@@ -41,14 +41,14 @@ int main(void)
 	ENTRY(pcurrent); 
 	ENTRY(irqrsp);
 	ENTRY(irqcount);
-	ENTRY(irqstack); 
 	ENTRY(cpunumber);
 	ENTRY(irqstackptr);
-	ENTRY(me);
 	ENTRY(__softirq_pending); 
 	ENTRY(__local_irq_count);
 	ENTRY(__local_bh_count);
 	ENTRY(__ksoftirqd_task);
+	ENTRY(level4_pgt);
+	ENTRY(me);
 #undef ENTRY
 	output("#ifdef __ASSEMBLY__"); 
 #define CONST(t) outconst("#define " #t " %0", t)

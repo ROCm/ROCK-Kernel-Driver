@@ -28,7 +28,9 @@
 #include <asm/pgalloc.h>
 
 /* Have we found an MP table */
-int smp_found_config = 0;
+int smp_found_config;
+
+int acpi_found_madt;
 
 /*
  * Various Linux-internal data structures created from the
@@ -60,6 +62,19 @@ static unsigned int num_processors = 0;
 
 /* Bitmask of physically existing CPUs */
 unsigned long phys_cpu_present_map = 0;
+
+/* ACPI MADT entry parsing functions */
+#ifdef CONFIG_ACPI_BOOT
+extern struct acpi_boot_flags acpi_boot;
+#ifdef CONFIG_X86_LOCAL_APIC
+extern int acpi_parse_lapic (acpi_table_entry_header *header);
+extern int acpi_parse_lapic_addr_ovr (acpi_table_entry_header *header);
+extern int acpi_parse_lapic_nmi (acpi_table_entry_header *header);
+#endif /*CONFIG_X86_LOCAL_APIC*/
+#ifdef CONFIG_X86_IO_APIC
+extern int acpi_parse_ioapic (acpi_table_entry_header *header);
+#endif /*CONFIG_X86_IO_APIC*/
+#endif /*CONFIG_ACPI_BOOT*/
 
 /*
  * Intel MP BIOS table parsing routines:
@@ -283,6 +298,7 @@ static int __init smp_read_mpc(struct mp_config_table *mpc)
 	printk("APIC at: 0x%X\n",mpc->mpc_lapic);
 
 	/* save the local APIC address, it might be non-default */
+	if (!acpi_found_madt)
 	mp_lapic_addr = mpc->mpc_lapic;
 
 	/*
@@ -294,6 +310,7 @@ static int __init smp_read_mpc(struct mp_config_table *mpc)
 			{
 				struct mpc_config_processor *m=
 					(struct mpc_config_processor *)mpt;
+				if (!acpi_found_madt)
 				MP_processor_info(m);
 				mpt += sizeof(*m);
 				count += sizeof(*m);
@@ -508,6 +525,21 @@ static struct intel_mp_floating *mpf_found;
 void __init get_smp_config (void)
 {
 	struct intel_mp_floating *mpf = mpf_found;
+
+#ifdef CONFIG_ACPI_BOOT
+	/*
+	 * Check if the MADT exists, and if so, use it to get processor
+	 * information (ACPI_MADT_LAPIC).  The MADT supports the concept
+	 * of both logical (e.g. HT) and physical processor(s); where the
+	 * MPS only supports physical.
+	 */
+	if (acpi_boot.madt) {
+		acpi_found_madt = acpi_table_parse(ACPI_APIC, acpi_parse_madt);
+		if (acpi_found_madt > 0)
+			acpi_table_parse_madt(ACPI_MADT_LAPIC, acpi_parse_lapic);
+	}
+#endif /*CONFIG_ACPI_BOOT*/
+
 	printk("Intel MultiProcessor Specification v1.%d\n", mpf->mpf_specification);
 	if (mpf->mpf_feature2 & (1<<7)) {
 		printk("    IMCR and PIC compatibility mode.\n");
@@ -566,7 +598,7 @@ void __init get_smp_config (void)
 
 static int __init smp_scan_config (unsigned long base, unsigned long length)
 {
-	unsigned long *bp = phys_to_virt(base);
+	unsigned int *bp = phys_to_virt(base);
 	struct intel_mp_floating *mpf;
 
 	Dprintk("Scan SMP from %p for %ld bytes.\n", bp,length);

@@ -14,8 +14,6 @@ void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
 	void *ret;
 	int gfp = GFP_ATOMIC;
 
-	/* We need to always allocate below 4Gig. We probably need new
-	   GPF mask to say that */ 
 	gfp |= GFP_DMA;
 	ret = (void *)__get_free_pages(gfp, get_order(size));
 

@@ -1,11 +1,11 @@
-#include <linux/config.h>
 #include <linux/types.h>
 #include <linux/string.h>
 #include <linux/sched.h>
+#include <linux/compiler.h>
 
 #include <asm/i387.h>
 #include <asm/hardirq.h> 
-
+#include <asm/page.h>
 
 /*
  *	MMX 3DNow! library helper functions
@@ -24,46 +24,50 @@
  *	22/09/2000 - Arjan van de Ven 
  *		Improved for non-egineering-sample Athlons 
  *
+ *	2002 Andi Kleen. Some cleanups and changes for x86-64. 
+ *	Not really tuned yet. Using the Athlon version for now.
+ *      This currenly uses MMX for 8 byte stores, but on hammer we could
+ *      use integer 8 byte stores too and avoid the FPU save overhead.
+ *	Disadvantage is that the integer load/stores have strong ordering
+ *	model and may be slower.
+ * 
+ *	$Id$
  */
 
-#error Don't use these for now, but we'll have to provide optimized functions in future
+#ifdef MMX_MEMCPY_THRESH
+
  
 void *_mmx_memcpy(void *to, const void *from, size_t len)
 {
  	void *p;
  	int i;
   
- 	if (in_interrupt())
- 		return __memcpy(to, from, len);
- 
  	p = to;
+
+ 	if (unlikely(in_interrupt()))
+		goto standard;
+	
+	/* XXX: check if this is still memory bound with unaligned to/from.
+	   if not align them here to 8bytes. */
  	i = len >> 6; /* len/64 */
  
  	kernel_fpu_begin();
 
 	__asm__ __volatile__ (
-		"1: prefetch (%0)\n"		/* This set is 28 bytes */
+		"   prefetch (%0)\n"		/* This set is 28 bytes */
 		"   prefetch 64(%0)\n"
 		"   prefetch 128(%0)\n"
 		"   prefetch 192(%0)\n"
 		"   prefetch 256(%0)\n"
-		"2:  \n"
-		".section .fixup, \"ax\"\n"
-		"3: movw $0x1AEB, 1b\n"	/* jmp on 26 bytes */
-		"   jmp 2b\n"
-		".previous\n"
-		".section __ex_table,\"a\"\n"
-		"	.align 4\n"
-		"	.long 1b, 3b\n"
-		".previous"
+		"\n"
 		: : "r" (from) );
 		
 	
 	for(; i>0; i--)
 	{
 		__asm__ __volatile__ (
-		"1:  prefetch 320(%0)\n"
-		"2:  movq (%0), %%mm0\n"
+		"  prefetch 320(%0)\n"
+		"  movq (%0), %%mm0\n"
 		"  movq 8(%0), %%mm1\n"
 		"  movq 16(%0), %%mm2\n"
 		"  movq 24(%0), %%mm3\n"
@@ -79,34 +83,24 @@ void *_mmx_memcpy(void *to, const void *from, size_t len)
 		"  movq %%mm1, 40(%1)\n"
 		"  movq %%mm2, 48(%1)\n"
 		"  movq %%mm3, 56(%1)\n"
-		".section .fixup, \"ax\"\n"
-		"3: movw $0x05EB, 1b\n"	/* jmp on 5 bytes */
-		"   jmp 2b\n"
-		".previous\n"
-		".section __ex_table,\"a\"\n"
-		"	.align 4\n"
-		"	.long 1b, 3b\n"
-		".previous"
 		: : "r" (from), "r" (to) : "memory");
 		from+=64;
 		to+=64;
 	}
+	len &= 63; 	
+	kernel_fpu_end();
+
 	/*
 	 *	Now do the tail of the block
 	 */
-	__memcpy(to, from, len&63);
-	kernel_fpu_end();
+
+ standard:
+	__inline_memcpy(to, from, len);
 	return p;
 }
+#endif
 
-#ifdef CONFIG_MK7
-
-/*
- *	The K7 has streaming cache bypass load/store. The Cyrix III, K6 and
- *	other MMX using processors do not.
- */
-
-static void fast_clear_page(void *page)
+static inline void fast_clear_page(void *page)
 {
 	int i;
 
@@ -139,7 +133,7 @@ static void fast_clear_page(void *page)
 	kernel_fpu_end();
 }
 
-static void fast_copy_page(void *to, void *from)
+static inline void fast_copy_page(void *to, void *from)
 {
 	int i;
 
@@ -149,27 +143,18 @@ static void fast_copy_page(void *to, void *from)
 	 * but that is for later. -AV
 	 */
 	__asm__ __volatile__ (
-		"1: prefetch (%0)\n"
+		"   prefetch (%0)\n"
 		"   prefetch 64(%0)\n"
 		"   prefetch 128(%0)\n"
 		"   prefetch 192(%0)\n"
 		"   prefetch 256(%0)\n"
-		"2:  \n"
-		".section .fixup, \"ax\"\n"
-		"3: movw $0x1AEB, 1b\n"	/* jmp on 26 bytes */
-		"   jmp 2b\n"
-		".previous\n"
-		".section __ex_table,\"a\"\n"
-		"	.align 4\n"
-		"	.long 1b, 3b\n"
-		".previous"
 		: : "r" (from) );
 
 	for(i=0; i<(4096-320)/64; i++)
 	{
 		__asm__ __volatile__ (
-		"1: prefetch 320(%0)\n"
-		"2: movq (%0), %%mm0\n"
+		"   prefetch 320(%0)\n"
+		"   movq (%0), %%mm0\n"
 		"   movntq %%mm0, (%1)\n"
 		"   movq 8(%0), %%mm1\n"
 		"   movntq %%mm1, 8(%1)\n"
@@ -185,14 +170,6 @@ static void fast_copy_page(void *to, void *from)
 		"   movntq %%mm6, 48(%1)\n"
 		"   movq 56(%0), %%mm7\n"
 		"   movntq %%mm7, 56(%1)\n"
-		".section .fixup, \"ax\"\n"
-		"3: movw $0x05EB, 1b\n"	/* jmp on 5 bytes */
-		"   jmp 2b\n"
-		".previous\n"
-		".section __ex_table,\"a\"\n"
-		"	.align 4\n"
-		"	.long 1b, 3b\n"
-		".previous"
 		: : "r" (from), "r" (to) : "memory");
 		from+=64;
 		to+=64;
@@ -229,149 +206,28 @@ static void fast_copy_page(void *to, void *from)
 	kernel_fpu_end();
 }
 
-#else
-
-/*
- *	Generic MMX implementation without K7 specific streaming
- */
- 
-static void fast_clear_page(void *page)
-{
-	int i;
-	
-	kernel_fpu_begin();
-	
-	__asm__ __volatile__ (
-		"  pxor %%mm0, %%mm0\n" : :
-	);
-
-	for(i=0;i<4096/128;i++)
-	{
-		__asm__ __volatile__ (
-		"  movq %%mm0, (%0)\n"
-		"  movq %%mm0, 8(%0)\n"
-		"  movq %%mm0, 16(%0)\n"
-		"  movq %%mm0, 24(%0)\n"
-		"  movq %%mm0, 32(%0)\n"
-		"  movq %%mm0, 40(%0)\n"
-		"  movq %%mm0, 48(%0)\n"
-		"  movq %%mm0, 56(%0)\n"
-		"  movq %%mm0, 64(%0)\n"
-		"  movq %%mm0, 72(%0)\n"
-		"  movq %%mm0, 80(%0)\n"
-		"  movq %%mm0, 88(%0)\n"
-		"  movq %%mm0, 96(%0)\n"
-		"  movq %%mm0, 104(%0)\n"
-		"  movq %%mm0, 112(%0)\n"
-		"  movq %%mm0, 120(%0)\n"
-		: : "r" (page) : "memory");
-		page+=128;
-	}
-
-	kernel_fpu_end();
-}
-
-static void fast_copy_page(void *to, void *from)
-{
-	int i;
-	
-	
-	kernel_fpu_begin();
-
-	__asm__ __volatile__ (
-		"1: prefetch (%0)\n"
-		"   prefetch 64(%0)\n"
-		"   prefetch 128(%0)\n"
-		"   prefetch 192(%0)\n"
-		"   prefetch 256(%0)\n"
-		"2:  \n"
-		".section .fixup, \"ax\"\n"
-		"3: movw $0x1AEB, 1b\n"	/* jmp on 26 bytes */
-		"   jmp 2b\n"
-		".previous\n"
-		".section __ex_table,\"a\"\n"
-		"	.align 4\n"
-		"	.long 1b, 3b\n"
-		".previous"
-		: : "r" (from) );
-
-	for(i=0; i<4096/64; i++)
-	{
-		__asm__ __volatile__ (
-		"1: prefetch 320(%0)\n"
-		"2: movq (%0), %%mm0\n"
-		"   movq 8(%0), %%mm1\n"
-		"   movq 16(%0), %%mm2\n"
-		"   movq 24(%0), %%mm3\n"
-		"   movq %%mm0, (%1)\n"
-		"   movq %%mm1, 8(%1)\n"
-		"   movq %%mm2, 16(%1)\n"
-		"   movq %%mm3, 24(%1)\n"
-		"   movq 32(%0), %%mm0\n"
-		"   movq 40(%0), %%mm1\n"
-		"   movq 48(%0), %%mm2\n"
-		"   movq 56(%0), %%mm3\n"
-		"   movq %%mm0, 32(%1)\n"
-		"   movq %%mm1, 40(%1)\n"
-		"   movq %%mm2, 48(%1)\n"
-		"   movq %%mm3, 56(%1)\n"
-		".section .fixup, \"ax\"\n"
-		"3: movw $0x05EB, 1b\n"	/* jmp on 5 bytes */
-		"   jmp 2b\n"
-		".previous\n"
-		".section __ex_table,\"a\"\n"
-		"	.align 4\n"
-		"	.long 1b, 3b\n"
-		".previous"
-		: : "r" (from), "r" (to) : "memory");
-		from+=64;
-		to+=64;
-	}
-	kernel_fpu_end();
-}
-
-
-#endif
-
-/*
- *	Favour MMX for page clear and copy. 
- */
-
-static void slow_zero_page(void * page)
-{
-	int d0, d1;
-	__asm__ __volatile__( \
-		"cld\n\t" \
-		"rep ; stosl" \
-		: "=&c" (d0), "=&D" (d1)
-		:"a" (0),"1" (page),"0" (1024)
-		:"memory");
-}
- 
 void mmx_clear_page(void * page)
 {
-	if(in_interrupt())
-		slow_zero_page(page);
+#if 1 
+	__builtin_memset(page,0,PAGE_SIZE);
+#else
+	/* AK: these in_interrupt checks should not be needed. */
+	if(unlikely(in_interrupt()))
+		__builtin_memset(page,0,PAGE_SIZE);
 	else
 		fast_clear_page(page);
+#endif
 }
-
-static void slow_copy_page(void *to, void *from)
-{
-	int d0, d1, d2;
-	__asm__ __volatile__( \
-		"cld\n\t" \
-		"rep ; movsl" \
-		: "=&c" (d0), "=&D" (d1), "=&S" (d2) \
-		: "0" (1024),"1" ((long) to),"2" ((long) from) \
-		: "memory");
-}
-  
 
 void mmx_copy_page(void *to, void *from)
 {
-	if(in_interrupt())
-		slow_copy_page(to, from);
+#if 1
+	__builtin_memcpy(to,from,PAGE_SIZE);
+#else
+	/* AK: these in_interrupt checks should not be needed. */
+	if(unlikely(in_interrupt()))
+		__builtin_memcpy(to,from,PAGE_SIZE);
 	else
 		fast_copy_page(to, from);
+#endif
 }

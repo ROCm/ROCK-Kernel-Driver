@@ -545,11 +545,28 @@ ide_startstop_t recal_intr(ide_drive_t *drive)
 }
 
 /*
+ * Quiet handler for commands without a data phase -- handy instead of
+ * task_no_data_intr() for commands we _know_ will fail (such as WIN_NOP)
+ */
+ide_startstop_t task_no_data_quiet_intr(ide_drive_t *drive)
+{
+	struct ata_request *ar = IDE_CUR_AR(drive);
+	struct ata_taskfile *args = &ar->ar_task;
+
+	ide__sti();	/* local CPU only */
+
+	if (args)
+		ide_end_drive_cmd(drive, GET_STAT(), GET_ERR());
+
+	return ide_stopped;
+}
+
+/*
  * Handler for commands without a data phase
  */
 ide_startstop_t task_no_data_intr (ide_drive_t *drive)
 {
-	struct ata_request *ar = HWGROUP(drive)->rq->special;
+	struct ata_request *ar = IDE_CUR_AR(drive);
 	struct ata_taskfile *args = &ar->ar_task;
 	u8 stat = GET_STAT();
 
@@ -892,6 +909,7 @@ void ide_cmd_type_parser(struct ata_taskfile *args)
 			return;
 
 		case WIN_NOP:
+			args->handler = task_no_data_quiet_intr;
 			args->command_type = IDE_DRIVE_TASK_NO_DATA;
 			return;
 
@@ -919,6 +937,7 @@ int ide_raw_taskfile(ide_drive_t *drive, struct ata_taskfile *args, byte *buf)
 {
 	struct request rq;
 	struct ata_request star;
+	int ret;
 
 	ata_ar_init(drive, &star);
 	init_taskfile_request(&rq);
@@ -933,7 +952,13 @@ int ide_raw_taskfile(ide_drive_t *drive, struct ata_taskfile *args, byte *buf)
 
 	rq.special = &star;
 
-	return ide_do_drive_cmd(drive, &rq, ide_wait);
+	ret = ide_do_drive_cmd(drive, &rq, ide_wait);
+
+	/*
+	 * copy back status etc
+	 */
+	memcpy(args, &star.ar_task, sizeof(*args));
+	return ret;
 }
 
 /*

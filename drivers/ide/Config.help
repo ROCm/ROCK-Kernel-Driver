@@ -753,24 +753,11 @@ CONFIG_BLK_DEV_IDE_TCQ
   Support for tagged command queueing on ATA disk drives. This enables
   the IDE layer to have multiple in-flight requests on hardware that
   supports it. For now this includes the IBM Deskstar series drives,
-  such as the GXP75, 40GV, GXP60, and GXP120 (ie any Deskstar made in
-  the last couple of years).
+  such as the 22GXP, 75GXP, 40GV, 60GXP, and 120GXP (ie any Deskstar made
+  in the last couple of years), and at least some of the Western
+  Digital drives in the Expert series.
 
   If you have such a drive, say Y here.
-
-CONFIG_BLK_DEV_IDE_TCQ_FULL
-  When a command completes from the drive, the SERVICE bit is checked to
-  see if other queued commands are ready to be started. Doing this
-  immediately after a command completes has a tendency to 'starve' the
-  device hardware queue, since we risk emptying the queue completely
-  before starting any new commands. This shows up during stressing the
-  drive as a /\/\/\/\ queue size balance, where we could instead try and
-  maintain a minimum queue size and get a /---------\ graph instead.
-
-  Saying Y here will attempt to always keep the queue full when possible
-  at the cost of possibly increasing command turn-around latency.
-
-  Generally say Y here.
 
 CONFIG_BLK_DEV_IDE_TCQ_DEPTH
   Maximum size of commands to enable per-drive. Any value between 1

@@ -1317,12 +1317,6 @@ static ide_drive_t *choose_drive(ide_hwgroup_t *hwgroup)
 	return NULL;
 }
 
-#ifdef CONFIG_BLK_DEV_IDE_TCQ
-ide_startstop_t ide_check_service(ide_drive_t *drive);
-#else
-#define ide_check_service(drive)	(ide_stopped)
-#endif
-
 /*
  * feed commands to a drive until it barfs. used to be part of ide_do_request.
  * called with ide_lock/DRIVE_LOCK held and busy hwgroup
@@ -1332,7 +1326,6 @@ static void ide_queue_commands(ide_drive_t *drive, int masked_irq)
 	ide_hwgroup_t *hwgroup = HWGROUP(drive);
 	ide_startstop_t startstop = -1;
 	struct request *rq;
-	int do_service = 0;
 
 	do {
 		rq = NULL;
@@ -1388,7 +1381,6 @@ static void ide_queue_commands(ide_drive_t *drive, int masked_irq)
 
 		hwgroup->rq = rq;
 
-service:
 		/*
 		 * Some systems have trouble with IDE IRQs arriving while
 		 * the driver is still setting things up.  So, here we disable
@@ -1403,10 +1395,7 @@ service:
 
 		spin_unlock(&ide_lock);
 		ide__sti();	/* allow other IRQs while we start this request */
-		if (!do_service)
-			startstop = start_request(drive, rq);
-		else
-			startstop = ide_check_service(drive);
+		startstop = start_request(drive, rq);
 
 		spin_lock_irq(&ide_lock);
 		if (masked_irq && HWIF(drive)->irq != masked_irq)
@@ -1433,9 +1422,6 @@ service:
 
 	if (startstop == ide_started)
 		return;
-
-	if ((do_service = drive->service_pending))
-		goto service;
 }
 
 /*

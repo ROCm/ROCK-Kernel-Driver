@@ -49,14 +49,15 @@
 #include <asm/mpspec.h>
 #include <asm/mmu_context.h>
 #include <asm/bootsetup.h>
+#include <asm/smp.h>
 
 /*
  * Machine setup..
  */
 
 extern void mcheck_init(struct cpuinfo_x86 *c);
+extern void init_memory_mapping(void);
 
-char ignore_irq13;		/* set if exception 16 works */
 struct cpuinfo_x86 boot_cpu_data = { 0, 0, 0, 0, -1, 1, 0, 0, -1 };
 
 unsigned long mmu_cr4_features;
@@ -69,7 +70,6 @@ unsigned long pci_mem_start = 0x10000000;
  */
 struct drive_info_struct { char dummy[32]; } drive_info;
 struct screen_info screen_info;
-struct apm_info apm_info;
 struct sys_desc_table_struct {
 	unsigned short length;
 	unsigned char table[0];
@@ -81,7 +81,6 @@ unsigned char aux_device_present;
 
 extern int root_mountflags;
 extern char _text, _etext, _edata, _end;
-extern unsigned long cpu_khz;
 
 static int disable_x86_fxsr __initdata = 0;
 
@@ -201,8 +200,8 @@ static void __init print_memory_map(char *who)
 
 	for (i = 0; i < e820.nr_map; i++) {
 		printk(" %s: %016Lx - %016Lx ", who,
-			(unsigned long long)e820.map[i].addr,
-			(unsigned long long)(e820.map[i].addr + e820.map[i].size));
+			(unsigned long long) e820.map[i].addr,
+			(unsigned long long) (e820.map[i].addr + e820.map[i].size));
 		switch (e820.map[i].type) {
 		case E820_RAM:	printk("(usable)\n");
 				break;
@@ -215,7 +214,7 @@ static void __init print_memory_map(char *who)
 		case E820_NVS:
 				printk("(ACPI NVS)\n");
 				break;
-		default:	printk("type %lu\n", (unsigned long)e820.map[i].type);
+		default:	printk("type %u\n", e820.map[i].type);
 				break;
 		}
 	}
@@ -544,16 +543,16 @@ static inline void parse_mem_cmdline (char ** cmdline_p)
 	}
 }
 
+unsigned long start_pfn, end_pfn; 
+
 void __init setup_arch(char **cmdline_p)
 {
 	unsigned long bootmap_size, low_mem_size;
-	unsigned long start_pfn, max_pfn, max_low_pfn;
 	int i;
 
  	ROOT_DEV = to_kdev_t(ORIG_ROOT_DEV);
  	drive_info = DRIVE_INFO;
  	screen_info = SCREEN_INFO;
-	apm_info.bios = APM_BIOS_INFO;
 	aux_device_present = AUX_DEVICE_INFO;
 
 #ifdef CONFIG_BLK_DEV_RAM
@@ -581,20 +580,20 @@ void __init setup_arch(char **cmdline_p)
 #define PFN_DOWN(x)	((x) >> PAGE_SHIFT)
 #define PFN_PHYS(x)	((x) << PAGE_SHIFT)
 
-#define VMALLOC_RESERVE	(unsigned long)(4096 << 20)
-#define MAXMEM		(unsigned long)(-PAGE_OFFSET-VMALLOC_RESERVE)
+#define MAXMEM		(120UL * 1024 * 1024 * 1024 * 1024)  /* 120TB */ 
 #define MAXMEM_PFN	PFN_DOWN(MAXMEM)
+#define MAX_NONPAE_PFN	(1 << 20)
 
 	/*
 	 * partially used pages are not usable - thus
 	 * we are rounding upwards:
 	 */
-	start_pfn = PFN_UP(__pa(&_end));
+	start_pfn = PFN_UP(__pa_symbol(&_end));
 
 	/*
 	 * Find the highest page frame number we have available
 	 */
-	max_pfn = 0;
+	end_pfn = 0;
 	for (i = 0; i < e820.nr_map; i++) {
 		unsigned long start, end;
 		/* RAM? */
@@ -604,23 +603,20 @@ void __init setup_arch(char **cmdline_p)
 		end = PFN_DOWN(e820.map[i].addr + e820.map[i].size);
 		if (start >= end)
 			continue;
-		if (end > max_pfn)
-			max_pfn = end;
+		if (end > end_pfn)
+			end_pfn = end;
 	}
 
-	/*
-	 * Determine low and high memory ranges:
-	 */
-	max_low_pfn = max_pfn;
-	if (max_low_pfn > MAXMEM_PFN) {
-		max_low_pfn = MAXMEM_PFN;
+	if (end_pfn > MAXMEM_PFN) {
+		end_pfn = MAXMEM_PFN;
 	}
 
+	init_memory_mapping(); 
 
 	/*
 	 * Initialize the boot-time allocator (with low memory only):
 	 */
-	bootmap_size = init_bootmem(start_pfn, max_low_pfn);
+	bootmap_size = init_bootmem(start_pfn, end_pfn);
 
 	/*
 	 * Register fully available low RAM pages with the bootmem allocator.
@@ -636,15 +632,15 @@ void __init setup_arch(char **cmdline_p)
 		 * We are rounding up the start address of usable memory:
 		 */
 		curr_pfn = PFN_UP(e820.map[i].addr);
-		if (curr_pfn >= max_low_pfn)
+		if (curr_pfn >= end_pfn)
 			continue;
 		/*
 		 * ... and at the end of the usable range downwards:
 		 */
 		last_pfn = PFN_DOWN(e820.map[i].addr + e820.map[i].size);
 
-		if (last_pfn > max_low_pfn)
-			last_pfn = max_low_pfn;
+		if (last_pfn > end_pfn)
+			last_pfn = end_pfn;
 
 		/*
 		 * .. finally, did all the rounding and playing
@@ -679,7 +675,12 @@ void __init setup_arch(char **cmdline_p)
 	 */
 	reserve_bootmem(PAGE_SIZE, PAGE_SIZE);
 #endif
-
+#ifdef CONFIG_ACPI_SLEEP
+       /*
+        * Reserve low memory region for sleep support.
+        */
+       acpi_reserve_bootmem();
+#endif
 #ifdef CONFIG_X86_LOCAL_APIC
 	/*
 	 * Find and reserve possible boot-time SMP configuration:
@@ -713,6 +714,15 @@ void __init setup_arch(char **cmdline_p)
 	smp_alloc_memory(); /* AP processor realmode stacks in low memory*/
 #endif
 	paging_init();
+#ifdef CONFIG_ACPI_BOOT
+       /*
+        * Initialize the ACPI boot-time table parser (gets the RSDP and SDT).
+        * Must do this after paging_init (due to reliance on fixmap, and thus
+        * the bootmem allocator) but before get_smp_config (to allow parsing
+        * of MADT).
+        */
+       acpi_boot_init(*cmdline_p);
+#endif
 #ifdef CONFIG_X86_LOCAL_APIC
 	/*
 	 * get boot-time SMP configuration:
@@ -760,6 +770,7 @@ void __init setup_arch(char **cmdline_p)
 		request_resource(&ioport_resource, standard_io_resources+i);
 
 	/* Tell the PCI layer not to allocate too close to the RAM area.. */
+	/* ??? move this up on x86-64 */
 	low_mem_size = ((max_low_pfn << PAGE_SHIFT) + 0xfffff) & ~0xfffff;
 	if (low_mem_size > pci_mem_start)
 		pci_mem_start = low_mem_size;
@@ -834,6 +845,15 @@ static int __init init_amd(struct cpuinfo_x86 *c)
 	clear_bit(0*32+31, &c->x86_capability);
 	
 	r = get_model_name(c);
+	if (!r) { 
+		switch (c->x86) { 
+		case 15:
+			/* Should distingush Models here, but this is only
+			   a fallback anyways. */
+			strcpy(c->x86_model_id, "Hammer");
+			break; 
+		} 
+	} 
 	display_cacheinfo(c);
 	return r;
 }
@@ -1016,7 +1036,6 @@ void __init print_cpu_info(struct cpuinfo_x86 *c)
 static int show_cpuinfo(struct seq_file *m, void *v)
 {
 	struct cpuinfo_x86 *c = v;
-	int index = c - cpu_data;
 
 	/* 
 	 * These flag bits must match the definitions in <asm/cpufeature.h>.
@@ -1036,7 +1055,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 		/* AMD-defined */
 		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 		NULL, NULL, NULL, "syscall", NULL, NULL, NULL, NULL,
-		NULL, NULL, NULL, NULL, NULL, NULL, "mmxext", NULL,
+		NULL, NULL, NULL, NULL, "nx", NULL, "mmxext", NULL,
 		NULL, NULL, NULL, NULL, NULL, "lm", "3dnowext", "3dnow",
 
 		/* Transmeta-defined */
@@ -1057,15 +1076,15 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 		return 0;
 #endif
 
-	seq_printf(m,"processor\t: %d\n"
+	seq_printf(m,"processor\t: %u\n"
 		     "vendor_id\t: %s\n"
 		     "cpu family\t: %d\n"
 		     "model\t\t: %d\n"
 		     "model name\t: %s\n",
-		   index,
+		     (unsigned)(c-cpu_data),
 		     c->x86_vendor_id[0] ? c->x86_vendor_id : "unknown",
 		     c->x86,
-		     c->x86_model,
+		     (int)c->x86_model,
 		     c->x86_model_id[0] ? c->x86_model_id : "unknown");
 	
 	if (c->x86_mask || c->cpuid_level >= 0)
@@ -1074,7 +1093,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 		seq_printf(m, "stepping\t: unknown\n");
 	
 	if ( test_bit(X86_FEATURE_TSC, &c->x86_capability) ) {
-		seq_printf(m, "cpu MHz\t\t: %lu.%03lu\n",
+		seq_printf(m, "cpu MHz\t\t: %u.%03u\n",
 			     cpu_khz / 1000, (cpu_khz % 1000));
 	}
 

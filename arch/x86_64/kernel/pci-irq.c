@@ -12,7 +12,6 @@
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
-
 #include <asm/io.h>
 #include <asm/smp.h>
 #include <asm/io_apic.h>
@@ -21,6 +20,8 @@
 
 #define PIRQ_SIGNATURE	(('$' << 0) + ('P' << 8) + ('I' << 16) + ('R' << 24))
 #define PIRQ_VERSION 0x0100
+
+int pci_use_acpi_routing = 0;
 
 static struct irq_routing_table *pirq_table;
 
@@ -461,6 +462,8 @@ static struct irq_router pirq_routers[] = {
 	{ "VLSI 82C534", PCI_VENDOR_ID_VLSI, PCI_DEVICE_ID_VLSI_82C534, pirq_vlsi_get, pirq_vlsi_set },
 	{ "ServerWorks", PCI_VENDOR_ID_SERVERWORKS, PCI_DEVICE_ID_SERVERWORKS_OSB4,
 	  pirq_serverworks_get, pirq_serverworks_set },
+	{ "ServerWorks", PCI_VENDOR_ID_SERVERWORKS, PCI_DEVICE_ID_SERVERWORKS_CSB5,
+	  pirq_serverworks_get, pirq_serverworks_set },
 	{ "AMD756 VIPER", PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_VIPER_740B,
 		pirq_amd756_get, pirq_amd756_set },
 
@@ -529,6 +532,54 @@ static void pcibios_test_irq_handler(int irq, void *dev_id, struct pt_regs *regs
 {
 }
 
+#ifdef CONFIG_ACPI_PCI
+
+static int acpi_lookup_irq (
+	struct pci_dev		*dev,
+	u8			pin,
+	int			assign)
+{
+	int			result = 0;
+	int			irq = 0;
+
+	/* TBD: Select IRQ from possible to improve routing performance. */
+
+	result = acpi_prt_get_irq(dev, pin, &irq);
+	if (!irq)
+		result = -ENODEV;
+	if (0 != result) {
+		printk(KERN_WARNING "PCI: No IRQ known for interrupt pin %c of device %s\n",
+		       'A'+pin, dev->slot_name);
+		return result;
+	}
+
+	dev->irq = irq;
+
+	if (!assign) {
+		/* only check for the IRQ */
+		printk(KERN_INFO "PCI: Found IRQ %d for device %s\n", irq, 
+		       dev->slot_name);
+		return 1;
+	}
+
+	/* also assign an IRQ */
+	if (irq && (dev->class >> 8) != PCI_CLASS_DISPLAY_VGA) {
+		result = acpi_prt_set_irq(dev, pin, irq);
+		if (0 != result) {
+			printk(KERN_WARNING "PCI: Could not assign IRQ %d to device %s\n", irq, dev->slot_name);
+			return result;
+		}
+
+		eisa_set_level_irq(irq);
+
+		printk(KERN_INFO "PCI: Assigned IRQ %d for device %s\n", irq, dev->slot_name);
+	}
+
+	return 1;
+}
+
+#endif /* CONFIG_ACPI_PCI */
+
 static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 {
 	u8 pin;
@@ -540,16 +591,24 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 	struct pci_dev *dev2;
 	char *msg = NULL;
 
-	if (!pirq_table)
-		return 0;
-
-	/* Find IRQ routing entry */
+	/* Find IRQ pin */
 	pci_read_config_byte(dev, PCI_INTERRUPT_PIN, &pin);
 	if (!pin) {
 		DBG(" -> no interrupt pin\n");
 		return 0;
 	}
 	pin = pin - 1;
+	
+#ifdef CONFIG_ACPI_PCI
+	/* Use ACPI to lookup IRQ */
+	if (pci_use_acpi_routing)
+		return acpi_lookup_irq(dev, pin, assign);
+#endif
+
+	/* Find IRQ routing entry */
+
+	if (!pirq_table)
+		return 0;
 	
 	DBG("IRQ for %s:%d", dev->slot_name, pin);
 	info = pirq_get_info(dev);
@@ -571,6 +630,10 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 	 * reported by the device if possible.
 	 */
 	newirq = dev->irq;
+	if (!((1 << newirq) & mask)) {
+		if ( pci_probe & PCI_USE_PIRQ_MASK) newirq = 0;
+		else printk(KERN_WARNING "PCI: IRQ %i for device %s doesn't match PIRQ mask - try pci=usepirqmask\n", newirq, dev->slot_name);
+	}
 	if (!newirq && assign) {
 		for (i = 0; i < 16; i++) {
 			if (!(mask & (1 << i)))
@@ -589,7 +652,8 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 		irq = pirq & 0xf;
 		DBG(" -> hardcoded IRQ %d\n", irq);
 		msg = "Hardcoded";
-	} else if (r->get && (irq = r->get(pirq_router_dev, dev, pirq))) {
+	} else if ( r->get && (irq = r->get(pirq_router_dev, dev, pirq)) && \
+	((!(pci_probe & PCI_USE_PIRQ_MASK)) || ((1 << irq) & mask)) ) {
 		DBG(" -> got IRQ %d\n", irq);
 		msg = "Found";
 	} else if (newirq && r->set && (dev->class >> 8) != PCI_CLASS_DISPLAY_VGA) {
@@ -623,7 +687,9 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 			continue;
 		if (info->irq[pin].link == pirq) {
 			/* We refuse to override the dev->irq information. Give a warning! */
-		    	if (dev2->irq && dev2->irq != irq) {
+		    	if ( dev2->irq && dev2->irq != irq && \
+			(!(pci_probe & PCI_USE_PIRQ_MASK) || \
+			((1 << dev2->irq) & mask)) ) {
 		    		printk(KERN_INFO "IRQ routing conflict for %s, have irq %d, want irq %d\n",
 				       dev2->slot_name, dev2->irq, irq);
 		    		continue;
@@ -640,7 +706,21 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 void __init pcibios_irq_init(void)
 {
 	DBG("PCI: IRQ init\n");
+
+#ifdef CONFIG_ACPI_PCI
+	if (!(pci_probe & PCI_NO_ACPI_ROUTING)) {
+		if (acpi_prts.count) {
+			printk(KERN_INFO "PCI: Using ACPI for IRQ routing\n");
+			pci_use_acpi_routing = 1;
+			return;
+		}
+		else
+			printk(KERN_WARNING "PCI: Invalid ACPI-PCI IRQ routing table\n");
+	}
+#endif
+
 	pirq_table = pirq_find_routing_table();
+
 #ifdef CONFIG_PCI_BIOS
 	if (!pirq_table && (pci_probe & PCI_BIOS_IRQ_SCAN))
 		pirq_table = pcibios_get_irq_routing_table();

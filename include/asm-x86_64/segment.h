@@ -4,6 +4,8 @@
 #define __KERNEL_CS	0x10
 #define __KERNEL_DS	0x18
 
+#define __KERNEL32_CS   0x38
+
 /* 
  * we cannot use the same code segment descriptor for user and kernel
  * even not in the long flat model, because of different DPL /kkeil 

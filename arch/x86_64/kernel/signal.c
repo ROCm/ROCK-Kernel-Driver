@@ -24,12 +24,13 @@
 #include <linux/stddef.h>
 #include <linux/tty.h>
 #include <linux/personality.h>
+#include <linux/compiler.h>
 #include <linux/binfmts.h>
 #include <asm/ucontext.h>
 #include <asm/uaccess.h>
 #include <asm/i387.h>
 
-#define DEBUG_SIG 0
+/* #define DEBUG_SIG 1 */
 
 #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
 
@@ -120,8 +121,7 @@ struct rt_sigframe
 	char *pretcode;
 	struct ucontext uc;
 	struct siginfo info;
-	struct _fpstate fpstate;
-	char retcode[8];
+	struct _fpstate fpstate __attribute__((aligned(8)));
 };
 
 static int
@@ -129,26 +129,17 @@ restore_sigcontext(struct pt_regs *regs, struct sigcontext *sc, unsigned long *p
 {
 	unsigned int err = 0;
 
+
 #define COPY(x)		err |= __get_user(regs->x, &sc->x)
 
-#define COPY_SEG(seg)							\
-	{ unsigned short tmp;						\
-	  err |= __get_user(tmp, &sc->seg);				\
-	  regs->x##seg = tmp; }
+	{ 
+		unsigned int seg; 
+		err |= __get_user(seg, &sc->gs); 
+		load_gs_index(seg); 
+		err |= __get_user(seg, &sc->fs);
+		loadsegment(fs,seg);
+	}
 
-#define COPY_SEG_STRICT(seg)						\
-	{ unsigned short tmp;						\
-	  err |= __get_user(tmp, &sc->seg);				\
-	  regs->x##seg = tmp|3; }
-
-#define GET_SEG(seg)							\
-	{ unsigned short tmp;						\
-	  err |= __get_user(tmp, &sc->seg);				\
-	  loadsegment(seg,tmp); }
-
-	/* XXX: rdmsr for 64bits */ 
-	GET_SEG(gs);
-	GET_SEG(fs);
 	COPY(rdi); COPY(rsi); COPY(rbp); COPY(rsp); COPY(rbx);
 	COPY(rdx); COPY(rcx); COPY(rip);
 	COPY(r8);
@@ -160,7 +151,6 @@ restore_sigcontext(struct pt_regs *regs, struct sigcontext *sc, unsigned long *p
 	COPY(r14);
 	COPY(r15);
 
-	
 	{
 		unsigned int tmpflags;
 		err |= __get_user(tmpflags, &sc->eflags);
@@ -235,6 +225,7 @@ setup_sigcontext(struct sigcontext *sc, struct _fpstate *fpstate,
 		 struct pt_regs *regs, unsigned long mask)
 {
 	int tmp, err = 0;
+	struct task_struct *me = current;
 
 	tmp = 0;
 	__asm__("movl %%gs,%0" : "=r"(tmp): "0"(tmp));
@@ -258,21 +249,18 @@ setup_sigcontext(struct sigcontext *sc, struct _fpstate *fpstate,
 	err |= __put_user(regs->r13, &sc->r13);
 	err |= __put_user(regs->r14, &sc->r14);
 	err |= __put_user(regs->r15, &sc->r15);
-	err |= __put_user(current->thread.trap_no, &sc->trapno);
-	err |= __put_user(current->thread.error_code, &sc->err);
+	err |= __put_user(me->thread.trap_no, &sc->trapno);
+	err |= __put_user(me->thread.error_code, &sc->err);
 	err |= __put_user(regs->rip, &sc->rip);
 	err |= __put_user(regs->eflags, &sc->eflags);
-	err |= __put_user(regs->rsp, &sc->rsp_at_signal);
+	err |= __put_user(mask, &sc->oldmask);
+	err |= __put_user(me->thread.cr2, &sc->cr2);
 
 	tmp = save_i387(fpstate);
 	if (tmp < 0)
 	  err = 1;
 	else
 	  err |= __put_user(tmp ? fpstate : NULL, &sc->fpstate);
-
-	/* non-iBCS2 extensions.. */
-	err |= __put_user(mask, &sc->oldmask);
-	err |= __put_user(current->thread.cr2, &sc->cr2);
 
 	return err;
 }
@@ -294,13 +282,20 @@ get_sigframe(struct k_sigaction *ka, struct pt_regs * regs, size_t frame_size)
 			rsp = current->sas_ss_sp + current->sas_ss_size;
 	}
 
-	return (void *)((rsp - frame_size) & -16UL);
+	{ 
+		extern void bad_sigframe(void); 
+		/* beginning of sigframe is 8 bytes misaligned, but fpstate
+		   must end up on a 16byte boundary */ 
+		if ((offsetof(struct rt_sigframe, fpstate) & 16) != 0) 
+			bad_sigframe(); 		
+	} 
+
+	return (void *)((rsp - frame_size) & ~(15UL)) - 8;
 }
 
 static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 			   sigset_t *set, struct pt_regs * regs)
 {
-	struct thread_info *ti; 
 	struct rt_sigframe *frame;
 	int err = 0;
 
@@ -346,16 +341,16 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	printk("%d old rip %lx old rsp %lx old rax %lx\n", current->pid,regs->rip,regs->rsp,regs->rax);
 #endif
 
-	ti = current_thread_info(); 
 
 	/* Set up registers for signal handler */
-	regs->rdi = (ti->exec_domain
-		     && ti->exec_domain->signal_invmap
-		     && sig < 32
-		     ? ti->exec_domain->signal_invmap[sig]
-		     : sig);
-	regs->rax = 0;	/* In case the signal handler was declared without prototypes */ 
-
+	{ 
+		struct exec_domain *ed = current_thread_info()->exec_domain;
+		if (unlikely(ed && ed->signal_invmap && sig < 32))
+			sig = ed->signal_invmap[sig];
+	} 
+	regs->rdi = sig;
+	/* In case the signal handler was declared without prototypes */ 
+	regs->rax = 0;	
 
 	/* This also works for non SA_SIGINFO handlers because they expect the
 	   next argument after the signal number on the stack. */
@@ -365,7 +360,6 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	regs->rip = (unsigned long) ka->sa.sa_handler;
 
 	set_fs(USER_DS);
-	// XXX: cs
 	regs->eflags &= ~TF_MASK;
 
 #if DEBUG_SIG
@@ -473,11 +467,9 @@ int do_signal(struct pt_regs *regs, sigset_t *oldset)
 		if ((current->ptrace & PT_PTRACED) && signr != SIGKILL) {
 			/* Let the debugger run.  */
 			current->exit_code = signr;
-			preempt_disable();
 			current->state = TASK_STOPPED;
 			notify_parent(current, SIGCHLD);
 			schedule();
-			preempt_enable();
 
 			/* We're back.  Did the debugger cancel the sig?  */
 			if (!(signr = current->exit_code))
@@ -493,8 +485,8 @@ int do_signal(struct pt_regs *regs, sigset_t *oldset)
 				info.si_signo = signr;
 				info.si_errno = 0;
 				info.si_code = SI_USER;
-				info.si_pid = current->p_pptr->pid;
-				info.si_uid = current->p_pptr->uid;
+				info.si_pid = current->parent->pid;
+				info.si_uid = current->parent->uid;
 			}
 
 			/* If the (new) signal is now blocked, requeue it.  */
@@ -535,7 +527,7 @@ int do_signal(struct pt_regs *regs, sigset_t *oldset)
 				preempt_disable(); 
 				current->state = TASK_STOPPED;
 				current->exit_code = signr;
-				sig = current->p_pptr->sig;
+				sig = current->parent->sig;
 				if (sig && !(sig->action[SIGCHLD-1].sa.sa_flags & SA_NOCLDSTOP))
 					notify_parent(current, SIGCHLD);
 				schedule();
@@ -575,7 +567,7 @@ int do_signal(struct pt_regs *regs, sigset_t *oldset)
 		    regs->rax == -ERESTARTSYS ||
 		    regs->rax == -ERESTARTNOINTR) {
 			regs->rax = regs->orig_rax;
-			regs->rcx -= 2;
+			regs->rip -= 2;
 		}
 	}
 	return 0;

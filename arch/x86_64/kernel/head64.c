@@ -64,7 +64,7 @@ static void __init setup_boot_cpu_data(void)
 	      (int *)&boot_cpu_data.x86_vendor_id[4]);
 
 	/* get cpu type */
-	cpuid(1, &eax, &dummy, &dummy, &boot_cpu_data.x86_capability[0]);
+	cpuid(1, &eax, &dummy, &dummy, (int *) &boot_cpu_data.x86_capability);
 	boot_cpu_data.x86 = (eax >> 8) & 0xf;
 	boot_cpu_data.x86_model = (eax >> 4) & 0xf;
 	boot_cpu_data.x86_mask = eax & 0xf;

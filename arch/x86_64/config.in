@@ -11,16 +11,16 @@ define_bool CONFIG_ISA y
 define_bool CONFIG_SBUS n
 
 define_bool CONFIG_UID16 y
-define_bool CONFIG_RWSEM_GENERIC_SPINLOCK n
-define_bool CONFIG_RWSEM_XCHGADD_ALGORITHM y
-
+define_bool CONFIG_RWSEM_GENERIC_SPINLOCK y
+define_bool CONFIG_RWSEM_XCHGADD_ALGORITHM n
+define_bool CONFIG_X86_CMPXCHG y
 
 source init/Config.in
 
 mainmenu_option next_comment
 comment 'Processor type and features'
 choice 'Processor family' \
-	"Clawhammer			CONFIG_MK8" Clawhammer
+	"AMD-Hammer			CONFIG_MK8" CONFIG_MK8
 	
 #
 # Define implied options from the CPU selection here
@@ -29,7 +29,6 @@ define_int CONFIG_X86_L1_CACHE_BYTES 64
 define_int CONFIG_X86_L1_CACHE_SHIFT 6
 define_bool CONFIG_X86_TSC y
 define_bool CONFIG_X86_GOOD_APIC y
-define_bool CONFIG_X86_CMPXCHG y
 
 tristate '/dev/cpu/*/msr - Model-specific register support' CONFIG_X86_MSR
 tristate '/dev/cpu/*/cpuid - CPU information support' CONFIG_X86_CPUID
@@ -37,32 +36,31 @@ tristate '/dev/cpu/*/cpuid - CPU information support' CONFIG_X86_CPUID
 define_bool CONFIG_MATH_EMULATION n
 define_bool CONFIG_MCA n
 define_bool CONFIG_EISA n
+define_bool CONFIG_X86_IO_APIC y
+define_bool CONFIG_X86_LOCAL_APIC y
 
-bool 'MTRR (Memory Type Range Register) support' CONFIG_MTRR
+#currently broken:
+#bool 'MTRR (Memory Type Range Register) support' CONFIG_MTRR
 bool 'Symmetric multi-processing support' CONFIG_SMP
 bool 'Preemptible Kernel' CONFIG_PREEMPT
-# currently doesn't boot without hacks. probably simulator bug.
-#if [ "$CONFIG_SMP" != "y" ]; then
-#   bool 'APIC and IO-APIC support on uniprocessors' CONFIG_X86_UP_IOAPIC
-#    if [ "$CONFIG_X86_UP_IOAPIC" = "y" ]; then
-#       define_bool CONFIG_X86_IO_APIC y
-#       define_bool CONFIG_X86_LOCAL_APIC y
-#    fi
-#fi
 if [ "$CONFIG_SMP" = "y" -a "$CONFIG_X86_CMPXCHG" = "y" ]; then
     define_bool CONFIG_HAVE_DEC_LOCK y
 fi
+
+define_bool CONFIG_X86_MCE y
+bool 'Check for non-fatal machine check errors' CONFIG_X86_MCE_NONFATAL $CONFIG_X86_MCE
+
 endmenu
 
 mainmenu_option next_comment
+
 comment 'General options'
 
-if [ "$CONFIG_SMP" = "y" ]; then
-   define_bool CONFIG_X86_IO_APIC y
-   define_bool CONFIG_X86_LOCAL_APIC y
-fi
+source drivers/acpi/Config.in
+
 bool 'PCI support' CONFIG_PCI
 if [ "$CONFIG_PCI" = "y" ]; then
+# x86-64 doesn't support PCI BIOS access from long mode so always go direct. 
    define_bool CONFIG_PCI_DIRECT y 
 fi
 
@@ -80,21 +78,13 @@ fi
 if [ "$CONFIG_PROC_FS" = "y" ]; then
    define_bool CONFIG_KCORE_ELF y
 fi
-# We probably are not going to support a.out, are we? Or should we support a.out in i386 compatibility mode?
-		#tristate 'Kernel support for a.out binaries' CONFIG_BINFMT_AOUT
-		tristate 'Kernel support for ELF binaries' CONFIG_BINFMT_ELF
+#tristate 'Kernel support for a.out binaries' CONFIG_BINFMT_AOUT
+tristate 'Kernel support for ELF binaries' CONFIG_BINFMT_ELF
 tristate 'Kernel support for MISC binaries' CONFIG_BINFMT_MISC
 
 bool 'Power Management support' CONFIG_PM
 
 bool 'IA32 Emulation' CONFIG_IA32_EMULATION
-
-if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
-   dep_bool '  ACPI support' CONFIG_ACPI $CONFIG_PM
-   if [ "$CONFIG_ACPI" != "n" ]; then
-      source drivers/acpi/Config.in
-   fi
-fi
 
 endmenu
 
@@ -186,10 +176,6 @@ endmenu
 source drivers/input/Config.in
 source drivers/char/Config.in
 
-if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
-   source net/bluetooth/Config.in
-fi
-
 source drivers/misc/Config.in
 
 source drivers/media/Config.in
@@ -219,6 +205,10 @@ endmenu
 
 source drivers/usb/Config.in
 
+if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
+   source net/bluetooth/Config.in
+fi
+
 mainmenu_option next_comment
 comment 'Kernel hacking'
 
@@ -228,13 +218,13 @@ if [ "$CONFIG_DEBUG_KERNEL" != "n" ]; then
 #   bool '  Memory mapped I/O debugging' CONFIG_DEBUG_IOVIRT
    bool '  Magic SysRq key' CONFIG_MAGIC_SYSRQ
    bool '  Spinlock debugging' CONFIG_DEBUG_SPINLOCK
-#   bool '  Early printk' CONFIG_EARLY_PRINTK
+   bool '  Early printk' CONFIG_EARLY_PRINTK
    bool '  Additional run-time checks' CONFIG_CHECKING
-fi
-bool 'Simnow environment (disables time-consuming things)' CONFIG_SIMNOW
+   bool '  Debug __init statements' CONFIG_INIT_DEBUG
 #if [ "$CONFIG_SERIAL_CONSOLE" = "y" ]; then
 #  bool 'Early serial console (ttyS0)' CONFIG_EARLY_SERIAL_CONSOLE
 #fi
+fi
 endmenu
 
 source lib/Config.in

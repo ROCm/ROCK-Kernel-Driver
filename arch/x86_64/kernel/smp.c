@@ -20,90 +20,12 @@
 
 #include <asm/mtrr.h>
 #include <asm/pgalloc.h>
-
-/*
- *	Some notes on x86 processor bugs affecting SMP operation:
- *
- *	Pentium, Pentium Pro, II, III (and all CPUs) have bugs.
- *	The Linux implications for SMP are handled as follows:
- *
- *	Pentium III / [Xeon]
- *		None of the E1AP-E3AP errata are visible to the user.
- *
- *	E1AP.	see PII A1AP
- *	E2AP.	see PII A2AP
- *	E3AP.	see PII A3AP
- *
- *	Pentium II / [Xeon]
- *		None of the A1AP-A3AP errata are visible to the user.
- *
- *	A1AP.	see PPro 1AP
- *	A2AP.	see PPro 2AP
- *	A3AP.	see PPro 7AP
- *
- *	Pentium Pro
- *		None of 1AP-9AP errata are visible to the normal user,
- *	except occasional delivery of 'spurious interrupt' as trap #15.
- *	This is very rare and a non-problem.
- *
- *	1AP.	Linux maps APIC as non-cacheable
- *	2AP.	worked around in hardware
- *	3AP.	fixed in C0 and above steppings microcode update.
- *		Linux does not use excessive STARTUP_IPIs.
- *	4AP.	worked around in hardware
- *	5AP.	symmetric IO mode (normal Linux operation) not affected.
- *		'noapic' mode has vector 0xf filled out properly.
- *	6AP.	'noapic' mode might be affected - fixed in later steppings
- *	7AP.	We do not assume writes to the LVT deassering IRQs
- *	8AP.	We do not enable low power mode (deep sleep) during MP bootup
- *	9AP.	We do not use mixed mode
- *
- *	Pentium
- *		There is a marginal case where REP MOVS on 100MHz SMP
- *	machines with B stepping processors can fail. XXX should provide
- *	an L1cache=Writethrough or L1cache=off option.
- *
- *		B stepping CPUs may hang. There are hardware work arounds
- *	for this. We warn about it in case your board doesnt have the work
- *	arounds. Basically thats so I can tell anyone with a B stepping
- *	CPU and SMP problems "tough".
- *
- *	Specific items [From Pentium Processor Specification Update]
- *
- *	1AP.	Linux doesn't use remote read
- *	2AP.	Linux doesn't trust APIC errors
- *	3AP.	We work around this
- *	4AP.	Linux never generated 3 interrupts of the same priority
- *		to cause a lost local interrupt.
- *	5AP.	Remote read is never used
- *	6AP.	not affected - worked around in hardware
- *	7AP.	not affected - worked around in hardware
- *	8AP.	worked around in hardware - we get explicit CS errors if not
- *	9AP.	only 'noapic' mode affected. Might generate spurious
- *		interrupts, we log only the first one and count the
- *		rest silently.
- *	10AP.	not affected - worked around in hardware
- *	11AP.	Linux reads the APIC between writes to avoid this, as per
- *		the documentation. Make sure you preserve this as it affects
- *		the C stepping chips too.
- *	12AP.	not affected - worked around in hardware
- *	13AP.	not affected - worked around in hardware
- *	14AP.	we always deassert INIT during bootup
- *	15AP.	not affected - worked around in hardware
- *	16AP.	not affected - worked around in hardware
- *	17AP.	not affected - worked around in hardware
- *	18AP.	not affected - worked around in hardware
- *	19AP.	not affected - worked around in BIOS
- *
- *	If this sounds worrying believe me these bugs are either ___RARE___,
- *	or are signal timing bugs worked around in hardware and there's
- *	about nothing of note with C stepping upwards.
- */
+#include <asm/tlbflush.h>
 
 /* The 'big kernel lock' */
 spinlock_t kernel_flag __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 
-struct tlb_state cpu_tlbstate[NR_CPUS] __cacheline_aligned = {[0 ... NR_CPUS-1] = { &init_mm, 0, }};
+struct tlb_state cpu_tlbstate[NR_CPUS] = {[0 ... NR_CPUS-1] = { &init_mm, 0 }};
 
 /*
  * the following functions deal with sending IPIs between CPUs.
@@ -111,9 +33,12 @@ struct tlb_state cpu_tlbstate[NR_CPUS] __cacheline_aligned = {[0 ... NR_CPUS-1] 
  * We use 'broadcast', CPU->CPU IPIs and self-IPIs too.
  */
 
-static inline int __prepare_ICR (unsigned int shortcut, int vector)
+static inline unsigned int __prepare_ICR (unsigned int shortcut, int vector)
 {
-	return APIC_DM_FIXED | shortcut | vector | APIC_DEST_LOGICAL;
+	unsigned int icr =  APIC_DM_FIXED | shortcut | vector | APIC_DEST_LOGICAL;
+	if (vector == KDB_VECTOR) 
+		icr = (icr & (~APIC_VECTOR_MASK)) | APIC_DM_NMI; 		
+	return icr;
 }
 
 static inline int __prepare_ICR2 (unsigned int mask)
@@ -406,54 +331,20 @@ void flush_tlb_all(void)
 	do_flush_tlb_all_local();
 }
 
-static spinlock_t migration_lock = SPIN_LOCK_UNLOCKED;
-static task_t *new_task;
-
-/*
- * This function sends a 'task migration' IPI to another CPU.
- * Must be called from syscall contexts, with interrupts *enabled*.
- */
-void smp_migrate_task(int cpu, task_t *p)
+void smp_kdb_stop(void)
 {
-	/*
-	 * The target CPU will unlock the migration spinlock:
-	 */
-	_raw_spin_lock(&migration_lock);
-	new_task = p;
-	send_IPI_mask(1 << cpu, TASK_MIGRATION_VECTOR);
+	send_IPI_allbutself(KDB_VECTOR);
 }
 
-/*
- * Task migration callback.
- */
-asmlinkage void smp_task_migration_interrupt(void)
-{
-	task_t *p;
-
-	ack_APIC_irq();
-	p = new_task;
-	_raw_spin_unlock(&migration_lock);
-	sched_task_migrated(p);
-}
 /*
  * this function sends a 'reschedule' IPI to another CPU.
  * it goes straight through and wastes no time serializing
  * anything. Worst case is that we lose a reschedule ...
  */
+
 void smp_send_reschedule(int cpu)
 {
 	send_IPI_mask(1 << cpu, RESCHEDULE_VECTOR);
-}
-
-/*
- * this function sends a reschedule IPI to all (other) CPUs.
- * This should only be used if some 'global' task became runnable,
- * such as a RT task, that must be handled now. The first CPU
- * that manages to grab the task will run it.
- */
-void smp_send_reschedule_all(void)
-{
-	send_IPI_allbutself(RESCHEDULE_VECTOR);
 }
 
 /*

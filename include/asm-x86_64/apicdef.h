@@ -71,6 +71,7 @@
 #define			GET_APIC_DEST_FIELD(x)	(((x)>>24)&0xFF)
 #define			SET_APIC_DEST_FIELD(x)	((x)<<24)
 #define		APIC_LVTT	0x320
+#define		APIC_LVTTHMR	0x330
 #define		APIC_LVTPC	0x340
 #define		APIC_LVT0	0x350
 #define			APIC_LVT_TIMER_BASE_MASK	(0x3<<18)
@@ -280,7 +281,16 @@ struct local_apic {
 		u32 __reserved_4[3];
 	} lvt_timer;
 
-/*330*/	struct { u32 __reserved[4]; } __reserved_15;
+/*330*/	struct { /* LVT - Thermal Sensor */
+		u32  vector		:  8,
+			delivery_mode	:  3,
+			__reserved_1	:  1,
+			delivery_status	:  1,
+			__reserved_2	:  3,
+			mask		:  1,
+			__reserved_3	: 15;
+		u32 __reserved_4[3];
+	} lvt_thermal;
 
 /*340*/	struct { /* LVT - Performance Counter */
 		u32   vector		:  8,

@@ -1,8 +1,6 @@
 #ifndef _X86_64_PGTABLE_H
 #define _X86_64_PGTABLE_H
 
-#include <linux/config.h>
-
 /*
  * This file contains the functions and defines necessary to modify and use
  * the x86-64 page table tree.
@@ -13,70 +11,24 @@
  * three level page setup on the beginning and some kernel mappings at 
  * the end. For more details see Documentation/x86_64/mm.txt
  */
-#ifndef __ASSEMBLY__
 #include <asm/processor.h>
 #include <asm/fixmap.h>
 #include <asm/bitops.h>
 #include <linux/threads.h>
+#include <asm/pda.h>
 
-extern level4_t level4_pgt[512];
 extern pgd_t level3_kernel_pgt[512];
 extern pgd_t level3_physmem_pgt[512];
-extern pgd_t level3_ident_pgt[512], swapper_pg_dir[512];
+extern pgd_t level3_ident_pgt[512];
 extern pmd_t level2_kernel_pgt[512];
+extern pml4_t init_level4_pgt[];
+extern pgd_t boot_vmalloc_pgt[];
+
+#define swapper_pg_dir NULL
+
 extern void paging_init(void);
 
-/* Caches aren't brain-dead. */
-#define flush_cache_all()			do { } while (0)
-#define flush_cache_mm(mm)			do { } while (0)
-#define flush_cache_range(vma, start, end)	do { } while (0)
-#define flush_cache_page(vma, vmaddr)		do { } while (0)
-#define flush_page_to_ram(page)			do { } while (0)
-#define flush_dcache_page(page)			do { } while (0)
-#define flush_icache_range(start, end)		do { } while (0)
-#define flush_icache_page(vma,pg)		do { } while (0)
-#define flush_icache_user_range(vma,pg,adr,len)       do { } while (0)
-
-#define __flush_tlb()							\
-	do {								\
-		unsigned long tmpreg;					\
-									\
-		__asm__ __volatile__(					\
-			"movq %%cr3, %0;  # flush TLB \n"		\
-			"movq %0, %%cr3;              \n"		\
-			: "=r" (tmpreg)					\
-			:: "memory");					\
-	} while (0)
-
-/*
- * Global pages have to be flushed a bit differently. Not a real
- * performance problem because this does not happen often.
- */
-#define __flush_tlb_global()						\
-	do {								\
-		unsigned long tmpreg;					\
-									\
-		__asm__ __volatile__(					\
-			"movq %1, %%cr4;  # turn off PGE     \n"	\
-			"movq %%cr3, %0;  # flush TLB        \n"	\
-			"movq %0, %%cr3;                     \n"	\
-			"movq %2, %%cr4;  # turn PGE back on \n"	\
-			: "=&r" (tmpreg)				\
-			: "r" (mmu_cr4_features & ~X86_CR4_PGE),	\
-			  "r" (mmu_cr4_features)			\
-			: "memory");					\
-	} while (0)
-
 extern unsigned long pgkern_mask;
-
-/*
- * Do not check the PGE bit unnecesserily if this is a PPro+ kernel.
- * FIXME: This should be cleaned up
- */
-
-# define __flush_tlb_all() __flush_tlb_global()
-
-#define __flush_tlb_one(addr) __asm__ __volatile__("invlpg %0": :"m" (*(char *) addr))
 
 /*
  * ZERO_PAGE is a global shared page that is always zero: used
@@ -85,10 +37,8 @@ extern unsigned long pgkern_mask;
 extern unsigned long empty_zero_page[1024];
 #define ZERO_PAGE(vaddr) (virt_to_page(empty_zero_page))
 
-#endif /* !__ASSEMBLY__ */
-
-#define LEVEL4_SHIFT	39
-#define PTRS_PER_LEVEL4	512
+#define PML4_SHIFT	39
+#define PTRS_PER_PML4	512
 
 /*
  * PGDIR_SHIFT determines what a top-level page table entry can map
@@ -115,37 +65,34 @@ extern unsigned long empty_zero_page[1024];
 #define pgd_ERROR(e) \
 	printk("%s:%d: bad pgd %p(%016lx).\n", __FILE__, __LINE__, &(e), pgd_val(e))
 
-#define level4_none(x)	(!level4_val(x))
+#define pml4_none(x)	(!pml4_val(x))
 #define pgd_none(x)	(!pgd_val(x))
-
-#define pgd_bad(x) ((pgd_val(x) & (~PAGE_MASK & ~_PAGE_USER)) != _KERNPG_TABLE )
 
 extern inline int pgd_present(pgd_t pgd)	{ return !pgd_none(pgd); }
 
 static inline void set_pte(pte_t *dst, pte_t val)
 {
-	*((unsigned long *)dst) = pte_val(val); 
+	pte_val(*dst) = pte_val(val);
 } 
 
 static inline void set_pmd(pmd_t *dst, pmd_t val)
 {
-	*((unsigned long *)dst) = pmd_val(val); 
+        pmd_val(*dst) = pmd_val(val); 
 } 
 
 static inline void set_pgd(pgd_t *dst, pgd_t val)
 {
-	*((unsigned long *)dst) = pgd_val(val); 
+	pgd_val(*dst) = pgd_val(val); 
 } 
 
-extern inline void __pgd_clear (pgd_t * pgd)
+extern inline void pgd_clear (pgd_t * pgd)
 {
 	set_pgd(pgd, __pgd(0));
 }
 
-extern inline void pgd_clear (pgd_t * pgd)
+static inline void set_pml4(pml4_t *dst, pml4_t val)
 {
-	__pgd_clear(pgd);
-	__flush_tlb();
+	pml4_val(*dst) = pml4_val(val); 
 }
 
 #define pgd_page(pgd) \
@@ -177,18 +124,12 @@ extern inline void pgd_clear (pgd_t * pgd)
 
 
 #ifndef __ASSEMBLY__
-/* Just any arbitrary offset to the start of the vmalloc VM area: the
- * current 8MB value just means that there will be a 8MB "hole" after the
- * physical memory until the kernel virtual memory starts.  That means that
- * any out-of-bounds memory accesses will hopefully be caught.
- * The vmalloc() routines leaves a hole of 4kB between each vmalloced
- * area for the same reason. ;)
- */
-#define VMALLOC_OFFSET	(8*1024*1024)
-#define VMALLOC_START	(((unsigned long) high_memory + 2*VMALLOC_OFFSET-1) & \
-						~(VMALLOC_OFFSET-1))
+#define VMALLOC_START    0xffffff0000000000
+#define VMALLOC_END      0xffffff7fffffffff
 #define VMALLOC_VMADDR(x) ((unsigned long)(x))
-#define VMALLOC_END	(__START_KERNEL_map-PAGE_SIZE)
+#define MODULES_VADDR    0xffffffffa0000000
+#define MODULES_END      0xffffffffafffffff
+#define MODULES_LEN   (MODULES_END - MODULES_VADDR)
 
 #define _PAGE_BIT_PRESENT	0
 #define _PAGE_BIT_RW		1
@@ -197,8 +138,9 @@ extern inline void pgd_clear (pgd_t * pgd)
 #define _PAGE_BIT_PCD		4
 #define _PAGE_BIT_ACCESSED	5
 #define _PAGE_BIT_DIRTY		6
-#define _PAGE_BIT_PSE		7	/* 4 MB (or 2MB) page, Pentium+, if present.. */
+#define _PAGE_BIT_PSE		7	/* 4 MB (or 2MB) page */
 #define _PAGE_BIT_GLOBAL	8	/* Global TLB entry PPro+ */
+#define _PAGE_BIT_NX           63       /* No execute: only valid after cpuid check */
 
 #define _PAGE_PRESENT	0x001
 #define _PAGE_RW	0x002
@@ -208,9 +150,10 @@ extern inline void pgd_clear (pgd_t * pgd)
 #define _PAGE_ACCESSED	0x020
 #define _PAGE_DIRTY	0x040
 #define _PAGE_PSE	0x080	/* 2MB page */
-#define _PAGE_GLOBAL	0x100	/* Global TLB entry PPro+ */
+#define _PAGE_GLOBAL	0x100	/* Global TLB entry */
 
 #define _PAGE_PROTNONE	0x080	/* If not present */
+#define _PAGE_NX        (1UL<<_PAGE_BIT_NX)
 
 #define _PAGE_TABLE	(_PAGE_PRESENT | _PAGE_RW | _PAGE_USER | _PAGE_ACCESSED | _PAGE_DIRTY)
 #define _KERNPG_TABLE	(_PAGE_PRESENT | _PAGE_RW | _PAGE_ACCESSED | _PAGE_DIRTY)
@@ -238,11 +181,6 @@ extern inline void pgd_clear (pgd_t * pgd)
 #define PAGE_KERNEL_NOCACHE MAKE_GLOBAL(__PAGE_KERNEL_NOCACHE)
 #define PAGE_KERNEL_VSYSCALL MAKE_GLOBAL(__PAGE_KERNEL_VSYSCALL)
 
-/*
- * The i386 can't do page protection for execute, and considers that
- * the same are read. Also, write permissions imply read permissions.
- * This is the closest we can get..
- */
 #define __P000	PAGE_NONE
 #define __P001	PAGE_READONLY
 #define __P010	PAGE_COPY
@@ -261,21 +199,13 @@ extern inline void pgd_clear (pgd_t * pgd)
 #define __S110	PAGE_SHARED
 #define __S111	PAGE_SHARED
 
-/*
- * Define this if things work differently on an i386 and an i486:
- * it will (on an i486) warn about kernel memory accesses that are
- * done without a 'verify_area(VERIFY_WRITE,..)'
- */
-#undef TEST_VERIFY_AREA
-
-/* page table for 0-4MB for everybody */
-extern unsigned long pg0[1024];
-
-/*
- * Handling allocation failures during page table setup.
- */
-extern void __handle_bad_pmd(pmd_t * pmd);
-extern void __handle_bad_pmd_kernel(pmd_t * pmd);
+static inline unsigned long pgd_bad(pgd_t pgd) 
+{ 
+       unsigned long val = pgd_val(pgd);
+       val &= ~PAGE_MASK; 
+       val &= ~(_PAGE_USER | _PAGE_DIRTY); 
+       return val & ~(_PAGE_PRESENT | _PAGE_RW | _PAGE_ACCESSED);      
+} 
 
 #define pte_none(x)	(!pte_val(x))
 #define pte_present(x)	(pte_val(x) & (_PAGE_PRESENT | _PAGE_PROTNONE))
@@ -286,10 +216,6 @@ extern void __handle_bad_pmd_kernel(pmd_t * pmd);
 #define pmd_clear(xp)	do { set_pmd(xp, __pmd(0)); } while (0)
 #define	pmd_bad(x)	((pmd_val(x) & (~PAGE_MASK & ~_PAGE_USER)) != _KERNPG_TABLE )
 
-/*
- * Permanent address of a page. Obviously must never be
- * called on a highmem page.
- */
 #define pages_to_mb(x) ((x) >> (20-PAGE_SHIFT))	/* FIXME: is this
 						   right? */
 #define pte_page(x) (mem_map+((unsigned long)((pte_val(x) >> PAGE_SHIFT))))
@@ -324,64 +250,82 @@ static inline void ptep_mkdirty(pte_t *ptep)			{ set_bit(_PAGE_BIT_DIRTY, ptep);
  * and a page entry and page directory to the page they refer to.
  */
 
-#define mk_pte(page,pgprot) \
-({									\
-	pte_t __pte;							\
-									\
-	set_pte(&__pte, __pte(((page)-mem_map) * 			\
-		(unsigned long long)PAGE_SIZE + pgprot_val(pgprot)));	\
-	__pte;								\
-})
-
-/* This takes a physical page address that is used by the remapping functions */
-#define mk_pte_phys(physpage, pgprot) \
-({ pte_t __pte; set_pte(&__pte, __pte(physpage + pgprot_val(pgprot))); __pte; })
-
-extern inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
-{ set_pte(&pte, __pte((pte_val(pte) & _PAGE_CHG_MASK) | pgprot_val(newprot))); return pte; }
-
 #define page_pte(page) page_pte_prot(page, __pgprot(0))
 
-#define pmd_page_kernel(pmd) \
-((unsigned long) __va(pmd_val(pmd) & PAGE_MASK))
-#define pmd_page(pmd) \
-       (mem_map + (pmd_val(pmd) >> PAGE_SHIFT))
+/*
+ * Level 4 access.
+ * Never use these in the common code.
+ */
+#define pml4_page(pml4) ((unsigned long) __va(pml4_val(pml4) & PAGE_MASK))
+#define pml4_index(address) ((address >> PML4_SHIFT) & (PTRS_PER_PML4-1))
+#define pml4_offset_k(address) (init_level4_pgt + pml4_index(address))
+#define mk_kernel_pml4(address) ((pml4_t){ (address) | _KERNPG_TABLE })
+#define level3_offset_k(dir, address) ((pgd_t *) pml4_page(*(dir)) + pgd_index(address))
 
+/* PGD - Level3 access */
+
+#define __pgd_offset_k(pgd, address) ((pgd) + pgd_index(address))
 /* to find an entry in a page-table-directory. */
 #define pgd_index(address) ((address >> PGDIR_SHIFT) & (PTRS_PER_PGD-1))
+#define current_pgd_offset_k(address) \
+       __pgd_offset_k((pgd_t *)read_pda(level4_pgt), address)
+
+/* This accesses the reference page table of the boot cpu. 
+   Other CPUs get synced lazily via the page fault handler. */
+static inline pgd_t *pgd_offset_k(unsigned long address)
+{
+	pml4_t pml4;
+
+	pml4 = init_level4_pgt[pml4_index(address)];
+	return __pgd_offset_k(__va(pml4_val(pml4) & PAGE_MASK), address);
+}
 
 #define __pgd_offset(address) pgd_index(address)
-
 #define pgd_offset(mm, address) ((mm)->pgd+pgd_index(address))
 
-/* to find an entry in a kernel page-table-directory */
-#define pgd_offset_k(address) pgd_offset(&init_mm, address)
+/* PMD  - Level 2 access */
+#define pmd_page_kernel(pmd) ((unsigned long) __va(pmd_val(pmd) & PAGE_MASK))
+#define pmd_page(pmd)        (mem_map + (pmd_val(pmd) >> PAGE_SHIFT))
 
 #define __pmd_offset(address) \
 		(((address) >> PMD_SHIFT) & (PTRS_PER_PMD-1))
 
-/* Find an entry in the third-level page table.. */
+/* PTE - Level 1 access. */
+
+#define mk_pte(page,pgprot) \
+({                                                                     \
+       pte_t __pte;                                                    \
+                                                                       \
+       set_pte(&__pte, __pte(((page)-mem_map) *                        \
+               (unsigned long long)PAGE_SIZE + pgprot_val(pgprot)));   \
+       __pte;                                                          \
+})
+ 
+/* This takes a physical page address that is used by the remapping functions */
+static inline pte_t mk_pte_phys(unsigned long physpage, pgprot_t pgprot)
+{ 
+       pte_t __pte; 
+       set_pte(&__pte, __pte(physpage + pgprot_val(pgprot))); 
+       return __pte;
+}
+ 
+extern inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
+{ 
+       set_pte(&pte, __pte((pte_val(pte) & _PAGE_CHG_MASK) | pgprot_val(newprot))); 
+       return pte; 
+}
+
 #define __pte_offset(address) \
 		((address >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
 #define pte_offset_kernel(dir, address) ((pte_t *) pmd_page_kernel(*(dir)) + \
 			__pte_offset(address))
 
+/* x86-64 always has all page tables mapped. */
 #define pte_offset_map(dir,address) pte_offset_kernel(dir,address)
 #define pte_offset_map_nested(dir,address) pte_offset_kernel(dir,address)
 #define pte_unmap(pte) /* NOP */
 #define pte_unmap_nested(pte) /* NOP */ 
 
-
-/* never use these in the common code */
-#define level4_page(level4) ((unsigned long) __va(level4_val(level4) & PAGE_MASK))
-#define level4_index(address) ((address >> LEVEL4_SHIFT) & (PTRS_PER_LEVEL4-1))
-#define level4_offset_k(address) (level4_pgt + level4_index(address))
-#define level3_offset_k(dir, address) ((pgd_t *) level4_page(*(dir)) + pgd_index(address))
-
-/*
- * The i386 doesn't have any external MMU info: the kernel page
- * tables contain all the necessary information.
- */
 #define update_mmu_cache(vma,address,pte) do { } while (0)
 
 /* Encode and de-code a swap entry */
@@ -402,6 +346,6 @@ extern inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 #define HAVE_ARCH_UNMAPPED_AREA
 
 #define pgtable_cache_init()   do { } while (0)
-
+#define check_pgt_cache()      do { } while (0)
 
 #endif /* _X86_64_PGTABLE_H */
