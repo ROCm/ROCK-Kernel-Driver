@@ -157,7 +157,8 @@ struct {
 /*
  * external references
  */
-extern int lmGroupCommit(struct jfs_log * log, struct tblock * tblk);
+extern int lmGroupCommit(struct jfs_log *, struct tblock *);
+extern int lmGCwrite(struct jfs_log *, int);
 extern void lmSync(struct jfs_log *);
 extern int jfs_commit_inode(struct inode *, int);
 extern int jfs_stop_threads;
@@ -2770,7 +2771,7 @@ void txLazyCommit(struct tblock * tblk)
 
 	tblk->flag |= tblkGC_COMMITTED;
 
-	if ((tblk->flag & tblkGC_READY) || (tblk->flag & tblkGC_LAZY))
+	if (tblk->flag & tblkGC_READY)
 		log->gcrtc--;
 
 	if (tblk->flag & tblkGC_READY)
@@ -2976,6 +2977,16 @@ restart:
 		goto restart;
 	}
 	TXN_UNLOCK();
+
+	/*
+	 * We may need to kick off the group commit
+	 */
+	spin_lock_irq(&log->gclock);	// LOGGC_LOCK
+	if (log->cqueue.head && !(log->cflag & logGC_PAGEOUT)) {
+		log->cflag |= logGC_PAGEOUT;
+		lmGCwrite(log, 0);
+	}
+	spin_unlock_irq(&log->gclock);	// LOGGC_UNLOCK
 }
 
 /*
