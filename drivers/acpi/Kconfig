@@ -54,7 +54,7 @@ config ACPI_HT_ONLY
 
 config ACPI_BOOT
 	bool
-	depends on IA64 && (!IA64_HP_SIM || IA64_SGI_SN) || X86 && ACPI && !ACPI_HT_ONLY || X86 && ACPI
+	depends on IA64 && (!IA64_HP_SIM || IA64_SGI_SN) || X86 && ACPI && !ACPI_HT_ONLY
 	default y
 
 config ACPI_SLEEP

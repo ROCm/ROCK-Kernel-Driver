@@ -61,7 +61,11 @@ struct cpuinfo_x86 boot_cpu_data = { 0, 0, 0, 0, -1, 1, 0, 0, -1 };
 unsigned long mmu_cr4_features;
 EXPORT_SYMBOL_GPL(mmu_cr4_features);
 
+#ifdef CONFIG_ACPI_HT_ONLY
+int acpi_disabled __initdata = 1;
+#else
 int acpi_disabled __initdata = 0;
+#endif
 
 int MCA_bus;
 /* for MCA, but anyone else can use it if they want */
@@ -514,6 +518,10 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 		/* "acpi=off" disables both ACPI table parsing and interpreter init */
 		if (c == ' ' && !memcmp(from, "acpi=off", 8))
 			acpi_disabled = 1;
+
+		/* "acpismp=force" turns on ACPI again */
+		else if (!memcmp(from, "acpismp=force", 14))
+			acpi_disabled = 0;
 
 		/*
 		 * highmem=size forces highmem to be exactly 'size' bytes.
