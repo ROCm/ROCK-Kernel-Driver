@@ -37,9 +37,6 @@ _GLOBAL(slb_allocate)
 	 * a free slot first but that took too long. Unfortunately we
 	 * dont have any LRU information to help us choose a slot.
 	 */
-	srdi	r9,r1,27
-	ori	r9,r9,1			/* mangle SP for later compare */
-
 	ld	r10,PACASTABRR(r13)
 3:
 	addi	r10,r10,1
@@ -48,18 +45,32 @@ _GLOBAL(slb_allocate)
 
 	blt+	4f
 	li	r10,SLB_NUM_BOLTED
-4:
-	slbmfee	r11,r10
-	/* Don't throw out the segment for our kernel stack. Since we
+
+	/*
+	 * Never cast out the segment for our kernel stack. Since we
 	 * dont invalidate the ERAT we could have a valid translation
-	 * for the kernel stack during the first part of exception
-	 * exit which gets invalidated due to a tlbie from another cpu
-	 * at a non recoverable point (after setting srr0/1) - Anton
-	 *
+	 * for the kernel stack during the first part of exception exit
+	 * which gets invalidated due to a tlbie from another cpu at a
+	 * non recoverable point (after setting srr0/1) - Anton
+	 */
+4:	slbmfee	r11,r10
+	srdi	r11,r11,27
+	/*
+	 * Use paca->ksave as the value of the kernel stack pointer,
+	 * because this is valid at all times.
 	 * The >> 27 (rather than >> 28) is so that the LSB is the
 	 * valid bit - this way we check valid and ESID in one compare.
+	 * In order to completely close the tiny race in the context
+	 * switch (between updating r1 and updating paca->ksave),
+	 * we check against both r1 and paca->ksave.
 	 */
-	srdi	r11,r11,27
+	srdi	r9,r1,27
+	ori	r9,r9,1			/* mangle SP for later compare */
+	cmpd	r11,r9
+	beq-	3b
+	ld	r9,PACAKSAVE(r13)
+	srdi	r9,r9,27
+	ori	r9,r9,1
 	cmpd	r11,r9
 	beq-	3b
 

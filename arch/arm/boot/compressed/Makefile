@@ -101,7 +101,7 @@ $(obj)/piggy.o:  $(obj)/piggy.gz FORCE
 CFLAGS_font.o := -Dstatic=
 $(obj)/font.o: $(FONTC)
 
-$(obj)/vmlinux.lds: $(obj)/vmlinux.lds.in Makefile arch/arm/boot/Makefile .config
+$(obj)/vmlinux.lds: $(obj)/vmlinux.lds.in arch/arm/boot/Makefile .config
 	@sed "$(SEDFLAGS)" < $< > $@
 
 $(obj)/misc.o: $(obj)/misc.c include/asm/arch/uncompress.h lib/inflate.c

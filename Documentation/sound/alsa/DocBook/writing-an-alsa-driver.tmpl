@@ -5182,7 +5182,7 @@ struct _snd_pcm_runtime {
       The callback is much more complicated than the text-file
       version. You need to use a low-level i/o functions such as
       <function>copy_from/to_user()</function> to transfer the
-      data. Also, you have to keep tracking the file position, too. 
+      data.
 
       <informalexample>
         <programlisting>
@@ -5190,14 +5190,15 @@ struct _snd_pcm_runtime {
   static long my_file_io_read(snd_info_entry_t *entry,
                               void *file_private_data,
                               struct file *file,
-                              char *buf, long count)
+                              char *buf,
+                              unsigned long count,
+                              unsigned long pos)
   {
           long size = count;
-          if (file->f_pos + size > local_max_size)
-                  size = local_max_size - file->f_pos;
-          if (copy_to_user(buf, local_data + file->f_pos, size))
+          if (pos + size > local_max_size)
+                  size = local_max_size - pos;
+          if (copy_to_user(buf, local_data + pos, size))
                   return -EFAULT;
-          file->f_pos += size;
           return size;
   }
 ]]>
