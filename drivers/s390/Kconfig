@@ -164,7 +164,7 @@ config DASD_FBA
 
 config DASD_DIAG
 	tristate "Support for DIAG access to CMS reserved Disks"
-	depends on DASD
+	depends on DASD && ARCH_S390X = 'n'
 	help
 	  Select this option if you want to use CMS reserved Disks under VM
 	  with the Diagnose250 command.  If you are not running under VM or

@@ -6,7 +6,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.36 $
+ * $Revision: 1.38 $
  *
  * History of changes (starts July 2000)
  * 02/01/01 added dynamic registration of ioctls
@@ -297,10 +297,6 @@ typedef struct dasd_device_t {
 	struct list_head ccw_chunks;
 	struct list_head erp_chunks;
 
-	/* Common i/o stuff. */
-	/* FIXME: remove the next */
-	int devno;
-
 	atomic_t tasklet_scheduled;
         struct tasklet_struct tasklet;
 	struct work_struct kick_work;
@@ -315,24 +311,23 @@ typedef struct dasd_device_t {
 #endif
 } dasd_device_t;
 
+void dasd_put_device_wake(dasd_device_t *);
+
 /*
- * dasd_devmap_t is used to store the features and the relation
- * between device number and device index. To find a dasd_devmap_t
- * that corresponds to a device number of a device index each
- * dasd_devmap_t is added to two linked lists, one to search by
- * the device number and one to search by the device index. As
- * soon as big minor numbers are available the device index list
- * can be removed since the device number will then be identical
- * to the device index.
+ * Reference count inliners
  */
-typedef struct {
-	struct list_head devindex_list;
-	struct list_head devno_list;
-        unsigned int devindex;
-        unsigned short devno;
-        unsigned short features;
-        dasd_device_t *device;
-} dasd_devmap_t;
+static inline void
+dasd_get_device(dasd_device_t *device)
+{
+	atomic_inc(&device->ref_count);
+}
+
+static inline void
+dasd_put_device(dasd_device_t *device)
+{
+	if (atomic_dec_return(&device->ref_count) == 0)
+		dasd_put_device_wake(device);
+}
 
 /*
  * The static memory in ccw_mem and erp_mem is managed by a sorted
@@ -444,8 +439,9 @@ dasd_kmalloc_set_cda(struct ccw1 *ccw, void *cda, dasd_device_t *device)
 	return set_normalized_cda(ccw, cda);
 }
 
-dasd_device_t *dasd_alloc_device(dasd_devmap_t *);
+dasd_device_t *dasd_alloc_device(unsigned int devindex);
 void dasd_free_device(dasd_device_t *);
+
 void dasd_enable_device(dasd_device_t *);
 void dasd_set_target_state(dasd_device_t *, int);
 void dasd_kick_device(dasd_device_t *);
@@ -467,6 +463,7 @@ int dasd_generic_remove (struct ccw_device *cdev);
 int dasd_generic_set_online(struct ccw_device *cdev, 
 			    dasd_discipline_t *discipline);
 int dasd_generic_set_offline (struct ccw_device *cdev);
+void dasd_generic_auto_online (struct ccw_driver *);
 
 /* externals in dasd_devmap.c */
 extern int dasd_max_devindex;
@@ -475,13 +472,16 @@ extern int dasd_autodetect;
 
 int dasd_devmap_init(void);
 void dasd_devmap_exit(void);
-dasd_devmap_t *dasd_devmap_from_devno(int);
-dasd_devmap_t *dasd_devmap_from_devindex(int);
-dasd_device_t *dasd_get_device(dasd_devmap_t *);
-void dasd_put_device(dasd_devmap_t *);
+
+dasd_device_t *dasd_create_device(struct ccw_device *);
+void dasd_delete_device(dasd_device_t *);
+
+kdev_t dasd_get_kdev(dasd_device_t *);
+dasd_device_t *dasd_device_from_devindex(int);
 
 int dasd_parse(void);
 int dasd_add_range(int, int, int);
+int dasd_devno_in_range(int);
 
 /* externals in dasd_gendisk.c */
 int  dasd_gendisk_init(void);

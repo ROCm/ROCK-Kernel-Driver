@@ -7,7 +7,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999-2001
  *
- * $Revision: 1.74 $
+ * $Revision: 1.82 $
  *
  * History of changes (starts July 2000)
  * 11/09/00 complete redesign after code review
@@ -101,7 +101,7 @@ static wait_queue_head_t dasd_init_waitq;
  * Allocate memory for a new device structure.
  */
 dasd_device_t *
-dasd_alloc_device(dasd_devmap_t *devmap)
+dasd_alloc_device(unsigned int devindex)
 {
 	dasd_device_t *device;
 	struct gendisk *gdp;
@@ -110,8 +110,6 @@ dasd_alloc_device(dasd_devmap_t *devmap)
 	if (device == NULL)
 		return ERR_PTR(-ENOMEM);
 	memset(device, 0, sizeof (dasd_device_t));
-
-	device->devno = devmap->devno;
 
 	/* Get two pages for normal block device operations. */
 	device->ccw_mem = (void *) __get_free_pages(GFP_ATOMIC | GFP_DMA, 1);
@@ -128,7 +126,7 @@ dasd_alloc_device(dasd_devmap_t *devmap)
 	}
 
 	/* Allocate gendisk structure for device. */
-	gdp = dasd_gendisk_alloc(devmap->devindex);
+	gdp = dasd_gendisk_alloc(devindex);
 	if (IS_ERR(gdp)) {
 		free_page((unsigned long) device->erp_mem);
 		free_pages((unsigned long) device->ccw_mem, 1);
@@ -147,7 +145,7 @@ dasd_alloc_device(dasd_devmap_t *devmap)
 		     (unsigned long) device);
 	INIT_LIST_HEAD(&device->ccw_queue);
 	init_timer(&device->timer);
-	INIT_WORK(&device->kick_work, do_kick_device, (void *) (addr_t) device->devno);
+	INIT_WORK(&device->kick_work, do_kick_device, device);
 	device->state = DASD_STATE_NEW;
 	device->target = DASD_STATE_NEW;
 
@@ -174,35 +172,35 @@ dasd_free_device(dasd_device_t *device)
 static inline int
 dasd_state_new_to_known(dasd_device_t *device)
 {
-	dasd_devmap_t *devmap;
 	umode_t devfs_perm;
-	devfs_handle_t dir;
-	int major, minor;
+	kdev_t kdev;
 	char buf[20];
 
-	/* Increase reference count of bdev. */
-	if (bdget(MKDEV(device->gdp->major, device->gdp->first_minor)) == NULL)
+	kdev = dasd_get_kdev(device);
+	if (kdev_none(kdev))
 		return -ENODEV;
 
-	devmap = dasd_devmap_from_devno(device->devno);
-	if (devmap == NULL)
-		return -ENODEV;
-	major = dasd_gendisk_index_major(devmap->devindex);
-	if (major < 0)
-		return -ENODEV;
-	minor = devmap->devindex % DASD_PER_MAJOR;
+	/*
+	 * As long as the device is not in state DASD_STATE_NEW we want to 
+	 * keep the reference count > 0.
+	 */
+	dasd_get_device(device);
 
+#ifdef CONFIG_DEVFS_FS
 	/* Add a proc directory and the dasd device entry to devfs. */
- 	dir = devfs_mk_dir("dasd/%04x", device->devno);
-	device->gdp->de = dir;
+ 	device->gdp->de = devfs_mk_dir("dasd/%04x",
+		_ccw_device_get_device_number(device->cdev));
+#endif
 	if (device->ro_flag)
 		devfs_perm = S_IFBLK | S_IRUSR;
 	else
 		devfs_perm = S_IFBLK | S_IRUSR | S_IWUSR;
 
-	snprintf(buf, sizeof(buf), "dasd/%04x/device", device->devno);
+	snprintf(buf, sizeof(buf), "dasd/%04x/device",
+		 _ccw_device_get_device_number(device->cdev));
 	device->devfs_entry = devfs_register(NULL, buf, 0,
-					     major, minor << DASD_PARTN_BITS,
+					     major(kdev),
+					     minor(kdev) << DASD_PARTN_BITS,
 					     devfs_perm,
 					     &dasd_device_operations, NULL);
 	device->state = DASD_STATE_KNOWN;
@@ -215,8 +213,6 @@ dasd_state_new_to_known(dasd_device_t *device)
 static inline void
 dasd_state_known_to_new(dasd_device_t * device)
 {
-	struct block_device *bdev;
-
 	/* Remove device entry and devfs directory. */
 	devfs_unregister(device->devfs_entry);
 	devfs_unregister(device->gdp->de);
@@ -225,10 +221,8 @@ dasd_state_known_to_new(dasd_device_t * device)
 	device->discipline = NULL;
 	device->state = DASD_STATE_NEW;
 
-	/* Decrease reference count of bdev. */
-	bdev = bdget(MKDEV(device->gdp->major, device->gdp->first_minor));
-	bdput(bdev);
-	bdput(bdev);
+	/* Give up reference we took in dasd_state_new_to_known. */
+	dasd_put_device(device);
 }
 
 /*
@@ -428,7 +422,8 @@ dasd_change_state(dasd_device_t *device)
         if (rc && rc != -EAGAIN) {
 		if (rc != -ENODEV)
 			MESSAGE (KERN_INFO, "giving up on dasd device with "
-				 "devno %04x", device->devno);
+				 "devno %04x",
+				 _ccw_device_get_device_number(device->cdev));
                 device->target = device->state;
         }
 
@@ -445,26 +440,18 @@ dasd_change_state(dasd_device_t *device)
 static void
 do_kick_device(void *data)
 {
-	int devno;
-	dasd_devmap_t *devmap;
 	dasd_device_t *device;
 
-	devno = (long) data;
-	devmap = dasd_devmap_from_devno(devno);
-	device = (devmap != NULL) ?
-		dasd_get_device(devmap) : ERR_PTR(-ENODEV);
-	if (IS_ERR(device))
-		return;
-	atomic_dec(&device->ref_count);
+	device = (dasd_device_t *) data;
 	dasd_change_state(device);
 	dasd_schedule_bh(device);
-	dasd_put_device(devmap);
+	dasd_put_device(device);
 }
 
 void
 dasd_kick_device(dasd_device_t *device)
 {
-	atomic_inc(&device->ref_count);
+	dasd_get_device(device);
 	/* queue call to dasd_kick_device to the kernel event daemon. */
 	schedule_work(&device->kick_work);
 }
@@ -646,7 +633,7 @@ dasd_kmalloc_request(char *magic, int cplength, int datasize,
 	}
 	strncpy((char *) &cqr->magic, magic, 4);
 	ASCEBC((char *) &cqr->magic, 4);
-	atomic_inc(&device->ref_count);
+	dasd_get_device(device);
 	return cqr;
 }
 
@@ -693,7 +680,7 @@ dasd_smalloc_request(char *magic, int cplength, int datasize,
 	}
 	strncpy((char *) &cqr->magic, magic, 4);
 	ASCEBC((char *) &cqr->magic, 4);
-	atomic_inc(&device->ref_count);
+	dasd_get_device(device);
 	return cqr;
 }
 
@@ -723,7 +710,7 @@ dasd_kfree_request(dasd_ccw_req_t * cqr, dasd_device_t * device)
 	if (cqr->data != NULL)
 		kfree(cqr->data);
 	kfree(cqr);
-	atomic_dec(&device->ref_count);
+	dasd_put_device(device);
 }
 
 void
@@ -738,7 +725,7 @@ dasd_sfree_request(dasd_ccw_req_t * cqr, dasd_device_t * device)
 	spin_lock_irqsave(&device->mem_lock, flags);
 	dasd_free_chunk(&device->ccw_chunks, cqr);
 	spin_unlock_irqrestore(&device->mem_lock, flags);
-	atomic_dec(&device->ref_count);
+	dasd_put_device(device);
 }
 
 /*
@@ -936,19 +923,14 @@ do_state_change_pending(void *data)
 		struct work_struct work;
 		dasd_device_t *device;
 	} *p;
-	dasd_devmap_t *devmap;
 	dasd_device_t *device;
 	dasd_ccw_req_t *cqr;
-	int devno;
 
 	p = data;
 	device = p->device;
 	DBF_EVENT(DBF_NOTICE, "State change Interrupt for bus_id %s",
 		  device->cdev->dev.bus_id);
 
-	// FIXME: get rid of devmap.
-	devno = _ccw_device_get_device_number(device->cdev);
-	devmap = dasd_devmap_from_devno(devno);
 	spin_lock_irq(get_ccwdev_lock(device->cdev));
 	/* re-activate first request in queue */
 	if (!list_empty(&device->ccw_queue)) {
@@ -965,10 +947,39 @@ do_state_change_pending(void *data)
 	}
 	spin_unlock_irq(get_ccwdev_lock(device->cdev));
 	dasd_schedule_bh(device);
-	dasd_put_device(devmap);
+	dasd_put_device(device);
 	kfree(p);
 }
 
+static void
+dasd_handle_killed_request(struct ccw_device *cdev, unsigned long intparm)
+{
+	dasd_ccw_req_t *cqr;
+	dasd_device_t *device;
+
+	cqr = (dasd_ccw_req_t *) intparm;
+	if (cqr->status != DASD_CQR_IN_IO) {
+		MESSAGE(KERN_DEBUG,
+			"invalid status: bus_id %s, status %02x",
+			cdev->dev.bus_id, cqr->status);
+		return;
+	}
+
+	device = (dasd_device_t *) cqr->device;
+	if (device == NULL ||
+	    device != cdev->dev.driver_data ||
+	    strncmp(device->discipline->ebcname, (char *) &cqr->magic, 4)) {
+		MESSAGE(KERN_DEBUG, "invalid device in request: bus_id %s",
+			cdev->dev.bus_id);
+		return;
+	}
+
+	/* Schedule request to be retried. */
+	cqr->status = DASD_CQR_QUEUED;
+
+	dasd_clear_timer(device);
+	dasd_schedule_bh(device);
+}
 
 static void
 dasd_handle_state_change_pending(dasd_device_t *device)
@@ -984,8 +995,7 @@ dasd_handle_state_change_pending(dasd_device_t *device)
 		return;
 	INIT_WORK(&p->work, (void *) do_state_change_pending, p);
 	p->device = device;
-	atomic_inc(&device->ref_count);
-	/* queue call to do_state_change_pending to the kernel event daemon. */
+	dasd_get_device(device);
 	schedule_work(&p->work);
 }
 
@@ -1002,6 +1012,23 @@ dasd_int_handler(struct ccw_device *cdev, unsigned long intparm,
 	int expires;
 	dasd_era_t era;
 	char mask;
+
+	if (IS_ERR(irb)) {
+		switch (PTR_ERR(irb)) {
+		case -EIO:
+			dasd_handle_killed_request(cdev, intparm);
+			break;
+		case -ETIMEDOUT:
+			printk(KERN_WARNING"%s(%s): request timed out\n",
+			       __FUNCTION__, cdev->dev.bus_id);
+			//FIXME - dasd uses own timeout interface...
+			break;
+		default:
+			printk(KERN_WARNING"%s(%s): unknown error %ld\n",
+			       __FUNCTION__, cdev->dev.bus_id, PTR_ERR(irb));
+		}
+		return;
+	}
 
 	now = get_clock();
 
@@ -1108,7 +1135,6 @@ dasd_end_request(struct request *req, int uptodate)
 		BUG();
 	add_disk_randomness(req->rq_disk);
 	end_that_request_last(req);
-	return;
 }
 
 /*
@@ -1177,7 +1203,9 @@ dasd_end_request_cb(dasd_ccw_req_t * cqr, void *data)
 
 	req = (struct request *) data;
 	dasd_profile_end(cqr->device, cqr, req);
+	spin_lock_irq(&cqr->device->request_queue_lock);
 	dasd_end_request(req, (cqr->status == DASD_CQR_DONE));
+	spin_unlock_irq(&cqr->device->request_queue_lock);
 	dasd_sfree_request(cqr, cqr->device);
 }
 
@@ -1189,7 +1217,6 @@ static inline void
 __dasd_process_blk_queue(dasd_device_t * device)
 {
 	request_queue_t *queue;
-	struct list_head *l;
 	struct request *req;
 	dasd_ccw_req_t *cqr;
 	int nr_queued;
@@ -1211,11 +1238,9 @@ __dasd_process_blk_queue(dasd_device_t * device)
 		return;
 	nr_queued = 0;
 	/* Now we try to fetch requests from the request queue */
-	list_for_each(l, &device->ccw_queue) {
-		cqr = list_entry(l, dasd_ccw_req_t, list);
+	list_for_each_entry(cqr, &device->ccw_queue, list)
 		if (cqr->status == DASD_CQR_QUEUED)
 			nr_queued++;
-	}
 	while (!blk_queue_plugged(queue) &&
 	       elv_next_request(queue) &&
 		nr_queued < DASD_CHANQ_MAX_SIZE) {
@@ -1223,7 +1248,8 @@ __dasd_process_blk_queue(dasd_device_t * device)
 		if (device->ro_flag && rq_data_dir(req) == WRITE) {
 			DBF_EVENT(DBF_ERR,
 				  "(%04x) Rejecting write request %p",
-				  device->devno, req);
+				  _ccw_device_get_device_number(device->cdev),
+				  req);
 			blkdev_dequeue_request(req);
 			dasd_end_request(req, 0);
 			continue;
@@ -1234,7 +1260,8 @@ __dasd_process_blk_queue(dasd_device_t * device)
 				break;	/* terminate request queue loop */
 			DBF_EVENT(DBF_ERR,
 				  "(%04x) CCW creation failed on request %p",
-				  device->devno, req);
+				  _ccw_device_get_device_number(device->cdev),
+				  req);
 			blkdev_dequeue_request(req);
 			dasd_end_request(req, 0);
 			continue;
@@ -1371,8 +1398,7 @@ dasd_tasklet(dasd_device_t * device)
 	__dasd_start_head(device);
 	spin_unlock(get_ccwdev_lock(device->cdev));
 	spin_unlock_irq(&device->request_queue_lock);
-	/* FIXME: what if ref_count == 0 && state == DASD_STATE_NEW ?? */
-	atomic_dec(&device->ref_count);
+	dasd_put_device(device);
 }
 
 /*
@@ -1384,7 +1410,7 @@ dasd_schedule_bh(dasd_device_t * device)
 	/* Protect against rescheduling. */
 	if (atomic_compare_and_swap (0, 1, &device->tasklet_scheduled))
 		return;
-	atomic_inc(&device->ref_count);
+	dasd_get_device(device);
 	tasklet_hi_schedule(&device->tasklet);
 }
 
@@ -1766,8 +1792,8 @@ dasd_release(struct inode *inp, struct file *filp)
 	return 0;
 }
 
-struct
-block_device_operations dasd_device_operations = {
+struct block_device_operations
+dasd_device_operations = {
 	.owner		= THIS_MODULE,
 	.open		= dasd_open,
 	.release	= dasd_release,
@@ -1823,12 +1849,6 @@ dasd_generic_probe (struct ccw_device *cdev, dasd_discipline_t *discipline)
 
 	cdev->handler = &dasd_int_handler;
 
-	if (dasd_autodetect ||
-	    dasd_devmap_from_devno(devno) != 0) {
-		/* => device was in dasd parameter line */
-		ccw_device_set_online(cdev);
-	}
-
 	return ret;
 }
 
@@ -1854,30 +1874,12 @@ dasd_generic_set_online (struct ccw_device *cdev,
 			 dasd_discipline_t *discipline)
 
 {
-	int devno;
-	dasd_devmap_t *devmap;
 	dasd_device_t *device;
 	int rc;
 
-	if (cdev->dev.driver_data != NULL) /* already enabled */
-		return 0;
-
-	devno = _ccw_device_get_device_number(cdev);
-	rc = dasd_add_range(devno, devno, DASD_FEATURE_DEFAULT);
-	if (rc)
-		return rc;
-
-	if (!(devmap = dasd_devmap_from_devno (devno)))
-		return 0; /* device is still disabled -> ignore it */
-
-	if (IS_ERR(device = dasd_get_device(devmap))) {
-		printk (KERN_WARNING "dasd_generic could not get %s\n",
-				cdev->dev.bus_id);
+	device = dasd_create_device(cdev);
+	if (IS_ERR(device))
 		return PTR_ERR(device);
-	}
-
-	device->gdp->driverfs_dev = &cdev->dev;
-	device->cdev = cdev;
 
 	if (device->use_diag_flag)
 		device->discipline = dasd_diag_discipline_pointer;
@@ -1898,7 +1900,7 @@ dasd_generic_set_online (struct ccw_device *cdev,
 	if (rc) {
 		printk (KERN_WARNING "dasd_generic found a bad device %s\n", 
 			cdev->dev.bus_id);
-		dasd_put_device(devmap);
+		dasd_delete_device(device);
 		return rc;
 	}
 
@@ -1909,16 +1911,17 @@ dasd_generic_set_online (struct ccw_device *cdev,
 			cdev->dev.bus_id);
 		rc = -ENODEV;
 		dasd_set_target_state(device, DASD_STATE_NEW);
+		dasd_delete_device(device);
 	} else {
 		pr_debug("dasd_generic device %s found\n",
 				cdev->dev.bus_id);
 		cdev->dev.driver_data = device;
 	}
 
-	dasd_put_device(devmap);
 	/* FIXME: we have to wait for the root device but we don't want
 	 * to wait for each single device but for all at once. */
 	wait_event(dasd_init_waitq, _wait_for_device(device));
+
 	return rc;
 }
 
@@ -1926,23 +1929,49 @@ int
 dasd_generic_set_offline (struct ccw_device *cdev)
 {
 	dasd_device_t *device;
-	dasd_devmap_t *devmap;
-	int devno;
 
-	devno = _ccw_device_get_device_number(cdev);
 	device = cdev->dev.driver_data;
-	devmap = dasd_devmap_from_devno(devno);
-	if (device == NULL || devmap == NULL)
-		return -ENODEV;
-
-	device = dasd_get_device(devmap);
-	if (IS_ERR(device))
-		return PTR_ERR(device);
-
+	if (atomic_read(&device->open_count) > 0) {
+		printk (KERN_WARNING "Can't offline dasd device with open"
+			" count = %i.\n",
+			atomic_read(&device->open_count));
+		return -EBUSY;
+	}
 	dasd_set_target_state(device, DASD_STATE_NEW);
-	dasd_put_device(devmap);
+	dasd_delete_device(device);
 	
 	return 0;
+}
+
+/*
+ * Automatically online either all dasd devices (dasd_autodetect) or
+ * all devices specified with dasd= parameters. For dasd_autodetect
+ * dasd_generic_probe has added devmaps for all dasd devices. We
+ * scan all present dasd devmaps and call ccw_device_set_online.
+ */
+void
+dasd_generic_auto_online (struct ccw_driver *dasd_discipline_driver)
+{
+	struct device_driver *drv;
+	struct device *d, *dev;
+	struct ccw_device *cdev;
+	int devno;
+
+	drv = get_driver(&dasd_discipline_driver->driver);
+	down_read(&drv->bus->subsys.rwsem);
+	dev = NULL;
+	list_for_each_entry(d, &drv->devices, driver_list) {
+		dev = get_device(d);
+		if (!dev)
+			continue;
+		cdev = to_ccwdev(dev);
+		devno = _ccw_device_get_device_number(cdev);
+		if (dasd_autodetect || dasd_devno_in_range(devno) == 0)
+			ccw_device_set_online(cdev);
+		put_device(dev);
+	}
+	up_read(&drv->bus->subsys.rwsem);
+	put_driver(drv);
 }
 
 /*
@@ -2078,11 +2107,13 @@ dasd_init(void)
 
 	DBF_EVENT(DBF_EMERG, "%s", "debug area created");
 
-	if (devfs_mk_dir("dasd")) {
+#ifdef CONFIG_DEVFS_FS
+	if (!devfs_mk_dir("dasd")) {
 		DBF_EVENT(DBF_ALERT, "%s", "no devfs");
 		rc = -ENOSYS;
 		goto failed;
 	}
+#endif
 	rc = dasd_devmap_init();
 	if (rc)
 		goto failed;

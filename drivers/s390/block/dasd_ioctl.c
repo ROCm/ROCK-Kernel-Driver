@@ -12,7 +12,6 @@
  * 05/04/02 split from dasd.c, code restructuring.
  */
 #include <linux/config.h>
-#include <linux/version.h>
 #include <linux/interrupt.h>
 #include <linux/major.h>
 #include <linux/fs.h>
@@ -333,7 +332,7 @@ dasd_ioctl_information(struct block_device *bdev, int no, long args)
 
 	cdev = device->cdev;
 
-	dasd_info->devno = device->devno;
+	dasd_info->devno = _ccw_device_get_device_number(device->cdev);
 	dasd_info->schid = _ccw_device_get_subchannel_number(device->cdev);
 	dasd_info->cu_type = cdev->id.cu_type;
 	dasd_info->cu_model = cdev->id.cu_model;

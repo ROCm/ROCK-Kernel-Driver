@@ -4,7 +4,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.25 $
+ * $Revision: 1.27 $
  *
  * History of changes
  *	    fixed partition handling and HDIO_GETGEO
@@ -414,9 +414,16 @@ static dasd_discipline_t dasd_fba_discipline = {
 static int __init
 dasd_fba_init(void)
 {
+	int ret;
+
 	ASCEBC(dasd_fba_discipline.ebcname, 4);
 
-	return ccw_driver_register(&dasd_fba_driver);
+	ret = ccw_driver_register(&dasd_fba_driver);
+	if (ret)
+		return ret;
+
+	dasd_generic_auto_online(&dasd_fba_driver);
+	return 0;
 }
 
 static void __exit

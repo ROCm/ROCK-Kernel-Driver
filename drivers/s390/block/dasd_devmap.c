@@ -11,7 +11,7 @@
  * functions may not be called from interrupt context. In particular
  * dasd_get_device is a no-no from interrupt context.
  *
- * $Revision: 1.11 $
+ * $Revision: 1.12 $
  *
  * History of changes 
  * 05/04/02 split from dasd.c, code restructuring.
@@ -29,6 +29,25 @@
 #define PRINTK_HEADER "dasd_devmap:"
 
 #include "dasd_int.h"
+
+/*
+ * dasd_devmap_t is used to store the features and the relation
+ * between device number and device index. To find a dasd_devmap_t
+ * that corresponds to a device number of a device index each
+ * dasd_devmap_t is added to two linked lists, one to search by
+ * the device number and one to search by the device index. As
+ * soon as big minor numbers are available the device index list
+ * can be removed since the device number will then be identical
+ * to the device index.
+ */
+typedef struct {
+	struct list_head devindex_list;
+	struct list_head devno_list;
+        unsigned int devindex;
+        unsigned short devno;
+        unsigned short features;
+	dasd_device_t *device;
+} dasd_devmap_t;
 
 /*
  * Parameter parsing functions for dasd= parameter. The syntax is:
@@ -279,6 +298,29 @@ dasd_add_range(int from, int to, int features)
 }
 
 /*
+ * Check if devno has been added to the list of dasd ranges.
+ */
+int
+dasd_devno_in_range(int devno)
+{
+	struct list_head *l;
+	int ret;
+		
+	ret = -ENOENT;
+	spin_lock(&dasd_devmap_lock);
+	/* Find devmap for device with device number devno */
+	list_for_each(l, &dasd_devno_hashlists[devno&255]) {
+		if (list_entry(l, dasd_devmap_t, devno_list)->devno == devno) {
+			/* Found the device. */
+			ret = 0;
+			break;
+		}
+	}
+	spin_unlock(&dasd_devmap_lock);
+	return ret;
+}
+
+/*
  * Forget all about the device numbers added so far.
  * This may only be called at module unload or system shutdown.
  */
@@ -307,7 +349,7 @@ dasd_forget_ranges(void)
  * Find the devmap structure from a devno. Can be removed as soon
  * as big minors are available.
  */
-dasd_devmap_t *
+static dasd_devmap_t *
 dasd_devmap_from_devno(int devno)
 {
 	struct list_head *l;
@@ -332,7 +374,7 @@ dasd_devmap_from_devno(int devno)
  * Find the devmap for a device by its device index. Can be removed
  * as soon as big minors are available.
  */
-dasd_devmap_t *
+static dasd_devmap_t *
 dasd_devmap_from_devindex(int devindex)
 {
 	struct list_head *l;
@@ -353,60 +395,140 @@ dasd_devmap_from_devindex(int devindex)
 	return devmap;
 }
 
-/*
- * Find the device structure for device number devno. If it does not
- * exists yet, allocate it. Increase the reference counter in the device
- * structure and return a pointer to it.
- */
 dasd_device_t *
-dasd_get_device(dasd_devmap_t *devmap)
+dasd_device_from_devindex(int devindex)
 {
+	dasd_devmap_t *devmap;
 	dasd_device_t *device;
 
+	devmap = dasd_devmap_from_devindex(devindex);
 	spin_lock(&dasd_devmap_lock);
 	device = devmap->device;
-	if (device != NULL)
-		atomic_inc(&device->ref_count);
-	spin_unlock(&dasd_devmap_lock);
-	if (device != NULL)
-		return device;
-
-	device = dasd_alloc_device(devmap);
-	if (IS_ERR(device))
-		return device;
-
-	spin_lock(&dasd_devmap_lock);
-	if (devmap->device != NULL) {
-		/* Someone else was faster. */
-		dasd_free_device(device);
-		device = devmap->device;
-	} else
-		devmap->device = device;
-	atomic_inc(&device->ref_count);
-	device->ro_flag = (devmap->features & DASD_FEATURE_READONLY) ? 1 : 0;
-	device->use_diag_flag = 1;
+	if (device)
+		dasd_get_device(device);
+	else
+		device = ERR_PTR(-ENODEV);
 	spin_unlock(&dasd_devmap_lock);
 	return device;
 }
 
 /*
- * Decrease the reference counter of a devices structure. If the
- * reference counter reaches zero and the device status is
- * DASD_STATE_NEW the device structure is freed. 
+ * Return kdev for a dasd device.
+ */
+kdev_t
+dasd_get_kdev(dasd_device_t *device)
+{
+	dasd_devmap_t *devmap;
+	int major, minor;
+	int devno;
+
+	devno = _ccw_device_get_device_number(device->cdev);
+	devmap = dasd_devmap_from_devno(devno);
+	if (devmap == NULL)
+		return NODEV;
+	major = dasd_gendisk_index_major(devmap->devindex);
+	if (major < 0)
+		return NODEV;
+	minor = devmap->devindex % DASD_PER_MAJOR;
+	return mk_kdev(major, minor);
+}
+
+/*
+ * Create a dasd device structure for cdev.
+ */
+dasd_device_t *
+dasd_create_device(struct ccw_device *cdev)
+{
+	dasd_devmap_t *devmap;
+	dasd_device_t *device;
+	int devno;
+	int rc;
+
+	devno = _ccw_device_get_device_number(cdev);
+	rc = dasd_add_range(devno, devno, DASD_FEATURE_DEFAULT);
+	if (rc)
+		return ERR_PTR(rc);
+
+	if (!(devmap = dasd_devmap_from_devno (devno)))
+		return ERR_PTR(-ENODEV);
+
+	device = dasd_alloc_device(devmap->devindex);
+	if (IS_ERR(device))
+		return device;
+	atomic_set(&device->ref_count, 1);
+	device->ro_flag = (devmap->features & DASD_FEATURE_READONLY) ? 1 : 0;
+	device->use_diag_flag = 1;
+
+	spin_lock_irq(get_ccwdev_lock(cdev));
+	if (cdev->dev.driver_data == NULL) {
+		get_device(&cdev->dev);
+		cdev->dev.driver_data = device;
+		device->gdp->driverfs_dev = &cdev->dev;
+		device->cdev = cdev;
+		rc = 0;
+	} else
+		/* Someone else was faster. */
+		rc = -EBUSY;
+	spin_unlock_irq(get_ccwdev_lock(cdev));
+	if (rc) {
+		dasd_free_device(device);
+		return ERR_PTR(rc);
+	}
+	/* Device created successfully. Make it known via devmap. */
+	spin_lock(&dasd_devmap_lock);
+	devmap->device = device;
+	spin_unlock(&dasd_devmap_lock);
+
+	return device;
+}
+
+/*
+ * Wait queue for dasd_delete_device waits.
+ */
+static DECLARE_WAIT_QUEUE_HEAD(dasd_delete_wq);
+
+/*
+ * Remove a dasd device structure.
  */
 void
-dasd_put_device(dasd_devmap_t *devmap)
+dasd_delete_device(dasd_device_t *device)
 {
-	dasd_device_t *device;
+	struct ccw_device *cdev;
+	dasd_devmap_t *devmap;
+	int devno;
 
+	/* First remove device pointer from devmap. */
+	devno = _ccw_device_get_device_number(device->cdev);
+	devmap = dasd_devmap_from_devno (devno);
 	spin_lock(&dasd_devmap_lock);
-	device = devmap->device;
-	if (atomic_dec_return(&device->ref_count) == 0 &&
-	    device->state == DASD_STATE_NEW) {
-		devmap->device = NULL;
-		dasd_free_device(device);
-	}
+	devmap->device = NULL;
 	spin_unlock(&dasd_devmap_lock);
+
+	/* Wait for reference counter to drop to zero. */
+	atomic_dec(&device->ref_count);
+	wait_event(dasd_delete_wq, atomic_read(&device->ref_count) == 0);
+
+	/* Disconnect dasd_device structure from ccw_device structure. */
+	cdev = device->cdev;
+	device->cdev = NULL;
+	device->gdp->driverfs_dev = NULL;
+	cdev->dev.driver_data = NULL;
+
+	/* Put ccw_device structure. */
+	put_device(&cdev->dev);
+
+	/* Now the device structure can be freed. */
+	dasd_free_device(device);
+}
+
+/*
+ * Reference counter dropped to zero. Wake up waiter
+ * in dasd_delete_device.
+ */
+void
+dasd_put_device_wake(dasd_device_t *device)
+{
+	wake_up(&dasd_delete_wq);
 }
 
 int

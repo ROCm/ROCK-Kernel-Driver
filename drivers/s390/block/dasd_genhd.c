@@ -9,7 +9,7 @@
  *
  * Dealing with devices registered to multiple major numbers.
  *
- * $Revision: 1.23 $
+ * $Revision: 1.24 $
  *
  * History of changes
  * 05/04/02 split from dasd.c, code restructuring.
@@ -108,7 +108,6 @@ dasd_unregister_major(struct major_info * mi)
 struct gendisk *
 dasd_gendisk_alloc(int devindex)
 {
-	struct list_head *l;
 	struct major_info *mi;
 	struct gendisk *gdp;
 	int index, len, rc;
@@ -118,8 +117,7 @@ dasd_gendisk_alloc(int devindex)
 	while (1) {
 		spin_lock(&dasd_major_lock);
 		index = devindex;
-		list_for_each(l, &dasd_major_info) {
-			mi = list_entry(l, struct major_info, list);
+		list_for_each_entry(mi, &dasd_major_info, list) {
 			if (index < DASD_PER_MAJOR)
 				break;
 			index -= DASD_PER_MAJOR;
@@ -142,6 +140,7 @@ dasd_gendisk_alloc(int devindex)
 	gdp->major = mi->major;
 	gdp->first_minor = index << DASD_PARTN_BITS;
 	gdp->fops = &dasd_device_operations;
+	gdp->flags |= GENHD_FL_DEVFS;
 
 	/*
 	 * Set device name.
@@ -191,14 +190,12 @@ static int dasd_gendisk_major_index(int major)
  */
 int dasd_gendisk_index_major(int devindex)
 {
-	struct list_head *l;
 	struct major_info *mi;
 	int rc;
 
 	spin_lock(&dasd_major_lock);
 	rc = -ENODEV;
-	list_for_each(l, &dasd_major_info) {
-		mi = list_entry(l, struct major_info, list);
+	list_for_each_entry(mi, &dasd_major_info, list) {
 		if (devindex < DASD_PER_MAJOR) {
 			rc = mi->major;
 			break;
@@ -231,6 +228,7 @@ void
 dasd_destroy_partitions(dasd_device_t * device)
 {
 	del_gendisk(device->gdp);
+	put_disk(device->gdp);
 }
 
 int

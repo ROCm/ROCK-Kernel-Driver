@@ -6,7 +6,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.27 $
+ * $Revision: 1.28 $
  *
  * History of changes
  * 07/13/00 Added fixup sections for diagnoses ans saved some registers
@@ -96,7 +96,7 @@ mdsk_init_io(dasd_device_t * device, int blocksize, int offset, int size)
 	iib = &private->iib;
 	memset(iib, 0, sizeof (diag_init_io_t));
 
-	iib->dev_nr = device->devno;
+	iib->dev_nr = _ccw_device_get_device_number(device->cdev);
 	iib->block_size = blocksize;
 	iib->offset = offset;
 	iib->start_block = 0;
@@ -117,7 +117,7 @@ mdsk_term_io(dasd_device_t * device)
 	private = (dasd_diag_private_t *) device->private;
 	iib = &private->iib;
 	memset(iib, 0, sizeof (diag_init_io_t));
-	iib->dev_nr = device->devno;
+	iib->dev_nr = _ccw_device_get_device_number(device->cdev);
 	rc = dia250(iib, TERM_BIO);
 	return rc & 3;
 }
@@ -134,7 +134,7 @@ dasd_start_diag(dasd_ccw_req_t * cqr)
 	private = (dasd_diag_private_t *) device->private;
 	dreq = (dasd_diag_req_t *) cqr->data;
 
-	private->iob.dev_nr = device->devno;
+	private->iob.dev_nr = _ccw_device_get_device_number(device->cdev);
 	private->iob.key = 0;
 	private->iob.flags = 2;	/* do asynchronous io */
 	private->iob.block_count = dreq->block_count;
@@ -252,7 +252,7 @@ dasd_diag_check_device(dasd_device_t *device)
 	}
 	/* Read Device Characteristics */
 	rdc_data = (void *) &(private->rdc_data);
-	rdc_data->dev_nr = device->devno;
+	rdc_data->dev_nr = _ccw_device_get_device_number(device->cdev);
 	rdc_data->rdc_len = sizeof (dasd_diag_characteristics_t);
 
 	rc = diag210((struct diag210 *) rdc_data);

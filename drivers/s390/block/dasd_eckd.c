@@ -7,7 +7,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.36 $
+ * $Revision: 1.38 $
  *
  * History of changes (starts July 2000)
  * 07/11/00 Enabled rotational position sensing
@@ -1003,7 +1003,7 @@ dasd_eckd_build_cp(dasd_device_t * device, struct request *req)
 				return ERR_PTR(-EINVAL);
 			count += bv->bv_len >> (device->s2b_shift + 9);
 #if defined(CONFIG_ARCH_S390X)
-			cidaw += idal_nr_words(kmap(bv->bv_page) +
+			cidaw += idal_nr_words(page_address(bv->bv_page) +
 					       bv->bv_offset, bv->bv_len);
 #endif
 		}
@@ -1042,7 +1042,7 @@ dasd_eckd_build_cp(dasd_device_t * device, struct request *req)
 			      last_rec - recid + 1, cmd, device, blksize);
 	}
 	rq_for_each_bio(bio, req) bio_for_each_segment(bv, bio, i) {
-		dst = kmap(bv->bv_page) + bv->bv_offset;
+		dst = page_address(bv->bv_page) + bv->bv_offset;
 		for (off = 0; off < bv->bv_len; off += blksize) {
 			sector_t trkid = recid;
 			unsigned int recoffs = sector_div(trkid, blk_per_trk);
@@ -1453,6 +1453,8 @@ static dasd_discipline_t dasd_eckd_discipline = {
 static int __init
 dasd_eckd_init(void)
 {
+	int ret;
+
 	dasd_ioctl_no_register(THIS_MODULE, BIODASDSATTR,
 			       dasd_eckd_set_attrib);
 	dasd_ioctl_no_register(THIS_MODULE, BIODASDPSRD,
@@ -1466,7 +1468,22 @@ dasd_eckd_init(void)
 
 	ASCEBC(dasd_eckd_discipline.ebcname, 4);
 
-	ccw_driver_register(&dasd_eckd_driver);
+	ret = ccw_driver_register(&dasd_eckd_driver);
+	if (ret) {
+		dasd_ioctl_no_unregister(THIS_MODULE, BIODASDSATTR,
+					 dasd_eckd_set_attrib);
+		dasd_ioctl_no_unregister(THIS_MODULE, BIODASDPSRD,
+					 dasd_eckd_performance);
+		dasd_ioctl_no_unregister(THIS_MODULE, BIODASDRLSE,
+					 dasd_eckd_release);
+		dasd_ioctl_no_unregister(THIS_MODULE, BIODASDRSRV,
+					 dasd_eckd_reserve);
+		dasd_ioctl_no_unregister(THIS_MODULE, BIODASDSLCK,
+					 dasd_eckd_steal_lock);
+		return ret;
+	}
+
+	dasd_generic_auto_online(&dasd_eckd_driver);
 	return 0;
 }
 

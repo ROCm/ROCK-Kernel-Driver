@@ -9,7 +9,7 @@
  *
  * /proc interface for the dasd driver.
  *
- * $Revision: 1.17 $
+ * $Revision: 1.18 $
  *
  * History of changes
  * 05/04/02 split from dasd.c, code restructuring.
@@ -56,17 +56,14 @@ dasd_get_user_string(const char *user_buf, size_t user_len)
 static int
 dasd_devices_show(struct seq_file *m, void *v)
 {
-	dasd_devmap_t *devmap;
 	dasd_device_t *device;
 	char *substr;
 
-	devmap = dasd_devmap_from_devindex((unsigned long) v - 1);
-	device = (devmap != NULL) ?
-		dasd_get_device(devmap) : ERR_PTR(-ENODEV);
+	device = dasd_device_from_devindex((unsigned long) v - 1);
 	if (IS_ERR(device))
 		return 0;
 	/* Print device number. */
-	seq_printf(m, "%04x", devmap->devno);
+	seq_printf(m, "%04x", _ccw_device_get_device_number(device->cdev));
 	/* Print discipline string. */
 	if (device != NULL && device->discipline != NULL)
 		seq_printf(m, "(%s)", device->discipline->name);
@@ -113,7 +110,7 @@ dasd_devices_show(struct seq_file *m, void *v)
 		seq_printf(m, "no stat");
 		break;
 	}
-	dasd_put_device(devmap);
+	dasd_put_device(device);
 	if (dasd_probeonly)
 		seq_printf(m, "(probeonly)");
 	seq_printf(m, "\n");
