@@ -794,8 +794,7 @@ __group_send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 	 * If the main thread wants the signal, it gets first crack.
 	 * Probably the least surprising to the average bear.
 	 */
-	if (p->state < TASK_ZOMBIE &&
-	    (sig_kernel_only(sig) || wants_signal(sig, p)))
+	if (wants_signal(sig, p))
 		t = p;
 	else if (thread_group_empty(p))
 		/*
