@@ -212,7 +212,7 @@ handle_interrupt(struct keywest_iface *iface, u8 isr)
 #ifndef POLLED_MODE
 
 /* Interrupt handler */
-static void
+static irqreturn_t
 keywest_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct keywest_iface *iface = (struct keywest_iface *)dev_id;
@@ -225,6 +225,7 @@ keywest_irq(int irq, void *dev_id, struct pt_regs *regs)
 		add_timer(&iface->timeout_timer);
 	}
 	spin_unlock(&iface->lock);
+	return IRQ_HANDLED;
 }
 
 static void

@@ -585,6 +585,8 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 		err = -ENOMEM;
 		goto ERROR1;
 	}
+	memset(new_client, 0x00, sizeof(struct i2c_client) +
+				 sizeof(struct it87_data));
 
 	data = (struct it87_data *) (new_client + 1);
 	if (is_isa)
