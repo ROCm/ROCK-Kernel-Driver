@@ -429,11 +429,6 @@ struct tc_netem_corr
 	__u32	dup_corr;	/* duplicate correlation  */
 };
 
-struct tc_netem_dist
-{
-	__u32	size;		/* table size */
-	__u32	factor;		/* table scaling factor */
-	__s16	data[0];	/* distribution table values */
-};
+#define NETEM_DIST_SCALE	8192
 
 #endif

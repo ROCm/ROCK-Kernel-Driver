@@ -734,10 +734,10 @@ int ip_append_data(struct sock *sk,
 	int hh_len;
 	int exthdrlen;
 	int mtu;
-	int copy;
+	int copy = 0;
 	int err;
 	int offset = 0;
-	unsigned int maxfraglen, fragheaderlen;
+	unsigned int maxfraglen, fragheaderlen, fraggap = 0;
 	int csummode = CHECKSUM_NONE;
 
 	if (flags&MSG_PROBE)
@@ -780,12 +780,26 @@ int ip_append_data(struct sock *sk,
 	hh_len = LL_RESERVED_SPACE(rt->u.dst.dev);
 
 	fragheaderlen = sizeof(struct iphdr) + (opt ? opt->optlen : 0);
-	maxfraglen = ((mtu-fragheaderlen) & ~7) + fragheaderlen;
 
 	if (inet->cork.length + length > 0xFFFF - fragheaderlen) {
 		ip_local_error(sk, EMSGSIZE, rt->rt_dst, inet->dport, mtu-exthdrlen);
 		return -EMSGSIZE;
 	}
+
+	/*
+	 * Let's try using as much space as possible to avoid generating
+	 * additional unnecessary small fragment of length 
+	 * (mtu-fragheaderlen)%8 if mtu-fragheaderlen is not 0 modulo 8.
+	 * -- yoshfuji
+	 */
+	if (fragheaderlen + inet->cork.length + length <= mtu)
+		maxfraglen = mtu;
+	else
+		maxfraglen = ((mtu - fragheaderlen) & ~7) + fragheaderlen;
+
+	if (fragheaderlen + inet->cork.length <= mtu &&
+	    fragheaderlen + inet->cork.length + length > mtu)
+		fraggap = 1;
 
 	/*
 	 * transhdrlen > 0 means that this is the first fragment and we wish
@@ -804,16 +818,12 @@ int ip_append_data(struct sock *sk,
 	 * We use calculated fragment length to generate chained skb,
 	 * each of segments is IP fragment ready for sending to network after
 	 * adding appropriate IP header.
-	 *
-	 * Mistake is:
-	 *
-	 *    If mtu-fragheaderlen is not 0 modulo 8, we generate additional
-	 *    small fragment of length (mtu-fragheaderlen)%8, even though
-	 *    it is not necessary. Not a big bug, but needs a fix.
 	 */
 
-	if ((skb = skb_peek_tail(&sk->sk_write_queue)) == NULL)
+	if ((skb = skb_peek_tail(&sk->sk_write_queue)) == NULL) {
+		fraggap = 0;
 		goto alloc_new_skb;
+	}
 
 	while (length > 0) {
 		if ((copy = maxfraglen - skb->len) <= 0) {
@@ -821,12 +831,18 @@ int ip_append_data(struct sock *sk,
 			unsigned int datalen;
 			unsigned int fraglen;
 			unsigned int alloclen;
-			BUG_TRAP(copy == 0);
+			struct sk_buff *skb_prev;
+			BUG_TRAP(fraggap || copy == 0);
 
 alloc_new_skb:
+			skb_prev = skb;
+
+			if (fraggap)
+				fraggap = -copy;
+
 			datalen = maxfraglen - fragheaderlen;
-			if (datalen > length)
-				datalen = length;
+			if (datalen > length + fraggap)
+				datalen = length + fraggap;
 
 			fraglen = datalen + fragheaderlen;
 			if ((flags & MSG_MORE) && 
@@ -875,7 +891,14 @@ alloc_new_skb:
 			data += fragheaderlen;
 			skb->h.raw = data + exthdrlen;
 
-			copy = datalen - transhdrlen;
+			if (fraggap) {
+				skb_copy_bits(skb_prev, maxfraglen, 
+					      data + transhdrlen, fraggap);
+				data += fraggap;
+				skb_trim(skb_prev, maxfraglen);
+			}
+
+			copy = datalen - transhdrlen - fraggap;
 			if (copy > 0 && getfrag(from, data + transhdrlen, offset, copy, 0, skb) < 0) {
 				err = -EFAULT;
 				kfree_skb(skb);
@@ -883,9 +906,10 @@ alloc_new_skb:
 			}
 
 			offset += copy;
-			length -= datalen;
+			length -= datalen - fraggap;
 			transhdrlen = 0;
 			exthdrlen = 0;
+			fraggap = 0;
 			csummode = CHECKSUM_NONE;
 
 			/*
