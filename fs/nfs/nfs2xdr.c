@@ -36,33 +36,33 @@ extern int			nfs_stat_to_errno(int stat);
  * Declare the space requirements for NFS arguments and replies as
  * number of 32bit-words
  */
-#define NFS_fhandle_sz		8
-#define NFS_sattr_sz		8
-#define NFS_filename_sz		1+(NFS2_MAXNAMLEN>>2)
-#define NFS_path_sz		1+(NFS2_MAXPATHLEN>>2)
-#define NFS_fattr_sz		17
-#define NFS_info_sz		5
-#define NFS_entry_sz		NFS_filename_sz+3
+#define NFS_fhandle_sz		(8)
+#define NFS_sattr_sz		(8)
+#define NFS_filename_sz		(1+(NFS2_MAXNAMLEN>>2))
+#define NFS_path_sz		(1+(NFS2_MAXPATHLEN>>2))
+#define NFS_fattr_sz		(17)
+#define NFS_info_sz		(5)
+#define NFS_entry_sz		(NFS_filename_sz+3)
 
-#define NFS_diropargs_sz	NFS_fhandle_sz+NFS_filename_sz
-#define NFS_sattrargs_sz	NFS_fhandle_sz+NFS_sattr_sz
-#define NFS_readlinkargs_sz	NFS_fhandle_sz
-#define NFS_readargs_sz		NFS_fhandle_sz+3
-#define NFS_writeargs_sz	NFS_fhandle_sz+4
-#define NFS_createargs_sz	NFS_diropargs_sz+NFS_sattr_sz
-#define NFS_renameargs_sz	NFS_diropargs_sz+NFS_diropargs_sz
-#define NFS_linkargs_sz		NFS_fhandle_sz+NFS_diropargs_sz
-#define NFS_symlinkargs_sz	NFS_diropargs_sz+NFS_path_sz+NFS_sattr_sz
-#define NFS_readdirargs_sz	NFS_fhandle_sz+2
+#define NFS_diropargs_sz	(NFS_fhandle_sz+NFS_filename_sz)
+#define NFS_sattrargs_sz	(NFS_fhandle_sz+NFS_sattr_sz)
+#define NFS_readlinkargs_sz	(NFS_fhandle_sz)
+#define NFS_readargs_sz		(NFS_fhandle_sz+3)
+#define NFS_writeargs_sz	(NFS_fhandle_sz+4)
+#define NFS_createargs_sz	(NFS_diropargs_sz+NFS_sattr_sz)
+#define NFS_renameargs_sz	(NFS_diropargs_sz+NFS_diropargs_sz)
+#define NFS_linkargs_sz		(NFS_fhandle_sz+NFS_diropargs_sz)
+#define NFS_symlinkargs_sz	(NFS_diropargs_sz+NFS_path_sz+NFS_sattr_sz)
+#define NFS_readdirargs_sz	(NFS_fhandle_sz+2)
 
-#define NFS_attrstat_sz		1+NFS_fattr_sz
-#define NFS_diropres_sz		1+NFS_fhandle_sz+NFS_fattr_sz
-#define NFS_readlinkres_sz	1
-#define NFS_readres_sz		1+NFS_fattr_sz+1
-#define NFS_writeres_sz         NFS_attrstat_sz
-#define NFS_stat_sz		1
-#define NFS_readdirres_sz	1
-#define NFS_statfsres_sz	1+NFS_info_sz
+#define NFS_attrstat_sz		(1+NFS_fattr_sz)
+#define NFS_diropres_sz		(1+NFS_fhandle_sz+NFS_fattr_sz)
+#define NFS_readlinkres_sz	(1)
+#define NFS_readres_sz		(1+NFS_fattr_sz+1)
+#define NFS_writeres_sz         (NFS_attrstat_sz)
+#define NFS_stat_sz		(1)
+#define NFS_readdirres_sz	(1)
+#define NFS_statfsres_sz	(1+NFS_info_sz)
 
 /*
  * Common NFS XDR functions as inlines

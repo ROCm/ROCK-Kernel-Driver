@@ -49,18 +49,6 @@
 
 extern struct rpc_procinfo nfs_procedures[];
 
-static void
-nfs_write_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
-{
-	if (!(fattr->valid & NFS_ATTR_WCC)) {
-		fattr->pre_size  = NFS_CACHE_ISIZE(inode);
-		fattr->pre_mtime = NFS_CACHE_MTIME(inode);
-		fattr->pre_ctime = NFS_CACHE_CTIME(inode);
-		fattr->valid |= NFS_ATTR_WCC;
-	}
-	nfs_refresh_inode(inode, fattr);
-}
-
 static struct rpc_cred *
 nfs_cred(struct inode *inode, struct file *filp)
 {
@@ -78,15 +66,33 @@ nfs_cred(struct inode *inode, struct file *filp)
  */
 static int
 nfs_proc_get_root(struct nfs_server *server, struct nfs_fh *fhandle,
-		  struct nfs_fattr *fattr)
+		  struct nfs_fsinfo *info)
 {
-	int		status;
+	struct nfs_fattr *fattr = info->fattr;
+	struct nfs2_fsstat fsinfo;
+	int status;
 
-	dprintk("NFS call  getroot\n");
+	dprintk("%s: call getattr\n", __FUNCTION__);
 	fattr->valid = 0;
-	status = rpc_call(server->client, NFSPROC_GETATTR, fhandle, fattr, 0);
-	dprintk("NFS reply getroot\n");
-	return status;
+	status = rpc_call(server->client_sys, NFSPROC_GETATTR, fhandle, fattr, 0);
+	dprintk("%s: reply getattr %d\n", __FUNCTION__, status);
+	if (status)
+		return status;
+	dprintk("%s: call statfs\n", __FUNCTION__);
+	status = rpc_call(server->client_sys, NFSPROC_STATFS, fhandle, &fsinfo, 0);
+	dprintk("%s: reply statfs %d\n", __FUNCTION__, status);
+	if (status)
+		return status;
+	info->rtmax  = NFS_MAXDATA;
+	info->rtpref = fsinfo.tsize;
+	info->rtmult = fsinfo.bsize;
+	info->wtmax  = NFS_MAXDATA;
+	info->wtpref = fsinfo.tsize;
+	info->wtmult = fsinfo.bsize;
+	info->dtpref = fsinfo.tsize;
+	info->maxfilesize = 0x7FFFFFFF;
+	info->lease_time = 0;
+	return 0;
 }
 
 /*
@@ -180,8 +186,14 @@ nfs_proc_read(struct nfs_read_data *rdata, struct file *filp)
 	msg.rpc_cred = nfs_cred(inode, filp);
 	status = rpc_call_sync(NFS_CLIENT(inode), &msg, flags);
 
-	if (status >= 0)
+	if (status >= 0) {
 		nfs_refresh_inode(inode, fattr);
+		/* Emulate the eof flag, which isn't normally needed in NFSv2
+		 * as it is guaranteed to always return the file attributes
+		 */
+		if (rdata->args.offset + rdata->args.count >= fattr->size)
+			rdata->res.eof = 1;
+	}
 	dprintk("NFS reply read: %d\n", status);
 	return status;
 }
@@ -205,7 +217,7 @@ nfs_proc_write(struct nfs_write_data *wdata, struct file *filp)
 	msg.rpc_cred = nfs_cred(inode, filp);
 	status = rpc_call_sync(NFS_CLIENT(inode), &msg, flags);
 	if (status >= 0) {
-		nfs_write_refresh_inode(inode, fattr);
+		nfs_refresh_inode(inode, fattr);
 		wdata->res.count = wdata->args.count;
 		wdata->verf.committed = NFS_FILE_SYNC;
 	}
@@ -331,10 +343,8 @@ nfs_proc_unlink_done(struct dentry *dir, struct rpc_task *task)
 {
 	struct rpc_message *msg = &task->tk_msg;
 	
-	if (msg->rpc_argp) {
-		NFS_CACHEINV(dir->d_inode);
+	if (msg->rpc_argp)
 		kfree(msg->rpc_argp);
-	}
 	return 0;
 }
 
@@ -537,8 +547,14 @@ nfs_read_done(struct rpc_task *task)
 {
 	struct nfs_read_data *data = (struct nfs_read_data *) task->tk_calldata;
 
-	if (task->tk_status >= 0)
+	if (task->tk_status >= 0) {
 		nfs_refresh_inode(data->inode, data->res.fattr);
+		/* Emulate the eof flag, which isn't normally needed in NFSv2
+		 * as it is guaranteed to always return the file attributes
+		 */
+		if (data->args.offset + data->args.count >= data->res.fattr->size)
+			data->res.eof = 1;
+	}
 	nfs_readpage_result(task);
 }
 
@@ -584,7 +600,7 @@ nfs_write_done(struct rpc_task *task)
 	struct nfs_write_data *data = (struct nfs_write_data *) task->tk_calldata;
 
 	if (task->tk_status >= 0)
-		nfs_write_refresh_inode(data->inode, data->res.fattr);
+		nfs_refresh_inode(data->inode, data->res.fattr);
 	nfs_writeback_done(task);
 }
 

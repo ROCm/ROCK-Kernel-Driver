@@ -99,7 +99,7 @@ struct nfs_inode {
 	/*
 	 * Various flags
 	 */
-	unsigned short		flags;
+	unsigned int		flags;
 
 	/*
 	 * read_cache_jiffies is when we started read-caching this inode,
@@ -118,19 +118,22 @@ struct nfs_inode {
 	 *
 	 *	mtime != read_cache_mtime
 	 */
+	unsigned long		readdir_timestamp;
 	unsigned long		read_cache_jiffies;
-	struct timespec		read_cache_ctime;
-	struct timespec		read_cache_mtime;
-	__u64			read_cache_isize;
 	unsigned long		attrtimeo;
 	unsigned long		attrtimeo_timestamp;
 	__u64			change_attr;		/* v4 only */
 
-	/*
-	 * Timestamp that dates the change made to read_cache_mtime.
-	 * This is of use for dentry revalidation
+	/* "Generation counter" for the attribute cache. This is
+	 * bumped whenever we update the metadata on the
+	 * server.
 	 */
-	unsigned long		cache_mtime_jiffies;
+	unsigned long		cache_change_attribute;
+	/*
+	 * Counter indicating the number of outstanding requests that
+	 * will cause a file data update.
+	 */
+	atomic_t		data_updates;
 
 	struct nfs_access_cache	cache_access;
 
@@ -170,8 +173,9 @@ struct nfs_inode {
 #define NFS_INO_STALE		0x0001		/* possible stale inode */
 #define NFS_INO_ADVISE_RDPLUS   0x0002          /* advise readdirplus */
 #define NFS_INO_REVALIDATING	0x0004		/* revalidating attrs */
-#define NFS_INO_FLUSH		0x0008		/* inode is due for flushing */
-#define NFS_INO_FAKE_ROOT	0x0080		/* root inode placeholder */
+#define NFS_INO_INVALID_ATTR	0x0008		/* cached attrs are invalid */
+#define NFS_INO_INVALID_DATA	0x0010		/* cached data is invalid */
+#define NFS_INO_INVALID_ATIME	0x0020		/* cached atime is invalid */
 
 static inline struct nfs_inode *NFS_I(struct inode *inode)
 {
@@ -186,15 +190,7 @@ static inline struct nfs_inode *NFS_I(struct inode *inode)
 #define NFS_ADDR(inode)			(RPC_PEERADDR(NFS_CLIENT(inode)))
 #define NFS_COOKIEVERF(inode)		(NFS_I(inode)->cookieverf)
 #define NFS_READTIME(inode)		(NFS_I(inode)->read_cache_jiffies)
-#define NFS_MTIME_UPDATE(inode)		(NFS_I(inode)->cache_mtime_jiffies)
-#define NFS_CACHE_CTIME(inode)		(NFS_I(inode)->read_cache_ctime)
-#define NFS_CACHE_MTIME(inode)		(NFS_I(inode)->read_cache_mtime)
-#define NFS_CACHE_ISIZE(inode)		(NFS_I(inode)->read_cache_isize)
 #define NFS_CHANGE_ATTR(inode)		(NFS_I(inode)->change_attr)
-#define NFS_CACHEINV(inode) \
-do { \
-	NFS_READTIME(inode) = jiffies - NFS_MAXATTRTIMEO(inode) - 1; \
-} while (0)
 #define NFS_ATTRTIMEO(inode)		(NFS_I(inode)->attrtimeo)
 #define NFS_MINATTRTIMEO(inode) \
 	(S_ISDIR(inode->i_mode)? NFS_SERVER(inode)->acdirmin \
@@ -207,9 +203,19 @@ do { \
 #define NFS_FLAGS(inode)		(NFS_I(inode)->flags)
 #define NFS_REVALIDATING(inode)		(NFS_FLAGS(inode) & NFS_INO_REVALIDATING)
 #define NFS_STALE(inode)		(NFS_FLAGS(inode) & NFS_INO_STALE)
-#define NFS_FAKE_ROOT(inode)		(NFS_FLAGS(inode) & NFS_INO_FAKE_ROOT)
 
 #define NFS_FILEID(inode)		(NFS_I(inode)->fileid)
+
+static inline int nfs_caches_unstable(struct inode *inode)
+{
+	return atomic_read(&NFS_I(inode)->data_updates) != 0;
+}
+
+static inline void NFS_CACHEINV(struct inode *inode)
+{
+	if (!nfs_caches_unstable(inode))
+		NFS_FLAGS(inode) |= NFS_INO_INVALID_ATTR;
+}
 
 static inline int nfs_server_capable(struct inode *inode, int cap)
 {
@@ -227,13 +233,37 @@ loff_t page_offset(struct page *page)
 	return ((loff_t)page->index) << PAGE_CACHE_SHIFT;
 }
 
+/**
+ * nfs_save_change_attribute - Returns the inode attribute change cookie
+ * @inode - pointer to inode
+ * The "change attribute" is updated every time we finish an operation
+ * that will result in a metadata change on the server.
+ */
+static inline long nfs_save_change_attribute(struct inode *inode)
+{
+	return NFS_I(inode)->cache_change_attribute;
+}
+
+/**
+ * nfs_verify_change_attribute - Detects NFS inode cache updates
+ * @inode - pointer to inode
+ * @chattr - previously saved change attribute
+ * Return "false" if metadata has been updated (or is in the process of
+ * being updated) since the change attribute was saved.
+ */
+static inline int nfs_verify_change_attribute(struct inode *inode, unsigned long chattr)
+{
+	return !nfs_caches_unstable(inode)
+		&& chattr == NFS_I(inode)->cache_change_attribute;
+}
+
 /*
  * linux/fs/nfs/inode.c
  */
 extern void nfs_zap_caches(struct inode *);
 extern struct inode *nfs_fhget(struct super_block *, struct nfs_fh *,
 				struct nfs_fattr *);
-extern int __nfs_refresh_inode(struct inode *, struct nfs_fattr *);
+extern int nfs_refresh_inode(struct inode *, struct nfs_fattr *);
 extern int nfs_getattr(struct vfsmount *, struct dentry *, struct kstat *);
 extern int nfs_permission(struct inode *, int, struct nameidata *);
 extern void nfs_set_mmcred(struct inode *, struct rpc_cred *);
@@ -241,6 +271,13 @@ extern int nfs_open(struct inode *, struct file *);
 extern int nfs_release(struct inode *, struct file *);
 extern int __nfs_revalidate_inode(struct nfs_server *, struct inode *);
 extern int nfs_setattr(struct dentry *, struct iattr *);
+extern void nfs_begin_attr_update(struct inode *);
+extern void nfs_end_attr_update(struct inode *);
+extern void nfs_begin_data_update(struct inode *);
+extern void nfs_end_data_update(struct inode *);
+
+/* linux/net/ipv4/ipconfig.c: trims ip addr off front of name, too. */
+extern u32 root_nfs_parse_addr(char *name); /*__init*/
 
 /*
  * linux/fs/nfs/file.c
@@ -309,16 +346,15 @@ extern void nfs_commit_done(struct rpc_task *);
  * Try to write back everything synchronously (but check the
  * return value!)
  */
-extern int  nfs_sync_file(struct inode *, struct file *, unsigned long, unsigned int, int);
-extern int  nfs_flush_file(struct inode *, struct file *, unsigned long, unsigned int, int);
+extern int  nfs_sync_inode(struct inode *, unsigned long, unsigned int, int);
+extern int  nfs_flush_inode(struct inode *, unsigned long, unsigned int, int);
 extern int  nfs_flush_list(struct list_head *, int, int);
 #if defined(CONFIG_NFS_V3) || defined(CONFIG_NFS_V4)
-extern int  nfs_commit_file(struct inode *, struct file *, unsigned long, unsigned int, int);
+extern int  nfs_commit_inode(struct inode *, unsigned long, unsigned int, int);
 extern int  nfs_commit_list(struct list_head *, int);
 #else
 static inline int
-nfs_commit_file(struct inode *inode, struct file *file, unsigned long offset,
-		unsigned int len, int flags)
+nfs_commit_inode(struct inode *inode, unsigned long idx_start, unsigned int npages, int how)
 {
 	return 0;
 }
@@ -333,7 +369,7 @@ nfs_have_writebacks(struct inode *inode)
 static inline int
 nfs_wb_all(struct inode *inode)
 {
-	int error = nfs_sync_file(inode, 0, 0, 0, FLUSH_WAIT);
+	int error = nfs_sync_inode(inode, 0, 0, FLUSH_WAIT);
 	return (error < 0) ? error : 0;
 }
 
@@ -343,18 +379,8 @@ nfs_wb_all(struct inode *inode)
 static inline int
 nfs_wb_page(struct inode *inode, struct page* page)
 {
-	int error = nfs_sync_file(inode, 0, page->index, 1,
+	int error = nfs_sync_inode(inode, page->index, 1,
 						FLUSH_WAIT | FLUSH_STABLE);
-	return (error < 0) ? error : 0;
-}
-
-/*
- * Write back all pending writes for one user.. 
- */
-static inline int
-nfs_wb_file(struct inode *inode, struct file *file)
-{
-	int error = nfs_sync_file(inode, file, 0, 0, FLUSH_WAIT);
 	return (error < 0) ? error : 0;
 }
 
@@ -383,20 +409,27 @@ extern int  nfsroot_mount(struct sockaddr_in *, char *, struct nfs_fh *,
 /*
  * inline functions
  */
-static inline int
-nfs_revalidate_inode(struct nfs_server *server, struct inode *inode)
+
+static inline int nfs_attribute_timeout(struct inode *inode)
 {
-	if (time_before(jiffies, NFS_READTIME(inode)+NFS_ATTRTIMEO(inode)))
-		return NFS_STALE(inode) ? -ESTALE : 0;
-	return __nfs_revalidate_inode(server, inode);
+	struct nfs_inode *nfsi = NFS_I(inode);
+
+	return time_after(jiffies, nfsi->read_cache_jiffies+nfsi->attrtimeo);
 }
 
-static inline int
-nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
+/**
+ * nfs_revalidate_inode - Revalidate the inode attributes
+ * @server - pointer to nfs_server struct
+ * @inode - pointer to inode struct
+ *
+ * Updates inode attribute information by retrieving the data from the server.
+ */
+static inline int nfs_revalidate_inode(struct nfs_server *server, struct inode *inode)
 {
-	if ((fattr->valid & NFS_ATTR_FATTR) == 0)
-		return 0;
-	return __nfs_refresh_inode(inode,fattr);
+	if (!(NFS_FLAGS(inode) & (NFS_INO_INVALID_ATTR|NFS_INO_INVALID_DATA))
+			&& !nfs_attribute_timeout(inode))
+		return NFS_STALE(inode) ? -ESTALE : 0;
+	return __nfs_revalidate_inode(server, inode);
 }
 
 static inline loff_t
@@ -661,7 +694,7 @@ struct nfs4_mount_data;
 #ifdef __KERNEL__
 # undef ifdebug
 # ifdef NFS_DEBUG
-#  define ifdebug(fac)		if (nfs_debug & NFSDBG_##fac)
+#  define ifdebug(fac)		if (unlikely(nfs_debug & NFSDBG_##fac))
 # else
 #  define ifdebug(fac)		if (0)
 # endif

@@ -479,6 +479,22 @@ nlmsvc_proc_sm_notify(struct svc_rqst *rqstp, struct nlm_reboot *argp,
 }
 
 /*
+ * client sent a GRANTED_RES, let's remove the associated block
+ */
+static int
+nlmsvc_proc_granted_res(struct svc_rqst *rqstp, struct nlm_res  *argp,
+                                                void            *resp)
+{
+	if (!nlmsvc_ops)
+		return rpc_success;
+
+	dprintk("lockd: GRANTED_RES   called\n");
+
+	nlmsvc_grant_reply(rqstp, &argp->cookie, argp->status);
+	return rpc_success;
+}
+
+/*
  * This is the generic lockd callback for async RPC calls
  */
 static u32
@@ -541,7 +557,6 @@ nlmsvc_callback_exit(struct rpc_task *task)
 #define nlmsvc_proc_lock_res	nlmsvc_proc_null
 #define nlmsvc_proc_cancel_res	nlmsvc_proc_null
 #define nlmsvc_proc_unlock_res	nlmsvc_proc_null
-#define nlmsvc_proc_granted_res	nlmsvc_proc_null
 
 struct nlm_void			{ int dummy; };
 
@@ -576,7 +591,7 @@ struct svc_procedure		nlmsvc_procedures[] = {
   PROC(lock_res,	lockres,	norep,		res,	void, 1),
   PROC(cancel_res,	cancelres,	norep,		res,	void, 1),
   PROC(unlock_res,	unlockres,	norep,		res,	void, 1),
-  PROC(granted_res,	grantedres,	norep,		res,	void, 1),
+  PROC(granted_res,	res,		norep,		res,	void, 1),
   /* statd callback */
   PROC(sm_notify,	reboot,		void,		reboot,	void, 1),
   PROC(none,		void,		void,		void,	void, 1),
