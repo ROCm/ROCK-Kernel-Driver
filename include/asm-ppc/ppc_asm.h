@@ -51,7 +51,6 @@
 
 /*
  * Once a version of gas that understands the AltiVec instructions
- * is freely available, we can do this the normal way...  - paulus
  */
 #define LVX(r,a,b)	.long	(31<<26)+((r)<<21)+((a)<<16)+((b)<<11)+(103<<1)
 #define STVX(r,a,b)	.long	(31<<26)+((r)<<21)+((a)<<16)+((b)<<11)+(231<<1)
@@ -169,7 +168,11 @@ END_FTR_SECTION_IFCLR(CPU_FTR_601)
 
 #else
 #define FIX_SRR1(ra, rb)
+#ifndef CONFIG_40x
 #define	RFI		rfi
+#else
+#define RFI		rfi; b .	/* Prevent prefetch past rfi */
+#endif
 #define MTMSRD(r)	mtmsr	r
 #define CLR_TOP32(r)
 #endif /* CONFIG_PPC64BRIDGE */

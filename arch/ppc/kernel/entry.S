@@ -164,7 +164,6 @@ ret_from_syscall:
 	andi.	r0,r9,(_TIF_SYSCALL_TRACE|_TIF_SIGPENDING|_TIF_NEED_RESCHED)
 	bne-	syscall_exit_work
 syscall_exit_cont:
-	PPC405_ERR77(0,r1)
 	stwcx.	r0,0,r1			/* to clear the reservation */
 	lwz	r4,_LINK(r1)
 	lwz	r5,_CCR(r1)
@@ -568,6 +567,7 @@ exc_exit_start:
 exc_exit_restart_end:
 	PPC405_ERR77_SYNC
 	rfi
+	b	.			/* prevent prefetch past rfi */
 crit_exc_exit:
 	mtcrf	0xff,r10
 	/* avoid any possible TLB misses here by turning off MSR.DR, we
@@ -576,18 +576,40 @@ crit_exc_exit:
 	mtmsr	r10
 	isync
 	tophys(r1, r1)
-	lwz	r9,_SRR0(r1)
-	lwz	r10,_SRR1(r1)
-	mtspr	SRR0,r9
+	lwz	r9,_DEAR(r1)
+	lwz	r10,_ESR(r1)
+	mtspr	SPRN_DEAR,r9
+	mtspr	SPRN_ESR,r10
 	lwz	r11,_NIP(r1)
-	mtspr	SRR1,r10
 	lwz	r12,_MSR(r1)
 	mtspr	SRR2,r11
 	mtspr	SRR3,r12
-	REST_4GPRS(9, r1)
+	lwz	r9,GPR9(r1)
+	lwz	r12,GPR12(r1)
+	lwz	r10,crit_sprg0@l(0)
+	mtspr	SPRN_SPRG0,r10
+	lwz	r10,crit_sprg1@l(0)
+	mtspr	SPRN_SPRG1,r10
+	lwz	r10,crit_sprg4@l(0)
+	mtspr	SPRN_SPRG4,r10
+	lwz	r10,crit_sprg5@l(0)
+	mtspr	SPRN_SPRG5,r10
+	lwz	r10,crit_sprg6@l(0)
+	mtspr	SPRN_SPRG6,r10
+	lwz	r10,crit_sprg7@l(0)
+	mtspr	SPRN_SPRG7,r10
+	lwz	r10,crit_srr0@l(0)
+	mtspr	SRR0,r10
+	lwz	r10,crit_srr1@l(0)
+	mtspr	SRR1,r10
+	lwz	r10,crit_pid@l(0)
+	mtspr	SPRN_PID,r10
+	lwz	r10,crit_r10@l(0)
+	lwz	r11,crit_r11@l(0)
 	lwz	r1,GPR1(r1)
 	PPC405_ERR77_SYNC
 	rfci
+	b	.		/* prevent prefetch past rfci */
 #endif /* CONFIG_4xx */
 
 recheck:

@@ -112,8 +112,6 @@ main(void)
 	 */
 	DEFINE(_DEAR, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, dar));
 	DEFINE(_ESR, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, dsisr));
-	DEFINE(_SRR0, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, dar));
-	DEFINE(_SRR1, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, dsisr));
 	DEFINE(ORIG_GPR3, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, orig_gpr3));
 	DEFINE(RESULT, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, result));
 	DEFINE(TRAP, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, trap));
