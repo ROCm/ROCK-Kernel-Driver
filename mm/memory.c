@@ -1387,10 +1387,10 @@ do_no_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	unsigned long address, int write_access, pte_t *page_table, pmd_t *pmd)
 {
 	struct page * new_page;
-	struct address_space *mapping;
+	struct address_space *mapping = NULL;
 	pte_t entry;
 	struct pte_chain *pte_chain;
-	int sequence;
+	int sequence = 0;
 	int ret;
 
 	if (!vma->vm_ops || !vma->vm_ops->nopage)
@@ -1399,8 +1399,10 @@ do_no_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	pte_unmap(page_table);
 	spin_unlock(&mm->page_table_lock);
 
-	mapping = vma->vm_file->f_dentry->d_inode->i_mapping;
-	sequence = atomic_read(&mapping->truncate_count);
+	if (vma->vm_file) {
+		mapping = vma->vm_file->f_dentry->d_inode->i_mapping;
+		sequence = atomic_read(&mapping->truncate_count);
+	}
 	smp_rmb();  /* Prevent CPU from reordering lock-free ->nopage() */
 retry:
 	new_page = vma->vm_ops->nopage(vma, address & PAGE_MASK, 0);
@@ -1436,7 +1438,8 @@ retry:
 	 * invalidated this page.  If invalidate_mmap_range got called,
 	 * retry getting the page.
 	 */
-	if (unlikely(sequence != atomic_read(&mapping->truncate_count))) {
+	if (mapping &&
+	      (unlikely(sequence != atomic_read(&mapping->truncate_count)))) {
 		sequence = atomic_read(&mapping->truncate_count);
 		spin_unlock(&mm->page_table_lock);
 		page_cache_release(new_page);
