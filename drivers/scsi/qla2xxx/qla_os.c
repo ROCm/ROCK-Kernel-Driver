@@ -2322,18 +2322,17 @@ qla2x00_proc_info(struct Scsi_Host *shost, char *buffer,
     char **start, off_t offset, int length, int inout)
 {
 	struct info_str	info;
-	int		i;
 	int             retval = -EINVAL;
 	os_lun_t	*up;
-	fc_port_t	*fcport;
+	os_tgt_t	*tq;
 	unsigned int	t, l;
 	uint32_t        tmp_sn;
-	unsigned long   *flags;
+	uint32_t	*flags;
 	uint8_t		*loop_state;
 	int	found;
 	scsi_qla_host_t *ha;
 	char fw_info[30];
-
+ 
 	DEBUG3(printk(KERN_INFO
 	    "Entering proc_info buff_in=%p, offset=0x%lx, length=0x%x\n",
 	    buffer, offset, length);)
@@ -2437,7 +2436,7 @@ qla2x00_proc_info(struct Scsi_Host *shost, char *buffer,
 	    ha->done_q_cnt, ha->scsi_retry_q_cnt);
 
 
-	flags = (unsigned long *) &ha->flags;
+	flags = (uint32_t *) &ha->flags;
 
 	if (atomic_read(&ha->loop_state) == LOOP_DOWN) {
 		loop_state = "DOWN";
@@ -2511,24 +2510,19 @@ qla2x00_proc_info(struct Scsi_Host *shost, char *buffer,
 	    ha->init_cb->port_name[7]);
 
 	/* Print out device port names */
-	i = 0;
- 	list_for_each_entry(fcport, &ha->fcports, list) {
-		if (fcport->port_type != FCT_TARGET)
+	for (t = 0; t < MAX_FIBRE_DEVICES; t++) {
+		if ((tq = TGT_Q(ha, t)) == NULL)
 			continue;
 
 		copy_info(&info,
 		    "scsi-qla%d-target-%d="
-		    "%02x%02x%02x%02x%02x%02x%02x%02x:%02x%02x%02x;\n",
-		    (int)ha->instance, i,
-		    fcport->port_name[0], fcport->port_name[1],
-		    fcport->port_name[2], fcport->port_name[3],
-		    fcport->port_name[4], fcport->port_name[5],
-		    fcport->port_name[6], fcport->port_name[7],
-		    fcport->d_id.b.domain, fcport->d_id.b.area,
-		    fcport->d_id.b.al_pa);
-		i++;
+		    "%02x%02x%02x%02x%02x%02x%02x%02x;\n",
+		    (int)ha->instance, t,
+		    tq->port_name[0], tq->port_name[1],
+		    tq->port_name[2], tq->port_name[3],
+		    tq->port_name[4], tq->port_name[5],
+		    tq->port_name[6], tq->port_name[7]);
 	}
-
 	copy_info(&info, "\nSCSI LUN Information:\n");
 	copy_info(&info,
 	    "(Id:Lun)  * - indicates lun is not registered with the OS.\n");
