@@ -1508,7 +1508,7 @@ static void udc_enable (struct pxa2xx_udc *dev)
 	/* caller must be able to sleep in order to cope
 	 * with startup transients.
 	 */
-	schedule_timeout(HZ/10);
+	msleep(100);
 
 	/* enable suspend/resume and reset irqs */
 	udc_clear_mask_UDCCR(UDCCR_SRM | UDCCR_REM);
