@@ -11,6 +11,9 @@
 #ifndef _ASM_IA64_NUMA_H
 #define _ASM_IA64_NUMA_H
 
+#include <linux/config.h>
+#include <linux/cpumask.h>
+
 #ifdef CONFIG_NUMA
 
 #ifdef CONFIG_DISCONTIGMEM

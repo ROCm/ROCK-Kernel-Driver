@@ -36,6 +36,7 @@
 #include <asm/ia32.h>
 #include <asm/machvec.h>
 #include <asm/mca.h>
+#include <asm/meminit.h>
 #include <asm/page.h>
 #include <asm/patch.h>
 #include <asm/pgtable.h>
@@ -84,90 +85,11 @@ unsigned long ia64_max_iommu_merge_mask = ~0UL;
 char saved_command_line[COMMAND_LINE_SIZE]; /* used in proc filesystem */
 
 /*
- * Entries defined so far:
- * 	- boot param structure itself
- * 	- memory map
- * 	- initrd (optional)
- * 	- command line string
- * 	- kernel code & data
- *
- * More could be added if necessary
- */
-#define IA64_MAX_RSVD_REGIONS 5
-
-struct rsvd_region {
-	unsigned long start;	/* virtual address of beginning of element */
-	unsigned long end;	/* virtual address of end of element + 1 */
-};
-
-/*
  * We use a special marker for the end of memory and it uses the extra (+1) slot
  */
-static struct rsvd_region rsvd_region[IA64_MAX_RSVD_REGIONS + 1];
-static int num_rsvd_regions;
+struct rsvd_region rsvd_region[IA64_MAX_RSVD_REGIONS + 1];
+int num_rsvd_regions;
 
-#define IGNORE_PFN0	1	/* XXX fix me: ignore pfn 0 until TLB miss handler is updated... */
-
-#ifndef CONFIG_DISCONTIGMEM
-
-static unsigned long bootmap_start; /* physical address where the bootmem map is located */
-
-static int
-find_max_pfn (unsigned long start, unsigned long end, void *arg)
-{
-	unsigned long *max_pfnp = arg, pfn;
-
-	pfn = (PAGE_ALIGN(end - 1) - PAGE_OFFSET) >> PAGE_SHIFT;
-	if (pfn > *max_pfnp)
-		*max_pfnp = pfn;
-	return 0;
-}
-
-#else /* CONFIG_DISCONTIGMEM */
-
-/*
- * efi_memmap_walk() knows nothing about layout of memory across nodes. Find
- * out to which node a block of memory belongs.  Ignore memory that we cannot
- * identify, and split blocks that run across multiple nodes.
- *
- * Take this opportunity to round the start address up and the end address
- * down to page boundaries.
- */
-void
-call_pernode_memory (unsigned long start, unsigned long end, void *arg)
-{
-	unsigned long rs, re;
-	void (*func)(unsigned long, unsigned long, int, int);
-	int i;
-
-	start = PAGE_ALIGN(start);
-	end &= PAGE_MASK;
-	if (start >= end)
-		return;
-
-	func = arg;
-
-	if (!num_memblks) {
-		/*
-		 * This machine doesn't have SRAT, so call func with
-		 * nid=0, bank=0.
-		 */
-		if (start < end)
-			(*func)(start, end - start, 0, 0);
-		return;
-	}
-
-	for (i = 0; i < num_memblks; i++) {
-		rs = max(start, node_memblk[i].start_paddr);
-		re = min(end, node_memblk[i].start_paddr+node_memblk[i].size);
-
-		if (rs < re)
-			(*func)(rs, re-rs, node_memblk[i].nid,
-				node_memblk[i].bank);
-	}
-}
-
-#endif /* CONFIG_DISCONTIGMEM */
 
 /*
  * Filter incoming memory segments based on the primitive map created from the boot
@@ -215,48 +137,6 @@ filter_rsvd_memory (unsigned long start, unsigned long end, void *arg)
 	return 0;
 }
 
-
-#ifndef CONFIG_DISCONTIGMEM
-/*
- * Find a place to put the bootmap and return its starting address in bootmap_start.
- * This address must be page-aligned.
- */
-static int
-find_bootmap_location (unsigned long start, unsigned long end, void *arg)
-{
-	unsigned long needed = *(unsigned long *)arg;
-	unsigned long range_start, range_end, free_start;
-	int i;
-
-#if IGNORE_PFN0
-	if (start == PAGE_OFFSET) {
-		start += PAGE_SIZE;
-		if (start >= end) return 0;
-	}
-#endif
-
-	free_start = PAGE_OFFSET;
-
-	for (i = 0; i < num_rsvd_regions; i++) {
-		range_start = max(start, free_start);
-		range_end   = min(end, rsvd_region[i].start & PAGE_MASK);
-
-		if (range_end <= range_start) continue;	/* skip over empty range */
-
-	       	if (range_end - range_start >= needed) {
-			bootmap_start = __pa(range_start);
-			return 1;	/* done */
-		}
-
-		/* nothing more available in this segment */
-		if (range_end == end) return 0;
-
-		free_start = PAGE_ALIGN(rsvd_region[i].end);
-	}
-	return 0;
-}
-#endif /* !CONFIG_DISCONTIGMEM */
-
 static void
 sort_regions (struct rsvd_region *rsvd_region, int max)
 {
@@ -275,10 +155,15 @@ sort_regions (struct rsvd_region *rsvd_region, int max)
 	}
 }
 
-static void
-find_memory (void)
+/**
+ * reserve_memory - setup reserved memory areas
+ *
+ * Setup the reserved memory areas set aside for the boot parameters, initrd,
+ * etc.
+ */
+void
+reserve_memory (void)
 {
-	unsigned long bootmap_size;
 	int n = 0;
 
 	/*
@@ -317,36 +202,17 @@ find_memory (void)
 	num_rsvd_regions = n;
 
 	sort_regions(rsvd_region, num_rsvd_regions);
+}
 
-#ifdef CONFIG_DISCONTIGMEM
-	{
-		extern void discontig_mem_init (void);
-
-		bootmap_size = max_pfn = 0;	/* stop gcc warnings */
-		discontig_mem_init();
-	}
-#else /* !CONFIG_DISCONTIGMEM */
-
-	/* first find highest page frame number */
-	max_pfn = 0;
-	efi_memmap_walk(find_max_pfn, &max_pfn);
-
-	/* how many bytes to cover all the pages */
-	bootmap_size = bootmem_bootmap_pages(max_pfn) << PAGE_SHIFT;
-
-	/* look for a location to hold the bootmap */
-	bootmap_start = ~0UL;
-	efi_memmap_walk(find_bootmap_location, &bootmap_size);
-	if (bootmap_start == ~0UL)
-		panic("Cannot find %ld bytes for bootmap\n", bootmap_size);
-
-	bootmap_size = init_bootmem(bootmap_start >> PAGE_SHIFT, max_pfn);
-
-	/* Free all available memory, then mark bootmem-map as being in use.  */
-	efi_memmap_walk(filter_rsvd_memory, free_bootmem);
-	reserve_bootmem(bootmap_start, bootmap_size);
-#endif /* !CONFIG_DISCONTIGMEM */
-
+/**
+ * find_initrd - get initrd parameters from the boot parameter structure
+ *
+ * Grab the initrd start and end from the boot parameter struct given us by
+ * the boot loader.
+ */
+void
+find_initrd (void)
+{
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (ia64_boot_param->initrd_start) {
 		initrd_start = (unsigned long)__va(ia64_boot_param->initrd_start);
