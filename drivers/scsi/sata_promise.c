@@ -35,7 +35,7 @@
 #include <asm/io.h>
 
 #define DRV_NAME	"sata_promise"
-#define DRV_VERSION	"0.88"
+#define DRV_VERSION	"0.89"
 
 
 enum {
@@ -123,6 +123,10 @@ struct pdc_port_priv {
 	u8			dimm_buf[(ATA_PRD_SZ * ATA_MAX_PRD) + 512];
 	u8			*pkt;
 	dma_addr_t		pkt_dma;
+};
+
+struct pdc_host_priv {
+	void			*dimm_mmio;
 
 	unsigned int		doing_hdma;
 	unsigned int		hdma_prod;
@@ -291,10 +295,11 @@ static struct pci_driver pdc_sata_pci_driver = {
 
 static void pdc20621_host_stop(struct ata_host_set *host_set)
 {
-	void *mmio = host_set->private_data;
+	struct pdc_host_priv *hpriv = host_set->private_data;
+	void *dimm_mmio = hpriv->dimm_mmio;
 
-	assert(mmio != NULL);
-	iounmap(mmio);
+	iounmap(dimm_mmio);
+	kfree(hpriv);
 }
 
 static int pdc_port_start(struct ata_port *ap)
@@ -646,7 +651,8 @@ static void pdc20621_fill_sg(struct ata_queued_cmd *qc)
 	struct ata_port *ap = qc->ap;
 	struct pdc_port_priv *pp = ap->private_data;
 	void *mmio = ap->host_set->mmio_base;
-	void *dimm_mmio = ap->host_set->private_data;
+	struct pdc_host_priv *hpriv = ap->host_set->private_data;
+	void *dimm_mmio = hpriv->dimm_mmio;
 	unsigned int portno = ap->port_no;
 	unsigned int i, last, idx, total_len = 0, sgt_len;
 	u32 *buf = (u32 *) &pp->dimm_buf[PDC_DIMM_HEADER_SZ];
@@ -723,7 +729,7 @@ static void pdc20621_push_hdma(struct ata_queued_cmd *qc,
 				u32 pkt_ofs)
 {
 	struct ata_port *ap = qc->ap;
-	struct pdc_port_priv *pp = ap->private_data;
+	struct pdc_host_priv *pp = ap->host_set->private_data;
 	unsigned int idx = pp->hdma_prod & PDC_HDMA_Q_MASK;
 
 	if (!pp->doing_hdma) {
@@ -741,7 +747,7 @@ static void pdc20621_push_hdma(struct ata_queued_cmd *qc,
 static void pdc20621_pop_hdma(struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
-	struct pdc_port_priv *pp = ap->private_data;
+	struct pdc_host_priv *pp = ap->host_set->private_data;
 	unsigned int idx = pp->hdma_cons & PDC_HDMA_Q_MASK;
 
 	/* if nothing on queue, we're done */
@@ -760,7 +766,8 @@ static void pdc20621_dump_hdma(struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
 	unsigned int port_no = ap->port_no;
-	void *dimm_mmio = ap->host_set->private_data;
+	struct pdc_host_priv *hpriv = ap->host_set->private_data;
+	void *dimm_mmio = hpriv->dimm_mmio;
 
 	dimm_mmio += (port_no * PDC_DIMM_WINDOW_STEP);
 	dimm_mmio += PDC_DIMM_HOST_PKT;
@@ -1172,7 +1179,8 @@ static void pdc20621_get_from_dimm(struct ata_probe_ent *pe, void *psource,
 	u8 page_mask;
 	long dist;
 	void *mmio = pe->mmio_base;
-	void *dimm_mmio = pe->private_data;
+	struct pdc_host_priv *hpriv = pe->private_data;
+	void *dimm_mmio = hpriv->dimm_mmio;
 
 	/* hard-code chip #0 */
 	mmio += PDC_CHIP0_OFS;
@@ -1227,7 +1235,8 @@ static void pdc20621_put_to_dimm(struct ata_probe_ent *pe, void *psource,
 	u8 page_mask;
 	long dist;
 	void *mmio = pe->mmio_base;
-	void *dimm_mmio = pe->private_data;
+	struct pdc_host_priv *hpriv = pe->private_data;
+	void *dimm_mmio = hpriv->dimm_mmio;
 
 	/* hard-code chip #0 */   
 	mmio += PDC_CHIP0_OFS;
@@ -1594,6 +1603,7 @@ static int pdc_sata_init_one (struct pci_dev *pdev, const struct pci_device_id *
 	struct ata_probe_ent *probe_ent = NULL;
 	unsigned long base;
 	void *mmio_base, *dimm_mmio = NULL;
+	struct pdc_host_priv *hpriv = NULL;
 	unsigned int board_idx = (unsigned int) ent->driver_data;
 	unsigned int have_20621 = (board_idx == board_20621);
 	int rc;
@@ -1636,12 +1646,22 @@ static int pdc_sata_init_one (struct pci_dev *pdev, const struct pci_device_id *
 	base = (unsigned long) mmio_base;
 
 	if (have_20621) {
-		dimm_mmio = ioremap(pci_resource_start(pdev, 4),
-				    pci_resource_len(pdev, 4));
-		if (!dimm_mmio) {
+		hpriv = kmalloc(sizeof(*hpriv), GFP_KERNEL);
+		if (!hpriv) {
 			rc = -ENOMEM;
 			goto err_out_iounmap;
 		}
+		memset(hpriv, 0, sizeof(*hpriv));
+
+		dimm_mmio = ioremap(pci_resource_start(pdev, 4),
+				    pci_resource_len(pdev, 4));
+		if (!dimm_mmio) {
+			kfree(hpriv);
+			rc = -ENOMEM;
+			goto err_out_iounmap;
+		}
+
+		hpriv->dimm_mmio = dimm_mmio;
 	}
 
 	probe_ent->sht		= pdc_port_info[board_idx].sht;
@@ -1655,7 +1675,7 @@ static int pdc_sata_init_one (struct pci_dev *pdev, const struct pci_device_id *
 	probe_ent->mmio_base = mmio_base;
 
 	if (have_20621) {
-		probe_ent->private_data = dimm_mmio;
+		probe_ent->private_data = hpriv;
 		base += PDC_CHIP0_OFS;
 	}
 
@@ -1696,7 +1716,7 @@ static int pdc_sata_init_one (struct pci_dev *pdev, const struct pci_device_id *
 		/* initialize local dimm */
 		if (pdc20621_dimm_init(probe_ent)) {
 			rc = -ENOMEM;
-			goto err_out_iounmap;
+			goto err_out_iounmap_dimm;
 		}
 		pdc_20621_init(probe_ent);
 	} else
@@ -1708,6 +1728,9 @@ static int pdc_sata_init_one (struct pci_dev *pdev, const struct pci_device_id *
 
 	return 0;
 
+err_out_iounmap_dimm:		/* only get to this label if 20621 */
+	kfree(hpriv);
+	iounmap(dimm_mmio);
 err_out_iounmap:
 	iounmap(mmio_base);
 err_out_free_ent:
