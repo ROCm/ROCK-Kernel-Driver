@@ -461,7 +461,6 @@ struct ax8817x_data {
 	u8 multi_filter[AX_MCAST_FILTER_SIZE];
 	struct urb *int_urb;
 	u8 *int_buf;
-	u8 link;
 };
 
 static int ax8817x_read_cmd(struct usbnet *dev, u8 cmd, u16 value, u16 index,
@@ -510,20 +509,20 @@ static void ax8817x_interrupt_complete(struct urb *urb, struct pt_regs *regs)
 {
 	struct usbnet *dev = (struct usbnet *)urb->context;
 	struct ax8817x_data *data = (struct ax8817x_data *)&dev->data;
+	int link;
 
 	if (urb->status < 0) {
 		printk(KERN_DEBUG "ax8817x_interrupt_complete() failed with %d",
 			urb->status);
 	} else {
 		if (data->int_buf[5] == 0x90) {
-			if (data->link != (data->int_buf[2] & 0x01)) {
-				if (data->link == 1)
-					netif_carrier_off(dev->net);
-				else
+			link = data->int_buf[2] & 0x01;
+			if (netif_carrier_ok(dev->net) != link) {
+				if (link)
 					netif_carrier_on(dev->net);
-
-				data->link = data->int_buf[2] & 0x01;
-				devdbg(dev, "ax8817x: link is now %d", data->link);
+				else
+					netif_carrier_off(dev->net);
+				devdbg(dev, "ax8817x - Link Status is: %d", link);
 			}
 		}
 		usb_submit_urb(data->int_urb, GFP_KERNEL);
@@ -703,14 +702,6 @@ static void ax8817x_get_drvinfo (struct net_device *net,
 	info->eedump_len = 0x3e;
 }
 
-static u32 ax8817x_get_link (struct net_device *net)
-{
-	struct usbnet *dev = (struct usbnet *)net->priv;
-	struct ax8817x_data *data = (struct ax8817x_data *)&dev->data;
-
-	return (u32)data->link;
-}
-
 static int ax8817x_get_settings(struct net_device *net, struct ethtool_cmd *cmd)
 {
 	struct usbnet *dev = (struct usbnet *)net->priv;
@@ -730,7 +721,7 @@ static int ax8817x_set_settings(struct net_device *net, struct ethtool_cmd *cmd)
    devices that may be connected at the same time. */
 static struct ethtool_ops ax8817x_ethtool_ops = {
 	.get_drvinfo		= ax8817x_get_drvinfo,
-	.get_link		= ax8817x_get_link,
+	.get_link		= ethtool_op_get_link,
 	.get_msglevel		= usbnet_get_msglevel,
 	.set_msglevel		= usbnet_set_msglevel,
 	.get_wol		= ax8817x_get_wol,
@@ -835,6 +826,7 @@ static void ax8817x_unbind(struct usbnet *dev, struct usb_interface *intf)
 	struct ax8817x_data *data = (struct ax8817x_data *)dev->data;
 
 	usb_unlink_urb(data->int_urb);
+	usb_free_urb(data->int_urb);
 	kfree(data->int_buf);
 }
 
