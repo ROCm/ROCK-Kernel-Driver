@@ -37,6 +37,12 @@
 #include <asm/hvcall.h>
 #include <asm/prom.h>
 
+/* in pSeries_hvCall.S */
+EXPORT_SYMBOL(plpar_hcall);
+EXPORT_SYMBOL(plpar_hcall_4out);
+EXPORT_SYMBOL(plpar_hcall_norets);
+EXPORT_SYMBOL(plpar_hcall_8arg_2ret);
+
 long poll_pending(void)
 {
 	unsigned long dummy;
