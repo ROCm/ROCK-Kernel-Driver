@@ -650,7 +650,7 @@ acpi_os_queue_for_execution(
 		task = (void *)(dpc+1);
 		INIT_WORK(task, acpi_os_schedule_exec, (void*)dpc);
 
-		if (schedule_work(task) < 0) {
+		if (!schedule_work(task)) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Call to schedule_work() failed.\n"));
 			kfree(dpc);
 			status = AE_ERROR;
