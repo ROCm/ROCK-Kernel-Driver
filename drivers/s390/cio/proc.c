@@ -17,7 +17,6 @@
 #include <linux/config.h>
 #include <linux/init.h>
 #include <linux/proc_fs.h>
-#include <linux/seq_file.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -30,31 +29,6 @@
 #include "cio_debug.h"
 
 static int chan_proc_init (void);
-
-int show_interrupts(struct seq_file *p, void *v)
-{
-	int i, j;
-
-	seq_puts(p, "           ");
-
-	for (j=0; j<num_online_cpus(); j++)
-		seq_printf(p, "CPU%d       ",j);
-
-	seq_putc(p, '\n');
-
-	for (i = 0 ; i < NR_IRQS ; i++) {
-		if (ioinfo[i] == INVALID_STORAGE_AREA)
-			continue;
-
-		seq_printf(p, "%3d: ",i);
-		seq_printf(p, "  %s", ioinfo[i]->irq_desc.name);
-
-		seq_putc(p, '\n');
-	
-	} /* endfor */
-
-	return 0;
-}
 
 /* 
  * Display info on subchannels in /proc/subchannels. 
