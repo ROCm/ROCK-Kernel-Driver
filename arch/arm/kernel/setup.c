@@ -255,7 +255,7 @@ int cpu_architecture(void)
 	} else if ((processor_id & 0x0000f000) == 0x00007000) {
 		cpu_arch = (processor_id & (1 << 23)) ? CPU_ARCH_ARMv4T : CPU_ARCH_ARMv3;
 	} else {
-		cpu_arch = (processor_id >> 16) & 15;
+		cpu_arch = (processor_id >> 16) & 7;
 		if (cpu_arch)
 			cpu_arch += CPU_ARCH_ARMv3;
 	}
