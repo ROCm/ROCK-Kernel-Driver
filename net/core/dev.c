@@ -94,6 +94,7 @@
 #include <net/sock.h>
 #include <linux/rtnetlink.h>
 #include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 #include <linux/stat.h>
 #include <linux/if_bridge.h>
 #include <linux/divert.h>
@@ -114,6 +115,7 @@
 extern int plip_init(void);
 #endif
 
+#include <asm/current.h>
 
 /* This define, if set, will randomly drop a packet when congestion
  * is more than moderate.  It helps fairness in the multi-interface
@@ -1719,85 +1721,79 @@ static int dev_ifconf(char *arg)
 	return copy_to_user(arg, &ifc, sizeof(struct ifconf)) ? -EFAULT : 0;
 }
 
+#ifdef CONFIG_PROC_FS
 /*
  *	This is invoked by the /proc filesystem handler to display a device
  *	in detail.
  */
+static __inline__ struct net_device *dev_get_idx(struct seq_file *seq,
+						 loff_t pos)
+{
+	struct net_device *dev;
+	loff_t i;
 
-#ifdef CONFIG_PROC_FS
+	for (i = 0, dev = dev_base; dev && i < pos; dev = dev->next);
 
-static int sprintf_stats(char *buffer, struct net_device *dev)
+	return i == pos ? dev : NULL;
+}
+
+static void *dev_seq_start(struct seq_file *seq, loff_t *pos)
+{
+	read_lock(&dev_base_lock);
+	return *pos ? dev_get_idx(seq, *pos) : (void *)1;
+}
+
+static void *dev_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	return v == (void *)1 ? dev_base : ((struct net_device *)v)->next;
+}
+
+static void dev_seq_stop(struct seq_file *seq, void *v)
+{
+	read_unlock(&dev_base_lock);
+}
+
+static void dev_seq_printf_stats(struct seq_file *seq, struct net_device *dev)
 {
 	struct net_device_stats *stats = dev->get_stats ? dev->get_stats(dev) :
 							  NULL;
-	int size;
-
 	if (stats)
-		size = sprintf(buffer, "%6s:%8lu %7lu %4lu %4lu %4lu %5lu "
-				       "%10lu %9lu %8lu %7lu %4lu %4lu %4lu "
-				       "%5lu %7lu %10lu\n",
- 		   dev->name,
-		   stats->rx_bytes,
-		   stats->rx_packets, stats->rx_errors,
-		   stats->rx_dropped + stats->rx_missed_errors,
-		   stats->rx_fifo_errors,
-		   stats->rx_length_errors + stats->rx_over_errors +
-		   	stats->rx_crc_errors + stats->rx_frame_errors,
-		   stats->rx_compressed, stats->multicast,
-		   stats->tx_bytes,
-		   stats->tx_packets, stats->tx_errors, stats->tx_dropped,
-		   stats->tx_fifo_errors, stats->collisions,
-		   stats->tx_carrier_errors + stats->tx_aborted_errors +
-		   	stats->tx_window_errors + stats->tx_heartbeat_errors,
-		   stats->tx_compressed);
+		seq_printf(seq, "%6s:%8lu %7lu %4lu %4lu %4lu %5lu %10lu %9lu "
+				"%8lu %7lu %4lu %4lu %4lu %5lu %7lu %10lu\n",
+			   dev->name, stats->rx_bytes, stats->rx_packets,
+			   stats->rx_errors,
+			   stats->rx_dropped + stats->rx_missed_errors,
+			   stats->rx_fifo_errors,
+			   stats->rx_length_errors + stats->rx_over_errors +
+			     stats->rx_crc_errors + stats->rx_frame_errors,
+			   stats->rx_compressed, stats->multicast,
+			   stats->tx_bytes, stats->tx_packets,
+			   stats->tx_errors, stats->tx_dropped,
+			   stats->tx_fifo_errors, stats->collisions,
+			   stats->tx_carrier_errors +
+			     stats->tx_aborted_errors +
+			     stats->tx_window_errors +
+			     stats->tx_heartbeat_errors,
+			   stats->tx_compressed);
 	else
-		size = sprintf(buffer, "%6s: No statistics available.\n",
-			       dev->name);
-
-	return size;
+		seq_printf(seq, "%6s: No statistics available.\n", dev->name);
 }
 
 /*
  *	Called from the PROCfs module. This now uses the new arbitrary sized
  *	/proc/net interface to create /proc/net/dev
  */
-static int dev_get_info(char *buffer, char **start, off_t offset, int length)
+static int dev_seq_show(struct seq_file *seq, void *v)
 {
-	int len = 0;
-	off_t begin = 0;
-	off_t pos = 0;
-	int size;
-	struct net_device *dev;
-
-	size = sprintf(buffer,
-		"Inter-|   Receive                                                |  Transmit\n"
-		" face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed\n");
-
-	pos += size;
-	len += size;
-
-	read_lock(&dev_base_lock);
-	for (dev = dev_base; dev; dev = dev->next) {
-		size = sprintf_stats(buffer+len, dev);
-		len += size;
-		pos = begin + len;
-
-		if (pos < offset) {
-			len = 0;
-			begin = pos;
-		}
-		if (pos > offset + length)
-			break;
-	}
-	read_unlock(&dev_base_lock);
-
-	*start = buffer + (offset - begin);	/* Start of wanted data */
-	len -= offset - begin;			/* Start slop */
-	if (len > length)
-		len = length;			/* Ending slop */
-	if (len < 0)
-		len = 0;
-	return len;
+	if (v == (void *)1)
+		seq_printf(seq, "Inter-|   Receive                            "
+				"                    |  Transmit\n"
+				" face |bytes    packets errs drop fifo frame "
+				"compressed multicast|bytes    packets errs "
+				"drop fifo colls carrier compressed\n");
+	else
+		dev_seq_printf_stats(seq, v);
+	return 0;
 }
 
 static int dev_proc_stats(char *buffer, char **start, off_t offset,
@@ -1841,6 +1837,44 @@ static int dev_proc_stats(char *buffer, char **start, off_t offset,
 	return len;
 }
 
+static struct seq_operations dev_seq_ops = {
+	.start = dev_seq_start,
+	.next  = dev_seq_next,
+	.stop  = dev_seq_stop,
+	.show  = dev_seq_show,
+};
+
+static int dev_seq_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &dev_seq_ops);
+}
+
+static struct file_operations dev_seq_fops = {
+	.open    = dev_seq_open,
+	.read    = seq_read,
+	.llseek  = seq_lseek,
+	.release = seq_release,
+};
+
+static int __init dev_proc_init(void)
+{
+	struct proc_dir_entry *p;
+	int rc = -ENOMEM;
+
+	p = create_proc_entry("dev", S_IRUGO, proc_net);
+	if (!p)
+		goto out;
+	p->proc_fops = &dev_seq_fops;
+	create_proc_read_entry("net/softnet_stat", 0, 0, dev_proc_stats, NULL);
+#ifdef WIRELESS_EXT
+	proc_net_create("wireless", 0, dev_get_wireless_info);
+#endif
+	rc = 0;
+out:
+	return rc;
+}
+#else
+#define dev_proc_init() 0
 #endif	/* CONFIG_PROC_FS */
 
 
@@ -2680,9 +2714,12 @@ extern void dv_init(void);
 static int __init net_dev_init(void)
 {
 	struct net_device *dev, **dp;
-	int i;
+	int i, rc = -ENOMEM;
 
 	BUG_ON(!dev_boot_phase);
+
+	if (dev_proc_init())
+		goto out;
 
 #ifdef CONFIG_NET_DIVERT
 	dv_init();
@@ -2787,15 +2824,6 @@ static int __init net_dev_init(void)
 		}
 	}
 
-#ifdef CONFIG_PROC_FS
-	proc_net_create("dev", 0, dev_get_info);
-	create_proc_read_entry("net/softnet_stat", 0, 0, dev_proc_stats, NULL);
-#ifdef WIRELESS_EXT
-	/* Available in net/core/wireless.c */
-	proc_net_create("wireless", 0, dev_get_wireless_info);
-#endif	/* WIRELESS_EXT */
-#endif	/* CONFIG_PROC_FS */
-
 	dev_boot_phase = 0;
 
 	open_softirq(NET_TX_SOFTIRQ, net_tx_action, NULL);
@@ -2812,8 +2840,9 @@ static int __init net_dev_init(void)
 	 */
 
 	net_device_init();
-
-	return 0;
+	rc = 0;
+out:
+	return rc;
 }
 
 subsys_initcall(net_dev_init);
