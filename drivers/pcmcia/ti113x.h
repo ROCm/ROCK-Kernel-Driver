@@ -176,6 +176,9 @@ static int ti_override(struct yenta_socket *socket)
 	if (new != reg)
 		exca_writeb(socket, I365_INTCTL, new);
 
+#if 0
+	/* THIS CAUSES HANGS! Disabled for now, do not know why */
+
 	/*
 	 * If ISA interrupts don't work, then fall back to routing card
 	 * interrupts to the PCI interrupt of the socket.
@@ -195,6 +198,7 @@ static int ti_override(struct yenta_socket *socket)
 		config_writel(socket, TI122X_IRQMUX, irqmux);
 		config_writeb(socket, TI113X_DEVICE_CONTROL, devctl);
 	}
+#endif
 
 	socket->socket.ss_entry->init = ti_init;
 	return 0;
