@@ -1117,7 +1117,7 @@ int __init isapnp_init(void)
 	isapnp_build_device_list();
 	cards = 0;
 
-	protocol_for_each_card(&isapnp_protocol,card) {
+	protocol_for_each_card(&isapnp_card_protocol,card) {
 		cards++;
 		if (isapnp_verbose) {
 			printk(KERN_INFO "isapnp: Card '%s'\n", card->name[0]?card->name:"Unknown");
