@@ -124,6 +124,8 @@ int usb_device_remove(struct device *dev)
 	if (driver->owner) {
 		m = try_inc_mod_count(driver->owner);
 		if (m == 0) {
+			// FIXME this happens even when we just rmmod
+			// drivers that aren't in active use... 
 			err("Dieing driver still bound to device.\n");
 			return -EIO;
 		}
@@ -1096,6 +1098,8 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
  * avoid behaviors like using "DMA bounce buffers", or tying down I/O mapping
  * hardware for long idle periods.  The implementation varies between
  * platforms, depending on details of how DMA will work to this device.
+ * Using these buffers also helps prevent cacheline sharing problems on
+ * architectures where CPU caches are not DMA-coherent.
  *
  * When the buffer is no longer used, free it with usb_buffer_free().
  */

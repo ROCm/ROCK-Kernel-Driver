@@ -123,6 +123,9 @@ int usb_internal_control_msg(struct usb_device *usb_dev, unsigned int pipe,
  *	Don't use this function from within an interrupt context, like a
  *	bottom half handler.  If you need an asynchronous message, or need to send
  *	a message from within interrupt context, use usb_submit_urb()
+ *      If a thread in your driver uses this call, make sure your disconnect()
+ *      method can wait for it to complete.  Since you don't have a handle on
+ *      the URB used, you can't cancel the request.
  */
 int usb_control_msg(struct usb_device *dev, unsigned int pipe, __u8 request, __u8 requesttype,
 			 __u16 value, __u16 index, void *data, __u16 size, int timeout)
@@ -170,6 +173,9 @@ int usb_control_msg(struct usb_device *dev, unsigned int pipe, __u8 request, __u
  *	Don't use this function from within an interrupt context, like a
  *	bottom half handler.  If you need an asynchronous message, or need to
  *	send a message from within interrupt context, use usb_submit_urb()
+ *      If a thread in your driver uses this call, make sure your disconnect()
+ *      method can wait for it to complete.  Since you don't have a handle on
+ *      the URB used, you can't cancel the request.
  */
 int usb_bulk_msg(struct usb_device *usb_dev, unsigned int pipe, 
 			void *data, int len, int *actual_length, int timeout)

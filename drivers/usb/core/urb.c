@@ -232,22 +232,19 @@ int usb_submit_urb(struct urb *urb, int mem_flags)
 		return -EMSGSIZE;
 	}
 
-	/* "high bandwidth" mode, 1-3 packets/uframe? */
-	if (dev->speed == USB_SPEED_HIGH) {
-		int	mult;
-		switch (temp) {
-		case PIPE_ISOCHRONOUS:
-		case PIPE_INTERRUPT:
-			mult = 1 + ((max >> 11) & 0x03);
+	/* periodic transfers limit size per frame/uframe,
+	 * but drivers only control those sizes for ISO.
+	 * while we're checking, initialize return status.
+	 */
+	if (temp == PIPE_ISOCHRONOUS) {
+		int	n, len;
+
+		/* "high bandwidth" mode, 1-3 packets/uframe? */
+		if (dev->speed == USB_SPEED_HIGH) {
+			int	mult = 1 + ((max >> 11) & 0x03);
 			max &= 0x03ff;
 			max *= mult;
 		}
-	}
-
-	/* periodic transfers limit size per frame/uframe */
-	switch (temp) {
-	case PIPE_ISOCHRONOUS: {
-		int	n, len;
 
 		if (urb->number_of_packets <= 0)		    
 			return -EINVAL;
@@ -255,13 +252,9 @@ int usb_submit_urb(struct urb *urb, int mem_flags)
 			len = urb->iso_frame_desc [n].length;
 			if (len < 0 || len > max) 
 				return -EMSGSIZE;
+			urb->iso_frame_desc [n].status = -EXDEV;
+			urb->iso_frame_desc [n].actual_length = 0;
 		}
-
-		}
-		break;
-	case PIPE_INTERRUPT:
-		if (urb->transfer_buffer_length > max)
-			return -EMSGSIZE;
 	}
 
 	/* the I/O buffer must be mapped/unmapped, except when length=0 */
