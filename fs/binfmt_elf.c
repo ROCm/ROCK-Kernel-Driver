@@ -362,8 +362,6 @@ static unsigned long load_elf_interp(struct elfhdr * interp_elf_ex,
 	  }
 	}
 
-	/* Now use mmap to map the library into memory. */
-
 	/*
 	 * Now fill out the bss section.  First pad the last page up
 	 * to the page boundary, and then perform a mmap to make sure
@@ -536,6 +534,25 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 			    strcmp(elf_interpreter,"/usr/lib/ld.so.1") == 0)
 				ibcs2_interpreter = 1;
 
+			/*
+			 * The early SET_PERSONALITY here is so that the lookup
+			 * for the interpreter happens in the namespace of the 
+			 * to-be-execed image.  SET_PERSONALITY can select an
+			 * alternate root.
+			 *
+			 * However, SET_PERSONALITY is NOT allowed to switch
+			 * this task into the new images's memory mapping
+			 * policy - that is, TASK_SIZE must still evaluate to
+			 * that which is appropriate to the execing application.
+			 * This is because exit_mmap() needs to have TASK_SIZE
+			 * evaluate to the size of the old image.
+			 *
+			 * So if (say) a 64-bit application is execing a 32-bit
+			 * application it is the architecture's responsibility
+			 * to defer changing the value of TASK_SIZE until the
+			 * switch really is going to happen - do this in
+			 * flush_thread().	- akpm
+			 */
 			SET_PERSONALITY(elf_ex, ibcs2_interpreter);
 
 			interpreter = open_exec(elf_interpreter);
