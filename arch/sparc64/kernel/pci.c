@@ -181,7 +181,7 @@ extern void rs_init(void);
 extern void clock_probe(void);
 extern void power_init(void);
 
-void __init pcibios_init(void)
+static void __init pcibios_init(void)
 {
 	pci_controller_probe();
 	if (pci_controller_root == NULL)
@@ -198,6 +198,8 @@ void __init pcibios_init(void)
 	clock_probe();
 	power_init();
 }
+
+subsys_initcall(pcibios_init);
 
 struct pci_fixup pcibios_fixups[] = {
 	{ 0 }
