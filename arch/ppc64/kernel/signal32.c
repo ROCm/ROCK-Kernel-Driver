@@ -57,7 +57,7 @@
 struct sigregs32 {
 	/*
 	 * the gp_regs array is 32 bit representation of the pt_regs
-	 * structure that was stored on the kernle stack during the
+	 * structure that was stored on the kernel stack during the
 	 * system call that was interrupted for the signal.
 	 *
 	 * Note that the entire pt_regs regs structure will fit in
