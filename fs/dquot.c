@@ -689,12 +689,12 @@ static void print_warning(struct dquot *dquot, const char warntype)
 
 	if (!need_print_warning(dquot) || (flag && test_and_set_bit(flag, &dquot->dq_flags)))
 		return;
-	tty_write_message(current->tty, dquot->dq_sb->s_id);
+	tty_write_message(current->signal->tty, dquot->dq_sb->s_id);
 	if (warntype == ISOFTWARN || warntype == BSOFTWARN)
-		tty_write_message(current->tty, ": warning, ");
+		tty_write_message(current->signal->tty, ": warning, ");
 	else
-		tty_write_message(current->tty, ": write failed, ");
-	tty_write_message(current->tty, quotatypes[dquot->dq_type]);
+		tty_write_message(current->signal->tty, ": write failed, ");
+	tty_write_message(current->signal->tty, quotatypes[dquot->dq_type]);
 	switch (warntype) {
 		case IHARDWARN:
 			msg = " file limit reached.\n";
@@ -715,7 +715,7 @@ static void print_warning(struct dquot *dquot, const char warntype)
 			msg = " block quota exceeded.\n";
 			break;
 	}
-	tty_write_message(current->tty, msg);
+	tty_write_message(current->signal->tty, msg);
 }
 
 static inline void flush_warnings(struct dquot **dquots, char *warntype)

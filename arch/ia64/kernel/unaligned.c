@@ -1337,7 +1337,7 @@ ia64_handle_unaligned (unsigned long ifa, struct pt_regs *regs)
 			 * be holding locks...
 			 */
 			if (user_mode(regs))
-				tty_write_message(current->tty, buf);
+				tty_write_message(current->signal->tty, buf);
 			buf[len-1] = '\0';	/* drop '\r' */
 			printk(KERN_WARNING "%s", buf);	/* watch for command names containing %s */
 		}
