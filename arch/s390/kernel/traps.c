@@ -38,6 +38,7 @@
 #include <asm/cpcmd.h>
 #include <asm/s390_ext.h>
 #include <asm/lowcore.h>
+#include <asm/debug.h>
 
 /* Called from entry.S only */
 extern void handle_per_exception(struct pt_regs *regs);
@@ -277,8 +278,10 @@ spinlock_t die_lock = SPIN_LOCK_UNLOCKED;
 void die(const char * str, struct pt_regs * regs, long err)
 {
 	static int die_counter;
-        console_verbose();
-        spin_lock_irq(&die_lock);
+
+	debug_stop_all();
+	console_verbose();
+	spin_lock_irq(&die_lock);
 	bust_spinlocks(1);
 	printk("%s: %04lx [#%d]\n", str, err & 0xffff, ++die_counter);
         show_regs(regs);
