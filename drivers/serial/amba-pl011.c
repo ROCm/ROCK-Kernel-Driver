@@ -44,6 +44,7 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/hardware/amba.h>
+#include <asm/hardware/clock.h>
 
 #if defined(CONFIG_SERIAL_AMBA_PL011_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
 #define SUPPORT_SYSRQ
@@ -68,6 +69,7 @@
  */
 struct uart_amba_port {
 	struct uart_port	port;
+	struct clk		*clk;
 	unsigned int		im;	/* interrupt mask */
 	unsigned int		old_status;
 };
@@ -352,11 +354,20 @@ static int pl011_startup(struct uart_port *port)
 	int retval;
 
 	/*
+	 * Try to enable the clock producer.
+	 */
+	retval = clk_enable(uap->clk);
+	if (retval)
+		goto out;
+
+	uap->port.uartclk = clk_get_rate(uap->clk);
+
+	/*
 	 * Allocate the IRQ
 	 */
 	retval = request_irq(uap->port.irq, pl011_int, 0, "uart-pl011", uap);
 	if (retval)
-		goto out;
+		goto clk_dis;
 
 	writew(UART011_IFLS_RX4_8|UART011_IFLS_TX4_8,
 	       uap->port.membase + UART011_IFLS);
@@ -391,6 +402,8 @@ static int pl011_startup(struct uart_port *port)
 
 	return 0;
 
+ clk_dis:
+	clk_disable(uap->clk);
  out:
 	return retval;
 }
@@ -425,6 +438,11 @@ static void pl011_shutdown(struct uart_port *port)
 	val = readw(uap->port.membase + UART011_LCRH);
 	val &= ~(UART01x_LCRH_BRK | UART01x_LCRH_FEN);
 	writew(val, uap->port.membase + UART011_LCRH);
+
+	/*
+	 * Shut down the clock producer
+	 */
+	clk_disable(uap->clk);
 }
 
 static void
@@ -594,38 +612,40 @@ static struct uart_amba_port *amba_ports[UART_NR];
 #ifdef CONFIG_SERIAL_AMBA_PL011_CONSOLE
 
 static inline void
-pl011_console_write_char(struct uart_port *port, char ch)
+pl011_console_write_char(struct uart_amba_port *uap, char ch)
 {
 	unsigned int status;
 
 	do {
-		status = readw(port->membase + UART01x_FR);
+		status = readw(uap->port.membase + UART01x_FR);
 	} while (status & UART01x_FR_TXFF);
-	writew(ch, port->membase + UART01x_DR);
+	writew(ch, uap->port.membase + UART01x_DR);
 }
 
 static void
 pl011_console_write(struct console *co, const char *s, unsigned int count)
 {
-	struct uart_port *port = &amba_ports[co->index]->port;
+	struct uart_amba_port *uap = amba_ports[co->index];
 	unsigned int status, old_cr, new_cr;
 	int i;
+
+	clk_enable(uap->clk);
 
 	/*
 	 *	First save the CR then disable the interrupts
 	 */
-	old_cr = readw(port->membase + UART011_CR);
+	old_cr = readw(uap->port.membase + UART011_CR);
 	new_cr = old_cr & ~UART011_CR_CTSEN;
 	new_cr |= UART01x_CR_UARTEN | UART011_CR_TXE;
-	writew(new_cr, port->membase + UART011_CR);
+	writew(new_cr, uap->port.membase + UART011_CR);
 
 	/*
 	 *	Now, do each character
 	 */
 	for (i = 0; i < count; i++) {
-		pl011_console_write_char(port, s[i]);
+		pl011_console_write_char(uap, s[i]);
 		if (s[i] == '\n')
-			pl011_console_write_char(port, '\r');
+			pl011_console_write_char(uap, '\r');
 	}
 
 	/*
@@ -633,19 +653,21 @@ pl011_console_write(struct console *co, const char *s, unsigned int count)
 	 *	and restore the TCR
 	 */
 	do {
-		status = readw(port->membase + UART01x_FR);
+		status = readw(uap->port.membase + UART01x_FR);
 	} while (status & UART01x_FR_BUSY);
-	writew(old_cr, port->membase + UART011_CR);
+	writew(old_cr, uap->port.membase + UART011_CR);
+
+	clk_disable(uap->clk);
 }
 
 static void __init
-pl011_console_get_options(struct uart_port *port, int *baud,
+pl011_console_get_options(struct uart_amba_port *uap, int *baud,
 			     int *parity, int *bits)
 {
-	if (readw(port->membase + UART011_CR) & UART01x_CR_UARTEN) {
+	if (readw(uap->port.membase + UART011_CR) & UART01x_CR_UARTEN) {
 		unsigned int lcr_h, ibrd, fbrd;
 
-		lcr_h = readw(port->membase + UART011_LCRH);
+		lcr_h = readw(uap->port.membase + UART011_LCRH);
 
 		*parity = 'n';
 		if (lcr_h & UART01x_LCRH_PEN) {
@@ -660,10 +682,10 @@ pl011_console_get_options(struct uart_port *port, int *baud,
 		else
 			*bits = 8;
 
-		ibrd = readw(port->membase + UART011_IBRD);
-		fbrd = readw(port->membase + UART011_FBRD);
+		ibrd = readw(uap->port.membase + UART011_IBRD);
+		fbrd = readw(uap->port.membase + UART011_FBRD);
 
-		*baud = port->uartclk * 4 / (64 * ibrd + fbrd);
+		*baud = uap->port.uartclk * 4 / (64 * ibrd + fbrd);
 	}
 }
 
@@ -685,10 +707,12 @@ static int __init pl011_console_setup(struct console *co, char *options)
 		co->index = 0;
 	uap = amba_ports[co->index];
 
+	uap->port.uartclk = clk_get_rate(uap->clk);
+
 	if (options)
 		uart_parse_options(options, &baud, &parity, &bits, &flow);
 	else
-		pl011_console_get_options(&uap->port, &baud, &parity, &bits);
+		pl011_console_get_options(uap, &baud, &parity, &bits);
 
 	return uart_set_options(&uap->port, co, baud, parity, bits, flow);
 }
@@ -747,16 +771,21 @@ static int pl011_probe(struct amba_device *dev, void *id)
 	}
 
 	memset(uap, 0, sizeof(struct uart_amba_port));
+	uap->clk = clk_get(&dev->dev, "UARTCLK");
+	if (IS_ERR(uap->clk)) {
+		ret = PTR_ERR(uap->clk);
+		goto unmap;
+	}
+
+	ret = clk_use(uap->clk);
+	if (ret)
+		goto putclk;
+
 	uap->port.dev = &dev->dev;
 	uap->port.mapbase = dev->res.start;
 	uap->port.membase = base;
 	uap->port.iotype = UPIO_MEM;
 	uap->port.irq = dev->irq[0];
-#if 0 /* FIXME */
-	uap->port.uartclk = 14745600;
-#else
-	uap->port.uartclk = 24000000;
-#endif
 	uap->port.fifosize = 16;
 	uap->port.ops = &amba_pl011_pops;
 	uap->port.flags = UPF_BOOT_AUTOCONF;
@@ -769,6 +798,10 @@ static int pl011_probe(struct amba_device *dev, void *id)
 	if (ret) {
 		amba_set_drvdata(dev, NULL);
 		amba_ports[i] = NULL;
+		clk_unuse(uap->clk);
+ putclk:
+		clk_put(uap->clk);
+ unmap:
 		iounmap(base);
  free:
 		kfree(uap);
@@ -791,6 +824,8 @@ static int pl011_remove(struct amba_device *dev)
 			amba_ports[i] = NULL;
 
 	iounmap(uap->port.membase);
+	clk_unuse(uap->clk);
+	clk_put(uap->clk);
 	kfree(uap);
 	return 0;
 }

@@ -25,13 +25,16 @@
 #include <asm/arch/impd1.h>
 #include <asm/sizes.h>
 
+#include "clock.h"
+
 static int module_id;
 
 module_param_named(lmid, module_id, int, 0444);
 MODULE_PARM_DESC(lmid, "logic module stack position");
 
 struct impd1_module {
-	void	*base;
+	void		*base;
+	struct clk	vcos[2];
 };
 
 static const struct icst525_params impd1_vco_params = {
@@ -43,25 +46,20 @@ static const struct icst525_params impd1_vco_params = {
 	.rd_max		= 120,
 };
 
-void impd1_set_vco(struct device *dev, int vconr, unsigned long period)
+static void impd1_setvco(struct clk *clk, struct icst525_vco vco)
 {
-	struct impd1_module *impd1 = dev_get_drvdata(dev);
-	struct icst525_vco vco;
+	struct impd1_module *impd1 = clk->data;
+	int vconr = clk - impd1->vcos;
 	u32 val;
-
-	vco = icst525_ps_to_vco(&impd1_vco_params, period);
-
-	pr_debug("Guessed VCO reg params: S=%d R=%d V=%d\n",
-		vco.s, vco.r, vco.v);
 
 	val = vco.v | (vco.r << 9) | (vco.s << 16);
 
 	writel(0xa05f, impd1->base + IMPD1_LOCK);
 	switch (vconr) {
-	case 1:
+	case 0:
 		writel(val, impd1->base + IMPD1_OSC1);
 		break;
-	case 2:
+	case 1:
 		writel(val, impd1->base + IMPD1_OSC2);
 		break;
 	}
@@ -76,8 +74,6 @@ void impd1_set_vco(struct device *dev, int vconr, unsigned long period)
 		 vconr, icst525_khz(&impd1_vco_params, vco));
 #endif
 }
-
-EXPORT_SYMBOL(impd1_set_vco);
 
 void impd1_tweak_control(struct device *dev, u32 mask, u32 val)
 {
@@ -140,6 +136,11 @@ static struct impd1_device impd1_devs[] = {
 	}
 };
 
+static const char *impd1_vconames[2] = {
+	"CLCDCLK",
+	"AUXVCO2",
+};
+
 static int impd1_probe(struct lm_device *dev)
 {
 	struct impd1_module *impd1;
@@ -167,6 +168,16 @@ static int impd1_probe(struct lm_device *dev)
 	lm_set_drvdata(dev, impd1);
 
 	printk("IM-PD1 found at 0x%08lx\n", dev->resource.start);
+
+	for (i = 0; i < ARRAY_SIZE(impd1->vcos); i++) {
+		impd1->vcos[i].owner = THIS_MODULE,
+		impd1->vcos[i].name = impd1_vconames[i],
+		impd1->vcos[i].params = &impd1_vco_params,
+		impd1->vcos[i].data = impd1,
+		impd1->vcos[i].setvco = impd1_setvco;
+
+		clk_register(&impd1->vcos[i]);
+	}
 
 	for (i = 0; i < ARRAY_SIZE(impd1_devs); i++) {
 		struct impd1_device *idev = impd1_devs + i;
@@ -216,12 +227,16 @@ static void impd1_remove(struct lm_device *dev)
 {
 	struct impd1_module *impd1 = lm_get_drvdata(dev);
 	struct list_head *l, *n;
+	int i;
 
 	list_for_each_safe(l, n, &dev->dev.children) {
 		struct device *d = list_to_dev(l);
 
 		device_unregister(d);
 	}
+
+	for (i = 0; i < ARRAY_SIZE(impd1->vcos); i++)
+		clk_unregister(&impd1->vcos[i]);
 
 	lm_set_drvdata(dev, NULL);
 
