@@ -1118,13 +1118,8 @@ static void *swap_start(struct seq_file *swap, loff_t *pos)
 	struct swap_info_struct *ptr = swap_info;
 	int i;
 	loff_t l = *pos;
-	char * page = (char *) __get_free_page(GFP_KERNEL);
 
-	swap->private = page;	/* save for swap_show */
 	swap_list_lock();
-
-	if (!page)
-		return ERR_PTR(-ENOMEM);
 
 	for (i = 0; i < nr_swapfiles; i++, ptr++) {
 		if (!(ptr->flags & SWP_USED) || !ptr->swap_map)
@@ -1154,24 +1149,21 @@ static void *swap_next(struct seq_file *swap, void *v, loff_t *pos)
 static void swap_stop(struct seq_file *swap, void *v)
 {
 	swap_list_unlock();
-	free_page((unsigned long) swap->private);
-	swap->private = NULL;
 }
 
 static int swap_show(struct seq_file *swap, void *v)
 {
 	struct swap_info_struct *ptr = v;
 	struct file *file;
-	char *path;
+	int len;
 
 	if (v == swap_info)
 		seq_puts(swap, "Filename\t\t\t\tType\t\tSize\tUsed\tPriority\n");
 
 	file = ptr->swap_file;
-	path = d_path(file->f_dentry, file->f_vfsmnt, swap->private, PAGE_SIZE);
-
-	seq_printf(swap, "%-39s %s\t%d\t%ld\t%d\n",
-		       path,
+	len = seq_path(swap, file->f_vfsmnt, file->f_dentry, " \t\n\\");
+	seq_printf(swap, "%*s %s\t%d\t%ld\t%d\n",
+		       len < 40 ? 40 - len : 1, " ",
 		       S_ISBLK(file->f_dentry->d_inode->i_mode) ?
 				"partition" : "file\t",
 		       ptr->pages << (PAGE_SHIFT - 10),

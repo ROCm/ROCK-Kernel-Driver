@@ -211,19 +211,10 @@ static int show_vfsmnt(struct seq_file *m, void *v)
 		{ 0, NULL }
 	};
 	struct proc_fs_info *fs_infop;
-	char *path_buf, *path;
-
-	path_buf = (char *) __get_free_page(GFP_KERNEL);
-	if (!path_buf)
-		return -ENOMEM;
-	path = d_path(mnt->mnt_root, mnt, path_buf, PAGE_SIZE);
-	if (IS_ERR(path))
-		path = " (too long)";
 
 	mangle(m, mnt->mnt_devname ? mnt->mnt_devname : "none");
 	seq_putc(m, ' ');
-	mangle(m, path);
-	free_page((unsigned long) path_buf);
+	seq_path(m, mnt, mnt->mnt_root, " \t\n\\");
 	seq_putc(m, ' ');
 	mangle(m, mnt->mnt_sb->s_type->name);
 	seq_puts(m, mnt->mnt_sb->s_flags & MS_RDONLY ? " ro" : " rw");
