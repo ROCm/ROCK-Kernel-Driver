@@ -2358,7 +2358,7 @@ static int __init ia_init(struct atm_dev *dev)
 	  
 	/* filling the iphase dev structure */  
 	iadev->mem = iadev->pci_map_size /2;  
-	iadev->base_diff = real_base - base;  
+	iadev->base_diff = real_base - (unsigned long)base;
 	iadev->real_base = real_base;  
 	iadev->base = base;  
 		  
