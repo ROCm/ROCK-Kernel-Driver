@@ -34,6 +34,8 @@ int jfs_strfromUCS_le(char *to, const wchar_t * from,	/* LITTLE ENDIAN */
 {
 	int i;
 	int outlen = 0;
+	static int warn_again = 5;	/* Only warn up to 5 times total */
+	int warn = !!warn_again;	/* once per string */
 
 	if (codepage) {
 		for (i = 0; (i < len) && from[i]; i++) {
@@ -48,8 +50,22 @@ int jfs_strfromUCS_le(char *to, const wchar_t * from,	/* LITTLE ENDIAN */
 				to[outlen++] = '?';
 		}
 	} else {
-		for (i = 0; (i < len) && from[i]; i++)
-			to[i] = (char) (le16_to_cpu(from[i]));
+		for (i = 0; (i < len) && from[i]; i++) {
+			if (le16_to_cpu(from[i]) & 0xff00) {
+				if (warn) {
+					warn--;
+					warn_again--;
+					printk(KERN_ERR
+			"non-latin1 character 0x%x found in JFS file name\n", 
+		       			       le16_to_cpu(from[i]));
+					printk(KERN_ERR
+				"mount with iocharset=utf8 to access\n");
+				}
+				to[i] = '?';
+			}
+			else
+				to[i] = (char) (le16_to_cpu(from[i]));
+		}
 		outlen = i;
 	}
 	to[outlen] = 0;
