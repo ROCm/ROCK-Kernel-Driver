@@ -175,6 +175,7 @@ static int  visor_ioctl		(struct usb_serial_port *port, struct file * file, unsi
 static void visor_set_termios	(struct usb_serial_port *port, struct termios *old_termios);
 static void visor_write_bulk_callback	(struct urb *urb, struct pt_regs *regs);
 static void visor_read_bulk_callback	(struct urb *urb, struct pt_regs *regs);
+static void visor_read_int_callback	(struct urb *urb, struct pt_regs *regs);
 static int  clie_3_5_startup	(struct usb_serial *serial);
 
 
@@ -232,9 +233,9 @@ static struct usb_driver visor_driver = {
 /* All of the device info needed for the Handspring Visor, and Palm 4.0 devices */
 static struct usb_serial_device_type handspring_device = {
 	.owner =		THIS_MODULE,
-	.name =			"Handspring Visor / Palm 4.0 / Clié 4.x",
+	.name =			"Handspring Visor / Treo / Palm 4.0 / Clié 4.x",
 	.id_table =		id_table,
-	.num_interrupt_in =	0,
+	.num_interrupt_in =	NUM_DONT_CARE,
 	.num_bulk_in =		2,
 	.num_bulk_out =		2,
 	.num_ports =		2,
@@ -252,6 +253,7 @@ static struct usb_serial_device_type handspring_device = {
 	.chars_in_buffer =	visor_chars_in_buffer,
 	.write_bulk_callback =	visor_write_bulk_callback,
 	.read_bulk_callback =	visor_read_bulk_callback,
+	.read_int_callback =	visor_read_int_callback,
 };
 
 /* device info for the Sony Clie OS version 3.5 */
@@ -320,9 +322,20 @@ static int visor_open (struct usb_serial_port *port, struct file *filp)
 			   port->read_urb->transfer_buffer_length,
 			   visor_read_bulk_callback, port);
 	result = usb_submit_urb(port->read_urb, GFP_KERNEL);
-	if (result)
-		err("%s - failed submitting read urb, error %d", __FUNCTION__, result);
+	if (result) {
+		err("%s - failed submitting read urb, error %d",
+		    __FUNCTION__, result);
+		goto exit;
+	}
 	
+	if (port->interrupt_in_urb) {
+		dbg("%s - adding interrupt input for treo", __FUNCTION__);
+		result = usb_submit_urb(port->interrupt_in_urb, GFP_KERNEL);
+		if (result)
+			err("%s - failed submitting interrupt urb, error %d",
+			    __FUNCTION__, result);
+	}
+exit:	
 	return result;
 }
 
@@ -358,6 +371,9 @@ static void visor_close (struct usb_serial_port *port, struct file * filp)
 		}
 		/* shutdown our bulk read */
 		usb_unlink_urb (port->read_urb);
+
+		if (port->interrupt_in_urb)
+			usb_unlink_urb (port->interrupt_in_urb);
 	}
 	/* Uncomment the following line if you want to see some statistics in your syslog */
 	/* info ("Bytes In = %d  Bytes Out = %d", bytes_in, bytes_out); */
@@ -523,6 +539,43 @@ static void visor_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 	return;
 }
 
+static void visor_read_int_callback (struct urb *urb, struct pt_regs *regs)
+{
+	int result;
+
+	switch (urb->status) {
+	case 0:
+		/* success */
+		break;
+	case -ECONNRESET:
+	case -ENOENT:
+	case -ESHUTDOWN:
+		/* this urb is terminated, clean up */
+		dbg("%s - urb shutting down with status: %d",
+		    __FUNCTION__, urb->status);
+		return;
+	default:
+		dbg("%s - nonzero urb status received: %d",
+		    __FUNCTION__, urb->status);
+		goto exit;
+	}
+
+	/*
+	 * This information is still unknown what it can be used for.
+	 * If anyone has an idea, please let the author know...
+	 *
+	 * Rumor has it this endpoint is used to notify when data
+	 * is ready to be read from the bulk ones.
+	 */
+	usb_serial_debug_data (__FILE__, __FUNCTION__, urb->actual_length,
+			       urb->transfer_buffer);
+
+exit:
+	result = usb_submit_urb (urb, GFP_ATOMIC);
+	if (result)
+		err("%s - Error %d submitting interrupt urb",
+		    __FUNCTION__, result);
+}
 
 static void visor_throttle (struct usb_serial_port *port)
 {
