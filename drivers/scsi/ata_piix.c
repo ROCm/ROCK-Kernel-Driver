@@ -39,6 +39,7 @@ enum {
 	ICH5_PMR		= 0x90, /* port mapping register */
 	ICH5_PCS		= 0x92,	/* port control and status */
 
+	PIIX_FLAG_AHCI		= (1 << 28), /* AHCI possible */
 	PIIX_FLAG_CHECKINTR	= (1 << 29), /* make sure PCI INTx enabled */
 	PIIX_FLAG_COMBINED	= (1 << 30), /* combined mode possible */
 
@@ -58,6 +59,7 @@ enum {
 	ich5_sata		= 1,
 	piix4_pata		= 2,
 	ich6_sata		= 3,
+	ich6_sata_rm		= 4,
 };
 
 static int piix_init_one (struct pci_dev *pdev,
@@ -85,13 +87,9 @@ static struct pci_device_id piix_pci_tbl[] = {
 	{ 0x8086, 0x24df, PCI_ANY_ID, PCI_ANY_ID, 0, 0, ich5_sata },
 	{ 0x8086, 0x25a3, PCI_ANY_ID, PCI_ANY_ID, 0, 0, ich5_sata },
 	{ 0x8086, 0x25b0, PCI_ANY_ID, PCI_ANY_ID, 0, 0, ich5_sata },
-
-	/* ICH6 operates in two modes, "looks-like-ICH5" mode,
-	 * and enhanced mode, with queueing and other fancy stuff.
-	 * This is distinguished by PCI class code.
-	 */
 	{ 0x8086, 0x2651, PCI_ANY_ID, PCI_ANY_ID, 0, 0, ich6_sata },
-	{ 0x8086, 0x2652, PCI_ANY_ID, PCI_ANY_ID, 0, 0, ich6_sata },
+	{ 0x8086, 0x2652, PCI_ANY_ID, PCI_ANY_ID, 0, 0, ich6_sata_rm },
+	{ 0x8086, 0x2653, PCI_ANY_ID, PCI_ANY_ID, 0, 0, ich6_sata_rm },
 
 	{ }	/* terminate list */
 };
@@ -218,6 +216,18 @@ static struct ata_port_info piix_port_info[] = {
 		.host_flags	= ATA_FLAG_SATA | ATA_FLAG_SRST |
 				  PIIX_FLAG_COMBINED | PIIX_FLAG_CHECKINTR |
 				  ATA_FLAG_SLAVE_POSS,
+		.pio_mask	= 0x1f,	/* pio0-4 */
+		.mwdma_mask	= 0x07, /* mwdma0-2 */
+		.udma_mask	= 0x7f,	/* udma0-6 */
+		.port_ops	= &piix_sata_ops,
+	},
+
+	/* ich6_sata_rm */
+	{
+		.sht		= &piix_sht,
+		.host_flags	= ATA_FLAG_SATA | ATA_FLAG_SRST |
+				  PIIX_FLAG_COMBINED | PIIX_FLAG_CHECKINTR |
+				  ATA_FLAG_SLAVE_POSS | PIIX_FLAG_AHCI,
 		.pio_mask	= 0x1f,	/* pio0-4 */
 		.mwdma_mask	= 0x07, /* mwdma0-2 */
 		.udma_mask	= 0x7f,	/* udma0-6 */
@@ -506,6 +516,42 @@ static void pci_enable_intx(struct pci_dev *pdev)
 	}
 }
 
+#define AHCI_PCI_BAR 5
+#define AHCI_GLOBAL_CTL 0x04
+#define AHCI_ENABLE (1 << 31)
+static int piix_disable_ahci(struct pci_dev *pdev)
+{
+	void *mmio;
+	unsigned long addr;
+	u32 tmp;
+	int rc = 0;
+
+	/* BUG: pci_enable_device has not yet been called.  This
+	 * works because this device is usually set up by BIOS.
+	 */
+
+	addr = pci_resource_start(pdev, AHCI_PCI_BAR);
+	if (!addr || !pci_resource_len(pdev, AHCI_PCI_BAR))
+		return 0;
+	
+	mmio = ioremap(addr, 64);
+	if (!mmio)
+		return -ENOMEM;
+	
+	tmp = readl(mmio + AHCI_GLOBAL_CTL);
+	if (tmp & AHCI_ENABLE) {
+		tmp &= ~AHCI_ENABLE;
+		writel(tmp, mmio + AHCI_GLOBAL_CTL);
+
+		tmp = readl(mmio + AHCI_GLOBAL_CTL);
+		if (tmp & AHCI_ENABLE)
+			rc = -EIO;
+	}
+	
+	iounmap(mmio);
+	return rc;
+}
+
 /**
  *	piix_init_one - Register PIIX ATA PCI device with kernel services
  *	@pdev: PCI device to register
@@ -537,6 +583,12 @@ static int piix_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	port_info[0] = &piix_port_info[ent->driver_data];
 	port_info[1] = NULL;
+
+	if (port_info[0]->host_flags & PIIX_FLAG_AHCI) {
+		int rc = piix_disable_ahci(pdev);
+		if (rc)
+			return rc;
+	}
 
 	if (port_info[0]->host_flags & PIIX_FLAG_COMBINED) {
 		u8 tmp;
