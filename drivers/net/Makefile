@@ -10,6 +10,7 @@ obj-$(CONFIG_E1000) += e1000/
 obj-$(CONFIG_IBM_EMAC) += ibm_emac/
 obj-$(CONFIG_IXGB) += ixgb/
 obj-$(CONFIG_BONDING) += bonding/
+obj-$(CONFIG_GIANFAR) += gianfar.o gianfar_ethtool.o gianfar_phy.o
 
 #
 # link order important here
