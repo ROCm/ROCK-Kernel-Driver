@@ -41,6 +41,7 @@ static inline void activate_page_nolock(struct page * page)
 	if (PageLRU(page) && !PageActive(page)) {
 		del_page_from_inactive_list(page);
 		add_page_to_active_list(page);
+		KERNEL_STAT_INC(pgactivate);
 	}
 }
 

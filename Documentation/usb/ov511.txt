@@ -128,16 +128,6 @@ MODULE PARAMETERS:
         programs that expect RGB data (e.g. gqcam) to work with this driver. If
         your colors look VERY wrong, you may want to change this.
 
-  NAME: buf_timeout (Temporarily disabled. Memory is deallocated immediately)
-  TYPE: integer
-  DEFAULT: 5 (seconds)
-  DESC: Number of seconds before unused frame buffers are deallocated.
-        Previously, memory was allocated upon open() and deallocated upon
-        close(). Deallocation now occurs only if the driver is closed and this
-        timeout is reached. If you are capturing frames less frequently than
-        the default timeout, increase this. This will not make any difference
-        with programs that capture multiple frames during an open/close cycle.
-
   NAME: cams
   TYPE: integer (1-4 for OV511, 1-31 for OV511+)
   DEFAULT: 1
@@ -160,13 +150,6 @@ MODULE PARAMETERS:
   DEFAULT: 0
   DESC: This configures the camera's sensor to transmit a colored test-pattern
         instead of an image. This does not work correctly yet.
-
-  NAME: sensor_gbr (*** TEMPORARILY DISABLED ***)
-  TYPE: integer (Boolean)
-  DEFAULT: 0
-  DESC: This makes the sensor output GBR422 instead of YUV420. This saves the
-        driver the trouble of converting YUV to RGB, but it currently does not
-        work very well (the colors are not quite right)
 
   NAME: dumppix
   TYPE: integer (0-2)
@@ -258,14 +241,6 @@ MODULE PARAMETERS:
 		10  VIDEO_PALETTE_YUV420    (YUV 4:2:0 Planar)
 		13  VIDEO_PALETTE_YUV422P   (YUV 4:2:2 Planar)
 		15  VIDEO_PALETTE_YUV420P   (YUV 4:2:0 Planar, same as 10)
-
-  NAME: tuner
-  TYPE: integer
-  DEFAULT: -1 (autodetect)
-  DESC: This sets the exact type of the tuner module in a device. This is set
-	automatically based on the custom ID of the OV511 device. In cases
-	where this fails, you can override this auto-detection. Please see
-	linux/drivers/media/video/tuner.h for a complete list.
 
   NAME: backlight
   TYPE: integer (Boolean)

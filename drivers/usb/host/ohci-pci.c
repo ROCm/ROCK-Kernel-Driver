@@ -284,47 +284,47 @@ dbg ("sleeping = %d, disabled = %d", ohci->sleeping, ohci->disabled);
 /*-------------------------------------------------------------------------*/
 
 static const struct hc_driver ohci_pci_hc_driver = {
-	description:		hcd_name,
+	.description =		hcd_name,
 
 	/*
 	 * generic hardware linkage
 	 */
-	irq:			ohci_irq,
-	flags:			HCD_MEMORY | HCD_USB11,
+	.irq =			ohci_irq,
+	.flags =		HCD_MEMORY | HCD_USB11,
 
 	/*
 	 * basic lifecycle operations
 	 */
-	start:			ohci_pci_start,
+	.start =		ohci_pci_start,
 #ifdef	CONFIG_PM
-	suspend:		ohci_pci_suspend,
-	resume:			ohci_pci_resume,
+	.suspend =		ohci_pci_suspend,
+	.resume =		ohci_pci_resume,
 #endif
-	stop:			ohci_stop,
+	.stop =			ohci_stop,
 
 	/*
 	 * memory lifecycle (except per-request)
 	 */
-	hcd_alloc:		ohci_hcd_alloc,
-	hcd_free:		ohci_hcd_free,
+	.hcd_alloc =		ohci_hcd_alloc,
+	.hcd_free =		ohci_hcd_free,
 
 	/*
 	 * managing i/o requests and associated device resources
 	 */
-	urb_enqueue:		ohci_urb_enqueue,
-	urb_dequeue:		ohci_urb_dequeue,
-	free_config:		ohci_free_config,
+	.urb_enqueue =		ohci_urb_enqueue,
+	.urb_dequeue =		ohci_urb_dequeue,
+	.free_config =		ohci_free_config,
 
 	/*
 	 * scheduling support
 	 */
-	get_frame_number:	ohci_get_frame,
+	.get_frame_number =	ohci_get_frame,
 
 	/*
 	 * root hub support
 	 */
-	hub_status_data:	ohci_hub_status_data,
-	hub_control:		ohci_hub_control,
+	.hub_status_data =	ohci_hub_status_data,
+	.hub_control =		ohci_hub_control,
 };
 
 /*-------------------------------------------------------------------------*/
@@ -333,15 +333,15 @@ static const struct hc_driver ohci_pci_hc_driver = {
 static const struct pci_device_id __devinitdata pci_ids [] = { {
 
 	/* handle any USB OHCI controller */
-	class:		(PCI_CLASS_SERIAL_USB << 8) | 0x10,
-	class_mask:	~0,
-	driver_data:	(unsigned long) &ohci_pci_hc_driver,
+	.class =	(PCI_CLASS_SERIAL_USB << 8) | 0x10,
+	.class_mask =	~0,
+	.driver_data =	(unsigned long) &ohci_pci_hc_driver,
 
 	/* no matter who makes it */
-	vendor:		PCI_ANY_ID,
-	device:		PCI_ANY_ID,
-	subvendor:	PCI_ANY_ID,
-	subdevice:	PCI_ANY_ID,
+	.vendor =	PCI_ANY_ID,
+	.device =	PCI_ANY_ID,
+	.subvendor =	PCI_ANY_ID,
+	.subdevice =	PCI_ANY_ID,
 
 	}, { /* end: all zeroes */ }
 };
@@ -349,15 +349,15 @@ MODULE_DEVICE_TABLE (pci, pci_ids);
 
 /* pci driver glue; this is a "new style" PCI driver module */
 static struct pci_driver ohci_pci_driver = {
-	name:		(char *) hcd_name,
-	id_table:	pci_ids,
+	.name =		(char *) hcd_name,
+	.id_table =	pci_ids,
 
-	probe:		usb_hcd_pci_probe,
-	remove:		usb_hcd_pci_remove,
+	.probe =	usb_hcd_pci_probe,
+	.remove =	usb_hcd_pci_remove,
 
 #ifdef	CONFIG_PM
-	suspend:	usb_hcd_pci_suspend,
-	resume:		usb_hcd_pci_resume,
+	.suspend =	usb_hcd_pci_suspend,
+	.resume =	usb_hcd_pci_resume,
 #endif
 };
 

@@ -52,34 +52,6 @@ struct msg_msgseg {
 	struct msg_msgseg* next;
 	/* the next part of the message follows immediately */
 };
-/* one msg_msg structure for each message */
-struct msg_msg {
-	struct list_head m_list; 
-	long  m_type;          
-	int m_ts;           /* message text size */
-	struct msg_msgseg* next;
-	/* the actual message follows immediately */
-};
-
-#define DATALEN_MSG	(PAGE_SIZE-sizeof(struct msg_msg))
-#define DATALEN_SEG	(PAGE_SIZE-sizeof(struct msg_msgseg))
-
-/* one msq_queue structure for each present queue on the system */
-struct msg_queue {
-	struct kern_ipc_perm q_perm;
-	time_t q_stime;			/* last msgsnd time */
-	time_t q_rtime;			/* last msgrcv time */
-	time_t q_ctime;			/* last change time */
-	unsigned long q_cbytes;		/* current number of bytes on queue */
-	unsigned long q_qnum;		/* number of messages in queue */
-	unsigned long q_qbytes;		/* max number of bytes on queue */
-	pid_t q_lspid;			/* pid of last msgsnd */
-	pid_t q_lrpid;			/* last receive pid */
-
-	struct list_head q_messages;
-	struct list_head q_receivers;
-	struct list_head q_senders;
-};
 
 #define SEARCH_ANY		1
 #define SEARCH_EQUAL		2
@@ -122,13 +94,15 @@ static int newque (key_t key, int msgflg)
 	msq  = (struct msg_queue *) kmalloc (sizeof (*msq), GFP_KERNEL);
 	if (!msq) 
 		return -ENOMEM;
+
+	msq->q_perm.mode = (msgflg & S_IRWXUGO);
+	msq->q_perm.key = key;
+
 	id = ipc_addid(&msg_ids, &msq->q_perm, msg_ctlmni);
 	if(id == -1) {
 		kfree(msq);
 		return -ENOSPC;
 	}
-	msq->q_perm.mode = (msgflg & S_IRWXUGO);
-	msq->q_perm.key = key;
 
 	msq->q_stime = msq->q_rtime = 0;
 	msq->q_ctime = CURRENT_TIME;

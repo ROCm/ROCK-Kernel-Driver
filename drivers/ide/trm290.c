@@ -151,8 +151,7 @@ static void trm290_prepare_drive(struct ata_device *drive, unsigned int use_dma)
 	/* select PIO or DMA */
 	reg = use_dma ? (0x21 | 0x82) : (0x21 & ~0x82);
 
-	__save_flags(flags);	/* local CPU only */
-	__cli();		/* local CPU only */
+	local_irq_save(flags);
 
 	if (reg != hwif->select_data) {
 		hwif->select_data = reg;
@@ -167,7 +166,7 @@ static void trm290_prepare_drive(struct ata_device *drive, unsigned int use_dma)
 		outw(reg, hwif->config_data+3);
 	}
 
-	__restore_flags(flags);	/* local CPU only */
+	local_irq_restore(flags);
 }
 
 static void trm290_selectproc(struct ata_device *drive)
@@ -266,8 +265,7 @@ static void __init trm290_init_channel(struct ata_channel *hwif)
 		printk("TRM290: using default config base at 0x%04lx\n", hwif->config_data);
 	}
 
-	__save_flags(flags);	/* local CPU only */
-	__cli();		/* local CPU only */
+	local_irq_save(flags);
 	/* put config reg into first byte of hwif->select_data */
 	outb(0x51|(hwif->unit<<3), hwif->config_data+1);
 	hwif->select_data = 0x21;			/* select PIO as default */
@@ -275,7 +273,7 @@ static void __init trm290_init_channel(struct ata_channel *hwif)
 	reg = inb(hwif->config_data+3);			/* get IRQ info */
 	reg = (reg & 0x10) | 0x03;			/* mask IRQs for both ports */
 	outb(reg, hwif->config_data+3);
-	__restore_flags(flags);	/* local CPU only */
+	local_irq_restore(flags);
 
 	if ((reg & 0x10))
 		hwif->irq = hwif->unit ? 15 : 14;	/* legacy mode */
@@ -327,10 +325,10 @@ static void __init trm290_init_channel(struct ata_channel *hwif)
 
 /* module data table */
 static struct ata_pci_device chipset __initdata = {
-	vendor: PCI_VENDOR_ID_TEKRAM,
-	device: PCI_DEVICE_ID_TEKRAM_DC290,
-	init_channel: trm290_init_channel,
-	bootable: ON_BOARD
+	.vendor = PCI_VENDOR_ID_TEKRAM,
+	.device = PCI_DEVICE_ID_TEKRAM_DC290,
+	.init_channel = trm290_init_channel,
+	.bootable = ON_BOARD
 };
 
 int __init init_trm290(void)

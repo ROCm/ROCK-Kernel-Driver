@@ -19,7 +19,7 @@
 #include <linux/pagemap.h>
 #include <linux/writeback.h>
 #include <linux/init.h>
-//#include <linux/sysrq.h>
+#include <linux/sysrq.h>
 #include <linux/backing-dev.h>
 #include <linux/mpage.h>
 
@@ -37,7 +37,7 @@
  * will look to see if it needs to force writeback or throttling.  Probably
  * should be scaled by memory size.
  */
-#define RATELIMIT_PAGES		1000
+#define RATELIMIT_PAGES		((512 * 1024) / PAGE_SIZE)
 
 /*
  * When balance_dirty_pages decides that the caller needs to perform some
@@ -45,7 +45,7 @@
  * It should be somewhat larger than RATELIMIT_PAGES to ensure that reasonably
  * large amounts of I/O are submitted.
  */
-#define SYNC_WRITEBACK_PAGES	1500
+#define SYNC_WRITEBACK_PAGES	((RATELIMIT_PAGES * 3) / 2)
 
 
 /* The following parameters are exported via /proc/sys/vm */
@@ -108,6 +108,7 @@ void balance_dirty_pages(struct address_space *mapping)
 	struct page_state ps;
 	int background_thresh, async_thresh, sync_thresh;
 	unsigned long dirty_and_writeback;
+	struct backing_dev_info *bdi;
 
 	get_page_state(&ps);
 	dirty_and_writeback = ps.nr_dirty + ps.nr_writeback;
@@ -115,21 +116,21 @@ void balance_dirty_pages(struct address_space *mapping)
 	background_thresh = (dirty_background_ratio * tot) / 100;
 	async_thresh = (dirty_async_ratio * tot) / 100;
 	sync_thresh = (dirty_sync_ratio * tot) / 100;
+	bdi = mapping->backing_dev_info;
 
 	if (dirty_and_writeback > sync_thresh) {
 		int nr_to_write = SYNC_WRITEBACK_PAGES;
 
-		writeback_unlocked_inodes(&nr_to_write, WB_SYNC_LAST, NULL);
+		writeback_backing_dev(bdi, &nr_to_write, WB_SYNC_LAST, NULL);
 		get_page_state(&ps);
 	} else if (dirty_and_writeback > async_thresh) {
 		int nr_to_write = SYNC_WRITEBACK_PAGES;
 
-		writeback_unlocked_inodes(&nr_to_write, WB_SYNC_NONE, NULL);
+		writeback_backing_dev(bdi, &nr_to_write, WB_SYNC_NONE, NULL);
 		get_page_state(&ps);
 	}
 
-	if (!writeback_in_progress(mapping->backing_dev_info) &&
-				ps.nr_dirty > background_thresh)
+	if (!writeback_in_progress(bdi) && ps.nr_dirty > background_thresh)
 		pdflush_operation(background_writeout, 0);
 }
 
@@ -170,6 +171,8 @@ static void background_writeout(unsigned long _min_pages)
 	const int background_thresh = (dirty_background_ratio * tot) / 100;
 	long min_pages = _min_pages;
 	int nr_to_write;
+
+	CHECK_EMERGENCY_SYNC
 
 	do {
 		struct page_state ps;
@@ -313,12 +316,6 @@ int generic_vm_writeback(struct page *page, int *nr_to_write)
 	return 0;
 }
 EXPORT_SYMBOL(generic_vm_writeback);
-
-int generic_writepages(struct address_space *mapping, int *nr_to_write)
-{
-	return mpage_writepages(mapping, nr_to_write, NULL);
-}
-EXPORT_SYMBOL(generic_writepages);
 
 int do_writepages(struct address_space *mapping, int *nr_to_write)
 {

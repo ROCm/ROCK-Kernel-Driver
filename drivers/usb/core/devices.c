@@ -152,8 +152,8 @@ static const struct class_info clas_info[] =
 
 void usbdevfs_conn_disc_event(void)
 {
-	wake_up(&deviceconndiscwq);
 	conndiscevcnt++;
+	wake_up(&deviceconndiscwq);
 }
 
 static const char *class_decode(const int class)
@@ -239,6 +239,7 @@ static char *usb_dump_interface_descriptor(char *start, char *end, const struct 
 
 	if (start > end)
 		return start;
+	lock_kernel(); /* driver might be unloaded */
 	start += sprintf(start, format_iface,
 			 desc->bInterfaceNumber,
 			 desc->bAlternateSetting,
@@ -248,6 +249,7 @@ static char *usb_dump_interface_descriptor(char *start, char *end, const struct 
 			 desc->bInterfaceSubClass,
 			 desc->bInterfaceProtocol,
 			 iface->driver ? iface->driver->name : "(none)");
+	unlock_kernel();
 	return start;
 }
 
@@ -597,6 +599,13 @@ static unsigned int usb_device_poll(struct file *file, struct poll_table_struct 
 			unlock_kernel();
 			return POLLIN;
 		}
+		
+		/* we may have dropped BKL - need to check for having lost the race */
+		if (file->private_data) {
+			kfree(st);
+			goto lost_race;
+		}
+
 		/*
 		 * need to prevent the module from being unloaded, since
 		 * proc_unregister does not call the release method and
@@ -606,6 +615,7 @@ static unsigned int usb_device_poll(struct file *file, struct poll_table_struct 
 		file->private_data = st;
 		mask = POLLIN;
 	}
+lost_race:
 	if (file->f_mode & FMODE_READ)
                 poll_wait(file, &deviceconndiscwq, wait);
 	if (st->lastev != conndiscevcnt)
@@ -656,9 +666,9 @@ static loff_t usb_device_lseek(struct file * file, loff_t offset, int orig)
 }
 
 struct file_operations usbdevfs_devices_fops = {
-	llseek:		usb_device_lseek,
-	read:		usb_device_read,
-	poll:		usb_device_poll,
-	open:		usb_device_open,
-	release:	usb_device_release,
+	.llseek =	usb_device_lseek,
+	.read =		usb_device_read,
+	.poll =		usb_device_poll,
+	.open =		usb_device_open,
+	.release =	usb_device_release,
 };

@@ -43,12 +43,12 @@ static int create_strip_zones (mddev_t *mddev)
 	conf->nr_strip_zones = 0;
  
 	ITERATE_RDEV(mddev,rdev1,tmp1) {
-		printk("raid0: looking at %s\n", partition_name(rdev1->dev));
+		printk("raid0: looking at %s\n", bdev_partition_name(rdev1->bdev));
 		c = 0;
 		ITERATE_RDEV(mddev,rdev2,tmp2) {
 			printk("raid0:   comparing %s(%ld) with %s(%ld)\n",
-			       partition_name(rdev1->dev), rdev1->size,
-			       partition_name(rdev2->dev), rdev2->size);
+			       bdev_partition_name(rdev1->bdev), rdev1->size,
+			       bdev_partition_name(rdev2->bdev), rdev2->size);
 			if (rdev2 == rdev1) {
 				printk("raid0:   END\n");
 				break;
@@ -89,7 +89,7 @@ static int create_strip_zones (mddev_t *mddev)
 	ITERATE_RDEV(mddev, rdev1, tmp1) {
 		int j = rdev1->sb->this_disk.raid_disk;
 
-		if (j < 0 || j >= mddev->sb->raid_disks) {
+		if (j < 0 || j >= mddev->raid_disks) {
 			printk("raid0: bad disk number %d - aborting!\n", j);
 			goto abort;
 		}
@@ -102,9 +102,9 @@ static int create_strip_zones (mddev_t *mddev)
 			smallest = rdev1;
 		cnt++;
 	}
-	if (cnt != mddev->sb->raid_disks) {
+	if (cnt != mddev->raid_disks) {
 		printk("raid0: too few disks (%d of %d) - aborting!\n", cnt, 
-		       mddev->sb->raid_disks);
+		       mddev->raid_disks);
 		goto abort;
 	}
 	zone->nb_dev = cnt;
@@ -127,7 +127,7 @@ static int create_strip_zones (mddev_t *mddev)
 
 		for (j=0; j<cnt; j++) {
 			rdev = conf->strip_zone[0].dev[j];
-			printk("raid0: checking %s ...", partition_name(rdev->dev));
+			printk("raid0: checking %s ...", bdev_partition_name(rdev->bdev));
 			if (rdev->size > current_offset)
 			{
 				printk(" contained as device %d\n", c);
@@ -271,7 +271,7 @@ static int raid0_make_request (request_queue_t *q, struct bio *bio)
 	mdk_rdev_t *tmp_dev;
 	unsigned long chunk, block, rsect;
 
-	chunk_size = mddev->sb->chunk_size >> 10;
+	chunk_size = mddev->chunk_size >> 10;
 	chunksize_bits = ffz(~chunk_size);
 	block = bio->bi_sector >> 1;
 	hash = conf->hash_table + block / conf->smallest->size;
@@ -351,8 +351,8 @@ static int raid0_status (char *page, mddev_t *mddev)
 	for (j = 0; j < conf->nr_strip_zones; j++) {
 		sz += sprintf(page + sz, "      z%d=[", j);
 		for (k = 0; k < conf->strip_zone[j].nb_dev; k++)
-			sz += sprintf (page+sz, "%s/", partition_name(
-				conf->strip_zone[j].dev[k]->dev));
+			sz += sprintf (page+sz, "%s/", bdev_partition_name(
+				conf->strip_zone[j].dev[k]->bdev));
 		sz--;
 		sz += sprintf (page+sz, "] zo=%d do=%d s=%d\n",
 				conf->strip_zone[j].zone_offset,
@@ -360,7 +360,7 @@ static int raid0_status (char *page, mddev_t *mddev)
 				conf->strip_zone[j].size);
 	}
 #endif
-	sz += sprintf(page + sz, " %dk chunks", mddev->sb->chunk_size/1024);
+	sz += sprintf(page + sz, " %dk chunks", mddev->chunk_size/1024);
 	return sz;
 }
 

@@ -6,8 +6,6 @@
 typedef struct mirror_info mirror_info_t;
 
 struct mirror_info {
-	int		number;
-	int		raid_disk;
 	struct block_device *bdev;
 	sector_t	head_position;
 	atomic_t	nr_pending;
@@ -27,7 +25,6 @@ typedef struct r1bio_s r1bio_t;
 struct r1_private_data_s {
 	mddev_t			*mddev;
 	mirror_info_t		mirrors[MD_SB_DISKS];
-	int			nr_disks;
 	int			raid_disks;
 	int			working_disks;
 	int			last_used;

@@ -426,12 +426,12 @@ static void __init ide_init_cy82c693(struct ata_channel *hwif)
 
 /* module data table */
 static struct ata_pci_device chipset __initdata = {
-	vendor: PCI_VENDOR_ID_CONTAQ,
-	device: PCI_DEVICE_ID_CONTAQ_82C693,
-	init_chipset: pci_init_cy82c693,
-	init_channel: ide_init_cy82c693,
-	bootable: ON_BOARD,
-	flags: ATA_F_DMA
+	.vendor = PCI_VENDOR_ID_CONTAQ,
+	.device = PCI_DEVICE_ID_CONTAQ_82C693,
+	.init_chipset = pci_init_cy82c693,
+	.init_channel = ide_init_cy82c693,
+	.bootable = ON_BOARD,
+	.flags = ATA_F_DMA
 };
 
 int __init init_cy82c693(void)

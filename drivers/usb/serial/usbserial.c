@@ -366,14 +366,14 @@ static struct usb_device_id generic_device_ids[2]; /* Initially all zeroes. */
 
 /* All of the device info needed for the Generic Serial Converter */
 static struct usb_serial_device_type generic_device = {
-	owner:			THIS_MODULE,
-	name:			"Generic",
-	id_table:		generic_device_ids,
-	num_interrupt_in:	NUM_DONT_CARE,
-	num_bulk_in:		NUM_DONT_CARE,
-	num_bulk_out:		NUM_DONT_CARE,
-	num_ports:		1,
-	shutdown:		generic_shutdown,
+	.owner =		THIS_MODULE,
+	.name =			"Generic",
+	.id_table =		generic_device_ids,
+	.num_interrupt_in =	NUM_DONT_CARE,
+	.num_bulk_in =		NUM_DONT_CARE,
+	.num_bulk_out =		NUM_DONT_CARE,
+	.num_ports =		1,
+	.shutdown =		generic_shutdown,
 };
 #endif
 
@@ -395,10 +395,10 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 static void usb_serial_disconnect(struct usb_device *dev, void *ptr);
 
 static struct usb_driver usb_serial_driver = {
-	name:		"serial",
-	probe:		usb_serial_probe,
-	disconnect:	usb_serial_disconnect,
-	id_table:	NULL, 			/* check all devices */
+	.name =		"serial",
+	.probe =	usb_serial_probe,
+	.disconnect =	usb_serial_disconnect,
+	.id_table =	NULL, 			/* check all devices */
 };
 
 /* There is no MODULE_DEVICE_TABLE for usbserial.c.  Instead
@@ -447,24 +447,18 @@ static struct usb_serial *get_free_serial (struct usb_serial *serial, int num_po
 
 		good_spot = 1;
 		for (j = 1; j <= num_ports-1; ++j)
-			if (serial_table[i+j])
+			if ((serial_table[i+j]) || (i+j >= SERIAL_TTY_MINORS)) {
 				good_spot = 0;
+				i += j;
+				break;
+			}
 		if (good_spot == 0)
 			continue;
 			
-		if (!serial) {
-			serial = kmalloc(sizeof(*serial), GFP_KERNEL);
-			if (!serial) {
-				err(__FUNCTION__ " - Out of memory");
-				return NULL;
-			}
-			memset(serial, 0, sizeof(*serial));
-		}
 		serial->magic = USB_SERIAL_MAGIC;
-		serial_table[i] = serial;
 		*minor = i;
 		dbg(__FUNCTION__ " - minor base = %d", *minor);
-		for (i = *minor+1; (i < (*minor + num_ports)) && (i < SERIAL_TTY_MINORS); ++i)
+		for (i = *minor; (i < (*minor + num_ports)) && (i < SERIAL_TTY_MINORS); ++i)
 			serial_table[i] = serial;
 		return serial;
 	}
@@ -1207,14 +1201,14 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 		return(NULL);
 	}
 
+	serial = create_serial (dev, interface, type);
+	if (!serial) {
+		err ("%s - out of memory", __FUNCTION__);
+		return NULL;
+	}
+
 	/* if this device type has a probe function, call it */
 	if (type->probe) {
-		serial = create_serial (dev, interface, type);
-		if (!serial) {
-			err ("%s - out of memory", __FUNCTION__);
-			return NULL;
-		}
-
 		if (type->owner)
 			__MOD_INC_USE_COUNT(type->owner);
 		retval = type->probe (serial);
@@ -1293,6 +1287,7 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 		num_ports = num_bulk_out;
 		if (num_ports == 0) {
 			err("Generic device with no bulk out, not allowed.");
+			kfree (serial);
 			return NULL;
 		}
 	}
@@ -1300,14 +1295,6 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 	if (!num_ports) {
 		/* if this device type has a calc_num_ports function, call it */
 		if (type->calc_num_ports) {
-			if (!serial) {
-				serial = create_serial (dev, interface, type);
-				if (!serial) {
-					err ("%s - out of memory", __FUNCTION__);
-					return NULL;
-				}
-			}
-
 			if (type->owner)
 				__MOD_INC_USE_COUNT(type->owner);
 			num_ports = type->calc_num_ports (serial);
@@ -1318,22 +1305,17 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 			num_ports = type->num_ports;
 	}
 
-	serial = get_free_serial (serial, num_ports, &minor);
-	if (serial == NULL) {
+	if (get_free_serial (serial, num_ports, &minor) == NULL) {
 		err("No more free serial devices");
+		kfree (serial);
 		return NULL;
 	}
 
-	serial->dev = dev;
-	serial->type = type;
-	serial->interface = interface;
 	serial->minor = minor;
 	serial->num_ports = num_ports;
 	serial->num_bulk_in = num_bulk_in;
 	serial->num_bulk_out = num_bulk_out;
 	serial->num_interrupt_in = num_interrupt_in;
-	serial->vendor = dev->descriptor.idVendor;
-	serial->product = dev->descriptor.idProduct;
 
 	/* set up the endpoint information */
 	for (i = 0; i < num_bulk_in; ++i) {
@@ -1577,32 +1559,32 @@ static void usb_serial_disconnect(struct usb_device *dev, void *ptr)
 
 
 static struct tty_driver serial_tty_driver = {
-	magic:			TTY_DRIVER_MAGIC,
-	driver_name:		"usb-serial",
-	name:			"usb/tts/%d",
-	major:			SERIAL_TTY_MAJOR,
-	minor_start:		0,
-	num:			SERIAL_TTY_MINORS,
-	type:			TTY_DRIVER_TYPE_SERIAL,
-	subtype:		SERIAL_TYPE_NORMAL,
-	flags:			TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS,
+	.magic =		TTY_DRIVER_MAGIC,
+	.driver_name =		"usb-serial",
+	.name =			"usb/tts/%d",
+	.major =		SERIAL_TTY_MAJOR,
+	.minor_start =		0,
+	.num =			SERIAL_TTY_MINORS,
+	.type =			TTY_DRIVER_TYPE_SERIAL,
+	.subtype =		SERIAL_TYPE_NORMAL,
+	.flags =		TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS,
 
-	refcount:		&serial_refcount,
-	table:			serial_tty,
-	termios:		serial_termios,
-	termios_locked:		serial_termios_locked,
+	.refcount =		&serial_refcount,
+	.table =		serial_tty,
+	.termios =		serial_termios,
+	.termios_locked =	serial_termios_locked,
 
-	open:			serial_open,
-	close:			serial_close,
-	write:			serial_write,
-	write_room:		serial_write_room,
-	ioctl:			serial_ioctl,
-	set_termios:		serial_set_termios,
-	throttle:		serial_throttle,
-	unthrottle:		serial_unthrottle,
-	break_ctl:		serial_break,
-	chars_in_buffer:	serial_chars_in_buffer,
-	read_proc:		serial_read_proc,
+	.open =			serial_open,
+	.close =		serial_close,
+	.write =		serial_write,
+	.write_room =		serial_write_room,
+	.ioctl =		serial_ioctl,
+	.set_termios =		serial_set_termios,
+	.throttle =		serial_throttle,
+	.unthrottle =		serial_unthrottle,
+	.break_ctl =		serial_break,
+	.chars_in_buffer =	serial_chars_in_buffer,
+	.read_proc =		serial_read_proc,
 };
 
 
@@ -1931,15 +1913,15 @@ static int usb_console_wait_key(struct console *co)
 #endif
 
 static struct console usbcons = {
-	name:		"ttyUSB",			/* only [8] */
-	write:		usb_console_write,
+	.name =		"ttyUSB",			/* only [8] */
+	.write =	usb_console_write,
 #if 0
-	device:		usb_console_device,		/* TBD */
-	wait_key:	usb_console_wait_key,		/* TBD */
+	.device =	usb_console_device,		/* TBD */
+	.wait_key =	usb_console_wait_key,		/* TBD */
 #endif
-	setup:		usb_console_setup,
-	flags:		CON_PRINTBUFFER,
-	index:		-1,
+	.setup =	usb_console_setup,
+	.flags =	CON_PRINTBUFFER,
+	.index =	-1,
 };
 
 #endif /* CONFIG_USB_SERIAL_CONSOLE */

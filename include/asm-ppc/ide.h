@@ -44,8 +44,6 @@ extern struct ide_machdep_calls ppc_ide_md;
 #undef	SUPPORT_SLOW_DATA_PORTS
 #define	SUPPORT_SLOW_DATA_PORTS	0
 
-#define ide__sti()	__sti()
-
 static __inline__ int ide_default_irq(ide_ioreg_t base)
 {
 	if (ppc_ide_md.default_irq)

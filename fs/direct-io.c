@@ -1,5 +1,5 @@
 /*
- * mm/direct-io.c
+ * fs/direct-io.c
  *
  * Copyright (C) 2002, Linus Torvalds.
  *
@@ -61,7 +61,7 @@ struct dio {
 	atomic_t bio_count;
 	spinlock_t bio_list_lock;
 	struct bio *bio_list;		/* singly linked via bi_private */
-	wait_queue_head_t wait_q;
+	struct task_struct *waiter;
 };
 
 /*
@@ -81,6 +81,7 @@ static int dio_refill_pages(struct dio *dio)
 	int nr_pages;
 
 	nr_pages = min(dio->total_pages - dio->curr_page, DIO_PAGES);
+	down_read(&current->mm->mmap_sem);
 	ret = get_user_pages(
 		current,			/* Task for fault acounting */
 		current->mm,			/* whose pages? */
@@ -90,6 +91,7 @@ static int dio_refill_pages(struct dio *dio)
 		0,				/* force (?) */
 		&dio->pages[0],
 		NULL);				/* vmas */
+	up_read(&current->mm->mmap_sem);
 
 	if (ret >= 0) {
 		dio->curr_user_address += ret * PAGE_SIZE;
@@ -139,7 +141,7 @@ static void dio_bio_end_io(struct bio *bio)
 	bio->bi_private = dio->bio_list;
 	dio->bio_list = bio;
 	spin_unlock_irqrestore(&dio->bio_list_lock, flags);
-	wake_up(&dio->wait_q);
+	wake_up_process(dio->waiter);
 }
 
 static int
@@ -193,13 +195,11 @@ static void dio_cleanup(struct dio *dio)
  */
 static struct bio *dio_await_one(struct dio *dio)
 {
-	DECLARE_WAITQUEUE(wait, current);
 	unsigned long flags;
 	struct bio *bio;
 
 	spin_lock_irqsave(&dio->bio_list_lock, flags);
 	while (dio->bio_list == NULL) {
-		add_wait_queue(&dio->wait_q, &wait);
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		if (dio->bio_list == NULL) {
 			spin_unlock_irqrestore(&dio->bio_list_lock, flags);
@@ -208,7 +208,6 @@ static struct bio *dio_await_one(struct dio *dio)
 			spin_lock_irqsave(&dio->bio_list_lock, flags);
 		}
 		set_current_state(TASK_RUNNING);
-		remove_wait_queue(&dio->wait_q, &wait);
 	}
 	bio = dio->bio_list;
 	dio->bio_list = bio->bi_private;
@@ -224,15 +223,9 @@ static int dio_bio_complete(struct dio *dio, struct bio *bio)
 	const int uptodate = test_bit(BIO_UPTODATE, &bio->bi_flags);
 	struct bio_vec *bvec = bio->bi_io_vec;
 	int page_no;
-	int ret = 0;
 
 	for (page_no = 0; page_no < bio->bi_vcnt; page_no++) {
 		struct page *page = bvec[page_no].bv_page;
-
-		if (!uptodate) {
-			if (ret == 0)
-				ret = -EIO;
-		}
 
 		if (dio->rw == READ)
 			set_page_dirty(page);
@@ -240,7 +233,7 @@ static int dio_bio_complete(struct dio *dio, struct bio *bio)
 	}
 	atomic_dec(&dio->bio_count);
 	bio_put(bio);
-	return ret;
+	return uptodate ? 0 : -EIO;
 }
 
 /*
@@ -265,7 +258,7 @@ static int dio_await_completion(struct dio *dio)
  * to keep the memory consumption sane we periodically reap any completed BIOs
  * during the BIO generation phase.
  *
- * This also helps to limis the peak amount of pinned userspace memory.
+ * This also helps to limit the peak amount of pinned userspace memory.
  */
 static int dio_bio_reap(struct dio *dio)
 {
@@ -388,15 +381,13 @@ out:
 	return ret;
 }
 
-struct dio *g_dio;
-
 int
 generic_direct_IO(int rw, struct inode *inode, char *buf, loff_t offset,
 			size_t count, get_block_t get_block)
 {
 	const unsigned blocksize_mask = (1 << inode->i_blkbits) - 1;
 	const unsigned long user_addr = (unsigned long)buf;
-	int ret = 0;
+	int ret;
 	int ret2;
 	struct dio dio;
 	size_t bytes;
@@ -406,8 +397,6 @@ generic_direct_IO(int rw, struct inode *inode, char *buf, loff_t offset,
 		ret = -EINVAL;
 		goto out;
 	}
-
-	g_dio = &dio;
 
 	/* BIO submission state */
 	dio.bio = NULL;
@@ -444,11 +433,9 @@ generic_direct_IO(int rw, struct inode *inode, char *buf, loff_t offset,
 	atomic_set(&dio.bio_count, 0);
 	spin_lock_init(&dio.bio_list_lock);
 	dio.bio_list = NULL;
-	init_waitqueue_head(&dio.wait_q);
+	dio.waiter = current;
 
-	down_read(&current->mm->mmap_sem);
 	ret = do_direct_IO(&dio);
-	up_read(&current->mm->mmap_sem);
 
 	if (dio.bio)
 		dio_bio_submit(&dio);

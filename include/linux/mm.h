@@ -130,6 +130,9 @@ struct vm_operations_struct {
 	struct page * (*nopage)(struct vm_area_struct * area, unsigned long address, int unused);
 };
 
+/* forward declaration; pte_chain is meant to be internal to rmap.c */
+struct pte_chain;
+
 /*
  * Each physical page in the system has a struct page associated with
  * it to keep track of whatever it is we are using the page for at the
@@ -154,6 +157,11 @@ struct page {
 					   updated asynchronously */
 	struct list_head lru;		/* Pageout list, eg. active_list;
 					   protected by pagemap_lru_lock !! */
+	union {
+		struct pte_chain * chain;	/* Reverse pte mapping pointer.
+					 * protected by PG_chainlock */
+		pte_t		 * direct;
+	} pte;
 	unsigned long private;		/* mapping-private opaque data */
 
 	/*
@@ -453,17 +461,16 @@ extern int filemap_sync(struct vm_area_struct *, unsigned long,	size_t, unsigned
 extern struct page *filemap_nopage(struct vm_area_struct *, unsigned long, int);
 
 /* mm/page-writeback.c */
-int generic_writepages(struct address_space *mapping, int *nr_to_write);
 int write_one_page(struct page *page, int wait);
 
 /* readahead.c */
 #define VM_MAX_READAHEAD	128	/* kbytes */
 #define VM_MIN_READAHEAD	16	/* kbytes (includes current page) */
-void do_page_cache_readahead(struct file *file,
+int do_page_cache_readahead(struct file *file,
 			unsigned long offset, unsigned long nr_to_read);
 void page_cache_readahead(struct file *file, unsigned long offset);
 void page_cache_readaround(struct file *file, unsigned long offset);
-void handle_ra_thrashing(struct file *file);
+void handle_ra_miss(struct file *file);
 
 /* vma is the first one with  address < vma->vm_end,
  * and even  address < vma->vm_start. Have to extend vma. */

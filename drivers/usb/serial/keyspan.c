@@ -1103,28 +1103,28 @@ static struct callbacks {
 } keyspan_callbacks[] = {
 	{
 		/* msg_usa26 callbacks */
-		instat_callback:	usa26_instat_callback,
-		glocont_callback:	usa26_glocont_callback,
-		indat_callback:		usa26_indat_callback,
-		outdat_callback:	usa2x_outdat_callback,
-		inack_callback:		usa26_inack_callback,
-		outcont_callback:	usa26_outcont_callback,
+		.instat_callback =	usa26_instat_callback,
+		.glocont_callback =	usa26_glocont_callback,
+		.indat_callback =		usa26_indat_callback,
+		.outdat_callback =	usa2x_outdat_callback,
+		.inack_callback =		usa26_inack_callback,
+		.outcont_callback =	usa26_outcont_callback,
 	}, {
 		/* msg_usa28 callbacks */
-		instat_callback:	usa28_instat_callback,
-		glocont_callback:	usa28_glocont_callback,
-		indat_callback:		usa28_indat_callback,
-		outdat_callback:	usa2x_outdat_callback,
-		inack_callback:		usa28_inack_callback,
-		outcont_callback:	usa28_outcont_callback,
+		.instat_callback =	usa28_instat_callback,
+		.glocont_callback =	usa28_glocont_callback,
+		.indat_callback =		usa28_indat_callback,
+		.outdat_callback =	usa2x_outdat_callback,
+		.inack_callback =		usa28_inack_callback,
+		.outcont_callback =	usa28_outcont_callback,
 	}, {
 		/* msg_usa49 callbacks */
-		instat_callback:	usa49_instat_callback,
-		glocont_callback:	usa49_glocont_callback,
-		indat_callback:		usa49_indat_callback,
-		outdat_callback:	usa2x_outdat_callback,
-		inack_callback:		usa49_inack_callback,
-		outcont_callback:	usa49_outcont_callback,
+		.instat_callback =	usa49_instat_callback,
+		.glocont_callback =	usa49_glocont_callback,
+		.indat_callback =		usa49_indat_callback,
+		.outdat_callback =	usa2x_outdat_callback,
+		.inack_callback =		usa49_inack_callback,
+		.outcont_callback =	usa49_outcont_callback,
 	}
 };
 

@@ -116,21 +116,21 @@ MODULE_DEVICE_TABLE (usb, id_table_combined);
 
 /* All of the device info needed for the serial converters */
 static struct usb_serial_device_type belkin_device = {
-	owner:			THIS_MODULE,
-	name:			"Belkin / Peracom / GoHubs USB Serial Adapter",
-	id_table:		id_table_combined,
-	num_interrupt_in:	1,
-	num_bulk_in:		1,
-	num_bulk_out:		1,
-	num_ports:		1,
-	open:			belkin_sa_open,
-	close:			belkin_sa_close,
-	read_int_callback:	belkin_sa_read_int_callback,	/* How we get the status info */
-	ioctl:			belkin_sa_ioctl,
-	set_termios:		belkin_sa_set_termios,
-	break_ctl:		belkin_sa_break_ctl,
-	attach:			belkin_sa_startup,
-	shutdown:		belkin_sa_shutdown,
+	.owner =		THIS_MODULE,
+	.name =			"Belkin / Peracom / GoHubs USB Serial Adapter",
+	.id_table =		id_table_combined,
+	.num_interrupt_in =	1,
+	.num_bulk_in =		1,
+	.num_bulk_out =		1,
+	.num_ports =		1,
+	.open =			belkin_sa_open,
+	.close =		belkin_sa_close,
+	.read_int_callback =	belkin_sa_read_int_callback,	/* How we get the status info */
+	.ioctl =		belkin_sa_ioctl,
+	.set_termios =		belkin_sa_set_termios,
+	.break_ctl =		belkin_sa_break_ctl,
+	.attach =		belkin_sa_startup,
+	.shutdown =		belkin_sa_shutdown,
 };
 
 

@@ -230,23 +230,23 @@ MODULE_DEVICE_TABLE (usb, brlvger_ids);
 
 static struct file_operations brlvger_fops =
 {
-	owner:		THIS_MODULE,
-	llseek:		brlvger_llseek,
-	read:		brlvger_read,
-	write:		brlvger_write,
-	ioctl:		brlvger_ioctl,
-	open:		brlvger_open,
-	release:	brlvger_release,
-	poll:		brlvger_poll,
+	.owner =	THIS_MODULE,
+	.llseek =	brlvger_llseek,
+	.read =		brlvger_read,
+	.write =	brlvger_write,
+	.ioctl =	brlvger_ioctl,
+	.open =		brlvger_open,
+	.release =	brlvger_release,
+	.poll =		brlvger_poll,
 };
 
 static struct usb_driver brlvger_driver =
 {
-	owner:		THIS_MODULE,
-	name:		"brlvger",
-	probe:		brlvger_probe,
-	disconnect:	brlvger_disconnect,
-	id_table:	brlvger_ids,
+	.owner =	THIS_MODULE,
+	.name =		"brlvger",
+	.probe =	brlvger_probe,
+	.disconnect =	brlvger_disconnect,
+	.id_table =	brlvger_ids,
 };
 
 static int

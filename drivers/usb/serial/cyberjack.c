@@ -74,21 +74,21 @@ static struct usb_device_id id_table [] = {
 MODULE_DEVICE_TABLE (usb, id_table);
 
 static struct usb_serial_device_type cyberjack_device = {
-	owner:			THIS_MODULE,
-	name:			"Reiner SCT Cyberjack USB card reader",
-	id_table:		id_table,
-	num_interrupt_in:	1,
-	num_bulk_in:		1,
-	num_bulk_out:		1,
-	num_ports:		1,
-	attach:		cyberjack_startup,
-	shutdown:		cyberjack_shutdown,
-	open:			cyberjack_open,
-	close:			cyberjack_close,
-	write:			cyberjack_write,
-	read_int_callback:	cyberjack_read_int_callback,
-	read_bulk_callback:	cyberjack_read_bulk_callback,
-	write_bulk_callback:	cyberjack_write_bulk_callback,
+	.owner =		THIS_MODULE,
+	.name =			"Reiner SCT Cyberjack USB card reader",
+	.id_table =		id_table,
+	.num_interrupt_in =	1,
+	.num_bulk_in =		1,
+	.num_bulk_out =		1,
+	.num_ports =		1,
+	.attach =	cyberjack_startup,
+	.shutdown =		cyberjack_shutdown,
+	.open =			cyberjack_open,
+	.close =		cyberjack_close,
+	.write =		cyberjack_write,
+	.read_int_callback =	cyberjack_read_int_callback,
+	.read_bulk_callback =	cyberjack_read_bulk_callback,
+	.write_bulk_callback =	cyberjack_write_bulk_callback,
 };
 
 struct cyberjack_private {

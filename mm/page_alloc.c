@@ -13,6 +13,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/kernel_stat.h>
 #include <linux/mm.h>
 #include <linux/swap.h>
 #include <linux/interrupt.h>
@@ -86,12 +87,15 @@ static void __free_pages_ok (struct page *page, unsigned int order)
 	struct page *base;
 	zone_t *zone;
 
+	KERNEL_STAT_ADD(pgfree, 1<<order);
+
 	BUG_ON(PagePrivate(page));
 	BUG_ON(page->mapping != NULL);
 	BUG_ON(PageLocked(page));
 	BUG_ON(PageLRU(page));
 	BUG_ON(PageActive(page));
 	BUG_ON(PageWriteback(page));
+	BUG_ON(page->pte.chain != NULL);
 	if (PageDirty(page))
 		ClearPageDirty(page);
 	BUG_ON(page_count(page) != 0);
@@ -319,20 +323,23 @@ balance_classzone(zone_t * classzone, unsigned int gfp_mask,
 struct page * __alloc_pages(unsigned int gfp_mask, unsigned int order, zonelist_t *zonelist)
 {
 	unsigned long min;
-	zone_t **zone, * classzone;
+	zone_t **zones, *classzone;
 	struct page * page;
-	int freed;
+	int freed, i;
 
-	zone = zonelist->zones;
-	classzone = *zone;
-	if (classzone == NULL)
+	KERNEL_STAT_ADD(pgalloc, 1<<order);
+
+	zones = zonelist->zones;  /* the list of zones suitable for gfp_mask */
+	classzone = zones[0]; 
+	if (classzone == NULL)    /* no zones in the zonelist */
 		return NULL;
-	min = 1UL << order;
-	for (;;) {
-		zone_t *z = *(zone++);
-		if (!z)
-			break;
 
+	/* Go through the zonelist once, looking for a zone with enough free */
+	min = 1UL << order;
+	for (i = 0; zones[i] != NULL; i++) {
+		zone_t *z = zones[i];
+
+		/* the incremental min is allegedly to discourage fallback */
 		min += z->pages_low;
 		if (z->free_pages > min) {
 			page = rmqueue(z, order);
@@ -343,16 +350,15 @@ struct page * __alloc_pages(unsigned int gfp_mask, unsigned int order, zonelist_
 
 	classzone->need_balance = 1;
 	mb();
+	/* we're somewhat low on memory, failed to find what we needed */
 	if (waitqueue_active(&kswapd_wait))
 		wake_up_interruptible(&kswapd_wait);
 
-	zone = zonelist->zones;
+	/* Go through the zonelist again, taking __GFP_HIGH into account */
 	min = 1UL << order;
-	for (;;) {
+	for (i = 0; zones[i] != NULL; i++) {
 		unsigned long local_min;
-		zone_t *z = *(zone++);
-		if (!z)
-			break;
+		zone_t *z = zones[i];
 
 		local_min = z->pages_min;
 		if (gfp_mask & __GFP_HIGH)
@@ -369,11 +375,9 @@ struct page * __alloc_pages(unsigned int gfp_mask, unsigned int order, zonelist_
 
 rebalance:
 	if (current->flags & (PF_MEMALLOC | PF_MEMDIE)) {
-		zone = zonelist->zones;
-		for (;;) {
-			zone_t *z = *(zone++);
-			if (!z)
-				break;
+		/* go through the zonelist yet again, ignoring mins */
+		for (i = 0; zones[i] != NULL; i++) {
+			zone_t *z = zones[i];
 
 			page = rmqueue(z, order);
 			if (page)
@@ -392,16 +396,15 @@ nopage:
 	if (!(gfp_mask & __GFP_WAIT))
 		goto nopage;
 
+	KERNEL_STAT_INC(allocstall);
 	page = balance_classzone(classzone, gfp_mask, order, &freed);
 	if (page)
 		return page;
 
-	zone = zonelist->zones;
+	/* go through the zonelist yet one more time */
 	min = 1UL << order;
-	for (;;) {
-		zone_t *z = *(zone++);
-		if (!z)
-			break;
+	for (i = 0; zones[i] != NULL; i++) {
+		zone_t *z = zones[i];
 
 		min += z->pages_min;
 		if (z->free_pages > min) {
@@ -562,6 +565,9 @@ void get_page_state(struct page_state *ret)
 		ret->nr_pagecache += ps->nr_pagecache;
 		ret->nr_active += ps->nr_active;
 		ret->nr_inactive += ps->nr_inactive;
+		ret->nr_page_table_pages += ps->nr_page_table_pages;
+		ret->nr_pte_chain_pages += ps->nr_pte_chain_pages;
+		ret->used_pte_chains_bytes += ps->used_pte_chains_bytes;
 	}
 }
 

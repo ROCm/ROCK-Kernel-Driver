@@ -17,8 +17,6 @@
 #define MAX_HWIFS	4
 #endif
 
-#define ide__sti()	__sti()
-
 #include <asm/arch/ide.h>
 
 /*

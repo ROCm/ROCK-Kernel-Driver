@@ -34,7 +34,7 @@ if [ "$CONFIG_BLK_DEV_IDE" != "n" ]; then
       dep_bool '      Use PCI DMA by default when available' CONFIG_IDEDMA_PCI_AUTO $CONFIG_BLK_DEV_IDEDMA_PCI
       dep_bool '      Enable DMA only for disks ' CONFIG_IDEDMA_ONLYDISK $CONFIG_IDEDMA_PCI_AUTO
       define_bool CONFIG_BLK_DEV_IDEDMA $CONFIG_BLK_DEV_IDEDMA_PCI
-      dep_bool '    ATA tagged command queueing (EXPERIMENTAL)' CONFIG_BLK_DEV_IDE_TCQ $CONFIG_BLK_DEV_IDEDMA_PCI $CONFIG_EXPERIMENTAL
+      dep_bool '    ATA tagged command queueing (DANGEROUS)' CONFIG_BLK_DEV_IDE_TCQ $CONFIG_BLK_DEV_IDEDMA_PCI $CONFIG_EXPERIMENTAL
       dep_bool '      TCQ on by default' CONFIG_BLK_DEV_IDE_TCQ_DEFAULT $CONFIG_BLK_DEV_IDE_TCQ
       if [ "$CONFIG_BLK_DEV_IDE_TCQ" != "n" ]; then
          int '      Default queue depth' CONFIG_BLK_DEV_IDE_TCQ_DEPTH 32

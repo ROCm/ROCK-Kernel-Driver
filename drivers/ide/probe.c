@@ -97,11 +97,15 @@ int ide_xlate_1024(kdev_t i_rdev, int xparm, int ptheads, const char *msg)
 		}
 	}
 
-	/* There used to be code here that assigned drive->id->CHS
-	   to drive->CHS and that to drive->bios_CHS. However, some disks have
-	   id->C/H/S = 4092/16/63 but are larger than 2.1 GB.  In such cases
-	   that code was wrong.  Moreover, there seems to be no reason to do
-	   any of these things. */
+	/* There used to be code here that assigned drive->id->CHS to
+	 * drive->CHS and that to drive->bios_CHS. However, some disks have
+	 * id->C/H/S = 4092/16/63 but are larger than 2.1 GB.  In such cases
+	 * that code was wrong.  Moreover, there seems to be no reason to do
+	 * any of these things.
+	 *
+	 * Please note that recent RedHat changes to the disk utils are bogous
+	 * and will report spurious errors.
+	 */
 
 	/* translate? */
 	if (drive->forced_geom)
@@ -169,8 +173,8 @@ int ide_xlate_1024(kdev_t i_rdev, int xparm, int ptheads, const char *msg)
 }
 
 /*
- * hd_driveid data come as little endian, it needs to be converted on big
- * endian machines.
+ * Drive ID data come as little endian, it needs to be converted on big endian
+ * machines.
  */
 void ata_fix_driveid(struct hd_driveid *id)
 {
@@ -319,11 +323,8 @@ int ide_config_drive_speed(struct ata_device *drive, byte speed)
 	outb(inb(ch->dma_base + 2) & ~(1 << (5 + unit)), ch->dma_base + 2);
 #endif
 
-	/* Don't use ide_wait_cmd here - it will attempt to set_geometry and
-	 * recalibrate, but for some reason these don't work at this point
-	 * (lost interrupt).
-         *
-         * Select the drive, and issue the SETFEATURES command
+	/*
+         * Select the drive, and issue the SETFEATURES command.
          */
 	disable_irq(ch->irq);	/* disable_irq_nosync ?? */
 	udelay(1);
@@ -339,7 +340,6 @@ int ide_config_drive_speed(struct ata_device *drive, byte speed)
 	udelay(1);
 	ret = ata_status_poll(drive, 0, BUSY_STAT, WAIT_CMD, NULL);
 	ata_mask(drive);
-
 	enable_irq(ch->irq);
 
 	if (ret != ATA_OP_READY) {
@@ -403,7 +403,7 @@ static inline void do_identify(struct ata_device *drive, u8 cmd)
 	 */
 
 	ata_read(drive, id, SECTOR_WORDS);
-	ide__sti();	/* local CPU only */
+	local_irq_enable();
 	ata_fix_driveid(id);
 
 	if (id->word156 == 0x4d42) {
@@ -616,12 +616,12 @@ static int identify(struct ata_device *drive, u8 cmd)
 
 	if (ata_status(drive, DRQ_STAT, BAD_R_STAT)) {
 		unsigned long flags;
-		__save_flags(flags);		/* local CPU only */
-		__cli();			/* local CPU only; some systems need this */
+
+		local_irq_save(flags);		/* some systems need this */
 		do_identify(drive, cmd);	/* drive returned ID */
 		rc = 0;				/* drive responded with ID */
 		ata_status(drive, 0, 0);	/* clear drive IRQ */
-		__restore_flags(flags);		/* local CPU only */
+		local_irq_restore(flags);	/* local CPU only */
 	} else
 		rc = 2;			/* drive refused ID */
 
@@ -733,8 +733,8 @@ static void channel_probe(struct ata_channel *ch)
 
 	ch->straight8 = 0;
 
-	__save_flags(flags);	/* local CPU only */
-	__sti();		/* local CPU only; needed for jiffies and irq probing */
+	__save_flags(flags);
+	local_irq_enable();	/* needed for jiffies and irq probing */
 
 	/*
 	 * Check for the presence of a channel by probing for drives on it.
@@ -852,7 +852,7 @@ static void channel_probe(struct ata_channel *ch)
 	if (ch->reset)
 		ata_reset(ch);
 
-	__restore_flags(flags);	/* local CPU only */
+	__restore_flags(flags);
 
 	/*
 	 * Now setup the PIO transfer modes of the drives on this channel.
@@ -1127,6 +1127,7 @@ static void channel_init(struct ata_channel *ch)
 	gd->sizes = kmalloc(ATA_MINORS * sizeof(int), GFP_KERNEL);
 	if (!gd->sizes)
 		goto err_kmalloc_gd_sizes;
+	memset(gd->sizes, 0, ATA_MINORS*sizeof(gd->sizes[0]));
 
 	gd->part = kmalloc(ATA_MINORS * sizeof(struct hd_struct), GFP_KERNEL);
 	if (!gd->part)

@@ -13,6 +13,7 @@
 #include <linux/slab.h>
 #include <linux/compiler.h>
 #include <linux/fs.h>
+#include <linux/kernel_stat.h>
 #include <linux/mm.h>
 #include <linux/mman.h>
 #include <linux/pagemap.h>
@@ -176,14 +177,13 @@ static inline void truncate_partial_page(struct page *page, unsigned partial)
  */
 static void truncate_complete_page(struct page *page)
 {
-	/* Leave it on the LRU if it gets converted into anonymous buffers */
-	if (!PagePrivate(page) || do_invalidatepage(page, 0)) {
-		lru_cache_del(page);
-	} else {
+	/* Drop fs-specific data so the page might become freeable. */
+	if (PagePrivate(page) && !do_invalidatepage(page, 0)) {
 		if (current->flags & PF_INVALIDATE)
 			printk("%s: buffer heads were leaked\n",
 				current->comm);
 	}
+
 	ClearPageDirty(page);
 	ClearPageUptodate(page);
 	remove_inode_page(page);
@@ -520,8 +520,6 @@ int filemap_fdatawait(struct address_space * mapping)
  * This adds a page to the page cache, starting out as locked, unreferenced,
  * not uptodate and with no errors.
  *
- * The caller must hold a write_lock on mapping->page_lock.
- *
  * This function is used for two things: adding newly allocated pagecache
  * pages and for moving existing anon pages into swapcache.
  *
@@ -533,44 +531,20 @@ int filemap_fdatawait(struct address_space * mapping)
  * SetPageLocked() is ugly-but-OK there too.  The required page state has been
  * set up by swap_out_add_to_swap_cache().
  */
-static int __add_to_page_cache(struct page *page,
+int add_to_page_cache(struct page *page,
 		struct address_space *mapping, unsigned long offset)
 {
-	if (radix_tree_insert(&mapping->page_tree, offset, page) == 0) {
+	int error;
+
+	write_lock(&mapping->page_lock);
+	error = radix_tree_insert(&mapping->page_tree, offset, page);
+	if (!error) {
 		SetPageLocked(page);
 		ClearPageDirty(page);
 		___add_to_page_cache(page, mapping, offset);
 		page_cache_get(page);
-		return 0;
 	}
-	return -ENOMEM;
-}
-
-int add_to_page_cache(struct page *page,
-		struct address_space *mapping, unsigned long offset)
-{
-	write_lock(&mapping->page_lock);
-	if (__add_to_page_cache(page, mapping, offset) < 0)
-		goto nomem;
 	write_unlock(&mapping->page_lock);
-	lru_cache_add(page);
-	return 0;
-nomem:
-	write_unlock(&mapping->page_lock);
-	return -ENOMEM;
-}
-
-int add_to_page_cache_unique(struct page *page,
-		struct address_space *mapping, unsigned long offset)
-{
-	struct page *alias;
-	int error = -EEXIST;
-
-	write_lock(&mapping->page_lock);
-	if (!(alias = radix_tree_lookup(&mapping->page_tree, offset)))
-		error = __add_to_page_cache(page, mapping, offset);
-	write_unlock(&mapping->page_lock);
-
 	if (!error)
 		lru_cache_add(page);
 	return error;
@@ -587,17 +561,11 @@ static int page_cache_read(struct file * file, unsigned long offset)
 	struct page *page; 
 	int error;
 
-	read_lock(&mapping->page_lock);
-	page = radix_tree_lookup(&mapping->page_tree, offset);
-	read_unlock(&mapping->page_lock);
-	if (page)
-		return 0;
-
 	page = page_cache_alloc(mapping);
 	if (!page)
 		return -ENOMEM;
 
-	error = add_to_page_cache_unique(page, mapping, offset);
+	error = add_to_page_cache(page, mapping, offset);
 	if (!error) {
 		error = mapping->a_ops->readpage(file, page);
 		page_cache_release(page);
@@ -660,7 +628,7 @@ EXPORT_SYMBOL(wait_on_page_bit);
  * But that's OK - sleepers in wait_on_page_writeback() just go back to sleep.
  *
  * The first mb is necessary to safely close the critical section opened by the
- * TryLockPage(), the second mb is necessary to enforce ordering between
+ * TestSetPageLocked(), the second mb is necessary to enforce ordering between
  * the clear_bit and the read of the waitqueue (to avoid SMP races with a
  * parallel wait_on_page_locked()).
  */
@@ -759,40 +727,6 @@ struct page *find_trylock_page(struct address_space *mapping, unsigned long offs
 	return page;
 }
 
-/*
- * Must be called with the mapping lock held for writing.
- * Will return with it held for writing, but it may be dropped
- * while locking the page.
- */
-static struct page *__find_lock_page(struct address_space *mapping,
-					unsigned long offset)
-{
-	struct page *page;
-
-	/*
-	 * We scan the hash list read-only. Addition to and removal from
-	 * the hash-list needs a held write-lock.
-	 */
-repeat:
-	page = radix_tree_lookup(&mapping->page_tree, offset);
-	if (page) {
-		page_cache_get(page);
-		if (TestSetPageLocked(page)) {
-			write_unlock(&mapping->page_lock);
-			lock_page(page);
-			write_lock(&mapping->page_lock);
-
-			/* Has the page been truncated while we slept? */
-			if (page->mapping != mapping || page->index != offset) {
-				unlock_page(page);
-				page_cache_release(page);
-				goto repeat;
-			}
-		}
-	}
-	return page;
-}
-
 /**
  * find_lock_page - locate, pin and lock a pagecache page
  *
@@ -804,20 +738,30 @@ repeat:
  *
  * Returns zero if the page was not present. find_lock_page() may sleep.
  */
-
-/*
- * The write_lock is unfortunate, but __find_lock_page() requires that on
- * behalf of find_or_create_page().  We could just clone __find_lock_page() -
- * one for find_lock_page(), one for find_or_create_page()...
- */
 struct page *find_lock_page(struct address_space *mapping,
 				unsigned long offset)
 {
 	struct page *page;
 
-	write_lock(&mapping->page_lock);
-	page = __find_lock_page(mapping, offset);
-	write_unlock(&mapping->page_lock);
+	read_lock(&mapping->page_lock);
+repeat:
+	page = radix_tree_lookup(&mapping->page_tree, offset);
+	if (page) {
+		page_cache_get(page);
+		if (TestSetPageLocked(page)) {
+			read_unlock(&mapping->page_lock);
+			lock_page(page);
+			read_lock(&mapping->page_lock);
+
+			/* Has the page been truncated while we slept? */
+			if (page->mapping != mapping || page->index != offset) {
+				unlock_page(page);
+				page_cache_release(page);
+				goto repeat;
+			}
+		}
+	}
+	read_unlock(&mapping->page_lock);
 	return page;
 }
 
@@ -842,32 +786,25 @@ struct page *find_lock_page(struct address_space *mapping,
 struct page *find_or_create_page(struct address_space *mapping,
 		unsigned long index, unsigned int gfp_mask)
 {
-	struct page *page;
-
+	struct page *page, *cached_page = NULL;
+	int err;
+repeat:
 	page = find_lock_page(mapping, index);
 	if (!page) {
-		struct page *newpage = alloc_page(gfp_mask);
-		if (newpage) {
-			write_lock(&mapping->page_lock);
-			page = __find_lock_page(mapping, index);
-			if (likely(!page)) {
-				page = newpage;
-				if (__add_to_page_cache(page, mapping, index)) {
-					write_unlock(&mapping->page_lock);
-					page_cache_release(page);
-					page = NULL;
-					goto out;
-				}
-				newpage = NULL;
-			}
-			write_unlock(&mapping->page_lock);
-			if (newpage == NULL)
-				lru_cache_add(page);
-			else 
-				page_cache_release(newpage);
+		if (!cached_page) {
+			cached_page = alloc_page(gfp_mask);
+			if (!cached_page)
+				return NULL;
 		}
+		err = add_to_page_cache(cached_page, mapping, index);
+		if (!err) {
+			page = cached_page;
+			cached_page = NULL;
+		} else if (err == -EEXIST)
+			goto repeat;
 	}
-out:
+	if (cached_page)
+		page_cache_release(cached_page);
 	return page;
 }
 
@@ -901,7 +838,7 @@ grab_cache_page_nowait(struct address_space *mapping, unsigned long index)
 		return NULL;
 	}
 	page = alloc_pages(mapping->gfp_mask & ~__GFP_FS, 0);
-	if (page && add_to_page_cache_unique(page, mapping, index)) {
+	if (page && add_to_page_cache(page, mapping, index)) {
 		page_cache_release(page);
 		page = NULL;
 	}
@@ -968,18 +905,16 @@ void do_generic_file_read(struct file * filp, loff_t *ppos, read_descriptor_t * 
 		/*
 		 * Try to find the data in the page cache..
 		 */
-
-		write_lock(&mapping->page_lock);
+find_page:
+		read_lock(&mapping->page_lock);
 		page = radix_tree_lookup(&mapping->page_tree, index);
 		if (!page) {
-			write_unlock(&mapping->page_lock);
-			handle_ra_thrashing(filp);
-			write_lock(&mapping->page_lock);
+			read_unlock(&mapping->page_lock);
+			handle_ra_miss(filp);
 			goto no_cached_page;
 		}
-found_page:
 		page_cache_get(page);
-		write_unlock(&mapping->page_lock);
+		read_unlock(&mapping->page_lock);
 
 		if (!PageUptodate(page))
 			goto page_not_up_to_date;
@@ -1059,40 +994,23 @@ no_cached_page:
 		/*
 		 * Ok, it wasn't cached, so we need to create a new
 		 * page..
-		 *
-		 * We get here with the page cache lock held.
 		 */
 		if (!cached_page) {
-			write_unlock(&mapping->page_lock);
 			cached_page = page_cache_alloc(mapping);
 			if (!cached_page) {
 				desc->error = -ENOMEM;
 				break;
 			}
-
-			/*
-			 * Somebody may have added the page while we
-			 * dropped the page cache lock. Check for that.
-			 */
-			write_lock(&mapping->page_lock);
-			page = radix_tree_lookup(&mapping->page_tree, index);
-			if (page)
-				goto found_page;
 		}
-
-		/*
-		 * Ok, add the new page to the hash-queues...
-		 */
-		if (__add_to_page_cache(cached_page, mapping, index) < 0) {
-			write_unlock(&mapping->page_lock);
-			desc->error = -ENOMEM;
+		error = add_to_page_cache(cached_page, mapping, index);
+		if (error) {
+			if (error == -EEXIST)
+				goto find_page;
+			desc->error = error;
 			break;
 		}
 		page = cached_page;
-		write_unlock(&mapping->page_lock);
-		lru_cache_add(page);		
 		cached_page = NULL;
-
 		goto readpage;
 	}
 
@@ -1101,89 +1019,6 @@ no_cached_page:
 		page_cache_release(cached_page);
 	UPDATE_ATIME(inode);
 }
-
-#if 0
-static ssize_t generic_file_direct_IO(int rw, struct file * filp, char * buf, size_t count, loff_t offset)
-{
-	ssize_t retval;
-	int new_iobuf, chunk_size, blocksize_mask, blocksize, blocksize_bits, iosize, progress;
-	struct kiobuf * iobuf;
-	struct address_space * mapping = filp->f_dentry->d_inode->i_mapping;
-	struct inode * inode = mapping->host;
-
-	new_iobuf = 0;
-	iobuf = filp->f_iobuf;
-	if (test_and_set_bit(0, &filp->f_iobuf_lock)) {
-		/*
-		 * A parallel read/write is using the preallocated iobuf
-		 * so just run slow and allocate a new one.
-		 */
-		retval = alloc_kiovec(1, &iobuf);
-		if (retval)
-			goto out;
-		new_iobuf = 1;
-	}
-
-	blocksize = 1 << inode->i_blkbits;
-	blocksize_bits = inode->i_blkbits;
-	blocksize_mask = blocksize - 1;
-	chunk_size = KIO_MAX_ATOMIC_IO << 10;
-
-	retval = -EINVAL;
-	if ((offset & blocksize_mask) || (count & blocksize_mask))
-		goto out_free;
-
-	/*
-	 * Flush to disk exclusively the _data_, metadata must remain
-	 * completly asynchronous or performance will go to /dev/null.
-	 */
-	retval = filemap_fdatawait(mapping);
-	if (retval == 0)
-		retval = filemap_fdatawrite(mapping);
-	if (retval == 0)
-		retval = filemap_fdatawait(mapping);
-	if (retval < 0)
-		goto out_free;
-
-	progress = retval = 0;
-	while (count > 0) {
-		iosize = count;
-		if (iosize > chunk_size)
-			iosize = chunk_size;
-
-		retval = map_user_kiobuf(rw, iobuf, (unsigned long) buf, iosize);
-		if (retval)
-			break;
-
-		retval = mapping->a_ops->direct_IO(rw, inode, iobuf, (offset+progress) >> blocksize_bits, blocksize);
-
-		if (rw == READ && retval > 0)
-			mark_dirty_kiobuf(iobuf, retval);
-		
-		if (retval >= 0) {
-			count -= retval;
-			buf += retval;
-			progress += retval;
-		}
-
-		unmap_kiobuf(iobuf);
-
-		if (retval != iosize)
-			break;
-	}
-
-	if (progress)
-		retval = progress;
-
- out_free:
-	if (!new_iobuf)
-		clear_bit(0, &filp->f_iobuf_lock);
-	else
-		free_kiovec(1, &iobuf);
- out:	
-	return retval;
-}
-#endif
 
 int file_read_actor(read_descriptor_t * desc, struct page *page, unsigned long offset, unsigned long size)
 {
@@ -1454,6 +1289,7 @@ struct page * filemap_nopage(struct vm_area_struct * area, unsigned long address
 	struct inode *inode = mapping->host;
 	struct page *page;
 	unsigned long size, pgoff, endoff;
+	int did_readahead;
 
 	pgoff = ((address - area->vm_start) >> PAGE_CACHE_SHIFT) + area->vm_pgoff;
 	endoff = ((area->vm_end - area->vm_start) >> PAGE_CACHE_SHIFT) + area->vm_pgoff;
@@ -1467,31 +1303,45 @@ retry_all:
 	if ((pgoff >= size) && (area->vm_mm == current->mm))
 		return NULL;
 
-	/* The "size" of the file, as far as mmap is concerned, isn't bigger than the mapping */
+	/*
+	 * The "size" of the file, as far as mmap is concerned, isn't bigger
+	 * than the mapping
+	 */
 	if (size > endoff)
 		size = endoff;
+
+	did_readahead = 0;
 
 	/*
 	 * The readahead code wants to be told about each and every page
 	 * so it can build and shrink its windows appropriately
 	 */
-	if (VM_SequentialReadHint(area))
+	if (VM_SequentialReadHint(area)) {
+		did_readahead = 1;
 		page_cache_readahead(area->vm_file, pgoff);
+	}
 
 	/*
 	 * If the offset is outside the mapping size we're off the end
 	 * of a privately mapped file, so we need to map a zero page.
 	 */
-	if ((pgoff < size) && !VM_RandomReadHint(area))
+	if ((pgoff < size) && !VM_RandomReadHint(area)) {
+		did_readahead = 1;
 		page_cache_readaround(file, pgoff);
+	}
 
 	/*
 	 * Do we have something in the page cache already?
 	 */
 retry_find:
 	page = find_get_page(mapping, pgoff);
-	if (!page)
+	if (!page) {
+		if (did_readahead) {
+			handle_ra_miss(file);
+			did_readahead = 0;
+		}
 		goto no_cached_page;
+	}
 
 	/*
 	 * Ok, found a page in the page cache, now we need to check
@@ -1534,6 +1384,7 @@ no_cached_page:
 	return NULL;
 
 page_not_uptodate:
+	KERNEL_STAT_INC(pgmajfault);
 	lock_page(page);
 
 	/* Did it get unhashed while we waited for it? */
@@ -1957,7 +1808,7 @@ repeat:
 			if (!cached_page)
 				return ERR_PTR(-ENOMEM);
 		}
-		err = add_to_page_cache_unique(cached_page, mapping, index);
+		err = add_to_page_cache(cached_page, mapping, index);
 		if (err == -EEXIST)
 			goto repeat;
 		if (err < 0) {
@@ -2030,7 +1881,7 @@ repeat:
 			if (!*cached_page)
 				return NULL;
 		}
-		err = add_to_page_cache_unique(*cached_page, mapping, index);
+		err = add_to_page_cache(*cached_page, mapping, index);
 		if (err == -EEXIST)
 			goto repeat;
 		if (err == 0) {

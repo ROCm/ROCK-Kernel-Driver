@@ -110,10 +110,10 @@ static void *rtl8150_probe(struct usb_device *dev, unsigned int ifnum,
 			   const struct usb_device_id *id);
 
 static struct usb_driver rtl8150_driver = {
-	name:		"rtl8150",
-	probe:		rtl8150_probe,
-	disconnect:	rtl8150_disconnect,
-	id_table:	rtl8150_table,
+	.name =		"rtl8150",
+	.probe =	rtl8150_probe,
+	.disconnect =	rtl8150_disconnect,
+	.id_table =	rtl8150_table,
 };
 
 /*

@@ -1432,20 +1432,20 @@ static int stv680_read (struct file *file, char *buf,
 }				/* stv680_read */
 
 static struct file_operations stv680_fops = {
-	owner:		THIS_MODULE,
-	open:		stv_open,
-	release:       	stv_close,
-	read:		stv680_read,
-	mmap:		stv680_mmap,
-	ioctl:          stv680_ioctl,
-	llseek:         no_llseek,
+	.owner =	THIS_MODULE,
+	.open =		stv_open,
+	.release =     	stv_close,
+	.read =		stv680_read,
+	.mmap =		stv680_mmap,
+	.ioctl =        stv680_ioctl,
+	.llseek =       no_llseek,
 };
 static struct video_device stv680_template = {
-	owner:		THIS_MODULE,
-	name:		"STV0680 USB camera",
-	type:		VID_TYPE_CAPTURE,
-	hardware:	VID_HARDWARE_SE401,
-	fops:           &stv680_fops,
+	.owner =	THIS_MODULE,
+	.name =		"STV0680 USB camera",
+	.type =		VID_TYPE_CAPTURE,
+	.hardware =	VID_HARDWARE_SE401,
+	.fops =         &stv680_fops,
 };
 
 static void *stv680_probe (struct usb_device *dev, unsigned int ifnum, const struct usb_device_id *id)
@@ -1545,10 +1545,10 @@ static void stv680_disconnect (struct usb_device *dev, void *ptr)
 }
 
 static struct usb_driver stv680_driver = {
-	name:		"stv680",
-	probe:		stv680_probe,
-	disconnect:	stv680_disconnect,
-	id_table:	device_table
+	.name =		"stv680",
+	.probe =	stv680_probe,
+	.disconnect =	stv680_disconnect,
+	.id_table =	device_table
 };
 
 /********************************************************************

@@ -284,23 +284,23 @@ static int default_open (struct inode *inode, struct file *filp)
 }
 
 static struct file_operations default_file_operations = {
-	read:		default_read_file,
-	write:		default_write_file,
-	open:		default_open,
-	llseek:		default_file_lseek,
+	.read =		default_read_file,
+	.write =	default_write_file,
+	.open =		default_open,
+	.llseek =	default_file_lseek,
 };
 
 static struct inode_operations usbfs_dir_inode_operations = {
-	create:		usbfs_create,
-	lookup:		simple_lookup,
-	unlink:		usbfs_unlink,
-	mkdir:		usbfs_mkdir,
-	rmdir:		usbfs_rmdir,
+	.create =	usbfs_create,
+	.lookup =	simple_lookup,
+	.unlink =	usbfs_unlink,
+	.mkdir =	usbfs_mkdir,
+	.rmdir =	usbfs_rmdir,
 };
 
 static struct super_operations usbfs_ops = {
-	statfs:		simple_statfs,
-	drop_inode:	generic_delete_inode,
+	.statfs =	simple_statfs,
+	.drop_inode =	generic_delete_inode,
 };
 
 static int usbfs_fill_super(struct super_block *sb, void *data, int silent)
@@ -468,17 +468,17 @@ static struct super_block *usb_get_sb(struct file_system_type *fs_type,
 }
 
 static struct file_system_type usbdevice_fs_type = {
-	owner:		THIS_MODULE,
-	name:		"usbdevfs",
-	get_sb:		usb_get_sb,
-	kill_sb:	kill_anon_super,
+	.owner =	THIS_MODULE,
+	.name =		"usbdevfs",
+	.get_sb =	usb_get_sb,
+	.kill_sb =	kill_anon_super,
 };
 
 static struct file_system_type usb_fs_type = {
-	owner:		THIS_MODULE,
-	name:		"usbfs",
-	get_sb:		usb_get_sb,
-	kill_sb:	kill_anon_super,
+	.owner =	THIS_MODULE,
+	.name =		"usbfs",
+	.get_sb =	usb_get_sb,
+	.kill_sb =	kill_anon_super,
 };
 
 /* --------------------------------------------------------------------- */

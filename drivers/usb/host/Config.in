@@ -6,6 +6,5 @@ dep_tristate '  EHCI HCD (USB 2.0) support' CONFIG_USB_EHCI_HCD $CONFIG_USB
 dep_tristate '  OHCI HCD support' CONFIG_USB_OHCI_HCD $CONFIG_USB
 dep_tristate '  UHCI HCD (most Intel and VIA) support' CONFIG_USB_UHCI_HCD_ALT $CONFIG_USB
 if [ "$CONFIG_ARM" = "y" ]; then
-   dep_tristate '  SA1111 OHCI-compatible host interface support' CONFIG_USB_OHCI_SA1111 $CONFIG_USB
    dep_tristate '  SL811HS support' CONFIG_USB_SL811HS $CONFIG_USB
 fi

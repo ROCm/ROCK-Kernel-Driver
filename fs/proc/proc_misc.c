@@ -159,7 +159,10 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		"SwapTotal:    %8lu kB\n"
 		"SwapFree:     %8lu kB\n"
 		"Dirty:        %8lu kB\n"
-		"Writeback:    %8lu kB\n",
+		"Writeback:    %8lu kB\n"
+		"PageTables:   %8lu kB\n"
+		"PteChainTot:  %8lu kB\n"
+		"PteChainUsed: %8lu kB\n",
 		K(i.totalram),
 		K(i.freeram),
 		K(i.sharedram),
@@ -174,7 +177,10 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		K(i.totalswap),
 		K(i.freeswap),
 		K(ps.nr_dirty),
-		K(ps.nr_writeback)
+		K(ps.nr_writeback),
+		K(ps.nr_page_table_pages),
+		K(ps.nr_pte_chain_pages),
+		ps.used_pte_chains_bytes >> 10
 		);
 
 	return proc_calc_metrics(page, start, off, count, eof, len);
@@ -347,9 +353,29 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 	}
 
 	len += sprintf(page + len,
-		"\nctxt %lu\n"
+		"\npageallocs %u\n"
+		"pagefrees %u\n"
+		"pageactiv %u\n"
+		"pagedeact %u\n"
+		"pagefault %u\n"
+		"majorfault %u\n"
+		"pagescan %u\n"
+		"pagesteal %u\n"
+		"pageoutrun %u\n"
+		"allocstall %u\n"
+		"ctxt %lu\n"
 		"btime %lu\n"
 		"processes %lu\n",
+		kstat.pgalloc,
+		kstat.pgfree,
+		kstat.pgactivate,
+		kstat.pgdeactivate,
+		kstat.pgfault,
+		kstat.pgmajfault,
+		kstat.pgscan,
+		kstat.pgsteal,
+		kstat.pageoutrun,
+		kstat.allocstall,
 		nr_context_switches(),
 		xtime.tv_sec - jif / HZ,
 		total_forks);

@@ -571,11 +571,11 @@ static int uhci_proc_release(struct inode *inode, struct file *file)
 }
 
 static struct file_operations uhci_proc_operations = {
-	open:		uhci_proc_open,
-	llseek:		uhci_proc_lseek,
-	read:		uhci_proc_read,
+	.open =		uhci_proc_open,
+	.llseek =	uhci_proc_lseek,
+	.read =		uhci_proc_read,
 //	write:		uhci_proc_write,
-	release:	uhci_proc_release,
+	.release =	uhci_proc_release,
 };
 #endif
 
