@@ -2840,8 +2840,7 @@ static int radeonfb_pci_register (struct pci_dev *pdev,
 	}
 
 	/* map the regions */
-	rinfo->mmio_base = (u32) ioremap (rinfo->mmio_base_phys,
-				    		    RADEON_REGSIZE);
+	rinfo->mmio_base = (unsigned long) ioremap (rinfo->mmio_base_phys, RADEON_REGSIZE);
 	if (!rinfo->mmio_base) {
 		printk ("radeonfb: cannot map MMIO\n");
 		release_mem_region (rinfo->mmio_base_phys,
@@ -2978,8 +2977,7 @@ static int radeonfb_pci_register (struct pci_dev *pdev,
 		}
 	}
 
-	rinfo->fb_base = (u32) ioremap (rinfo->fb_base_phys,
-				  		  rinfo->video_ram);
+	rinfo->fb_base = (unsigned long) ioremap (rinfo->fb_base_phys, rinfo->video_ram);
 	if (!rinfo->fb_base) {
 		printk ("radeonfb: cannot map FB\n");
 		iounmap ((void*)rinfo->mmio_base);
