@@ -1,6 +1,7 @@
 #include <linux/config.h>
 
 OUTPUT_FORMAT("elf64-alpha")
+OUTPUT_ARCH(alpha)
 ENTRY(__start)
 PHDRS { kernel PT_LOAD ; }
 jiffies = jiffies_64;
@@ -12,64 +13,53 @@ SECTIONS
   . = 0xfffffc0000810000;
 #endif
 
-  .text : {
-	_text = .;
-	*(.text)
-	_etext = .;
+  _text = .;					/* Text and read-only data */
+  .text : { 
+	*(.text) 
+	*(.fixup)
+	*(.gnu.warning)
   } :kernel
+  _etext = .;					/* End of text section */
 
-  /* Exception table */
-  __ex_table ALIGN(16) : {
-	__start___ex_table = .;
-	*(__ex_table)
-	__stop___ex_table = .;
-  }
-
-  /* Kernel symbol table */
-  __ksymtab ALIGN(8) : {
-	__start___ksymtab = .;
-	*(__ksymtab)
-	__stop___ksymtab = .;
-  }
-
-  /* Kernel symbol table: GPL only */
-  __gpl_ksymtab ALIGN(8) : {
-	__start___gpl_ksymtab = .;
-	*(__gpl_ksymtab)
-	__stop___gpl_ksymtab = .;
-  }
-
-  /* All kernel symbols */
-  __kallsyms ALIGN(8) : {
-	__start___kallsyms = .;
-	*(__kallsyms)
-	__stop___kallsyms = .;
-  }
-
-  .kstrtab : { *(.kstrtab) }
   .rodata : { *(.rodata) *(.rodata.*) }
+  .kstrtab : { *(.kstrtab) }
 
-  /* Startup code */
-  .init.text ALIGN(8192) : {
-	__init_begin = .;
-	*(.init.text)
-  }
+  . = ALIGN(16);
+  __start___ex_table = .;			/* Exception table */
+  __ex_table : { *(__ex_table) }
+  __stop___ex_table = .;
+
+  . = ALIGN(8);
+  __start___ksymtab = .;			/* Kernel symbol table */
+  __ksymtab : { *(__ksymtab) }
+  __stop___ksymtab = .;
+
+  . = ALIGN(8);
+  __start___gpl_ksymtab = .;	/* kernel symbol table - GPL-only symbols */
+  __gpl_ksymtab : { *(__gpl_ksymtab) }
+  __stop___gpl_ksymtab = .;
+
+  . = ALIGN(8);
+  __start___kallsyms = .;			/* All kernel symbols */
+  __kallsyms : { *(__kallsyms) }
+  __stop___kallsyms = .;
+
+  /* Will be freed after init */
+  . = ALIGN(8192);				/* Init code and data */
+  __init_begin = .;
+  .init.text : { *(.init.text) }
   .init.data : { *(.init.data) }
-
-  .init.setup ALIGN(16): {
-	__setup_start = .;
-	*(.init.setup)
-	__setup_end = .;
-  }
-
-  __param ALIGN(8): {
-	__start___param = .;
-	*(__param)
-	__stop___param = .;
-  }
-
-  .initcall.init ALIGN(8): {
-	__initcall_start = .;
+  . = ALIGN(16);
+  __setup_start = .;
+  .init.setup : { *(.init.setup) }
+  __setup_end = .;
+  . = ALIGN(8);
+  __start___param = .;
+  __param : { *(__param) }
+  __stop___param = .;
+  . = ALIGN(8);
+  __initcall_start = .;
+  .initcall.init : {
 	*(.initcall1.init) 
 	*(.initcall2.init) 
 	*(.initcall3.init) 
@@ -77,54 +67,63 @@ SECTIONS
 	*(.initcall5.init) 
 	*(.initcall6.init) 
 	*(.initcall7.init)
-	__initcall_end = .;
+  }
+  __initcall_end = .;
+  . = ALIGN(8192);
+  __initramfs_start = .;
+  .init.ramfs : { *(.init.ramfs) }
+  __initramfs_end = .;
+  . = ALIGN(64);
+  __per_cpu_start = .;
+  .data.percpu : { *(.data.percpu) }
+  __per_cpu_end = .;
+  . = ALIGN(8192);
+  __init_end = .;
+  /* Freed after init ends here */
+
+  /* writeable */
+  _data = .;
+  .data : {					/* Data */
+	*(.data)
+	CONSTRUCTORS
   }
 
-  .init.ramfs ALIGN(8192): {
-	__initramfs_start = .;
-	*(.init.ramfs)
-	__initramfs_end = .;
-  }
+  . = ALIGN(8192);
+  .data.page_aligned : { *(.data.page_aligned) }
 
-  .data.percpu ALIGN(64): {
-	__per_cpu_start = .;
-	*(.data.percpu)
-	__per_cpu_end = .;
-  }
-
-  /* The initial task and kernel stack */
-  .data.init_thread ALIGN(2*8192) : {
-	__init_end = .;
-	*(.data.init_thread)
-  }
-
-  /* Global data */
-  .data.page_aligned ALIGN(8192) : {
-	_data = .;
-	*(.data.page_aligned) 
-  }
+  . = ALIGN(64);
   .data.cacheline_aligned : { *(.data.cacheline_aligned) }
-  .data : { *(.data) CONSTRUCTORS }
-  .got : { *(.got) }
-  .sdata : {
-	*(.sdata)
-	_edata = .;
-  }
 
-  .sbss : {
-	__bss_start = .;
-	*(.sbss) *(.scommon)
-  }
-  .bss : {
-	*(.bss) *(COMMON)
-	__bss_stop = .;
-	_end = .;
-  }
+  .got : { *(.got) }
+  .sdata : { *(.sdata) }
+
+  _edata = .;					/* End of data section */
+
+  . = ALIGN(2*8192);				/* Inititial task and stack */
+  .data.init_thread : { *(.data.init_thread) }
+
+  __bss_start = .;
+  .sbss : { *(.sbss) *(.scommon) }
+  .bss : { *(.bss) *(COMMON) }
+  __bss_stop = .;
+
+  _end = .;
+
+  /* Sections to be discarded */
+  /DISCARD/ : { *(.exit.text) *(.exit.data) *(.exitcall.exit) }
+
 
   .mdebug 0 : { *(.mdebug) }
   .note 0 : { *(.note) }
   .comment 0 : { *(.comment) }
 
+  /* Stabs debugging sections */
+  .stab 0 : { *(.stab) }
+  .stabstr 0 : { *(.stabstr) }
+  .stab.excl 0 : { *(.stab.excl) }
+  .stab.exclstr 0 : { *(.stab.exclstr) }
+  .stab.index 0 : { *(.stab.index) }
+  .stab.indexstr 0 : { *(.stab.indexstr) }
   /* DWARF 1 */
   .debug          0 : { *(.debug) }
   .line           0 : { *(.line) }
@@ -147,6 +146,4 @@ SECTIONS
   .debug_funcnames 0 : { *(.debug_funcnames) }
   .debug_typenames 0 : { *(.debug_typenames) }
   .debug_varnames  0 : { *(.debug_varnames) }
-
-  /DISCARD/ : { *(.exit.text) *(.exit.data) *(.exitcall.exit) }
 }
