@@ -1137,7 +1137,7 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 	case VIDIOC_REQBUFS: {
 		struct v4l2_requestbuffers *req = arg;
 		DEB_D(("VIDIOC_REQBUFS, type:%d\n",req->type));
-		return videobuf_reqbufs(file,q,req);
+		return videobuf_reqbufs(q,req);
 	}
 	case VIDIOC_QUERYBUF: {
 		struct v4l2_buffer *buf = arg;
@@ -1147,14 +1147,14 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 	case VIDIOC_QBUF: {
 		struct v4l2_buffer *buf = arg;
 		int ret = 0;
-		ret = videobuf_qbuf(file,q,buf);
+		ret = videobuf_qbuf(q,buf);
 		DEB_D(("VIDIOC_QBUF: ret:%d, index:%d\n",ret,buf->index));
 		return ret;
 	}
 	case VIDIOC_DQBUF: {
 		struct v4l2_buffer *buf = arg;
 		int ret = 0;
-		ret = videobuf_dqbuf(file,q,buf,file->f_flags & O_NONBLOCK);
+		ret = videobuf_dqbuf(q,buf,file->f_flags & O_NONBLOCK);
 		DEB_D(("VIDIOC_DQBUF: ret:%d, index:%d\n",ret,buf->index));
 		return ret;
 	}
@@ -1166,7 +1166,7 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 		if( 0 != err) {
 				return err;
 			}
-		err = videobuf_streamon(file,q);
+		err = videobuf_streamon(q);
 		return err;
 	}
 	case VIDIOC_STREAMOFF: {
@@ -1187,7 +1187,7 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 			return -EBUSY;
 		}
 
-		err = videobuf_streamoff(file,q);
+		err = videobuf_streamoff(q);
 		if (0 != err) {
 			DEB_D(("warning: videobuf_streamoff() failed.\n"));
 		video_end(fh, file);
@@ -1210,7 +1210,7 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 
 		q = &fh->video_q;
 		down(&q->lock);
-		err = videobuf_mmap_setup(file,q,gbuffers,gbufsize,
+		err = videobuf_mmap_setup(q,gbuffers,gbufsize,
 					  V4L2_MEMORY_MMAP);
 		if (err < 0) {
 			up(&q->lock);
@@ -1247,9 +1247,10 @@ static int buffer_activate (struct saa7146_dev *dev,
 	return 0;
 }
 
-static int buffer_prepare(void *priv, struct videobuf_buffer *vb, enum v4l2_field field)
+static int buffer_prepare(struct videobuf_queue *q,
+			  struct videobuf_buffer *vb, enum v4l2_field field)
 {
-	struct file *file = priv;
+	struct file *file = q->priv_data;
 	struct saa7146_fh *fh = file->private_data;
 	struct saa7146_dev *dev = fh->dev;
 	struct saa7146_vv *vv = dev->vv_data;
@@ -1330,9 +1331,9 @@ static int buffer_prepare(void *priv, struct videobuf_buffer *vb, enum v4l2_fiel
 	return err;
 }
 
-static int buffer_setup(void *priv, unsigned int *count, unsigned int *size)
+static int buffer_setup(struct videobuf_queue *q, unsigned int *count, unsigned int *size)
 {
-	struct file *file = priv;
+	struct file *file = q->priv_data;
 	struct saa7146_fh *fh = file->private_data;
 
 	if (0 == *count || *count > MAX_SAA7146_CAPTURE_BUFFERS)
@@ -1350,9 +1351,9 @@ static int buffer_setup(void *priv, unsigned int *count, unsigned int *size)
 	return 0;
 }
 
-static void buffer_queue(void *priv, struct videobuf_buffer *vb)
+static void buffer_queue(struct videobuf_queue *q, struct videobuf_buffer *vb)
 {
-	struct file *file = priv;
+	struct file *file = q->priv_data;
 	struct saa7146_fh *fh = file->private_data;
 	struct saa7146_dev *dev = fh->dev;
 	struct saa7146_vv *vv = dev->vv_data;
@@ -1363,9 +1364,9 @@ static void buffer_queue(void *priv, struct videobuf_buffer *vb)
 }
 
 
-static void buffer_release(void *priv, struct videobuf_buffer *vb)
+static void buffer_release(struct videobuf_queue *q, struct videobuf_buffer *vb)
 {
-	struct file *file = priv;
+	struct file *file = q->priv_data;
 	struct saa7146_fh *fh = file->private_data;
 	struct saa7146_dev *dev = fh->dev;
 	struct saa7146_buf *buf = (struct saa7146_buf *)vb;
@@ -1419,7 +1420,8 @@ static int video_open(struct saa7146_dev *dev, struct file *file)
 			    dev->pci, &dev->slock,
 			    V4L2_BUF_TYPE_VIDEO_CAPTURE,
 			    V4L2_FIELD_INTERLACED,
-			    sizeof(struct saa7146_buf));
+			    sizeof(struct saa7146_buf),
+			    file);
 
 	init_MUTEX(&fh->video_q.lock);
 
@@ -1485,7 +1487,7 @@ static ssize_t video_read(struct file *file, char __user *data, size_t count, lo
 		goto out;
 	}
 
-	ret = videobuf_read_one(file,&fh->video_q , data, count, ppos,
+	ret = videobuf_read_one(&fh->video_q, data, count, ppos,
 				file->f_flags & O_NONBLOCK);
 	if (ret != 0) {
 	video_end(fh, file);
