@@ -373,7 +373,10 @@ int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev * dev, int max
 		child->bridge_ctl = bctl;
 
 		cmax = pci_scan_child_bus(child);
-		if (cmax > max) max = cmax;
+		if (cmax > max)
+			max = cmax;
+		if (child->subordinate > max)
+			max = child->subordinate;
 	} else {
 		/*
 		 * We need to assign a number to this bus which we always
