@@ -426,7 +426,8 @@ extern int handle_mm_fault(struct mm_struct *mm,struct vm_area_struct *vma, unsi
 extern int make_pages_present(unsigned long addr, unsigned long end);
 extern int access_process_vm(struct task_struct *tsk, unsigned long addr, void *buf, int len, int write);
 extern long sys_remap_file_pages(unsigned long start, unsigned long size, unsigned long prot, unsigned long pgoff, unsigned long nonblock);
-
+void put_dirty_page(struct task_struct *tsk, struct page *page,
+			unsigned long address, pgprot_t prot);
 
 int get_user_pages(struct task_struct *tsk, struct mm_struct *mm, unsigned long start,
 		int len, int write, int force, struct page **pages, struct vm_area_struct **vmas);

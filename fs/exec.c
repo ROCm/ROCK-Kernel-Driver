@@ -287,7 +287,8 @@ int copy_strings_kernel(int argc,char ** argv, struct linux_binprm *bprm)
  *
  * tsk->mmap_sem is held for writing.
  */
-void put_dirty_page(struct task_struct * tsk, struct page *page, unsigned long address)
+void put_dirty_page(struct task_struct *tsk, struct page *page,
+			unsigned long address, pgprot_t prot)
 {
 	pgd_t * pgd;
 	pmd_t * pmd;
@@ -295,7 +296,8 @@ void put_dirty_page(struct task_struct * tsk, struct page *page, unsigned long a
 	struct pte_chain *pte_chain;
 
 	if (page_count(page) != 1)
-		printk(KERN_ERR "mem_map disagrees with %p at %08lx\n", page, address);
+		printk(KERN_ERR "mem_map disagrees with %p at %08lx\n",
+				page, address);
 
 	pgd = pgd_offset(tsk->mm, address);
 	pte_chain = pte_chain_alloc(GFP_KERNEL);
@@ -314,7 +316,7 @@ void put_dirty_page(struct task_struct * tsk, struct page *page, unsigned long a
 	}
 	lru_cache_add_active(page);
 	flush_dcache_page(page);
-	set_pte(pte, pte_mkdirty(pte_mkwrite(mk_pte(page, PAGE_COPY))));
+	set_pte(pte, pte_mkdirty(pte_mkwrite(mk_pte(page, prot))));
 	pte_chain = page_add_rmap(page, pte, pte_chain);
 	pte_unmap(pte);
 	tsk->mm->rss++;
@@ -421,7 +423,8 @@ int setup_arg_pages(struct linux_binprm *bprm)
 		struct page *page = bprm->page[i];
 		if (page) {
 			bprm->page[i] = NULL;
-			put_dirty_page(current,page,stack_base);
+			put_dirty_page(current, page, stack_base,
+					mpnt->vm_page_prot);
 		}
 		stack_base += PAGE_SIZE;
 	}
@@ -434,8 +437,6 @@ int setup_arg_pages(struct linux_binprm *bprm)
 
 #else
 
-#define put_dirty_page(tsk, page, address)
-#define setup_arg_pages(bprm)			(0)
 static inline void free_arg_pages(struct linux_binprm *bprm)
 {
 	int i;
