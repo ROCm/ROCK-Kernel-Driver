@@ -21,6 +21,7 @@
 
 #include <linux/kernel.h>
 #include <linux/list.h>
+#include <linux/delay.h>
 
 #include "w1.h"
 #include "w1_log.h"

@@ -21,6 +21,7 @@
 
 #include <linux/spinlock.h>
 #include <linux/list.h>
+#include <linux/delay.h>
 
 #include "w1_family.h"
 
