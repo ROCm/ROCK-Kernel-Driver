@@ -541,7 +541,5 @@ void check_bugs(void)
 				"emulation project\n" );
 		panic( "no FPU" );
 	}
-
-#endif /* CONFIG_SUN3 */
-
+#endif /* !CONFIG_M68KFPU_EMU */
 }
