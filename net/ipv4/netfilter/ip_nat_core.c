@@ -450,6 +450,13 @@ int icmp_reply_translation(struct sk_buff **pskb,
 		       !manip))
 		return 0;
 
+	/* Reloading "inside" here since manip_pkt inner. */
+	inside = (void *)(*pskb)->data + (*pskb)->nh.iph->ihl*4;
+	inside->icmp.checksum = 0;
+	inside->icmp.checksum = csum_fold(skb_checksum(*pskb, hdrlen,
+						       (*pskb)->len - hdrlen,
+						       0));
+
 	/* Change outer to look the reply to an incoming packet
 	 * (proto 0 means don't invert per-proto part). */
 
@@ -468,13 +475,6 @@ int icmp_reply_translation(struct sk_buff **pskb,
 			return 0;
 	}
 
-	/* Reloading "inside" here since manip_pkt inner. */
-	inside = (void *)(*pskb)->data + (*pskb)->nh.iph->ihl*4;
-
-	inside->icmp.checksum = 0;
-	inside->icmp.checksum = csum_fold(skb_checksum(*pskb, hdrlen,
-						       (*pskb)->len - hdrlen,
-						       0));
 	return 1;
 }
 
