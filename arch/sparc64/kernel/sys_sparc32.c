@@ -1090,8 +1090,8 @@ asmlinkage long compat_sys_sigaction(int sig, struct old_sigaction32 __user *act
         ret = do_sigaction(sig, act ? &new_ka : NULL, oact ? &old_ka : NULL);
 
 	if (!ret && oact) {
-		ret = put_user((long)old_ka.sa.sa_handler, &oact->sa_handler);
-		ret |= __put_user((long)old_ka.sa.sa_restorer, &oact->sa_restorer);
+		ret = put_user(ptr_to_compat(old_ka.sa.sa_handler), &oact->sa_handler);
+		ret |= __put_user(ptr_to_compat(old_ka.sa.sa_restorer), &oact->sa_restorer);
 		ret |= __put_user(old_ka.sa.sa_flags, &oact->sa_flags);
 		ret |= __put_user(old_ka.sa.sa_mask.sig[0], &oact->sa_mask);
         }
@@ -1147,10 +1147,10 @@ asmlinkage long compat_sys_rt_sigaction(int sig,
 		case 2: set32.sig[3] = (old_ka.sa.sa_mask.sig[1] >> 32); set32.sig[2] = old_ka.sa.sa_mask.sig[1];
 		case 1: set32.sig[1] = (old_ka.sa.sa_mask.sig[0] >> 32); set32.sig[0] = old_ka.sa.sa_mask.sig[0];
 		}
-		ret = put_user((long)old_ka.sa.sa_handler, &oact->sa_handler);
+		ret = put_user(ptr_to_compat(old_ka.sa.sa_handler), &oact->sa_handler);
 		ret |= __copy_to_user(&oact->sa_mask, &set32, sizeof(compat_sigset_t));
 		ret |= __put_user(old_ka.sa.sa_flags, &oact->sa_flags);
-		ret |= __put_user((long)old_ka.sa.sa_restorer, &oact->sa_restorer);
+		ret |= __put_user(ptr_to_compat(old_ka.sa.sa_restorer), &oact->sa_restorer);
 		if (ret)
 			ret = -EFAULT;
         }
