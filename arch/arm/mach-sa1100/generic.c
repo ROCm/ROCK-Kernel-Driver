@@ -100,7 +100,7 @@ EXPORT_SYMBOL(cpufreq_get);
 static void sa1100_power_off(void)
 {
 	mdelay(100);
-	cli();
+	local_irq_disable();
 	/* disable internal oscillator, float CS lines */
 	PCFR = (PCFR_OPDE | PCFR_FP | PCFR_FS);
 	/* enable wake-up on GPIO0 (Assabet...) */

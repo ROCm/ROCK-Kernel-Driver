@@ -202,8 +202,7 @@ __do_irq(unsigned int irq, struct irqaction *action, struct pt_regs *regs)
 	if (status & SA_SAMPLE_RANDOM)
 		add_interrupt_randomness(irq);
 
-	__cli();
-	spin_lock(&irq_controller_lock);
+	spin_lock_irq(&irq_controller_lock);
 }
 
 /*
