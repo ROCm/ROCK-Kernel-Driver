@@ -1,3 +1,8 @@
+
+Gunther Mayer's bttv card gallery (graphical version of this text file :-)
+is available at: http://mayerg.gmxhome.de/bttv/bttv-gallery.html
+
+
 Suppported cards:
 
 
@@ -91,10 +96,9 @@ e.g.:
 - sound decoder: TDA9800, MSP34xx (stereo cards) 
 
 
-CPH-Series (CPH050, ...)
-------------------------
-Developed by TelSignal(?), OEMed by many vendors (Askey, Typhoon, 
-  Anubis, Dynalink)
+Askey CPH-Series
+----------------
+Developed by TelSignal(?), OEMed by many vendors (Typhoon, Anubis, Dynalink)
 
   Card series:
     CPH01x: BT848 capture only
@@ -149,9 +153,12 @@ Lifeview Flyvideo Series:
       LR50 Rev.Q = Flyvideo 98 (w/eeprom and PCI subsystem ID)
            Rev.W = Flyvideo 98 (no eeprom)
       LR51 Rev.E = Flyvideo 98 EZ (capture only)
-      LR90       = Flyvideo 2000 series
+      LR90       = Flyvideo 2000 (Bt878)
+		   Flyvideo 2000S (Bt878) w/Stereo TV (Package incl. LR91 daughterboard)
       LR91       = Stereo daughter card for LR90
       LR97       = Flyvideo DVBS
+      LR136	 = Flyvideo 2100/3100 (Low profile, SAA7130/SAA7134)
+      LR137      = Flyvideo DV2000/DV3000 (SAA7130/SAA7134 + IEEE1394)
       LR138 Rev.C= Flyvideo 2000 (SAA7130)
 	        or Flyvideo 3000 (SAA7134) w/Stereo TV
 		   These exist in variations w/FM and w/Remote sometimes denoted
@@ -162,15 +169,14 @@ Lifeview Flyvideo Series:
       Their Bt8x8 cards are listed as discontinued.
       Flyvideo 2000S was probably sold as Flyvideo 3000 in some contries(Europe?).
       The new Flyvideo 2000/3000 are SAA7130/SAA7134 based. 
-      Flyvideo 2100/3100 are half-sized cards (for system integrators etc.)
 
   "Flyvideo II" had been the name for the 848 cards, nowadays (in Germany)
   this name is re-used for LR50 Rev.W.
   The Lifeview website mentioned Flyvideo III at some time, but such a card
-  has never been seen. 
+  has not yet been seen (perhaps it was the german name for LR90 [stereo]).
   These cards are sold by many OEMs too.
 
-  FlyVideo A2 = LR90 Rev.F (w/Remote, w/o FM, stereo TV by tda9821)
+  FlyVideo A2 = LR90 Rev.F (w/Remote, w/o FM, stereo TV by tda9821) {Germany}
 
 
 Typhoon TV card series:
@@ -190,7 +196,12 @@ Typhoon TV card series:
   50686 "TV Tuner"                       = KNC1 TV Station
   50687 "TV Tuner stereo"                = KNC1 TV Station pro
   50688 "TV Tuner RDS" (black package)   = KNC1 TV Station RDS
+  50689  TV SAT DVB-S CARD CI PCI (SAA7146AH)
   50692 "TV/FM Tuner" (small PCB)
+  50694  TV TUNER CARD RDS (PHILIPS CHIPSET SAA7134HL)
+  50696  TV TUNER STEREO (PHILIPS CHIPSET SAA7134HL, MK3ME Tuner)
+  50804  PC-SAT TV/Audio Karte = Techni-PC-Sat (ZORAN 36120PQC, Tuner:Alps)
+  50866  TVIEW SAT RECEIVER+ADR
   50868 "TV/FM Tuner Pal I" (variant of 50682)
   50999 "TV/FM Tuner Secam" (variant of 50682)
 
@@ -207,16 +218,30 @@ Mentor
 
 Prolink
 -------
-   Pixelview Play TV Pro:
-     PV-BT878P+rev.9B (Play TV Pro w/FM w/NICAM)
-     PV-BT878P+rev.8X 
-     PV-BT878P+rev.4C (Play TV Pro) 
-     PV-BT878P+rev.4E (Play TV Pak) 
-     PV-BT878P+rev.2F 
-     PV-BT878TV 
+   TV cards:
+   PixelView Play TV pro - (Model: PV-BT878P+ REV 8E)
+   PixelView Play TV pro - (Model: PV-BT878P+ REV 9D)
+   PixelView Play TV pro - (Model: PV-BT878P+ REV 4C / 8D / 10A )
+   PixelView Play TV - (Model: PV-BT848P+)
+   878TV - (Model: PV-BT878TV)
 
-   PixelView Play TV 
-     PV-BT848P+
+   Multimedia TV packages (card + software pack):
+   PixelView Play TV Theater - (Model: PV-M4200) =  PixelView Play TV pro + Software
+   PixelView Play TV PAK -     (Model: PV-BT878P+ REV 4E)
+   PixelView Play TV/VCR -     (Model: PV-M3200 REV 4C / 8D / 10A ) 
+   PixelView Studio PAK -      (Model:    M2200 REV 4C / 8D / 10A )
+   PixelView PowerStudio PAK - (Model: PV-M3600 REV 4E)
+   PixelView DigitalVCR PAK -  (Model: PV-M2400 REV 4C / 8D / 10A )
+
+   Further Cards:
+   PV-BT878P+rev.9B (Play TV Pro, opt. w/FM w/NICAM)
+   PV-BT878P+rev.2F
+   
+   Video Conferencing:
+   PixelView Meeting PAK - (Model: PV-BT878P)
+   PixelView Meeting PAK Lite - (Model: PV-BT878P)
+   PixelView Meeting PAK plus - (Model: PV-BT878P+rev 4C/8D/10A)
+   PixelView Capture - (Model: PV-BT848P)
 
 Dynalink
 --------
@@ -235,7 +260,7 @@ Genius/Kye
 Tekram
 ------
    VideoCap C205 (Bt848)
-   VideoCap C210 (Zoran ZR36120 +Philips)
+   VideoCap C210 (zr36120 +Philips)
    CaptureTV M200 (ISA)
    CaptureTV M205 (Bt848)
 
@@ -257,8 +282,8 @@ KNC One
    TV-Station FM (+Radio)
    TV-Station RDS (+RDS)
 
-PV951 cards:
-------------
+Provideo PV951 
+--------------
   These are sold as:
    Boeder TV-FM Video Capture Card
    Titanmedia Supervision TV-2400
@@ -270,12 +295,14 @@ PV951 cards:
 Highscreen
 ----------
    TV Karte = LR50 Rev.S
-   TV-Boostar = Terratec Terra TV+ Version 1.0 (Bt848, TDA9821) "ceb105.pcb"
+   TV-Boostar = Terratec Terra TV+ Version 1.0 (Bt848, tda9821) "ceb105.pcb"
 
 Zoltrix
 -------
+   Face to Face Capture (Bt848 capture only) (PCB "VP-2848")
    Face To Face TV MAX (Bt848) (PCB "VP-8482 Rev1.3")
    Genie TV (Bt878) (PCB "VP-8790 Rev 2.1")
+   Genie Wonder Pro
 
 AVerMedia
 ---------
@@ -304,19 +331,21 @@ Aimslab
 -------
    Video Highway Xtreme (aka "VHX") (Bt848, FM w/ TEA5757)
 
-IXMicro
+IXMicro (former: IMS=Integrated Micro Solutions)
 -------
    IXTV BT848
    IXTV BT878
    TurboTV (Bt848)
 
 Lifetec/Medion/Tevion/Aldi
--------
-   LT9415/MD9415 = LR90 Rev. F
+--------------------------
+   LT9306/MD9306 = CPH061
+   LT9415/MD9415 = LR90 Rev.F or Rev.G
           MD9592 = Avermedia TVphone98 (PCI_ID=1461:0003), PCB-Rev=M168II-B (w/TDA9873H)
+          MD9717 = KNC One (Rev D4, saa7134)
 
 Modular Technologies (www.modulartech.com) UK
---------------------
+---------------------------------------------
    MM100 PCTV (Bt848)
    MM205 PCTV (Bt878)
    MM210 PCTV (Bt878) (Galaxy TV)
@@ -326,19 +355,26 @@ Terratec
    Terra TV+ Version 1.0 (Bt848), "ceb105.PCB" printed on the PCB, TDA9821
    Terra TV+ Version 1.1 (Bt878), "LR74 Rev.E" printed on the PCB, TDA9821
    Terra TValueRadio,             "LR102 Rev.C" printed on the PCB
-   Terra TV/Radio+ Version 1.0,   "80-CP2830100-0" TTTV3 printed on the PCB, i
+   Terra TV/Radio+ Version 1.0,   "80-CP2830100-0" TTTV3 printed on the PCB,
 				     "CPH010-E83" on the back, SAA6588T, TDA9873H
    Terra TValue Version BT878,    "80-CP2830110-0 TTTV4" printed on the PCB, 
 				     "CPH011-D83" on back
    Terra TValue Version 1.0       "ceb105.PCB" (really identical to Terra TV+ Version 1.0)
+   Terra Active Radio Upgrade (tea5757h, saa6588t)
 
    LR74 is a newer PCB revision of ceb105 (both incl. connector for Active Radio Upgrade)
 
-
 Technisat
 ---------
-   Mediafocus I (ZR36120/ZR36125)
-   Mediafocus II (SAA7146)
+   Discos ADR PC-Karte ISA (no TV!)
+   Discos ADR PC-Karte PCI (probably no TV?)
+   Techni-PC-Sat (Sat. analog)
+         Rev 1.2 (zr36120, vpx3220, stv0030, saa5246, BSJE3-494A)
+   Mediafocus I (zr36120/zr36125, drp3510, Sat. analog + ADR Radio)
+   Mediafocus II (saa7146, Sat. analog)
+         SatADR Rev 2.1 (saa7146a, saa7113h, stv0056a, msp3400c, drp3510a, BSKE3-307A)
+   SkyStar 1 DVB  (AV7110)
+   SkyStar 2 DVB  (B2C2) (=Sky2PC)
 
 Siemens
 -------
@@ -359,34 +395,252 @@ Pinnacle
    Mirovideo PCTV (Bt848)
    Mirovideo PCTV SE (Bt848)
    Mirovideo PCTV Pro (Bt848 + Daughterboard)
-   Studio PCTV Rave (Bt878 w/o infrared)
-   Studio PCTV
-   Studio PCTV Pro (Bt878 stereo w/ FM)
+   Studio PCTV Rave (Bt878 package w/o infrared)
+   Studio PCTV      (Bt878)
+   Studio PCTV Pro  (Bt878 stereo w/ FM)
 
+   M(J)PEG capture and playback:
    DC1+ (ISA)
-   DC10  (zr36057 + zr36060 + saa7110 + adv7176)
-   DC10+ (zr36067 + zr36060 + saa7110 + adv7176)
-   DC20
-   DC30
-   DC30+ (zr36067 + zr36050 + zr36016 + vpx3220 + adv7176)
+   DC10  (zr36057,     zr36060,      saa7110, adv7176)
+   DC10+ (zr36067,     zr36060,      saa7110, adv7176)
+   DC20  (ql16x24b,zr36050, zr36016, saa7110, saa7187 ...)
+   DC30  (zr36057, zr36050, zr36016, vpx3220, adv7176, ad1843, tea6415, miro FST97A1)
+   DC30+ (zr36067, zr36050, zr36016, vpx3220, adv7176)
+   DC50  (zr36067, zr36050, zr36016, saa7112, adv7176 (2 pcs.?), ad1843, miro FST97A1, Lattice ???)
 
 Lenco
 -----
    MXR-9565 (=Technisat Mediafocus?)
-   MXR-9571 (Bt848)
+   MXR-9571 (Bt848) (=CPH031?)
    MXR-9575
-   MXR-9477 (Bt878)
-   MXTV-9578CP (= Prolink PV-BT878P+4E)
+   MXR-9577 (Bt878) (=Prolink 878TV Rev.3x)
+   MXTV-9578CP (Bt878) (= Prolink PV-BT878P+4E)
 
 Iomega
 ------
-   Buz (Zoran zr36067 + zr36060 + SAA7111 + SAA7185)
+   Buz (zr36067, zr36060, saa7111, saa7185)
 
 LML
 ---
-   LML33 (zr36067 + zr36060 + bt819+ bt856)
+   LML33 (zr36067, zr36060, bt819, bt856)
 
 Grandtec
 --------
    Grand Video Capture (Bt848)
    Multi Capture Card  (Bt878)
+
+Koutech
+-------
+   KW-606 (Bt848)
+   KW-607 (Bt848 capture only)
+   KW-606RSF
+   KW-607A (capture only)
+   KW-608 (Zoran capture only)
+ 
+IODATA (jp)
+------
+   GV-BCTV/PCI
+   GV-BCTV2/PCI
+   GV-BCTV3/PCI
+   GV-BCTV4/PCI
+   GV-VCP/PCI (capture only)
+   GV-VCP2/PCI (capture only)
+
+Canopus (jp)
+-------
+   WinDVR	= Kworld "KW-TVL878RF"
+
+www.sigmacom.co.kr 
+------------------
+   Sigma Cyber TV II 
+
+www.sasem.co.kr
+---------------
+   Litte OnAir TV
+
+hama 
+----
+   TV/Radio-Tuner Card, PCI (Model 44677) = CPH051
+
+Sigma Designs
+-------------
+   Hollywood plus (em8300, em9010, adv7175), (PCB "M340-10") MPEG DVD decoder
+
+Formac
+------
+   iProTV (Card for iMac Mezzanine slot, Bt848+SCSI)
+   ProTV (Bt848)
+   ProTV II = ProTV Stereo (Bt878)
+
+ATI
+---
+   TV-Wonder
+   TV-Wonder VE
+
+Diamond Multimedia
+------------------
+   DTV2000 (Bt848, tda9875)
+
+Aopen
+-----
+   VA1000 Plus (w/ Stereo)
+   VA1000 Lite
+   VA1000 (=LR90)
+
+Intel
+-----
+   Smart Video Recorder (ISA full-length)
+   Smart Video Recorder pro (ISA half-length)
+   Smart Video Recorder III (Bt848)
+
+STB
+---
+   TV PCI (Temic4032FY5, tda9850??)
+   other variants?
+
+Videologic
+----------
+   Captivator Pro/TV (ISA?)
+   Captivator PCI/VC (Bt848 bundled with camera) (capture only)
+
+Technotrend
+------------
+   TT-SAT PCI (PCB "Sat-PCI Rev.:1.3.1"; zr36125, vpx3225d, stc0056a, Tuner:BSKE6-155A
+   TT-DVB-Sat
+   TT-DVB-C PCI
+
+Teles
+-----
+   DVB-s (Rev. 2.2, BSRV2-301A, data only?)
+
+Remote Vision
+-------------
+   MX RV605 (Bt848 capture only)
+
+Boeder
+------
+   PC ChatCam (Model 68252) (Bt848 capture only)
+   Tv/Fm Capture Card  (Model 68404) = PV951
+
+Media-Surfer  (esc-kathrein.de)
+-------------------------------
+   Sat-Surfer (ISA)
+   Sat-Surfer PCI = Techni-PC-Sat
+   Cable-Surfer 1
+   Cable-Surfer 2
+   Cable-Surfer PCI (zr36120)
+   Audio-Surfer (ISA Radio card)
+
+Jetway (www.jetway.com.tw)
+--------------------------
+   JW-TV 878M 
+   JW-TV 878  = KWorld KW-TV878RF
+
+Galaxis
+-------
+   Galaxis DVB Card S CI
+   Galaxis DVB Card C CI
+   Galaxis DVB Card S
+   Galaxis DVB Card C
+
+Hauppauge
+---------
+   many many WinTV models ...
+   WinTV DVBs
+   WinTV NOVA
+   WinTV NOVA-CI
+   WinTV-Nexus-s
+
+Matrix-Vision
+-------------
+   MATRIX-Vision MV-Delta
+   MATRIX-Vision MV-Delta 2
+   MVsigma-SLC (Bt848)
+
+Conceptronic (.net)
+------------
+   TVCON FM,  TV card w/ FM = CPH05x
+
+BestData
+--------
+   HCC100 = VCC100rev1 + camera
+   VCC100 rev1 (bt848)
+   VCC100 rev2 (bt878)
+
+Gallant  (www.gallantcom.com) www.minton.com.tw
+-----------------------------------------------
+   Intervision IV-510 (capture only bt8x8)
+   Intervision IV-550 (bt8x8)
+   Intervision IV-100 (zoran)
+   Intervision IV-1000 (bt8x8)
+   
+Asonic (www.asonic.com.cn) (website down)
+-----------------------------------------
+   SkyEye tv 878
+
+Hoontech
+--------
+   878TV/FM
+
+Teppro (www.itcteppro.com.tw)
+-----------------------------
+   ITC PCITV (Card Ver 1.0) "Teppro TV1/TVFM1 Card"
+   ITC PCITV (Card Ver 2.0)
+   ITC PCITV (Card Ver 3.0) = "PV-BT878P+ (REV.9D)"
+   ITC PCITV (Card Ver 4.0)
+   TEPPRO IV-550 (For BT848 Main Chip)
+   ITC DSTTV (bt878, satellite)
+   ITC VideoMaker (saa7146, StreamMachine sm2110, tvtuner) "PV-SM2210P+ (REV:1C)"
+
+Kworld (www.kworld.com.tw)
+--------------------------
+   KWORLD KW-TV878RF-Pro TV Capture with FM Radio
+   KWORLD KW-TV878R-Pro TV
+   KWORLD KW-TVL878RF  (low profile)
+   KWORLD KW-TV878R TV Capture (No FM Radio)
+   KWORLD KW-TV878RF TV
+
+JTT/ Justy Corp.http://www.justy.co.jp/ (www.jtt.com.jp website down)
+---------------------------------------------------------------------
+   JTT-02 (JTT TV) "TV watchmate pro" (bt848) 
+
+ADS www.adstech.com
+-------------------
+   Channel Surfer TV ( CHX-950 ) 
+   Channel Surfer TV+FM ( CHX-960FM )
+
+AVEC www.prochips.com
+---------------------
+   AVEC Intercapture (bt848, tea6320)
+
+NoBrand
+-------
+   TV Excel = Australian Name for "PV-BT878P+ 8E" or so
+
+Mach www.machspeed.com
+----
+   Mach TV 878
+
+Eline www.eline-net.com/
+-----
+   Eline Vision TVMaster / TVMaster FM (ELV-TVM/ ELV-TVM-FM) = LR26  (bt878)
+   Eline Vision TVMaster-2000 (ELV-TVM-2000, ELV-TVM-2000-FM)= LR138 (saa713x)
+
+Spirit http://www.spiritmodems.com.au/
+------
+   Spirit TV Tuner/Video Capture Card (bt848)
+
+Boser www.boser.com.tw
+-----
+   HS-878 Mini PCI Capture Add-on Card
+   HS-879 Mini PCI 3D Audio and Capture Add-on Card (w/ ES1938 Solo-1)
+
+Satelco
+-------
+   TV-FM =KNC1 saa7134
+
+Sensoray www.sensoray.com
+--------
+   Sensoray 311 (PC/104 bus)
+   Sensoray 611 (PCI)
+

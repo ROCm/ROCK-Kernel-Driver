@@ -103,15 +103,14 @@ int videobuf_dma_free(struct videobuf_dmabuf *dma);
  */
 
 struct videobuf_buffer;
-typedef void (*videobuf_buffer_free)(struct file *file,
-				     struct videobuf_buffer *vb);
+struct videobuf_queue;
 
 struct videobuf_mapping {
 	int count;
 	int highmem_ok;
 	unsigned long start;
 	unsigned long end;
-	struct videobuf_buffer **buflist;
+	struct videobuf_queue *q;
 };
 
 #define VBUF_FIELD_EVEN  1
@@ -132,7 +131,6 @@ struct videobuf_buffer {
 	int                     i;
 
 	/* info about the buffer */
-	int                     type;
 	int                     width;
 	int                     height;
 	long                    size;
@@ -146,7 +144,6 @@ struct videobuf_buffer {
 	unsigned long  bsize;            /* buffer size */
 	unsigned long  baddr;            /* buffer addr (userland ptr!) */
 	struct videobuf_mapping *map;
-	videobuf_buffer_free    free;
 
 	/* touched by irq handler */
 	struct list_head        queue;
@@ -157,19 +154,76 @@ struct videobuf_buffer {
 #endif
 };
 
-void* videobuf_alloc(int size, int type);
+struct videobuf_queue_ops {
+	int (*buf_setup)(struct file *file, int *count, int *size);
+	int (*buf_prepare)(struct file *file,struct videobuf_buffer *vb,
+			   int field);
+	void (*buf_queue)(struct file *file,struct videobuf_buffer *vb);
+	void (*buf_release)(struct file *file,struct videobuf_buffer *vb);
+};
+
+struct videobuf_queue {
+        struct semaphore           lock;
+	spinlock_t                 *irqlock;
+	struct pci_dev             *pci;
+
+	int                        type;
+	int                        msize;
+	struct videobuf_buffer     *bufs[VIDEO_MAX_FRAME];
+	struct videobuf_queue_ops  *ops;
+
+	/* capture via mmap() + ioctl(QBUF/DQBUF) */
+	int                        streaming;
+	struct list_head           stream;
+
+	/* capture via read() */
+	int                        reading;
+	int                        read_off;
+	struct videobuf_buffer     *read_buf;
+};
+
+void* videobuf_alloc(int size);
 int videobuf_waiton(struct videobuf_buffer *vb, int non_blocking, int intr);
 int videobuf_iolock(struct pci_dev *pci, struct videobuf_buffer *vb);
-#ifdef HAVE_V4L2
-void videobuf_status(struct v4l2_buffer *b, struct videobuf_buffer *vb);
-#endif
 
-int videobuf_mmap_setup(struct file *file, struct videobuf_buffer **buflist,
-			int msize, int bcount, int bsize, int type,
-			videobuf_buffer_free free);
-int videobuf_mmap_free(struct file *file, struct videobuf_buffer **buflist);
+void videobuf_queue_init(struct videobuf_queue *q,
+			 struct videobuf_queue_ops *ops,
+			 struct pci_dev *pci, spinlock_t *irqlock,
+			 int type, int msize);
+void videobuf_queue_cancel(struct file *file, struct videobuf_queue *q);
+
+#ifdef HAVE_V4L2
+void videobuf_status(struct v4l2_buffer *b, struct videobuf_buffer *vb,
+		     int type);
+int videobuf_reqbufs(struct file *file, struct videobuf_queue *q,
+		     struct v4l2_requestbuffers *req);
+int videobuf_querybuf(struct videobuf_queue *q, struct v4l2_buffer *b);
+int videobuf_qbuf(struct file *file, struct videobuf_queue *q,
+		  struct v4l2_buffer *b);
+int videobuf_dqbuf(struct file *file, struct videobuf_queue *q,
+		   struct v4l2_buffer *b);
+#endif
+int videobuf_streamon(struct file *file, struct videobuf_queue *q);
+int videobuf_streamoff(struct file *file, struct videobuf_queue *q);
+
+int videobuf_read_start(struct file *file, struct videobuf_queue *q);
+void videobuf_read_stop(struct file *file, struct videobuf_queue *q);
+ssize_t videobuf_read_stream(struct file *file, struct videobuf_queue *q,
+			     char *data, size_t count, loff_t *ppos,
+			     int vbihack);
+ssize_t videobuf_read_one(struct file *file, struct videobuf_queue *q,
+			  char *data, size_t count, loff_t *ppos);
+unsigned int videobuf_poll_stream(struct file *file,
+				  struct videobuf_queue *q,
+				  poll_table *wait);
+
+int videobuf_mmap_setup(struct file *file, struct videobuf_queue *q,
+			int bcount, int bsize);
+int videobuf_mmap_free(struct file *file, struct videobuf_queue *q);
 int videobuf_mmap_mapper(struct vm_area_struct *vma,
-			 struct videobuf_buffer **buflist);
+			 struct videobuf_queue *q);
+
+/* --------------------------------------------------------------------- */
 
 /*
  * Local variables:

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: nsnames - Name manipulation and search
- *              $Revision: 77 $
+ *              $Revision: 78 $
  *
  ******************************************************************************/
 
@@ -179,7 +179,7 @@ acpi_ns_get_pathname_length (
 	size = 0;
 	next_node = node;
 
-	while (next_node != acpi_gbl_root_node) {
+	while (next_node && (next_node != acpi_gbl_root_node)) {
 		size += PATH_SEGMENT_LENGTH;
 		next_node = acpi_ns_get_parent_node (next_node);
 	}

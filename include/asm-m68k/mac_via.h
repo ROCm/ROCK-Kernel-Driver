@@ -3,7 +3,7 @@
  *
  *	There are two of these on the Mac II. Some IRQ's are vectored
  *	via them as are assorted bits and bobs - eg rtc, adb. The picture
- *	is a bit incomplete as the Mac documentation doesnt cover this well
+ *	is a bit incomplete as the Mac documentation doesn't cover this well
  */
  
 #ifndef _ASM_MAC_VIA_H_

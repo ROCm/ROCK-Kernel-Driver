@@ -6,7 +6,7 @@ comment 'File systems'
 
 bool 'Quota support' CONFIG_QUOTA
 dep_tristate '  Old quota format support' CONFIG_QFMT_V1 $CONFIG_QUOTA
-dep_tristate '  VFS v0 quota format support' CONFIG_QFMT_V2 $CONFIG_QUOTA
+dep_tristate '  Quota format v2 support' CONFIG_QFMT_V2 $CONFIG_QUOTA
 if [ "$CONFIG_QUOTA" = "y" ]; then
    define_bool CONFIG_QUOTACTL y
 fi

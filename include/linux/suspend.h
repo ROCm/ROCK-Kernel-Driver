@@ -56,9 +56,22 @@ extern int register_suspend_notifier(struct notifier_block *);
 extern int unregister_suspend_notifier(struct notifier_block *);
 extern void refrigerator(unsigned long);
 
+extern int freeze_processes(void);
+extern void thaw_processes(void);
+
 extern unsigned int nr_copy_pages __nosavedata;
 extern suspend_pagedir_t *pagedir_nosave __nosavedata;
 
+/* Communication between kernel/suspend.c and arch/i386/suspend.c */
+
+extern void do_magic_resume_1(void);
+extern void do_magic_resume_2(void);
+extern void do_magic_suspend_1(void);
+extern void do_magic_suspend_2(void);
+
+/* Communication between acpi and arch/i386/suspend.c */
+
+extern void do_suspend_lowlevel(int resume);
 
 #else
 #define software_suspend()		do { } while(0)

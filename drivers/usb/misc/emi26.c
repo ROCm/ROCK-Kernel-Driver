@@ -54,7 +54,7 @@ static int emi26_writememory (struct usb_device *dev, int address, unsigned char
 	unsigned char *buffer =  kmalloc (length, GFP_KERNEL);
 
 	if (!buffer) {
-		printk(KERN_ERR "emi26: kmalloc(%d) failed.", length);
+		err("emi26: kmalloc(%d) failed.", length);
 		return -ENOMEM;
 	}
 	memcpy (buffer, data, length);
@@ -69,11 +69,11 @@ static int emi26_writememory (struct usb_device *dev, int address, unsigned char
 static int emi26_set_reset (struct usb_device *dev, unsigned char reset_bit)
 {
 	int response;
-	printk(KERN_INFO "%s - %d", __FUNCTION__, reset_bit);
+	info("%s - %d", __FUNCTION__, reset_bit);
 	/* printk(KERN_DEBUG "%s - %d", __FUNCTION__, reset_bit); */
 	response = emi26_writememory (dev, CPUCS_REG, &reset_bit, 1, 0xa0);
 	if (response < 0) {
-		printk(KERN_ERR "emi26: set_reset (%d) failed", reset_bit);
+		err("emi26: set_reset (%d) failed", reset_bit);
 	}
 	return response;
 }
@@ -89,7 +89,7 @@ static int emi26_load_firmware (struct usb_device *dev)
 	/* Assert reset (stop the CPU in the EMI) */
 	err = emi26_set_reset(dev,1);
 	if (err < 0) {
-		printk(KERN_ERR "%s - error loading firmware: error = %d", __FUNCTION__, err);
+		err( "%s - error loading firmware: error = %d", __FUNCTION__, err);
 		return err;
 	}
 
@@ -97,7 +97,7 @@ static int emi26_load_firmware (struct usb_device *dev)
 	for (i=0; g_Loader[i].type == 0; i++) {
 		err = emi26_writememory(dev, g_Loader[i].address, g_Loader[i].data, g_Loader[i].length, ANCHOR_LOAD_INTERNAL);
 		if (err < 0) {
-			printk(KERN_ERR "%s - error loading firmware: error = %d", __FUNCTION__, err);
+			err("%s - error loading firmware: error = %d", __FUNCTION__, err);
 			return err;
 		}
 	}
@@ -120,7 +120,7 @@ static int emi26_load_firmware (struct usb_device *dev)
 		}
 		err = emi26_writememory(dev, addr, buf, i, ANCHOR_LOAD_FPGA);
 		if (err < 0) {
-			printk(KERN_ERR "%s - error loading firmware: error = %d", __FUNCTION__, err);
+			err("%s - error loading firmware: error = %d", __FUNCTION__, err);
 			return err;
 		}
 	} while (i > 0);
@@ -128,7 +128,7 @@ static int emi26_load_firmware (struct usb_device *dev)
 	/* Assert reset (stop the CPU in the EMI) */
 	err = emi26_set_reset(dev,1);
 	if (err < 0) {
-		printk(KERN_ERR "%s - error loading firmware: error = %d", __FUNCTION__, err);
+		err("%s - error loading firmware: error = %d", __FUNCTION__, err);
 		return err;
 	}
 
@@ -136,7 +136,7 @@ static int emi26_load_firmware (struct usb_device *dev)
 	for (i=0; g_Loader[i].type == 0; i++) {
 		err = emi26_writememory(dev, g_Loader[i].address, g_Loader[i].data, g_Loader[i].length, ANCHOR_LOAD_INTERNAL);
 		if (err < 0) {
-			printk(KERN_ERR "%s - error loading firmware: error = %d", __FUNCTION__, err);
+			err("%s - error loading firmware: error = %d", __FUNCTION__, err);
 			return err;
 		}
 	}
@@ -144,7 +144,7 @@ static int emi26_load_firmware (struct usb_device *dev)
 	/* De-assert reset (let the CPU run) */
 	err = emi26_set_reset(dev,0);
 	if (err < 0) {
-		printk(KERN_ERR "%s - error loading firmware: error = %d", __FUNCTION__, err);
+		err("%s - error loading firmware: error = %d", __FUNCTION__, err);
 		return err;
 	}
 
@@ -153,7 +153,7 @@ static int emi26_load_firmware (struct usb_device *dev)
 		if (!INTERNAL_RAM(g_Firmware[i].address)) {
 			err = emi26_writememory(dev, g_Firmware[i].address, g_Firmware[i].data, g_Firmware[i].length, ANCHOR_LOAD_EXTERNAL);
 			if (err < 0) {
-				printk(KERN_ERR "%s - error loading firmware: error = %d", __FUNCTION__, err);
+				err("%s - error loading firmware: error = %d", __FUNCTION__, err);
 				return err;
 			}
 		}
@@ -162,7 +162,7 @@ static int emi26_load_firmware (struct usb_device *dev)
 	/* Assert reset (stop the CPU in the EMI) */
 	err = emi26_set_reset(dev,1);
 	if (err < 0) {
-		printk(KERN_ERR "%s - error loading firmware: error = %d", __FUNCTION__, err);
+		err("%s - error loading firmware: error = %d", __FUNCTION__, err);
 		return err;
 	}
 
@@ -170,7 +170,7 @@ static int emi26_load_firmware (struct usb_device *dev)
 		if (INTERNAL_RAM(g_Firmware[i].address)) {
 			err = emi26_writememory(dev, g_Firmware[i].address, g_Firmware[i].data, g_Firmware[i].length, ANCHOR_LOAD_INTERNAL);
 			if (err < 0) {
-				printk(KERN_ERR "%s - error loading firmware: error = %d", __FUNCTION__, err);
+				err("%s - error loading firmware: error = %d", __FUNCTION__, err);
 				return err;
 			}
 		}
@@ -179,7 +179,7 @@ static int emi26_load_firmware (struct usb_device *dev)
 	/* De-assert reset (let the CPU run) */
 	err = emi26_set_reset(dev,0);
 	if (err < 0) {
-		printk(KERN_ERR "%s - error loading firmware: error = %d", __FUNCTION__, err);
+		err("%s - error loading firmware: error = %d", __FUNCTION__, err);
 		return err;
 	}
 
@@ -197,7 +197,7 @@ MODULE_DEVICE_TABLE (usb, id_table);
 
 static void * emi26_probe(struct usb_device *dev, unsigned int if_num, const struct usb_device_id *id)
 {
-	printk(KERN_INFO "%s start", __FUNCTION__); 
+	info("%s start", __FUNCTION__); 
 	
 	if((dev->descriptor.idVendor == EMI26_VENDOR_ID) && (dev->descriptor.idProduct == EMI26_PRODUCT_ID)) {
 		emi26_load_firmware(dev);

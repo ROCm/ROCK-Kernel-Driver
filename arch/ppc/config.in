@@ -475,7 +475,7 @@ endmenu
 mainmenu_option next_comment
 comment 'Console drivers'
 if [ "$CONFIG_4xx" != "y" -a "$CONFIG_8xx" != "y" ]; then
-   bool 'Support for VGA Console' CONFIG_VGA_CONSOLE
+   bool 'VGA text console' CONFIG_VGA_CONSOLE
 fi
 source drivers/video/Config.in
 if [ "$CONFIG_FB" = "y" -a "$CONFIG_ALL_PPC" = "y" ]; then
@@ -536,12 +536,9 @@ if [ "$CONFIG_ALL_PPC" = "y" ]; then
    bool 'Apple Desktop Bus (ADB) support' CONFIG_ADB
    if [ "$CONFIG_ADB" = "y" ]; then
       bool '   Include MacIO (CHRP) ADB driver' CONFIG_ADB_MACIO
-      dep_bool '   Use input layer for ADB devices' CONFIG_INPUT_ADBHID $CONFIG_INPUT
+      dep_bool '   Support for ADB input devices (keyboard, mice, ...)' CONFIG_INPUT_ADBHID $CONFIG_INPUT
       if [ "$CONFIG_INPUT_ADBHID" = "y" ]; then
-         bool '     Support for ADB raw keycodes' CONFIG_MAC_ADBKEYCODES
          bool '     Support for mouse button 2+3 emulation' CONFIG_MAC_EMUMOUSEBTN
-      else
-         bool '   Support for ADB keyboard (old driver)' CONFIG_ADB_KEYBOARD
       fi
    fi
    # This is for drivers/macintosh/mac_hid.o, which is needed if the input

@@ -75,9 +75,7 @@ struct rpc_task {
 	wait_queue_head_t	tk_wait;	/* sync: sleep on this q */
 	unsigned long		tk_timeout;	/* timeout for rpc_sleep() */
 	unsigned short		tk_flags;	/* misc flags */
-	unsigned short		tk_lock;	/* Task lock counter */
-	unsigned char		tk_active   : 1,/* Task has been activated */
-				tk_wakeup   : 1;/* Task waiting to wake up */
+	unsigned char		tk_active   : 1;/* Task has been activated */
 	unsigned long		tk_runstate;	/* Task run status */
 #ifdef RPC_DEBUG
 	unsigned short		tk_pid;		/* debugging aid */
@@ -181,15 +179,11 @@ int		rpc_add_wait_queue(struct rpc_wait_queue *, struct rpc_task *);
 void		rpc_remove_wait_queue(struct rpc_task *);
 void		rpc_sleep_on(struct rpc_wait_queue *, struct rpc_task *,
 					rpc_action action, rpc_action timer);
-void		rpc_sleep_locked(struct rpc_wait_queue *, struct rpc_task *,
-				 rpc_action action, rpc_action timer);
 void		rpc_add_timer(struct rpc_task *, rpc_action);
 void		rpc_wake_up_task(struct rpc_task *);
 void		rpc_wake_up(struct rpc_wait_queue *);
 struct rpc_task *rpc_wake_up_next(struct rpc_wait_queue *);
 void		rpc_wake_up_status(struct rpc_wait_queue *, int);
-int		__rpc_lock_task(struct rpc_task *);
-void		rpc_unlock_task(struct rpc_task *);
 void		rpc_delay(struct rpc_task *, unsigned long);
 void *		rpc_allocate(unsigned int flags, unsigned int);
 void		rpc_free(void *);

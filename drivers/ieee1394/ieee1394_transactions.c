@@ -169,8 +169,9 @@ void fill_phy_packet(struct hpsb_packet *packet, quadlet_t data)
  */
 int get_tlabel(struct hpsb_host *host, nodeid_t nodeid, int wait)
 {
-	int tlabel;
+	int tlabel = 0;
 	unsigned long flags;
+	int found_tlabel = 0;
 
 	if (wait) {
 		down(&host->tlabel_count);
@@ -180,15 +181,18 @@ int get_tlabel(struct hpsb_host *host, nodeid_t nodeid, int wait)
 
 	spin_lock_irqsave(&host->tlabel_lock, flags);
 
-	if (host->tlabel_pool[0] != ~0) {
-		tlabel = ffz(host->tlabel_pool[0]);
-		host->tlabel_pool[0] |= 1 << tlabel;
-	} else {
-		tlabel = ffz(host->tlabel_pool[1]);
-		host->tlabel_pool[1] |= 1 << tlabel;
-		tlabel += 32;
+	while (!found_tlabel) {
+		tlabel = host->tlabel_current;
+		if (tlabel < 32 && !(host->tlabel_pool[0] & 1 << tlabel)) {
+			host->tlabel_pool[0] |= 1 << tlabel;
+			found_tlabel = 1;
+		} else if (!(host->tlabel_pool[1] & 1 << (tlabel - 32))) {
+			host->tlabel_pool[1] |= 1 << (tlabel - 32);
+			found_tlabel = 1;
+		}
+		host->tlabel_current = (host->tlabel_current + 1) % 64;
 	}
-
+	
 	spin_unlock_irqrestore(&host->tlabel_lock, flags);
 
 	return tlabel;

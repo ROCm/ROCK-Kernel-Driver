@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbinstal - ACPI table installation and removal
- *              $Revision: 61 $
+ *              $Revision: 62 $
  *
  *****************************************************************************/
 
@@ -49,7 +49,8 @@
 acpi_status
 acpi_tb_match_signature (
 	NATIVE_CHAR             *signature,
-	acpi_table_desc         *table_info)
+	acpi_table_desc         *table_info,
+	u8                      search_type)
 {
 	NATIVE_UINT             i;
 
@@ -61,6 +62,10 @@ acpi_tb_match_signature (
 	 * Search for a signature match among the known table types
 	 */
 	for (i = 0; i < NUM_ACPI_TABLES; i++) {
+		if ((acpi_gbl_acpi_table_data[i].flags & ACPI_TABLE_TYPE_MASK) != search_type) {
+			continue;
+		}
+
 		if (!ACPI_STRNCMP (signature, acpi_gbl_acpi_table_data[i].signature,
 				   acpi_gbl_acpi_table_data[i].sig_length)) {
 			/* Found a signature match, return index if requested */
@@ -69,12 +74,17 @@ acpi_tb_match_signature (
 				table_info->type = (u8) i;
 			}
 
-			ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "ACPI Signature match %4.4s\n",
+			ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+				"Table [%4.4s] matched and is a required ACPI table\n",
 				(char *) acpi_gbl_acpi_table_data[i].signature));
 
 			return_ACPI_STATUS (AE_OK);
 		}
 	}
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+		"Table [%4.4s] is not a required ACPI table - ignored\n",
+		(char *) signature));
 
 	return_ACPI_STATUS (AE_TABLE_NOT_SUPPORTED);
 }
@@ -84,7 +94,7 @@ acpi_tb_match_signature (
  *
  * FUNCTION:    Acpi_tb_install_table
  *
- * PARAMETERS:  Table_info          - Return value from Acpi_tb_get_table
+ * PARAMETERS:  Table_info          - Return value from Acpi_tb_get_table_body
  *
  * RETURN:      Status
  *
@@ -103,25 +113,22 @@ acpi_tb_install_table (
 	ACPI_FUNCTION_TRACE ("Tb_install_table");
 
 
-	/*
-	 * Check the table signature and make sure it is recognized
-	 * Also checks the header checksum
-	 */
-	status = acpi_tb_recognize_table (table_info);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
-	}
-
 	/* Lock tables while installing */
 
 	status = acpi_ut_acquire_mutex (ACPI_MTX_TABLES);
 	if (ACPI_FAILURE (status)) {
+		ACPI_REPORT_ERROR (("Could not acquire table mutex for [%4.4s], %s\n",
+			table_info->pointer->signature, acpi_format_exception (status)));
 		return_ACPI_STATUS (status);
 	}
 
 	/* Install the table into the global data structure */
 
 	status = acpi_tb_init_table_descriptor (table_info->type, table_info);
+	if (ACPI_FAILURE (status)) {
+		ACPI_REPORT_ERROR (("Could not install ACPI table [%s], %s\n",
+			table_info->pointer->signature, acpi_format_exception (status)));
+	}
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "%s located at %p\n",
 		acpi_gbl_acpi_table_data[table_info->type].name, table_info->pointer));
@@ -135,7 +142,7 @@ acpi_tb_install_table (
  *
  * FUNCTION:    Acpi_tb_recognize_table
  *
- * PARAMETERS:  Table_info          - Return value from Acpi_tb_get_table
+ * PARAMETERS:  Table_info          - Return value from Acpi_tb_get_table_body
  *
  * RETURN:      Status
  *
@@ -153,7 +160,8 @@ acpi_tb_install_table (
 
 acpi_status
 acpi_tb_recognize_table (
-	acpi_table_desc         *table_info)
+	acpi_table_desc         *table_info,
+	u8                      search_type)
 {
 	acpi_table_header       *table_header;
 	acpi_status             status;
@@ -177,7 +185,7 @@ acpi_tb_recognize_table (
 	 * This can be any one of many valid ACPI tables, it just isn't one of
 	 * the tables that is consumed by the core subsystem
 	 */
-	status = acpi_tb_match_signature (table_header->signature, table_info);
+	status = acpi_tb_match_signature (table_header->signature, table_info, search_type);
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
@@ -190,22 +198,6 @@ acpi_tb_recognize_table (
 	/* Return the table type and length via the info struct */
 
 	table_info->length = (ACPI_SIZE) table_header->length;
-
-	/*
-	 * Validate checksum for _most_ tables,
-	 * even the ones whose signature we don't recognize
-	 */
-	if (table_info->type != ACPI_TABLE_FACS) {
-		status = acpi_tb_verify_table_checksum (table_header);
-
-#if (!ACPI_CHECKSUM_ABORT)
-		if (ACPI_FAILURE (status)) {
-			/* Ignore the error if configuration says so */
-
-			status = AE_OK;
-		}
-#endif
-	}
 
 	return_ACPI_STATUS (status);
 }

@@ -79,6 +79,8 @@
 
 /* operational registers common to DX, NX, 7018 */
 enum trident_op_registers {
+	T4D_GAME_CR	= 0x30, T4D_GAME_LEG	= 0x31,
+	T4D_GAME_AXD	= 0x34,
 	T4D_REC_CH	= 0x70,
 	T4D_START_A     = 0x80, T4D_STOP_A      = 0x84,
 	T4D_DLY_A       = 0x88, T4D_SIGN_CSO_A  = 0x8c,
@@ -333,7 +335,7 @@ enum miscint_bits {
 #define VALIDATE_STATE(a) VALIDATE_MAGIC(a,TRIDENT_STATE_MAGIC)
 #define VALIDATE_CARD(a) VALIDATE_MAGIC(a,TRIDENT_CARD_MAGIC)
 
-extern __inline__ unsigned ld2(unsigned int x)
+static inline unsigned ld2(unsigned int x)
 {
 	unsigned r = 0;
 	

@@ -59,15 +59,22 @@ extern struct ata_timing ata_timing[];
 #define ENOUGH(v,unit)	(((v)-1)/(unit)+1)
 #define EZ(v,unit)	((v)?ENOUGH(v,unit):0)
 
-#define XFER_MODE	0xf0
-#define XFER_UDMA_133	0x48
-#define XFER_UDMA_100	0x44
-#define XFER_UDMA_66	0x42
-#define XFER_UDMA	0x40
-#define XFER_MWDMA	0x20
-#define XFER_SWDMA	0x10
-#define XFER_EPIO	0x01
-#define XFER_PIO	0x00
+/* see hpt366.c for details */
+#define XFER_UDMA_66_3	0x100
+#define XFER_UDMA_66_4	0x200
+
+#define XFER_MODE	0xff0
+#define XFER_UDMA_133	0x800
+#define XFER_UDMA_100	0x400
+#define XFER_UDMA_66	0x300
+#define XFER_UDMA	0x040
+#define XFER_MWDMA	0x020
+#define XFER_SWDMA	0x010
+#define XFER_EPIO	0x001
+#define XFER_PIO	0x000
+
+#define XFER_UDMA_ALL	0xf40
+#define XFER_UDMA_80W	0xf00
 
 /* External interface to host chips channel timing setup.
  *

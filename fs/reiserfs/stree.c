@@ -700,7 +700,7 @@ int search_by_key (struct super_block * p_s_sb,
 	/* Read the next tree node, and set the last element in the path to
            have a pointer to it. */
 	if ( ! (p_s_bh = p_s_last_element->pe_buffer =
-		reiserfs_bread(p_s_sb, n_block_number)) ) {
+		sb_bread(p_s_sb, n_block_number)) ) {
 	    p_s_search_path->path_length --;
 	    pathrelse(p_s_search_path);
 	    return IO_ERROR;

@@ -1070,10 +1070,46 @@ static int tea6300_shift12(int val) { return val >> 12; }
 #define TDA8425_S1         0x08  /* switch functions */
                                  /* values for those registers: */
 #define TDA8425_S1_OFF     0xEE  /* audio off (mute on) */
-#define TDA8425_S1_ON      0xCE  /* audio on (mute off) - "linear stereo" mode */
+#define TDA8425_S1_CH1     0xCE  /* audio channel 1 (mute off) - "linear stereo" mode */
+#define TDA8425_S1_CH2     0xCF  /* audio channel 2 (mute off) - "linear stereo" mode */
+#define TDA8425_S1_MU      0x20  /* mute bit */
+#define TDA8425_S1_STEREO  0x18  /* stereo bits */
+#define TDA8425_S1_STEREO_SPATIAL 0x18 /* spatial stereo */
+#define TDA8425_S1_STEREO_LINEAR  0x08 /* linear stereo */
+#define TDA8425_S1_STEREO_PSEUDO  0x10 /* pseudo stereo */
+#define TDA8425_S1_STEREO_MONO    0x00 /* forced mono */
+#define TDA8425_S1_ML      0x06        /* language selector */
+#define TDA8425_S1_ML_SOUND_A 0x02     /* sound a */
+#define TDA8425_S1_ML_SOUND_B 0x04     /* sound b */
+#define TDA8425_S1_ML_STEREO  0x06     /* stereo */
+#define TDA8425_S1_IS      0x01        /* channel selector */
 
-static int tda8425_shift10(int val) { return val >> 10 | 0xc0; }
-static int tda8425_shift12(int val) { return val >> 12 | 0xf0; }
+
+static int tda8425_shift10(int val) { return (val >> 10) | 0xc0; }
+static int tda8425_shift12(int val) { return (val >> 12) | 0xf0; }
+
+static void tda8425_setmode(struct CHIPSTATE *chip, int mode)
+{
+	int s1 = chip->shadow.bytes[TDA8425_S1+1] & 0xe1;
+	
+	if (mode & VIDEO_SOUND_LANG1) {
+		s1 |= TDA8425_S1_ML_SOUND_A;
+		s1 |= TDA8425_S1_STEREO_PSEUDO;
+
+	} else if (mode & VIDEO_SOUND_LANG2) {
+		s1 |= TDA8425_S1_ML_SOUND_B;
+		s1 |= TDA8425_S1_STEREO_PSEUDO;
+		
+	} else {
+		s1 |= TDA8425_S1_ML_STEREO;
+		
+		if (mode & VIDEO_SOUND_MONO)
+			s1 |= TDA8425_S1_STEREO_MONO;
+		if (mode & VIDEO_SOUND_STEREO)
+			s1 |= TDA8425_S1_STEREO_SPATIAL;
+	}
+	chip_write(chip,TDA8425_S1,s1);
+}
 
 
 /* ---------------------------------------------------------------------- */
@@ -1190,8 +1226,8 @@ static struct CHIPDESC chiplist[] = {
 		registers:  11,
 		flags:      CHIP_HAS_VOLUME | CHIP_HAS_BASSTREBLE,
 
-		leftreg:    TDA9855_VR,
-		rightreg:   TDA9855_VL,
+		leftreg:    TDA9855_VL,
+		rightreg:   TDA9855_VR,
 		bassreg:    TDA9855_BA,
 		treblereg:  TDA9855_TR,
 		volfunc:    tda9855_volume,
@@ -1258,8 +1294,10 @@ static struct CHIPDESC chiplist[] = {
 		treblefunc: tda8425_shift12,
 
 		inputreg:   TDA8425_S1,
-		inputmap:   { TDA8425_S1_ON, TDA8425_S1_ON, TDA8425_S1_ON },
+		inputmap:   { TDA8425_S1_CH1, TDA8425_S1_CH1, TDA8425_S1_CH1 },
 		inputmute:  TDA8425_S1_OFF,
+
+		setmode:    tda8425_setmode,
 	},
 	{
 		name:       "pic16c54 (PV951)",
@@ -1338,8 +1376,8 @@ static int chip_attach(struct i2c_adapter *adap, int addr,
 		chip_cmd(chip,"init",&desc->init);
 
 	if (desc->flags & CHIP_HAS_VOLUME) {
-		chip->left   = desc->leftinit   ? desc->leftinit   : 65536;
-		chip->right  = desc->rightinit  ? desc->rightinit  : 65536;
+		chip->left   = desc->leftinit   ? desc->leftinit   : 65535;
+		chip->right  = desc->rightinit  ? desc->rightinit  : 65535;
 		chip_write(chip,desc->leftreg,desc->volfunc(chip->left));
 		chip_write(chip,desc->rightreg,desc->volfunc(chip->right));
 	}
@@ -1367,9 +1405,14 @@ static int chip_attach(struct i2c_adapter *adap, int addr,
 
 static int chip_probe(struct i2c_adapter *adap)
 {
-	if (adap->id == (I2C_ALGO_BIT | I2C_HW_B_BT848))
+	switch (adap->id) {
+	case I2C_ALGO_BIT | I2C_HW_B_BT848:
+	case I2C_ALGO_BIT | I2C_HW_B_RIVA:
 		return i2c_probe(adap, &addr_data, chip_attach);
-	return 0;
+	default:
+		/* ignore this i2c bus */
+		return 0;
+	}
 }
 
 static int chip_detach(struct i2c_client *client)

@@ -283,11 +283,7 @@ void redwood_irkb_init(void)
 {
 	extern struct machdep_calls ppc_md;
 
-	ppc_md.kbd_setkeycode           = rawirkbd_setkeycode;
-	ppc_md.kbd_getkeycode           = rawirkbd_getkeycode;
 	ppc_md.kbd_translate            = rawirkbd_translate;
 	ppc_md.kbd_unexpected_up        = rawirkbd_unexpected_up;
-	ppc_md.kbd_leds                 = NULL; /*rawirkbd_leds;*/
-	ppc_md.kbd_init_hw              = rawirkbd_init_hw;
 }
 

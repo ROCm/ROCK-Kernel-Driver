@@ -216,7 +216,7 @@ pipe_write(struct file *filp, const char *buf, size_t count, loff_t *ppos)
 		do {
 			/*
 			 * Synchronous wake-up: it knows that this process
-			 * is going to give up this CPU, so it doesnt have
+			 * is going to give up this CPU, so it doesn't have
 			 * to do idle reschedules.
 			 */
 			wake_up_interruptible_sync(PIPE_WAIT(*inode));

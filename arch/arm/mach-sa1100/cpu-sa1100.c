@@ -92,7 +92,7 @@
 
 extern unsigned int sa11x0_freq_to_ppcr(unsigned int khz);
 extern unsigned int sa11x0_validatespeed(unsigned int khz);
-
+extern unsigned int sa11x0_getspeed(void);
 
 typedef struct {
 	int speed;
@@ -187,7 +187,7 @@ static void sa1100_update_dram_timings(int current_speed, int new_speed)
 static int sa1100_dram_notifier(struct notifier_block *nb, 
 				unsigned long val, void *data)
 {
-	struct cpufreq_info *ci = data;
+	struct cpufreq_freqs *ci = data;
 	
 	switch(val) {
 	case CPUFREQ_MINMAX:
@@ -195,13 +195,13 @@ static int sa1100_dram_notifier(struct notifier_block *nb,
 		break;
 
 	case CPUFREQ_PRECHANGE:
-		if(ci->new_freq > ci->old_freq)
-			sa1100_update_dram_timings(ci->old_freq, ci->new_freq);
+		if(ci->new > ci->cur)
+			sa1100_update_dram_timings(ci->cur, ci->new);
 		break;
 
 	case CPUFREQ_POSTCHANGE:
-		if(ci->new_freq < ci->old_freq)
-			sa1100_update_dram_timings(ci->old_freq, ci->new_freq);
+		if(ci->new < ci->cur)
+			sa1100_update_dram_timings(ci->cur, ci->new);
 		break;
 		
 	default:
@@ -230,9 +230,19 @@ static int __init sa1100_dram_init(void)
 	int ret = -ENODEV;
 
 	if ((processor_id & CPU_SA1100_MASK) == CPU_SA1100_ID) {
-		ret = cpufreq_register_notifier(&sa1100_dram_block);
+		cpufreq_driver_t cpufreq_driver;
 
-		cpufreq_setfunctions(sa11x0_validatespeed, sa1100_setspeed);
+		ret = cpufreq_register_notifier(&sa1100_dram_block);
+		if (ret)
+			return ret;
+
+		cpufreq_driver.freq.min = 59000;
+		cpufreq_driver.freq.max = 287000;
+		cpufreq_driver.freq.cur = sa11x0_getspeed();
+		cpufreq_driver.validate = &sa11x0_validatespeed;
+		cpufreq_driver.setspeed = &sa1100_setspeed;
+
+		ret = cpufreq_register(cpufreq_driver);<
 	}
 
 	return ret;

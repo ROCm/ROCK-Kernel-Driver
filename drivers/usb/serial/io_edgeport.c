@@ -1460,9 +1460,6 @@ static void send_more_port_data(struct edgeport_serial *edge_serial, struct edge
 		       usb_sndbulkpipe(edge_serial->serial->dev, edge_serial->bulk_out_endpoint),
 		       buffer, count+2, edge_bulk_out_data_callback, edge_port);
 
-	/* set the USB_BULK_QUEUE flag so that we can shove a bunch of urbs at once down the pipe */
-	urb->transfer_flags |= USB_QUEUE_BULK;
-
 	urb->dev = edge_serial->serial->dev;
 	status = usb_submit_urb(urb, GFP_ATOMIC);
 	if (status) {
@@ -2487,9 +2484,6 @@ static int write_cmd_usb (struct edgeport_port *edge_port, unsigned char *buffer
 	FILL_BULK_URB (urb, edge_serial->serial->dev, 
 		       usb_sndbulkpipe(edge_serial->serial->dev, edge_serial->bulk_out_endpoint),
 		       buffer, length, edge_bulk_out_cmd_callback, edge_port);
-
-	/* set the USB_BULK_QUEUE flag so that we can shove a bunch of urbs at once down the pipe */
-	urb->transfer_flags |= USB_QUEUE_BULK;
 
 	edge_port->commandPending = TRUE;
 	status = usb_submit_urb(urb, GFP_ATOMIC);

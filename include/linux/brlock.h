@@ -19,7 +19,7 @@
  *
  *                 David S. Miller <davem@redhat.com>
  *
- * David has an implementation that doesnt use atomic operations in
+ * David has an implementation that doesn't use atomic operations in
  * the read branch via memory ordering tricks - i guess we need to
  * split this up into a per-arch thing? The atomicity issue is a
  * secondary item in profiles, at least on x86 platforms.

@@ -64,13 +64,6 @@ extern void spruce_init_IRQ(void);
 extern int spruce_get_irq(struct pt_regs *);
 extern void spruce_setup_hose(void);
 
-extern int pckbd_setkeycode(unsigned int, unsigned int);
-extern int pckbd_getkeycode(unsigned int);
-extern int pckbd_translate(unsigned char, unsigned char *, char);
-extern char pckbd_unexpected_up(unsigned char);
-extern void pckbd_leds(unsigned char);
-extern void pckbd_init_hw(void);
-extern unsigned char pckbd_sysrq_xlate[128];
 extern char cmd_line[];
 
 /*
@@ -279,18 +272,4 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 
 	ppc_md.nvram_read_val = todc_direct_read_val;
 	ppc_md.nvram_write_val = todc_direct_write_val;
-
-#ifdef CONFIG_VT
-	/* Spruce has a PS2 style keyboard */
-	ppc_md.kbd_setkeycode = pckbd_setkeycode;
-	ppc_md.kbd_getkeycode = pckbd_getkeycode;
-	ppc_md.kbd_translate = pckbd_translate;
-	ppc_md.kbd_unexpected_up = pckbd_unexpected_up;
-	ppc_md.kbd_leds = pckbd_leds;
-	ppc_md.kbd_init_hw = pckbd_init_hw;
-#ifdef CONFIG_MAGIC_SYSRQ
-	ppc_md.kbd_sysrq_xlate = pckbd_sysrq_xlate;
-	SYSRQ_KEY = 0x54;
-#endif
-#endif
 }

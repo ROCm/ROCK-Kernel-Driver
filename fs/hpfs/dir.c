@@ -211,7 +211,10 @@ struct dentry *hpfs_lookup(struct inode *dir, struct dentry *dentry)
 
 	lock_kernel();
 	if ((err = hpfs_chk_name((char *)name, &len))) {
-		if (err == -ENAMETOOLONG) return ERR_PTR(-ENAMETOOLONG);
+		if (err == -ENAMETOOLONG) {
+			unlock_kernel();
+			return ERR_PTR(-ENAMETOOLONG);
+		}
 		goto end_add;
 	}
 

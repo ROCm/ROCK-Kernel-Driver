@@ -8,8 +8,8 @@
  * device are used to bind the other minor numbers to block devices.
  */
 
+#include <linux/init.h>
 #include <linux/fs.h>
-#include <linux/iobuf.h>
 #include <linux/major.h>
 #include <linux/blkdev.h>
 #include <linux/raw.h>
@@ -86,12 +86,6 @@ int raw_open(struct inode *inode, struct file *filp)
 		return 0;
 	}
 	
-	if (!filp->f_iobuf) {
-		err = alloc_kiovec(1, &filp->f_iobuf);
-		if (err)
-			return err;
-	}
-
 	down(&raw_devices[minor].mutex);
 	/*
 	 * No, it is a normal raw device.  All we need to do on open is
@@ -256,124 +250,46 @@ int raw_ctl_ioctl(struct inode *inode,
 	return err;
 }
 
-
-
-ssize_t	raw_read(struct file *filp, char * buf, 
-		 size_t size, loff_t *offp)
+ssize_t raw_read(struct file *filp, char * buf, size_t size, loff_t *offp)
 {
 	return rw_raw_dev(READ, filp, buf, size, offp);
 }
 
-ssize_t	raw_write(struct file *filp, const char *buf, 
-		  size_t size, loff_t *offp)
+ssize_t	raw_write(struct file *filp, const char *buf, size_t size, loff_t *offp)
 {
 	return rw_raw_dev(WRITE, filp, (char *) buf, size, offp);
 }
 
-#define SECTOR_BITS 9
-#define SECTOR_SIZE (1U << SECTOR_BITS)
-#define SECTOR_MASK (SECTOR_SIZE - 1)
-
-ssize_t	rw_raw_dev(int rw, struct file *filp, char *buf, 
-		   size_t size, loff_t *offp)
+ssize_t
+rw_raw_dev(int rw, struct file *filp, char *buf, size_t size, loff_t *offp)
 {
-	struct kiobuf * iobuf;
-	int		new_iobuf;
-	int		err = 0;
-	unsigned long	blocks;
-	size_t		transferred;
-	int		iosize;
-	int		minor;
-	kdev_t		dev;
-	unsigned long	limit;
-	int		sector_size, sector_bits, sector_mask;
-	sector_t	blocknr;
 	struct block_device *bdev;
-	
-	/*
-	 * First, a few checks on device size limits 
-	 */
+	struct inode *inode;
+	int minor;
+	ssize_t ret = 0;
 
 	minor = minor(filp->f_dentry->d_inode->i_rdev);
-
-	new_iobuf = 0;
-	iobuf = filp->f_iobuf;
-	if (test_and_set_bit(0, &filp->f_iobuf_lock)) {
-		/*
-		 * A parallel read/write is using the preallocated iobuf
-		 * so just run slow and allocate a new one.
-		 */
-		err = alloc_kiovec(1, &iobuf);
-		if (err)
-			goto out;
-		new_iobuf = 1;
-	}
-
 	bdev = raw_devices[minor].binding;
-	dev = to_kdev_t(bdev->bd_dev);
-	sector_size = raw_devices[minor].sector_size;
-	sector_bits = raw_devices[minor].sector_bits;
-	sector_mask = sector_size - 1;
+	inode = bdev->bd_inode;
 
-	limit = bdev->bd_inode->i_size >> sector_bits;
-	if (!limit)
-		limit = INT_MAX;
-	dprintk ("rw_raw_dev: dev %d:%d (+%d)\n",
-		 major(dev), minor(dev), limit);
-	
-	err = -EINVAL;
-	if ((*offp & sector_mask) || (size & sector_mask))
-		goto out_free;
-	err = 0;
-	if (size)
-		err = -ENXIO;
-	if ((*offp >> sector_bits) >= limit)
-		goto out_free;
-
-	transferred = 0;
-	blocknr = *offp >> sector_bits;
-	while (size > 0) {
-		blocks = size >> sector_bits;
-		if (blocks > limit - blocknr)
-			blocks = limit - blocknr;
-		if (!blocks)
-			break;
-
-		iosize = blocks << sector_bits;
-
-		err = map_user_kiobuf(rw, iobuf, (unsigned long) buf, iosize);
-		if (err)
-			break;
-
-		err = brw_kiovec(rw, 1, &iobuf, raw_devices[minor].binding, &blocknr, sector_size);
-
-		if (rw == READ && err > 0)
-			mark_dirty_kiobuf(iobuf, err);
-		
-		if (err >= 0) {
-			transferred += err;
-			size -= err;
-			buf += err;
-		}
-
-		blocknr += blocks;
-
-		unmap_kiobuf(iobuf);
-
-		if (err != iosize)
-			break;
+	if (size == 0)
+		goto out;
+	if (size < 0) {
+		ret = -EINVAL;
+		goto out;
 	}
-	
-	if (transferred) {
-		*offp += transferred;
-		err = transferred;
+	if (*offp >= inode->i_size) {
+		ret = -ENXIO;
+		goto out;
 	}
+	if (size + *offp > inode->i_size)
+		size = inode->i_size - *offp;
 
- out_free:
-	if (!new_iobuf)
-		clear_bit(0, &filp->f_iobuf_lock);
-	else
-		free_kiovec(1, &iobuf);
- out:	
-	return err;
+	ret = generic_file_direct_IO(rw, inode, buf, *offp, size);
+	if (ret > 0)
+		*offp += ret;
+	if (inode->i_mapping->nrpages)
+		invalidate_inode_pages2(inode->i_mapping);
+out:
+	return ret;
 }

@@ -235,9 +235,9 @@ if [ "$CONFIG_SMP" = "y" ]; then
 fi
 
 if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
-   bool 'Discontiguous Memory Support' CONFIG_DISCONTIGMEM
+   bool 'Discontiguous Memory Support (EXPERIMENTAL)' CONFIG_DISCONTIGMEM
    if [ "$CONFIG_DISCONTIGMEM" = "y" ]; then
-      bool ' NUMA Support' CONFIG_NUMA
+      bool ' NUMA Support (EXPERIMENTAL)' CONFIG_NUMA
    fi
 fi
 

@@ -1028,10 +1028,9 @@ int balance_internal (struct tree_balance * tb,			/* tree_balance structure 		*/
 	/* new_insert_ptr = node_pointer to S_new */
 	new_insert_ptr = S_new;
 
-	RFALSE(( buffer_locked(S_new) || atomic_read (&(S_new->b_count)) != 1) &&
-	       (buffer_locked(S_new) || atomic_read(&(S_new->b_count)) > 2 ||
-		!(buffer_journaled(S_new) || buffer_journal_dirty(S_new))),
-	       "cm-00001: bad S_new (%b)", S_new);
+	RFALSE (!buffer_journaled(S_new) || buffer_journal_dirty(S_new) ||
+		buffer_dirty (S_new),
+		"cm-00001: bad S_new (%b)", S_new);
 
 	// S_new is released in unfix_nodes
     }

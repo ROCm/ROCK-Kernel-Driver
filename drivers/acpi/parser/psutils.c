@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: psutils - Parser miscellaneous utilities (Parser only)
- *              $Revision: 51 $
+ *              $Revision: 52 $
  *
  *****************************************************************************/
 
@@ -27,9 +27,40 @@
 #include "acpi.h"
 #include "acparser.h"
 #include "amlcode.h"
+#include "acnamesp.h"
 
 #define _COMPONENT          ACPI_PARSER
 	 ACPI_MODULE_NAME    ("psutils")
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_ps_create_scope_op
+ *
+ * PARAMETERS:  None
+ *
+ * RETURN:      Scope_op
+ *
+ * DESCRIPTION: Create a Scope and associated namepath op with the root name
+ *
+ ******************************************************************************/
+
+acpi_parse_object *
+acpi_ps_create_scope_op (
+	void)
+{
+	acpi_parse_object       *scope_op;
+
+
+	scope_op = acpi_ps_alloc_op (AML_SCOPE_OP);
+	if (!scope_op) {
+		return (NULL);
+	}
+
+
+	scope_op->named.name = ACPI_ROOT_NAME;
+	return (scope_op);
+}
 
 
 /*******************************************************************************

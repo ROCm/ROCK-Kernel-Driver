@@ -602,8 +602,6 @@ ENTRY(cpu_xscale_set_pmd)
  */
 	.align	5
 ENTRY(cpu_xscale_set_pte)
-	tst	r0, #2048
-	streq	r0, [r0, -r0]			@ BUG_ON
 	str	r1, [r0], #-2048		@ linux version
 
 	bic	r2, r1, #0xff0
@@ -681,6 +679,9 @@ __xscale_setup:
 	mcr	p15, 0, r4, c2, c0, 0		@ load page table pointer
 	mov	r0, #0x1f			@ Domains 0, 1 = client
 	mcr	p15, 0, r0, c3, c0, 0		@ load domain access register
+	mov	r0, #1				@ Allow access to CP0 and CP13
+	orr	r0, r0, #1 << 13		@ Its undefined whether this
+	mcr	p15, 0, r0, c15, c1, 0		@ affects USR or SVC modes
 	mrc	p15, 0, r0, c1, c0, 0		@ get control register
 	bic	r0, r0, #0x0200			@ .... ..R. .... ....
 	bic	r0, r0, #0x0082			@ .... .... B... ..A.
@@ -697,7 +698,7 @@ __xscale_setup:
 
 	.type	xscale_processor_functions, #object
 ENTRY(xscale_processor_functions)
-	.word	v4t_early_abort
+	.word	xscale_abort
 	.word	cpu_xscale_check_bugs
 	.word	cpu_xscale_proc_init
 	.word	cpu_xscale_proc_fin
@@ -739,7 +740,7 @@ cpu_pxa250_info:
 
 	.type	cpu_arch_name, #object
 cpu_arch_name:
-	.asciz	"armv5"
+	.asciz	"armv5te"
 	.size	cpu_arch_name, . - cpu_arch_name
 
 	.type	cpu_elf_name, #object
@@ -762,7 +763,7 @@ __80200_proc_info:
 	.long	cpu_80200_info
 	.long	xscale_processor_functions
 	.long	v4wbi_tlb_fns
-	.long	v5te_mc_user_fns
+	.long	xscale_mc_user_fns
 	.size	__80200_proc_info, . - __80200_proc_info
 
 	.type	__pxa250_proc_info,#object
@@ -777,6 +778,6 @@ __pxa250_proc_info:
 	.long	cpu_pxa250_info
 	.long	xscale_processor_functions
 	.long	v4wbi_tlb_fns
-	.long	v5te_mc_user_fns
+	.long	xscale_mc_user_fns
 	.size	__pxa250_proc_info, . - __pxa250_proc_info
 

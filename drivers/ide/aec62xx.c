@@ -160,16 +160,15 @@ static void aec62xx_tune_drive(struct ata_device *drive, unsigned char pio)
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-static int aec62xx_udma_setup(struct ata_device *drive)
+static int __init aec62xx_modes_map(struct ata_channel *ch)
 {
-	u32 bmide = pci_resource_start(drive->channel->pci_dev, 4);
-	short speed;
+	u32 bmide = pci_resource_start(ch->pci_dev, 4);
 	int map;
 
-	map = XFER_PIO | XFER_EPIO | XFER_MWDMA | XFER_UDMA | XFER_SWDMA | XFER_UDMA;
+	map = XFER_EPIO | XFER_SWDMA | XFER_MWDMA | XFER_UDMA;
 
-	if (drive->channel->udma_four)
-		switch (drive->channel->pci_dev->device) {
+	if (ch->udma_four)
+		switch (ch->pci_dev->device) {
 			case PCI_DEVICE_ID_ARTOP_ATP865R:
 			case PCI_DEVICE_ID_ARTOP_ATP865:
 				/* Can't use these modes simultaneously,
@@ -180,11 +179,7 @@ static int aec62xx_udma_setup(struct ata_device *drive)
 				map |= XFER_UDMA_66;
 		}
 
-	speed = ata_timing_mode(drive, map);
-	aec_set_drive(drive, speed);
-	udma_enable(drive, drive->channel->autodma && (speed & XFER_MODE) != XFER_PIO, 0);
-
-	return 0;
+	return map;
 }
 #endif
 
@@ -256,10 +251,11 @@ static void __init aec62xx_init_channel(struct ata_channel *ch)
 
 	ch->tuneproc = aec62xx_tune_drive;
 	ch->speedproc = aec_set_drive;
-	ch->autodma = 0;
 
 	ch->io_32bit = 1;
 	ch->unmask = 1;
+
+	ch->udma_four = aec62xx_ata66_check(ch);
 
 	for (i = 0; i < 2; i++) {
 		ch->drives[i].autotune = 1;
@@ -269,11 +265,8 @@ static void __init aec62xx_init_channel(struct ata_channel *ch)
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (ch->dma_base) {
 		ch->highmem = 1;
-		ch->udma_setup = aec62xx_udma_setup;
-#ifdef CONFIG_IDEDMA_AUTO
-		if (!noautodma)
-			ch->autodma = 1;
-#endif
+		ch->modes_map = aec62xx_modes_map(ch);
+		ch->udma_setup = udma_generic_setup;
 	}
 #endif
 }
@@ -306,17 +299,15 @@ static struct ata_pci_device chipsets[] __initdata = {
 		vendor: PCI_VENDOR_ID_ARTOP,
 		device: PCI_DEVICE_ID_ARTOP_ATP860,
 		init_chipset: aec62xx_init_chipset,
-		ata66_check: aec62xx_ata66_check,
 		init_channel: aec62xx_init_channel,
 		enablebits: { {0x4a,0x02,0x02},	{0x4a,0x04,0x04} },
 		bootable: NEVER_BOARD,
-		flags: ATA_F_IRQ | ATA_F_NOADMA | ATA_F_DMA
+		flags: ATA_F_IRQ | ATA_F_DMA
 	},
 	{
 		vendor: PCI_VENDOR_ID_ARTOP,
 		device: PCI_DEVICE_ID_ARTOP_ATP860R,
 		init_chipset: aec62xx_init_chipset,
-		ata66_check: aec62xx_ata66_check,
 		init_channel: aec62xx_init_channel,
 		enablebits: { {0x4a,0x02,0x02},	{0x4a,0x04,0x04} },
 		bootable: OFF_BOARD,
@@ -326,7 +317,6 @@ static struct ata_pci_device chipsets[] __initdata = {
 		vendor: PCI_VENDOR_ID_ARTOP,
 		device: PCI_DEVICE_ID_ARTOP_ATP865,
 		init_chipset: aec62xx_init_chipset,
-		ata66_check: aec62xx_ata66_check,
 		init_channel: aec62xx_init_channel,
 		enablebits: { {0x4a,0x02,0x02},	{0x4a,0x04,0x04} },
 		bootable: NEVER_BOARD,
@@ -336,7 +326,6 @@ static struct ata_pci_device chipsets[] __initdata = {
 		vendor: PCI_VENDOR_ID_ARTOP,
 		device: PCI_DEVICE_ID_ARTOP_ATP865R,
 		init_chipset: aec62xx_init_chipset,
-		ata66_check: aec62xx_ata66_check,
 		init_channel: aec62xx_init_channel,
 		enablebits: { {0x4a,0x02,0x02},	{0x4a,0x04,0x04} },
 		bootable: OFF_BOARD,

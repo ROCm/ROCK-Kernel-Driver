@@ -137,6 +137,7 @@ repeat:
 		goto kill_it;
 	list_add(&dentry->d_lru, &dentry_unused);
 	dentry_stat.nr_unused++;
+	dentry->d_vfs_flags |= DCACHE_REFERENCED;
 	spin_unlock(&dcache_lock);
 	return;
 
@@ -883,7 +884,6 @@ struct dentry * __d_lookup(struct dentry * parent, struct qstr * name)
 			if (memcmp(dentry->d_name.name, str, len))
 				continue;
 		}
-		dentry->d_vfs_flags |= DCACHE_REFERENCED;
 		return dentry;
 	}
 	return NULL;

@@ -301,7 +301,6 @@ void fill_inquiry_response(struct us_data *us, unsigned char *data,
 static int usb_stor_control_thread(void * __us)
 {
 	struct us_data *us = (struct us_data *)__us;
-	int action;
 
 	lock_kernel();
 
@@ -334,32 +333,30 @@ static int usb_stor_control_thread(void * __us)
 	for(;;) {
 		struct Scsi_Host *host;
 		US_DEBUGP("*** thread sleeping.\n");
-		atomic_set(&us->sm_state, US_STATE_IDLE);
 		if(down_interruptible(&us->sema))
 			break;
 			
 		US_DEBUGP("*** thread awakened.\n");
-		atomic_set(&us->sm_state, US_STATE_RUNNING);
 
-		/* lock access to the queue element */
-		spin_lock_irq(&us->queue_exclusion);
-
-		/* take the command off the queue */
-		action = us->action;
-		us->action = 0;
-		us->srb = us->queue_srb;
-		host = us->srb->host;
-
-		/* release the queue lock as fast as possible */
-		spin_unlock_irq(&us->queue_exclusion);
-
-		/* exit if we get a signal to exit */
-		if (action == US_ACT_EXIT) {
-			US_DEBUGP("-- US_ACT_EXIT command received\n");
+		/* if us->srb is NULL, we are being asked to exit */
+		if (us->srb == NULL) {
+			US_DEBUGP("-- exit command received\n");
 			break;
 		}
+		host = us->srb->host;
 
-		BUG_ON(action != US_ACT_COMMAND);
+		/* lock access to the state */
+		scsi_lock(host);
+
+		/* has the command been aborted *already* ? */
+		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
+			us->srb->result = DID_ABORT << 16;
+			goto SkipForAbort;
+		}
+
+		/* set the state and release the lock */
+		atomic_set(&us->sm_state, US_STATE_RUNNING);
+		scsi_unlock(host);
 
 		/* lock the device pointers */
 		down(&(us->dev_semaphore));
@@ -396,7 +393,7 @@ static int usb_stor_control_thread(void * __us)
 		}
 
 		/* our device has gone - pretend not ready */
-		else if (!test_bit(DEV_ATTACHED, &us->bitflags)) {
+		else if (!(us->flags & US_FL_DEV_ATTACHED)) {
 			US_DEBUGP("Request is for removed device\n");
 			/* For REQUEST_SENSE, it's the data.  But
 			 * for anything else, it should look like
@@ -420,7 +417,7 @@ static int usb_stor_control_thread(void * __us)
 				       sizeof(usb_stor_sense_notready));
 				us->srb->result = CHECK_CONDITION << 1;
 			}
-		}  /* test_bit(DEV_ATTACHED, &us->bitflags) */
+		}  /* !(us->flags & US_FL_DEV_ATTACHED) */
 
 		/* Handle those devices which need us to fake 
 		 * their inquiry data */
@@ -444,19 +441,29 @@ static int usb_stor_control_thread(void * __us)
 		/* unlock the device pointers */
 		up(&(us->dev_semaphore));
 
+		/* lock access to the state */
+		scsi_lock(host);
+
 		/* indicate that the command is done */
 		if (us->srb->result != DID_ABORT << 16) {
 			US_DEBUGP("scsi cmd done, result=0x%x\n", 
 				   us->srb->result);
-			scsi_lock(host);
 			us->srb->scsi_done(us->srb);
-			us->srb = NULL;
-			scsi_unlock(host);
 		} else {
+			SkipForAbort:
 			US_DEBUGP("scsi command aborted\n");
-			us->srb = NULL;
-			complete(&(us->notify));
 		}
+
+		/* in case an abort request was received after the command
+		 * completed, we must use a separate test to see whether
+		 * we need to signal that the abort has finished */
+		if (atomic_read(&us->sm_state) == US_STATE_ABORTING)
+			complete(&(us->notify));
+
+		/* empty the queue, reset the state, and release the lock */
+		us->srb = NULL;
+		atomic_set(&us->sm_state, US_STATE_IDLE);
+		scsi_unlock(host);
 	} /* for (;;) */
 
 	/* notify the exit routine that we're actually exiting now */
@@ -466,7 +473,7 @@ static int usb_stor_control_thread(void * __us)
 }	
 
 /* Set up the URB, the usb_ctrlrequest, and the IRQ pipe and handler.
- * ss->dev_semaphore should already be locked.
+ * ss->dev_semaphore must already be locked.
  * Note that this function assumes that all the data in the us_data
  * strucuture is current.  This includes the ep_int field, which gives us
  * the endpoint for the interrupt.
@@ -478,18 +485,18 @@ static int usb_stor_allocate_urbs(struct us_data *ss)
 	int maxp;
 	int result;
 
-	/* allocate the URB we're going to use */
-	US_DEBUGP("Allocating URB\n");
-	ss->current_urb = usb_alloc_urb(0, GFP_KERNEL);
-	if (!ss->current_urb) {
-		US_DEBUGP("allocation failed\n");
-		return 1;
-	}
-
 	/* allocate the usb_ctrlrequest for control packets */
 	US_DEBUGP("Allocating usb_ctrlrequest\n");
 	ss->dr = kmalloc(sizeof(struct usb_ctrlrequest), GFP_NOIO);
 	if (!ss->dr) {
+		US_DEBUGP("allocation failed\n");
+		return 1;
+	}
+
+	/* allocate the URB we're going to use */
+	US_DEBUGP("Allocating URB\n");
+	ss->current_urb = usb_alloc_urb(0, GFP_KERNEL);
+	if (!ss->current_urb) {
 		US_DEBUGP("allocation failed\n");
 		return 2;
 	}
@@ -554,12 +561,6 @@ static void usb_stor_deallocate_urbs(struct us_data *ss)
 	}
 	up(&(ss->irq_urb_sem));
 
-	/* free the usb_ctrlrequest buffer */
-	if (ss->dr) {
-		kfree(ss->dr);
-		ss->dr = NULL;
-	}
-
 	/* free up the main URB for this device */
 	if (ss->current_urb) {
 		US_DEBUGP("-- releasing main URB\n");
@@ -569,8 +570,14 @@ static void usb_stor_deallocate_urbs(struct us_data *ss)
 		ss->current_urb = NULL;
 	}
 
+	/* free the usb_ctrlrequest buffer */
+	if (ss->dr) {
+		kfree(ss->dr);
+		ss->dr = NULL;
+	}
+
 	/* mark the device as gone */
-	clear_bit(DEV_ATTACHED, &ss->bitflags);
+	ss->flags &= ~ US_FL_DEV_ATTACHED;
 	usb_put_dev(ss->pusb_dev);
 	ss->pusb_dev = NULL;
 }
@@ -726,7 +733,7 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 	 */
 	ss = us_list;
 	while ((ss != NULL) && 
-	           (test_bit(DEV_ATTACHED, &ss->bitflags) ||
+	           ((ss->flags & US_FL_DEV_ATTACHED) ||
 		    !GUID_EQUAL(guid, ss->guid)))
 		ss = ss->next;
 
@@ -741,7 +748,7 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 		/* establish the connection to the new device upon reconnect */
 		ss->ifnum = ifnum;
 		ss->pusb_dev = dev;
-		set_bit(DEV_ATTACHED, &ss->bitflags);
+		ss->flags |= US_FL_DEV_ATTACHED;
 
 		/* copy over the endpoint data */
 		ss->ep_in = ep_in->bEndpointAddress & 
@@ -777,15 +784,14 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 		/* Initialize the mutexes only when the struct is new */
 		init_completion(&(ss->notify));
 		init_MUTEX_LOCKED(&(ss->ip_waitq));
-		spin_lock_init(&ss->queue_exclusion);
 		init_MUTEX(&(ss->irq_urb_sem));
 		init_MUTEX(&(ss->current_urb_sem));
-		init_MUTEX(&(ss->dev_semaphore));
+		init_MUTEX_LOCKED(&(ss->dev_semaphore));
 
 		/* copy over the subclass and protocol data */
 		ss->subclass = subclass;
 		ss->protocol = protocol;
-		ss->flags = flags;
+		ss->flags = flags | US_FL_DEV_ATTACHED;
 		ss->unusual_dev = unusual_dev;
 
 		/* copy over the endpoint data */
@@ -1000,7 +1006,6 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 
 		/* start up our control thread */
 		atomic_set(&ss->sm_state, US_STATE_IDLE);
-		set_bit(DEV_ATTACHED, &ss->bitflags);
 		ss->pid = kernel_thread(usb_stor_control_thread, ss,
 					CLONE_VM);
 		if (ss->pid < 0) {
@@ -1012,6 +1017,9 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 		/* wait for the thread to start */
 		wait_for_completion(&(ss->notify));
 
+		/* unlock the device pointers */
+		up(&(ss->dev_semaphore));
+
 		/* now register	 - our detect function will be called */
 		ss->htmplt.module = THIS_MODULE;
 		result = scsi_register_host(&(ss->htmplt));
@@ -1020,9 +1028,12 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 				"Unable to register the scsi host\n");
 
 			/* tell the control thread to exit */
-			ss->action = US_ACT_EXIT;
+			ss->srb = NULL;
 			up(&ss->sema);
 			wait_for_completion(&ss->notify);
+
+			/* re-lock the device pointers */
+			down(&ss->dev_semaphore);
 			goto BadDevice;
 		}
 
@@ -1046,13 +1057,13 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 	return ss;
 
 	/* we come here if there are any problems */
+	/* ss->dev_semaphore must be locked */
 	BadDevice:
 	US_DEBUGP("storage_probe() failed\n");
 	usb_stor_deallocate_urbs(ss);
+	up(&ss->dev_semaphore);
 	if (new_device)
 		kfree(ss);
-	else
-		up(&ss->dev_semaphore);
 	return NULL;
 }
 

@@ -56,6 +56,7 @@ static int __init integrator_init(void)
 	register_kmi(&integrator_keyboard);
 	register_kmi(&integrator_mouse);
 #endif
+	return 0;
 }
 
 __initcall(integrator_init);

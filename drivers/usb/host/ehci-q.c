@@ -170,7 +170,7 @@ static void ehci_urb_complete (
 	/* cleanse status if we saw no error */
 	if (likely (urb->status == -EINPROGRESS)) {
 		if (urb->actual_length != urb->transfer_buffer_length
-				&& (urb->transfer_flags & USB_DISABLE_SPD))
+				&& (urb->transfer_flags & URB_SHORT_NOT_OK))
 			urb->status = -EREMOTEIO;
 		else
 			urb->status = 0;
@@ -202,7 +202,7 @@ static void ehci_urb_done (
 
 	if (likely (urb->status == -EINPROGRESS)) {
 		if (urb->actual_length != urb->transfer_buffer_length
-				&& (urb->transfer_flags & USB_DISABLE_SPD))
+				&& (urb->transfer_flags & URB_SHORT_NOT_OK))
 			urb->status = -EREMOTEIO;
 		else
 			urb->status = 0;
@@ -793,7 +793,7 @@ submit_async (
 			last_qtd->hw_next = hw_next;
 
 			/* previous urb allows short rx? maybe optimize. */
-			if (!(last_qtd->urb->transfer_flags & USB_DISABLE_SPD)
+			if (!(last_qtd->urb->transfer_flags & URB_SHORT_NOT_OK)
 					&& (epnum & 0x10)) {
 				// only the last QTD for now
 				last_qtd->hw_alt_next = hw_next;

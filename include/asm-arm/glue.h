@@ -89,7 +89,8 @@
  *	  v4_early	- ARMv4 without Thumb early abort handler
  *	  v4t_late	- ARMv4 with Thumb late abort handler
  *	  v4t_early	- ARMv4 with Thumb early abort handler
- *	  v5ej_early	- ARMv5 with Thumb and Java early abort handler
+ *	  v5tej_early	- ARMv5 with Thumb and Java early abort handler
+ *	  xscale	- ARMv5 with Thumb with Xscale extensions
  */
 #undef CPU_ABORT_HANDLER
 #undef MULTI_ABORT
@@ -127,7 +128,7 @@
 #endif
 
 #if defined(CONFIG_CPU_ARM920T) || defined(CONFIG_CPU_ARM922T) || \
-    defined(CONFIG_CPU_ARM1020) || defined(CONFIG_CPU_XSCALE)
+    defined(CONFIG_CPU_ARM1020)
 # ifdef CPU_ABORT_HANDLER
 #  define MULTI_ABORT 1
 # else
@@ -139,7 +140,15 @@
 # ifdef CPU_ABORT_HANDLER
 #  define MULTI_ABORT 1
 # else
-#  define CPU_ABORT_HANDLER v5ej_early_abort
+#  define CPU_ABORT_HANDLER v5tej_early_abort
+# endif
+#endif
+
+#if defined(CONFIG_CPU_XSCALE)
+# ifdef CPU_ABORT_HANDLER
+#  define MULTI_ABORT 1
+# else
+#  define CPU_ABORT_HANDLER xscale_abort
 # endif
 #endif
 
@@ -161,7 +170,7 @@
  *	  v4wt		- ARMv4 with writethrough cache, without minicache
  *	  v4wb		- ARMv4 with writeback cache, without minicache
  *	  v4_mc		- ARMv4 with minicache
- *	  v5te_mc	- ARMv5TE with minicache
+ *	  xscale	- Xscale
  */
 #undef _USER
 #undef MULTI_USER
@@ -204,7 +213,7 @@
 # ifdef _USER
 #  define MULTI_USER 1
 # else
-#  define _USER v5te_mc
+#  define _USER xscale_mc
 # endif
 #endif
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dsmethod - Parser/Interpreter interface - control method parsing
- *              $Revision: 86 $
+ *              $Revision: 87 $
  *
  *****************************************************************************/
 
@@ -290,7 +290,7 @@ acpi_ds_call_control_method (
 
 	/* Create and init a Root Node */
 
-	op = acpi_ps_alloc_op (AML_SCOPE_OP);
+	op = acpi_ps_create_scope_op ();
 	if (!op) {
 		status = AE_NO_MEMORY;
 		goto cleanup;

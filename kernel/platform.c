@@ -6,10 +6,6 @@
 #include <linux/module.h>
 #include <linux/errno.h>
 
-static struct platform_t default_platform;
-
-struct platform_t * platform = &default_platform;
-static spinlock_t platform_lock = SPIN_LOCK_UNLOCKED;
 
 void default_reboot(char * cmd)
 {
@@ -35,6 +31,9 @@ static struct platform_t default_platform = {
 	suspend:	default_suspend,
 	idle:		default_idle,
 };
+
+struct platform_t * platform = &default_platform;
+static spinlock_t platform_lock = SPIN_LOCK_UNLOCKED;
 
 /**
  * set_platform_driver - set the platform driver.

@@ -1,4 +1,4 @@
-CONFIG_JOYSTICK
+CONFIG_INPUT_JOYSTICK
   If you have a joystick, 6dof controller, gamepad, steering wheel,
   weapon control system or something like that you can say Y here
   and the list of supported devices will be displayed. This option
@@ -103,24 +103,6 @@ CONFIG_JOYSTICK_TMDC
   The module will be called tmdc.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
 
-CONFIG_JOYSTICK_IFORCE_USB
-  Say Y here if you have an I-Force joystick or steering wheel
-  connected to your USB port. 
-
-  This driver is also available as a module ( = code which can be
-  inserted in and removed from the running kernel whenever you want).
-  The module will be called iforce.o. If you want to compile it as a
-  module, say M here and read <file:Documentation/modules.txt>.
-
-CONFIG_JOYSTICK_IFORCE_232
-  Say Y here if you have an I-Force joystick or steering wheel
-  connected to your serial (COM) port.
-
-  This driver is also available as a module ( = code which can be
-  inserted in and removed from the running kernel whenever you want).
-  The module will be called iforce.o. If you want to compile it as a
-  module, say M here and read <file:Documentation/modules.txt>.
-
 CONFIG_JOYSTICK_WARRIOR
   Say Y here if you have a Logitech WingMan Warrior joystick connected
   to your computer's serial port. 
@@ -221,3 +203,12 @@ CONFIG_JOYSTICK_AMIJOY
   The module will be called joy-amiga.o. If you want to compile it as
   a module, say M here and read <file:Documentation/modules.txt>.
 
+CONFIG_INPUT_JOYDUMP
+  Say Y here if you want to dump data from your joystick into the system
+  log for debugging purposes. Say N if you are making a production
+  configuration or aren't sure. 
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called joydump.o. If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.

@@ -117,7 +117,6 @@ struct ata_pci_device {
 	unsigned short		vendor;
 	unsigned short		device;
 	unsigned int		(*init_chipset)(struct pci_dev *);
-	unsigned int		(*ata66_check)(struct ata_channel *);
 	void			(*init_channel)(struct ata_channel *);
 	void			(*init_dma)(struct ata_channel *, unsigned long);
 	ide_pci_enablebit_t	enablebits[2];

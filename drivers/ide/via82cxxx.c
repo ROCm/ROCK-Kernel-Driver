@@ -221,22 +221,16 @@ static void via82cxxx_tune_drive(struct ata_device *drive, unsigned char pio)
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-static int via82cxxx_udma_setup(struct ata_device *drive)
+static int __init via_modes_map(struct ata_channel *ch)
 {
-	short w80 = drive->channel->udma_four;
+	short w80 = ch->udma_four;
+	int map = XFER_EPIO | XFER_SWDMA | XFER_MWDMA |
+		  (via_config->flags & VIA_UDMA ? XFER_UDMA : 0) |
+		  (w80 && (via_config->flags & VIA_UDMA) >= VIA_UDMA_66 ? XFER_UDMA_66 : 0) |
+		  (w80 && (via_config->flags & VIA_UDMA) >= VIA_UDMA_100 ? XFER_UDMA_100 : 0) |
+		  (w80 && (via_config->flags & VIA_UDMA) >= VIA_UDMA_133 ? XFER_UDMA_133 : 0);
 
-	short speed = ata_timing_mode(drive,
-			XFER_PIO | XFER_EPIO | XFER_SWDMA | XFER_MWDMA |
-			(via_config->flags & VIA_UDMA ? XFER_UDMA : 0) |
-			(w80 && (via_config->flags & VIA_UDMA) >= VIA_UDMA_66 ? XFER_UDMA_66 : 0) |
-			(w80 && (via_config->flags & VIA_UDMA) >= VIA_UDMA_100 ? XFER_UDMA_100 : 0) |
-			(w80 && (via_config->flags & VIA_UDMA) >= VIA_UDMA_133 ? XFER_UDMA_133 : 0));
-
-	via_set_drive(drive, speed);
-
-	udma_enable(drive, drive->channel->autodma && (speed & XFER_MODE) != XFER_PIO, 0);
-
-	return 0;
+	return map;
 }
 #endif
 
@@ -352,9 +346,10 @@ static void __init via82cxxx_init_channel(struct ata_channel *hwif)
 {
 	int i;
 
+	hwif->udma_four = via82cxxx_ata66_check(hwif);
+
 	hwif->tuneproc = &via82cxxx_tune_drive;
 	hwif->speedproc = &via_set_drive;
-	hwif->autodma = 0;
 	hwif->io_32bit = 1;
 
 	hwif->unmask = (via_config->flags & VIA_NO_UNMASK) ? 0 : 1;
@@ -366,11 +361,8 @@ static void __init via82cxxx_init_channel(struct ata_channel *hwif)
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (hwif->dma_base) {
 		hwif->highmem = 1;
-		hwif->udma_setup = via82cxxx_udma_setup;
-# ifdef CONFIG_IDEDMA_AUTO
-		if (!noautodma)
-			hwif->autodma = 1;
-# endif
+		hwif->modes_map = via_modes_map(hwif);
+		hwif->udma_setup = udma_generic_setup;
 	}
 #endif
 }
@@ -391,23 +383,19 @@ static struct ata_pci_device chipsets[] __initdata = {
 		vendor: PCI_VENDOR_ID_VIA,
 		device:	PCI_DEVICE_ID_VIA_82C576_1,
 		init_chipset: via82cxxx_init_chipset,
-		ata66_check: via82cxxx_ata66_check,
 		init_channel: via82cxxx_init_channel,
 		init_dma: via82cxxx_init_dma,
 		enablebits: {{0x40,0x02,0x02}, {0x40,0x01,0x01}},
 		bootable: ON_BOARD,
-		flags: ATA_F_NOADMA
 	},
 	{
 		vendor:	PCI_VENDOR_ID_VIA,
 		device:	PCI_DEVICE_ID_VIA_82C586_1,
 		init_chipset: via82cxxx_init_chipset,
-		ata66_check: via82cxxx_ata66_check,
 		init_channel: via82cxxx_init_channel,
 		init_dma: via82cxxx_init_dma,
 		enablebits: {{0x40,0x02,0x02}, {0x40,0x01,0x01}},
 		bootable: ON_BOARD,
-		flags: ATA_F_NOADMA
 	},
 };
 

@@ -48,7 +48,7 @@ fi
 if [ "$CONFIG_DDB5477" = "y" ]; then
     dep_tristate '  NEC Vrc5477 AC97 sound' CONFIG_SOUND_VRC5477 $CONFIG_SOUND
 fi
-dep_tristate '  Trident 4DWave DX/NX, SiS 7018 or ALi 5451 PCI Audio Core' CONFIG_SOUND_TRIDENT $CONFIG_SOUND
+dep_tristate '  Trident 4DWave DX/NX, SiS 7018 or ALi 5451 PCI Audio Core' CONFIG_SOUND_TRIDENT $CONFIG_SOUND $CONFIG_SOUND_GAMEPORT
 
 dep_tristate '  Support for Turtle Beach MultiSound Classic, Tahiti, Monterey' CONFIG_SOUND_MSNDCLAS $CONFIG_SOUND
 if [ "$CONFIG_SOUND_MSNDCLAS" = "y" -o "$CONFIG_SOUND_MSNDCLAS" = "m" ]; then
@@ -134,7 +134,7 @@ if [ "$CONFIG_SOUND_OSS" = "y" -o "$CONFIG_SOUND_OSS" = "m" ]; then
    dep_tristate '    Microsoft Sound System support' CONFIG_SOUND_MSS $CONFIG_SOUND_OSS
    dep_tristate '    MPU-401 support (NOT for SB16)' CONFIG_SOUND_MPU401 $CONFIG_SOUND_OSS
    dep_tristate '    NM256AV/NM256ZX audio support' CONFIG_SOUND_NM256 $CONFIG_SOUND_OSS
-   dep_tristate '    OPTi MAD16 and/or Mozart based cards' CONFIG_SOUND_MAD16 $CONFIG_SOUND_OSS
+   dep_tristate '    OPTi MAD16 and/or Mozart based cards' CONFIG_SOUND_MAD16 $CONFIG_SOUND_OSS $CONFIG_SOUND_GAMEPORT
    if [ "$CONFIG_SOUND_MAD16" = "y" -o "$CONFIG_SOUND_MAD16" = "m" ]; then
      bool '      Support MIDI in older MAD16 based cards (requires SB)' CONFIG_MAD16_OLDCARD
    fi

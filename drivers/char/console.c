@@ -126,6 +126,7 @@ const struct consw *conswitchp;
 #define DEFAULT_BELL_DURATION	(HZ/8)
 
 extern void vcs_make_devfs (unsigned int index, int unregister);
+extern void console_map_init(void);
 
 #ifndef MIN
 #define MIN(a,b)	((a) < (b) ? (a) : (b))
@@ -2381,6 +2382,7 @@ static int con_open(struct tty_struct *tty, struct file * filp)
 
 	vt_cons[currcons]->vc_num = currcons;
 	tty->driver_data = vt_cons[currcons];
+	vc_cons[currcons].d->vc_tty = tty;
 
 	if (!tty->winsize.ws_row && !tty->winsize.ws_col) {
 		tty->winsize.ws_row = video_num_lines;
@@ -2445,42 +2447,6 @@ void __init con_init(void)
 		return;
 	}
 
-	memset(&console_driver, 0, sizeof(struct tty_driver));
-	console_driver.magic = TTY_DRIVER_MAGIC;
-	console_driver.name = "vc/%d";
-	console_driver.name_base = 1;
-	console_driver.major = TTY_MAJOR;
-	console_driver.minor_start = 1;
-	console_driver.num = MAX_NR_CONSOLES;
-	console_driver.type = TTY_DRIVER_TYPE_CONSOLE;
-	console_driver.init_termios = tty_std_termios;
-	console_driver.flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_RESET_TERMIOS;
-	/* Tell tty_register_driver() to skip consoles because they are
-	 * registered before kmalloc() is ready. We'll patch them in later. 
-	 * See comments at console_init(); see also con_init_devfs(). 
-	 */
-	console_driver.flags |= TTY_DRIVER_NO_DEVFS;
-	console_driver.refcount = &console_refcount;
-	console_driver.table = console_table;
-	console_driver.termios = console_termios;
-	console_driver.termios_locked = console_termios_locked;
-
-	console_driver.open = con_open;
-	console_driver.close = con_close;
-	console_driver.write = con_write;
-	console_driver.write_room = con_write_room;
-	console_driver.put_char = con_put_char;
-	console_driver.flush_chars = con_flush_chars;
-	console_driver.chars_in_buffer = con_chars_in_buffer;
-	console_driver.ioctl = vt_ioctl;
-	console_driver.stop = con_stop;
-	console_driver.start = con_start;
-	console_driver.throttle = con_throttle;
-	console_driver.unthrottle = con_unthrottle;
-
-	if (tty_register_driver(&console_driver))
-		panic("Couldn't register console driver\n");
-
 	init_timer(&console_timer);
 	console_timer.function = blank_screen;
 	if (blankinterval) {
@@ -2517,6 +2483,50 @@ void __init con_init(void)
 #ifdef CONFIG_VT_CONSOLE
 	register_console(&vt_console_driver);
 #endif
+}
+
+int __init vty_init(void)
+{
+	memset(&console_driver, 0, sizeof(struct tty_driver));
+	console_driver.magic = TTY_DRIVER_MAGIC;
+	console_driver.name = "vc/%d";
+	console_driver.name_base = 1;
+	console_driver.major = TTY_MAJOR;
+	console_driver.minor_start = 1;
+	console_driver.num = MAX_NR_CONSOLES;
+	console_driver.type = TTY_DRIVER_TYPE_CONSOLE;
+	console_driver.init_termios = tty_std_termios;
+	console_driver.flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_RESET_TERMIOS;
+	/* Tell tty_register_driver() to skip consoles because they are
+	 * registered before kmalloc() is ready. We'll patch them in later. 
+	 * See comments at console_init(); see also con_init_devfs(). 
+	 */
+	console_driver.flags |= TTY_DRIVER_NO_DEVFS;
+	console_driver.refcount = &console_refcount;
+	console_driver.table = console_table;
+	console_driver.termios = console_termios;
+	console_driver.termios_locked = console_termios_locked;
+
+	console_driver.open = con_open;
+	console_driver.close = con_close;
+	console_driver.write = con_write;
+	console_driver.write_room = con_write_room;
+	console_driver.put_char = con_put_char;
+	console_driver.flush_chars = con_flush_chars;
+	console_driver.chars_in_buffer = con_chars_in_buffer;
+	console_driver.ioctl = vt_ioctl;
+	console_driver.stop = con_stop;
+	console_driver.start = con_start;
+	console_driver.throttle = con_throttle;
+	console_driver.unthrottle = con_unthrottle;
+
+	if (tty_register_driver(&console_driver))
+		panic("Couldn't register console driver\n");
+
+	kbd_init();
+	console_map_init();
+	vcs_init();
+	return 0;
 }
 
 #ifndef VT_SINGLE_DRIVER

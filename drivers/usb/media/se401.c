@@ -593,7 +593,6 @@ static int se401_start_stream(struct usb_se401 *se401)
 			se401->sbuf[i].data, SE401_PACKETSIZE,
 			se401_video_irq,
 			se401);
-		urb->transfer_flags |= USB_QUEUE_BULK;
 
 		se401->urb[i]=urb;
 

@@ -106,9 +106,12 @@ static int blkdev_get_block(struct inode * inode, sector_t iblock, struct buffer
 	return 0;
 }
 
-static int blkdev_direct_IO(int rw, struct inode * inode, struct kiobuf * iobuf, unsigned long blocknr, int blocksize)
+static int
+blkdev_direct_IO(int rw, struct inode *inode, char *buf,
+			loff_t offset, size_t count)
 {
-	return generic_direct_IO(rw, inode, iobuf, blocknr, blocksize, blkdev_get_block);
+	return generic_direct_IO(rw, inode, buf, offset,
+				count, blkdev_get_block);
 }
 
 static int blkdev_writepage(struct page * page)

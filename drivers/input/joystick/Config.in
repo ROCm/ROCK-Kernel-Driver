@@ -14,15 +14,13 @@ dep_tristate '  Guillemot joysticks and gamepads' CONFIG_JOYSTICK_GUILLEMOT $CON
 dep_tristate '  InterAct digital joysticks and gamepads' CONFIG_JOYSTICK_INTERACT $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_GAMEPORT
 dep_tristate '  Microsoft SideWinder digital joysticks and gamepads' CONFIG_JOYSTICK_SIDEWINDER $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_GAMEPORT
 dep_tristate '  ThrustMaster DirectConnect joysticks and gamepads' CONFIG_JOYSTICK_TMDC $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_GAMEPORT
-
-dep_tristate '  I-Force USB joysticks and wheels' CONFIG_JOYSTICK_IFORCE_USB $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_USB
-dep_tristate '  I-Force Serial joysticks and wheels' CONFIG_JOYSTICK_IFORCE_232 $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_SERIO
+source drivers/input/joystick/iforce/Config.in
 dep_tristate '  Logitech WingMan Warrior joystick' CONFIG_JOYSTICK_WARRIOR $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_SERIO
 dep_tristate '  LogiCad3d Magellan/SpaceMouse 6dof controllers' CONFIG_JOYSTICK_MAGELLAN $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_SERIO
 dep_tristate '  SpaceTec SpaceOrb/Avenger 6dof controllers' CONFIG_JOYSTICK_SPACEORB $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_SERIO
 dep_tristate '  SpaceTec SpaceBall 6dof controllers' CONFIG_JOYSTICK_SPACEBALL $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_SERIO
 dep_tristate '  Gravis Stinger gamepad' CONFIG_JOYSTICK_STINGER $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_SERIO
-dep_tristate '  Twiddler as as joystick' CONFIG_JOYSTICK_TWIDDLER $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_SERIO
+dep_tristate '  Twiddler as a joystick' CONFIG_JOYSTICK_TWIDDLER $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_SERIO
 
 dep_tristate '  Multisystem, Sega Genesis, Saturn joysticks and gamepads' CONFIG_JOYSTICK_DB9 $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_PARPORT
 dep_tristate '  Multisystem, NES, SNES, N64, PSX joysticks and gamepads' CONFIG_JOYSTICK_GAMECON $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_PARPORT
@@ -31,3 +29,5 @@ dep_tristate '  Multisystem joysticks via TurboGraFX device' CONFIG_JOYSTICK_TUR
 if [ "$CONFIG_AMIGA" = "y" ]; then
    dep_tristate '  Amiga joysticks' CONFIG_JOYSTICK_AMIJOY $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK
 fi
+
+dep_tristate '  Gameport data dumper' CONFIG_INPUT_JOYDUMP $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK

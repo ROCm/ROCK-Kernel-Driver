@@ -1017,8 +1017,6 @@ void __init mp_config_acpi_legacy_irqs (void)
 	return;
 }
 
-#endif /*CONFIG_X86_IO_APIC*/
-
 #ifdef CONFIG_ACPI_PCI
 
 void __init mp_parse_prt (void)
@@ -1085,5 +1083,7 @@ void __init mp_parse_prt (void)
 }
 
 #endif /*CONFIG_ACPI_PCI*/
+
+#endif /*CONFIG_X86_IO_APIC*/
 
 #endif /*CONFIG_ACPI_BOOT*/

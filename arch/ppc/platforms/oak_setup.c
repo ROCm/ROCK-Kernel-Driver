@@ -117,14 +117,6 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.set_rtc_time	 	= oak_set_rtc_time;
 	ppc_md.get_rtc_time	 	= oak_get_rtc_time;
 	ppc_md.calibrate_decr	 	= oak_calibrate_decr;
-
-	ppc_md.kbd_setkeycode    	= NULL;
-	ppc_md.kbd_getkeycode    	= NULL;
-	ppc_md.kbd_translate     	= NULL;
-	ppc_md.kbd_unexpected_up 	= NULL;
-	ppc_md.kbd_leds          	= NULL;
-	ppc_md.kbd_init_hw       	= NULL;
-	ppc_md.ppc_kbd_sysrq_xlate	= NULL;
 }
 
 /*

@@ -205,6 +205,7 @@ struct hid_item {
 #define HID_QUIRK_NOTOUCH	0x02
 #define HID_QUIRK_IGNORE	0x04
 #define HID_QUIRK_NOGET		0x08
+#define HID_QUIRK_HIDDEV	0x10
 
 /*
  * This is the global enviroment of the parser. This information is
@@ -231,10 +232,11 @@ struct hid_global {
 
 #define HID_MAX_DESCRIPTOR_SIZE		4096
 #define HID_MAX_USAGES			1024
-#define HID_MAX_APPLICATIONS		16
+#define HID_DEFAULT_NUM_COLLECTIONS	16
 
 struct hid_local {
 	unsigned usage[HID_MAX_USAGES]; /* usage array */
+	unsigned collection_index[HID_MAX_USAGES]; /* collection index array */
 	unsigned usage_index;
 	unsigned usage_minimum;
 	unsigned delimiter_depth;
@@ -249,10 +251,12 @@ struct hid_local {
 struct hid_collection {
 	unsigned type;
 	unsigned usage;
+	unsigned level;
 };
 
 struct hid_usage {
 	unsigned  hid;			/* hid usage code */
+	unsigned  collection_index;	/* index into collection array */
 	__u16     code;			/* input driver code */
 	__u8      type;			/* input driver type */
 	__s8	  hat_min;		/* hat switch fun */
@@ -319,7 +323,9 @@ struct hid_control_fifo {
 struct hid_device {							/* device report descriptor */
 	 __u8 *rdesc;
 	unsigned rsize;
-	unsigned application[HID_MAX_APPLICATIONS];			/* List of HID applications */
+	struct hid_collection *collection;				/* List of HID collections */
+	unsigned collection_size;					/* Number of allocated hid_collections */
+	unsigned maxcollection;						/* Number of parsed collections */
 	unsigned maxapplication;					/* Number of applications */
 	unsigned version;						/* HID version */
 	unsigned country;						/* HID country */
@@ -359,6 +365,11 @@ struct hid_device {							/* device report descriptor */
 	char name[128];							/* Device name */
 	char phys[64];							/* Device physical location */
 	char uniq[64];							/* Device unique identifier (serial #) */
+
+	void *ff_private;                                               /* Private data for the force-feedback driver */
+	void (*ff_exit)(struct hid_device*);                            /* Called by hid_exit_ff(hid) */
+	int (*ff_event)(struct hid_device *hid, struct input_dev *input,
+			unsigned int type, unsigned int code, int value);
 };
 
 #define HID_GLOBAL_STACK_SIZE 4
@@ -369,7 +380,7 @@ struct hid_parser {
 	struct hid_global     global_stack[HID_GLOBAL_STACK_SIZE];
 	unsigned              global_stack_ptr;
 	struct hid_local      local;
-	struct hid_collection collection_stack[HID_COLLECTION_STACK_SIZE];
+	unsigned              collection_stack[HID_COLLECTION_STACK_SIZE];
 	unsigned              collection_stack_ptr;
 	struct hid_device    *device;
 };
@@ -395,6 +406,7 @@ struct hid_descriptor {
 #define hid_dump_input(a,b)	do { } while (0)
 #define hid_dump_device(c)	do { } while (0)
 #define hid_dump_field(a,b)	do { } while (0)
+#define resolv_usage(a)		do { } while (0)
 #endif
 
 #endif
@@ -419,3 +431,23 @@ int hid_find_field(struct hid_device *, unsigned int, unsigned int, struct hid_f
 int hid_set_field(struct hid_field *, unsigned, __s32);
 void hid_submit_report(struct hid_device *, struct hid_report *, unsigned char dir);
 void hid_init_reports(struct hid_device *hid);
+int hid_find_report_by_usage(struct hid_device *hid, __u32 wanted_usage, struct hid_report **report, int type);
+
+
+#ifdef CONFIG_HID_FF
+int hid_ff_init(struct hid_device *hid);
+#else
+static inline int hid_ff_init(struct hid_device *hid) { return -1; }
+#endif
+static inline void hid_ff_exit(struct hid_device *hid)
+{
+	if (hid->ff_exit)
+		hid->ff_exit(hid);
+}
+static inline int hid_ff_event(struct hid_device *hid, struct input_dev *input,
+			unsigned int type, unsigned int code, int value)
+{
+	if (hid->ff_event)
+		return hid->ff_event(hid, input, type, code, value);
+	return -ENOSYS;
+}

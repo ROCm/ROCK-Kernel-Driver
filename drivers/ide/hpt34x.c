@@ -72,83 +72,13 @@ static void hpt34x_tune_drive(struct ata_device *drive, u8 pio)
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-static int config_chipset_for_dma(struct ata_device *drive, u8 udma)
+static int hpt34x_udma_setup(struct ata_device *drive, int map)
 {
-	int map;
-	u8 mode;
-
-	if (drive->type != ATA_DISK)
-		return 0;
-
-	if (udma)
-		map = XFER_UDMA;
-	else
-		map = XFER_SWDMA | XFER_MWDMA;
-
-	mode = ata_timing_mode(drive, map);
-	if (mode < XFER_SW_DMA_0)
-		return 0;
-
-	return !hpt34x_tune_chipset(drive, mode);
-}
-
-static int hpt34x_udma_setup(struct ata_device *drive)
-{
-	struct hd_driveid *id = drive->id;
-	int on = 1;
-	int verbose = 1;
-
-	if (id && (id->capability & 1) && drive->channel->autodma) {
-		/* Consult the list of known "bad" drives */
-		if (udma_black_list(drive)) {
-			on = 0;
-			goto fast_ata_pio;
-		}
-		on = 0;
-		verbose = 0;
-		if (id->field_valid & 4) {
-			if (id->dma_ultra & 0x0007) {
-				/* Force if Capable UltraDMA */
-				on = config_chipset_for_dma(drive, 1);
-				if ((id->field_valid & 2) &&
-				    (!on))
-					goto try_dma_modes;
-			}
-		} else if (id->field_valid & 2) {
-try_dma_modes:
-			if ((id->dma_mword & 0x0007) ||
-			    (id->dma_1word & 0x0007)) {
-				/* Force if Capable regular DMA modes */
-				on = config_chipset_for_dma(drive, 0);
-				if (!on)
-					goto no_dma_set;
-			}
-		} else if (udma_white_list(drive)) {
-			if (id->eide_dma_time > 150) {
-				goto no_dma_set;
-			}
-			/* Consult the list of known "good" drives */
-			on = config_chipset_for_dma(drive, 0);
-			if (!on)
-				goto no_dma_set;
-		} else {
-			goto fast_ata_pio;
-		}
-	} else if ((id->capability & 8) || (id->field_valid & 2)) {
-fast_ata_pio:
-		on = 0;
-		verbose = 0;
-no_dma_set:
-		hpt34x_tune_chipset(drive, ata_best_pio_mode(drive));
-	}
-
-#ifndef CONFIG_HPT34X_AUTODMA
-	if (on)
-		on = 0;
-#endif
-	udma_enable(drive, on, verbose);
-
+#ifdef CONFIG_HPT34X_AUTODMA
+	return udma_generic_setup(drive, map);
+#else
 	return 0;
+#endif
 }
 
 static int hpt34x_udma_stop(struct ata_device *drive)
@@ -173,7 +103,7 @@ static int hpt34x_udma_init(struct ata_device *drive, struct request *rq)
 	u8 cmd;
 
 	if (!(count = udma_new_table(drive, rq)))
-		return ide_stopped;	/* try PIO instead of DMA */
+		return ATA_OP_FINISHED;	/* try PIO instead of DMA */
 
 	if (rq_data_dir(rq) == READ)
 		cmd = 0x09;
@@ -189,7 +119,7 @@ static int hpt34x_udma_init(struct ata_device *drive, struct request *rq)
 		OUT_BYTE((cmd == 0x09) ? WIN_READDMA : WIN_WRITEDMA, IDE_COMMAND_REG);
 	}
 
-	return ide_started;
+	return ATA_OP_CONTINUES;
 }
 #endif
 
@@ -252,24 +182,21 @@ static void __init ide_init_hpt34x(struct ata_channel *hwif)
 		unsigned short pcicmd = 0;
 
 		pci_read_config_word(hwif->pci_dev, PCI_COMMAND, &pcicmd);
-		if (!noautodma)
-			hwif->autodma = (pcicmd & PCI_COMMAND_MEMORY) ? 1 : 0;
-		else
-			hwif->autodma = 0;
-
+#ifdef CONFIG_IDEDMA_AUTO
+		hwif->autodma = (pcicmd & PCI_COMMAND_MEMORY) ? 1 : 0;
+#endif
 		hwif->udma_stop = hpt34x_udma_stop;
 		hwif->udma_init = hpt34x_udma_init;
+		hwif->modes_map = XFER_EPIO | XFER_SWDMA | XFER_MWDMA | XFER_UDMA;
+		hwif->no_atapi_autodma = 1;
 		hwif->udma_setup = hpt34x_udma_setup;
 		hwif->highmem = 1;
-	} else {
+	} else 
+#endif
+	{
 		hwif->drives[0].autotune = 1;
 		hwif->drives[1].autotune = 1;
 	}
-#else
-	hwif->drives[0].autotune = 1;
-	hwif->drives[1].autotune = 1;
-	hwif->autodma = 0;
-#endif
 }
 
 
@@ -281,7 +208,7 @@ static struct ata_pci_device chipset __initdata = {
 	init_channel:	ide_init_hpt34x,
 	bootable: NEVER_BOARD,
 	extra: 16,
-	flags: ATA_F_NOADMA | ATA_F_DMA
+	flags: ATA_F_DMA
 };
 
 int __init init_hpt34x(void)

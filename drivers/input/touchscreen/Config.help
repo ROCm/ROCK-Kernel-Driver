@@ -14,3 +14,13 @@ CONFIG_TOUCHSCREEN_GUNZE
   inserted in and removed from the running kernel whenever you want).
   The module will be called gunze.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_TOUCHSCREEN_BITSY
+  Say Y here if you have the h3600 (Bitsy) touchscreen.
+
+  If unsure, say N.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called gunze.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.

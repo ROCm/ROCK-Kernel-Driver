@@ -38,7 +38,6 @@ struct saved_context {
                        : /* no output */ \
                        :"r" ((thread)->debugreg[register]))
 
-extern void do_fpu_end(void);
 extern void fix_processor_context(void);
 extern void do_magic(int resume);
 

@@ -169,16 +169,17 @@ asmlinkage long sys_msync(unsigned long start, size_t len, int flags)
 {
 	unsigned long end;
 	struct vm_area_struct * vma;
-	int unmapped_error, error = -ENOMEM;
+	int unmapped_error, error = -EINVAL;
 
 	down_read(&current->mm->mmap_sem);
+	if (flags & ~(MS_ASYNC | MS_INVALIDATE | MS_SYNC))
+		goto out;
 	if (start & ~PAGE_MASK)
 		goto out;
+	error = -ENOMEM;
 	len = (len + ~PAGE_MASK) & PAGE_MASK;
 	end = start + len;
 	if (end < start)
-		goto out;
-	if (flags & ~(MS_ASYNC | MS_INVALIDATE | MS_SYNC))
 		goto out;
 	error = 0;
 	if (end == start)

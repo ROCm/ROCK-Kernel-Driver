@@ -141,9 +141,10 @@ struct vlan_skb_tx_cookie {
 	(VLAN_TX_SKB_CB(__skb)->magic == VLAN_TX_COOKIE_MAGIC)
 #define vlan_tx_tag_get(__skb)	(VLAN_TX_SKB_CB(__skb)->vlan_tag)
 
-/* VLAN rx hw acceleration helper.  This acts like netif_rx().  */
-static inline int vlan_hwaccel_rx(struct sk_buff *skb, struct vlan_group *grp,
-				  unsigned short vlan_tag)
+/* VLAN rx hw acceleration helper.  This acts like netif_{rx,receive_skb}(). */
+static inline int __vlan_hwaccel_rx(struct sk_buff *skb,
+				    struct vlan_group *grp,
+				    unsigned short vlan_tag, int polling)
 {
 	struct net_device_stats *stats;
 
@@ -182,9 +183,22 @@ static inline int vlan_hwaccel_rx(struct sk_buff *skb, struct vlan_group *grp,
 		break;
 	};
 
-	return netif_rx(skb);
+	return (polling ? netif_receive_skb(skb) : netif_rx(skb));
 }
 
+static inline int vlan_hwaccel_rx(struct sk_buff *skb,
+				  struct vlan_group *grp,
+				  unsigned short vlan_tag)
+{
+	return __vlan_hwaccel_rx(skb, grp, vlan_tag, 0);
+}
+
+static inline int vlan_hwaccel_receive_skb(struct sk_buff *skb,
+					   struct vlan_group *grp,
+					   unsigned short vlan_tag)
+{
+	return __vlan_hwaccel_rx(skb, grp, vlan_tag, 1);
+}
 #endif /* __KERNEL__ */
 
 /* VLAN IOCTLs are found in sockios.h */

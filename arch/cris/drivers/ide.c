@@ -703,11 +703,11 @@ static ide_startstop_t etrax_dma_intr(struct ata_device *drive, struct request *
 				i -= rq->current_nr_sectors;
 				ide_end_request(drive, rq, 1);
 			}
-			return ide_stopped;
+			return ATA_OP_FINISHED;
 		}
 		printk("%s: bad DMA status\n", drive->name);
 	}
-	return ata_error(drive, __FUNCTION__);
+	return ata_error(drive, rq, __FUNCTION__);
 }
 
 /*

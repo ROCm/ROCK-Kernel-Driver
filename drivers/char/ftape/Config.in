@@ -35,7 +35,7 @@ if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
    int '  Maximal data rate to use (EXPERIMENTAL)' CONFIG_FT_FDC_MAX_RATE 2000
 fi
 
-if [ "$ARCH" = "alpha" ]; then
+if [ "$CONFIG_ALPHA" = "y" ]; then
    int '  CPU clock frequency of your DEC Alpha' CONFIG_FT_ALPHA_CLOCK 0
 else
    define_int CONFIG_FT_ALPHA_CLOCK 0

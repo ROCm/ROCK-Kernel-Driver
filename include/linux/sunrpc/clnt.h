@@ -15,6 +15,7 @@
 #include <linux/sunrpc/auth.h>
 #include <linux/sunrpc/stats.h>
 #include <linux/sunrpc/xdr.h>
+#include <linux/sunrpc/timer.h>
 #include <asm/signal.h>
 
 /*
@@ -51,6 +52,8 @@ struct rpc_clnt {
 				cl_dead     : 1;/* abandoned */
 	unsigned int		cl_flags;	/* misc client flags */
 	unsigned long		cl_hardmax;	/* max hard timeout */
+
+	struct rpc_rtt		cl_rtt;		/* RTO estimator data */
 
 	struct rpc_portmap	cl_pmap;	/* port mapping */
 	struct rpc_wait_queue	cl_bindwait;	/* waiting on getport() */
@@ -91,6 +94,7 @@ struct rpc_procinfo {
 	kxdrproc_t		p_decode;	/* XDR decode function */
 	unsigned int		p_bufsiz;	/* req. buffer size */
 	unsigned int		p_count;	/* call count */
+	unsigned int		p_timer;	/* Which RTT timer to use */
 };
 
 #define rpcproc_bufsiz(clnt, proc)	((clnt)->cl_procinfo[proc].p_bufsiz)
@@ -98,6 +102,7 @@ struct rpc_procinfo {
 #define rpcproc_decode(clnt, proc)	((clnt)->cl_procinfo[proc].p_decode)
 #define rpcproc_name(clnt, proc)	((clnt)->cl_procinfo[proc].p_procname)
 #define rpcproc_count(clnt, proc)	((clnt)->cl_procinfo[proc].p_count)
+#define rpcproc_timer(clnt, proc)	((clnt)->cl_procinfo[proc].p_timer)
 
 #define RPC_CONGESTED(clnt)	(RPCXPRT_CONGESTED((clnt)->cl_xprt))
 #define RPC_PEERADDR(clnt)	(&(clnt)->cl_xprt->addr)

@@ -688,7 +688,7 @@ static int set_rtc_mmss(unsigned long nowtime)
 
 	/* 
 	 * Not having a register set can lead to trouble.
-	 * Also starfire doesnt have a tod clock.
+	 * Also starfire doesn't have a tod clock.
 	 */
 	if (!mregs && !dregs) 
 		return -1;

@@ -3,7 +3,7 @@
  *
  *  Copyright (C) 2001 Deep Blue Solutions Ltd.
  *
- *  $Id: cpu.c,v 1.4 2002/05/29 11:41:55 rmk Exp $
+ *  $Id: cpu.c,v 1.5 2002/07/06 16:53:17 rmk Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -121,8 +121,16 @@ static int __init cpu_init(void)
 	cpu_freq_khz = vco_to_freq(vco, 1);
 
 #ifdef CONFIG_CPU_FREQ
-	cpufreq_init(cpu_freq_khz, 1000, 0);
-	cpufreq_setfunctions(integrator_validatespeed, integrator_setspeed);
+	{
+		struct cpufreq_driver cpufreq_driver;
+
+		cpufreq_driver.freq.min = 12000;
+		cpufreq_driver.freq.max = 160000;
+		cpufreq_driver.freq.cur = cpu_freq_khz;
+		cpufreq_driver.validate = &integrator_validatespeed;
+		cpufreq_driver.setspeed = &integrator_setspeed;
+		cpufreq_register(cpufreq_driver);
+	}
 #endif
 
 	cm_stat = __raw_readl(CM_STAT);

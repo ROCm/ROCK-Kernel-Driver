@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acdebug.h - ACPI/AML debugger
- *       $Revision: 61 $
+ *       $Revision: 62 $
  *
  *****************************************************************************/
 
@@ -211,6 +211,10 @@ acpi_db_display_opcode (
 void
 acpi_db_decode_internal_object (
 	acpi_operand_object     *obj_desc);
+
+void
+acpi_db_decode_node (
+	acpi_namespace_node     *node);
 
 u32
 acpi_db_block_type (
