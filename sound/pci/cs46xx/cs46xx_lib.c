@@ -2849,23 +2849,11 @@ static long snd_cs46xx_io_read(snd_info_entry_t *entry, void *file_private_data,
 	if (file->f_pos + (size_t)size > region->size)
 		size = region->size - file->f_pos;
 	if (size > 0) {
-		char *tmp;
-		long res;
-		unsigned long virt;
-		if ((tmp = kmalloc(size, GFP_KERNEL)) == NULL)
-			return -ENOMEM;
-		virt = region->remap_addr + file->f_pos;
-		memcpy_fromio(tmp, virt, size);
-		if (copy_to_user(buf, tmp, size))
-			res = -EFAULT;
-		else {
-			res = size;
-			file->f_pos += size;
-		}
-		kfree(tmp);
-		return res;
+		if (copy_to_user_fromio(buf, region->remap_addr + file->f_pos, size))
+			return -EFAULT;
+		file->f_pos += size;
 	}
-	return 0;
+	return size;
 }
 
 static struct snd_info_entry_ops snd_cs46xx_proc_io_ops = {

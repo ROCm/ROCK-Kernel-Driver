@@ -335,7 +335,7 @@ snd_nm256_write_buffer(nm256_t *chip, void *src, int offset, int size)
 		return;
 	}
 #endif
-	memcpy_toio(chip->buffer + offset, src, size);
+	memcpy_toio((void *)chip->buffer + offset, src, size);
 }
 
 /*

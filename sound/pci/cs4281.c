@@ -1178,23 +1178,11 @@ static long snd_cs4281_BA0_read(snd_info_entry_t *entry, void *file_private_data
 	if (file->f_pos + size > CS4281_BA0_SIZE)
 		size = (long)CS4281_BA0_SIZE - file->f_pos;
 	if (size > 0) {
-		char *tmp;
-		long res;
-		unsigned long virt;
-		if ((tmp = kmalloc(size, GFP_KERNEL)) == NULL)
-			return -ENOMEM;
-		virt = chip->ba0 + file->f_pos;
-		memcpy_fromio(tmp, virt, size);
-		if (copy_to_user(buf, tmp, size))
-			res = -EFAULT;
-		else {
-			res = size;
-			file->f_pos += size;
-		}
-		kfree(tmp);
-		return res;
+		if (copy_to_user_fromio(buf, chip->ba0 + file->f_pos, size))
+			return -EFAULT;
+		file->f_pos += size;
 	}
-	return 0;
+	return size;
 }
 
 static long snd_cs4281_BA1_read(snd_info_entry_t *entry, void *file_private_data,
@@ -1207,23 +1195,11 @@ static long snd_cs4281_BA1_read(snd_info_entry_t *entry, void *file_private_data
 	if (file->f_pos + size > CS4281_BA1_SIZE)
 		size = (long)CS4281_BA1_SIZE - file->f_pos;
 	if (size > 0) {
-		char *tmp;
-		long res;
-		unsigned long virt;
-		if ((tmp = kmalloc(size, GFP_KERNEL)) == NULL)
-			return -ENOMEM;
-		virt = chip->ba1 + file->f_pos;
-		memcpy_fromio(tmp, virt, size);
-		if (copy_to_user(buf, tmp, size))
-			res = -EFAULT;
-		else {
-			res = size;
-			file->f_pos += size;
-		}
-		kfree(tmp);
-		return res;
+		if (copy_to_user_fromio(buf, chip->ba1 + file->f_pos, size))
+			return -EFAULT;
+		file->f_pos += size;
 	}
-	return 0;
+	return size;
 }
 
 static struct snd_info_entry_ops snd_cs4281_proc_ops_BA0 = {
