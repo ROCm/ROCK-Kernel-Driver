@@ -657,6 +657,7 @@ static struct dentry *nfs_lookup(struct inode *dir, struct dentry * dentry)
 out_unlock:
 	unlock_kernel();
 out:
+	BUG_ON(error > 0);
 	return ERR_PTR(error);
 }
 
