@@ -405,13 +405,7 @@ err_out:
 
 static int __init sil_init(void)
 {
-	int rc;
-
-	rc = pci_module_init(&sil_pci_driver);
-	if (rc)
-		return rc;
-
-	return 0;
+	return pci_module_init(&sil_pci_driver);
 }
 
 static void __exit sil_exit(void)
