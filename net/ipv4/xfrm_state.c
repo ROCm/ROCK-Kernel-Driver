@@ -28,7 +28,7 @@ DECLARE_WAIT_QUEUE_HEAD(km_waitq);
 
 static void __xfrm_state_delete(struct xfrm_state *x);
 
-unsigned long make_jiffies(long secs)
+static inline unsigned long make_jiffies(long secs)
 {
 	if (secs >= (MAX_SCHEDULE_TIMEOUT-1)/HZ)
 		return MAX_SCHEDULE_TIMEOUT-1;
@@ -92,7 +92,14 @@ resched:
 	goto out;
 
 expired:
-	km_expired(x);
+	if (x->km.state == XFRM_STATE_ACQ && x->id.spi == 0) {
+		x->km.state = XFRM_STATE_EXPIRED;
+		wake_up(&km_waitq);
+		next = 2;
+		goto resched;
+	}
+	if (x->id.spi != 0)
+		km_expired(x);
 	__xfrm_state_delete(x);
 
 out:
@@ -298,11 +305,13 @@ xfrm_state_find(u32 daddr, u32 saddr, struct flowi *fl, struct xfrm_tmpl *tmpl,
 			x->km.state = XFRM_STATE_DEAD;
 			xfrm_state_put(x);
 			x = NULL;
+			error = 1;
 		}
 	}
 	spin_unlock_bh(&xfrm_state_lock);
 	if (!x)
-		*err = acquire_in_progress ? -EAGAIN : -ENOMEM;
+		*err = acquire_in_progress ? -EAGAIN :
+			(error ? -ESRCH : -ENOMEM);
 	return x;
 }
 
@@ -612,6 +621,7 @@ void km_expired(struct xfrm_state *x)
 	list_for_each_entry(km, &xfrm_km_list, list)
 		km->notify(x, 1);
 	read_unlock(&xfrm_km_lock);
+	wake_up(&km_waitq);
 }
 
 int km_query(struct xfrm_state *x, struct xfrm_tmpl *t, struct xfrm_policy *pol)
