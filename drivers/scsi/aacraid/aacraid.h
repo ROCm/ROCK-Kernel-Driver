@@ -713,6 +713,24 @@ struct rx_registers {
 #define rx_writeb(AEP, CSR, value)	writeb(value, &((AEP)->regs.rx->CSR))
 #define rx_writel(AEP, CSR, value)	writel(value, &((AEP)->regs.rx->CSR))
 
+/*
+ *	Rkt Message Unit Registers (same as Rx, except a larger reserve region)
+ */
+
+#define rkt_mu_registers rx_mu_registers
+#define rkt_inbound rx_inbound
+
+struct rkt_registers {
+	struct rkt_mu_registers		MUnit;		 /* 1300h - 1334h */
+	u32				reserved1[1010]; /* 1338h - 22fch */
+	struct rkt_inbound		IndexRegs;	 /* 2300h - */
+};
+
+#define rkt_readb(AEP, CSR)		readb(&((AEP)->regs.rkt->CSR))
+#define rkt_readl(AEP, CSR)		readl(&((AEP)->regs.rkt->CSR))
+#define rkt_writeb(AEP, CSR, value)	writeb(value, &((AEP)->regs.rkt->CSR))
+#define rkt_writel(AEP, CSR, value)	writel(value, &((AEP)->regs.rkt->CSR))
+
 struct fib;
 
 typedef void (*fib_callback)(void *ctxt, struct fib *fibctx);
@@ -889,7 +907,9 @@ struct aac_dev
 	{
 		struct sa_registers *sa;
 		struct rx_registers *rx;
+		struct rkt_registers *rkt;
 	} regs;
+	u32			OIMR; /* Mask Register Cache */
 	/*
 	 *	The following is the number of the individual adapter
 	 */
@@ -1492,6 +1512,7 @@ int aac_scsi_cmd(struct scsi_cmnd *cmd);
 int aac_dev_ioctl(struct aac_dev *dev, int cmd, void *arg);
 int aac_do_ioctl(struct aac_dev * dev, int cmd, void *arg);
 int aac_rx_init(struct aac_dev *dev, unsigned long devNumber);
+int aac_rkt_init(struct aac_dev *dev, unsigned long devNumber);
 int aac_sa_init(struct aac_dev *dev, unsigned long devNumber);
 unsigned int aac_response_normal(struct aac_queue * q);
 unsigned int aac_command_normal(struct aac_queue * q);
