@@ -17,9 +17,14 @@ choice
 	default MPC8540_ADS
 
 config MPC8540_ADS
-	bool "MPC8540ADS"
+	bool "Freescale MPC8540 ADS"
 	help
 	  This option enables support for the MPC 8540 ADS evaluation board.
+
+config MPC8560_ADS
+	bool "Freescale MPC8560 ADS"
+	help
+	  This option enables support for the MPC 8560 ADS evaluation board.
 
 config SBC8560
 	bool "WindRiver PowerQUICC III SBC8560"
@@ -39,7 +44,7 @@ config MPC8540
 
 config MPC8560
 	bool
-	depends on SBC8560
+	depends on SBC8560 || MPC8560_ADS
 	default y
 
 config FSL_OCP

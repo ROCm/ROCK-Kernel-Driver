@@ -650,7 +650,7 @@ config 8272
 
 config CPM2
 	bool
-	depends on 8260
+	depends on 8260 || MPC8560
 	default y
 	help
 	  The CPM2 (Communications Processor Module) is a coprocessor on

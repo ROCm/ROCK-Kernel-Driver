@@ -1,5 +1,5 @@
 /*
- * arch/ppc/platforms/85xx/mpc8540_ads.h
+ * arch/ppc/platforms/mpc8560_ads.h
  *
  * MPC8540ADS board definitions
  *
@@ -14,16 +14,14 @@
  *
  */
 
-#ifndef __MACH_MPC8540ADS_H__
-#define __MACH_MPC8540ADS_H__
+#ifndef __MACH_MPC8560ADS_H
+#define __MACH_MPC8560ADS_H
 
 #include <linux/config.h>
-#include <linux/initrd.h>
 #include <syslib/ppc85xx_setup.h>
 #include <platforms/85xx/mpc85xx_ads_common.h>
 
-#define SERIAL_PORT_DFNS	\
-	STD_UART_OP(0)		\
-	STD_UART_OP(1)
+#define CPM_MAP_ADDR	(CCSRBAR + MPC85xx_CPM_OFFSET)
+#define PHY_INTERRUPT	MPC85xx_IRQ_EXT7
 
-#endif /* __MACH_MPC8540ADS_H__ */
+#endif				/* __MACH_MPC8560ADS_H */
