@@ -154,7 +154,7 @@ static int get_nodes(unsigned long *nodes, unsigned long *nmask,
 	}
 
 	bitmap_clear(nodes, MAX_NUMNODES);
-	if (nodes) {
+	if (nmask) {
 		if (copy_from_user(nodes, nmask, nlongs*sizeof(unsigned long)))
 			return -EFAULT;
 	}
