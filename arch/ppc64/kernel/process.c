@@ -147,7 +147,6 @@ EXPORT_SYMBOL(enable_kernel_altivec);
  */
 void flush_altivec_to_thread(struct task_struct *tsk)
 {
-#ifdef CONFIG_ALTIVEC
 	if (tsk->thread.regs) {
 		preempt_disable();
 		if (tsk->thread.regs->msr & MSR_VEC) {
@@ -158,7 +157,6 @@ void flush_altivec_to_thread(struct task_struct *tsk)
 		}
 		preempt_enable();
 	}
-#endif
 }
 
 int dump_task_altivec(struct pt_regs *regs, elf_vrregset_t *vrregs)
