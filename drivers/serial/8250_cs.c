@@ -43,7 +43,6 @@
 #include <linux/serial.h>
 #include <linux/serial_core.h>
 #include <linux/major.h>
-#include <linux/workqueue.h>
 #include <asm/io.h>
 #include <asm/system.h>
 
@@ -108,7 +107,6 @@ struct serial_info {
 	int			manfid;
 	dev_node_t		node[4];
 	int			line[4];
-	struct work_struct	remove;
 };
 
 static void serial_config(dev_link_t * link);
@@ -124,20 +122,19 @@ static dev_link_t *dev_list = NULL;
 
 /*======================================================================
 
-    After a card is removed, do_serial_release() will unregister
+    After a card is removed, serial_remove() will unregister
     the serial device(s), and release the PCMCIA configuration.
     
 ======================================================================*/
 
-/*
- * This always runs in process context.
- */
-static void do_serial_release(void *arg)
+static void serial_remove(dev_link_t *link)
 {
-	struct serial_info *info = arg;
-	int i;
+	struct serial_info *info = link->priv;
+	int i, ret;
 
-	DEBUG(0, "serial_release(0x%p)\n", &info->link);
+	link->state &= ~DEV_PRESENT;
+
+	DEBUG(0, "serial_release(0x%p)\n", link);
 
 	/*
 	 * Recheck to see if the device is still configured.
@@ -156,25 +153,6 @@ static void do_serial_release(void *arg)
 
 		info->link.state &= ~DEV_CONFIG;
 	}
-}
-
-/*
- * This may be called from IRQ context.
- */
-static void serial_remove(dev_link_t *link)
-{
-	struct serial_info *info = link->priv;
-
-	link->state &= ~DEV_PRESENT;
-
-	/*
-	 * FIXME: Since the card has probably been removed,
-	 * we should call into the serial layer and hang up
-	 * the ports on the card immediately.
-	 */
-
-	if (link->state & DEV_CONFIG)
-		schedule_work(&info->remove);
 }
 
 /*======================================================================
@@ -201,8 +179,6 @@ static dev_link_t *serial_attach(void)
 	memset(info, 0, sizeof (*info));
 	link = &info->link;
 	link->priv = info;
-
-	INIT_WORK(&info->remove, do_serial_release, info);
 
 	link->io.Attributes1 = IO_DATA_PATH_WIDTH_8;
 	link->io.NumPorts1 = 8;
@@ -275,7 +251,7 @@ static void serial_detach(dev_link_t * link)
 	/*
 	 * Ensure that the ports have been released.
 	 */
-	do_serial_release(info);
+	serial_remove(link);
 
 	if (link->handle) {
 		ret = CardServices(DeregisterClient, link->handle);
@@ -631,7 +607,7 @@ void serial_config(dev_link_t * link)
  cs_failed:
 	cs_error(link->handle, last_fn, last_ret);
  failed:
-	do_serial_release(info);
+	serial_remove(link);
 }
 
 /*======================================================================
