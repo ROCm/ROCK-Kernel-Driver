@@ -490,6 +490,18 @@ static void ub_id_put(int id)
  */
 static void ub_cleanup(struct ub_dev *sc)
 {
+
+	/*
+	 * If we zero disk->private_data BEFORE put_disk, we have to check
+	 * for NULL all over the place in open, release, check_media and
+	 * revalidate, because the block level semaphore is well inside the
+	 * put_disk. But we cannot zero after the call, because *disk is gone.
+	 * The sd.c is blatantly racy in this area.
+	 */
+	/* disk->private_data = NULL; */
+	put_disk(sc->disk);
+	sc->disk = NULL;
+
 	ub_id_put(sc->id);
 	kfree(sc);
 }
@@ -1413,7 +1425,15 @@ static int ub_bd_open(struct inode *inode, struct file *filp)
 	if (sc->removable || sc->readonly)
 		check_disk_change(inode->i_bdev);
 
-	/* XXX sd.c and floppy.c bail on open if media is not present. */
+	/*
+	 * The sd.c considers ->media_present and ->changed not equivalent,
+	 * under some pretty murky conditions (a failure of READ CAPACITY).
+	 * We may need it one day.
+	 */
+	if (sc->removable && sc->changed && !(filp->f_flags & O_NDELAY)) {
+		rc = -ENOMEDIUM;
+		goto err_open;
+	}
 
 	if (sc->readonly && (filp->f_mode & FMODE_WRITE)) {
 		rc = -EROFS;
@@ -1498,8 +1518,11 @@ static int ub_bd_revalidate(struct gendisk *disk)
 	printk(KERN_INFO "%s: device %u capacity nsec %ld bsize %u\n",
 	    sc->name, sc->dev->devnum, sc->capacity.nsec, sc->capacity.bsize);
 
+	/* XXX Support sector size switching like in sr.c */
+	// blk_queue_hardsect_size(q, sc->capacity.bsize);
 	set_capacity(disk, sc->capacity.nsec);
 	// set_disk_ro(sdkp->disk, sc->readonly);
+
 	return 0;
 }
 
@@ -1746,12 +1769,7 @@ static int ub_probe_clear_stall(struct ub_dev *sc, int stalled_pipe)
 	wait_for_completion(&compl);
 
 	del_timer_sync(&timer);
-	/*
-	 * Most of the time, URB was done and dev set to NULL, and so
-	 * the unlink bounces out with ENODEV. We do not call usb_kill_urb
-	 * because we still think about a backport to 2.4.
-	 */
-	usb_unlink_urb(&sc->work_urb);
+	usb_kill_urb(&sc->work_urb);
 
 	/* reset the endpoint toggle */
 	usb_settoggle(sc->dev, endp, usb_pipeout(sc->last_pipe), 0);
@@ -2009,17 +2027,6 @@ static void ub_disconnect(struct usb_interface *intf)
 		del_gendisk(disk);
 	if (q)
 		blk_cleanup_queue(q);
-
-	/*
-	 * If we zero disk->private_data BEFORE put_disk, we have to check
-	 * for NULL all over the place in open, release, check_media and
-	 * revalidate, because the block level semaphore is well inside the
-	 * put_disk. But we cannot zero after the call, because *disk is gone.
-	 * The sd.c is blatantly racy in this area.
-	 */
-	/* disk->private_data = NULL; */
-	put_disk(disk);
-	sc->disk = NULL;
 
 	/*
 	 * We really expect blk_cleanup_queue() to wait, so no amount
