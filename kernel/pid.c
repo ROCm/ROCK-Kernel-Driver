@@ -1,7 +1,8 @@
 /*
  * Generic pidhash and scalable, time-bounded PID allocator
  *
- * (C) 2002-2004 William Irwin, Oracle
+ * (C) 2002-2003 William Irwin, IBM
+ * (C) 2004 William Irwin, Oracle
  * (C) 2002-2004 Ingo Molnar, Red Hat
  *
  * pid-structures are backing objects for tasks sharing a given ID to chain
