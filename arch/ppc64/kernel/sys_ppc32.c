@@ -1948,7 +1948,7 @@ asmlinkage long sys32_ipc(u32 call, u32 first_parm, u32 second_parm, u32 third_p
 		err = do_sys32_shmctl(first, second, (void *)AA(ptr));
 		break;
 	default:
-		err = -EINVAL;
+		err = -ENOSYS;
 		break;
 	}
 	return err;
