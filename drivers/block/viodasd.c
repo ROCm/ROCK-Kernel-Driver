@@ -70,7 +70,6 @@ enum {
 	MAX_DISK_NAME = sizeof(((struct gendisk *)0)->disk_name)
 };
 
-static int		viodasd_max_disk;
 static spinlock_t	viodasd_spinlock = SPIN_LOCK_UNLOCKED;
 
 #define VIOMAXREQ		16
@@ -209,7 +208,6 @@ static int viodasd_open(struct inode *ino, struct file *fil)
 				(int)we.rc, we.sub_result, err->msg);
 		return -EIO;
 	}
-	viodasd_max_disk = we.max_disk;
 
 	return 0;
 }
@@ -483,7 +481,17 @@ static void probe_disk(struct viodasd_device *d)
 
 	if (we.rc != 0)
 		return;
-	viodasd_max_disk = we.max_disk;
+	if (we.max_disk > (MAX_DISKNO - 1)) {
+		static int warned;
+
+		if (warned == 0) {
+			warned++;
+			printk(VIOD_KERN_INFO
+				"Only examining the first %d "
+				"of %d disks connected\n",
+				MAX_DISKNO, we.max_disk + 1);
+		}
+	}
 
 	/* Send the close event to OS/400.  We DON'T expect a response */
 	hvrc = HvCallEvent_signalLpEventFast(viopath_hostLp,
@@ -744,21 +752,8 @@ static int __init viodasd_init(void)
 	/* Initialize our request handler */
 	vio_setHandler(viomajorsubtype_blockio, handle_block_event);
 
-	viodasd_max_disk = MAX_DISKNO - 1;
-	for (i = 0; (i <= viodasd_max_disk) && (i < MAX_DISKNO); i++) {
-		/*
-		 * Note that probe_disk has side effects:
-		 *  a) it updates the size of the disk
-		 *  b) it updates viodasd_max_disk
-		 *  c) it registers the disk if it has not done so already
-		 */
+	for (i = 0; i < MAX_DISKNO; i++)
 		probe_disk(&viodasd_devices[i]);
-	}
-
-	if (viodasd_max_disk > (MAX_DISKNO - 1))
-		printk(VIOD_KERN_INFO
-			"Only examining the first %d of %d disks connected\n",
-			MAX_DISKNO, viodasd_max_disk + 1);
 
 	return 0;
 }
