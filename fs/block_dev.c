@@ -220,7 +220,7 @@ static int block_fsync(struct file *filp, struct dentry *dentry, int datasync)
  * pseudo-fs
  */
 
-static struct super_block *bd_read_super(struct super_block *sb, void *data, int silent)
+static int bd_fill_super(struct super_block *sb, void *data, int silent)
 {
 	static struct super_operations sops = {};
 	struct inode *root;
@@ -232,22 +232,33 @@ static struct super_block *bd_read_super(struct super_block *sb, void *data, int
 	sb->s_op = &sops;
 	root = new_inode(sb);
 	if (!root)
-		return NULL;
+		return -ENOMEM;
 	root->i_mode = S_IFDIR | S_IRUSR | S_IWUSR;
 	root->i_uid = root->i_gid = 0;
 	root->i_atime = root->i_mtime = root->i_ctime = CURRENT_TIME;
 	sb->s_root = d_alloc(NULL, &(const struct qstr) { "bdev:", 5, 0 });
 	if (!sb->s_root) {
 		iput(root);
-		return NULL;
+		return -ENOMEM;
 	}
 	sb->s_root->d_sb = sb;
 	sb->s_root->d_parent = sb->s_root;
 	d_instantiate(sb->s_root, root);
-	return sb;
+	return 0;
 }
 
-static DECLARE_FSTYPE(bd_type, "bdev", bd_read_super, FS_NOMOUNT);
+static struct super_block *bd_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_nodev(fs_type, flags, data, bd_fill_super);
+}
+
+static struct file_system_type bd_type = {
+	owner:		THIS_MODULE,
+	name:		"bdev",
+	get_sb:		bd_get_sb,
+	fs_flags:	FS_NOMOUNT,
+};
 
 static struct vfsmount *bd_mnt;
 
