@@ -43,7 +43,7 @@
  * assuming we won't have both UniNorth and Bandit */
 static int has_uninorth;
 static struct pci_controller *u3_agp;
-struct pci_dev *k2_skiplist[2];
+struct device_node *k2_skiplist[2];
 
 static int __init fixup_one_level_bus_range(struct device_node *node, int higher)
 {
@@ -233,15 +233,6 @@ static int u3_ht_skip_device(struct pci_controller *hose,
 	struct device_node *busdn, *dn;
 	int i;
 
-	/*
-	 * When a device in K2 is powered down, we die on config
-	 * cycle accesses. Fix that here.
-	 */
-	for (i=0; i<2; i++)
-		if (k2_skiplist[i] && k2_skiplist[i]->bus == bus &&
-		    k2_skiplist[i]->devfn == devfn)
-			return 1;
-
 	/* We only allow config cycles to devices that are in OF device-tree
 	 * as we are apparently having some weird things going on with some
 	 * revs of K2 on recent G5s
@@ -255,6 +246,14 @@ static int u3_ht_skip_device(struct pci_controller *hose,
 			break;
 	if (dn == NULL)
 		return -1;
+
+	/*
+	 * When a device in K2 is powered down, we die on config
+	 * cycle accesses. Fix that here.
+	 */
+	for (i=0; i<2; i++)
+		if (k2_skiplist[i] == dn)
+			return 1;
 
 	return 0;
 }

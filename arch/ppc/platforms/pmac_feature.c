@@ -56,7 +56,7 @@ extern int powersave_lowspeed;
 #endif
 
 extern int powersave_nap;
-extern struct pci_dev *k2_skiplist[2];
+extern struct device_node *k2_skiplist[2];
 
 
 /*
@@ -1328,16 +1328,7 @@ g5_gmac_enable(struct device_node* node, long param, long value)
 {
 	struct macio_chip* macio = &macio_chips[0];
 	unsigned long flags;
-	struct pci_dev *pdev;
 	u8 pbus, pid;
-
-	/* XXX FIXME: We should fix pci_device_from_OF_node here, and
-	 * get to a real pci_dev or we'll get into trouble with PCI
-	 * domains the day we get overlapping numbers (like if we ever
-	 * decide to show the HT root
-	 */
-	if (pci_device_from_OF_node(node, &pbus, &pid) == 0)
-		pdev = pci_find_slot(pbus, pid);
 
 	LOCK(flags);
 	if (value) {
@@ -1345,7 +1336,7 @@ g5_gmac_enable(struct device_node* node, long param, long value)
 		mb();
 		k2_skiplist[0] = NULL;
 	} else {
-		k2_skiplist[0] = pdev;
+		k2_skiplist[0] = node;
 		mb();
 		MACIO_BIC(KEYLARGO_FCR1, K2_FCR1_GMAC_CLK_ENABLE);
 	}
@@ -1361,16 +1352,6 @@ g5_fw_enable(struct device_node* node, long param, long value)
 {
 	struct macio_chip* macio = &macio_chips[0];
 	unsigned long flags;
-	struct pci_dev *pdev;
-	u8 pbus, pid;
-
-	/* XXX FIXME: We should fix pci_device_from_OF_node here, and
-	 * get to a real pci_dev or we'll get into trouble with PCI
-	 * domains the day we get overlapping numbers (like if we ever
-	 * decide to show the HT root
-	 */
-	if (pci_device_from_OF_node(node, &pbus, &pid) == 0)
-		pdev = pci_find_slot(pbus, pid);
 
 	LOCK(flags);
 	if (value) {
@@ -1378,7 +1359,7 @@ g5_fw_enable(struct device_node* node, long param, long value)
 		mb();
 		k2_skiplist[1] = NULL;
 	} else {
-		k2_skiplist[1] = pdev;
+		k2_skiplist[1] = node;
 		mb();
 		MACIO_BIC(KEYLARGO_FCR1, K2_FCR1_FW_CLK_ENABLE);
 	}
