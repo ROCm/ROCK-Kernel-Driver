@@ -835,9 +835,10 @@ sd_spinup_disk(struct scsi_disk *sdkp, char *diskname,
 
 			the_result = SRpnt->sr_result;
 			retries++;
-		} while (retries < 3 && !scsi_status_is_good(the_result)
-			 && ((driver_byte(the_result) & DRIVER_SENSE)
-			     && SRpnt->sr_sense_buffer[2] == UNIT_ATTENTION));
+		} while (retries < 3 && 
+			 (!scsi_status_is_good(the_result) ||
+			  ((driver_byte(the_result) & DRIVER_SENSE) &&
+			   SRpnt->sr_sense_buffer[2] == UNIT_ATTENTION)));
 
 		/*
 		 * If the drive has indicated to us that it doesn't have
