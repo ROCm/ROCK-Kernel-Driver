@@ -445,6 +445,7 @@ setup_frame (int sig, struct k_sigaction *ka, siginfo_t *info, sigset_t *set,
 	scr->pt.ar_fpsr = FPSR_DEFAULT;			/* reset fpsr for signal handler */
 	scr->pt.cr_iip = tramp_addr;
 	ia64_psr(&scr->pt)->ri = 0;			/* start executing in first slot */
+	ia64_psr(&scr->pt)->be = 0;			/* force little-endian byte-order */
 	/*
 	 * Force the interruption function mask to zero.  This has no effect when a
 	 * system-call got interrupted by a signal (since, in that case, scr->pt_cr_ifs is
