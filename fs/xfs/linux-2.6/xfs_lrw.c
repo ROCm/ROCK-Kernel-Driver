@@ -81,7 +81,7 @@ void
 xfs_rw_enter_trace(
 	int			tag,
 	xfs_iocore_t		*io,
-	const struct iovec	*iovp,
+	void			*data,
 	size_t			segs,
 	loff_t			offset,
 	int			ioflags)
@@ -95,7 +95,7 @@ xfs_rw_enter_trace(
 		(void *)ip,
 		(void *)((unsigned long)((ip->i_d.di_size >> 32) & 0xffffffff)),
 		(void *)((unsigned long)(ip->i_d.di_size & 0xffffffff)),
-		(void *)(__psint_t)iovp,
+		(void *)data,
 		(void *)((unsigned long)segs),
 		(void *)((unsigned long)((offset >> 32) & 0xffffffff)),
 		(void *)((unsigned long)(offset & 0xffffffff)),
