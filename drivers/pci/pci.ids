@@ -5684,7 +5684,15 @@
 		1166 1648  NetXtreme CIOB-E 1000Base-T
 	164d  NetXtreme BCM5702FE Gigabit Ethernet
 	1653  NetXtreme BCM5705 Gigabit Ethernet
+	1654  NetXtreme BCM5705_2 Gigabit Ethernet
+	1658  NetXtreme BCM5720 Gigabit Ethernet
+	1659  NetXtreme BCM5721 Gigabit Ethernet
 	165d  NetXtreme BCM5705M Gigabit Ethernet
+	165e  NetXtreme BCM5705M_2 Gigabit Ethernet
+	166e  NetXtreme BCM5705F Gigabit Ethernet
+	1676  NetXtreme BCM5750 Gigabit Ethernet
+	1677  NetXtreme BCM5751 Gigabit Ethernet
+	167c  NetXtreme BCM5750M Gigabit Ethernet
 	1696  NetXtreme BCM5782 Gigabit Ethernet
 		14e4 000d  NetXtreme BCM5782 1000Base-T
 	169c  NetXtreme BCM5788 Gigabit Ethernet
@@ -5709,6 +5717,8 @@
 	16c7  NetXtreme BCM5703 Gigabit Ethernet
 		14e4 0009  NetXtreme BCM5703 1000Base-T
 		14e4 000a  NetXtreme BCM5703 1000Base-SX
+	170d  NetXtreme BCM5901 Gigabit Ethernet
+	170e  NetXtreme BCM5901_2 Gigabit Ethernet
 	4210  BCM4210 iLine10 HomePNA 2.0
 	4211  BCM4211 iLine10 HomePNA 2.0 + V.90 56k modem
 	4212  BCM4212 v.90 56k modem
