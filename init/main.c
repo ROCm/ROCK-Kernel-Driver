@@ -619,6 +619,29 @@ static void run_init_process(char *init_filename)
 	execve(init_filename, argv_init, envp_init);
 }
 
+static int free_initmem_on_exec_helper(void *data)
+{
+	int *fd = data; 
+	char c;
+
+	sys_close(fd[1]);
+	sys_read(fd[0], &c, 1);
+	free_initmem();
+	return 0;
+}
+
+static void free_initmem_on_exec(void)
+{
+	int fd[2]; 
+
+	do_pipe(fd);
+	kernel_thread(free_initmem_on_exec_helper, &fd, 0);
+
+	sys_dup2(fd[1], 255);   /* to get it out of the way */
+	sys_close(fd[0]);
+	sys_close(fd[1]);
+	sys_fcntl(255, F_SETFD, 1);
+}                                                                                                                                                                   
 extern void prepare_namespace(void);
 
 static int init(void * unused)
@@ -642,23 +665,22 @@ static int init(void * unused)
 	smp_init();
 	do_basic_setup();
 
-       /*
-        * check if there is an early userspace init, if yes
-        * let it do all the work
-        */
-       if (sys_access("/init", 0) == 0)
-               execute_command = "/init";
-       else
-	prepare_namespace();
-
 	/*
 	 * Ok, we have completed the initial bootup, and
 	 * we're essentially up and running. Get rid of the
 	 * initmem segments and start the user-mode stuff..
 	 */
-	free_initmem();
+	free_initmem_on_exec();
 	unlock_kernel();
 	system_running = 1;
+
+       /*
+        * check if there is an early userspace init, if yes
+        * let it do all the things prepare_namespace() would do.
+        */
+	run_init_process("/init");
+
+	prepare_namespace();
 
 	if (sys_open("/dev/console", O_RDWR, 0) < 0)
 		printk("Warning: unable to open an initial console.\n");
