@@ -118,6 +118,25 @@ ip_nat_used_tuple(const struct ip_conntrack_tuple *tuple,
 	return ip_conntrack_tuple_taken(&reply, ignored_conntrack);
 }
 
+/* Before 2.6.11 we did implicit source NAT if required. Warn about change. */
+static void warn_if_extra_mangle(u32 dstip, u32 srcip)
+{
+	static int warned = 0;
+	struct flowi fl = { .nl_u = { .ip4_u = { .daddr = dstip } } };
+	struct rtable *rt;
+
+	if (ip_route_output_key(&rt, &fl) != 0)
+		return;
+
+	if (rt->rt_src != srcip && !warned) {
+		printk("NAT: no longer support implicit source local NAT\n");
+		printk("NAT: packet src %u.%u.%u.%u -> dst %u.%u.%u.%u\n",
+		       NIPQUAD(srcip), NIPQUAD(dstip));
+		warned = 1;
+	}
+	ip_rt_put(rt);
+}
+
 /* If we source map this tuple so reply looks like reply_tuple, will
  * that meet the constraints of range. */
 static int
@@ -309,6 +328,9 @@ get_unique_tuple(struct ip_conntrack_tuple *tuple,
 	   range. */
 	*tuple = *orig_tuple;
 	find_best_ips_proto(tuple, range, conntrack, hooknum);
+
+	if (hooknum == NF_IP_LOCAL_OUT && tuple->dst.ip != orig_tuple->dst.ip)
+		warn_if_extra_mangle(tuple->src.ip, tuple->dst.ip);
 
 	/* 3) The per-protocol part of the manip is made to map into
 	   the range to make a unique tuple. */
