@@ -1955,10 +1955,6 @@ ppp_set_compress(struct ppp *ppp, unsigned long arg)
 #endif /* CONFIG_KMOD */
 	if (cp == 0)
 		goto out;
-	/*
-	 * XXX race: the compressor module could get unloaded between
-	 * here and when we do the comp_alloc or decomp_alloc call below.
-	 */
 
 	err = -ENOBUFS;
 	if (data.transmit) {
@@ -1971,10 +1967,13 @@ ppp_set_compress(struct ppp *ppp, unsigned long arg)
 			ppp->xcomp = cp;
 			ppp->xc_state = state;
 			ppp_xmit_unlock(ppp);
-			if (ostate != 0)
+			if (ostate != 0) {
 				ocomp->comp_free(ostate);
+				module_put(ocomp->owner);
+			}
 			err = 0;
-		}
+		} else
+			module_put(cp->owner);
 
 	} else {
 		state = cp->decomp_alloc(ccp_option, data.length);
@@ -1986,10 +1985,13 @@ ppp_set_compress(struct ppp *ppp, unsigned long arg)
 			ppp->rcomp = cp;
 			ppp->rc_state = state;
 			ppp_recv_unlock(ppp);
-			if (ostate != 0)
+			if (ostate != 0) {
 				ocomp->decomp_free(ostate);
+				module_put(ocomp->owner);
+			}
 			err = 0;
-		}
+		} else
+			module_put(cp->owner);
 	}
 
  out:
@@ -2100,10 +2102,14 @@ ppp_ccp_closed(struct ppp *ppp)
 	ppp->rc_state = 0;
 	ppp_unlock(ppp);
 
-	if (xstate)
+	if (xstate) {
 		xcomp->comp_free(xstate);
-	if (rstate)
+		module_put(xcomp->owner);
+	}
+	if (rstate) {
 		rcomp->decomp_free(rstate);
+		module_put(rcomp->owner);
+	}
 }
 
 /* List of compressors. */
@@ -2175,8 +2181,11 @@ find_compressor(int type)
 
 	spin_lock(&compressor_list_lock);
 	ce = find_comp_entry(type);
-	if (ce != 0)
+	if (ce != 0) {
 		cp = ce->comp;
+		if (!try_module_get(cp->owner))
+			cp = NULL;
+	}
 	spin_unlock(&compressor_list_lock);
 	return cp;
 }
