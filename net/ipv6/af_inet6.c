@@ -75,22 +75,16 @@ MODULE_LICENSE("GPL");
 
 #ifdef CONFIG_PROC_FS
 extern int raw6_proc_init(void);
-extern int raw6_proc_exit(void);
-
+extern void raw6_proc_exit(void);
 extern int tcp6_proc_init(void);
 extern void tcp6_proc_exit(void);
-
 extern int udp6_proc_init(void);
 extern void udp6_proc_exit(void);
-
 extern int ipv6_misc_proc_init(void);
-extern int ipv6_misc_proc_exit(void);
-
+extern void ipv6_misc_proc_exit(void);
 extern int anycast6_get_info(char *, char **, off_t, int);
-
 extern int if6_proc_init(void);
 extern void if6_proc_exit(void);
-
 #endif
 
 #ifdef CONFIG_SYSCTL
