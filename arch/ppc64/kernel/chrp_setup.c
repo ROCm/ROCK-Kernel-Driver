@@ -243,6 +243,8 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 		ppc_md.get_irq        = xics_get_irq;
 	}
 
+	ppc_md.log_error      = pSeries_log_error;
+
 	ppc_md.init           = chrp_init2;
 
 	ppc_md.pcibios_fixup  = pSeries_final_fixup;
