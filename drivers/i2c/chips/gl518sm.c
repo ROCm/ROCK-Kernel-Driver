@@ -151,7 +151,7 @@ static void gl518_init_client(struct i2c_client *client);
 static int gl518_detach_client(struct i2c_client *client);
 static int gl518_read_value(struct i2c_client *client, u8 reg);
 static int gl518_write_value(struct i2c_client *client, u8 reg, u16 value);
-static void gl518_update_client(struct i2c_client *client);
+static struct gl518_data *gl518_update_device(struct device *dev);
 
 /* This is the driver that will be inserted */
 static struct i2c_driver gl518_driver = {
@@ -176,18 +176,14 @@ static int gl518_id = 0;
 #define show(type, suffix, value)					\
 static ssize_t show_##suffix(struct device *dev, char *buf)		\
 {									\
-	struct i2c_client *client = to_i2c_client(dev);			\
-	struct gl518_data *data = i2c_get_clientdata(client);		\
-	gl518_update_client(client);					\
+	struct gl518_data *data = gl518_update_device(dev);		\
 	return sprintf(buf, "%d\n", type##_FROM_REG(data->value));	\
 }
 
 #define show_fan(suffix, value, index)					\
 static ssize_t show_##suffix(struct device *dev, char *buf)		\
 {									\
-	struct i2c_client *client = to_i2c_client(dev);			\
-	struct gl518_data *data = i2c_get_clientdata(client);		\
-	gl518_update_client(client);					\
+	struct gl518_data *data = gl518_update_device(dev);		\
 	return sprintf(buf, "%d\n", FAN_FROM_REG(data->value[index],	\
 		DIV_FROM_REG(data->fan_div[index])));			\
 }
@@ -523,8 +519,9 @@ static int gl518_write_value(struct i2c_client *client, u8 reg, u16 value)
 		return i2c_smbus_write_byte_data(client, reg, value);
 }
 
-static void gl518_update_client(struct i2c_client *client)
+static struct gl518_data *gl518_update_device(struct device *dev)
 {
+	struct i2c_client *client = to_i2c_client(dev);
 	struct gl518_data *data = i2c_get_clientdata(client);
 	int val;
 
@@ -590,6 +587,8 @@ static void gl518_update_client(struct i2c_client *client)
 	}
 
 	up(&data->update_lock);
+
+	return data;
 }
 
 static int __init sensors_gl518sm_init(void)

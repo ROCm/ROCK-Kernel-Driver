@@ -126,7 +126,7 @@ static int lm90_detect(struct i2c_adapter *adapter, int address,
 	int kind);
 static void lm90_init_client(struct i2c_client *client);
 static int lm90_detach_client(struct i2c_client *client);
-static void lm90_update_client(struct i2c_client *client);
+static struct lm90_data *lm90_update_device(struct device *dev);
 
 /*
  * Driver data (common to all clients)
@@ -171,9 +171,7 @@ static int lm90_id = 0;
 #define show_temp(value, converter) \
 static ssize_t show_##value(struct device *dev, char *buf) \
 { \
-	struct i2c_client *client = to_i2c_client(dev); \
-	struct lm90_data *data = i2c_get_clientdata(client); \
-	lm90_update_client(client); \
+	struct lm90_data *data = lm90_update_device(dev); \
 	return sprintf(buf, "%d\n", converter(data->value)); \
 }
 show_temp(temp_input1, TEMP1_FROM_REG);
@@ -216,9 +214,7 @@ set_temp1(temp_crit2, LM90_REG_W_REMOTE_CRIT);
 #define show_temp_hyst(value, basereg) \
 static ssize_t show_##value(struct device *dev, char *buf) \
 { \
-	struct i2c_client *client = to_i2c_client(dev); \
-	struct lm90_data *data = i2c_get_clientdata(client); \
-	lm90_update_client(client); \
+	struct lm90_data *data = lm90_update_device(dev); \
 	return sprintf(buf, "%d\n", TEMP1_FROM_REG(data->basereg) \
 		       - HYST_FROM_REG(data->temp_hyst)); \
 }
@@ -239,9 +235,7 @@ static ssize_t set_temp_hyst1(struct device *dev, const char *buf,
 
 static ssize_t show_alarms(struct device *dev, char *buf)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct lm90_data *data = i2c_get_clientdata(client);
-	lm90_update_client(client);
+	struct lm90_data *data = lm90_update_device(dev);
 	return sprintf(buf, "%d\n", data->alarms);
 }
 
@@ -430,8 +424,9 @@ static int lm90_detach_client(struct i2c_client *client)
 	return 0;
 }
 
-static void lm90_update_client(struct i2c_client *client)
+static struct lm90_data *lm90_update_device(struct device *dev)
 {
+	struct i2c_client *client = to_i2c_client(dev);
 	struct lm90_data *data = i2c_get_clientdata(client);
 
 	down(&data->update_lock);
@@ -505,6 +500,8 @@ static void lm90_update_client(struct i2c_client *client)
 	}
 
 	up(&data->update_lock);
+
+	return data;
 }
 
 static int __init sensors_lm90_init(void)

@@ -118,7 +118,7 @@ static const u8 LM83_REG_W_HIGH[] = {
 static int lm83_attach_adapter(struct i2c_adapter *adapter);
 static int lm83_detect(struct i2c_adapter *adapter, int address, int kind);
 static int lm83_detach_client(struct i2c_client *client);
-static void lm83_update_client(struct i2c_client *client);
+static struct lm83_data *lm83_update_device(struct device *dev);
 
 /*
  * Driver data (common to all clients)
@@ -162,9 +162,7 @@ static int lm83_id = 0;
 #define show_temp(suffix, value) \
 static ssize_t show_temp_##suffix(struct device *dev, char *buf) \
 { \
-	struct i2c_client *client = to_i2c_client(dev); \
-	struct lm83_data *data = i2c_get_clientdata(client); \
-	lm83_update_client(client); \
+	struct lm83_data *data = lm83_update_device(dev); \
 	return sprintf(buf, "%d\n", TEMP_FROM_REG(data->value)); \
 }
 show_temp(input1, temp_input[0]);
@@ -195,9 +193,7 @@ set_temp(crit, temp_crit, LM83_REG_W_TCRIT);
 
 static ssize_t show_alarms(struct device *dev, char *buf)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct lm83_data *data = i2c_get_clientdata(client);
-	lm83_update_client(client);
+	struct lm83_data *data = lm83_update_device(dev);
 	return sprintf(buf, "%d\n", data->alarms);
 }
 
@@ -353,8 +349,9 @@ static int lm83_detach_client(struct i2c_client *client)
 	return 0;
 }
 
-static void lm83_update_client(struct i2c_client *client)
+static struct lm83_data *lm83_update_device(struct device *dev)
 {
+	struct i2c_client *client = to_i2c_client(dev);
 	struct lm83_data *data = i2c_get_clientdata(client);
 
 	down(&data->update_lock);
@@ -385,6 +382,8 @@ static void lm83_update_client(struct i2c_client *client)
 	}
 
 	up(&data->update_lock);
+
+	return data;
 }
 
 static int __init sensors_lm83_init(void)

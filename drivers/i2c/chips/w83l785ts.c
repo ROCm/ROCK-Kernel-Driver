@@ -89,7 +89,7 @@ static int w83l785ts_detect(struct i2c_adapter *adapter, int address,
 	int kind);
 static int w83l785ts_detach_client(struct i2c_client *client);
 static u8 w83l785ts_read_value(struct i2c_client *client, u8 reg, u8 defval);
-static void w83l785ts_update_client(struct i2c_client *client);
+static struct w83l785ts_data *w83l785ts_update_device(struct device *dev);
 
 /*
  * Driver data (common to all clients)
@@ -130,17 +130,13 @@ static int w83l785ts_id = 0;
 
 static ssize_t show_temp(struct device *dev, char *buf)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct w83l785ts_data *data = i2c_get_clientdata(client);
-	w83l785ts_update_client(client);
+	struct w83l785ts_data *data = w83l785ts_update_device(dev);
 	return sprintf(buf, "%d\n", TEMP_FROM_REG(data->temp));
 }
 
 static ssize_t show_temp_over(struct device *dev, char *buf)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct w83l785ts_data *data = i2c_get_clientdata(client);
-	w83l785ts_update_client(client);
+	struct w83l785ts_data *data = w83l785ts_update_device(dev);
 	return sprintf(buf, "%d\n", TEMP_FROM_REG(data->temp_over));
 }
 
@@ -304,8 +300,9 @@ static u8 w83l785ts_read_value(struct i2c_client *client, u8 reg, u8 defval)
 	return defval;
 }
 
-static void w83l785ts_update_client(struct i2c_client *client)
+static struct w83l785ts_data *w83l785ts_update_device(struct device *dev)
 {
+	struct i2c_client *client = to_i2c_client(dev);
 	struct w83l785ts_data *data = i2c_get_clientdata(client);
 
 	down(&data->update_lock);
@@ -324,6 +321,8 @@ static void w83l785ts_update_client(struct i2c_client *client)
 	}
 
 	up(&data->update_lock);
+
+	return data;
 }
 
 static int __init sensors_w83l785ts_init(void)

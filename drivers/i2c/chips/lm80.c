@@ -141,7 +141,7 @@ static int lm80_attach_adapter(struct i2c_adapter *adapter);
 static int lm80_detect(struct i2c_adapter *adapter, int address, int kind);
 static void lm80_init_client(struct i2c_client *client);
 static int lm80_detach_client(struct i2c_client *client);
-static void lm80_update_client(struct i2c_client *client);
+static struct lm80_data *lm80_update_device(struct device *dev);
 static int lm80_read_value(struct i2c_client *client, u8 reg);
 static int lm80_write_value(struct i2c_client *client, u8 reg, u8 value);
 
@@ -171,9 +171,7 @@ static struct i2c_driver lm80_driver = {
 #define show_in(suffix, value) \
 static ssize_t show_in_##suffix(struct device *dev, char *buf) \
 { \
-	struct i2c_client *client = to_i2c_client(dev); \
-	struct lm80_data *data = i2c_get_clientdata(client); \
-	lm80_update_client(client); \
+	struct lm80_data *data = lm80_update_device(dev); \
 	return sprintf(buf, "%d\n", IN_FROM_REG(data->value)); \
 }
 show_in(min0, in_min[0]);
@@ -227,9 +225,7 @@ set_in(max6, in_max[6], LM80_REG_IN_MAX(6));
 #define show_fan(suffix, value, div) \
 static ssize_t show_fan_##suffix(struct device *dev, char *buf) \
 { \
-	struct i2c_client *client = to_i2c_client(dev); \
-	struct lm80_data *data = i2c_get_clientdata(client); \
-	lm80_update_client(client); \
+	struct lm80_data *data = lm80_update_device(dev); \
 	return sprintf(buf, "%d\n", FAN_FROM_REG(data->value, \
 		       DIV_FROM_REG(data->div))); \
 }
@@ -241,9 +237,7 @@ show_fan(input2, fan[1], fan_div[1]);
 #define show_fan_div(suffix, value) \
 static ssize_t show_fan_div##suffix(struct device *dev, char *buf) \
 { \
-	struct i2c_client *client = to_i2c_client(dev); \
-	struct lm80_data *data = i2c_get_clientdata(client); \
-	lm80_update_client(client); \
+	struct lm80_data *data = lm80_update_device(dev); \
 	return sprintf(buf, "%d\n", DIV_FROM_REG(data->value)); \
 }
 show_fan_div(1, fan_div[0]);
@@ -265,18 +259,14 @@ set_fan(min2, fan_min[1], LM80_REG_FAN2_MIN, fan_div[1]);
 
 static ssize_t show_temp_input1(struct device *dev, char *buf)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct lm80_data *data = i2c_get_clientdata(client);
-	lm80_update_client(client);
+	struct lm80_data *data = lm80_update_device(dev);
 	return sprintf(buf, "%ld\n", TEMP_FROM_REG(data->temp));
 }
 
 #define show_temp(suffix, value) \
 static ssize_t show_temp_##suffix(struct device *dev, char *buf) \
 { \
-	struct i2c_client *client = to_i2c_client(dev); \
-	struct lm80_data *data = i2c_get_clientdata(client); \
-	lm80_update_client(client); \
+	struct lm80_data *data = lm80_update_device(dev); \
 	return sprintf(buf, "%d\n", TEMP_LIMIT_FROM_REG(data->value)); \
 }
 show_temp(hot_max, temp_hot_max);
@@ -302,9 +292,7 @@ set_temp(os_hyst, temp_os_hyst, LM80_REG_TEMP_OS_HYST);
 
 static ssize_t show_alarms(struct device *dev, char *buf)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct lm80_data *data = i2c_get_clientdata(client);
-	lm80_update_client(client);
+	struct lm80_data *data = lm80_update_device(dev);
 	return sprintf(buf, "%d\n", ALARMS_FROM_REG(data->alarms));
 }
 
@@ -498,8 +486,9 @@ static void lm80_init_client(struct i2c_client *client)
 	lm80_write_value(client, LM80_REG_CONFIG, 0x01);
 }
 
-static void lm80_update_client(struct i2c_client *client)
+static struct lm80_data *lm80_update_device(struct device *dev)
 {
+	struct i2c_client *client = to_i2c_client(dev);
 	struct lm80_data *data = i2c_get_clientdata(client);
 	int i;
 
@@ -546,6 +535,8 @@ static void lm80_update_client(struct i2c_client *client)
 	}
 
 	up(&data->update_lock);
+
+	return data;
 }
 
 static int __init sensors_lm80_init(void)

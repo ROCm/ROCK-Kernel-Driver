@@ -223,7 +223,7 @@ static int lm78_detach_client(struct i2c_client *client);
 
 static int lm78_read_value(struct i2c_client *client, u8 register);
 static int lm78_write_value(struct i2c_client *client, u8 register, u8 value);
-static void lm78_update_client(struct i2c_client *client);
+static struct lm78_data *lm78_update_device(struct device *dev);
 static void lm78_init_client(struct i2c_client *client);
 
 
@@ -239,25 +239,19 @@ static struct i2c_driver lm78_driver = {
 /* 7 Voltages */
 static ssize_t show_in(struct device *dev, char *buf, int nr)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct lm78_data *data = i2c_get_clientdata(client);
-	lm78_update_client(client);
+	struct lm78_data *data = lm78_update_device(dev);
 	return sprintf(buf, "%d\n", IN_FROM_REG(data->in[nr]));
 }
 
 static ssize_t show_in_min(struct device *dev, char *buf, int nr)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct lm78_data *data = i2c_get_clientdata(client);
-	lm78_update_client(client);
+	struct lm78_data *data = lm78_update_device(dev);
 	return sprintf(buf, "%d\n", IN_FROM_REG(data->in_min[nr]));
 }
 
 static ssize_t show_in_max(struct device *dev, char *buf, int nr)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct lm78_data *data = i2c_get_clientdata(client);
-	lm78_update_client(client);
+	struct lm78_data *data = lm78_update_device(dev);
 	return sprintf(buf, "%d\n", IN_FROM_REG(data->in_max[nr]));
 }
 
@@ -327,17 +321,13 @@ show_in_offset(6);
 /* Temperature */
 static ssize_t show_temp(struct device *dev, char *buf)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct lm78_data *data = i2c_get_clientdata(client);
-	lm78_update_client(client);
+	struct lm78_data *data = lm78_update_device(dev);
 	return sprintf(buf, "%d\n", TEMP_FROM_REG(data->temp));
 }
 
 static ssize_t show_temp_over(struct device *dev, char *buf)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct lm78_data *data = i2c_get_clientdata(client);
-	lm78_update_client(client);
+	struct lm78_data *data = lm78_update_device(dev);
 	return sprintf(buf, "%d\n", TEMP_FROM_REG(data->temp_over));
 }
 
@@ -353,9 +343,7 @@ static ssize_t set_temp_over(struct device *dev, const char *buf, size_t count)
 
 static ssize_t show_temp_hyst(struct device *dev, char *buf)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct lm78_data *data = i2c_get_clientdata(client);
-	lm78_update_client(client);
+	struct lm78_data *data = lm78_update_device(dev);
 	return sprintf(buf, "%d\n", TEMP_FROM_REG(data->temp_hyst));
 }
 
@@ -378,18 +366,14 @@ static DEVICE_ATTR(temp1_max_hyst, S_IRUGO | S_IWUSR,
 /* 3 Fans */
 static ssize_t show_fan(struct device *dev, char *buf, int nr)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct lm78_data *data = i2c_get_clientdata(client);
-	lm78_update_client(client);
+	struct lm78_data *data = lm78_update_device(dev);
 	return sprintf(buf, "%d\n", FAN_FROM_REG(data->fan[nr],
 		DIV_FROM_REG(data->fan_div[nr])) );
 }
 
 static ssize_t show_fan_min(struct device *dev, char *buf, int nr)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct lm78_data *data = i2c_get_clientdata(client);
-	lm78_update_client(client);
+	struct lm78_data *data = lm78_update_device(dev);
 	return sprintf(buf,"%d\n", FAN_FROM_REG(data->fan_min[nr],
 		DIV_FROM_REG(data->fan_div[nr])) );
 }
@@ -407,9 +391,7 @@ static ssize_t set_fan_min(struct device *dev, const char *buf,
 
 static ssize_t show_fan_div(struct device *dev, char *buf, int nr)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct lm78_data *data = i2c_get_clientdata(client);
-	lm78_update_client(client);
+	struct lm78_data *data = lm78_update_device(dev);
 	return sprintf(buf, "%d\n", DIV_FROM_REG(data->fan_div[nr]) );
 }
 
@@ -490,9 +472,7 @@ static DEVICE_ATTR(fan3_div, S_IRUGO, show_fan_3_div, NULL)
 /* VID */
 static ssize_t show_vid(struct device *dev, char *buf)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct lm78_data *data = i2c_get_clientdata(client);
-	lm78_update_client(client);
+	struct lm78_data *data = lm78_update_device(dev);
 	return sprintf(buf, "%d\n", VID_FROM_REG(data->vid));
 }
 static DEVICE_ATTR(in0_ref, S_IRUGO, show_vid, NULL);
@@ -500,9 +480,7 @@ static DEVICE_ATTR(in0_ref, S_IRUGO, show_vid, NULL);
 /* Alarms */
 static ssize_t show_alarms(struct device *dev, char *buf)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct lm78_data *data = i2c_get_clientdata(client);
-	lm78_update_client(client);
+	struct lm78_data *data = lm78_update_device(dev);
 	return sprintf(buf, "%d\n", ALARMS_FROM_REG(data->alarms));
 }
 static DEVICE_ATTR(alarms, S_IRUGO, show_alarms, NULL);
@@ -829,8 +807,9 @@ static void lm78_init_client(struct i2c_client *client)
 
 }
 
-static void lm78_update_client(struct i2c_client *client)
+static struct lm78_data *lm78_update_device(struct device *dev)
 {
+	struct i2c_client *client = to_i2c_client(dev);
 	struct lm78_data *data = i2c_get_clientdata(client);
 	int i;
 
@@ -879,6 +858,8 @@ static void lm78_update_client(struct i2c_client *client)
 	}
 
 	up(&data->update_lock);
+
+	return data;
 }
 
 static int __init sm_lm78_init(void)

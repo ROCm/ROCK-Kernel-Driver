@@ -113,7 +113,7 @@ SENSORS_INSMOD_1(fscher);
 static int fscher_attach_adapter(struct i2c_adapter *adapter);
 static int fscher_detect(struct i2c_adapter *adapter, int address, int kind);
 static int fscher_detach_client(struct i2c_client *client);
-static void fscher_update_client(struct i2c_client *client);
+static struct fscher_data *fscher_update_device(struct device *dev);
 static void fscher_init_client(struct i2c_client *client);
 
 static int fscher_read_value(struct i2c_client *client, u8 reg);
@@ -170,9 +170,7 @@ static ssize_t show_##kind##sub (struct fscher_data *, char *, int); \
 static ssize_t show_##kind##offset##sub (struct device *, char *); \
 static ssize_t show_##kind##offset##sub (struct device *dev, char *buf) \
 { \
-	struct i2c_client *client = to_i2c_client(dev); \
-	struct fscher_data *data = i2c_get_clientdata(client); \
-	fscher_update_client(client); \
+	struct fscher_data *data = fscher_update_device(dev); \
 	return show_##kind##sub(data, buf, (offset)); \
 }
 
@@ -420,8 +418,9 @@ static void fscher_init_client(struct i2c_client *client)
 	data->revision =  fscher_read_value(client, FSCHER_REG_REVISION);
 }
 
-static void fscher_update_client(struct i2c_client *client)
+static struct fscher_data *fscher_update_device(struct device *dev)
 {
+	struct i2c_client *client = to_i2c_client(dev);
 	struct fscher_data *data = i2c_get_clientdata(client);
 
 	down(&data->update_lock);
@@ -466,6 +465,8 @@ static void fscher_update_client(struct i2c_client *client)
 	}
 
 	up(&data->update_lock);
+
+	return data;
 }
 
 

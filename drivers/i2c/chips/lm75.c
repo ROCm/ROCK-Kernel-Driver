@@ -64,7 +64,7 @@ static void lm75_init_client(struct i2c_client *client);
 static int lm75_detach_client(struct i2c_client *client);
 static int lm75_read_value(struct i2c_client *client, u8 reg);
 static int lm75_write_value(struct i2c_client *client, u8 reg, u16 value);
-static void lm75_update_client(struct i2c_client *client);
+static struct lm75_data *lm75_update_device(struct device *dev);
 
 
 /* This is the driver that will be inserted */
@@ -82,9 +82,7 @@ static int lm75_id = 0;
 #define show(value)	\
 static ssize_t show_##value(struct device *dev, char *buf)		\
 {									\
-	struct i2c_client *client = to_i2c_client(dev);			\
-	struct lm75_data *data = i2c_get_clientdata(client);		\
-	lm75_update_client(client);					\
+	struct lm75_data *data = lm75_update_device(dev);		\
 	return sprintf(buf, "%d\n", LM75_TEMP_FROM_REG(data->value));	\
 }
 show(temp_max);
@@ -250,8 +248,9 @@ static void lm75_init_client(struct i2c_client *client)
 	lm75_write_value(client, LM75_REG_CONF, 0);
 }
 
-static void lm75_update_client(struct i2c_client *client)
+static struct lm75_data *lm75_update_device(struct device *dev)
 {
+	struct i2c_client *client = to_i2c_client(dev);
 	struct lm75_data *data = i2c_get_clientdata(client);
 
 	down(&data->update_lock);
@@ -268,6 +267,8 @@ static void lm75_update_client(struct i2c_client *client)
 	}
 
 	up(&data->update_lock);
+
+	return data;
 }
 
 static int __init sensors_lm75_init(void)

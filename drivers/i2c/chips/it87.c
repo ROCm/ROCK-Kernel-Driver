@@ -167,7 +167,7 @@ static int it87_detach_client(struct i2c_client *client);
 static int it87_read_value(struct i2c_client *client, u8 register);
 static int it87_write_value(struct i2c_client *client, u8 register,
 			u8 value);
-static void it87_update_client(struct i2c_client *client);
+static struct it87_data *it87_update_device(struct device *dev);
 static void it87_init_client(struct i2c_client *client, struct it87_data *data);
 
 
@@ -184,25 +184,19 @@ static int it87_id = 0;
 
 static ssize_t show_in(struct device *dev, char *buf, int nr)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct it87_data *data = i2c_get_clientdata(client);
-	it87_update_client(client);
+	struct it87_data *data = it87_update_device(dev);
 	return sprintf(buf, "%d\n", IN_FROM_REG(data->in[nr])*10 );
 }
 
 static ssize_t show_in_min(struct device *dev, char *buf, int nr)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct it87_data *data = i2c_get_clientdata(client);
-	it87_update_client(client);
+	struct it87_data *data = it87_update_device(dev);
 	return sprintf(buf, "%d\n", IN_FROM_REG(data->in_min[nr])*10 );
 }
 
 static ssize_t show_in_max(struct device *dev, char *buf, int nr)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct it87_data *data = i2c_get_clientdata(client);
-	it87_update_client(client);
+	struct it87_data *data = it87_update_device(dev);
 	return sprintf(buf, "%d\n", IN_FROM_REG(data->in_max[nr])*10 );
 }
 
@@ -284,23 +278,17 @@ show_in_offset(8);
 /* 3 temperatures */
 static ssize_t show_temp(struct device *dev, char *buf, int nr)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct it87_data *data = i2c_get_clientdata(client);
-	it87_update_client(client);
+	struct it87_data *data = it87_update_device(dev);
 	return sprintf(buf, "%d\n", TEMP_FROM_REG(data->temp[nr])*100 );
 }
 static ssize_t show_temp_max(struct device *dev, char *buf, int nr)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct it87_data *data = i2c_get_clientdata(client);
-	it87_update_client(client);
+	struct it87_data *data = it87_update_device(dev);
 	return sprintf(buf, "%d\n", TEMP_FROM_REG(data->temp_high[nr])*100);
 }
 static ssize_t show_temp_min(struct device *dev, char *buf, int nr)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct it87_data *data = i2c_get_clientdata(client);
-	it87_update_client(client);
+	struct it87_data *data = it87_update_device(dev);
 	return sprintf(buf, "%d\n", TEMP_FROM_REG(data->temp_low[nr])*100);
 }
 static ssize_t set_temp_max(struct device *dev, const char *buf, 
@@ -360,9 +348,7 @@ show_temp_offset(3);
 
 static ssize_t show_sensor(struct device *dev, char *buf, int nr)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct it87_data *data = i2c_get_clientdata(client);
-	it87_update_client(client);
+	struct it87_data *data = it87_update_device(dev);
 	if (data->sensor & (1 << nr))
 		return sprintf(buf, "3\n");  /* thermal diode */
 	if (data->sensor & (8 << nr))
@@ -408,25 +394,19 @@ show_sensor_offset(3);
 /* 3 Fans */
 static ssize_t show_fan(struct device *dev, char *buf, int nr)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct it87_data *data = i2c_get_clientdata(client);
-	it87_update_client(client);
+	struct it87_data *data = it87_update_device(dev);
 	return sprintf(buf,"%d\n", FAN_FROM_REG(data->fan[nr], 
 				DIV_FROM_REG(data->fan_div[nr])) );
 }
 static ssize_t show_fan_min(struct device *dev, char *buf, int nr)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct it87_data *data = i2c_get_clientdata(client);
-	it87_update_client(client);
+	struct it87_data *data = it87_update_device(dev);
 	return sprintf(buf,"%d\n",
 		FAN_FROM_REG(data->fan_min[nr], DIV_FROM_REG(data->fan_div[nr])) );
 }
 static ssize_t show_fan_div(struct device *dev, char *buf, int nr)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct it87_data *data = i2c_get_clientdata(client);
-	it87_update_client(client);
+	struct it87_data *data = it87_update_device(dev);
 	return sprintf(buf,"%d\n", DIV_FROM_REG(data->fan_div[nr]) );
 }
 static ssize_t set_fan_min(struct device *dev, const char *buf, 
@@ -512,9 +492,7 @@ show_fan_offset(3);
 /* Alarms */
 static ssize_t show_alarms(struct device *dev, char *buf)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct it87_data *data = i2c_get_clientdata(client);
-	it87_update_client(client);
+	struct it87_data *data = it87_update_device(dev);
 	return sprintf(buf,"%d\n", ALARMS_FROM_REG(data->alarms));
 }
 static DEVICE_ATTR(alarms, S_IRUGO | S_IWUSR, show_alarms, NULL);
@@ -811,8 +789,9 @@ static void it87_init_client(struct i2c_client *client, struct it87_data *data)
 			 | (update_vbat ? 0x41 : 0x01));
 }
 
-static void it87_update_client(struct i2c_client *client)
+static struct it87_data *it87_update_device(struct device *dev)
 {
+	struct i2c_client *client = to_i2c_client(dev);
 	struct it87_data *data = i2c_get_clientdata(client);
 	int i;
 
@@ -883,6 +862,8 @@ static void it87_update_client(struct i2c_client *client)
 	}
 
 	up(&data->update_lock);
+
+	return data;
 }
 
 static int __init sm_it87_init(void)

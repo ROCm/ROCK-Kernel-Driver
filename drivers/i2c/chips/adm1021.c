@@ -139,7 +139,7 @@ static int adm1021_detach_client(struct i2c_client *client);
 static int adm1021_read_value(struct i2c_client *client, u8 reg);
 static int adm1021_write_value(struct i2c_client *client, u8 reg,
 			       u16 value);
-static void adm1021_update_client(struct i2c_client *client);
+static struct adm1021_data *adm1021_update_device(struct device *dev);
 
 /* (amalysh) read only mode, otherwise any limit's writing confuse BIOS */
 static int read_only = 0;
@@ -161,15 +161,10 @@ static struct i2c_driver adm1021_driver = {
 static int adm1021_id = 0;
 
 #define show(value)	\
-static ssize_t show_##value(struct device *dev, char *buf)	\
-{								\
-	struct i2c_client *client = to_i2c_client(dev);		\
-	struct adm1021_data *data = i2c_get_clientdata(client);	\
-	int temp;						\
-								\
-	adm1021_update_client(client);				\
-	temp = TEMP_FROM_REG(data->value);			\
-	return sprintf(buf, "%d\n", temp);			\
+static ssize_t show_##value(struct device *dev, char *buf)		\
+{									\
+	struct adm1021_data *data = adm1021_update_device(dev);		\
+	return sprintf(buf, "%d\n", TEMP_FROM_REG(data->value));	\
 }
 show(temp_max);
 show(temp_hyst);
@@ -179,13 +174,10 @@ show(remote_temp_hyst);
 show(remote_temp_input);
 
 #define show2(value)	\
-static ssize_t show_##value(struct device *dev, char *buf)	\
-{								\
-	struct i2c_client *client = to_i2c_client(dev);		\
-	struct adm1021_data *data = i2c_get_clientdata(client);	\
-								\
-	adm1021_update_client(client);				\
-	return sprintf(buf, "%d\n", data->value);		\
+static ssize_t show_##value(struct device *dev, char *buf)		\
+{									\
+	struct adm1021_data *data = adm1021_update_device(dev);		\
+	return sprintf(buf, "%d\n", data->value);			\
 }
 show2(alarms);
 show2(die_code);
@@ -393,8 +385,9 @@ static int adm1021_write_value(struct i2c_client *client, u8 reg, u16 value)
 	return 0;
 }
 
-static void adm1021_update_client(struct i2c_client *client)
+static struct adm1021_data *adm1021_update_device(struct device *dev)
 {
+	struct i2c_client *client = to_i2c_client(dev);
 	struct adm1021_data *data = i2c_get_clientdata(client);
 
 	down(&data->update_lock);
@@ -424,6 +417,8 @@ static void adm1021_update_client(struct i2c_client *client)
 	}
 
 	up(&data->update_lock);
+
+	return data;
 }
 
 static int __init sensors_adm1021_init(void)

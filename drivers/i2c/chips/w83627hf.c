@@ -322,7 +322,7 @@ static int w83627hf_detach_client(struct i2c_client *client);
 static int w83627hf_read_value(struct i2c_client *client, u16 register);
 static int w83627hf_write_value(struct i2c_client *client, u16 register,
 			       u16 value);
-static void w83627hf_update_client(struct i2c_client *client);
+static struct w83627hf_data *w83627hf_update_device(struct device *dev);
 static void w83627hf_init_client(struct i2c_client *client);
 
 static struct i2c_driver w83627hf_driver = {
@@ -338,11 +338,7 @@ static struct i2c_driver w83627hf_driver = {
 #define show_in_reg(reg) \
 static ssize_t show_##reg (struct device *dev, char *buf, int nr) \
 { \
-	struct i2c_client *client = to_i2c_client(dev); \
-	struct w83627hf_data *data = i2c_get_clientdata(client); \
-	 \
-	w83627hf_update_client(client); \
-	 \
+	struct w83627hf_data *data = w83627hf_update_device(dev); \
 	return sprintf(buf,"%ld\n", (long)IN_FROM_REG(data->reg[nr])); \
 }
 show_in_reg(in)
@@ -414,11 +410,7 @@ device_create_file(&client->dev, &dev_attr_in##offset##_max); \
 #define show_fan_reg(reg) \
 static ssize_t show_##reg (struct device *dev, char *buf, int nr) \
 { \
-	struct i2c_client *client = to_i2c_client(dev); \
-	struct w83627hf_data *data = i2c_get_clientdata(client); \
-	 \
-	w83627hf_update_client(client); \
-	 \
+	struct w83627hf_data *data = w83627hf_update_device(dev); \
 	return sprintf(buf,"%ld\n", \
 		FAN_FROM_REG(data->reg[nr-1], \
 			    (long)DIV_FROM_REG(data->fan_div[nr-1]))); \
@@ -478,11 +470,7 @@ device_create_file(&client->dev, &dev_attr_fan##offset##_min); \
 #define show_temp_reg(reg) \
 static ssize_t show_##reg (struct device *dev, char *buf, int nr) \
 { \
-	struct i2c_client *client = to_i2c_client(dev); \
-	struct w83627hf_data *data = i2c_get_clientdata(client); \
-	 \
-	w83627hf_update_client(client); \
-	 \
+	struct w83627hf_data *data = w83627hf_update_device(dev); \
 	if (nr >= 2) {	/* TEMP2 and TEMP3 */ \
 		return sprintf(buf,"%ld\n", \
 			(long)LM75_TEMP_FROM_REG(data->reg##_add[nr-2])); \
@@ -560,11 +548,7 @@ device_create_file(&client->dev, &dev_attr_temp##offset##_max_hyst); \
 static ssize_t
 show_vid_reg(struct device *dev, char *buf)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct w83627hf_data *data = i2c_get_clientdata(client);
-
-	w83627hf_update_client(client);
-
+	struct w83627hf_data *data = w83627hf_update_device(dev);
 	return sprintf(buf, "%ld\n", (long) vid_from_reg(data->vid, data->vrm));
 }
 static DEVICE_ATTR(in0_ref, S_IRUGO, show_vid_reg, NULL)
@@ -574,11 +558,7 @@ device_create_file(&client->dev, &dev_attr_in0_ref)
 static ssize_t
 show_vrm_reg(struct device *dev, char *buf)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct w83627hf_data *data = i2c_get_clientdata(client);
-
-	w83627hf_update_client(client);
-
+	struct w83627hf_data *data = w83627hf_update_device(dev);
 	return sprintf(buf, "%ld\n", (long) data->vrm);
 }
 static ssize_t
@@ -600,11 +580,7 @@ device_create_file(&client->dev, &dev_attr_vrm)
 static ssize_t
 show_alarms_reg(struct device *dev, char *buf)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct w83627hf_data *data = i2c_get_clientdata(client);
-
-	w83627hf_update_client(client);
-
+	struct w83627hf_data *data = w83627hf_update_device(dev);
 	return sprintf(buf, "%ld\n", (long) data->alarms);
 }
 static DEVICE_ATTR(alarms, S_IRUGO, show_alarms_reg, NULL)
@@ -614,11 +590,7 @@ device_create_file(&client->dev, &dev_attr_alarms)
 #define show_beep_reg(REG, reg) \
 static ssize_t show_beep_##reg (struct device *dev, char *buf) \
 { \
-	struct i2c_client *client = to_i2c_client(dev); \
-	struct w83627hf_data *data = i2c_get_clientdata(client); \
-	 \
-	w83627hf_update_client(client); \
-	 \
+	struct w83627hf_data *data = w83627hf_update_device(dev); \
 	return sprintf(buf,"%ld\n", \
 		      (long)BEEP_##REG##_FROM_REG(data->beep_##reg)); \
 }
@@ -682,11 +654,7 @@ device_create_file(&client->dev, &dev_attr_beep_mask); \
 static ssize_t
 show_fan_div_reg(struct device *dev, char *buf, int nr)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct w83627hf_data *data = i2c_get_clientdata(client);
-
-	w83627hf_update_client(client);
-
+	struct w83627hf_data *data = w83627hf_update_device(dev);
 	return sprintf(buf, "%ld\n",
 		       (long) DIV_FROM_REG(data->fan_div[nr - 1]));
 }
@@ -749,11 +717,7 @@ device_create_file(&client->dev, &dev_attr_fan##offset##_div); \
 static ssize_t
 show_pwm_reg(struct device *dev, char *buf, int nr)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct w83627hf_data *data = i2c_get_clientdata(client);
-
-	w83627hf_update_client(client);
-
+	struct w83627hf_data *data = w83627hf_update_device(dev);
 	return sprintf(buf, "%ld\n", (long) data->pwm[nr - 1]);
 }
 
@@ -809,11 +773,7 @@ device_create_file(&client->dev, &dev_attr_fan##offset##_pwm); \
 static ssize_t
 show_sensor_reg(struct device *dev, char *buf, int nr)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct w83627hf_data *data = i2c_get_clientdata(client);
-
-	w83627hf_update_client(client);
-
+	struct w83627hf_data *data = w83627hf_update_device(dev);
 	return sprintf(buf, "%ld\n", (long) data->sens[nr - 1]);
 }
 
@@ -1273,8 +1233,9 @@ static void w83627hf_init_client(struct i2c_client *client)
 			    | 0x01);
 }
 
-static void w83627hf_update_client(struct i2c_client *client)
+static struct w83627hf_data *w83627hf_update_device(struct device *dev)
 {
+	struct i2c_client *client = to_i2c_client(dev);
 	struct w83627hf_data *data = i2c_get_clientdata(client);
 	int i;
 
@@ -1362,6 +1323,8 @@ static void w83627hf_update_client(struct i2c_client *client)
 	}
 
 	up(&data->update_lock);
+
+	return data;
 }
 
 static int __init sensors_w83627hf_init(void)

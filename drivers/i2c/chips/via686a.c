@@ -409,30 +409,24 @@ static inline void via686a_write_value(struct i2c_client *client, u8 reg,
 	outb_p(value, client->addr + reg);
 }
 
-static void via686a_update_client(struct i2c_client *client);
+static struct via686a_data *via686a_update_device(struct device *dev);
 static void via686a_init_client(struct i2c_client *client);
 
 /* following are the sysfs callback functions */
 
 /* 7 voltage sensors */
 static ssize_t show_in(struct device *dev, char *buf, int nr) {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct via686a_data *data = i2c_get_clientdata(client);
-	via686a_update_client(client);
+	struct via686a_data *data = via686a_update_device(dev);
 	return sprintf(buf, "%ld\n", IN_FROM_REG(data->in[nr], nr)*10 );
 }
 
 static ssize_t show_in_min(struct device *dev, char *buf, int nr) {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct via686a_data *data = i2c_get_clientdata(client);
-	via686a_update_client(client);
+	struct via686a_data *data = via686a_update_device(dev);
 	return sprintf(buf, "%ld\n", IN_FROM_REG(data->in_min[nr], nr)*10 );
 }
 
 static ssize_t show_in_max(struct device *dev, char *buf, int nr) {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct via686a_data *data = i2c_get_clientdata(client);
-	via686a_update_client(client);
+	struct via686a_data *data = via686a_update_device(dev);
 	return sprintf(buf, "%ld\n", IN_FROM_REG(data->in_max[nr], nr)*10 );
 }
 
@@ -496,21 +490,15 @@ show_in_offset(4);
 
 /* 3 temperatures */
 static ssize_t show_temp(struct device *dev, char *buf, int nr) {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct via686a_data *data = i2c_get_clientdata(client);
-	via686a_update_client(client);
+	struct via686a_data *data = via686a_update_device(dev);
 	return sprintf(buf, "%ld\n", TEMP_FROM_REG10(data->temp[nr])*100 );
 }
 static ssize_t show_temp_over(struct device *dev, char *buf, int nr) {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct via686a_data *data = i2c_get_clientdata(client);
-	via686a_update_client(client);
+	struct via686a_data *data = via686a_update_device(dev);
 	return sprintf(buf, "%ld\n", TEMP_FROM_REG(data->temp_over[nr])*100);
 }
 static ssize_t show_temp_hyst(struct device *dev, char *buf, int nr) {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct via686a_data *data = i2c_get_clientdata(client);
-	via686a_update_client(client);
+	struct via686a_data *data = via686a_update_device(dev);
 	return sprintf(buf, "%ld\n", TEMP_FROM_REG(data->temp_hyst[nr])*100);
 }
 static ssize_t set_temp_over(struct device *dev, const char *buf, 
@@ -568,23 +556,17 @@ show_temp_offset(3);
 
 /* 2 Fans */
 static ssize_t show_fan(struct device *dev, char *buf, int nr) {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct via686a_data *data = i2c_get_clientdata(client);
-	via686a_update_client(client);
+	struct via686a_data *data = via686a_update_device(dev);
 	return sprintf(buf,"%d\n", FAN_FROM_REG(data->fan[nr], 
 				DIV_FROM_REG(data->fan_div[nr])) );
 }
 static ssize_t show_fan_min(struct device *dev, char *buf, int nr) {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct via686a_data *data = i2c_get_clientdata(client);
-	via686a_update_client(client);
+	struct via686a_data *data = via686a_update_device(dev);
 	return sprintf(buf,"%d\n",
 		FAN_FROM_REG(data->fan_min[nr], DIV_FROM_REG(data->fan_div[nr])) );
 }
 static ssize_t show_fan_div(struct device *dev, char *buf, int nr) {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct via686a_data *data = i2c_get_clientdata(client);
-	via686a_update_client(client);
+	struct via686a_data *data = via686a_update_device(dev);
 	return sprintf(buf,"%d\n", DIV_FROM_REG(data->fan_div[nr]) );
 }
 static ssize_t set_fan_min(struct device *dev, const char *buf, 
@@ -642,9 +624,7 @@ show_fan_offset(2);
 
 /* Alarms */
 static ssize_t show_alarms(struct device *dev, char *buf) {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct via686a_data *data = i2c_get_clientdata(client);
-	via686a_update_client(client);
+	struct via686a_data *data = via686a_update_device(dev);
 	return sprintf(buf,"%d\n", ALARMS_FROM_REG(data->alarms));
 }
 static DEVICE_ATTR(alarms, S_IRUGO | S_IWUSR, show_alarms, NULL);
@@ -854,8 +834,9 @@ static void via686a_init_client(struct i2c_client *client)
 			    !(VIA686A_TEMP_MODE_MASK | VIA686A_TEMP_MODE_CONTINUOUS));
 }
 
-static void via686a_update_client(struct i2c_client *client)
+static struct via686a_data *via686a_update_device(struct device *dev)
 {
+	struct i2c_client *client = to_i2c_client(dev);
 	struct via686a_data *data = i2c_get_clientdata(client);
 	int i;
 
@@ -916,6 +897,8 @@ static void via686a_update_client(struct i2c_client *client)
 	}
 
 	up(&data->update_lock);
+
+	return data;
 }
 
 static struct pci_device_id via686a_pci_ids[] = {

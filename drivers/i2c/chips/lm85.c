@@ -397,7 +397,7 @@ static int lm85_detach_client(struct i2c_client *client);
 
 static int lm85_read_value(struct i2c_client *client, u8 register);
 static int lm85_write_value(struct i2c_client *client, u8 register, int value);
-static void lm85_update_client(struct i2c_client *client);
+static struct lm85_data *lm85_update_device(struct device *dev);
 static void lm85_init_client(struct i2c_client *client);
 
 
@@ -417,18 +417,12 @@ static int lm85_id = 0;
 /* 4 Fans */
 static ssize_t show_fan(struct device *dev, char *buf, int nr)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct lm85_data *data = i2c_get_clientdata(client);
-
-	lm85_update_client(client);
+	struct lm85_data *data = lm85_update_device(dev);
 	return sprintf(buf,"%d\n", FAN_FROM_REG(data->fan[nr]) );
 }
 static ssize_t show_fan_min(struct device *dev, char *buf, int nr)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct lm85_data *data = i2c_get_clientdata(client);
-
-	lm85_update_client(client);
+	struct lm85_data *data = lm85_update_device(dev);
 	return sprintf(buf,"%d\n", FAN_FROM_REG(data->fan_min[nr]) );
 }
 static ssize_t set_fan_min(struct device *dev, const char *buf, 
@@ -473,10 +467,7 @@ show_fan_offset(4);
 
 static ssize_t show_vid_reg(struct device *dev, char *buf)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct lm85_data *data = i2c_get_clientdata(client);
-
-	lm85_update_client(client);
+	struct lm85_data *data = lm85_update_device(dev);
 	return sprintf(buf, "%ld\n", (long) vid_from_reg(data->vid, data->vrm));
 }
 
@@ -484,10 +475,7 @@ static DEVICE_ATTR(in0_ref, S_IRUGO, show_vid_reg, NULL)
 
 static ssize_t show_vrm_reg(struct device *dev, char *buf)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct lm85_data *data = i2c_get_clientdata(client);
-
-	lm85_update_client(client);
+	struct lm85_data *data = lm85_update_device(dev);
 	return sprintf(buf, "%ld\n", (long) data->vrm);
 }
 
@@ -506,10 +494,7 @@ static DEVICE_ATTR(vrm, S_IRUGO | S_IWUSR, show_vrm_reg, store_vrm_reg)
 
 static ssize_t show_alarms_reg(struct device *dev, char *buf)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct lm85_data *data = i2c_get_clientdata(client);
-
-	lm85_update_client(client);
+	struct lm85_data *data = lm85_update_device(dev);
 	return sprintf(buf, "%ld\n", (long) ALARMS_FROM_REG(data->alarms));
 }
 
@@ -519,10 +504,7 @@ static DEVICE_ATTR(alarms, S_IRUGO, show_alarms_reg, NULL)
 
 static ssize_t show_pwm(struct device *dev, char *buf, int nr)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct lm85_data *data = i2c_get_clientdata(client);
-
-	lm85_update_client(client);
+	struct lm85_data *data = lm85_update_device(dev);
 	return sprintf(buf,"%d\n", PWM_FROM_REG(data->pwm[nr]) );
 }
 static ssize_t set_pwm(struct device *dev, const char *buf, 
@@ -541,11 +523,9 @@ static ssize_t set_pwm(struct device *dev, const char *buf,
 }
 static ssize_t show_pwm_enable(struct device *dev, char *buf, int nr)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct lm85_data *data = i2c_get_clientdata(client);
+	struct lm85_data *data = lm85_update_device(dev);
 	int	pwm_zone;
 
-	lm85_update_client(client);
 	pwm_zone = ZONE_FROM_REG(data->autofan[nr].config);
 	return sprintf(buf,"%d\n", (pwm_zone != 0 && pwm_zone != -1) );
 }
@@ -576,18 +556,12 @@ show_pwm_reg(3);
 
 static ssize_t show_in(struct device *dev, char *buf, int nr)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct lm85_data *data = i2c_get_clientdata(client);
-
-	lm85_update_client(client);
+	struct lm85_data *data = lm85_update_device(dev);
 	return sprintf(buf,"%d\n", INS_FROM_REG(nr, data->in[nr]) );
 }
 static ssize_t show_in_min(struct device *dev, char *buf, int nr)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct lm85_data *data = i2c_get_clientdata(client);
-
-	lm85_update_client(client);
+	struct lm85_data *data = lm85_update_device(dev);
 	return sprintf(buf,"%d\n", INS_FROM_REG(nr, data->in_min[nr]) );
 }
 static ssize_t set_in_min(struct device *dev, const char *buf, 
@@ -606,10 +580,7 @@ static ssize_t set_in_min(struct device *dev, const char *buf,
 }
 static ssize_t show_in_max(struct device *dev, char *buf, int nr)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct lm85_data *data = i2c_get_clientdata(client);
-
-	lm85_update_client(client);
+	struct lm85_data *data = lm85_update_device(dev);
 	return sprintf(buf,"%d\n", INS_FROM_REG(nr, data->in_max[nr]) );
 }
 static ssize_t set_in_max(struct device *dev, const char *buf, 
@@ -665,18 +636,12 @@ show_in_reg(4);
 
 static ssize_t show_temp(struct device *dev, char *buf, int nr)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct lm85_data *data = i2c_get_clientdata(client);
-
-	lm85_update_client(client);
+	struct lm85_data *data = lm85_update_device(dev);
 	return sprintf(buf,"%d\n", TEMP_FROM_REG(data->temp[nr]) );
 }
 static ssize_t show_temp_min(struct device *dev, char *buf, int nr)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct lm85_data *data = i2c_get_clientdata(client);
-
-	lm85_update_client(client);
+	struct lm85_data *data = lm85_update_device(dev);
 	return sprintf(buf,"%d\n", TEMP_FROM_REG(data->temp_min[nr]) );
 }
 static ssize_t set_temp_min(struct device *dev, const char *buf, 
@@ -695,10 +660,7 @@ static ssize_t set_temp_min(struct device *dev, const char *buf,
 }
 static ssize_t show_temp_max(struct device *dev, char *buf, int nr)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct lm85_data *data = i2c_get_clientdata(client);
-
-	lm85_update_client(client);
+	struct lm85_data *data = lm85_update_device(dev);
 	return sprintf(buf,"%d\n", TEMP_FROM_REG(data->temp_max[nr]) );
 }
 static ssize_t set_temp_max(struct device *dev, const char *buf, 
@@ -1047,8 +1009,9 @@ void lm85_init_client(struct i2c_client *client)
 	lm85_write_value(client, LM85_REG_CONFIG, value);
 }
 
-void lm85_update_client(struct i2c_client *client)
+static struct lm85_data *lm85_update_device(struct device *dev)
 {
+	struct i2c_client *client = to_i2c_client(dev);
 	struct lm85_data *data = i2c_get_clientdata(client);
 	int i;
 
@@ -1189,6 +1152,8 @@ void lm85_update_client(struct i2c_client *client)
 	data->valid = 1;
 
 	up(&data->update_lock);
+
+	return data;
 }
 
 
