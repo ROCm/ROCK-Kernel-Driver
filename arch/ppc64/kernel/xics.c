@@ -475,7 +475,7 @@ void xics_init_IRQ(void)
 		while (1);
 	}
 nextnode:
-	ireg = (uint *)get_property(np, "ibm,interrupt-server-ranges", 0);
+	ireg = (uint *)get_property(np, "ibm,interrupt-server-ranges", NULL);
 	if (ireg) {
 		/*
 		 * set node starting index for this node
@@ -532,7 +532,7 @@ nextnode:
 		xics_irq_8259_cascade_real = -1;
 		xics_irq_8259_cascade = -1;
 	} else {
-		ireg = (uint *) get_property(np, "interrupts", 0);
+		ireg = (uint *) get_property(np, "interrupts", NULL);
 		if (!ireg) {
 			printk(KERN_WARNING "Can't find ISA Interrupts Property\n");
 			udbg_printf("Can't find ISA Interrupts Property\n");
@@ -589,7 +589,7 @@ static int __init xics_setup_i8259(void)
 	if (naca->interrupt_controller == IC_PPC_XIC &&
 	    xics_irq_8259_cascade != -1) {
 		if (request_irq(irq_offset_up(xics_irq_8259_cascade),
-				no_action, 0, "8259 cascade", 0))
+				no_action, 0, "8259 cascade", NULL))
 			printk(KERN_ERR "xics_init_IRQ: couldn't get 8259 cascade\n");
 		i8259_init();
 	}
@@ -604,7 +604,7 @@ void xics_request_IPIs(void)
 
 	/* IPIs are marked SA_INTERRUPT as they must run with irqs disabled */
 	request_irq(irq_offset_up(XICS_IPI), xics_ipi_action, SA_INTERRUPT,
-		    "IPI", 0);
+		    "IPI", NULL);
 	get_irq_desc(irq_offset_up(XICS_IPI))->status |= IRQ_PER_CPU;
 }
 #endif

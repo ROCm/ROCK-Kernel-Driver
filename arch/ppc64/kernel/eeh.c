@@ -473,10 +473,10 @@ static void *early_enable_eeh(struct device_node *dn, void *data)
 {
 	struct eeh_early_enable_info *info = data;
 	int ret;
-	char *status = get_property(dn, "status", 0);
-	u32 *class_code = (u32 *)get_property(dn, "class-code", 0);
-	u32 *vendor_id = (u32 *)get_property(dn, "vendor-id", 0);
-	u32 *device_id = (u32 *)get_property(dn, "device-id", 0);
+	char *status = get_property(dn, "status", NULL);
+	u32 *class_code = (u32 *)get_property(dn, "class-code", NULL);
+	u32 *vendor_id = (u32 *)get_property(dn, "vendor-id", NULL);
+	u32 *device_id = (u32 *)get_property(dn, "device-id", NULL);
 	u32 *regs;
 	int enable;
 
@@ -522,7 +522,7 @@ static void *early_enable_eeh(struct device_node *dn, void *data)
 
 	/* Ok... see if this device supports EEH.  Some do, some don't,
 	 * and the only way to find out is to check each and every one. */
-	regs = (u32 *)get_property(dn, "reg", 0);
+	regs = (u32 *)get_property(dn, "reg", NULL);
 	if (regs) {
 		/* First register entry is addr (00BBSS00)  */
 		/* Try to enable eeh */
@@ -802,7 +802,7 @@ static int eeh_check_opts_config(struct device_node *dn,
 
 	/* Build list of strings to match */
 	nstrs = 0;
-	s = (char *)get_property(dn, "ibm,loc-code", 0);
+	s = (char *)get_property(dn, "ibm,loc-code", NULL);
 	if (s)
 		strs[nstrs++] = s;
 	sprintf(devname, "dev%04x:%04x", vendor_id, device_id);
