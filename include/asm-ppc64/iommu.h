@@ -29,10 +29,10 @@
 
 /*
  * IOMAP_MAX_ORDER defines the largest contiguous block
- * of dma (tce) space we can get.  IOMAP_MAX_ORDER = 10 
- * allows up to 2**9 pages (512 * 4096) = 2 MB
+ * of dma (tce) space we can get.  IOMAP_MAX_ORDER = 13
+ * allows up to 2**12 pages (4096 * 4096) = 16 MB
  */
-#define IOMAP_MAX_ORDER 10
+#define IOMAP_MAX_ORDER 13
 
 /*
  * Tces come in two formats, one for the virtual bus and a different
