@@ -260,11 +260,13 @@ struct sctp_af {
 					 struct sock *sk);
 	void		(*to_sk_daddr)	(union sctp_addr *,
 					 struct sock *sk);
-	int		(*addr_valid)	(union sctp_addr *);
+	int		(*addr_valid)	(union sctp_addr *,
+					 struct sctp_opt *);
 	sctp_scope_t	(*scope) (union sctp_addr *);
 	void		(*inaddr_any)	(union sctp_addr *, unsigned short);
 	int		(*is_any)	(const union sctp_addr *);
-	int		(*available)	(const union sctp_addr *);
+	int		(*available)	(union sctp_addr *,
+					 struct sctp_opt *);
 	int		(*skb_iif)	(const struct sk_buff *sk);
 	int		(*is_ce)	(const struct sk_buff *sk);
 	void		(*seq_dump_addr)(struct seq_file *seq,
@@ -282,7 +284,7 @@ int sctp_register_af(struct sctp_af *);
 struct sctp_pf {
 	void (*event_msgname)(struct sctp_ulpevent *, char *, int *);
 	void (*skb_msgname)  (struct sk_buff *, char *, int *);
-	int  (*af_supported) (sa_family_t);
+	int  (*af_supported) (sa_family_t, struct sctp_opt *);
 	int  (*cmp_addr) (const union sctp_addr *,
 			  const union sctp_addr *,
 			  struct sctp_opt *);
@@ -291,6 +293,7 @@ struct sctp_pf {
 	int  (*supported_addrs)(const struct sctp_opt *, __u16 *);
 	struct sock *(*create_accept_sk) (struct sock *sk,
 					  struct sctp_association *asoc);
+	void (*addr_v4map) (struct sctp_opt *, union sctp_addr *);
 	struct sctp_af *af;
 };
 

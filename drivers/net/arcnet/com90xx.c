@@ -58,7 +58,6 @@ static void com90xx_command(struct net_device *dev, int command);
 static int com90xx_status(struct net_device *dev);
 static void com90xx_setmask(struct net_device *dev, int mask);
 static int com90xx_reset(struct net_device *dev, int really_reset);
-static void com90xx_openclose(struct net_device *dev, bool open);
 static void com90xx_copy_to_card(struct net_device *dev, int bufnum, int offset,
 				 void *buf, int count);
 static void com90xx_copy_from_card(struct net_device *dev, int bufnum, int offset,
@@ -450,7 +449,7 @@ static int __init com90xx_found(struct net_device *dev0, int ioaddr, int airq,
 	lp->hw.status = com90xx_status;
 	lp->hw.intmask = com90xx_setmask;
 	lp->hw.reset = com90xx_reset;
-	lp->hw.open_close = com90xx_openclose;
+	lp->hw.owner = THIS_MODULE;
 	lp->hw.copy_to_card = com90xx_copy_to_card;
 	lp->hw.copy_from_card = com90xx_copy_from_card;
 	lp->mem_start = ioremap(dev->mem_start, dev->mem_end - dev->mem_start + 1);
@@ -569,16 +568,6 @@ int com90xx_reset(struct net_device *dev, int really_reset)
 	/* done!  return success. */
 	return 0;
 }
-
-
-static void com90xx_openclose(struct net_device *dev, bool open)
-{
-	if (open)
-		MOD_INC_USE_COUNT;
-	else
-		MOD_DEC_USE_COUNT;
-}
-
 
 static void com90xx_copy_to_card(struct net_device *dev, int bufnum, int offset,
 				 void *buf, int count)

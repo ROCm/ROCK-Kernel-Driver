@@ -150,7 +150,7 @@ int sctp_rcv(struct sk_buff *skb)
 	 * IP broadcast addresses cannot be used in an SCTP transport
 	 * address."
 	 */
-	if (!af->addr_valid(&src) || !af->addr_valid(&dest))
+	if (!af->addr_valid(&src, NULL) || !af->addr_valid(&dest, NULL))
 		goto discard_it;
 
 	asoc = __sctp_rcv_lookup(skb, &src, &dest, &transport);

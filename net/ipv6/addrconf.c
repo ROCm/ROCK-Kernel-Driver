@@ -209,15 +209,8 @@ int ipv6_addr_type(const struct in6_addr *addr)
 		};
 		return type;
 	}
-	/* check for reserved anycast addresses */
-	
-	if ((st & htonl(0xE0000000)) &&
-	    ((addr->s6_addr32[2] == htonl(0xFDFFFFFF) &&
-	    (addr->s6_addr32[3] | htonl(0x7F)) == (u32)~0) ||
-	    (addr->s6_addr32[2] == 0 && addr->s6_addr32[3] == 0)))
-		type = IPV6_ADDR_ANYCAST;
-	else
-		type = IPV6_ADDR_UNICAST;
+
+	type = IPV6_ADDR_UNICAST;
 
 	/* Consider all addresses with the first three bits different of
 	   000 and 111 as finished.
@@ -2552,7 +2545,7 @@ static void ipv6_ifa_notify(int event, struct inet6_ifaddr *ifp)
 
 	switch (event) {
 	case RTM_NEWADDR:
-		ip6_rt_addr_add(&ifp->addr, ifp->idev->dev);
+		ip6_rt_addr_add(&ifp->addr, ifp->idev->dev, 0);
 		break;
 	case RTM_DELADDR:
 		addrconf_leave_solict(ifp->idev->dev, &ifp->addr);

@@ -507,6 +507,10 @@ static void ip_vs_conn_expire(unsigned long data)
 	 *	refcnt==1 implies I'm the only one referrer
 	 */
 	if (likely(atomic_read(&cp->refcnt) == 1)) {
+		/* delete the timer if it is activated by other users */
+		if (timer_pending(&cp->timer))
+			del_timer(&cp->timer);
+
 		/* does anybody control me? */
 		if (cp->control)
 			ip_vs_control_del(cp);

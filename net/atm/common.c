@@ -478,6 +478,8 @@ int vcc_connect(struct socket *sock, int itf, short vpi, int vci)
 		return -EINVAL;
 	if (itf != ATM_ITF_ANY) {
 		dev = atm_dev_lookup(itf);
+		if (!dev)
+			return -ENODEV;
 		error = __vcc_connect(vcc, dev, vpi, vci);
 		if (error) {
 			atm_dev_put(dev);

@@ -667,7 +667,8 @@ nodata:
 }
 
 /* Make a SHUTDOWN chunk. */
-struct sctp_chunk *sctp_make_shutdown(const struct sctp_association *asoc)
+struct sctp_chunk *sctp_make_shutdown(const struct sctp_association *asoc,
+				      const struct sctp_chunk *chunk)
 {
 	struct sctp_chunk *retval;
 	sctp_shutdownhdr_t shut;
@@ -683,6 +684,9 @@ struct sctp_chunk *sctp_make_shutdown(const struct sctp_association *asoc)
 
 	retval->subh.shutdown_hdr =
 		sctp_addto_chunk(retval, sizeof(shut), &shut);
+
+	if (chunk)
+		retval->transport = chunk->transport;
 nodata:
 	return retval;
 }
@@ -1089,7 +1093,7 @@ void sctp_chunk_free(struct sctp_chunk *chunk)
 {
 	/* Make sure that we are not on any list.  */
 	skb_unlink((struct sk_buff *) chunk);
-	list_del(&chunk->transmitted_list);
+	list_del_init(&chunk->transmitted_list);
 
 	/* Release our reference on the message tracker. */
 	if (chunk->msg)
@@ -1850,7 +1854,7 @@ clean_up:
 	/* Release the transport structures. */
 	list_for_each_safe(pos, temp, &asoc->peer.transport_addr_list) {
 		transport = list_entry(pos, struct sctp_transport, transports);
-		list_del(pos);
+		list_del_init(pos);
 		sctp_transport_free(transport);
 	}
 nomem:

@@ -58,7 +58,7 @@ __xfrm4_state_lookup(xfrm_address_t *daddr, u32 spi, u8 proto)
 }
 
 static struct xfrm_state *
-__xfrm4_find_acq(u8 mode, u16 reqid, u8 proto, 
+__xfrm4_find_acq(u8 mode, u32 reqid, u8 proto, 
 		 xfrm_address_t *daddr, xfrm_address_t *saddr, 
 		 int create)
 {

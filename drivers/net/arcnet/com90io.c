@@ -47,7 +47,6 @@ static void com90io_command(struct net_device *dev, int command);
 static int com90io_status(struct net_device *dev);
 static void com90io_setmask(struct net_device *dev, int mask);
 static int com90io_reset(struct net_device *dev, int really_reset);
-static void com90io_openclose(struct net_device *dev, bool open);
 static void com90io_copy_to_card(struct net_device *dev, int bufnum, int offset,
 				 void *buf, int count);
 static void com90io_copy_from_card(struct net_device *dev, int bufnum, int offset,
@@ -257,7 +256,7 @@ static int __init com90io_found(struct net_device *dev)
 	lp->hw.status = com90io_status;
 	lp->hw.intmask = com90io_setmask;
 	lp->hw.reset = com90io_reset;
-	lp->hw.open_close = com90io_openclose;
+	lp->hw.owner = THIS_MODULE;
 	lp->hw.copy_to_card = com90io_copy_to_card;
 	lp->hw.copy_from_card = com90io_copy_from_card;
 
@@ -342,14 +341,6 @@ static void com90io_setmask(struct net_device *dev, int mask)
 	short ioaddr = dev->base_addr;
 
 	AINTMASK(mask);
-}
-
-static void com90io_openclose(struct net_device *dev, int open)
-{
-	if (open)
-		MOD_INC_USE_COUNT;
-	else
-		MOD_DEC_USE_COUNT;
 }
 
 static void com90io_copy_to_card(struct net_device *dev, int bufnum, int offset,

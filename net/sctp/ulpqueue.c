@@ -235,9 +235,9 @@ int sctp_ulpq_tail_event(struct sctp_ulpq *ulpq, struct sctp_ulpevent *event)
 
 out_free:
 	if (sctp_event2skb(event)->list)
-		skb_queue_purge(sctp_event2skb(event)->list);
+		sctp_queue_purge_ulpevents(sctp_event2skb(event)->list);
 	else
-		kfree_skb(sctp_event2skb(event));
+		sctp_ulpevent_free(event);
 	return 0;
 }
 
@@ -289,7 +289,7 @@ static inline void sctp_ulpq_store_reasm(struct sctp_ulpq *ulpq,
  * payload was fragmented on the way and ip had to reassemble them.
  * We add the rest of skb's to the first skb's fraglist.
  */
-static inline struct sctp_ulpevent *sctp_make_reassembled_event(struct sk_buff *f_frag, struct sk_buff *l_frag)
+static struct sctp_ulpevent *sctp_make_reassembled_event(struct sk_buff *f_frag, struct sk_buff *l_frag)
 {
 	struct sk_buff *pos;
 	struct sctp_ulpevent *event;
@@ -325,11 +325,10 @@ static inline struct sctp_ulpevent *sctp_make_reassembled_event(struct sk_buff *
 
 		/* Remove the fragment from the reassembly queue.  */
 		__skb_unlink(pos, pos->list);
-
+	
 		/* Break if we have reached the last fragment.  */
 		if (pos == l_frag)
 			break;
-
 		pos->next = pnext;
 		pos = pnext;
 	};
