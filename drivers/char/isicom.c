@@ -2008,11 +2008,12 @@ int init_module(void)
 	if (!(isi_card[0].base || isi_card[1].base || isi_card[2].base || isi_card[3].base)) {
 		printk(KERN_ERR "ISICOM: No valid card configuration. Driver cannot be initialized...\n"); 
 		return -EIO;
-	}		
-	retval=misc_register(&isiloader_device);
-	if (retval<0) {
+	}	
+
+	retval = misc_register(&isiloader_device);
+	if (retval < 0) {
 		printk(KERN_ERR "ISICOM: Unable to register firmware loader driver.\n");
-		return -EIO;
+		return retval;
 	}
 	
 	if (!isicom_init()) {
