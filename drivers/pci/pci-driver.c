@@ -390,10 +390,9 @@ pci_populate_driver_dir(struct pci_driver *drv)
  * pci_register_driver - register a new pci driver
  * @drv: the driver structure to register
  * 
- * Adds the driver structure to the list of registered drivers
- * Returns the number of pci devices which were claimed by the driver
- * during registration.  The driver remains registered even if the
- * return value is zero.
+ * Adds the driver structure to the list of registered drivers.
+ * Returns a negative value on error. The driver remains registered
+ * even if no device was claimed during registration.
  */
 int
 pci_register_driver(struct pci_driver *drv)
