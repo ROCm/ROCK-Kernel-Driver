@@ -579,16 +579,16 @@ void openpic_request_IPIs(void)
 	/* IPIs are marked SA_INTERRUPT as they must run with irqs disabled */
 	request_irq(OPENPIC_VEC_IPI+open_pic_irq_offset,
 		    openpic_ipi_action, SA_INTERRUPT,
-		    "IPI0 (call function)", 0);
+		    "IPI0 (call function)", NULL);
 	request_irq(OPENPIC_VEC_IPI+open_pic_irq_offset+1,
 		    openpic_ipi_action, SA_INTERRUPT,
-		    "IPI1 (reschedule)", 0);
+		    "IPI1 (reschedule)", NULL);
 	request_irq(OPENPIC_VEC_IPI+open_pic_irq_offset+2,
 		    openpic_ipi_action, SA_INTERRUPT,
-		    "IPI2 (invalidate tlb)", 0);
+		    "IPI2 (invalidate tlb)", NULL);
 	request_irq(OPENPIC_VEC_IPI+open_pic_irq_offset+3,
 		    openpic_ipi_action, SA_INTERRUPT,
-		    "IPI3 (xmon break)", 0);
+		    "IPI3 (xmon break)", NULL);
 
 	for ( i = 0; i < OPENPIC_NUM_IPI ; i++ )
 		openpic_enable_ipi(OPENPIC_VEC_IPI+open_pic_irq_offset+i);

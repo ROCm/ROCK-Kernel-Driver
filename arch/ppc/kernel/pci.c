@@ -671,11 +671,11 @@ make_one_node_map(struct device_node* node, u8 pci_bus)
 		struct pci_dev* dev;
 		unsigned int *class_code, *reg;
 	
-		class_code = (unsigned int *) get_property(node, "class-code", 0);
+		class_code = (unsigned int *) get_property(node, "class-code", NULL);
 		if (!class_code || ((*class_code >> 8) != PCI_CLASS_BRIDGE_PCI &&
 			(*class_code >> 8) != PCI_CLASS_BRIDGE_CARDBUS))
 			continue;
-		reg = (unsigned int *)get_property(node, "reg", 0);
+		reg = (unsigned int *)get_property(node, "reg", NULL);
 		if (!reg)
 			continue;
 		dev = pci_find_slot(pci_bus, ((reg[0] >> 8) & 0xff));
@@ -712,7 +712,7 @@ pcibios_make_OF_bus_map(void)
 			continue;
 		make_one_node_map(node, hose->first_busno);
 	}
-	of_prop_map = get_property(find_path_device("/"), "pci-OF-bus-map", 0);
+	of_prop_map = get_property(find_path_device("/"), "pci-OF-bus-map", NULL);
 	if (of_prop_map)
 		memcpy(of_prop_map, pci_to_OF_bus_map, pci_bus_count);
 #ifdef DEBUG
@@ -743,7 +743,7 @@ scan_OF_pci_childs(struct device_node* node, pci_OF_scan_iterator filter, void* 
 		 * a fake root for all functions of a multi-function device,
 		 * we go down them as well.
 		 */
-		class_code = (unsigned int *) get_property(node, "class-code", 0);
+		class_code = (unsigned int *) get_property(node, "class-code", NULL);
 		if ((!class_code || ((*class_code >> 8) != PCI_CLASS_BRIDGE_PCI &&
 			(*class_code >> 8) != PCI_CLASS_BRIDGE_CARDBUS)) &&
 			strcmp(node->name, "multifunc-device"))
@@ -761,7 +761,7 @@ scan_OF_pci_childs_iterator(struct device_node* node, void* data)
 	unsigned int *reg;
 	u8* fdata = (u8*)data;
 	
-	reg = (unsigned int *) get_property(node, "reg", 0);
+	reg = (unsigned int *) get_property(node, "reg", NULL);
 	if (reg && ((reg[0] >> 8) & 0xff) == fdata[1]
 		&& ((reg[0] >> 16) & 0xff) == fdata[0])
 		return 1;
@@ -874,7 +874,7 @@ pci_device_from_OF_node(struct device_node* node, u8* bus, u8* devfn)
 	if (!scan_OF_pci_childs(((struct device_node*)hose->arch_data)->child,
 			find_OF_pci_device_filter, (void *)node))
 		return -ENODEV;
-	reg = (unsigned int *) get_property(node, "reg", 0);
+	reg = (unsigned int *) get_property(node, "reg", NULL);
 	if (!reg)
 		return -ENODEV;
 	*bus = (reg[0] >> 16) & 0xff;

@@ -693,7 +693,7 @@ void __init setup_arch(char **cmdline_p)
 #ifdef CONFIG_XMON
 	xmon_map_scc();
 	if (strstr(cmd_line, "xmon"))
-		xmon(0);
+		xmon(NULL);
 #endif /* CONFIG_XMON */
 	if ( ppc_md.progress ) ppc_md.progress("setup_arch: enter", 0x3eab);
 

@@ -479,9 +479,9 @@ void start_thread(struct pt_regs *regs, unsigned long nip, unsigned long sp)
 	regs->gpr[1] = sp;
 	regs->msr = MSR_USER;
 	if (last_task_used_math == current)
-		last_task_used_math = 0;
+		last_task_used_math = NULL;
 	if (last_task_used_altivec == current)
-		last_task_used_altivec = 0;
+		last_task_used_altivec = NULL;
 	memset(current->thread.fpr, 0, sizeof(current->thread.fpr));
 	current->thread.fpscr = 0;
 #ifdef CONFIG_ALTIVEC

@@ -741,7 +741,7 @@ raven_init(void)
 	}
 
 	/* Check the first PCI device to see if it is a Raven. */
-	early_read_config_dword(0, 0, 0, PCI_VENDOR_ID, &devid);
+	early_read_config_dword(NULL, 0, 0, PCI_VENDOR_ID, &devid);
 
 	switch (devid & 0xffff0000) {
 	case MPIC_RAVEN_ID:
@@ -757,7 +757,7 @@ raven_init(void)
 
 
 	/* Read the memory base register. */
-	early_read_config_dword(0, 0, 0, PCI_BASE_ADDRESS_1, &pci_membase);
+	early_read_config_dword(NULL, 0, 0, PCI_BASE_ADDRESS_1, &pci_membase);
 
 	if (pci_membase == 0) {
 		OpenPIC_Addr = NULL;
