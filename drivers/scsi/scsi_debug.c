@@ -183,7 +183,6 @@ static struct device_driver sdebug_driverfs_driver = {
 	.name 		= sdebug_proc_name,
 	.probe          = sdebug_driver_probe,
 	.remove         = sdebug_driver_remove,
-	.devclass 	= &shost_devclass,
 };
 
 static const int check_condition_result = 

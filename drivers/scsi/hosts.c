@@ -294,7 +294,6 @@ int scsi_add_host(struct Scsi_Host *shost, struct device *dev)
 			sht->info ? sht->info(shost) : sht->name);
 
 	if (dev) {
-		dev->class_data = shost;
 		shost->host_gendev = dev;
 	}
 
