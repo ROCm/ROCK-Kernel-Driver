@@ -11,6 +11,5 @@ typedef struct vmidi_devc {
 	   int input_opened;
 	   int intr_active;
 	   void (*midi_input_intr) (int dev, unsigned char data);
-	   spinlock_t lock;
 	} vmidi_devc;
 
