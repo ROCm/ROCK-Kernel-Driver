@@ -99,7 +99,7 @@ fold_field(void *mib[], int nr)
 		    *((unsigned long *) (((void *) per_cpu_ptr(mib[0], i)) +
 					 sizeof (unsigned long) * nr));
 		res +=
-		    *((unsigned long *) (((void *) per_cpu_ptr(mib[0], i)) +
+		    *((unsigned long *) (((void *) per_cpu_ptr(mib[1], i)) +
 					 sizeof (unsigned long) * nr));
 	}
 	return res;
