@@ -1966,7 +1966,7 @@ static int journal_init_dev( struct super_block *super,
 			printk( "sh-458: journal_init_dev: cannot init journal device\n '%s': %i", 
 				kdevname( to_kdev_t(jdev) ), result );
 
-		else if (!kdev_same(jdev, super->s_dev)) {
+		else if (jdev != super->s_dev) {
 			set_blocksize(journal->j_dev_bd, super->s_blocksize);
 		}
 		return result;
