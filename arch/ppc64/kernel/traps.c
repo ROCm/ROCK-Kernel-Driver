@@ -127,6 +127,7 @@ int die(const char *str, struct pt_regs *regs, long err)
 	}
 	if (nl)
 		printk("\n");
+	print_modules();
 	show_regs(regs);
 	bust_spinlocks(0);
 	spin_unlock_irq(&die_lock);
