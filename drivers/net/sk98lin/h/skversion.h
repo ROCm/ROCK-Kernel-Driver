@@ -61,14 +61,14 @@
 #ifdef	lint
 static const char SysKonnectFileId[] = "@(#) (C) SysKonnect GmbH.";
 static const char SysKonnectBuildNumber[] =
-	"@(#)SK-BUILD: 6.21 PL: 01"; 
+	"@(#)SK-BUILD: 6.22 PL: 01"; 
 #endif	/* !defined(lint) */
 
-#define BOOT_STRING	"sk98lin: Network Device Driver v6.21\n" \
-			"(C)Copyright 1999-2003 Marvell(R)."
+#define BOOT_STRING	"sk98lin: Network Device Driver v6.22\n" \
+			"(C)Copyright 1999-2004 Marvell(R)."
 
-#define VER_STRING	"6.21"
+#define VER_STRING	"6.22"
 #define DRIVER_FILE_NAME	"sk98lin"
-#define DRIVER_REL_DATE		"Dec-15-2003"
+#define DRIVER_REL_DATE		"Jan-30-2004"
 
 

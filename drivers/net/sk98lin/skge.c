@@ -2,8 +2,8 @@
  *
  * Name:	skge.c
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.42 $
- * Date:       	$Date: 2003/12/12 10:05:43 $
+ * Version:	$Revision: 1.43 $
+ * Date:       	$Date: 2004/01/29 15:47:07 $
  * Purpose:	The main driver source module
  *
  ******************************************************************************/
@@ -41,6 +41,9 @@
  * History:
  *
  *	$Log: skge.c,v $
+ *	Revision 1.43  2004/01/29 15:47:07  mlindner
+ *	Fix: Reset Xmac when stopping the port
+ *	
  *	Revision 1.42  2003/12/12 10:05:43  mlindner
  *	Fix: Format of error message corrected
  *	
@@ -2154,6 +2157,7 @@ struct SK_NET_DEVICE	*dev)
 		EvPara.Para32[0] = pNet->NetNr;
 		EvPara.Para32[1] = -1;
 		SkEventQueue(pAC, SKGE_RLMT, SK_RLMT_STOP, EvPara);
+		SkPnmiEvent(pAC, pAC->IoBase, SK_PNMI_EVT_XMAC_RESET, EvPara);
 		SkEventDispatcher(pAC, pAC->IoBase);
 		spin_unlock_irqrestore(&pAC->SlowPathLock, Flags);
 		
@@ -5002,6 +5006,7 @@ SK_BOOL		DualNet;
 		spin_lock_irqsave(
 			&pAC->TxPort[FromPort][TX_PRIO_LOW].TxDesRingLock,
 			Flags);
+
 		SkGeStopPort(pAC, IoC, FromPort, SK_STOP_ALL, SK_HARD_RST);
 		pAC->dev[Param.Para32[0]]->flags &= ~IFF_RUNNING;
 		spin_unlock_irqrestore(
