@@ -298,9 +298,11 @@ static int sa1110_setspeed(struct cpufreq_policy *policy)
 static struct cpufreq_policy sa1110_policy = {
 	.cpu		= 0,
 	.policy		= CPUFREQ_POLICY_POWERSAVE,
-	.cpuinfo.max_freq	= 287000,
-	.cpuinfo.min_freq	= 59000,
-	.cpuinfo.transition_latency	= CPUFREQ_ETERNAL,
+	.cpuinfo	= {
+		.max_freq		= 287000,
+		.min_freq		= 59000,
+		.transition_latency	= CPUFREQ_ETERNAL,
+	},
 };
 
 static struct cpufreq_driver sa1110_driver = {

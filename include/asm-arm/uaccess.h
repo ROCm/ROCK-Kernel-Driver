@@ -81,7 +81,7 @@ extern int __get_user_bad(void);
 		const register typeof(*(p)) *__p asm("r0") = (p);	\
 		register typeof(*(p)) __r1 asm("r1");			\
 		register int __e asm("r0");				\
-		switch (sizeof(*(p))) {					\
+		switch (sizeof(*(__p))) {				\
 		case 1:							\
 			__get_user_x(__r1, __p, __e, 1, "lr");		\
 	       		break;						\
@@ -120,7 +120,7 @@ extern int __put_user_bad(void);
 		const register typeof(*(p)) __r1 asm("r1") = (x);	\
 		const register typeof(*(p)) *__p asm("r0") = (p);	\
 		register int __e asm("r0");				\
-		switch (sizeof(*(p))) {					\
+		switch (sizeof(*(__p))) {				\
 		case 1:							\
 			__put_user_x(__r1, __p, __e, 1, "r2", "lr");	\
 			break;						\
@@ -256,14 +256,15 @@ static inline long strnlen_user(const char *s, long n)
 #define __put_user_nocheck(x,ptr,size)					\
 ({									\
 	long __pu_err = 0;						\
-	__typeof__(*(ptr)) *__pu_addr = (ptr);				\
+	unsigned long __pu_addr = (unsigned long)(ptr);			\
 	__put_user_size((x),__pu_addr,(size),__pu_err);			\
 	__pu_err;							\
 })
 
 #define __put_user_nocheck_error(x,ptr,size,err)			\
 ({									\
-	__put_user_size((x),(ptr),(size),err);				\
+	unsigned long __pu_addr = (unsigned long)(ptr);			\
+	__put_user_size((x),__pu_addr,(size),err);			\
 	(void) 0;							\
 })
 
@@ -273,6 +274,7 @@ do {									\
 	case 1:	__get_user_asm_byte(x,ptr,retval);	break;		\
 	case 2:	__get_user_asm_half(x,ptr,retval);	break;		\
 	case 4:	__get_user_asm_word(x,ptr,retval);	break;		\
+	case 8:	__get_user_asm_dword(x,ptr,retval);	break;		\
 	default: (x) = __get_user_bad();				\
 	}								\
 } while (0)
@@ -283,6 +285,7 @@ do {									\
 	case 1: __put_user_asm_byte(x,ptr,retval);	break;		\
 	case 2: __put_user_asm_half(x,ptr,retval);	break;		\
 	case 4: __put_user_asm_word(x,ptr,retval);	break;		\
+	case 8:	__put_user_asm_dword(x,ptr,retval);	break;		\
 	default: __put_user_bad();					\
 	}								\
 } while (0)
