@@ -605,7 +605,9 @@ static void corkscrew_setup(struct net_device *dev, int ioaddr,
 		vp->full_duplex = 0;
 		vp->bus_master = 0;
 	}
+#ifdef MODULE
 	list_add(&vp->list, &root_corkscrew_dev);
+#endif
 
 	printk(KERN_INFO "%s: 3Com %s at %#3x,", dev->name, vp->product_name, ioaddr);
 
