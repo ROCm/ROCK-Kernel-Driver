@@ -212,7 +212,7 @@ struct smc_local {
 #define DBG(n, args...)					\
 	do {						\
 		if (SMC_DEBUG >= (n))			\
-			printk(KERN_DEBUG args);	\
+			printk(args);	\
 	} while (0)
 
 #define PRINTK(args...)   printk(args)
@@ -361,11 +361,10 @@ static void smc_reset(struct net_device *dev)
 	 * transmitted packets, to make the best use out of our limited
 	 * memory
 	 */
-#if ! THROTTLE_TX_PKTS
-	ctl |= CTL_AUTO_RELEASE;
-#else
-	ctl &= ~CTL_AUTO_RELEASE;
-#endif
+	if(!THROTTLE_TX_PKTS)
+		ctl |= CTL_AUTO_RELEASE;
+	else
+		ctl &= ~CTL_AUTO_RELEASE;
 	SMC_SET_CTL(ctl);
 
 	/* Disable all interrupts */
@@ -526,10 +525,10 @@ static void smc_hardware_send_packet(struct net_device *dev)
 
 	DBG(3, "%s: %s\n", dev->name, __FUNCTION__);
 
+	lp->saved_skb = NULL;
 	packet_no = SMC_GET_AR();
 	if (unlikely(packet_no & AR_FAILED)) {
 		printk("%s: Memory allocation failed.\n", dev->name);
-		lp->saved_skb = NULL;
 		lp->stats.tx_errors++;
 		lp->stats.tx_fifo_errors++;
 		dev_kfree_skb_any(skb);
@@ -564,7 +563,6 @@ static void smc_hardware_send_packet(struct net_device *dev)
 
 	dev->trans_start = jiffies;
 	dev_kfree_skb_any(skb);
-	lp->saved_skb = NULL;
 	lp->stats.tx_packets++;
 	lp->stats.tx_bytes += len;
 }
@@ -644,9 +642,8 @@ static int smc_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		 * away for better TX throughput, in which case the queue is
 		 * left active.
 		 */  
-#if THROTTLE_TX_PKTS
-		netif_stop_queue(dev);
-#endif
+		if (THROTTLE_TX_PKTS)
+			netif_stop_queue(dev);
 		smc_hardware_send_packet(dev);
 		SMC_ENABLE_INT(IM_TX_INT | IM_TX_EMPTY_INT);
 	}
@@ -1178,7 +1175,7 @@ static irqreturn_t smc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	do {
 		status = SMC_GET_INT();
 
-		DBG(2, "%s: IRQ 0x%02x MASK 0x%02x MEM 0x%04x FIFO 0x%04x\n",
+		DBG(2, "%s: INT 0x%02x MASK 0x%02x MEM 0x%04x FIFO 0x%04x\n",
 			dev->name, status, mask,
 			({ int meminfo; SMC_SELECT_BANK(0);
 			   meminfo = SMC_GET_MIR();
@@ -1198,17 +1195,15 @@ static irqreturn_t smc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			DBG(3, "%s: TX int\n", dev->name);
 			smc_tx(dev);
 			SMC_ACK_INT(IM_TX_INT);
-#if THROTTLE_TX_PKTS
-			netif_wake_queue(dev);
-#endif
+			if (THROTTLE_TX_PKTS)
+				netif_wake_queue(dev);
 		} else if (status & IM_ALLOC_INT) {
 			DBG(3, "%s: Allocation irq\n", dev->name);
 			smc_hardware_send_packet(dev);
 			mask |= (IM_TX_INT | IM_TX_EMPTY_INT);
 			mask &= ~IM_ALLOC_INT;
-#if ! THROTTLE_TX_PKTS
-			netif_wake_queue(dev);
-#endif
+			if (!THROTTLE_TX_PKTS)
+				netif_wake_queue(dev);
 		} else if (status & IM_TX_EMPTY_INT) {
 			DBG(3, "%s: TX empty\n", dev->name);
 			mask &= ~IM_TX_EMPTY_INT;
@@ -1438,7 +1433,7 @@ smc_open(struct net_device *dev)
 	 * address using ifconfig eth0 hw ether xx:xx:xx:xx:xx:xx
 	 */
 	if (!is_valid_ether_addr(dev->dev_addr)) {
-		DBG(2, (KERN_DEBUG "smc_open: no valid ethernet hw addr\n"));
+		PRINTK("%s: no valid ethernet hw addr\n", __FUNCTION__);
 		return -EINVAL;
 	}
 
@@ -1464,7 +1459,7 @@ smc_open(struct net_device *dev)
 	SMC_SELECT_BANK(1);
 	SMC_SET_MAC_ADDR(dev->dev_addr);
 
-	/* Configure the PHY */
+	/* Configure the PHY, initialize the link state */
 	if (lp->phy_type != 0)
 		smc_phy_configure(dev);
 	else {
@@ -1473,12 +1468,6 @@ smc_open(struct net_device *dev)
 		spin_unlock_irq(&lp->lock);
 	}
 
-	/*
-	 * make sure to initialize the link state with netif_carrier_off()
-	 * somewhere, too --jgarzik
-	 *
-	 * smc_phy_configure() and smc_10bt_check_media() does that. --rmk
-	 */
 	netif_start_queue(dev);
 	return 0;
 }
@@ -1879,6 +1868,7 @@ static int __init smc_probe(struct net_device *dev, unsigned long ioaddr)
       		goto err_out;
 
 	set_irq_type(dev->irq, IRQT_RISING);
+
 #ifdef SMC_USE_PXA_DMA
 	{
 		int dma = pxa_request_dma(dev->name, DMA_PRIO_LOW,

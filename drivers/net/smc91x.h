@@ -223,7 +223,8 @@ smc_pxa_dma_insl(u_long ioaddr, u_long physaddr, int reg, int dma,
 
 	/* 64 bit alignment is required for memory to memory DMA */
 	if ((long)buf & 4) {
-		*((u32 *)buf)++ = SMC_inl(ioaddr, reg);
+		*((u32 *)buf) = SMC_inl(ioaddr, reg);
+		buf += 4;
 		len--;
 	}
 
@@ -235,7 +236,8 @@ smc_pxa_dma_insl(u_long ioaddr, u_long physaddr, int reg, int dma,
 	DCMD(dma) = (DCMD_INCTRGADDR | DCMD_BURST32 |
 		     DCMD_WIDTH4 | (DCMD_LENGTH & len));
 	DCSR(dma) = DCSR_NODESC | DCSR_RUN;
-	while (!(DCSR(dma) & DCSR_STOPSTATE));
+	while (!(DCSR(dma) & DCSR_STOPSTATE))
+		cpu_relax();
 	DCSR(dma) = 0;
 	dma_unmap_single(NULL, dmabuf, len, PCI_DMA_FROMDEVICE);
 }
@@ -259,7 +261,8 @@ smc_pxa_dma_insw(u_long ioaddr, u_long physaddr, int reg, int dma,
 
 	/* 64 bit alignment is required for memory to memory DMA */
 	while ((long)buf & 6) {
-		*((u16 *)buf)++ = SMC_inw(ioaddr, reg);
+		*((u16 *)buf) = SMC_inw(ioaddr, reg);
+		buf += 2;
 		len--;
 	}
 
@@ -271,7 +274,8 @@ smc_pxa_dma_insw(u_long ioaddr, u_long physaddr, int reg, int dma,
 	DCMD(dma) = (DCMD_INCTRGADDR | DCMD_BURST32 |
 		     DCMD_WIDTH2 | (DCMD_LENGTH & len));
 	DCSR(dma) = DCSR_NODESC | DCSR_RUN;
-	while (!(DCSR(dma) & DCSR_STOPSTATE));
+	while (!(DCSR(dma) & DCSR_STOPSTATE))
+		cpu_relax();
 	DCSR(dma) = 0;
 	dma_unmap_single(NULL, dmabuf, len, PCI_DMA_FROMDEVICE);
 }
