@@ -950,7 +950,13 @@ static int idescsi_attach(ide_drive_t *drive)
 {
 	idescsi_scsi_t *idescsi;
 	struct Scsi_Host *host;
+	static int warned;
 	int err;
+
+	if (!warned && drive->media == ide_cdrom) {
+		printk(KERN_WARNING "ide-scsi is deprecated for cd burning! Use ide-cd and give dev=/dev/hdX as device\n");
+		warned = 1;
+	}
 
 	if (!strstr("ide-scsi", drive->driver_req) ||
 	    !drive->present ||

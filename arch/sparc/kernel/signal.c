@@ -284,6 +284,9 @@ asmlinkage void do_sigreturn(struct pt_regs *regs)
 	sigset_t set;
 	int err;
 
+	/* Always make any pending restarted system calls return -EINTR */
+	current_thread_info()->restart_block.fn = do_no_restart_syscall;
+
 	synchronize_user_stack();
 
 	if (current->thread.new_signal)
@@ -1084,12 +1087,6 @@ asmlinkage int do_signal(sigset_t *oldset, struct pt_regs * regs,
 		struct k_sigaction *ka;
 		
 		ka = &current->sighand->action[signr-1];
-
-		/* Always make any pending restarted system
-		 * calls return -EINTR.
-		 */
-		current_thread_info()->restart_block.fn =
-			do_no_restart_syscall;
 
 		if (cookie.restart_syscall)
 			syscall_restart(cookie.orig_i0, regs, &ka->sa);

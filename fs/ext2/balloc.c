@@ -331,7 +331,7 @@ int ext2_new_block(struct inode *inode, unsigned long goal,
 	struct ext2_group_desc *desc;
 	int group_no;			/* i */
 	int ret_block;			/* j */
-	int bit;			/* k */
+	int group_idx;			/* k */
 	int target_block;		/* tmp */
 	int block = 0;
 	struct super_block *sb = inode->i_sb;
@@ -340,6 +340,7 @@ int ext2_new_block(struct inode *inode, unsigned long goal,
 	unsigned group_size = EXT2_BLOCKS_PER_GROUP(sb);
 	unsigned prealloc_goal = es->s_prealloc_blocks;
 	unsigned group_alloc = 0, es_alloc, dq_alloc;
+	int nr_scanned_groups;
 
 	if (!prealloc_goal--)
 		prealloc_goal = EXT2_DEFAULT_PREALLOC_BLOCKS - 1;
@@ -402,9 +403,10 @@ int ext2_new_block(struct inode *inode, unsigned long goal,
 	 * Now search the rest of the groups.  We assume that 
 	 * i and desc correctly point to the last group visited.
 	 */
+	nr_scanned_groups = 0;
 retry:
-	for (bit = 0; !group_alloc &&
-			bit < sbi->s_groups_count; bit++) {
+	for (group_idx = 0; !group_alloc &&
+			group_idx < sbi->s_groups_count; group_idx++) {
 		group_no++;
 		if (group_no >= sbi->s_groups_count)
 			group_no = 0;
@@ -427,9 +429,20 @@ retry:
 				group_size, 0);
 	if (ret_block < 0) {
 		/*
+		 * If a free block counter is corrupted we can loop inifintely.
+		 * Detect that here.
+		 */
+		nr_scanned_groups++;
+		if (nr_scanned_groups > 2 * sbi->s_groups_count) {
+			ext2_error(sb, "ext2_new_block",
+				"corrupted free blocks counters");
+			goto io_error;
+		}
+		/*
 		 * Someone else grabbed the last free block in this blockgroup
 		 * before us.  Retry the scan.
 		 */
+		group_release_blocks(sb, group_no, desc, gdp_bh, group_alloc);
 		group_alloc = 0;
 		goto retry;
 	}

@@ -1558,13 +1558,13 @@ rtattr_failure:
 static int rt6_dump_route(struct rt6_info *rt, void *p_arg)
 {
 	struct rt6_rtnl_dump_arg *arg = (struct rt6_rtnl_dump_arg *) p_arg;
-	struct rtmsg *rtm;
 	int prefix;
 
-	rtm = NLMSG_DATA(arg->cb->nlh);
-	if (rtm)
+	if (arg->cb->nlh->nlmsg_len >= NLMSG_LENGTH(sizeof(struct rtmsg))) {
+		struct rtmsg *rtm = NLMSG_DATA(arg->cb->nlh);
 		prefix = (rtm->rtm_flags & RTM_F_PREFIX) != 0;
-	else prefix = 0;
+	} else
+		prefix = 0;
 
 	return rt6_fill_node(arg->skb, rt, NULL, NULL, 0, RTM_NEWROUTE,
 		     NETLINK_CB(arg->cb->skb).pid, arg->cb->nlh->nlmsg_seq,
