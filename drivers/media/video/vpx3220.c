@@ -33,7 +33,7 @@
 #include <linux/i2c.h>
 #include <linux/i2c-dev.h>
 
-#define I2C_NAME(x) (x)->dev.name
+#define I2C_NAME(x) (x)->name
 
 #include <linux/videodev.h>
 #include <linux/video_decoder.h>

@@ -146,11 +146,7 @@ Private IOCTL to set up for displaying MJPEG
 
 #define ZORAN_NAME    "ZORAN"	/* name of the device */
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-#define ZR_DEVNAME(zr) (zr)->name
-#else
-#define ZR_DEVNAME(zr) (zr)->pci_dev->dev.name
-#endif
+#define ZR_DEVNAME(zr) pci_name((zr)->pci_dev)
 
 #define   BUZ_MAX_WIDTH   (zr->timing->Wa)
 #define   BUZ_MAX_HEIGHT  (zr->timing->Ha)

@@ -54,7 +54,7 @@
 #include "zoran_device.h"
 #include "zoran_procfs.h"
 
-#define I2C_NAME(x) (x)->dev.name
+#define I2C_NAME(x) (x)->name
 
 extern const struct zoran_format zoran_formats[];
 extern const int zoran_num_formats;
