@@ -221,14 +221,6 @@
 
 #define PFM_REG_RETFLAG_SET(flags, val)	do { flags &= ~PFM_REG_RETFL_MASK; flags |= (val); } while(0)
 
-#ifdef CONFIG_SMP
-#define PFM_CPU_ONLINE_MAP	cpu_online_map
-#define cpu_is_online(i)	(PFM_CPU_ONLINE_MAP & (1UL << i))
-#else
-#define PFM_CPU_ONLINE_MAP	 1UL
-#define cpu_is_online(i)	(i==0)
-#endif
-
 /*
  * cmp0 must be the value of pmc0
  */
@@ -5354,7 +5346,7 @@ pfm_proc_info(char *page)
 		p += sprintf(p, "ovfl_mask                 : 0x%lx\n", pmu_conf.ovfl_val);
 
 	for(i=0; i < NR_CPUS; i++) {
-		if (cpu_is_online(i) == 0) continue;
+		if (cpu_online(i) == 0) continue;
 		p += sprintf(p, "CPU%-2d overflow intrs      : %lu\n", i, pfm_stats[i].pfm_ovfl_intr_count);
 		p += sprintf(p, "CPU%-2d overflow cycles     : %lu\n", i, pfm_stats[i].pfm_ovfl_intr_cycles);
 		p += sprintf(p, "CPU%-2d overflow min        : %lu\n", i, pfm_stats[i].pfm_ovfl_intr_cycles_min);
@@ -5372,7 +5364,7 @@ pfm_proc_info(char *page)
 		p += sprintf(p, "CPU%-2d activations         : %lu\n", i, pfm_get_cpu_data(pmu_activation_number,i));
 	}
 
-	if (hweight64(PFM_CPU_ONLINE_MAP) == 1)
+	if (num_online_cpus() == 1)
 	{
 		psr = pfm_get_psr();
 		ia64_srlz_d();

@@ -31,33 +31,33 @@ extern int irq_vector[NR_IRQS];
 extern void (*interrupt[NR_IRQS])(void);
 
 #ifdef CONFIG_SMP
-extern asmlinkage void reschedule_interrupt(void);
-extern asmlinkage void invalidate_interrupt(void);
-extern asmlinkage void call_function_interrupt(void);
+asmlinkage void reschedule_interrupt(void);
+asmlinkage void invalidate_interrupt(void);
+asmlinkage void call_function_interrupt(void);
 #endif
 
 #ifdef CONFIG_X86_LOCAL_APIC
-extern asmlinkage void apic_timer_interrupt(void);
-extern asmlinkage void error_interrupt(void);
-extern asmlinkage void spurious_interrupt(void);
-extern asmlinkage void thermal_interrupt(struct pt_regs);
+asmlinkage void apic_timer_interrupt(void);
+asmlinkage void error_interrupt(void);
+asmlinkage void spurious_interrupt(void);
+asmlinkage void thermal_interrupt(struct pt_regs);
 #endif
 
-extern void mask_irq(unsigned int irq);
-extern void unmask_irq(unsigned int irq);
-extern void disable_8259A_irq(unsigned int irq);
-extern void enable_8259A_irq(unsigned int irq);
-extern int i8259A_irq_pending(unsigned int irq);
-extern void make_8259A_irq(unsigned int irq);
-extern void init_8259A(int aeoi);
-extern void FASTCALL(send_IPI_self(int vector));
-extern void init_VISWS_APIC_irqs(void);
-extern void setup_IO_APIC(void);
-extern void disable_IO_APIC(void);
-extern void print_IO_APIC(void);
-extern int IO_APIC_get_PCI_irq_vector(int bus, int slot, int fn);
-extern void send_IPI(int dest, int vector);
-extern void setup_ioapic_dest(unsigned long mask);
+void mask_irq(unsigned int irq);
+void unmask_irq(unsigned int irq);
+void disable_8259A_irq(unsigned int irq);
+void enable_8259A_irq(unsigned int irq);
+int i8259A_irq_pending(unsigned int irq);
+void make_8259A_irq(unsigned int irq);
+void init_8259A(int aeoi);
+void FASTCALL(send_IPI_self(int vector));
+void init_VISWS_APIC_irqs(void);
+void setup_IO_APIC(void);
+void disable_IO_APIC(void);
+void print_IO_APIC(void);
+int IO_APIC_get_PCI_irq_vector(int bus, int slot, int fn);
+void send_IPI(int dest, int vector);
+void setup_ioapic_dest(cpumask_t mask);
 
 extern unsigned long io_apic_irqs;
 

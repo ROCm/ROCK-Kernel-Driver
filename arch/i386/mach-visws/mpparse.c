@@ -26,7 +26,7 @@ unsigned int boot_cpu_physical_apicid = -1U;
 unsigned int boot_cpu_logical_apicid = -1U;
 
 /* Bitmask of physically existing CPUs */
-unsigned long phys_cpu_present_map;
+physid_mask_t phys_cpu_present_map;
 
 
 /*
@@ -38,6 +38,7 @@ unsigned long phys_cpu_present_map;
 void __init MP_processor_info (struct mpc_config_processor *m)
 {
  	int ver, logical_apicid;
+	cpumask_t apic_cpus;
  	
 	if (!(m->mpc_cpuflag & CPU_ENABLED))
 		return;
@@ -62,7 +63,8 @@ void __init MP_processor_info (struct mpc_config_processor *m)
 	}
 	ver = m->mpc_apicver;
 
-	phys_cpu_present_map |= apicid_to_cpu_present(m->mpc_apicid);
+	apic_cpus = apicid_to_cpu_present(m->mpc_apicid);
+	physids_or(phys_cpu_present_map, phys_cpu_present_map, apic_cpus);
 	/*
 	 * Validate version
 	 */

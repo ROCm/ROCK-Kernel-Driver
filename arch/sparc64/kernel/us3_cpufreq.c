@@ -78,14 +78,15 @@ static unsigned long get_current_freq(unsigned int cpu, unsigned long safari_cfg
 
 static void us3_set_cpu_divider_index(unsigned int cpu, unsigned int index)
 {
-	unsigned long new_bits, new_freq, reg, cpus_allowed;
+	unsigned long new_bits, new_freq, reg;
+	cpumask_t cpus_allowed;
 	struct cpufreq_freqs freqs;
 
 	if (!cpu_online(cpu))
 		return;
 
 	cpus_allowed = current->cpus_allowed;
-	set_cpus_allowed(current, (1UL << cpu));
+	set_cpus_allowed(current, cpumask_of_cpu(cpu));
 
 	new_freq = sparc64_get_clock_tick(cpu);
 	switch (index) {

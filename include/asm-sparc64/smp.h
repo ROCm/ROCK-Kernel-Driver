@@ -14,6 +14,7 @@
 
 #ifndef __ASSEMBLY__
 
+#include <linux/cpumask.h>
 #include <linux/cache.h>
 
 /* PROM provided per-processor information we need
@@ -68,24 +69,13 @@ extern cpuinfo_sparc cpu_data[NR_CPUS];
 
 extern unsigned char boot_cpu_id;
 
-extern unsigned long phys_cpu_present_map;
-#define cpu_possible(cpu)	(phys_cpu_present_map & (1UL << (cpu)))
+extern cpumask_t phys_cpu_present_map;
+#define cpu_possible(cpu)	cpu_isset(cpu, phys_cpu_present_map)
 
-extern unsigned long cpu_online_map;
-#define cpu_online(cpu)		(cpu_online_map & (1UL << (cpu)))
-
-extern atomic_t sparc64_num_cpus_online;
-#define num_online_cpus()	(atomic_read(&sparc64_num_cpus_online))
+#define cpu_online(cpu)		cpu_isset(cpu, cpu_online_map)
 
 extern atomic_t sparc64_num_cpus_possible;
 #define num_possible_cpus()	(atomic_read(&sparc64_num_cpus_possible))
-
-static inline unsigned int any_online_cpu(unsigned long mask)
-{
-	if ((mask &= cpu_online_map) != 0UL)
-		return __ffs(mask);
-	return NR_CPUS;
-}
 
 /*
  *	General functions that each host system must provide.

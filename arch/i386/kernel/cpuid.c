@@ -136,7 +136,7 @@ static int cpuid_open(struct inode *inode, struct file *file)
   int cpu = minor(file->f_dentry->d_inode->i_rdev);
   struct cpuinfo_x86 *c = &(cpu_data)[cpu];
 
-  if ( !(cpu_online_map & (1UL << cpu)) )
+  if (!cpu_online(cpu))
     return -ENXIO;		/* No such CPU */
   if ( c->cpuid_level < 0 )
     return -EIO;		/* CPUID not supported */

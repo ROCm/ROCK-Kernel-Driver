@@ -110,6 +110,10 @@ static void register_irq_proc (unsigned int irq);
 		action->flags |= __irq_ino(irq) << 48;
 #define get_ino_in_irqaction(action)	(action->flags >> 48)
 
+#if NR_CPUS > 64
+#error irqaction embedded smp affinity does not work with > 64 cpus, FIXME
+#endif
+
 #define put_smpaff_in_irqaction(action, smpaff)	(action)->mask = (smpaff)
 #define get_smpaff_in_irqaction(action) 	((action)->mask)
 
@@ -670,11 +674,11 @@ static inline void redirect_intr(int cpu, struct ino_bucket *bp)
 	 *    Just Do It.
 	 */
 	struct irqaction *ap = bp->irq_info;
-	unsigned long cpu_mask = get_smpaff_in_irqaction(ap);
+	cpumask_t cpu_mask = get_smpaff_in_irqaction(ap);
 	unsigned int buddy, ticks;
 
-	cpu_mask &= cpu_online_map;
-	if (cpu_mask == 0)
+	cpus_and(cpu_mask, cpu_mask, cpu_online_map);
+	if (cpus_empty(cpu_mask))
 		cpu_mask = cpu_online_map;
 
 	if (this_is_starfire != 0 ||
@@ -689,7 +693,7 @@ static inline void redirect_intr(int cpu, struct ino_bucket *bp)
 		buddy = 0;
 
 	ticks = 0;
-	while ((cpu_mask & (1UL << buddy)) == 0) {
+	while (!cpu_isset(buddy, cpu_mask)) {
 		if (++buddy >= NR_CPUS)
 			buddy = 0;
 		if (++ticks > NR_CPUS) {

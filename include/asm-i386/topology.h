@@ -31,9 +31,11 @@
 
 #include <asm/mpspec.h>
 
+#include <linux/cpumask.h>
+
 /* Mappings between logical cpu number and node number */
-extern volatile unsigned long node_2_cpu_mask[];
-extern volatile int cpu_2_node[];
+extern cpumask_t node_2_cpu_mask[];
+extern int cpu_2_node[];
 
 /* Returns the number of the node containing CPU 'cpu' */
 static inline int cpu_to_node(int cpu)
@@ -49,7 +51,7 @@ static inline int cpu_to_node(int cpu)
 #define parent_node(node) (node)
 
 /* Returns a bitmask of CPUs on Node 'node'. */
-static inline unsigned long node_to_cpumask(int node)
+static inline cpumask_t node_to_cpumask(int node)
 {
 	return node_2_cpu_mask[node];
 }
@@ -57,14 +59,15 @@ static inline unsigned long node_to_cpumask(int node)
 /* Returns the number of the first CPU on Node 'node'. */
 static inline int node_to_first_cpu(int node)
 { 
-	return __ffs(node_to_cpumask(node));
+	cpumask_t mask = node_to_cpumask(node);
+	return first_cpu(mask);
 }
 
 /* Returns the number of the first MemBlk on Node 'node' */
 #define node_to_memblk(node) (node)
 
 /* Returns the number of the node containing PCI bus 'bus' */
-static inline unsigned long pcibus_to_cpumask(int bus)
+static inline cpumask_t pcibus_to_cpumask(int bus)
 {
 	return node_to_cpumask(mp_bus_id_to_node[bus]);
 }

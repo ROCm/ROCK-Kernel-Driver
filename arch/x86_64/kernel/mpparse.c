@@ -43,7 +43,7 @@ int acpi_found_madt;
 int apic_version [MAX_APICS];
 unsigned char mp_bus_id_to_type [MAX_MP_BUSSES] = { [0 ... MAX_MP_BUSSES-1] = -1 };
 int mp_bus_id_to_pci_bus [MAX_MP_BUSSES] = { [0 ... MAX_MP_BUSSES-1] = -1 };
-unsigned long mp_bus_to_cpumask [MAX_MP_BUSSES] = { [0 ... MAX_MP_BUSSES-1] = -1UL };
+cpumask_t mp_bus_to_cpumask [MAX_MP_BUSSES] = { [0 ... MAX_MP_BUSSES-1] = CPU_MASK_ALL };
 
 int mp_current_pci_id = 0;
 /* I/O APIC entries */
@@ -67,7 +67,7 @@ unsigned int boot_cpu_id = -1U;
 static unsigned int num_processors = 0;
 
 /* Bitmask of physically existing CPUs */
-unsigned long phys_cpu_present_map = 0;
+cpumask_t phys_cpu_present_map = CPU_MASK_NONE;
 
 /* ACPI MADT entry parsing functions */
 #ifdef CONFIG_ACPI_BOOT
@@ -126,7 +126,7 @@ static void __init MP_processor_info (struct mpc_config_processor *m)
 	}
 	ver = m->mpc_apicver;
 
-	phys_cpu_present_map |= 1 << m->mpc_apicid;
+	cpu_set(m->mpc_apicid, phys_cpu_present_map);
 	/*
 	 * Validate version
 	 */

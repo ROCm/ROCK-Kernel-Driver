@@ -143,7 +143,7 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
 	  struct task_struct *tsk)
 {
 	flush_stab(tsk, next);
-	set_bit(smp_processor_id(), &next->cpu_vm_mask);
+	cpu_set(smp_processor_id(), next->cpu_vm_mask);
 }
 
 #define deactivate_mm(tsk,mm)	do { } while (0)

@@ -17,6 +17,7 @@
 
 #include <linux/bitops.h>
 #include <linux/threads.h>
+#include <linux/cpumask.h>
 #include <asm/atomic.h>
 
 #define smp_processor_id()	(current_thread_info()->cpu)
@@ -45,56 +46,22 @@ extern struct call_data_struct *call_data;
 #define SMP_RESCHEDULE_YOURSELF	0x1	/* XXX braindead */
 #define SMP_CALL_FUNCTION	0x2
 
-#if (NR_CPUS <= _MIPS_SZLONG)
-
-typedef unsigned long   cpumask_t;
-
-#define CPUMASK_CLRALL(p)	(p) = 0
-#define CPUMASK_SETB(p, bit)	(p) |= 1UL << (bit)
-#define CPUMASK_CLRB(p, bit)	(p) &= ~(1UL << (bit))
-#define CPUMASK_TSTB(p, bit)	((p) & (1UL << (bit)))
-
-#elif (NR_CPUS <= 128)
-
-/*
- * The foll should work till 128 cpus.
- */
-#define CPUMASK_SIZE		(NR_CPUS/_MIPS_SZLONG)
-#define CPUMASK_INDEX(bit)	((bit) >> 6)
-#define CPUMASK_SHFT(bit)	((bit) & 0x3f)
-
-typedef struct {
-	unsigned long	_bits[CPUMASK_SIZE];
-} cpumask_t;
-
-#define	CPUMASK_CLRALL(p)	(p)._bits[0] = 0, (p)._bits[1] = 0
-#define CPUMASK_SETB(p, bit)	(p)._bits[CPUMASK_INDEX(bit)] |= \
-					(1UL << CPUMASK_SHFT(bit))
-#define CPUMASK_CLRB(p, bit)	(p)._bits[CPUMASK_INDEX(bit)] &= \
-					~(1UL << CPUMASK_SHFT(bit))
-#define CPUMASK_TSTB(p, bit)	((p)._bits[CPUMASK_INDEX(bit)] & \
-					(1UL << CPUMASK_SHFT(bit)))
-
-#else
-#error cpumask macros only defined for 128p kernels
-#endif
-
 extern cpumask_t phys_cpu_present_map;
 extern cpumask_t cpu_online_map;
 
-#define cpu_possible(cpu) (phys_cpu_present_map & (1<<(cpu)))
-#define cpu_online(cpu) (cpu_online_map & (1<<(cpu)))
+#define cpu_possible(cpu)	cpu_isset(cpu, phys_cpu_present_map)
+#define cpu_online(cpu)		cpu_isset(cpu, cpu_online_map)
 
 static inline unsigned int num_online_cpus(void)
 {
-	return hweight32(cpu_online_map);
+	return cpus_weight(cpu_online_map);
 }
 
-extern volatile unsigned long cpu_callout_map;
+extern cpumask_t cpu_callout_map;
 /* We don't mark CPUs online until __cpu_up(), so we need another measure */
 static inline int num_booting_cpus(void)
 {
-	return hweight32(cpu_callout_map);
+	return cpus_weight(cpu_callout_map);
 }
 
 #endif /* CONFIG_SMP */

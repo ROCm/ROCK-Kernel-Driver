@@ -1,13 +1,13 @@
 #ifndef _ASM_GENAPIC_H
 #define _ASM_GENAPIC_H 1
 
-/* 
+/*
  * Generic APIC driver interface.
- *  
- * An straight forward mapping of the APIC related parts of the 
+ *
+ * An straight forward mapping of the APIC related parts of the
  * x86 subarchitecture interface to a dynamic object.
- *	
- * This is used by the "generic" x86 subarchitecture. 
+ *
+ * This is used by the "generic" x86 subarchitecture.
  *
  * Copyright 2003 Andi Kleen, SuSE Labs.
  */
@@ -22,23 +22,23 @@ struct genapic {
 	int (*probe)(void); 
 
 	int (*apic_id_registered)(void);
-	unsigned long (*target_cpus)(void); 
+	cpumask_t (*target_cpus)(void);
 	int int_delivery_mode;
 	int int_dest_mode; 
 	int apic_broadcast_id; 
 	int esr_disable;
-	unsigned long (*check_apicid_used)(unsigned long bitmap, int apicid); 
+	unsigned long (*check_apicid_used)(physid_mask_t bitmap, int apicid);
 	unsigned long (*check_apicid_present)(int apicid); 
 	int no_balance_irq;
 	void (*init_apic_ldr)(void);
-	unsigned long (*ioapic_phys_id_map)(unsigned long map); 
+	physid_mask_t (*ioapic_phys_id_map)(physid_mask_t map);
 
 	void (*clustered_apic_check)(void);
 	int (*multi_timer_check)(int apic, int irq);
 	int (*apicid_to_node)(int logical_apicid); 
 	int (*cpu_to_logical_apicid)(int cpu);
 	int (*cpu_present_to_apicid)(int mps_cpu);
-	unsigned long (*apicid_to_cpu_present)(int phys_apicid); 
+	physid_mask_t (*apicid_to_cpu_present)(int phys_apicid);
 	int (*mpc_apic_id)(struct mpc_config_processor *m, 
 			   struct mpc_config_translation *t); 
 	void (*setup_portio_remap)(void); 
@@ -59,11 +59,11 @@ struct genapic {
 	int (*acpi_madt_oem_check)(char *oem_id, char *oem_table_id);
 
 	unsigned (*get_apic_id)(unsigned long x);
-	unsigned long apic_id_mask; 
-	unsigned int (*cpu_mask_to_apicid)(unsigned long cpumask);
+	unsigned long apic_id_mask;
+	unsigned int (*cpu_mask_to_apicid)(cpumask_const_t cpumask);
 	
 	/* ipi */
-	void (*send_IPI_mask)(int mask, int vector);
+	void (*send_IPI_mask)(cpumask_t mask, int vector);
 	void (*send_IPI_allbutself)(int vector);
 	void (*send_IPI_all)(int vector);
 }; 

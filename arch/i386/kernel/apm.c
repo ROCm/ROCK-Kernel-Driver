@@ -508,16 +508,16 @@ static void apm_error(char *str, int err)
  
 #ifdef CONFIG_SMP
 
-static unsigned long apm_save_cpus(void)
+static cpumask_t apm_save_cpus(void)
 {
-	unsigned long x = current->cpus_allowed;
+	cpumask_t x = current->cpus_allowed;
 	/* Some bioses don't like being called from CPU != 0 */
-	set_cpus_allowed(current, 1UL << 0);
+	set_cpus_allowed(current, cpumask_of_cpu(0));
 	BUG_ON(smp_processor_id() != 0);
 	return x;
 }
 
-static inline void apm_restore_cpus(unsigned long mask)
+static inline void apm_restore_cpus(cpumask_t mask)
 {
 	set_cpus_allowed(current, mask);
 }
@@ -528,7 +528,7 @@ static inline void apm_restore_cpus(unsigned long mask)
  *	No CPU lockdown needed on a uniprocessor
  */
  
-#define apm_save_cpus()	0
+#define apm_save_cpus()		(current->cpus_allowed)
 #define apm_restore_cpus(x)	(void)(x)
 
 #endif
@@ -593,7 +593,7 @@ static u8 apm_bios_call(u32 func, u32 ebx_in, u32 ecx_in,
 {
 	APM_DECL_SEGS
 	unsigned long		flags;
-	unsigned long		cpus;
+	cpumask_t		cpus;
 	int			cpu;
 	struct desc_struct	save_desc_40;
 
@@ -635,7 +635,7 @@ static u8 apm_bios_call_simple(u32 func, u32 ebx_in, u32 ecx_in, u32 *eax)
 	u8			error;
 	APM_DECL_SEGS
 	unsigned long		flags;
-	unsigned long		cpus;
+	cpumask_t		cpus;
 	int			cpu;
 	struct desc_struct	save_desc_40;
 
@@ -913,7 +913,7 @@ static void apm_power_off(void)
 	 */
 #ifdef CONFIG_SMP
 	/* Some bioses don't like being called from CPU != 0 */
-	set_cpus_allowed(current, 1UL << 0);
+	set_cpus_allowed(current, cpumask_of_cpu(0));
 	BUG_ON(smp_processor_id() != 0);
 #endif
 	if (apm_info.realmode_power_off)
@@ -1704,7 +1704,7 @@ static int apm(void *unused)
 	 * Some bioses don't like being called from CPU != 0.
 	 * Method suggested by Ingo Molnar.
 	 */
-	set_cpus_allowed(current, 1UL << 0);
+	set_cpus_allowed(current, cpumask_of_cpu(0));
 	BUG_ON(smp_processor_id() != 0);
 #endif
 

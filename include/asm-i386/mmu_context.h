@@ -31,12 +31,12 @@ static inline void switch_mm(struct mm_struct *prev,
 
 	if (likely(prev != next)) {
 		/* stop flush ipis for the previous mm */
-		clear_bit(cpu, &prev->cpu_vm_mask);
+		cpu_clear(cpu, prev->cpu_vm_mask);
 #ifdef CONFIG_SMP
 		cpu_tlbstate[cpu].state = TLBSTATE_OK;
 		cpu_tlbstate[cpu].active_mm = next;
 #endif
-		set_bit(cpu, &next->cpu_vm_mask);
+		cpu_set(cpu, next->cpu_vm_mask);
 
 		/* Re-load page tables */
 		load_cr3(next->pgd);
@@ -52,7 +52,7 @@ static inline void switch_mm(struct mm_struct *prev,
 		cpu_tlbstate[cpu].state = TLBSTATE_OK;
 		BUG_ON(cpu_tlbstate[cpu].active_mm != next);
 
-		if (!test_and_set_bit(cpu, &next->cpu_vm_mask)) {
+		if (!cpu_test_and_set(cpu, next->cpu_vm_mask)) {
 			/* We were in lazy tlb mode and leave_mm disabled 
 			 * tlb flush IPI delivery. We must reload %cr3.
 			 */

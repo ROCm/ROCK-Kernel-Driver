@@ -46,7 +46,7 @@ static int broken_ipi_registers;
 OpenPIC_SourcePtr ISU[OPENPIC_MAX_ISU];
 
 static void openpic_end_irq(unsigned int irq_nr);
-static void openpic_set_affinity(unsigned int irq_nr, unsigned long cpumask);
+static void openpic_set_affinity(unsigned int irq_nr, cpumask_t cpumask);
 
 struct hw_interrupt_type open_pic = {
 	" OpenPIC  ",
@@ -516,7 +516,7 @@ static void openpic_set_spurious(u_int vec)
 void openpic_init_processor(u_int cpumask)
 {
 	openpic_write(&OpenPIC->Global.Processor_Initialization,
-		      cpumask & cpu_online_map);
+		      cpumask & cpus_coerce(cpu_online_map));
 }
 
 #ifdef CONFIG_SMP
@@ -550,7 +550,7 @@ void openpic_cause_IPI(u_int ipi, u_int cpumask)
 	CHECK_THIS_CPU;
 	check_arg_ipi(ipi);
 	openpic_write(&OpenPIC->THIS_CPU.IPI_Dispatch(ipi),
-		      cpumask & cpu_online_map);
+		      cpumask & cpus_coerce(cpu_online_map));
 }
 
 void openpic_request_IPIs(void)
@@ -636,7 +636,7 @@ static void __init openpic_maptimer(u_int timer, u_int cpumask)
 {
 	check_arg_timer(timer);
 	openpic_write(&OpenPIC->Global.Timer[timer].Destination,
-		      cpumask & cpu_online_map);
+		      cpumask & cpus_coerce(cpu_online_map));
 }
 
 
@@ -757,9 +757,12 @@ static void openpic_end_irq(unsigned int irq_nr)
 		openpic_eoi();
 }
 
-static void openpic_set_affinity(unsigned int irq_nr, unsigned long cpumask)
+static void openpic_set_affinity(unsigned int irq_nr, cpumask_t cpumask)
 {
-	openpic_mapirq(irq_nr - open_pic_irq_offset, cpumask & cpu_online_map);
+	cpumask_t tmp;
+
+	cpus_and(tmp, cpumask, cpu_online_map);
+	openpic_mapirq(irq_nr - open_pic_irq_offset, cpus_coerce(tmp));
 }
 
 #ifdef CONFIG_SMP
