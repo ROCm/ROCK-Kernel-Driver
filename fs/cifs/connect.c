@@ -1224,6 +1224,7 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 			srvTcp->ssocket = csocket;
 			srvTcp->protocolType = IPV4;
 			init_waitqueue_head(&srvTcp->response_q);
+			init_waitqueue_head(&srvTcp->request_q);
 			INIT_LIST_HEAD(&srvTcp->pending_mid_q);
 			srvTcp->tcpStatus = CifsNew;
 			init_MUTEX(&srvTcp->tcpSem);
