@@ -623,10 +623,9 @@ static void error(mddev_t *mddev, mdk_rdev_t *rdev)
 		mddev->degraded++;
 		conf->working_disks--;
 		/*
-		 * if recovery was running, stop it now.
+		 * if recovery is running, make sure it aborts.
 		 */
-		if (mddev->recovery_running) 
-			mddev->recovery_running = -EIO;
+		set_bit(MD_RECOVERY_ERR, &mddev->recovery);
 	}
 	rdev->in_sync = 0;
 	rdev->faulty = 1;

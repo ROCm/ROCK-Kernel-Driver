@@ -210,18 +210,24 @@ struct mddev_s
 	unsigned long			curr_resync;	/* blocks scheduled */
 	unsigned long			resync_mark;	/* a recent timestamp */
 	unsigned long			resync_mark_cnt;/* blocks written at resync_mark */
-	/* recovery_running is 0 for no recovery/resync,
-	 * 1 for active recovery
-	 * 2 for active resync
-	 * -error for an error (e.g. -EINTR)
-	 * it can only be set > 0 under reconfig_sem
+
+	/* recovery/resync flags 
+	 * RUNNING:  a thread is running, or about to be started
+	 * SYNC:     actually doing a resync, not a recovery
+	 * ERR:      and IO error was detected - abort the resync/recovery
+	 * INTR:     someone requested a (clean) early abort.
+	 * DONE:     thread is done and is waiting to be reaped
 	 */
-	int				recovery_running;
-	int				recovery_error;	/* error from recovery write */
+#define	MD_RECOVERY_RUNNING	0
+#define	MD_RECOVERY_SYNC	1
+#define	MD_RECOVERY_ERR		2
+#define	MD_RECOVERY_INTR	3
+#define	MD_RECOVERY_DONE	4
+	unsigned long			recovery;
+
 	int				in_sync;	/* know to not need resync */
 	struct semaphore		reconfig_sem;
 	atomic_t			active;
-	int				spares;
 
 	int				degraded;	/* whether md should consider
 							 * adding a spare

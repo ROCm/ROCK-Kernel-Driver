@@ -463,10 +463,9 @@ static void error(mddev_t *mddev, mdk_rdev_t *rdev)
 			conf->failed_disks++;
 			rdev->in_sync = 0;
 			/*
-			 * if recovery was running, stop it now.
+			 * if recovery was running, make sure it aborts.
 			 */
-			if (mddev->recovery_running) 
-				mddev->recovery_running = -EIO;
+			set_bit(MD_RECOVERY_ERR, &mddev->recovery);
 		}
 		rdev->faulty = 1;
 		printk (KERN_ALERT
