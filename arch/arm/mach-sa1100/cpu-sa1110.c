@@ -238,7 +238,7 @@ static int sa1110_target(struct cpufreq_policy *policy,
 		return -EINVAL;
 	}
 
-	freqs.old = sa11x0_getspeed();
+	freqs.old = sa11x0_getspeed(0);
 	freqs.new = sa11x0_ppcr_to_freq(ppcr);
 	freqs.cpu = 0;
 
@@ -320,7 +320,7 @@ static int __init sa1110_cpu_init(struct cpufreq_policy *policy)
 {
 	if (policy->cpu != 0)
 		return -EINVAL;
-	policy->cur = policy->min = policy->max = sa11x0_getspeed();
+	policy->cur = policy->min = policy->max = sa11x0_getspeed(0);
 	policy->governor = CPUFREQ_DEFAULT_GOVERNOR;
 	policy->cpuinfo.min_freq = 59000;
 	policy->cpuinfo.max_freq = 287000;
@@ -329,8 +329,11 @@ static int __init sa1110_cpu_init(struct cpufreq_policy *policy)
 }
 
 static struct cpufreq_driver sa1110_driver = {
+	.flags		= (CPUFREQ_PANIC_OUTOFSYNC | 
+			   CPUFREQ_PANIC_RESUME_OUTOFSYNC),
 	.verify		= sa11x0_verify_speed,
 	.target		= sa1110_target,
+	.get		= sa11x0_getspeed,
 	.init		= sa1110_cpu_init,
 	.name		= "sa1110",
 };
@@ -354,8 +357,6 @@ static int __init sa1110_clk_init(void)
 			sdram->tck, sdram->trcd, sdram->trp,
 			sdram->twr, sdram->refresh, sdram->cas_latency);
 
-		cpufreq_gov_userspace_init();
- 
 		memcpy(&sdram_params, sdram, sizeof(sdram_params));
 
 		return cpufreq_register_driver(&sa1110_driver);
