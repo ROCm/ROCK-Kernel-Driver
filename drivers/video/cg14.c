@@ -469,9 +469,9 @@ static void cg14_init_one(struct sbus_dev *sdev, int node, int parent_node)
 	int is_8mb, linebytes, i;
 
 	if (!sdev) {
-		prom_getproperty(node, "address",
-				 (char *) &bases[0], sizeof(bases));
-		if (!bases[0]) {
+		if (prom_getproperty(node, "address",
+				     (char *) &bases[0], sizeof(bases)) <= 0
+		    || !bases[0]) {
 			printk(KERN_ERR "cg14: Device is not mapped.\n");
 			return;
 		}

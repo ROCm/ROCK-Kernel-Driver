@@ -45,7 +45,6 @@ static inline void truncate_partial_page(struct page *page, unsigned partial)
 static void
 truncate_complete_page(struct address_space *mapping, struct page *page)
 {
-	BUG_ON(page_mapped(page));
 	if (page->mapping != mapping)
 		return;
 
