@@ -50,7 +50,7 @@
  * SUCH DAMAGE.
  */
 
-#define SYM_DRIVER_NAME	"sym-2.1.16a"
+#define SYM_DRIVER_NAME	"sym-2.1.17a"
 
 #ifdef __FreeBSD__
 #include <dev/sym/sym_glue.h>
@@ -289,7 +289,7 @@ int sym_reset_scsi_bus(hcb_p np, int enab_int)
 		((INW(nc_sbdl) & 0xff00) << 10) |	/* d15-8    */
 		INB(nc_sbcl);	/* req ack bsy sel atn msg cd io    */
 
-	if (!(np->features & FE_WIDE))
+	if (!np->maxwide)
 		term &= 0x3ffff;
 
 	if (term != (2<<7)) {
@@ -744,6 +744,12 @@ static int sym_prepare_setting(hcb_p np, struct sym_nvram *nvram)
 	u32	period;
 	int i;
 
+#ifdef CONFIG_PARISC
+	unsigned long pdc_period;
+	char scsi_mode = -1;
+	struct hardware_path hwpath;
+#endif
+
 	/*
 	 *  Wide ?
 	 */
@@ -800,6 +806,31 @@ static int sym_prepare_setting(hcb_p np, struct sym_nvram *nvram)
 	 * Btw, 'period' is in tenths of nanoseconds.
 	 */
 	period = (4 * div_10M[0] + np->clock_khz - 1) / np->clock_khz;
+
+#if defined(CONFIG_PARISC)
+	/* Host firmware (PDC) keeps a table for crippling SCSI capabilities.
+	 * Many newer machines export one channel of 53c896 chip
+	 * as SE, 50-pin HD.  Also used for Multi-initiator SCSI clusters
+	 * to set the SCSI Initiator ID.
+	 */
+	get_pci_node_path(np->s.device, &hwpath);
+	if (pdc_get_initiator(&hwpath, &np->myaddr, &pdc_period, &np->maxwide, &scsi_mode))
+	{
+		if (scsi_mode >= 0) {
+			/* C3000 PDC reports period/mode */
+			SYM_SETUP_SCSI_DIFF = 0;
+			switch(scsi_mode) {
+			case 0:	np->scsi_mode = SMODE_SE; break;
+			case 1:	np->scsi_mode = SMODE_HVD; break;
+			case 2:	np->scsi_mode = SMODE_LVD; break;
+			default:	break;
+			}
+		}
+
+		period = (u32) pdc_period;
+	}
+#endif
+
 	if	(period <= 250)		np->minsync = 10;
 	else if	(period <= 303)		np->minsync = 11;
 	else if	(period <= 500)		np->minsync = 12;
@@ -862,7 +893,7 @@ static int sym_prepare_setting(hcb_p np, struct sym_nvram *nvram)
 	 *  In dual channel mode, contention occurs if internal cycles
 	 *  are used. Disable internal cycles.
 	 */
-	if (np->device_id == PCI_ID_LSI53C1010 &&
+	if (np->device_id == PCI_ID_LSI53C1010_33 &&
 	    np->revision_id < 0x1)
 		np->rv_ccntl0	|=  DILS;
 
@@ -1362,17 +1393,17 @@ static struct sym_pci_chip sym_pci_dev_table[] = {
  FE_WIDE|FE_ULTRA|FE_QUAD|FE_CACHE_SET|FE_BOF|FE_DFS|FE_LDSTR|FE_PFEN|
  FE_RAM|FE_DAC|FE_IO256|FE_NOPM|FE_LEDC|FE_LCKFRQ}
  ,
- {PCI_ID_LSI53C1010, 0x00, "1010-33", 6, 31, 7, 8,
+ {PCI_ID_LSI53C1010_33, 0x00, "1010-33", 6, 31, 7, 8,
  FE_WIDE|FE_ULTRA3|FE_QUAD|FE_CACHE_SET|FE_BOF|FE_DFBC|FE_LDSTR|FE_PFEN|
  FE_RAM|FE_RAM8K|FE_64BIT|FE_DAC|FE_IO256|FE_NOPM|FE_LEDC|FE_CRC|
  FE_C10}
  ,
- {PCI_ID_LSI53C1010, 0xff, "1010-33", 6, 31, 7, 8,
+ {PCI_ID_LSI53C1010_33, 0xff, "1010-33", 6, 31, 7, 8,
  FE_WIDE|FE_ULTRA3|FE_QUAD|FE_CACHE_SET|FE_BOF|FE_DFBC|FE_LDSTR|FE_PFEN|
  FE_RAM|FE_RAM8K|FE_64BIT|FE_DAC|FE_IO256|FE_NOPM|FE_LEDC|FE_CRC|
  FE_C10|FE_U3EN}
  ,
- {PCI_ID_LSI53C1010_2, 0xff, "1010-66", 6, 31, 7, 8,
+ {PCI_ID_LSI53C1010_66, 0xff, "1010-66", 6, 31, 7, 8,
  FE_WIDE|FE_ULTRA3|FE_QUAD|FE_CACHE_SET|FE_BOF|FE_DFBC|FE_LDSTR|FE_PFEN|
  FE_RAM|FE_RAM8K|FE_64BIT|FE_DAC|FE_IO256|FE_NOPM|FE_LEDC|FE_66MHZ|FE_CRC|
  FE_C10|FE_U3EN}
@@ -1809,7 +1840,7 @@ void sym_start_up (hcb_p np, int reason)
 	/*
 	 *  For now, disable AIP generation on C1010-66.
 	 */
-	if (np->device_id == PCI_ID_LSI53C1010_2)
+	if (np->device_id == PCI_ID_LSI53C1010_66)
 		OUTB (nc_aipcntl1, DISAIP);
 
 	/*
@@ -1819,7 +1850,7 @@ void sym_start_up (hcb_p np, int reason)
 	 *  that from SCRIPTS for each selection/reselection, but 
 	 *  I just don't want. :)
 	 */
-	if (np->device_id == PCI_ID_LSI53C1010 &&
+	if (np->device_id == PCI_ID_LSI53C1010_33 &&
 	    np->revision_id < 1)
 		OUTB (nc_stest1, INB(nc_stest1) | 0x30);
 
