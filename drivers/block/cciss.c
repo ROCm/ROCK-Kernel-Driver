@@ -2607,6 +2607,7 @@ static int __devinit cciss_init_one(struct pci_dev *pdev,
 			   j);
 			break;
 		}
+		q->backing_dev_info.ra_pages = READ_AHEAD;
 		drv->queue = q;
 	blk_queue_bounce_limit(q, hba[i]->pdev->dma_mask);
 
