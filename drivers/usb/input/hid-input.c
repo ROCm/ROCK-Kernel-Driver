@@ -364,8 +364,13 @@ static void hidinput_configure_usage(struct hid_device *device, struct hid_field
 		
 		input->absmin[usage->code] = a;
 		input->absmax[usage->code] = b;
-		input->absfuzz[usage->code] = (b - a) >> 8;
-		input->absflat[usage->code] = (b - a) >> 4;
+		input->absfuzz[usage->code] = 0;
+		input->absflat[usage->code] = 0;
+
+		if (field->application == HID_GD_GAMEPAD || field->application == HID_GD_JOYSTICK) {
+			input->absfuzz[usage->code] = (b - a) >> 8;
+			input->absflat[usage->code] = (b - a) >> 4;
+		}
 	}
 
 	if (usage->hat_min != usage->hat_max) {

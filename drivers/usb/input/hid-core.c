@@ -1327,6 +1327,9 @@ void hid_init_reports(struct hid_device *hid)
 #define USB_VENDOR_ID_ONTRAK		0x0a07
 #define USB_DEVICE_ID_ONTRAK_ADU100	0x0064
 
+#define USB_VENDOR_ID_TANGTOP          0x0d3d
+#define USB_DEVICE_ID_TANGTOP_USBPS2   0x0001
+
 struct hid_blacklist {
 	__u16 idVendor;
 	__u16 idProduct;
@@ -1368,6 +1371,7 @@ struct hid_blacklist {
 	{ USB_VENDOR_ID_ONTRAK, USB_DEVICE_ID_ONTRAK_ADU100 + 300, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_ONTRAK, USB_DEVICE_ID_ONTRAK_ADU100 + 400, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_ONTRAK, USB_DEVICE_ID_ONTRAK_ADU100 + 500, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_TANGTOP, USB_DEVICE_ID_TANGTOP_USBPS2, HID_QUIRK_NOGET },
 	{ 0, 0 }
 };
 
@@ -1533,6 +1537,8 @@ static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 	kfree(buf);
 
 	hid->urbctrl = usb_alloc_urb(0, GFP_KERNEL);
+	if (!hid->urbctrl)
+		goto fail;
 	usb_fill_control_urb(hid->urbctrl, dev, 0, (void *) hid->cr,
 			     hid->ctrlbuf, 1, hid_ctrl, hid);
 	hid->urbctrl->setup_dma = hid->cr_dma;

@@ -206,7 +206,7 @@ struct hid_item {
 #define HID_QUIRK_IGNORE	0x04
 #define HID_QUIRK_NOGET		0x08
 #define HID_QUIRK_HIDDEV	0x10
-#define HID_QUIRK_BADPAD        0x12
+#define HID_QUIRK_BADPAD        0x20
 
 /*
  * This is the global enviroment of the parser. This information is
