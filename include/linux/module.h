@@ -137,6 +137,10 @@ extern struct module __this_module;
 /* What your module does. */
 #define MODULE_DESCRIPTION(_description) MODULE_INFO(description, _description)
 
+/* Type information for a module parameter. */
+#define MODULE_PARM_TYPE(name, _type) \
+	__MODULE_INFO(parmtype, name##type, #name ":" _type)
+
 /* One for each parameter, describing how to use it.  Some files do
    multiple of these per line, so can't just use MODULE_INFO. */
 #define MODULE_PARM_DESC(_parm, desc) \
@@ -564,7 +568,8 @@ static inline void MODULE_PARM_(void) { }
 /* DEPRECATED: Do not use. */
 #define MODULE_PARM(var,type)						    \
 struct obsolete_modparm __parm_##var __attribute__((section("__obsparm"))) = \
-{ __stringify(var), type, &MODULE_PARM_ };
+{ __stringify(var), type, &MODULE_PARM_ }; \
+MODULE_PARM_TYPE(var, type);
 #else
 #define MODULE_PARM(var,type) static void __attribute__((__unused__)) *__parm_##var = &MODULE_PARM_;
 #endif
