@@ -59,7 +59,7 @@ struct inode *jfs_iget(struct super_block *sb, ino_t ino)
 		inode->i_mapping->a_ops = &jfs_aops;
 		inode->i_mapping->gfp_mask = GFP_NOFS;
 	} else if (S_ISLNK(inode->i_mode)) {
-		if (inode->i_size > IDATASIZE) {
+		if (inode->i_size >= IDATASIZE) {
 			inode->i_op = &page_symlink_inode_operations;
 			inode->i_mapping->a_ops = &jfs_aops;
 		} else
@@ -330,3 +330,58 @@ struct address_space_operations jfs_aops = {
 	.bmap		= jfs_bmap,
 	.direct_IO	= jfs_direct_IO,
 };
+
+/*
+ * Guts of jfs_truncate.  Called with locks already held.  Can be called
+ * with directory for truncating directory index table.
+ */
+void jfs_truncate_nolock(struct inode *ip, loff_t length)
+{
+	loff_t newsize;
+	tid_t tid;
+
+	ASSERT(length >= 0);
+
+	if (test_cflag(COMMIT_Nolink, ip)) {
+		xtTruncate(0, ip, length, COMMIT_WMAP);
+		return;
+	}
+
+	do {
+		tid = txBegin(ip->i_sb, 0);
+
+		/*
+		 * The commit_sem cannot be taken before txBegin.
+		 * txBegin may block and there is a chance the inode
+		 * could be marked dirty and need to be committed
+		 * before txBegin unblocks
+		 */
+		down(&JFS_IP(ip)->commit_sem);
+
+		newsize = xtTruncate(tid, ip, length,
+				     COMMIT_TRUNCATE | COMMIT_PWMAP);
+		if (newsize < 0) {
+			txEnd(tid);
+			up(&JFS_IP(ip)->commit_sem);
+			break;
+		}
+
+		ip->i_mtime = ip->i_ctime = CURRENT_TIME;
+		mark_inode_dirty(ip);
+
+		txCommit(tid, 1, &ip, 0);
+		txEnd(tid);
+		up(&JFS_IP(ip)->commit_sem);
+	} while (newsize > length);	/* Truncate isn't always atomic */
+}
+
+void jfs_truncate(struct inode *ip)
+{
+	jFYI(1, ("jfs_truncate: size = 0x%lx\n", (ulong) ip->i_size));
+
+	block_truncate_page(ip->i_mapping, ip->i_size, jfs_get_block);
+
+	IWRITE_LOCK(ip);
+	jfs_truncate_nolock(ip, ip->i_size);
+	IWRITE_UNLOCK(ip);
+}

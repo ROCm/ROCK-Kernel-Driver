@@ -54,7 +54,6 @@ struct jfs_inode_info {
 	lid_t	atlhead;	/* anonymous tlock list head	*/
 	lid_t	atltail;	/* anonymous tlock list tail	*/
 	struct list_head anon_inode_list; /* inodes having anonymous txns */
-	struct list_head mp_list; /* metapages in inode's address space */
 	/*
 	 * rdwrlock serializes xtree between reads & writes and synchronizes
 	 * changes to special inodes.  It's use would be redundant on
