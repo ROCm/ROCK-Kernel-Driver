@@ -642,7 +642,7 @@ restart:
 /* Return 0 if dqput() won't block (note that 1 doesn't necessarily mean blocking) */
 static inline int dqput_blocks(struct dquot *dquot)
 {
-	if (atomic_read(&dquot->dq_count) <= 1 && dquot_dirty(dquot))
+	if (atomic_read(&dquot->dq_count) <= 1)
 		return 1;
 	return 0;
 }
