@@ -119,7 +119,9 @@ _GLOBAL(__save_cpu_setup)
 	/* We only deal with 970 for now */
 	mfspr	r0,SPRN_PVR
 	srwi	r0,r0,16
-	cmpwi	r0,0x39
+	cmpwi	cr0,r0,0x39
+	cmpwi	cr1,r0,0x3c
+	cror	4*cr0+eq,4*cr0+eq,4*cr1+eq
 	bne	1f
 
 	/* Save HID0,1,4 and 5 */
@@ -149,7 +151,9 @@ _GLOBAL(__restore_cpu_setup)
 	/* We only deal with 970 for now */
 	mfspr	r0,SPRN_PVR
 	srwi	r0,r0,16
-	cmpwi	r0,0x39
+	cmpwi	cr0,r0,0x39
+	cmpwi	cr1,r0,0x3c
+	cror	4*cr0+eq,4*cr0+eq,4*cr1+eq
 	bne	1f
 
 	/* Clear interrupt prefix */
