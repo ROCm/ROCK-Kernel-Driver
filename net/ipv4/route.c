@@ -2605,17 +2605,28 @@ static int ip_rt_acct_read(char *buffer, char **start, off_t offset,
 		*eof = 1;
 	}
 
-	/* Copy first cpu. */
-	*start = buffer;
-	memcpy(buffer, IP_RT_ACCT_CPU(0), length);
+	offset /= sizeof(u32);
 
-	/* Add the other cpus in, one int at a time */
-	for (i = 1; i < NR_CPUS; i++) {
-		unsigned int j;
-		if (!cpu_online(i))
-			continue;
-		for (j = 0; j < length/4; j++)
-			((u32*)buffer)[j] += ((u32*)IP_RT_ACCT_CPU(i))[j];
+	if (length > 0) {
+		u32 *src = ((u32 *) IP_RT_ACCT_CPU(0)) + offset;
+		u32 *dst = (u32 *) buffer;
+
+		/* Copy first cpu. */
+		*start = buffer;
+		memcpy(dst, src, length);
+
+		/* Add the other cpus in, one int at a time */
+		for (i = 1; i < NR_CPUS; i++) {
+			unsigned int j;
+
+			if (!cpu_online(i))
+				continue;
+
+			src = ((u32 *) IP_RT_ACCT_CPU(i)) + offset;
+
+			for (j = 0; j < length/4; j++)
+				dst[j] += src[j];
+		}
 	}
 	return length;
 }
