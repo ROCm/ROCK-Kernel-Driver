@@ -1,8 +1,9 @@
 #ifndef _B44_H
 #define _B44_H
 
-/* Register layout. */
+/* Register layout. (These correspond to struct _bcmenettregs in bcm4400.) */
 #define	B44_DEVCTRL	0x0000UL /* Device Control */
+#define  DEVCTRL_MPM		0x00000040 /* Magic Packet PME Enable (B0 only) */
 #define  DEVCTRL_PFE		0x00000080 /* Pattern Filtering Enable */
 #define  DEVCTRL_IPP		0x00000400 /* Internal EPHY Present */
 #define  DEVCTRL_EPR		0x00008000 /* EPHY Reset */
@@ -24,6 +25,7 @@
 #define  WKUP_LEN_P3_SHIFT	24
 #define  WKUP_LEN_D3		0x80000000
 #define B44_ISTAT	0x0020UL /* Interrupt Status */
+#define  ISTAT_LS		0x00000020 /* Link Change (B0 only) */
 #define  ISTAT_PME		0x00000040 /* Power Management Event */
 #define  ISTAT_TO		0x00000080 /* General Purpose Timeout */
 #define  ISTAT_DSCE		0x00000400 /* Descriptor Error */
@@ -41,6 +43,8 @@
 #define B44_IMASK	0x0024UL /* Interrupt Mask */
 #define  IMASK_DEF		(ISTAT_ERRORS | ISTAT_TO | ISTAT_RX | ISTAT_TX)
 #define B44_GPTIMER	0x0028UL /* General Purpose Timer */
+#define B44_ADDR_LO	0x0088UL /* ENET Address Lo (B0 only) */
+#define B44_ADDR_HI	0x008CUL /* ENET Address Hi (B0 only) */
 #define B44_FILT_ADDR	0x0090UL /* ENET Filter Address */
 #define B44_FILT_DATA	0x0094UL /* ENET Filter Data */
 #define B44_TXBURST	0x00A0UL /* TX Max Burst Length */
