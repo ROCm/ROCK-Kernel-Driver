@@ -14,7 +14,7 @@
 #include "amiga.h"
 
 static __inline__ u32
-checksum_block(u32 *m, int size)
+checksum_block(__be32 *m, int size)
 {
 	u32 sum = 0;
 
@@ -45,17 +45,17 @@ amiga_partition(struct parsed_partitions *state, struct block_device *bdev)
 				       bdevname(bdev, b), blk);
 			goto rdb_done;
 		}
-		if (*(u32 *)data != cpu_to_be32(IDNAME_RIGIDDISK))
+		if (*(__be32 *)data != cpu_to_be32(IDNAME_RIGIDDISK))
 			continue;
 
 		rdb = (struct RigidDiskBlock *)data;
-		if (checksum_block((u32 *)data, be32_to_cpu(rdb->rdb_SummedLongs) & 0x7F) == 0)
+		if (checksum_block((__be32 *)data, be32_to_cpu(rdb->rdb_SummedLongs) & 0x7F) == 0)
 			break;
 		/* Try again with 0xdc..0xdf zeroed, Windows might have
 		 * trashed it.
 		 */
-		*(u32 *)(data+0xdc) = 0;
-		if (checksum_block((u32 *)data,
+		*(__be32 *)(data+0xdc) = 0;
+		if (checksum_block((__be32 *)data,
 				be32_to_cpu(rdb->rdb_SummedLongs) & 0x7F)==0) {
 			printk("Warning: Trashed word at 0xd0 in block %d "
 				"ignored in checksum calculation\n",blk);
@@ -85,7 +85,7 @@ amiga_partition(struct parsed_partitions *state, struct block_device *bdev)
 		blk = be32_to_cpu(pb->pb_Next);
 		if (pb->pb_ID != cpu_to_be32(IDNAME_PARTITION))
 			continue;
-		if (checksum_block((u32 *)pb, be32_to_cpu(pb->pb_SummedLongs) & 0x7F) != 0 )
+		if (checksum_block((__be32 *)pb, be32_to_cpu(pb->pb_SummedLongs) & 0x7F) != 0 )
 			continue;
 
 		/* Tell Kernel about it */
@@ -105,7 +105,7 @@ amiga_partition(struct parsed_partitions *state, struct block_device *bdev)
 		{
 			/* Be even more informative to aid mounting */
 			char dostype[4];
-			u32 *dt = (u32 *)dostype;
+			__be32 *dt = (__be32 *)dostype;
 			*dt = pb->pb_Environment[16];
 			if (dostype[3] < ' ')
 				printk(" (%c%c%c^%c)",

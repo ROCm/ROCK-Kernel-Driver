@@ -566,7 +566,7 @@ static BOOL ldm_validate_partition_table (struct block_device *bdev)
 		return FALSE;
 	}
 
-	if (*(u16*) (data + 0x01FE) != cpu_to_le16 (MSDOS_LABEL_MAGIC))
+	if (*(__le16*) (data + 0x01FE) != cpu_to_le16 (MSDOS_LABEL_MAGIC))
 		goto out;
 
 	p = (struct partition*)(data + 0x01BE);
