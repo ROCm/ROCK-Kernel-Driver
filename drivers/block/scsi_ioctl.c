@@ -30,7 +30,7 @@
 
 #include <scsi/scsi.h>
 #include <scsi/scsi_ioctl.h>
-#include <scsi/scsi_cmnd.h>
+
 
 /* Command group 3 is reserved and should never be used.  */
 const unsigned char scsi_command_size[8] =
@@ -40,6 +40,44 @@ const unsigned char scsi_command_size[8] =
 };
 
 #define BLK_DEFAULT_TIMEOUT	(60 * HZ)
+
+/* defined in ../scsi/scsi.h  ... should it be included? */
+#ifndef SCSI_SENSE_BUFFERSIZE
+#define SCSI_SENSE_BUFFERSIZE 64
+#endif
+
+static int blk_do_rq(request_queue_t *q, struct gendisk *bd_disk,
+		     struct request *rq)
+{
+	char sense[SCSI_SENSE_BUFFERSIZE];
+	DECLARE_COMPLETION(wait);
+	int err = 0;
+
+	rq->rq_disk = bd_disk;
+
+	/*
+	 * we need an extra reference to the request, so we can look at
+	 * it after io completion
+	 */
+	rq->ref_count++;
+
+	if (!rq->sense) {
+		memset(sense, 0, sizeof(sense));
+		rq->sense = sense;
+		rq->sense_len = 0;
+	}
+
+	rq->flags |= REQ_NOMERGE;
+	rq->waiting = &wait;
+	elv_add_request(q, rq, ELEVATOR_INSERT_BACK, 1);
+	generic_unplug_device(q);
+	wait_for_completion(&wait);
+
+	if (rq->errors)
+		err = -EIO;
+
+	return err;
+}
 
 #include <scsi/sg.h>
 
@@ -208,7 +246,7 @@ static int sg_io(request_queue_t *q, struct gendisk *bd_disk,
 	 * (if he doesn't check that is his problem).
 	 * N.B. a non-zero SCSI status is _not_ necessarily an error.
 	 */
-	blk_execute_rq(q, bd_disk, rq);
+	blk_do_rq(q, bd_disk, rq);
 
 	if (bio)
 		bio_unmap_user(bio, reading);
@@ -331,7 +369,7 @@ static int sg_scsi_ioctl(request_queue_t *q, struct gendisk *bd_disk,
 	rq->data_len = bytes;
 	rq->flags |= REQ_BLOCK_PC;
 
-	blk_execute_rq(q, bd_disk, rq);
+	blk_do_rq(q, bd_disk, rq);
 	err = rq->errors & 0xff;	/* only 8 bit SCSI status */
 	if (err) {
 		if (rq->sense_len && rq->sense) {
@@ -491,7 +529,7 @@ int scsi_cmd_ioctl(struct gendisk *bd_disk, unsigned int cmd, unsigned long arg)
 			rq->cmd[0] = GPCMD_START_STOP_UNIT;
 			rq->cmd[4] = 0x02 + (close != 0);
 			rq->cmd_len = 6;
-			err = blk_execute_rq(q, bd_disk, rq);
+			err = blk_do_rq(q, bd_disk, rq);
 			blk_put_request(rq);
 			break;
 		default:
