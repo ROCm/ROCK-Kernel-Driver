@@ -344,47 +344,6 @@ config ACPI
 	bool
 	depends on !IA64_HP_SIM
 	default y
-	help
-	  ACPI/OSPM support for Linux is currently under development. As such,
-	  this support is preliminary and EXPERIMENTAL.  Configuring ACPI
-	  support enables kernel interfaces that allow higher level software
-	  (OSPM) to manipulate ACPI defined hardware and software interfaces,
-	  including the evaluation of ACPI control methods.  If unsure, choose
-	  N here.  Note, this option will enlarge your kernel by about 120K.
-
-	  This support requires an ACPI compliant platform (hardware/firmware).
-	  If both ACPI and Advanced Power Management (APM) support are
-	  configured, whichever is loaded first shall be used.
-
-	  This code DOES NOT currently provide a complete OSPM implementation
-	  -- it has not yet reached APM's level of functionality.  When fully
-	  implemented, Linux ACPI/OSPM will provide a more robust functional
-	  replacement for legacy configuration and power management
-	  interfaces, including the Plug-and-Play BIOS specification (PnP
-	  BIOS), the Multi-Processor Specification (MPS), and the Advanced
-	  Power Management specification (APM).
-
-	  Linux support for ACPI/OSPM is based on Intel Corporation's ACPI
-	  Component Architecture (ACPI CA). The latest ACPI CA source code,
-	  documentation, debug builds, and implementation status information
-	  can be downloaded from:
-	  <http://developer.intel.com/technology/iapc/acpi/downloads.htm>.
-
-	  The ACPI Sourceforge project may also be of interest:
-	  <http://sf.net/projects/acpi/>
-
-config ACPI_INTERPRETER
-	bool
-	depends on !IA64_HP_SIM
-	default y
-
-config ACPI_KERNEL_CONFIG
-	bool
-	depends on !IA64_HP_SIM
-	default y
-	help
-	  If you say `Y' here, Linux's ACPI support will use the
-	  hardware-level system descriptions found on IA-64 systems.
 
 if !IA64_HP_SIM
 
