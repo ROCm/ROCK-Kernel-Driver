@@ -33,7 +33,7 @@
 
 ENTRY(trampoline_data)
 r_base = .
-
+	wbinvd	
 	mov	%cs, %ax	# Code and data in the same place
 	mov	%ax, %ds
 

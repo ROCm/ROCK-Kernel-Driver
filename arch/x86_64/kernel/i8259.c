@@ -1,6 +1,5 @@
 #include <linux/linkage.h>
 #include <linux/config.h>
-#include <linux/ptrace.h>
 #include <linux/errno.h>
 #include <linux/signal.h>
 #include <linux/sched.h>
@@ -120,7 +119,8 @@ static void end_8259A_irq (unsigned int irq)
 		BUG(); 
 	}
 
-	if (!(irq_desc[irq].status & (IRQ_DISABLED|IRQ_INPROGRESS)))
+	if (!(irq_desc[irq].status & (IRQ_DISABLED|IRQ_INPROGRESS)) &&
+	    irq_desc[irq].action)
 		enable_8259A_irq(irq);
 }
 
@@ -319,18 +319,6 @@ spurious_8259A_irq:
 		goto handle_real_irq;
 	}
 }
-
-static struct device device_i8259A = {
-       name:           "i8259A",
-       bus_id:         "0020",
-};
-
-static int __init init_8259A_devicefs(void)
-{
-       return register_sys_device(&device_i8259A);
-}
-
-__initcall(init_8259A_devicefs);
 
 void __init init_8259A(int auto_eoi)
 {

@@ -11,8 +11,8 @@
  */
 
 #define map_page_into_agp(page) \
-      change_page_attr(page, __pgprot(__PAGE_KERNEL | _PAGE_PCD))
-#define unmap_page_from_agp(page) change_page_attr(page, PAGE_KERNEL)
+      change_page_attr(page, 1, PAGE_KERNEL_NOCACHE)
+#define unmap_page_from_agp(page) change_page_attr(page, 1, PAGE_KERNEL)
 #define flush_agp_mappings() global_flush_tlb()
 
 /* Could use CLFLUSH here if the cpu supports it. But then it would

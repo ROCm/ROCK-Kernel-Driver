@@ -966,7 +966,8 @@ int nr_rx_frame(struct sk_buff *skb, struct net_device *dev)
 	return 1;
 }
 
-static int nr_sendmsg(struct socket *sock, struct msghdr *msg, int len, struct scm_cookie *scm)
+static int nr_sendmsg(struct kiocb *iocb, struct socket *sock,
+		      struct msghdr *msg, int len, struct scm_cookie *scm)
 {
 	struct sock *sk = sock->sk;
 	nr_cb *nr = nr_sk(sk);
@@ -1056,8 +1057,9 @@ static int nr_sendmsg(struct socket *sock, struct msghdr *msg, int len, struct s
 	return len;
 }
 
-static int nr_recvmsg(struct socket *sock, struct msghdr *msg, int size, 
-	int flags, struct scm_cookie *scm)
+static int nr_recvmsg(struct kiocb *iocb, struct socket *sock,
+		      struct msghdr *msg, int size, int flags,
+		      struct scm_cookie *scm)
 {
 	struct sock *sk = sock->sk;
 	struct sockaddr_ax25 *sax = (struct sockaddr_ax25 *)msg->msg_name;

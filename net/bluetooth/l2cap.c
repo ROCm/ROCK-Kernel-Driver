@@ -641,7 +641,7 @@ static int l2cap_sock_getname(struct socket *sock, struct sockaddr *addr, int *l
 	return 0;
 }
 
-static int l2cap_sock_sendmsg(struct socket *sock, struct msghdr *msg, int len, struct scm_cookie *scm)
+static int l2cap_sock_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg, int len, struct scm_cookie *scm)
 {
 	struct sock *sk = sock->sk;
 	int err = 0;

@@ -349,7 +349,6 @@ static int fib_check_nh(const struct rtmsg *r, struct fib_info *fi, struct fib_n
 	int err;
 
 	if (nh->nh_gw) {
-		struct rt_key key;
 		struct fib_result res;
 
 #ifdef CONFIG_IP_ROUTE_PERVASIVE
@@ -372,16 +371,18 @@ static int fib_check_nh(const struct rtmsg *r, struct fib_info *fi, struct fib_n
 			nh->nh_scope = RT_SCOPE_LINK;
 			return 0;
 		}
-		memset(&key, 0, sizeof(key));
-		key.dst = nh->nh_gw;
-		key.oif = nh->nh_oif;
-		key.scope = r->rtm_scope + 1;
+		{
+			struct flowi fl = { .nl_u = { .ip4_u =
+						      { .daddr = nh->nh_gw,
+							.scope = r->rtm_scope + 1 } },
+					    .oif = nh->nh_oif };
 
-		/* It is not necessary, but requires a bit of thinking */
-		if (key.scope < RT_SCOPE_LINK)
-			key.scope = RT_SCOPE_LINK;
-		if ((err = fib_lookup(&key, &res)) != 0)
-			return err;
+			/* It is not necessary, but requires a bit of thinking */
+			if (fl.fl4_scope < RT_SCOPE_LINK)
+				fl.fl4_scope = RT_SCOPE_LINK;
+			if ((err = fib_lookup(&fl, &res)) != 0)
+				return err;
+		}
 		err = -EINVAL;
 		if (res.type != RTN_UNICAST && res.type != RTN_LOCAL)
 			goto out;
@@ -578,7 +579,7 @@ failure:
 }
 
 int 
-fib_semantic_match(int type, struct fib_info *fi, const struct rt_key *key, struct fib_result *res)
+fib_semantic_match(int type, struct fib_info *fi, const struct flowi *flp, struct fib_result *res)
 {
 	int err = fib_props[type].error;
 
@@ -603,7 +604,7 @@ fib_semantic_match(int type, struct fib_info *fi, const struct rt_key *key, stru
 			for_nexthops(fi) {
 				if (nh->nh_flags&RTNH_F_DEAD)
 					continue;
-				if (!key->oif || key->oif == nh->nh_oif)
+				if (!flp->oif || flp->oif == nh->nh_oif)
 					break;
 			}
 #ifdef CONFIG_IP_ROUTE_MULTIPATH
@@ -949,7 +950,7 @@ int fib_sync_up(struct net_device *dev)
    fair weighted route distribution.
  */
 
-void fib_select_multipath(const struct rt_key *key, struct fib_result *res)
+void fib_select_multipath(const struct flowi *flp, struct fib_result *res)
 {
 	struct fib_info *fi = res->fi;
 	int w;

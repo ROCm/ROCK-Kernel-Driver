@@ -44,5 +44,5 @@ ide_init_default_hwifs(void)
 
 	ide_init_hwif_ports(&hw, 0x1f0, 0x3f6, NULL);
 	hw.irq = IRQ_HARDDISK;
-	ide_register_hw(&hw);
+	ide_register_hw(&hw, NULL);
 }

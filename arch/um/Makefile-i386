@@ -8,27 +8,24 @@ ARCH_CFLAGS = -U__$(SUBARCH)__ -U$(SUBARCH)
 ELF_ARCH = $(SUBARCH)
 ELF_FORMAT = elf32-$(SUBARCH)
 
+SYS_DIR		:= $(ARCH_DIR)/include/sysdep-i386
+SYS_UTIL_DIR	:= $(ARCH_DIR)/sys-i386/util
 
-SYS_HEADERS = $(ARCH_DIR)/include/sysdep-i386/sc.h \
-	$(ARCH_DIR)/include/sysdep-i386/thread.h
+SYS_HEADERS = $(SYS_DIR)/sc.h $(SYS_DIR)/thread.h
 
-$(ARCH_DIR)/include/sysdep-i386/sc.h : $(ARCH_DIR)/sys-i386/util/mk_sc \
-	include/asm
-	$(ARCH_DIR)/sys-i386/util/mk_sc > $@
+prepare: $(SYS_HEADERS)
 
-$(ARCH_DIR)/include/sysdep-i386/thread.h : $(ARCH_DIR)/sys-i386/util/mk_thread\
-	include/asm
-	$(ARCH_DIR)/sys-i386/util/mk_thread > $@
+$(SYS_DIR)/sc.h: $(SYS_UTIL_DIR)/mk_sc
+	$< > $@
 
-$(ARCH_DIR)/sys-i386/util/mk_sc : $(ARCH_DIR)/sys-i386/util/mk_sc.c \
-	include/asm
-	$(MAKE) -C $(ARCH_DIR)/sys-i386/util mk_sc
+$(SYS_DIR)/thread.h: $(SYS_UTIL_DIR)/mk_thread
+	$< > $@
 
-$(ARCH_DIR)/sys-i386/util/mk_thread : \
-	$(ARCH_DIR)/sys-i386/util/mk_thread_user.c \
-	$(ARCH_DIR)/sys-i386/util/mk_thread_kern.c
-	$(MAKE) -C $(ARCH_DIR)/sys-i386/util mk_thread
+$(SYS_UTIL_DIR)/mk_sc $(SYS_UTIL_DIR)/mk_thread: $(SYS_UTIL_DIR) FORCE ; 
+
+$(SYS_UTIL_DIR): include/asm FORCE
+	@$(call descend,$@,)
 
 sysclean :
 	rm -f $(SYS_HEADERS)
-	make -C $(ARCH_DIR)/sys-i386/util clean
+	@$(call descend,$(SYS_DIR),clean)

@@ -36,16 +36,14 @@ extern cycles_t cacheflush_time;
 
 static inline cycles_t get_cycles (void)
 {
-#ifndef CONFIG_X86_TSC
-	return 0;
-#else
 	unsigned long long ret;
 
 	rdtscll(ret);
 	return ret;
-#endif
 }
 
 extern unsigned int cpu_khz;
+
+extern struct hpet_data hpet;
 
 #endif

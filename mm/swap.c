@@ -194,8 +194,10 @@ void pagevec_deactivate_inactive(struct pagevec *pvec)
 }
 
 /*
- * Add the passed pages to the inactive_list, then drop the caller's refcount
+ * Add the passed pages to the LRU, then drop the caller's refcount
  * on them.  Reinitialises the caller's pagevec.
+ *
+ * Mapped pages go onto the active list.
  */
 void __pagevec_lru_add(struct pagevec *pvec)
 {
@@ -214,7 +216,13 @@ void __pagevec_lru_add(struct pagevec *pvec)
 		}
 		if (TestSetPageLRU(page))
 			BUG();
-		add_page_to_inactive_list(zone, page);
+		if (page_mapped(page)) {
+			if (TestSetPageActive(page))
+				BUG();
+			add_page_to_active_list(zone, page);
+		} else {
+			add_page_to_inactive_list(zone, page);
+		}
 	}
 	if (zone)
 		spin_unlock_irq(&zone->lru_lock);

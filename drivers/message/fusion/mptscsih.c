@@ -26,7 +26,7 @@
  *  (mailto:sjralston1@netscape.net)
  *  (mailto:Pam.Delaney@lsil.com)
  *
- *  $Id: mptscsih.c,v 1.101 2002/09/05 22:30:11 pdelaney Exp $
+ *  $Id: mptscsih.c,v 1.102 2002/10/03 13:10:14 pdelaney Exp $
  */
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
@@ -76,7 +76,6 @@
 #include <linux/delay.h>	/* for mdelay */
 #include <linux/interrupt.h>	/* needed for in_interrupt() proto */
 #include <linux/reboot.h>	/* notifier code */
-#include <linux/workqueue.h>
 #include "../../scsi/scsi.h"
 #include "../../scsi/hosts.h"
 #include "../../scsi/sd.h"
@@ -165,7 +164,6 @@ static int	mptscsih_AddSGE(MPT_SCSI_HOST *hd, Scsi_Cmnd *SCpnt,
 static int	mptscsih_getFreeChainBuffer(MPT_SCSI_HOST *hd, int *retIndex);
 static void	mptscsih_freeChainBuffers(MPT_SCSI_HOST *hd, int req_idx);
 static int	mptscsih_initChainBuffers (MPT_SCSI_HOST *hd, int init);
-
 static void	copy_sense_data(Scsi_Cmnd *sc, MPT_SCSI_HOST *hd, MPT_FRAME_HDR *mf, SCSIIOReply_t *pScsiReply);
 #ifndef MPT_SCSI_USE_NEW_EH
 static void	search_taskQ_for_cmd(Scsi_Cmnd *sc, MPT_SCSI_HOST *hd);
@@ -184,7 +182,9 @@ static int	mptscsih_event_process(MPT_ADAPTER *ioc, EventNotificationReply_t *pE
 
 static VirtDevice	*mptscsih_initTarget(MPT_SCSI_HOST *hd, int bus_id, int target_id, u8 lun, char *data, int dlen);
 void		mptscsih_setTargetNegoParms(MPT_SCSI_HOST *hd, VirtDevice *target, char byte56);
+#ifdef MPT_SAVE_AUTOSENSE
 static void	clear_sense_flag(MPT_SCSI_HOST *hd, SCSIIORequest_t *pReq);
+#endif
 static void	mptscsih_set_dvflags(MPT_SCSI_HOST *hd, SCSIIORequest_t *pReq);
 static void	mptscsih_setDevicePage1Flags (u8 width, u8 factor, u8 offset, int *requestedPtr, int *configurationPtr, u8 flags);
 static void	mptscsih_no_negotiate(MPT_SCSI_HOST *hd, int target_id);
@@ -245,7 +245,7 @@ static struct proc_dir_entry proc_mpt_scsihost =
  */
 static spinlock_t mytaskQ_lock = SPIN_LOCK_UNLOCKED;
 static int mytaskQ_bh_active = 0;
-static struct work_struct	mptscsih_ptaskfoo;
+static struct mpt_work_struct	mptscsih_ptaskfoo;
 static atomic_t	mpt_taskQdepth;
 #endif
 
@@ -256,7 +256,7 @@ static atomic_t	mpt_taskQdepth;
 static spinlock_t dvtaskQ_lock = SPIN_LOCK_UNLOCKED;
 static int dvtaskQ_active = 0;
 static int dvtaskQ_release = 0;
-static struct work_struct	mptscsih_dvTask;
+static struct mpt_work_struct	mptscsih_dvTask;
 #endif
 
 /*
@@ -352,7 +352,9 @@ mptscsih_io_done(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *mr)
 						dlen);
 			}
 		}
+#ifdef MPT_SAVE_AUTOSENSE
 		clear_sense_flag(hd, pScsiReq);
+#endif
 	} else {
 		u32	 xfer_cnt;
 		u16	 status;
@@ -437,17 +439,21 @@ mptscsih_io_done(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *mr)
 			 *  precedence!
 			 */
 			sc->result = (DID_OK << 16) | pScsiReply->SCSIStatus;
+#ifdef MPT_SAVE_AUTOSENSE
 			clear_sense_flag(hd, pScsiReq);
-			if (pScsiReply->SCSIState & MPI_SCSI_STATE_AUTOSENSE_VALID) {
+#endif
+			if (scsi_state == 0) {
+				;
+			} else if (scsi_state & MPI_SCSI_STATE_AUTOSENSE_VALID) {
 				/* Have already saved the status and sense data
 				 */
 				;
-			} else if (pScsiReply->SCSIState & (MPI_SCSI_STATE_AUTOSENSE_FAILED | MPI_SCSI_STATE_NO_SCSI_STATUS)) {
+			} else if (scsi_state & (MPI_SCSI_STATE_AUTOSENSE_FAILED | MPI_SCSI_STATE_NO_SCSI_STATUS)) {
 				/* What to do?
 				 */
 				sc->result = DID_SOFT_ERROR << 16;
 			}
-			else if (pScsiReply->SCSIState & MPI_SCSI_STATE_TERMINATED) {
+			else if (scsi_state & MPI_SCSI_STATE_TERMINATED) {
 				/*  Not real sure here either...  */
 				sc->result = DID_RESET << 16;
 			}
@@ -488,9 +494,12 @@ mptscsih_io_done(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *mr)
 		case MPI_IOCSTATUS_SCSI_RECOVERED_ERROR:	/* 0x0040 */
 		case MPI_IOCSTATUS_SUCCESS:			/* 0x0000 */
 			sc->result = (DID_OK << 16) | pScsiReply->SCSIStatus;
+#ifdef MPT_SAVE_AUTOSENSE
 			clear_sense_flag(hd, pScsiReq);
-
-			if (pScsiReply->SCSIState & MPI_SCSI_STATE_AUTOSENSE_VALID) {
+#endif
+			if (scsi_state == 0) {
+				;
+			} else if (scsi_state & MPI_SCSI_STATE_AUTOSENSE_VALID) {
 				/*
 				 * If running agains circa 200003dd 909 MPT f/w,
 				 * may get this (AUTOSENSE_VALID) for actual TASK_SET_FULL
@@ -521,7 +530,7 @@ mptscsih_io_done(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *mr)
 #endif
 
 			}
-			else if (pScsiReply->SCSIState &
+			else if (scsi_state &
 			         (MPI_SCSI_STATE_AUTOSENSE_FAILED | MPI_SCSI_STATE_NO_SCSI_STATUS)
 			   ) {
 				/*
@@ -529,11 +538,11 @@ mptscsih_io_done(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *mr)
 				 */
 				sc->result = DID_SOFT_ERROR << 16;
 			}
-			else if (pScsiReply->SCSIState & MPI_SCSI_STATE_TERMINATED) {
+			else if (scsi_state & MPI_SCSI_STATE_TERMINATED) {
 				/*  Not real sure here either...  */
 				sc->result = DID_RESET << 16;
 			}
-			else if (pScsiReply->SCSIState & MPI_SCSI_STATE_QUEUE_TAG_REJECTED) {
+			else if (scsi_state & MPI_SCSI_STATE_QUEUE_TAG_REJECTED) {
 				/* Device Inq. data indicates that it supports
 				 * QTags, but rejects QTag messages.
 				 * This command completed OK.
@@ -1024,21 +1033,13 @@ mptscsih_initChainBuffers (MPT_SCSI_HOST *hd, int init)
 	MPT_FRAME_HDR	*chain;
 	u8		*mem;
 	unsigned long	flags;
-	int		sz, ii, numChain;
+	int		sz, ii, num_chain;
+	int 		scale, num_sge;
 
-
-        /* Chain buffer allocations
-	 * Allocate and initialize tracker structures
+	/* ReqToChain size must equal the req_depth
+	 * index = req_idx
 	 */
-	if (hd->ioc->req_sz <= 64)
-		numChain = MPT_SG_REQ_64_SCALE * hd->ioc->req_depth;
-	else if (hd->ioc->req_sz <= 96)
-		numChain = MPT_SG_REQ_96_SCALE * hd->ioc->req_depth;
-	else
-		numChain = MPT_SG_REQ_128_SCALE * hd->ioc->req_depth;
-
-	sz = numChain * sizeof(int);
-
+	sz = hd->ioc->req_depth * sizeof(int);
 	if (hd->ReqToChain == NULL) {
 		mem = kmalloc(sz, GFP_ATOMIC);
 		if (mem == NULL)
@@ -1050,6 +1051,38 @@ mptscsih_initChainBuffers (MPT_SCSI_HOST *hd, int init)
 	}
 	memset(mem, 0xFF, sz);
 
+
+	/* ChainToChain size must equal the total number
+	 * of chain buffers to be allocated.
+	 * index = chain_idx
+	 *
+	 * Calculate the number of chain buffers needed(plus 1) per I/O 
+	 * then multiply the the maximum number of simultaneous cmds
+	 *
+	 * num_sge = num sge in request frame + last chain buffer
+	 * scale = num sge per chain buffer if no chain element
+	 */
+	scale = hd->ioc->req_sz/(sizeof(dma_addr_t) + sizeof(u32));
+	if (sizeof(dma_addr_t) == sizeof(u64))
+		num_sge =  scale + (hd->ioc->req_sz - 60) / (sizeof(dma_addr_t) + sizeof(u32));
+	else
+		num_sge =  1+ scale + (hd->ioc->req_sz - 64) / (sizeof(dma_addr_t) + sizeof(u32));
+
+	num_chain = 1;
+	while (hd->max_sge - num_sge > 0) {
+		num_chain++;
+		num_sge += (scale - 1);
+	}
+	num_chain++;
+
+	if ((int) hd->ioc->chip_type > (int) FC929)
+		num_chain *= MPT_SCSI_CAN_QUEUE;
+	else
+		num_chain *= MPT_FC_CAN_QUEUE;
+
+	hd->num_chain = num_chain;
+
+	sz = num_chain * sizeof(int);
 	if (hd->ChainToChain == NULL) {
 		mem = kmalloc(sz, GFP_ATOMIC);
 		if (mem == NULL)
@@ -1061,10 +1094,10 @@ mptscsih_initChainBuffers (MPT_SCSI_HOST *hd, int init)
 	}
 	memset(mem, 0xFF, sz);
 
+	sz = num_chain * hd->ioc->req_sz;
 	if (hd->ChainBuffer == NULL) {
 		/* Allocate free chain buffer pool
 		 */
-		sz = numChain * hd->ioc->req_sz;
 		mem = pci_alloc_consistent(hd->ioc->pcidev, sz, &hd->ChainBufferDMA);
 		if (mem == NULL)
 			return -1;
@@ -1090,7 +1123,7 @@ mptscsih_initChainBuffers (MPT_SCSI_HOST *hd, int init)
 	/* Post the chain buffers to the FreeChainQ.
 	 */
 	mem = (u8 *)hd->ChainBuffer;
-	for (ii=0; ii < numChain; ii++) {
+	for (ii=0; ii < num_chain; ii++) {
 		chain = (MPT_FRAME_HDR *) mem;
 		Q_ADD_TAIL(&hd->FreeChainQ.head, &chain->u.frame.linkage, MPT_FRAME_HDR);
 		mem += hd->ioc->req_sz;
@@ -1227,7 +1260,7 @@ mptscsih_detect(Scsi_Host_Template *tpnt)
 #endif
 			sh = scsi_register(tpnt, sizeof(MPT_SCSI_HOST));
 			if (sh != NULL) {
-				mptscsih_save_flags(flags);
+				mptscsih_lock(this, flags);
 				sh->io_port = 0;
 				sh->n_io_port = 0;
 				sh->irq = 0;
@@ -1254,12 +1287,21 @@ mptscsih_detect(Scsi_Host_Template *tpnt)
 				}
 				sh->max_lun = MPT_LAST_LUN + 1;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,7)
+				sh->max_sectors = MPT_SCSI_MAX_SECTORS;
+#endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,1)
+				sh->highmem_io = 1;
+#endif
 				sh->this_id = this->pfacts[portnum].PortSCSIID;
 
 				/* OS entry to allow host drivers to force
 				 * a queue depth on a per device basis.
 				 */
 				sh->select_queue_depths = mptscsih_select_queue_depths;
+				/* Required entry.
+				 */
+				sh->unique_id = this->id;
 
 				/* Verify that we won't exceed the maximum
 				 * number of chain buffers
@@ -1291,10 +1333,11 @@ mptscsih_detect(Scsi_Host_Template *tpnt)
 				 */
 				scsi_set_pci_device(sh, this->pcidev);
 
-				mptscsih_restore_flags(flags);
+				mptscsih_unlock(this, flags);
 
 				hd = (MPT_SCSI_HOST *) sh->hostdata;
 				hd->ioc = this;
+				hd->max_sge = sh->sg_tablesize;
 
 				if ((int)this->chip_type > (int)FC929)
 					hd->is_spi = 1;
@@ -1534,20 +1577,12 @@ mptscsih_release(struct Scsi_Host *host)
 		int szc2chain = 0;
 		int szchain = 0;
 		int szQ = 0;
-		int scale;
 
 		/* Synchronize disk caches
 		 */
 		(void) mptscsih_synchronize_cache(hd, 0);
 
 		sz1 = sz2 = sz3 = 0;
-
-		if (hd->ioc->req_sz <= 64)
-			scale = MPT_SG_REQ_64_SCALE;
-		else if (hd->ioc->req_sz <= 96)
-			scale = MPT_SG_REQ_96_SCALE;
-		else
-			scale = MPT_SG_REQ_128_SCALE;
 
 		if (hd->ScsiLookup != NULL) {
 			sz1 = hd->ioc->req_depth * sizeof(void *);
@@ -1556,19 +1591,19 @@ mptscsih_release(struct Scsi_Host *host)
 		}
 
 		if (hd->ReqToChain != NULL) {
-			szr2chain = scale * hd->ioc->req_depth * sizeof(int);
+			szr2chain = hd->ioc->req_depth * sizeof(int);
 			kfree(hd->ReqToChain);
 			hd->ReqToChain = NULL;
 		}
 
 		if (hd->ChainToChain != NULL) {
-			szc2chain = scale * hd->ioc->req_depth * sizeof(int);
+			szc2chain = hd->num_chain * sizeof(int);
 			kfree(hd->ChainToChain);
 			hd->ChainToChain = NULL;
 		}
 
 		if (hd->ChainBuffer != NULL) {
-			sz2 = scale * hd->ioc->req_depth * hd->ioc->req_sz;
+			sz2 = hd->num_chain * hd->ioc->req_sz;
 			szchain = szr2chain + szc2chain + sz2;
 
 			pci_free_consistent(hd->ioc->pcidev, sz2,
@@ -1591,7 +1626,7 @@ mptscsih_release(struct Scsi_Host *host)
 			if (hd->is_spi) {
 				max = MPT_MAX_SCSI_DEVICES;
 			} else {
-				max = MPT_MAX_FC_DEVICES;
+				max = MPT_MAX_FC_DEVICES<256 ? MPT_MAX_FC_DEVICES : 255;
 			}
 			for (ii=0; ii < max; ii++) {
 				if (hd->Targets[ii]) {
@@ -1805,6 +1840,7 @@ mptscsih_qcmd(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	dmfprintk((MYIOC_s_INFO_FMT "qcmd: SCpnt=%p, done()=%p\n",
 			(hd && hd->ioc) ? hd->ioc->name : "ioc?", SCpnt, done));
 
+#ifdef MPT_SAVE_AUTOSENSE
 	/* 20000617 -sralston
 	 *  GRRRRR...  Shouldn't have to do this but...
 	 *  Do explicit check for REQUEST_SENSE and cached SenseData.
@@ -1840,6 +1876,7 @@ mptscsih_qcmd(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 			}
 		}
 	}
+#endif
 
 	if (hd->resetPending) {
 		/* Prevent new commands from being issued
@@ -2020,7 +2057,8 @@ mptscsih_qcmd(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 					if (!dvtaskQ_active) {
 						dvtaskQ_active = 1;
 						spin_unlock_irqrestore(&dvtaskQ_lock, lflags);
-						INIT_WORK(&mptscsih_dvTask, mptscsih_domainValidation, (void *) hd);
+						MPT_INIT_WORK(&mptscsih_dvTask, mptscsih_domainValidation, (void *) hd); 
+
 						SCHEDULE_TASK(&mptscsih_dvTask);
 					} else {
 						spin_unlock_irqrestore(&dvtaskQ_lock, lflags);
@@ -3046,7 +3084,7 @@ mptscsih_old_abort(Scsi_Cmnd *SCpnt)
 {
 	MPT_SCSI_HOST		*hd;
 	MPT_FRAME_HDR		*mf;
-	struct work_struct	*ptaskfoo;
+	struct mpt_work_struct	*ptaskfoo;
 	unsigned long		 flags;
 	int			 scpnt_idx;
 
@@ -3154,10 +3192,8 @@ mptscsih_old_abort(Scsi_Cmnd *SCpnt)
 		 *  Oh how cute, no alloc/free/mgmt needed if we use
 		 *  (bottom/unused portion of) MPT request frame.
 		 */
-		ptaskfoo = (struct work_struct *) &mptscsih_ptaskfoo;
-		ptaskfoo->sync = 0;
-		ptaskfoo->routine = mptscsih_taskmgmt_bh;
-		ptaskfoo->data = SCpnt;
+		ptaskfoo = (struct mpt_work_struct *) &mptscsih_ptaskfoo;
+		MPT_INIT_WORK(&mptscsih_ptaskfoo, mptscsih_taskmgmt_bh, (void *) SCpnt); 
 
 		SCHEDULE_TASK(ptaskfoo);
 	} else  {
@@ -3182,7 +3218,7 @@ mptscsih_old_reset(Scsi_Cmnd *SCpnt, unsigned int reset_flags)
 {
 	MPT_SCSI_HOST		*hd;
 	MPT_FRAME_HDR		*mf;
-	struct work_struct	*ptaskfoo;
+	struct mpt_work_struct	*ptaskfoo;
 	unsigned long		 flags;
 	int			 scpnt_idx;
 
@@ -3284,10 +3320,8 @@ mptscsih_old_reset(Scsi_Cmnd *SCpnt, unsigned int reset_flags)
 		 *  Oh how cute, no alloc/free/mgmt needed if we use
 		 *  (bottom/unused portion of) MPT request frame.
 		 */
-		ptaskfoo = (struct work_struct *) &mptscsih_ptaskfoo;
-		ptaskfoo->sync = 0;
-		ptaskfoo->routine = mptscsih_taskmgmt_bh;
-		ptaskfoo->data = SCpnt;
+		ptaskfoo = (struct mpt_work_struct *) &mptscsih_ptaskfoo;
+		MPT_INIT_WORK(&mptscsih_ptaskfoo, mptscsih_taskmgmt_bh, (void *) SCpnt); 
 
 		SCHEDULE_TASK(ptaskfoo);
 	} else  {
@@ -3655,7 +3689,7 @@ mptscsih_select_queue_depths(struct Scsi_Host *sh, Scsi_Device *sdList)
 			if (hd->is_spi)
 				max = MPT_MAX_SCSI_DEVICES;
 			else
-				max = MPT_MAX_FC_DEVICES;
+				max = MPT_MAX_FC_DEVICES<256 ? MPT_MAX_FC_DEVICES : 255;
 
 			for (ii=0; ii < max; ii++) {
 				pTarget = hd->Targets[ii];
@@ -3801,6 +3835,7 @@ copy_sense_data(Scsi_Cmnd *sc, MPT_SCSI_HOST *hd, MPT_FRAME_HDR *mf, SCSIIOReply
 		/* save sense data to the target device
 		 */
 		if (target) {
+#ifdef MPT_SAVE_AUTOSENSE
 			int sz;
 
 			sz = MIN(pReq->SenseBufferLength, sense_count);
@@ -3808,6 +3843,7 @@ copy_sense_data(Scsi_Cmnd *sc, MPT_SCSI_HOST *hd, MPT_FRAME_HDR *mf, SCSIIOReply
 				sz =  SCSI_STD_SENSE_BYTES;
 			memcpy(target->sense, sense_data, sz);
 			target->tflags |= MPT_TARGET_FLAGS_VALID_SENSE;
+#endif
 
 #ifdef ABORT_FIX
 			if (sz >= SCSI_STD_SENSE_BYTES) {
@@ -4491,6 +4527,7 @@ static int dump_cdb(char *foo, unsigned char *cdb)
 }
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+#if 0
 static int dump_sd(char *foo, unsigned char *sd)
 {
 	int snsLen = 8 + SD_Additional_Sense_Length(sd);
@@ -4503,6 +4540,7 @@ static int dump_sd(char *foo, unsigned char *sd)
 
 	return l;
 }
+#endif
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*  Do ASC/ASCQ lookup/grindage to English readable string(s)  */
@@ -4594,6 +4632,15 @@ static const char * ascq_set_strings_4max(
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
+ *  SCSI Information Report; desired output format...
+ *---
+SCSI Error: (iocnum:target_id:LUN) Status=02h (CHECK CONDITION)
+  Key=6h (UNIT ATTENTION); FRU=03h
+  ASC/ASCQ=29h/00h, "POWER ON, RESET, OR BUS DEVICE RESET OCCURRED"
+  CDB: 00 00 00 00 00 00 - TestUnitReady
+ *---
+ */
+/*
  *  SCSI Error Report; desired output format...
  *---
 SCSI Error Report =-=-=-=-=-=-=-=-=-=-=-=-=-= (ioc0,scsi0:0)
@@ -4617,6 +4664,22 @@ int mpt_ScsiHost_ErrorReport(IO_Info_t *ioop)
 	unsigned char	 ascq		= SD_ASCQ(ioop->sensePtr);
 	int		 l;
 
+	/* Change the error logging to only report errors on
+	 * read and write commands. Ignore errors on other commands.
+	 * Should this be configurable via proc?
+	 */
+	switch (ioop->cdbPtr[0]) {
+	case READ_6:
+	case WRITE_6:
+	case READ_10:
+	case WRITE_10:
+	case READ_12:
+	case WRITE_12:
+		break;
+	default:
+		return 0;
+	}
+
 	/*
 	 *  More quiet mode.
 	 *  Filter out common, repetitive, warning-type errors...  like:
@@ -4627,6 +4690,7 @@ int mpt_ScsiHost_ErrorReport(IO_Info_t *ioop)
 	if (sk == SK_NO_SENSE) {
 		return 0;
 	}
+
 	if (	(sk==SK_UNIT_ATTENTION	&& asc==0x29 && (ascq==0x00 || ascq==0x01))
 	     || (sk==SK_NOT_READY	&& asc==0x04 && (ascq==0x01 || ascq==0x02))
 	     || (sk==SK_ILLEGAL_REQUEST && asc==0x25 && ascq==0x00)
@@ -4681,20 +4745,12 @@ int mpt_ScsiHost_ErrorReport(IO_Info_t *ioop)
 	else if (mpt_ScsiOpcodesPtr)
 		opstr = mpt_ScsiOpcodesPtr[ioop->cdbPtr[0]];
 
-	l = sprintf(foo, "SCSI Error Report =-=-= (%s)\n"
-	  "  SCSI_Status=%02Xh (%s)\n"
-	  "  Original_CDB[]:",
-			ioop->DevIDStr,
-			ioop->SCSIStatus,
-			statstr);
-	l += dump_cdb(foo+l, ioop->cdbPtr);
-	if (opstr)
-		l += sprintf(foo+l, " - \"%s\"", opstr);
-	l += sprintf(foo+l, "\n  SenseData[%02Xh]:", 8+SD_Additional_Sense_Length(ioop->sensePtr));
-	l += dump_sd(foo+l, ioop->sensePtr);
-	l += sprintf(foo+l, "\n  SenseKey=%Xh (%s); FRU=%02Xh\n  ASC/ASCQ=%02Xh/%02Xh",
-			sk, skstr, SD_FRU(ioop->sensePtr), asc, ascq );
-
+	l = sprintf(foo, "SCSI Error: (%s) Status=%02Xh (%s)\n",
+			  ioop->DevIDStr,
+			  ioop->SCSIStatus,
+			  statstr);
+	l += sprintf(foo+l, " Key=%Xh (%s); FRU=%02Xh\n ASC/ASCQ=%02Xh/%02Xh",
+		  sk, skstr, SD_FRU(ioop->sensePtr), asc, ascq );
 	{
 		const char	*x1, *x2, *x3, *x4;
 		x1 = x2 = x3 = x4 = "";
@@ -4706,11 +4762,11 @@ int mpt_ScsiHost_ErrorReport(IO_Info_t *ioop)
 				l += sprintf(foo+l, " %s%s%s%s", x1,x2,x3,x4);
 		}
 	}
-
-#if 0
-	if (SPECIAL_ASCQ(asc,ascq))
-		l += sprintf(foo+l, " (%02Xh)", ascq);
-#endif
+	l += sprintf(foo+l, "\n CDB:");
+	l += dump_cdb(foo+l, ioop->cdbPtr);
+	if (opstr)
+		l += sprintf(foo+l, " - \"%s\"", opstr);
+	l += sprintf(foo+l, "\n");
 
 	PrintF(("%s\n", foo));
 
@@ -4953,6 +5009,7 @@ void mptscsih_setTargetNegoParms(MPT_SCSI_HOST *hd, VirtDevice *target, char byt
 	return;
 }
 
+#ifdef MPT_SAVE_AUTOSENSE
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
  *  Clear sense valid flag.
@@ -4968,6 +5025,7 @@ static void clear_sense_flag(MPT_SCSI_HOST *hd, SCSIIORequest_t *pReq)
 
 	return;
 }
+#endif
 
 /* If DV disabled (negoNvram set to USE_NVARM) or if not LUN 0, return.
  * Else set the NEED_DV flag after Read Capacity Issued (disks) 
@@ -5366,7 +5424,9 @@ mptscsih_scandv_complete(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *mr)
 
 	/* If target struct exists, clear sense valid flag.
 	 */
+#ifdef MPT_SAVE_AUTOSENSE
 	clear_sense_flag(hd, pReq);
+#endif
 
 	if (mr == NULL) {
 		completionCode = MPT_SCANDV_GOOD;
@@ -5418,7 +5478,9 @@ mptscsih_scandv_complete(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *mr)
 					completionCode = MPT_SCANDV_SOME_ERROR;
 
 			} else if (pReply->SCSIState & MPI_SCSI_STATE_AUTOSENSE_VALID) {
+#ifdef MPT_SAVE_AUTOSENSE
 				VirtDevice	*target;
+#endif
 				u8		*sense_data;
 				int		 sz;
 
@@ -5433,12 +5495,14 @@ mptscsih_scandv_complete(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *mr)
 							SCSI_STD_SENSE_BYTES);
 				memcpy(hd->pLocal->sense, sense_data, sz);
 
+#ifdef MPT_SAVE_AUTOSENSE
 				target = hd->Targets[pReq->TargetID];
 				if (target) {
 					memcpy(target->sense, sense_data, sz);
 					target->tflags
 						|= MPT_TARGET_FLAGS_VALID_SENSE;
 				}
+#endif
 
 				ddvprintk((KERN_NOTICE "  Check Condition, sense ptr %p\n",
 						sense_data));

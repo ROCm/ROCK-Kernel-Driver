@@ -51,14 +51,6 @@ LINK_WRAPS = -Wl,--wrap,malloc -Wl,--wrap,free -Wl,--wrap,calloc
 
 SIZE = (($(CONFIG_NEST_LEVEL) + $(CONFIG_KERNEL_HALF_GIGS)) * 0x20000000)
 
-$(ARCH_DIR)/uml.lds.s : $(ARCH_DIR)/uml.lds.S
-	$(call if_changed_dep,as_s_S)
-
-AFLAGS_uml.lds.o = -U$(SUBARCH) -DSTART=$$(($(TOP_ADDR) - $(SIZE))) \
-	-DELF_ARCH=$(ELF_ARCH) -DELF_FORMAT=\"$(ELF_FORMAT)\" -P -C -Uum
-
-LDFLAGS_vmlinux = -r $(ARCH_DIR)/main.o
-
 SYMLINK_HEADERS = include/asm-um/archparam.h include/asm-um/system.h \
 	include/asm-um/sigcontext.h include/asm-um/processor.h \
 	include/asm-um/ptrace.h include/asm-um/arch-signal.h
@@ -71,10 +63,24 @@ GEN_HEADERS = $(ARCH_DIR)/include/task.h
 $(ARCH_DIR)/vmlinux.lds.S :
 	touch $@
 
-linux: scripts $(ARCH_SYMLINKS) $(SYS_HEADERS) $(GEN_HEADERS) \
-	arch/um/uml.lds.s $(ARCH_DIR)/main.o vmlinux
+prepare: $(ARCH_SYMLINKS) $(GEN_HEADERS)
+
+
+LDFLAGS_vmlinux = -r $(ARCH_DIR)/main.o
+
+vmlinux: $(ARCH_DIR)/main.o 
+
+
+$(ARCH_DIR)/uml.lds.s : $(ARCH_DIR)/uml.lds.S
+	$(call if_changed_dep,as_s_S)
+
+AFLAGS_uml.lds.o = -U$(SUBARCH) -DSTART=$$(($(TOP_ADDR) - $(SIZE))) \
+	-DELF_ARCH=$(ELF_ARCH) -DELF_FORMAT=\"$(ELF_FORMAT)\" -P -C -Uum
+
+linux: arch/um/uml.lds.s vmlinux
 	$(CC) -Wl,-T,arch/um/uml.lds.s -o $@ $(LINK_PROFILE) \
 	$(LINK_WRAPS) -static vmlinux -L/usr/lib -lutil
+
 
 USER_CFLAGS := $(patsubst -I%,,$(CFLAGS))
 USER_CFLAGS := $(patsubst -Derrno=kernel_errno,,$(USER_CFLAGS))
@@ -125,8 +131,9 @@ arch/um/os:
 $(ARCH_DIR)/include/task.h : $(ARCH_DIR)/util/mk_task
 	$< > $@
 
-$(ARCH_DIR)/util/mk_task : $(ARCH_DIR)/util/mk_task_user.c \
-	$(ARCH_DIR)/util/mk_task_kern.c 
-	$(MAKE) $(MFLAGS) -C $(ARCH_DIR)/util all
+$(ARCH_DIR)/util/mk_task : $(ARCH_DIR)/util FORCE ;
+
+$(ARCH_DIR)/util: FORCE
+	@$(call descend,$@,)
 
 export SUBARCH USER_CFLAGS OS

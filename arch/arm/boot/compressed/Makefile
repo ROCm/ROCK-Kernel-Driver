@@ -18,7 +18,7 @@ ZLDFLAGS	 = -p -X -T vmlinux.lds
 #
 ifeq ($(CONFIG_ARCH_ACORN),y)
 OBJS		+= ll_char_wr.o font.o
-ZLDFLAGS	+= -defsym params=$(PARAMS_PHYS)
+CFLAGS		+= -DPARAMS_PHYS=$(PARAMS_PHYS)
 endif
 
 ifeq ($(CONFIG_ARCH_NETWINDER),y)

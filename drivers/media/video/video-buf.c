@@ -18,8 +18,8 @@
 
 #include <linux/init.h>
 #include <linux/module.h>
-#include <linux/iobuf.h>
 #include <linux/vmalloc.h>
+#include <linux/pagemap.h>
 #include <linux/slab.h>
 #include <linux/pci.h>
 #include <linux/interrupt.h>
@@ -65,32 +65,31 @@ videobuf_vmalloc_to_sg(unsigned char *virt, int nr_pages)
 	return NULL;
 }
 
-struct scatterlist*
-videobuf_iobuf_to_sg(struct kiobuf *iobuf)
+struct scatterlist *
+videobuf_pages_to_sg(struct page **pages, int nr_pages, int offset)
 {
 	struct scatterlist *sglist;
 	int i = 0;
-
-	sglist = kmalloc(sizeof(struct scatterlist) * iobuf->nr_pages,
-			 GFP_KERNEL);
+	
+	if (NULL == pages[0])
+		return NULL;
+	sglist = kmalloc(sizeof(*sglist) * nr_pages, GFP_KERNEL);
 	if (NULL == sglist)
 		return NULL;
-	memset(sglist,0,sizeof(struct scatterlist) * iobuf->nr_pages);
+	memset(sglist, 0, sizeof(*sglist) * nr_pages);
 
-	if (NULL == iobuf->maplist[0])
-		goto err;
-	if (PageHighMem(iobuf->maplist[0]))
+	if (PageHighMem(pages[0]))
 		/* DMA to highmem pages might not work */
 		goto err;
-	sglist[0].page   = iobuf->maplist[0];
-	sglist[0].offset = iobuf->offset;
-	sglist[0].length = PAGE_SIZE - iobuf->offset;
-	for (i = 1; i < iobuf->nr_pages; i++) {
-		if (NULL == iobuf->maplist[i])
+	sglist[0].page   = pages[0];
+	sglist[0].offset = offset;
+	sglist[0].length = PAGE_SIZE - offset;
+	for (i = 1; i < nr_pages; i++) {
+		if (NULL == pages[i])
 			goto err;
-		if (PageHighMem(iobuf->maplist[i]))
+		if (PageHighMem(pages[i]))
 			goto err;
-		sglist[i].page   = iobuf->maplist[i];
+		sglist[i].page   = pages[i];
 		sglist[i].length = PAGE_SIZE;
 	}
 	return sglist;
@@ -98,6 +97,30 @@ videobuf_iobuf_to_sg(struct kiobuf *iobuf)
  err:
 	kfree(sglist);
 	return NULL;
+}
+
+int videobuf_lock(struct page **pages, int nr_pages)
+{
+	int i;
+
+	for (i = 0; i < nr_pages; i++)
+		if (TestSetPageLocked(pages[i]))
+			goto err;
+	return 0;
+
+ err:
+	while (i > 0)
+		unlock_page(pages[--i]);
+	return -EINVAL;
+}
+
+int videobuf_unlock(struct page **pages, int nr_pages)
+{
+	int i;
+
+	for (i = 0; i < nr_pages; i++)
+		unlock_page(pages[i]);
+	return 0;
 }
 
 /* --------------------------------------------------------------------- */
@@ -113,14 +136,21 @@ int videobuf_dma_init_user(struct videobuf_dmabuf *dma, int direction,
 	case PCI_DMA_TODEVICE:   rw = WRITE; break;
 	default:                 BUG();
 	}
-	if (0 != (err = alloc_kiovec(1,&dma->iobuf)))
-		return err;
-	if (0 != (err = map_user_kiobuf(rw, dma->iobuf, data, size))) {
-		dprintk(1,"map_user_kiobuf: %d\n",err);
-		return err;
-	}
-	dma->nr_pages = dma->iobuf->nr_pages;
-	return 0;
+
+	dma->offset   = data & PAGE_MASK;
+	dma->nr_pages = ((((data+size) & ~PAGE_MASK) -
+			  (data & ~PAGE_MASK)) >> PAGE_SHIFT) +1;
+	dma->pages    = kmalloc(dma->nr_pages * sizeof(struct page*),
+				GFP_KERNEL);
+	if (NULL == dma->pages)
+		return -ENOMEM;
+	down_read(&current->mm->mmap_sem);
+        err = get_user_pages(current,current->mm,
+			     data, dma->nr_pages,
+			     rw == READ, 0, /* don't force */
+			     dma->pages, NULL);
+	up_read(&current->mm->mmap_sem);
+	return err;
 }
 
 int videobuf_dma_init_kernel(struct videobuf_dmabuf *dma, int direction,
@@ -144,13 +174,15 @@ int videobuf_dma_pci_map(struct pci_dev *dev, struct videobuf_dmabuf *dma)
 	if (0 == dma->nr_pages)
 		BUG();
 	
-	if (dma->iobuf) {
-		if (0 != (err = lock_kiovec(1,&dma->iobuf,1))) {
-			dprintk(1,"lock_kiovec: %d\n",err);
+	if (dma->pages) {
+		if (0 != (err = videobuf_lock(dma->pages, dma->nr_pages))) {
+			dprintk(1,"videobuf_lock_pages: %d\n",err);
 			return err;
 		}
-		dma->sglist = videobuf_iobuf_to_sg(dma->iobuf);
+		dma->sglist = videobuf_pages_to_sg(dma->pages, dma->nr_pages,
+						   dma->offset);
 	}
+
 	if (dma->vmalloc) {
 		dma->sglist = videobuf_vmalloc_to_sg
 			(dma->vmalloc,dma->nr_pages);
@@ -160,7 +192,7 @@ int videobuf_dma_pci_map(struct pci_dev *dev, struct videobuf_dmabuf *dma)
 		return -ENOMEM;
 	}
 	dma->sglen = pci_map_sg(dev,dma->sglist,dma->nr_pages,
-				 dma->direction);
+				dma->direction);
 	return 0;
 }
 
@@ -182,8 +214,8 @@ int videobuf_dma_pci_unmap(struct pci_dev *dev, struct videobuf_dmabuf *dma)
 	kfree(dma->sglist);
 	dma->sglist = NULL;
 	dma->sglen = 0;
-	if (dma->iobuf)
-		unlock_kiovec(1,&dma->iobuf);
+	if (dma->pages)
+		videobuf_lock(dma->pages, dma->nr_pages);
 	return 0;
 }
 
@@ -192,11 +224,14 @@ int videobuf_dma_free(struct videobuf_dmabuf *dma)
 	if (dma->sglen)
 		BUG();
 
-	if (dma->iobuf) {
-		unmap_kiobuf(dma->iobuf);
-		free_kiovec(1,&dma->iobuf);
-		dma->iobuf = NULL;
+	if (dma->pages) {
+		int i;
+		for (i=0; i < dma->nr_pages; i++)
+			page_cache_release(dma->pages[i]);
+		kfree(dma->pages);
+		dma->pages = NULL;
 	}
+
 	if (dma->vmalloc) {
 		vfree(dma->vmalloc);
 		dma->vmalloc = NULL;
@@ -959,6 +994,7 @@ int videobuf_mmap_mapper(struct vm_area_struct *vma,
 	map->q       = q;
 	vma->vm_ops  = &videobuf_vm_ops;
 	vma->vm_flags |= VM_DONTEXPAND;
+	vma->vm_flags &= ~VM_IO; /* using shared anonymous pages */
 	vma->vm_private_data = map;
 	dprintk(1,"mmap %p: %08lx-%08lx pgoff %08lx bufs %d-%d\n",
 		map,vma->vm_start,vma->vm_end,vma->vm_pgoff,first,last);
@@ -972,7 +1008,6 @@ int videobuf_mmap_mapper(struct vm_area_struct *vma,
 /* --------------------------------------------------------------------- */
 
 EXPORT_SYMBOL_GPL(videobuf_vmalloc_to_sg);
-EXPORT_SYMBOL_GPL(videobuf_iobuf_to_sg);
 
 EXPORT_SYMBOL_GPL(videobuf_dma_init_user);
 EXPORT_SYMBOL_GPL(videobuf_dma_init_kernel);

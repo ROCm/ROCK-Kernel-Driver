@@ -2092,7 +2092,7 @@ static const struct usb_device_id	products [] = {
 #ifdef	CONFIG_USB_EPSON2888
 {
 	USB_DEVICE (0x0525, 0x2888),	// EPSON USB client
-	driver_info:	(unsigned long) &epson2888_info,
+	.driver_info	= (unsigned long) &epson2888_info,
 },
 #endif
 

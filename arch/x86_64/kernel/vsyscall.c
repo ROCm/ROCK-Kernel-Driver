@@ -47,7 +47,7 @@
 
 #define __vsyscall(nr) __attribute__ ((unused,__section__(".vsyscall_" #nr)))
 
-//#define NO_VSYSCALL 1
+#define NO_VSYSCALL 1
 
 #ifdef NO_VSYSCALL
 #include <asm/unistd.h>
@@ -71,51 +71,27 @@ static inline void timeval_normalize(struct timeval * tv)
 
 long __vxtime_sequence[2] __section_vxtime_sequence;
 
+
 static inline void do_vgettimeofday(struct timeval * tv)
 {
-	long sequence;
-	unsigned long usec, sec;
+	long sequence, t;
+	unsigned long sec, usec;
 
 	do {
-		unsigned long eax, edx;
-
 		sequence = __vxtime_sequence[1];
 		rmb();
 		
-		/* Read the Time Stamp Counter */
-		rdtsc(eax,edx);
-
-		/* .. relative to previous jiffy (32 bits is enough) */
-		eax -= __last_tsc_low;	/* tsc_low delta */
-
-		/*
-		 * Time offset = (tsc_low delta) * fast_gettimeoffset_quotient
-		 *             = (tsc_low delta) * (usecs_per_clock)
-		 *             = (tsc_low delta) * (usecs_per_jiffy / clocks_per_jiffy)
-		 *
-		 * Using a mull instead of a divl saves up to 31 clock cycles
-		 * in the critical path.
-		 */
-
-		edx = (eax*__fast_gettimeoffset_quotient) >> 32;
-
-		/* our adjusted time offset in microseconds */
-		usec = __delay_at_last_interrupt + edx;
-
-		{
-			unsigned long lost = __jiffies - __wall_jiffies;
-			if (lost)
-				usec += lost * (1000000 / HZ);
-		}
+		rdtscll(t);
 		sec = __xtime.tv_sec;
-		usec += __xtime.tv_usec;
+		usec = __xtime.tv_usec +
+			(__jiffies - __wall_jiffies) * (1000000 / HZ) +
+			(t  - __hpet.last_tsc) * (1000000 / HZ) / __hpet.ticks + __hpet.offset;
 
 		rmb();
 	} while (sequence != __vxtime_sequence[0]);
 
-	tv->tv_sec = sec;
-	tv->tv_usec = usec;
-	timeval_normalize(tv);
+	tv->tv_sec = sec + usec / 1000000;
+	tv->tv_usec = usec % 1000000;
 }
 
 static inline void do_get_tz(struct timezone * tz)

@@ -1763,7 +1763,6 @@ sys32_recvmsg (int fd, struct msghdr32 *msg, unsigned int flags)
 	struct msghdr msg_sys;
 	unsigned long cmsg_ptr;
 	int err, iov_size, total_len, len;
-	struct scm_cookie scm;
 
 	/* kernel mode address */
 	char addr[MAX_SOCK_ADDR];
@@ -1811,20 +1810,35 @@ sys32_recvmsg (int fd, struct msghdr32 *msg, unsigned int flags)
 	if (sock->file->f_flags & O_NONBLOCK)
 		flags |= MSG_DONTWAIT;
 
-	memset(&scm, 0, sizeof(scm));
-
+	/* XXX This code needs massive updating... -DaveM */
 	lock_kernel();
 	{
-		err = sock->ops->recvmsg(sock, &msg_sys, total_len, flags, &scm);
+		struct sock_iocb *si;
+		struct kiocb iocb;
+
+		init_sync_kiocb(&iocb, NULL);
+		si = kiocb_to_siocb(&iocb);
+		si->sock = sock;
+		si->scm = &si->async_scm;
+		si->msg = &msg_sys;
+		si->size = total_len;
+		si->flags = flags;
+		memset(si->scm, 0, sizeof(*si->scm));
+
+		err = sock->ops->recvmsg(&iocb, sock, &msg_sys, total_len,
+					 flags, si->scm);
+		if (-EIOCBQUEUED == err)
+			err = wait_on_sync_kiocb(&iocb);
+
 		if (err < 0)
 			goto out_unlock_freeiov;
 
 		len = err;
 		if (!msg_sys.msg_control) {
-			if (sock->passcred || scm.fp)
+			if (sock->passcred || si->scm->fp)
 				msg_sys.msg_flags |= MSG_CTRUNC;
-			if (scm.fp)
-				__scm_destroy(&scm);
+			if (si->scm->fp)
+				__scm_destroy(si->scm);
 		} else {
 			/*
 			 * If recvmsg processing itself placed some control messages into
@@ -1837,9 +1851,10 @@ sys32_recvmsg (int fd, struct msghdr32 *msg, unsigned int flags)
 			/* Wheee... */
 			if (sock->passcred)
 				put_cmsg32(&msg_sys, SOL_SOCKET, SCM_CREDENTIALS,
-					   sizeof(scm.creds), &scm.creds);
-			if (scm.fp != NULL)
-				scm_detach_fds32(&msg_sys, &scm);
+					   sizeof(si->scm->creds),
+					   &si->scm->creds);
+			if (si->scm->fp != NULL)
+				scm_detach_fds32(&msg_sys, si->scm);
 		}
 	}
 	unlock_kernel();

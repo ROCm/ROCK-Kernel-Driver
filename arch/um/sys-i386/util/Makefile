@@ -1,16 +1,18 @@
-host-progs = mk_sc
+EXTRA_TARGETS	:= mk_sc mk_thread mk_thread_kern.o
 
-mk_sc-objs = mk_sc.o
+host-progs	:= mk_sc
+
+mk_sc-objs	:= mk_sc.o
 
 include $(TOPDIR)/Rules.make
 
-mk_thread : mk_thread_kern.o mk_thread_user.o
-	$(CC) $(CFLAGS) -o $@ mk_thread_user.o mk_thread_kern.o
+$(obj)/mk_thread : $(obj)/mk_thread_kern.o $(obj)/mk_thread_user.o
+	$(CC) $(CFLAGS) -o $@ $^
 
-mk_thread_user.o : mk_thread_user.c
+$(obj)/mk_thread_user.o : $(src)/mk_thread_user.c
 	$(CC) $(USER_CFLAGS) -c -o $@ $<
 
 clean :
-	$(RM) $(host-progs) mk_thread
+	$(RM) -f $(EXTRA_TARGETS)
 
 archmrproper : clean

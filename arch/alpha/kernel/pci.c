@@ -102,7 +102,7 @@ quirk_cypress(struct pci_dev *dev)
 #define DMAPSZ (max_low_pfn << PAGE_SHIFT) /* memory size, not window size */
 		if ((__direct_map_base + DMAPSZ - 1) >= 0xfff00000UL) {
 			__direct_map_size = 0xfff00000UL - __direct_map_base;
-			printk("%s: adjusting direct map size to 0x%x\n",
+			printk("%s: adjusting direct map size to 0x%lx\n",
 			       __FUNCTION__, __direct_map_size);
 		} else {
 			struct pci_controller *hose = dev->sysdata;

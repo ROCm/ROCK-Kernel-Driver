@@ -678,7 +678,7 @@ static int cdrom_decode_status (ide_startstop_t *startstop, ide_drive_t *drive,
 		*startstop = DRIVER(drive)->error(drive, "request sense failure", stat);
 		return 1;
 
-	} else if (rq->flags & REQ_PC) {
+	} else if (rq->flags & (REQ_PC | REQ_BLOCK_PC)) {
 		/* All other functions, except for READ. */
 		struct completion *wait = NULL;
 		pc = (struct packet_command *) rq->buffer;

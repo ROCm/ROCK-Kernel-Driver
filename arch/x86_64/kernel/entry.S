@@ -84,7 +84,7 @@
 	xorq %rax, %rax
 	pushq %rax /* ss */
 	pushq %rax /* rsp */
-	pushq %rax /* eflags */
+	pushq $(1<<9) /* eflags - interrupts on */
 	pushq $__KERNEL_CS /* cs */
 	pushq \child_rip /* rip */
 	pushq	%rax /* orig rax */
@@ -236,21 +236,17 @@ badsys:
  * Has correct top of stack, but partial stack frame.
  */ 	
 ENTRY(int_ret_from_sys_call)	
-	testl $3,CS-ARGOFFSET(%rsp)	# kernel syscall?
-	je int_restore_args
+	cli
+	testl $3,CS-ARGOFFSET(%rsp)
+	je retint_restore_args
 	movl $_TIF_ALLWORK_MASK,%edi
 	/* edi:	mask to check */
 int_with_check:
 	GET_THREAD_INFO(%rcx)
-	cli
 	movl threadinfo_flags(%rcx),%edx
 	andl %edi,%edx
 	jnz   int_careful
-int_restore_swapgs:	
-	swapgs
-int_restore_args:		
-	RESTORE_ARGS 0,8,0
-	iretq
+	jmp   retint_swapgs
 
 	/* Either reschedule or signal or syscall exit tracking needed. */
 	/* First do a reschedule test. */
@@ -364,15 +360,11 @@ ENTRY(stub_rt_sigreturn)
 	.macro interrupt func
 	cld
 	SAVE_ARGS
-#ifdef CONFIG_PREEMPT
-	GET_THREAD_INFO(%rdx)
-	incl threadinfo_preempt_count(%rdx)
-#endif		
 	leaq -ARGOFFSET(%rsp),%rdi	# arg1 for handler
 	testl $3,CS(%rdi)
 	je 1f
 	swapgs	
-1:	addl $1,PDAREF(pda_irqcount)	# XXX: should be merged with irq.c irqcount
+1:	addl $1,PDAREF(pda_irqcount)	# RED-PEN should check preempt count
 	movq PDAREF(pda_irqstackptr),%rax
 	cmoveq %rax,%rsp							
 	pushq %rdi			# save old stack	
@@ -389,9 +381,6 @@ ret_from_intr:
 	leaq ARGOFFSET(%rdi),%rsp
 exit_intr:	 	
 	GET_THREAD_INFO(%rcx)
-#ifdef CONFIG_PREEMPT	
-	decl threadinfo_preempt_count(%rcx)
-#endif
 	testl $3,CS-ARGOFFSET(%rsp)
 	je retint_kernel
 	
@@ -407,11 +396,24 @@ retint_check:
 	andl %edi,%edx
 	jnz  retint_careful
 retint_swapgs:	 	
+	cli
 	swapgs 
 retint_restore_args:				
+	cli
 	RESTORE_ARGS 0,8,0						
+iret_label:	
 	iretq
 
+	.section __ex_table,"a"
+	.quad iret_label,bad_iret	
+	.previous
+	.section .fixup,"ax"
+	/* force a signal here? this matches i386 behaviour */
+bad_iret:
+	movq $-9999,%rdi	/* better code? */
+	jmp do_exit			
+	.previous	
+	
 	/* edi: workmask, edx: work */	
 retint_careful:
 	bt    $TIF_NEED_RESCHED,%edx
@@ -448,9 +450,8 @@ retint_kernel:
 	jnz  retint_restore_args
 	bt  $TIF_NEED_RESCHED,threadinfo_flags(%rcx)
 	jnc  retint_restore_args
-	movl PDAREF(pda___local_bh_count),%eax
-	addl PDAREF(pda___local_irq_count),%eax
-	jnz  retint_restore_args
+	bt   $9,EFLAGS-ARGOFFSET(%rsp)	/* interrupts off? */
+	jc   retint_restore_args
 	movl $PREEMPT_ACTIVE,threadinfo_preempt_count(%rcx)
 	sti
 	call schedule
@@ -513,11 +514,6 @@ ENTRY(spurious_interrupt)
  */ 		  				
  	ALIGN
 error_entry:
-	testl $3,24(%rsp)	
-	je  error_kernelspace	
-	swapgs
-error_kernelspace:			
-	sti
 	/* rdi slot contains rax, oldrax contains error code */
 	pushq %rsi
 	movq  8(%rsp),%rsi	/* load rax */
@@ -530,17 +526,25 @@ error_kernelspace:
 	pushq %r11
 	cld	
 	SAVE_REST
+	testl $3,CS(%rsp)
+	je  error_kernelspace
+error_swapgs:	
+	xorl %ebx,%ebx	
+	swapgs
+error_sti:	
+	sti
 	movq %rdi,RDI(%rsp) 	
 	movq %rsp,%rdi
 	movq ORIG_RAX(%rsp),%rsi	/* get error code */ 
 	movq $-1,ORIG_RAX(%rsp)
 	call *%rax
 error_exit:		
+	movl %ebx,%eax		
 	RESTORE_REST
 	cli
 	GET_THREAD_INFO(%rcx)	
-	testl $3,CS-ARGOFFSET(%rsp)
-	je retint_kernel
+	testl %eax,%eax
+	jne  retint_kernel
 	movl  threadinfo_flags(%rcx),%edx
 	movl  $_TIF_WORK_MASK,%edi
 	andl  %edi,%edx
@@ -549,6 +553,39 @@ error_exit:
 	RESTORE_ARGS 0,8,0						
 	iretq
 
+error_kernelspace:
+       /* There are two places in the kernel that can potentially fault with
+          usergs. Handle them here. */    
+	cmpq $iret_label,RIP(%rsp) 
+	je   error_swapgs
+	cmpq $gs_change,RIP(%rsp)
+        je   error_swapgs
+	movl $1,%ebx	
+	jmp  error_sti
+	
+       /* Reload gs selector with exception handling */
+       /* edi:  new selector */ 
+ENTRY(load_gs_index)
+	pushf
+	cli
+        swapgs
+gs_change:     
+        movl %edi,%gs   
+2:      swapgs
+        popf
+        ret
+       
+        .section __ex_table,"a"
+        .align 8
+        .quad gs_change,bad_gs
+        .previous
+        .section .fixup,"ax"
+bad_gs: 
+	xorl %eax,%eax
+        movl %eax,%gs
+        jmp  2b
+        .previous       
+	
 /*
  * Create a kernel thread.
  *
@@ -564,7 +601,7 @@ ENTRY(kernel_thread)
 
 	# rdi: flags, rsi: usp, rdx: will be &pt_regs
 	movq %rdx,%rdi
-	orq  kernel_thread_flags(%rip), %rdi
+	orq  kernel_thread_flags(%rip),%rdi
 	movq $-1, %rsi
 	movq %rsp, %rdx
 
@@ -573,8 +610,9 @@ ENTRY(kernel_thread)
 
 	xorl %edi,%edi
 	cmpq $-1000,%rax
-	cmovb %rdi,%rax
-	movq %rax,RAX(%rsp)
+	jnb  1f
+	movl tsk_pid(%rax),%eax	
+1:	movq %rax,RAX(%rsp)
 
 	/*
 	 * It isn't worth to check for reschedule here,
@@ -648,18 +686,19 @@ ENTRY(simd_coprocessor_error)
 	zeroentry do_simd_coprocessor_error	
 
 ENTRY(device_not_available)
-	testl $3,8(%rsp)
-	je 1f
-	swapgs
-1:	pushq $-1	#error code
+	pushq $-1	#error code
 	SAVE_ALL
-	movq  %cr0,%rax
+	movl  $1,%ebx
+	testl $3,CS(%rsp)
+	je 1f
+	xorl %ebx,%ebx
+	swapgs
+1:	movq  %cr0,%rax
 	leaq  math_state_restore(%rip),%rcx
-	leaq  math_emulate(%rip),%rbx
+	leaq  math_emulate(%rip),%rdx
 	testl $0x4,%eax
-	cmoveq %rcx,%rbx
-	preempt_stop
-	call  *%rbx
+	cmoveq %rcx,%rdx
+	call  *%rdx
 	jmp  error_exit
 
 ENTRY(debug)

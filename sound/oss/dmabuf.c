@@ -443,6 +443,7 @@ int DMAbuf_sync(int dev)
 		       adev->dmap_out->qlen && adev->dmap_out->underrun_count == 0) {
 			long t = dmabuf_timeout(dmap);
 			spin_unlock_irqrestore(&dmap->lock,flags);
+			/* FIXME: not safe may miss events */
 			t = interruptible_sleep_on_timeout(&adev->out_sleeper, t);
 			spin_lock_irqsave(&dmap->lock,flags);
 			if (!t) {
@@ -521,12 +522,11 @@ int DMAbuf_activate_recording(int dev, struct dma_buffparms *dmap)
 	if (!(adev->enable_bits & PCM_ENABLE_INPUT))
 		return 0;
 	if (dmap->dma_mode == DMODE_OUTPUT) {	/* Direction change */
-		unsigned long flags;
 		/* release lock - it's not recursive */
-		spin_unlock_irqrestore(&dmap->lock,flags);
+		spin_unlock_irq(&dmap->lock);
 		DMAbuf_sync(dev);
 		DMAbuf_reset(dev);
-		spin_lock_irqsave(&dmap->lock,flags);
+		spin_lock_irq(&dmap->lock);
 		dmap->dma_mode = DMODE_NONE;
 	}
 	if (!dmap->dma_mode) {

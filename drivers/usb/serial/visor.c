@@ -669,7 +669,7 @@ static int clie_3_5_startup (struct usb_serial *serial)
 	/* get the interface number */
 	result = usb_control_msg (serial->dev, usb_rcvctrlpipe(serial->dev, 0),
 				  USB_REQ_GET_INTERFACE, 
-				  USB_DIR_IN | USB_DT_DEVICE,
+				  USB_DIR_IN | USB_RECIP_INTERFACE,
 				  0, 0, &data, 1, HZ * 3);
 	if (result < 0) {
 		err("%s: get interface number failed: %d", __FUNCTION__, result);

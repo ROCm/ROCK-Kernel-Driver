@@ -133,6 +133,10 @@ static int __init pcibios_init(void)
 
 	pcibios_resource_survey();
 
+#ifdef CONFIG_GART_IOMMU
+	pci_iommu_init();
+#endif
+
 	/* may eventually need to do ACPI sort here. */
 	return 0;
 }
@@ -185,11 +189,11 @@ unsigned int pcibios_assign_all_busses(void)
 	return (pci_probe & PCI_ASSIGN_ALL_BUSSES) ? 1 : 0;
 }
 
-int pcibios_enable_device(struct pci_dev *dev)
+int pcibios_enable_device(struct pci_dev *dev, int mask)
 {
 	int err;
 
-	if ((err = pcibios_enable_resources(dev)) < 0)
+	if ((err = pcibios_enable_resources(dev, mask)) < 0)
 		return err;
 
 	return pcibios_enable_irq(dev);

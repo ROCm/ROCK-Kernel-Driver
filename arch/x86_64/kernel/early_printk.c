@@ -47,10 +47,10 @@ static void early_vga_write(struct console *con, const char *str, unsigned n)
 }
 
 static struct console early_vga_console = {
-	name:		"earlyvga",
-	write:		early_vga_write,
-	flags:		CON_PRINTBUFFER,
-	index:		-1,
+	.name =		"earlyvga",
+	.write =	early_vga_write,
+	.flags =	CON_PRINTBUFFER,
+	.index =	-1,
 };
 
 /* Serial functions losely based on a similar package from Klaus P. Gerlicher */ 
@@ -138,10 +138,10 @@ static __init void early_serial_init(char *opt)
 }
 
 static struct console early_serial_console = {
-	name:		"earlyser",
-	write:		early_serial_write,
-	flags:		CON_PRINTBUFFER,
-	index:		-1,
+	.name =		"earlyser",
+	.write =	early_serial_write,
+	.flags =	CON_PRINTBUFFER,
+	.index =	-1,
 };
 
 /* Direct interface for emergencies */
@@ -181,6 +181,9 @@ int __init setup_early_printk(char *opt)
 	if (!strncmp(buf, "serial", 6)) { 
 		early_serial_init(buf + 6);
 		early_console = &early_serial_console;
+	} else if (!strncmp(buf, "ttyS", 4)) { 
+		early_serial_init(buf);
+		early_console = &early_serial_console;		
 	} else if (!strncmp(buf, "vga", 3)) {
 		early_console = &early_vga_console; 
 	} else {

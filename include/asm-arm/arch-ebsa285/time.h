@@ -62,7 +62,7 @@ static unsigned long isa_gettimeoffset(void)
 
 	count_p = count;
 
-	count = (((mSEC_10_from_14/6)-1) - count) * tick;
+	count = (((mSEC_10_from_14/6)-1) - count) * (tick_nsec / 1000);
 	count = (count + (mSEC_10_from_14/6)/2) / (mSEC_10_from_14/6);
 
 	return count;
@@ -182,7 +182,7 @@ static unsigned long timer1_gettimeoffset (void)
 {
 	unsigned long value = LATCH - *CSR_TIMER1_VALUE;
 
-	return (tick * value) / LATCH;
+	return ((tick_nsec / 1000) * value) / LATCH;
 }
 
 static void timer1_interrupt(int irq, void *dev_id, struct pt_regs *regs)

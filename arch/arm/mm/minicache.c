@@ -15,9 +15,11 @@
  */
 #include <linux/init.h>
 #include <linux/mm.h>
+
 #include <asm/page.h>
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>
+#include <asm/tlbflush.h>
 
 /*
  * 0xffff8000 to 0xffffffff is reserved for any ARM architecture

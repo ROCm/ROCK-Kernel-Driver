@@ -10,6 +10,7 @@ if [ "$CONFIG_FUSION" = "y" -o "$CONFIG_FUSION" = "m" ]; then
   else
     define_bool CONFIG_FUSION_BOOT n
   fi
+  int  "  Maximum number of scatter gather entries" CONFIG_FUSION_MAX_SGE 40 
 
   if [ "$CONFIG_MODULES" = "y" ]; then
     #  How can we force these options to module or nothing?

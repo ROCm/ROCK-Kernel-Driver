@@ -91,7 +91,6 @@
 #include <asm/byteorder.h>
 #include <asm/atomic.h>
 #include <asm/uaccess.h>
-#include <linux/tqueue.h>
 #include <linux/delay.h>
 #include <linux/spinlock.h>
 
@@ -154,7 +153,7 @@ printk(level "%s: " fmt "\n" , OHCI1394_DRIVER_NAME , ## args)
 printk(level "%s_%d: " fmt "\n" , OHCI1394_DRIVER_NAME, card , ## args)
 
 static char version[] __devinitdata =
-	"$Rev: 578 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 601 $ Ben Collins <bcollins@debian.org>";
 
 /* Module Parameters */
 MODULE_PARM(attempt_root,"i");
@@ -1905,7 +1904,7 @@ static void ohci_init_config_rom(struct ti_ohci *ohci)
 	ohci->csr_config_rom_length = cr.data - ohci->csr_config_rom_cpu;
 }
 
-static size_t ohci_get_rom(struct hpsb_host *host, const quadlet_t **ptr)
+static size_t ohci_get_rom(struct hpsb_host *host, quadlet_t **ptr)
 {
 	struct ti_ohci *ohci=host->hostdata;
 

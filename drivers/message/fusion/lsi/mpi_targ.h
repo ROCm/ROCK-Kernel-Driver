@@ -6,7 +6,7 @@
  *          Title:  MPI Target mode messages and structures
  *  Creation Date:  June 22, 2000
  *
- *    MPI_TARG.H Version:  01.02.06
+ *    MPI_TARG.H Version:  01.02.07
  *
  *  Version History
  *  ---------------
@@ -39,6 +39,8 @@
  *  05-31-02  01.02.06  Modified TARGET_MODE_REPLY_ALIAS_MASK to only include
  *                      one bit.
  *                      Added AliasIndex field to MPI_TARGET_FCP_CMD_BUFFER.
+ *  09-16-02  01.02.07  Added flags for confirmed completion.
+ *                      Added PRIORITY_REASON_TARGET_BUSY.
  *  --------------------------------------------------------------------------
  */
 
@@ -138,6 +140,7 @@ typedef struct _MSG_PRIORITY_CMD_RECEIVED_REPLY
 #define PRIORITY_REASON_PROTOCOL_ERR            (0x06)
 #define PRIORITY_REASON_DATA_OUT_PARITY_ERR     (0x07)
 #define PRIORITY_REASON_DATA_OUT_CRC_ERR        (0x08)
+#define PRIORITY_REASON_TARGET_BUSY             (0x09)
 #define PRIORITY_REASON_UNKNOWN                 (0xFF)
 
 
@@ -217,6 +220,7 @@ typedef struct _MSG_TARGET_ASSIST_REQUEST
 #define TARGET_ASSIST_FLAGS_DATA_DIRECTION          (0x01)
 #define TARGET_ASSIST_FLAGS_AUTO_STATUS             (0x02)
 #define TARGET_ASSIST_FLAGS_HIGH_PRIORITY           (0x04)
+#define TARGET_ASSIST_FLAGS_CONFIRMED               (0x08)
 #define TARGET_ASSIST_FLAGS_REPOST_CMD_BUFFER       (0x80)
 
 
@@ -261,6 +265,7 @@ typedef struct _MSG_TARGET_STATUS_SEND_REQUEST
 
 #define TARGET_STATUS_SEND_FLAGS_AUTO_GOOD_STATUS   (0x01)
 #define TARGET_STATUS_SEND_FLAGS_HIGH_PRIORITY      (0x04)
+#define TARGET_STATUS_SEND_FLAGS_CONFIRMED          (0x08)
 #define TARGET_STATUS_SEND_FLAGS_REPOST_CMD_BUFFER  (0x80)
 
 /*

@@ -25,6 +25,9 @@
 	v2.01  June 2002  Dave Jones <davej@suse.de>
 	  Removal of redundant abstraction layer.
 	  64-bit fixes.
+	v2.02  July 2002  Dave Jones <davej@suse.de>
+	  Fix gentry inconsistencies between kernel/userspace.
+	  More casts to clean up warnings.
 */
 
 #include <linux/types.h>
@@ -50,6 +53,7 @@
 #include <linux/init.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
+#include <linux/agp_backend.h>
 
 #include <asm/uaccess.h>
 #include <asm/io.h>
@@ -64,7 +68,7 @@
 #include <asm/hardirq.h>
 #include <linux/irq.h>
 
-#define MTRR_VERSION "2.01 (20020605)"
+#define MTRR_VERSION "2.02 (20020716)"
 
 #define TRUE  1
 #define FALSE 0
@@ -106,7 +110,7 @@ static DECLARE_MUTEX (mtrr_lock);
 struct set_mtrr_context {
 	u32 deftype_lo;
 	u32 deftype_hi;
-	u64 flags;
+	unsigned long flags;
 	u64 cr4val;
 };
 
@@ -117,7 +121,7 @@ static void set_mtrr_prepare (struct set_mtrr_context *ctxt)
 	u64 cr0;
 
 	/* Disable interrupts locally */
-	local_save_flags(ctxt->flags);
+	local_irq_save(ctxt->flags);
 	local_irq_disable();
 
     /*  Save value of CR4 and clear Page Global Enable (bit 7)  */
@@ -221,6 +225,8 @@ static void set_mtrr_up (unsigned int reg, u64 base,
 		   u32 size, mtrr_type type, int do_safe)
 {
     struct set_mtrr_context ctxt;
+	u64 base64;
+	u64 size64;
 
 	if (do_safe)
 		set_mtrr_prepare (&ctxt);
@@ -230,10 +236,12 @@ static void set_mtrr_up (unsigned int reg, u64 base,
 	   relevant mask register to disable a range. */
 		wrmsr (MSR_MTRRphysMask(reg), 0, 0);
 	} else {
-		wrmsr (MSR_MTRRphysBase(reg), base << PAGE_SHIFT | type,
-		(base & size_and_mask) >> (32 - PAGE_SHIFT));
-		wrmsr (MSR_MTRRphysMask(reg), (-size-1) << PAGE_SHIFT | 0x800,
-		       ((-size-1) & size_and_mask) >> (32 - PAGE_SHIFT));
+		base64 = (base << PAGE_SHIFT) & size_and_mask;
+		wrmsr (MSR_MTRRphysBase(reg), base64 | type, base64 >> 32);
+
+		size64 = ~((size << PAGE_SHIFT) - 1);
+		size64 = size64 & size_and_mask;
+		wrmsr (MSR_MTRRphysMask(reg), (u32) (size64 | 0x800), (u32) (size64 >> 32));
     }
 	if (do_safe)
 		set_mtrr_done (&ctxt);
@@ -267,15 +275,15 @@ static int __init set_mtrr_var_range_testing (unsigned int index,
     int changed = FALSE;
 
 	rdmsr (MSR_MTRRphysBase(index), lo, hi);
-	if ((vr->base_lo & 0xfffff0ff) != (lo & 0xfffff0ff)
-	    || (vr->base_hi & 0x000fffff) != (hi & 0x000fffff)) {
+	if ((vr->base_lo & 0xfffff0ff) != (lo & 0xfffff0ff) ||
+		(vr->base_hi & 0x000fffff) != (hi & 0x000fffff)) {
 		wrmsr (MSR_MTRRphysBase(index), vr->base_lo, vr->base_hi);
 	changed = TRUE;
     }
 
 	rdmsr (MSR_MTRRphysMask(index), lo, hi);
-	if ((vr->mask_lo & 0xfffff800) != (lo & 0xfffff800)
-	    || (vr->mask_hi & 0x000fffff) != (hi & 0x000fffff)) {
+	if ((vr->mask_lo & 0xfffff800) != (lo & 0xfffff800) ||
+		(vr->mask_hi & 0x000fffff) != (hi & 0x000fffff)) {
 		wrmsr (MSR_MTRRphysMask(index), vr->mask_lo, vr->mask_hi);
 	changed = TRUE;
     }
@@ -457,7 +465,7 @@ static void set_mtrr_smp (unsigned int reg, u64 base, u32 size, mtrr_type type)
     data.smp_type = type;
     wait_barrier_execute = TRUE;
     wait_barrier_cache_enable = TRUE;
-    atomic_set (&undone_count, smp_num_cpus - 1);
+	atomic_set (&undone_count, num_online_cpus() - 1);
 
     /*  Start the ball rolling on other CPUs  */
     if (smp_call_function (ipi_handler, &data, 1, 0) != 0)
@@ -471,7 +479,7 @@ static void set_mtrr_smp (unsigned int reg, u64 base, u32 size, mtrr_type type)
 		barrier ();
 
 	/* Set up for completion wait and then release other CPUs to change MTRRs */
-    atomic_set (&undone_count, smp_num_cpus - 1);
+	atomic_set (&undone_count, num_online_cpus() - 1);
     wait_barrier_execute = FALSE;
 	set_mtrr_up (reg, base, size, type, FALSE);
 
@@ -596,10 +604,21 @@ int mtrr_add_page (u64 base, u32 size, unsigned int type, char increment)
 
 	if (base + size < 0x100) {
 		printk (KERN_WARNING
-			"mtrr: cannot set region below 1 MiB (0x%lx000,0x%x000)\n",
+			"mtrr: cannot set region below 1 MiB (0x%Lx000,0x%x000)\n",
 		    base, size);
 	    return -EINVAL;
 	}
+
+#if defined(__x86_64__) && defined(CONFIG_AGP) 
+/*	{
+	agp_kern_info info; 
+	if (type != MTRR_TYPE_UNCACHABLE && agp_copy_info(&info) >= 0 && 
+	    base<<PAGE_SHIFT >= info.aper_base && 
+            (base<<PAGE_SHIFT)+(size<<PAGE_SHIFT) >= 
+			info.aper_base+info.aper_size*1024*1024)
+		printk(KERN_INFO "%s[%d] setting conflicting mtrr into agp aperture\n",current->comm,current->pid); 
+	}*/
+#endif
 
 	/*  Check upper bits of base and last are equal and lower bits are 0
 	    for base and 1 for last  */
@@ -609,7 +628,7 @@ int mtrr_add_page (u64 base, u32 size, unsigned int type, char increment)
 
 	if (lbase != last) {
 		printk (KERN_WARNING
-			"mtrr: base(0x%lx000) is not aligned on a size(0x%x000) boundary\n",
+			"mtrr: base(0x%Lx000) is not aligned on a size(0x%x000) boundary\n",
 			base, size);
 	return -EINVAL;
     }
@@ -626,8 +645,14 @@ int mtrr_add_page (u64 base, u32 size, unsigned int type, char increment)
         return -ENOSYS;
     }
 
-	if (base & size_or_mask || size & size_or_mask) {
-	printk ("mtrr: base or size exceeds the MTRR width\n");
+	if (base & (size_or_mask>>PAGE_SHIFT)) {
+		printk (KERN_WARNING "mtrr: base(%lx) exceeds the MTRR width(%lx)\n",
+				base, (size_or_mask>>PAGE_SHIFT));
+		return -EINVAL;
+	}
+
+	if (size & (size_or_mask>>PAGE_SHIFT)) {
+		printk (KERN_WARNING "mtrr: size exceeds the MTRR width\n");
 	return -EINVAL;
     }
 
@@ -646,8 +671,8 @@ int mtrr_add_page (u64 base, u32 size, unsigned int type, char increment)
 		if ((base < lbase) || (base + size > lbase + lsize)) {
 			up (&mtrr_lock);
 			printk (KERN_WARNING
-				"mtrr: 0x%lx000,0x%x000 overlaps existing"
-				" 0x%lx000,0x%x000\n", base, size, lbase, lsize);
+				"mtrr: 0x%Lx000,0x%x000 overlaps existing"
+				" 0x%Lx000,0x%x000\n", base, size, lbase, lsize);
 	    return -EINVAL;
 	}
 	/*  New region is enclosed by an existing region  */
@@ -656,7 +681,7 @@ int mtrr_add_page (u64 base, u32 size, unsigned int type, char increment)
 				continue;
 			up (&mtrr_lock);
 			printk
-			    ("mtrr: type mismatch for %lx000,%x000 old: %s new: %s\n",
+			    ("mtrr: type mismatch for %Lx000,%x000 old: %s new: %s\n",
 			     base, size,
 				 attrib_to_str (ltype),
 			     attrib_to_str (type));
@@ -720,7 +745,7 @@ int mtrr_add (u64 base, u32 size, unsigned int type, char increment)
 {
 	if ((base & (PAGE_SIZE - 1)) || (size & (PAGE_SIZE - 1))) {
 	printk ("mtrr: size and base must be multiples of 4 kiB\n");
-		printk ("mtrr: size: 0x%x  base: 0x%lx\n", size, base);
+		printk ("mtrr: size: 0x%x  base: 0x%Lx\n", size, base);
 	return -EINVAL;
     }
 	return mtrr_add_page (base >> PAGE_SHIFT, size >> PAGE_SHIFT, type,
@@ -763,7 +788,7 @@ int mtrr_del_page (int reg, u64 base, u32 size)
 	}
 		if (reg < 0) {
 			up (&mtrr_lock);
-			printk ("mtrr: no MTRR for %lx000,%x000 found\n", base, size);
+			printk ("mtrr: no MTRR for %Lx000,%x000 found\n", base, size);
 	    return -EINVAL;
 	}
     }
@@ -814,7 +839,7 @@ int mtrr_del (int reg, u64 base, u32 size)
 {
 	if ((base & (PAGE_SIZE - 1)) || (size & (PAGE_SIZE - 1))) {
 	printk ("mtrr: size and base must be multiples of 4 kiB\n");
-		printk ("mtrr: size: 0x%x  base: 0x%lx\n", size, base);
+		printk ("mtrr: size: 0x%x  base: 0x%Lx\n", size, base);
 	return -EINVAL;
     }
 	return mtrr_del_page (reg, base >> PAGE_SHIFT, size >> PAGE_SHIFT);
@@ -844,7 +869,7 @@ static int mtrr_file_add (u64 base, u32 size, unsigned int type,
 		if ((base & (PAGE_SIZE - 1)) || (size & (PAGE_SIZE - 1))) {
 			printk
 			    ("mtrr: size and base must be multiples of 4 kiB\n");
-			printk ("mtrr: size: 0x%x  base: 0x%lx\n", size, base);
+			printk ("mtrr: size: 0x%x  base: 0x%Lx\n", size, base);
 	    return -EINVAL;
 	}
 	base >>= PAGE_SHIFT;
@@ -869,7 +894,7 @@ static int mtrr_file_del (u64 base, u32 size,
 		if ((base & (PAGE_SIZE - 1)) || (size & (PAGE_SIZE - 1))) {
 			printk
 			    ("mtrr: size and base must be multiples of 4 kiB\n");
-			printk ("mtrr: size: 0x%x  base: 0x%lx\n", size, base);
+			printk ("mtrr: size: 0x%x  base: 0x%Lx\n", size, base);
 	    return -EINVAL;
 	}
 	base >>= PAGE_SHIFT;
@@ -961,7 +986,7 @@ static ssize_t mtrr_write (struct file *file, const char *buf,
 
 	if ((base & 0xfff) || (size & 0xfff)) {
 	printk ("mtrr: size and base must be multiples of 4 kiB\n");
-		printk ("mtrr: size: 0x%x  base: 0x%lx\n", size, base);
+		printk ("mtrr: size: 0x%x  base: 0x%Lx\n", size, base);
 	return -EINVAL;
     }
 
@@ -1007,8 +1032,7 @@ static int mtrr_ioctl (struct inode *inode, struct file *file,
 			return -EPERM;
 		if (copy_from_user (&sentry, (void *) arg, sizeof sentry))
 	    return -EFAULT;
-		err =
-		    mtrr_file_add (sentry.base, sentry.size, sentry.type,
+		err = mtrr_file_add (sentry.base, sentry.size, sentry.type,
 				   file, 0);
 		if (err < 0)
 			return err;
@@ -1049,7 +1073,7 @@ static int mtrr_ioctl (struct inode *inode, struct file *file,
 	    return -EFAULT;
 		if (gentry.regnum >= get_num_var_ranges ())
 			return -EINVAL;
-		get_mtrr (gentry.regnum, &gentry.base, &gentry.size, &type);
+		get_mtrr (gentry.regnum, (u64*) &gentry.base, &gentry.size, &type);
 
 	/* Hide entries that go above 4GB */
 		if (gentry.base + gentry.size > 0x100000
@@ -1070,9 +1094,7 @@ static int mtrr_ioctl (struct inode *inode, struct file *file,
 			return -EPERM;
 		if (copy_from_user (&sentry, (void *) arg, sizeof sentry))
 	    return -EFAULT;
-		err =
-		    mtrr_file_add (sentry.base, sentry.size, sentry.type,
-				   file, 1);
+		err = mtrr_file_add (sentry.base, sentry.size, sentry.type, file, 1);
 		if (err < 0)
 			return err;
 	break;
@@ -1112,7 +1134,7 @@ static int mtrr_ioctl (struct inode *inode, struct file *file,
 	    return -EFAULT;
 		if (gentry.regnum >= get_num_var_ranges ())
 			return -EINVAL;
-		get_mtrr (gentry.regnum, &gentry.base, &gentry.size, &type);
+		get_mtrr (gentry.regnum, (u64*) &gentry.base, &gentry.size, &type);
 	gentry.type = type;
 
 		if (copy_to_user ((void *) arg, &gentry, sizeof gentry))
@@ -1131,6 +1153,7 @@ static int mtrr_close (struct inode *ino, struct file *file)
 	if (fcount == NULL)
 		return 0;
 
+	lock_kernel ();
     max = get_num_var_ranges ();
 	for (i = 0; i < max; ++i) {
 		while (fcount[i] > 0) {
@@ -1139,6 +1162,7 @@ static int mtrr_close (struct inode *ino, struct file *file)
 	    --fcount[i];
 	}
     }
+	unlock_kernel ();
     kfree (fcount);
     file->private_data = NULL;
     return 0;
@@ -1146,11 +1170,11 @@ static int mtrr_close (struct inode *ino, struct file *file)
 
 
 static struct file_operations mtrr_fops = {
-    owner:	THIS_MODULE,
-    read:	mtrr_read,
-    write:	mtrr_write,
-    ioctl:	mtrr_ioctl,
-	release:mtrr_close,
+	.owner   = THIS_MODULE,
+	.read	 = mtrr_read,
+	.write	 = mtrr_write,
+	.ioctl   = mtrr_ioctl,
+	.release = mtrr_close,
 };
 
 #ifdef CONFIG_PROC_FS
@@ -1182,10 +1206,9 @@ static void compute_ascii (void)
 		factor = 'M';
 		size >>= 20 - PAGE_SHIFT;
 	    }
-	    sprintf
-		(ascii_buffer + ascii_buf_bytes,
-			     "reg%02i: base=0x%05lx000 (%4liMB), size=%4i%cB: %s, count=%d\n",
-		 i, base, base >> (20 - PAGE_SHIFT), size, factor,
+			sprintf (ascii_buffer + ascii_buf_bytes,
+				"reg%02i: base=0x%05Lx000 (%4iMB), size=%4i%cB: %s, count=%d\n",
+				i, base, (u32) base >> (20 - PAGE_SHIFT), size, factor,
 		 attrib_to_str (type), usage_table[i]);
 			ascii_buf_bytes += strlen (ascii_buffer + ascii_buf_bytes);
 	}
@@ -1213,8 +1236,12 @@ static void __init mtrr_setup (void)
 		if ((cpuid_eax (0x80000000) >= 0x80000008)) {
 			u32	phys_addr;
 			phys_addr = cpuid_eax (0x80000008) & 0xff;
-			size_or_mask = ~((1 << (phys_addr - PAGE_SHIFT)) - 1);
-			size_and_mask = ~size_or_mask & 0xfffffffffff00000;
+			size_or_mask = ~((1L << phys_addr) - 1);
+			/*
+			 * top bits MBZ as its beyond the addressable range.
+			 * bottom bits MBZ as we don't care about lower 12 bits of addr.
+			 */
+			size_and_mask = (~size_or_mask) & 0x000ffffffffff000L;
 	}
 		printk ("mtrr: detected mtrr type: x86-64\n");
     }

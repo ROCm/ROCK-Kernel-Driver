@@ -113,7 +113,7 @@
 #define CHECK_TTY_COUNT 1
 
 struct termios tty_std_termios;		/* for the benefit of tty drivers  */
-struct tty_driver *tty_drivers;		/* linked list of tty drivers */
+LIST_HEAD(tty_drivers);			/* linked list of tty drivers */
 struct tty_ldisc ldiscs[NR_LDISCS];	/* line disc dispatch table	*/
 
 #ifdef CONFIG_UNIX98_PTYS
@@ -338,7 +338,7 @@ struct tty_driver *get_tty_driver(kdev_t device)
 	minor = minor(device);
 	major = major(device);
 
-	for (p = tty_drivers; p; p = p->next) {
+	list_for_each_entry(p, &tty_drivers, tty_drivers) {
 		if (p->major != major)
 			continue;
 		if (minor < p->minor_start)
@@ -2083,10 +2083,7 @@ int tty_register_driver(struct tty_driver *driver)
 	if (!driver->put_char)
 		driver->put_char = tty_default_put_char;
 	
-	driver->prev = 0;
-	driver->next = tty_drivers;
-	if (tty_drivers) tty_drivers->prev = driver;
-	tty_drivers = driver;
+	list_add(&driver->tty_drivers, &tty_drivers);
 	
 	if ( !(driver->flags & TTY_DRIVER_NO_DEVFS) ) {
 		for(i = 0; i < driver->num; i++)
@@ -2110,7 +2107,7 @@ int tty_unregister_driver(struct tty_driver *driver)
 	if (*driver->refcount)
 		return -EBUSY;
 
-	for (p = tty_drivers; p; p = p->next) {
+	list_for_each_entry(p, &tty_drivers, tty_drivers) {
 		if (p == driver)
 			found++;
 		else if (p->major == driver->major)
@@ -2127,13 +2124,7 @@ int tty_unregister_driver(struct tty_driver *driver)
 	} else
 		register_chrdev(driver->major, othername, &tty_fops);
 
-	if (driver->prev)
-		driver->prev->next = driver->next;
-	else
-		tty_drivers = driver->next;
-	
-	if (driver->next)
-		driver->next->prev = driver->prev;
+	list_del(&driver->tty_drivers);
 
 	/*
 	 * Free the termios and termios_locked structures because

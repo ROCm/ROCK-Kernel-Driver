@@ -24,6 +24,7 @@
 #include <asm/i387.h>
 #include <asm/fpu32.h>
 #include <linux/mm.h>
+#include <linux/ptrace.h>
 
 #define R32(l,q) \
 	case offsetof(struct user32, regs.l): stack[offsetof(struct pt_regs, q)/8] = val; break
@@ -35,20 +36,32 @@ static int putreg32(struct task_struct *child, unsigned regno, u32 val)
 
 	switch (regno) {
 	case offsetof(struct user32, regs.fs):
+		if (val && (val & 3) != 3) return -EIO; 
 	        child->thread.fs = val; 
 		break;
 	case offsetof(struct user32, regs.gs):
+		if (val && (val & 3) != 3) return -EIO; 
 		child->thread.gs = val;
 		break;
 	case offsetof(struct user32, regs.ds):
+		if (val && (val & 3) != 3) return -EIO; 
 		child->thread.ds = val;
 		break;
 	case offsetof(struct user32, regs.es):
+		if (val && (val & 3) != 3) return -EIO; 
 		child->thread.es = val;
 		break;
 
-	R32(cs, cs);
-	R32(ss, ss);
+	case offsetof(struct user32, regs.ss): 
+		if ((val & 3) != 3) return -EIO;
+		stack[offsetof(struct pt_regs, ss)/8] = val; 
+		break;
+
+	case offsetof(struct user32, regs.cs): 
+		if ((val & 3) != 3) return -EIO;
+		stack[offsetof(struct pt_regs, cs)/8] = val; 
+		break;
+
 	R32(ebx, rbx); 
 	R32(ecx, rcx);
 	R32(edx, rdx);

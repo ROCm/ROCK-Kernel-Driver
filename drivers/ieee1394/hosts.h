@@ -2,13 +2,20 @@
 #define _IEEE1394_HOSTS_H
 
 #include <linux/wait.h>
-#include <linux/tqueue.h>
 #include <linux/list.h>
 #include <asm/semaphore.h>
 
 #include "ieee1394_types.h"
 #include "csr.h"
 
+/* size of the array used to store config rom (in quadlets)
+   maximum is 0x100. About 0x40 is needed for the default
+   entries. So 0x80 should provide enough space for additional
+   directories etc. 
+   Note: All lowlevel drivers are required to allocate at least
+         this amount of memory for the configuration rom!
+*/
+#define CSR_CONFIG_ROM_SIZE       0x100
 
 struct hpsb_packet;
 
@@ -23,7 +30,7 @@ struct hpsb_host {
 
         struct list_head pending_packets;
         spinlock_t pending_pkt_lock;
-        struct tq_struct timeout_tq;
+        struct hpsb_queue_struct timeout_tq;
 
         /* A bitmask where a set bit means that this tlabel is in use.
          * FIXME - should be handled per node instead of per bus. */
@@ -119,7 +126,7 @@ struct hpsb_host_driver {
          * may not fail.  If any allocation is required, it must be done
          * earlier.
          */
-        size_t (*get_rom) (struct hpsb_host *host, const quadlet_t **pointer);
+        size_t (*get_rom) (struct hpsb_host *host, quadlet_t **pointer);
 
         /* This function shall implement packet transmission based on
          * packet->type.  It shall CRC both parts of the packet (unless
@@ -171,5 +178,25 @@ void hpsb_unref_host(struct hpsb_host *host);
 struct hpsb_host *hpsb_alloc_host(struct hpsb_host_driver *drv, size_t extra);
 void hpsb_add_host(struct hpsb_host *host);
 void hpsb_remove_host(struct hpsb_host *h);
+
+/* updates the configuration rom of a host.
+ * rom_version must be the current version,
+ * otherwise it will fail with return value -1.
+ * Return value -2 indicates that the new
+ * rom version is too big.
+ * Return value 0 indicates success
+ */
+int hpsb_update_config_rom(struct hpsb_host *host,
+      const quadlet_t *new_rom, size_t size, unsigned char rom_version);
+
+/* reads the current version of the configuration rom of a host.
+ * buffersize is the size of the buffer, rom_size
+ * returns the size of the current rom image.
+ * rom_version is the version number of the fetched rom.
+ * return value -1 indicates, that the buffer was
+ * too small, 0 indicates success.
+ */
+int hpsb_get_config_rom(struct hpsb_host *host, quadlet_t *buffer,
+      size_t buffersize, size_t *rom_size, unsigned char *rom_version);
 
 #endif /* _IEEE1394_HOSTS_H */

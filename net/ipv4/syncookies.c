@@ -171,14 +171,17 @@ struct sock *cookie_v4_check(struct sock *sk, struct sk_buff *skb,
 	 * hasn't changed since we received the original syn, but I see
 	 * no easy way to do this. 
 	 */
-	if (ip_route_output(&rt,
-			    opt && 
-			    opt->srr ? opt->faddr : req->af.v4_req.rmt_addr,
-			    req->af.v4_req.loc_addr,
-			    RT_CONN_FLAGS(sk),
-			    0)) { 
-		tcp_openreq_free(req);
-		goto out; 
+	{
+		struct flowi fl = { .nl_u = { .ip4_u =
+					      { .daddr = ((opt && opt->srr) ?
+							  opt->faddr :
+							  req->af.v4_req.rmt_addr),
+						.saddr = req->af.v4_req.loc_addr,
+						.tos = RT_CONN_FLAGS(sk) } } };
+		if (ip_route_output_key(&rt, &fl)) {
+			tcp_openreq_free(req);
+			goto out; 
+		}
 	}
 
 	/* Try to redo what tcp_v4_send_synack did. */

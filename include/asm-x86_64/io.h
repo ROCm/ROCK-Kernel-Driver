@@ -149,11 +149,7 @@ extern inline void * ioremap (unsigned long offset, unsigned long size)
  * it's useful if some control registers are in such an area and write combining
  * or read caching is not desirable:
  */
-extern inline void * ioremap_nocache (unsigned long offset, unsigned long size)
-{
-        return __ioremap(offset, size, _PAGE_PCD);
-}
-
+extern void * ioremap_nocache (unsigned long offset, unsigned long size);
 extern void iounmap(void *addr);
 
 /*

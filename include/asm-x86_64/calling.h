@@ -117,7 +117,7 @@
 	subq $6*8,%rsp
 	movq %rax,5*8(%rsp)  /* ss */
 	movq %rax,4*8(%rsp)  /* rsp */
-	movq %rax,3*8(%rsp)  /* eflags */
+	movq $(1<<9),3*8(%rsp)  /* eflags */
 	movq $__KERNEL_CS,2*8(%rsp) /* cs */
 	movq \child_rip,1*8(%rsp)  /* rip */ 
 	movq %rax,(%rsp)   /* orig_rax */ 

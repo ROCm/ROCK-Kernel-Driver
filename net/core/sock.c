@@ -1047,14 +1047,14 @@ int sock_no_getsockopt(struct socket *sock, int level, int optname,
 	return -EOPNOTSUPP;
 }
 
-int sock_no_sendmsg(struct socket *sock, struct msghdr *m, int flags,
-		    struct scm_cookie *scm)
+int sock_no_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
+		    int flags, struct scm_cookie *scm)
 {
 	return -EOPNOTSUPP;
 }
 
-int sock_no_recvmsg(struct socket *sock, struct msghdr *m, int len, int flags,
-		    struct scm_cookie *scm)
+int sock_no_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
+		    int len, int flags, struct scm_cookie *scm)
 {
 	return -EOPNOTSUPP;
 }

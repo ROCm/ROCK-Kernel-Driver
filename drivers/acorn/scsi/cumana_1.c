@@ -83,11 +83,9 @@ static const card_ids cumanascsi_cids[] = {
 #define NCR5380_read(reg) cumanascsi_read(_instance, reg)
 #define NCR5380_write(reg, value) cumanascsi_write(_instance, reg, value)
 
-#define do_NCR5380_intr do_cumanascsi_intr
-#define NCR5380_queue_command cumanascsi_queue_command
-#define NCR5380_abort cumanascsi_abort
-#define NCR5380_reset cumanascsi_reset
-#define NCR5380_proc_info cumanascsi_proc_info
+#define NCR5380_intr		cumanascsi_intr
+#define NCR5380_queue_command	cumanascsi_queue_command
+#define NCR5380_proc_info	cumanascsi_proc_info
 
 int NCR5380_proc_info(char *buffer, char **start, off_t offset,
 		      int length, int hostno, int inout);
@@ -159,7 +157,7 @@ int cumanascsi_detect(Scsi_Host_Template * tpnt)
         outb(0x00, instance->io_port - 577);
 
 	if (instance->irq != IRQ_NONE)
-	    if (request_irq(instance->irq, do_cumanascsi_intr, SA_INTERRUPT, "CumanaSCSI-1", NULL)) {
+	    if (request_irq(instance->irq, cumanascsi_intr, SA_INTERRUPT, "CumanaSCSI-1", NULL)) {
 		printk("scsi%d: IRQ%d not free, interrupts disabled\n",
 		    instance->host_no, instance->irq);
 		instance->irq = IRQ_NONE;
@@ -401,8 +399,10 @@ static Scsi_Host_Template cumanascsi_template = {
 	.release		= cumanascsi_release,
 	.info			= cumanascsi_info,
 	.queuecommand		= cumanascsi_queue_command,
-	.abort			= cumanascsi_abort,
-	.reset			= cumanascsi_reset,
+	.eh_abort_handler	= NCR5380_abort,
+	.eh_device_reset_handler= NCR5380_device_reset,
+	.eh_bus_reset_handler	= NCR5380_bus_reset,
+	.eh_host_reset_handler	= NCR5380_host_reset,
 	.bios_param		= scsicam_bios_param,
 	.can_queue		= 16,
 	.this_id		= 7,

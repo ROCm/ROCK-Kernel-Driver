@@ -1,5 +1,5 @@
-#ifndef __i386_IPC_H__
-#define __i386_IPC_H__
+#ifndef __x86_64_IPC_H__
+#define __x86_64_IPC_H__
 
 /* dummy */
 

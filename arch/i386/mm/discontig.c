@@ -70,6 +70,7 @@ static void __init allocate_pgdat(int nid)
 	node_datasz = PFN_UP(sizeof(struct pglist_data));
 	NODE_DATA(nid) = (pg_data_t *)(__va(min_low_pfn << PAGE_SHIFT));
 	min_low_pfn += node_datasz;
+	memset(NODE_DATA(nid), 0, sizeof(struct pglist_data));
 }
 
 /*

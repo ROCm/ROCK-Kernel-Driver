@@ -29,7 +29,7 @@
      /* UART CLK        PORT  IRQ     FLAGS        */
 #define STD_SERIAL_PORT_DEFNS \
 	{ 0, BASE_BAUD, 0x3F8, 10, STD_COM_FLAGS },	/* ttyS0 */	\
-	{ 0, BASE_BAUD, 0x2F8, 10, STD_COM_FLAGS },	/* ttyS1 */	\
+	{ 0, BASE_BAUD, 0    ,  0, STD_COM_FLAGS },	/* ttyS1 */	\
 	{ 0, BASE_BAUD, 0    ,  0, STD_COM_FLAGS },	/* ttyS2 */	\
 	{ 0, BASE_BAUD, 0    ,  0, STD_COM_FLAGS },	/* ttyS3 */	\
 	{ 0, BASE_BAUD, 0    ,  0, STD_COM_FLAGS }, 	/* ttyS4 */	\

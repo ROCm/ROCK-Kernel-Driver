@@ -42,6 +42,16 @@ CONFIG_FUSION
   architecture is based on LSI Logic's Message Passing Interface (MPI)
   specification.
 
+Maximum number of scatter gather entries
+CONFIG_FUSION_MAX_SGE
+  This option allows you to specify the maximum number of scatter-
+  gather entries per I/O. The driver defaults to 40, a reasonable number
+  for most systems. However, the user may increase this up to 128.
+  Increasing this parameter will require significantly more memory 
+  on a per controller instance. Increasing the parameter is not
+  necessary (or recommended) unless the user will be running 
+  large I/O's via the raw interface.
+
 CONFIG_FUSION_ISENSE
   The isense module (roughly stands for Interpret SENSE data) is
   completely optional.  It simply provides extra English readable

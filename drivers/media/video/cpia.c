@@ -56,7 +56,7 @@ static int video_nr = -1;
 
 #ifdef MODULE
 MODULE_PARM(video_nr,"i");
-MODULE_AUTHOR("Scott J. Bertin <sbertin@mindspring.com> & Peter Pregler <Peter_Pregler@email.com> & Johannes Erdfelt <jerdfelt@valinux.com>");
+MODULE_AUTHOR("Scott J. Bertin <sbertin@securenym.net> & Peter Pregler <Peter_Pregler@email.com> & Johannes Erdfelt <johannes@erdfeld.com>");
 MODULE_DESCRIPTION("V4L-driver for Vision CPiA based cameras");
 MODULE_LICENSE("GPL");
 MODULE_SUPPORTED_DEVICE("video");
@@ -163,7 +163,7 @@ enum {
 #define COMMAND_SETAPCOR		0x1000
 #define COMMAND_SETFLICKERCTRL		0x2000
 #define COMMAND_SETVLOFFSET		0x4000
-
+#define COMMAND_SETLIGHTS		0x8000
 /* Developer's Guide Table 5 p 3-34
  * indexed by [mains][sensorFps.baserate][sensorFps.divisor]*/
 static u8 flicker_jumps[2][2][4] =
@@ -244,7 +244,7 @@ static int cpia_read_proc(char *page, char **start, off_t off,
 	char *out = page;
 	int len, tmp;
 	struct cam_data *cam = data;
-	char tmpstr[20];
+	char tmpstr[29];
 
 	/* IMPORTANT: This output MUST be kept under PAGE_SIZE
 	 *            or we need to get more sophisticated. */
@@ -281,6 +281,13 @@ static int cpia_read_proc(char *page, char **start, off_t off,
 	               cam->params.status.vpStatus);
 	out += sprintf(out, "error_code:               %#04x\n",
 	               cam->params.status.errorCode);
+	/* QX3 specific entries */
+	if (cam->params.qx3.qx3_detected) {
+		out += sprintf(out, "button:                   %4d\n",
+		               cam->params.qx3.button);
+		out += sprintf(out, "cradled:                  %4d\n",
+		               cam->params.qx3.cradled);
+	}
 	out += sprintf(out, "video_size:               %s\n",
 	               cam->params.format.videoSize == VIDEOSIZE_CIF ?
 		       "CIF " : "QCIF");
@@ -345,16 +352,17 @@ static int cpia_read_proc(char *page, char **start, off_t off,
 	if (cam->params.version.firmwareVersion == 1 &&
 	   cam->params.version.firmwareRevision == 2)
 		/* 1-02 firmware limits gain to 2 */
-		sprintf(tmpstr, "%8d  %8d", 1, 2);
+		sprintf(tmpstr, "%8d  %8d  %8d", 1, 2, 2);
 	else
-		sprintf(tmpstr, "1,2,4,8");
+		sprintf(tmpstr, "%8d  %8d  %8d", 1, 8, 2);
 
 	if (cam->params.exposure.gainMode == 0)
-		out += sprintf(out, "max_gain:                unknown  %18s"
-		               "  %8d\n", tmpstr, 2); 
+		out += sprintf(out, "max_gain:                unknown  %28s"
+		               "  powers of 2\n", tmpstr); 
 	else
-		out += sprintf(out, "max_gain:               %8d  %18s  %8d\n", 
-		               1<<(cam->params.exposure.gainMode-1), tmpstr, 2);
+		out += sprintf(out, "max_gain:               %8d  %28s"
+			       "  1,2,4 or 8 \n",
+		               1<<(cam->params.exposure.gainMode-1), tmpstr);
 
 	switch(cam->params.exposure.expMode) {
 	case 1:
@@ -481,6 +489,15 @@ static int cpia_read_proc(char *page, char **start, off_t off,
 	out += sprintf(out, "decimation_thresh_mod:  %8d  %8d  %8d  %8d\n",
 	               cam->params.compressionParams.decimationThreshMod,
 		       0, 255, 2);
+	/* QX3 specific entries */
+	if (cam->params.qx3.qx3_detected) {
+		out += sprintf(out, "toplight:               %8s  %8s  %8s  %8s\n", 
+		               cam->params.qx3.toplight ? "on" : "off",
+			       "off", "on", "off");
+		out += sprintf(out, "bottomlight:            %8s  %8s  %8s  %8s\n", 
+		               cam->params.qx3.bottomlight ? "on" : "off",
+			       "off", "on", "off");
+	}
 	
 	len = out - page;
 	len -= off;
@@ -494,18 +511,45 @@ static int cpia_read_proc(char *page, char **start, off_t off,
 	return len;
 }
 
-static int cpia_write_proc(struct file *file, const char *buffer,
+static int cpia_write_proc(struct file *file, const char *buf,
                            unsigned long count, void *data)
 {
-	return -EINVAL;
-#if 0
 	struct cam_data *cam = data;
 	struct cam_params new_params;
+	char *page, *buffer;
 	int retval, find_colon;
 	int size = count;
-	unsigned long val;
+	unsigned long val = 0;
 	u32 command_flags = 0;
 	u8 new_mains;
+
+	/*
+	 * This code to copy from buf to page is shamelessly copied
+	 * from the comx driver
+	 */
+	if (count > PAGE_SIZE) {
+		printk(KERN_ERR "count is %lu > %d!!!\n", count, (int)PAGE_SIZE);
+		return -ENOSPC;
+	}
+
+	if (!(page = (char *)__get_free_page(GFP_KERNEL))) return -ENOMEM;
+
+	if(copy_from_user(page, buf, count))
+	{
+		retval = -EFAULT;
+		goto out;
+	}
+
+	if (page[count-1] == '\n')
+		page[count-1] = '\0';
+	else if (count < PAGE_SIZE)
+		page[count] = '\0';
+	else if (page[count]) {
+		retval = -EINVAL;
+		goto out;
+	}
+	
+	buffer = page;
 	
 	if (down_interruptible(&cam->param_lock))
 		return -ERESTARTSYS;
@@ -1163,6 +1207,22 @@ static int cpia_write_proc(struct file *file, const char *buffer,
 					retval = -EINVAL;
 			}
 			command_flags |= COMMAND_SETCOMPRESSIONPARAMS;
+		} else if (MATCH("toplight")) {
+		        if (!retval && MATCH("on"))
+				new_params.qx3.toplight = 1;
+			else if (!retval && MATCH("off"))
+				new_params.qx3.toplight = 0;
+			else 
+				retval = -EINVAL;
+			command_flags |= COMMAND_SETLIGHTS;
+		} else if (MATCH("bottomlight")) {
+		        if (!retval && MATCH("on"))
+				new_params.qx3.bottomlight = 1;
+			else if (!retval && MATCH("off"))  
+				new_params.qx3.bottomlight = 0;
+			else 
+				retval = -EINVAL;
+			command_flags |= COMMAND_SETLIGHTS;
 		} else {
 			DBG("No match found\n");
 			retval = -EINVAL;
@@ -1174,7 +1234,10 @@ static int cpia_write_proc(struct file *file, const char *buffer,
 				++buffer;
 			}
 			if (count) {
-				if (*buffer != '\n' && *buffer != ';')
+				if (*buffer == '\0' && count != 1)
+					retval = -EINVAL;
+				else if (*buffer != '\n' && *buffer != ';' &&
+					 *buffer != '\0')
 					retval = -EINVAL;
 				else {
 					--count;
@@ -1208,8 +1271,9 @@ static int cpia_write_proc(struct file *file, const char *buffer,
 	
 	up(&cam->param_lock);
 	
-	return retval;
-#endif
+out:
+	free_page((unsigned long)page);
+ 	return retval;
 }
 
 static void create_proc_cpia_cam(struct cam_data *cam)
@@ -1229,7 +1293,12 @@ static void create_proc_cpia_cam(struct cam_data *cam)
 	ent->data = cam;
 	ent->read_proc = cpia_read_proc;
 	ent->write_proc = cpia_write_proc;
-	ent->size = 3626;
+	/* 
+	   size of the proc entry is 3672 bytes for the standard webcam;
+ 	   the extra features of the QX3 microscope add 188 bytes.
+	   (we have not yet probed the camera to see which type it is).
+	*/
+	ent->size = 3672 + 188;
 	cam->proc_entry = ent;
 }
 
@@ -1523,6 +1592,10 @@ static int do_command(struct cam_data *cam, u16 command, u8 a, u8 b, u8 c, u8 d)
 		down(&cam->param_lock);
 		datasize=8;
 		break;
+	case CPIA_COMMAND_ReadMCPorts: 
+	case CPIA_COMMAND_ReadVCRegs:
+		datasize = 4;
+		break;
 	default:
 		datasize=0;
 		break;
@@ -1620,6 +1693,22 @@ static int do_command(struct cam_data *cam, u16 command, u8 a, u8 b, u8 c, u8 d)
 			  }
 			up(&cam->param_lock);
 			break;
+
+		case CPIA_COMMAND_ReadMCPorts: 
+			if (!cam->params.qx3.qx3_detected) 
+				break;
+			/* test button press */ 
+			cam->params.qx3.button = ((data[1] & 0x02) == 0);
+			if (cam->params.qx3.button) {
+				/* button pressed - unlock the latch */
+				do_command(cam,CPIA_COMMAND_WriteMCPort,3,0xDF,0xDF,0);
+				do_command(cam,CPIA_COMMAND_WriteMCPort,3,0xFF,0xFF,0);
+			}
+
+			/* test whether microscope is cradled */
+			cam->params.qx3.cradled = ((data[2] & 0x40) == 0);
+			break;
+
 		default:
 			break;
 		}
@@ -1779,6 +1868,7 @@ static int skipcount(int count, int fmt)
 {
 	switch(fmt) {
 	case VIDEO_PALETTE_GREY:
+		return count;
 	case VIDEO_PALETTE_RGB555:
 	case VIDEO_PALETTE_RGB565:
 	case VIDEO_PALETTE_YUV422:
@@ -2059,6 +2149,13 @@ static void dispatch_commands(struct cam_data *cam)
 	if (cam->cmd_queue & COMMAND_RESUME)
 		init_stream_cap(cam);
 
+	if (cam->cmd_queue & COMMAND_SETLIGHTS && cam->params.qx3.qx3_detected) {
+		int p1 = (cam->params.qx3.bottomlight == 0) << 1;
+		int p2 = (cam->params.qx3.toplight == 0) << 3;
+		do_command(cam, CPIA_COMMAND_WriteVCReg,  0x90, 0x8F, 0x50, 0);
+		do_command(cam, CPIA_COMMAND_WriteMCPort, 2, 0, (p1|p2|0xE0), 0);
+	}
+
 	up(&cam->param_lock);
 	cam->cmd_queue = COMMAND_NONE;
 	return;
@@ -2133,9 +2230,10 @@ static void fetch_frame(void *data)
 		/* camera idle now so dispatch queued commands */
 		dispatch_commands(cam);
 
-		/* Update our knowledge of the camera state - FIXME: necessary? */
-		do_command(cam, CPIA_COMMAND_GetColourBalance, 0, 0, 0, 0);
-		do_command(cam, CPIA_COMMAND_GetExposure, 0, 0, 0, 0);
+		/* Update our knowledge of the camera state */
+ 		do_command(cam, CPIA_COMMAND_GetColourBalance, 0, 0, 0, 0);
+ 		do_command(cam, CPIA_COMMAND_GetExposure, 0, 0, 0, 0);
+		do_command(cam, CPIA_COMMAND_ReadMCPorts, 0, 0, 0, 0);
 
 		/* decompress and convert image to by copying it from
 		 * raw_image to decompressed_frame
@@ -2346,8 +2444,12 @@ static int reset_camera(struct cam_data *cam)
 	get_version_information(cam);
 	if (cam->params.version.firmwareVersion != 1)
 		return -ENODEV;
-	
-	/* The fatal error checking should be done after
+
+	/* set QX3 detected flag */
+	cam->params.qx3.qx3_detected = (cam->params.pnpID.vendor == 0x0813 &&
+					cam->params.pnpID.product == 0x0001);
+
+ 	/* The fatal error checking should be done after
 	 * the camera powers up (developer's guide p 3-38) */
 
 	/* Set streamState before transition to high power to avoid bug
@@ -2481,7 +2583,7 @@ static int cpia_close(struct inode *inode, struct file *file)
 		/* GotoLoPower */
 		goto_low_power(cam);
 
-		/* Update the camera ststus */
+		/* Update the camera status */
 		do_command(cam, CPIA_COMMAND_GetCameraStatus, 0, 0, 0, 0);
 
 		/* cleanup internal state stuff */
@@ -2520,7 +2622,7 @@ static int cpia_read(struct file *file, char *buf,
 	struct video_device *dev = file->private_data;
 	struct cam_data *cam = dev->priv;
 
-	/* make this _really_ smp and multithredi-safe */
+	/* make this _really_ smp and multithread-safe */
 	if (down_interruptible(&cam->busy_lock))
 		return -EINTR;
 
@@ -2728,7 +2830,6 @@ static int cpia_do_ioctl(struct inode *inode, struct file *file,
 			cam->cmd_queue |= COMMAND_SETFORMAT;
 		}
 
-		// FIXME needed??? memcpy(&cam->vw, &vw, sizeof(vw));
 		up(&cam->param_lock);
 
 		/* setformat ignored by camera during streaming,
@@ -2762,10 +2863,8 @@ static int cpia_do_ioctl(struct inode *inode, struct file *file,
 		struct video_mmap *vm = arg;
 		int video_size;
 
-#if 1
 		DBG("VIDIOCMCAPTURE: %d / %d / %dx%d\n", vm->format, vm->frame,
 		    vm->width, vm->height);
-#endif
 		if (vm->frame<0||vm->frame>=FRAME_NUM) {
 			retval = -EINVAL;
 			break;
@@ -2775,6 +2874,8 @@ static int cpia_do_ioctl(struct inode *inode, struct file *file,
 		cam->vp.palette = vm->format;
 		switch(vm->format) {
 		case VIDEO_PALETTE_GREY:
+			cam->vp.depth=8;
+			break;
 		case VIDEO_PALETTE_RGB555:
 		case VIDEO_PALETTE_RGB565:
 		case VIDEO_PALETTE_YUV422:
@@ -2807,10 +2908,6 @@ static int cpia_do_ioctl(struct inode *inode, struct file *file,
 			cam->cmd_queue |= COMMAND_SETFORMAT;
 			dispatch_commands(cam);
 		}
-#if 0
-		DBG("VIDIOCMCAPTURE: %d / %d/%d\n", cam->video_size,
-		    cam->vw.width, cam->vw.height);
-#endif
 		/* according to v4l-spec we must start streaming here */
 		cam->mmap_kludge = 1;
 		retval = capture_frame(cam, vm);
@@ -2947,7 +3044,7 @@ static struct video_device cpia_template = {
 	owner:		THIS_MODULE,
 	name:		"CPiA Camera",
 	type:		VID_TYPE_CAPTURE,
-	hardware:	VID_HARDWARE_CPIA,      /* FIXME */
+	hardware:	VID_HARDWARE_CPIA,
 	fops:           &cpia_fops,
 };
 
@@ -3006,8 +3103,8 @@ static void reset_camera_struct(struct cam_data *cam)
 	cam->params.sensorFps.divisor = 1;
 	cam->params.sensorFps.baserate = 1;
 	
-	cam->params.yuvThreshold.yThreshold = 15; /* FIXME? */
-	cam->params.yuvThreshold.uvThreshold = 15; /* FIXME? */
+	cam->params.yuvThreshold.yThreshold = 6; /* From windows driver */
+	cam->params.yuvThreshold.uvThreshold = 6; /* From windows driver */
 	
 	cam->params.format.subSample = SUBSAMPLE_422;
 	cam->params.format.yuvOrder = YUVORDER_YUYV;
@@ -3015,8 +3112,14 @@ static void reset_camera_struct(struct cam_data *cam)
 	cam->params.compression.mode = CPIA_COMPRESSION_AUTO;
 	cam->params.compressionTarget.frTargeting =
 		CPIA_COMPRESSION_TARGET_QUALITY;
-	cam->params.compressionTarget.targetFR = 7; /* FIXME? */
-	cam->params.compressionTarget.targetQ = 10; /* FIXME? */
+	cam->params.compressionTarget.targetFR = 15; /* From windows driver */
+	cam->params.compressionTarget.targetQ = 5; /* From windows driver */
+
+	cam->params.qx3.qx3_detected = 0;
+	cam->params.qx3.toplight = 0;
+	cam->params.qx3.bottomlight = 0;
+	cam->params.qx3.button = 0;
+	cam->params.qx3.cradled = 0;
 
 	cam->video_size = VIDEOSIZE_CIF;
 	
@@ -3025,8 +3128,8 @@ static void reset_camera_struct(struct cam_data *cam)
 	cam->vp.brightness = 32768;  /* 50% */
 	cam->vp.contrast = 32768;    /* 50% */
 	cam->vp.whiteness = 0;       /* not used -> grayscale only */
-	cam->vp.depth = 0;           /* FIXME: to be set by user? */
-	cam->vp.palette = VIDEO_PALETTE_RGB24;         /* FIXME: to be set by user? */
+	cam->vp.depth = 24;          /* to be set by user */
+	cam->vp.palette = VIDEO_PALETTE_RGB24; /* to be set by user */
 
 	cam->vw.x = 0;
 	cam->vw.y = 0;
@@ -3080,14 +3183,9 @@ struct cam_data *cpia_register_camera(struct cpia_camera_ops *ops, void *lowleve
 {
         struct cam_data *camera;
 	
-	/* Need a lock when adding/removing cameras.  This doesn't happen
-	 * often and doesn't take very long, so grabbing the kernel lock
-	 * should be OK. */
-	
-	if ((camera = kmalloc(sizeof(struct cam_data), GFP_KERNEL)) == NULL) {
-		unlock_kernel();
+	if ((camera = kmalloc(sizeof(struct cam_data), GFP_KERNEL)) == NULL)
 		return NULL;
-	}
+
 	
 	init_camera_struct( camera, ops );
 	camera->lowlevel_data = lowlevel;
@@ -3095,7 +3193,6 @@ struct cam_data *cpia_register_camera(struct cpia_camera_ops *ops, void *lowleve
 	/* register v4l device */
 	if (video_register_device(&camera->vdev, VFL_TYPE_GRABBER, video_nr) == -1) {
 		kfree(camera);
-		unlock_kernel();
 		printk(KERN_DEBUG "video_register_device failed\n");
 		return NULL;
 	}
@@ -3118,12 +3215,6 @@ struct cam_data *cpia_register_camera(struct cpia_camera_ops *ops, void *lowleve
 	/* close cpia */
 	camera->ops->close(camera->lowlevel_data);
 
-/* Eh? Feeling happy? - jerdfelt */
-/*
-	camera->ops->open(camera->lowlevel_data);
-	camera->ops->close(camera->lowlevel_data);
-*/
-	
 	printk(KERN_INFO "  CPiA Version: %d.%02d (%d.%d)\n",
 	       camera->params.version.firmwareVersion,
 	       camera->params.version.firmwareRevision,

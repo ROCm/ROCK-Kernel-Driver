@@ -95,7 +95,7 @@ your version of gcc 2.95.x, may necessitate using -fno-strict-aliasing).
 Make
 ----
 
-You will need Gnu make 3.77 or later to build the kernel.
+You will need Gnu make 3.78 or later to build the kernel.
 
 Binutils
 --------
@@ -287,9 +287,9 @@ gcc 2.95.3
 ----------
 o  <ftp://ftp.gnu.org/gnu/gcc/gcc-2.95.3.tar.gz>
 
-Make 3.77
+Make 3.78
 ---------
-o  <ftp://ftp.gnu.org/gnu/make/make-3.77.tar.gz>
+o  <ftp://ftp.gnu.org/gnu/make/make-3.78.1.tar.gz>
 
 Binutils
 --------

@@ -40,7 +40,8 @@ _recvfrom(struct socket *socket, unsigned char *ubuf, int size, unsigned flags)
 {
 	struct iovec iov;
 	struct msghdr msg;
-	struct scm_cookie scm;
+	struct kiocb iocb;
+	struct sock_iocb *si;
 	mm_segment_t fs;
 
 	fs = get_fs();
@@ -56,10 +57,21 @@ _recvfrom(struct socket *socket, unsigned char *ubuf, int size, unsigned flags)
 	iov.iov_base = ubuf;
 	iov.iov_len = size;
 
-	memset(&scm, 0, sizeof(scm));
-	size = socket->ops->recvmsg(socket, &msg, size, flags, &scm);
+	init_sync_kiocb(&iocb, NULL);
+	si = kiocb_to_siocb(iocb);
+	si->sock = socket;
+	si->scm = &si->async_scm;
+	si->msg = &msg;
+	si->size = size;
+	si->flags = flags;
+
+	memset(si->scm, 0, sizeof(*si->scm));
+
+	size = socket->ops->recvmsg(&iocb, socket, &msg, size, flags, si->scm);
 	if (size >= 0)
-		scm_recv(socket, &msg, &scm, flags);
+		scm_recv(socket, &msg, si->scm, flags);
+	if (-EIOCBQUEUED == size)
+		size = wait_on_sync_kiocb(&iocb);
 
 	set_fs(fs);
 	return size;
@@ -286,7 +298,8 @@ smb_receive_drop(struct smb_sb_info *server)
 	unsigned int flags;
 	struct iovec iov;
 	struct msghdr msg;
-	struct scm_cookie scm;
+	struct kiocb iocb;
+	struct sock_iocb *si;
 	mm_segment_t fs;
 	int rlen = smb_len(server->header) - server->smb_read + 4;
 	int result = -EIO;
@@ -313,10 +326,21 @@ smb_receive_drop(struct smb_sb_info *server)
 	if (rlen > PAGE_SIZE)
 		rlen = PAGE_SIZE;
 
-	memset(&scm, 0, sizeof(scm));
-	result = sock->ops->recvmsg(sock, &msg, rlen, flags, &scm);
+	init_sync_kiocb(&iocb, NULL);
+	si = kiocb_to_siocb(iocb);
+	si->sock = sock;
+	si->scm = &si->async_scm;
+	si->msg = &msg;
+	si->size = rlen;
+	si->flags = flags;
+
+	memset(si->scm, 0, sizeof(*si->scm));
+
+	result = sock->ops->recvmsg(&iocb, sock, &msg, rlen, flags, si->scm);
 	if (result >= 0)
 		scm_recv(sock, &msg, &scm, flags);
+	if (-EIOCBQUEUED == result)
+		result = wait_on_sync_kiocb(&iocb);
 
 	set_fs(fs);
 
@@ -372,10 +396,21 @@ smb_receive(struct smb_sb_info *server, struct smb_request *req)
 	if (req->rq_rlen < rlen)
 		rlen = req->rq_rlen;
 
-	memset(&scm, 0, sizeof(scm));
-	result = sock->ops->recvmsg(sock, &msg, rlen, flags, &scm);
+	init_sync_kiocb(&iocb, NULL);
+	si = kiocb_to_siocb(iocb);
+	si->sock = sock;
+	si->scm = &si->async_scm;
+	si->msg = &msg;
+	si->size = rlen;
+	si->flags = flags;
+
+	memset(si->scm, 0, sizeof(*si->scm));
+
+	result = sock->ops->recvmsg(&iocb, sock, &msg, rlen, flags, si->scm);
 	if (result >= 0)
 		scm_recv(sock, &msg, &scm, flags);
+	if (-EIOCBQUEUED == result)
+		result = wait_on_sync_kiocb(&iocb);
 
 	set_fs(fs);
 
@@ -403,7 +438,8 @@ smb_send_request(struct smb_request *req)
 	mm_segment_t fs;
 	struct smb_sb_info *server = req->rq_server;
 	struct socket *sock;
-	struct scm_cookie scm;
+	struct kiocb iocb;
+	struct sock_iocb *si;
 	struct msghdr msg;
         int slen = req->rq_slen - req->rq_bytes_sent;
 	int result = -EIO;
@@ -427,13 +463,23 @@ smb_send_request(struct smb_request *req)
 	if (req->rq_bytes_sent)
 		smb_move_iov(&msg, iov, req->rq_bytes_sent);
 
+	init_sync_kiocb(&iocb, NULL);
+	si = kiocb_to_siocb(iocb);
+	si->scm = &si->async_scm;
+	si->sock = sock;
+	si->msg = &msg;
+	si->size = slen;
+
 	fs = get_fs();
 	set_fs(get_ds());
-	result = scm_send(sock, &msg, &scm);
+	result = scm_send(sock, &msg, si->scm);
 	if (result >= 0) {
-		result = sock->ops->sendmsg(sock, &msg, slen, &scm);
-		scm_destroy(&scm);
+		result = sock->ops->sendmsg(&iocb, sock, &msg, slen, si->scm);
+		if (-EIOCBQUEUED != result)
+			scm_destroy(&scm);
 	}
+	if (-EIOCBQUEUED == result)
+		result = wait_on_sync_kiocb(&iocb);
 	set_fs(fs);
 
 	if (result >= 0) {

@@ -1576,7 +1576,6 @@ static void esp_exec_cmd(struct esp *esp)
 		memset(esp_dev, 0, sizeof(struct esp_device));
 		SDptr->hostdata = esp_dev;
 	}
-	}
 
 	esp->snip = 0;
 	esp->msgout_len = 0;
@@ -3589,7 +3588,7 @@ static int target_with_ants_in_pants(struct esp *esp,
 				     Scsi_Cmnd *SCptr,
 				     struct esp_device *esp_dev)
 {
-	if (esp_dev->sync || SCptr->SDptr->borken) {
+	if (esp_dev->sync || SCptr->device->borken) {
 		/* sorry, no can do */
 		ESPSDTR(("forcing to async, "));
 		build_sync_nego_msg(esp, 0, 0);
@@ -3811,7 +3810,7 @@ static int check_multibyte_msg(struct esp *esp)
 
 			/* Regardless, next try for sync transfers. */
 			build_sync_nego_msg(esp, esp->sync_defp, 15);
-			espo_dev->sync = 1;
+			esp_dev->sync = 1;
 			esp->snip = 1;
 			message_out = EXTENDED_MESSAGE;
 		}

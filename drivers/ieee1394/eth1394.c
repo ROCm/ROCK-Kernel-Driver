@@ -77,7 +77,7 @@
 	printk(KERN_ERR fmt, ## args)
 
 static char version[] __devinitdata =
-	"$Rev: 546 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 601 $ Ben Collins <bcollins@debian.org>";
 
 /* Our ieee1394 highlevel driver */
 #define ETHER1394_DRIVER_NAME "ether1394"
@@ -522,7 +522,7 @@ static inline unsigned short ether1394_parse_encap (struct sk_buff *skb, struct 
  * ethernet header, and fill it with some of our other fields. This is
  * an incoming packet from the 1394 bus.  */
 static int ether1394_write (struct hpsb_host *host, int srcid, int destid,
-			    quadlet_t *data, u64 addr, unsigned int len)
+			    quadlet_t *data, u64 addr, unsigned int len, u16 fl)
 {
 	struct sk_buff *skb;
 	char *buf = (char *)data;
@@ -682,8 +682,8 @@ static int ether1394_tx (struct sk_buff *skb, struct net_device *dev)
 	ptask->skb = skb;
 	ptask->addr = addr;
 	ptask->dest_node = dest_node;
-	INIT_TQUEUE(&ptask->tq, hpsb_write_sched, ptask);
-	schedule_task(&ptask->tq);
+	HPSB_INIT_WORK(&ptask->tq, hpsb_write_sched, ptask);
+	hpsb_schedule_work(&ptask->tq);
 
 	return 0;
 fail:

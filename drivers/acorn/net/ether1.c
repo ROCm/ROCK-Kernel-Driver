@@ -43,6 +43,7 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/errno.h>
+#include <linux/device.h>
 #include <linux/init.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
@@ -79,11 +80,6 @@ static char version[] __initdata = "ether1 ethernet driver (c) 2000 Russell King
 
 #define BUS_16 16
 #define BUS_8  8
-
-static const card_ids __init ether1_cids[] = {
-	{ MANU_ACORN, PROD_ACORN_ETHER1 },
-	{ 0xffff, 0xffff }
-};
 
 /* ------------------------------------------------------------------------- */
 
@@ -647,6 +643,12 @@ ether1_open (struct net_device *dev)
 {
 	struct ether1_priv *priv = (struct ether1_priv *)dev->priv;
 
+	if (!is_valid_ether_addr(dev->dev_addr)) {
+		printk(KERN_WARNING "%s: invalid ethernet MAC address\n",
+			dev->name);
+		return -EINVAL;
+	}
+
 	if (request_irq(dev->irq, ether1_interrupt, 0, "ether1", dev))
 		return -EAGAIN;
 
@@ -971,6 +973,23 @@ ether1_getstats (struct net_device *dev)
 	return &priv->stats;
 }
 
+static int
+ether1_set_mac_address(struct net_device *dev, void *p)
+{
+	struct sockaddr *addr = p;
+
+	if (netif_running(dev))
+		return -EBUSY;
+
+	memcpy(dev->dev_addr, addr->sa_data, dev->addr_len);
+
+	/*
+	 * We'll set the MAC address on the chip when we open it.
+	 */
+
+	return 0;
+}
+
 /*
  * Set or clear the multicast filter for this adaptor.
  * num_addrs == -1	Promiscuous mode, receive all packets.
@@ -993,19 +1012,22 @@ static void __init ether1_banner(void)
 		printk(KERN_INFO "%s", version);
 }
 
-static struct net_device * __init ether1_init_one(struct expansion_card *ec)
+static int __devinit
+ether1_probe(struct expansion_card *ec, const struct ecard_id *id)
 {
 	struct net_device *dev;
 	struct ether1_priv *priv;
-	int i;
+	int i, ret = 0;
 
 	ether1_banner();
 
 	ecard_claim(ec);
 
 	dev = init_etherdev(NULL, sizeof(struct ether1_priv));
-	if (!dev)
+	if (!dev) {
+		ret = -ENOMEM;
 		goto out;
+	}
 
 	SET_MODULE_OWNER(dev);
 
@@ -1019,8 +1041,10 @@ static struct net_device * __init ether1_init_one(struct expansion_card *ec)
 	request_region(dev->base_addr + 0x800, 4096, dev->name);
 
 	priv = (struct ether1_priv *)dev->priv;
-	if ((priv->bus_type = ether1_reset(dev)) == 0)
+	if ((priv->bus_type = ether1_reset(dev)) == 0) {
+		ret = -ENODEV;
 		goto release;
+	}
 
 	printk(KERN_INFO "%s: ether1 in slot %d, ",
 		dev->name, ec->slot_no);
@@ -1030,16 +1054,21 @@ static struct net_device * __init ether1_init_one(struct expansion_card *ec)
 		printk ("%2.2x%c", dev->dev_addr[i], i == 5 ? '\n' : ':');
 	}
 
-	if (ether1_init_2(dev))
+	if (ether1_init_2(dev)) {
+		ret = -ENODEV;
 		goto release;
+	}
 
 	dev->open		= ether1_open;
 	dev->stop		= ether1_close;
 	dev->hard_start_xmit    = ether1_sendpacket;
 	dev->get_stats		= ether1_getstats;
 	dev->set_multicast_list = ether1_setmulticastlist;
+	dev->set_mac_address	= ether1_set_mac_address;
 	dev->tx_timeout		= ether1_timeout;
 	dev->watchdog_timeo	= 5 * HZ / 100;
+
+	ecard_set_drvdata(ec, dev);
 	return 0;
 
 release:
@@ -1049,55 +1078,46 @@ release:
 	kfree(dev);
 out:
 	ecard_release(ec);
-	return dev;
+	return ret;
 }
 
-static struct expansion_card	*e_card[MAX_ECARDS];
-static struct net_device	*e_dev[MAX_ECARDS];
+static void __devexit ether1_remove(struct expansion_card *ec)
+{
+	struct net_device *dev = ecard_get_drvdata(ec);
+
+	ecard_set_drvdata(ec, NULL);	
+
+	unregister_netdev(dev);
+
+	release_region(dev->base_addr, 16);
+	release_region(dev->base_addr + 0x800, 4096);
+	kfree(dev);
+
+	ecard_release(ec);
+}
+
+static const struct ecard_id ether1_ids[] = {
+	{ MANU_ACORN, PROD_ACORN_ETHER1 },
+	{ 0xffff, 0xffff }
+};
+
+static struct ecard_driver ether1_driver = {
+	.probe		= ether1_probe,
+	.remove		= __devexit_p(ether1_remove),
+	.id_table	= ether1_ids,
+	.drv = {
+		.name	= "ether1",
+	},
+};
 
 static int __init ether1_init(void)
 {
-	int i, ret = -ENODEV;
-
-	ecard_startfind();
-
-	for (i = 0; i < MAX_ECARDS; i++) {
-		struct expansion_card *ec;
-		struct net_device *dev;
-
-		ec = ecard_find(0, ether1_cids);
-		if (!ec)
-			break;
-
-		dev = ether1_init_one(ec);
-		if (!dev)
-			break;
-
-		e_card[i] = ec;
-		e_dev[i]  = dev;
-		ret = 0;
-	}
-
-	return ret;
+	return ecard_register_driver(&ether1_driver);
 }
 
 static void __exit ether1_exit(void)
 {
-	int i;
-
-	for (i = 0; i < MAX_ECARDS; i++) {
-		if (e_dev[i]) {
-			unregister_netdev(e_dev[i]);
-			release_region(e_dev[i]->base_addr, 16);
-			release_region(e_dev[i]->base_addr + 0x800, 4096);
-			kfree(e_dev[i]);
-			e_dev[i] = NULL;
-		}
-		if (e_card[i]) {
-			ecard_release(e_card[i]);
-			e_card[i] = NULL;
-		}
-	}
+	ecard_remove_driver(&ether1_driver);
 }
 
 module_init(ether1_init);

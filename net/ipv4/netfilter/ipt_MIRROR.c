@@ -44,12 +44,13 @@ struct in_device;
 static int route_mirror(struct sk_buff *skb)
 {
         struct iphdr *iph = skb->nh.iph;
+	struct flowi fl = { .nl_u = { .ip4_u = { .daddr = iph->saddr,
+						 .saddr = iph->daddr,
+						 .tos = RT_TOS(iph->tos) | RTO_CONN } } };
 	struct rtable *rt;
 
 	/* Backwards */
-	if (ip_route_output(&rt, iph->saddr, iph->daddr,
-			    RT_TOS(iph->tos) | RTO_CONN,
-			    0)) {
+	if (ip_route_output_key(&rt, &fl)) {
 		return 0;
 	}
 

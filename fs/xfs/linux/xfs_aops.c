@@ -34,7 +34,6 @@
 #include <linux/mm.h>
 #include <linux/pagemap.h>
 #include <linux/mpage.h>
-#include <linux/iobuf.h>
 
 
 STATIC int delalloc_convert(struct inode *, struct page *, int, int);

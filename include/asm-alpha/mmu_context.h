@@ -33,7 +33,7 @@ __reload_thread(struct pcb_struct *pcb)
 		"call_pal %2 #__reload_thread"
 		: "=r"(v0), "=r"(a0)
 		: "i"(PAL_swpctx), "r"(a0)
-		: "$1", "$16", "$22", "$23", "$24", "$25");
+		: "$1", "$22", "$23", "$24", "$25");
 
 	return v0;
 }

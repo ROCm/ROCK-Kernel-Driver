@@ -243,22 +243,25 @@ void clear_inode(struct inode *inode)
  * Dispose-list gets a local list with local inodes in it, so it doesn't
  * need to worry about list corruption and SMP locks.
  */
-static void dispose_list(struct list_head * head)
+static void dispose_list(struct list_head *head)
 {
-	struct list_head * inode_entry;
-	struct inode * inode;
+	int nr_disposed = 0;
 
-	while ((inode_entry = head->next) != head)
-	{
-		list_del(inode_entry);
+	while (!list_empty(head)) {
+		struct inode *inode;
 
-		inode = list_entry(inode_entry, struct inode, i_list);
+		inode = list_entry(head->next, struct inode, i_list);
+		list_del(&inode->i_list);
+
 		if (inode->i_data.nrpages)
 			truncate_inode_pages(&inode->i_data, 0);
 		clear_inode(inode);
 		destroy_inode(inode);
-		inodes_stat.nr_inodes--;
+		nr_disposed++;
 	}
+	spin_lock(&inode_lock);
+	inodes_stat.nr_inodes -= nr_disposed;
+	spin_unlock(&inode_lock);
 }
 
 /*
@@ -377,7 +380,7 @@ int invalidate_device(kdev_t dev, int do_sync)
 	 !inode_has_buffers(inode))
 #define INODE(entry)	(list_entry(entry, struct inode, i_list))
 
-void prune_icache(int goal)
+static inline void prune_icache(int goal)
 {
 	LIST_HEAD(list);
 	struct list_head *entry, *freeable = &list;
@@ -417,23 +420,19 @@ void prune_icache(int goal)
  * This is called from kswapd when we think we need some
  * more memory. 
  */
-int shrink_icache_memory(int ratio, unsigned int gfp_mask)
+static int shrink_icache_memory(int nr, unsigned int gfp_mask)
 {
-	int entries = inodes_stat.nr_inodes / ratio + 1;
-	/*
-	 * Nasty deadlock avoidance..
-	 *
-	 * We may hold various FS locks, and we don't
-	 * want to recurse into the FS that called us
-	 * in clear_inode() and friends..
-	 */
-	if (!(gfp_mask & __GFP_FS))
-		return 0;
-
-	prune_icache(entries);
-	return entries;
+	if (nr) {
+		/*
+		 * Nasty deadlock avoidance.  We may hold various FS locks,
+		 * and we don't want to recurse into the FS that called us
+		 * in clear_inode() and friends..
+	 	 */
+		if (gfp_mask & __GFP_FS)
+			prune_icache(nr);
+	}
+	return inodes_stat.nr_inodes;
 }
-EXPORT_SYMBOL(shrink_icache_memory);
 
 /*
  * Called with the inode lock held.
@@ -1226,4 +1225,6 @@ void __init inode_init(unsigned long mempages)
 					 NULL);
 	if (!inode_cachep)
 		panic("cannot create inode slab cache");
+
+	set_shrinker(DEFAULT_SEEKS, shrink_icache_memory);
 }

@@ -273,14 +273,16 @@ static int cpia_usb_open(void *privdata)
 
 error_urb1:		/* free urb 1 */
 	usb_free_urb(ucpia->sbuf[1].urb);
-
+	ucpia->sbuf[1].urb = NULL;
 error_urb0:		/* free urb 0 */
 	usb_free_urb(ucpia->sbuf[0].urb);
-
+	ucpia->sbuf[0].urb = NULL;
 error_1:
 	kfree (ucpia->sbuf[1].data);
+	ucpia->sbuf[1].data = NULL;
 error_0:
 	kfree (ucpia->sbuf[0].data);
+	ucpia->sbuf[0].data = NULL;
 	
 	return retval;
 }
@@ -636,8 +638,10 @@ static void cpia_disconnect(struct usb_interface *intf)
 		ucpia->buffers[0] = NULL;
 	}
 
-	if (!ucpia->open)
-		kfree(ucpia);
+	if (!ucpia->open) {
+ 		kfree(ucpia);
+		cam->lowlevel_data = NULL;
+	}
 }
 
 static int __init usb_cpia_init(void)

@@ -64,10 +64,8 @@
 
 #define NCR5380_read(reg)		oakscsi_read(_instance, reg)
 #define NCR5380_write(reg, value)	oakscsi_write(_instance, reg, value)
-#define do_NCR5380_intr			do_oakscsi_intr
+#define NCR5380_intr			oakscsi_intr
 #define NCR5380_queue_command		oakscsi_queue_command
-#define NCR5380_abort			oakscsi_abort
-#define NCR5380_reset			oakscsi_reset
 #define NCR5380_proc_info		oakscsi_proc_info
 
 int NCR5380_proc_info(char *buffer, char **start, off_t offset,
@@ -142,7 +140,7 @@ int oakscsi_detect(Scsi_Host_Template * tpnt)
 	}
 
 	if (instance->irq != IRQ_NONE)
-	    if (request_irq(instance->irq, do_oakscsi_intr, SA_INTERRUPT, "Oak SCSI", NULL)) {
+	    if (request_irq(instance->irq, oakscsi_intr, SA_INTERRUPT, "Oak SCSI", NULL)) {
 		printk("scsi%d: IRQ%d not free, interrupts disabled\n",
 		    instance->host_no, instance->irq);
 		instance->irq = IRQ_NONE;
@@ -264,8 +262,10 @@ static Scsi_Host_Template oakscsi_template = {
 	.release	= oakscsi_release,
 	.info		= oakscsi_info,
 	.queuecommand	= oakscsi_queue_command,
-	.abort		= oakscsi_abort,
-	.reset		= oakscsi_reset,
+	.eh_abort_handler	= NCR5380_abort,
+	.eh_device_reset_handler= NCR5380_device_reset,
+	.eh_bus_reset_handler	= NCR5380_bus_reset,
+	.eh_host_reset_handler	= NCR5380_host_reset,
 	.can_queue	= 16,
 	.this_id	= 7,
 	.sg_tablesize	= SG_ALL,

@@ -23,7 +23,7 @@
 #ifndef _H_CIFS_DEBUG
 #define _H_CIFS_DEBUG
 
-void dump_mem(char *label, void *data, int length);
+void cifs_dump_mem(char *label, void *data, int length);
 extern int traceSMB;		/* flag which enables the function below */
 void dump_smb(struct smb_hdr *, int);
 

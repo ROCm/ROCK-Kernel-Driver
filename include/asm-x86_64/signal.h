@@ -141,7 +141,6 @@ typedef void (*__sighandler_t)(int);
 #define SIG_IGN	((__sighandler_t)1)	/* ignore signal */
 #define SIG_ERR	((__sighandler_t)-1)	/* error return from signal */
 
-#ifdef __KERNEL__
 struct sigaction {
 	__sighandler_t sa_handler;
 	unsigned long sa_flags;
@@ -152,7 +151,6 @@ struct sigaction {
 struct k_sigaction {
 	struct sigaction sa;
 };
-#endif /* __KERNEL__ */
 
 typedef struct sigaltstack {
 	void *ss_sp;

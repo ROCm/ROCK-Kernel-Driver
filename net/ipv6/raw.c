@@ -344,7 +344,7 @@ int rawv6_rcv(struct sock *sk, struct sk_buff *skb)
  *	we return it, otherwise we block.
  */
 
-static int rawv6_recvmsg(struct sock *sk, struct msghdr *msg, int len,
+static int rawv6_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg, int len,
 		  int noblock, int flags, int *addr_len)
 {
 	struct ipv6_pinfo *np = inet6_sk(sk);
@@ -500,7 +500,7 @@ static int rawv6_frag_cksum(const void *data, struct in6_addr *addr,
 }
 
 
-static int rawv6_sendmsg(struct sock *sk, struct msghdr *msg, int len)
+static int rawv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg, int len)
 {
 	struct ipv6_txoptions opt_space;
 	struct sockaddr_in6 * sin6 = (struct sockaddr_in6 *) msg->msg_name;

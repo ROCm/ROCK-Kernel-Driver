@@ -55,8 +55,8 @@ unsigned int sa11x0_freq_to_ppcr(unsigned int khz)
 
 	khz /= 100;
 
-	for (i = 0; i < ARRAY_SIZE(cclk_frequency_100khz); i--)
-		if (cclk_frequency_100khz[i] >= khz)
+	for (i = NR_FREQS - 1; i > 0; i--)
+		if (cclk_frequency_100khz[i] <= khz)
 			break;
 
 	return i;

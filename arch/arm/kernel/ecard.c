@@ -38,6 +38,7 @@
 #include <linux/slab.h>
 #include <linux/proc_fs.h>
 #include <linux/notifier.h>
+#include <linux/device.h>
 #include <linux/init.h>
 
 #include <asm/dma.h>
@@ -48,6 +49,7 @@
 #include <asm/pgalloc.h>
 #include <asm/mmu_context.h>
 #include <asm/mach/irq.h>
+#include <asm/tlbflush.h>
 
 #ifndef CONFIG_ARCH_RPC
 #define HAVE_EXPMASK
@@ -92,6 +94,8 @@ ecard_loader_reset(volatile unsigned char *pa, loader_t loader);
 asmlinkage extern int
 ecard_loader_read(int off, volatile unsigned char *pa, loader_t loader);
 
+static const struct ecard_id *
+ecard_match_device(const struct ecard_id *ids, struct expansion_card *ec);
 
 static inline unsigned short
 ecard_getu16(unsigned char *v)
@@ -969,6 +973,14 @@ ecard_probe(int slot, card_type_t type)
 
 	*ecp = ec;
 	slot_to_expcard[slot] = ec;
+
+	snprintf(ec->dev.bus_id, sizeof(ec->dev.bus_id), "ecard%d", slot);
+	strcpy(ec->dev.name, "fixme!");
+	ec->dev.parent = NULL;
+	ec->dev.bus    = &ecard_bus_type;
+
+	device_register(&ec->dev);
+
 	return 0;
 
 nodev:
@@ -995,22 +1007,17 @@ ecard_t *ecard_find(int cid, const card_ids *cids)
 		if (finding_pos->claimed)
 			continue;
 
+		if (finding_pos->dev.driver)
+			continue;
+
 		if (!cids) {
 			if ((finding_pos->cid.id ^ cid) == 0)
 				break;
 		} else {
-			unsigned int manufacturer, product;
-			int i;
+			const struct ecard_id *id;
 
-			manufacturer = finding_pos->cid.manufacturer;
-			product = finding_pos->cid.product;
-
-			for (i = 0; cids[i].manufacturer != 65535; i++)
-				if (manufacturer == cids[i].manufacturer &&
-				    product == cids[i].product)
-					break;
-
-			if (cids[i].manufacturer != 65535)
+			id = ecard_match_device(cids, finding_pos);
+			if (id)
 				break;
 		}
 	}
@@ -1023,7 +1030,7 @@ ecard_t *ecard_find(int cid, const card_ids *cids)
  * Locate all hardware - interrupt management and
  * actual cards.
  */
-void __init ecard_init(void)
+static int __init ecard_init(void)
 {
 	int slot, irqhw;
 
@@ -1053,11 +1060,96 @@ void __init ecard_init(void)
 				irqhw ? ecard_irqexp_handler : ecard_irq_handler);
 
 	ecard_proc_init();
+
+	return 0;
 }
 
 subsys_initcall(ecard_init);
+
+/*
+ *	ECARD "bus"
+ */
+static const struct ecard_id *
+ecard_match_device(const struct ecard_id *ids, struct expansion_card *ec)
+{
+	int i;
+
+	for (i = 0; ids[i].manufacturer != 65535; i++)
+		if (ec->cid.manufacturer == ids[i].manufacturer &&
+		    ec->cid.product == ids[i].product)
+			return ids + i;
+
+	return NULL;
+}
+
+static int ecard_drv_probe(struct device *dev)
+{
+	struct expansion_card *ec = ECARD_DEV(dev);
+	struct ecard_driver *drv = ECARD_DRV(dev->driver);
+	const struct ecard_id *id;
+
+	id = ecard_match_device(drv->id_table, ec);
+
+	return drv->probe(ec, id);
+}
+
+static int ecard_drv_remove(struct device *dev)
+{
+	struct expansion_card *ec = ECARD_DEV(dev);
+	struct ecard_driver *drv = ECARD_DRV(dev->driver);
+
+	drv->remove(ec);
+
+	return 0;
+}
+
+int ecard_register_driver(struct ecard_driver *drv)
+{
+	drv->drv.bus = &ecard_bus_type;
+	drv->drv.probe = ecard_drv_probe;
+	drv->drv.remove = ecard_drv_remove;
+
+	return driver_register(&drv->drv);
+}
+
+void ecard_remove_driver(struct ecard_driver *drv)
+{
+	remove_driver(&drv->drv);
+}
+
+static int ecard_match(struct device *_dev, struct device_driver *_drv)
+{
+	struct expansion_card *ec = ECARD_DEV(_dev);
+	struct ecard_driver *drv = ECARD_DRV(_drv);
+	int ret;
+
+	if (drv->id_table) {
+		ret = ecard_match_device(drv->id_table, ec) != NULL;
+	} else {
+		ret = ec->cid.id == drv->id;
+	}
+
+	return ret;
+}
+
+struct bus_type ecard_bus_type = {
+	.name	= "ecard",
+	.match	= ecard_match,
+};
+
+static int ecard_bus_init(void)
+{
+	return bus_register(&ecard_bus_type);
+}
+
+postcore_initcall(ecard_bus_init);
 
 EXPORT_SYMBOL(ecard_startfind);
 EXPORT_SYMBOL(ecard_find);
 EXPORT_SYMBOL(ecard_readchunk);
 EXPORT_SYMBOL(ecard_address);
+
+EXPORT_SYMBOL(ecard_register_driver);
+EXPORT_SYMBOL(ecard_remove_driver);
+
+EXPORT_SYMBOL(ecard_bus_type);

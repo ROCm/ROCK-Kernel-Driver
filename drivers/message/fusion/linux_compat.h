@@ -253,24 +253,35 @@ static __inline__ int __get_order(unsigned long size)
 #endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,28)
-#define mptscsih_save_flags(flags) \
-({	local_irq_save(flags); \
-})
+#define mptscsih_lock(iocp, flags) \
+                spin_lock_irqsave(&iocp->FreeQlock, flags)
 #else
-#define mptscsih_save_flags(flags) \
+#define mptscsih_lock(iocp, flags) \
 ({	save_flags(flags); \
 	cli(); \
 })
 #endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,28)
-#define mptscsih_restore_flags(flags) \
-({	local_irq_enable(); \
-	local_irq_restore(flags); \
-})
+#define mptscsih_unlock(iocp, flags) \
+                spin_unlock_irqrestore(&iocp->FreeQlock, flags)
 #else
-#define mptscsih_restore_flags(flags)  restore_flags(flags);
+#define mptscsih_unlock(iocp, flags)  restore_flags(flags);
 #endif
+
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,41)
+#define mpt_work_struct work_struct 
+#define MPT_INIT_WORK(_task, _func, _data) INIT_WORK(_task, _func, _data)
+#else
+#define mpt_work_struct tq_struct 
+#define MPT_INIT_WORK(_task, _func, _data) \
+({	(_task)->sync = 0; \
+	(_task)->routine = (_func); \
+	(_task)->data = (void *) (_data); \
+})
+#endif
+
 
 /*}-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 #endif /* _LINUX_COMPAT_H */

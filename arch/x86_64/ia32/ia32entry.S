@@ -171,7 +171,7 @@ ia32_sys_call_table:
 	.quad sys_umount			/* new_umount */
 	.quad ni_syscall			/* old lock syscall holder */
 	.quad sys32_ioctl
-	.quad sys32_fcntl		/* 55 */
+	.quad sys32_fcntl64		/* 55 */
 	.quad ni_syscall			/* old mpx syscall holder */
 	.quad sys_setpgid
 	.quad ni_syscall			/* old ulimit syscall holder */
@@ -319,15 +319,15 @@ ia32_sys_call_table:
 	.quad sys_getgid		/* 200 */
 	.quad sys_geteuid
 	.quad sys_getegid
-	.quad sys32_setreuid
-	.quad sys32_setregid
-	.quad sys32_getgroups	/* 205 */
-	.quad sys32_setgroups
+	.quad sys_setreuid
+	.quad sys_setregid
+	.quad sys_getgroups	/* 205 */
+	.quad sys_setgroups
 	.quad sys_fchown
-	.quad sys32_setresuid
-	.quad sys32_getresuid
-	.quad sys32_setresgid	/* 210 */
-	.quad sys32_getresgid
+	.quad sys_setresuid
+	.quad sys_getresuid
+	.quad sys_setresgid	/* 210 */
+	.quad sys_getresgid
 	.quad sys_chown
 	.quad sys_setuid
 	.quad sys_setgid
@@ -356,9 +356,19 @@ ia32_sys_call_table:
 	.quad sys_fremovexattr
 	.quad sys_tkill		/* 238 */ 
 	.quad sys_sendfile64 
-	.quad sys_futex
+	.quad sys_futex		/* 240 */
         .quad sys32_sched_setaffinity
         .quad sys32_sched_getaffinity
+	.quad sys_set_thread_area
+	.quad sys_get_thread_area
+	.quad sys32_io_setup
+	.quad sys_io_destroy
+	.quad sys_io_getevents
+	.quad sys_io_submit
+	.quad sys_io_cancel
+	.quad sys_ni_syscall /* 250 alloc_huge_pages */
+	.quad sys_ni_syscall /* free_huge_pages */
+	.quad sys_ni_syscall /* exit_group */
 ia32_syscall_end:		
 	.rept IA32_NR_syscalls-(ia32_syscall_end-ia32_sys_call_table)/8
 		.quad ni_syscall

@@ -6,7 +6,7 @@
  *          Title:  MPI Config message, structures, and Pages
  *  Creation Date:  July 27, 2000
  *
- *    MPI_CNFG.H Version:  01.02.08
+ *    MPI_CNFG.H Version:  01.02.09
  *
  *  Version History
  *  ---------------
@@ -127,6 +127,7 @@
  *                      MPI_SCSIDEVPAGE1_CONF_EXTENDED_PARAMS_ENABLE.
  *                      Added new config page: CONFIG_PAGE_SCSI_DEVICE_3.
  *                      Modified MPI_FCPORTPAGE5_FLAGS_ defines.
+ *  09-16-02 01.02.09   Added more MPI_SCSIDEVPAGE1_CONF_FORCE_PPR_MSG define.
  *  --------------------------------------------------------------------------
  */
 
@@ -814,6 +815,7 @@ typedef struct _CONFIG_PAGE_SCSI_DEVICE_1
 #define MPI_SCSIDEVPAGE1_CONF_WDTR_DISALLOWED           (0x00000002)
 #define MPI_SCSIDEVPAGE1_CONF_SDTR_DISALLOWED           (0x00000004)
 #define MPI_SCSIDEVPAGE1_CONF_EXTENDED_PARAMS_ENABLE    (0x00000008)
+#define MPI_SCSIDEVPAGE1_CONF_FORCE_PPR_MSG             (0x00000010)
 
 
 typedef struct _CONFIG_PAGE_SCSI_DEVICE_2

@@ -129,6 +129,8 @@ void timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 		sparc_do_profile(regs->pc, regs->u_regs[UREG_RETPC]);
 #endif
 
+	/* Protect counter clear so that do_gettimeoffset works */
+	write_lock(&xtime_lock);
 #ifdef CONFIG_SUN4
 	if((idprom->id_machtype == (SM_SUN4 | SM_4_260)) ||
 	   (idprom->id_machtype == (SM_SUN4 | SM_4_110))) {
@@ -139,8 +141,6 @@ void timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	}
 #endif
 	clear_clock_irq();
-
-	write_lock(&xtime_lock);
 
 	do_timer(regs);
 
@@ -459,17 +459,7 @@ void __init time_init(void)
 
 extern __inline__ unsigned long do_gettimeoffset(void)
 {
-	struct tasklet_struct *t;
-	unsigned long offset = 0;
-	unsigned int count;
-
-	count = (*master_l10_counter >> 10) & 0x1fffff;
-
-	t = &bh_task_vec[TIMER_BH];
-	if (test_bit(TASKLET_STATE_SCHED, &t->state))
-		offset = 1000000;
-
-	return offset + count;
+	return (*master_l10_counter >> 10) & 0x1fffff;
 }
 
 /* Ok, my cute asm atomicity trick doesn't work anymore.

@@ -15,12 +15,14 @@
 #include <linux/delay.h>
 #include <linux/spinlock.h>
 #include <linux/smp_lock.h>
+#include <linux/smp.h>
 #include <linux/kernel_stat.h>
 #include <linux/mc146818rtc.h>
 
 #include <asm/mtrr.h>
 #include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
+#include <asm/hardirq.h>
 
 /*
  * the following functions deal with sending IPIs between CPUs.
@@ -75,7 +77,7 @@ static inline void send_IPI_allbutself(int vector)
 	 * we get an APIC send error if we try to broadcast.
 	 * thus we have to avoid sending IPIs in this case.
 	 */
-	if (smp_num_cpus > 1)
+	if (num_online_cpus() > 1)
 		__send_IPI_shortcut(APIC_DEST_ALLBUT, vector);
 }
 
@@ -224,7 +226,7 @@ asmlinkage void smp_invalidate_interrupt (void)
 	clear_bit(cpu, &flush_cpumask);
 
 out:
-	put_cpu();
+	put_cpu_no_resched();
 }
 
 static void flush_tlb_others (unsigned long cpumask, struct mm_struct *mm,
@@ -399,7 +401,7 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
  */
 {
 	struct call_data_struct data;
-	int cpus = smp_num_cpus-1;
+	int cpus = num_online_cpus()-1;
 
 	if (!cpus)
 		return 0;
@@ -448,7 +450,6 @@ static void stop_this_cpu (void * dummy)
 void smp_send_stop(void)
 {
 	smp_call_function(stop_this_cpu, NULL, 1, 0);
-	smp_num_cpus = 1;
 
 	local_irq_disable();
 	disable_local_APIC();
@@ -481,7 +482,9 @@ asmlinkage void smp_call_function_interrupt(void)
 	/*
 	 * At this point the info structure may be out of scope unless wait==1
 	 */
+	irq_enter();
 	(*func)(info);
+	irq_exit();
 	if (wait) {
 		mb();
 		atomic_inc(&call_data->finished);
