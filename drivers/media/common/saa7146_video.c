@@ -904,6 +904,8 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 	{
 		struct v4l2_framebuffer *fb = arg;
 		struct saa7146_format *fmt;
+		struct saa7146_fh *ov_fh = NULL;
+		int restart_overlay = 0;
 
 		DEB_EE(("VIDIOC_S_FBUF\n"));
 
@@ -913,10 +915,6 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 			return -EPERM;
 		}
 */
-		if( 0 != vv->ov_data ) {
-			DEB_D(("VIDIOC_S_FBUF: overlay is active.\n"));
-			return -EPERM;
-		}
 
 		/* check args */
 		fmt = format_by_fourcc(dev,fb->fmt.pixelformat);
@@ -924,12 +922,27 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 			return -EINVAL;
 		}
 		
+		down(&dev->lock);
+
+		if( vv->ov_data != NULL ) {
+			ov_fh = vv->ov_data->fh;
+			saa7146_stop_preview(ov_fh);
+			restart_overlay = 1;
+		}
+
 		/* ok, accept it */
 		vv->ov_fb = *fb;
 		vv->ov_fmt = fmt;
 		if (0 == vv->ov_fb.fmt.bytesperline)
 			vv->ov_fb.fmt.bytesperline =
 				vv->ov_fb.fmt.width*fmt->depth/8;
+
+		if( 0 != restart_overlay ) {
+			saa7146_start_preview(ov_fh);
+		}
+
+		up(&dev->lock);
+
 		return 0;
 	}
 	case VIDIOC_ENUM_FMT:
