@@ -32,7 +32,7 @@ static int fat_default_codepage = CONFIG_FAT_DEFAULT_CODEPAGE;
 static char fat_default_iocharset[] = CONFIG_FAT_DEFAULT_IOCHARSET;
 
 static int fat_statfs(struct super_block *sb, struct kstatfs *buf);
-static void fat_write_inode(struct inode *inode, int wait);
+static int fat_write_inode(struct inode *inode, int wait);
 
 /*
  * New FAT inode stuff. We do the following:
@@ -1233,7 +1233,7 @@ static int fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
 	return 0;
 }
 
-int fat_write_inode(struct inode *inode, int wait)
+static int fat_write_inode(struct inode *inode, int wait)
 {
 	struct super_block *sb = inode->i_sb;
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
