@@ -390,6 +390,7 @@ unuse_pte(struct vm_area_struct *vma, unsigned long address, pte_t *dir,
 	vma->vm_mm->rss++;
 	get_page(page);
 	set_pte(dir, pte_mkold(mk_pte(page, vma->vm_page_prot)));
+	SetPageAnon(page);
 	*pte_chainp = page_add_rmap(page, dir, *pte_chainp);
 	swap_free(entry);
 }

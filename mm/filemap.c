@@ -73,6 +73,9 @@
  *  ->mmap_sem
  *    ->i_sem			(msync)
  *
+ *  ->lock_page
+ *    ->i_shared_sem		(page_convert_anon)
+ *
  *  ->inode_lock
  *    ->sb_lock			(fs/fs-writeback.c)
  *    ->mapping->page_lock	(__sync_single_inode)

@@ -1071,6 +1071,7 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 			++mm->rss;
 		page_remove_rmap(old_page, page_table);
 		break_cow(vma, new_page, address, page_table);
+		SetPageAnon(new_page);
 		pte_chain = page_add_rmap(new_page, page_table, pte_chain);
 		lru_cache_add_active(new_page);
 
@@ -1310,6 +1311,7 @@ static int do_swap_page(struct mm_struct * mm,
 
 	flush_icache_page(vma, page);
 	set_pte(page_table, pte);
+	SetPageAnon(page);
 	pte_chain = page_add_rmap(page, page_table, pte_chain);
 
 	/* No need to invalidate - it was non-present before */
@@ -1377,6 +1379,7 @@ do_anonymous_page(struct mm_struct *mm, struct vm_area_struct *vma,
 				      vma);
 		lru_cache_add_active(page);
 		mark_page_accessed(page);
+		SetPageAnon(page);
 	}
 
 	set_pte(page_table, entry);
@@ -1444,6 +1447,10 @@ retry:
 	if (!pte_chain)
 		goto oom;
 
+	/* See if nopage returned an anon page */
+	if (!new_page->mapping || PageSwapCache(new_page))
+		SetPageAnon(new_page);
+
 	/*
 	 * Should we do an early C-O-W break?
 	 */
@@ -1454,6 +1461,7 @@ retry:
 		copy_user_highpage(page, new_page, address);
 		page_cache_release(new_page);
 		lru_cache_add_active(page);
+		SetPageAnon(page);
 		new_page = page;
 	}
 

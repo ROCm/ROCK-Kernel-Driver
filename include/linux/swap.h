@@ -185,6 +185,8 @@ struct pte_chain *FASTCALL(page_add_rmap(struct page *, pte_t *,
 void FASTCALL(page_remove_rmap(struct page *, pte_t *));
 int FASTCALL(try_to_unmap(struct page *));
 
+int page_convert_anon(struct page *);
+
 /* linux/mm/shmem.c */
 extern int shmem_unuse(swp_entry_t entry, struct page *page);
 #else

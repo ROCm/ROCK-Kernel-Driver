@@ -231,6 +231,8 @@ static inline void free_pages_check(const char *function, struct page *page)
 		bad_page(function, page);
 	if (PageDirty(page))
 		ClearPageDirty(page);
+	if (PageAnon(page))
+		ClearPageAnon(page);
 }
 
 /*

@@ -324,6 +324,7 @@ void put_dirty_page(struct task_struct *tsk, struct page *page,
 	}
 	lru_cache_add_active(page);
 	flush_dcache_page(page);
+	SetPageAnon(page);
 	set_pte(pte, pte_mkdirty(pte_mkwrite(mk_pte(page, prot))));
 	pte_chain = page_add_rmap(page, pte, pte_chain);
 	pte_unmap(pte);

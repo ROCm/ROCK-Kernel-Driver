@@ -268,9 +268,7 @@ static void vma_link(struct mm_struct *mm, struct vm_area_struct *vma,
 
 	if (mapping)
 		down(&mapping->i_shared_sem);
-	spin_lock(&mm->page_table_lock);
 	__vma_link(mm, vma, prev, rb_link, rb_parent);
-	spin_unlock(&mm->page_table_lock);
 	if (mapping)
 		up(&mapping->i_shared_sem);
 
@@ -317,6 +315,22 @@ static inline int is_mergeable_vma(struct vm_area_struct *vma,
 	if (vma->vm_private_data)
 		return 0;
 	return 1;
+}
+
+/* requires that the relevant i_shared_sem be held by the caller */
+static void move_vma_start(struct vm_area_struct *vma, unsigned long addr)
+{
+	struct inode *inode = NULL;
+	
+	if (vma->vm_file)
+		inode = vma->vm_file->f_dentry->d_inode;
+	if (inode)
+		__remove_shared_vm_struct(vma, inode);
+	/* If no vm_file, perhaps we should always keep vm_pgoff at 0?? */
+	vma->vm_pgoff += (long)(addr - vma->vm_start) >> PAGE_SHIFT;
+	vma->vm_start = addr;
+	if (inode)
+		__vma_link_file(vma);
 }
 
 /*
@@ -371,7 +385,6 @@ static int vma_merge(struct mm_struct *mm, struct vm_area_struct *prev,
 			unsigned long end, unsigned long vm_flags,
 			struct file *file, unsigned long pgoff)
 {
-	spinlock_t *lock = &mm->page_table_lock;
 	struct inode *inode = file ? file->f_dentry->d_inode : NULL;
 	struct semaphore *i_shared_sem;
 
@@ -403,7 +416,6 @@ static int vma_merge(struct mm_struct *mm, struct vm_area_struct *prev,
 			down(i_shared_sem);
 			need_up = 1;
 		}
-		spin_lock(lock);
 		prev->vm_end = end;
 
 		/*
@@ -416,7 +428,6 @@ static int vma_merge(struct mm_struct *mm, struct vm_area_struct *prev,
 			prev->vm_end = next->vm_end;
 			__vma_unlink(mm, next, prev);
 			__remove_shared_vm_struct(next, inode);
-			spin_unlock(lock);
 			if (need_up)
 				up(i_shared_sem);
 			if (file)
@@ -426,7 +437,6 @@ static int vma_merge(struct mm_struct *mm, struct vm_area_struct *prev,
 			kmem_cache_free(vm_area_cachep, next);
 			return 1;
 		}
-		spin_unlock(lock);
 		if (need_up)
 			up(i_shared_sem);
 		return 1;
@@ -444,10 +454,7 @@ static int vma_merge(struct mm_struct *mm, struct vm_area_struct *prev,
 		if (end == prev->vm_start) {
 			if (file)
 				down(i_shared_sem);
-			spin_lock(lock);
-			prev->vm_start = addr;
-			prev->vm_pgoff -= (end - addr) >> PAGE_SHIFT;
-			spin_unlock(lock);
+			move_vma_start(prev, addr);
 			if (file)
 				up(i_shared_sem);
 			return 1;
@@ -906,19 +913,16 @@ int expand_stack(struct vm_area_struct * vma, unsigned long address)
 	 */
 	address += 4 + PAGE_SIZE - 1;
 	address &= PAGE_MASK;
- 	spin_lock(&vma->vm_mm->page_table_lock);
 	grow = (address - vma->vm_end) >> PAGE_SHIFT;
 
 	/* Overcommit.. */
 	if (security_vm_enough_memory(grow)) {
-		spin_unlock(&vma->vm_mm->page_table_lock);
 		return -ENOMEM;
 	}
 	
 	if (address - vma->vm_start > current->rlim[RLIMIT_STACK].rlim_cur ||
 			((vma->vm_mm->total_vm + grow) << PAGE_SHIFT) >
 			current->rlim[RLIMIT_AS].rlim_cur) {
-		spin_unlock(&vma->vm_mm->page_table_lock);
 		vm_unacct_memory(grow);
 		return -ENOMEM;
 	}
@@ -926,7 +930,6 @@ int expand_stack(struct vm_area_struct * vma, unsigned long address)
 	vma->vm_mm->total_vm += grow;
 	if (vma->vm_flags & VM_LOCKED)
 		vma->vm_mm->locked_vm += grow;
-	spin_unlock(&vma->vm_mm->page_table_lock);
 	return 0;
 }
 
@@ -960,19 +963,16 @@ int expand_stack(struct vm_area_struct *vma, unsigned long address)
 	 * the spinlock only before relocating the vma range ourself.
 	 */
 	address &= PAGE_MASK;
- 	spin_lock(&vma->vm_mm->page_table_lock);
 	grow = (vma->vm_start - address) >> PAGE_SHIFT;
 
 	/* Overcommit.. */
 	if (security_vm_enough_memory(grow)) {
-		spin_unlock(&vma->vm_mm->page_table_lock);
 		return -ENOMEM;
 	}
 	
 	if (vma->vm_end - address > current->rlim[RLIMIT_STACK].rlim_cur ||
 			((vma->vm_mm->total_vm + grow) << PAGE_SHIFT) >
 			current->rlim[RLIMIT_AS].rlim_cur) {
-		spin_unlock(&vma->vm_mm->page_table_lock);
 		vm_unacct_memory(grow);
 		return -ENOMEM;
 	}
@@ -981,7 +981,6 @@ int expand_stack(struct vm_area_struct *vma, unsigned long address)
 	vma->vm_mm->total_vm += grow;
 	if (vma->vm_flags & VM_LOCKED)
 		vma->vm_mm->locked_vm += grow;
-	spin_unlock(&vma->vm_mm->page_table_lock);
 	return 0;
 }
 
@@ -1148,8 +1147,6 @@ static void unmap_region(struct mm_struct *mm,
 /*
  * Create a list of vma's touched by the unmap, removing them from the mm's
  * vma list as we go..
- *
- * Called with the page_table_lock held.
  */
 static void
 detach_vmas_to_be_unmapped(struct mm_struct *mm, struct vm_area_struct *vma,
@@ -1212,10 +1209,9 @@ int split_vma(struct mm_struct * mm, struct vm_area_struct * vma,
 		down(&mapping->i_shared_sem);
 	spin_lock(&mm->page_table_lock);
 
-	if (new_below) {
-		vma->vm_start = addr;
-		vma->vm_pgoff += ((addr - new->vm_start) >> PAGE_SHIFT);
-	} else
+	if (new_below)
+		move_vma_start(vma, addr);
+	else
 		vma->vm_end = addr;
 
 	__insert_vm_struct(mm, new);

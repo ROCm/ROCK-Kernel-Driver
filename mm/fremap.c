@@ -61,10 +61,26 @@ int install_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	pmd_t *pmd;
 	pte_t pte_val;
 	struct pte_chain *pte_chain;
+	unsigned long pgidx;
 
 	pte_chain = pte_chain_alloc(GFP_KERNEL);
 	if (!pte_chain)
 		goto err;
+
+	/*
+	 * Convert this page to anon for objrmap if it's nonlinear
+	 */
+	pgidx = (addr - vma->vm_start) >> PAGE_SHIFT;
+	pgidx += vma->vm_pgoff;
+	pgidx >>= PAGE_CACHE_SHIFT - PAGE_SHIFT;
+	if (!PageAnon(page) && (page->index != pgidx)) {
+		lock_page(page);
+		err = page_convert_anon(page);
+		unlock_page(page);
+		if (err < 0)
+			goto err_free;
+	}
+
 	pgd = pgd_offset(mm, addr);
 	spin_lock(&mm->page_table_lock);
 
@@ -85,12 +101,11 @@ int install_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	pte_val = *pte;
 	pte_unmap(pte);
 	update_mmu_cache(vma, addr, pte_val);
-	spin_unlock(&mm->page_table_lock);
-	pte_chain_free(pte_chain);
-	return 0;
 
+	err = 0;
 err_unlock:
 	spin_unlock(&mm->page_table_lock);
+err_free:
 	pte_chain_free(pte_chain);
 err:
 	return err;
