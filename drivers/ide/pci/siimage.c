@@ -1172,9 +1172,6 @@ static void __init init_hwif_siimage (ide_hwif_t *hwif)
 	hwif->drives[1].autodma = hwif->autodma;
 }
 
-extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
-
-
 /**
  *	siimage_init_one	-	pci layer discovery entry
  *	@dev: PCI device
