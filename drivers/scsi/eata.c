@@ -476,7 +476,6 @@ MODULE_AUTHOR("Dario Ballabio");
 #include <linux/blk.h>
 #include "scsi.h"
 #include "hosts.h"
-#include "sd.h"
 #include <asm/dma.h>
 #include <asm/irq.h>
 #include "eata.h"
@@ -1838,7 +1837,7 @@ int eata2x_bios_param(struct scsi_device *sdev, struct block_device *bdev,
 		sector_t capacity, int *dkinfo) {
    int size = capacity;
 
-   if (ext_tran || (scsicam_bios_param(disk, bdev, dkinfo) < 0)) {
+   if (ext_tran || (scsicam_bios_param(bdev, capacity, dkinfo) < 0)) {
       dkinfo[0] = 255;
       dkinfo[1] = 63;
       dkinfo[2] = size / (dkinfo[0] * dkinfo[1]);

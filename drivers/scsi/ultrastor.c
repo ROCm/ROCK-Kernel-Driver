@@ -8,6 +8,9 @@
  *    John's work modified by Caleb Epstein (cae@jpmorgan.com) and 
  *    Eric Youngdale (ericy@cais.com).
  *	Thanks to UltraStor for providing the necessary documentation
+ *
+ *  This is an old driver, for the 14F and 34F you should be using the
+ *  u14-34f driver instead.
  */
 
 /*
@@ -164,8 +167,8 @@
    packed structure.  */
 
 typedef struct {
-  unsigned int address;
-  unsigned int num_bytes;
+  u32 address;
+  u32 num_bytes;
 } ultrastor_sg_list;
 
 
@@ -190,7 +193,7 @@ struct mscp {
   unsigned char scsi_cdbs[12];	/* SCSI commands */
   unsigned char adapter_status;	/* non-zero indicates HA error */
   unsigned char target_status;	/* non-zero indicates target error */
-  unsigned int sense_data PACKED;
+  u32 sense_data PACKED;
   /* The following fields are for software only.  They are included in
      the MSCP structure because they are associated with SCSI requests.  */
   void (*done)(Scsi_Cmnd *);
@@ -289,17 +292,15 @@ static void do_ultrastor_interrupt(int, void *, struct pt_regs *);
 static inline void build_sg_list(struct mscp *, Scsi_Cmnd *SCpnt);
 
 
+/* Always called with host lock held */
+
 static inline int find_and_clear_bit_16(unsigned short *field)
 {
   int rv;
-  unsigned long flags;
 
-  save_flags(flags);
-  cli();
   if (*field == 0) panic("No free mscp");
   asm("xorl %0,%0\n0:\tbsfw %1,%w0\n\tbtr %0,%1\n\tjnc 0b"
       : "=&r" (rv), "=m" (*field) : "1" (*field));
-  restore_flags(flags);
   return rv;
 }
 
@@ -320,14 +321,12 @@ static inline unsigned char xchgb(unsigned char reg,
 
 #if ULTRASTOR_DEBUG & (UD_COMMAND | UD_ABORT)
 
-static void log_ultrastor_abort(register struct ultrastor_config *config,
+/* Always called with the host lock held */
+static void log_ultrastor_abort(struct ultrastor_config *config,
 				int command)
 {
   static char fmt[80] = "abort %d (%x); MSCP free pool: %x;";
-  register int i;
-  unsigned long flags;
-  save_flags(flags);
-  cli();
+  int i;
 
   for (i = 0; i < ULTRASTOR_MAX_CMDS; i++)
     {
@@ -340,7 +339,7 @@ static void log_ultrastor_abort(register struct ultrastor_config *config,
   fmt[20 + ULTRASTOR_MAX_CMDS * 2] = '\n';
   fmt[21 + ULTRASTOR_MAX_CMDS * 2] = 0;
   printk(fmt, command, &config->mscp[command], config->mscp_free);
-  restore_flags(flags);
+
 }
 #endif
 
@@ -528,7 +527,7 @@ out_release_port:
 
 static int ultrastor_24f_detect(Scsi_Host_Template * tpnt)
 {
-  register int i;
+  int i;
   struct Scsi_Host * shpnt = NULL;
 
 #if (ULTRASTOR_DEBUG & UD_DETECT)
@@ -638,13 +637,13 @@ static int ultrastor_24f_detect(Scsi_Host_Template * tpnt)
   return FALSE;
 }
 
-int ultrastor_detect(Scsi_Host_Template * tpnt)
+static int ultrastor_detect(Scsi_Host_Template * tpnt)
 {
-    tpnt->proc_name = "ultrastor";
-  return ultrastor_14f_detect(tpnt) || ultrastor_24f_detect(tpnt);
+	tpnt->proc_name = "ultrastor";
+	return ultrastor_14f_detect(tpnt) || ultrastor_24f_detect(tpnt);
 }
 
-const char *ultrastor_info(struct Scsi_Host * shpnt)
+static const char *ultrastor_info(struct Scsi_Host * shpnt)
 {
     static char buf[64];
 
@@ -662,7 +661,7 @@ const char *ultrastor_info(struct Scsi_Host * shpnt)
     return buf;
 }
 
-static inline void build_sg_list(register struct mscp *mscp, Scsi_Cmnd *SCpnt)
+static inline void build_sg_list(struct mscp *mscp, Scsi_Cmnd *SCpnt)
 {
 	struct scatterlist *sl;
 	long transfer_length = 0;
@@ -683,14 +682,13 @@ static inline void build_sg_list(register struct mscp *mscp, Scsi_Cmnd *SCpnt)
 	mscp->transfer_data_length = transfer_length;
 }
 
-int ultrastor_queuecommand(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
+static int ultrastor_queuecommand(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 {
-    register struct mscp *my_mscp;
+    struct mscp *my_mscp;
 #if ULTRASTOR_MAX_CMDS > 1
     int mscp_index;
 #endif
     unsigned int status;
-    unsigned long flags;
 
     /* Next test is for debugging; "can't happen" */
     if ((config.mscp_free & ((1U << ULTRASTOR_MAX_CMDS) - 1)) == 0)
@@ -706,14 +704,8 @@ int ultrastor_queuecommand(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 
     my_mscp = &config.mscp[mscp_index];
 
-#if 1
-    /* This way is faster.  */
     *(unsigned char *)my_mscp = OP_SCSI | (DTD_SCSI << 3);
-#else
-    my_mscp->opcode = OP_SCSI;
-    my_mscp->xdir = DTD_SCSI;
-    my_mscp->dcn = FALSE;
-#endif
+
     /* Tape drives don't work properly if the cache is used.  The SCSI
        READ command for a tape doesn't have a block offset, and the adapter
        incorrectly assumes that all reads from the tape read the same
@@ -748,35 +740,31 @@ int ultrastor_queuecommand(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
     SCpnt->host_scribble = (unsigned char *)my_mscp;
 
     /* Find free OGM slot.  On 24F, look for OGM status byte == 0.
-       On 14F and 34F, wait for local interrupt pending flag to clear.  */
+       On 14F and 34F, wait for local interrupt pending flag to clear. 
+       
+       FIXME: now we are using new_eh we should punt here and let the
+       midlayer sort it out */
 
-  retry:
+retry:
     if (config.slot)
-	while (inb(config.ogm_address - 1) != 0 &&
-	       config.aborted[mscp_index] == 0xff) barrier();
+	while (inb(config.ogm_address - 1) != 0 && config.aborted[mscp_index] == 0xff)
+		barrier();
 
     /* else??? */
 
-    while ((inb(LCL_DOORBELL_INTR(config.doorbell_address)) & 
-	    (config.slot ? 2 : 1)) 
-	   && config.aborted[mscp_index] == 0xff) barrier();
+    while ((inb(LCL_DOORBELL_INTR(config.doorbell_address)) & (config.slot ? 2 : 1))  && config.aborted[mscp_index] == 0xff)
+    	barrier();
 
-    /* To avoid race conditions, make the code to write to the adapter
-       atomic.  This simplifies the abort code.  */
+    /* To avoid race conditions, keep the code to write to the adapter
+       atomic.  This simplifies the abort code.  Right now the
+       scsi mid layer has the host_lock already held
+     */
 
-    save_flags(flags);
-    cli();
-
-    if (inb(LCL_DOORBELL_INTR(config.doorbell_address)) &
-	(config.slot ? 2 : 1))
-      {
-      restore_flags(flags);
+    if (inb(LCL_DOORBELL_INTR(config.doorbell_address)) & (config.slot ? 2 : 1))
       goto retry;
-      }
 
     status = xchgb(0, &config.aborted[mscp_index]);
     if (status != 0xff) {
-	restore_flags(flags);
 
 #if ULTRASTOR_DEBUG & (UD_COMMAND | UD_ABORT)
 	printk("USx4F: queuecommand: aborted\n");
@@ -811,8 +799,6 @@ int ultrastor_queuecommand(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	outb(0x1, LCL_DOORBELL_INTR(config.doorbell_address));
     }
 
-    restore_flags(flags);
-
 #if (ULTRASTOR_DEBUG & UD_COMMAND)
     printk("USx4F: queuecommand: returning\n");
 #endif
@@ -835,7 +821,7 @@ int ultrastor_queuecommand(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 
  */
 
-int ultrastor_abort(Scsi_Cmnd *SCpnt)
+static int ultrastor_abort(Scsi_Cmnd *SCpnt)
 {
 #if ULTRASTOR_DEBUG & UD_ABORT
     char out[108];
@@ -844,14 +830,16 @@ int ultrastor_abort(Scsi_Cmnd *SCpnt)
 #endif
     unsigned int mscp_index;
     unsigned char old_aborted;
+    unsigned long flags;
     void (*done)(Scsi_Cmnd *);
+    struct Scsi_Host *host = SCpnt->host;
 
     if(config.slot) 
-      return SCSI_ABORT_SNOOZE;  /* Do not attempt an abort for the 24f */
-
+      return FAILED;  /* Do not attempt an abort for the 24f */
+      
     /* Simple consistency checking */
     if(!SCpnt->host_scribble)
-      return SCSI_ABORT_NOT_RUNNING;
+      return FAILED;
 
     mscp_index = ((struct mscp *)SCpnt->host_scribble) - config.mscp;
     if (mscp_index >= ULTRASTOR_MAX_CMDS)
@@ -863,8 +851,8 @@ int ultrastor_abort(Scsi_Cmnd *SCpnt)
 	int port0 = (config.slot << 12) | 0xc80;
 	int i;
 	unsigned long flags;
-	save_flags(flags);
-	cli();
+	
+	spin_lock_irqsave(host->host_lock, flags);
 	strcpy(out, "OGM %d:%x ICM %d:%x ports:  ");
 	for (i = 0; i < 16; i++)
 	  {
@@ -879,7 +867,7 @@ int ultrastor_abort(Scsi_Cmnd *SCpnt)
 	ogm_addr = (unsigned int)isa_bus_to_virt(inl(port0 + 23));
 	icm_status = inb(port0 + 27);
 	icm_addr = (unsigned int)isa_bus_to_virt(inl(port0 + 28));
-	restore_flags(flags);
+	spin_lock_irqsave(host->host_lock, flags);
       }
 
     /* First check to see if an interrupt is pending.  I suspect the SiS
@@ -888,14 +876,13 @@ int ultrastor_abort(Scsi_Cmnd *SCpnt)
     if (config.slot ? inb(config.icm_address - 1) == 2 :
 	(inb(SYS_DOORBELL_INTR(config.doorbell_address)) & 1))
       {
-	unsigned long flags;
-	save_flags(flags);
 	printk("Ux4F: abort while completed command pending\n");
-	restore_flags(flags);
-	cli();
+	
+	spin_lock_irqsave(host->host_lock, flags);
+	/* FIXME: Ewww... need to think about passing host around properly */
 	ultrastor_interrupt(0, NULL, NULL);
-	restore_flags(flags);
-	return SCSI_ABORT_SUCCESS;  /* FIXME - is this correct? -ERY */
+	spin_unlock_irqrestore(host->host_lock, flags);
+	return SUCCESS;
       }
 #endif
 
@@ -904,7 +891,7 @@ int ultrastor_abort(Scsi_Cmnd *SCpnt)
     /* aborted == 0xff is the signal that queuecommand has not yet sent
        the command.  It will notice the new abort flag and fail.  */
     if (old_aborted == 0xff)
-	return SCSI_ABORT_SUCCESS;
+	return SUCCESS;
 
     /* On 24F, send an abort MSCP request.  The adapter will interrupt
        and the interrupt handler will call done.  */
@@ -912,18 +899,18 @@ int ultrastor_abort(Scsi_Cmnd *SCpnt)
       {
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(host->host_lock, flags);
 	outl(isa_virt_to_bus(&config.mscp[mscp_index]), config.ogm_address);
-	inb(0xc80);	/* delay */
+	udelay(8);
 	outb(0x80, config.ogm_address - 1);
 	outb(0x2, LCL_DOORBELL_INTR(config.doorbell_address));
 #if ULTRASTOR_DEBUG & UD_ABORT
 	log_ultrastor_abort(&config, mscp_index);
 	printk(out, ogm_status, ogm_addr, icm_status, icm_addr);
 #endif
-	restore_flags(flags);
-	return SCSI_ABORT_PENDING;
+	spin_unlock_irqrestore(host->host_lock, flags);
+	/* FIXME: add a wait for the abort to complete */
+	return SUCCESS;
       }
 
 #if ULTRASTOR_DEBUG & UD_ABORT
@@ -953,27 +940,30 @@ int ultrastor_abort(Scsi_Cmnd *SCpnt)
     done = config.mscp[mscp_index].done;
     config.mscp[mscp_index].done = 0;
     SCpnt->result = DID_ABORT << 16;
-    /* I worry about reentrancy in scsi.c  */
+    
+    /* Take the host lock to guard against scsi layer re-entry */
+    spin_lock_irqsave(host->host_lock, flags);
     done(SCpnt);
+    spin_unlock_irqrestore(host->host_lock, flags);
 
     /* Need to set a timeout here in case command never completes.  */
-    return SCSI_ABORT_SUCCESS;
+    return SUCCESS;
 }
 
-int ultrastor_reset(Scsi_Cmnd * SCpnt, unsigned int reset_flags)
+static int ultrastor_host_reset(Scsi_Cmnd * SCpnt)
 {
     unsigned long flags;
-    register int i;
+    int i;
+    struct Scsi_Host *host = SCpnt->host;
+    
 #if (ULTRASTOR_DEBUG & UD_RESET)
     printk("US14F: reset: called\n");
 #endif
 
     if(config.slot)
-      return SCSI_RESET_PUNT;  /* Do not attempt a reset for the 24f */
+    	return FAILED;
 
-    save_flags(flags);
-    cli();
-
+    spin_lock_irqsave(host->host_lock, flags);
     /* Reset the adapter and SCSI bus.  The SCSI bus reset can be
        inhibited by clearing ultrastor_bus_reset before probe.  */
     outb(0xc0, LCL_DOORBELL_INTR(config.doorbell_address));
@@ -1005,7 +995,10 @@ int ultrastor_reset(Scsi_Cmnd * SCpnt, unsigned int reset_flags)
 #endif
 
     /* FIXME - if the device implements soft resets, then the command
-       will still be running.  ERY */
+       will still be running.  ERY  
+       
+       Even bigger deal with new_eh! 
+     */
 
     memset((unsigned char *)config.aborted, 0, sizeof config.aborted);
 #if ULTRASTOR_MAX_CMDS == 1
@@ -1014,7 +1007,7 @@ int ultrastor_reset(Scsi_Cmnd * SCpnt, unsigned int reset_flags)
     config.mscp_free = ~0;
 #endif
 
-    restore_flags(flags);
+    spin_unlock_irqrestore(host->host_lock, flags);
     return SCSI_RESET_SUCCESS;
 
 }
@@ -1041,7 +1034,7 @@ static void ultrastor_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 #if ULTRASTOR_MAX_CMDS > 1
     unsigned int mscp_index;
 #endif
-    register struct mscp *mscp;
+    struct mscp *mscp;
     void (*done)(Scsi_Cmnd *);
     Scsi_Cmnd *SCtmp;
 

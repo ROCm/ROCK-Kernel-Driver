@@ -11,6 +11,6 @@ $(obj)/initramfs_data.o: $(src)/initramfs_data.scr $(obj)/initramfs_data.cpio.gz
 	$(call if_changed,ld)
 
 $(obj)/initramfs_data.cpio.gz: $(obj)/gen_init_cpio
-	( cd $(obj) ; ./$< | gzip -9c > $@ )
+	./$< | gzip -9c > $@
 
 
