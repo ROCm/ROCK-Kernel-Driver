@@ -389,29 +389,6 @@ void rio_udelay (int usecs)
   udelay (usecs);
 }
 
-
-void rio_inc_mod_count (void)
-{
-#ifdef MODULE
-  func_enter ();
-  rio_dprintk (RIO_DEBUG_MOD_COUNT, "rio_inc_mod_count\n");
-  MOD_INC_USE_COUNT; 
-  func_exit ();
-#endif
-}
-
-
-void rio_dec_mod_count (void)
-{
-#ifdef MODULE
-  func_enter ();
-  rio_dprintk (RIO_DEBUG_MOD_COUNT, "rio_dec_mod_count\n");
-  MOD_DEC_USE_COUNT; 
-  func_exit ();
-#endif
-}
-
-
 static int rio_set_real_termios (void *ptr)
 {
   int rv, modem;
@@ -660,7 +637,6 @@ static void rio_hungup (void *ptr)
   
   PortP = (struct Port *)ptr;
   PortP->gs.tty = NULL;
-  rio_dec_mod_count (); 
 
   func_exit ();
 }
@@ -686,7 +662,6 @@ static void rio_close (void *ptr)
   }                
 
   PortP->gs.tty = NULL;
-  rio_dec_mod_count ();
   func_exit ();
 }
 
@@ -908,6 +883,7 @@ static int rio_init_drivers(void)
 
   memset(&rio_driver, 0, sizeof(rio_driver));
   rio_driver.magic = TTY_DRIVER_MAGIC;
+  rio_driver.owner = THIS_MODULE;
   rio_driver.driver_name = "specialix_rio";
   rio_driver.name = "ttySR";
   rio_driver.major = RIO_NORMAL_MAJOR0;
