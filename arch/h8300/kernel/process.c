@@ -261,12 +261,6 @@ out:
 	return error;
 }
 
-/*
- * These bracket the sleeping functions..
- */
-#define first_sched	((unsigned long) scheduling_functions_start_here)
-#define last_sched	((unsigned long) scheduling_functions_end_here)
-
 unsigned long thread_saved_pc(struct task_struct *tsk)
 {
 	return ((struct pt_regs *)tsk->thread.esp0)->pc;
@@ -287,7 +281,7 @@ unsigned long get_wchan(struct task_struct *p)
 		    fp >= 8184+stack_page)
 			return 0;
 		pc = ((unsigned long *)fp)[1];
-		if (pc < first_sched || pc >= last_sched)
+		if (!in_sched_functions(pc))
 			return pc;
 		fp = *(unsigned long *) fp;
 	} while (count++ < 16);

@@ -510,12 +510,6 @@ thread_saved_pc(task_t *t)
 	return 0;
 }
 
-/*
- * These bracket the sleeping functions..
- */
-#define first_sched	((unsigned long) scheduling_functions_start_here)
-#define last_sched	((unsigned long) scheduling_functions_end_here)
-
 unsigned long
 get_wchan(struct task_struct *p)
 {
@@ -534,7 +528,7 @@ get_wchan(struct task_struct *p)
 	 */
 
 	pc = thread_saved_pc(p);
-	if (pc >= first_sched && pc < last_sched) {
+	if (in_sched_functions(pc)) {
 		schedule_frame = ((unsigned long *)p->thread_info->pcb.ksp)[6];
 		return ((unsigned long *)schedule_frame)[12];
 	}

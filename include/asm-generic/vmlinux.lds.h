@@ -53,6 +53,6 @@
 	}
 
 #define SCHED_TEXT							\
-		__scheduling_functions_start_here = .;			\
+		__sched_text_start = .;					\
 		*(.sched.text)						\
-		__scheduling_functions_end_here = .;
+		__sched_text_end = .;

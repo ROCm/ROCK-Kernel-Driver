@@ -252,13 +252,6 @@ static DEFINE_PER_CPU(struct runqueue, runqueues);
 #define task_rq(p)		cpu_rq(task_cpu(p))
 #define cpu_curr(cpu)		(cpu_rq(cpu)->curr)
 
-extern unsigned long __scheduling_functions_start_here;
-extern unsigned long __scheduling_functions_end_here;
-const unsigned long scheduling_functions_start_here =
-			(unsigned long)&__scheduling_functions_start_here;
-const unsigned long scheduling_functions_end_here =
-			(unsigned long)&__scheduling_functions_end_here;
-
 /*
  * Default context-switch locking:
  */
@@ -3851,6 +3844,14 @@ void __init sched_init_smp(void)
 {
 }
 #endif /* CONFIG_SMP */
+
+int in_sched_functions(unsigned long addr)
+{
+	/* Linker adds these: start and end of __sched functions */
+	extern char __sched_text_start[], __sched_text_end[];
+	return addr >= (unsigned long)__sched_text_start
+		&& addr < (unsigned long)__sched_text_end;
+}
 
 void __init sched_init(void)
 {

@@ -574,12 +574,6 @@ asmlinkage long sys_vfork(struct pt_regs regs)
 		    NULL, NULL);
 }
 
-/*
- * These bracket the sleeping functions..
- */
-#define first_sched	((unsigned long) scheduling_functions_start_here)
-#define last_sched	((unsigned long) scheduling_functions_end_here)
-
 unsigned long get_wchan(struct task_struct *p)
 {
 	unsigned long stack;
@@ -596,14 +590,12 @@ unsigned long get_wchan(struct task_struct *p)
 		if (fp < (unsigned long)stack || fp > (unsigned long)stack+THREAD_SIZE)
 			return 0; 
 		rip = *(u64 *)(fp+8); 
-		if (rip < first_sched || rip >= last_sched)
+		if (!in_sched_functions(rip))
 			return rip; 
 		fp = *(u64 *)fp; 
 	} while (count++ < 16); 
 	return 0;
 }
-#undef last_sched
-#undef first_sched
 
 long do_arch_prctl(struct task_struct *task, int code, unsigned long addr)
 { 

@@ -633,11 +633,6 @@ out:
 	return error;
 }
 
-/*
- * These bracket the sleeping functions..
- */
-#define first_sched	((unsigned long) scheduling_functions_start_here)
-#define last_sched	((unsigned long) scheduling_functions_end_here)
 #define top_esp                (THREAD_SIZE - sizeof(unsigned long))
 #define top_ebp                (THREAD_SIZE - 2*sizeof(unsigned long))
 
@@ -658,14 +653,12 @@ unsigned long get_wchan(struct task_struct *p)
 		if (ebp < stack_page || ebp > top_ebp+stack_page)
 			return 0;
 		eip = *(unsigned long *) (ebp+4);
-		if (eip < first_sched || eip >= last_sched)
+		if (!in_sched_functions(eip))
 			return eip;
 		ebp = *(unsigned long *) ebp;
 	} while (count++ < 16);
 	return 0;
 }
-#undef last_sched
-#undef first_sched
 
 /*
  * sys_alloc_thread_area: get a yet unused TLS descriptor index.

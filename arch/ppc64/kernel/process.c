@@ -469,12 +469,6 @@ static inline int validate_sp(unsigned long sp, struct task_struct *p)
 	return 1;
 }
 
-/*
- * These bracket the sleeping functions..
- */
-#define first_sched    (*(unsigned long *)scheduling_functions_start_here)
-#define last_sched     (*(unsigned long *)scheduling_functions_end_here)
-
 unsigned long get_wchan(struct task_struct *p)
 {
 	unsigned long ip, sp;
@@ -493,7 +487,7 @@ unsigned long get_wchan(struct task_struct *p)
 			return 0;
 		if (count > 0) {
 			ip = *(unsigned long *)(sp + 16);
-			if (ip < first_sched || ip >= last_sched)
+			if (!in_sched_functions(ip))
 				return ip;
 		}
 	} while (count++ < 16);
