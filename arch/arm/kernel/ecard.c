@@ -295,12 +295,6 @@ static void ecard_call(struct ecard_request *req)
 {
 	DECLARE_COMPLETION(completion);
 
-	/*
-	 * Make sure we have a context that is able to sleep.
-	 */
-	if (current == &init_task || in_interrupt())
-		BUG();
-
 	req->complete = &completion;
 
 	down(&ecard_sem);
