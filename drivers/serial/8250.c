@@ -491,6 +491,11 @@ static void autoconfig_has_efr(struct uart_8250_port *up)
 	unsigned char id1, id2, id3, rev, saved_dll, saved_dlm;
 
 	/*
+	 * Everything with an EFR has SLEEP
+	 */
+	up->capabilities |= UART_CAP_EFR | UART_CAP_SLEEP;
+
+	/*
 	 * First we check to see if it's an Oxford Semiconductor UART.
 	 *
 	 * If we have to do this here because some non-National
@@ -600,6 +605,7 @@ static void autoconfig_16550a(struct uart_8250_port *up)
 	unsigned char status1, status2;
 
 	up->port.type = PORT_16550A;
+	up->capabilities |= UART_CAP_FIFO;
 
 	/*
 	 * Check for presence of the EFR when DLAB is set.
@@ -611,6 +617,7 @@ static void autoconfig_16550a(struct uart_8250_port *up)
 		if (serial_in(up, UART_EFR) != 0) {
 			DEBUG_AUTOCONF("EFRv1 ");
 			up->port.type = PORT_16650;
+			up->capabilities |= UART_CAP_EFR | UART_CAP_SLEEP;
 		} else {
 			DEBUG_AUTOCONF("Motorola 8xxx DUART ");
 		}
@@ -663,6 +670,7 @@ static void autoconfig_16550a(struct uart_8250_port *up)
 #endif
 
 			up->port.type = PORT_NS16550A;
+			up->capabilities |= UART_NATSEMI;
 			return;
 		}
 	}
@@ -686,6 +694,7 @@ static void autoconfig_16550a(struct uart_8250_port *up)
 
 	if (status1 == 6 && status2 == 7) {
 		up->port.type = PORT_16750;
+		up->capabilities |= UART_CAP_AFE | UART_CAP_SLEEP;
 		return;
 	}
 }
@@ -715,6 +724,8 @@ static void autoconfig(struct uart_8250_port *up, unsigned int probeflags)
 	 */
 	spin_lock_irqsave(&up->port.lock, flags);
 //	save_flags(flags); cli();
+
+	up->capabilities = 0;
 
 	if (!(up->port.flags & UPF_BUGGY_UART)) {
 		/*
@@ -825,6 +836,13 @@ static void autoconfig(struct uart_8250_port *up, unsigned int probeflags)
 	}
 #endif
 	serial_outp(up, UART_LCR, save_lcr);
+
+	if (up->capabilities != uart_config[up->port.type].flags) {
+		printk(KERN_WARNING
+		       "ttyS%d: detected caps %08x should be %08x\n",
+			up->port.line, up->capabilities,
+			uart_config[up->port.type].flags);
+	}
 
 	up->port.fifosize = uart_config[up->port.type].fifo_size;
 	up->capabilities = uart_config[up->port.type].flags;
