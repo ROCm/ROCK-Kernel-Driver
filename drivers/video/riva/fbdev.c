@@ -1974,13 +1974,7 @@ int __init rivafb_setup(char *options)
 		return 0;
 
 	while ((this_opt = strsep(&options, ",")) != NULL) {
-		if (!*this_opt)
-			continue;
-#ifdef CONFIG_MTRR
-		} else if (!strncmp(this_opt, "nomtrr", 6)) {
-			nomtrr = 1;
-#endif
-		} else if (!strncmp(this_opt, "forceCRTC", 9)) {
+		if (!strncmp(this_opt, "forceCRTC", 9)) {
 			char *p;
 			
 			p = this_opt + 9;
@@ -1990,6 +1984,10 @@ int __init rivafb_setup(char *options)
 				forceCRTC = -1;
 		} else if (!strncmp(this_opt, "flatpanel", 9)) {
 			flatpanel = 1;
+#ifdef CONFIG_MTRR
+		} else if (!strncmp(this_opt, "nomtrr", 6)) {
+			nomtrr = 1;
+#endif
 		} else
 			mode_option = this_opt;
 	}

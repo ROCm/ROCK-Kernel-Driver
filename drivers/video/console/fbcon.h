@@ -119,7 +119,6 @@ extern void set_con2fb_map(int unit, int newidx);
 /* Namespace consistency */
 #define SCROLL_YNOPARTIAL	__SCROLL_YNOPARTIAL
 
-extern void fbcon_redraw_clear(struct vc_data *, struct display *, int, int, int, int);
-extern void fbcon_redraw_bmove(struct vc_data *, struct display *, int, int, int, int, int, int);
+extern int fb_console_init(void);
 
 #endif /* _VIDEO_FBCON_H */

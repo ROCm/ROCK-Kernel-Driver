@@ -907,11 +907,9 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		if (!registered_fb[con2fb.framebuffer])
 		    return -EINVAL;
 		if (con2fb.console != 0)
-		    set_con2fb_map(con2fb.console-1, con2fb.framebuffer);
+			set_con2fb_map(con2fb.console-1, con2fb.framebuffer);
 		else
-		    /* set them all */
-		    for (i = 0; i < MAX_NR_CONSOLES; i++)
-			set_con2fb_map(i, con2fb.framebuffer);
+			fb_console_init();		
 		return 0;
 #endif	/* CONFIG_FRAMEBUFFER_CONSOLE */
 	case FBIOBLANK:
