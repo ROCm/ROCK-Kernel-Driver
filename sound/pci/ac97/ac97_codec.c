@@ -2908,7 +2908,7 @@ int snd_ac97_tune_hardware(ac97_t *ac97, struct ac97_quirk *quirk)
 
 	for (; quirk->vendor; quirk++) {
 		if (quirk->vendor == ac97->subsystem_vendor && quirk->device == ac97->subsystem_device) {
-			snd_printdd("ac97 quirk for %s (%04x:%04x)\n", quirk->name, vendor, device);
+			snd_printdd("ac97 quirk for %s (%04x:%04x)\n", quirk->name, ac97->subsystem_vendor, ac97->subsystem_device);
 			switch (quirk->type) {
 			case AC97_TUNE_HP_ONLY:
 				return swap_headphone(ac97, 1);
