@@ -8,7 +8,8 @@ obj-m           :=
 obj-n           :=
 obj-            :=
 
-mod-subdirs     := appletalk arcnet fc irda tokenring tulip pcmcia wireless wan
+mod-subdirs     := appletalk arcnet fc irda tokenring tulip pcmcia wireless \
+		   wan ../acorn/net
 
 O_TARGET := net.o
 
@@ -20,30 +21,22 @@ export-objs     :=	8390.o arlan.o aironet4500_core.o aironet4500_card.o \
 			net_init.o mii.o
 rcpci-objs	:=	rcpci45.o rclanmtl.o
 
-ifeq ($(CONFIG_E100),y)
-  obj-y += e100/e100.o
-endif
-ifeq ($(CONFIG_E1000),y)
-  obj-y += e1000/e1000.o
-endif
-
 ifeq ($(CONFIG_ISDN_PPP),y)
   obj-$(CONFIG_ISDN) += slhc.o
 endif
 
 subdir-$(CONFIG_NET_PCMCIA) += pcmcia
 subdir-$(CONFIG_NET_WIRELESS) += wireless
-subdir-$(CONFIG_NET_TULIP) += tulip
+
 subdir-$(CONFIG_E100) += e100
+ifeq ($(CONFIG_E100),y)
+  obj-y += e100/e100.o
+endif
+
 subdir-$(CONFIG_E1000) += e1000
-subdir-$(CONFIG_IRDA) += irda
-subdir-$(CONFIG_TR) += tokenring
-subdir-$(CONFIG_WAN) += wan
-subdir-$(CONFIG_NET_FC) += fc
-subdir-$(CONFIG_ARCNET) += arcnet
-subdir-$(CONFIG_DEV_APPLETALK) += appletalk
-subdir-$(CONFIG_SK98LIN) += sk98lin
-subdir-$(CONFIG_SKFP) += skfp
+ifeq ($(CONFIG_E1000),y)
+  obj-y += e1000/e1000.o
+endif
 
 #
 # link order important here
@@ -83,10 +76,12 @@ obj-$(CONFIG_FEALNX) += fealnx.o mii.o
 obj-$(CONFIG_TIGON3) += tg3.o
 obj-$(CONFIG_TC35815) += tc35815.o
 
+subdir-$(CONFIG_SK98LIN) += sk98lin
 ifeq ($(CONFIG_SK98LIN),y)
 obj-y += sk98lin/sk98lin.o
 endif
 
+subdir-$(CONFIG_SKFP) += skfp
 ifeq ($(CONFIG_SKFP),y)
   obj-y += skfp/skfp.o
 endif
@@ -215,10 +210,59 @@ obj-$(CONFIG_MAC89x0) += mac89x0.o
 obj-$(CONFIG_TUN) += tun.o
 obj-$(CONFIG_DL2K) += dl2k.o
 
+subdir-$(CONFIG_ARCH_ACORN) += ../acorn/net
 ifeq ($(CONFIG_ARCH_ACORN),y)
-mod-subdirs	+= ../acorn/net
-subdir-y	+= ../acorn/net
-obj-y		+= ../acorn/net/acorn-net.o
+  obj-y		+= ../acorn/net/acorn-net.o
+endif
+
+subdir-$(CONFIG_NET_FC) += fc
+ifeq ($(CONFIG_NET_FC),y)
+  obj-y		+= fc/fc.o
+endif
+
+subdir-$(CONFIG_DEV_APPLETALK) += appletalk
+ifeq ($(CONFIG_DEV_APPLETALK),y)
+  obj-y		+= appletalk/appletalk.o
+endif
+
+subdir-$(CONFIG_TR) += tokenring
+ifeq ($(CONFIG_TR),y)
+  obj-y		+= tokenring/tr.o
+endif
+
+subdir-$(CONFIG_WAN) += wan
+ifeq ($(CONFIG_WAN),y)
+  obj-y		+= wan/wan.o
+endif
+
+subdir-$(CONFIG_ARCNET) += arcnet
+ifeq ($(CONFIG_ARCNET),y)
+  obj-y		+= arcnet/arcnetdrv.o
+endif
+
+subdir-$(CONFIG_NET_PCMCIA) += pcmcia
+ifeq ($(CONFIG_NET_PCMCIA),y)
+  obj-y		+= pcmcia/pcmcia_net.o
+endif
+
+subdir-$(CONFIG_NET_WIRELESS) += wireless
+ifeq ($(CONFIG_NET_WIRELESS),y)
+  obj-y		+= wireless/wireless_net.o
+endif
+
+subdir-$(CONFIG_NET_TULIP) += tulip
+ifeq ($(CONFIG_NET_TULIP),y)
+  obj-y		+= tulip/tulip_net.o
+endif
+
+subdir-$(CONFIG_HAMRADIO) += hamradio
+ifeq ($(CONFIG_HAMRADIO),y)
+  obj-y		+= hamradio/hamradio.o
+endif
+
+subdir-$(CONFIG_IRDA) += irda
+ifeq ($(CONFIG_IRDA),y)
+  obj-y		+= irda/irda.o
 endif
 
 include $(TOPDIR)/Rules.make
