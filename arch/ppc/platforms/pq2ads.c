@@ -1,5 +1,5 @@
 /*
- * arch/ppc/platforms/pq2ads_setup.c
+ * arch/ppc/platforms/pq2ads.c
  *
  * PQ2ADS platform support
  *
