@@ -108,12 +108,6 @@ static int gx_fix;
 
 #define yellowfin_debug debug
 
-#if !defined(__OPTIMIZE__)
-#warning  You must compile this file with the correct options!
-#warning  See the last lines of the source file.
-#error You must compile this driver with "-O".
-#endif
-
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/string.h>

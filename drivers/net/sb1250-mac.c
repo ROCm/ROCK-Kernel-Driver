@@ -55,12 +55,6 @@ static int int_timeout = 0;
 /* Time in jiffies before concluding the transmitter is hung. */
 #define TX_TIMEOUT  (2*HZ)
 
-#if !defined(__OPTIMIZE__)  ||  !defined(__KERNEL__)
-#warning  You must compile this file with the correct options!
-#warning  See the last lines of the source file.
-#error  You must compile this driver with "-O".
-#endif
-
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/string.h>

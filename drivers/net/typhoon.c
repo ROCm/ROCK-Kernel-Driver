@@ -90,12 +90,6 @@ static const int multicast_filter_limit = 32;
 #define PFX			DRV_MODULE_NAME ": "
 #define ERR_PFX			KERN_ERR PFX
 
-#if !defined(__OPTIMIZE__)  ||  !defined(__KERNEL__)
-#warning  You must compile this file with the correct options!
-#warning  See the last lines of the source file.
-#error  You must compile this driver with "-O".
-#endif
-
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
