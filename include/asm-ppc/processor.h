@@ -848,6 +848,7 @@ struct thread_struct {
 	/* AltiVec status */
 	vector128	vscr __attribute((aligned(16)));
 	unsigned long	vrsave;
+	int		used_vr;	/* set if process has used altivec */
 #endif /* CONFIG_ALTIVEC */
 };
 

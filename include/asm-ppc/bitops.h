@@ -276,7 +276,7 @@ static __inline__ int fls(unsigned int x)
  * Find the first bit set in a 140-bit bitmap.
  * The first 100 bits are unlikely to be set.
  */
-static inline int sched_find_first_bit(unsigned long *b)
+static inline int sched_find_first_bit(const unsigned long *b)
 {
 	if (unlikely(b[0]))
 		return __ffs(b[0]);
@@ -295,7 +295,7 @@ static inline int sched_find_first_bit(unsigned long *b)
  * @offset: The bitnumber to start searching at
  * @size: The maximum size to search
  */
-static __inline__ unsigned long find_next_bit(unsigned long *addr,
+static __inline__ unsigned long find_next_bit(const unsigned long *addr,
 	unsigned long size, unsigned long offset)
 {
 	unsigned int *p = ((unsigned int *) addr) + (offset >> 5);
@@ -352,7 +352,7 @@ found_middle:
 #define find_first_zero_bit(addr, size) \
 	find_next_zero_bit((addr), (size), 0)
 
-static __inline__ unsigned long find_next_zero_bit(unsigned long * addr,
+static __inline__ unsigned long find_next_zero_bit(const unsigned long *addr,
 	unsigned long size, unsigned long offset)
 {
 	unsigned int * p = ((unsigned int *) addr) + (offset >> 5);
@@ -411,7 +411,7 @@ static __inline__ int ext2_test_bit(int nr, __const__ void * addr)
 #define ext2_find_first_zero_bit(addr, size) \
         ext2_find_next_zero_bit((addr), (size), 0)
 
-static __inline__ unsigned long ext2_find_next_zero_bit(void *addr,
+static __inline__ unsigned long ext2_find_next_zero_bit(const void *addr,
 	unsigned long size, unsigned long offset)
 {
 	unsigned int *p = ((unsigned int *) addr) + (offset >> 5);

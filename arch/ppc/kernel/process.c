@@ -415,6 +415,7 @@ void start_thread(struct pt_regs *regs, unsigned long nip, unsigned long sp)
 	memset(current->thread.vr, 0, sizeof(current->thread.vr));
 	memset(&current->thread.vscr, 0, sizeof(current->thread.vscr));
 	current->thread.vrsave = 0;
+	current->thread.used_vr = 0;
 #endif /* CONFIG_ALTIVEC */
 }
 
