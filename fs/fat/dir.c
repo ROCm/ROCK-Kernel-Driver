@@ -93,14 +93,6 @@ static void dump_de(struct msdos_dir_entry *de)
 }
 #endif
 
-static inline unsigned char
-fat_tolower(struct nls_table *t, unsigned char c)
-{
-	unsigned char nc = t->charset2lower[c];
-
-	return nc ? nc : c;
-}
-
 static inline int
 fat_short2uni(struct nls_table *t, unsigned char *c, int clen, wchar_t *uni)
 {
@@ -138,17 +130,6 @@ fat_short2lower_uni(struct nls_table *t, unsigned char *c, int clen, wchar_t *un
 		*uni = wc;
 	
 	return charlen;
-}
-
-static int
-fat_strnicmp(struct nls_table *t, const unsigned char *s1,
-					const unsigned char *s2, int len)
-{
-	while(len--)
-		if (fat_tolower(t, *s1++) != fat_tolower(t, *s2++))
-			return 1;
-
-	return 0;
 }
 
 static inline int
@@ -311,7 +292,7 @@ parse_long:
 			:uni16_to_x8(bufname, bufuname, uni_xlate, nls_io);
 		if (xlate_len == name_len)
 			if ((!anycase && !memcmp(name, bufname, xlate_len)) ||
-			    (anycase && !fat_strnicmp(nls_io, name, bufname,
+			    (anycase && !nls_strnicmp(nls_io, name, bufname,
 								xlate_len)))
 				goto Found;
 
@@ -322,7 +303,7 @@ parse_long:
 			if (xlate_len != name_len)
 				continue;
 			if ((!anycase && !memcmp(name, bufname, xlate_len)) ||
-			    (anycase && !fat_strnicmp(nls_io, name, bufname,
+			    (anycase && !nls_strnicmp(nls_io, name, bufname,
 								xlate_len)))
 				goto Found;
 		}
