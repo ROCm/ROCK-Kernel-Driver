@@ -3252,6 +3252,10 @@ static const struct usb_device_id	products [] = {
 	// Sitecom LN-029 "USB 2.0 10/100 Ethernet adapter"
 	USB_DEVICE (0x6189, 0x182d),
 	.driver_info =  (unsigned long) &ax8817x_info,
+}, {
+	// Surecom EP-1427X-2
+	USB_DEVICE (0x1189, 0x0893),
+	.driver_info = (unsigned long) &ax8817x_info,
 },
 #endif
 
