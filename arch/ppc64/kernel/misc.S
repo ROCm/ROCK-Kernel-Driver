@@ -740,7 +740,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_getresuid	        /* 165 */
 	.llong .sys_ni_syscall		/* old query_module syscall */
 	.llong .sys_poll
-	.llong .sys32_nfsservctl
+	.llong .compat_sys_nfsservctl
 	.llong .sys_setresgid
 	.llong .sys_getresgid	        /* 170 */
 	.llong .sys32_prctl

@@ -786,12 +786,12 @@ sys32_poll_wrapper:
 	lgfr	%r4,%r4			# long 
 	jg	sys_poll		# branch to system call
 
-	.globl  sys32_nfsservctl_wrapper 
-sys32_nfsservctl_wrapper:
+	.globl  compat_sys_nfsservctl_wrapper
+compat_sys_nfsservctl_wrapper:
 	lgfr	%r2,%r2			# int 
-	llgtr	%r3,%r3			# struct nfsctl_arg_emu31 * 
-	llgtr	%r4,%r4			# union nfsctl_res_emu31 * 
-	jg	sys32_nfsservctl	# branch to system call
+	llgtr	%r3,%r3			# struct compat_nfsctl_arg*
+	llgtr	%r4,%r4			# union compat_nfsctl_res*
+	jg	compat_sys_nfsservctl	# branch to system call
 
 	.globl  sys32_setresgid16_wrapper 
 sys32_setresgid16_wrapper:
