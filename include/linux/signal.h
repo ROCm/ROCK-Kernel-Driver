@@ -7,6 +7,9 @@
 #include <asm/siginfo.h>
 
 #ifdef __KERNEL__
+
+#define MAX_SIGPENDING	1024
+
 /*
  * Real Time signals may be queued.
  */
