@@ -59,11 +59,14 @@ static void add_node(struct device_node *np, struct proc_dir_entry *de)
 		 * Unfortunately proc_register puts each new entry
 		 * at the beginning of the list.  So we rearrange them.
 		 */
-		ent = create_proc_read_entry(pp->name, S_IRUGO, de,
-					     property_read_proc, pp);
+		ent = create_proc_read_entry(pp->name, strncmp(pp->name, "security-", 9) ?
+					     S_IRUGO : S_IRUSR, de, property_read_proc, pp);
 		if (ent == 0)
 			break;
-		ent->size = pp->length;
+		if (!strncmp(pp->name, "security-", 9))
+		     ent->size = 0; /* don't leak number of password chars */
+		else
+		     ent->size = pp->length;
 		*lastp = ent;
 		lastp = &ent->next;
 	}
