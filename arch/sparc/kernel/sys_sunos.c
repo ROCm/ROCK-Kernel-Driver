@@ -343,7 +343,7 @@ static int sunos_filldir(void * __buf, const char * name, int namlen,
 	put_user(reclen, &dirent->d_reclen);
 	copy_to_user(dirent->d_name, name, namlen);
 	put_user(0, dirent->d_name + namlen);
-	((char *) dirent) += reclen;
+	dirent = (void *)dirent + reclen;
 	buf->curr = dirent;
 	buf->count -= reclen;
 	return 0;
@@ -422,7 +422,7 @@ static int sunos_filldirentry(void * __buf, const char * name, int namlen,
 	put_user(reclen, &dirent->d_reclen);
 	copy_to_user(dirent->d_name, name, namlen);
 	put_user(0, dirent->d_name + namlen);
-	((char *) dirent) += reclen;
+	dirent = (void *)dirent + reclen;
 	buf->curr = dirent;
 	buf->count -= reclen;
 	return 0;
