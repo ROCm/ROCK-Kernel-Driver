@@ -57,7 +57,7 @@ sys_rt_sigsuspend(sigset_t __user *unewset, size_t sigsetsize, struct pt_regs re
 	current->blocked = newset;
 	recalc_sigpending();
 	spin_unlock_irq(&current->sighand->siglock);
-#if DEBUG_SIG
+#ifdef DEBUG_SIG
 	printk("rt_sigsuspend savset(%lx) newset(%lx) regs(%p) rip(%lx)\n",
 		saveset, newset, &regs, regs.rip);
 #endif 
@@ -158,7 +158,7 @@ asmlinkage long sys_rt_sigreturn(struct pt_regs regs)
 		goto badframe;
 	} 
 
-#if DEBUG_SIG
+#ifdef DEBUG_SIG
 	printk("%d sigreturn rip:%lx rsp:%lx frame:%p rax:%lx\n",current->pid,regs.rip,regs.rsp,frame,eax);
 #endif
 
@@ -295,7 +295,7 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 		goto give_sigsegv;
 	} 
 
-#if DEBUG_SIG
+#ifdef DEBUG_SIG
 	printk("%d old rip %lx old rsp %lx old rax %lx\n", current->pid,regs->rip,regs->rsp,regs->rax);
 #endif
 
@@ -320,7 +320,7 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	set_fs(USER_DS);
 	regs->eflags &= ~TF_MASK;
 
-#if DEBUG_SIG
+#ifdef DEBUG_SIG
 	printk("SIG deliver (%s:%d): sp=%p pc=%p ra=%p\n",
 		current->comm, current->pid, frame, regs->rip, frame->pretcode);
 #endif
@@ -343,7 +343,7 @@ handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 {
 	struct k_sigaction *ka = &current->sighand->action[sig-1];
 
-#if DEBUG_SIG
+#ifdef DEBUG_SIG
 	printk("handle_signal pid:%d sig:%lu rip:%lx rsp:%lx regs=%p\n", current->pid, sig, 
 		regs->rip, regs->rsp, regs);
 #endif
@@ -455,7 +455,7 @@ int do_signal(struct pt_regs *regs, sigset_t *oldset)
 
 void do_notify_resume(struct pt_regs *regs, sigset_t *oldset, __u32 thread_info_flags)
 {
-#if DEBUG_SIG
+#ifdef DEBUG_SIG
 	printk("do_notify_resume flags:%x rip:%lx rsp:%lx caller:%lx pending:%lx\n",
 	       thread_info_flags, regs->rip, regs->rsp, __builtin_return_address(0),signal_pending(current)); 
 #endif
