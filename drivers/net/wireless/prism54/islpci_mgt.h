@@ -34,7 +34,7 @@
 #define TRACE(devname)   K_DEBUG(SHOW_TRACING, VERBOSE, "%s:  -> " __FUNCTION__ "()\n", devname)
 
 extern int pc_debug;
-const int init_wds = 0;	/* help compiler optimize away dead code */
+#define init_wds 0	/* help compiler optimize away dead code */
 
 
 /* General driver definitions */
