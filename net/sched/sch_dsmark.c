@@ -297,6 +297,7 @@ static int dsmark_requeue(struct sk_buff *skb,struct Qdisc *sch)
 	D2PRINTK("dsmark_requeue(skb %p,sch %p,[qdisc %p])\n",skb,sch,p);
         if ((ret = p->q->ops->requeue(skb, p->q)) == 0) {
 		sch->q.qlen++;
+		sch->qstats.requeues++;
 		return 0;
 	}
 	sch->qstats.drops++;

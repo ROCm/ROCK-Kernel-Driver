@@ -69,6 +69,7 @@
 #include <linux/i2c.h>
 #include <linux/i2c-dev.h>
 #include <linux/wireless.h>
+#include <linux/atalk.h>
 
 #include <net/sock.h>          /* siocdevprivate_ioctl */
 #include <net/bluetooth/bluetooth.h>
@@ -3185,6 +3186,13 @@ HANDLE_IOCTL(SIOCGIFMAP, dev_ifsioc)
 HANDLE_IOCTL(SIOCSIFMAP, dev_ifsioc)
 HANDLE_IOCTL(SIOCGIFADDR, dev_ifsioc)
 HANDLE_IOCTL(SIOCSIFADDR, dev_ifsioc)
+
+/* ioctls used by appletalk ddp.c */
+HANDLE_IOCTL(SIOCATALKDIFADDR, dev_ifsioc)
+HANDLE_IOCTL(SIOCDIFADDR, dev_ifsioc)
+HANDLE_IOCTL(SIOCSARP, dev_ifsioc)
+HANDLE_IOCTL(SIOCDARP, dev_ifsioc)
+
 HANDLE_IOCTL(SIOCGIFBRDADDR, dev_ifsioc)
 HANDLE_IOCTL(SIOCSIFBRDADDR, dev_ifsioc)
 HANDLE_IOCTL(SIOCGIFDSTADDR, dev_ifsioc)

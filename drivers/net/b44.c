@@ -80,6 +80,7 @@ static char version[] __devinitdata =
 MODULE_AUTHOR("Florian Schirmer, Pekka Pietikainen, David S. Miller");
 MODULE_DESCRIPTION("Broadcom 4400 10/100 PCI ethernet driver");
 MODULE_LICENSE("GPL");
+MODULE_VERSION(DRV_MODULE_VERSION);
 
 static int b44_debug = -1;	/* -1 == use B44_DEF_MSG_ENABLE as value */
 module_param(b44_debug, int, 0);

@@ -170,17 +170,6 @@ struct via_ircc_cb {
 			// Sets bit to 1
 #define ResetBit(val,bit) val= (unsigned char ) (val & ~(0x1 << bit))
 			// Sets bit to 0
-#define PCI_CONFIG_ADDRESS 0xcf8
-#define PCI_CONFIG_DATA    0xcfc
-
-#define VenderID    0x1106
-#define DeviceID1   0x8231
-#define DeviceID2   0x3109
-#define DeviceID3   0x3074
-//F01_S
-#define DeviceID4   0x3147
-#define DeviceID5   0x3177
-//F01_E
 
 #define OFF   0
 #define ON   1
@@ -794,7 +783,7 @@ static void SetBaudRate(__u16 iobase, __u32 rate)
 		value = 0;	// will automatically be fixed in 4M
 	}
 	temp = (ReadReg(iobase, I_CF_H_1) & 0x03);
-	temp = temp | (value << 2);
+	temp |= value << 2;
 	WriteReg(iobase, I_CF_H_1, temp);
 }
 
@@ -805,9 +794,9 @@ static void SetPulseWidth(__u16 iobase, __u8 width)
 	temp = (ReadReg(iobase, I_CF_L_1) & 0x1f);
 	temp1 = (ReadReg(iobase, I_CF_H_1) & 0xfc);
 	temp2 = (width & 0x07) << 5;
-	temp = temp | temp2;
+	temp |= temp2;
 	temp2 = (width & 0x18) >> 3;
-	temp1 = temp1 | temp2;
+	temp1 |= temp2;
 	WriteReg(iobase, I_CF_L_1, temp);
 	WriteReg(iobase, I_CF_H_1, temp1);
 }
@@ -817,7 +806,7 @@ static void SetSendPreambleCount(__u16 iobase, __u8 count)
 	__u8 temp;
 
 	temp = ReadReg(iobase, I_CF_L_1) & 0xe0;
-	temp = temp | count;
+	temp |= count;
 	WriteReg(iobase, I_CF_L_1, temp);
 
 }

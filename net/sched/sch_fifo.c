@@ -67,6 +67,7 @@ bfifo_requeue(struct sk_buff *skb, struct Qdisc* sch)
 {
 	__skb_queue_head(&sch->q, skb);
 	sch->qstats.backlog += skb->len;
+	sch->qstats.requeues++;
 	return 0;
 }
 
@@ -126,6 +127,7 @@ static int
 pfifo_requeue(struct sk_buff *skb, struct Qdisc* sch)
 {
 	__skb_queue_head(&sch->q, skb);
+	sch->qstats.requeues++;
 	return 0;
 }
 

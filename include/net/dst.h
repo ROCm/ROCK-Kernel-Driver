@@ -103,19 +103,19 @@ struct dst_ops
 #ifdef __KERNEL__
 
 static inline u32
-dst_metric(struct dst_entry *dst, int metric)
+dst_metric(const struct dst_entry *dst, int metric)
 {
 	return dst->metrics[metric-1];
 }
 
 static inline u32
-dst_path_metric(struct dst_entry *dst, int metric)
+dst_path_metric(const struct dst_entry *dst, int metric)
 {
 	return dst->path->metrics[metric-1];
 }
 
 static inline u32
-dst_pmtu(struct dst_entry *dst)
+dst_pmtu(const struct dst_entry *dst)
 {
 	u32 mtu = dst_path_metric(dst, RTAX_MTU);
 	/* Yes, _exactly_. This is paranoia. */
@@ -142,16 +142,11 @@ struct dst_entry * dst_clone(struct dst_entry * dst)
 	return dst;
 }
 
-extern const char dst_underflow_bug_msg[];
-
 static inline
 void dst_release(struct dst_entry * dst)
 {
 	if (dst) {
-		if (atomic_read(&dst->__refcnt) < 1)
-			printk(dst_underflow_bug_msg, 
-			       atomic_read(&dst->__refcnt), 
-			       dst, current_text_addr());
+		WARN_ON(atomic_read(&dst->__refcnt) < 1);
 		atomic_dec(&dst->__refcnt);
 	}
 }

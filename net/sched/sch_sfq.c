@@ -310,8 +310,10 @@ sfq_requeue(struct sk_buff *skb, struct Qdisc* sch)
 			q->tail = x;
 		}
 	}
-	if (++sch->q.qlen < q->limit - 1)
+	if (++sch->q.qlen < q->limit - 1) {
+		sch->qstats.requeues++;
 		return 0;
+	}
 
 	sch->qstats.drops++;
 	sfq_drop(sch);

@@ -46,6 +46,7 @@ obj-$(CONFIG_IP_NF_RAW) += iptable_raw.o
 # matches
 obj-$(CONFIG_IP_NF_MATCH_HELPER) += ipt_helper.o
 obj-$(CONFIG_IP_NF_MATCH_LIMIT) += ipt_limit.o
+obj-$(CONFIG_IP_NF_MATCH_HASHLIMIT) += ipt_hashlimit.o
 obj-$(CONFIG_IP_NF_MATCH_SCTP) += ipt_sctp.o
 obj-$(CONFIG_IP_NF_MATCH_MARK) += ipt_mark.o
 obj-$(CONFIG_IP_NF_MATCH_MAC) += ipt_mac.o
@@ -61,6 +62,7 @@ obj-$(CONFIG_IP_NF_MATCH_AH_ESP) += ipt_ah.o ipt_esp.o
 obj-$(CONFIG_IP_NF_MATCH_LENGTH) += ipt_length.o
 obj-$(CONFIG_IP_NF_MATCH_TTL) += ipt_ttl.o
 obj-$(CONFIG_IP_NF_MATCH_STATE) += ipt_state.o
+obj-$(CONFIG_IP_NF_MATCH_CONNMARK) += ipt_connmark.o
 obj-$(CONFIG_IP_NF_MATCH_CONNTRACK) += ipt_conntrack.o
 obj-$(CONFIG_IP_NF_MATCH_TCPMSS) += ipt_tcpmss.o
 obj-$(CONFIG_IP_NF_MATCH_REALM) += ipt_realm.o
@@ -81,9 +83,11 @@ obj-$(CONFIG_IP_NF_TARGET_SAME) += ipt_SAME.o
 obj-$(CONFIG_IP_NF_TARGET_CLASSIFY) += ipt_CLASSIFY.o
 obj-$(CONFIG_IP_NF_NAT_SNMP_BASIC) += ip_nat_snmp_basic.o
 obj-$(CONFIG_IP_NF_TARGET_LOG) += ipt_LOG.o
+obj-$(CONFIG_IP_NF_TARGET_CONNMARK) += ipt_CONNMARK.o
 obj-$(CONFIG_IP_NF_TARGET_ULOG) += ipt_ULOG.o
 obj-$(CONFIG_IP_NF_TARGET_TCPMSS) += ipt_TCPMSS.o
 obj-$(CONFIG_IP_NF_TARGET_NOTRACK) += ipt_NOTRACK.o
+obj-$(CONFIG_IP_NF_TARGET_CLUSTERIP) += ipt_CLUSTERIP.o
 
 # generic ARP tables
 obj-$(CONFIG_IP_NF_ARPTABLES) += arp_tables.o

@@ -113,6 +113,7 @@ teql_requeue(struct sk_buff *skb, struct Qdisc* sch)
 	struct teql_sched_data *q = qdisc_priv(sch);
 
 	__skb_queue_head(&q->q, skb);
+	sch->qstats.requeues++;
 	return 0;
 }
 

@@ -63,7 +63,7 @@ static char *check[] = {
 	"des", "md5", "des3_ede", "rot13", "sha1", "sha256", "blowfish",
 	"twofish", "serpent", "sha384", "sha512", "md4", "aes", "cast6", 
 	"arc4", "michael_mic", "deflate", "crc32c", "tea", "xtea", 
-	"wp512", "wp384", "wp256", "tnepres", NULL
+	"khazad", "wp512", "wp384", "wp256", "tnepres", NULL
 };
 
 static void

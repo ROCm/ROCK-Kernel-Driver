@@ -601,7 +601,7 @@ static inline int xfrm_policy_check(struct sock *sk, int dir, struct sk_buff *sk
 	if (sk && sk->sk_policy[XFRM_POLICY_IN])
 		return __xfrm_policy_check(sk, dir, skb, family);
 		
-	return	!xfrm_policy_list[dir] ||
+	return	(!xfrm_policy_list[dir] && !skb->sp) ||
 		(skb->dst->flags & DST_NOPOLICY) ||
 		__xfrm_policy_check(sk, dir, skb, family);
 }
