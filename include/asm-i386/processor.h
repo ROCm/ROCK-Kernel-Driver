@@ -404,6 +404,8 @@ struct thread_struct {
 #define INIT_TSS  {							\
 	.esp0		= sizeof(init_stack) + (long)&init_stack,	\
 	.ss0		= __KERNEL_DS,					\
+	.esp1		= sizeof(init_tss[0]) + (long)&init_tss[0],	\
+	.ss1		= __KERNEL_CS,					\
 	.ldt		= GDT_ENTRY_LDT,				\
 	.bitmap		= INVALID_IO_BITMAP_OFFSET,			\
 	.io_bitmap	= { [ 0 ... IO_BITMAP_SIZE ] = ~0 },		\
@@ -412,12 +414,10 @@ struct thread_struct {
 static inline void load_esp0(struct tss_struct *tss, unsigned long esp0)
 {
 	tss->esp0 = esp0;
-	if (cpu_has_sep) {
-		if (tss->ss1 != __KERNEL_CS) {
-			tss->ss1 = __KERNEL_CS;
-			wrmsr(MSR_IA32_SYSENTER_CS, __KERNEL_CS, 0);
-		}
-		wrmsr(MSR_IA32_SYSENTER_ESP, esp0, 0);
+	/* This can only happen when SEP is enabled, no need to test "SEP"arately */
+	if (tss->ss1 != __KERNEL_CS) {
+		tss->ss1 = __KERNEL_CS;
+		wrmsr(MSR_IA32_SYSENTER_CS, __KERNEL_CS, 0);
 	}
 }
 
