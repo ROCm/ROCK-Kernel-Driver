@@ -278,17 +278,22 @@ xfs_mount_validate_sb(
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 
-#if !XFS_BIG_BLKNOS
+	ASSERT(PAGE_SHIFT >= sbp->sb_blocklog);
+	ASSERT(sbp->sb_blocklog >= BBSHIFT);
+
+#if XFS_BIG_BLKNOS     /* Limited by ULONG_MAX of page cache index */
 	if (unlikely(
-	    (sbp->sb_dblocks << (__uint64_t)(sbp->sb_blocklog - BBSHIFT))
-		> UINT_MAX ||
-	    (sbp->sb_rblocks << (__uint64_t)(sbp->sb_blocklog - BBSHIFT))
-		> UINT_MAX)) {
+	    (sbp->sb_dblocks >> (PAGE_SHIFT - sbp->sb_blocklog)) > ULONG_MAX ||
+	    (sbp->sb_rblocks >> (PAGE_SHIFT - sbp->sb_blocklog)) > ULONG_MAX)) {
+#else                  /* Limited by UINT_MAX of sectors */
+	if (unlikely(
+	    (sbp->sb_dblocks << (sbp->sb_blocklog - BBSHIFT)) > UINT_MAX ||
+	    (sbp->sb_rblocks << (sbp->sb_blocklog - BBSHIFT)) > UINT_MAX)) {
+#endif
 		cmn_err(CE_WARN,
 	"XFS: File system is too large to be mounted on this system.");
 		return XFS_ERROR(E2BIG);
 	}
-#endif
 
 	if (unlikely(sbp->sb_inprogress)) {
 		cmn_err(CE_WARN, "XFS: file system busy");
@@ -633,9 +638,8 @@ xfs_mountfs(
 	xfs_buf_t	*bp;
 	xfs_sb_t	*sbp = &(mp->m_sb);
 	xfs_inode_t	*rip;
-	vnode_t		*rvp = 0;
+	vnode_t		*rvp = NULL;
 	int		readio_log, writeio_log;
-	vmap_t		vmap;
 	xfs_daddr_t	d;
 	__uint64_t	ret64;
 	__int64_t	update_flags;
@@ -979,7 +983,6 @@ xfs_mountfs(
 
 	ASSERT(rip != NULL);
 	rvp = XFS_ITOV(rip);
-	VMAP(rvp, vmap);
 
 	if (unlikely((rip->i_d.di_mode & S_IFMT) != S_IFDIR)) {
 		cmn_err(CE_WARN, "XFS: corrupted root inode");
@@ -1043,7 +1046,6 @@ xfs_mountfs(
 	 * Free up the root inode.
 	 */
 	VN_RELE(rvp);
-	vn_purge(rvp, &vmap);
  error3:
 	xfs_log_unmount_dealloc(mp);
  error2:

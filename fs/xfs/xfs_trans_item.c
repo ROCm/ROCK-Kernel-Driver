@@ -290,7 +290,7 @@ xfs_trans_next_item(xfs_trans_t *tp, xfs_log_item_desc_t *lidp)
 	}
 	ASSERT(0);
 	/* NOTREACHED */
-	return 0; /* keep gcc quite */
+	return NULL; /* keep gcc quite */
 }
 
 /*

@@ -823,10 +823,15 @@ xfs_setattr(
 				mp->m_sb.sb_blocklog;
 		}
 		if (mask & XFS_AT_XFLAGS) {
-			ip->i_d.di_flags = 0;
-			if (vap->va_xflags & XFS_XFLAG_REALTIME) {
+			/* can't set PREALLOC this way, just preserve it */
+			ip->i_d.di_flags =
+				(ip->i_d.di_flags & XFS_DIFLAG_PREALLOC);
+			if (vap->va_xflags & XFS_XFLAG_REALTIME &&
+			    (ip->i_d.di_mode & S_IFMT) == S_IFREG) {
 				ip->i_d.di_flags |= XFS_DIFLAG_REALTIME;
 				ip->i_iocore.io_flags |= XFS_IOCORE_RT;
+			} else {
+				ip->i_iocore.io_flags &= ~XFS_IOCORE_RT;
 			}
 			if (vap->va_xflags & XFS_XFLAG_IMMUTABLE)
 				ip->i_d.di_flags |= XFS_DIFLAG_IMMUTABLE;
@@ -838,7 +843,9 @@ xfs_setattr(
 				ip->i_d.di_flags |= XFS_DIFLAG_NOATIME;
 			if (vap->va_xflags & XFS_XFLAG_NODUMP)
 				ip->i_d.di_flags |= XFS_DIFLAG_NODUMP;
-			/* can't set PREALLOC this way, just ignore it */
+			if ((vap->va_xflags & XFS_XFLAG_RTINHERIT) &&
+			    (ip->i_d.di_mode & S_IFMT) == S_IFDIR)
+				ip->i_d.di_flags |= XFS_DIFLAG_RTINHERIT;
 		}
 		xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 		timeflags |= XFS_ICHGTIME_CHG;
@@ -1821,8 +1828,6 @@ xfs_lookup(
 	return error;
 }
 
-
-#define	XFS_CREATE_NEW_MAXTRIES	10000
 
 /*
  * xfs_create (create a new file).
@@ -4337,8 +4342,10 @@ xfs_free_file_space(
 		nimap = 1;
 		error = xfs_bmapi(NULL, ip, startoffset_fsb, 1, 0, NULL, 0,
 			&imap, &nimap, NULL);
-		if (error)
+		if (error) {
+			xfs_iunlock(ip, XFS_IOLOCK_EXCL);
 			return error;
+		}
 		ASSERT(nimap == 0 || nimap == 1);
 		if (nimap && imap.br_startblock != HOLESTARTBLOCK) {
 			xfs_daddr_t	block;
@@ -4352,8 +4359,10 @@ xfs_free_file_space(
 		nimap = 1;
 		error = xfs_bmapi(NULL, ip, endoffset_fsb - 1, 1, 0, NULL, 0,
 			&imap, &nimap, NULL);
-		if (error)
+		if (error) {
+			xfs_iunlock(ip, XFS_IOLOCK_EXCL);
 			return error;
+		}
 		ASSERT(nimap == 0 || nimap == 1);
 		if (nimap && imap.br_startblock != HOLESTARTBLOCK) {
 			ASSERT(imap.br_startblock != DELAYSTARTBLOCK);

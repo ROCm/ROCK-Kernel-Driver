@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2004 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -30,37 +30,12 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#include <xfs.h>
+#include <linux/config.h>
 
-/* Read from kernel buffer at src to user/kernel buffer defined
- * by the uio structure. Advance the pointer in the uio struct
- * as we go.
- */
-int
-uio_read(caddr_t src, size_t len, struct uio *uio)
-{
-	size_t	count;
-
-	if (!len || !uio->uio_resid)
-		return 0;
-
-	count = uio->uio_iov->iov_len;
-	if (!count)
-		return 0;
-	if (count > len)
-		count = len;
-
-	if (uio->uio_segflg == UIO_USERSPACE) {
-		if (copy_to_user(uio->uio_iov->iov_base, src, count))
-			return EFAULT;
-	} else {
-		ASSERT(uio->uio_segflg == UIO_SYSSPACE);
-		memcpy(uio->uio_iov->iov_base, src, count);
-	}
-
-	uio->uio_iov->iov_base = (void*)((char*)uio->uio_iov->iov_base + count);
-	uio->uio_iov->iov_len -= count;
-	uio->uio_offset += count;
-	uio->uio_resid -= count;
-	return 0;
-}
+#ifdef CONFIG_COMPAT
+extern int xfs_ioctl32_init(void);
+extern void xfs_ioctl32_exit(void);
+#else
+static inline int xfs_ioctl32_init(void) { return 0; }
+static inline void xfs_ioctl32_exit(void) { }
+#endif

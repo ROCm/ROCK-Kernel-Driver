@@ -229,11 +229,8 @@ xfs_qm_hold_quotafs_ref(
 	 */
 	XFS_QM_LOCK(xfs_Gqm);
 
-	if (xfs_Gqm == NULL) {
-		if ((xfs_Gqm = xfs_Gqm_init()) == NULL) {
-			return (XFS_ERROR(EINVAL));
-		}
-	}
+	if (xfs_Gqm == NULL)
+		xfs_Gqm = xfs_Gqm_init();
 	/*
 	 * We can keep a list of all filesystems with quotas mounted for
 	 * debugging and statistical purposes, but ...
@@ -1735,7 +1732,7 @@ STATIC int
 xfs_qm_dqusage_adjust(
 	xfs_mount_t	*mp,		/* mount point for filesystem */
 	xfs_ino_t	ino,		/* inode number to get data for */
-	void		*buffer,	/* not used */
+	void		__user *buffer,	/* not used */
 	int		ubsize,		/* not used */
 	void		*private_data,	/* not used */
 	xfs_daddr_t	bno,		/* starting block of inode cluster */

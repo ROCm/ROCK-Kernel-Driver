@@ -137,8 +137,8 @@ xfs_qm_read_stats(
 void
 xfs_qm_init_procfs(void)
 {
-	create_proc_read_entry("fs/xfs/xqmstat", 0, 0, xfs_qm_read_stats, NULL);
-	create_proc_read_entry("fs/xfs/xqm", 0, 0, xfs_qm_read_xfsquota, NULL);
+	create_proc_read_entry("fs/xfs/xqmstat", 0, NULL, xfs_qm_read_stats, NULL);
+	create_proc_read_entry("fs/xfs/xqm", 0, NULL, xfs_qm_read_xfsquota, NULL);
 }
 
 void

@@ -263,7 +263,7 @@ xfs_alloc_delrec(
 			/*
 			 * Update the cursor so there's one fewer level.
 			 */
-			xfs_btree_setbuf(cur, level, 0);
+			xfs_btree_setbuf(cur, level, NULL);
 			cur->bc_nlevels--;
 		} else if (level > 0 &&
 			   (error = xfs_alloc_decrement(cur, level, &i)))

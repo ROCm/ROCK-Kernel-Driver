@@ -154,6 +154,8 @@ struct backing_dev_info *blk_get_backing_dev_info(struct block_device *bdev)
 	return ret;
 }
 
+EXPORT_SYMBOL(blk_get_backing_dev_info);
+
 void blk_queue_activity_fn(request_queue_t *q, activity_fn *fn, void *data)
 {
 	q->activity_fn = fn;
