@@ -1,7 +1,6 @@
 if ARCH_INTEGRATOR
 
 menu "Integrator Options"
-	depends on ARCH_INTEGRATOR
 
 config ARCH_INTEGRATOR_AP
 	bool "Support Integrator/AP and Integrator/PP2 platforms"

@@ -2,7 +2,6 @@ if ARCH_IXP4XX
 
 config ARCH_SUPPORTS_BIG_ENDIAN
 	bool
-	depends on ARCH_IXP4XX
 	default y
 
 menu "Intel IXP4xx Implementation Options"
@@ -11,7 +10,6 @@ comment "IXP4xx Platforms"
 
 config ARCH_AVILA
 	bool "Avila"
-	depends on ARCH_IXP4XX
 	help
 	  Say 'Y' here if you want your kernel to support the Gateworks
 	  Avila Network Platform. For more information on this platform,
@@ -19,7 +17,6 @@ config ARCH_AVILA
 
 config ARCH_ADI_COYOTE
 	bool "Coyote"
-	depends on ARCH_IXP4XX
 	help
 	  Say 'Y' here if you want your kernel to support the ADI 
 	  Engineering Coyote Gateway Reference Platform. For more
@@ -27,7 +24,6 @@ config ARCH_ADI_COYOTE
 
 config ARCH_IXDP425
 	bool "IXDP425"
-	depends on ARCH_IXP4XX
 	help
 	  Say 'Y' here if you want your kernel to support Intel's 
 	  IXDP425 Development Platform (Also known as Richfield).  
@@ -45,7 +41,6 @@ config ARCH_IXCDP1100
 
 config ARCH_PRPMC1100
 	bool "PrPMC1100"
-	depends on ARCH_IXP4XX
 	help
 	  Say 'Y' here if you want your kernel to support the Motorola
 	  PrPCM1100 Processor Mezanine Module. For more information on
@@ -63,7 +58,6 @@ comment "IXP4xx Options"
 
 config IXP4XX_INDIRECT_PCI
 	bool "Use indirect PCI memory access"
-	depends on ARCH_IXP4XX
 	help
           IXP4xx provides two methods of accessing PCI memory space:
 

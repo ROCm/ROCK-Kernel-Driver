@@ -4,7 +4,6 @@ menu "LH7A40X Implementations"
 
 config MACH_KEV7A400
 	bool "KEV7A400"
-	depends on ARCH_LH7A40X
 	select ARCH_LH7A400
 	help
 	  Say Y here if you are using the Sharp KEV7A400 development
@@ -13,7 +12,6 @@ config MACH_KEV7A400
 
 config MACH_LPD7A400
 	bool "LPD7A400 Card Engine"
-	depends on ARCH_LH7A40X
 	select ARCH_LH7A400
 #	select IDE_POLL
 	help
@@ -23,7 +21,6 @@ config MACH_LPD7A400
 
 config MACH_LPD7A404
 	bool "LPD7A404 Card Engine"
-	depends on ARCH_LH7A40X
 	select ARCH_LH7A404
 #	select IDE_POLL
 	help
