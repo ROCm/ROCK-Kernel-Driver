@@ -23,6 +23,8 @@
 #include <linux/ethtool.h>
 #include <linux/mii.h>
 #include <linux/if_vlan.h>
+#include <linux/ip.h>
+#include <linux/tcp.h>
 
 #include <asm/system.h>
 #include <asm/io.h>
@@ -49,7 +51,9 @@
 #endif
 
 #ifdef NETIF_F_TSO
-/* XXX some bug in tso firmware hangs tx cpu, disabled until fixed */
+/* XXX Works but still disabled, decreases TCP performance to 7MB/sec even
+ * XXX over gigabit.
+ */
 #define TG3_DO_TSO	0
 #else
 #define TG3_DO_TSO	0
@@ -2390,9 +2394,20 @@ static int tg3_start_xmit_4gbug(struct sk_buff *skb, struct net_device *dev)
 	if (skb->ip_summed == CHECKSUM_HW)
 		base_flags |= TXD_FLAG_TCPUDP_CSUM;
 #if TG3_DO_TSO != 0
-	if ((mss = skb_shinfo(skb)->tso_size) != 0)
+	if ((mss = skb_shinfo(skb)->tso_size) != 0) {
+		static int times = 0;
+
+		mss += ((skb->h.th->doff * 4) - 20);
 		base_flags |= (TXD_FLAG_CPU_PRE_DMA |
 			       TXD_FLAG_CPU_POST_DMA);
+
+		if (times++ < 5) {
+			printk("tg3_xmit: tso_size[%u] tso_segs[%u] len[%u]\n",
+			       (unsigned int) skb_shinfo(skb)->tso_size,
+			       (unsigned int) skb_shinfo(skb)->tso_segs,
+			       skb->len);
+		}
+	}
 #else
 	mss = 0;
 #endif
@@ -2443,7 +2458,7 @@ static int tg3_start_xmit_4gbug(struct sk_buff *skb, struct net_device *dev)
 			}
 
 			tg3_set_txd(tp, entry, mapping, len,
-				    base_flags, (i == last) | (mss << 1));
+				    base_flags, (i == last));
 
 			entry = NEXT_TX(entry);
 		}
@@ -2555,9 +2570,24 @@ static int tg3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (skb->ip_summed == CHECKSUM_HW)
 		base_flags |= TXD_FLAG_TCPUDP_CSUM;
 #if TG3_DO_TSO != 0
-	if ((mss = skb_shinfo(skb)->tso_size) != 0)
+	if ((mss = skb_shinfo(skb)->tso_size) != 0) {
+		static int times = 0;
+
+		/* TSO firmware wants TCP options included in
+		 * tx descriptor MSS value.
+		 */
+		mss += ((skb->h.th->doff * 4) - 20);
+
 		base_flags |= (TXD_FLAG_CPU_PRE_DMA |
 			       TXD_FLAG_CPU_POST_DMA);
+
+		if (times++ < 5) {
+			printk("tg3_xmit: tso_size[%u] tso_segs[%u] len[%u]\n",
+			       (unsigned int) skb_shinfo(skb)->tso_size,
+			       (unsigned int) skb_shinfo(skb)->tso_segs,
+			       skb->len);
+		}
+	}
 #else
 	mss = 0;
 #endif
@@ -2597,7 +2627,7 @@ static int tg3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 			pci_unmap_addr_set(&tp->tx_buffers[entry], mapping, mapping);
 
 			tg3_set_txd(tp, entry, mapping, len,
-				    base_flags, (i == last) | (mss << 1));
+				    base_flags, (i == last));
 
 			entry = NEXT_TX(entry);
 		}
@@ -4329,9 +4359,11 @@ static int tg3_reset_hw(struct tg3 *tp)
 	}
 
 #if TG3_DO_TSO != 0
-	err = tg3_load_tso_firmware(tp);
-	if (err)
-		return err;
+	if (tp->dev->features & NETIF_F_TSO) {
+		err = tg3_load_tso_firmware(tp);
+		if (err)
+			return err;
+	}
 #endif
 
 	tp->tx_mode = TX_MODE_ENABLE;
@@ -6752,9 +6784,6 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 	dev->vlan_rx_register = tg3_vlan_rx_register;
 	dev->vlan_rx_kill_vid = tg3_vlan_rx_kill_vid;
 #endif
-#if TG3_DO_TSO != 0
-	dev->features |= NETIF_F_TSO;
-#endif
 
 	tp = dev->priv;
 	tp->pdev = pdev;
@@ -6854,6 +6883,17 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 		tp->tg3_flags |= TG3_FLAG_RX_CHECKSUMS;
 	} else
 		tp->tg3_flags &= ~TG3_FLAG_RX_CHECKSUMS;
+
+#if TG3_DO_TSO != 0
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5700 ||
+	    (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5701 &&
+	     tp->pci_chip_rev_id <= CHIPREV_ID_5701_B2)) {
+		/* Not TSO capable. */
+		dev->features &= ~NETIF_F_TSO;
+	} else {
+		dev->features |= NETIF_F_TSO;
+	}
+#endif
 
 	err = register_netdev(dev);
 	if (err) {

@@ -184,19 +184,32 @@ int llc_sk_init(struct sock* sk)
 		goto out;
 	memset(llc, 0, sizeof(*llc));
 	rc = 0;
-	llc->sk			     = sk;
-	llc->state		     = LLC_CONN_STATE_ADM;
-	llc->inc_cntr		     = llc->dec_cntr = 2;
-	llc->dec_step		     = llc->connect_step = 1;
-	llc->ack_timer.expire	     = LLC_ACK_TIME;
-	llc->pf_cycle_timer.expire   = LLC_P_TIME;
-	llc->rej_sent_timer.expire   = LLC_REJ_TIME;
-	llc->busy_state_timer.expire = LLC_BUSY_TIME;
-	llc->n2			     = 2;   /* max retransmit */
-	llc->k			     = 2;   /* tx win size, will adjust dynam */
-	llc->rw			     = 128; /* rx win size (opt and equal to
-					     * tx_win of remote LLC)
-					     */
+
+	llc->sk	      = sk;
+	llc->state    = LLC_CONN_STATE_ADM;
+	llc->inc_cntr = llc->dec_cntr = 2;
+	llc->dec_step = llc->connect_step = 1;
+
+	llc->ack_timer.expire	      = LLC_ACK_TIME;
+	llc->ack_timer.timer.data     = (unsigned long)sk;
+	llc->ack_timer.timer.function = llc_conn_ack_tmr_cb;
+
+	llc->pf_cycle_timer.expire	   = LLC_P_TIME;
+	llc->pf_cycle_timer.timer.data     = (unsigned long)sk;
+	llc->pf_cycle_timer.timer.function = llc_conn_pf_cycle_tmr_cb;
+
+	llc->rej_sent_timer.expire	   = LLC_REJ_TIME;
+	llc->rej_sent_timer.timer.data     = (unsigned long)sk;
+	llc->rej_sent_timer.timer.function = llc_conn_rej_tmr_cb;
+
+	llc->busy_state_timer.expire	     = LLC_BUSY_TIME;
+	llc->busy_state_timer.timer.data     = (unsigned long)sk;
+	llc->busy_state_timer.timer.function = llc_conn_busy_tmr_cb;
+
+	llc->n2 = 2;   /* max retransmit */
+	llc->k  = 2;   /* tx win size, will adjust dynam */
+	llc->rw = 128; /* rx win size (opt and equal to
+		        * tx_win of remote LLC) */
 	skb_queue_head_init(&llc->pdu_unack_q);
 	sk->backlog_rcv = llc_backlog_rcv;
 	llc_sk(sk) = llc;
@@ -534,6 +547,21 @@ struct sk_buff *llc_alloc_frame(void)
 	return skb;
 }
 
+static char *llc_conn_state_names[] = {
+	[LLC_CONN_STATE_ADM] =        "adm", 
+	[LLC_CONN_STATE_SETUP] =      "setup", 
+	[LLC_CONN_STATE_NORMAL] =     "normal",
+	[LLC_CONN_STATE_BUSY] =       "busy", 
+	[LLC_CONN_STATE_REJ] =        "rej", 
+	[LLC_CONN_STATE_AWAIT] =      "await", 
+	[LLC_CONN_STATE_AWAIT_BUSY] = "await_busy",
+	[LLC_CONN_STATE_AWAIT_REJ] =  "await_rej",
+	[LLC_CONN_STATE_D_CONN]	=     "d_conn",
+	[LLC_CONN_STATE_RESET] =      "reset", 
+	[LLC_CONN_STATE_ERROR] =      "error", 
+	[LLC_CONN_STATE_TEMP] =       "temp", 
+};
+
 static int llc_proc_get_info(char *bf, char **start, off_t offset, int length)
 {
 	struct llc_opt *llc;
@@ -546,19 +574,34 @@ static int llc_proc_get_info(char *bf, char **start, off_t offset, int length)
 		struct llc_sap *sap = list_entry(sap_entry, struct llc_sap,
 						 node);
 
-		len += sprintf(bf + len, "lsap=%d\n", sap->laddr.lsap);
+		len += sprintf(bf + len, "lsap=%02X\n", sap->laddr.lsap);
 		spin_lock_bh(&sap->sk_list.lock);
 		if (list_empty(&sap->sk_list.list)) {
 			len += sprintf(bf + len, "no connections\n");
 			goto unlock;
 		}
-		len += sprintf(bf + len,
-				"connection list:\nstate  retr txwin rxwin\n");
+		len += sprintf(bf + len, "connection list:\n"
+					 "dsap state      retr txw rxw "
+					 "pf ff sf df rs cs "
+					 "tack tpfc trs tbs blog busr\n");
 		list_for_each(llc_entry, &sap->sk_list.list) {
 			llc = list_entry(llc_entry, struct llc_opt, node);
-			len += sprintf(bf + len, "  %-5d%-5d%-6d%-5d\n",
-					llc->state, llc->retry_count, llc->k,
-					llc->rw);
+			len += sprintf(bf + len, " %02X  %-10s %3d  %3d %3d "
+						 "%2d %2d %2d "
+						 "%2d %2d %2d "
+						 "%4d %4d %3d %3d %4d %4d\n",
+				       llc->daddr.lsap,
+				       llc_conn_state_names[llc->state],
+				       llc->retry_count, llc->k, llc->rw,
+				       llc->p_flag, llc->f_flag, llc->s_flag,
+				       llc->data_flag, llc->remote_busy_flag,
+				       llc->cause_flag,
+				       timer_pending(&llc->ack_timer.timer),
+				       timer_pending(&llc->pf_cycle_timer.timer),
+				       timer_pending(&llc->rej_sent_timer.timer),
+				       timer_pending(&llc->busy_state_timer.timer),
+				       !!llc->sk->backlog.tail,
+				       llc->sk->lock.users);
 		}
 unlock:	
 		spin_unlock_bh(&sap->sk_list.lock);
@@ -608,6 +651,9 @@ static int __init llc_init(void)
 	skb_queue_head_init(&llc_main_station.mac_pdu_q);
 	skb_queue_head_init(&llc_main_station.ev_q.list);
 	spin_lock_init(&llc_main_station.ev_q.lock);
+	llc_main_station.ack_timer.data     = (unsigned long)&llc_main_station;
+	llc_main_station.ack_timer.function = llc_station_ack_tmr_cb;
+
 	skb = alloc_skb(0, GFP_ATOMIC);
 	if (!skb)
 		goto err;

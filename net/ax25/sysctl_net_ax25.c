@@ -1,13 +1,15 @@
-/* -*- linux-c -*-
- * sysctl_net_ax25.c: sysctl interface to net AX.25 subsystem.
+/*
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- * Begun April 1, 1996, Mike Shaver.
- * Added /proc/sys/net/ax25 directory entry (empty =) ). [MS]
+ * Copyright (C) 1996 Mike Shaver (shaver@zeroknowledge.com)
  */
-
 #include <linux/config.h>
 #include <linux/mm.h>
 #include <linux/sysctl.h>
+#include <linux/spinlock.h>
 #include <net/ax25.h>
 
 static int min_ipdefmode[] = {0},	max_ipdefmode[] = {1};
@@ -105,6 +107,7 @@ void ax25_register_sysctl(void)
 	ax25_dev *ax25_dev;
 	int n, k;
 
+	spin_lock_bh(&ax25_dev_lock);
 	for (ax25_table_size = sizeof(ctl_table), ax25_dev = ax25_dev_list; ax25_dev != NULL; ax25_dev = ax25_dev->next)
 		ax25_table_size += sizeof(ctl_table);
 
@@ -119,6 +122,7 @@ void ax25_register_sysctl(void)
 			while (n--)
 				kfree(ax25_table[n].child);
 			kfree(ax25_table);
+			spin_unlock_bh(&ax25_dev_lock);
 			return;
 		}
 		memcpy(child, ax25_param_table, sizeof(ax25_param_table));
@@ -128,7 +132,7 @@ void ax25_register_sysctl(void)
 		ax25_table[n].mode         = 0555;
 
 #ifndef CONFIG_AX25_DAMA_SLAVE
-		/* 
+		/*
 		 * We do not wish to have a representation of this parameter
 		 * in /proc/sys/ when configured *not* to include the
 		 * AX.25 DAMA slave code, do we?
@@ -144,6 +148,7 @@ void ax25_register_sysctl(void)
 
 		n++;
 	}
+	spin_unlock_bh(&ax25_dev_lock);
 
 	ax25_dir_table[0].child = ax25_table;
 
