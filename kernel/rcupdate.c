@@ -66,7 +66,7 @@ static DEFINE_PER_CPU(struct tasklet_struct, rcu_tasklet) = {NULL};
  * The read-side of critical section that use call_rcu() for updation must 
  * be protected by rcu_read_lock()/rcu_read_unlock().
  */
-void call_rcu(struct rcu_head *head, void (*func)(void *arg), void *arg)
+void fastcall call_rcu(struct rcu_head *head, void (*func)(void *arg), void *arg)
 {
 	int cpu;
 	unsigned long flags;

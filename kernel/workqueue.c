@@ -78,7 +78,7 @@ static void __queue_work(struct cpu_workqueue_struct *cwq,
  * We queue the work to the CPU it was submitted, but there is no
  * guarantee that it will be processed by that CPU.
  */
-int queue_work(struct workqueue_struct *wq, struct work_struct *work)
+int fastcall queue_work(struct workqueue_struct *wq, struct work_struct *work)
 {
 	int ret = 0, cpu = get_cpu();
 
@@ -99,7 +99,7 @@ static void delayed_work_timer_fn(unsigned long __data)
 	__queue_work(wq->cpu_wq + smp_processor_id(), work);
 }
 
-int queue_delayed_work(struct workqueue_struct *wq,
+int fastcall queue_delayed_work(struct workqueue_struct *wq,
 			struct work_struct *work, unsigned long delay)
 {
 	int ret = 0;
@@ -203,7 +203,7 @@ static int worker_thread(void *__cwq)
  * This function used to run the workqueues itself.  Now we just wait for the
  * helper threads to do it.
  */
-void flush_workqueue(struct workqueue_struct *wq)
+void fastcall flush_workqueue(struct workqueue_struct *wq)
 {
 	struct cpu_workqueue_struct *cwq;
 	int cpu;
@@ -310,12 +310,12 @@ void destroy_workqueue(struct workqueue_struct *wq)
 
 static struct workqueue_struct *keventd_wq;
 
-int schedule_work(struct work_struct *work)
+int fastcall schedule_work(struct work_struct *work)
 {
 	return queue_work(keventd_wq, work);
 }
 
-int schedule_delayed_work(struct work_struct *work, unsigned long delay)
+int fastcall schedule_delayed_work(struct work_struct *work, unsigned long delay)
 {
 	return queue_delayed_work(keventd_wq, work, delay);
 }

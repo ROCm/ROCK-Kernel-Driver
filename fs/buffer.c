@@ -97,7 +97,7 @@ void wake_up_buffer(struct buffer_head *bh)
 }
 EXPORT_SYMBOL(wake_up_buffer);
 
-void unlock_buffer(struct buffer_head *bh)
+void fastcall unlock_buffer(struct buffer_head *bh)
 {
 	/*
 	 * unlock_buffer against a zero-count bh is a bug, if the page
@@ -1256,7 +1256,7 @@ __getblk_slow(struct block_device *bdev, sector_t block, int size)
  * mark_buffer_dirty() is atomic.  It takes bh->b_page->mapping->private_lock,
  * mapping->page_lock and the global inode_lock.
  */
-void mark_buffer_dirty(struct buffer_head *bh)
+void fastcall mark_buffer_dirty(struct buffer_head *bh)
 {
 	if (!buffer_uptodate(bh))
 		buffer_error();

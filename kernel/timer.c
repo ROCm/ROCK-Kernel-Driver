@@ -997,7 +997,7 @@ static void process_timeout(unsigned long __data)
  *
  * In all cases the return value is guaranteed to be non-negative.
  */
-signed long schedule_timeout(signed long timeout)
+fastcall signed long schedule_timeout(signed long timeout)
 {
 	struct timer_list timer;
 	unsigned long expire;
