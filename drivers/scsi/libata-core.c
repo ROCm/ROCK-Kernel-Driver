@@ -49,7 +49,9 @@ static unsigned int ata_busy_sleep (struct ata_port *ap,
 				    unsigned long tmout_pat,
 			    	    unsigned long tmout);
 static void __ata_dev_select (struct ata_port *ap, unsigned int device);
+#if 0 /* to be used eventually */
 static void ata_qc_push (struct ata_queued_cmd *qc, unsigned int append);
+#endif
 static void ata_dma_complete(struct ata_port *ap, u8 host_stat,
 			     unsigned int done_late);
 static void ata_host_set_pio(struct ata_port *ap);
@@ -1971,6 +1973,7 @@ static void ata_pio_sector(struct ata_port *ap)
 	kunmap(sg[qc->cursg].page);
 }
 
+#if 0 /* to be used eventually */
 /**
  *	ata_eng_schedule - run an iteration of the pio/dma/whatever engine
  *	@ap: port on which activity will occur
@@ -1983,6 +1986,7 @@ static void ata_eng_schedule (struct ata_port *ap, struct ata_engine *eng)
 {
 	/* FIXME */
 }
+#endif
 
 /**
  *	ata_eng_timeout - Handle timeout of queued command
@@ -2172,6 +2176,7 @@ void ata_qc_complete(struct ata_queued_cmd *qc, u8 drv_stat, unsigned int done_l
 		clear_bit(tag, &ap->qactive);
 }
 
+#if 0 /* to be used eventually */
 /**
  *	ata_qc_push -
  *	@qc:
@@ -2193,6 +2198,7 @@ static void ata_qc_push (struct ata_queued_cmd *qc, unsigned int append)
 	if (!test_and_set_bit(ATA_EFLG_ACTIVE, &eng->flags))
 		ata_eng_schedule(ap, eng);
 }
+#endif
 
 /**
  *	ata_qc_issue -
