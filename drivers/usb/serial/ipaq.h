@@ -19,7 +19,7 @@
 #define COMPAQ_VENDOR_ID	0x049f
 #define COMPAQ_IPAQ_ID		0x0003
 
-#define HP_VENDOR_ID		0x003f
+#define HP_VENDOR_ID		0x03f0
 #define HP_JORNADA_548_ID	0x1016
 #define HP_JORNADA_568_ID	0x1116
 

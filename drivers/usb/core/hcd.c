@@ -289,7 +289,7 @@ static int rh_string (
 	// language ids
 	if (id == 0) {
 		*data++ = 4; *data++ = 3;	/* 4 bytes string data */
-		*data++ = 0; *data++ = 0;	/* some language id */
+		*data++ = 0x09; *data++ = 0x04;	/* MSFT-speak for "en-us" */
 		return 4;
 
 	// serial number
@@ -585,9 +585,7 @@ void usb_bus_init (struct usb_bus *bus)
 {
 	memset (&bus->devmap, 0, sizeof(struct usb_devmap));
 
-#ifdef DEVNUM_ROUND_ROBIN
 	bus->devnum_next = 1;
-#endif /* DEVNUM_ROUND_ROBIN */
 
 	bus->root_hub = NULL;
 	bus->hcpriv = NULL;
@@ -738,10 +736,10 @@ EXPORT_SYMBOL (usb_register_root_hub);
 /*-------------------------------------------------------------------------*/
 
 /**
- * usb_calc_bus_time: approximate periodic transaction time in nanoseconds
+ * usb_calc_bus_time - approximate periodic transaction time in nanoseconds
  * @speed: from dev->speed; USB_SPEED_{LOW,FULL,HIGH}
  * @is_input: true iff the transaction sends data to the host
- * @is_isoc: true for isochronous transactions, false for interrupt ones
+ * @isoc: true for isochronous transactions, false for interrupt ones
  * @bytecount: how many bytes in the transaction.
  *
  * Returns approximate bus time in nanoseconds for a periodic transaction.
@@ -1286,8 +1284,8 @@ EXPORT_SYMBOL (usb_hcd_operations);
  * This hands the URB from HCD to its USB device driver, using its
  * completion function.  The HCD has freed all per-urb resources
  * (and is done using urb->hcpriv).  It also released all HCD locks;
- * the device driver won't cause deadlocks if it resubmits this URB,
- * and won't confuse things by modifying and resubmitting this one.
+ * the device driver won't cause problems if it frees, modifies,
+ * or resubmits this URB.
  * Bandwidth and other resources will be deallocated.
  *
  * HCDs must not use this for periodic URBs that are still scheduled

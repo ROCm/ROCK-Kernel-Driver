@@ -19,6 +19,31 @@
 
 #ifdef __KERNEL__
 
+/* This file contains declarations of usbcore internals that are mostly
+ * used or exposed by Host Controller Drivers.
+ */
+
+/*
+ * USB Packet IDs (PIDs)
+ */
+#define USB_PID_UNDEF_0			0xf0
+#define USB_PID_OUT			0xe1
+#define USB_PID_ACK			0xd2
+#define USB_PID_DATA0			0xc3
+#define USB_PID_PING			0xb4	/* USB 2.0 */
+#define USB_PID_SOF			0xa5
+#define USB_PID_NYET			0x96	/* USB 2.0 */
+#define USB_PID_DATA2			0x87	/* USB 2.0 */
+#define USB_PID_SPLIT			0x78	/* USB 2.0 */
+#define USB_PID_IN			0x69
+#define USB_PID_NAK			0x5a
+#define USB_PID_DATA1			0x4b
+#define USB_PID_PREAMBLE		0x3c	/* Token mode */
+#define USB_PID_ERR			0x3c	/* USB 2.0: handshake mode */
+#define USB_PID_SETUP			0x2d
+#define USB_PID_STALL			0x1e
+#define USB_PID_MDATA			0x0f	/* USB 2.0 */
+
 /*-------------------------------------------------------------------------*/
 
 /*
@@ -234,13 +259,11 @@ extern int usb_new_device(struct usb_device *dev);
 extern void usb_connect(struct usb_device *dev);
 extern void usb_disconnect(struct usb_device **);
 
-#ifndef _LINUX_HUB_H
 /* exported to hub driver ONLY to support usb_reset_device () */
 extern int usb_get_configuration(struct usb_device *dev);
 extern void usb_set_maxpacket(struct usb_device *dev);
 extern void usb_destroy_configuration(struct usb_device *dev);
 extern int usb_set_address(struct usb_device *dev);
-#endif /* _LINUX_HUB_H */
 
 /*-------------------------------------------------------------------------*/
 
@@ -354,9 +377,47 @@ extern struct usb_interface *usb_ifnum_to_if (struct usb_device *dev,
 extern int usb_find_interface_driver (struct usb_device *dev,
 	struct usb_interface *interface);
 
+#define usb_endpoint_halt(dev, ep, out) ((dev)->halted[out] |= (1 << (ep)))
+
+#define usb_endpoint_out(ep_dir)	(!((ep_dir) & USB_DIR_IN))
+
 /* for probe/disconnect with correct module usage counting */
 void *usb_bind_driver(struct usb_driver *driver, struct usb_interface *intf);
 void usb_unbind_driver(struct usb_device *device, struct usb_interface *intf);
+
+extern struct list_head usb_driver_list;
+
+/*
+ * USB device fs stuff
+ */
+
+#ifdef CONFIG_USB_DEVICEFS
+
+/*
+ * these are expected to be called from the USB core/hub thread
+ * with the kernel lock held
+ */
+extern void usbfs_add_bus(struct usb_bus *bus);
+extern void usbfs_remove_bus(struct usb_bus *bus);
+extern void usbfs_add_device(struct usb_device *dev);
+extern void usbfs_remove_device(struct usb_device *dev);
+extern void usbfs_update_special (void);
+
+extern int usbfs_init(void);
+extern void usbfs_cleanup(void);
+
+#else /* CONFIG_USB_DEVICEFS */
+
+static inline void usbfs_add_bus(struct usb_bus *bus) {}
+static inline void usbfs_remove_bus(struct usb_bus *bus) {}
+static inline void usbfs_add_device(struct usb_device *dev) {}
+static inline void usbfs_remove_device(struct usb_device *dev) {}
+static inline void usbfs_update_special (void) {}
+
+static inline int usbfs_init(void) { return 0; }
+static inline void usbfs_cleanup(void) { }
+
+#endif /* CONFIG_USB_DEVICEFS */
 
 /*-------------------------------------------------------------------------*/
 

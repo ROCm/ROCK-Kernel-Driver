@@ -15,7 +15,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/init.h>
-
+#include <linux/input.h>
 
 #include "usbvideo.h"
 
@@ -117,6 +117,10 @@ struct konicawc {
 	int maxline;		/* number of lines per frame */
 	int yplanesz;		/* Number of bytes in the Y plane */
 	unsigned int buttonsts:1;
+#ifdef CONFIG_INPUT
+	struct input_dev input;
+	char input_physname[64];
+#endif
 };
 
 
@@ -258,7 +262,7 @@ static int konicawc_compress_iso(uvd_t *uvd, struct urb *dataurb, struct urb *st
 		 */
 
 		if(sts < 0x80) {
-			button = sts & 0x40;
+			button = !!(sts & 0x40);
 			sts &= ~0x40;
 		}
 		
@@ -268,6 +272,10 @@ static int konicawc_compress_iso(uvd_t *uvd, struct urb *dataurb, struct urb *st
 		if(button != cam->buttonsts) {
 			DEBUG(2, "button: %sclicked", button ? "" : "un");
 			cam->buttonsts = button;
+#ifdef CONFIG_INPUT
+			input_report_key(&cam->input, BTN_0, cam->buttonsts);
+			input_sync(&cam->input);
+#endif
 		}
 
 		if(sts == 0x01) { /* drop frame */
@@ -624,7 +632,7 @@ static void *konicawc_probe(struct usb_device *dev, unsigned int ifnum, const st
 	int i, nas;
 	int actInterface=-1, inactInterface=-1, maxPS=0;
 	unsigned char video_ep = 0;
-	
+
 	DEBUG(1, "konicawc_probe(%p,%u.)", dev, ifnum);
 
 	/* We don't handle multi-config cameras */
@@ -735,6 +743,24 @@ static void *konicawc_probe(struct usb_device *dev, unsigned int ifnum, const st
 			err("usbvideo_RegisterVideoDevice() failed.");
 			uvd = NULL;
 		}
+#ifdef CONFIG_INPUT
+		/* Register input device for button */
+		memset(&cam->input, 0, sizeof(struct input_dev));
+		cam->input.name = "Konicawc snapshot button";
+		cam->input.private = cam;
+		cam->input.evbit[0] = BIT(EV_KEY);
+		cam->input.keybit[LONG(BTN_0)] = BIT(BTN_0);
+		cam->input.id.bustype = BUS_USB;
+		cam->input.id.vendor = dev->descriptor.idVendor;
+		cam->input.id.product = dev->descriptor.idProduct;
+		cam->input.id.version = dev->descriptor.bcdDevice;
+		input_register_device(&cam->input);
+		
+		usb_make_path(dev, cam->input_physname, 56);
+		strcat(cam->input_physname, "/input0");
+		cam->input.phys = cam->input_physname;
+		info("konicawc: %s on %s\n", cam->input.name, cam->input.phys);
+#endif
 	}
 	MOD_DEC_USE_COUNT;
 	return uvd;
@@ -746,6 +772,9 @@ static void konicawc_free_uvd(uvd_t *uvd)
 	int i;
 	struct konicawc *cam = (struct konicawc *)uvd->user_data;
 
+#ifdef CONFIG_INPUT
+	input_unregister_device(&cam->input);
+#endif
 	for (i=0; i < USBVIDEO_NUMSBUF; i++) {
 		usb_free_urb(cam->sts_urb[i]);
 		cam->sts_urb[i] = NULL;

@@ -4,6 +4,9 @@
 #include <linux/list.h>
 #include <linux/usb.h>
 
+#define usb_packetid(pipe)	(usb_pipein(pipe) ? USB_PID_IN : USB_PID_OUT)
+#define PIPE_DEVEP_MASK		0x0007ff00
+
 /*
  * Universal Host Controller Interface data structures and defines
  */
