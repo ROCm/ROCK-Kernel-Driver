@@ -2097,7 +2097,7 @@ static char *page_getlink(struct dentry * dentry, struct page **ppage)
 				NULL);
 	if (IS_ERR(page))
 		goto sync_fail;
-	wait_on_page(page);
+	wait_on_page_locked(page);
 	if (!PageUptodate(page))
 		goto async_fail;
 	*ppage = page;

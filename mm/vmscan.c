@@ -95,6 +95,9 @@ static inline int try_to_swap_out(struct mm_struct * mm, struct vm_area_struct* 
 	if (TestSetPageLocked(page))
 		return 0;
 
+	if (PageWriteback(page))
+		goto out_unlock;
+
 	/* From this point on, the odds are that we're going to
 	 * nuke this pte, so read and clear the pte.  This hook
 	 * is needed on CPUs which update the accessed and dirty
@@ -186,6 +189,7 @@ drop_pte:
 	/* No swap space left */
 preserve:
 	set_pte(page_table, pte);
+out_unlock:
 	unlock_page(page);
 	return 0;
 }
@@ -421,14 +425,22 @@ static int shrink_cache(int nr_pages, zone_t * classzone, unsigned int gfp_mask,
 		 * The page is locked. IO in progress?
 		 * Move it to the back of the list.
 		 */
-		if (unlikely(TestSetPageLocked(page))) {
+		if (unlikely(PageWriteback(page))) {
 			if (PageLaunder(page) && (gfp_mask & __GFP_FS)) {
 				page_cache_get(page);
 				spin_unlock(&pagemap_lru_lock);
-				wait_on_page(page);
+				wait_on_page_writeback(page);
 				page_cache_release(page);
 				spin_lock(&pagemap_lru_lock);
 			}
+			continue;
+		}
+
+		if (TestSetPageLocked(page))
+			continue;
+
+		if (PageWriteback(page)) {	/* The non-racy check */
+			unlock_page(page);
 			continue;
 		}
 
@@ -457,10 +469,10 @@ static int shrink_cache(int nr_pages, zone_t * classzone, unsigned int gfp_mask,
 			writeback = a_ops->vm_writeback;
 			writepage = a_ops->writepage;
 			if (writeback || writepage) {
-				ClearPageDirty(page);
 				SetPageLaunder(page);
 				page_cache_get(page);
 				spin_unlock(&pagemap_lru_lock);
+				ClearPageDirty(page);
 
 				if (writeback) {
 					int nr_to_write = WRITEOUT_PAGES;

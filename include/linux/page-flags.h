@@ -64,6 +64,7 @@
 
 #define PG_launder		12	/* written out by VM pressure.. */
 #define PG_private		13	/* Has something at ->private */
+#define PG_writeback		14	/* Page is under writeback */
 
 /*
  * Global page accounting.  One instance per CPU.
@@ -198,6 +199,14 @@ extern void get_page_state(struct page_state *ret);
 #define SetPagePrivate(page)	set_bit(PG_private, &(page)->flags)
 #define ClearPagePrivate(page)	clear_bit(PG_private, &(page)->flags)
 #define PagePrivate(page)	test_bit(PG_private, &(page)->flags)
+
+#define PageWriteback(page)	test_bit(PG_writeback, &(page)->flags)
+#define SetPageWriteback(page)	set_bit(PG_writeback, &(page)->flags)
+#define ClearPageWriteback(page) clear_bit(PG_writeback, &(page)->flags)
+#define TestSetPageWriteback(page)	\
+	test_and_set_bit(PG_writeback, &(page)->flags)
+#define TestClearPageWriteback(page)	\
+	test_and_clear_bit(PG_writeback, &(page)->flags)
 
 /*
  * The PageSwapCache predicate doesn't use a PG_flag at this time,

@@ -354,7 +354,8 @@ smb_file_release(struct inode *inode, struct file * file)
 		/* We must flush any dirty pages now as we won't be able to
 		   write anything after close. mmap can trigger this.
 		   "openers" should perhaps include mmap'ers ... */
-		filemap_fdatasync(inode->i_mapping);
+		filemap_fdatawait(inode->i_mapping);
+		filemap_fdatawrite(inode->i_mapping);
 		filemap_fdatawait(inode->i_mapping);
 		smb_close(inode);
 	}

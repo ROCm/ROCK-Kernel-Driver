@@ -55,7 +55,7 @@ static struct page * dir_get_page(struct inode *dir, unsigned long n)
 	struct page *page = read_cache_page(mapping, n,
 				(filler_t*)mapping->a_ops->readpage, NULL);
 	if (!IS_ERR(page)) {
-		wait_on_page(page);
+		wait_on_page_locked(page);
 		kmap(page);
 		if (!PageUptodate(page))
 			goto fail;

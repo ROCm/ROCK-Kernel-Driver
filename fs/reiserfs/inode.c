@@ -1990,21 +1990,27 @@ static int reiserfs_write_full_page(struct page *page) {
 	block++ ;
     } while(bh != head) ;
 
+    if (!partial)
+        SetPageUptodate(page) ;
+    BUG_ON(PageWriteback(page));
+    SetPageWriteback(page);
+    unlock_page(page);
+
     /* if this page only had a direct item, it is very possible for
     ** nr == 0 without there being any kind of error.
     */
     if (nr) {
         submit_bh_for_writepage(arr, nr) ;
     } else {
-        unlock_page(page) ;
+        end_page_writeback(page) ;
     }
-    if (!partial)
-        SetPageUptodate(page) ;
 
     return 0 ;
 
 fail:
     if (nr) {
+        SetPageWriteback(page);
+        unlock_page(page);
         submit_bh_for_writepage(arr, nr) ;
     } else {
         unlock_page(page) ;

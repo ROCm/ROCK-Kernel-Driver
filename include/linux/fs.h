@@ -1150,7 +1150,7 @@ extern void invalidate_inode_pages(struct inode *);
 extern void invalidate_inode_pages2(struct address_space *);
 extern void write_inode_now(struct inode *, int);
 extern void sync_inodes_sb(struct super_block *);
-extern int filemap_fdatasync(struct address_space *);
+extern int filemap_fdatawrite(struct address_space *);
 extern int filemap_fdatawait(struct address_space *);
 extern void sync_supers(void);
 extern int bmap(struct inode *, int);

@@ -589,11 +589,12 @@ static int try_to_unuse(unsigned int type)
 		 * Wait for and lock page.  When do_swap_page races with
 		 * try_to_unuse, do_swap_page can handle the fault much
 		 * faster than try_to_unuse can locate the entry.  This
-		 * apparently redundant "wait_on_page" lets try_to_unuse
+		 * apparently redundant "wait_on_page_locked" lets try_to_unuse
 		 * defer to do_swap_page in such a case - in some tests,
 		 * do_swap_page and try_to_unuse repeatedly compete.
 		 */
-		wait_on_page(page);
+		wait_on_page_locked(page);
+		wait_on_page_writeback(page);
 		lock_page(page);
 
 		/*

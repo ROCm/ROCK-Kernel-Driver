@@ -692,7 +692,7 @@ struct dentry *umsdos_solve_hlink (struct dentry *hlink)
 	dentry_dst=(struct dentry *)page;
 	if (IS_ERR(page))
 		goto out;
-	wait_on_page(page);
+	wait_on_page_locked(page);
 	if (!PageUptodate(page))
 		goto async_fail;
 

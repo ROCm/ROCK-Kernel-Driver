@@ -1155,7 +1155,7 @@ int txCommit(tid_t tid,		/* transaction identifier */
 		jfs_ip = JFS_IP(ip);
 
 		/*
-		 * BUGBUG - Should we call filemap_fdatasync here instead
+		 * BUGBUG - Should we call filemap_fdatawrite here instead
 		 * of fsync_inode_data?
 		 * If we do, we have a deadlock condition since we may end
 		 * up recursively calling jfs_get_block with the IWRITELOCK
@@ -1164,7 +1164,8 @@ int txCommit(tid_t tid,		/* transaction identifier */
 		 */
 		if ((!S_ISDIR(ip->i_mode))
 		    && (tblk->flag & COMMIT_DELETE) == 0) {
-			filemap_fdatasync(ip->i_mapping);
+			filemap_fdatawait(ip->i_mapping);
+			filemap_fdatawrite(ip->i_mapping);
 			filemap_fdatawait(ip->i_mapping);
 		}
 

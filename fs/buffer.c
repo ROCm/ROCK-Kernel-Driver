@@ -123,7 +123,9 @@ void unlock_buffer(struct buffer_head *bh)
 	 * waitqueue, which is used here. (Well.  Other locked buffers
 	 * against the page will pin it.  But complain anyway).
 	 */
-	if (atomic_read(&bh->b_count) == 0 && !PageLocked(bh->b_page))
+	if (atomic_read(&bh->b_count) == 0 &&
+			!PageLocked(bh->b_page) &&
+			!PageWriteback(bh->b_page))
 		buffer_error();
 
 	clear_buffer_locked(bh);
@@ -205,12 +207,14 @@ void end_buffer_io_sync(struct buffer_head *bh, int uptodate)
  * via its mapping.  Does not take the superblock lock.
  *
  * If `wait' is true, wait on the writeout.
+ *
+ * FIXME: rename this function.
  */
 int sync_buffers(struct block_device *bdev, int wait)
 {
 	int ret;
 
-	ret = filemap_fdatasync(bdev->bd_inode->i_mapping);
+	ret = filemap_fdatawrite(bdev->bd_inode->i_mapping);
 	if (wait) {
 		int err;
 
@@ -341,18 +345,21 @@ asmlinkage long sys_fsync(unsigned int fd)
 
 	ret = -EINVAL;
 	if (!file->f_op || !file->f_op->fsync) {
-		/* Why?  We can still call filemap_fdatasync */
+		/* Why?  We can still call filemap_fdatawrite */
 		goto out_putf;
 	}
 
 	/* We need to protect against concurrent writers.. */
 	down(&inode->i_sem);
-	ret = filemap_fdatasync(inode->i_mapping);
+	ret = filemap_fdatawait(inode->i_mapping);
+	err = filemap_fdatawrite(inode->i_mapping);
+	if (!ret)
+		ret = err;
 	err = file->f_op->fsync(file, dentry, 0);
-	if (err && !ret)
+	if (!ret)
 		ret = err;
 	err = filemap_fdatawait(inode->i_mapping);
-	if (err && !ret)
+	if (!ret)
 		ret = err;
 	up(&inode->i_sem);
 
@@ -382,12 +389,15 @@ asmlinkage long sys_fdatasync(unsigned int fd)
 		goto out_putf;
 
 	down(&inode->i_sem);
-	ret = filemap_fdatasync(inode->i_mapping);
+	ret = filemap_fdatawait(inode->i_mapping);
+	err = filemap_fdatawrite(inode->i_mapping);
+	if (!ret)
+		ret = err;
 	err = file->f_op->fsync(file, dentry, 1);
-	if (err && !ret)
+	if (!ret)
 		ret = err;
 	err = filemap_fdatawait(inode->i_mapping);
-	if (err && !ret)
+	if (!ret)
 		ret = err;
 	up(&inode->i_sem);
 
@@ -604,7 +614,13 @@ static void end_buffer_io_async(struct buffer_head *bh, int uptodate)
 	 */
 	if (page_uptodate && !PageError(page))
 		SetPageUptodate(page);
-	unlock_page(page);
+	if (PageWriteback(page)) {
+		/* It was a write */
+		end_page_writeback(page);
+	} else {
+		/* read */
+		unlock_page(page);
+	}
 	return;
 
 still_busy:
@@ -632,6 +648,7 @@ inline void set_buffer_async_io(struct buffer_head *bh)
 	bh->b_end_io = end_buffer_io_async;
 	set_buffer_async(bh);
 }
+EXPORT_SYMBOL(set_buffer_async_io);
 
 /*
  * osync is designed to support O_SYNC io.  It waits synchronously for
@@ -1168,6 +1185,8 @@ int try_to_release_page(struct page *page, int gfp_mask)
 
 	if (!PageLocked(page))
 		BUG();
+	if (PageWriteback(page))
+		return 0;
 	
 	if (mapping && mapping->a_ops->releasepage)
 		return mapping->a_ops->releasepage(page, gfp_mask);
@@ -1317,8 +1336,7 @@ static int __block_write_full_page(struct inode *inode,
 	struct buffer_head *bh, *head;
 	int nr_underway = 0;
 
-	if (!PageLocked(page))
-		BUG();
+	BUG_ON(!PageLocked(page));
 
 	last_block = (inode->i_size - 1) >> inode->i_blkbits;
 
@@ -1385,6 +1403,10 @@ static int __block_write_full_page(struct inode *inode,
 		bh = bh->b_this_page;
 	} while (bh != head);
 
+	BUG_ON(PageWriteback(page));
+	SetPageWriteback(page);		/* Keeps try_to_free_buffers() away */
+	unlock_page(page);
+
 	/*
 	 * The page may come unlocked any time after the *first* submit_bh()
 	 * call.  Be careful with its buffers.
@@ -1418,7 +1440,7 @@ done:
 		} while (bh != head);
 		if (uptodate)
 			SetPageUptodate(page);
-		unlock_page(page);
+		end_page_writeback(page);
 	}
 	return err;
 recover:
@@ -1426,6 +1448,7 @@ recover:
 	 * ENOSPC, or some other error.  We may already have added some
 	 * blocks to the file, so we need to write these out to avoid
 	 * exposing stale data.
+	 * The page is currently locked and not marked for writeback
 	 */
 	ClearPageUptodate(page);
 	bh = head;
@@ -1453,6 +1476,9 @@ recover:
 		}
 		bh = next;
 	} while (bh != head);
+	BUG_ON(PageWriteback(page));
+	SetPageWriteback(page);
+	unlock_page(page);
 	goto done;
 }
 
@@ -2082,6 +2108,12 @@ int brw_kiovec(int rw, int nr, struct kiobuf *iovec[],
  *
  * FIXME: we need a swapper_inode->get_block function to remove
  *        some of the bmap kludges and interface ugliness here.
+ *
+ * NOTE: unlike file pages, swap pages are locked while under writeout.
+ * This is to avoid a deadlock which occurs when free_swap_and_cache()
+ * calls block_flushpage() under spinlock and hits a locked buffer, and
+ * schedules under spinlock.   Another approach would be to teach
+ * find_trylock_page() to also trylock the page's writeback flags.
  */
 int brw_page(int rw, struct page *page,
 		struct block_device *bdev, sector_t b[], int size)
@@ -2100,7 +2132,7 @@ int brw_page(int rw, struct page *page,
 		bh->b_blocknr = *(b++);
 		bh->b_bdev = bdev;
 		set_buffer_mapped(bh);
-		if (rw == WRITE)	/* To support submit_bh debug tests */
+		if (rw == WRITE)
 			set_buffer_uptodate(bh);
 		set_buffer_async_io(bh);
 		bh = bh->b_this_page;
@@ -2138,7 +2170,7 @@ int block_symlink(struct inode *inode, const char *symname, int len)
 	 * OTOH it's obviously correct and should make the page up-to-date.
 	 */
 	err = mapping->a_ops->readpage(NULL, page);
-	wait_on_page(page);
+	wait_on_page_locked(page);
 	page_cache_release(page);
 	if (err < 0)
 		goto fail;
@@ -2238,6 +2270,8 @@ int try_to_free_buffers(struct page *page)
 	int ret = 0;
 
 	BUG_ON(!PageLocked(page));
+	if (PageWriteback(page))
+		return 0;
 
 	if (page->mapping == NULL)	/* swapped-in anon page */
 		return drop_buffers(page);

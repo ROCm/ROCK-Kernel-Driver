@@ -532,7 +532,7 @@ repeat:
 					goto repeat;
 				return ERR_PTR(-ENOMEM);
 			}
-			wait_on_page(page);
+			wait_on_page_locked(page);
 			if (!PageUptodate(page) && entry->val == swap.val) {
 				page_cache_release(page);
 				return ERR_PTR(-EIO);
@@ -595,7 +595,7 @@ no_space:
 
 wait_retry:
 	spin_unlock (&info->lock);
-	wait_on_page(page);
+	wait_on_page_locked(page);
 	page_cache_release(page);
 	goto repeat;
 }

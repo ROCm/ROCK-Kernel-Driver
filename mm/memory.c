@@ -738,7 +738,7 @@ int lock_kiovec(int nr, struct kiobuf *iovec[], int wait)
 			return -EINVAL;
 		
 		/* Try again...  */
-		wait_on_page(page);
+		wait_on_page_locked(page);
 	}
 	
 	if (++repeat < 16)

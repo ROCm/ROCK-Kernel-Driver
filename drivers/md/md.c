@@ -488,7 +488,7 @@ static int read_disk_sb(mdk_rdev_t * rdev)
 			(filler_t *)mapping->a_ops->readpage, NULL);
 	if (IS_ERR(page))
 		goto out;
-	wait_on_page(page);
+	wait_on_page_locked(page);
 	if (!PageUptodate(page))
 		goto fail;
 	if (PageError(page))
@@ -949,7 +949,7 @@ static int write_disk_sb(mdk_rdev_t * rdev)
 	if (error)
 		goto unlock;
 	unlock_page(page);
-	wait_on_page(page);
+	wait_on_page_locked(page);
 	page_cache_release(page);
 	fsync_bdev(bdev);
 skip:

@@ -432,7 +432,7 @@ unsigned char *read_dev_sector(struct block_device *bdev, unsigned long n, Secto
 	page = read_cache_page(mapping, n/sect,
 			(filler_t *)mapping->a_ops->readpage, NULL);
 	if (!IS_ERR(page)) {
-		wait_on_page(page);
+		wait_on_page_locked(page);
 		if (!PageUptodate(page))
 			goto fail;
 		if (PageError(page))

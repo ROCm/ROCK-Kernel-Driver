@@ -201,6 +201,17 @@ static int truncate_list_pages(struct address_space *mapping,
 			int failed;
 
 			page_cache_get(page);
+			if (PageWriteback(page)) {
+				/*
+				 * urgggh. This function is utterly foul,
+				 * and this addition doesn't help.  Kill.
+				 */
+				write_unlock(&mapping->page_lock);
+				wait_on_page_writeback(page);
+				unlocked = 1;
+				write_lock(&mapping->page_lock);
+				goto restart;
+			}
 			failed = TestSetPageLocked(page);
 
 			list_del(head);
@@ -223,7 +234,7 @@ static int truncate_list_pages(struct address_space *mapping,
 
 				unlock_page(page);
 			} else
- 				wait_on_page(page);
+ 				wait_on_page_locked(page);
 
 			page_cache_release(page);
 
@@ -238,6 +249,23 @@ static int truncate_list_pages(struct address_space *mapping,
 		curr = curr->next;
 	}
 	return unlocked;
+}
+
+/*
+ * Unconditionally clean all pages outside `start'.  The mapping lock
+ * must be held.
+ */
+static void clean_list_pages(struct address_space *mapping,
+		struct list_head *head, unsigned long start)
+{
+	struct page *page;
+	struct list_head *curr;
+
+	for (curr = head->next; curr != head; curr = curr->next) {
+		page = list_entry(curr, struct page, list);
+		if (page->index > start)
+			ClearPageDirty(page);
+	}
 }
 
 /**
@@ -256,6 +284,8 @@ void truncate_inode_pages(struct address_space * mapping, loff_t lstart)
 	int unlocked;
 
 	write_lock(&mapping->page_lock);
+	clean_list_pages(mapping, &mapping->io_pages, start);
+	clean_list_pages(mapping, &mapping->dirty_pages, start);
 	do {
 		unlocked |= truncate_list_pages(mapping,
 				&mapping->io_pages, start, &partial);
@@ -321,6 +351,13 @@ static int invalidate_list_pages2(struct address_space * mapping,
 	while (curr != head) {
 		page = list_entry(curr, struct page, list);
 
+		if (PageWriteback(page)) {
+			write_unlock(&mapping->page_lock);
+			wait_on_page_writeback(page);
+			unlocked = 1;
+			write_lock(&mapping->page_lock);
+			goto restart;
+		}
 		if (!TestSetPageLocked(page)) {
 			int __unlocked;
 
@@ -339,7 +376,7 @@ static int invalidate_list_pages2(struct address_space * mapping,
 			page_cache_get(page);
 			write_unlock(&mapping->page_lock);
 			unlocked = 1;
-			wait_on_page(page);
+			wait_on_page_locked(page);
 		}
 
 		page_cache_release(page);
@@ -403,17 +440,16 @@ int fail_writepage(struct page *page)
 	unlock_page(page);
 	return 0;
 }
-
 EXPORT_SYMBOL(fail_writepage);
 
 /**
- *  filemap_fdatasync - walk the list of dirty pages of the given address space
+ *  filemap_fdatawrite - walk the list of dirty pages of the given address space
  *                      and writepage() all of them.
  *
  *  @mapping: address space structure to write
  *
  */
-int filemap_fdatasync(struct address_space *mapping)
+int filemap_fdatawrite(struct address_space *mapping)
 {
 	if (mapping->a_ops->writeback_mapping)
 		return mapping->a_ops->writeback_mapping(mapping, NULL);
@@ -437,15 +473,18 @@ int filemap_fdatawait(struct address_space * mapping)
 		struct page *page = list_entry(mapping->locked_pages.next, struct page, list);
 
 		list_del(&page->list);
-		list_add(&page->list, &mapping->clean_pages);
+		if (PageDirty(page))
+			list_add(&page->list, &mapping->dirty_pages);
+		else
+			list_add(&page->list, &mapping->clean_pages);
 
-		if (!PageLocked(page))
+		if (!PageWriteback(page))
 			continue;
 
 		page_cache_get(page);
 		write_unlock(&mapping->page_lock);
 
-		___wait_on_page(page);
+		wait_on_page_writeback(page);
 		if (PageError(page))
 			ret = -EIO;
 
@@ -562,14 +601,7 @@ static inline wait_queue_head_t *page_waitqueue(struct page *page)
 	return &zone->wait_table[hash_ptr(page, zone->wait_table_bits)];
 }
 
-/* 
- * Wait for a page to get unlocked.
- *
- * This must be called with the caller "holding" the page,
- * ie with increased "page->count" so that the page won't
- * go away during the wait..
- */
-void ___wait_on_page(struct page *page)
+static void wait_on_page_bit(struct page *page, int bit_nr)
 {
 	wait_queue_head_t *waitqueue = page_waitqueue(page);
 	struct task_struct *tsk = current;
@@ -578,22 +610,51 @@ void ___wait_on_page(struct page *page)
 	add_wait_queue(waitqueue, &wait);
 	do {
 		set_task_state(tsk, TASK_UNINTERRUPTIBLE);
-		if (!PageLocked(page))
+		if (!test_bit(bit_nr, &page->flags))
 			break;
 		sync_page(page);
 		schedule();
-	} while (PageLocked(page));
+	} while (test_bit(bit_nr, &page->flags));
 	__set_task_state(tsk, TASK_RUNNING);
 	remove_wait_queue(waitqueue, &wait);
 }
 
-/*
- * Unlock the page and wake up sleepers in ___wait_on_page.
+/* 
+ * Wait for a page to be unlocked.
+ *
+ * This must be called with the caller "holding" the page,
+ * ie with increased "page->count" so that the page won't
+ * go away during the wait..
+ */
+void ___wait_on_page_locked(struct page *page)
+{
+	wait_on_page_bit(page, PG_locked_dontuse);
+}
+EXPORT_SYMBOL(___wait_on_page_locked);
+
+/* 
+ * Wait for a page to complete writeback
+ */
+void wait_on_page_writeback(struct page *page)
+{
+	wait_on_page_bit(page, PG_writeback);
+}
+EXPORT_SYMBOL(wait_on_page_writeback);
+
+/**
+ * unlock_page() - unlock a locked page
+ *
+ * @page: the page
+ *
+ * Unlocks the page and wakes up sleepers in ___wait_on_page_locked().
+ * Also wakes sleepers in wait_on_page_writeback() because the wakeup
+ * mechananism between PageLocked pages and PageWriteback pages is shared.
+ * But that's OK - sleepers in wait_on_page_writeback() just go back to sleep.
  *
  * The first mb is necessary to safely close the critical section opened by the
  * TryLockPage(), the second mb is necessary to enforce ordering between
  * the clear_bit and the read of the waitqueue (to avoid SMP races with a
- * parallel wait_on_page).
+ * parallel wait_on_page_locked()).
  */
 void unlock_page(struct page *page)
 {
@@ -606,6 +667,22 @@ void unlock_page(struct page *page)
 	if (waitqueue_active(waitqueue))
 		wake_up_all(waitqueue);
 }
+
+/*
+ * End writeback against a page.
+ */
+void end_page_writeback(struct page *page)
+{
+	wait_queue_head_t *waitqueue = page_waitqueue(page);
+	clear_bit(PG_launder, &(page)->flags);
+	smp_mb__before_clear_bit();
+	if (!TestClearPageWriteback(page))
+		BUG();
+	smp_mb__after_clear_bit(); 
+	if (waitqueue_active(waitqueue))
+		wake_up_all(waitqueue);
+}
+EXPORT_SYMBOL(end_page_writeback);
 
 /*
  * Get a lock on the page, assuming we need to sleep
@@ -988,7 +1065,7 @@ readpage:
 		if (!error) {
 			if (PageUptodate(page))
 				goto page_ok;
-			wait_on_page(page);
+			wait_on_page_locked(page);
 			if (PageUptodate(page))
 				goto page_ok;
 			error = -EIO;
@@ -1082,7 +1159,9 @@ static ssize_t generic_file_direct_IO(int rw, struct file * filp, char * buf, si
 	 * Flush to disk exclusively the _data_, metadata must remain
 	 * completly asynchronous or performance will go to /dev/null.
 	 */
-	retval = filemap_fdatasync(mapping);
+	retval = filemap_fdatawait(mapping);
+	if (retval == 0)
+		retval = filemap_fdatawrite(mapping);
 	if (retval == 0)
 		retval = filemap_fdatawait(mapping);
 	if (retval < 0)
@@ -1504,7 +1583,7 @@ page_not_uptodate:
 	}
 
 	if (!mapping->a_ops->readpage(file, page)) {
-		wait_on_page(page);
+		wait_on_page_locked(page);
 		if (PageUptodate(page))
 			goto success;
 	}
@@ -1531,7 +1610,7 @@ page_not_uptodate:
 	}
 	ClearPageError(page);
 	if (!mapping->a_ops->readpage(file, page)) {
-		wait_on_page(page);
+		wait_on_page_locked(page);
 		if (PageUptodate(page))
 			goto success;
 	}

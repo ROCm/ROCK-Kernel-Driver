@@ -153,7 +153,7 @@ void do_page_cache_readahead(struct file *file,
 	}
 
 	/*
-	 * Do this now, rather than at the next wait_on_page().
+	 * Do this now, rather than at the next wait_on_page_locked().
 	 */
 	run_task_queue(&tq_disk);
 

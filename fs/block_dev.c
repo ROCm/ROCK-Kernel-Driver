@@ -180,22 +180,9 @@ static loff_t block_llseek(struct file *file, loff_t offset, int origin)
 	return retval;
 }
 	
-/*
- * AKPM: fixme.  unneeded stuff here.
- */
 static int __block_fsync(struct inode * inode)
 {
-	int ret, err;
-
-	ret = filemap_fdatasync(inode->i_mapping);
-	err = sync_buffers(inode->i_bdev, 1);
-	if (err && !ret)
-		ret = err;
-	err = filemap_fdatawait(inode->i_mapping);
-	if (err && !ret)
-		ret = err;
-
-	return ret;
+	return sync_buffers(inode->i_bdev, 1);
 }
 
 /*

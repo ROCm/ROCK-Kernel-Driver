@@ -109,6 +109,8 @@ static void __free_pages_ok (struct page *page, unsigned int order)
 		BUG();
 	if (PageActive(page))
 		BUG();
+	if (PageWriteback(page))
+		BUG();
 	ClearPageDirty(page);
 	page->flags &= ~(1<<PG_referenced);
 
@@ -302,6 +304,8 @@ static struct page * balance_classzone(zone_t * classzone, unsigned int gfp_mask
 					if (PageActive(page))
 						BUG();
 					if (PageDirty(page))
+						BUG();
+					if (PageWriteback(page))
 						BUG();
 
 					break;

@@ -151,7 +151,8 @@ static void jfs_put_super(struct super_block *sb)
 	 * We need to clean out the direct_inode pages since this inode
 	 * is not in the inode hash.
 	 */
-	filemap_fdatasync(sbi->direct_inode->i_mapping);
+	filemap_fdatawait(sbi->direct_inode->i_mapping);
+	filemap_fdatawrite(sbi->direct_inode->i_mapping);
 	filemap_fdatawait(sbi->direct_inode->i_mapping);
 	truncate_inode_pages(sbi->direct_mapping, 0);
 	iput(sbi->direct_inode);
@@ -338,7 +339,8 @@ out_no_rw:
 		jERROR(1, ("jfs_umount failed with return code %d\n", rc));
 	}
 out_mount_failed:
-	filemap_fdatasync(sbi->direct_inode->i_mapping);
+	filemap_fdatawait(sbi->direct_inode->i_mapping);
+	filemap_fdatawrite(sbi->direct_inode->i_mapping);
 	filemap_fdatawait(sbi->direct_inode->i_mapping);
 	truncate_inode_pages(sbi->direct_mapping, 0);
 	make_bad_inode(sbi->direct_inode);

@@ -73,16 +73,18 @@ static inline void ___add_to_page_cache(struct page *page,
 
 extern void FASTCALL(lock_page(struct page *page));
 extern void FASTCALL(unlock_page(struct page *page));
+extern void end_page_writeback(struct page *page);
 
-extern void ___wait_on_page(struct page *);
+extern void ___wait_on_page_locked(struct page *);
 
-static inline void wait_on_page(struct page * page)
+static inline void wait_on_page_locked(struct page *page)
 {
 	if (PageLocked(page))
-		___wait_on_page(page);
+		___wait_on_page_locked(page);
 }
 
 extern void wake_up_page(struct page *);
+extern void wait_on_page_writeback(struct page *page);
 
 typedef int filler_t(void *, struct page*);
 

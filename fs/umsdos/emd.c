@@ -139,7 +139,7 @@ int umsdos_emd_dir_readentry (struct dentry *demd, loff_t *pos, struct umsdos_di
 			(filler_t*)mapping->a_ops->readpage, NULL);
 	if (IS_ERR(page))
 		goto sync_fail;
-	wait_on_page(page);
+	wait_on_page_locked(page);
 	if (!PageUptodate(page))
 		goto async_fail;
 	p = (struct umsdos_dirent*)(kmap(page)+offs);
@@ -165,7 +165,7 @@ int umsdos_emd_dir_readentry (struct dentry *demd, loff_t *pos, struct umsdos_di
 			page = page2;
 			goto sync_fail;
 		}
-		wait_on_page(page2);
+		wait_on_page_locked(page2);
 		if (!PageUptodate(page2)) {
 			kunmap(page);
 			page_cache_release(page2);
@@ -392,7 +392,7 @@ static int umsdos_find (struct dentry *demd, struct umsdos_info *info)
 			page = read_cache_page(mapping,index,readpage,NULL);
 			if (IS_ERR(page))
 				goto sync_fail;
-			wait_on_page(page);
+			wait_on_page_locked(page);
 			if (!PageUptodate(page))
 				goto async_fail;
 			p = kmap(page);
@@ -441,7 +441,7 @@ static int umsdos_find (struct dentry *demd, struct umsdos_info *info)
 				page = next_page;
 				goto sync_fail;
 			}
-			wait_on_page(next_page);
+			wait_on_page_locked(next_page);
 			if (!PageUptodate(next_page)) {
 				page_cache_release(page);
 				page = next_page;

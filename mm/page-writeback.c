@@ -290,23 +290,14 @@ EXPORT_SYMBOL(generic_vm_writeback);
  * address_space_operation for filesystems which are using multipage BIO
  * writeback.
  *
- * We need to be careful to avoid deadlocks here.  mpage_bio_writepage() does
- * not immediately start I/O against each page.  It waits until the bio is
- * full, or until mpage_bio_flush() is called.  So generic_writeback_mapping()
- * is locking multiple pages without necessarily starting I/O against them.
- *
- * AB/BA deadlocks are avoided via locking implemented in the filesystem.
- * Only one process ever has multiple locked pages against any mapping.
- *
- * FIXME: doing the locking in the fs is a bit grotty, but it allows us to
- * not have to put a new semaphore in struct inode.  The fs could
- * pass its bio_write_state up here, I guess.
+ * (The next two paragraphs refer to code which isn't here yet, but they
+ *  explain the presence of address_space.io_pages)
  *
  * Pages can be moved from clean_pages or locked_pages onto dirty_pages
  * at any time - it's not possible to lock against that.  So pages which
  * have already been added to a BIO may magically reappear on the dirty_pages
  * list.  And generic_writeback_mapping() will again try to lock those pages.
- * But I/O has not yet been started agains the page.  Thus deadlock.
+ * But I/O has not yet been started against the page.  Thus deadlock.
  *
  * To avoid this, the entire contents of the dirty_pages list are moved
  * onto io_pages up-front.  We then walk io_pages, locking the
@@ -315,9 +306,15 @@ EXPORT_SYMBOL(generic_vm_writeback);
  * This has the added benefit of preventing a livelock which would otherwise
  * occur if pages are being dirtied faster than we can write them out.
  *
- * Thus generic_writeback_mapping() only makes the guarantee that all pages
- * which were dirty at the time it was called will have I/O started against
- * them.  And it's not possible to make a stronger guarantee than that.
+ * If a page is already under I/O, generic_writeback_mapping() skips it, even
+ * if it's dirty.  This is desirable behaviour for memory-cleaning writeback,
+ * but it is INCORRECT for data-integrity system calls such as fsync().  fsync()
+ * and msync() need to guarentee that all the data which was dirty at the time
+ * the call was made get new I/O started against them.  The way to do this is
+ * to run filemap_fdatawait() before calling filemap_fdatawrite().
+ *
+ * It's fairly rare for PageWriteback pages to be on ->dirty_pages.  It
+ * means that someone redirtied the page while it was under I/O.
  */
 int generic_writeback_mapping(struct address_space *mapping, int *nr_to_write)
 {
@@ -336,9 +333,19 @@ int generic_writeback_mapping(struct address_space *mapping, int *nr_to_write)
 		struct page *page = list_entry(mapping->io_pages.prev,
 					struct page, list);
 		list_del(&page->list);
-		list_add(&page->list, &mapping->locked_pages);
-		if (!PageDirty(page))
+		if (PageWriteback(page)) {
+			if (PageDirty(page)) {
+				list_add(&page->list, &mapping->dirty_pages);
+				continue;
+			}
+			list_add(&page->list, &mapping->locked_pages);
 			continue;
+		}
+		if (!PageDirty(page)) {
+			list_add(&page->list, &mapping->clean_pages);
+			continue;
+		}
+		list_add(&page->list, &mapping->locked_pages);
 
 		page_cache_get(page);
 		write_unlock(&mapping->page_lock);
@@ -354,8 +361,9 @@ int generic_writeback_mapping(struct address_space *mapping, int *nr_to_write)
 				if (*nr_to_write <= 0)
 					done = 1;
 			}
-		} else
+		} else {
 			unlock_page(page);
+		}
 
 		page_cache_release(page);
 		write_lock(&mapping->page_lock);
@@ -390,21 +398,25 @@ int write_one_page(struct page *page, int wait)
 
 	BUG_ON(!PageLocked(page));
 
+	if (wait && PageWriteback(page))
+		wait_on_page_writeback(page);
+
 	write_lock(&mapping->page_lock);
 	list_del(&page->list);
-	list_add(&page->list, &mapping->locked_pages);
-	write_unlock(&mapping->page_lock);
-
 	if (TestClearPageDirty(page)) {
+		list_add(&page->list, &mapping->locked_pages);
 		page_cache_get(page);
+		write_unlock(&mapping->page_lock);
 		ret = mapping->a_ops->writepage(page);
 		if (ret == 0 && wait) {
-			wait_on_page(page);
+			wait_on_page_writeback(page);
 			if (PageError(page))
 				ret = -EIO;
 		}
 		page_cache_release(page);
 	} else {
+		list_add(&page->list, &mapping->clean_pages);
+		write_unlock(&mapping->page_lock);
 		unlock_page(page);
 	}
 	return ret;

@@ -157,7 +157,7 @@ struct buffer_head *bread(kdev_t dev, int block, int size);
 
 
 /* reiserfs_writepage needs this */
-void set_buffer_async_io(struct buffer_head *bh) ;
+void set_buffer_async_io(struct buffer_head *bh);
 void invalidate_inode_buffers(struct inode *);
 void invalidate_bdev(struct block_device *, int);
 void __invalidate_buffers(kdev_t dev, int);

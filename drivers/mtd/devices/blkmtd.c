@@ -662,7 +662,7 @@ static int blkmtd_read(struct mtd_info *mtd, loff_t from, size_t len,
     if(IS_ERR(page)) {
       return PTR_ERR(page);
     }
-    wait_on_page(page);
+    wait_on_page_locked(page);
     if(!PageUptodate(page)) {
       /* error reading page */
       printk("blkmtd: read: page not uptodate\n");

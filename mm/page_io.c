@@ -117,6 +117,9 @@ void rw_swap_page_nolock(int rw, swp_entry_t entry, char *buf)
 	page->mapping = &swapper_space;
 	if (!rw_swap_page_base(rw, entry, page))
 		unlock_page(page);
-	wait_on_page(page);
+	if (rw == WRITE)
+		wait_on_page_writeback(page);
+	else
+		wait_on_page_locked(page);
 	page->mapping = NULL;
 }

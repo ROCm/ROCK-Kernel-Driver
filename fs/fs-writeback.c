@@ -129,10 +129,13 @@ static void __sync_single_inode(struct inode *inode, int wait, int *nr_to_write)
 	inode->i_state &= ~I_DIRTY;
 	spin_unlock(&inode_lock);
 
+	if (wait)
+		filemap_fdatawait(mapping);
+
 	if (mapping->a_ops->writeback_mapping)
 		mapping->a_ops->writeback_mapping(mapping, nr_to_write);
 	else
-		filemap_fdatasync(mapping);
+		filemap_fdatawrite(mapping);
 
 	/* Don't write the inode if only I_DIRTY_PAGES was set */
 	if (dirty & (I_DIRTY_SYNC | I_DIRTY_DATASYNC))
@@ -499,7 +502,7 @@ int generic_osync_inode(struct inode *inode, int what)
 	if (what & (OSYNC_METADATA|OSYNC_DATA))
 		err = fsync_inode_buffers(inode);
 	if (what & OSYNC_DATA) {
-		err2 = filemap_fdatasync(inode->i_mapping);
+		err2 = filemap_fdatawrite(inode->i_mapping);
 		if (!err)
 			err = err2;
 	}
