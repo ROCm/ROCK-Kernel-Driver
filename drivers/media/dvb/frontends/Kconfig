@@ -63,13 +63,9 @@ config DVB_SP887X
 	help
  	  A DVB-T tuner module. Say Y when you want to support this frontend.
 
-	  This driver needs a copy of the Avermedia firmware. The version tested
-	  is part of the Avermedia DVB-T 1.3.26.3 Application. If the software is
-	  installed in Windoze the file will be in the /Program Files/AVerTV DVB-T/
-	  directory and is called sc_main.mc. Alternatively it can "extracted" from
-	  the install cab files.
-
-   	  Copy this file to '/usr/lib/hotplug/firmware/dvb-fe-sp887x.fw'.
+	  This driver needs external firmware. Please use the command
+	  "<kerneldir>/Documentation/dvb/get_dvb_firmware sp887x" to
+	  download/extract it, and then copy it to /usr/lib/hotplug/firmware.
 
 	  If you don't know what tuner module is soldered on your 
 	  DVB adapter simply enable all supported frontends, the 
@@ -81,9 +77,9 @@ config DVB_ALPS_TDLB7
 	help
 	  A DVB-T tuner module. Say Y when you want to support this frontend.
 
-	  This driver needs a copy of the firmware file from the Haupauge
-	  Windoze driver. Copy 'Sc_main.mc' to
-	  '/usr/lib/hotplug/firmware/dvb-fe-tdlb7.fw'.
+	  This driver needs external firmware. Please use the command
+	  "<kerneldir>/Documentation/dvb/get_dvb_firmware alps_tdlb7" to
+	  download/extract it, and then copy it to /usr/lib/hotplug/firmware.
 
 	  If you don't know what tuner module is soldered on your 
 	  DVB adapter simply enable all supported frontends, the 
@@ -98,6 +94,16 @@ config DVB_ALPS_TDMB7
 	  If you don't know what tuner module is soldered on your 
 	  DVB adapter simply enable all supported frontends, the 
 	  right one will get autodetected.
+
+config DVB_CX22702
+ 	tristate "Conexant cx22702 demodulator (OFDM)"
+ 	depends on DVB_CORE
+ 	help
+ 	  A DVB-T tuner module. Say Y when you want to support this frontend.
+
+ 	  If you don't know what tuner module is soldered on your
+ 	  DVB adapter simply enable all supported frontends, the
+ 	  right one will get autodetected.
 
 config DVB_GRUNDIG_29504_401
 	tristate "Grundig 29504-401 based"
@@ -114,6 +120,11 @@ config DVB_TDA1004X
 	depends on DVB_CORE
 	help
 	  A DVB-T tuner module. Say Y when you want to support this frontend.
+
+	  This driver needs external firmware. Please use the commands
+	  "<kerneldir>/Documentation/dvb/get_dvb_firmware tda10045",
+  	  "<kerneldir>/Documentation/dvb/get_dvb_firmware tda10046" to
+	  download/extract them, and then copy them to /usr/lib/hotplug/firmware.
 
 	  If you don't know what tuner module is soldered on your 
 	  DVB adapter simply enable all supported frontends, the 
@@ -134,6 +145,21 @@ config DVB_MT352
 	depends on DVB_CORE
 	help
 	  A DVB-T tuner module. Say Y when you want to support this frontend.
+
+	  If you don't know what tuner module is soldered on your
+	  DVB adapter simply enable all supported frontends, the
+	  right one will get autodetected.
+
+config DVB_DIB3000MB
+	tristate "DiBcom 3000-MB"
+	depends on DVB_CORE
+	help
+	  A DVB-T tuner module. Designed for mobile usage. Say Y when you want
+	  to support this frontend.
+
+	  Used on USB-powered devices. You should also say Y to DVB_DIBUSB
+	  (DiBcom USB DVB-T Adapter) to support the actual device,
+	  this is "only" the frontend/tuner.
 
 	  If you don't know what tuner module is soldered on your
 	  DVB adapter simply enable all supported frontends, the
