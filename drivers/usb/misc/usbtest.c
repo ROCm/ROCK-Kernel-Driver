@@ -1355,7 +1355,7 @@ static void iso_callback (struct urb *urb, struct pt_regs *regs)
 				"iso test, %lu errors\n",
 				ctx->errors);
 		complete (&ctx->done);
-	} else
+	}
 done:
 	spin_unlock(&ctx->lock);
 }
@@ -1457,8 +1457,10 @@ test_iso_queue (struct usbtest_dev *dev, struct usbtest_param *param,
 		status = usb_submit_urb (urbs [i], SLAB_ATOMIC);
 		if (status < 0) {
 			ERROR (dev, "submit iso[%d], error %d\n", i, status);
-			if (i == 0)
+			if (i == 0) {
+				spin_unlock_irq (&context.lock);
 				goto fail;
+			}
 
 			simple_free_urb (urbs [i]);
 			context.pending--;

@@ -510,7 +510,7 @@ static inline void ohci_writel (const struct ohci_hcd *ohci,
 /* cpu to ohci */
 static inline __hc16 cpu_to_hc16 (const struct ohci_hcd *ohci, const u16 x)
 {
-	return big_endian(ohci) ? cpu_to_be16(x) : cpu_to_le16(x);
+	return big_endian(ohci) ? (__force __hc16)cpu_to_be16(x) : (__force __hc16)cpu_to_le16(x);
 }
 
 static inline __hc16 cpu_to_hc16p (const struct ohci_hcd *ohci, const u16 *x)
@@ -520,7 +520,7 @@ static inline __hc16 cpu_to_hc16p (const struct ohci_hcd *ohci, const u16 *x)
 
 static inline __hc32 cpu_to_hc32 (const struct ohci_hcd *ohci, const u32 x)
 {
-	return big_endian(ohci) ? cpu_to_be32(x) : cpu_to_le32(x);
+	return big_endian(ohci) ? (__force __hc32)cpu_to_be32(x) : (__force __hc32)cpu_to_le32(x);
 }
 
 static inline __hc32 cpu_to_hc32p (const struct ohci_hcd *ohci, const u32 *x)
@@ -531,22 +531,22 @@ static inline __hc32 cpu_to_hc32p (const struct ohci_hcd *ohci, const u32 *x)
 /* ohci to cpu */
 static inline u16 hc16_to_cpu (const struct ohci_hcd *ohci, const __hc16 x)
 {
-	return big_endian(ohci) ? be16_to_cpu(x) : le16_to_cpu(x);
+	return big_endian(ohci) ? be16_to_cpu((__force __be16)x) : le16_to_cpu((__force __le16)x);
 }
 
 static inline u16 hc16_to_cpup (const struct ohci_hcd *ohci, const __hc16 *x)
 {
-	return big_endian(ohci) ? be16_to_cpup(x) : le16_to_cpup(x);
+	return big_endian(ohci) ? be16_to_cpup((__force __be16 *)x) : le16_to_cpup((__force __le16 *)x);
 }
 
 static inline u32 hc32_to_cpu (const struct ohci_hcd *ohci, const __hc32 x)
 {
-	return big_endian(ohci) ? be32_to_cpu(x) : le32_to_cpu(x);
+	return big_endian(ohci) ? be32_to_cpu((__force __be32)x) : le32_to_cpu((__force __le32)x);
 }
 
 static inline u32 hc32_to_cpup (const struct ohci_hcd *ohci, const __hc32 *x)
 {
-	return big_endian(ohci) ? be32_to_cpup(x) : le32_to_cpup(x);
+	return big_endian(ohci) ? be32_to_cpup((__force __be32 *)x) : le32_to_cpup((__force __le32 *)x);
 }
 
 /*-------------------------------------------------------------------------*/
