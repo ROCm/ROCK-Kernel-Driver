@@ -689,6 +689,15 @@ static ssize_t blkdev_file_write(struct file *file, const char *buf,
 	return generic_file_write_nolock(file, &local_iov, 1, ppos);
 }
 
+static ssize_t blkdev_file_aio_write(struct kiocb *iocb, const char *buf,
+				   size_t count, loff_t pos)
+{
+	struct iovec local_iov = { .iov_base = (void *)buf, .iov_len = count };
+
+	return generic_file_aio_write_nolock(iocb, &local_iov, 1, &iocb->ki_pos);
+}
+
+
 struct address_space_operations def_blk_aops = {
 	.readpage	= blkdev_readpage,
 	.writepage	= blkdev_writepage,
@@ -705,6 +714,8 @@ struct file_operations def_blk_fops = {
 	.llseek		= block_llseek,
 	.read		= generic_file_read,
 	.write		= blkdev_file_write,
+  	.aio_read	= generic_file_aio_read,
+  	.aio_write	= blkdev_file_aio_write, 
 	.mmap		= generic_file_mmap,
 	.fsync		= block_fsync,
 	.ioctl		= blkdev_ioctl,

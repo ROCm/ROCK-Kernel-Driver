@@ -992,9 +992,9 @@ static irqreturn_t ircc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		return IRQ_NONE;
 	}
 	irport = (struct irport_cb *) dev->priv;
-	ASSERT(irport != NULL, return;);
+	ASSERT(irport != NULL, return IRQ_NONE;);
 	self = (struct ircc_cb *) irport->priv;
-	ASSERT(self != NULL, return;);
+	ASSERT(self != NULL, return IRQ_NONE;);
 
 	/* Check if we should use the SIR interrupt handler */
 	if (self->io->speed < 576000) {

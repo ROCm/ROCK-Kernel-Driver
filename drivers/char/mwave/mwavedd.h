@@ -140,6 +140,8 @@ typedef struct _MWAVE_DEVICE_DATA {
 	MWAVE_IPC IPCs[16];
 	BOOLEAN bMwaveDevRegistered;
 	short sLine;
+	int nr_registered_attrs;
+	int device_registered;
 
 } MWAVE_DEVICE_DATA, *pMWAVE_DEVICE_DATA;
 

@@ -277,13 +277,16 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 /* Compiling for a 386 proper.	Is it worth implementing via cli/sti?  */
 #endif
 
+#ifdef __KERNEL__
 struct alt_instr { 
-	u8 *instr; 		/* original instruction */
-	u8  cpuid;		/* cpuid bit set for replacement */
-	u8  instrlen;		/* length of original instruction */
-	u8  replacementlen; 	/* length of new instruction, <= instrlen */ 
-	u8  replacement[0];   	/* new instruction */
+	__u8 *instr; 		/* original instruction */
+	__u8 *replacement;
+	__u8  cpuid;		/* cpuid bit set for replacement */
+	__u8  instrlen;		/* length of original instruction */
+	__u8  replacementlen; 	/* length of new instruction, <= instrlen */ 
+	__u8  pad;
 }; 
+#endif
 
 /* 
  * Alternative instructions for different CPU types or capabilities.
@@ -302,11 +305,38 @@ struct alt_instr {
 		      ".section .altinstructions,\"a\"\n"     	     \
 		      "  .align 4\n"				       \
 		      "  .long 661b\n"            /* label */          \
+		      "  .long 663f\n"		  /* new instruction */ 	\
 		      "  .byte %c0\n"             /* feature bit */    \
 		      "  .byte 662b-661b\n"       /* sourcelen */      \
 		      "  .byte 664f-663f\n"       /* replacementlen */ \
+		      ".previous\n"						\
+		      ".section .altinstr_replacement,\"ax\"\n"			\
 		      "663:\n\t" newinstr "\n664:\n"   /* replacement */    \
 		      ".previous" :: "i" (feature) : "memory")  
+
+/*
+ * Alternative inline assembly with input.
+ * 
+ * Pecularities:
+ * No memory clobber here. 
+ * Argument numbers start with 1.
+ * Best is to use constraints that are fixed size (like (%1) ... "r")
+ * If you use variable sized constraints like "m" or "g" in the 
+ * replacement maake sure to pad to the worst case length.
+ */
+#define alternative_input(oldinstr, newinstr, feature, input)			\
+	asm volatile ("661:\n\t" oldinstr "\n662:\n"				\
+		      ".section .altinstructions,\"a\"\n"			\
+		      "  .align 4\n"						\
+		      "  .long 661b\n"            /* label */			\
+		      "  .long 663f\n"		  /* new instruction */ 	\
+		      "  .byte %c0\n"             /* feature bit */		\
+		      "  .byte 662b-661b\n"       /* sourcelen */		\
+		      "  .byte 664f-663f\n"       /* replacementlen */ 		\
+		      ".previous\n"						\
+		      ".section .altinstr_replacement,\"ax\"\n"			\
+		      "663:\n\t" newinstr "\n664:\n"   /* replacement */ 	\
+		      ".previous" :: "i" (feature), input)  
 
 /*
  * Force strict CPU ordering.

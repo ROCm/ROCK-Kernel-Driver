@@ -99,23 +99,30 @@ char *disk_name(struct gendisk *hd, int part, char *buf)
 #ifdef CONFIG_DEVFS_FS
 	if (hd->devfs_name[0] != '\0') {
 		if (part)
-			sprintf(buf, "%s/part%d", hd->devfs_name, part);
+			snprintf(buf, BDEVNAME_SIZE, "%s/part%d",
+					hd->devfs_name, part);
 		else if (hd->minors != 1)
-			sprintf(buf, "%s/disc", hd->devfs_name);
+			snprintf(buf, BDEVNAME_SIZE, "%s/disc", hd->devfs_name);
 		else
-			sprintf(buf, "%s", hd->devfs_name);
+			snprintf(buf, BDEVNAME_SIZE, "%s", hd->devfs_name);
 		return buf;
 	}
 #endif
 
 	if (!part)
-		sprintf(buf, "%s", hd->disk_name);
+		snprintf(buf, BDEVNAME_SIZE, "%s", hd->disk_name);
 	else if (isdigit(hd->disk_name[strlen(hd->disk_name)-1]))
-		sprintf(buf, "%sp%d", hd->disk_name, part);
+		snprintf(buf, BDEVNAME_SIZE, "%sp%d", hd->disk_name, part);
 	else
-		sprintf(buf, "%s%d", hd->disk_name, part);
+		snprintf(buf, BDEVNAME_SIZE, "%s%d", hd->disk_name, part);
 
 	return buf;
+}
+
+const char *bdevname(struct block_device *bdev, char *buf)
+{
+	int part = MINOR(bdev->bd_dev) - bdev->bd_disk->first_minor;
+	return disk_name(bdev->bd_disk, part, buf);
 }
 
 static struct parsed_partitions *
@@ -417,7 +424,7 @@ void del_gendisk(struct gendisk *disk)
 struct dev_name {
 	struct list_head list;
 	dev_t dev;
-	char namebuf[64];
+	char namebuf[BDEVNAME_SIZE];
 	char *name;
 };
 

@@ -978,12 +978,6 @@ static void ext3_orphan_cleanup (struct super_block * sb,
 		return;
 	}
 
-	if (s_flags & MS_RDONLY) {
-		printk(KERN_INFO "EXT3-fs: %s: orphan cleanup on readonly fs\n",
-		       sb->s_id);
-		sb->s_flags &= ~MS_RDONLY;
-	}
-
 	if (EXT3_SB(sb)->s_mount_state & EXT3_ERROR_FS) {
 		if (es->s_last_orphan)
 			jbd_debug(1, "Errors on filesystem, "
@@ -991,6 +985,12 @@ static void ext3_orphan_cleanup (struct super_block * sb,
 		es->s_last_orphan = 0;
 		jbd_debug(1, "Skipping orphan recovery on fs with errors.\n");
 		return;
+	}
+
+	if (s_flags & MS_RDONLY) {
+		printk(KERN_INFO "EXT3-fs: %s: orphan cleanup on readonly fs\n",
+		       sb->s_id);
+		sb->s_flags &= ~MS_RDONLY;
 	}
 
 	while (es->s_last_orphan) {
