@@ -2895,7 +2895,6 @@ drop_buffers(struct page *page, struct buffer_head **buffers_to_free)
 {
 	struct buffer_head *head = page_buffers(page);
 	struct buffer_head *bh;
-	int was_uptodate = 1;
 
 	bh = head;
 	do {
@@ -2903,8 +2902,6 @@ drop_buffers(struct page *page, struct buffer_head **buffers_to_free)
 			set_bit(AS_EIO, &page->mapping->flags);
 		if (buffer_busy(bh))
 			goto failed;
-		if (!buffer_uptodate(bh) && !buffer_req(bh))
-			was_uptodate = 0;
 		bh = bh->b_this_page;
 	} while (bh != head);
 
