@@ -50,8 +50,6 @@
 #define NV_PIO_MASK			0x1f
 #define NV_MWDMA_MASK			0x07
 #define NV_UDMA_MASK			0x7f
-#define NV_PORT0_BMDMA_REG_OFFSET	0x00
-#define NV_PORT1_BMDMA_REG_OFFSET	0x08
 #define NV_PORT0_SCR_REG_OFFSET		0x00
 #define NV_PORT1_SCR_REG_OFFSET		0x40
 
@@ -187,7 +185,7 @@ static Scsi_Host_Template nv_sht = {
 	.eh_strategy_handler	= ata_scsi_error,
 	.can_queue		= ATA_DEF_QUEUE,
 	.this_id		= ATA_SHT_THIS_ID,
-	.sg_tablesize		= ATA_MAX_PRD,
+	.sg_tablesize		= LIBATA_MAX_PRD,
 	.max_sectors		= ATA_MAX_SECTORS,
 	.cmd_per_lun		= ATA_SHT_CMD_PER_LUN,
 	.emulated		= ATA_SHT_EMULATED,
@@ -200,13 +198,13 @@ static Scsi_Host_Template nv_sht = {
 
 static struct ata_port_operations nv_ops = {
 	.port_disable		= ata_port_disable,
-	.tf_load		= ata_tf_load_pio,
-	.tf_read		= ata_tf_read_pio,
-	.exec_command		= ata_exec_command_pio,
-	.check_status		= ata_check_status_pio,
+	.tf_load		= ata_tf_load,
+	.tf_read		= ata_tf_read,
+	.exec_command		= ata_exec_command,
+	.check_status		= ata_check_status,
 	.phy_reset		= sata_phy_reset,
-	.bmdma_setup		= ata_bmdma_setup_pio,
-	.bmdma_start		= ata_bmdma_start_pio,
+	.bmdma_setup		= ata_bmdma_setup,
+	.bmdma_start		= ata_bmdma_start,
 	.qc_prep		= ata_qc_prep,
 	.qc_issue		= ata_qc_issue_prot,
 	.eng_timeout		= ata_eng_timeout,
@@ -217,6 +215,18 @@ static struct ata_port_operations nv_ops = {
 	.port_start		= ata_port_start,
 	.port_stop		= ata_port_stop,
 	.host_stop		= nv_host_stop,
+};
+
+static struct ata_port_info nv_port_info = {
+	.sht		= &nv_sht,
+	.host_flags	= ATA_FLAG_SATA |
+			  ATA_FLAG_SATA_RESET |
+			  ATA_FLAG_SRST |
+			  ATA_FLAG_NO_LEGACY,
+	.pio_mask	= NV_PIO_MASK,
+	.mwdma_mask	= NV_MWDMA_MASK,
+	.udma_mask	= NV_UDMA_MASK,
+	.port_ops	= &nv_ops,
 };
 
 MODULE_AUTHOR("NVIDIA");
@@ -299,6 +309,7 @@ static int nv_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	static int printed_version = 0;
 	struct nv_host *host;
+	struct ata_port_info *ppi;
 	struct ata_probe_ent *probe_ent = NULL;
 	int rc;
 
@@ -320,7 +331,8 @@ static int nv_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (rc)
 		goto err_out_regions;
 
-	probe_ent = kmalloc(sizeof(*probe_ent), GFP_KERNEL);
+	ppi = &nv_port_info;
+	probe_ent = ata_pci_init_native_mode(pdev, &ppi);
 	if (!probe_ent) {
 		rc = -ENOMEM;
 		goto err_out_regions;
@@ -333,40 +345,6 @@ static int nv_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	}
 
 	host->host_desc = &nv_device_tbl[ent->driver_data];
-
-	memset(probe_ent, 0, sizeof(*probe_ent));
-	INIT_LIST_HEAD(&probe_ent->node);
-
-	probe_ent->pdev = pdev;
-	probe_ent->sht = &nv_sht;
-	probe_ent->host_flags = ATA_FLAG_SATA |
-				ATA_FLAG_SATA_RESET |
-				ATA_FLAG_SRST |
-				ATA_FLAG_NO_LEGACY;
-
-	probe_ent->port_ops = &nv_ops;
-	probe_ent->n_ports = NV_PORTS;
-	probe_ent->irq = pdev->irq;
-	probe_ent->irq_flags = SA_SHIRQ;
-	probe_ent->pio_mask = NV_PIO_MASK;
-	probe_ent->mwdma_mask = NV_MWDMA_MASK;
-	probe_ent->udma_mask = NV_UDMA_MASK;
-
-	probe_ent->port[0].cmd_addr = pci_resource_start(pdev, 0);
-	ata_std_ports(&probe_ent->port[0]);
-	probe_ent->port[0].altstatus_addr =
-	probe_ent->port[0].ctl_addr =
-		pci_resource_start(pdev, 1) | ATA_PCI_CTL_OFS;
-	probe_ent->port[0].bmdma_addr =
-		pci_resource_start(pdev, 4) | NV_PORT0_BMDMA_REG_OFFSET;
-
-	probe_ent->port[1].cmd_addr = pci_resource_start(pdev, 2);
-	ata_std_ports(&probe_ent->port[1]);
-	probe_ent->port[1].altstatus_addr =
-	probe_ent->port[1].ctl_addr =
-		pci_resource_start(pdev, 3) | ATA_PCI_CTL_OFS;
-	probe_ent->port[1].bmdma_addr =
-		pci_resource_start(pdev, 4) | NV_PORT1_BMDMA_REG_OFFSET;
 
 	probe_ent->private_data = host;
 

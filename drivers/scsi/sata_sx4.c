@@ -193,8 +193,8 @@ static Scsi_Host_Template pdc_sata_sht = {
 static struct ata_port_operations pdc_20621_ops = {
 	.port_disable		= ata_port_disable,
 	.tf_load		= pdc_tf_load_mmio,
-	.tf_read		= ata_tf_read_mmio,
-	.check_status		= ata_check_status_mmio,
+	.tf_read		= ata_tf_read,
+	.check_status		= ata_check_status,
 	.exec_command		= pdc_exec_command_mmio,
 	.phy_reset		= pdc_20621_phy_reset,
 	.qc_prep		= pdc20621_qc_prep,
@@ -887,7 +887,7 @@ static void pdc_tf_load_mmio(struct ata_port *ap, struct ata_taskfile *tf)
 {
 	WARN_ON (tf->protocol == ATA_PROT_DMA ||
 		 tf->protocol == ATA_PROT_NODATA);
-	ata_tf_load_mmio(ap, tf);
+	ata_tf_load(ap, tf);
 }
 
 
@@ -895,7 +895,7 @@ static void pdc_exec_command_mmio(struct ata_port *ap, struct ata_taskfile *tf)
 {
 	WARN_ON (tf->protocol == ATA_PROT_DMA ||
 		 tf->protocol == ATA_PROT_NODATA);
-	ata_exec_command_mmio(ap, tf);
+	ata_exec_command(ap, tf);
 }
 
 
