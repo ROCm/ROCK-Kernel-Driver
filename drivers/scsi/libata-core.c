@@ -2123,8 +2123,8 @@ static void ata_pio_task(void *_data)
 }
 
 /**
- *	ata_eng_timeout - Handle timeout of queued command
- *	@ap: Port on which timed-out command is active
+ *	ata_qc_timeout - Handle timeout of queued command
+ *	@qc: Command that timed out
  *
  *	Some part of the kernel (currently, only the SCSI layer)
  *	has noticed that the active command on port @ap has not
@@ -2138,22 +2138,13 @@ static void ata_pio_task(void *_data)
  *	transaction completed successfully.
  *
  *	LOCKING:
- *	Inherited from SCSI layer (none, can sleep)
  */
 
-void ata_eng_timeout(struct ata_port *ap)
+static void ata_qc_timeout(struct ata_queued_cmd *qc)
 {
 	u8 host_stat = 0, drv_stat;
-	struct ata_queued_cmd *qc;
 
 	DPRINTK("ENTER\n");
-
-	qc = ata_qc_from_tag(ap, ap->active_tag);
-	if (!qc) {
-		printk(KERN_ERR "ata%u: BUG: timeout without command\n",
-		       ap->id);
-		goto out;
-	}
 
 	/* hack alert!  We cannot use the supplied completion
 	 * function from inside the ->eh_strategy_handler() thread.
@@ -2189,6 +2180,45 @@ void ata_eng_timeout(struct ata_port *ap)
 		ata_qc_complete(qc, drv_stat);
 		break;
 	}
+
+out:
+	DPRINTK("EXIT\n");
+}
+
+/**
+ *	ata_eng_timeout - Handle timeout of queued command
+ *	@ap: Port on which timed-out command is active
+ *
+ *	Some part of the kernel (currently, only the SCSI layer)
+ *	has noticed that the active command on port @ap has not
+ *	completed after a specified length of time.  Handle this
+ *	condition by disabling DMA (if necessary) and completing
+ *	transactions, with error if necessary.
+ *
+ *	This also handles the case of the "lost interrupt", where
+ *	for some reason (possibly hardware bug, possibly driver bug)
+ *	an interrupt was not delivered to the driver, even though the
+ *	transaction completed successfully.
+ *
+ *	LOCKING:
+ *	Inherited from SCSI layer (none, can sleep)
+ */
+
+void ata_eng_timeout(struct ata_port *ap)
+{
+	u8 host_stat = 0, drv_stat;
+	struct ata_queued_cmd *qc;
+
+	DPRINTK("ENTER\n");
+
+	qc = ata_qc_from_tag(ap, ap->active_tag);
+	if (!qc) {
+		printk(KERN_ERR "ata%u: BUG: timeout without command\n",
+		       ap->id);
+		goto out;
+	}
+
+	ata_qc_timeout(qc);
 
 out:
 	DPRINTK("EXIT\n");
