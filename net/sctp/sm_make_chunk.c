@@ -1030,16 +1030,17 @@ nodata:
 	return retval;
 }
 
-/* Set chunk->source based on the IP header in chunk->skb.  */
-void sctp_init_source(sctp_chunk_t *chunk)
+/* Set chunk->source and dest based on the IP header in chunk->skb.  */
+void sctp_init_addrs(sctp_chunk_t *chunk)
 {
-	sockaddr_storage_t *source;
+	sockaddr_storage_t *source, *dest;
 	struct sk_buff *skb;
 	struct sctphdr *sh;
 	struct iphdr *ih4;
 	struct ipv6hdr *ih6;
 
 	source = &chunk->source;
+	dest = &chunk->dest;
 	skb = chunk->skb;
 	ih4 = skb->nh.iph;
 	ih6 = skb->nh.ipv6h;
@@ -1050,6 +1051,9 @@ void sctp_init_source(sctp_chunk_t *chunk)
 		source->v4.sin_family = AF_INET;
 		source->v4.sin_port = ntohs(sh->source);
 		source->v4.sin_addr.s_addr = ih4->saddr;
+		dest->v4.sin_family = AF_INET;
+		dest->v4.sin_port = ntohs(sh->dest);
+		dest->v4.sin_addr.s_addr = ih4->daddr;
 		break;
 
 	case 6:
@@ -1057,6 +1061,9 @@ void sctp_init_source(sctp_chunk_t *chunk)
 			source->v6.sin6_family = AF_INET6;
 			source->v6.sin6_port = ntohs(sh->source);
 			source->v6.sin6_addr = ih6->saddr;
+			dest->v6.sin6_family = AF_INET6;
+			dest->v6.sin6_port = ntohs(sh->dest);
+			dest->v6.sin6_addr = ih6->daddr;
 			/* FIXME:  What do we do with scope, etc. ? */
 			break;
 		)

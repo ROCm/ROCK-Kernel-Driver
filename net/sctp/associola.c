@@ -404,6 +404,9 @@ sctp_transport_t *sctp_assoc_add_peer(sctp_association_t *asoc,
 
 	sctp_transport_set_owner(peer, asoc);
 
+	/* Cache a route for the transport. */
+	sctp_transport_route(peer, NULL);
+
 	/* If this is the first transport addr on this association,
 	 * initialize the association PMTU to the peer's PMTU.
 	 * If not and the current association PMTU is higher than the new

@@ -4261,6 +4261,11 @@ sctp_packet_t *sctp_ootb_pkt_new(const sctp_association_t *asoc,
 	if (!packet)
 		goto nomem_packet;
 
+	/* Cache a route for the transport with the chunk's destination as
+	 * the source address.
+	 */
+	sctp_transport_route(transport, (sockaddr_storage_t *)&chunk->dest);
+
 	packet = sctp_packet_init(packet, transport, sport, dport);
 	packet = sctp_packet_config(packet, vtag, 0, NULL);
 
