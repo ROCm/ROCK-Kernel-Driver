@@ -135,7 +135,7 @@ EXPORT_SYMBOL(remove_shrinker);
  *
  * We do weird things to avoid (scanned*seeks*entries) overflowing 32 bits.
  */
-static int shrink_slab(long scanned, unsigned int gfp_mask)
+static int shrink_slab(unsigned long scanned, unsigned int gfp_mask)
 {
 	struct shrinker *shrinker;
 	long pages;
@@ -147,7 +147,7 @@ static int shrink_slab(long scanned, unsigned int gfp_mask)
 	list_for_each_entry(shrinker, &shrinker_list, list) {
 		unsigned long long delta;
 
-		delta = 4 * (scanned / shrinker->seeks);
+		delta = (4 * scanned) / shrinker->seeks;
 		delta *= (*shrinker->shrinker)(0, gfp_mask);
 		do_div(delta, pages + 1);
 		shrinker->nr += delta;
