@@ -448,7 +448,6 @@ void reiserfs_init_alloc_options (struct super_block *s)
     set_bit (_ALLOC_skip_busy, &SB_ALLOC_OPTS(s));
     set_bit (_ALLOC_dirid_groups, &SB_ALLOC_OPTS(s));
     set_bit (_ALLOC_packing_groups, &SB_ALLOC_OPTS(s));
-    reiserfs_warning (s, "allocator defaults = [%08x]\n", SB_ALLOC_OPTS(s));
 }
 
 /* block allocator related options are parsed here */
