@@ -19,6 +19,7 @@
 
 #include "scsi.h"
 #include <linux/genhd.h>
+#include <linux/kref.h>
 
 /* The CDROM is fairly slow, so we need a little extra time */
 /* In fact, it is very slow if it has to spin up first */
@@ -37,8 +38,8 @@ typedef struct scsi_cd {
 	unsigned readcd_cdda:1;	/* reading audio data using READ_CD */
 	struct cdrom_device_info cdi;
 	/* We hold gendisk and scsi_device references on probe and use
-	 * the refs on this kobj to decide when to release them */
-	struct kobject kobj;
+	 * the refs on this kref to decide when to release them */
+	struct kref kref;
 	struct gendisk *disk;
 } Scsi_CD;
 
