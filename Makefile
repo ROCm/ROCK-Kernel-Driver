@@ -195,7 +195,7 @@ scripts/docproc scripts/fixdep scripts/split-include : scripts ;
 
 .PHONY: scripts
 scripts:
-	+@$(call descend,scripts,)
+	+@$(Q)$(MAKE) -f scripts/Makefile.build obj=scripts
 
 # Objects we will link into vmlinux / subdirs we need to visit
 # ---------------------------------------------------------------------------
@@ -314,7 +314,7 @@ define rule_vmlinux__
 	  echo '  Generating build number'
 	  . scripts/mkversion > .tmp_version
 	  mv -f .tmp_version .version
-	  +$(call descend,init,)
+	  $(Q)$(MAKE) -f scripts/Makefile.build obj=init
 	)
 	$(call cmd,vmlinux__)
 	echo 'cmd_$@ := $(cmd_vmlinux__)' > $(@D)/.$(@F).cmd
@@ -373,7 +373,7 @@ $(sort $(vmlinux-objs)): $(SUBDIRS) ;
 
 .PHONY: $(SUBDIRS)
 $(SUBDIRS): .hdepend prepare
-	+$(call descend,$@,)
+	$(Q)$(MAKE) -f scripts/Makefile.build obj=$@
 
 #	Things we need done before we descend to build or make
 #	module versions are listed in "prepare"
@@ -396,17 +396,17 @@ targets += arch/$(ARCH)/vmlinux.lds.s
 # ---------------------------------------------------------------------------
 
 %.s: %.c scripts FORCE
-	+@$(call descend,$(@D),$@)
+	$(Q)$(MAKE) -f scripts/Makefile.build obj=$(@D) $@
 %.i: %.c scripts FORCE
-	+@$(call descend,$(@D),$@)
+	$(Q)$(MAKE) -f scripts/Makefile.build obj=$(@D) $@
 %.o: %.c scripts FORCE
-	+@$(call descend,$(@D),$@)
+	$(Q)$(MAKE) -f scripts/Makefile.build obj=$(@D) $@
 %.lst: %.c scripts FORCE
-	+@$(call descend,$(@D),$@)
+	$(Q)$(MAKE) -f scripts/Makefile.build obj=$(@D) $@
 %.s: %.S scripts FORCE
-	+@$(call descend,$(@D),$@)
+	$(Q)$(MAKE) -f scripts/Makefile.build obj=$(@D) $@
 %.o: %.S scripts FORCE
-	+@$(call descend,$(@D),$@)
+	$(Q)$(MAKE) -f scripts/Makefile.build obj=$(@D) $@
 
 # 	FIXME: The asm symlink changes when $(ARCH) changes. That's
 #	hard to detect, but I suppose "make mrproper" is a good idea
@@ -648,11 +648,11 @@ ifeq ($(filter-out $(noconfig_targets),$(MAKECMDGOALS)),)
 	make_with_config
 
 xconfig:
-	+@$(call descend,scripts,scripts/kconfig.tk)
+	$(Q)$(MAKE) -f scripts/Makefile.build obj=scripts scripts/kconfig.tk
 	wish -f scripts/kconfig.tk
 
 menuconfig:
-	+@$(call descend,scripts,lxdialog)
+	$(Q)$(MAKE) -f scripts/Makefile.build obj=scripts lxdialog
 	$(CONFIG_SHELL) $(src)/scripts/Menuconfig arch/$(ARCH)/config.in
 
 config:
@@ -808,7 +808,7 @@ help:
 # Documentation targets
 # ---------------------------------------------------------------------------
 sgmldocs psdocs pdfdocs htmldocs: scripts
-	+@$(call descend,Documentation/DocBook,$@)
+	$(Q)$(MAKE) -f Documentation/DocBook/Makefile $@
 
 # Scripts to check various things for consistency
 # ---------------------------------------------------------------------------
@@ -893,10 +893,5 @@ define update-if-changed
 		mv -f $@.tmp $@; \
 	fi
 endef
-
-#	$(call descend,<dir>,<target>)
-#	Recursively call a sub-make in <dir> with target <target> 
-
-descend = $(Q)$(MAKE) -f scripts/Makefile.build obj=$(1) $(2)
 
 FORCE:
