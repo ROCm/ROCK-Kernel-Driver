@@ -91,7 +91,7 @@ krb5_make_token(struct krb5_ctx *ctx, int qop_req,
 
 	dprintk("RPC:     gss_krb5_seal\n");
 
-	now = jiffies;
+	now = get_seconds();
 
 	if (qop_req != 0)
 		goto out_err;

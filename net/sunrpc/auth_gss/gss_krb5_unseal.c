@@ -178,7 +178,7 @@ krb5_read_token(struct krb5_ctx *ctx,
 	if (qop_state)
 		*qop_state = GSS_C_QOP_DEFAULT;
 
-	now = jiffies;
+	now = get_seconds();
 
 	ret = GSS_S_CONTEXT_EXPIRED;
 	if (now > ctx->endtime)
