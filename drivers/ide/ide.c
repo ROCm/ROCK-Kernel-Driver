@@ -3440,7 +3440,9 @@ int ide_register_driver(ide_driver_t *driver)
 		list_del_init(&drive->list);
 		ata_attach(drive);
 	}
-	return 0;
+	driver->gen_driver.name = driver->name;
+	driver->gen_driver.bus = &ide_bus_type;
+	return driver_register(&driver->gen_driver);
 }
 
 EXPORT_SYMBOL(ide_register_driver);

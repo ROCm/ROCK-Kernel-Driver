@@ -1200,6 +1200,7 @@ typedef struct ide_driver_s {
 	int		(*attach)(ide_drive_t *);
 	void		(*ata_prebuilder)(ide_drive_t *);
 	void		(*atapi_prebuilder)(ide_drive_t *);
+	struct device_driver	gen_driver;
 	struct list_head drives;
 	struct list_head drivers;
 } ide_driver_t;
