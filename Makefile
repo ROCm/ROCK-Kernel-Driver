@@ -342,17 +342,9 @@ define rule_vmlinux__
 	echo 'cmd_$@ := $(cmd_vmlinux__)' > $(@D)/.$(@F).cmd
 endef
 
-ifdef CONFIG_SMP
-#	Final awk script makes sure per-cpu vars are in per-cpu section, as
-#	old gcc (eg egcs 2.92.11) ignores section attribute if uninitialized.
-
-check_per_cpu =	$(AWK) -f $(srctree)/scripts/per-cpu-check.awk < System.map
-endif
-
 define rule_vmlinux
 	$(rule_vmlinux__)
 	$(NM) $@ | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
-	$(check_per_cpu)
 endef
 
 LDFLAGS_vmlinux += -T arch/$(ARCH)/vmlinux.lds.s
