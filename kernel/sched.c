@@ -6,14 +6,14 @@
  *  Copyright (C) 1991-2002  Linus Torvalds
  *
  *  1996-12-23  Modified by Dave Grothe to fix bugs in semaphores and
- *              make semaphores SMP safe
+ *		make semaphores SMP safe
  *  1998-11-19	Implemented schedule_timeout() and related stuff
  *		by Andrea Arcangeli
  *  2002-01-04	New ultra-scalable O(1) scheduler by Ingo Molnar:
- *  		hybrid priority-list and round-robin design with
- *  		an array-switch method of distributing timeslices
- *  		and per-CPU runqueues.  Additional code by Davide
- *  		Libenzi, Robert Love, and Rusty Russell.
+ *		hybrid priority-list and round-robin design with
+ *		an array-switch method of distributing timeslices
+ *		and per-CPU runqueues.  Additional code by Davide
+ *		Libenzi, Robert Love, and Rusty Russell.
  */
 
 #include <linux/mm.h>
@@ -180,11 +180,14 @@ static inline void task_rq_unlock(runqueue_t *rq, unsigned long *flags)
 /*
  * rq_lock - lock a given runqueue and disable interrupts.
  */
-static inline runqueue_t *rq_lock(runqueue_t *rq)
+static inline runqueue_t *this_rq_lock(void)
 {
+	runqueue_t *rq;
+
 	local_irq_disable();
 	rq = this_rq();
 	spin_lock(&rq->lock);
+
 	return rq;
 }
 
@@ -388,9 +391,7 @@ int wake_up_process(task_t * p)
 
 void wake_up_forked_process(task_t * p)
 {
-	runqueue_t *rq;
-
-	rq = rq_lock(rq);
+	runqueue_t *rq = this_rq_lock();
 
 	p->state = TASK_RUNNING;
 	if (!rt_task(p)) {
@@ -798,7 +799,8 @@ asmlinkage void schedule(void)
 	list_t *queue;
 	int idx;
 
-	BUG_ON(in_interrupt());
+	if (unlikely(in_interrupt()))
+		BUG();
 
 #if CONFIG_DEBUG_HIGHMEM
 	check_highmem_ptes();
@@ -1164,13 +1166,12 @@ static inline task_t *find_process_by_pid(pid_t pid)
 static int setscheduler(pid_t pid, int policy, struct sched_param *param)
 {
 	struct sched_param lp;
+	int retval = -EINVAL;
 	prio_array_t *array;
 	unsigned long flags;
 	runqueue_t *rq;
-	int retval;
 	task_t *p;
 
-	retval = -EINVAL;
 	if (!param || pid < 0)
 		goto out_nounlock;
 
@@ -1257,10 +1258,9 @@ asmlinkage long sys_sched_setparam(pid_t pid, struct sched_param *param)
 
 asmlinkage long sys_sched_getscheduler(pid_t pid)
 {
+	int retval = -EINVAL;
 	task_t *p;
-	int retval;
 
-	retval = -EINVAL;
 	if (pid < 0)
 		goto out_nounlock;
 
@@ -1277,11 +1277,10 @@ out_nounlock:
 
 asmlinkage long sys_sched_getparam(pid_t pid, struct sched_param *param)
 {
-	task_t *p;
 	struct sched_param lp;
-	int retval;
+	int retval = -EINVAL;
+	task_t *p;
 
-	retval = -EINVAL;
 	if (!param || pid < 0)
 		goto out_nounlock;
 
@@ -1316,8 +1315,8 @@ asmlinkage int sys_sched_setaffinity(pid_t pid, unsigned int len,
 				      unsigned long *user_mask_ptr)
 {
 	unsigned long new_mask;
-	task_t *p;
 	int retval;
+	task_t *p;
 
 	if (len < sizeof(new_mask))
 		return -EINVAL;
@@ -1367,13 +1366,12 @@ out_unlock:
 asmlinkage int sys_sched_getaffinity(pid_t pid, unsigned int len,
 				      unsigned long *user_mask_ptr)
 {
-	unsigned long mask;
 	unsigned int real_len;
-	task_t *p;
+	unsigned long mask;
 	int retval;
+	task_t *p;
 
 	real_len = sizeof(mask);
-
 	if (len < real_len)
 		return -EINVAL;
 
@@ -1398,7 +1396,7 @@ out_unlock:
 
 asmlinkage long sys_sched_yield(void)
 {
-	runqueue_t *rq = rq_lock(rq);
+	runqueue_t *rq = this_rq_lock();
 	prio_array_t *array = current->array;
 
 	/*
@@ -1477,9 +1475,9 @@ asmlinkage long sys_sched_get_priority_min(int policy)
 
 asmlinkage long sys_sched_rr_get_interval(pid_t pid, struct timespec *interval)
 {
+	int retval = -EINVAL;
 	struct timespec t;
 	task_t *p;
-	int retval = -EINVAL;
 
 	if (pid < 0)
 		goto out_nounlock;
@@ -1871,4 +1869,4 @@ void __init migration_init(void)
 			schedule_timeout(2);
 	}
 }
-#endif /* CONFIG_SMP */
+#endif
