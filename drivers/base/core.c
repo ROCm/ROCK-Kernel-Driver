@@ -98,9 +98,20 @@ static int device_attach(struct device * dev)
 
 static void device_detach(struct device * dev)
 {
-	/* detach from driver */
-	if (dev->driver && dev->driver->remove)
-		dev->driver->remove(dev);
+	if (dev->driver) {
+		write_lock(&dev->driver->lock);
+		list_del_init(&dev->driver_list);
+		write_unlock(&dev->driver->lock);
+
+		lock_device(dev);
+		dev->driver = NULL;
+		unlock_device(dev);
+
+		/* detach from driver */
+		if (dev->driver->remove)
+			dev->driver->remove(dev);
+		put_driver(dev->driver);
+	}
 }
 
 static int do_driver_attach(struct device * dev, void * data)
@@ -140,12 +151,13 @@ void driver_detach(struct device_driver * drv)
 	struct list_head * node;
 	int error = 0;
 
-	read_lock(&drv->lock);
+	write_lock(&drv->lock);
 	node = drv->devices.next;
 	while (node != &drv->devices) {
 		next = list_entry(node,struct device,driver_list);
 		get_device(next);
-		read_unlock(&drv->lock);
+		list_del_init(&next->driver_list);
+		write_unlock(&drv->lock);
 
 		if (dev)
 			put_device(dev);
@@ -154,10 +166,10 @@ void driver_detach(struct device_driver * drv)
 			put_device(dev);
 			break;
 		}
-		read_lock(&drv->lock);
-		node = dev->driver_list.next;
+		write_lock(&drv->lock);
+		node = drv->devices.next;
 	}
-	read_unlock(&drv->lock);
+	write_unlock(&drv->lock);
 	if (dev)
 		put_device(dev);
 }
@@ -181,13 +193,13 @@ int device_register(struct device *dev)
 	if (!dev || !strlen(dev->bus_id))
 		return -EINVAL;
 
-	spin_lock(&device_lock);
 	INIT_LIST_HEAD(&dev->node);
 	INIT_LIST_HEAD(&dev->children);
 	INIT_LIST_HEAD(&dev->g_list);
 	spin_lock_init(&dev->lock);
 	atomic_set(&dev->refcount,2);
 
+	spin_lock(&device_lock);
 	if (dev != &device_root) {
 		if (!dev->parent)
 			dev->parent = &device_root;

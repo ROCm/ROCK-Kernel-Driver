@@ -167,12 +167,13 @@ static int bus_make_dir(struct bus_type * bus)
 
 int bus_register(struct bus_type * bus)
 {
-	spin_lock(&device_lock);
 	rwlock_init(&bus->lock);
 	INIT_LIST_HEAD(&bus->devices);
 	INIT_LIST_HEAD(&bus->drivers);
-	list_add_tail(&bus->node,&bus_driver_list);
 	atomic_set(&bus->refcount,2);
+
+	spin_lock(&device_lock);
+	list_add_tail(&bus->node,&bus_driver_list);
 	spin_unlock(&device_lock);
 
 	pr_debug("bus type '%s' registered\n",bus->name);
