@@ -206,7 +206,7 @@ static void __exit pcxe_cleanup(void)
 {
 
 	unsigned long	flags;
-	int e1, e2;
+	int e1;
 
 	printk(KERN_NOTICE "Unloading PC/Xx version %s\n", VERSION);
 
@@ -222,12 +222,6 @@ static void __exit pcxe_cleanup(void)
 	kfree(digi_channels);
 	restore_flags(flags);
 }
-
-/*
- * pcxe_init() is our init_module():
- */
-module_init(pcxe_init);
-module_cleanup(pcxe_cleanup);
 
 static inline struct channel *chan(register struct tty_struct *tty)
 {
@@ -1013,9 +1007,6 @@ void __init pcxx_setup(char *str, int *ints)
 }
 #endif
 
-module_init(pcxe_init)
-module_exit(pcxe_exit)
-
 static struct tty_operations pcxe_ops = {
 	.open = pcxe_open,
 	.close = pcxe_close,
@@ -1561,6 +1552,8 @@ cleanup_boards:
 	return ret;
 }
 
+module_init(pcxe_init)
+module_exit(pcxe_cleanup)
 
 static void pcxxpoll(unsigned long dummy)
 {
@@ -1995,6 +1988,7 @@ static int pcxe_tiocmget(struct tty_struct *tty, struct file *file)
 	volatile struct board_chan *bc;
 	unsigned long flags;
 	int mflag = 0;
+	int mstat;
 
 	if(ch)
 		bc = ch->brdchan;
@@ -2069,6 +2063,7 @@ static int pcxe_tiocmset(struct tty_struct *tty, struct file *file,
 	pcxxparam(tty,ch);
 	memoff(ch);
 	restore_flags(flags);
+	return 0;
 }
 
 
