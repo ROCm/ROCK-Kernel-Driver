@@ -5598,7 +5598,7 @@ static int smctr_update_tx_chain(struct net_device *dev, FCBlock *fcb,
                 /* if all transmit buffer are cleared
                  * need to set the tx_buff_curr[] to tx_buff_head[]
                  * otherwise, tx buffer will be segregate and cannot
-                 * accomodate and buffer greater than (curr - head) and
+                 * accommodate and buffer greater than (curr - head) and
                  * (end - curr) since we do not allow wrap around allocation.
                  */
                 if(tp->tx_buff_used[queue] == 0)

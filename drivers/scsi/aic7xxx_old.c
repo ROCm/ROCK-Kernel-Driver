@@ -111,7 +111,7 @@
  * but are not limited to:
  *
  *  1: Import of the latest FreeBSD sequencer code for this driver
- *  2: Modification of kernel code to accomodate different sequencer semantics
+ *  2: Modification of kernel code to accommodate different sequencer semantics
  *  3: Extensive changes throughout kernel portion of driver to improve
  *     abort/reset processing and error hanndling
  *  4: Other work contributed by various people on the Internet

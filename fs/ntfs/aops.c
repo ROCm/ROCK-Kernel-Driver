@@ -1087,7 +1087,7 @@ static int ntfs_prepare_nonresident_write(struct page *page,
 
 		if (block >= ablock) {
 			// TODO: block is above allocated_size, need to
-			// allocate it. Best done in one go to accomodate not
+			// allocate it. Best done in one go to accommodate not
 			// only block but all above blocks up to and including:
 			// ((page->index << PAGE_CACHE_SHIFT) + to + blocksize
 			// - 1) >> blobksize_bits. Obviously will need to round

@@ -1518,7 +1518,7 @@ ess_rec_setup(struct ess_state *ess, int mode, u32 rate, void *buffer, int size)
 				pa = virt_to_bus(buffer);
 			} else {
 				/* right channel records its split half.
-				*2 accomodates for rampant shifting earlier */
+				*2 accommodates for rampant shifting earlier */
 				pa = virt_to_bus(buffer + size*2);
 			}
 

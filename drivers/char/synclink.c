@@ -4260,7 +4260,7 @@ int load_next_tx_holding_buffer(struct mgsl_struct *info)
 
 	if ( info->tx_holding_count ) {
 		/* determine if we have enough tx dma buffers
-		 * to accomodate the next tx frame
+		 * to accommodate the next tx frame
 		 */
 		struct tx_holding_buffer *ptx =
 			&info->tx_holding_buffers[info->get_tx_holding_index];

@@ -41,7 +41,7 @@
 //	into one 8 byte word. In this case we have only one entry in the pipeline.
 //
 //	We use a (LOAD_LATENCY+2)-stage pipeline in the loop to account for
-//	possible load latency and also to accomodate for head and tail.
+//	possible load latency and also to accommodate for head and tail.
 //
 //	The end of the function deals with folding the checksum from 64bits
 //	down to 16bits taking care of the carry.

@@ -1115,7 +1115,7 @@ done:
 		       envctrl_dev.minor);
 	}
 
-	/* Note above traversal routine post-incremented 'i' to accomodate 
+	/* Note above traversal routine post-incremented 'i' to accommodate 
 	 * a next child device, so we decrement before reverse-traversal of
 	 * child devices.
 	 */

@@ -141,7 +141,7 @@ struct CYZ_BOOT_CTRL {
 /****************** ****************** *******************/
 /*
  *	The data types defined below are used in all ZFIRM interface
- *	data structures. They accomodate differences between HW
+ *	data structures. They accommodate differences between HW
  *	architectures and compilers.
  */
 

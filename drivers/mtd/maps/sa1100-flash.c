@@ -96,7 +96,7 @@ static struct map_info sa1100_map __initdata = {
  *  1. We no longer support static flash mappings via the machine io_desc
  *     structure.
  *  2. The flash size given should be the largest flash size that can
- *     be accomodated.
+ *     be accommodated.
  *
  * The MTD layer will detect flash chip aliasing and reduce the size of
  * the map accordingly.

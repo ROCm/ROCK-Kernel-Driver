@@ -73,7 +73,7 @@
  *                       detect the ES1373 and later parts.
  *                       added AC97 #defines for readability
  *                       added a /proc file system for dumping hardware state
- *                       updated SRC and CODEC w/r functions to accomodate bugs
+ *                       updated SRC and CODEC w/r functions to accommodate bugs
  *                       in some versions of the ES137x chips.
  *    31.08.1999   0.17  add spin_lock_init
  *                       replaced current->state = x with set_current_state(x)

@@ -11,7 +11,7 @@
  * Pentium III FXSR, SSE support
  *	Gareth Hughes <gareth@valinux.com>, May 2000
  *
- * The FPU state data structure has had to grow to accomodate the
+ * The FPU state data structure has had to grow to accommodate the
  * extended FPU state required by the Streaming SIMD Extensions.
  * There is no documented standard to accomplish this at the moment.
  */

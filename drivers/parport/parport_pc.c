@@ -35,7 +35,7 @@
  * All registers are 8 bits wide and read/write.  If your hardware differs
  * only in register addresses (eg because your registers are on 32-bit
  * word boundaries) then you can alter the constants in parport_pc.h to
- * accomodate this.
+ * accommodate this.
  *
  * Note that the ECP registers may not start at offset 0x400 for PCI cards,
  * but rather will start at port->base_hi.
