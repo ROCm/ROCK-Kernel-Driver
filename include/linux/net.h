@@ -169,6 +169,7 @@ extern struct socket *sockfd_lookup(int fd, int *err);
 extern int	     net_ratelimit(void);
 extern unsigned long net_random(void);
 extern void	     net_srandom(unsigned long);
+extern void	     net_random_init(void);
 
 extern int   	     kernel_sendmsg(struct socket *sock, struct msghdr *msg,
 				    struct kvec *vec, size_t num, size_t len);

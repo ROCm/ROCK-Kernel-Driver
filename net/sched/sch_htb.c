@@ -1277,7 +1277,6 @@ static int htb_init(struct Qdisc *sch, struct rtattr *opt)
 				HTB_VER >> 16,HTB_VER & 0xffff,gopt->version);
 		return -EINVAL;
 	}
-	memset(q,0,sizeof(*q));
 	q->debug = gopt->debug;
 	HTB_DBG(0,1,"htb_init sch=%p handle=%X r2q=%d\n",sch,sch->handle,gopt->rate2quantum);
 

@@ -47,6 +47,7 @@
 #define DUMP_OFFSET(x)
 #endif
 
+static LIST_HEAD(helpers);
 DECLARE_LOCK(ip_nat_seqofs_lock);
 
 /* Setup TCP sequence correction given this change at this sequence */
@@ -417,6 +418,18 @@ int ip_nat_helper_register(struct ip_nat_helper *me)
 	WRITE_UNLOCK(&ip_nat_lock);
 
 	return ret;
+}
+
+struct ip_nat_helper *
+ip_nat_find_helper(const struct ip_conntrack_tuple *tuple)
+{
+	struct ip_nat_helper *h;
+
+	READ_LOCK(&ip_nat_lock);
+	h = LIST_FIND(&helpers, helper_cmp, struct ip_nat_helper *, tuple);
+	READ_UNLOCK(&ip_nat_lock);
+
+	return h;
 }
 
 static int

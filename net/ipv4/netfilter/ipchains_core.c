@@ -679,49 +679,53 @@ ip_fw_check(const char *rif,
 		case IPPROTO_TCP:
 			dprintf("TCP ");
 			if (!offset) {
-				struct tcphdr tcph;
+				struct tcphdr _tcph, *th;
 
-				if (skb_copy_bits(*pskb,
-						  (*pskb)->nh.iph->ihl * 4,
-						  &tcph, sizeof(tcph)))
+				th = skb_header_pointer(*pskb,
+							(*pskb)->nh.iph->ihl*4,
+							sizeof(_tcph), &_tcph);
+				if (th == NULL)
 					return FW_BLOCK;
 
-				src_port = ntohs(tcph.source);
-				dst_port = ntohs(tcph.dest);
+				src_port = ntohs(th->source);
+				dst_port = ntohs(th->dest);
 
 				/* Connection initilisation can only
 				 * be made when the syn bit is set and
 				 * neither of the ack or reset is
 				 * set. */
-				if (tcph.syn && !(tcph.ack || tcph.rst))
+				if (th->syn && !(th->ack || th->rst))
 					tcpsyn = 1;
 			}
 			break;
 		case IPPROTO_UDP:
 			dprintf("UDP ");
 			if (!offset) {
-				struct udphdr udph;
+				struct udphdr _udph, *uh;
 
-				if (skb_copy_bits(*pskb,
-						  (*pskb)->nh.iph->ihl * 4,
-						  &udph, sizeof(udph)))
+				uh = skb_header_pointer(*pskb,
+							(*pskb)->nh.iph->ihl*4,
+							sizeof(_udph), &_udph);
+				if (uh == NULL)
 					return FW_BLOCK;
 
-				src_port = ntohs(udph.source);
-				dst_port = ntohs(udph.dest);
+				src_port = ntohs(uh->source);
+				dst_port = ntohs(uh->dest);
 			}
 			break;
 		case IPPROTO_ICMP:
 			if (!offset) {
-				struct icmphdr icmph;
+				struct icmphdr _icmph, *ic;
 
-				if (skb_copy_bits(*pskb,
-						  (*pskb)->nh.iph->ihl * 4,
-						  &icmph, sizeof(icmph)))
+				ic = skb_header_pointer(*pskb,
+							(*pskb)->nh.iph->ihl*4,
+							sizeof(_icmph),
+							&_icmph);
+				if (ic == NULL)
 					return FW_BLOCK;
 
-				src_port = (__u16) icmph.type;
-				dst_port = (__u16) icmph.code;
+				src_port = (__u16) ic->type;
+				dst_port = (__u16) ic->code;
 			}
 			dprintf("ICMP ");
 			break;

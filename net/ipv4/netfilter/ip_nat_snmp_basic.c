@@ -47,6 +47,7 @@
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
+#include <linux/moduleparam.h>
 #include <linux/netfilter_ipv4.h>
 #include <linux/netfilter_ipv4/ip_nat.h>
 #include <linux/netfilter_ipv4/ip_nat_helper.h>
@@ -1252,6 +1253,9 @@ static unsigned int nat_help(struct ip_conntrack *ct,
 	int dir = CTINFO2DIR(ctinfo);
 	struct iphdr *iph = (*pskb)->nh.iph;
 	struct udphdr *udph = (struct udphdr *)((u_int32_t *)iph + iph->ihl);
+	
+	if (!skb_ip_make_writable(pskb, (*pskb)->len))
+		return NF_DROP;
 
 	spin_lock_bh(&snmp_lock);
 	
@@ -1357,4 +1361,4 @@ static void __exit fini(void)
 module_init(init);
 module_exit(fini);
 
-MODULE_PARM(debug, "i");
+module_param(debug, bool, 0600);

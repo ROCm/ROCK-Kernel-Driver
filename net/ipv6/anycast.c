@@ -293,6 +293,7 @@ static void aca_put(struct ifacaddr6 *ac)
 {
 	if (atomic_dec_and_test(&ac->aca_refcnt)) {
 		in6_dev_put(ac->aca_idev);
+		dst_release(&ac->aca_rt->u.dst);
 		kfree(ac);
 	}
 }
@@ -304,6 +305,8 @@ int ipv6_dev_ac_inc(struct net_device *dev, struct in6_addr *addr)
 {
 	struct ifacaddr6 *aca;
 	struct inet6_dev *idev;
+	struct rt6_info *rt;
+	int err;
 
 	idev = in6_dev_get(dev);
 
@@ -312,17 +315,15 @@ int ipv6_dev_ac_inc(struct net_device *dev, struct in6_addr *addr)
 
 	write_lock_bh(&idev->lock);
 	if (idev->dead) {
-		write_unlock_bh(&idev->lock);
-		in6_dev_put(idev);
-		return -ENODEV;
+		err = -ENODEV;
+		goto out;
 	}
 
 	for (aca = idev->ac_list; aca; aca = aca->aca_next) {
 		if (ipv6_addr_cmp(&aca->aca_addr, addr) == 0) {
 			aca->aca_users++;
-			write_unlock_bh(&idev->lock);
-			in6_dev_put(idev);
-			return 0;
+			err = 0;
+			goto out;
 		}
 	}
 
@@ -333,15 +334,22 @@ int ipv6_dev_ac_inc(struct net_device *dev, struct in6_addr *addr)
 	aca = kmalloc(sizeof(struct ifacaddr6), GFP_ATOMIC);
 
 	if (aca == NULL) {
-		write_unlock_bh(&idev->lock);
-		in6_dev_put(idev);
-		return -ENOMEM;
+		err = -ENOMEM;
+		goto out;
+	}
+
+	rt = addrconf_dst_alloc(idev, addr, 1);
+	if (IS_ERR(rt)) {
+		kfree(aca);
+		err = PTR_ERR(rt);
+		goto out;
 	}
 
 	memset(aca, 0, sizeof(struct ifacaddr6));
 
 	ipv6_addr_copy(&aca->aca_addr, addr);
 	aca->aca_idev = idev;
+	aca->aca_rt = rt;
 	aca->aca_users = 1;
 	/* aca_tstamp should be updated upon changes */
 	aca->aca_cstamp = aca->aca_tstamp = jiffies;
@@ -352,12 +360,18 @@ int ipv6_dev_ac_inc(struct net_device *dev, struct in6_addr *addr)
 	idev->ac_list = aca;
 	write_unlock_bh(&idev->lock);
 
-	ip6_rt_addr_add(&aca->aca_addr, dev, 1);
+	dst_hold(&rt->u.dst);
+	if (ip6_ins_rt(rt, NULL, NULL))
+		dst_release(&rt->u.dst);
 
 	addrconf_join_solict(dev, &aca->aca_addr);
 
 	aca_put(aca);
 	return 0;
+out:
+	write_unlock_bh(&idev->lock);
+	in6_dev_put(idev);
+	return err;
 }
 
 /*
@@ -396,7 +410,11 @@ int ipv6_dev_ac_dec(struct net_device *dev, struct in6_addr *addr)
 	write_unlock_bh(&idev->lock);
 	addrconf_leave_solict(dev, &aca->aca_addr);
 
-	ip6_rt_addr_del(&aca->aca_addr, dev);
+	dst_hold(&aca->aca_rt->u.dst);
+	if (ip6_del_rt(aca->aca_rt, NULL, NULL))
+		dst_free(&aca->aca_rt->u.dst);
+	else
+		dst_release(&aca->aca_rt->u.dst);
 
 	aca_put(aca);
 	in6_dev_put(idev);

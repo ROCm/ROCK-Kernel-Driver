@@ -216,7 +216,7 @@ struct xfrm_type
 	void			(*destructor)(struct xfrm_state *);
 	int			(*input)(struct xfrm_state *, struct xfrm_decap_state *, struct sk_buff *skb);
 	int			(*post_input)(struct xfrm_state *, struct xfrm_decap_state *, struct sk_buff *skb);
-	int			(*output)(struct sk_buff **pskb);
+	int			(*output)(struct sk_buff *pskb);
 	/* Estimate maximal size of result of transformation of a dgram */
 	u32			(*get_max_size)(struct xfrm_state *, int size);
 };
@@ -303,47 +303,6 @@ struct xfrm_mgr
 extern int xfrm_register_km(struct xfrm_mgr *km);
 extern int xfrm_unregister_km(struct xfrm_mgr *km);
 
-
-#define XFRM_FLOWCACHE_HASH_SIZE	1024
-
-static inline u32 __flow_hash4(struct flowi *fl)
-{
-	u32 hash = fl->fl4_src ^ fl->fl_ip_sport;
-
-	hash = ((hash & 0xF0F0F0F0) >> 4) | ((hash & 0x0F0F0F0F) << 4);
-
-	hash ^= fl->fl4_dst ^ fl->fl_ip_dport;
-	hash ^= (hash >> 10);
-	hash ^= (hash >> 20);
-	return hash & (XFRM_FLOWCACHE_HASH_SIZE-1);
-}
-
-static inline u32 __flow_hash6(struct flowi *fl)
-{
-	u32 hash = fl->fl6_src.s6_addr32[2] ^
-		   fl->fl6_src.s6_addr32[3] ^ 
-		   fl->fl_ip_sport;
-
-	hash = ((hash & 0xF0F0F0F0) >> 4) | ((hash & 0x0F0F0F0F) << 4);
-
-	hash ^= fl->fl6_dst.s6_addr32[2] ^
-		fl->fl6_dst.s6_addr32[3] ^ 
-		fl->fl_ip_dport;
-	hash ^= (hash >> 10);
-	hash ^= (hash >> 20);
-	return hash & (XFRM_FLOWCACHE_HASH_SIZE-1);
-}
-
-static inline u32 flow_hash(struct flowi *fl, unsigned short family)
-{
-	switch (family) {
-	case AF_INET:
-		return __flow_hash4(fl);
-	case AF_INET6:
-		return __flow_hash6(fl);
-	}
-	return 0;	/*XXX*/
-}
 
 extern struct xfrm_policy *xfrm_policy_list[XFRM_POLICY_MAX*2];
 
@@ -462,13 +421,51 @@ static __inline__ int addr_match(void *token1, void *token2, int prefixlen)
 	return 1;
 }
 
+static __inline__
+u16 xfrm_flowi_sport(struct flowi *fl)
+{
+	u16 port;
+	switch(fl->proto) {
+	case IPPROTO_TCP:
+	case IPPROTO_UDP:
+		port = fl->fl_ip_sport;
+		break;
+	case IPPROTO_ICMP:
+	case IPPROTO_ICMPV6:
+		port = htons(fl->fl_icmp_type);
+		break;
+	default:
+		port = 0;	/*XXX*/
+	}
+	return port;
+}
+
+static __inline__
+u16 xfrm_flowi_dport(struct flowi *fl)
+{
+	u16 port;
+	switch(fl->proto) {
+	case IPPROTO_TCP:
+	case IPPROTO_UDP:
+		port = fl->fl_ip_dport;
+		break;
+	case IPPROTO_ICMP:
+	case IPPROTO_ICMPV6:
+		port = htons(fl->fl_icmp_code);
+		break;
+	default:
+		port = 0;	/*XXX*/
+	}
+	return port;
+}
+
 static inline int
 __xfrm4_selector_match(struct xfrm_selector *sel, struct flowi *fl)
 {
 	return  addr_match(&fl->fl4_dst, &sel->daddr, sel->prefixlen_d) &&
 		addr_match(&fl->fl4_src, &sel->saddr, sel->prefixlen_s) &&
-		!((fl->fl_ip_dport^sel->dport)&sel->dport_mask) &&
-		!((fl->fl_ip_sport^sel->sport)&sel->sport_mask) &&
+		!((xfrm_flowi_dport(fl) ^ sel->dport) & sel->dport_mask) &&
+		!((xfrm_flowi_sport(fl) ^ sel->sport) & sel->sport_mask) &&
 		(fl->proto == sel->proto || !sel->proto) &&
 		(fl->oif == sel->ifindex || !sel->ifindex);
 }
@@ -478,8 +475,8 @@ __xfrm6_selector_match(struct xfrm_selector *sel, struct flowi *fl)
 {
 	return  addr_match(&fl->fl6_dst, &sel->daddr, sel->prefixlen_d) &&
 		addr_match(&fl->fl6_src, &sel->saddr, sel->prefixlen_s) &&
-		!((fl->fl_ip_dport^sel->dport)&sel->dport_mask) &&
-		!((fl->fl_ip_sport^sel->sport)&sel->sport_mask) &&
+		!((xfrm_flowi_dport(fl) ^ sel->dport) & sel->dport_mask) &&
+		!((xfrm_flowi_sport(fl) ^ sel->sport) & sel->sport_mask) &&
 		(fl->proto == sel->proto || !sel->proto) &&
 		(fl->oif == sel->ifindex || !sel->ifindex);
 }
@@ -795,8 +792,6 @@ extern void xfrm4_state_init(void);
 extern void xfrm4_state_fini(void);
 extern void xfrm6_state_init(void);
 extern void xfrm6_state_fini(void);
-extern void xfrm6_tunnel_init(void);
-extern void xfrm6_tunnel_fini(void);
 
 extern int xfrm_state_walk(u8 proto, int (*func)(struct xfrm_state *, int, void*), void *);
 extern struct xfrm_state *xfrm_state_alloc(void);
@@ -821,6 +816,7 @@ extern int xfrm4_rcv(struct sk_buff *skb);
 extern int xfrm4_output(struct sk_buff **pskb);
 extern int xfrm4_tunnel_register(struct xfrm_tunnel *handler);
 extern int xfrm4_tunnel_deregister(struct xfrm_tunnel *handler);
+extern int xfrm6_rcv_spi(struct sk_buff **pskb, unsigned int *nhoffp, u32 spi);
 extern int xfrm6_rcv(struct sk_buff **pskb, unsigned int *nhoffp);
 extern int xfrm6_tunnel_register(struct xfrm6_tunnel *handler);
 extern int xfrm6_tunnel_deregister(struct xfrm6_tunnel *handler);
@@ -852,8 +848,6 @@ static inline int xfrm_dst_lookup(struct xfrm_dst **dst, struct flowi *fl, unsig
 #endif
 
 void xfrm_policy_init(void);
-void xfrm4_policy_init(void);
-void xfrm6_policy_init(void);
 struct xfrm_policy *xfrm_policy_alloc(int gfp);
 extern int xfrm_policy_walk(int (*func)(struct xfrm_policy *, int, int, void*), void *);
 int xfrm_policy_insert(int dir, struct xfrm_policy *policy, int excl);

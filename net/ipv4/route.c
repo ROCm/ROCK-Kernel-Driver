@@ -1339,9 +1339,12 @@ static void ipv4_dst_ifdown(struct dst_entry *dst, int how)
 {
 	struct rtable *rt = (struct rtable *) dst;
 	struct in_device *idev = rt->idev;
-	if (idev) {
-		rt->idev = NULL;
-		in_dev_put(idev);
+	if (idev && idev->dev != &loopback_dev) {
+		struct in_device *loopback_idev = in_dev_get(&loopback_dev);
+		if (loopback_idev) {
+			rt->idev = loopback_idev;
+			in_dev_put(idev);
+		}
 	}
 }
 
@@ -1384,13 +1387,7 @@ void ip_rt_get_source(u8 *addr, struct rtable *rt)
 	if (rt->fl.iif == 0)
 		src = rt->rt_src;
 	else if (fib_lookup(&rt->fl, &res) == 0) {
-#ifdef CONFIG_IP_ROUTE_NAT
-		if (res.type == RTN_NAT)
-			src = inet_select_addr(rt->u.dst.dev, rt->rt_gateway,
-						RT_SCOPE_UNIVERSE);
-		else
-#endif
-			src = FIB_RES_PREFSRC(res);
+		src = FIB_RES_PREFSRC(res);
 		fib_res_put(&res);
 	} else
 		src = inet_select_addr(rt->u.dst.dev, rt->rt_gateway,
@@ -1494,10 +1491,6 @@ static int ip_route_input_mc(struct sk_buff *skb, u32 daddr, u32 saddr,
 #endif
 	rth->fl.fl4_src	= saddr;
 	rth->rt_src	= saddr;
-#ifdef CONFIG_IP_ROUTE_NAT
-	rth->rt_dst_map	= daddr;
-	rth->rt_src_map	= saddr;
-#endif
 #ifdef CONFIG_NET_CLS_ROUTE
 	rth->u.dst.tclassid = itag;
 #endif
@@ -1607,31 +1600,6 @@ static int ip_route_input_slow(struct sk_buff *skb, u32 daddr, u32 saddr,
 
 	RT_CACHE_STAT_INC(in_slow_tot);
 
-#ifdef CONFIG_IP_ROUTE_NAT
-	/* Policy is applied before mapping destination,
-	   but rerouting after map should be made with old source.
-	 */
-
-	if (1) {
-		u32 src_map = saddr;
-		if (res.r)
-			src_map = fib_rules_policy(saddr, &res, &flags);
-
-		if (res.type == RTN_NAT) {
-			fl.fl4_dst = fib_rules_map_destination(daddr, &res);
-			fib_res_put(&res);
-			free_res = 0;
-			if (fib_lookup(&fl, &res))
-				goto e_inval;
-			free_res = 1;
-			if (res.type != RTN_UNICAST)
-				goto e_inval;
-			flags |= RTCF_DNAT;
-		}
-		fl.fl4_src = src_map;
-	}
-#endif
-
 	if (res.type == RTN_BROADCAST)
 		goto brd_input;
 
@@ -1705,12 +1673,6 @@ static int ip_route_input_slow(struct sk_buff *skb, u32 daddr, u32 saddr,
 	rth->fl.fl4_src	= saddr;
 	rth->rt_src	= saddr;
 	rth->rt_gateway	= daddr;
-#ifdef CONFIG_IP_ROUTE_NAT
-	rth->rt_src_map	= fl.fl4_src;
-	rth->rt_dst_map	= fl.fl4_dst;
-	if (flags&RTCF_DNAT)
-		rth->rt_gateway	= fl.fl4_dst;
-#endif
 	rth->rt_iif 	=
 	rth->fl.iif	= dev->ifindex;
 	rth->u.dst.dev	= out_dev->dev;
@@ -1773,10 +1735,6 @@ local_input:
 #endif
 	rth->fl.fl4_src	= saddr;
 	rth->rt_src	= saddr;
-#ifdef CONFIG_IP_ROUTE_NAT
-	rth->rt_dst_map	= fl.fl4_dst;
-	rth->rt_src_map	= fl.fl4_src;
-#endif
 #ifdef CONFIG_NET_CLS_ROUTE
 	rth->u.dst.tclassid = itag;
 #endif
@@ -1897,7 +1855,7 @@ int ip_route_input(struct sk_buff *skb, u32 daddr, u32 saddr,
 	if (MULTICAST(daddr)) {
 		struct in_device *in_dev;
 
-		read_lock(&inetdev_lock);
+		rcu_read_lock();
 		if ((in_dev = __in_dev_get(dev)) != NULL) {
 			int our = ip_check_mc(in_dev, daddr, saddr,
 				skb->nh.iph->protocol);
@@ -1906,12 +1864,12 @@ int ip_route_input(struct sk_buff *skb, u32 daddr, u32 saddr,
 			    || (!LOCAL_MCAST(daddr) && IN_DEV_MFORWARD(in_dev))
 #endif
 			    ) {
-				read_unlock(&inetdev_lock);
+				rcu_read_unlock();
 				return ip_route_input_mc(skb, daddr, saddr,
 							 tos, dev, our);
 			}
 		}
-		read_unlock(&inetdev_lock);
+		rcu_read_unlock();
 		return -EINVAL;
 	}
 	return ip_route_input_slow(skb, daddr, saddr, tos, dev);
@@ -2069,9 +2027,6 @@ static int ip_route_output_slow(struct rtable **rp, const struct flowi *oldflp)
 	}
 	free_res = 1;
 
-	if (res.type == RTN_NAT)
-		goto e_inval;
-
 	if (res.type == RTN_LOCAL) {
 		if (!fl.fl4_src)
 			fl.fl4_src = fl.fl4_dst;
@@ -2161,10 +2116,6 @@ make_route:
 #endif
 	rth->rt_dst	= fl.fl4_dst;
 	rth->rt_src	= fl.fl4_src;
-#ifdef CONFIG_IP_ROUTE_NAT
-	rth->rt_dst_map	= fl.fl4_dst;
-	rth->rt_src_map	= fl.fl4_src;
-#endif
 	rth->rt_iif	= oldflp->oif ? : dev_out->ifindex;
 	rth->u.dst.dev	= dev_out;
 	dev_hold(dev_out);

@@ -172,13 +172,13 @@ int fib_validate_source(u32 src, u32 dst, u8 tos, int oif,
 	int ret;
 
 	no_addr = rpf = 0;
-	read_lock(&inetdev_lock);
+	rcu_read_lock();
 	in_dev = __in_dev_get(dev);
 	if (in_dev) {
 		no_addr = in_dev->ifa_list == NULL;
 		rpf = IN_DEV_RPFILTER(in_dev);
 	}
-	read_unlock(&inetdev_lock);
+	rcu_read_unlock();
 
 	if (in_dev == NULL)
 		goto e_inval;

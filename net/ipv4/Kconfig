@@ -82,16 +82,6 @@ config IP_ROUTE_FWMARK
 	  If you say Y here, you will be able to specify different routes for
 	  packets with different mark values (see iptables(8), MARK target).
 
-config IP_ROUTE_NAT
-	bool "IP: fast network address translation"
-	depends on IP_MULTIPLE_TABLES
-	help
-	  If you say Y here, your router will be able to modify source and
-	  destination addresses of packets that pass through it, in a manner
-	  you specify.  General information about Network Address Translation
-	  can be gotten from the document
-	  <http://www.hasenstein.com/linux-ip-nat/diplom/nat.html>.
-
 config IP_ROUTE_MULTIPATH
 	bool "IP: equal cost multipath"
 	depends on IP_ADVANCED_ROUTER
@@ -187,7 +177,7 @@ config IP_PNP_RARP
 config NET_IPIP
 	tristate "IP: tunneling"
 	depends on INET
-	select XFRM
+	select INET_TUNNEL
 	---help---
 	  Tunneling means encapsulating data of one protocol type within
 	  another protocol and sending it over a channel that understands the
@@ -351,11 +341,21 @@ config INET_ESP
 config INET_IPCOMP
 	tristate "IP: IPComp transformation"
 	select XFRM
+	select INET_TUNNEL
 	select CRYPTO
 	select CRYPTO_DEFLATE
 	---help---
 	  Support for IP Paylod Compression (RFC3173), typically needed
 	  for IPsec.
+	  
+	  If unsure, say Y.
+
+config INET_TUNNEL
+	tristate "IP: tunnel transformation"
+	select XFRM
+	---help---
+	  Support for generic IP tunnel transformation, which is required by
+	  the IP tunneling module as well as tunnel mode IPComp.
 	  
 	  If unsure, say Y.
 

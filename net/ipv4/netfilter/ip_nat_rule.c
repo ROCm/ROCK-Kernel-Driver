@@ -132,7 +132,8 @@ static unsigned int ipt_snat_target(struct sk_buff **pskb,
 	ct = ip_conntrack_get(*pskb, &ctinfo);
 
 	/* Connection must be valid and new. */
-	IP_NF_ASSERT(ct && (ctinfo == IP_CT_NEW || ctinfo == IP_CT_RELATED));
+	IP_NF_ASSERT(ct && (ctinfo == IP_CT_NEW || ctinfo == IP_CT_RELATED
+	                    || ctinfo == IP_CT_RELATED + IP_CT_IS_REPLY));
 	IP_NF_ASSERT(out);
 
 	return ip_nat_setup_info(ct, targinfo, hooknum);

@@ -89,6 +89,8 @@
 #define NET_CALLER(arg) __builtin_return_address(0)
 #endif
 
+struct net_device;
+
 #ifdef CONFIG_NETFILTER
 struct nf_conntrack {
 	atomic_t use;
@@ -1104,6 +1106,20 @@ extern unsigned int    skb_copy_and_csum_bits(const struct sk_buff *skb,
 extern void	       skb_copy_and_csum_dev(const struct sk_buff *skb, u8 *to);
 extern void	       skb_split(struct sk_buff *skb,
 				 struct sk_buff *skb1, const u32 len);
+
+static inline void *skb_header_pointer(const struct sk_buff *skb, int offset,
+				       int len, void *buffer)
+{
+	int hlen = skb_headlen(skb);
+
+	if (offset + len <= hlen)
+		return skb->data + offset;
+
+	if (skb_copy_bits(skb, offset, buffer, len) < 0)
+		return NULL;
+
+	return buffer;
+}
 
 extern void skb_init(void);
 extern void skb_add_mtu(int mtu);

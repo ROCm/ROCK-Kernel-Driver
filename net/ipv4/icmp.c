@@ -478,20 +478,25 @@ void icmp_send(struct sk_buff *skb_in, int type, int code, u32 info)
 		 *	ICMP error
 		 */
 		if (iph->protocol == IPPROTO_ICMP) {
-			u8 inner_type;
+			u8 _inner_type, *itp;
 
-			if (skb_copy_bits(skb_in,
-					  skb_in->nh.raw + (iph->ihl << 2) +
-					  offsetof(struct icmphdr, type) -
-					  skb_in->data, &inner_type, 1))
+			itp = skb_header_pointer(skb_in,
+						 skb_in->nh.raw +
+						 (iph->ihl << 2) +
+						 offsetof(struct icmphdr,
+							  type) -
+						 skb_in->data,
+						 sizeof(_inner_type),
+						 &_inner_type);
+			if (itp == NULL)
 				goto out;
 
 			/*
 			 *	Assume any unknown ICMP type is an error. This
 			 *	isn't specified by the RFC, but think about it..
 			 */
-			if (inner_type > NR_ICMP_TYPES ||
-			    icmp_pointers[inner_type].error)
+			if (*itp > NR_ICMP_TYPES ||
+			    icmp_pointers[*itp].error)
 				goto out;
 		}
 	}
@@ -502,16 +507,6 @@ void icmp_send(struct sk_buff *skb_in, int type, int code, u32 info)
 	/*
 	 *	Construct source address and options.
 	 */
-
-#ifdef CONFIG_IP_ROUTE_NAT
-	/*
-	 *	Restore original addresses if packet has been translated.
-	 */
-	if (rt->rt_flags & RTCF_NAT && IPCB(skb_in)->flags & IPSKB_TRANSLATED) {
-		iph->daddr = rt->fl.fl4_dst;
-		iph->saddr = rt->fl.fl4_src;
-	}
-#endif
 
 	saddr = iph->daddr;
 	if (!(rt->rt_flags & RTCF_LOCAL))
@@ -879,7 +874,6 @@ static void icmp_address_reply(struct sk_buff *skb)
 	struct net_device *dev = skb->dev;
 	struct in_device *in_dev;
 	struct in_ifaddr *ifa;
-	u32 mask;
 
 	if (skb->len < 4 || !(rt->rt_flags&RTCF_DIRECTSRC))
 		goto out;
@@ -887,24 +881,27 @@ static void icmp_address_reply(struct sk_buff *skb)
 	in_dev = in_dev_get(dev);
 	if (!in_dev)
 		goto out;
-	read_lock(&in_dev->lock);
+	rcu_read_lock();
 	if (in_dev->ifa_list &&
 	    IN_DEV_LOG_MARTIANS(in_dev) &&
 	    IN_DEV_FORWARD(in_dev)) {
-		if (skb_copy_bits(skb, 0, &mask, 4))
+		u32 _mask, *mp;
+
+		mp = skb_header_pointer(skb, 0, sizeof(_mask), &_mask);
+		if (mp == NULL)
 			BUG();
 		for (ifa = in_dev->ifa_list; ifa; ifa = ifa->ifa_next) {
-			if (mask == ifa->ifa_mask &&
+			if (*mp == ifa->ifa_mask &&
 			    inet_ifa_match(rt->rt_src, ifa))
 				break;
 		}
 		if (!ifa && net_ratelimit()) {
 			printk(KERN_INFO "Wrong address mask %u.%u.%u.%u from "
 					 "%s/%u.%u.%u.%u\n",
-			       NIPQUAD(mask), dev->name, NIPQUAD(rt->rt_src));
+			       NIPQUAD(*mp), dev->name, NIPQUAD(rt->rt_src));
 		}
 	}
-	read_unlock(&in_dev->lock);
+	rcu_read_unlock();
 	in_dev_put(in_dev);
 out:;
 }

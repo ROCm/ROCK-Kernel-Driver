@@ -18,6 +18,7 @@
 #include <linux/interrupt.h>
 #include <linux/netpoll.h>
 #include <linux/sched.h>
+#include <linux/rcupdate.h>
 #include <net/tcp.h>
 #include <net/udp.h>
 
@@ -572,16 +573,18 @@ int netpoll_setup(struct netpoll *np)
 		memcpy(np->local_mac, ndev->dev_addr, 6);
 
 	if (!np->local_ip) {
-		in_dev = in_dev_get(ndev);
+		rcu_read_lock();
+		in_dev = __in_dev_get(ndev);
 
 		if (!in_dev) {
+			rcu_read_unlock();
 			printk(KERN_ERR "%s: no IP address for %s, aborting\n",
 			       np->name, np->dev_name);
 			goto release;
 		}
 
 		np->local_ip = ntohl(in_dev->ifa_list->ifa_local);
-		in_dev_put(in_dev);
+		rcu_read_unlock();
 		printk(KERN_INFO "%s: local IP %d.%d.%d.%d\n",
 		       np->name, HIPQUAD(np->local_ip));
 	}

@@ -628,5 +628,17 @@ config IP_NF_MATCH_REALM
 	  If you want to compile it as a module, say M here and read
 	  Documentation/modules.txt.  If unsure, say `N'.
 
+config IP_NF_CT_ACCT
+	bool "Connection tracking flow accounting"
+	depends on IP_NF_CONNTRACK
+
+config IP_NF_MATCH_SCTP
+	tristate  'SCTP protocol match support'
+	depends on IP_NF_IPTABLES
+
+config IP_NF_CT_PROTO_SCTP
+	tristate  'SCTP protocol connection tracking support (EXPERIMENTAL)'
+	depends on IP_NF_CONNTRACK && EXPERIMENTAL
+
 endmenu
 

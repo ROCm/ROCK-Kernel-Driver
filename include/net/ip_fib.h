@@ -242,7 +242,6 @@ extern u32 fib_rules_map_destination(u32 daddr, struct fib_result *res);
 #ifdef CONFIG_NET_CLS_ROUTE
 extern u32 fib_rules_tclass(struct fib_result *res);
 #endif
-extern u32 fib_rules_policy(u32 saddr, struct fib_result *res, unsigned *flags);
 extern void fib_rules_init(void);
 #endif
 

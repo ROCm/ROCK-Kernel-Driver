@@ -17,12 +17,12 @@
 #include <net/ipv6.h>
 #include <net/ip6_route.h>
 
-extern struct dst_ops xfrm6_dst_ops;
-extern struct xfrm_policy_afinfo xfrm6_policy_afinfo;
+static struct dst_ops xfrm6_dst_ops;
+static struct xfrm_policy_afinfo xfrm6_policy_afinfo;
 
 static struct xfrm_type_map xfrm6_type_map = { .lock = RW_LOCK_UNLOCKED };
 
-int xfrm6_dst_lookup(struct xfrm_dst **dst, struct flowi *fl)
+static int xfrm6_dst_lookup(struct xfrm_dst **dst, struct flowi *fl)
 {
 	int err = 0;
 	*dst = (struct xfrm_dst*)ip6_route_output(NULL, fl);
@@ -213,6 +213,16 @@ _decode_session6(struct sk_buff *skb, struct flowi *fl)
 			fl->proto = nexthdr;
 			return;
 
+		case IPPROTO_ICMPV6:
+			if (pskb_may_pull(skb, skb->nh.raw + offset + 2 - skb->data)) {
+				u8 *icmp = (u8 *)exthdr;
+
+				fl->fl_icmp_type = icmp[0];
+				fl->fl_icmp_code = icmp[1];
+			}
+			fl->proto = nexthdr;
+			return;
+
 		/* XXX Why are there these headers? */
 		case IPPROTO_AH:
 		case IPPROTO_ESP:
@@ -243,7 +253,7 @@ static void xfrm6_update_pmtu(struct dst_entry *dst, u32 mtu)
 	return;
 }
 
-struct dst_ops xfrm6_dst_ops = {
+static struct dst_ops xfrm6_dst_ops = {
 	.family =		AF_INET6,
 	.protocol =		__constant_htons(ETH_P_IPV6),
 	.gc =			xfrm6_garbage_collect,
@@ -252,7 +262,7 @@ struct dst_ops xfrm6_dst_ops = {
 	.entry_size =		sizeof(struct xfrm_dst),
 };
 
-struct xfrm_policy_afinfo xfrm6_policy_afinfo = {
+static struct xfrm_policy_afinfo xfrm6_policy_afinfo = {
 	.family =		AF_INET6,
 	.lock = 		RW_LOCK_UNLOCKED,
 	.type_map = 		&xfrm6_type_map,
@@ -263,12 +273,12 @@ struct xfrm_policy_afinfo xfrm6_policy_afinfo = {
 	.decode_session =	_decode_session6,
 };
 
-void __init xfrm6_policy_init(void)
+static void __init xfrm6_policy_init(void)
 {
 	xfrm_policy_register_afinfo(&xfrm6_policy_afinfo);
 }
 
-void __exit xfrm6_policy_fini(void)
+static void __exit xfrm6_policy_fini(void)
 {
 	xfrm_policy_unregister_afinfo(&xfrm6_policy_afinfo);
 }
@@ -277,12 +287,10 @@ void __init xfrm6_init(void)
 {
 	xfrm6_policy_init();
 	xfrm6_state_init();
-	xfrm6_tunnel_init();
 }
 
 void __exit xfrm6_fini(void)
 {
-	xfrm6_tunnel_fini();
 	//xfrm6_input_fini();
 	xfrm6_policy_fini();
 	xfrm6_state_fini();

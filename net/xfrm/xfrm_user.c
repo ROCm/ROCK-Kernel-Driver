@@ -78,15 +78,6 @@ static int verify_encap_tmpl(struct rtattr **xfrma)
 	if ((rt->rta_len - sizeof(*rt)) < sizeof(*encap))
 		return -EINVAL;
 
-	encap = RTA_DATA(rt);
-	switch (encap->encap_type) {
-	case UDP_ENCAP_ESPINUDP:
-	case UDP_ENCAP_ESPINUDP_NON_IKE:
-		break;
-	default:
-		return -ENOPROTOOPT;
-	}
-
 	return 0;
 }
 
@@ -164,15 +155,24 @@ out:
 	return err;
 }
 
-static int attach_one_algo(struct xfrm_algo **algpp, struct rtattr *u_arg)
+static int attach_one_algo(struct xfrm_algo **algpp, u8 *props,
+			   struct xfrm_algo_desc *(*get_byname)(char *),
+			   struct rtattr *u_arg)
 {
 	struct rtattr *rta = u_arg;
 	struct xfrm_algo *p, *ualg;
+	struct xfrm_algo_desc *algo;
 
 	if (!rta)
 		return 0;
 
 	ualg = RTA_DATA(rta);
+
+	algo = get_byname(ualg->alg_name);
+	if (!algo)
+		return -ENOSYS;
+	*props = algo->desc.sadb_alg_id;
+
 	p = kmalloc(sizeof(*ualg) + ualg->alg_key_len, GFP_KERNEL);
 	if (!p)
 		return -ENOMEM;
@@ -225,11 +225,17 @@ static struct xfrm_state *xfrm_state_construct(struct xfrm_usersa_info *p,
 
 	copy_from_user_state(x, p);
 
-	if ((err = attach_one_algo(&x->aalg, xfrma[XFRMA_ALG_AUTH-1])))
+	if ((err = attach_one_algo(&x->aalg, &x->props.aalgo,
+				   xfrm_aalg_get_byname,
+				   xfrma[XFRMA_ALG_AUTH-1])))
 		goto error;
-	if ((err = attach_one_algo(&x->ealg, xfrma[XFRMA_ALG_CRYPT-1])))
+	if ((err = attach_one_algo(&x->ealg, &x->props.ealgo,
+				   xfrm_ealg_get_byname,
+				   xfrma[XFRMA_ALG_CRYPT-1])))
 		goto error;
-	if ((err = attach_one_algo(&x->calg, xfrma[XFRMA_ALG_COMP-1])))
+	if ((err = attach_one_algo(&x->calg, &x->props.calgo,
+				   xfrm_calg_get_byname,
+				   xfrma[XFRMA_ALG_COMP-1])))
 		goto error;
 	if ((err = attach_encap_tmpl(&x->encap, xfrma[XFRMA_ENCAP-1])))
 		goto error;

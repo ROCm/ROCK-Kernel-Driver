@@ -573,7 +573,6 @@ static int atm_tc_init(struct Qdisc *sch,struct rtattr *opt)
 	struct atm_qdisc_data *p = PRIV(sch);
 
 	DPRINTK("atm_tc_init(sch %p,[qdisc %p],opt %p)\n",sch,p,opt);
-	memset(p,0,sizeof(*p));
 	p->flows = &p->link;
 	if(!(p->link.q = qdisc_create_dflt(sch->dev,&pfifo_qdisc_ops)))
 		p->link.q = &noop_qdisc;

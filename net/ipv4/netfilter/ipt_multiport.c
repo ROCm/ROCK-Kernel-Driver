@@ -54,7 +54,7 @@ match(const struct sk_buff *skb,
       int offset,
       int *hotdrop)
 {
-	u16 ports[2];
+	u16 _ports[2], *pptr;
 	const struct ipt_multiport *multiinfo = matchinfo;
 
 	/* Must not be a fragment. */
@@ -63,18 +63,21 @@ match(const struct sk_buff *skb,
 
 	/* Must be big enough to read ports (both UDP and TCP have
            them at the start). */
-	if (skb_copy_bits(skb, skb->nh.iph->ihl*4, ports, sizeof(ports)) < 0) {
+	pptr = skb_header_pointer(skb, skb->nh.iph->ihl * 4,
+				  sizeof(_ports), &_ports[0]);
+	if (pptr == NULL) {
 		/* We've been asked to examine this packet, and we
-		   can't.  Hence, no choice but to drop. */
-			duprintf("ipt_multiport:"
-				 " Dropping evil offset=0 tinygram.\n");
-			*hotdrop = 1;
-			return 0;
+		 * can't.  Hence, no choice but to drop.
+		 */
+		duprintf("ipt_multiport:"
+			 " Dropping evil offset=0 tinygram.\n");
+		*hotdrop = 1;
+		return 0;
 	}
 
 	return ports_match(multiinfo->ports,
 			   multiinfo->flags, multiinfo->count,
-			   ntohs(ports[0]), ntohs(ports[1]));
+			   ntohs(pptr[0]), ntohs(pptr[1]));
 }
 
 /* Called when user tries to insert an entry of this type. */

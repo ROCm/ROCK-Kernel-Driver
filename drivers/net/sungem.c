@@ -808,16 +808,16 @@ static irqreturn_t gem_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	if (gem_status & GREG_STAT_ABNORMAL) {
 		if (gem_abnormal_irq(dev, gp, gem_status))
-			goto out;
+			goto out_unlock;
 	}
 	if (gem_status & (GREG_STAT_TXALL | GREG_STAT_TXINTME))
 		gem_tx(dev, gp, gem_status);
 	if (gem_status & GREG_STAT_RXDONE)
 		gem_rx(gp);
 
-out:
+out_unlock:
 	spin_unlock(&gp->lock);
-
+out:
 	return IRQ_HANDLED;
 }
 

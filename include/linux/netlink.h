@@ -99,6 +99,7 @@ enum {
 #ifdef __KERNEL__
 
 #include <linux/capability.h>
+#include <linux/skbuff.h>
 
 struct netlink_skb_parms
 {
