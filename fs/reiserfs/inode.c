@@ -444,7 +444,7 @@ static int reiserfs_get_blocks_direct_io(struct inode *inode,
         /* make sure future calls to the direct io funcs for this offset
         ** in the file fail by unmapping the buffer
         */
-        reiserfs_unmap_buffer(bh_result);
+        clear_buffer_mapped(bh_result);
         ret = -EINVAL ;
     }
     /* Possible unpacked tail. Flush the data before pages have
