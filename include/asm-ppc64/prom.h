@@ -120,6 +120,7 @@ struct device_node {
 	char	*name;
 	char	*type;
 	phandle	node;
+	phandle linux_phandle;
 	int	n_addrs;
 	struct	address_range *addrs;
 	int	n_intrs;

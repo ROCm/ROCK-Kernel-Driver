@@ -1444,6 +1444,23 @@ inspect_node(phandle node, struct device_node *dad,
 		*prev_propp = PTRUNRELOC(pp);
 		prev_propp = &pp->next;
 	}
+
+	/* Add a "linux_phandle" value */
+        if (np->node) {
+		u32 ibm_phandle = 0;
+		int len;
+
+                /* First see if "ibm,phandle" exists and use its value */
+                len = (int)
+                        call_prom(RELOC("getprop"), 4, 1, node, RELOC("ibm,phandle"),
+                                  &ibm_phandle, sizeof(ibm_phandle));
+                if (len < 0) {
+                        np->linux_phandle = np->node;
+                } else {
+                        np->linux_phandle = ibm_phandle;
+		}
+	}
+
 	*prev_propp = 0;
 
 	/* get the node's full name */
@@ -1992,7 +2009,7 @@ find_phandle(phandle ph)
 	struct device_node *np;
 
 	for (np = allnodes; np != 0; np = np->allnext)
-		if (np->node == ph)
+		if (np->linux_phandle == ph)
 			return np;
 	return NULL;
 }
