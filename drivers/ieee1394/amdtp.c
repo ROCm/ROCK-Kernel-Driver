@@ -688,7 +688,7 @@ static u32 get_header_bits(struct stream *s, int sub_frame, u32 sample)
 		return get_iec958_header_bits(s, sub_frame, sample);
 		
 	case AMDTP_FORMAT_RAW:
-		return 0x40000000;
+		return 0x40;
 
 	default:
 		return 0;
@@ -833,8 +833,9 @@ static int stream_alloc_packet_lists(struct stream *s)
 		max_nevents = fraction_ceil(&s->samples_per_cycle);
 
 	max_packet_size = max_nevents * s->dimension * 4 + 8;
-	s->packet_pool = pci_pool_create("packet pool", s->host->ohci->dev,
-					 max_packet_size, 0, 0);
+	s->packet_pool = hpsb_pci_pool_create("packet pool", s->host->ohci->dev,
+					 max_packet_size, 0, 0 ,SLAB_KERNEL);
+
 	if (s->packet_pool == NULL)
 		return -1;
 
@@ -1018,9 +1019,10 @@ struct stream *stream_alloc(struct amdtp_host *host)
 		return NULL;
 	}
 
-	s->descriptor_pool = pci_pool_create("descriptor pool", host->ohci->dev,
+	s->descriptor_pool = hpsb_pci_pool_create("descriptor pool", host->ohci->dev,
 					     sizeof(struct descriptor_block),
-					     16, 0);
+					     16, 0 ,SLAB_KERNEL);
+
 	if (s->descriptor_pool == NULL) {
 		kfree(s->input);
 		kfree(s);
@@ -1107,7 +1109,7 @@ static ssize_t amdtp_write(struct file *file, const char *buffer, size_t count,
 	 */
 
 	for (i = 0; i < count; i += length) {
-		p = buffer_put_bytes(s->input, count, &length);
+		p = buffer_put_bytes(s->input, count - i, &length);
 		copy_from_user(p, buffer + i, length);
 		if (s->input->length < s->input->size)
 			continue;
@@ -1210,7 +1212,7 @@ static void amdtp_add_host(struct hpsb_host *host)
 	if (strcmp(host->driver->name, OHCI1394_DRIVER_NAME) != 0)
 		return;
 
-	ah = kmalloc(sizeof *ah, SLAB_KERNEL);
+	ah = kmalloc(sizeof *ah, in_interrupt() ? SLAB_ATOMIC : SLAB_KERNEL);
 	ah->host = host;
 	ah->ohci = host->hostdata;
 	INIT_LIST_HEAD(&ah->stream_list);
