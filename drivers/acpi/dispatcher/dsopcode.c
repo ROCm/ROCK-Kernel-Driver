@@ -79,7 +79,6 @@ acpi_ds_execute_arguments (
 	acpi_status                     status;
 	union acpi_parse_object         *op;
 	struct acpi_walk_state          *walk_state;
-	union acpi_parse_object         *arg;
 
 
 	ACPI_FUNCTION_TRACE ("ds_execute_arguments");
@@ -126,9 +125,7 @@ acpi_ds_execute_arguments (
 
 	/* Get and init the Op created above */
 
-	arg = op->common.value.arg;
 	op->common.node = node;
-	arg->common.node = node;
 	acpi_ps_delete_parse_tree (op);
 
 	/* Evaluate the deferred arguments */

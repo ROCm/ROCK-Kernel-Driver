@@ -130,27 +130,27 @@ acpi_ev_update_gpe_enable_masks (
 	/* 1) Disable case.  Simply clear all enable bits */
 
 	if (type == ACPI_GPE_DISABLE) {
-		gpe_register_info->enable_for_wake &= ~register_bit;
-		gpe_register_info->enable_for_run &= ~register_bit;
+		ACPI_CLEAR_BIT (gpe_register_info->enable_for_wake, register_bit);
+		ACPI_CLEAR_BIT (gpe_register_info->enable_for_run, register_bit);
 		return_ACPI_STATUS (AE_OK);
 	}
 
-	/* 2) Enable case.  Set the appropriate enable bits */
+	/* 2) Enable case.  Set/Clear the appropriate enable bits */
 
 	switch (gpe_event_info->flags & ACPI_GPE_TYPE_MASK) {
 	case ACPI_GPE_TYPE_WAKE:
-		gpe_register_info->enable_for_wake |= register_bit;
-		gpe_register_info->enable_for_run &= ~register_bit;
+		ACPI_SET_BIT   (gpe_register_info->enable_for_wake, register_bit);
+		ACPI_CLEAR_BIT (gpe_register_info->enable_for_run, register_bit);
 		break;
 
 	case ACPI_GPE_TYPE_RUNTIME:
-		gpe_register_info->enable_for_wake &= ~register_bit;
-		gpe_register_info->enable_for_run |= register_bit;
+		ACPI_CLEAR_BIT (gpe_register_info->enable_for_wake, register_bit);
+		ACPI_SET_BIT   (gpe_register_info->enable_for_run, register_bit);
 		break;
 
 	case ACPI_GPE_TYPE_WAKE_RUN:
-		gpe_register_info->enable_for_wake |= register_bit;
-		gpe_register_info->enable_for_run |= register_bit;
+		ACPI_SET_BIT   (gpe_register_info->enable_for_wake, register_bit);
+		ACPI_SET_BIT   (gpe_register_info->enable_for_run, register_bit);
 		break;
 
 	default:
@@ -195,17 +195,19 @@ acpi_ev_enable_gpe (
 
 	switch (gpe_event_info->flags & ACPI_GPE_TYPE_MASK) {
 	case ACPI_GPE_TYPE_WAKE:
-		gpe_event_info->flags |= ACPI_GPE_WAKE_ENABLED;
+
+		ACPI_SET_BIT (gpe_event_info->flags, ACPI_GPE_WAKE_ENABLED);
 		break;
 
 	case ACPI_GPE_TYPE_WAKE_RUN:
-		gpe_event_info->flags |= ACPI_GPE_WAKE_ENABLED;
+
+		ACPI_SET_BIT (gpe_event_info->flags, ACPI_GPE_WAKE_ENABLED);
 
 		/*lint -fallthrough */
 
 	case ACPI_GPE_TYPE_RUNTIME:
 
-		gpe_event_info->flags |= ACPI_GPE_RUN_ENABLED;
+		ACPI_SET_BIT (gpe_event_info->flags, ACPI_GPE_RUN_ENABLED);
 
 		if (write_to_hardware) {
 			/* Clear the GPE (of stale events), then enable it */
@@ -266,11 +268,11 @@ acpi_ev_disable_gpe (
 
 	switch (gpe_event_info->flags & ACPI_GPE_TYPE_MASK) {
 	case ACPI_GPE_TYPE_WAKE:
-		gpe_event_info->flags &= ~ACPI_GPE_WAKE_ENABLED;
+		ACPI_CLEAR_BIT (gpe_event_info->flags, ACPI_GPE_WAKE_ENABLED);
 		break;
 
 	case ACPI_GPE_TYPE_WAKE_RUN:
-		gpe_event_info->flags &= ~ACPI_GPE_WAKE_ENABLED;
+		ACPI_CLEAR_BIT (gpe_event_info->flags, ACPI_GPE_WAKE_ENABLED);
 
 		/*lint -fallthrough */
 
@@ -278,7 +280,7 @@ acpi_ev_disable_gpe (
 
 		/* Disable the requested runtime GPE */
 
-		gpe_event_info->flags &= ~ACPI_GPE_RUN_ENABLED;
+		ACPI_CLEAR_BIT (gpe_event_info->flags, ACPI_GPE_RUN_ENABLED);
 		status = acpi_hw_write_gpe_enable_reg (gpe_event_info);
 		break;
 
@@ -613,10 +615,10 @@ acpi_ev_gpe_dispatch (
 	/* Save current system state */
 
 	if (acpi_gbl_system_awake_and_running) {
-		gpe_event_info->flags |= ACPI_GPE_SYSTEM_RUNNING;
+		ACPI_SET_BIT (gpe_event_info->flags, ACPI_GPE_SYSTEM_RUNNING);
 	}
 	else {
-		gpe_event_info->flags &= ~ACPI_GPE_SYSTEM_RUNNING;
+		ACPI_CLEAR_BIT (gpe_event_info->flags, ACPI_GPE_SYSTEM_RUNNING);
 	}
 
 	/*
@@ -629,9 +631,11 @@ acpi_ev_gpe_dispatch (
 	switch (gpe_event_info->flags & ACPI_GPE_DISPATCH_MASK) {
 	case ACPI_GPE_DISPATCH_HANDLER:
 
-		/* Invoke the installed handler (at interrupt level) */
-
-		gpe_event_info->dispatch.handler->address ((void *)
+		/*
+		 * Invoke the installed handler (at interrupt level)
+		 * Ignore return status for now.  TBD: leave GPE disabled on error?
+		 */
+		(void) gpe_event_info->dispatch.handler->address (
 				  gpe_event_info->dispatch.handler->context);
 
 		/* It is now safe to clear level-triggered events. */

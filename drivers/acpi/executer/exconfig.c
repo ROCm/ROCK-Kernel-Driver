@@ -321,7 +321,7 @@ acpi_ex_load_op (
 		table_header.length = 0;
 		for (i = 0; i < 8; i++) {
 			status = acpi_ev_address_space_dispatch (obj_desc, ACPI_READ,
-					   (acpi_physical_address) i + address, 8,
+					   (acpi_physical_address) (i + address), 8,
 					   ((u8 *) &table_header) + i);
 			if (ACPI_FAILURE (status)) {
 				return_ACPI_STATUS (status);
@@ -345,7 +345,7 @@ acpi_ex_load_op (
 
 		for (i = 0; i < table_header.length; i++) {
 			status = acpi_ev_address_space_dispatch (obj_desc, ACPI_READ,
-					   (acpi_physical_address) i + address, 8,
+					   (acpi_physical_address) (i + address), 8,
 					   ((u8 *) table_ptr + i));
 			if (ACPI_FAILURE (status)) {
 				goto cleanup;

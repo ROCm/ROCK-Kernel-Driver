@@ -118,6 +118,12 @@ acpi_ex_convert_to_ascii (
  */
 
 acpi_status
+acpi_ex_common_buffer_setup (
+	union acpi_operand_object       *obj_desc,
+	u32                             buffer_length,
+	u32                             *datum_count);
+
+acpi_status
 acpi_ex_extract_from_field (
 	union acpi_operand_object       *obj_desc,
 	void                            *buffer,
