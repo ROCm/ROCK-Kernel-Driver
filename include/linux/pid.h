@@ -16,7 +16,7 @@ struct pid
 	atomic_t count;
 	struct task_struct *task;
 	struct list_head task_list;
-	struct list_head hash_chain;
+	struct hlist_node hash_chain;
 };
 
 struct pid_link
