@@ -322,8 +322,10 @@ static inline void put_page(struct page *page)
 /*
  * The zone field is never updated after free_area_init_core()
  * sets it, so none of the operations on it need to be atomic.
+ * We'll have up to log2(MAX_NUMNODES * MAX_NR_ZONES) zones
+ * total, so we use NODES_SHIFT here to get enough bits.
  */
-#define ZONE_SHIFT (BITS_PER_LONG - 8)
+#define ZONE_SHIFT (BITS_PER_LONG - NODES_SHIFT - MAX_NR_ZONES_SHIFT)
 
 struct zone;
 extern struct zone *zone_table[];

@@ -159,7 +159,10 @@ struct zone {
 #define ZONE_DMA		0
 #define ZONE_NORMAL		1
 #define ZONE_HIGHMEM		2
-#define MAX_NR_ZONES		3
+
+#define MAX_NR_ZONES		3	/* Sync this with MAX_NR_ZONES_SHIFT */
+#define MAX_NR_ZONES_SHIFT	2	/* ceil(log2(MAX_NR_ZONES)) */
+
 #define GFP_ZONEMASK	0x03
 
 /*
