@@ -263,9 +263,11 @@ static int __init alsa_card_mpu401_init(void)
 
 #ifdef USE_ACPI_PNP
 	cards = acpi_bus_register_driver(&snd_mpu401_acpi_driver);
-	acpi_driver_registered = cards >= 0;
+	if (cards >= 0)
+		acpi_driver_registered = 1;
+	else
 #else
-	cards = 0;
+		cards = 0;
 #endif
 	for (dev = 0; dev < SNDRV_CARDS; dev++) {
 		if (!enable[dev])
