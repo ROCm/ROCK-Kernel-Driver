@@ -712,7 +712,6 @@ __dabt_svc:	sub	sp, sp, #S_FRAME_SIZE
 		mrs	r9, cpsr			@ Enable interrupts if they were
 		tst	r3, #PSR_I_BIT
 		biceq	r9, r9, #PSR_I_BIT		@ previously
-		mov	r0, r2				@ *** remove once everyones in sync
 /*
  * This routine must not corrupt r9
  */
@@ -855,7 +854,6 @@ __dabt_usr:	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
 		stmdb	r5, {sp, lr}^
 		alignment_trap r7, r7, __temp_abt
 		zero_fp
-		mov	r0, r2				@ remove once everyones in sync
 #ifdef MULTI_ABORT
 		ldr	r4, .LCprocfns			@ pass r0, r3 to
 		mov	lr, pc				@ processor code
@@ -913,6 +911,8 @@ __und_usr:	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
 		stmdb	r8, {sp, lr}^			@ Save user sp, lr
 		alignment_trap r4, r7, __temp_und
 		zero_fp
+		tst	r6, #PSR_T_BIT			@ Thumb mode?
+		bne	fpundefinstr
 		adrsvc	al, r9, ret_from_exception	@ r9  = normal FP return
 		adrsvc	al, lr, fpundefinstr		@ lr  = undefined instr return
 
