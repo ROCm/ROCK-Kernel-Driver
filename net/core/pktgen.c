@@ -603,7 +603,7 @@ static void show_results(struct pktgen_info* info, int nr_frags)
 	do_div(idle, cpu_speed);
 
 	p += sprintf(p, "OK: %llu(c%llu+d%lu) usec, %llu (%dbyte,%dfrags)\n",
-		     total, total - idle, idle,
+		     total, (unsigned long long)(total - idle), idle,
 		     info->sofar, size, nr_frags);
 
 	pps = info->sofar * USEC_PER_SEC;
