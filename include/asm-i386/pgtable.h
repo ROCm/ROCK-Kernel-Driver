@@ -277,8 +277,6 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 
 #endif /* !__ASSEMBLY__ */
 
-/* Needs to be defined here and not in linux/mm.h, as it is arch dependent */
-#define PageSkip(page)		(0)
 #define kern_addr_valid(addr)	(1)
 
 #define io_remap_page_range remap_page_range

@@ -506,8 +506,6 @@ static inline void update_mmu_cache(struct vm_area_struct * vma,
 #define pte_to_swp_entry(pte)           ((swp_entry_t) { pte_val(pte) })
 #define swp_entry_to_pte(x)             ((pte_t) { (x).val })
 
-/* Needs to be defined here and not in linux/mm.h, as it is arch dependent */
-#define PageSkip(page)          (0)
 #define kern_addr_valid(addr)   (1)
 
 #include <asm-generic/pgtable.h>
