@@ -503,13 +503,13 @@ static int TIIsTxActive (struct edgeport_port *port)
 
 	if (status)
 		goto exit_is_tx_active;
-	dbg ("%s - LSR = 0x%X", __FUNCTION__, lsr);
+	dbg ("%s - LSR = 0x%X", __FUNCTION__, *lsr);
 	
 	/* If either buffer has data or we are transmitting then return TRUE */
 	if ((oedb->XByteCount & 0x80 ) != 0 )
 		bytes_left += 64;
 
-	if ((lsr & UMP_UART_LSR_TX_MASK ) == 0 )
+	if ((*lsr & UMP_UART_LSR_TX_MASK ) == 0 )
 		bytes_left += 1;
 
 	/* We return Not Active if we get any kind of error */
