@@ -1590,6 +1590,12 @@ L:	linux-tr@linuxtr.net
 W:	http://www.linuxtr.net
 S:	Maintained
 
+TOSHIBA ACPI EXTRAS DRIVER
+P:	John Belmonte
+M:	toshiba_acpi@memebeam.org
+W:	http://memebeam.org/toys/ToshibaAcpiDriver
+S:	Maintained
+
 TOSHIBA SMM DRIVER
 P:	Jonathan Buzzard
 M:	jonathan@buzzard.org.uk
