@@ -24,7 +24,6 @@
 #include <linux/vmalloc.h>
 #include <linux/delay.h>
 #include <linux/syscalls.h> 
-#include <linux/ioctl32.h>
 #include <asm/hardirq.h>
 #include "dump_methods.h"
 #include <linux/irq.h>
@@ -229,21 +228,6 @@ kdb_sysdump(int argc, const char **argv, const char **envp, struct pt_regs *regs
 }
 #endif
 
-static int dw_long(unsigned int fd, unsigned int cmd, unsigned long arg,
-                  struct file *f)
-{
-	mm_segment_t old_fs = get_fs();
-	int err;
-	unsigned long val;
-
-	set_fs (KERNEL_DS);
-	err = sys_ioctl(fd, cmd, (unsigned long)&val);
-	set_fs (old_fs);
-	if (!err && put_user((unsigned int) val, (u32 *)arg))
-		return -EFAULT;
-	return err;
-}
-
 /*
  * Name: __dump_init()
  * Func: Initialize the dumping routine process.  This is in case
@@ -252,30 +236,6 @@ static int dw_long(unsigned int fd, unsigned int cmd, unsigned long arg,
 void
 __dump_init(uint64_t local_memory_start)
 {
-	int ret;
-
-	ret = register_ioctl32_conversion(DIOSDUMPDEV, NULL);
-	ret |= register_ioctl32_conversion(DIOGDUMPDEV, NULL);
-	ret |= register_ioctl32_conversion(DIOSDUMPLEVEL, NULL);
-	ret |= register_ioctl32_conversion(DIOGDUMPLEVEL, dw_long);
-	ret |= register_ioctl32_conversion(DIOSDUMPFLAGS, NULL);
-	ret |= register_ioctl32_conversion(DIOGDUMPFLAGS, dw_long);
-	ret |= register_ioctl32_conversion(DIOSDUMPCOMPRESS, NULL);
-	ret |= register_ioctl32_conversion(DIOGDUMPCOMPRESS, dw_long);
-	ret |= register_ioctl32_conversion(DIOSTARGETIP, NULL);
-	ret |= register_ioctl32_conversion(DIOGTARGETIP, NULL);
-	ret |= register_ioctl32_conversion(DIOSTARGETPORT, NULL);
-	ret |= register_ioctl32_conversion(DIOGTARGETPORT, NULL);
-	ret |= register_ioctl32_conversion(DIOSSOURCEPORT, NULL);
-	ret |= register_ioctl32_conversion(DIOGSOURCEPORT, NULL);
-	ret |= register_ioctl32_conversion(DIOSETHADDR, NULL);
-	ret |= register_ioctl32_conversion(DIOGETHADDR, NULL);
-	ret |= register_ioctl32_conversion(DIOGDUMPOKAY, dw_long);
-	ret |= register_ioctl32_conversion(DIOSDUMPTAKE, NULL);
-	if (ret) {
-		printk(KERN_ERR "LKCD: registering ioctl32 translations failed\n");
-	}
-
 #if defined(FIXME) && defined(CONFIG_KDB) && !defined(CONFIG_DUMP_MODULE)
 	/* This won't currently work because interrupts are off in kdb
 	 * and the dump process doesn't understand how to recover.
@@ -308,29 +268,6 @@ __dump_open(void)
 void
 __dump_cleanup(void)
 {
-	int ret;
-
-	ret = unregister_ioctl32_conversion(DIOSDUMPDEV);
-	ret |= unregister_ioctl32_conversion(DIOGDUMPDEV);
-	ret |= unregister_ioctl32_conversion(DIOSDUMPLEVEL);
-	ret |= unregister_ioctl32_conversion(DIOGDUMPLEVEL);
-	ret |= unregister_ioctl32_conversion(DIOSDUMPFLAGS);
-	ret |= unregister_ioctl32_conversion(DIOGDUMPFLAGS);
-	ret |= unregister_ioctl32_conversion(DIOSDUMPCOMPRESS);
-	ret |= unregister_ioctl32_conversion(DIOGDUMPCOMPRESS);
-	ret |= unregister_ioctl32_conversion(DIOSTARGETIP);
-	ret |= unregister_ioctl32_conversion(DIOGTARGETIP);
-	ret |= unregister_ioctl32_conversion(DIOSTARGETPORT);
-	ret |= unregister_ioctl32_conversion(DIOGTARGETPORT);
-	ret |= unregister_ioctl32_conversion(DIOSSOURCEPORT);
-	ret |= unregister_ioctl32_conversion(DIOGSOURCEPORT);
-	ret |= unregister_ioctl32_conversion(DIOSETHADDR);
-	ret |= unregister_ioctl32_conversion(DIOGETHADDR);
-	ret |= unregister_ioctl32_conversion(DIOGDUMPOKAY);
-	ret |= unregister_ioctl32_conversion(DIOSDUMPTAKE);
-	if (ret) {
-		printk(KERN_ERR "LKCD: Unregistering ioctl32 translations failed\n");
-	}
 	free_dha_stack();
 }
 
