@@ -120,6 +120,7 @@
 #include <linux/stat.h>
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/delay.h>
 
 static struct override {
     unsigned long address;
@@ -247,7 +248,7 @@ int __init t128_detect(Scsi_Host_Template * tpnt){
 	    instance->irq = NCR5380_probe_irq(instance, T128_IRQS);
 
 	if (instance->irq != IRQ_NONE) 
-	    if (request_irq(instance->irq, do_t128_intr, SA_INTERRUPT, "t128", instance)) {
+	    if (request_irq(instance->irq, t128_intr, SA_INTERRUPT, "t128", instance)) {
 		printk("scsi%d : IRQ%d not free, interrupts disabled\n", 
 		    instance->host_no, instance->irq);
 		instance->irq = IRQ_NONE;
