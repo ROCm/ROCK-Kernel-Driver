@@ -809,27 +809,30 @@ int get_swaparea_info(char *buf)
 
 	len = sprintf(buf, "Filename\t\t\t\tType\t\tSize\tUsed\tPriority\n");
 	for (i = 0 ; i < nr_swapfiles ; i++, ptr++) {
-		if ((ptr->flags & SWP_USED) && ptr->swap_map) {
-			char * path = d_path(ptr->swap_file->f_dentry,
-						ptr->swap_file->f_vfsmnt,
-						page, PAGE_SIZE);
-			int j, usedswap = 0;
-			for (j = 0; j < ptr->max; ++j)
-				switch (ptr->swap_map[j]) {
-					case SWAP_MAP_BAD:
-					case 0:
-						continue;
-					default:
-						usedswap++;
-				}
-			len += sprintf(buf + len, "%-39s %s\t%d\t%d\t%d\n",
-				       path,
-				       (ptr->flags & SWP_BLOCKDEV) ?
-				       		"partition" : "file\t",
-				       ptr->pages << (PAGE_SHIFT - 10),
-				       usedswap << (PAGE_SHIFT - 10),
-				       ptr->prio);
-		}
+		int j, usedswap;
+		struct file *file;
+		char *path;
+
+		if (!(ptr->flags & SWP_USED) || !ptr->swap_map)
+			continue;
+
+		file = ptr->swap_file;
+		path = d_path(file->f_dentry, file->f_vfsmnt, page, PAGE_SIZE);
+		for (j = 0,usedswap = 0; j < ptr->max; ++j)
+			switch (ptr->swap_map[j]) {
+				case SWAP_MAP_BAD:
+				case 0:
+					continue;
+				default:
+					usedswap++;
+			}
+		len += sprintf(buf + len, "%-39s %s\t%d\t%d\t%d\n",
+			       path,
+			       S_ISBLK(file->f_dentry->d_inode->i_mode) ?
+					"partition" : "file\t",
+			       ptr->pages << (PAGE_SHIFT - 10),
+			       usedswap << (PAGE_SHIFT - 10),
+			       ptr->prio);
 	}
 	free_page((unsigned long) page);
 	return len;
@@ -1037,8 +1040,6 @@ asmlinkage long sys_swapon(const char * specialfile, int swap_flags)
 	swap_device_lock(p);
 	p->max = maxpages;
 	p->flags = SWP_ACTIVE;
-	if (S_ISBLK(swap_file->f_dentry->d_inode->i_mode))
-		p->flags |= SWP_BLOCKDEV;
 	p->pages = nr_good_pages;
 	nr_swap_pages += nr_good_pages;
 	total_swap_pages += nr_good_pages;

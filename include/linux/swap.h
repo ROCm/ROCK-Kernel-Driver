@@ -64,7 +64,6 @@ typedef struct {
 enum {
 	SWP_USED	= (1 << 0),	/* is slot in swap_info[] used? */
 	SWP_WRITEOK	= (1 << 1),	/* ok to write to this swap?	*/
-	SWP_BLOCKDEV	= (1 << 2),	/* is this swap a block device? */
 	SWP_ACTIVE	= (SWP_USED | SWP_WRITEOK),
 };
 
