@@ -290,7 +290,6 @@ static void hostfs_delete_inode(struct inode *inode)
 {
 	if(HOSTFS_I(inode)->fd != -1) {
 		close_file(&HOSTFS_I(inode)->fd);
-		printk("Closing host fd in .delete_inode\n");
 		HOSTFS_I(inode)->fd = -1;
 	}
 	clear_inode(inode);
@@ -301,9 +300,11 @@ static void hostfs_destroy_inode(struct inode *inode)
 	if(HOSTFS_I(inode)->host_filename)
 		kfree(HOSTFS_I(inode)->host_filename);
 
+	/*XXX: This should not happen, probably. The check is here for
+	 * additional safety.*/
 	if(HOSTFS_I(inode)->fd != -1) {
 		close_file(&HOSTFS_I(inode)->fd);
-		printk("Closing host fd in .destroy_inode\n");
+		printk(KERN_DEBUG "Closing host fd in .destroy_inode\n");
 	}
 
 	kfree(HOSTFS_I(inode));
