@@ -86,7 +86,7 @@ static struct i2c_driver eeprom_driver = {
 	.detach_client	= eeprom_detach_client,
 };
 
-static int eeprom_id = 0;
+static int eeprom_id;
 
 static void eeprom_update_client(struct i2c_client *client, u8 slice)
 {

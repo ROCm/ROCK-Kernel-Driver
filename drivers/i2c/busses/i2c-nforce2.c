@@ -298,6 +298,9 @@ static struct pci_device_id nforce2_ids[] = {
 };
 
 
+MODULE_DEVICE_TABLE (pci, nforce2_ids);
+
+
 static int __devinit nforce2_probe_smb (struct pci_dev *dev, int reg,
 	struct nforce2_smbus *smbus, char *name)
 {
@@ -391,7 +394,7 @@ static struct pci_driver nforce2_driver = {
 
 static int __init nforce2_init(void)
 {
-	return pci_module_init(&nforce2_driver);
+	return pci_register_driver(&nforce2_driver);
 }
 
 static void __exit nforce2_exit(void)

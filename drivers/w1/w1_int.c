@@ -32,12 +32,13 @@ extern struct device_driver w1_driver;
 extern struct bus_type w1_bus_type;
 extern struct device w1_device;
 extern int w1_max_slave_count;
+extern int w1_max_slave_ttl;
 extern struct list_head w1_masters;
 extern spinlock_t w1_mlock;
 
 extern int w1_process(void *);
 
-struct w1_master * w1_alloc_dev(u32 id, int slave_count,
+struct w1_master * w1_alloc_dev(u32 id, int slave_count, int slave_ttl,
 	      struct device_driver *driver, struct device *device)
 {
 	struct w1_master *dev;
@@ -65,6 +66,7 @@ struct w1_master * w1_alloc_dev(u32 id, int slave_count,
 	dev->kpid 		= -1;
 	dev->initialized 	= 0;
 	dev->id 		= id;
+	dev->slave_ttl		= slave_ttl;
 
 	atomic_set(&dev->refcnt, 2);
 
@@ -121,7 +123,7 @@ int w1_add_master_device(struct w1_bus_master *master)
 	int retval = 0;
 	struct w1_netlink_msg msg;
 
-	dev = w1_alloc_dev(w1_ids++, w1_max_slave_count, &w1_driver, &w1_device);
+	dev = w1_alloc_dev(w1_ids++, w1_max_slave_count, w1_max_slave_ttl, &w1_driver, &w1_device);
 	if (!dev)
 		return -ENOMEM;
 
@@ -179,8 +181,15 @@ void __w1_remove_master_device(struct w1_master *dev)
 			 "%s: Failed to send signal to w1 kernel thread %d.\n",
 			 __func__, dev->kpid);
 
-	while (atomic_read(&dev->refcnt))
-		schedule_timeout(10);
+	while (atomic_read(&dev->refcnt)) {
+		printk(KERN_INFO "Waiting for %s to become free: refcnt=%d.\n",
+				dev->name, atomic_read(&dev->refcnt));
+		set_current_state(TASK_INTERRUPTIBLE);
+		schedule_timeout(HZ);
+
+		if (signal_pending(current))
+			flush_signals(current);
+	}
 
 	msg.id.mst.id = dev->id;
 	msg.id.mst.pid = dev->kpid;

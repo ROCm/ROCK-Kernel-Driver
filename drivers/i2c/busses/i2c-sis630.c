@@ -468,6 +468,8 @@ static struct pci_device_id sis630_ids[] __devinitdata = {
 	{ 0, }
 };
 
+MODULE_DEVICE_TABLE (pci, sis630_ids);
+
 static int __devinit sis630_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
 	if (sis630_setup(dev)) {
@@ -503,7 +505,7 @@ static struct pci_driver sis630_driver = {
 
 static int __init i2c_sis630_init(void)
 {
-	return pci_module_init(&sis630_driver);
+	return pci_register_driver(&sis630_driver);
 }
 
 

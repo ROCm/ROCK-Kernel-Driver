@@ -517,9 +517,29 @@ static int i2c_device_match(struct device *dev, struct device_driver *drv)
 	return 1;
 }
 
+static int i2c_bus_suspend(struct device * dev, u32 state)
+{
+	int rc = 0;
+
+	if (dev->driver && dev->driver->suspend)
+		rc = dev->driver->suspend(dev,state,0);
+	return rc;
+}
+
+static int i2c_bus_resume(struct device * dev)
+{
+	int rc = 0;
+	
+	if (dev->driver && dev->driver->resume)
+		rc = dev->driver->resume(dev,0);
+	return rc;
+}
+
 struct bus_type i2c_bus_type = {
 	.name =		"i2c",
 	.match =	i2c_device_match,
+	.suspend =      i2c_bus_suspend,
+	.resume =       i2c_bus_resume,
 };
 
 static int __init i2c_init(void)
