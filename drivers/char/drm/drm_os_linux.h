@@ -134,7 +134,7 @@ do {								\
 	add_wait_queue(&(queue), &entry);			\
 								\
 	for (;;) {						\
-		current->state = TASK_INTERRUPTIBLE;		\
+		set_current_state(TASK_INTERRUPTIBLE);		\
 		if (condition)					\
 			break;					\
 		if (time_after_eq(jiffies, end)) {		\
@@ -147,7 +147,7 @@ do {								\
 			break;					\
 		}						\
 	}							\
-	current->state = TASK_RUNNING;				\
+	set_current_state(TASK_RUNNING);				\
 	remove_wait_queue(&(queue), &entry);			\
 } while (0)
 
