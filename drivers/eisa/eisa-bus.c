@@ -70,7 +70,7 @@ static void __init eisa_name_device (struct eisa_device *edev)
 	}
 
 	/* No name was found */
-	sprintf (edev->dev.name, "EISA device %.7s", edev->id.sig);
+	sprintf (edev->pretty_name, "EISA device %.7s", edev->id.sig);
 #endif
 }
 
