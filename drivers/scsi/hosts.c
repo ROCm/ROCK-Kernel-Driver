@@ -397,6 +397,7 @@ struct Scsi_Host * scsi_register(Scsi_Host_Template *shost_tp, int xtr_bytes)
 	spin_lock_init(&shost->default_lock);
 	scsi_assign_lock(shost, &shost->default_lock);
 	INIT_LIST_HEAD(&shost->my_devices);
+	INIT_LIST_HEAD(&shost->eh_cmd_list);
 
 	init_waitqueue_head(&shost->host_wait);
 	shost->dma_channel = 0xff;
@@ -635,21 +636,6 @@ void scsi_host_busy_dec_and_test(struct Scsi_Host *shost, Scsi_Device *sdev)
 	shost->host_busy--;
 	sdev->device_busy--;
 	if (shost->in_recovery && (shost->host_busy == shost->host_failed)) {
-		up(shost->eh_wait);
-		SCSI_LOG_ERROR_RECOVERY(5, printk("Waking error handler"
-					  " thread\n"));
-	}
-	spin_unlock_irqrestore(shost->host_lock, flags);
-}
-
-void scsi_host_failed_inc_and_test(struct Scsi_Host *shost)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(shost->host_lock, flags);
-	shost->in_recovery = 1;
-	shost->host_failed++;
-	if (shost->host_busy == shost->host_failed) {
 		up(shost->eh_wait);
 		SCSI_LOG_ERROR_RECOVERY(5, printk("Waking error handler"
 					  " thread\n"));
