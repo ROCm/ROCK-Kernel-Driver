@@ -164,13 +164,13 @@ static const struct serial8250_config uart_config[PORT_MAX_8250+1] = {
 	{ "16550",	1,	1,	0 },
 	{ "16550A",	16,	16,	UART_CAP_FIFO },
 	{ "Cirrus",	1, 	1,	0 },
-	{ "ST16650",	1,	1,	UART_CAP_FIFO | UART_CAP_SLEEP | UART_STARTECH },
-	{ "ST16650V2",	32,	16,	UART_CAP_FIFO | UART_CAP_SLEEP | UART_STARTECH },
+	{ "ST16650",	1,	1,	UART_CAP_FIFO | UART_CAP_SLEEP | UART_CAP_EFR },
+	{ "ST16650V2",	32,	16,	UART_CAP_FIFO | UART_CAP_SLEEP | UART_CAP_EFR },
 	{ "TI16750",	64,	64,	UART_CAP_FIFO | UART_CAP_SLEEP },
 	{ "Startech",	1,	1,	0 },
 	{ "16C950/954",	128,	128,	UART_CAP_FIFO },
-	{ "ST16654",	64,	32,	UART_CAP_FIFO | UART_CAP_SLEEP | UART_STARTECH },
-	{ "XR16850",	128,	128,	UART_CAP_FIFO | UART_CAP_SLEEP | UART_STARTECH },
+	{ "ST16654",	64,	32,	UART_CAP_FIFO | UART_CAP_SLEEP | UART_CAP_EFR },
+	{ "XR16850",	128,	128,	UART_CAP_FIFO | UART_CAP_SLEEP | UART_CAP_EFR },
 	{ "RSA",	2048,	2048,	UART_CAP_FIFO },
 	{ "NS16550A",	16,	16,	UART_CAP_FIFO | UART_NATSEMI },
 	{ "XScale",	32,	32,	UART_CAP_FIFO },
@@ -258,18 +258,20 @@ static inline void serial8250_clear_fifos(struct uart_8250_port *p)
 }
 
 /*
- * Sleep support.
+ * IER sleep support.  UARTs which have EFRs need the "extended
+ * capability" bit enabled.  Note that on XR16C850s, we need to
+ * reset LCR to write to IER.
  */
 static inline void serial8250_set_sleep(struct uart_8250_port *p, int sleep)
 {
 	if (p->capabilities & UART_CAP_SLEEP) {
-		if (p->capabilities & UART_STARTECH) {
+		if (p->capabilities & UART_CAP_EFR) {
 			serial_outp(p, UART_LCR, 0xBF);
 			serial_outp(p, UART_EFR, UART_EFR_ECB);
 			serial_outp(p, UART_LCR, 0);
 		}
 		serial_outp(p, UART_IER, sleep ? UART_IERX_SLEEP : 0);
-		if (p->capabilities & UART_STARTECH) {
+		if (p->capabilities & UART_CAP_EFR) {
 			serial_outp(p, UART_LCR, 0xBF);
 			serial_outp(p, UART_EFR, 0);
 			serial_outp(p, UART_LCR, 0);
@@ -1555,7 +1557,7 @@ serial8250_set_termios(struct uart_port *port, struct termios *termios,
 
 	serial_out(up, UART_IER, up->ier);
 
-	if (up->capabilities & UART_STARTECH) {
+	if (up->capabilities & UART_CAP_EFR) {
 		serial_outp(up, UART_LCR, 0xBF);
 		serial_outp(up, UART_EFR,
 			    termios->c_cflag & CRTSCTS ? UART_EFR_CTS :0);
