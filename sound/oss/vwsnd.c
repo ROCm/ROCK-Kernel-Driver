@@ -256,7 +256,7 @@ static int __init li_create(lithium_t *lith, unsigned long baseaddr)
 {
 	static void li_destroy(lithium_t *);
 
-	lith->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&lith->lock);
 	lith->page0 = ioremap_nocache(baseaddr + LI_PAGE0_OFFSET, PAGE_SIZE);
 	lith->page1 = ioremap_nocache(baseaddr + LI_PAGE1_OFFSET, PAGE_SIZE);
 	lith->page2 = ioremap_nocache(baseaddr + LI_PAGE2_OFFSET, PAGE_SIZE);
@@ -3380,13 +3380,13 @@ static int __init attach_vwsnd(struct address_info *hw_config)
 	init_MUTEX(&devc->io_sema);
 	init_MUTEX(&devc->mix_sema);
 	devc->open_mode = 0;
-	devc->rport.lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&devc->rport.lock);
 	init_waitqueue_head(&devc->rport.queue);
 	devc->rport.swstate = SW_OFF;
 	devc->rport.hwstate = HW_STOPPED;
 	devc->rport.flags = 0;
 	devc->rport.swbuf = NULL;
-	devc->wport.lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&devc->wport.lock);
 	init_waitqueue_head(&devc->wport.queue);
 	devc->wport.swstate = SW_OFF;
 	devc->wport.hwstate = HW_STOPPED;

@@ -521,7 +521,7 @@ int sb_dsp_detect(struct address_info *hw_config, int pci, int pciio, struct sb_
 	
 	DDB(printk("sb_dsp_detect(%x) entered\n", hw_config->io_base));
 
-	devc->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&devc->lock);
 	devc->type = hw_config->card_subtype;
 
 	devc->base = hw_config->io_base;

@@ -1191,7 +1191,7 @@ match:
 		wiinst->mmapped = 0;
 		wiinst->total_recorded = 0;
 		wiinst->blocks = 0;
-		wiinst->lock = SPIN_LOCK_UNLOCKED;
+		spin_lock_init(&wiinst->lock);
 		tasklet_init(&wiinst->timer.tasklet, emu10k1_wavein_bh, (unsigned long) wave_dev);
 		wave_dev->wiinst = wiinst;
 		emu10k1_wavein_setformat(wave_dev, &wiinst->format);
@@ -1235,7 +1235,7 @@ match:
 		woinst->total_copied = 0;
 		woinst->total_played = 0;
 		woinst->blocks = 0;
-		woinst->lock = SPIN_LOCK_UNLOCKED;
+		spin_lock_init(&woinst->lock);
 		tasklet_init(&woinst->timer.tasklet, emu10k1_waveout_bh, (unsigned long) wave_dev);
 		wave_dev->woinst = woinst;
 		emu10k1_waveout_setformat(wave_dev, &woinst->format);
