@@ -4438,30 +4438,32 @@ asmlinkage int sys32_vm86(u32 a1, u32 a2, u32 a3, u32 a4)
 	return sys_vm86((int)a1, (int)a2, (int)a3, (int)a4);
 }
 
+extern ssize_t sys_pread64(unsigned int fd, char *buf, size_t count,
+			   loff_t pos);
 
-
-
-
-extern asmlinkage ssize_t sys_pread(unsigned int fd, char * buf,
-				    size_t count, loff_t pos);
-
-extern asmlinkage ssize_t sys_pwrite(unsigned int fd, const char * buf,
-				     size_t count, loff_t pos);
+extern ssize_t sys_pwrite64(unsigned int fd, const char *buf, size_t count,
+			    loff_t pos);
 
 typedef __kernel_ssize_t32 ssize_t32;
 
-asmlinkage ssize_t32 sys32_pread(unsigned int fd, char *ubuf,
-				 __kernel_size_t32 count, u32 reg6, u32 poshi, u32 poslo)
+ssize_t32 sys32_pread64(unsigned int fd, char *ubuf, __kernel_size_t32 count,
+			u32 reg6, u32 poshi, u32 poslo)
 {
-	return sys_pread(fd, ubuf, count, ((loff_t)AA(poshi) << 32) | AA(poslo));
+	return sys_pread64(fd, ubuf, count, ((loff_t)AA(poshi) << 32) | AA(poslo));
 }
 
-asmlinkage ssize_t32 sys32_pwrite(unsigned int fd, char *ubuf,
-				  __kernel_size_t32 count, u32 reg6 ,u32 poshi, u32 poslo)
+ssize_t32 sys32_pwrite64(unsigned int fd, char *ubuf, __kernel_size_t32 count,
+			 u32 reg6 ,u32 poshi, u32 poslo)
 {
-	return sys_pwrite(fd, ubuf, count, ((loff_t)AA(poshi) << 32) | AA(poslo));
+	return sys_pwrite64(fd, ubuf, count, ((loff_t)AA(poshi) << 32) | AA(poslo));
 }
 
+extern ssize_t sys_readahead(int fd, loff_t offset, size_t count);
+
+ssize_t32 sys32_readahead(int fd, u32 offhi, u32 offlo, s32 count)
+{
+        return sys_readahead(fd, ((loff_t)AA(offhi) << 32) | AA(offlo), count);
+}
 
 extern asmlinkage long sys_truncate(const char * path, unsigned long length);
 extern asmlinkage long sys_ftruncate(unsigned int fd, unsigned long length);
