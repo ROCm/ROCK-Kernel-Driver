@@ -79,23 +79,19 @@ static inline pte_t *alloc_one_pte_map(struct mm_struct *mm, unsigned long addr)
 	return pte;
 }
 
-static void
-copy_one_pte(struct vm_area_struct *vma, unsigned long old_addr,
-	     unsigned long new_addr, pte_t *src, pte_t *dst)
+static inline int
+can_move_one_pte(pte_t *src, unsigned long new_addr)
 {
-	pte_t pte = ptep_clear_flush(vma, old_addr, src);
-	set_pte(dst, pte);
-
-	if (pte_present(pte)) {
-		unsigned long pfn = pte_pfn(pte);
+	int move = 1;
+	if (pte_present(*src)) {
+		unsigned long pfn = pte_pfn(*src);
 		if (pfn_valid(pfn)) {
 			struct page *page = pfn_to_page(pfn);
-			if (PageAnon(page)) {
-				page_remove_rmap(page);
-				page_add_anon_rmap(page, vma->vm_mm, new_addr);
-			}
+			if (PageAnon(page))
+				move = mremap_move_anon_rmap(page, new_addr);
 		}
 	}
+	return move;
 }
 
 static int
@@ -126,10 +122,15 @@ move_one_page(struct vm_area_struct *vma, unsigned long old_addr,
 		 * page_table_lock, we should re-check the src entry...
 		 */
 		if (src) {
-			if (dst)
-				copy_one_pte(vma, old_addr, new_addr, src, dst);
-			else
+			if (!dst)
 				error = -ENOMEM;
+			else if (!can_move_one_pte(src, new_addr))
+				error = -EAGAIN;
+			else {
+				pte_t pte;
+				pte = ptep_clear_flush(vma, old_addr, src);
+				set_pte(dst, pte);
+			}
 			pte_unmap_nested(src);
 		}
 		if (dst)
@@ -140,7 +141,8 @@ move_one_page(struct vm_area_struct *vma, unsigned long old_addr,
 }
 
 static unsigned long move_page_tables(struct vm_area_struct *vma,
-	unsigned long new_addr, unsigned long old_addr, unsigned long len)
+		unsigned long new_addr, unsigned long old_addr,
+		unsigned long len, int *cows)
 {
 	unsigned long offset;
 
@@ -152,8 +154,23 @@ static unsigned long move_page_tables(struct vm_area_struct *vma,
 	 * only a few pages.. This also makes error recovery easier.
 	 */
 	for (offset = 0; offset < len; offset += PAGE_SIZE) {
-		if (move_one_page(vma, old_addr+offset, new_addr+offset) < 0)
+		int ret = move_one_page(vma, old_addr+offset, new_addr+offset);
+		/*
+		 * The anonmm objrmap can only track anon page movements
+		 * if the page is exclusive to one mm.  In the rare case
+		 * when mremap move is applied to a shared page, break
+		 * COW (take a copy of the page) to make it exclusive.
+		 * If shared while on swap, page will be copied when
+		 * brought back in (if it's still shared by then).
+		 */
+		if (ret == -EAGAIN) {
+			ret = make_page_exclusive(vma, old_addr+offset);
+			offset -= PAGE_SIZE;
+			(*cows)++;
+		}
+		if (ret)
 			break;
+		cond_resched();
 	}
 	return offset;
 }
@@ -170,6 +187,7 @@ static unsigned long move_vma(struct vm_area_struct *vma,
 	unsigned long moved_len;
 	unsigned long excess = 0;
 	int split = 0;
+	int cows = 0;
 
 	/*
 	 * We'd prefer to avoid failure later on in do_munmap:
@@ -193,19 +211,22 @@ static unsigned long move_vma(struct vm_area_struct *vma,
 		mapping = vma->vm_file->f_mapping;
 		down(&mapping->i_shared_sem);
 	}
-	moved_len = move_page_tables(vma, new_addr, old_addr, old_len);
+	moved_len = move_page_tables(vma, new_addr, old_addr, old_len, &cows);
 	if (moved_len < old_len) {
 		/*
 		 * On error, move entries back from new area to old,
 		 * which will succeed since page tables still there,
 		 * and then proceed to unmap new area instead of old.
 		 */
-		move_page_tables(new_vma, old_addr, new_addr, moved_len);
+		move_page_tables(new_vma, old_addr, new_addr, moved_len, &cows);
 		vma = new_vma;
 		old_len = new_len;
 		old_addr = new_addr;
 		new_addr = -ENOMEM;
 	}
+	if (cows)	/* Downgrade or remove this message later */
+		printk(KERN_WARNING "%s: mremap moved %d cows\n",
+							current->comm, cows);
 	if (mapping)
 		up(&mapping->i_shared_sem);
 

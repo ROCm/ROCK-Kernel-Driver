@@ -7,6 +7,7 @@
 
 #include <linux/config.h>
 #include <linux/mm.h>
+#include <linux/hugetlb.h>
 #include <linux/mman.h>
 #include <linux/slab.h>
 #include <linux/kernel_stat.h>
@@ -437,7 +438,7 @@ unuse_pte(struct vm_area_struct *vma, unsigned long address, pte_t *dir,
 }
 
 /* vma->vm_mm->page_table_lock is held */
-static int unuse_pmd(struct vm_area_struct * vma, pmd_t *dir,
+static unsigned long unuse_pmd(struct vm_area_struct * vma, pmd_t *dir,
 	unsigned long address, unsigned long size, unsigned long offset,
 	swp_entry_t entry, struct page *page)
 {
@@ -466,7 +467,8 @@ static int unuse_pmd(struct vm_area_struct * vma, pmd_t *dir,
 		if (unlikely(pte_same(*pte, swp_pte))) {
 			unuse_pte(vma, offset + address, pte, entry, page);
 			pte_unmap(pte);
-			return 1;
+			/* add 1 since address may be 0 */
+			return 1 + offset + address;
 		}
 		address += PAGE_SIZE;
 		pte++;
@@ -476,12 +478,13 @@ static int unuse_pmd(struct vm_area_struct * vma, pmd_t *dir,
 }
 
 /* vma->vm_mm->page_table_lock is held */
-static int unuse_pgd(struct vm_area_struct * vma, pgd_t *dir,
+static unsigned long unuse_pgd(struct vm_area_struct * vma, pgd_t *dir,
 	unsigned long address, unsigned long size,
 	swp_entry_t entry, struct page *page)
 {
 	pmd_t * pmd;
 	unsigned long offset, end;
+	unsigned long foundaddr;
 
 	if (pgd_none(*dir))
 		return 0;
@@ -499,9 +502,10 @@ static int unuse_pgd(struct vm_area_struct * vma, pgd_t *dir,
 	if (address >= end)
 		BUG();
 	do {
-		if (unuse_pmd(vma, pmd, address, end - address,
-				offset, entry, page))
-			return 1;
+		foundaddr = unuse_pmd(vma, pmd, address, end - address,
+						offset, entry, page);
+		if (foundaddr)
+			return foundaddr;
 		address = (address + PMD_SIZE) & PMD_MASK;
 		pmd++;
 	} while (address && (address < end));
@@ -509,16 +513,19 @@ static int unuse_pgd(struct vm_area_struct * vma, pgd_t *dir,
 }
 
 /* vma->vm_mm->page_table_lock is held */
-static int unuse_vma(struct vm_area_struct * vma, pgd_t *pgdir,
+static unsigned long unuse_vma(struct vm_area_struct * vma, pgd_t *pgdir,
 	swp_entry_t entry, struct page *page)
 {
 	unsigned long start = vma->vm_start, end = vma->vm_end;
+	unsigned long foundaddr;
 
 	if (start >= end)
 		BUG();
 	do {
-		if (unuse_pgd(vma, pgdir, start, end - start, entry, page))
-			return 1;
+		foundaddr = unuse_pgd(vma, pgdir, start, end - start,
+						entry, page);
+		if (foundaddr)
+			return foundaddr;
 		start = (start + PGDIR_SIZE) & PGDIR_MASK;
 		pgdir++;
 	} while (start && (start < end));
@@ -529,18 +536,27 @@ static int unuse_process(struct mm_struct * mm,
 			swp_entry_t entry, struct page* page)
 {
 	struct vm_area_struct* vma;
+	unsigned long foundaddr = 0;
+	int ret = 0;
 
 	/*
 	 * Go through process' page directory.
 	 */
+	down_read(&mm->mmap_sem);
 	spin_lock(&mm->page_table_lock);
 	for (vma = mm->mmap; vma; vma = vma->vm_next) {
-		pgd_t * pgd = pgd_offset(mm, vma->vm_start);
-		if (unuse_vma(vma, pgd, entry, page))
-			break;
+		if (!is_vm_hugetlb_page(vma)) {
+			pgd_t * pgd = pgd_offset(mm, vma->vm_start);
+			foundaddr = unuse_vma(vma, pgd, entry, page);
+			if (foundaddr)
+				break;
+		}
 	}
 	spin_unlock(&mm->page_table_lock);
-	return 0;
+	if (foundaddr && mremap_moved_anon_rmap(page, foundaddr))
+		ret = make_page_exclusive(vma, foundaddr);
+	up_read(&mm->mmap_sem);
+	return ret;
 }
 
 /*

@@ -1326,13 +1326,22 @@ static int do_swap_page(struct mm_struct * mm,
 
 	mm->rss++;
 	pte = mk_pte(page, vma->vm_page_prot);
-	if (write_access && can_share_swap_page(page))
+	if (write_access && can_share_swap_page(page)) {
 		pte = maybe_mkwrite(pte_mkdirty(pte), vma);
+		write_access = 0;
+	}
 	unlock_page(page);
 
 	flush_icache_page(vma, page);
 	set_pte(page_table, pte);
 	page_add_anon_rmap(page, mm, address);
+
+	if (write_access || mremap_moved_anon_rmap(page, address)) {
+		if (do_wp_page(mm, vma, address,
+				page_table, pmd, pte) == VM_FAULT_OOM)
+			ret = VM_FAULT_OOM;
+		goto out;
+	}
 
 	/* No need to invalidate - it was non-present before */
 	update_mmu_cache(vma, address, pte);

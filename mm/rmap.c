@@ -263,6 +263,12 @@ static inline int page_referenced_anon(struct page *page)
 		}
 	}
 
+	/*
+	 * The warning below may appear if page_referenced catches the
+	 * page in between page_add_rmap and its replacement demanded
+	 * by mremap_moved_anon_page: so remove the warning once we're
+	 * convinced that anonmm rmap really is finding its pages.
+	 */
 	WARN_ON(!failed);
 out:
 	spin_unlock(&anonhd->lock);
@@ -448,6 +454,32 @@ void fastcall page_remove_rmap(struct page *page)
 		dec_page_state(nr_mapped);
 	}
 	page_map_unlock(page);
+}
+
+/**
+ * mremap_move_anon_rmap - try to note new address of anonymous page
+ * @page:	page about to be moved
+ * @address:	user virtual address at which it is going to be mapped
+ *
+ * Returns boolean, true if page is not shared, so address updated.
+ *
+ * For mremap's can_move_one_page: to update address when vma is moved,
+ * provided that anon page is not shared with a parent or child mm.
+ * If it is shared, then caller must take a copy of the page instead:
+ * not very clever, but too rare a case to merit cleverness.
+ */
+int fastcall mremap_move_anon_rmap(struct page *page, unsigned long address)
+{
+	int move = 0;
+	if (page->mapcount == 1) {
+		page_map_lock(page);
+		if (page->mapcount == 1) {
+			page->index = address & PAGE_MASK;
+			move = 1;
+		}
+		page_map_unlock(page);
+	}
+	return move;
 }
 
 /**
