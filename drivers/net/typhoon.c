@@ -2469,14 +2469,13 @@ typhoon_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	dev->set_multicast_list	= typhoon_set_rx_mode;
 	dev->tx_timeout		= typhoon_tx_timeout;
 	dev->poll		= typhoon_poll;
-	dev->ethtool_ops	= &typhoon_ethtool_ops;
 	dev->weight		= 16;
 	dev->watchdog_timeo	= TX_TIMEOUT;
 	dev->get_stats		= typhoon_get_stats;
 	dev->set_mac_address	= typhoon_set_mac_address;
 	dev->vlan_rx_register	= typhoon_vlan_rx_register;
 	dev->vlan_rx_kill_vid	= typhoon_vlan_rx_kill_vid;
-	SET_ETHTOOL_OPS(dev, &ops);
+	SET_ETHTOOL_OPS(dev, &typhoon_ethtool_ops);
 
 	/* We can handle scatter gather, up to 16 entries, and
 	 * we can do IP checksumming (only version 4, doh...)
