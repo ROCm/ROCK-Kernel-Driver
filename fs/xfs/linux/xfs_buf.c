@@ -193,10 +193,14 @@ EXPORT_SYMBOL(pagebuf_trace_buf);
 	(((flags) & PBF_READ_AHEAD) ? GFP_READAHEAD : \
 	 ((flags) & PBF_DONT_BLOCK) ? GFP_NOFS : GFP_KERNEL)
 
+#define pb_to_km(flags) \
+	 (((flags) & PBF_DONT_BLOCK) ? KM_NOFS : KM_SLEEP)
+
+
 #define pagebuf_allocate(flags) \
-	kmem_cache_alloc(pagebuf_cache, pb_to_gfp(flags))
+	kmem_zone_alloc(pagebuf_cache, pb_to_km(flags))
 #define pagebuf_deallocate(pb) \
-	kmem_cache_free(pagebuf_cache, (pb));
+	kmem_zone_free(pagebuf_cache, (pb));
 
 /*
  * Pagebuf hashing
