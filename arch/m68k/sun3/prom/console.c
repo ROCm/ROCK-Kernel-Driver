@@ -22,9 +22,9 @@ prom_nbgetchar(void)
 	int i = -1;
 	unsigned long flags;
 
-	save_flags(flags); cli();
+	local_irq_save(flags);
 		i = (*(romvec->pv_nbgetchar))();
-	restore_flags(flags);
+	local_irq_restore(flags);
 	return i; /* Ugh, we could spin forever on unsupported proms ;( */
 }
 
@@ -37,9 +37,9 @@ prom_nbputchar(char c)
 	unsigned long flags;
 	int i = -1;
 
-	save_flags(flags); cli();
+	local_irq_save(flags);
 		i = (*(romvec->pv_nbputchar))(c);
-	restore_flags(flags);	
+	local_irq_restore(flags);
 	return i; /* Ugh, we could spin forever on unsupported proms ;( */
 }
 
@@ -83,12 +83,12 @@ prom_query_input_device()
 		};
 	case PROM_V3:
 	case PROM_P1275:
-		save_flags(flags); cli();
+		local_irq_save(flags);
 		st_p = (*romvec->pv_v2devops.v2_inst2pkg)(*romvec->pv_v2bootargs.fd_stdin);
 		__asm__ __volatile__("ld [%0], %%g6\n\t" : :
 				     "r" (&current_set[smp_processor_id()]) :
 				     "memory");
-		restore_flags(flags);
+		local_irq_restore(flags);
 		if(prom_node_has_property(st_p, "keyboard"))
 			return PROMDEV_IKBD;
 		prom_getproperty(st_p, "device_type", propb, sizeof(propb));
@@ -133,12 +133,12 @@ prom_query_output_device()
 	case PROM_V2:
 	case PROM_V3:
 	case PROM_P1275:
-		save_flags(flags); cli();
+		local_irq_save(flags);
 		st_p = (*romvec->pv_v2devops.v2_inst2pkg)(*romvec->pv_v2bootargs.fd_stdout);
 		__asm__ __volatile__("ld [%0], %%g6\n\t" : :
 				     "r" (&current_set[smp_processor_id()]) :
 				     "memory");
-		restore_flags(flags);
+		local_irq_restore(flags);
 		propl = prom_getproperty(st_p, "device_type", propb, sizeof(propb));
 		if (propl >= 0 && propl == sizeof("display") &&
 			strncmp("display", propb, sizeof("display")) == 0)
