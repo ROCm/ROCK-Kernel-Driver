@@ -74,8 +74,6 @@ textaddr-y	:= 0xC0008000
 textaddr-$(CONFIG_ARCH_CO285)	   := 0x60008000
  machine-$(CONFIG_ARCH_CO285)	   := footbridge
   incdir-$(CONFIG_ARCH_CO285)	   := ebsa285
- machine-$(CONFIG_ARCH_FTVPCI)	   := ftvpci
-  incdir-$(CONFIG_ARCH_FTVPCI)	   := nexuspci
  machine-$(CONFIG_ARCH_SHARK)	   := shark
  machine-$(CONFIG_ARCH_SA1100)	   := sa1100
 ifeq ($(CONFIG_ARCH_SA1100),y)
