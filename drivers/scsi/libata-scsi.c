@@ -49,7 +49,8 @@ int ata_std_bios_param(struct scsi_device *sdev, struct block_device *bdev,
 {
 	geom[0] = 255;
 	geom[1] = 63;
-	geom[2] = capacity / (geom[0] * geom[1]);
+	sector_div(capacity, 255*63);
+	geom[2] = capacity;
 
 	return 0;
 }
