@@ -28,7 +28,7 @@
 
 #define DBG(level, format, arg...) do { \
 if (level & __debug_variable) \
-printk(KERN_DEBUG __FUNCTION__ ": " format "\n" , ## arg); \
+printk(KERN_DEBUG "%s: " format "\n" , __FUNCTION__ , ## arg); \
 } while (0)
 
 #define DBG_PACKET(level,data,count) \

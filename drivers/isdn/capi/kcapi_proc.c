@@ -90,17 +90,17 @@ static int contrstats_show(struct seq_file *seq, void *v)
 }
 
 struct seq_operations seq_controller_ops = {
-	start:	controller_start,
-	next:	controller_next,
-	stop:	controller_stop,
-	show:	controller_show,
+	.start	= controller_start,
+	.next	= controller_next,
+	.stop	= controller_stop,
+	.show	= controller_show,
 };
 
 struct seq_operations seq_contrstats_ops = {
-	start:	controller_start,
-	next:	controller_next,
-	stop:	controller_stop,
-	show:	contrstats_show,
+	.start	= controller_start,
+	.next	= controller_next,
+	.stop	= controller_stop,
+	.show	= contrstats_show,
 };
 
 static int seq_controller_open(struct inode *inode, struct file *file)
@@ -114,17 +114,17 @@ static int seq_contrstats_open(struct inode *inode, struct file *file)
 }
 
 static struct file_operations proc_controller_ops = {
-	open:		seq_controller_open,
-	read:		seq_read,
-	llseek:		seq_lseek,
-	release:	seq_release,
+	.open		= seq_controller_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
 };
 
 static struct file_operations proc_contrstats_ops = {
-	open:		seq_contrstats_open,
-	read:		seq_read,
-	llseek:		seq_lseek,
-	release:	seq_release,
+	.open		= seq_contrstats_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
 };
 
 // /proc/capi/applications: 
@@ -193,17 +193,17 @@ applstats_show(struct seq_file *seq, void *v)
 }
 
 struct seq_operations seq_applications_ops = {
-	start:	applications_start,
-	next:	applications_next,
-	stop:	applications_stop,
-	show:	applications_show,
+	.start	= applications_start,
+	.next	= applications_next,
+	.stop	= applications_stop,
+	.show	= applications_show,
 };
 
 struct seq_operations seq_applstats_ops = {
-	start:	applications_start,
-	next:	applications_next,
-	stop:	applications_stop,
-	show:	applstats_show,
+	.start	= applications_start,
+	.next	= applications_next,
+	.stop	= applications_stop,
+	.show	= applstats_show,
 };
 
 static int
@@ -219,17 +219,17 @@ seq_applstats_open(struct inode *inode, struct file *file)
 }
 
 static struct file_operations proc_applications_ops = {
-	open:		seq_applications_open,
-	read:		seq_read,
-	llseek:		seq_lseek,
-	release:	seq_release,
+	.open		= seq_applications_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
 };
 
 static struct file_operations proc_applstats_ops = {
-	open:		seq_applstats_open,
-	read:		seq_read,
-	llseek:		seq_lseek,
-	release:	seq_release,
+	.open		= seq_applstats_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
 };
 
 static void

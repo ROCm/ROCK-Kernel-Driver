@@ -72,16 +72,16 @@ static int capifs_revalidate(struct dentry *, int);
 static struct inode *capifs_new_inode(struct super_block *sb);
 
 static struct file_operations capifs_root_operations = {
-	read:		generic_read_dir,
-	readdir:	capifs_root_readdir,
+	.read		= generic_read_dir,
+	.readdir	= capifs_root_readdir,
 };
 
 struct inode_operations capifs_root_inode_operations = {
-	lookup: capifs_root_lookup,
+	.lookup = capifs_root_lookup,
 };
 
 static struct dentry_operations capifs_dentry_operations = {
-	d_revalidate: capifs_revalidate,
+	.d_revalidate = capifs_revalidate,
 };
 
 /*
@@ -222,8 +222,8 @@ static void capifs_put_super(struct super_block *sb)
 }
 
 static struct super_operations capifs_sops = {
-	put_super:	capifs_put_super,
-	statfs:		simple_statfs,
+	.put_super	= capifs_put_super,
+	.statfs		= simple_statfs,
 };
 
 static int capifs_parse_options(char *options, struct capifs_sb_info *sbi)
@@ -371,10 +371,10 @@ static struct super_block *capifs_get_sb(struct file_system_type *fs_type,
 }
 
 static struct file_system_type capifs_fs_type = {
-	owner:		THIS_MODULE,
-	name:		"capifs",
-	get_sb:		capifs_get_sb,
-	kill_sb:	kill_anon_super,
+	.owner		= THIS_MODULE,
+	.name		= "capifs",
+	.get_sb		= capifs_get_sb,
+	.kill_sb	= kill_anon_super,
 };
 
 void capifs_new_ncci(char type, unsigned int num, kdev_t device)

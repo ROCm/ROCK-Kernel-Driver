@@ -215,10 +215,10 @@ static int __devinit t1pci_probe(struct pci_dev *dev,
 }
 
 static struct pci_driver t1pci_pci_driver = {
-       name:           "t1pci",
-       id_table:       t1pci_pci_tbl,
-       probe:          t1pci_probe,
-       remove:         t1pci_remove,
+       .name           = "t1pci",
+       .id_table       = t1pci_pci_tbl,
+       .probe          = t1pci_probe,
+       .remove         = t1pci_remove,
 };
 
 static int __init t1pci_init(void)

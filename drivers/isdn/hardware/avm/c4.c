@@ -1232,10 +1232,10 @@ static int __devinit c4_probe(struct pci_dev *dev,
 }
 
 static struct pci_driver c4_pci_driver = {
-       name:           "c4",
-       id_table:       c4_pci_tbl,
-       probe:          c4_probe,
-       remove:         c4_remove,
+       .name           = "c4",
+       .id_table       = c4_pci_tbl,
+       .probe          = c4_probe,
+       .remove         = c4_remove,
 };
 
 static int __init c4_init(void)

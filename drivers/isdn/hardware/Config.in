@@ -2,4 +2,26 @@
 # ISDN hardware drivers
 #
 
-source drivers/isdn/hardware/avm/Config.in
+if [ "$CONFIG_ISDN_CAPI" != "n" ]; then
+  comment 'CAPI hardware drivers'
+  source drivers/isdn/hardware/avm/Config.in
+fi
+
+if [ "$CONFIG_ISDN" != "n" ]; then
+  comment 'ISDN4Linux hardware drivers'
+
+  source drivers/isdn/hisax/Config.in
+
+  mainmenu_option next_comment
+  comment 'Active cards'
+
+  source drivers/isdn/icn/Config.in
+  source drivers/isdn/pcbit/Config.in
+  source drivers/isdn/sc/Config.in
+  source drivers/isdn/act2000/Config.in
+  source drivers/isdn/eicon/Config.in
+  source drivers/isdn/tpam/Config.in
+  source drivers/isdn/hysdn/Config.in
+  endmenu
+fi
+
