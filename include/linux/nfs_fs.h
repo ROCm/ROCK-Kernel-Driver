@@ -13,6 +13,7 @@
 #include <linux/in.h>
 #include <linux/mm.h>
 #include <linux/pagemap.h>
+#include <linux/rwsem.h>
 #include <linux/wait.h>
 #include <linux/uio.h>
 
@@ -469,11 +470,32 @@ extern void * nfs_root_data(void);
  ((err) != NFSERR_RESOURCE)       &&  \
  ((err) != NFSERR_NOFILEHANDLE))
 
+enum nfs4_client_state {
+	NFS4CLNT_OK  = 0,
+	NFS4CLNT_NEW,
+};
+
+/*
+ * The nfs4_client identifies our client state to the server.
+ */
 struct nfs4_client {
-        u64                     cl_clientid;    /* constant */
-	nfs4_verifier           cl_confirm;     
+	struct list_head	cl_servers;	/* Global list of servers */
+	struct in_addr		cl_addr;	/* Server identifier */
+	u64			cl_clientid;	/* constant */
+	nfs4_verifier		cl_confirm;
+	enum nfs4_client_state	cl_state;
 
 	u32			cl_lockowner_id;
+
+	/*
+	 * The following rwsem ensures exclusive access to the server
+	 * while we recover the state following a lease expiration.
+	 */
+	struct rw_semaphore	cl_sem;
+
+	struct list_head	cl_state_owners;
+	spinlock_t		cl_lock;
+	atomic_t		cl_count;
 };
 
 /*
@@ -483,6 +505,7 @@ struct nfs4_client {
 * the protocol.
 */
 struct nfs4_state_owner {
+	struct list_head     so_list;	 /* per-clientid list of state_owners */
 	u32                  so_id;      /* 32-bit identifier, unique */
 	struct semaphore     so_sema;
 	u32                  so_seqid;   /* protected by so_sema */
@@ -499,7 +522,7 @@ extern int nfs4_do_close(struct inode *inode, struct nfs4_state_owner *sp);
 extern int nfs4_init_renewd(struct nfs_server *server);
 
 /* nfs4state.c */
-extern struct nfs4_client *nfs4_get_client(void);
+extern struct nfs4_client *nfs4_get_client(struct in_addr *);
 extern void nfs4_put_client(struct nfs4_client *clp);
 extern struct nfs4_state_owner * nfs4_get_state_owner(struct inode *inode);
 void nfs4_put_state_owner(struct inode *inode, struct nfs4_state_owner *sp);

@@ -740,6 +740,7 @@ static int
 nfs4_proc_get_root(struct nfs_server *server, struct nfs_fh *fhandle,
 		   struct nfs_fattr *fattr)
 {
+	struct nfs4_client	*clp;
 	struct nfs4_compound	compound;
 	struct nfs4_op		ops[4];
 	struct nfs_fsinfo	fsinfo;
@@ -747,10 +748,23 @@ nfs4_proc_get_root(struct nfs_server *server, struct nfs_fh *fhandle,
 	struct qstr		q;
 	int			status;
 
-	fattr->valid = 0;
-
-	if (!(server->nfs4_state = nfs4_get_client()))
+	clp = server->nfs4_state = nfs4_get_client(&server->addr.sin_addr);
+	if (!clp)
 		return -ENOMEM;
+
+	down_write(&clp->cl_sem);
+	/* Has the clientid already been initialized? */
+	if (clp->cl_state != NFS4CLNT_NEW) {
+		/* Yep, so just read the root attributes and the lease time. */
+		fattr->valid = 0;
+		nfs4_setup_compound(&compound, ops, server, "getrootfh");
+		nfs4_setup_putrootfh(&compound);
+		nfs4_setup_getrootattr(&compound, fattr, &fsinfo);
+		nfs4_setup_getfh(&compound, fhandle);
+		if ((status = nfs4_call_compound(&compound, NULL, 0)))
+			goto out_unlock;
+		goto no_setclientid;
+	}
 
 	/* 
 	 * SETCLIENTID.
@@ -760,28 +774,33 @@ nfs4_proc_get_root(struct nfs_server *server, struct nfs_fh *fhandle,
 	nfs4_setup_compound(&compound, ops, server, "setclientid");
 	nfs4_setup_setclientid(&compound, 0, 0);
 	if ((status = nfs4_call_compound(&compound, NULL, 0)))
-		goto out;
+		goto out_unlock;
 
 	/*
 	 * SETCLIENTID_CONFIRM, plus root filehandle.
 	 * We also get the lease time here.
 	 */
+	fattr->valid = 0;
 	nfs4_setup_compound(&compound, ops, server, "setclientid_confirm");
 	nfs4_setup_setclientid_confirm(&compound);
 	nfs4_setup_putrootfh(&compound);
 	nfs4_setup_getrootattr(&compound, fattr, &fsinfo);
 	nfs4_setup_getfh(&compound, fhandle);
 	if ((status = nfs4_call_compound(&compound, NULL, 0)))
-		goto out;
-	
+		goto out_unlock;
+	clp->cl_state = NFS4CLNT_OK;
+
+no_setclientid:
 	/*
 	 * Now that we have instantiated the clientid and determined
 	 * the lease time, we can initialize the renew daemon for this
 	 * server.
+	 * FIXME: we only need one renewd daemon per server.
 	 */
 	server->lease_time = fsinfo.lease_time * HZ;
 	if ((status = nfs4_init_renewd(server)))
-		goto out;
+		goto out_unlock;
+	up_write(&clp->cl_sem);
 	
 	/*
 	 * Now we do a separate LOOKUP for each component of the mount path.
@@ -799,6 +818,7 @@ nfs4_proc_get_root(struct nfs_server *server, struct nfs_fh *fhandle,
 			p++;
 		q.len = p - q.name;
 
+		fattr->valid = 0;
 		nfs4_setup_compound(&compound, ops, server, "mount");
 		nfs4_setup_putfh(&compound, fhandle);
 		nfs4_setup_lookup(&compound, &q);
@@ -813,8 +833,11 @@ nfs4_proc_get_root(struct nfs_server *server, struct nfs_fh *fhandle,
 		}
 		break;
 	}
-
-out:
+	return status;
+out_unlock:
+	up_write(&clp->cl_sem);
+	nfs4_put_client(clp);
+	server->nfs4_state = NULL;
 	return status;
 }
 

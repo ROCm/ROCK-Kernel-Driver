@@ -51,6 +51,7 @@ nfs4_stateid zero_stateid =
 nfs4_stateid one_stateid =
 	{ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 
+static LIST_HEAD(nfs4_clientid_list);
 
 /*
  * nfs4_get_client(): returns an empty client structure
@@ -60,20 +61,60 @@ nfs4_stateid one_stateid =
  * bother putting them in a slab cache...
  */
 struct nfs4_client *
-nfs4_get_client(void)
+nfs4_alloc_client(struct in_addr *addr)
 {
 	struct nfs4_client *clp;
 
-	if ((clp = kmalloc(sizeof(*clp), GFP_KERNEL)))
+	if ((clp = kmalloc(sizeof(*clp), GFP_KERNEL))) {
 		memset(clp, 0, sizeof(*clp));
+		memcpy(&clp->cl_addr, addr, sizeof(clp->cl_addr));
+		init_rwsem(&clp->cl_sem);
+		INIT_LIST_HEAD(&clp->cl_state_owners);
+		spin_lock_init(&clp->cl_lock);
+		atomic_set(&clp->cl_count, 1);
+		clp->cl_state = NFS4CLNT_NEW;
+	}
+	return clp;
+}
+
+void
+nfs4_free_client(struct nfs4_client *clp)
+{
+	BUG_ON(!clp);
+	kfree(clp);
+}
+
+struct nfs4_client *
+nfs4_get_client(struct in_addr *addr)
+{
+	struct nfs4_client *new, *clp = NULL;
+
+	new = nfs4_alloc_client(addr);
+	spin_lock(&state_spinlock);
+	list_for_each_entry(clp, &nfs4_clientid_list, cl_servers) {
+		if (memcmp(&clp->cl_addr, addr, sizeof(clp->cl_addr)) == 0)
+			goto found;
+	}
+	if (new)
+		list_add(&new->cl_servers, &nfs4_clientid_list);
+	spin_unlock(&state_spinlock);
+	return new;
+found:
+	atomic_inc(&clp->cl_count);
+	spin_unlock(&state_spinlock);
+	if (new)
+		nfs4_free_client(new);
 	return clp;
 }
 
 void
 nfs4_put_client(struct nfs4_client *clp)
 {
-	BUG_ON(!clp);
-	kfree(clp);
+	if (!atomic_dec_and_lock(&clp->cl_count, &state_spinlock))
+		return;
+	list_del(&clp->cl_servers);
+	spin_unlock(&state_spinlock);
+	nfs4_free_client(clp);
 }
 
 static inline u32
