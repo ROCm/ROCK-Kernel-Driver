@@ -1370,7 +1370,6 @@ int ntfs_show_options(struct seq_file *sf, struct vfsmount *mnt)
 {
 	ntfs_volume *vol = NTFS_SB(mnt->mnt_sb);
 	int i;
-	char *s;
 
 	seq_printf(sf, ",uid=%i", vol->uid);
 	seq_printf(sf, ",gid=%i", vol->gid);
