@@ -60,8 +60,6 @@ static int do_mlock(unsigned long start, size_t len, int on)
 	struct vm_area_struct * vma, * next;
 	int error;
 
-	if (on && !can_do_mlock())
-		return -EPERM;
 	len = PAGE_ALIGN(len);
 	end = start + len;
 	if (end < start)
@@ -107,6 +105,9 @@ asmlinkage long sys_mlock(unsigned long start, size_t len)
 	unsigned long lock_limit;
 	int error = -ENOMEM;
 
+	if (!can_do_mlock())
+		return -EPERM;
+
 	down_write(&current->mm->mmap_sem);
 	len = PAGE_ALIGN(len + (start & ~PAGE_MASK));
 	start &= PAGE_MASK;
@@ -138,13 +139,9 @@ asmlinkage long sys_munlock(unsigned long start, size_t len)
 
 static int do_mlockall(int flags)
 {
-	unsigned int def_flags;
 	struct vm_area_struct * vma;
+	unsigned int def_flags = 0;
 
-	if (!can_do_mlock())
-		return -EPERM;
-
-	def_flags = 0;
 	if (flags & MCL_FUTURE)
 		def_flags = VM_LOCKED;
 	current->mm->def_flags = def_flags;
@@ -172,6 +169,10 @@ asmlinkage long sys_mlockall(int flags)
 
 	down_write(&current->mm->mmap_sem);
 	if (!flags || (flags & ~(MCL_CURRENT | MCL_FUTURE)))
+		goto out;
+
+	ret = -EPERM;
+	if (!can_do_mlock())
 		goto out;
 
 	lock_limit = current->rlim[RLIMIT_MEMLOCK].rlim_cur;
