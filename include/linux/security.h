@@ -582,7 +582,7 @@ struct swap_info_struct;
  * @task_setrlimit:
  *	Check permission before setting the resource limits of the current
  *	process for @resource to @new_rlim.  The old resource limit values can
- *	be examined by dereferencing (current->rlim + resource).
+ *	be examined by dereferencing (current->signal->rlim + resource).
  *	@resource contains the resource whose limit is being set.
  *	@new_rlim contains the new limits for @resource.
  *	Return 0 if permission is granted.

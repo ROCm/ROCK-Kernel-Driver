@@ -24,8 +24,8 @@ extern void detect_cpu_and_cache_system(void);
  * Generic wrapper for command line arguments to disable on-chip
  * peripherals (nofpu, nodsp, and so forth).
  */
-#define onchip_setup(x) 			\
-static int x##_disabled __initdata = 0; 	\
+#define onchip_setup(x)				\
+static int x##_disabled __initdata = 0;		\
 						\
 static int __init x##_setup(char *opts)		\
 {						\
@@ -88,7 +88,7 @@ static void __init cache_init(void)
 		} while (--ways);
 	}
 
-	/* 
+	/*
 	 * Default CCR values .. enable the caches
 	 * and invalidate them immediately..
 	 */
@@ -160,7 +160,7 @@ static void __init dsp_init(void)
 }
 #endif /* CONFIG_SH_DSP */
 
-/*
+/**
  * sh_cpu_init
  *
  * This is our initial entry point for each CPU, and is invoked on the boot
@@ -200,7 +200,7 @@ asmlinkage void __init sh_cpu_init(void)
 #ifdef CONFIG_SH_DSP
 	/* Probe for DSP */
 	dsp_init();
-	
+
 	/* Disable the DSP */
 	if (dsp_disabled) {
 		printk("DSP Disabled\n");

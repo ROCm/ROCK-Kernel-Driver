@@ -7,7 +7,7 @@ DRIVER_OBJS = $(addprefix ../../../drivers/oprofile/, \
 		timer_int.o )
 
 profdrvr-y				:= op_model_null.o
-profdrvr-$(CONFIG_SH_DREAMCAST)		:= op_model_dreamcast.o
+profdrvr-$(CONFIG_CPU_SUBTYPE_SH7750)	:= op_model_sh7750.o
 
 oprofile-y				:= $(DRIVER_OBJS) $(profdrvr-y)
 

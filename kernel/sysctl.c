@@ -40,6 +40,7 @@
 #include <linux/times.h>
 #include <linux/limits.h>
 #include <linux/dcache.h>
+#include <linux/syscalls.h>
 
 #include <asm/uaccess.h>
 #include <asm/processor.h>

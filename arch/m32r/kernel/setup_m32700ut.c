@@ -435,7 +435,7 @@ void __init init_IRQ(void)
 	icu_data[M32R_IRQ_INT2].icucr = M32R_ICUCR_IEN|M32R_ICUCR_ISMOD01;
 	enable_m32700ut_irq(M32R_IRQ_INT2);
 
-//#if defined(CONFIG_M32R_AR_VGA)
+//#if defined(CONFIG_VIDEO_M32R_AR)
 	/*
 	 * INT3# is used for AR
 	 */
@@ -445,7 +445,7 @@ void __init init_IRQ(void)
 	irq_desc[M32R_IRQ_INT3].depth = 1;
 	icu_data[M32R_IRQ_INT3].icucr = M32R_ICUCR_IEN|M32R_ICUCR_ISMOD10;
 	disable_m32700ut_irq(M32R_IRQ_INT3);
-//#endif	/* CONFIG_M32R_ARV */
+//#endif	/* CONFIG_VIDEO_M32R_AR */
 }
 
 #define LAN_IOSTART     0x300

@@ -19,8 +19,10 @@
 
 int reiserfs_resize (struct super_block * s, unsigned long block_count_new)
 {
+        int err = 0;
 	struct reiserfs_super_block * sb;
         struct reiserfs_bitmap_info *bitmap;
+	struct reiserfs_bitmap_info *old_bitmap = SB_AP_BITMAP(s);
 	struct buffer_head * bh;
 	struct reiserfs_transaction_handle th;
 	unsigned int bmap_nr_new, bmap_nr;
@@ -107,12 +109,19 @@ int reiserfs_resize (struct super_block * s, unsigned long block_count_new)
 	     * block pointers */
 	    bitmap = vmalloc(sizeof(struct reiserfs_bitmap_info) * bmap_nr_new);
 	    if (!bitmap) {
+		/* Journal bitmaps are still supersized, but the memory isn't
+		 * leaked, so I guess it's ok */
 		printk("reiserfs_resize: unable to allocate memory.\n");
 		return -ENOMEM;
 	    }
 	    memset (bitmap, 0, sizeof (struct reiserfs_bitmap_info) * SB_BMAP_NR(s));
 	    for (i = 0; i < bmap_nr; i++)
-		bitmap[i] = SB_AP_BITMAP(s)[i];
+		bitmap[i] = old_bitmap[i];
+
+	    /* This doesn't go through the journal, but it doesn't have to.
+	     * The changes are still atomic: We're synced up when the journal
+	     * transaction begins, and the new bitmaps don't matter if the
+	     * transaction fails. */
 	    for (i = bmap_nr; i < bmap_nr_new; i++) {
 		bitmap[i].bh = sb_getblk(s, i * s->s_blocksize * 8);
 		memset(bitmap[i].bh->b_data, 0, sb_blocksize(sb));
@@ -126,12 +135,16 @@ int reiserfs_resize (struct super_block * s, unsigned long block_count_new)
 		bitmap[i].free_count = sb_blocksize(sb) * 8 - 1;
 	    }	
 	    /* free old bitmap blocks array */
-	    vfree(SB_AP_BITMAP(s));
 	    SB_AP_BITMAP(s) = bitmap;
+	    vfree (old_bitmap);
 	}
 	
-	/* begin transaction */
-	journal_begin(&th, s, 10);
+	/* begin transaction, if there was an error, it's fine. Yes, we have
+	 * incorrect bitmaps now, but none of it is ever going to touch the
+	 * disk anyway. */
+	err = journal_begin(&th, s, 10);
+	if (err)
+	    return err;
 
 	/* correct last bitmap blocks in old and new disk layout */
 	reiserfs_prepare_for_journal(s, SB_AP_BITMAP(s)[bmap_nr - 1].bh, 1);
@@ -165,8 +178,5 @@ int reiserfs_resize (struct super_block * s, unsigned long block_count_new)
 	journal_mark_dirty(&th, s, SB_BUFFER_WITH_SB(s));
 	
 	SB_JOURNAL(s)->j_must_wait = 1;
-	journal_end(&th, s, 10);
-
-	return 0;
+	return journal_end(&th, s, 10);
 }
-

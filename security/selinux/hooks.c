@@ -1909,8 +1909,8 @@ static void selinux_bprm_apply_creds(struct linux_binprm *bprm, int unsafe)
 				  PROCESS__RLIMITINH, NULL, NULL);
 		if (rc) {
 			for (i = 0; i < RLIM_NLIMITS; i++) {
-				rlim = current->rlim + i;
-				initrlim = init_task.rlim+i;
+				rlim = current->signal->rlim + i;
+				initrlim = init_task.signal->rlim+i;
 				rlim->rlim_cur = min(rlim->rlim_max,initrlim->rlim_cur);
 			}
 		}
@@ -2699,7 +2699,7 @@ static int selinux_task_setnice(struct task_struct *p, int nice)
 
 static int selinux_task_setrlimit(unsigned int resource, struct rlimit *new_rlim)
 {
-	struct rlimit *old_rlim = current->rlim + resource;
+	struct rlimit *old_rlim = current->signal->rlim + resource;
 	int rc;
 
 	rc = secondary_ops->task_setrlimit(resource, new_rlim);

@@ -32,7 +32,27 @@ static inline cpumask_t __pcibus_to_cpumask(int bus)
 /* broken generic file uses #ifndef later on this */
 #define pcibus_to_cpumask(bus) __pcibus_to_cpumask(bus)
 
-#define NODE_BALANCE_RATE 30	/* CHECKME */ 
+#ifdef CONFIG_NUMA
+/* sched_domains SD_NODE_INIT for x86_64 machines */
+#define SD_NODE_INIT (struct sched_domain) {		\
+	.span			= CPU_MASK_NONE,	\
+	.parent			= NULL,			\
+	.groups			= NULL,			\
+	.min_interval		= 8,			\
+	.max_interval		= 32,			\
+	.busy_factor		= 32,			\
+	.imbalance_pct		= 125,			\
+	.cache_hot_time		= (10*1000),		\
+	.cache_nice_tries	= 1,			\
+	.per_cpu_gain		= 100,			\
+	.flags			= SD_LOAD_BALANCE	\
+				| SD_BALANCE_EXEC	\
+				| SD_WAKE_BALANCE,	\
+	.last_balance		= jiffies,		\
+	.balance_interval	= 1,			\
+	.nr_balance_failed	= 0,			\
+}
+#endif
 
 #endif
 

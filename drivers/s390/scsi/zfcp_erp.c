@@ -12,6 +12,7 @@
  *            Wolfgang Taphorn
  *            Stefan Bader <stefan.bader@de.ibm.com> 
  *            Heiko Carstens <heiko.carstens@de.ibm.com> 
+ *            Andreas Herrmann <aherrman@de.ibm.com>
  * 
  * This program is free software; you can redistribute it and/or modify 
  * it under the terms of the GNU General Public License as published by 
@@ -31,7 +32,7 @@
 #define ZFCP_LOG_AREA			ZFCP_LOG_AREA_ERP
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_ERP_REVISION "$Revision: 1.65 $"
+#define ZFCP_ERP_REVISION "$Revision: 1.69 $"
 
 #include "zfcp_ext.h"
 
@@ -336,7 +337,8 @@ zfcp_els(struct zfcp_port *port, u8 ls_code)
 	send_els->req->offset = 0;
 	send_els->resp->offset = PAGE_SIZE >> 1;
 
-	send_els->port = port;
+	send_els->adapter = port->adapter;
+	send_els->d_id = port->d_id;
 	send_els->ls_code = ls_code;
 	send_els->handler = zfcp_els_handler;
 	send_els->handler_data = (unsigned long)send_els;
@@ -441,13 +443,19 @@ void
 zfcp_els_handler(unsigned long data)
 {
 	struct zfcp_send_els *send_els = (struct zfcp_send_els*)data;
-	struct zfcp_port *port = send_els->port;
+	struct zfcp_port *port;
 	struct zfcp_ls_rtv_acc *rtv;
 	struct zfcp_ls_rls_acc *rls;
 	struct zfcp_ls_pdisc_acc *pdisc;
 	struct zfcp_ls_adisc_acc *adisc;
 	void *req, *resp;
 	u8 req_code;
+
+	read_lock(&zfcp_data.config_lock);
+	port = zfcp_get_port_by_did(send_els->adapter, send_els->d_id);
+	read_unlock(&zfcp_data.config_lock);
+
+	BUG_ON(port == NULL);
 
 	/* request rejected or timed out */
 	if (send_els->status != 0) {
@@ -521,6 +529,7 @@ zfcp_els_handler(unsigned long data)
 	}
 
  out:
+	zfcp_port_put(port);
 	__free_pages(send_els->req->page, 0);
 	kfree(send_els->req);
 	kfree(send_els->resp);
@@ -541,8 +550,10 @@ zfcp_test_link(struct zfcp_port *port)
 {
 	int retval;
 
+	zfcp_port_get(port);
 	retval = zfcp_els(port, ZFCP_LS_ADISC);
 	if (retval != 0) {
+		zfcp_port_put(port);
 		ZFCP_LOG_NORMAL("reopen needed for port 0x%016Lx "
 				"on adapter %s\n ", port->wwpn,
 				zfcp_get_busid_by_port(port));
@@ -3445,21 +3456,20 @@ zfcp_erp_action_dequeue(struct zfcp_erp_action *erp_action)
 /**
  * zfcp_erp_action_cleanup
  *
- * registers unit with scsi stack if appropiate and fixes reference counts
+ * Register unit with scsi stack if appropiate and fix reference counts.
+ * Note: Temporary units are not registered with scsi stack.
  */
-
 static void
 zfcp_erp_action_cleanup(int action, struct zfcp_adapter *adapter,
 			struct zfcp_port *port, struct zfcp_unit *unit,
 			int result)
 {
-	if ((action == ZFCP_ERP_ACTION_REOPEN_UNIT)
-	    && (result == ZFCP_ERP_SUCCEEDED)
-	    && (!unit->device)) {
-		zfcp_erp_schedule_work(unit);
-	}
 	switch (action) {
 	case ZFCP_ERP_ACTION_REOPEN_UNIT:
+		if ((result == ZFCP_ERP_SUCCEEDED)
+		    && (!atomic_test_mask(ZFCP_STATUS_UNIT_TEMPORARY, &unit->status))
+		    && (!unit->device))
+			zfcp_erp_schedule_work(unit);
 		zfcp_unit_put(unit);
 		break;
 	case ZFCP_ERP_ACTION_REOPEN_PORT_FORCED:

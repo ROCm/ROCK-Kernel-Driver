@@ -106,6 +106,8 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
 	pci_read_config_word(dev, PCI_COMMAND, &cmd);
 	old_cmd = cmd;
 	for(idx=0; idx<6; idx++) {
+		if (!(mask & (1 << idx)))
+			continue;
 		r = &dev->resource[idx];
 		if (!r->start && r->end) {
 			printk(KERN_ERR "PCI: Device %s not available because "

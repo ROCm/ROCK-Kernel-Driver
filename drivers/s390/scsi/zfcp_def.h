@@ -12,6 +12,7 @@
  *            Wolfgang Taphorn
  *            Stefan Bader <stefan.bader@de.ibm.com> 
  *            Heiko Carstens <heiko.carstens@de.ibm.com> 
+ *            Andreas Herrmann <aherrman@de.ibm.com>
  * 
  * This program is free software; you can redistribute it and/or modify 
  * it under the terms of the GNU General Public License as published by 
@@ -33,7 +34,7 @@
 #define ZFCP_DEF_H
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_DEF_REVISION "$Revision: 1.91 $"
+#define ZFCP_DEF_REVISION "$Revision: 1.98 $"
 
 /*************************** INCLUDES *****************************************/
 
@@ -71,7 +72,7 @@
 /********************* GENERAL DEFINES *********************************/
 
 /* zfcp version number, it consists of major, minor, and patch-level number */
-#define ZFCP_VERSION		"4.1.3"
+#define ZFCP_VERSION		"4.1.4"
 
 /**
  * zfcp_sg_to_address - determine kernel address from struct scatterlist
@@ -597,7 +598,8 @@ do { \
 		 ZFCP_STATUS_PORT_NO_SCSI_ID)
 
 /* logical unit status */
-#define ZFCP_STATUS_UNIT_NOTSUPPUNITRESET	0x00000001
+#define ZFCP_STATUS_UNIT_NOTSUPPUNITRESET       0x00000001
+#define ZFCP_STATUS_UNIT_TEMPORARY		0x00000010
 
 
 /* FSF request status (this does not have a common part) */
@@ -817,7 +819,8 @@ typedef void (*zfcp_send_els_handler_t)(unsigned long);
 
 /**
  * struct zfcp_send_els - used to pass parameters to function zfcp_fsf_send_els
- * @port: port where the request is sent to
+ * @adapter: adapter where request is sent from
+ * @d_id: destiniation id of port where request is sent to
  * @req: scatter-gather list for request
  * @resp: scatter-gather list for response
  * @req_count: number of elements in request scatter-gather list
@@ -830,7 +833,8 @@ typedef void (*zfcp_send_els_handler_t)(unsigned long);
  * @status: used to pass error status to calling function
  */
 struct zfcp_send_els {
-	struct zfcp_port *port;
+	struct zfcp_adapter *adapter;
+	fc_id_t d_id;
 	struct scatterlist *req;
 	struct scatterlist *resp;
 	unsigned int req_count;
@@ -1055,6 +1059,7 @@ struct zfcp_data {
 	char                    init_busid[BUS_ID_SIZE];
 	wwn_t                   init_wwpn;
 	fcp_lun_t               init_fcp_lun;
+	char 			*driver_version;
 };
 
 /**

@@ -115,12 +115,12 @@ _GLOBAL(call_do_softirq)
 	mtlr	r0
 	blr
 
-_GLOBAL(call_handle_irq_event)
+_GLOBAL(call_handle_IRQ_event)
 	mflr	r0
 	std	r0,16(r1)
 	stdu	r1,THREAD_SIZE-112(r6)
 	mr	r1,r6
-	bl	.handle_irq_event
+	bl	.handle_IRQ_event
 	ld	r1,0(r1)
 	ld	r0,16(r1)
 	mtlr	r0

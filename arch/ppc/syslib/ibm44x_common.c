@@ -3,8 +3,8 @@
  *
  * PPC44x system library
  *
- * Matt Porter <mporter@mvista.com>
- * Copyright 2002-2003 MontaVista Software Inc.
+ * Matt Porter <mporter@kernel.crashing.org>
+ * Copyright 2002-2004 MontaVista Software Inc.
  *
  * Eugene Surovegin <eugene.surovegin@zultys.com> or <ebs@ebshome.net>
  * Copyright (c) 2003, 2004 Zultys Technologies
@@ -16,15 +16,17 @@
  *
  */
 #include <linux/config.h>
+#include <linux/time.h>
 #include <linux/types.h>
 #include <linux/serial.h>
 
-#include <asm/param.h>
 #include <asm/ibm44x.h>
 #include <asm/mmu.h>
 #include <asm/machdep.h>
 #include <asm/time.h>
 #include <asm/ppc4xx_pic.h>
+
+#include <syslib/gen550.h>
 
 phys_addr_t fixup_bigphys_addr(phys_addr_t addr, phys_addr_t size)
 {
@@ -149,44 +151,6 @@ static void __init ibm44x_init_irq(void)
 		irq_desc[i].handler = ppc4xx_pic;
 }
 
-#ifdef CONFIG_SERIAL_TEXT_DEBUG
-#include <linux/serialP.h>
-#include <linux/serial_reg.h>
-#include <asm/serial.h>
-
-static struct serial_state rs_table[RS_TABLE_SIZE] = {
-	SERIAL_PORT_DFNS	/* Defined in <asm/serial.h> */
-};
-
-static void ibm44x_progress(char *s, unsigned short hex)
-{
-	volatile char c;
-	volatile unsigned long com_port;
-	u16 shift;
-
-	com_port = (unsigned long)rs_table[0].iomem_base;
-	shift = rs_table[0].iomem_reg_shift;
-
-	while ((c = *s++) != 0) {
-		while ((*((volatile unsigned char *)com_port +
-				(UART_LSR << shift)) & UART_LSR_THRE) == 0)
-			;
-		*(volatile unsigned char *)com_port = c;
-
-	}
-
-	/* Send LF/CR to pretty up output */
-	while ((*((volatile unsigned char *)com_port +
-		(UART_LSR << shift)) & UART_LSR_THRE) == 0)
-		;
-	*(volatile unsigned char *)com_port = '\r';
-	while ((*((volatile unsigned char *)com_port +
-		(UART_LSR << shift)) & UART_LSR_THRE) == 0)
-		;
-	*(volatile unsigned char *)com_port = '\n';
-}
-#endif /* CONFIG_SERIAL_TEXT_DEBUG */
-
 void __init ibm44x_platform_init(void)
 {
 	ppc_md.init_IRQ = ibm44x_init_irq;
@@ -196,7 +160,10 @@ void __init ibm44x_platform_init(void)
 	ppc_md.halt = ibm44x_halt;
 
 #ifdef CONFIG_SERIAL_TEXT_DEBUG
-	ppc_md.progress = ibm44x_progress;
+	ppc_md.progress = gen550_progress;
 #endif /* CONFIG_SERIAL_TEXT_DEBUG */
+#ifdef CONFIG_KGDB
+	ppc_md.kgdb_map_scc = gen550_kgdb_map_scc;
+#endif
 }
 

@@ -433,6 +433,7 @@ struct video_code
 #define VID_HARDWARE_W9968CF	36
 #define VID_HARDWARE_SAA7114H   37
 #define VID_HARDWARE_SN9C102	38
+#define VID_HARDWARE_ARV	39
 #endif /* __LINUX_VIDEODEV_H */
 
 /*

@@ -19,6 +19,7 @@
 #include <linux/config.h>
 #include <linux/init.h>
 #include <linux/irq.h>
+#include <linux/module.h>
 
 #include <asm/system.h>
 #include <asm/io.h>
@@ -41,7 +42,7 @@ static void mask_and_ack_ipr(unsigned int);
 static void end_ipr_irq(unsigned int irq);
 
 static unsigned int startup_ipr_irq(unsigned int irq)
-{ 
+{
 	enable_ipr_irq(irq);
 	return 0; /* never anything pending */
 }
@@ -281,6 +282,10 @@ void __init init_IRQ(void)
 #endif /* !CONFIG_CPU_SUBTYPE_SH7300 */
 #endif /* CONFIG_CPU_SUBTYPE_SH7707 || CONFIG_CPU_SUBTYPE_SH7709  || CONFIG_CPU_SUBTYPE_SH7300*/
 
+#ifdef CONFIG_CPU_SUBTYPE_ST40
+	init_IRQ_intc2();
+#endif
+
 	/* Perform the machine specific initialisation */
 	if (sh_mv.mv_init_irq != NULL) {
 		sh_mv.mv_init_irq();
@@ -329,3 +334,6 @@ int ipr_irq_demux(int irq)
 	return irq;
 }
 #endif
+
+EXPORT_SYMBOL(make_ipr_irq);
+

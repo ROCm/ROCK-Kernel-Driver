@@ -17,6 +17,8 @@ obj-$(CONFIG_HD64465_PCMCIA)			+= hd64465_ss.o
 obj-$(CONFIG_PCMCIA_SA1100)			+= sa11xx_core.o sa1100_cs.o
 obj-$(CONFIG_PCMCIA_SA1111)			+= sa11xx_core.o sa1111_cs.o
 obj-$(CONFIG_PCMCIA_PXA2XX)                     += pxa2xx_core.o pxa2xx_cs.o
+obj-$(CONFIG_M32R_PCC)				+= m32r_pcc.o
+obj-$(CONFIG_M32R_CFC)				+= m32r_cfc.o
 
 pcmcia_core-y					+= cistpl.o rsrc_mgr.o bulkmem.o cs.o socket_sysfs.o
 pcmcia_core-$(CONFIG_CARDBUS)			+= cardbus.o

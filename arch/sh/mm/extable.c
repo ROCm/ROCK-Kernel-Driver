@@ -1,5 +1,4 @@
-/* $Id: extable.c,v 1.3 2003/05/06 23:28:50 lethal Exp $
- *
+/*
  * linux/arch/sh/mm/extable.c
  *  Taken from:
  *   linux/arch/i386/mm/extable.c

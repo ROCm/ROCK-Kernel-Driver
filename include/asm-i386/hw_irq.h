@@ -45,8 +45,6 @@ asmlinkage void thermal_interrupt(struct pt_regs);
 #define platform_legacy_irq(irq)	((irq) < 16)
 #endif
 
-void mask_irq(unsigned int irq);
-void unmask_irq(unsigned int irq);
 void disable_8259A_irq(unsigned int irq);
 void enable_8259A_irq(unsigned int irq);
 int i8259A_irq_pending(unsigned int irq);

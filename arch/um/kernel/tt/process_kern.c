@@ -65,7 +65,7 @@ void *switch_to_tt(void *prev, void *next, void *last)
 		panic("write of switch_pipe failed, err = %d", -err);
 
 	reading = 1;
-	if((from->state == TASK_ZOMBIE) || (from->state == TASK_DEAD))
+	if((from->exit_state == EXIT_ZOMBIE) || (from->exit_state == EXIT_DEAD))
 		os_kill_process(os_getpid(), 0);
 
 	err = os_read_file(from->thread.mode.tt.switch_pipe[0], &c, sizeof(c));
@@ -80,8 +80,8 @@ void *switch_to_tt(void *prev, void *next, void *last)
 	 * in case it has not already killed itself.
 	 */
 	prev_sched = current->thread.prev_sched;
-	if((prev_sched->state == TASK_ZOMBIE) ||
-	   (prev_sched->state == TASK_DEAD))
+	if((prev_sched->exit_state == EXIT_ZOMBIE) ||
+	   (prev_sched->exit_state == EXIT_DEAD))
 		os_kill_process(prev_sched->thread.mode.tt.extern_pid, 1);
 
 	/* This works around a nasty race with 'jail'.  If we are switching

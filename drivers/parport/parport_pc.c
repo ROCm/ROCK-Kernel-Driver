@@ -1194,7 +1194,7 @@ struct parport_operations parport_pc_ops =
 
 #ifdef CONFIG_PARPORT_PC_SUPERIO
 /* Super-IO chipset detection, Winbond, SMSC */
-static int __devinit show_parconfig_smsc37c669(int io, int key)
+static void __devinit show_parconfig_smsc37c669(int io, int key)
 {
 	int cr1,cr4,cra,cr23,cr26,cr27,i=0;
 	static const char *modes[]={ "SPP and Bidirectional (PS/2)",	
@@ -1261,26 +1261,17 @@ static int __devinit show_parconfig_smsc37c669(int io, int key)
 					superios[i].io = 0x278;
 					superios[i].irq = 5;
 			}
-			if (io != superios[i].io) {
-				/* how many bytes? */
-				if (!request_region(superios[i].io, 3, "smsc parport")) {
-					superios[i].io = 0;
-					return 0;
-				}
-			}
 			d=(cr26 &0x0f);
 			if((d==1) || (d==3)) 
 				superios[i].dma= d;
 			else
 				superios[i].dma= PARPORT_DMA_NONE;
-			return 1;
 		}
  	}
-	return 0;
 }
 
 
-static int __devinit show_parconfig_winbond(int io, int key)
+static void __devinit show_parconfig_winbond(int io, int key)
 {
 	int cr30,cr60,cr61,cr70,cr74,crf0,i=0;
 	static const char *modes[] = {
@@ -1336,23 +1327,14 @@ static int __devinit show_parconfig_winbond(int io, int key)
 			printk(KERN_INFO "Super-IO: too many chips!\n");
 		else {
 			superios[i].io = (cr60<<8)|cr61;
-			if (io != superios[i].io) {
-				/* how many bytes? */
-				if (!request_region(superios[i].io, 3, "winbond parport")) {
-					superios[i].io = 0;
-					return 0;
-				}
-			}
 			superios[i].irq = cr70&0x0f;
 			superios[i].dma = (((cr74 & 0x07) > 3) ?
 					   PARPORT_DMA_NONE : (cr74 & 0x07));
-			return 1;
 		}
 	}
-	return 0;
 }
 
-static int __devinit decode_winbond(int efer, int key, int devid, int devrev, int oldid)
+static void __devinit decode_winbond(int efer, int key, int devid, int devrev, int oldid)
 {
 	const char *type = "unknown";
 	int id,progif=2;
@@ -1360,7 +1342,7 @@ static int __devinit decode_winbond(int efer, int key, int devid, int devrev, in
 	if (devid == devrev)
 		/* simple heuristics, we happened to read some
                    non-winbond register */
-		return 0;
+		return;
 
 	id=(devid<<8) | devrev;
 
@@ -1385,20 +1367,19 @@ static int __devinit decode_winbond(int efer, int key, int devid, int devrev, in
 		       efer, key, devid, devrev, oldid, type);
 
 	if (progif == 2)
-		return show_parconfig_winbond(efer,key);
-	return 0;
+		show_parconfig_winbond(efer,key);
 }
 
-static int __devinit decode_smsc(int efer, int key, int devid, int devrev)
+static void __devinit decode_smsc(int efer, int key, int devid, int devrev)
 {
         const char *type = "unknown";
-	int (*func)(int io, int key);
+	void (*func)(int io, int key);
         int id;
 
         if (devid == devrev)
 		/* simple heuristics, we happened to read some
                    non-smsc register */
-		return 0;
+		return;
 
 	func=NULL;
         id=(devid<<8) | devrev;
@@ -1414,8 +1395,7 @@ static int __devinit decode_smsc(int efer, int key, int devid, int devrev)
 		       efer, key, devid, devrev, type);
 
 	if (func)
-		return func(efer,key);
-	return 0;
+		func(efer,key);
 }
 
 
@@ -1448,8 +1428,7 @@ static void __devinit winbond_check(int io, int key)
 	if ((x_devid == devid) && (x_devrev == devrev) && (x_oldid == oldid))
 		goto out; /* protection against false positives */
 
-	if (decode_winbond(io,key,devid,devrev,oldid));
-		return;
+	decode_winbond(io,key,devid,devrev,oldid);
 out:
 	release_region(io, 3);
 }
@@ -1482,8 +1461,7 @@ static void __devinit winbond_check2(int io,int key)
 	if ((x_devid == devid) && (x_devrev == devrev) && (x_oldid == oldid))
 		goto out; /* protection against false positives */
 
-        if (decode_winbond(io,key,devid,devrev,oldid))
-		return;
+	decode_winbond(io,key,devid,devrev,oldid);
 out:
 	release_region(io, 3);
 }
@@ -1522,8 +1500,7 @@ static void __devinit smsc_check(int io, int key)
 	    (x_oldid == oldid) && (x_rev == rev))
 		goto out; /* protection against false positives */
 
-        if (decode_smsc(io,key,oldid,oldrev))
-		return;
+        decode_smsc(io,key,oldid,oldrev);
 out:
 	release_region(io, 3);
 }

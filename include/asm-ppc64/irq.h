@@ -17,10 +17,6 @@
  */
 #define NR_IRQS		512
 
-extern void disable_irq(unsigned int);
-extern void disable_irq_nosync(unsigned int);
-extern void enable_irq(unsigned int);
-
 /* this number is used when no interrupt has been assigned */
 #define NO_IRQ			(-1)
 
@@ -80,7 +76,6 @@ static __inline__ int irq_canonicalize(int irq)
 
 struct irqaction;
 struct pt_regs;
-int handle_irq_event(int, struct pt_regs *, struct irqaction *);
 
 #ifdef CONFIG_IRQSTACKS
 /*
@@ -91,7 +86,7 @@ extern struct thread_info *softirq_ctx[NR_CPUS];
 
 extern void irq_ctx_init(void);
 extern void call_do_softirq(struct thread_info *tp);
-extern int call_handle_irq_event(int irq, struct pt_regs *regs,
+extern int call_handle_IRQ_event(int irq, struct pt_regs *regs,
 			struct irqaction *action, struct thread_info *tp);
 
 #define __ARCH_HAS_DO_SOFTIRQ

@@ -820,7 +820,7 @@ static int  get_empty_nodes(
     RFALSE (p_s_tb->FEB[p_s_tb->cur_blknum],
 	    "PAP-8141: busy slot for new buffer");
 
-    mark_buffer_journal_new(p_s_new_bh) ;
+    set_buffer_journal_new (p_s_new_bh);
     p_s_tb->FEB[p_s_tb->cur_blknum++] = p_s_new_bh;
   }
 

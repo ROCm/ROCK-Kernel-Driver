@@ -51,6 +51,12 @@ config SH_7300_SOLUTION_ENGINE
 	  Select 7300 SolutionEngine if configuring for a Hitachi SH7300(SH-Mobile V)
 	  evalutation board.
 
+config SH_73180_SOLUTION_ENGINE
+       bool "SolutionEngine73180"
+       help
+         Select 73180 SolutionEngine if configuring for a Hitachi SH73180(SH-Mobile 3)
+         evalutation board.
+
 config SH_7751_SYSTEMH
 	bool "SystemH7751R"
 	help
@@ -137,6 +143,16 @@ config SH_ADX
 config SH_MPC1211
 	bool "MPC1211"
 
+config SH_SH03
+	bool "SH03"
+	help
+	  CTP/PCI-SH03 is a CPU module computer that produced
+	  by Interface Corporation.
+	  It is compact and excellent in durability.
+	  It will play an active part in your factory or laboratory
+	  as a FA computer.
+	  More information at <http://www.interface.co.jp>
+
 config SH_SECUREEDGE5410
 	bool "SecureEdge5410"
 	help
@@ -155,6 +171,15 @@ config SH_RTS7751R2D
 	help
 	  Select RTS7751R2D if configuring for a Renesas Technology
 	  Sales SH-Graphics board.
+
+config SH_EDOSK7705
+	bool "EDOSK7705"
+
+config SH_SH4202_MICRODEV
+	bool "SH4-202 MicroDev"
+	help
+	  Select SH4-202 MicroDev if configuring for a SuperH MicroDev board
+	  with an SH4-202 CPU.
 
 config SH_UNKNOWN
 	bool "BareCPU"
@@ -245,6 +270,10 @@ config CPU_SUBTYPE_SH7760
 	bool "SH7760"
 	depends on CPU_SH4
 
+config CPU_SUBTYPE_SH73180
+       bool "SH73180"
+       depends on CPU_SH4
+
 config CPU_SUBTYPE_ST40STB1
        bool "ST40STB1 / ST40RA"
        depends on CPU_SH4
@@ -258,7 +287,16 @@ config CPU_SUBTYPE_ST40GX1
        help
          Select ST40GX1 if you have a ST40GX1 CPU.
 
+config CPU_SUBTYPE_SH4_202
+	bool "SH4-202"
+	depends on CPU_SH4
+
 endchoice
+
+config SH7705_CACHE_32KB
+    bool "Enable 32KB cache size for SH7705"
+    depends on CPU_SUBTYPE_SH7705
+    default y
 
 config MMU
         bool "Support for memory management hardware"
@@ -296,8 +334,8 @@ config CMDLINE
 # Platform-specific memory start and size definitions
 config MEMORY_START
 	hex "Physical memory start address" if !MEMORY_SET || MEMORY_OVERRIDE
-	default "0x08000000" if !MEMORY_SET || MEMORY_OVERRIDE || !MEMORY_OVERRIDE && SH_ADX || SH_MPC1211 || SH_SECUREEDGE5410
-	default "0x0c000000" if !MEMORY_OVERRIDE && (SH_DREAMCAST || SH_HP600 || SH_BIGSUR || SH_SH2000 || SH_7751_SOLUTION_ENGINE || SH_SOLUTION_ENGINE || SH_HS7751RVOIP || SH_RTS7751R2D)
+	default "0x08000000" if !MEMORY_SET || MEMORY_OVERRIDE || !MEMORY_OVERRIDE && SH_ADX || SH_MPC1211 || SH_SH03 || SH_SECUREEDGE5410 || SH_SH4202_MICRODEV
+	default "0x0c000000" if !MEMORY_OVERRIDE && (SH_DREAMCAST || SH_HP600 || SH_BIGSUR || SH_SH2000 || SH_73180_SOLUTION_ENGINE || SH_7300_SOLUTION_ENGINE || SH_7751_SOLUTION_ENGINE || SH_SOLUTION_ENGINE || SH_HS7751RVOIP || SH_RTS7751R2D || SH_EDOSK7705)
 	---help---
 	  Computers built with Hitachi SuperH processors always
 	  map the ROM starting at address zero.  But the processor
@@ -315,10 +353,10 @@ config MEMORY_START
 config MEMORY_SIZE
 	hex "Physical memory size" if !MEMORY_SET || MEMORY_OVERRIDE
 	default "0x00400000" if !MEMORY_SET || MEMORY_OVERRIDE || !MEMORY_OVERRIDE && SH_ADX || !MEMORY_OVERRIDE && (SH_HP600 || SH_BIGSUR || SH_SH2000)
-	default "0x01000000" if !MEMORY_OVERRIDE && SH_DREAMCAST || SH_SECUREEDGE5410
-	default "0x04000000" if !MEMORY_OVERRIDE && (SH_7751_SOLUTION_ENGINE || SH_HS7751RVOIP || SH_RTS7751R2D)
-	default "0x02000000" if !MEMORY_OVERRIDE && SH_SOLUTION_ENGINE
-	default "0x08000000" if SH_MPC1211
+	default "0x01000000" if !MEMORY_OVERRIDE && SH_DREAMCAST || SH_SECUREEDGE5410 || SH_EDOSK7705
+        default "0x02000000" if !MEMORY_OVERRIDE && (SH_73180_SOLUTION_ENGINE || SH_SOLUTION_ENGINE)
+        default "0x04000000" if !MEMORY_OVERRIDE && (SH_7300_SOLUTION_ENGINE || SH_7751_SOLUTION_ENGINE || SH_HS7751RVOIP || SH_RTS7751R2D || SH_SH4202_MICRODEV)
+	default "0x08000000" if SH_MPC1211 || SH_SH03
 	help
 	  This sets the default memory size assumed by your SH kernel. It can
 	  be overridden as normal by the 'mem=' argument on the kernel command
@@ -328,7 +366,7 @@ config MEMORY_SIZE
 
 config MEMORY_SET
 	bool
-	depends on !MEMORY_OVERRIDE && (SH_MPC1211 || SH_ADX || SH_DREAMCAST || SH_HP600 || SH_BIGSUR || SH_SH2000 || SH_7751_SOLUTION_ENGINE || SH_SOLUTION_ENGINE || SH_SECUREEDGE5410 || SH_HS7751RVOIP || SH_RTS7751R2D)
+	depends on !MEMORY_OVERRIDE && (SH_MPC1211 || SH_SH03 || SH_ADX || SH_DREAMCAST || SH_HP600 || SH_BIGSUR || SH_SH2000 || SH_7751_SOLUTION_ENGINE || SH_SOLUTION_ENGINE || SH_SECUREEDGE5410 || SH_HS7751RVOIP || SH_RTS7751R2D || SH_SH4202_MICRODEV || SH_EDOSK7705)
 	default y
 	help
 	  This is an option about which you will never be asked a question.
@@ -343,7 +381,7 @@ config MEMORY_OVERRIDE
 # XXX: break these out into the board-specific configs below
 config CF_ENABLER
 	bool "Compact Flash Enabler support"
-	depends on SH_ADX || SH_SOLUTION_ENGINE || SH_UNKNOWN || SH_CAT68701
+	depends on SH_ADX || SH_SOLUTION_ENGINE || SH_UNKNOWN || SH_CAT68701 || SH_SH03
 	---help---
 	  Compact Flash is a small, removable mass storage device introduced
 	  in 1994 originally as a PCMCIA device.  If you say `Y' here, you
@@ -387,13 +425,23 @@ config CF_BASE_ADDR
 # The SH7750 RTC module is disabled in the Dreamcast
 config SH_RTC
 	bool
-	depends on !SH_DREAMCAST && !SH_SATURN && !SH_7300_SOLUTION_ENGINE
+	depends on !SH_DREAMCAST && !SH_SATURN && !SH_7300_SOLUTION_ENGINE && !SH_73180_SOLUTION_ENGINE
 	default y
 	help
 	  Selecting this option will allow the Linux kernel to emulate
 	  PC's RTC.
 
 	  If unsure, say N.
+
+config SH_FPU
+	bool "FPU support"
+	depends on !CPU_SH3
+	default y
+	help
+	  Selecting this option will enable support for SH processors that
+	  have FPU units (ie, SH77xx).
+
+	  This option must be set in order to enable the FPU.
 
 config SH_DSP
 	bool "DSP support"
@@ -438,8 +486,8 @@ config DISCONTIGMEM
 
 config ZERO_PAGE_OFFSET
 	hex "Zero page offset"
-	default "0x00001000" if !SH_MPC1211
-	default "0x00004000" if SH_MPC1211
+	default "0x00001000" if !(SH_MPC1211 || SH_SH03)
+	default "0x00004000" if SH_MPC1211 || SH_SH03
 	help
 	  This sets the default offset of zero page.
 
@@ -572,7 +620,7 @@ config RTS7751R2D_REV11
 
 config SH_PCLK_CALC
 	bool
-	default n if CPU_SUBTYPE_SH7300
+	default n if CPU_SUBTYPE_SH7300 || CPU_SUBTYPE_SH73180
 	default y
 	help
 	  This option will cause the PCLK value to be probed at run-time. It
@@ -581,9 +629,11 @@ config SH_PCLK_CALC
 
 config SH_PCLK_FREQ
 	int "Peripheral clock frequency (in Hz)"
-	default "49876504" if CPU_SUBTYPE_SH7750
-	default "60013568" if CPU_SUBTYPE_SH7751
+	default "50000000" if CPU_SUBTYPE_SH7750
+	default "60000000" if CPU_SUBTYPE_SH7751
 	default "33333333" if CPU_SUBTYPE_SH7300
+	default "27000000" if CPU_SUBTYPE_SH73180
+	default "66000000" if CPU_SUBTYPE_SH4_202
 	default "1193182"
 	help
 	  This option is used to specify the peripheral clock frequency. This
@@ -636,7 +686,7 @@ source "arch/sh/cchips/Kconfig"
 
 config HEARTBEAT
 	bool "Heartbeat LED"
-	depends on SH_MPC1211 || SH_CAT68701 || SH_STB1_HARP || SH_STB1_OVERDRIVE || SH_BIGSUR || SH_7751_SOLUTION_ENGINE || SH_7300_SOLUTION_ENGINE || SH_SOLUTION_ENGINE || SH_RTS7751R2D
+	depends on SH_MPC1211 || SH_SH03 || SH_CAT68701 || SH_STB1_HARP || SH_STB1_OVERDRIVE || SH_BIGSUR || SH_7751_SOLUTION_ENGINE || SH_7300_SOLUTION_ENGINE || SH_73180_SOLUTION_ENGINE || SH_SOLUTION_ENGINE || SH_RTS7751R2D || SH_SH4202_MICRODEV
 	help
 	  Use the power-on LED on your machine as a load meter.  The exact
 	  behavior is platform-dependent, but normally the flash frequency is
@@ -662,7 +712,7 @@ menu "Bus options (PCI, PCMCIA, EISA, MCA, ISA)"
 # PCMCIA outright. -- PFM.
 config ISA
 	bool
-	default y if PCMCIA
+	default y if PCMCIA || SMC91X
 	help
 	  Find out whether you have ISA slots on your motherboard.  ISA is the
 	  name of a bus system, i.e. the way the CPU talks to the other stuff
@@ -711,6 +761,7 @@ source "drivers/pci/hotplug/Kconfig"
 
 endmenu
 
+
 menu "Executable file formats"
 
 source "fs/Kconfig.binfmt"
@@ -729,7 +780,7 @@ config EMBEDDED_RAMDISK_IMAGE
 	default "ramdisk.gz"
 	help
 	  This is the filename of the ramdisk image to be built into the
-	  kernel.  Relative pathnames are relative to arch/mips/ramdisk/.
+	  kernel.  Relative pathnames are relative to arch/sh/ramdisk/.
 	  The ramdisk image is not part of the kernel distribution; you must
 	  provide one yourself.
 

@@ -355,7 +355,7 @@ do_sys_ptrace(long request, long pid, long addr, long data,
 	 */
 	case PTRACE_KILL:
 		ret = 0;
-		if (child->state == TASK_ZOMBIE)
+		if (child->exit_state == EXIT_ZOMBIE)
 			break;
 		child->exit_code = SIGKILL;
 		/* make sure single-step breakpoint is gone. */

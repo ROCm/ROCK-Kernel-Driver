@@ -45,9 +45,4 @@
 #define pcibus_to_cpumask(bus)	(cpu_online_map)
 #endif
 
-/* Cross-node load balancing interval. */
-#ifndef NODE_BALANCE_RATE
-#define NODE_BALANCE_RATE 10
-#endif
-
 #endif /* _ASM_M32R_TOPOLOGY_H */
