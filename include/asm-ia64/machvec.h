@@ -17,7 +17,6 @@
 struct device;
 struct pt_regs;
 struct scatterlist;
-struct irq_desc;
 struct page;
 struct mm_struct;
 struct pci_bus;
@@ -29,8 +28,6 @@ typedef void ia64_mv_send_ipi_t (int, int, int, int);
 typedef void ia64_mv_timer_interrupt_t (int, void *, struct pt_regs *);
 typedef void ia64_mv_global_tlb_purge_t (unsigned long, unsigned long, unsigned long);
 typedef void ia64_mv_tlb_migrate_finish_t (struct mm_struct *);
-typedef struct irq_desc *ia64_mv_irq_desc (unsigned int);
-typedef u8 ia64_mv_irq_to_vector (unsigned int);
 typedef unsigned int ia64_mv_local_vector_to_irq (u8);
 typedef char *ia64_mv_pci_get_legacy_mem_t (struct pci_bus *);
 typedef int ia64_mv_pci_legacy_read_t (struct pci_bus *, u16 port, u32 *val,
@@ -130,8 +127,6 @@ extern void machvec_tlb_migrate_finish (struct mm_struct *);
 #  define platform_dma_sync_sg_for_device ia64_mv.dma_sync_sg_for_device
 #  define platform_dma_mapping_error		ia64_mv.dma_mapping_error
 #  define platform_dma_supported	ia64_mv.dma_supported
-#  define platform_irq_desc		ia64_mv.irq_desc
-#  define platform_irq_to_vector	ia64_mv.irq_to_vector
 #  define platform_local_vector_to_irq	ia64_mv.local_vector_to_irq
 #  define platform_pci_get_legacy_mem	ia64_mv.pci_get_legacy_mem
 #  define platform_pci_legacy_read	ia64_mv.pci_legacy_read
@@ -180,8 +175,6 @@ struct ia64_machine_vector {
 	ia64_mv_dma_sync_sg_for_device *dma_sync_sg_for_device;
 	ia64_mv_dma_mapping_error *dma_mapping_error;
 	ia64_mv_dma_supported *dma_supported;
-	ia64_mv_irq_desc *irq_desc;
-	ia64_mv_irq_to_vector *irq_to_vector;
 	ia64_mv_local_vector_to_irq *local_vector_to_irq;
 	ia64_mv_pci_get_legacy_mem_t *pci_get_legacy_mem;
 	ia64_mv_pci_legacy_read_t *pci_legacy_read;
@@ -226,8 +219,6 @@ struct ia64_machine_vector {
 	platform_dma_sync_sg_for_device,	\
 	platform_dma_mapping_error,			\
 	platform_dma_supported,			\
-	platform_irq_desc,			\
-	platform_irq_to_vector,			\
 	platform_local_vector_to_irq,		\
 	platform_pci_get_legacy_mem,		\
 	platform_pci_legacy_read,		\
@@ -337,12 +328,6 @@ extern ia64_mv_dma_supported		swiotlb_dma_supported;
 #endif
 #ifndef platform_dma_supported
 # define  platform_dma_supported	swiotlb_dma_supported
-#endif
-#ifndef platform_irq_desc
-# define platform_irq_desc		__ia64_irq_desc
-#endif
-#ifndef platform_irq_to_vector
-# define platform_irq_to_vector		__ia64_irq_to_vector
 #endif
 #ifndef platform_local_vector_to_irq
 # define platform_local_vector_to_irq	__ia64_local_vector_to_irq

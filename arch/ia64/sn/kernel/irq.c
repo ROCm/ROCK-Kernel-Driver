@@ -204,16 +204,6 @@ struct hw_interrupt_type irq_type_sn = {
 	sn_set_affinity_irq
 };
 
-struct irq_desc *sn_irq_desc(unsigned int irq)
-{
-	return (irq_desc + irq);
-}
-
-u8 sn_irq_to_vector(unsigned int irq)
-{
-	return irq;
-}
-
 unsigned int sn_local_vector_to_irq(u8 vector)
 {
 	return (CPU_VECTOR_TO_IRQ(smp_processor_id(), vector));
