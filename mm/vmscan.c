@@ -845,14 +845,10 @@ shrink_caches(struct zone **zones, int priority, int *total_scanned,
  *
  * If the caller is !__GFP_FS then the probability of a failure is reasonably
  * high - the zone may be full of dirty or under-writeback pages, which this
- * caller can't do much about.  So for !__GFP_FS callers, we just perform a
- * small LRU walk and if that didn't work out, fail the allocation back to the
- * caller.  GFP_NOFS allocators need to know how to deal with it.  Kicking
- * bdflush, waiting and retrying will work.
- *
- * This is a fairly lame algorithm - it can result in excessive CPU burning and
- * excessive rotation of the inactive list, which is _supposed_ to be an LRU,
- * yes?
+ * caller can't do much about.  We kick pdflush and take explicit naps in the
+ * hope that some of these pages can be written.  But if the allocating task
+ * holds filesystem locks which prevent writeout this might not work, and the
+ * allocation attempt will fail.
  */
 int try_to_free_pages(struct zone **zones,
 		unsigned int gfp_mask, unsigned int order)
@@ -886,8 +882,6 @@ int try_to_free_pages(struct zone **zones,
 			ret = 1;
 			goto out;
 		}
-		if (!(gfp_mask & __GFP_FS))
-			break;		/* Let the caller handle it */
 		/*
 		 * Try to write back as many pages as we just scanned.  This
 		 * tends to cause slow streaming writers to write data to the
