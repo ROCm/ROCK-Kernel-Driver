@@ -64,9 +64,10 @@ ENTRY(do_magic)
 	jb .L1455
 	.p2align 4,,7
 .L1453:
-	movl $104,%eax
+	movl $__USER_DS,%eax
 
 	movw %ax, %ds
+	movw %ax, %es
 	movl saved_context_esp, %esp
 	movl saved_context_ebp, %ebp
 	movl saved_context_eax, %eax
