@@ -359,7 +359,8 @@ static void do_dbs_timer(void *data)
 static inline void dbs_timer_init(void)
 {
 	INIT_WORK(&dbs_work, do_dbs_timer, NULL);
-	schedule_work(&dbs_work);
+	schedule_delayed_work(&dbs_work,
+			sampling_rate_in_HZ(dbs_tuners_ins.sampling_rate));
 	return;
 }
 
