@@ -83,7 +83,7 @@ struct dbs_tuners {
 	unsigned int		down_threshold;
 };
 
-struct dbs_tuners dbs_tuners_ins = {
+static struct dbs_tuners dbs_tuners_ins = {
 	.up_threshold 		= DEF_FREQUENCY_UP_THRESHOLD,
 	.down_threshold 	= DEF_FREQUENCY_DOWN_THRESHOLD,
 	.sampling_down_factor 	= DEF_SAMPLING_DOWN_FACTOR,
