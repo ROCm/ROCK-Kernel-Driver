@@ -736,7 +736,7 @@ static int powernow_k8_cpu_init_acpi(struct powernow_k8_data *data)
 		/* verify only 1 entry from the lo frequency table */
 		if ((fid < HI_FID_TABLE_BOTTOM) && (cntlofreq++)) {
 			printk(KERN_ERR PFX "Too many lo freq table entries\n");
-			goto err_out;
+			goto err_out_mem;
 		}
 
 		if (powernow_table[i].frequency != (data->acpi_data.states[i].core_frequency * 1000)) {
@@ -757,6 +757,10 @@ static int powernow_k8_cpu_init_acpi(struct powernow_k8_data *data)
 	print_basics(data);
 	powernow_k8_acpi_pst_values(data, 0);
 	return 0;
+
+err_out_mem:
+	kfree(powernow_table);
+
 err_out:
 	acpi_processor_unregister_performance(&data->acpi_data, data->cpu);
 
