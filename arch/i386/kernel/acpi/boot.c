@@ -753,7 +753,7 @@ acpi_process_madt(void)
 	int count, error;
 
 	count = acpi_table_parse(ACPI_APIC, acpi_parse_madt);
-	if (count == 1) {
+	if (count >= 1) {
 
 		/*
 		 * Parse MADT LAPIC entries
