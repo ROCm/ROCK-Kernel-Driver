@@ -1908,6 +1908,9 @@ sctp_disposition_t sctp_sf_do_5_2_6_stale(const struct sctp_endpoint *ep,
 
 	sctp_addto_chunk(reply, sizeof(bht), &bht);
 
+	/* Clear peer's init_tag cached in assoc as we are sending a new INIT */
+	sctp_add_cmd_sf(commands, SCTP_CMD_CLEAR_INIT_TAG, SCTP_NULL());
+
 	/* Cast away the const modifier, as we want to just
 	 * rerun it through as a sideffect.
 	 */
