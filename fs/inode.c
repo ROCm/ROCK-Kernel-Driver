@@ -12,6 +12,7 @@
 #include <linux/quotaops.h>
 #include <linux/slab.h>
 #include <linux/writeback.h>
+#include <linux/module.h>
 
 /*
  * New inode.c implementation.
@@ -501,6 +502,21 @@ struct inode *new_inode(struct super_block *sb)
 	return inode;
 }
 
+void unlock_new_inode(struct inode *inode)
+{
+	/*
+	 * This is special!  We do not need the spinlock
+	 * when clearing I_LOCK, because we're guaranteed
+	 * that nobody else tries to do anything about the
+	 * state of the inode when it is locked, as we
+	 * just created it (so there can be no old holders
+	 * that haven't tested I_LOCK).
+	 */
+	inode->i_state &= ~(I_LOCK|I_NEW);
+	wake_up(&inode->i_wait);
+}
+
+
 /*
  * This is called without the inode lock held.. Be careful.
  *
@@ -527,31 +543,12 @@ static struct inode * get_new_inode(struct super_block *sb, unsigned long ino, s
 			inodes_stat.nr_inodes++;
 			list_add(&inode->i_list, &inode_in_use);
 			list_add(&inode->i_hash, head);
-			inode->i_state = I_LOCK;
+			inode->i_state = I_LOCK|I_NEW;
 			spin_unlock(&inode_lock);
 
-			/* reiserfs specific hack right here.  We don't
-			** want this to last, and are looking for VFS changes
-			** that will allow us to get rid of it.
-			** -- mason@suse.com 
-			*/
-			if (sb->s_op->read_inode2) {
-				sb->s_op->read_inode2(inode, data) ;
-			} else {
-				sb->s_op->read_inode(inode);
-			}
-
-			/*
-			 * This is special!  We do not need the spinlock
-			 * when clearing I_LOCK, because we're guaranteed
-			 * that nobody else tries to do anything about the
-			 * state of the inode when it is locked, as we
-			 * just created it (so there can be no old holders
-			 * that haven't tested I_LOCK).
+			/* Return the locked inode with I_NEW set, the
+			 * caller is responsible for filling in the contents
 			 */
-			inode->i_state &= ~I_LOCK;
-			wake_up(&inode->i_wait);
-
 			return inode;
 		}
 
@@ -636,8 +633,12 @@ struct inode *igrab(struct inode *inode)
 	return inode;
 }
 
-
-struct inode *iget4(struct super_block *sb, unsigned long ino, int (*test)(struct inode *, void *), int (*set)(struct inode *, void *), void *data)
+/*
+ * This is iget without the read_inode portion of get_new_inode
+ * the filesystem gets back a new locked and hashed inode and gets
+ * to fill it in before unlocking it via unlock_new_inode().
+ */
+struct inode *iget5_locked(struct super_block *sb, unsigned long ino, int (*test)(struct inode *, void *), int (*set)(struct inode *, void *), void *data)
 {
 	struct list_head * head = inode_hashtable + hash(sb,ino);
 	struct inode * inode;
@@ -657,6 +658,36 @@ struct inode *iget4(struct super_block *sb, unsigned long ino, int (*test)(struc
 	 * in case it had to block at any point.
 	 */
 	return get_new_inode(sb, ino, head, test, set, data);
+}
+
+struct inode *iget_locked(struct super_block *sb, unsigned long ino)
+{
+	return iget5_locked(sb, ino, NULL, NULL, NULL);
+}
+
+EXPORT_SYMBOL(iget5_locked);
+EXPORT_SYMBOL(iget_locked);
+EXPORT_SYMBOL(unlock_new_inode);
+
+struct inode *iget4(struct super_block *sb, unsigned long ino, int (*test)(struct inode *, void *), int (*set)(struct inode *, void *), void *data)
+{
+	struct inode *inode = iget5_locked(sb, ino, test, set, data);
+
+	if (inode && (inode->i_state & I_NEW)) {
+		/* reiserfs specific hack right here.  We don't
+		** want this to last, and are looking for VFS changes
+		** that will allow us to get rid of it.
+		** -- mason@suse.com 
+		*/
+		if (sb->s_op->read_inode2) {
+			sb->s_op->read_inode2(inode, data);
+		} else {
+			sb->s_op->read_inode(inode);
+		}
+		unlock_new_inode(inode);
+	}
+
+	return inode;
 }
 
 /**
