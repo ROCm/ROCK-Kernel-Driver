@@ -25,16 +25,11 @@ extern void pci_setup_phb_io_dynamic(struct pci_controller *hose);
 extern struct list_head hose_list;
 extern int global_phb_number;
 
-/*******************************************************************
- * Platform functions that are brand specific implementation. 
- *******************************************************************/
 extern unsigned long find_and_init_phbs(void);
 
 extern struct pci_dev *ppc64_isabridge_dev;	/* may be NULL if no ISA bus */
 
-/*******************************************************************
- * PCI device_node operations
- *******************************************************************/
+/* PCI device_node operations */
 struct device_node;
 typedef void *(*traverse_func)(struct device_node *me, void *data);
 void *traverse_pci_devices(struct device_node *start, traverse_func pre,
@@ -55,5 +50,7 @@ void pci_addr_cache_remove_device(struct pci_dev *dev);
 void init_pci_config_tokens (void);
 unsigned long get_phb_buid (struct device_node *);
 
+extern int pci_probe_only;
+extern int pci_read_irq_line(struct pci_dev *pci_dev);
 
 #endif /* __PPC_KERNEL_PCI_H__ */

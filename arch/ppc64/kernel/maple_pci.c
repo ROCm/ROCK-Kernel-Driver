@@ -32,9 +32,6 @@
 #define DBG(x...)
 #endif
 
-extern int pci_probe_only;
-extern int pci_read_irq_line(struct pci_dev *pci_dev);
-
 static struct pci_controller *u3_agp, *u3_ht;
 
 static int __init fixup_one_level_bus_range(struct device_node *node, int higher)
@@ -377,7 +374,7 @@ void __init maple_pcibios_fixup(void)
 
 	DBG(" -> maple_pcibios_fixup\n");
 
-	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL)
+	for_each_pci_dev(dev)
 		pci_read_irq_line(dev);
 
 	/* Do the mapping of the IO space */

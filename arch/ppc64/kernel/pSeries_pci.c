@@ -26,7 +26,6 @@
 #include <linux/kernel.h>
 #include <linux/threads.h>
 #include <linux/pci.h>
-#include <linux/delay.h>
 #include <linux/string.h>
 #include <linux/init.h>
 #include <linux/bootmem.h>
@@ -37,7 +36,6 @@
 #include <asm/prom.h>
 #include <asm/machdep.h>
 #include <asm/pci-bridge.h>
-#include <asm/ppcdebug.h>
 #include <asm/naca.h>
 #include <asm/iommu.h>
 #include <asm/rtas.h>
@@ -53,7 +51,6 @@ static int ibm_write_pci_config;
 
 static int s7a_workaround;
 
-extern unsigned long pci_probe_only;
 extern struct mpic *pSeries_mpic;
 
 static int rtas_read_config(struct device_node *dn, int where, int size, u32 *val)
@@ -248,17 +245,16 @@ static enum phb_types get_phb_type(struct device_node *dev)
 	return type;
 }
 
-int get_phb_reg_prop(struct device_node *dev, unsigned int addr_size_words,
-		struct reg_property64 *reg)
+static int get_phb_reg_prop(struct device_node *dev,
+			    unsigned int addr_size_words,
+			    struct reg_property64 *reg)
 {
 	unsigned int *ui_ptr = NULL, len;
 
 	/* Found a PHB, now figure out where his registers are mapped. */
 	ui_ptr = (unsigned int *) get_property(dev, "reg", &len);
-	if (ui_ptr == NULL) {
-		PPCDBG(PPCDBG_PHBINIT, "\tget reg failed.\n"); 
+	if (ui_ptr == NULL)
 		return 1;
-	}
 
 	if (addr_size_words == 1) {
 		reg->address = ((struct reg_property32 *)ui_ptr)->address;
@@ -270,7 +266,8 @@ int get_phb_reg_prop(struct device_node *dev, unsigned int addr_size_words,
 	return 0;
 }
 
-int phb_set_bus_ranges(struct device_node *dev, struct pci_controller *phb)
+static int phb_set_bus_ranges(struct device_node *dev,
+			      struct pci_controller *phb)
 {
 	int *bus_range;
 	unsigned int len;

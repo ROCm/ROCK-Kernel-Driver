@@ -16,14 +16,9 @@
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/pci.h>
-#include <linux/delay.h>
 #include <linux/string.h>
 #include <linux/init.h>
-#include <linux/capability.h>
-#include <linux/sched.h>
-#include <linux/errno.h>
 #include <linux/bootmem.h>
-#include <linux/module.h>
 #include <linux/mm.h>
 #include <linux/list.h>
 
@@ -33,11 +28,8 @@
 #include <asm/pci-bridge.h>
 #include <asm/byteorder.h>
 #include <asm/irq.h>
-#include <asm/uaccess.h>
-#include <asm/ppcdebug.h>
-#include <asm/naca.h>
-#include <asm/iommu.h>
 #include <asm/machdep.h>
+#include <asm/udbg.h>
 
 #include "pci.h"
 
@@ -50,8 +42,10 @@
 unsigned long pci_probe_only = 1;
 unsigned long pci_assign_all_buses = 0;
 
-/* legal IO pages under MAX_ISA_PORT.  This is to ensure we don't touch
-   devices we don't have access to. */
+/*
+ * legal IO pages under MAX_ISA_PORT.  This is to ensure we don't touch
+ * devices we don't have access to.
+ */
 unsigned long io_page_mask;
 
 EXPORT_SYMBOL(io_page_mask);
@@ -702,7 +696,7 @@ void __init pci_setup_phb_io(struct pci_controller *hose, int primary)
 	struct device_node *isa_dn;
 
 	hose->io_base_virt = reserve_phb_iospace(size);
-	PPCDBG(PPCDBG_PHBINIT, "phb%d io_base_phys 0x%lx io_base_virt 0x%lx\n",
+	DBG("phb%d io_base_phys 0x%lx io_base_virt 0x%lx\n",
 		hose->global_number, hose->io_base_phys,
 		(unsigned long) hose->io_base_virt);
 
@@ -733,7 +727,7 @@ void __devinit pci_setup_phb_io_dynamic(struct pci_controller *hose)
 
 	hose->io_base_virt = __ioremap(hose->io_base_phys, size,
 					_PAGE_NO_CACHE);
-	PPCDBG(PPCDBG_PHBINIT, "phb%d io_base_phys 0x%lx io_base_virt 0x%lx\n",
+	DBG("phb%d io_base_phys 0x%lx io_base_virt 0x%lx\n",
 		hose->global_number, hose->io_base_phys,
 		(unsigned long) hose->io_base_virt);
 
@@ -833,13 +827,10 @@ void phbs_remap_io(void)
 }
 
 
-/*********************************************************************** 
- * pci_find_hose_for_OF_device
- *
+/*
  * This function finds the PHB that matching device_node in the 
  * OpenFirmware by scanning all the pci_controllers.
- * 
- ***********************************************************************/
+ */
 struct pci_controller* pci_find_hose_for_OF_device(struct device_node *node)
 {
 	while (node) {
@@ -972,44 +963,31 @@ void __devinit pcibios_fixup_bus(struct pci_bus *bus)
 }
 EXPORT_SYMBOL(pcibios_fixup_bus);
 
-/******************************************************************
- * pci_read_irq_line
- *
- * Reads the Interrupt Pin to determine if interrupt is use by card.
+/*
+ * Reads the interrupt pin to determine if interrupt is use by card.
  * If the interrupt is used, then gets the interrupt line from the 
  * openfirmware and sets it in the pci_dev and pci_config line.
- *
- ******************************************************************/
+ */
 int pci_read_irq_line(struct pci_dev *pci_dev)
 {
 	u8 intpin;
 	struct device_node *node;
 
     	pci_read_config_byte(pci_dev, PCI_INTERRUPT_PIN, &intpin);
-
-	if (intpin == 0) {
-		PPCDBG(PPCDBG_BUSWALK,"\tDevice: %s No Interrupt used by device.\n",
-		       pci_name(pci_dev));
-		return 0;	
-	}
+	if (intpin == 0)
+		return 0;
 
 	node = pci_device_to_OF_node(pci_dev);
-	if (node == NULL) { 
-		PPCDBG(PPCDBG_BUSWALK,"\tDevice: %s Device Node not found.\n",
-		       pci_name(pci_dev));
-		return -1;	
-	}
-	if (node->n_intrs == 0) 	{
-		PPCDBG(PPCDBG_BUSWALK,"\tDevice: %s No Device OF interrupts defined.\n",
-		       pci_name(pci_dev));
-		return -1;	
-	}
+	if (node == NULL)
+		return -1;
+
+	if (node->n_intrs == 0)
+		return -1;
+
 	pci_dev->irq = node->intrs[0].line;
 
 	pci_write_config_byte(pci_dev, PCI_INTERRUPT_LINE, pci_dev->irq);
-	
-	PPCDBG(PPCDBG_BUSWALK,"\tDevice: %s pci_dev->irq = 0x%02X\n",
-	       pci_name(pci_dev), pci_dev->irq);
+
 	return 0;
 }
 EXPORT_SYMBOL(pci_read_irq_line);

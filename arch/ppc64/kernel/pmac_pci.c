@@ -39,9 +39,6 @@
 #define DBG(x...)
 #endif
 
-extern int pci_probe_only;
-extern int pci_read_irq_line(struct pci_dev *pci_dev);
-
 /* XXX Could be per-controller, but I don't think we risk anything by
  * assuming we won't have both UniNorth and Bandit */
 static int has_uninorth;

@@ -292,7 +292,6 @@ void iSeries_pcibios_init(void)
 	iomm_table_initialize();
 	find_and_init_phbs();
 	io_page_mask = -1;
-	/* pci_assign_all_busses = 0;		SFRXXX*/
 	PPCDBG(PPCDBG_BUSWALK, "iSeries_pcibios_init Exit.\n"); 
 }
 
