@@ -854,6 +854,34 @@ xfs_xlate_dinode_core(
 	INT_XLATE(buf_core->di_gen, mem_core->di_gen, dir, arch);
 }
 
+uint
+xfs_dic2xflags(
+	xfs_dinode_core_t	*dic,
+	xfs_arch_t		arch)
+{
+	__uint16_t		di_flags;
+	uint			flags = 0;
+
+	di_flags = INT_GET(dic->di_flags, arch);
+	if (di_flags & XFS_DIFLAG_REALTIME)
+		flags |= XFS_XFLAG_REALTIME;
+	if (di_flags & XFS_DIFLAG_PREALLOC)
+		flags |= XFS_XFLAG_PREALLOC;
+	if (di_flags & XFS_DIFLAG_IMMUTABLE)
+		flags |= XFS_XFLAG_IMMUTABLE;
+	if (di_flags & XFS_DIFLAG_APPEND)
+		flags |= XFS_XFLAG_APPEND;
+	if (di_flags & XFS_DIFLAG_SYNC)
+		flags |= XFS_XFLAG_SYNC;
+	if (di_flags & XFS_DIFLAG_NOATIME)
+		flags |= XFS_XFLAG_NOATIME;
+	if (di_flags & XFS_DIFLAG_NODUMP)
+		flags |= XFS_XFLAG_NODUMP;
+	if (XFS_CFORK_Q_ARCH(dic, arch))
+		flags |= XFS_XFLAG_HASATTR;
+	return flags;
+}
+
 /*
  * Given a mount structure and an inode number, return a pointer
  * to a newly allocated in-core inode coresponding to the given
