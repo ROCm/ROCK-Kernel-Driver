@@ -62,24 +62,25 @@ int sirdev_set_dongle(struct sir_dev *dev, IRDA_DONGLE type)
 
 int sirdev_raw_write(struct sir_dev *dev, const char *buf, int len)
 {
+	unsigned long flags;
 	int ret;
 
 	if (unlikely(len > dev->tx_buff.truesize))
 		return -ENOSPC;
 
-	spin_lock_bh(&dev->tx_lock);		/* serialize with other tx operations */
-	while (dev->tx_buff.len > 0) {		/* wait until tx idle */
-		spin_unlock_bh(&dev->tx_lock);
+	spin_lock_irqsave(&dev->tx_lock, flags);	/* serialize with other tx operations */
+	while (dev->tx_buff.len > 0) {			/* wait until tx idle */
+		spin_unlock_irqrestore(&dev->tx_lock, flags);
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout(MSECS_TO_JIFFIES(10));
-		spin_lock_bh(&dev->tx_lock);
+		spin_lock_irqsave(&dev->tx_lock, flags);
 	}
 
 	dev->tx_buff.data = dev->tx_buff.head;
 	memcpy(dev->tx_buff.data, buf, len);	
 
 	ret = dev->drv->do_write(dev, dev->tx_buff.data, dev->tx_buff.len);
-	spin_unlock_bh(&dev->tx_lock);
+	spin_unlock_irqrestore(&dev->tx_lock, flags);
 	return ret;
 }
 
@@ -114,11 +115,12 @@ int sirdev_raw_read(struct sir_dev *dev, char *buf, int len)
 
 void sirdev_write_complete(struct sir_dev *dev)
 {
+	unsigned long flags;
 	struct sk_buff *skb;
 	int actual = 0;
 	int err;
 	
-	spin_lock_bh(&dev->tx_lock);
+	spin_lock_irqsave(&dev->tx_lock, flags);
 
 	IRDA_DEBUG(3, "%s() - dev->tx_buff.len = %d\n",
 		   __FUNCTION__, dev->tx_buff.len);
@@ -143,7 +145,7 @@ void sirdev_write_complete(struct sir_dev *dev)
 			dev->tx_buff.len = 0;
 		}
 		if (dev->tx_buff.len > 0) {
-			spin_unlock_bh(&dev->tx_lock);
+			spin_unlock_irqrestore(&dev->tx_lock, flags);
 			return;
 		}
 	}
@@ -190,7 +192,7 @@ void sirdev_write_complete(struct sir_dev *dev)
 		netif_wake_queue(dev->netdev);
 	}
 
-	spin_unlock_bh(&dev->tx_lock);
+	spin_unlock_irqrestore(&dev->tx_lock, flags);
 }
 
 /* called from client driver - likely with bh-context - to give us
@@ -258,6 +260,7 @@ static struct net_device_stats *sirdev_get_stats(struct net_device *ndev)
 static int sirdev_hard_xmit(struct sk_buff *skb, struct net_device *ndev)
 {
 	struct sir_dev *dev = ndev->priv;
+	unsigned long flags;
 	int actual = 0;
 	int err;
 	s32 speed;
@@ -307,7 +310,7 @@ static int sirdev_hard_xmit(struct sk_buff *skb, struct net_device *ndev)
 	}
 
 	/* serialize with write completion */
-	spin_lock_bh(&dev->tx_lock);
+	spin_lock_irqsave(&dev->tx_lock, flags);
 
         /* Copy skb to tx_buff while wrapping, stuffing and making CRC */
 	dev->tx_buff.len = async_wrap_skb(skb, dev->tx_buff.data, dev->tx_buff.truesize); 
@@ -337,7 +340,7 @@ static int sirdev_hard_xmit(struct sk_buff *skb, struct net_device *ndev)
 		dev->stats.tx_dropped++;		      
 		netif_wake_queue(ndev);
 	}
-	spin_unlock_bh(&dev->tx_lock);
+	spin_unlock_irqrestore(&dev->tx_lock, flags);
 
 	return 0;
 }
