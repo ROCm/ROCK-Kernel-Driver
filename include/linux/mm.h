@@ -327,7 +327,6 @@ static inline void set_page_zone(struct page *page, unsigned long zone_num)
 extern struct page *mem_map;
 
 extern void show_free_areas(void);
-extern void show_free_areas_node(pg_data_t *pgdat);
 
 extern int fail_writepage(struct page *);
 struct page * shmem_nopage(struct vm_area_struct * vma, unsigned long address, int unused);

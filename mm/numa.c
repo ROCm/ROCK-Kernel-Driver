@@ -44,17 +44,6 @@ struct page * alloc_pages_node(int nid, unsigned int gfp_mask, unsigned int orde
 
 #define LONG_ALIGN(x) (((x)+(sizeof(long))-1)&~((sizeof(long))-1))
 
-static spinlock_t node_lock = SPIN_LOCK_UNLOCKED;
-
-void show_free_areas_node(pg_data_t *pgdat)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&node_lock, flags);
-	show_free_areas_core(pgdat);
-	spin_unlock_irqrestore(&node_lock, flags);
-}
-
 /*
  * Nodes can be initialized parallely, in no particular order.
  */
@@ -106,11 +95,10 @@ struct page * _alloc_pages(unsigned int gfp_mask, unsigned int order)
 #ifdef CONFIG_NUMA
 	temp = NODE_DATA(numa_node_id());
 #else
-	spin_lock_irqsave(&node_lock, flags);
-	if (!next) next = pgdat_list;
+	if (!next)
+		next = pgdat_list;
 	temp = next;
 	next = next->node_next;
-	spin_unlock_irqrestore(&node_lock, flags);
 #endif
 	start = temp;
 	while (temp) {
