@@ -221,22 +221,6 @@ static void tg3_enable_ints(struct tg3 *tp)
 	tr32(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW);
 }
 
-static inline void tg3_mask_ints(struct tg3 *tp)
-{
-	tw32(TG3PCI_MISC_HOST_CTRL,
-	     (tp->misc_host_ctrl | MISC_HOST_CTRL_MASK_PCI_INT));
-}
-
-static inline void tg3_unmask_ints(struct tg3 *tp)
-{
-	tw32(TG3PCI_MISC_HOST_CTRL,
-	     (tp->misc_host_ctrl & ~MISC_HOST_CTRL_MASK_PCI_INT));
-	if (tp->hw_status->status & SD_STATUS_UPDATED) {
-		tw32(GRC_LOCAL_CTRL,
-		     tp->grc_local_ctrl | GRC_LCLCTRL_SETINT);
-	}
-}
-
 static void tg3_switch_clocks(struct tg3 *tp)
 {
 	if (tr32(TG3PCI_CLOCK_CTRL) & CLOCK_CTRL_44MHZ_CORE) {
@@ -2057,7 +2041,7 @@ static int tg3_poll(struct net_device *netdev, int *budget)
 
 	if (done) {
 		netif_rx_complete(netdev);
-		tg3_unmask_ints(tp);
+		tg3_enable_ints(tp);
 	}
 
 	spin_unlock_irqrestore(&tp->lock, flags);
@@ -2065,10 +2049,10 @@ static int tg3_poll(struct net_device *netdev, int *budget)
 	return (done ? 0 : 1);
 }
 
-static __inline__ void tg3_interrupt_main_work(struct net_device *dev, struct tg3 *tp)
+static inline unsigned int tg3_has_work(struct net_device *dev, struct tg3 *tp)
 {
 	struct tg3_hw_status *sblk = tp->hw_status;
-	int work_exists = 0;
+	unsigned int work_exists = 0;
 
 	if (!(tp->tg3_flags &
 	      (TG3_FLAG_USE_LINKCHG_REG |
@@ -2080,19 +2064,7 @@ static __inline__ void tg3_interrupt_main_work(struct net_device *dev, struct tg
 	    sblk->idx[0].rx_producer != tp->rx_rcb_ptr)
 		work_exists = 1;
 
-	if (!work_exists)
-		return;
-
-	if (netif_rx_schedule_prep(dev)) {
-		/* NOTE: These writes are posted by the readback of
-		 *       the mailbox register done by our caller.
-		 */
-		tg3_mask_ints(tp);
-		__netif_rx_schedule(dev);
-	} else {
-		printk(KERN_ERR PFX "%s: Error, poll already scheduled\n",
-		       dev->name);
-	}
+	return work_exists;
 }
 
 static void tg3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
@@ -2107,13 +2079,16 @@ static void tg3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	if (sblk->status & SD_STATUS_UPDATED) {
 		tw32_mailbox(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW,
 			     0x00000001);
+		tr32(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW);
 		sblk->status &= ~SD_STATUS_UPDATED;
 
-		tg3_interrupt_main_work(dev, tp);
-
-		tw32_mailbox(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW,
-			     0x00000000);
-		tr32(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW);
+		if (likely(tg3_has_work(dev, tp)))
+			netif_rx_schedule(dev);
+		else {
+			tw32_mailbox(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW,
+			     	0x00000000);
+			tr32(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW);
+		}
 	}
 
 	spin_unlock_irqrestore(&tp->lock, flags);
