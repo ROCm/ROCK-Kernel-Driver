@@ -100,6 +100,8 @@ enum wl3501_status {
 #define WL3501_FREQ_DOMAIN_FRANCE 0x32	/* Channel 10 to 13 */
 #define WL3501_FREQ_DOMAIN_MKK    0x40	/* Channel 14 */
 
+#define WL3501_ESSID_MAX_LEN (IW_ESSID_MAX_SIZE + 2)
+
 struct wl3501_tx_hdr {
 	u16		tx_cnt;
 	unsigned char	sync[16];
@@ -146,7 +148,7 @@ struct wl3501_start_req {
 	u16		dtim_period;
 	u16		probe_delay;
 	u16		cap_info;
-	unsigned char	ssid[34];
+	unsigned char	ssid[WL3501_ESSID_MAX_LEN];
 	unsigned char	bss_basic_rate_set[10];
 	unsigned char	operational_rate_set[10];
 	unsigned char	cf_pset[8];
@@ -219,7 +221,7 @@ struct wl3501_join_req {
 	u16		cap_info;
 	unsigned char	bss_type;
 	unsigned char	bssid[ETH_ALEN];
-	unsigned char	ssid[34];
+	unsigned char	ssid[WL3501_ESSID_MAX_LEN];
 	unsigned char	phy_pset[3];
 	unsigned char	cf_pset[8];
 	unsigned char	ibss_pset[4];
@@ -242,7 +244,7 @@ struct wl3501_scan_req {
 	u16			max_chan_time;
 	unsigned char		chan_list[14];
 	unsigned char		bssid[ETH_ALEN];
-	unsigned char		ssid[34];
+	unsigned char		ssid[WL3501_ESSID_MAX_LEN];
 	enum wl3501_scan_type	scan_type;
 };
 
@@ -258,7 +260,7 @@ struct wl3501_scan_confirm {
 	u16		cap_info;
 	unsigned char	bss_type;
 	unsigned char	bssid[ETH_ALEN];
-	unsigned char	ssid[34];
+	unsigned char	ssid[WL3501_ESSID_MAX_LEN];
 	unsigned char	phy_pset[3];
 	unsigned char	cf_pset[8];
 	unsigned char	ibss_pset[4];
@@ -422,11 +424,11 @@ struct wl3501_card {
 	u16				esbq_confirm_end;
 	u16				esbq_confirm;
 	u8				llc_type;
-	u8				essid[34];
+	u8				essid[WL3501_ESSID_MAX_LEN];
 	struct wl3501_mac_addr		bssid;
 	int				ether_type;
 	int				net_type;
-	u8				keep_essid[34];
+	u8				keep_essid[WL3501_ESSID_MAX_LEN];
 	unsigned char			nick[32];
 	u8				chan;
 	u8				def_chan;
@@ -465,8 +467,8 @@ struct wl3501_ioctl_parm {
 	u8			def_chan;
 	u8			chan;
 	enum wl3501_net_type	net_type;
-	u8			essid[34];
-	u8			keep_essid[34];
+	u8			essid[WL3501_ESSID_MAX_LEN];
+	u8			keep_essid[WL3501_ESSID_MAX_LEN];
 	u8			version[2];
 	u8			freq_domain;
 };

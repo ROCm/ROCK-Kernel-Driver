@@ -739,8 +739,9 @@ static int wl3501_mgmt_start(struct wl3501_card *this)
 
 	signal.next_blk = 0;
 	signal.sig_id = WL3501_SIG_START_REQ;
-	memcpy((char *)signal.ssid, (char *)this->essid, 34);
-	memcpy((char *)this->keep_essid, (char *)this->essid, 34);
+	memcpy((char *)signal.ssid, (char *)this->essid, WL3501_ESSID_MAX_LEN);
+	memcpy((char *)this->keep_essid, (char *)this->essid,
+	       WL3501_ESSID_MAX_LEN);
 	signal.bss_type = this->net_type = IW_MODE_INFRA ?
 				WL3501_NET_TYPE_INFRA : WL3501_NET_TYPE_INFRA;
 	signal.beacon_period = 400;
@@ -1097,7 +1098,8 @@ static void wl3501_mgmt_join_confirm(struct net_device *dev, u16 addr)
 				       ETH_ALEN);
 				this->chan = this->bss_set[i].phy_pset[2];
 				memcpy((char *)this->keep_essid,
-				       (char *)this->bss_set[i].ssid, 34);
+				       (char *)this->bss_set[i].ssid,
+				       WL3501_ESSID_MAX_LEN);
 				wl3501_mgmt_auth(this);
 			}
 		} else {
@@ -1106,7 +1108,8 @@ static void wl3501_mgmt_join_confirm(struct net_device *dev, u16 addr)
 			       (char *)&(this->bss_set[i].bssid), ETH_ALEN);
 			this->chan = this->bss_set[i].phy_pset[2];
 			memcpy((char *)this->keep_essid,
-			       (char *)this->bss_set[i].ssid, 34);
+			       (char *)this->bss_set[i].ssid,
+			       WL3501_ESSID_MAX_LEN);
 			wl3501_online(dev);
 		}
 	} else {
@@ -1759,8 +1762,9 @@ static int wl3501_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		parm.version[1] = this->version[1];
 		parm.freq_domain = this->freq_domain;
 		memcpy((char *)&(parm.keep_essid[0]),
-		       (char *)&(this->keep_essid[0]), 34);
-		memcpy((char *)&(parm.essid[0]), (char *)&(this->essid[0]), 34);
+		       (char *)&(this->keep_essid[0]), WL3501_ESSID_MAX_LEN);
+		memcpy((char *)&(parm.essid[0]), (char *)&(this->essid[0]),
+		       WL3501_ESSID_MAX_LEN);
 		spin_unlock_irqrestore(&this->lock, flags);
 		blk->len = sizeof(parm);
 		rc = -EFAULT;
@@ -1778,7 +1782,8 @@ static int wl3501_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		spin_lock_irqsave(&this->lock, flags);
 		this->def_chan = parm.def_chan;
 		this->net_type = parm.net_type;
-		memcpy((char *)&(this->essid[0]), (char *)&(parm.essid[0]), 34);
+		memcpy((char *)&(this->essid[0]), (char *)&(parm.essid[0]),
+		       WL3501_ESSID_MAX_LEN);
 		rc = wl3501_reset(dev);
 		spin_unlock_irqrestore(&this->lock, flags);
 		break;
