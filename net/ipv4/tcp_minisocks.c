@@ -1075,7 +1075,3 @@ EXPORT_SYMBOL(tcp_child_process);
 EXPORT_SYMBOL(tcp_create_openreq_child);
 EXPORT_SYMBOL(tcp_timewait_state_process);
 EXPORT_SYMBOL(tcp_tw_deschedule);
-
-#ifdef CONFIG_SYSCTL
-EXPORT_SYMBOL(sysctl_tcp_tw_recycle);
-#endif
