@@ -49,8 +49,9 @@
 u64 jiffies_64 = INITIAL_JIFFIES;
 
 static ext_int_info_t ext_int_info_timer;
-static uint64_t xtime_cc;
-static uint64_t init_timer_cc;
+static u64 init_timer_cc;
+static u64 jiffies_timer_cc;
+static u64 xtime_cc;
 
 extern unsigned long wall_jiffies;
 
@@ -70,7 +71,7 @@ static inline unsigned long do_gettimeoffset(void)
 	__u64 now;
 
 	asm volatile ("STCK 0(%0)" : : "a" (&now) : "memory", "cc");
-        now = (now - init_timer_cc) >> 12;
+        now = (now - jiffies_timer_cc) >> 12;
 	/* We require the offset from the latest update of xtime */
 	now -= (__u64) wall_jiffies*USECS_PER_JIFFY;
 	return (unsigned long) now;
@@ -202,14 +203,14 @@ void init_cpu_timer(void)
 	unsigned long cr0;
 	__u64 timer;
 
+	timer = jiffies_timer_cc + jiffies_64 * CLK_TICKS_PER_JIFFY;
+	S390_lowcore.jiffy_timer = timer;
+	timer += CLK_TICKS_PER_JIFFY + CPU_DEVIATION;
+	asm volatile ("SCKC %0" : : "m" (timer));
         /* allow clock comparator timer interrupt */
         asm volatile ("STCTL 0,0,%0" : "=m" (cr0) : : "memory");
         cr0 |= 0x800;
         asm volatile ("LCTL 0,0,%0" : : "m" (cr0) : "memory");
-	timer = init_timer_cc + jiffies_64 * CLK_TICKS_PER_JIFFY;
-	S390_lowcore.jiffy_timer = timer;
-	timer += CLK_TICKS_PER_JIFFY + CPU_DEVIATION;
-	asm volatile ("SCKC %0" : : "m" (timer));
 }
 
 /*
@@ -239,6 +240,7 @@ void __init time_init(void)
                 printk("time_init: TOD clock stopped/non-operational\n");
                 break;
         }
+	jiffies_timer_cc = init_timer_cc - jiffies_64 * CLK_TICKS_PER_JIFFY;
 
 	/* set xtime */
 	xtime_cc = init_timer_cc;

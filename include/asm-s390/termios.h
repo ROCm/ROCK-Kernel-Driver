@@ -12,7 +12,6 @@
 #include <asm/termbits.h>
 #include <asm/ioctls.h>
 
-
 struct winsize {
 	unsigned short ws_row;
 	unsigned short ws_col;
@@ -44,7 +43,7 @@ struct termio {
 #define TIOCM_RI	TIOCM_RNG
 #define TIOCM_OUT1	0x2000
 #define TIOCM_OUT2	0x4000
-#define TIOCM_LOOP      0x8000
+#define TIOCM_LOOP	0x8000
 
 /* ioctl (fd, TIOCSERGETLSR, &result) where result may be as below */
 
@@ -62,7 +61,8 @@ struct termio {
 #define N_PROFIBUS_FDL	10	/* Reserved for Profibus <Dave@mvhi.com> */
 #define N_IRDA		11	/* Linux IR - http://irda.sourceforge.net/ */
 #define N_SMSBLOCK	12	/* SMS block mode - for talking to GSM data cards about SMS messages */
-#define N_HDLC         13	/* synchronous HDLC */
+#define N_HDLC		13	/* synchronous HDLC */
+#define N_SYNC_PPP	14	/* synchronous PPP */
 #define N_HCI		15  /* Bluetooth HCI UART */
 
 #ifdef __KERNEL__
@@ -78,19 +78,18 @@ struct termio {
 /*
  * Translate a "termio" structure into a "termios". Ugh.
  */
+#define SET_LOW_TERMIOS_BITS(termios, termio, x) { \
+	unsigned short __tmp; \
+	get_user(__tmp,&(termio)->x); \
+	(termios)->x = (0xffff0000 & ((termios)->x)) | __tmp; \
+}
 
 #define user_termio_to_kernel_termios(termios, termio) \
 ({ \
-        unsigned short tmp; \
-        get_user(tmp, &(termio)->c_iflag); \
-        (termios)->c_iflag = (0xffff0000 & ((termios)->c_iflag)) | tmp; \
-        get_user(tmp, &(termio)->c_oflag); \
-        (termios)->c_oflag = (0xffff0000 & ((termios)->c_oflag)) | tmp; \
-        get_user(tmp, &(termio)->c_cflag); \
-        (termios)->c_cflag = (0xffff0000 & ((termios)->c_cflag)) | tmp; \
-        get_user(tmp, &(termio)->c_lflag); \
-        (termios)->c_lflag = (0xffff0000 & ((termios)->c_lflag)) | tmp; \
-        get_user((termios)->c_line, &(termio)->c_line); \
+	SET_LOW_TERMIOS_BITS(termios, termio, c_iflag); \
+	SET_LOW_TERMIOS_BITS(termios, termio, c_oflag); \
+	SET_LOW_TERMIOS_BITS(termios, termio, c_cflag); \
+	SET_LOW_TERMIOS_BITS(termios, termio, c_lflag); \
 	copy_from_user((termios)->c_cc, (termio)->c_cc, NCC); \
 })
 

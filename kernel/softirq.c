@@ -105,7 +105,7 @@ void local_bh_enable(void)
 	BUG_ON(irqs_disabled());
 	if (unlikely(!in_interrupt() &&
 		     local_softirq_pending()))
-		do_softirq();
+		invoke_softirq();
 	preempt_check_resched();
 }
 EXPORT_SYMBOL(local_bh_enable);

@@ -52,9 +52,11 @@ extern inline int _raw_spin_trylock(spinlock_t *lp)
 
 extern inline void _raw_spin_unlock(spinlock_t *lp)
 {
-	__asm__ __volatile("    xc 0(4,%1),0(%1)\n"
-                           "    bcr 15,0"
-			   : "+m" (lp->lock) : "a" (&lp->lock) : "cc" );
+	unsigned int old;
+
+	__asm__ __volatile("cs %0,%3,0(%4)"
+			   : "=d" (old), "=m" (lp->lock)
+			   : "0" (lp->lock), "d" (0), "a" (lp) : "cc" );
 }
 		
 /*

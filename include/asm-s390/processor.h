@@ -133,7 +133,10 @@ unsigned long get_wchan(struct task_struct *p);
 #define KSTK_EIP(tsk)	(__KSTK_PTREGS(tsk)->psw.addr)
 #define KSTK_ESP(tsk)	(__KSTK_PTREGS(tsk)->gprs[15])
 
-#define cpu_relax()	barrier()
+/*
+ * Give up the time slice of the virtual PU.
+ */
+#define cpu_relax()	asm volatile ("diag 0,0,68" : : : "memory")
 
 /*
  * Set PSW mask to specified value, while leaving the

@@ -80,6 +80,8 @@ typedef struct {
 
 extern void do_call_softirq(void);
 
+#define invoke_softirq() do_call_softirq()
+
 #if CONFIG_PREEMPT
 # define in_atomic()	(in_interrupt() || preempt_count() == PREEMPT_ACTIVE)
 # define IRQ_EXIT_OFFSET (HARDIRQ_OFFSET-1)

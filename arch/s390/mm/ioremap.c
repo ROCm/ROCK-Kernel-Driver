@@ -38,7 +38,7 @@ static inline void remap_area_pte(pte_t * pte, unsigned long address, unsigned l
                         printk("remap_area_pte: page already exists\n");
 			BUG();
 		}
-                set_pte(pte, pfn_pte(pfn, __pgprot(_PAGE_PRESENT | flags)));
+                set_pte(pte, pfn_pte(pfn, __pgprot(flags)));
                 address += PAGE_SIZE;
                 pfn++;
                 pte++;

@@ -82,7 +82,7 @@ static inline void restore_fp_regs(s390_fp_regs *fpregs)
 		break;							     \
 	save_fp_regs(&prev->thread.fp_regs);				     \
 	restore_fp_regs(&next->thread.fp_regs);				     \
-	resume(prev,next);						     \
+	prev = resume(prev,next);					     \
 } while (0)
 
 #define nop() __asm__ __volatile__ ("nop")

@@ -77,6 +77,9 @@ extern void softirq_init(void);
 extern void FASTCALL(cpu_raise_softirq(unsigned int cpu, unsigned int nr));
 extern void FASTCALL(raise_softirq(unsigned int nr));
 
+#ifndef invoke_softirq
+#define invoke_softirq() do_softirq()
+#endif
 
 
 /* Tasklets --- multithreaded analogue of BHs.

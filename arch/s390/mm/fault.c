@@ -22,7 +22,6 @@
 #include <linux/mm.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
-#include <linux/compatmac.h>
 #include <linux/init.h>
 #include <linux/console.h>
 #include <linux/module.h>

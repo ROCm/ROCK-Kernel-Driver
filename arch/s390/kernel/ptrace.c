@@ -207,21 +207,24 @@ do_ptrace(struct task_struct *child, long request, long addr, long data)
 		return ptrace_attach(child);
 
 	/*
-	 * I added child != current line so we can get the
-	 * ieee_instruction_pointer from the user structure DJB
+	 * Special cases to get/store the ieee instructions pointer.
 	 */
-	if (child != current) {
-		ret = ptrace_check_attach(child, request == PTRACE_KILL);
-		if (ret < 0)
-			return ret;
+	if (child == current) {
+		if (request == PTRACE_PEEKUSR && addr == PT_IEEE_IP)
+			return peek_user(child, addr, data);
+		if (request == PTRACE_POKEUSR && addr == PT_IEEE_IP)
+			return poke_user(child, addr, data);
 	}
 
-	/* Remove high order bit from address. */
-	addr &= PSW_ADDR_INSN;
+	ret = ptrace_check_attach(child, request == PTRACE_KILL);
+	if (ret < 0)
+		return ret;
 
 	switch (request) {
 	case PTRACE_PEEKTEXT:
 	case PTRACE_PEEKDATA:
+		/* Remove high order bit from address. */
+		addr &= PSW_ADDR_INSN;
 		/* read word at location addr. */
 		copied = access_process_vm(child, addr, &tmp, sizeof(tmp), 0);
 		if (copied != sizeof(tmp))
@@ -234,6 +237,8 @@ do_ptrace(struct task_struct *child, long request, long addr, long data)
 
 	case PTRACE_POKETEXT:
 	case PTRACE_POKEDATA:
+		/* Remove high order bit from address. */
+		addr &= PSW_ADDR_INSN;
 		/* write the word at location addr. */
 		copied = access_process_vm(child, addr, &data, sizeof(data),1);
 		if (copied != sizeof(data))

@@ -143,12 +143,20 @@ extern char empty_zero_page[PAGE_SIZE];
  * C  : changed bit
  */
 
-/* Bits in the page table entry */
-#define _PAGE_PRESENT   0x001          /* Software                         */
-#define _PAGE_MKCLEAN   0x002          /* Software                         */
-#define _PAGE_ISCLEAN   0x004	       /* Software			   */
+/* Hardware bits in the page table entry */
 #define _PAGE_RO        0x200          /* HW read-only                     */
 #define _PAGE_INVALID   0x400          /* HW invalid                       */
+
+/* Software bits in the page table entry */
+#define _PAGE_MKCLEAN   0x002
+#define _PAGE_ISCLEAN   0x004
+
+/* Mask and four different kinds of invalid pages. */
+#define _PAGE_INVALID_MASK	0x601
+#define _PAGE_INVALID_EMPTY	0x400
+#define _PAGE_INVALID_NONE	0x001
+#define _PAGE_INVALID_SWAP	0x200
+#define _PAGE_INVALID_FILE	0x201
 
 /* Bits in the segment table entry */
 #define _PAGE_TABLE_LEN 0xf            /* only full page-tables            */
@@ -166,29 +174,28 @@ extern char empty_zero_page[PAGE_SIZE];
 /*
  * User and Kernel pagetables are identical
  */
-#define _PAGE_TABLE     (_PAGE_TABLE_LEN )
-#define _KERNPG_TABLE   (_PAGE_TABLE_LEN )
+#define _PAGE_TABLE	_PAGE_TABLE_LEN
+#define _KERNPG_TABLE	_PAGE_TABLE_LEN
 
 /*
  * The Kernel segment-tables includes the User segment-table
  */
 
-#define _SEGMENT_TABLE  (_USER_SEG_TABLE_LEN|0x80000000|0x100)
-#define _KERNSEG_TABLE  (_KERNEL_SEG_TABLE_LEN)
+#define _SEGMENT_TABLE	(_USER_SEG_TABLE_LEN|0x80000000|0x100)
+#define _KERNSEG_TABLE	_KERNEL_SEG_TABLE_LEN
 
-#define USER_STD_MASK           0x00000080UL
+#define USER_STD_MASK	0x00000080UL
 
 /*
  * No mapping available
  */
-#define PAGE_INVALID	  __pgprot(_PAGE_INVALID)
-#define PAGE_NONE_SHARED  __pgprot(_PAGE_PRESENT|_PAGE_INVALID)
-#define PAGE_NONE_PRIVATE __pgprot(_PAGE_PRESENT|_PAGE_INVALID|_PAGE_ISCLEAN)
-#define PAGE_RO_SHARED	  __pgprot(_PAGE_PRESENT|_PAGE_RO)
-#define PAGE_RO_PRIVATE	  __pgprot(_PAGE_PRESENT|_PAGE_RO|_PAGE_ISCLEAN)
-#define PAGE_COPY	  __pgprot(_PAGE_PRESENT|_PAGE_RO|_PAGE_ISCLEAN)
-#define PAGE_SHARED	  __pgprot(_PAGE_PRESENT)
-#define PAGE_KERNEL	  __pgprot(_PAGE_PRESENT)
+#define PAGE_NONE_SHARED  __pgprot(_PAGE_INVALID_NONE)
+#define PAGE_NONE_PRIVATE __pgprot(_PAGE_INVALID_NONE|_PAGE_ISCLEAN)
+#define PAGE_RO_SHARED	  __pgprot(_PAGE_RO)
+#define PAGE_RO_PRIVATE	  __pgprot(_PAGE_RO|_PAGE_ISCLEAN)
+#define PAGE_COPY	  __pgprot(_PAGE_RO|_PAGE_ISCLEAN)
+#define PAGE_SHARED	  __pgprot(0)
+#define PAGE_KERNEL	  __pgprot(0)
 
 /*
  * The S390 can't do page protection for execute, and considers that the
@@ -247,11 +254,20 @@ extern inline int pmd_bad(pmd_t pmd)
 	return (pmd_val(pmd) & (~PAGE_MASK & ~_PAGE_TABLE_INV)) != _PAGE_TABLE;
 }
 
-extern inline int pte_present(pte_t pte) { return pte_val(pte) & _PAGE_PRESENT; }
 extern inline int pte_none(pte_t pte)
 {
-	return ((pte_val(pte) & 
-                (_PAGE_INVALID | _PAGE_RO | _PAGE_PRESENT)) == _PAGE_INVALID);
+	return (pte_val(pte) & _PAGE_INVALID_MASK) == _PAGE_INVALID_EMPTY;
+}
+
+extern inline int pte_present(pte_t pte)
+{
+	return !(pte_val(pte) & _PAGE_INVALID) ||
+		(pte_val(pte) & _PAGE_INVALID_MASK) == _PAGE_INVALID_NONE;
+}
+
+extern inline int pte_file(pte_t pte)
+{
+	return (pte_val(pte) & _PAGE_INVALID_MASK) == _PAGE_INVALID_FILE;
 }
 
 #define pte_same(a,b)	(pte_val(a) == pte_val(b))
@@ -298,7 +314,7 @@ extern inline void pmd_clear(pmd_t * pmdp)
 
 extern inline void pte_clear(pte_t *ptep)
 {
-	pte_val(*ptep) = _PAGE_INVALID; 
+	pte_val(*ptep) = _PAGE_INVALID_EMPTY;
 }
 
 /*
@@ -495,7 +511,7 @@ extern inline pmd_t * pmd_offset(pgd_t * dir, unsigned long address)
 extern inline pte_t mk_swap_pte(unsigned long type, unsigned long offset)
 {
 	pte_t pte;
-	pte_val(pte) = (type << 1) | (offset << 12) | _PAGE_INVALID | _PAGE_RO;
+	pte_val(pte) = (type << 1) | (offset << 12) | _PAGE_INVALID_SWAP;
 	pte_val(pte) &= 0x7ffff6fe;  /* better to be paranoid */
 	return pte;
 }
@@ -508,6 +524,15 @@ extern inline pte_t mk_swap_pte(unsigned long type, unsigned long offset)
 #define __swp_entry_to_pte(x)	((pte_t) { (x).val })
 
 typedef pte_t *pte_addr_t;
+
+#define PTE_FILE_MAX_BITS	26
+
+#define pte_to_pgoff(__pte) \
+	((((__pte).pte >> 12) << 7) + (((__pte).pte >> 1) & 0x7f))
+
+#define pgoff_to_pte(__off) \
+	((pte_t) { ((((__off) & 0x7f) << 1) + (((__off) >> 7) << 12)) \
+		   | _PAGE_INVALID_FILE })
 
 #endif /* !__ASSEMBLY__ */
 
