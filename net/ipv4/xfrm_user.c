@@ -390,7 +390,7 @@ static int xfrm_alloc_userspi(struct sk_buff *skb, struct nlmsghdr *nlh, void **
 		goto out_noput;
 	x = xfrm_find_acq(p->info.mode, p->info.reqid, p->info.id.proto,
 			  p->info.sel.daddr.xfrm4_addr,
-			  p->info.sel.saddr.xfrm4_addr);
+			  p->info.sel.saddr.xfrm4_addr, 1);
 	err = -ENOENT;
 	if (x == NULL)
 		goto out_noput;
