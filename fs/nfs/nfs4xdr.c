@@ -166,6 +166,16 @@ static int nfs_stat_to_errno(int);
 #define NFS4_dec_open_confirm_sz        compound_decode_hdr_maxsz + \
                                         decode_putfh_maxsz + \
                                         op_decode_hdr_maxsz + 4
+#define NFS4_enc_open_reclaim_sz	compound_encode_hdr_maxsz + \
+					encode_putfh_maxsz + \
+					op_encode_hdr_maxsz + \
+					11 + \
+					encode_getattr_maxsz
+#define NFS4_dec_open_reclaim_sz	compound_decode_hdr_maxsz + \
+					decode_putfh_maxsz + \
+					op_decode_hdr_maxsz + \
+					4 + 5 + 2 + 3 + \
+					decode_getattr_maxsz
 #define NFS4_enc_close_sz       compound_encode_hdr_maxsz + \
                                 encode_putfh_maxsz + \
                                 op_encode_hdr_maxsz + 5
@@ -667,6 +677,41 @@ encode_open_confirm(struct xdr_stream *xdr, struct nfs_open_confirmargs *arg)
 
 
 static int
+encode_open_reclaim(struct xdr_stream *xdr, struct nfs_open_reclaimargs *arg)
+{
+	uint32_t *p;
+
+ /*
+ * opcode 4, seqid 4, share_access 4, share_deny 4, clientid 8, ownerlen 4,
+ * owner 4, opentype 4, claim 4, delegation_type 4 = 44
+ */
+	RESERVE_SPACE(44);
+	WRITE32(OP_OPEN);
+	WRITE32(arg->seqid);
+	switch (arg->share_access) {
+		case FMODE_READ:
+			WRITE32(NFS4_SHARE_ACCESS_READ);
+			break;
+		case FMODE_WRITE:
+			WRITE32(NFS4_SHARE_ACCESS_WRITE);
+			break;
+		case FMODE_READ|FMODE_WRITE:
+			WRITE32(NFS4_SHARE_ACCESS_BOTH);
+			break;
+		default:
+			BUG();
+	}
+	WRITE32(0);                  /* for linux, share_deny = 0 always */
+	WRITE64(arg->clientid);
+	WRITE32(4);
+	WRITE32(arg->id);
+	WRITE32(NFS4_OPEN_NOCREATE);
+	WRITE32(NFS4_OPEN_CLAIM_PREVIOUS);
+	WRITE32(NFS4_OPEN_DELEGATE_NONE);
+	return 0;
+}
+
+static int
 encode_putfh(struct xdr_stream *xdr, struct nfs_fh *fh)
 {
 	int len = fh->size;
@@ -1054,6 +1099,32 @@ nfs4_xdr_enc_open_confirm(struct rpc_rqst *req, uint32_t *p, struct nfs_open_con
 	if(status)
 		goto out;
 	status = encode_open_confirm(&xdr, args);
+out:
+	return status;
+}
+
+/*
+ * Encode an OPEN request
+ */
+static int
+nfs4_xdr_enc_open_reclaim(struct rpc_rqst *req, uint32_t *p,
+		struct nfs_open_reclaimargs *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops   = 3,
+	};
+	int status;
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr);
+	status = encode_putfh(&xdr, args->fh);
+	if (status)
+		goto out;
+	status = encode_open_reclaim(&xdr, args);
+	if (status)
+		goto out;
+	status = encode_getattr(&xdr, args->f_getattr);
 out:
 	return status;
 }
@@ -2418,6 +2489,31 @@ out:
 }
 
 /*
+ * Decode OPEN_RECLAIM response
+ */
+static int
+nfs4_xdr_dec_open_reclaim(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_openres *res)
+{
+        struct xdr_stream xdr;
+        struct compound_hdr hdr;
+        int status;
+
+        xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+        status = decode_compound_hdr(&xdr, &hdr);
+        if (status)
+                goto out;
+        status = decode_putfh(&xdr);
+        if (status)
+                goto out;
+        status = decode_open(&xdr, res);
+        if (status)
+                goto out;
+        status = decode_getattr(&xdr, res->f_getattr, res->server);
+out:
+        return status;
+}
+
+/*
  * Decode SETATTR response
  */
 static int
@@ -2730,6 +2826,7 @@ struct rpc_procinfo	nfs4_procedures[] = {
   PROC(COMMIT,		enc_commit,	dec_commit),
   PROC(OPEN,		enc_open,	dec_open),
   PROC(OPEN_CONFIRM,	enc_open_confirm,	dec_open_confirm),
+  PROC(OPEN_RECLAIM,	enc_open_reclaim,	dec_open_reclaim),
   PROC(CLOSE,		enc_close,	dec_close),
   PROC(SETATTR,		enc_setattr,	dec_setattr),
   PROC(FSINFO,		enc_fsinfo,	dec_fsinfo),

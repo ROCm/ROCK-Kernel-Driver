@@ -554,6 +554,7 @@ struct nfs4_state {
 /* nfs4proc.c */
 extern int nfs4_proc_setclientid(struct nfs4_client *, u32, unsigned short);
 extern int nfs4_proc_setclientid_confirm(struct nfs4_client *);
+extern int nfs4_open_reclaim(struct nfs4_state_owner *, struct nfs4_state *);
 extern int nfs4_proc_async_renew(struct nfs4_client *);
 extern int nfs4_do_close(struct inode *, struct nfs4_state *);
 
@@ -572,6 +573,7 @@ extern void nfs4_put_state_owner(struct nfs4_state_owner *);
 extern struct nfs4_state * nfs4_get_open_state(struct inode *, struct nfs4_state_owner *);
 extern void nfs4_put_open_state(struct nfs4_state *);
 extern void nfs4_increment_seqid(int status, struct nfs4_state_owner *sp);
+extern void nfs4_recover_state(struct nfs4_client *);
 
 struct nfs4_mount_data;
 #else

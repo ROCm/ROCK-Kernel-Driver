@@ -458,6 +458,54 @@ process_cinfo(struct nfs4_change_info *info, struct nfs_fattr *fattr)
 	}
 }
 
+/*
+ * OPEN_RECLAIM:
+ * 	reclaim state on the server after a reboot.
+ * 	Assumes caller is holding the sp->so_sem
+ */
+int
+nfs4_open_reclaim(struct nfs4_state_owner *sp, struct nfs4_state *state)
+{
+	struct inode *inode = state->inode;
+	struct nfs_server *server = NFS_SERVER(inode);
+	struct nfs_fattr fattr = {
+		.valid = 0,
+	};
+	struct nfs4_change_info d_cinfo;
+	struct nfs4_getattr     f_getattr = {
+		.gt_bmval       = nfs4_fattr_bitmap,
+		.gt_attrs       = &fattr,
+	};
+
+	struct nfs_open_reclaimargs o_arg = {
+		.fh = NFS_FH(inode),
+		.seqid = sp->so_seqid,
+		.id = sp->so_id,
+		.share_access = state->state,
+		.clientid = server->nfs4_state->cl_clientid,
+		.claim = NFS4_OPEN_CLAIM_PREVIOUS,
+		.f_getattr = &f_getattr,
+	};
+	struct nfs_openres o_res = {
+		.cinfo = &d_cinfo,
+		.f_getattr = &f_getattr,
+		.server = server,	/* Grrr */
+	};
+	struct rpc_message msg = {
+		.rpc_proc       = &nfs4_procedures[NFSPROC4_CLNT_OPEN_RECLAIM],
+		.rpc_argp       = &o_arg,
+		.rpc_resp	= &o_res,
+		.rpc_cred	= sp->so_cred,
+	};
+	int status;
+
+	status = rpc_call_sync(server->client, &msg, 0);
+	nfs4_increment_seqid(status, sp);
+	/* Update the inode attributes */
+	nfs_refresh_inode(inode, &fattr);
+	return status;
+}
+
 struct nfs4_state *
 nfs4_do_open(struct inode *dir, struct qstr *name, int flags, struct iattr *sattr, struct rpc_cred *cred)
 {
@@ -523,10 +571,9 @@ nfs4_do_open(struct inode *dir, struct qstr *name, int flags, struct iattr *satt
 	o_arg.id = sp->so_id;
 
 	status = rpc_call_sync(server->client, &msg, 0);
-	if (status) {
-		goto out_up;
-	}
 	nfs4_increment_seqid(status, sp);
+	if (status)
+		goto out_up;
 	process_cinfo(&d_cinfo, &d_attr);
 	nfs_refresh_inode(dir, &d_attr);
 
@@ -555,9 +602,9 @@ nfs4_do_open(struct inode *dir, struct qstr *name, int flags, struct iattr *satt
 
 		memcpy(&oc_arg.stateid, &o_res.stateid, sizeof(oc_arg.stateid));
 		status = rpc_call_sync(server->client, &msg, 0);
+		nfs4_increment_seqid(status, sp);
 		if (status)
 			goto out_up;
-		nfs4_increment_seqid(status, sp);
 		memcpy(&state->stateid, &oc_res.stateid, sizeof(state->stateid));
 	} else
 		memcpy(&state->stateid, &o_res.stateid, sizeof(state->stateid));

@@ -134,6 +134,19 @@ struct nfs_open_confirmres {
 };
 
 /*
+ * Arguments to the open_reclaim call.
+ */
+struct nfs_open_reclaimargs {
+	struct nfs_fh *		fh;
+	__u64			clientid;
+	__u32			seqid;
+	__u32			id;
+	__u32			share_access;
+	__u32			claim;
+	struct nfs4_getattr *   f_getattr;
+};
+
+/*
  * Arguments to the close call.
  */
 struct nfs_closeargs {

@@ -382,6 +382,95 @@ nfs4_increment_seqid(int status, struct nfs4_state_owner *sp)
 		sp->so_seqid++;
 }
 
+static int reclaimer(void *);
+struct reclaimer_args {
+	struct nfs4_client *clp;
+	struct completion complete;
+};
+
+/*
+ * State recovery routine
+ */
+void
+nfs4_recover_state(struct nfs4_client *clp)
+{
+	struct reclaimer_args args = {
+		.clp = clp,
+	};
+	init_completion(&args.complete);
+
+	down_read(&clp->cl_sem);
+	if (kernel_thread(reclaimer, &args, CLONE_KERNEL) < 0)
+		goto out_failed;
+	wait_for_completion(&args.complete);
+	return;
+out_failed:
+	up_read(&clp->cl_sem);
+}
+
+static void
+nfs4_reclaim_open_state(struct nfs4_state_owner *sp)
+{
+	struct nfs4_state *state;
+	int status;
+
+	list_for_each_entry(state, &sp->so_states, open_states) {
+		status = nfs4_open_reclaim(sp, state);
+		if (status) {
+			/*
+			 * Open state on this file cannot be recovered
+			 * All we can do is revert to using the zero stateid.
+			 */
+			memset(state->stateid.data, 0,
+					sizeof(state->stateid.data));
+			/* Mark the file as being 'closed' */
+			state->state = 0;
+		}
+	}
+}
+
+static int
+reclaimer(void *ptr)
+{
+	struct reclaimer_args *args = (struct reclaimer_args *)ptr;
+	struct nfs4_client *clp = args->clp;
+	struct nfs4_state_owner *sp;
+	int status;
+
+	daemonize("%u.%u.%u.%u-reclaim", NIPQUAD(clp->cl_addr));
+	allow_signal(SIGKILL);
+
+	complete(&args->complete);
+
+	/* Are there any NFS mounts out there? */
+	if (list_empty(&clp->cl_superblocks))
+		goto out;
+	status = nfs4_proc_setclientid(clp, 0, 0);
+	if (status)
+		goto out_error;
+	status = nfs4_proc_setclientid_confirm(clp);
+	if (status)
+		goto out_error;
+	spin_lock(&clp->cl_lock);
+	list_for_each_entry(sp, &clp->cl_state_owners, so_list) {
+		atomic_inc(&sp->so_count);
+		spin_unlock(&clp->cl_lock);
+		down(&sp->so_sema);
+		nfs4_reclaim_open_state(sp);
+		up(&sp->so_sema);
+		nfs4_put_state_owner(sp);
+		spin_lock(&clp->cl_lock);
+	}
+	spin_unlock(&clp->cl_lock);
+out:
+	up_read(&clp->cl_sem);
+	return 0;
+out_error:
+	printk(KERN_WARNING "Error: state recovery failed on NFSv4 server %u.%u.%u.%u\n",
+				NIPQUAD(clp->cl_addr.s_addr));
+	goto out;
+}
+
 /*
  * Local variables:
  *  c-basic-offset: 8
