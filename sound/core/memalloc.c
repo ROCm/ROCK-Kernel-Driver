@@ -27,6 +27,7 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/mm.h>
+#include <linux/dma-mapping.h>
 #include <asm/semaphore.h>
 #include <sound/memalloc.h>
 
