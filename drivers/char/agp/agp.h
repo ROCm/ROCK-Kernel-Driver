@@ -420,7 +420,7 @@ void get_agp_version(struct agp_bridge_data *bridge);
 #define AGPSTAT2_2X		(1<<1)
 #define AGPSTAT2_4X		(1<<2)
 
-#define AGPSTAT_RSVD		(1<<2)
+#define AGPSTAT3_RSVD		(1<<2)
 #define AGPSTAT3_8X		(1<<1)
 #define AGPSTAT3_4X		(1)
 

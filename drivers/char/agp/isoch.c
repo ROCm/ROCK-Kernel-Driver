@@ -318,8 +318,8 @@ int agp_3_5_enable(struct agp_bridge_data *bridge, u32 mode)
 {
 	struct pci_dev *td = bridge->dev, *dev;
 	u8 mcapndx;
-	u32 isoch, arqsz, cal_cycle, tmp, rate;
-	u32 tstatus, tcmd, mcmd, mstatus, ncapid;
+	u32 isoch, arqsz;
+	u32 tstatus, mstatus, ncapid;
 	u32 mmajor;
 	u16 mpstat;
 	struct agp_3_5_dev *dev_list, *cur;
@@ -327,9 +327,17 @@ int agp_3_5_enable(struct agp_bridge_data *bridge, u32 mode)
 	unsigned int ndevs = 0;
 	int ret = 0;
 
+	/* Extract some power-on defaults from the target */
+	pci_read_config_dword(td, bridge->capndx+AGPSTAT, &tstatus);
+	isoch     = (tstatus >> 17) & 0x1;
+	if (isoch == 0)	/* isoch xfers not available, bail out. */
+		return -ENODEV;
+
+	arqsz     = (tstatus >> 13) & 0x7;
+
 	/* 
-	 * Allocate a head for our AGP 3.0 device list (multiple AGP 3.0
-	 * devices are allowed behind a single bridge). 
+	 * Allocate a head for our AGP 3.5 device list
+	 * (multiple AGP v3 devices are allowed behind a single bridge). 
 	 */
 	if ((dev_list = kmalloc(sizeof(*dev_list), GFP_KERNEL)) == NULL) {
 		ret = -ENOMEM;
@@ -375,19 +383,11 @@ int agp_3_5_enable(struct agp_bridge_data *bridge, u32 mode)
 		}
 	}
 
-	/* Extract some power-on defaults from the target */
-	pci_read_config_dword(td, bridge->capndx+AGPSTAT, &tstatus);
-	isoch     = (tstatus >> 17) & 0x1;
-	arqsz     = (tstatus >> 13) & 0x7;
-	cal_cycle = (tstatus >> 10) & 0x7;
-	rate      = tstatus & 0x7;
-
 	/*
 	 * Take an initial pass through the devices lying behind our host
 	 * bridge.  Make sure each one is actually an AGP 3.0 device, otherwise
 	 * exit with an error message.  Along the way store the AGP 3.0
-	 * cap_ptr for each device, the minimum supported cal_cycle, and the
-	 * minimum supported data rate.
+	 * cap_ptr for each device
 	 */
 	list_for_each(pos, head) {
 		cur = list_entry(pos, struct agp_3_5_dev, list);
@@ -398,13 +398,13 @@ int agp_3_5_enable(struct agp_bridge_data *bridge, u32 mode)
 			continue;
 
 		pci_read_config_byte(dev, PCI_CAPABILITY_LIST, &mcapndx);
-		if (mcapndx != 0x00) {
+		if (mcapndx != 0) {
 			do {
 				pci_read_config_dword(dev, mcapndx, &ncapid);
-				if ((ncapid & 0xff) != 0x02)
+				if ((ncapid & 0xff) != 2)
 					mcapndx = (ncapid >> 8) & 0xff;
 			}
-			while (((ncapid & 0xff) != 0x02) && (mcapndx != 0x00));
+			while (((ncapid & 0xff) != 2) && (mcapndx != 0));
 		}
 
 		if (mcapndx == 0) {
@@ -435,31 +435,7 @@ int agp_3_5_enable(struct agp_bridge_data *bridge, u32 mode)
 			ret = -ENODEV;
 			goto free_and_exit;
 		}
-
-		tmp = (mstatus >> 10) & 0x7;
-		cal_cycle = min(cal_cycle, tmp);
-
-		/* figure the lesser rate */
-		tmp = mstatus & 0x7;
-		if (tmp < rate) 
-			rate = tmp;
-			
 	}		
-
-	/* Turn rate into something we can actually write out to AGPCMD */
-	switch(rate) {
-	case 0x1:
-	case 0x2:
-		break;
-	case 0x3:
-		rate = 0x2;
-		break;
-	default:
-		printk(KERN_ERR PFX "woah!  Bogus AGP rate (%d) "
-			"value found advertised behind an AGP 3.5 bridge!\n", rate);
-		ret = -ENODEV;
-		goto free_and_exit;
-	}
 
 	/*
 	 * Call functions to divide target resources amongst the AGP 3.0
@@ -475,46 +451,6 @@ int agp_3_5_enable(struct agp_bridge_data *bridge, u32 mode)
 		}
 	}
 	agp_3_5_nonisochronous_node_enable(bridge, dev_list, ndevs);
-
-	/*
-	 * Set the calculated minimum supported cal_cycle and minimum
-	 * supported transfer rate in the target's AGPCMD register.
-	 * Also set the AGP_ENABLE bit, effectively 'turning on' the
-	 * target (this has to be done _before_ turning on the masters).
-	 */
-	pci_read_config_dword(td, bridge->capndx+AGPCMD, &tcmd);
-
-	tcmd &= ~(0x7 << 10);
-	tcmd &= ~0x7;
-
-	tcmd |= cal_cycle << 10;
-	tcmd |= 0x1 << 8;
-	tcmd |= rate;
-
-	pci_write_config_dword(td, bridge->capndx+AGPCMD, tcmd);
-
-	/*
-	 * Set the target's advertised arqsz value, the minimum supported
-	 * transfer rate, and the AGP_ENABLE bit in each master's AGPCMD
-	 * register.
-	 */
-	list_for_each(pos, head) {
-		cur = list_entry(pos, struct agp_3_5_dev, list);
-		dev = cur->dev;
-
-		mcapndx = cur->capndx;
-
-		pci_read_config_dword(dev, cur->capndx+AGPCMD, &mcmd);
-
-		mcmd &= ~(0x7 << AGPSTAT_ARQSZ_SHIFT);
-		mcmd &= ~0x7;
-
-		mcmd |= arqsz << 13;
-		mcmd |= AGPSTAT_AGP_ENABLE;
-		mcmd |= rate;
-
-		pci_write_config_dword(dev, cur->capndx+AGPCMD, mcmd);
-	}
 
 free_and_exit:
 	/* Be sure to free the dev_list */
