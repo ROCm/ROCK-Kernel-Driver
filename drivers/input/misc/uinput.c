@@ -49,7 +49,7 @@ static int uinput_dev_event(struct input_dev *dev, unsigned int type, unsigned i
 
 	udev = (struct uinput_device *)dev->private;
 
-	udev->head = (udev->head + 1) & 0xF;
+	udev->head = (udev->head + 1) % UINPUT_BUFFER_SIZE;
 	udev->buff[udev->head].type = type;
 	udev->buff[udev->head].code = code;
 	udev->buff[udev->head].value = value;
@@ -87,14 +87,14 @@ static int uinput_create_device(struct uinput_device *udev)
 
 	input_register_device(udev->dev);
 
-	udev->state |= UIST_CREATED;
+	set_bit(UIST_CREATED, &(udev->state));
 
 	return 0;
 }
 
 static int uinput_destroy_device(struct uinput_device *udev)
 {
-	if (!(udev->state & UIST_CREATED)) {
+	if (!test_bit(UIST_CREATED, &(udev->state))) {
 		printk(KERN_WARNING "%s: create the device first\n", UINPUT_NAME);
 		return -EINVAL;
 	}
@@ -135,6 +135,39 @@ error:
 	return -ENOMEM;
 }
 
+static int uinput_validate_absbits(struct input_dev *dev)
+{
+	unsigned int cnt;
+	int retval = 0;
+	
+	for (cnt = 0; cnt < ABS_MAX; cnt++) {
+		if (!test_bit(cnt, dev->absbit)) 
+			continue;
+		
+		if (/*!dev->absmin[cnt] || !dev->absmax[cnt] || */
+		    (dev->absmax[cnt] <= dev->absmin[cnt])) {
+			printk(KERN_DEBUG 
+				"%s: invalid abs[%02x] min:%d max:%d\n",
+				UINPUT_NAME, cnt, 
+				dev->absmin[cnt], dev->absmax[cnt]);
+			retval = -EINVAL;
+			break;
+		}
+
+		if ((dev->absflat[cnt] < dev->absmin[cnt]) ||
+		    (dev->absflat[cnt] > dev->absmax[cnt])) {
+			printk(KERN_DEBUG 
+				"%s: absflat[%02x] out of range: %d "
+				"(min:%d/max:%d)\n",
+				UINPUT_NAME, cnt, dev->absflat[cnt],
+				dev->absmin[cnt], dev->absmax[cnt]);
+			retval = -EINVAL;
+			break;
+		}
+	}
+	return retval;
+}
+
 static int uinput_alloc_device(struct file *file, const char *buffer, size_t count)
 {
 	struct uinput_user_dev	user_dev;
@@ -145,14 +178,17 @@ static int uinput_alloc_device(struct file *file, const char *buffer, size_t cou
 
 	retval = count;
 
+	udev = (struct uinput_device *)file->private_data;
+	dev = udev->dev;
+
 	if (copy_from_user(&user_dev, buffer, sizeof(struct uinput_user_dev))) {
 		retval = -EFAULT;
 		goto exit;
 	}
 
-	udev = (struct uinput_device *)file->private_data;
-	dev = udev->dev;
-
+	if (NULL != dev->name) 
+		kfree(dev->name);
+		
 	size = strnlen(user_dev.name, UINPUT_MAX_NAME_SIZE);
 	dev->name = kmalloc(size + 1, GFP_KERNEL);
 	if (!dev->name) {
@@ -168,7 +204,7 @@ static int uinput_alloc_device(struct file *file, const char *buffer, size_t cou
 	dev->id.version	= user_dev.id.version;
 	dev->ff_effects_max = user_dev.ff_effects_max;
 
-	size = sizeof(unsigned long) * NBITS(ABS_MAX + 1);
+	size = sizeof(int) * (ABS_MAX + 1);
 	memcpy(dev->absmax, user_dev.absmax, size);
 	memcpy(dev->absmin, user_dev.absmin, size);
 	memcpy(dev->absfuzz, user_dev.absfuzz, size);
@@ -177,33 +213,20 @@ static int uinput_alloc_device(struct file *file, const char *buffer, size_t cou
 	/* check if absmin/absmax/absfuzz/absflat are filled as
 	 * told in Documentation/input/input-programming.txt */
 	if (test_bit(EV_ABS, dev->evbit)) {
-		unsigned int cnt;
-		for (cnt = 1; cnt < ABS_MAX; cnt++)
-			if (test_bit(cnt, dev->absbit) &&
-					(!dev->absmin[cnt] ||
-					 !dev->absmax[cnt] ||
-					 !dev->absfuzz[cnt] ||
-					 !dev->absflat[cnt])) {
-				printk(KERN_DEBUG "%s: set abs fields "
-					"first\n", UINPUT_NAME);
-				retval = -EINVAL;
-				goto free_name;
-			}
+		retval = uinput_validate_absbits(dev);
+		if (retval < 0)
+			kfree(dev->name);
 	}
 
 exit:
 	return retval;
-free_name:
-	kfree(dev->name);
-	goto exit;
 }
 
 static int uinput_write(struct file *file, const char *buffer, size_t count, loff_t *ppos)
 {
 	struct uinput_device	*udev = file->private_data;
 	
-
-	if (udev->state & UIST_CREATED) {
+	if (test_bit(UIST_CREATED, &(udev->state))) {
 		struct input_event	ev;
 
 		if (copy_from_user(&ev, buffer, sizeof(struct input_event)))
@@ -220,23 +243,28 @@ static ssize_t uinput_read(struct file *file, char *buffer, size_t count, loff_t
 {
 	struct uinput_device *udev = file->private_data;
 	int retval = 0;
+	
+	if (!test_bit(UIST_CREATED, &(udev->state)))
+		return -ENODEV;
 
-	if (udev->head == udev->tail && (udev->state & UIST_CREATED) && (file->f_flags & O_NONBLOCK))
+	if ((udev->head == udev->tail) && (file->f_flags & O_NONBLOCK))
 		return -EAGAIN;
 
 	retval = wait_event_interruptible(udev->waitq,
-		udev->head != udev->tail && (udev->state & UIST_CREATED));
-
+			(udev->head != udev->tail) || 
+			!test_bit(UIST_CREATED, &(udev->state)));
+	
 	if (retval)
 		return retval;
 
-	if (!(udev->state & UIST_CREATED))
+	if (!test_bit(UIST_CREATED, &(udev->state)))
 		return -ENODEV;
 
-	while (udev->head != udev->tail && retval + sizeof(struct uinput_device) <= count) {
+	while ((udev->head != udev->tail) && 
+	    (retval + sizeof(struct uinput_device) <= count)) {
 		if (copy_to_user(buffer + retval, &(udev->buff[udev->tail]),
 		    sizeof(struct input_event))) return -EFAULT;
-		udev->tail = (udev->tail + 1) % (UINPUT_BUFFER_SIZE - 1);
+		udev->tail = (udev->tail + 1) % UINPUT_BUFFER_SIZE;
 		retval += sizeof(struct input_event);
 	}
 
@@ -245,7 +273,7 @@ static ssize_t uinput_read(struct file *file, char *buffer, size_t count, loff_t
 
 static unsigned int uinput_poll(struct file *file, poll_table *wait)
 {
-        struct uinput_device *udev = file->private_data;
+	struct uinput_device *udev = file->private_data;
 
 	poll_wait(file, &udev->waitq, wait);
 
@@ -257,7 +285,7 @@ static unsigned int uinput_poll(struct file *file, poll_table *wait)
 
 static int uinput_burn_device(struct uinput_device *udev)
 {
-	if (udev->state & UIST_CREATED)
+	if (test_bit(UIST_CREATED, &(udev->state)))
 		uinput_destroy_device(udev);
 
 	kfree(udev->dev);
@@ -282,50 +310,52 @@ static int uinput_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 
 	udev = (struct uinput_device *)file->private_data;
 
-	if (cmd >= UI_SET_EVBIT && (udev->state & UIST_CREATED))
+	/* device attributes can not be changed after the device is created */
+	if (cmd >= UI_SET_EVBIT && test_bit(UIST_CREATED, &(udev->state)))
 		return -EINVAL;
 
 	switch (cmd) {
 		case UI_DEV_CREATE:
 			retval = uinput_create_device(udev);
-
 			break;
+			
 		case UI_DEV_DESTROY:
 			retval = uinput_destroy_device(udev);
-
 			break;
+
+
 		case UI_SET_EVBIT:
 			set_bit(arg, udev->dev->evbit);
-
-		break;
+			break;
+			
 		case UI_SET_KEYBIT:
 			set_bit(arg, udev->dev->keybit);
-
-		break;
+			break;
+			
 		case UI_SET_RELBIT:
 			set_bit(arg, udev->dev->relbit);
-
-		break;
+			break;
+			
 		case UI_SET_ABSBIT:
 			set_bit(arg, udev->dev->absbit);
-
-		break;
+			break;
+			
 		case UI_SET_MSCBIT:
 			set_bit(arg, udev->dev->mscbit);
-
-		break;
+			break;
+			
 		case UI_SET_LEDBIT:
 			set_bit(arg, udev->dev->ledbit);
-
-		break;
+			break;
+			
 		case UI_SET_SNDBIT:
 			set_bit(arg, udev->dev->sndbit);
-
-		break;
+			break;
+			
 		case UI_SET_FFBIT:
 			set_bit(arg, udev->dev->ffbit);
-
-		break;
+			break;
+			
 		default:
 			retval = -EFAULT;
 	}

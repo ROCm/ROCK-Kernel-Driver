@@ -29,9 +29,9 @@
 #define UINPUT_MINOR		223
 #define UINPUT_NAME		"uinput"
 #define UINPUT_BUFFER_SIZE	16
-#define U_MAX_NAME_SIZE		50
 
-#define UIST_CREATED		1
+/* state flags => bit index for {set|clear|test}_bit ops */
+#define UIST_CREATED		0
 
 struct uinput_device {
 	struct input_dev	*dev;
