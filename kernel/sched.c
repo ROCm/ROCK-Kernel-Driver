@@ -1666,7 +1666,7 @@ asmlinkage long sys_nice(int increment)
  */
 int task_prio(task_t *p)
 {
-	return p->prio - MAX_USER_RT_PRIO;
+	return p->prio - MAX_RT_PRIO;
 }
 
 /**
