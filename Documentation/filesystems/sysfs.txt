@@ -116,7 +116,7 @@ static struct device_attribute dev_attr_foo = {
 Subsystem-Specific Callbacks
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When a subsystem defines a new attribute type, they must implement a
+When a subsystem defines a new attribute type, it must implement a
 set of sysfs operations for forwarding read and write calls to the
 show and store methods of the attribute owners. 
 
@@ -204,7 +204,7 @@ Other notes:
   can be done using strlen().
 
 - show() or store() can always return errors. If a bad value comes
-  through, be sure and return an error.
+  through, be sure to return an error.
 
 - The object passed to the methods will be pinned in memory via sysfs
   referencing counting its embedded object. However, the physical 
@@ -229,7 +229,7 @@ static DEVICE_ATTR(name,S_IRUGO,show_name,store_name);
 
 
 (Note that the real implementation doesn't allow userspace to set the 
-name for a device).
+name for a device.)
 
 
 Top Level Directory Layout

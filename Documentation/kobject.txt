@@ -87,7 +87,7 @@ initialized kobject may later be added to the object hierarchy by
 calling kobject_add(). An initialized kobject may be used for
 reference counting.
 
-Note: calling kobject_init(), then kobject_add() is functionally
+Note: calling kobject_init() then kobject_add() is functionally
 equivalent to calling kobject_register().
 
 When a kobject is unregistered, it is removed from its kset's list,
@@ -108,10 +108,10 @@ This allows any memory allocated for the object to be freed.
 
 NOTE!!! 
 
-It is _imperative_ that you supply a desctructor for dynamically
+It is _imperative_ that you supply a destructor for dynamically
 allocated kobjects to free them if you are using kobject reference
-counts. The reference count controls the duration of the lifetime of
-the object. If it goes to 0, then it is assumed that the object  will
+counts. The reference count controls the lifetime of the object.
+If it goes to 0, then it is assumed that the object will
 be freed and cannot be used. 
 
 More importantly, you must free the object there, and not immediately
@@ -169,7 +169,7 @@ struct kobject * kset_find_obj(struct kset *, char *);
 
 
 The type that the kobjects are embedded in is described by the ktype
-pointer. The subsystem that the kobject belongs to is pointed to by
+pointer. The subsystem that the kobject belongs to is pointed to by the
 subsys pointer. 
 
 A kset contains a kobject itself, meaning that it may be registered in
@@ -180,7 +180,7 @@ kset (of that object type).
 For example, a block device is an object (struct gendisk) that is
 contained in a set of block devices. It may also contain a set of
 partitions (struct hd_struct) that have been found on the device. The
-following code snippet illustrates how to properly express this.
+following code snippet illustrates how to express this properly.
 
 	 struct gendisk * disk;
 	 ...
@@ -215,7 +215,7 @@ name. The kobject, if found, is returned.
 ksets are represented in sysfs when their embedded kobjects are
 registered. They follow the same rules of parenting, with one
 exception. If a kset does not have a parent, nor is its embedded
-kobject part of another kset, the kset's parent becomes it's dominant
+kobject part of another kset, the kset's parent becomes its dominant
 subsystem. 
 
 If the kset does not have a parent, its directory is created at the
@@ -262,7 +262,7 @@ ksets, as there may be disparate sets of identical objects.
 
 A subsystem represents a significant entity of code that maintains an
 arbitrary number of sets of objects of various types. Since the number
-of ksets, and the type of objects they contain, are variable, a
+of ksets and the type of objects they contain are variable, a
 generic representation of a subsystem is minimal. 
 
 
@@ -294,7 +294,7 @@ All ksets that are attached to a subsystem share the subsystem's R/W
 semaphore. 
 
 
-4.2 Programming Interface.
+4.2 subsystem Programming Interface.
 
 The subsystem programming interface is simple and does not offer the
 flexibility that the kset and kobject programming interfaces do. They
@@ -305,7 +305,7 @@ calls to their embedded kobjects).
 
 4.3 Helpers
 
-A number of macros are available to make dealing with subsystems, and
+A number of macros are available to make dealing with subsystems and
 their embedded objects easier. 
 
 
