@@ -3,7 +3,7 @@
  *	      of the Linux-NTFS project.
  *
  * Copyright (c) 2001,2002 Anton Altaparmakov.
- * Copyright (C) 2002 Richard Russon.
+ * Copyright (c) 2002 Richard Russon.
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -89,10 +89,8 @@ typedef struct {
 	u32 index_record_size;		/* in bytes */
 	u32 index_record_size_mask;	/* index_record_size - 1 */
 	u8 index_record_size_bits;	/* log2(index_record_size) */
-	union {
-		LCN nr_clusters;	/* Volume size in clusters. */
-		LCN nr_lcn_bits;	/* Number of bits in lcn bitmap. */
-	} SN(vcl);
+	LCN nr_clusters;		/* Volume size in clusters == number of
+					   bits in lcn bitmap. */
 	LCN mft_lcn;			/* Cluster location of mft data. */
 	LCN mftmirr_lcn;		/* Cluster location of copy of mft. */
 	u64 serial_no;			/* The volume serial number. */
@@ -104,10 +102,8 @@ typedef struct {
 	struct inode *mft_ino;		/* The VFS inode of $MFT. */
 	struct rw_semaphore mftbmp_lock; /* Lock for serializing accesses to the
 					    mft record bitmap ($MFT/$BITMAP). */
-	union {
-		unsigned long nr_mft_records; /* Number of mft records. */
-		unsigned long nr_mft_bits; /* Number of bits in mft bitmap. */
-	} SN(vmm);
+	unsigned long nr_mft_records;	/* Number of mft records == number of
+					   bits in mft bitmap. */
 	struct address_space mftbmp_mapping; /* Page cache for $MFT/$BITMAP. */
 	run_list mftbmp_rl;		/* Run list for $MFT/$BITMAP. */
 	s64 mftbmp_size;		/* Data size of $MFT/$BITMAP. */
@@ -127,9 +123,6 @@ typedef struct {
 					   only, otherwise NULL). */
 	struct nls_table *nls_map;
 } ntfs_volume;
-
-#define _VCL(X)  SC(vcl,X)
-#define _VMM(X)  SC(vmm,X)
 
 #endif /* _LINUX_NTFS_VOLUME_H */
 

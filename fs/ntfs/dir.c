@@ -27,7 +27,7 @@
 /**
  * The little endian Unicode string $I30 as a global constant.
  */
-const uchar_t I30[5] = { const_cpu_to_le16('$'), const_cpu_to_le16('I'),
+uchar_t I30[5] = { const_cpu_to_le16('$'), const_cpu_to_le16('I'),
 		const_cpu_to_le16('3'),	const_cpu_to_le16('0'),
 		const_cpu_to_le16(0) };
 
