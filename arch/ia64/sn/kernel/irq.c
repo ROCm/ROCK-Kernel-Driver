@@ -40,6 +40,7 @@
 static void force_interrupt(int irq);
 extern void pcibr_force_interrupt(pcibr_intr_t intr);
 extern int sn_force_interrupt_flag;
+struct irq_desc * sn_irq_desc(unsigned int irq);
 
 struct sn_intr_list_t {
 	struct sn_intr_list_t *next;
@@ -101,6 +102,8 @@ sn_end_irq(unsigned int irq)
 	int nasid;
 	int ivec;
 	unsigned long event_occurred;
+	irq_desc_t *desc = sn_irq_desc(irq);
+	unsigned int status = desc->status;
 
 	ivec = irq & 0xff;
 	if (ivec == SGI_UART_VECTOR) {
@@ -115,7 +118,8 @@ sn_end_irq(unsigned int irq)
 	}
 	__clear_bit(ivec, (volatile void *)pda->sn_in_service_ivecs);
 	if (sn_force_interrupt_flag)
-		force_interrupt(irq);
+		if (!(status & (IRQ_DISABLED | IRQ_INPROGRESS)))
+			force_interrupt(irq);
 }
 
 static void

@@ -472,7 +472,9 @@ static int svwks_config_drive_xfer_rate (ide_drive_t *drive)
 				int dma = config_chipset_for_dma(drive);
 				if ((id->field_valid & 2) && !dma)
 					goto try_dma_modes;
-			}
+			} else
+				/* UDMA disabled by mask, try other DMA modes */
+				goto try_dma_modes;
 		} else if (id->field_valid & 2) {
 try_dma_modes:
 			if ((id->dma_mword & hwif->mwdma_mask) ||

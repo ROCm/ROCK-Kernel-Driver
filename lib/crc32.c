@@ -23,6 +23,7 @@
 #include <linux/crc32.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/compiler.h>
 #include <linux/types.h>
 #include <linux/slab.h>
 #include <linux/init.h>
@@ -36,13 +37,6 @@
 #define tobe(x) (x)
 #endif
 #include "crc32table.h"
-
-#if __GNUC__ >= 3	/* 2.x has "attribute", but only 3.0 has "pure */
-#define attribute(x) __attribute__(x)
-#else
-#define attribute(x)
-#endif
-
 
 MODULE_AUTHOR("Matt Domsch <Matt_Domsch@dell.com>");
 MODULE_DESCRIPTION("Ethernet CRC32 calculations");
@@ -62,7 +56,7 @@ MODULE_LICENSE("GPL");
  * @len - length of buffer @p
  * 
  */
-u32 attribute((pure)) crc32_le(u32 crc, unsigned char const *p, size_t len)
+u32 __attribute_pure__ crc32_le(u32 crc, unsigned char const *p, size_t len)
 {
 	int i;
 	while (len--) {
@@ -82,7 +76,7 @@ u32 attribute((pure)) crc32_le(u32 crc, unsigned char const *p, size_t len)
  * @len - length of buffer @p
  * 
  */
-u32 attribute((pure)) crc32_le(u32 crc, unsigned char const *p, size_t len)
+u32 __attribute_pure__ crc32_le(u32 crc, unsigned char const *p, size_t len)
 {
 # if CRC_LE_BITS == 8
 	const u32      *b =(u32 *)p;
@@ -165,7 +159,7 @@ u32 attribute((pure)) crc32_le(u32 crc, unsigned char const *p, size_t len)
  * @len - length of buffer @p
  * 
  */
-u32 attribute((pure)) crc32_be(u32 crc, unsigned char const *p, size_t len)
+u32 __attribute_pure__ crc32_be(u32 crc, unsigned char const *p, size_t len)
 {
 	int i;
 	while (len--) {
@@ -187,7 +181,7 @@ u32 attribute((pure)) crc32_be(u32 crc, unsigned char const *p, size_t len)
  * @len - length of buffer @p
  * 
  */
-u32 attribute((pure)) crc32_be(u32 crc, unsigned char const *p, size_t len)
+u32 __attribute_pure__ crc32_be(u32 crc, unsigned char const *p, size_t len)
 {
 # if CRC_BE_BITS == 8
 	const u32      *b =(u32 *)p;

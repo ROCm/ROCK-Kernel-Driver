@@ -33,7 +33,7 @@
 #include <asm/pgtable.h>
 #include <asm/cacheflush.h>
 
-#define DEBUG_SIG 0
+#undef DEBUG_SIG
 
 #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
 
@@ -514,8 +514,8 @@ handle_signal(unsigned long sig, struct k_sigaction *ka,
 
 badframe:
 #ifdef DEBUG_SIG
-	printk("badframe in handle_signal, regs=%p frame=%lx newsp=%lx\n",
-	       regs, frame, *newspp);
+	printk("badframe in handle_signal, regs=%p frame=%p newsp=%lx\n",
+	       regs, frame, newsp);
 #endif
 	if (sig == SIGSEGV)
 		ka->sa.sa_handler = SIG_DFL;

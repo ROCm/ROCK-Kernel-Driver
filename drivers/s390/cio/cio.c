@@ -52,15 +52,6 @@ cio_setup (char *parm)
 
 __setup ("cio_msg=", cio_setup);
 
-
-#ifdef CONFIG_PROC_FS
-void
-init_irq_proc(void)
-{
-	/* For now, nothing... */
-}
-#endif
-
 /*
  * Function: cio_debug_init
  * Initializes three debug logs (under /proc/s390dbf) for common I/O:

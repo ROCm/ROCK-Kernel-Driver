@@ -41,8 +41,7 @@ static inline struct rw_semaphore *__rwsem_do_wake(struct rw_semaphore *sem, int
 {
 	struct rwsem_waiter *waiter;
 	struct list_head *next;
-	signed long oldcount;
-	int woken, loop;
+	signed long oldcount, woken, loop;
 
 	rwsemtrace(sem,"Entering __rwsem_do_wake");
 

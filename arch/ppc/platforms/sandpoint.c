@@ -444,6 +444,8 @@ sandpoint_init_IRQ(void)
 	openpic_set_sources(0, 16, OpenPIC_Addr + 0x10200);
 
 	openpic_init(NUM_8259_INTERRUPTS);
+	openpic_hookup_cascade(NUM_8259_INTERRUPTS, "82c59 cascade",
+			i8259_irq);
 
 	/*
 	 * openpic_init() has set up irq_desc[16-31] to be openpic

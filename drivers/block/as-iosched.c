@@ -914,7 +914,7 @@ static void as_update_arq(struct as_data *ad, struct as_rq *arq)
 /*
  * Gathers timings and resizes the write batch automatically
  */
-void update_write_batch(struct as_data *ad)
+static void update_write_batch(struct as_data *ad)
 {
 	unsigned long batch = ad->batch_expire[REQ_ASYNC];
 	long write_time;
@@ -2049,7 +2049,7 @@ static struct sysfs_ops as_sysfs_ops = {
 	.store	= as_attr_store,
 };
 
-struct kobj_type as_ktype = {
+static struct kobj_type as_ktype = {
 	.sysfs_ops	= &as_sysfs_ops,
 	.default_attrs	= default_attrs,
 };

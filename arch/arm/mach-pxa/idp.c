@@ -113,7 +113,7 @@ static void __init idp_map_io(void)
 
 MACHINE_START(PXA_IDP, "Accelent Xscale IDP")
 	MAINTAINER("Accelent Systems Inc.")
-	BOOT_MEM(0xa0000000, 0x40000000, 0xfc000000)
+	BOOT_MEM(0xa0000000, 0x40000000, io_p2v(0x40000000))
 	MAPIO(idp_map_io)
 	INITIRQ(idp_init_irq)
 	INIT_MACHINE(idp_init)

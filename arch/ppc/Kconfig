@@ -609,7 +609,7 @@ config PPC_OF
 
 config PPC_GEN550
 	bool
-	depends on SANDPOINT || MCPN765 || SPRUCE || PPLUS || PCORE
+	depends on SANDPOINT || MCPN765 || SPRUCE || PPLUS || PCORE || PRPMC750 || K2 || PRPMC800
 	default y
 
 config FORCE
@@ -620,6 +620,15 @@ config FORCE
 config GT64260
 	bool
 	depends on EV64260
+	default y
+
+config NONMONARCH_SUPPORT
+	bool "Enable Non-Monarch Support"
+	depends on PRPMC800
+
+config HARRIER
+	bool
+	depends on PRPMC800
 	default y
 
 config EPIC_SERIAL_MODE
@@ -639,6 +648,10 @@ config MPC10X_STORE_GATHERING
 config CPC710_DATA_GATHERING
 	bool "Enable CPC710 data gathering"
 	depends on K2
+
+config HARRIER_STORE_GATHERING
+	bool "Enable Harrier store gathering"
+	depends on HARRIER
 
 config MVME5100_IPMC761_PRESENT
 	bool "MVME5100 configured with an IPMC761"

@@ -1,8 +1,8 @@
 /*
- *  linux/arch/arm/mm/fault-common.c
+ *  linux/arch/arm/mm/fault.c
  *
  *  Copyright (C) 1995  Linus Torvalds
- *  Modifications for ARM processor (c) 1995-2001 Russell King
+ *  Modifications for ARM processor (c) 1995-2004 Russell King
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -11,11 +11,8 @@
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/signal.h>
-#include <linux/sched.h>
-#include <linux/string.h>
 #include <linux/ptrace.h>
 #include <linux/mm.h>
-#include <linux/interrupt.h>
 #include <linux/init.h>
 
 #include <asm/system.h>
@@ -24,20 +21,6 @@
 #include <asm/uaccess.h>
 
 #include "fault.h"
-
-#ifdef CONFIG_CPU_26
-#define FAULT_CODE_WRITE	0x02
-#define FAULT_CODE_FORCECOW	0x01
-#define DO_COW(m)		((m) & (FAULT_CODE_WRITE|FAULT_CODE_FORCECOW))
-#define READ_FAULT(m)		(!((m) & FAULT_CODE_WRITE))
-#else
-/*
- * "code" is actually the FSR register.  Bit 11 set means the
- * instruction was performing a write.
- */
-#define DO_COW(code)		((code) & (1 << 11))
-#define READ_FAULT(code)	(!DO_COW(code))
-#endif
 
 /*
  * This is useful to dump out the page tables associated with
@@ -186,10 +169,10 @@ __do_page_fault(struct mm_struct *mm, unsigned long addr, unsigned int fsr,
 	 * memory access, so we can handle it.
 	 */
 good_area:
-	if (READ_FAULT(fsr)) /* read? */
-		mask = VM_READ|VM_EXEC;
-	else
+	if (fsr & (1 << 11)) /* write? */
 		mask = VM_WRITE;
+	else
+		mask = VM_READ|VM_EXEC;
 
 	fault = VM_FAULT_BADACCESS;
 	if (!(vma->vm_flags & mask))
@@ -201,7 +184,7 @@ good_area:
 	 * than endlessly redo the fault.
 	 */
 survive:
-	fault = handle_mm_fault(mm, vma, addr & PAGE_MASK, DO_COW(fsr));
+	fault = handle_mm_fault(mm, vma, addr & PAGE_MASK, fsr & (1 << 11));
 
 	/*
 	 * Handle the "normal" cases first - successful and sigbus
@@ -233,7 +216,8 @@ out:
 	return fault;
 }
 
-int do_page_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+static int
+do_page_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 {
 	struct task_struct *tsk;
 	struct mm_struct *mm;
@@ -332,8 +316,9 @@ no_context:
  * interrupt or a critical region, and should only copy the information
  * from the master page table, nothing more.
  */
-int do_translation_fault(unsigned long addr, unsigned int fsr,
-			 struct pt_regs *regs)
+static int
+do_translation_fault(unsigned long addr, unsigned int fsr,
+		     struct pt_regs *regs)
 {
 	struct task_struct *tsk;
 	unsigned int index;
@@ -372,3 +357,108 @@ bad_area:
 	do_bad_area(tsk, tsk->active_mm, addr, fsr, regs);
 	return 0;
 }
+
+/*
+ * Some section permission faults need to be handled gracefully.
+ * They can happen due to a __{get,put}_user during an oops.
+ */
+static int
+do_sect_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+{
+	struct task_struct *tsk = current;
+	do_bad_area(tsk, tsk->active_mm, addr, fsr, regs);
+	return 0;
+}
+
+/*
+ * This abort handler always returns "fault".
+ */
+static int
+do_bad(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+{
+	return 1;
+}
+
+static struct fsr_info {
+	int	(*fn)(unsigned long addr, unsigned int fsr, struct pt_regs *regs);
+	int	sig;
+	const char *name;
+} fsr_info[] = {
+	/*
+	 * The following are the standard ARMv3 and ARMv4 aborts.  ARMv5
+	 * defines these to be "precise" aborts.
+	 */
+	{ do_bad,		SIGSEGV, "vector exception"		   },
+	{ do_bad,		SIGILL,	 "alignment exception"		   },
+	{ do_bad,		SIGKILL, "terminal exception"		   },
+	{ do_bad,		SIGILL,	 "alignment exception"		   },
+	{ do_bad,		SIGBUS,	 "external abort on linefetch"	   },
+	{ do_translation_fault,	SIGSEGV, "section translation fault"	   },
+	{ do_bad,		SIGBUS,	 "external abort on linefetch"	   },
+	{ do_page_fault,	SIGSEGV, "page translation fault"	   },
+	{ do_bad,		SIGBUS,	 "external abort on non-linefetch" },
+	{ do_bad,		SIGSEGV, "section domain fault"		   },
+	{ do_bad,		SIGBUS,	 "external abort on non-linefetch" },
+	{ do_bad,		SIGSEGV, "page domain fault"		   },
+	{ do_bad,		SIGBUS,	 "external abort on translation"   },
+	{ do_sect_fault,	SIGSEGV, "section permission fault"	   },
+	{ do_bad,		SIGBUS,	 "external abort on translation"   },
+	{ do_page_fault,	SIGSEGV, "page permission fault"	   },
+	/*
+	 * The following are "imprecise" aborts, which are signalled by bit
+	 * 10 of the FSR, and may not be recoverable.  These are only
+	 * supported if the CPU abort handler supports bit 10.
+	 */
+	{ do_bad,		SIGBUS,  "unknown 16"			   },
+	{ do_bad,		SIGBUS,  "unknown 17"			   },
+	{ do_bad,		SIGBUS,  "unknown 18"			   },
+	{ do_bad,		SIGBUS,  "unknown 19"			   },
+	{ do_bad,		SIGBUS,  "lock abort"			   }, /* xscale */
+	{ do_bad,		SIGBUS,  "unknown 21"			   },
+	{ do_bad,		SIGBUS,  "imprecise external abort"	   }, /* xscale */
+	{ do_bad,		SIGBUS,  "unknown 23"			   },
+	{ do_bad,		SIGBUS,  "dcache parity error"		   }, /* xscale */
+	{ do_bad,		SIGBUS,  "unknown 25"			   },
+	{ do_bad,		SIGBUS,  "unknown 26"			   },
+	{ do_bad,		SIGBUS,  "unknown 27"			   },
+	{ do_bad,		SIGBUS,  "unknown 28"			   },
+	{ do_bad,		SIGBUS,  "unknown 29"			   },
+	{ do_bad,		SIGBUS,  "unknown 30"			   },
+	{ do_bad,		SIGBUS,  "unknown 31"			   }
+};
+
+void __init
+hook_fault_code(int nr, int (*fn)(unsigned long, unsigned int, struct pt_regs *),
+		int sig, const char *name)
+{
+	if (nr >= 0 && nr < ARRAY_SIZE(fsr_info)) {
+		fsr_info[nr].fn   = fn;
+		fsr_info[nr].sig  = sig;
+		fsr_info[nr].name = name;
+	}
+}
+
+/*
+ * Dispatch a data abort to the relevant handler.
+ */
+asmlinkage void
+do_DataAbort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+{
+	const struct fsr_info *inf = fsr_info + (fsr & 15) + ((fsr & (1 << 10)) >> 6);
+
+	if (!inf->fn(addr, fsr, regs))
+		return;
+
+	printk(KERN_ALERT "Unhandled fault: %s (0x%03x) at 0x%08lx\n",
+		inf->name, fsr, addr);
+	force_sig(inf->sig, current);
+	show_pte(current->mm, addr);
+	die_if_kernel("Oops", regs, 0);
+}
+
+asmlinkage void
+do_PrefetchAbort(unsigned long addr, struct pt_regs *regs)
+{
+	do_translation_fault(addr, 0, regs);
+}
+

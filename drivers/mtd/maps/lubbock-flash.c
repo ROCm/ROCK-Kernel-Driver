@@ -60,7 +60,7 @@ static const char *probes[] = { "RedBoot", "cmdlinepart", NULL };
 
 static int __init init_lubbock(void)
 {
-	int flashboot = (CONF_SWITCHES & 1);
+	int flashboot = (LUB_CONF_SWITCHES & 1);
 	int ret = 0, i;
 
 	lubbock_maps[0].buswidth = lubbock_maps[1].buswidth = 

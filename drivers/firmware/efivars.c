@@ -633,7 +633,6 @@ efivar_create_sysfs_entry(unsigned long variable_name_size,
 
 	*(short_name + strlen(short_name)) = '-';
 	efi_guid_unparse(vendor_guid, short_name + strlen(short_name));
-	*(short_name + strlen(short_name)) = ' ';
 
 	kobject_set_name(&new_efivar->kobj, short_name);
 	kobj_set_kset_s(new_efivar, vars_subsys);

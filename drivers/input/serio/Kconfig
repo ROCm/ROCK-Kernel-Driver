@@ -80,7 +80,7 @@ config SERIO_PARKBD
 
 config SERIO_RPCKBD
 	tristate "Acorn RiscPC keyboard controller"
-	depends on ARCH_ACORN && SERIO
+	depends on (ARCH_ACORN || ARCH_CLPS7500) && SERIO
 	default y
 	help
 	  Say Y here if you have the Acorn RiscPC and want to use an AT
@@ -91,7 +91,7 @@ config SERIO_RPCKBD
 
 config SERIO_AMBAKMI
 	tristate "AMBA KMI keyboard controller"
-	depends on ARCH_INTEGRATOR && SERIO
+	depends on ARM_AMBA && SERIO
 
 config SERIO_SA1111
 	tristate "Intel SA1111 keyboard controller"

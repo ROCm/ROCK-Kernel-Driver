@@ -314,13 +314,12 @@ int tcp_transmit_skb(struct sock *sk, struct sk_buff *skb)
 }
 
 
-/* This is the main buffer sending routine. We queue the buffer
- * and decide whether to queue or transmit now.
+/* This routine just queue's the buffer 
  *
  * NOTE: probe0 timer is not checked, do not forget tcp_push_pending_frames,
  * otherwise socket can stall.
  */
-void tcp_send_skb(struct sock *sk, struct sk_buff *skb, int force_queue, unsigned cur_mss)
+static void tcp_queue_skb(struct sock *sk, struct sk_buff *skb)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
 
@@ -329,17 +328,6 @@ void tcp_send_skb(struct sock *sk, struct sk_buff *skb, int force_queue, unsigne
 	__skb_queue_tail(&sk->sk_write_queue, skb);
 	tcp_charge_skb(sk, skb);
 
-	if (!force_queue && tp->send_head == NULL && tcp_snd_test(tp, skb, cur_mss, tp->nonagle)) {
-		/* Send it out now. */
-		TCP_SKB_CB(skb)->when = tcp_time_stamp;
-		if (!tcp_transmit_skb(sk, skb_clone(skb, sk->sk_allocation))) {
-			tp->snd_nxt = TCP_SKB_CB(skb)->end_seq;
-			tcp_minshall_update(tp, cur_mss, skb);
-			if (tp->packets_out++ == 0)
-				tcp_reset_xmit_timer(sk, TCP_TIME_RETRANS, tp->rto);
-			return;
-		}
-	}
 	/* Queue it, remembering where we must start sending. */
 	if (tp->send_head == NULL)
 		tp->send_head = skb;
@@ -1120,10 +1108,10 @@ void tcp_send_fin(struct sock *sk)
 		TCP_SKB_CB(skb)->flags = (TCPCB_FLAG_ACK | TCPCB_FLAG_FIN);
 		TCP_SKB_CB(skb)->sacked = 0;
 
-		/* FIN eats a sequence byte, write_seq advanced by tcp_send_skb(). */
+		/* FIN eats a sequence byte, write_seq advanced by tcp_queue_skb(). */
 		TCP_SKB_CB(skb)->seq = tp->write_seq;
 		TCP_SKB_CB(skb)->end_seq = TCP_SKB_CB(skb)->seq + 1;
-		tcp_send_skb(sk, skb, 1, mss_now);
+		tcp_queue_skb(sk, skb);
 	}
 	__tcp_push_pending_frames(sk, tp, mss_now, TCP_NAGLE_OFF);
 }

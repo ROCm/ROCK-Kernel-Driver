@@ -43,7 +43,7 @@
 #define cpus_promote(map)		({ map; })
 #define cpumask_of_cpu(cpu)		({ ((cpumask_t)1) << (cpu); })
 
-#define first_cpu(map)			__ffs(map)
+#define first_cpu(map)			find_first_bit(&(map), NR_CPUS)
 #define next_cpu(cpu, map)		find_next_bit(&(map), NR_CPUS, cpu + 1)
 
 #endif /* __ASM_GENERIC_CPUMASK_ARITH_H */

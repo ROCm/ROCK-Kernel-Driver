@@ -53,7 +53,6 @@
 #include "xfs_rw.h"
 
 #include <linux/dcache.h>
-#include <linux/mman.h> /* for PROT_WRITE */
 
 static struct vm_operations_struct linvfs_file_vm_ops;
 
@@ -488,7 +487,7 @@ linvfs_mprotect(
 
 	if ((vp->v_type == VREG) && (vp->v_vfsp->vfs_flag & VFS_DMI)) {
 		if ((vma->vm_flags & VM_MAYSHARE) &&
-		    (newflags & PROT_WRITE) && !(vma->vm_flags & PROT_WRITE)) {
+		    (newflags & VM_WRITE) && !(vma->vm_flags & VM_WRITE)) {
 			xfs_mount_t	*mp = XFS_VFSTOM(vp->v_vfsp);
 
 			error = XFS_SEND_MMAP(mp, vma, VM_WRITE);
