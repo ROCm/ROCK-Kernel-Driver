@@ -1336,6 +1336,13 @@ static inline void sock_valbool_flag(struct sock *sk, int bit, int valbool)
 extern __u32 sysctl_wmem_max;
 extern __u32 sysctl_rmem_max;
 
+#ifdef CONFIG_NET
 int siocdevprivate_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg);
+#else
+static inline int siocdevprivate_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
+{
+	return -ENODEV;
+}
+#endif
 
 #endif	/* _SOCK_H */
