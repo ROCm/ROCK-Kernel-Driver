@@ -280,12 +280,19 @@ extern inline void eieio(void)
 
 /*
  * 8, 16 and 32 bit, big and little endian I/O operations, with barrier.
+ *
+ * Read operations have additional twi & isync to make sure the read
+ * is actually performed (i.e. the data has come back) before we start
+ * executing any following instructions.
  */
 extern inline int in_8(volatile unsigned char *addr)
 {
 	int ret;
 
-	__asm__ __volatile__("lbz%U1%X1 %0,%1; eieio" : "=r" (ret) : "m" (*addr));
+	__asm__ __volatile__(
+		"lbz%U1%X1 %0,%1;\n"
+		"twi 0,%0,0;\n"
+		"isync" : "=r" (ret) : "m" (*addr));
 	return ret;
 }
 
@@ -298,7 +305,9 @@ extern inline int in_le16(volatile unsigned short *addr)
 {
 	int ret;
 
-	__asm__ __volatile__("lhbrx %0,0,%1; eieio" : "=r" (ret) :
+	__asm__ __volatile__("lhbrx %0,0,%1;\n"
+			     "twi 0,%0,0;\n"
+			     "isync" : "=r" (ret) :
 			      "r" (addr), "m" (*addr));
 	return ret;
 }
@@ -307,7 +316,9 @@ extern inline int in_be16(volatile unsigned short *addr)
 {
 	int ret;
 
-	__asm__ __volatile__("lhz%U1%X1 %0,%1; eieio" : "=r" (ret) : "m" (*addr));
+	__asm__ __volatile__("lhz%U1%X1 %0,%1;\n"
+			     "twi 0,%0,0;\n"
+			     "isync" : "=r" (ret) : "m" (*addr));
 	return ret;
 }
 
@@ -326,7 +337,9 @@ extern inline unsigned in_le32(volatile unsigned *addr)
 {
 	unsigned ret;
 
-	__asm__ __volatile__("lwbrx %0,0,%1; eieio" : "=r" (ret) :
+	__asm__ __volatile__("lwbrx %0,0,%1;\n"
+			     "twi 0,%0,0;\n"
+			     "isync" : "=r" (ret) :
 			     "r" (addr), "m" (*addr));
 	return ret;
 }
@@ -335,7 +348,9 @@ extern inline unsigned in_be32(volatile unsigned *addr)
 {
 	unsigned ret;
 
-	__asm__ __volatile__("lwz%U1%X1 %0,%1; eieio" : "=r" (ret) : "m" (*addr));
+	__asm__ __volatile__("lwz%U1%X1 %0,%1;\n"
+			     "twi 0,%0,0;\n"
+			     "isync" : "=r" (ret) : "m" (*addr));
 	return ret;
 }
 
