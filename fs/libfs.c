@@ -521,6 +521,7 @@ int simple_transaction_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
+EXPORT_SYMBOL(get_sb_pseudo);
 EXPORT_SYMBOL(dcache_dir_close);
 EXPORT_SYMBOL(dcache_dir_lseek);
 EXPORT_SYMBOL(dcache_dir_open);
