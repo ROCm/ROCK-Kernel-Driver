@@ -140,14 +140,4 @@
 #define HERMES_RID_BUILDSEQ			0xFFFE
 #define HERMES_RID_FWID				0xFFFF
 
-/* "ID" structure - used for ESSID and station nickname */
-struct hermes_idstring {
-	u16 len;
-	u16 val[16];
-} __attribute__ ((packed));
-
-typedef struct hermes_multicast {
-	u8 addr[HERMES_MAX_MULTICAST][ETH_ALEN];
-} __attribute__ ((packed)) hermes_multicast_t;
-
 #endif

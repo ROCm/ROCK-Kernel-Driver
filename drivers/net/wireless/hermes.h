@@ -157,16 +157,6 @@
 #define HERMES_802_3_OFFSET		(14+32)
 #define HERMES_802_2_OFFSET		(14+32+14)
 
-struct hermes_rx_descriptor {
-	u16 status;
-	u32 time;
-	u8 silence;
-	u8 signal;
-	u8 rate;
-	u8 rxflow;
-	u32 reserved;
-} __attribute__ ((packed));
-
 #define HERMES_RXSTAT_ERR		(0x0003)
 #define	HERMES_RXSTAT_BADCRC		(0x0001)
 #define	HERMES_RXSTAT_UNDECRYPTABLE	(0x0002)
@@ -262,6 +252,20 @@ struct hermes_linkstatus {
 	u16 linkstatus;         /* Link status */
 } __attribute__ ((packed));
 
+typedef struct hermes_response {
+	u16 status, resp0, resp1, resp2;
+} hermes_response_t;
+
+/* "ID" structure - used for ESSID and station nickname */
+struct hermes_idstring {
+	u16 len;
+	u16 val[16];
+} __attribute__ ((packed));
+
+typedef struct hermes_multicast {
+	u8 addr[HERMES_MAX_MULTICAST][ETH_ALEN];
+} __attribute__ ((packed)) hermes_multicast_t;
+
 // #define HERMES_DEBUG_BUFFER 1
 #define HERMES_DEBUG_BUFSIZE 4096
 struct hermes_debug_entry {
@@ -293,10 +297,6 @@ typedef struct hermes {
 	unsigned long profile[HERMES_BAP_BUSY_TIMEOUT+1];
 #endif
 } hermes_t;
-
-typedef struct hermes_response {
-	u16 status, resp0, resp1, resp2;
-} hermes_response_t;
 
 /* Register access convenience macros */
 #define hermes_read_reg(hw, off) ((hw)->io_space ? \

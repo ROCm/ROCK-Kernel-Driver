@@ -27,11 +27,6 @@ struct orinoco_key {
 	char data[ORINOCO_MAX_KEY_SIZE];
 } __attribute__ ((packed));
 
-#define ORINOCO_INTEN	 	( HERMES_EV_RX | HERMES_EV_ALLOC | HERMES_EV_TX | \
-				HERMES_EV_TXEXC | HERMES_EV_WTERR | HERMES_EV_INFO | \
-				HERMES_EV_INFDROP )
-
-
 struct orinoco_private {
 	void *card;	/* Pointer to card dependent structure */
 	int (*hard_reset)(struct orinoco_private *);
