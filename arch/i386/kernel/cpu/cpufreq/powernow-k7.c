@@ -481,13 +481,7 @@ static int powernow_decode_bios (int maxfid, int startvid)
 			printk (KERN_INFO PFX "No PST tables match this cpuid (0x%x)\n", etuple);
 			printk (KERN_INFO PFX "This is indicative of a broken BIOS.\n");
 
-			printk (KERN_INFO PFX "Trying ACPI perflib\n");
-			ret = powernow_acpi_init();
-			if (ret) {
-				printk (KERN_INFO PFX "ACPI and legacy methods failed\n");
-				printk (KERN_INFO PFX "See http://www.codemonkey.org.uk/projects/cpufreq/powernow-k7.shtml\n");
-			}
-			return ret;
+			return -EINVAL;
 		}
 		p++;
 	}
@@ -568,7 +562,12 @@ static int __init powernow_cpu_init (struct cpufreq_policy *policy)
 	} else {
 		result = powernow_decode_bios(fidvidstatus.bits.MFID, fidvidstatus.bits.SVID);
 		if (result) {
+			printk (KERN_INFO PFX "Trying ACPI perflib\n");
 			result = powernow_acpi_init();
+			if (result) {
+				printk (KERN_INFO PFX "ACPI and legacy methods failed\n");
+				printk (KERN_INFO PFX "See http://www.codemonkey.org.uk/projects/cpufreq/powernow-k7.shtml\n");
+			}
 		} else {
 			/* SGTC use the bus clock as timer */
 			latency = fixup_sgtc();
