@@ -509,7 +509,7 @@ int ipoib_ib_dev_stop(struct net_device *dev)
 			goto timeout;
 		}
 
-		yield();
+		msleep(1);
 	}
 
 	ipoib_dbg(priv, "All sends and receives done.\n");
@@ -535,7 +535,7 @@ timeout:
 			break;
 		}
 
-		yield();
+		msleep(1);
 	}
 
 	return 0;
