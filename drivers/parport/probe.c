@@ -75,8 +75,9 @@ static void parse_data(struct parport *port, int device, char *str)
 			char *u;
 			*(sep++) = 0;
 			/* Get rid of trailing blanks */
-			u = strchr (sep, ' ');
-			if (u) *u = '\0';
+			u = sep + strlen (sep) - 1;
+			while (u >= p && *u == ' ')
+				*u-- = '\0';
 			u = p;
 			while (*u) {
 				*u = toupper(*u);

@@ -3104,7 +3104,7 @@ CONFIG_FB_3DFX
 
 nVidia Riva support (EXPERIMENTAL)
 CONFIG_FB_RIVA
-  This driver supports graphics boards with the nVidia Riva (aka TNTx)
+  This driver supports graphics boards with the nVidia Riva/Geforce
   chips.
   Say Y if you have such a graphics board.
 
@@ -5119,7 +5119,7 @@ CONFIG_PHONE
 
 Compaq Smart Array support
 CONFIG_BLK_CPQ_CISS_DA
-   This is the driver for Compaq Smart Array controllers.
+   This is the driver for Compaq Smart Array 5xxx controllers.
    Everyone using these boards should say Y here.
    See Documentation/cciss.txt for the current list of
    boards supported by this driver, and for further information

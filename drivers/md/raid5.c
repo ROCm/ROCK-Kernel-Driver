@@ -1076,7 +1076,7 @@ static void handle_stripe(struct stripe_head *sh)
 		bh->b_end_io(bh, 1);
 	}
 	while ((bh=return_fail)) {
-		return_ok = bh->b_reqnext;
+		return_fail = bh->b_reqnext;
 		bh->b_reqnext = NULL;
 		bh->b_end_io(bh, 0);
 	}

@@ -29,6 +29,7 @@
 #define	SO_SNDLOWAT	0x1011
 #define	SO_RCVTIMEO	0x1012
 #define	SO_SNDTIMEO	0x1013
+#define SO_ACCEPTCONN	0x1014
 
 /* linux-specific, might as well be the same as on i386 */
 #define SO_NO_CHECK	11

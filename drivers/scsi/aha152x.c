@@ -1784,7 +1784,7 @@ int aha152x_biosparam(Scsi_Disk * disk, kdev_t dev, int *info_array)
 			if (info[0] == 255 && !EXT_TRANS) {
 				printk(KERN_NOTICE
 				       "aha152x: current partition table is using extended translation.\n"
-				       "         using it also, although it's not explictly enabled.\n");
+				       "         using it also, although it's not explicitly enabled.\n");
 			}
 		}
 	}

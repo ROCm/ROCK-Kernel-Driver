@@ -43,6 +43,8 @@
 #define SO_ATTACH_FILTER        0x401a
 #define SO_DETACH_FILTER        0x401b
 
+#define SO_ACCEPTCONN		0x401c
+
 #if defined(__KERNEL__)
 #define SOCK_STREAM	1	/* stream (connection) socket	*/
 #define SOCK_DGRAM	2	/* datagram (conn.less) socket	*/

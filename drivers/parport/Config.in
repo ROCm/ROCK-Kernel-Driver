@@ -12,8 +12,8 @@ tristate 'Parallel port support' CONFIG_PARPORT
 if [ "$CONFIG_PARPORT" != "n" ]; then
    dep_tristate '  PC-style hardware' CONFIG_PARPORT_PC $CONFIG_PARPORT
    if [ "$CONFIG_PARPORT_PC" != "n" ]; then
-      bool '    Use FIFO/DMA if available' CONFIG_PARPORT_PC_FIFO
       if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
+         bool '    Use FIFO/DMA if available (EXPERIMENTAL)' CONFIG_PARPORT_PC_FIFO
          bool '    SuperIO chipset support (EXPERIMENTAL)' CONFIG_PARPORT_PC_SUPERIO
       fi
    fi

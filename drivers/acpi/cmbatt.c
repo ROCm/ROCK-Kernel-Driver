@@ -163,11 +163,13 @@ acpi_get_battery_info(ACPI_HANDLE handle, struct cmbatt_info *result)
 	result->battery_capacity_granularity_1=objs[7].integer.value;
 	result->battery_capacity_granularity_2=objs[8].integer.value;
 
+#define Xstrncpy(a, b, c) if (b) strncpy(a,b,c); else strncpy(a, "unknown", c);
+
 	/* BUG: trailing NULL issue */
-	strncpy(result->model_number, objs[9].string.pointer, MAX_BATT_STRLEN-1);
-	strncpy(result->serial_number, objs[10].string.pointer, MAX_BATT_STRLEN-1);
-	strncpy(result->battery_type, objs[11].string.pointer, MAX_BATT_STRLEN-1);
-	strncpy(result->oem_info, objs[12].string.pointer, MAX_BATT_STRLEN-1);
+	Xstrncpy(result->model_number, objs[9].string.pointer, MAX_BATT_STRLEN-1);
+	Xstrncpy(result->serial_number, objs[10].string.pointer, MAX_BATT_STRLEN-1);
+	Xstrncpy(result->battery_type, objs[11].string.pointer, MAX_BATT_STRLEN-1);
+	Xstrncpy(result->oem_info, objs[12].string.pointer, MAX_BATT_STRLEN-1);
 	
 	kfree(buf.pointer);
 

@@ -798,9 +798,9 @@ static int sd_init_onedisk(int i)
 				SRpnt->sr_data_direction = SCSI_DATA_READ;
 				scsi_wait_req(SRpnt, (void *) cmd, (void *) buffer,
 					    0/*512*/, SD_TIMEOUT, MAX_RETRIES);
+				spintime_value = jiffies;
 			}
 			spintime = 1;
-			spintime_value = jiffies;
 			time1 = HZ;
 			/* Wait 1 second for next try */
 			do {

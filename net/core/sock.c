@@ -7,7 +7,7 @@
  *		handler for protocols to use and generic option handler.
  *
  *
- * Version:	$Id: sock.c,v 1.102 2000/12/11 23:00:24 davem Exp $
+ * Version:	$Id: sock.c,v 1.104 2001/01/30 07:48:30 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -549,6 +549,13 @@ int sock_getsockopt(struct socket *sock, int level, int optname,
 				return -EFAULT;
 			goto lenout;
 		}
+
+		/* Dubious BSD thing... Probably nobody even uses it, but
+		 * the UNIX standard wants it for whatever reason... -DaveM
+		 */
+		case SO_ACCEPTCONN:
+			v.val = (sk->state == TCP_LISTEN);
+			break;
 
 		default:
 			return(-ENOPROTOOPT);

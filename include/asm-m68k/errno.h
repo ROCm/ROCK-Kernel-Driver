@@ -129,4 +129,6 @@
 #define	ENOMEDIUM	123	/* No medium found */
 #define	EMEDIUMTYPE	124	/* Wrong medium type */
 
+#define	EHASHCOLLISION	125	/* Number of hash collisons exceeds maximum generation counter value.  */
+
 #endif /* _M68K_ERRNO_H */

@@ -328,7 +328,7 @@ static void log_ultrastor_abort(register struct ultrastor_config *config,
 {
   static char fmt[80] = "abort %d (%x); MSCP free pool: %x;";
   register int i;
-  int flags;
+  unsigned long flags;
   save_flags(flags);
   cli();
 
@@ -676,7 +676,7 @@ int ultrastor_queuecommand(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
     int mscp_index;
 #endif
     unsigned int status;
-    int flags;
+    unsigned long flags;
 
     /* Next test is for debugging; "can't happen" */
     if ((config.mscp_free & ((1U << ULTRASTOR_MAX_CMDS) - 1)) == 0)
@@ -848,7 +848,7 @@ int ultrastor_abort(Scsi_Cmnd *SCpnt)
       {
 	int port0 = (config.slot << 12) | 0xc80;
 	int i;
-	int flags;
+	unsigned long flags;
 	save_flags(flags);
 	cli();
 	strcpy(out, "OGM %d:%x ICM %d:%x ports:  ");
@@ -874,7 +874,7 @@ int ultrastor_abort(Scsi_Cmnd *SCpnt)
     if (config.slot ? inb(config.icm_address - 1) == 2 :
 	(inb(SYS_DOORBELL_INTR(config.doorbell_address)) & 1))
       {
-	int flags;
+	unsigned long flags;
 	save_flags(flags);
 	printk("Ux4F: abort while completed command pending\n");
 	restore_flags(flags);
@@ -896,7 +896,7 @@ int ultrastor_abort(Scsi_Cmnd *SCpnt)
        and the interrupt handler will call done.  */
     if (config.slot && inb(config.ogm_address - 1) == 0)
       {
-	int flags;
+	unsigned long flags;
 
 	save_flags(flags);
 	cli();
@@ -948,7 +948,7 @@ int ultrastor_abort(Scsi_Cmnd *SCpnt)
 
 int ultrastor_reset(Scsi_Cmnd * SCpnt, unsigned int reset_flags)
 {
-    int flags;
+    unsigned long flags;
     register int i;
 #if (ULTRASTOR_DEBUG & UD_RESET)
     printk("US14F: reset: called\n");

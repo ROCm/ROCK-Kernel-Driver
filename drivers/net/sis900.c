@@ -1,6 +1,6 @@
 /* sis900.c: A SiS 900/7016 PCI Fast Ethernet driver for Linux.
    Copyright 1999 Silicon Integrated System Corporation 
-   Revision:	1.07.07	Nov. 29 2000
+   Revision:	1.07.08	Jan. 8 2001
    
    Modified from the driver which is originally written by Donald Becker.
    
@@ -18,6 +18,7 @@
    preliminary Rev. 1.0 Jan. 18, 1998
    http://www.sis.com.tw/support/databook.htm
 
+   Rev 1.07.08 Jan.  8 2001 Lei-Chun Chang added RTL8201 PHY support
    Rev 1.07.07 Nov. 29 2000 Lei-Chun Chang added kernel-doc extractable documentation and 630 workaround fix
    Rev 1.07.06 Nov.  7 2000 Jeff Garzik <jgarzik@mandrakesoft.com> some bug fix and cleaning
    Rev 1.07.05 Nov.  6 2000 metapirat<metapirat@gmx.de> contribute media type select by ifconfig
@@ -59,7 +60,7 @@
 #include "sis900.h"
 
 static const char *version =
-"sis900.c: v1.07.07  11/29/2000\n";
+"sis900.c: v1.07.08  1/8/2001\n";
 
 static int max_interrupt_work = 20;
 static int multicast_filter_limit = 128;
@@ -92,6 +93,7 @@ MODULE_DEVICE_TABLE (pci, sis900_pci_tbl);
 static void sis900_read_mode(struct net_device *net_dev, int phy_addr, int *speed, int *duplex);
 static void amd79c901_read_mode(struct net_device *net_dev, int phy_addr, int *speed, int *duplex);
 static void ics1893_read_mode(struct net_device *net_dev, int phy_addr, int *speed, int *duplex);
+static void rtl8201_read_mode(struct net_device *net_dev, int phy_addr, int *speed, int *duplex);
 
 static struct mii_chip_info {
 	const char * name;
@@ -104,6 +106,7 @@ static struct mii_chip_info {
 	{"AMD 79C901 10BASE-T PHY",  0x0000, 0x35b9, amd79c901_read_mode},
 	{"AMD 79C901 HomePNA PHY",   0x0000, 0x35c8, amd79c901_read_mode},
 	{"ICS 1893 Integrated PHYceiver"   , 0x0015, 0xf441,ics1893_read_mode},
+	{"RTL 8201 10/100Mbps Phyceiver"   , 0x0000, 0x8201,rtl8201_read_mode},
 	{0,},
 };
 
@@ -270,6 +273,7 @@ static int __devinit sis900_probe (struct pci_dev *pci_dev, const struct pci_dev
 	net_dev = init_etherdev(NULL, sizeof(struct sis900_private));
 	if (!net_dev)
 		return -ENOMEM;
+	SET_MODULE_OWNER(net_dev);
 
 	if (!request_region(ioaddr, SIS900_TOTAL_SIZE, net_dev->name)) {
 		printk(KERN_ERR "sis900.c: can't allocate I/O space at 0x%lX\n", ioaddr);
@@ -368,7 +372,8 @@ static int __init sis900_mii_probe (struct net_device * net_dev)
 
 		/* search our mii table for the current mii */ 
 		for (i = 0; mii_chip_table[i].phy_id1; i++)
-			if (phy_id0 == mii_chip_table[i].phy_id0) {
+			if (phy_id0 == mii_chip_table[i].phy_id0 &&
+			    phy_id1 == mii_chip_table[i].phy_id1) {
 				struct mii_phy * mii_phy;
 
 				printk(KERN_INFO
@@ -606,8 +611,7 @@ sis900_open(struct net_device *net_dev)
 	struct sis900_private *sis_priv = (struct sis900_private *)net_dev->priv;
 	long ioaddr = net_dev->base_addr;
 	u8  revision;
-
-	MOD_INC_USE_COUNT;
+	int ret;
 
 	/* Soft reset the chip. */
 	sis900_reset(net_dev);
@@ -618,10 +622,9 @@ sis900_open(struct net_device *net_dev)
 	    revision == SIS630A_900_REV)
 		sis630_set_eq(net_dev,revision);
 
-	if (request_irq(net_dev->irq, &sis900_interrupt, SA_SHIRQ, net_dev->name, net_dev)) {
-		MOD_DEC_USE_COUNT;
-		return -EAGAIN;
-	}
+	ret = request_irq(net_dev->irq, &sis900_interrupt, SA_SHIRQ, net_dev->name, net_dev);
+	if (ret)
+		return ret;
 
 	sis900_init_rxfilter(net_dev);
 
@@ -1112,6 +1115,51 @@ static void ics1893_read_mode(struct net_device *net_dev, int phy_addr, int *spe
 }
 
 /**
+ *	rtl8201_read_mode: - read media mode for rtl8201 phy
+ *	@net_dev: the net device to read mode for
+ *	@phy_addr: mii phy address
+ *	@speed: the transmit speed to be determined
+ *	@duplex: the duplex mode to be determined
+ *
+ *	read MII_STATUS register from rtl8201 phy
+ *	to determine the speed and duplex mode for sis900
+ */
+
+static void rtl8201_read_mode(struct net_device *net_dev, int phy_addr, int *speed, int *duplex)
+{
+	u32 status;
+
+	status = mdio_read(net_dev, phy_addr, MII_STATUS);
+
+	if (status & MII_STAT_CAN_TX_FDX) {
+		*speed = HW_SPEED_100_MBPS;
+		*duplex = FDX_CAPABLE_FULL_SELECTED;
+	}
+	else if (status & MII_STAT_CAN_TX) {
+		*speed = HW_SPEED_100_MBPS;
+		*duplex = FDX_CAPABLE_HALF_SELECTED;
+	}
+	else if (status & MII_STAT_CAN_T_FDX) {
+		*speed = HW_SPEED_10_MBPS;
+		*duplex = FDX_CAPABLE_FULL_SELECTED;
+	}
+	else if (status & MII_STAT_CAN_T) {
+		*speed = HW_SPEED_10_MBPS;
+		*duplex = FDX_CAPABLE_HALF_SELECTED;
+	}
+
+	if (status & MII_STAT_LINK)
+		printk(KERN_INFO "%s: Media Link On %s %s-duplex \n",
+		       net_dev->name,
+		       *speed == HW_SPEED_100_MBPS ?
+		       "100mbps" : "10mbps",
+		       *duplex == FDX_CAPABLE_FULL_SELECTED ?
+		       "full" : "half");
+	else
+		printk(KERN_INFO "%s: Media Link Off\n", net_dev->name);
+}
+
+/**
  *	sis900_tx_timeout: - sis900 transmit timeout routine
  *	@net_dev: the net device to transmit
  *
@@ -1505,8 +1553,6 @@ sis900_close(struct net_device *net_dev)
 	}
 
 	/* Green! Put the chip in low-power mode. */
-
-	MOD_DEC_USE_COUNT;
 
 	return 0;
 }

@@ -44,8 +44,8 @@
 #include <linux/genhd.h>
 
 #define CCISS_DRIVER_VERSION(maj,min,submin) ((maj<<16)|(min<<8)|(submin))
-#define DRIVER_NAME "Compaq CISS Driver (v 2.4.0)"
-#define DRIVER_VERSION CCISS_DRIVER_VERSION(2,4,0)
+#define DRIVER_NAME "Compaq CISS Driver (v 2.4.2)"
+#define DRIVER_VERSION CCISS_DRIVER_VERSION(2,4,2)
 
 /* Embedded module documentation macros - see modules.h */
 MODULE_AUTHOR("Charles M. White III - Compaq Computer Corporation");
@@ -63,6 +63,8 @@ MODULE_DESCRIPTION("Driver for Compaq Smart Array Controller 5300");
  */
 static struct board_type products[] = {
 	{ 0x40700E11, "Smart Array 5300",	&SA5_access },
+	{ 0x40800E11, "Smart Array 5i", &SA5B_access},
+	{ 0x40820E11, "Smart Array 532", &SA5B_access},
 };
 
 /* How long to wait (in millesconds) for board to go into simple mode */
@@ -76,23 +78,7 @@ static ctlr_info_t *hba[MAX_CTLR];
 
 static struct proc_dir_entry *proc_cciss;
 
-static void do_cciss_request(int i);
-/*
- * This is a hack.  This driver eats a major number for each controller, and
- * sets blkdev[xxx].request_fn to each one of these so the real request
- * function knows what controller its working with.
- */
-#define DO_CCISS_REQUEST(x) { do_cciss_request(x); }
-
-static void do_cciss_request0(request_queue_t * q) DO_CCISS_REQUEST(0);
-static void do_cciss_request1(request_queue_t * q) DO_CCISS_REQUEST(1);
-static void do_cciss_request2(request_queue_t * q) DO_CCISS_REQUEST(2);
-static void do_cciss_request3(request_queue_t * q) DO_CCISS_REQUEST(3);
-static void do_cciss_request4(request_queue_t * q) DO_CCISS_REQUEST(4);
-static void do_cciss_request5(request_queue_t * q) DO_CCISS_REQUEST(5);
-static void do_cciss_request6(request_queue_t * q) DO_CCISS_REQUEST(6);
-static void do_cciss_request7(request_queue_t * q) DO_CCISS_REQUEST(7);
-
+static void do_cciss_request(request_queue_t *q);
 static int cciss_open(struct inode *inode, struct file *filep);
 static int cciss_release(struct inode *inode, struct file *filep);
 static int cciss_ioctl(struct inode *inode, struct file *filep, 
@@ -693,7 +679,7 @@ static int revalidate_logvol(kdev_t dev, int maxusage)
         spin_lock_irqsave(&io_request_lock, flags);
         if (hba[ctlr]->drv[target].usage_count > maxusage) {
                 spin_unlock_irqrestore(&io_request_lock, flags);
-                printk(KERN_WARNING "cpqarray: Device busy for "
+                printk(KERN_WARNING "cciss: Device busy for "
                         "revalidation (usage=%d)\n",
                         hba[ctlr]->drv[target].usage_count);
                 return -EBUSY;
@@ -1175,48 +1161,85 @@ static inline void complete_command( CommandList_struct *cmd, int timeout)
 	}
 	complete_buffers(cmd->bh, status);
 }
+
+
+static inline int cpq_new_segment(request_queue_t *q, struct request *rq,
+                                  int max_segments)
+{
+        if (rq->nr_segments < MAXSGENTRIES) {
+                rq->nr_segments++;
+                return 1;
+        }
+        return 0;
+}
+
+static int cpq_back_merge_fn(request_queue_t *q, struct request *rq,
+                             struct buffer_head *bh, int max_segments)
+{
+        if (rq->bhtail->b_data + rq->bhtail->b_size == bh->b_data)
+                return 1;
+        return cpq_new_segment(q, rq, max_segments);
+}
+
+static int cpq_front_merge_fn(request_queue_t *q, struct request *rq,
+                             struct buffer_head *bh, int max_segments)
+{
+        if (bh->b_data + bh->b_size == rq->bh->b_data)
+                return 1;
+        return cpq_new_segment(q, rq, max_segments);
+}
+
+static int cpq_merge_requests_fn(request_queue_t *q, struct request *rq,
+                                 struct request *nxt, int max_segments)
+{
+        int total_segments = rq->nr_segments + nxt->nr_segments;
+
+        if (rq->bhtail->b_data + rq->bhtail->b_size == nxt->bh->b_data)
+                total_segments--;
+
+        if (total_segments > MAXSGENTRIES)
+                return 0;
+
+        rq->nr_segments = total_segments;
+        return 1;
+}
+
 /* 
  * Get a request and submit it to the controller. 
  * Currently we do one request at a time.  Ideally we would like to send
  * everything to the controller on the first call, but there is a danger
  * of holding the io_request_lock for to long.  
  */
-static void do_cciss_request(int ctlr)
+static void do_cciss_request(request_queue_t *q)
 {
-	ctlr_info_t *h= hba[ctlr];
+	ctlr_info_t *h= q->queuedata; 
 	CommandList_struct *c;
 	int log_unit, start_blk, seg, sect;
 	char *lastdataend;
 	struct buffer_head *bh;
-	struct list_head *queue_head;
+	struct list_head *queue_head = &q->queue_head;
 	struct request *creq;
 	u64bit temp64;
 
-	queue_head = &blk_dev[MAJOR_NR+ctlr].request_queue.queue_head;	
-	if (list_empty(queue_head))
-	{
-		/* nothing to do... */
-		start_io(h);
-		return;
-	}
+	if (q->plugged || list_empty(queue_head)) {
+                start_io(h);
+                return;
+        }
+
 	creq =	blkdev_entry_next_request(queue_head); 
-	if ((creq == NULL) || (creq->rq_status == RQ_INACTIVE))
-	{
-		/* nothing to do... restart processing and return */ 
-		start_io(h);
-		return;
-	}
-	if ((ctlr != (MAJOR(creq->rq_dev)-MAJOR_NR)) || (ctlr > nr_ctlr)
-		|| (h == NULL))
-	{
-#ifdef CCISS_DEBUG
-		printk(KERN_WARNING "cciss: doreq cmd of %d, %x at %p\n",
-			ctlr, creq->rq_dev, creq);
-#endif /* CCISS_DEBUG */
-		complete_buffers(creq->bh, 0);
-		start_io(h); 
-		return;
-	}
+	if (creq->nr_segments > MAXSGENTRIES)
+                BUG();
+
+        if ((h->ctlr != MAJOR(creq->rq_dev)-MAJOR_NR) || (h->ctlr > nr_ctlr))
+        {
+                printk(KERN_WARNING "doreq cmd for %d, %x at %p\n",
+                                h->ctlr, creq->rq_dev, creq);
+                blkdev_dequeue_request(creq);
+                complete_buffers(creq->bh, 0);
+                start_io(h);
+                return;
+        }
+
 	if (( c = cmd_alloc(h)) == NULL)
 	{
 		start_io(h);
@@ -1229,7 +1252,7 @@ static void do_cciss_request(int ctlr)
 	log_unit = MINOR(creq->rq_dev) >> NWD_SHIFT; 
 	c->Header.ReplyQueue = 0;  // unused in simple mode
 	c->Header.Tag.lower = c->busaddr;  // use the physical address the cmd block for tag
-	c->Header.LUN.LogDev.VolId= hba[ctlr]->drv[log_unit].LunID;
+	c->Header.LUN.LogDev.VolId= hba[h->ctlr]->drv[log_unit].LunID;
 	c->Header.LUN.LogDev.Mode = 1;
 	c->Request.CDBLen = 10; // 12 byte commands not in FW yet;
 	c->Request.Type.Type =  TYPE_CMD; // It is a command. 
@@ -1238,10 +1261,10 @@ static void do_cciss_request(int ctlr)
 		(creq->cmd == READ) ? XFER_READ: XFER_WRITE; 
 	c->Request.Timeout = 0; // Don't time out	
 	c->Request.CDB[0] = (creq->cmd == READ) ? CCISS_READ : CCISS_WRITE;
-	start_blk = hba[ctlr]->hd[MINOR(creq->rq_dev)].start_sect + creq->sector;
+	start_blk = hba[h->ctlr]->hd[MINOR(creq->rq_dev)].start_sect + creq->sector;
+#ifdef CCISS_DEBUG
 	if (bh == NULL)
 		panic("cciss: bh== NULL?");
-#ifdef CCISS_DEBUG
 	printk(KERN_DEBUG "ciss: sector =%d nr_sectors=%d\n",(int) creq->sector,
 		(int) creq->nr_sectors);	
 #endif /* CCISS_DEBUG */
@@ -1251,38 +1274,27 @@ static void do_cciss_request(int ctlr)
 	while(bh)
 	{
 		sect += bh->b_size/512;
-		if (bh->b_size % 512)
-		{
-			printk(KERN_CRIT "cciss:  Oh Man.  %d+%d, size=%d\n", 
-				(int) creq->sector, sect, (int) bh->b_size);
-			panic("b_size 512 != 0\n");
-		}
 		if (bh->b_data == lastdataend)
 		{  // tack it on to the last segment 
 			c->SG[seg-1].Len +=bh->b_size;
 			lastdataend += bh->b_size;
 		} else
 		{
+			if (seg == MAXSGENTRIES)
+				BUG();
 			c->SG[seg].Len = bh->b_size;
 			temp64.val = (__u64) virt_to_bus(bh->b_data);
 			c->SG[seg].Addr.lower = temp64.val32.lower;
 			c->SG[seg].Addr.upper = temp64.val32.upper;
 			c->SG[0].Ext = 0;  // we are not chaining
 			lastdataend = bh->b_data + bh->b_size;
-			if( ++seg == MAXSGENTRIES)
-			{
-				break; 
-			}
+			seg++;
 		}
 		bh = bh->b_reqnext;
 	}
 	/* track how many SG entries we are using */ 
 	if( seg > h->maxSG)
 		h->maxSG = seg; 
-
-	/* adjusting the remaining request, if any */ 
-	creq-> sector+= sect;
-	creq->nr_sectors -= sect; 
 
 #ifdef CCISS_DEBUG
 	printk(KERN_DEBUG "cciss: Submitting %d sectors in %d segments\n", sect, seg);
@@ -1295,31 +1307,23 @@ static void do_cciss_request(int ctlr)
 	c->Request.CDB[4]= (start_blk >>  8) & 0xff;
 	c->Request.CDB[5]= start_blk & 0xff;
 	c->Request.CDB[6]= 0; // (sect >> 24) & 0xff; MSB
-	// c->Request.CDB[7]= (sect >> 16) & 0xff; 
 	c->Request.CDB[7]= (sect >>  8) & 0xff; 
 	c->Request.CDB[8]= sect & 0xff; 
 	c->Request.CDB[9] = c->Request.CDB[11] = c->Request.CDB[12] = 0;
 
-	/* check to see if we going to complete the entire request */ 
-	/* if so, mark this request as Done and ready the next one */ 
-	if (creq->nr_sectors)
-	{
-#ifdef CCISS_DEBUG
-		printk(KERN_DEBUG "cciss: More to do on the same request %p %ld\n", 
-			creq, creq->nr_sectors);
-#endif /* CCISS_DEBUG */
-
-		creq->bh = bh->b_reqnext;
-		bh->b_reqnext = NULL;
-	} else
-	{
-#ifdef CCISS_DEBUG
-		printk("cciss: Done with %p, queueing %p\n", creq);
-#endif /* CCISS_DEBUG */
 			
-		blkdev_dequeue_request(creq);
-		end_that_request_last(creq);
-	}
+	blkdev_dequeue_request(creq);
+
+	
+        /*
+         * ehh, we can't really end the request here since it's not
+         * even started yet. for now it shouldn't hurt though
+         */
+#ifdef CCISS_DEBUG
+	printk("Done with %p\n", creq);
+#endif /* CCISS_DEBUG */ 
+	end_that_request_last(creq);
+
 	addQ(&(h->reqQ),c);
 	h->Qdepth++;
 	if(h->Qdepth > h->maxQsinceinit)
@@ -1352,7 +1356,7 @@ static void do_cciss_intr(int irq, void *dev_id, struct pt_regs *regs)
 			a &= ~3;
 			if ((c = h->cmpQ) == NULL)
 			{  
-				printk(KERN_WARNING "cpqarray: Completion of %08lx ignored\n", (unsigned long)a1);
+				printk(KERN_WARNING "cciss: Completion of %08lx ignored\n", (unsigned long)a1);
 				continue;	
 			} 
 			while(c->busaddr != a) {
@@ -1379,7 +1383,7 @@ static void do_cciss_intr(int irq, void *dev_id, struct pt_regs *regs)
 	/*
 	 * See if we can queue up some more IO
 	 */
-	do_cciss_request(h->ctlr);
+	do_cciss_request(BLK_DEFAULT_QUEUE(MAJOR_NR + h->ctlr));
 	spin_unlock_irqrestore(&io_request_lock, flags);
 }
 /* 
@@ -1420,7 +1424,7 @@ static void print_cfg_table( CfgTable_struct *tb)
 	printk("   Heartbeat Counter = 0x%x\n\n\n", 
 			readl(&(tb->HeartBeat)));
 }
-#endif /* CCISS_DEBUG */
+#endif /* CCISS_DEBUG */ 
 
 static int cciss_pci_init(ctlr_info_t *c, unchar bus, unchar device_fn)
 {
@@ -1430,7 +1434,9 @@ static int cciss_pci_init(ctlr_info_t *c, unchar bus, unchar device_fn)
 	uint addr[6];
 	__u32 board_id;
 	struct pci_dev *pdev;
-
+	int cfg_offset;
+	int cfg_base_addr;
+	int cfg_base_addr_index;
 	int i;
 
 	pdev = pci_find_slot(bus, device_fn);
@@ -1473,15 +1479,38 @@ static int cciss_pci_init(ctlr_info_t *c, unchar bus, unchar device_fn)
 	 * Memory base addr is first addr , the second points to the config
          *   table
 	 */
-	c->paddr = pci_resource_start(pdev, 0);
-	c->vaddr = remap_pci_mem(c->paddr, 128);
-	c->cfgtable = (CfgTable_struct *) remap_pci_mem(addr[1], 
-						sizeof(CfgTable_struct));
+
+	c->paddr = addr[0] & 0xfffffff0; /* remove the addressing mode bits */
+#ifdef CCISS_DEBUG
+	printk("address 0 = %x\n", c->paddr);
+#endif /* CCISS_DEBUG */ 
+	c->vaddr = remap_pci_mem(c->paddr, 200);
+
+	/* get the address index number */
+	cfg_base_addr = readl(c->vaddr + SA5_CTCFG_OFFSET);
+	/* I am not prepared to deal with a 64 bit address value */
+	cfg_base_addr &= 0xffff;
+#ifdef CCISS_DEBUG
+	printk("cfg base address = %x\n", cfg_base_addr);
+#endif /* CCISS_DEBUG */
+	cfg_base_addr_index = (cfg_base_addr  - PCI_BASE_ADDRESS_0)/4;
+#ifdef CCISS_DEBUG
+	printk("cfg base address index = %x\n", cfg_base_addr_index);
+#endif /* CCISS_DEBUG */
+
+	cfg_offset = readl(c->vaddr + SA5_CTMEM_OFFSET);
+#ifdef CCISS_DEBUG
+	printk("cfg offset = %x\n", cfg_offset);
+#endif /* CCISS_DEBUG */
+	c->cfgtable = (CfgTable_struct *) 
+		remap_pci_mem((addr[cfg_base_addr_index] & 0xfffffff0)
+				+ cfg_offset, sizeof(CfgTable_struct));
 	c->board_id = board_id;
 
 #ifdef CCISS_DEBUG
 	print_cfg_table(c->cfgtable); 
 #endif /* CCISS_DEBUG */
+
 	for(i=0; i<NR_PRODUCTS; i++) {
 		if (board_id == products[i].board_id) {
 			c->product_name = products[i].product_name;
@@ -1493,6 +1522,14 @@ static int cciss_pci_init(ctlr_info_t *c, unchar bus, unchar device_fn)
 		printk(KERN_WARNING "cciss: Sorry, I don't know how"
 			" to access the Smart Array controller %08lx\n", 
 				(unsigned long)board_id);
+		return -1;
+	}
+	if (  (readb(&c->cfgtable->Signature[0]) != 'C') ||
+	      (readb(&c->cfgtable->Signature[1]) != 'I') ||
+	      (readb(&c->cfgtable->Signature[2]) != 'S') ||
+	      (readb(&c->cfgtable->Signature[3]) != 'S') )
+	{
+		printk("Does not appear to be a valid CISS config table\n");
 		return -1;
 	}
 #ifdef CCISS_DEBUG
@@ -1536,14 +1573,22 @@ static int cciss_pci_detect(void)
 
 	int index;
 	unchar bus=0, dev_fn=0;
-	
+
+	#define CCISS_BOARD_TYPES 2
+	static int cciss_device_id[CCISS_BOARD_TYPES] = { 
+		PCI_DEVICE_ID_COMPAQ_CISS, PCI_DEVICE_ID_COMPAQ_CISSB};
+	int brdtype;
+
+	/* search for all PCI board types that could be for this driver */
+	for(brdtype=0; brdtype<CCISS_BOARD_TYPES; brdtype++)
+	{
 		for(index=0; ; index++) {
 			if (pcibios_find_device(PCI_VENDOR_ID_COMPAQ,
-			 	PCI_DEVICE_ID_COMPAQ_CISS, 
+			 	cciss_device_id[brdtype], 
 					index, &bus, &dev_fn))
 				break;
 			printk(KERN_DEBUG "cciss: Device %x has been found at %x %x\n",
-				PCI_DEVICE_ID_COMPAQ_CISS, bus, dev_fn);
+				cciss_device_id[brdtype], bus, dev_fn);
 			if (index == 1000000) break;
 			if (nr_ctlr == 8) {
 				printk(KERN_WARNING "cciss: This driver"
@@ -1569,6 +1614,7 @@ static int cciss_pci_detect(void)
 			nr_ctlr++;
 
 		}
+	}
 	return nr_ctlr;
 
 }
@@ -1698,8 +1744,8 @@ static void cciss_getgeometry(int cntl_num)
 			printk(KERN_WARNING "cciss: read capacity failed\n");
 			total_size = block_size = 0; 
 		}	
-		printk("      blocks= %d block_size= %d\n", total_size,
-					block_size);
+		printk(KERN_INFO "      blocks= %d block_size= %d\n", 
+					total_size, block_size);
 
 		/* Execute the command to read the disk geometry */
 		memset(inq_buff, 0, sizeof(InquiryData_struct));
@@ -1759,13 +1805,7 @@ int __init cciss_init(void)
 {
 	int num_cntlrs_reg = 0;
 	int i,j;
-
-	void (*request_fns[MAX_CTLR])(request_queue_t *) = {
-                do_cciss_request0, do_cciss_request1,
-                do_cciss_request2, do_cciss_request3,
-                do_cciss_request4, do_cciss_request5,
-                do_cciss_request6, do_cciss_request7,
-        };
+	request_queue_t *q;
 
 	/* detect controllers */
 	cciss_pci_detect();
@@ -1834,15 +1874,22 @@ int __init cciss_init(void)
 		hba[i]->access.set_intr_mask(hba[i], CCISS_INTR_ON);
 
 		cciss_procinit(i);
-		
-		blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR+i),
-				request_fns[i]);
-		blk_queue_headactive(BLK_DEFAULT_QUEUE(MAJOR_NR+i), 0);
+
+		q = BLK_DEFAULT_QUEUE(MAJOR_NR + i);
+                q->queuedata = hba[i];
+                blk_init_queue(q, do_cciss_request);
+                blk_queue_headactive(q, 0);		
 
 		/* fill in the other Kernel structs */
 		blksize_size[MAJOR_NR+i] = hba[i]->blocksizes;
                 hardsect_size[MAJOR_NR+i] = hba[i]->hardsizes;
                 read_ahead[MAJOR_NR+i] = READ_AHEAD;
+
+		/* Set the pointers to queue functions */ 
+		q->back_merge_fn = cpq_back_merge_fn;
+                q->front_merge_fn = cpq_front_merge_fn;
+                q->merge_requests_fn = cpq_merge_requests_fn;
+
 
 		/* Fill in the gendisk data */ 	
 		hba[i]->gendisk.major = MAJOR_NR + i;

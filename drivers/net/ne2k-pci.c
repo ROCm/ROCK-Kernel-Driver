@@ -202,6 +202,10 @@ static int __devinit ne2k_pci_init_one (struct pci_dev *pdev,
 	if (fnd_cnt++ == 0)
 		printk(KERN_INFO "%s" KERN_INFO "%s", version1, version2);
 
+	i = pci_enable_device (pdev);
+	if (i)
+		return i;
+
 	ioaddr = pci_resource_start (pdev, 0);
 	irq = pdev->irq;
 
@@ -209,10 +213,6 @@ static int __devinit ne2k_pci_init_one (struct pci_dev *pdev,
 		printk (KERN_ERR "ne2k-pci: no I/O resource at PCI BAR #0\n");
 		return -ENODEV;
 	}
-
-	i = pci_enable_device (pdev);
-	if (i)
-		return i;
 
 	if (request_region (ioaddr, NE_IO_EXTENT, "ne2k-pci") == NULL) {
 		printk (KERN_ERR "ne2k-pci: I/O resource 0x%x @ 0x%lx busy\n",

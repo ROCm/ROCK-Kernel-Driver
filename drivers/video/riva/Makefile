@@ -9,7 +9,7 @@
 
 O_TARGET := rivafb.o
 
-obj-y    := fbdev.o riva_hw.o
+obj-y    := fbdev.o riva_hw.o accel.o
 obj-m    := $(O_TARGET)
 
 include $(TOPDIR)/Rules.make

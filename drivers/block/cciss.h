@@ -94,8 +94,13 @@ struct ctlr_info
 #define SA5_REPLY_PORT_OFFSET		0x44
 #define SA5_INTR_STATUS		0x30
 
+#define SA5_CTCFG_OFFSET	0xB4
+#define SA5_CTMEM_OFFSET	0xB8
+
 #define SA5_INTR_OFF		0x08
+#define SA5B_INTR_OFF		0x04
 #define SA5_INTR_PENDING	0x08
+#define SA5B_INTR_PENDING	0x04
 #define FIFO_EMPTY		0xffffffff	
 
 #define  CISS_ERROR_BIT		0x02
@@ -131,6 +136,22 @@ static void SA5_intr_mask(ctlr_info_t *h, unsigned long val)
         	writel( SA5_INTR_OFF, 
 			h->vaddr + SA5_REPLY_INTR_MASK_OFFSET);
 	}
+}
+/*
+ *  This card is the oposite of the other cards.
+ *   0 turns interrupts on...
+ *   0x04 turns them off...
+ */
+static void SA5B_intr_mask(ctlr_info_t *h, unsigned long val)
+{
+        if (val)
+        { /* Turn interrupts on */
+                writel(0, h->vaddr + SA5_REPLY_INTR_MASK_OFFSET);
+        } else /* Turn them off */
+        {
+                writel( SA5B_INTR_OFF,
+                        h->vaddr + SA5_REPLY_INTR_MASK_OFFSET);
+        }
 }
 /*
  *  Returns true if fifo is full.  
@@ -183,6 +204,21 @@ static unsigned long SA5_intr_pending(ctlr_info_t *h)
 	return 0 ;
 }
 
+/*
+ *      Returns true if an interrupt is pending..
+ */
+static unsigned long SA5B_intr_pending(ctlr_info_t *h)
+{
+        unsigned long register_value  =
+                readl(h->vaddr + SA5_INTR_STATUS);
+#ifdef CCISS_DEBUG
+        printk("cciss: intr_pending %lx\n", register_value);
+#endif  /* CCISS_DEBUG */
+        if( register_value &  SA5B_INTR_PENDING)
+                return  1;
+        return 0 ;
+}
+
 
 static struct access_method SA5_access = {
 	SA5_submit_command,
@@ -190,6 +226,14 @@ static struct access_method SA5_access = {
 	SA5_fifo_full,
 	SA5_intr_pending,
 	SA5_completed,
+};
+
+static struct access_method SA5B_access = {
+        SA5_submit_command,
+        SA5B_intr_mask,
+        SA5_fifo_full,
+        SA5B_intr_pending,
+        SA5_completed,
 };
 
 struct board_type {

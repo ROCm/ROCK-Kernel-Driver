@@ -139,8 +139,9 @@ struct serial_uart_config {
 #define ASYNC_CHECK_CD		0x02000000 /* i.e., CLOCAL */
 #define ASYNC_SHARE_IRQ		0x01000000 /* for multifunction cards
 					     --- no longer used */
+#define ASYNC_NO_FLOW		0x00800000 /* No flow control serial console */
 
-#define ASYNC_INTERNAL_FLAGS	0xFF000000 /* Internal flags */
+#define ASYNC_INTERNAL_FLAGS	0xFF800000 /* Internal flags */
 
 /*
  * Multiport serial configuration structure --- external structure
@@ -177,5 +178,7 @@ struct serial_icounter_struct {
 extern int register_serial(struct serial_struct *req);
 extern void unregister_serial(int line);
 
+/* Allow complicated architectures to specify rs_table[] at run time */
+extern int early_serial_setup(struct serial_struct *req);
 #endif /* __KERNEL__ */
 #endif /* _LINUX_SERIAL_H */

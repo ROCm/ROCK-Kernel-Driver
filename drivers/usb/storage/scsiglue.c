@@ -248,7 +248,7 @@ static int bus_reset( Scsi_Cmnd *srb )
         for (i = 0; i < us->pusb_dev->actconfig->bNumInterfaces; i++) {
  		struct usb_interface *intf =
 			&us->pusb_dev->actconfig->interface[i];
-		struct usb_device_id *id;
+		const struct usb_device_id *id;
 
 		/* if this is an unclaimed interface, skip it */
 		if (!intf->driver) {

@@ -1458,6 +1458,8 @@ int pcmcia_register_client(client_handle_t *handle, client_reg_t *req)
 	    s->functions = 1;
 	s->config = kmalloc(sizeof(config_t) * s->functions,
 			    GFP_KERNEL);
+	if (!s->config)
+		return CS_OUT_OF_RESOURCE;
 	memset(s->config, 0, sizeof(config_t) * s->functions);
     }
     

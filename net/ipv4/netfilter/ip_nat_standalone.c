@@ -330,11 +330,9 @@ static void __exit fini(void)
 module_init(init);
 module_exit(fini);
 
-#ifdef MODULE
 EXPORT_SYMBOL(ip_nat_setup_info);
 EXPORT_SYMBOL(ip_nat_helper_register);
 EXPORT_SYMBOL(ip_nat_helper_unregister);
 EXPORT_SYMBOL(ip_nat_expect_register);
 EXPORT_SYMBOL(ip_nat_expect_unregister);
 EXPORT_SYMBOL(ip_nat_cheat_check);
-#endif

@@ -414,6 +414,8 @@ static int bind_request(int i, bind_info_t *bind_info)
     /* Add binding to list for this socket */
     driver->use_count++;
     b = kmalloc(sizeof(socket_bind_t), GFP_KERNEL);
+    if (!b) 
+      return -ENOMEM;
     b->driver = driver;
     b->function = bind_info->function;
     b->instance = NULL;

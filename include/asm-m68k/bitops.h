@@ -228,7 +228,7 @@ extern __inline__ int ffs(int x)
 {
 	int cnt;
 
-	asm ("bfffo %1{#0:#0}" : "=d" (cnt) : "dm" (x & -x));
+	asm ("bfffo %1{#0:#0},%0" : "=d" (cnt) : "dm" (x & -x));
 
 	return 32 - cnt;
 }

@@ -41,6 +41,7 @@ To add: #define SO_REUSEPORT 0x0200	/* Allow local address and port reuse.  */
 #define SO_RCVLOWAT	0x1004	/* receive low-water mark */
 #define SO_SNDTIMEO	0x1005	/* send timeout */
 #define SO_RCVTIMEO 	0x1006	/* receive timeout */
+#define SO_ACCEPTCONN	0x1007
 
 /* linux-specific, might as well be the same as on i386 */
 #define SO_NO_CHECK	11

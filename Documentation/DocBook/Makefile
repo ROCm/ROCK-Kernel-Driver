@@ -81,6 +81,7 @@ APISOURCES :=	$(TOPDIR)/drivers/media/video/videodev.c \
 		$(TOPDIR)/fs/devfs/base.c \
 		$(TOPDIR)/kernel/pm.c \
 		$(TOPDIR)/kernel/ksyms.c \
+		$(TOPDIR)/kernel/kmod.c \
 		$(TOPDIR)/net/netsyms.c
  
 kernel-api.sgml: kernel-api.tmpl $(APISOURCES)

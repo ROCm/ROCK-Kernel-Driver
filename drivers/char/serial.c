@@ -54,6 +54,9 @@
  *  7/00: fix some returns on failure not using MOD_DEC_USE_COUNT.
  *	  Arnaldo Carvalho de Melo <acme@conectiva.com.br>
  *
+ * 10/00: add in optional hardware flow control for serial console.
+ *	  Kanoj Sarcar <kanoj@sgi.com>
+ *
  * This module exports the following rs232 io functions:
  *
  *	int rs_init(void);
@@ -5252,6 +5255,36 @@ static int __init rs_init(void)
 }
 
 /*
+ * This is for use by architectures that know their serial port
+ * attributes only at run time. Not to be invoked after rs_init().
+ */
+int __init early_serial_setup(struct serial_struct *req)
+{
+	int i = req->line;
+
+	if (i >= NR_IRQS)
+		return(-ENOENT);
+	rs_table[i].magic = 0;
+	rs_table[i].baud_base = req->baud_base;
+	rs_table[i].port = req->port;
+	if (HIGH_BITS_OFFSET)
+		rs_table[i].port += (unsigned long) req->port_high << 
+							HIGH_BITS_OFFSET;
+	rs_table[i].irq = req->irq;
+	rs_table[i].flags = req->flags;
+	rs_table[i].close_delay = req->close_delay;
+	rs_table[i].io_type = req->io_type;
+	rs_table[i].hub6 = req->hub6;
+	rs_table[i].iomem_base = req->iomem_base;
+	rs_table[i].iomem_reg_shift = req->iomem_reg_shift;
+	rs_table[i].type = req->type;
+	rs_table[i].xmit_fifo_size = req->xmit_fifo_size;
+	rs_table[i].custom_divisor = req->custom_divisor;
+	rs_table[i].closing_wait = req->closing_wait;
+	return(0);
+}
+
+/*
  * register_serial and unregister_serial allows for 16x50 serial ports to be
  * configured at run-time, to support PCMCIA modems.
  */
@@ -5461,6 +5494,10 @@ static inline void wait_for_xmitr(struct async_struct *info)
 		if (--tmout == 0)
 			break;
 	} while((status & BOTH_EMPTY) != BOTH_EMPTY);
+	if (info->flags & ASYNC_NO_FLOW)
+		return;
+	tmout = 1000000;
+	while (--tmout && ((serial_in(info, UART_MSR) & UART_MSR_CTS) == 0));
 }
 
 
@@ -5543,7 +5580,7 @@ static kdev_t serial_console_device(struct console *c)
 }
 
 /*
- *	Setup initial baud/bits/parity. We do two things here:
+ *	Setup initial baud/bits/parity/flow. We do two things here:
  *	- construct a cflag setting for the first rs_open()
  *	- initialize the serial port
  *	Return non-zero if we didn't find a serial port.
@@ -5556,6 +5593,7 @@ static int __init serial_console_setup(struct console *co, char *options)
 	int	baud = 9600;
 	int	bits = 8;
 	int	parity = 'n';
+	int	doflow = 0;
 	int	cflag = CREAD | HUPCL | CLOCAL;
 	int	quot = 0;
 	char	*s;
@@ -5566,7 +5604,9 @@ static int __init serial_console_setup(struct console *co, char *options)
 		while(*s >= '0' && *s <= '9')
 			s++;
 		if (*s) parity = *s++;
-		if (*s) bits   = *s - '0';
+		if (*s) bits   = *s++ - '0';
+		if ((*s) && (!strcmp(s, "rtscts")))
+			doflow = 1;
 	}
 
 	/*
@@ -5622,6 +5662,8 @@ static int __init serial_console_setup(struct console *co, char *options)
 	 *	Divisor, bytesize and parity
 	 */
 	state = rs_table + co->index;
+	if (doflow == 0)
+		state->flags |= ASYNC_NO_FLOW;
 	info = &async_sercons;
 	info->magic = SERIAL_MAGIC;
 	info->state = state;

@@ -44,6 +44,8 @@
  *   Val Henson <vhenson@esscom.com>:    Reset Jumbo skb producer and
  *                                       rx producer index when
  *                                       flushing the Jumbo ring.
+ *   Hans Grobler <grobh@sun.ac.za>:     Memory leak fixes in the
+ *                                       driver init path.
  */
 
 #include <linux/config.h>
@@ -77,7 +79,6 @@
 
 
 #undef INDEX_DEBUG
-#define TX_HOST_RING	1
 
 #ifdef CONFIG_ACENIC_OMIT_TIGON_I
 #define ACE_IS_TIGON_I(ap)	0
@@ -151,6 +152,11 @@ MODULE_DEVICE_TABLE(pci, acenic_pci_tbl);
 #define __exit
 #endif
 
+#ifndef __devinit
+#define __devinit	__init
+#endif
+
+
 #ifndef SMP_CACHE_BYTES
 #define SMP_CACHE_BYTES	L1_CACHE_BYTES
 #endif
@@ -188,6 +194,8 @@ static inline void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
 	void *virt_ptr;
 
 	virt_ptr = kmalloc(size, GFP_KERNEL);
+	if (!virt_ptr)
+		return NULL;
 	*dma_handle = virt_to_bus(virt_ptr);
 	return virt_ptr;
 }
@@ -481,15 +489,15 @@ static int tx_ratio[ACE_MAX_MOD_PARMS];
 static int dis_pci_mem_inval[ACE_MAX_MOD_PARMS] = {1, 1, 1, 1, 1, 1, 1, 1};
 
 static char version[] __initdata = 
-  "acenic.c: v0.49 12/13/2000  Jes Sorensen, linux-acenic@SunSITE.auc.dk\n"
+  "acenic.c: v0.50 02/02/2001  Jes Sorensen, linux-acenic@SunSITE.dk\n"
   "                            http://home.cern.ch/~jes/gige/acenic.html\n";
 
-static struct net_device *root_dev = NULL;
+static struct net_device *root_dev;
 
 static int probed __initdata = 0;
 
 
-int __init acenic_probe (ACE_PROBE_ARG)
+int __devinit acenic_probe (ACE_PROBE_ARG)
 {
 #ifdef NEW_NETINIT
 	struct net_device *dev;
@@ -658,12 +666,19 @@ int __init acenic_probe (ACE_PROBE_ARG)
 			printk(KERN_ERR "%s: Driver compiled without Tigon I"
 			       " support - NIC disabled\n", dev->name);
 			ace_init_cleanup(dev);
+			kfree(dev);
 			continue;
 		}
 #endif
 
-		if (ace_allocate_descriptors(dev))
+		if (ace_allocate_descriptors(dev)) {
+			/*
+			 * ace_allocate_descriptors() calls
+			 * ace_init_cleanup() on error.
+			 */
+			kfree(dev);
 			continue;
+		}
 
 #ifdef MODULE
 		if (boards_found >= ACE_MAX_MOD_PARMS)
@@ -674,8 +689,13 @@ int __init acenic_probe (ACE_PROBE_ARG)
 		ap->board_idx = BOARD_IDX_STATIC;
 #endif
 
-		if (ace_init(dev))
+		if (ace_init(dev)) {
+			/*
+			 * ace_init() calls ace_init_cleanup() on error.
+			 */
+			kfree(dev);
 			continue;
+		}
 
 		boards_found++;
 	}
@@ -705,7 +725,7 @@ MODULE_PARM(max_rx_desc, "1-" __MODULE_STRING(8) "i");
 #endif
 
 
-void __exit ace_module_cleanup(void)
+static void __exit ace_module_cleanup(void)
 {
 	struct ace_private *ap;
 	struct ace_regs *regs;
@@ -1006,9 +1026,14 @@ static int __init ace_init(struct net_device *dev)
 	 * This will most likely need BYTE_SWAP once we switch
 	 * to using __raw_writel()
 	 */
-	writel((WORD_SWAP | CLR_INT |
-		((WORD_SWAP | CLR_INT) << 24)),
+#ifdef __parisc__
+	writel((WORD_SWAP | BYTE_SWAP | CLR_INT |
+		((WORD_SWAP | BYTE_SWAP | CLR_INT) << 24)),
 	       &regs->HostCtrl);
+#else
+	writel((WORD_SWAP | CLR_INT | ((WORD_SWAP | CLR_INT) << 24)),
+	       &regs->HostCtrl);
+#endif
 #else
 	writel((CLR_INT | WORD_SWAP | ((CLR_INT | WORD_SWAP) << 24)),
 	       &regs->HostCtrl);
@@ -1026,7 +1051,7 @@ static int __init ace_init(struct net_device *dev)
 	switch(tig_ver){
 #ifndef CONFIG_ACENIC_OMIT_TIGON_I
 	case 4:
-		printk(KERN_INFO"  Tigon I  (Rev. 4), Firmware: %i.%i.%i, ",
+		printk(KERN_INFO "  Tigon I  (Rev. 4), Firmware: %i.%i.%i, ",
 		       tigonFwReleaseMajor, tigonFwReleaseMinor,
 		       tigonFwReleaseFix);
 		writel(0, &regs->LocalCtrl);
@@ -1034,7 +1059,7 @@ static int __init ace_init(struct net_device *dev)
 		break;
 #endif
 	case 6:
-		printk(KERN_INFO"  Tigon II (Rev. %i), Firmware: %i.%i.%i, ",
+		printk(KERN_INFO "  Tigon II (Rev. %i), Firmware: %i.%i.%i, ",
 		       tig_ver, tigon2FwReleaseMajor, tigon2FwReleaseMinor,
 		       tigon2FwReleaseFix);
 		writel(readl(&regs->CpuBCtrl) | CPU_HALT, &regs->CpuBCtrl);
@@ -1048,8 +1073,8 @@ static int __init ace_init(struct net_device *dev)
 		ap->version = 2;
 		break;
 	default:
-		printk(KERN_INFO"  Unsupported Tigon version detected (%i), ",
-		       tig_ver);
+		printk(KERN_WARNING "  Unsupported Tigon version detected "
+		       "(%i), ", tig_ver);
 		ecode = -ENODEV;
 		goto init_error;
 	}
@@ -2040,6 +2065,7 @@ static void ace_rx_int(struct net_device *dev, u32 rxretprd, u32 rxretcsm)
 
 		netif_rx(skb);		/* send it up */
 
+		dev->last_rx = jiffies;
 		ap->stats.rx_packets++;
 		ap->stats.rx_bytes += retdesc->size;
 

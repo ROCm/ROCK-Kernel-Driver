@@ -249,12 +249,6 @@ static const struct gtype##_id * __module_##gtype##_table \
   __attribute__ ((unused)) = name
 #define MODULE_DEVICE_TABLE(type,name)		\
   MODULE_GENERIC_TABLE(type##_device,name)
-/* not put to .modinfo section to avoid section type conflicts */
-
-/* The attributes of a section are set the first time the section is
-   seen; we want .modinfo to not be allocated.  */
-
-__asm__(".section .modinfo\n\t.previous");
 
 /* Define the module variable, and usage macros.  */
 extern struct module __this_module;

@@ -415,7 +415,8 @@ acpi_aml_write_field_data_with_update_rule (
 
 		/* Check if update rule needs to be applied (not if mask is all ones) */
 
-		if (((1 << bit_granularity) -1) & ~mask) {
+		/* The left shift drops the bits we want to ignore. */
+	  	if ((~mask << (sizeof(mask)*8 - bit_granularity)) != 0) {
 			/*
 			 * Read the current contents of the byte/word/dword containing
 			 * the field, and merge with the new field value.

@@ -6,6 +6,8 @@ Supported Cards:
 This driver is known to work with the following cards:
 
 	* SA 5300
+	* SA 5i 
+	* SA 532
 
 If notes are not already created in the /dev/cciss directory
 

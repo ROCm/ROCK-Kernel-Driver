@@ -72,19 +72,19 @@ static int wait_for_packet(struct sock * sk, int *err, long *timeo_p)
 	/* Socket errors? */
 	error = sock_error(sk);
 	if (error)
-		goto out;
+		goto out_err;
 
 	if (!skb_queue_empty(&sk->receive_queue))
 		goto ready;
 
 	/* Socket shut down? */
 	if (sk->shutdown & RCV_SHUTDOWN)
-		goto out;
+		goto out_noerr;
 
 	/* Sequenced packets can come disconnected. If so we report the problem */
 	error = -ENOTCONN;
 	if(connection_based(sk) && !(sk->state==TCP_ESTABLISHED || sk->state==TCP_LISTEN))
-		goto out;
+		goto out_err;
 
 	/* handle signals */
 	if (signal_pending(current))
@@ -99,11 +99,16 @@ ready:
 
 interrupted:
 	error = sock_intr_errno(*timeo_p);
+out_err:
+	*err = error;
 out:
 	current->state = TASK_RUNNING;
 	remove_wait_queue(sk->sleep, &wait);
-	*err = error;
 	return error;
+out_noerr:
+	*err = 0;
+	error = 1;
+	goto out;
 }
 
 /*
