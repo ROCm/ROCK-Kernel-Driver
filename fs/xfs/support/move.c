@@ -38,57 +38,37 @@
 #include "debug.h"
 #include "move.h"
 
-/*
- * Move "n" bytes at byte address "cp"; "rw" indicates the direction
- * of the move, and the I/O parameters are provided in "uio", which is
- * update to reflect the data which was moved.  Returns 0 on success or
- * a non-zero errno on failure.
+/* Read from kernel buffer at src to user/kernel buffer defined
+ * by the uio structure. Advance the pointer in the uio struct
+ * as we go.
  */
 int
-uiomove(void *cp, size_t n, enum uio_rw rw, struct uio *uio)
+uio_read(caddr_t src, size_t len, struct uio *uio)
 {
-	register struct iovec *iov;
+	struct iovec *iov;
 	u_int cnt;
 	int error;
 
-	while (n > 0 && uio->uio_resid) {
+	if (len > 0 && uio->uio_resid) {
 		iov = uio->uio_iov;
 		cnt = (u_int)iov->iov_len;
-		if (cnt == 0) {
-			uio->uio_iov++;
-			uio->uio_iovcnt--;
-			continue;
-		}
-		if (cnt > n)
-			cnt = (u_int)n;
-		switch (uio->uio_segflg) {
-		case UIO_USERSPACE:
-			if (rw == UIO_READ)
-				error = copy_to_user(iov->iov_base, cp, cnt);
-			else
-				error = copy_from_user(cp, iov->iov_base, cnt);
+		if (cnt == 0)
+			return 0;
+		if (cnt > len)
+			cnt = (u_int)len;
+		if (uio->uio_segflg == UIO_USERSPACE) {
+			error = copy_to_user(iov->iov_base, src, cnt);
 			if (error)
 				return EFAULT;
-			break;
-
-
-		case UIO_SYSSPACE:
-			if (rw == UIO_READ)
-				memcpy(iov->iov_base, cp, cnt);
-			else
-				memcpy(cp, iov->iov_base, cnt);
-			break;
-
-		default:
+		} else if (uio->uio_segflg == UIO_SYSSPACE) {
+			memcpy(iov->iov_base, src, cnt);
+		} else {
 			ASSERT(0);
-			break;
 		}
 		iov->iov_base = (void *)((char *)iov->iov_base + cnt);
 		iov->iov_len -= cnt;
 		uio->uio_resid -= cnt;
 		uio->uio_offset += cnt;
-		cp = (void *)((char *)cp + cnt);
-		n -= cnt;
 	}
 	return 0;
 }

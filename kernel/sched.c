@@ -1707,7 +1707,7 @@ void __wake_up_sync(wait_queue_head_t *q, unsigned int mode, int nr_exclusive)
 	spin_unlock_irqrestore(&q->lock, flags);
 }
 
-EXPORT_SYMBOL(__wake_up_sync);
+EXPORT_SYMBOL_GPL(__wake_up_sync);	/* For internal use only */
 
 void complete(struct completion *x)
 {
@@ -1962,7 +1962,7 @@ int idle_cpu(int cpu)
 	return cpu_curr(cpu) == cpu_rq(cpu)->idle;
 }
 
-EXPORT_SYMBOL(idle_cpu);
+EXPORT_SYMBOL_GPL(idle_cpu);
 
 /**
  * find_process_by_pid - find a process with a matching PID value.
@@ -2465,7 +2465,7 @@ static void show_task(task_t * p)
 		unsigned long * n = (unsigned long *) (p->thread_info+1);
 		while (!*n)
 			n++;
-		free = (unsigned long) n - (unsigned long)(p+1);
+		free = (unsigned long) n - (unsigned long)(p->thread_info+1);
 	}
 	printk("%5lu %5d %6d ", free, p->pid, p->parent->pid);
 	if ((relative = eldest_child(p)))

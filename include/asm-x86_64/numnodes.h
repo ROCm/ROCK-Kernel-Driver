@@ -3,10 +3,7 @@
 
 #include <linux/config.h>
 
-#ifdef CONFIG_DISCONTIGMEM
-#define MAX_NUMNODES 8	/* APIC limit currently */
-#else
-#define MAX_NUMNODES 1
-#endif
+/* Max 8 Nodes - APIC limit currently */
+#define NODES_SHIFT	3
 
 #endif

@@ -31,7 +31,6 @@
 #error CONFIG_ACPI_SRAT not defined, and srat.h header has been included
 #endif
 
-#define MAX_NUMNODES		8
 extern int get_memcfg_from_srat(void);
 extern unsigned long *get_zholes_size(int);
 

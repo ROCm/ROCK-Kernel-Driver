@@ -26,7 +26,6 @@
 /* #define _CPIA_DEBUG_  1 */  
 
 #include <linux/config.h>
-#include <linux/version.h>
 
 #include <linux/module.h>
 #include <linux/init.h>

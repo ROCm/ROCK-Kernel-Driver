@@ -915,6 +915,8 @@ int unregister_netdevice_notifier(struct notifier_block *nb)
 
 /**
  *	call_netdevice_notifiers - call all network notifier blocks
+ *      @val: value passed unmodified to notifier function
+ *      @v:   pointer passed unmodified to notifier function
  *
  *	Call all network notifier blocks.  Parameters and return value
  *	are as for notifier_call_chain().
@@ -1576,9 +1578,13 @@ int netif_receive_skb(struct sk_buff *skb)
 		}
 	}
 
-	if (pt_prev)
-		ret = deliver_skb(skb, pt_prev, 1);
-	else {
+	if (pt_prev) {
+		if (!pt_prev->data) {
+			ret = deliver_to_old_ones(pt_prev, skb, 1);
+		} else {
+			ret = pt_prev->func(skb, skb->dev, pt_prev);
+		}
+	} else {
 		kfree_skb(skb);
 		/* Jamal, now you will not able to escape explaining
 		 * me how you were going to use this. :-)

@@ -1084,7 +1084,7 @@ static void fill_prstatus(struct elf_prstatus *prstatus,
 	prstatus->pr_pid = p->pid;
 	prstatus->pr_ppid = p->parent->pid;
 	prstatus->pr_pgrp = process_group(p);
-	prstatus->pr_sid = p->session;
+	prstatus->pr_sid = process_session(p);
 	jiffies_to_timeval(p->utime, &prstatus->pr_utime);
 	jiffies_to_timeval(p->stime, &prstatus->pr_stime);
 	jiffies_to_timeval(p->cutime, &prstatus->pr_cutime);
@@ -1112,7 +1112,7 @@ static void fill_psinfo(struct elf_prpsinfo *psinfo, struct task_struct *p,
 	psinfo->pr_pid = p->pid;
 	psinfo->pr_ppid = p->parent->pid;
 	psinfo->pr_pgrp = process_group(p);
-	psinfo->pr_sid = p->session;
+	psinfo->pr_sid = process_session(p);
 
 	i = p->state ? ffz(~p->state) + 1 : 0;
 	psinfo->pr_state = i;

@@ -4,11 +4,15 @@
 #include <linux/config.h>
 
 #ifdef CONFIG_X86_NUMAQ
-#include <asm/numaq.h>
-#elif CONFIG_ACPI_SRAT
-#include <asm/srat.h>
-#else
-#define MAX_NUMNODES	1
+
+/* Max 16 Nodes */
+#define NODES_SHIFT	4
+
+#elif defined(CONFIG_ACPI_SRAT)
+
+/* Max 8 Nodes */
+#define NODES_SHIFT	3
+
 #endif /* CONFIG_X86_NUMAQ */
 
 #endif /* _ASM_MAX_NUMNODES_H */

@@ -128,6 +128,7 @@ struct dongle_reg {
 	void (*close)(dongle_t *dongle);
 	int  (*reset)(struct irda_task *task);
 	int  (*change_speed)(struct irda_task *task);
+	struct module *owner;
 };
 
 /* 

@@ -19,7 +19,7 @@ config VIDEO_DEV
 
 	  Documentation for the original API is included in the file
 	  Documentation/video4linux/API.html.  Documentation for V4L2 is
-	  available on the web at http://bytesex.org/v4l/
+	  available on the web at <http://bytesex.org/v4l/>.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called videodev.

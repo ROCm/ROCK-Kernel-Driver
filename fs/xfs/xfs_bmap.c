@@ -5553,7 +5553,7 @@ xfs_getbmap(
 	    && DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_READ)
 	    && whichfork == XFS_DATA_FORK) {
 
-		error = XFS_SEND_DATA(mp, DM_EVENT_READ, bdp, 0, 0, 0, NULL);
+		error = XFS_SEND_DATA(mp, DM_EVENT_READ, vp, 0, 0, 0, NULL);
 		if (error)
 			return XFS_ERROR(error);
 	}

@@ -6,7 +6,6 @@
 #include <linux/ide.h>
 
 static void init_hwif_ns87415(ide_hwif_t *);
-static void init_dma_ns87415(ide_hwif_t *, unsigned long);
 
 static ide_pci_device_t ns87415_chipsets[] __devinitdata = {
 	{	/* 0 */
@@ -16,7 +15,6 @@ static ide_pci_device_t ns87415_chipsets[] __devinitdata = {
 		.init_chipset	= NULL,
 		.init_iops	= NULL,
 		.init_hwif	= init_hwif_ns87415,
-                .init_dma	= init_dma_ns87415,
 		.channels	= 2,
 		.autodma	= AUTODMA,
 		.enablebits	= {{0x00,0x00,0x00}, {0x00,0x00,0x00}},

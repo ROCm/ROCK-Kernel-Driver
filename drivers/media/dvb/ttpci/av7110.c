@@ -55,10 +55,8 @@
 #include <linux/ptrace.h>
 #include <linux/ioport.h>
 #include <linux/in.h>
-#include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/pci.h>
-#include <linux/init.h>
 #include <linux/vmalloc.h>
 #include <linux/netdevice.h>
 #include <linux/inetdevice.h>
@@ -4745,12 +4743,19 @@ static struct saa7146_extension av7110_extension = {
 
 static int __init av7110_init(void) 
 {
-	if (saa7146_register_extension(&av7110_extension))
-		return -ENODEV;
+	int retval;
+	retval = saa7146_register_extension(&av7110_extension);
+	if (retval)
+		goto failed_saa7146_register;
 	
-	av7110_ir_init();
-
+	retval = av7110_ir_init();
+	if (retval)
+		goto failed_av7110_ir_init;
 	return 0;
+failed_av7110_ir_init:
+	saa7146_unregister_extension(&av7110_extension);
+failed_saa7146_register:
+	return retval;
 }
 
 

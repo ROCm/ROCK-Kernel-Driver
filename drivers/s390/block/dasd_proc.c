@@ -9,7 +9,7 @@
  *
  * /proc interface for the dasd driver.
  *
- * $Revision: 1.22 $
+ * $Revision: 1.23 $
  */
 
 #include <linux/config.h>
@@ -59,7 +59,7 @@ dasd_devices_show(struct seq_file *m, void *v)
 	if (IS_ERR(device))
 		return 0;
 	/* Print device number. */
-	seq_printf(m, "%04x", _ccw_device_get_device_number(device->cdev));
+	seq_printf(m, "%s", device->cdev->dev.bus_id);
 	/* Print discipline string. */
 	if (device != NULL && device->discipline != NULL)
 		seq_printf(m, "(%s)", device->discipline->name);

@@ -15,7 +15,6 @@
 #include <linux/mm.h>
 #include <linux/init.h>
 #include <linux/bootmem.h>
-#include <linux/mmzone.h>
 #include <asm/numa.h>
 
 /*
@@ -29,7 +28,7 @@ struct node_cpuid_s node_cpuid[NR_CPUS];
  * This is a matrix with "distances" between nodes, they should be
  * proportional to the memory access latency ratios.
  */
-u8 numa_slit[NR_NODES * NR_NODES];
+u8 numa_slit[MAX_NUMNODES * MAX_NUMNODES];
 
 /* Identify which cnode a physical address resides on */
 int

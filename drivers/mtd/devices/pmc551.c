@@ -82,6 +82,7 @@
  *       * Comb the init routine.  It's still a bit cludgy on a few things.
  */
 
+#include <linux/version.h>
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/module.h>

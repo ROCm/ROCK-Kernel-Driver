@@ -240,7 +240,6 @@
 #include "sxwindow.h"
 
 #include <linux/generic_serial.h>
-#include <asm/uaccess.h>
 #include "sx.h"
 
 

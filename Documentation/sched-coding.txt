@@ -47,7 +47,7 @@ The routines
 
 and
 
-	double_rq_unlock(runqueue_t *rq1, runqueue_t rq2)
+	double_rq_unlock(runqueue_t *rq1, runqueue_t *rq2)
 
 safely lock and unlock, respectively, the two specified runqueues.  They do
 not, however, disable and restore interrupts.  Users are required to do so

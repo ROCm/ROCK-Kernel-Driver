@@ -23,7 +23,6 @@ Qua Jun 27 15:02:26 BRT 2001
 
 /* #define DEBUG_DZ 1 */
 
-#include <linux/version.h>
 #include <linux/module.h>
 
 #include <linux/config.h>

@@ -33,7 +33,6 @@ static ide_pci_host_proc_t hpt34x_procs[] __initdata = {
 
 static unsigned int init_chipset_hpt34x(struct pci_dev *, const char *);
 static void init_hwif_hpt34x(ide_hwif_t *);
-static void init_dma_hpt34x(ide_hwif_t *, unsigned long);
 
 static ide_pci_device_t hpt34x_chipsets[] __devinitdata = {
 	{	/* 0 */
@@ -43,7 +42,6 @@ static ide_pci_device_t hpt34x_chipsets[] __devinitdata = {
 		.init_chipset	= init_chipset_hpt34x,
 		.init_iops	= NULL,
 		.init_hwif	= init_hwif_hpt34x,
-		.init_dma	= init_dma_hpt34x,
 		.channels	= 2,
 		.autodma	= NOAUTODMA,
 		.enablebits	= {{0x00,0x00,0x00}, {0x00,0x00,0x00}},

@@ -33,4 +33,13 @@ typedef struct {
 	unsigned int edi __attribute__ ((packed));
 } SMMRegisters;
 
+#ifdef CONFIG_PROC_FS
+static int tosh_get_info(char *, char **, off_t, int);
+#else /* !CONFIG_PROC_FS */
+inline int tosh_get_info(char *buffer, char **start, off_t fpos, int lenght)
+{
+	return 0;
+}
+#endif /* CONFIG_PROC_FS */
+
 #endif

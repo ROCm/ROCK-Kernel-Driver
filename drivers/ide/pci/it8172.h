@@ -17,7 +17,6 @@ static int it8172_config_chipset_for_dma(ide_drive_t *drive);
 static void init_setup_it8172(struct pci_dev *, ide_pci_device_t *);
 static unsigned int init_chipset_it8172(struct pci_dev *, const char *);
 static void init_hwif_it8172(ide_hwif_t *);
-static void init_dma_it8172(ide_hwif_t *, unsigned long);
 
 static ide_pci_device_t it8172_chipsets[] __devinitdata = {
 	{	/* 0 */
@@ -28,7 +27,6 @@ static ide_pci_device_t it8172_chipsets[] __devinitdata = {
 		.init_chipset	= init_chipset_it8172,
 		.init_iops	= NULL,
 		.init_hwif	= init_hwif_it8172,
-                .init_dma	= init_dma_it8172,
 		.channels	= 2,
 		.autodma	= AUTODMA,
 		.enablebits	= {{0x00,0x00,0x00}, {0x40,0x00,0x01}},

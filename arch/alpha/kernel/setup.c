@@ -33,6 +33,7 @@
 #include <linux/seq_file.h>
 #include <linux/root_dev.h>
 #include <linux/initrd.h>
+#include <linux/eisa.h>
 #ifdef CONFIG_MAGIC_SYSRQ
 #include <linux/sysrq.h>
 #include <linux/reboot.h>
@@ -679,6 +680,11 @@ setup_arch(char **cmdline_p)
 
 	/* Default root filesystem to sda2.  */
 	ROOT_DEV = Root_SDA2;
+
+#ifdef CONFIG_EISA
+	/* FIXME:  only set this when we actually have EISA in this box? */
+	EISA_bus = 1;
+#endif
 
  	/*
 	 * Check ASN in HWRPB for validity, report if bad.

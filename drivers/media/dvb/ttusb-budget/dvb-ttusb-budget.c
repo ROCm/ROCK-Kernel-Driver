@@ -9,6 +9,7 @@
  *	published by the Free Software Foundation; either version 2 of
  *	the License, or (at your option) any later version.
  */
+#include <linux/version.h>
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/wait.h>
@@ -27,7 +28,6 @@
 #include <linux/dvb/frontend.h>
 #include <linux/dvb/dmx.h>
 #include <linux/pci.h>
-#include <linux/usb.h>
 
 #include "dvb_functions.h"
 
@@ -1055,7 +1055,8 @@ static ssize_t stc_read(struct file *file, char *buf, size_t count,
 	if (tc < 0)
 		return 0;
 
-	copy_to_user(buf, stc_firmware + *offset, tc);
+	if (copy_to_user(buf, stc_firmware + *offset, tc))
+		return -EFAULT;
 
 	*offset += tc;
 

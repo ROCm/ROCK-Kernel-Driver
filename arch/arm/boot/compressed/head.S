@@ -477,6 +477,12 @@ proc_types:
 @		b	__arm6_cache_off
 @		b	__armv3_cache_flush
 
+		.word	0x00000000		@ old ARM ID
+		.word	0x0000f000
+		mov	pc, lr
+		mov	pc, lr
+		mov	pc, lr
+
 		.word	0x41007000		@ ARM7/710
 		.word	0xfff8fe00
 		b	__arm7_cache_off
@@ -488,6 +494,14 @@ proc_types:
 		b	__armv4_cache_on
 		b	__armv4_cache_off
 		mov	pc, lr
+
+		.word	0x00007000		@ ARM7 IDs
+		.word	0x0000f000
+		mov	pc, lr
+		mov	pc, lr
+		mov	pc, lr
+
+		@ Everything from here on will be the new ID system.
 
 		.word	0x41129200		@ ARM920T
 		.word	0xff00fff0
@@ -507,8 +521,16 @@ proc_types:
 		b	__armv4_cache_off
 		b	__armv4_cache_flush
 
-		.word	0x69050000		@ xscale
-		.word	0xffff0000
+		@ These match on the architecture ID
+
+		.word	0x00050000		@ ARMv5TE
+		.word	0x000f0000
+		b	__armv4_cache_on
+		b	__armv4_cache_off
+		b	__armv4_cache_flush
+
+		.word	0x00060000		@ ARMv5TEJ
+		.word	0x000f0000
 		b	__armv4_cache_on
 		b	__armv4_cache_off
 		b	__armv4_cache_flush

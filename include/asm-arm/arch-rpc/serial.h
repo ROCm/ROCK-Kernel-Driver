@@ -24,8 +24,6 @@
 
 #define STD_COM_FLAGS (ASYNC_BOOT_AUTOCONF | ASYNC_SKIP_TEST)
 
-#define RS_TABLE_SIZE	16
-
      /* UART CLK        PORT  IRQ     FLAGS        */
 #define STD_SERIAL_PORT_DEFNS \
 	{ 0, BASE_BAUD, 0x3F8, 10, STD_COM_FLAGS },	/* ttyS0 */	\

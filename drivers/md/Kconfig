@@ -38,9 +38,7 @@ config MD_LINEAR
 	  use the so-called linear mode, i.e. it will combine the hard disk
 	  partitions by simply appending one to the other.
 
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
+	  To compile this as a module, choose M here: the module
 	  will be called linear.
 
 	  If unsure, say Y.
@@ -60,9 +58,7 @@ config MD_RAID0
 	  <http://www.tldp.org/docs.html#howto>. There you will also
 	  learn where to get the supporting user space utilities raidtools.
 
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
+	  To compile this as a module, choose M here: the module
 	  will be called raid0.
 
 	  If unsure, say Y.
@@ -84,11 +80,8 @@ config MD_RAID1
 	  <http://www.tldp.org/docs.html#howto>.  There you will also
 	  learn where to get the supporting user space utilities raidtools.
 
-	  If you want to use such a RAID-1 set, say Y. This code is also
-	  available as a module called raid1 ( = code which can be inserted
-	  in and removed from the running kernel whenever you want).  If you
-	  want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.
+	  If you want to use such a RAID-1 set, say Y.  To compile this code
+	  as a module, choose M here: the module will be called raid1.
 
 	  If unsure, say Y.
 
@@ -109,11 +102,8 @@ config MD_RAID5
 	  <http://www.tldp.org/docs.html#howto>. There you will also
 	  learn where to get the supporting user space utilities raidtools.
 
-	  If you want to use such a RAID-4/RAID-5 set, say Y. This code is
-	  also available as a module called raid5 ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.
+	  If you want to use such a RAID-4/RAID-5 set, say Y.  To compile
+	  this code as a module, choose M here: the module will be called raid5.
 
 	  If unsure, say Y.
 
@@ -140,8 +130,8 @@ config BLK_DEV_DM
 
 	  Higher level volume managers such as LVM2 use this driver.
 
-	  If you want to compile this as a module, say M here and read 
-	  <file:Documentation/modules.txt>.  The module will be called dm-mod.
+	  To compile this as a module, choose M here: the module will be
+	  called dm-mod.
 
 	  If unsure, say N.
 

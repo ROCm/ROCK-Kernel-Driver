@@ -1036,7 +1036,6 @@ static int kenvctrld(void *__unused)
 	for (;;) {
 		current->state = TASK_INTERRUPTIBLE;
 		schedule_timeout(poll_interval);
-		current->state = TASK_RUNNING;
 
 		if(signal_pending(current))
 			break;
@@ -1184,7 +1183,6 @@ static void __exit envctrl_cleanup(void)
 
 			current->state = TASK_INTERRUPTIBLE;
 			schedule_timeout(HZ);
-			current->state = TASK_RUNNING;
 		}
 		kenvctrld_task = NULL;
 	}

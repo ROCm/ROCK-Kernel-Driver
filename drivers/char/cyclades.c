@@ -670,7 +670,6 @@ static char rcsid[] =
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/pci.h>
-#include <linux/version.h>
 
 #include <linux/stat.h>
 #include <linux/proc_fs.h>
@@ -2724,7 +2723,6 @@ cy_wait_until_sent(struct tty_struct *tty, int timeout)
     /* Run one more char cycle */
     current->state = TASK_INTERRUPTIBLE;
     schedule_timeout(char_time * 5);
-    current->state = TASK_RUNNING;
 #ifdef CY_DEBUG_WAIT_UNTIL_SENT
     printk("Clean (jiff=%lu)...done\n", jiffies);
 #endif

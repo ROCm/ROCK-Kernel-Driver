@@ -38,7 +38,6 @@
  */
 
 #include <linux/module.h>
-#include <linux/version.h>
 #include <linux/kernel.h>
 #include <linux/tty.h>
 #include <linux/termios.h>
@@ -958,7 +957,6 @@ static int isicom_open(struct tty_struct * tty, struct file * filp)
 	struct isi_port * port;
 	struct isi_board * card;
 	unsigned int line, board;
-	unsigned long flags;
 	int error;
 
 #ifdef ISICOM_DEBUG	

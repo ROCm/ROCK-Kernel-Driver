@@ -1182,7 +1182,6 @@ static ssize_t snd_rawmidi_write(struct file *file, const char *buf, size_t coun
 			spin_unlock_irq(&runtime->lock);
 			set_current_state(TASK_INTERRUPTIBLE);
 			timeout = schedule_timeout(30 * HZ);
-			set_current_state(TASK_RUNNING);
 			remove_wait_queue(&runtime->sleep, &wait);
 			if (signal_pending(current))
 				return result > 0 ? result : -ERESTARTSYS;
@@ -1210,7 +1209,6 @@ static ssize_t snd_rawmidi_write(struct file *file, const char *buf, size_t coun
 			spin_unlock_irq(&runtime->lock);
 			set_current_state(TASK_INTERRUPTIBLE);
 			timeout = schedule_timeout(30 * HZ);
-			set_current_state(TASK_RUNNING);
 			remove_wait_queue(&runtime->sleep, &wait);
 			if (signal_pending(current))
 				return result > 0 ? result : -ERESTARTSYS;

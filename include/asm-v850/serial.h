@@ -16,7 +16,6 @@
 
 #define irq_cannonicalize(x) (x)
 #define BASE_BAUD	250000	/* (16MHz / (16 * 38400)) * 9600 */
-#define RS_TABLE_SIZE	1
 #define SERIAL_PORT_DFNS \
    { 0, BASE_BAUD, CB_UART_BASE, IRQ_CB_EXTSIO, STD_COM_FLAGS },
 

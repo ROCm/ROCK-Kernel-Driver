@@ -28,7 +28,6 @@
 #include <linux/poll.h>
 #include <linux/fs.h>
 #include <linux/list.h>
-#include <linux/version.h>
 #include <linux/devfs_fs_kernel.h>
 
 #define DVB_MAJOR 250

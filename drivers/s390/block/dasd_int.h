@@ -6,7 +6,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.45 $
+ * $Revision: 1.48 $
  */
 
 #ifndef DASD_INT_H
@@ -15,7 +15,7 @@
 #ifdef __KERNEL__
 
 /* we keep old device allocation scheme; IOW, minors are still in 0..255 */
-#define DASD_PER_MAJOR ( 1U<<(8-DASD_PARTN_BITS))
+#define DASD_PER_MAJOR (1U << (MINORBITS - DASD_PARTN_BITS))
 #define DASD_PARTN_MASK ((1 << DASD_PARTN_BITS) - 1)
 
 /*
@@ -477,8 +477,8 @@ void dasd_delete_device(struct dasd_device *);
 struct dasd_device *dasd_device_from_devindex(int);
 
 int dasd_parse(void);
-int dasd_add_range(int, int, int);
-int dasd_devno_in_range(int);
+int dasd_add_busid(char *, int);
+int dasd_busid_known(char *);
 
 /* externals in dasd_gendisk.c */
 int  dasd_gendisk_init(void);

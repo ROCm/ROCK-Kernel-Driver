@@ -45,7 +45,9 @@ static int match_one(char *s, char *p, substring_t args[])
 		args[argc].from = s;
 		switch (*p++) {
 		case 's':
-			if (len == -1 || len > strlen(s))
+			if (strlen(s) == 0)
+				return 0;
+			else if (len == -1 || len > strlen(s))
 				len = strlen(s);
 			args[argc].to = s + len;
 			break;

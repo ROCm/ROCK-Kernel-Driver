@@ -70,7 +70,6 @@
 #include <linux/types.h>
 #include <linux/kernel.h>
 
-#include <linux/version.h>
 #include <asm/uaccess.h>
 #include <linux/init.h>
 

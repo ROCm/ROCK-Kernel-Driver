@@ -4,11 +4,14 @@
  * Intel Corporation:  Storage RAID Controllers                         *
  *                                                                      *
  * gdth.c                                                               *
- * Copyright (C) 1995-03 ICP vortex, an Intel company,  Achim Leubner   *
- * <achim.leubner@intel.com>                                            *
+ * Copyright (C) 1995-03 ICP vortex GmbH, Achim Leubner                 *
+ * Copyright (C) 2002-03 Intel Corporation                              *
+ * Copyright (C) 2003    Adaptec Inc.                                   *
+ * <achim_leubner@adaptec.com>                                          *
  *                                                                      *
- * Additions/Fixes: Boji Tony Kannanthanam                              *
- * <boji.t.kannanthanam@intel.com>                                      *
+ * Additions/Fixes:                                                     *
+ * Boji Tony Kannanthanam <boji.t.kannanthanam@intel.com>               *
+ * Johannes Dinner <johannes_dinner@adaptec.com>                        *
  *                                                                      *
  * This program is free software; you can redistribute it and/or modify *
  * it under the terms of the GNU General Public License as published    *
@@ -24,9 +27,13 @@
  * along with this kernel; if not, write to the Free Software           *
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.            *
  *                                                                      *
- * Tested with Linux 1.2.13, ..., 2.2.20, ..., 2.4.20                   *
+ * Tested with Linux 1.2.13, ..., 2.2.20, ..., 2.4.22                   *
  *                                                                      *
  * $Log: gdth.c,v $
+ * Revision 1.64  2003/09/17 08:30:26  achim
+ * EISA/ISA controller scan disabled
+ * Command line switch probe_eisa_isa added
+ *
  * Revision 1.63  2003/07/12 14:01:00  Daniele Bellucci <bellucda@tiscali.it>
  * Minor cleanups in gdth_ioctl.
  *
@@ -257,7 +264,7 @@
  * Initial revision
  *
  ************************************************************************/
-#ident "$Id: gdth.c,v 1.62 2003/02/27 15:01:59 achim Exp $" 
+#ident "$Id: gdth.c,v 1.64 2003/09/17 08:30:26 achim Exp $" 
 
 /* All GDT Disk Array Controllers are fully supported by this driver.
  * This includes the PCI/EISA/ISA SCSI Disk Array Controllers and the
@@ -291,10 +298,12 @@
  *                              access a shared resource from several nodes, 
  *                              appropiate controller firmware required
  * shared_access:N              enable driver reserve/release protocol
+ * probe_eisa_isa:Y             scan for EISA/ISA controllers
+ * probe_eisa_isa:N             do not scan for EISA/ISA controllers
  *
  * The default values are: "gdth=disable:N,reserve_mode:1,reverse_scan:N,
  *                          max_ids:127,rescan:N,virt_ctr:N,hdr_channel:0,
- *                          shared_access:Y".
+ *                          shared_access:Y,probe_eisa_isa:N".
  * Here is another example: "gdth=reserve_list:0,1,2,0,0,1,3,0,rescan:Y".
  * 
  * When loading the gdth driver as a module, the same options are available. 
@@ -304,7 +313,8 @@
  * '1' in place of 'Y' and '0' in place of 'N'.
  * 
  * Default: "modprobe gdth disable=0 reserve_mode=1 reverse_scan=0
- *           max_ids=127 rescan=0 virt_ctr=0 hdr_channel=0 shared_access=0"
+ *           max_ids=127 rescan=0 virt_ctr=0 hdr_channel=0 shared_access=0 
+ *           probe_eisa_isa=0"
  * The other example: "modprobe gdth reserve_list=0,1,2,0,0,1,3,0 rescan=1".
  */
 
@@ -719,6 +729,8 @@ static int rescan = 0;
 static int virt_ctr = 0;
 /* shared access */
 static int shared_access = 1;
+/* enable support for EISA and ISA controllers */
+static int probe_eisa_isa = 0;
 
 #ifdef MODULE
 #if LINUX_VERSION_CODE >= 0x02011A
@@ -733,6 +745,7 @@ MODULE_PARM(max_ids, "i");
 MODULE_PARM(rescan, "i");
 MODULE_PARM(virt_ctr, "i");
 MODULE_PARM(shared_access, "i");
+MODULE_PARM(probe_eisa_isa, "i");
 MODULE_AUTHOR("Achim Leubner");
 #endif
 #if LINUX_VERSION_CODE >= 0x02040B
@@ -4133,6 +4146,8 @@ GDTH_INITFUNC(void, internal_setup(char *str,int *ints))
             virt_ctr = val;
         else if (!strncmp(argv, "shared_access:", 14))
             shared_access = val;
+        else if (!strncmp(argv, "probe_eisa_isa:", 15))
+            probe_eisa_isa = val;
         else if (!strncmp(argv, "reserve_list:", 13)) {
             reserve_list[0] = val;
             for (i = 1; i < MAX_RES_ARGS; i++) {
@@ -4213,249 +4228,250 @@ GDTH_INITFUNC(int, gdth_detect(Scsi_Host_Template *shtp))
     gdth_polling = TRUE; b = 0;
     gdth_clear_events();
 
-    /* scanning for controllers, at first: ISA controller */
-    for (isa_bios=0xc8000UL; isa_bios<=0xd8000UL; isa_bios+=0x8000UL) {
+    /* As default we do not probe for EISA or ISA controllers */
+    if (probe_eisa_isa) {    
+        /* scanning for controllers, at first: ISA controller */
+        for (isa_bios=0xc8000UL; isa_bios<=0xd8000UL; isa_bios+=0x8000UL) {
+            dma_addr_t scratch_dma_handle;
 
-	dma_addr_t scratch_dma_handle;
+            if (gdth_ctr_count >= MAXHA) 
+                break;
+            if (gdth_search_isa(isa_bios)) {        /* controller found */
+                shp = scsi_register(shtp,sizeof(gdth_ext_str));
+                if (shp == NULL)
+                    continue;  
 
-        if (gdth_ctr_count >= MAXHA) 
-            break;
-        if (gdth_search_isa(isa_bios)) {        /* controller found */
-            shp = scsi_register(shtp,sizeof(gdth_ext_str));
-            if (shp == NULL)
-                continue;  
-
-            ha = HADATA(shp);
-            if (!gdth_init_isa(isa_bios,ha)) {
-                scsi_unregister(shp);
-                continue;
-            }
+                ha = HADATA(shp);
+                if (!gdth_init_isa(isa_bios,ha)) {
+                    scsi_unregister(shp);
+                    continue;
+                }
 #ifdef __ia64__
-            break;
+                break;
 #else
-            /* controller found and initialized */
-            printk("Configuring GDT-ISA HA at BIOS 0x%05X IRQ %u DRQ %u\n",
-                   isa_bios,ha->irq,ha->drq);
+                /* controller found and initialized */
+                printk("Configuring GDT-ISA HA at BIOS 0x%05X IRQ %u DRQ %u\n",
+                       isa_bios,ha->irq,ha->drq);
 
 #if LINUX_VERSION_CODE >= 0x010346 
-            if (request_irq(ha->irq,gdth_interrupt,SA_INTERRUPT,"gdth",ha))
+                if (request_irq(ha->irq,gdth_interrupt,SA_INTERRUPT,"gdth",ha))
 #else
-            if (request_irq(ha->irq,gdth_interrupt,SA_INTERRUPT,"gdth")) 
+                if (request_irq(ha->irq,gdth_interrupt,SA_INTERRUPT,"gdth")) 
 #endif
-            {
-                printk("GDT-ISA: Unable to allocate IRQ\n");
-                scsi_unregister(shp);
-                continue;
-            }
-            if (request_dma(ha->drq,"gdth")) {
-                printk("GDT-ISA: Unable to allocate DMA channel\n");
-#if LINUX_VERSION_CODE >= 0x010346 
-                free_irq(ha->irq,ha);
-#else
-                free_irq(ha->irq);
-#endif
-                scsi_unregister(shp);
-                continue;
-            }
-            set_dma_mode(ha->drq,DMA_MODE_CASCADE);
-            enable_dma(ha->drq);
-            shp->unchecked_isa_dma = 1;
-            shp->irq = ha->irq;
-            shp->dma_channel = ha->drq;
-            hanum = gdth_ctr_count;         
-            gdth_ctr_tab[gdth_ctr_count++] = shp;
-            gdth_ctr_vtab[gdth_ctr_vcount++] = shp;
-
-            NUMDATA(shp)->hanum = (ushort)hanum;
-            NUMDATA(shp)->busnum= 0;
-
-            ha->pccb = CMDDATA(shp);
-            ha->ccb_phys = 0L;
-#if LINUX_VERSION_CODE >= 0x020400
-            ha->pdev = NULL;
-            ha->pscratch = pci_alloc_consistent(ha->pdev, GDTH_SCRATCH, 
-						&scratch_dma_handle);
-            ha->scratch_phys = (ulong32)scratch_dma_handle;
-#else
-            ha->pscratch = scsi_init_malloc(GDTH_SCRATCH, GFP_ATOMIC | GFP_DMA);
-            if (ha->pscratch)
-                ha->scratch_phys = virt_to_bus(ha->pscratch);
-#endif
-            ha->scratch_busy = FALSE;
-            ha->req_first = NULL;
-            ha->tid_cnt = MAX_HDRIVES;
-            if (max_ids > 0 && max_ids < ha->tid_cnt)
-                ha->tid_cnt = max_ids;
-            for (i=0; i<GDTH_MAXCMDS; ++i)
-                ha->cmd_tab[i].cmnd = UNUSED_CMND;
-            ha->scan_mode = rescan ? 0x10 : 0;
-
-            if (ha->pscratch == NULL || !gdth_search_drives(hanum)) {
-                printk("GDT-ISA: Error during device scan\n");
-                --gdth_ctr_count;
-                --gdth_ctr_vcount;
-                if (ha->pscratch != NULL) {
-#if LINUX_VERSION_CODE >= 0x020400
-                    pci_free_consistent(ha->pdev, GDTH_SCRATCH, 
-                                        ha->pscratch, ha->scratch_phys);
-#else
-                    scsi_init_free((void *)ha->pscratch, GDTH_SCRATCH);
-#endif
+                {
+                    printk("GDT-ISA: Unable to allocate IRQ\n");
+                    scsi_unregister(shp);
+                    continue;
                 }
+                if (request_dma(ha->drq,"gdth")) {
+                    printk("GDT-ISA: Unable to allocate DMA channel\n");
 #if LINUX_VERSION_CODE >= 0x010346 
-                free_irq(ha->irq,ha);
+                    free_irq(ha->irq,ha);
 #else
-                free_irq(ha->irq);
+                    free_irq(ha->irq);
 #endif
-                scsi_unregister(shp);
-                continue;
-            }
-            if (hdr_channel < 0 || hdr_channel > ha->bus_cnt)
-                hdr_channel = ha->bus_cnt;
-            ha->virt_bus = hdr_channel;
+                    scsi_unregister(shp);
+                    continue;
+                }
+                set_dma_mode(ha->drq,DMA_MODE_CASCADE);
+                enable_dma(ha->drq);
+                shp->unchecked_isa_dma = 1;
+                shp->irq = ha->irq;
+                shp->dma_channel = ha->drq;
+                hanum = gdth_ctr_count;         
+                gdth_ctr_tab[gdth_ctr_count++] = shp;
+                gdth_ctr_vtab[gdth_ctr_vcount++] = shp;
+
+                NUMDATA(shp)->hanum = (ushort)hanum;
+                NUMDATA(shp)->busnum= 0;
+
+                ha->pccb = CMDDATA(shp);
+                ha->ccb_phys = 0L;
+#if LINUX_VERSION_CODE >= 0x020400
+                ha->pdev = NULL;
+                ha->pscratch = pci_alloc_consistent(ha->pdev, GDTH_SCRATCH, 
+                                                    &scratch_dma_handle);
+                ha->scratch_phys = (ulong32)scratch_dma_handle;
+#else
+                ha->pscratch = scsi_init_malloc(GDTH_SCRATCH, GFP_ATOMIC | GFP_DMA);
+                if (ha->pscratch)
+                    ha->scratch_phys = virt_to_bus(ha->pscratch);
+#endif
+                ha->scratch_busy = FALSE;
+                ha->req_first = NULL;
+                ha->tid_cnt = MAX_HDRIVES;
+                if (max_ids > 0 && max_ids < ha->tid_cnt)
+                    ha->tid_cnt = max_ids;
+                for (i=0; i<GDTH_MAXCMDS; ++i)
+                    ha->cmd_tab[i].cmnd = UNUSED_CMND;
+                ha->scan_mode = rescan ? 0x10 : 0;
+
+                if (ha->pscratch == NULL || !gdth_search_drives(hanum)) {
+                    printk("GDT-ISA: Error during device scan\n");
+                    --gdth_ctr_count;
+                    --gdth_ctr_vcount;
+                    if (ha->pscratch != NULL) {
+#if LINUX_VERSION_CODE >= 0x020400
+                        pci_free_consistent(ha->pdev, GDTH_SCRATCH, 
+                                            ha->pscratch, ha->scratch_phys);
+#else
+                        scsi_init_free((void *)ha->pscratch, GDTH_SCRATCH);
+#endif
+                    }
+#if LINUX_VERSION_CODE >= 0x010346 
+                    free_irq(ha->irq,ha);
+#else
+                    free_irq(ha->irq);
+#endif
+                    scsi_unregister(shp);
+                    continue;
+                }
+                if (hdr_channel < 0 || hdr_channel > ha->bus_cnt)
+                    hdr_channel = ha->bus_cnt;
+                ha->virt_bus = hdr_channel;
 
 #if LINUX_VERSION_CODE >= 0x020000
-            shp->max_id      = ha->tid_cnt;
-            shp->max_lun     = MAXLUN;
-            shp->max_channel = virt_ctr ? 0 : ha->bus_cnt;
-            if (virt_ctr)  
+                shp->max_id      = ha->tid_cnt;
+                shp->max_lun     = MAXLUN;
+                shp->max_channel = virt_ctr ? 0 : ha->bus_cnt;
+                if (virt_ctr)  
 #endif
-            {
-                virt_ctr = 1;
-                /* register addit. SCSI channels as virtual controllers */
-                for (b = 1; b < ha->bus_cnt + 1; ++b) {
-                    shp = scsi_register(shtp,sizeof(gdth_num_str));
-                    shp->unchecked_isa_dma = 1;
-                    shp->irq = ha->irq;
-                    shp->dma_channel = ha->drq;
-                    gdth_ctr_vtab[gdth_ctr_vcount++] = shp;
-                    NUMDATA(shp)->hanum = (ushort)hanum;
-                    NUMDATA(shp)->busnum = b;
-                }
-            }  
+                {
+                    virt_ctr = 1;
+                    /* register addit. SCSI channels as virtual controllers */
+                    for (b = 1; b < ha->bus_cnt + 1; ++b) {
+                        shp = scsi_register(shtp,sizeof(gdth_num_str));
+                        shp->unchecked_isa_dma = 1;
+                        shp->irq = ha->irq;
+                        shp->dma_channel = ha->drq;
+                        gdth_ctr_vtab[gdth_ctr_vcount++] = shp;
+                        NUMDATA(shp)->hanum = (ushort)hanum;
+                        NUMDATA(shp)->busnum = b;
+                    }
+                }  
 
-            GDTH_INIT_LOCK_HA(ha);
-            gdth_enable_int(hanum);
+                GDTH_INIT_LOCK_HA(ha);
+                gdth_enable_int(hanum);
 #endif /* !__ia64__ */
+            }
         }
-    }
 
-    /* scanning for EISA controllers */
-    for (eisa_slot=0x1000; eisa_slot<=0x8000; eisa_slot+=0x1000) {
+        /* scanning for EISA controllers */
+        for (eisa_slot=0x1000; eisa_slot<=0x8000; eisa_slot+=0x1000) {
+            dma_addr_t scratch_dma_handle;
 
-	dma_addr_t scratch_dma_handle;
+            if (gdth_ctr_count >= MAXHA) 
+                break;
+            if (gdth_search_eisa(eisa_slot)) {      /* controller found */
+                shp = scsi_register(shtp,sizeof(gdth_ext_str));
+                if (shp == NULL)
+                    continue;  
 
-        if (gdth_ctr_count >= MAXHA) 
-            break;
-        if (gdth_search_eisa(eisa_slot)) {      /* controller found */
-            shp = scsi_register(shtp,sizeof(gdth_ext_str));
-            if (shp == NULL)
-                continue;  
-
-            ha = HADATA(shp);
-            if (!gdth_init_eisa(eisa_slot,ha)) {
-                scsi_unregister(shp);
-                continue;
-            }
-            /* controller found and initialized */
-            printk("Configuring GDT-EISA HA at Slot %d IRQ %u\n",
-                   eisa_slot>>12,ha->irq);
-
-#if LINUX_VERSION_CODE >= 0x010346 
-            if (request_irq(ha->irq,gdth_interrupt,SA_INTERRUPT,"gdth",ha))
-#else
-            if (request_irq(ha->irq,gdth_interrupt,SA_INTERRUPT,"gdth")) 
-#endif
-            {
-                printk("GDT-EISA: Unable to allocate IRQ\n");
-                scsi_unregister(shp);
-                continue;
-            }
-            shp->unchecked_isa_dma = 0;
-            shp->irq = ha->irq;
-            shp->dma_channel = 0xff;
-            hanum = gdth_ctr_count;
-            gdth_ctr_tab[gdth_ctr_count++] = shp;
-            gdth_ctr_vtab[gdth_ctr_vcount++] = shp;
-
-            NUMDATA(shp)->hanum = (ushort)hanum;
-            NUMDATA(shp)->busnum= 0;
-            TRACE2(("EISA detect Bus 0: hanum %d\n",
-                    NUMDATA(shp)->hanum));
-
-            ha->pccb = CMDDATA(shp);
-            ha->ccb_phys = 0L; 
-#if LINUX_VERSION_CODE >= 0x020400
-            ha->pdev = NULL;
-            ha->pscratch = pci_alloc_consistent(ha->pdev, GDTH_SCRATCH, 
-						&scratch_dma_handle);
-            ha->scratch_phys = (ulong32) scratch_dma_handle;
-            ha->ccb_phys = 
-                pci_map_single(ha->pdev,ha->pccb,
-                               sizeof(gdth_cmd_str),PCI_DMA_BIDIRECTIONAL);
-#else
-            ha->pscratch = scsi_init_malloc(GDTH_SCRATCH, GFP_ATOMIC | GFP_DMA);
-            if (ha->pscratch)
-                ha->scratch_phys = virt_to_bus(ha->pscratch);
-            ha->ccb_phys = virt_to_bus(ha->pccb);
-#endif
-            ha->scratch_busy = FALSE;
-            ha->req_first = NULL;
-            ha->tid_cnt = MAX_HDRIVES;
-            if (max_ids > 0 && max_ids < ha->tid_cnt)
-                ha->tid_cnt = max_ids;
-            for (i=0; i<GDTH_MAXCMDS; ++i)
-                ha->cmd_tab[i].cmnd = UNUSED_CMND;
-            ha->scan_mode = rescan ? 0x10 : 0;
-
-            if (ha->pscratch == NULL || !gdth_search_drives(hanum)) {
-                printk("GDT-EISA: Error during device scan\n");
-                --gdth_ctr_count;
-                --gdth_ctr_vcount;
-                if (ha->pscratch != NULL) {
-#if LINUX_VERSION_CODE >= 0x020400
-                    pci_free_consistent(ha->pdev, GDTH_SCRATCH, 
-                                        ha->pscratch, ha->scratch_phys);
-                    pci_unmap_single(ha->pdev,ha->ccb_phys,
-                                    sizeof(gdth_cmd_str),PCI_DMA_BIDIRECTIONAL);
-#else
-                    scsi_init_free((void *)ha->pscratch, GDTH_SCRATCH);
-#endif
+                ha = HADATA(shp);
+                if (!gdth_init_eisa(eisa_slot,ha)) {
+                    scsi_unregister(shp);
+                    continue;
                 }
+                /* controller found and initialized */
+                printk("Configuring GDT-EISA HA at Slot %d IRQ %u\n",
+                        eisa_slot>>12,ha->irq);
+
 #if LINUX_VERSION_CODE >= 0x010346 
-                free_irq(ha->irq,ha);
+                if (request_irq(ha->irq,gdth_interrupt,SA_INTERRUPT,"gdth",ha))
 #else
-                free_irq(ha->irq);
+                if (request_irq(ha->irq,gdth_interrupt,SA_INTERRUPT,"gdth")) 
 #endif
-                scsi_unregister(shp);
-                continue;
-            }
-            if (hdr_channel < 0 || hdr_channel > ha->bus_cnt)
-                hdr_channel = ha->bus_cnt;
-            ha->virt_bus = hdr_channel;
+                {
+                    printk("GDT-EISA: Unable to allocate IRQ\n");
+                    scsi_unregister(shp);
+                    continue;
+                }
+                shp->unchecked_isa_dma = 0;
+                shp->irq = ha->irq;
+                shp->dma_channel = 0xff;
+                hanum = gdth_ctr_count;
+                gdth_ctr_tab[gdth_ctr_count++] = shp;
+                gdth_ctr_vtab[gdth_ctr_vcount++] = shp;
+
+                NUMDATA(shp)->hanum = (ushort)hanum;
+                NUMDATA(shp)->busnum= 0;
+                TRACE2(("EISA detect Bus 0: hanum %d\n",
+                        NUMDATA(shp)->hanum));
+
+                ha->pccb = CMDDATA(shp);
+                ha->ccb_phys = 0L; 
+#if LINUX_VERSION_CODE >= 0x020400
+                ha->pdev = NULL;
+                ha->pscratch = pci_alloc_consistent(ha->pdev, GDTH_SCRATCH, 
+                                                    &scratch_dma_handle);
+                ha->scratch_phys = (ulong32) scratch_dma_handle;
+                ha->ccb_phys = 
+                    pci_map_single(ha->pdev,ha->pccb,
+                                   sizeof(gdth_cmd_str),PCI_DMA_BIDIRECTIONAL);
+#else
+                ha->pscratch = scsi_init_malloc(GDTH_SCRATCH, GFP_ATOMIC | GFP_DMA);
+                if (ha->pscratch)
+                    ha->scratch_phys = virt_to_bus(ha->pscratch);
+                ha->ccb_phys = virt_to_bus(ha->pccb);
+#endif
+                ha->scratch_busy = FALSE;
+                ha->req_first = NULL;
+                ha->tid_cnt = MAX_HDRIVES;
+                if (max_ids > 0 && max_ids < ha->tid_cnt)
+                    ha->tid_cnt = max_ids;
+                for (i=0; i<GDTH_MAXCMDS; ++i)
+                     ha->cmd_tab[i].cmnd = UNUSED_CMND;
+                ha->scan_mode = rescan ? 0x10 : 0;
+
+                if (ha->pscratch == NULL || !gdth_search_drives(hanum)) {
+                    printk("GDT-EISA: Error during device scan\n");
+                    --gdth_ctr_count;
+                    --gdth_ctr_vcount;
+                    if (ha->pscratch != NULL) {
+#if LINUX_VERSION_CODE >= 0x020400
+                        pci_free_consistent(ha->pdev, GDTH_SCRATCH, 
+                                            ha->pscratch, ha->scratch_phys);
+                        pci_unmap_single(ha->pdev,ha->ccb_phys,
+                                         sizeof(gdth_cmd_str),PCI_DMA_BIDIRECTIONAL);
+#else
+                        scsi_init_free((void *)ha->pscratch, GDTH_SCRATCH);
+#endif
+                    }
+#if LINUX_VERSION_CODE >= 0x010346 
+                    free_irq(ha->irq,ha);
+#else
+                    free_irq(ha->irq);
+#endif
+                    scsi_unregister(shp);
+                    continue;
+                }
+                if (hdr_channel < 0 || hdr_channel > ha->bus_cnt)
+                    hdr_channel = ha->bus_cnt;
+                ha->virt_bus = hdr_channel;
 
 #if LINUX_VERSION_CODE >= 0x020000
-            shp->max_id      = ha->tid_cnt;
-            shp->max_lun     = MAXLUN;
-            shp->max_channel = virt_ctr ? 0 : ha->bus_cnt;
-            if (virt_ctr)  
+                shp->max_id      = ha->tid_cnt;
+                shp->max_lun     = MAXLUN;
+                shp->max_channel = virt_ctr ? 0 : ha->bus_cnt;
+                if (virt_ctr)  
 #endif
-            {
-                virt_ctr = 1;
-                /* register addit. SCSI channels as virtual controllers */
-                for (b = 1; b < ha->bus_cnt + 1; ++b) {
-                    shp = scsi_register(shtp,sizeof(gdth_num_str));
-                    shp->unchecked_isa_dma = 0;
-                    shp->irq = ha->irq;
-                    shp->dma_channel = 0xff;
-                    gdth_ctr_vtab[gdth_ctr_vcount++] = shp;
-                    NUMDATA(shp)->hanum = (ushort)hanum;
-                    NUMDATA(shp)->busnum = b;
-                }
-            }  
+                {
+                    virt_ctr = 1;
+                    /* register addit. SCSI channels as virtual controllers */
+                    for (b = 1; b < ha->bus_cnt + 1; ++b) {
+                        shp = scsi_register(shtp,sizeof(gdth_num_str));
+                        shp->unchecked_isa_dma = 0;
+                        shp->irq = ha->irq;
+                        shp->dma_channel = 0xff;
+                        gdth_ctr_vtab[gdth_ctr_vcount++] = shp;
+                        NUMDATA(shp)->hanum = (ushort)hanum;
+                        NUMDATA(shp)->busnum = b;
+                    }
+                }  
 
-            GDTH_INIT_LOCK_HA(ha);
-            gdth_enable_int(hanum);
+                GDTH_INIT_LOCK_HA(ha);
+                gdth_enable_int(hanum);
+            }
         }
     }
 
@@ -4470,8 +4486,7 @@ GDTH_INITFUNC(int, gdth_detect(Scsi_Host_Template *shtp))
         printk("GDT: Found %d PCI Storage RAID Controllers\n",cnt);
         gdth_sort_pci(pcistr,cnt);
         for (ctr = 0; ctr < cnt; ++ctr) {
-
-	    dma_addr_t scratch_dma_handle;
+            dma_addr_t scratch_dma_handle;
 
             if (gdth_ctr_count >= MAXHA)
                 break;
@@ -4514,7 +4529,7 @@ GDTH_INITFUNC(int, gdth_detect(Scsi_Host_Template *shtp))
             ha->ccb_phys = 0L;
 #if LINUX_VERSION_CODE >= 0x020400
             ha->pscratch = pci_alloc_consistent(ha->pdev, GDTH_SCRATCH, 
-						&scratch_dma_handle);
+                                                &scratch_dma_handle);
             ha->scratch_phys = (ulong32)scratch_dma_handle;
 #else
             ha->pscratch = scsi_init_malloc(GDTH_SCRATCH, GFP_ATOMIC | GFP_DMA);

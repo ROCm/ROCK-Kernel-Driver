@@ -1070,7 +1070,6 @@ cdu_ioctl(struct inode *inode,
 	Byte cmd_buff[10], params[10];
 	int  i;
 	int  dsc_status;
-	int  err;
 
 	if (check_drive_status() != 0)
 		return -EIO;
@@ -1153,12 +1152,10 @@ cdu_ioctl(struct inode *inode,
 		break;
 
 	case CDROMPLAYMSF:			/* Play starting at the given MSF address. */
-		err = verify_area(VERIFY_READ, (char *)arg, 6);
-		if (err)
-			return err;
+		if (copy_from_user(params, (void *)arg, 6))
+			return -EFAULT;
 		spin_up_drive(status);
 		set_drive_mode(SONY535_AUDIO_DRIVE_MODE, status);
-		copy_from_user(params, (void *)arg, 6);
 
 		/* The parameters are given in int, must be converted */
 		for (i = 0; i < 3; i++) {

@@ -23,7 +23,6 @@
 #include <linux/fcntl.h>
 #include <linux/delay.h>
 #include <linux/console.h>
-#include <linux/version.h>
 #include <linux/fs.h>
 
 #include <asm/io.h>

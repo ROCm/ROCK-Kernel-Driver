@@ -15,8 +15,6 @@
 /* Standard COM flags */
 #define STD_COM_FLAGS (ASYNC_SKIP_TEST)
 
-#define RS_TABLE_SIZE	5
-
 #define STD_SERIAL_PORT_DEFNS	\
 	{	\
 		type:			PORT_PXA,	\

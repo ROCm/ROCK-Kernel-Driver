@@ -7,7 +7,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999-2001
  *
- * $Revision: 1.110 $
+ * $Revision: 1.114 $
  */
 
 #include <linux/config.h>
@@ -1142,8 +1142,8 @@ __dasd_process_blk_queue(struct dasd_device * device)
 		req = elv_next_request(queue);
 		if (device->ro_flag && rq_data_dir(req) == WRITE) {
 			DBF_EVENT(DBF_ERR,
-				  "(%04x) Rejecting write request %p",
-				  _ccw_device_get_device_number(device->cdev),
+				  "(%s) Rejecting write request %p",
+				  device->cdev->dev.bus_id,
 				  req);
 			blkdev_dequeue_request(req);
 			dasd_end_request(req, 0);
@@ -1154,8 +1154,8 @@ __dasd_process_blk_queue(struct dasd_device * device)
 			if (PTR_ERR(cqr) == -ENOMEM)
 				break;	/* terminate request queue loop */
 			DBF_EVENT(DBF_ERR,
-				  "(%04x) CCW creation failed on request %p",
-				  _ccw_device_get_device_number(device->cdev),
+				  "(%s) CCW creation failed on request %p",
+				  device->cdev->dev.bus_id,
 				  req);
 			blkdev_dequeue_request(req);
 			dasd_end_request(req, 0);
@@ -1728,12 +1728,10 @@ int
 dasd_generic_probe (struct ccw_device *cdev,
 		    struct dasd_discipline *discipline)
 {
-	int devno;
 	int ret = 0;
 
-	devno = _ccw_device_get_device_number(cdev);
-	if (dasd_autodetect
-	    && (ret = dasd_add_range(devno, devno, DASD_FEATURE_DEFAULT))) {
+	if (dasd_autodetect &&
+	    (ret = dasd_add_busid(cdev->dev.bus_id, DASD_FEATURE_DEFAULT))) {
 		printk (KERN_WARNING
 			"dasd_generic_probe: cannot autodetect %s\n",
 			cdev->dev.bus_id);
@@ -1830,12 +1828,6 @@ dasd_generic_set_offline (struct ccw_device *cdev)
 	struct dasd_device *device;
 
 	device = cdev->dev.driver_data;
-	if (atomic_read(&device->open_count) > 0) {
-		printk (KERN_WARNING "Can't offline dasd device with open"
-			" count = %i.\n",
-			atomic_read(&device->open_count));
-		return -EBUSY;
-	}
 	dasd_set_target_state(device, DASD_STATE_NEW);
 	dasd_delete_device(device);
 	
@@ -1854,7 +1846,6 @@ dasd_generic_auto_online (struct ccw_driver *dasd_discipline_driver)
 	struct device_driver *drv;
 	struct device *d, *dev;
 	struct ccw_device *cdev;
-	int devno;
 
 	drv = get_driver(&dasd_discipline_driver->driver);
 	down_read(&drv->bus->subsys.rwsem);
@@ -1864,8 +1855,7 @@ dasd_generic_auto_online (struct ccw_driver *dasd_discipline_driver)
 		if (!dev)
 			continue;
 		cdev = to_ccwdev(dev);
-		devno = _ccw_device_get_device_number(cdev);
-		if (dasd_autodetect || dasd_devno_in_range(devno) == 0)
+		if (dasd_autodetect || dasd_busid_known(cdev->dev.bus_id) == 0)
 			ccw_device_set_online(cdev);
 		put_device(dev);
 	}
@@ -1934,31 +1924,6 @@ dasd_use_diag_store(struct device *dev, const char *buf, size_t count)
 static
 DEVICE_ATTR(use_diag, 0644, dasd_use_diag_show, dasd_use_diag_store);
 
-#if 0
-/* this file shows the same information as /proc/dasd/devices using
- * an inaccaptable interface */
-/* TODO: Split this up into smaller files! */
-static ssize_t
-dasd_devices_show(struct device *dev, char *buf)
-{
-	
-	struct dasd_device *device;
-	dasd_devmap_t *devmap;
-
-	devmap = NULL;
-	device = dev->driver_data;
-	if (device)
-		devmap = dasd_devmap_from_devno(device->devno);
-
-	if (!devmap)
-		return sprintf(buf, "unused\n");
-
-	return min ((size_t) dasd_devices_print(devmap, buf), PAGE_SIZE);
-}
-
-static DEVICE_ATTR(dasd, 0444, dasd_devices_show, 0);
-#endif
-
 static ssize_t
 dasd_discipline_show(struct device *dev, char *buf)
 {
@@ -1973,7 +1938,6 @@ dasd_discipline_show(struct device *dev, char *buf)
 static DEVICE_ATTR(discipline, 0444, dasd_discipline_show, NULL);
 
 static struct attribute * dasd_attrs[] = {
-	//&dev_attr_dasd.attr,
 	&dev_attr_readonly.attr,
 	&dev_attr_discipline.attr,
 	&dev_attr_use_diag.attr,

@@ -35,7 +35,6 @@
 #include <linux/serial.h>
 #include <linux/cdk.h>
 #include <linux/comstats.h>
-#include <linux/version.h>
 #include <linux/istallion.h>
 #include <linux/ioport.h>
 #include <linux/delay.h>
@@ -1489,7 +1488,6 @@ static void stli_delay(int len)
 	if (len > 0) {
 		set_current_state(TASK_INTERRUPTIBLE);
 		schedule_timeout(len);
-		set_current_state(TASK_RUNNING);
 	}
 }
 

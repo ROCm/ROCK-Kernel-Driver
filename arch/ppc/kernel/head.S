@@ -759,7 +759,10 @@ DataStoreTLBMiss:
 	EXCEPTION(0x2c00, Trap_2c, UnknownException, EXC_XFER_EE)
 	EXCEPTION(0x2d00, Trap_2d, UnknownException, EXC_XFER_EE)
 	EXCEPTION(0x2e00, Trap_2e, UnknownException, EXC_XFER_EE)
-	EXCEPTION(0x2f00, Trap_2f, UnknownException, EXC_XFER_EE)
+	EXCEPTION(0x2f00, MOLTrampoline, UnknownException, EXC_XFER_EE_LITE)
+
+	.globl mol_trampoline
+	.set mol_trampoline, i0x2f00
 
 	. = 0x3000
 
