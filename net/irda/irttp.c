@@ -968,6 +968,10 @@ void irttp_status_indication(void *instance,
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == TTP_TSAP_MAGIC, return;);
 
+	/* Check if client has already closed the TSAP and gone away */
+	if (self->close_pend)
+		return;
+
 	/*
 	 *  Inform service user if he has requested it
 	 */
@@ -1603,7 +1607,7 @@ void irttp_do_data_indication(struct tsap_cb *self, struct sk_buff *skb)
 {
 	int err;
 
-	/* Check if client has already tried to close the TSAP */
+	/* Check if client has already closed the TSAP and gone away */
 	if (self->close_pend) {
 		dev_kfree_skb(skb);
 		return;
