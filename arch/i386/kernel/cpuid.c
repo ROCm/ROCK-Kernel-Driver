@@ -36,11 +36,14 @@
 #include <linux/fs.h>
 #include <linux/smp_lock.h>
 #include <linux/fs.h>
+#include <linux/device.h>
 
 #include <asm/processor.h>
 #include <asm/msr.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
+
+static struct class_simple *cpuid_class;
 
 #ifdef CONFIG_SMP
 
@@ -155,17 +158,48 @@ static struct file_operations cpuid_fops = {
 
 int __init cpuid_init(void)
 {
+	int i, err = 0;
+	struct class_device *class_err;
+	i = 0;
+
 	if (register_chrdev(CPUID_MAJOR, "cpu/cpuid", &cpuid_fops)) {
 		printk(KERN_ERR "cpuid: unable to get major %d for cpuid\n",
 		       CPUID_MAJOR);
-		return -EBUSY;
+		err = -EBUSY;
+		goto out;
 	}
+	cpuid_class = class_simple_create(THIS_MODULE, "cpuid");
+	if (IS_ERR(cpuid_class)) {
+		err = PTR_ERR(cpuid_class);
+		goto out_chrdev;
+	}
+	for_each_online_cpu(i) {
+		class_err = class_simple_device_add(cpuid_class, MKDEV(CPUID_MAJOR, i), NULL, "cpu%d",i);
+		if (IS_ERR(class_err)) {
+			err = PTR_ERR(class_err);
+			goto out_class;
+		}
+	}
+	err = 0;
+	goto out;
 
-	return 0;
+out_class:
+	i = 0;
+	for_each_online_cpu(i)
+		class_simple_device_remove(MKDEV(CPUID_MAJOR, i));
+	class_simple_destroy(cpuid_class);
+out_chrdev:
+	unregister_chrdev(CPUID_MAJOR, "cpu/cpuid");	
+out:
+	return err;
 }
 
 void __exit cpuid_exit(void)
 {
+	int i = 0;
+	for_each_online_cpu(i)
+		class_simple_device_remove(MKDEV(CPUID_MAJOR, i));
+	class_simple_destroy(cpuid_class);
 	unregister_chrdev(CPUID_MAJOR, "cpu/cpuid");
 }
 
