@@ -30,7 +30,7 @@
 extern void die_if_kernel (char *str, struct pt_regs *regs, long err);
 
 struct exec_domain ia32_exec_domain;
-struct page *ia32_shared_page[(PAGE_ALIGN(IA32_PAGE_SIZE)/PAGE_SIZE) * NR_CPUS];
+struct page *ia32_shared_page[NR_CPUS];
 unsigned long *ia32_boot_gdt;
 unsigned long *cpu_gdt_table[NR_CPUS];
 
