@@ -1779,7 +1779,6 @@ nfsd4_encode_dirent(struct readdir_cd *ccd, const char *name, int namlen,
 	u32 *attrlenp;
 	struct dentry *dentry;
 	struct svc_export *exp = cd->rd_fhp->fh_export;
-	u32 bmval0, bmval1;
 	int nfserr = 0;
 
 	/* In nfsv4, "." and ".." never make it onto the wire.. */
@@ -1803,9 +1802,6 @@ nfsd4_encode_dirent(struct readdir_cd *ccd, const char *name, int namlen,
 	/*
 	 * Now we come to the ugly part: writing the fattr for this entry.
 	 */
-	bmval0 = cd->rd_bmval[0];
-	bmval1 = cd->rd_bmval[1];
-
 	dentry = lookup_one_len(name, cd->rd_fhp->fh_dentry, namlen);
 	if (IS_ERR(dentry)) {
 		nfserr = nfserrno(PTR_ERR(dentry));
@@ -1852,19 +1848,16 @@ error:
 	 * then in accordance with the spec, we fail the
 	 * entire READDIR operation(!)
 	 */
-	if (!(bmval0 & FATTR4_WORD0_RDATTR_ERROR)) {
+	if (!(cd->rd_bmval[0] & FATTR4_WORD0_RDATTR_ERROR)) {
 		cd->common.err = nfserr;
 		return -EINVAL;
 	}
 
-	bmval0 = FATTR4_WORD0_RDATTR_ERROR;
-	bmval1 = 0;
-
 	if (buflen < 6)
 		goto nospc;
 	*p++ = htonl(2);
-	*p++ = htonl(bmval0);
-	*p++ = htonl(bmval1);
+	*p++ = htonl(FATTR4_WORD0_RDATTR_ERROR); /* bmval0 */
+	*p++ = htonl(0);			 /* bmval1 */
 
 	attrlenp = p++;
 	*p++ = nfserr;       /* no htonl */
