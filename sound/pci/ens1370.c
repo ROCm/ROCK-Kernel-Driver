@@ -100,7 +100,7 @@ MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 #ifdef CHIP1371
 MODULE_PARM(joystick_port, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(joystick_port, "Joystick port address.");
-MODULE_PARM_SYNTAX(joystick_port, SNDRV_ENABLED ",allows:{{0},{0x200},{0x208},{0x210},{0x218}},dialog:list");
+MODULE_PARM_SYNTAX(joystick_port, SNDRV_ENABLED ",allows:{{0},{1},{0x200},{0x208},{0x210},{0x218}},dialog:list");
 #else
 MODULE_PARM(joystick, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(joystick, "Enable joystick.");

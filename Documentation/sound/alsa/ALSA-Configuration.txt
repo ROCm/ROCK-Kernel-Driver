@@ -198,6 +198,8 @@ Module parameters
 
     Module for soundcards based on Aztech AZF3328 PCI chip.
 
+    joystick	- Enable joystick (default off)
+
     Module supports up to 8 cards.
 
   Module snd-cmi8330
@@ -220,8 +222,8 @@ Module parameters
 
     Module for C-Media CMI8338 and 8738 PCI soundcards.
 
-    mpu_port	- 0x300 (default),0x310,0x320,0x330, -1 (diable)
-    fm_port     - 0x388 (default), -1 (disable)
+    mpu_port	- 0x300,0x310,0x320,0x330, 0 = disable (default)
+    fm_port     - 0x388 (default), 0 = disable (default)
     soft_ac3    - Sofware-conversion of raw SPDIF packets (model 033 only)
                   (default = 1)
     joystick	- Enable joystick (default off)
@@ -1124,17 +1126,16 @@ Module parameters
 
     Module for Yamaha PCI chips (YMF72x, YMF74x & YMF75x).
 
-    mpu_port      - 0x300,0x330,0x332,0x334, 0 (disable) by default
+    mpu_port      - 0x300,0x330,0x332,0x334, 0 (disable) by default,
+                    1 (auto-detect for YMF744/754 only)
     fm_port       - 0x388,0x398,0x3a0,0x3a8, 0 (disable) by default
+                    1 (auto-detect for YMF744/754 only)
     joystick_port - 0x201,0x202,0x204,0x205, 0 (disable) by default,
                     1 (auto-detect)
     rear_switch   - enable shared rear/line-in switch (bool)
 
     Module supports autoprobe and multiple chips (max 8).
 
-    With YMF744/754 chips, the MPU401/FM/joystick port addresses are
-    chosen automatically, and enabled by default.
-    
     The power-management is supported.
 
 

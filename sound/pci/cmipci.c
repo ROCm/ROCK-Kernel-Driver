@@ -60,8 +60,8 @@ MODULE_DEVICES("{{C-Media,CMI8738},"
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable switches */
-static long mpu_port[SNDRV_CARDS] = {0x330, [1 ... (SNDRV_CARDS-1)]=-1};
-static long fm_port[SNDRV_CARDS] = {0x388, [1 ... (SNDRV_CARDS-1)]=-1};
+static long mpu_port[SNDRV_CARDS];
+static long fm_port[SNDRV_CARDS];
 #ifdef DO_SOFT_AC3
 static int soft_ac3[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)]=1};
 #endif
@@ -80,10 +80,10 @@ MODULE_PARM_DESC(enable, "Enable C-Media PCI soundcard.");
 MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 MODULE_PARM(mpu_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
 MODULE_PARM_DESC(mpu_port, "MPU-401 port.");
-MODULE_PARM_SYNTAX(mpu_port, SNDRV_ENABLED ",allows:{{-1},{0x330},{0x320},{0x310},{0x300}},dialog:list");
+MODULE_PARM_SYNTAX(mpu_port, SNDRV_ENABLED ",allows:{{0},{0x330},{0x320},{0x310},{0x300}},dialog:list");
 MODULE_PARM(fm_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
 MODULE_PARM_DESC(fm_port, "FM port.");
-MODULE_PARM_SYNTAX(fm_port, SNDRV_ENABLED ",allows:{{-1},{0x388},{0x3c8},{0x3e0},{0x3e8}},dialog:list");
+MODULE_PARM_SYNTAX(fm_port, SNDRV_ENABLED ",allows:{{0},{0x388},{0x3c8},{0x3e0},{0x3e8}},dialog:list");
 #ifdef DO_SOFT_AC3
 MODULE_PARM(soft_ac3, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
 MODULE_PARM_DESC(soft_ac3, "Sofware-conversion of raw SPDIF packets (model 033 only).");
@@ -2958,8 +2958,8 @@ static int __devinit snd_cmipci_create(snd_card_t *card, struct pci_dev *pci,
 		.dev_free =	snd_cmipci_dev_free,
 	};
 	unsigned int val = 0;
-	unsigned long iomidi = mpu_port[dev];
-	unsigned long iosynth = fm_port[dev];
+	long iomidi = mpu_port[dev];
+	long iosynth = fm_port[dev];
 	int pcm_index, pcm_spdif_index;
 
 	*rcmipci = NULL;

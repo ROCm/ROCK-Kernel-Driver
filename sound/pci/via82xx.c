@@ -77,7 +77,7 @@ MODULE_DEVICES("{{VIA,VT82C686A/B/C,pci},{VIA,VT8233A/C,8235}}");
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
-static long mpu_port[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = -1};
+static long mpu_port[SNDRV_CARDS];
 #ifdef SUPPORT_JOYSTICK
 static int joystick[SNDRV_CARDS];
 #endif
@@ -1625,7 +1625,7 @@ static int snd_via686_init_misc(via82xx_t *chip, int dev)
 						    "VIA82xx MPU401")) != NULL) {
 			legacy |= VIA_FUNC_ENABLE_MIDI;
 		} else {
-			mpu_port[dev] = -1;
+			mpu_port[dev] = 0;
 			legacy &= ~VIA_FUNC_ENABLE_MIDI;
 		}
 	} else {
@@ -1652,7 +1652,7 @@ static int snd_via686_init_misc(via82xx_t *chip, int dev)
 		if (rev_h)
 			legacy &= ~VIA_FUNC_MIDI_PNP;	/* disable PCI I/O 2 */
 		legacy &= ~VIA_FUNC_ENABLE_MIDI;
-		mpu_port[dev] = -1;
+		mpu_port[dev] = 0;
 	}
 
 #ifdef SUPPORT_JOYSTICK

@@ -164,8 +164,7 @@ static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
 #ifdef SUPPORT_JOYSTICK
-static int joystick[SNDRV_CARDS] =
-	{-1};	/* "unset" as default */
+static int joystick[SNDRV_CARDS];
 #endif
 
 MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
@@ -179,8 +178,8 @@ MODULE_PARM_DESC(enable, "Enable AZF3328 soundcard.");
 MODULE_PARM_SYNTAX(enable, SNDRV_INDEX_DESC);
 #ifdef SUPPORT_JOYSTICK
 MODULE_PARM(joystick, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(joystick, "Forced joystick port enable for AZF3328 soundcard. (0 = force disable)");
-MODULE_PARM_SYNTAX(joystick, SNDRV_ENABLED);
+MODULE_PARM_DESC(joystick, "Enable joystick for AZF3328 soundcard.");
+MODULE_PARM_SYNTAX(joystick, SNDRV_BOOLEAN_FALSE_DESC);
 #endif
 
 typedef struct _snd_azf3328 azf3328_t;
@@ -1445,47 +1444,21 @@ static int __devinit snd_azf3328_create(snd_card_t * card,
 #ifdef SUPPORT_JOYSTICK
 static void __devinit snd_azf3328_config_joystick(azf3328_t *chip, int joystick)
 {
-	int i, activate = 0;
-	char *msg = NULL;
 	unsigned char val;
 
-	if (joystick == -1) /* auto detection/activation */
-	{
-		activate = 1;
-		for (i=0x200; i <= 0x207; i++)
-			if (inb(i) != 0xff) {
-				activate = 0;
-				break;
-			}
-	}
-
-	if (activate || joystick == 1) {
-		if ((chip->res_joystick = request_region(0x200, 8, "AZF3328 gameport")) != NULL) {
+	if (joystick == 1) {
+		if ((chip->res_joystick = request_region(0x200, 8, "AZF3328 gameport")) != NULL)
 			chip->gameport.io = 0x200;
-			activate = 1;
-		} else
-			activate = 0;
 	}
-	if (joystick == 0)
-		msg = "DISABLED (forced)";
-	else if (joystick == 1 && activate)
-		msg = "ENABLED (Warning: forced!)";
-	else if (activate)
-		msg = "ENABLED (via autodetect)";
-	else
-		msg = "DISABLED (address occupied by another joystick port)";
 
 	val = inb(chip->io2_port + IDX_IO2_LEGACY_ADDR);
-	if (activate)
+	if (chip->res_joystick)
 		val |= LEGACY_JOY;
 	else
 		val &= ~LEGACY_JOY;
 
 	outb(val, chip->io2_port + IDX_IO2_LEGACY_ADDR);
-#ifdef MODULE
-	printk("azt3328: Joystick port: %s.\n", msg);
-#endif
-	if (activate)
+	if (chip->res_joystick)
 		gameport_register_port(&chip->gameport);
 }
 #endif
