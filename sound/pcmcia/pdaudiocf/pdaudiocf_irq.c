@@ -28,7 +28,7 @@
  */
 irqreturn_t pdacf_interrupt(int irq, void *dev, struct pt_regs *regs)
 {
-	pdacf_t *chip = snd_magic_cast(pdacf_t, dev, return);
+	pdacf_t *chip = snd_magic_cast(pdacf_t, dev, return IRQ_NONE);
 	unsigned short stat;
 
 	if ((chip->chip_status & (PDAUDIOCF_STAT_IS_STALE|
