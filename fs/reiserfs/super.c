@@ -575,11 +575,8 @@ static const arg_desc_t tails[] = {
     {NULL, 0, 0}
 };
 
-int reiserfs_default_io_size = 128 * 1024; /* Default recommended I/O size is 128k.
-					      There might be broken applications that are
-					      confused by this. Use nolargeio mount option
-					      to get usual i/o size = PAGE_SIZE.
-					    */
+int reiserfs_default_io_size = PAGE_SIZE;  /* FIXME: RPM breaks with the
+						     previous value of 128k! */
 
 /* proceed only one option from a list *cur - string containing of mount options
    opts - array of options which are accepted
