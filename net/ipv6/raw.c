@@ -453,6 +453,9 @@ static int rawv6_push_pending_frames(struct sock *sk, struct flowi *fl, struct r
 	int err = 0;
 	u16 *csum;
 
+	if (!opt->checksum)
+		goto send;
+
 	if ((skb = skb_peek(&sk->sk_write_queue)) == NULL)
 		goto out;
 
@@ -485,6 +488,7 @@ static int rawv6_push_pending_frames(struct sock *sk, struct flowi *fl, struct r
 	}
 	if (*csum == 0)
 		*csum = -1;
+send:
 	err = ip6_push_pending_frames(sk);
 out:
 	return err;
@@ -702,13 +706,8 @@ back_from_confirm:
 
 		if (err)
 			ip6_flush_pending_frames(sk);
-		else if (!(msg->msg_flags & MSG_MORE)) {
-			if (raw_opt->checksum) {
-				err = rawv6_push_pending_frames(sk, &fl, raw_opt, len);
-			} else {
-				err = ip6_push_pending_frames(sk);
-			}
-		}
+		else if (!(msg->msg_flags & MSG_MORE))
+			err = rawv6_push_pending_frames(sk, &fl, raw_opt, len);
 	}
 done:
 	ip6_dst_store(sk, dst,
