@@ -269,6 +269,9 @@ static struct gendisk *xlvbd_get_gendisk(struct xlbd_major_info *mi,
 
         /* Make sure buffer addresses are sector-aligned. */
         blk_queue_dma_alignment(xlbd_blk_queue, 511);
+
+	/* Set readahead */
+	blk_queue_max_sectors(xlbd_blk_queue, 128);
     }
     gd->queue = xlbd_blk_queue;
 
