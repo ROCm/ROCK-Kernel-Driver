@@ -2,7 +2,7 @@
 # Makefile for the Linux networking core.
 #
 
-export-objs := ext8022.o netfilter.o profile.o
+export-objs := ext8022.o
 
 obj-y := sock.o skbuff.o iovec.o datagram.o scm.o
 
