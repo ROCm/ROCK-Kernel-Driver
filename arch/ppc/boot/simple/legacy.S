@@ -3,15 +3,15 @@
  *
  * Author: Tom Rini <trini@mvista.com>
  *
- * This will go and setup ISA_io to 0x8000000.
+ * This will go and setup ISA_io to 0x8000000 and return.
  */
 
 #include <asm/ppc_asm.h>
 
 	.text
 
-	.globl setup_legacy
-setup_legacy:
+	.globl serial_fixups
+serial_fixups:
 	lis	r3,ISA_io@h	/* Load ISA_io */
 	ori	r3,r3,ISA_io@l
 	lis	r4,0x8000	/* Load the value, 0x8000000 */

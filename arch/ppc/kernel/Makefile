@@ -56,12 +56,11 @@ obj-$(CONFIG_PM)		+= ppc4xx_pm.o
 endif
 obj-$(CONFIG_8xx)		+= m8xx_setup.o ppc8xx_pic.o
 ifeq ($(CONFIG_8xx),y)
-obj-$(CONFIG_PCI)		+= qspan_pci.o
-ifndef CONFIG_MATH_EMULATION
+obj-$(CONFIG_PCI)		+= qspan_pci.o i8259.o
+ifneq ($(CONFIG_MATH_EMULATION),n)
 obj-y				+= softemu8xx.o
 endif
 endif
-obj-$(CONFIG_MBX)		+= i8259.o
 obj-$(CONFIG_ALL_PPC)		+= prom_init.o prom.o open_pic.o \
 					indirect_pci.o i8259.o
 obj-$(CONFIG_ADIR)		+= i8259.o indirect_pci.o pci_auto.o \

@@ -75,7 +75,7 @@ extern void gunzip(void *, int, unsigned char *, int *);
 
 extern void _put_MSR(unsigned int val);
 extern unsigned long serial_init(int chan, void *ignored);
-extern void setup_legacy(void);
+extern void serial_fixups(void);
 
 void
 writel(unsigned int val, unsigned int address)
@@ -134,7 +134,7 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum,
 	int start_multi = 0;
 	unsigned int pci_viddid, pci_did, tulip_pci_base, tulip_base;
 
-	setup_legacy();
+	serial_fixups();
 #if defined(CONFIG_SERIAL_CONSOLE)
 	com_port = serial_init(0, NULL);
 #endif /* CONFIG_SERIAL_CONSOLE */

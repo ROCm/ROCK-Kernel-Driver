@@ -6,7 +6,7 @@
  * Author: Mark A. Greer
  *         mgreer@mvista.com
  *
- * Copyright 2000, 2001 MontaVista Software Inc.
+ * Copyright 2000-2002 MontaVista Software Inc.
  *
  * This program is free software; you can redistribute  it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the
@@ -71,7 +71,6 @@
 #include <linux/delay.h>
 #include <linux/irq.h>
 #include <linux/ide.h>
-#include <linux/irq.h>
 #include <linux/seq_file.h>
 
 #include <asm/system.h>
@@ -180,7 +179,7 @@ sandpoint_setup_arch(void)
 #endif
 
 	printk("Motorola SPS Sandpoint Test Platform\n");
-	printk("Sandpoint port (C) 2000, 2001 MontaVista Software, Inc. (source@mvista.com)\n");
+	printk("Sandpoint port (MontaVista Software, Inc. (source@mvista.com))\n");
 
 	/* The Sandpoint rom doesn't enable any caches.  Do that now.
 	 * The 7450 portion will also set up the L3s once I get enough

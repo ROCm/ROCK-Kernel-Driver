@@ -15,34 +15,23 @@
  */
 
 #include <linux/config.h>
-#include <linux/kernel.h>
-#include <linux/init.h>
-#include <linux/errno.h>
-#include <linux/pci.h>
-#include <linux/time.h>
 #include <linux/types.h>
-#include <linux/major.h>
-#include <linux/kdev_t.h>
+#include <linux/delay.h>
+#include <linux/pci_ids.h>
+#include <linux/ioport.h>
+#include <linux/init.h>
 #include <linux/ide.h>
-#include <linux/irq.h>
 #include <linux/seq_file.h>
+#include <linux/blk.h>
 #include <linux/console.h>
 
-#include <asm/system.h>
-#include <asm/pgtable.h>
-#include <asm/machdep.h>
-#include <asm/page.h>
-#include <asm/dma.h>
 #include <asm/io.h>
-#include <asm/time.h>
-#include <asm/delay.h>
-#include <asm/irq.h>
 #include <asm/open_pic.h>
 #include <asm/i8259.h>
-#include <asm/pci-bridge.h>
 #include <asm/todc.h>
 #include <asm/bootinfo.h>
 #include <asm/mpc10x.h>
+#include <asm/hw_irq.h>
 
 extern void lopec_find_bridges(void);
 
@@ -230,7 +219,7 @@ lopec_init_IRQ(void)
 	i8259_init(0xfef00000);
 }
 
-void __init
+static int __init
 lopec_request_io(void)
 {
 	outb(0x00, 0x4d0);
@@ -242,9 +231,11 @@ lopec_request_io(void)
 	request_region(0x80, 0x10, "dma page reg");
 	request_region(0xa0, 0x20, "pic2");
 	request_region(0xc0, 0x20, "dma2");
+	
+	return 0;
 }
 
-arch_initcall(lopec_request_io);
+device_initcall(lopec_request_io);
 
 static void __init
 lopec_map_io(void)
