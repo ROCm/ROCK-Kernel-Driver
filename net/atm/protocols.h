@@ -11,6 +11,5 @@ void atm_push_raw(struct atm_vcc *vcc,struct sk_buff *skb);
 int atm_init_aal0(struct atm_vcc *vcc);	/* "raw" AAL0 */
 int atm_init_aal34(struct atm_vcc *vcc);/* "raw" AAL3/4 transport */
 int atm_init_aal5(struct atm_vcc *vcc);	/* "raw" AAL5 transport */
-int atm_init_atmarp(struct atm_vcc *vcc);/* ATM ARP */
 
 #endif

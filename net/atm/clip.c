@@ -762,14 +762,51 @@ static int atm_init_atmarp(struct atm_vcc *vcc)
 	return 0;
 }
 
-static struct atm_clip_ops __atm_clip_ops = {
-	.clip_create =		clip_create,
-	.clip_mkip =		clip_mkip,
-	.clip_setentry =	clip_setentry,
-	.clip_encap =		clip_encap,
-	.clip_push =		clip_push,
-	.atm_init_atmarp =	atm_init_atmarp,
-	.owner =		THIS_MODULE
+static int clip_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
+{
+	struct atm_vcc *vcc = ATM_SD(sock);
+	int err = 0;
+
+	switch (cmd) {
+		case SIOCMKCLIP:
+		case ATMARPD_CTRL:
+		case ATMARP_MKIP:
+		case ATMARP_SETENTRY:
+		case ATMARP_ENCAP:
+			if (!capable(CAP_NET_ADMIN))
+				return -EPERM;
+			break;
+		default:
+			return -ENOIOCTLCMD;
+	}
+
+	switch (cmd) {
+		case SIOCMKCLIP:
+			err = clip_create(arg);
+			break;
+		case ATMARPD_CTRL:
+			err = atm_init_atmarp(vcc);
+			if (!err) {
+				sock->state = SS_CONNECTED;
+				__module_get(THIS_MODULE);
+			}
+			break;
+		case ATMARP_MKIP:
+			err = clip_mkip(vcc ,arg);
+			break;
+		case ATMARP_SETENTRY:
+			err = clip_setentry(vcc, arg);
+			break;
+		case ATMARP_ENCAP:
+			err = clip_encap(vcc, arg);
+			break;
+	}
+	return err;
+}
+
+static struct atm_ioctl clip_ioctl_ops = {
+	.owner 	= THIS_MODULE,
+	.ioctl	= clip_ioctl,
 };
 
 #ifdef CONFIG_PROC_FS
@@ -942,13 +979,10 @@ static int arp_seq_open(struct inode *inode, struct file *file)
 	struct seq_file *seq;
 	int rc = -EAGAIN;
 
-	if (!try_atm_clip_ops())
-		goto out;
-
 	state = kmalloc(sizeof(*state), GFP_KERNEL);
 	if (!state) {
 		rc = -ENOMEM;
-		goto out_put;
+		goto out_kfree;
 	}
 
 	rc = seq_open(file, &arp_seq_ops);
@@ -960,8 +994,6 @@ static int arp_seq_open(struct inode *inode, struct file *file)
 out:
 	return rc;
 
-out_put:
-	module_put(atm_clip_ops->owner);
 out_kfree:
 	kfree(state);
 	goto out;
@@ -969,7 +1001,6 @@ out_kfree:
 
 static int arp_seq_release(struct inode *inode, struct file *file)
 {
-	module_put(atm_clip_ops->owner);
 	return seq_release_private(inode, file);
 }
 
@@ -1004,7 +1035,7 @@ static int __init atm_clip_init(void)
 	skb_queue_head_init(&clip_tbl.proxy_queue);
 
 	clip_tbl_hook = &clip_tbl;
-	atm_clip_ops_set(&__atm_clip_ops);
+	register_atm_ioctl(&clip_ioctl_ops);
 
 	return 0;
 }
@@ -1015,7 +1046,7 @@ static void __exit atm_clip_exit(void)
 
 	remove_proc_entry("arp", atm_proc_root);
 
-	atm_clip_ops_set(NULL);
+	deregister_atm_ioctl(&clip_ioctl_ops);
 
 	neigh_ifdown(&clip_tbl, NULL);
 	dev = clip_devs;
