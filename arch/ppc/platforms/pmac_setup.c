@@ -399,7 +399,7 @@ note_scsi_host(struct device_node *node, void *host)
 #endif
 
 #if defined(CONFIG_BLK_DEV_IDE) && defined(CONFIG_BLK_DEV_IDE_PMAC)
-dev_t __init
+static dev_t __init
 find_ide_boot(void)
 {
 	char *p;

@@ -362,7 +362,6 @@ jffs_new_inode(const struct inode * dir, struct jffs_raw_inode *raw_inode,
 	inode->i_nlink = raw_inode->nlink;
 	inode->i_uid = raw_inode->uid;
 	inode->i_gid = raw_inode->gid;
-	inode->i_rdev = NODEV;
 	inode->i_size = raw_inode->dsize;
 	inode->i_atime.tv_sec = raw_inode->atime;
 	inode->i_mtime.tv_sec = raw_inode->mtime;

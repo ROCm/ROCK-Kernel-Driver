@@ -16,10 +16,6 @@
 
 /* The great kdev_t changeover in 2.5.x */
 #include <linux/kdev_t.h>
-#ifndef minor
-#define minor(dev) MINOR(dev)
-#endif
-
 
 /* Transaction Label handling */
 struct hpsb_tlabel_pool {

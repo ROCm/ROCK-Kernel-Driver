@@ -322,7 +322,6 @@ struct inode *hfs_iget(struct hfs_cat_entry *entry, ino_t type,
 		/* Initialize the inode */
 		struct hfs_sb_info *hsb = HFS_SB(sb);
 
-		inode->i_rdev = NODEV;
 		inode->i_ctime.tv_sec = inode->i_atime.tv_sec = inode->i_mtime.tv_sec =
 					hfs_m_to_utime(entry->modify_date);
 		inode->i_ctime.tv_nsec = 0;

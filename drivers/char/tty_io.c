@@ -2140,7 +2140,7 @@ error:
 	kfree(tty_dev);
 }
 
-void tty_remove_class_device(dev_t dev)
+static void tty_remove_class_device(dev_t dev)
 {
 	struct tty_dev *tty_dev = NULL;
 	struct list_head *tmp;
@@ -2149,19 +2149,15 @@ void tty_remove_class_device(dev_t dev)
 	spin_lock(&tty_dev_list_lock);
 	list_for_each (tmp, &tty_dev_list) {
 		tty_dev = list_entry(tmp, struct tty_dev, node);
-		if ((MAJOR(tty_dev->dev) == MAJOR(dev)) &&
-		    (MINOR(tty_dev->dev) == MINOR(dev))) {
+		if (tty_dev->dev == dev) {
+			list_del(&tty_dev->node);
 			found = 1;
 			break;
 		}
 	}
-	if (found) {
-		list_del(&tty_dev->node);
-		spin_unlock(&tty_dev_list_lock);
+	spin_unlock(&tty_dev_list_lock);
+	if (found)
 		class_device_unregister(&tty_dev->class_dev);
-	} else {
-		spin_unlock(&tty_dev_list_lock);
-	}
 }
 
 /**
