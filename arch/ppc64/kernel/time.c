@@ -267,7 +267,7 @@ int timer_interrupt(struct pt_regs * regs)
 	int next_dec;
 	unsigned long cur_tb;
 	struct paca_struct *lpaca = get_paca();
-	unsigned long cpu = lpaca->xPacaIndex;
+	unsigned long cpu = smp_processor_id();
 
 	irq_enter();
 
