@@ -207,7 +207,11 @@
 #define TG3PCI_STD_RING_PROD_IDX	0x00000098 /* 64-bit */
 #define TG3PCI_RCV_RET_RING_CON_IDX	0x000000a0 /* 64-bit */
 #define TG3PCI_SND_PROD_IDX		0x000000a8 /* 64-bit */
-/* 0xb0 --> 0x100 unused */
+/* 0xb0 --> 0xb8 unused */
+#define TG3PCI_DUAL_MAC_CTRL		0x000000b8
+#define  DUAL_MAC_CTRL_CH_MASK		 0x00000003
+#define  DUAL_MAC_CTRL_ID		 0x00000004
+/* 0xbc --> 0x100 unused */
 
 /* 0x100 --> 0x200 unused */
 
@@ -1337,6 +1341,9 @@
 #define  SWARB_REQ3			 0x00008000
 #define    NVRAM_BUFFERED_PAGE_SIZE	   264
 #define    NVRAM_BUFFERED_PAGE_POS	   9
+#define NVRAM_ACCESS			0x00007024
+#define  ACCESS_ENABLE			 0x00000001
+#define  ACCESS_WR_ENABLE		 0x00000002
 /* 0x7024 --> 0x7400 unused */
 
 /* 0x7400 --> 0x8000 unused */

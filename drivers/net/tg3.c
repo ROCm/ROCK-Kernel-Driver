@@ -3503,28 +3503,39 @@ out:
 }
 
 /* tp->lock is held. */
+static int tg3_nvram_lock(struct tg3 *tp)
+{
+	if (tp->tg3_flags & TG3_FLAG_NVRAM) {
+		int i;
+
+		tw32(NVRAM_SWARB, SWARB_REQ_SET1);
+		for (i = 0; i < 8000; i++) {
+			if (tr32(NVRAM_SWARB) & SWARB_GNT1)
+				break;
+			udelay(20);
+		}
+		if (i == 8000)
+			return -ENODEV;
+	}
+	return 0;
+}
+
+/* tp->lock is held. */
+static void tg3_nvram_unlock(struct tg3 *tp)
+{
+	if (tp->tg3_flags & TG3_FLAG_NVRAM)
+		tw32_f(NVRAM_SWARB, SWARB_REQ_CLR1);
+}
+
+/* tp->lock is held. */
 static int tg3_chip_reset(struct tg3 *tp)
 {
 	u32 val;
 	u32 flags_save;
 	int i;
 
-	if (!(tp->tg3_flags2 & TG3_FLG2_SUN_5704)) {
-		/* Force NVRAM to settle.
-		 * This deals with a chip bug which can result in EEPROM
-		 * corruption.
-		 */
-		if (tp->tg3_flags & TG3_FLAG_NVRAM) {
-			int i;
-
-			tw32(NVRAM_SWARB, SWARB_REQ_SET1);
-			for (i = 0; i < 100000; i++) {
-				if (tr32(NVRAM_SWARB) & SWARB_GNT1)
-					break;
-				udelay(10);
-			}
-		}
-	}
+	if (!(tp->tg3_flags2 & TG3_FLG2_SUN_5704))
+		tg3_nvram_lock(tp);
 
 	/*
 	 * We must avoid the readl() that normally takes place.
@@ -6518,7 +6529,15 @@ static void __devinit tg3_nvram_init(struct tg3 *tp)
 
 	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5700 &&
 	    GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5701) {
-		u32 nvcfg1 = tr32(NVRAM_CFG1);
+		u32 nvcfg1;
+
+		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5750) {
+			u32 nvaccess = tr32(NVRAM_ACCESS);
+
+			tw32_f(NVRAM_ACCESS, nvaccess | ACCESS_ENABLE);
+		}
+
+		nvcfg1 = tr32(NVRAM_CFG1);
 
 		tp->tg3_flags |= TG3_FLAG_NVRAM;
 		if (nvcfg1 & NVRAM_CFG1_FLASHIF_ENAB) {
@@ -6529,6 +6548,11 @@ static void __devinit tg3_nvram_init(struct tg3 *tp)
 			tw32(NVRAM_CFG1, nvcfg1);
 		}
 
+		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5750) {
+			u32 nvaccess = tr32(NVRAM_ACCESS);
+
+			tw32_f(NVRAM_ACCESS, nvaccess & ~ACCESS_ENABLE);
+		}
 	} else {
 		tp->tg3_flags &= ~(TG3_FLAG_NVRAM | TG3_FLAG_NVRAM_BUFFERED);
 	}
@@ -6571,7 +6595,7 @@ static int __devinit tg3_nvram_read_using_eeprom(struct tg3 *tp,
 static int __devinit tg3_nvram_read(struct tg3 *tp,
 				    u32 offset, u32 *val)
 {
-	int i, saw_done_clear;
+	int i;
 
 	if (tp->tg3_flags2 & TG3_FLG2_SUN_5704) {
 		printk(KERN_ERR PFX "Attempt to do nvram_read on Sun 5704\n");
@@ -6589,11 +6613,12 @@ static int __devinit tg3_nvram_read(struct tg3 *tp,
 	if (offset > NVRAM_ADDR_MSK)
 		return -EINVAL;
 
-	tw32(NVRAM_SWARB, SWARB_REQ_SET1);
-	for (i = 0; i < 1000; i++) {
-		if (tr32(NVRAM_SWARB) & SWARB_GNT1)
-			break;
-		udelay(20);
+	tg3_nvram_lock(tp);
+
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5750) {
+		u32 nvaccess = tr32(NVRAM_ACCESS);
+
+		tw32_f(NVRAM_ACCESS, nvaccess | ACCESS_ENABLE);
 	}
 
 	tw32(NVRAM_ADDR, offset);
@@ -6601,24 +6626,26 @@ static int __devinit tg3_nvram_read(struct tg3 *tp,
 	     NVRAM_CMD_RD | NVRAM_CMD_GO |
 	     NVRAM_CMD_FIRST | NVRAM_CMD_LAST | NVRAM_CMD_DONE);
 
-	/* Wait for done bit to clear then set again. */
-	saw_done_clear = 0;
+	/* Wait for done bit to clear. */
 	for (i = 0; i < 1000; i++) {
 		udelay(10);
-		if (!saw_done_clear &&
-		    !(tr32(NVRAM_CMD) & NVRAM_CMD_DONE))
-			saw_done_clear = 1;
-		else if (saw_done_clear &&
-			 (tr32(NVRAM_CMD) & NVRAM_CMD_DONE))
+		if (tr32(NVRAM_CMD) & NVRAM_CMD_DONE) {
+			udelay(10);
+			*val = swab32(tr32(NVRAM_RDDATA));
 			break;
-	}
-	if (i >= 1000) {
-		tw32(NVRAM_SWARB, SWARB_REQ_CLR1);
-		return -EBUSY;
+		}
 	}
 
-	*val = swab32(tr32(NVRAM_RDDATA));
-	tw32(NVRAM_SWARB, 0x20);
+	tg3_nvram_unlock(tp);
+
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5750) {
+		u32 nvaccess = tr32(NVRAM_ACCESS);
+
+		tw32_f(NVRAM_ACCESS, nvaccess & ~ACCESS_ENABLE);
+	}
+
+	if (i >= 1000)
+		return -EBUSY;
 
 	return 0;
 }
@@ -7355,10 +7382,16 @@ static int __devinit tg3_get_device_address(struct tg3 *tp)
 		return 0;
 #endif
 
-	if (PCI_FUNC(tp->pdev->devfn) == 0)
-		mac_offset = 0x7c;
-	else
-		mac_offset = 0xcc;
+	mac_offset = 0x7c;
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704 &&
+	    !(tp->tg3_flags & TG3_FLG2_SUN_5704)) {
+		if (tr32(TG3PCI_DUAL_MAC_CTRL) & DUAL_MAC_CTRL_ID)
+			mac_offset = 0xcc;
+		if (tg3_nvram_lock(tp))
+			tw32_f(NVRAM_CMD, NVRAM_CMD_RESET);
+		else
+			tg3_nvram_unlock(tp);
+	}
 
 	/* First try to get it from MAC address mailbox. */
 	tg3_read_mem(tp, NIC_SRAM_MAC_ADDR_HIGH_MBOX, &hi);
