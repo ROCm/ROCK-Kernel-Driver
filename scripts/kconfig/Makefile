@@ -3,37 +3,25 @@
 # These targets are used from top-level makefile
 
 .PHONY: oldconfig xconfig gconfig menuconfig config silentoldconfig \
-	cloneconfig check-meta
+	cloneconfig
 
-check-meta:
-	@if [ -e .config ] &&						\
-		grep /var/adm/running-kernel.make .config; then		\
-	    echo;							\
-	    echo "The .config file is a merged configuration; please"	\
-		 "remove it by hand before creating your own."		\
-		 "You can use one of the files arch/$(ARCH)/defconfig.*" \
-		 "as a template.";					\
-	    echo;							\
-	    exit 1;							\
-	fi
-
-xconfig: $(obj)/qconf check-meta
+xconfig: $(obj)/qconf
 	$< arch/$(ARCH)/Kconfig
 
-gconfig: (obj)/gconf check-meta
+gconfig: $(obj)/gconf
 	$< arch/$(ARCH)/Kconfig
 
-menuconfig: $(obj)/mconf check-meta
+menuconfig: $(obj)/mconf
 	$(Q)$(MAKE) $(build)=scripts/lxdialog
 	$< arch/$(ARCH)/Kconfig
 
-config: $(obj)/conf check-meta
+config: $(obj)/conf
 	$< arch/$(ARCH)/Kconfig
 
-oldconfig: $(obj)/conf check-meta
+oldconfig: $(obj)/conf
 	$< -o arch/$(ARCH)/Kconfig
 
-silentoldconfig: $(obj)/conf check-meta
+silentoldconfig: $(obj)/conf
 	$< -s arch/$(ARCH)/Kconfig
 
 check_CONFIG_IKCONFIG_PROC:
@@ -44,20 +32,20 @@ check_CONFIG_IKCONFIG_PROC:
 
 _cloneconfig: check_CONFIG_IKCONFIG_PROC
 	$(Q)gzip -cd /proc/config.gz > $(objtree)/.config
-cloneconfig: check-meta _cloneconfig oldconfig
+cloneconfig: _cloneconfig oldconfig
 
 .PHONY: randconfig allyesconfig allnoconfig allmodconfig defconfig
 
-randconfig: $(obj)/conf check-meta
+randconfig: $(obj)/conf
 	$< -r arch/$(ARCH)/Kconfig
 
-allyesconfig: $(obj)/conf check-meta
+allyesconfig: $(obj)/conf
 	$< -y arch/$(ARCH)/Kconfig
 
-allnoconfig: $(obj)/conf check-meta
+allnoconfig: $(obj)/conf
 	$< -n arch/$(ARCH)/Kconfig
 
-allmodconfig: $(obj)/conf check-meta
+allmodconfig: $(obj)/conf
 	$< -m arch/$(ARCH)/Kconfig
 
 _defconfig: check_CONFIG_IKCONFIG_PROC
@@ -68,7 +56,7 @@ _defconfig: check_CONFIG_IKCONFIG_PROC
 	    false;							\
 	fi;								\
 	cp $$config $(objtree)/.config
-defconfig: check-meta _defconfig oldconfig
+defconfig: _defconfig oldconfig
 
 # Help text used by make help
 help:

@@ -53,8 +53,8 @@ static inline void __endian(const void *src, void *dest, unsigned int size)
 
 #endif
 
-#define NOFAIL(ptr)   do_nofail((ptr), __FILE__, __LINE__, #ptr)
-void *do_nofail(void *ptr, const char *file, int line, const char *expr);
+#define NOFAIL(ptr)   do_nofail((ptr), #ptr)
+void *do_nofail(void *ptr, const char *expr);
 
 struct buffer {
 	char *p;

@@ -1007,6 +1007,8 @@ static int simplify_symbols(Elf_Shdr *sechdrs,
 			/* We compiled with -fno-common.  These are not
 			   supposed to happen.  */
 			DEBUGP("Common symbol: %s\n", strtab + sym[i].st_name);
+			printk("%s: please compile with -fno-common\n",
+			       mod->name);
 			ret = -ENOEXEC;
 			break;
 
@@ -1545,6 +1547,10 @@ static struct module *load_module(void __user *umod,
 				      / sizeof(struct obsolete_modparm),
 				      sechdrs, symindex,
 				      (char *)sechdrs[strindex].sh_addr);
+		if (setupindex)
+			printk(KERN_WARNING "%s: Ignoring new-style "
+			       "parameters in presence of obsolete ones\n",
+			       mod->name);
 	} else {
 		/* Size of section 0 is 0, so this works well if no params */
 		err = parse_args(mod->name, mod->args,
