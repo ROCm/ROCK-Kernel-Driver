@@ -7,10 +7,11 @@ static int u14_34f_release(struct Scsi_Host *);
 static int u14_34f_queuecommand(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
 static int u14_34f_eh_abort(Scsi_Cmnd *);
 static int u14_34f_eh_host_reset(Scsi_Cmnd *);
-static int u14_34f_bios_param(struct scsi_device *, struct block_device *, sector_t, int *);
+static int u14_34f_bios_param(struct scsi_device *, struct block_device *,
+                              sector_t, int *);
 static int u14_34f_slave_configure(Scsi_Device *);
 
-#define U14_34F_VERSION "8.00.00"
+#define U14_34F_VERSION "8.03.00"
 
 #define ULTRASTOR_14_34F {                                                   \
                 .name         = "UltraStor 14F/34F rev. " U14_34F_VERSION " ", \
