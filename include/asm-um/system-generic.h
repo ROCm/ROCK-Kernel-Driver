@@ -17,6 +17,7 @@
 
 extern void *switch_to(void *prev, void *next, void *last);
 
+extern int get_signals(void);
 extern int set_signals(int enable);
 extern int get_signals(void);
 extern void block_signals(void);

@@ -58,8 +58,7 @@ void atari_mksound (unsigned int hz, unsigned int ticks)
 	unsigned char tmp;
 	int period;
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 
 
 	/* Disable generator A in mixer control.  */
@@ -106,5 +105,5 @@ void atari_mksound (unsigned int hz, unsigned int ticks)
 	tmp &= ~1;
 	sound_ym.wd_data = tmp;
 	}
-	restore_flags(flags);
+	local_irq_restore(flags);
 }

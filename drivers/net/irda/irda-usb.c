@@ -1524,7 +1524,7 @@ static int irda_usb_probe(struct usb_interface *intf,
 	if (ret)
 		return -ENOMEM;
 
-	dev_set_drvdata(&intf->dev, self);
+	usb_set_intfdata(intf, self);
 	return 0;
 }
 
@@ -1543,12 +1543,12 @@ static int irda_usb_probe(struct usb_interface *intf,
 static void irda_usb_disconnect(struct usb_interface *intf)
 {
 	unsigned long flags;
-	struct irda_usb_cb *self = dev_get_drvdata (&intf->dev);
+	struct irda_usb_cb *self = usb_get_intfdata(intf);
 	int i;
 
 	IRDA_DEBUG(1, "%s()\n", __FUNCTION__);
 
-	dev_set_drvdata(&intf->dev, NULL);
+	usb_set_intfdata(intf, NULL);
 	if (!self)
 		return;
 

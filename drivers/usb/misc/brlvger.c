@@ -406,7 +406,7 @@ brlvger_probe (struct usb_interface *intf,
  out:
 	up(&reserve_sem);
 	if (priv) {
-		dev_set_drvdata (&intf->dev, priv);
+		usb_set_intfdata (intf, priv);
 		return 0;
 	}
 	return -EIO;
@@ -415,10 +415,10 @@ brlvger_probe (struct usb_interface *intf,
 static void
 brlvger_disconnect(struct usb_interface *intf)
 {
-	struct brlvger_priv *priv = dev_get_drvdata (&intf->dev);
+	struct brlvger_priv *priv = usb_get_intfdata (intf);
 	int r;
 
-	dev_set_drvdata (&intf->dev, NULL);
+	usb_set_intfdata (intf, NULL);
 	if(priv){
 		info("Display %d disconnecting", priv->subminor);
 

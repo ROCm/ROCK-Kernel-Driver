@@ -48,8 +48,8 @@ typedef struct {
 	"js 2f\n" \
 	LOCK_SECTION_START("") \
 	"2:\t" \
-	"cmpb $0,%0\n\t" \
 	"rep;nop\n\t" \
+	"cmpb $0,%0\n\t" \
 	"jle 2b\n\t" \
 	"jmp 1b\n" \
 	LOCK_SECTION_END

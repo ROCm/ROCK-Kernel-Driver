@@ -257,7 +257,6 @@ struct pci_bus * __devinit pci_add_new_bus(struct pci_bus *parent, struct pci_de
 int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev * dev, int max, int pass)
 {
 	unsigned int buses;
-	unsigned short cr;
 	struct pci_bus *child;
 	int is_cardbus = (dev->hdr_type == PCI_HEADER_TYPE_CARDBUS);
 
@@ -285,13 +284,12 @@ int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev * dev, int max
 	} else {
 		/*
 		 * We need to assign a number to this bus which we always
-		 * do in the second pass. We also keep all address decoders
-		 * on the bridge disabled during scanning.  FIXME: Why?
+		 * do in the second pass.
 		 */
 		if (!pass)
 			return max;
-		pci_read_config_word(dev, PCI_COMMAND, &cr);
-		pci_write_config_word(dev, PCI_COMMAND, 0x0000);
+
+		/* Clear errors */
 		pci_write_config_word(dev, PCI_STATUS, 0xffff);
 
 		child = pci_add_new_bus(bus, dev, ++max);
@@ -319,7 +317,6 @@ int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev * dev, int max
 		 */
 		child->subordinate = max;
 		pci_write_config_byte(dev, PCI_SUBORDINATE_BUS, max);
-		pci_write_config_word(dev, PCI_COMMAND, cr);
 	}
 	sprintf(child->name, (is_cardbus ? "PCI CardBus #%02x" : "PCI Bus #%02x"), child->number);
 

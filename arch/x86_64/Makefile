@@ -54,6 +54,8 @@ libs-y 					+= arch/x86_64/lib/
 core-y					+= arch/x86_64/kernel/ arch/x86_64/mm/
 core-$(CONFIG_IA32_EMULATION)		+= arch/x86_64/ia32/
 drivers-$(CONFIG_PCI)			+= arch/x86_64/pci/
+# FIXME: is drivers- right ?
+drivers-$(CONFIG_OPROFILE)		+= arch/x86_64/oprofile/
 
 makeboot =$(Q)$(MAKE) -f scripts/Makefile.build obj=arch/x86_64/boot $(1)
 

@@ -177,7 +177,7 @@ void usb_show_string(struct usb_device *dev, char *id, int index)
 	if (!(buf = kmalloc(256, GFP_KERNEL)))
 		return;
 	if (usb_string(dev, index, buf, 256) > 0)
-		printk(KERN_INFO "%s: %s\n", id, buf);
+		dev_printk(KERN_INFO, dev->dev, "%s: %s\n", id, buf);
 	kfree(buf);
 }
 

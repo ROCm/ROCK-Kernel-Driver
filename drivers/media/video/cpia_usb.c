@@ -486,7 +486,7 @@ static int cpia_probe(struct usb_interface *intf,
 		      const struct usb_device_id *id)
 {
 	struct usb_device *udev = interface_to_usbdev(intf);
-	struct usb_interface_descriptor *interface;
+	struct usb_host_interface *interface;
 	struct usb_cpia *ucpia;
 	struct cam_data *cam;
 	int ret;
@@ -508,7 +508,7 @@ static int cpia_probe(struct usb_interface *intf,
 	memset(ucpia, 0, sizeof(*ucpia));
 
 	ucpia->dev = udev;
-	ucpia->iface = interface->bInterfaceNumber;
+	ucpia->iface = interface->desc.bInterfaceNumber;
 	init_waitqueue_head(&ucpia->wq_stream);
 
 	ucpia->buffers[0] = vmalloc(sizeof(*ucpia->buffers[0]));
@@ -552,7 +552,7 @@ static int cpia_probe(struct usb_interface *intf,
 	cpia_add_to_list(&cam_list, &cam);
 	spin_unlock( &cam_list_lock_usb );
 
-	dev_set_drvdata(&intf->dev, cam);
+	usb_set_intfdata(intf, cam);
 	return 0;
 
 fail_all:
@@ -593,11 +593,11 @@ static struct usb_driver cpia_driver = {
 /* will do it for us as well as passing a udev structure - jerdfelt */
 static void cpia_disconnect(struct usb_interface *intf)
 {
-	struct cam_data *cam = dev_get_drvdata(&intf->dev);
+	struct cam_data *cam = usb_get_intfdata(intf);
 	struct usb_cpia *ucpia;
 	struct usb_device *udev;
   
-	dev_set_drvdata(&intf->dev, NULL);
+	usb_set_intfdata(intf, NULL);
 	if (!cam)
 		return;
 

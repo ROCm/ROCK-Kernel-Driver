@@ -209,17 +209,16 @@ static void swimiop_init_request(struct swim_iop_req *req)
 
 static int swimiop_send_request(struct swim_iop_req *req)
 {
-	unsigned long cpu_flags;
+	unsigned long flags;
 	int err;
 
 	/* It's doubtful an interrupt routine would try to send */
 	/* a SWIM request, but I'd rather play it safe here.    */
 
-	save_flags(cpu_flags);
-	cli();
+	local_irq_save(flags);
 
 	if (current_req != NULL) {
-		restore_flags(cpu_flags);
+		local_irq_restore(flags);
 		return -ENOMEM;
 	}
 
@@ -227,7 +226,7 @@ static int swimiop_send_request(struct swim_iop_req *req)
 
 	/* Interrupts should be back on for iop_send_message() */
 
-	restore_flags(cpu_flags);
+	local_irq_restore(flags);
 
 	err = iop_send_message(SWIM_IOP, SWIM_CHAN, (void *) req,
 				sizeof(req->command), (__u8 *) &req->command[0],
@@ -423,14 +422,13 @@ static int grab_drive(struct floppy_state *fs, enum swim_state state,
 {
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 	if (fs->state != idle) {
 		++fs->wanted;
 		while (fs->state != available) {
 			if (interruptible && signal_pending(current)) {
 				--fs->wanted;
-				restore_flags(flags);
+				local_irq_restore(flags);
 				return -EINTR;
 			}
 			interruptible_sleep_on(&fs->wait);
@@ -438,7 +436,7 @@ static int grab_drive(struct floppy_state *fs, enum swim_state state,
 		--fs->wanted;
 	}
 	fs->state = state;
-	restore_flags(flags);
+	local_irq_restore(flags);
 	return 0;
 }
 
@@ -446,11 +444,10 @@ static void release_drive(struct floppy_state *fs)
 {
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 	fs->state = idle;
 	start_request(fs);
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static void set_timeout(struct floppy_state *fs, int nticks,
@@ -458,7 +455,7 @@ static void set_timeout(struct floppy_state *fs, int nticks,
 {
 	unsigned long flags;
 
-	save_flags(flags); cli();
+	local_irq_save(flags);
 	if (fs->timeout_pending)
 		del_timer(&fs->timeout);
 	init_timer(&fs->timeout);
@@ -467,7 +464,7 @@ static void set_timeout(struct floppy_state *fs, int nticks,
 	fs->timeout.data = (unsigned long) fs;
 	add_timer(&fs->timeout);
 	fs->timeout_pending = 1;
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static void do_fd_request(request_queue_t * q)

@@ -39,6 +39,59 @@ source "init/Kconfig"
 menu "Processor type and features"
 
 choice
+	prompt "Subarchitecture Type"
+	default PC
+
+config PC
+	bool "IBM PC (and compatible)"
+	help
+	  Choose this option if your computer is a standard PC or compatible.
+
+config VOYAGER
+	bool "NCR Voyager"
+	help
+	  Voyager is a MCA based 32 way capable SMP architecture proprietary
+	  to NCR Corp.  Machine classes 345x/35xx/4100/51xx are voyager based.
+	  
+	  *** WARNING ***
+	
+	  If you do not specifically know you have a Voyager based machine,
+	  say N here otherwise the kernel you build will not be bootable.
+
+config X86_NUMAQ
+	bool "IBM/Sequent NUMAQ"
+	help
+	  This option is used for getting Linux to run on a (IBM/Sequent) NUMA 
+	  multiquad box. This changes the way that processors are bootstrapped,
+	  and uses Clustered Logical APIC addressing mode instead of Flat Logical.
+	  You will need a new lynxer.elf file to flash your firmware with - send
+	  email to Martin.Bligh@us.ibm.com
+
+config X86_SUMMIT
+	bool "IBM x440 (Summit/EXA)"
+	help
+	  This option is needed for IBM systems that use the Summit/EXA chipset.
+	  In particular, it is needed for the x440.
+
+	  If you don't have one of these computers, you should say N here.
+
+# Visual Workstation support is utterly broken.
+# If you want to see it working mail an VW540 to hch@infradead.org 8)
+#config X86_VISWS
+#	bool "SGI 320/540 (Visual Workstation)"
+#	help
+#	  The SGI Visual Workstation series is an IA32-based workstation
+#	  based on SGI systems chips with some legacy PC hardware attached.
+#
+#	  Say Y here to create a kernel to run on the SGI 320 or 540.
+#
+#	  A kernel compiled for the Visual Workstation will not run on PCs
+#	  and vice versa. See <file:Documentation/sgi-visws.txt> for details.
+
+endchoice
+
+
+choice
 	prompt "Processor family"
 	default M686
 
@@ -140,6 +193,13 @@ config MK7
 	  some extended instructions, and passes appropriate optimization
 	  flags to GCC.
 
+config MK8
+	bool "Opteron/Athlon64/Hammer/K8"
+	help
+	  Select this for an AMD Opteron or Athlon64 Hammer-family processor.  Enables
+	  use of some extended instructions, and passes appropriate optimization
+	  flags to GCC.
+
 config MELAN
 	bool "Elan"
 
@@ -200,7 +260,7 @@ config X86_L1_CACHE_SHIFT
 	int
 	default "5" if MWINCHIP3D || MWINCHIP2 || MWINCHIPC6 || MCRUSOE || MCYRIXIII || MK6 || MPENTIUMIII || M686 || M586MMX || M586TSC || M586
 	default "4" if MELAN || M486 || M386
-	default "6" if MK7
+	default "6" if MK7 || MK8
 	default "7" if MPENTIUM4
 
 config RWSEM_GENERIC_SPINLOCK
@@ -255,12 +315,12 @@ config X86_ALIGNMENT_16
 
 config X86_TSC
 	bool
-	depends on MWINCHIP3D || MWINCHIP2 || MCRUSOE || MCYRIXIII || MK7 || MK6 || MPENTIUM4 || MPENTIUMIII || M686 || M586MMX || M586TSC
+	depends on MWINCHIP3D || MWINCHIP2 || MCRUSOE || MCYRIXIII || MK7 || MK6 || MPENTIUM4 || MPENTIUMIII || M686 || M586MMX || M586TSC || MK8
 	default y
 
 config X86_GOOD_APIC
 	bool
-	depends on MK7 || MPENTIUM4 || MPENTIUMIII || M686 || M586MMX
+	depends on MK7 || MPENTIUM4 || MPENTIUMIII || M686 || M586MMX || MK8
 	default y
 
 config X86_INTEL_USERCOPY
@@ -270,7 +330,7 @@ config X86_INTEL_USERCOPY
 
 config X86_USE_PPRO_CHECKSUM
 	bool
-	depends on MWINCHIP3D || MWINCHIP2 || MWINCHIPC6 || MCYRIXIII || MK7 || MK6 || MPENTIUM4 || MPENTIUMIII || M686
+	depends on MWINCHIP3D || MWINCHIP2 || MWINCHIPC6 || MCYRIXIII || MK7 || MK6 || MPENTIUM4 || MPENTIUMIII || M686 || MK8
 	default y
 
 config X86_USE_3DNOW
@@ -281,6 +341,16 @@ config X86_USE_3DNOW
 config X86_OOSTORE
 	bool
 	depends on MWINCHIP3D || MWINCHIP2 || MWINCHIPC6
+	default y
+
+config X86_PREFETCH
+	bool
+	depends on MPENTIUMIII || MP4
+	default y
+
+config X86_SSE2
+        bool
+	depends on MK8 || MPENTIUM4
 	default y
 
 config HUGETLB_PAGE
@@ -337,6 +407,7 @@ config PREEMPT
 
 config X86_UP_APIC
 	bool "Local APIC support on uniprocessors" if !SMP
+	depends on !VOYAGER
 	---help---
 	  A local APIC (Advanced Programmable Interrupt Controller) is an
 	  integrated interrupt controller in the CPU. If you have a single-CPU
@@ -385,33 +456,9 @@ config NR_CPUS
 	  This is purely to save memory - each supported CPU adds
 	  approximately eight kilobytes to the kernel image.
 
-config X86_NUMA
-	bool "Multi-node NUMA system support"
-	depends on SMP
-
-#Platform Choices
-config X86_NUMAQ
-	bool "Multiquad (IBM/Sequent) NUMAQ support"
-	depends on X86_NUMA
-	help
-	  This option is used for getting Linux to run on a (IBM/Sequent) NUMA 
-	  multiquad box. This changes the way that processors are bootstrapped,
-	  and uses Clustered Logical APIC addressing mode instead of Flat Logical.
-	  You will need a new lynxer.elf file to flash your firmware with - send
-	  email to Martin.Bligh@us.ibm.com
-
-config X86_SUMMIT
-	bool "IBM x440 (Summit/EXA) support"
-	depends on X86_NUMA
-	help
-	  This option is needed for IBM systems that use the Summit/EXA chipset.
-	  In particular, it is needed for the x440.
-
-	  If you don't have one of these computers, you should say N here.
-
 config CLUSTERED_APIC
 	bool
-	depends on X86_NUMA && (X86_NUMAQ || X86_SUMMIT)
+	depends on X86_NUMAQ || X86_SUMMIT
 	default y
 
 # Common NUMA Features
@@ -690,6 +737,7 @@ endmenu
 
 
 menu "Power management options (ACPI, APM)"
+	depends on !VOYAGER
 
 config PM
 	bool "Power Management support"
@@ -990,9 +1038,6 @@ endmenu
 
 menu "Bus options (PCI, PCMCIA, EISA, MCA, ISA)"
 
-# Visual Workstation support is utterly broken.
-# If you want to see it working mail an VW540 to hch@infradead.org 8)
-#bool 'SGI Visual Workstation support' CONFIG_VISWS
 config X86_VISWS_APIC
 	bool
 	depends on VISWS
@@ -1000,11 +1045,12 @@ config X86_VISWS_APIC
 
 config X86_LOCAL_APIC
 	bool
-	depends on !VISWS && SMP || VISWS
+	depends on ((!VISWS && SMP) || VISWS) && !VOYAGER
 	default y
 
 config PCI
 	bool "PCI support" if !VISWS
+	depends on !VOYAGER
 	default y if VISWS
 	help
 	  Find out whether you have a PCI motherboard. PCI is the name of a
@@ -1019,7 +1065,7 @@ config PCI
 
 config X86_IO_APIC
 	bool
-	depends on !VISWS && SMP
+	depends on !VISWS && SMP && !VOYAGER
 	default y
 
 choice
@@ -1063,6 +1109,7 @@ config PCI_DIRECT
 
 config SCx200
 	tristate "NatSemi SCx200 support"
+	depends on !VOYAGER
 	help
 	  This provides basic support for the National Semiconductor SCx200 
 	  processor.  Right now this is just a driver for the GPIO pins.
@@ -1076,6 +1123,7 @@ source "drivers/pci/Kconfig"
 
 config ISA
 	bool "ISA support"
+	depends on !VOYAGER
 	help
 	  Find out whether you have ISA slots on your motherboard.  ISA is the
 	  name of a bus system, i.e. the way the CPU talks to the other stuff
@@ -1101,12 +1149,16 @@ config EISA
 
 config MCA
 	bool "MCA support"
-	depends on !VISWS
+	depends on !VISWS && !VOYAGER
 	help
 	  MicroChannel Architecture is found in some IBM PS/2 machines and
 	  laptops.  It is a bus system similar to PCI or ISA. See
 	  <file:Documentation/mca.txt> (and especially the web page given
 	  there) before attempting to build an MCA bus kernel.
+
+config MCA
+	depends on VOYAGER
+	default y if VOYAGER
 
 source "drivers/mca/Kconfig"
 
@@ -1574,12 +1626,12 @@ config FRAME_POINTER
 
 config X86_EXTRA_IRQS
 	bool
-	depends on X86_LOCAL_APIC
+	depends on X86_LOCAL_APIC || VOYAGER
 	default y
 
 config X86_FIND_SMP_CONFIG
 	bool
-	depends on X86_LOCAL_APIC
+	depends on X86_LOCAL_APIC || VOYAGER
 	default y
 
 config X86_MPPARSE
@@ -1597,15 +1649,20 @@ source "lib/Kconfig"
 
 config X86_SMP
 	bool
-	depends on SMP
+	depends on SMP && !VOYAGER
 	default y
 
 config X86_HT
 	bool
-	depends on SMP
+	depends on SMP && !VOYAGER
 	default y
 
 config X86_BIOS_REBOOT
 	bool
+	depends on !VOYAGER
 	default y
 
+config X86_TRAMPOLINE
+	bool
+	depends on SMP
+	default y

@@ -842,7 +842,7 @@ static int rtl8150_probe(struct usb_interface *intf,
 	info("%s: rtl8150 is detected", netdev->name);
 	
 	up(&dev->sem);
-	dev_set_drvdata(&intf->dev, dev);
+	usb_set_intfdata(intf, dev);
 	return 0;
 err:
 	unregister_netdev(dev->netdev);
@@ -854,9 +854,9 @@ err:
 
 static void rtl8150_disconnect(struct usb_interface *intf)
 {
-	rtl8150_t *dev = dev_get_drvdata(&intf->dev);
+	rtl8150_t *dev = usb_get_intfdata(intf);
 
-	dev_set_drvdata(&intf->dev, NULL);
+	usb_set_intfdata(intf, NULL);
 	if (dev) {
 		set_bit(RTL8150_UNPLUG, &dev->flags);
 		unregister_netdev(dev->netdev);

@@ -18,45 +18,6 @@ int sc_size(void *data)
 	return(sizeof(struct sigcontext) + arch->fpstate_size);
 }
 
-int copy_sc_to_user(void *to_ptr, void *from_ptr, void *data)
-{
-	struct arch_frame_data *arch = data;
-	struct sigcontext *to = to_ptr, *from = from_ptr;
-	struct _fpstate *to_fp, *from_fp;
-	int err;
-
-	to_fp = (struct _fpstate *)((unsigned long) to + sizeof(*to));
-	from_fp = from->fpstate;
-	err = copy_to_user_proc(to, from, sizeof(*to));
-	if(from_fp != NULL){
-		err |= copy_to_user_proc(&to->fpstate, &to_fp,
-					 sizeof(to->fpstate));
-		err |= copy_to_user_proc(to_fp, from_fp, arch->fpstate_size);
-	}
-	return(err);
-}
-
-int copy_sc_from_user(void *to_ptr, void *from_ptr, void *data)
-{
-	struct arch_frame_data *arch = data;
-	struct sigcontext *to = to_ptr, *from = from_ptr;
-	struct _fpstate *to_fp, *from_fp;
-	unsigned long sigs;
-	int err;
-
-	to_fp = to->fpstate;
-	from_fp = from->fpstate;
-	sigs = to->oldmask;
-	err = copy_from_user_proc(to, from, sizeof(*to));
-	to->oldmask = sigs;
-	if(to_fp != NULL){
-		err |= copy_from_user_proc(&to->fpstate, &to_fp,
-					   sizeof(to->fpstate));
-		err |= copy_from_user_proc(to_fp, from_fp, arch->fpstate_size);
-	}
-	return(err);
-}
-
 void sc_to_sc(void *to_ptr, void *from_ptr)
 {
 	struct sigcontext *to = to_ptr, *from = from_ptr;

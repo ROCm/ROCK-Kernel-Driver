@@ -743,10 +743,11 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	if (nr_threads >= max_threads)
 		goto bad_fork_cleanup_count;
 	
-	get_exec_domain(p->thread_info->exec_domain);
+	if (!try_module_get(p->thread_info->exec_domain->module))
+		goto bad_fork_cleanup_count;
 
-	if (p->binfmt && p->binfmt->module)
-		__MOD_INC_USE_COUNT(p->binfmt->module);
+	if (p->binfmt && !try_module_get(p->binfmt->module))
+		goto bad_fork_cleanup_put_domain;
 
 #ifdef CONFIG_PREEMPT
 	/*
@@ -958,9 +959,10 @@ bad_fork_cleanup_security:
 bad_fork_cleanup:
 	if (p->pid > 0)
 		free_pidmap(p->pid);
-	put_exec_domain(p->thread_info->exec_domain);
-	if (p->binfmt && p->binfmt->module)
-		__MOD_DEC_USE_COUNT(p->binfmt->module);
+	if (p->binfmt)
+		module_put(p->binfmt->module);
+bad_fork_cleanup_put_domain:
+	module_put(p->thread_info->exec_domain->module);
 bad_fork_cleanup_count:
 	atomic_dec(&p->user->processes);
 	free_uid(p->user);

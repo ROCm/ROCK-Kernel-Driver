@@ -52,7 +52,8 @@
   Arnaldo Carvalho de Melo <acme@conectiva.com.br> - 11/01/2001
   check kmalloc and release the allocated memory on failure in
   mac89x0_probe and in init_module
-  use save_flags/restore_flags in net_get_stat, not just cli/sti
+  use local_irq_{save,restore}(flags) in net_get_stat, not just
+  local_irq_{dis,en}able()
 */
 
 static char *version =
@@ -199,11 +200,10 @@ int __init mac89x0_probe(struct net_device *dev)
 		unsigned long flags;
 		int card_present;
 		
-		save_flags(flags);
-		cli();
+		local_irq_save(flags);
 		card_present = hwreg_present((void*) ioaddr+4)
 		  && hwreg_present((void*) ioaddr + DATA_PORT);
-		restore_flags(flags);
+		local_irq_restore(flags);
 
 		if (!card_present)
 			return -ENODEV;
@@ -397,8 +397,7 @@ net_send_packet(struct sk_buff *skb, struct net_device *dev)
 		/* keep the upload from being interrupted, since we
                    ask the chip to start transmitting before the
                    whole packet has been completely uploaded. */
-		save_flags(flags);
-		cli();
+		local_irq_save(flags);
 
 		/* initiate a transmit sequence */
 		writereg(dev, PP_TxCMD, lp->send_cmd);
@@ -408,14 +407,14 @@ net_send_packet(struct sk_buff *skb, struct net_device *dev)
 		if ((readreg(dev, PP_BusST) & READY_FOR_TX_NOW) == 0) {
 			/* Gasp!  It hasn't.  But that shouldn't happen since
 			   we're waiting for TxOk, so return 1 and requeue this packet. */
-			restore_flags(flags);
+			local_irq_restore(flags);
 			return 1;
 		}
 
 		/* Write the contents of the packet */
 		memcpy_toio(dev->mem_start + PP_TxFrame, skb->data, skb->len+1);
 
-		restore_flags(flags);
+		local_irq_restore(flags);
 		dev->trans_start = jiffies;
 	}
 	dev_kfree_skb (skb);
@@ -568,12 +567,11 @@ net_get_stats(struct net_device *dev)
 	struct net_local *lp = (struct net_local *)dev->priv;
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 	/* Update the statistics from the device registers. */
 	lp->stats.rx_missed_errors += (readreg(dev, PP_RxMiss) >> 6);
 	lp->stats.collisions += (readreg(dev, PP_TxCol) >> 6);
-	restore_flags(flags);
+	local_irq_restore(flags);
 
 	return &lp->stats;
 }

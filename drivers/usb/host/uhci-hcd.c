@@ -2280,7 +2280,7 @@ err_alloc_skelqh:
 	uhci->term_td = NULL;
 
 err_alloc_term_td:
-	usb_free_dev(udev);
+	usb_put_dev(udev);
 	hcd->self.root_hub = NULL;
 
 err_alloc_root_hub:

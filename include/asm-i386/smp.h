@@ -6,6 +6,7 @@
  */
 #ifndef __ASSEMBLY__
 #include <linux/config.h>
+#include <linux/kernel.h>
 #include <linux/threads.h>
 #endif
 
@@ -83,9 +84,20 @@ extern volatile unsigned long cpu_callout_map;
 #define cpu_possible(cpu) (cpu_callout_map & (1<<(cpu)))
 #define cpu_online(cpu) (cpu_online_map & (1<<(cpu)))
 
+#define for_each_cpu(cpu, mask) \
+	for(mask = cpu_online_map; \
+	    cpu = __ffs(mask), mask != 0; \
+	    mask &= ~(1<<cpu))
+
 extern inline unsigned int num_online_cpus(void)
 {
 	return hweight32(cpu_online_map);
+}
+
+/* We don't mark CPUs online until __cpu_up(), so we need another measure */
+static inline int num_booting_cpus(void)
+{
+	return hweight32(cpu_callout_map);
 }
 
 extern inline int any_online_cpu(unsigned int mask)
@@ -95,7 +107,7 @@ extern inline int any_online_cpu(unsigned int mask)
 
 	return -1;
 }
-
+#ifdef CONFIG_X86_LOCAL_APIC
 static __inline int hard_smp_processor_id(void)
 {
 	/* we don't want to mark this access volatile - bad code generation */
@@ -108,12 +120,7 @@ static __inline int logical_smp_processor_id(void)
 	return GET_APIC_LOGICAL_ID(*(unsigned long *)(APIC_BASE+APIC_LDR));
 }
 
-/* We don't mark CPUs online until __cpu_up(), so we need another measure */
-static inline int num_booting_cpus(void)
-{
-	return hweight32(cpu_callout_map);
-}
-
+#endif
 #endif /* !__ASSEMBLY__ */
 
 #define NO_PROC_ID		0xFF		/* No processor magic marker */

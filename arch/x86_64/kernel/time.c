@@ -222,6 +222,19 @@ static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	do_timer(regs);
 
 /*
+ * In the SMP case we use the local APIC timer interrupt to do the profiling,
+ * except when we simulate SMP mode on a uniprocessor system, in that case we
+ * have to call the local interrupt handler.
+ */
+
+#ifndef CONFIG_X86_LOCAL_APIC
+	x86_do_profile(regs);
+#else
+	if (!using_apic_timer)
+		smp_local_timer_interrupt(regs);
+#endif
+
+/*
  * If we have an externally synchronized Linux clock, then update CMOS clock
  * accordingly every ~11 minutes. set_rtc_mmss() will be called in the jiffy
  * closest to exactly 500 ms before the next second. If the update fails, we

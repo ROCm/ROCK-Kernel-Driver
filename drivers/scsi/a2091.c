@@ -4,6 +4,7 @@
 #include <linux/sched.h>
 #include <linux/version.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 
 #include <asm/setup.h>
 #include <asm/page.h>
@@ -230,7 +231,21 @@ int __init a2091_detect(Scsi_Host_Template *tpnt)
 
 #define HOSTS_C
 
-static Scsi_Host_Template driver_template = A2091_SCSI;
+static Scsi_Host_Template driver_template = {
+	.proc_name		= "A2901",
+	.name			= "Commodore A2091/A590 SCSI",
+	.detect			= a2091_detect,
+	.release		= a2091_release,
+	.queuecommand		= wd33c93_queuecommand,
+	.abort			= wd33c93_abort,
+	.reset			= wd33c93_reset,
+	.can_queue		= CAN_QUEUE,
+	.this_id		= 7,
+	.sg_tablesize		= SG_ALL,
+	.cmd_per_lun		= CMD_PER_LUN,
+	.use_clustering		= DISABLE_CLUSTERING
+};
+
 
 #include "scsi_module.c"
 

@@ -857,8 +857,7 @@ tape_release(struct tape_device *device)
 	spin_lock(get_ccwdev_lock(device->cdev));
 	if (device->tape_state == TS_IN_USE)
 		tape_state_set(device, TS_UNUSED);
-	if (device->discipline->owner)
-		__MOD_DEC_USE_COUNT(device->discipline->owner);
+	module_put(device->discipline->owner);
 	spin_unlock(get_ccwdev_lock(device->cdev));
 	return 0;
 }

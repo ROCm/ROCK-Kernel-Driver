@@ -216,8 +216,7 @@ int atari_tt_hwclk( int op, struct rtc_time *t )
         schedule_timeout(HWCLK_POLL_INTERVAL);
     }
 
-    save_flags(flags);
-    cli();
+    local_irq_save(flags);
     RTC_WRITE( RTC_CONTROL, ctrl | RTC_SET );
     if (!op) {
         sec  = RTC_READ( RTC_SECONDS );
@@ -238,7 +237,7 @@ int atari_tt_hwclk( int op, struct rtc_time *t )
         if (wday >= 0) RTC_WRITE( RTC_DAY_OF_WEEK, wday );
     }
     RTC_WRITE( RTC_CONTROL, ctrl & ~RTC_SET );
-    restore_flags(flags);
+    local_irq_restore(flags);
 
     if (!op) {
         /* read: adjust values */

@@ -102,7 +102,7 @@ inline int dvma_map_cpu(unsigned long kaddr,
 		pmd_t *pmd;
 		unsigned long end2;
 
-		if((pmd = pmd_alloc_kernel(pgd, vaddr)) == NULL) {
+		if((pmd = pmd_alloc(&init_mm, pgd, vaddr)) == NULL) {
 			ret = -ENOMEM;
 			goto out;
 		}
@@ -116,7 +116,7 @@ inline int dvma_map_cpu(unsigned long kaddr,
 			pte_t *pte;
 			unsigned long end3;
 
-			if((pte = pte_alloc_kernel(pmd, vaddr)) == NULL) {
+			if((pte = pte_alloc_kernel(&init_mm, pmd, vaddr)) == NULL) {
 				ret = -ENOMEM;
 				goto out;
 			}
@@ -131,7 +131,8 @@ inline int dvma_map_cpu(unsigned long kaddr,
 				printk("mapping %08lx phys to %08lx\n",
 				       __pa(kaddr), vaddr);
 #endif
-				set_pte(pte, __mk_pte(kaddr, PAGE_KERNEL));
+				set_pte(pte, pfn_pte(virt_to_pfn(kaddr), 
+						     PAGE_KERNEL));
 				pte++;
 				kaddr += PAGE_SIZE;
 				vaddr += PAGE_SIZE;

@@ -55,12 +55,6 @@ much elements are in array.
 
 */
 
-static inline void dec_mod_count(struct module *module)
-{
-	if (module)
-		__MOD_DEC_USE_COUNT(module);
-}
-
 /* return pointer to port structure - port is locked if found */
 client_port_t *snd_seq_port_use_ptr(client_t *client, int num)
 {
@@ -413,7 +407,7 @@ static int subscribe_port(client_t *client, client_port_t *port, port_subs_info_
 	if (grp->open && (port->callback_all || grp->count == 1)) {
 		err = grp->open(port->private_data, info);
 		if (err < 0) {
-			dec_mod_count(port->owner);
+			module_put(port->owner);
 			grp->count--;
 		}
 	}
@@ -438,7 +432,7 @@ static int unsubscribe_port(client_t *client, client_port_t *port,
 	if (send_ack && client->type == USER_CLIENT)
 		snd_seq_client_notify_subscription(port->addr.client, port->addr.port,
 						   info, SNDRV_SEQ_EVENT_PORT_UNSUBSCRIBED);
-	dec_mod_count(port->owner);
+	module_put(port->owner);
 	return err;
 }
 

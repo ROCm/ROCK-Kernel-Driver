@@ -18,6 +18,8 @@ struct page;
 #undef PAGE_OFFSET
 #undef KERNELBASE
 
+extern unsigned long uml_physmem;
+
 #define PAGE_OFFSET (uml_physmem)
 #define KERNELBASE PAGE_OFFSET
 

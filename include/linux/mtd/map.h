@@ -81,10 +81,7 @@ static inline void map_destroy(struct mtd_info *mtd)
 
 	if (map->fldrv->destroy)
 		map->fldrv->destroy(mtd);
-#ifdef CONFIG_MODULES
-	if (map->fldrv->module)
-		__MOD_DEC_USE_COUNT(map->fldrv->module);
-#endif
+	module_put(map->fldrv->module);
 	kfree(mtd);
 }
 

@@ -3278,19 +3278,23 @@ request_decompressor(struct usb_ov511 *ov)
 		err("Unknown bridge");
 	}
 
-	if (ov->decomp_ops) {
-		if (!ov->decomp_ops->owner) {
-			ov->decomp_ops = NULL;
-			unlock_kernel();
-			return -ENOSYS;
-		}
-		__MOD_INC_USE_COUNT(ov->decomp_ops->owner);
-		unlock_kernel();
-		return 0;
-	} else {
-		unlock_kernel();
-		return -ENOSYS;
+	if (!ov->decomp_ops)
+		goto nosys;
+
+	if (!ov->decomp_ops->owner) {
+		ov->decomp_ops = NULL;
+		goto nosys;
 	}
+	
+	if (!try_module_get(ov->decomp_ops->owner))
+		goto nosys;
+
+	unlock_kernel();
+	return 0;
+
+ nosys:
+	unlock_kernel();
+	return -ENOSYS;
 }
 
 /* Unlocks decompression module and nulls ov->decomp_ops. Safe to call even
@@ -3306,8 +3310,8 @@ release_decompressor(struct usb_ov511 *ov)
 
 	lock_kernel();
 
-	if (ov->decomp_ops && ov->decomp_ops->owner) {
-		__MOD_DEC_USE_COUNT(ov->decomp_ops->owner);
+	if (ov->decomp_ops) {
+		module_put(ov->decomp_ops->owner);
 		released = 1;
 	}
 
@@ -6247,7 +6251,7 @@ ov51x_probe(struct usb_interface *intf,
 
 	create_proc_ov511_cam(ov);
 
-	dev_set_drvdata (&intf->dev, ov);
+	usb_set_intfdata (intf, ov);
 	return 0;
 
 error:
@@ -6274,12 +6278,12 @@ error_out:
 static void
 ov51x_disconnect(struct usb_interface *intf)
 {
-	struct usb_ov511 *ov = dev_get_drvdata (&intf->dev);
+	struct usb_ov511 *ov = usb_get_intfdata (intf);
 	int n;
 
 	PDEBUG(3, "");
 
-	dev_set_drvdata (&intf->dev, NULL);
+	usb_set_intfdata (intf, NULL);
 	if (!ov)
 		return;
 

@@ -23,6 +23,13 @@
  */
 
 #include <linux/config.h>
+
+#ifdef CONFIG_USB_DEBUG
+	#define DEBUG
+#else
+	#undef DEBUG
+#endif
+
 #include <linux/module.h>
 #include <linux/string.h>
 #include <linux/bitops.h>
@@ -33,13 +40,12 @@
 #include <linux/spinlock.h>
 #include <linux/errno.h>
 #include <linux/smp_lock.h>
-
-#ifdef CONFIG_USB_DEBUG
-	#define DEBUG
-#else
-	#undef DEBUG
-#endif
 #include <linux/usb.h>
+
+#include <asm/io.h>
+#include <asm/scatterlist.h>
+#include <linux/mm.h>
+#include <linux/dma-mapping.h>
 
 #include "hcd.h"
 #include "usb.h"
@@ -293,7 +299,7 @@ void usb_driver_claim_interface(struct usb_driver *driver, struct usb_interface 
 	    dbg("%s driver claimed interface %p", driver->name, iface);
 
 	iface->driver = driver;
-	iface->private_data = priv;
+	usb_set_intfdata(iface, priv);
 }
 
 /**
@@ -336,7 +342,7 @@ void usb_driver_release_interface(struct usb_driver *driver, struct usb_interfac
 		return;
 
 	iface->driver = NULL;
-	iface->private_data = NULL;
+	usb_set_intfdata(iface, NULL);
 }
 
 /**
@@ -672,13 +678,14 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus)
 
 	memset(dev, 0, sizeof(*dev));
 
+	device_initialize(&dev->dev);
+
 	usb_bus_get(bus);
 
 	if (!parent)
 		dev->devpath [0] = '0';
 	dev->bus = bus;
 	dev->parent = parent;
-	atomic_set(&dev->refcnt, 1);
 	INIT_LIST_HEAD(&dev->filelist);
 
 	init_MUTEX(&dev->serialize);
@@ -690,7 +697,7 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus)
 }
 
 /**
- * usb_get_dev - increments the reference count of the device
+ * usb_get_dev - increments the reference count of the usb device structure
  * @dev: the device being referenced
  *
  * Each live reference to a device should be refcounted.
@@ -703,34 +710,51 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus)
  */
 struct usb_device *usb_get_dev (struct usb_device *dev)
 {
-	if (dev) {
-		atomic_inc (&dev->refcnt);
-		return dev;
-	}
-	return NULL;
+	struct device *tmp;
+
+	if (!dev)
+		return NULL;
+
+	tmp = get_device(&dev->dev);
+	if (tmp)        
+		return to_usb_device(tmp);
+	else
+		return NULL;
 }
 
 /**
- * usb_free_dev - free a usb device structure when all users of it are finished.
+ * usb_put_dev - release a use of the usb device structure
  * @dev: device that's been disconnected
- * Context: !in_interrupt ()
  *
  * Must be called when a user of a device is finished with it.  When the last
  * user of the device calls this function, the memory of the device is freed.
- *
- * Used by hub and virtual root hub drivers.  The device is completely
- * gone, everything is cleaned up, so it's time to get rid of these last
- * records of this device.
  */
-void usb_free_dev(struct usb_device *dev)
+void usb_put_dev(struct usb_device *dev)
 {
-	if (atomic_dec_and_test(&dev->refcnt)) {
-		if (dev->bus->op->deallocate)
-			dev->bus->op->deallocate(dev);
-		usb_destroy_configuration (dev);
-		usb_bus_put (dev->bus);
-		kfree (dev);
-	}
+	if (dev)
+		put_device(&dev->dev);
+}
+
+/**
+ * usb_release_dev - free a usb device structure when all users of it are finished.
+ * @dev: device that's been disconnected
+ *
+ * Will be called only by the device core when all users of this usb device are
+ * done.
+ */
+static void usb_release_dev(struct device *dev)
+{
+	struct usb_device *udev;
+
+	udev = to_usb_device(dev);
+	if (!udev)
+		return;
+
+	if (udev->bus && udev->bus->op && udev->bus->op->deallocate)
+		udev->bus->op->deallocate(udev);
+	usb_destroy_configuration (udev);
+	usb_bus_put (udev->bus);
+	kfree (udev);
 }
 
 
@@ -803,7 +827,7 @@ void usb_disconnect(struct usb_device **pdev)
 
 	*pdev = NULL;
 
-	info("USB disconnect on device %d", dev->devnum);
+	dev_info (dev->dev, "USB disconnect, address %d\n", dev->devnum);
 
 	/* Free up all the children before we remove this device */
 	for (i = 0; i < USB_MAXCHILDREN; i++) {
@@ -812,7 +836,7 @@ void usb_disconnect(struct usb_device **pdev)
 			usb_disconnect(child);
 	}
 
-	dbg ("unregistering interfaces on device %d", dev->devnum);
+	dev_dbg (dev->dev, "unregistering interfaces\n");
 	if (dev->actconfig) {
 		for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++) {
 			struct usb_interface *interface = &dev->actconfig->interface[i];
@@ -822,7 +846,7 @@ void usb_disconnect(struct usb_device **pdev)
 		}
 	}
 
-	dbg ("unregistering the device %d", dev->devnum);
+	dev_dbg (dev->dev, "unregistering device\n");
 	/* Free the device number and remove the /proc/bus/usb entry */
 	if (dev->devnum > 0) {
 		clear_bit(dev->devnum, dev->bus->devmap.devicemap);
@@ -907,7 +931,7 @@ static void set_device_description (struct usb_device *dev)
 
 	if (prod && usb_string (dev, prod, prod_str, 256) > 0) {
 #ifdef DEBUG
-		printk (KERN_INFO "Product: %s\n", prod_str);
+		dev_printk (KERN_INFO, dev->dev, "Product: %s\n", prod_str);
 #endif
 	} else {
 		prod_str = 0;
@@ -915,7 +939,7 @@ static void set_device_description (struct usb_device *dev)
 
 	if (mfgr && usb_string (dev, mfgr, mfgr_str, 256) > 0) {
 #ifdef DEBUG
-		printk (KERN_INFO "Manufacturer: %s\n", mfgr_str);
+		dev_printk (KERN_INFO, dev->dev, "Manufacturer: %s\n", mfgr_str);
 #endif
 	} else {
 		mfgr_str = 0;
@@ -976,9 +1000,14 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 	dev->dev.parent = parent;
 	dev->dev.driver = &usb_generic_driver;
 	dev->dev.bus = &usb_bus_type;
+	dev->dev.release = usb_release_dev;
+	usb_get_dev(dev);
 	if (dev->dev.bus_id[0] == 0)
 		sprintf (&dev->dev.bus_id[0], "%d-%s",
 			 dev->bus->busnum, dev->devpath);
+
+	/* dma masks come from the controller; readonly, except to hcd */
+	dev->dev.dma_mask = parent->dma_mask;
 
 	/* USB device state == default ... it's not usable yet */
 
@@ -1079,7 +1108,7 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 
 	/* USB device state == configured ... tell the world! */
 
-	dbg("new device strings: Mfr=%d, Product=%d, SerialNumber=%d",
+	dev_dbg(dev->dev, "new device strings: Mfr=%d, Product=%d, SerialNumber=%d\n",
 		dev->descriptor.iManufacturer, dev->descriptor.iProduct, dev->descriptor.iSerialNumber);
 	set_device_description (dev);
 
@@ -1089,7 +1118,7 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 #endif
 
 	/* put into sysfs, with device and config specific files */
-	err = device_register (&dev->dev);
+	err = device_add (&dev->dev);
 	if (err)
 		return err;
 	usb_create_driverfs_dev_files (dev);
@@ -1104,6 +1133,7 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 		interface->dev.parent = &dev->dev;
 		interface->dev.driver = NULL;
 		interface->dev.bus = &usb_bus_type;
+		interface->dev.dma_mask = parent->dma_mask;
 		sprintf (&interface->dev.bus_id[0], "%d-%s:%d",
 			 dev->bus->busnum, dev->devpath,
 			 desc->bInterfaceNumber);
@@ -1122,7 +1152,7 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 				desc->bInterfaceNumber);
 		}
 		dbg ("%s - registering %s", __FUNCTION__, interface->dev.bus_id);
-		device_register (&interface->dev);
+		device_add (&interface->dev);
 		usb_create_driverfs_intf_files (interface);
 	}
 
@@ -1206,24 +1236,21 @@ void usb_buffer_free (
 struct urb *usb_buffer_map (struct urb *urb)
 {
 	struct usb_bus		*bus;
-	struct usb_operations	*op;
+	struct device		*controller;
 
 	if (!urb
 			|| usb_pipecontrol (urb->pipe)
 			|| !urb->dev
 			|| !(bus = urb->dev->bus)
-			|| !(op = bus->op)
-			|| !op->buffer_map)
+			|| !(controller = bus->controller))
 		return 0;
 
-	if (op->buffer_map (bus,
-			urb->transfer_buffer,
-			&urb->transfer_dma,
-			urb->transfer_buffer_length,
+	urb->transfer_dma = dma_map_single (controller,
+			urb->transfer_buffer, urb->transfer_buffer_length,
 			usb_pipein (urb->pipe)
-				? USB_DIR_IN
-				: USB_DIR_OUT))
-		return 0;
+				? DMA_FROM_DEVICE : DMA_TO_DEVICE);
+	// FIXME generic api broken like pci, can't report errors
+	// if (urb->transfer_dma == DMA_ADDR_INVALID) return 0;
 	urb->transfer_flags |= URB_NO_DMA_MAP;
 	return urb;
 }
@@ -1235,22 +1262,19 @@ struct urb *usb_buffer_map (struct urb *urb)
 void usb_buffer_dmasync (struct urb *urb)
 {
 	struct usb_bus		*bus;
-	struct usb_operations	*op;
+	struct device		*controller;
 
 	if (!urb
 			|| !(urb->transfer_flags & URB_NO_DMA_MAP)
 			|| !urb->dev
 			|| !(bus = urb->dev->bus)
-			|| !(op = bus->op)
-			|| !op->buffer_dmasync)
+			|| !(controller = bus->controller))
 		return;
 
-	op->buffer_dmasync (bus,
-			urb->transfer_dma,
-			urb->transfer_buffer_length,
+	dma_sync_single (controller,
+			urb->transfer_dma, urb->transfer_buffer_length,
 			usb_pipein (urb->pipe)
-				? USB_DIR_IN
-				: USB_DIR_OUT);
+				? DMA_FROM_DEVICE : DMA_TO_DEVICE);
 }
 
 /**
@@ -1262,23 +1286,21 @@ void usb_buffer_dmasync (struct urb *urb)
 void usb_buffer_unmap (struct urb *urb)
 {
 	struct usb_bus		*bus;
-	struct usb_operations	*op;
+	struct device		*controller;
 
 	if (!urb
 			|| !(urb->transfer_flags & URB_NO_DMA_MAP)
 			|| !urb->dev
 			|| !(bus = urb->dev->bus)
-			|| !(op = bus->op)
-			|| !op->buffer_unmap)
+			|| !(controller = bus->controller))
 		return;
 
-	op->buffer_unmap (bus,
-			urb->transfer_dma,
-			urb->transfer_buffer_length,
+	dma_unmap_single (controller,
+			urb->transfer_dma, urb->transfer_buffer_length,
 			usb_pipein (urb->pipe)
-				? USB_DIR_IN
-				: USB_DIR_OUT);
+				? DMA_FROM_DEVICE : DMA_TO_DEVICE);
 }
+
 /**
  * usb_buffer_map_sg - create scatterlist DMA mapping(s) for an endpoint
  * @dev: device to which the scatterlist will be mapped
@@ -1297,6 +1319,7 @@ void usb_buffer_unmap (struct urb *urb)
  * to complete before starting the next I/O.   This is particularly easy
  * to do with scatterlists.  Just allocate and submit one URB for each DMA
  * mapping entry returned, stopping on the first error or when all succeed.
+ * Better yet, use the usb_sg_*() calls, which do that (and more) for you.
  *
  * This call would normally be used when translating scatterlist requests,
  * rather than usb_buffer_map(), since on some hardware (with IOMMUs) it
@@ -1308,26 +1331,17 @@ int usb_buffer_map_sg (struct usb_device *dev, unsigned pipe,
 		struct scatterlist *sg, int nents)
 {
 	struct usb_bus		*bus;
-	struct usb_operations	*op;
-	int n_hw_ents;
+	struct device		*controller;
 
 	if (!dev
 			|| usb_pipecontrol (pipe)
 			|| !(bus = dev->bus)
-			|| !(op = bus->op)
-			|| !op->buffer_map_sg)
+			|| !(controller = bus->controller))
 		return -1;
 
-	if (op->buffer_map_sg (bus,
-			       sg,
-			       &n_hw_ents,
-			       nents,
-			       usb_pipein (pipe)
-				       ? USB_DIR_IN
-				       : USB_DIR_OUT))
-		return -1;
-
-	return n_hw_ents;
+	// FIXME generic api broken like pci, can't report errors
+	return dma_map_sg (controller, sg, nents,
+			usb_pipein (pipe) ? DMA_FROM_DEVICE : DMA_TO_DEVICE);
 }
 
 /**
@@ -1344,20 +1358,15 @@ void usb_buffer_dmasync_sg (struct usb_device *dev, unsigned pipe,
 		struct scatterlist *sg, int n_hw_ents)
 {
 	struct usb_bus		*bus;
-	struct usb_operations	*op;
+	struct device		*controller;
 
 	if (!dev
 			|| !(bus = dev->bus)
-			|| !(op = bus->op)
-			|| !op->buffer_dmasync_sg)
+			|| !(controller = bus->controller))
 		return;
 
-	op->buffer_dmasync_sg (bus,
-			       sg,
-			       n_hw_ents,
-			       usb_pipein (pipe)
-				       ? USB_DIR_IN
-				       : USB_DIR_OUT);
+	dma_sync_sg (controller, sg, n_hw_ents,
+			usb_pipein (pipe) ? DMA_FROM_DEVICE : DMA_TO_DEVICE);
 }
 
 /**
@@ -1373,20 +1382,15 @@ void usb_buffer_unmap_sg (struct usb_device *dev, unsigned pipe,
 		struct scatterlist *sg, int n_hw_ents)
 {
 	struct usb_bus		*bus;
-	struct usb_operations	*op;
+	struct device		*controller;
 
 	if (!dev
 			|| !(bus = dev->bus)
-			|| !(op = bus->op)
-			|| !op->buffer_unmap_sg)
+			|| !(controller = bus->controller))
 		return;
 
-	op->buffer_unmap_sg (bus,
-			     sg,
-			     n_hw_ents,
-			     usb_pipein (pipe)
-				     ? USB_DIR_IN
-				     : USB_DIR_OUT);
+	dma_unmap_sg (controller, sg, n_hw_ents,
+			usb_pipein (pipe) ? DMA_FROM_DEVICE : DMA_TO_DEVICE);
 }
 
 
@@ -1471,7 +1475,7 @@ EXPORT_SYMBOL(usb_device_probe);
 EXPORT_SYMBOL(usb_device_remove);
 
 EXPORT_SYMBOL(usb_alloc_dev);
-EXPORT_SYMBOL(usb_free_dev);
+EXPORT_SYMBOL(usb_put_dev);
 EXPORT_SYMBOL(usb_get_dev);
 EXPORT_SYMBOL(usb_hub_tt_clear_buffer);
 

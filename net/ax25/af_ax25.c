@@ -1786,7 +1786,7 @@ static int ax25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 				warned=1;
 			}
 
-			if (copy_to_user((void *)arg, &ax25_info, sizeof(struct ax25_info_struct_depreciated))) {
+			if (copy_to_user((void *)arg, &ax25_info, sizeof(struct ax25_info_struct_deprecated))) {
 				res = -EFAULT;
 				break;
 			}

@@ -330,16 +330,16 @@ aiptek_probe(struct usb_interface *intf,
 	printk(KERN_INFO "input: %s on usb%d:%d\n",
 	       aiptek->features->name, dev->bus->busnum, dev->devnum);
 
-	dev_set_drvdata(&intf->dev, aiptek);
+	usb_set_intfdata(intf, aiptek);
 	return 0;
 }
 
 static void
 aiptek_disconnect(struct usb_interface *intf)
 {
-	struct aiptek *aiptek  = dev_get_drvdata(&intf->dev);
+	struct aiptek *aiptek  = usb_get_intfdata (intf);
 
-	dev_set_drvdata(&intf->dev, NULL);
+	usb_set_intfdata(intf, NULL);
 	if (aiptek) {
 		usb_unlink_urb(aiptek->irq);
 		input_unregister_device(&aiptek->dev);

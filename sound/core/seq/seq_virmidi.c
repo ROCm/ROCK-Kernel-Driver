@@ -53,12 +53,6 @@ MODULE_AUTHOR("Takashi Iwai <tiwai@suse.de>");
 MODULE_DESCRIPTION("Virtual Raw MIDI client on Sequencer");
 MODULE_LICENSE("GPL");
 
-static inline void dec_mod_count(struct module *module)
-{
-	if (module)
-		__MOD_DEC_USE_COUNT(module);
-}
-
 /*
  * initialize an event record
  */
@@ -303,7 +297,7 @@ static int snd_virmidi_unsubscribe(void *private_data, snd_seq_port_subscribe_t 
 
 	rdev = snd_magic_cast(snd_virmidi_dev_t, private_data, return -EINVAL);
 	rdev->flags &= ~SNDRV_VIRMIDI_SUBSCRIBE;
-	dec_mod_count(rdev->card->module);
+	module_put(rdev->card->module);
 	return 0;
 }
 
@@ -331,7 +325,7 @@ static int snd_virmidi_unuse(void *private_data, snd_seq_port_subscribe_t *info)
 
 	rdev = snd_magic_cast(snd_virmidi_dev_t, private_data, return -EINVAL);
 	rdev->flags &= ~SNDRV_VIRMIDI_USE;
-	dec_mod_count(rdev->card->module);
+	module_put(rdev->card->module);
 	return 0;
 }
 

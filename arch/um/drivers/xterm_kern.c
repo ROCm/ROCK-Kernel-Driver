@@ -22,11 +22,13 @@ struct xterm_wait {
 static void xterm_interrupt(int irq, void *data, struct pt_regs *regs)
 {
 	struct xterm_wait *xterm = data;
+	int fd;
 
-	xterm->new_fd = os_rcv_fd(xterm->fd, &xterm->pid);
-	if(xterm->new_fd == -EAGAIN)
+	fd = os_rcv_fd(xterm->fd, &xterm->pid);
+	if(fd == -EAGAIN)
 		return;
 
+	xterm->new_fd = fd;
 	up(&xterm->sem);
 }
 

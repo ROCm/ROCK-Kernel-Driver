@@ -69,8 +69,7 @@ static inline int mpc_apic_id(struct mpc_config_processor *m, int quad)
 	return logical_apicid;
 }
 
-#define wakeup_secondary_cpu(apicid, start_eip) \
-	wakeup_secondary_via_NMI(apicid)
+#define WAKE_SECONDARY_VIA_NMI
 
 static inline void setup_portio_remap(void)
 {

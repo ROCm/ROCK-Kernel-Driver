@@ -16,6 +16,7 @@ extern struct desc_struct cpu_gdt_table[NR_CPUS][GDT_ENTRIES];
 struct Xgt_desc_struct {
 	unsigned short size;
 	unsigned long address __attribute__((packed));
+	unsigned short pad;
 } __attribute__ ((packed));
 
 extern struct Xgt_desc_struct idt_descr, cpu_gdt_descr[NR_CPUS];

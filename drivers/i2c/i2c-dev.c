@@ -28,7 +28,7 @@
 /* The devfs code is contributed by Philipp Matthias Hahn 
    <pmhahn@titan.lahn.de> */
 
-/* $Id: i2c-dev.c,v 1.46 2002/07/06 02:07:39 mds Exp $ */
+/* $Id: i2c-dev.c,v 1.48 2002/10/01 14:10:04 ac9410 Exp $ */
 
 #include <linux/config.h>
 #include <linux/kernel.h>
@@ -433,19 +433,6 @@ static int i2cdev_command(struct i2c_client *client, unsigned int cmd,
 	return -1;
 }
 
-static void i2cdev_cleanup(void)
-{
-	int res;
-
-	if ((res = i2c_del_driver(&i2cdev_driver))) {
-		printk(KERN_ERR "i2c-dev.o: Driver deregistration failed, "
-		       "module not removed.\n");
-	}
-
-	devfs_remove("i2c");
-	unregister_chrdev(I2C_MAJOR,"i2c");
-}
-
 int __init i2c_dev_init(void)
 {
 	int res;
@@ -467,11 +454,16 @@ int __init i2c_dev_init(void)
 	return 0;
 }
 
-EXPORT_NO_SYMBOLS;
+static void __exit i2c_dev_exit(void)
+{
+	i2c_del_driver(&i2cdev_driver);
+	devfs_remove("i2c");
+	unregister_chrdev(I2C_MAJOR,"i2c");
+}
 
 MODULE_AUTHOR("Frodo Looijaard <frodol@dds.nl> and Simon G. Vogl <simon@tk.uni-linz.ac.at>");
 MODULE_DESCRIPTION("I2C /dev entries driver");
 MODULE_LICENSE("GPL");
 
 module_init(i2c_dev_init);
-module_exit(i2cdev_cleanup);
+module_exit(i2c_dev_exit);

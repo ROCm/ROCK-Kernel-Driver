@@ -983,13 +983,13 @@ struct super_block *get_sb_pseudo(struct file_system_type *, char *,
 /* Alas, no aliases. Too much hassle with bringing module.h everywhere */
 #define fops_get(fops) \
 	(((fops) && (fops)->owner)	\
-		? ( try_inc_mod_count((fops)->owner) ? (fops) : NULL ) \
+		? (try_inc_mod_count((fops)->owner) ? (fops) : NULL) \
 		: (fops))
 
 #define fops_put(fops) \
 do {	\
 	if ((fops) && (fops)->owner) \
-		__MOD_DEC_USE_COUNT((fops)->owner);	\
+		module_put((fops)->owner);	\
 } while(0)
 
 extern int register_filesystem(struct file_system_type *);
@@ -1300,6 +1300,7 @@ extern int dcache_dir_open(struct inode *, struct file *);
 extern int dcache_dir_close(struct inode *, struct file *);
 extern loff_t dcache_dir_lseek(struct file *, loff_t, int);
 extern int dcache_readdir(struct file *, void *, filldir_t);
+extern int simple_getattr(struct vfsmount *, struct dentry *, struct kstat *);
 extern int simple_statfs(struct super_block *, struct statfs *);
 extern int simple_link(struct dentry *, struct inode *, struct dentry *);
 extern int simple_unlink(struct inode *, struct dentry *);

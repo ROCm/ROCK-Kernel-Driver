@@ -8,9 +8,7 @@ extern struct timer_opts timer_tsc;
 /* list of timers, ordered by preference, NULL terminated */
 static struct timer_opts* timers[] = {
 	&timer_tsc,
-#ifndef CONFIG_X86_TSC
 	&timer_pit,
-#endif
 	NULL,
 };
 

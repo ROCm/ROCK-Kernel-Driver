@@ -566,8 +566,7 @@ char *partition_name(dev_t dev)
 	dname->name = NULL;
 	if (hd) {
 		dname->name = disk_name(hd, part, dname->namebuf);
-		if (hd->fops->owner)
-			__MOD_DEC_USE_COUNT(hd->fops->owner);
+		module_put(hd->fops->owner);
 		put_disk(hd);
 	}
 	if (!dname->name) {

@@ -447,13 +447,13 @@ fail:
 
 static void hub_disconnect(struct usb_interface *intf)
 {
-	struct usb_hub *hub = dev_get_drvdata (&intf->dev);
+	struct usb_hub *hub = usb_get_intfdata (intf);
 	unsigned long flags;
 
 	if (!hub)
 		return;
 
-	dev_set_drvdata (&intf->dev, NULL);
+	usb_set_intfdata (intf, NULL);
 	spin_lock_irqsave(&hub_event_lock, flags);
 
 	/* Delete it and then reset it */
@@ -546,7 +546,7 @@ descriptor_error:
 	list_add(&hub->hub_list, &hub_list);
 	spin_unlock_irqrestore(&hub_event_lock, flags);
 
-	dev_set_drvdata (&intf->dev, hub);
+	usb_set_intfdata (intf, hub);
 
 	if (usb_hub_configure(hub, endpoint) >= 0) {
 		strcpy (intf->dev.name, "Hub");
@@ -876,7 +876,7 @@ static void usb_hub_port_connect_change(struct usb_hub *hubstate, int port,
 
 		/* Reset the device, and detect its speed */
 		if (usb_hub_port_reset(hub, port, dev, delay)) {
-			usb_free_dev(dev);
+			usb_put_dev(dev);
 			break;
 		}
 
@@ -928,7 +928,7 @@ static void usb_hub_port_connect_change(struct usb_hub *hubstate, int port,
 			goto done;
 
 		/* Free the configuration if there was an error */
-		usb_free_dev(dev);
+		usb_put_dev(dev);
 
 		/* Switch to a long reset time */
 		delay = HUB_LONG_RESET_TIME;

@@ -49,6 +49,14 @@ static int falconide_offsets[IDE_NR_PORTS] __initdata = {
 
 
     /*
+     *  falconide_intr_lock is used to obtain access to the IDE interrupt,
+     *  which is shared between several drivers.
+     */
+
+int falconide_intr_lock;
+
+
+    /*
      *  Probe for a Falcon IDE interface
      */
 

@@ -131,7 +131,7 @@ static inline void set_tss_desc(unsigned cpu, void *addr)
 
 static inline void set_ldt_desc(unsigned cpu, void *addr, int size)
 { 
-	set_tssldt_descriptor(&cpu_gdt_table[cpu][GDT_ENTRY_TSS], (unsigned long)addr, 
+	set_tssldt_descriptor(&cpu_gdt_table[cpu][GDT_ENTRY_LDT], (unsigned long)addr, 
 			      DESC_LDT, size); 
 }
 

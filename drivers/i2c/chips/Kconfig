@@ -1,0 +1,40 @@
+#
+# Sensor device configuration
+# All depend on EXPERIMENTAL, I2C and I2C_PROC.
+#
+
+menu "I2C Hardware Sensors Chip support"
+
+config SENSORS_ADM1021
+	tristate "  Analog Devices ADM1021 and compatibles"
+	depends on I2C && I2C_PROC
+	help
+	  If you say yes here you get support for Analog Devices ADM1021 
+	  and ADM1023 sensor chips and clones: Maxim MAX1617 and MAX1617A,
+	  Genesys Logic GL523SM, National Semi LM84, TI THMC10,
+	  and the XEON processor built-in sensor. This can also 
+	  be built as a module which can be inserted and removed while the 
+	  kernel is running.
+
+	  The module will be called adm1021.o.
+	  
+	  You will also need the latest user-space utilties: you can find them
+	  in the lm_sensors package, which you can download at 
+	  http://www.lm-sensors.nu
+
+config SENSORS_LM75
+	tristate "  National Semiconductors LM75 and compatibles"
+	depends on I2C && I2C_PROC
+	help
+	  If you say yes here you get support for National Semiconductor LM75
+	  sensor chips and clones: Dallas Semi DS75 and DS1775, TelCon
+	  TCN75, and National Semi LM77. This can also be built as a module
+	  which can be inserted and removed while the kernel is running.
+
+	  The module will be called lm75.o.
+
+	  You will also need the latest user-space utilties: you can find them
+	  in the lm_sensors package, which you can download at 
+	  http://www.lm-sensors.nu
+
+endmenu

@@ -86,6 +86,11 @@
 extern int overflowuid,overflowgid; 
 
 
+extern asmlinkage long sys_newstat(char * filename, struct stat * statbuf);
+extern asmlinkage long sys_newlstat(char * filename, struct stat * statbuf);
+extern asmlinkage long sys_newfstat(unsigned int fd, struct stat * statbuf);
+
+
 int cp_compat_stat(struct kstat *kbuf, struct compat_stat *ubuf)
 {
 	if (verify_area(VERIFY_WRITE, ubuf, sizeof(struct compat_stat)) ||

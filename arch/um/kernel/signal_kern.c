@@ -16,6 +16,7 @@
 #include "linux/binfmts.h"
 #include "asm/signal.h"
 #include "asm/uaccess.h"
+#include "asm/unistd.h"
 #include "user_util.h"
 #include "kern_util.h"
 #include "signal_kern.h"
@@ -23,6 +24,7 @@
 #include "kern.h"
 #include "frame_kern.h"
 #include "sigcontext.h"
+#include "mode.h"
 
 EXPORT_SYMBOL(block_signals);
 EXPORT_SYMBOL(unblock_signals);
@@ -69,6 +71,9 @@ static int handle_signal(struct pt_regs *regs, unsigned long signr,
 
 	ret = 0;
 	switch(error){
+	case -ERESTART_RESTARTBLOCK:
+		current_thread_info()->restart_block.fn = 
+			do_no_restart_syscall;
 	case -ERESTARTNOHAND:
 		ret = -EINTR;
 		break;
@@ -160,6 +165,10 @@ static int kern_do_signal(struct pt_regs *regs, sigset_t *oldset, int error)
 			PT_REGS_ORIG_SYSCALL(regs) = PT_REGS_SYSCALL_NR(regs);
 			PT_REGS_RESTART_SYSCALL(regs);
 		}
+		else if(PT_REGS_SYSCALL_RET(regs) == -ERESTART_RESTARTBLOCK){
+			PT_REGS_SYSCALL_RET(regs) = __NR_restart_syscall;
+			PT_REGS_RESTART_SYSCALL(regs);
+ 		}
 	}
 
 	/* This closes a way to execute a system call on the host.  If
@@ -171,7 +180,7 @@ static int kern_do_signal(struct pt_regs *regs, sigset_t *oldset, int error)
 	 */
 	if((current->ptrace & PT_DTRACE) && 
 	   is_syscall(PT_REGS_IP(&current->thread.regs)))
-		current->thread.singlestep_syscall = 1;
+ 		(void) CHOOSE_MODE(current->thread.mode.tt.singlestep_syscall = 1, 0);
 	return(0);
 }
 
@@ -228,6 +237,16 @@ int sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize)
 	}
 }
 
+static int copy_sc_from_user(struct pt_regs *to, void *from)
+{
+	int ret;
+
+	ret = CHOOSE_MODE(copy_sc_from_user_tt(to->regs.mode.tt, from, 
+					       &signal_frame_sc.arch),
+			  copy_sc_from_user_skas(&to->regs, from));
+	return(ret);
+}
+
 int sys_sigreturn(struct pt_regs regs)
 {
 	void *sc = sp_to_sc(PT_REGS_SP(&regs));
@@ -241,8 +260,7 @@ int sys_sigreturn(struct pt_regs regs)
 	sigdelsetmask(&current->blocked, ~_BLOCKABLE);
 	recalc_sigpending();
 	spin_unlock_irq(&current->sig->siglock);
-	copy_sc_from_user(current->thread.regs.regs.sc, sc,
-			  &signal_frame_sc.arch);
+	copy_sc_from_user(&current->thread.regs, sc);
 	return(PT_REGS_SYSCALL_RET(&current->thread.regs));
 }
 
@@ -257,8 +275,7 @@ int sys_rt_sigreturn(struct pt_regs regs)
 	sigdelsetmask(&current->blocked, ~_BLOCKABLE);
 	recalc_sigpending();
 	spin_unlock_irq(&current->sig->siglock);
-	copy_sc_from_user(current->thread.regs.regs.sc, sc,
-			  &signal_frame_sc.arch);
+	copy_sc_from_user(&current->thread.regs, sc);
 	return(PT_REGS_SYSCALL_RET(&current->thread.regs));
 }
 

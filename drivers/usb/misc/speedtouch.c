@@ -973,16 +973,16 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 
 	minor_data[instance->minor] = instance;
 
-	dev_set_drvdata (&intf->dev, instance);
+	usb_set_intfdata (intf, instance);
 	return 0;
 }
 
 static void udsl_usb_disconnect (struct usb_interface *intf)
 {
-	struct udsl_instance_data *instance = dev_get_drvdata (&intf->dev);
+	struct udsl_instance_data *instance = usb_get_intfdata (intf);
 	int i;
 
-	dev_set_drvdata (&intf->dev, NULL);
+	usb_set_intfdata (intf, NULL);
 	if (instance) {
 		i = instance->minor;
 		/* unlinking receive buffers */

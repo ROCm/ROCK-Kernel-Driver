@@ -138,7 +138,8 @@ clean_2:
 	hcd->pdev = dev;
 	hcd->self.bus_name = dev->slot_name;
 	hcd->product_desc = dev->dev.name;
-	hcd->controller = &dev->dev;
+	hcd->self.controller = &dev->dev;
+	hcd->controller = hcd->self.controller;
 
 	if ((retval = hcd_buffer_create (hcd)) != 0) {
 clean_3:

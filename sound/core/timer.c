@@ -80,12 +80,6 @@ static int snd_timer_dev_unregister(snd_device_t *device);
 
 static void snd_timer_reschedule(snd_timer_t * timer, unsigned long ticks_left);
 
-static inline void dec_mod_count(struct module *module)
-{
-	if (module)
-		__MOD_DEC_USE_COUNT(module);
-}
-
 /*
  * create a timer instance with the given owner string.
  * when timer is not NULL, increments the module counter
@@ -325,7 +319,7 @@ int snd_timer_close(snd_timer_instance_t * timeri)
 		kfree(timeri->owner);
 	kfree(timeri);
 	if (timer && timer->card)
-		dec_mod_count(timer->card->module);
+		module_put(timer->card->module);
 	return 0;
 }
 

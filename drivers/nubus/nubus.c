@@ -915,10 +915,9 @@ void __init nubus_probe_slot(int slot)
 		int card_present;
 
 		rp--;
-		save_flags(flags);
-		cli();
+		local_irq_save(flags);
 		card_present = hwreg_present(rp);
-		restore_flags(flags);
+		local_irq_restore(flags);
 	       
 		if (!card_present)
 			continue;

@@ -44,11 +44,11 @@ static struct tt_internal *get_target_type(const char *name)
 
 	read_lock(&_lock);
 	ti = __find_target_type(name);
-
-	if (ti) {
-		if (ti->use == 0 && ti->tt.module)
-			__MOD_INC_USE_COUNT(ti->tt.module);
-		ti->use++;
+	if (ti && ti->use == 0) {
+		if (try_module_get(ti->tt.module))
+			ti->use++;
+		else
+			ti = NULL;
 	}
 	read_unlock(&_lock);
 
@@ -86,8 +86,8 @@ void dm_put_target_type(struct target_type *t)
 	struct tt_internal *ti = (struct tt_internal *) t;
 
 	read_lock(&_lock);
-	if (--ti->use == 0 && ti->tt.module)
-		__MOD_DEC_USE_COUNT(ti->tt.module);
+	if (--ti->use == 0)
+		module_put(ti->tt.module);
 
 	if (ti->use < 0)
 		BUG();

@@ -43,8 +43,11 @@ static int helper_child(void *arg)
 	execvp(argv[0], argv);
 	printk("execvp of '%s' failed - errno = %d\n", argv[0], errno);
 	write(data->fd, &errno, sizeof(errno));
-	_exit(1);
+	os_kill_process(os_getpid(), 0);
+	return(0);
 }
+
+/* XXX The alloc_stack here breaks if this is called in the tracing thread */
 
 int run_helper(void (*pre_exec)(void *), void *pre_data, char **argv,
 	       unsigned long *stack_out)
@@ -86,7 +89,10 @@ int run_helper(void (*pre_exec)(void *), void *pre_data, char **argv,
 		       errno);
 		return(-errno);
 	}
-	else if(n != 0)	pid = -err;
+	else if(n != 0){
+		waitpid(pid, NULL, 0);
+		pid = -err;
+	}
 
 	if(stack_out == NULL) free_stack(stack, 0);
         else *stack_out = stack;

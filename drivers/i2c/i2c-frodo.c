@@ -96,8 +96,6 @@ static int __init i2c_frodo_init (void)
 	return (i2c_bit_add_bus (&frodo_ops));
 }
 
-EXPORT_NO_SYMBOLS;
-
 static void __exit i2c_frodo_exit (void)
 {
 	i2c_bit_del_bus (&frodo_ops);
@@ -105,12 +103,7 @@ static void __exit i2c_frodo_exit (void)
 
 MODULE_AUTHOR ("Abraham van der Merwe <abraham@2d3d.co.za>");
 MODULE_DESCRIPTION ("I2C-Bus adapter routines for Frodo");
-
-#ifdef MODULE_LICENSE
 MODULE_LICENSE ("GPL");
-#endif	/* #ifdef MODULE_LICENSE */
-
-EXPORT_NO_SYMBOLS;
 
 module_init (i2c_frodo_init);
 module_exit (i2c_frodo_exit);

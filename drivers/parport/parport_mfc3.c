@@ -59,6 +59,7 @@
 #include <linux/delay.h>
 #include <linux/mc6821.h>
 #include <linux/zorro.h>
+#include <linux/interrupt.h>
 #include <asm/setup.h>
 #include <asm/amigahw.h>
 #include <asm/irq.h>

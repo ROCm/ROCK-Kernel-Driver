@@ -181,14 +181,6 @@ spinlock_t ide_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 
 static int ide_scan_direction; /* THIS was formerly 2.2.x pci=reverse */
 
-#ifdef IDE_ARCH_LOCK
-/*
- * ide_lock is used by the Atari code to obtain access to the IDE interrupt,
- * which is shared between several drivers.
- */
-static int	ide_intr_lock;
-#endif /* IDE_ARCH_LOCK */
-
 #ifdef CONFIG_IDEDMA_AUTO
 int noautodma = 0;
 #else
@@ -1344,14 +1336,12 @@ int ata_attach(ide_drive_t *drive)
 			continue;
 		spin_unlock(&drivers_lock);
 		if (driver->attach(drive) == 0) {
-			if (driver->owner)
-				__MOD_DEC_USE_COUNT(driver->owner);
+			module_put(driver->owner);
 			drive->gendev.driver = &driver->gen_driver;
 			return 0;
 		}
 		spin_lock(&drivers_lock);
-		if (driver->owner)
-			__MOD_DEC_USE_COUNT(driver->owner);
+		module_put(driver->owner);
 	}
 	spin_unlock(&drivers_lock);
 	spin_lock(&drives_lock);
@@ -2097,12 +2087,12 @@ void __init ide_init_builtin_drivers (void)
 
 #ifdef CONFIG_BLK_DEV_IDE
 	if (ide_hwifs[0].io_ports[IDE_DATA_OFFSET])
-		ide_get_lock(&ide_intr_lock, NULL, NULL); /* for atari only */
+		ide_get_lock(NULL, NULL); /* for atari only */
 
 	(void) ideprobe_init();
 
 	if (ide_hwifs[0].io_ports[IDE_DATA_OFFSET])
-		ide_release_lock(&ide_intr_lock);	/* for atari only */
+		ide_release_lock();	/* for atari only */
 #endif /* CONFIG_BLK_DEV_IDE */
 
 #ifdef CONFIG_PROC_FS

@@ -248,24 +248,24 @@ static struct atari_floppy_struct {
 #define FDC_READ(reg) ({			\
     /* unsigned long __flags; */		\
     unsigned short __val;			\
-    /* save_flags(__flags); cli(); */		\
+    /* local_irq_save(__flags); */		\
     dma_wd.dma_mode_status = 0x80 | (reg);	\
     udelay(25);					\
     __val = dma_wd.fdc_acces_seccount;		\
     MFPDELAY();					\
-    /* restore_flags(__flags); */		\
+    /* local_irq_restore(__flags); */		\
     __val & 0xff;				\
 })
 
 #define FDC_WRITE(reg,val)			\
     do {					\
 	/* unsigned long __flags; */		\
-	/* save_flags(__flags); cli(); */	\
+	/* local_irq_save(__flags); */		\
 	dma_wd.dma_mode_status = 0x80 | (reg);	\
 	udelay(25);				\
 	dma_wd.fdc_acces_seccount = (val);	\
 	MFPDELAY();				\
-        /* restore_flags(__flags); */		\
+        /* local_irq_restore(__flags); */	\
     } while(0)
 
 
@@ -394,7 +394,7 @@ static int floppy_release( struct inode * inode, struct file * filp );
 
 static struct timer_list motor_off_timer =
 	TIMER_INITIALIZER(fd_motor_off_timer, 0, 0);
-static struct timer_list readtrack_timer
+static struct timer_list readtrack_timer =
 	TIMER_INITIALIZER(fd_readtrack_check, 0, 0);
 
 static struct timer_list timeout_timer =
@@ -434,14 +434,14 @@ static void fd_select_side( int side )
 {
 	unsigned long flags;
 
-	save_flags(flags);
-	cli(); /* protect against various other ints mucking around with the PSG */
+	/* protect against various other ints mucking around with the PSG */
+	local_irq_save(flags);
   
 	sound_ym.rd_data_reg_sel = 14; /* Select PSG Port A */
 	sound_ym.wd_data = (side == 0) ? sound_ym.rd_data_reg_sel | 0x01 :
 	                                 sound_ym.rd_data_reg_sel & 0xfe;
 
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 
@@ -457,13 +457,13 @@ static void fd_select_drive( int drive )
 	if (drive == SelectedDrive)
 	  return;
 
-	save_flags(flags);
-	cli(); /* protect against various other ints mucking around with the PSG */
+	/* protect against various other ints mucking around with the PSG */
+	local_irq_save(flags);
 	sound_ym.rd_data_reg_sel = 14; /* Select PSG Port A */
 	tmp = sound_ym.rd_data_reg_sel;
 	sound_ym.wd_data = (tmp | DSKDRVNONE) & ~(drive == 0 ? DSKDRV0 : DSKDRV1);
 	atari_dont_touch_floppy_select = 1;
-	restore_flags(flags);
+	local_irq_restore(flags);
 
 	/* restore track register to saved value */
 	FDC_WRITE( FDCREG_TRACK, UD.track );
@@ -484,8 +484,8 @@ static void fd_deselect( void )
 {
 	unsigned long flags;
 
-	save_flags(flags);
-	cli(); /* protect against various other ints mucking around with the PSG */
+	/* protect against various other ints mucking around with the PSG */
+	local_irq_save(flags);
 	atari_dont_touch_floppy_select = 0;
 	sound_ym.rd_data_reg_sel=14;	/* Select PSG Port A */
 	sound_ym.wd_data = (sound_ym.rd_data_reg_sel |
@@ -493,7 +493,7 @@ static void fd_deselect( void )
 	/* On Falcon, the drive B select line is used on the printer port, so
 	 * leave it alone... */
 	SelectedDrive = -1;
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 
@@ -549,8 +549,8 @@ static void check_change( unsigned long dummy )
 	if (++drive > 1 || !UD.connected)
 		drive = 0;
 
-	save_flags(flags);
-	cli(); /* protect against various other ints mucking around with the PSG */
+	/* protect against various other ints mucking around with the PSG */
+	local_irq_save(flags);
 
 	if (!stdma_islocked()) {
 		sound_ym.rd_data_reg_sel = 14;
@@ -566,7 +566,7 @@ static void check_change( unsigned long dummy )
 			set_bit (drive, &changed_floppies);
 		}
 	}
-	restore_flags(flags);
+	local_irq_restore(flags);
 
 	start_check_change_timer();
 }
@@ -666,13 +666,12 @@ static int do_format(kdev_t device, struct atari_format_descr *desc)
 	DPRINT(("do_format( dr=%d tr=%d he=%d offs=%d )\n",
 		drive, desc->track, desc->head, desc->sect_offset ));
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 	while( fdc_busy ) sleep_on( &fdc_wait );
 	fdc_busy = 1;
 	stdma_lock(floppy_irq, NULL);
 	atari_turnon_irq( IRQ_MFP_FDC ); /* should be already, just to be sure */
-	restore_flags(flags);
+	local_irq_restore(flags);
 
 	type = minor(device) >> 2;
 	if (type) {
@@ -930,8 +929,7 @@ static void fd_rwsec( void )
 	udelay(25);
   
 	/* Setup DMA */
-	save_flags(flags);  
-	cli();
+	local_irq_save(flags);
 	dma_wd.dma_lo = (unsigned char)paddr;
 	MFPDELAY();
 	paddr >>= 8;
@@ -943,7 +941,7 @@ static void fd_rwsec( void )
 	else
 		dma_wd.dma_hi = (unsigned char)paddr;
 	MFPDELAY();
-	restore_flags(flags);
+	local_irq_restore(flags);
   
 	/* Clear FIFO and switch DMA to correct mode */  
 	dma_wd.dma_mode_status = 0x90 | rwflag;  
@@ -990,8 +988,7 @@ static void fd_readtrack_check( unsigned long dummy )
 {
 	unsigned long flags, addr, addr2;
 
-	save_flags(flags);  
-	cli();
+	local_irq_save(flags);
 
 	if (!MultReadInProgress) {
 		/* This prevents a race condition that could arise if the
@@ -1000,7 +997,7 @@ static void fd_readtrack_check( unsigned long dummy )
 		 * already cleared 'MultReadInProgress'  when flow of control
 		 * gets here.
 		 */
-		restore_flags(flags);
+		local_irq_restore(flags);
 		return;
 	}
 
@@ -1026,7 +1023,7 @@ static void fd_readtrack_check( unsigned long dummy )
 		 */
 		SET_IRQ_HANDLER( NULL );
 		MultReadInProgress = 0;
-		restore_flags(flags);
+		local_irq_restore(flags);
 		DPRINT(("fd_readtrack_check(): done\n"));
 		FDC_WRITE( FDCREG_CMD, FDCCMD_FORCI );
 		udelay(25);
@@ -1038,7 +1035,7 @@ static void fd_readtrack_check( unsigned long dummy )
 	}
 	else {
 		/* not yet finished, wait another tenth rotation */
-		restore_flags(flags);
+		local_irq_restore(flags);
 		DPRINT(("fd_readtrack_check(): not yet finished\n"));
 		mod_timer(&readtrack_timer, jiffies + HZ/5/10);
 	}
@@ -1199,8 +1196,7 @@ static void fd_writetrack( void )
 	udelay(40);
   
 	/* Setup DMA */
-	save_flags(flags);  
-	cli();
+	local_irq_save(flags);
 	dma_wd.dma_lo = (unsigned char)paddr;
 	MFPDELAY();
 	paddr >>= 8;
@@ -1212,7 +1208,7 @@ static void fd_writetrack( void )
 	else
 		dma_wd.dma_hi = (unsigned char)paddr;
 	MFPDELAY();
-	restore_flags(flags);
+	local_irq_restore(flags);
   
 	/* Clear FIFO and switch DMA to correct mode */  
 	dma_wd.dma_mode_status = 0x190;  
@@ -1325,12 +1321,11 @@ static void finish_fdc_done( int dummy )
 		start_check_change_timer();
 	start_motor_off_timer();
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 	stdma_release();
 	fdc_busy = 0;
 	wake_up( &fdc_wait );
-	restore_flags(flags);
+	local_irq_restore(flags);
 
 	DPRINT(("finish_fdc() finished\n"));
 }
@@ -1519,10 +1514,10 @@ void do_fd_request(request_queue_t * q)
 	stdma_lock(floppy_irq, NULL);
 
 	atari_disable_irq( IRQ_MFP_FDC );
-	save_flags(flags);	/* The request function is called with ints
-	sti();				 * disabled... so must save the IPL for later */ 
+	local_save_flags(flags);	/* The request function is called with ints
+	local_irq_disable();		 * disabled... so must save the IPL for later */ 
 	redo_fd_request();
-	restore_flags(flags);
+	local_irq_restore(flags);
 	atari_enable_irq( IRQ_MFP_FDC );
 }
 

@@ -470,6 +470,7 @@ CONFIG_RTC=y
 # CONFIG_FTAPE is not set
 # CONFIG_AGP is not set
 # CONFIG_AGP_GART is not set
+# CONFIG_AGP3 is not set
 # CONFIG_DRM is not set
 # CONFIG_MWAVE is not set
 CONFIG_RAW_DRIVER=y
@@ -584,6 +585,11 @@ CONFIG_DUMMY_CONSOLE=y
 # Bluetooth support
 #
 # CONFIG_BT is not set
+
+#
+# Profiling support
+#
+# CONFIG_PROFILING is not set
 
 #
 # Kernel hacking
