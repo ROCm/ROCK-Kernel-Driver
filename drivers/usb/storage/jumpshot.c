@@ -43,8 +43,8 @@
   *
   * This driver supports reading and writing.  If you're truly paranoid,
   * however, you can force the driver into a write-protected state by setting
-  * the WP enable bits in jumpshot_handle_mode_sense.  Basically this means
-  * setting mode_param_header[3] = 0x80.  
+  * the WP enable bits in jumpshot_handle_mode_sense.  See the comments
+  * in that routine.
   */
 
 #include "transport.h"
@@ -320,34 +320,24 @@ static int jumpshot_id_device(struct us_data *us,
 
 static int jumpshot_handle_mode_sense(struct us_data *us,
 				      Scsi_Cmnd * srb, 
-				      unsigned char *ptr,
 				      int sense_6)
 {
-	unsigned char mode_param_header[8] = {
-		0, 0, 0, 0, 0, 0, 0, 0
-	};
-	unsigned char rw_err_page[12] = {
+	static unsigned char rw_err_page[12] = {
 		0x1, 0xA, 0x21, 1, 0, 0, 0, 0, 1, 0, 0, 0
 	};
-	unsigned char cache_page[12] = {
+	static unsigned char cache_page[12] = {
 		0x8, 0xA, 0x1, 0, 0, 0, 0, 0, 0, 0, 0, 0
 	};
-	unsigned char rbac_page[12] = {
+	static unsigned char rbac_page[12] = {
 		0x1B, 0xA, 0, 0x81, 0, 0, 0, 0, 0, 0, 0, 0
 	};
-	unsigned char timer_page[8] = {
+	static unsigned char timer_page[8] = {
 		0x1C, 0x6, 0, 0, 0, 0
 	};
 	unsigned char pc, page_code;
-	unsigned short total_len = 0;
-	unsigned short param_len, i = 0;
-
-
-	if (sense_6)
-		param_len = srb->cmnd[4];
-	else
-		param_len = ((u32) (srb->cmnd[7]) >> 8) | ((u32) (srb->cmnd[8]));
-
+	unsigned int i = 0;
+	struct jumpshot_info *info = (struct jumpshot_info *) (us->extra);
+	unsigned char *ptr = us->iobuf;
 
 	pc = srb->cmnd[2] >> 6;
 	page_code = srb->cmnd[2] & 0x3F;
@@ -367,66 +357,44 @@ static int jumpshot_handle_mode_sense(struct us_data *us,
 		break;
 	}
 
-	mode_param_header[3] = 0x80;	// write enable
+	memset(ptr, 0, 8);
+	if (sense_6) {
+		ptr[2] = 0x00;		// WP enable: 0x80
+		i = 4;
+	} else {
+		ptr[3] = 0x00;		// WP enable: 0x80
+		i = 8;
+	}
 
 	switch (page_code) {
 	   case 0x0:
 		// vendor-specific mode
-		return USB_STOR_TRANSPORT_ERROR;
+		info->sense_key = 0x05;
+		info->sense_asc = 0x24;
+		info->sense_ascq = 0x00;
+		return USB_STOR_TRANSPORT_FAILED;
 
 	   case 0x1:
-		total_len = sizeof(rw_err_page);
-		mode_param_header[0] = total_len >> 8;
-		mode_param_header[1] = total_len & 0xFF;
-		mode_param_header[3] = 0x00;	// WP enable: 0x80
-
-		memcpy(ptr, mode_param_header, sizeof(mode_param_header));
-		i += sizeof(mode_param_header);
 		memcpy(ptr + i, rw_err_page, sizeof(rw_err_page));
+		i += sizeof(rw_err_page);
 		break;
 
 	   case 0x8:
-		total_len = sizeof(cache_page);
-		mode_param_header[0] = total_len >> 8;
-		mode_param_header[1] = total_len & 0xFF;
-		mode_param_header[3] = 0x00;	// WP enable: 0x80
-
-		memcpy(ptr, mode_param_header, sizeof(mode_param_header));
-		i += sizeof(mode_param_header);
 		memcpy(ptr + i, cache_page, sizeof(cache_page));
+		i += sizeof(cache_page);
 		break;
 
 	   case 0x1B:
-		total_len = sizeof(rbac_page);
-		mode_param_header[0] = total_len >> 8;
-		mode_param_header[1] = total_len & 0xFF;
-		mode_param_header[3] = 0x00;	// WP enable: 0x80
-
-		memcpy(ptr, mode_param_header, sizeof(mode_param_header));
-		i += sizeof(mode_param_header);
 		memcpy(ptr + i, rbac_page, sizeof(rbac_page));
+		i += sizeof(rbac_page);
 		break;
 
 	   case 0x1C:
-		total_len = sizeof(timer_page);
-		mode_param_header[0] = total_len >> 8;
-		mode_param_header[1] = total_len & 0xFF;
-		mode_param_header[3] = 0x00;	// WP enable: 0x80
-
-		memcpy(ptr, mode_param_header, sizeof(mode_param_header));
-		i += sizeof(mode_param_header);
 		memcpy(ptr + i, timer_page, sizeof(timer_page));
+		i += sizeof(timer_page);
 		break;
 
 	   case 0x3F:
-		total_len = sizeof(timer_page) + sizeof(rbac_page) +
-		    sizeof(cache_page) + sizeof(rw_err_page);
-		mode_param_header[0] = total_len >> 8;
-		mode_param_header[1] = total_len & 0xFF;
-		mode_param_header[3] = 0x00;	// WP enable: 0x80
-
-		memcpy(ptr, mode_param_header, sizeof(mode_param_header));
-		i += sizeof(mode_param_header);
 		memcpy(ptr + i, timer_page, sizeof(timer_page));
 		i += sizeof(timer_page);
 		memcpy(ptr + i, rbac_page, sizeof(rbac_page));
@@ -434,8 +402,15 @@ static int jumpshot_handle_mode_sense(struct us_data *us,
 		memcpy(ptr + i, cache_page, sizeof(cache_page));
 		i += sizeof(cache_page);
 		memcpy(ptr + i, rw_err_page, sizeof(rw_err_page));
+		i += sizeof(rw_err_page);
 		break;
 	}
+
+	if (sense_6)
+		ptr[0] = i - 1;
+	else
+		((u16 *) ptr)[0] = cpu_to_be16(i - 2);
+	usb_stor_set_xfer_buf(ptr, i, srb);
 
 	return USB_STOR_TRANSPORT_GOOD;
 }
@@ -456,8 +431,8 @@ int jumpshot_transport(Scsi_Cmnd * srb, struct us_data *us)
 	struct jumpshot_info *info;
 	int rc;
 	unsigned long block, blocks;
-	unsigned char *ptr = NULL;
-	unsigned char inquiry_response[36] = {
+	unsigned char *ptr = us->iobuf;
+	static unsigned char inquiry_response[8] = {
 		0x00, 0x80, 0x00, 0x01, 0x1F, 0x00, 0x00, 0x00
 	};
 
@@ -472,12 +447,11 @@ int jumpshot_transport(Scsi_Cmnd * srb, struct us_data *us)
 	}
 
 	info = (struct jumpshot_info *) (us->extra);
-	ptr = (unsigned char *) srb->request_buffer;
 
 	if (srb->cmnd[0] == INQUIRY) {
 		US_DEBUGP("jumpshot_transport:  INQUIRY.  Returning bogus response.\n");
-		memset(inquiry_response + 8, 0, 28);
-		fill_inquiry_response(us, inquiry_response, 36);
+		memcpy(ptr, inquiry_response, sizeof(inquiry_response));
+		fill_inquiry_response(us, ptr, 36);
 		return USB_STOR_TRANSPORT_GOOD;
 	}
 
@@ -497,15 +471,9 @@ int jumpshot_transport(Scsi_Cmnd * srb, struct us_data *us)
 
 		// build the reply
 		//
-		ptr[0] = (info->sectors >> 24) & 0xFF;
-		ptr[1] = (info->sectors >> 16) & 0xFF;
-		ptr[2] = (info->sectors >> 8) & 0xFF;
-		ptr[3] = (info->sectors) & 0xFF;
-
-		ptr[4] = (info->ssize >> 24) & 0xFF;
-		ptr[5] = (info->ssize >> 16) & 0xFF;
-		ptr[6] = (info->ssize >> 8) & 0xFF;
-		ptr[7] = (info->ssize) & 0xFF;
+		((u32 *) ptr)[0] = cpu_to_be32(info->sectors);
+		((u32 *) ptr)[1] = cpu_to_be32(info->ssize);
+		usb_stor_set_xfer_buf(ptr, 8, srb);
 
 		return USB_STOR_TRANSPORT_GOOD;
 	}
@@ -568,25 +536,27 @@ int jumpshot_transport(Scsi_Cmnd * srb, struct us_data *us)
 	}
 
 	if (srb->cmnd[0] == REQUEST_SENSE) {
-		US_DEBUGP("jumpshot_transport:  REQUEST_SENSE.  Returning NO SENSE for now\n");
+		US_DEBUGP("jumpshot_transport:  REQUEST_SENSE.\n");
 
+		memset(ptr, 0, 18);
 		ptr[0] = 0xF0;
 		ptr[2] = info->sense_key;
 		ptr[7] = 11;
 		ptr[12] = info->sense_asc;
 		ptr[13] = info->sense_ascq;
+		usb_stor_set_xfer_buf(ptr, 18, srb);
 
 		return USB_STOR_TRANSPORT_GOOD;
 	}
 
 	if (srb->cmnd[0] == MODE_SENSE) {
 		US_DEBUGP("jumpshot_transport:  MODE_SENSE_6 detected\n");
-		return jumpshot_handle_mode_sense(us, srb, ptr, TRUE);
+		return jumpshot_handle_mode_sense(us, srb, TRUE);
 	}
 
 	if (srb->cmnd[0] == MODE_SENSE_10) {
 		US_DEBUGP("jumpshot_transport:  MODE_SENSE_10 detected\n");
-		return jumpshot_handle_mode_sense(us, srb, ptr, FALSE);
+		return jumpshot_handle_mode_sense(us, srb, FALSE);
 	}
 
 	if (srb->cmnd[0] == ALLOW_MEDIUM_REMOVAL) {
@@ -615,5 +585,8 @@ int jumpshot_transport(Scsi_Cmnd * srb, struct us_data *us)
 
 	US_DEBUGP("jumpshot_transport:  Gah! Unknown command: %d (0x%x)\n",
 		  srb->cmnd[0], srb->cmnd[0]);
-	return USB_STOR_TRANSPORT_ERROR;
+	info->sense_key = 0x05;
+	info->sense_asc = 0x20;
+	info->sense_ascq = 0x00;
+	return USB_STOR_TRANSPORT_FAILED;
 }
