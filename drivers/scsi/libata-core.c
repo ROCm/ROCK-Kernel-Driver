@@ -2800,7 +2800,7 @@ static inline int ata_should_dma_map(struct ata_queued_cmd *qc)
 			return 1;
 
 		/* fall through */
-	
+
 	default:
 		return 0;
 	}
@@ -3743,16 +3743,13 @@ int ata_pci_init_one (struct pci_dev *pdev, struct ata_port_info **port_info,
 	if (legacy_mode) {
 		if (legacy_mode & (1 << 0))
 			ata_device_add(probe_ent);
-		else
-			kfree(probe_ent);
 		if (legacy_mode & (1 << 1))
 			ata_device_add(probe_ent2);
-		else
-			kfree(probe_ent2);
-	} else {
+	} else
 		ata_device_add(probe_ent);
-	}
+
 	kfree(probe_ent);
+	kfree(probe_ent2);
 
 	return 0;
 
