@@ -96,7 +96,7 @@ us_copy_to_sgbuf(unsigned char *buffer, int buflen,
 			length = room;
 		
 		memcpy(ptr, buffer+transferred, length);
-		transferred += sg[i].length;
+		transferred += length;
 		*offset += length;
 		if (length == room) {
 			i++;
