@@ -743,7 +743,7 @@ ENTRY(ia64_leave_syscall)
 	mov r22=r0		// clear r22
 	;;
 	ld8 r26=[r2],PT(B0)-PT(AR_PFS)	// M0|1 load ar.pfs
-	nop.m 0
+(pKStk)	mov r22=psr		// M2 read PSR now that interrupts are disabled
 	mov f10=f0		// clear f10
 	;;
 	ld8 r21=[r2],PT(AR_RNAT)-PT(B0) // load b0
@@ -895,12 +895,16 @@ GLOBAL_ENTRY(ia64_leave_kernel)
 	srlz.i			// ensure interruption collection is off
 	mov ar.ccv=r15
 	;;
+	ldf.fill f11=[r2]
 	bsw.0			// switch back to bank 0 (no stop bit required beforehand...)
 	;;
-	ldf.fill f11=[r2]
-(pUStk)	mov r18=IA64_KR(CURRENT)	// Itanium 2: 12 cycle read latency
+(pUStk)	mov r18=IA64_KR(CURRENT)// M2 (12 cycle read latency)
 	adds r16=PT(CR_IPSR)+16,r12
 	adds r17=PT(CR_IIP)+16,r12
+
+(pKStk)	mov r22=psr		// M2 read PSR now that interrupts are disabled
+	nop.i 0
+	nop.i 0
 	;;
 	ld8 r29=[r16],16	// load cr.ipsr
 	ld8 r28=[r17],16	// load cr.iip
@@ -1045,11 +1049,11 @@ rse_clear_invalid:
 	;;
 skip_rbs_switch:
 	mov ar.unat=r25		// M2
-	nop.i 0			// I0
+(pKStk)	extr.u r22=r22,21,1	// I0 extract current value of psr.pp from r22
 (pLvSys)mov r19=r0		// A  clear r19 for leave_syscall, no-op otherwise
 	;;
 (pUStk)	mov ar.bspstore=r23	// M2
-	nop.i 0			// I0
+(pKStk)	dep r29=r22,r29,21,1	// I0 update ipsr.pp with psr.pp
 (pLvSys)mov r16=r0		// A  clear r16 for leave_syscall, no-op otherwise
 	;;
 	mov cr.ipsr=r29		// M2
