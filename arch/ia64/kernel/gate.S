@@ -234,7 +234,7 @@ back_from_setup_rbs:
 	br.call.sptk.many rp=b6			// call the signal handler
 .ret0:	adds base0=(BSP_OFF+SIGCONTEXT_OFF),sp
 	;;
-	ld8 r15=[base0],(CFM_OFF-BSP_OFF)	// fetch sc_ar_bsp and advance to CFM_OFF
+	ld8 r15=[base0]				// fetch sc_ar_bsp
 	mov r14=ar.bsp
 	;;
 	cmp.ne p1,p0=r14,r15			// do we need to restore the rbs?

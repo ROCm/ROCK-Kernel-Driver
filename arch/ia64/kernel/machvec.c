@@ -50,8 +50,27 @@ machvec_noop (void)
 EXPORT_SYMBOL(machvec_noop);
 
 void
-machvec_memory_fence (void)
+machvec_setup (char **arg)
+{
+}
+EXPORT_SYMBOL(machvec_setup);
+
+void
+machvec_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
+{
+}
+EXPORT_SYMBOL(machvec_timer_interrupt);
+
+void
+machvec_dma_sync_single (struct device *hwdev, dma_addr_t dma_handle, size_t size, int dir)
 {
 	mb();
 }
-EXPORT_SYMBOL(machvec_memory_fence);
+EXPORT_SYMBOL(machvec_dma_sync_single);
+
+void
+machvec_dma_sync_sg (struct device *hwdev, struct scatterlist *sg, int n, int dir)
+{
+	mb();
+}
+EXPORT_SYMBOL(machvec_dma_sync_sg);
