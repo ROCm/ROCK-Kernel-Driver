@@ -67,8 +67,10 @@ int kml_unpack_version(struct presto_version **ver, char **buf, char *end)
 
 	UNLOGP(*ver, struct presto_version, ptr, end);
         pv = *ver;
-        pv->pv_mtime   = NTOH__u64(pv->pv_mtime);
-        pv->pv_ctime   = NTOH__u64(pv->pv_ctime);
+        pv->pv_mtime_sec   = NTOH__u32(pv->pv_mtime_sec);
+        pv->pv_mtime_nsec   = NTOH__u32(pv->pv_mtime_nsec);
+        pv->pv_ctime_sec   = NTOH__u32(pv->pv_ctime_sec);
+        pv->pv_ctime_nsec   = NTOH__u32(pv->pv_ctime_nsec);
         pv->pv_size    = NTOH__u64(pv->pv_size);
 
 	*buf = ptr;
@@ -247,8 +249,10 @@ static int kml_unpack_setattr(struct kml_rec *rec, char **buf, char *end)
 	LUNLOGV(rec->uid, __u32, ptr, end);
 	LUNLOGV(rec->gid, __u32, ptr, end);
 	LUNLOGV(rec->size, __u64, ptr, end);
-	LUNLOGV(rec->mtime, __u64, ptr, end);
-	LUNLOGV(rec->ctime, __u64, ptr, end);
+	LUNLOGV(rec->mtime_sec, __u32, ptr, end);
+	LUNLOGV(rec->mtime_nsec, __u32, ptr, end);
+	LUNLOGV(rec->ctime_sec, __u32, ptr, end);
+	LUNLOGV(rec->ctime_nsec, __u32, ptr, end);
 	LUNLOGV(rec->flags, __u32, ptr, end);
         LUNLOGV(rec->old_mode, __u32, ptr, end);
         LUNLOGV(rec->old_rdev, __u32, ptr, end);

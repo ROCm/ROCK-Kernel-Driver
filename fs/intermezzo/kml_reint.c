@@ -100,7 +100,8 @@ static inline int version_equal(struct presto_version *a, struct inode *inode)
                 return 0;
         }
 
-        if (inode->i_mtime == a->pv_mtime &&
+        if (inode->i_mtime.tv_sec == a->pv_mtime_sec &&
+            inode->i_mtime.tv_nsec == a->pv_mtime_nsec &&
             (S_ISDIR(inode->i_mode) || inode->i_size == a->pv_size))
                 return 1;
 
@@ -126,8 +127,10 @@ static int reint_close(struct kml_rec *rec, struct file *file,
                 struct iattr iattr;
 
                 iattr.ia_valid = ATTR_CTIME | ATTR_MTIME | ATTR_SIZE;
-                iattr.ia_mtime = (time_t)rec->new_objectv->pv_mtime;
-                iattr.ia_ctime = (time_t)rec->new_objectv->pv_ctime;
+                iattr.ia_mtime.tv_sec = (time_t)rec->new_objectv->pv_mtime_sec;
+                iattr.ia_mtime.tv_nsec = (time_t)rec->new_objectv->pv_mtime_nsec;
+                iattr.ia_ctime.tv_sec = (time_t)rec->new_objectv->pv_ctime_sec;
+                iattr.ia_ctime.tv_nsec = (time_t)rec->new_objectv->pv_ctime_nsec;
                 iattr.ia_size = (time_t)rec->new_objectv->pv_size;
 
                 /* no kml record, but update last rcvd */
@@ -144,7 +147,8 @@ static int reint_close(struct kml_rec *rec, struct file *file,
         } else {
                 int minor = presto_f2m(fset);
 
-                info.updated_time = rec->new_objectv->pv_mtime;
+                info.updated_time.tv_sec = rec->new_objectv->pv_mtime_sec;
+                info.updated_time.tv_nsec = rec->new_objectv->pv_mtime_nsec;
                 memcpy(&info.remote_version, rec->old_objectv, 
                        sizeof(*rec->old_objectv));
                 info.remote_ino = rec->ino;
@@ -180,7 +184,8 @@ static int reint_create(struct kml_rec *rec, struct file *dir,
         int     error;        ENTRY;
 
         CDEBUG (D_KML, "=====REINT_CREATE::%s\n", rec->path);
-        info->updated_time = rec->new_objectv->pv_ctime;
+        info->updated_time.tv_sec = rec->new_objectv->pv_ctime_sec;
+        info->updated_time.tv_nsec = rec->new_objectv->pv_ctime_nsec;
         kmlreint_pre_secure(rec, dir, &saved_ctxt);
         error = lento_create(rec->path, rec->mode, info);
         pop_ctxt(&saved_ctxt); 
@@ -198,7 +203,8 @@ static int reint_link(struct kml_rec *rec, struct file *dir,
         ENTRY;
 
         CDEBUG (D_KML, "=====REINT_LINK::%s -> %s\n", rec->path, rec->target);
-        info->updated_time = rec->new_objectv->pv_mtime;
+        info->updated_time.tv_sec = rec->new_objectv->pv_mtime_sec;
+        info->updated_time.tv_nsec = rec->new_objectv->pv_mtime_nsec;
         kmlreint_pre_secure(rec, dir, &saved_ctxt);
         error = lento_link(rec->path, rec->target, info);
         pop_ctxt(&saved_ctxt); 
@@ -216,7 +222,8 @@ static int reint_mkdir(struct kml_rec *rec, struct file *dir,
         ENTRY;
 
         CDEBUG (D_KML, "=====REINT_MKDIR::%s\n", rec->path);
-        info->updated_time = rec->new_objectv->pv_ctime;
+        info->updated_time.tv_sec = rec->new_objectv->pv_ctime_sec;
+        info->updated_time.tv_nsec = rec->new_objectv->pv_ctime_nsec;
         kmlreint_pre_secure(rec, dir, &saved_ctxt);
         error = lento_mkdir(rec->path, rec->mode, info);
         pop_ctxt(&saved_ctxt); 
@@ -234,7 +241,8 @@ static int reint_mknod(struct kml_rec *rec, struct file *dir,
         ENTRY;
 
         CDEBUG (D_KML, "=====REINT_MKNOD::%s\n", rec->path);
-        info->updated_time = rec->new_objectv->pv_ctime;
+        info->updated_time.tv_sec = rec->new_objectv->pv_ctime_sec;
+        info->updated_time.tv_nsec = rec->new_objectv->pv_ctime_nsec;
         kmlreint_pre_secure(rec, dir, &saved_ctxt);
 
         dev = rec->rdev ?: MKDEV(rec->major, rec->minor);
@@ -262,7 +270,8 @@ static int reint_rename(struct kml_rec *rec, struct file *dir,
         ENTRY;
 
         CDEBUG (D_KML, "=====REINT_RENAME::%s -> %s\n", rec->path, rec->target);
-        info->updated_time = rec->new_objectv->pv_mtime;
+        info->updated_time.tv_sec = rec->new_objectv->pv_mtime_sec;
+        info->updated_time.tv_nsec = rec->new_objectv->pv_mtime_nsec;
         kmlreint_pre_secure(rec, dir, &saved_ctxt);
         error = lento_rename(rec->path, rec->target, info);
         pop_ctxt(&saved_ctxt); 
@@ -287,7 +296,8 @@ static int reint_rmdir(struct kml_rec *rec, struct file *dir,
         }
 
         CDEBUG (D_KML, "=====REINT_RMDIR::%s\n", path);
-        info->updated_time = rec->new_parentv->pv_mtime;
+        info->updated_time.tv_sec = rec->new_parentv->pv_mtime_sec;
+        info->updated_time.tv_nsec = rec->new_parentv->pv_mtime_nsec;
         kmlreint_pre_secure(rec, dir, &saved_ctxt);
         error = lento_rmdir(path, info);
         pop_ctxt(&saved_ctxt); 
@@ -311,8 +321,10 @@ static int reint_setattr(struct kml_rec *rec, struct file *dir,
         iattr.ia_uid   = (uid_t)rec->uid;
         iattr.ia_gid   = (gid_t)rec->gid;
         iattr.ia_size  = (off_t)rec->size;
-        iattr.ia_ctime = (time_t)rec->ctime;
-        iattr.ia_mtime = (time_t)rec->mtime;
+        iattr.ia_ctime.tv_sec = rec->ctime_sec;
+        iattr.ia_ctime.tv_nsec = rec->ctime_nsec;
+        iattr.ia_mtime.tv_sec = rec->mtime_sec;
+        iattr.ia_mtime.tv_nsec = rec->mtime_nsec;
         iattr.ia_atime = iattr.ia_mtime; /* We don't track atimes. */
         iattr.ia_attr_flags = rec->flags;
 
@@ -334,7 +346,8 @@ static int reint_symlink(struct kml_rec *rec, struct file *dir,
         ENTRY;
 
         CDEBUG (D_KML, "=====REINT_SYMLINK::%s -> %s\n", rec->path, rec->target);
-        info->updated_time = rec->new_objectv->pv_ctime;
+        info->updated_time.tv_sec = rec->new_objectv->pv_ctime_sec;
+        info->updated_time.tv_nsec = rec->new_objectv->pv_ctime_nsec;
         kmlreint_pre_secure(rec, dir, &saved_ctxt);
         error = lento_symlink(rec->target, rec->path, info);
         pop_ctxt(&saved_ctxt); 
@@ -359,7 +372,8 @@ static int reint_unlink(struct kml_rec *rec, struct file *dir,
         }
 
         CDEBUG (D_KML, "=====REINT_UNLINK::%s\n", path);
-        info->updated_time = rec->new_parentv->pv_mtime;
+        info->updated_time.tv_sec = rec->new_parentv->pv_mtime_sec;
+        info->updated_time.tv_nsec = rec->new_parentv->pv_mtime_nsec;
         kmlreint_pre_secure(rec, dir, &saved_ctxt);
         error = lento_unlink(path, info);
         pop_ctxt(&saved_ctxt); 

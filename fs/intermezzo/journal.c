@@ -363,8 +363,10 @@ static inline char *log_dentry_version(char *buf, struct dentry *dentry)
 
         presto_getversion(&version, dentry->d_inode);
         
-        version.pv_mtime = HTON__u64(version.pv_mtime);
-        version.pv_ctime = HTON__u64(version.pv_ctime);
+        version.pv_mtime_sec = HTON__u32(version.pv_mtime_sec);
+        version.pv_ctime_sec = HTON__u32(version.pv_ctime_sec);
+        version.pv_mtime_nsec = HTON__u32(version.pv_mtime_nsec);
+        version.pv_ctime_nsec = HTON__u32(version.pv_ctime_nsec);
         version.pv_size = HTON__u64(version.pv_size);
 
         return logit(buf, &version, sizeof(version));
@@ -376,8 +378,10 @@ static inline char *log_version(char *buf, struct presto_version *pv)
 
         memcpy(&version, pv, sizeof(version));
         
-        version.pv_mtime = HTON__u64(version.pv_mtime);
-        version.pv_ctime = HTON__u64(version.pv_ctime);
+        version.pv_mtime_sec = HTON__u32(version.pv_mtime_sec);
+        version.pv_mtime_nsec = HTON__u32(version.pv_mtime_nsec);
+        version.pv_ctime_sec = HTON__u32(version.pv_ctime_sec);
+        version.pv_ctime_nsec = HTON__u32(version.pv_ctime_nsec);
         version.pv_size = HTON__u64(version.pv_size);
 
         return logit(buf, &version, sizeof(version));

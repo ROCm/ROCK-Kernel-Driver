@@ -342,7 +342,7 @@ int presto_setattr(struct dentry *de, struct iattr *iattr)
         int error;
         struct presto_cache *cache;
         struct presto_file_set *fset;
-        struct lento_vfs_context info = { 0, 0, 0 };
+        struct lento_vfs_context info = { 0, {0}, 0 };
 
         ENTRY;
 
@@ -358,8 +358,8 @@ int presto_setattr(struct dentry *de, struct iattr *iattr)
         CDEBUG(D_INODE, "valid %#x, mode %#o, uid %u, gid %u, size %Lu, "
                "atime %lu mtime %lu ctime %lu flags %d\n",
                iattr->ia_valid, iattr->ia_mode, iattr->ia_uid, iattr->ia_gid,
-               iattr->ia_size, iattr->ia_atime, iattr->ia_mtime,
-               iattr->ia_ctime, iattr->ia_attr_flags);
+               iattr->ia_size, iattr->ia_atime.tv_sec, iattr->ia_mtime.tv_sec,
+               iattr->ia_ctime.tv_sec, iattr->ia_attr_flags);
         
         if ( presto_get_permit(de->d_inode) < 0 ) {
                 EXIT;

@@ -39,7 +39,7 @@ typedef __u8 uuid_t[16];
 
 struct lento_vfs_context {
         __u64 kml_offset;
-        __u64 updated_time;
+        struct timespec updated_time;
         __u64 remote_ino;
         __u64 remote_generation;
         __u32 slot_offset;

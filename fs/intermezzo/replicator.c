@@ -29,7 +29,8 @@
 #include <asm/uaccess.h>
 
 #include <linux/errno.h>
-
+#include <linux/fs.h>
+#include <linux/fsfilter.h>
 #include <linux/intermezzo_fs.h>
 
 /*
