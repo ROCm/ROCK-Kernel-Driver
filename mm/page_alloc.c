@@ -903,7 +903,7 @@ void si_meminfo_node(struct sysinfo *val, int nid)
 {
 	pg_data_t *pgdat = NODE_DATA(nid);
 
-	val->totalram = pgdat->node_size;
+	val->totalram = pgdat->node_present_pages;
 	val->freeram = nr_free_pages_pgdat(pgdat);
 	val->totalhigh = pgdat->node_zones[ZONE_HIGHMEM].present_pages;
 	val->freehigh = pgdat->node_zones[ZONE_HIGHMEM].free_pages;
@@ -1138,12 +1138,13 @@ static void __init calculate_zone_totalpages(struct pglist_data *pgdat,
 
 	for (i = 0; i < MAX_NR_ZONES; i++)
 		totalpages += zones_size[i];
-	pgdat->node_size = totalpages;
+	pgdat->node_spanned_pages = totalpages;
 
 	realtotalpages = totalpages;
 	if (zholes_size)
 		for (i = 0; i < MAX_NR_ZONES; i++)
 			realtotalpages -= zholes_size[i];
+	pgdat->node_present_pages = realtotalpages;
 	printk("On node %d totalpages: %lu\n", pgdat->node_id, realtotalpages);
 }
 
@@ -1349,7 +1350,7 @@ void __init free_area_init_node(int nid, struct pglist_data *pgdat,
 	pgdat->node_start_pfn = node_start_pfn;
 	calculate_zone_totalpages(pgdat, zones_size, zholes_size);
 	if (!node_mem_map) {
-		size = (pgdat->node_size + 1) * sizeof(struct page); 
+		size = (pgdat->node_spanned_pages + 1) * sizeof(struct page);
 		node_mem_map = alloc_bootmem_node(pgdat, size);
 	}
 	pgdat->node_mem_map = node_mem_map;

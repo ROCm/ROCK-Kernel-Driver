@@ -32,8 +32,7 @@ extern struct pglist_data *node_data[];
 #define alloc_bootmem_low_pages_node(ignore, x) \
 	__alloc_bootmem_node(NODE_DATA(0), (x), PAGE_SIZE, 0)
 
-#define node_size(nid)		(node_data[nid]->node_size)
-#define node_localnr(pfn, nid)	((pfn) - node_data[nid]->node_start_pfn)
+#define node_localnr(pfn, nid)		((pfn) - node_data[nid]->node_start_pfn)
 
 /*
  * Following are macros that each numa implmentation must define.
@@ -54,7 +53,7 @@ extern struct pglist_data *node_data[];
 #define node_end_pfn(nid)						\
 ({									\
 	pg_data_t *__pgdat = NODE_DATA(nid);				\
-	__pgdat->node_start_pfn + __pgdat->node_size;			\
+	__pgdat->node_start_pfn + __pgdat->node_spanned_pages;		\
 })
 
 #define local_mapnr(kvaddr)						\

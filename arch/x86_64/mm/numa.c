@@ -86,7 +86,7 @@ void __init setup_node_bootmem(int nodeid, unsigned long start, unsigned long en
 	memset(NODE_DATA(nodeid), 0, sizeof(pg_data_t));
 	NODE_DATA(nodeid)->bdata = &plat_node_bdata[nodeid];
 	NODE_DATA(nodeid)->node_start_pfn = start_pfn;
-	NODE_DATA(nodeid)->node_size = end_pfn - start_pfn;
+	NODE_DATA(nodeid)->node_spanned_pages = end_pfn - start_pfn;
 
 	/* Find a place for the bootmem map */
 	bootmap_pages = bootmem_bootmap_pages(end_pfn - start_pfn); 

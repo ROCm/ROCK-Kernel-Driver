@@ -338,7 +338,7 @@ void __init mem_init(void)
 
 		lmem_map = node_mem_map(nid);
 		pfn = NODE_DATA(nid)->node_start_pfn;
-		for (i = 0; i < node_size(nid); i++, pfn++)
+		for (i = 0; i < node_spanned_pages(nid); i++, pfn++)
 			if (page_is_ram(pfn) && PageReserved(lmem_map+i))
 				reservedpages++;
 	}
@@ -372,7 +372,7 @@ show_mem(void)
 	printk("Free swap:       %6dkB\n",nr_swap_pages<<(PAGE_SHIFT-10));
 	for (nid = 0; nid < numnodes; nid++) {
 		struct page * lmem_map = node_mem_map(nid);
-		i = node_size(nid);
+		i = node_spanned_pages(nid);
 		while (i-- > 0) {
 			total++;
 			if (PageReserved(lmem_map+i))

@@ -40,8 +40,7 @@ static inline __attribute__((pure)) int phys_to_nid(unsigned long addr)
 #define node_mem_map(nid)	(NODE_DATA(nid)->node_mem_map)
 #define node_start_pfn(nid)	(NODE_DATA(nid)->node_start_pfn)
 #define node_end_pfn(nid)       (NODE_DATA(nid)->node_start_pfn + \
-				 NODE_DATA(nid)->node_size)
-#define node_size(nid)		(NODE_DATA(nid)->node_size)
+				 NODE_DATA(nid)->node_spanned_pages)
 
 #define local_mapnr(kvaddr) \
 	( (__pa(kvaddr) >> PAGE_SHIFT) - node_start_pfn(kvaddr_to_nid(kvaddr)) )
