@@ -19,10 +19,6 @@
 #include "isdn_ppp.h"
 #include "isdn_net.h"
 
-#ifndef PPP_IPX
-#define PPP_IPX 0x002b
-#endif
-
 /* Prototypes */
 static int isdn_ppp_fill_rq(unsigned char *buf, int len, int proto, int slot);
 static int isdn_ppp_closewait(int slot);
@@ -348,20 +344,13 @@ isdn_ppp_release(struct inode *ino, struct file *file)
 		printk(KERN_DEBUG "ippp: release, minor: %d %lx\n", minor, (long) is->lp);
 
 	if (is->lp) {           /* a lp address says: this link is still up */
-		isdn_net_dev *p = is->lp->netdev;
-
- 		if (!p) {
- 			printk(KERN_ERR "%s: no lp->netdev\n", __FUNCTION__ );
-			unlock_kernel();
- 			return 0;
- 		}
-		is->state &= ~IPPP_CONNECT;	/* -> effect: no call of wakeup */
 		/*
 		 * isdn_net_hangup() calls isdn_ppp_free()
 		 * isdn_ppp_free() sets is->lp to NULL and lp->ppp_slot to -1
 		 * removing the IPPP_CONNECT flag omits calling of isdn_ppp_wakeup_daemon()
 		 */
-		isdn_net_hangup(&p->dev);
+		is->state &= ~IPPP_CONNECT;
+		isdn_net_hangup(is->lp);
 	}
 	for (i = 0; i < NUM_RCV_BUFFS; i++) {
 		if (is->rq[i].buf) {
@@ -2003,7 +1992,7 @@ isdn_ppp_hangup_slave(char *name)
 {
 #ifdef CONFIG_ISDN_MPP
 	isdn_net_dev *ndev;
-	isdn_net_local *lp;
+	isdn_net_local *lp, *mlp = NULL;
 	struct net_device *sdev;
 
 	if (!(ndev = isdn_net_findif(name)))
@@ -2014,7 +2003,7 @@ isdn_ppp_hangup_slave(char *name)
 
 	sdev = lp->slave;
 	while (sdev) {
-		isdn_net_local *mlp = (isdn_net_local *) sdev->priv;
+		mlp = (isdn_net_local *) sdev->priv;
 
 		if (mlp->slave) { /* find last connected link in chain */
 			isdn_net_local *nlp = (isdn_net_local *) mlp->slave->priv;
@@ -2029,7 +2018,7 @@ isdn_ppp_hangup_slave(char *name)
 	if (!sdev)
 		return 2;
 
-	isdn_net_hangup(sdev);
+	isdn_net_hangup(mlp);
 	return 0;
 #else
 	return -1;
