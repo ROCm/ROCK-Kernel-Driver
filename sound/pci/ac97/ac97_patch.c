@@ -1605,7 +1605,10 @@ int patch_alc655(ac97_t * ac97)
 
 	/* adjust default values */
 	val = snd_ac97_read(ac97, 0x7a); /* misc control */
-	val |= (1 << 1); /* spdif input pin */
+	if (ac97->id == 0x414c4780) /* ALC658 */
+		val &= ~(1 << 1); /* Pin 47 is spdif input pin */
+	else /* ALC655 */
+		val |= (1 << 1); /* Pin 47 is spdif input pin */
 	val &= ~(1 << 12); /* vref enable */
 	snd_ac97_write_cache(ac97, 0x7a, val);
 	/* set default: spdif-in enabled,
