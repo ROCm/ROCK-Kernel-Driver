@@ -1210,7 +1210,9 @@ rollback_error:
 	ntfs_clear_extent_inode(ni);
 
 	/* Clear the bit in the $MFT/$BITMAP corresponding to this record. */
+	down_write(&vol->mftbmp_lock);
 	err = ntfs_bitmap_clear_bit(vol->mftbmp_ino, mft_no);
+	up_write(&vol->mftbmp_lock);
 	if (unlikely(err)) {
 		/*
 		 * The extent inode is gone but we failed to deallocate it in
