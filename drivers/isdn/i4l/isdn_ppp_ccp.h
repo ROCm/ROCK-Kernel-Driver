@@ -16,7 +16,7 @@
 */
 
 struct ippp_ccp {
-	int proto;
+	u16                         proto;
 	struct isdn_ppp_compressor *compressor;
 	struct isdn_ppp_compressor *decompressor;
 	void                       *comp_stat;
@@ -45,10 +45,10 @@ unsigned int
 ippp_ccp_get_flags(struct ippp_ccp *ccp);
 
 struct sk_buff *
-ippp_ccp_compress(struct ippp_ccp *ccp, struct sk_buff *skb, int *proto);
+ippp_ccp_compress(struct ippp_ccp *ccp, struct sk_buff *skb, u16 *proto);
 
 struct sk_buff *
-ippp_ccp_decompress(struct ippp_ccp *ccp, struct sk_buff *skb, int *proto);
+ippp_ccp_decompress(struct ippp_ccp *ccp, struct sk_buff *skb, u16 *proto);
 
 void
 ippp_ccp_send_ccp(struct ippp_ccp *ccp, struct sk_buff *skb);

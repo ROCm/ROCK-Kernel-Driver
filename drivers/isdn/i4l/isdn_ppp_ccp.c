@@ -250,7 +250,7 @@ ippp_ccp_get_flags(struct ippp_ccp *ccp)
  * and a new skb otherwise
  */
 struct sk_buff *
-ippp_ccp_compress(struct ippp_ccp *ccp, struct sk_buff *skb_in, int *proto)
+ippp_ccp_compress(struct ippp_ccp *ccp, struct sk_buff *skb_in, u16 *proto)
 {
 	struct sk_buff *skb;
 
@@ -260,7 +260,7 @@ ippp_ccp_compress(struct ippp_ccp *ccp, struct sk_buff *skb_in, int *proto)
 		return skb_in;
 	}
 	/* we do not compress control protocols */
-	if (*proto < 0 || *proto > 0x3fff) {
+	if (*proto > 0x3fff) {
 		return skb_in;
 	}
 	if (!ccp->compressor || !ccp->comp_stat) {
@@ -294,7 +294,7 @@ ippp_ccp_compress(struct ippp_ccp *ccp, struct sk_buff *skb_in, int *proto)
  */
 
 struct sk_buff *
-ippp_ccp_decompress(struct ippp_ccp *ccp, struct sk_buff *skb_in, int *proto)
+ippp_ccp_decompress(struct ippp_ccp *ccp, struct sk_buff *skb_in, u16 *proto)
 {
 	struct sk_buff *skb;
 	struct isdn_ppp_resetparams rsparm;
@@ -344,8 +344,7 @@ ippp_ccp_decompress(struct ippp_ccp *ccp, struct sk_buff *skb_in, int *proto)
 		kfree_skb(skb);
 		return NULL;
 	}
-	*proto = isdn_ppp_strip_proto(skb);
-	if (*proto < 0) {
+	if (isdn_ppp_strip_proto(skb, proto)) {
 		kfree_skb(skb);
 		return NULL;
 	}

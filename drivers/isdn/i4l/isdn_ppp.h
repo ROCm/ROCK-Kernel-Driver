@@ -23,7 +23,11 @@ int isdn_ppp_hangup_slave(char *);
 void
 isdn_ppp_frame_log(char *info, char *data, int len, int maxlen, 
 		   int unit, int slot);
+
 int
-isdn_ppp_strip_proto(struct sk_buff *skb);
+isdn_ppp_strip_proto(struct sk_buff *skb, u16 *proto);
+
+struct sk_buff *
+isdn_ppp_dev_alloc_skb(void *priv, int len, int gfp_mask);
 
 #define IPPP_MAX_HEADER 10
