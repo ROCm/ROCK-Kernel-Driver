@@ -325,6 +325,7 @@ union ehci_shadow {
 	struct ehci_itd		*itd;		/* Q_TYPE_ITD */
 	struct ehci_sitd	*sitd;		/* Q_TYPE_SITD */
 	struct ehci_fstn	*fstn;		/* Q_TYPE_FSTN */
+	u32			*hw_next;	/* (all types) */
 	void			*ptr;
 };
 
@@ -469,26 +470,11 @@ struct ehci_fstn {
 
 /*-------------------------------------------------------------------------*/
 
-#include <linux/version.h>
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,32)
-
-#define SUBMIT_URB(urb,mem_flags) usb_submit_urb(urb)
-#define STUB_DEBUG_FILES
-
-static inline int hcd_register_root (struct usb_hcd *hcd)
-{
-	return usb_new_device (hcd_to_bus (hcd)->root_hub);
-}
-
-#else	/* LINUX_VERSION_CODE */
-
 #define SUBMIT_URB(urb,mem_flags) usb_submit_urb(urb,mem_flags)
 
 #ifndef DEBUG
 #define STUB_DEBUG_FILES
 #endif	/* DEBUG */
-
-#endif	/* LINUX_VERSION_CODE */
 
 /*-------------------------------------------------------------------------*/
 
