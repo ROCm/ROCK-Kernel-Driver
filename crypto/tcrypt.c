@@ -48,7 +48,7 @@ static char *tvmem;
 
 static char *check[] = {
 	"des", "md5", "des3_ede", "rot13", "sha1", "sha256", "blowfish",
-	"twofish", "serpent", "sha384", "sha512",
+	"twofish", "serpent", "sha384", "sha512", "md4", "aes",
 	 NULL
 };
 
