@@ -118,10 +118,10 @@ struct pcmcia_bus_socket {
 	struct pcmcia_socket	*parent;
 };
 
-#define SOCKET_PRESENT		0x01
-#define SOCKET_BUSY		0x02
-#define SOCKET_REMOVAL_PENDING	0x10
-#define SOCKET_DEAD		0x80
+#define DS_SOCKET_PRESENT		0x01
+#define DS_SOCKET_BUSY			0x02
+#define DS_SOCKET_REMOVAL_PENDING	0x10
+#define DS_SOCKET_DEAD			0x80
 
 /*====================================================================*/
 
@@ -254,12 +254,12 @@ static int handle_request(struct pcmcia_bus_socket *s, event_t event)
 {
     if (s->req_pending != 0)
 	return CS_IN_USE;
-    if (s->state & SOCKET_BUSY)
+    if (s->state & DS_SOCKET_BUSY)
 	s->req_pending = 1;
     handle_event(s, event);
     if (wait_event_interruptible(s->request, s->req_pending <= 0))
         return CS_IN_USE;
-    if (s->state & SOCKET_BUSY)
+    if (s->state & DS_SOCKET_BUSY)
         return s->req_result;
     return CS_SUCCESS;
 }
@@ -268,7 +268,7 @@ static void handle_removal(void *data)
 {
     struct pcmcia_bus_socket *s = data;
     handle_event(s, CS_EVENT_CARD_REMOVAL);
-    s->state &= ~SOCKET_REMOVAL_PENDING;
+    s->state &= ~DS_SOCKET_REMOVAL_PENDING;
 }
 
 /*======================================================================
@@ -289,15 +289,15 @@ static int ds_event(event_t event, int priority,
     switch (event) {
 	
     case CS_EVENT_CARD_REMOVAL:
-	s->state &= ~SOCKET_PRESENT;
-	if (!(s->state & SOCKET_REMOVAL_PENDING)) {
-		s->state |= SOCKET_REMOVAL_PENDING;
+	s->state &= ~DS_SOCKET_PRESENT;
+	if (!(s->state & DS_SOCKET_REMOVAL_PENDING)) {
+		s->state |= DS_SOCKET_REMOVAL_PENDING;
 		schedule_delayed_work(&s->removal,  HZ/10);
 	}
 	break;
 	
     case CS_EVENT_CARD_INSERTION:
-	s->state |= SOCKET_PRESENT;
+	s->state |= DS_SOCKET_PRESENT;
 	handle_event(s, event);
 	break;
 
@@ -530,10 +530,10 @@ static int ds_open(struct inode *inode, struct file *file)
 	    return -ENODEV;
 
     if ((file->f_flags & O_ACCMODE) != O_RDONLY) {
-	if (s->state & SOCKET_BUSY)
+	if (s->state & DS_SOCKET_BUSY)
 	    return -EBUSY;
 	else
-	    s->state |= SOCKET_BUSY;
+	    s->state |= DS_SOCKET_BUSY;
     }
     
     user = kmalloc(sizeof(user_info_t), GFP_KERNEL);
@@ -545,7 +545,7 @@ static int ds_open(struct inode *inode, struct file *file)
     s->user = user;
     file->private_data = user;
     
-    if (s->state & SOCKET_PRESENT)
+    if (s->state & DS_SOCKET_PRESENT)
 	queue_event(user, CS_EVENT_CARD_INSERTION);
     return 0;
 } /* ds_open */
@@ -567,7 +567,7 @@ static int ds_release(struct inode *inode, struct file *file)
 
     /* Unlink user data structure */
     if ((file->f_flags & O_ACCMODE) != O_RDONLY) {
-	s->state &= ~SOCKET_BUSY;
+	s->state &= ~DS_SOCKET_BUSY;
 	s->req_pending = 0;
 	wake_up_interruptible(&s->request);
     }
@@ -603,7 +603,7 @@ static ssize_t ds_read(struct file *file, char *buf,
 	return -EIO;
     
     s = user->socket;
-    if (s->state & SOCKET_DEAD)
+    if (s->state & DS_SOCKET_DEAD)
         return -EIO;
 
     ret = wait_event_interruptible(s->queue, !queue_empty(user));
@@ -633,7 +633,7 @@ static ssize_t ds_write(struct file *file, const char *buf,
 	return -EIO;
 
     s = user->socket;
-    if (s->state & SOCKET_DEAD)
+    if (s->state & DS_SOCKET_DEAD)
         return -EIO;
 
     if (s->req_pending) {
@@ -689,7 +689,7 @@ static int ds_ioctl(struct inode * inode, struct file * file,
 	return -EIO;
 
     s = user->socket;
-    if (s->state & SOCKET_DEAD)
+    if (s->state & DS_SOCKET_DEAD)
         return -EIO;
     
     size = (cmd & IOCSIZE_MASK) >> IOCSIZE_SHIFT;
@@ -921,7 +921,7 @@ static void pcmcia_bus_remove_socket(struct class_device *class_dev)
 
 	pcmcia_deregister_client(socket->pcmcia->handle);
 
-	socket->pcmcia->state |= SOCKET_DEAD;
+	socket->pcmcia->state |= DS_SOCKET_DEAD;
 	pcmcia_put_bus_socket(socket->pcmcia);
 	socket->pcmcia = NULL;
 
