@@ -20,7 +20,6 @@ typedef struct pci_socket {
 	socket_cap_t cap;
 	spinlock_t event_lock;
 	unsigned int events;
-	struct socket_info_t *pcmcia_socket;
 	struct work_struct tq_task;
 	struct timer_list poll_timer;
 

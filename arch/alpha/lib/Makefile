@@ -3,7 +3,7 @@
 #
 
 EXTRA_AFLAGS := $(CFLAGS)
-CFLAGS += -Werror
+EXTRA_CFLAGS := -Werror
 
 L_TARGET := lib.a
 

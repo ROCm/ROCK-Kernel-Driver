@@ -47,7 +47,7 @@
      __kir; })
 # define __kernel_cmpbge(a, b)						\
   ({ unsigned long __kir;						\
-     __asm__("cmpbge %r2,%1,%0" : "=r"(__kir) : "rI"(b), "rJ"(val));	\
+     __asm__("cmpbge %r2,%1,%0" : "=r"(__kir) : "rI"(b), "rJ"(a));	\
      __kir; })
 # define __kernel_cttz(x)						\
   ({ unsigned long __kir;						\
