@@ -36,8 +36,11 @@
 #include <linux/agp_backend.h>
 #include "agp.h"
 
-#define AGPGART_VERSION_MAJOR 1
-#define AGPGART_VERSION_MINOR 0
+/* Due to XFree86 brain-damage, we can't go to 1.0 until they
+ * fix some real stupidity. It's only by chance we can bump
+ * past 0.99 at all due to some boolean logic error. */
+#define AGPGART_VERSION_MAJOR 0
+#define AGPGART_VERSION_MINOR 100
 
 struct agp_bridge_data agp_bridge = { .type = NOT_SUPPORTED };
 
