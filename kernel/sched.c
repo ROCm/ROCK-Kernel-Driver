@@ -665,7 +665,7 @@ repeat_lock_task:
 
 	return success;
 }
-int wake_up_process(task_t * p)
+int fastcall wake_up_process(task_t * p)
 {
 	return try_to_wake_up(p, TASK_STOPPED |
 		       		 TASK_INTERRUPTIBLE | TASK_UNINTERRUPTIBLE, 0);
@@ -673,7 +673,7 @@ int wake_up_process(task_t * p)
 
 EXPORT_SYMBOL(wake_up_process);
 
-int wake_up_state(task_t *p, unsigned int state)
+int fastcall wake_up_state(task_t *p, unsigned int state)
 {
 	return try_to_wake_up(p, state, 0);
 }
@@ -682,7 +682,7 @@ int wake_up_state(task_t *p, unsigned int state)
  * Perform scheduler related setup for a newly forked process p.
  * p is forked by current.
  */
-void sched_fork(task_t *p)
+void fastcall sched_fork(task_t *p)
 {
 	/*
 	 * We mark the process as running here, but have not actually
@@ -738,7 +738,7 @@ void sched_fork(task_t *p)
  * This function will do some initial scheduler statistics housekeeping
  * that must be done for every newly created process.
  */
-void wake_up_forked_process(task_t * p)
+void fastcall wake_up_forked_process(task_t * p)
 {
 	unsigned long flags;
 	runqueue_t *rq = task_rq_lock(current, &flags);
@@ -782,7 +782,7 @@ void wake_up_forked_process(task_t * p)
  * artificially, because any timeslice recovered here
  * was given away by the parent in the first place.)
  */
-void sched_exit(task_t * p)
+void fastcall sched_exit(task_t * p)
 {
 	unsigned long flags;
 	runqueue_t *rq;
@@ -1780,7 +1780,7 @@ static void __wake_up_common(wait_queue_head_t *q, unsigned int mode,
  * @mode: which threads
  * @nr_exclusive: how many wake-one or wake-many threads to wake up
  */
-void __wake_up(wait_queue_head_t *q, unsigned int mode, int nr_exclusive)
+void fastcall __wake_up(wait_queue_head_t *q, unsigned int mode, int nr_exclusive)
 {
 	unsigned long flags;
 
@@ -1794,7 +1794,7 @@ EXPORT_SYMBOL(__wake_up);
 /*
  * Same as __wake_up but called with the spinlock in wait_queue_head_t held.
  */
-void __wake_up_locked(wait_queue_head_t *q, unsigned int mode)
+void fastcall __wake_up_locked(wait_queue_head_t *q, unsigned int mode)
 {
 	__wake_up_common(q, mode, 1, 0);
 }
@@ -1812,7 +1812,7 @@ void __wake_up_locked(wait_queue_head_t *q, unsigned int mode)
  *
  * On UP it can prevent extra preemption.
  */
-void __wake_up_sync(wait_queue_head_t *q, unsigned int mode, int nr_exclusive)
+void fastcall __wake_up_sync(wait_queue_head_t *q, unsigned int mode, int nr_exclusive)
 {
 	unsigned long flags;
 
@@ -1829,7 +1829,7 @@ void __wake_up_sync(wait_queue_head_t *q, unsigned int mode, int nr_exclusive)
 
 EXPORT_SYMBOL_GPL(__wake_up_sync);	/* For internal use only */
 
-void complete(struct completion *x)
+void fastcall complete(struct completion *x)
 {
 	unsigned long flags;
 
@@ -1842,7 +1842,7 @@ void complete(struct completion *x)
 
 EXPORT_SYMBOL(complete);
 
-void complete_all(struct completion *x)
+void fastcall complete_all(struct completion *x)
 {
 	unsigned long flags;
 
@@ -1853,7 +1853,7 @@ void complete_all(struct completion *x)
 	spin_unlock_irqrestore(&x->wait.lock, flags);
 }
 
-void wait_for_completion(struct completion *x)
+void fastcall wait_for_completion(struct completion *x)
 {
 	might_sleep();
 	spin_lock_irq(&x->wait.lock);
@@ -1891,7 +1891,7 @@ EXPORT_SYMBOL(wait_for_completion);
 	__remove_wait_queue(q, &wait);			\
 	spin_unlock_irqrestore(&q->lock, flags);
 
-void interruptible_sleep_on(wait_queue_head_t *q)
+void fastcall interruptible_sleep_on(wait_queue_head_t *q)
 {
 	SLEEP_ON_VAR
 
@@ -1904,7 +1904,7 @@ void interruptible_sleep_on(wait_queue_head_t *q)
 
 EXPORT_SYMBOL(interruptible_sleep_on);
 
-long interruptible_sleep_on_timeout(wait_queue_head_t *q, long timeout)
+long fastcall interruptible_sleep_on_timeout(wait_queue_head_t *q, long timeout)
 {
 	SLEEP_ON_VAR
 
@@ -1919,7 +1919,7 @@ long interruptible_sleep_on_timeout(wait_queue_head_t *q, long timeout)
 
 EXPORT_SYMBOL(interruptible_sleep_on_timeout);
 
-void sleep_on(wait_queue_head_t *q)
+void fastcall sleep_on(wait_queue_head_t *q)
 {
 	SLEEP_ON_VAR
 
@@ -1932,7 +1932,7 @@ void sleep_on(wait_queue_head_t *q)
 
 EXPORT_SYMBOL(sleep_on);
 
-long sleep_on_timeout(wait_queue_head_t *q, long timeout)
+long fastcall sleep_on_timeout(wait_queue_head_t *q, long timeout)
 {
 	SLEEP_ON_VAR
 
