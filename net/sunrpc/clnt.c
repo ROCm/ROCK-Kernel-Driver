@@ -605,7 +605,7 @@ call_connect(struct rpc_task *task)
 	dprintk("RPC: %4d call_connect status %d\n",
 				task->tk_pid, task->tk_status);
 
-	if (!clnt->cl_xprt->stream) {
+	if (xprt_connected(clnt->cl_xprt)) {
 		task->tk_action = call_transmit;
 		return;
 	}

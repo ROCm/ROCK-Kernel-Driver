@@ -446,6 +446,10 @@ xprt_connect(struct rpc_task *task)
 		goto out_write;
 	}
 	xprt_bind_socket(xprt, sock);
+
+	if (!xprt->stream)
+		goto out_write;
+
 	inet = sock->sk;
 
 	/*
@@ -1562,15 +1566,6 @@ xprt_create_proto(int proto, struct sockaddr_in *sap, struct rpc_timeout *to)
 	xprt = xprt_setup(proto, sap, to);
 	if (!xprt)
 		goto out_bad;
-
-	if (!xprt->stream) {
-		struct socket *sock;
-
-		sock = xprt_create_socket(proto, to, xprt->resvport);
-		if (!sock)
-			goto out_bad;
-		xprt_bind_socket(xprt, sock);
-	}
 
 	dprintk("RPC:      xprt_create_proto created xprt %p\n", xprt);
 	return xprt;
