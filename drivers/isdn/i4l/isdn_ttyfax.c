@@ -74,7 +74,7 @@ isdn_tty_fax_modem_result(int code, modem_info * info)
 		case 2:	/* +FCON */
 			/* Append CPN, if enabled */
 			if ((m->mdmreg[REG_CPNFCON] & BIT_CPNFCON) &&
-				(!(dev->usage[info->isdn_slot] & ISDN_USAGE_OUTGOING))) {
+				(!(isdn_slot_usage(info->isdn_slot) & ISDN_USAGE_OUTGOING))) {
 				sprintf(rs, "/%s", m->cpn);
 				isdn_tty_at_cout(rs, info);
 			}

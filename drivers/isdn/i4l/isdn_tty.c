@@ -658,10 +658,9 @@ isdn_tty_dial(char *n, modem_info * info, atemu * m)
 	} else {
 		info->isdn_slot = i;
 		dev->m_idx[i] = info->line;
-		dev->usage[i] |= ISDN_USAGE_OUTGOING;
 		info->last_dir = 1;
 		strcpy(info->last_num, n);
-		isdn_info_update();
+		isdn_slot_set_usage(i, isdn_slot_usage(i) | ISDN_USAGE_OUTGOING);
 		restore_flags(flags);
 		isdn_slot_command(info->isdn_slot, ISDN_CMD_CLREAZ, &cmd);
 		strcpy(cmd.parm.num, isdn_slot_map_eaz2msn(info->isdn_slot, m->msn));
@@ -849,10 +848,9 @@ isdn_tty_resume(char *id, modem_info * info, atemu * m)
 	} else {
 		info->isdn_slot = i;
 		dev->m_idx[i] = info->line;
-		dev->usage[i] |= ISDN_USAGE_OUTGOING;
+		isdn_slot_set_usage(i, isdn_slot_usage(i) | ISDN_USAGE_OUTGOING);
 		info->last_dir = 1;
 //		strcpy(info->last_num, n);
-		isdn_info_update();
 		restore_flags(flags);
 		isdn_slot_command(info->isdn_slot, ISDN_CMD_CLREAZ, &cmd);
 		strcpy(cmd.parm.num, isdn_slot_map_eaz2msn(info->isdn_slot, m->msn));
@@ -929,9 +927,8 @@ isdn_tty_send_msg(modem_info * info, atemu * m, char *msg)
 	} else {
 		info->isdn_slot = i;
 		dev->m_idx[i] = info->line;
-		dev->usage[i] |= ISDN_USAGE_OUTGOING;
+		isdn_slot_set_usage(i, isdn_slot_usage(i) | ISDN_USAGE_OUTGOING);
 		info->last_dir = 1;
-		isdn_info_update();
 		restore_flags(flags);
 		isdn_slot_command(info->isdn_slot, ISDN_CMD_CLREAZ, &cmd);
 		strcpy(cmd.parm.num, isdn_slot_map_eaz2msn(info->isdn_slot, m->msn));
@@ -2206,7 +2203,7 @@ isdn_tty_find_icall(int di, int ch, setup_parm *setup)
 				(info->flags & ISDN_ASYNC_NORMAL_ACTIVE) &&
 #endif
 				(info->isdn_slot == -1) &&
-				(USG_NONE(dev->usage[idx]))) {
+				(USG_NONE(isdn_slot_usage(idx)))) {
 				int matchret;
 
 				if ((matchret = isdn_tty_match_icall(eaz, &info->emu, di)) > wret)
@@ -2214,14 +2211,12 @@ isdn_tty_find_icall(int di, int ch, setup_parm *setup)
 				if (!matchret) {                  /* EAZ is matching */
 					info->isdn_slot = idx;
 					dev->m_idx[idx] = info->line;
-					dev->usage[idx] &= ISDN_USAGE_EXCLUSIVE;
-					dev->usage[idx] |= isdn_calc_usage(si1, info->emu.mdmreg[REG_L2PROT]); 
 					strcpy(dev->num[idx], nr);
 					strcpy(info->emu.cpn, eaz);
 					info->emu.mdmreg[REG_SI1I] = si2bit[si1];
 					info->emu.mdmreg[REG_PLAN] = setup->plan;
 					info->emu.mdmreg[REG_SCREEN] = setup->screen;
-					isdn_info_update();
+					isdn_slot_set_usage(idx, (isdn_slot_usage(idx) & ISDN_USAGE_EXCLUSIVE) | isdn_calc_usage(si1, info->emu.mdmreg[REG_L2PROT]));
 					restore_flags(flags);
 					printk(KERN_INFO "isdn_tty: call from %s, -> RING on ttyI%d\n", nr,
 					       info->line);
@@ -2349,14 +2344,14 @@ isdn_tty_stat_callback(int i, isdn_ctrl *c)
 						info->last_dir = 0;
 					info->dialing = 0;
 					info->rcvsched = 1;
-					if (USG_MODEM(dev->usage[i])) {
+					if (USG_MODEM(isdn_slot_usage(i))) {
 						if (info->emu.mdmreg[REG_L2PROT] == ISDN_PROTO_L2_MODEM) {
 							strcpy(info->emu.connmsg, c->parm.num);
 							isdn_tty_modem_result(RESULT_CONNECT, info);
 						} else
 							isdn_tty_modem_result(RESULT_CONNECT64000, info);
 					}
-					if (USG_VOICE(dev->usage[i]))
+					if (USG_VOICE(isdn_slot_usage(i)))
 						isdn_tty_modem_result(RESULT_VCON, info);
 					return 1;
 				}
@@ -3940,7 +3935,7 @@ isdn_tty_modem_escape(void)
 	int midx;
 
 	for (i = 0; i < ISDN_MAX_CHANNELS; i++)
-		if (USG_MODEM(dev->usage[i]))
+		if (USG_MODEM(isdn_slot_usage(i)))
 			if ((midx = dev->m_idx[i]) >= 0) {
 				modem_info *info = &dev->mdm.info[midx];
 				if (info->online) {

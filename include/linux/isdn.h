@@ -605,7 +605,6 @@ typedef struct isdn_devt {
 	infostruct        *infochain;                /* List of open info-devs.    */
 	wait_queue_head_t info_waitq;               /* Wait-Queue for isdninfo    */
 	struct timer_list timer;		       /* Misc.-function Timer       */
-	int               usage[ISDN_MAX_CHANNELS];  /* Used by tty/ip/voice       */
 	char              num[ISDN_MAX_CHANNELS][ISDN_MSNLEN];
 	/* Remote number of active ch.*/
 	int               m_idx[ISDN_MAX_CHANNELS];  /* Index for mdm....          */

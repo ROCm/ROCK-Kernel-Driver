@@ -52,3 +52,5 @@ extern int   isdn_slot_readbchan(int slot, u_char *, u_char *, int);
 extern int   isdn_slot_hdrlen(int slot);
 extern int   isdn_slot_driver(int slot);
 extern int   isdn_slot_channel(int slot);
+extern int   isdn_slot_usage(int slot);
+extern void  isdn_slot_set_usage(int slot, int usage);
