@@ -480,6 +480,9 @@ check_bug_trap(struct pt_regs *regs)
 void
 ProgramCheckException(struct pt_regs *regs)
 {
+	if (debugger_fault_handler(regs))
+		return;
+
 	if (regs->msr & 0x100000) {
 		/* IEEE FP exception */
 		parse_fpe(regs);

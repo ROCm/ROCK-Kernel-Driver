@@ -1443,7 +1443,17 @@ read_spr(int n)
 	store_inst(instrs+1);
 	code = (unsigned long (*)(void)) opd;
 
-	ret = code();
+	if (setjmp(bus_error_jmp) == 0) {
+		catch_memory_errors = 1;
+		sync();
+
+		ret = code();
+
+		sync();
+		/* wait a little while to see if we get a machine check */
+		__delay(200);
+		n = size;
+	}
 
 	return ret;
 }
@@ -1464,7 +1474,17 @@ write_spr(int n, unsigned long val)
 	store_inst(instrs+1);
 	code = (unsigned long (*)(unsigned long)) opd;
 
-	code(val);
+	if (setjmp(bus_error_jmp) == 0) {
+		catch_memory_errors = 1;
+		sync();
+
+		code(val);
+
+		sync();
+		/* wait a little while to see if we get a machine check */
+		__delay(200);
+		n = size;
+	}
 }
 
 static unsigned long regno;
