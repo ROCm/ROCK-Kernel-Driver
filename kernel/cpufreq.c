@@ -362,6 +362,8 @@ static int cpufreq_add_dev (struct sys_device * sys_dev)
 
 	policy = &cpufreq_driver->policy[cpu];
 	policy->cpu = cpu;
+	init_MUTEX_LOCKED(&policy->lock);
+	init_completion(&policy->kobj_unregister);
 
 	/* call driver. From then on the cpufreq must be able
 	 * to accept all calls to ->verify and ->setpolicy for this CPU
@@ -370,15 +372,7 @@ static int cpufreq_add_dev (struct sys_device * sys_dev)
 	if (ret)
 		goto out;
 
-	/* set default policy on this CPU */
-	down(&cpufreq_driver_sem);
-	memcpy(&new_policy, 
-	       policy, 
-	       sizeof(struct cpufreq_policy));
-	up(&cpufreq_driver_sem);
-
-	init_MUTEX(&policy->lock);
-	init_completion(&policy->kobj_unregister);
+	memcpy(&new_policy, policy, sizeof(struct cpufreq_policy));
 
 	/* prepare interface data */
 	policy->kobj.parent = &sys_dev->kobj;
@@ -399,6 +393,8 @@ static int cpufreq_add_dev (struct sys_device * sys_dev)
 	spin_lock_irqsave(&cpufreq_driver_lock, flags);
 	cpufreq_cpu_data[cpu] = policy;
 	spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
+
+	up(&policy->lock);
 	
 	/* set default policy */
 	ret = cpufreq_set_policy(&new_policy);
@@ -406,6 +402,7 @@ static int cpufreq_add_dev (struct sys_device * sys_dev)
 		spin_lock_irqsave(&cpufreq_driver_lock, flags);
 		cpufreq_cpu_data[cpu] = NULL;
 		spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
+
 		kobject_unregister(&policy->kobj);
 		wait_for_completion(&policy->kobj_unregister);
 	}
@@ -440,9 +437,7 @@ static int cpufreq_remove_dev (struct sys_device * sys_dev)
 	if (!kobject_get(&data->kobj))
 		return -EFAULT;
 
-	down(&cpufreq_driver_sem);
 	kobject_unregister(&data->kobj);
-	up(&cpufreq_driver_sem);
 
 	kobject_put(&data->kobj);
 
@@ -482,9 +477,9 @@ static int cpufreq_restore(struct sys_device * sysdev)
 
 	cpu_policy = cpufreq_cpu_get(cpu);
 
-	down(&cpufreq_driver_sem);
+	down(&cpu_policy->lock);
 	memcpy(&policy, cpu_policy, sizeof(struct cpufreq_policy));
-	up(&cpufreq_driver_sem);
+	up(&cpu_policy->lock);
 
 	ret = cpufreq_set_policy(&policy);
 
@@ -724,9 +719,9 @@ int cpufreq_get_policy(struct cpufreq_policy *policy, unsigned int cpu)
 	if (!cpu_policy)
 		return -EINVAL;
 
-	down(&cpufreq_driver_sem);
+	down(&cpu_policy->lock);
 	memcpy(policy, cpu_policy, sizeof(struct cpufreq_policy));
-	up(&cpufreq_driver_sem);
+	up(&cpu_policy->lock);
 
 	cpufreq_cpu_put(cpu_policy);
 
@@ -753,11 +748,12 @@ int cpufreq_set_policy(struct cpufreq_policy *policy)
 	if (!data)
 		return -EINVAL;
 
-	down(&cpufreq_driver_sem);
+	/* lock this CPU */
+	down(&data->lock);
+
 	memcpy(&policy->cpuinfo, 
 	       &data->cpuinfo, 
 	       sizeof(struct cpufreq_cpuinfo));
-	up(&cpufreq_driver_sem);
 
 	/* verify the cpu speed can be set within this limit */
 	ret = cpufreq_driver->verify(policy);
@@ -804,26 +800,25 @@ int cpufreq_set_policy(struct cpufreq_policy *policy)
 			struct cpufreq_governor *old_gov = data->governor;
 
 			/* end old governor */
-			cpufreq_governor(data->cpu, CPUFREQ_GOV_STOP);
+			__cpufreq_governor(data, CPUFREQ_GOV_STOP);
 
 			/* start new governor */
 			data->policy = policy->policy;
 			data->governor = policy->governor;
-			if (cpufreq_governor(data->cpu, CPUFREQ_GOV_START)) {
+			if (__cpufreq_governor(data, CPUFREQ_GOV_START)) {
 				/* new governor failed, so re-start old one */
 				data->policy = old_pol;
 				data->governor = old_gov;
-				cpufreq_governor(data->cpu, CPUFREQ_GOV_START);
+				__cpufreq_governor(data, CPUFREQ_GOV_START);
 			}
-			/* might be a policy change, too */
-			cpufreq_governor(data->cpu, CPUFREQ_GOV_LIMITS);
-		} else {
-			cpufreq_governor(data->cpu, CPUFREQ_GOV_LIMITS);
+			/* might be a policy change, too, so fall through */
 		}
+		__cpufreq_governor(data, CPUFREQ_GOV_LIMITS);
 	}
 	up(&cpufreq_driver_sem);
 
- error_out:	
+ error_out:
+	up(&data->lock);
 	cpufreq_cpu_put(data);
 
 	return ret;
