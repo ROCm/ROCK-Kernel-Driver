@@ -37,6 +37,7 @@
 #include <linux/backing-dev.h>
 #include <linux/kobject.h>
 #include <linux/mount.h>
+#include <linux/dnotify.h>
 #include <asm/uaccess.h>
 
 /* Random magic number */
@@ -716,6 +717,46 @@ static void hash_and_remove(struct dentry * dir, const char * name)
 	up(&dir->d_inode->i_sem);
 }
 
+/**
+ * sysfs_update_file - update the modified timestamp on an object attribute.
+ * @kobj: object we're acting for.
+ * @attr: attribute descriptor.
+ *
+ * Also call dnotify for the dentry, which lots of userspace programs
+ * use.
+ */
+int sysfs_update_file(struct kobject * kobj, struct attribute * attr)
+{
+	struct dentry * dir = kobj->dentry;
+	struct dentry * victim;
+	int res = -ENOENT;
+
+	down(&dir->d_inode->i_sem);
+	victim = get_dentry(dir, attr->name);
+	if (!IS_ERR(victim)) {
+		/* make sure dentry is really there */
+		if (victim->d_inode && 
+		    (victim->d_parent->d_inode == dir->d_inode)) {
+			victim->d_inode->i_mtime = CURRENT_TIME;
+			dnotify_parent(victim, DN_MODIFY);
+
+			/**
+			 * Drop reference from initial get_dentry().
+			 */
+			dput(victim);
+			res = 0;
+		}
+		
+		/**
+		 * Drop the reference acquired from get_dentry() above.
+		 */
+		dput(victim);
+	}
+	up(&dir->d_inode->i_sem);
+
+	return res;
+}
+
 
 /**
  *	sysfs_remove_file - remove an object attribute.
@@ -815,6 +856,8 @@ void sysfs_remove_dir(struct kobject * kobj)
 
 EXPORT_SYMBOL(sysfs_create_file);
 EXPORT_SYMBOL(sysfs_remove_file);
+EXPORT_SYMBOL(sysfs_update_file);
+
 EXPORT_SYMBOL(sysfs_create_link);
 EXPORT_SYMBOL(sysfs_remove_link);
 EXPORT_SYMBOL(sysfs_create_dir);
