@@ -2852,7 +2852,8 @@ module_exit(alsa_card_es1968_exit)
 			 total_bufsize,
 			 pcm_substreams_p,
 			 pcm_substreams_c,
-			 clock
+			 clock,
+			 use_pm
 */
 
 static int __init alsa_card_es1968_setup(char *str)
@@ -2867,7 +2868,8 @@ static int __init alsa_card_es1968_setup(char *str)
 	       get_option(&str,&total_bufsize[nr_dev]) == 2 &&
 	       get_option(&str,&pcm_substreams_p[nr_dev]) == 2 &&
 	       get_option(&str,&pcm_substreams_c[nr_dev]) == 2 &&
-	       get_option(&str,&clock[nr_dev]) == 2);
+	       get_option(&str,&clock[nr_dev]) == 2 &&
+	       get_option(&str,&use_pm[nr_dev]) == 2);
 	nr_dev++;
 	return 1;
 }
