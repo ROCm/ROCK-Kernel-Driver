@@ -870,7 +870,7 @@ sub output_function_man(%) {
     my ($parameter, $section);
     my $count;
 
-    print ".TH \"$args{'module'}\" 9 \"$args{'function'}\" \"$man_date\" \"API Manual\" LINUX\n";
+    print ".TH \"$args{'function'}\" 9 \"$args{'function'}\" \"$man_date\" \"Kernel Hacker's Manual\" LINUX\n";
 
     print ".SH NAME\n";
     print $args{'function'}." \\- ".$args{'purpose'}."\n";
@@ -896,13 +896,13 @@ sub output_function_man(%) {
 	$parenth = "";
     }
 
-    print ".SH Arguments\n";
+    print ".SH ARGUMENTS\n";
     foreach $parameter (@{$args{'parameterlist'}}) {
 	print ".IP \"".$parameter."\" 12\n";
 	output_highlight($args{'parameterdescs'}{$parameter});
     }
     foreach $section (@{$args{'sectionlist'}}) {
-	print ".SH \"$section\"\n";
+	print ".SH \"", uc $section, "\"\n";
 	output_highlight($args{'sections'}{$section});
     }
 }
