@@ -1198,6 +1198,7 @@ static int old_capi_manufacturer(unsigned int cmd, void *data)
 				return retval;
 		}
 		card = get_capi_ctr_by_nr(ldef.contr);
+		card = capi_ctr_get(card);
 		if (!card)
 			return -ESRCH;
 		if (card->driver->load_firmware == 0) {
@@ -1231,6 +1232,7 @@ static int old_capi_manufacturer(unsigned int cmd, void *data)
 
 		if (retval) {
 			card->cardstate = CARD_DETECTED;
+			capi_ctr_put(card);
 			return retval;
 		}
 
@@ -1239,9 +1241,12 @@ static int old_capi_manufacturer(unsigned int cmd, void *data)
 			set_current_state(TASK_INTERRUPTIBLE);
 			schedule_timeout(HZ/10);	/* 0.1 sec */
 
-			if (signal_pending(current))
+			if (signal_pending(current)) {
+				capi_ctr_put(card);
 				return -EINTR;
+			}
 		}
+		capi_ctr_put(card);
 		return 0;
 
 	case AVMB1_RESETCARD:

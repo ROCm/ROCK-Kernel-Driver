@@ -47,8 +47,6 @@ static void b1isa_remove_ctr(struct capi_ctr *ctrl)
 	free_irq(card->irq, card);
 	release_region(card->port, AVMB1_PORTLEN);
 	b1_free_card(card);
-
-	MOD_DEC_USE_COUNT;
 }
 
 /* ------------------------------------------------------------- */
@@ -58,8 +56,6 @@ static int b1isa_add_card(struct capi_driver *driver, struct capicardparams *p)
 	avmctrl_info *cinfo;
 	avmcard *card;
 	int retval;
-
-	MOD_INC_USE_COUNT;
 
 	card = b1_alloc_card(1);
 	if (!card) {
@@ -127,7 +123,6 @@ static int b1isa_add_card(struct capi_driver *driver, struct capicardparams *p)
  err_free:
 	b1_free_card(card);
  err:
-	MOD_DEC_USE_COUNT;
 	return retval;
 }
 

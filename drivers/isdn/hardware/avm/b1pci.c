@@ -68,8 +68,6 @@ static int b1pci_add_card(struct capi_driver *driver,
 	avmctrl_info *cinfo;
 	int retval;
 
-	MOD_INC_USE_COUNT;
-
 	card = b1_alloc_card(1);
 	if (!card) {
 		printk(KERN_WARNING "%s: no memory.\n", driver->name);
@@ -136,7 +134,6 @@ static int b1pci_add_card(struct capi_driver *driver,
  err_free:
 	b1_free_card(card);
  err:
-	MOD_DEC_USE_COUNT;
 	return retval;
 }
 
@@ -154,8 +151,6 @@ static void b1pci_remove_ctr(struct capi_ctr *ctrl)
 	release_region(card->port, AVMB1_PORTLEN);
 	ctrl->driverdata = 0;
 	b1_free_card(card);
-
-	MOD_DEC_USE_COUNT;
 }
 
 /* ------------------------------------------------------------- */
@@ -207,8 +202,6 @@ static int b1pciv4_add_card(struct capi_driver *driver,
 	avmcard *card;
 	avmctrl_info *cinfo;
 	int retval;
-
-	MOD_INC_USE_COUNT;
 
 	card = b1_alloc_card(1);
 	if (!card) {
@@ -293,7 +286,6 @@ static int b1pciv4_add_card(struct capi_driver *driver,
  err_free:
 	b1_free_card(card);
  err:
-	MOD_DEC_USE_COUNT;
 	return retval;
 
 }
@@ -312,8 +304,6 @@ static void b1pciv4_remove_ctr(struct capi_ctr *ctrl)
 	ctrl->driverdata = 0;
         avmcard_dma_free(card->dma);
 	b1_free_card(card);
-
-	MOD_DEC_USE_COUNT;
 }
 
 /* ------------------------------------------------------------- */
@@ -405,7 +395,7 @@ static int __init b1pci_init(void)
 	struct capi_driver *driverv4 = &b1pciv4_driver;
 #endif
 	char *p;
-	int ncards;
+	int retval;
 
 	MOD_INC_USE_COUNT;
 
@@ -434,19 +424,21 @@ static int __init b1pci_init(void)
         attach_capi_driver(driverv4);
 #endif
 
-	ncards = pci_register_driver(&b1pci_pci_driver);
-	if (ncards) {
-		printk(KERN_INFO "%s: %d B1-PCI card(s) detected\n",
-				driver->name, ncards);
-		MOD_DEC_USE_COUNT;
-		return 0;
-	}
-	printk(KERN_ERR "%s: NO B1-PCI card detected\n", driver->name);
-	pci_unregister_driver(&b1pci_pci_driver);
+	retval = pci_module_init(&b1pci_pci_driver);
+	if (retval < 0) 
+		goto err;
+
+	printk(KERN_INFO "%s: %d B1-PCI card(s) detected\n",
+	       driver->name, retval);
+	retval = 0;
+	goto out;
+
+ err:
 	detach_capi_driver(driver);
 #ifdef CONFIG_ISDN_DRV_AVMB1_B1PCIV4
 	detach_capi_driver(driverv4);
 #endif
+ out:
 	MOD_DEC_USE_COUNT;
 	return -ENODEV;
 }

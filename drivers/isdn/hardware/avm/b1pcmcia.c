@@ -47,8 +47,6 @@ static void b1pcmcia_remove_ctr(struct capi_ctr *ctrl)
 	detach_capi_ctr(ctrl);
 	free_irq(card->irq, card);
 	b1_free_card(card);
-
-	MOD_DEC_USE_COUNT;
 }
 
 /* ------------------------------------------------------------- */
@@ -62,8 +60,6 @@ static int b1pcmcia_add_card(struct capi_driver *driver,
 	avmcard *card;
 	char *cardname;
 	int retval;
-
-	MOD_INC_USE_COUNT;
 
 	card = b1_alloc_card(1);
 	if (!card) {
@@ -123,7 +119,6 @@ static int b1pcmcia_add_card(struct capi_driver *driver,
  err_free:
 	b1_free_card(card);
  err:
-	MOD_DEC_USE_COUNT;
 	return retval;
 }
 
@@ -231,7 +226,7 @@ static int __init b1pcmcia_init(void)
 
 static void __exit b1pcmcia_exit(void)
 {
-    detach_capi_driver(&b1pcmcia_driver);
+	detach_capi_driver(&b1pcmcia_driver);
 }
 
 module_init(b1pcmcia_init);

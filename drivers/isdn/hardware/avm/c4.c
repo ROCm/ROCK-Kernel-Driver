@@ -923,8 +923,6 @@ static void c4_remove_ctr(struct capi_ctr *ctrl)
 	ctrl->driverdata = 0;
         avmcard_dma_free(card->dma);
 	b1_free_card(card);
-
-	MOD_DEC_USE_COUNT;
 }
 
 /* ------------------------------------------------------------- */
@@ -1121,8 +1119,6 @@ static int c4_add_card(struct capi_driver *driver,
 	int retval;
 	int i;
 
-	MOD_INC_USE_COUNT;
-
 	card = b1_alloc_card(nr_controllers);
 	if (!card) {
 		printk(KERN_WARNING "%s: no memory.\n", driver->name);
@@ -1208,7 +1204,6 @@ static int c4_add_card(struct capi_driver *driver,
  err_free:
 	b1_free_card(card);
  err:
-	MOD_DEC_USE_COUNT;
 	return retval;
 }
 
@@ -1250,7 +1245,7 @@ static struct capi_driver c4_driver = {
 	add_card: 0, /* no add_card function */
 };
 
-static int c4_attach_driver (struct capi_driver * driver)
+static void c4_attach_driver (struct capi_driver * driver)
 {
 	char *p;
 	if ((p = strchr(revision, ':')) != 0 && p[1]) {
@@ -1263,7 +1258,6 @@ static int c4_attach_driver (struct capi_driver * driver)
 	printk(KERN_INFO "%s: revision %s\n", driver->name, driver->revision);
 
         attach_capi_driver(driver);
-	return 0;
 }
 
 static int __devinit c4_probe(struct pci_dev *dev,
@@ -1308,35 +1302,28 @@ static struct pci_driver c4_pci_driver = {
 static int __init c4_init(void)
 {
 	int retval;
-	int ncards;
 
 	MOD_INC_USE_COUNT;
 
-	retval = c4_attach_driver (&c4_driver);
-	if (retval) {
-		MOD_DEC_USE_COUNT;
-		return retval;
-	}
+	c4_attach_driver (&c4_driver);
+	c4_attach_driver (&c2_driver);
 
-	retval = c4_attach_driver (&c2_driver);
-	if (retval) {
-		MOD_DEC_USE_COUNT;
-		return retval;
-	}
+	retval = pci_module_init(&c4_pci_driver);
+	if (retval < 0)
+		goto err;
 
-	ncards = pci_register_driver(&c4_pci_driver);
-	if (ncards) {
-		printk(KERN_INFO "%s: %d C4/C2 card(s) detected\n",
-				c4_driver.name, ncards);
-		MOD_DEC_USE_COUNT;
-		return 0;
-	}
-	printk(KERN_ERR "%s: NO C4/C2 card detected\n", c4_driver.name);
-	pci_unregister_driver(&c4_pci_driver);
-	detach_capi_driver(&c4_driver);
+	printk(KERN_INFO "%s: %d C4/C2 card(s) detected\n",
+	       c4_driver.name, retval);
+
+	retval = 0;
+	goto out;
+
+ err:
 	detach_capi_driver(&c2_driver);
+	detach_capi_driver(&c4_driver);
+ out:
 	MOD_DEC_USE_COUNT;
-	return -ENODEV;
+	return retval;
 }
 
 static void __exit c4_exit(void)
