@@ -397,24 +397,18 @@ S:	Supported
 
 COMPAQ FIBRE CHANNEL 64-bit/66MHz PCI non-intelligent HBA
 P:	Amy Vanzant-Hodge 
-M:	Amy Vanzant-Hodge (fibrechannel@compaq.com)
-L:	compaqandlinux@cpqlin.van-dijk.net
 W:	ftp.compaq.com/pub/products/drivers/linux
-S:	Supported
+S:	Orphan
 
 COMPAQ SMART2 RAID DRIVER
 P:	Charles White	
-M:	Charles White <arrays@compaq.com>
-L:	compaqandlinux@cpqlin.van-dijk.net
 W:	ftp.compaq.com/pub/products/drivers/linux
-S:	Supported	
+S:	Orphan
 
 COMPAQ SMART CISS RAID DRIVER 
 P:	Charles White
-M:	Charles White <arrays@compaq.com>
-L:	compaqandlinux@cpqlin.van-dijk.net
 W:	ftp.compaq.com/pub/products/drivers/linux	
-S:	Supported 
+S:	Orphan
 
 COMPUTONE INTELLIPORT MULTIPORT CARD
 P:	Michael H. Warfield
