@@ -1233,6 +1233,8 @@ asmlinkage long sys_setrlimit(unsigned int resource, struct rlimit *rlim)
 		return -EINVAL;
 	if(copy_from_user(&new_rlim, rlim, sizeof(*rlim)))
 		return -EFAULT;
+       if (new_rlim.rlim_cur > new_rlim.rlim_max)
+               return -EINVAL;
 	old_rlim = current->rlim + resource;
 	if (((new_rlim.rlim_cur > old_rlim->rlim_max) ||
 	     (new_rlim.rlim_max > old_rlim->rlim_max)) &&
