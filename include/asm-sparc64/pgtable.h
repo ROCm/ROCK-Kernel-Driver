@@ -180,16 +180,27 @@
 
 /* Don't set the TTE _PAGE_W bit here, else the dirty bit never gets set. */
 #define PAGE_SHARED	__pgprot (_PAGE_PRESENT | _PAGE_VALID | _PAGE_CACHE | \
-				  __ACCESS_BITS | _PAGE_WRITE)
+				  __ACCESS_BITS | _PAGE_WRITE | _PAGE_EXEC)
 
 #define PAGE_COPY	__pgprot (_PAGE_PRESENT | _PAGE_VALID | _PAGE_CACHE | \
-				  __ACCESS_BITS)
+				  __ACCESS_BITS | _PAGE_EXEC)
 
 #define PAGE_READONLY	__pgprot (_PAGE_PRESENT | _PAGE_VALID | _PAGE_CACHE | \
-				  __ACCESS_BITS)
+				  __ACCESS_BITS | _PAGE_EXEC)
 
 #define PAGE_KERNEL	__pgprot (_PAGE_PRESENT | _PAGE_VALID | _PAGE_CACHE | \
-				  __PRIV_BITS | __ACCESS_BITS | __DIRTY_BITS)
+				  __PRIV_BITS | \
+				  __ACCESS_BITS | __DIRTY_BITS | _PAGE_EXEC)
+
+#define PAGE_SHARED_NOEXEC	__pgprot (_PAGE_PRESENT | _PAGE_VALID | \
+					  _PAGE_CACHE | \
+					  __ACCESS_BITS | _PAGE_WRITE)
+
+#define PAGE_COPY_NOEXEC	__pgprot (_PAGE_PRESENT | _PAGE_VALID | \
+					  _PAGE_CACHE | __ACCESS_BITS)
+
+#define PAGE_READONLY_NOEXEC	__pgprot (_PAGE_PRESENT | _PAGE_VALID | \
+					  _PAGE_CACHE | __ACCESS_BITS)
 
 #define _PFN_MASK	_PAGE_PADDR
 
@@ -197,18 +208,18 @@
 		   __ACCESS_BITS | _PAGE_E)
 
 #define __P000	PAGE_NONE
-#define __P001	PAGE_READONLY
-#define __P010	PAGE_COPY
-#define __P011	PAGE_COPY
+#define __P001	PAGE_READONLY_NOEXEC
+#define __P010	PAGE_COPY_NOEXEC
+#define __P011	PAGE_COPY_NOEXEC
 #define __P100	PAGE_READONLY
 #define __P101	PAGE_READONLY
 #define __P110	PAGE_COPY
 #define __P111	PAGE_COPY
 
 #define __S000	PAGE_NONE
-#define __S001	PAGE_READONLY
-#define __S010	PAGE_SHARED
-#define __S011	PAGE_SHARED
+#define __S001	PAGE_READONLY_NOEXEC
+#define __S010	PAGE_SHARED_NOEXEC
+#define __S011	PAGE_SHARED_NOEXEC
 #define __S100	PAGE_READONLY
 #define __S101	PAGE_READONLY
 #define __S110	PAGE_SHARED
