@@ -55,7 +55,6 @@ static int q40kbd_open(struct serio *port)
 }
 static void q40kbd_close(struct serio *port)
 {
-	return 0;
 }
 
 static struct serio q40kbd_port =
@@ -70,8 +69,6 @@ static struct serio q40kbd_port =
 
 static void q40kbd_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	unsigned long flags;
-
 	if (IRQ_KEYB_MASK & master_inb(INTERRUPT_REG))
 		if (q40kbd_port.dev)
                          q40kbd_port.dev->interrupt(&q40kbd_port, master_inb(KEYCODE_REG), 0);
