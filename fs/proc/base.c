@@ -282,7 +282,7 @@ static int proc_pid_environ(struct task_struct *task, char * buffer)
 	int res = 0;
 	struct mm_struct *mm = get_task_mm(task);
 	if (mm) {
-		int len = mm->env_end - mm->env_start;
+		unsigned int len = mm->env_end - mm->env_start;
 		if (len > PAGE_SIZE)
 			len = PAGE_SIZE;
 		res = access_process_vm(task, mm->env_start, buffer, len, 0);
@@ -294,7 +294,7 @@ static int proc_pid_environ(struct task_struct *task, char * buffer)
 static int proc_pid_cmdline(struct task_struct *task, char * buffer)
 {
 	int res = 0;
-	int len;
+	unsigned int len;
 	struct mm_struct *mm = get_task_mm(task);
 	if (!mm)
 		goto out;
