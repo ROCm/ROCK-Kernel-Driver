@@ -723,7 +723,14 @@ static irqreturn_t irq_handler(int intno, void *dev_id, struct pt_regs * regs)
 	irqbits |= irq_bit;
 	if (vm86_irqs[intno].sig)
 		send_sig(vm86_irqs[intno].sig, vm86_irqs[intno].tsk, 1);
-	/* else user will poll for IRQs */
+	spin_unlock_irqrestore(&irqbits_lock, flags);
+	/*
+	 * IRQ will be re-enabled when user asks for the irq (whether
+	 * polling or as a result of the signal)
+	 */
+	disable_irq(intno);
+	return IRQ_HANDLED;
+
 out:
 	spin_unlock_irqrestore(&irqbits_lock, flags);	
 	return IRQ_NONE;
