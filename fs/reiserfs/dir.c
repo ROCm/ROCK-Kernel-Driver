@@ -30,7 +30,9 @@ int reiserfs_dir_fsync(struct file *filp, struct dentry *dentry, int datasync) {
   reiserfs_write_lock(inode->i_sb);
   err = reiserfs_commit_for_inode(inode) ;
   reiserfs_write_unlock(inode->i_sb) ;
-  return err;
+  if (err < 0)
+      return err;
+  return 0;
 }
 
 

@@ -481,7 +481,7 @@ static int reiserfs_get_blocks_direct_io(struct inode *inode,
         err = reiserfs_commit_for_inode(inode);
         REISERFS_I(inode)->i_flags &= ~i_pack_on_close_mask;
         unlock_kernel();
-        if (err)
+        if (err < 0)
             ret = err;
     }
 out:
