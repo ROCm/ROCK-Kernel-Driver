@@ -48,7 +48,6 @@
 #include <linux/delay.h>
 #include <linux/ide.h>
 #include <linux/spinlock.h>
-#include <linux/pci.h>
 #include <linux/kmod.h>
 #include <linux/pci.h>
 
