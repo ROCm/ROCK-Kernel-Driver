@@ -47,9 +47,7 @@ xfs_get_dir_entry(
 	vnode_t		*vp;
 	bhv_desc_t	*bdp;
 
-	ASSERT(dentry->d_inode);
-
-	vp = LINVFS_GET_VP(dentry->d_inode);
+	vp = VNAME_TO_VNODE(dentry);
 	bdp = vn_bhv_lookup_unlocked(VN_BHV_HEAD(vp), &xfs_vnodeops);
 	if (!bdp) {
 		*ipp = NULL;
