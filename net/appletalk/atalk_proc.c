@@ -144,7 +144,7 @@ static __inline__ struct sock *atalk_get_socket_idx(loff_t pos)
 {
 	struct sock *s;
 
-	for (s = atalk_sockets; pos && s; s = s->next)
+	for (s = atalk_sockets; pos && s; s = s->sk_next)
 		--pos;
 
 	return s;
@@ -170,7 +170,7 @@ static void *atalk_seq_socket_next(struct seq_file *seq, void *v, loff_t *pos)
 		goto out;
 	}
 	i = v;
-	i = i->next;
+	i = i->sk_next;
 out:
 	return i;
 }
@@ -196,10 +196,11 @@ static int atalk_seq_socket_show(struct seq_file *seq, void *v)
 
 	seq_printf(seq, "%02X   %04X:%02X:%02X  %04X:%02X:%02X  %08X:%08X "
 			"%02X %d\n",
-		   s->type, ntohs(at->src_net), at->src_node, at->src_port,
+		   s->sk_type, ntohs(at->src_net), at->src_node, at->src_port,
 		   ntohs(at->dest_net), at->dest_node, at->dest_port,
-		   atomic_read(&s->wmem_alloc), atomic_read(&s->rmem_alloc),
-		   s->state, SOCK_INODE(s->socket)->i_uid);
+		   atomic_read(&s->sk_wmem_alloc),
+		   atomic_read(&s->sk_rmem_alloc),
+		   s->sk_state, SOCK_INODE(s->sk_socket)->i_uid);
 out:
 	return 0;
 }

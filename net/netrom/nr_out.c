@@ -65,12 +65,12 @@ void nr_output(struct sock *sk, struct sk_buff *skb)
 			if (skb->len > 0)
 				skbn->data[4] |= NR_MORE_FLAG;
 
-			skb_queue_tail(&sk->write_queue, skbn); /* Throw it on the queue */
+			skb_queue_tail(&sk->sk_write_queue, skbn); /* Throw it on the queue */
 		}
 
 		kfree_skb(skb);
 	} else {
-		skb_queue_tail(&sk->write_queue, skb);		/* Throw it on the queue */
+		skb_queue_tail(&sk->sk_write_queue, skb);		/* Throw it on the queue */
 	}
 
 	nr_kick(sk);
@@ -135,7 +135,7 @@ void nr_kick(struct sock *sk)
 	if (nr->condition & NR_COND_PEER_RX_BUSY)
 		return;
 
-	if (skb_peek(&sk->write_queue) == NULL)
+	if (!skb_peek(&sk->sk_write_queue))
 		return;
 
 	start = (skb_peek(&nr->ack_queue) == NULL) ? nr->va : nr->vs;
@@ -154,11 +154,11 @@ void nr_kick(struct sock *sk)
 	/*
 	 * Dequeue the frame and copy it.
 	 */
-	skb  = skb_dequeue(&sk->write_queue);
+	skb = skb_dequeue(&sk->sk_write_queue);
 
 	do {
 		if ((skbn = skb_clone(skb, GFP_ATOMIC)) == NULL) {
-			skb_queue_head(&sk->write_queue, skb);
+			skb_queue_head(&sk->sk_write_queue, skb);
 			break;
 		}
 
@@ -176,7 +176,8 @@ void nr_kick(struct sock *sk)
 		 */
 		skb_queue_tail(&nr->ack_queue, skb);
 
-	} while (nr->vs != end && (skb = skb_dequeue(&sk->write_queue)) != NULL);
+	} while (nr->vs != end &&
+		 (skb = skb_dequeue(&sk->sk_write_queue)) != NULL);
 
 	nr->vl         = nr->vr;
 	nr->condition &= ~NR_COND_ACK_PENDING;

@@ -191,12 +191,12 @@ struct packet_opt
 #endif
 };
 
-#define pkt_sk(__sk) ((struct packet_opt *)(__sk)->protinfo)
+#define pkt_sk(__sk) ((struct packet_opt *)(__sk)->sk_protinfo)
 
 void packet_sock_destruct(struct sock *sk)
 {
-	BUG_TRAP(atomic_read(&sk->rmem_alloc)==0);
-	BUG_TRAP(atomic_read(&sk->wmem_alloc)==0);
+	BUG_TRAP(!atomic_read(&sk->sk_rmem_alloc));
+	BUG_TRAP(!atomic_read(&sk->sk_wmem_alloc));
 
 	if (!sock_flag(sk, SOCK_DEAD)) {
 		printk("Attempt to release alive packet socket: %p\n", sk);
@@ -356,7 +356,7 @@ static int packet_sendmsg_spkt(struct kiocb *iocb, struct socket *sock,
 	err = memcpy_fromiovec(skb_put(skb,len), msg->msg_iov, len);
 	skb->protocol = proto;
 	skb->dev = dev;
-	skb->priority = sk->priority;
+	skb->priority = sk->sk_priority;
 	if (err)
 		goto out_free;
 
@@ -418,7 +418,7 @@ static int packet_rcv(struct sk_buff *skb, struct net_device *dev,  struct packe
 		   structure, so that corresponding packet head
 		   never delivered to user.
 		 */
-		if (sk->type != SOCK_DGRAM)
+		if (sk->sk_type != SOCK_DGRAM)
 			skb_push(skb, skb->data - skb->mac.raw);
 		else if (skb->pkt_type == PACKET_OUTGOING) {
 			/* Special case: outgoing packets have ll header at head */
@@ -428,13 +428,14 @@ static int packet_rcv(struct sk_buff *skb, struct net_device *dev,  struct packe
 
 	snaplen = skb->len;
 
-	if (sk->filter) {
+	if (sk->sk_filter) {
 		unsigned res = snaplen;
 		struct sk_filter *filter;
 
 		bh_lock_sock(sk);
-		if ((filter = sk->filter) != NULL)
-			res = sk_run_filter(skb, sk->filter->insns, sk->filter->len);
+		if ((filter = sk->sk_filter) != NULL)
+			res = sk_run_filter(skb, sk->sk_filter->insns,
+					    sk->sk_filter->len);
 		bh_unlock_sock(sk);
 
 		if (res == 0)
@@ -443,7 +444,8 @@ static int packet_rcv(struct sk_buff *skb, struct net_device *dev,  struct packe
 			snaplen = res;
 	}
 
-	if (atomic_read(&sk->rmem_alloc) + skb->truesize >= (unsigned)sk->rcvbuf)
+	if (atomic_read(&sk->sk_rmem_alloc) + skb->truesize >=
+	    (unsigned)sk->sk_rcvbuf)
 		goto drop_n_acct;
 
 	if (skb_shared(skb)) {
@@ -475,17 +477,17 @@ static int packet_rcv(struct sk_buff *skb, struct net_device *dev,  struct packe
 
 	skb_set_owner_r(skb, sk);
 	skb->dev = NULL;
-	spin_lock(&sk->receive_queue.lock);
+	spin_lock(&sk->sk_receive_queue.lock);
 	po->stats.tp_packets++;
-	__skb_queue_tail(&sk->receive_queue, skb);
-	spin_unlock(&sk->receive_queue.lock);
-	sk->data_ready(sk,skb->len);
+	__skb_queue_tail(&sk->sk_receive_queue, skb);
+	spin_unlock(&sk->sk_receive_queue.lock);
+	sk->sk_data_ready(sk, skb->len);
 	return 0;
 
 drop_n_acct:
-	spin_lock(&sk->receive_queue.lock);
+	spin_lock(&sk->sk_receive_queue.lock);
 	po->stats.tp_drops++;
-	spin_unlock(&sk->receive_queue.lock);
+	spin_unlock(&sk->sk_receive_queue.lock);
 
 drop_n_restore:
 	if (skb_head != skb->data && skb_shared(skb)) {
@@ -518,7 +520,7 @@ static int tpacket_rcv(struct sk_buff *skb, struct net_device *dev,  struct pack
 	po = pkt_sk(sk);
 
 	if (dev->hard_header) {
-		if (sk->type != SOCK_DGRAM)
+		if (sk->sk_type != SOCK_DGRAM)
 			skb_push(skb, skb->data - skb->mac.raw);
 		else if (skb->pkt_type == PACKET_OUTGOING) {
 			/* Special case: outgoing packets have ll header at head */
@@ -530,13 +532,14 @@ static int tpacket_rcv(struct sk_buff *skb, struct net_device *dev,  struct pack
 
 	snaplen = skb->len;
 
-	if (sk->filter) {
+	if (sk->sk_filter) {
 		unsigned res = snaplen;
 		struct sk_filter *filter;
 
 		bh_lock_sock(sk);
-		if ((filter = sk->filter) != NULL)
-			res = sk_run_filter(skb, sk->filter->insns, sk->filter->len);
+		if ((filter = sk->sk_filter) != NULL)
+			res = sk_run_filter(skb, sk->sk_filter->insns,
+					    sk->sk_filter->len);
 		bh_unlock_sock(sk);
 
 		if (res == 0)
@@ -545,7 +548,7 @@ static int tpacket_rcv(struct sk_buff *skb, struct net_device *dev,  struct pack
 			snaplen = res;
 	}
 
-	if (sk->type == SOCK_DGRAM) {
+	if (sk->sk_type == SOCK_DGRAM) {
 		macoff = netoff = TPACKET_ALIGN(TPACKET_HDRLEN) + 16;
 	} else {
 		unsigned maclen = skb->nh.raw - skb->data;
@@ -555,7 +558,8 @@ static int tpacket_rcv(struct sk_buff *skb, struct net_device *dev,  struct pack
 
 	if (macoff + snaplen > po->frame_size) {
 		if (po->copy_thresh &&
-		    atomic_read(&sk->rmem_alloc) + skb->truesize < (unsigned)sk->rcvbuf) {
+		    atomic_read(&sk->sk_rmem_alloc) + skb->truesize <
+		    (unsigned)sk->sk_rcvbuf) {
 			if (skb_shared(skb)) {
 				copy_skb = skb_clone(skb, GFP_ATOMIC);
 			} else {
@@ -572,7 +576,7 @@ static int tpacket_rcv(struct sk_buff *skb, struct net_device *dev,  struct pack
 	if (snaplen > skb->len-skb->data_len)
 		snaplen = skb->len-skb->data_len;
 
-	spin_lock(&sk->receive_queue.lock);
+	spin_lock(&sk->sk_receive_queue.lock);
 	h = po->iovec[po->head];
 
 	if (h->tp_status)
@@ -581,11 +585,11 @@ static int tpacket_rcv(struct sk_buff *skb, struct net_device *dev,  struct pack
 	po->stats.tp_packets++;
 	if (copy_skb) {
 		status |= TP_STATUS_COPY;
-		__skb_queue_tail(&sk->receive_queue, copy_skb);
+		__skb_queue_tail(&sk->sk_receive_queue, copy_skb);
 	}
 	if (!po->stats.tp_drops)
 		status &= ~TP_STATUS_LOSING;
-	spin_unlock(&sk->receive_queue.lock);
+	spin_unlock(&sk->sk_receive_queue.lock);
 
 	memcpy((u8*)h + macoff, skb->data, snaplen);
 
@@ -621,7 +625,7 @@ static int tpacket_rcv(struct sk_buff *skb, struct net_device *dev,  struct pack
 		}
 	}
 
-	sk->data_ready(sk, 0);
+	sk->sk_data_ready(sk, 0);
 
 drop_n_restore:
 	if (skb_head != skb->data && skb_shared(skb)) {
@@ -634,9 +638,9 @@ drop:
 
 ring_is_full:
 	po->stats.tp_drops++;
-	spin_unlock(&sk->receive_queue.lock);
+	spin_unlock(&sk->sk_receive_queue.lock);
 
-	sk->data_ready(sk, 0);
+	sk->sk_data_ready(sk, 0);
 	if (copy_skb)
 		kfree_skb(copy_skb);
 	goto drop_n_restore;
@@ -713,7 +717,7 @@ static int packet_sendmsg(struct kiocb *iocb, struct socket *sock,
 
 	skb->protocol = proto;
 	skb->dev = dev;
-	skb->priority = sk->priority;
+	skb->priority = sk->sk_priority;
 
 	err = -ENETDOWN;
 	if (!(dev->flags & IFF_UP))
@@ -755,9 +759,9 @@ static int packet_release(struct socket *sock)
 		return 0;
 
 	write_lock_bh(&packet_sklist_lock);
-	for (skp = &packet_sklist; *skp; skp = &(*skp)->next) {
+	for (skp = &packet_sklist; *skp; skp = &(*skp)->sk_next) {
 		if (*skp == sk) {
-			*skp = sk->next;
+			*skp = sk->sk_next;
 			__sock_put(sk);
 			break;
 		}
@@ -799,7 +803,7 @@ static int packet_release(struct socket *sock)
 
 	/* Purge queues */
 
-	skb_queue_purge(&sk->receive_queue);
+	skb_queue_purge(&sk->sk_receive_queue);
 
 	sock_put(sk);
 	return 0;
@@ -843,9 +847,9 @@ static int packet_do_bind(struct sock *sk, struct net_device *dev, int protocol)
 			sock_hold(sk);
 			po->running = 1;
 		} else {
-			sk->err = ENETDOWN;
+			sk->sk_err = ENETDOWN;
 			if (!sock_flag(sk, SOCK_DEAD))
-				sk->error_report(sk);
+				sk->sk_error_report(sk);
 		}
 	} else {
 		dev_add_pack(&po->prot_hook);
@@ -959,10 +963,10 @@ static int packet_create(struct socket *sock, int protocol)
 	if (!po)
 		goto out_free;
 	memset(po, 0, sizeof(*po));
-	sk->family = PF_PACKET;
+	sk->sk_family = PF_PACKET;
 	po->num = protocol;
 
-	sk->destruct = packet_sock_destruct;
+	sk->sk_destruct = packet_sock_destruct;
 	atomic_inc(&packet_socks_nr);
 
 	/*
@@ -985,7 +989,7 @@ static int packet_create(struct socket *sock, int protocol)
 	}
 
 	write_lock_bh(&packet_sklist_lock);
-	sk->next = packet_sklist;
+	sk->sk_next = packet_sklist;
 	packet_sklist = sk;
 	sock_hold(sk);
 	write_unlock_bh(&packet_sklist_lock);
@@ -1342,10 +1346,10 @@ int packet_getsockopt(struct socket *sock, int level, int optname,
 
 		if (len > sizeof(struct tpacket_stats))
 			len = sizeof(struct tpacket_stats);
-		spin_lock_bh(&sk->receive_queue.lock);
+		spin_lock_bh(&sk->sk_receive_queue.lock);
 		st = po->stats;
 		memset(&po->stats, 0, sizeof(st));
-		spin_unlock_bh(&sk->receive_queue.lock);
+		spin_unlock_bh(&sk->sk_receive_queue.lock);
 		st.tp_packets += st.tp_drops;
 
 		if (copy_to_user(optval, &st, len))
@@ -1368,7 +1372,7 @@ static int packet_notifier(struct notifier_block *this, unsigned long msg, void 
 	struct net_device *dev = (struct net_device*)data;
 
 	read_lock(&packet_sklist_lock);
-	for (sk = packet_sklist; sk; sk = sk->next) {
+	for (sk = packet_sklist; sk; sk = sk->sk_next) {
 		struct packet_opt *po = pkt_sk(sk);
 
 		switch (msg) {
@@ -1380,9 +1384,9 @@ static int packet_notifier(struct notifier_block *this, unsigned long msg, void 
 					__dev_remove_pack(&po->prot_hook);
 					__sock_put(sk);
 					po->running = 0;
-					sk->err = ENETDOWN;
+					sk->sk_err = ENETDOWN;
 					if (!sock_flag(sk, SOCK_DEAD))
-						sk->error_report(sk);
+						sk->sk_error_report(sk);
 				}
 				if (msg == NETDEV_UNREGISTER) {
 					po->ifindex = -1;
@@ -1424,7 +1428,7 @@ static int packet_ioctl(struct socket *sock, unsigned int cmd,
 	switch(cmd) {
 		case SIOCOUTQ:
 		{
-			int amount = atomic_read(&sk->wmem_alloc);
+			int amount = atomic_read(&sk->sk_wmem_alloc);
 			return put_user(amount, (int *)arg);
 		}
 		case SIOCINQ:
@@ -1432,17 +1436,17 @@ static int packet_ioctl(struct socket *sock, unsigned int cmd,
 			struct sk_buff *skb;
 			int amount = 0;
 
-			spin_lock_bh(&sk->receive_queue.lock);
-			skb = skb_peek(&sk->receive_queue);
+			spin_lock_bh(&sk->sk_receive_queue.lock);
+			skb = skb_peek(&sk->sk_receive_queue);
 			if (skb)
 				amount = skb->len;
-			spin_unlock_bh(&sk->receive_queue.lock);
+			spin_unlock_bh(&sk->sk_receive_queue.lock);
 			return put_user(amount, (int *)arg);
 		}
 		case SIOCGSTAMP:
-			if (sk->stamp.tv_sec==0)
+			if (!sk->sk_stamp.tv_sec)
 				return -ENOENT;
-			if (copy_to_user((void *)arg, &sk->stamp,
+			if (copy_to_user((void *)arg, &sk->sk_stamp,
 					 sizeof(struct timeval)))
 				return -EFAULT;
 			break;
@@ -1482,14 +1486,14 @@ unsigned int packet_poll(struct file * file, struct socket *sock, poll_table *wa
 	struct packet_opt *po = pkt_sk(sk);
 	unsigned int mask = datagram_poll(file, sock, wait);
 
-	spin_lock_bh(&sk->receive_queue.lock);
+	spin_lock_bh(&sk->sk_receive_queue.lock);
 	if (po->iovec) {
 		unsigned last = po->head ? po->head-1 : po->iovmax;
 
 		if (po->iovec[last]->tp_status)
 			mask |= POLLIN | POLLRDNORM;
 	}
-	spin_unlock_bh(&sk->receive_queue.lock);
+	spin_unlock_bh(&sk->sk_receive_queue.lock);
 	return mask;
 }
 
@@ -1635,20 +1639,20 @@ static int packet_set_ring(struct sock *sk, struct tpacket_req *req, int closing
 		err = 0;
 #define XC(a, b) ({ __typeof__ ((a)) __t; __t = (a); (a) = (b); __t; })
 
-		spin_lock_bh(&sk->receive_queue.lock);
+		spin_lock_bh(&sk->sk_receive_queue.lock);
 		pg_vec = XC(po->pg_vec, pg_vec);
 		io_vec = XC(po->iovec, io_vec);
 		po->iovmax = req->tp_frame_nr-1;
 		po->head = 0;
 		po->frame_size = req->tp_frame_size;
-		spin_unlock_bh(&sk->receive_queue.lock);
+		spin_unlock_bh(&sk->sk_receive_queue.lock);
 
 		order = XC(po->pg_vec_order, order);
 		req->tp_block_nr = XC(po->pg_vec_len, req->tp_block_nr);
 
 		po->pg_vec_pages = req->tp_block_size/PAGE_SIZE;
 		po->prot_hook.func = po->iovec ? tpacket_rcv : packet_rcv;
-		skb_queue_purge(&sk->receive_queue);
+		skb_queue_purge(&sk->sk_receive_queue);
 #undef XC
 		if (atomic_read(&po->mapped))
 			printk(KERN_DEBUG "packet_mmap: vma is busy: %d\n", atomic_read(&po->mapped));
@@ -1778,17 +1782,17 @@ static int packet_read_proc(char *buffer, char **start, off_t offset,
 
 	read_lock(&packet_sklist_lock);
 
-	for (s = packet_sklist; s; s = s->next) {
+	for (s = packet_sklist; s; s = s->sk_next) {
 		struct packet_opt *po = pkt_sk(s);
 
 		len+=sprintf(buffer+len,"%p %-6d %-4d %04x   %-5d %1d %-6u %-6u %-6lu",
 			     s,
-			     atomic_read(&s->refcnt),
-			     s->type,
+			     atomic_read(&s->sk_refcnt),
+			     s->sk_type,
 			     ntohs(po->num),
 			     po->ifindex,
 			     po->running,
-			     atomic_read(&s->rmem_alloc),
+			     atomic_read(&s->sk_rmem_alloc),
 			     sock_i_uid(s),
 			     sock_i_ino(s)
 			     );

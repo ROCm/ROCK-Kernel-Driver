@@ -492,7 +492,7 @@ void sctp_retransmit(struct sctp_outq *q, struct sctp_transport *transport,
 	error = sctp_outq_flush(q, /* rtx_timeout */ 1);
 
 	if (error)
-		q->asoc->base.sk->err = -error;
+		q->asoc->base.sk->sk_err = -error;
 }
 
 /*

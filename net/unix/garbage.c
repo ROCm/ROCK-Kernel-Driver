@@ -219,8 +219,8 @@ void unix_gc(void)
 		 *	negative inflight counter to close race window.
 		 *	It is trick of course and dirty one.
 		 */
-		if(s->socket && s->socket->file)
-			open_count = file_count(s->socket->file);
+		if (s->sk_socket && s->sk_socket->file)
+			open_count = file_count(s->sk_socket->file);
 		if (open_count > atomic_read(&unix_sk(s)->inflight))
 			maybe_unmark_and_push(s);
 	}
@@ -234,15 +234,14 @@ void unix_gc(void)
 		unix_socket *x = pop_stack();
 		unix_socket *sk;
 
-		spin_lock(&x->receive_queue.lock);
-		skb=skb_peek(&x->receive_queue);
+		spin_lock(&x->sk_receive_queue.lock);
+		skb = skb_peek(&x->sk_receive_queue);
 		
 		/*
 		 *	Loop through all but first born 
 		 */
 		
-		while(skb && skb != (struct sk_buff *)&x->receive_queue)
-		{
+		while (skb && skb != (struct sk_buff *)&x->sk_receive_queue) {
 			/*
 			 *	Do we have file descriptors ?
 			 */
@@ -266,12 +265,11 @@ void unix_gc(void)
 				}
 			}
 			/* We have to scan not-yet-accepted ones too */
-			if (x->state == TCP_LISTEN) {
+			if (x->sk_state == TCP_LISTEN)
 				maybe_unmark_and_push(skb->sk);
-			}
 			skb=skb->next;
 		}
-		spin_unlock(&x->receive_queue.lock);
+		spin_unlock(&x->sk_receive_queue.lock);
 		sock_put(x);
 	}
 
@@ -283,10 +281,11 @@ void unix_gc(void)
 
 		if (u->gc_tree == GC_ORPHAN) {
 			struct sk_buff *nextsk;
-			spin_lock(&s->receive_queue.lock);
-			skb=skb_peek(&s->receive_queue);
-			while(skb && skb != (struct sk_buff *)&s->receive_queue)
-			{
+
+			spin_lock(&s->sk_receive_queue.lock);
+			skb = skb_peek(&s->sk_receive_queue);
+			while (skb &&
+			       skb != (struct sk_buff *)&s->sk_receive_queue) {
 				nextsk=skb->next;
 				/*
 				 *	Do we have file descriptors ?
@@ -298,7 +297,7 @@ void unix_gc(void)
 				}
 				skb=nextsk;
 			}
-			spin_unlock(&s->receive_queue.lock);
+			spin_unlock(&s->sk_receive_queue.lock);
 		}
 		u->gc_tree = GC_ORPHAN;
 	}

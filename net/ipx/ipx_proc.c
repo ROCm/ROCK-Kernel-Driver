@@ -174,7 +174,7 @@ static __inline__ struct sock *ipx_get_socket_idx(loff_t pos)
 		if (!pos)
 			break;
 		spin_lock_bh(&i->if_sklist_lock);
-		for (s = i->if_sklist; pos && s; s = s->next)
+		for (s = i->if_sklist; pos && s; s = s->sk_next)
 			--pos;
 		if (!pos) {
 			if (!s)
@@ -213,8 +213,8 @@ static void *ipx_seq_socket_next(struct seq_file *seq, void *v, loff_t *pos)
 		goto out;
 	}
 	sk = v;
-	if (sk->next) {
-		sk = sk->next;
+	if (sk->sk_next) {
+		sk = sk->sk_next;
 		goto out;
 	}
 	ipxs = ipx_sk(sk);
@@ -264,7 +264,7 @@ static int ipx_seq_socket_show(struct seq_file *seq, void *v)
 	seq_printf(seq, "%08lX:%04X  ", (unsigned long) htonl(ipxs->intrfc->if_netnum),
 		   htons(ipxs->port));
 #endif	/* CONFIG_IPX_INTERN */
-	if (s->state != TCP_ESTABLISHED)
+	if (s->sk_state != TCP_ESTABLISHED)
 		seq_printf(seq, "%-28s", "Not_Connected");
 	else {
 		seq_printf(seq, "%08lX:%02X%02X%02X%02X%02X%02X:%04X  ",
@@ -276,8 +276,9 @@ static int ipx_seq_socket_show(struct seq_file *seq, void *v)
 	}
 
 	seq_printf(seq, "%08X  %08X  %02X     %03d\n",
-		   atomic_read(&s->wmem_alloc), atomic_read(&s->rmem_alloc),
-		   s->state, SOCK_INODE(s->socket)->i_uid);
+		   atomic_read(&s->sk_wmem_alloc),
+		   atomic_read(&s->sk_rmem_alloc),
+		   s->sk_state, SOCK_INODE(s->sk_socket)->i_uid);
 out:
 	return 0;
 }

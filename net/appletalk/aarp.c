@@ -630,7 +630,7 @@ out_unlock:
 
 sendit:
 	if (skb->sk)
-		skb->priority = skb->sk->priority;
+		skb->priority = skb->sk->sk_priority;
 	dev_queue_xmit(skb);
 sent:
 	return 1;

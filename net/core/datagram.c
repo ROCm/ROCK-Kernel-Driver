@@ -59,7 +59,7 @@
  */
 static inline int connection_based(struct sock *sk)
 {
-	return sk->type == SOCK_SEQPACKET || sk->type == SOCK_STREAM;
+	return sk->sk_type == SOCK_SEQPACKET || sk->sk_type == SOCK_STREAM;
 }
 
 /*
@@ -70,26 +70,26 @@ static int wait_for_packet(struct sock *sk, int *err, long *timeo_p)
 	int error;
 	DEFINE_WAIT(wait);
 
-	prepare_to_wait_exclusive(sk->sleep, &wait, TASK_INTERRUPTIBLE);
+	prepare_to_wait_exclusive(sk->sk_sleep, &wait, TASK_INTERRUPTIBLE);
 
 	/* Socket errors? */
 	error = sock_error(sk);
 	if (error)
 		goto out_err;
 
-	if (!skb_queue_empty(&sk->receive_queue))
+	if (!skb_queue_empty(&sk->sk_receive_queue))
 		goto out;
 
 	/* Socket shut down? */
-	if (sk->shutdown & RCV_SHUTDOWN)
+	if (sk->sk_shutdown & RCV_SHUTDOWN)
 		goto out_noerr;
 
 	/* Sequenced packets can come disconnected.
 	 * If so we report the problem
 	 */
 	error = -ENOTCONN;
-	if (connection_based(sk) && !(sk->state == TCP_ESTABLISHED ||
-				      sk->state == TCP_LISTEN))
+	if (connection_based(sk) &&
+	    !(sk->sk_state == TCP_ESTABLISHED || sk->sk_state == TCP_LISTEN))
 		goto out_err;
 
 	/* handle signals */
@@ -99,7 +99,7 @@ static int wait_for_packet(struct sock *sk, int *err, long *timeo_p)
 	error = 0;
 	*timeo_p = schedule_timeout(*timeo_p);
 out:
-	finish_wait(sk->sleep, &wait);
+	finish_wait(sk->sk_sleep, &wait);
 	return error;
 interrupted:
 	error = sock_intr_errno(*timeo_p);
@@ -146,7 +146,9 @@ struct sk_buff *skb_recv_datagram(struct sock *sk, unsigned flags,
 {
 	struct sk_buff *skb;
 	long timeo;
-	/* Caller is allowed not to check sk->err before skb_recv_datagram() */
+	/*
+	 * Caller is allowed not to check sk->sk_err before skb_recv_datagram()
+	 */
 	int error = sock_error(sk);
 
 	if (error)
@@ -164,14 +166,15 @@ struct sk_buff *skb_recv_datagram(struct sock *sk, unsigned flags,
 		if (flags & MSG_PEEK) {
 			unsigned long cpu_flags;
 
-			spin_lock_irqsave(&sk->receive_queue.lock, cpu_flags);
-			skb = skb_peek(&sk->receive_queue);
+			spin_lock_irqsave(&sk->sk_receive_queue.lock,
+					  cpu_flags);
+			skb = skb_peek(&sk->sk_receive_queue);
 			if (skb)
 				atomic_inc(&skb->users);
-			spin_unlock_irqrestore(&sk->receive_queue.lock,
+			spin_unlock_irqrestore(&sk->sk_receive_queue.lock,
 					       cpu_flags);
 		} else
-			skb = skb_dequeue(&sk->receive_queue);
+			skb = skb_dequeue(&sk->sk_receive_queue);
 
 		if (skb)
 			return skb;
@@ -451,26 +454,26 @@ unsigned int datagram_poll(struct file *file, struct socket *sock,
 	struct sock *sk = sock->sk;
 	unsigned int mask;
 
-	poll_wait(file, sk->sleep, wait);
+	poll_wait(file, sk->sk_sleep, wait);
 	mask = 0;
 
 	/* exceptional events? */
-	if (sk->err || !skb_queue_empty(&sk->error_queue))
+	if (sk->sk_err || !skb_queue_empty(&sk->sk_error_queue))
 		mask |= POLLERR;
-	if (sk->shutdown == SHUTDOWN_MASK)
+	if (sk->sk_shutdown == SHUTDOWN_MASK)
 		mask |= POLLHUP;
 
 	/* readable? */
-	if (!skb_queue_empty(&sk->receive_queue) ||
-	    (sk->shutdown & RCV_SHUTDOWN))
+	if (!skb_queue_empty(&sk->sk_receive_queue) ||
+	    (sk->sk_shutdown & RCV_SHUTDOWN))
 		mask |= POLLIN | POLLRDNORM;
 
 	/* Connection-based need to check for termination and startup */
 	if (connection_based(sk)) {
-		if (sk->state == TCP_CLOSE)
+		if (sk->sk_state == TCP_CLOSE)
 			mask |= POLLHUP;
 		/* connection hasn't started yet? */
-		if (sk->state == TCP_SYN_SENT)
+		if (sk->sk_state == TCP_SYN_SENT)
 			return mask;
 	}
 
@@ -478,7 +481,7 @@ unsigned int datagram_poll(struct file *file, struct socket *sock,
 	if (sock_writeable(sk))
 		mask |= POLLOUT | POLLWRNORM | POLLWRBAND;
 	else
-		set_bit(SOCK_ASYNC_NOSPACE, &sk->socket->flags);
+		set_bit(SOCK_ASYNC_NOSPACE, &sk->sk_socket->flags);
 
 	return mask;
 }

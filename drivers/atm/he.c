@@ -2656,7 +2656,7 @@ he_close(struct atm_vcc *vcc)
 		 * TBRQ, the host issues the close command to the adapter.
 		 */
 
-		while (((tx_inuse = atomic_read(&vcc->sk->wmem_alloc)) > 0) &&
+		while (((tx_inuse = atomic_read(&vcc->sk->sk_wmem_alloc)) > 0) &&
 		       (retry < MAX_RETRY)) {
 			set_current_state(TASK_UNINTERRUPTIBLE);
 			(void) schedule_timeout(sleep);

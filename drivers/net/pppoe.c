@@ -277,11 +277,12 @@ static void pppoe_flush_dev(struct net_device *dev)
 
 				lock_sock(sk);
 
-				if (sk->state & (PPPOX_CONNECTED|PPPOX_BOUND)){
+				if (sk->sk_state &
+				    (PPPOX_CONNECTED | PPPOX_BOUND)) {
 					pppox_unbind_sock(sk);
 					dev_put(dev);
-					sk->state = PPPOX_ZOMBIE;
-					sk->state_change(sk);
+					sk->sk_state = PPPOX_ZOMBIE;
+					sk->sk_state_change(sk);
 				}
 
 				release_sock(sk);
@@ -347,16 +348,16 @@ int pppoe_rcv_core(struct sock *sk, struct sk_buff *skb)
 	struct pppox_opt *po = pppox_sk(sk);
 	struct pppox_opt *relay_po = NULL;
 
-	if (sk->state & PPPOX_BOUND) {
+	if (sk->sk_state & PPPOX_BOUND) {
 		skb_pull(skb, sizeof(struct pppoe_hdr));
 		ppp_input(&po->chan, skb);
-	} else if (sk->state & PPPOX_RELAY) {
+	} else if (sk->sk_state & PPPOX_RELAY) {
 		relay_po = get_item_by_addr(&po->pppoe_relay);
 
 		if (relay_po == NULL)
 			goto abort_kfree;
 
-		if ((relay_po->sk->state & PPPOX_CONNECTED) == 0)
+		if ((relay_po->sk->sk_state & PPPOX_CONNECTED) == 0)
 			goto abort_put;
 
 		skb_pull(skb, sizeof(struct pppoe_hdr));
@@ -447,7 +448,7 @@ static int pppoe_disc_rcv(struct sk_buff *skb,
 			/* We're no longer connect at the PPPOE layer,
 			 * and must wait for ppp channel to disconnect us.
 			 */
-			sk->state = PPPOX_ZOMBIE;
+			sk->sk_state = PPPOX_ZOMBIE;
 		}
 
 		bh_unlock_sock(sk);
@@ -503,12 +504,12 @@ static int pppoe_create(struct socket *sock)
 	sock->state = SS_UNCONNECTED;
 	sock->ops   = &pppoe_ops;
 
-	sk->backlog_rcv = pppoe_rcv_core;
-	sk->state = PPPOX_NONE;
-	sk->type = SOCK_STREAM;
-	sk->family   = PF_PPPOX;
-	sk->protocol = PX_PROTO_OE;
-	sk->destruct = pppoe_sk_free;
+	sk->sk_backlog_rcv = pppoe_rcv_core;
+	sk->sk_state	   = PPPOX_NONE;
+	sk->sk_type	   = SOCK_STREAM;
+	sk->sk_family	   = PF_PPPOX;
+	sk->sk_protocol	   = PX_PROTO_OE;
+	sk->sk_destruct	   = pppoe_sk_free;
 
 	po = pppox_sk(sk) = kmalloc(sizeof(*po), GFP_KERNEL);
 	if (!po)
@@ -536,7 +537,7 @@ int pppoe_release(struct socket *sock)
 	pppox_unbind_sock(sk);
 
 	/* Signal the death of the socket. */
-	sk->state = PPPOX_DEAD;
+	sk->sk_state = PPPOX_DEAD;
 
 	po = pppox_sk(sk);
 	if (po->pppoe_pa.sid) {
@@ -551,7 +552,7 @@ int pppoe_release(struct socket *sock)
 	sock_orphan(sk);
 	sock->sk = NULL;
 
-	skb_queue_purge(&sk->receive_queue);
+	skb_queue_purge(&sk->sk_receive_queue);
 	sock_put(sk);
 
 	return error;
@@ -575,12 +576,12 @@ int pppoe_connect(struct socket *sock, struct sockaddr *uservaddr,
 
 	/* Check for already bound sockets */
 	error = -EBUSY;
-	if ((sk->state & PPPOX_CONNECTED) && sp->sa_addr.pppoe.sid)
+	if ((sk->sk_state & PPPOX_CONNECTED) && sp->sa_addr.pppoe.sid)
 		goto end;
 
 	/* Check for already disconnected sockets, on attempts to disconnect */
 	error = -EALREADY;
-	if((sk->state & PPPOX_DEAD) && !sp->sa_addr.pppoe.sid )
+	if ((sk->sk_state & PPPOX_DEAD) && !sp->sa_addr.pppoe.sid )
 		goto end;
 
 	error = 0;
@@ -596,7 +597,7 @@ int pppoe_connect(struct socket *sock, struct sockaddr *uservaddr,
 		memset(po, 0, sizeof(struct pppox_opt));
 		po->sk = sk;
 
-		sk->state = PPPOX_NONE;
+		sk->sk_state = PPPOX_NONE;
 	}
 
 	/* Don't re-bind if sid==0 */
@@ -630,7 +631,7 @@ int pppoe_connect(struct socket *sock, struct sockaddr *uservaddr,
 		if (error)
 			goto err_put;
 
-		sk->state = PPPOX_CONNECTED;
+		sk->sk_state = PPPOX_CONNECTED;
 	}
 
 	po->num = sp->sa_addr.pppoe.sid;
@@ -678,7 +679,7 @@ int pppoe_ioctl(struct socket *sock, unsigned int cmd,
 	case PPPIOCGMRU:
 		err = -ENXIO;
 
-		if (!(sk->state & PPPOX_CONNECTED))
+		if (!(sk->sk_state & PPPOX_CONNECTED))
 			break;
 
 		err = -EFAULT;
@@ -692,7 +693,7 @@ int pppoe_ioctl(struct socket *sock, unsigned int cmd,
 
 	case PPPIOCSMRU:
 		err = -ENXIO;
-		if (!(sk->state & PPPOX_CONNECTED))
+		if (!(sk->sk_state & PPPOX_CONNECTED))
 			break;
 
 		err = -EFAULT;
@@ -719,11 +720,11 @@ int pppoe_ioctl(struct socket *sock, unsigned int cmd,
 		struct pppox_opt *relay_po;
 
 		err = -EBUSY;
-		if (sk->state & (PPPOX_BOUND|PPPOX_ZOMBIE|PPPOX_DEAD))
+		if (sk->sk_state & (PPPOX_BOUND | PPPOX_ZOMBIE | PPPOX_DEAD))
 			break;
 
 		err = -ENOTCONN;
-		if (!(sk->state & PPPOX_CONNECTED))
+		if (!(sk->sk_state & PPPOX_CONNECTED))
 			break;
 
 		/* PPPoE address from the user specifies an outbound
@@ -747,17 +748,17 @@ int pppoe_ioctl(struct socket *sock, unsigned int cmd,
 			break;
 
 		sock_put(relay_po->sk);
-		sk->state |= PPPOX_RELAY;
+		sk->sk_state |= PPPOX_RELAY;
 		err = 0;
 		break;
 	}
 
 	case PPPOEIOCDFWD:
 		err = -EALREADY;
-		if (!(sk->state & PPPOX_RELAY))
+		if (!(sk->sk_state & PPPOX_RELAY))
 			break;
 
-		sk->state &= ~PPPOX_RELAY;
+		sk->sk_state &= ~PPPOX_RELAY;
 		err = 0;
 		break;
 
@@ -780,7 +781,7 @@ int pppoe_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
 	struct net_device *dev;
 	char *start;
 
-	if (sock_flag(sk, SOCK_DEAD) || !(sk->state & PPPOX_CONNECTED)) {
+	if (sock_flag(sk, SOCK_DEAD) || !(sk->sk_state & PPPOX_CONNECTED)) {
 		error = -ENOTCONN;
 		goto end;
 	}
@@ -812,7 +813,7 @@ int pppoe_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
 
 	skb->dev = dev;
 
-	skb->priority = sk->priority;
+	skb->priority = sk->sk_priority;
 	skb->protocol = __constant_htons(ETH_P_PPP_SES);
 
 	ph = (struct pppoe_hdr *) skb_put(skb, total_len + sizeof(struct pppoe_hdr));
@@ -856,7 +857,7 @@ int __pppoe_xmit(struct sock *sk, struct sk_buff *skb)
 	int data_len = skb->len;
 	struct sk_buff *skb2;
 
-	if (sock_flag(sk, SOCK_DEAD)  || !(sk->state & PPPOX_CONNECTED))
+	if (sock_flag(sk, SOCK_DEAD) || !(sk->sk_state & PPPOX_CONNECTED))
 		goto abort;
 
 	hdr.ver	= 1;
@@ -938,7 +939,7 @@ int pppoe_recvmsg(struct kiocb *iocb, struct socket *sock,
 	int len;
 	struct pppoe_hdr *ph = NULL;
 
-	if (sk->state & PPPOX_BOUND) {
+	if (sk->sk_state & PPPOX_BOUND) {
 		error = -EIO;
 		goto end;
 	}

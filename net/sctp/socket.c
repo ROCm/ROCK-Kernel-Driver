@@ -327,7 +327,7 @@ SCTP_STATIC int sctp_do_bind(struct sock *sk, union sctp_addr *addr, int len)
  * added.
  */
 
-/* Unprotected by locks. Call only with socket lock sk->lock held! See
+/* Unprotected by locks. Call only with socket lock sk->sk_lock held! See
  * sctp_bindx() for a lock-protected call.
  */
 
@@ -537,8 +537,8 @@ int sctp_bindx_rem(struct sock *sk, struct sockaddr_storage *addrs, int addrcnt)
 			goto err_bindx_rem;
 		};
 
-		/* FIXME - There is probably a need to check if sk->saddr and
-		 * sk->rcv_addr are currently set to one of the addresses to
+		/* FIXME - There is probably a need to check if sk->sk_saddr and
+		 * sk->sk_rcv_addr are currently set to one of the addresses to
 		 * be removed. This is something which needs to be looked into
 		 * when we are fixing the outstanding issues with multi-homing
 		 * socket routing and failover schemes. Refer to comments in
@@ -713,7 +713,7 @@ SCTP_STATIC void sctp_close(struct sock *sk, long timeout)
 	printk("sctp_close(sk: 0x%p, timeout:%ld)\n", sk, timeout);
 
 	sctp_lock_sock(sk);
-	sk->shutdown = SHUTDOWN_MASK;
+	sk->sk_shutdown = SHUTDOWN_MASK;
 
 	ep = sctp_sk(sk)->ep;
 
@@ -732,7 +732,7 @@ SCTP_STATIC void sctp_close(struct sock *sk, long timeout)
 				sctp_association_free(asoc);
 
 			} else if (sock_flag(sk, SOCK_LINGER) &&
-				   !sk->lingertime)
+				   !sk->sk_lingertime)
 				sctp_primitive_ABORT(asoc, NULL);
 			else
 				sctp_primitive_SHUTDOWN(asoc, NULL);
@@ -741,7 +741,7 @@ SCTP_STATIC void sctp_close(struct sock *sk, long timeout)
 	}
 
 	/* Clean up any skbs sitting on the receive queue.  */
-	skb_queue_purge(&sk->receive_queue);
+	skb_queue_purge(&sk->sk_receive_queue);
 	skb_queue_purge(&sctp_sk(sk)->pd_lobby);
 
 	/* On a TCP-style socket, block for at most linger_time if set. */
@@ -1073,7 +1073,7 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	/* API 7.1.7, the sndbuf size per association bounds the
 	 * maximum size of data that can be sent in a single send call.
 	 */
-	if (msg_len > sk->sndbuf) {
+	if (msg_len > sk->sk_sndbuf) {
 		err = -EMSGSIZE;
 		goto out_free;
 	}
@@ -1296,7 +1296,7 @@ SCTP_STATIC int sctp_recvmsg(struct kiocb *iocb, struct sock *sk,
 		sctp_ulpevent_read_sndrcvinfo(event, msg);
 #if 0
 	/* FIXME: we should be calling IP/IPv6 layers.  */
-	if (sk->protinfo.af_inet.cmsg_flags)
+	if (sk->sk_protinfo.af_inet.cmsg_flags)
 		ip_cmsg_recv(msg, skb);
 #endif
 
@@ -1311,7 +1311,7 @@ SCTP_STATIC int sctp_recvmsg(struct kiocb *iocb, struct sock *sk,
 		if (flags & MSG_PEEK)
 			goto out_free;
 		sctp_skb_pull(skb, copied);
-		skb_queue_head(&sk->receive_queue, skb);
+		skb_queue_head(&sk->sk_receive_queue, skb);
 
 		/* When only partial message is copied to the user, increase
 		 * rwnd by that amount. If all the data in the skb is read,
@@ -1819,7 +1819,7 @@ SCTP_STATIC int sctp_connect(struct sock *sk, struct sockaddr *uaddr,
 	af = sctp_get_af_specific(to.sa.sa_family);
 	af->to_sk_daddr(&to, sk);
 
-	timeo = sock_sndtimeo(sk, sk->socket->file->f_flags & O_NONBLOCK);
+	timeo = sock_sndtimeo(sk, sk->sk_socket->file->f_flags & O_NONBLOCK);
 	err = sctp_wait_for_connect(asoc, &timeo);
 
 out_unlock:
@@ -1865,7 +1865,7 @@ SCTP_STATIC struct sock *sctp_accept(struct sock *sk, int flags, int *err)
 		goto out;
 	}
 
-	timeo = sock_rcvtimeo(sk, sk->socket->file->f_flags & O_NONBLOCK);
+	timeo = sock_rcvtimeo(sk, sk->sk_socket->file->f_flags & O_NONBLOCK);
 
 	error = sctp_wait_for_accept(sk, timeo);
 	if (error)
@@ -1916,7 +1916,7 @@ SCTP_STATIC int sctp_init_sock(struct sock *sk)
 	sp = sctp_sk(sk);
 
 	/* Initialize the SCTP per socket area.  */
-	switch (sk->type) {
+	switch (sk->sk_type) {
 	case SOCK_SEQPACKET:
 		sp->type = SCTP_SOCKET_UDP;
 		break;
@@ -1988,7 +1988,7 @@ SCTP_STATIC int sctp_init_sock(struct sock *sk)
 	/* User specified fragmentation limit. */
 	sp->user_frag         = 0;
 
-	sp->pf = sctp_get_pf_specific(sk->family);
+	sp->pf = sctp_get_pf_specific(sk->sk_family);
 
 	/* Control variables for partial data delivery. */
 	sp->pd_mode           = 0;
@@ -2184,7 +2184,7 @@ SCTP_STATIC int sctp_do_peeloff(struct sctp_association *asoc,
 		return -EINVAL;
 
 	/* Create a new socket.  */
-	err = sock_create(sk->family, SOCK_SEQPACKET, IPPROTO_SCTP, &sock);
+	err = sock_create(sk->sk_family, SOCK_SEQPACKET, IPPROTO_SCTP, &sock);
 	if (err < 0)
 		return err;
 
@@ -2814,12 +2814,12 @@ static long sctp_get_port_local(struct sock *sk, union sctp_addr *addr)
 		 * used by other socket (pp->sk != NULL); that other
 		 * socket is going to be sk2.
 		 */
-		int sk_reuse = sk->reuse;
+		int reuse = sk->sk_reuse;
 		struct sock *sk2 = pp->sk;
 
 		SCTP_DEBUG_PRINTK("sctp_get_port() found a "
 				  "possible match\n");
-		if (pp->fastreuse != 0 && sk->reuse != 0)
+		if (pp->fastreuse && sk->sk_reuse)
 			goto success;
 
 		/* Run through the list of sockets bound to the port
@@ -2832,11 +2832,11 @@ static long sctp_get_port_local(struct sock *sk, union sctp_addr *addr)
 		 * that this port/socket (sk) combination are already
 		 * in an endpoint.
 		 */
-		for ( ; sk2 != NULL; sk2 = sk2->bind_next) {
+		for (; sk2; sk2 = sk2->sk_bind_next) {
 			struct sctp_endpoint *ep2;
 			ep2 = sctp_sk(sk2)->ep;
 
-			if (sk_reuse && sk2->reuse)
+			if (reuse && sk2->sk_reuse)
 				continue;
 
 			if (sctp_bind_addr_match(&ep2->base.bind_addr, addr,
@@ -2860,12 +2860,12 @@ static long sctp_get_port_local(struct sock *sk, union sctp_addr *addr)
 		goto fail_unlock;
 
 	/* In either case (hit or miss), make sure fastreuse is 1 only
-	 * if sk->reuse is too (that is, if the caller requested
+	 * if sk->sk_reuse is too (that is, if the caller requested
 	 * SO_REUSEADDR on this socket -sk-).
 	 */
 	if (!pp->sk)
-		pp->fastreuse = sk->reuse ? 1 : 0;
-	else if (pp->fastreuse && sk->reuse == 0)
+		pp->fastreuse = sk->sk_reuse ? 1 : 0;
+	else if (pp->fastreuse && !sk->sk_reuse)
 		pp->fastreuse = 0;
 
 	/* We are set, so fill up all the data in the hash table
@@ -2874,12 +2874,12 @@ static long sctp_get_port_local(struct sock *sk, union sctp_addr *addr)
 	 */
 success:
 	inet_sk(sk)->num = snum;
-	if (sk->prev == NULL) {
-		if ((sk->bind_next = pp->sk) != NULL)
-			pp->sk->bind_pprev = &sk->bind_next;
+	if (!sk->sk_prev) {
+		if ((sk->sk_bind_next = pp->sk) != NULL)
+			pp->sk->sk_bind_pprev = &sk->sk_bind_next;
 		pp->sk = sk;
-		sk->bind_pprev = &pp->sk;
-		sk->prev = (struct sock *) pp;
+		sk->sk_bind_pprev = &pp->sk;
+		sk->sk_prev = (struct sock *) pp;
 	}
 	ret = 0;
 
@@ -2907,7 +2907,7 @@ static int sctp_get_port(struct sock *sk, unsigned short snum)
 	af->from_sk(&addr, sk);
 	addr.v4.sin_port = htons(snum);
 
-	/* Note: sk->num gets filled in if ephemeral port request. */
+	/* Note: sk->sk_num gets filled in if ephemeral port request. */
 	ret = sctp_get_port_local(sk, &addr);
 
 	return (ret ? 1 : 0);
@@ -2948,7 +2948,7 @@ SCTP_STATIC int sctp_seqpacket_listen(struct sock *sk, int backlog)
 		if (sctp_autobind(sk))
 			return -EAGAIN;
 	}
-	sk->state = SCTP_SS_LISTENING;
+	sk->sk_state = SCTP_SS_LISTENING;
 	sctp_hash_endpoint(ep);
 	return 0;
 }
@@ -2981,8 +2981,8 @@ SCTP_STATIC int sctp_stream_listen(struct sock *sk, int backlog)
 		if (sctp_autobind(sk))
 			return -EAGAIN;
 	}
-	sk->state = SCTP_SS_LISTENING;
-	sk->max_ack_backlog = backlog;
+	sk->sk_state = SCTP_SS_LISTENING;
+	sk->sk_max_ack_backlog = backlog;
 	sctp_hash_endpoint(ep);
 	return 0;
 }
@@ -3056,7 +3056,7 @@ unsigned int sctp_poll(struct file *file, struct socket *sock, poll_table *wait)
 	struct sctp_opt *sp = sctp_sk(sk);
 	unsigned int mask;
 
-	poll_wait(file, sk->sleep, wait);
+	poll_wait(file, sk->sk_sleep, wait);
 
 	/* A TCP-style listening socket becomes readable when the accept queue
 	 * is not empty.
@@ -3068,14 +3068,14 @@ unsigned int sctp_poll(struct file *file, struct socket *sock, poll_table *wait)
 	mask = 0;
 
 	/* Is there any exceptional events?  */
-	if (sk->err || !skb_queue_empty(&sk->error_queue))
+	if (sk->sk_err || !skb_queue_empty(&sk->sk_error_queue))
 		mask |= POLLERR;
-	if (sk->shutdown == SHUTDOWN_MASK)
+	if (sk->sk_shutdown == SHUTDOWN_MASK)
 		mask |= POLLHUP;
 
 	/* Is it readable?  Reconsider this code with TCP-style support.  */
-	if (!skb_queue_empty(&sk->receive_queue) ||
-	    (sk->shutdown & RCV_SHUTDOWN))
+	if (!skb_queue_empty(&sk->sk_receive_queue) ||
+	    (sk->sk_shutdown & RCV_SHUTDOWN))
 		mask |= POLLIN | POLLRDNORM;
 
 	/* The association is either gone or not ready.  */
@@ -3086,7 +3086,7 @@ unsigned int sctp_poll(struct file *file, struct socket *sock, poll_table *wait)
 	if (sctp_writeable(sk)) {
 		mask |= POLLOUT | POLLWRNORM;
 	} else {
-		set_bit(SOCK_ASYNC_NOSPACE, &sk->socket->flags);
+		set_bit(SOCK_ASYNC_NOSPACE, &sk->sk_socket->flags);
 		/*
 		 * Since the socket is not locked, the buffer
 		 * might be made available after the writeable check and
@@ -3133,11 +3133,11 @@ static __inline__ void __sctp_put_port(struct sock *sk)
 	sctp_bind_bucket_t *pp;
 
 	sctp_spin_lock(&head->lock);
-	pp = (sctp_bind_bucket_t *) sk->prev;
-	if (sk->bind_next)
-		sk->bind_next->bind_pprev = sk->bind_pprev;
-	*(sk->bind_pprev) = sk->bind_next;
-	sk->prev = NULL;
+	pp = (sctp_bind_bucket_t *)sk->sk_prev;
+	if (sk->sk_bind_next)
+		sk->sk_bind_next->sk_bind_pprev = sk->sk_bind_pprev;
+	*(sk->sk_bind_pprev) = sk->sk_bind_next;
+	sk->sk_prev = NULL;
 	inet_sk(sk)->num = 0;
 	if (pp->sk) {
 		if (pp->next)
@@ -3299,18 +3299,18 @@ static int sctp_wait_for_packet(struct sock * sk, int *err, long *timeo_p)
 	int error;
 	DEFINE_WAIT(wait);
 
-	prepare_to_wait_exclusive(sk->sleep, &wait, TASK_INTERRUPTIBLE);
+	prepare_to_wait_exclusive(sk->sk_sleep, &wait, TASK_INTERRUPTIBLE);
 
 	/* Socket errors? */
 	error = sock_error(sk);
 	if (error)
 		goto out;
 
-	if (!skb_queue_empty(&sk->receive_queue))
+	if (!skb_queue_empty(&sk->sk_receive_queue))
 		goto ready;
 
 	/* Socket shut down?  */
-	if (sk->shutdown & RCV_SHUTDOWN)
+	if (sk->sk_shutdown & RCV_SHUTDOWN)
 		goto out;
 
 	/* Sequenced packets can come disconnected.  If so we report the
@@ -3336,14 +3336,14 @@ static int sctp_wait_for_packet(struct sock * sk, int *err, long *timeo_p)
 	sctp_lock_sock(sk);
 
 ready:
-	finish_wait(sk->sleep, &wait);
+	finish_wait(sk->sk_sleep, &wait);
 	return 0;
 
 interrupted:
 	error = sock_intr_errno(*timeo_p);
 
 out:
-	finish_wait(sk->sleep, &wait);
+	finish_wait(sk->sk_sleep, &wait);
 	*err = error;
 	return error;
 }
@@ -3359,7 +3359,7 @@ static struct sk_buff *sctp_skb_recv_datagram(struct sock *sk, int flags,
 	struct sk_buff *skb;
 	long timeo;
 
-	/* Caller is allowed not to check sk->err before calling.  */
+	/* Caller is allowed not to check sk->sk_err before calling.  */
 	error = sock_error(sk);
 	if (error)
 		goto no_packet;
@@ -3380,21 +3380,21 @@ static struct sk_buff *sctp_skb_recv_datagram(struct sock *sk, int flags,
 		if (flags & MSG_PEEK) {
 			unsigned long cpu_flags;
 
-			sctp_spin_lock_irqsave(&sk->receive_queue.lock,
+			sctp_spin_lock_irqsave(&sk->sk_receive_queue.lock,
 					       cpu_flags);
-			skb = skb_peek(&sk->receive_queue);
+			skb = skb_peek(&sk->sk_receive_queue);
 			if (skb)
 				atomic_inc(&skb->users);
-			sctp_spin_unlock_irqrestore(&sk->receive_queue.lock,
+			sctp_spin_unlock_irqrestore(&sk->sk_receive_queue.lock,
 						    cpu_flags);
 		} else {
-			skb = skb_dequeue(&sk->receive_queue);
+			skb = skb_dequeue(&sk->sk_receive_queue);
 		}
 
 		if (skb)
 			return skb;
 
-		if (sk->shutdown & RCV_SHUTDOWN)
+		if (sk->sk_shutdown & RCV_SHUTDOWN)
 			break;
 
 		/* User doesn't want to wait.  */
@@ -3437,7 +3437,7 @@ static inline int sctp_wspace(struct sctp_association *asoc)
 	struct sock *sk = asoc->base.sk;
 	int amt = 0;
 
-	amt = sk->sndbuf - asoc->sndbuf_used;
+	amt = sk->sk_sndbuf - asoc->sndbuf_used;
 	if (amt < 0)
 		amt = 0;
 	return amt;
@@ -3465,29 +3465,29 @@ static inline void sctp_set_owner_w(struct sctp_chunk *chunk)
 	*((struct sctp_chunk **)(chunk->skb->cb)) = chunk;
 
 	asoc->sndbuf_used += SCTP_DATA_SNDSIZE(chunk);
-	sk->wmem_queued += SCTP_DATA_SNDSIZE(chunk);
+	sk->sk_wmem_queued += SCTP_DATA_SNDSIZE(chunk);
 }
 
 /* If sndbuf has changed, wake up per association sndbuf waiters.  */
 static void __sctp_write_space(struct sctp_association *asoc)
 {
 	struct sock *sk = asoc->base.sk;
-	struct socket *sock = sk->socket;
+	struct socket *sock = sk->sk_socket;
 
 	if ((sctp_wspace(asoc) > 0) && sock) {
 		if (waitqueue_active(&asoc->wait))
 			wake_up_interruptible(&asoc->wait);
 
 		if (sctp_writeable(sk)) {
-			if (sk->sleep && waitqueue_active(sk->sleep))
-				wake_up_interruptible(sk->sleep);
+			if (sk->sk_sleep && waitqueue_active(sk->sk_sleep))
+				wake_up_interruptible(sk->sk_sleep);
 
 			/* Note that we try to include the Async I/O support
 			 * here by modeling from the current TCP/UDP code.
 			 * We have not tested with it yet.
 			 */
 			if (sock->fasync_list &&
-			    !(sk->shutdown & SEND_SHUTDOWN))
+			    !(sk->sk_shutdown & SEND_SHUTDOWN))
 				sock_wake_async(sock, 2, POLL_OUT);
 		}
 	}
@@ -3508,7 +3508,7 @@ static void sctp_wfree(struct sk_buff *skb)
 	asoc = chunk->asoc;
 	sk = asoc->base.sk;
 	asoc->sndbuf_used -= SCTP_DATA_SNDSIZE(chunk);
-	sk->wmem_queued -= SCTP_DATA_SNDSIZE(chunk);
+	sk->sk_wmem_queued -= SCTP_DATA_SNDSIZE(chunk);
 	__sctp_write_space(asoc);
 
 	sctp_association_put(asoc);
@@ -3535,7 +3535,7 @@ static int sctp_wait_for_sndbuf(struct sctp_association *asoc, long *timeo_p,
 					  TASK_INTERRUPTIBLE);
 		if (!*timeo_p)
 			goto do_nonblock;
-		if (sk->err || asoc->state >= SCTP_STATE_SHUTDOWN_PENDING ||
+		if (sk->sk_err || asoc->state >= SCTP_STATE_SHUTDOWN_PENDING ||
 		    asoc->base.dead)
 			goto do_error;
 		if (signal_pending(current))
@@ -3602,7 +3602,7 @@ static int sctp_writeable(struct sock *sk)
 {
 	int amt = 0;
 
-	amt = sk->sndbuf - sk->wmem_queued;
+	amt = sk->sk_sndbuf - sk->sk_wmem_queued;
 	if (amt < 0)
 		amt = 0;
 	return amt;
@@ -3629,9 +3629,9 @@ static int sctp_wait_for_connect(struct sctp_association *asoc, long *timeo_p)
 					  TASK_INTERRUPTIBLE);
 		if (!*timeo_p)
 			goto do_nonblock;
-		if (sk->shutdown & RCV_SHUTDOWN)
+		if (sk->sk_shutdown & RCV_SHUTDOWN)
 			break;
-		if (sk->err || asoc->state >= SCTP_STATE_SHUTDOWN_PENDING ||
+		if (sk->sk_err || asoc->state >= SCTP_STATE_SHUTDOWN_PENDING ||
 		    asoc->base.dead)
 			goto do_error;
 		if (signal_pending(current))
@@ -3681,7 +3681,8 @@ static int sctp_wait_for_accept(struct sock *sk, long timeo)
 
 
 	for (;;) {
-		prepare_to_wait_exclusive(sk->sleep, &wait, TASK_INTERRUPTIBLE);
+		prepare_to_wait_exclusive(sk->sk_sleep, &wait,
+					  TASK_INTERRUPTIBLE);
 
 		if (list_empty(&ep->asocs)) {
 			sctp_release_sock(sk);
@@ -3706,7 +3707,7 @@ static int sctp_wait_for_accept(struct sock *sk, long timeo)
 			break;
 	}
 
-	finish_wait(sk->sleep, &wait);
+	finish_wait(sk->sk_sleep, &wait);
 
 	return err;
 }
@@ -3716,7 +3717,7 @@ void sctp_wait_for_close(struct sock *sk, long timeout)
 	DEFINE_WAIT(wait);
 
 	do {
-		prepare_to_wait(sk->sleep, &wait, TASK_INTERRUPTIBLE);
+		prepare_to_wait(sk->sk_sleep, &wait, TASK_INTERRUPTIBLE);
 		if (list_empty(&sctp_sk(sk)->ep->asocs))
 			break;
 		sctp_release_sock(sk);
@@ -3724,7 +3725,7 @@ void sctp_wait_for_close(struct sock *sk, long timeout)
 		sctp_lock_sock(sk);
 	} while (!signal_pending(current) && timeout);
 
-	finish_wait(sk->sleep, &wait);
+	finish_wait(sk->sk_sleep, &wait);
 }
 
 /* Populate the fields of the newsk from the oldsk and migrate the assoc
@@ -3743,8 +3744,8 @@ static void sctp_sock_migrate(struct sock *oldsk, struct sock *newsk,
 	/* Migrate socket buffer sizes and all the socket level options to the
 	 * new socket.
 	 */
-	newsk->sndbuf = oldsk->sndbuf;
-	newsk->rcvbuf = oldsk->rcvbuf;
+	newsk->sk_sndbuf = oldsk->sk_sndbuf;
+	newsk->sk_rcvbuf = oldsk->sk_rcvbuf;
 	*newsp = *oldsp;
 
 	/* Restore the ep value that was overwritten with the above structure
@@ -3756,11 +3757,11 @@ static void sctp_sock_migrate(struct sock *oldsk, struct sock *newsk,
 	/* Move any messages in the old socket's receive queue that are for the
 	 * peeled off association to the new socket's receive queue.
 	 */
-	sctp_skb_for_each(skb, &oldsk->receive_queue, tmp) {
+	sctp_skb_for_each(skb, &oldsk->sk_receive_queue, tmp) {
 		event = sctp_skb2event(skb);
 		if (event->asoc == assoc) {
 			__skb_unlink(skb, skb->list);
-			__skb_queue_tail(&newsk->receive_queue, skb);
+			__skb_queue_tail(&newsk->sk_receive_queue, skb);
 		}
 	}
 
@@ -3780,7 +3781,7 @@ static void sctp_sock_migrate(struct sock *oldsk, struct sock *newsk,
 		if (assoc->ulpq.pd_mode) {
 			queue = &newsp->pd_lobby;
 		} else
-			queue = &newsk->receive_queue;
+			queue = &newsk->sk_receive_queue;
 
 		/* Walk through the pd_lobby, looking for skbs that
 		 * need moved to the new socket.
@@ -3814,9 +3815,9 @@ static void sctp_sock_migrate(struct sock *oldsk, struct sock *newsk,
 	 * is called, set RCV_SHUTDOWN flag.
 	 */
 	if (sctp_state(assoc, CLOSED) && sctp_style(newsk, TCP))
-		newsk->shutdown |= RCV_SHUTDOWN;
+		newsk->sk_shutdown |= RCV_SHUTDOWN;
 
-	newsk->state = SCTP_SS_ESTABLISHED;
+	newsk->sk_state = SCTP_SS_ESTABLISHED;
 }
 
 /* This proto struct describes the ULP interface for SCTP.  */

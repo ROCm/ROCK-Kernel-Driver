@@ -133,12 +133,12 @@ static void irda_disconnect_indication(void *instance, void *sap,
 	}
 
 	/* Prevent race conditions with irda_release() and irda_shutdown() */
-	if (!sock_flag(sk, SOCK_DEAD) && sk->state != TCP_CLOSE) {
-		sk->state     = TCP_CLOSE;
-		sk->err       = ECONNRESET;
-		sk->shutdown |= SEND_SHUTDOWN;
+	if (!sock_flag(sk, SOCK_DEAD) && sk->sk_state != TCP_CLOSE) {
+		sk->sk_state     = TCP_CLOSE;
+		sk->sk_err       = ECONNRESET;
+		sk->sk_shutdown |= SEND_SHUTDOWN;
 
-		sk->state_change(sk);
+		sk->sk_state_change(sk);
 		/* Uh-oh... Should use sock_orphan ? */
                 sock_set_flag(sk, SOCK_DEAD);
 
@@ -151,7 +151,7 @@ static void irda_disconnect_indication(void *instance, void *sap,
 		 * requests. Some apps forget to close sockets, or hang to it
 		 * a bit too long, so we may stay in this dead state long
 		 * enough to be noticed...
-		 * Note : all socket function do check sk->state, so we are
+		 * Note : all socket function do check sk->sk_state, so we are
 		 * safe...
 		 * Jean II
 		 */
@@ -163,8 +163,8 @@ static void irda_disconnect_indication(void *instance, void *sap,
 
 	/* Note : once we are there, there is not much you want to do
 	 * with the socket anymore, apart from closing it.
-	 * For example, bind() and connect() won't reset sk->err,
-	 * sk->shutdown and sk->flags to valid values...
+	 * For example, bind() and connect() won't reset sk->sk_err,
+	 * sk->sk_shutdown and sk->sk_flags to valid values...
 	 * Jean II
 	 */
 }
@@ -192,7 +192,7 @@ static void irda_connect_confirm(void *instance, void *sap,
 		return;
 
 	dev_kfree_skb(skb);
-	// Should be ??? skb_queue_tail(&sk->receive_queue, skb);
+	// Should be ??? skb_queue_tail(&sk->sk_receive_queue, skb);
 
 	/* How much header space do we need to reserve */
 	self->max_header_size = max_header_size;
@@ -201,7 +201,7 @@ static void irda_connect_confirm(void *instance, void *sap,
 	self->max_sdu_size_tx = max_sdu_size;
 
 	/* Find out what the largest chunk of data that we can transmit is */
-	switch (sk->type) {
+	switch (sk->sk_type) {
 	case SOCK_STREAM:
 		if (max_sdu_size != 0) {
 			ERROR("%s: max_sdu_size must be 0\n", __FUNCTION__);
@@ -226,8 +226,8 @@ static void irda_connect_confirm(void *instance, void *sap,
 	memcpy(&self->qos_tx, qos, sizeof(struct qos_info));
 
 	/* We are now connected! */
-	sk->state = TCP_ESTABLISHED;
-	sk->state_change(sk);
+	sk->sk_state = TCP_ESTABLISHED;
+	sk->sk_state_change(sk);
 }
 
 /*
@@ -258,7 +258,7 @@ static void irda_connect_indication(void *instance, void *sap,
 	self->max_sdu_size_tx = max_sdu_size;
 
 	/* Find out what the largest chunk of data that we can transmit is */
-	switch (sk->type) {
+	switch (sk->sk_type) {
 	case SOCK_STREAM:
 		if (max_sdu_size != 0) {
 			ERROR("%s: max_sdu_size must be 0\n", __FUNCTION__);
@@ -284,8 +284,8 @@ static void irda_connect_indication(void *instance, void *sap,
 
 	memcpy(&self->qos_tx, qos, sizeof(struct qos_info));
 
-	skb_queue_tail(&sk->receive_queue, skb);
-	sk->state_change(sk);
+	skb_queue_tail(&sk->sk_receive_queue, skb);
+	sk->sk_state_change(sk);
 }
 
 /*
@@ -344,7 +344,7 @@ static void irda_flow_indication(void *instance, void *sap, LOCAL_FLOW flow)
 		self->tx_flow = flow;
 		IRDA_DEBUG(1, "%s(), IrTTP wants us to start again\n",
 			   __FUNCTION__);
-		wake_up_interruptible(sk->sleep);
+		wake_up_interruptible(sk->sk_sleep);
 		break;
 	default:
 		IRDA_DEBUG(0, "%s(), Unknown flow command!\n", __FUNCTION__);
@@ -717,7 +717,7 @@ static int irda_getname(struct socket *sock, struct sockaddr *uaddr,
 	struct irda_sock *self = irda_sk(sk);
 
 	if (peer) {
-		if (sk->state != TCP_ESTABLISHED)
+		if (sk->sk_state != TCP_ESTABLISHED)
 			return -ENOTCONN;
 
 		saddr.sir_family = AF_IRDA;
@@ -751,13 +751,13 @@ static int irda_listen(struct socket *sock, int backlog)
 
 	IRDA_DEBUG(2, "%s()\n", __FUNCTION__);
 
-	if ((sk->type != SOCK_STREAM) && (sk->type != SOCK_SEQPACKET) &&
-	    (sk->type != SOCK_DGRAM))
+	if ((sk->sk_type != SOCK_STREAM) && (sk->sk_type != SOCK_SEQPACKET) &&
+	    (sk->sk_type != SOCK_DGRAM))
 		return -EOPNOTSUPP;
 
-	if (sk->state != TCP_LISTEN) {
-		sk->max_ack_backlog = backlog;
-		sk->state           = TCP_LISTEN;
+	if (sk->sk_state != TCP_LISTEN) {
+		sk->sk_max_ack_backlog = backlog;
+		sk->sk_state           = TCP_LISTEN;
 
 		return 0;
 	}
@@ -787,7 +787,8 @@ static int irda_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 
 #ifdef CONFIG_IRDA_ULTRA
 	/* Special care for Ultra sockets */
-	if ((sk->type == SOCK_DGRAM) && (sk->protocol == IRDAPROTO_ULTRA)) {
+	if ((sk->sk_type == SOCK_DGRAM) &&
+	    (sk->sk_protocol == IRDAPROTO_ULTRA)) {
 		self->pid = addr->sir_lsap_sel;
 		if (self->pid & 0x80) {
 			IRDA_DEBUG(0, "%s(), extension in PID not supp!\n", __FUNCTION__);
@@ -802,7 +803,7 @@ static int irda_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 
 		/* Pretend we are connected */
 		sock->state = SS_CONNECTED;
-		sk->state   = TCP_ESTABLISHED;
+		sk->sk_state   = TCP_ESTABLISHED;
 
 		return 0;
 	}
@@ -839,7 +840,7 @@ static int irda_accept(struct socket *sock, struct socket *newsock, int flags)
 
 	ASSERT(self != NULL, return -1;);
 
-	err = irda_create(newsock, sk->protocol);
+	err = irda_create(newsock, sk->sk_protocol);
 	if (err)
 		return err;
 
@@ -849,11 +850,11 @@ static int irda_accept(struct socket *sock, struct socket *newsock, int flags)
 	if ((sk = sock->sk) == NULL)
 		return -EINVAL;
 
-	if ((sk->type != SOCK_STREAM) && (sk->type != SOCK_SEQPACKET) &&
-	    (sk->type != SOCK_DGRAM))
+	if ((sk->sk_type != SOCK_STREAM) && (sk->sk_type != SOCK_SEQPACKET) &&
+	    (sk->sk_type != SOCK_DGRAM))
 		return -EOPNOTSUPP;
 
-	if (sk->state != TCP_LISTEN)
+	if (sk->sk_state != TCP_LISTEN)
 		return -EINVAL;
 
 	/*
@@ -869,7 +870,7 @@ static int irda_accept(struct socket *sock, struct socket *newsock, int flags)
 	 * calling us, the data is waiting for us ;-)
 	 * Jean II
 	 */
-	skb = skb_dequeue(&sk->receive_queue);
+	skb = skb_dequeue(&sk->sk_receive_queue);
 	if (skb == NULL) {
 		int ret = 0;
 		DECLARE_WAITQUEUE(waitq, current);
@@ -883,10 +884,10 @@ static int irda_accept(struct socket *sock, struct socket *newsock, int flags)
 		 * We don't us the macro because the condition has
 		 * side effects : we want to make sure that only one
 		 * skb get dequeued - Jean II */
-		add_wait_queue(sk->sleep, &waitq);
+		add_wait_queue(sk->sk_sleep, &waitq);
 		for (;;) {
 			set_current_state(TASK_INTERRUPTIBLE);
-			skb = skb_dequeue(&sk->receive_queue);
+			skb = skb_dequeue(&sk->sk_receive_queue);
 			if (skb != NULL)
 				break;
 			if (!signal_pending(current)) {
@@ -897,13 +898,13 @@ static int irda_accept(struct socket *sock, struct socket *newsock, int flags)
 			break;
 		}
 		current->state = TASK_RUNNING;
-		remove_wait_queue(sk->sleep, &waitq);
+		remove_wait_queue(sk->sk_sleep, &waitq);
 		if(ret)
 			return -ERESTARTSYS;
 	}
 
 	newsk = newsock->sk;
-	newsk->state = TCP_ESTABLISHED;
+	newsk->sk_state = TCP_ESTABLISHED;
 
 	new = irda_sk(newsk);
 	ASSERT(new != NULL, return -1;);
@@ -935,7 +936,7 @@ static int irda_accept(struct socket *sock, struct socket *newsock, int flags)
 	skb->sk = NULL;
 	skb->destructor = NULL;
 	kfree_skb(skb);
-	sk->ack_backlog--;
+	sk->sk_ack_backlog--;
 
 	newsock->state = SS_CONNECTED;
 
@@ -975,23 +976,23 @@ static int irda_connect(struct socket *sock, struct sockaddr *uaddr,
 	IRDA_DEBUG(2, "%s(%p)\n", __FUNCTION__, self);
 
 	/* Don't allow connect for Ultra sockets */
-	if ((sk->type == SOCK_DGRAM) && (sk->protocol == IRDAPROTO_ULTRA))
+	if ((sk->sk_type == SOCK_DGRAM) && (sk->sk_protocol == IRDAPROTO_ULTRA))
 		return -ESOCKTNOSUPPORT;
 
-	if (sk->state == TCP_ESTABLISHED && sock->state == SS_CONNECTING) {
+	if (sk->sk_state == TCP_ESTABLISHED && sock->state == SS_CONNECTING) {
 		sock->state = SS_CONNECTED;
 		return 0;   /* Connect completed during a ERESTARTSYS event */
 	}
 
-	if (sk->state == TCP_CLOSE && sock->state == SS_CONNECTING) {
+	if (sk->sk_state == TCP_CLOSE && sock->state == SS_CONNECTING) {
 		sock->state = SS_UNCONNECTED;
 		return -ECONNREFUSED;
 	}
 
-	if (sk->state == TCP_ESTABLISHED)
+	if (sk->sk_state == TCP_ESTABLISHED)
 		return -EISCONN;      /* No reconnect on a seqpacket socket */
 
-	sk->state   = TCP_CLOSE;
+	sk->sk_state   = TCP_CLOSE;
 	sock->state = SS_UNCONNECTED;
 
 	if (addr_len != sizeof(struct sockaddr_irda))
@@ -1024,7 +1025,7 @@ static int irda_connect(struct socket *sock, struct sockaddr *uaddr,
 
 	/* Move to connecting socket, start sending Connect Requests */
 	sock->state = SS_CONNECTING;
-	sk->state   = TCP_SYN_SENT;
+	sk->sk_state   = TCP_SYN_SENT;
 
 	/* Connect to remote device */
 	err = irttp_connect_request(self->tsap, self->dtsap_sel,
@@ -1036,13 +1037,14 @@ static int irda_connect(struct socket *sock, struct sockaddr *uaddr,
 	}
 
 	/* Now the loop */
-	if (sk->state != TCP_ESTABLISHED && (flags & O_NONBLOCK))
+	if (sk->sk_state != TCP_ESTABLISHED && (flags & O_NONBLOCK))
 		return -EINPROGRESS;
 
-	if (wait_event_interruptible(*(sk->sleep), (sk->state!=TCP_SYN_SENT)))
+	if (wait_event_interruptible(*(sk->sk_sleep),
+				     (sk->sk_state != TCP_SYN_SENT)))
 		return -ERESTARTSYS;
 
-	if (sk->state != TCP_ESTABLISHED) {
+	if (sk->sk_state != TCP_ESTABLISHED) {
 		sock->state = SS_UNCONNECTED;
 		return sock_error(sk);	/* Always set at this point */
 	}
@@ -1095,9 +1097,9 @@ static int irda_create(struct socket *sock, int protocol)
 	init_waitqueue_head(&self->query_wait);
 
 	/* Initialise networking socket struct */
-	sock_init_data(sock, sk);	/* Note : set sk->refcnt to 1 */
-	sk->family = PF_IRDA;
-	sk->protocol = protocol;
+	sock_init_data(sock, sk);	/* Note : set sk->sk_refcnt to 1 */
+	sk->sk_family = PF_IRDA;
+	sk->sk_protocol = protocol;
 	/* Link networking socket and IrDA socket structs together */
 	self->sk = sk;
 
@@ -1194,9 +1196,9 @@ static int irda_release(struct socket *sock)
         if (sk == NULL)
 		return 0;
 
-	sk->state       = TCP_CLOSE;
-	sk->shutdown   |= SEND_SHUTDOWN;
-	sk->state_change(sk);
+	sk->sk_state       = TCP_CLOSE;
+	sk->sk_shutdown   |= SEND_SHUTDOWN;
+	sk->sk_state_change(sk);
 
 	/* Destroy IrDA socket */
 	irda_destroy_socket(irda_sk(sk));
@@ -1207,10 +1209,10 @@ static int irda_release(struct socket *sock)
 	sock->sk   = NULL;
 
 	/* Purge queues (see sock_init_data()) */
-	skb_queue_purge(&sk->receive_queue);
+	skb_queue_purge(&sk->sk_receive_queue);
 
 	/* Destroy networking socket if we are the last reference on it,
-	 * i.e. if(sk->refcnt == 0) -> sk_free(sk) */
+	 * i.e. if(sk->sk_refcnt == 0) -> sk_free(sk) */
 	sock_put(sk);
 
 	/* Notes on socket locking and deallocation... - Jean II
@@ -1264,12 +1266,12 @@ static int irda_sendmsg(struct kiocb *iocb, struct socket *sock,
 	if (msg->msg_flags & ~(MSG_DONTWAIT | MSG_EOR))
 		return -EINVAL;
 
-	if (sk->shutdown & SEND_SHUTDOWN) {
+	if (sk->sk_shutdown & SEND_SHUTDOWN) {
 		send_sig(SIGPIPE, current, 0);
 		return -EPIPE;
 	}
 
-	if (sk->state != TCP_ESTABLISHED)
+	if (sk->sk_state != TCP_ESTABLISHED)
 		return -ENOTCONN;
 
 	self = irda_sk(sk);
@@ -1277,12 +1279,12 @@ static int irda_sendmsg(struct kiocb *iocb, struct socket *sock,
 
 	/* Check if IrTTP is wants us to slow down */
 
-	if (wait_event_interruptible(*(sk->sleep),
-	    (self->tx_flow != FLOW_STOP  ||  sk->state != TCP_ESTABLISHED)))
+	if (wait_event_interruptible(*(sk->sk_sleep),
+	    (self->tx_flow != FLOW_STOP  ||  sk->sk_state != TCP_ESTABLISHED)))
 		return -ERESTARTSYS;
 
 	/* Check if we are still connected */
-	if (sk->state != TCP_ESTABLISHED)
+	if (sk->sk_state != TCP_ESTABLISHED)
 		return -ENOTCONN;
 
 	/* Check that we don't send out to big frames */
@@ -1358,7 +1360,7 @@ static int irda_recvmsg_dgram(struct kiocb *iocb, struct socket *sock,
 	 *  empty
 	 */
 	if (self->rx_flow == FLOW_STOP) {
-		if ((atomic_read(&sk->rmem_alloc) << 2) <= sk->rcvbuf) {
+		if ((atomic_read(&sk->sk_rmem_alloc) << 2) <= sk->sk_rcvbuf) {
 			IRDA_DEBUG(2, "%s(), Starting IrTTP\n", __FUNCTION__);
 			self->rx_flow = FLOW_START;
 			irttp_flow_request(self->tsap, FLOW_START);
@@ -1398,9 +1400,8 @@ static int irda_recvmsg_stream(struct kiocb *iocb, struct socket *sock,
 
 	do {
 		int chunk;
-		struct sk_buff *skb;
+		struct sk_buff *skb = skb_dequeue(&sk->sk_receive_queue);
 
-		skb=skb_dequeue(&sk->receive_queue);
 		if (skb==NULL) {
 			int ret = 0;
 
@@ -1411,32 +1412,32 @@ static int irda_recvmsg_stream(struct kiocb *iocb, struct socket *sock,
 			 * wait_event_interruptible() macro.
 			 * We don't us the macro because the test condition
 			 * is messy. - Jean II */
-			set_bit(SOCK_ASYNC_WAITDATA, &sk->socket->flags);
-			add_wait_queue(sk->sleep, &waitq);
+			set_bit(SOCK_ASYNC_WAITDATA, &sk->sk_socket->flags);
+			add_wait_queue(sk->sk_sleep, &waitq);
 			set_current_state(TASK_INTERRUPTIBLE);
 
 			/*
 			 *	POSIX 1003.1g mandates this order.
 			 */
-			if (sk->err)
+			if (sk->sk_err)
 				ret = sock_error(sk);
-			else if (sk->shutdown & RCV_SHUTDOWN)
+			else if (sk->sk_shutdown & RCV_SHUTDOWN)
 				;
 			else if (noblock)
 				ret = -EAGAIN;
 			else if (signal_pending(current))
 				ret = -ERESTARTSYS;
-			else if (skb_peek(&sk->receive_queue) == NULL)
+			else if (skb_peek(&sk->sk_receive_queue) == NULL)
 				/* Wait process until data arrives */
 				schedule();
 
 			current->state = TASK_RUNNING;
-			remove_wait_queue(sk->sleep, &waitq);
-			clear_bit(SOCK_ASYNC_WAITDATA, &sk->socket->flags);
+			remove_wait_queue(sk->sk_sleep, &waitq);
+			clear_bit(SOCK_ASYNC_WAITDATA, &sk->sk_socket->flags);
 
 			if(ret)
 				return(ret);
-			if (sk->shutdown & RCV_SHUTDOWN)
+			if (sk->sk_shutdown & RCV_SHUTDOWN)
 				break;
 
 			continue;
@@ -1444,7 +1445,7 @@ static int irda_recvmsg_stream(struct kiocb *iocb, struct socket *sock,
 
 		chunk = min_t(unsigned int, skb->len, size);
 		if (memcpy_toiovec(msg->msg_iov, skb->data, chunk)) {
-			skb_queue_head(&sk->receive_queue, skb);
+			skb_queue_head(&sk->sk_receive_queue, skb);
 			if (copied == 0)
 				copied = -EFAULT;
 			break;
@@ -1460,7 +1461,7 @@ static int irda_recvmsg_stream(struct kiocb *iocb, struct socket *sock,
 			if (skb->len) {
 				IRDA_DEBUG(1, "%s(), back on q!\n",
 					   __FUNCTION__);
-				skb_queue_head(&sk->receive_queue, skb);
+				skb_queue_head(&sk->sk_receive_queue, skb);
 				break;
 			}
 
@@ -1469,7 +1470,7 @@ static int irda_recvmsg_stream(struct kiocb *iocb, struct socket *sock,
 			IRDA_DEBUG(0, "%s() questionable!?\n", __FUNCTION__);
 
 			/* put message back and return */
-			skb_queue_head(&sk->receive_queue, skb);
+			skb_queue_head(&sk->sk_receive_queue, skb);
 			break;
 		}
 	} while (size);
@@ -1481,7 +1482,7 @@ static int irda_recvmsg_stream(struct kiocb *iocb, struct socket *sock,
 	 *  empty
 	 */
 	if (self->rx_flow == FLOW_STOP) {
-		if ((atomic_read(&sk->rmem_alloc) << 2) <= sk->rcvbuf) {
+		if ((atomic_read(&sk->sk_rmem_alloc) << 2) <= sk->sk_rcvbuf) {
 			IRDA_DEBUG(2, "%s(), Starting IrTTP\n", __FUNCTION__);
 			self->rx_flow = FLOW_START;
 			irttp_flow_request(self->tsap, FLOW_START);
@@ -1512,12 +1513,12 @@ static int irda_sendmsg_dgram(struct kiocb *iocb, struct socket *sock,
 	if (msg->msg_flags & ~MSG_DONTWAIT)
 		return -EINVAL;
 
-	if (sk->shutdown & SEND_SHUTDOWN) {
+	if (sk->sk_shutdown & SEND_SHUTDOWN) {
 		send_sig(SIGPIPE, current, 0);
 		return -EPIPE;
 	}
 
-	if (sk->state != TCP_ESTABLISHED)
+	if (sk->sk_state != TCP_ESTABLISHED)
 		return -ENOTCONN;
 
 	self = irda_sk(sk);
@@ -1578,7 +1579,7 @@ static int irda_sendmsg_ultra(struct kiocb *iocb, struct socket *sock,
 	if (msg->msg_flags & ~MSG_DONTWAIT)
 		return -EINVAL;
 
-	if (sk->shutdown & SEND_SHUTDOWN) {
+	if (sk->sk_shutdown & SEND_SHUTDOWN) {
 		send_sig(SIGPIPE, current, 0);
 		return -EPIPE;
 	}
@@ -1629,9 +1630,9 @@ static int irda_shutdown(struct socket *sock, int how)
 
 	IRDA_DEBUG(1, "%s(%p)\n", __FUNCTION__, self);
 
-	sk->state       = TCP_CLOSE;
-	sk->shutdown   |= SEND_SHUTDOWN;
-	sk->state_change(sk);
+	sk->sk_state       = TCP_CLOSE;
+	sk->sk_shutdown   |= SEND_SHUTDOWN;
+	sk->sk_state_change(sk);
 
 	if (self->iriap) {
 		iriap_close(self->iriap);
@@ -1664,32 +1665,32 @@ static unsigned int irda_poll(struct file * file, struct socket *sock,
 
 	IRDA_DEBUG(4, "%s()\n", __FUNCTION__);
 
-	poll_wait(file, sk->sleep, wait);
+	poll_wait(file, sk->sk_sleep, wait);
 	mask = 0;
 
 	/* Exceptional events? */
-	if (sk->err)
+	if (sk->sk_err)
 		mask |= POLLERR;
-	if (sk->shutdown & RCV_SHUTDOWN) {
+	if (sk->sk_shutdown & RCV_SHUTDOWN) {
 		IRDA_DEBUG(0, "%s(), POLLHUP\n", __FUNCTION__);
 		mask |= POLLHUP;
 	}
 
 	/* Readable? */
-	if (!skb_queue_empty(&sk->receive_queue)) {
+	if (!skb_queue_empty(&sk->sk_receive_queue)) {
 		IRDA_DEBUG(4, "Socket is readable\n");
 		mask |= POLLIN | POLLRDNORM;
 	}
 
 	/* Connection-based need to check for termination and startup */
-	switch (sk->type) {
+	switch (sk->sk_type) {
 	case SOCK_STREAM:
-		if (sk->state == TCP_CLOSE) {
+		if (sk->sk_state == TCP_CLOSE) {
 			IRDA_DEBUG(0, "%s(), POLLHUP\n", __FUNCTION__);
 			mask |= POLLHUP;
 		}
 
-		if (sk->state == TCP_ESTABLISHED) {
+		if (sk->sk_state == TCP_ESTABLISHED) {
 			if ((self->tx_flow == FLOW_START) &&
 			    sock_writeable(sk))
 			{
@@ -1726,7 +1727,7 @@ static int irda_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 	switch (cmd) {
 	case TIOCOUTQ: {
 		long amount;
-		amount = sk->sndbuf - atomic_read(&sk->wmem_alloc);
+		amount = sk->sk_sndbuf - atomic_read(&sk->sk_wmem_alloc);
 		if (amount < 0)
 			amount = 0;
 		if (put_user(amount, (unsigned int *)arg))
@@ -1738,7 +1739,7 @@ static int irda_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		struct sk_buff *skb;
 		long amount = 0L;
 		/* These two are safe on a single CPU system as only user tasks fiddle here */
-		if ((skb = skb_peek(&sk->receive_queue)) != NULL)
+		if ((skb = skb_peek(&sk->sk_receive_queue)) != NULL)
 			amount = skb->len;
 		if (put_user(amount, (unsigned int *)arg))
 			return -EFAULT;
@@ -1747,9 +1748,9 @@ static int irda_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 
 	case SIOCGSTAMP:
 		if (sk != NULL) {
-			if (sk->stamp.tv_sec == 0)
+			if (!sk->sk_stamp.tv_sec)
 				return -ENOENT;
-			if (copy_to_user((void *)arg, &sk->stamp,
+			if (copy_to_user((void *)arg, &sk->sk_stamp,
 					 sizeof(struct timeval)))
 				return -EFAULT;
 			return 0;
@@ -1973,7 +1974,7 @@ static int irda_setsockopt(struct socket *sock, int level, int optname,
 			return -EFAULT;
 
 		/* Only possible for a seqpacket service (TTP with SAR) */
-		if (sk->type != SOCK_SEQPACKET) {
+		if (sk->sk_type != SOCK_SEQPACKET) {
 			IRDA_DEBUG(2, "%s(), setting max_sdu_size = %d\n",
 				   __FUNCTION__, opt);
 			self->max_sdu_size_rx = opt;

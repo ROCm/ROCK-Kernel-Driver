@@ -48,7 +48,7 @@ static __inline__
 void update_send_head(struct sock *sk, struct tcp_opt *tp, struct sk_buff *skb)
 {
 	tp->send_head = skb->next;
-	if (tp->send_head == (struct sk_buff *) &sk->write_queue)
+	if (tp->send_head == (struct sk_buff *)&sk->sk_write_queue)
 		tp->send_head = NULL;
 	tp->snd_nxt = TCP_SKB_CB(skb)->end_seq;
 	if (tp->packets_out++ == 0)
@@ -309,13 +309,13 @@ void tcp_send_skb(struct sock *sk, struct sk_buff *skb, int force_queue, unsigne
 
 	/* Advance write_seq and place onto the write_queue. */
 	tp->write_seq = TCP_SKB_CB(skb)->end_seq;
-	__skb_queue_tail(&sk->write_queue, skb);
+	__skb_queue_tail(&sk->sk_write_queue, skb);
 	tcp_charge_skb(sk, skb);
 
 	if (!force_queue && tp->send_head == NULL && tcp_snd_test(tp, skb, cur_mss, tp->nonagle)) {
 		/* Send it out now. */
 		TCP_SKB_CB(skb)->when = tcp_time_stamp;
-		if (tcp_transmit_skb(sk, skb_clone(skb, sk->allocation)) == 0) {
+		if (!tcp_transmit_skb(sk, skb_clone(skb, sk->sk_allocation))) {
 			tp->snd_nxt = TCP_SKB_CB(skb)->end_seq;
 			tcp_minshall_update(tp, cur_mss, skb);
 			if (tp->packets_out++ == 0)
@@ -339,7 +339,7 @@ void tcp_push_one(struct sock *sk, unsigned cur_mss)
 	if (tcp_snd_test(tp, skb, cur_mss, TCP_NAGLE_PUSH)) {
 		/* Send it out now. */
 		TCP_SKB_CB(skb)->when = tcp_time_stamp;
-		if (tcp_transmit_skb(sk, skb_clone(skb, sk->allocation)) == 0) {
+		if (!tcp_transmit_skb(sk, skb_clone(skb, sk->sk_allocation))) {
 			tp->send_head = NULL;
 			tp->snd_nxt = TCP_SKB_CB(skb)->end_seq;
 			if (tp->packets_out++ == 0)
@@ -587,7 +587,7 @@ int tcp_sync_mss(struct sock *sk, u32 pmtu)
 	tp->pmtu_cookie = pmtu;
 	tp->mss_cache = tp->mss_cache_std = mss_now;
 
-	if (sk->route_caps&NETIF_F_TSO) {
+	if (sk->sk_route_caps & NETIF_F_TSO) {
 		int large_mss;
 
 		large_mss = 65535 - tp->af_specific->net_header_len -
@@ -620,7 +620,7 @@ int tcp_write_xmit(struct sock *sk, int nonagle)
 	 * In time closedown will finish, we empty the write queue and all
 	 * will be happy.
 	 */
-	if(sk->state != TCP_CLOSE) {
+	if (sk->sk_state != TCP_CLOSE) {
 		struct sk_buff *skb;
 		int sent_pkts = 0;
 
@@ -886,16 +886,17 @@ int tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb)
 	/* Do not sent more than we queued. 1/4 is reserved for possible
 	 * copying overhead: frgagmentation, tunneling, mangling etc.
 	 */
-	if (atomic_read(&sk->wmem_alloc) > min(sk->wmem_queued+(sk->wmem_queued>>2),sk->sndbuf))
+	if (atomic_read(&sk->sk_wmem_alloc) >
+	    min(sk->sk_wmem_queued + (sk->sk_wmem_queued >> 2), sk->sk_sndbuf))
 		return -EAGAIN;
 
 	if (before(TCP_SKB_CB(skb)->seq, tp->snd_una)) {
 		if (before(TCP_SKB_CB(skb)->end_seq, tp->snd_una))
 			BUG();
 
-		if (sk->route_caps&NETIF_F_TSO) {
-			sk->route_caps &= ~NETIF_F_TSO;
-			sk->no_largesend = 1;
+		if (sk->sk_route_caps & NETIF_F_TSO) {
+			sk->sk_route_caps &= ~NETIF_F_TSO;
+			sk->sk_no_largesend = 1;
 			tp->mss_cache = tp->mss_cache_std;
 		}
 
@@ -924,7 +925,7 @@ int tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb)
 	if(!(TCP_SKB_CB(skb)->flags & TCPCB_FLAG_SYN) &&
 	   (skb->len < (cur_mss >> 1)) &&
 	   (skb->next != tp->send_head) &&
-	   (skb->next != (struct sk_buff *)&sk->write_queue) &&
+	   (skb->next != (struct sk_buff *)&sk->sk_write_queue) &&
 	   (skb_shinfo(skb)->nr_frags == 0 && skb_shinfo(skb->next)->nr_frags == 0) &&
 	   (sysctl_tcp_retrans_collapse != 0))
 		tcp_retrans_try_collapse(sk, skb, cur_mss);
@@ -1013,7 +1014,8 @@ void tcp_xmit_retransmit_queue(struct sock *sk)
 					else
 						NET_INC_STATS_BH(TCPSlowStartRetrans);
 
-					if (skb == skb_peek(&sk->write_queue))
+					if (skb ==
+					    skb_peek(&sk->sk_write_queue))
 						tcp_reset_xmit_timer(sk, TCP_TIME_RETRANS, tp->rto);
 				}
 
@@ -1059,7 +1061,7 @@ void tcp_xmit_retransmit_queue(struct sock *sk)
 		if(tcp_retransmit_skb(sk, skb))
 			break;
 
-		if (skb == skb_peek(&sk->write_queue))
+		if (skb == skb_peek(&sk->sk_write_queue))
 			tcp_reset_xmit_timer(sk, TCP_TIME_RETRANS, tp->rto);
 
 		NET_INC_STATS_BH(TCPForwardRetrans);
@@ -1073,7 +1075,7 @@ void tcp_xmit_retransmit_queue(struct sock *sk)
 void tcp_send_fin(struct sock *sk)
 {
 	struct tcp_opt *tp = tcp_sk(sk);	
-	struct sk_buff *skb = skb_peek_tail(&sk->write_queue);
+	struct sk_buff *skb = skb_peek_tail(&sk->sk_write_queue);
 	unsigned int mss_now;
 	
 	/* Optimization, tack on the FIN if we have a queue of
@@ -1149,7 +1151,7 @@ int tcp_send_synack(struct sock *sk)
 {
 	struct sk_buff* skb;
 
-	skb = skb_peek(&sk->write_queue);
+	skb = skb_peek(&sk->sk_write_queue);
 	if (skb == NULL || !(TCP_SKB_CB(skb)->flags&TCPCB_FLAG_SYN)) {
 		printk(KERN_DEBUG "tcp_send_synack: wrong queue state\n");
 		return -EFAULT;
@@ -1159,8 +1161,8 @@ int tcp_send_synack(struct sock *sk)
 			struct sk_buff *nskb = skb_copy(skb, GFP_ATOMIC);
 			if (nskb == NULL)
 				return -ENOMEM;
-			__skb_unlink(skb, &sk->write_queue);
-			__skb_queue_head(&sk->write_queue, nskb);
+			__skb_unlink(skb, &sk->sk_write_queue);
+			__skb_queue_head(&sk->sk_write_queue, nskb);
 			tcp_free_skb(sk, skb);
 			tcp_charge_skb(sk, nskb);
 			skb = nskb;
@@ -1275,7 +1277,7 @@ static inline void tcp_connect_init(struct sock *sk)
 
 	tp->rcv_ssthresh = tp->rcv_wnd;
 
-	sk->err = 0;
+	sk->sk_err = 0;
 	sock_reset_flag(sk, SOCK_DONE);
 	tp->snd_wnd = 0;
 	tcp_init_wl(tp, tp->write_seq, 0);
@@ -1300,7 +1302,7 @@ int tcp_connect(struct sock *sk)
 
 	tcp_connect_init(sk);
 
-	buff = alloc_skb(MAX_TCP_HEADER + 15, sk->allocation);
+	buff = alloc_skb(MAX_TCP_HEADER + 15, sk->sk_allocation);
 	if (unlikely(buff == NULL))
 		return -ENOBUFS;
 
@@ -1319,7 +1321,7 @@ int tcp_connect(struct sock *sk)
 	/* Send it off. */
 	TCP_SKB_CB(buff)->when = tcp_time_stamp;
 	tp->retrans_stamp = TCP_SKB_CB(buff)->when;
-	__skb_queue_tail(&sk->write_queue, buff);
+	__skb_queue_tail(&sk->sk_write_queue, buff);
 	tcp_charge_skb(sk, buff);
 	tp->packets_out++;
 	tcp_transmit_skb(sk, skb_clone(buff, GFP_KERNEL));
@@ -1388,7 +1390,7 @@ void tcp_send_delayed_ack(struct sock *sk)
 void tcp_send_ack(struct sock *sk)
 {
 	/* If we have been reset, we may not send again. */
-	if(sk->state != TCP_CLOSE) {
+	if (sk->sk_state != TCP_CLOSE) {
 		struct tcp_opt *tp = tcp_sk(sk);
 		struct sk_buff *buff;
 
@@ -1456,7 +1458,7 @@ static int tcp_xmit_probe_skb(struct sock *sk, int urgent)
 
 int tcp_write_wakeup(struct sock *sk)
 {
-	if (sk->state != TCP_CLOSE) {
+	if (sk->sk_state != TCP_CLOSE) {
 		struct tcp_opt *tp = tcp_sk(sk);
 		struct sk_buff *skb;
 
@@ -1481,9 +1483,9 @@ int tcp_write_wakeup(struct sock *sk)
 					return -1;
 				/* SWS override triggered forced fragmentation.
 				 * Disable TSO, the connection is too sick. */
-				if (sk->route_caps&NETIF_F_TSO) {
-					sk->no_largesend = 1;
-					sk->route_caps &= ~NETIF_F_TSO;
+				if (sk->sk_route_caps & NETIF_F_TSO) {
+					sk->sk_no_largesend = 1;
+					sk->sk_route_caps &= ~NETIF_F_TSO;
 					tp->mss_cache = tp->mss_cache_std;
 				}
 			}

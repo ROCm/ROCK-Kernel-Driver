@@ -31,10 +31,10 @@ static __inline__ void
 TCP_ECN_send_syn(struct sock *sk, struct tcp_opt *tp, struct sk_buff *skb)
 {
 	tp->ecn_flags = 0;
-	if (sysctl_tcp_ecn && !(sk->route_caps&NETIF_F_TSO)) {
+	if (sysctl_tcp_ecn && !(sk->sk_route_caps & NETIF_F_TSO)) {
 		TCP_SKB_CB(skb)->flags |= TCPCB_FLAG_ECE|TCPCB_FLAG_CWR;
 		tp->ecn_flags = TCP_ECN_OK;
-		sk->no_largesend = 1;
+		sk->sk_no_largesend = 1;
 	}
 }
 
