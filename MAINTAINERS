@@ -1571,6 +1571,13 @@ W:	http://www.m17n.org/linux-sh/
 W:	http://www.rr.iij4u.or.jp/~kkojima/linux-sh4.html
 S:	Maintained
 
+SUN3/3X
+P:	Sam Creasey
+M:	sammy@sammy.net
+L:	sun3-list@redhat.com
+W:	http://sammy.net/sun3/
+S:	Maintained
+
 SVGA HANDLING
 P:	Martin Mares
 M:	mj@ucw.cz

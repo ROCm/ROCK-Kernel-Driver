@@ -189,7 +189,8 @@ config SUN3X
 	help
 	  This option enables support for the Sun 3x series of workstations.
 	  Be warned that this support is very experimental. You will also want
-	  to say Y to 68020 support and N to the other processors below.
+	  to say Y to 68030 support and N to the other processors below.
+	  Note that Sun 3x kernels are not compatible with Sun 3 hardware.
 	  General Linux information on the Sun 3x series (now discontinued)
 	  is at <http://www.angelfire.com/ca2/tech68k/sun3.html>.
 
@@ -198,13 +199,14 @@ config SUN3X
 config SUN3
 	bool "Sun3 support"
 	help
-	  This option enables support for the Sun 3 series of workstations.
-	  Currently, only the Sun 3/80 is supported within the Sun 3x family.
-	  You will also want to enable 68030 support.  General Linux
-	  information on the Sun 3x series (now discontinued) is at
-	  <http://www.angelfire.com/ca2/tech68k/sun3.html>.
+	  This option enables support for the Sun 3 series of workstations
+	  (3/50, 3/60, 3/1xx, 3/2xx systems). Enabling this option requires 
+	  that all other hardware types must be disabled, as Sun 3 kernels 
+	  are incompatible with all other m68k targets (including Sun 3x!).  
+	  Also, you will want to say Y to 68020 support and N to the other 
+	  processors below.
 
-	  If you don't want to compile a kernel for a Sun 3, say N.
+	  If you don't want to compile a kernel exclusively for a Sun 3, say N.
 
 config Q40
 	bool "Q40/Q60 support"
