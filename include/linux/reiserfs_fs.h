@@ -2023,6 +2023,7 @@ int reiserfs_global_version_in_proc( char *buffer, char **start, off_t offset,
 /* dir.c */
 extern struct inode_operations reiserfs_dir_inode_operations;
 extern struct inode_operations reiserfs_symlink_inode_operations;
+extern struct inode_operations reiserfs_special_inode_operations;
 extern struct file_operations reiserfs_dir_operations;
 
 /* tail_conversion.c */
