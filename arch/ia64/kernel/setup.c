@@ -289,7 +289,7 @@ setup_serial_legacy (void)
  *
  * Returns non-zero if a console couldn't be setup.
  */
-static int __init
+static inline int __init
 early_console_setup (void)
 {
 #ifdef CONFIG_SERIAL_SGI_L1_CONSOLE
@@ -320,9 +320,11 @@ setup_arch (char **cmdline_p)
 	machvec_init(acpi_get_sysname());
 #endif
 
+#ifdef CONFIG_SMP
 	/* If we register an early console, allow CPU 0 to printk */
 	if (!early_console_setup())
 		cpu_set(smp_processor_id(), cpu_online_map);
+#endif
 
 #ifdef CONFIG_ACPI_BOOT
 	/* Initialize the ACPI boot-time table parser */
