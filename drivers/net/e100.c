@@ -513,7 +513,7 @@ struct nic {
 
 	spinlock_t cb_lock			____cacheline_aligned;
 	spinlock_t cmd_lock;
-	struct csr *csr;
+	struct csr __iomem *csr;
 	enum scb_cmd_lo cuc_cmd;
 	unsigned int cbs_avail;
 	struct cb *cbs;

@@ -303,7 +303,7 @@ int SkGeInitPCI(SK_AC *pAC)
 	/*
 	 * Remap the regs into kernel space.
 	 */
-	pAC->IoBase = (char*)ioremap_nocache(dev->mem_start, 0x4000);
+	pAC->IoBase = ioremap_nocache(dev->mem_start, 0x4000);
 
 	if (!pAC->IoBase){
 		retval = 3;
