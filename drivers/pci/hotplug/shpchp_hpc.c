@@ -1539,7 +1539,7 @@ int shpc_init(struct controller * ctrl,
 		slot_reg = readl(php_ctlr->creg + SLOT1 + 4*hp_slot );
 		dbg("%s: Default Logical Slot Register %d value %x\n", __FUNCTION__,
 			hp_slot, slot_reg);
-		tempdword = 0xffffffff;  
+		tempdword = 0xffff3fff;  
 		writel(tempdword, php_ctlr->creg + SLOT1 + (4*hp_slot));
 	}
 	
@@ -1592,7 +1592,7 @@ int shpc_init(struct controller * ctrl,
 		slot_reg = readl(php_ctlr->creg + SLOT1 + 4*hp_slot );
 		dbg("%s: Default Logical Slot Register %d value %x\n", __FUNCTION__,
 			hp_slot, slot_reg);
-		tempdword = 0xe01fffff;  
+		tempdword = 0xe01f3fff;  
 		writel(tempdword, php_ctlr->creg + SLOT1 + (4*hp_slot));
 	}
 	if (!shpchp_poll_mode) {
