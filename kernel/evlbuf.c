@@ -234,7 +234,11 @@ evl_mk_rechdr(struct kern_log_entry *rec_hdr,
 	rec_hdr->log_uid		=  current->uid;
 	rec_hdr->log_gid		=  current->gid;
 	rec_hdr->log_pid		=  current->pid;
-	rec_hdr->log_pgrp		=  process_group(current);
+	/* current->signal->xxx pointers may be bad. */
+	if (unlikely(current->flags & PF_EXITING))
+		rec_hdr->log_pgrp 	=  0;
+	else
+		rec_hdr->log_pgrp 	=  process_group(current);
 	rec_hdr->log_flags		=  (__u32) flags;
 	rec_hdr->log_processor		=  (__s32) smp_processor_id();
 
