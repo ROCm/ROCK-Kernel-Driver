@@ -200,5 +200,17 @@ config HOTPLUG_PCI_RPA
 
 	  When in doubt, say N.
 
+config HOTPLUG_PCI_RPA_DLPAR
+	tristate "RPA Dynamic Logical Partitioning for I/O slots"
+	depends on HOTPLUG_PCI_RPA
+	help
+	  Say Y here if your system supports Dynamic Logical Partitioning
+	  for I/O slots.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called rpadlpar_io.
+ 
+ 	  When in doubt, say N.
+
 endmenu
 

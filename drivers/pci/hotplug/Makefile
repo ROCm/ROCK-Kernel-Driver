@@ -12,6 +12,7 @@ obj-$(CONFIG_HOTPLUG_PCI_CPCI_GENERIC)	+= cpcihp_generic.o
 obj-$(CONFIG_HOTPLUG_PCI_PCIE)		+= pciehp.o
 obj-$(CONFIG_HOTPLUG_PCI_SHPC)		+= shpchp.o
 obj-$(CONFIG_HOTPLUG_PCI_RPA)		+= rpaphp.o
+obj-$(CONFIG_HOTPLUG_PCI_RPA_DLPAR)	+= rpadlpar_io.o
 
 pci_hotplug-objs	:=	pci_hotplug_core.o
 
@@ -38,6 +39,9 @@ acpiphp-objs		:=	acpiphp_core.o	\
 
 rpaphp-objs		:=	rpaphp_core.o	\
 				rpaphp_pci.o	
+
+rpadlpar_io-objs	:=	rpadlpar_core.o \
+				rpadlpar_sysfs.o
 
 pciehp-objs		:=	pciehp_core.o	\
 				pciehp_ctrl.o	\
