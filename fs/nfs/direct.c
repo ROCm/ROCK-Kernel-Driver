@@ -252,9 +252,7 @@ nfs_direct_write_seg(struct inode *inode, struct file *file,
 {
 	const unsigned int wsize = NFS_SERVER(inode)->wsize;
 	size_t request;
-	int need_commit;
-	int tot_bytes;
-	int curpage;
+	int curpage, need_commit, result, tot_bytes;
 	struct nfs_writeverf first_verf;
 	struct nfs_write_data	wdata = {
 		.inode		= inode,
@@ -281,8 +279,6 @@ retry:
 	wdata.args.pgbase = user_addr & ~PAGE_MASK;
 	wdata.args.offset = file_offset;
         do {
-		int result;
-
 		wdata.args.count = request;
                 if (wdata.args.count > wsize)
                         wdata.args.count = wsize;
@@ -299,7 +295,7 @@ retry:
 		if (result <= 0) {
 			if (tot_bytes > 0)
 				break;
-			return result;
+			goto out;
 		}
 
 		if (tot_bytes == 0)
@@ -324,8 +320,6 @@ retry:
 	 * Commit data written so far, even in the event of an error
 	 */
 	if (need_commit) {
-		int result;
-
 		wdata.args.count = tot_bytes;
 		wdata.args.offset = file_offset;
 
@@ -338,9 +332,12 @@ retry:
 						VERF_SIZE) != 0)
 			goto sync_retry;
 	}
+	result = tot_bytes;
+
+out:
 	nfs_end_data_update_defer(inode);
 
-	return tot_bytes;
+	return result;
 
 sync_retry:
 	wdata.args.stable = NFS_FILE_SYNC;
