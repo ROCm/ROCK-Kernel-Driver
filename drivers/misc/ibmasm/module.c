@@ -107,7 +107,7 @@ static int __devinit ibmasm_init_one(struct pci_dev *pdev, const struct pci_devi
 		goto error_remote_queue;
 	}
 
-	sp->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&sp->lock);
 	INIT_LIST_HEAD(&sp->command_queue);
 
 	result = request_irq(sp->irq, ibmasm_interrupt_handler, SA_SHIRQ, sp->devname, (void*)sp);
