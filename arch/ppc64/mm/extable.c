@@ -24,8 +24,8 @@ extern struct exception_table_entry __stop___ex_table[];
  *
  * Also used for modules.
  */
-void sort_ex_table(struct exception_table_entry *start,
-		   struct exception_table_entry *finish) __init_or_module
+void __init_or_module sort_ex_table(struct exception_table_entry *start,
+				    struct exception_table_entry *finish)
 {
 	struct exception_table_entry el, *p, *q;
 
