@@ -7,8 +7,6 @@
 #
 # Note 2! The CFLAGS definition is now in the main makefile...
 
-O_TARGET := mm.o
-
 obj-y	 := init.o fault.o tlb.o extable.o
 obj-$(CONFIG_HUGETLB_PAGE) += hugetlbpage.o
 

@@ -208,6 +208,8 @@ ia64_mca_check_errors (void)
 	ia64_mca_log_sal_error_record(SAL_INFO_TYPE_MCA);
 }
 
+device_initcall(ia64_mca_check_errors);
+
 /*
  * ia64_mca_register_cpev
  *

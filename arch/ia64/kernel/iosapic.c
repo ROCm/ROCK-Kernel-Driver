@@ -27,8 +27,8 @@
  * 02/04/30	J.I. Lee	bug fix in find_iosapic to fix ACPI PCI IRQ to IOSAPIC mapping
  *				error
  * 02/07/29	T. Kochi	Allocate interrupt vectors dynamically
- * 02/08/04	T. Kochi	Cleaned up terminology (irq, global system interrupt, vector,
- *				etc.)
+ * 02/08/04	T. Kochi	Cleaned up terminology (irq, global system interrupt, vector, etc.)
+ * 02/09/20	D. Mosberger	Simplified by taking advantage of ACPI's pci_irq code.
  */
 /*
  * Here is what the interrupt logic between a PCI device and the kernel looks like:
@@ -51,7 +51,7 @@
  *     architecture-independent interrupt handling mechanism in Linux.  As an
  *     IRQ is a number, we have to have IA-64 interrupt vector number <-> IRQ number
  *     mapping.  On smaller systems, we use one-to-one mapping between IA-64 vector and
- *     IRQ.  A platform can implemnent platform_irq_to_vector(irq) and
+ *     IRQ.  A platform can implement platform_irq_to_vector(irq) and
  *     platform_local_vector_to_irq(vector) APIs to differentiate the mapping.
  *     Please see also include/asm-ia64/hw_irq.h for those APIs.
  *
@@ -65,14 +65,15 @@
  */
 #include <linux/config.h>
 
-#include <linux/kernel.h>
+#include <linux/acpi.h>
 #include <linux/init.h>
+#include <linux/irq.h>
+#include <linux/kernel.h>
+#include <linux/list.h>
 #include <linux/pci.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 #include <linux/string.h>
-#include <linux/irq.h>
-#include <linux/acpi.h>
 
 #include <asm/delay.h>
 #include <asm/hw_irq.h>
@@ -94,13 +95,6 @@
 #endif
 
 static spinlock_t iosapic_lock = SPIN_LOCK_UNLOCKED;
-
-/* PCI pin to GSI routing information.  This info typically comes from ACPI. */
-
-static struct {
-	int num_routes;
-	struct pci_vector_struct *route;
-} pci_irq;
 
 /* These tables map IA-64 vectors to the IOSAPIC pin that generates this vector. */
 
@@ -146,11 +140,11 @@ find_iosapic (unsigned int gsi)
 int
 gsi_to_vector (unsigned int gsi)
 {
-	int vector;
+	struct iosapic_intr_info *info;
 
-	for (vector = 0; vector < IA64_NUM_VECTORS; ++vector)
-		if (iosapic_intr_info[vector].gsi_base + iosapic_intr_info[vector].rte_index == gsi)
-			return vector;
+	for (info = iosapic_intr_info; info < iosapic_intr_info + IA64_NUM_VECTORS; ++info)
+		if (info->gsi_base + info->rte_index == gsi)
+			return info - iosapic_intr_info;
 	return -1;
 }
 
@@ -163,7 +157,7 @@ set_rte (unsigned int vector, unsigned int dest)
 	int rte_index;
 	char redir;
 
-	DBG(KERN_DEBUG "%s: routing vector %d to %x\n", __FUNCTION__, vector, dest);
+	DBG(KERN_DEBUG"IOSAPIC: routing vector %d to %x\n", vector, dest);
 
 	rte_index = iosapic_intr_info[vector].rte_index;
 	if (rte_index < 0)
@@ -584,7 +578,8 @@ iosapic_override_isa_irq (unsigned int isa_irq, unsigned int gsi,
 	index = find_iosapic(gsi);
 
 	if (index < 0) {
-		printk("ISA: No corresponding IOSAPIC found : ISA IRQ %u -> GSI 0x%x\n", isa_irq, gsi);
+		printk("ISA: No corresponding IOSAPIC found : ISA IRQ %u -> GSI 0x%x\n",
+		       isa_irq, gsi);
 		return;
 	}
 
@@ -602,75 +597,6 @@ iosapic_override_isa_irq (unsigned int isa_irq, unsigned int gsi,
 
 	/* program the IOSAPIC routing table */
 	set_rte(vector, dest);
-}
-
-/*
- * Map PCI pin to the corresponding GSI.
- * If no such mapping exists, return -1.
- */
-static int
-pci_pin_to_gsi (int bus, int slot, int pci_pin, unsigned int *gsi)
-{
-	struct pci_vector_struct *r;
-
-	for (r = pci_irq.route; r < pci_irq.route + pci_irq.num_routes; ++r)
-		if (r->bus == bus &&
-		    (r->pci_id >> 16) == slot && r->pin == pci_pin) {
-			*gsi = r->irq;
-			return 0;
-		}
-
-	return -1;
-}
-
-/*
- * Map PCI pin to the corresponding IA-64 interrupt vector.  If no such mapping exists,
- * try to allocate a new vector.  If it fails, return -1.
- */
-static int
-pci_pin_to_vector (int bus, int slot, int pci_pin)
-{
-	int index, vector;
-	int gsi_base, pcat_compat;
-	char *addr;
-	unsigned int gsi;
-
-	if (pci_pin_to_gsi(bus, slot, pci_pin, &gsi) < 0) {
-		printk("PCI: no interrupt route for %02x:%02x pin %c\n", bus, slot, 'A' + pci_pin);
-		return -1;
-	}
-
-	vector = gsi_to_vector(gsi);
-
-	if (vector < 0) {
-		/* we should allocate a vector for this interrupt line */
-
-		index = find_iosapic(gsi);
-
-		if (index < 0) {
-			printk("PCI: GSI 0x%x has no IOSAPIC mapping\n", gsi);
-			return -1;
-		}
-
-		addr = iosapic_lists[index].addr;
-		gsi_base = iosapic_lists[index].gsi_base;
-		pcat_compat = iosapic_lists[index].pcat_compat;
-
-		if (pcat_compat && (gsi < 16))
-			vector = isa_irq_to_vector(gsi);
-		else {
-			/* new GSI; allocate a vector for it */
-			vector = ia64_alloc_vector();
-		}
-
-		register_intr(gsi, vector, IOSAPIC_LOWEST_PRIORITY,
-			      0, 0, gsi_base, addr);
-
-		DBG("PCI: (%02x:%02x INT%c) -> GSI 0x%x -> vector %d\n",
-		    bus, slot, 'A' + pci_pin, gsi, vector);
-	}
-
-	return vector;
 }
 
 void __devinit
@@ -713,7 +639,7 @@ iosapic_init (unsigned long phys_addr, unsigned int gsi_base, int pcat_compat)
 	iosapic_lists[num_iosapic].num_rte = num_rte;
 	num_iosapic++;
 
-	printk("IOSAPIC: version %x.%x, address 0x%lx, GSIs 0x%x-0x%x\n",
+	printk(KERN_INFO"  IOSAPIC v%x.%x, address 0x%lx, GSIs 0x%x-0x%x\n",
 	       (ver & 0xf0) >> 4, (ver & 0x0f), phys_addr, gsi_base, gsi_base + num_rte - 1);
 
 	if ((gsi_base == 0) && pcat_compat) {
@@ -740,122 +666,93 @@ iosapic_init (unsigned long phys_addr, unsigned int gsi_base, int pcat_compat)
 	}
 }
 
-
-/*
- * Set allocated interrupt vector to dev->irq and
- * program IOSAPIC to deliver interrupts
- */
-void
-iosapic_fixup_pci_interrupt (struct pci_dev *dev)
+static void
+fixup_vector (int vector, unsigned int gsi, const char *pci_id)
 {
-	unsigned char pci_pin;
-	int vector;
-	unsigned int dest;
-	struct hw_interrupt_type *irq_type;
+	struct hw_interrupt_type *irq_type = &irq_type_iosapic_level;
 	irq_desc_t *idesc;
+	unsigned int dest;
 
-	pci_read_config_byte(dev, PCI_INTERRUPT_PIN, &pci_pin);
-	if (pci_pin) {
-		pci_pin--; /* interrupt pins are numberd starting from 1 */
-
-		vector = pci_pin_to_vector(dev->bus->number, PCI_SLOT(dev->devfn), pci_pin);
-
-		if (vector < 0 && dev->bus->parent) {
-			/* go back to the bridge */
-			struct pci_dev *bridge = dev->bus->self;
-
-			if (bridge) {
-				/* allow for multiple bridges on an adapter */
-				do {
-					/* do the bridge swizzle... */
-					pci_pin = (pci_pin + PCI_SLOT(dev->devfn)) % 4;
-					vector = pci_pin_to_vector(bridge->bus->number,
-								   PCI_SLOT(bridge->devfn),
-								   pci_pin);
-				} while (vector < 0 && (bridge = bridge->bus->self));
-			}
-			if (vector >= 0)
-				printk(KERN_WARNING
-				       "PCI: using PPB (%s INT%c) to get vector %d\n",
-				       dev->slot_name, 'A' + pci_pin,
-				       vector);
-			else
-				printk(KERN_WARNING
-				       "PCI: Couldn't map irq for (%s INT%c)\n",
-				       dev->slot_name, 'A' + pci_pin);
-		}
-
-		if (vector >= 0) {
-			dev->irq = vector;
-
-			irq_type = &irq_type_iosapic_level;
-			idesc = irq_desc(vector);
-			if (idesc->handler != irq_type) {
-				if (idesc->handler != &no_irq_type)
-					printk("%s: changing vector %d from %s to %s\n",
-					       __FUNCTION__, vector,
-					       idesc->handler->typename,
-					       irq_type->typename);
-				idesc->handler = irq_type;
-			}
-#ifdef CONFIG_SMP
-			/*
-			 * For platforms that do not support interrupt redirect
-			 * via the XTP interface, we can round-robin the PCI
-			 * device interrupts to the processors
-			 */
-			if (!(smp_int_redirect & SMP_IRQ_REDIRECTION)) {
-				static int cpu_index = 0;
-
-				while (!cpu_online(cpu_index))
-					if (++cpu_index >= NR_CPUS)
-						cpu_index = 0;
-
-				dest = cpu_physical_id(cpu_index) & 0xffff;
-			} else {
-				/*
-				 * Direct the interrupt vector to the current cpu,
-				 * platform redirection will distribute them.
-				 */
-				dest = (ia64_get_lid() >> 16) & 0xffff;
-			}
-#else
-			/* direct the interrupt vector to the running cpu id */
-			dest = (ia64_get_lid() >> 16) & 0xffff;
-#endif
-
-			printk("PCI->APIC IRQ transform: (%s INT%c) -> CPU 0x%04x vector %d\n",
-			       dev->slot_name, 'A' + pci_pin, dest, vector);
-			set_rte(vector, dest);
-		}
+	idesc = irq_desc(vector);
+	if (idesc->handler != irq_type) {
+		if (idesc->handler != &no_irq_type)
+			printk("IOSAPIC: changing vector %d from %s to %s\n",
+			       vector, idesc->handler->typename, irq_type->typename);
+		idesc->handler = irq_type;
 	}
+#ifdef CONFIG_SMP
+	/*
+	 * For platforms that do not support interrupt redirect via the XTP interface, we
+	 * can round-robin the PCI device interrupts to the processors
+	 */
+	if (!(smp_int_redirect & SMP_IRQ_REDIRECTION)) {
+		static int cpu_index = -1;
+
+		do
+			if (++cpu_index >= NR_CPUS)
+				cpu_index = 0;
+		while (!cpu_online(cpu_index));
+
+		dest = cpu_physical_id(cpu_index) & 0xffff;
+	} else {
+		/*
+		 * Direct the interrupt vector to the current cpu, platform redirection
+		 * will distribute them.
+		 */
+		dest = (ia64_get_lid() >> 16) & 0xffff;
+	}
+#else
+	/* direct the interrupt vector to the running cpu id */
+	dest = (ia64_get_lid() >> 16) & 0xffff;
+#endif
+	set_rte(vector, dest);
+
+	printk("IOSAPIC: %s -> GSI 0x%x -> CPU 0x%04x vector %d\n", pci_id, gsi, dest, vector);
 }
 
-
-void
-iosapic_pci_fixup (int phase)
+void __init
+iosapic_parse_prt (void)
 {
-	struct	pci_dev	*dev;
+	struct acpi_prt_entry *entry;
+	struct list_head *node;
+	unsigned int gsi, gsi_base;
+	int index, vector, pcat_compat;
+	char pci_id[16];
+	char *addr;
 
-	if (phase == 0) {
-		if (acpi_get_prt(&pci_irq.route, &pci_irq.num_routes)) {
-			printk("%s: acpi_get_prt failed\n", __FILE__);
+	list_for_each(node, &acpi_prt.entries) {
+		entry = list_entry(node, struct acpi_prt_entry, node);
+
+		/* We're only interested in static (non-link) entries.  */
+		if (entry->link.handle)
+			continue;
+
+		gsi = entry->link.index;
+
+		vector = gsi_to_vector(gsi);
+		if (vector < 0) {
+			/* allocate a vector for this interrupt line */
+			index = find_iosapic(gsi);
+
+			if (index < 0) {
+				printk(KERN_WARNING"IOSAPIC: GSI 0x%x has no IOSAPIC!\n", gsi);
+				return;
+			}
+			addr = iosapic_lists[index].addr;
+			gsi_base = iosapic_lists[index].gsi_base;
+			pcat_compat = iosapic_lists[index].pcat_compat;
+
+			if (pcat_compat && (gsi < 16))
+				vector = isa_irq_to_vector(gsi);
+			else
+				/* new GSI; allocate a vector for it */
+				vector = ia64_alloc_vector();
+
+			register_intr(gsi, vector, IOSAPIC_LOWEST_PRIORITY, 0, 0, gsi_base, addr);
 		}
-		return;
-	}
+		snprintf(pci_id, sizeof(pci_id), "%02x:%02x:%02x[%c]",
+			 entry->id.segment, entry->id.bus, entry->id.device, 'A' + entry->pin);
 
-	if (phase != 1)
-		return;
-
-	pci_for_each_dev(dev) {
-		/* fixup dev->irq and program IOSAPIC */
-		iosapic_fixup_pci_interrupt(dev);
-
-		/*
-		 * Nothing to fixup
-		 * Fix out-of-range IRQ numbers
-		 */
-		if (dev->irq >= IA64_NUM_VECTORS)
-			dev->irq = 15;	/* Spurious interrupts */
+		fixup_vector(vector, gsi, pci_id);
 	}
 }

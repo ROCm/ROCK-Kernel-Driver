@@ -10,6 +10,7 @@
  */
 #include <linux/config.h>
 
+#include <linux/acpi.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/pci.h>
@@ -100,16 +101,29 @@ pci_sal_write (struct pci_bus *bus, unsigned int devfn, int where, int size, u32
 
 struct pci_ops pci_sal_ops = {
 	.read = 	pci_sal_read,
-	.write =	pci_sal_write,
+	.write =	pci_sal_write
 };
 
 struct pci_ops *pci_root_ops = &pci_sal_ops;	/* default to SAL */
 
+static int __init
+pci_acpi_init (void)
+{
+	if (!acpi_pci_irq_init())
+		printk(KERN_INFO "PCI: Using ACPI for IRQ routing\n");
+	else
+		printk(KERN_WARNING "PCI: Invalid ACPI-PCI IRQ routing table\n");
+	return 0;
+}
+
+subsys_initcall(pci_acpi_init);
+
+/* Called by ACPI when it finds a new root bus.  */
 struct pci_bus *
 pcibios_scan_root (int bus)
 {
-	struct list_head *list = NULL;
-	struct pci_bus *pci_bus = NULL;
+	struct list_head *list;
+	struct pci_bus *pci_bus;
 
 	list_for_each(list, &pci_root_buses) {
 		pci_bus = pci_bus_b(list);
@@ -124,33 +138,8 @@ pcibios_scan_root (int bus)
 	return pci_scan_bus(bus, pci_root_ops, NULL);
 }
 
-static int __init
-pcibios_init (void)
-{
-#	define PCI_BUSES_TO_SCAN 255
-	int i = 0;
-
-acpi_init();	/* hackedy hack hack... */
-
-#ifdef CONFIG_IA64_MCA
-	ia64_mca_check_errors();    /* For post-failure MCA error logging */
-#endif
-
-	platform_pci_fixup(0);	/* phase 0 fixups (before buses scanned) */
-
-	printk("PCI: Probing PCI hardware\n");
-	for (i = 0; i < PCI_BUSES_TO_SCAN; i++)
-		pci_scan_bus(i, pci_root_ops, NULL);
-
-	platform_pci_fixup(1);	/* phase 1 fixups (after buses scanned) */
-	return 0;
-}
-
-subsys_initcall(pcibios_init);
-
 /*
- *  Called after each bus is probed, but before its children
- *  are examined.
+ *  Called after each bus is probed, but before its children are examined.
  */
 void __init
 pcibios_fixup_bus (struct pci_bus *b)
@@ -235,7 +224,7 @@ pcibios_enable_device (struct pci_dev *dev, int mask)
 		return ret;
 
 	printk(KERN_INFO "PCI: Found IRQ %d for device %s\n", dev->irq, dev->slot_name);
-	return 0;
+	return acpi_pci_irq_enable(dev);
 }
 
 void

@@ -81,7 +81,7 @@ ia64_tlb_flush_mmu (mmu_gather_t *tlb, unsigned long start, unsigned long end)
 		 */
 		flush_tlb_mm(tlb->mm);
 	} else if (unlikely (end - start >= 1024*1024*1024*1024UL
-		      || REGION_NUMBER(start) != REGION_NUMBER(end - 1)))
+			     || REGION_NUMBER(start) != REGION_NUMBER(end - 1)))
 	{
 		/*
 		 * If we flush more than a tera-byte or across regions, we're probably

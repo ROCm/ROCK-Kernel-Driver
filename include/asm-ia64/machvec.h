@@ -86,12 +86,10 @@ extern void machvec_noop (void);
 #  define platform_setup	ia64_mv.setup
 #  define platform_cpu_init	ia64_mv.cpu_init
 #  define platform_irq_init	ia64_mv.irq_init
-#  define platform_map_nr	ia64_mv.map_nr
 #  define platform_mca_init	ia64_mv.mca_init
 #  define platform_mca_handler	ia64_mv.mca_handler
 #  define platform_cmci_handler	ia64_mv.cmci_handler
 #  define platform_log_print	ia64_mv.log_print
-#  define platform_pci_fixup	ia64_mv.pci_fixup
 #  define platform_send_ipi	ia64_mv.send_ipi
 #  define platform_global_tlb_purge	ia64_mv.global_tlb_purge
 #  define platform_pci_dma_init		ia64_mv.dma_init
@@ -159,8 +157,6 @@ struct ia64_machine_vector {
 	platform_setup,				\
 	platform_cpu_init,			\
 	platform_irq_init,			\
-	platform_pci_fixup,			\
-	platform_map_nr,			\
 	platform_mca_init,			\
 	platform_mca_handler,			\
 	platform_cmci_handler,			\
@@ -236,9 +232,6 @@ extern ia64_mv_pci_dma_supported swiotlb_pci_dma_supported;
 #endif
 #ifndef platform_log_print
 # define platform_log_print	((ia64_mv_log_print_t *) machvec_noop)
-#endif
-#ifndef platform_pci_fixup
-# define platform_pci_fixup	((ia64_mv_pci_fixup_t *) machvec_noop)
 #endif
 #ifndef platform_send_ipi
 # define platform_send_ipi	ia64_send_ipi	/* default to architected version */

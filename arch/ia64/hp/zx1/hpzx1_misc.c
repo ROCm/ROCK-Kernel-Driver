@@ -335,19 +335,14 @@ hpzx1_acpi_dev_init(void)
 
 extern void sba_init(void);
 
-void
-hpzx1_pci_fixup (int phase)
+static void
+hpzx1_init (void)
 {
-	iosapic_pci_fixup(phase);
-	switch (phase) {
-	      case 0:
-		/* zx1 has a hardware I/O TLB which lets us DMA from any device to any address */
-		MAX_DMA_ADDRESS = ~0UL;
-		break;
+	/* zx1 has a hardware I/O TLB which lets us DMA from any device to any address */
+	MAX_DMA_ADDRESS = ~0UL;
 
-	      case 1:
-		hpzx1_acpi_dev_init();
-		sba_init();
-		break;
-	}
+	hpzx1_acpi_dev_init();
+	sba_init();
 }
+
+subsys_initcall(hpzx1_init);
