@@ -206,7 +206,7 @@ static int queue_io(struct mapped_device *md, struct bio *bio)
 
 	down_write(&md->lock);
 
-	if (!test_bit(DMF_SUSPENDED, &md->flags)) {
+	if (!test_bit(DMF_BLOCK_IO, &md->flags)) {
 		up_write(&md->lock);
 		free_deferred(di);
 		return 1;
