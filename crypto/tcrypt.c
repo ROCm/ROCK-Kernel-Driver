@@ -703,7 +703,7 @@ test_des(void)
 		sg[0].page = virt_to_page(p);
 		sg[0].offset = ((long) p & ~PAGE_MASK);
 		sg[0].length = len;
-		ret = crypto_cipher_encrypt(tfm, sg, 1);
+		ret = crypto_cipher_encrypt(tfm, sg, sg, len);
 		if (ret) {
 			printk("encrypt() failed flags=%x\n", tfm->crt_flags);
 			goto out;
@@ -746,7 +746,7 @@ test_des(void)
 	sg[1].offset = ((long) p & ~PAGE_MASK);
 	sg[1].length = 8;
 
-	ret = crypto_cipher_encrypt(tfm, sg, 2);
+	ret = crypto_cipher_encrypt(tfm, sg, sg, 16);
 	if (ret) {
 		printk("encrypt() failed flags=%x\n", tfm->crt_flags);
 		goto out;
@@ -814,7 +814,7 @@ test_des(void)
 	sg[2].offset = ((long) p & ~PAGE_MASK);
 	sg[2].length = 8;
 
-	ret = crypto_cipher_encrypt(tfm, sg, 3);
+	ret = crypto_cipher_encrypt(tfm, sg, sg, 32);
 
 	if (ret) {
 		printk("decrypt() failed flags=%x\n", tfm->crt_flags);
@@ -890,7 +890,7 @@ test_des(void)
 	sg[3].offset = ((long) p & ~PAGE_MASK);
 	sg[3].length = 18;
 
-	ret = crypto_cipher_encrypt(tfm, sg, 4);
+	ret = crypto_cipher_encrypt(tfm, sg, sg, 24);
 
 	if (ret) {
 		printk("encrypt() failed flags=%x\n", tfm->crt_flags);
@@ -979,7 +979,7 @@ test_des(void)
 	sg[4].offset = ((long) p & ~PAGE_MASK);
 	sg[4].length = 8;
 
-	ret = crypto_cipher_encrypt(tfm, sg, 5);
+	ret = crypto_cipher_encrypt(tfm, sg, sg, 16);
 
 	if (ret) {
 		printk("encrypt() failed flags=%x\n", tfm->crt_flags);
@@ -1078,7 +1078,7 @@ test_des(void)
 	sg[7].offset = ((long) p & ~PAGE_MASK);
 	sg[7].length = 1;
 
-	ret = crypto_cipher_encrypt(tfm, sg, 8);
+	ret = crypto_cipher_encrypt(tfm, sg, sg, 8);
 	if (ret) {
 		printk("encrypt() failed flags=%x\n", tfm->crt_flags);
 		goto out;
@@ -1120,7 +1120,7 @@ test_des(void)
 		sg[0].offset = ((long) p & ~PAGE_MASK);
 		sg[0].length = len;
 
-		ret = crypto_cipher_decrypt(tfm, sg, 1);
+		ret = crypto_cipher_decrypt(tfm, sg, sg, sg[0].length);
 		if (ret) {
 			printk("des_decrypt() failed flags=%x\n",
 			       tfm->crt_flags);
@@ -1163,7 +1163,7 @@ test_des(void)
 	sg[1].offset = ((long) p & ~PAGE_MASK);
 	sg[1].length = 8;
 
-	ret = crypto_cipher_decrypt(tfm, sg, 2);
+	ret = crypto_cipher_decrypt(tfm, sg, sg, 16);
 	if (ret) {
 		printk("decrypt() failed flags=%x\n", tfm->crt_flags);
 		goto out;
@@ -1220,7 +1220,7 @@ test_des(void)
 	sg[2].offset = ((long) p & ~PAGE_MASK);
 	sg[2].length = 1;
 
-	ret = crypto_cipher_decrypt(tfm, sg, 3);
+	ret = crypto_cipher_decrypt(tfm, sg, sg, 16);
 
 	if (ret) {
 		printk("decrypt() failed flags=%x\n", tfm->crt_flags);
@@ -1290,7 +1290,7 @@ test_des(void)
 		crypto_cipher_set_iv(tfm, des_tv[i].iv,
 				     crypto_tfm_alg_ivsize(tfm));
 
-		ret = crypto_cipher_encrypt(tfm, sg, 1);
+		ret = crypto_cipher_encrypt(tfm, sg, sg, len);
 		if (ret) {
 			printk("des_cbc_encrypt() failed flags=%x\n",
 			       tfm->crt_flags);
@@ -1349,7 +1349,7 @@ test_des(void)
 
 	crypto_cipher_set_iv(tfm, des_tv[i].iv, crypto_tfm_alg_ivsize(tfm));
 
-	ret = crypto_cipher_encrypt(tfm, sg, 2);
+	ret = crypto_cipher_encrypt(tfm, sg, sg, 24);
 	if (ret) {
 		printk("des_cbc_decrypt() failed flags=%x\n", tfm->crt_flags);
 		goto out;
@@ -1398,7 +1398,7 @@ test_des(void)
 		crypto_cipher_set_iv(tfm, des_tv[i].iv,
 				      crypto_tfm_alg_blocksize(tfm));
 
-		ret = crypto_cipher_decrypt(tfm, sg, 1);
+		ret = crypto_cipher_decrypt(tfm, sg, sg, len);
 		if (ret) {
 			printk("des_cbc_decrypt() failed flags=%x\n",
 			       tfm->crt_flags);
@@ -1450,7 +1450,7 @@ test_des(void)
 
 	crypto_cipher_set_iv(tfm, des_tv[i].iv, crypto_tfm_alg_ivsize(tfm));
 
-	ret = crypto_cipher_decrypt(tfm, sg, 2);
+	ret = crypto_cipher_decrypt(tfm, sg, sg, 8);
 	if (ret) {
 		printk("des_cbc_decrypt() failed flags=%x\n", tfm->crt_flags);
 		goto out;
@@ -1518,7 +1518,7 @@ test_des3_ede(void)
 		sg[0].page = virt_to_page(p);
 		sg[0].offset = ((long) p & ~PAGE_MASK);
 		sg[0].length = len;
-		ret = crypto_cipher_encrypt(tfm, sg, 1);
+		ret = crypto_cipher_encrypt(tfm, sg, sg, len);
 		if (ret) {
 			printk("encrypt() failed flags=%x\n", tfm->crt_flags);
 			goto out;
@@ -1561,7 +1561,7 @@ test_des3_ede(void)
 		sg[0].page = virt_to_page(p);
 		sg[0].offset = ((long) p & ~PAGE_MASK);
 		sg[0].length = len;
-		ret = crypto_cipher_decrypt(tfm, sg, 1);
+		ret = crypto_cipher_decrypt(tfm, sg, sg, len);
 		if (ret) {
 			printk("decrypt() failed flags=%x\n", tfm->crt_flags);
 			goto out;
@@ -1624,7 +1624,7 @@ test_blowfish(void)
 		sg[0].page = virt_to_page(p);
 		sg[0].offset = ((long) p & ~PAGE_MASK);
 		sg[0].length = bf_tv[i].plen;
-		ret = crypto_cipher_encrypt(tfm, sg, 1);
+		ret = crypto_cipher_encrypt(tfm, sg, sg, sg[0].length);
 		if (ret) {
 			printk("encrypt() failed flags=%x\n", tfm->crt_flags);
 			goto out;
@@ -1666,7 +1666,7 @@ test_blowfish(void)
 		sg[0].page = virt_to_page(p);
 		sg[0].offset = ((long) p & ~PAGE_MASK);
 		sg[0].length = bf_tv[i].plen;
-		ret = crypto_cipher_decrypt(tfm, sg, 1);
+		ret = crypto_cipher_decrypt(tfm, sg, sg, sg[0].length);
 		if (ret) {
 			printk("decrypt() failed flags=%x\n", tfm->crt_flags);
 			goto out;
@@ -1719,7 +1719,7 @@ test_blowfish(void)
 		crypto_cipher_set_iv(tfm, bf_tv[i].iv,
 				     crypto_tfm_alg_ivsize(tfm));
 
-		ret = crypto_cipher_encrypt(tfm, sg, 1);
+		ret = crypto_cipher_encrypt(tfm, sg, sg, sg[0].length);
 		if (ret) {
 			printk("blowfish_cbc_encrypt() failed flags=%x\n",
 			       tfm->crt_flags);
@@ -1764,7 +1764,7 @@ test_blowfish(void)
 		crypto_cipher_set_iv(tfm, bf_tv[i].iv,
 				     crypto_tfm_alg_ivsize(tfm));
 
-		ret = crypto_cipher_decrypt(tfm, sg, 1);
+		ret = crypto_cipher_decrypt(tfm, sg, sg, sg[0].length);
 		if (ret) {
 			printk("blowfish_cbc_decrypt() failed flags=%x\n",
 			       tfm->crt_flags);
@@ -1829,7 +1829,7 @@ test_twofish(void)
 		sg[0].page = virt_to_page(p);
 		sg[0].offset = ((long) p & ~PAGE_MASK);
 		sg[0].length = tf_tv[i].plen;
-		ret = crypto_cipher_encrypt(tfm, sg, 1);
+		ret = crypto_cipher_encrypt(tfm, sg, sg, sg[0].length);
 		if (ret) {
 			printk("encrypt() failed flags=%x\n", tfm->crt_flags);
 			goto out;
@@ -1871,7 +1871,7 @@ test_twofish(void)
 		sg[0].page = virt_to_page(p);
 		sg[0].offset = ((long) p & ~PAGE_MASK);
 		sg[0].length = tf_tv[i].plen;
-		ret = crypto_cipher_decrypt(tfm, sg, 1);
+		ret = crypto_cipher_decrypt(tfm, sg, sg, sg[0].length);
 		if (ret) {
 			printk("decrypt() failed flags=%x\n", tfm->crt_flags);
 			goto out;
@@ -1924,7 +1924,7 @@ test_twofish(void)
 		crypto_cipher_set_iv(tfm, tf_tv[i].iv,
 				     crypto_tfm_alg_ivsize(tfm));
 
-		ret = crypto_cipher_encrypt(tfm, sg, 1);
+		ret = crypto_cipher_encrypt(tfm, sg, sg, sg[0].length);
 		if (ret) {
 			printk("blowfish_cbc_encrypt() failed flags=%x\n",
 			       tfm->crt_flags);
@@ -1970,7 +1970,7 @@ test_twofish(void)
 		crypto_cipher_set_iv(tfm, tf_tv[i].iv,
 				     crypto_tfm_alg_ivsize(tfm));
 
-		ret = crypto_cipher_decrypt(tfm, sg, 1);
+		ret = crypto_cipher_decrypt(tfm, sg, sg, sg[0].length);
 		if (ret) {
 			printk("blowfish_cbc_decrypt() failed flags=%x\n",
 			       tfm->crt_flags);
@@ -2030,7 +2030,7 @@ test_serpent(void)
 		sg[0].page = virt_to_page(p);
 		sg[0].offset = ((long) p & ~PAGE_MASK);
 		sg[0].length = sizeof(serp_tv[i].plaintext);
-		ret = crypto_cipher_encrypt(tfm, sg, 1);
+		ret = crypto_cipher_encrypt(tfm, sg, sg, sg[0].length);
 		if (ret) {
 			printk("encrypt() failed flags=%x\n", tfm->crt_flags);
 			goto out;
@@ -2070,7 +2070,7 @@ test_serpent(void)
 		sg[0].page = virt_to_page(p);
 		sg[0].offset = ((long) p & ~PAGE_MASK);
 		sg[0].length = sizeof(serp_tv[i].plaintext);
-		ret = crypto_cipher_decrypt(tfm, sg, 1);
+		ret = crypto_cipher_decrypt(tfm, sg, sg, sg[0].length);
 		if (ret) {
 			printk("decrypt() failed flags=%x\n", tfm->crt_flags);
 			goto out;
@@ -2133,7 +2133,7 @@ test_aes(void)
 		sg[0].page = virt_to_page(p);
 		sg[0].offset = ((long) p & ~PAGE_MASK);
 		sg[0].length = aes_tv[i].plen;
-		ret = crypto_cipher_encrypt(tfm, sg, 1);
+		ret = crypto_cipher_encrypt(tfm, sg, sg, sg[0].length);
 		if (ret) {
 			printk("encrypt() failed flags=%x\n", tfm->crt_flags);
 			goto out;
@@ -2175,7 +2175,7 @@ test_aes(void)
 		sg[0].page = virt_to_page(p);
 		sg[0].offset = ((long) p & ~PAGE_MASK);
 		sg[0].length = aes_tv[i].plen;
-		ret = crypto_cipher_decrypt(tfm, sg, 1);
+		ret = crypto_cipher_decrypt(tfm, sg, sg, sg[0].length);
 		if (ret) {
 			printk("decrypt() failed flags=%x\n", tfm->crt_flags);
 			goto out;

@@ -19,7 +19,7 @@
  *			created test case so that I was able to fix nasty bug
  *		and many others. thanks.
  *
- * $Id: sch_htb.c,v 1.14 2002/09/28 12:55:22 devik Exp devik $
+ * $Id: sch_htb.c,v 1.17 2003/01/29 09:22:18 devik Exp devik $
  */
 #include <linux/config.h>
 #include <linux/module.h>
@@ -71,15 +71,11 @@
 #define HTB_HYSTERESIS 1/* whether to use mode hysteresis for speedup */
 #define HTB_QLOCK(S) spin_lock_bh(&(S)->dev->queue_lock)
 #define HTB_QUNLOCK(S) spin_unlock_bh(&(S)->dev->queue_lock)
-#define HTB_VER 0x30007	/* major must be matched with number suplied by TC as version */
+#define HTB_VER 0x3000a	/* major must be matched with number suplied by TC as version */
 
 #if HTB_VER >> 16 != TC_HTB_PROTOVER
 #error "Mismatched sch_htb.c and pkt_sch.h"
 #endif
-
-/* temporary debug defines to be removed after beta stage */
-#define DEVIK_MEND(N)
-#define DEVIK_MSTART(N)
 
 /* debugging support; S is subsystem, these are defined:
   0 - netlink messages
@@ -421,7 +417,6 @@ static void htb_add_to_wait_tree (struct htb_sched *q,
 	if ((delay <= 0 || delay > cl->mbuffer) && net_ratelimit())
 		printk(KERN_ERR "HTB: suspicious delay in wait_tree d=%ld cl=%X h=%d\n",delay,cl->classid,debug_hint);
 #endif
-	DEVIK_MSTART(9);
 	cl->pq_key = jiffies + PSCHED_US2JIFFIE(delay);
 	if (cl->pq_key == jiffies)
 		cl->pq_key++;
@@ -440,7 +435,6 @@ static void htb_add_to_wait_tree (struct htb_sched *q,
 	}
 	rb_link_node(&cl->pq_node, parent, p);
 	rb_insert_color(&cl->pq_node, &q->wait_pq[cl->level]);
-	DEVIK_MEND(9);
 }
 
 /**
@@ -678,7 +672,6 @@ static int htb_enqueue(struct sk_buff *skb, struct Qdisc *sch)
     struct htb_sched *q = (struct htb_sched *)sch->data;
     struct htb_class *cl = htb_classify(skb,sch);
 
-    DEVIK_MSTART(0);
     if (cl == HTB_DIRECT || !cl) {
 	/* enqueue to helper queue */
 	if (q->direct_queue.qlen < q->direct_qlen && cl) {
@@ -687,25 +680,20 @@ static int htb_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 	} else {
 	    kfree_skb (skb);
 	    sch->stats.drops++;
-	    DEVIK_MEND(0);
 	    return NET_XMIT_DROP;
 	}
     } else if (cl->un.leaf.q->enqueue(skb, cl->un.leaf.q) != NET_XMIT_SUCCESS) {
 	sch->stats.drops++;
 	cl->stats.drops++;
-	DEVIK_MEND(0);
 	return NET_XMIT_DROP;
     } else {
 	cl->stats.packets++; cl->stats.bytes += skb->len;
-	DEVIK_MSTART(1);
 	htb_activate (q,cl);
-	DEVIK_MEND(1);
     }
 
     sch->q.qlen++;
     sch->stats.packets++; sch->stats.bytes += skb->len;
     HTB_DBG(1,1,"htb_enq_ok cl=%X skb=%p\n",cl?cl->classid:0,skb);
-    DEVIK_MEND(0);
     return NET_XMIT_SUCCESS;
 }
 
@@ -941,7 +929,6 @@ htb_dequeue_tree(struct htb_sched *q,int prio,int level)
 	//struct htb_sched *q = (struct htb_sched *)sch->data;
 	struct htb_class *cl,*start;
 	/* look initial class up in the row */
-	DEVIK_MSTART(6);
 	start = cl = htb_lookup_leaf (q->row[level]+prio,prio,q->ptr[level]+prio);
 	
 	do {
@@ -960,8 +947,6 @@ htb_dequeue_tree(struct htb_sched *q,int prio,int level)
 		cl = htb_lookup_leaf (q->row[level]+prio,prio,q->ptr[level]+prio);
 	} while (cl != start);
 
-	DEVIK_MEND(6);
-	DEVIK_MSTART(7);
 	if (likely(skb != NULL)) {
 		if ((cl->un.leaf.deficit[level] -= skb->len) < 0) {
 			HTB_DBG(4,2,"htb_next_cl oldptr=%p quant_add=%d\n",
@@ -973,11 +958,8 @@ htb_dequeue_tree(struct htb_sched *q,int prio,int level)
 		   gives us slightly better performance */
 		if (!cl->un.leaf.q->q.qlen)
 			htb_deactivate (q,cl);
-	DEVIK_MSTART(8);
 		htb_charge_class (q,cl,level,skb->len);
-	DEVIK_MEND(8);
 	}
-	DEVIK_MEND(7);
 	return skb;
 }
 
@@ -1005,6 +987,9 @@ static struct sk_buff *htb_dequeue(struct Qdisc *sch)
 	struct htb_sched *q = (struct htb_sched *)sch->data;
 	int level;
 	long min_delay;
+#ifdef HTB_DEBUG
+	int evs_used = 0;
+#endif
 
 	HTB_DBG(3,1,"htb_deq dircnt=%d qlen=%d\n",skb_queue_len(&q->direct_queue),
 			sch->q.qlen);
@@ -1016,27 +1001,26 @@ static struct sk_buff *htb_dequeue(struct Qdisc *sch)
 		return skb;
 	}
 
-	DEVIK_MSTART(2);
 	if (!sch->q.qlen) goto fin;
 	PSCHED_GET_TIME(q->now);
 
-	min_delay = HZ*5;
+	min_delay = LONG_MAX;
 	q->nwc_hit = 0;
 	for (level = 0; level < TC_HTB_MAXDEPTH; level++) {
 		/* common case optimization - skip event handler quickly */
 		int m;
 		long delay;
-	DEVIK_MSTART(3);
 		if (jiffies - q->near_ev_cache[level] < 0x80000000 || 0) {
 			delay = htb_do_events(q,level);
 			q->near_ev_cache[level] += delay ? delay : HZ;
+#ifdef HTB_DEBUG
+			evs_used++;
+#endif
 		} else
 			delay = q->near_ev_cache[level] - jiffies;	
 		
 		if (delay && min_delay > delay) 
 			min_delay = delay;
-	DEVIK_MEND(3);
-	DEVIK_MSTART(5);
 		m = ~q->row_mask[level];
 		while (m != (int)(-1)) {
 			int prio = ffz (m);
@@ -1045,24 +1029,24 @@ static struct sk_buff *htb_dequeue(struct Qdisc *sch)
 			if (likely(skb != NULL)) {
 				sch->q.qlen--;
 				sch->flags &= ~TCQ_F_THROTTLED;
-	DEVIK_MEND(5);
 				goto fin;
 			}
 		}
-	DEVIK_MEND(5);
 	}
-	DEVIK_MSTART(4);
 #ifdef HTB_DEBUG
-	if (!q->nwc_hit && min_delay >= 5*HZ && net_ratelimit()) { 
-		printk(KERN_ERR "HTB: mindelay=%ld, report it please !\n",min_delay);
-		htb_debug_dump(q);
+	if (!q->nwc_hit && min_delay >= 10*HZ && net_ratelimit()) {
+		if (min_delay == LONG_MAX) {
+			printk(KERN_ERR "HTB: dequeue bug (%d), report it please !\n",
+					evs_used);
+			htb_debug_dump(q);
+		} else 
+			printk(KERN_WARNING "HTB: mindelay=%ld, some class has "
+					"too small rate\n",min_delay);
 	}
 #endif
-	htb_delay_by (sch,min_delay);
-	DEVIK_MEND(4);
+	htb_delay_by (sch,min_delay > 5*HZ ? 5*HZ : min_delay);
 fin:
 	HTB_DBG(3,1,"htb_deq_end %s j=%lu skb=%p\n",sch->dev->name,jiffies,skb);
-	DEVIK_MEND(2);
 	return skb;
 }
 
@@ -1433,6 +1417,7 @@ static int htb_change_class(struct Qdisc *sch, u32 classid,
 	if (!rtab || !ctab) goto failure;
 
 	if (!cl) { /* new class */
+		struct Qdisc *new_q;
 		/* check for valid classid */
 		if (!classid || TC_H_MAJ(classid^sch->handle) || htb_find(classid,sch))
 			goto failure;
@@ -1456,6 +1441,10 @@ static int htb_change_class(struct Qdisc *sch, u32 classid,
 		cl->magic = HTB_CMAGIC;
 #endif
 
+		/* create leaf qdisc early because it uses kmalloc(GPF_KERNEL)
+		   so that can't be used inside of sch_tree_lock
+		   -- thanks to Karlis Peisenieks */
+		new_q = qdisc_create_dflt(sch->dev, &pfifo_qdisc_ops);
 		sch_tree_lock(sch);
 		if (parent && !parent->level) {
 			/* turn parent into inner node */
@@ -1474,8 +1463,7 @@ static int htb_change_class(struct Qdisc *sch, u32 classid,
 			memset (&parent->un.inner,0,sizeof(parent->un.inner));
 		}
 		/* leaf (we) needs elementary qdisc */
-		if (!(cl->un.leaf.q = qdisc_create_dflt(sch->dev, &pfifo_qdisc_ops)))
-			cl->un.leaf.q = &noop_qdisc;
+		cl->un.leaf.q = new_q ? new_q : &noop_qdisc;
 
 		cl->classid = classid; cl->parent = parent;
 
@@ -1503,11 +1491,11 @@ static int htb_change_class(struct Qdisc *sch, u32 classid,
 	if (!cl->level) {
 		cl->un.leaf.quantum = rtab->rate.rate / q->rate2quantum;
 		if (!hopt->quantum && cl->un.leaf.quantum < 1000) {
-			printk(KERN_WARNING "HTB: quantum of class %X is small. Consider r2q change.", cl->classid);
+			printk(KERN_WARNING "HTB: quantum of class %X is small. Consider r2q change.\n", cl->classid);
 			cl->un.leaf.quantum = 1000;
 		}
 		if (!hopt->quantum && cl->un.leaf.quantum > 200000) {
-			printk(KERN_WARNING "HTB: quantum of class %X is big. Consider r2q change.", cl->classid);
+			printk(KERN_WARNING "HTB: quantum of class %X is big. Consider r2q change.\n", cl->classid);
 			cl->un.leaf.quantum = 200000;
 		}
 		if (hopt->quantum)

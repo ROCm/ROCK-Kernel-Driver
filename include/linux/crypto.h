@@ -131,9 +131,13 @@ struct cipher_tfm {
 	int (*cit_setkey)(struct crypto_tfm *tfm,
 	                  const u8 *key, unsigned int keylen);
 	int (*cit_encrypt)(struct crypto_tfm *tfm,
-	                   struct scatterlist *sg, unsigned int nsg);
+			   struct scatterlist *dst,
+			   struct scatterlist *src,
+			   unsigned int nbytes);
 	int (*cit_decrypt)(struct crypto_tfm *tfm,
-	                   struct scatterlist *sg, unsigned int nsg);
+			   struct scatterlist *dst,
+			   struct scatterlist *src,
+			   unsigned int nbytes);
 	void (*cit_xor_block)(u8 *dst, const u8 *src);
 };
 
@@ -274,19 +278,21 @@ static inline int crypto_cipher_setkey(struct crypto_tfm *tfm,
 }
 
 static inline int crypto_cipher_encrypt(struct crypto_tfm *tfm,
-                                        struct scatterlist *sg,
-                                        unsigned int nsg)
+                                        struct scatterlist *dst,
+                                        struct scatterlist *src,
+                                        unsigned int nbytes)
 {
 	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_CIPHER);
-	return tfm->crt_cipher.cit_encrypt(tfm, sg, nsg);
+	return tfm->crt_cipher.cit_encrypt(tfm, dst, src, nbytes);
 }                                        
 
 static inline int crypto_cipher_decrypt(struct crypto_tfm *tfm,
-                                        struct scatterlist *sg,
-                                        unsigned int nsg)
+                                        struct scatterlist *dst,
+                                        struct scatterlist *src,
+                                        unsigned int nbytes)
 {
 	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_CIPHER);
-	return tfm->crt_cipher.cit_decrypt(tfm, sg, nsg);
+	return tfm->crt_cipher.cit_decrypt(tfm, dst, src, nbytes);
 }
 
 static inline void crypto_cipher_set_iv(struct crypto_tfm *tfm,
