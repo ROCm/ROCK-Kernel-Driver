@@ -15,9 +15,6 @@
 #include <linux/wait.h>
 #include <linux/rwsem.h>
 
-#define DEBUG_SEMAPHORE 0
-#define DEBUG_RW_SEMAPHORE 0
-
 struct semaphore {
 	/* Careful, inline assembly knows about the position of these two.  */
 	atomic_t count __attribute__((aligned(8)));
@@ -92,14 +89,14 @@ extern void __up_wakeup(struct semaphore *);
 static inline void __down(struct semaphore *sem)
 {
 	long count = atomic_dec_return(&sem->count);
-	if (__builtin_expect(count < 0, 0))
+	if (unlikely(count < 0))
 		__down_failed(sem);
 }
 
 static inline int __down_interruptible(struct semaphore *sem)
 {
 	long count = atomic_dec_return(&sem->count);
-	if (__builtin_expect(count < 0, 0))
+	if (unlikely(count < 0))
 		return __down_failed_interruptible(sem);
 	return 0;
 }
@@ -201,11 +198,11 @@ static inline void __up(struct semaphore *sem)
 		: "m"(*sem), "r"(0x0000000100000000)
 		: "memory");
 
-	if (__builtin_expect(ret <= 0, 0))
+	if (unlikely(ret <= 0))
 		__up_wakeup(sem);
 }
 
-#if !WAITQUEUE_DEBUG && !DEBUG_SEMAPHORE
+#if !WAITQUEUE_DEBUG && !defined(CONFIG_DEBUG_SEMAPHORE)
 extern inline void down(struct semaphore *sem)
 {
 	__down(sem);

@@ -782,7 +782,9 @@ out:
 	if (jiffies - scq->trans_start > HZ) {
 		printk("%s: Error pushing TBD for %d.%d\n",
 		       card->name, vc->tx_vcc->vpi, vc->tx_vcc->vci);
+#ifdef CONFIG_ATM_IDT77252_DEBUG
 		idt77252_tx_dump(card);
+#endif
 		scq->trans_start = jiffies;
 	}
 

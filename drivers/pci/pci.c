@@ -985,7 +985,7 @@ void __devinit  pci_read_bridge_bases(struct pci_bus *child)
 	base = (io_base_lo & PCI_IO_RANGE_MASK) << 8;
 	limit = (io_limit_lo & PCI_IO_RANGE_MASK) << 8;
 
-	if ((base & PCI_IO_RANGE_TYPE_MASK) == PCI_IO_RANGE_TYPE_32) {
+	if ((io_base_lo & PCI_IO_RANGE_TYPE_MASK) == PCI_IO_RANGE_TYPE_32) {
 		u16 io_base_hi, io_limit_hi;
 		pci_read_config_word(dev, PCI_IO_BASE_UPPER16, &io_base_hi);
 		pci_read_config_word(dev, PCI_IO_LIMIT_UPPER16, &io_limit_hi);

@@ -116,21 +116,21 @@
 #define PCI_SEC_LATENCY_TIMER	0x1b	/* Latency timer for secondary interface */
 #define PCI_IO_BASE		0x1c	/* I/O range behind the bridge */
 #define PCI_IO_LIMIT		0x1d
-#define  PCI_IO_RANGE_TYPE_MASK	0x0f	/* I/O bridging type */
+#define  PCI_IO_RANGE_TYPE_MASK	0x0fUL	/* I/O bridging type */
 #define  PCI_IO_RANGE_TYPE_16	0x00
 #define  PCI_IO_RANGE_TYPE_32	0x01
-#define  PCI_IO_RANGE_MASK	~0x0f
+#define  PCI_IO_RANGE_MASK	(~0x0fUL)
 #define PCI_SEC_STATUS		0x1e	/* Secondary status register, only bit 14 used */
 #define PCI_MEMORY_BASE		0x20	/* Memory range behind */
 #define PCI_MEMORY_LIMIT	0x22
-#define  PCI_MEMORY_RANGE_TYPE_MASK 0x0f
-#define  PCI_MEMORY_RANGE_MASK	~0x0f
+#define  PCI_MEMORY_RANGE_TYPE_MASK 0x0fUL
+#define  PCI_MEMORY_RANGE_MASK	(~0x0fUL)
 #define PCI_PREF_MEMORY_BASE	0x24	/* Prefetchable memory range behind */
 #define PCI_PREF_MEMORY_LIMIT	0x26
-#define  PCI_PREF_RANGE_TYPE_MASK 0x0f
+#define  PCI_PREF_RANGE_TYPE_MASK 0x0fUL
 #define  PCI_PREF_RANGE_TYPE_32	0x00
 #define  PCI_PREF_RANGE_TYPE_64	0x01
-#define  PCI_PREF_RANGE_MASK	~0x0f
+#define  PCI_PREF_RANGE_MASK	(~0x0fUL)
 #define PCI_PREF_BASE_UPPER32	0x28	/* Upper half of prefetchable memory range */
 #define PCI_PREF_LIMIT_UPPER32	0x2c
 #define PCI_IO_BASE_UPPER16	0x30	/* Upper half of I/O addresses */
@@ -168,7 +168,7 @@
 #define PCI_CB_IO_BASE_1_HI	0x36
 #define PCI_CB_IO_LIMIT_1	0x38
 #define PCI_CB_IO_LIMIT_1_HI	0x3a
-#define  PCI_CB_IO_RANGE_MASK	~0x03
+#define  PCI_CB_IO_RANGE_MASK	(~0x03UL)
 /* 0x3c-0x3d are same as for htype 0 */
 #define PCI_CB_BRIDGE_CONTROL	0x3e
 #define  PCI_CB_BRIDGE_CTL_PARITY	0x01	/* Similar to standard bridge control register */
@@ -402,7 +402,7 @@ struct pci_dev {
 #define PCI_BRIDGE_RESOURCES 7
 #define PCI_NUM_RESOURCES 11
   
-#define PCI_REGION_FLAG_MASK 0x0f	/* These bits of resource flags tell us the PCI region flags */
+#define PCI_REGION_FLAG_MASK 0x0fU	/* These bits of resource flags tell us the PCI region flags */
 
 struct pci_bus {
 	struct list_head node;		/* node in list of buses */

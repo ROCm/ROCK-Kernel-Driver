@@ -385,6 +385,9 @@ if [ "$CONFIG_DEBUG_KERNEL" != "n" ]; then
    tristate '  Kernel FP software completion' CONFIG_MATHEMU
    bool '  Debug memory allocations' CONFIG_DEBUG_SLAB
    bool '  Magic SysRq key' CONFIG_MAGIC_SYSRQ
+   bool '  Spinlock debugging' CONFIG_DEBUG_SPINLOCK
+   bool '  Read-write spinlock debugging' CONFIG_DEBUG_RWLOCK
+   bool '  Semaphore debugging' CONFIG_DEBUG_SEMAPHORE
 else
    define_tristate CONFIG_MATHEMU y
 fi

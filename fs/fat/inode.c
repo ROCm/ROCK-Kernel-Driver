@@ -123,6 +123,8 @@ struct inode *fat_iget(struct super_block *sb, int i_pos)
 		if (i->i_location != i_pos)
 			continue;
 		inode = igrab(i->i_fat_inode);
+		if (inode)
+			break;
 	}
 	spin_unlock(&fat_inode_lock);
 	return inode;

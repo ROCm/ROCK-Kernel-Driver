@@ -1,12 +1,11 @@
 #ifndef _ALPHA_SPINLOCK_H
 #define _ALPHA_SPINLOCK_H
 
+#include <linux/config.h>
 #include <asm/system.h>
 #include <linux/kernel.h>
 #include <asm/current.h>
 
-#define DEBUG_SPINLOCK 0
-#define DEBUG_RWLOCK 0
 
 /*
  * Simple spin lock operations.  There are two variants, one clears IRQ's
@@ -17,7 +16,7 @@
 
 typedef struct {
 	volatile unsigned int lock /*__attribute__((aligned(32))) */;
-#if DEBUG_SPINLOCK
+#if CONFIG_DEBUG_SPINLOCK
 	int on_cpu;
 	int line_no;
 	void *previous;
@@ -26,7 +25,7 @@ typedef struct {
 #endif
 } spinlock_t;
 
-#if DEBUG_SPINLOCK
+#if CONFIG_DEBUG_SPINLOCK
 #define SPIN_LOCK_UNLOCKED (spinlock_t) {0, -1, 0, 0, 0, 0}
 #define spin_lock_init(x)						\
 	((x)->lock = 0, (x)->on_cpu = -1, (x)->previous = 0, (x)->task = 0)
@@ -38,7 +37,7 @@ typedef struct {
 #define spin_is_locked(x)	((x)->lock != 0)
 #define spin_unlock_wait(x)	({ do { barrier(); } while ((x)->lock); })
 
-#if DEBUG_SPINLOCK
+#if CONFIG_DEBUG_SPINLOCK
 extern void spin_unlock(spinlock_t * lock);
 extern void debug_spin_lock(spinlock_t * lock, const char *, int);
 extern int debug_spin_trylock(spinlock_t * lock, const char *, int);
@@ -86,7 +85,7 @@ static inline void spin_lock(spinlock_t * lock)
 
 #define spin_trylock(lock) (!test_and_set_bit(0,(lock)))
 #define spin_lock_own(LOCK, LOCATION)	((void)0)
-#endif /* DEBUG_SPINLOCK */
+#endif /* CONFIG_DEBUG_SPINLOCK */
 
 /***********************************************************/
 
@@ -98,7 +97,7 @@ typedef struct {
 
 #define rwlock_init(x)	do { *(x) = RW_LOCK_UNLOCKED; } while(0)
 
-#if DEBUG_RWLOCK
+#if CONFIG_DEBUG_RWLOCK
 extern void write_lock(rwlock_t * lock);
 extern void read_lock(rwlock_t * lock);
 #else
@@ -141,7 +140,7 @@ static inline void read_lock(rwlock_t * lock)
 	: "=m" (*(volatile int *)lock), "=&r" (regx)
 	: "m" (*(volatile int *)lock) : "memory");
 }
-#endif /* DEBUG_RWLOCK */
+#endif /* CONFIG_DEBUG_RWLOCK */
 
 static inline void write_unlock(rwlock_t * lock)
 {

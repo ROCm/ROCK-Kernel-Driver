@@ -57,7 +57,7 @@ __down_failed(struct semaphore *sem)
 {
 	DECLARE_WAITQUEUE(wait, current);
 
-#if DEBUG_SEMAPHORE
+#ifdef CONFIG_DEBUG_SEMAPHORE
 	printk("%s(%d): down failed(%p)\n",
 	       current->comm, current->pid, sem);
 #endif
@@ -97,7 +97,7 @@ __down_failed(struct semaphore *sem)
 	remove_wait_queue(&sem->wait, &wait);
 	current->state = TASK_RUNNING;
 
-#if DEBUG_SEMAPHORE
+#ifdef CONFIG_DEBUG_SEMAPHORE
 	printk("%s(%d): down acquired(%p)\n",
 	       current->comm, current->pid, sem);
 #endif
@@ -109,7 +109,7 @@ __down_failed_interruptible(struct semaphore *sem)
 	DECLARE_WAITQUEUE(wait, current);
 	long ret;
 
-#if DEBUG_SEMAPHORE
+#ifdef CONFIG_DEBUG_SEMAPHORE
 	printk("%s(%d): down failed(%p)\n",
 	       current->comm, current->pid, sem);
 #endif
@@ -185,7 +185,7 @@ __down_failed_interruptible(struct semaphore *sem)
 	current->state = TASK_RUNNING;
 	wake_up(&sem->wait);
 
-#if DEBUG_SEMAPHORE
+#ifdef CONFIG_DEBUG_SEMAPHORE
 	printk("%s(%d): down %s(%p)\n",
 	       current->comm, current->pid,
 	       (ret < 0 ? "interrupted" : "acquired"), sem);
@@ -207,7 +207,7 @@ down(struct semaphore *sem)
 #if WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
 #endif
-#if DEBUG_SEMAPHORE
+#ifdef CONFIG_DEBUG_SEMAPHORE
 	printk("%s(%d): down(%p) <count=%d> from %p\n",
 	       current->comm, current->pid, sem,
 	       atomic_read(&sem->count), __builtin_return_address(0));
@@ -221,7 +221,7 @@ down_interruptible(struct semaphore *sem)
 #if WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
 #endif
-#if DEBUG_SEMAPHORE
+#ifdef CONFIG_DEBUG_SEMAPHORE
 	printk("%s(%d): down(%p) <count=%d> from %p\n",
 	       current->comm, current->pid, sem,
 	       atomic_read(&sem->count), __builtin_return_address(0));
@@ -240,7 +240,7 @@ down_trylock(struct semaphore *sem)
 
 	ret = __down_trylock(sem);
 
-#if DEBUG_SEMAPHORE
+#ifdef CONFIG_DEBUG_SEMAPHORE
 	printk("%s(%d): down_trylock %s from %p\n",
 	       current->comm, current->pid,
 	       ret ? "failed" : "acquired",
@@ -256,7 +256,7 @@ up(struct semaphore *sem)
 #if WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
 #endif
-#if DEBUG_SEMAPHORE
+#ifdef CONFIG_DEBUG_SEMAPHORE
 	printk("%s(%d): up(%p) <count=%d> from %p\n",
 	       current->comm, current->pid, sem,
 	       atomic_read(&sem->count), __builtin_return_address(0));

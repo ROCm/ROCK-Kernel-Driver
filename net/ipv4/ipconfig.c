@@ -1144,7 +1144,9 @@ static int __init ip_auto_config(void)
 	 */
 	if (ic_myaddr == INADDR_NONE ||
 #ifdef CONFIG_ROOT_NFS
-	    (root_server_addr == INADDR_NONE && ic_servaddr == INADDR_NONE) ||
+	    (MAJOR(ROOT_DEV) == UNNAMED_MAJOR
+	     && root_server_addr == INADDR_NONE
+	     && ic_servaddr == INADDR_NONE) ||
 #endif
 	    ic_first_dev->next) {
 #ifdef IPCONFIG_DYNAMIC

@@ -124,7 +124,7 @@ get_irqlock(int cpu, void* where)
 	/*
 	 * Finally.
 	 */
-#if DEBUG_SPINLOCK
+#ifdef CONFIG_DEBUG_SPINLOCK
 	global_irq_lock.task = current;
 	global_irq_lock.previous = where;
 #endif

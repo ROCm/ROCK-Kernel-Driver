@@ -222,12 +222,12 @@ EXPORT_SYMBOL(__global_sti);
 EXPORT_SYMBOL(__global_save_flags);
 EXPORT_SYMBOL(__global_restore_flags);
 EXPORT_SYMBOL(atomic_dec_and_lock);
-#if DEBUG_SPINLOCK
+#ifdef CONFIG_DEBUG_SPINLOCK
 EXPORT_SYMBOL(spin_unlock);
 EXPORT_SYMBOL(debug_spin_lock);
 EXPORT_SYMBOL(debug_spin_trylock);
 #endif
-#if DEBUG_RWLOCK
+#ifdef CONFIG_DEBUG_RWLOCK
 EXPORT_SYMBOL(write_lock);
 EXPORT_SYMBOL(read_lock);
 #endif

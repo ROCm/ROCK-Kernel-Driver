@@ -50,11 +50,6 @@
  * have a way to deal with that gracefully. Right now I used straightforward
  * wrappers, but this needs further analysis wrt potential overflows.
  */
-extern int get_hardware_list(char *);
-extern int get_stram_list(char *);
-#ifdef CONFIG_DEBUG_MALLOC
-extern int get_malloc(char * buffer);
-#endif
 #ifdef CONFIG_MODULES
 extern int get_module_list(char *);
 #endif
@@ -218,33 +213,6 @@ static struct file_operations proc_cpuinfo_operations = {
 	llseek:		seq_lseek,
 	release:	seq_release,
 };
-
-#ifdef CONFIG_PROC_HARDWARE
-static int hardware_read_proc(char *page, char **start, off_t off,
-				 int count, int *eof, void *data)
-{
-	int len = get_hardware_list(page);
-	return proc_calc_metrics(page, start, off, count, eof, len);
-}
-#endif
-
-#ifdef CONFIG_STRAM_PROC
-static int stram_read_proc(char *page, char **start, off_t off,
-				 int count, int *eof, void *data)
-{
-	int len = get_stram_list(page);
-	return proc_calc_metrics(page, start, off, count, eof, len);
-}
-#endif
-
-#ifdef CONFIG_DEBUG_MALLOC
-static int malloc_read_proc(char *page, char **start, off_t off,
-				 int count, int *eof, void *data)
-{
-	int len = get_malloc(page);
-	return proc_calc_metrics(page, start, off, count, eof, len);
-}
-#endif
 
 #ifdef CONFIG_MODULES
 static int modules_read_proc(char *page, char **start, off_t off,
@@ -538,15 +506,6 @@ void __init proc_misc_init(void)
 		{"uptime",	uptime_read_proc},
 		{"meminfo",	meminfo_read_proc},
 		{"version",	version_read_proc},
-#ifdef CONFIG_PROC_HARDWARE
-		{"hardware",	hardware_read_proc},
-#endif
-#ifdef CONFIG_STRAM_PROC
-		{"stram",	stram_read_proc},
-#endif
-#ifdef CONFIG_DEBUG_MALLOC
-		{"malloc",	malloc_read_proc},
-#endif
 #ifdef CONFIG_MODULES
 		{"modules",	modules_read_proc},
 #endif

@@ -314,7 +314,7 @@ nfs_inode_add_request(struct inode *inode, struct nfs_page *req)
 	if (!NFS_WBACK_BUSY(req))
 		printk(KERN_ERR "NFS: unlocked request attempted hashed!\n");
 	if (list_empty(&inode->u.nfs_i.writeback))
-		atomic_inc(&inode->i_count);
+		igrab(inode);
 	inode->u.nfs_i.npages++;
 	list_add(&req->wb_hash, &inode->u.nfs_i.writeback);
 	req->wb_count++;

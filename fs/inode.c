@@ -404,6 +404,8 @@ static void try_to_sync_unused_inodes(void * arg)
 	spin_lock(&sb_lock);
 	sb = sb_entry(super_blocks.next);
 	for (; nr_inodes && sb != sb_entry(&super_blocks); sb = sb_entry(sb->s_list.next)) {
+		if (list_empty(&sb->s_dirty))
+			continue;
 		spin_unlock(&sb_lock);
 		nr_inodes = try_to_sync_unused_list(&sb->s_dirty, nr_inodes);
 		spin_lock(&sb_lock);
@@ -957,8 +959,6 @@ struct inode *igrab(struct inode *inode)
 		 */
 		inode = NULL;
 	spin_unlock(&inode_lock);
-	if (inode)
-		wait_on_inode(inode);
 	return inode;
 }
 
