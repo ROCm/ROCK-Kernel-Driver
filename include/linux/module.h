@@ -43,6 +43,12 @@ struct kernel_symbol
 extern int init_module(void);
 extern void cleanup_module(void);
 
+/* Archs provide a method of finding the correct exception table. */
+const struct exception_table_entry *
+search_extable(const struct exception_table_entry *first,
+	       const struct exception_table_entry *last,
+	       unsigned long value);
+
 #ifdef MODULE
 
 /* For replacement modutils, use an alias not a pointer. */
@@ -110,6 +116,9 @@ struct kernel_symbol_group
 	unsigned int num_syms;
 	const struct kernel_symbol *syms;
 };
+
+/* Given an address, look for it in the exception tables */
+const struct exception_table_entry *search_exception_tables(unsigned long add);
 
 struct exception_table
 {
@@ -300,10 +309,20 @@ const char *module_address_lookup(unsigned long addr,
 				  unsigned long *offset,
 				  char **modname);
 
+/* For extable.c to search modules' exception tables. */
+const struct exception_table_entry *search_module_extables(unsigned long addr);
+
 #else /* !CONFIG_MODULES... */
 #define EXPORT_SYMBOL(sym)
 #define EXPORT_SYMBOL_GPL(sym)
 #define EXPORT_SYMBOL_NOVERS(sym)
+
+/* Given an address, look for it in the exception tables. */
+static inline const struct exception_table_entry *
+search_module_extables(unsigned long addr)
+{
+	return NULL;
+}
 
 /* Get/put a kernel symbol (calls should be symmetric) */
 #define symbol_get(x) (&(x))
@@ -343,10 +362,6 @@ __attribute__((section(".gnu.linkonce.this_module"))) = {
 };
 #endif /* KBUILD_MODNAME */
 #endif /* MODULE */
-
-/* For archs to search exception tables */
-extern struct list_head extables;
-extern spinlock_t modlist_lock;
 
 #define symbol_request(x) try_then_request_module(symbol_get(x), "symbol:" #x)
 

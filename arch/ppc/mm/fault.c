@@ -27,6 +27,7 @@
 #include <linux/mm.h>
 #include <linux/interrupt.h>
 #include <linux/highmem.h>
+#include <linux/module.h>
 
 #include <asm/page.h>
 #include <asm/pgtable.h>
@@ -263,12 +264,11 @@ void
 bad_page_fault(struct pt_regs *regs, unsigned long address, int sig)
 {
 	extern void die(const char *,struct pt_regs *,long);
-
-	unsigned long fixup;
+	const struct exception_table_entry *entry;
 
 	/* Are we prepared to handle this fault?  */
-	if ((fixup = search_exception_table(regs->nip)) != 0) {
-		regs->nip = fixup;
+	if ((entry = search_exception_tables(regs->nip)) != NULL) {
+		regs->nip = entry->fixup;
 		return;
 	}
 

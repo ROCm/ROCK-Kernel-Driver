@@ -9,10 +9,11 @@
 extern const struct exception_table_entry __start___ex_table[];
 extern const struct exception_table_entry __stop___ex_table[];
 
-static unsigned long
-search_one_table(const struct exception_table_entry *start,
-		 const struct exception_table_entry *end,
-		 unsigned long value, unsigned long *g2)
+/* Caller knows they are in a range if ret->fixup == 0 */
+const struct exception_table_entry *
+search_extable(const struct exception_table_entry *start,
+	       const struct exception_table_entry *last,
+	       unsigned long value)
 {
 	const struct exception_table_entry *walk;
 
@@ -38,7 +39,7 @@ search_one_table(const struct exception_table_entry *start,
 		}
 
 		if (walk->insn == value)
-			return walk->fixup;
+			return walk;
 	}
 
 	/* 2. Try to find a range match. */
@@ -46,47 +47,29 @@ search_one_table(const struct exception_table_entry *start,
 		if (walk->fixup)
 			continue;
 
-		if (walk[0].insn <= value &&
-		    walk[1].insn > value) {
-			*g2 = (value - walk[0].insn) / 4;
-			return walk[1].fixup;
-		}
+		if (walk[0].insn <= value && walk[1].insn > value)
+			return walk;
+
 		walk++;
 	}
 
-        return 0;
+        return NULL;
 }
 
-extern spinlock_t modlist_lock;
-
-unsigned long
-search_exception_table(unsigned long addr, unsigned long *g2)
+/* Special extable search, which handles ranges.  Returns fixup */
+unsigned long search_extables_range(unsigned long addr, unsigned long *g2)
 {
-	unsigned long ret = 0;
+	const struct exception_table_entry *entry;
 
-#ifndef CONFIG_MODULES
-	/* There is only the kernel to search.  */
-	ret = search_one_table(__start___ex_table,
-			       __stop___ex_table-1, addr, g2);
-	return ret;
-#else
-	unsigned long flags;
-	struct list_head *i;
+	entry = search_exception_tables(addr);
+	if (!entry)
+		return 0;
 
-	/* The kernel is the last "module" -- no need to treat it special.  */
-	spin_lock_irqsave(&modlist_lock, flags);
-	list_for_each(i, &extables) {
-		struct exception_table *ex =
-			list_entry(i, struct exception_table, list);
-		if (ex->num_entries == 0)
-			continue;
-		ret = search_one_table(ex->entry,
-				       ex->entry + ex->num_entries - 1,
-				       addr, g2);
-		if (ret)
-			break;
+	/* Inside range?  Fix g2 and return correct fixup */
+	if (!entry->fixup) {
+		*g2 = (addr - entry->insn) / 4;
+		return (entry + 1)->fixup;
 	}
-	spin_unlock_irqrestore(&modlist_lock, flags);
-	return ret;
-#endif
+
+	return entry->fixup;
 }

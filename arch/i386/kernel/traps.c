@@ -338,7 +338,7 @@ static inline void do_trap(int trapnr, int signr, char *str, int vm86,
 	}
 
 	kernel_trap: {
-		unsigned long fixup;
+		const struct exception_table_entry *fixup;
 #ifdef CONFIG_PNPBIOS
 		if (unlikely((regs->xcs | 8) == 0x88)) /* 0x80 or 0x88 */
 		{
@@ -354,9 +354,9 @@ static inline void do_trap(int trapnr, int signr, char *str, int vm86,
 		}
 #endif	
 		
-		fixup = search_exception_table(regs->eip);
+		fixup = search_exception_tables(regs->eip);
 		if (fixup)
-			regs->eip = fixup;
+			regs->eip = fixup->fixup;
 		else	
 			die(str, regs, error_code);
 		return;
@@ -435,10 +435,10 @@ gp_in_vm86:
 
 gp_in_kernel:
 	{
-		unsigned long fixup;
-		fixup = search_exception_table(regs->eip);
+		const struct exception_table_entry *fixup;
+		fixup = search_exception_tables(regs->eip);
 		if (fixup) {
-			regs->eip = fixup;
+			regs->eip = fixup->fixup;
 			return;
 		}
 		die("general protection fault", regs, error_code);

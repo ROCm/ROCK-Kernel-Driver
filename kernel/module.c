@@ -51,9 +51,14 @@
 #define symbol_is(literal, string)				\
 	(strcmp(MODULE_SYMBOL_PREFIX literal, (string)) == 0)
 
+/* Protects extables and symbols lists */
+static spinlock_t modlist_lock = SPIN_LOCK_UNLOCKED;
+
 /* List of modules, protected by module_mutex */
 static DECLARE_MUTEX(module_mutex);
-LIST_HEAD(modules); /* FIXME: Accessed w/o lock on oops by some archs */
+LIST_HEAD(modules);  /* FIXME: Accessed w/o lock on oops by some archs */
+static LIST_HEAD(symbols);
+static LIST_HEAD(extables);
 
 /* We require a truly strong try_module_get() */
 static inline int strong_try_module_get(struct module *mod)
@@ -1424,6 +1429,55 @@ struct seq_operations modules_op = {
 	.stop	= m_stop,
 	.show	= m_show
 };
+
+/* Given an address, look for it in the module exception tables. */
+const struct exception_table_entry *search_module_extables(unsigned long addr)
+{
+	unsigned long flags;
+	const struct exception_table_entry *e = NULL;
+	struct exception_table *i;
+
+	spin_lock_irqsave(&modlist_lock, flags);
+	list_for_each_entry(i, &extables, list) {
+		if (i->num_entries == 0)
+			continue;
+				
+		e = search_extable(i->entry, i->entry+i->num_entries-1, addr);
+		if (e)
+			break;
+	}
+	spin_unlock_irqrestore(&modlist_lock, flags);
+
+	/* Now, if we found one, we are running inside it now, hence
+           we cannot unload the module, hence no refcnt needed. */
+	return e;
+}
+
+/* Provided by the linker */
+extern const struct kernel_symbol __start___ksymtab[];
+extern const struct kernel_symbol __stop___ksymtab[];
+extern const struct kernel_symbol __start___gpl_ksymtab[];
+extern const struct kernel_symbol __stop___gpl_ksymtab[];
+
+static struct kernel_symbol_group kernel_symbols, kernel_gpl_symbols;
+
+static int __init symbols_init(void)
+{
+	/* Add kernel symbols to symbol table */
+	kernel_symbols.num_syms = (__stop___ksymtab - __start___ksymtab);
+	kernel_symbols.syms = __start___ksymtab;
+	kernel_symbols.gplonly = 0;
+	list_add(&kernel_symbols.list, &symbols);
+	kernel_gpl_symbols.num_syms = (__stop___gpl_ksymtab
+				       - __start___gpl_ksymtab);
+	kernel_gpl_symbols.syms = __start___gpl_ksymtab;
+	kernel_gpl_symbols.gplonly = 1;
+	list_add(&kernel_gpl_symbols.list, &symbols);
+
+	return 0;
+}
+
+__initcall(symbols_init);
 
 /* Obsolete lvalue for broken code which asks about usage */
 int module_dummy_usage = 1;

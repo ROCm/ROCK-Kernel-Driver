@@ -61,7 +61,6 @@ extern void init_IRQ(void);
 extern void init_modules(void);
 extern void sock_init(void);
 extern void fork_init(unsigned long);
-extern void extable_init(void);
 extern void mca_init(void);
 extern void sbus_init(void);
 extern void sysctl_init(void);
@@ -392,7 +391,6 @@ asmlinkage void __init start_kernel(void)
 		   &__stop___param - &__start___param,
 		   &unknown_bootoption);
 	trap_init();
-	extable_init();
 	rcu_init();
 	init_IRQ();
 	pidhash_init();

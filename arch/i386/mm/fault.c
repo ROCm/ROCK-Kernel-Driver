@@ -19,6 +19,7 @@
 #include <linux/init.h>
 #include <linux/tty.h>
 #include <linux/vt_kern.h>		/* For unblank_screen() */
+#include <linux/module.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -154,7 +155,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	struct vm_area_struct * vma;
 	unsigned long address;
 	unsigned long page;
-	unsigned long fixup;
+	const struct exception_table_entry *fixup;
 	int write;
 	siginfo_t info;
 
@@ -310,8 +311,8 @@ bad_area:
 
 no_context:
 	/* Are we prepared to handle this kernel fault?  */
-	if ((fixup = search_exception_table(regs->eip)) != 0) {
-		regs->eip = fixup;
+	if ((fixup = search_exception_tables(regs->eip)) != NULL) {
+		regs->eip = fixup->fixup;
 		return;
 	}
 
