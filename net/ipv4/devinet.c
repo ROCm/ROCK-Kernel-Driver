@@ -90,8 +90,6 @@ static void devinet_sysctl_unregister(struct ipv4_devconf *p);
 
 /* Locks all the inet devices. */
 
-static spinlock_t inetdev_lock = SPIN_LOCK_UNLOCKED;
-
 static struct in_ifaddr *inet_alloc_ifa(void)
 {
 	struct in_ifaddr *ifa = kmalloc(sizeof(*ifa), GFP_KERNEL);
@@ -158,11 +156,12 @@ struct in_device *inetdev_init(struct net_device *dev)
 	neigh_sysctl_register(dev, in_dev->arp_parms, NET_IPV4,
 			      NET_IPV4_NEIGH, "ipv4", NULL);
 #endif
-	spin_lock_bh(&inetdev_lock);
-	dev->ip_ptr = in_dev;
+
 	/* Account for reference dev->ip_ptr */
 	in_dev_hold(in_dev);
-	spin_unlock_bh(&inetdev_lock);
+	smp_wmb();
+	dev->ip_ptr = in_dev;
+
 #ifdef CONFIG_SYSCTL
 	devinet_sysctl_register(in_dev, &in_dev->cnf);
 #endif
@@ -201,10 +200,8 @@ static void inetdev_destroy(struct in_device *in_dev)
 #ifdef CONFIG_SYSCTL
 	devinet_sysctl_unregister(&in_dev->cnf);
 #endif
-	spin_lock_bh(&inetdev_lock);
+
 	in_dev->dev->ip_ptr = NULL;
-	/* in_dev_put following below will kill the in_device */
-	spin_unlock_bh(&inetdev_lock);
 
 #ifdef CONFIG_SYSCTL
 	neigh_sysctl_unregister(in_dev->arp_parms);
@@ -248,9 +245,8 @@ static void inet_del_ifa(struct in_device *in_dev, struct in_ifaddr **ifap,
 				ifap1 = &ifa->ifa_next;
 				continue;
 			}
-			spin_lock_bh(&inetdev_lock);
+
 			*ifap1 = ifa->ifa_next;
-			spin_unlock_bh(&inetdev_lock);
 
 			rtmsg_ifa(RTM_DELADDR, ifa);
 			notifier_call_chain(&inetaddr_chain, NETDEV_DOWN, ifa);
@@ -260,9 +256,7 @@ static void inet_del_ifa(struct in_device *in_dev, struct in_ifaddr **ifap,
 
 	/* 2. Unlink it */
 
-	spin_lock_bh(&inetdev_lock);
 	*ifap = ifa1->ifa_next;
-	spin_unlock_bh(&inetdev_lock);
 
 	/* 3. Announce address deletion */
 
@@ -324,9 +318,7 @@ static int inet_insert_ifa(struct in_ifaddr *ifa)
 	}
 
 	ifa->ifa_next = *ifap;
-	spin_lock_bh(&inetdev_lock);
 	*ifap = ifa;
-	spin_unlock_bh(&inetdev_lock);
 
 	/* Send message first, then call notifier.
 	   Notifier will trigger FIB update, so that
