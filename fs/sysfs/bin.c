@@ -47,7 +47,7 @@ read(struct file * file, char __user * userbuf, size_t count, loff_t * off)
 		return ret;
 	count = ret;
 
-	if (copy_to_user(userbuf, buffer + offs, count))
+	if (copy_to_user(userbuf, buffer, count))
 		return -EFAULT;
 
 	pr_debug("offs = %lld, *off = %lld, count = %zd\n", offs, *off, count);
@@ -83,7 +83,7 @@ static ssize_t write(struct file * file, const char __user * userbuf,
 			count = size - offs;
 	}
 
-	if (copy_from_user(buffer + offs, userbuf, count))
+	if (copy_from_user(buffer, userbuf, count))
 		return -EFAULT;
 
 	count = flush_write(dentry, buffer, offs, count);

@@ -34,7 +34,7 @@ extern int      gus_pcm_volume;
 extern int      have_gus_max;
 int             gus_pnp_flag = 0;
 #ifdef CONFIG_SOUND_GUS16
-static int      db16 = 0;	/* Has a Gus16 AD1848 on it */
+static int      db16;	/* Has a Gus16 AD1848 on it */
 #endif
 
 static void __init attach_gus(struct address_info *hw_config)
@@ -200,10 +200,10 @@ static void __exit unload_gus_db16(struct address_info *hw_config)
 #endif
 
 #ifdef CONFIG_SOUND_GUS16
-static int gus16 = 0;
+static int gus16;
 #endif
 #ifdef CONFIG_SOUND_GUSMAX
-static int no_wave_dma = 0;/* Set if no dma is to be used for the
+static int no_wave_dma;   /* Set if no dma is to be used for the
                                    wave table (GF1 chip) */
 #endif
 

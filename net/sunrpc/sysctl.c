@@ -102,7 +102,7 @@ proc_dodebug(ctl_table *table, int write, struct file *file,
 		len = sprintf(tmpbuf, "%d", *(unsigned int *) table->data);
 		if (len > left)
 			len = left;
-		copy_to_user(buffer, tmpbuf, len);
+		__copy_to_user(buffer, tmpbuf, len);
 		if ((left -= len) > 0) {
 			put_user('\n', (char *)buffer + len);
 			left--;

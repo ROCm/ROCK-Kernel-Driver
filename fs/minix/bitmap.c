@@ -116,7 +116,7 @@ minix_V1_raw_inode(struct super_block *sb, ino_t ino, struct buffer_head **bh)
 
 	if (!ino || ino > sbi->s_ninodes) {
 		printk("Bad inode number on dev %s: %ld is out of range\n",
-		       sb->s_id, ino);
+		       sb->s_id, (long)ino);
 		return NULL;
 	}
 	ino--;
@@ -141,7 +141,7 @@ minix_V2_raw_inode(struct super_block *sb, ino_t ino, struct buffer_head **bh)
 	*bh = NULL;
 	if (!ino || ino > sbi->s_ninodes) {
 		printk("Bad inode number on dev %s: %ld is out of range\n",
-		       sb->s_id, ino);
+		       sb->s_id, (long)ino);
 		return NULL;
 	}
 	ino--;

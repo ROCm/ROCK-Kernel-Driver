@@ -43,9 +43,11 @@
  *	1.10e	Maciej W. Rozycki: Handle DECstation's year weirdness.
  *      1.11    Takashi Iwai: Kernel access functions
  *			      rtc_register/rtc_unregister/rtc_control
+ *      1.11a   Daniele Bellucci: Audit create_proc_read_entry in rtc_init
+ *
  */
 
-#define RTC_VERSION		"1.11"
+#define RTC_VERSION		"1.11a"
 
 #define RTC_IO_EXTENT	0x8
 
@@ -881,15 +883,13 @@ found:
 	}
 no_irq:
 #else
-	if (!request_region(RTC_PORT(0), RTC_IO_EXTENT, "rtc"))
-	{
+	if (!request_region(RTC_PORT(0), RTC_IO_EXTENT, "rtc")) {
 		printk(KERN_ERR "rtc: I/O port %d is not free.\n", RTC_PORT (0));
 		return -EIO;
 	}
 
 #if RTC_IRQ
-	if(request_irq(RTC_IRQ, rtc_interrupt, SA_INTERRUPT, "rtc", NULL))
-	{
+	if (request_irq(RTC_IRQ, rtc_interrupt, SA_INTERRUPT, "rtc", NULL)) {
 		/* Yeah right, seeing as irq 8 doesn't even hit the bus. */
 		printk(KERN_ERR "rtc: IRQ %d is not free.\n", RTC_IRQ);
 		release_region(RTC_PORT(0), RTC_IO_EXTENT);
@@ -899,15 +899,21 @@ no_irq:
 
 #endif /* __sparc__ vs. others */
 
-	if (misc_register(&rtc_dev))
-		{
+	if (misc_register(&rtc_dev)) {
 #if RTC_IRQ
 		free_irq(RTC_IRQ, NULL);
 #endif
 		release_region(RTC_PORT(0), RTC_IO_EXTENT);
 		return -ENODEV;
-		}
-	create_proc_read_entry ("driver/rtc", 0, 0, rtc_read_proc, NULL);
+	}
+	if (create_proc_read_entry ("driver/rtc", 0, 0, rtc_read_proc, NULL) == NULL) {
+#if RTC_IRQ
+		free_irq(RTC_IRQ, NULL);
+#endif
+		release_region(RTC_PORT(0), RTC_IO_EXTENT);
+		misc_deregister(&rtc_dev);
+		return -ENOMEM;
+	}
 
 #if defined(__alpha__) || defined(__mips__)
 	rtc_freq = HZ;

@@ -120,7 +120,7 @@
 #ifdef CONFIG_PSS_MIXER
 static unsigned char pss_mixer = 1;
 #else
-static unsigned char pss_mixer = 0;
+static unsigned char pss_mixer;
 #endif
 
 
@@ -145,10 +145,10 @@ static pss_confdata pss_data;
 static pss_confdata *devc = &pss_data;
 static spinlock_t lock=SPIN_LOCK_UNLOCKED;
 
-static int      pss_initialized = 0;
-static int      nonstandard_microcode = 0;
+static int      pss_initialized;
+static int      nonstandard_microcode;
 static int	pss_cdrom_port = -1;	/* Parameter for the PSS cdrom port */
-static int	pss_enable_joystick = 0;/* Parameter for enabling the joystick */
+static int	pss_enable_joystick;    /* Parameter for enabling the joystick */
 
 static void pss_write(pss_confdata *devc, int data)
 {

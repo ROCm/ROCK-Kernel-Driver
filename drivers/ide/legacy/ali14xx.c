@@ -269,7 +269,7 @@ MODULE_AUTHOR("see local file");
 MODULE_DESCRIPTION("support of ALI 14XX IDE chipsets");
 MODULE_LICENSE("GPL");
 
-int __init ali14xx_mod_init(void)
+static int __init ali14xx_mod_init(void)
 {
 	/* auto-detect IDE controller port */
 	if (findPort())
@@ -287,7 +287,7 @@ int __init ali14xx_mod_init(void)
 }
 module_init(ali14xx_mod_init);
 
-void __init ali14xx_mod_exit(void)
+static void __exit ali14xx_mod_exit(void)
 {
 	ali14xx_release();
 }

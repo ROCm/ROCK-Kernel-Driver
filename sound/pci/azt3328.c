@@ -1021,7 +1021,7 @@ static irqreturn_t snd_azf3328_interrupt(int irq, void *dev_id, struct pt_regs *
 {
 	azf3328_t *chip = snd_magic_cast(azf3328_t, dev_id, return IRQ_NONE);
 	unsigned int status, which;
-	static unsigned long count = 0;
+	static unsigned long count;
 
 	status  = inw(chip->codec_port+IDX_IO_IRQSTATUS);
 

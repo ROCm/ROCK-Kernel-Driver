@@ -39,7 +39,7 @@
 
 static int      maui_base = 0x330;
 
-static volatile int irq_ok = 0;
+static volatile int irq_ok;
 static int     *maui_osp;
 
 #define HOST_DATA_PORT	(maui_base + 2)
@@ -413,7 +413,7 @@ static void __exit unload_maui(struct address_info *hw_config)
 		free_irq(irq, NULL);
 }
 
-static int fw_load = 0;
+static int fw_load;
 
 static struct address_info cfg;
 

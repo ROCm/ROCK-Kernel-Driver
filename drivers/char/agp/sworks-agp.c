@@ -266,6 +266,10 @@ static int serverworks_configure(void)
 	pci_read_config_dword(agp_bridge->dev, serverworks_private.mm_addr_ofs, &temp);
 	temp = (temp & PCI_BASE_ADDRESS_MEM_MASK);
 	serverworks_private.registers = (volatile u8 *) ioremap(temp, 4096);
+	if (!serverworks_private.registers) {
+		printk (KERN_ERR PFX "Unable to ioremap() memory.\n");
+		return -ENOMEM;
+	}
 
 	OUTREG8(serverworks_private.registers, SVWRKS_GART_CACHE, 0x0a);
 
@@ -444,8 +448,8 @@ static int __init agp_serverworks_probe(struct pci_dev *pdev,
 	bridge_dev = pci_find_slot((unsigned int)pdev->bus->number,
 			PCI_DEVFN(0, 1));
 	if (!bridge_dev) {
-		printk(KERN_INFO PFX "agpgart: Detected a Serverworks "
-		       "Chipset, but could not find the secondary device.\n");
+		printk(KERN_INFO PFX "Detected a Serverworks chipset "
+		       "but could not find the secondary device.\n");
 		return -ENODEV;
 	}
 

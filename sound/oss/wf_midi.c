@@ -359,7 +359,7 @@ wf_mpuintr(int irq, void *dev_id, struct pt_regs *dummy)
 
 {
 	struct wf_mpu_config *physical_dev = dev_id;
-	static struct wf_mpu_config *input_dev = 0;
+	static struct wf_mpu_config *input_dev;
 	struct midi_input_info *mi = &midi_devs[physical_dev->devno]->in_info;
 	int n;
 

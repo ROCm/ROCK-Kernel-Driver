@@ -173,7 +173,7 @@ MODULE_AUTHOR("See Local File");
 MODULE_DESCRIPTION("support of DTC-2278 VLB IDE chipsets");
 MODULE_LICENSE("GPL");
 
-int __init dtc2278_mod_init(void)
+static int __init dtc2278_mod_init(void)
 {
 	probe_dtc2278();
 	if (ide_hwifs[0].chipset != ide_dtc2278 &&
@@ -185,7 +185,7 @@ int __init dtc2278_mod_init(void)
 }
 module_init(dtc2278_mod_init);
 
-void __init dtc2278_mod_exit(void)
+static void __exit dtc2278_mod_exit(void)
 {
 	dtc2278_release();
 }

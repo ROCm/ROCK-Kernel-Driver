@@ -13,3 +13,5 @@ struct class_device_attribute *to_class_dev_attr(struct attribute *_attr)
 {
 	return container_of(_attr,struct class_device_attribute,attr);
 }
+
+

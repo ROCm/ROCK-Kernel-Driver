@@ -113,7 +113,7 @@ MODULE_DEVICE_TABLE(pci, snd_ice1712_ids);
 static int snd_ice1712_build_pro_mixer(ice1712_t *ice);
 static int snd_ice1712_build_controls(ice1712_t *ice);
 
-static int PRO_RATE_LOCKED = 0;
+static int PRO_RATE_LOCKED;
 static int PRO_RATE_RESET = 1;
 static unsigned int PRO_RATE_DEFAULT = 44100;
 

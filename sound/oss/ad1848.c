@@ -180,12 +180,12 @@ static struct {
 
 #ifdef CONFIG_PNP
 static int isapnp	= 1;
-static int isapnpjump	= 0;
-static int reverse	= 0;
+static int isapnpjump;
+static int reverse;
 
-static int audio_activated = 0;
+static int audio_activated;
 #else
-static int isapnp	= 0;
+static int isapnp;
 #endif
 
 
@@ -2717,7 +2717,7 @@ void unload_ms_sound(struct address_info *hw_config)
  * Timer stuff (for /dev/music).
  */
 
-static unsigned int current_interval = 0;
+static unsigned int current_interval;
 
 static unsigned int ad1848_tmr_start(int dev, unsigned int usecs)
 {

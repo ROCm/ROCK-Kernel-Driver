@@ -906,7 +906,7 @@ int cs46xx_dsp_proc_done (cs46xx_t *chip)
 	return 0;
 }
 
-static int debug_tree = 0;
+static int debug_tree;
 static void _dsp_create_task_tree (cs46xx_t *chip,u32 * task_data, u32  dest, int size)
 {
 	unsigned long spdst = chip->region.idx[1].remap_addr + 
@@ -920,7 +920,7 @@ static void _dsp_create_task_tree (cs46xx_t *chip,u32 * task_data, u32  dest, in
 	}
 }
 
-static int debug_scb = 0;
+static int debug_scb;
 static void _dsp_create_scb (cs46xx_t *chip,u32 * scb_data, u32  dest)
 {
 	unsigned long spdst = chip->region.idx[1].remap_addr + 

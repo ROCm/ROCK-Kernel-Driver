@@ -1224,6 +1224,12 @@ static devfs_handle_t _devfs_walk_path (struct devfs_entry *dir,
     {
 	struct devfs_entry *de, *link;
 
+	if (!S_ISDIR (dir->mode))
+	{
+	    devfs_put (dir);
+	    return NULL;
+	}
+
 	if ( ( de = _devfs_descend (dir, name, namelen, &next_pos) ) == NULL )
 	{
 	    devfs_put (dir);
@@ -1697,13 +1703,13 @@ int devfs_mk_dir(const char *fmt, ...)
 	}
 
 	error = _devfs_append_entry(dir, de, &old);
-	if (error == -EEXIST) {
+	if (error == -EEXIST && S_ISDIR(old->mode)) {
 		/*
 		 * devfs_mk_dir() of an already-existing directory will
 		 * return success.
 		 */
 		error = 0;
-		devfs_put(old);
+		goto out_put;
 	} else if (error) {
 		PRINTK("(%s): could not append to dir: %p \"%s\"\n",
 				buf, dir, dir->name);

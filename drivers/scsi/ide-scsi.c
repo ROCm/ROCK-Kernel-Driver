@@ -872,7 +872,7 @@ static int idescsi_abort (Scsi_Cmnd *cmd)
 			continue;
 		}
 		/* no, but is it queued in the ide subsystem? */
-		if (elv_queue_empty(&drive->queue)) {
+		if (elv_queue_empty(drive->queue)) {
 			spin_unlock_irqrestore(&ide_lock, flags);
 			return SUCCESS;
 		}
@@ -899,7 +899,7 @@ static int idescsi_reset (Scsi_Cmnd *cmd)
 		schedule_timeout(1);
 	}
 	/* now nuke the drive queue */
-	while ((req = elv_next_request(&drive->queue))) {
+	while ((req = elv_next_request(drive->queue))) {
 		blkdev_dequeue_request(req);
 		end_that_request_last(req);
 	}

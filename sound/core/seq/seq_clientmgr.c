@@ -58,7 +58,7 @@ static DECLARE_MUTEX(register_mutex);
  */
 static char clienttablock[SNDRV_SEQ_MAX_CLIENTS];
 static client_t *clienttab[SNDRV_SEQ_MAX_CLIENTS];
-static usage_t client_usage = {0, 0};
+static usage_t client_usage;
 
 /*
  * prototypes

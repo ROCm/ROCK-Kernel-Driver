@@ -878,5 +878,6 @@ ENTRY(sys_call_table)
 	.long sys_fstatfs64	
 	.long sys_tgkill	/* 270 */
 	.long sys_utimes
- 
+ 	.long sys_fadvise64_64
+
 nr_syscalls=(.-sys_call_table)/4

@@ -137,11 +137,11 @@ static unsigned char *macio_base;
  */
 static void *awacs_tx_cmd_space;
 static volatile struct dbdma_cmd *awacs_tx_cmds;
-static int number_of_tx_cmd_buffers = 0;
+static int number_of_tx_cmd_buffers;
 
 static void *awacs_rx_cmd_space;
 static volatile struct dbdma_cmd *awacs_rx_cmds;
-static int number_of_rx_cmd_buffers = 0;
+static int number_of_rx_cmd_buffers;
 
 /*
  * Cached values of AWACS registers (we can't read them).
@@ -154,15 +154,15 @@ int awacs_reg1_save;
 /* tracking values for the mixer contents
 */
 
-static int spk_vol = 0 ;
-static int line_vol = 0 ;
-static int passthru_vol = 0 ;
+static int spk_vol;
+static int line_vol;
+static int passthru_vol;
 
-static int ip_gain = 0 ; /* mic preamp settings */
+static int ip_gain;           /* mic preamp settings */
 static int rec_lev = 0x4545 ; /* default CD gain 69 % */
-static int mic_lev = 0 ;
+static int mic_lev;
 static int cd_lev = 0x6363 ; /* 99 % */
-static int line_lev = 0 ;
+static int line_lev;
 
 /*
  * Stuff for outputting a beep.  The values range from -327 to +327
@@ -210,8 +210,8 @@ static short beep_wform[256] = {
 #define BEEP_VOLUME	15	/* 0 - 100 */
 
 static int beep_vol = BEEP_VOLUME;
-static int beep_playing = 0;
-static int awacs_beep_state = 0;
+static int beep_playing;
+static int awacs_beep_state;
 static short *beep_buf;
 static void *beep_dbdma_cmd_space;
 static volatile struct dbdma_cmd *beep_dbdma_cmd;
@@ -934,7 +934,7 @@ pmac_awacs_tx_intr(int irq, void *devid, struct pt_regs *regs)
 	int stat;
 	volatile struct dbdma_cmd *cp;
 	/* != 0 when we are dealing with a DEAD xfer */
-	static int emergency_in_use = 0 ;
+	static int emergency_in_use;
 
 	spin_lock(&dmasound.lock);
 	while (write_sq.active > 0) { /* we expect to have done something*/

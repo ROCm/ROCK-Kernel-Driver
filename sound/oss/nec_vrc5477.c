@@ -104,8 +104,8 @@
 #endif /* VRC5477_AC97_DEBUG */
 
 #if defined(VRC5477_AC97_VERBOSE_DEBUG)
-static u16 inTicket=0; 		/* check sync between intr & write */
-static u16 outTicket=0;
+static u16 inTicket; 		/* check sync between intr & write */
+static u16 outTicket;
 #endif
 
 /* --------------------------------------------------------------------- */
@@ -1810,7 +1810,7 @@ static int proc_vrc5477_ac97_dump (char *buf, char **start, off_t fpos,
 /* maximum number of devices; only used for command line params */
 #define NR_DEVICE 5
 
-static unsigned int devindex = 0;
+static unsigned int devindex;
 
 MODULE_AUTHOR("Monta Vista Software, jsun@mvista.com or jsun@junsun.net");
 MODULE_DESCRIPTION("NEC Vrc5477 audio (AC97) Driver");

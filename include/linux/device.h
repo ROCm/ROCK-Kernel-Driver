@@ -19,6 +19,7 @@
 #include <linux/types.h>
 #include <linux/ioport.h>
 #include <linux/module.h>
+#include <linux/pm.h>
 #include <asm/semaphore.h>
 #include <asm/atomic.h>
 
@@ -41,13 +42,6 @@ enum {
 	RESUME_ENABLE,
 };
 
-enum device_state {
-	DEVICE_UNINITIALIZED	= 0,
-	DEVICE_INITIALIZED	= 1,
-	DEVICE_REGISTERED	= 2,
-	DEVICE_GONE		= 3,
-};
-
 struct device;
 struct device_driver;
 struct class;
@@ -64,8 +58,8 @@ struct bus_type {
 	struct device * (*add)	(struct device * parent, char * bus_id);
 	int		(*hotplug) (struct device *dev, char **envp, 
 				    int num_envp, char *buffer, int buffer_size);
-};
 
+};
 
 extern int bus_register(struct bus_type * bus);
 extern void bus_unregister(struct bus_type * bus);
@@ -269,13 +263,16 @@ struct device {
 	void		*driver_data;	/* data private to the driver */
 	void		*platform_data;	/* Platform specific data (e.g. ACPI,
 					   BIOS data relevant to device) */
-
+	struct dev_pm_info	power;
 	u32		power_state;	/* Current operating state. In
 					   ACPI-speak, this is D0-D3, D0
 					   being fully functional, and D3
 					   being off. */
 
 	unsigned char *saved_state;	/* saved device state */
+	u32		detach_state;	/* State to enter when device is
+					   detached from its driver. */
+
 	u64		*dma_mask;	/* dma mask (if dma'able device) */
 
 	void	(*release)(struct device * dev);

@@ -85,7 +85,7 @@ static struct pci_device_id snd_vt1724_ids[] = {
 MODULE_DEVICE_TABLE(pci, snd_vt1724_ids);
 
 
-static int PRO_RATE_LOCKED = 0;
+static int PRO_RATE_LOCKED;
 static int PRO_RATE_RESET = 1;
 static unsigned int PRO_RATE_DEFAULT = 44100;
 

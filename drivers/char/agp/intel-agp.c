@@ -75,6 +75,10 @@ static int intel_i810_configure(void)
 	temp &= 0xfff80000;
 
 	intel_i810_private.registers = (volatile u8 *) ioremap(temp, 128 * 4096);
+	if (!intel_i810_private.registers) {
+		printk(KERN_ERR PFX "Unable to remap memory.\n");
+		return -ENOMEM;
+	}
 
 	if ((INREG32(intel_i810_private.registers, I810_DRAM_CTL)
 		& I810_DRAM_ROW_0) == I810_DRAM_ROW_0_SDRAM) {

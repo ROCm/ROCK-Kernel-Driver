@@ -230,12 +230,12 @@ unsigned int speedstep_get_freqs(unsigned int processor,
 	unsigned long flags;
 
 	if ((!processor) || (!low_speed) || (!high_speed) || (!set_state))
-		return EINVAL;
+		return -EINVAL;
 
 	/* get current speed */
 	prev_speed = speedstep_get_processor_frequency(processor);
 	if (!prev_speed)
-		return EIO;
+		return -EIO;
 	
 	local_irq_save(flags);
 
@@ -243,7 +243,7 @@ unsigned int speedstep_get_freqs(unsigned int processor,
 	set_state(SPEEDSTEP_LOW, 0);
 	*low_speed = speedstep_get_processor_frequency(processor);
 	if (!*low_speed) {
-		ret = EIO;
+		ret = -EIO;
 		goto out;
 	}
 
@@ -251,12 +251,12 @@ unsigned int speedstep_get_freqs(unsigned int processor,
 	set_state(SPEEDSTEP_HIGH, 0);
 	*high_speed = speedstep_get_processor_frequency(processor);
 	if (!*high_speed) {
-		ret = EIO;
+		ret = -EIO;
 		goto out;
 	}
 
 	if (*low_speed == *high_speed) {
-		ret = ENODEV;
+		ret = -ENODEV;
 		goto out;
 	}
 

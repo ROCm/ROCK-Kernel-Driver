@@ -326,6 +326,21 @@ struct agp_bridge_data {
 #define ALI_CACHE_FLUSH_ADDR_MASK	0xFFFFF000
 #define ALI_CACHE_FLUSH_EN		0x100
 
+/* ATI register */
+#define ATI_APBASE                  0x10
+#define ATI_GART_MMBASE_ADDR        0x14
+#define ATI_RS100_APSIZE            0xac
+#define ATI_RS300_APSIZE            0xf8
+#define ATI_RS100_IG_AGPMODE        0xb0
+#define ATI_RS300_IG_AGPMODE        0xfc
+
+#define ATI_GART_FEATURE_ID         0x00
+#define ATI_GART_BASE               0x04
+#define ATI_GART_CACHE_SZBASE       0x08
+#define ATI_GART_CACHE_CNTRL        0x0c
+#define ATI_GART_CACHE_ENTRY_CNTRL  0x10
+
+
 /* Serverworks Registers */
 #define SVWRKS_APSIZE		0x10
 #define SVWRKS_SIZE_MASK	0xfe000000

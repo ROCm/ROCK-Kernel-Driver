@@ -127,7 +127,7 @@ void nr_write_internal(struct sock *sk, int frametype)
 	unsigned char  *dptr;
 	int len, timeout;
 
-	len = AX25_BPQ_HEADER_LEN + AX25_MAX_HEADER_LEN + NR_NETWORK_LEN + NR_TRANSPORT_LEN;
+	len = NR_NETWORK_LEN + NR_TRANSPORT_LEN;
 
 	switch (frametype & 0x0F) {
 	case NR_CONNREQ:
@@ -151,7 +151,7 @@ void nr_write_internal(struct sock *sk, int frametype)
 	/*
 	 *	Space for AX.25 and NET/ROM network header
 	 */
-	skb_reserve(skb, AX25_BPQ_HEADER_LEN + AX25_MAX_HEADER_LEN + NR_NETWORK_LEN);
+	skb_reserve(skb, NR_NETWORK_LEN);
 
 	dptr = skb_put(skb, skb_tailroom(skb));
 
@@ -219,12 +219,12 @@ void nr_transmit_refusal(struct sk_buff *skb, int mine)
 	unsigned char *dptr;
 	int len;
 
-	len = AX25_BPQ_HEADER_LEN + AX25_MAX_HEADER_LEN + NR_NETWORK_LEN + NR_TRANSPORT_LEN + 1;
+	len = NR_NETWORK_LEN + NR_TRANSPORT_LEN + 1;
 
 	if ((skbn = alloc_skb(len, GFP_ATOMIC)) == NULL)
 		return;
 
-	skb_reserve(skbn, AX25_BPQ_HEADER_LEN + AX25_MAX_HEADER_LEN);
+	skb_reserve(skbn, 0);
 
 	dptr = skb_put(skbn, NR_NETWORK_LEN + NR_TRANSPORT_LEN);
 

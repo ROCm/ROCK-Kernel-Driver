@@ -371,7 +371,7 @@ struct sv_state {
 /* --------------------------------------------------------------------- */
 
 static LIST_HEAD(devs);
-static unsigned long wavetable_mem = 0;
+static unsigned long wavetable_mem;
 
 /* --------------------------------------------------------------------- */
 
@@ -2448,13 +2448,13 @@ static /*const*/ struct file_operations sv_dmfm_fops = {
 /* maximum number of devices; only used for command line params */
 #define NR_DEVICE 5
 
-static int reverb[NR_DEVICE] = { 0, };
+static int reverb[NR_DEVICE];
 
 #if 0
-static int wavetable[NR_DEVICE] = { 0, };
+static int wavetable[NR_DEVICE];
 #endif
 
-static unsigned int devindex = 0;
+static unsigned int devindex;
 
 MODULE_PARM(reverb, "1-" __MODULE_STRING(NR_DEVICE) "i");
 MODULE_PARM_DESC(reverb, "if 1 enables the reverb circuitry. NOTE: your card must have the reverb RAM");

@@ -18,7 +18,7 @@
 #include <linux/spinlock.h>
 #include "sound_config.h"
 
-static volatile int opened = 0, tmr_running = 0;
+static volatile int opened, tmr_running;
 static volatile time_t tmr_offs, tmr_ctr;
 static volatile unsigned long ticks_offs;
 static volatile int curr_tempo, curr_timebase;

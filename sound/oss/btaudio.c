@@ -150,9 +150,9 @@ struct cardinfo {
 	int rate;
 };
 
-static struct btaudio *btaudios = NULL;
-static unsigned int debug = 0;
-static unsigned int irq_debug = 0;
+static struct btaudio *btaudios;
+static unsigned int debug;
+static unsigned int irq_debug;
 
 /* -------------------------------------------------------------- */
 
@@ -876,7 +876,7 @@ static unsigned int mixer = -1;
 static int latency = -1;
 static int digital = 1;
 static int analog = 1;
-static int rate = 0;
+static int rate;
 
 #define BTA_OSPREY200 1
 

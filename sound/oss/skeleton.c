@@ -53,7 +53,7 @@
  */
  
 static struct address_info	mss_data[MAX_CARDS];
-static int 			cards = 0;
+static int 			cards;
 
 /*
  *	Install the actual card. This is an example

@@ -5,6 +5,12 @@
 
 extern int use_cyclone;
 
+#ifdef CONFIG_NUMA
+extern void setup_summit(void);
+#else /* !CONFIG_NUMA */
+#define setup_summit()	{}
+#endif /* CONFIG_NUMA */
+
 static inline void mpc_oem_bus_info(struct mpc_config_bus *m, char *name, 
 				struct mpc_config_translation *translation)
 {
@@ -24,6 +30,7 @@ static inline int mps_oem_check(struct mp_config_table *mpc, char *oem,
 			 || !strncmp(productid, "EXA", 3)
 			 || !strncmp(productid, "RUTHLESS SMP", 12))){
 		use_cyclone = 1; /*enable cyclone-timer*/
+		setup_summit();
 		return 1;
 	}
 	return 0;
@@ -36,6 +43,7 @@ static inline int acpi_madt_oem_check(char *oem_id, char *oem_table_id)
 	    (!strncmp(oem_table_id, "SERVIGIL", 8)
 	     || !strncmp(oem_table_id, "EXA", 3))){
 		use_cyclone = 1; /*enable cyclone-timer*/
+		setup_summit();
 		return 1;
 	}
 	return 0;

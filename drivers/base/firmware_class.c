@@ -149,7 +149,7 @@ firmware_data_read(struct kobject *kobj,
 	if (offset + count > fw->size)
 		count = fw->size - offset;
 
-	memcpy(buffer + offset, fw->data + offset, count);
+	memcpy(buffer, fw->data + offset, count);
 	return count;
 }
 static int
@@ -198,7 +198,7 @@ firmware_data_write(struct kobject *kobj,
 	if (retval)
 		return retval;
 
-	memcpy(fw->data + offset, buffer + offset, count);
+	memcpy(fw->data + offset, buffer, count);
 
 	fw->size = max_t(size_t, offset + count, fw->size);
 

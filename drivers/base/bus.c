@@ -16,6 +16,7 @@
 #include <linux/init.h>
 #include <linux/string.h>
 #include "base.h"
+#include "power/power.h"
 
 #define to_dev(node) container_of(node,struct device,bus_list)
 #define to_drv(node) container_of(node,struct device_driver,kobj.entry)
@@ -364,6 +365,7 @@ void device_release_driver(struct device * dev)
 	if (drv) {
 		sysfs_remove_link(&drv->kobj,dev->kobj.name);
 		list_del_init(&dev->driver_list);
+		device_detach_shutdown(dev);
 		if (drv->remove)
 			drv->remove(dev);
 		dev->driver = NULL;

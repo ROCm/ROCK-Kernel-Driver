@@ -822,7 +822,7 @@ static struct pci_fixup pci_fixups[] __devinitdata = {
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C686_6,	quirk_via_irqpic },
 
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_AMD,	PCI_DEVICE_ID_AMD_FE_GATE_700C, quirk_amd_ordering },
-	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_ATI,	PCI_DEVICE_ID_ATI_RADEON_IGP,   quirk_ati_exploding_mce },
+	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_ATI,	PCI_DEVICE_ID_ATI_RS100,   quirk_ati_exploding_mce },
 	/*
 	 * i82380FB mobile docking controller: its PCI-to-PCI bridge
 	 * is subtractive decoding (transparent), and does indicate this

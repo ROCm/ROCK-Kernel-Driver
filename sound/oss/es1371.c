@@ -2738,11 +2738,11 @@ static int proc_es1371_dump (char *buf, char **start, off_t fpos, int length, in
 /* maximum number of devices; only used for command line params */
 #define NR_DEVICE 5
 
-static int spdif[NR_DEVICE] = { 0, };
-static int nomix[NR_DEVICE] = { 0, };
-static int amplifier[NR_DEVICE] = { 0, };
+static int spdif[NR_DEVICE];
+static int nomix[NR_DEVICE];
+static int amplifier[NR_DEVICE];
 
-static unsigned int devindex = 0;
+static unsigned int devindex;
 
 MODULE_PARM(spdif, "1-" __MODULE_STRING(NR_DEVICE) "i");
 MODULE_PARM_DESC(spdif, "if 1 the output is in S/PDIF digital mode");
