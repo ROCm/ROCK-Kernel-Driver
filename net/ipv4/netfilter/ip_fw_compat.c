@@ -216,21 +216,40 @@ static int sock_fn(struct sock *sk, int optval, void *user, unsigned int len)
 	return -ip_fw_ctl(optval, &tmp_fw, len);
 }
 
-static struct nf_hook_ops preroute_ops
-= { { NULL, NULL }, fw_in, PF_INET, NF_IP_PRE_ROUTING, NF_IP_PRI_FILTER };
+static struct nf_hook_ops preroute_ops = {
+	.hook		= fw_in,
+	.pf		= PF_INET,
+	.hooknum	= NF_IP_PRE_ROUTING,
+	.priority	= NF_IP_PRI_FILTER,
+};
 
-static struct nf_hook_ops postroute_ops
-= { { NULL, NULL }, fw_in, PF_INET, NF_IP_POST_ROUTING, NF_IP_PRI_FILTER };
+static struct nf_hook_ops postroute_ops = {
+	.hook		= fw_in,
+	.pf		= PF_INET,
+	.hooknum	= NF_IP_POST_ROUTING,
+	.priority	= NF_IP_PRI_FILTER,
+};
 
-static struct nf_hook_ops forward_ops
-= { { NULL, NULL }, fw_in, PF_INET, NF_IP_FORWARD, NF_IP_PRI_FILTER };
+static struct nf_hook_ops forward_ops = {
+	.hook		= fw_in,
+	.pf		= PF_INET,
+	.hooknum	= NF_IP_FORWARD,
+	.priority	= NF_IP_PRI_FILTER,
+};
 
-static struct nf_hook_ops local_in_ops
-= { { NULL, NULL }, fw_confirm, PF_INET, NF_IP_LOCAL_IN, NF_IP_PRI_LAST - 1 };
+static struct nf_hook_ops local_in_ops = {
+	.hook		= fw_confirm,
+	.pf		= PF_INET,
+	.hooknum	= NF_IP_LOCAL_IN,
+	.priority	= NF_IP_PRI_LAST - 1,
+};
 
-static struct nf_sockopt_ops sock_ops
-= { { NULL, NULL }, PF_INET, 64, 64 + 1024 + 1, &sock_fn, 0, 0, NULL,
-    0, NULL };
+static struct nf_sockopt_ops sock_ops = {
+	.pf		= PF_INET,
+	.set_optmin	= 64,
+	.set_optmax	= 64 + 1024 + 1,
+	.set		= &sock_fn,
+};
 
 extern int ipfw_init_or_cleanup(int init);
 

@@ -111,9 +111,14 @@ static struct
     }
 };
 
-static struct arpt_table packet_filter
-= { { NULL, NULL }, "filter", &initial_table.repl,
-    FILTER_VALID_HOOKS, RW_LOCK_UNLOCKED, NULL, THIS_MODULE };
+static struct arpt_table packet_filter = {
+	.name		= "filter",
+	.table		= &initial_table.repl,
+	.valid_hooks	= FILTER_VALID_HOOKS,
+	.lock		= RW_LOCK_UNLOCKED,
+	.private	= NULL,
+	.me		= THIS_MODULE,
+};
 
 /* The work comes in here from netfilter.c */
 static unsigned int arpt_hook(unsigned int hook,
@@ -125,9 +130,17 @@ static unsigned int arpt_hook(unsigned int hook,
 	return arpt_do_table(pskb, hook, in, out, &packet_filter, NULL);
 }
 
-static struct nf_hook_ops arpt_ops[]
-= { { { NULL, NULL }, arpt_hook, NF_ARP, NF_ARP_IN, 0 },
-    { { NULL, NULL }, arpt_hook, NF_ARP, NF_ARP_OUT, 0 }
+static struct nf_hook_ops arpt_ops[] = {
+	{
+		.hook		= arpt_hook,
+		.pf		= NF_ARP,
+		.hooknum	= NF_ARP_IN,
+	},
+	{
+		.hook		= arpt_hook,
+		.pf		= NF_ARP,
+		.hooknum	= NF_ARP_OUT,
+	}
 };
 
 static int __init init(void)
