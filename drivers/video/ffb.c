@@ -572,7 +572,7 @@ ffb_copyarea(struct fb_info *info, const struct fb_copyarea *area)
 	unsigned long flags;
 
 	if (area->dx != area->sx ||
-	    area->dy == area->dy) {
+	    area->dy == area->sy) {
 		cfb_copyarea(info, area);
 		return;
 	}
@@ -1027,7 +1027,13 @@ static void ffb_init_one(int node, int parent)
 	all->par.prom_node = node;
 	all->par.prom_parent_node = parent;
 
-	all->info.flags = FBINFO_DEFAULT;
+	/* Don't mention copyarea, so SCROLL_REDRAW is always
+	 * used.  It is the fastest on this chip.
+	 */
+	all->info.flags = (FBINFO_DEFAULT |
+			   /* FBINFO_HWACCEL_COPYAREA | */
+			   FBINFO_HWACCEL_FILLRECT |
+			   FBINFO_HWACCEL_IMAGEBLIT);
 	all->info.fbops = &ffb_ops;
 	all->info.screen_base = (char *) all->par.physbase + FFB_DFB24_POFF;
 	all->info.currcon = -1;
