@@ -1,5 +1,5 @@
 /*
- * $Id: physmap.c,v 1.36 2004/11/04 13:24:15 gleixner Exp $
+ * $Id: physmap.c,v 1.37 2004/11/28 09:40:40 dwmw2 Exp $
  *
  * Normal mappings of chips in physical memory
  *

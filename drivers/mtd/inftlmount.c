@@ -8,7 +8,7 @@
  * Author: Fabrice Bellard (fabrice.bellard@netgem.com) 
  * Copyright (C) 2000 Netgem S.A.
  *
- * $Id: inftlmount.c,v 1.15 2004/11/05 21:55:55 kalev Exp $
+ * $Id: inftlmount.c,v 1.16 2004/11/22 13:50:53 kalev Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -41,7 +41,7 @@
 #include <linux/mtd/inftl.h>
 #include <linux/mtd/compatmac.h>
 
-char inftlmountrev[]="$Revision: 1.15 $";
+char inftlmountrev[]="$Revision: 1.16 $";
 
 /*
  * find_boot_record: Find the INFTL Media Header and its Spare copy which
@@ -389,8 +389,6 @@ int INFTL_formatblock(struct INFTLrecord *inftl, int block)
 	struct erase_info *instr = &inftl->instr;
 	int physblock;
 
-	instr->mtd = inftl->mbd.mtd;
-
 	DEBUG(MTD_DEBUG_LEVEL3, "INFTL: INFTL_formatblock(inftl=%p,"
 		"block=%d)\n", inftl, block);
 
@@ -400,6 +398,7 @@ int INFTL_formatblock(struct INFTLrecord *inftl, int block)
 	   _first_? */
 
 	/* Use async erase interface, test return code */
+	instr->mtd = inftl->mbd.mtd;
 	instr->addr = block * inftl->EraseSize;
 	instr->len = inftl->mbd.mtd->erasesize;
 	/* Erase one physical eraseblock at a time, even though the NAND api
