@@ -5,8 +5,6 @@
 
 O_TARGET     := oss.o
 
-list-multi   := snd-seq-oss.o
-
 snd-seq-oss-objs  := seq_oss.o seq_oss_init.o seq_oss_timer.o seq_oss_ioctl.o \
 		     seq_oss_event.o seq_oss_rw.o seq_oss_synth.o \
 		     seq_oss_midi.o seq_oss_readq.o seq_oss_writeq.o
@@ -14,6 +12,3 @@ snd-seq-oss-objs  := seq_oss.o seq_oss_init.o seq_oss_timer.o seq_oss_ioctl.o \
 obj-$(CONFIG_SND_SEQUENCER_OSS) += snd-seq-oss.o
 
 include $(TOPDIR)/Rules.make
-
-snd-seq-oss.o: $(snd-seq-oss-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-seq-oss-objs)

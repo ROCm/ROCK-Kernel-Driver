@@ -5,9 +5,6 @@
 
 O_TARGET     := instr.o
 
-list-multi   := snd-ainstr-fm.o snd-ainstr-simple.o snd-ainstr-gf1.o \
-		snd-ainstr-iw.o
-
 export-objs  := ainstr_fm.o ainstr_simple.o ainstr_gf1.o ainstr_iw.o
 
 snd-ainstr-fm-objs := ainstr_fm.o
@@ -47,15 +44,3 @@ obj-$(CONFIG_SND_TRIDENT) += snd-ainstr-simple.o
 obj-$(CONFIG_SND_YMFPCI) += snd-ainstr-fm.o
 
 include $(TOPDIR)/Rules.make
-
-snd-ainstr-fm.o: $(snd-ainstr-fm-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-ainstr-fm-objs)
-
-snd-ainstr-simple.o: $(snd-ainstr-simple-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-ainstr-simple-objs)
-
-snd-ainstr-gf1.o: $(snd-ainstr-gf1-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-ainstr-gf1-objs)
-
-snd-ainstr-iw.o: $(snd-ainstr-iw-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-ainstr-iw-objs)

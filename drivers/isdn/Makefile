@@ -6,14 +6,15 @@ O_TARGET	:= vmlinux-obj.o
 
 # Object files in subdirectories
 
-mod-subdirs				:= i4l hisax avmb1 eicon
+mod-subdirs				:= i4l hisax capi eicon
 subdir-$(CONFIG_ISDN)			+= i4l
+subdir-$(CONFIG_ISDN_CAPI)		+= capi
+subdir-$(CONFIG_ISDN_CAPI)		+= hardware
 subdir-$(CONFIG_ISDN_DIVERSION)		+= divert
 subdir-$(CONFIG_ISDN_DRV_HISAX)		+= hisax
 subdir-$(CONFIG_ISDN_DRV_ICN)		+= icn
 subdir-$(CONFIG_ISDN_DRV_PCBIT)		+= pcbit
 subdir-$(CONFIG_ISDN_DRV_SC)		+= sc
-subdir-$(CONFIG_ISDN_CAPI)		+= avmb1
 subdir-$(CONFIG_ISDN_DRV_LOOP)		+= isdnloop
 subdir-$(CONFIG_ISDN_DRV_ACT2000)	+= act2000
 subdir-$(CONFIG_ISDN_DRV_EICON)		+= eicon

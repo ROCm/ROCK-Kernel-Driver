@@ -23,10 +23,10 @@
 #include <linux/init.h>
 #include <asm/uaccess.h>
 #include <linux/netdevice.h>
-#include "capilli.h"
+#include <linux/isdn/capilli.h>
 #include "avmcard.h"
-#include "capicmd.h"
-#include "capiutil.h"
+#include <linux/isdn/capicmd.h>
+#include <linux/isdn/capiutil.h>
 
 #if BITS_PER_LONG != 32
 #error FIXME: driver requires 32-bit platform

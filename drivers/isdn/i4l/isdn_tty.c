@@ -789,7 +789,7 @@ isdn_tty_modem_hup(modem_info * info, int local)
  * Begin of a CAPI like interface, currently used only for 
  * supplementary service (CAPI 2.0 part III)
  */
-#include "avmb1/capicmd.h"  /* this should be moved in a common place */
+#include <linux/isdn/capicmd.h>
 
 int
 isdn_tty_capi_facility(capi_msg *cm) {

@@ -5,14 +5,9 @@
 
 O_TARGET     := _korg1212.o
 
-list-multi   := snd-korg1212.o
-
 snd-korg1212-objs := korg1212.o
 
 # Toplevel Module Dependency
 obj-$(CONFIG_SND_KORG1212) += snd-korg1212.o
 
 include $(TOPDIR)/Rules.make
-
-snd-korg1212.o: $(snd-korg1212-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-korg1212-objs)

@@ -5,8 +5,6 @@
 
 O_TARGET     := _trident.o
 
-list-multi   := snd-trident.o snd-trident-synth.o
-
 export-objs  := trident_main.o
 
 snd-trident-objs := trident.o trident_main.o trident_memory.o
@@ -19,9 +17,3 @@ ifeq ($(subst m,y,$(CONFIG_SND_SEQUENCER)),y)
 endif
 
 include $(TOPDIR)/Rules.make
-
-snd-trident.o: $(snd-trident-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-trident-objs)
-
-snd-trident-synth.o: $(snd-trident-synth-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-trident-synth-objs)
