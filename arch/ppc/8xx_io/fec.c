@@ -22,14 +22,8 @@
  *
  * Make use of MII for PHY control configurable.
  * Some fixes.
- * Copyright (c) 2000 Wolfgang Denk, DENX Software Engineering.
+ * Copyright (c) 2000-2002 Wolfgang Denk, DENX Software Engineering.
  */
-
-/* List of PHYs we wish to support.
-*/
-#undef	CONFIG_FEC_LXT970
-#define	CONFIG_FEC_LXT971
-#undef	CONFIG_FEC_QS6612
 
 #include <linux/config.h>
 #include <linux/kernel.h>
