@@ -205,12 +205,12 @@ static ssize_t apm_read(struct file *fp, char __user *buf, size_t count, loff_t 
 {
 	struct apm_user *as = fp->private_data;
 	apm_event_t event;
-	int i = count, ret = 0, nonblock = fp->f_flags & O_NONBLOCK;
+	int i = count, ret = 0;
 
 	if (count < sizeof(apm_event_t))
 		return -EINVAL;
 
-	if (queue_empty(&as->queue) && nonblock)
+	if (queue_empty(&as->queue) && fp->f_flags & O_NONBLOCK)
 		return -EAGAIN;
 
 	wait_event_interruptible(apm_waitqueue, !queue_empty(&as->queue));
