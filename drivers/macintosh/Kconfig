@@ -184,7 +184,7 @@ config THERM_PM72
 	  G5 machines. 
 
 config ANSLCD
-	bool "Support for ANS LCD display"
+	tristate "Support for ANS LCD display"
 	depends on ADB_CUDA && PPC_PMAC
 
 endmenu
