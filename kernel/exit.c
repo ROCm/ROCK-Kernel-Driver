@@ -731,7 +731,7 @@ static int eligible_child(pid_t pid, int options, task_t *p)
 	 * in a non-empty thread group:
 	 */
 	if (current->tgid != p->tgid && delay_group_leader(p))
-		return 0;
+		return 2;
 
 	if (security_ops->task_wait(p))
 		return 0;
@@ -757,11 +757,21 @@ repeat:
 	do {
 		struct task_struct *p;
 		struct list_head *_p;
+		int ret;
+
 		list_for_each(_p,&tsk->children) {
 			p = list_entry(_p,struct task_struct,sibling);
-			if (!eligible_child(pid, options, p))
+
+			ret = eligible_child(pid, options, p);
+			if (!ret)
 				continue;
 			flag = 1;
+			/*
+			 * Eligible but we cannot release it yet:
+			 */
+			if (ret == 2)
+				continue;
+
 			switch (p->state) {
 			case TASK_STOPPED:
 				if (!p->exit_code)
