@@ -65,11 +65,11 @@ bool 'Support for hot-pluggable devices' CONFIG_HOTPLUG
 
 if [ "$CONFIG_HOTPLUG" = "y" ]; then
    source drivers/pcmcia/Config.in
+   source drivers/hotplug/Config.in
 else
    define_bool CONFIG_PCMCIA n
+   define_bool CONFIG_HOTPLUG_PCI n
 fi
-
-source drivers/parport/Config.in
 
 if [ "$CONFIG_PPC_ISERIES" != "y" ]; then
    bool 'Support for Open Firmware device tree in /proc' CONFIG_PROC_DEVICETREE
@@ -83,9 +83,9 @@ fi
 endmenu
 
 source drivers/mtd/Config.in
+source drivers/parport/Config.in
 source drivers/pnp/Config.in
 source drivers/block/Config.in
-source drivers/md/Config.in
 
 mainmenu_option next_comment
 comment 'ATA/ATAPI/MFM/RLL support'
@@ -100,12 +100,14 @@ fi
 endmenu
 
 mainmenu_option next_comment
-comment 'SCSI support'
-tristate 'SCSI support' CONFIG_SCSI
+comment 'SCSI device support'
+tristate 'SCSI device support' CONFIG_SCSI
 if [ "$CONFIG_SCSI" != "n" ]; then
    source drivers/scsi/Config.in
 fi
 endmenu
+
+source drivers/md/Config.in
 
 source drivers/message/fusion/Config.in
 
@@ -135,66 +137,25 @@ source net/irda/Config.in
 
 source drivers/isdn/Config.in
 
-mainmenu_option next_comment
-comment 'Old CD-ROM drivers (not SCSI, not IDE)'
+source drivers/telephony/Config.in
 
-bool 'Support non-SCSI/IDE/ATAPI CDROM drives' CONFIG_CD_NO_IDESCSI
-if [ "$CONFIG_CD_NO_IDESCSI" != "n" ]; then
-   source drivers/cdrom/Config.in
-fi
-endmenu
-
-mainmenu_option next_comment
-comment 'Console drivers'
-source drivers/video/Config.in
-endmenu
-
+#
+# input before char - char/joystick depends on it. As does USB.
+#
 source drivers/input/Config.in
-
-if [ "$CONFIG_PPC_ISERIES" = "y" ]; then
-mainmenu_option next_comment
-comment 'iSeries device drivers'
-   dep_tristate 'iSeries Virtual Console Support' CONFIG_VIOCONS $CONFIG_PPC_ISERIES
-   dep_tristate 'iSeries Virtual I/O disk support' CONFIG_VIODASD $CONFIG_PPC_ISERIES
-   if [ "$CONFIG_VIODASD" = "y" -o "$CONFIG_VIODASD" = "m" ]; then
-      bool 'iSeries Virtual disk IDE emulation' CONFIG_VIODASD_IDE
-   fi
-   dep_tristate 'iSeries Virtual I/O CD support' CONFIG_VIOCD $CONFIG_PPC_ISERIES
-   if [ "$CONFIG_VIOCD" = "y" -o "$CONFIG_VIOCD" = "m" ]; then
-      bool 'iSeries Virtual CD Aztech emulation' CONFIG_VIOCD_AZTECH
-   fi
-   dep_tristate 'iSeries Virtual Tape Support' CONFIG_VIOTAPE  $CONFIG_PPC_ISERIES
-   dep_tristate 'iSeries Virtual Ethernet driver support' CONFIG_VETH $CONFIG_PPC_ISERIES
-endmenu
-fi
-
-if [ "$CONFIG_VIOCONS" = "n" ]; then
-   if [ "$CONFIG_VIODASD" = "n" ]; then
-      if [ "$CONFIG_VIOTAPE" = "n" ]; then
-         if [ "$CONFIG_VIOCD" = "n" ]; then
-		    define_bool CONFIG_VIOPATH n
-		 else
-		    define_bool CONFIG_VIOPATH y
-         fi
-	  else
-	     define_bool CONFIG_VIOPATH y
-      fi
-   else
-      define_bool CONFIG_VIOPATH y
-   fi
-else
-   define_bool CONFIG_VIOPATH y
-fi
-
-if [ "$CONFIG_VIOCD" = "y" ]; then
-   define_bool CONFIG_CD_NO_IDESCSI y
-fi
 
 source drivers/char/Config.in
 
 source drivers/media/Config.in
 
 source fs/Config.in
+
+if [ "$CONFIG_VT" = "y" ]; then
+   mainmenu_option next_comment
+   comment 'Console drivers'
+   source drivers/video/Config.in
+   endmenu
+fi
 
 mainmenu_option next_comment
 comment 'Sound'
@@ -208,6 +169,25 @@ endmenu
 source drivers/usb/Config.in
 
 source net/bluetooth/Config.in
+
+if [ "$CONFIG_PPC_ISERIES" = "y" ]; then
+mainmenu_option next_comment
+comment 'iSeries device drivers'
+   tristate 'iSeries Virtual Console Support' CONFIG_VIOCONS
+   tristate 'iSeries Virtual I/O disk support' CONFIG_VIODASD
+   if [ "$CONFIG_VIODASD" = "y" -o "$CONFIG_VIODASD" = "m" ]; then
+      bool 'iSeries Virtual disk IDE emulation' CONFIG_VIODASD_IDE
+   fi
+   tristate 'iSeries Virtual I/O CD support' CONFIG_VIOCD
+   if [ "$CONFIG_VIOCD" = "y" -o "$CONFIG_VIOCD" = "m" ]; then
+      bool 'iSeries Virtual CD Aztech emulation' CONFIG_VIOCD_AZTECH
+   fi
+   tristate 'iSeries Virtual Tape Support' CONFIG_VIOTAPE
+   tristate 'iSeries Virtual Ethernet driver support' CONFIG_VETH
+endmenu
+
+   define_bool CONFIG_VIOPATH y
+fi
 
 mainmenu_option next_comment
 comment 'Kernel hacking'
