@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exconvrt - Object conversion routines
- *              $Revision: 35 $
+ *              $Revision: 37 $
  *
  *****************************************************************************/
 
@@ -64,7 +64,7 @@ acpi_ex_convert_to_integer (
 	ACPI_FUNCTION_TRACE_PTR ("Ex_convert_to_integer", obj_desc);
 
 
-	switch (obj_desc->common.type) {
+	switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
 	case ACPI_TYPE_INTEGER:
 		*result_desc = obj_desc;
 		return_ACPI_STATUS (AE_OK);
@@ -103,7 +103,7 @@ acpi_ex_convert_to_integer (
 	/*
 	 * String conversion is different than Buffer conversion
 	 */
-	switch (obj_desc->common.type) {
+	switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
 	case ACPI_TYPE_STRING:
 
 		/*
@@ -190,11 +190,11 @@ acpi_ex_convert_to_buffer (
 	ACPI_FUNCTION_TRACE_PTR ("Ex_convert_to_buffer", obj_desc);
 
 
-	switch (obj_desc->common.type) {
+	switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
 	case ACPI_TYPE_INTEGER:
 
 		/*
-		 * Create a new Buffer
+		 * Create a new Buffer object
 		 */
 		ret_desc = acpi_ut_create_internal_object (ACPI_TYPE_BUFFER);
 		if (!ret_desc) {
@@ -203,7 +203,6 @@ acpi_ex_convert_to_buffer (
 
 		/* Need enough space for one integer */
 
-		ret_desc->buffer.length = acpi_gbl_integer_byte_width;
 		new_buf = ACPI_MEM_CALLOCATE (acpi_gbl_integer_byte_width);
 		if (!new_buf) {
 			ACPI_REPORT_ERROR
@@ -217,7 +216,12 @@ acpi_ex_convert_to_buffer (
 		for (i = 0; i < acpi_gbl_integer_byte_width; i++) {
 			new_buf[i] = (u8) (obj_desc->integer.value >> (i * 8));
 		}
+
+		/* Complete buffer object initialization */
+
+		ret_desc->buffer.flags |= AOPOBJ_DATA_VALID;
 		ret_desc->buffer.pointer = new_buf;
+		ret_desc->buffer.length = acpi_gbl_integer_byte_width;
 
 		/* Return the new buffer descriptor */
 
@@ -373,7 +377,7 @@ acpi_ex_convert_to_string (
 	ACPI_FUNCTION_TRACE_PTR ("Ex_convert_to_string", obj_desc);
 
 
-	switch (obj_desc->common.type) {
+	switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
 	case ACPI_TYPE_INTEGER:
 
 		string_length = acpi_gbl_integer_byte_width * 2;
@@ -565,10 +569,10 @@ acpi_ex_convert_to_target_type (
 		default:
 			/* No conversion allowed for these types */
 
-			if (destination_type != source_desc->common.type) {
+			if (destination_type != ACPI_GET_OBJECT_TYPE (source_desc)) {
 				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 					"Target does not allow conversion of type %s to %s\n",
-					acpi_ut_get_type_name ((source_desc)->common.type),
+					acpi_ut_get_object_type_name (source_desc),
 					acpi_ut_get_type_name (destination_type)));
 				status = AE_TYPE;
 			}

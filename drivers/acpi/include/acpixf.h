@@ -196,6 +196,14 @@ acpi_evaluate_object (
 	acpi_buffer             *return_object_buffer);
 
 acpi_status
+acpi_evaluate_object_typed (
+	acpi_handle             object,
+	acpi_string             pathname,
+	acpi_object_list        *external_params,
+	acpi_buffer             *return_buffer,
+	acpi_object_type        return_type);
+
+acpi_status
 acpi_get_object_info (
 	acpi_handle             device,
 	acpi_device_info        *info);

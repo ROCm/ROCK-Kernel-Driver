@@ -2,7 +2,7 @@
  *
  * Module Name: nsutils - Utilities for accessing ACPI namespace, accessing
  *                        parents and siblings and Scope manipulation
- *              $Revision: 109 $
+ *              $Revision: 110 $
  *
  *****************************************************************************/
 
@@ -227,7 +227,7 @@ acpi_ns_build_internal_name (
 	NATIVE_CHAR             *internal_name = info->internal_name;
 	NATIVE_CHAR             *external_name = info->next_external_char;
 	NATIVE_CHAR             *result = NULL;
-	NATIVE_UINT_MIN32       i;
+	NATIVE_UINT             i;
 
 
 	ACPI_FUNCTION_TRACE ("Ns_build_internal_name");

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dsobject - Dispatcher object management routines
- *              $Revision: 99 $
+ *              $Revision: 103 $
  *
  *****************************************************************************/
 
@@ -29,6 +29,7 @@
 #include "amlcode.h"
 #include "acdispat.h"
 #include "acnamesp.h"
+#include "acinterp.h"
 
 #define _COMPONENT          ACPI_DISPATCHER
 	 ACPI_MODULE_NAME    ("dsobject")
@@ -241,9 +242,10 @@ acpi_ds_init_object_from_op (
 {
 	const acpi_opcode_info  *op_info;
 	acpi_operand_object     *obj_desc;
+	acpi_status             status = AE_OK;
 
 
-	ACPI_FUNCTION_NAME ("Ds_init_object_from_op");
+	ACPI_FUNCTION_TRACE ("Ds_init_object_from_op");
 
 
 	obj_desc = *ret_obj_desc;
@@ -251,12 +253,12 @@ acpi_ds_init_object_from_op (
 	if (op_info->class == AML_CLASS_UNKNOWN) {
 		/* Unknown opcode */
 
-		return (AE_TYPE);
+		return_ACPI_STATUS (AE_TYPE);
 	}
 
 	/* Perform per-object initialization */
 
-	switch (obj_desc->common.type) {
+	switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
 	case ACPI_TYPE_BUFFER:
 
 		/*
@@ -281,7 +283,62 @@ acpi_ds_init_object_from_op (
 
 	case ACPI_TYPE_INTEGER:
 
-		obj_desc->integer.value = op->common.value.integer;
+		switch (op_info->type) {
+		case AML_TYPE_CONSTANT:
+			/*
+			 * Resolve AML Constants here - AND ONLY HERE!
+			 * All constants are integers.
+			 * We mark the integer with a flag that indicates that it started life
+			 * as a constant -- so that stores to constants will perform as expected (noop).
+			 * (Zero_op is used as a placeholder for optional target operands.)
+			 */
+			obj_desc->common.flags = AOPOBJ_AML_CONSTANT;
+
+			switch (opcode) {
+			case AML_ZERO_OP:
+
+				obj_desc->integer.value = 0;
+				break;
+
+			case AML_ONE_OP:
+
+				obj_desc->integer.value = 1;
+				break;
+
+			case AML_ONES_OP:
+
+				obj_desc->integer.value = ACPI_INTEGER_MAX;
+
+				/* Truncate value if we are executing from a 32-bit ACPI table */
+
+				acpi_ex_truncate_for32bit_table (obj_desc);
+				break;
+
+			case AML_REVISION_OP:
+
+				obj_desc->integer.value = ACPI_CA_SUPPORT_LEVEL;
+				break;
+
+			default:
+
+				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown constant opcode %X\n", opcode));
+				status = AE_AML_OPERAND_TYPE;
+				break;
+			}
+			break;
+
+
+		case AML_TYPE_LITERAL:
+
+			obj_desc->integer.value = op->common.value.integer;
+			break;
+
+
+		default:
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown Integer type %X\n", op_info->type));
+			status = AE_AML_OPERAND_TYPE;
+			break;
+		}
 		break;
 
 
@@ -323,7 +380,7 @@ acpi_ds_init_object_from_op (
 			break;
 
 
-		default: /* Constants, Literals, etc.. */
+		default: /* Other literals, etc.. */
 
 			if (op->common.aml_opcode == AML_INT_NAMEPATH_OP) {
 				/* Node was saved in Op */
@@ -340,12 +397,13 @@ acpi_ds_init_object_from_op (
 	default:
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unimplemented data type: %X\n",
-			obj_desc->common.type));
+			ACPI_GET_OBJECT_TYPE (obj_desc)));
 
+		status = AE_AML_OPERAND_TYPE;
 		break;
 	}
 
-	return (AE_OK);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -380,7 +438,7 @@ acpi_ds_build_internal_object (
 
 	if (op->common.aml_opcode == AML_INT_NAMEPATH_OP) {
 		/*
-		 * This is an object reference.  If this name was
+		 * This is an named object reference.  If this name was
 		 * previously looked up in the namespace, it was stored in this op.
 		 * Otherwise, go ahead and look it up now
 		 */
@@ -435,7 +493,9 @@ acpi_ds_build_internal_object (
  *
  * FUNCTION:    Acpi_ds_build_internal_buffer_obj
  *
- * PARAMETERS:  Op              - Parser object to be translated
+ * PARAMETERS:  Walk_state      - Current walk state
+ *              Op              - Parser object to be translated
+ *              Buffer_length   - Length of the buffer
  *              Obj_desc_ptr    - Where the ACPI internal object is returned
  *
  * RETURN:      Status
@@ -541,7 +601,9 @@ acpi_ds_build_internal_buffer_obj (
  *
  * FUNCTION:    Acpi_ds_build_internal_package_obj
  *
- * PARAMETERS:  Op              - Parser object to be translated
+ * PARAMETERS:  Walk_state      - Current walk state
+ *              Op              - Parser object to be translated
+ *              Package_length  - Number of elements in the package
  *              Obj_desc_ptr    - Where the ACPI internal object is returned
  *
  * RETURN:      Status
@@ -658,12 +720,13 @@ acpi_ds_build_internal_package_obj (
  *
  * FUNCTION:    Acpi_ds_create_node
  *
- * PARAMETERS:  Op              - Parser object to be translated
- *              Obj_desc_ptr    - Where the ACPI internal object is returned
+ * PARAMETERS:  Walk_state      - Current walk state
+ *              Node            - NS Node to be initialized
+ *              Op              - Parser object to be translated
  *
  * RETURN:      Status
  *
- * DESCRIPTION:
+ * DESCRIPTION: Create the object to be associated with a namespace node
  *
  ****************************************************************************/
 
@@ -704,7 +767,7 @@ acpi_ds_create_node (
 
 	/* Re-type the object according to it's argument */
 
-	node->type = obj_desc->common.type;
+	node->type = ACPI_GET_OBJECT_TYPE (obj_desc);
 
 	/* Attach obj to node */
 

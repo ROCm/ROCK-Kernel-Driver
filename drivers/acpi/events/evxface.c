@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evxface - External interfaces for ACPI events
- *              $Revision: 128 $
+ *              $Revision: 129 $
  *
  *****************************************************************************/
 
@@ -78,7 +78,6 @@ acpi_install_fixed_event_handler (
 		status = AE_ALREADY_EXISTS;
 		goto cleanup;
 	}
-
 
 	/* Install the handler before enabling the event */
 

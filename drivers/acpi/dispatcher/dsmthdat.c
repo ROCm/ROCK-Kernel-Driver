@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dsmthdat - control method arguments and local variables
- *              $Revision: 61 $
+ *              $Revision: 62 $
  *
  ******************************************************************************/
 
@@ -354,7 +354,7 @@ acpi_ds_method_data_get_type (
 
 	/* Get the object type */
 
-	return_VALUE (object->common.type);
+	return_VALUE (ACPI_GET_OBJECT_TYPE (object));
 }
 
 
@@ -602,7 +602,7 @@ acpi_ds_store_object_to_local (
 			 * (perform the indirect store)
 			 */
 			status = acpi_ns_attach_object ((acpi_namespace_node *) current_obj_desc,
-					  obj_desc, obj_desc->common.type);
+					  obj_desc, ACPI_GET_OBJECT_TYPE (obj_desc));
 			return_ACPI_STATUS (status);
 		}
 

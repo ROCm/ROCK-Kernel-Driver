@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: uteval - Object evaluation
- *              $Revision: 39 $
+ *              $Revision: 40 $
  *
  *****************************************************************************/
 
@@ -91,11 +91,11 @@ acpi_ut_evaluate_numeric_object (
 
 	/* Is the return object of the correct type? */
 
-	if (obj_desc->common.type != ACPI_TYPE_INTEGER) {
+	if (ACPI_GET_OBJECT_TYPE (obj_desc) != ACPI_TYPE_INTEGER) {
 		status = AE_TYPE;
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-			"Type returned from %s was not a number: %X \n",
-			object_name, obj_desc->common.type));
+			"Type returned from %s was not an Integer: %X \n",
+			object_name, ACPI_GET_OBJECT_TYPE (obj_desc)));
 	}
 	else {
 		/*
@@ -169,15 +169,16 @@ acpi_ut_execute_HID (
 	 *  A _HID can return either a Number (32 bit compressed EISA ID) or
 	 *  a string
 	 */
-	if ((obj_desc->common.type != ACPI_TYPE_INTEGER) &&
-		(obj_desc->common.type != ACPI_TYPE_STRING)) {
+	if ((ACPI_GET_OBJECT_TYPE (obj_desc) != ACPI_TYPE_INTEGER) &&
+		(ACPI_GET_OBJECT_TYPE (obj_desc) != ACPI_TYPE_STRING)) {
 		status = AE_TYPE;
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 			"Type returned from _HID not a number or string: %s(%X) \n",
-			acpi_ut_get_type_name (obj_desc->common.type), obj_desc->common.type));
+			acpi_ut_get_object_type_name (obj_desc),
+			ACPI_GET_OBJECT_TYPE (obj_desc)));
 	}
 	else {
-		if (obj_desc->common.type == ACPI_TYPE_INTEGER) {
+		if (ACPI_GET_OBJECT_TYPE (obj_desc) == ACPI_TYPE_INTEGER) {
 			/* Convert the Numeric HID to string */
 
 			acpi_ex_eisa_id_to_string ((u32) obj_desc->integer.value, hid->buffer);
@@ -253,7 +254,7 @@ acpi_ut_execute_CID (
 	 *  IDs.  Each compatible ID can be a Number (32 bit compressed EISA ID) or
 	 *  string (PCI ID format, e.g. "PCI\VEN_vvvv&DEV_dddd&SUBSYS_ssssssss").
 	 */
-	switch (obj_desc->common.type) {
+	switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
 	case ACPI_TYPE_INTEGER:
 
 		/* Convert the Numeric CID to string */
@@ -278,7 +279,8 @@ acpi_ut_execute_CID (
 		status = AE_TYPE;
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 			"Type returned from _CID not a number, string, or package: %s(%X) \n",
-			acpi_ut_get_type_name (obj_desc->common.type), obj_desc->common.type));
+			acpi_ut_get_object_type_name (obj_desc),
+			ACPI_GET_OBJECT_TYPE (obj_desc)));
 		break;
 	}
 
@@ -347,15 +349,15 @@ acpi_ut_execute_UID (
 	 *  A _UID can return either a Number (32 bit compressed EISA ID) or
 	 *  a string
 	 */
-	if ((obj_desc->common.type != ACPI_TYPE_INTEGER) &&
-		(obj_desc->common.type != ACPI_TYPE_STRING)) {
+	if ((ACPI_GET_OBJECT_TYPE (obj_desc) != ACPI_TYPE_INTEGER) &&
+		(ACPI_GET_OBJECT_TYPE (obj_desc) != ACPI_TYPE_STRING)) {
 		status = AE_TYPE;
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 			"Type returned from _UID was not a number or string: %X \n",
-			obj_desc->common.type));
+			ACPI_GET_OBJECT_TYPE (obj_desc)));
 	}
 	else {
-		if (obj_desc->common.type == ACPI_TYPE_INTEGER) {
+		if (ACPI_GET_OBJECT_TYPE (obj_desc) == ACPI_TYPE_INTEGER) {
 			/* Convert the Numeric UID to string */
 
 			acpi_ex_unsigned_integer_to_string (obj_desc->integer.value, uid->buffer);
@@ -433,11 +435,11 @@ acpi_ut_execute_STA (
 
 		/* Is the return object of the correct type? */
 
-		if (obj_desc->common.type != ACPI_TYPE_INTEGER) {
+		if (ACPI_GET_OBJECT_TYPE (obj_desc) != ACPI_TYPE_INTEGER) {
 			status = AE_TYPE;
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 				"Type returned from _STA was not a number: %X \n",
-				obj_desc->common.type));
+				ACPI_GET_OBJECT_TYPE (obj_desc)));
 		}
 		else {
 			/* Extract the status flags */

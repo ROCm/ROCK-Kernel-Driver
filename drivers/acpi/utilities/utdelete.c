@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: utdelete - object deletion and reference count utilities
- *              $Revision: 90 $
+ *              $Revision: 91 $
  *
  ******************************************************************************/
 
@@ -65,7 +65,7 @@ acpi_ut_delete_internal_obj (
 	 * Must delete or free any pointers within the object that are not
 	 * actual ACPI objects (for example, a raw buffer pointer).
 	 */
-	switch (object->common.type) {
+	switch (ACPI_GET_OBJECT_TYPE (object)) {
 	case ACPI_TYPE_STRING:
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS, "**** String %p, ptr %p\n",
@@ -190,7 +190,7 @@ acpi_ut_delete_internal_obj (
 	/* Now the object can be safely deleted */
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS, "Deleting Object %p [%s]\n",
-			object, acpi_ut_get_type_name (object->common.type)));
+			object, acpi_ut_get_object_type_name (object)));
 
 	acpi_ut_delete_object_desc (object);
 	return_VOID;
@@ -295,7 +295,7 @@ acpi_ut_update_ref_count (
 				object, new_count));
 		}
 
-		if (object->common.type == ACPI_TYPE_METHOD) {
+		if (ACPI_GET_OBJECT_TYPE (object) == ACPI_TYPE_METHOD) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS, "Method Obj %p Refs=%X, [Decremented]\n",
 				object, new_count));
 		}
@@ -403,7 +403,7 @@ acpi_ut_update_object_reference (
 		 * All sub-objects must have their reference count incremented also.
 		 * Different object types have different subobjects.
 		 */
-		switch (object->common.type) {
+		switch (ACPI_GET_OBJECT_TYPE (object)) {
 		case ACPI_TYPE_DEVICE:
 
 			status = acpi_ut_create_update_state_and_push (object->device.addr_handler,

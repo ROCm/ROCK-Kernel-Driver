@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exconfig - Namespace reconfiguration (Load/Unload opcodes)
- *              $Revision: 65 $
+ *              $Revision: 66 $
  *
  *****************************************************************************/
 
@@ -274,7 +274,7 @@ acpi_ex_load_op (
 	case ACPI_TYPE_REGION:
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Load from Region %p %s\n",
-			obj_desc, acpi_ut_get_type_name (obj_desc->common.type)));
+			obj_desc, acpi_ut_get_object_type_name (obj_desc)));
 
 		/* Get the table header */
 
@@ -319,7 +319,7 @@ acpi_ex_load_op (
 	case INTERNAL_TYPE_INDEX_FIELD:
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Load from Field %p %s\n",
-			obj_desc, acpi_ut_get_type_name (obj_desc->common.type)));
+			obj_desc, acpi_ut_get_object_type_name (obj_desc)));
 
 		/*
 		 * The length of the field must be at least as large as the table.
@@ -415,8 +415,7 @@ acpi_ex_unload_table (
 	 */
 	if ((!ddb_handle) ||
 		(ACPI_GET_DESCRIPTOR_TYPE (ddb_handle) != ACPI_DESC_TYPE_OPERAND) ||
-		(((acpi_operand_object  *)ddb_handle)->common.type !=
-				INTERNAL_TYPE_REFERENCE)) {
+		(ACPI_GET_OBJECT_TYPE (ddb_handle) != INTERNAL_TYPE_REFERENCE)) {
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 

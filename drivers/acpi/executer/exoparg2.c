@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exoparg2 - AML execution - opcodes with 2 arguments
- *              $Revision: 106 $
+ *              $Revision: 108 $
  *
  *****************************************************************************/
 
@@ -297,7 +297,7 @@ acpi_ex_opcode_2A_1T_1R (
 		 * guaranteed to be either Integer/String/Buffer by the operand
 		 * resolution mechanism above.
 		 */
-		switch (operand[0]->common.type) {
+		switch (ACPI_GET_OBJECT_TYPE (operand[0])) {
 		case ACPI_TYPE_INTEGER:
 			status = acpi_ex_convert_to_integer (operand[1], &operand[1], walk_state);
 			break;
@@ -355,7 +355,7 @@ acpi_ex_opcode_2A_1T_1R (
 		/*
 		 * At this point, the Source operand is either a Package or a Buffer
 		 */
-		if (operand[0]->common.type == ACPI_TYPE_PACKAGE) {
+		if (ACPI_GET_OBJECT_TYPE (operand[0]) == ACPI_TYPE_PACKAGE) {
 			/* Object to be indexed is a Package */
 
 			if (index >= operand[0]->package.count) {
@@ -364,10 +364,10 @@ acpi_ex_opcode_2A_1T_1R (
 				goto cleanup;
 			}
 
-			if ((operand[2]->common.type == INTERNAL_TYPE_REFERENCE) &&
-				(operand[2]->reference.opcode == AML_ZERO_OP)) {
+			if ((ACPI_GET_OBJECT_TYPE (operand[2]) == ACPI_TYPE_INTEGER) &&
+				(operand[2]->common.flags & AOPOBJ_AML_CONSTANT)) {
 				/*
-				 * There is no actual result descriptor (the Zero_op Result
+				 * There is no actual result descriptor (the Zero_op/Constant Result
 				 * descriptor is a placeholder), so just delete the placeholder and
 				 * return a reference to the package element
 				 */
@@ -381,7 +381,7 @@ acpi_ex_opcode_2A_1T_1R (
 				 */
 				temp_desc                        = operand[0]->package.elements [index];
 				return_desc->reference.opcode    = AML_INDEX_OP;
-				return_desc->reference.target_type = temp_desc->common.type;
+				return_desc->reference.target_type = ACPI_GET_OBJECT_TYPE (temp_desc);
 				return_desc->reference.object    = temp_desc;
 
 				status = acpi_ex_store (return_desc, operand[2], walk_state);

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dsutils - Dispatcher utilities
- *              $Revision: 92 $
+ *              $Revision: 93 $
  *
  ******************************************************************************/
 
@@ -380,8 +380,8 @@ acpi_ds_create_operand (
 			/*
 			 * If the name is null, this means that this is an
 			 * optional result parameter that was not specified
-			 * in the original ASL.  Create an Reference for a
-			 * placeholder
+			 * in the original ASL.  Create a Zero Constant for a
+			 * placeholder.  (Store to a constant is a Noop.)
 			 */
 			opcode = AML_ZERO_OP;       /* Has no arguments! */
 

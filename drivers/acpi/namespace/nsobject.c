@@ -2,7 +2,7 @@
  *
  * Module Name: nsobject - Utilities for objects attached to namespace
  *                         table entries
- *              $Revision: 82 $
+ *              $Revision: 83 $
  *
  ******************************************************************************/
 
@@ -199,8 +199,9 @@ acpi_ns_detach_object (
 
 
 	obj_desc = node->object;
-	if (!obj_desc   ||
-		(obj_desc->common.type == INTERNAL_TYPE_DATA)) {
+
+	if (!obj_desc ||
+		(ACPI_GET_OBJECT_TYPE (obj_desc) == INTERNAL_TYPE_DATA)) {
 		return_VOID;
 	}
 
@@ -210,7 +211,7 @@ acpi_ns_detach_object (
 	if (ACPI_GET_DESCRIPTOR_TYPE (obj_desc) == ACPI_DESC_TYPE_OPERAND) {
 		node->object = obj_desc->common.next_object;
 		if (node->object &&
-		   (node->object->common.type != INTERNAL_TYPE_DATA)) {
+		   (ACPI_GET_OBJECT_TYPE (node->object) != INTERNAL_TYPE_DATA)) {
 			node->object = node->object->common.next_object;
 		}
 	}
@@ -255,7 +256,7 @@ acpi_ns_get_attached_object (
 	if (!node->object ||
 			((ACPI_GET_DESCRIPTOR_TYPE (node->object) != ACPI_DESC_TYPE_OPERAND) &&
 			 (ACPI_GET_DESCRIPTOR_TYPE (node->object) != ACPI_DESC_TYPE_NAMED))  ||
-		(node->object->common.type == INTERNAL_TYPE_DATA)) {
+		(ACPI_GET_OBJECT_TYPE (node->object) == INTERNAL_TYPE_DATA)) {
 		return_PTR (NULL);
 	}
 
@@ -281,10 +282,10 @@ acpi_ns_get_secondary_object (
 	ACPI_FUNCTION_TRACE_PTR ("Ns_get_secondary_object", obj_desc);
 
 
-	if ((!obj_desc)                                  ||
-		(obj_desc->common.type == INTERNAL_TYPE_DATA) ||
-		(!obj_desc->common.next_object)              ||
-		(obj_desc->common.next_object->common.type == INTERNAL_TYPE_DATA)) {
+	if ((!obj_desc)                                             ||
+		(ACPI_GET_OBJECT_TYPE (obj_desc) == INTERNAL_TYPE_DATA) ||
+		(!obj_desc->common.next_object)                         ||
+		(ACPI_GET_OBJECT_TYPE (obj_desc->common.next_object) == INTERNAL_TYPE_DATA)) {
 		return_PTR (NULL);
 	}
 
@@ -319,7 +320,7 @@ acpi_ns_attach_data (
 	prev_obj_desc = NULL;
 	obj_desc = node->object;
 	while (obj_desc) {
-		if ((obj_desc->common.type == INTERNAL_TYPE_DATA) &&
+		if ((ACPI_GET_OBJECT_TYPE (obj_desc) == INTERNAL_TYPE_DATA) &&
 			(obj_desc->data.handler == handler)) {
 			return (AE_ALREADY_EXISTS);
 		}
@@ -377,7 +378,7 @@ acpi_ns_detach_data (
 	prev_obj_desc = NULL;
 	obj_desc = node->object;
 	while (obj_desc) {
-		if ((obj_desc->common.type == INTERNAL_TYPE_DATA) &&
+		if ((ACPI_GET_OBJECT_TYPE (obj_desc) == INTERNAL_TYPE_DATA) &&
 			(obj_desc->data.handler == handler)) {
 			if (prev_obj_desc) {
 				prev_obj_desc->common.next_object = obj_desc->common.next_object;
@@ -421,7 +422,7 @@ acpi_ns_get_attached_data (
 
 	obj_desc = node->object;
 	while (obj_desc) {
-		if ((obj_desc->common.type == INTERNAL_TYPE_DATA) &&
+		if ((ACPI_GET_OBJECT_TYPE (obj_desc) == INTERNAL_TYPE_DATA) &&
 			(obj_desc->data.handler == handler)) {
 			*data = obj_desc->data.pointer;
 			return (AE_OK);

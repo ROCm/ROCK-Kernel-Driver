@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: excreate - Named object creation
- *              $Revision: 91 $
+ *              $Revision: 92 $
  *
  *****************************************************************************/
 
@@ -40,8 +40,7 @@
  *
  * FUNCTION:    Acpi_ex_create_alias
  *
- * PARAMETERS:  Walk_state           - Current state, contains List of
- *                                      operands for the opcode
+ * PARAMETERS:  Walk_state           - Current state, contains operands
  *
  * RETURN:      Status
  *
@@ -392,9 +391,7 @@ cleanup:
  *
  * FUNCTION:    Acpi_ex_create_processor
  *
- * PARAMETERS:  Op              - Op containing the Processor definition and
- *                                args
- *              Processor_node  - Parent Node for the processor object
+ * PARAMETERS:  Walk_state          - Current state
  *
  * RETURN:      Status
  *
@@ -447,9 +444,7 @@ acpi_ex_create_processor (
  *
  * FUNCTION:    Acpi_ex_create_power_resource
  *
- * PARAMETERS:  Op              - Op containing the Power_resource definition
- *                                and args
- *              Power_node      - Parent Node for the power object
+ * PARAMETERS:  Walk_state          - Current state
  *
  * RETURN:      Status
  *
@@ -502,8 +497,7 @@ acpi_ex_create_power_resource (
  *
  * PARAMETERS:  Aml_start       - First byte of the method's AML
  *              Aml_length      - AML byte count for this method
- *              Method_flags    - AML method flag byte
- *              Method          - Method Node
+ *              Walk_state      - Current state
  *
  * RETURN:      Status
  *

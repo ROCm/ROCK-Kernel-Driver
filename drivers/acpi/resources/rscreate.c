@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rscreate - Create resource lists/tables
- *              $Revision: 56 $
+ *              $Revision: 57 $
  *
  ******************************************************************************/
 
@@ -212,12 +212,12 @@ acpi_rs_create_pci_routing_table (
 		/*
 		 * 1) First subobject:  Dereference the Address
 		 */
-		if (ACPI_TYPE_INTEGER == (*sub_object_list)->common.type) {
+		if (ACPI_GET_OBJECT_TYPE (*sub_object_list) == ACPI_TYPE_INTEGER) {
 			user_prt->address = (*sub_object_list)->integer.value;
 		}
 		else {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Need Integer, found %s\n",
-				acpi_ut_get_type_name ((*sub_object_list)->common.type)));
+				acpi_ut_get_object_type_name (*sub_object_list)));
 			return_ACPI_STATUS (AE_BAD_DATA);
 		}
 
@@ -226,12 +226,12 @@ acpi_rs_create_pci_routing_table (
 		 */
 		sub_object_list++;
 
-		if (ACPI_TYPE_INTEGER == (*sub_object_list)->common.type) {
+		if (ACPI_GET_OBJECT_TYPE (*sub_object_list) == ACPI_TYPE_INTEGER) {
 			user_prt->pin = (u32) (*sub_object_list)->integer.value;
 		}
 		else {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Need Integer, found %s\n",
-				acpi_ut_get_type_name ((*sub_object_list)->common.type)));
+				acpi_ut_get_object_type_name (*sub_object_list)));
 			return_ACPI_STATUS (AE_BAD_DATA);
 		}
 
@@ -240,7 +240,7 @@ acpi_rs_create_pci_routing_table (
 		 */
 		sub_object_list++;
 
-		switch ((*sub_object_list)->common.type) {
+		switch (ACPI_GET_OBJECT_TYPE (*sub_object_list)) {
 		case INTERNAL_TYPE_REFERENCE:
 
 			if ((*sub_object_list)->reference.opcode != AML_INT_NAMEPATH_OP) {
@@ -288,7 +288,7 @@ acpi_rs_create_pci_routing_table (
 		default:
 
 		   ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Need Integer, found %s\n",
-				acpi_ut_get_type_name ((*sub_object_list)->common.type)));
+				acpi_ut_get_object_type_name (*sub_object_list)));
 		   return_ACPI_STATUS (AE_BAD_DATA);
 		}
 
@@ -301,12 +301,12 @@ acpi_rs_create_pci_routing_table (
 		 */
 		sub_object_list++;
 
-		if (ACPI_TYPE_INTEGER == (*sub_object_list)->common.type) {
+		if (ACPI_GET_OBJECT_TYPE (*sub_object_list) == ACPI_TYPE_INTEGER) {
 			user_prt->source_index = (u32) (*sub_object_list)->integer.value;
 		}
 		else {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Need Integer, found %s\n",
-				acpi_ut_get_type_name ((*sub_object_list)->common.type)));
+				acpi_ut_get_object_type_name (*sub_object_list)));
 			return_ACPI_STATUS (AE_BAD_DATA);
 		}
 

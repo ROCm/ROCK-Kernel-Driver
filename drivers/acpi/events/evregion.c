@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evregion - ACPI Address_space (Op_region) handler dispatch
- *              $Revision: 133 $
+ *              $Revision: 134 $
  *
  *****************************************************************************/
 
@@ -624,7 +624,7 @@ acpi_ev_addr_handler_helper (
 	/*
 	 *  Devices are handled different than regions
 	 */
-	if (obj_desc->common.type == ACPI_TYPE_DEVICE) {
+	if (ACPI_GET_OBJECT_TYPE (obj_desc) == ACPI_TYPE_DEVICE) {
 		/*
 		 *  See if this guy has any handlers
 		 */
