@@ -152,4 +152,6 @@ extern void tce_init_iSeries(void);
 extern void pci_iommu_init(void);
 extern void pci_dma_init_direct(void);
 
+extern int ppc64_iommu_off;
+
 #endif

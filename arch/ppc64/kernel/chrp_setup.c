@@ -206,15 +206,17 @@ void __init fwnmi_init(void)
 		fwnmi_active = 1;
 }
 
-
 /* Early initialization.  Relocation is on but do not reference unbolted pages */
 void __init pSeries_init_early(void)
 {
-#ifdef CONFIG_PPC_PSERIES	/* This ifdef should go away */
 	void *comport;
 
 	hpte_init_pSeries();
-	tce_init_pSeries();
+
+	if (ppc64_iommu_off)
+		pci_dma_init_direct();
+	else
+		tce_init_pSeries();
 
 #ifdef CONFIG_SMP
 	smp_init_pSeries();
@@ -227,7 +229,6 @@ void __init pSeries_init_early(void)
 	ppc_md.udbg_putc = udbg_putc;
 	ppc_md.udbg_getc = udbg_getc;
 	ppc_md.udbg_getc_poll = udbg_getc_poll;
-#endif
 }
 
 void __init
