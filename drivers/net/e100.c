@@ -604,16 +604,6 @@ static void e100_hw_reset(struct nic *nic)
 	writel(software_reset, &nic->csr->port);
 	e100_write_flush(nic); udelay(20);
 
-	/* TCO workaround - 82559 and greater */
-	if(nic->mac >= mac_82559_D101M) {
-		/* Issue a redundant CU load base without setting
-		 * general pointer, and without waiting for scb to
-		 * clear.  This gets us into post-driver.  Finally,
-		 * wait 20 msec for reset to take effect. */
-		writeb(cuc_load_base, &nic->csr->scb.cmd_lo);
-		mdelay(20);
-	}
-
 	/* Mask off our interrupt line - it's unmasked after reset */
 	e100_disable_irq(nic);
 }
