@@ -70,6 +70,7 @@
 /* Bits in as_io_context.state */
 enum as_io_states {
 	AS_TASK_RUNNING=0,	/* Process has not exitted */
+	AS_TASK_IOSTARTED,	/* Process has started some IO */
 	AS_TASK_IORUNNING,	/* Process has completed some IO */
 };
 
@@ -99,6 +100,14 @@ struct as_data {
 	sector_t last_sector[2];	/* last REQ_SYNC & REQ_ASYNC sectors */
 	struct list_head *dispatch;	/* driver dispatch queue */
 	struct list_head *hash;		/* request hash */
+
+	unsigned long exit_prob;	/* probability a task will exit while
+					   being waited on */
+	unsigned long new_ttime_total; 	/* mean thinktime on new proc */
+	unsigned long new_ttime_mean;
+	u64 new_seek_total;		/* mean seek on new proc */
+	sector_t new_seek_mean;
+
 	unsigned long current_batch_expires;
 	unsigned long last_check_fifo[2];
 	int changed_batch;		/* 1: waiting for old batch to end */
@@ -186,6 +195,7 @@ static void free_as_io_context(struct as_io_context *aic)
 /* Called when the task exits */
 static void exit_as_io_context(struct as_io_context *aic)
 {
+	WARN_ON(!test_bit(AS_TASK_RUNNING, &aic->state));
 	clear_bit(AS_TASK_RUNNING, &aic->state);
 }
 
@@ -608,8 +618,15 @@ static void as_antic_timeout(unsigned long data)
 	spin_lock_irqsave(q->queue_lock, flags);
 	if (ad->antic_status == ANTIC_WAIT_REQ
 			|| ad->antic_status == ANTIC_WAIT_NEXT) {
+		struct as_io_context *aic = ad->io_context->aic;
+
 		ad->antic_status = ANTIC_FINISHED;
 		kblockd_schedule_work(&ad->antic_work);
+
+		if (aic->ttime_samples == 0) {
+			/* process anticipated on has exitted or timed out*/
+			ad->exit_prob = (7*ad->exit_prob + 256)/8;
+		}
 	}
 	spin_unlock_irqrestore(q->queue_lock, flags);
 }
@@ -623,7 +640,7 @@ static int as_close_req(struct as_data *ad, struct as_rq *arq)
 	unsigned long delay;	/* milliseconds */
 	sector_t last = ad->last_sector[ad->batch_data_dir];
 	sector_t next = arq->request->sector;
-	sector_t delta;	/* acceptable close offset (in sectors) */
+	sector_t delta; /* acceptable close offset (in sectors) */
 
 	if (ad->antic_status == ANTIC_OFF || !ad->ioc_finished)
 		delay = 0;
@@ -657,6 +674,15 @@ static int as_can_break_anticipation(struct as_data *ad, struct as_rq *arq)
 {
 	struct io_context *ioc;
 	struct as_io_context *aic;
+	sector_t s;
+
+	ioc = ad->io_context;
+	BUG_ON(!ioc);
+
+	if (arq && ioc == arq->io_context) {
+		/* request from same process */
+		return 1;
+	}
 
 	if (arq && arq->is_sync == REQ_SYNC && as_close_req(ad, arq)) {
 		/* close request */
@@ -671,20 +697,14 @@ static int as_can_break_anticipation(struct as_data *ad, struct as_rq *arq)
 		return 1;
 	}
 
-	ioc = ad->io_context;
-	BUG_ON(!ioc);
-
-	if (arq && ioc == arq->io_context) {
-		/* request from same process */
-		return 1;
-	}
-
 	aic = ioc->aic;
 	if (!aic)
 		return 0;
 
 	if (!test_bit(AS_TASK_RUNNING, &aic->state)) {
 		/* process anticipated on has exitted */
+		if (aic->ttime_samples == 0)
+			ad->exit_prob = (7*ad->exit_prob + 256)/8;
 		return 1;
 	}
 
@@ -698,27 +718,36 @@ static int as_can_break_anticipation(struct as_data *ad, struct as_rq *arq)
 		return 1;
 	}
 
-	if (aic->seek_samples == 0 || aic->ttime_samples == 0) {
-		/*
-		 * Process has just started IO. Don't anticipate.
-		 * TODO! Must fix this up.
-		 */
-		return 1;
-	}
-
-	if (aic->ttime_mean > ad->antic_expire) {
+	if (aic->ttime_samples == 0) {
+		if (ad->new_ttime_mean > ad->antic_expire)
+			return 1;
+		if (ad->exit_prob > 128)
+			return 1;
+	} else if (aic->ttime_mean > ad->antic_expire) {
 		/* the process thinks too much between requests */
 		return 1;
 	}
 
-	if (arq && aic->seek_samples) {
-		sector_t s;
-		if (ad->last_sector[REQ_SYNC] < arq->request->sector)
-			s = arq->request->sector - ad->last_sector[REQ_SYNC];
-		else
-			s = ad->last_sector[REQ_SYNC] - arq->request->sector;
+	if (!arq)
+		return 0;
 
-		if (aic->seek_mean > (s>>1)) {
+	if (ad->last_sector[REQ_SYNC] < arq->request->sector)
+		s = arq->request->sector - ad->last_sector[REQ_SYNC];
+	else
+		s = ad->last_sector[REQ_SYNC] - arq->request->sector;
+
+	if (aic->seek_samples == 0) {
+		/*
+		 * Process has just started IO. Use past statistics to
+		 * guage success possibility
+		 */
+		if (ad->new_seek_mean/2 > s) {
+			/* this request is better than what we're expecting */
+			return 1;
+		}
+
+	} else {
+		if (aic->seek_mean/2 > s) {
 			/* this request is better than what we're expecting */
 			return 1;
 		}
@@ -763,12 +792,51 @@ static int as_can_anticipate(struct as_data *ad, struct as_rq *arq)
 	return 1;
 }
 
+static void as_update_thinktime(struct as_data *ad, struct as_io_context *aic, unsigned long ttime)
+{
+	/* fixed point: 1.0 == 1<<8 */
+	if (aic->ttime_samples == 0) {
+		ad->new_ttime_total = (7*ad->new_ttime_total + 256*ttime) / 8;
+		ad->new_ttime_mean = ad->new_ttime_total / 256;
+
+		ad->exit_prob = (7*ad->exit_prob)/8;
+	}
+	aic->ttime_samples = (7*aic->ttime_samples + 256) / 8;
+	aic->ttime_total = (7*aic->ttime_total + 256*ttime) / 8;
+	aic->ttime_mean = (aic->ttime_total + 128) / aic->ttime_samples;
+}
+
+static void as_update_seekdist(struct as_data *ad, struct as_io_context *aic, sector_t sdist)
+{
+	u64 total;
+
+	if (aic->seek_samples == 0) {
+		ad->new_seek_total = (7*ad->new_seek_total + 256*(u64)sdist)/8;
+		ad->new_seek_mean = ad->new_seek_total / 256;
+	}
+
+	/*
+	 * Don't allow the seek distance to get too large from the
+	 * odd fragment, pagein, etc
+	 */
+	if (aic->seek_samples <= 60) /* second&third seek */
+		sdist = min(sdist, (aic->seek_mean * 4) + 2*1024*1024);
+	else
+		sdist = min(sdist, (aic->seek_mean * 4)	+ 2*1024*64);
+
+	aic->seek_samples = (7*aic->seek_samples + 256) / 8;
+	aic->seek_total = (7*aic->seek_total + (u64)256*sdist) / 8;
+	total = aic->seek_total + (aic->seek_samples/2);
+	do_div(total, aic->seek_samples);
+	aic->seek_mean = (sector_t)total;
+}
+
 /*
  * as_update_iohist keeps a decaying histogram of IO thinktimes, and
  * updates @aic->ttime_mean based on that. It is called when a new
  * request is queued.
  */
-static void as_update_iohist(struct as_io_context *aic, struct request *rq)
+static void as_update_iohist(struct as_data *ad, struct as_io_context *aic, struct request *rq)
 {
 	struct as_rq *arq = RQ_DATA(rq);
 	int data_dir = arq->is_sync;
@@ -779,60 +847,29 @@ static void as_update_iohist(struct as_io_context *aic, struct request *rq)
 		return;
 
 	if (data_dir == REQ_SYNC) {
+		unsigned long in_flight = atomic_read(&aic->nr_queued)
+					+ atomic_read(&aic->nr_dispatched);
 		spin_lock(&aic->lock);
-
-		if (test_bit(AS_TASK_IORUNNING, &aic->state)
-				&& !atomic_read(&aic->nr_queued)
-				&& !atomic_read(&aic->nr_dispatched)) {
+		if (test_bit(AS_TASK_IORUNNING, &aic->state) ||
+			test_bit(AS_TASK_IOSTARTED, &aic->state)) {
 			/* Calculate read -> read thinktime */
-			thinktime = jiffies - aic->last_end_request;
-			thinktime = min(thinktime, MAX_THINKTIME-1);
-			/* fixed point: 1.0 == 1<<8 */
-			aic->ttime_samples += 256;
-			aic->ttime_total += 256*thinktime;
-			if (aic->ttime_samples)
-				/* fixed point factor is cancelled here */
-				aic->ttime_mean = (aic->ttime_total + 128)
-							/ aic->ttime_samples;
-			aic->ttime_samples = (aic->ttime_samples>>1)
-						+ (aic->ttime_samples>>2);
-			aic->ttime_total = (aic->ttime_total>>1)
-						+ (aic->ttime_total>>2);
+			if (test_bit(AS_TASK_IORUNNING, &aic->state)
+							&& in_flight == 0) {
+				thinktime = jiffies - aic->last_end_request;
+				thinktime = min(thinktime, MAX_THINKTIME-1);
+			} else
+				thinktime = 0;
+			as_update_thinktime(ad, aic, thinktime);
+
+			/* Calculate read -> read seek distance */
+			if (aic->last_request_pos < rq->sector)
+				seek_dist = rq->sector - aic->last_request_pos;
+			else
+				seek_dist = aic->last_request_pos - rq->sector;
+			as_update_seekdist(ad, aic, seek_dist);
 		}
-
-		/* Calculate read -> read seek distance */
-		if (!aic->seek_samples)
-			seek_dist = 0;
-		else if (aic->last_request_pos < rq->sector)
-			seek_dist = rq->sector - aic->last_request_pos;
-		else
-			seek_dist = aic->last_request_pos - rq->sector;
-
 		aic->last_request_pos = rq->sector + rq->nr_sectors;
-
-		/*
-		 * Don't allow the seek distance to get too large from the
-		 * odd fragment, pagein, etc
-		 */
-		if (aic->seek_samples < 400) /* second&third seek */
-			seek_dist = min(seek_dist, (aic->seek_mean * 4)
-							+ 2*1024*1024);
-		else
-			seek_dist = min(seek_dist, (aic->seek_mean * 4)
-							+ 2*1024*64);
-
-		aic->seek_samples += 256;
-		aic->seek_total += (u64)256*seek_dist;
-		if (aic->seek_samples) {
-			u64 total = aic->seek_total + (aic->seek_samples>>1);
-			do_div(total, aic->seek_samples);
-			aic->seek_mean = (sector_t)total;
-		}
-		aic->seek_samples = (aic->seek_samples>>1)
-					+ (aic->seek_samples>>2);
-		aic->seek_total = (aic->seek_total>>1)
-					+ (aic->seek_total>>2);
-
+		set_bit(AS_TASK_IOSTARTED, &aic->state);
 		spin_unlock(&aic->lock);
 	}
 }
@@ -1376,8 +1413,8 @@ static void as_add_request(struct as_data *ad, struct as_rq *arq)
 	arq->io_context = as_get_io_context();
 
 	if (arq->io_context) {
+		as_update_iohist(ad, arq->io_context->aic, arq->request);
 		atomic_inc(&arq->io_context->aic->nr_queued);
-		as_update_iohist(arq->io_context->aic, arq->request);
 	}
 
 	alias = as_add_arq_rb(ad, arq);
@@ -1885,6 +1922,17 @@ as_var_store(unsigned long *var, const char *page, size_t count)
 	return count;
 }
 
+static ssize_t as_est_show(struct as_data *ad, char *page)
+{
+	int pos = 0;
+
+	pos += sprintf(page+pos, "%lu %% exit probability\n", 100*ad->exit_prob/256);
+	pos += sprintf(page+pos, "%lu ms new thinktime\n", ad->new_ttime_mean);
+	pos += sprintf(page+pos, "%llu sectors new seek distance\n", (unsigned long long)ad->new_seek_mean);
+
+	return pos;
+}
+
 #define SHOW_FUNCTION(__FUNC, __VAR)					\
 static ssize_t __FUNC(struct as_data *ad, char *page)		\
 {									\
@@ -1916,6 +1964,10 @@ STORE_FUNCTION(as_write_batchexpire_store,
 			&ad->batch_expire[REQ_ASYNC], 0, INT_MAX);
 #undef STORE_FUNCTION
 
+static struct as_fs_entry as_est_entry = {
+	.attr = {.name = "est_time", .mode = S_IRUGO },
+	.show = as_est_show,
+};
 static struct as_fs_entry as_readexpire_entry = {
 	.attr = {.name = "read_expire", .mode = S_IRUGO | S_IWUSR },
 	.show = as_readexpire_show,
@@ -1943,6 +1995,7 @@ static struct as_fs_entry as_write_batchexpire_entry = {
 };
 
 static struct attribute *default_attrs[] = {
+	&as_est_entry.attr,
 	&as_readexpire_entry.attr,
 	&as_writeexpire_entry.attr,
 	&as_anticexpire_entry.attr,
