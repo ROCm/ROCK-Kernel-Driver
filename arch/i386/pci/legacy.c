@@ -28,7 +28,7 @@ static void __devinit pcibios_fixup_peer_bridges(void)
 	}
 
 	for (n=0; n <= pcibios_last_bus; n++) {
-		if (pci_bus_exists(&pci_root_buses, n))
+		if (pci_find_bus(0, n))
 			continue;
 		bus->number = n;
 		bus->ops = &pci_root_ops;

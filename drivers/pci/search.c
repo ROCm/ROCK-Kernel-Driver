@@ -7,13 +7,14 @@
  *	Copyright 2003 -- Greg Kroah-Hartman <greg@kroah.com>
  */
 
+#include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/module.h>
 #include <linux/interrupt.h>
 
 spinlock_t pci_bus_lock = SPIN_LOCK_UNLOCKED;
 
-static struct pci_bus *
+static struct pci_bus * __devinit
 pci_do_find_bus(struct pci_bus* bus, unsigned char busnr)
 {
 	struct pci_bus* child;
@@ -39,7 +40,7 @@ pci_do_find_bus(struct pci_bus* bus, unsigned char busnr)
  * in the global list of PCI buses.  If the bus is found, a pointer to its
  * data structure is returned.  If no bus is found, %NULL is returned.
  */
-struct pci_bus * pci_find_bus(int domain, int busnr)
+struct pci_bus * __devinit pci_find_bus(int domain, int busnr)
 {
 	struct pci_bus *bus = NULL;
 	struct pci_bus *tmp_bus;

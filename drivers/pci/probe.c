@@ -633,22 +633,11 @@ unsigned int __devinit pci_do_scan_bus(struct pci_bus *bus)
 	return max;
 }
 
-int __devinit pci_bus_exists(const struct list_head *list, int nr)
-{
-	const struct pci_bus *b;
-
-	list_for_each_entry(b, list, node) {
-		if (b->number == nr || pci_bus_exists(&b->children, nr))
-			return 1;
-	}
-	return 0;
-}
-
 struct pci_bus * __devinit pci_scan_bus_parented(struct device *parent, int bus, struct pci_ops *ops, void *sysdata)
 {
 	struct pci_bus *b;
 
-	if (pci_bus_exists(&pci_root_buses, bus)) {
+	if (pci_find_bus(0, bus)) {
 		/* If we already got to this bus through a different bridge, ignore it */
 		DBG("PCI: Bus %02x already known\n", bus);
 		return NULL;
