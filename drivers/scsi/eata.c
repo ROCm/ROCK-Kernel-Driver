@@ -1,6 +1,13 @@
 /*
  *      eata.c - Low-level driver for EATA/DMA SCSI host adapters.
  *
+ *      20 Feb 2002 Rev. 7.22 for linux 2.5.5
+ *        + Remove any reference to virt_to_bus().
+ *        + Fix pio hang while detecting multiple HBAs.
+ *        + Fixed a board detection bug: in a system with
+ *          multiple ISA/EISA boards, all but the first one
+ *          were erroneously detected as PCI.
+ *
  *      01 Jan 2002 Rev. 7.20 for linux 2.5.1
  *        + Use the dynamic DMA mapping API.
  *
@@ -29,7 +36,7 @@
  *          boot time.
  *        + Improved boot messages: all tagged capable device are
  *          indicated as "tagged" or "soft-tagged" :
- *          - "soft-tagged"  means that the driver is trying to do its 
+ *          - "soft-tagged"  means that the driver is trying to do its
  *            own tagging (i.e. the tc:y option is in effect);
  *          - "tagged" means that the device supports tagged commands,
  *            but the driver lets the HBA be responsible for tagging
@@ -40,7 +47,7 @@
  *        + When loaded as a module, accepts the new parameter boot_options
  *          which value is a string with the same format of the kernel boot
  *          command line options. A valid example is:
- *          modprobe eata boot_options=\"0x7410,0x230,lc:y,tc:n,mq:4\"
+ *          modprobe eata 'boot_options="0x7410,0x230,lc:y,tc:n,mq:4"'
  *
  *       9 Sep 1999 Rev. 5.10 for linux 2.2.12 and 2.3.17
  *        + 64bit cleanup for Linux/Alpha platform support
@@ -401,8 +408,6 @@
  *  the driver sets host->wish_block = TRUE for all ISA boards.
  */
 
-#error Please convert me to Documentation/DMA-mapping.txt
-
 #include <linux/version.h>
 
 #ifndef LinuxVersionCode
@@ -454,7 +459,7 @@ MODULE_AUTHOR("Dario Ballabio");
 #define ISA  0
 #define ESA 1
 
-#undef FORCE_CONFIG
+#undef  FORCE_CONFIG
 
 #undef  DEBUG_LINKED_COMMANDS
 #undef  DEBUG_DETECT
@@ -645,10 +650,17 @@ struct mscp {
    u_int32_t data_address; /* If sg=0 Data Address, if sg=1 sglist address */
    u_int32_t sp_dma_addr;  /* Address where sp is DMA'ed when cp completes */
    u_int32_t sense_addr; /* Address where Sense Data is DMA'ed on error */
+
    /* Additional fields begin here. */
    Scsi_Cmnd *SCpnt;
-   struct sg_list *sglist;
+
+   /* All the cp structure is zero filled by queuecommand except the
+      following CP_TAIL_SIZE bytes, initialized by detect */
+   dma_addr_t cp_dma_addr; /* dma handle for this cp structure */
+   struct sg_list *sglist; /* pointer to the allocated SG list */
    };
+
+#define CP_TAIL_SIZE (sizeof(struct sglist *) + sizeof(dma_addr_t))
 
 struct hostdata {
    struct mscp cp[MAX_MAILBOXES];       /* Mailboxes for this board */
@@ -657,7 +669,6 @@ struct hostdata {
    unsigned int iocount;                /* Total i/o done for this board */
    int board_number;                    /* Number of this board */
    char board_name[16];                 /* Name of this board */
-   char board_id[256];                  /* data from INQUIRY on this board */
    int in_reset;                        /* True if board is doing a reset */
    int target_to[MAX_TARGET][MAX_CHANNEL]; /* N. of timeout errors on target */
    int target_redo[MAX_TARGET][MAX_CHANNEL]; /* If TRUE redo i/o on target */
@@ -675,6 +686,7 @@ struct hostdata {
 static struct Scsi_Host *sh[MAX_BOARDS + 1];
 static const char *driver_name = "EATA";
 static char sha[MAX_BOARDS];
+static spinlock_t driver_lock = SPIN_LOCK_UNLOCKED;
 
 /* Initialize num_boards so that ihdlr can work while detect is in progress */
 static unsigned int num_boards = MAX_BOARDS;
@@ -709,8 +721,6 @@ static unsigned long io_port[] = {
 /* Device is Big Endian */
 #define H2DEV(x) cpu_to_be32(x)
 #define DEV2H(x) be32_to_cpu(x)
-
-#define V2DEV(addr) ((addr) ? H2DEV(virt_to_bus((void *)addr)) : 0)
 
 static void do_interrupt_handler(int, void *, struct pt_regs *);
 static void flush_dev(Scsi_Device *, unsigned long, unsigned int, unsigned int);
@@ -813,7 +823,7 @@ static inline int do_dma(unsigned long iobase, unsigned long addr, unchar cmd) {
 
    if (wait_on_busy(iobase, (addr ? MAXLOOP * 100 : MAXLOOP))) return TRUE;
 
-   if ((addr = V2DEV(addr))) {
+   if ((addr = H2DEV(addr))) {
       outb((char) (addr >> 24), iobase + REG_LOW);
       outb((char) (addr >> 16), iobase + REG_LM);
       outb((char) (addr >> 8),  iobase + REG_MID);
@@ -919,7 +929,8 @@ static inline int port_detect \
    else
       protocol_rev = 'C';
 
-   if (!setup_done && j > 0 && j <= MAX_PCI) {
+   if (protocol_rev != 'A' && info.forcaddr) {
+      printk("%s: warning, port address has been forced.\n", name);
       bus_type = "PCI";
       is_pci = TRUE;
       subversion = ESA;
@@ -982,7 +993,7 @@ static inline int port_detect \
 
    if (is_pci) {
       pdev = get_pci_dev(port_base);
-      if (!pdev) 
+      if (!pdev)
          printk("%s: warning, failed to get pci_dev structure.\n", name);
       }
    else
@@ -1012,18 +1023,29 @@ static inline int port_detect \
 
 #if defined(FORCE_CONFIG)
    {
-   struct eata_config config;
+   struct eata_config *cf;
+   dma_addr_t cf_dma_addr;
 
-   /* Set board configuration */
-   memset((char *)&config, 0, sizeof(struct eata_config));
-   config.len = (ushort) cpu_to_be16((ushort)510);
-   config.ocena = TRUE;
+   cf = pci_alloc_consistent(pdev, sizeof(struct eata_config), &cf_dma_addr);
 
-   if (do_dma(port_base, (unsigned long)&config, SET_CONFIG_DMA)) {
-      printk("%s: busy timeout sending configuration, detaching.\n", name);
+   if (!cf) {
+      printk("%s: config, pci_alloc_consistent failed, detaching.\n", name);
       release_region(port_base, REGION_SIZE);
       return FALSE;
       }
+
+   /* Set board configuration */
+   memset((char *)cf, 0, sizeof(struct eata_config));
+   cf->len = (ushort) cpu_to_be16((ushort)510);
+   cf->ocena = TRUE;
+
+   if (do_dma(port_base, cf_dma_addr, SET_CONFIG_DMA)) {
+      printk("%s: busy timeout sending configuration, detaching.\n", name);
+      pci_free_consistent(pdev, sizeof(struct eata_config), cf, cf_dma_addr);
+      release_region(port_base, REGION_SIZE);
+      return FALSE;
+      }
+
    }
 #endif
 
@@ -1111,6 +1133,10 @@ static inline int port_detect \
    else                       sprintf(dma_name, "DMA %u", dma_channel);
 
    for (i = 0; i < sh[j]->can_queue; i++)
+      HD(j)->cp[i].cp_dma_addr = pci_map_single(HD(j)->pdev,
+            &HD(j)->cp[i], sizeof(struct mscp), PCI_DMA_BIDIRECTIONAL);
+
+   for (i = 0; i < sh[j]->can_queue; i++)
       if (! ((&HD(j)->cp[i])->sglist = kmalloc(
             sh[j]->sg_tablesize * sizeof(struct sg_list),
             (sh[j]->unchecked_isa_dma ? GFP_DMA : 0) | GFP_ATOMIC))) {
@@ -1119,7 +1145,7 @@ static inline int port_detect \
          return FALSE;
          }
 
-   if (! (HD(j)->sp_cpu_addr = pci_alloc_consistent(HD(j)->pdev, 
+   if (! (HD(j)->sp_cpu_addr = pci_alloc_consistent(HD(j)->pdev,
          sizeof(struct mssp), &HD(j)->sp_dma_addr))) {
       printk("%s: pci_alloc_consistent failed, detaching.\n", BN(j));
       eata2x_release(sh[j]);
@@ -1279,6 +1305,9 @@ static void add_pci_ports(void) {
 
 int eata2x_detect(Scsi_Host_Template *tpnt) {
    unsigned int j = 0, k;
+   unsigned long spin_flags;
+
+   spin_lock_irqsave(&driver_lock, spin_flags);
 
    tpnt->proc_name = "eata2x";
 
@@ -1304,6 +1333,7 @@ int eata2x_detect(Scsi_Host_Template *tpnt) {
       }
 
    num_boards = j;
+   spin_unlock_irqrestore(&driver_lock, spin_flags);
    return j;
 }
 
@@ -1324,10 +1354,10 @@ static inline void map_dma(unsigned int i, unsigned int j) {
 
    if (!SCpnt->use_sg) {
 
-      if (!SCpnt->request_bufflen)
-         cpp->data_address = V2DEV(SCpnt->request_buffer);
+      /* If we get here with PCI_DMA_NONE, pci_map_single triggers a BUG() */
+      if (!SCpnt->request_bufflen) pci_dir = PCI_DMA_BIDIRECTIONAL;
 
-      else if (SCpnt->request_buffer)
+      if (SCpnt->request_buffer)
          cpp->data_address = H2DEV(pci_map_single(HD(j)->pdev,
                   SCpnt->request_buffer, SCpnt->request_bufflen, pci_dir));
 
@@ -1344,7 +1374,8 @@ static inline void map_dma(unsigned int i, unsigned int j) {
       }
 
    cpp->sg = TRUE;
-   cpp->data_address = V2DEV(cpp->sglist);
+   cpp->data_address = H2DEV(pci_map_single(HD(j)->pdev, cpp->sglist,
+                             SCpnt->use_sg * sizeof(struct sg_list), pci_dir));
    cpp->data_len = H2DEV((SCpnt->use_sg * sizeof(struct sg_list)));
 }
 
@@ -1360,13 +1391,14 @@ static void unmap_dma(unsigned int i, unsigned int j) {
       pci_unmap_single(HD(j)->pdev, DEV2H(cpp->sense_addr),
                        DEV2H(cpp->sense_len), PCI_DMA_FROMDEVICE);
 
-   if (SCpnt->use_sg) 
+   if (SCpnt->use_sg)
       pci_unmap_sg(HD(j)->pdev, SCpnt->request_buffer, SCpnt->use_sg, pci_dir);
 
-   else if (DEV2H(cpp->data_address) && DEV2H(cpp->data_len))
-      pci_unmap_single(HD(j)->pdev, DEV2H(cpp->data_address), 
-                       DEV2H(cpp->data_len), pci_dir);
+   if (!DEV2H(cpp->data_len)) pci_dir = PCI_DMA_BIDIRECTIONAL;
 
+   if (DEV2H(cpp->data_address))
+      pci_unmap_single(HD(j)->pdev, DEV2H(cpp->data_address),
+                       DEV2H(cpp->data_len), pci_dir);
 }
 
 static void sync_dma(unsigned int i, unsigned int j) {
@@ -1381,14 +1413,15 @@ static void sync_dma(unsigned int i, unsigned int j) {
       pci_dma_sync_single(HD(j)->pdev, DEV2H(cpp->sense_addr),
                           DEV2H(cpp->sense_len), PCI_DMA_FROMDEVICE);
 
-   if (SCpnt->use_sg) 
-      pci_dma_sync_sg(HD(j)->pdev, SCpnt->request_buffer, 
+   if (SCpnt->use_sg)
+      pci_dma_sync_sg(HD(j)->pdev, SCpnt->request_buffer,
                          SCpnt->use_sg, pci_dir);
 
-   else if (DEV2H(cpp->data_address) && DEV2H(cpp->data_len))
-      pci_dma_sync_single(HD(j)->pdev, DEV2H(cpp->data_address), 
-                          DEV2H(cpp->data_len), pci_dir);
+   if (!DEV2H(cpp->data_len)) pci_dir = PCI_DMA_BIDIRECTIONAL;
 
+   if (DEV2H(cpp->data_address))
+      pci_dma_sync_single(HD(j)->pdev, DEV2H(cpp->data_address),
+                       DEV2H(cpp->data_len), pci_dir);
 }
 
 static inline void scsi_to_dev_dir(unsigned int i, unsigned int j) {
@@ -1409,8 +1442,7 @@ static inline void scsi_to_dev_dir(unsigned int i, unsigned int j) {
    struct mscp *cpp;
    Scsi_Cmnd *SCpnt;
 
-   cpp = &HD(j)->cp[i];
-   SCpnt = cpp->SCpnt;
+   cpp = &HD(j)->cp[i]; SCpnt = cpp->SCpnt;
 
    if (SCpnt->sc_data_direction == SCSI_DATA_READ) {
       cpp->din  = TRUE;
@@ -1428,7 +1460,7 @@ static inline void scsi_to_dev_dir(unsigned int i, unsigned int j) {
       return;
       }
 
-   if (SCpnt->sc_data_direction != SCSI_DATA_UNKNOWN) 
+   if (SCpnt->sc_data_direction != SCSI_DATA_UNKNOWN)
       panic("%s: qcomm, invalid SCpnt->sc_data_direction.\n", BN(j));
 
    for (k = 0; k < ARRAY_SIZE(data_out_cmds); k++)
@@ -1479,7 +1511,7 @@ static inline int do_qcomm(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *)) {
    /* Set pointer to control packet structure */
    cpp = &HD(j)->cp[i];
 
-   memset(cpp, 0, sizeof(struct mscp) - sizeof(struct sg_list *));
+   memset(cpp, 0, sizeof(struct mscp) - CP_TAIL_SIZE);
 
    /* Set pointer to status packet structure, Big Endian format */
    cpp->sp_dma_addr = H2DEV(HD(j)->sp_dma_addr);
@@ -1536,7 +1568,7 @@ static inline int do_qcomm(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *)) {
       }
 
    /* Send control packet to the board */
-   if (do_dma(sh[j]->io_port, (unsigned long) cpp, SEND_CP_DMA)) {
+   if (do_dma(sh[j]->io_port, cpp->cp_dma_addr, SEND_CP_DMA)) {
       unmap_dma(i, j);
       SCpnt->host_scribble = NULL;
       printk("%s: qcomm, target %d.%d:%d, pid %ld, adapter busy.\n",
@@ -1935,7 +1967,7 @@ static void flush_dev(Scsi_Device *dev, unsigned long cursec, unsigned int j,
    for (n = 0; n < n_ready; n++) {
       k = il[n]; cpp = &HD(j)->cp[k]; SCpnt = cpp->SCpnt;
 
-      if (do_dma(sh[j]->io_port, (unsigned long) cpp, SEND_CP_DMA)) {
+      if (do_dma(sh[j]->io_port, cpp->cp_dma_addr, SEND_CP_DMA)) {
          printk("%s: %s, target %d.%d:%d, pid %ld, mbox %d, adapter"\
                 " busy, will abort.\n", BN(j), (ihdlr ? "ihdlr" : "qcomm"),
                 SCpnt->channel, SCpnt->target, SCpnt->lun, SCpnt->pid, k);
@@ -1985,7 +2017,7 @@ static inline void ihdlr(int irq, unsigned int j) {
    reg = inb(sh[j]->io_port + REG_STATUS);
 
    /* Reject any sp with supspect data */
-   if (spp->eoc == FALSE)
+   if (spp->eoc == FALSE && HD(j)->iocount > 1)
       printk("%s: ihdlr, spp->eoc == FALSE, irq %d, reg 0x%x, count %d.\n",
              BN(j), irq, reg, HD(j)->iocount);
    if (spp->cpp_index < 0 || spp->cpp_index >= sh[j]->can_queue)
@@ -2191,10 +2223,14 @@ int eata2x_release(struct Scsi_Host *shpnt) {
    for (i = 0; i < sh[j]->can_queue; i++)
       if ((&HD(j)->cp[i])->sglist) kfree((&HD(j)->cp[i])->sglist);
 
-   if (HD(j)->sp_cpu_addr) 
+   for (i = 0; i < sh[j]->can_queue; i++)
+      pci_unmap_single(HD(j)->pdev, HD(j)->cp[i].cp_dma_addr,
+                     sizeof(struct mscp), PCI_DMA_BIDIRECTIONAL);
+
+   if (HD(j)->sp_cpu_addr)
       pci_free_consistent(HD(j)->pdev, sizeof(struct mssp),
                           HD(j)->sp_cpu_addr, HD(j)->sp_dma_addr);
-                       
+
    free_irq(sh[j]->irq, &sha[j]);
 
    if (sh[j]->dma_channel != NO_DMA) free_dma(sh[j]->dma_channel);
