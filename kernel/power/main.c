@@ -218,10 +218,15 @@ static ssize_t state_store(struct subsystem * subsys, const char * buf, size_t n
 {
 	u32 state = PM_SUSPEND_STANDBY;
 	char ** s;
+	char *p;
 	int error;
+	int len;
+
+	p = memchr(buf, '\n', n);
+	len = p ? p - buf : n;
 
 	for (s = &pm_states[state]; *s; s++, state++) {
-		if (!strcmp(buf,*s))
+		if (!strncmp(buf, *s, len))
 			break;
 	}
 	if (*s)
