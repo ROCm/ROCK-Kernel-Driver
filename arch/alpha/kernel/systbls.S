@@ -431,6 +431,7 @@ sys_call_table:
 	.quad sys_epoll_wait
 	.quad sys_remap_file_pages		/* 410 */
 	.quad sys_set_tid_address
+	.quad sys_restart_syscall
 
 	.size sys_call_table, . - sys_call_table
 	.type sys_call_table, @object

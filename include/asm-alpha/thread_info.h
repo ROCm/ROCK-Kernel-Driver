@@ -25,6 +25,8 @@ struct thread_info {
 	int bpt_nsaved;
 	unsigned long bpt_addr[2];		/* breakpoint handling  */
 	unsigned int bpt_insn[2];
+
+	struct restart_block	restart_block;
 };
 
 /*
@@ -35,6 +37,9 @@ struct thread_info {
 	task:		&tsk,			\
 	exec_domain:	&default_exec_domain,	\
 	addr_limit:	KERNEL_DS,		\
+	.restart_block = {			\
+		.fn = do_no_restart_syscall,	\
+	},					\
 }
 
 #define init_thread_info	(init_thread_union.thread_info)
