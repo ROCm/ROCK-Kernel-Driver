@@ -50,7 +50,7 @@
  * SUCH DAMAGE.
  */
 
-#define SYM_DRIVER_NAME	"sym-2.1.18"
+#define SYM_DRIVER_NAME	"sym-2.1.18b"
 
 #ifdef __FreeBSD__
 #include <dev/sym/sym_glue.h>

@@ -1617,7 +1617,7 @@ static int sym_setup_bus_dma_mask(struct sym_hcb *np)
 		goto out_err32;
 #else
 #if   SYM_CONF_DMA_ADDRESSING_MODE == 1
-#define	PciDmaMask	0xffffffffff
+#define	PciDmaMask	0xffffffffffULL
 #elif SYM_CONF_DMA_ADDRESSING_MODE == 2
 #define	PciDmaMask	0xffffffffffffffffULL
 #endif
@@ -2316,6 +2316,7 @@ static void pqs_remove()
 
 static struct pci_device_id pqs_id_table[] __devinitdata = {
 	{ 0x101a, 0x0009, },
+	{ 0, }
 };
 
 MODULE_DEVICE_TABLE(pci, pqs_id_table);
@@ -2411,6 +2412,7 @@ static struct pci_device_id sym2_id_table[] __devinitdata = {
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{ PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_NCR_53C875J,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ 0, }
 };
 
 MODULE_DEVICE_TABLE(pci, sym2_id_table);
