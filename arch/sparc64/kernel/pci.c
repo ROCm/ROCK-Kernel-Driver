@@ -148,7 +148,7 @@ int pcic_present(void)
 			len = prom_getproperty(node, "compatible",
 					       namebuf, sizeof(namebuf));
 			if (len > 0)
-				ret = pci_controller_init(namebuf, len, node);
+				ret = pci_is_controller(namebuf, len, node);
 		}
 		if (ret)
 			return ret;
