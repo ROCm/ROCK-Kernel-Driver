@@ -919,30 +919,10 @@ static void __init prom_hold_cpus(unsigned long mem)
 	unsigned long secondary_hold
 		= virt_to_abs(*PTRRELOC((unsigned long *)__secondary_hold));
 	struct systemcfg *_systemcfg = RELOC(systemcfg);
-	struct paca_struct *lpaca = PTRRELOC(&paca[0]);
 	struct prom_t *_prom = PTRRELOC(&prom);
 #ifdef CONFIG_SMP
 	struct naca_struct *_naca = RELOC(naca);
 #endif
-
-	/* On pmac, we just fill out the various global bitmasks and
-	 * arrays indicating our CPUs are here, they are actually started
-	 * later on from pmac_smp
-	 */
-	if (_systemcfg->platform == PLATFORM_POWERMAC) {
-		for (node = 0; prom_next_node(&node); ) {
-			type[0] = 0;
-			prom_getprop(node, "device_type", type, sizeof(type));
-			if (strcmp(type, RELOC("cpu")) != 0)
-				continue;
-			reg = -1;
-			prom_getprop(node, "reg", &reg, sizeof(reg));
-			lpaca[cpuid].hw_cpu_id = reg;
-
-			cpuid++;
-		}
-		return;
-	}
 
 	prom_debug("prom_hold_cpus: start...\n");
 	prom_debug("    1) spinloop       = 0x%x\n", (unsigned long)spinloop);
@@ -987,7 +967,6 @@ static void __init prom_hold_cpus(unsigned long mem)
 
 		prom_debug("\ncpuid        = 0x%x\n", cpuid);
 		prom_debug("cpu hw idx   = 0x%x\n", reg);
-		lpaca[cpuid].hw_cpu_id = reg;
 
 		/* Init the acknowledge var which will be reset by
 		 * the secondary cpu when it awakens from its OF
@@ -1044,7 +1023,6 @@ next:
 			cpuid++;
 			if (cpuid >= NR_CPUS)
 				continue;
-			lpaca[cpuid].hw_cpu_id = interrupt_server[i];
 			prom_printf("%x : preparing thread ... ",
 				    interrupt_server[i]);
 			if (_naca->smt_state) {

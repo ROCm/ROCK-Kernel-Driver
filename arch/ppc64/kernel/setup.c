@@ -170,6 +170,8 @@ void __init disable_early_printk(void)
  *
  * This function is valid only for Open Firmware systems.  finish_device_tree
  * must be called before using this.
+ *
+ * While we're here, we may as well set the "physical" cpu ids in the paca.
  */
 static void __init setup_cpu_maps(void)
 {
@@ -182,11 +184,15 @@ static void __init setup_cpu_maps(void)
 
 		intserv = (u32 *)get_property(dn, "ibm,ppc-interrupt-server#s",
 					      &len);
+		if (!intserv)
+			intserv = (u32 *)get_property(dn, "reg", NULL);
+
 		nthreads = len / sizeof(u32);
 
 		for (j = 0; j < nthreads && cpu < NR_CPUS; j++) {
 			cpu_set(cpu, cpu_possible_map);
 			cpu_set(cpu, cpu_present_map);
+			set_hard_smp_processor_id(cpu, intserv[j]);
 			cpu++;
 		}
 	}
