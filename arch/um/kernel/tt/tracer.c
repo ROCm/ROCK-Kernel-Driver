@@ -184,6 +184,7 @@ int tracer(int (*init_proc)(void *), void *sp)
 	unsigned long eip = 0;
 	int status, pid = 0, sig = 0, cont_type, tracing = 0, op = 0;
 	int last_index, proc_id = 0, n, err, old_tracing = 0, strace = 0;
+	int pt_syscall_parm, local_using_sysemu;
 
 	capture_signal_stack();
 	signal(SIGPIPE, SIG_IGN);
@@ -297,6 +298,9 @@ int tracer(int (*init_proc)(void *), void *sp)
 			tracing = is_tracing(task);
 			old_tracing = tracing;
 
+			local_using_sysemu = get_using_sysemu();
+			pt_syscall_parm = local_using_sysemu ? PTRACE_SYSEMU : PTRACE_SYSCALL;
+
 			switch(sig){
 			case SIGUSR1:
 				sig = 0;
@@ -330,7 +334,7 @@ int tracer(int (*init_proc)(void *), void *sp)
 					continue;
 				}
 				tracing = 0;
-				if(do_syscall(task, pid))
+				if(do_syscall(task, pid, local_using_sysemu))
 					sig = SIGUSR2;
 				else clear_singlestep(task);
 				break;
@@ -349,6 +353,7 @@ int tracer(int (*init_proc)(void *), void *sp)
 			case SIGBUS:
 			case SIGILL:
 			case SIGWINCH:
+
 			default:
 				tracing = 0;
 				break;
@@ -370,7 +375,7 @@ int tracer(int (*init_proc)(void *), void *sp)
 			if(tracing){
 				if(singlestepping_tt(task))
 					cont_type = PTRACE_SINGLESTEP;
-				else cont_type = PTRACE_SYSCALL;
+				else cont_type = pt_syscall_parm;
 			}
 			else cont_type = PTRACE_CONT;
 

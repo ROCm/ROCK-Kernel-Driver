@@ -28,7 +28,7 @@ extern int singlestepping_tt(void *t);
 extern void clear_singlestep(void *t);
 extern void syscall_handler(int sig, union uml_pt_regs *regs);
 extern void exit_kernel(int pid, void *task);
-extern int do_syscall(void *task, int pid);
+extern int do_syscall(void *task, int pid, int local_using_sysemu);
 extern int is_valid_pid(int pid);
 extern void remap_data(void *segment_start, void *segment_end, int w);
 

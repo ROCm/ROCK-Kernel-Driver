@@ -242,9 +242,6 @@ static void __init check_sysemu(void)
 	void *stack;
 	int pid, n, status;
 
-	if (mode_tt)
-		return;
-
 	printk("Checking syscall emulation patch for ptrace...");
 	sysemu_supported = 0;
 	pid = start_ptraced_child(&stack);
