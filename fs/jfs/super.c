@@ -53,6 +53,8 @@ MODULE_PARM_DESC(jfsloglevel, "Specify JFS loglevel (0, 1 or 2)");
 /*
  * External declarations
  */
+extern struct inode *jfs_iget(struct super_block *, ino_t);
+
 extern int jfs_mount(struct super_block *);
 extern int jfs_mount_rw(struct super_block *, int);
 extern int jfs_umount(struct super_block *);
@@ -61,11 +63,12 @@ extern int jfs_umount_rw(struct super_block *);
 extern int jfsIOWait(void *);
 extern int jfs_lazycommit(void *);
 extern int jfs_sync(void *);
-extern void jfs_put_inode(struct inode *inode);
-extern void jfs_read_inode(struct inode *inode);
+
 extern void jfs_dirty_inode(struct inode *inode);
 extern void jfs_delete_inode(struct inode *inode);
 extern void jfs_write_inode(struct inode *inode, int wait);
+
+extern struct dentry *jfs_get_parent(struct dentry *dentry);
 
 #if defined(CONFIG_JFS_DEBUG) && defined(CONFIG_PROC_FS)
 extern void jfs_proc_init(void);
@@ -232,17 +235,19 @@ int jfs_remount(struct super_block *sb, int *flags, char *data)
 	return 0;
 }
 
-static struct super_operations jfs_sops = {
+static struct super_operations jfs_super_operations = {
 	alloc_inode:	jfs_alloc_inode,
 	destroy_inode:	jfs_destroy_inode,
-	read_inode:	jfs_read_inode,
 	dirty_inode:	jfs_dirty_inode,
 	write_inode:	jfs_write_inode,
-	put_inode:	jfs_put_inode,
 	delete_inode:	jfs_delete_inode,
 	put_super:	jfs_put_super,
 	statfs:		jfs_statfs,
 	remount_fs:	jfs_remount,
+};
+
+static struct export_operations jfs_export_operations = {
+	get_parent:	jfs_get_parent,
 };
 
 static int jfs_fill_super(struct super_block *sb, void *data, int silent)
@@ -268,7 +273,13 @@ static int jfs_fill_super(struct super_block *sb, void *data, int silent)
 	 * Initialize blocksize to 4K.
 	 */
 	sb_set_blocksize(sb, PSIZE);
-	sb->s_op = &jfs_sops;
+
+	/*
+	 * Set method vectors.
+	 */
+	sb->s_op = &jfs_super_operations;
+	sb->s_export_op = &jfs_export_operations;
+
 	/*
 	 * Initialize direct-mapping inode/address-space
 	 */
@@ -309,7 +320,7 @@ static int jfs_fill_super(struct super_block *sb, void *data, int silent)
 
 	sb->s_magic = JFS_SUPER_MAGIC;
 
-	inode = iget(sb, ROOT_I);
+	inode = jfs_iget(sb, ROOT_I);
 	if (!inode || is_bad_inode(inode))
 		goto out_no_root;
 	sb->s_root = d_alloc_root(inode);
