@@ -66,7 +66,6 @@
 #define	PEGASUS_REQ_GET_REGS	0xf0
 #define	PEGASUS_REQ_SET_REGS	0xf1
 #define	PEGASUS_REQ_SET_REG	PEGASUS_REQ_SET_REGS
-#define	ALIGN(x)		x __attribute__((aligned(L1_CACHE_BYTES)))
 
 enum pegasus_registers {
 	EthCtrl0 = 0,
@@ -103,9 +102,9 @@ typedef struct pegasus {
 	struct usb_ctrlrequest	dr;
 	wait_queue_head_t	ctrl_wait;
 	struct semaphore	ctrl_sem;
-	unsigned char		ALIGN(rx_buff[PEGASUS_MAX_MTU]);
-	unsigned char		ALIGN(tx_buff[PEGASUS_MAX_MTU]);
-	unsigned char		ALIGN(intr_buff[8]);
+	unsigned char		rx_buff[PEGASUS_MAX_MTU];
+	unsigned char		tx_buff[PEGASUS_MAX_MTU];
+	unsigned char		intr_buff[8];
 	__u8			eth_regs[4];
 	__u8			phy;
 	__u8			gpio_res;
@@ -129,6 +128,7 @@ struct usb_eth_dev {
 #define	VENDOR_COMPAQ		0x049f
 #define	VENDOR_COREGA		0x07aa
 #define	VENDOR_DLINK		0x2001
+#define	VENDOR_ELCON		0x0db7
 #define	VENDOR_ELSA		0x05cc
 #define	VENDOR_HAWKING		0x0e66
 #define	VENDOR_IODATA		0x04bb
@@ -208,6 +208,8 @@ PEGASUS_DEV( "D-Link DSB-650TX(PNA)", VENDOR_DLINK, 0x4003,
 		DEFAULT_GPIO_RESET | HAS_HOME_PNA )
 PEGASUS_DEV( "D-Link DSB-650", VENDOR_DLINK, 0xabc1,
 		DEFAULT_GPIO_RESET )
+PEGASUS_DEV( "ELCON EPLC10Mi USB to Powerline Adapter", VENDOR_ELCON, 0x0002,
+		DEFAULT_GPIO_RESET | PEGASUS_II | HAS_HOME_PNA )
 PEGASUS_DEV( "Elsa Micolink USB2Ethernet", VENDOR_ELSA, 0x3000,
 		DEFAULT_GPIO_RESET )
 PEGASUS_DEV( "Hawking UF100 10/100 Ethernet", VENDOR_HAWKING, 0x400c,
