@@ -248,7 +248,7 @@ void sun4c_complete_all_stores(void)
 	_unused = sun4c_get_context();
 	sun4c_set_context(_unused);
 #ifdef CONFIG_SUN_AUXIO
-	_unused = *AUXREG;
+	_unused = get_auxio();
 #endif
 }
 

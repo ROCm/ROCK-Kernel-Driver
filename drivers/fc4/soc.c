@@ -40,7 +40,6 @@ static char *version =
 
 #include <asm/openprom.h>
 #include <asm/oplib.h>
-#include <asm/auxio.h>
 #include <asm/pgtable.h>
 #include <asm/irq.h>
 
