@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acglobal.h - Declarations for global variables
- *       $Revision: 130 $
+ *       $Revision: 131 $
  *
  *****************************************************************************/
 
@@ -136,6 +136,7 @@ ACPI_EXTERN u8                          acpi_gbl_global_lock_acquired;
 ACPI_EXTERN u8                          acpi_gbl_step_to_next_call;
 ACPI_EXTERN u8                          acpi_gbl_acpi_hardware_present;
 ACPI_EXTERN u8                          acpi_gbl_global_lock_present;
+ACPI_EXTERN u8                          acpi_gbl_events_initialized;
 
 extern u8                               acpi_gbl_shutdown;
 extern u32                              acpi_gbl_startup_flags;

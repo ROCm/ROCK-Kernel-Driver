@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dswload - Dispatcher namespace load callbacks
- *              $Revision: 70 $
+ *              $Revision: 71 $
  *
  *****************************************************************************/
 
@@ -109,22 +109,27 @@ acpi_ds_load1_begin_op (
 	acpi_status             status;
 	acpi_object_type        object_type;
 	NATIVE_CHAR             *path;
+	u32                     flags;
 
 
 	ACPI_FUNCTION_NAME ("Ds_load1_begin_op");
 
+
 	op = walk_state->op;
 	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH, "Op=%p State=%p\n", op, walk_state));
-
-
-	if (op && (op->common.aml_opcode == AML_INT_NAMEDFIELD_OP)) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH, "Op=%p State=%p\n", op, walk_state));
-	}
 
 	/* We are only interested in opcodes that have an associated name */
 
 	if (op) {
 		if (!(walk_state->op_info->flags & AML_NAMED)) {
+#if 0
+			if ((walk_state->op_info->class == AML_CLASS_EXECUTE) ||
+				(walk_state->op_info->class == AML_CLASS_CONTROL)) {
+				acpi_os_printf ("\n\n***EXECUTABLE OPCODE %s***\n\n", walk_state->op_info->name);
+				*out_op = op;
+				return (AE_CTRL_SKIP);
+			}
+#endif
 			*out_op = op;
 			return (AE_OK);
 		}
@@ -144,7 +149,31 @@ acpi_ds_load1_begin_op (
 	object_type = walk_state->op_info->object_type;
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
-		"State=%p Op=%p Type=%X\n", walk_state, op, object_type));
+		"State=%p Op=%p [%s] ", walk_state, op, acpi_ut_get_type_name (object_type)));
+
+	/*
+	 * Setup the search flags.
+	 *
+	 * Since we are entering a name into the namespace, we do not want to
+	 *    enable the search-to-root upsearch.
+	 *
+	 * There are only two conditions where it is acceptable that the name
+	 *    already exists:
+	 *    1) the Scope() operator can reopen a scoping object that was
+	 *       previously defined (Scope, Method, Device, etc.)
+	 *    2) Whenever we are parsing a deferred opcode (Op_region, Buffer,
+	 *       Buffer_field, or Package), the name of the object is already
+	 *       in the namespace.
+	 */
+	flags = ACPI_NS_NO_UPSEARCH;
+	if ((walk_state->opcode != AML_SCOPE_OP) &&
+		(!(walk_state->parse_flags & ACPI_PARSE_DEFERRED_OP))) {
+		flags |= ACPI_NS_ERROR_IF_FOUND;
+		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DISPATCH, "Cannot already exist\n"));
+	}
+	else {
+		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DISPATCH, "Both Find or Create allowed\n"));
+	}
 
 	/*
 	 * Enter the named type into the internal namespace.  We enter the name
@@ -152,10 +181,36 @@ acpi_ds_load1_begin_op (
 	 * arguments to the opcode must be created as we go back up the parse tree later.
 	 */
 	status = acpi_ns_lookup (walk_state->scope_info, path, object_type,
-			  ACPI_IMODE_LOAD_PASS1, ACPI_NS_NO_UPSEARCH, walk_state, &(node));
-
+			  ACPI_IMODE_LOAD_PASS1, flags, walk_state, &(node));
 	if (ACPI_FAILURE (status)) {
 		return (status);
+	}
+
+	/*
+	 * For the scope op, we must check to make sure that the target is
+	 * one of the opcodes that actually opens a scope
+	 */
+	if (walk_state->opcode == AML_SCOPE_OP) {
+		switch (node->type) {
+		case ACPI_TYPE_ANY:         /* Scope nodes are untyped (ANY) */
+		case ACPI_TYPE_DEVICE:
+		case ACPI_TYPE_METHOD:
+		case ACPI_TYPE_POWER:
+		case ACPI_TYPE_PROCESSOR:
+		case ACPI_TYPE_THERMAL:
+
+			/* These are acceptable types */
+			break;
+
+		default:
+
+			/* All other types are an error */
+
+			ACPI_REPORT_ERROR (("Invalid type (%s) for target of Scope operator [%4.4s]\n",
+				acpi_ut_get_type_name (node->type), path));
+
+			return (AE_AML_OPERAND_TYPE);
+		}
 	}
 
 	if (!op) {
@@ -214,9 +269,9 @@ acpi_ds_load1_end_op (
 
 	ACPI_FUNCTION_NAME ("Ds_load1_end_op");
 
+
 	op = walk_state->op;
 	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH, "Op=%p State=%p\n", op, walk_state));
-
 
 	/* We are only interested in opcodes that have an associated name */
 
