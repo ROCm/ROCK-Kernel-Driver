@@ -10,6 +10,8 @@
 #ifndef _LINUX_FLAT_H
 #define _LINUX_FLAT_H
 
+#include <asm/flat.h>
+
 #define	FLAT_VERSION			0x00000004L
 
 /*
