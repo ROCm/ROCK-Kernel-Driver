@@ -2,36 +2,16 @@
 #define _SERIO_H
 
 /*
- * $Id: serio.h,v 1.21 2001/12/19 05:15:21 skids Exp $
- *
- * Copyright (C) 1999-2001 Vojtech Pavlik
- */
-
-/*
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
- *
- * Should you need to contact me, the author, you can do so either by
- * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
- * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
- */
-
-/*
- * The serial port set type ioctl.
+ * Copyright (C) 1999-2002 Vojtech Pavlik
+*
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 as published by
+ * the Free Software Foundation.
  */
 
 #include <linux/ioctl.h>
+#include <linux/list.h>
+
 #define SPIOCSTYPE	_IOW('q', 0x01, unsigned long)
 
 struct serio;
@@ -57,7 +37,8 @@ struct serio {
 	void (*close)(struct serio *);
 
 	struct serio_dev *dev;
-	struct serio *next;
+
+	struct list_head node;
 };
 
 struct serio_dev {
@@ -71,7 +52,7 @@ struct serio_dev {
 	void (*disconnect)(struct serio *);
 	void (*cleanup)(struct serio *);
 
-	struct serio_dev *next;
+	struct list_head node;
 };
 
 int serio_open(struct serio *serio, struct serio_dev *dev);
