@@ -559,9 +559,6 @@ e1000_probe(struct pci_dev *pdev,
 	INIT_WORK(&adapter->tx_timeout_task,
 		(void (*)(void *))e1000_tx_timeout_task, netdev);
 
-	if((err = register_netdev(netdev)))
-		goto err_register;
-
 	/* we're going to reset, so assume we have no link for now */
 
 	netif_carrier_off(netdev);
@@ -600,6 +597,9 @@ e1000_probe(struct pci_dev *pdev,
 	/* reset the hardware with the new settings */
 
 	e1000_reset(adapter);
+
+	if((err = register_netdev(netdev)))
+		goto err_register;
 
 	cards_found++;
 	return 0;
