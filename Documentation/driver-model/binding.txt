@@ -60,7 +60,7 @@ When a driver is attached to a device, the device is inserted into the
 driver's list of devices. 
 
 
-driverfs
+sysfs
 ~~~~~~~~
 
 A symlink is created in the bus's 'devices' directory that points to
@@ -71,7 +71,7 @@ to the device's directory in the physical hierarchy.
 
 A directory for the device is created in the class's directory. A
 symlink is created in that directory that points to the device's
-physical location in the driverfs tree. 
+physical location in the sysfs tree. 
 
 A symlink can be created (though this isn't done yet) in the device's
 physical directory to either its class directory, or the class's
