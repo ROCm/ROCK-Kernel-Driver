@@ -380,12 +380,6 @@ uart_get_baud_rate(struct uart_port *port, struct termios *termios,
 
 EXPORT_SYMBOL(uart_get_baud_rate);
 
-static inline unsigned int
-uart_calculate_quot(struct uart_port *port, unsigned int baud)
-{
-	return quot;
-}
-
 /**
  *	uart_get_divisor - return uart clock divisor
  *	@port: uart_port structure describing the port.
@@ -429,7 +423,6 @@ uart_change_speed(struct uart_info *info, struct termios *old_termios)
 	struct tty_struct *tty = info->tty;
 	struct uart_port *port = info->port;
 	struct termios *termios;
-	unsigned int quot;
 
 	/*
 	 * If we have no tty, termios, or the port does not exist,
