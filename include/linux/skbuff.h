@@ -109,7 +109,8 @@ struct sk_buff_head {
 
 struct sk_buff;
 
-#define MAX_SKB_FRAGS 6
+/* To allow 64K frame to be packed as single skb without frag_list */
+#define MAX_SKB_FRAGS (65536/PAGE_SIZE + 2)
 
 typedef struct skb_frag_struct skb_frag_t;
 
@@ -125,6 +126,8 @@ struct skb_frag_struct {
 struct skb_shared_info {
 	atomic_t	dataref;
 	unsigned int	nr_frags;
+	unsigned short	tso_size;
+	unsigned short	tso_segs;
 	struct sk_buff	*frag_list;
 	skb_frag_t	frags[MAX_SKB_FRAGS];
 };

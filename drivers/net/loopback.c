@@ -49,10 +49,71 @@
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <net/sock.h>
+#include <net/checksum.h>
 #include <linux/if_ether.h>	/* For the statistics structure. */
 #include <linux/if_arp.h>	/* For ARPHRD_ETHER */
+#include <linux/ip.h>
+#include <linux/tcp.h>
 
 #define LOOPBACK_OVERHEAD (128 + MAX_HEADER + 16 + 16)
+
+/* KISS: just allocate small chunks and copy bits.
+ *
+ * So, in fact, this is documentation, explaining what we expect
+ * of largesending device modulo TCP checksum, which is ignored for loopback.
+ */
+
+static void emulate_large_send_offload(struct sk_buff *skb)
+{
+	struct iphdr *iph = skb->nh.iph;
+	struct tcphdr *th = (struct tcphdr*)(skb->nh.raw + (iph->ihl * 4));
+	unsigned int doffset = (iph->ihl + th->doff) * 4;
+	unsigned int mtu = skb_shinfo(skb)->tso_size + doffset;
+	unsigned int offset = 0;
+	u32 seq = ntohl(th->seq);
+	u16 id  = ntohs(iph->id);
+
+	while (offset + doffset < skb->len) {
+		unsigned int frag_size = min(mtu, skb->len - offset) - doffset;
+		struct sk_buff *nskb = alloc_skb(mtu + 32, GFP_ATOMIC);
+
+		if (!nskb)
+			break;
+		skb_reserve(nskb, 32);
+		nskb->mac.raw = nskb->data - 14;
+		nskb->nh.raw = nskb->data;
+		iph = nskb->nh.iph;
+		memcpy(nskb->data, skb->nh.raw, doffset);
+		if (skb_copy_bits(skb,
+				  doffset + offset,
+				  nskb->data + doffset,
+				  frag_size))
+			BUG();
+		skb_put(nskb, doffset + frag_size);
+		nskb->ip_summed = CHECKSUM_UNNECESSARY;
+		nskb->dev = skb->dev;
+		nskb->priority = skb->priority;
+		nskb->protocol = skb->protocol;
+		nskb->dst = dst_clone(skb->dst);
+		memcpy(nskb->cb, skb->cb, sizeof(skb->cb));
+		nskb->pkt_type = skb->pkt_type;
+
+		th = (struct tcphdr*)(nskb->nh.raw + iph->ihl*4);
+		iph->tot_len = htons(frag_size + doffset);
+		iph->id = htons(id);
+		iph->check = 0;
+		iph->check = ip_fast_csum((unsigned char *) iph, iph->ihl);
+		th->seq = htonl(seq);
+		if (offset + doffset + frag_size < skb->len)
+			th->fin = th->psh = 0;
+		netif_rx(nskb);
+		offset += frag_size;
+		seq += frag_size;
+		id++;
+	}
+
+	dev_kfree_skb(skb);
+}
 
 /*
  * The higher levels take care of making this non-reentrant (it's
@@ -86,6 +147,18 @@ static int loopback_xmit(struct sk_buff *skb, struct net_device *dev)
 	skb->ip_summed = CHECKSUM_UNNECESSARY;
 #endif
 
+	if (skb_shinfo(skb)->tso_size) {
+		struct iphdr *iph = skb->nh.iph;
+
+		if (skb->protocol != htons(ETH_P_IP))
+			BUG();
+		if (iph->protocol != IPPROTO_TCP)
+			BUG();
+
+		emulate_large_send_offload(skb);
+		return 0;
+	}
+
 	dev->last_rx = jiffies;
 	stats->rx_bytes+=skb->len;
 	stats->tx_bytes+=skb->len;
@@ -117,6 +190,12 @@ int __init loopback_init(struct net_device *dev)
 	dev->rebuild_header	= eth_rebuild_header;
 	dev->flags		= IFF_LOOPBACK;
 	dev->features		= NETIF_F_SG|NETIF_F_FRAGLIST|NETIF_F_NO_CSUM|NETIF_F_HIGHDMA;
+
+	/* Current netfilter will die with oom linearizing large skbs,
+	 * however this will be cured before 2.5.x is done.
+	 */
+	dev->features	       |= NETIF_F_TSO;
+
 	dev->priv = kmalloc(sizeof(struct net_device_stats), GFP_KERNEL);
 	if (dev->priv == NULL)
 			return -ENOMEM;
