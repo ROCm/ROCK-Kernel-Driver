@@ -13,7 +13,7 @@ AWK := awk
 
 export AWK
 
-LINKFLAGS = -static -T arch/$(ARCH)/vmlinux.lds
+LDFLAGS_vmlinux := -static -T arch/$(ARCH)/vmlinux.lds
 AFLAGS_KERNEL := -mconstant-gp
 EXTRA	=
 

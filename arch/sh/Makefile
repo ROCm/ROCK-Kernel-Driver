@@ -15,12 +15,12 @@
 ifdef CONFIG_CPU_LITTLE_ENDIAN
 CFLAGS		+= -ml
 AFLAGS		+= -ml
-# LINKFLAGS	+= -EL
+# LDFLAGS_vmlinux	+= -EL
 LDFLAGS		:= -EL
 else
 CFLAGS		+= -mb
 AFLAGS		+= -mb
-# LINKFLAGS	+= -EB
+# LDFLAGS_vmlinux	+= -EB
 LDFLAGS		:= -EB
 endif
 
@@ -47,10 +47,10 @@ endif
 # none has been choosen above.
 #
 LINKSCRIPT    = arch/sh/vmlinux.lds
-LINKFLAGS     += -T $(word 1,$(LINKSCRIPT)) -e _stext
+LDFLAGS_vmlinux     += -T $(word 1,$(LINKSCRIPT)) -e _stext
 
 ifdef LOADADDR
-LINKFLAGS     += -Ttext $(word 1,$(LOADADDR))
+LDFLAGS_vmlinux     += -Ttext $(word 1,$(LOADADDR))
 endif
 
 #

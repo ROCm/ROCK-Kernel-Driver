@@ -20,7 +20,7 @@ ifeq ($(CONFIG_SHARED_KERNEL),y)
 else
   LINKSCRIPT := arch/s390/vmlinux.lds
 endif
-LINKFLAGS =-T $(TOPDIR)/$(LINKSCRIPT) -e start
+LDFLAGS_vmlinux := -T $(LINKSCRIPT) -e start
 
 CFLAGS_PIPE := -pipe
 CFLAGS_NSR  := -fno-strength-reduce

@@ -224,7 +224,7 @@ NETWORKS	:= net/network.o
 
 include arch/$(ARCH)/Makefile
 
-export	NETWORKS DRIVERS LIBS HEAD LDFLAGS LINKFLAGS MAKEBOOT ASFLAGS
+export	NETWORKS DRIVERS LIBS HEAD LDFLAGS MAKEBOOT ASFLAGS
 
 # boot target
 # ---------------------------------------------------------------------------
@@ -245,7 +245,7 @@ boot: vmlinux
 vmlinux-objs := $(HEAD) $(INIT) $(CORE_FILES) $(LIBS) $(DRIVERS) $(NETWORKS)
 
 quiet_cmd_link_vmlinux = LD     $@
-cmd_link_vmlinux = $(LD) $(LINKFLAGS) $(HEAD) $(INIT) \
+cmd_link_vmlinux = $(LD) $(LDFLAGS_$(@F)) $(HEAD) $(INIT) \
 		--start-group \
 		$(CORE_FILES) \
 		$(LIBS) \

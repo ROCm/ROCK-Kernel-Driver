@@ -25,9 +25,9 @@ ifneq ($(COMPILE_ARCH),$(ARCH))
 endif
 
 ifndef CONFIG_SUN3
-LINKFLAGS = -T $(TOPDIR)/arch/m68k/vmlinux.lds
+LDFLAGS_vmlinux = -T $(TOPDIR)/arch/m68k/vmlinux.lds
 else
-LINKFLAGS = -T $(TOPDIR)/arch/m68k/vmlinux-sun3.lds -N
+LDFLAGS_vmlinux = -T $(TOPDIR)/arch/m68k/vmlinux-sun3.lds -N
 endif
 
 # without -fno-strength-reduce the 53c7xx.c driver fails ;-(

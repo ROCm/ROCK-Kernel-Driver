@@ -21,7 +21,7 @@ ifeq ($(CONFIG_SHARED_KERNEL),y)
 else
   LINKSCRIPT := arch/s390x/vmlinux.lds
 endif
-LINKFLAGS =-T $(TOPDIR)/$(LINKSCRIPT) -e start
+LDFLAGS_vmlinux := -T $(LINKSCRIPT) -e start
 MODFLAGS += -fpic
 
 CFLAGS_PIPE := -pipe

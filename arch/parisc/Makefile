@@ -21,7 +21,7 @@ FINAL_LD=$(CROSS_COMPILE)ld --warn-common --warn-section-align
 
 CPP=$(CC) -E
 OBJCOPY=$(CROSS_COMPILE)objcopy -O binary -R .note -R .comment -S
-LINKFLAGS =-T $(TOPDIR)/arch/parisc/vmlinux.lds
+LDFLAGS_vmlinux =-T arch/parisc/vmlinux.lds
 
 CFLAGS_PIPE := -pipe
 CFLAGS_NSR  := -fno-strength-reduce

@@ -18,7 +18,7 @@
 
 LD=$(CROSS_COMPILE)ld -m elf_i386
 OBJCOPY=$(CROSS_COMPILE)objcopy -O binary -R .note -R .comment -S
-LINKFLAGS =-T $(TOPDIR)/arch/i386/vmlinux.lds -e stext
+LDFLAGS_vmlinux :=-T arch/i386/vmlinux.lds -e stext
 
 CFLAGS += -pipe
 

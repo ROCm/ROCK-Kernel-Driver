@@ -35,7 +35,7 @@ endif
 #
 CFLAGS		+= -I $(TOPDIR)/include/asm/gcc $(CFLAGS)
 CFLAGS		+= -mabi=64 -G 0 -mno-abicalls -fno-pic -Wa,--trap -pipe
-LINKFLAGS	+= -G 0 -static # -N
+LDFLAGS_vmlinux	+= -G 0 -static # -N
 MODFLAGS	+= -mlong-calls
 
 ifdef CONFIG_REMOTE_DEBUG
@@ -118,7 +118,7 @@ endif
 #
 ifdef CONFIG_BOOT_ELF32
 CFLAGS += -Wa,-32
-LINKFLAGS += -T arch/mips64/ld.script.elf32
+LDFLAGS_vmlinux += -T arch/mips64/ld.script.elf32
 endif
 #
 # The 64-bit ELF tools are pretty broken so at this time we generate 64-bit
@@ -126,13 +126,13 @@ endif
 #
 ifdef CONFIG_BOOT_ELF64
 CFLAGS += -Wa,-32
-LINKFLAGS += -T arch/mips64/ld.script.elf32
+LDFLAGS_vmlinux += -T arch/mips64/ld.script.elf32
 #AS += -64
 #LD += -m elf64bmip
-#LINKFLAGS += -T arch/mips64/ld.script.elf64
+#LDFLAGS_vmlinux += -T arch/mips64/ld.script.elf64
 endif
 
-LINKFLAGS += -Ttext $(LOADADDR)
+LDFLAGS_vmlinux += -Ttext $(LOADADDR)
 
 HEAD := arch/mips64/kernel/head.o arch/mips64/kernel/init_task.o
 

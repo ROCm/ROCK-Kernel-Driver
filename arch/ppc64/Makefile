@@ -15,7 +15,7 @@
 
 KERNELLOAD	=0xc000000000000000
 
-LINKFLAGS	= -T arch/ppc64/vmlinux.lds -Bstatic \
+LDFLAGS_vmlinux	= -T arch/ppc64/vmlinux.lds -Bstatic \
 		-e $(KERNELLOAD) -Ttext $(KERNELLOAD)
 CFLAGS		:= $(CFLAGS) -fsigned-char -msoft-float -pipe \
 		-Wno-uninitialized -mminimal-toc -mtraceback=full \

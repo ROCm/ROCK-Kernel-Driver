@@ -36,7 +36,7 @@ endif
 # crossformat linking we rely on the elf2ecoff tool for format conversion.
 #
 GCCFLAGS	:= -G 0 -mno-abicalls -fno-pic
-LINKFLAGS	+= -static
+LDFLAGS_vmlinux	+= -static
 MODFLAGS	+= -mlong-calls
 LD		:= $(LD) -G 0
 
@@ -270,7 +270,7 @@ vmlinux: arch/$(ARCH)/ld.script
 
 arch/$(ARCH)/ld.script: arch/$(ARCH)/ld.script.in arch/$(ARCH)/Makefile
 	sed -e 's/@@LOADADDR@@/$(LOADADDR)/' <$< >$@
-LINKFLAGS	+= -T arch/$(ARCH)/ld.script
+LDFLAGS_vmlinux	+= -T arch/$(ARCH)/ld.script
 
 HEAD := arch/mips/kernel/head.o arch/mips/kernel/init_task.o
 

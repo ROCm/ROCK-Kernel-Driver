@@ -31,7 +31,7 @@ LD = if [ ! -e $(LD_SCRIPT).tmp -o $(LD_SCRIPT) -nt $(LD_SCRIPT).tmp ]; then \
      else true; \
      fi && $(CROSS_COMPILE)ld -mcrislinux
 
-LINKFLAGS = -T $(LD_SCRIPT).tmp
+LDFLAGS_vmlinux = -T $(LD_SCRIPT).tmp
 
 # objcopy is used to make binary images from the resulting linked file
 
