@@ -25,7 +25,7 @@ SVGA_MODE := -DSVGA_MODE=NORMAL_VGA
 
 #RAMDISK := -DRAMDISK=512
 
-EXTRA_TARGETS	:= vmlinux.bin bvmlinux.bin bootsect bootsect.o \
+EXTRA_TARGETS	:= vmlinux.bin bootsect bootsect.o \
 		   setup setup.o zImage bzImage
 
 host-progs	:= tools/build
@@ -81,8 +81,7 @@ install: $(BOOTIMAGE)
 
 clean:
 	@echo 'Cleaning up (boot)'
-	@rm -f $(addprefix $(obj)/,tools/build vmlinux.bin bvmlinux.bin \
-		bootsect zImage bsetup bbootsect bzImage)
+	@rm -f $(host-progs) $(EXTRA_TARGETS)
 	+@$(call descend,$(obj)/compressed) clean
 
 archhelp:
