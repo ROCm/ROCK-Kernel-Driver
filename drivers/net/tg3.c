@@ -6128,23 +6128,8 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	if (tp->tg3_flags & TG3_FLAG_PCIX_TARGET_HWBUG)
 		tp->tg3_flags |= TG3_FLAG_HOST_TXDS;
 
-	/* Quick sanity check.  Make sure we see an expected
-	 * value here.
-	 */
 	grc_misc_cfg = tr32(GRC_MISC_CFG);
 	grc_misc_cfg &= GRC_MISC_CFG_BOARD_ID_MASK;
-	if (grc_misc_cfg != GRC_MISC_CFG_BOARD_ID_5700 &&
-	    grc_misc_cfg != GRC_MISC_CFG_BOARD_ID_5701 &&
-	    grc_misc_cfg != GRC_MISC_CFG_BOARD_ID_5702FE &&
-	    grc_misc_cfg != GRC_MISC_CFG_BOARD_ID_5703 &&
-	    grc_misc_cfg != GRC_MISC_CFG_BOARD_ID_5703S &&
-	    grc_misc_cfg != GRC_MISC_CFG_BOARD_ID_5704 &&
-	    grc_misc_cfg != GRC_MISC_CFG_BOARD_ID_5704_A2 &&
-	    grc_misc_cfg != GRC_MISC_CFG_BOARD_ID_AC91002A1) {
-		printk(KERN_ERR PFX "(%s) unknown board id 0x%x\n",
-		       tp->pdev->slot_name, grc_misc_cfg);
-		return -ENODEV;
-	}
 
 	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704 &&
 	    grc_misc_cfg == GRC_MISC_CFG_BOARD_ID_5704CIOBE) {
