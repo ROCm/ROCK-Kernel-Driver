@@ -91,6 +91,7 @@ nfs_create_request(struct rpc_cred *cred, struct inode *inode,
 	req->wb_index	= page->index;
 	page_cache_get(page);
 	req->wb_offset  = offset;
+	req->wb_pgbase	= offset;
 	req->wb_bytes   = count;
 
 	if (cred)
@@ -278,13 +279,13 @@ nfs_coalesce_requests(struct list_head *head, struct list_head *dst,
 			if (req->wb_index != (prev->wb_index + 1))
 				break;
 
-			if (req->wb_offset != 0)
+			if (req->wb_pgbase != 0)
 				break;
 		}
 		nfs_list_remove_request(req);
 		nfs_list_add_request(req, dst);
 		npages++;
-		if (req->wb_offset + req->wb_bytes != PAGE_CACHE_SIZE)
+		if (req->wb_pgbase + req->wb_bytes != PAGE_CACHE_SIZE)
 			break;
 		if (npages >= nmax)
 			break;
