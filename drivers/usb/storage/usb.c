@@ -754,8 +754,14 @@ static int usb_stor_acquire_resources(struct us_data *us)
 	down(&us->dev_semaphore);
 
 	/* For bulk-only devices, determine the max LUN value */
-	if (us->protocol == US_PR_BULK)
-		us->max_lun = usb_stor_Bulk_max_lun(us);
+	if (us->protocol == US_PR_BULK) {
+		p = usb_stor_Bulk_max_lun(us);
+		if (p < 0) {
+			up(&us->dev_semaphore);
+			return p;
+		}
+		us->max_lun = p;
+	}
 
 	/* Just before we start our control thread, initialize
 	 * the device if it needs initialization */

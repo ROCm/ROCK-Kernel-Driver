@@ -908,17 +908,6 @@ int usb_stor_Bulk_max_lun(struct us_data *us)
 				 USB_RECIP_INTERFACE,
 				 0, us->ifnum, us->iobuf, 1, HZ);
 
-	/* 
-	 * Some devices (i.e. Iomega Zip100) need this -- apparently
-	 * the bulk pipes get STALLed when the GetMaxLUN request is
-	 * processed.   This is, in theory, harmless to all other devices
-	 * (regardless of if they stall or not).
-	 */
-	if (result < 0) {
-		usb_stor_clear_halt(us, us->recv_bulk_pipe);
-		usb_stor_clear_halt(us, us->send_bulk_pipe);
-	}
-
 	US_DEBUGP("GetMaxLUN command result is %d, data is %d\n", 
 		  result, us->iobuf[0]);
 
@@ -926,8 +915,22 @@ int usb_stor_Bulk_max_lun(struct us_data *us)
 	if (result == 1)
 		return us->iobuf[0];
 
-	/* return the default -- no LUNs */
-	return 0;
+	/* 
+	 * Some devices (i.e. Iomega Zip100) need this -- apparently
+	 * the bulk pipes get STALLed when the GetMaxLUN request is
+	 * processed.   This is, in theory, harmless to all other devices
+	 * (regardless of if they stall or not).
+	 */
+	if (result == -EPIPE) {
+		usb_stor_clear_halt(us, us->recv_bulk_pipe);
+		usb_stor_clear_halt(us, us->send_bulk_pipe);
+		/* return the default -- no LUNs */
+		return 0;
+	}
+
+	/* An answer or a STALL are the only valid responses.  If we get
+	 * something else, return an indication of error */
+	return -1;
 }
 
 int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
