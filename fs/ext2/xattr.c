@@ -230,7 +230,7 @@ ext2_listxattr(struct dentry *dentry, char *buffer, size_t size)
  */
 int
 ext2_setxattr(struct dentry *dentry, const char *name,
-	      void *value, size_t size, int flags)
+	      const void *value, size_t size, int flags)
 {
 	struct ext2_xattr_handler *handler;
 	struct inode *inode = dentry->d_inode;
