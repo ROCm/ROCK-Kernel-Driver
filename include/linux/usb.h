@@ -960,8 +960,6 @@ static inline unsigned int __create_pipe(struct usb_device *dev, unsigned int en
 #define usb_rcvbulkpipe(dev,endpoint)	((PIPE_BULK << 30) | __create_pipe(dev,endpoint) | USB_DIR_IN)
 #define usb_sndintpipe(dev,endpoint)	((PIPE_INTERRUPT << 30) | __create_pipe(dev,endpoint))
 #define usb_rcvintpipe(dev,endpoint)	((PIPE_INTERRUPT << 30) | __create_pipe(dev,endpoint) | USB_DIR_IN)
-#define usb_snddefctrl(dev)		((PIPE_CONTROL << 30))
-#define usb_rcvdefctrl(dev)		((PIPE_CONTROL << 30) | USB_DIR_IN)
 
 /* -------------------------------------------------------------------------- */
 
