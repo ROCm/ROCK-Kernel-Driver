@@ -7,6 +7,7 @@
 #include <linux/kernel.h>
 #include <linux/delay.h>
 #include <linux/sched.h>
+#include <linux/spinlock.h>
 #include <asm/prom.h>
 #include <linux/adb.h>
 #include <asm/io.h>
@@ -57,7 +58,7 @@ struct adb_regs {
 
 static volatile struct adb_regs *adb;
 static struct adb_request *current_req, *last_req;
-static unsigned char adb_rbuf[16];
+static spinlock_t macio_lock = SPIN_LOCK_UNLOCKED;
 
 static int macio_probe(void);
 static int macio_init(void);
@@ -66,7 +67,6 @@ static int macio_send_request(struct adb_request *req, int sync);
 static int macio_adb_autopoll(int devs);
 static void macio_adb_poll(void);
 static int macio_adb_reset_bus(void);
-static void completed(void);
 
 struct adb_driver macio_adb_driver = {
 	"MACIO",
@@ -107,19 +107,19 @@ int macio_init(void)
 	adb = (volatile struct adb_regs *)
 		ioremap(adbs->addrs->address, sizeof(struct adb_regs));
 
-	if (request_irq(adbs->intrs[0].line, macio_adb_interrupt,
-			0, "ADB", (void *)0)) {
-		printk(KERN_ERR "ADB: can't get irq %d\n",
-		       adbs->intrs[0].line);
-		return -EAGAIN;
-	}
-
 	out_8(&adb->ctrl.r, 0);
 	out_8(&adb->intr.r, 0);
 	out_8(&adb->error.r, 0);
 	out_8(&adb->active_hi.r, 0xff); /* for now, set all devices active */
 	out_8(&adb->active_lo.r, 0xff);
 	out_8(&adb->autopoll.r, APE);
+
+	if (request_irq(adbs->intrs[0].line, macio_adb_interrupt,
+			0, "ADB", (void *)0)) {
+		printk(KERN_ERR "ADB: can't get irq %d\n",
+		       adbs->intrs[0].line);
+		return -EAGAIN;
+	}
 	out_8(&adb->intr_enb.r, DFB | TAG);
 
 	printk("adb: mac-io driver 1.0 for unified ADB\n");
@@ -129,16 +129,27 @@ int macio_init(void)
 
 static int macio_adb_autopoll(int devs)
 {
+	unsigned long flags;
+	
+	spin_lock_irqsave(&macio_lock, flags);
 	out_8(&adb->active_hi.r, devs >> 8);
 	out_8(&adb->active_lo.r, devs);
 	out_8(&adb->autopoll.r, devs? APE: 0);
+	spin_unlock_irqrestore(&macio_lock, flags);
 	return 0;
 }
 
 static int macio_adb_reset_bus(void)
 {
+	unsigned long flags;
 	int timeout = 1000000;
 
+	/* Hrm... we may want to not lock interrupts for so
+	 * long ... oh well, who uses that chip anyway ? :)
+	 * That function will be seldomly used during boot
+	 * on rare machines, so...
+	 */
+	spin_lock_irqsave(&macio_lock, flags);
 	out_8(&adb->ctrl.r, in_8(&adb->ctrl.r) | ADB_RST);
 	while ((in_8(&adb->ctrl.r) & ADB_RST) != 0) {
 		if (--timeout == 0) {
@@ -146,13 +157,14 @@ static int macio_adb_reset_bus(void)
 			return -1;
 		}
 	}
+	spin_unlock_irqrestore(&macio_lock, flags);
 	return 0;
 }
 
 /* Send an ADB command */
 static int macio_send_request(struct adb_request *req, int sync)
 {
-	unsigned long mflags;
+	unsigned long flags;
 	int i;
 	
 	if (req->data[0] != ADB_PACKET)
@@ -167,8 +179,7 @@ static int macio_send_request(struct adb_request *req, int sync)
 	req->complete = 0;
 	req->reply_len = 0;
 
-	save_flags(mflags);
-	cli();
+	spin_lock_irqsave(&macio_lock, flags);
 	if (current_req != 0) {
 		last_req->next = req;
 		last_req = req;
@@ -176,7 +187,7 @@ static int macio_send_request(struct adb_request *req, int sync)
 		current_req = last_req = req;
 		out_8(&adb->ctrl.r, in_8(&adb->ctrl.r) | TAR);
 	}
-	restore_flags(mflags);
+	spin_unlock_irqrestore(&macio_lock, flags);
 	
 	if (sync) {
 		while (!req->complete)
@@ -190,7 +201,12 @@ static void macio_adb_interrupt(int irq, void *arg, struct pt_regs *regs)
 {
 	int i, n, err;
 	struct adb_request *req;
-
+	unsigned char ibuf[16];
+	int ibuf_len = 0;
+	int complete = 0;
+	int autopoll = 0;
+	
+	spin_lock(&macio_lock);
 	if (in_8(&adb->intr.r) & TAG) {
 		if ((req = current_req) != 0) {
 			/* put the current request in */
@@ -202,7 +218,10 @@ static void macio_adb_interrupt(int irq, void *arg, struct pt_regs *regs)
 				out_8(&adb->ctrl.r, DTB + CRE);
 			} else {
 				out_8(&adb->ctrl.r, DTB);
-				completed();
+				current_req = req->next;
+				complete = 1;
+				if (current_req)
+					out_8(&adb->ctrl.r, in_8(&adb->ctrl.r) | TAR);
 			}
 		}
 		out_8(&adb->intr.r, 0);
@@ -218,39 +237,42 @@ static void macio_adb_interrupt(int irq, void *arg, struct pt_regs *regs)
 				for (i = 0; i < req->reply_len; ++i)
 					req->reply[i] = in_8(&adb->data[i].r);
 			}
-			completed();
+			current_req = req->next;
+			complete = 1;
+			if (current_req)
+				out_8(&adb->ctrl.r, in_8(&adb->ctrl.r) | TAR);
 		} else if (err == 0) {
 			/* autopoll data */
 			n = in_8(&adb->dcount.r) & HMB;
 			for (i = 0; i < n; ++i)
-				adb_rbuf[i] = in_8(&adb->data[i].r);
-			adb_input(adb_rbuf, n, regs,
-				  in_8(&adb->dcount.r) & APD);
+				ibuf[i] = in_8(&adb->data[i].r);
+			ibuf_len = n;
+			autopoll = (in_8(&adb->dcount.r) & APD) != 0;
 		}
 		out_8(&adb->error.r, 0);
 		out_8(&adb->intr.r, 0);
 	}
-}
-
-static void completed(void)
-{
-	struct adb_request *req = current_req;
-
-	req->complete = 1;
-	current_req = req->next;
-	if (current_req)
-		out_8(&adb->ctrl.r, in_8(&adb->ctrl.r) | TAR);
-	if (req->done)
-		(*req->done)(req);
+	spin_unlock(&macio_lock);
+	if (complete && req) {
+	    void (*done)(struct adb_request *) = req->done;
+	    mb();
+	    req->complete = 1;
+	    /* Here, we assume that if the request has a done member, the
+    	     * struct request will survive to setting req->complete to 1
+	     */
+	    if (done)
+		(*done)(req);
+	}
+	if (ibuf_len)
+		adb_input(ibuf, ibuf_len, regs, autopoll);
 }
 
 static void macio_adb_poll(void)
 {
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 	if (in_8(&adb->intr.r) != 0)
 		macio_adb_interrupt(0, 0, 0);
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
