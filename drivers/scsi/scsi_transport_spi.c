@@ -814,7 +814,7 @@ spi_attach_transport(struct spi_function_template *ft)
 
 	BUG_ON(count > SPI_HOST_ATTRS);
 
-	i->attrs[count] = NULL;
+	i->host_attrs[count] = NULL;
 
 	return &i->t;
 }
