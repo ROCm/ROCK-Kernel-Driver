@@ -100,7 +100,6 @@
 
 /*****************************************************************************/
       
-#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/string.h>
 #include <linux/ioport.h>
@@ -1267,11 +1266,11 @@ static int sv_ioctl_mixdev(struct inode *inode, struct file *file, unsigned int 
 }
 
 static /*const*/ struct file_operations sv_mixer_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	ioctl:		sv_ioctl_mixdev,
-	open:		sv_open_mixdev,
-	release:	sv_release_mixdev,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.ioctl		= sv_ioctl_mixdev,
+	.open		= sv_open_mixdev,
+	.release	= sv_release_mixdev,
 };
 
 /* --------------------------------------------------------------------- */
@@ -1978,15 +1977,15 @@ static int sv_release(struct inode *inode, struct file *file)
 }
 
 static /*const*/ struct file_operations sv_audio_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	read:		sv_read,
-	write:		sv_write,
-	poll:		sv_poll,
-	ioctl:		sv_ioctl,
-	mmap:		sv_mmap,
-	open:		sv_open,
-	release:	sv_release,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.read		= sv_read,
+	.write		= sv_write,
+	.poll		= sv_poll,
+	.ioctl		= sv_ioctl,
+	.mmap		= sv_mmap,
+	.open		= sv_open,
+	.release	= sv_release,
 };
 
 /* --------------------------------------------------------------------- */
@@ -2260,13 +2259,13 @@ static int sv_midi_release(struct inode *inode, struct file *file)
 }
 
 static /*const*/ struct file_operations sv_midi_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	read:		sv_midi_read,
-	write:		sv_midi_write,
-	poll:		sv_midi_poll,
-	open:		sv_midi_open,
-	release:	sv_midi_release,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.read		= sv_midi_read,
+	.write		= sv_midi_write,
+	.poll		= sv_midi_poll,
+	.open		= sv_midi_open,
+	.release	= sv_midi_release,
 };
 
 /* --------------------------------------------------------------------- */
@@ -2435,11 +2434,11 @@ static int sv_dmfm_release(struct inode *inode, struct file *file)
 }
 
 static /*const*/ struct file_operations sv_dmfm_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	ioctl:		sv_dmfm_ioctl,
-	open:		sv_dmfm_open,
-	release:	sv_dmfm_release,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.ioctl		= sv_dmfm_ioctl,
+	.open		= sv_dmfm_open,
+	.release	= sv_dmfm_release,
 };
 
 /* --------------------------------------------------------------------- */

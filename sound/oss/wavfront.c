@@ -1961,11 +1961,11 @@ wavefront_ioctl(struct inode *inode, struct file *file,
 }
 
 static /*const*/ struct file_operations wavefront_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	ioctl:		wavefront_ioctl,
-	open:		wavefront_open,
-	release:	wavefront_release,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.ioctl		= wavefront_ioctl,
+	.open		= wavefront_open,
+	.release	= wavefront_release,
 };
 
 
@@ -2078,25 +2078,25 @@ wavefront_oss_load_patch (int devno, int format, const char *addr,
 
 static struct synth_operations wavefront_operations =
 {
-	owner:		THIS_MODULE,
-	id:		"WaveFront",
-	info:		&wavefront_info,
-	midi_dev:	0,
-	synth_type:	SYNTH_TYPE_SAMPLE,
-	synth_subtype:	SAMPLE_TYPE_WAVEFRONT,
-	open:		wavefront_oss_open,
-	close:		wavefront_oss_close,
-	ioctl:		wavefront_oss_ioctl,
-	kill_note:	midi_synth_kill_note,
-	start_note:	midi_synth_start_note,
-	set_instr:	midi_synth_set_instr,
-	reset:		midi_synth_reset,
-	load_patch:	midi_synth_load_patch,
-	aftertouch:	midi_synth_aftertouch,
-	controller:	midi_synth_controller,
-	panning:	midi_synth_panning,
-	bender:		midi_synth_bender,
-	setup_voice:	midi_synth_setup_voice
+	.owner		= THIS_MODULE,
+	.id		= "WaveFront",
+	.info		= &wavefront_info,
+	.midi_dev	= 0,
+	.synth_type	= SYNTH_TYPE_SAMPLE,
+	.synth_subtype	= SAMPLE_TYPE_WAVEFRONT,
+	.open		= wavefront_oss_open,
+	.close		= wavefront_oss_close,
+	.ioctl		= wavefront_oss_ioctl,
+	.kill_note	= midi_synth_kill_note,
+	.start_note	= midi_synth_start_note,
+	.set_instr	= midi_synth_set_instr,
+	.reset		= midi_synth_reset,
+	.load_patch	= midi_synth_load_patch,
+	.aftertouch	= midi_synth_aftertouch,
+	.controller	= midi_synth_controller,
+	.panning	= midi_synth_panning,
+	.bender		= midi_synth_bender,
+	.setup_voice	= midi_synth_setup_voice
 };
 #endif /* OSS_SUPPORT_SEQ */
 

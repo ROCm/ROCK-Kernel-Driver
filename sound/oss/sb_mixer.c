@@ -626,18 +626,18 @@ static int sb_mixer_ioctl(int dev, unsigned int cmd, caddr_t arg)
 
 static struct mixer_operations sb_mixer_operations =
 {
-	owner:	THIS_MODULE,
-	id:	"SB",
-	name:	"Sound Blaster",
-	ioctl:	sb_mixer_ioctl
+	.owner	= THIS_MODULE,
+	.id	= "SB",
+	.name	= "Sound Blaster",
+	.ioctl	= sb_mixer_ioctl
 };
 
 static struct mixer_operations als007_mixer_operations =
 {
-	owner:	THIS_MODULE,
-	id:	"ALS007",
-	name:	"Avance ALS-007",
-	ioctl:	sb_mixer_ioctl
+	.owner	= THIS_MODULE,
+	.id	= "ALS007",
+	.name	= "Avance ALS-007",
+	.ioctl	= sb_mixer_ioctl
 };
 
 static void sb_mixer_reset(sb_devc * devc)

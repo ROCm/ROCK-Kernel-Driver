@@ -815,21 +815,21 @@ waveartist_set_bits(int dev, unsigned int arg)
 }
 
 static struct audio_driver waveartist_audio_driver = {
-	owner:			THIS_MODULE,
-	open:			waveartist_open,
-	close:			waveartist_close,
-	output_block:		waveartist_output_block,
-	start_input:		waveartist_start_input,
-	ioctl:			waveartist_ioctl,
-	prepare_for_input:	waveartist_prepare_for_input,
-	prepare_for_output:	waveartist_prepare_for_output,
-	halt_io:		waveartist_halt,
-	halt_input:		waveartist_halt_input,
-	halt_output:		waveartist_halt_output,
-	trigger:		waveartist_trigger,
-	set_speed:		waveartist_set_speed,
-	set_bits:		waveartist_set_bits,
-	set_channels:		waveartist_set_channels
+	.owner			= THIS_MODULE,
+	.open			= waveartist_open,
+	.close			= waveartist_close,
+	.output_block		= waveartist_output_block,
+	.start_input		= waveartist_start_input,
+	.ioctl			= waveartist_ioctl,
+	.prepare_for_input	= waveartist_prepare_for_input,
+	.prepare_for_output	= waveartist_prepare_for_output,
+	.halt_io		= waveartist_halt,
+	.halt_input		= waveartist_halt_input,
+	.halt_output		= waveartist_halt_output,
+	.trigger		= waveartist_trigger,
+	.set_speed		= waveartist_set_speed,
+	.set_bits		= waveartist_set_bits,
+	.set_channels		= waveartist_set_channels
 };
 
 
@@ -1062,15 +1062,15 @@ static int waveartist_get_mixer(wavnc_info *devc, int dev)
 }
 
 static const struct waveartist_mixer_info waveartist_mixer = {
-	supported_devs:	SUPPORTED_MIXER_DEVICES | SOUND_MASK_IGAIN,
-	recording_devs:	SOUND_MASK_LINE  | SOUND_MASK_MIC   |
+	.supported_devs	= SUPPORTED_MIXER_DEVICES | SOUND_MASK_IGAIN,
+	.recording_devs	= SOUND_MASK_LINE  | SOUND_MASK_MIC   |
 			SOUND_MASK_LINE1 | SOUND_MASK_LINE2 |
 			SOUND_MASK_IMIX,
-	stereo_devs:	(SUPPORTED_MIXER_DEVICES | SOUND_MASK_IGAIN) & ~
+	.stereo_devs	= (SUPPORTED_MIXER_DEVICES | SOUND_MASK_IGAIN) & ~
 			(SOUND_MASK_SPEAKER | SOUND_MASK_IMIX),
-	select_input:	waveartist_select_input,
-	decode_mixer:	waveartist_decode_mixer,
-	get_mixer:	waveartist_get_mixer,
+	.select_input	= waveartist_select_input,
+	.decode_mixer	= waveartist_decode_mixer,
+	.get_mixer	= waveartist_get_mixer,
 };
 
 static void
@@ -1203,10 +1203,10 @@ waveartist_mixer_ioctl(int dev, unsigned int cmd, caddr_t arg)
 
 static struct mixer_operations waveartist_mixer_operations =
 {
-	owner:	THIS_MODULE,
-	id:	"WaveArtist",
-	name:	"WaveArtist",
-	ioctl:	waveartist_mixer_ioctl
+	.owner	= THIS_MODULE,
+	.id	= "WaveArtist",
+	.name	= "WaveArtist",
+	.ioctl	= waveartist_mixer_ioctl
 };
 
 static void
@@ -1692,24 +1692,24 @@ static int netwinder_get_mixer(wavnc_info *devc, int dev)
  * Waveartist specific mixer information.
  */
 static const struct waveartist_mixer_info netwinder_mixer = {
-	supported_devs:	SOUND_MASK_VOLUME  | SOUND_MASK_SYNTH   |
+	.supported_devs	= SOUND_MASK_VOLUME  | SOUND_MASK_SYNTH   |
 			SOUND_MASK_PCM     | SOUND_MASK_SPEAKER |
 			SOUND_MASK_LINE    | SOUND_MASK_MIC     |
 			SOUND_MASK_IMIX    | SOUND_MASK_LINE1   |
 			SOUND_MASK_PHONEIN | SOUND_MASK_PHONEOUT|
 			SOUND_MASK_IGAIN,
 
-	recording_devs:	SOUND_MASK_LINE    | SOUND_MASK_MIC     |
+	.recording_devs	= SOUND_MASK_LINE    | SOUND_MASK_MIC     |
 			SOUND_MASK_IMIX    | SOUND_MASK_LINE1   |
 			SOUND_MASK_PHONEIN,
 
-	stereo_devs:	SOUND_MASK_VOLUME  | SOUND_MASK_SYNTH   |
+	.stereo_devs	= SOUND_MASK_VOLUME  | SOUND_MASK_SYNTH   |
 			SOUND_MASK_PCM     | SOUND_MASK_LINE    |
 			SOUND_MASK_IMIX    | SOUND_MASK_IGAIN,
 
-	select_input:	netwinder_select_input,
-	decode_mixer:	netwinder_decode_mixer,
-	get_mixer:	netwinder_get_mixer,
+	.select_input	= netwinder_select_input,
+	.decode_mixer	= netwinder_decode_mixer,
+	.get_mixer	= netwinder_get_mixer,
 };
 
 static void
