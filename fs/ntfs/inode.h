@@ -106,7 +106,7 @@ struct _ntfs_inode {
 						   this base inode which have
 						   been loaded. */
 		ntfs_inode *base_ntfs_ino;	/* For nr_extents == -1, the
-						   vfs inode of the base mft
+						   ntfs inode of the base mft
 						   record. */
 	} SN(ine);
 };

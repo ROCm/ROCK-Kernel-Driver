@@ -885,7 +885,7 @@ unm_err_out:
  *  -1 = LCN_HOLE		Hole / not allocated on disk.
  *  -2 = LCN_RL_NOT_MAPPED	This is part of the run list which has not been
  *				inserted into the run list yet.
- *  -3 = LCN_ENOENT		There is no such vcn in the data attribute.
+ *  -3 = LCN_ENOENT		There is no such vcn in the attribute.
  *  -4 = LCN_EINVAL		Input parameter error (if debug enabled).
  */
 LCN vcn_to_lcn(const run_list_element *rl, const VCN vcn)
