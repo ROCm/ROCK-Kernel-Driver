@@ -10,6 +10,7 @@
 #include <errno.h>
 #include <sys/wait.h>
 #include <sys/ptrace.h>
+#include <linux/ptrace.h>
 #include <signal.h>
 #include "user_util.h"
 #include "kern_util.h"
@@ -36,6 +37,9 @@ void do_exec(int old_pid, int new_pid)
 			     errno);
 
 	kill(old_pid, SIGKILL);
+
+	if (ptrace(PTRACE_SETOPTIONS, new_pid, 0, (void *)PTRACE_O_TRACESYSGOOD) < 0)
+		tracer_panic("do_exec: PTRACE_SETOPTIONS failed, errno = %d", errno);
 
 	if(ptrace_setregs(new_pid, regs) < 0)
 		tracer_panic("do_exec failed to start new proc - errno = %d",

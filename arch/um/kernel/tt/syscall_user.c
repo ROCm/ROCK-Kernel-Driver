@@ -43,21 +43,19 @@ void syscall_handler_tt(int sig, union uml_pt_regs *regs)
 	record_syscall_end(index, result);
 }
 
+void do_sigtrap(void *task)
+{
+	UPT_SYSCALL_NR(TASK_REGS(task)) = -1;
+}
+
 int do_syscall(void *task, int pid, int local_using_sysemu)
 {
 	unsigned long proc_regs[FRAME_SIZE];
-	union uml_pt_regs *regs;
-	int syscall;
 
 	if(ptrace_getregs(pid, proc_regs) < 0)
 		tracer_panic("Couldn't read registers");
-	syscall = PT_SYSCALL_NR(proc_regs);
 
-	regs = TASK_REGS(task);
-	UPT_SYSCALL_NR(regs) = syscall;
-
-	if(syscall < 0)
-		return(0);
+	UPT_SYSCALL_NR(TASK_REGS(task)) = PT_SYSCALL_NR(proc_regs);
 
 	if((syscall != __NR_sigreturn) &&
 	   ((unsigned long *) PT_IP(proc_regs) >= &_stext) && 
