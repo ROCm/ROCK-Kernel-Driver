@@ -324,7 +324,7 @@ struct coda_statfs {
 #define VC_MAXMSGSIZE      sizeof(union inputArgs)+sizeof(union outputArgs) +\
                             VC_MAXDATASIZE  
 
-#define CIOC_KERNEL_VERSION _IOWR('c', 10, sizeof (int))
+#define CIOC_KERNEL_VERSION _IOWR('c', 10, size_t)
 
 #if 0
 #define CODA_KERNEL_VERSION 0 /* don't care about kernel version number */

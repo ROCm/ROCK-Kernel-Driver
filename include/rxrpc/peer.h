@@ -42,7 +42,10 @@ struct rxrpc_peer
 	struct rxrpc_timer	timeout;	/* timeout for grave destruction */
 	struct list_head	link;		/* link in transport's peer list */
 	struct list_head	proc_link;	/* link in /proc list */
-	rwlock_t		conn_lock;	/* lock for connections */
+	rwlock_t		conn_idlock;	/* lock for connection IDs */
+	struct list_head	conn_idlist;	/* list of connections granted IDs */
+	uint32_t		conn_idcounter;	/* connection ID counter */
+	rwlock_t		conn_lock;	/* lock for active/dead connections */
 	struct list_head	conn_active;	/* active connections to/from this peer */
 	struct list_head	conn_graveyard;	/* graveyard for inactive connections */
 	spinlock_t		conn_gylock;	/* lock for conn_graveyard */

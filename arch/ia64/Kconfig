@@ -18,6 +18,9 @@ config IA64
 	  page at <http://www.linuxia64.org/> and a mailing list at
 	  linux-ia64@linuxia64.org.
 
+config 64BIT
+	def_bool y
+
 config MMU
 	bool
 	default y
@@ -264,7 +267,7 @@ config IA64_MCA
 	  unsure, answer Y.
 
 config PM
-	bool
+	bool "Power Management support"
 	depends on IA64_GENERIC || IA64_DIG || IA64_HP_ZX1
 	default y
 	---help---
@@ -566,6 +569,7 @@ source "lib/Kconfig"
 
 source "arch/ia64/hp/sim/Kconfig"
 
+source "arch/ia64/oprofile/Kconfig"
 
 menu "Kernel hacking"
 

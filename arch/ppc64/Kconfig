@@ -3,6 +3,9 @@
 # see Documentation/kbuild/kconfig-language.txt.
 #
 
+config 64BIT
+	def_bool y
+
 config MMU
 	bool
 	default y

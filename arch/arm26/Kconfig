@@ -96,6 +96,7 @@ config ZBOOT_ROM
 	  directly from ROM or flash.  If unsure, say N.
 
 config ZBOOT_ROM_TEXT
+	depends on ZBOOT_ROM
 	hex "Compressed ROM boot loader base address"
 	default "0"
 	help
@@ -103,12 +104,19 @@ config ZBOOT_ROM_TEXT
 	  should not change this value.
 
 config ZBOOT_ROM_BSS
+	depends on ZBOOT_ROM
 	hex "Compressed ROM boot loader BSS address"
 	default "0"
 	help
 	  The base address of 64KiB of read/write memory, which must be available
 	  while the decompressor is running.  Unless you have special requirements,
 	  you should not change this value.
+
+config XIP_KERNEL
+	bool "Execute In Place (XIP) kernel image"
+	help
+	  Select this option to create a kernel that can be programed into
+	  the OS ROMs.
 
 config HOTPLUG
 	bool "Support for hot-pluggable devices"

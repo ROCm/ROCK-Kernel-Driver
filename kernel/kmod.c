@@ -60,12 +60,11 @@ char modprobe_path[256] = "/sbin/modprobe";
  */
 int request_module(const char *fmt, ...)
 {
-#define MODULENAME_SIZE 32
 	va_list args;
-	char module_name[MODULENAME_SIZE];
+	char module_name[MODULE_NAME_LEN];
 	unsigned int max_modprobes;
 	int ret;
-	char *argv[] = { modprobe_path, "--", module_name, NULL };
+	char *argv[] = { modprobe_path, "-q", "--", module_name, NULL };
 	static char *envp[] = { "HOME=/",
 				"TERM=linux",
 				"PATH=/sbin:/usr/sbin:/bin:/usr/bin",
@@ -75,9 +74,9 @@ int request_module(const char *fmt, ...)
 	static int kmod_loop_msg;
 
 	va_start(args, fmt);
-	ret = vsnprintf(module_name, MODULENAME_SIZE, fmt, args);
+	ret = vsnprintf(module_name, MODULE_NAME_LEN, fmt, args);
 	va_end(args);
-	if (ret >= MODULENAME_SIZE)
+	if (ret >= MODULE_NAME_LEN)
 		return -ENAMETOOLONG;
 
 	/* If modprobe needs a service that is in a module, we get a recursive

@@ -679,8 +679,8 @@ void math_error(void *rip)
 		default:
 			break;
 		case 0x001: /* Invalid Op */
-		case 0x040: /* Stack Fault */
-		case 0x240: /* Stack Fault | Direction */
+		case 0x041: /* Stack Fault */
+		case 0x241: /* Stack Fault | Direction */
 			info.si_code = FPE_FLTINV;
 			break;
 		case 0x002: /* Denormalize */

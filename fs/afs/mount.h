@@ -17,7 +17,7 @@ struct afs_mountdata {
 	const char		*cell;		/* name of cell containing volume */
 	const char		*cache;		/* name of cache block device */
 	size_t			nservers;	/* number of server addresses listed */
-	u_int32_t		servers[10];	/* IP addresses of servers in this cell */
+	uint32_t		servers[10];	/* IP addresses of servers in this cell */
 };
 
 #endif /* _LINUX_AFS_MOUNT_H */

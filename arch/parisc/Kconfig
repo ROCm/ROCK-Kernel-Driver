@@ -103,6 +103,9 @@ config PARISC64
 	  enable this option otherwise. The 64bit kernel is significantly bigger
 	  and slower than the 32bit one.
 
+config 64BIT
+	def_bool PARISC64
+
 config PDC_NARROW
 	bool "32-bit firmware"
 	depends on PARISC64

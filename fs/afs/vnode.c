@@ -29,6 +29,19 @@ struct afs_timer_ops afs_vnode_cb_timed_out_ops = {
 	.timed_out	= afs_vnode_cb_timed_out,
 };
 
+#ifdef AFS_CACHING_SUPPORT
+static cachefs_match_val_t afs_vnode_cache_match(void *target, const void *entry);
+static void afs_vnode_cache_update(void *source, void *entry);
+
+struct cachefs_index_def afs_vnode_cache_index_def = {
+	.name		= "vnode",
+	.data_size	= sizeof(struct afs_cache_vnode),
+	.keys[0]	= { CACHEFS_INDEX_KEYS_BIN, 4 },
+	.match		= afs_vnode_cache_match,
+	.update		= afs_vnode_cache_update,
+};
+#endif
+
 /*****************************************************************************/
 /*
  * handle a callback timing out
@@ -61,8 +74,7 @@ static void afs_vnode_cb_timed_out(struct afs_timer *timer)
 
 	spin_unlock(&vnode->lock);
 
-	if (oldserver)
-		afs_put_server(oldserver);
+	afs_put_server(oldserver);
 
 	_leave("");
 } /* end afs_vnode_cb_timed_out() */
@@ -126,8 +138,7 @@ void afs_vnode_finalise_status_update(afs_vnode_t *vnode, afs_server_t *server, 
 
 	wake_up_all(&vnode->update_waitq);
 
-	if (oldserver)
-		afs_put_server(oldserver);
+	afs_put_server(oldserver);
 
 	_leave("");
 
@@ -272,7 +283,7 @@ int afs_vnode_fetch_data(afs_vnode_t *vnode, struct afs_rxfs_fetch_descriptor *d
 /*****************************************************************************/
 /*
  * break any outstanding callback on a vnode
- * - only relevant to server that issued it
+ * - only relevent to server that issued it
  */
 int afs_vnode_give_up_callback(afs_vnode_t *vnode)
 {
@@ -314,3 +325,56 @@ int afs_vnode_give_up_callback(afs_vnode_t *vnode)
 	_leave(" = %d",ret);
 	return ret;
 } /* end afs_vnode_give_up_callback() */
+
+/*****************************************************************************/
+/*
+ * match a vnode record stored in the cache
+ */
+#ifdef AFS_CACHING_SUPPORT
+static cachefs_match_val_t afs_vnode_cache_match(void *target, const void *entry)
+{
+	const struct afs_cache_vnode *cvnode = entry;
+	struct afs_vnode *vnode = target;
+
+	_enter("{%x,%x,%Lx},{%x,%x,%Lx}",
+	       vnode->fid.vnode,
+	       vnode->fid.unique,
+	       vnode->status.version,
+	       cvnode->vnode_id,
+	       cvnode->vnode_unique,
+	       cvnode->data_version);
+
+	if (vnode->fid.vnode != cvnode->vnode_id) {
+		_leave(" = FAILED");
+		return CACHEFS_MATCH_FAILED;
+	}
+
+	if (vnode->fid.unique != cvnode->vnode_unique ||
+	    vnode->status.version != cvnode->data_version) {
+		_leave(" = DELETE");
+		return CACHEFS_MATCH_SUCCESS_DELETE;
+	}
+
+	_leave(" = SUCCESS");
+	return CACHEFS_MATCH_SUCCESS;
+} /* end afs_vnode_cache_match() */
+#endif
+
+/*****************************************************************************/
+/*
+ * update a vnode record stored in the cache
+ */
+#ifdef AFS_CACHING_SUPPORT
+static void afs_vnode_cache_update(void *source, void *entry)
+{
+	struct afs_cache_vnode *cvnode = entry;
+	struct afs_vnode *vnode = source;
+
+	_enter("");
+
+	cvnode->vnode_id	= vnode->fid.vnode;
+	cvnode->vnode_unique	= vnode->fid.unique;
+	cvnode->data_version	= vnode->status.version;
+
+} /* end afs_vnode_cache_update() */
+#endif

@@ -29,7 +29,7 @@
  */
 struct afs_super_info
 {
-	afs_volume_t		*volume;	/* volume record */
+	struct afs_volume	*volume;	/* volume record */
 	char			rwparent;	/* T if parent is R/W AFS volume */
 };
 

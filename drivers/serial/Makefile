@@ -11,10 +11,10 @@ serial-8250-$(CONFIG_PNP) += 8250_pnp.o
 serial-8250-$(CONFIG_SERIAL_8250_HCDP) += 8250_hcdp.o
 serial-8250-$(CONFIG_SERIAL_8250_ACPI) += 8250_acpi.o
 
-obj-$(CONFIG_SERIAL_CORE) += core.o
+obj-$(CONFIG_SERIAL_CORE) += serial_core.o
 obj-$(CONFIG_SERIAL_21285) += 21285.o
 obj-$(CONFIG_SERIAL_8250) += 8250.o $(serial-8250-y)
-obj-$(CONFIG_SERIAL_8250_CS) += 8250_cs.o
+obj-$(CONFIG_SERIAL_8250_CS) += serial_cs.o
 obj-$(CONFIG_SERIAL_8250_ACORN) += 8250_acorn.o
 obj-$(CONFIG_SERIAL_ANAKIN) += anakin.o
 obj-$(CONFIG_SERIAL_AMBA) += amba.o

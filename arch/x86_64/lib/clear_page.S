@@ -1,4 +1,3 @@
-
 /*
  * Zero a page. 	
  * rdi	page
@@ -24,4 +23,28 @@ clear_page:
 	jnz	.Lloop
 	nop
 	ret
+clear_page_end:	
+	
+	/* C stepping K8 run faster using the string instructions.
+	   It is also a lot simpler. Use this when possible */
+	
+#include <asm/cpufeature.h>
 	    	
+	.section .altinstructions,"a"
+	.align 8
+	.quad  clear_page
+	.quad  clear_page_c
+	.byte  X86_FEATURE_K8_C
+	.byte  clear_page_end-clear_page	
+	.byte  clear_page_c_end-clear_page_c
+	.previous
+
+	.section .altinstr_replacement,"ax"
+clear_page_c:
+	movl $4096/8,%ecx
+	xorl %eax,%eax
+	rep 
+	stosq
+	ret
+clear_page_c_end:
+	.previous

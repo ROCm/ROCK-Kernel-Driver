@@ -40,6 +40,9 @@ config ARCH_S390X
 	  Select this option if you have a 64 bit IBM zSeries machine
 	  and want to use the 64 bit addressing mode.
 
+config 64BIT
+	def_bool ARCH_S390X
+
 config ARCH_S390_31
 	bool
 	depends on ARCH_S390X = 'n'

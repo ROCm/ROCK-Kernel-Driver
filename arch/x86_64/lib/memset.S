@@ -1,5 +1,4 @@
 /* Copyright 2002 Andi Kleen, SuSE Labs */
-
 /*
  * ISO C memset - set a memory block to a byte value.
  *	
@@ -85,3 +84,42 @@ __memset:
 	addq %r8,%rdi
 	subq %r8,%r11
 	jmp .Lafter_bad_alignment
+
+	/* C stepping K8 run faster using the string instructions.
+	   It is also a lot simpler. Use this when possible */
+
+#include <asm/cpufeature.h>	
+		
+	.section .altinstructions,"a"
+	.align 8
+	.quad  memset
+	.quad  memset_c
+	.byte  X86_FEATURE_K8_C
+	.byte  memset_c_end-memset_c
+	.byte  memset_c_end-memset_c
+	.previous
+
+	.section .altinstr_replacement,"ax"
+ /* rdi	destination
+  * rsi value
+  * rdx count
+  */			
+memset_c:	
+	movq %rdi,%r9
+	movl %edx,%r8d
+	andl $7,%r8d		
+	movl %edx,%ecx
+	shrl $3,%ecx		
+	/* expand byte value  */
+	movzbl %sil,%esi
+	movabs $0x0101010101010101,%rax
+	mul    %esi		/* with rax, clobbers rdx */
+	rep
+	stosq	
+	movl %r8d,%ecx
+	rep
+	stosb
+	movq %r9,%rax
+	ret
+memset_c_end:
+	.previous

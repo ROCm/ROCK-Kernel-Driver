@@ -36,7 +36,7 @@ endif
 
 export	ZTEXTADDR ZBSSADDR ZRELADDR INITRD_PHYS PARAMS_PHYS
 
-targets := Image zImage bootpImage
+targets := Image zImage bootpImage xipImage
 
 $(obj)/Image: vmlinux FORCE
 	$(call if_changed,objcopy)
@@ -48,6 +48,15 @@ $(obj)/zImage:	$(obj)/compressed/vmlinux FORCE
 
 $(obj)/compressed/vmlinux: vmlinux FORCE
 	$(Q)$(MAKE) $(build)=$(obj)/compressed $@
+
+ifeq ($(CONFIG_XIP_KERNEL),y)
+$(obj)/xipImage: vmlinux FORCE
+	$(OBJCOPY) -S -O binary -R .data -R .comment vmlinux vmlinux-text.bin
+	$(OBJCOPY) -S -O binary -R .init -R .text -R .comment -R __ex_table -R __ksymtab vmlinux vmlinux-data.bin
+	cat vmlinux-text.bin vmlinux-data.bin > $@
+	$(RM) -f vmlinux-text.bin vmlinux-data.bin
+	@echo '  Kernel: $@ is ready'
+endif
 
 .PHONY: initrd
 initrd:

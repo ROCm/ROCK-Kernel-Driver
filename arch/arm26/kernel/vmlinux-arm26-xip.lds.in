@@ -27,7 +27,6 @@ SECTIONS
 		__tagtable_begin = .;
 			*(.taglist)
 		__tagtable_end = .;
-			*(.init.data)
 		. = ALIGN(16);
 		__setup_start = .;
 			*(.init.setup)
@@ -87,11 +86,15 @@ SECTIONS
 
 	RODATA
 
-	. = ALIGN(8192);
+	_endtext = .;
+
+	. = DATAADDR;
+
+	_sdata = .;
 
 	.data : {
 		/*
-		 * first, the init task union, aligned
+		 * first, the init thread union, aligned
 		 * to an 8192 byte boundary.
 		 */
 		*(.init.task)
@@ -107,6 +110,8 @@ SECTIONS
 		 */
 		*(.data)
 		CONSTRUCTORS
+
+		*(.init.data)
 
 		_edata = .;
 	}

@@ -1505,7 +1505,7 @@ config CIFS
 	  cifs module since smbfs is currently more stable and provides
 	  support for older servers.  The intent of this module is to provide the
 	  most advanced network file system function for CIFS compliant servers, 
-	  including support for dfs (heirarchical name space), secure per-user
+	  including support for dfs (hierarchical name space), secure per-user
 	  session establishment, safe distributed caching (oplock), optional
 	  packet signing, Unicode and other internationalization improvements, and
 	  optional Winbind (nsswitch) integration.  This module is in an early

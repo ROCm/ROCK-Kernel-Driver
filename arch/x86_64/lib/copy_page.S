@@ -89,3 +89,26 @@ copy_page:
 	movq	2*8(%rsp),%r13
 	addq	$3*8,%rsp
 	ret
+	
+	/* C stepping K8 run faster using the string copy instructions.
+	   It is also a lot simpler. Use this when possible */
+
+#include <asm/cpufeature.h>		
+		
+	.section .altinstructions,"a"
+	.align 8
+	.quad  copy_page
+	.quad  copy_page_c
+	.byte  X86_FEATURE_K8_C
+	.byte  copy_page_c_end-copy_page_c
+	.byte  copy_page_c_end-copy_page_c
+	.previous
+
+	.section .altinstr_replacement,"ax"
+copy_page_c:
+	movl $4096/8,%ecx
+	rep 
+	movsq 
+	ret
+copy_page_c_end:
+	.previous

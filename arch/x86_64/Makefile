@@ -41,15 +41,16 @@ CFLAGS += -mno-red-zone
 CFLAGS += -mcmodel=kernel
 CFLAGS += -pipe
 # this makes reading assembly source easier, but produces worse code
+# actually it makes the kernel smaller too.
 CFLAGS += -fno-reorder-blocks	
 # should lower this a lot and see how much .text is saves	
 CFLAGS += -finline-limit=2000
 CFLAGS += -Wno-sign-compare
-#CFLAGS += -g
 # don't enable this when you use kgdb:
 ifneq ($(CONFIG_X86_REMOTE_DEBUG),y)
 CFLAGS += -fno-asynchronous-unwind-tables
 endif
+#CFLAGS += -funit-at-a-time
 
 head-y := arch/x86_64/kernel/head.o arch/x86_64/kernel/head64.o arch/x86_64/kernel/init_task.o
 

@@ -56,6 +56,19 @@ static LIST_HEAD(afs_vlocation_update_pendq);	/* queue of VLs awaiting update */
 static afs_vlocation_t *afs_vlocation_update;	/* VL currently being updated */
 static spinlock_t afs_vlocation_update_lock = SPIN_LOCK_UNLOCKED; /* lock guarding update queue */
 
+#ifdef AFS_CACHING_SUPPORT
+static cachefs_match_val_t afs_vlocation_cache_match(void *target, const void *entry);
+static void afs_vlocation_cache_update(void *source, void *entry);
+
+struct cachefs_index_def afs_vlocation_cache_index_def = {
+	.name		= "vldb",
+	.data_size	= sizeof(struct afs_cache_vlocation),
+	.keys[0]	= { CACHEFS_INDEX_KEYS_ASCIIZ, 64 },
+	.match		= afs_vlocation_cache_match,
+	.update		= afs_vlocation_cache_update,
+};
+#endif
+
 /*****************************************************************************/
 /*
  * iterate through the VL servers in a cell until one of them admits knowing about the volume in
@@ -64,21 +77,23 @@ static spinlock_t afs_vlocation_update_lock = SPIN_LOCK_UNLOCKED; /* lock guardi
  */
 static int afs_vlocation_access_vl_by_name(afs_vlocation_t *vlocation,
 					   const char *name,
-					   afsc_vldb_record_t *vldb)
+					   unsigned namesz,
+					   struct afs_cache_vlocation *vldb)
 {
 	afs_server_t *server = NULL;
 	afs_cell_t *cell = vlocation->cell;
 	int count, ret;
 
-	_enter("%s,%s,",cell->name,name);
+	_enter("%s,%*.*s,%u", cell->name, namesz, namesz, name, namesz);
 
 	ret = -ENOMEDIUM;
 	for (count=cell->vl_naddrs; count>0; count--) {
 		_debug("CellServ[%hu]: %08x",
-		       cell->vl_curr_svix,cell->vl_addrs[cell->vl_curr_svix].s_addr);
+		       cell->vl_curr_svix,
+		       cell->vl_addrs[cell->vl_curr_svix].s_addr);
 
 		/* try and create a server */
-		ret = afs_server_lookup(cell,&cell->vl_addrs[cell->vl_curr_svix],&server);
+		ret = afs_server_lookup(cell, &cell->vl_addrs[cell->vl_curr_svix], &server);
 		switch (ret) {
 		case 0:
 			break;
@@ -90,7 +105,7 @@ static int afs_vlocation_access_vl_by_name(afs_vlocation_t *vlocation,
 		}
 
 		/* attempt to access the VL server */
-		ret = afs_rxvl_get_entry_by_name(server,name,vldb);
+		ret = afs_rxvl_get_entry_by_name(server, name, namesz, vldb);
 		switch (ret) {
 		case 0:
 			afs_put_server(server);
@@ -107,7 +122,7 @@ static int afs_vlocation_access_vl_by_name(afs_vlocation_t *vlocation,
 			}
 			up_write(&server->sem);
 			afs_put_server(server);
-			if (ret==-ENOMEM || ret==-ENONET)
+			if (ret == -ENOMEM || ret == -ENONET)
 				goto out;
 			goto rotate;
 		case -ENOMEDIUM:
@@ -140,21 +155,22 @@ static int afs_vlocation_access_vl_by_name(afs_vlocation_t *vlocation,
 static int afs_vlocation_access_vl_by_id(afs_vlocation_t *vlocation,
 					 afs_volid_t volid,
 					 afs_voltype_t voltype,
-					 afsc_vldb_record_t *vldb)
+					 struct afs_cache_vlocation *vldb)
 {
 	afs_server_t *server = NULL;
 	afs_cell_t *cell = vlocation->cell;
 	int count, ret;
 
-	_enter("%s,%x,%d,",cell->name,volid,voltype);
+	_enter("%s,%x,%d,", cell->name, volid, voltype);
 
 	ret = -ENOMEDIUM;
 	for (count=cell->vl_naddrs; count>0; count--) {
 		_debug("CellServ[%hu]: %08x",
-		       cell->vl_curr_svix,cell->vl_addrs[cell->vl_curr_svix].s_addr);
+		       cell->vl_curr_svix,
+		       cell->vl_addrs[cell->vl_curr_svix].s_addr);
 
 		/* try and create a server */
-		ret = afs_server_lookup(cell,&cell->vl_addrs[cell->vl_curr_svix],&server);
+		ret = afs_server_lookup(cell, &cell->vl_addrs[cell->vl_curr_svix], &server);
 		switch (ret) {
 		case 0:
 			break;
@@ -166,7 +182,7 @@ static int afs_vlocation_access_vl_by_id(afs_vlocation_t *vlocation,
 		}
 
 		/* attempt to access the VL server */
-		ret = afs_rxvl_get_entry_by_id(server,volid,voltype,vldb);
+		ret = afs_rxvl_get_entry_by_id(server, volid, voltype, vldb);
 		switch (ret) {
 		case 0:
 			afs_put_server(server);
@@ -183,7 +199,7 @@ static int afs_vlocation_access_vl_by_id(afs_vlocation_t *vlocation,
 			}
 			up_write(&server->sem);
 			afs_put_server(server);
-			if (ret==-ENOMEM || ret==-ENONET)
+			if (ret == -ENOMEM || ret == -ENONET)
 				goto out;
 			goto rotate;
 		case -ENOMEDIUM:
@@ -216,74 +232,83 @@ static int afs_vlocation_access_vl_by_id(afs_vlocation_t *vlocation,
  * - lookup in the local cache if not able to find on the VL server
  * - insert/update in the local cache if did get a VL response
  */
-int afs_vlocation_lookup(afs_cell_t *cell, const char *name, afs_vlocation_t **_vlocation)
+int afs_vlocation_lookup(afs_cell_t *cell, const char *name, unsigned namesz,
+			 afs_vlocation_t **_vlocation)
 {
-	afsc_vldb_record_t vldb;
+	struct afs_cache_vlocation vldb;
 	struct list_head *_p;
 	afs_vlocation_t *vlocation;
 	afs_voltype_t voltype;
 	afs_volid_t vid;
 	int active = 0, ret;
 
-	_enter(",%s,%s,",cell->name,name);
+	_enter("{%s},%*.*s,%u,", cell->name, namesz, namesz, name, namesz);
 
-	if (strlen(name)>sizeof(vlocation->vldb.name)) {
+	if (namesz > sizeof(vlocation->vldb.name)) {
 		_leave(" = -ENAMETOOLONG");
 		return -ENAMETOOLONG;
 	}
 
 	/* search the cell's active list first */
-	list_for_each(_p,&cell->vl_list) {
-		vlocation = list_entry(_p,afs_vlocation_t,link);
-		if (strncmp(vlocation->vldb.name,name,sizeof(vlocation->vldb.name))==0)
+	list_for_each(_p, &cell->vl_list) {
+		vlocation = list_entry(_p, afs_vlocation_t, link);
+		if (namesz < sizeof(vlocation->vldb.name) &&
+		    vlocation->vldb.name[namesz] != '\0')
+			continue;
+
+		if (memcmp(vlocation->vldb.name, name, namesz) == 0)
 			goto found_in_memory;
 	}
 
 	/* search the cell's graveyard list second */
 	spin_lock(&cell->vl_gylock);
-	list_for_each(_p,&cell->vl_graveyard) {
-		vlocation = list_entry(_p,afs_vlocation_t,link);
-		if (strncmp(vlocation->vldb.name,name,sizeof(vlocation->vldb.name))==0)
+	list_for_each(_p, &cell->vl_graveyard) {
+		vlocation = list_entry(_p, afs_vlocation_t, link);
+		if (namesz < sizeof(vlocation->vldb.name) &&
+		    vlocation->vldb.name[namesz] != '\0')
+			continue;
+
+		if (memcmp(vlocation->vldb.name, name, namesz) == 0)
 			goto found_in_graveyard;
 	}
 	spin_unlock(&cell->vl_gylock);
 
 	/* not in the cell's in-memory lists - create a new record */
-	vlocation = kmalloc(sizeof(afs_vlocation_t),GFP_KERNEL);
+	vlocation = kmalloc(sizeof(afs_vlocation_t), GFP_KERNEL);
 	if (!vlocation)
 		return -ENOMEM;
 
-	memset(vlocation,0,sizeof(afs_vlocation_t));
-	atomic_set(&vlocation->usage,1);
+	memset(vlocation, 0, sizeof(afs_vlocation_t));
+	atomic_set(&vlocation->usage, 1);
 	INIT_LIST_HEAD(&vlocation->link);
 	rwlock_init(&vlocation->lock);
-	strncpy(vlocation->vldb.name,name,sizeof(vlocation->vldb.name));
+	memcpy(vlocation->vldb.name, name, namesz);
 
-	afs_timer_init(&vlocation->timeout,&afs_vlocation_timer_ops);
-	afs_timer_init(&vlocation->upd_timer,&afs_vlocation_update_timer_ops);
-	afs_async_op_init(&vlocation->upd_op,&afs_vlocation_update_op_ops);
-
-	INIT_LIST_HEAD(&vlocation->caches);
+	afs_timer_init(&vlocation->timeout, &afs_vlocation_timer_ops);
+	afs_timer_init(&vlocation->upd_timer, &afs_vlocation_update_timer_ops);
+	afs_async_op_init(&vlocation->upd_op, &afs_vlocation_update_op_ops);
 
 	afs_get_cell(cell);
 	vlocation->cell = cell;
 
-	list_add_tail(&vlocation->link,&cell->vl_list);
+	list_add_tail(&vlocation->link, &cell->vl_list);
 
-#if 0
-	/* search local cache if wasn't in memory */
-	ret = afsc_lookup_vlocation(vlocation);
-	switch (ret) {
-	default:	goto error;		/* disk error */
-	case 0:		goto found_in_cache;	/* pulled from local cache into memory */
-	case -ENOENT:	break;			/* not in local cache */
-	}
+#ifdef AFS_CACHING_SUPPORT
+	/* we want to store it in the cache, plus it might already be encached */
+	cachefs_acquire_cookie(cell->cache,
+			       &afs_volume_cache_index_def,
+			       vlocation,
+			       &vlocation->cache);
+
+	if (vlocation->valid)
+		goto found_in_cache;
 #endif
 
 	/* try to look up an unknown volume in the cell VL databases by name */
-	ret = afs_vlocation_access_vl_by_name(vlocation,name,&vldb);
+	ret = afs_vlocation_access_vl_by_name(vlocation, name, namesz, &vldb);
 	if (ret<0) {
-		printk("kAFS: failed to locate '%s' in cell '%s'\n",name,cell->name);
+		printk("kAFS: failed to locate '%*.*s' in cell '%s'\n",
+		       namesz, namesz, name, cell->name);
 		goto error;
 	}
 
@@ -294,7 +319,7 @@ int afs_vlocation_lookup(afs_cell_t *cell, const char *name, afs_vlocation_t **_
 	_debug("found in graveyard");
 	atomic_inc(&vlocation->usage);
 	list_del(&vlocation->link);
-	list_add_tail(&vlocation->link,&cell->vl_list);
+	list_add_tail(&vlocation->link, &cell->vl_list);
 	spin_unlock(&cell->vl_gylock);
 
 	afs_kafstimod_del_timer(&vlocation->timeout);
@@ -308,30 +333,32 @@ int afs_vlocation_lookup(afs_cell_t *cell, const char *name, afs_vlocation_t **_
  active:
 	active = 1;
 
-/* found_in_cache: */
+#ifdef AFS_CACHING_SUPPORT
+ found_in_cache:
+#endif
 	/* try to look up a cached volume in the cell VL databases by ID */
 	_debug("found in cache");
 
 	_debug("Locally Cached: %s %02x { %08x(%x) %08x(%x) %08x(%x) }",
 	       vlocation->vldb.name,
 	       vlocation->vldb.vidmask,
-	       ntohl(vlocation->vldb.servers[0].s_addr),vlocation->vldb.srvtmask[0],
-	       ntohl(vlocation->vldb.servers[1].s_addr),vlocation->vldb.srvtmask[1],
-	       ntohl(vlocation->vldb.servers[2].s_addr),vlocation->vldb.srvtmask[2]
+	       ntohl(vlocation->vldb.servers[0].s_addr), vlocation->vldb.srvtmask[0],
+	       ntohl(vlocation->vldb.servers[1].s_addr), vlocation->vldb.srvtmask[1],
+	       ntohl(vlocation->vldb.servers[2].s_addr), vlocation->vldb.srvtmask[2]
 	       );
 
 	_debug("Vids: %08x %08x %08x",
-	       vlocation->vldb.vid[0],vlocation->vldb.vid[1],vlocation->vldb.vid[2]);
+	       vlocation->vldb.vid[0], vlocation->vldb.vid[1], vlocation->vldb.vid[2]);
 
-	if (vlocation->vldb.vidmask & AFSC_VOL_STM_RW) {
+	if (vlocation->vldb.vidmask & AFS_VOL_VTM_RW) {
 		vid = vlocation->vldb.vid[0];
 		voltype = AFSVL_RWVOL;
 	}
-	else if (vlocation->vldb.vidmask & AFSC_VOL_STM_RO) {
+	else if (vlocation->vldb.vidmask & AFS_VOL_VTM_RO) {
 		vid = vlocation->vldb.vid[1];
 		voltype = AFSVL_ROVOL;
 	}
-	else if (vlocation->vldb.vidmask & AFSC_VOL_STM_BAK) {
+	else if (vlocation->vldb.vidmask & AFS_VOL_VTM_BAK) {
 		vid = vlocation->vldb.vid[2];
 		voltype = AFSVL_BACKVOL;
 	}
@@ -341,41 +368,44 @@ int afs_vlocation_lookup(afs_cell_t *cell, const char *name, afs_vlocation_t **_
 		voltype = 0;
 	}
 
-	ret = afs_vlocation_access_vl_by_id(vlocation,vid,voltype,&vldb);
+	ret = afs_vlocation_access_vl_by_id(vlocation, vid, voltype, &vldb);
 	switch (ret) {
 		/* net error */
 	default:
-		printk("kAFS: failed to volume '%s' (%x) up in '%s': %d\n",
-		       name,vid,cell->name,ret);
+		printk("kAFS: failed to volume '%*.*s' (%x) up in '%s': %d\n",
+		       namesz, namesz, name, vid, cell->name, ret);
 		goto error;
 
 		/* pulled from local cache into memory */
-	case 0:	
+	case 0:
 		goto found_on_vlserver;
 
 		/* uh oh... looks like the volume got deleted */
 	case -ENOMEDIUM:
-		printk("kAFS: volume '%s' (%x) does not exist '%s'\n",name,vid,cell->name);
+		printk("kAFS: volume '%*.*s' (%x) does not exist '%s'\n",
+		       namesz, namesz, name, vid, cell->name);
 
 		/* TODO: make existing record unavailable */
 		goto error;
 	}
 
  found_on_vlserver:
-	_debug("Done VL Lookup: %s %02x { %08x(%x) %08x(%x) %08x(%x) }",
-	       name,
+	_debug("Done VL Lookup: %*.*s %02x { %08x(%x) %08x(%x) %08x(%x) }",
+	       namesz, namesz, name,
 	       vldb.vidmask,
-	       ntohl(vldb.servers[0].s_addr),vldb.srvtmask[0],
-	       ntohl(vldb.servers[1].s_addr),vldb.srvtmask[1],
-	       ntohl(vldb.servers[2].s_addr),vldb.srvtmask[2]
+	       ntohl(vldb.servers[0].s_addr), vldb.srvtmask[0],
+	       ntohl(vldb.servers[1].s_addr), vldb.srvtmask[1],
+	       ntohl(vldb.servers[2].s_addr), vldb.srvtmask[2]
 	       );
 
-	_debug("Vids: %08x %08x %08x",vldb.vid[0],vldb.vid[1],vldb.vid[2]);
+	_debug("Vids: %08x %08x %08x", vldb.vid[0], vldb.vid[1], vldb.vid[2]);
 
-	if (strncmp(vldb.name,name,sizeof(vlocation->vldb.name))!=0)
-		printk("kAFS: name of volume '%s' changed to '%s' on server\n",name,vldb.name);
+	if ((namesz < sizeof(vlocation->vldb.name) && vlocation->vldb.name[namesz] != '\0') ||
+	    memcmp(vldb.name, name, namesz) != 0)
+		printk("kAFS: name of volume '%*.*s' changed to '%s' on server\n",
+		       namesz, namesz, name, vldb.name);
 
-	memcpy(&vlocation->vldb,&vldb,sizeof(vlocation->vldb));
+	memcpy(&vlocation->vldb, &vldb, sizeof(vlocation->vldb));
 
 #if 0
 	/* add volume entry to local cache */
@@ -384,7 +414,7 @@ int afs_vlocation_lookup(afs_cell_t *cell, const char *name, afs_vlocation_t **_
 		goto error;
 #endif
 
-	afs_kafstimod_add_timer(&vlocation->upd_timer,10*HZ);
+	afs_kafstimod_add_timer(&vlocation->upd_timer, 10*HZ);
 
 	*_vlocation = vlocation;
 	_leave(" = 0 (%p)",vlocation);
@@ -397,10 +427,10 @@ int afs_vlocation_lookup(afs_cell_t *cell, const char *name, afs_vlocation_t **_
 		}
 		else {
 			list_del(&vlocation->link);
-			afs_put_cell(vlocation->cell);
-#if 0
-			afs_put_cache(vlocation->cache);
+#ifdef AFS_CACHING_SUPPORT
+			cachefs_relinquish_cookie(vlocation->cache, 0);
 #endif
+			afs_put_cell(vlocation->cell);
 			kfree(vlocation);
 		}
 	}
@@ -414,11 +444,16 @@ int afs_vlocation_lookup(afs_cell_t *cell, const char *name, afs_vlocation_t **_
  * finish using a volume location record
  * - caller must have cell->vol_sem write-locked
  */
-void __afs_put_vlocation(afs_vlocation_t *vlocation)
+void __afs_put_vlocation(struct afs_vlocation *vlocation)
 {
-	afs_cell_t *cell = vlocation->cell;
+	struct afs_cell *cell;
+
+	if (!vlocation)
+		return;
 
 	_enter("%s",vlocation->vldb.name);
+
+	cell = vlocation->cell;
 
 	/* sanity check */
 	if (atomic_read(&vlocation->usage)<=0)
@@ -453,11 +488,13 @@ void __afs_put_vlocation(afs_vlocation_t *vlocation)
  */
 void afs_put_vlocation(afs_vlocation_t *vlocation)
 {
-	afs_cell_t *cell = vlocation->cell;
+	if (vlocation) {
+		struct afs_cell *cell = vlocation->cell;
 
-	down_write(&cell->vl_sem);
-	__afs_put_vlocation(vlocation);
-	up_write(&cell->vl_sem);
+		down_write(&cell->vl_sem);
+		__afs_put_vlocation(vlocation);
+		up_write(&cell->vl_sem);
+	}
 } /* end afs_put_vlocation() */
 
 /*****************************************************************************/
@@ -489,10 +526,10 @@ void afs_vlocation_do_timeout(afs_vlocation_t *vlocation)
 	}
 
 	/* we can now destroy it properly */
-	afs_put_cell(cell);
-#if 0
-	afs_put_cache(vlocation->cache);
+#ifdef AFS_CACHING_SUPPORT
+	cachefs_relinquish_cookie(vlocation->cache,0);
 #endif
+	afs_put_cell(cell);
 
 	kfree(vlocation);
 
@@ -513,15 +550,15 @@ static int afs_vlocation_update_begin(afs_vlocation_t *vlocation)
 	       vlocation->vldb.name,vlocation->upd_first_svix,vlocation->upd_curr_svix);
 
 	/* try to look up a cached volume in the cell VL databases by ID */
-	if (vlocation->vldb.vidmask & AFSC_VOL_STM_RW) {
+	if (vlocation->vldb.vidmask & AFS_VOL_VTM_RW) {
 		vid = vlocation->vldb.vid[0];
 		voltype = AFSVL_RWVOL;
 	}
-	else if (vlocation->vldb.vidmask & AFSC_VOL_STM_RO) {
+	else if (vlocation->vldb.vidmask & AFS_VOL_VTM_RO) {
 		vid = vlocation->vldb.vid[1];
 		voltype = AFSVL_ROVOL;
 	}
-	else if (vlocation->vldb.vidmask & AFSC_VOL_STM_BAK) {
+	else if (vlocation->vldb.vidmask & AFS_VOL_VTM_BAK) {
 		vid = vlocation->vldb.vid[2];
 		voltype = AFSVL_BACKVOL;
 	}
@@ -571,10 +608,8 @@ static void afs_vlocation_update_abandon(afs_vlocation_t *vlocation,
 		printk("kAFS: Abandoning VL update '%s': %d\n",vlocation->vldb.name,ret);
 
 	/* discard the server record */
-	if (vlocation->upd_op.server) {
-		afs_put_server(vlocation->upd_op.server);
-		vlocation->upd_op.server = NULL;
-	}
+	afs_put_server(vlocation->upd_op.server);
+	vlocation->upd_op.server = NULL;
 
 	spin_lock(&afs_vlocation_update_lock);
 	afs_vlocation_update = NULL;
@@ -669,7 +704,7 @@ static void afs_vlocation_update_timer(afs_timer_t *timer)
  */
 static void afs_vlocation_update_attend(afs_async_op_t *op)
 {
-	afsc_vldb_record_t vldb;
+	struct afs_cache_vlocation vldb;
 	afs_vlocation_t *vlocation = list_entry(op,afs_vlocation_t,upd_op);
 	unsigned tmp;
 	int ret;
@@ -762,11 +797,9 @@ static void afs_vlocation_update_attend(afs_async_op_t *op)
  try_next:
 	vlocation->upd_busy_cnt = 0;
 
-	if (vlocation->upd_op.server) {
-		/* discard the server record */
-		afs_put_server(vlocation->upd_op.server);
-		vlocation->upd_op.server = NULL;
-	}
+	/* discard the server record */
+	afs_put_server(vlocation->upd_op.server);
+	vlocation->upd_op.server = NULL;
 
 	tmp = vlocation->cell->vl_naddrs;
 	if (tmp==0)
@@ -822,3 +855,68 @@ static void afs_vlocation_update_discard(afs_async_op_t *op)
 
 	_leave("");
 } /* end afs_vlocation_update_discard() */
+
+/*****************************************************************************/
+/*
+ * match a VLDB record stored in the cache
+ * - may also load target from entry
+ */
+#ifdef AFS_CACHING_SUPPORT
+static cachefs_match_val_t afs_vlocation_cache_match(void *target,
+						     const void *entry)
+{
+	const struct afs_cache_vlocation *vldb = entry;
+	struct afs_vlocation *vlocation = target;
+
+	_enter("{%s},{%s}", vlocation->vldb.name, vldb->name);
+
+	if (strncmp(vlocation->vldb.name,
+		    vldb->name,
+		    sizeof(vldb->name)) == 0) {
+		if (!vlocation->valid ||
+		    vlocation->vldb.rtime == vldb->rtime) {
+			struct_cpy(&vlocation->vldb, vldb);
+			vlocation->valid = 1;
+			_leave(" = SUCCESS [c->m]");
+			return CACHEFS_MATCH_SUCCESS;
+		}
+		/* need to update cache if cached info differs */
+		else if (memcmp(&vlocation->vldb, vldb, sizeof(*vldb)) != 0) {
+			/* delete if VIDs for this name differ */
+			if (memcmp(&vlocation->vldb.vid,
+				   &vldb->vid,
+				   sizeof(vldb->vid)) != 0) {
+				_leave(" = DELETE");
+				return CACHEFS_MATCH_SUCCESS_DELETE;
+			}
+
+			_leave(" = UPDATE");
+			return CACHEFS_MATCH_SUCCESS_UPDATE;
+		}
+		else {
+			_leave(" = SUCCESS");
+			return CACHEFS_MATCH_SUCCESS;
+		}
+	}
+
+	_leave(" = FAILED");
+	return CACHEFS_MATCH_FAILED;
+} /* end afs_vlocation_cache_match() */
+#endif
+
+/*****************************************************************************/
+/*
+ * update a VLDB record stored in the cache
+ */
+#ifdef AFS_CACHING_SUPPORT
+static void afs_vlocation_cache_update(void *source, void *entry)
+{
+	struct afs_cache_vlocation *vldb = entry;
+	struct afs_vlocation *vlocation = source;
+
+	_enter("");
+
+	struct_cpy(vldb,&vlocation->vldb);
+
+} /* end afs_vlocation_cache_update() */
+#endif

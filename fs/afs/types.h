@@ -33,26 +33,13 @@ typedef struct afs_volsync		afs_volsync_t;
 typedef struct afs_volume		afs_volume_t;
 typedef struct afs_volume_info		afs_volume_info_t;
 
-typedef struct afsc_cache		afsc_cache_t;
-typedef struct afsc_cache_cell		afsc_cache_cell_t;
-typedef struct afsc_cache_vldb		afsc_cache_vldb_t;
-typedef struct afsc_cell_record		afsc_cell_record_t;
-typedef struct afsc_inode		afsc_inode_t;
-typedef struct afsc_io			afsc_io_t;
-typedef struct afsc_io_subop		afsc_io_subop_t;
-typedef struct afsc_io_queue		afsc_io_queue_t;
-typedef struct afsc_super_block		afsc_super_block_t;
-typedef struct afsc_vldb_record		afsc_vldb_record_t;
-typedef struct afsc_vnode_catalogue	afsc_vnode_catalogue_t;
-typedef struct afsc_vnode_meta		afsc_vnode_meta_t;
-
 typedef struct afsvl_dbentry		afsvl_dbentry_t;
 
 typedef enum {
 	AFSVL_RWVOL,			/* read/write volume */
 	AFSVL_ROVOL,			/* read-only volume */
 	AFSVL_BACKVOL,			/* backup volume */
-} afs_voltype_t;
+} __attribute__((packed)) afs_voltype_t;
 
 extern const char *afs_voltypes[];
 

@@ -47,7 +47,7 @@
 @
 @ Stack format (ensured by USER_* and SVC_*)
 @
-#define S_FRAME_SIZE	72
+#define S_FRAME_SIZE	72   @ FIXME: Really?
 #define S_OLD_R0	64
 #define S_PSR		60
 #define S_PC		60
@@ -77,11 +77,11 @@
 	.endm
 
 	.macro	slow_restore_user_regs
-	ldmia	sp, {r0 - lr}^
-	mov	r0, r0
-	ldr	lr, [sp, #15*4]
-	add	sp, sp, #15*4+8
-	movs	pc, lr
+	ldmia	sp, {r0 - lr}^   @ restore the user regs
+	mov	r0, r0           @ no-op
+	ldr	lr, [sp, #15*4]  @ get user PC
+	add	sp, sp, #15*4+8  @ free stack
+	movs	pc, lr           @ return
 	.endm
 
 	.macro	fast_restore_user_regs
@@ -514,30 +514,36 @@ Lfiqmsg:	.ascii	"*** Unexpected FIQ\n\0"
  * Handles floating point instructions
  */
 vector_undefinstr:
-		tst	lr,#3
-		bne	__und_svc
+		tst	lr, #MODE_SVC26          @ did we come from a non-user mode?
+		bne	__und_svc                @ yes - deal with it.
+/* Otherwise, fall through for the user-space (common) case. */
 		save_user_regs
-		zero_fp
-		teqp	pc, #PSR_I_BIT | MODE_SVC26
+		zero_fp                                 @ zero frame pointer
+		teqp	pc, #PSR_I_BIT | MODE_SVC26     @ disable IRQs
 .Lbug_undef:
 		ldr	r4, .LC2
-		ldr	pc, [r4]			@ Call FP module USR entry point
+                ldr     pc, [r4]         @ Call FP module entry point
+/* FIXME - should we trap for a null pointer here? */
 
-		.globl	fpundefinstr
-fpundefinstr:						@ Called by FP module on undefined instr
+/* The SVC mode case */
+__und_svc:      SVC_SAVE_ALL                            @ Non-user mode
+                mask_pc r0, lr
+                and     r2, lr, #3
+                sub     r0, r0, #4
+                mov     r1, sp
+                bl      do_undefinstr
+                SVC_RESTORE_ALL
+
+/* We get here if the FP emulator doesnt handle the undef instr.
+ * If the insn WAS handled, the emulator jumps to ret_from_exception by itself/
+ */
+		.globl	fpundefinstr 
+fpundefinstr:
 		mov	r0, lr
 		mov	r1, sp
 		teqp	pc, #MODE_SVC26
 		bl	do_undefinstr
 		b	ret_from_exception		@ Normal FP exit
-
-__und_svc:	SVC_SAVE_ALL				@ Non-user mode
-		mask_pc	r0, lr
-		and	r2, lr, #3
-		sub	r0, r0, #4
-		mov	r1, sp
-		bl	do_undefinstr
-		SVC_RESTORE_ALL
 
 #if defined CONFIG_FPE_NWFPE || defined CONFIG_FPE_FASTFPE
 		/* The FPE is always present */
@@ -548,6 +554,7 @@ __und_svc:	SVC_SAVE_ALL				@ Non-user mode
  * a WFS, we just perform a normal return as if we had emulated the
  * operation.  This is a hack to allow some basic userland binaries
  * to run so that the emulator module proper can be loaded. --philb
+ * FIXME - probably a broken useless hack...
  */
 fpe_not_present:
 		adr	r10, wfs_mask_data
@@ -587,14 +594,14 @@ wfs_mask_data:	.word	0x0e200110			@ WFS/RFS
  * Prefetch abort handler
  *-----------------------------------------------------------------------------
  */
-
+#define DEBUG_UNDEF
 /* remember: lr = USR pc */
 vector_prefetch:
 		sub	lr, lr, #4
-		tst	lr, #3
+		tst	lr, #MODE_SVC26
 		bne	__pabt_invalid
 		save_user_regs
-		teqp	pc, #MODE_SVC26
+		teqp	pc, #MODE_SVC26         @ Enable IRQs...
 		mask_pc	r0, lr			@ Address of abort
 		mov	r1, sp			@ Tasks registers
 		bl	do_PrefetchAbort
@@ -604,7 +611,7 @@ vector_prefetch:
 		adr	r0, t
 		bl	printk
 #endif
-		ldr	lr, [sp,#S_PC]		@ program to test this on.  I think its
+		ldr	lr, [sp,#S_PC]		@ FIXME program to test this on.  I think its
 		b	.Lbug_undef		@ broken at the moment though!)
 
 __pabt_invalid:	SVC_SAVE_ALL
@@ -707,7 +714,7 @@ vector_IRQ:	ldr	r13, .LCirq			@ I will leave this one in just in case...
 		bne	asm_do_IRQ
 
 		mov	why, #0
-		get_thread_info r5
+		get_thread_info tsk        @ FIXME - was r5, but seemed wrong.
 		b	ret_to_user
 
 		irq_prio_table

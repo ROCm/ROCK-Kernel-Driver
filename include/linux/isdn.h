@@ -94,48 +94,48 @@
 #define ISDN_CMSGLEN	     50	 /* Length of CONNECT-Message to add for Modem */
 
 #define ISDN_MSNLEN          32
-#define NET_DV 0x06  /* Data version for isdn_net_ioctl_cfg   */
-#define TTY_DV 0x06  /* Data version for iprofd etc.          */
+#define NET_DV	0x06  /* Data version for isdn_net_ioctl_cfg   */
+#define TTY_DV	0x06  /* Data version for iprofd etc.          */
 
-#define INF_DV 0x01  /* Data version for /dev/isdninfo        */
+#define INF_DV	0x01  /* Data version for /dev/isdninfo        */
 
 typedef struct {
-  char drvid[25];
-  unsigned long arg;
+	char		drvid[25];
+	unsigned long	arg;
 } isdn_ioctl_struct;
 
 typedef struct {
-  char name[10];
-  char phone[ISDN_MSNLEN];
-  int  outgoing;
+	char	name[10];
+	char	phone[ISDN_MSNLEN];
+	int	outgoing;
 } isdn_net_ioctl_phone;
 
 typedef struct {
-  char name[10];     /* Name of interface                     */
-  char master[10];   /* Name of Master for Bundling           */
-  char slave[10];    /* Name of Slave for Bundling            */
-  char eaz[256];     /* EAZ/MSN                               */
-  char drvid[25];    /* DriverId for Bindings                 */
-  int  onhtime;      /* Hangup-Timeout                        */
-  int  charge;       /* Charge-Units                          */
-  int  l2_proto;     /* Layer-2 protocol                      */
-  int  l3_proto;     /* Layer-3 protocol                      */
-  int  p_encap;      /* Encapsulation                         */
-  int  exclusive;    /* Channel, if bound exclusive           */
-  int  dialmax;      /* Dial Retry-Counter                    */
-  int  slavedelay;   /* Delay until slave starts up           */
-  int  cbdelay;      /* Delay before Callback                 */
-  int  chargehup;    /* Flag: Charge-Hangup                   */
-  int  ihup;         /* Flag: Hangup-Timeout on incoming line */
-  int  secure;       /* Flag: Secure                          */
-  int  callback;     /* Flag: Callback                        */
-  int  cbhup;        /* Flag: Reject Call before Callback     */
-  int  pppbind;      /* ippp device for bindings              */
-  int  chargeint;    /* Use fixed charge interval length      */
-  int  triggercps;   /* BogoCPS needed for triggering slave   */
-  int  dialtimeout;  /* Dial-Timeout                          */
-  int  dialwait;     /* Time to wait after failed dial        */
-  int  dialmode;     /* Flag: off / on / auto                 */
+	char	name[10];	/* Name of interface                     */
+	char	master[10];	/* Name of Master for Bundling           */
+	char	slave[10];	/* Name of Slave for Bundling            */
+	char	eaz[256];	/* EAZ/MSN                               */
+	char	drvid[25];	/* DriverId for Bindings                 */
+	int	onhtime;	/* Hangup-Timeout                        */
+	int	charge;		/* Charge-Units                          */
+	int	l2_proto;	/* Layer-2 protocol                      */
+	int	l3_proto;	/* Layer-3 protocol                      */
+	int	p_encap;	/* Encapsulation                         */
+	int	exclusive;	/* Channel, if bound exclusive           */
+	int	dialmax;	/* Dial Retry-Counter                    */
+	int	slavedelay;	/* Delay until slave starts up           */
+	int	cbdelay;	/* Delay before Callback                 */
+	int	chargehup;	/* Flag: Charge-Hangup                   */
+	int	ihup;		/* Flag: Hangup-Timeout on incoming line */
+	int	secure;		/* Flag: Secure                          */
+	int	callback;	/* Flag: Callback                        */
+	int	cbhup;		/* Flag: Reject Call before Callback     */
+	int	pppbind;	/* ippp device for bindings              */
+	int	chargeint;	/* Use fixed charge interval length      */
+	int	triggercps;	/* BogoCPS needed for triggering slave   */
+	int	dialtimeout;	/* Dial-Timeout                          */
+	int	dialwait;	/* Time to wait after failed dial        */
+	int	dialmode;	/* Flag: off / on / auto                 */
 } isdn_net_ioctl_cfg;
 
 #define ISDN_NET_DIALMODE_MASK  0xC0    /* bits for status                */
@@ -385,24 +385,22 @@ typedef struct {
 } infostruct;
 
 /* Main driver-data */
-typedef struct isdn_devt {
-	unsigned short    flags;		       /* Bitmapped Flags:           */
-	/*                            */
-	int               channels;		       /* Current number of channels */
-	int               net_verbose;               /* Verbose-Flag               */
-	int               modempoll;		       /* Flag: tty-read active      */
-	int               tflags;                    /* Timer-Flags:               */
-	/*  see ISDN_TIMER_..defines  */
-	int               global_flags;
-	infostruct        *infochain;                /* List of open info-devs.    */
-	wait_queue_head_t info_waitq;               /* Wait-Queue for isdninfo    */
-	struct task_struct *profd;                   /* For iprofd                 */
-	struct semaphore  sem;                       /* serialize list access*/
-	unsigned long     global_features;
-} isdn_dev;
+typedef struct _isdn_dev_t {
+	unsigned short		flags;		/* Bitmapped Flags:           */
+	int			channels;	/* Current number of channels */
+	int			net_verbose;	/* Verbose-Flag               */
+	int			modempoll;	/* Flag: tty-read active      */
+	int			tflags;		/* Timer-Flags:               */
+						/*  see ISDN_TIMER_..defines  */
+	int			global_flags;
+	infostruct		*infochain;	/* List of open info-devs.    */
+	wait_queue_head_t	info_waitq;	/* Wait-Queue for isdninfo    */
+	struct task_struct	*profd;		/* For iprofd                 */
+	struct semaphore	sem;		/* serialize list access*/
+	unsigned long		global_features; 
+} isdn_dev_t;
 
-extern isdn_dev *dev;
-
+extern isdn_dev_t	*get_isdn_dev(void);
 
 #endif /* __KERNEL__ */
 

@@ -44,6 +44,12 @@ static int rxrpc_krxiod(void *arg)
 
 	daemonize("krxiod");
 
+	/* only certain signals are of interest */
+	spin_lock_irq(&current->sighand->siglock);
+	siginitsetinv(&current->blocked, 0);
+	recalc_sigpending();
+	spin_unlock_irq(&current->sighand->siglock);
+
 	/* loop around waiting for work to do */
 	do {
 		/* wait for work or to be told to exit */
@@ -51,7 +57,7 @@ static int rxrpc_krxiod(void *arg)
 		if (!atomic_read(&rxrpc_krxiod_qcount)) {
 			set_current_state(TASK_INTERRUPTIBLE);
 
-			add_wait_queue(&rxrpc_krxiod_sleepq,&krxiod);
+			add_wait_queue(&rxrpc_krxiod_sleepq, &krxiod);
 
 			for (;;) {
 				set_current_state(TASK_INTERRUPTIBLE);
@@ -63,7 +69,7 @@ static int rxrpc_krxiod(void *arg)
 				schedule();
 			}
 
-			remove_wait_queue(&rxrpc_krxiod_sleepq,&krxiod);
+			remove_wait_queue(&rxrpc_krxiod_sleepq, &krxiod);
 			set_current_state(TASK_RUNNING);
 		}
 		_debug("### End Wait");
@@ -78,12 +84,16 @@ static int rxrpc_krxiod(void *arg)
 			spin_lock_irq(&rxrpc_krxiod_transportq_lock);
 
 			if (!list_empty(&rxrpc_krxiod_transportq)) {
-				trans = list_entry(rxrpc_krxiod_transportq.next,
-						   struct rxrpc_transport,krxiodq_link);
+				trans = list_entry(
+					rxrpc_krxiod_transportq.next,
+					struct rxrpc_transport,
+					krxiodq_link);
+
 				list_del_init(&trans->krxiodq_link);
 				atomic_dec(&rxrpc_krxiod_qcount);
 
-				/* make sure it hasn't gone away and doesn't go away */
+				/* make sure it hasn't gone away and doesn't go
+				 * away */
 				if (atomic_read(&trans->usage)>0)
 					rxrpc_get_transport(trans);
 				else
@@ -106,13 +116,16 @@ static int rxrpc_krxiod(void *arg)
 
 			if (!list_empty(&rxrpc_krxiod_callq)) {
 				call = list_entry(rxrpc_krxiod_callq.next,
-						   struct rxrpc_call,rcv_krxiodq_lk);
+						   struct rxrpc_call,
+						  rcv_krxiodq_lk);
 				list_del_init(&call->rcv_krxiodq_lk);
 				atomic_dec(&rxrpc_krxiod_qcount);
 
-				/* make sure it hasn't gone away and doesn't go away */
-				if (atomic_read(&call->usage)>0) {
-					_debug("@@@ KRXIOD Begin Attend Call %p",call);
+				/* make sure it hasn't gone away and doesn't go
+				 * away */
+				if (atomic_read(&call->usage) > 0) {
+					_debug("@@@ KRXIOD"
+					       " Begin Attend Call %p",call);
 					rxrpc_get_call(call);
 				}
 				else {
@@ -125,7 +138,7 @@ static int rxrpc_krxiod(void *arg)
 			if (call) {
 				rxrpc_call_do_stuff(call);
 				rxrpc_put_call(call);
-				_debug("@@@ KRXIOD End Attend Call %p",call);
+				_debug("@@@ KRXIOD End Attend Call %p", call);
 			}
 		}
 
@@ -137,7 +150,7 @@ static int rxrpc_krxiod(void *arg)
 	} while (!rxrpc_krxiod_die);
 
 	/* and that's all */
-	complete_and_exit(&rxrpc_krxiod_dead,0);
+	complete_and_exit(&rxrpc_krxiod_dead, 0);
 
 } /* end rxrpc_krxiod() */
 
@@ -147,7 +160,7 @@ static int rxrpc_krxiod(void *arg)
  */
 int __init rxrpc_krxiod_init(void)
 {
-	return kernel_thread(rxrpc_krxiod,NULL,0);
+	return kernel_thread(rxrpc_krxiod, NULL, 0);
 
 } /* end rxrpc_krxiod_init() */
 
@@ -174,16 +187,17 @@ void rxrpc_krxiod_queue_transport(struct rxrpc_transport *trans)
 	_enter("");
 
 	if (list_empty(&trans->krxiodq_link)) {
-		spin_lock_irqsave(&rxrpc_krxiod_transportq_lock,flags);
+		spin_lock_irqsave(&rxrpc_krxiod_transportq_lock, flags);
 
 		if (list_empty(&trans->krxiodq_link)) {
-			if (atomic_read(&trans->usage)>0) {
-				list_add_tail(&trans->krxiodq_link,&rxrpc_krxiod_transportq);
+			if (atomic_read(&trans->usage) > 0) {
+				list_add_tail(&trans->krxiodq_link,
+					      &rxrpc_krxiod_transportq);
 				atomic_inc(&rxrpc_krxiod_qcount);
 			}
 		}
 
-		spin_unlock_irqrestore(&rxrpc_krxiod_transportq_lock,flags);
+		spin_unlock_irqrestore(&rxrpc_krxiod_transportq_lock, flags);
 		wake_up_all(&rxrpc_krxiod_sleepq);
 	}
 
@@ -201,12 +215,12 @@ void rxrpc_krxiod_dequeue_transport(struct rxrpc_transport *trans)
 
 	_enter("");
 
-	spin_lock_irqsave(&rxrpc_krxiod_transportq_lock,flags);
+	spin_lock_irqsave(&rxrpc_krxiod_transportq_lock, flags);
 	if (!list_empty(&trans->krxiodq_link)) {
 		list_del_init(&trans->krxiodq_link);
 		atomic_dec(&rxrpc_krxiod_qcount);
 	}
-	spin_unlock_irqrestore(&rxrpc_krxiod_transportq_lock,flags);
+	spin_unlock_irqrestore(&rxrpc_krxiod_transportq_lock, flags);
 
 	_leave("");
 
@@ -221,15 +235,16 @@ void rxrpc_krxiod_queue_call(struct rxrpc_call *call)
 	unsigned long flags;
 
 	if (list_empty(&call->rcv_krxiodq_lk)) {
-		spin_lock_irqsave(&rxrpc_krxiod_callq_lock,flags);
-		if (atomic_read(&call->usage)>0) {
-			list_add_tail(&call->rcv_krxiodq_lk,&rxrpc_krxiod_callq);
+		spin_lock_irqsave(&rxrpc_krxiod_callq_lock, flags);
+		if (atomic_read(&call->usage) > 0) {
+			list_add_tail(&call->rcv_krxiodq_lk,
+				      &rxrpc_krxiod_callq);
 			atomic_inc(&rxrpc_krxiod_qcount);
 		}
-		spin_unlock_irqrestore(&rxrpc_krxiod_callq_lock,flags);
+		spin_unlock_irqrestore(&rxrpc_krxiod_callq_lock, flags);
 	}
 	wake_up_all(&rxrpc_krxiod_sleepq);
-	
+
 } /* end rxrpc_krxiod_queue_call() */
 
 /*****************************************************************************/
@@ -240,11 +255,11 @@ void rxrpc_krxiod_dequeue_call(struct rxrpc_call *call)
 {
 	unsigned long flags;
 
-	spin_lock_irqsave(&rxrpc_krxiod_callq_lock,flags);
+	spin_lock_irqsave(&rxrpc_krxiod_callq_lock, flags);
 	if (!list_empty(&call->rcv_krxiodq_lk)) {
 		list_del_init(&call->rcv_krxiodq_lk);
 		atomic_dec(&rxrpc_krxiod_qcount);
 	}
-	spin_unlock_irqrestore(&rxrpc_krxiod_callq_lock,flags);
+	spin_unlock_irqrestore(&rxrpc_krxiod_callq_lock, flags);
 
 } /* end rxrpc_krxiod_dequeue_call() */

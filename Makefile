@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 0
-EXTRAVERSION = -test4
+EXTRAVERSION = -test5
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
@@ -344,8 +344,8 @@ endif
 include arch/$(ARCH)/Makefile
 
 # Let architecture Makefiles change CPPFLAGS if needed
-CFLAGS += $(CPPFLAGS) $(CFLAGS)
-AFLAGS += $(CPPFLAGS) $(AFLAGS)
+CFLAGS := $(CPPFLAGS) $(CFLAGS)
+AFLAGS := $(CPPFLAGS) $(AFLAGS)
 
 core-y		+= kernel/ mm/ fs/ ipc/ security/ crypto/
 

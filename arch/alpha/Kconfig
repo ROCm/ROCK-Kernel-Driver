@@ -11,6 +11,9 @@ config ALPHA
 	  now Hewlett-Packard.  The Alpha Linux project has a home page at
 	  <http://www.alphalinux.org/>.
 
+config 64BIT
+	def_bool y
+
 config MMU
 	bool
 	default y

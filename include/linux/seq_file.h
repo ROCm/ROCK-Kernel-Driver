@@ -65,5 +65,8 @@ int seq_path(struct seq_file *, struct vfsmount *, struct dentry *, char *);
 int single_open(struct file *, int (*)(struct seq_file *, void *), void *);
 int single_release(struct inode *, struct file *);
 int seq_release_private(struct inode *, struct file *);
+
+#define SEQ_START_TOKEN ((void *)1)
+
 #endif
 #endif

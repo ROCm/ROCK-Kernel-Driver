@@ -24,8 +24,10 @@ int elevator_noop_merge(request_queue_t *q, struct request **req,
 	struct request *__rq;
 	int ret;
 
-	if ((ret = elv_try_last_merge(q, bio)))
+	if ((ret = elv_try_last_merge(q, bio))) {
+		*req = q->last_merge;
 		return ret;
+	}
 
 	while ((entry = entry->prev) != &q->queue_head) {
 		__rq = list_entry_rq(entry);

@@ -14,7 +14,7 @@
 
 #ifdef __KERNEL__
 
-extern u32 rxrpc_epoch;
+extern uint32_t rxrpc_epoch;
 
 extern int rxrpc_ktrace;
 extern int rxrpc_kdebug;

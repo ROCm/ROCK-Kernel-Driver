@@ -475,6 +475,7 @@ ia32_sys_call_table:
 	.quad compat_fstatfs64  /* fstatfs64 */
 	.quad sys_tgkill
 	.quad compat_sys_utimes
+	.quad sys32_fadvise64_64
 	/* don't forget to change IA32_NR_syscalls */
 ia32_syscall_end:		
 	.rept IA32_NR_syscalls-(ia32_syscall_end-ia32_sys_call_table)/8

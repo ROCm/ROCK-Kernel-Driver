@@ -68,7 +68,7 @@ int SRXAFSCM_InitCallBackState(afs_server_t *server)
 			spin_unlock(&vnode->lock);
 
 			iput(inode);
-			if (release) afs_put_server(server);
+			afs_put_server(server);
 
 			spin_lock(&server->cb_lock);
 		}
