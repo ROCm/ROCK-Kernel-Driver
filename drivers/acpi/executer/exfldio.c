@@ -507,8 +507,8 @@ acpi_ex_field_datum_io (
 
 	default:
 
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "%p, Wrong object type - %s\n",
-			obj_desc, acpi_ut_get_object_type_name (obj_desc)));
+		ACPI_REPORT_ERROR (("Wrong object type in field I/O %X\n",
+			ACPI_GET_OBJECT_TYPE (obj_desc)));
 		status = AE_AML_INTERNAL;
 		break;
 	}
