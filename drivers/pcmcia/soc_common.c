@@ -448,9 +448,7 @@ soc_common_pcmcia_set_mem_map(struct pcmcia_socket *sock, struct pccard_mem_map 
 
 	skt->ops->set_timing(skt);
 
-	map->sys_stop -= map->sys_start;
-	map->sys_stop += res->start + map->card_start;
-	map->sys_start = res->start + map->card_start;
+	map->static_start = res->start + map->card_start;
 
 	return 0;
 }

@@ -1912,7 +1912,13 @@ int pcmcia_request_window(client_handle_t *handle, win_req_t *req, window_handle
     s->state |= SOCKET_WIN_REQ(w);
 
     /* Return window handle */
-    req->Base = win->ctl.sys_start;
+    if (s->features & SS_CAP_STATIC_MAP) {
+	req->Base = win->ctl.static_start;
+	win->ctl.sys_start = req->Base;
+	win->ctl.sys_stop = req->Base + req->Size - 1;
+    } else {
+	req->Base = win->ctl.res->start;
+    }
     *wh = win;
     
     return CS_SUCCESS;
