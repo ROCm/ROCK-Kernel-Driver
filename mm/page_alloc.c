@@ -518,7 +518,7 @@ static struct page *buffered_rmqueue(struct zone *zone, int order, int cold)
 
 	if (page != NULL) {
 		BUG_ON(bad_range(zone, page));
-		mod_page_state(pgalloc, 1 << order);
+		mod_page_state_zone(zone, pgalloc, 1 << order);
 		prep_new_page(page, order);
 	}
 	return page;
@@ -1021,6 +1021,7 @@ void show_free_areas(void)
 			" high:%lukB"
 			" active:%lukB"
 			" inactive:%lukB"
+			" present:%lukB"
 			"\n",
 			zone->name,
 			K(zone->free_pages),
@@ -1028,7 +1029,8 @@ void show_free_areas(void)
 			K(zone->pages_low),
 			K(zone->pages_high),
 			K(zone->nr_active),
-			K(zone->nr_inactive)
+			K(zone->nr_inactive),
+			K(zone->present_pages)
 			);
 	}
 
@@ -1586,23 +1588,38 @@ static char *vmstat_text[] = {
 	"pgpgout",
 	"pswpin",
 	"pswpout",
-	"pgalloc",
+	"pgalloc_high",
 
+	"pgalloc_normal",
+	"pgalloc_dma",
 	"pgfree",
 	"pgactivate",
 	"pgdeactivate",
+
 	"pgfault",
 	"pgmajfault",
+	"pgrefill_high",
+	"pgrefill_normal",
+	"pgrefill_dma",
 
-	"pgscan",
-	"pgrefill",
-	"pgsteal",
+	"pgsteal_high",
+	"pgsteal_normal",
+	"pgsteal_dma",
+	"pgscan_kswapd_high",
+	"pgscan_kswapd_normal",
+
+	"pgscan_kswapd_dma",
+	"pgscan_direct_high",
+	"pgscan_direct_normal",
+	"pgscan_direct_dma",
 	"pginodesteal",
-	"kswapd_steal",
 
+	"slabs_scanned",
+	"kswapd_steal",
 	"kswapd_inodesteal",
 	"pageoutrun",
 	"allocstall",
+
 	"pgrotated",
 };
 

@@ -155,6 +155,7 @@ static int shrink_slab(long scanned, unsigned int gfp_mask)
 			long nr_to_scan = shrinker->nr;
 
 			shrinker->nr = 0;
+			mod_page_state(slabs_scanned, nr_to_scan);
 			while (nr_to_scan) {
 				long this_scan = nr_to_scan;
 
@@ -459,9 +460,6 @@ keep:
 	list_splice(&ret_pages, page_list);
 	if (pagevec_count(&freed_pvec))
 		__pagevec_release_nonlru(&freed_pvec);
-	mod_page_state(pgsteal, ret);
-	if (current_is_kswapd())
-		mod_page_state(kswapd_steal, ret);
 	mod_page_state(pgactivate, pgactivate);
 	return ret;
 }
@@ -532,9 +530,16 @@ shrink_cache(const int nr_pages, struct zone *zone,
 			goto done;
 
 		max_scan -= nr_scan;
-		mod_page_state(pgscan, nr_scan);
+		if (current_is_kswapd())
+			mod_page_state_zone(zone, pgscan_kswapd, nr_scan);
+		else
+			mod_page_state_zone(zone, pgscan_direct, nr_scan);
 		nr_freed = shrink_list(&page_list, gfp_mask,
 					&max_scan, nr_mapped);
+		if (current_is_kswapd())
+			mod_page_state(kswapd_steal, nr_freed);
+		mod_page_state_zone(zone, pgsteal, nr_freed);
+
 		ret += nr_freed;
 		if (nr_freed <= 0 && list_empty(&page_list))
 			goto done;
@@ -733,7 +738,7 @@ refill_inactive_zone(struct zone *zone, const int nr_pages_in,
 	spin_unlock_irq(&zone->lru_lock);
 	pagevec_release(&pvec);
 
-	mod_page_state(pgrefill, nr_pages_in - nr_pages);
+	mod_page_state_zone(zone, pgrefill, nr_pages_in - nr_pages);
 	mod_page_state(pgdeactivate, pgdeactivate);
 }
 

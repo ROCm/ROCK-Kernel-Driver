@@ -288,6 +288,11 @@ static inline int is_highmem(struct zone *zone)
 	return (zone - zone->zone_pgdat->node_zones == ZONE_HIGHMEM);
 }
 
+static inline int is_normal(struct zone *zone)
+{
+	return (zone - zone->zone_pgdat->node_zones == ZONE_NORMAL);
+}
+
 /* These two functions are used to setup the per zone pages min values */
 struct ctl_table;
 struct file;
