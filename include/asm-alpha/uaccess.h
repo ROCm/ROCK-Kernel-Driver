@@ -340,25 +340,31 @@ __asm__ __volatile__("1: stb %r2,%1\n"				\
  * Complex access routines
  */
 
+/* This little bit of silliness is to get the GP loaded for a function
+   that ordinarily wouldn't.  Otherwise we could have it done by the macro
+   directly, which can be optimized the linker.  */
+#ifdef MODULE
+#define __module_address(sym)		"r"(sym),
+#define __module_call(ra, arg, sym)	"jsr $" #ra ",(%" #arg ")," #sym
+#else
+#define __module_address(sym)
+#define __module_call(ra, arg, sym)	"bsr $" #ra "," #sym " !samegp"
+#endif
+
 extern void __copy_user(void);
 
 extern inline long
 __copy_tofrom_user_nocheck(void *to, const void *from, long len)
 {
-	/* This little bit of silliness is to get the GP loaded for
-	   a function that ordinarily wouldn't.  Otherwise we could
-	   have it done by the macro directly, which can be optimized
-	   the linker.  */
-	register void * pv __asm__("$27") = __copy_user;
-
 	register void * __cu_to __asm__("$6") = to;
 	register const void * __cu_from __asm__("$7") = from;
 	register long __cu_len __asm__("$0") = len;
 
 	__asm__ __volatile__(
-		"jsr $28,(%3),__copy_user"
-		: "=r" (__cu_len), "=r" (__cu_from), "=r" (__cu_to), "=r"(pv)
-		: "0" (__cu_len), "1" (__cu_from), "2" (__cu_to), "3"(pv)
+		__module_call(28, 3, __copy_user)
+		: "=r" (__cu_len), "=r" (__cu_from), "=r" (__cu_to)
+		: __module_address(__copy_user)
+		  "0" (__cu_len), "1" (__cu_from), "2" (__cu_to)
 		: "$1","$2","$3","$4","$5","$28","memory");
 
 	return __cu_len;
@@ -367,20 +373,8 @@ __copy_tofrom_user_nocheck(void *to, const void *from, long len)
 extern inline long
 __copy_tofrom_user(void *to, const void *from, long len, const void *validate)
 {
-	if (__access_ok((long)validate, len, get_fs())) {
-		register void * pv __asm__("$27") = __copy_user;
-		register void * __cu_to __asm__("$6") = to;
-		register const void * __cu_from __asm__("$7") = from;
-		register long __cu_len __asm__("$0") = len;
-		__asm__ __volatile__(
-			"jsr $28,(%3),__copy_user"
-			: "=r"(__cu_len), "=r"(__cu_from), "=r"(__cu_to),
-			  "=r" (pv)
-			: "0" (__cu_len), "1" (__cu_from), "2" (__cu_to), 
-			  "3" (pv)
-			: "$1","$2","$3","$4","$5","$28","memory");
-		len = __cu_len;
-	}
+	if (__access_ok((long)validate, len, get_fs()))
+		len = __copy_tofrom_user_nocheck(to, from, len);
 	return len;
 }
 
@@ -404,18 +398,13 @@ extern void __do_clear_user(void);
 extern inline long
 __clear_user(void *to, long len)
 {
-	/* This little bit of silliness is to get the GP loaded for
-	   a function that ordinarily wouldn't.  Otherwise we could
-	   have it done by the macro directly, which can be optimized
-	   the linker.  */
-	register void * pv __asm__("$27") = __do_clear_user;
-
 	register void * __cl_to __asm__("$6") = to;
 	register long __cl_len __asm__("$0") = len;
 	__asm__ __volatile__(
-		"jsr $28,(%2),__do_clear_user"
-		: "=r"(__cl_len), "=r"(__cl_to), "=r"(pv)
-		: "0"(__cl_len), "1"(__cl_to), "2"(pv)
+		__module_call(28, 2, __do_clear_user)
+		: "=r"(__cl_len), "=r"(__cl_to)
+		: __module_address(__do_clear_user)
+		  "0"(__cl_len), "1"(__cl_to)
 		: "$1","$2","$3","$4","$5","$28","memory");
 	return __cl_len;
 }
@@ -423,19 +412,13 @@ __clear_user(void *to, long len)
 extern inline long
 clear_user(void *to, long len)
 {
-	if (__access_ok((long)to, len, get_fs())) {
-		register void * pv __asm__("$27") = __do_clear_user;
-		register void * __cl_to __asm__("$6") = to;
-		register long __cl_len __asm__("$0") = len;
-		__asm__ __volatile__(
-			"jsr $28,(%2),__do_clear_user"
-			: "=r"(__cl_len), "=r"(__cl_to), "=r"(pv)
-			: "0"(__cl_len), "1"(__cl_to), "2"(pv)
-			: "$1","$2","$3","$4","$5","$28","memory");
-		len = __cl_len;
-	}
+	if (__access_ok((long)to, len, get_fs()))
+		len = __clear_user(to, len);
 	return len;
 }
+
+#undef __module_address
+#undef __module_call
 
 /* Returns: -EFAULT if exception before terminator, N if the entire
    buffer filled, else strlen.  */

@@ -14,7 +14,7 @@
  * the get/put functions are indeed always optimized,
  * and that we use the correct sizes.
  */
-extern void bad_unaligned_access_length(void);
+extern void bad_unaligned_access_length(void) __attribute__((noreturn));
 
 /*
  * EGCS 1.1 knows about arbitrary unaligned loads.  Define some
