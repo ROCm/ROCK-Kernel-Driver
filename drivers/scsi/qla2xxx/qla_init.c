@@ -772,6 +772,54 @@ qla2x00_init_response_q_entries(scsi_qla_host_t *ha)
 }
 
 /**
+ * qla2x00_update_fw_options() - Read and process firmware options.
+ * @ha: HA context
+ *
+ * Returns 0 on success.
+ */
+static void
+qla2x00_update_fw_options(scsi_qla_host_t *ha)
+{
+	/* Setup seriallink options */
+	uint16_t swing, emphasis;
+
+	memset(ha->fw_options, 0, sizeof(ha->fw_options));
+	qla2x00_get_fw_options(ha, ha->fw_options);
+
+	if (IS_QLA2100(ha) || IS_QLA2200(ha))
+		return;
+
+	/* Serial Link options. */
+	DEBUG3(printk("scsi(%ld): Serial link options:\n",
+	    ha->host_no));
+	DEBUG3(qla2x00_dump_buffer((uint8_t *)&ha->fw_seriallink_options,
+	    sizeof(ha->fw_seriallink_options)));
+
+	ha->fw_options[1] &= ~FO1_SET_EMPHASIS_SWING;
+	if (ha->fw_seriallink_options[1] & BIT_2)
+		ha->fw_options[1] |= FO1_SET_EMPHASIS_SWING;
+
+	/*  1G settings */
+	swing = ha->fw_seriallink_options[0] & (BIT_2 | BIT_1 | BIT_0);
+	emphasis = ha->fw_seriallink_options[0] & (BIT_4 | BIT_3);
+	emphasis >>= 3;
+	ha->fw_options[10] = (emphasis << 14) | (swing << 8) | 0x3;
+
+	/*  2G settings */
+	swing = ha->fw_seriallink_options[0] & (BIT_7 | BIT_6 | BIT_5);
+	swing >>= 5;
+	emphasis = ha->fw_seriallink_options[1] & (BIT_1 | BIT_0);
+	ha->fw_options[11] = (emphasis << 14) | (swing << 8) | 0x3;
+
+	/* FCP2 options. */
+	/*  Return command IOCBs without waiting for an ABTS to complete. */
+	ha->fw_options[3] |= BIT_13;
+
+	/* Update Serial Link options. */
+	qla2x00_set_fw_options(ha, ha->fw_options);
+}
+
+/**
  * qla2x00_init_rings() - Initializes firmware.
  * @ha: HA context
  *
@@ -824,35 +872,8 @@ qla2x00_init_rings(scsi_qla_host_t *ha)
 		DEBUG2_3(printk("scsi(%ld): Init firmware **** FAILED ****.\n",
 		    ha->host_no));
 	} else {
-		/* Setup seriallink options */
-		uint16_t swing, emphasis;
-
-		DEBUG3(printk("scsi(%ld): Serial link options:\n",
-		    ha->host_no));
-		DEBUG3(qla2x00_dump_buffer(
-		    (uint8_t *)&ha->fw_seriallink_options,
-		    sizeof(ha->fw_seriallink_options)));
-
-		memset(ha->fw_options, 0, sizeof(ha->fw_options));
-		qla2x00_get_fw_options(ha, ha->fw_options);
-
-		ha->fw_options[1] &= ~FO1_SET_EMPHASIS_SWING;
-		if (ha->fw_seriallink_options[1] & BIT_2)
-			ha->fw_options[1] |= FO1_SET_EMPHASIS_SWING;
-
-		/* 1G settings */
-		swing = ha->fw_seriallink_options[0] & (BIT_2 | BIT_1 | BIT_0);
-		emphasis = ha->fw_seriallink_options[0] & (BIT_4 | BIT_3);
-		emphasis >>= 3;
-		ha->fw_options[10] = (emphasis << 14) | (swing << 8) | 0x3;
-
-		/* 2G settings */
-		swing = ha->fw_seriallink_options[0] & (BIT_7 | BIT_6 | BIT_5);
-		swing >>= 5;
-		emphasis = ha->fw_seriallink_options[1] & (BIT_1 | BIT_0);
-		ha->fw_options[11] = (emphasis << 14) | (swing << 8) | 0x3;
-
-		qla2x00_set_fw_options(ha, ha->fw_options);
+		/* Update any ISP specific firmware options. */
+		qla2x00_update_fw_options(ha);
 
 		DEBUG3(printk("scsi(%ld): Init firmware -- success.\n",
 		    ha->host_no));
