@@ -33,8 +33,8 @@ struct vfsmount;
  */
 struct qstr {
 	unsigned int hash;
-	const unsigned char *name;
 	unsigned int len;
+	const unsigned char *name;
 };
 
 struct dentry_stat_t {
@@ -101,11 +101,11 @@ struct dentry {
 	unsigned long d_time;		/* used by d_revalidate */
 	struct dentry_operations *d_op;
 	struct super_block *d_sb;	/* The root of the dentry tree */
-	int d_mounted;
 	void *d_fsdata;			/* fs-specific data */
  	struct rcu_head d_rcu;
 	struct dcookie_struct *d_cookie; /* cookie, if any */
 	struct hlist_node d_hash;	/* lookup hash list */	
+	int d_mounted;
 	unsigned char d_iname[DNAME_INLINE_LEN_MIN];	/* small names */
 };
 
