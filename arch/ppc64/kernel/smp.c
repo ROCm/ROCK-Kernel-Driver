@@ -900,10 +900,6 @@ int __devinit __cpu_up(unsigned int cpu)
 		paca[cpu].xStab_data.real = virt_to_abs(tmp);
 	}
 
-	/* The information for processor bringup must be written out
-	 * to main store before we release the processor. */
-	mb();
-
 	/* The information for processor bringup must
 	 * be written out to main store before we release
 	 * the processor.
