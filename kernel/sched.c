@@ -1592,9 +1592,9 @@ void __init sched_init(void)
 	int i, j, k;
 
 	for (i = 0; i < NR_CPUS; i++) {
-		runqueue_t *rq = cpu_rq(i);
 		prio_array_t *array;
 
+		rq = cpu_rq(i);
 		rq->active = rq->arrays;
 		rq->expired = rq->arrays + 1;
 		spin_lock_init(&rq->lock);
