@@ -179,7 +179,7 @@ static __inline__ ssize_t tun_get_user(struct tun_struct *tun, struct iovec *iv,
 	size_t len = count;
 
 	if (!(tun->flags & TUN_NO_PI)) {
-		if ((len -= sizeof(pi)) < 0)
+		if ((len -= sizeof(pi)) > len)
 			return -EINVAL;
 
 		memcpy_fromiovec((void *)&pi, iv, sizeof(pi));
