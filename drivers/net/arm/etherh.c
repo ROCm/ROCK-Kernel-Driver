@@ -40,6 +40,7 @@
 #include <linux/errno.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
+#include <linux/ethtool.h>
 #include <linux/skbuff.h>
 #include <linux/delay.h>
 #include <linux/device.h>
@@ -56,6 +57,9 @@
 #define NET_DEBUG  0
 #define DEBUG_INIT 2
 
+#define DRV_NAME	"etherh"
+#define DRV_VERSION	"1.10"
+
 static unsigned int net_debug = NET_DEBUG;
 
 struct etherh_priv {
@@ -64,6 +68,7 @@ struct etherh_priv {
 	unsigned int	id;
 	void		*ctrl_port;
 	unsigned char	ctrl;
+	u32		supported;
 };
 
 struct etherh_data {
@@ -72,11 +77,7 @@ struct etherh_data {
 	unsigned long	ctrlport_offset;
 	int		ctrl_ioc;
 	const char	name[16];
-	/*
-	 * netdev flags and port
-	 */
-	unsigned short	flags;
-	unsigned char	if_port;
+	u32		supported;
 	unsigned char	tx_start_page;
 	unsigned char	stop_page;
 };
@@ -86,7 +87,7 @@ MODULE_DESCRIPTION("EtherH/EtherM driver");
 MODULE_LICENSE("GPL");
 
 static char version[] __initdata =
-	"EtherH/EtherM Driver (c) 2002 Russell King v1.09\n";
+	"EtherH/EtherM Driver (c) 2002-2004 Russell King " DRV_VERSION "\n";
 
 #define ETHERH500_DATAPORT	0x800	/* MEMC */
 #define ETHERH500_NS8390	0x000	/* MEMC */
@@ -556,6 +557,62 @@ static int __init etherm_addr(char *addr)
 	return 0;
 }
 
+static void etherh_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
+{
+	strlcpy(info->driver, DRV_NAME, sizeof(info->driver));
+	strlcpy(info->version, DRV_VERSION, sizeof(info->version));
+	strlcpy(info->bus_info, dev->class_dev.dev->bus_id,
+		sizeof(info->bus_info));
+}
+
+static int etherh_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+{
+	cmd->supported	= etherh_priv(dev)->supported;
+	cmd->speed	= SPEED_10;
+	cmd->duplex	= DUPLEX_HALF;
+	cmd->port	= dev->if_port == IF_PORT_10BASET ? PORT_TP : PORT_BNC;
+	cmd->autoneg	= dev->flags & IFF_AUTOMEDIA ? AUTONEG_ENABLE : AUTONEG_DISABLE;
+	return 0;
+}
+
+static int etherh_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+{
+	switch (cmd->autoneg) {
+	case AUTONEG_ENABLE:
+		dev->flags |= IFF_AUTOMEDIA;
+		break;
+
+	case AUTONEG_DISABLE:
+		switch (cmd->port) {
+		case PORT_TP:
+			dev->if_port = IF_PORT_10BASET;
+			break;
+
+		case PORT_BNC:
+			dev->if_port = IF_PORT_10BASE2;
+			break;
+
+		default:
+			return -EINVAL;
+		}
+		dev->flags &= ~IFF_AUTOMEDIA;
+		break;
+
+	default:
+		return -EINVAL;
+	}
+
+	etherh_setif(dev);
+
+	return 0;
+}
+
+static struct ethtool_ops etherh_ethtool_ops = {
+	.get_settings	= etherh_get_settings,
+	.set_settings	= etherh_set_settings,
+	.get_drvinfo	= etherh_get_drvinfo,
+};
+
 static u32 etherh_regoffsets[16];
 static u32 etherm_regoffsets[16];
 
@@ -587,10 +644,21 @@ etherh_probe(struct expansion_card *ec, const struct ecard_id *id)
 	dev->stop		= etherh_close;
 	dev->set_config		= etherh_set_config;
 	dev->irq		= ec->irq;
-	dev->if_port		= data->if_port;
-	dev->flags		|= data->flags;
+	dev->ethtool_ops	= &etherh_ethtool_ops;
+
+	if (data->supported & SUPPORTED_Autoneg)
+		dev->flags |= IFF_AUTOMEDIA;
+	if (data->supported & SUPPORTED_TP) {
+		dev->flags |= IFF_PORTSEL;
+		dev->if_port = IF_PORT_10BASET;
+	} else if (data->supported & SUPPORTED_BNC) {
+		dev->flags |= IFF_PORTSEL;
+		dev->if_port = IF_PORT_10BASE2;
+	} else
+		dev->if_port = IF_PORT_UNKNOWN;
 
 	eh = etherh_priv(dev);
+	eh->supported		= data->supported;
 	eh->ctrl		= 0;
 	eh->id			= ec->cid.product;
 	eh->memc		= ioremap(ecard_resource_start(ec, ECARD_RES_MEMC), PAGE_SIZE);
@@ -701,7 +769,7 @@ static struct etherh_data etherm_data = {
 	.dataport_offset	= ETHERM_NS8390 + ETHERM_DATAPORT,
 	.ctrlport_offset	= ETHERM_NS8390 + ETHERM_CTRLPORT,
 	.name			= "ANT EtherM",
-	.if_port		= IF_PORT_UNKNOWN,
+	.supported		= SUPPORTED_10baseT_Half,
 	.tx_start_page		= ETHERM_TX_START_PAGE,
 	.stop_page		= ETHERM_STOP_PAGE,
 };
@@ -712,7 +780,7 @@ static struct etherh_data etherlan500_data = {
 	.ctrlport_offset	= ETHERH500_CTRLPORT,
 	.ctrl_ioc		= 1,
 	.name			= "i3 EtherH 500",
-	.if_port		= IF_PORT_UNKNOWN,
+	.supported		= SUPPORTED_10baseT_Half,
 	.tx_start_page		= ETHERH_TX_START_PAGE,
 	.stop_page		= ETHERH_STOP_PAGE,
 };
@@ -722,8 +790,7 @@ static struct etherh_data etherlan600_data = {
 	.dataport_offset	= ETHERH600_NS8390 + ETHERH600_DATAPORT,
 	.ctrlport_offset	= ETHERH600_NS8390 + ETHERH600_CTRLPORT,
 	.name			= "i3 EtherH 600",
-	.flags			= IFF_PORTSEL | IFF_AUTOMEDIA,
-	.if_port		= IF_PORT_10BASET,
+	.supported		= SUPPORTED_10baseT_Half | SUPPORTED_TP | SUPPORTED_BNC | SUPPORTED_Autoneg,
 	.tx_start_page		= ETHERH_TX_START_PAGE,
 	.stop_page		= ETHERH_STOP_PAGE,
 };
@@ -733,8 +800,7 @@ static struct etherh_data etherlan600a_data = {
 	.dataport_offset	= ETHERH600_NS8390 + ETHERH600_DATAPORT,
 	.ctrlport_offset	= ETHERH600_NS8390 + ETHERH600_CTRLPORT,
 	.name			= "i3 EtherH 600A",
-	.flags			= IFF_PORTSEL | IFF_AUTOMEDIA,
-	.if_port		= IF_PORT_10BASET,
+	.supported		= SUPPORTED_10baseT_Half | SUPPORTED_TP | SUPPORTED_BNC | SUPPORTED_Autoneg,
 	.tx_start_page		= ETHERH_TX_START_PAGE,
 	.stop_page		= ETHERH_STOP_PAGE,
 };
@@ -752,7 +818,7 @@ static struct ecard_driver etherh_driver = {
 	.remove		= __devexit_p(etherh_remove),
 	.id_table	= etherh_ids,
 	.drv = {
-		.name	= "etherh",
+		.name	= DRV_NAME,
 	},
 };
 
