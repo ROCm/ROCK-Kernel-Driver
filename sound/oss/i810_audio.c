@@ -2197,6 +2197,13 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 #if defined(DEBUG) || defined(DEBUG_MMAP)
 		printk("SNDCTL_DSP_SETTRIGGER 0x%x\n", val);
 #endif
+		/* silently ignore invalid PCM_ENABLE_xxx bits,
+		 * like the other drivers do
+		 */
+		if (!(file->f_mode & FMODE_READ ))
+			val &= ~PCM_ENABLE_INPUT;
+		if (!(file->f_mode & FMODE_WRITE ))
+			val &= ~PCM_ENABLE_OUTPUT;
 		if((file->f_mode & FMODE_READ) && !(val & PCM_ENABLE_INPUT) && dmabuf->enable == ADC_RUNNING) {
 			stop_adc(state);
 		}
@@ -2204,7 +2211,7 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 			stop_dac(state);
 		}
 		dmabuf->trigger = val;
-		if((file->f_mode & FMODE_WRITE) && (val & PCM_ENABLE_OUTPUT) && !(dmabuf->enable & DAC_RUNNING)) {
+		if((val & PCM_ENABLE_OUTPUT) && !(dmabuf->enable & DAC_RUNNING)) {
 			if (!dmabuf->write_channel) {
 				dmabuf->ready = 0;
 				dmabuf->write_channel = state->card->alloc_pcm_channel(state->card);
@@ -2225,7 +2232,7 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 			i810_update_lvi(state, 0);
 			start_dac(state);
 		}
-		if((file->f_mode & FMODE_READ) && (val & PCM_ENABLE_INPUT) && !(dmabuf->enable & ADC_RUNNING)) {
+		if((val & PCM_ENABLE_INPUT) && !(dmabuf->enable & ADC_RUNNING)) {
 			if (!dmabuf->read_channel) {
 				dmabuf->ready = 0;
 				dmabuf->read_channel = state->card->alloc_rec_pcm_channel(state->card);
