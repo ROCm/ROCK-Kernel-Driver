@@ -337,7 +337,7 @@ static void __split_page(struct clone_info *ci, unsigned int len)
 {
 	struct dm_target *ti = dm_table_find_target(ci->md->map, ci->sector);
 	struct bio *clone, *bio = ci->bio;
-	struct bio_vec *bv = bio->bi_io_vec + (bio->bi_vcnt - 1);
+	struct bio_vec *bv = bio->bi_io_vec + ci->idx;
 
 	DMWARN("splitting page");
 
@@ -349,11 +349,13 @@ static void __split_page(struct clone_info *ci, unsigned int len)
 
 	clone->bi_sector = ci->sector;
 	clone->bi_bdev = bio->bi_bdev;
-	clone->bi_flags = bio->bi_flags | (1 << BIO_SEG_VALID);
 	clone->bi_rw = bio->bi_rw;
+	clone->bi_vcnt = 1;
 	clone->bi_size = len << SECTOR_SHIFT;
 	clone->bi_end_io = clone_endio;
 	clone->bi_private = ci->io;
+	clone->bi_io_vec->bv_offset = bv->bv_len - clone->bi_size;
+	clone->bi_io_vec->bv_len = clone->bi_size;
 
 	ci->sector += len;
 	ci->sector_count -= len;
