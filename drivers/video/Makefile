@@ -15,11 +15,6 @@ export-objs    	:= fbmem.o fbcmap.o fbcon.o fbmon.o modedb.o \
 		   fbcon-cfb8.o fbcon-mac.o fbcon-mfb.o \
 		   cyber2000fb.o sa1100fb.o fbcon-hga.o fbgen.o
 
-obj-y		:=
-obj-m		:=
-obj-n		:=
-obj-		:=
-
 # Each configuration option enables a list of files.
 
 obj-$(CONFIG_DUMMY_CONSOLE)       += dummycon.o
