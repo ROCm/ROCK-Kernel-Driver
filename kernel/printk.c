@@ -186,17 +186,18 @@ int do_syslog(int type, char __user * buf, int len)
 			goto out;
 		i = 0;
 		spin_lock_irq(&logbuf_lock);
-		while ((log_start != log_end) && i < len) {
+		while (!error && (log_start != log_end) && i < len) {
 			c = LOG_BUF(log_start);
 			log_start++;
 			spin_unlock_irq(&logbuf_lock);
-			__put_user(c,buf);
+			error = __put_user(c,buf);
 			buf++;
 			i++;
 			spin_lock_irq(&logbuf_lock);
 		}
 		spin_unlock_irq(&logbuf_lock);
-		error = i;
+		if (!error)
+			error = i;
 		break;
 	case 4:		/* Read/clear last kernel messages */
 		do_clear = 1; 
@@ -226,26 +227,30 @@ int do_syslog(int type, char __user * buf, int len)
 		 * we try to copy to user space. Therefore
 		 * the messages are copied in reverse. <manfreds>
 		 */
-		for(i=0;i < count;i++) {
+		for(i = 0; i < count && !error; i++) {
 			j = limit-1-i;
 			if (j+LOG_BUF_LEN < log_end)
 				break;
 			c = LOG_BUF(j);
 			spin_unlock_irq(&logbuf_lock);
-			__put_user(c,&buf[count-1-i]);
+			error = __put_user(c,&buf[count-1-i]);
 			spin_lock_irq(&logbuf_lock);
 		}
 		spin_unlock_irq(&logbuf_lock);
+		if (error)
+			break;
 		error = i;
 		if(i != count) {
 			int offset = count-error;
 			/* buffer overflow during copy, correct user buffer. */
 			for(i=0;i<error;i++) {
-				__get_user(c,&buf[i+offset]);
-				__put_user(c,&buf[i]);
+				if (__get_user(c,&buf[i+offset]) ||
+				    __put_user(c,&buf[i])) {
+					error = -EFAULT;
+					break;
+				}
 			}
 		}
-
 		break;
 	case 5:		/* Clear ring buffer */
 		logged_chars = 0;
