@@ -929,8 +929,6 @@ void __init mp_override_legacy_irq (
 	u32			gsi)
 {
 	struct mpc_config_intsrc intsrc;
-	int			i = 0;
-	int			found = 0;
 	int			ioapic = -1;
 	int			pin = -1;
 
@@ -958,28 +956,14 @@ void __init mp_override_legacy_irq (
 	intsrc.mpc_dstapic = mp_ioapics[ioapic].mpc_apicid;	   /* APIC ID */
 	intsrc.mpc_dstirq = pin;				    /* INTIN# */
 
-	Dprintk("Int: type %d, pol %d, trig %d, bus %d, irq %d, %d-%d\n",
+	printk("Int: type %d, pol %d, trig %d, bus %d, irq %d, %d-%d\n",
 		intsrc.mpc_irqtype, intsrc.mpc_irqflag & 3, 
 		(intsrc.mpc_irqflag >> 2) & 3, intsrc.mpc_srcbus, 
 		intsrc.mpc_srcbusirq, intsrc.mpc_dstapic, intsrc.mpc_dstirq);
 
-	/* 
-	 * If an existing [IOAPIC.PIN -> IRQ] routing entry exists we override it.
-	 * Otherwise create a new entry (e.g. gsi == 2).
-	 */
-	for (i = 0; i < mp_irq_entries; i++) {
-		if ((mp_irqs[i].mpc_srcbus == intsrc.mpc_srcbus) 
-			&& (mp_irqs[i].mpc_srcbusirq == intsrc.mpc_srcbusirq)) {
-			mp_irqs[i] = intsrc;
-			found = 1;
-			break;
-		}
-	}
-	if (!found) {
-		mp_irqs[mp_irq_entries] = intsrc;
-		if (++mp_irq_entries == MAX_IRQ_SOURCES)
-			panic("Max # of irq sources exceeded!\n");
-	}
+	mp_irqs[mp_irq_entries] = intsrc;
+	if (++mp_irq_entries == MAX_IRQ_SOURCES)
+		panic("Max # of irq sources exceeded!\n");
 
 	return;
 }
@@ -1010,19 +994,26 @@ void __init mp_config_acpi_legacy_irqs (void)
 	intsrc.mpc_dstapic = mp_ioapics[ioapic].mpc_apicid;
 
 	/* 
-	 * Use the default configuration for the IRQs 0-15.  These may be
+	 * Use the default configuration for the IRQs 0-15.  Unless
 	 * overriden by (MADT) interrupt source override entries.
 	 */
 	for (i = 0; i < 16; i++) {
+		int idx;
 
-		if (i == 2)
-			continue;			/* Don't connect IRQ2 */
+		for (idx = 0; idx < mp_irq_entries; idx++)
+			if (mp_irqs[idx].mpc_srcbus == MP_ISA_BUS &&
+				(mp_irqs[idx].mpc_srcbusirq == i ||
+				mp_irqs[idx].mpc_dstirq == i))
+					break;
+
+		if (idx != mp_irq_entries)
+			continue;			  /* IRQ already used */
 
 		intsrc.mpc_irqtype = mp_INT;
 		intsrc.mpc_srcbusirq = i;		   /* Identity mapped */
 		intsrc.mpc_dstirq = i;
 
-		Dprintk("Int: type %d, pol %d, trig %d, bus %d, irq %d, "
+		printk("Int: type %d, pol %d, trig %d, bus %d, irq %d, "
 			"%d-%d\n", intsrc.mpc_irqtype, intsrc.mpc_irqflag & 3, 
 			(intsrc.mpc_irqflag >> 2) & 3, intsrc.mpc_srcbus, 
 			intsrc.mpc_srcbusirq, intsrc.mpc_dstapic, 
@@ -1037,6 +1028,8 @@ void __init mp_config_acpi_legacy_irqs (void)
 extern FADT_DESCRIPTOR acpi_fadt;
 
 #ifdef CONFIG_ACPI_PCI
+
+int (*platform_rename_gsi)(int ioapic, int gsi);
 
 void __init mp_parse_prt (void)
 {
@@ -1081,10 +1074,8 @@ void __init mp_parse_prt (void)
 			continue;
 		ioapic_pin = gsi - mp_ioapic_routing[ioapic].gsi_base;
 
-		if (es7000_plat) {
-			if (!ioapic && (gsi < 16))
-				gsi += 16;
-		}
+		if (platform_rename_gsi)
+			gsi = platform_rename_gsi(ioapic, gsi);
 
 		/* 
 		 * Avoid pin reprogramming.  PRTs typically include entries  

@@ -32,7 +32,7 @@
 #define	MIP_VALID		0x0100000000000000
 
 #define	MIP_RD_LO(VALUE)	(VALUE & 0xffffffff)   
-#define	MIP_PORT(VALUE)		((VALUE >> 32) & 0xffff)
+#define MIP_PORT(VALUE)		((VALUE >> 32) & 0xffff)
 
 struct mip_reg_info {
 	unsigned long long mip_info;

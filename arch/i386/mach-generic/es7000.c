@@ -1,5 +1,5 @@
 /* 
- * APIC driver for the Unisys ES7000 chipset.
+ * APIC driver for the IBM "Summit" chipset.
  */
 #define APIC_DEFINITION 1
 #include <linux/config.h>
