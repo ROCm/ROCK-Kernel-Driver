@@ -643,12 +643,6 @@ pci_find_hose_for_OF_device(struct device_node *node)
 void 
 pSeries_pcibios_init(void)
 {
-	PPCDBG(PPCDBG_PHBINIT, "\tppc64_pcibios_init Entry.\n"); 
-
-	if (get_property(find_path_device("/rtas"),"ibm,fw-phb-id",NULL) != NULL) {
-		PPCDBG(PPCDBG_PHBINIT, "\tFound: ibm,fw-phb-id\n"); 
-		Pci_Large_Bus_System = 1;
-	}
 }
 
 /*

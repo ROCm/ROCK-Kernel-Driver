@@ -51,11 +51,6 @@ void pSeries_pcibios_init_early(void);
 void pSeries_pcibios_init(void);
 
 /*******************************************************************
- * Platform configuration flags.. (Live in pci.c)
- *******************************************************************/
-extern int  Pci_Large_Bus_System;      /* System has > 256 buses   */
-
-/*******************************************************************
  * Helper macros for extracting data from pci structures.  
  *   PCI_GET_PHB_PTR(struct pci_dev*)    returns the Phb pointer.
  *   PCI_GET_PHB_NUMBER(struct pci_dev*) returns the Phb number.

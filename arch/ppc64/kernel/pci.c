@@ -55,7 +55,6 @@ struct pci_controller* hose_head;
 struct pci_controller** hose_tail = &hose_head;
 
 int  global_phb_number    = 0;           /* Global phb counter    */
-int  Pci_Large_Bus_System = 0;
 struct pci_controller *phbtab[PCI_MAX_PHB];
 
 /* Cached ISA bridge dev. */
