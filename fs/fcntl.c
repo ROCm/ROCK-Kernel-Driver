@@ -229,8 +229,8 @@ static int setfl(int fd, struct file * filp, unsigned long arg)
 		   arg |= O_NONBLOCK;
 
 	if (arg & O_DIRECT) {
-		if (!inode->i_mapping || !inode->i_mapping->a_ops ||
-			!inode->i_mapping->a_ops->direct_IO)
+		if (!filp->f_mapping || !filp->f_mapping->a_ops ||
+			!filp->f_mapping->a_ops->direct_IO)
 				return -EINVAL;
 	}
 

@@ -912,7 +912,7 @@ static int setup_swap_extents(struct swap_info_struct *sis)
 	sector_t last_block;
 	int ret;
 
-	inode = sis->swap_file->f_dentry->d_inode;
+	inode = sis->swap_file->f_mapping->host;
 	if (S_ISBLK(inode->i_mode)) {
 		ret = add_swap_extent(sis, 0, sis->max, 0);
 		goto done;
@@ -1099,13 +1099,13 @@ asmlinkage long sys_swapoff(const char __user * specialfile)
 	swap_device_unlock(p);
 	swap_list_unlock();
 	vfree(swap_map);
-	if (S_ISBLK(swap_file->f_dentry->d_inode->i_mode)) {
+	if (S_ISBLK(mapping->host->i_mode)) {
 		struct block_device *bdev;
-		bdev = swap_file->f_dentry->d_inode->i_bdev;
+		bdev = mapping->host->i_bdev;
 		set_blocksize(bdev, p->old_block_size);
 		bd_release(bdev);
 	} else {
-		up(&swap_file->f_mapping->host->i_sem);
+		up(&mapping->host->i_sem);
 	}
 	filp_close(swap_file, NULL);
 	err = 0;
@@ -1231,8 +1231,8 @@ asmlinkage long sys_swapon(const char __user * specialfile, int swap_flags)
 	int swapfilesize;
 	unsigned short *swap_map;
 	struct page *page = NULL;
-	struct inode *inode;
-	struct inode *downed_inode = NULL;
+	struct inode *inode = NULL;
+	int did_down = 0;
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
@@ -1279,8 +1279,8 @@ asmlinkage long sys_swapon(const char __user * specialfile, int swap_flags)
 	}
 
 	p->swap_file = swap_file;
-	inode = swap_file->f_dentry->d_inode;
 	mapping = swap_file->f_mapping;
+	inode = mapping->host;
 
 	error = -EBUSY;
 	for (i = 0; i < nr_swapfiles; i++) {
@@ -1307,13 +1307,13 @@ asmlinkage long sys_swapon(const char __user * specialfile, int swap_flags)
 		p->bdev = bdev;
 	} else if (S_ISREG(inode->i_mode)) {
 		p->bdev = inode->i_sb->s_bdev;
-		downed_inode = mapping->host;
-		down(&downed_inode->i_sem);
+		down(&inode->i_sem);
+		did_down = 1;
 	} else {
 		goto bad_swap;
 	}
 
-	swapfilesize = i_size_read(mapping->host) >> PAGE_SHIFT;
+	swapfilesize = i_size_read(inode) >> PAGE_SHIFT;
 
 	/*
 	 * Read the swap header.
@@ -1465,8 +1465,8 @@ out:
 	}
 	if (name)
 		putname(name);
-	if (error && downed_inode)
-		up(&downed_inode->i_sem);
+	if (error && did_down)
+		up(&inode->i_sem);
 	return error;
 }
 

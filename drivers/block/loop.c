@@ -659,6 +659,7 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 	struct file	*file;
 	struct inode	*inode;
 	struct block_device *lo_device = NULL;
+	struct address_space *mapping;
 	unsigned lo_blocksize;
 	int		lo_flags = 0;
 	int		error;
@@ -675,7 +676,8 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 	if (!file)
 		goto out;
 
-	inode = file->f_dentry->d_inode;
+	mapping = file->f_mapping;
+	inode = mapping->host;
 
 	if (!(file->f_mode & FMODE_WRITE))
 		lo_flags |= LO_FLAGS_READ_ONLY;
@@ -690,7 +692,7 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 		if (bdev_read_only(lo_device))
 			lo_flags |= LO_FLAGS_READ_ONLY;
 	} else if (S_ISREG(inode->i_mode)) {
-		struct address_space_operations *aops = inode->i_mapping->a_ops;
+		struct address_space_operations *aops = mapping->a_ops;
 		/*
 		 * If we can't read - sorry. If we only can't write - well,
 		 * it's going to be read-only.
@@ -724,9 +726,8 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 		error = -EFBIG;
 		goto out_putf;
 	}
-	lo->old_gfp_mask = mapping_gfp_mask(inode->i_mapping);
-	mapping_set_gfp_mask(inode->i_mapping,
-			     lo->old_gfp_mask & ~(__GFP_IO|__GFP_FS));
+	lo->old_gfp_mask = mapping_gfp_mask(mapping);
+	mapping_set_gfp_mask(mapping, lo->old_gfp_mask & ~(__GFP_IO|__GFP_FS));
 
 	lo->lo_bio = lo->lo_biotail = NULL;
 
