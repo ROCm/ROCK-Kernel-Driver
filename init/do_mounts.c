@@ -26,21 +26,6 @@ extern asmlinkage long sys_chdir(const char *name);
 extern asmlinkage long sys_fchdir(int fd);
 extern asmlinkage long sys_chroot(const char *name);
 
-#ifdef CONFIG_BLK_DEV_INITRD
-unsigned int real_root_dev;	/* do_proc_dointvec cannot handle kdev_t */
-static int __initdata mount_initrd = 1;
-
-static int __init no_initrd(char *str)
-{
-	mount_initrd = 0;
-	return 1;
-}
-
-__setup("noinitrd", no_initrd);
-#else
-static int __initdata mount_initrd = 0;
-#endif
-
 int __initdata rd_doload;	/* 1 = load RAM disk, 0 = don't load */
 
 int root_mountflags = MS_RDONLY | MS_VERBOSE;
@@ -607,7 +592,19 @@ static void __init mount_root(void)
 }
 
 #ifdef CONFIG_BLK_DEV_INITRD
+
+unsigned int real_root_dev;	/* do_proc_dointvec cannot handle kdev_t */
 static int __initdata old_fd, root_fd;
+static int __initdata mount_initrd = 1;
+
+static int __init no_initrd(char *str)
+{
+	mount_initrd = 0;
+	return 1;
+}
+
+__setup("noinitrd", no_initrd);
+
 static int __init do_linuxrc(void * shell)
 {
 	static char *argv[] = { "linuxrc", NULL, };
@@ -686,6 +683,9 @@ static void __init handle_initrd(void)
 
 static int __init initrd_load(void)
 {
+	if (!mount_initrd)
+		return 0;
+
 	create_dev("/dev/ram", MKDEV(RAMDISK_MAJOR, 0), NULL);
 	create_dev("/dev/initrd", MKDEV(RAMDISK_MAJOR, INITRD_MINOR), NULL);
 	/* Load the initrd data into /dev/ram0. Execute it as initrd unless
@@ -728,10 +728,9 @@ void __init prepare_namespace(void)
 	   log corrupting stuff */
 	software_resume();
 
-	if (mount_initrd) {
-		if (initrd_load())
-			goto out;
-	}
+	if (initrd_load())
+		goto out;
+
 	if (is_floppy && rd_doload && rd_load_disk(0))
 		ROOT_DEV = Root_RAM0;
 
