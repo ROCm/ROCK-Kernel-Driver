@@ -2,6 +2,11 @@
 #define _ASM_GENERIC_PGTABLE_H
 
 #ifndef __HAVE_ARCH_PTEP_ESTABLISH
+
+#ifndef ptep_update_dirty_accessed
+#define ptep_update_dirty_accessed(__ptep, __entry, __dirty) set_pte(__ptep, __entry)
+#endif
+
 /*
  * Establish a new mapping:
  *  - flush the old one
@@ -12,7 +17,7 @@
  */
 #define ptep_establish(__vma, __address, __ptep, __entry, __dirty)	\
 do {									\
-	set_pte(__ptep, __entry);					\
+	ptep_update_dirty_accessed(__ptep, __entry, __dirty);		\
 	flush_tlb_page(__vma, __address);				\
 } while (0)
 #endif
