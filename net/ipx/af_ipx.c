@@ -1695,7 +1695,7 @@ static int ipx_sendmsg(struct kiocb *iocb, struct socket *sock,
 	/* Socket gets bound below anyway */
 /*	if (sk->sk_zapped)
 		return -EIO; */	/* Socket not bound */
-	if (flags & ~MSG_DONTWAIT)
+	if (flags & ~(MSG_DONTWAIT|MSG_CMSG_COMPAT))
 		goto out;
 
 	/* Max possible packet size limited by 16 bit pktsize in header */
