@@ -557,8 +557,9 @@ CLEAN_FILES += \
 	drivers/scsi/aic7xxx/aicasm/y.tab.h \
 	drivers/scsi/aic7xxx/aicasm/aicasm \
 	drivers/scsi/53c700_d.h \
-	net/khttpd/make_times_h \
-	net/khttpd/times.h \
+	net/802/cl2llc.c net/802/transit/pdutr.h net/802/transit/timertr.h \
+	net/802/pseudo/pseudocode.h \
+	net/khttpd/make_times_h net/khttpd/times.h \
 	submenu*
 
 # 	files removed with 'make mrproper'

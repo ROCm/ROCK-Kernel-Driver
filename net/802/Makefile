@@ -18,5 +18,21 @@ obj-$(CONFIG_ATALK)	+= p8022.o psnap.o
 
 include $(TOPDIR)/Rules.make
 
-cl2llc.c: cl2llc.pre
-	sed -f ./pseudo/opcd2num.sed cl2llc.pre >cl2llc.c
+# Dependencies on generated files need to be listed explicitly
+
+cl2llc.o: transit/pdutr.h transit/timertr.h pseudo/pseudocode.h
+
+# Generated files
+
+transit/pdutr.h: transit/pdutr.pre transit/compile.awk			
+	awk -f transit/compile.awk $< >$@
+
+transit/timertr.h: transit/timertr.pre transit/compile.awk
+	awk -f transit/compile.awk $< >$@
+
+pseudo/pseudocode.h: pseudo/pseudocode pseudo/opcd2num.sed \
+		     pseudo/compile.awk
+	sed -f pseudo/opcd2num.sed $< | awk -f pseudo/compile.awk >$@
+
+cl2llc.c: cl2llc.pre pseudo/opcd2num.sed
+	sed -f pseudo/opcd2num.sed $< >$@
