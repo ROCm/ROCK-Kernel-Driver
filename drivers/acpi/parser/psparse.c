@@ -498,7 +498,7 @@ acpi_ps_parse_loop (
 		if (!op) {
 			/* Get the next opcode from the AML stream */
 
-			walk_state->aml_offset = ACPI_PTR_DIFF (parser_state->aml,
+			walk_state->aml_offset = (u32) ACPI_PTR_DIFF (parser_state->aml,
 					   parser_state->aml_start);
 			walk_state->opcode   = acpi_ps_peek_opcode (parser_state);
 
@@ -710,7 +710,7 @@ acpi_ps_parse_loop (
 
 				while (GET_CURRENT_ARG_TYPE (walk_state->arg_types) &&
 						!walk_state->arg_count) {
-					walk_state->aml_offset = ACPI_PTR_DIFF (parser_state->aml,
+					walk_state->aml_offset = (u32) ACPI_PTR_DIFF (parser_state->aml,
 							   parser_state->aml_start);
 					status = acpi_ps_get_next_arg (walk_state, parser_state,
 							 GET_CURRENT_ARG_TYPE (walk_state->arg_types), &arg);

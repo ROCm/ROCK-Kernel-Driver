@@ -223,29 +223,10 @@ acpi_ut_valid_internal_object (
 
 		return (TRUE);
 
-	case ACPI_DESC_TYPE_NAMED:
-
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
-			"**** Obj %p is a named obj, not ACPI obj\n", object));
-		break;
-
-	case ACPI_DESC_TYPE_PARSER:
-
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
-			"**** Obj %p is a parser obj, not ACPI obj\n", object));
-		break;
-
-	case ACPI_DESC_TYPE_CACHED:
-
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-			"**** Obj %p has already been released to internal cache\n", object));
-		break;
-
 	default:
-
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-			"**** Obj %p has unknown descriptor type %X\n", object,
-			ACPI_GET_DESCRIPTOR_TYPE (object)));
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+				"%p is not not an ACPI operand obj [%s]\n",
+				object, acpi_ut_get_descriptor_name (object)));
 		break;
 	}
 
@@ -322,7 +303,8 @@ acpi_ut_delete_object_desc (
 
 	if (ACPI_GET_DESCRIPTOR_TYPE (object) != ACPI_DESC_TYPE_OPERAND) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-			"Obj %p is not an ACPI object\n", object));
+				"%p is not an ACPI Operand object [%s]\n", object,
+				acpi_ut_get_descriptor_name (object)));
 		return_VOID;
 	}
 

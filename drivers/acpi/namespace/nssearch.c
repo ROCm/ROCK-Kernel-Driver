@@ -119,7 +119,7 @@ acpi_ns_search_node (
 			ACPI_DEBUG_PRINT ((ACPI_DB_NAMES,
 				"Name [%4.4s] (%s) %p found in scope [%4.4s] %p\n",
 				(char *) &target_name, acpi_ut_get_type_name (next_node->type),
-				next_node, node->name.ascii, node));
+				next_node, acpi_ut_get_node_name (node), node));
 
 			*return_node = next_node;
 			return_ACPI_STATUS (AE_OK);
@@ -145,7 +145,7 @@ acpi_ns_search_node (
 	ACPI_DEBUG_PRINT ((ACPI_DB_NAMES,
 		"Name [%4.4s] (%s) not found in search in scope [%4.4s] %p first child %p\n",
 		(char *) &target_name, acpi_ut_get_type_name (type),
-		node->name.ascii, node, node->child));
+		acpi_ut_get_node_name (node), node, node->child));
 
 	return_ACPI_STATUS (AE_NOT_FOUND);
 }

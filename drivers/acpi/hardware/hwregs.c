@@ -418,16 +418,14 @@ acpi_set_register (
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_IO, "PM2 control: Read %X from %8.8X%8.8X\n",
 			register_value,
-			ACPI_HIDWORD (acpi_gbl_FADT->xpm2_cnt_blk.address),
-			ACPI_LODWORD (acpi_gbl_FADT->xpm2_cnt_blk.address)));
+			ACPI_FORMAT_UINT64 (acpi_gbl_FADT->xpm2_cnt_blk.address)));
 
 		ACPI_REGISTER_INSERT_VALUE (register_value, bit_reg_info->bit_position,
 				bit_reg_info->access_bit_mask, value);
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_IO, "About to write %4.4X to %8.8X%8.8X\n",
 			register_value,
-			ACPI_HIDWORD (acpi_gbl_FADT->xpm2_cnt_blk.address),
-			ACPI_LODWORD (acpi_gbl_FADT->xpm2_cnt_blk.address)));
+			ACPI_FORMAT_UINT64 (acpi_gbl_FADT->xpm2_cnt_blk.address)));
 
 		status = acpi_hw_register_write (ACPI_MTX_DO_NOT_LOCK,
 				   ACPI_REGISTER_PM2_CONTROL, (u8) (register_value));
@@ -763,8 +761,7 @@ acpi_hw_low_level_read (
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_IO, "Read:  %8.8X width %2d from %8.8X%8.8X (%s)\n",
 			*value, width,
-			ACPI_HIDWORD (reg->address),
-			ACPI_LODWORD (reg->address),
+			ACPI_FORMAT_UINT64 (reg->address),
 			acpi_ut_get_region_name (reg->address_space_id)));
 
 	return (status);
@@ -850,8 +847,7 @@ acpi_hw_low_level_write (
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_IO, "Wrote: %8.8X width %2d   to %8.8X%8.8X (%s)\n",
 			value, width,
-			ACPI_HIDWORD (reg->address),
-			ACPI_LODWORD (reg->address),
+			ACPI_FORMAT_UINT64 (reg->address),
 			acpi_ut_get_region_name (reg->address_space_id)));
 
 	return (status);

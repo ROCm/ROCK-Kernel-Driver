@@ -101,14 +101,13 @@ acpi_ex_opcode_3A_0T_0R (
 
 
 	switch (walk_state->opcode) {
-
 	case AML_FATAL_OP:          /* Fatal (fatal_type fatal_code fatal_arg)   */
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
 			"fatal_op: Type %X Code %X Arg %X <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n",
-			(u32) operand[0]->integer.value, (u32) operand[1]->integer.value,
+			(u32) operand[0]->integer.value,
+			(u32) operand[1]->integer.value,
 			(u32) operand[2]->integer.value));
-
 
 		fatal = ACPI_MEM_ALLOCATE (sizeof (struct acpi_signal_fatal_info));
 		if (fatal) {

@@ -899,24 +899,19 @@ acpi_rs_dump_address64 (
 			 "" : "not ");
 
 	acpi_os_printf ("  Granularity: %8.8X%8.8X\n",
-			 ACPI_HIDWORD (address64_data->granularity),
-			 ACPI_LODWORD (address64_data->granularity));
+			 ACPI_FORMAT_UINT64 (address64_data->granularity));
 
 	acpi_os_printf ("  Address range min: %8.8X%8.8X\n",
-			 ACPI_HIDWORD (address64_data->min_address_range),
-			 ACPI_HIDWORD (address64_data->min_address_range));
+			 ACPI_FORMAT_UINT64 (address64_data->min_address_range));
 
 	acpi_os_printf ("  Address range max: %8.8X%8.8X\n",
-			 ACPI_HIDWORD (address64_data->max_address_range),
-			 ACPI_HIDWORD (address64_data->max_address_range));
+			 ACPI_FORMAT_UINT64 (address64_data->max_address_range));
 
 	acpi_os_printf ("  Address translation offset: %8.8X%8.8X\n",
-			 ACPI_HIDWORD (address64_data->address_translation_offset),
-			 ACPI_HIDWORD (address64_data->address_translation_offset));
+			 ACPI_FORMAT_UINT64 (address64_data->address_translation_offset));
 
 	acpi_os_printf ("  Address Length: %8.8X%8.8X\n",
-			 ACPI_HIDWORD (address64_data->address_length),
-			 ACPI_HIDWORD (address64_data->address_length));
+			 ACPI_FORMAT_UINT64 (address64_data->address_length));
 
 	if(0xFF != address64_data->resource_source.index) {
 		acpi_os_printf ("  Resource Source Index: %X\n",
@@ -1126,8 +1121,7 @@ acpi_rs_dump_irq_list (
 			acpi_os_printf ("PCI IRQ Routing Table structure %X.\n", count++);
 
 			acpi_os_printf ("  Address: %8.8X%8.8X\n",
-					 ACPI_HIDWORD (prt_element->address),
-					 ACPI_LODWORD (prt_element->address));
+					 ACPI_FORMAT_UINT64 (prt_element->address));
 
 			acpi_os_printf ("  Pin: %X\n", prt_element->pin);
 

@@ -349,6 +349,8 @@ acpi_ex_resolve_multiple (
 			/* All "References" point to a NS node */
 
 			if (ACPI_GET_DESCRIPTOR_TYPE (node) != ACPI_DESC_TYPE_NAMED) {
+				ACPI_REPORT_ERROR (("acpi_ex_resolve_multiple: Not a NS node %p [%s]\n",
+						node, acpi_ut_get_descriptor_name (node)));
 				return_ACPI_STATUS (AE_AML_INTERNAL);
 			}
 
@@ -399,7 +401,9 @@ acpi_ex_resolve_multiple (
 			/* All "References" point to a NS node */
 
 			if (ACPI_GET_DESCRIPTOR_TYPE (node) != ACPI_DESC_TYPE_NAMED) {
-				return_ACPI_STATUS (AE_AML_INTERNAL);
+				ACPI_REPORT_ERROR (("acpi_ex_resolve_multiple: Not a NS node %p [%s]\n",
+						node, acpi_ut_get_descriptor_name (node)));
+			   return_ACPI_STATUS (AE_AML_INTERNAL);
 			}
 
 			/* Get the attached object */

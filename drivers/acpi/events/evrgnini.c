@@ -239,7 +239,7 @@ acpi_ev_pci_config_region_setup (
 						else {
 							ACPI_REPORT_ERROR ((
 								"Could not install pci_config handler for Root Bridge %4.4s, %s\n",
-								pci_root_node->name.ascii, acpi_format_exception (status)));
+								acpi_ut_get_node_name (pci_root_node), acpi_format_exception (status)));
 						}
 					}
 					break;

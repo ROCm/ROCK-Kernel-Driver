@@ -902,71 +902,30 @@ acpi_ut_dump_allocations (
 
 			descriptor = ACPI_CAST_PTR (union acpi_descriptor, &element->user_space);
 			if (descriptor->descriptor_id != ACPI_DESC_TYPE_CACHED) {
-				acpi_os_printf ("%p Len %04X %9.9s-%d ",
+				acpi_os_printf ("%p Len %04X %9.9s-%d [%s] ",
 						 descriptor, element->size, element->module,
-						 element->line);
+						 element->line, acpi_ut_get_descriptor_name (descriptor));
 
-				/* Most of the elements will be internal objects. */
+				/* Most of the elements will be Operand objects. */
 
 				switch (ACPI_GET_DESCRIPTOR_TYPE (descriptor)) {
 				case ACPI_DESC_TYPE_OPERAND:
-					acpi_os_printf ("obj_type %12.12s R%hd",
+					acpi_os_printf ("%12.12s R%hd",
 							acpi_ut_get_type_name (descriptor->object.common.type),
 							descriptor->object.common.reference_count);
 					break;
 
 				case ACPI_DESC_TYPE_PARSER:
-					acpi_os_printf ("parse_obj aml_opcode %04hX",
+					acpi_os_printf ("aml_opcode %04hX",
 							descriptor->op.asl.aml_opcode);
 					break;
 
 				case ACPI_DESC_TYPE_NAMED:
-					acpi_os_printf ("Node %4.4s",
-							descriptor->node.name.ascii);
-					break;
-
-				case ACPI_DESC_TYPE_STATE:
-					acpi_os_printf ("Untyped state_obj");
-					break;
-
-				case ACPI_DESC_TYPE_STATE_UPDATE:
-					acpi_os_printf ("UPDATE state_obj");
-					break;
-
-				case ACPI_DESC_TYPE_STATE_PACKAGE:
-					acpi_os_printf ("PACKAGE state_obj");
-					break;
-
-				case ACPI_DESC_TYPE_STATE_CONTROL:
-					acpi_os_printf ("CONTROL state_obj");
-					break;
-
-				case ACPI_DESC_TYPE_STATE_RPSCOPE:
-					acpi_os_printf ("ROOT-PARSE-SCOPE state_obj");
-					break;
-
-				case ACPI_DESC_TYPE_STATE_PSCOPE:
-					acpi_os_printf ("PARSE-SCOPE state_obj");
-					break;
-
-				case ACPI_DESC_TYPE_STATE_WSCOPE:
-					acpi_os_printf ("WALK-SCOPE state_obj");
-					break;
-
-				case ACPI_DESC_TYPE_STATE_RESULT:
-					acpi_os_printf ("RESULT state_obj");
-					break;
-
-				case ACPI_DESC_TYPE_STATE_NOTIFY:
-					acpi_os_printf ("NOTIFY state_obj");
-					break;
-
-				case ACPI_DESC_TYPE_STATE_THREAD:
-					acpi_os_printf ("THREAD state_obj");
+					acpi_os_printf ("%4.4s",
+							acpi_ut_get_node_name (&descriptor->node));
 					break;
 
 				default:
-					/* All types should appear above */
 					break;
 				}
 

@@ -91,7 +91,7 @@ acpi_ut_evaluate_object (
 	if (ACPI_FAILURE (status)) {
 		if (status == AE_NOT_FOUND) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[%4.4s.%s] was not found\n",
-				prefix_node->name.ascii, path));
+				acpi_ut_get_node_name (prefix_node), path));
 		}
 		else {
 			ACPI_REPORT_METHOD_ERROR ("Method execution failed",
@@ -544,7 +544,7 @@ acpi_ut_execute_STA (
 		if (AE_NOT_FOUND == status) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
 				"_STA on %4.4s was not found, assuming device is present\n",
-				device_node->name.ascii));
+				acpi_ut_get_node_name (device_node)));
 
 			*flags = 0x0F;
 			status = AE_OK;

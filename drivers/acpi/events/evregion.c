@@ -321,7 +321,7 @@ acpi_ev_address_space_dispatch (
 	ACPI_DEBUG_PRINT ((ACPI_DB_OPREGION,
 		"Handler %p (@%p) Address %8.8X%8.8X [%s]\n",
 		&region_obj->region.address_space->address_space, handler,
-		ACPI_HIDWORD (address), ACPI_LODWORD (address),
+		ACPI_FORMAT_UINT64 (address),
 		acpi_ut_get_region_name (region_obj->region.space_id)));
 
 	if (!(handler_desc->address_space.flags & ACPI_ADDR_HANDLER_DEFAULT_INSTALLED)) {

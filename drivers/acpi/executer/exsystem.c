@@ -111,11 +111,16 @@ acpi_ex_system_wait_semaphore (
  *
  * FUNCTION:    acpi_ex_system_do_stall
  *
- * PARAMETERS:  how_long            - The amount of time to stall
+ * PARAMETERS:  how_long            - The amount of time to stall,
+ *                                    in microseconds
  *
  * RETURN:      Status
  *
  * DESCRIPTION: Suspend running thread for specified amount of time.
+ *              Note: ACPI specification requires that Stall() does not
+ *              relinquish the processor, and delays longer than 100 usec
+ *              should use Sleep() instead.  We allow stalls up to 255 usec
+ *              for compatibility with other interpreters and existing BIOSs.
  *
  ******************************************************************************/
 
@@ -129,12 +134,15 @@ acpi_ex_system_do_stall (
 	ACPI_FUNCTION_ENTRY ();
 
 
-	if (how_long > 100) /* 100 microseconds */ {
+	if (how_long > 255) /* 255 microseconds */ {
 		/*
-		 * Longer than 100 usec, use sleep instead
-		 * (according to ACPI specification)
+		 * Longer than 255 usec, this is an error
+		 *
+		 * (ACPI specifies 100 usec as max, but this gives some slack in
+		 * order to support existing BIOSs)
 		 */
-		status = acpi_ex_system_do_suspend ((how_long / 1000) + 1);
+		ACPI_REPORT_ERROR (("Stall: Time parameter is too large (%d)\n", how_long));
+		status = AE_AML_OPERAND_VALUE;
 	}
 	else {
 		acpi_os_stall (how_long);
@@ -148,7 +156,8 @@ acpi_ex_system_do_stall (
  *
  * FUNCTION:    acpi_ex_system_do_suspend
  *
- * PARAMETERS:  how_long            - The amount of time to suspend
+ * PARAMETERS:  how_long            - The amount of time to suspend,
+ *                                    in milliseconds
  *
  * RETURN:      None
  *

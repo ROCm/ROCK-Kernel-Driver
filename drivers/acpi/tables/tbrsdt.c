@@ -278,8 +278,7 @@ acpi_tb_get_table_rsdt (
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
 		"RSDP located at %p, points to RSDT physical=%8.8X%8.8X \n",
 		acpi_gbl_RSDP,
-		ACPI_HIDWORD (address.pointer.value),
-		ACPI_LODWORD (address.pointer.value)));
+		ACPI_FORMAT_UINT64 (address.pointer.value)));
 
 	/* Check the RSDT or XSDT signature */
 

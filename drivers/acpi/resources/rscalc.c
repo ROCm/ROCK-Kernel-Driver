@@ -696,7 +696,7 @@ acpi_rs_get_list_length (
 		default:
 			/*
 			 * If we get here, everything is out of sync,
-			 *  so exit with an error
+			 * exit with an error
 			 */
 			return_ACPI_STATUS (AE_AML_INVALID_RESOURCE_TYPE);
 		}
@@ -704,7 +704,7 @@ acpi_rs_get_list_length (
 		/*
 		 * Update the return value and counter
 		 */
-		buffer_size += ACPI_ALIGN_RESOURCE_SIZE(structure_size);
+		buffer_size += (u32) ACPI_ALIGN_RESOURCE_SIZE (structure_size);
 		bytes_parsed += bytes_consumed;
 
 		/*

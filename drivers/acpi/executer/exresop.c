@@ -247,8 +247,8 @@ acpi_ex_resolve_operands (
 			/* Invalid descriptor */
 
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-				"Bad descriptor type %X in Obj %p\n",
-				ACPI_GET_DESCRIPTOR_TYPE (obj_desc), obj_desc));
+					"Invalid descriptor %p [%s]\n",
+					obj_desc, acpi_ut_get_descriptor_name (obj_desc)));
 
 			return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
 		}

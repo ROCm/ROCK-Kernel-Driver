@@ -161,7 +161,7 @@ acpi_ex_system_memory_space_handler (
 				  (void **) &mem_info->mapped_logical_address);
 		if (ACPI_FAILURE (status)) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not map memory at %8.8X%8.8X, size %X\n",
-				ACPI_HIDWORD (address), ACPI_LODWORD (address), (u32) window_size));
+					ACPI_FORMAT_UINT64 (address), (u32) window_size));
 			mem_info->mapped_length = 0;
 			return_ACPI_STATUS (status);
 		}
@@ -180,8 +180,8 @@ acpi_ex_system_memory_space_handler (
 			  ((acpi_integer) address - (acpi_integer) mem_info->mapped_physical_address);
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
-		"system_memory %d (%d width) Address=%8.8X%8.8X\n", function, bit_width,
-		ACPI_HIDWORD (address), ACPI_LODWORD (address)));
+			"system_memory %d (%d width) Address=%8.8X%8.8X\n", function, bit_width,
+			ACPI_FORMAT_UINT64 (address)));
 
    /*
 	* Perform the memory read or write
@@ -290,8 +290,8 @@ acpi_ex_system_io_space_handler (
 
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
-		"system_iO %d (%d width) Address=%8.8X%8.8X\n", function, bit_width,
-		ACPI_HIDWORD (address), ACPI_LODWORD (address)));
+			"system_iO %d (%d width) Address=%8.8X%8.8X\n", function, bit_width,
+			ACPI_FORMAT_UINT64 (address)));
 
 	/* Decode the function parameter */
 

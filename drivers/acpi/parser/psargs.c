@@ -490,7 +490,7 @@ union acpi_parse_object *
 acpi_ps_get_next_field (
 	struct acpi_parse_state         *parser_state)
 {
-	u32                             aml_offset = ACPI_PTR_DIFF (parser_state->aml,
+	u32                             aml_offset = (u32) ACPI_PTR_DIFF (parser_state->aml,
 			 parser_state->aml_start);
 	union acpi_parse_object         *field;
 	u16                             opcode;
@@ -677,7 +677,7 @@ acpi_ps_get_next_arg (
 
 			/* Fill in bytelist data */
 
-			arg->common.value.size = ACPI_PTR_DIFF (parser_state->pkg_end,
+			arg->common.value.size = (u32) ACPI_PTR_DIFF (parser_state->pkg_end,
 					  parser_state->aml);
 			arg->named.data = parser_state->aml;
 

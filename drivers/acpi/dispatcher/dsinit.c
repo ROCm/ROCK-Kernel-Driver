@@ -106,7 +106,7 @@ acpi_ds_init_one_object (
 		status = acpi_ds_initialize_region (obj_handle);
 		if (ACPI_FAILURE (status)) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Region %p [%4.4s] - Init failure, %s\n",
-				obj_handle, ((struct acpi_namespace_node *) obj_handle)->name.ascii,
+				obj_handle, acpi_ut_get_node_name (obj_handle),
 				acpi_format_exception (status)));
 		}
 
@@ -141,7 +141,7 @@ acpi_ds_init_one_object (
 		status = acpi_ds_parse_method (obj_handle);
 		if (ACPI_FAILURE (status)) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Method %p [%4.4s] - parse failure, %s\n",
-				obj_handle, ((struct acpi_namespace_node *) obj_handle)->name.ascii,
+				obj_handle, acpi_ut_get_node_name (obj_handle),
 				acpi_format_exception (status)));
 
 			/* This parse failed, but we will continue parsing more methods */

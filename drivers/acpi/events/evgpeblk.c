@@ -743,8 +743,7 @@ acpi_ev_create_gpe_block (
 				((gpe_block->register_count * ACPI_GPE_REGISTER_WIDTH) -1)),
 		gpe_device->name.ascii,
 		gpe_block->register_count,
-		ACPI_HIDWORD (gpe_block->block_address.address),
-		ACPI_LODWORD (gpe_block->block_address.address),
+		ACPI_FORMAT_UINT64 (gpe_block->block_address.address),
 		interrupt_level));
 
 	/* Find all GPE methods (_Lxx, _Exx) for this block */

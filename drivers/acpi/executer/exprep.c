@@ -351,7 +351,7 @@ acpi_ex_prep_common_field_object (
 	 */
 	nearest_byte_address =
 			ACPI_ROUND_BITS_DOWN_TO_BYTES (field_bit_position);
-	obj_desc->common_field.base_byte_offset =
+	obj_desc->common_field.base_byte_offset = (u32)
 			ACPI_ROUND_DOWN (nearest_byte_address, byte_alignment);
 
 	/*
@@ -539,7 +539,7 @@ acpi_ex_prep_field_value (
 			  acpi_ns_get_type (info->field_node));
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD, "Set named_obj %p [%4.4s], obj_desc %p\n",
-			info->field_node, info->field_node->name.ascii, obj_desc));
+			info->field_node, acpi_ut_get_node_name (info->field_node), obj_desc));
 
 	/* Remove local reference to the object */
 

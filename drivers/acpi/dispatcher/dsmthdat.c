@@ -624,8 +624,8 @@ acpi_ds_store_object_to_local (
 			 * operand objects of type Reference.
 			 */
 			if (ACPI_GET_DESCRIPTOR_TYPE (current_obj_desc) != ACPI_DESC_TYPE_OPERAND) {
-				ACPI_REPORT_ERROR (("Invalid descriptor type while storing to method arg: %X\n",
-					current_obj_desc->common.type));
+				ACPI_REPORT_ERROR (("Invalid descriptor type while storing to method arg: [%s]\n",
+						acpi_ut_get_descriptor_name (current_obj_desc)));
 				return_ACPI_STATUS (AE_AML_INTERNAL);
 			}
 
@@ -636,8 +636,8 @@ acpi_ds_store_object_to_local (
 			if ((current_obj_desc->common.type == ACPI_TYPE_LOCAL_REFERENCE) &&
 				(current_obj_desc->reference.opcode == AML_REF_OF_OP)) {
 				ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
-					"Arg (%p) is an obj_ref(Node), storing in node %p\n",
-					obj_desc, current_obj_desc));
+						"Arg (%p) is an obj_ref(Node), storing in node %p\n",
+						obj_desc, current_obj_desc));
 
 				/*
 				 * Store this object to the Node

@@ -190,8 +190,7 @@ acpi_ex_store (
 		case ACPI_TYPE_INTEGER:
 
 			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DEBUG_OBJECT, "%8.8X%8.8X\n",
-					ACPI_HIDWORD (source_desc->integer.value),
-					ACPI_LODWORD (source_desc->integer.value)));
+					ACPI_FORMAT_UINT64 (source_desc->integer.value)));
 			break;
 
 

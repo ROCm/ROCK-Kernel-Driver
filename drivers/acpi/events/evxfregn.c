@@ -240,7 +240,8 @@ acpi_install_address_space_handler (
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_OPREGION,
 		"Installing address handler for region %s(%X) on Device %4.4s %p(%p)\n",
-		acpi_ut_get_region_name (space_id), space_id, node->name.ascii, node, obj_desc));
+		acpi_ut_get_region_name (space_id), space_id,
+		acpi_ut_get_node_name (node), node, obj_desc));
 
 	/*
 	 * Install the handler

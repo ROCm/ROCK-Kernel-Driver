@@ -144,10 +144,17 @@ acpi_ns_initialize_devices (
 
 	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INIT, "Executing all Device _STA and_INI methods:"));
 
-	/* Walk namespace for all objects of type Device */
+	status = acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
 
-	status = acpi_ns_walk_namespace (ACPI_TYPE_DEVICE, ACPI_ROOT_OBJECT,
-			  ACPI_UINT32_MAX, FALSE, acpi_ns_init_one_device, &info, NULL);
+	/* Walk namespace for all objects of type Device or Processor */
+
+	status = acpi_ns_walk_namespace (ACPI_TYPE_ANY, ACPI_ROOT_OBJECT,
+			  ACPI_UINT32_MAX, TRUE, acpi_ns_init_one_device, &info, NULL);
+
+	(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 
 	if (ACPI_FAILURE (status)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "walk_namespace failed! %s\n",
@@ -290,7 +297,8 @@ acpi_ns_init_one_object (
 		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_ERROR, "\n"));
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 				"Could not execute arguments for [%4.4s] (%s), %s\n",
-				node->name.ascii, acpi_ut_get_type_name (type), acpi_format_exception (status)));
+				acpi_ut_get_node_name (node), acpi_ut_get_type_name (type),
+				acpi_format_exception (status)));
 	}
 
 	/* Print a dot for each object unless we are going to print the entire pathname */
@@ -338,45 +346,48 @@ acpi_ns_init_one_device (
 	ACPI_FUNCTION_TRACE ("ns_init_one_device");
 
 
+	node = acpi_ns_map_handle_to_node (obj_handle);
+	if (!node) {
+		return_ACPI_STATUS (AE_BAD_PARAMETER);
+	}
+
+	/*
+	 * We will run _STA/_INI on Devices and Processors only
+	 */
+	if ((node->type != ACPI_TYPE_DEVICE) &&
+		(node->type != ACPI_TYPE_PROCESSOR)) {
+		return_ACPI_STATUS (AE_OK);
+	}
+
 	if ((acpi_dbg_level <= ACPI_LV_ALL_EXCEPTIONS) && (!(acpi_dbg_level & ACPI_LV_INFO))) {
 		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INIT, "."));
 	}
 
 	info->device_count++;
 
-	status = acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
-	}
-
-	node = acpi_ns_map_handle_to_node (obj_handle);
-	if (!node) {
-		(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
-		return_ACPI_STATUS (AE_BAD_PARAMETER);
-	}
-
-	status = acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
-	}
-
 	/*
 	 * Run _STA to determine if we can run _INI on the device.
 	 */
 	ACPI_DEBUG_EXEC (acpi_ut_display_init_pathname (ACPI_TYPE_METHOD, node, "_STA"));
 	status = acpi_ut_execute_STA (node, &flags);
+
 	if (ACPI_FAILURE (status)) {
-		/* Ignore error and move on to next device */
+		if (node->type == ACPI_TYPE_DEVICE) {
+			/* Ignore error and move on to next device */
 
-		return_ACPI_STATUS (AE_OK);
+			return_ACPI_STATUS (AE_OK);
+		}
+
+		/* _STA is not required for Processor objects */
 	}
+	else {
+		info->num_STA++;
 
-	info->num_STA++;
+		if (!(flags & 0x01)) {
+			/* Don't look at children of a not present device */
 
-	if (!(flags & 0x01)) {
-		/* don't look at children of a not present device */
-
-		return_ACPI_STATUS(AE_CTRL_DEPTH);
+			return_ACPI_STATUS(AE_CTRL_DEPTH);
+		}
 	}
 
 	/*

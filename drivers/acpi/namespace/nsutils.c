@@ -977,8 +977,8 @@ acpi_ns_find_parent_name (
 		parent_node = acpi_ns_get_parent_node (child_node);
 		if (parent_node) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Parent of %p [%4.4s] is %p [%4.4s]\n",
-				child_node, child_node->name.ascii,
-				parent_node, parent_node->name.ascii));
+				child_node, acpi_ut_get_node_name (child_node),
+				parent_node, acpi_ut_get_node_name (parent_node)));
 
 			if (parent_node->name.integer) {
 				return_VALUE ((acpi_name) parent_node->name.integer);
@@ -986,7 +986,7 @@ acpi_ns_find_parent_name (
 		}
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "unable to find parent of %p (%4.4s)\n",
-			child_node, child_node->name.ascii));
+			child_node, acpi_ut_get_node_name (child_node)));
 	}
 
 	return_VALUE (ACPI_UNKNOWN_NAME);

@@ -121,8 +121,8 @@ acpi_ex_get_object_reference (
 
 	default:
 
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Invalid descriptor type %X in %p\n",
-			ACPI_GET_DESCRIPTOR_TYPE (obj_desc), obj_desc));
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "%p has invalid descriptor [%s]\n",
+				obj_desc, acpi_ut_get_descriptor_name (obj_desc)));
 		return_ACPI_STATUS (AE_TYPE);
 	}
 
@@ -139,7 +139,7 @@ acpi_ex_get_object_reference (
 	*return_desc = reference_obj;
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Object %p Type [%s], returning Reference %p\n",
-		obj_desc, acpi_ut_get_object_type_name (obj_desc), *return_desc));
+			obj_desc, acpi_ut_get_object_type_name (obj_desc), *return_desc));
 
 	return_ACPI_STATUS (AE_OK);
 }

@@ -94,7 +94,7 @@ acpi_ds_parse_method (
 	}
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "**** Parsing [%4.4s] **** named_obj=%p\n",
-		((struct acpi_namespace_node *) obj_handle)->name.ascii, obj_handle));
+		acpi_ut_get_node_name (obj_handle), obj_handle));
 
 	/* Extract the method object from the method Node */
 
@@ -169,7 +169,7 @@ acpi_ds_parse_method (
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_PARSE,
 		"**** [%4.4s] Parsed **** named_obj=%p Op=%p\n",
-		((struct acpi_namespace_node *) obj_handle)->name.ascii, obj_handle, op));
+		acpi_ut_get_node_name (obj_handle), obj_handle, op));
 
 	acpi_ps_delete_parse_tree (op);
 	return_ACPI_STATUS (status);

@@ -416,10 +416,24 @@ acpi_ds_exec_end_op (
 			status = acpi_gbl_op_type_dispatch [op_type] (walk_state);
 		}
 		else {
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-				"[%s]: Could not resolve operands, %s\n",
-				acpi_ps_get_opcode_name (walk_state->opcode),
-				acpi_format_exception (status)));
+			/*
+			 * Treat constructs of the form "Store(local_x,local_x)" as noops when the
+			 * Local is uninitialized.
+			 */
+			if  ((status == AE_AML_UNINITIALIZED_LOCAL) &&
+				(walk_state->opcode == AML_STORE_OP) &&
+				(walk_state->operands[0]->common.type == ACPI_TYPE_LOCAL_REFERENCE) &&
+				(walk_state->operands[1]->common.type == ACPI_TYPE_LOCAL_REFERENCE) &&
+				(walk_state->operands[0]->reference.opcode ==
+				 walk_state->operands[1]->reference.opcode)) {
+				status = AE_OK;
+			}
+			else {
+				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+					"[%s]: Could not resolve operands, %s\n",
+					acpi_ps_get_opcode_name (walk_state->opcode),
+					acpi_format_exception (status)));
+			}
 		}
 
 		/* Always delete the argument objects and clear the operand stack */

@@ -314,8 +314,8 @@ acpi_ns_lookup (
 	else {
 		prefix_node = scope_info->scope.node;
 		if (ACPI_GET_DESCRIPTOR_TYPE (prefix_node) != ACPI_DESC_TYPE_NAMED) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "[%p] Not a namespace node\n",
-				prefix_node));
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "%p Not a namespace node [%s]\n",
+					prefix_node, acpi_ut_get_descriptor_name (prefix_node)));
 			return_ACPI_STATUS (AE_AML_INTERNAL);
 		}
 
@@ -379,7 +379,7 @@ acpi_ns_lookup (
 
 			ACPI_DEBUG_PRINT ((ACPI_DB_NAMES,
 				"Searching relative to prefix scope [%4.4s] (%p)\n",
-				prefix_node->name.ascii, prefix_node));
+				acpi_ut_get_node_name (prefix_node), prefix_node));
 
 			/*
 			 * Handle multiple Parent Prefixes (carat) by just getting
@@ -413,7 +413,7 @@ acpi_ns_lookup (
 			if (search_parent_flag == ACPI_NS_NO_UPSEARCH) {
 				ACPI_DEBUG_PRINT ((ACPI_DB_NAMES,
 					"Search scope is [%4.4s], path has %d carat(s)\n",
-					this_node->name.ascii, num_carats));
+					acpi_ut_get_node_name (this_node), num_carats));
 			}
 		}
 

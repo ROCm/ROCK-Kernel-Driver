@@ -93,7 +93,7 @@ acpi_ns_dump_one_device (
 
 		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, "    HID: %s, ADR: %8.8X%8.8X, Status: %X\n",
 				  info->hardware_id.value,
-				  ACPI_HIDWORD (info->address), ACPI_LODWORD (info->address),
+				  ACPI_FORMAT_UINT64 (info->address),
 				  info->current_status));
 		ACPI_MEM_FREE (info);
 	}

@@ -351,8 +351,7 @@ acpi_ex_opcode_1A_1T_1R (
 
 			if (digit > 0) {
 				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Integer too large to convert to BCD: %8.8X%8.8X\n",
-					ACPI_HIDWORD(operand[0]->integer.value),
-					ACPI_LODWORD(operand[0]->integer.value)));
+						ACPI_FORMAT_UINT64 (operand[0]->integer.value)));
 				status = AE_AML_NUMERIC_OVERFLOW;
 				goto cleanup;
 			}

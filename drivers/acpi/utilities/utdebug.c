@@ -447,7 +447,7 @@ acpi_ut_value_exit (
 
 	acpi_ut_debug_print (ACPI_LV_FUNCTIONS, line_number, dbg_info,
 			"%s %8.8X%8.8X\n", acpi_gbl_fn_exit_str,
-			ACPI_HIDWORD (value), ACPI_LODWORD (value));
+			ACPI_FORMAT_UINT64 (value));
 
 	acpi_gbl_nesting_level--;
 }
