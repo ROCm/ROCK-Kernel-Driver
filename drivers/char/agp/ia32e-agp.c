@@ -447,7 +447,7 @@ static struct aper_size_info_8 intel_8xx_sizes[7] =
 	{4, 1024, 0, 63}
 };
 
-struct agp_bridge_driver intel_830_driver = {
+static struct agp_bridge_driver intel_830_driver = {
 	.owner			= THIS_MODULE,
 	.aperture_sizes		= intel_i830_sizes,
 	.size_type		= FIXED_APER_SIZE,
@@ -471,7 +471,7 @@ struct agp_bridge_driver intel_830_driver = {
 	.agp_destroy_page	= agp_generic_destroy_page,
 };
 
-struct agp_bridge_driver intel_845_driver = {
+static struct agp_bridge_driver intel_845_driver = {
 	.owner			= THIS_MODULE,
 	.aperture_sizes		= intel_8xx_sizes,
 	.size_type		= U8_APER_SIZE,
@@ -495,7 +495,7 @@ struct agp_bridge_driver intel_845_driver = {
 };
 
 
-struct agp_bridge_driver intel_860_driver = {
+static struct agp_bridge_driver intel_860_driver = {
 	.owner			= THIS_MODULE,
 	.aperture_sizes		= intel_8xx_sizes,
 	.size_type		= U8_APER_SIZE,
