@@ -17,16 +17,16 @@
 extern unsigned long __bad_size_for_ia64_fetch_and_add (void);
 extern unsigned long __bad_increment_for_ia64_fetch_and_add (void);
 
-#define IA64_FETCHADD(tmp,v,n,sz)						\
+#define IA64_FETCHADD(tmp,v,n,sz,sem)						\
 ({										\
 	switch (sz) {								\
 	      case 4:								\
-		__asm__ __volatile__ ("fetchadd4.rel %0=[%1],%2"		\
+		__asm__ __volatile__ ("fetchadd4."sem" %0=[%1],%2"		\
 				      : "=r"(tmp) : "r"(v), "i"(n) : "memory");	\
 		break;								\
 										\
 	      case 8:								\
-		__asm__ __volatile__ ("fetchadd8.rel %0=[%1],%2"		\
+		__asm__ __volatile__ ("fetchadd8."sem" %0=[%1],%2"		\
 				      : "=r"(tmp) : "r"(v), "i"(n) : "memory");	\
 		break;								\
 										\
@@ -35,31 +35,33 @@ extern unsigned long __bad_increment_for_ia64_fetch_and_add (void);
 	}									\
 })
 
-#define ia64_fetch_and_add(i,v)								\
+#define ia64_fetchadd(i,v,sem)								\
 ({											\
 	__u64 _tmp;									\
 	volatile __typeof__(*(v)) *_v = (v);						\
 	/* Can't use a switch () here: gcc isn't always smart enough for that... */	\
 	if ((i) == -16)									\
-		IA64_FETCHADD(_tmp, _v, -16, sizeof(*(v)));				\
+		IA64_FETCHADD(_tmp, _v, -16, sizeof(*(v)), sem);			\
 	else if ((i) == -8)								\
-		IA64_FETCHADD(_tmp, _v, -8, sizeof(*(v)));				\
+		IA64_FETCHADD(_tmp, _v, -8, sizeof(*(v)), sem);				\
 	else if ((i) == -4)								\
-		IA64_FETCHADD(_tmp, _v, -4, sizeof(*(v)));				\
+		IA64_FETCHADD(_tmp, _v, -4, sizeof(*(v)), sem);				\
 	else if ((i) == -1)								\
-		IA64_FETCHADD(_tmp, _v, -1, sizeof(*(v)));				\
+		IA64_FETCHADD(_tmp, _v, -1, sizeof(*(v)), sem);				\
 	else if ((i) == 1)								\
-		IA64_FETCHADD(_tmp, _v, 1, sizeof(*(v)));				\
+		IA64_FETCHADD(_tmp, _v, 1, sizeof(*(v)), sem);				\
 	else if ((i) == 4)								\
-		IA64_FETCHADD(_tmp, _v, 4, sizeof(*(v)));				\
+		IA64_FETCHADD(_tmp, _v, 4, sizeof(*(v)), sem);				\
 	else if ((i) == 8)								\
-		IA64_FETCHADD(_tmp, _v, 8, sizeof(*(v)));				\
+		IA64_FETCHADD(_tmp, _v, 8, sizeof(*(v)), sem);				\
 	else if ((i) == 16)								\
-		IA64_FETCHADD(_tmp, _v, 16, sizeof(*(v)));				\
+		IA64_FETCHADD(_tmp, _v, 16, sizeof(*(v)), sem);				\
 	else										\
 		_tmp = __bad_increment_for_ia64_fetch_and_add();			\
-	(__typeof__(*(v))) (_tmp + (i));	/* return new value */			\
+	(__typeof__(*(v))) (_tmp);	/* return old value */				\
 })
+
+#define ia64_fetch_and_add(i,v)	(ia64_fetchadd(i, v, "rel") + (i)) /* return new value */
 
 /*
  * This function doesn't exist, so you'll get a linker error if

@@ -72,43 +72,31 @@ do {											\
 #define spin_unlock_wait(x)	do { barrier(); } while ((x)->lock)
 
 typedef struct {
-	volatile int read_counter:31;
-	volatile int write_lock:1;
+	volatile int read_counter	: 31;
+	volatile int write_lock		:  1;
 } rwlock_t;
 #define RW_LOCK_UNLOCKED (rwlock_t) { 0, 0 }
 
 #define rwlock_init(x)		do { *(x) = RW_LOCK_UNLOCKED; } while(0)
 #define rwlock_is_locked(x)	(*(volatile int *) (x) != 0)
 
-#define _raw_read_lock(rw)							\
-do {										\
-	int __read_lock_tmp = 0;						\
-	__asm__ __volatile__ ("1:\tfetchadd4.acq %0 = [%1], 1\n"		\
-			      ";;\n"						\
-			      "tbit.nz p6,p0 = %0, 31\n"			\
-			      "(p6) br.cond.sptk.few 2f\n"			\
-			      ".section .text.lock,\"ax\"\n"			\
-			      "2:\tfetchadd4.rel %0 = [%1], -1\n"		\
-			      ";;\n"						\
-			      "3:\tld4.acq %0 = [%1]\n"				\
-			      ";;\n"						\
-			      "tbit.nz p6,p0 = %0, 31\n"			\
-			      "(p6) br.cond.sptk.few 3b\n"			\
-			      "br.cond.sptk.few 1b\n"				\
-			      ";;\n"						\
-			      ".previous\n"					\
-			      : "=&r" (__read_lock_tmp)				\
-			      : "r" (rw) : "p6", "memory");			\
-} while(0)
+#define _raw_read_lock(rw)								\
+do {											\
+	rwlock_t *__read_lock_ptr = (rw);						\
+											\
+	while (unlikely(ia64_fetchadd(1, (int *) __read_lock_ptr, "acq") < 0)) {	\
+		ia64_fetchadd(-1, (int *) __read_lock_ptr, "rel");			\
+		while (*(volatile int *)__read_lock_ptr < 0)				\
+			barrier();							\
+											\
+	}										\
+} while (0)
 
-#define _raw_read_unlock(rw)							\
-do {										\
-	int __read_unlock_tmp = 0;						\
-	__asm__ __volatile__ ("fetchadd4.rel %0 = [%1], -1\n"			\
-			      : "=r" (__read_unlock_tmp)			\
-			      : "r" (rw)					\
-			      : "memory");					\
-} while(0)
+#define _raw_read_unlock(rw)					\
+do {								\
+	rwlock_t *__read_lock_ptr = (rw);			\
+	ia64_fetchadd(-1, (int *) __read_lock_ptr, "rel");	\
+} while (0)
 
 #define _raw_write_lock(rw)							\
 do {										\
