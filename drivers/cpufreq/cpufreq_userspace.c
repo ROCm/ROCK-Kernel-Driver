@@ -460,7 +460,7 @@ static ctl_table ctl_cpu[2] = {
 	}
 };
 
-struct ctl_table_header *cpufreq_sysctl_table;
+static struct ctl_table_header *cpufreq_sysctl_table;
 
 static inline void cpufreq_sysctl_init(void)
 {
