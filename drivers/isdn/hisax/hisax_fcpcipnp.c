@@ -945,14 +945,14 @@ static void __devexit fcpnp_remove(struct pci_dev *pdev)
 static struct pci_driver fcpci_driver = {
 	name:     "fcpci",
 	probe:    fcpci_probe,
-	remove:   fcpci_remove,
+	remove:   __devexit_p(fcpci_remove),
 	id_table: fcpci_ids,
 };
 
 static struct isapnp_driver fcpnp_driver = {
 	name:     "fcpnp",
 	probe:    fcpnp_probe,
-	remove:   fcpnp_remove,
+	remove:   __devexit_p(fcpnp_remove),
 	id_table: fcpnp_ids,
 };
 

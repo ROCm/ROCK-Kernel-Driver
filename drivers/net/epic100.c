@@ -1533,7 +1533,7 @@ static struct pci_driver epic_driver = {
 	name:		DRV_NAME,
 	id_table:	epic_pci_tbl,
 	probe:		epic_init_one,
-	remove:		epic_remove_one,
+	remove:		__devexit_p(epic_remove_one),
 #ifdef CONFIG_PM
 	suspend:	epic_suspend,
 	resume:		epic_resume,

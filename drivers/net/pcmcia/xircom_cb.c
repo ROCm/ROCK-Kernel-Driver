@@ -170,7 +170,7 @@ static struct pci_driver xircom_ops = {
 	name:		"xircom_cb", 
 	id_table:	xircom_pci_table, 
 	probe:		xircom_probe, 
-	remove:		xircom_remove, 
+	remove:		__devexit_p(xircom_remove), 
 };
 
 

@@ -645,7 +645,7 @@
     X##_f[1] = (rsize <= _FP_W_TYPE_SIZE ? 0 : r >> _FP_W_TYPE_SIZE);	\
     X##_f[2] = (rsize <= 2*_FP_W_TYPE_SIZE ? 0 : r >> 2*_FP_W_TYPE_SIZE); \
     X##_f[3] = (rsize <= 3*_FP_W_TYPE_SIZE ? 0 : r >> 3*_FP_W_TYPE_SIZE); \
-  } while (0);
+  } while (0)
 
 #define _FP_FRAC_CONV_4_1(dfs, sfs, D, S)				\
    do {									\

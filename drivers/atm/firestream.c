@@ -2102,7 +2102,7 @@ static struct pci_driver firestream_driver = {
 	name:           "firestream",
 	id_table:       firestream_pci_tbl,
 	probe:          firestream_init_one,
-	remove:         firestream_remove_one,
+	remove:         __devexit_p(firestream_remove_one),
 };
 
 static int __init firestream_init_module (void)
