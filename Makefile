@@ -207,25 +207,6 @@ prepare: .hdepend include/config/MARKER
 %.o: %.S FORCE
 	@$(MAKE) -C $(@D) $(@F)
 
-# Configuration
-# ---------------------------------------------------------------------------
-
-PHONY: oldconfig xconfig menuconfig config
-
-oldconfig:
-	$(CONFIG_SHELL) scripts/Configure -d arch/$(ARCH)/config.in
-
-xconfig:
-	@$(MAKE) -C scripts kconfig.tk
-	wish -f scripts/kconfig.tk
-
-menuconfig:
-	@$(MAKE) -C scripts/lxdialog all
-	$(CONFIG_SHELL) scripts/Menuconfig arch/$(ARCH)/config.in
-
-config:
-	$(CONFIG_SHELL) scripts/Configure arch/$(ARCH)/config.in
-
 # 	FIXME: The asm symlink changes when $(ARCH) changes. That's
 #	hard to detect, but I suppose "make mrproper" is a good idea
 #	before switching between archs anyway.
@@ -370,6 +351,90 @@ modules modules_install: FORCE
 
 endif # CONFIG_MODULES
 
+# Scripts to check various things for consistency
+# ---------------------------------------------------------------------------
+
+checkconfig:
+	find * -name '*.[hcS]' -type f -print | sort | xargs $(PERL) -w scripts/checkconfig.pl
+
+checkhelp:
+	find * -name [cC]onfig.in -print | sort | xargs $(PERL) -w scripts/checkhelp.pl
+
+checkincludes:
+	find * -name '*.[hcS]' -type f -print | sort | xargs $(PERL) -w scripts/checkincludes.pl
+
+# Generate tags for editors
+# ---------------------------------------------------------------------------
+
+TAGS: FORCE
+	{ find include/asm-${ARCH} -name '*.h' -print ; \
+	find include -type d \( -name "asm-*" -o -name config \) -prune -o -name '*.h' -print ; \
+	find $(SUBDIRS) init -name '*.[ch]' ; } | grep -v SCCS | etags -
+
+# 	Exuberant ctags works better with -I
+tags: FORCE
+	CTAGSF=`ctags --version | grep -i exuberant >/dev/null && echo "-I __initdata,__exitdata,EXPORT_SYMBOL,EXPORT_SYMBOL_NOVERS"`; \
+	ctags $$CTAGSF `find include/asm-$(ARCH) -name '*.h'` && \
+	find include -type d \( -name "asm-*" -o -name config \) -prune -o -name '*.h' -print | xargs ctags $$CTAGSF -a && \
+	find $(SUBDIRS) init -name '*.[ch]' | xargs ctags $$CTAGSF -a
+
+# Assorted miscellaneous targets
+# ---------------------------------------------------------------------------
+
+# Documentation targets
+
+sgmldocs psdocs pdfdocs htmldocs:
+	@$(MAKE) -C Documentation/DocBook $@
+
+
+# RPM target
+#
+#	If you do a make spec before packing the tarball you can rpm -ta it
+
+spec:
+	. scripts/mkspec >kernel.spec
+
+#	Build a tar ball, generate an rpm from it and pack the result
+#	There arw two bits of magic here
+#	1) The use of /. to avoid tar packing just the symlink
+#	2) Removing the .dep files as they have source paths in them that
+#	   will become invalid
+
+rpm:	clean spec
+	find . \( -size 0 -o -name .depend -o -name .hdepend \) -type f -print | xargs rm -f
+	set -e; \
+	cd $(TOPDIR)/.. ; \
+	ln -sf $(TOPDIR) $(KERNELPATH) ; \
+	tar -cvz --exclude CVS -f $(KERNELPATH).tar.gz $(KERNELPATH)/. ; \
+	rm $(KERNELPATH) ; \
+	cd $(TOPDIR) ; \
+	. scripts/mkversion > .version ; \
+	rpm -ta $(TOPDIR)/../$(KERNELPATH).tar.gz ; \
+	rm $(TOPDIR)/../$(KERNELPATH).tar.gz
+
+# Targets which don't need .config
+# ===========================================================================
+
+# Kernel configuration
+# ---------------------------------------------------------------------------
+
+.PHONY: oldconfig xconfig menuconfig config
+
+oldconfig:
+	$(CONFIG_SHELL) scripts/Configure -d arch/$(ARCH)/config.in
+
+xconfig:
+	@$(MAKE) -C scripts kconfig.tk
+	wish -f scripts/kconfig.tk
+
+menuconfig:
+	@$(MAKE) -C scripts/lxdialog all
+	$(CONFIG_SHELL) scripts/Menuconfig arch/$(ARCH)/config.in
+
+config:
+	$(CONFIG_SHELL) scripts/Configure arch/$(ARCH)/config.in
+
+
 # Cleaning up
 # ---------------------------------------------------------------------------
 
@@ -447,80 +512,8 @@ distclean: mrproper
 		-o -name '*.bak' -o -name '#*#' -o -name '.*.orig' \
 		-o -name '.*.rej' -o -name '.SUMS' -o -size 0 \) -type f -print` TAGS tags
 
-# Assorted miscellaneous targets
-# ---------------------------------------------------------------------------
-
-# Documentation targets
-
-sgmldocs psdocs pdfdocs htmldocs:
-	@$(MAKE) -C Documentation/DocBook $@
-
-
-# RPM target
-#
-#	If you do a make spec before packing the tarball you can rpm -ta it
-
-spec:
-	. scripts/mkspec >kernel.spec
-
-#	Build a tar ball, generate an rpm from it and pack the result
-#	There arw two bits of magic here
-#	1) The use of /. to avoid tar packing just the symlink
-#	2) Removing the .dep files as they have source paths in them that
-#	   will become invalid
-
-rpm:	clean spec
-	find . \( -size 0 -o -name .depend -o -name .hdepend \) -type f -print | xargs rm -f
-	set -e; \
-	cd $(TOPDIR)/.. ; \
-	ln -sf $(TOPDIR) $(KERNELPATH) ; \
-	tar -cvz --exclude CVS -f $(KERNELPATH).tar.gz $(KERNELPATH)/. ; \
-	rm $(KERNELPATH) ; \
-	cd $(TOPDIR) ; \
-	. scripts/mkversion > .version ; \
-	rpm -ta $(TOPDIR)/../$(KERNELPATH).tar.gz ; \
-	rm $(TOPDIR)/../$(KERNELPATH).tar.gz
-
-# Scripts to check various things for consistency
-
-checkconfig:
-	find * -name '*.[hcS]' -type f -print | sort | xargs $(PERL) -w scripts/checkconfig.pl
-
-checkhelp:
-	find * -name [cC]onfig.in -print | sort | xargs $(PERL) -w scripts/checkhelp.pl
-
-checkincludes:
-	find * -name '*.[hcS]' -type f -print | sort | xargs $(PERL) -w scripts/checkincludes.pl
-
-# Generate tags for editors
-
-TAGS: FORCE
-	{ find include/asm-${ARCH} -name '*.h' -print ; \
-	find include -type d \( -name "asm-*" -o -name config \) -prune -o -name '*.h' -print ; \
-	find $(SUBDIRS) init -name '*.[ch]' ; } | grep -v SCCS | etags -
-
-# 	Exuberant ctags works better with -I
-tags: FORCE
-	CTAGSF=`ctags --version | grep -i exuberant >/dev/null && echo "-I __initdata,__exitdata,EXPORT_SYMBOL,EXPORT_SYMBOL_NOVERS"`; \
-	ctags $$CTAGSF `find include/asm-$(ARCH) -name '*.h'` && \
-	find include -type d \( -name "asm-*" -o -name config \) -prune -o -name '*.h' -print | xargs ctags $$CTAGSF -a && \
-	find $(SUBDIRS) init -name '*.[ch]' | xargs ctags $$CTAGSF -a
-
-# Make a backup
-# FIXME anybody still using this?
-
-backup: mrproper
-	cd .. && tar cf - linux/ | gzip -9 > backup.gz
-	sync
-
-# Make checksums
-# FIXME anybody still using this?
-
-sums:
-	find . -type f -print | sort | xargs sum > .SUMS
-
 # FIXME Should go into a make.lib or something 
-# ---------------------------------------------------------------------------
+# ===========================================================================
 
 # read all saved command lines
 
