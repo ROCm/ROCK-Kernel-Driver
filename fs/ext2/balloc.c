@@ -232,7 +232,7 @@ do_more:
 	bh = load_block_bitmap (sb, block_group);
 	if (IS_ERR(bh))
 		goto error_return;
-	
+
 	gdp = ext2_get_group_desc (sb, block_group, &bh2);
 	if (!gdp)
 		goto error_return;
@@ -253,10 +253,8 @@ do_more:
 			ext2_error (sb, "ext2_free_blocks",
 				      "bit already cleared for block %lu",
 				      block + i);
-		else {
+		else
 			group_freed++;
-			freed++;
-		}
 	}
 
 	mark_buffer_dirty(bh);
@@ -266,6 +264,8 @@ do_more:
 	}
 
 	group_release_blocks(gdp, bh2, group_freed);
+	freed += group_freed;
+
 	if (overflow) {
 		block += count;
 		count = overflow;
