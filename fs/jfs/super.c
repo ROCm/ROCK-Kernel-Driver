@@ -457,6 +457,7 @@ static void init_once(void *foo, kmem_cache_t * cachep, unsigned long flags)
 		INIT_LIST_HEAD(&jfs_ip->anon_inode_list);
 		init_rwsem(&jfs_ip->rdwrlock);
 		init_MUTEX(&jfs_ip->commit_sem);
+		init_rwsem(&jfs_ip->xattr_sem);
 		jfs_ip->atlhead = 0;
 		jfs_ip->active_ag = -1;
 #ifdef CONFIG_JFS_POSIX_ACL
