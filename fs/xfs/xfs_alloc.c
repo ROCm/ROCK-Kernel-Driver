@@ -2597,7 +2597,7 @@ xfs_alloc_search_busy(xfs_trans_t *tp,
 	s = mutex_spinlock(&mp->m_perag[agno].pagb_lock);
 	cnt = mp->m_perag[agno].pagb_count;
 
-	uend = bno + len;
+	uend = bno + len - 1;
 
 	/* search pagb_list for this slot, skipping open slots */
 	for (bsy = mp->m_perag[agno].pagb_list, n = 0;
@@ -2607,16 +2607,16 @@ xfs_alloc_search_busy(xfs_trans_t *tp,
 		 * (start1,length1) within (start2, length2)
 		 */
 		if (bsy->busy_tp != NULL) {
-			bend = bsy->busy_start + bsy->busy_length;
-			if ( (bno >= bsy->busy_start && bno <= bend) ||
-			     (uend >= bsy->busy_start && uend <= bend) ||
-			     (bno <= bsy->busy_start && uend >= bsy->busy_start) ) {
+			bend = bsy->busy_start + bsy->busy_length - 1;
+			if ((bno > bend) ||
+			    (uend < bsy->busy_start)) {
+				cnt--;
+			} else {
 				TRACE_BUSYSEARCH("xfs_alloc_search_busy",
 						 "found1", agno, bno, len, n,
 						 tp);
 				break;
 			}
-			cnt--;
 		}
 	}
 
