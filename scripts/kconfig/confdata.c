@@ -269,8 +269,14 @@ int conf_write(const char *name)
 
 	dirname[0] = 0;
 	if (name && name[0]) {
-		char *slash = strrchr(name, '/');
-		if (slash) {
+		struct stat st;
+		char *slash;
+
+		if (!stat(name, &st) && S_ISDIR(st.st_mode)) {
+			strcpy(dirname, name);
+			strcat(dirname, "/");
+			basename = conf_def_filename;
+		} else if ((slash = strrchr(name, '/'))) {
 			int size = slash - name + 1;
 			memcpy(dirname, name, size);
 			dirname[size] = 0;
