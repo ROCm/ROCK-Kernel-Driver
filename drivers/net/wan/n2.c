@@ -312,8 +312,10 @@ static void n2_destroy_card(card_t *card)
 	int cnt;
 
 	for (cnt = 0; cnt < 2; cnt++)
-		if (card->ports[cnt].card)
-			unregister_hdlc_device(&card->ports[cnt].hdlc);
+		if (card->ports[cnt].card) {
+			struct net_device *dev = port_to_dev(&card->ports[cnt]);
+			unregister_hdlc_device(dev_to_hdlc(dev));
+		}
 
 	if (card->irq)
 		free_irq(card->irq, card);
@@ -435,7 +437,8 @@ static int __init n2_run(unsigned long io, unsigned long irq,
 	sca_init(card, 0);
 	for (cnt = 0; cnt < 2; cnt++) {
 		port_t *port = &card->ports[cnt];
-		struct net_device *dev = hdlc_to_dev(&port->hdlc);
+		struct net_device *dev = port_to_dev(port);
+		hdlc_device *hdlc = dev_to_hdlc(dev);
 
 		if ((cnt == 0 && !valid0) || (cnt == 1 && !valid1))
 			continue;
@@ -455,11 +458,11 @@ static int __init n2_run(unsigned long io, unsigned long irq,
 		dev->do_ioctl = n2_ioctl;
 		dev->open = n2_open;
 		dev->stop = n2_close;
-		port->hdlc.attach = sca_attach;
-		port->hdlc.xmit = sca_xmit;
+		hdlc->attach = sca_attach;
+		hdlc->xmit = sca_xmit;
 		port->settings.clock_type = CLOCK_EXT;
 
-		if (register_hdlc_device(&port->hdlc)) {
+		if (register_hdlc_device(hdlc)) {
 			printk(KERN_WARNING "n2: unable to register hdlc "
 			       "device\n");
 			n2_destroy_card(card);
@@ -469,7 +472,7 @@ static int __init n2_run(unsigned long io, unsigned long irq,
 		sca_init_sync_port(port); /* Set up SCA memory */
 
 		printk(KERN_INFO "%s: RISCom/N2 node %d\n",
-		       hdlc_to_name(&port->hdlc), port->phy_node);
+		       dev->name, port->phy_node);
 	}
 
 	*new_card = card;
