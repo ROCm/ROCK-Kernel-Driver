@@ -819,7 +819,7 @@ void __init atari_scsi_setup(char *str, int *ints)
 #endif
 }
 
-int atari_scsi_reset( Scsi_Cmnd *cmd, unsigned int reset_flags)
+int atari_scsi_bus_reset(Scsi_Cmnd *cmd)
 {
 	int		rv;
 	struct NCR5380_hostdata *hostdata =
@@ -845,7 +845,7 @@ int atari_scsi_reset( Scsi_Cmnd *cmd, unsigned int reset_flags)
 #endif /* REAL_DMA */
 	}
 
-	rv = NCR5380_reset(cmd, reset_flags);
+	rv = NCR5380_bus_reset(cmd);
 
 	/* Re-enable ints */
 	if (IS_A_TT()) {
@@ -1146,8 +1146,8 @@ static Scsi_Host_Template driver_template = {
 	.release		= atari_scsi_release,
 	.info			= atari_scsi_info,
 	.queuecommand		= atari_scsi_queue_command,
-	.abort			= atari_scsi_abort,
-	.reset			= atari_scsi_reset,
+	.eh_abort_handler	= atari_scsi_abort,
+	.eh_bus_reset_handler	= atari_scsi_bus_reset,
 	.can_queue		= 0, /* initialized at run-time */
 	.this_id		= 0, /* initialized at run-time */
 	.sg_tablesize		= 0, /* initialized at run-time */

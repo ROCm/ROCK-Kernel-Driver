@@ -1,4 +1,4 @@
-/*
+ /*
  * Sun3 SCSI stuff by Erik Verbruggen (erik@bigmama.xtdnet.nl)
  *
  * Sun3 DMA routines added by Sam Creasey (sammy@sammy.net)
@@ -566,8 +566,8 @@ static Scsi_Host_Template driver_template = {
 	.release		= sun3scsi_release,
 	.info			= sun3scsi_info,
 	.queuecommand		= sun3scsi_queue_command,
-	.abort			= sun3scsi_abort,
-	.reset			= sun3scsi_reset,
+	.eh_abort_handler      	= sun3scsi_abort,
+	.eh_bus_reset_handler  	= sun3scsi_bus_reset,
 	.can_queue		= CAN_QUEUE,
 	.this_id		= 7,
 	.sg_tablesize		= SG_TABLESIZE,

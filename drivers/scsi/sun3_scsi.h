@@ -55,7 +55,7 @@
 static int sun3scsi_abort (Scsi_Cmnd *);
 static int sun3scsi_detect (Scsi_Host_Template *);
 static const char *sun3scsi_info (struct Scsi_Host *);
-static int sun3scsi_reset(Scsi_Cmnd *, unsigned int);
+static int sun3scsi_bus_reset(Scsi_Cmnd *);
 static int sun3scsi_queue_command (Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
 static int sun3scsi_proc_info (char *buffer, char **start, off_t offset,
 			int length, int hostno, int inout);
@@ -109,7 +109,7 @@ static int sun3scsi_release (struct Scsi_Host *);
 
 #define NCR5380_intr sun3scsi_intr
 #define NCR5380_queue_command sun3scsi_queue_command
-#define NCR5380_reset sun3scsi_reset
+#define NCR5380_bus_reset sun3scsi_bus_reset
 #define NCR5380_abort sun3scsi_abort
 #define NCR5380_proc_info sun3scsi_proc_info
 #define NCR5380_dma_xfer_len(i, cmd, phase) \

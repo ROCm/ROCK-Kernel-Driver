@@ -834,7 +834,7 @@ lprint_Scsi_Cmnd (Scsi_Cmnd *cmd, char *pos, char *buffer, int length)
  * 
  */
 
-static void __init NCR5380_init (struct Scsi_Host *instance, int flags)
+static int NCR5380_init (struct Scsi_Host *instance, int flags)
 {
     int i;
     SETUP_HOSTDATA(instance);
@@ -878,6 +878,8 @@ static void __init NCR5380_init (struct Scsi_Host *instance, int flags)
     NCR5380_write(MODE_REG, MR_BASE);
     NCR5380_write(TARGET_COMMAND_REG, 0);
     NCR5380_write(SELECT_ENABLE_REG, 0);
+
+    return 0;
 }
 
 /* 
@@ -898,10 +900,7 @@ static void __init NCR5380_init (struct Scsi_Host *instance, int flags)
  *
  */
 
-/* Only make static if a wrapper function is used */
-#ifndef NCR5380_queue_command
 static
-#endif
 int NCR5380_queue_command (Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *))
 {
     SETUP_HOSTDATA(cmd->host);
@@ -1014,7 +1013,7 @@ int NCR5380_queue_command (Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *))
     if (in_interrupt() || ((flags >> 8) & 7) >= 6)
 	queue_main();
     else
-	NCR5380_main();
+	NCR5380_main(NULL);
     return 0;
 }
 
@@ -1030,7 +1029,7 @@ int NCR5380_queue_command (Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *))
  *  reenable them.  This prevents reentrancy and kernel stack overflow.
  */ 	
     
-static void NCR5380_main (void)
+static void NCR5380_main (void *bl)
 {
     Scsi_Cmnd *tmp, *prev;
     struct Scsi_Host *instance = first_instance;
@@ -2642,9 +2641,7 @@ static void NCR5380_reselect (struct Scsi_Host *instance)
  * 	 called where the loop started in NCR5380_main().
  */
 
-#ifndef NCR5380_abort
 static
-#endif
 int NCR5380_abort (Scsi_Cmnd *cmd)
 {
     struct Scsi_Host *instance = cmd->host;
@@ -2842,7 +2839,7 @@ int NCR5380_abort (Scsi_Cmnd *cmd)
 
 
 /* 
- * Function : int NCR5380_reset (Scsi_Cmnd *cmd, unsigned int reset_flags)
+ * Function : int NCR5380_reset (Scsi_Cmnd *cmd)
  * 
  * Purpose : reset the SCSI bus.
  *
@@ -2850,7 +2847,7 @@ int NCR5380_abort (Scsi_Cmnd *cmd)
  *
  */ 
 
-static int NCR5380_reset( Scsi_Cmnd *cmd, unsigned int reset_flags)
+static int NCR5380_bus_reset( Scsi_Cmnd *cmd)
 {
     SETUP_HOSTDATA(cmd->host);
     int           i;
