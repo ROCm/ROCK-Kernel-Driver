@@ -53,7 +53,6 @@ extern int marvel_pa_to_nid(unsigned long);
 extern int marvel_cpuid_to_nid(int);
 extern unsigned long marvel_node_mem_start(int);
 extern unsigned long marvel_node_mem_size(int);
-extern int marvel_srmcons_allowed(void);
 extern struct _alpha_agp_info *marvel_agp_info(void);
 struct io7 *marvel_find_io7(int pe);
 struct io7 *marvel_next_io7(struct io7 *prev);

@@ -732,21 +732,6 @@ marvel_iounmap(unsigned long addr)
 EXPORT_SYMBOL(marvel_ioremap);
 EXPORT_SYMBOL(marvel_iounmap);
 #endif
-
-/*
- * SRMCons support
- *
- * Marvel doesn't have a real serial console -- it's either graphics or 
- * server management based. If we're running on the server management based
- * console, allow the srmcons callback driver to be a console device.
- */
-int
-marvel_srmcons_allowed(void)
-{
-	u64 *pu64 = (u64 *)((u64)hwrpb + hwrpb->ctbt_offset);
-
-	return (pu64[7] == 2);
-}
 
 
 /*
