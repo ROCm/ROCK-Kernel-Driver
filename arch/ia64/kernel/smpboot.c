@@ -10,10 +10,6 @@
  *						smp_boot_cpus()/smp_commence() is replaced by
  *						smp_prepare_cpus()/__cpu_up()/smp_cpus_done().
  */
-
-
-#define __KERNEL_SYSCALLS__
-
 #include <linux/config.h>
 
 #include <linux/module.h>

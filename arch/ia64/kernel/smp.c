@@ -18,10 +18,6 @@
  * 10/13/00 Goutham Rao <goutham.rao@intel.com> Updated smp_call_function and
  *		smp_call_function_single to resend IPI on timeouts
  */
-#define __KERNEL_SYSCALLS__
-
-#include <linux/config.h>
-
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
