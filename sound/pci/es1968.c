@@ -2562,7 +2562,7 @@ static int __devinit snd_es1968_create(snd_card_t * card,
 		snd_printk("architecture does not support 28bit PCI busmaster DMA\n");
 		return -ENXIO;
 	}
-	pci_set_dma_mask(pci, 0x0fffffff);
+	pci_set_consistent_dma_mask(pci, 0x0fffffff);
 
 	chip = (es1968_t *) snd_magic_kcalloc(es1968_t, 0, GFP_KERNEL);
 	if (! chip)

@@ -1295,7 +1295,7 @@
                   printk(KERN_ERR "error to set 28bit mask DMA\n");
                   return -ENXIO;
           }
-          pci_set_dma_mask(pci, 0x0fffffff);
+          pci_set_consistent_dma_mask(pci, 0x0fffffff);
 
           chip = snd_magic_kcalloc(mychip_t, 0, GFP_KERNEL);
           if (chip == NULL)
@@ -1413,7 +1413,7 @@
           printk(KERN_ERR "error to set 28bit mask DMA\n");
           return -ENXIO;
   }
-  pci_set_dma_mask(pci, 0x0fffffff);
+  pci_set_consistent_dma_mask(pci, 0x0fffffff);
 ]]>
           </programlisting>
         </informalexample>

@@ -2546,7 +2546,7 @@ snd_m3_create(snd_card_t *card, struct pci_dev *pci,
 		snd_printk("architecture does not support 28bit PCI busmaster DMA\n");
 		return -ENXIO;
 	}
-	pci_set_dma_mask(pci, 0x0fffffff);
+	pci_set_consistent_dma_mask(pci, 0x0fffffff);
 
 	chip = snd_magic_kcalloc(m3_t, 0, GFP_KERNEL);
 	if (chip == NULL)

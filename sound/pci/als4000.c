@@ -625,7 +625,7 @@ static int __devinit snd_card_als4000_probe(struct pci_dev *pci,
 		snd_printk("architecture does not support 24bit PCI busmaster DMA\n");
 		return -ENXIO;
 	}
-	pci_set_dma_mask(pci, 0x00ffffff);
+	pci_set_consistent_dma_mask(pci, 0x00ffffff);
 
 	gcr = pci_resource_start(pci, 0);
 	if ((res_gcr_port = request_region(gcr, 0x40, "ALS4000")) == NULL) {

@@ -1253,7 +1253,7 @@ static int __devinit snd_sonicvibes_create(snd_card_t * card,
                 snd_printk("architecture does not support 24bit PCI busmaster DMA\n");
                 return -ENXIO;
         }
-	pci_set_dma_mask(pci, 0x00ffffff);
+	pci_set_consistent_dma_mask(pci, 0x00ffffff);
 
 	sonic = snd_magic_kcalloc(sonicvibes_t, 0, GFP_KERNEL);
 	if (sonic == NULL)

@@ -3522,7 +3522,7 @@ int __devinit snd_trident_create(snd_card_t * card,
 		snd_printk("architecture does not support 30bit PCI busmaster DMA\n");
 		return -ENXIO;
 	}
-	pci_set_dma_mask(pci, 0x3fffffff);
+	pci_set_consistent_dma_mask(pci, 0x3fffffff);
 	
 	trident = snd_magic_kcalloc(trident_t, 0, GFP_KERNEL);
 	if (trident == NULL)
@@ -3947,7 +3947,7 @@ void snd_trident_resume(trident_t *trident)
 		return;
 
 	pci_enable_device(trident->pci);
-	pci_set_dma_mask(trident->pci, 0x3fffffff); /* to be sure */
+	pci_set_consistent_dma_mask(trident->pci, 0x3fffffff); /* FIXME: correct? */
 	pci_set_master(trident->pci); /* to be sure */
 
 	switch (trident->device) {

@@ -2096,7 +2096,7 @@ static int __devinit snd_ali_create(snd_card_t * card,
 		snd_printk("architecture does not support 31bit PCI busmaster DMA\n");
 		return -ENXIO;
 	}
-	pci_set_dma_mask(pci, 0x7fffffff);
+	pci_set_consistent_dma_mask(pci, 0x7fffffff);
 
 	if ((codec = snd_magic_kcalloc(ali_t, 0, GFP_KERNEL)) == NULL)
 		return -ENOMEM;

@@ -1365,7 +1365,7 @@ static int __devinit snd_azf3328_create(snd_card_t * card,
 		snd_printk("architecture does not support 24bit PCI busmaster DMA\n");
 		return -ENXIO;
 	}
-	pci_set_dma_mask(pci, 0x00ffffff);
+	pci_set_consistent_dma_mask(pci, 0x00ffffff);
 
 	chip->codec_port = pci_resource_start(pci, 0);
 	if ((chip->res_codec_port = request_region(chip->codec_port, 0x80, "Aztech AZF3328 I/O")) == NULL) {
