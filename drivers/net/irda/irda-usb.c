@@ -1487,7 +1487,7 @@ static int irda_usb_probe(struct usb_interface *intf,
 	 * specify an alternate, but very few driver do like this.
 	 * Jean II */
 	ret = usb_set_interface(dev, intf->altsetting->bInterfaceNumber, 0);
-	IRDA_DEBUG(1, "usb-irda: set interface %d result %d\n", ifnum, ret);
+	IRDA_DEBUG(1, "usb-irda: set interface %d result %d\n", intf->altsetting->bInterfaceNumber, ret);
 	switch (ret) {
 		case 0:
 			break;
