@@ -1,4 +1,3 @@
-2002  Rohit Seth <rohit.seth@intel.com>
 
 The intent of this file is to give a brief summary of hugetlbpage support in
 the Linux kernel.  This support is built on top of multiple page size support
@@ -11,75 +10,194 @@ use of limited number of TLB resources.  This optimization is more critical
 now as bigger and bigger physical memories (several GBs) are more readily
 available.
 
-The current support is provided in kernel using the following two system calls:
+Users can use the huge page support in Linux kernel by either using the mmap
+system call or standard SYSv shared memory system calls (shmget, shmat).
 
-1) sys_alloc_hugepages(int key, unsigned long addr, size_t len, int prot, int flag)
+First the Linux kernel needs to be built with CONFIG_HUGETLB_PAGE (present
+under Processor types and feature)  and CONFIG_HUGETLBFS (present under file
+system option on config menu) config options.
 
-2) sys_free_hugepages(unsigned long addr)
+The kernel built with hugepage support should show the number of configured
+hugepages in the system by running the "cat /proc/meminfo" command.  
 
-Arguments to these system calls are defined as follows:
-
-key: If a user application wants to share hugepages with other
-      processes then this input argument needs to be greater than 0. 
-      Different applications can use the same key to map the same physical
-      memory (mapped by hugeTLBs) in their address space.  When a process
-      forks, then children share the same physical memory with their parent.
-
-      For the cases when an application wishes to keep the huge
-      pages private, the key value of 0 is defined.  In this case
-      kernel allocates hugetlb pages to the process that are not
-      shareable across different processes.  These segments are marked
-      private for the process.  These segments are not copied to
-      children's address space on forks - the child will have no
-      mapping for these virtual addresses.
-
-      The key manangement (and assignment) part is left to user
-      applications.
-
-addr: This is an address hint.  The kernel will perform a sanity check
-      on this address (alignment etc.) before using it.  It is possible that
-      kernel will allocates a different address (on success).
-
-len:  Length of the required segment.  Applications are expected to give
-      HPAGE_SIZE aligned length.  (Else EINVAL is returned.)
-
-prot: The prot parameter specifies the desired memory protection on the
-      requested hugepages.  The possible values are PROT_EXEC, PROT_READ,
-      PROT_WRITE.
-
-flag: This parameter can only take the value IPC_CREAT for the cases
-      when "key" value greater than zero (shared hugepage cases).  It is
-      ignored for values of "key" that are <= 0.
-
-      This parameter indicates that the kernel should create a new huge
-      page segment (corresponding to "key"), if none already exists.  If this
-      flag is not set, then sys_allochugepages() will return ENOENT if there
-      is no segment associated with corresponding "key".
-
-In case of success, sys_alloc_hugepages() return the allocated virtual address.
-
-sys_free_hugepages() frees the hugetlb resources from the calling process's
-address space.  The input argument "addr" specifies the segment that needs to
-be freed.  It is important to note that for the shared hugepage cases, the
-underlying hugepages are freed onlyafter all the users of those pages have
-either freed those hugepages or have exited.
-
-/proc/sys/vm_nr_hugepages indicates the current number of configured hugetlb
-pages in the kernel.  Super user privileges are required for modification of
-this value.  The allocation of hugetlb pages is possible only if there are
-enough physically contiguous free pages in system OR if there are enough
-hugetlb pages free that can be transfered back to regular memory pool.
-
-/proc/meminfo also gives the information about the total number of hugetlb
+/proc/meminfo also provides information about the total number of hugetlb
 pages configured in the kernel.  It also displays information about the
 number of free hugetlb pages at any time.  It also displays information about
-the configured hugepage size - this is needed for generting the proper
+the configured hugepage size - this is needed for generating the proper
 alignment and size of the arguments to the above system calls.
 
-Pages that are used as hugetlb pages are marked reserved inside the kernel. 
-This allows hugetlb pages to be always locked in memory.  The user either
-needs to be super user to use these pages or one of supplementary group
-should include root.  In future there will be support to check RLIMIT_MLOCK
-for limited (number of hugetlb pages) usage to unprivileged applications.
+The output of "cat /proc/meminfo" will have output like:
 
-If the kernel does not support hugepages these system calls will return ENOSYS.
+.....
+HugePages_Total: xxx
+HugePages_Free:  yyy
+Hugepagesize:    zzz KB
+
+/proc/filesystems should also show a filesystem of type "hugetlbfs" configured
+in the kernel.
+
+/proc/sys/vm/nr_hugepages indicates the current number of configured hugetlb
+pages in the kernel.  Super user can dynamically request more (or free some
+pre-configured) hugepages. 
+The allocation( or deallocation) of hugetlb pages is posible only if there are
+enough physically contiguous free pages in system (freeing of hugepages is
+possible only if there are enough hugetlb pages free that can be transfered 
+back to regular memory pool).
+
+Pages that are used as hugetlb pages are reserved inside the kernel and can
+not be used for other purposes. 
+
+Once the kernel with Hugetlb page support is built and running, a user can
+use either the mmap system call or shared memory system calls to start using
+the huge pages.  It is required that the system administrator preallocate
+enough memory for huge page purposes.  
+
+Use the following command to dynamically allocate/deallocate hugepages:
+
+	echo 20 > /proc/sys/vm/nr_hugepages
+
+This command will try to configure 20 hugepages in the system.  The success
+or failure of allocation depends on the amount of physically contiguous
+memory that is preset in system at this time.  System administrators may want
+to put this command in one of the local rc init file.  This will enable the
+kernel to request huge pages early in the boot process (when the possibility
+of getting physical contiguous pages is still very high).
+
+If the user applications are going to request hugepages using mmap system
+call, then it is required that system administrator mount a file system of
+type hugetlbfs:
+
+	mount none /mnt/huge -t hugetlbfs
+
+This commands mounts a (psuedo) filesystem of type hugetlbfs on the directory
+/mnt/huge.  Any files created on /mnt/huge uses hugepages.  An example is
+given at the end of this document.
+
+read and write system calls are not supported on files that reside on hugetlb
+file systems.
+
+Also, it is important to note that no such mount command is required if the
+applications are going to use only shmat/shmget system calls.  It is possible
+for same or different applications to use any combination of mmaps and shm*
+calls.  Though the mount of filesystem will be required for using mmaps.
+
+/* Example of using hugepage in user application using Sys V shared memory
+ * system calls.  In this example, app is requesting memory of size 256MB that
+ * is backed by huge pages.  Application uses the flag SHM_HUGETLB in shmget
+ * system call to informt the kernel that it is requesting hugepages.  For
+ * IA-64 architecture, Linux kernel reserves Region number 4 for hugepages.
+ * That means the addresses starting with 0x800000....will need to be
+ * specified.
+ */
+#include <sys/types.h>
+#include <sys/shm.h>
+#include <sys/types.h>
+#include <sys/mman.h>
+
+extern int errno;
+#define SHM_HUGETLB 04000
+#define LPAGE_SIZE      (256UL*1024UL*1024UL)
+#define         dprintf(x)  printf(x)
+#define ADDR (0x8000000000000000UL)
+main()
+{
+        int shmid;
+        int     i, j, k;
+        volatile        char    *shmaddr;
+
+        if ((shmid =shmget(2, LPAGE_SIZE, SHM_HUGETLB|IPC_CREAT|SHM_R|SHM_W ))
+< 0) {
+                perror("Failure:");
+                exit(1);
+        }
+        printf("shmid: 0x%x\n", shmid);
+        shmaddr = shmat(shmid, (void *)ADDR, SHM_RND) ;
+        if (errno != 0) {
+                perror("Shared Memory Attach Failure:");
+                exit(2);
+        }
+        printf("shmaddr: %p\n", shmaddr);
+
+        dprintf("Starting the writes:\n");
+        for (i=0;i<LPAGE_SIZE;i++) {
+                shmaddr[i] = (char) (i);
+                if (!(i%(1024*1024))) dprintf(".");
+        }
+        dprintf("\n");
+        dprintf("Starting the Check...");
+        for (i=0; i<LPAGE_SIZE;i++)
+                if (shmaddr[i] != (char)i)
+                        printf("\nIndex %d mismatched.");
+        dprintf("Done.\n");
+        if (shmdt((const void *)shmaddr) != 0) {
+                perror("Detached Failure:");
+                exit (3);
+        }
+}
+*******************************************************************
+*******************************************************************
+
+
+/* Example of using hugepage in user application using mmap 
+ * system call.  Before running this application, make sure that
+ * administrator has mounted the hugetlbfs (on some directory like /mnt) using
+ * the command mount -t hugetlbfs nodev /mnt
+ * In this example, app is requesting memory of size 256MB that
+ * is backed by huge pages.  Application uses the flag SHM_HUGETLB in shmget
+ * system call to informt the kernel that it is requesting hugepages.  For
+ * IA-64 architecture, Linux kernel reserves Region number 4 for hugepages.
+ * That means the addresses starting with 0x800000....will need to be
+ * specified.
+ */
+#include <unistd.h>
+#include <stdio.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+
+#define FILE_NAME "/mnt/hugepagefile"
+#define LENGTH (256*1024*1024)
+#define PROTECTION (PROT_READ | PROT_WRITE)
+#define FLAGS   MAP_SHARED |MAP_FIXED
+#define ADDRESS (char *)(0x60000000UL + 0x8000000000000000UL)
+
+extern errno;
+
+check_bytes(char *addr)
+{
+        printf("First hex is %x\n", *((unsigned int *)addr));
+}
+
+write_bytes(char *addr)
+{
+        int i;
+        for (i=0;i<LENGTH;i++)
+                *(addr+i)=(char)i;
+}
+read_bytes(char *addr)
+{
+        int i;
+        check_bytes(addr);
+        for (i=0;i<LENGTH;i++)
+                if (*(addr+i)!=(char)i) {
+                        printf("Mismatch at %d\n", i);
+                        break;
+                }
+}
+main()
+{
+        unsigned long addr = 0;
+        int fd ;
+
+        fd = open(FILE_NAME, O_CREAT|O_RDWR, 0755);
+        if (fd < 0) {
+                perror("Open failed");
+                exit(errno);
+        }
+        addr = (unsigned long)mmap(ADDRESS, LENGTH, PROTECTION, FLAGS, fd, 0);
+        if (errno != 0)
+                perror("mmap failed");
+        printf("Returned address is %p\n", addr);
+        check_bytes((char*)addr);
+        write_bytes((char*)addr);
+        read_bytes((char *)addr);
+}
