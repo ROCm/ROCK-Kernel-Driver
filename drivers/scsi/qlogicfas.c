@@ -48,11 +48,6 @@
 
 #define QL_INT_ACTIVE_HIGH 2
 
-/* Set the following to 1 to enable the use of interrupts.  Note that 0 tends
-   to be more stable, but slower (or ties up the system more) */
-
-#define QL_USE_IRQ 1
-
 /* Set the following to max out the speed of the PIO PseudoDMA transfers,
    again, 0 tends to be slower, but more stable.  */
 
@@ -502,8 +497,6 @@ static unsigned int ql_pcmd(Scsi_Cmnd * cmd)
 	return (result << 16) | (message << 8) | (status & STATUS_MASK);
 }
 
-#if QL_USE_IRQ
-
 /*
  *	Interrupt handler 
  */
@@ -543,10 +536,6 @@ static irqreturn_t do_ql_ihandl(int irq, void *dev_id, struct pt_regs *regs)
 	return IRQ_HANDLED;
 }
 
-#endif
-
-#if QL_USE_IRQ
-
 /*
  *	Queued command
  */
@@ -568,12 +557,6 @@ int qlogicfas_queuecommand(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
 	ql_icmd(cmd);
 	return 0;
 }
-#else
-int qlogicfas_queuecommand(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
-{
-	return 1;
-}
-#endif
 
 #ifdef PCMCIA
 
@@ -643,7 +626,6 @@ struct Scsi_Host *__qlogicfas_detect(Scsi_Host_Template *host)
 	REG0;
 #endif
 
-#if QL_USE_IRQ
 	/*
 	 *	IRQ probe - toggle pin and check request pending 
 	 */
@@ -672,7 +654,7 @@ struct Scsi_Host *__qlogicfas_detect(Scsi_Host_Template *host)
 
 	if (qlirq >= 0 && !request_irq(qlirq, do_ql_ihandl, 0, qlogicfas_name, NULL))
 		host->can_queue = 1;
-#endif
+
 	hreg = scsi_register(host, 0);	/* no host data */
 	if (!hreg)
 		goto err_release_mem;
