@@ -204,6 +204,11 @@ void blk_queue_bounce_limit(request_queue_t *q, u64 dma_addr)
  **/
 void blk_queue_max_sectors(request_queue_t *q, unsigned short max_sectors)
 {
+	if ((max_sectors << 9) < PAGE_CACHE_SIZE) {
+		max_sectors = 1 << (PAGE_CACHE_SHIFT - 9);
+		printk("%s: set to minimum %d\n", __FUNCTION__, max_sectors);
+	}
+
 	q->max_sectors = max_sectors;
 }
 
@@ -219,6 +224,11 @@ void blk_queue_max_sectors(request_queue_t *q, unsigned short max_sectors)
  **/
 void blk_queue_max_phys_segments(request_queue_t *q, unsigned short max_segments)
 {
+	if (!max_segments) {
+		max_segments = 1;
+		printk("%s: set to minimum %d\n", __FUNCTION__, max_segments);
+	}
+
 	q->max_phys_segments = max_segments;
 }
 
@@ -235,6 +245,11 @@ void blk_queue_max_phys_segments(request_queue_t *q, unsigned short max_segments
  **/
 void blk_queue_max_hw_segments(request_queue_t *q, unsigned short max_segments)
 {
+	if (!max_segments) {
+		max_segments = 1;
+		printk("%s: set to minimum %d\n", __FUNCTION__, max_segments);
+	}
+
 	q->max_hw_segments = max_segments;
 }
 
@@ -249,6 +264,11 @@ void blk_queue_max_hw_segments(request_queue_t *q, unsigned short max_segments)
  **/
 void blk_queue_max_segment_size(request_queue_t *q, unsigned int max_size)
 {
+	if (max_size < PAGE_CACHE_SIZE) {
+		max_size = PAGE_CACHE_SIZE;
+		printk("%s: set to minimum %d\n", __FUNCTION__, max_size);
+	}
+
 	q->max_segment_size = max_size;
 }
 
@@ -275,6 +295,11 @@ void blk_queue_hardsect_size(request_queue_t *q, unsigned short size)
  **/
 void blk_queue_segment_boundary(request_queue_t *q, unsigned long mask)
 {
+	if (mask < PAGE_CACHE_SIZE - 1) {
+		mask = PAGE_CACHE_SIZE - 1;
+		printk("%s: set to minimum %lx\n", __FUNCTION__, mask);
+	}
+
 	q->seg_boundary_mask = mask;
 }
 
