@@ -475,51 +475,6 @@ type name(type1 arg1, type2 arg2, type3 arg3, type4 arg4, type5 arg5, type6 arg6
 #include <linux/types.h>
 #include <linux/syscalls.h>
 
-static inline pid_t setsid(void)
-{
-	return sys_setsid();
-}
-
-static inline long write(int fd, const char *buf, off_t count)
-{
-	return sys_write(fd, buf, count);
-}
-
-static inline long read(int fd, char *buf, off_t count)
-{
-	return sys_read(fd, buf, count);
-}
-
-static inline off_t lseek(int fd, off_t offset, int count)
-{
-	return sys_lseek(fd, offset, count);
-}
-
-static inline long dup(int fd)
-{
-	return sys_dup(fd);
-}
-
-static inline long open(const char *file, int flag, int mode)
-{
-	return sys_open(file, flag, mode);
-}
-
-static inline long close(int fd)
-{
-	return sys_close(fd);
-}
-
-static inline long _exit(int exitcode)
-{
-	return sys_exit(exitcode);
-}
-
-static inline pid_t waitpid(pid_t pid, int *wait_stat, int options)
-{
-	return sys_wait4((int)pid, wait_stat, options, NULL);
-}
-
 extern long execve(const char *file, char **argv, char **envp);
 
 struct pt_regs;

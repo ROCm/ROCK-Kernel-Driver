@@ -55,8 +55,8 @@ tune-$(CONFIG_CPU_XSCALE)	:=$(call cc-option,-mtune=xscale,-mtune=strongarm110) 
 tune-$(CONFIG_CPU_V6)		:=-mtune=strongarm
 
 # Need -Uarm for gcc < 3.x
-CFLAGS		+=-mapcs-32 $(arch-y) $(tune-y) $(call cc-option,-malignment-traps,-mshort-load-bytes) -msoft-float -Wa,-mno-fpu -Uarm
-AFLAGS		+=-mapcs-32 $(arch-y) $(tune-y) -msoft-float -Wa,-mno-fpu
+CFLAGS		+=-mapcs-32 $(arch-y) $(tune-y) $(call cc-option,-malignment-traps,-mshort-load-bytes) -msoft-float -Uarm
+AFLAGS		+=-mapcs-32 $(arch-y) $(tune-y) -msoft-float
 
 CHECKFLAGS	+= -D__arm__=1
 
