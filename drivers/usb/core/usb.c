@@ -63,7 +63,8 @@ static void generic_release (struct device_driver * drv)
 }
 
 static struct device_driver usb_generic_driver = {
-	.name =	"generic usb driver",
+	.name =	"generic",
+	.bus = &usb_bus_type,
 	.probe = generic_probe,
 	.remove = generic_remove,
 	.release = generic_release,
@@ -469,6 +470,10 @@ static int usb_device_match (struct device *dev, struct device_driver *drv)
 	struct usb_interface *intf;
 	struct usb_driver *usb_drv;
 	const struct usb_device_id *id;
+
+	/* check for generic driver, which we don't match any device with */
+	if (drv == &usb_generic_driver)
+		return 0;
 
 	intf = to_usb_interface(dev);
 
@@ -1445,6 +1450,8 @@ static int __init usb_init(void)
 	usbfs_init();
 	usb_hub_init();
 
+	driver_register(&usb_generic_driver);
+
 	return 0;
 }
 
@@ -1453,6 +1460,7 @@ static int __init usb_init(void)
  */
 static void __exit usb_exit(void)
 {
+	remove_driver(&usb_generic_driver);
 	usb_major_cleanup();
 	usbfs_cleanup();
 	usb_hub_cleanup();
