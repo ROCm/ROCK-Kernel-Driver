@@ -55,24 +55,24 @@ extern int at1500_probe(struct net_device *);
 extern int at1700_probe(struct net_device *);
 extern int fmv18x_probe(struct net_device *);
 extern int eth16i_probe(struct net_device *);
-extern int i82596_probe(struct net_device *);
+extern struct net_device *i82596_probe(int unit);
 extern int ewrk3_probe(struct net_device *);
-extern int el1_probe(struct net_device *);
-extern int wavelan_probe(struct net_device *);
-extern int arlan_probe(struct net_device *);
-extern int el16_probe(struct net_device *);
+extern struct net_device *el1_probe(int unit);
+extern struct net_device *wavelan_probe(int unit);
+extern struct net_device *arlan_probe(int unit);
+extern struct net_device *el16_probe(int unit);
 extern int elmc_probe(struct net_device *);
 extern int skmca_probe(struct net_device *);
-extern int elplus_probe(struct net_device *);
+extern struct net_device *elplus_probe(int unit);
 extern int ac3200_probe(struct net_device *);
 extern int es_probe(struct net_device *);
 extern int lne390_probe(struct net_device *);
 extern int e2100_probe(struct net_device *);
-extern int ni5010_probe(struct net_device *);
-extern int ni52_probe(struct net_device *);
-extern int ni65_probe(struct net_device *);
+extern struct net_device *ni5010_probe(int unit);
+extern struct net_device *ni52_probe(int unit);
+extern struct net_device *ni65_probe(int unit);
 extern int sonic_probe(struct net_device *);
-extern int SK_init(struct net_device *);
+extern struct net_device *SK_init(int unit);
 extern int seeq8005_probe(struct net_device *);
 extern int smc_init( struct net_device * );
 extern int atarilance_probe(struct net_device *);
@@ -96,7 +96,7 @@ extern struct net_device *cops_probe(int unit);
 extern struct net_device *ltpc_probe(void);
   
 /* Detachable devices ("pocket adaptors") */
-extern int de620_probe(struct net_device *);
+extern struct net_device *de620_probe(int unit);
 
 /* Fibre Channel adapters */
 extern int iph5526_probe(struct net_device *dev);
@@ -107,6 +107,11 @@ extern int sbni_probe(int unit);
 struct devprobe
 {
 	int (*probe)(struct net_device *dev);
+	int status;	/* non-zero if autoprobe has failed */
+};
+
+struct devprobe2 {
+	struct net_device *(*probe)(int unit);
 	int status;	/* non-zero if autoprobe has failed */
 };
 
@@ -131,6 +136,21 @@ static int __init probe_list(struct net_device *dev, struct devprobe *plist)
 				return 0;
 		}
 		p++;
+	}
+	return -ENODEV;
+}
+
+static int __init probe_list2(int unit, struct devprobe2 *p, int autoprobe)
+{
+	struct net_device *dev;
+	for (; p->probe; p++) {
+		if (autoprobe && p->status)
+			continue;
+		dev = p->probe(unit);
+		if (!IS_ERR(dev))
+			return 0;
+		if (autoprobe)
+			p->status = PTR_ERR(dev);
 	}
 	return -ENODEV;
 }
@@ -239,6 +259,10 @@ static struct devprobe isa_probes[] __initdata = {
 #ifdef CONFIG_EWRK3             /* DEC EtherWORKS 3 */
     	{ewrk3_probe, 0},
 #endif
+	{NULL, 0},
+};
+
+static struct devprobe2 isa_probes2[] __initdata = {
 #if defined(CONFIG_APRICOT) || defined(CONFIG_MVME16x_NET) || defined(CONFIG_BVME6000_NET)	/* Intel I82596 */
 	{i82596_probe, 0},
 #endif
@@ -272,7 +296,7 @@ static struct devprobe isa_probes[] __initdata = {
 	{NULL, 0},
 };
 
-static struct devprobe parport_probes[] __initdata = {
+static struct devprobe2 parport_probes[] __initdata = {
 #ifdef CONFIG_DE620		/* D-Link DE-620 adapter */
 	{de620_probe, 0},
 #endif
@@ -363,8 +387,7 @@ static int __init ethif_probe(int unit)
 	    probe_list(dev, mips_probes) == 0 ||
 	    probe_list(dev, eisa_probes) == 0 ||
 	    probe_list(dev, mca_probes) == 0 ||
-	    probe_list(dev, isa_probes) == 0 ||
-	    probe_list(dev, parport_probes) == 0) 
+	    probe_list(dev, isa_probes) == 0)
 		err = register_netdev(dev);
 
 	if (err)
@@ -372,13 +395,37 @@ static int __init ethif_probe(int unit)
 	return err;
 
 }
+ 
+static void __init ethif_probe2(int unit)
+{
+	unsigned long base_addr = netdev_boot_base("eth", unit);
+
+	if (base_addr == 1)
+		return;
+
+	probe_list2(unit, isa_probes2, base_addr == 0) &&
+	probe_list2(unit, parport_probes, base_addr == 0);
+}
 
 #ifdef CONFIG_TR
 /* Token-ring device probe */
 extern int ibmtr_probe(struct net_device *);
-extern int sk_isa_probe(struct net_device *);
-extern int proteon_probe(struct net_device *);
-extern int smctr_probe(struct net_device *);
+extern struct net_device *sk_isa_probe(int unit);
+extern struct net_device *proteon_probe(int unit);
+extern struct net_device *smctr_probe(int unit);
+
+static struct devprobe2 tr_probes2[] __initdata = {
+#ifdef CONFIG_SKISA
+	{sk_isa_probe, 0},
+#endif
+#ifdef CONFIG_PROTEON
+	{proteon_probe, 0},
+#endif
+#ifdef CONFIG_SMCTR
+	{smctr_probe, 0},
+#endif
+	{NULL, 0},
+};
 
 static __init int trif_probe(int unit)
 {
@@ -395,15 +442,6 @@ static __init int trif_probe(int unit)
 #ifdef CONFIG_IBMTR
 	    ibmtr_probe(dev) == 0  ||
 #endif
-#ifdef CONFIG_SKISA
-	    sk_isa_probe(dev) == 0 || 
-#endif
-#ifdef CONFIG_PROTEON
-	    proteon_probe(dev) == 0 ||
-#endif
-#ifdef CONFIG_SMCTR
-	    smctr_probe(dev) == 0 ||
-#endif
 	    0 ) 
 		err = register_netdev(dev);
 		
@@ -411,6 +449,15 @@ static __init int trif_probe(int unit)
 		free_netdev(dev);
 	return err;
 
+}
+
+static void __init trif_probe2(int unit)
+{
+	unsigned long base_addr = netdev_boot_base("tr", unit);
+
+	if (base_addr == 1)
+		return;
+	probe_list2(unit, tr_probes2, base_addr == 0);
 }
 #endif
 
@@ -437,10 +484,12 @@ static int __init net_olddevs_init(void)
 #endif
 #ifdef CONFIG_TR
 	for (num = 0; num < 8; ++num)
-		trif_probe(num);
+		if (!trif_probe(num))
+			trif_probe2(num);
 #endif
 	for (num = 0; num < 8; ++num)
-		ethif_probe(num);
+		if (!ethif_probe(num))
+			ethif_probe2(num);
 
 #ifdef CONFIG_COPS
 	cops_probe(0);

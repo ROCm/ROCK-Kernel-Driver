@@ -656,9 +656,8 @@ static void
 static int
 	wavelan_open(device *),		/* Open the device. */
 	wavelan_close(device *),	/* Close the device. */
-	wavelan_config(device *);	/* Configure one device. */
-extern int
-	wavelan_probe(device *);	/* See Space.c. */
+	wavelan_config(device *, unsigned short);/* Configure one device. */
+extern struct net_device *wavelan_probe(int unit);	/* See Space.c. */
 
 /**************************** VARIABLES ****************************/
 
