@@ -46,9 +46,9 @@ EXPORT_SYMBOL(__udelay);
 EXPORT_SYMBOL(__delay);
 EXPORT_SYMBOL(__const_udelay);
 
-EXPORT_SYMBOL_NOVERS(__get_user_1);
-EXPORT_SYMBOL_NOVERS(__get_user_2);
-EXPORT_SYMBOL_NOVERS(__get_user_4);
+EXPORT_SYMBOL(__get_user_1);
+EXPORT_SYMBOL(__get_user_2);
+EXPORT_SYMBOL(__get_user_4);
 
 EXPORT_SYMBOL(strpbrk);
 EXPORT_SYMBOL(strstr);
@@ -85,57 +85,57 @@ extern void __ashrdi3(void);
 extern void __lshldi3(void);
 extern void __lshrdi3(void);
 extern void __muldi3(void);
-EXPORT_SYMBOL_NOVERS(__ashldi3);
-EXPORT_SYMBOL_NOVERS(__ashrdi3);
-EXPORT_SYMBOL_NOVERS(__lshldi3);
-EXPORT_SYMBOL_NOVERS(__lshrdi3);
-EXPORT_SYMBOL_NOVERS(__muldi3);
+EXPORT_SYMBOL(__ashldi3);
+EXPORT_SYMBOL(__ashrdi3);
+EXPORT_SYMBOL(__lshldi3);
+EXPORT_SYMBOL(__lshrdi3);
+EXPORT_SYMBOL(__muldi3);
 
 /* memory and string operations */
-EXPORT_SYMBOL_NOVERS(memchr);
-EXPORT_SYMBOL_NOVERS(memcpy);
-/* EXPORT_SYMBOL_NOVERS(memcpy_fromio); // not implement yet */
-/* EXPORT_SYMBOL_NOVERS(memcpy_toio); // not implement yet */
-EXPORT_SYMBOL_NOVERS(memset);
-/* EXPORT_SYMBOL_NOVERS(memset_io); // not implement yet */
-EXPORT_SYMBOL_NOVERS(memmove);
-EXPORT_SYMBOL_NOVERS(memcmp);
-EXPORT_SYMBOL_NOVERS(memscan);
-EXPORT_SYMBOL_NOVERS(copy_page);
-EXPORT_SYMBOL_NOVERS(clear_page);
+EXPORT_SYMBOL(memchr);
+EXPORT_SYMBOL(memcpy);
+/* EXPORT_SYMBOL(memcpy_fromio); // not implement yet */
+/* EXPORT_SYMBOL(memcpy_toio); // not implement yet */
+EXPORT_SYMBOL(memset);
+/* EXPORT_SYMBOL(memset_io); // not implement yet */
+EXPORT_SYMBOL(memmove);
+EXPORT_SYMBOL(memcmp);
+EXPORT_SYMBOL(memscan);
+EXPORT_SYMBOL(copy_page);
+EXPORT_SYMBOL(clear_page);
 
-EXPORT_SYMBOL_NOVERS(strcat);
-EXPORT_SYMBOL_NOVERS(strchr);
-EXPORT_SYMBOL_NOVERS(strcmp);
-EXPORT_SYMBOL_NOVERS(strcpy);
-EXPORT_SYMBOL_NOVERS(strlen);
-EXPORT_SYMBOL_NOVERS(strncat);
-EXPORT_SYMBOL_NOVERS(strncmp);
-EXPORT_SYMBOL_NOVERS(strnlen);
-EXPORT_SYMBOL_NOVERS(strncpy);
+EXPORT_SYMBOL(strcat);
+EXPORT_SYMBOL(strchr);
+EXPORT_SYMBOL(strcmp);
+EXPORT_SYMBOL(strcpy);
+EXPORT_SYMBOL(strlen);
+EXPORT_SYMBOL(strncat);
+EXPORT_SYMBOL(strncmp);
+EXPORT_SYMBOL(strnlen);
+EXPORT_SYMBOL(strncpy);
 
-EXPORT_SYMBOL_NOVERS(_inb);
-EXPORT_SYMBOL_NOVERS(_inw);
-EXPORT_SYMBOL_NOVERS(_inl);
-EXPORT_SYMBOL_NOVERS(_outb);
-EXPORT_SYMBOL_NOVERS(_outw);
-EXPORT_SYMBOL_NOVERS(_outl);
-EXPORT_SYMBOL_NOVERS(_inb_p);
-EXPORT_SYMBOL_NOVERS(_inw_p);
-EXPORT_SYMBOL_NOVERS(_inl_p);
-EXPORT_SYMBOL_NOVERS(_outb_p);
-EXPORT_SYMBOL_NOVERS(_outw_p);
-EXPORT_SYMBOL_NOVERS(_outl_p);
-EXPORT_SYMBOL_NOVERS(_insb);
-EXPORT_SYMBOL_NOVERS(_insw);
-EXPORT_SYMBOL_NOVERS(_insl);
-EXPORT_SYMBOL_NOVERS(_outsb);
-EXPORT_SYMBOL_NOVERS(_outsw);
-EXPORT_SYMBOL_NOVERS(_outsl);
-EXPORT_SYMBOL_NOVERS(_readb);
-EXPORT_SYMBOL_NOVERS(_readw);
-EXPORT_SYMBOL_NOVERS(_readl);
-EXPORT_SYMBOL_NOVERS(_writeb);
-EXPORT_SYMBOL_NOVERS(_writew);
-EXPORT_SYMBOL_NOVERS(_writel);
+EXPORT_SYMBOL(_inb);
+EXPORT_SYMBOL(_inw);
+EXPORT_SYMBOL(_inl);
+EXPORT_SYMBOL(_outb);
+EXPORT_SYMBOL(_outw);
+EXPORT_SYMBOL(_outl);
+EXPORT_SYMBOL(_inb_p);
+EXPORT_SYMBOL(_inw_p);
+EXPORT_SYMBOL(_inl_p);
+EXPORT_SYMBOL(_outb_p);
+EXPORT_SYMBOL(_outw_p);
+EXPORT_SYMBOL(_outl_p);
+EXPORT_SYMBOL(_insb);
+EXPORT_SYMBOL(_insw);
+EXPORT_SYMBOL(_insl);
+EXPORT_SYMBOL(_outsb);
+EXPORT_SYMBOL(_outsw);
+EXPORT_SYMBOL(_outsl);
+EXPORT_SYMBOL(_readb);
+EXPORT_SYMBOL(_readw);
+EXPORT_SYMBOL(_readl);
+EXPORT_SYMBOL(_writeb);
+EXPORT_SYMBOL(_writew);
+EXPORT_SYMBOL(_writel);
 
