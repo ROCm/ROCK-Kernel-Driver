@@ -707,13 +707,13 @@ static int reiserfs_parse_options (struct super_block * s, char * options, /* st
 
 	if ( c == 'c' ) {
 		char *p = 0;
-		int val = simple_strtoul (arg, &p, 0);
+		unsigned long val = simple_strtoul (arg, &p, 0);
 		/* commit=NNN (time in seconds) */
-		if ( *p != '\0' || val < 0) {
+		if ( *p != '\0' || val >= (unsigned int)-1) {
 			printk ("reiserfs_parse_options: bad value %s\n", arg);
 			return 0;
 		}
-		*commit_max_age = val;
+		*commit_max_age = (unsigned int)val;
 	}
 
 	if ( c == 'w' ) {
@@ -796,7 +796,7 @@ static int reiserfs_remount (struct super_block * s, int * mount_flags, char * a
   unsigned long blocks;
   unsigned long mount_options = REISERFS_SB(s)->s_mount_opt;
   unsigned long safe_mask = 0;
-  unsigned int commit_max_age = 0;
+  unsigned int commit_max_age = (unsigned int)-1;
 
   rs = SB_DISK_SUPER_BLOCK (s);
 
@@ -818,11 +818,11 @@ static int reiserfs_remount (struct super_block * s, int * mount_flags, char * a
    * the bits we're not allowed to change here */
   REISERFS_SB(s)->s_mount_opt = (REISERFS_SB(s)->s_mount_opt & ~safe_mask) |  (mount_options & safe_mask);
 
-  if(commit_max_age != 0) {
+  if(commit_max_age != 0 && commit_max_age != (unsigned int)-1) {
     SB_JOURNAL_MAX_COMMIT_AGE(s) = commit_max_age;
     SB_JOURNAL_MAX_TRANS_AGE(s) = commit_max_age;
   }
-  else
+  else if(commit_max_age == 0)
   {
     /* 0 means restore defaults. */
     SB_JOURNAL_MAX_COMMIT_AGE(s) = SB_JOURNAL_DEFAULT_MAX_COMMIT_AGE(s);
@@ -1282,7 +1282,7 @@ static int reiserfs_fill_super (struct super_block * s, void * data, int silent)
     struct reiserfs_transaction_handle th ;
     int old_format = 0;
     unsigned long blocks;
-	unsigned int commit_max_age = 0;
+    unsigned int commit_max_age = 0;
     int jinit_done = 0 ;
     struct reiserfs_iget_args args ;
     struct reiserfs_super_block * rs;
