@@ -33,16 +33,6 @@
 
 #define segment_eq(a,b)	((a).seg == (b).seg)
 
-#ifdef __CHECKER__
-#define CHECK_UPTR(ptr) do {				\
-	__typeof__(*(ptr)) *__dummy_check_uptr =	\
-		(void __user *)&__dummy_check_uptr;	\
-} while(0)
-#else
-#define CHECK_UPTR(ptr)
-#endif
-
-
 #define __addr_ok(addr) (!((unsigned long)(addr) & (current_thread_info()->addr_limit.seg)))
 
 /*
@@ -50,7 +40,7 @@
  */
 #define __range_not_ok(addr,size) ({ \
 	unsigned long flag,sum; \
-	CHECK_UPTR(addr);	\
+	__chk_user_ptr(addr); \
 	asm("# range_ok\n\r" \
 		"addq %3,%1 ; sbbq %0,%0 ; cmpq %1,%4 ; sbbq $0,%0"  \
 		:"=&r" (flag), "=r" (sum) \
@@ -114,7 +104,7 @@ extern void __get_user_8(void);
 #define get_user(x,ptr)							\
 ({	long __val_gu;							\
 	int __ret_gu; 							\
-	CHECK_UPTR(ptr);						\
+	__chk_user_ptr(ptr);						\
 	switch(sizeof (*(ptr))) {					\
 	case 1:  __get_user_x(1,__ret_gu,__val_gu,ptr); break;		\
 	case 2:  __get_user_x(2,__ret_gu,__val_gu,ptr); break;		\
@@ -150,7 +140,6 @@ extern void __put_user_bad(void);
 #define __put_user_nocheck(x,ptr,size)			\
 ({							\
 	int __pu_err;					\
-	CHECK_UPTR(ptr);				\
 	__put_user_size((x),(ptr),(size),__pu_err);	\
 	__pu_err;					\
 })
@@ -168,6 +157,7 @@ extern void __put_user_bad(void);
 #define __put_user_size(x,ptr,size,retval)				\
 do {									\
 	retval = 0;							\
+	__chk_user_ptr(ptr);						\
 	switch (size) {							\
 	  case 1: __put_user_asm(x,ptr,retval,"b","b","iq",-EFAULT); break;\
 	  case 2: __put_user_asm(x,ptr,retval,"w","w","ir",-EFAULT); break;\
@@ -206,7 +196,6 @@ struct __large_struct { unsigned long buf[100]; };
 ({								\
 	int __gu_err;						\
 	long __gu_val;						\
-	CHECK_UPTR(ptr);					\
 	__get_user_size(__gu_val,(ptr),(size),__gu_err);	\
 	(x) = (__typeof__(*(ptr)))__gu_val;			\
 	__gu_err;						\
@@ -217,6 +206,7 @@ extern int __get_user_bad(void);
 #define __get_user_size(x,ptr,size,retval)				\
 do {									\
 	retval = 0;							\
+	__chk_user_ptr(ptr);						\
 	switch (size) {							\
 	  case 1: __get_user_asm(x,ptr,retval,"b","b","=q",-EFAULT); break;\
 	  case 2: __get_user_asm(x,ptr,retval,"w","w","=r",-EFAULT); break;\
@@ -257,28 +247,28 @@ static inline int __copy_from_user(void *dst, const void __user *src, unsigned s
 { 
        int ret = 0;
 	if (!__builtin_constant_p(size))
-		return copy_user_generic(dst,(void *)src,size);
+		return copy_user_generic(dst,(__force void *)src,size);
 	switch (size) { 
-	case 1:__get_user_asm(*(u8*)dst,(u8 *)src,ret,"b","b","=q",1); 
+	case 1:__get_user_asm(*(u8*)dst,(u8 __user *)src,ret,"b","b","=q",1); 
 		return ret;
-	case 2:__get_user_asm(*(u16*)dst,(u16*)src,ret,"w","w","=r",2);
+	case 2:__get_user_asm(*(u16*)dst,(u16 __user *)src,ret,"w","w","=r",2);
 		return ret;
-	case 4:__get_user_asm(*(u32*)dst,(u32*)src,ret,"l","k","=r",4);
+	case 4:__get_user_asm(*(u32*)dst,(u32 __user *)src,ret,"l","k","=r",4);
 		return ret;
-	case 8:__get_user_asm(*(u64*)dst,(u64*)src,ret,"q","","=r",8);
+	case 8:__get_user_asm(*(u64*)dst,(u64 __user *)src,ret,"q","","=r",8);
 		return ret; 
 	case 10:
-	       	__get_user_asm(*(u64*)dst,(u64*)src,ret,"q","","=r",16);
+	       	__get_user_asm(*(u64*)dst,(u64 __user *)src,ret,"q","","=r",16);
 		if (unlikely(ret)) return ret;
-		__get_user_asm(*(u16*)(8+(char*)dst),(u16*)(8+(char*)src),ret,"w","w","=r",2);
+		__get_user_asm(*(u16*)(8+(char*)dst),(u16 __user *)(8+(char __user *)src),ret,"w","w","=r",2);
 		return ret; 
 	case 16:
-		__get_user_asm(*(u64*)dst,(u64*)src,ret,"q","","=r",16);
+		__get_user_asm(*(u64*)dst,(u64 __user *)src,ret,"q","","=r",16);
 		if (unlikely(ret)) return ret;
-		__get_user_asm(*(u64*)(8+(char*)dst),(u64*)(8+(char*)src),ret,"q","","=r",8);
+		__get_user_asm(*(u64*)(8+(char*)dst),(u64 __user *)(8+(char __user *)src),ret,"q","","=r",8);
 		return ret; 
 	default:
-		return copy_user_generic(dst,(void *)src,size); 
+		return copy_user_generic(dst,(__force void *)src,size); 
 	}
 }	
 
@@ -286,30 +276,30 @@ static inline int __copy_to_user(void __user *dst, const void *src, unsigned siz
 { 
        int ret = 0;
 	if (!__builtin_constant_p(size))
-		return copy_user_generic((void *)dst,src,size);
+		return copy_user_generic((__force void *)dst,src,size);
 	switch (size) { 
-	case 1:__put_user_asm(*(u8*)src,(u8 *)dst,ret,"b","b","iq",1); 
+	case 1:__put_user_asm(*(u8*)src,(u8 __user *)dst,ret,"b","b","iq",1); 
 		return ret;
-	case 2:__put_user_asm(*(u16*)src,(u16*)dst,ret,"w","w","ir",2);
+	case 2:__put_user_asm(*(u16*)src,(u16 __user *)dst,ret,"w","w","ir",2);
 		return ret;
-	case 4:__put_user_asm(*(u32*)src,(u32*)dst,ret,"l","k","ir",4);
+	case 4:__put_user_asm(*(u32*)src,(u32 __user *)dst,ret,"l","k","ir",4);
 		return ret;
-	case 8:__put_user_asm(*(u64*)src,(u64*)dst,ret,"q","","ir",8);
+	case 8:__put_user_asm(*(u64*)src,(u64 __user *)dst,ret,"q","","ir",8);
 		return ret; 
 	case 10:
-		__put_user_asm(*(u64*)src,(u64*)dst,ret,"q","","ir",10);
+		__put_user_asm(*(u64*)src,(u64 __user *)dst,ret,"q","","ir",10);
 		if (unlikely(ret)) return ret;
 		asm("":::"memory");
-		__put_user_asm(4[(u16*)src],4+(u16*)dst,ret,"w","w","ir",2);
+		__put_user_asm(4[(u16*)src],4+(u16 __user *)dst,ret,"w","w","ir",2);
 		return ret; 
 	case 16:
-		__put_user_asm(*(u64*)src,(u64*)dst,ret,"q","","ir",16);
+		__put_user_asm(*(u64*)src,(u64 __user *)dst,ret,"q","","ir",16);
 		if (unlikely(ret)) return ret;
 		asm("":::"memory");
-		__put_user_asm(1[(u64*)src],1+(u64*)dst,ret,"q","","ir",8);
+		__put_user_asm(1[(u64*)src],1+(u64 __user *)dst,ret,"q","","ir",8);
 		return ret; 
 	default:
-		return copy_user_generic((void *)dst,src,size); 
+		return copy_user_generic((__force void *)dst,src,size); 
 	}
 }	
 
@@ -318,39 +308,39 @@ static inline int __copy_in_user(void __user *dst, const void __user *src, unsig
 { 
        int ret = 0;
 	if (!__builtin_constant_p(size))
-		return copy_user_generic((void *)dst,(void *)src,size);
+		return copy_user_generic((__force void *)dst,(__force void *)src,size);
 	switch (size) { 
 	case 1: { 
 		u8 tmp;
-		__get_user_asm(tmp,(u8 *)src,ret,"b","b","=q",1); 
+		__get_user_asm(tmp,(u8 __user *)src,ret,"b","b","=q",1); 
 		if (likely(!ret))
-			__put_user_asm(tmp,(u8 *)dst,ret,"b","b","iq",1); 
+			__put_user_asm(tmp,(u8 __user *)dst,ret,"b","b","iq",1); 
 		return ret;
 	}
 	case 2: { 
 		u16 tmp;
-		__get_user_asm(tmp,(u16 *)src,ret,"w","w","=r",2); 
+		__get_user_asm(tmp,(u16 __user *)src,ret,"w","w","=r",2); 
 		if (likely(!ret))
-			__put_user_asm(tmp,(u16 *)dst,ret,"w","w","ir",2); 
+			__put_user_asm(tmp,(u16 __user *)dst,ret,"w","w","ir",2); 
 		return ret;
 	}
 
 	case 4: { 
 		u32 tmp;
-		__get_user_asm(tmp,(u32 *)src,ret,"l","k","=r",4); 
+		__get_user_asm(tmp,(u32 __user *)src,ret,"l","k","=r",4); 
 		if (likely(!ret))
-			__put_user_asm(tmp,(u32 *)dst,ret,"l","k","ir",4); 
+			__put_user_asm(tmp,(u32 __user *)dst,ret,"l","k","ir",4); 
 		return ret;
 	}
 	case 8: { 
 		u64 tmp;
-		__get_user_asm(tmp,(u64 *)src,ret,"q","","=r",8); 
+		__get_user_asm(tmp,(u64 __user *)src,ret,"q","","=r",8); 
 		if (likely(!ret))
-			__put_user_asm(tmp,(u64 *)dst,ret,"q","","ir",8); 
+			__put_user_asm(tmp,(u64 __user *)dst,ret,"q","","ir",8); 
 		return ret;
 	}
 	default:
-		return copy_user_generic((void *)dst,(void *)src,size); 
+		return copy_user_generic((__force void *)dst,(__force void *)src,size); 
 	}
 }	
 
