@@ -1283,8 +1283,5 @@ static inline ino_t parent_ino(struct dentry *dentry)
 	return res;
 }
 
-#include <linux/buffer_head.h>
-
 #endif /* __KERNEL__ */
-
 #endif /* _LINUX_FS_H */
