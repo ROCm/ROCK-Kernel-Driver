@@ -160,23 +160,29 @@ static void rvfree(void * mem, unsigned long size) {
 	}
 }
 
-/* return a page table pointing to N pages of locked memory */
+/* return a page table pointing to N pages of locked memory
+ *
+ * NOTE: The meye device expects dma_addr_t size to be 32 bits
+ * (the toc must be exactly 1024 entries each of them being 4 bytes
+ * in size, the whole result being 4096 bytes). We're using here
+ * dma_addr_t for corectness but the compilation of this driver is
+ * disabled for HIGHMEM64G=y, where sizeof(dma_addr_t) != 4 */
 static int ptable_alloc(void) {
-	u32 *pt;
+	dma_addr_t *pt;
 	int i;
 
 	memset(meye.mchip_ptable, 0, sizeof(meye.mchip_ptable));
 
-	meye.mchip_ptable[MCHIP_NB_PAGES] = dma_alloc_coherent(&meye.mchip_dev->dev, 
-							       PAGE_SIZE, 
-							       &meye.mchip_dmahandle,
-							       GFP_KERNEL);
-	if (!meye.mchip_ptable[MCHIP_NB_PAGES]) {
+	meye.mchip_ptable_toc = dma_alloc_coherent(&meye.mchip_dev->dev,
+						   PAGE_SIZE,
+						   &meye.mchip_dmahandle,
+						   GFP_KERNEL);
+	if (!meye.mchip_ptable_toc) {
 		meye.mchip_dmahandle = 0;
 		return -1;
 	}
 
-	pt = (u32 *)meye.mchip_ptable[MCHIP_NB_PAGES];
+	pt = meye.mchip_ptable_toc;
 	for (i = 0; i < MCHIP_NB_PAGES; i++) {
 		meye.mchip_ptable[i] = dma_alloc_coherent(&meye.mchip_dev->dev, 
 							  PAGE_SIZE,
@@ -184,13 +190,18 @@ static int ptable_alloc(void) {
 							  GFP_KERNEL);
 		if (!meye.mchip_ptable[i]) {
 			int j;
-			pt = (u32 *)meye.mchip_ptable[MCHIP_NB_PAGES];
+			pt = meye.mchip_ptable_toc;
 			for (j = 0; j < i; ++j) {
 				dma_free_coherent(&meye.mchip_dev->dev,
 						  PAGE_SIZE,
 						  meye.mchip_ptable[j], *pt);
 				pt++;
 			}
+			dma_free_coherent(&meye.mchip_dev->dev,
+					  PAGE_SIZE,
+					  meye.mchip_ptable_toc,
+					  meye.mchip_dmahandle);
+			meye.mchip_ptable_toc = 0;
 			meye.mchip_dmahandle = 0;
 			return -1;
 		}
@@ -200,10 +211,10 @@ static int ptable_alloc(void) {
 }
 
 static void ptable_free(void) {
-	u32 *pt;
+	dma_addr_t *pt;
 	int i;
 
-	pt = (u32 *)meye.mchip_ptable[MCHIP_NB_PAGES];
+	pt = meye.mchip_ptable_toc;
 	for (i = 0; i < MCHIP_NB_PAGES; i++) {
 		if (meye.mchip_ptable[i])
 			dma_free_coherent(&meye.mchip_dev->dev, 
@@ -212,13 +223,14 @@ static void ptable_free(void) {
 		pt++;
 	}
 
-	if (meye.mchip_ptable[MCHIP_NB_PAGES])
+	if (meye.mchip_ptable_toc)
 		dma_free_coherent(&meye.mchip_dev->dev, 
 				  PAGE_SIZE, 
-				  meye.mchip_ptable[MCHIP_NB_PAGES],
+				  meye.mchip_ptable_toc,
 				  meye.mchip_dmahandle);
 
 	memset(meye.mchip_ptable, 0, sizeof(meye.mchip_ptable));
+	meye.mchip_ptable_toc = 0;
 	meye.mchip_dmahandle = 0;
 }
 

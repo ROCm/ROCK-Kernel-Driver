@@ -205,7 +205,7 @@ config VIDEO_ZR36120
 
 config VIDEO_MEYE
 	tristate "Sony Vaio Picturebook Motion Eye Video For Linux (EXPERIMENTAL)"
-	depends on VIDEO_DEV && SONYPI
+	depends on VIDEO_DEV && SONYPI && !HIGHMEM64G
 	---help---
 	  This is the video4linux driver for the Motion Eye camera found
 	  in the Vaio Picturebook laptops. Please read the material in
