@@ -13,21 +13,14 @@
 #define VERIFY_READ	0
 #define VERIFY_WRITE	1
 
-/* We let the MMU do all checking */
-extern inline int access_ok(int type, const void * addr, unsigned long size)
-{
-#define	RANGE_CHECK_OK(addr, size, lower, upper) \
-	(((addr) >= (lower)) && (((addr) + (size)) < (upper)))
+#define access_ok(type,addr,size)	_access_ok((unsigned long)(addr),(size))
 
-#ifdef CONFIG_COLDFIRE
-	extern unsigned long _ramend;
-	return(RANGE_CHECK_OK((unsigned long) addr, size, 0L, _ramend) ||
-			(is_in_rom((unsigned long) addr) &&
-					is_in_rom((unsigned long) addr + size)));
-#else
-	/* DAVIDM - this could be restricted a lot more */
-	return(RANGE_CHECK_OK((unsigned long)addr, size, 0, 0x10f00000));
-#endif
+static inline int _access_ok(unsigned long addr, unsigned long size)
+{
+	extern unsigned long memory_start, memory_end;
+
+	return (((addr >= memory_start) && (addr+size < memory_end)) ||
+		(is_in_rom(addr) && is_in_rom(addr+size)));
 }
 
 extern inline int verify_area(int type, const void * addr, unsigned long size)
