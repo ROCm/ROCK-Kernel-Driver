@@ -801,7 +801,7 @@ void	DivaDoCardDpc(card_t *card)
 			
 }
 
-void	DivasDoDpc(void *pData)
+void	DivasDoDpc(unsigned long dummy)
 {
 	card_t	*card = DivasCards;
 	int 	i = DivasCardNext;
@@ -812,11 +812,6 @@ void	DivasDoDpc(void *pData)
 		DivaDoCardDpc(card);
             card++;
 	}
-}
-
-void	DivasDoRequestDpc(void *pData)
-{
-	DivasDoDpc(pData);
 }
 
 /*

@@ -10,7 +10,7 @@
 #undef N_DATA
 
 #include <linux/kernel.h>
-
+#include <linux/tqueue.h>
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/ioport.h>
@@ -24,6 +24,8 @@
 MODULE_DESCRIPTION("ISDN4Linux: Driver for Eicon Diva Server cards");
 MODULE_AUTHOR("Armin Schindler");
 MODULE_LICENSE("GPL");
+
+void DivasInitDpc(void);
 
 #ifdef MODULE
 #include "idi.h"
@@ -46,6 +48,8 @@ divas_init(void)
 	printk(KERN_WARNING "CONFIG_PCI is not defined!\n");
 	return -ENODEV;
 #endif
+
+	DivasInitDpc();
 
 	if (pci_present())
 	{
