@@ -23,7 +23,7 @@ static struct acpi_table_slit *acpi_slit;
 static nodemask_t nodes_parsed __initdata;
 static nodemask_t nodes_found __initdata;
 static struct node nodes[MAX_NUMNODES] __initdata;
-static __u8  pxm2node[256] __initdata = { [0 ... 255] = 0xff };
+static __u8  pxm2node[256] = { [0 ... 255] = 0xff };
 
 static __init int setup_node(int pxm)
 {
