@@ -1575,7 +1575,7 @@ rtl8169_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		tp->Tx_skbuff[entry] = skb;
 		tp->TxDescArray[entry].addr = cpu_to_le64(mapping);
 
-		/* anti gcc 2.95.3 bugware */
+		/* anti gcc 2.95.[3/4] bugware - do not merge these lines */
 		status = DescOwn | FirstFrag | LastFrag | len |
 			 (RingEnd * !((entry + 1) % NUM_TX_DESC));
 		tp->TxDescArray[entry].opts1 = cpu_to_le32(status);
