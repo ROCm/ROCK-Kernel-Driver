@@ -13,10 +13,6 @@
 #include <asm/sn/pci/pcibr.h>
 #include <asm/sn/pci/pcibr_private.h>
 #include <asm/sn/pci/pci_defs.h>
-#include <asm/sn/prio.h>
-#include <asm/sn/xtalk/xbow.h>
-#include <asm/sn/io.h>
-#include <asm/sn/sn_private.h>
 
 void              do_pcibr_rrb_clear(bridge_t *, int);
 void              do_pcibr_rrb_flush(bridge_t *, int);
