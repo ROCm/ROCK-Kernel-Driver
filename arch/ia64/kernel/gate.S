@@ -91,16 +91,18 @@ GLOBAL_ENTRY(__kernel_syscall_via_epc)
 	cmp.geu p6,p7=r19,r17			// (syscall > 0 && syscall < 1024+NR_syscalls)?
 	;;
 (p6)	ld8 r18=[r18]
-	mov r29=psr				// read psr (12 cyc load latency)
+	mov r21=ar.fpsr
 	add r14=-8,r14				// r14 <- addr of fsys_bubble_down entry
 	;;
 (p6)	mov b7=r18
 (p6)	tbit.z p8,p0=r18,0
 (p8)	br.dptk.many b7
 
+(p6)	rsm psr.i
 	mov r27=ar.rsc
-	mov r21=ar.fpsr
 	mov r26=ar.pfs
+	;;
+	mov r29=psr				// read psr (12 cyc load latency)
 /*
  * brl.cond doesn't work as intended because the linker would convert this branch
  * into a branch to a PLT.  Perhaps there will be a way to avoid this with some
