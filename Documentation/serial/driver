@@ -120,7 +120,7 @@ hardware.
 	          TTY stop to the driver (equiv to rs_stop).
 
 	Locking: port->lock taken.
-	Interrupts: caller dependent.
+	Interrupts: locally disabled.
 	This call must not sleep
 
   start_tx(port,tty_start)
