@@ -22,6 +22,7 @@
 #include <linux/ioport.h>
 #include <linux/mc146818rtc.h>
 #include <linux/delay.h>
+#include <linux/profile.h>
 
 #include <asm/oplib.h>
 #include <asm/mostek.h>
