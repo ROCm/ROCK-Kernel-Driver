@@ -909,15 +909,28 @@ void __init time_init_smp(void)
 {
 	char *timetype;
 
-	if (vxtime.hpet_address) {
+	/*
+	 * AMD systems with more than one CPU don't have fully synchronized
+	 * TSCs. Always use HPET gettimeofday for these, although it is slower.
+	 * Intel SMP systems usually have synchronized TSCs, so use always
+	 * the TSC.
+	 *
+	 * Exceptions:
+	 * IBM Summit. Will need to be special cased later.
+ 	 * AMD dual core may also not need HPET. Check me.
+	 */
+	if (vxtime.hpet_address &&
+	    num_online_cpus() > 1 &&
+	    boot_cpu_data.x86_vendor == X86_VENDOR_AMD) {
 		timetype = "HPET";
 		vxtime.last = hpet_readl(HPET_T0_CMP) - hpet_tick;
 		vxtime.mode = VXTIME_HPET;
 		do_gettimeoffset = do_gettimeoffset_hpet;
 	} else {
-		timetype = "PIT/TSC";
+		timetype = vxtime.hpet_address ? "HPET/TSC" : "PIT/TSC";
 		vxtime.mode = VXTIME_TSC;
 	}
+
 	printk(KERN_INFO "time.c: Using %s based timekeeping.\n", timetype);
 }
 
