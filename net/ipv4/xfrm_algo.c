@@ -314,6 +314,7 @@ void xfrm_probe_algs(void)
 	
 	BUG_ON(in_softirq());
 
+#ifdef CONFIG_CRYPTO
 	for (i = 0; i < aalg_entries(); i++) {
 		status = crypto_alg_available(aalg_list[i].name, 0);
 		if (aalg_list[i].available != status)
@@ -325,6 +326,7 @@ void xfrm_probe_algs(void)
 		if (ealg_list[i].available != status)
 			ealg_list[i].available = status;
 	}
+#endif
 }
 
 int xfrm_count_auth_supported(void)
