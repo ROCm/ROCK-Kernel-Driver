@@ -385,6 +385,8 @@ typedef struct {
 #define DRM_IOCTL_RADEON_INIT_HEAP  DRM_IOW( 0x55, drm_radeon_mem_init_heap_t)
 #define DRM_IOCTL_RADEON_IRQ_EMIT   DRM_IOWR( 0x56, drm_radeon_irq_emit_t)
 #define DRM_IOCTL_RADEON_IRQ_WAIT   DRM_IOW( 0x57, drm_radeon_irq_wait_t)
+/* added by Charl P. Botha - see radeon_cp.c for details */
+#define DRM_IOCTL_RADEON_CP_RESUME  DRM_IO(0x58)
 
 typedef struct drm_radeon_init {
 	enum {
