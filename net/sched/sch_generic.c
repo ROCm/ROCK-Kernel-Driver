@@ -99,11 +99,17 @@ int qdisc_restart(struct net_device *dev)
 	if ((skb = q->dequeue(q)) != NULL) {
 		unsigned nolock = (dev->features & NETIF_F_LLTX);
 		/*
-		 * When the driver has LLTX set it does not require any
-		 * locking in start_xmit.
+		 * When the driver has LLTX set it does its own locking
+		 * in start_xmit. No need to add additional overhead by
+		 * locking again. These checks are worth it because
+		 * even uncongested locks can be quite expensive.
+		 * The driver can do trylock like here too, in case
+		 * of lock congestion it should return -1 and the packet
+		 * will be requeued.
 		 */
 		if (!nolock) {
-			if (!spin_trylock_irq(&dev->xmit_lock)) {
+			if (!spin_trylock(&dev->xmit_lock)) {
+			collision:
 				/* So, someone grabbed the driver. */
 				
 				/* It may be transient configuration error,
@@ -137,10 +143,14 @@ int qdisc_restart(struct net_device *dev)
 				if (ret == NETDEV_TX_OK) { 
 					if (!nolock) {
 						dev->xmit_lock_owner = -1;
-						spin_unlock_irq(&dev->xmit_lock);
+						spin_unlock(&dev->xmit_lock);
 					}
 					spin_lock(&dev->queue_lock);
 					return -1;
+				}
+				if (ret == NETDEV_TX_LOCKED && nolock) {
+					spin_lock(&dev->queue_lock);
+					goto collision; 
 				}
 			}
 
@@ -148,7 +158,7 @@ int qdisc_restart(struct net_device *dev)
 			/* Release the driver */
 			if (!nolock) { 
 				dev->xmit_lock_owner = -1;
-				spin_unlock_irq(&dev->xmit_lock);
+				spin_unlock(&dev->xmit_lock);
 			} 
 			spin_lock(&dev->queue_lock);
 			q = dev->qdisc;
@@ -176,7 +186,7 @@ static void dev_watchdog(unsigned long arg)
 {
 	struct net_device *dev = (struct net_device *)arg;
 
-	spin_lock_irq(&dev->xmit_lock);
+	spin_lock(&dev->xmit_lock);
 	if (dev->qdisc != &noop_qdisc) {
 		if (netif_device_present(dev) &&
 		    netif_running(dev) &&
@@ -190,7 +200,7 @@ static void dev_watchdog(unsigned long arg)
 				dev_hold(dev);
 		}
 	}
-	spin_unlock_irq(&dev->xmit_lock);
+	spin_unlock(&dev->xmit_lock);
 
 	dev_put(dev);
 }
@@ -214,17 +224,17 @@ void __netdev_watchdog_up(struct net_device *dev)
 
 static void dev_watchdog_up(struct net_device *dev)
 {
-	spin_lock_irq(&dev->xmit_lock);
+	spin_lock_bh(&dev->xmit_lock);
 	__netdev_watchdog_up(dev);
-	spin_unlock_irq(&dev->xmit_lock);
+	spin_unlock_bh(&dev->xmit_lock);
 }
 
 static void dev_watchdog_down(struct net_device *dev)
 {
-	spin_lock_irq(&dev->xmit_lock);
+	spin_lock_bh(&dev->xmit_lock);
 	if (del_timer(&dev->watchdog_timer))
 		__dev_put(dev);
-	spin_unlock_irq(&dev->xmit_lock);
+	spin_unlock_bh(&dev->xmit_lock);
 }
 
 /* "NOOP" scheduler: the best scheduler, recommended for all interfaces

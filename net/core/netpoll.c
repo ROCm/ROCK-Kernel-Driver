@@ -188,7 +188,7 @@ repeat:
 		return;
 	}
 
-	spin_lock_irq(&np->dev->xmit_lock);
+	spin_lock(&np->dev->xmit_lock);
 	np->dev->xmit_lock_owner = smp_processor_id();
 
 	/*
@@ -197,7 +197,7 @@ repeat:
 	 */
 	if (netif_queue_stopped(np->dev)) {
 		np->dev->xmit_lock_owner = -1;
-		spin_unlock_irq(&np->dev->xmit_lock);
+		spin_unlock(&np->dev->xmit_lock);
 
 		netpoll_poll(np);
 		goto repeat;
@@ -205,7 +205,7 @@ repeat:
 
 	status = np->dev->hard_start_xmit(skb, np->dev);
 	np->dev->xmit_lock_owner = -1;
-	spin_unlock_irq(&np->dev->xmit_lock);
+	spin_unlock(&np->dev->xmit_lock);
 
 	/* transmit busy */
 	if(status) {

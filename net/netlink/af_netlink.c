@@ -91,12 +91,12 @@ struct nl_pid_hash {
 struct netlink_table {
 	struct nl_pid_hash hash;
 	struct hlist_head mc_list;
+	unsigned int nl_nonroot;
 };
 
 static struct netlink_table *nl_table;
 
 static DECLARE_WAIT_QUEUE_HEAD(nl_table_wait);
-static unsigned int nl_nonroot[MAX_LINKS];
 
 static int netlink_dump(struct sock *sk);
 static void netlink_destroy_callback(struct netlink_callback *cb);
@@ -438,7 +438,7 @@ retry:
 
 static inline int netlink_capable(struct socket *sock, unsigned int flag) 
 { 
-	return (nl_nonroot[sock->sk->sk_protocol] & flag) ||
+	return (nl_table[sock->sk->sk_protocol].nl_nonroot & flag) ||
 	       capable(CAP_NET_ADMIN);
 } 
 
@@ -1066,7 +1066,7 @@ netlink_kernel_create(int unit, void (*input)(struct sock *sk, int len))
 void netlink_set_nonroot(int protocol, unsigned int flags)
 { 
 	if ((unsigned int)protocol < MAX_LINKS) 
-		nl_nonroot[protocol] = flags;
+		nl_table[protocol].nl_nonroot = flags;
 } 
 
 static void netlink_destroy_callback(struct netlink_callback *cb)
