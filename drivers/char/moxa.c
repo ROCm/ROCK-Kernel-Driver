@@ -216,10 +216,7 @@ static struct timer_list moxaEmptyTimer[MAX_PORTS];
 static struct semaphore moxaBuffSem;
 
 int moxa_init(void);
-#ifdef MODULE
-int init_module(void);
-void cleanup_module(void);
-#endif
+
 /*
  * static functions:
  */

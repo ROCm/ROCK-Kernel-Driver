@@ -35,6 +35,7 @@
 #include <asm/starfire.h>
 #include <asm/tlb.h>
 #include <asm/spitfire.h>
+#include <asm/sections.h>
 
 DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
 
@@ -54,8 +55,8 @@ unsigned long tlb_context_cache = CTX_FIRST_VERSION - 1;
 #define CTX_BMAP_SLOTS (1UL << (CTX_VERSION_SHIFT - 6))
 unsigned long mmu_context_bmap[CTX_BMAP_SLOTS];
 
-/* References to section boundaries */
-extern char __init_begin, __init_end, _start, _end, etext, edata;
+/* References to special section boundaries */
+extern char  _start[], _end[];
 
 /* Initial ramdisk setup */
 extern unsigned int sparc_ramdisk_image;
@@ -1331,7 +1332,7 @@ unsigned long __init bootmem_init(unsigned long *pages_avail)
 	 * image.  The kernel is hard mapped below PAGE_OFFSET in a
 	 * 4MB locked TLB translation.
 	 */
-	start_pfn  = PAGE_ALIGN((unsigned long) &_end) -
+	start_pfn  = PAGE_ALIGN((unsigned long) _end) -
 		((unsigned long) KERNBASE);
 
 	/* Adjust up to the physical address where the kernel begins. */
@@ -1347,7 +1348,7 @@ unsigned long __init bootmem_init(unsigned long *pages_avail)
 #ifdef CONFIG_BLK_DEV_INITRD
 	/* Now have to check initial ramdisk, so that bootmap does not overwrite it */
 	if (sparc_ramdisk_image) {
-		if (sparc_ramdisk_image >= (unsigned long)&_end - 2 * PAGE_SIZE)
+		if (sparc_ramdisk_image >= (unsigned long)_end - 2 * PAGE_SIZE)
 			sparc_ramdisk_image -= KERNBASE;
 		initrd_start = sparc_ramdisk_image + phys_base;
 		initrd_end = initrd_start + sparc_ramdisk_size;
@@ -1424,7 +1425,7 @@ void __init paging_init(void)
 
 	set_bit(0, mmu_context_bmap);
 
-	real_end = (unsigned long)&_end;
+	real_end = (unsigned long)_end;
 	if ((real_end > ((unsigned long)KERNBASE + 0x400000)))
 		bigkernel = 1;
 #ifdef CONFIG_BLK_DEV_INITRD
@@ -1716,7 +1717,7 @@ void __init mem_init(void)
 	memset(sparc64_valid_addr_bitmap, 0, i << 3);
 
 	addr = PAGE_OFFSET + phys_base;
-	last = PAGE_ALIGN((unsigned long)&_end) -
+	last = PAGE_ALIGN((unsigned long)_end) -
 		((unsigned long) KERNBASE);
 	last += PAGE_OFFSET + phys_base;
 	while (addr < last) {
@@ -1743,11 +1744,11 @@ void __init mem_init(void)
 	SetPageReserved(mem_map_zero);
 	clear_page(page_address(mem_map_zero));
 
-	codepages = (((unsigned long) &etext) - ((unsigned long)&_start));
+	codepages = (((unsigned long) _etext) - ((unsigned long) _start));
 	codepages = PAGE_ALIGN(codepages) >> PAGE_SHIFT;
-	datapages = (((unsigned long) &edata) - ((unsigned long)&etext));
+	datapages = (((unsigned long) _edata) - ((unsigned long) _etext));
 	datapages = PAGE_ALIGN(datapages) >> PAGE_SHIFT;
-	initpages = (((unsigned long) &__init_end) - ((unsigned long) &__init_begin));
+	initpages = (((unsigned long) __init_end) - ((unsigned long) __init_begin));
 	initpages = PAGE_ALIGN(initpages) >> PAGE_SHIFT;
 
 #ifndef CONFIG_SMP
@@ -1810,8 +1811,8 @@ void free_initmem (void)
 	/*
 	 * The init section is aligned to 8k in vmlinux.lds. Page align for >8k pagesizes.
 	 */
-	addr = PAGE_ALIGN((unsigned long)(&__init_begin));
-	initend = (unsigned long)(&__init_end) & PAGE_MASK;
+	addr = PAGE_ALIGN((unsigned long)(__init_begin));
+	initend = (unsigned long)(__init_end) & PAGE_MASK;
 	for (; addr < initend; addr += PAGE_SIZE) {
 		unsigned long page;
 		struct page *p;

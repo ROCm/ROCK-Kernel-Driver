@@ -176,6 +176,8 @@ EXPORT_SYMBOL(up);
 /* Atomic counter implementation. */
 EXPORT_SYMBOL(__atomic_add);
 EXPORT_SYMBOL(__atomic_sub);
+EXPORT_SYMBOL(__atomic64_add);
+EXPORT_SYMBOL(__atomic64_sub);
 #ifdef CONFIG_SMP
 EXPORT_SYMBOL(atomic_dec_and_lock);
 #endif

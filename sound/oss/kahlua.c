@@ -159,7 +159,7 @@ static int __devinit probe_one(struct pci_dev *pdev, const struct pci_device_id 
 	if(sb_dsp_detect(hw_config, 0, 0, NULL)==0)
 	{
 		printk(KERN_ERR "kahlua: audio not responding.\n");
-		return 1;
+		goto err_out_free;
 	}
 
 	oldquiet = sb_be_quiet;	
@@ -167,13 +167,16 @@ static int __devinit probe_one(struct pci_dev *pdev, const struct pci_device_id 
 	if(sb_dsp_init(hw_config, THIS_MODULE))
 	{
 		sb_be_quiet = oldquiet;
-		pci_set_drvdata(pdev, NULL);
-		kfree(hw_config);
-		return 1;
+		goto err_out_free;
 	}
 	sb_be_quiet = oldquiet;
 	
 	return 0;
+
+err_out_free:
+	pci_set_drvdata(pdev, NULL);
+	kfree(hw_config);
+	return 1;
 }
 
 static void __devexit remove_one(struct pci_dev *pdev)

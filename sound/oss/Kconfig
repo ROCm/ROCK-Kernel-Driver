@@ -233,6 +233,10 @@ config SOUND_ICH
 	  Support for integral audio in Intel's I/O Controller Hub (ICH)
 	  chipset, as used on the 810/820/840 motherboards.
 
+config SOUND_HARMONY
+	tristate "PA Harmony audio driver"
+	depends on GSC_LASI && SOUND
+
 config SOUND_RME96XX
 	tristate "RME Hammerfall (RME96XX) support (EXPERIMENTAL)"
 	depends on SOUND_PRIME!=n && SOUND && PCI && EXPERIMENTAL
@@ -259,6 +263,10 @@ config SOUND_VWSND
 	  able to use its on-board audio.  Read
 	  <file:Documentation/sound/oss/vwsnd> for more info on this driver's
 	  capabilities.
+
+config SOUND_HAL2
+	tristate "SGI HAL2 sound (EXPERIMENTAL)"
+	depends on SGI_IP22 && SOUND && EXPERIMENTAL
 
 config SOUND_VRC5477
 	tristate "NEC Vrc5477 AC97 sound"
@@ -1125,6 +1133,10 @@ config SOUND_TVMIXER
 	help
 	  Support for audio mixer facilities on the BT848 TV frame-grabber
 	  card.
+
+config SOUND_KAHLUA
+	tristate "XpressAudio Sound Blaster emulation"
+	depends on SOUND_SB
 
 config SOUND_ALI5455
 	tristate "ALi5455 audio support"
