@@ -39,7 +39,7 @@
 
 #define PFX "powernow-k8: "
 #define BFX PFX "BIOS error: "
-#define VERSION "version 1.00.09b"
+#define VERSION "version 1.00.09e"
 #include "powernow-k8.h"
 
 /* serialize freq changes  */
@@ -596,6 +596,8 @@ static int find_psb_table(struct powernow_k8_data *data)
 	unsigned int i;
 	u32 mvs;
 	u8 maxvid;
+	u32 cpst = 0;
+	u32 thiscpuid;
 
 	for (i = 0xc0000; i < 0xffff0; i += 0x10) {
 		/* Scan BIOS looking for the signature. */
@@ -634,7 +636,14 @@ static int find_psb_table(struct powernow_k8_data *data)
 		dprintk(KERN_INFO PFX "maximum voltage step: %d - 0x%x\n", mvs, data->vidmvs);
 
 		dprintk(KERN_DEBUG PFX "numpst: 0x%x\n", psb->numpst);
-		if (psb->numpst != 1) {
+		cpst = psb->numpst;
+		if ((psb->cpuid == 0x00000fc0) || (psb->cpuid == 0x00000fe0) ){
+			thiscpuid = cpuid_eax(CPUID_PROCESSOR_SIGNATURE);
+			if ((thiscpuid == 0x00000fc0) || (thiscpuid == 0x00000fe0) ) {
+				cpst = 1;
+			}
+		}
+		if (cpst != 1) {
 			printk(KERN_ERR BFX "numpst must be 1\n");
 			return -ENODEV;
 		}
