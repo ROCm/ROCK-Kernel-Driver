@@ -499,7 +499,9 @@ e1000_probe(struct pci_dev *pdev,
 	if(pci_using_dac)
 		netdev->features |= NETIF_F_HIGHDMA;
 
-
+ 	/* hard_start_xmit is safe against parallel locking */
+ 	netdev->features |= NETIF_F_LLTX; 
+ 
 	adapter->en_mng_pt = e1000_enable_mng_pass_thru(&adapter->hw);
 
 	/* before reading the EEPROM, reset the controller to 
@@ -1276,8 +1278,11 @@ e1000_set_multi(struct net_device *netdev)
 	uint32_t rctl;
 	uint32_t hash_value;
 	int i;
+	unsigned long flags;
 
 	/* Check for Promiscuous and All Multicast modes */
+
+	spin_lock_irqsave(&adapter->tx_lock, flags);
 
 	rctl = E1000_READ_REG(hw, RCTL);
 
@@ -1327,6 +1332,8 @@ e1000_set_multi(struct net_device *netdev)
 
 	if(hw->mac_type == e1000_82542_rev2_0)
 		e1000_leave_82542_rst(adapter);
+
+	spin_unlock_irqrestore(&adapter->tx_lock, flags);
 }
 
 /* Need to wait a few seconds after link up to get diagnostic information from
@@ -1806,7 +1813,12 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 	if(adapter->pcix_82544)
 		count += nr_frags;
 
-	spin_lock_irqsave(&adapter->tx_lock, flags);
+ 	local_irq_save(flags); 
+ 	if (!spin_trylock(&adapter->tx_lock)) { 
+ 		/* Collision - tell upper layer to requeue */ 
+ 		local_irq_restore(flags); 
+ 		return -1; 
+ 	} 
 
 	/* need: count + 2 desc gap to keep tail from touching
 	 * head, otherwise try next time */
@@ -1816,12 +1828,11 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 		return 1;
 	}
 
-	spin_unlock_irqrestore(&adapter->tx_lock, flags);
-
 	if(unlikely(adapter->hw.mac_type == e1000_82547)) {
 		if(unlikely(e1000_82547_fifo_workaround(adapter, skb))) {
 			netif_stop_queue(netdev);
 			mod_timer(&adapter->tx_fifo_stall_timer, jiffies);
+			spin_unlock_irqrestore(&adapter->tx_lock, flags);
 			return 1;
 		}
 	}
@@ -1844,6 +1855,7 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 
 	netdev->trans_start = jiffies;
 
+	spin_unlock_irqrestore(&adapter->tx_lock, flags);
 	return 0;
 }
 
