@@ -1,5 +1,21 @@
 #
 # IPv6 configuration
 # 
+config IPV6_PRIVACY
+	bool "IPv6: Privacy Extensions (RFC 3041) support"
+	depends on IPV6
+	---help---
+	  Privacy Extensions for Stateless Address Autoconfiguration in IPv6
+	  support.  With this option, additional periodically-alter 
+	  pseudo-random global-scope unicast address(es) will assigned to
+	  your interface(s).
+	
+	  By default, kernel do not generate temporary addresses.
+	  To use temporary addresses, do
+	
+	        echo 2 >/proc/sys/net/ipv6/conf/all/use_tempaddr 
+
+	  See <file:Documentation/networking/ip-sysctl.txt> for details.
+
 source "net/ipv6/netfilter/Kconfig"
 

@@ -43,6 +43,12 @@ struct inet6_ifaddr
 	struct inet6_ifaddr	*lst_next;      /* next addr in addr_lst */
 	struct inet6_ifaddr	*if_next;       /* next addr in inet6_dev */
 
+#ifdef CONFIG_IPV6_PRIVACY
+	struct inet6_ifaddr	*tmp_next;	/* next addr in tempaddr_lst */
+	struct inet6_ifaddr	*ifpub;
+	int			regen_count;
+#endif
+
 	int			dead;
 };
 
@@ -86,7 +92,13 @@ struct ipv6_devconf
 	int		rtr_solicits;
 	int		rtr_solicit_interval;
 	int		rtr_solicit_delay;
-
+#ifdef CONFIG_IPV6_PRIVACY
+	int		use_tempaddr;
+	int		temp_valid_lft;
+	int		temp_prefered_lft;
+	int		regen_max_retry;
+	int		max_desync_factor;
+#endif
 	void		*sysctl;
 };
 
@@ -100,6 +112,13 @@ struct inet6_dev
 	atomic_t		refcnt;
 	__u32			if_flags;
 	int			dead;
+
+#ifdef CONFIG_IPV6_PRIVACY
+	u8			rndid[8];
+	u8			entropy[8];
+	struct timer_list	regen_timer;
+	struct inet6_ifaddr	*tempaddr_list;
+#endif
 
 	struct neigh_parms	*nd_parms;
 	struct inet6_dev	*next;
