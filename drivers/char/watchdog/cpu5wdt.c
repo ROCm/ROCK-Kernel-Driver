@@ -19,12 +19,10 @@
  *
  */
 
-#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/errno.h>
 #include <linux/miscdevice.h>
-#include <linux/kernel.h>
 #include <linux/fs.h>
 #include <linux/init.h>
 #include <linux/ioport.h>
@@ -312,5 +310,3 @@ MODULE_PARM_DESC(verbose, "be verbose, default is 0 (no)");
 
 MODULE_PARM(ticks, "i");
 MODULE_PARM_DESC(ticks, "count down ticks, default is 10000");
-
-EXPORT_NO_SYMBOLS;
