@@ -427,6 +427,13 @@ Module parameters
 	* Creative Card 5.1 (c) 2003			[0x3fc3/0x7cff]
         * Creative Card all ins and outs		[0x3fff/0x7fff]
     
+  Module snd-emu10k1x
+  -------------------
+
+    Module for Creative Emu10k1X (SB Live Dell OEM version)
+
+    Module supports up to 8 cards.
+
   Module snd-ens1370
   ------------------
 
