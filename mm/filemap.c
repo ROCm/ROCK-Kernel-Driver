@@ -1036,7 +1036,37 @@ no_cached_page:
 	UPDATE_ATIME(inode);
 }
 
-int file_read_actor(read_descriptor_t * desc, struct page *page, unsigned long offset, unsigned long size)
+/*
+ * Fault a userspace page into pagetables.  Return non-zero on a fault.
+ *
+ * FIXME: this assumes that two userspace pages are always sufficient.  That's
+ * not true if PAGE_CACHE_SIZE > PAGE_SIZE.
+ */
+static inline int fault_in_pages_writeable(char *uaddr, int size)
+{
+	int ret;
+
+	/*
+	 * Writing zeroes into userspace here is OK, because we know that if
+	 * the zero gets there, we'll be overwriting it.
+	 */
+	ret = __put_user(0, uaddr);
+	if (ret == 0) {
+		char *end = uaddr + size - 1;
+
+		/*
+		 * If the page was already mapped, this will get a cache miss
+		 * for sure, so try to avoid doing it.
+		 */
+		if (((unsigned long)uaddr & PAGE_MASK) !=
+				((unsigned long)end & PAGE_MASK))
+		 	ret = __put_user(0, end);
+	}
+	return ret;
+}
+
+int file_read_actor(read_descriptor_t *desc, struct page *page,
+			unsigned long offset, unsigned long size)
 {
 	char *kaddr;
 	unsigned long left, count = desc->count;
@@ -1044,14 +1074,28 @@ int file_read_actor(read_descriptor_t * desc, struct page *page, unsigned long o
 	if (size > count)
 		size = count;
 
+	/*
+	 * Faults on the destination of a read are common, so do it before
+	 * taking the kmap.
+	 */
+	if (!fault_in_pages_writeable(desc->buf, size)) {
+		kaddr = kmap_atomic(page, KM_USER0);
+		left = __copy_to_user(desc->buf, kaddr + offset, size);
+		kunmap_atomic(kaddr, KM_USER0);
+		if (left == 0)
+			goto success;
+	}
+
+	/* Do it the slow way */
 	kaddr = kmap(page);
 	left = __copy_to_user(desc->buf, kaddr + offset, size);
 	kunmap(page);
-	
+
 	if (left) {
 		size -= left;
 		desc->error = -EFAULT;
 	}
+success:
 	desc->count = count - size;
 	desc->written += size;
 	desc->buf += size;
