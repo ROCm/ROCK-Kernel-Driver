@@ -1335,10 +1335,8 @@ static void raid5d (void *data)
 
 	handled = 0;
 
-	if (mddev->sb_dirty) {
-		mddev->sb_dirty = 0;
+	if (mddev->sb_dirty)
 		md_update_sb(mddev);
-	}
 	spin_lock_irq(&conf->device_lock);
 	while (1) {
 		struct list_head *first;

@@ -1084,7 +1084,6 @@ static void raid1d(void *data)
 		conf = mddev_to_conf(mddev);
 		if (mddev->sb_dirty) {
 			printk(KERN_INFO "raid1: dirty sb detected, updating.\n");
-			mddev->sb_dirty = 0;
 			md_update_sb(mddev);
 		}
 		bio = r1_bio->master_bio;

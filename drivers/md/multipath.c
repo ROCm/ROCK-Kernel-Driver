@@ -699,7 +699,6 @@ static void multipathd (void *data)
 		mddev = mp_bh->mddev;
 		if (mddev->sb_dirty) {
 			printk(KERN_INFO "dirty sb detected, updating.\n");
-			mddev->sb_dirty = 0;
 			md_update_sb(mddev);
 		}
 		bio = mp_bh->bio;

@@ -75,7 +75,7 @@ extern mdk_thread_t * md_register_thread (void (*run) (void *data),
 extern void md_unregister_thread (mdk_thread_t *thread);
 extern void md_wakeup_thread(mdk_thread_t *thread);
 extern void md_interrupt_thread (mdk_thread_t *thread);
-extern int md_update_sb (mddev_t *mddev);
+extern void md_update_sb (mddev_t *mddev);
 extern int md_do_sync(mddev_t *mddev, mdp_disk_t *spare);
 extern void md_done_sync(mddev_t *mddev, int blocks, int ok);
 extern void md_sync_acct(kdev_t dev, unsigned long nr_sectors);

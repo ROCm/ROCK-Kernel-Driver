@@ -921,12 +921,13 @@ static int sync_sbs(mddev_t * mddev)
 	return 0;
 }
 
-int md_update_sb(mddev_t * mddev)
+void __md_update_sb(mddev_t * mddev)
 {
 	int err, count = 100;
 	struct list_head *tmp;
 	mdk_rdev_t *rdev;
 
+	mddev->sb_dirty = 0;
 repeat:
 	mddev->sb->utime = CURRENT_TIME;
 	if (!(++mddev->sb->events_lo))
@@ -948,7 +949,7 @@ repeat:
 	 * nonpersistent superblocks
 	 */
 	if (mddev->sb->not_persistent)
-		return 0;
+		return;
 
 	printk(KERN_INFO "md: updating md%d RAID superblock on device\n",
 					mdidx(mddev));
@@ -976,8 +977,17 @@ repeat:
 		}
 		printk(KERN_ERR "md: excessive errors occurred during superblock update, exiting\n");
 	}
-	return 0;
 }
+
+void md_update_sb(mddev_t *mddev)
+{
+	if (mddev_lock(mddev))
+		return;
+	if (mddev->sb_dirty)
+		__md_update_sb(mddev);
+	mddev_unlock(mddev);
+}
+
 
 /*
  * Import a device. If 'on_disk', then sanity check the superblock
@@ -1648,7 +1658,7 @@ static int do_md_run(mddev_t * mddev)
 	}
 
 	mddev->sb->state &= ~(1 << MD_SB_CLEAN);
-	md_update_sb(mddev);
+	__md_update_sb(mddev);
 
 	/*
 	 * md_size has units of 1K blocks, which are
@@ -1770,7 +1780,7 @@ static int do_md_stop(mddev_t * mddev, int ro)
 				printk(KERN_INFO "md: marking sb clean...\n");
 				mddev->sb->state |= 1 << MD_SB_CLEAN;
 			}
-			md_update_sb(mddev);
+			__md_update_sb(mddev);
 		}
 		if (ro)
 			set_device_ro(dev, 1);
@@ -2281,8 +2291,7 @@ static int hot_remove_disk(mddev_t * mddev, kdev_t dev)
 
 	remove_descriptor(disk, mddev->sb);
 	kick_rdev_from_array(rdev);
-	mddev->sb_dirty = 1;
-	md_update_sb(mddev);
+	__md_update_sb(mddev);
 
 	return 0;
 busy:
@@ -2393,9 +2402,7 @@ static int hot_add_disk(mddev_t * mddev, kdev_t dev)
 	mddev->sb->spare_disks++;
 	mddev->sb->working_disks++;
 
-	mddev->sb_dirty = 1;
-
-	md_update_sb(mddev);
+	__md_update_sb(mddev);
 
 	/*
 	 * Kick recovery, maybe this spare has to be added to the
@@ -2918,7 +2925,6 @@ int md_error(mddev_t *mddev, struct block_device *bdev)
 		return 0;
 	if (!mddev->pers->error_handler
 			|| mddev->pers->error_handler(mddev,rdev) <= 0) {
-		free_disk_sb(rrdev);
 		rrdev->faulty = 1;
 	} else
 		return 1;
@@ -3423,8 +3429,7 @@ void md_do_recovery(void *data)
 			sb->active_disks++;
 			sb->spare_disks--;
 		}
-		mddev->sb_dirty = 1;
-		md_update_sb(mddev);
+		__md_update_sb(mddev);
 		mddev->recovery_running = 0;
 	unlock:
 		mddev_unlock(mddev);
