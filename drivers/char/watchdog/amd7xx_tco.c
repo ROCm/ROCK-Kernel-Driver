@@ -253,7 +253,7 @@ static ssize_t amdtco_fop_write(struct file *file, const char *data, size_t len,
 		return -ESPIPE;
 
 	if (len) {
-		if (!nowayout)
+		if (!nowayout) {
 			size_t i;
 			char c;
 			expect_close = 0;
