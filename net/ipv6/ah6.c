@@ -162,7 +162,7 @@ int ah6_output(struct sk_buff *skb)
 	}
 
 	spin_lock_bh(&x->lock);
-	err = xfrm_check_output(x, skb, AF_INET);
+	err = xfrm_check_output(x, skb, AF_INET6);
 	if (err)
 		goto error;
 
