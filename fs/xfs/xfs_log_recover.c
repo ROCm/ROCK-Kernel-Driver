@@ -530,250 +530,254 @@ out:
  * Return: zero if normal, non-zero if error.
  */
 int
-xlog_find_head(xlog_t  *log,
-	       xfs_daddr_t *return_head_blk)
+xlog_find_head(
+	xlog_t 		*log,
+	xfs_daddr_t	*return_head_blk)
 {
-    xfs_buf_t   *bp;
-    xfs_caddr_t	offset;
-    xfs_daddr_t new_blk, first_blk, start_blk, last_blk, head_blk;
-    int     num_scan_bblks;
-    uint    first_half_cycle, last_half_cycle;
-    uint    stop_on_cycle;
-    int     error, log_bbnum = log->l_logBBsize;
+	xfs_buf_t	*bp;
+	xfs_caddr_t	offset;
+	xfs_daddr_t	new_blk, first_blk, start_blk, last_blk, head_blk;
+	int		num_scan_bblks;
+	uint		first_half_cycle, last_half_cycle;
+	uint		stop_on_cycle;
+	int		error, log_bbnum = log->l_logBBsize;
 
-    /* Is the end of the log device zeroed? */
-    if ((error = xlog_find_zeroed(log, &first_blk)) == -1) {
-	*return_head_blk = first_blk;
+	/* Is the end of the log device zeroed? */
+	if ((error = xlog_find_zeroed(log, &first_blk)) == -1) {
+		*return_head_blk = first_blk;
 
-	/* is the whole lot zeroed? */
-	if (!first_blk) {
-	    /* Linux XFS shouldn't generate totally zeroed logs -
-	     * mkfs etc write a dummy unmount record to a fresh
-	     * log so we can store the uuid in there
-	     */
-	    xlog_warn("XFS: totally zeroed log");
+		/* Is the whole lot zeroed? */
+		if (!first_blk) {
+			/* Linux XFS shouldn't generate totally zeroed logs -
+			 * mkfs etc write a dummy unmount record to a fresh
+			 * log so we can store the uuid in there
+			 */
+			xlog_warn("XFS: totally zeroed log");
+		}
+
+		return 0;
+	} else if (error) {
+		xlog_warn("XFS: empty log check failed");
+		return error;
 	}
 
+	first_blk = 0;			/* get cycle # of 1st block */
+	bp = xlog_get_bp(log, 1);
+	if (!bp)
+		return ENOMEM;
+	if ((error = xlog_bread(log, 0, 1, bp)))
+		goto bp_err;
+	offset = xlog_align(log, 0, 1, bp);
+	first_half_cycle = GET_CYCLE(offset, ARCH_CONVERT);
+
+	last_blk = head_blk = log_bbnum - 1;	/* get cycle # of last block */
+	if ((error = xlog_bread(log, last_blk, 1, bp)))
+		goto bp_err;
+	offset = xlog_align(log, last_blk, 1, bp);
+	last_half_cycle = GET_CYCLE(offset, ARCH_CONVERT);
+	ASSERT(last_half_cycle != 0);
+
+	/*
+	 * If the 1st half cycle number is equal to the last half cycle number,
+	 * then the entire log is stamped with the same cycle number.  In this
+	 * case, head_blk can't be set to zero (which makes sense).  The below
+	 * math doesn't work out properly with head_blk equal to zero.  Instead,
+	 * we set it to log_bbnum which is an illegal block number, but this
+	 * value makes the math correct.  If head_blk doesn't changed through
+	 * all the tests below, *head_blk is set to zero at the very end rather
+	 * than log_bbnum.  In a sense, log_bbnum and zero are the same block
+	 * in a circular file.
+	 */
+	if (first_half_cycle == last_half_cycle) {
+		/*
+		 * In this case we believe that the entire log should have
+		 * cycle number last_half_cycle.  We need to scan backwards
+		 * from the end verifying that there are no holes still
+		 * containing last_half_cycle - 1.  If we find such a hole,
+		 * then the start of that hole will be the new head.  The
+		 * simple case looks like
+		 *        x | x ... | x - 1 | x
+		 * Another case that fits this picture would be
+		 *        x | x + 1 | x ... | x
+		 * In this case the head really is somwhere at the end of the
+		 * log, as one of the latest writes at the beginning was
+		 * incomplete.
+		 * One more case is
+		 *        x | x + 1 | x ... | x - 1 | x
+		 * This is really the combination of the above two cases, and
+		 * the head has to end up at the start of the x-1 hole at the
+		 * end of the log.
+		 *
+		 * In the 256k log case, we will read from the beginning to the
+		 * end of the log and search for cycle numbers equal to x-1.
+		 * We don't worry about the x+1 blocks that we encounter,
+		 * because we know that they cannot be the head since the log
+		 * started with x.
+		 */
+		head_blk = log_bbnum;
+		stop_on_cycle = last_half_cycle - 1;
+	} else {
+		/*
+		 * In this case we want to find the first block with cycle
+		 * number matching last_half_cycle.  We expect the log to be
+		 * some variation on
+		 *        x + 1 ... | x ...
+		 * The first block with cycle number x (last_half_cycle) will
+		 * be where the new head belongs.  First we do a binary search
+		 * for the first occurrence of last_half_cycle.  The binary
+		 * search may not be totally accurate, so then we scan back
+		 * from there looking for occurrences of last_half_cycle before
+		 * us.  If that backwards scan wraps around the beginning of
+		 * the log, then we look for occurrences of last_half_cycle - 1
+		 * at the end of the log.  The cases we're looking for look
+		 * like
+		 *        x + 1 ... | x | x + 1 | x ...
+		 *                               ^ binary search stopped here
+		 * or
+		 *        x + 1 ... | x ... | x - 1 | x
+		 *        <---------> less than scan distance
+		 */
+		stop_on_cycle = last_half_cycle;
+		if ((error = xlog_find_cycle_start(log, bp, first_blk,
+						&head_blk, last_half_cycle)))
+			goto bp_err;
+	}
+
+	/*
+	 * Now validate the answer.  Scan back some number of maximum possible
+	 * blocks and make sure each one has the expected cycle number.  The
+	 * maximum is determined by the total possible amount of buffering
+	 * in the in-core log.  The following number can be made tighter if
+	 * we actually look at the block size of the filesystem.
+	 */
+	num_scan_bblks = XLOG_TOTAL_REC_SHIFT(log);
+	if (head_blk >= num_scan_bblks) {
+		/*
+		 * We are guaranteed that the entire check can be performed
+		 * in one buffer.
+		 */
+		start_blk = head_blk - num_scan_bblks;
+		if ((error = xlog_find_verify_cycle(log,
+						start_blk, num_scan_bblks,
+						stop_on_cycle, &new_blk)))
+			goto bp_err;
+		if (new_blk != -1)
+			head_blk = new_blk;
+	} else {		/* need to read 2 parts of log */
+		/*
+		 * We are going to scan backwards in the log in two parts.
+		 * First we scan the physical end of the log.  In this part
+		 * of the log, we are looking for blocks with cycle number
+		 * last_half_cycle - 1.
+		 * If we find one, then we know that the log starts there, as
+		 * we've found a hole that didn't get written in going around
+		 * the end of the physical log.  The simple case for this is
+		 *        x + 1 ... | x ... | x - 1 | x
+		 *        <---------> less than scan distance
+		 * If all of the blocks at the end of the log have cycle number
+		 * last_half_cycle, then we check the blocks at the start of
+		 * the log looking for occurrences of last_half_cycle.  If we
+		 * find one, then our current estimate for the location of the
+		 * first occurrence of last_half_cycle is wrong and we move
+		 * back to the hole we've found.  This case looks like
+		 *        x + 1 ... | x | x + 1 | x ...
+		 *                               ^ binary search stopped here
+		 * Another case we need to handle that only occurs in 256k
+		 * logs is
+		 *        x + 1 ... | x ... | x+1 | x ...
+		 *                   ^ binary search stops here
+		 * In a 256k log, the scan at the end of the log will see the
+		 * x + 1 blocks.  We need to skip past those since that is
+		 * certainly not the head of the log.  By searching for
+		 * last_half_cycle-1 we accomplish that.
+		 */
+		start_blk = log_bbnum - num_scan_bblks + head_blk;
+		ASSERT(head_blk <= INT_MAX &&
+			(xfs_daddr_t) num_scan_bblks - head_blk >= 0);
+		if ((error = xlog_find_verify_cycle(log, start_blk,
+					num_scan_bblks - (int)head_blk,
+					(stop_on_cycle - 1), &new_blk)))
+			goto bp_err;
+		if (new_blk != -1) {
+			head_blk = new_blk;
+			goto bad_blk;
+		}
+
+		/*
+		 * Scan beginning of log now.  The last part of the physical
+		 * log is good.  This scan needs to verify that it doesn't find
+		 * the last_half_cycle.
+		 */
+		start_blk = 0;
+		ASSERT(head_blk <= INT_MAX);
+		if ((error = xlog_find_verify_cycle(log,
+					start_blk, (int)head_blk,
+					stop_on_cycle, &new_blk)))
+			goto bp_err;
+		if (new_blk != -1)
+			head_blk = new_blk;
+	}
+
+ bad_blk:
+	/*
+	 * Now we need to make sure head_blk is not pointing to a block in
+	 * the middle of a log record.
+	 */
+	num_scan_bblks = XLOG_REC_SHIFT(log);
+	if (head_blk >= num_scan_bblks) {
+		start_blk = head_blk - num_scan_bblks; /* don't read head_blk */
+
+		/* start ptr at last block ptr before head_blk */
+		if ((error = xlog_find_verify_log_record(log, start_blk,
+							&head_blk, 0)) == -1) {
+			error = XFS_ERROR(EIO);
+			goto bp_err;
+		} else if (error)
+			goto bp_err;
+	} else {
+		start_blk = 0;
+		ASSERT(head_blk <= INT_MAX);
+		if ((error = xlog_find_verify_log_record(log, start_blk,
+							&head_blk, 0)) == -1) {
+			/* We hit the beginning of the log during our search */
+			start_blk = log_bbnum - num_scan_bblks + head_blk;
+			new_blk = log_bbnum;
+			ASSERT(start_blk <= INT_MAX &&
+				(xfs_daddr_t) log_bbnum-start_blk >= 0);
+			ASSERT(head_blk <= INT_MAX);
+			if ((error = xlog_find_verify_log_record(log,
+							start_blk, &new_blk,
+							(int)head_blk)) == -1) {
+				error = XFS_ERROR(EIO);
+				goto bp_err;
+			} else if (error)
+				goto bp_err;
+			if (new_blk != log_bbnum)
+				head_blk = new_blk;
+		} else if (error)
+			goto bp_err;
+	}
+
+	xlog_put_bp(bp);
+	if (head_blk == log_bbnum)
+		*return_head_blk = 0;
+	else
+		*return_head_blk = head_blk;
+	/*
+	 * When returning here, we have a good block number.  Bad block
+	 * means that during a previous crash, we didn't have a clean break
+	 * from cycle number N to cycle number N-1.  In this case, we need
+	 * to find the first block with cycle number N-1.
+	 */
 	return 0;
-    } else if (error) {
-	xlog_warn("XFS: empty log check failed");
-	return error;
-    }
 
-    first_blk = 0;				/* get cycle # of 1st block */
-    bp = xlog_get_bp(log, 1);
-    if (!bp)
-	return ENOMEM;
-    if ((error = xlog_bread(log, 0, 1, bp)))
-	goto bp_err;
-    offset = xlog_align(log, 0, 1, bp);
-    first_half_cycle = GET_CYCLE(offset, ARCH_CONVERT);
-
-    last_blk = head_blk = log_bbnum-1;		/* get cycle # of last block */
-    if ((error = xlog_bread(log, last_blk, 1, bp)))
-	goto bp_err;
-    offset = xlog_align(log, last_blk, 1, bp);
-    last_half_cycle = GET_CYCLE(offset, ARCH_CONVERT);
-    ASSERT(last_half_cycle != 0);
-
-    /*
-     * If the 1st half cycle number is equal to the last half cycle number,
-     * then the entire log is stamped with the same cycle number.  In this
-     * case, head_blk can't be set to zero (which makes sense).  The below
-     * math doesn't work out properly with head_blk equal to zero.  Instead,
-     * we set it to log_bbnum which is an illegal block number, but this
-     * value makes the math correct.  If head_blk doesn't changed through
-     * all the tests below, *head_blk is set to zero at the very end rather
-     * than log_bbnum.  In a sense, log_bbnum and zero are the same block
-     * in a circular file.
-     */
-    if (first_half_cycle == last_half_cycle) {
-	/*
-	 * In this case we believe that the entire log should have cycle
-	 * number last_half_cycle.  We need to scan backwards from the
-	 * end verifying that there are no holes still containing
-	 * last_half_cycle - 1.  If we find such a hole, then the start
-	 * of that hole will be the new head.  The simple case looks like
-	 *        x | x ... | x - 1 | x
-	 * Another case that fits this picture would be
-	 *        x | x + 1 | x ... | x
-	 * In this case the head really is somwhere at the end of the
-	 * log, as one of the latest writes at the beginning was incomplete.
-	 * One more case is
-	 *        x | x + 1 | x ... | x - 1 | x
-	 * This is really the combination of the above two cases, and the
-	 * head has to end up at the start of the x-1 hole at the end of
-	 * the log.
-	 *
-	 * In the 256k log case, we will read from the beginning to the
-	 * end of the log and search for cycle numbers equal to x-1.  We
-	 * don't worry about the x+1 blocks that we encounter, because
-	 * we know that they cannot be the head since the log started with
-	 * x.
-	 */
-	head_blk = log_bbnum;
-	stop_on_cycle = last_half_cycle - 1;
-    } else {
-	/*
-	 * In this case we want to find the first block with cycle number
-	 * matching last_half_cycle.  We expect the log to be some
-	 * variation on
-	 *        x + 1 ... | x ...
-	 * The first block with cycle number x (last_half_cycle) will be
-	 * where the new head belongs.  First we do a binary search for
-	 * the first occurrence of last_half_cycle.  The binary search
-	 * may not be totally accurate, so then we scan back from there
-	 * looking for occurrences of last_half_cycle before us.  If
-	 * that backwards scan wraps around the beginning of the log,
-	 * then we look for occurrences of last_half_cycle - 1 at the
-	 * end of the log.  The cases we're looking for look like
-	 *        x + 1 ... | x | x + 1 | x ...
-	 *                               ^ binary search stopped here
-	 * or
-	 *        x + 1 ... | x ... | x - 1 | x
-	 *        <---------> less than scan distance
-	 */
-	stop_on_cycle = last_half_cycle;
-	if ((error = xlog_find_cycle_start(log, bp, first_blk,
-					  &head_blk, last_half_cycle)))
-	    goto bp_err;
-    }
-
-    /*
-     * Now validate the answer.  Scan back some number of maximum possible
-     * blocks and make sure each one has the expected cycle number.  The
-     * maximum is determined by the total possible amount of buffering
-     * in the in-core log.  The following number can be made tighter if
-     * we actually look at the block size of the filesystem.
-     */
-    num_scan_bblks = XLOG_TOTAL_REC_SHIFT(log);
-    if (head_blk >= num_scan_bblks) {
-	/*
-	 * We are guaranteed that the entire check can be performed
-	 * in one buffer.
-	 */
-	start_blk = head_blk - num_scan_bblks;
-	if ((error = xlog_find_verify_cycle(log, start_blk, num_scan_bblks,
-					 stop_on_cycle, &new_blk)))
-	    goto bp_err;
-	if (new_blk != -1)
-	    head_blk = new_blk;
-    } else {			/* need to read 2 parts of log */
-	/*
-	 * We are going to scan backwards in the log in two parts.  First
-	 * we scan the physical end of the log.  In this part of the log,
-	 * we are looking for blocks with cycle number last_half_cycle - 1.
-	 * If we find one, then we know that the log starts there, as we've
-	 * found a hole that didn't get written in going around the end
-	 * of the physical log.  The simple case for this is
-	 *        x + 1 ... | x ... | x - 1 | x
-	 *        <---------> less than scan distance
-	 * If all of the blocks at the end of the log have cycle number
-	 * last_half_cycle, then we check the blocks at the start of the
-	 * log looking for occurrences of last_half_cycle.  If we find one,
-	 * then our current estimate for the location of the first
-	 * occurrence of last_half_cycle is wrong and we move back to the
-	 * hole we've found.  This case looks like
-	 *        x + 1 ... | x | x + 1 | x ...
-	 *                               ^ binary search stopped here
-	 * Another case we need to handle that only occurs in 256k logs is
-	 *        x + 1 ... | x ... | x+1 | x ...
-	 *                   ^ binary search stops here
-	 * In a 256k log, the scan at the end of the log will see the x+1
-	 * blocks.  We need to skip past those since that is certainly not
-	 * the head of the log.  By searching for last_half_cycle-1 we
-	 * accomplish that.
-	 */
-	start_blk = log_bbnum - num_scan_bblks + head_blk;
-	ASSERT(head_blk <= INT_MAX && (xfs_daddr_t) num_scan_bblks-head_blk >= 0);
-	if ((error = xlog_find_verify_cycle(log, start_blk,
-			num_scan_bblks-(int)head_blk, (stop_on_cycle - 1),
-			&new_blk)))
-		goto bp_err;
-	if (new_blk != -1) {
-	    head_blk = new_blk;
-	    goto bad_blk;
-	}
-
-	/*
-	 * Scan beginning of log now.  The last part of the physical log
-	 * is good.  This scan needs to verify that it doesn't find the
-	 * last_half_cycle.
-	 */
-	start_blk = 0;
-	ASSERT(head_blk <= INT_MAX);
-	if ((error = xlog_find_verify_cycle(log, start_blk, (int) head_blk,
-					 stop_on_cycle, &new_blk)))
-	    goto bp_err;
-	if (new_blk != -1)
-	    head_blk = new_blk;
-    }
-
-bad_blk:
-    /*
-     * Now we need to make sure head_blk is not pointing to a block in
-     * the middle of a log record.
-     */
-    num_scan_bblks = XLOG_REC_SHIFT(log);
-    if (head_blk >= num_scan_bblks) {
-	start_blk = head_blk - num_scan_bblks;  /* don't read head_blk */
-
-	/* start ptr at last block ptr before head_blk */
-	if ((error = xlog_find_verify_log_record(log,
-						 start_blk,
-						 &head_blk,
-						 0)) == -1) {
-	    error = XFS_ERROR(EIO);
-	    goto bp_err;
-	} else if (error)
-	    goto bp_err;
-    } else {
-	start_blk = 0;
-	ASSERT(head_blk <= INT_MAX);
-	if ((error = xlog_find_verify_log_record(log,
-						 start_blk,
-						 &head_blk,
-						 0)) == -1) {
-	    /* We hit the beginning of the log during our search */
-	    start_blk = log_bbnum - num_scan_bblks + head_blk;
-	    new_blk = log_bbnum;
-	    ASSERT(start_blk <= INT_MAX && (xfs_daddr_t) log_bbnum-start_blk >= 0);
-	    ASSERT(head_blk <= INT_MAX);
-	    if ((error = xlog_find_verify_log_record(log,
-						     start_blk,
-						     &new_blk,
-						     (int)head_blk)) == -1) {
-		error = XFS_ERROR(EIO);
-		goto bp_err;
-	    } else if (error)
-		goto bp_err;
-	    if (new_blk != log_bbnum)
-		head_blk = new_blk;
-	} else if (error)
-	    goto bp_err;
-    }
-
-    xlog_put_bp(bp);
-    if (head_blk == log_bbnum)
-	    *return_head_blk = 0;
-    else
-	    *return_head_blk = head_blk;
-    /*
-     * When returning here, we have a good block number.  Bad block
-     * means that during a previous crash, we didn't have a clean break
-     * from cycle number N to cycle number N-1.  In this case, we need
-     * to find the first block with cycle number N-1.
-     */
-    return 0;
-
-bp_err:
+ bp_err:
 	xlog_put_bp(bp);
 
 	if (error)
 	    xlog_warn("XFS: failed to find log head");
-
 	return error;
-}	/* xlog_find_head */
+}
 
 /*
  * Find the sync block number or the tail of the log.
@@ -3418,255 +3422,294 @@ xlog_unpack_data(
  * here.
  */
 STATIC int
-xlog_do_recovery_pass(xlog_t	*log,
-		      xfs_daddr_t	head_blk,
-		      xfs_daddr_t	tail_blk,
-		      int	pass)
+xlog_do_recovery_pass(
+	xlog_t			*log,
+	xfs_daddr_t		head_blk,
+	xfs_daddr_t		tail_blk,
+	int			pass)
 {
-    xlog_rec_header_t	*rhead;
-    xfs_daddr_t		blk_no;
-    xfs_caddr_t		bufaddr, offset;
-    xfs_buf_t		*hbp, *dbp;
-    int			error, h_size;
-    int			bblks, split_bblks;
-    int			hblks, split_hblks, wrapped_hblks;
-    xlog_recover_t	*rhash[XLOG_RHASH_SIZE];
+	xlog_rec_header_t	*rhead;
+	xfs_daddr_t		blk_no;
+	xfs_caddr_t		bufaddr, offset;
+	xfs_buf_t		*hbp, *dbp;
+	int			error = 0, h_size;
+	int			bblks, split_bblks;
+	int			hblks, split_hblks, wrapped_hblks;
+	xlog_recover_t		*rhash[XLOG_RHASH_SIZE];
 
-    error = 0;
-
-
-    /*
-     * Read the header of the tail block and get the iclog buffer size from
-     * h_size.  Use this to tell how many sectors make up the log header.
-     */
-    if (XFS_SB_VERSION_HASLOGV2(&log->l_mp->m_sb)) {
 	/*
-	 * When using variable length iclogs, read first sector of iclog
-	 * header and extract the header size from it.  Get a new hbp that
-	 * is the correct size.
+	 * Read the header of the tail block and get the iclog buffer size from
+	 * h_size.  Use this to tell how many sectors make up the log header.
 	 */
-	hbp = xlog_get_bp(log, 1);
-	if (!hbp)
-	    return ENOMEM;
-	if ((error = xlog_bread(log, tail_blk, 1, hbp)))
-	    goto bread_err1;
-	offset = xlog_align(log, tail_blk, 1, hbp);
-	rhead = (xlog_rec_header_t *)offset;
-	ASSERT(INT_GET(rhead->h_magicno, ARCH_CONVERT) ==
+	if (XFS_SB_VERSION_HASLOGV2(&log->l_mp->m_sb)) {
+		/*
+		 * When using variable length iclogs, read first sector of
+		 * iclog header and extract the header size from it.  Get a
+		 * new hbp that is the correct size.
+		 */
+		hbp = xlog_get_bp(log, 1);
+		if (!hbp)
+			return ENOMEM;
+		if ((error = xlog_bread(log, tail_blk, 1, hbp)))
+			goto bread_err1;
+		offset = xlog_align(log, tail_blk, 1, hbp);
+		rhead = (xlog_rec_header_t *)offset;
+		ASSERT(INT_GET(rhead->h_magicno, ARCH_CONVERT) ==
 						XLOG_HEADER_MAGIC_NUM);
-	if ((INT_GET(rhead->h_version, ARCH_CONVERT) & (~XLOG_VERSION_OKBITS)) != 0) {
-	    xlog_warn("XFS: xlog_do_recovery_pass: unrecognised log version number.");
-	    error = XFS_ERROR(EIO);
-	    goto bread_err1;
-	}
-	h_size = INT_GET(rhead->h_size, ARCH_CONVERT);
+		if ((INT_GET(rhead->h_version, ARCH_CONVERT) &
+				(~XLOG_VERSION_OKBITS)) != 0) {
+			xlog_warn(
+	"XFS: xlog_do_recovery_pass: unrecognised log version number.");
+			error = XFS_ERROR(EIO);
+			goto bread_err1;
+		}
+		h_size = INT_GET(rhead->h_size, ARCH_CONVERT);
 
-	if ((INT_GET(rhead->h_version, ARCH_CONVERT) & XLOG_VERSION_2) &&
-	    (h_size > XLOG_HEADER_CYCLE_SIZE)) {
-	    hblks = h_size / XLOG_HEADER_CYCLE_SIZE;
-	    if (h_size % XLOG_HEADER_CYCLE_SIZE)
-		hblks++;
-	    xlog_put_bp(hbp);
-	    hbp = xlog_get_bp(log, hblks);
+		if ((INT_GET(rhead->h_version, ARCH_CONVERT)
+				& XLOG_VERSION_2) &&
+		    (h_size > XLOG_HEADER_CYCLE_SIZE)) {
+			hblks = h_size / XLOG_HEADER_CYCLE_SIZE;
+			if (h_size % XLOG_HEADER_CYCLE_SIZE)
+				hblks++;
+			xlog_put_bp(hbp);
+			hbp = xlog_get_bp(log, hblks);
+		} else {
+			hblks = 1;
+		}
 	} else {
-	    hblks=1;
+		ASSERT(log->l_sectbb_log == 0);
+		hblks = 1;
+		hbp = xlog_get_bp(log, 1);
+		h_size = XLOG_BIG_RECORD_BSIZE;
 	}
-    } else {
-	ASSERT(log->l_sectbb_log == 0);
-	hblks=1;
-	hbp = xlog_get_bp(log, 1);
-	h_size = XLOG_BIG_RECORD_BSIZE;
-    }
 
-    if (!hbp)
-	return ENOMEM;
-    dbp = xlog_get_bp(log, BTOBB(h_size));
-    if (!dbp) {
+	if (!hbp)
+		return ENOMEM;
+	dbp = xlog_get_bp(log, BTOBB(h_size));
+	if (!dbp) {
+		xlog_put_bp(hbp);
+		return ENOMEM;
+	}
+
+	memset(rhash, 0, sizeof(rhash));
+	if (tail_blk <= head_blk) {
+		for (blk_no = tail_blk; blk_no < head_blk; ) {
+			if ((error = xlog_bread(log, blk_no, hblks, hbp)))
+				goto bread_err2;
+			offset = xlog_align(log, blk_no, hblks, hbp);
+			rhead = (xlog_rec_header_t *)offset;
+			ASSERT(INT_GET(rhead->h_magicno, ARCH_CONVERT) ==
+				XLOG_HEADER_MAGIC_NUM);
+			ASSERT(BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT) <=
+				INT_MAX));
+			/* blocks in data section */
+			bblks = (int)BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT));
+
+			if (unlikely(
+			    (INT_GET(rhead->h_magicno, ARCH_CONVERT) !=
+					XLOG_HEADER_MAGIC_NUM) ||
+			    (BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT) >
+					INT_MAX)) ||
+			    (bblks <= 0) ||
+			    (blk_no > log->l_logBBsize))) {
+				XFS_ERROR_REPORT("xlog_do_recovery_pass(1)",
+						XFS_ERRLEVEL_LOW, log->l_mp);
+				error = EFSCORRUPTED;
+				goto bread_err2;
+			}
+
+			if ((INT_GET(rhead->h_version, ARCH_CONVERT) &
+					(~XLOG_VERSION_OKBITS)) != 0) {
+				xlog_warn(
+		"XFS: xlog_do_recovery_pass: unrecognised log version number.");
+				error = XFS_ERROR(EIO);
+				goto bread_err2;
+			}
+			/* blocks in data section */
+			bblks = (int)BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT));
+			if (bblks > 0) {
+				if ((error = xlog_bread(log, blk_no + hblks,
+							bblks, dbp)))
+					goto bread_err2;
+				offset = xlog_align(log, blk_no + hblks,
+							bblks, dbp);
+				xlog_unpack_data(rhead, offset, log);
+				if ((error = xlog_recover_process_data(log,
+						rhash, rhead, offset, pass)))
+					goto bread_err2;
+			}
+			blk_no += (bblks+hblks);
+		}
+	} else {
+		/*
+		 * Perform recovery around the end of the physical log.
+		 * When the head is not on the same cycle number as the tail,
+		 * we can't do a sequential recovery as above.
+		 */
+		blk_no = tail_blk;
+		while (blk_no < log->l_logBBsize) {
+			/*
+			 * Check for header wrapping around physical end-of-log
+			 */
+			wrapped_hblks = 0;
+			if (blk_no+hblks <= log->l_logBBsize) {
+				/* Read header in one read */
+				if ((error = xlog_bread(log, blk_no,
+							hblks, hbp)))
+					goto bread_err2;
+				offset = xlog_align(log, blk_no, hblks, hbp);
+			} else {
+				/* This LR is split across physical log end */
+				offset = NULL;
+				split_hblks = 0;
+				if (blk_no != log->l_logBBsize) {
+					/* some data before physical log end */
+					ASSERT(blk_no <= INT_MAX);
+					split_hblks = log->l_logBBsize - (int)blk_no;
+					ASSERT(split_hblks > 0);
+					if ((error = xlog_bread(log, blk_no,
+							split_hblks, hbp)))
+						goto bread_err2;
+					offset = xlog_align(log, blk_no,
+							split_hblks, hbp);
+				}
+				/*
+				 * Note: this black magic still works with
+				 * large sector sizes (non-512) only because:
+				 * - we increased the buffer size originally
+				 *   by 1 sector giving us enough extra space
+				 *   for the second read;
+				 * - the log start is guaranteed to be sector
+				 *   aligned;
+				 * - we read the log end (LR header start)
+				 *   _first_, then the log start (LR header end)
+				 *   - order is important.
+				 */
+				bufaddr = XFS_BUF_PTR(hbp);
+				XFS_BUF_SET_PTR(hbp,
+						bufaddr + BBTOB(split_hblks),
+						BBTOB(hblks - split_hblks));
+				wrapped_hblks = hblks - split_hblks;
+				if ((error = xlog_bread(log, 0,
+							wrapped_hblks, hbp)))
+					goto bread_err2;
+				XFS_BUF_SET_PTR(hbp, bufaddr, hblks);
+				if (!offset)
+					offset = xlog_align(log, 0,
+							wrapped_hblks, hbp);
+			}
+			rhead = (xlog_rec_header_t *)offset;
+			ASSERT(INT_GET(rhead->h_magicno, ARCH_CONVERT) ==
+				XLOG_HEADER_MAGIC_NUM);
+			ASSERT(BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT) <=
+				INT_MAX));
+			bblks = (int)BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT));
+
+			/* LR body must have data or it wouldn't have been
+			 * written */
+			ASSERT(bblks > 0);
+			blk_no += hblks;	/* successfully read header */
+
+			if (unlikely(
+			    (INT_GET(rhead->h_magicno, ARCH_CONVERT) !=
+					XLOG_HEADER_MAGIC_NUM) ||
+			    (BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT) >
+					INT_MAX)) ||
+			    (bblks <= 0))) {
+				XFS_ERROR_REPORT("xlog_do_recovery_pass(2)",
+					     XFS_ERRLEVEL_LOW, log->l_mp);
+				error = EFSCORRUPTED;
+				goto bread_err2;
+			}
+
+			/* Read in data for log record */
+			if (blk_no+bblks <= log->l_logBBsize) {
+				if ((error = xlog_bread(log, blk_no,
+							bblks, dbp)))
+					goto bread_err2;
+				offset = xlog_align(log, blk_no, bblks, dbp);
+			} else {
+				/* This log record is split across the
+				 * physical end of log */
+				offset = NULL;
+				split_bblks = 0;
+				if (blk_no != log->l_logBBsize) {
+					/* some data is before the physical
+					 * end of log */
+					ASSERT(!wrapped_hblks);
+					ASSERT(blk_no <= INT_MAX);
+					split_bblks =
+						log->l_logBBsize - (int)blk_no;
+					ASSERT(split_bblks > 0);
+					if ((error = xlog_bread(log, blk_no,
+							split_bblks, dbp)))
+						goto bread_err2;
+					offset = xlog_align(log, blk_no,
+							split_bblks, dbp);
+				}
+				/*
+				 * Note: this black magic still works with
+				 * large sector sizes (non-512) only because:
+				 * - we increased the buffer size originally
+				 *   by 1 sector giving us enough extra space
+				 *   for the second read;
+				 * - the log start is guaranteed to be sector
+				 *   aligned;
+				 * - we read the log end (LR header start)
+				 *   _first_, then the log start (LR header end)
+				 *   - order is important.
+				 */
+				bufaddr = XFS_BUF_PTR(dbp);
+				XFS_BUF_SET_PTR(dbp,
+						bufaddr + BBTOB(split_bblks),
+						BBTOB(bblks - split_bblks));
+				if ((error = xlog_bread(log, wrapped_hblks,
+						bblks - split_bblks, dbp)))
+					goto bread_err2;
+				XFS_BUF_SET_PTR(dbp, bufaddr,
+						XLOG_BIG_RECORD_BSIZE);
+				if (!offset)
+					offset = xlog_align(log, wrapped_hblks,
+						bblks - split_bblks, dbp);
+			}
+			xlog_unpack_data(rhead, offset, log);
+			if ((error = xlog_recover_process_data(log, rhash,
+						  rhead, offset, pass)))
+				goto bread_err2;
+			blk_no += bblks;
+		}
+
+		ASSERT(blk_no >= log->l_logBBsize);
+		blk_no -= log->l_logBBsize;
+
+		/* read first part of physical log */
+		while (blk_no < head_blk) {
+			if ((error = xlog_bread(log, blk_no, hblks, hbp)))
+				goto bread_err2;
+			offset = xlog_align(log, blk_no, hblks, hbp);
+			rhead = (xlog_rec_header_t *)offset;
+			ASSERT(INT_GET(rhead->h_magicno, ARCH_CONVERT) ==
+				XLOG_HEADER_MAGIC_NUM);
+			ASSERT(BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT) <=
+				INT_MAX));
+			bblks = (int)BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT));
+			ASSERT(bblks > 0);
+			if ((error = xlog_bread(log, blk_no+hblks, bblks, dbp)))
+				goto bread_err2;
+			offset = xlog_align(log, blk_no+hblks, bblks, dbp);
+			xlog_unpack_data(rhead, offset, log);
+			if ((error = xlog_recover_process_data(log, rhash,
+							  rhead, offset, pass)))
+				goto bread_err2;
+			blk_no += (bblks+hblks);
+		}
+	}
+
+ bread_err2:
+	xlog_put_bp(dbp);
+ bread_err1:
 	xlog_put_bp(hbp);
-	return ENOMEM;
-    }
-
-    memset(rhash, 0, sizeof(rhash));
-    if (tail_blk <= head_blk) {
-	for (blk_no = tail_blk; blk_no < head_blk; ) {
-	    if ((error = xlog_bread(log, blk_no, hblks, hbp)))
-		goto bread_err2;
-	    offset = xlog_align(log, blk_no, hblks, hbp);
-	    rhead = (xlog_rec_header_t *)offset;
-	    ASSERT(INT_GET(rhead->h_magicno, ARCH_CONVERT) == XLOG_HEADER_MAGIC_NUM);
-	    ASSERT(BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT) <= INT_MAX));
-	    bblks = (int) BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT));	/* blocks in data section */
-
-	    if (unlikely((INT_GET(rhead->h_magicno, ARCH_CONVERT) != XLOG_HEADER_MAGIC_NUM) ||
-		(BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT) > INT_MAX)) ||
-		(bblks <= 0) ||
-		(blk_no > log->l_logBBsize))) {
-		    XFS_ERROR_REPORT("xlog_do_recovery_pass(1)",
-				     XFS_ERRLEVEL_LOW, log->l_mp);
-		    error = EFSCORRUPTED;
-		    goto bread_err2;
-	    }
-
-	    if ((INT_GET(rhead->h_version, ARCH_CONVERT) & (~XLOG_VERSION_OKBITS)) != 0) {
-		xlog_warn("XFS: xlog_do_recovery_pass: unrecognised log version number.");
-		error = XFS_ERROR(EIO);
-		goto bread_err2;
-	    }
-	    bblks = (int) BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT));	/* blocks in data section */
-	    if (bblks > 0) {
-		if ((error = xlog_bread(log, blk_no+hblks, bblks, dbp)))
-		    goto bread_err2;
-		offset = xlog_align(log, blk_no+hblks, bblks, dbp);
-		xlog_unpack_data(rhead, offset, log);
-		if ((error = xlog_recover_process_data(log, rhash,
-						      rhead, offset, pass)))
-			goto bread_err2;
-	    }
-	    blk_no += (bblks+hblks);
-	}
-    } else {
-	/*
-	 * Perform recovery around the end of the physical log.  When the head
-	 * is not on the same cycle number as the tail, we can't do a sequential
-	 * recovery as above.
-	 */
-	blk_no = tail_blk;
-	while (blk_no < log->l_logBBsize) {
-	    /*
-	     * Check for header wrapping around physical end-of-log
-	     */
-	    wrapped_hblks = 0;
-	    if (blk_no+hblks <= log->l_logBBsize) {
-		/* Read header in one read */
-		if ((error = xlog_bread(log, blk_no, hblks, hbp)))
-		    goto bread_err2;
-		offset = xlog_align(log, blk_no, hblks, hbp);
-	    } else {
-		/* This log record is split across physical end of log */
-		offset = NULL;
-		split_hblks = 0;
-		if (blk_no != log->l_logBBsize) {
-		    /* some data is before physical end of log */
-		    ASSERT(blk_no <= INT_MAX);
-		    split_hblks = log->l_logBBsize - (int)blk_no;
-		    ASSERT(split_hblks > 0);
-		    if ((error = xlog_bread(log, blk_no, split_hblks, hbp)))
-			goto bread_err2;
-		    offset = xlog_align(log, blk_no, split_hblks, hbp);
-		}
-		/*
-		 * Note: this black magic still works with large sector
-		 * sizes (non-512) only because:
-		 * - we increased the buffer size originally by 1 sector
-		 *   giving us enough extra space for the second read;
-		 * - the log start is guaranteed to be sector aligned;
-		 * - we read the log end (LR header start) _first_, then
-		 *   the log start (LR header end) - order is important.
-		 */
-		bufaddr = XFS_BUF_PTR(hbp);
-		XFS_BUF_SET_PTR(hbp, bufaddr + BBTOB(split_hblks),
-			BBTOB(hblks - split_hblks));
-		wrapped_hblks = hblks - split_hblks;
-		if ((error = xlog_bread(log, 0, wrapped_hblks, hbp)))
-		    goto bread_err2;
-		XFS_BUF_SET_PTR(hbp, bufaddr, hblks);
-		if (!offset)
-		    offset = xlog_align(log, 0, wrapped_hblks, hbp);
-	    }
-	    rhead = (xlog_rec_header_t *)offset;
-	    ASSERT(INT_GET(rhead->h_magicno, ARCH_CONVERT) == XLOG_HEADER_MAGIC_NUM);
-	    ASSERT(BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT) <= INT_MAX));
-	    bblks = (int) BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT));
-
-	    /* LR body must have data or it wouldn't have been written */
-	    ASSERT(bblks > 0);
-	    blk_no += hblks;			/* successfully read header */
-
-	    if (unlikely((INT_GET(rhead->h_magicno, ARCH_CONVERT) != XLOG_HEADER_MAGIC_NUM) ||
-		(BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT) > INT_MAX)) ||
-		(bblks <= 0))) {
-		    XFS_ERROR_REPORT("xlog_do_recovery_pass(2)",
-				     XFS_ERRLEVEL_LOW, log->l_mp);
-		    error = EFSCORRUPTED;
-		    goto bread_err2;
-	    }
-
-	    /* Read in data for log record */
-	    if (blk_no+bblks <= log->l_logBBsize) {
-		if ((error = xlog_bread(log, blk_no, bblks, dbp)))
-		    goto bread_err2;
-		offset = xlog_align(log, blk_no, bblks, dbp);
-	    } else {
-		/* This log record is split across physical end of log */
-		offset = NULL;
-		split_bblks = 0;
-		if (blk_no != log->l_logBBsize) {
-		    /* some data is before physical end of log */
-		    ASSERT(!wrapped_hblks);
-		    ASSERT(blk_no <= INT_MAX);
-		    split_bblks = log->l_logBBsize - (int)blk_no;
-		    ASSERT(split_bblks > 0);
-		    if ((error = xlog_bread(log, blk_no, split_bblks, dbp)))
-			goto bread_err2;
-		    offset = xlog_align(log, blk_no, split_bblks, dbp);
-		}
-		/*
-		 * Note: this black magic still works with large sector
-		 * sizes (non-512) only because:
-		 * - we increased the buffer size originally by 1 sector
-		 *   giving us enough extra space for the second read;
-		 * - the log start is guaranteed to be sector aligned;
-		 * - we read the log end (LR header start) _first_, then
-		 *   the log start (LR header end) - order is important.
-		 */
-		bufaddr = XFS_BUF_PTR(dbp);
-		XFS_BUF_SET_PTR(dbp, bufaddr + BBTOB(split_bblks),
-			BBTOB(bblks - split_bblks));
-		if ((error = xlog_bread(log, wrapped_hblks,
-					bblks - split_bblks, dbp)))
-		    goto bread_err2;
-		XFS_BUF_SET_PTR(dbp, bufaddr, XLOG_BIG_RECORD_BSIZE);
-		if (!offset)
-		    offset = xlog_align(log, wrapped_hblks,
-					BBTOB(bblks - split_bblks), dbp);
-	    }
-	    xlog_unpack_data(rhead, offset, log);
-	    if ((error = xlog_recover_process_data(log, rhash,
-						  rhead, offset, pass)))
-		goto bread_err2;
-	    blk_no += bblks;
-	}
-
-	ASSERT(blk_no >= log->l_logBBsize);
-	blk_no -= log->l_logBBsize;
-
-	/* read first part of physical log */
-	while (blk_no < head_blk) {
-	    if ((error = xlog_bread(log, blk_no, hblks, hbp)))
-		goto bread_err2;
-	    offset = xlog_align(log, blk_no, hblks, hbp);
-	    rhead = (xlog_rec_header_t *)offset;
-	    ASSERT(INT_GET(rhead->h_magicno, ARCH_CONVERT) == XLOG_HEADER_MAGIC_NUM);
-	    ASSERT(BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT) <= INT_MAX));
-	    bblks = (int) BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT));
-	    ASSERT(bblks > 0);
-	    if ((error = xlog_bread(log, blk_no+hblks, bblks, dbp)))
-		goto bread_err2;
-	    offset = xlog_align(log, blk_no+hblks, bblks, dbp);
-	    xlog_unpack_data(rhead, offset, log);
-	    if ((error = xlog_recover_process_data(log, rhash,
-						  rhead, offset, pass)))
-		goto bread_err2;
-	    blk_no += (bblks+hblks);
-	}
-    }
-
-bread_err2:
-    xlog_put_bp(dbp);
-bread_err1:
-    xlog_put_bp(hbp);
-
-    return error;
+	return error;
 }
 
 /*
