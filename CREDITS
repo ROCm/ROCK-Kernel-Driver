@@ -1459,6 +1459,13 @@ S: Ballinagard
 S: Roscommon
 S: Ireland
 
+N: Michael Hunold
+E: michael@mihu.de
+W: http://www.mihu.de/linux/
+D: Generic saa7146 video4linux-2 driver core,
+D: Driver for the "Multimedia eXtension Board", "dpc7146",
+D: "Hexium Orion", "Hexium Gemini"
+
 N: Miguel de Icaza Amozurrutia
 E: miguel@nuclecu.unam.mx
 D: Linux/SPARC team, Midnight Commander maintainer
@@ -1862,9 +1869,9 @@ S: D53424 Remagen
 S: Germany
 
 N: Achim Leubner
-E: achim.leubner@intel.com
+E: achim_leubner@adaptec.com
 D: GDT Disk Array Controller/Storage RAID controller driver
-S: ICP vortex GmbH, an Intel company
+S: ICP vortex GmbH
 S: Neckarsulm
 S: Germany
 

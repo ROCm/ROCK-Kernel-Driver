@@ -41,6 +41,11 @@ There are some restrictions:
    offset+size(magic) has to be less than 128
  - the interpreter string may not exceed 127 characters
 
+To use binfmt_misc you have to mount it first. You can mount it with
+"mount -t binfmt_misc none /proc/sys/fs/binfmt_misc" command, or you can add
+a line "none  /proc/sys/fs/binfmt_misc binfmt_misc defaults 0 0" to your
+/etc/fstab so it auto mounts on boot.
+
 You may want to add the binary formats in one of your /etc/rc scripts during
 boot-up. Read the manual of your init program to figure out how to do this
 right.

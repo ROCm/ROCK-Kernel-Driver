@@ -150,6 +150,7 @@ EXPORT_SYMBOL(irlap_close);
 EXPORT_SYMBOL(irda_init_max_qos_capabilies);
 EXPORT_SYMBOL(irda_qos_bits_to_value);
 EXPORT_SYMBOL(irda_device_setup);
+EXPORT_SYMBOL(alloc_irdadev);
 EXPORT_SYMBOL(irda_device_set_media_busy);
 EXPORT_SYMBOL(irda_device_txqueue_empty);
 
@@ -186,13 +187,9 @@ __u32 irda_debug = IRDA_DEBUG_LEVEL;
 /* Packet type handler.
  * Tell the kernel how IrDA packets should be handled.
  */
-static struct packet_type irda_packet_type = 
-{
+static struct packet_type irda_packet_type = {
 	.type	= __constant_htons(ETH_P_IRDA),
-	.dev	= NULL,			/* Wildcard : All devices */
 	.func	= irlap_driver_rcv,	/* Packet type handler irlap_frame.c */
-	.data	= PKT_CAN_SHARE_SKB,
-	//.next	= NULL,
 };
 
 /*
@@ -309,7 +306,6 @@ void __exit irda_cleanup(void)
 #endif
 
 	/* Remove IrDA packet type (stop receiving packets) */
-	irda_packet_type.type = htons(ETH_P_IRDA);
         dev_remove_pack(&irda_packet_type);
 	
 	/* Stop receiving interfaces notifications */

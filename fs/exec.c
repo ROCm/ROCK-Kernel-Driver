@@ -83,6 +83,8 @@ int register_binfmt(struct linux_binfmt * fmt)
 	return 0;	
 }
 
+EXPORT_SYMBOL(register_binfmt);
+
 int unregister_binfmt(struct linux_binfmt * fmt)
 {
 	struct linux_binfmt ** tmp = &formats;
@@ -99,6 +101,8 @@ int unregister_binfmt(struct linux_binfmt * fmt)
 	write_unlock(&binfmt_lock);
 	return -EINVAL;
 }
+
+EXPORT_SYMBOL(unregister_binfmt);
 
 static inline void put_binfmt(struct linux_binfmt * fmt)
 {
@@ -281,6 +285,8 @@ int copy_strings_kernel(int argc,char ** argv, struct linux_binprm *bprm)
 	return r;
 }
 
+EXPORT_SYMBOL(copy_strings_kernel);
+
 #ifdef CONFIG_MMU
 /*
  * This routine is used to map in a page into an address space: needed by
@@ -443,6 +449,8 @@ int setup_arg_pages(struct linux_binprm *bprm)
 	return 0;
 }
 
+EXPORT_SYMBOL(setup_arg_pages);
+
 #define free_arg_pages(bprm) do { } while (0)
 
 #else
@@ -493,6 +501,8 @@ out:
 	goto out;
 }
 
+EXPORT_SYMBOL(open_exec);
+
 int kernel_read(struct file *file, unsigned long offset,
 	char *addr, unsigned long count)
 {
@@ -507,6 +517,8 @@ int kernel_read(struct file *file, unsigned long offset,
 	set_fs(old_fs);
 	return result;
 }
+
+EXPORT_SYMBOL(kernel_read);
 
 static int exec_mmap(struct mm_struct *mm)
 {
@@ -584,6 +596,11 @@ static inline int de_thread(struct task_struct *tsk)
 		newsig->group_stop_count = 0;
 		newsig->curr_target = NULL;
 		init_sigpending(&newsig->shared_pending);
+
+		newsig->pgrp = oldsig->pgrp;
+		newsig->session = oldsig->session;
+		newsig->leader = oldsig->leader;
+		newsig->tty_old_pgrp = oldsig->tty_old_pgrp;
 	}
 
 	if (thread_group_empty(current))
@@ -822,6 +839,8 @@ out:
 	return retval;
 }
 
+EXPORT_SYMBOL(flush_old_exec);
+
 /*
  * We mustn't allow tracing of suid binaries, unless
  * the tracer has the capability to trace anything..
@@ -878,6 +897,8 @@ int prepare_binprm(struct linux_binprm *bprm)
 	return kernel_read(bprm->file,0,bprm->buf,BINPRM_BUF_SIZE);
 }
 
+EXPORT_SYMBOL(prepare_binprm);
+
 /*
  * This function is used to produce the new IDs and capabilities
  * from the old ones and the file's capabilities.
@@ -918,6 +939,8 @@ void compute_creds(struct linux_binprm *bprm)
 	security_bprm_compute_creds(bprm);
 }
 
+EXPORT_SYMBOL(compute_creds);
+
 void remove_arg_zero(struct linux_binprm *bprm)
 {
 	if (bprm->argc) {
@@ -941,6 +964,8 @@ inside:
 		bprm->argc--;
 	}
 }
+
+EXPORT_SYMBOL(remove_arg_zero);
 
 /*
  * cycle the list of binary formats handler, until one recognizes the image
@@ -1036,6 +1061,8 @@ int search_binary_handler(struct linux_binprm *bprm,struct pt_regs *regs)
 	}
 	return retval;
 }
+
+EXPORT_SYMBOL(search_binary_handler);
 
 /*
  * sys_execve() executes a new program.
@@ -1133,6 +1160,8 @@ out_file:
 	return retval;
 }
 
+EXPORT_SYMBOL(do_execve);
+
 int set_binfmt(struct linux_binfmt *new)
 {
 	struct linux_binfmt *old = current->binfmt;
@@ -1146,6 +1175,8 @@ int set_binfmt(struct linux_binfmt *new)
 		module_put(old->module);
 	return 0;
 }
+
+EXPORT_SYMBOL(set_binfmt);
 
 #define CORENAME_MAX_SIZE 64
 

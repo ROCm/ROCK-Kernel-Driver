@@ -429,6 +429,7 @@ static struct file_system_type nfsd_fs_type = {
 
 static int __init init_nfsd(void)
 {
+	int retval;
 	printk(KERN_INFO "Installing knfsd (copyright (C) 1996 okir@monad.swb.de).\n");
 
 	nfsd_stat_init();	/* Statistics */
@@ -441,8 +442,16 @@ static int __init init_nfsd(void)
 		if (entry)
 			entry->proc_fops =  &exports_operations;
 	}
-	register_filesystem(&nfsd_fs_type);
-	return 0;
+	retval = register_filesystem(&nfsd_fs_type);
+	if (retval) {
+		nfsd_export_shutdown();
+		nfsd_cache_shutdown();
+		remove_proc_entry("fs/nfs/exports", NULL);
+		remove_proc_entry("fs/nfs", NULL);
+		nfsd_stat_shutdown();
+		nfsd_lockd_shutdown();
+	}
+	return retval;
 }
 
 static void __exit exit_nfsd(void)

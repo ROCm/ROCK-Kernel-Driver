@@ -1064,7 +1064,8 @@ static unsigned int make_rate (unsigned int rate, rounding r,
 
 /********** Open a VC **********/
 
-static int amb_open (struct atm_vcc * atm_vcc, short vpi, int vci) {
+static int amb_open (struct atm_vcc * atm_vcc)
+{
   int error;
   
   struct atm_qos * qos;
@@ -1077,6 +1078,8 @@ static int amb_open (struct atm_vcc * atm_vcc, short vpi, int vci) {
   amb_dev * dev = AMB_DEV(atm_vcc->dev);
   amb_vcc * vcc;
   unsigned char pool = -1; // hush gcc
+  short vpi = atm_vcc->vpi;
+  int vci = atm_vcc->vci;
   
   PRINTD (DBG_FLOW|DBG_VCC, "amb_open %x %x", vpi, vci);
   
@@ -1087,14 +1090,6 @@ static int amb_open (struct atm_vcc * atm_vcc, short vpi, int vci) {
     return -EINVAL;
   }
 #endif
-  
-  // deal with possibly wildcarded VCs
-  error = atm_find_ci (atm_vcc, &vpi, &vci);
-  if (error) {
-    PRINTD (DBG_WARN|DBG_VCC, "atm_find_ci failed!");
-    return error;
-  }
-  PRINTD (DBG_VCC, "atm_find_ci gives %x %x", vpi, vci);
   
   if (!(0 <= vpi && vpi < (1<<NUM_VPI_BITS) &&
 	0 <= vci && vci < (1<<NUM_VCI_BITS))) {
@@ -1273,10 +1268,6 @@ static int amb_open (struct atm_vcc * atm_vcc, short vpi, int vci) {
     dev->rxer[vci] = atm_vcc;
     up (&dev->vcc_sf);
   }
-  
-  // set elements of vcc
-  atm_vcc->vpi = vpi; // 0
-  atm_vcc->vci = vci;
   
   // indicate readiness
   set_bit(ATM_VF_READY,&atm_vcc->flags);

@@ -12,6 +12,7 @@
  */
 #include <linux/config.h>
 #include <linux/errno.h>
+#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
 #include <linux/param.h>
@@ -34,6 +35,8 @@
 
 u64 jiffies_64 = INITIAL_JIFFIES;
 
+EXPORT_SYMBOL(jiffies_64);
+
 /* xtime and wall_jiffies keep wall-clock time */
 extern unsigned long wall_jiffies;
 
@@ -48,7 +51,9 @@ static inline void
 parisc_do_profile(struct pt_regs *regs)
 {
 	unsigned long pc = regs->iaoq[0];
+#if 0
 	extern unsigned long prof_cpu_mask;
+#endif
 	extern char _stext;
 
 	profile_hook(regs);
@@ -60,6 +65,10 @@ parisc_do_profile(struct pt_regs *regs)
 		return;
 
 #if 0
+	/* FIXME: when we have irq affinity to cpu, we need to
+	 * only look at the cpus specified in this mask 
+	 */
+
 	if (!((1 << smp_processor_id()) & prof_cpu_mask))
 		return;
 #endif
@@ -187,6 +196,8 @@ do_gettimeofday (struct timeval *tv)
 	tv->tv_usec = usec;
 }
 
+EXPORT_SYMBOL(do_gettimeofday);
+
 int
 do_settimeofday (struct timespec *tv)
 {
@@ -206,7 +217,6 @@ do_settimeofday (struct timespec *tv)
 		 * done, and then undo it!
 		 */
 		nsec -= gettimeoffset() * 1000;
-		nsec -= (jiffies - wall_jiffies) * (NSEC_PER_SEC / HZ);
 
 		wtm_sec  = wall_to_monotonic.tv_sec + (xtime.tv_sec - sec);
 		wtm_nsec = wall_to_monotonic.tv_nsec + (xtime.tv_nsec - nsec);
@@ -221,6 +231,18 @@ do_settimeofday (struct timespec *tv)
 	}
 	write_sequnlock_irq(&xtime_lock);
 	return 0;
+}
+
+EXPORT_SYMBOL(do_settimeofday);
+
+/*
+ * XXX: We can do better than this.
+ * Returns nanoseconds
+ */
+
+unsigned long long sched_clock(void)
+{
+	return (unsigned long long)jiffies * (1000000000 / HZ);
 }
 
 

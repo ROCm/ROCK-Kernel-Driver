@@ -105,11 +105,20 @@ unsigned int share_irqs = SERIAL8250_SHARE_IRQS;
 
 #include <asm/serial.h>
 
+/*
+ * SERIAL_PORT_DFNS tells us about built-in ports that have no
+ * standard enumeration mechanism.   Platforms that can find all
+ * serial ports via mechanisms like ACPI or PCI need not supply it.
+ */
+#ifndef SERIAL_PORT_DFNS
+#define SERIAL_PORT_DFNS
+#endif
+
 static struct old_serial_port old_serial_port[] = {
 	SERIAL_PORT_DFNS /* defined in asm/serial.h */
 };
 
-#define UART_NR	ARRAY_SIZE(old_serial_port)
+#define UART_NR	(ARRAY_SIZE(old_serial_port) + CONFIG_SERIAL_8250_NR_UARTS)
 
 #if defined(CONFIG_SERIAL_8250_RSA) && defined(MODULE)
 
@@ -469,8 +478,14 @@ static void autoconfig_16550a(struct uart_8250_port *up)
 	 */
 	serial_outp(up, UART_LCR, UART_LCR_DLAB);
 	if (serial_in(up, UART_EFR) == 0) {
-		DEBUG_AUTOCONF("EFRv1 ");
-		up->port.type = PORT_16650;
+		serial_outp(up, UART_EFR, 0xA8);
+		if (serial_in(up, UART_EFR) != 0) {
+			DEBUG_AUTOCONF("EFRv1 ");
+			up->port.type = PORT_16650;
+		} else {
+			DEBUG_AUTOCONF("Motorola 8xxx DUART ");
+		}
+		serial_outp(up, UART_EFR, 0);
 		return;
 	}
 
@@ -490,7 +505,9 @@ static void autoconfig_16550a(struct uart_8250_port *up)
 	 * Attempt to switch to bank 2, read the value of the LOOP bit
 	 * from EXCR1. Switch back to bank 0, change it in MCR. Then
 	 * switch back to bank 2, read it from EXCR1 again and check
-	 * it's changed. If so, set baud_base in EXCR2 to 921600.
+	 * it's changed. If so, set baud_base in EXCR2 to 921600. -- dwmw2
+	 * On PowerPC we don't want to change baud_base, as we have
+	 * a number of different divisors.  -- Tom Rini
 	 */
 	serial_outp(up, UART_LCR, 0);
 	status1 = serial_in(up, UART_MCR);
@@ -506,12 +523,14 @@ static void autoconfig_16550a(struct uart_8250_port *up)
 		serial_outp(up, UART_MCR, status1);
 
 		if ((status2 ^ status1) & UART_MCR_LOOP) {
+#ifndef CONFIG_PPC
 			serial_outp(up, UART_LCR, 0xE0);
 			status1 = serial_in(up, 0x04); /* EXCR1 */
 			status1 &= ~0xB0; /* Disable LOCK, mask out PRESL[01] */
 			status1 |= 0x10;  /* 1.625 divisor for baud_base --> 921600 */
 			serial_outp(up, 0x04, status1);
 			serial_outp(up, UART_LCR, 0);
+#endif
 
 			up->port.type = PORT_NS16550A;
 			up->port.uartclk = 921600*16;
@@ -2101,7 +2120,8 @@ void serial8250_get_irq_map(unsigned int *map)
 
 /**
  *	serial8250_suspend_port - suspend one serial port
- *	@line: serial line number
+ *	@line:  serial line number
+ *      @level: the level of port suspension, as per uart_suspend_port
  *
  *	Suspend one serial port.
  */
@@ -2112,7 +2132,8 @@ void serial8250_suspend_port(int line)
 
 /**
  *	serial8250_resume_port - resume one serial port
- *	@line: serial line number
+ *	@line:  serial line number
+ *      @level: the level of port resumption, as per uart_resume_port
  *
  *	Resume one serial port.
  */
@@ -2126,7 +2147,8 @@ static int __init serial8250_init(void)
 	int ret, i;
 
 	printk(KERN_INFO "Serial: 8250/16550 driver $Revision: 1.90 $ "
-		"IRQ sharing %sabled\n", share_irqs ? "en" : "dis");
+		"%d ports, IRQ sharing %sabled\n", (int) UART_NR,
+		share_irqs ? "en" : "dis");
 
 	for (i = 0; i < NR_IRQS; i++)
 		spin_lock_init(&irq_lists[i].lock);

@@ -335,8 +335,7 @@ static __devinit int via_ircc_open(int i, chipio_t * info, unsigned int id)
 		return -1;
 
 	/* Allocate new instance of the driver */
-	dev = alloc_netdev(sizeof(struct via_ircc_cb), "irda%d",
-			   irda_device_setup);
+	dev = alloc_irdadev(sizeof(struct via_ircc_cb));
 	if (dev == NULL) 
 		return -ENOMEM;
 

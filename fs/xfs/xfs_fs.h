@@ -392,22 +392,17 @@ typedef struct xfs_fsop_attrmulti_handlereq {
 } xfs_fsop_attrmulti_handlereq_t;
 
 /*
- * File system identifier. Should be unique (at least per machine).
+ * per machine unique filesystem identifier types.
  */
-typedef struct {
-	__u32 val[2];			/* file system id type */
-} xfs_fsid_t;
+typedef struct { __u32 val[2]; } xfs_fsid_t; /* file system id type */
 
-/*
- * File identifier.  Should be unique per filesystem on a single machine.
- * This is typically called by a stateless file server in order to generate
- * "file handles".
- */
+
 #ifndef HAVE_FID
 #define MAXFIDSZ	46
+
 typedef struct fid {
 	__u16		fid_len;		/* length of data in bytes */
-	unsigned char	fid_data[MAXFIDSZ];	/* data (variable length)  */
+	unsigned char	fid_data[MAXFIDSZ];	/* data (fid_len worth)  */
 } fid_t;
 #endif
 

@@ -710,6 +710,8 @@ void batch_entropy_store(u32 a, u32 b, int num)
 	spin_unlock_irqrestore(&batch_lock, flags);
 }
 
+EXPORT_SYMBOL(batch_entropy_store);
+
 /*
  * Flush out the accumulated entropy operations, adding entropy to the passed
  * store (normally random_state).  If that store has enough entropy, alternate
@@ -854,10 +856,14 @@ void add_keyboard_randomness(unsigned char scancode)
 	}
 }
 
+EXPORT_SYMBOL(add_keyboard_randomness);
+
 void add_mouse_randomness(__u32 mouse_data)
 {
 	add_timer_randomness(&mouse_timer_state, mouse_data);
 }
+
+EXPORT_SYMBOL(add_mouse_randomness);
 
 void add_interrupt_randomness(int irq)
 {
@@ -867,6 +873,8 @@ void add_interrupt_randomness(int irq)
 	add_timer_randomness(irq_timer_state[irq], 0x100+irq);
 }
 
+EXPORT_SYMBOL(add_interrupt_randomness);
+
 void add_disk_randomness(struct gendisk *disk)
 {
 	if (!disk || !disk->random)
@@ -874,6 +882,8 @@ void add_disk_randomness(struct gendisk *disk)
 	/* first major is 1, so we get >= 0x200 here */
 	add_timer_randomness(disk->random, 0x100+MKDEV(disk->major, disk->first_minor));
 }
+
+EXPORT_SYMBOL(add_disk_randomness);
 
 /******************************************************************
  *
@@ -1458,6 +1468,8 @@ void get_random_bytes(void *buf, int nbytes)
 				   "random driver initialization\n");
 }
 
+EXPORT_SYMBOL(get_random_bytes);
+
 /*********************************************************************
  *
  * Functions to interface with Linux
@@ -1735,7 +1747,7 @@ random_ioctl(struct inode * inode, struct file * file,
 		tmp = kmalloc(size * sizeof(__u32), GFP_KERNEL);
 
 		if (!tmp)
-			return -EFAULT;
+			return -ENOMEM;
 
 		spin_lock_irqsave(&random_state->lock, flags);
 		ent_count = random_state->entropy_count;
@@ -1823,6 +1835,8 @@ void generate_random_uuid(unsigned char uuid_out[16])
 	/* Set the UUID variant to DCE */
 	uuid_out[8] = (uuid_out[8] & 0x3F) | 0x80;
 }
+
+EXPORT_SYMBOL(generate_random_uuid);
 
 /********************************************************************
  *
@@ -2323,6 +2337,8 @@ __u32 secure_tcp_sequence_number(__u32 saddr, __u32 daddr,
 	return seq;
 }
 
+EXPORT_SYMBOL(secure_tcp_sequence_number);
+
 /*  The code below is shamelessly stolen from secure_tcp_sequence_number().
  *  All blames to Andrey V. Savochkin <saw@msu.ru>.
  */
@@ -2445,13 +2461,3 @@ __u32 check_tcp_syn_cookie(__u32 cookie, __u32 saddr, __u32 daddr, __u16 sport,
 	return (cookie - tmp[17]) & COOKIEMASK;	/* Leaving the data behind */
 }
 #endif
-
-
-
-EXPORT_SYMBOL(add_keyboard_randomness);
-EXPORT_SYMBOL(add_mouse_randomness);
-EXPORT_SYMBOL(add_interrupt_randomness);
-EXPORT_SYMBOL(add_disk_randomness);
-EXPORT_SYMBOL(batch_entropy_store);
-EXPORT_SYMBOL(generate_random_uuid);
-

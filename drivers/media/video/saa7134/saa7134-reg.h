@@ -101,7 +101,15 @@
 #define   SAA7134_IRQ1_INTE_RA0_2               (1 <<  2)
 #define   SAA7134_IRQ1_INTE_RA0_1               (1 <<  1)
 #define   SAA7134_IRQ1_INTE_RA0_0               (1 <<  0)
+
 #define SAA7134_IRQ2                            (0x2c8 >> 2)
+#define   SAA7134_IRQ2_INTE_GPIO23A             (1 << 17)
+#define   SAA7134_IRQ2_INTE_GPIO23              (1 << 16)
+#define   SAA7134_IRQ2_INTE_GPIO22A             (1 << 15)
+#define   SAA7134_IRQ2_INTE_GPIO22              (1 << 14)
+#define   SAA7134_IRQ2_INTE_GPIO18A             (1 << 13)
+#define   SAA7134_IRQ2_INTE_GPIO18              (1 << 12)
+#define   SAA7134_IRQ2_INTE_GPIO16              (1 << 11) /* not certain */
 #define   SAA7134_IRQ2_INTE_SC2                 (1 << 10)
 #define   SAA7134_IRQ2_INTE_SC1                 (1 <<  9)
 #define   SAA7134_IRQ2_INTE_SC0                 (1 <<  8)
@@ -113,7 +121,12 @@
 #define   SAA7134_IRQ2_INTE_DEC0                (1 <<  2)
 #define   SAA7134_IRQ2_INTE_PE                  (1 <<  1)
 #define   SAA7134_IRQ2_INTE_AR                  (1 <<  0)
+
 #define SAA7134_IRQ_REPORT                      (0x2cc >> 2)
+#define   SAA7134_IRQ_REPORT_GPIO23             (1 << 17)
+#define   SAA7134_IRQ_REPORT_GPIO22             (1 << 16)
+#define   SAA7134_IRQ_REPORT_GPIO18             (1 << 15)
+#define   SAA7134_IRQ_REPORT_GPIO16             (1 << 14) /* not certain */
 #define   SAA7134_IRQ_REPORT_LOAD_ERR           (1 << 13)
 #define   SAA7134_IRQ_REPORT_CONF_ERR           (1 << 12)
 #define   SAA7134_IRQ_REPORT_TRIG_ERR           (1 << 11)

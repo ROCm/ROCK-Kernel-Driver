@@ -229,8 +229,7 @@ void dev_add_pack(struct packet_type *pt)
 
 	spin_lock_bh(&ptype_lock);
 #ifdef CONFIG_NET_FASTROUTE
-	/* Hack to detect packet socket */
-	if (pt->data && pt->data != PKT_CAN_SHARE_SKB) {
+	if (pt->af_packet_priv) {
 		netdev_fastroute_obstacles++;
 		dev_clear_fastroute(pt->dev);
 	}
@@ -278,7 +277,7 @@ void __dev_remove_pack(struct packet_type *pt)
 	list_for_each_entry(pt1, head, list) {
 		if (pt == pt1) {
 #ifdef CONFIG_NET_FASTROUTE
-			if (pt->data && pt->data != PKT_CAN_SHARE_SKB)
+			if (pt->af_packet_priv)
 				netdev_fastroute_obstacles--;
 #endif
 			list_del_rcu(&pt->list);
@@ -915,6 +914,8 @@ int unregister_netdevice_notifier(struct notifier_block *nb)
 
 /**
  *	call_netdevice_notifiers - call all network notifier blocks
+ *      @val: value passed unmodified to notifier function
+ *      @v:   pointer passed unmodified to notifier function
  *
  *	Call all network notifier blocks.  Parameters and return value
  *	are as for notifier_call_chain().
@@ -941,7 +942,7 @@ void dev_queue_xmit_nit(struct sk_buff *skb, struct net_device *dev)
 		 * they originated from - MvS (miquels@drinkel.ow.org)
 		 */
 		if ((ptype->dev == dev || !ptype->dev) &&
-		    (struct sock *)ptype->data != skb->sk) {
+		    (struct sock *)ptype->af_packet_priv != skb->sk) {
 			struct sk_buff *skb2= skb_clone(skb, GFP_ATOMIC);
 			if (!skb2)
 				break;
@@ -1402,36 +1403,6 @@ drop:
 	return NET_RX_DROP;
 }
 
-/* Deliver skb to an old protocol, which is not threaded well
-   or which do not understand shared skbs.
- */
-static int deliver_to_old_ones(struct packet_type *pt,
-			       struct sk_buff *skb, int last)
-{
-	int ret = NET_RX_DROP;
-
-	if (!last) {
-		skb = skb_clone(skb, GFP_ATOMIC);
-		if (!skb)
-			goto out;
-	}
-	if (skb_is_nonlinear(skb) && __skb_linearize(skb, GFP_ATOMIC))
-		goto out_kfree;
-
-#ifdef CONFIG_SMP
-	/* Old protocols did not depened on BHs different of NET_BH and
-	   TIMER_BH - they need to be fixed for the new assumptions.
-	 */
-	print_symbol("fix old protocol handler %s!\n", (unsigned long)pt->func);
-#endif
-	ret = pt->func(skb, skb->dev, pt);
-out:
-	return ret;
-out_kfree:
-	kfree_skb(skb);
-	goto out;
-}
-
 static __inline__ void skb_bond(struct sk_buff *skb)
 {
 	struct net_device *dev = skb->dev;
@@ -1488,6 +1459,14 @@ static void net_tx_action(struct softirq_action *h)
 	}
 }
 
+static __inline__ int deliver_skb(struct sk_buff *skb,
+				  struct packet_type *pt_prev, int last)
+{
+	atomic_inc(&skb->users);
+	return pt_prev->func(skb, skb->dev, pt_prev);
+}
+
+
 #if defined(CONFIG_BRIDGE) || defined (CONFIG_BRIDGE_MODULE)
 int (*br_handle_frame_hook)(struct sk_buff *skb);
 
@@ -1495,15 +1474,8 @@ static __inline__ int handle_bridge(struct sk_buff *skb,
 				     struct packet_type *pt_prev)
 {
 	int ret = NET_RX_DROP;
-
-	if (pt_prev) {
-		if (!pt_prev->data)
-			ret = deliver_to_old_ones(pt_prev, skb, 0);
-		else {
-			atomic_inc(&skb->users);
-			ret = pt_prev->func(skb, skb->dev, pt_prev);
-		}
-	}
+	if (pt_prev)
+		ret = deliver_skb(skb, pt_prev, 0);
 
 	return ret;
 }
@@ -1551,16 +1523,8 @@ int netif_receive_skb(struct sk_buff *skb)
 	rcu_read_lock();
 	list_for_each_entry_rcu(ptype, &ptype_all, list) {
 		if (!ptype->dev || ptype->dev == skb->dev) {
-			if (pt_prev) {
-				if (!pt_prev->data) {
-					ret = deliver_to_old_ones(pt_prev,
-								  skb, 0);
-				} else {
-					atomic_inc(&skb->users);
-					ret = pt_prev->func(skb, skb->dev,
-							    pt_prev);
-				}
-			}
+			if (pt_prev) 
+				ret = deliver_skb(skb, pt_prev, 0);
 			pt_prev = ptype;
 		}
 	}
@@ -1573,26 +1537,14 @@ int netif_receive_skb(struct sk_buff *skb)
 	list_for_each_entry_rcu(ptype, &ptype_base[ntohs(type)&15], list) {
 		if (ptype->type == type &&
 		    (!ptype->dev || ptype->dev == skb->dev)) {
-			if (pt_prev) {
-				if (!pt_prev->data) {
-					ret = deliver_to_old_ones(pt_prev,
-								  skb, 0);
-				} else {
-					atomic_inc(&skb->users);
-					ret = pt_prev->func(skb, skb->dev,
-							    pt_prev);
-				}
-			}
+			if (pt_prev) 
+				ret = deliver_skb(skb, pt_prev, 0);
 			pt_prev = ptype;
 		}
 	}
 
 	if (pt_prev) {
-		if (!pt_prev->data) {
-			ret = deliver_to_old_ones(pt_prev, skb, 1);
-		} else {
-			ret = pt_prev->func(skb, skb->dev, pt_prev);
-		}
+		ret = pt_prev->func(skb, skb->dev, pt_prev);
 	} else {
 		kfree_skb(skb);
 		/* Jamal, now you will not able to escape explaining
@@ -1637,8 +1589,8 @@ static int process_backlog(struct net_device *backlog_dev, int *budget)
 #ifdef CONFIG_NET_HW_FLOWCONTROL
 		if (queue->throttle &&
 		    queue->input_pkt_queue.qlen < no_cong_thresh ) {
+			queue->throttle = 0;
 			if (atomic_dec_and_test(&netdev_dropping)) {
-				queue->throttle = 0;
 				netdev_wakeup();
 				break;
 			}
@@ -3036,3 +2988,63 @@ out:
 }
 
 subsys_initcall(net_dev_init);
+
+EXPORT_SYMBOL(__dev_get);
+EXPORT_SYMBOL(__dev_get_by_flags);
+EXPORT_SYMBOL(__dev_get_by_index);
+EXPORT_SYMBOL(__dev_get_by_name);
+EXPORT_SYMBOL(__dev_remove_pack);
+EXPORT_SYMBOL(__skb_linearize);
+EXPORT_SYMBOL(call_netdevice_notifiers);
+EXPORT_SYMBOL(dev_add_pack);
+EXPORT_SYMBOL(dev_alloc);
+EXPORT_SYMBOL(dev_alloc_name);
+EXPORT_SYMBOL(dev_close);
+EXPORT_SYMBOL(dev_get_by_flags);
+EXPORT_SYMBOL(dev_get_by_index);
+EXPORT_SYMBOL(dev_get_by_name);
+EXPORT_SYMBOL(dev_getbyhwaddr);
+EXPORT_SYMBOL(dev_ioctl);
+EXPORT_SYMBOL(dev_new_index);
+EXPORT_SYMBOL(dev_open);
+EXPORT_SYMBOL(dev_queue_xmit);
+EXPORT_SYMBOL(dev_queue_xmit_nit);
+EXPORT_SYMBOL(dev_remove_pack);
+EXPORT_SYMBOL(dev_set_allmulti);
+EXPORT_SYMBOL(dev_set_promiscuity);
+EXPORT_SYMBOL(free_netdev);
+EXPORT_SYMBOL(netdev_boot_setup_check);
+EXPORT_SYMBOL(netdev_set_master);
+EXPORT_SYMBOL(netdev_state_change);
+EXPORT_SYMBOL(netif_receive_skb);
+EXPORT_SYMBOL(netif_rx);
+EXPORT_SYMBOL(register_gifconf);
+EXPORT_SYMBOL(register_netdevice);
+EXPORT_SYMBOL(register_netdevice_notifier);
+EXPORT_SYMBOL(skb_checksum_help);
+EXPORT_SYMBOL(synchronize_net);
+EXPORT_SYMBOL(unregister_netdevice);
+EXPORT_SYMBOL(unregister_netdevice_notifier);
+
+#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
+EXPORT_SYMBOL(br_handle_frame_hook);
+#endif
+/* for 801q VLAN support */
+#if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
+EXPORT_SYMBOL(dev_change_flags);
+#endif
+#ifdef CONFIG_KMOD
+EXPORT_SYMBOL(dev_load);
+#endif
+#ifdef CONFIG_NET_HW_FLOWCONTROL
+EXPORT_SYMBOL(netdev_dropping);
+EXPORT_SYMBOL(netdev_fc_xoff);
+EXPORT_SYMBOL(netdev_register_fc);
+EXPORT_SYMBOL(netdev_unregister_fc);
+#endif
+#ifdef CONFIG_NET_FASTROUTE
+EXPORT_SYMBOL(netdev_fastroute);
+EXPORT_SYMBOL(netdev_fastroute_obstacles);
+#endif
+
+EXPORT_PER_CPU_SYMBOL(softnet_data);

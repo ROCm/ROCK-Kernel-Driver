@@ -70,21 +70,6 @@ static unsigned int calc_speed (int mult, int fsb)
 }
 
 
-static unsigned int longhaul_get_cpu_fsb (void)
-{
-	unsigned long lo, hi;
-	unsigned int eblcr_fsb_table[] = { 66, 133, 100, -1 };
-	unsigned int invalue=0;
-
-	if (fsb == 0) {
-		rdmsr (MSR_IA32_EBL_CR_POWERON, lo, hi);
-		invalue = (lo & (1<<18|1<<19)) >>18;
-		fsb = eblcr_fsb_table[invalue];
-	}
-	return fsb;
-}
-
-
 static int longhaul_get_cpu_mult (void)
 {
 	unsigned long invalue=0,lo, hi;
@@ -168,7 +153,7 @@ static void longhaul_setstate (unsigned int clock_ratio_index)
 		break;
 
 	/*
-	 * Longhaul v3. (Ezra-T [C5M], Nehemiag [C5N])
+	 * Longhaul v3. (Ezra-T [C5M], Nehemiah [C5N])
 	 * This can also do voltage scaling, but see above.
 	 * Ezra-T was alleged to do FSB scaling too, but it never worked in practice.
 	 */
@@ -193,6 +178,39 @@ static void longhaul_setstate (unsigned int clock_ratio_index)
 	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
 }
 
+/*
+ * Centaur decided to make life a little more tricky.
+ * Only longhaul v1 is allowed to read EBLCR BSEL[0:1].
+ * Samuel2 and above have to try and guess what the FSB is.
+ * We do this by assuming we booted at maximum multiplier, and interpolate
+ * between that value multiplied by possible FSBs and cpu_mhz which
+ * was calculated at boot time. Really ugly, but no other way to do this.
+ */
+static int _guess (int guess, int maxmult)
+{
+	int target;
+
+	target = ((maxmult/10)*guess);
+	if (maxmult%10 != 0)
+		target += (guess/2);
+	target &= ~0xf;
+	return target;
+}
+
+static int guess_fsb(int maxmult)
+{
+	int speed = (cpu_khz/1000) & ~0xf;
+	int i;
+	int speeds[3] = { 66, 100, 133 };
+
+	for (i=0; i<3; i++) {
+		if (_guess(speeds[i],maxmult) == speed)
+			return speeds[i];
+	}
+	return 0;
+}
+
+
 
 static int __init longhaul_get_ranges (void)
 {
@@ -203,8 +221,8 @@ static int __init longhaul_get_ranges (void)
 		-1,110,120,-1,135,115,125,105,130,150,160,140,-1,155,-1,145 };
 	unsigned int j, k = 0;
 	union msr_longhaul longhaul;
-
-	fsb = longhaul_get_cpu_fsb();
+	unsigned long lo, hi;
+	unsigned int eblcr_fsb_table[] = { 66, 133, 100, -1 };
 
 	switch (longhaul_version) {
 	case 1:
@@ -212,6 +230,9 @@ static int __init longhaul_get_ranges (void)
 		   Assume min=3.0x & max = whatever we booted at. */
 		minmult = 30;
 		maxmult = longhaul_get_cpu_mult();
+		rdmsr (MSR_IA32_EBL_CR_POWERON, lo, hi);
+		invalue = (lo & (1<<18|1<<19)) >>18;
+		fsb = eblcr_fsb_table[invalue];
 		break;
 
 	case 2 ... 3:
@@ -222,14 +243,13 @@ static int __init longhaul_get_ranges (void)
 			invalue += 16;
 		maxmult=multipliers[invalue];
 
-#if 0
 		invalue = longhaul.bits.MinMHzBR;
-		if (longhaul.bits.MinMHzBR4);
-			invalue += 16;
-		minmult = multipliers[invalue];
-#else
-		minmult = 30; /* as per spec */
-#endif
+		if (longhaul.bits.MinMHzBR4 == 1)
+			minmult = 30;
+		else
+			minmult = multipliers[invalue];
+
+		fsb = guess_fsb(maxmult);
 		break;
 	}
 
@@ -353,7 +373,7 @@ static int longhaul_cpu_init (struct cpufreq_policy *policy)
 	case 6:
 		cpuname = "C3 'Samuel' [C5A]";
 		longhaul_version=1;
-		memcpy (clock_ratio, longhaul1_clock_ratio, sizeof(longhaul1_clock_ratio));
+		memcpy (clock_ratio, samuel1_clock_ratio, sizeof(samuel1_clock_ratio));
 		memcpy (eblcr_table, samuel1_eblcr, sizeof(samuel1_eblcr));
 		break;
 
@@ -362,13 +382,17 @@ static int longhaul_cpu_init (struct cpufreq_policy *policy)
 		case 0:
 			cpuname = "C3 'Samuel 2' [C5B]";
 			longhaul_version=1;
-			memcpy (clock_ratio, longhaul1_clock_ratio, sizeof(longhaul1_clock_ratio));
+			/* Note, this is not a typo, early Samuel2's had Samuel1 ratios. */
+			memcpy (clock_ratio, samuel1_clock_ratio, sizeof(samuel1_clock_ratio));
 			memcpy (eblcr_table, samuel2_eblcr, sizeof(samuel2_eblcr));
 			break;
 		case 1 ... 15:
-			cpuname = "C3 'Ezra' [C5C]";
+			if (c->x86_mask < 8)
+				cpuname = "C3 'Samuel 2' [C5B]";
+			else
+				cpuname = "C3 'Ezra' [C5C]";
 			longhaul_version=2;
-			memcpy (clock_ratio, longhaul2_clock_ratio, sizeof(longhaul2_clock_ratio));
+			memcpy (clock_ratio, ezra_clock_ratio, sizeof(ezra_clock_ratio));
 			memcpy (eblcr_table, ezra_eblcr, sizeof(ezra_eblcr));
 			break;
 		}
@@ -378,14 +402,16 @@ static int longhaul_cpu_init (struct cpufreq_policy *policy)
 		cpuname = "C3 'Ezra-T [C5M]";
 		longhaul_version=3;
 		numscales=32;
-		memcpy (clock_ratio, longhaul3_clock_ratio, sizeof(longhaul3_clock_ratio));
-		memcpy (eblcr_table, c5m_eblcr, sizeof(c5m_eblcr));
+		memcpy (clock_ratio, ezrat_clock_ratio, sizeof(ezrat_clock_ratio));
+		memcpy (eblcr_table, ezrat_eblcr, sizeof(ezrat_eblcr));
 		break;
 	/*
 	case 9:
 		cpuname = "C3 'Nehemiah' [C5N]";
 		longhaul_version=3;
 		numscales=32;
+		memcpy (clock_ratio, nehemiah_clock_ratio, sizeof(nehemiah_clock_ratio));
+		memcpy (eblcr_table, nehemiah_eblcr, sizeof(nehemiah_eblcr));
 	*/
 	default:
 		cpuname = "Unknown";
@@ -425,12 +451,8 @@ static int __init longhaul_init (void)
 		return -ENODEV;
 
 	switch (c->x86_model) {
-	case 6 ... 7:
+	case 6 ... 8:
 		return cpufreq_register_driver(&longhaul_driver);
-	case 8:
-		printk (KERN_INFO PFX "Ezra-T unsupported: Waiting on updated docs "
-						"from VIA before this is usable.\n");
-		break;
 	case 9:
 		printk (KERN_INFO PFX "Nehemiah unsupported: Waiting on working silicon "
 						"from VIA before this is usable.\n");

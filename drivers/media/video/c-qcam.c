@@ -33,7 +33,6 @@
 #include <linux/mm.h>
 #include <linux/parport.h>
 #include <linux/sched.h>
-#include <linux/version.h>
 #include <linux/videodev.h>
 #include <asm/semaphore.h>
 #include <asm/uaccess.h>

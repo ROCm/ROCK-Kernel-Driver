@@ -574,7 +574,7 @@ config SCSI_GDTH
 	  Formerly called GDT SCSI Disk Array Controller Support.
 
 	  This is a driver for RAID/SCSI Disk Array Controllers (EISA/ISA/PCI) 
-	  manufactured by Intel/ICP vortex (an Intel Company). It is documented
+	  manufactured by Intel Corporation/ICP vortex GmbH. It is documented
 	  in the kernel source in <file:drivers/scsi/gdth.c> and
 	  <file:drivers/scsi/gdth.h.>
 
@@ -1166,16 +1166,6 @@ config SCSI_QLOGIC_1280
 	  To compile this driver as a module, choose M here: the
 	  module will be called qla1280.
 
-config SCSI_QLOGIC_1280_PIO
-	bool "Use PIO instead of MMIO" if !X86_VISWS
-	depends on SCSI_QLOGIC_1280
-	default y if X86_VISWS
-	help
-	  This instructs the driver to use programmed I/O ports (PIO) instead
-	  of PCI shared memory (MMIO).  This can possibly solve some problems
-	  in case your mainboard has memory consistency issues.  If unsure,
-	  say N.
-
 config SCSI_QLOGICPTI
 	tristate "PTI Qlogic, ISP Driver"
 	depends on SBUS && SCSI
@@ -1453,7 +1443,7 @@ config A3000_SCSI
 
 config A4000T_SCSI
 	bool "A4000T SCSI support (EXPERIMENTAL)"
-	depends on AMIGA && SCSI && EXPERIMENTAL
+	depends on AMIGA && SCSI && EXPERIMENTAL && BROKEN
 	help
 	  Support for the NCR53C710 SCSI controller on the Amiga 4000T.
 
@@ -1521,7 +1511,7 @@ config FASTLANE_SCSI
 
 config A4091_SCSI
 	bool "A4091 SCSI support (EXPERIMENTAL)"
-	depends on ZORRO && SCSI && EXPERIMENTAL
+	depends on ZORRO && SCSI && EXPERIMENTAL && BROKEN
 	help
 	  Support for the NCR53C710 chip on the Amiga 4091 Z3 SCSI2 controller
 	  (1993).  Very obscure -- the 4091 was part of an Amiga 4000 upgrade
@@ -1529,7 +1519,7 @@ config A4091_SCSI
 
 config WARPENGINE_SCSI
 	bool "WarpEngine SCSI support (EXPERIMENTAL)"
-	depends on ZORRO && SCSI && EXPERIMENTAL
+	depends on ZORRO && SCSI && EXPERIMENTAL && BROKEN
 	help
 	  Support for MacroSystem Development's WarpEngine Amiga SCSI-2
 	  controller. Info at
@@ -1537,7 +1527,7 @@ config WARPENGINE_SCSI
 
 config BLZ603EPLUS_SCSI
 	bool "Blizzard PowerUP 603e+ SCSI (EXPERIMENTAL)"
-	depends on ZORRO && SCSI && EXPERIMENTAL
+	depends on ZORRO && SCSI && EXPERIMENTAL && BROKEN
 	help
 	  If you have an Amiga 1200 with a Phase5 Blizzard PowerUP 603e+
 	  accelerator, say Y. Otherwise, say N.
@@ -1553,7 +1543,7 @@ config OKTAGON_SCSI
 
 config ATARI_SCSI
 	tristate "Atari native SCSI support"
-	depends on ATARI && SCSI
+	depends on ATARI && SCSI && BROKEN
 	---help---
 	  If you have an Atari with built-in NCR5380 SCSI controller (TT,
 	  Falcon, ...) say Y to get it supported. Of course also, if you have
@@ -1622,7 +1612,7 @@ config MVME147_SCSI
 
 config MVME16x_SCSI
 	bool "NCR53C710 SCSI driver for MVME16x"
-	depends on MVME16x && SCSI
+	depends on MVME16x && SCSI && BROKEN
 	help
 	  The Motorola MVME162, 166, 167, 172 and 177 boards use the NCR53C710
 	  SCSI controller chip.  Almost everyone using one of these boards
@@ -1630,7 +1620,7 @@ config MVME16x_SCSI
 
 config BVME6000_SCSI
 	bool "NCR53C710 SCSI driver for BVME6000"
-	depends on BVME6000 && SCSI
+	depends on BVME6000 && SCSI && BROKEN
 	help
 	  The BVME4000 and BVME6000 boards from BVM Ltd use the NCR53C710
 	  SCSI controller chip.  Almost everyone using one of these boards
@@ -1685,6 +1675,11 @@ config WD33C93_PIO
 
 #      bool 'Cyberstorm Mk III SCSI support (EXPERIMENTAL)' CONFIG_CYBERSTORMIII_SCSI
 #      bool 'GVP Turbo 040/060 SCSI support (EXPERIMENTAL)' CONFIG_GVP_TURBO_SCSI
+
+config ZFCP
+	tristate "IBM z900 OpenFCP/SCSI support"
+	depends on ARCH_S390 && SCSI
+
 endmenu
 
 source "drivers/scsi/pcmcia/Kconfig"

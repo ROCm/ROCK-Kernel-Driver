@@ -20,6 +20,7 @@
 #include <linux/fs.h>
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/parser.h>
 #include <linux/completion.h>
 #include <linux/vfs.h>
 #include <asm/uaccess.h>
@@ -164,59 +165,82 @@ static void jfs_put_super(struct super_block *sb)
 	kfree(sbi);
 }
 
+enum {
+	Opt_integrity, Opt_nointegrity, Opt_iocharset, Opt_resize,
+	Opt_ignore, Opt_err,
+};
+
+static match_table_t tokens = {
+	{Opt_integrity, "integrity"},
+	{Opt_nointegrity, "nointegrity"},
+	{Opt_iocharset, "iocharset=%s"},
+	{Opt_resize, "resize=%u"},
+	{Opt_ignore, "noquota"},
+	{Opt_ignore, "quota"},
+	{Opt_ignore, "usrquota"},
+	{Opt_ignore, "grpquota"},
+	{Opt_err, NULL}
+};
+
 static int parse_options(char *options, struct super_block *sb, s64 *newLVSize,
 			 int *flag)
 {
 	void *nls_map = NULL;
-	char *this_char;
-	char *value;
+	char *p;
 	struct jfs_sb_info *sbi = JFS_SBI(sb);
 
 	*newLVSize = 0;
 
 	if (!options)
 		return 1;
-	while ((this_char = strsep(&options, ",")) != NULL) {
-		if (!*this_char)
+
+	while ((p = strsep(&options, ",")) != NULL) {
+		substring_t args[MAX_OPT_ARGS];
+		int token;
+		if (!*p)
 			continue;
-		if ((value = strchr(this_char, '=')) != NULL)
-			*value++ = 0;
-		if (!strcmp(this_char, "integrity")) {
+
+		token = match_token(p, tokens, args);
+		switch (token) {
+		case Opt_integrity:
 			*flag &= ~JFS_NOINTEGRITY;
-		} else 	if (!strcmp(this_char, "nointegrity")) {
+			break;
+		case Opt_nointegrity:
 			*flag |= JFS_NOINTEGRITY;
-		} else if (!strcmp(this_char, "iocharset")) {
-			if (!value || !*value)
-				goto needs_arg;
+			break;
+		case Opt_ignore:
+			/* Silently ignore the quota options */
+			/* Don't do anything ;-) */
+			break;
+		case Opt_iocharset:
 			if (nls_map)	/* specified iocharset twice! */
 				unload_nls(nls_map);
-			nls_map = load_nls(value);
+			nls_map = load_nls(args[0].from);
 			if (!nls_map) {
 				printk(KERN_ERR "JFS: charset not found\n");
 				goto cleanup;
 			}
-		} else if (!strcmp(this_char, "resize")) {
-			if (!value || !*value) {
+			break;
+		case Opt_resize:
+		{
+			char *resize = args[0].from;
+			if (!resize || !*resize) {
 				*newLVSize = sb->s_bdev->bd_inode->i_size >>
 					sb->s_blocksize_bits;
 				if (*newLVSize == 0)
 					printk(KERN_ERR
-					 "JFS: Cannot determine volume size\n");
+					"JFS: Cannot determine volume size\n");
 			} else
-				*newLVSize = simple_strtoull(value, &value, 0);
-
-			/* Silently ignore the quota options */
-		} else if (!strcmp(this_char, "grpquota")
-			   || !strcmp(this_char, "noquota")
-			   || !strcmp(this_char, "quota")
-			   || !strcmp(this_char, "usrquota"))
-			/* Don't do anything ;-) */ ;
-		else {
-			printk("jfs: Unrecognized mount option %s\n",
-			       this_char);
+				*newLVSize = simple_strtoull(resize, &resize, 0);
+			break;
+		}
+		default:
+			printk("jfs: Unrecognized mount option \"%s\" "
+					" or missing value\n", p);
 			goto cleanup;
 		}
 	}
+
 	if (nls_map) {
 		/* Discard old (if remount) */
 		if (sbi->nls_tab)
@@ -224,8 +248,7 @@ static int parse_options(char *options, struct super_block *sb, s64 *newLVSize,
 		sbi->nls_tab = nls_map;
 	}
 	return 1;
-needs_arg:
-	printk(KERN_ERR "JFS: %s needs an argument\n", this_char);
+
 cleanup:
 	if (nls_map)
 		unload_nls(nls_map);

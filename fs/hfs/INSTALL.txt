@@ -15,9 +15,7 @@
   +o  The kernel sources (or at least the header files) available online.
 
   +o  The module utilities package current for your kernel version and an
-     understanding of how to use it.  (The file
-     Documentation/modules.txt in the kernel source directory provides a
-     brief introduction.)
+     understanding of how to use it.
 
   22..  IInnssttaallllaattiioonn
 

@@ -180,6 +180,7 @@ typedef struct config_req_t {
 #define INT_MEMORY		0x01
 #define INT_MEMORY_AND_IO	0x02
 #define INT_CARDBUS		0x04
+#define INT_ZOOMED_VIDEO	0x08
 
 /* For RequestIO and ReleaseIO */
 typedef struct io_req_t {

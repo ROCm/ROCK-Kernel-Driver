@@ -48,6 +48,8 @@ int profile_event_unregister(enum profile_type, struct notifier_block * n);
 int register_profile_notifier(struct notifier_block * nb);
 int unregister_profile_notifier(struct notifier_block * nb);
 
+struct pt_regs;
+
 /* profiling hook activated on each timer interrupt */
 void profile_hook(struct pt_regs * regs);
 

@@ -242,10 +242,10 @@ int param_array(const char *name,
 		const char *val,
 		unsigned int min, unsigned int max,
 		void *elem, int elemsize,
-		int (*set)(const char *, struct kernel_param *kp))
+		int (*set)(const char *, struct kernel_param *kp),
+		int *num)
 {
 	int ret;
-	unsigned int count = 0;
 	struct kernel_param kp;
 	char save;
 
@@ -259,11 +259,12 @@ int param_array(const char *name,
 		return -EINVAL;
 	}
 
+	*num = 0;
 	/* We expect a comma-separated list of values. */
 	do {
 		int len;
 
-		if (count > max) {
+		if (*num == max) {
 			printk(KERN_ERR "%s: can only take %i arguments\n",
 			       name, max);
 			return -EINVAL;
@@ -279,10 +280,10 @@ int param_array(const char *name,
 			return ret;
 		kp.arg += elemsize;
 		val += len+1;
-		count++;
+		(*num)++;
 	} while (save == ',');
 
-	if (count < min) {
+	if (*num < min) {
 		printk(KERN_ERR "%s: needs at least %i arguments\n",
 		       name, min);
 		return -EINVAL;
@@ -290,29 +291,32 @@ int param_array(const char *name,
 	return 0;
 }
 
-/* First two elements are the max and min array length (which don't change) */
-int param_set_intarray(const char *val, struct kernel_param *kp)
+int param_array_set(const char *val, struct kernel_param *kp)
 {
-	int *array;
+	struct kparam_array *arr = kp->arg;
 
-	/* Grab min and max as first two elements */
-	array = kp->arg;
-	return param_array(kp->name, val, array[0], array[1], &array[2],
-			   sizeof(int), param_set_int);
+	return param_array(kp->name, val, 1, arr->max, arr->elem,
+			   arr->elemsize, arr->set, arr->num);
 }
 
-int param_get_intarray(char *buffer, struct kernel_param *kp)
+int param_array_get(char *buffer, struct kernel_param *kp)
 {
-	int max;
-	int *array;
-	unsigned int i;
+	int i, off, ret;
+	struct kparam_array *arr = kp->arg;
+	struct kernel_param p;
 
-	array = kp->arg;
-	max = array[1];
-
-	for (i = 2; i < max + 2; i++)
-		sprintf(buffer, "%s%i", i > 2 ? "," : "", array[i]);
-	return strlen(buffer);
+	p = *kp;
+	for (i = off = 0; i < *arr->num; i++) {
+		if (i)
+			buffer[off++] = ',';
+		p.arg = arr->elem + arr->elemsize * i;
+		ret = arr->get(buffer + off, &p);
+		if (ret < 0)
+			return ret;
+		off += ret;
+	}
+	buffer[off] = '\0';
+	return off;
 }
 
 int param_set_copystring(const char *val, struct kernel_param *kp)
@@ -346,6 +350,6 @@ EXPORT_SYMBOL(param_set_bool);
 EXPORT_SYMBOL(param_get_bool);
 EXPORT_SYMBOL(param_set_invbool);
 EXPORT_SYMBOL(param_get_invbool);
-EXPORT_SYMBOL(param_set_intarray);
-EXPORT_SYMBOL(param_get_intarray);
+EXPORT_SYMBOL(param_array_set);
+EXPORT_SYMBOL(param_array_get);
 EXPORT_SYMBOL(param_set_copystring);

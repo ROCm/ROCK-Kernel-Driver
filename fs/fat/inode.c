@@ -20,6 +20,7 @@
 #include <linux/buffer_head.h>
 #include <linux/mount.h>
 #include <linux/vfs.h>
+#include <linux/parser.h>
 #include <asm/unaligned.h>
 
 /*
@@ -183,20 +184,6 @@ void fat_put_super(struct super_block *sb)
 	kfree(sbi);
 }
 
-static int simple_getbool(char *s, int *setval)
-{
-	if (s) {
-		if (!strcmp(s,"1") || !strcmp(s,"yes") || !strcmp(s,"true"))
-			*setval = 1;
-		else if (!strcmp(s,"0") || !strcmp(s,"no") || !strcmp(s,"false"))
-			*setval = 0;
-		else
-			return 0;
-	} else
-		*setval = 1;
-	return 1;
-}
-
 static int fat_show_options(struct seq_file *m, struct vfsmount *mnt)
 {
 	struct msdos_sb_info *sbi = MSDOS_SB(mnt->mnt_sb);
@@ -259,11 +246,91 @@ static int fat_show_options(struct seq_file *m, struct vfsmount *mnt)
 	return 0;
 }
 
+enum {
+	Opt_check_n, Opt_check_r, Opt_check_s, Opt_uid, Opt_gid,
+	Opt_umask, Opt_dmask, Opt_fmask, Opt_codepage, Opt_nocase,
+	Opt_quiet, Opt_showexec, Opt_debug, Opt_immutable,
+	Opt_dots, Opt_nodots,
+	Opt_charset, Opt_shortname_lower, Opt_shortname_win95,
+	Opt_shortname_winnt, Opt_shortname_mixed, Opt_utf8_no, Opt_utf8_yes,
+	Opt_uni_xl_no, Opt_uni_xl_yes, Opt_nonumtail_no, Opt_nonumtail_yes,
+	Opt_obsolate, Opt_err,
+};
+
+static match_table_t fat_tokens = {
+	{Opt_check_r, "check=relaxed"},
+	{Opt_check_s, "check=strict"},
+	{Opt_check_n, "check=normal"},
+	{Opt_check_r, "check=r"},
+	{Opt_check_s, "check=s"},
+	{Opt_check_n, "check=n"},
+	{Opt_uid, "uid=%u"},
+	{Opt_gid, "gid=%u"},
+	{Opt_umask, "umask=%o"},
+	{Opt_dmask, "dmask=%o"},
+	{Opt_fmask, "fmask=%o"},
+	{Opt_codepage, "codepage=%u"},
+	{Opt_nocase, "nocase"},
+	{Opt_quiet, "quiet"},
+	{Opt_showexec, "showexec"},
+	{Opt_debug, "debug"},
+	{Opt_immutable, "sys_immutable"},
+	{Opt_obsolate, "conv=binary"},
+	{Opt_obsolate, "conv=text"},
+	{Opt_obsolate, "conv=auto"},
+	{Opt_obsolate, "conv=b"},
+	{Opt_obsolate, "conv=t"},
+	{Opt_obsolate, "conv=a"},
+	{Opt_obsolate, "fat=%u"},
+	{Opt_obsolate, "blocksize=%u"},
+	{Opt_obsolate, "cvf_format=%20s"},
+	{Opt_obsolate, "cvf_options=%100s"},
+	{Opt_obsolate, "posix"},
+	{Opt_err, NULL}
+};
+static match_table_t msdos_tokens = {
+	{Opt_nodots, "nodots"},
+	{Opt_nodots, "dotsOK=no"},
+	{Opt_dots, "dots"},
+	{Opt_dots, "dotsOK=yes"},
+	{Opt_err, NULL}
+};
+static match_table_t vfat_tokens = {
+	{Opt_charset, "iocharset=%s"},
+	{Opt_shortname_lower, "shortname=lower"},
+	{Opt_shortname_win95, "shortname=win95"},
+	{Opt_shortname_winnt, "shortname=winnt"},
+	{Opt_shortname_mixed, "shortname=mixed"},
+	{Opt_utf8_no, "utf8=0"},		/* 0 or no or false */
+	{Opt_utf8_no, "utf8=no"},
+	{Opt_utf8_no, "utf8=false"},
+	{Opt_utf8_yes, "utf8=1"},		/* empty or 1 or yes or true */
+	{Opt_utf8_yes, "utf8=yes"},
+	{Opt_utf8_yes, "utf8=true"},
+	{Opt_utf8_yes, "utf8"},
+	{Opt_uni_xl_no, "uni_xlate=0"},		/* 0 or no or false */
+	{Opt_uni_xl_no, "uni_xlate=no"},
+	{Opt_uni_xl_no, "uni_xlate=false"},
+	{Opt_uni_xl_yes, "uni_xlate=1"},	/* empty or 1 or yes or true */
+	{Opt_uni_xl_yes, "uni_xlate=yes"},
+	{Opt_uni_xl_yes, "uni_xlate=true"},
+	{Opt_uni_xl_yes, "uni_xlate"},
+	{Opt_nonumtail_no, "nonumtail=0"},	/* 0 or no or false */
+	{Opt_nonumtail_no, "nonumtail=no"},
+	{Opt_nonumtail_no, "nonumtail=false"},
+	{Opt_nonumtail_yes, "nonumtail=1"},	/* empty or 1 or yes or true */
+	{Opt_nonumtail_yes, "nonumtail=yes"},
+	{Opt_nonumtail_yes, "nonumtail=true"},
+	{Opt_nonumtail_yes, "nonumtail"},
+	{Opt_err, NULL}
+};
+
 static int parse_options(char *options, int is_vfat, int *debug,
 			 struct fat_mount_options *opts)
 {
-	char *this_char, *value, *p;
-	int ret = 1, val, len;
+	char *p;
+	substring_t args[MAX_OPT_ARGS];
+	int option;
 
 	opts->isvfat = is_vfat;
 
@@ -284,183 +351,149 @@ static int parse_options(char *options, int is_vfat, int *debug,
 	*debug = 0;
 
 	if (!options)
-		goto out;
-	while ((this_char = strsep(&options,",")) != NULL) {
-		if (!*this_char)
-			continue;
-		if ((value = strchr(this_char,'=')) != NULL)
-			*value++ = 0;
+		return 1;
 
-		if (!strcmp(this_char,"check") && value) {
-			if (value[0] && !value[1] && strchr("rns",*value))
-				opts->name_check = *value;
-			else if (!strcmp(value,"relaxed"))
-				opts->name_check = 'r';
-			else if (!strcmp(value,"normal"))
-				opts->name_check = 'n';
-			else if (!strcmp(value,"strict"))
-				opts->name_check = 's';
-			else ret = 0;
+	while ((p = strsep(&options, ",")) != NULL) {
+		int token;
+		if (!*p)
+			continue;
+
+		token = match_token(p, fat_tokens, args);
+		if (token == Opt_err) {
+			if (is_vfat)
+				token = match_token(p, vfat_tokens, args);
+			else
+				token = match_token(p, msdos_tokens, args);
 		}
-		else if (!strcmp(this_char,"conv") && value) {
-			printk(KERN_INFO "FAT: conv option is obsolete, "
-			       "not supported now\n");
-		}
-		else if (!strcmp(this_char,"nocase")) {
+		switch (token) {
+		case Opt_check_s:
+			opts->name_check = 's';
+			break;
+		case Opt_check_r:
+			opts->name_check = 'r';
+			break;
+		case Opt_check_n:
+			opts->name_check = 'n';
+			break;
+		case Opt_nocase:
 			if (!is_vfat)
 				opts->nocase = 1;
 			else {
-				/* for backward compatible */
+				/* for backward compatibility */
 				opts->shortname = VFAT_SFN_DISPLAY_WIN95
 					| VFAT_SFN_CREATE_WIN95;
 			}
-		}
-		else if (!strcmp(this_char,"showexec")) {
+			break;
+		case Opt_quiet:
+			opts->quiet = 1;
+			break;
+		case Opt_showexec:
 			opts->showexec = 1;
-		}
-		else if (!strcmp(this_char,"uid")) {
-			if (!value || !*value) ret = 0;
-			else {
-				opts->fs_uid = simple_strtoul(value,&value,0);
-				if (*value) ret = 0;
-			}
-		}
-		else if (!strcmp(this_char,"gid")) {
-			if (!value || !*value) ret= 0;
-			else {
-				opts->fs_gid = simple_strtoul(value,&value,0);
-				if (*value) ret = 0;
-			}
-		}
-		else if (!strcmp(this_char,"umask")) {
-			if (!value || !*value) ret = 0;
-			else {
-				opts->fs_fmask = opts->fs_dmask =
-					simple_strtoul(value,&value,8);
-				if (*value) ret = 0;
-			}
-		}
-		else if (!strcmp(this_char,"fmask")) {
-			if (!value || !*value) ret = 0;
-			else {
-				opts->fs_fmask = simple_strtoul(value,&value,8);
-				if (*value) ret = 0;
-			}
-		}
-		else if (!strcmp(this_char,"dmask")) {
-			if (!value || !*value) ret = 0;
-			else {
-				opts->fs_dmask = simple_strtoul(value,&value,8);
-				if (*value) ret = 0;
-			}
-		}
-		else if (!strcmp(this_char,"debug")) {
-			if (value) ret = 0;
-			else *debug = 1;
-		}
-		else if (!strcmp(this_char,"fat")) {
-			printk(KERN_INFO "FAT: fat option is obsolete, "
-			       "not supported now\n");
-		}
-		else if (!strcmp(this_char,"quiet")) {
-			if (value) ret = 0;
-			else opts->quiet = 1;
-		}
-		else if (!strcmp(this_char,"blocksize")) {
-			printk(KERN_INFO "FAT: blocksize option is obsolete, "
-			       "not supported now\n");
-		}
-		else if (!strcmp(this_char,"sys_immutable")) {
-			if (value) ret = 0;
-			else opts->sys_immutable = 1;
-		}
-		else if (!strcmp(this_char,"codepage") && value) {
-			opts->codepage = simple_strtoul(value,&value,0);
-			if (*value) ret = 0;
-		}
+			break;
+		case Opt_debug:
+			*debug = 1;
+			break;
+		case Opt_immutable:
+			opts->sys_immutable = 1;
+			break;
+		case Opt_uid:
+			if (match_int(&args[0], &option))
+				return 0;
+			opts->fs_uid = option;
+			break;
+		case Opt_gid:
+			if (match_int(&args[0], &option))
+				return 0;
+			opts->fs_gid = option;
+			break;
+		case Opt_umask:
+			if (match_octal(&args[0], &option))
+				return 0;
+			opts->fs_fmask = opts->fs_dmask = option;
+			break;
+		case Opt_dmask:
+			if (match_octal(&args[0], &option))
+				return 0;
+			opts->fs_dmask = option;
+			break;
+		case Opt_fmask:
+			if (match_octal(&args[0], &option))
+				return 0;
+			opts->fs_fmask = option;
+			break;
+		case Opt_codepage:
+			if (match_int(&args[0], &option))
+				return 0;
+			opts->codepage = option;
+			break;
 
 		/* msdos specific */
-		else if (!is_vfat && !strcmp(this_char,"dots")) {
+		case Opt_dots:
 			opts->dotsOK = 1;
-		}
-		else if (!is_vfat && !strcmp(this_char,"nodots")) {
+			break;
+		case Opt_nodots:
 			opts->dotsOK = 0;
-		}
-		else if (!is_vfat && !strcmp(this_char,"dotsOK") && value) {
-			if (!strcmp(value,"yes")) opts->dotsOK = 1;
-			else if (!strcmp(value,"no")) opts->dotsOK = 0;
-			else ret = 0;
-		}
+			break;
 
 		/* vfat specific */
-		else if (is_vfat && !strcmp(this_char,"iocharset") && value) {
-			p = value;
-			while (*value && *value != ',')
-				value++;
-			len = value - p;
-			if (len) {
-				char *buffer;
-
-				if (opts->iocharset != NULL) {
-					kfree(opts->iocharset);
-					opts->iocharset = NULL;
-				}
-				buffer = kmalloc(len + 1, GFP_KERNEL);
-				if (buffer != NULL) {
-					opts->iocharset = buffer;
-					memcpy(buffer, p, len);
-					buffer[len] = 0;
-				} else
-					ret = 0;
-			}
-		}
-		else if (is_vfat && !strcmp(this_char,"utf8")) {
-			ret = simple_getbool(value, &val);
-			if (ret) opts->utf8 = val;
-		}
-		else if (is_vfat && !strcmp(this_char,"uni_xlate")) {
-			ret = simple_getbool(value, &val);
-			if (ret) opts->unicode_xlate = val;
-		}
-		else if (is_vfat && !strcmp(this_char,"posix")) {
-			printk(KERN_INFO "FAT: posix option is obsolete, "
-			       "not supported now\n");
-		}
-		else if (is_vfat && !strcmp(this_char,"nonumtail")) {
-			ret = simple_getbool(value, &val);
-			if (ret) {
-				opts->numtail = !val;
-			}
-		}
-		else if (is_vfat && !strcmp(this_char, "shortname")) {
-			if (!strcmp(value, "lower"))
-				opts->shortname = VFAT_SFN_DISPLAY_LOWER
-						| VFAT_SFN_CREATE_WIN95;
-			else if (!strcmp(value, "win95"))
-				opts->shortname = VFAT_SFN_DISPLAY_WIN95
-						| VFAT_SFN_CREATE_WIN95;
-			else if (!strcmp(value, "winnt"))
-				opts->shortname = VFAT_SFN_DISPLAY_WINNT
-						| VFAT_SFN_CREATE_WINNT;
-			else if (!strcmp(value, "mixed"))
-				opts->shortname = VFAT_SFN_DISPLAY_WINNT
-						| VFAT_SFN_CREATE_WIN95;
-			else
-				ret = 0;
-		} else {
-			printk(KERN_ERR "FAT: Unrecognized mount option %s\n",
-			       this_char);
-			ret = 0;
-		}
-
-		if (ret == 0)
+		case Opt_charset:
+			kfree(opts->iocharset);
+			opts->iocharset = match_strdup(&args[0]);
+			if (!opts->iocharset)
+				return 0;
 			break;
+		case Opt_shortname_lower:
+			opts->shortname = VFAT_SFN_DISPLAY_LOWER
+					| VFAT_SFN_CREATE_WIN95;
+			break;
+		case Opt_shortname_win95:
+			opts->shortname = VFAT_SFN_DISPLAY_WIN95
+					| VFAT_SFN_CREATE_WIN95;
+			break;
+		case Opt_shortname_winnt:
+			opts->shortname = VFAT_SFN_DISPLAY_WINNT
+					| VFAT_SFN_CREATE_WINNT;
+			break;
+		case Opt_shortname_mixed:
+			opts->shortname = VFAT_SFN_DISPLAY_WINNT
+					| VFAT_SFN_CREATE_WIN95;
+			break;
+		case Opt_utf8_no:		/* 0 or no or false */
+			opts->utf8 = 0;
+			break;
+		case Opt_utf8_yes:		/* empty or 1 or yes or true */
+			opts->utf8 = 1;
+			break;
+		case Opt_uni_xl_no:		/* 0 or no or false */
+			opts->unicode_xlate = 0;
+			break;
+		case Opt_uni_xl_yes:		/* empty or 1 or yes or true */
+			opts->unicode_xlate = 1;
+			break;
+		case Opt_nonumtail_no:		/* 0 or no or false */
+			opts->numtail = 1;	/* negated option */
+			break;
+		case Opt_nonumtail_yes:		/* empty or 1 or yes or true */
+			opts->numtail = 0;	/* negated option */
+			break;
+
+		/* obsolete mount options */
+		case Opt_obsolate:
+			printk(KERN_INFO "FAT: \"%s\" option is obsolete, "
+			       "not supported now\n", p);
+			break;
+		/* unknown option */
+		default:
+			printk(KERN_ERR "FAT: Unrecognized mount option \"%s\" "
+			       "or missing value\n", p);
+			return 0;
+		}
 	}
-out:
+
 	if (opts->unicode_xlate)
 		opts->utf8 = 0;
 	
-	return ret;
+	return 1;
 }
 
 static int fat_calc_dir_size(struct inode *inode)

@@ -63,10 +63,10 @@ ip_vs_lc_dest_overhead(struct ip_vs_dest *dest)
  *	Least Connection scheduling
  */
 static struct ip_vs_dest *
-ip_vs_lc_schedule(struct ip_vs_service *svc, struct iphdr *iph)
+ip_vs_lc_schedule(struct ip_vs_service *svc, const struct sk_buff *skb)
 {
-	struct ip_vs_dest *dest, *least;
-	unsigned int loh, doh;
+	struct ip_vs_dest *dest, *least = NULL;
+	unsigned int loh = 0, doh;
 
 	IP_VS_DBG(6, "ip_vs_lc_schedule(): Scheduling...\n");
 
@@ -79,31 +79,18 @@ ip_vs_lc_schedule(struct ip_vs_service *svc, struct iphdr *iph)
 	 * served, but no new connection is assigned to the server.
 	 */
 
-	list_for_each_entry(least, &svc->destinations, n_list) {
-		if (least->flags & IP_VS_DEST_F_OVERLOAD)
-			continue;
-		if (atomic_read(&least->weight) > 0) {
-			loh = ip_vs_lc_dest_overhead(least);
-			goto nextstage;
-		}
-	}
-	return NULL;
-
-	/*
-	 *    Find the destination with the least load.
-	 */
-  nextstage:
 	list_for_each_entry(dest, &svc->destinations, n_list) {
 		if ((dest->flags & IP_VS_DEST_F_OVERLOAD) ||
 		    atomic_read(&dest->weight) == 0)
 			continue;
 		doh = ip_vs_lc_dest_overhead(dest);
-		if (doh < loh) {
+		if (!least || doh < loh) {
 			least = dest;
 			loh = doh;
 		}
 	}
 
+	if (least)
 	IP_VS_DBG(6, "LC: server %u.%u.%u.%u:%u activeconns %d inactconns %d\n",
 		  NIPQUAD(least->addr), ntohs(least->port),
 		  atomic_read(&least->activeconns),

@@ -128,32 +128,11 @@ ip_vs_dst_reset(struct ip_vs_dest *dest)
 }
 
 
-static inline int
-ip_vs_skb_cow(struct sk_buff *skb, unsigned int headroom,
-	      struct iphdr **iph_p, unsigned char **t_p)
-{
-	int delta = (headroom > 16 ? headroom : 16) - skb_headroom(skb);
-
-	if (delta < 0)
-		delta = 0;
-
-	if (delta ||skb_cloned(skb)) {
-		if (pskb_expand_head(skb, (delta+15)&~15, 0, GFP_ATOMIC))
-			return -ENOMEM;
-
-		/* skb data changed, update pointers */
-		*iph_p = skb->nh.iph;
-		*t_p = (char*) (*iph_p) + (*iph_p)->ihl * 4;
-	}
-	return 0;
-}
-
-
 #define IP_VS_XMIT(skb, rt)				\
 do {							\
-	skb->nfcache |= NFC_IPVS_PROPERTY;		\
-	NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, skb, NULL,	\
-		rt->u.dst.dev, dst_output);		\
+	(skb)->nfcache |= NFC_IPVS_PROPERTY;		\
+	NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, (skb), NULL,	\
+		(rt)->u.dst.dev, dst_output);		\
 } while (0)
 
 
@@ -164,6 +143,7 @@ int
 ip_vs_null_xmit(struct sk_buff *skb, struct ip_vs_conn *cp,
 		struct ip_vs_protocol *pp)
 {
+	/* we do not touch skb and do not need pskb ptr */
 	return NF_ACCEPT;
 }
 
@@ -188,7 +168,6 @@ ip_vs_bypass_xmit(struct sk_buff *skb, struct ip_vs_conn *cp,
 				.daddr = iph->daddr,
 				.saddr = 0,
 				.tos = RT_TOS(tos), } },
-		.proto = iph->protocol,
 	};
 
 	EnterFunction(10);
@@ -208,20 +187,22 @@ ip_vs_bypass_xmit(struct sk_buff *skb, struct ip_vs_conn *cp,
 		goto tx_error;
 	}
 
-	if (skb_is_nonlinear(skb) && skb->len <= mtu)
-		ip_send_check(iph);
-
-	if (unlikely(skb_headroom(skb) < rt->u.dst.dev->hard_header_len)) {
-		if (skb_cow(skb, rt->u.dst.dev->hard_header_len)) {
-			ip_rt_put(rt);
-			IP_VS_ERR_RL("ip_vs_bypass_xmit(): no memory\n");
-			goto tx_error;
-		}
+	/*
+	 * Call ip_send_check because we are not sure it is called
+	 * after ip_defrag. Is copy-on-write needed?
+	 */
+	if (unlikely((skb = skb_share_check(skb, GFP_ATOMIC)) == NULL)) {
+		ip_rt_put(rt);
+		return NF_STOLEN;
 	}
+	ip_send_check(skb->nh.iph);
 
 	/* drop old route */
 	dst_release(skb->dst);
 	skb->dst = &rt->u.dst;
+
+	/* Another hack: avoid icmp_send in ip_fragment */
+	skb->local_df = 1;
 
 #ifdef CONFIG_NETFILTER_DEBUG
 	skb->nf_debug = 0;
@@ -235,6 +216,7 @@ ip_vs_bypass_xmit(struct sk_buff *skb, struct ip_vs_conn *cp,
 	dst_link_failure(skb);
  tx_error:
 	kfree_skb(skb);
+	LeaveFunction(10);
 	return NF_STOLEN;
 }
 
@@ -248,45 +230,18 @@ ip_vs_nat_xmit(struct sk_buff *skb, struct ip_vs_conn *cp,
 	       struct ip_vs_protocol *pp)
 {
 	struct rtable *rt;		/* Route to the other host */
-	struct iphdr  *iph;
-	union ip_vs_tphdr h;
-	int ihl;
-	unsigned short size;
 	int mtu;
+	struct iphdr *iph = skb->nh.iph;
 
 	EnterFunction(10);
 
-	/*
-	 * If it has ip_vs_app helper, the helper may change the payload,
-	 * so it needs full checksum checking and checksum calculation.
-	 * If not, only the header (such as IP address and port number)
-	 * will be changed, so it is fast to do incremental checksum update,
-	 * and let the destination host do final checksum checking.
-	 */
-
-	if (unlikely(cp->app && !pp->slave)) {
-		if (skb_is_nonlinear(skb) &&
-		    skb_linearize(skb, GFP_ATOMIC) != 0)
-			return NF_DROP;
-	}
-
-	iph = skb->nh.iph;
-	ihl = iph->ihl << 2;
-	h.raw = (char*) iph + ihl;
-	size = ntohs(iph->tot_len) - ihl;
-
-	/* do TCP/UDP checksum checking if it has application helper */
-	if (unlikely(cp->app && pp->csum_check && !pp->slave)) {
-		if (!pp->csum_check(skb, pp, iph, h, size))
-			goto tx_error;
-	}
-
-	/*
-	 *  Check if it is no clinet port connection ...
-	 */
+	/* check if it is a connection of no-client-port */
 	if (unlikely(cp->flags & IP_VS_CONN_F_NO_CPORT)) {
-		ip_vs_conn_fill_cport(cp, h.portp[0]);
-		IP_VS_DBG(10, "filled cport=%d\n", ntohs(cp->dport));
+		__u16 pt;
+		if (skb_copy_bits(skb, iph->ihl*4, &pt, sizeof(pt)) < 0)
+			goto tx_error;
+		ip_vs_conn_fill_cport(cp, pt);
+		IP_VS_DBG(10, "filled cport=%d\n", ntohs(pt));
 	}
 
 	if (!(rt = __ip_vs_get_out_rt(cp, RT_TOS(iph->tos))))
@@ -297,32 +252,35 @@ ip_vs_nat_xmit(struct sk_buff *skb, struct ip_vs_conn *cp,
 	if ((skb->len > mtu) && (iph->frag_off&__constant_htons(IP_DF))) {
 		ip_rt_put(rt);
 		icmp_send(skb, ICMP_DEST_UNREACH,ICMP_FRAG_NEEDED, htonl(mtu));
-		IP_VS_DBG_RL_PKT(0, pp, iph, "ip_vs_nat_xmit(): frag needed for");
+		IP_VS_DBG_RL_PKT(0, pp, skb, 0, "ip_vs_nat_xmit(): frag needed for");
 		goto tx_error;
 	}
+
+	/* copy-on-write the packet before mangling it */
+	if (!ip_vs_make_skb_writable(&skb, sizeof(struct iphdr)))
+		goto tx_error_put;
+
+	if (skb_cow(skb, rt->u.dst.dev->hard_header_len))
+		goto tx_error_put;
 
 	/* drop old route */
 	dst_release(skb->dst);
 	skb->dst = &rt->u.dst;
 
-	/* copy-on-write the packet before mangling it */
-	if (ip_vs_skb_cow(skb, rt->u.dst.dev->hard_header_len, &iph, &h.raw))
-		return NF_DROP;
-
 	/* mangle the packet */
-	iph->daddr = cp->daddr;
-	if (pp->dnat_handler) {
-		pp->dnat_handler(skb, pp, cp, iph, h, size);
-		iph = skb->nh.iph;
-		h.raw = (char*) iph + ihl;
-	}
-	ip_send_check(iph);
+	if (pp->dnat_handler && !pp->dnat_handler(&skb, pp, cp))
+		goto tx_error;
+	skb->nh.iph->daddr = cp->daddr;
+	ip_send_check(skb->nh.iph);
 
-	IP_VS_DBG_PKT(10, pp, iph, "After DNAT");
+	IP_VS_DBG_PKT(10, pp, skb, 0, "After DNAT");
 
 	/* FIXME: when application helper enlarges the packet and the length
 	   is larger than the MTU of outgoing device, there will be still
 	   MTU problem. */
+
+	/* Another hack: avoid icmp_send in ip_fragment */
+	skb->local_df = 1;
 
 #ifdef CONFIG_NETFILTER_DEBUG
 	skb->nf_debug = 0;
@@ -335,8 +293,12 @@ ip_vs_nat_xmit(struct sk_buff *skb, struct ip_vs_conn *cp,
   tx_error_icmp:
 	dst_link_failure(skb);
   tx_error:
+	LeaveFunction(10);
 	kfree_skb(skb);
 	return NF_STOLEN;
+  tx_error_put:
+	ip_rt_put(rt);
+	goto tx_error;
 }
 
 
@@ -405,11 +367,6 @@ ip_vs_tunnel_xmit(struct sk_buff *skb, struct ip_vs_conn *cp,
 		goto tx_error;
 	}
 
-	if (skb_is_nonlinear(skb))
-		ip_send_check(old_iph);
-
-	skb->h.raw = skb->nh.raw;
-
 	/*
 	 * Okay, now see if we can stuff it in the buffer as-is.
 	 */
@@ -423,11 +380,17 @@ ip_vs_tunnel_xmit(struct sk_buff *skb, struct ip_vs_conn *cp,
 			ip_rt_put(rt);
 			kfree_skb(skb);
 			IP_VS_ERR_RL("ip_vs_tunnel_xmit(): no memory\n");
-			return -EINVAL;
+			return NF_STOLEN;
 		}
 		kfree_skb(skb);
 		skb = new_skb;
+		old_iph = skb->nh.iph;
 	}
+
+	skb->h.raw = (void *) old_iph;
+
+	/* fix old IP header checksum */
+	ip_send_check(old_iph);
 
 	skb->nh.raw = skb_push(skb, sizeof(struct iphdr));
 	memset(&(IPCB(skb)->opt), 0, sizeof(IPCB(skb)->opt));
@@ -453,9 +416,14 @@ ip_vs_tunnel_xmit(struct sk_buff *skb, struct ip_vs_conn *cp,
 	ip_send_check(iph);
 
 	skb->ip_summed = CHECKSUM_NONE;
+
+	/* Another hack: avoid icmp_send in ip_fragment */
+	skb->local_df = 1;
+
 #ifdef CONFIG_NETFILTER_DEBUG
 	skb->nf_debug = 0;
 #endif /* CONFIG_NETFILTER_DEBUG */
+
 	IP_VS_XMIT(skb, rt);
 
 	LeaveFunction(10);
@@ -466,6 +434,7 @@ ip_vs_tunnel_xmit(struct sk_buff *skb, struct ip_vs_conn *cp,
 	dst_link_failure(skb);
   tx_error:
 	kfree_skb(skb);
+	LeaveFunction(10);
 	return NF_STOLEN;
 }
 
@@ -496,20 +465,22 @@ ip_vs_dr_xmit(struct sk_buff *skb, struct ip_vs_conn *cp,
 		goto tx_error;
 	}
 
-	if (skb_is_nonlinear(skb) && skb->len <= mtu)
-		ip_send_check(iph);
-
-	if (unlikely(skb_headroom(skb) < rt->u.dst.dev->hard_header_len)) {
-		if (skb_cow(skb, rt->u.dst.dev->hard_header_len)) {
-			ip_rt_put(rt);
-			IP_VS_ERR_RL("ip_vs_dr_xmit(): no memory\n");
-			goto tx_error;
-		}
+	/*
+	 * Call ip_send_check because we are not sure it is called
+	 * after ip_defrag. Is copy-on-write needed?
+	 */
+	if (unlikely((skb = skb_share_check(skb, GFP_ATOMIC)) == NULL)) {
+		ip_rt_put(rt);
+		return NF_STOLEN;
 	}
+	ip_send_check(skb->nh.iph);
 
 	/* drop old route */
 	dst_release(skb->dst);
 	skb->dst = &rt->u.dst;
+
+	/* Another hack: avoid icmp_send in ip_fragment */
+	skb->local_df = 1;
 
 #ifdef CONFIG_NETFILTER_DEBUG
 	skb->nf_debug = 0;
@@ -523,6 +494,7 @@ ip_vs_dr_xmit(struct sk_buff *skb, struct ip_vs_conn *cp,
 	dst_link_failure(skb);
   tx_error:
 	kfree_skb(skb);
+	LeaveFunction(10);
 	return NF_STOLEN;
 }
 
@@ -533,14 +505,9 @@ ip_vs_dr_xmit(struct sk_buff *skb, struct ip_vs_conn *cp,
  */
 int
 ip_vs_icmp_xmit(struct sk_buff *skb, struct ip_vs_conn *cp,
-		struct ip_vs_protocol *pp)
+		struct ip_vs_protocol *pp, int offset)
 {
 	struct rtable	*rt;	/* Route to the other host */
-	struct iphdr	*iph;
-	struct icmphdr	*icmph;
-	struct iphdr	*ciph;	/* The ip header contained within the ICMP */
-	unsigned short	len;
-	union ip_vs_tphdr h;
 	int mtu;
 	int rc;
 
@@ -554,65 +521,43 @@ ip_vs_icmp_xmit(struct sk_buff *skb, struct ip_vs_conn *cp,
 			rc = cp->packet_xmit(skb, cp, pp);
 		else
 			rc = NF_ACCEPT;
+		/* do not touch skb anymore */
 		atomic_inc(&cp->in_pkts);
 		__ip_vs_conn_put(cp);
 		goto out;
 	}
 
-	iph = skb->nh.iph;
-	icmph = (struct icmphdr *)((char *)iph+(iph->ihl<<2));
-	len = ntohs(iph->tot_len) - (iph->ihl<<2);
-
 	/*
 	 * mangle and send the packet here (only for VS/NAT)
 	 */
 
-	if (!(rt = __ip_vs_get_out_rt(cp, RT_TOS(iph->tos))))
+	if (!(rt = __ip_vs_get_out_rt(cp, RT_TOS(skb->nh.iph->tos))))
 		goto tx_error_icmp;
 
 	/* MTU checking */
 	mtu = dst_pmtu(&rt->u.dst);
-	if ((skb->len > mtu) && (iph->frag_off&__constant_htons(IP_DF))) {
+	if ((skb->len > mtu) && (skb->nh.iph->frag_off&__constant_htons(IP_DF))) {
 		ip_rt_put(rt);
-		icmp_send(skb, ICMP_DEST_UNREACH,ICMP_FRAG_NEEDED, htonl(mtu));
+		icmp_send(skb, ICMP_DEST_UNREACH, ICMP_FRAG_NEEDED, htonl(mtu));
 		IP_VS_DBG_RL("ip_vs_in_icmp(): frag needed\n");
 		goto tx_error;
 	}
 
-	/* drop old route */
+	/* copy-on-write the packet before mangling it */
+	if (!ip_vs_make_skb_writable(&skb, offset))
+		goto tx_error_put;
+
+	if (skb_cow(skb, rt->u.dst.dev->hard_header_len))
+		goto tx_error_put;
+
+	/* drop the old route when skb is not shared */
 	dst_release(skb->dst);
 	skb->dst = &rt->u.dst;
 
-	/* copy-on-write the packet before mangling it */
-	if (ip_vs_skb_cow(skb, rt->u.dst.dev->hard_header_len,
-			  &iph, (unsigned char**)&icmph)) {
-		rc = NF_DROP;
-		goto out;
-	}
-	ciph = (struct iphdr *) (icmph + 1);
-	h.raw = (char *) ciph + (ciph->ihl << 2);
+	ip_vs_nat_icmp(skb, pp, cp, 0);
 
-	/* The ICMP packet for VS/NAT must be written to correct addresses
-	   before being forwarded to the right server */
-
-	/* First change the dest IP address, and recalc checksum */
-	iph->daddr = cp->daddr;
-	ip_send_check(iph);
-
-	/* Now change the *source* address in the contained IP */
-	ciph->saddr = cp->daddr;
-	ip_send_check(ciph);
-
-	/* the TCP/UDP source port - cannot redo check */
-	if (IPPROTO_TCP == ciph->protocol || IPPROTO_UDP == ciph->protocol)
-		h.portp[0] = cp->dport;
-
-	/* And finally the ICMP checksum */
-	icmph->checksum = 0;
-	icmph->checksum = ip_compute_csum((unsigned char *) icmph, len);
-	skb->ip_summed = CHECKSUM_UNNECESSARY;
-
-	IP_VS_DBG_PKT(11, pp, ciph, "Forwarding incoming ICMP");
+	/* Another hack: avoid icmp_send in ip_fragment */
+	skb->local_df = 1;
 
 #ifdef CONFIG_NETFILTER_DEBUG
 	skb->nf_debug = 0;
@@ -630,4 +575,7 @@ ip_vs_icmp_xmit(struct sk_buff *skb, struct ip_vs_conn *cp,
   out:
 	LeaveFunction(10);
 	return rc;
+  tx_error_put:
+	ip_rt_put(rt);
+	goto tx_error;
 }

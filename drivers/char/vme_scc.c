@@ -29,7 +29,6 @@
 #include <linux/fcntl.h>
 #include <linux/major.h>
 #include <linux/delay.h>
-#include <linux/version.h>
 #include <linux/slab.h>
 #include <linux/miscdevice.h>
 #include <linux/console.h>

@@ -296,7 +296,6 @@ restart:
 
 			schedule_timeout (POOL_TIMEOUT_JIFFIES);
 
-			current->state = TASK_RUNNING;
 			remove_wait_queue (&pool->waitq, &wait);
 			goto restart;
 		}

@@ -101,8 +101,6 @@ BTFIXUPDEF_SIMM13(ptrs_per_pmd)
 BTFIXUPDEF_SIMM13(ptrs_per_pgd)
 BTFIXUPDEF_SIMM13(user_ptrs_per_pgd)
 
-#define VMALLOC_VMADDR(x) ((unsigned long)(x))
-
 #define pte_ERROR(e)   __builtin_trap()
 #define pmd_ERROR(e)   __builtin_trap()
 #define pgd_ERROR(e)   __builtin_trap()

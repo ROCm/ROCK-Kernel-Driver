@@ -499,8 +499,8 @@ static struct task_struct * __init fork_by_hand(void)
 #ifdef CONFIG_NUMA
 
 /* which logical CPUs are on which nodes */
-cpumask_t node_2_cpu_mask[MAX_NR_NODES] =
-				{ [0 ... MAX_NR_NODES-1] = CPU_MASK_NONE };
+cpumask_t node_2_cpu_mask[MAX_NUMNODES] =
+				{ [0 ... MAX_NUMNODES-1] = CPU_MASK_NONE };
 /* which node each logical CPU is on */
 int cpu_2_node[NR_CPUS] = { [0 ... NR_CPUS-1] = 0 };
 
@@ -518,7 +518,7 @@ static inline void unmap_cpu_to_node(int cpu)
 	int node;
 
 	printk("Unmapping cpu %d from all nodes\n", cpu);
-	for (node = 0; node < MAX_NR_NODES; node ++)
+	for (node = 0; node < MAX_NUMNODES; node ++)
 		cpu_clear(cpu, node_2_cpu_mask[node]);
 	cpu_2_node[cpu] = -1;
 }
@@ -937,6 +937,7 @@ int cpu_sibling_map[NR_CPUS] __cacheline_aligned;
 static void __init smp_boot_cpus(unsigned int max_cpus)
 {
 	int apicid, cpu, bit, kicked;
+	unsigned long bogosum = 0;
 
 	/*
 	 * Setup boot CPU information
@@ -1048,26 +1049,25 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	/*
 	 * Allow the user to impress friends.
 	 */
-
 	Dprintk("Before bogomips.\n");
-	if (!cpucount) {
-		printk(KERN_ERR "Error: only one processor found.\n");
-	} else {
-		unsigned long bogosum = 0;
-		for (cpu = 0; cpu < NR_CPUS; cpu++)
-			if (cpu_isset(cpu, cpu_callout_map))
-				bogosum += cpu_data[cpu].loops_per_jiffy;
-		printk(KERN_INFO "Total of %d processors activated (%lu.%02lu BogoMIPS).\n",
-			cpucount+1,
-			bogosum/(500000/HZ),
-			(bogosum/(5000/HZ))%100);
-		Dprintk("Before bogocount - setting activated=1.\n");
-	}
+	for (cpu = 0; cpu < NR_CPUS; cpu++)
+		if (cpu_isset(cpu, cpu_callout_map))
+			bogosum += cpu_data[cpu].loops_per_jiffy;
+	printk(KERN_INFO
+		"Total of %d processors activated (%lu.%02lu BogoMIPS).\n",
+		cpucount+1,
+		bogosum/(500000/HZ),
+		(bogosum/(5000/HZ))%100);
+	
+	Dprintk("Before bogocount - setting activated=1.\n");
 
 	if (smp_b_stepping)
 		printk(KERN_WARNING "WARNING: SMP operation may be unreliable with B stepping processors.\n");
 
-	/* Don't taint if we are running SMP kernel on a single non-MP approved Athlon  */
+	/*
+	 * Don't taint if we are running SMP kernel on a single non-MP
+	 * approved Athlon
+	 */
 	if (tainted & TAINT_UNSAFE_SMP) {
 		if (cpucount)
 			printk (KERN_INFO "WARNING: This combination of AMD processors is not suitable for SMP.\n");

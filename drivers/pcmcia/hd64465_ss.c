@@ -347,11 +347,7 @@ static int hs_init(struct pcmcia_socket *s)
     	hs_socket_t *sp = container_of(s, struct hs_socket_t, socket);
 	
     	DPRINTK("hs_init(%d)\n", sp->number);
-	
-	sp->state.Vcc = 0;
-	sp->state.Vpp = 0;
-	hs_set_voltages(sp, 0, 0);
-	
+
 	return 0;
 }
 

@@ -12,6 +12,7 @@
 #include <stdarg.h>
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
@@ -42,10 +43,14 @@ void disable_hlt(void)
 	hlt_counter++;
 }
 
+EXPORT_SYMBOL(disable_hlt);
+
 void enable_hlt(void)
 {
 	hlt_counter--;
 }
+
+EXPORT_SYMBOL(enable_hlt);
 
 static int __init nohlt_setup(char *__unused)
 {
@@ -115,12 +120,16 @@ void machine_halt(void)
 	leds_event(led_halted);
 }
 
+EXPORT_SYMBOL(machine_halt);
+
 void machine_power_off(void)
 {
 	leds_event(led_halted);
 	if (pm_power_off)
 		pm_power_off();
 }
+
+EXPORT_SYMBOL(machine_power_off);
 
 void machine_restart(char * __unused)
 {
@@ -151,6 +160,8 @@ void machine_restart(char * __unused)
 	printk("Reboot failed -- System halted\n");
 	while (1);
 }
+
+EXPORT_SYMBOL(machine_restart);
 
 void show_regs(struct pt_regs * regs)
 {

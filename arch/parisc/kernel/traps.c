@@ -129,6 +129,7 @@ void dump_stack(void)
 	show_trace(current, &stack);
 }
 
+EXPORT_SYMBOL(dump_stack);
 
 #ifndef __LP64__
 static int kstack_depth_to_print = 64 * 4;
@@ -678,12 +679,13 @@ void handle_interruption(int code, struct pt_regs *regs)
 	}
 
 	if (user_mode(regs)) {
-	    if (fault_space != regs->sr[7]) {
+	    if ((fault_space>>SPACEID_SHIFT) != (regs->sr[7] >> SPACEID_SHIFT)) {
 #ifdef PRINT_USER_FAULTS
 		if (fault_space == 0)
 			printk(KERN_DEBUG "User Fault on Kernel Space ");
 		else
-			printk(KERN_DEBUG "User Fault (long pointer) ");
+			printk(KERN_DEBUG "User Fault (long pointer) (fault %d) ",
+			       code);
 		printk("pid=%d command='%s'\n", current->pid, current->comm);
 		show_regs(regs);
 #endif

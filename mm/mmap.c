@@ -681,6 +681,8 @@ unacct_error:
 	return error;
 }
 
+EXPORT_SYMBOL(do_mmap_pgoff);
+
 /* Get an address range which is currently unmapped.
  * For shmat() with addr=0.
  *
@@ -779,6 +781,8 @@ get_unmapped_area(struct file *file, unsigned long addr, unsigned long len,
 	return arch_get_unmapped_area(file, addr, len, pgoff, flags);
 }
 
+EXPORT_SYMBOL(get_unmapped_area);
+
 /* Look up the first VMA which satisfies  addr < vm_end,  NULL if none. */
 struct vm_area_struct * find_vma(struct mm_struct * mm, unsigned long addr)
 {
@@ -814,6 +818,8 @@ struct vm_area_struct * find_vma(struct mm_struct * mm, unsigned long addr)
 	}
 	return vma;
 }
+
+EXPORT_SYMBOL(find_vma);
 
 /* Same as find_vma, but also return a pointer to the previous VMA in *pprev. */
 struct vm_area_struct *
@@ -1242,6 +1248,8 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len)
 	return 0;
 }
 
+EXPORT_SYMBOL(do_munmap);
+
 asmlinkage long sys_munmap(unsigned long addr, size_t len)
 {
 	int ret;
@@ -1341,6 +1349,8 @@ out:
 	}
 	return addr;
 }
+
+EXPORT_SYMBOL(do_brk);
 
 /* Build the RB tree corresponding to the VMA list. */
 void build_mmap_rb(struct mm_struct * mm)

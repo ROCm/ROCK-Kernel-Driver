@@ -17,7 +17,7 @@
 #include "mce.h"
 
 /* Machine Check Handler For AMD Athlon/Duron */
-static void k7_machine_check(struct pt_regs * regs, long error_code)
+static asmlinkage void k7_machine_check(struct pt_regs * regs, long error_code)
 {
 	int recover=1;
 	u32 alow, ahigh, high, low;
@@ -31,7 +31,7 @@ static void k7_machine_check(struct pt_regs * regs, long error_code)
 	printk (KERN_EMERG "CPU %d: Machine Check Exception: %08x%08x\n",
 		smp_processor_id(), mcgsth, mcgstl);
 
-	for (i=0; i<nr_mce_banks; i++) {
+	for (i=1; i<nr_mce_banks; i++) {
 		rdmsr (MSR_IA32_MC0_STATUS+i*4,low, high);
 		if (high&(1<<31)) {
 			if (high & (1<<29))
@@ -81,6 +81,9 @@ void __init amd_mcheck_init(struct cpuinfo_x86 *c)
 		wrmsr (MSR_IA32_MCG_CTL, 0xffffffff, 0xffffffff);
 	nr_mce_banks = l & 0xff;
 
+	/* Clear status for MC index 0 separately, we don't touch CTL,
+	 * as some Athlons cause spurious MCEs when its enabled. */
+	wrmsr (MSR_IA32_MC0_STATUS, 0x0, 0x0);
 	for (i=1; i<nr_mce_banks; i++) {
 		wrmsr (MSR_IA32_MC0_CTL+4*i, 0xffffffff, 0xffffffff);
 		wrmsr (MSR_IA32_MC0_STATUS+4*i, 0x0, 0x0);

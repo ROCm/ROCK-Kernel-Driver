@@ -250,7 +250,7 @@ struct kmem_cache_s {
 	unsigned int		limit;
 /* 2) touched by every alloc & free from the backend */
 	struct kmem_list3	lists;
-	/* NUMA: kmem_3list_t	*nodelists[NR_NODES] */
+	/* NUMA: kmem_3list_t	*nodelists[MAX_NUMNODES] */
 	unsigned int		objsize;
 	unsigned int	 	flags;	/* constant flags */
 	unsigned int		num;	/* # of objs per slab */
@@ -465,6 +465,8 @@ struct cache_sizes malloc_sizes[] = {
 	{ 0, }
 #undef CACHE
 };
+
+EXPORT_SYMBOL(malloc_sizes);
 
 /* Must match cache_sizes above. Out of line to keep cache footprint low. */
 static struct cache_names {
@@ -1276,6 +1278,8 @@ opps:
 	return cachep;
 }
 
+EXPORT_SYMBOL(kmem_cache_create);
+
 static inline void check_irq_off(void)
 {
 #if DEBUG
@@ -1395,6 +1399,8 @@ int kmem_cache_shrink(kmem_cache_t *cachep)
 	return __cache_shrink(cachep);
 }
 
+EXPORT_SYMBOL(kmem_cache_shrink);
+
 /**
  * kmem_cache_destroy - delete a cache
  * @cachep: the cache to destroy
@@ -1445,6 +1451,8 @@ int kmem_cache_destroy (kmem_cache_t * cachep)
 
 	return 0;
 }
+
+EXPORT_SYMBOL(kmem_cache_destroy);
 
 /* Get the memory for a slab management obj. */
 static inline struct slab* alloc_slabmgmt (kmem_cache_t *cachep,
@@ -2064,6 +2072,8 @@ void * kmem_cache_alloc (kmem_cache_t *cachep, int flags)
 	return __cache_alloc(cachep, flags);
 }
 
+EXPORT_SYMBOL(kmem_cache_alloc);
+
 /**
  * kmalloc - allocate memory
  * @size: how many bytes of memory are required.
@@ -2105,6 +2115,8 @@ void * __kmalloc (size_t size, int flags)
 	return NULL;
 }
 
+EXPORT_SYMBOL(__kmalloc);
+
 #ifdef CONFIG_SMP
 /**
  * __alloc_percpu - allocate one copy of the object for every present
@@ -2144,6 +2156,8 @@ unwind_oom:
 	kfree(pdata);
 	return NULL;
 }
+
+EXPORT_SYMBOL(__alloc_percpu);
 #endif
 
 /**
@@ -2162,6 +2176,8 @@ void kmem_cache_free (kmem_cache_t *cachep, void *objp)
 	__cache_free(cachep, objp);
 	local_irq_restore(flags);
 }
+
+EXPORT_SYMBOL(kmem_cache_free);
 
 /**
  * kfree - free previously allocated memory
@@ -2184,6 +2200,8 @@ void kfree (const void *objp)
 	local_irq_restore(flags);
 }
 
+EXPORT_SYMBOL(kfree);
+
 #ifdef CONFIG_SMP
 /**
  * free_percpu - free previously allocated percpu memory
@@ -2204,12 +2222,16 @@ free_percpu(const void *objp)
 		kfree(p->ptrs[i]);
 	}
 }
+
+EXPORT_SYMBOL(free_percpu);
 #endif
 
 unsigned int kmem_cache_size(kmem_cache_t *cachep)
 {
 	return obj_reallen(cachep);
 }
+
+EXPORT_SYMBOL(kmem_cache_size);
 
 kmem_cache_t * kmem_find_general_cachep (size_t size, int gfpflags)
 {
@@ -2226,6 +2248,8 @@ kmem_cache_t * kmem_find_general_cachep (size_t size, int gfpflags)
 	}
 	return (gfpflags & GFP_DMA) ? csizep->cs_dmacachep : csizep->cs_cachep;
 }
+
+EXPORT_SYMBOL(kmem_find_general_cachep);
 
 struct ccupdate_struct {
 	kmem_cache_t *cachep;
@@ -2675,8 +2699,8 @@ struct seq_operations slabinfo_op = {
  * slabinfo_write - Tuning for the slab allocator
  * @file: unused
  * @buffer: user buffer
- * @count: data len
- * @data: unused
+ * @count: data length
+ * @ppos: unused
  */
 ssize_t slabinfo_write(struct file *file, const char __user *buffer,
 				size_t count, loff_t *ppos)
@@ -2749,6 +2773,7 @@ void ptrinfo(unsigned long addr)
 		printk("virt addr invalid.\n");
 		return;
 	}
+#ifdef CONFIG_MMU
 	do {
 		pgd_t *pgd = pgd_offset_k(addr);
 		pmd_t *pmd;
@@ -2770,6 +2795,7 @@ void ptrinfo(unsigned long addr)
 		printk("normal page, pte_val 0x%llx\n",
 		  (unsigned long long)pte_val(*pte_offset_kernel(pmd, addr)));
 	} while(0);
+#endif
 
 	page = virt_to_page((void*)addr);
 	printk("struct page at %p, flags %lxh.\n", page, page->flags);

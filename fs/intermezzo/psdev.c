@@ -102,8 +102,7 @@ int izo_psdev_setpid(int minor)
                 struct list_head *lh;
                 struct upc_req *req;
                 CERROR("WARNING: setpid & processing not empty!\n");
-                lh = &channel->uc_processing;
-                while ( (lh = lh->next) != &channel->uc_processing) {
+		list_for_each(lh, &channel->uc_processing) {
                         req = list_entry(lh, struct upc_req, rq_chain);
                         /* freeing of req and data is done by the sleeper */
                         wake_up(&req->rq_sleep);
@@ -208,8 +207,7 @@ static ssize_t presto_psdev_write(struct file *file, const char *buf,
 
         spin_lock(&channel->uc_lock); 
         /* Look for the message on the processing queue. */
-        lh  = &channel->uc_processing;
-        while ( (lh = lh->next) != &channel->uc_processing ) {
+	list_for_each(lh, &channel->uc_processing) {
                 tmp = list_entry(lh, struct upc_req , rq_chain);
                 if (tmp->rq_unique == hdr.unique) {
                         req = tmp;
@@ -337,8 +335,7 @@ static int presto_psdev_release(struct inode * inode, struct file * file)
         /* Wake up clients so they can return. */
         CDEBUG(D_PSDEV, "Wake up clients sleeping for pending.\n");
         spin_lock(&channel->uc_lock); 
-        lh = &channel->uc_pending;
-        while ( (lh = lh->next) != &channel->uc_pending) {
+	list_for_each(lh, &channel->uc_pending) {
                 req = list_entry(lh, struct upc_req, rq_chain);
 
                 /* Async requests stay around for a new lento */
@@ -351,8 +348,7 @@ static int presto_psdev_release(struct inode * inode, struct file * file)
         }
 
         CDEBUG(D_PSDEV, "Wake up clients sleeping for processing\n");
-        lh = &channel->uc_processing;
-        while ( (lh = lh->next) != &channel->uc_processing) {
+	list_for_each(lh, &channel->uc_processing) {
                 req = list_entry(lh, struct upc_req, rq_chain);
                 /* freeing of req and data is done by the sleeper */
                 req->rq_flags |= REQ_DEAD; 
@@ -419,7 +415,7 @@ void presto_psdev_cleanup(void)
 
         for ( i = 0 ; i < MAX_CHANNEL ; i++ ) {
                 struct upc_channel *channel = &(izo_channels[i]);
-                struct list_head *lh;
+                struct list_head *lh, *next;
 
                 spin_lock(&channel->uc_lock); 
                 if ( ! list_empty(&channel->uc_pending)) { 
@@ -431,12 +427,10 @@ void presto_psdev_cleanup(void)
                 if ( ! list_empty(&channel->uc_cache_list)) { 
                         CERROR("Weird, tell Peter: module cleanup and cache listnot empty dev %d\n", i);
                 }
-                lh = channel->uc_pending.next;
-                while ( lh != &channel->uc_pending) {
+		list_for_each_safe(lh, next, &channel->uc_pending) {
                         struct upc_req *req;
 
                         req = list_entry(lh, struct upc_req, rq_chain);
-                        lh = lh->next;
                         if ( req->rq_flags & REQ_ASYNC ) {
                                 list_del(&(req->rq_chain));
                                 CDEBUG(D_UPCALL, "free pending upcall type %d\n",
@@ -448,8 +442,7 @@ void presto_psdev_cleanup(void)
                                 wake_up(&req->rq_sleep);
                         }
                 }
-                lh = &channel->uc_processing;
-                while ( (lh = lh->next) != &channel->uc_processing ) {
+		list_for_each(lh, &channel->uc_processing) {
                         struct upc_req *req;
                         req = list_entry(lh, struct upc_req, rq_chain);
                         list_del(&(req->rq_chain));
@@ -562,6 +555,10 @@ int izo_upc_upcall(int minor, int *size, struct izo_upcall_hdr *buffer,
         buffer->u_uniq = req->rq_unique;
         buffer->u_async = async;
 
+        /* Remove potential datarace possibility*/
+        if ( async ) 
+                req->rq_flags = REQ_ASYNC;
+
         spin_lock(&channel->uc_lock); 
         /* Append msg to pending queue and poke Lento. */
         list_add(&req->rq_chain, channel->uc_pending.prev);
@@ -574,7 +571,7 @@ int izo_upc_upcall(int minor, int *size, struct izo_upcall_hdr *buffer,
 
         if ( async ) {
                 /* req, rq_data are freed in presto_psdev_read for async */
-                req->rq_flags = REQ_ASYNC;
+                /* req->rq_flags = REQ_ASYNC;*/
                 EXIT;
                 return 0;
         }
@@ -645,5 +642,6 @@ int izo_upc_upcall(int minor, int *size, struct izo_upcall_hdr *buffer,
 exit_req:
         PRESTO_FREE(req, sizeof(struct upc_req));
 exit_buf:
+        PRESTO_FREE(buffer,*size);
         return error;
 }

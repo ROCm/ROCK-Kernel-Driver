@@ -17,6 +17,7 @@
  *	- added a writev function
  */
 
+#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
@@ -26,7 +27,6 @@
 #include <asm/byteorder.h>
 
 #include <linux/errno.h>
-#include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/interrupt.h>
@@ -208,6 +208,7 @@ static struct mtd_info *cfi_staa_setup(struct map_info *map)
 	if (!mtd->eraseregions) { 
 		printk(KERN_ERR "Failed to allocate memory for MTD erase region info\n");
 		kfree(cfi->cmdset_priv);
+		kfree(mtd);
 		return NULL;
 	}
 	
@@ -232,6 +233,7 @@ static struct mtd_info *cfi_staa_setup(struct map_info *map)
 			printk(KERN_WARNING "Sum of regions (%lx) != total size of set of interleaved chips (%lx)\n", offset, devsize);
 			kfree(mtd->eraseregions);
 			kfree(cfi->cmdset_priv);
+			kfree(mtd);
 			return NULL;
 		}
 

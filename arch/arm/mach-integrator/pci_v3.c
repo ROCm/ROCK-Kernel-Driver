@@ -575,7 +575,7 @@ void __init pci_v3_preinit(void)
 	/*
 	 * Grab the PCI error interrupt.
 	 */
-	ret = request_irq(IRQ_V3INT, v3_irq, 0, "V3", NULL);
+	ret = request_irq(IRQ_AP_V3INT, v3_irq, 0, "V3", NULL);
 	if (ret)
 		printk(KERN_ERR "PCI: unable to grab PCI error "
 		       "interrupt: %d\n", ret);
@@ -596,7 +596,7 @@ void __init pci_v3_postinit(void)
 	v3_writeb(V3_LB_IMASK, 0x68);
 
 #if 0
-	ret = request_irq(IRQ_LBUSTIMEOUT, lb_timeout, 0, "bus timeout", NULL);
+	ret = request_irq(IRQ_AP_LBUSTIMEOUT, lb_timeout, 0, "bus timeout", NULL);
 	if (ret)
 		printk(KERN_ERR "PCI: unable to grab local bus timeout "
 		       "interrupt: %d\n", ret);

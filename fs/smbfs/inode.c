@@ -551,8 +551,8 @@ int smb_fill_super(struct super_block *sb, void *raw_data, int silent)
 	if (ver == SMB_MOUNT_OLDVERSION) {
 		mnt->version = oldmnt->version;
 
-		mnt->uid = low2highuid(oldmnt->uid);
-		mnt->gid = low2highuid(oldmnt->gid);
+		SET_UID(mnt->uid, oldmnt->uid);
+		SET_GID(mnt->gid, oldmnt->gid);
 
 		mnt->file_mode = (oldmnt->file_mode & S_IRWXUGO) | S_IFREG;
 		mnt->dir_mode = (oldmnt->dir_mode & S_IRWXUGO) | S_IFDIR;

@@ -159,7 +159,7 @@ static unsigned int get_time_pit(void)
 #define DELTA(x,y)	((y)-(x))
 #define TIME_NAME	"TSC"
 #elif __alpha__
-#define GET_TIME(x)	do { x = get_cycles(x); } while (0)
+#define GET_TIME(x)	do { x = get_cycles(); } while (0)
 #define DELTA(x,y)	((y)-(x))
 #define TIME_NAME	"PCC"
 #else

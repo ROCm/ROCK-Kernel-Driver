@@ -6,7 +6,7 @@ menu "Block devices"
 
 config BLK_DEV_FD
 	tristate "Normal floppy disk support"
-	depends on !X86_PC9800 && !ARCH_S390
+	depends on ISA || M68 || SPARC64
 	---help---
 	  If you want to use the floppy disk drive(s) of your PC under Linux,
 	  say Y. Information about this driver, especially important for IBM
@@ -35,7 +35,7 @@ config BLK_DEV_FD98
 
 config BLK_DEV_SWIM_IOP
 	bool "Macintosh IIfx/Quadra 900/Quadra 950 floppy support (EXPERIMENTAL)"
-	depends on MAC && EXPERIMENTAL
+	depends on MAC && EXPERIMENTAL && BROKEN
 	help
 	  Say Y here to support the SWIM (Super Woz Integrated Machine) IOP
 	  floppy controller on the Macintosh IIfx and Quadra 900/950.
@@ -63,7 +63,7 @@ config AMIGA_Z2RAM
 
 config ATARI_ACSI
 	tristate "Atari ACSI support"
-	depends on ATARI
+	depends on ATARI && BROKEN
 	---help---
 	  This enables support for the Atari ACSI interface. The driver
 	  supports hard disks and CD-ROMs, which have 512-byte sectors, or can

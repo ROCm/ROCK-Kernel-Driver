@@ -278,10 +278,14 @@ void enable_hlt(void)
 	panic("enable_hlt");
 }
 
+EXPORT_SYMBOL(enable_hlt);
+
 void disable_hlt(void)
 {
 	panic("disable_hlt");
 }
+
+EXPORT_SYMBOL(disable_hlt);
 
 extern int signal_frame_size;
 

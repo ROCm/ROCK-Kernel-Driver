@@ -157,12 +157,11 @@ static int misc_open(struct inode * inode, struct file * file)
 		list_for_each_entry(c, &misc_list, list) {
 			if (c->minor == minor) {
 				new_fops = fops_get(c->fops);
-				if (!new_fops)
-					goto fail;
 				break;
 			}
 		}
-		goto fail;
+		if (!new_fops)
+			goto fail;
 	}
 
 	err = 0;

@@ -9,6 +9,7 @@
 #include <sys/time.h>
 #include <signal.h>
 #include <errno.h>
+#include "linux/module.h"
 #include "user_util.h"
 #include "kern_util.h"
 #include "user.h"
@@ -96,6 +97,8 @@ void do_gettimeofday(struct timeval *tv)
 	time_unlock(flags);
 }
 
+EXPORT_SYMBOL(do_gettimeofday);
+
 int do_settimeofday(struct timespec *tv)
 {
 	struct timeval now;
@@ -115,6 +118,8 @@ int do_settimeofday(struct timespec *tv)
 
 	return(0);
 }
+
+EXPORT_SYMBOL(do_settimeofday);
 
 void idle_sleep(int secs)
 {

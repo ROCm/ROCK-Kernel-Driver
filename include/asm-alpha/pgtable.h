@@ -49,7 +49,6 @@
 #else
 #define VMALLOC_START		(-2*PGDIR_SIZE)
 #endif
-#define VMALLOC_VMADDR(x)	((unsigned long)(x))
 #define VMALLOC_END		(-PGDIR_SIZE)
 
 /*

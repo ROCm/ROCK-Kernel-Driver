@@ -29,11 +29,11 @@
 #include <linux/delay.h>
 #include <linux/smp.h>
 #include <linux/security.h>
+#include <linux/bootmem.h>
 
 #include <asm/uaccess.h>
 
-#define LOG_BUF_LEN	(1 << CONFIG_LOG_BUF_SHIFT)
-#define LOG_BUF_MASK	(LOG_BUF_LEN-1)
+#define __LOG_BUF_LEN	(1 << CONFIG_LOG_BUF_SHIFT)
 
 /* printk's without a loglevel use this.. */
 #define DEFAULT_MESSAGE_LOGLEVEL 4 /* KERN_WARNING */
@@ -50,6 +50,8 @@ int console_printk[4] = {
 	MINIMUM_CONSOLE_LOGLEVEL,	/* minimum_console_loglevel */
 	DEFAULT_CONSOLE_LOGLEVEL,	/* default_console_loglevel */
 };
+
+EXPORT_SYMBOL(console_printk);
 
 int oops_in_progress;
 
@@ -68,17 +70,21 @@ struct console *console_drivers;
  */
 static spinlock_t logbuf_lock = SPIN_LOCK_UNLOCKED;
 
-static char log_buf[LOG_BUF_LEN];
+static char __log_buf[__LOG_BUF_LEN];
+static char *log_buf = __log_buf;
+static int log_buf_len = __LOG_BUF_LEN;
+
+#define LOG_BUF_MASK	(log_buf_len-1)
 #define LOG_BUF(idx) (log_buf[(idx) & LOG_BUF_MASK])
 
 /*
- * The indices into log_buf are not constrained to LOG_BUF_LEN - they
+ * The indices into log_buf are not constrained to log_buf_len - they
  * must be masked before subscripting
  */
-static unsigned long log_start;			/* Index into log_buf: next char to be read by syslog() */
-static unsigned long con_start;			/* Index into log_buf: next char to be sent to consoles */
-static unsigned long log_end;			/* Index into log_buf: most-recently-written-char + 1 */
-static unsigned long logged_chars;		/* Number of chars produced since last read+clear operation */
+static unsigned long log_start;	/* Index into log_buf: next char to be read by syslog() */
+static unsigned long con_start;	/* Index into log_buf: next char to be sent to consoles */
+static unsigned long log_end;	/* Index into log_buf: most-recently-written-char + 1 */
+static unsigned long logged_chars; /* Number of chars produced since last read+clear operation */
 
 struct console_cmdline console_cmdline[MAX_CMDLINECONSOLES];
 static int preferred_console = -1;
@@ -140,6 +146,45 @@ static int __init console_setup(char *str)
 }
 
 __setup("console=", console_setup);
+
+static int __init log_buf_len_setup(char *str)
+{
+	unsigned long size = memparse(str, &str);
+
+	if (size > log_buf_len) {
+		unsigned long start, dest_idx, offset;
+		char * new_log_buf;
+
+		new_log_buf = alloc_bootmem(size);
+		if (!new_log_buf) {
+			printk("log_buf_len: allocation failed\n");
+			goto out;
+		}
+
+		spin_lock_irq(&logbuf_lock);
+		log_buf_len = size;
+		log_buf = new_log_buf;
+
+		offset = start = min(con_start, log_start);
+		dest_idx = 0;
+		while (start != log_end) {
+			log_buf[dest_idx] = __log_buf[start & (__LOG_BUF_LEN - 1)];
+			start++;
+			dest_idx++;
+		}
+		log_start -= offset;
+		con_start -= offset;
+		log_end -= offset;
+		spin_unlock_irq(&logbuf_lock);
+
+		printk("log_buf_len: %d\n", log_buf_len);
+	}
+out:
+
+	return 1;
+}
+
+__setup("log_buf_len=", log_buf_len_setup);
 
 /*
  * Commands to do_syslog:
@@ -213,8 +258,8 @@ int do_syslog(int type, char __user * buf, int len)
 		if (error)
 			goto out;
 		count = len;
-		if (count > LOG_BUF_LEN)
-			count = LOG_BUF_LEN;
+		if (count > log_buf_len)
+			count = log_buf_len;
 		spin_lock_irq(&logbuf_lock);
 		if (count > logged_chars)
 			count = logged_chars;
@@ -229,7 +274,7 @@ int do_syslog(int type, char __user * buf, int len)
 		 */
 		for(i = 0; i < count && !error; i++) {
 			j = limit-1-i;
-			if (j+LOG_BUF_LEN < log_end)
+			if (j + log_buf_len < log_end)
 				break;
 			c = LOG_BUF(j);
 			spin_unlock_irq(&logbuf_lock);
@@ -302,12 +347,15 @@ static void __call_console_drivers(unsigned long start, unsigned long end)
 /*
  * Write out chars from start to end - 1 inclusive
  */
-static void _call_console_drivers(unsigned long start, unsigned long end, int msg_log_level)
+static void _call_console_drivers(unsigned long start,
+				unsigned long end, int msg_log_level)
 {
-	if (msg_log_level < console_loglevel && console_drivers && start != end) {
+	if (msg_log_level < console_loglevel &&
+			console_drivers && start != end) {
 		if ((start & LOG_BUF_MASK) > (end & LOG_BUF_MASK)) {
 			/* wrapped write */
-			__call_console_drivers(start & LOG_BUF_MASK, LOG_BUF_LEN);
+			__call_console_drivers(start & LOG_BUF_MASK,
+						log_buf_len);
 			__call_console_drivers(0, end & LOG_BUF_MASK);
 		} else {
 			__call_console_drivers(start, end);
@@ -376,11 +424,11 @@ static void emit_log_char(char c)
 {
 	LOG_BUF(log_end) = c;
 	log_end++;
-	if (log_end - log_start > LOG_BUF_LEN)
-		log_start = log_end - LOG_BUF_LEN;
-	if (log_end - con_start > LOG_BUF_LEN)
-		con_start = log_end - LOG_BUF_LEN;
-	if (logged_chars < LOG_BUF_LEN)
+	if (log_end - log_start > log_buf_len)
+		log_start = log_end - log_buf_len;
+	if (log_end - con_start > log_buf_len)
+		con_start = log_end - log_buf_len;
+	if (logged_chars < log_buf_len)
 		logged_chars++;
 }
 

@@ -30,7 +30,6 @@
 #include <asm/io.h>
 #include <linux/sched.h>
 #include <linux/videodev.h>
-#include <linux/version.h>
 #include <asm/uaccess.h>
 
 

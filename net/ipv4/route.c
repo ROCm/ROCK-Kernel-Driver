@@ -62,6 +62,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
 #include <asm/bitops.h>
@@ -2778,8 +2779,8 @@ int __init ip_rt_init(void)
 	ip_rt_max_size = (rt_hash_mask + 1) * 16;
 
 	rt_cache_stat = alloc_percpu(struct rt_cache_stat);
-	if (!rt_cache_stat) 
-		goto out_enomem1;
+	if (!rt_cache_stat)
+		return -ENOMEM;
 
 	devinet_init();
 	ip_fib_init();
@@ -2804,8 +2805,10 @@ int __init ip_rt_init(void)
 
 #ifdef CONFIG_PROC_FS
 	if (!proc_net_fops_create("rt_cache", S_IRUGO, &rt_cache_seq_fops) ||
-	    !proc_net_fops_create("rt_cache_stat", S_IRUGO, &rt_cpu_seq_fops))
-		goto out_enomem;
+	    !proc_net_fops_create("rt_cache_stat", S_IRUGO, &rt_cpu_seq_fops)) {
+		free_percpu(rt_cache_stat);
+		return -ENOMEM;
+	}
 
 #ifdef CONFIG_NET_CLS_ROUTE
 	create_proc_read_entry("rt_acct", 0, proc_net, ip_rt_acct_read, NULL);
@@ -2815,11 +2818,9 @@ int __init ip_rt_init(void)
 	xfrm_init();
 	xfrm4_init();
 #endif
-out:
 	return rc;
-out_enomem:
-	free_percpu(rt_cache_stat);
-out_enomem1:
-	rc = -ENOMEM;
-	goto out;
 }
+
+EXPORT_SYMBOL(__ip_select_ident);
+EXPORT_SYMBOL(ip_route_input);
+EXPORT_SYMBOL(ip_route_output_key);

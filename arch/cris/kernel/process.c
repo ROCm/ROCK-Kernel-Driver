@@ -96,6 +96,7 @@
 #include <asm/atomic.h>
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
+#include <linux/module.h>
 #include <linux/spinlock.h>
 #include <linux/fs_struct.h>
 #include <linux/init_task.h>
@@ -119,6 +120,8 @@ static struct signal_struct init_signals = INIT_SIGNALS(init_signals);
 static struct sighand_struct init_sighand = INIT_SIGHAND(init_sighand);
 struct mm_struct init_mm = INIT_MM(init_mm);
 
+EXPORT_SYMBOL(init_mm);
+
 /*
  * Initial thread structure.
  *
@@ -137,7 +140,7 @@ union thread_union init_thread_union
  */
 struct task_struct init_task = INIT_TASK(init_task);
 
-
+EXPORT_SYMBOL(init_task);
 
 /*
  * The hlt_counter, disable_hlt and enable_hlt is just here as a hook if
@@ -155,10 +158,14 @@ void disable_hlt(void)
 	hlt_counter++;
 }
 
+EXPORT_SYMBOL(disable_hlt);
+
 void enable_hlt(void)
 {
 	hlt_counter--;
 }
+
+EXPORT_SYMBOL(enable_hlt);
  
 /*
  * The following aren't currently used.
@@ -193,6 +200,8 @@ void machine_restart(void)
 	hard_reset_now();
 }
 
+EXPORT_SYMBOL(machine_restart);
+
 /*
  * Similar to machine_power_off, but don't shut off power.  Add code
  * here to freeze the system for e.g. post-mortem debug purpose when
@@ -203,11 +212,15 @@ void machine_halt(void)
 {
 }
 
+EXPORT_SYMBOL(machine_halt);
+
 /* If or when software power-off is implemented, add code here.  */
 
 void machine_power_off(void)
 {
 }
+
+EXPORT_SYMBOL(machine_power_off);
 
 /*
  * When a process does an "exec", machine state like FPU and debug

@@ -586,7 +586,7 @@ mega_find_card(Scsi_Host_Template *host_template, u16 pci_vendor,
 
 		/* Set the Mode of addressing to 64 bit if we can */
 		if((adapter->flag & BOARD_64BIT)&&(sizeof(dma_addr_t) == 8)) {
-			pci_set_dma_mask(pdev, 0xffffffffffffffff);
+			pci_set_dma_mask(pdev, 0xffffffffffffffffULL);
 			adapter->has_64bit_addr = 1;
 		}
 		else  {

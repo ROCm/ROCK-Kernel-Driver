@@ -236,7 +236,7 @@ void sppp_input (struct net_device *dev, struct sk_buff *skb)
 		sp->ipkts++;
 	}
 
-	if (skb->len <= PPP_HEADER_LEN) {
+	if (!pskb_may_pull(skb, PPP_HEADER_LEN)) {
 		/* Too small packet, drop it. */
 		if (sp->pp_flags & PP_DEBUG)
 			printk (KERN_DEBUG "%s: input packet is too small, %d bytes\n",
@@ -473,7 +473,7 @@ static void sppp_lcp_input (struct sppp *sp, struct sk_buff *skb)
 	u8 *p, opt[6];
 	u32 rmagic;
 
-	if (len < 4) {
+	if (!pskb_may_pull(skb, sizeof(struct lcp_header))) {
 		if (sp->pp_flags & PP_DEBUG)
 			printk (KERN_WARNING "%s: invalid lcp packet length: %d bytes\n",
 				dev->name, len);
@@ -707,7 +707,9 @@ static void sppp_cisco_input (struct sppp *sp, struct sk_buff *skb)
 	struct cisco_packet *h;
 	struct net_device *dev = sp->pp_if;
 
-	if (skb->len != CISCO_PACKET_LEN && skb->len != CISCO_BIG_PACKET_LEN) {
+	if (!pskb_may_pull(skb, sizeof(struct cisco_packet))
+	    || (skb->len != CISCO_PACKET_LEN
+		&& skb->len != CISCO_BIG_PACKET_LEN)) {
 		if (sp->pp_flags & PP_DEBUG)
 			printk (KERN_WARNING "%s: invalid cisco packet length: %d bytes\n",
 				dev->name,  skb->len);
@@ -1211,8 +1213,7 @@ static void sppp_ipcp_input (struct sppp *sp, struct sk_buff *skb)
 	struct net_device *dev = sp->pp_if;
 	int len = skb->len;
 
-	if (len < 4) 
-	{
+	if (!pskb_may_pull(skb, sizeof(struct lcp_header))) {
 		if (sp->pp_flags & PP_DEBUG)
 			printk (KERN_WARNING "%s: invalid ipcp packet length: %d bytes\n",
 				dev->name,  len);
@@ -1454,7 +1455,6 @@ static int sppp_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_t
 struct packet_type sppp_packet_type = {
 	.type	= __constant_htons(ETH_P_WAN_PPP),
 	.func	= sppp_rcv,
-	.data   = PKT_CAN_SHARE_SKB,
 };
 
 static char banner[] __initdata = 

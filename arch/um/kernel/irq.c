@@ -7,6 +7,7 @@
 
 #include "linux/config.h"
 #include "linux/kernel.h"
+#include "linux/module.h"
 #include "linux/smp.h"
 #include "linux/irq.h"
 #include "linux/kernel_stat.h"
@@ -416,6 +417,8 @@ int request_irq(unsigned int irq,
 	return retval;
 }
 
+EXPORT_SYMBOL(request_irq);
+
 int um_request_irq(unsigned int irq, int fd, int type,
 		   irqreturn_t (*handler)(int, void *, struct pt_regs *),
 		   unsigned long irqflags, const char * devname,
@@ -547,6 +550,8 @@ void free_irq(unsigned int irq, void *dev_id)
 		return;
 	}
 }
+
+EXPORT_SYMBOL(free_irq);
 
 /* These are initialized by sysctl_init, which is called from init/main.c */
 static struct proc_dir_entry * root_irq_dir;
@@ -742,10 +747,14 @@ unsigned long probe_irq_on(void)
 	return(0);
 }
 
+EXPORT_SYMBOL(probe_irq_on);
+
 int probe_irq_off(unsigned long val)
 {
 	return(0);
 }
+
+EXPORT_SYMBOL(probe_irq_off);
 
 static unsigned int startup_SIGIO_irq(unsigned int irq)
 {

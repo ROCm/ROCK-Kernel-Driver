@@ -73,10 +73,7 @@ struct got_entry {
 	Elf32_Addr addr;
 };
 
-struct fdesc_entry {
-	Elf32_Addr addr;
-	Elf32_Addr gp;
-};
+#define Elf_Fdesc	Elf32_Fdesc
 
 struct stub_entry {
 	Elf32_Word insns[2]; /* each stub entry has two insns */
@@ -86,11 +83,7 @@ struct got_entry {
 	Elf64_Addr addr;
 };
 
-struct fdesc_entry {
-	Elf64_Addr dummy[2];
-	Elf64_Addr addr;
-	Elf64_Addr gp;
-};
+#define Elf_Fdesc	Elf64_Fdesc
 
 struct stub_entry {
 	Elf64_Word insns[4]; /* each stub entry has four insns */
@@ -276,7 +269,7 @@ int module_frob_arch_sections(CONST Elf_Ehdr *hdr,
 
 	me->core_size = ALIGN(me->core_size, 16);
 	me->arch.fdesc_offset = me->core_size;
-	me->core_size += fdescs * sizeof(struct fdesc_entry);
+	me->core_size += fdescs * sizeof(Elf_Fdesc);
 
 	me->core_size = ALIGN(me->core_size, 16);
 	me->arch.stub_offset = me->core_size;
@@ -322,7 +315,7 @@ static Elf64_Word get_got(struct module *me, unsigned long value, long addend)
 #ifdef __LP64__
 static Elf_Addr get_fdesc(struct module *me, unsigned long value)
 {
-	struct fdesc_entry *fdesc = me->module_core + me->arch.fdesc_offset;
+	Elf_Fdesc *fdesc = me->module_core + me->arch.fdesc_offset;
 
 	if (!value) {
 		printk(KERN_ERR "%s: zero OPD requested!\n", me->name);
@@ -664,7 +657,7 @@ int apply_relocate_add(Elf_Shdr *sechdrs,
 				*loc64 = get_fdesc(me, val+addend);
 				DEBUGP("FDESC for %s at %p points to %lx\n",
 				       strtab + sym->st_name, *loc64,
-				       ((struct fdesc_entry *)*loc64)->addr);
+				       ((Elf_Fdesc *)*loc64)->addr);
 			} else {
 				/* if the symbol is not local to this
 				 * module then val+addend is a pointer
@@ -696,10 +689,10 @@ int module_finalize(const Elf_Ehdr *hdr,
 	Elf_Sym *newptr, *oldptr;
 	Elf_Shdr *symhdr = NULL;
 #ifdef DEBUG
-	struct fdesc_entry *entry;
+	Elf_Fdesc *entry;
 	u32 *addr;
 
-	entry = (struct fdesc_entry *)me->init;
+	entry = (Elf_Fdesc *)me->init;
 	printk("FINALIZE, ->init FPTR is %p, GP %lx ADDR %lx\n", entry,
 	       entry->gp, entry->addr);
 	addr = (u32 *)entry->addr;

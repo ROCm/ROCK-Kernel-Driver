@@ -53,7 +53,6 @@
 #include <linux/fcntl.h>
 #include <linux/major.h>
 #include <linux/delay.h>
-#include <linux/version.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/miscdevice.h>
@@ -333,7 +332,6 @@ int RIODelay (struct Port *PortP, int njiffies)
   rio_dprintk (RIO_DEBUG_DELAY, "delaying %d jiffies\n", njiffies);  
   current->state = TASK_INTERRUPTIBLE;
   schedule_timeout(njiffies);
-  current->state = TASK_RUNNING;
   func_exit();
 
   if (signal_pending(current))
@@ -351,7 +349,6 @@ int RIODelay_ni (struct Port *PortP, int njiffies)
   rio_dprintk (RIO_DEBUG_DELAY, "delaying %d jiffies (ni)\n", njiffies);  
   current->state = TASK_UNINTERRUPTIBLE;
   schedule_timeout(njiffies);
-  current->state = TASK_RUNNING;
   func_exit();
   return !RIO_FAIL;
 }

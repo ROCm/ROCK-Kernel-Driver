@@ -25,6 +25,7 @@
 #include <linux/eisa.h>
 #include <linux/errno.h>
 #include <linux/init.h>
+#include <linux/module.h>
 #include <linux/signal.h>
 #include <linux/types.h>
 #include <linux/ioport.h>
@@ -193,6 +194,7 @@ void disable_irq(int irq)
 	else
 		BUG();
 }
+EXPORT_SYMBOL(disable_irq);
 
 void enable_irq(int irq)
 {
@@ -208,6 +210,7 @@ void enable_irq(int irq)
 	else
 		BUG();
 }
+EXPORT_SYMBOL(enable_irq);
 
 int show_interrupts(struct seq_file *p, void *v)
 {
@@ -650,6 +653,8 @@ int request_irq(unsigned int irq,
 	return 0;
 }
 
+EXPORT_SYMBOL(request_irq);
+
 void free_irq(unsigned int irq, void *dev_id)
 {
 	struct irqaction *action, **p;
@@ -692,12 +697,15 @@ void free_irq(unsigned int irq, void *dev_id)
 	printk(KERN_ERR "Trying to free free IRQ%d\n",irq);
 }
 
+EXPORT_SYMBOL(free_irq);
+
 
 #ifdef CONFIG_SMP
 void synchronize_irq(unsigned int irqnum)
 {
 	while (in_irq()) ;
 }
+EXPORT_SYMBOL(synchronize_irq);
 #endif
 
 
@@ -784,6 +792,8 @@ unsigned long probe_irq_on(void)
 	return val;
 }
 
+EXPORT_SYMBOL(probe_irq_on);
+
 /*
  * Return the one interrupt that triggered (this can
  * handle any interrupt source).
@@ -843,10 +853,13 @@ int probe_irq_off(unsigned long val)
 	return irq_found;
 }
 
+EXPORT_SYMBOL(probe_irq_off);
+
 unsigned int probe_irq_mask(unsigned long irqs)
 {
 	return 0;
 }
+EXPORT_SYMBOL(probe_irq_mask);
 
 void __init init_IRQ(void)
 {

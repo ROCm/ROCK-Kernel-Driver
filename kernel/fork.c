@@ -53,6 +53,8 @@ DEFINE_PER_CPU(unsigned long, process_counts) = 0;
 
 rwlock_t tasklist_lock __cacheline_aligned = RW_LOCK_UNLOCKED;  /* outer */
 
+EXPORT_SYMBOL(tasklist_lock);
+
 int nr_processes(void)
 {
 	int cpu;
@@ -98,6 +100,8 @@ void add_wait_queue(wait_queue_head_t *q, wait_queue_t * wait)
 	spin_unlock_irqrestore(&q->lock, flags);
 }
 
+EXPORT_SYMBOL(add_wait_queue);
+
 void add_wait_queue_exclusive(wait_queue_head_t *q, wait_queue_t * wait)
 {
 	unsigned long flags;
@@ -108,6 +112,8 @@ void add_wait_queue_exclusive(wait_queue_head_t *q, wait_queue_t * wait)
 	spin_unlock_irqrestore(&q->lock, flags);
 }
 
+EXPORT_SYMBOL(add_wait_queue_exclusive);
+
 void remove_wait_queue(wait_queue_head_t *q, wait_queue_t * wait)
 {
 	unsigned long flags;
@@ -116,6 +122,8 @@ void remove_wait_queue(wait_queue_head_t *q, wait_queue_t * wait)
 	__remove_wait_queue(q, wait);
 	spin_unlock_irqrestore(&q->lock, flags);
 }
+
+EXPORT_SYMBOL(remove_wait_queue);
 
 void prepare_to_wait(wait_queue_head_t *q, wait_queue_t *wait, int state)
 {
@@ -128,6 +136,8 @@ void prepare_to_wait(wait_queue_head_t *q, wait_queue_t *wait, int state)
 		__add_wait_queue(q, wait);
 	spin_unlock_irqrestore(&q->lock, flags);
 }
+
+EXPORT_SYMBOL(prepare_to_wait);
 
 void
 prepare_to_wait_exclusive(wait_queue_head_t *q, wait_queue_t *wait, int state)
@@ -142,6 +152,8 @@ prepare_to_wait_exclusive(wait_queue_head_t *q, wait_queue_t *wait, int state)
 	spin_unlock_irqrestore(&q->lock, flags);
 }
 
+EXPORT_SYMBOL(prepare_to_wait_exclusive);
+
 void finish_wait(wait_queue_head_t *q, wait_queue_t *wait)
 {
 	unsigned long flags;
@@ -154,6 +166,8 @@ void finish_wait(wait_queue_head_t *q, wait_queue_t *wait)
 	}
 }
 
+EXPORT_SYMBOL(finish_wait);
+
 int autoremove_wake_function(wait_queue_t *wait, unsigned mode, int sync)
 {
 	int ret = default_wake_function(wait, mode, sync);
@@ -162,6 +176,8 @@ int autoremove_wake_function(wait_queue_t *wait, unsigned mode, int sync)
 		list_del_init(&wait->task_list);
 	return ret;
 }
+
+EXPORT_SYMBOL(autoremove_wake_function);
 
 void __init fork_init(unsigned long mempages)
 {
@@ -555,6 +571,8 @@ struct fs_struct *copy_fs_struct(struct fs_struct *old)
 	return __copy_fs_struct(old);
 }
 
+EXPORT_SYMBOL_GPL(copy_fs_struct);
+
 static inline int copy_fs(unsigned long clone_flags, struct task_struct * tsk)
 {
 	if (clone_flags & CLONE_FS) {
@@ -725,6 +743,12 @@ static inline int copy_signal(unsigned long clone_flags, struct task_struct * ts
 	sig->curr_target = NULL;
 	init_sigpending(&sig->shared_pending);
 
+	sig->tty = process_tty(current);
+	sig->pgrp = process_group(current);
+	sig->session = process_session(current);
+	sig->leader = 0;	/* session leadership doesn't inherit */
+	sig->tty_old_pgrp = 0;
+
 	return 0;
 }
 
@@ -771,7 +795,9 @@ struct task_struct *copy_process(unsigned long clone_flags,
 	 * Thread groups must share signals as well, and detached threads
 	 * can only be started up within the thread group.
 	 */
-	if ((clone_flags & CLONE_THREAD) && !(clone_flags & CLONE_SIGHAND))
+	if ((clone_flags & CLONE_THREAD) &&
+		(clone_flags & (CLONE_SIGHAND|CLONE_DETACHED)) !=
+			(CLONE_SIGHAND|CLONE_DETACHED))
 		return ERR_PTR(-EINVAL);
 
 	/*
@@ -876,8 +902,6 @@ struct task_struct *copy_process(unsigned long clone_flags,
 	init_timer(&p->real_timer);
 	p->real_timer.data = (unsigned long) p;
 
-	p->leader = 0;		/* session leadership doesn't inherit */
-	p->tty_old_pgrp = 0;
 	p->utime = p->stime = 0;
 	p->cutime = p->cstime = 0;
 	p->array = NULL;
@@ -1022,7 +1046,7 @@ struct task_struct *copy_process(unsigned long clone_flags,
 	if (thread_group_leader(p)) {
 		attach_pid(p, PIDTYPE_TGID, p->tgid);
 		attach_pid(p, PIDTYPE_PGID, process_group(p));
-		attach_pid(p, PIDTYPE_SID, p->session);
+		attach_pid(p, PIDTYPE_SID, process_session(p));
 		if (p->pid)
 			__get_cpu_var(process_counts)++;
 	} else

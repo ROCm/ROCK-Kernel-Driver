@@ -227,7 +227,7 @@ static int packet_rcv_spkt(struct sk_buff *skb, struct net_device *dev,  struct 
 	 *	field for just this event.
 	 */
 
-	sk = (struct sock *) pt->data;
+	sk = pt->af_packet_priv;
 	
 	/*
 	 *	Yank back the headers [hope the device set this
@@ -422,7 +422,7 @@ static int packet_rcv(struct sk_buff *skb, struct net_device *dev,  struct packe
 	if (skb->pkt_type == PACKET_LOOPBACK)
 		goto drop;
 
-	sk = (struct sock *) pt->data;
+	sk = pt->af_packet_priv;
 	po = pkt_sk(sk);
 
 	skb->dev = dev;
@@ -525,7 +525,7 @@ static int tpacket_rcv(struct sk_buff *skb, struct net_device *dev,  struct pack
 	if (skb->pkt_type == PACKET_LOOPBACK)
 		goto drop;
 
-	sk = (struct sock *) pt->data;
+	sk = pt->af_packet_priv;
 	po = pkt_sk(sk);
 
 	if (dev->hard_header) {
@@ -973,7 +973,7 @@ static int packet_create(struct socket *sock, int protocol)
 	if (sock->type == SOCK_PACKET)
 		po->prot_hook.func = packet_rcv_spkt;
 #endif
-	po->prot_hook.data = (void *)sk;
+	po->prot_hook.af_packet_priv = sk;
 
 	if (protocol) {
 		po->prot_hook.type = protocol;

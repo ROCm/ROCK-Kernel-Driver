@@ -1,6 +1,7 @@
 #ifndef _PARISC_PGTABLE_H
 #define _PARISC_PGTABLE_H
 
+#include <linux/config.h>
 #include <asm/fixmap.h>
 
 #ifndef __ASSEMBLY__
@@ -108,7 +109,6 @@
 extern  void *vmalloc_start;
 #define PCXL_DMA_MAP_SIZE   (8*1024*1024)
 #define VMALLOC_START   ((unsigned long)vmalloc_start)
-#define VMALLOC_VMADDR(x) ((unsigned long)(x))
 /* this is a fixmap remnant, see fixmap.h */
 #define VMALLOC_END	(TMPALIAS_MAP_START)
 #endif

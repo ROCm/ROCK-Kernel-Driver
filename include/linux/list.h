@@ -203,7 +203,7 @@ static inline void list_move_tail(struct list_head *list,
  * list_empty - tests whether a list is empty
  * @head: the list to test.
  */
-static inline int list_empty(struct list_head *head)
+static inline int list_empty(const struct list_head *head)
 {
 	return head->next == head;
 }
@@ -325,6 +325,19 @@ static inline void list_splice_init(struct list_head *list,
 	     pos = list_entry(pos->member.prev, typeof(*pos), member),	\
 		     prefetch(pos->member.prev))
 
+/**
+ * list_for_each_entry_continue -	iterate over list of given type
+ *			continuing after existing point
+ * @pos:	the type * to use as a loop counter.
+ * @head:	the head for your list.
+ * @member:	the name of the list_struct within the struct.
+ */
+#define list_for_each_entry_continue(pos, head, member) 		\
+	for (pos = list_entry(pos->member.next, typeof(*pos), member),	\
+		     prefetch(pos->member.next);			\
+	     &pos->member != (head);					\
+	     pos = list_entry(pos->member.next, typeof(*pos), member),	\
+		     prefetch(pos->member.next))
 
 /**
  * list_for_each_entry_safe - iterate over list of given type safe against removal of list entry
@@ -408,12 +421,12 @@ struct hlist_node {
 #define INIT_HLIST_HEAD(ptr) ((ptr)->first = NULL) 
 #define INIT_HLIST_NODE(ptr) ((ptr)->next = NULL, (ptr)->pprev = NULL)
 
-static __inline__ int hlist_unhashed(struct hlist_node *h) 
+static __inline__ int hlist_unhashed(const struct hlist_node *h) 
 { 
 	return !h->pprev;
 } 
 
-static __inline__ int hlist_empty(struct hlist_head *h) 
+static __inline__ int hlist_empty(const struct hlist_head *h) 
 { 
 	return !h->first;
 } 
@@ -436,7 +449,7 @@ static __inline__ void hlist_del(struct hlist_node *n)
 
 /**
  * hlist_del_rcu - deletes entry from hash list without re-initialization
- * @entry: the element to delete from the hash list.
+ * @n: the element to delete from the hash list.
  *
  * Note: list_unhashed() on entry does not return true after this, 
  * the entry is in an undefined state. It is useful for RCU based

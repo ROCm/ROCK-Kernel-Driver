@@ -355,9 +355,10 @@ void __init clear_kernel_mapping(unsigned long address, unsigned long size)
 	
 	for (; address < end; address += LARGE_PAGE_SIZE) { 
 		pgd_t *pgd = pgd_offset_k(address);
+               pmd_t *pmd;
 		if (!pgd || pgd_none(*pgd))
 			continue; 
-		pmd_t *pmd = pmd_offset(pgd, address);
+               pmd = pmd_offset(pgd, address);
 		if (!pmd || pmd_none(*pmd))
 			continue; 
 		if (0 == (pmd_val(*pmd) & _PAGE_PSE)) { 
@@ -513,24 +514,29 @@ void __init reserve_bootmem_generic(unsigned long phys, unsigned len)
 int kern_addr_valid(unsigned long addr) 
 { 
 	unsigned long above = ((long)addr) >> __VIRTUAL_MASK_SHIFT;
+       pml4_t *pml4;
+       pgd_t *pgd;
+       pmd_t *pmd;
+       pte_t *pte;
+
 	if (above != 0 && above != -1UL)
 		return 0; 
 	
-	pml4_t *pml4 = pml4_offset_k(addr);
+       pml4 = pml4_offset_k(addr);
 	if (pml4_none(*pml4))
 		return 0;
 
-	pgd_t *pgd = pgd_offset_k(addr); 
+       pgd = pgd_offset_k(addr);
 	if (pgd_none(*pgd))
 		return 0; 
 
-	pmd_t *pmd = pmd_offset(pgd, addr);
+       pmd = pmd_offset(pgd, addr);
 	if (pmd_none(*pmd))
 		return 0;
 	if (pmd_large(*pmd))
 		return pfn_valid(pmd_pfn(*pmd));
 
-	pte_t *pte = pte_offset_kernel(pmd, addr); 
+       pte = pte_offset_kernel(pmd, addr);
 	if (pte_none(*pte))
 		return 0;
 	return pfn_valid(pte_pfn(*pte));

@@ -27,6 +27,7 @@
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/blkdev.h>
+#include <linux/parser.h>
 #include <linux/smp_lock.h>
 #include <linux/buffer_head.h>
 #include <linux/vfs.h>
@@ -459,7 +460,7 @@ static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
 #ifdef CONFIG_EXT3_FS_XATTR
 		init_rwsem(&ei->xattr_sem);
 #endif
-		init_rwsem(&ei->truncate_sem);
+		init_MUTEX(&ei->truncate_sem);
 		inode_init_once(&ei->vfs_inode);
 	}
 }
@@ -526,36 +527,54 @@ static struct export_operations ext3_export_ops = {
 	.get_parent = ext3_get_parent,
 };
 
+enum {
+	Opt_bsd_df, Opt_minix_df, Opt_grpid, Opt_nogrpid,
+	Opt_resgid, Opt_resuid, Opt_sb, Opt_err_cont, Opt_err_panic, Opt_err_ro,
+	Opt_nouid32, Opt_check, Opt_nocheck, Opt_debug, Opt_oldalloc, Opt_orlov,
+	Opt_user_xattr, Opt_nouser_xattr, Opt_acl, Opt_noacl, Opt_noload,
+	Opt_commit, Opt_journal_update, Opt_journal_inum,
+	Opt_abort, Opt_data_journal, Opt_data_ordered, Opt_data_writeback,
+	Opt_ignore, Opt_err,
+};
 
-static int want_value(char *value, char *option)
-{
-	if (!value || !*value) {
-		printk(KERN_NOTICE "EXT3-fs: the %s option needs an argument\n",
-		       option);
-		return -1;
-	}
-	return 0;
-}
-
-static int want_null_value(char *value, char *option)
-{
-	if (*value) {
-		printk(KERN_NOTICE "EXT3-fs: Invalid %s argument: %s\n",
-		       option, value);
-		return -1;
-	}
-	return 0;
-}
-
-static int want_numeric(char *value, char *option, unsigned long *number)
-{
-	if (want_value(value, option))
-		return -1;
-	*number = simple_strtoul(value, &value, 0);
-	if (want_null_value(value, option))
-		return -1;
-	return 0;
-}
+static match_table_t tokens = {
+	{Opt_bsd_df, "bsddf"},
+	{Opt_minix_df, "minixdf"},
+	{Opt_grpid, "grpid"},
+	{Opt_grpid, "bsdgroups"},
+	{Opt_nogrpid, "nogrpid"},
+	{Opt_nogrpid, "sysvgroups"},
+	{Opt_resgid, "resgid=%u"},
+	{Opt_resuid, "resuid=%u"},
+	{Opt_sb, "sb=%u"},
+	{Opt_err_cont, "errors=continue"},
+	{Opt_err_panic, "errors=panic"},
+	{Opt_err_ro, "errors=remount-ro"},
+	{Opt_nouid32, "nouid32"},
+	{Opt_nocheck, "nocheck"},
+	{Opt_nocheck, "check=none"},
+	{Opt_check, "check"},
+	{Opt_debug, "debug"},
+	{Opt_oldalloc, "oldalloc"},
+	{Opt_orlov, "orlov"},
+	{Opt_user_xattr, "user_xattr"},
+	{Opt_nouser_xattr, "nouser_xattr"},
+	{Opt_acl, "acl"},
+	{Opt_noacl, "noacl"},
+	{Opt_noload, "noload"},
+	{Opt_commit, "commit=%u"},
+	{Opt_journal_update, "journal=update"},
+	{Opt_journal_inum, "journal=%u"},
+	{Opt_abort, "abort"},
+	{Opt_data_journal, "data=journal"},
+	{Opt_data_ordered, "data=ordered"},
+	{Opt_data_writeback, "data=writeback"},
+	{Opt_ignore, "grpquota"},
+	{Opt_ignore, "noquota"},
+	{Opt_ignore, "quota"},
+	{Opt_ignore, "usrquota"},
+	{Opt_err, NULL}
+};
 
 static unsigned long get_sb_block(void **data)
 {
@@ -577,175 +596,180 @@ static unsigned long get_sb_block(void **data)
 	return sb_block;
 }
 
-/*
- * This function has been shamelessly adapted from the msdos fs
- */
 static int parse_options (char * options, struct ext3_sb_info *sbi,
 			  unsigned long * inum, int is_remount)
 {
-	char * this_char;
-	char * value;
+	char * p;
+	substring_t args[MAX_OPT_ARGS];
+	int data_opt = 0;
+	int option;
 
 	if (!options)
 		return 1;
-	while ((this_char = strsep (&options, ",")) != NULL) {
-		if (!*this_char)
+
+	while ((p = strsep (&options, ",")) != NULL) {
+		int token;
+		if (!*p)
 			continue;
-		if ((value = strchr (this_char, '=')) != NULL)
-			*value++ = 0;
+
+		token = match_token(p, tokens, args);
+		switch (token) {
+		case Opt_bsd_df:
+			clear_opt (sbi->s_mount_opt, MINIX_DF);
+			break;
+		case Opt_minix_df:
+			set_opt (sbi->s_mount_opt, MINIX_DF);
+			break;
+		case Opt_grpid:
+			set_opt (sbi->s_mount_opt, GRPID);
+			break;
+		case Opt_nogrpid:
+			clear_opt (sbi->s_mount_opt, GRPID);
+			break;
+		case Opt_resuid:
+			if (match_int(&args[0], &option))
+				return 0;
+			sbi->s_resuid = option;
+			break;
+		case Opt_resgid:
+			if (match_int(&args[0], &option))
+				return 0;
+			sbi->s_resgid = option;
+			break;
+		case Opt_sb:
+			/* handled by get_sb_block() instead of here */
+			/* *sb_block = match_int(&args[0]); */
+			break;
+		case Opt_err_panic:
+			clear_opt (sbi->s_mount_opt, ERRORS_CONT);
+			clear_opt (sbi->s_mount_opt, ERRORS_RO);
+			set_opt (sbi->s_mount_opt, ERRORS_PANIC);
+			break;
+		case Opt_err_ro:
+			clear_opt (sbi->s_mount_opt, ERRORS_CONT);
+			clear_opt (sbi->s_mount_opt, ERRORS_PANIC);
+			set_opt (sbi->s_mount_opt, ERRORS_RO);
+			break;
+		case Opt_err_cont:
+			clear_opt (sbi->s_mount_opt, ERRORS_RO);
+			clear_opt (sbi->s_mount_opt, ERRORS_PANIC);
+			set_opt (sbi->s_mount_opt, ERRORS_CONT);
+			break;
+		case Opt_nouid32:
+			set_opt (sbi->s_mount_opt, NO_UID32);
+			break;
+		case Opt_check:
+#ifdef CONFIG_EXT3_CHECK
+			set_opt (sbi->s_mount_opt, CHECK);
+#else
+			printk(KERN_ERR
+			       "EXT3 Check option not supported\n");
+#endif
+			break;
+		case Opt_nocheck:
+			clear_opt (sbi->s_mount_opt, CHECK);
+			break;
+		case Opt_debug:
+			set_opt (sbi->s_mount_opt, DEBUG);
+			break;
+		case Opt_oldalloc:
+			set_opt (sbi->s_mount_opt, OLDALLOC);
+			break;
+		case Opt_orlov:
+			clear_opt (sbi->s_mount_opt, OLDALLOC);
+			break;
 #ifdef CONFIG_EXT3_FS_XATTR
-		if (!strcmp (this_char, "user_xattr"))
+		case Opt_user_xattr:
 			set_opt (sbi->s_mount_opt, XATTR_USER);
-		else if (!strcmp (this_char, "nouser_xattr"))
+			break;
+		case Opt_nouser_xattr:
 			clear_opt (sbi->s_mount_opt, XATTR_USER);
-		else
+			break;
+#else
+		case Opt_user_xattr:
+		case Opt_nouser_xattr:
+			printk("EXT3 (no)user_xattr options not supported\n");
+			break;
 #endif
 #ifdef CONFIG_EXT3_FS_POSIX_ACL
-		if (!strcmp(this_char, "acl"))
-			set_opt (sbi->s_mount_opt, POSIX_ACL);
-		else if (!strcmp(this_char, "noacl"))
-			clear_opt (sbi->s_mount_opt, POSIX_ACL);
-		else
-#endif
-		if (!strcmp (this_char, "bsddf"))
-			clear_opt (sbi->s_mount_opt, MINIX_DF);
-		else if (!strcmp (this_char, "nouid32")) {
-			set_opt (sbi->s_mount_opt, NO_UID32);
-		}
-		else if (!strcmp (this_char, "abort"))
-			set_opt (sbi->s_mount_opt, ABORT);
-		else if (!strcmp (this_char, "check")) {
-			if (!value || !*value || !strcmp (value, "none"))
-				clear_opt (sbi->s_mount_opt, CHECK);
-			else
-#ifdef CONFIG_EXT3_CHECK
-				set_opt (sbi->s_mount_opt, CHECK);
+		case Opt_acl:
+			set_opt(sbi->s_mount_opt, POSIX_ACL);
+			break;
+		case Opt_noacl:
+			clear_opt(sbi->s_mount_opt, POSIX_ACL);
+			break;
 #else
-				printk(KERN_ERR 
-				       "EXT3 Check option not supported\n");
+		case Opt_acl:
+		case Opt_noacl:
+			printk("EXT3 (no)acl options not supported\n");
+			break;
 #endif
-		}
-		else if (!strcmp (this_char, "debug"))
-			set_opt (sbi->s_mount_opt, DEBUG);
-		else if (!strcmp (this_char, "errors")) {
-			if (want_value(value, "errors"))
-				return 0;
-			if (!strcmp (value, "continue")) {
-				clear_opt (sbi->s_mount_opt, ERRORS_RO);
-				clear_opt (sbi->s_mount_opt, ERRORS_PANIC);
-				set_opt (sbi->s_mount_opt, ERRORS_CONT);
-			}
-			else if (!strcmp (value, "remount-ro")) {
-				clear_opt (sbi->s_mount_opt, ERRORS_CONT);
-				clear_opt (sbi->s_mount_opt, ERRORS_PANIC);
-				set_opt (sbi->s_mount_opt, ERRORS_RO);
-			}
-			else if (!strcmp (value, "panic")) {
-				clear_opt (sbi->s_mount_opt, ERRORS_CONT);
-				clear_opt (sbi->s_mount_opt, ERRORS_RO);
-				set_opt (sbi->s_mount_opt, ERRORS_PANIC);
-			}
-			else {
-				printk (KERN_ERR
-					"EXT3-fs: Invalid errors option: %s\n",
-					value);
-				return 0;
-			}
-		}
-		else if (!strcmp (this_char, "grpid") ||
-			 !strcmp (this_char, "bsdgroups"))
-			set_opt (sbi->s_mount_opt, GRPID);
-		else if (!strcmp (this_char, "minixdf"))
-			set_opt (sbi->s_mount_opt, MINIX_DF);
-		else if (!strcmp (this_char, "nocheck"))
-			clear_opt (sbi->s_mount_opt, CHECK);
-		else if (!strcmp (this_char, "nogrpid") ||
-			 !strcmp (this_char, "sysvgroups"))
-			clear_opt (sbi->s_mount_opt, GRPID);
-		else if (!strcmp (this_char, "resgid")) {
-			unsigned long v;
-			if (want_numeric(value, "resgid", &v))
-				return 0;
-			sbi->s_resgid = v;
-		}
-		else if (!strcmp (this_char, "resuid")) {
-			unsigned long v;
-			if (want_numeric(value, "resuid", &v))
-				return 0;
-			sbi->s_resuid = v;
-		}
-		else if (!strcmp (this_char, "oldalloc"))
-			set_opt (sbi->s_mount_opt, OLDALLOC);
-		else if (!strcmp (this_char, "orlov"))
-			clear_opt (sbi->s_mount_opt, OLDALLOC);
-		/* Silently ignore the quota options */
-		else if (!strcmp (this_char, "grpquota")
-		         || !strcmp (this_char, "noquota")
-		         || !strcmp (this_char, "quota")
-		         || !strcmp (this_char, "usrquota"))
-			/* Don't do anything ;-) */ ;
-		else if (!strcmp (this_char, "journal")) {
+		case Opt_journal_update:
 			/* @@@ FIXME */
 			/* Eventually we will want to be able to create
-                           a journal file here.  For now, only allow the
-                           user to specify an existing inode to be the
-                           journal file. */
+			   a journal file here.  For now, only allow the
+			   user to specify an existing inode to be the
+			   journal file. */
 			if (is_remount) {
 				printk(KERN_ERR "EXT3-fs: cannot specify "
 				       "journal on remount\n");
 				return 0;
 			}
-
-			if (want_value(value, "journal"))
-				return 0;
-			if (!strcmp (value, "update"))
-				set_opt (sbi->s_mount_opt, UPDATE_JOURNAL);
-			else if (want_numeric(value, "journal", inum))
-				return 0;
-		}
-		else if (!strcmp (this_char, "noload"))
-			set_opt (sbi->s_mount_opt, NOLOAD);
-		else if (!strcmp (this_char, "data")) {
-			int data_opt = 0;
-
-			if (want_value(value, "data"))
-				return 0;
-			if (!strcmp (value, "journal"))
-				data_opt = EXT3_MOUNT_JOURNAL_DATA;
-			else if (!strcmp (value, "ordered"))
-				data_opt = EXT3_MOUNT_ORDERED_DATA;
-			else if (!strcmp (value, "writeback"))
-				data_opt = EXT3_MOUNT_WRITEBACK_DATA;
-			else {
-				printk (KERN_ERR 
-					"EXT3-fs: Invalid data option: %s\n",
-					value);
+			set_opt (sbi->s_mount_opt, UPDATE_JOURNAL);
+			break;
+		case Opt_journal_inum:
+			if (is_remount) {
+				printk(KERN_ERR "EXT3-fs: cannot specify "
+				       "journal on remount\n");
 				return 0;
 			}
+			if (match_int(&args[0], &option))
+				return 0;
+			*inum = option;
+			break;
+		case Opt_noload:
+			set_opt (sbi->s_mount_opt, NOLOAD);
+			break;
+		case Opt_commit:
+			if (match_int(&args[0], &option))
+				return 0;
+			sbi->s_commit_interval = HZ * option;
+			break;
+		case Opt_data_journal:
+			data_opt = EXT3_MOUNT_JOURNAL_DATA;
+			goto datacheck;
+		case Opt_data_ordered:
+			data_opt = EXT3_MOUNT_ORDERED_DATA;
+			goto datacheck;
+		case Opt_data_writeback:
+			data_opt = EXT3_MOUNT_WRITEBACK_DATA;
+		datacheck:
 			if (is_remount) {
-				if ((sbi->s_mount_opt & EXT3_MOUNT_DATA_FLAGS) !=
-							data_opt) {
+				if ((sbi->s_mount_opt & EXT3_MOUNT_DATA_FLAGS)
+						!= data_opt) {
 					printk(KERN_ERR
-					       "EXT3-fs: cannot change data "
-					       "mode on remount\n");
+						"EXT3-fs: cannot change data "
+						"mode on remount\n");
 					return 0;
 				}
 			} else {
 				sbi->s_mount_opt &= ~EXT3_MOUNT_DATA_FLAGS;
 				sbi->s_mount_opt |= data_opt;
 			}
-		} else if (!strcmp (this_char, "commit")) {
-			unsigned long v;
-			if (want_numeric(value, "commit", &v))
-				return 0;
-			sbi->s_commit_interval = (HZ * v);
-		} else {
-			printk (KERN_ERR 
-				"EXT3-fs: Unrecognized mount option %s\n",
-				this_char);
+			break;
+		case Opt_abort:
+			set_opt(sbi->s_mount_opt, ABORT);
+			break;
+		case Opt_ignore:
+			break;
+		default:
+			printk (KERN_ERR
+				"EXT3-fs: Unrecognized mount option \"%s\" "
+				"or missing value\n", p);
 			return 0;
 		}
 	}
+
 	return 1;
 }
 

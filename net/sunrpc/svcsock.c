@@ -1151,7 +1151,6 @@ svc_recv(struct svc_serv *serv, struct svc_rqst *rqstp, long timeout)
 		if (!p) {
 			set_current_state(TASK_UNINTERRUPTIBLE);
 			schedule_timeout(HZ/2);
-			current->state = TASK_RUNNING;
 			continue;
 		}
 		rqstp->rq_argpages[rqstp->rq_arghi++] = p;

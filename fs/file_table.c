@@ -22,8 +22,12 @@ struct files_stat_struct files_stat = {
 	.max_files = NR_FILE
 };
 
+EXPORT_SYMBOL(files_stat); /* Needed by unix.o */
+
 /* public *and* exported. Not pretty! */
 spinlock_t __cacheline_aligned_in_smp files_lock = SPIN_LOCK_UNLOCKED;
+
+EXPORT_SYMBOL(files_lock);
 
 static spinlock_t filp_count_lock = SPIN_LOCK_UNLOCKED;
 
@@ -100,6 +104,8 @@ fail:
 	return NULL;
 }
 
+EXPORT_SYMBOL(get_empty_filp);
+
 /*
  * Clear and initialize a (private) struct file for the given dentry,
  * allocate the security structure, and call the open function (if any).  
@@ -128,6 +134,8 @@ int open_private_file(struct file *filp, struct dentry *dentry, int flags)
 	return error;
 }
 
+EXPORT_SYMBOL(open_private_file);
+
 /*
  * Release a private file by calling the release function (if any) and
  * freeing the security structure.
@@ -141,11 +149,15 @@ void close_private_file(struct file *file)
 	security_file_free(file);
 }
 
+EXPORT_SYMBOL(close_private_file);
+
 void fput(struct file *file)
 {
 	if (atomic_dec_and_test(&file->f_count))
 		__fput(file);
 }
+
+EXPORT_SYMBOL(fput);
 
 /* __fput is called from task context when aio completion releases the last
  * last use of a struct file *.  Do not use otherwise.
@@ -192,6 +204,8 @@ struct file *fget(unsigned int fd)
 	return file;
 }
 
+EXPORT_SYMBOL(fget);
+
 /*
  * Lightweight file lookup - no refcnt increment if fd table isn't shared. 
  * You can use this only if it is guranteed that the current task already 
@@ -228,6 +242,8 @@ void put_filp(struct file *file)
 		file_free(file);
 	}
 }
+
+EXPORT_SYMBOL(put_filp);
 
 void file_move(struct file *file, struct list_head *list)
 {
@@ -284,4 +300,3 @@ void __init files_init(unsigned long mempages)
 	if (files_stat.max_files < NR_FILE)
 		files_stat.max_files = NR_FILE;
 } 
-

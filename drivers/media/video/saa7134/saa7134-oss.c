@@ -732,7 +732,7 @@ struct file_operations saa7134_mixer_fops = {
 
 /* ------------------------------------------------------------------ */
 
-int saa7134_oss_init(struct saa7134_dev *dev)
+int saa7134_oss_init1(struct saa7134_dev *dev)
 {
 	/* general */
         init_MUTEX(&dev->oss.lock);

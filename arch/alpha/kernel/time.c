@@ -27,6 +27,7 @@
  */
 #include <linux/config.h>
 #include <linux/errno.h>
+#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
 #include <linux/param.h>
@@ -51,6 +52,8 @@
 #include "irq_impl.h"
 
 u64 jiffies_64 = INITIAL_JIFFIES;
+
+EXPORT_SYMBOL(jiffies_64);
 
 extern unsigned long wall_jiffies;	/* kernel/timer.c */
 
@@ -87,6 +90,16 @@ static inline __u32 rpcc(void)
     __u32 result;
     asm volatile ("rpcc %0" : "=r"(result));
     return result;
+}
+
+/*
+ * Scheduler clock - returns current time in nanosec units.
+ *
+ * Copied from ARM code for expediency... ;-}
+ */
+unsigned long long sched_clock(void)
+{
+        return (unsigned long long)jiffies * (1000000000 / HZ);
 }
 
 
@@ -239,8 +252,9 @@ validate_cc_value(unsigned long cc)
  * arch/i386/time.c.
  */
 
-#define CALIBRATE_LATCH	(52 * LATCH)
-#define CALIBRATE_TIME	(52 * 1000020 / HZ)
+#define PIC_TICK_RATE	1193180UL
+#define CALIBRATE_LATCH	0xffff
+#define TIMEOUT_COUNT	0x100000
 
 static unsigned long __init
 calibrate_cc_with_pic(void)
@@ -263,19 +277,15 @@ calibrate_cc_with_pic(void)
 
 	cc = rpcc();
 	do {
-	  count+=100; /* by 1 takes too long to timeout from 0 */
-	} while ((inb(0x61) & 0x20) == 0 && count > 0);
+		count++;
+	} while ((inb(0x61) & 0x20) == 0 && count < TIMEOUT_COUNT);
 	cc = rpcc() - cc;
 
 	/* Error: ECTCNEVERSET or ECPUTOOFAST.  */
-	if (count <= 100)
+	if (count <= 1 || count == TIMEOUT_COUNT)
 		return 0;
 
-	/* Error: ECPUTOOSLOW.  */
-	if (cc <= CALIBRATE_TIME)
-		return 0;
-
-	return (cc * 1000000UL) / CALIBRATE_TIME;
+	return ((long)cc * PIC_TICK_RATE) / (CALIBRATE_LATCH + 1);
 }
 
 /* The Linux interpretation of the CMOS clock register contents:
@@ -450,6 +460,8 @@ do_gettimeofday(struct timeval *tv)
 	tv->tv_usec = usec;
 }
 
+EXPORT_SYMBOL(do_gettimeofday);
+
 int
 do_settimeofday(struct timespec *tv)
 {
@@ -493,6 +505,8 @@ do_settimeofday(struct timespec *tv)
 	write_sequnlock_irq(&xtime_lock);
 	return 0;
 }
+
+EXPORT_SYMBOL(do_settimeofday);
 
 
 /*

@@ -870,6 +870,7 @@ dvb_register_frontend (int (*ioctl) (struct dvb_frontend *frontend,
 	static const struct dvb_device dvbdev_template = {
 		.users = ~0,
 		.writers = 1,
+		.readers = (~0)-1,
 		.fops = &dvb_frontend_fops,
 		.kernel_ioctl = dvb_frontend_ioctl
 	};

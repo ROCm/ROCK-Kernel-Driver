@@ -586,7 +586,7 @@ config NET_HW_FLOWCONTROL
 	depends on EXPERIMENTAL
 	---help---
 	  This option enables NIC (Network Interface Card) hardware throttling
-	  during periods of extremal congestion. At the moment only a couple
+	  during periods of extreme congestion. At the moment only a couple
 	  of device drivers support it (really only one -- tulip, a modified
 	  8390 driver can be found at
 	  <ftp://ftp.inr.ac.ru/ip-routing/fastroute/fastroute-8390.tar.gz>).

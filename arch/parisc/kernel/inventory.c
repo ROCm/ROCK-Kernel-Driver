@@ -526,12 +526,14 @@ static void __init system_map_inventory(void)
 	int i;
 	long status = PDC_OK;
     
+#if defined(CONFIG_IOMMU_SBA) && defined(CONFIG_SUPERIO)
 	/*
-	 * first stop the usb controller, otherwise the machine
-	 * might crash during iommu setup
+	 * Stop the suckyio usb controller on Astro based systems.
+	 * Otherwise the machine might crash during iommu setup.
 	 */
-#warning We still probably need to worry about USB here, but how?
-        /* pdc_suspend_usb(); */
+	pdc_io_reset();
+	pdc_io_reset_devices();
+#endif
 
 	for (i = 0; status != PDC_BAD_PROC && status != PDC_NE_MOD; i++) {
 		struct parisc_device *dev;

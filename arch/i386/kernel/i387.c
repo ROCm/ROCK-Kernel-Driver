@@ -10,7 +10,6 @@
 
 #include <linux/config.h>
 #include <linux/sched.h>
-#include <linux/spinlock.h>
 #include <asm/processor.h>
 #include <asm/i387.h>
 #include <asm/math_emu.h>
@@ -549,13 +548,3 @@ int dump_task_extended_fpu(struct task_struct *tsk, struct user_fxsr_struct *fpu
 	}
 	return fpvalid;
 }
-
-
-#ifdef CONFIG_SMP
-void dump_smp_unlazy_fpu(void)
-{
-	unlazy_fpu(current);
-	return;
-}
-#endif
-

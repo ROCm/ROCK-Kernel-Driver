@@ -79,6 +79,7 @@
 #include <linux/string.h>
 #include <linux/blkdev.h>
 #include <linux/init.h>
+#include <linux/parser.h>
 #include <linux/smp_lock.h>
 #include <linux/buffer_head.h>
 #include <linux/vfs.h>
@@ -250,64 +251,99 @@ void ufs_warning (struct super_block * sb, const char * function,
 		sb->s_id, function, error_buf);
 }
 
+enum {
+	Opt_type_old, Opt_type_sunx86, Opt_type_sun, Opt_type_44bsd,
+	Opt_type_hp, Opt_type_nextstepcd, Opt_type_nextstep,
+	Opt_type_openstep, Opt_onerror_panic, Opt_onerror_lock,
+	Opt_onerror_umount, Opt_onerror_repair, Opt_err
+};
+
+static match_table_t tokens = {
+	{Opt_type_old, "ufstype=old"},
+	{Opt_type_sunx86, "ufstype=sunx86"},
+	{Opt_type_sun, "ufstype=sun"},
+	{Opt_type_44bsd, "ufstype=44bsd"},
+	{Opt_type_hp, "ufstype=hp"},
+	{Opt_type_nextstepcd, "ufstype=nextstep-cd"},
+	{Opt_type_nextstep, "ufstype=nextstep"},
+	{Opt_type_openstep, "ufstype=openstep"},
+	{Opt_onerror_panic, "onerror=panic"},
+	{Opt_onerror_lock, "onerror=lock"},
+	{Opt_onerror_umount, "onerror=umount"},
+	{Opt_onerror_repair, "onerror=repair"},
+	{Opt_err, NULL}
+};
+
 static int ufs_parse_options (char * options, unsigned * mount_options)
 {
-	char * this_char;
-	char * value;
+	char * p;
 	
 	UFSD(("ENTER\n"))
 	
 	if (!options)
 		return 1;
 
-	while ((this_char = strsep (&options, ",")) != NULL) {
-		if (!*this_char)
+	while ((p = strsep(&options, ",")) != NULL) {
+		substring_t args[MAX_OPT_ARGS];
+		int token;
+		if (!*p)
 			continue;
-		if ((value = strchr (this_char, '=')) != NULL)
-			*value++ = 0;
-		if (!strcmp (this_char, "ufstype")) {
+
+		token = match_token(p, tokens, args);
+		switch (token) {
+		case Opt_type_old:
 			ufs_clear_opt (*mount_options, UFSTYPE);
-			if (!strcmp (value, "old"))
-				ufs_set_opt (*mount_options, UFSTYPE_OLD);
-			else if (!strcmp (value, "sun"))
-				ufs_set_opt (*mount_options, UFSTYPE_SUN);
-			else if (!strcmp (value, "44bsd"))
-				ufs_set_opt (*mount_options, UFSTYPE_44BSD);
-			else if (!strcmp (value, "nextstep"))
-				ufs_set_opt (*mount_options, UFSTYPE_NEXTSTEP);
-			else if (!strcmp (value, "nextstep-cd"))
-				ufs_set_opt (*mount_options, UFSTYPE_NEXTSTEP_CD);
-			else if (!strcmp (value, "openstep"))
-				ufs_set_opt (*mount_options, UFSTYPE_OPENSTEP);
-			else if (!strcmp (value, "sunx86"))
-				ufs_set_opt (*mount_options, UFSTYPE_SUNx86);
-			else if (!strcmp (value, "hp"))
-				ufs_set_opt (*mount_options, UFSTYPE_HP);
-			else {
-				printk ("UFS-fs: Invalid type option: %s\n", value);
-				return 0;
-			}
-		}
-		else if (!strcmp (this_char, "onerror")) {
+			ufs_set_opt (*mount_options, UFSTYPE_OLD);
+			break;
+		case Opt_type_sunx86:
+			ufs_clear_opt (*mount_options, UFSTYPE);
+			ufs_set_opt (*mount_options, UFSTYPE_SUNx86);
+			break;
+		case Opt_type_sun:
+			ufs_clear_opt (*mount_options, UFSTYPE);
+			ufs_set_opt (*mount_options, UFSTYPE_SUN);
+			break;
+		case Opt_type_44bsd:
+			ufs_clear_opt (*mount_options, UFSTYPE);
+			ufs_set_opt (*mount_options, UFSTYPE_44BSD);
+			break;
+		case Opt_type_hp:
+			ufs_clear_opt (*mount_options, UFSTYPE);
+			ufs_set_opt (*mount_options, UFSTYPE_HP);
+			break;
+		case Opt_type_nextstepcd:
+			ufs_clear_opt (*mount_options, UFSTYPE);
+			ufs_set_opt (*mount_options, UFSTYPE_NEXTSTEP_CD);
+			break;
+		case Opt_type_nextstep:
+			ufs_clear_opt (*mount_options, UFSTYPE);
+			ufs_set_opt (*mount_options, UFSTYPE_NEXTSTEP);
+			break;
+		case Opt_type_openstep:
+			ufs_clear_opt (*mount_options, UFSTYPE);
+			ufs_set_opt (*mount_options, UFSTYPE_OPENSTEP);
+			break;
+		case Opt_onerror_panic:
 			ufs_clear_opt (*mount_options, ONERROR);
-			if (!strcmp (value, "panic"))
-				ufs_set_opt (*mount_options, ONERROR_PANIC);
-			else if (!strcmp (value, "lock"))
-				ufs_set_opt (*mount_options, ONERROR_LOCK);
-			else if (!strcmp (value, "umount"))
-				ufs_set_opt (*mount_options, ONERROR_UMOUNT);
-			else if (!strcmp (value, "repair")) {
-				printk("UFS-fs: Unable to do repair on error, "
-					"will lock lock instead \n");
-				ufs_set_opt (*mount_options, ONERROR_REPAIR);
-			}
-			else {
-				printk ("UFS-fs: Invalid action onerror: %s\n", value);
-				return 0;
-			}
-		}
-		else {
-			printk("UFS-fs: Invalid option: %s\n", this_char);
+			ufs_set_opt (*mount_options, ONERROR_PANIC);
+			break;
+		case Opt_onerror_lock:
+			ufs_clear_opt (*mount_options, ONERROR);
+			ufs_set_opt (*mount_options, ONERROR_LOCK);
+			break;
+		case Opt_onerror_umount:
+			ufs_clear_opt (*mount_options, ONERROR);
+			ufs_set_opt (*mount_options, ONERROR_UMOUNT);
+			break;
+		case Opt_onerror_repair:
+			printk("UFS-fs: Unable to do repair on error, "
+				"will lock lock instead\n");
+			ufs_clear_opt (*mount_options, ONERROR);
+			ufs_set_opt (*mount_options, ONERROR_REPAIR);
+			break;
+		default:
+			printk("UFS-fs: Invalid option: \"%s\" "
+					"or missing value\n", p);
 			return 0;
 		}
 	}

@@ -1228,6 +1228,7 @@ static int ext2_update_inode(struct inode * inode, int do_sync)
 			raw_inode->i_block[0] = 0;
 			raw_inode->i_block[1] =
 				cpu_to_le32(new_encode_dev(inode->i_rdev));
+			raw_inode->i_block[2] = 0;
 		}
 	} else for (n = 0; n < EXT2_N_BLOCKS; n++)
 		raw_inode->i_block[n] = ei->i_data[n];

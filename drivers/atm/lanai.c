@@ -2350,11 +2350,13 @@ static void lanai_close(struct atm_vcc *atmvcc)
 }
 
 /* open a vcc on the card to vpi/vci */
-static int lanai_open(struct atm_vcc *atmvcc, short vpi, int vci)
+static int lanai_open(struct atm_vcc *atmvcc)
 {
 	struct lanai_dev *lanai;
 	struct lanai_vcc *lvcc;
 	int result = 0;
+	int vci = atmvcc->vci;
+	short vpi = atmvcc->vpi;
 	/* we don't support partial open - it's not really useful anyway */
 	if ((test_bit(ATM_VF_PARTIAL, &atmvcc->flags)) ||
 	    (vpi == ATM_VPI_UNSPEC) || (vci == ATM_VCI_UNSPEC))
@@ -2363,8 +2365,6 @@ static int lanai_open(struct atm_vcc *atmvcc, short vpi, int vci)
 	result = lanai_normalize_ci(lanai, atmvcc, &vpi, &vci);
 	if (unlikely(result != 0))
 		goto out;
-	atmvcc->vpi = vpi;
-	atmvcc->vci = vci;
 	set_bit(ATM_VF_ADDR, &atmvcc->flags);
 	if (atmvcc->qos.aal != ATM_AAL0 && atmvcc->qos.aal != ATM_AAL5)
 		return -EINVAL;

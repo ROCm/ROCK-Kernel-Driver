@@ -33,6 +33,7 @@
 #include <linux/seq_file.h>
 #include <linux/root_dev.h>
 #include <linux/initrd.h>
+#include <linux/eisa.h>
 #ifdef CONFIG_MAGIC_SYSRQ
 #include <linux/sysrq.h>
 #include <linux/reboot.h>
@@ -680,6 +681,11 @@ setup_arch(char **cmdline_p)
 	/* Default root filesystem to sda2.  */
 	ROOT_DEV = Root_SDA2;
 
+#ifdef CONFIG_EISA
+	/* FIXME:  only set this when we actually have EISA in this box? */
+	EISA_bus = 1;
+#endif
+
  	/*
 	 * Check ASN in HWRPB for validity, report if bad.
 	 * FIXME: how was this failing?  Should we trust it instead,
@@ -1203,7 +1209,7 @@ show_cpuinfo(struct seq_file *f, void *slot)
 		       platform_string(), nr_processors);
 
 #ifdef CONFIG_SMP
-	seq_printf(f, "cpus active\t\t: %d\n"
+	seq_printf(f, "cpus active\t\t: %ld\n"
 		      "cpu active mask\t\t: %016lx\n",
 		       num_online_cpus(), cpu_present_mask);
 #endif

@@ -20,8 +20,6 @@
  */
 #define BASE_BAUD (1843200 / 16)
 
-#define RS_TABLE_SIZE	2
-
 #define STD_COM_FLAGS (ASYNC_BOOT_AUTOCONF | ASYNC_SKIP_TEST)
 
      /* UART CLK        PORT  IRQ     FLAGS        */

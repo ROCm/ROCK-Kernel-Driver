@@ -107,7 +107,7 @@
 #include <linux/hdlc.h>
 
 /* Version */
-static const char version[] = "$Id: dscc4.c,v 1.159 2002/04/10 22:05:17 romieu Exp $ for Linux\n";
+static const char version[] = "$Id: dscc4.c,v 1.173 2003/09/20 23:55:34 romieu Exp $ for Linux\n";
 static int debug;
 static int quartz;
 
@@ -592,6 +592,7 @@ static inline int dscc4_xpr_ack(struct dscc4_dev_priv *dpriv)
 	return (i >= 0 ) ? i : -EAGAIN;
 }
 
+#if 0 /* dscc4_{rx/tx}_reset are both unreliable - more tweak needed */
 static void dscc4_rx_reset(struct dscc4_dev_priv *dpriv, struct net_device *dev)
 {
 	unsigned long flags;
@@ -606,6 +607,9 @@ static void dscc4_rx_reset(struct dscc4_dev_priv *dpriv, struct net_device *dev)
 	spin_unlock_irqrestore(&dpriv->pci_priv->lock, flags);
 }
 
+#endif
+
+#if 0
 static void dscc4_tx_reset(struct dscc4_dev_priv *dpriv, struct net_device *dev)
 {
 	u16 i = 0;
@@ -625,6 +629,7 @@ static void dscc4_tx_reset(struct dscc4_dev_priv *dpriv, struct net_device *dev)
 	if (dscc4_do_action(dev, "Rdt") < 0)
 		printk(KERN_ERR "%s: Tx reset failed\n", dev->name);
 }
+#endif
 
 /* TODO: (ab)use this function to refill a completely depleted RX ring. */
 static inline void dscc4_rx_skb(struct dscc4_dev_priv *dpriv,
@@ -859,7 +864,7 @@ static int dscc4_found1(struct pci_dev *pdev, unsigned long ioaddr)
 {
 	struct dscc4_pci_priv *ppriv;
 	struct dscc4_dev_priv *root;
-	int i = 0;
+	int i, ret = -ENOMEM;
 
 	root = (struct dscc4_dev_priv *)
 		kmalloc(dev_per_card*sizeof(*root), GFP_KERNEL);
@@ -900,7 +905,8 @@ static int dscc4_found1(struct pci_dev *pdev, unsigned long ioaddr)
 		hdlc->xmit = dscc4_start_xmit;
 		hdlc->attach = dscc4_hdlc_attach;
 
-	        if (register_hdlc_device(hdlc)) {
+		ret = register_hdlc_device(hdlc);
+		if (ret < 0) {
 			printk(KERN_ERR "%s: unable to register\n", DRV_NAME);
 			goto err_unregister;
 	        }
@@ -908,17 +914,20 @@ static int dscc4_found1(struct pci_dev *pdev, unsigned long ioaddr)
 		dscc4_init_registers(dpriv, d);
 		dpriv->parity = PARITY_CRC16_PR0_CCITT;
 		dpriv->encoding = ENCODING_NRZ;
-		if (dscc4_init_ring(d)) {
+
+		ret = dscc4_init_ring(d);
+		if (ret < 0) {
 			unregister_hdlc_device(hdlc);
 			goto err_unregister;
 		}
 	}
-	if (dscc4_set_quartz(root, quartz) < 0)
+	ret = dscc4_set_quartz(root, quartz);
+	if (ret < 0)
 		goto err_unregister;
 	ppriv->root = root;
 	spin_lock_init(&ppriv->lock);
 	pci_set_drvdata(pdev, ppriv);
-	return 0;
+	return ret;
 
 err_unregister:
 	while (--i >= 0) {
@@ -929,7 +938,7 @@ err_unregister:
 err_free_dev:
 	kfree(root);
 err_out:
-	return -1;
+	return ret;
 };
 
 /* FIXME: get rid of the unneeded code */
@@ -971,7 +980,7 @@ static int dscc4_loopback_check(struct dscc4_dev_priv *dpriv)
  *
  * This code doesn't need to be efficient. Keep It Simple
  */
-static void dscc4_pci_reset(struct pci_dev *pdev, u32 ioaddr)
+static void dscc4_pci_reset(struct pci_dev *pdev, unsigned long ioaddr)
 {
 	int i;
 
@@ -1092,9 +1101,7 @@ done:
 
 err_disable_scc_events:
 	scc_writel(0xffffffff, dpriv, dev, IMR);
-err_free_ring:
 	scc_patchl(PowerUp | Vis, 0, dpriv, dev, CCR0);
-	dscc4_release_ring(dpriv);
 err_out:
 	hdlc_close(hdlc);
 err:
@@ -1160,7 +1167,6 @@ static int dscc4_close(struct net_device *dev)
 	dpriv->flags |= FakeReset;
 
 	hdlc_close(hdlc);
-	dscc4_release_ring(dpriv);
 
 	return 0;
 }
@@ -1455,7 +1461,8 @@ static irqreturn_t dscc4_irq(int irq, void *token, struct pt_regs *ptregs)
 	struct dscc4_dev_priv *root = token;
 	struct dscc4_pci_priv *priv;
 	struct net_device *dev;
-	u32 ioaddr, state;
+	unsigned long ioaddr;
+	u32 state;
 	unsigned long flags;
 	int i, handled = 1;
 
@@ -1607,7 +1614,7 @@ try:
 				goto try;
 		}
 		if (state & Xpr) {
-			u32 scc_addr, ring;
+			unsigned long scc_addr, ring;
 			int i;
 
 			/*
@@ -1948,7 +1955,7 @@ static void __devexit dscc4_remove_one(struct pci_dev *pdev)
 {
 	struct dscc4_pci_priv *ppriv;
 	struct dscc4_dev_priv *root;
-	u32 ioaddr;
+	unsigned long ioaddr;
 	int i;
 
 	ppriv = pci_get_drvdata(pdev);
@@ -2006,6 +2013,7 @@ static int dscc4_hdlc_attach(hdlc_device *hdlc, unsigned short encoding,
 	return 0;
 }
 
+#ifndef MODULE
 static int __init dscc4_setup(char *str)
 {
 	int *args[] = { &debug, &quartz, NULL }, **p = args;
@@ -2016,6 +2024,7 @@ static int __init dscc4_setup(char *str)
 }
 
 __setup("dscc4.setup=", dscc4_setup);
+#endif
 
 static struct pci_device_id dscc4_pci_tbl[] = {
 	{ PCI_VENDOR_ID_SIEMENS, PCI_DEVICE_ID_SIEMENS_DSCC4,

@@ -114,8 +114,8 @@ W:	http://sourceforge.net/projects/gkernel/
 S:	Maintained
 
 8250/16?50 (AND CLONE UARTS) SERIAL DRIVER
-P:	Theodore Ts'o
-M:	tytso@mit.edu
+P:	Russell King
+M:	rmk+serial@arm.linux.org.uk
 L:	linux-serial@vger.kernel.org
 W:	http://serial.sourceforge.net
 S:	Maintained
@@ -282,6 +282,16 @@ S:	Maintained
 ARPD SUPPORT
 P:	Jonathan Layes
 L:	linux-net@vger.kernel.org
+S:	Maintained
+
+ASUS ACPI EXTRAS DRIVER
+P:	Karol Kozimor
+M:	sziwan@users.sourceforge.net
+P:	Julien Lerouge
+M:	julien.lerouge@free.fr
+L:	acpi4asus-user@lists.sourceforge.net
+W:	http://sourceforge.net/projects/acpi4asus
+W:	http://julien.lerouge.free.fr
 S:	Maintained
 
 ATM
@@ -509,7 +519,7 @@ S:	Maintained
 
 CRYPTO API
 P:	James Morris
-M:	jmorris@intercode.com.au
+M:	jmorris@redhat.com
 P:	David S. Miller
 M:	davem@redhat.com
 W	http://samba.org/~jamesm/crypto/
@@ -624,7 +634,7 @@ DIGIBOARD PC/XE AND PC/XI DRIVER
 P:	Christoph Lameter
 M:	christoph@lameter.com
 W:	http://www.digi.com
-L:	digilnux@dgii.com
+L:	digilnux@digi.com
 S:	Orphaned
 
 DIRECTORY NOTIFICATION
@@ -668,6 +678,12 @@ P:	François Romieu
 M:	romieu@cogenit.fr
 M:	romieu@ensta.fr
 S:	Maintained
+
+DVB SUBSYSTEM AND DRIVERS
+P:	LinuxTV.org Project
+L: 	linux-dvb@linuxtv.org
+W:	http://linuxtv.org/developer/dvb.xml
+S:	Supported
 
 EATA-DMA SCSI DRIVER
 P:	Michael Neuffer
@@ -798,7 +814,7 @@ S:	Odd fixes (e.g., new signatures)
 
 GDT SCSI DISK ARRAY CONTROLLER DRIVER
 P:	Achim Leubner
-M:	achim.leubner@intel.com
+M:	achim_leubner@adaptec.com
 L:	linux-scsi@vger.kernel.org
 W:	http://www.icp-vortex.com/
 S:	Supported
@@ -1386,7 +1402,7 @@ M:	kuznet@ms2.inr.ac.ru
 P:	Pekka Savola (ipv6)
 M:	pekkas@netcore.fi
 P:	James Morris
-M:	jmorris@intercode.com.au
+M:	jmorris@redhat.com
 P:	Hideaki YOSHIFUJI
 M:	yoshfuji@linux-ipv6.org
 L:	netdev@oss.sgi.com
@@ -1657,6 +1673,12 @@ M:	linux390@de.ibm.com
 L:	linux-390@vm.marist.edu
 W:	http://oss.software.ibm.com/developerworks/opensource/linux390
 S:	Supported
+
+SAA7146 VIDEO4LINUX-2 DRIVER
+P:	Michael Hunold
+M:	michael@mihu.de
+W:	http://www.mihu.de/linux/saa7146
+S:	Maintained
 
 SA1100 SUPPORT
 P:	Nicolas Pitre

@@ -33,6 +33,7 @@
  *
  */
 
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <asm/uaccess.h>
@@ -485,3 +486,10 @@ unsigned int datagram_poll(struct file *file, struct socket *sock,
 
 	return mask;
 }
+
+EXPORT_SYMBOL(datagram_poll);
+EXPORT_SYMBOL(skb_copy_and_csum_datagram_iovec);
+EXPORT_SYMBOL(skb_copy_datagram);
+EXPORT_SYMBOL(skb_copy_datagram_iovec);
+EXPORT_SYMBOL(skb_free_datagram);
+EXPORT_SYMBOL(skb_recv_datagram);

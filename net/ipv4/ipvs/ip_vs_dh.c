@@ -202,10 +202,11 @@ static inline int is_overloaded(struct ip_vs_dest *dest)
  *      Destination hashing scheduling
  */
 static struct ip_vs_dest *
-ip_vs_dh_schedule(struct ip_vs_service *svc, struct iphdr *iph)
+ip_vs_dh_schedule(struct ip_vs_service *svc, const struct sk_buff *skb)
 {
 	struct ip_vs_dest *dest;
 	struct ip_vs_dh_bucket *tbl;
+	struct iphdr *iph = skb->nh.iph;
 
 	IP_VS_DBG(6, "ip_vs_dh_schedule(): Scheduling...\n");
 

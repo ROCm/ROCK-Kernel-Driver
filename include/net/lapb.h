@@ -129,7 +129,7 @@ extern void lapb_clear_queues(struct lapb_cb *lapb);
 extern void lapb_frames_acked(struct lapb_cb *lapb, unsigned short);
 extern void lapb_requeue_frames(struct lapb_cb *lapb);
 extern int  lapb_validate_nr(struct lapb_cb *lapb, unsigned short);
-extern void lapb_decode(struct lapb_cb *lapb, struct sk_buff *, struct lapb_frame *);
+extern int lapb_decode(struct lapb_cb *lapb, struct sk_buff *, struct lapb_frame *);
 extern void lapb_send_control(struct lapb_cb *lapb, int, int, int);
 extern void lapb_transmit_frmr(struct lapb_cb *lapb);
 

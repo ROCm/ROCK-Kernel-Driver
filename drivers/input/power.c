@@ -45,9 +45,7 @@ static struct input_handler power_handler;
 static int suspend_button_pushed = 0;
 static void suspend_button_task_handler(void *data)
 {
-        //extern void pm_do_suspend(void);
         udelay(200); /* debounce */
-        //pm_do_suspend();
         suspend_button_pushed = 0;
 }
 
@@ -66,8 +64,6 @@ static void power_event(struct input_handle *handle, unsigned int type,
 		switch (code) {
 			case KEY_SUSPEND:
 				printk("Powering down entire device\n");
-
-				//pm_send_all(PM_SUSPEND, dev);
 
 				if (!suspend_button_pushed) {
                 			suspend_button_pushed = 1;

@@ -169,7 +169,7 @@ void __init MP_processor_info (struct mpc_config_processor *m)
 
 	if (num_processors >= NR_CPUS) {
 		printk(KERN_WARNING "NR_CPUS limit of %i reached.  Cannot "
-			"boot CPU(apicid 0x%d).\n", NR_CPUS, m->mpc_apicid);
+			"boot CPU(apicid 0x%x).\n", NR_CPUS, m->mpc_apicid);
 		return;
 	}
 	num_processors++;
@@ -830,7 +830,7 @@ void __init mp_register_lapic (
 	MP_processor_info(&processor);
 }
 
-#ifdef CONFIG_X86_IO_APIC
+#if defined(CONFIG_X86_IO_APIC) && defined(CONFIG_ACPI_INTERPRETER)
 
 #define MP_ISA_BUS		0
 #define MP_MAX_IOAPIC_PIN	127
@@ -1019,10 +1019,6 @@ void __init mp_config_acpi_legacy_irqs (void)
 	}
 }
 
-#ifdef	CONFIG_ACPI
-
-/* Ensure the ACPI SCI interrupt level is active low, edge-triggered */
-
 extern FADT_DESCRIPTOR acpi_fadt;
 
 void __init mp_config_ioapic_for_sci(int irq)
@@ -1031,6 +1027,7 @@ void __init mp_config_ioapic_for_sci(int irq)
 	int ioapic_pin;
 	struct acpi_table_madt *madt;
 	struct acpi_table_int_src_ovr *entry = NULL;
+	acpi_interrupt_flags flags;
 	void *madt_end;
 	acpi_status status;
 
@@ -1049,32 +1046,37 @@ void __init mp_config_ioapic_for_sci(int irq)
 
 		while ((void *) entry < madt_end) {
                 	if (entry->header.type == ACPI_MADT_INT_SRC_OVR &&
-			    acpi_fadt.sci_int == entry->bus_irq) {
-				/*
-				 * See the note at the end of ACPI 2.0b section
-				 * 5.2.10.8 for what this is about.
-				 */
-				if (entry->bus_irq != entry->global_irq) {
-					acpi_fadt.sci_int = entry->global_irq;
-					irq = entry->global_irq;
-					break;
-				}
-				else
-                			return;
-			}
-
+			    acpi_fadt.sci_int == entry->bus_irq)
+				goto found;
+			
                 	entry = (struct acpi_table_int_src_ovr *)
                 	        ((unsigned long) entry + entry->header.length);
         	}
 	}
+	/*
+	 * Although the ACPI spec says that the SCI should be level/low
+	 * don't reprogram it unless there is an explicit MADT OVR entry
+	 * instructing us to do so -- otherwise we break Tyan boards which
+	 * have the SCI wired edge/high but no MADT OVR.
+	 */
+	return;
+
+found:
+	/*
+	 * See the note at the end of ACPI 2.0b section
+	 * 5.2.10.8 for what this is about.
+	 */
+	flags = entry->flags;
+	acpi_fadt.sci_int = entry->global_irq;
+	irq = entry->global_irq;
 
 	ioapic = mp_find_ioapic(irq);
 
 	ioapic_pin = irq - mp_ioapic_routing[ioapic].irq_start;
 
-	io_apic_set_pci_routing(ioapic, ioapic_pin, irq, 1, 1); // Active low, level triggered
+	io_apic_set_pci_routing(ioapic, ioapic_pin, irq, 
+				(flags.trigger >> 1) , (flags.polarity >> 1));
 }
-#endif	/* CONFIG_ACPI */
 
 #ifdef CONFIG_ACPI_PCI
 
@@ -1110,8 +1112,10 @@ void __init mp_parse_prt (void)
 		}
 
 		/* Don't set up the ACPI SCI because it's already set up */
-		if (acpi_fadt.sci_int == irq)
+                if (acpi_fadt.sci_int == irq) {
+                        entry->irq = irq; /*we still need to set entry's irq*/
 			continue;
+                }
 	
 		ioapic = mp_find_ioapic(irq);
 		if (ioapic < 0)
@@ -1154,5 +1158,5 @@ void __init mp_parse_prt (void)
 }
 
 #endif /*CONFIG_ACPI_PCI*/
-#endif	/* CONFIG_X86_IO_APIC */
+#endif /*CONFIG_X86_IO_APIC && CONFIG_ACPI_INTERPRETER*/
 #endif /*CONFIG_ACPI_BOOT*/

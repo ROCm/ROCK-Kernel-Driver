@@ -973,8 +973,9 @@ static struct devfs_entry *_devfs_search_dir (struct devfs_entry *dir,
 
 /**
  *	_devfs_alloc_entry - Allocate a devfs entry.
- *	@name:  The name of the entry.
- *	@namelen:  The number of characters in @name.
+ *	@name:     the name of the entry
+ *	@namelen:  the number of characters in @name
+ *      @mode:     the mode for the entry
  *
  *  Allocate a devfs entry and returns a pointer to the entry on success, else
  *   %NULL.

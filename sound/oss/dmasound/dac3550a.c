@@ -7,7 +7,6 @@
  *  for more details.
  */
 
-#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/proc_fs.h>

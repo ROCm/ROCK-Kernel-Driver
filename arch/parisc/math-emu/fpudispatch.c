@@ -50,7 +50,7 @@
 #define FPUDEBUG 0
 
 #include "float.h"
-#include "types.h"
+#include <linux/kernel.h>
 #include <asm/processor.h>
 /* #include <sys/debug.h> */
 /* #include <machine/sys/mdep_private.h> */

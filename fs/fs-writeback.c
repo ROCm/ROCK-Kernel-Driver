@@ -107,6 +107,8 @@ out:
 	spin_unlock(&inode_lock);
 }
 
+EXPORT_SYMBOL(__mark_inode_dirty);
+
 static void write_inode(struct inode *inode, int sync)
 {
 	if (inode->i_sb->s_op->write_inode && !is_bad_inode(inode))
@@ -494,6 +496,8 @@ void write_inode_now(struct inode *inode, int sync)
 		wait_on_inode(inode);
 }
 
+EXPORT_SYMBOL(write_inode_now);
+
 /**
  * generic_osync_inode - flush all dirty data for a given inode to disk
  * @inode: inode to write
@@ -544,6 +548,8 @@ int generic_osync_inode(struct inode *inode, int what)
 
 	return err;
 }
+
+EXPORT_SYMBOL(generic_osync_inode);
 
 /**
  * writeback_acquire: attempt to get exclusive writeback access to a device

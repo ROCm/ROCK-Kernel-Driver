@@ -1552,8 +1552,10 @@ pciserial_init_one(struct pci_dev *dev, const struct pci_device_id *ent)
 #endif
 		
 		priv->line[i] = register_serial(&serial_req);
-		if (priv->line[i] < 0)
+		if (priv->line[i] < 0) {
+			printk(KERN_WARNING "Couldn't register serial port %s: %d\n", pci_name(dev), priv->line[i]);
 			break;
+		}
 	}
 
 	priv->nr = i;

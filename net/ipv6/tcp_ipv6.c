@@ -101,7 +101,10 @@ static inline int tcp_v6_bind_conflict(struct sock *sk,
 
 	/* We must walk the whole port owner list in this case. -DaveM */
 	sk_for_each_bound(sk2, node, &tb->owners) {
-		if (sk != sk2 && sk->sk_bound_dev_if == sk2->sk_bound_dev_if &&
+		if (sk != sk2 &&
+		    (!sk->sk_bound_dev_if ||
+		     !sk2->sk_bound_dev_if ||
+		     sk->sk_bound_dev_if == sk2->sk_bound_dev_if) &&
 		    (!sk->sk_reuse || !sk2->sk_reuse ||
 		     sk2->sk_state == TCP_LISTEN) &&
 		     ipv6_rcv_saddr_equal(sk, sk2))

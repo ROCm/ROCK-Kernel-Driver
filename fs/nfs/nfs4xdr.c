@@ -205,6 +205,7 @@ struct compound_hdr {
 
 #define RESERVE_SPACE(nbytes)	do {				\
 	p = xdr_reserve_space(xdr, nbytes);			\
+	if (!p) printk("RESERVE_SPACE(%d) failed in function %s\n", (int) (nbytes), __FUNCTION__); \
 	BUG_ON(!p);						\
 } while (0)
 
@@ -382,10 +383,10 @@ encode_close(struct xdr_stream *xdr, struct nfs_closeargs *arg)
 {
 	uint32_t *p;
 
-	RESERVE_SPACE(8+sizeof(nfs4_stateid));
+	RESERVE_SPACE(8+sizeof(arg->stateid.data));
 	WRITE32(OP_CLOSE);
 	WRITE32(arg->seqid);
-	WRITEMEM(arg->stateid, sizeof(nfs4_stateid));
+	WRITEMEM(arg->stateid.data, sizeof(arg->stateid.data));
 	
 	return 0;
 }
@@ -553,14 +554,17 @@ encode_open(struct xdr_stream *xdr, struct nfs_openargs *arg)
 	WRITE32(OP_OPEN);
 	WRITE32(arg->seqid);
 	switch (arg->share_access) {
-		case O_RDONLY:
+		case FMODE_READ:
 			WRITE32(NFS4_SHARE_ACCESS_READ);
 			break;
-		case O_WRONLY:
+		case FMODE_WRITE:
 			WRITE32(NFS4_SHARE_ACCESS_WRITE);
 			break;
-		case O_RDWR:
+		case FMODE_READ|FMODE_WRITE:
 			WRITE32(NFS4_SHARE_ACCESS_BOTH);
+			break;
+		default:
+			BUG();
 	}
 	WRITE32(0);                  /* for linux, share_deny = 0 always */
 	WRITE64(arg->clientid);
@@ -572,7 +576,7 @@ encode_open(struct xdr_stream *xdr, struct nfs_openargs *arg)
 		if (arg->createmode == NFS4_CREATE_EXCLUSIVE) {
 			RESERVE_SPACE(12);
 			WRITE32(arg->createmode);
-			WRITEMEM(arg->u.verifier, sizeof(nfs4_verifier));
+			WRITEMEM(arg->u.verifier.data, sizeof(arg->u.verifier.data));
 		}
 		else if (arg->u.attrs) {
 			RESERVE_SPACE(4);
@@ -601,9 +605,9 @@ encode_open_confirm(struct xdr_stream *xdr, struct nfs_open_confirmargs *arg)
 {
 	uint32_t *p;
 
-	RESERVE_SPACE(8+sizeof(nfs4_stateid));
+	RESERVE_SPACE(8+sizeof(arg->stateid.data));
 	WRITE32(OP_OPEN_CONFIRM);
-	WRITEMEM(arg->stateid, sizeof(nfs4_stateid));
+	WRITEMEM(arg->stateid.data, sizeof(arg->stateid.data));
 	WRITE32(arg->seqid);
 
 	return 0;
@@ -642,7 +646,7 @@ encode_read(struct xdr_stream *xdr, struct nfs_readargs *args)
 
 	RESERVE_SPACE(32);
 	WRITE32(OP_READ);
-	WRITEMEM(args->stateid, sizeof(nfs4_stateid));
+	WRITEMEM(args->stateid.data, sizeof(args->stateid.data));
 	WRITE64(args->offset);
 	WRITE32(args->count);
 
@@ -659,7 +663,7 @@ encode_readdir(struct xdr_stream *xdr, struct nfs4_readdir *readdir, struct rpc_
 	RESERVE_SPACE(32+sizeof(nfs4_verifier));
 	WRITE32(OP_READDIR);
 	WRITE64(readdir->rd_cookie);
-	WRITEMEM(readdir->rd_req_verifier, sizeof(nfs4_verifier));
+	WRITEMEM(readdir->rd_req_verifier.data, sizeof(readdir->rd_req_verifier.data));
 	WRITE32(readdir->rd_count >> 5);  /* meaningless "dircount" field */
 	WRITE32(readdir->rd_count);
 	WRITE32(2);
@@ -768,9 +772,9 @@ encode_setattr(struct xdr_stream *xdr, struct nfs_setattrargs *arg,
 	int status;
 	uint32_t *p;
 	
-        RESERVE_SPACE(4+sizeof(nfs4_stateid));
+        RESERVE_SPACE(4+sizeof(arg->stateid.data));
         WRITE32(OP_SETATTR);
-	WRITEMEM(arg->stateid, sizeof(nfs4_stateid));
+	WRITEMEM(arg->stateid.data, sizeof(arg->stateid.data));
 
         if ((status = encode_attrs(xdr, arg->iap, server)))
 		return status;
@@ -789,11 +793,11 @@ encode_setclientid(struct xdr_stream *xdr, struct nfs4_setclientid *setclientid)
 	len2 = strlen(setclientid->sc_netid);
 	len3 = strlen(setclientid->sc_uaddr);
 	total_len = XDR_QUADLEN(len1) + XDR_QUADLEN(len2) + XDR_QUADLEN(len3);
-	total_len = (total_len << 2) + 24 + sizeof(nfs4_verifier);
+	total_len = (total_len << 2) + 24 + sizeof(setclientid->sc_verifier.data);
 
 	RESERVE_SPACE(total_len);
 	WRITE32(OP_SETCLIENTID);
-	WRITEMEM(setclientid->sc_verifier, sizeof(nfs4_verifier));
+	WRITEMEM(setclientid->sc_verifier.data, sizeof(setclientid->sc_verifier.data));
 	WRITE32(len1);
 	WRITEMEM(setclientid->sc_name, len1);
 	WRITE32(setclientid->sc_prog);
@@ -811,10 +815,10 @@ encode_setclientid_confirm(struct xdr_stream *xdr, struct nfs4_client *client_st
 {
         uint32_t *p;
 
-        RESERVE_SPACE(12 + sizeof(nfs4_verifier));
+        RESERVE_SPACE(12 + sizeof(client_state->cl_confirm.data));
         WRITE32(OP_SETCLIENTID_CONFIRM);
         WRITE64(client_state->cl_clientid);
-        WRITEMEM(client_state->cl_confirm,sizeof(nfs4_verifier));
+        WRITEMEM(client_state->cl_confirm.data, sizeof(client_state->cl_confirm.data));
 
         return 0;
 }
@@ -826,7 +830,7 @@ encode_write(struct xdr_stream *xdr, struct nfs_writeargs *args)
 
 	RESERVE_SPACE(36);
 	WRITE32(OP_WRITE);
-	WRITEMEM(args->stateid, sizeof(nfs4_stateid));
+	WRITEMEM(args->stateid.data, sizeof(args->stateid.data));
 	WRITE64(args->offset);
 	WRITE32(args->stable);
 	WRITE32(args->count);
@@ -1253,8 +1257,8 @@ decode_close(struct xdr_stream *xdr, struct nfs_closeres *res)
 	status = decode_op_hdr(xdr, OP_CLOSE);
 	if (status)
 		return status;
-	READ_BUF(sizeof(nfs4_stateid));
-	COPYMEM(res->stateid, sizeof(nfs4_stateid));
+	READ_BUF(sizeof(res->stateid.data));
+	COPYMEM(res->stateid.data, sizeof(res->stateid.data));
 	return 0;
 }
 
@@ -1333,8 +1337,10 @@ decode_getattr(struct xdr_stream *xdr, struct nfs4_getattr *getattr,
 		dprintk("read_attrs: server returned bad attributes!\n");
 		goto xdr_error;
 	}
-	getattr->gt_bmres[0] = bmval0;
-	getattr->gt_bmres[1] = bmval1;
+	if (nfp) {
+		nfp->bitmap[0] = bmval0;
+		nfp->bitmap[1] = bmval1;
+	}
 
 	/*
 	 * In case the server doesn't return some attributes,
@@ -1739,8 +1745,8 @@ decode_open(struct xdr_stream *xdr, struct nfs_openres *res)
         status = decode_op_hdr(xdr, OP_OPEN);
         if (status)
                 return status;
-        READ_BUF(sizeof(nfs4_stateid));
-        COPYMEM(res->stateid, sizeof(nfs4_stateid));
+        READ_BUF(sizeof(res->stateid.data));
+        COPYMEM(res->stateid.data, sizeof(res->stateid.data));
 
         decode_change_info(xdr, res->cinfo);
 
@@ -1767,8 +1773,8 @@ decode_open_confirm(struct xdr_stream *xdr, struct nfs_open_confirmres *res)
         res->status = decode_op_hdr(xdr, OP_OPEN_CONFIRM);
         if (res->status)
                 return res->status;
-        READ_BUF(sizeof(nfs4_stateid));
-        COPYMEM(res->stateid, sizeof(nfs4_stateid));
+        READ_BUF(sizeof(res->stateid.data));
+        COPYMEM(res->stateid.data, sizeof(res->stateid.data));
         return 0;
 }
 
@@ -1828,7 +1834,7 @@ decode_readdir(struct xdr_stream *xdr, struct rpc_rqst *req, struct nfs4_readdir
 	if (status)
 		return status;
 	READ_BUF(8);
-	COPYMEM(readdir->rd_resp_verifier, 8);
+	COPYMEM(readdir->rd_resp_verifier.data, 8);
 
 	hdrlen = (char *) p - (char *) iov->iov_base;
 	recvd = req->rq_received - hdrlen;
@@ -2021,9 +2027,9 @@ decode_setclientid(struct xdr_stream *xdr, struct nfs4_setclientid *setclientid)
 	}
 	READ32(nfserr);
 	if (nfserr == NFS_OK) {
-		READ_BUF(8 + sizeof(nfs4_verifier));
+		READ_BUF(8 + sizeof(setclientid->sc_state->cl_confirm.data));
 		READ64(setclientid->sc_state->cl_clientid);
-		COPYMEM(setclientid->sc_state->cl_confirm, sizeof(nfs4_verifier));
+		COPYMEM(setclientid->sc_state->cl_confirm.data, sizeof(setclientid->sc_state->cl_confirm.data));
 	} else if (nfserr == NFSERR_CLID_INUSE) {
 		uint32_t len;
 

@@ -58,7 +58,19 @@ static int pxa_gpio_irq_type(unsigned int irq, unsigned int type)
 {
 	int gpio, idx;
 
-	gpio = irq - ((irq >= IRQ_GPIO(2)) ? IRQ_GPIO(2) + 2 : IRQ_GPIO(0));
+	gpio = IRQ_TO_GPIO(irq);
+	idx = gpio >> 5;
+
+	if (type == IRQT_PROBE) {
+	    /* Don't mess with enabled GPIOs using preconfigured edges or
+	       GPIOs set to alternate function during probe */
+		if ((GPIO_IRQ_rising_edge[idx] | GPIO_IRQ_falling_edge[idx]) &
+		    GPIO_bit(gpio))
+			return 0;
+		if (GAFR(gpio) & (0x3 << (((gpio) & 0xf)*2)))
+			return 0;
+		type = __IRQT_RISEDGE | __IRQT_FALEDGE;
+	}
 
 	printk(KERN_DEBUG "IRQ%d (GPIO%d): ", irq, gpio);
 
@@ -78,10 +90,8 @@ static int pxa_gpio_irq_type(unsigned int irq, unsigned int type)
 
 	printk("edges\n");
 
-	idx = gpio >> 5;
 	GRER(gpio) = GPIO_IRQ_rising_edge[idx] & GPIO_IRQ_mask[idx];
 	GFER(gpio) = GPIO_IRQ_falling_edge[idx] & GPIO_IRQ_mask[idx];
-
 	return 0;
 }
 

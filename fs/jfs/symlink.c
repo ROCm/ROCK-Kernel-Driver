@@ -26,7 +26,7 @@ static int jfs_follow_link(struct dentry *dentry, struct nameidata *nd)
 	return vfs_follow_link(nd, s);
 }
 
-static int jfs_readlink(struct dentry *dentry, char *buffer, int buflen)
+static int jfs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
 {
 	char *s = JFS_IP(dentry->d_inode)->i_inline;
 	return vfs_readlink(dentry, buffer, buflen, s);

@@ -460,6 +460,10 @@ running once the system is up.
 	logibm_irq=	[HW,MOUSE] Logitech Bus Mouse Driver
 			Format: <irq>
 
+	log_buf_len=n	Sets the size of the printk ring buffer, in bytes.
+			Format is n, nk, nM.  n must be a power of two.  The
+			default is set in kernel config.
+
 	lp=0		[LP]	Specify parallel ports to use, e.g,
 	lp=port[,port...]	lp=none,parport0 (lp0 not configured, lp1 uses
 	lp=reset		first parallel port). 'lp=0' disables the

@@ -898,8 +898,18 @@ void netlink_ack(struct sk_buff *in_skb, struct nlmsghdr *nlh, int err)
 		size = NLMSG_SPACE(4 + NLMSG_ALIGN(nlh->nlmsg_len));
 
 	skb = alloc_skb(size, GFP_KERNEL);
-	if (!skb)
+	if (!skb) {
+		struct sock *sk;
+
+		sk = netlink_lookup(in_skb->sk->sk_protocol,
+				    NETLINK_CB(in_skb).pid);
+		if (sk) {
+			sk->sk_err = ENOBUFS;
+			sk->sk_error_report(sk);
+			sock_put(sk);
+		}
 		return;
+	}
 
 	rep = __nlmsg_put(skb, NETLINK_CB(in_skb).pid, nlh->nlmsg_seq,
 			  NLMSG_ERROR, sizeof(struct nlmsgerr));
@@ -1133,4 +1143,22 @@ core_initcall(netlink_proto_init);
 module_exit(netlink_proto_exit);
 
 MODULE_LICENSE("GPL");
+
 MODULE_ALIAS_NETPROTO(PF_NETLINK);
+
+EXPORT_SYMBOL(netlink_ack);
+EXPORT_SYMBOL(netlink_broadcast);
+EXPORT_SYMBOL(netlink_broadcast_deliver);
+EXPORT_SYMBOL(netlink_dump_start);
+EXPORT_SYMBOL(netlink_kernel_create);
+EXPORT_SYMBOL(netlink_register_notifier);
+EXPORT_SYMBOL(netlink_set_err);
+EXPORT_SYMBOL(netlink_set_nonroot);
+EXPORT_SYMBOL(netlink_unicast);
+EXPORT_SYMBOL(netlink_unregister_notifier);
+
+#if defined(CONFIG_NETLINK_DEV) || defined(CONFIG_NETLINK_DEV_MODULE)
+EXPORT_SYMBOL(netlink_attach);
+EXPORT_SYMBOL(netlink_detach);
+EXPORT_SYMBOL(netlink_post);
+#endif

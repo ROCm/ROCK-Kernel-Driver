@@ -12,7 +12,7 @@ config CPU_FREQ
 	  because the lower the clock speed, the less power the CPU consumes.
 
 	  For more information, take a look at linux/Documentation/cpu-freq or
-	  at <http://www.brodo.de/cpufreq/>
+	  at <http://www.codemonkey.org.uk/projects/cpufreq/>
 
 	  If in doubt, say N.
 
@@ -83,6 +83,16 @@ config X86_POWERNOW_K7
 	depends on CPU_FREQ_TABLE
 	help
 	  This adds the CPUFreq driver for mobile AMD K7 mobile processors.
+
+	  For details, take a look at linux/Documentation/cpu-freq. 
+
+	  If in doubt, say N.
+
+config X86_POWERNOW_K8
+	tristate "AMD Opteron/Athlon64 PowerNow!"
+	depends on CPU_FREQ && EXPERIMENTAL
+	help
+	  This adds the CPUFreq driver for mobile AMD Opteron/Athlon64 processors.
 
 	  For details, take a look at linux/Documentation/cpu-freq. 
 

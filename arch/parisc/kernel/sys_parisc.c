@@ -65,7 +65,7 @@ static int get_offset(struct address_space *mapping)
  */
 static int get_offset(struct address_space *mapping)
 {
-	int offset = (int) mapping << (PAGE_SHIFT - 8);
+	int offset = (unsigned long) mapping << (PAGE_SHIFT - 8);
 	return offset & 0x3FF000;
 }
 #endif
@@ -165,12 +165,13 @@ long sys_shmat_wrapper(int shmid, char *shmaddr, int shmflag)
 	return raddr;
 }
 
-
 /* Fucking broken ABI */
 
 #ifdef CONFIG_PARISC64
 extern asmlinkage long sys_truncate(const char *, unsigned long);
 extern asmlinkage long sys_ftruncate(unsigned int, unsigned long);
+extern asmlinkage long sys_fcntl(unsigned int, unsigned int, unsigned long);
+
 asmlinkage long parisc_truncate64(const char * path,
 					unsigned int high, unsigned int low)
 {
@@ -181,6 +182,21 @@ asmlinkage long parisc_ftruncate64(unsigned int fd,
 					unsigned int high, unsigned int low)
 {
 	return sys_ftruncate(fd, (long)high << 32 | low);
+}
+
+/* stubs for the benefit of the syscall_table since truncate64 and truncate 
+ * are identical on LP64 */
+asmlinkage long sys_truncate64(const char * path, unsigned long length)
+{
+	return sys_truncate(path, length);
+}
+asmlinkage long sys_ftruncate64(unsigned int fd, unsigned long length)
+{
+	return sys_ftruncate(fd, length);
+}
+asmlinkage long sys_fcntl64(unsigned int fd, unsigned int cmd, unsigned long arg)
+{
+	return sys_fcntl(fd, cmd, arg);
 }
 #else
 

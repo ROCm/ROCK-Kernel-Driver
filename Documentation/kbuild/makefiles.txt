@@ -212,7 +212,6 @@ more details, with real examples.
 
 	No special notation is required in the makefiles for
 	modules exporting symbols.
-	See also Documentation/modules.txt.
 
 --- 3.5 Library file goals - lib-y
 

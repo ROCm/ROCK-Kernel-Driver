@@ -56,8 +56,6 @@ EXPORT_SYMBOL(rpc_unlink);
 EXPORT_SYMBOL(rpc_wake_up);
 EXPORT_SYMBOL(rpc_queue_upcall);
 EXPORT_SYMBOL(rpc_mkpipe);
-EXPORT_SYMBOL(__rpc_purge_current_upcall);
-EXPORT_SYMBOL(__rpc_purge_one_upcall);
 
 /* Client transport */
 EXPORT_SYMBOL(xprt_create_proto);

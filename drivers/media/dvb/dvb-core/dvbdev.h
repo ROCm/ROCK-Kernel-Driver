@@ -1,9 +1,8 @@
 /* 
  * dvbdev.h
  *
- * Copyright (C) 2000 Ralph  Metzler <ralph@convergence.de>
- *                  & Marcus Metzler <marcus@convergence.de>
-                      for convergence integrated media GmbH
+ * Copyright (C) 2000 Ralph Metzler & Marcus Metzler
+ *                    for convergence integrated media GmbH
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Lesser Public License
@@ -28,7 +27,6 @@
 #include <linux/poll.h>
 #include <linux/fs.h>
 #include <linux/list.h>
-#include <linux/version.h>
 #include <linux/devfs_fs_kernel.h>
 
 #define DVB_MAJOR 250
@@ -56,12 +54,18 @@ struct dvb_adapter {
 struct dvb_device {
 	struct list_head list_head;
 	struct file_operations *fops;
+ 
+ 
+ 
 	struct dvb_adapter *adapter;
 	int type;
 	u32 id;
 
-	int users;
+	/* in theory, 'users' can vanish now,
+	   but I don't want to change too much now... */
+	int readers;
 	int writers;
+	int users;
 
         /* don't really need those !? -- FIXME: use video_usercopy  */
         int (*kernel_ioctl)(struct inode *inode, struct file *file,

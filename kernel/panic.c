@@ -9,6 +9,7 @@
  * to indicate a major problem.
  */
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/delay.h>
 #include <linux/reboot.h>
@@ -24,7 +25,11 @@ int panic_timeout;
 int panic_on_oops;
 int tainted;
 
+EXPORT_SYMBOL(panic_timeout);
+
 struct notifier_block *panic_notifier_list;
+
+EXPORT_SYMBOL(panic_notifier_list);
 
 static int __init panic_setup(char *str)
 {
@@ -104,6 +109,8 @@ NORET_TYPE void panic(const char * fmt, ...)
 	for (;;)
 		;
 }
+
+EXPORT_SYMBOL(panic);
 
 /**
  *	print_tainted - return a string to represent the kernel taint state.

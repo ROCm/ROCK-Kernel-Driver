@@ -1,6 +1,8 @@
 #ifndef _PARISC_PDC_H
 #define _PARISC_PDC_H
 
+#include <linux/config.h>
+
 /*
  *	PDC return values ...
  *	All PDC calls return a subset of these errors. 
@@ -191,8 +193,8 @@ typedef struct {
 
 #define PDC_IO		135		/* log error info, reset IO system */
 #define PDC_IO_READ_AND_CLEAR_ERRORS	0
-#define PDC_IO_READ_AND_LOG_ERRORS	1
-#define PDC_IO_SUSPEND_USB		2
+#define PDC_IO_RESET			1
+#define PDC_IO_RESET_DEVICES		2
 /* sets bits 6&7 (little endian) of the HcControl Register */
 #define PDC_IO_USB_SUSPEND	0xC000000000000000
 #define PDC_IO_EEPROM_IO_ERR_TABLE_FULL	-5	/* return value */
@@ -951,7 +953,8 @@ int pdc_do_firm_test_reset(unsigned long ftc_bitmap);
 int pdc_do_reset(void);
 int pdc_soft_power_info(unsigned long *power_reg);
 int pdc_soft_power_button(int sw_control);
-void pdc_suspend_usb(void);
+void pdc_io_reset(void);
+void pdc_io_reset_devices(void);
 int pdc_iodc_getc(void);
 void pdc_iodc_putc(unsigned char c);
 void pdc_iodc_outc(unsigned char c);

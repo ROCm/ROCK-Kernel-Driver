@@ -27,7 +27,6 @@
 
 /* $Id: planb.c,v 1.18 1999/05/02 17:36:34 mlan Exp $ */
 
-#include <linux/version.h>
 #include <linux/init.h>
 #include <linux/errno.h>
 #include <linux/module.h>

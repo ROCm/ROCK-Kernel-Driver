@@ -56,6 +56,7 @@
 
 #include <linux/types.h>
 #include <linux/fcntl.h>
+#include <linux/module.h>
 #include <linux/random.h>
 #include <linux/cache.h>
 #include <linux/jhash.h>
@@ -187,7 +188,9 @@ static inline int tcp_bind_conflict(struct sock *sk, struct tcp_bind_bucket *tb)
 	sk_for_each_bound(sk2, node, &tb->owners) {
 		if (sk != sk2 &&
 		    !ipv6_only_sock(sk2) &&
-		    sk->sk_bound_dev_if == sk2->sk_bound_dev_if) {
+		    (!sk->sk_bound_dev_if ||
+		     !sk2->sk_bound_dev_if ||
+		     sk->sk_bound_dev_if == sk2->sk_bound_dev_if)) {
 			if (!reuse || !sk2->sk_reuse ||
 			    sk2->sk_state == TCP_LISTEN) {
 				struct inet_opt *inet2 = inet_sk(sk2);
@@ -2644,3 +2647,32 @@ void __init tcp_v4_init(struct net_proto_family *ops)
 	 */
 	tcp_socket->sk->sk_prot->unhash(tcp_socket->sk);
 }
+
+EXPORT_SYMBOL(ipv4_specific);
+EXPORT_SYMBOL(tcp_bind_hash);
+EXPORT_SYMBOL(tcp_bucket_create);
+EXPORT_SYMBOL(tcp_hashinfo);
+EXPORT_SYMBOL(tcp_inherit_port);
+EXPORT_SYMBOL(tcp_listen_wlock);
+EXPORT_SYMBOL(tcp_port_rover);
+EXPORT_SYMBOL(tcp_prot);
+EXPORT_SYMBOL(tcp_put_port);
+EXPORT_SYMBOL(tcp_unhash);
+EXPORT_SYMBOL(tcp_v4_conn_request);
+EXPORT_SYMBOL(tcp_v4_connect);
+EXPORT_SYMBOL(tcp_v4_do_rcv);
+EXPORT_SYMBOL(tcp_v4_lookup_listener);
+EXPORT_SYMBOL(tcp_v4_rebuild_header);
+EXPORT_SYMBOL(tcp_v4_remember_stamp);
+EXPORT_SYMBOL(tcp_v4_send_check);
+EXPORT_SYMBOL(tcp_v4_syn_recv_sock);
+
+#ifdef CONFIG_PROC_FS
+EXPORT_SYMBOL(tcp_proc_register);
+EXPORT_SYMBOL(tcp_proc_unregister);
+#endif
+#ifdef CONFIG_SYSCTL
+EXPORT_SYMBOL(sysctl_local_port_range);
+EXPORT_SYMBOL(sysctl_max_syn_backlog);
+EXPORT_SYMBOL(sysctl_tcp_low_latency);
+#endif

@@ -17,6 +17,7 @@
 
 #include <linux/string.h>
 #include <linux/interrupt.h>
+#include <linux/config.h>
 
 
 #define CPU_IRQ_REGION		1

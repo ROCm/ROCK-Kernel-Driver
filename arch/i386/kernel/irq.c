@@ -19,6 +19,7 @@
 
 #include <linux/config.h>
 #include <linux/errno.h>
+#include <linux/module.h>
 #include <linux/signal.h>
 #include <linux/sched.h>
 #include <linux/ioport.h>
@@ -579,6 +580,8 @@ int request_irq(unsigned int irq,
 	return retval;
 }
 
+EXPORT_SYMBOL(request_irq);
+
 /**
  *	free_irq - free an interrupt
  *	@irq: Interrupt line to free
@@ -632,6 +635,8 @@ void free_irq(unsigned int irq, void *dev_id)
 		return;
 	}
 }
+
+EXPORT_SYMBOL(free_irq);
 
 /*
  * IRQ autodetection code..
@@ -725,6 +730,8 @@ unsigned long probe_irq_on(void)
 
 	return val;
 }
+
+EXPORT_SYMBOL(probe_irq_on);
 
 /*
  * Return a mask of triggered interrupts (this
@@ -824,6 +831,8 @@ int probe_irq_off(unsigned long val)
 	return irq_found;
 }
 
+EXPORT_SYMBOL(probe_irq_off);
+
 /* this was setup_x86_irq but it seems pretty generic */
 int setup_irq(unsigned int irq, struct irqaction * new)
 {
@@ -904,7 +913,7 @@ static unsigned int parse_hex_value(const char __user *buffer,
 		return -EFAULT;
 
 	/*
-	 * Parse the first 8 characters as a hex string, any non-hex char
+	 * Parse the first HEX_DIGITS characters as a hex string, any non-hex char
 	 * is end-of-string. '00e1', 'e1', '00E1', 'E1' are all the same.
 	 */
 
@@ -965,6 +974,8 @@ static int irq_affinity_write_proc(struct file *file, const char __user *buffer,
 		return -EIO;
 
 	err = parse_hex_value(buffer, count, &new_value);
+	if (err)
+		return err;
 
 	/*
 	 * Do not allow disabling IRQs completely - it's a too easy

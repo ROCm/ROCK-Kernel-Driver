@@ -15,6 +15,7 @@
  */
 
 #include <linux/init.h>
+#include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/fs.h>
 #include <linux/namei.h>
@@ -218,7 +219,7 @@ int permission(struct inode * inode,int mask, struct nameidata *nd)
 	if (retval)
 		return retval;
 
-	return security_inode_permission(inode, mask);
+	return security_inode_permission(inode, mask, nd);
 }
 
 /*
@@ -302,7 +303,8 @@ static struct dentry * cached_lookup(struct dentry * parent, struct qstr * name,
  * short-cut DAC fails, then call permission() to do more
  * complete permission check.
  */
-static inline int exec_permission_lite(struct inode *inode)
+static inline int exec_permission_lite(struct inode *inode,
+				       struct nameidata *nd)
 {
 	umode_t	mode = inode->i_mode;
 
@@ -325,7 +327,7 @@ static inline int exec_permission_lite(struct inode *inode)
 
 	return -EACCES;
 ok:
-	return security_inode_permission(inode, MAY_EXEC);
+	return security_inode_permission(inode, MAY_EXEC, nd);
 }
 
 /*
@@ -584,7 +586,7 @@ int link_path_walk(const char * name, struct nameidata *nd)
 		struct qstr this;
 		unsigned int c;
 
-		err = exec_permission_lite(inode);
+		err = exec_permission_lite(inode, nd);
 		if (err == -EAGAIN) { 
 			err = permission(inode, MAY_EXEC, nd);
 		}
@@ -2275,3 +2277,33 @@ struct inode_operations page_symlink_inode_operations = {
 	.readlink	= page_readlink,
 	.follow_link	= page_follow_link,
 };
+
+EXPORT_SYMBOL(__user_walk);
+EXPORT_SYMBOL(follow_down);
+EXPORT_SYMBOL(follow_up);
+EXPORT_SYMBOL(get_write_access); /* binfmt_aout */
+EXPORT_SYMBOL(getname);
+EXPORT_SYMBOL(lock_rename);
+EXPORT_SYMBOL(lookup_create);
+EXPORT_SYMBOL(lookup_hash);
+EXPORT_SYMBOL(lookup_one_len);
+EXPORT_SYMBOL(page_follow_link);
+EXPORT_SYMBOL(page_readlink);
+EXPORT_SYMBOL(page_symlink);
+EXPORT_SYMBOL(page_symlink_inode_operations);
+EXPORT_SYMBOL(path_lookup);
+EXPORT_SYMBOL(path_release);
+EXPORT_SYMBOL(path_walk);
+EXPORT_SYMBOL(permission);
+EXPORT_SYMBOL(unlock_rename);
+EXPORT_SYMBOL(vfs_create);
+EXPORT_SYMBOL(vfs_follow_link);
+EXPORT_SYMBOL(vfs_link);
+EXPORT_SYMBOL(vfs_mkdir);
+EXPORT_SYMBOL(vfs_mknod);
+EXPORT_SYMBOL(vfs_permission);
+EXPORT_SYMBOL(vfs_readlink);
+EXPORT_SYMBOL(vfs_rename);
+EXPORT_SYMBOL(vfs_rmdir);
+EXPORT_SYMBOL(vfs_symlink);
+EXPORT_SYMBOL(vfs_unlink);

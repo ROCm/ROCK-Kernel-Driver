@@ -120,20 +120,26 @@ extern long __put_user_bad(void);
 	__pu_err;						\
 })
 
-#define __put_user_size(x,ptr,size,retval)			\
-do {								\
-	retval = 0;						\
-	switch (size) {						\
-	  case 1: __put_user_asm(x,ptr,retval,"stb"); break;	\
-	  case 2: __put_user_asm(x,ptr,retval,"sth"); break;	\
-	  case 4: __put_user_asm(x,ptr,retval,"stw"); break;	\
-	  case 8: __put_user_asm2(x,ptr,retval); break;		\
-	  default: __put_user_bad();				\
-	}							\
+#define __put_user_size(x,ptr,size,retval)		\
+do {							\
+	retval = 0;					\
+	switch (size) {					\
+	case 1:						\
+		__put_user_asm(x, ptr, retval, "stb");	\
+		break;					\
+	case 2:						\
+		__put_user_asm(x, ptr, retval, "sth");	\
+		break;					\
+	case 4:						\
+		__put_user_asm(x, ptr, retval, "stw");	\
+		break;					\
+	case 8:						\
+		__put_user_asm2(x, ptr, retval);	\
+		break;					\
+	default:					\
+		__put_user_bad();			\
+	}						\
 } while (0)
-
-struct __large_struct { unsigned long buf[100]; };
-#define __m(x) (*(struct __large_struct *)(x))
 
 /*
  * We don't tell gcc that we are accessing memory, but this is OK
@@ -152,13 +158,13 @@ struct __large_struct { unsigned long buf[100]; };
 		"	.align 2\n"				\
 		"	.long 1b,3b\n"				\
 		".previous"					\
-		: "=r"(err)					\
-		: "r"(x), "b"(addr), "i"(-EFAULT), "0"(err))
+		: "=r" (err)					\
+		: "r" (x), "b" (addr), "i" (-EFAULT), "0" (err))
 
 #define __put_user_asm2(x, addr, err)				\
 	__asm__ __volatile__(					\
 		"1:	stw %1,0(%2)\n"				\
-		"2:	stw %1+1,4(%2)\n"				\
+		"2:	stw %1+1,4(%2)\n"			\
 		"3:\n"						\
 		".section .fixup,\"ax\"\n"			\
 		"4:	li %0,%3\n"				\
@@ -169,69 +175,85 @@ struct __large_struct { unsigned long buf[100]; };
 		"	.long 1b,4b\n"				\
 		"	.long 2b,4b\n"				\
 		".previous"					\
-		: "=r"(err)					\
-		: "r"(x), "b"(addr), "i"(-EFAULT), "0"(err))
+		: "=r" (err)					\
+		: "r" (x), "b" (addr), "i" (-EFAULT), "0" (err))
 
-#define __get_user_nocheck(x,ptr,size)				\
+#define __get_user_nocheck(x, ptr, size)			\
 ({								\
 	long __gu_err, __gu_val;				\
-	__get_user_size(__gu_val,(ptr),(size),__gu_err);	\
+	__get_user_size(__gu_val, (ptr), (size), __gu_err);	\
 	(x) = (__typeof__(*(ptr)))__gu_val;			\
 	__gu_err;						\
 })
 
-#define __get_user64_nocheck(x,ptr,size)			\
+#define __get_user64_nocheck(x, ptr, size)			\
 ({								\
 	long __gu_err;						\
 	long long __gu_val;					\
-	__get_user_size64(__gu_val,(ptr),(size),__gu_err);	\
+	__get_user_size64(__gu_val, (ptr), (size), __gu_err);	\
 	(x) = (__typeof__(*(ptr)))__gu_val;			\
 	__gu_err;						\
 })
 
-#define __get_user_check(x,ptr,size)					\
+#define __get_user_check(x, ptr, size)					\
 ({									\
 	long __gu_err = -EFAULT, __gu_val = 0;				\
 	const __typeof__(*(ptr)) *__gu_addr = (ptr);			\
-	if (access_ok(VERIFY_READ,__gu_addr,size))			\
-		__get_user_size(__gu_val,__gu_addr,(size),__gu_err);	\
+	if (access_ok(VERIFY_READ, __gu_addr, (size)))			\
+		__get_user_size(__gu_val, __gu_addr, (size), __gu_err);	\
 	(x) = (__typeof__(*(ptr)))__gu_val;				\
 	__gu_err;							\
 })
 
-#define __get_user64_check(x,ptr,size)					\
-({									\
-	long __gu_err = -EFAULT;					\
-	long long __gu_val = 0;						\
-	const __typeof__(*(ptr)) *__gu_addr = (ptr);			\
-	if (access_ok(VERIFY_READ,__gu_addr,size))			\
-		__get_user_size64(__gu_val,__gu_addr,(size),__gu_err);	\
-	(x) = (__typeof__(*(ptr)))__gu_val;				\
-	__gu_err;							\
+#define __get_user64_check(x, ptr, size)				  \
+({									  \
+	long __gu_err = -EFAULT;					  \
+	long long __gu_val = 0;						  \
+	const __typeof__(*(ptr)) *__gu_addr = (ptr);			  \
+	if (access_ok(VERIFY_READ, __gu_addr, (size)))			  \
+		__get_user_size64(__gu_val, __gu_addr, (size), __gu_err); \
+	(x) = (__typeof__(*(ptr)))__gu_val;				  \
+	__gu_err;							  \
 })
 
 extern long __get_user_bad(void);
 
-#define __get_user_size(x,ptr,size,retval)			\
+#define __get_user_size(x, ptr, size, retval)			\
 do {								\
 	retval = 0;						\
 	switch (size) {						\
-	  case 1: __get_user_asm(x,ptr,retval,"lbz"); break;	\
-	  case 2: __get_user_asm(x,ptr,retval,"lhz"); break;	\
-	  case 4: __get_user_asm(x,ptr,retval,"lwz"); break;	\
-	  default: (x) = __get_user_bad();			\
+	case 1:							\
+		__get_user_asm(x, ptr, retval, "lbz");		\
+		break;						\
+	case 2:							\
+		__get_user_asm(x, ptr, retval, "lhz");		\
+		break;						\
+	case 4:							\
+		__get_user_asm(x, ptr, retval, "lwz");		\
+		break;						\
+	default:						\
+		x = __get_user_bad();				\
 	}							\
 } while (0)
 
-#define __get_user_size64(x,ptr,size,retval)			\
+#define __get_user_size64(x, ptr, size, retval)			\
 do {								\
 	retval = 0;						\
 	switch (size) {						\
-	  case 1: __get_user_asm(x,ptr,retval,"lbz"); break;	\
-	  case 2: __get_user_asm(x,ptr,retval,"lhz"); break;	\
-	  case 4: __get_user_asm(x,ptr,retval,"lwz"); break;	\
-	  case 8: __get_user_asm2(x, ptr, retval); break;	\
-	  default: (x) = __get_user_bad();			\
+	case 1:							\
+		__get_user_asm(x, ptr, retval, "lbz");		\
+		break;						\
+	case 2:							\
+		__get_user_asm(x, ptr, retval, "lhz");		\
+		break;						\
+	case 4:							\
+		__get_user_asm(x, ptr, retval, "lwz");		\
+		break;						\
+	case 8:							\
+		__get_user_asm2(x, ptr, retval);		\
+		break;						\
+	default:						\
+		x = __get_user_bad();				\
 	}							\
 } while (0)
 

@@ -504,7 +504,7 @@ typedef struct log {
 	struct xfs_mount	*l_mp;	        /* mount point */
 	struct xfs_buf		*l_xbuf;        /* extra buffer for log
 						 * wrapping */
-	dev_t			l_dev;	        /* dev_t of log */
+	struct xfs_buftarg	*l_targ;        /* buftarg of log */
 	xfs_daddr_t		l_logBBstart;   /* start block of log */
 	int			l_logsize;      /* size of log in bytes */
 	int			l_logBBsize;    /* size of log in BB chunks */

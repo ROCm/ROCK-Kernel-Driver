@@ -812,15 +812,17 @@ out:
 	if (err == -EAGAIN)
 		goto changed;
 
-	if (ext3_find_goal(inode, iblock, chain, partial, &goal) < 0)
+	down(&ei->truncate_sem);
+	if (ext3_find_goal(inode, iblock, chain, partial, &goal) < 0) {
+		up(&ei->truncate_sem);
 		goto changed;
+	}
 
 	left = (chain + depth) - partial;
 
 	/*
 	 * Block out ext3_truncate while we alter the tree
 	 */
-	down_read(&ei->truncate_sem);
 	err = ext3_alloc_branch(handle, inode, left, goal,
 					offsets+(partial-chain), partial);
 
@@ -832,7 +834,7 @@ out:
 	if (!err)
 		err = ext3_splice_branch(handle, inode, iblock, chain,
 					 partial, left);
-	up_read(&ei->truncate_sem);
+	up(&ei->truncate_sem);
 	if (err == -EAGAIN)
 		goto changed;
 	if (err)
@@ -2205,7 +2207,7 @@ void ext3_truncate(struct inode * inode)
 	 * From here we block out all ext3_get_block() callers who want to
 	 * modify the block allocation tree.
 	 */
-	down_write(&ei->truncate_sem);
+	down(&ei->truncate_sem);
 
 	if (n == 1) {		/* direct blocks */
 		ext3_free_data(handle, inode, NULL, i_data+offsets[0],
@@ -2269,7 +2271,7 @@ do_indirects:
 		case EXT3_TIND_BLOCK:
 			;
 	}
-	up_write(&ei->truncate_sem);
+	up(&ei->truncate_sem);
 	inode->i_mtime = inode->i_ctime = CURRENT_TIME;
 	ext3_mark_inode_dirty(handle, inode);
 
@@ -2679,6 +2681,7 @@ static int ext3_do_update_inode(handle_t *handle,
 			raw_inode->i_block[0] = 0;
 			raw_inode->i_block[1] =
 				cpu_to_le32(new_encode_dev(inode->i_rdev));
+			raw_inode->i_block[2] = 0;
 		}
 	} else for (block = 0; block < EXT3_N_BLOCKS; block++)
 		raw_inode->i_block[block] = ei->i_data[block];

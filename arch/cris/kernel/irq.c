@@ -22,6 +22,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/ptrace.h>
 
 #include <linux/kernel_stat.h>
@@ -70,11 +71,15 @@ probe_irq_on()
 	return 0;
 }
 
+EXPORT_SYMBOL(probe_irq_on);
+
 int
 probe_irq_off(unsigned long x)
 {
 	return 0;
 }
+
+EXPORT_SYMBOL(probe_irq_off);
 
 /*
  * Initial irq handlers.
@@ -253,6 +258,8 @@ int request_irq(unsigned int irq,
 		kfree(action);
 	return retval;
 }
+
+EXPORT_SYMBOL(request_irq);
 		
 void free_irq(unsigned int irq, void *dev_id)
 {
@@ -281,6 +288,8 @@ void free_irq(unsigned int irq, void *dev_id)
 	}
 	printk("Trying to free free IRQ%d\n",irq);
 }
+
+EXPORT_SYMBOL(free_irq);
 
 void weird_irq(void)
 {

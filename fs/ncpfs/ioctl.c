@@ -112,7 +112,7 @@ int ncp_ioctl(struct inode *inode, struct file *filp,
 				return -EINVAL;
 			}
 			/* TODO: info.addr = server->m.serv_addr; */
-			info.mounted_uid	= NEW_TO_OLD_UID(server->m.mounted_uid);
+			SET_UID(info.mounted_uid, server->m.mounted_uid);
 			info.connection		= server->connection;
 			info.buffer_size	= server->buffer_size;
 			info.volume_number	= NCP_FINFO(inode)->volNumber;
@@ -637,11 +637,13 @@ outrel:
 	/* NCP_IOC_GETMOUNTUID may be same as NCP_IOC_GETMOUNTUID2,
            so we have this out of switch */
 	if (cmd == NCP_IOC_GETMOUNTUID) {
+		__kernel_uid_t uid = 0;
 		if ((permission(inode, MAY_READ, NULL) != 0)
 		    && (current->uid != server->m.mounted_uid)) {
 			return -EACCES;
 		}
-		if (put_user(NEW_TO_OLD_UID(server->m.mounted_uid), (__kernel_uid_t *) arg))
+		SET_UID(uid, server->m.mounted_uid);
+		if (put_user(uid, (__kernel_uid_t *) arg))
 			return -EFAULT;
 		return 0;
 	}

@@ -23,10 +23,9 @@
  */
 
 #include <asm/bitops.h>
-#include <asm/ioctls.h>
+#include <asm/termios.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
-#include <linux/smp_lock.h>
 
 #include <linux/errno.h>
 #include <linux/fs.h>
@@ -55,7 +54,7 @@ static inline void presto_relock_other(struct inode *dir)
 {
         /* vfs_mkdir locks */
         //        down(&dir->i_zombie);
-        lock_kernel(); 
+        //lock_kernel(); 
 }
 
 static inline void presto_fulllock(struct inode *dir) 
@@ -64,13 +63,13 @@ static inline void presto_fulllock(struct inode *dir)
         down(&dir->i_sem);
         /* vfs_mkdir locks */
         //        down(&dir->i_zombie);
-        lock_kernel(); 
+        //lock_kernel(); 
 }
 
 static inline void presto_unlock(struct inode *dir) 
 {
         /* vfs_mkdir locks */
-        unlock_kernel(); 
+        //unlock_kernel(); 
         //        up(&dir->i_zombie);
         /* the lock from sys_mkdir / lookup_create */
         up(&dir->i_sem);

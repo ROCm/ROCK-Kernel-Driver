@@ -534,7 +534,7 @@ titan_ioremap(unsigned long addr, unsigned long size)
 			}
 			pfn >>= 1;	/* make it a true pfn */
 			
-			if (__alpha_remap_area_pages(VMALLOC_VMADDR(vaddr), 
+			if (__alpha_remap_area_pages(vaddr,
 						     pfn << PAGE_SHIFT, 
 						     PAGE_SIZE, 0)) {
 				printk("FAILED to map...\n");

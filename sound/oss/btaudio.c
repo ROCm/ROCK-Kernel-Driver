@@ -177,8 +177,11 @@ static int alloc_buffer(struct btaudio *bta)
 		bta->risc_size = PAGE_SIZE;
 		bta->risc_cpu = pci_alloc_consistent
 			(bta->pci, bta->risc_size, &bta->risc_dma);
-		if (NULL == bta->risc_cpu)
+		if (NULL == bta->risc_cpu) {
+			pci_free_consistent(bta->pci, bta->buf_size, bta->buf_cpu, bta->buf_dma);
+			bta->buf_cpu = NULL;
 			return -ENOMEM;
+		}
 	}
 	return 0;
 }

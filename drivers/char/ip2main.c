@@ -84,8 +84,6 @@
 /************/
 #include <linux/config.h>
 
-#include <linux/version.h>
-
 #include <linux/ctype.h>
 #include <linux/string.h>
 #include <linux/fcntl.h>

@@ -20,8 +20,6 @@
 
 #include <asm/uaccess.h>
 
-#define MAX_RAW_MINORS	256
-
 struct raw_device_data {
 	struct block_device *binding;
 	int inuse;

@@ -1,5 +1,5 @@
 /*
- * Version 2.9
+ * Version 2.11
  *
  * AMD 755/756/766/8111 and nVidia nForce IDE driver for Linux.
  *
@@ -65,7 +65,6 @@ static struct amd_ide_chip {
 };
 
 static struct amd_ide_chip *amd_config;
-static unsigned char amd_enabled;
 static unsigned int amd_80w;
 static unsigned int amd_clock;
 
@@ -103,7 +102,7 @@ static int amd74xx_get_info(char *buffer, char **addr, off_t offset, int count)
 
 	amd_print("----------AMD BusMastering IDE Configuration----------------");
 
-	amd_print("Driver Version:                     2.9");
+	amd_print("Driver Version:                     2.11");
 	amd_print("South Bridge:                       %s", pci_name(bmide_dev));
 
 	pci_read_config_byte(dev, PCI_REVISION_ID, &t);
@@ -250,9 +249,6 @@ static int amd_set_drive(ide_drive_t *drive, u8 speed)
 
 static void amd74xx_tune_drive(ide_drive_t *drive, u8 pio)
 {
-	if (!((amd_enabled >> HWIF(drive)->channel) & 1))
-		return;
-
 	if (pio == 255) {
 		amd_set_drive(drive, ide_find_best_mode(drive, XFER_PIO | XFER_EPIO));
 		return;
@@ -330,9 +326,6 @@ static unsigned int __init init_chipset_amd74xx(struct pci_dev *dev, const char 
 			break;
 	}
 
-	pci_read_config_dword(dev, AMD_IDE_ENABLE, &u);
-	amd_enabled = ((u & 1) ? 2 : 0) | ((u & 2) ? 1 : 0);
-
 /*
  * Take care of prefetch & postwrite.
  */
@@ -408,23 +401,13 @@ static void __init init_hwif_amd74xx(ide_hwif_t *hwif)
         hwif->mwdma_mask = 0x07;
         hwif->swdma_mask = 0x07;
 
-        if (!(hwif->udma_four))
-                hwif->udma_four = ((amd_enabled & amd_80w) >> hwif->channel) & 1;
+	if (!hwif->udma_four)
+		hwif->udma_four = (amd_80w >> hwif->channel) & 1;
         hwif->ide_dma_check = &amd74xx_ide_dma_check;
         if (!noautodma)
                 hwif->autodma = 1;
         hwif->drives[0].autodma = hwif->autodma;
         hwif->drives[1].autodma = hwif->autodma;
-}
-
-/*
- * We allow the BM-DMA driver only work on enabled interfaces.
- */
-
-static void __init init_dma_amd74xx(ide_hwif_t *hwif, unsigned long dmabase)
-{
-	if ((amd_enabled >> hwif->channel) & 1)
-		ide_setup_dma(hwif, dmabase, 8);
 }
 
 extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);

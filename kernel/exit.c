@@ -119,13 +119,13 @@ int session_of_pgrp(int pgrp)
 
 	read_lock(&tasklist_lock);
 	for_each_task_pid(pgrp, PIDTYPE_PGID, p, l, pid)
-		if (p->session > 0) {
-			sid = p->session;
+		if (process_session(p) > 0) {
+			sid = process_session(p);
 			goto out;
 		}
 	p = find_task_by_pid(pgrp);
 	if (p)
-		sid = p->session;
+		sid = process_session(p);
 out:
 	read_unlock(&tasklist_lock);
 	
@@ -153,7 +153,7 @@ static int will_become_orphaned_pgrp(int pgrp, task_t *ignored_task)
 				|| p->real_parent->pid == 1)
 			continue;
 		if (process_group(p->real_parent) != pgrp
-			    && p->real_parent->session == p->session) {
+			    && process_session(p->real_parent) == process_session(p)) {
 			ret = 0;
 			break;
 		}
@@ -242,14 +242,14 @@ void __set_special_pids(pid_t session, pid_t pgrp)
 {
 	struct task_struct *curr = current;
 
-	if (curr->session != session) {
+	if (process_session(curr) != session) {
 		detach_pid(curr, PIDTYPE_SID);
-		curr->session = session;
+		curr->signal->session = session;
 		attach_pid(curr, PIDTYPE_SID, session);
 	}
 	if (process_group(curr) != pgrp) {
 		detach_pid(curr, PIDTYPE_PGID);
-		curr->group_leader->__pgrp = pgrp;
+		curr->signal->pgrp = pgrp;
 		attach_pid(curr, PIDTYPE_PGID, pgrp);
 	}
 }
@@ -303,7 +303,7 @@ void daemonize(const char *name, ...)
 	exit_mm(current);
 
 	set_special_pids(1, 1);
-	current->tty = NULL;
+	current->signal->tty = NULL;
 
 	/* Block and flush all signals */
 	sigfillset(&blocked);
@@ -322,6 +322,8 @@ void daemonize(const char *name, ...)
 
 	reparent_to_init();
 }
+
+EXPORT_SYMBOL(daemonize);
 
 static inline void close_files(struct files_struct * files)
 {
@@ -418,6 +420,8 @@ void exit_fs(struct task_struct *tsk)
 	__exit_fs(tsk);
 }
 
+EXPORT_SYMBOL_GPL(exit_fs);
+
 /*
  * Turn us into a lazy TLB process if we
  * aren't already..
@@ -454,6 +458,8 @@ void exit_mm(struct task_struct *tsk)
 {
 	__exit_mm(tsk);
 }
+
+EXPORT_SYMBOL(exit_mm);
 
 static inline void choose_new_parent(task_t *p, task_t *reaper, task_t *child_reaper)
 {
@@ -509,7 +515,7 @@ static inline void reparent_thread(task_t *p, task_t *father, int traced)
 	 * outside, so the child pgrp is now orphaned.
 	 */
 	if ((process_group(p) != process_group(father)) &&
-	    (p->session == father->session)) {
+	    (process_session(p) == process_session(father))) {
 		int pgrp = process_group(p);
 
 		if (will_become_orphaned_pgrp(pgrp, NULL) && has_stopped_jobs(pgrp)) {
@@ -619,7 +625,7 @@ static void exit_notify(struct task_struct *tsk)
 	t = tsk->real_parent;
 	
 	if ((process_group(t) != process_group(tsk)) &&
-	    (t->session == tsk->session) &&
+	    (process_session(t) == process_session(tsk)) &&
 	    will_become_orphaned_pgrp(process_group(tsk), tsk) &&
 	    has_stopped_jobs(process_group(tsk))) {
 		__kill_pg_info(SIGHUP, (void *)1, process_group(tsk));
@@ -714,7 +720,7 @@ NORET_TYPE void do_exit(long code)
 	exit_itimers(tsk);
 	exit_thread();
 
-	if (tsk->leader)
+	if (process_session_leader(tsk))
 		disassociate_ctty(1);
 
 	module_put(tsk->thread_info->exec_domain->module);
@@ -741,6 +747,8 @@ NORET_TYPE void complete_and_exit(struct completion *comp, long code)
 	do_exit(code);
 }
 
+EXPORT_SYMBOL(complete_and_exit);
+
 asmlinkage long sys_exit(int error_code)
 {
 	do_exit((error_code&0xff)<<8);
@@ -764,6 +772,8 @@ task_t *next_thread(task_t *p)
 
 	return pid_task(tmp, PIDTYPE_TGID);
 }
+
+EXPORT_SYMBOL(next_thread);
 
 /*
  * Take down every thread in the group.  This is called by fatal signals

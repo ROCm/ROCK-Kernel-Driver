@@ -64,7 +64,6 @@
 #define FIRST_USER_PGD_NR	0
 
 #define VMALLOC_START		XKSEG
-#define VMALLOC_VMADDR(x)	((unsigned long)(x))
 #define VMALLOC_END	\
 	(VMALLOC_START + ((1 << PGD_ORDER) * PTRS_PER_PTE * PAGE_SIZE))
 

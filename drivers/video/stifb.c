@@ -1238,7 +1238,7 @@ stifb_init_fb(struct sti_struct *sti, int force_bpp)
 
 
 	/* get framebuffer physical and virtual base addr & len (64bit ready) */
-	fix->smem_start = fb->sti->regions_phys[1] | 0xffffffff00000000;
+	fix->smem_start = F_EXTEND(fb->sti->regions_phys[1]);
 	fix->smem_len = fb->sti->regions[1].region_desc.length * 4096;
 
 	fix->line_length = (fb->sti->glob_cfg->total_x * bpp) / 8;

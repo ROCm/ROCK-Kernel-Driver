@@ -865,7 +865,6 @@ static int tcic_init(struct pcmcia_socket *s)
 	pccard_mem_map mem = { 0, 0, 0, 0, 0, 0 };
 
 	mem.sys_stop = 0x1000;
-	tcic_set_socket(s, &dead_socket);
 	for (i = 0; i < 2; i++) {
 		io.map = i;
 		tcic_set_io_map(s, &io);

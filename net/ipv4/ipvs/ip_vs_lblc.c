@@ -458,10 +458,11 @@ __ip_vs_wlc_schedule(struct ip_vs_service *svc, struct iphdr *iph)
 	 * The server with weight=0 is quiesced and will not receive any
 	 * new connection.
 	 */
-	list_for_each_entry(least, &svc->destinations, n_list) {
-		if (least->flags & IP_VS_DEST_F_OVERLOAD)
+	list_for_each_entry(dest, &svc->destinations, n_list) {
+		if (dest->flags & IP_VS_DEST_F_OVERLOAD)
 			continue;
-		if (atomic_read(&least->weight) > 0) {
+		if (atomic_read(&dest->weight) > 0) {
+			least = dest;
 			loh = atomic_read(&least->activeconns) * 50
 				+ atomic_read(&least->inactconns);
 			goto nextstage;
@@ -473,7 +474,7 @@ __ip_vs_wlc_schedule(struct ip_vs_service *svc, struct iphdr *iph)
 	 *    Find the destination with the least load.
 	 */
   nextstage:
-	list_for_each_entry(dest, &svc->destinations, n_list) {
+	list_for_each_entry_continue(dest, &svc->destinations, n_list) {
 		if (dest->flags & IP_VS_DEST_F_OVERLOAD)
 			continue;
 
@@ -522,11 +523,12 @@ is_overloaded(struct ip_vs_dest *dest, struct ip_vs_service *svc)
  *    Locality-Based (weighted) Least-Connection scheduling
  */
 static struct ip_vs_dest *
-ip_vs_lblc_schedule(struct ip_vs_service *svc, struct iphdr *iph)
+ip_vs_lblc_schedule(struct ip_vs_service *svc, const struct sk_buff *skb)
 {
 	struct ip_vs_dest *dest;
 	struct ip_vs_lblc_table *tbl;
 	struct ip_vs_lblc_entry *en;
+	struct iphdr *iph = skb->nh.iph;
 
 	IP_VS_DBG(6, "ip_vs_lblc_schedule(): Scheduling...\n");
 

@@ -178,8 +178,7 @@ If you do not have the iso9660-filesystem in your boot kernel, you also have
 to load it before you can mount the CDROM:
                     insmod /lib/modules/X.X.X/fs/isofs.o
 The mount procedure works as described in 4. above.
-(In all commands 'X.X.X' is the current linux kernel version number. For details
-see file modules.txt in /usr/src/linux/Documentation)
+(In all commands 'X.X.X' is the current linux kernel version number)
 
 4.2 CDROM CONNECTED TO A SOUNDCARD
 Most soundcards do have a bus interface to the CDROM-drive. In many cases

@@ -357,10 +357,12 @@ static int budget_ci_detach (struct saa7146_dev* dev)
 static struct saa7146_extension budget_extension; 
 
 MAKE_BUDGET_INFO(ttbci,	"TT-Budget/WinTV-NOVA-CI PCI",	BUDGET_TT_HW_DISEQC);
+MAKE_BUDGET_INFO(ttbt2,	"TT-Budget/WinTV-NOVA-T  PCI",	BUDGET_TT);
 
 static struct pci_device_id pci_tbl[] = {
 	MAKE_EXTENSION_PCI(ttbci, 0x13c2, 0x100c),
 	MAKE_EXTENSION_PCI(ttbci, 0x13c2, 0x100f),
+	MAKE_EXTENSION_PCI(ttbt2,  0x13c2, 0x1011),
 	{
 		.vendor    = 0,
 	}
@@ -384,10 +386,7 @@ static struct saa7146_extension budget_extension = {
 
 static int __init budget_ci_init(void) 
 {
-	if (saa7146_register_extension(&budget_extension))
-		return -ENODEV;
-	
-	return 0;
+	return saa7146_register_extension(&budget_extension);
 }
 
 

@@ -7,6 +7,7 @@
 #define PAGE_MASK	(~(PAGE_SIZE-1))
 
 #ifdef __KERNEL__
+#include <linux/config.h>
 #ifndef __ASSEMBLY__
 
 #include <asm/cache.h>

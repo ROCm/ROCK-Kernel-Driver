@@ -41,6 +41,7 @@
 #include <linux/irq.h>
 #include <linux/acpi.h>
 #include <linux/efi.h>
+#include <linux/mmzone.h>
 #include <asm/io.h>
 #include <asm/iosapic.h>
 #include <asm/machvec.h>
@@ -56,7 +57,7 @@ void (*pm_power_off) (void);
 
 unsigned char acpi_kbd_controller_present = 1;
 
-int acpi_disabled __initdata;	/* XXX this shouldn't be needed---we can't boot without ACPI! */
+int acpi_disabled;	/* XXX this shouldn't be needed---we can't boot without ACPI! */
 
 const char *
 acpi_get_sysname (void)
@@ -341,7 +342,7 @@ static u32 __initdata pxm_flag[PXM_FLAG_LEN];
 #define pxm_bit_test(bit)	(test_bit(bit,(void *)pxm_flag))
 /* maps to convert between proximity domain and logical node ID */
 int __initdata pxm_to_nid_map[MAX_PXM_DOMAINS];
-int __initdata nid_to_pxm_map[NR_NODES];
+int __initdata nid_to_pxm_map[MAX_NUMNODES];
 static struct acpi_table_slit __initdata *slit_table;
 
 /*

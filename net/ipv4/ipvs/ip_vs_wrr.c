@@ -58,26 +58,18 @@ static int ip_vs_wrr_gcd_weight(struct ip_vs_service *svc)
 {
 	struct ip_vs_dest *dest;
 	int weight;
-	int g = 1;
+	int g = 0;
 
 	list_for_each_entry(dest, &svc->destinations, n_list) {
 		weight = atomic_read(&dest->weight);
 		if (weight > 0) {
-			g = weight;
-			goto search_gcd;
+			if (g > 0)
+				g = gcd(weight, g);
+			else
+				g = weight;
 		}
 	}
-
-	return g;
-
- search_gcd:
-	list_for_each_entry(dest, &svc->destinations, n_list) {
-		weight = atomic_read(&dest->weight);
-		if (weight > 0)
-			g = gcd(weight, g);
-	}
-
-	return g;
+	return g ? g : 1;
 }
 
 
@@ -146,7 +138,7 @@ static int ip_vs_wrr_update_svc(struct ip_vs_service *svc)
  *    Weighted Round-Robin Scheduling
  */
 static struct ip_vs_dest *
-ip_vs_wrr_schedule(struct ip_vs_service *svc, struct iphdr *iph)
+ip_vs_wrr_schedule(struct ip_vs_service *svc, const struct sk_buff *skb)
 {
 	struct ip_vs_dest *dest;
 	struct ip_vs_wrr_mark *mark = svc->sched_data;

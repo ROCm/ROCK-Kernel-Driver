@@ -25,8 +25,6 @@
 #ifndef _PARISC_KEYBOARD_H
 #define _PARISC_KEYBOARD_H
 
-#include <linux/config.h>
-
 #ifdef __KERNEL__
 
 #include <linux/kernel.h>

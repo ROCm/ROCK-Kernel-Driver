@@ -164,9 +164,10 @@ extern __inline__ int test_bit(int nr, const volatile unsigned long * vaddr)
 	return ((1UL << (nr & 31)) & (((const volatile unsigned long *) vaddr)[nr >> 5])) != 0;
 }
 
-extern __inline__ int find_first_zero_bit(unsigned long * vaddr, unsigned size)
+extern __inline__ int find_first_zero_bit(const unsigned long *vaddr,
+					  unsigned size)
 {
-	unsigned long *p = vaddr, *addr = vaddr;
+	const unsigned long *p = vaddr, *addr = vaddr;
 	unsigned long allones = ~0UL;
 	int res;
 	unsigned long num;
@@ -187,11 +188,11 @@ extern __inline__ int find_first_zero_bit(unsigned long * vaddr, unsigned size)
 	return ((p - addr) << 5) + (res ^ 31);
 }
 
-extern __inline__ int find_next_zero_bit (unsigned long *vaddr, int size,
+extern __inline__ int find_next_zero_bit (const unsigned long *vaddr, int size,
 				      int offset)
 {
-	unsigned long *addr = vaddr;
-	unsigned long *p = addr + (offset >> 5);
+	const unsigned long *addr = vaddr;
+	const unsigned long *p = addr + (offset >> 5);
 	int set = 0, bit = offset & 31UL, res;
 
 	if (offset >= size)
@@ -263,7 +264,7 @@ static inline int fls(int x)
  * unlikely to be set. It's guaranteed that at least one of the 140
  * bits is cleared.
  */
-static inline int sched_find_first_bit(unsigned long *b)
+static inline int sched_find_first_bit(const unsigned long *b)
 {
 	if (unlikely(b[0]))
 		return __ffs(b[0]);

@@ -595,7 +595,7 @@ ENTRY(page_fault)
 #ifdef CONFIG_X86_MCE
 ENTRY(machine_check)
 	pushl $0
-	pushl $do_machine_check
+	pushl machine_check_vector
 	jmp error_code
 #endif
 
@@ -879,5 +879,6 @@ ENTRY(sys_call_table)
 	.long sys_tgkill	/* 270 */
 	.long sys_utimes
  	.long sys_fadvise64_64
+	.long sys_ni_syscall	/* sys_vserver */
 
 nr_syscalls=(.-sys_call_table)/4

@@ -32,7 +32,7 @@
 #include <asm/io.h>
 #include <acpi/acpi_bus.h>
 #include <acpi/acpi_drivers.h>
-
+#include <acpi/actypes.h>
 
 #define _COMPONENT		ACPI_EC_COMPONENT
 ACPI_MODULE_NAME		("acpi_ec")
@@ -412,7 +412,10 @@ acpi_ec_space_setup (
 	 * The EC object is in the handler context and is needed
 	 * when calling the acpi_ec_space_handler.
 	 */
-	*return_context = handler_context;
+	if(function == ACPI_REGION_DEACTIVATE) 
+		*return_context = NULL;
+	else 
+		*return_context = handler_context;
 
 	return AE_OK;
 }

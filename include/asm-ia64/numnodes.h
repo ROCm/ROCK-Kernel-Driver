@@ -1,7 +1,12 @@
 #ifndef _ASM_MAX_NUMNODES_H
 #define _ASM_MAX_NUMNODES_H
 
-#include <asm/mmzone.h>
-#define MAX_NUMNODES	NR_NODES
+#ifdef CONFIG_IA64_DIG
+/* Max 8 Nodes */
+#define NODES_SHIFT	3
+#elif defined(CONFIG_IA64_SGI_SN2)
+/* Max 128 Nodes */
+#define NODES_SHIFT	7
+#endif
 
 #endif /* _ASM_MAX_NUMNODES_H */

@@ -35,7 +35,7 @@ MODULE_DESCRIPTION("v4l2 driver module for saa7130/34 based TV cards");
 MODULE_AUTHOR("Gerd Knorr <kraxel@bytesex.org> [SuSE Labs]");
 MODULE_LICENSE("GPL");
 
-#define SAA7134_MAXBOARDS 4
+#define SAA7134_MAXBOARDS 8
 
 /* ------------------------------------------------------------------ */
 
@@ -51,32 +51,32 @@ static unsigned int gpio_tracking = 0;
 MODULE_PARM(gpio_tracking,"i");
 MODULE_PARM_DESC(gpio_tracking,"enable debug messages [gpio]");
 
-static unsigned int video_nr = -1;
-MODULE_PARM(video_nr,"i");
+static unsigned int video_nr[] = {[0 ... (SAA7134_MAXBOARDS - 1)] = UNSET };
+MODULE_PARM(video_nr,"1-" __stringify(SAA7134_MAXBOARDS) "i");
 MODULE_PARM_DESC(video_nr,"video device number");
 
-static unsigned int ts_nr = -1;
-MODULE_PARM(ts_nr,"i");
+static unsigned int ts_nr[] = {[0 ... (SAA7134_MAXBOARDS - 1)] = UNSET };
+MODULE_PARM(ts_nr,"1-" __stringify(SAA7134_MAXBOARDS) "i");
 MODULE_PARM_DESC(ts_nr,"ts device number");
 
-static unsigned int vbi_nr = -1;
-MODULE_PARM(vbi_nr,"i");
+static unsigned int vbi_nr[] = {[0 ... (SAA7134_MAXBOARDS - 1)] = UNSET };
+MODULE_PARM(vbi_nr,"1-" __stringify(SAA7134_MAXBOARDS) "i");
 MODULE_PARM_DESC(vbi_nr,"vbi device number");
 
-static unsigned int radio_nr = -1;
-MODULE_PARM(radio_nr,"i");
+static unsigned int radio_nr[] = {[0 ... (SAA7134_MAXBOARDS - 1)] = UNSET };
+MODULE_PARM(radio_nr,"1-" __stringify(SAA7134_MAXBOARDS) "i");
 MODULE_PARM_DESC(radio_nr,"radio device number");
 
 static unsigned int oss = 0;
 MODULE_PARM(oss,"i");
 MODULE_PARM_DESC(oss,"register oss devices (default: no)");
 
-static unsigned int dsp_nr = -1;
-MODULE_PARM(dsp_nr,"i");
+static unsigned int dsp_nr[] = {[0 ... (SAA7134_MAXBOARDS - 1)] = UNSET };
+MODULE_PARM(dsp_nr,"1-" __stringify(SAA7134_MAXBOARDS) "i");
 MODULE_PARM_DESC(dsp_nr,"oss dsp device number");
 
-static unsigned int mixer_nr = -1;
-MODULE_PARM(mixer_nr,"i");
+static unsigned int mixer_nr[] = {[0 ... (SAA7134_MAXBOARDS - 1)] = UNSET };
+MODULE_PARM(mixer_nr,"1-" __stringify(SAA7134_MAXBOARDS) "i");
 MODULE_PARM_DESC(mixer_nr,"oss mixer device number");
 
 static unsigned int tuner[] = {[0 ... (SAA7134_MAXBOARDS - 1)] = UNSET };
@@ -529,7 +529,8 @@ int saa7134_set_dmabits(struct saa7134_dev *dev)
 static char *irqbits[] = {
 	"DONE_RA0", "DONE_RA1", "DONE_RA2", "DONE_RA3",
 	"AR", "PE", "PWR_ON", "RDCAP", "INTL", "FIDT", "MMC",
-	"TRIG_ERR", "CONF_ERR", "LOAD_ERR"
+	"TRIG_ERR", "CONF_ERR", "LOAD_ERR",
+	"GPIO16?", "GPIO18", "GPIO22", "GPIO23"
 };
 #define IRQBITS ARRAY_SIZE(irqbits)
 
@@ -598,6 +599,13 @@ static irqreturn_t saa7134_irq(int irq, void *dev_id, struct pt_regs *regs)
 		if ((report & SAA7134_IRQ_REPORT_DONE_RA3))
 			saa7134_irq_oss_done(dev,status);
 
+#ifdef CONFIG_VIDEO_IR
+		if ((report & (SAA7134_IRQ_REPORT_GPIO16 |
+			       SAA7134_IRQ_REPORT_GPIO18)) &&
+		    dev->remote)
+			saa7134_input_irq(dev);
+#endif
+
 	};
 	if (10 == loop) {
 		print_irqstatus(dev,loop,report,status);
@@ -613,23 +621,30 @@ static irqreturn_t saa7134_irq(int irq, void *dev_id, struct pt_regs *regs)
 
 /* ------------------------------------------------------------------ */
 
-static int saa7134_hwinit(struct saa7134_dev *dev)
+/* early init (no i2c, no irq) */
+static int saa7134_hwinit1(struct saa7134_dev *dev)
 {
+	dprintk("hwinit1\n");
+
+	saa_writel(SAA7134_IRQ1, 0);
+	saa_writel(SAA7134_IRQ2, 0);
         init_MUTEX(&dev->lock);
 	dev->slock = SPIN_LOCK_UNLOCKED;
 
 	saa7134_track_gpio(dev,"pre-init");
-	saa7134_tvaudio_init(dev);
-	saa7134_video_init(dev);
-	saa7134_vbi_init(dev);
+	saa7134_video_init1(dev);
+	saa7134_vbi_init1(dev);
 	if (card_has_ts(dev))
-		saa7134_ts_init(dev);
+		saa7134_ts_init1(dev);
+#ifdef CONFIG_VIDEO_IR
+	saa7134_input_init1(dev);
+#endif
 
 	switch (dev->pci->device) {
 	case PCI_DEVICE_ID_PHILIPS_SAA7134:
 	case PCI_DEVICE_ID_PHILIPS_SAA7133:
 	case PCI_DEVICE_ID_PHILIPS_SAA7135:
-		saa7134_oss_init(dev);
+		saa7134_oss_init1(dev);
 		break;
 	}
 	
@@ -648,26 +663,63 @@ static int saa7134_hwinit(struct saa7134_dev *dev)
 		   SAA7134_MAIN_CTRL_EBADC |
 		   SAA7134_MAIN_CTRL_EBDAC);
 
-	/* IRQ's */
-	saa_writel(SAA7134_IRQ1, 0);
-	saa_writel(SAA7134_IRQ2,
-		   SAA7134_IRQ2_INTE_SC2  |
-		   SAA7134_IRQ2_INTE_SC1  |
-		   SAA7134_IRQ2_INTE_SC0  |
-		   /* SAA7134_IRQ2_INTE_DEC5 |  FIXME: TRIG_ERR ??? */
-		   SAA7134_IRQ2_INTE_DEC3 |
-		   SAA7134_IRQ2_INTE_DEC2 |
-		   /* SAA7134_IRQ2_INTE_DEC1 | */
-		   SAA7134_IRQ2_INTE_DEC0 |
-		   SAA7134_IRQ2_INTE_PE |
-		   SAA7134_IRQ2_INTE_AR);
-
 	/* enable peripheral devices */
 	saa_writeb(SAA7134_SPECIAL_MODE, 0x01);
 
 	/* set vertical line numbering start (vbi needs this) */
 	saa_writeb(SAA7134_SOURCE_TIMING2, 0x20);
 	
+	return 0;
+}
+
+/* late init (with i2c + irq) */
+static int saa7134_hwinit2(struct saa7134_dev *dev)
+{
+	dprintk("hwinit2\n");
+
+	saa7134_video_init2(dev);
+	saa7134_tvaudio_init2(dev);
+
+	/* enable IRQ's */
+	saa_writel(SAA7134_IRQ1, 0);
+	saa_writel(SAA7134_IRQ2,
+		   SAA7134_IRQ2_INTE_GPIO18  |
+		   SAA7134_IRQ2_INTE_GPIO18A |
+		   SAA7134_IRQ2_INTE_GPIO16  |
+		   SAA7134_IRQ2_INTE_SC2     |
+		   SAA7134_IRQ2_INTE_SC1     |
+		   SAA7134_IRQ2_INTE_SC0     |
+		   /* SAA7134_IRQ2_INTE_DEC5    |  FIXME: TRIG_ERR ??? */
+		   SAA7134_IRQ2_INTE_DEC3    |
+		   SAA7134_IRQ2_INTE_DEC2    |
+		   /* SAA7134_IRQ2_INTE_DEC1    | */
+		   SAA7134_IRQ2_INTE_DEC0    |
+		   SAA7134_IRQ2_INTE_PE      |
+		   SAA7134_IRQ2_INTE_AR);
+
+	return 0;
+}
+
+/* shutdown */
+static int saa7134_hwfini(struct saa7134_dev *dev)
+{
+	dprintk("hwfini\n");
+
+	switch (dev->pci->device) {
+	case PCI_DEVICE_ID_PHILIPS_SAA7134:
+	case PCI_DEVICE_ID_PHILIPS_SAA7133:
+	case PCI_DEVICE_ID_PHILIPS_SAA7135:
+		saa7134_oss_fini(dev);
+		break;
+	}
+	if (card_has_ts(dev))
+		saa7134_ts_fini(dev);
+#ifdef CONFIG_VIDEO_IR
+	saa7134_input_fini(dev);
+#endif
+	saa7134_vbi_fini(dev);
+	saa7134_video_fini(dev);
+	saa7134_tvaudio_fini(dev);
 	return 0;
 }
 
@@ -698,6 +750,56 @@ static void __devinit must_configure_manually(void)
 	}
 }
 
+static struct video_device *vdev_init(struct saa7134_dev *dev,
+				      struct video_device *template,
+				      char *type)
+{
+	struct video_device *vfd;
+	
+	vfd = video_device_alloc();
+	if (NULL == vfd)
+		return NULL;
+	*vfd = *template;
+	vfd->minor   = -1;
+	vfd->dev     = &dev->pci->dev;
+	vfd->release = video_device_release;
+	snprintf(vfd->name, sizeof(vfd->name), "%s %s (%s)",
+		 dev->name, type, saa7134_boards[dev->board].name);
+	return vfd;
+}
+
+static void saa7134_unregister_video(struct saa7134_dev *dev)
+{
+	if (dev->video_dev) {
+		if (-1 != dev->video_dev->minor)
+			video_unregister_device(dev->video_dev);
+		else
+			video_device_release(dev->video_dev);
+		dev->video_dev = NULL;
+	}
+	if (dev->ts_dev) {
+		if (-1 != dev->ts_dev->minor)
+			video_unregister_device(dev->ts_dev);
+		else
+			video_device_release(dev->ts_dev);
+		dev->ts_dev = NULL;
+	}
+	if (dev->vbi_dev) {
+		if (-1 != dev->vbi_dev->minor)
+			video_unregister_device(dev->vbi_dev);
+		else
+			video_device_release(dev->vbi_dev);
+		dev->vbi_dev = NULL;
+	}
+	if (dev->radio_dev) {
+		if (-1 != dev->radio_dev->minor)
+			video_unregister_device(dev->radio_dev);
+		else
+			video_device_release(dev->radio_dev);
+		dev->radio_dev = NULL;
+	}
+}
+
 static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 				     const struct pci_device_id *pci_id)
 {
@@ -705,10 +807,8 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 	int err;
 
 	dev = kmalloc(sizeof(*dev),GFP_KERNEL);
-	if (NULL == dev) {
-		err = -ENOMEM;
-		goto fail0;
-	}
+	if (NULL == dev)
+		return -ENOMEM;
 	memset(dev,0,sizeof(*dev));
 
 	/* pci init */
@@ -785,19 +885,17 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 		goto fail1;
 	}
 	dev->lmmio = ioremap(pci_resource_start(pci_dev,0), 0x1000);
-	if (!dev->lmmio) {
-		printk(KERN_ERR "Unable to remap memory.\n");
-		err = -ENOMEM;
+	dev->bmmio = (__u8*)dev->lmmio;
+	if (NULL == dev->lmmio) {
+		err = -EIO;
+		printk(KERN_ERR "%s: can't ioremap() MMIO memory\n",
+		       dev->name);
 		goto fail2;
 	}
-	dev->bmmio = (__u8*)dev->lmmio;
 
-	/* register i2c bus */
-	saa7134_i2c_register(dev);
-
-	/* initialize hardware */
+	/* initialize hardware #1 */
 	saa7134_board_init(dev);
-	saa7134_hwinit(dev);
+	saa7134_hwinit1(dev);
 
 	/* get irq */
 	err = request_irq(pci_dev->irq, saa7134_irq,
@@ -808,53 +906,63 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 		goto fail3;
 	}
 
+	/* wait a bit, register i2c bus */
+	current->state = TASK_INTERRUPTIBLE;
+	schedule_timeout(HZ/10);
+	saa7134_i2c_register(dev);
+
+	/* initialize hardware #2 */
+	saa7134_hwinit2(dev);
+
 	/* load i2c helpers */
 	if (TUNER_ABSENT != dev->tuner_type)
 		request_module("tuner");
 	if (saa7134_boards[dev->board].need_tda9887)
 		request_module("tda9887");
+  	if (card_has_ts(dev))
+		request_module("saa6752hs");
 
 	/* register v4l devices */
-	dev->video_dev = saa7134_video_template;
-	dev->video_dev.priv = dev;
-	err = video_register_device(&dev->video_dev,VFL_TYPE_GRABBER,video_nr);
+	dev->video_dev = vdev_init(dev,&saa7134_video_template,"video");
+	err = video_register_device(dev->video_dev,VFL_TYPE_GRABBER,
+				    video_nr[saa7134_devcount]);
 	if (err < 0) {
 		printk(KERN_INFO "%s: can't register video device\n",
 		       dev->name);
 		goto fail4;
 	}
 	printk(KERN_INFO "%s: registered device video%d [v4l2]\n",
-	       dev->name,dev->video_dev.minor & 0x1f);
+	       dev->name,dev->video_dev->minor & 0x1f);
 
-	dev->ts_dev = saa7134_ts_template;
-	dev->ts_dev.priv = dev;
 	if (card_has_ts(dev)) {
-		err = video_register_device(&dev->ts_dev,VFL_TYPE_GRABBER,ts_nr);
+		dev->ts_dev = vdev_init(dev,&saa7134_ts_template,"ts");
+		err = video_register_device(dev->ts_dev,VFL_TYPE_GRABBER,
+					    ts_nr[saa7134_devcount]);
 		if (err < 0) {
 			printk(KERN_INFO "%s: can't register video device\n",
 			       dev->name);
-			goto fail5;
+			goto fail4;
 		}
 		printk(KERN_INFO "%s: registered device video%d [ts]\n",
-		       dev->name,dev->ts_dev.minor & 0x1f);
+		       dev->name,dev->ts_dev->minor & 0x1f);
 	}
 	
-	dev->vbi_dev = saa7134_vbi_template;
-	dev->vbi_dev.priv = dev;
-	err = video_register_device(&dev->vbi_dev,VFL_TYPE_VBI,vbi_nr);
+	dev->vbi_dev = vdev_init(dev,&saa7134_vbi_template,"vbi");
+	err = video_register_device(dev->vbi_dev,VFL_TYPE_VBI,
+				    vbi_nr[saa7134_devcount]);
 	if (err < 0)
-		goto fail6;
+		goto fail4;
 	printk(KERN_INFO "%s: registered device vbi%d\n",
-	       dev->name,dev->vbi_dev.minor & 0x1f);
+	       dev->name,dev->vbi_dev->minor & 0x1f);
 
-	dev->radio_dev = saa7134_radio_template;
-	dev->radio_dev.priv = dev;
 	if (card_has_radio(dev)) {
-		err = video_register_device(&dev->radio_dev,VFL_TYPE_RADIO,radio_nr);
+		dev->radio_dev = vdev_init(dev,&saa7134_radio_template,"radio");
+		err = video_register_device(dev->radio_dev,VFL_TYPE_RADIO,
+					    radio_nr[saa7134_devcount]);
 		if (err < 0)
-			goto fail7;
+			goto fail4;
 		printk(KERN_INFO "%s: registered device radio%d\n",
-		       dev->name,dev->radio_dev.minor & 0x1f);
+		       dev->name,dev->radio_dev->minor & 0x1f);
 	}
 
 	/* register oss devices */
@@ -864,17 +972,19 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 	case PCI_DEVICE_ID_PHILIPS_SAA7135:
 		if (oss) {
 			err = dev->oss.minor_dsp =
-				register_sound_dsp(&saa7134_dsp_fops,dsp_nr);
+				register_sound_dsp(&saa7134_dsp_fops,
+						   dsp_nr[saa7134_devcount]);
 			if (err < 0) {
-				goto fail8;
+				goto fail4;
 			}
 			printk(KERN_INFO "%s: registered device dsp%d\n",
 			       dev->name,dev->oss.minor_dsp >> 4);
 			
 			err = dev->oss.minor_mixer =
-				register_sound_mixer(&saa7134_mixer_fops,mixer_nr);
+				register_sound_mixer(&saa7134_mixer_fops,
+						     mixer_nr[saa7134_devcount]);
 			if (err < 0)
-				goto fail9;
+				goto fail5;
 			printk(KERN_INFO "%s: registered device mixer%d\n",
 			       dev->name,dev->oss.minor_mixer >> 4);
 		}
@@ -887,7 +997,7 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 	saa7134_devcount++;
 	return 0;
 
- fail9:
+ fail5:
 	switch (dev->pci->device) {
 	case PCI_DEVICE_ID_PHILIPS_SAA7134:
 	case PCI_DEVICE_ID_PHILIPS_SAA7133:
@@ -896,39 +1006,18 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 			unregister_sound_dsp(dev->oss.minor_dsp);
 		break;
 	}
- fail8:
-	if (card_has_radio(dev))
-		video_unregister_device(&dev->radio_dev);
- fail7:
-	video_unregister_device(&dev->vbi_dev);
- fail6:
- 	if (card_has_ts(dev))
-  		video_unregister_device(&dev->ts_dev);
- fail5:
-	video_unregister_device(&dev->video_dev);
  fail4:
+	saa7134_unregister_video(dev);
+	saa7134_i2c_unregister(dev);
 	free_irq(pci_dev->irq, dev);
  fail3:
-	switch (dev->pci->device) {
-	case PCI_DEVICE_ID_PHILIPS_SAA7134:
-	case PCI_DEVICE_ID_PHILIPS_SAA7133:
-	case PCI_DEVICE_ID_PHILIPS_SAA7135:
-		saa7134_oss_fini(dev);
-		break;
-	}
-	if (card_has_ts(dev))
-		saa7134_ts_fini(dev);
-	saa7134_vbi_fini(dev);
-	saa7134_video_fini(dev);
-	saa7134_tvaudio_fini(dev);
-	iounmap (dev->lmmio);
-	saa7134_i2c_unregister(dev);
+	saa7134_hwfini(dev);
+	iounmap(dev->lmmio);
  fail2:
 	release_mem_region(pci_resource_start(pci_dev,0),
 			   pci_resource_len(pci_dev,0));
  fail1:
 	kfree(dev);
- fail0:
 	return err;
 }
 
@@ -964,12 +1053,6 @@ static void __devexit saa7134_finidev(struct pci_dev *pci_dev)
 	saa7134_vbi_fini(dev);
 	saa7134_video_fini(dev);
 	saa7134_tvaudio_fini(dev);
-	iounmap(dev->lmmio);
-
-	/* release ressources */
-	free_irq(pci_dev->irq, dev);
-	release_mem_region(pci_resource_start(pci_dev,0),
-			   pci_resource_len(pci_dev,0));
 
 	/* unregister */
 	saa7134_i2c_unregister(dev);
@@ -983,17 +1066,18 @@ static void __devexit saa7134_finidev(struct pci_dev *pci_dev)
 		}
 		break;
 	}
-	if (card_has_radio(dev))
-		video_unregister_device(&dev->radio_dev);
-	video_unregister_device(&dev->vbi_dev);
-	if (card_has_ts(dev))
-		video_unregister_device(&dev->ts_dev);
-	video_unregister_device(&dev->video_dev);
-	pci_set_drvdata(pci_dev, NULL);
-#if 0
-	/* causes some trouble when reinserting the driver ... */
+	saa7134_unregister_video(dev);
+
+	/* release ressources */
+	free_irq(pci_dev->irq, dev);
+	iounmap(dev->lmmio);
+	release_mem_region(pci_resource_start(pci_dev,0),
+			   pci_resource_len(pci_dev,0));
+
+#if 0  /* causes some trouble when reinserting the driver ... */
 	pci_disable_device(pci_dev);
 #endif
+	pci_set_drvdata(pci_dev, NULL);
 
 	/* free memory */
 	list_del(&dev->devlist);

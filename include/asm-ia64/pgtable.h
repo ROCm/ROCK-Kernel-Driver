@@ -207,7 +207,6 @@ ia64_phys_addr_valid (unsigned long addr)
 #define RGN_KERNEL	7
 
 #define VMALLOC_START		0xa000000200000000
-#define VMALLOC_VMADDR(x)	((unsigned long)(x))
 #ifdef CONFIG_VIRTUAL_MEM_MAP
 # define VMALLOC_END_INIT	(0xa000000000000000 + (1UL << (4*PAGE_SHIFT - 9)))
 # define VMALLOC_END		vmalloc_end

@@ -17,6 +17,7 @@
  */
 
 #include <linux/mm.h>
+#include <linux/module.h>
 #include <linux/swap.h>
 #include <linux/bio.h>
 #include <linux/pagemap.h>
@@ -24,6 +25,7 @@
 #include <linux/blkdev.h>
 #include <linux/init.h>
 #include <linux/hash.h>
+#include <linux/highmem.h>
 #include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
 
@@ -62,7 +64,7 @@ static void flush_all_zero_pkmaps(void)
 {
 	int i;
 
-	flush_cache_all();
+	flush_cache_kmaps();
 
 	for (i = 0; i < LAST_PKMAP; i++) {
 		struct page *page;
@@ -166,6 +168,8 @@ void *kmap_high(struct page *page)
 	return (void*) vaddr;
 }
 
+EXPORT_SYMBOL(kmap_high);
+
 void kunmap_high(struct page *page)
 {
 	unsigned long vaddr;
@@ -205,6 +209,8 @@ void kunmap_high(struct page *page)
 	if (need_wakeup)
 		wake_up(&pkmap_map_wait);
 }
+
+EXPORT_SYMBOL(kunmap_high);
 
 #define POOL_SIZE	64
 
@@ -472,6 +478,8 @@ void blk_queue_bounce(request_queue_t *q, struct bio **bio_orig)
 	__blk_queue_bounce(q, bio_orig, pool);
 }
 
+EXPORT_SYMBOL(blk_queue_bounce);
+
 #if defined(HASHED_PAGE_VIRTUAL)
 
 #define PA_HASH_ORDER	7
@@ -530,6 +538,8 @@ done:
 	spin_unlock_irqrestore(&pas->lock, flags);
 	return ret;
 }
+
+EXPORT_SYMBOL(page_address);
 
 void set_page_address(struct page *page, void *virtual)
 {

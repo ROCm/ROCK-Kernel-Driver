@@ -9,7 +9,14 @@
  */
 #include <linux/linkage.h>
 #include <asm/assembler.h>
-#include <asm/hardware.h>
+
+		.macro	pack, rd, hw1, hw2
+#ifndef __ARMEB__
+		orr	\rd, \hw1, \hw2, lsl #16
+#else
+		orr	\rd, \hw2, \hw1, lsl #16
+#endif
+		.endm
 
 .insw_bad_alignment:
 		adr	r0, .insw_bad_align_msg
@@ -41,19 +48,19 @@ ENTRY(__raw_readsw)
 
 .insw_8_lp:	ldrh	r3, [r0]
 		ldrh	r4, [r0]
-		orr	r3, r3, r4, lsl #16
+		pack	r3, r3, r4
 
 		ldrh	r4, [r0]
 		ldrh	r5, [r0]
-		orr	r4, r4, r5, lsl #16
+		pack	r4, r4, r5
 
 		ldrh	r5, [r0]
 		ldrh	ip, [r0]
-		orr	r5, r5, ip, lsl #16
+		pack	r5, r5, ip
 
 		ldrh	ip, [r0]
 		ldrh	lr, [r0]
-		orr	ip, ip, lr, lsl #16
+		pack	ip, ip, lr
 
 		stmia	r1!, {r3 - r5, ip}
 
@@ -68,11 +75,11 @@ ENTRY(__raw_readsw)
 
 		ldrh	r3, [r0]
 		ldrh	r4, [r0]
-		orr	r3, r3, r4, lsl #16
+		pack	r3, r3, r4
 
 		ldrh	r4, [r0]
 		ldrh	ip, [r0]
-		orr	r4, r4, ip, lsl #16
+		pack	r4, r4, ip
 
 		stmia	r1!, {r3, r4}
 
@@ -81,7 +88,7 @@ ENTRY(__raw_readsw)
 
 		ldrh	r3, [r0]
 		ldrh	ip, [r0]
-		orr	r3, r3, ip, lsl #16
+		pack	r3, r3, ip
 
 		str	r3, [r1], #4
 

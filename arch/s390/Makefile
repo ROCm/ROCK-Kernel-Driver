@@ -48,20 +48,18 @@ libs-y		+= arch/$(ARCH)/lib/
 drivers-y	+= drivers/s390/
 drivers-$(CONFIG_MATHEMU) += arch/$(ARCH)/math-emu/
 
+boot		:= arch/$(ARCH)/boot
 
-makeboot =$(Q)$(MAKE) -f scripts/Makefile.build obj=arch/$(ARCH)/boot $(1)
-
-all: image listing
-
-listing image: vmlinux
-	$(call makeboot,arch/$(ARCH)/boot/$@)
+all: image
 
 install: vmlinux
-	$(call makeboot, $@)
+	$(Q)$(MAKE) $(build)=$(boot) $@
+
+image: vmlinux
+	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
 
 archclean:
-	$(Q)$(MAKE) -f scripts/Makefile.clean obj=arch/$(ARCH)/boot
-
+	$(Q)$(MAKE) $(clean)=$(boot)
 
 prepare: include/asm-$(ARCH)/offsets.h
 

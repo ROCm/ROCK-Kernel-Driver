@@ -228,8 +228,8 @@ out:
 }
 
 static void
-copy_verf(struct nfs4_client *target, nfs4_verifier source) {
-	memcpy(&target->cl_verifier, source, sizeof(nfs4_verifier));
+copy_verf(struct nfs4_client *target, nfs4_verifier *source) {
+	memcpy(target->cl_verifier.data, source->data, sizeof(target->cl_verifier.data));
 }
 
 static void
@@ -256,8 +256,8 @@ cmp_name(struct xdr_netobj *n1, struct xdr_netobj *n2) {
 }
 
 static int
-cmp_verf(nfs4_verifier v1, nfs4_verifier v2) {
-	return(!memcmp(v1,v2,sizeof(nfs4_verifier)));
+cmp_verf(nfs4_verifier *v1, nfs4_verifier *v2) {
+	return(!memcmp(v1->data,v2->data,sizeof(v1->data)));
 }
 
 static int
@@ -286,7 +286,7 @@ gen_confirm(struct nfs4_client *clp) {
 	u32 *			p;
 
 	tv = CURRENT_TIME;
-	p = (u32 *)clp->cl_confirm;
+	p = (u32 *)clp->cl_confirm.data;
 	*p++ = tv.tv_sec;
 	*p++ = tv.tv_nsec;
 }
@@ -371,7 +371,7 @@ nfsd4_setclientid(struct svc_rqst *rqstp, struct nfsd4_setclientid *setclid)
 		.len = setclid->se_namelen,
 		.data = setclid->se_name,
 	};
-	char *			clverifier = setclid->se_verf;
+	nfs4_verifier		clverifier = setclid->se_verf;
 	unsigned int 		strhashval;
 	struct nfs4_client *	conf, * unconf, * new, * clp;
 	int 			status;
@@ -439,13 +439,13 @@ nfsd4_setclientid(struct svc_rqst *rqstp, struct nfsd4_setclientid *setclid)
 			expire_client(unconf);
 		if (!(new = create_client(clname)))
 			goto out;
-		copy_verf(new,clverifier);
+		copy_verf(new, &clverifier);
 		new->cl_addr = ip_addr;
 		copy_cred(&new->cl_cred,&rqstp->rq_cred);
 		gen_clid(new);
 		gen_confirm(new);
 		add_to_unconfirmed(new, strhashval);
-	} else if (cmp_verf(conf->cl_verifier, clverifier)) {
+	} else if (cmp_verf(&conf->cl_verifier, &clverifier)) {
 		/*
 		 * CASE 1:
 		 * cl_name match, confirmed, principal match
@@ -460,13 +460,13 @@ nfsd4_setclientid(struct svc_rqst *rqstp, struct nfsd4_setclientid *setclid)
 		 * new cl_confirm
 		 */
 		if ((unconf) && 
-		    cmp_verf(unconf->cl_verifier, conf->cl_verifier) &&
+		    cmp_verf(&unconf->cl_verifier, &conf->cl_verifier) &&
 		     cmp_clid(&unconf->cl_clientid, &conf->cl_clientid)) {
 				expire_client(unconf);
 		}
 		if (!(new = create_client(clname)))
 			goto out;
-		copy_verf(new,conf->cl_verifier);
+		copy_verf(new,&conf->cl_verifier);
 		new->cl_addr = ip_addr;
 		copy_cred(&new->cl_cred,&rqstp->rq_cred);
 		copy_clid(new, conf);
@@ -483,14 +483,14 @@ nfsd4_setclientid(struct svc_rqst *rqstp, struct nfsd4_setclientid *setclid)
 		 */
 		if (!(new = create_client(clname)))
 			goto out;
-		copy_verf(new,clverifier);
+		copy_verf(new,&clverifier);
 		new->cl_addr = ip_addr;
 		copy_cred(&new->cl_cred,&rqstp->rq_cred);
 		gen_clid(new);
 		gen_confirm(new);
 		add_to_unconfirmed(new, strhashval);
 	} else if (!cmp_clid(&conf->cl_clientid, &unconf->cl_clientid) &&
-	      !cmp_verf(conf->cl_confirm, unconf->cl_confirm)) {
+	      !cmp_verf(&conf->cl_confirm, &unconf->cl_confirm)) {
 		/*	
 		 * CASE3:
 		 * confirmed found (name, principal match)
@@ -510,7 +510,7 @@ nfsd4_setclientid(struct svc_rqst *rqstp, struct nfsd4_setclientid *setclid)
 		expire_client(unconf);
 		if (!(new = create_client(clname)))
 			goto out;
-		copy_verf(new,clverifier);
+		copy_verf(new,&clverifier);
 		new->cl_addr = ip_addr;
 		copy_cred(&new->cl_cred,&rqstp->rq_cred);
 		gen_clid(new);
@@ -524,7 +524,7 @@ nfsd4_setclientid(struct svc_rqst *rqstp, struct nfsd4_setclientid *setclid)
 	}
 	setclid->se_clientid.cl_boot = new->cl_clientid.cl_boot;
 	setclid->se_clientid.cl_id = new->cl_clientid.cl_id;
-	memcpy(&setclid->se_confirm, new->cl_confirm, sizeof(nfs4_verifier));
+	memcpy(setclid->se_confirm.data, new->cl_confirm.data, sizeof(setclid->se_confirm.data));
 	printk(KERN_INFO "NFSD: this client will not receive delegations\n");
 	status = nfs_ok;
 out:
@@ -546,7 +546,7 @@ nfsd4_setclientid_confirm(struct svc_rqst *rqstp, struct nfsd4_setclientid_confi
 	u32 ip_addr = rqstp->rq_addr.sin_addr.s_addr;
 	unsigned int idhashval;
 	struct nfs4_client *clp, *conf = NULL, *unconf = NULL;
-	char * confirm = setclientid_confirm->sc_confirm; 
+	nfs4_verifier confirm = setclientid_confirm->sc_confirm; 
 	clientid_t * clid = &setclientid_confirm->sc_clientid;
 	struct list_head *pos, *next;
 	int status;
@@ -601,10 +601,10 @@ nfsd4_setclientid_confirm(struct svc_rqst *rqstp, struct nfsd4_setclientid_confi
 	* conf  and unconf records match names, verifiers 
 	*/
 	if ((conf && unconf) && 
-	    (cmp_verf(unconf->cl_confirm, confirm)) &&
-	    (cmp_verf(conf->cl_verifier, unconf->cl_verifier)) &&
+	    (cmp_verf(&unconf->cl_confirm, &confirm)) &&
+	    (cmp_verf(&conf->cl_verifier, &unconf->cl_verifier)) &&
 	    (cmp_name(&conf->cl_name,&unconf->cl_name))  &&
-	    (!cmp_verf(conf->cl_confirm, unconf->cl_confirm))) {
+	    (!cmp_verf(&conf->cl_confirm, &unconf->cl_confirm))) {
 		if (!cmp_creds(&conf->cl_cred, &unconf->cl_cred)) 
 			status = nfserr_clid_inuse;
 		else {
@@ -621,7 +621,7 @@ nfsd4_setclientid_confirm(struct svc_rqst *rqstp, struct nfsd4_setclientid_confi
 	 */
 	if ((conf && !unconf) || 
 	    ((conf && unconf) && 
-	     (!cmp_verf(conf->cl_verifier, unconf->cl_verifier) ||
+	     (!cmp_verf(&conf->cl_verifier, &unconf->cl_verifier) ||
 	      !cmp_name(&conf->cl_name, &unconf->cl_name)))) {
 		if (!cmp_creds(&conf->cl_cred,&rqstp->rq_cred)) {
 			status = nfserr_clid_inuse;
@@ -635,7 +635,7 @@ nfsd4_setclientid_confirm(struct svc_rqst *rqstp, struct nfsd4_setclientid_confi
 	 * unconf record found. 
 	 * unconf->cl_confirm matches input confirm
 	 */ 
-	if (!conf && unconf && cmp_verf(unconf->cl_confirm, confirm)) {
+	if (!conf && unconf && cmp_verf(&unconf->cl_confirm, &confirm)) {
 		if (!cmp_creds(&unconf->cl_cred, &rqstp->rq_cred)) {
 			status = nfserr_clid_inuse;
 		} else {
@@ -650,8 +650,8 @@ nfsd4_setclientid_confirm(struct svc_rqst *rqstp, struct nfsd4_setclientid_confi
 	 * unconf record not found, or if unconf, then unconf->cl_confirm 
 	 * does not match input confirm.
 	 */
-	if ((!conf || (conf && !cmp_verf(conf->cl_confirm, confirm))) &&
-	    (!unconf || (unconf && !cmp_verf(unconf->cl_confirm, confirm)))) {
+	if ((!conf || (conf && !cmp_verf(&conf->cl_confirm, &confirm))) &&
+	    (!unconf || (unconf && !cmp_verf(&unconf->cl_confirm, &confirm)))) {
 		status = nfserr_stale_clientid;
 		goto out;
 	}

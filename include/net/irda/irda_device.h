@@ -128,6 +128,7 @@ struct dongle_reg {
 	void (*close)(dongle_t *dongle);
 	int  (*reset)(struct irda_task *task);
 	int  (*change_speed)(struct irda_task *task);
+	struct module *owner;
 };
 
 /* 
@@ -223,6 +224,7 @@ int  irda_device_set_raw_mode(struct net_device* self, int status);
 int  irda_device_set_dtr_rts(struct net_device *dev, int dtr, int rts);
 int  irda_device_change_speed(struct net_device *dev, __u32 speed);
 void irda_device_setup(struct net_device *dev);
+struct net_device *alloc_irdadev(int sizeof_priv);
 
 /* Dongle interface */
 void irda_device_unregister_dongle(struct dongle_reg *dongle);

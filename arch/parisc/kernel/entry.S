@@ -2225,17 +2225,22 @@ syscall_exit:
 	LDREG     TI_TASK(%r1),%r1
 	STREG     %r28,TASK_PT_GR28(%r1)
 
-	/* Save other hpux returns if personality is PER_HPUX */
+#ifdef CONFIG_HPUX
 
 /* <linux/personality.h> cannot be easily included */
 #define PER_HPUX 0x10
 	LDREG     TASK_PERSONALITY(%r1),%r19
-#warning the ldo+CMPIB could probably be done better but 0x10 i soutside of range of CMPIB
+
+	/* We can't use "CMPIB<> PER_HPUX" since "im5" field is sign extended */
 	ldo	  -PER_HPUX(%r19), %r19
 	CMPIB<>,n 0,%r19,1f
+
+	/* Save other hpux returns if personality is PER_HPUX */
 	STREG     %r22,TASK_PT_GR22(%r1)
 	STREG     %r29,TASK_PT_GR29(%r1)
 1:
+
+#endif /* CONFIG_HPUX */
 
 	/* Seems to me that dp could be wrong here, if the syscall involved
 	 * calling a module, and nothing got round to restoring dp on return.
@@ -2315,18 +2320,16 @@ syscall_restore:
 	depi	3,31,2,%r31			   /* ensure return to user mode. */
 
 #ifdef __LP64__
-	/* Since we are returning to a 32 bit user process, we always
-	 * clear the W bit. This means that the be (and mtsp) gets
-	 * executed in narrow mode, but that is OK, since we are
-	 * returning to a 32 bit process. When we support 64 bit processes
-	 * we won't clear the W bit, so the be will run in wide mode.
-	 */
-
-	be	0(%sr3,%r31)			   /* return to user space */
+	/* decide whether to reset the wide mode bit
+	 *
+	 * For a syscall, the W bit is stored in the lowest bit
+	 * of sp.  Extract it and reset W if it is zero */
+	extrd,u,*<>	%r30,63,1,%r1
 	rsm	PSW_SM_W, %r0
-#else
-	be,n    0(%sr3,%r31)                       /* return to user space */
+	/* now reset the lowest bit of sp if it was set */
+	xor	%r30,%r1,%r30
 #endif
+	be,n    0(%sr3,%r31)                       /* return to user space */
 
 	/* We have to return via an RFI, so that PSW T and R bits can be set
 	 * appropriately.
@@ -2340,12 +2343,19 @@ syscall_restore_rfi:
 	LDREG	TASK_PT_PSW(%r1),%r2		   /* Get old PSW */
 	ldi	0x0b,%r20			   /* Create new PSW */
 	depi	-1,13,1,%r20			   /* C, Q, D, and I bits */
-	bb,>=,n	%r19,15,try_tbit		   /* PT_SINGLESTEP */
+
+	/* The values of PA_SINGLESTEP_BIT and PA_BLOCKSTEP_BIT are
+	 * set in include/linux/ptrace.h and converted to PA bitmap
+	 * numbers in asm-offsets.c */
+
+	/* if ((%r19.PA_SINGLESTEP_BIT)) { %r20.27=1} */
+	extru,=	%r19,PA_SINGLESTEP_BIT,1,%r0
 	depi	-1,27,1,%r20			   /* R bit */
-try_tbit:
-	bb,>=,n	%r19,14,psw_setup		   /* PT_BLOCKSTEP, see ptrace.c */
+
+	/* if ((%r19.PA_BLOCKSTEP_BIT)) { %r20.7=1} */
+	extru,= %r19,PA_BLOCKSTEP_BIT,1,%r0
 	depi	-1,7,1,%r20			   /* T bit */
-psw_setup:
+
 	STREG	%r20,TASK_PT_PSW(%r1)
 
 	/* Always store space registers, since sr3 can be changed (e.g. fork) */

@@ -280,11 +280,7 @@ config PM
 	  to the requisite support below.
 
 	  Power Management is most important for battery powered laptop
-	  computers; if you have a laptop, check out the Linux Laptop home
-	  page on the WWW at
-	  <http://www.cs.utexas.edu/users/kharker/linux-laptop/> and the
-	  Battery Powered Linux mini-HOWTO, available from
-	  <http://www.tldp.org/docs.html#howto>.
+	  computers.
 
 	  Note that, even if you say N here, Linux on the x86 architecture
 	  will issue the hlt instruction if nothing is to be done, thereby
@@ -322,8 +318,9 @@ config SOFTWARE_SUSPEND
 
 source "drivers/acpi/Kconfig"
 
-endmenu
+source "arch/x86_64/kernel/cpufreq/Kconfig"
 
+endmenu
 
 menu "Bus options (PCI etc.)"
 

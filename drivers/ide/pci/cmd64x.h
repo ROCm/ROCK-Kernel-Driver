@@ -81,7 +81,6 @@ static ide_pci_host_proc_t cmd64x_procs[] __initdata = {
 
 static unsigned int init_chipset_cmd64x(struct pci_dev *, const char *);
 static void init_hwif_cmd64x(ide_hwif_t *);
-static void init_dma_cmd64x(ide_hwif_t *, unsigned long);
 
 static ide_pci_device_t cmd64x_chipsets[] __devinitdata = {
 	{	/* 0 */
@@ -91,7 +90,6 @@ static ide_pci_device_t cmd64x_chipsets[] __devinitdata = {
 		.init_chipset	= init_chipset_cmd64x,
 		.init_iops	= NULL,
 		.init_hwif	= init_hwif_cmd64x,
-		.init_dma	= init_dma_cmd64x,
 		.channels	= 2,
 		.autodma	= AUTODMA,
 		.enablebits	= {{0x00,0x00,0x00}, {0x00,0x00,0x00}},
@@ -104,7 +102,6 @@ static ide_pci_device_t cmd64x_chipsets[] __devinitdata = {
 		.init_chipset	= init_chipset_cmd64x,
 		.init_iops	= NULL,
 		.init_hwif	= init_hwif_cmd64x,
-		.init_dma	= init_dma_cmd64x,
 		.channels	= 2,
 		.autodma	= AUTODMA,
 		.enablebits	= {{0x00,0x00,0x00}, {0x51,0x80,0x80}},
@@ -117,7 +114,6 @@ static ide_pci_device_t cmd64x_chipsets[] __devinitdata = {
 		.init_chipset	= init_chipset_cmd64x,
 		.init_iops	= NULL,
 		.init_hwif	= init_hwif_cmd64x,
-		.init_dma	= init_dma_cmd64x,
 		.channels	= 2,
 		.autodma	= AUTODMA,
 		.enablebits	= {{0x00,0x00,0x00}, {0x00,0x00,0x00}},
@@ -130,7 +126,6 @@ static ide_pci_device_t cmd64x_chipsets[] __devinitdata = {
 		.init_chipset	= init_chipset_cmd64x,
 		.init_iops	= NULL,
 		.init_hwif	= init_hwif_cmd64x,
-		.init_dma	= init_dma_cmd64x,
 		.channels	= 2,
 		.autodma	= AUTODMA,
 		.enablebits	= {{0x00,0x00,0x00}, {0x00,0x00,0x00}},

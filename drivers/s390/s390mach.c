@@ -44,7 +44,7 @@ s390_collect_crw_info(void)
 	struct crw crw;
 	int ccode;
 
-	do {
+	while (1) {
 		ccode = stcrw(&crw);
 		if (ccode != 0)
 			break;
@@ -85,7 +85,7 @@ s390_collect_crw_info(void)
 			pr_debug("unknown source\n");
 			break;
 		}
-	} while (crw.chn);
+	}
 }
 
 /*

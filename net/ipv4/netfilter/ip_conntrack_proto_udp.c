@@ -6,8 +6,8 @@
 #include <linux/udp.h>
 #include <linux/netfilter_ipv4/ip_conntrack_protocol.h>
 
-#define UDP_TIMEOUT (30*HZ)
-#define UDP_STREAM_TIMEOUT (180*HZ)
+unsigned long ip_ct_udp_timeout = 30*HZ;
+unsigned long ip_ct_udp_timeout_stream = 180*HZ;
 
 static int udp_pkt_to_tuple(const struct sk_buff *skb,
 			     unsigned int dataoff,
@@ -57,11 +57,11 @@ static int udp_packet(struct ip_conntrack *conntrack,
 	/* If we've seen traffic both ways, this is some kind of UDP
 	   stream.  Extend timeout. */
 	if (test_bit(IPS_SEEN_REPLY_BIT, &conntrack->status)) {
-		ip_ct_refresh(conntrack, UDP_STREAM_TIMEOUT);
+		ip_ct_refresh(conntrack, ip_ct_udp_timeout_stream);
 		/* Also, more likely to be important, and not a probe */
 		set_bit(IPS_ASSURED_BIT, &conntrack->status);
 	} else
-		ip_ct_refresh(conntrack, UDP_TIMEOUT);
+		ip_ct_refresh(conntrack, ip_ct_udp_timeout);
 
 	return NF_ACCEPT;
 }

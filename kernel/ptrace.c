@@ -7,6 +7,7 @@
  * to continually duplicate across every architecture.
  */
 
+#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/errno.h>
 #include <linux/mm.h>
@@ -179,19 +180,14 @@ int access_process_vm(struct task_struct *tsk, unsigned long addr, void *buf, in
 
 		flush_cache_page(vma, addr);
 
-		/*
-		 * FIXME!  We used to have flush_page_to_ram() in here, but
-		 * that was wrong.  davem says we need a new per-arch primitive
-		 * to handle this correctly.
-		 */
-
 		maddr = kmap(page);
 		if (write) {
-			memcpy(maddr + offset, buf, bytes);
-			flush_icache_user_range(vma, page, addr, bytes);
+			copy_to_user_page(vma, page, addr,
+					  maddr + offset, buf, bytes);
 			set_page_dirty_lock(page);
 		} else {
-			memcpy(buf, maddr + offset, bytes);
+			copy_from_user_page(vma, page, addr,
+					    buf, maddr + offset, bytes);
 		}
 		kunmap(page);
 		page_cache_release(page);
@@ -345,3 +341,5 @@ void ptrace_notify(int exit_code)
 	recalc_sigpending();
 	spin_unlock_irq(&current->sighand->siglock);
 }
+
+EXPORT_SYMBOL(ptrace_notify);

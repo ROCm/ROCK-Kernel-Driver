@@ -74,8 +74,6 @@
  * 	node 3:  0xd8000000 - 0xdfffffff
  */
 
-#define NR_NODES	4
-
 /*
  * Given a kernel address, find the home node of the underlying memory.
  */

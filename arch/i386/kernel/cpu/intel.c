@@ -238,12 +238,9 @@ static void __init init_intel(struct cpuinfo_x86 *c)
 	}
 
 	/* SEP CPUID bug: Pentium Pro reports SEP but doesn't have it until model 3 mask 3 */
-	if ( c->x86 == 6) {
-		unsigned model_mask = (c->x86_model << 8) + c->x86_mask;
-		if (model_mask < 0x0303)
-			clear_bit(X86_FEATURE_SEP, c->x86_capability);
-	}
-	
+	if ((c->x86<<8 | c->x86_model<<4 | c->x86_mask) < 0x633)
+		clear_bit(X86_FEATURE_SEP, c->x86_capability);
+
 	/* Names for the Pentium II/Celeron processors 
 	   detectable only by also checking the cache size.
 	   Dixon is NOT a Celeron. */

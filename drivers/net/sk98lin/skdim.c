@@ -327,9 +327,7 @@ GetCurrentSystemLoad(SK_AC *pAC) {
 	**
 	**      struct kernel_stat kstat
 	**
-	** is not marked as an exported symbol in the file
-	**
-	**      kernel/ksyms.c 
+	** is not marked as an exported symbol
 	**
 	** As a consequence, using this driver as KLM is not possible
 	** and any access of the structure kernel_stat via the 

@@ -896,13 +896,15 @@ static int convert_context(u32 key,
 	struct user_datum *usrdatum;
 	char *s;
 	u32 len;
-	int rc = -EINVAL;
+	int rc;
 
 	args = p;
 
 	rc = context_cpy(&oldc, c);
 	if (rc)
 		goto out;
+
+	rc = -EINVAL;
 
 	/* Convert the user. */
 	usrdatum = hashtab_search(args->newp->p_users.table,

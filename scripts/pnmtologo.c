@@ -119,7 +119,8 @@ static unsigned int get_number255(FILE *fp, unsigned int maxval)
 static void read_image(void)
 {
     FILE *fp;
-    int i, j, magic;
+    unsigned int i, j;
+    int magic;
     unsigned int maxval;
 
     /* open image file */
@@ -274,7 +275,7 @@ static void write_hex(unsigned char byte)
 
 static void write_logo_mono(void)
 {
-    int i, j;
+    unsigned int i, j;
     unsigned char val, bit;
 
     /* validate image */
@@ -302,7 +303,7 @@ static void write_logo_mono(void)
 
 static void write_logo_vga16(void)
 {
-    int i, j, k;
+    unsigned int i, j, k;
     unsigned char val;
 
     /* validate image */
@@ -342,7 +343,7 @@ static void write_logo_vga16(void)
 
 static void write_logo_clut224(void)
 {
-    int i, j, k;
+    unsigned int i, j, k;
 
     /* validate image */
     for (i = 0; i < logo_height; i++)
@@ -388,7 +389,7 @@ static void write_logo_clut224(void)
 
 static void write_logo_gray256(void)
 {
-    int i, j;
+    unsigned int i, j;
 
     /* validate image */
     for (i = 0; i < logo_height; i++)

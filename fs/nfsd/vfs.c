@@ -3,7 +3,7 @@
  * linux/fs/nfsd/vfs.c
  *
  * File operations used by nfsd. Some of these have been ripped from
- * other parts of the kernel because they weren't in ksyms.c, others
+ * other parts of the kernel because they weren't exported, others
  * are partial duplicates with added or changed functionality.
  *
  * Note that several functions dget() the dentry upon which they want
@@ -781,7 +781,6 @@ nfsd_write(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 				dprintk("nfsd: write defer %d\n", current->pid);
 				set_current_state(TASK_UNINTERRUPTIBLE);
 				schedule_timeout((HZ+99)/100);
-				current->state = TASK_RUNNING;
 				dprintk("nfsd: write resume %d\n", current->pid);
 			}
 

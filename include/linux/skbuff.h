@@ -103,8 +103,11 @@ struct nf_bridge_info {
 	atomic_t use;
 	struct net_device *physindev;
 	struct net_device *physoutdev;
+#if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
+	struct net_device *netoutdev;
+#endif
 	unsigned int mask;
-	unsigned long hh[16 / sizeof(unsigned long)];
+	unsigned long hh[32 / sizeof(unsigned long)];
 };
 #endif
 
@@ -152,6 +155,7 @@ struct skb_shared_info {
  *	@sk: Socket we are owned by
  *	@stamp: Time we arrived
  *	@dev: Device we arrived on/are leaving by
+ *      @real_dev: The real device we are using
  *	@h: Transport layer header
  *	@nh: Network layer header
  *	@mac: Link layer header
@@ -179,6 +183,7 @@ struct skb_shared_info {
  *	@nfct: Associated connection, if any
  *	@nf_debug: Netfilter debugging
  *	@nf_bridge: Saved data about a bridged frame - see br_netfilter.c
+ *      @private: Data which is private to the HIPPI implementation
  *	@tc_index: Traffic control index
  */
 
@@ -885,7 +890,7 @@ static inline char *__skb_pull(struct sk_buff *skb, unsigned int len)
  */
 static inline unsigned char *skb_pull(struct sk_buff *skb, unsigned int len)
 {
-	return (len > skb->len) ? NULL : __skb_pull(skb, len);
+	return unlikely(len > skb->len) ? NULL : __skb_pull(skb, len);
 }
 
 extern unsigned char *__pskb_pull_tail(struct sk_buff *skb, int delta);
@@ -901,7 +906,7 @@ static inline char *__pskb_pull(struct sk_buff *skb, unsigned int len)
 
 static inline unsigned char *pskb_pull(struct sk_buff *skb, unsigned int len)
 {
-	return (len > skb->len) ? NULL : __pskb_pull(skb, len);
+	return unlikely(len > skb->len) ? NULL : __pskb_pull(skb, len);
 }
 
 static inline int pskb_may_pull(struct sk_buff *skb, unsigned int len)
@@ -1052,7 +1057,7 @@ static inline struct sk_buff *__dev_alloc_skb(unsigned int length,
 					      int gfp_mask)
 {
 	struct sk_buff *skb = alloc_skb(length + 16, gfp_mask);
-	if (skb)
+	if (likely(skb))
 		skb_reserve(skb, 16);
 	return skb;
 }

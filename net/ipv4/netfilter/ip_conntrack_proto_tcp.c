@@ -49,20 +49,28 @@ static const char *tcp_conntrack_names[] = {
 #define HOURS * 60 MINS
 #define DAYS * 24 HOURS
 
+unsigned long ip_ct_tcp_timeout_syn_sent =      2 MINS;
+unsigned long ip_ct_tcp_timeout_syn_recv =     60 SECS;
+unsigned long ip_ct_tcp_timeout_established =   5 DAYS;
+unsigned long ip_ct_tcp_timeout_fin_wait =      2 MINS;
+unsigned long ip_ct_tcp_timeout_close_wait =    3 DAYS;
+unsigned long ip_ct_tcp_timeout_last_ack =     30 SECS;
+unsigned long ip_ct_tcp_timeout_time_wait =     2 MINS;
+unsigned long ip_ct_tcp_timeout_close =        10 SECS;
 
-static unsigned long tcp_timeouts[]
-= { 30 MINS, 	/*	TCP_CONNTRACK_NONE,	*/
-    5 DAYS,	/*	TCP_CONNTRACK_ESTABLISHED,	*/
-    2 MINS,	/*	TCP_CONNTRACK_SYN_SENT,	*/
-    60 SECS,	/*	TCP_CONNTRACK_SYN_RECV,	*/
-    2 MINS,	/*	TCP_CONNTRACK_FIN_WAIT,	*/
-    2 MINS,	/*	TCP_CONNTRACK_TIME_WAIT,	*/
-    10 SECS,	/*	TCP_CONNTRACK_CLOSE,	*/
-    60 SECS,	/*	TCP_CONNTRACK_CLOSE_WAIT,	*/
-    30 SECS,	/*	TCP_CONNTRACK_LAST_ACK,	*/
-    2 MINS,	/*	TCP_CONNTRACK_LISTEN,	*/
-};
-
+static unsigned long * tcp_timeouts[]
+= { 0,                                 /*      TCP_CONNTRACK_NONE */
+    &ip_ct_tcp_timeout_established,    /*      TCP_CONNTRACK_ESTABLISHED,      */
+    &ip_ct_tcp_timeout_syn_sent,       /*      TCP_CONNTRACK_SYN_SENT, */
+    &ip_ct_tcp_timeout_syn_recv,       /*      TCP_CONNTRACK_SYN_RECV, */
+    &ip_ct_tcp_timeout_fin_wait,       /*      TCP_CONNTRACK_FIN_WAIT, */
+    &ip_ct_tcp_timeout_time_wait,      /*      TCP_CONNTRACK_TIME_WAIT,        */
+    &ip_ct_tcp_timeout_close,          /*      TCP_CONNTRACK_CLOSE,    */
+    &ip_ct_tcp_timeout_close_wait,     /*      TCP_CONNTRACK_CLOSE_WAIT,       */
+    &ip_ct_tcp_timeout_last_ack,       /*      TCP_CONNTRACK_LAST_ACK, */
+    0,                                 /*      TCP_CONNTRACK_LISTEN */
+ };
+ 
 #define sNO TCP_CONNTRACK_NONE
 #define sES TCP_CONNTRACK_ESTABLISHED
 #define sSS TCP_CONNTRACK_SYN_SENT
@@ -204,7 +212,7 @@ static int tcp_packet(struct ip_conntrack *conntrack,
 			set_bit(IPS_ASSURED_BIT, &conntrack->status);
 
 		WRITE_UNLOCK(&tcp_lock);
-		ip_ct_refresh(conntrack, tcp_timeouts[newconntrack]);
+		ip_ct_refresh(conntrack, *tcp_timeouts[newconntrack]);
 	}
 
 	return NF_ACCEPT;

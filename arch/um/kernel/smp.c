@@ -8,6 +8,7 @@
 #ifdef CONFIG_SMP
 
 #include "linux/sched.h"
+#include "linux/module.h"
 #include "linux/threads.h"
 #include "linux/interrupt.h"
 #include "linux/err.h"
@@ -23,6 +24,8 @@
 
 /* CPU online map, set by smp_boot_cpus */
 unsigned long cpu_online_map = CPU_MASK_NONE;
+
+EXPORT_SYMBOL(cpu_online_map);
 
 /* Per CPU bogomips and other parameters
  * The only piece used here is the ipi pipe, which is set before SMP is

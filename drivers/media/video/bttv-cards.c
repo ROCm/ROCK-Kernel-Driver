@@ -21,10 +21,9 @@
     You should have received a copy of the GNU General Public License
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-    
+
 */
 
-#include <linux/version.h>
 #include <linux/config.h>
 #include <linux/delay.h>
 #include <linux/module.h>
@@ -32,7 +31,9 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/vmalloc.h>
-#include <linux/firmware.h>
+#ifdef CONFIG_FW_LOADER
+# include <linux/firmware.h>
+#endif
 
 #include <asm/io.h>
 
@@ -62,6 +63,7 @@ static void adtvk503_audio(struct bttv *btv, struct video_audio *v, int set);
 static void rv605_muxsel(struct bttv *btv, unsigned int input);
 static void eagle_muxsel(struct bttv *btv, unsigned int input);
 static void xguard_muxsel(struct bttv *btv, unsigned int input);
+static void ivc120_muxsel(struct bttv *btv, unsigned int input);
 
 static int terratec_active_radio_upgrade(struct bttv *btv);
 static int tea5757_read(struct bttv *btv);
@@ -78,6 +80,7 @@ unsigned int no_overlay=-1;
 static unsigned int card[BTTV_MAX]  = { [ 0 ... (BTTV_MAX-1) ] = UNSET};
 static unsigned int pll[BTTV_MAX]   = { [ 0 ... (BTTV_MAX-1) ] = UNSET};
 static unsigned int tuner[BTTV_MAX] = { [ 0 ... (BTTV_MAX-1) ] = UNSET};
+static unsigned int svhs[BTTV_MAX]  = { [ 0 ... (BTTV_MAX-1) ] = UNSET};
 #ifdef MODULE
 static unsigned int autoload = 1;
 #else
@@ -216,12 +219,32 @@ static struct CARD {
 	{ 0x1466aa06, BTTV_PV150,         "Provideo PV150B-3" },
 	{ 0x1467aa07, BTTV_PV150,         "Provideo PV150B-4" },
 
-
-	{ 0xa1550000, BTTV_IVC200,        "IVC-200" },
-	{ 0xa1550001, BTTV_IVC200,        "IVC-200" },
-	{ 0xa1550002, BTTV_IVC200,        "IVC-200" },
-	{ 0xa1550003, BTTV_IVC200,        "IVC-200" },	
-
+	{ 0xa132ff00, BTTV_IVC100,        "IVC-100"  },
+	{ 0xa1550000, BTTV_IVC200,        "IVC-200"  },
+	{ 0xa1550001, BTTV_IVC200,        "IVC-200"  },
+	{ 0xa1550002, BTTV_IVC200,        "IVC-200"  },
+	{ 0xa1550003, BTTV_IVC200,        "IVC-200"  },	
+	{ 0xa1550100, BTTV_IVC200,        "IVC-200G" },
+	{ 0xa1550101, BTTV_IVC200,        "IVC-200G" },
+	{ 0xa1550102, BTTV_IVC200,        "IVC-200G" },
+	{ 0xa1550103, BTTV_IVC200,        "IVC-200G" },
+	{ 0xa182ff00, BTTV_IVC120,        "IVC-120G" },
+	{ 0xa182ff01, BTTV_IVC120,        "IVC-120G" },
+	{ 0xa182ff02, BTTV_IVC120,        "IVC-120G" },
+	{ 0xa182ff03, BTTV_IVC120,        "IVC-120G" },
+	{ 0xa182ff04, BTTV_IVC120,        "IVC-120G" },
+	{ 0xa182ff05, BTTV_IVC120,        "IVC-120G" },
+	{ 0xa182ff06, BTTV_IVC120,        "IVC-120G" },
+	{ 0xa182ff07, BTTV_IVC120,        "IVC-120G" },
+	{ 0xa182ff08, BTTV_IVC120,        "IVC-120G" },
+	{ 0xa182ff09, BTTV_IVC120,        "IVC-120G" },
+	{ 0xa182ff0a, BTTV_IVC120,        "IVC-120G" },
+	{ 0xa182ff0b, BTTV_IVC120,        "IVC-120G" },
+	{ 0xa182ff0c, BTTV_IVC120,        "IVC-120G" },
+	{ 0xa182ff0d, BTTV_IVC120,        "IVC-120G" },
+	{ 0xa182ff0e, BTTV_IVC120,        "IVC-120G" },
+	{ 0xa182ff0f, BTTV_IVC120,        "IVC-120G" },
+	
 	{ 0x41424344, BTTV_GRANDTEC,      "GrandTec Multi Capture" },
 	{ 0x01020304, BTTV_XGUARD,        "Grandtec Grand X-Guard" },
 	
@@ -1338,7 +1361,7 @@ struct tvcard bttv_tvcards[] = {
 },{
         .name           = "Jetway TV/Capture JW-TV878-FBK, Kworld KW-TV878RF",
         .video_inputs   = 4,
-        .audio_inputs   = 3, 
+        .audio_inputs   = 3,
         .tuner          = 0,
         .svhs           = 2,
         .gpiomask       = 7,
@@ -1388,18 +1411,19 @@ struct tvcard bttv_tvcards[] = {
 	.gpiomask       = 7,
 	.audiomux       = {7},
 },{
-	.name           = "GV-BCTV5/PCI",
+	.name           = "IODATA GV-BCTV5/PCI",
 	.video_inputs   = 3,
 	.audio_inputs   = 1,
 	.tuner          = 0,
 	.svhs           = 2,
-	.gpiomask       = 0x010f00,
+	.gpiomask       = 0x0f0f80,
 	.muxsel         = {2, 3, 1, 0},
-	.audiomux       = {0x10000, 0, 0x10000, 0, 0, 0},
+	.audiomux       = {0x030000, 0x010000, 0x030000, 0, 0x020000, 0},
 	.no_msp34xx     = 1,
 	.pll            = PLL_28,
 	.tuner_type     = TUNER_PHILIPS_NTSC_M,
 	.audio_hook     = gvbctv3pci_audio,
+	.has_radio      = 1,
 },{
 	.name           = "Osprey 100/150 (878)", /* 0x1(2|3)-45C6-C1 */
 	.video_inputs   = 4,                  /* id-inputs-clock */
@@ -1720,16 +1744,14 @@ struct tvcard bttv_tvcards[] = {
 
 	/* ---- card 0x68 ---------------------------------- */
 	.name           = "Nebula Electronics DigiTV",
-	.video_inputs   = 0,
-	.audio_inputs   = 0,
 	.svhs           = -1,
 	.muxsel         = { 2, 3, 1, 0},
-	.needs_tvaudio  = 0,
 	.no_msp34xx     = 1,
 	.no_tda9875     = 1,
 	.no_tda7432     = 1,
 	.pll            = PLL_28,
 	.tuner_type     = -1,
+	.no_video       = 1,
 },{
 	/* Jorge Boncompte - DTI2 <jorge@dti2.net> */
 	.name           = "ProVideo PV143",
@@ -1801,6 +1823,33 @@ struct tvcard bttv_tvcards[] = {
 	.needs_tvaudio  = 1,
 	.pll            = PLL_28,
 	.tuner_type     = -1,
+},{
+        .name           = "IVC-100",
+        .video_inputs   = 4,
+        .audio_inputs   = 0,
+        .tuner          = -1,
+        .tuner_type     = -1,
+        .svhs           = -1,
+        .gpiomask       = 0xdf,
+        .muxsel         = { 2, 3, 1, 0 },
+        .pll            = PLL_28,
+},{
+	/* IVC-120G - Alan Garfield <alan@fromorbit.com> */
+	.name           = "IVC-120G",
+	.video_inputs   = 16,
+	.audio_inputs   = 0,    /* card has no audio */
+	.tuner          = -1,   /* card has no tuner */
+	.tuner_type     = -1,
+	.svhs           = -1,   /* card has no svhs */
+	.needs_tvaudio  = 0,
+	.no_msp34xx     = 1,
+	.no_tda9875     = 1,
+	.no_tda7432     = 1,
+	.gpiomask       = 0x00,
+	.muxsel         = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 
+			    0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10 },
+	.muxsel_hook    = ivc120_muxsel,
+	.pll            = PLL_28,
 }};
 
 const unsigned int bttv_num_tvcards = ARRAY_SIZE(bttv_tvcards);
@@ -1853,12 +1902,8 @@ void __devinit bttv_idcard(struct bttv *btv)
 		btv->type=card[btv->nr];
 	
 	/* print which card config we are using */
-	sprintf(btv->video_dev.name,"BT%d%s(%.23s)",
-		btv->id,
-		(btv->id==848 && btv->revision==0x12) ? "A" : "",
-		bttv_tvcards[btv->type].name);
 	printk(KERN_INFO "bttv%d: using: %s [card=%d,%s]\n",btv->nr,
-	       btv->video_dev.name,btv->type,
+	       bttv_tvcards[btv->type].name, btv->type,
 	       card[btv->nr] < bttv_num_tvcards
 	       ? "insmod option" : "autodetected");
 
@@ -2107,6 +2152,27 @@ static void eagle_muxsel(struct bttv *btv, unsigned int input)
 
 /* ----------------------------------------------------------------------- */
 
+void bttv_reset_audio(struct bttv *btv)
+{
+	/*
+	 * BT878A has a audio-reset register.
+	 * 1. This register is an audio reset function but it is in
+	 *    function-0 (video capture) address space.
+	 * 2. It is enough to do this once per power-up of the card.
+	 * 3. There is a typo in the Conexant doc -- it is not at
+	 *    0x5B, but at 0x058. (B is an odd-number, obviously a typo!).
+	 * --//Shrikumar 030609
+	 */
+	if (btv->id != 878)
+		return;
+	
+	if (bttv_debug)
+		printk("bttv%d: BT878A ARESET\n",btv->nr);
+	btwrite((1<<7), 0x058);
+	udelay(10);
+	btwrite(     0, 0x058);
+}
+
 /* initialization part one -- before registering i2c bus */
 void __devinit bttv_init_card1(struct bttv *btv)
 {
@@ -2269,6 +2335,9 @@ void __devinit bttv_init_card2(struct bttv *btv)
 				      &btv->pinnacle_id);
 	if (btv->tuner_type != UNSET)
 		bttv_call_i2c_clients(btv,TUNER_SET_TYPE,&btv->tuner_type);
+	btv->svhs = bttv_tvcards[btv->type].svhs;
+	if (svhs[btv->nr] != UNSET)
+		btv->svhs = svhs[btv->nr];
 
 	if (bttv_tvcards[btv->type].has_radio)
 		btv->has_radio=1;
@@ -2548,10 +2617,9 @@ int __devinit pvr_boot(struct bttv *btv)
 int __devinit pvr_boot(struct bttv *btv)
 {
         const struct firmware *fw_entry;
-	struct device *dev = &btv->dev->dev;
 	int rc;
 
-	rc = request_firmware(&fw_entry, "hcwamc.rbf", dev);
+	rc = request_firmware(&fw_entry, "hcwamc.rbf", &btv->dev->dev);
 	if (rc != 0) {
 		printk(KERN_WARNING "bttv%d: no altera firmware [via hotplug]\n",
 		       btv->nr);
@@ -2696,12 +2764,12 @@ int tuner_1_table[] = {
 
 static void __devinit avermedia_eeprom(struct bttv *btv)
 {
-        int tuner_make,tuner_tv_fm,tuner_format,tuner=0,remote;
+        int tuner_make,tuner_tv_fm,tuner_format,tuner=0;
 
-	tuner_make   = (eeprom_data[0x41] & 0x7);
-        tuner_tv_fm  = (eeprom_data[0x41] & 0x18) >> 3;
-        tuner_format = (eeprom_data[0x42] & 0xf0) >> 4;
-	remote       = (eeprom_data[0x42] & 0x01);
+	tuner_make      = (eeprom_data[0x41] & 0x7);
+        tuner_tv_fm     = (eeprom_data[0x41] & 0x18) >> 3;
+        tuner_format    = (eeprom_data[0x42] & 0xf0) >> 4;
+	btv->has_remote = (eeprom_data[0x42] & 0x01);
 
 	if (tuner_make == 0 || tuner_make == 2)
 		if(tuner_format <=9)
@@ -2718,8 +2786,8 @@ static void __devinit avermedia_eeprom(struct bttv *btv)
 	} else
 		printk("Unknown type");
 	printk(" radio:%s remote control:%s\n",
-		tuner_tv_fm?"yes":"no",
-		remote?"yes":"no");
+	       tuner_tv_fm     ? "yes" : "no",
+	       btv->has_remote ? "yes" : "no");
 }
 
 /* used on Voodoo TV/FM (Voodoo 200), S0 wired to 0x10000 */
@@ -3448,6 +3516,72 @@ static void xguard_muxsel(struct bttv *btv, unsigned int input)
         btwrite(masks[input%16], BT848_GPIO_DATA);
 }
 
+/*
+ * ivc120_muxsel [Added by Alan Garfield <alan@fromorbit.com>]
+ *
+ * The IVC120G security card has 4 i2c controlled TDA8540 matrix
+ * swichers to provide 16 channels to MUX0. The TDA8540's have 
+ * 4 indepedant outputs and as such the IVC120G also has the 
+ * optional "Monitor Out" bus. This allows the card to be looking 
+ * at one input while the monitor is looking at another.
+ *
+ * Since I've couldn't be bothered figuring out how to add an
+ * independant muxsel for the monitor bus, I've just set it to 
+ * whatever the card is looking at.
+ *
+ *  OUT0 of the TDA8540's is connected to MUX0         (0x03)
+ *  OUT1 of the TDA8540's is connected to "Monitor Out"        (0x0C)
+ *
+ *  TDA8540_ALT3 IN0-3 = Channel 13 - 16       (0x03)
+ *  TDA8540_ALT4 IN0-3 = Channel 1 - 4         (0x03)
+ *  TDA8540_ALT5 IN0-3 = Channel 5 - 8         (0x03)
+ *  TDA8540_ALT6 IN0-3 = Channel 9 - 12                (0x03)
+ *
+ */
+
+/* All 7 possible sub-ids for the TDA8540 Matrix Switcher */
+#define I2C_TDA8540        0x90
+#define I2C_TDA8540_ALT1   0x92
+#define I2C_TDA8540_ALT2   0x94
+#define I2C_TDA8540_ALT3   0x96
+#define I2C_TDA8540_ALT4   0x98
+#define I2C_TDA8540_ALT5   0x9a
+#define I2C_TDA8540_ALT6   0x9c
+
+static void ivc120_muxsel(struct bttv *btv, unsigned int input)
+{
+	// Simple maths
+	int key = input % 4;    
+	int matrix = input / 4;
+	
+	dprintk("bttv%d: ivc120_muxsel: Input - %02d | TDA - %02d | In - %02d\n",
+		btv->nr, input, matrix, key);
+	
+	// Handles the input selection on the TDA8540's
+	bttv_I2CWrite(btv, I2C_TDA8540_ALT3, 0x00,
+		      ((matrix == 3) ? (key | key << 2) : 0x00), 1);
+	bttv_I2CWrite(btv, I2C_TDA8540_ALT4, 0x00,
+		      ((matrix == 0) ? (key | key << 2) : 0x00), 1);
+	bttv_I2CWrite(btv, I2C_TDA8540_ALT5, 0x00,
+		      ((matrix == 1) ? (key | key << 2) : 0x00), 1);
+	bttv_I2CWrite(btv, I2C_TDA8540_ALT6, 0x00,
+		      ((matrix == 2) ? (key | key << 2) : 0x00), 1);
+	
+	// Handles the output enables on the TDA8540's
+	bttv_I2CWrite(btv, I2C_TDA8540_ALT3, 0x02,
+		      ((matrix == 3) ? 0x03 : 0x00), 1);  // 13 - 16
+	bttv_I2CWrite(btv, I2C_TDA8540_ALT4, 0x02,
+		      ((matrix == 0) ? 0x03 : 0x00), 1);  // 1-4
+	bttv_I2CWrite(btv, I2C_TDA8540_ALT5, 0x02,
+		      ((matrix == 1) ? 0x03 : 0x00), 1);  // 5-8 
+	bttv_I2CWrite(btv, I2C_TDA8540_ALT6, 0x02,
+		      ((matrix == 2) ? 0x03 : 0x00), 1);  // 9-12
+	
+	// Selects MUX0 for input on the 878
+	btaor((0)<<5, ~(3<<5), BT848_IFORM);
+}
+
+
 /* ----------------------------------------------------------------------- */
 /* motherboard chipset specific stuff                                      */
 
@@ -3467,9 +3601,11 @@ void __devinit bttv_check_chipset(void)
 		latency = 0x0A;
 #endif
 
+#if 0
 	/* print which chipset we have */
 	while ((dev = pci_find_class(PCI_CLASS_BRIDGE_HOST << 8,dev)))
 		printk(KERN_INFO "bttv: Host bridge is %s\n",pci_name(dev));
+#endif
 
 	/* print warnings about any quirks found */
 	if (triton1)

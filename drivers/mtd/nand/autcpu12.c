@@ -27,6 +27,7 @@
  *	10-06-2002 TG	128K card support added
  */
 
+#include <linux/version.h>
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/module.h>

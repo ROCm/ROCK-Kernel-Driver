@@ -1,6 +1,5 @@
 #include <linux/list.h>
 #include <linux/mm.h>
-#include <linux/smp_lock.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 

@@ -1365,3 +1365,10 @@ void wireless_spy_update(struct net_device *	dev,
 #endif /* IW_WIRELESS_THRSPY */
 #endif /* IW_WIRELESS_SPY */
 }
+
+EXPORT_SYMBOL(iw_handler_get_spy);
+EXPORT_SYMBOL(iw_handler_get_thrspy);
+EXPORT_SYMBOL(iw_handler_set_spy);
+EXPORT_SYMBOL(iw_handler_set_thrspy);
+EXPORT_SYMBOL(wireless_send_event);
+EXPORT_SYMBOL(wireless_spy_update);

@@ -260,8 +260,7 @@ static int __init nsc_ircc_open(int i, chipio_t *info)
 
 	MESSAGE("%s, driver loaded (Dag Brattli)\n", driver_name);
 
-	dev = alloc_netdev(sizeof(struct nsc_ircc_cb), "irda%d",
-			   irda_device_setup);
+	dev = alloc_irdadev(sizeof(struct nsc_ircc_cb));
 	if (dev == NULL) {
 		ERROR("%s(), can't allocate memory for "
 		       "control block!\n", __FUNCTION__);

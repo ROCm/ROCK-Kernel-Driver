@@ -1,11 +1,12 @@
 config VIDEO_SAA7146
         tristate
-        default y if DVB_AV7110=y || DVB_BUDGET=y || DVB_BUDGET_AV=y || VIDEO_MXB=y || VIDEO_DPC=y || VIDEO_HEXIUM_ORION=y || VIDEO_HEXIUM_GEMINI=y
-        default m if DVB_AV7110=m || DVB_BUDGET=m || DVB_BUDGET_AV=m || VIDEO_MXB=m || VIDEO_DPC=m || VIDEO_HEXIUM_ORION=m || VIDEO_HEXIUM_GEMINI=m
-        depends on VIDEO_DEV && PCI && I2C
+	select I2C
+
+config VIDEO_SAA7146_VV
+        tristate
+	select VIDEO_BUF
+	select VIDEO_VIDEOBUF
+	select VIDEO_SAA7146
 
 config VIDEO_VIDEOBUF
         tristate
-        default y if VIDEO_SAA7134=y || VIDEO_BT848=y || VIDEO_SAA7146=y
-        default m if VIDEO_SAA7134=m || VIDEO_BT848=m || VIDEO_SAA7146=m
-        depends on VIDEO_DEV

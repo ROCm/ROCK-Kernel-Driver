@@ -26,6 +26,7 @@
 #include <linux/timex.h>
 #include <linux/errno.h>
 #include <linux/profile.h>
+#include <linux/sysdev.h>
 
 #include <asm/hardware.h>
 #include <asm/io.h>
@@ -33,6 +34,8 @@
 #include <asm/leds.h>
 
 u64 jiffies_64 = INITIAL_JIFFIES;
+
+EXPORT_SYMBOL(jiffies_64);
 
 extern unsigned long wall_jiffies;
 
@@ -72,8 +75,6 @@ unsigned long (*gettimeoffset)(void) = dummy_gettimeoffset;
  */
 unsigned long long sched_clock(void)
 {
-	unsigned long long this_offset;
-
 	return (unsigned long long)jiffies * (1000000000 / HZ);
 }
 
@@ -137,6 +138,47 @@ static void dummy_leds_event(led_event_t evt)
 
 void (*leds_event)(led_event_t) = dummy_leds_event;
 
+static int leds_suspend(struct sys_device *dev, u32 state)
+{
+	leds_event(led_stop);
+	return 0;
+}
+
+static int leds_resume(struct sys_device *dev)
+{
+	leds_event(led_start);
+	return 0;
+}
+
+static int leds_shutdown(struct sys_device *dev)
+{
+	leds_event(led_halted);
+	return 0;
+}
+
+static struct sysdev_class leds_sysclass = {
+	set_kset_name("leds"),
+	.shutdown	= leds_shutdown,
+	.suspend	= leds_suspend,
+	.resume		= leds_resume,
+};
+
+static struct sys_device leds_device = {
+	.id		= 0,
+	.cls		= &leds_sysclass,
+};
+
+static int __init leds_init(void)
+{
+	int ret;
+	ret = sysdev_class_register(&leds_sysclass);
+	if (ret == 0)
+		ret = sys_device_register(&leds_device);
+	return ret;
+}
+
+device_initcall(leds_init);
+
 EXPORT_SYMBOL(leds_event);
 #endif
 
@@ -182,6 +224,8 @@ void do_gettimeofday(struct timeval *tv)
 	tv->tv_usec = usec;
 }
 
+EXPORT_SYMBOL(do_gettimeofday);
+
 int do_settimeofday(struct timespec *tv)
 {
 	time_t wtm_sec, sec = tv->tv_sec;
@@ -214,6 +258,8 @@ int do_settimeofday(struct timespec *tv)
 	clock_was_set();
 	return 0;
 }
+
+EXPORT_SYMBOL(do_settimeofday);
 
 static struct irqaction timer_irq = {
 	.name	= "timer",

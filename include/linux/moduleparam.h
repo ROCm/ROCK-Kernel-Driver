@@ -3,6 +3,7 @@
 /* (C) Copyright 2001, 2002 Rusty Russell IBM Corporation */
 #include <linux/init.h>
 #include <linux/stringify.h>
+#include <linux/kernel.h>
 
 /* You can override this manually, but generally this should match the
    module name. */
@@ -31,6 +32,17 @@ struct kernel_param {
 struct kparam_string {
 	unsigned int maxlen;
 	char *string;
+};
+
+/* Special one for arrays */
+struct kparam_array
+{
+	unsigned int max;
+	unsigned int *num;
+	param_set_fn set;
+	param_get_fn get;
+	unsigned int elemsize;
+	void *elem;
 };
 
 /* This is the fundamental function for registering boot/module
@@ -113,10 +125,16 @@ extern int param_set_invbool(const char *val, struct kernel_param *kp);
 extern int param_get_invbool(char *buffer, struct kernel_param *kp);
 #define param_check_invbool(name, p) __param_check(name, p, int)
 
-/* First two elements are the max and min array length (which don't change) */
-extern int param_set_intarray(const char *val, struct kernel_param *kp);
-extern int param_get_intarray(char *buffer, struct kernel_param *kp);
-#define param_check_intarray(name, p) __param_check(name, p, int *)
+/* Comma-separated array: num is set to number they actually specified. */
+#define module_param_array(name, type, num, perm)			\
+	static struct kparam_array __param_arr_##name			\
+	= { ARRAY_SIZE(name), &num, param_set_##type, param_get_##type,	\
+	    sizeof(name[0]), name };					\
+	module_param_call(name, param_array_set, param_array_get, 	\
+			  &__param_arr_##name, perm)
+
+extern int param_array_set(const char *val, struct kernel_param *kp);
+extern int param_array_get(char *buffer, struct kernel_param *kp);
 
 extern int param_set_copystring(const char *val, struct kernel_param *kp);
 
@@ -124,5 +142,6 @@ int param_array(const char *name,
 		const char *val,
 		unsigned int min, unsigned int max,
 		void *elem, int elemsize,
-		int (*set)(const char *, struct kernel_param *kp));
+		int (*set)(const char *, struct kernel_param *kp),
+		int *num);
 #endif /* _LINUX_MODULE_PARAM_TYPES_H */

@@ -134,7 +134,7 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr * exec,
 	elf_addr_t *sp, *u_platform;
 	const char *k_platform = ELF_PLATFORM;
 	int items;
-	elf_addr_t elf_info[40];
+	elf_addr_t *elf_info;
 	int ei_index = 0;
 	struct task_struct *tsk = current;
 
@@ -169,6 +169,7 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr * exec,
 	}
 
 	/* Create the ELF interpreter info */
+	elf_info = (elf_addr_t *) current->mm->saved_auxv;
 #define NEW_AUX_ENT(id, val) \
 	do { elf_info[ei_index++] = id; elf_info[ei_index++] = val; } while (0)
 
@@ -196,8 +197,13 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr * exec,
 	if (k_platform) {
 		NEW_AUX_ENT(AT_PLATFORM, (elf_addr_t)(long)u_platform);
 	}
-	NEW_AUX_ENT(AT_NULL, 0);
 #undef NEW_AUX_ENT
+	/* AT_NULL is zero; clear the rest too */
+	memset(&elf_info[ei_index], 0,
+	       sizeof current->mm->saved_auxv - ei_index * sizeof elf_info[0]);
+
+	/* And advance past the AT_NULL entry.  */
+	ei_index += 2;
 
 	sp = STACK_ADD(p, ei_index);
 
@@ -1078,7 +1084,7 @@ static void fill_prstatus(struct elf_prstatus *prstatus,
 	prstatus->pr_pid = p->pid;
 	prstatus->pr_ppid = p->parent->pid;
 	prstatus->pr_pgrp = process_group(p);
-	prstatus->pr_sid = p->session;
+	prstatus->pr_sid = process_session(p);
 	jiffies_to_timeval(p->utime, &prstatus->pr_utime);
 	jiffies_to_timeval(p->stime, &prstatus->pr_stime);
 	jiffies_to_timeval(p->cutime, &prstatus->pr_cutime);
@@ -1106,7 +1112,7 @@ static void fill_psinfo(struct elf_prpsinfo *psinfo, struct task_struct *p,
 	psinfo->pr_pid = p->pid;
 	psinfo->pr_ppid = p->parent->pid;
 	psinfo->pr_pgrp = process_group(p);
-	psinfo->pr_sid = p->session;
+	psinfo->pr_sid = process_session(p);
 
 	i = p->state ? ffz(~p->state) + 1 : 0;
 	psinfo->pr_state = i;
@@ -1114,8 +1120,8 @@ static void fill_psinfo(struct elf_prpsinfo *psinfo, struct task_struct *p,
 	psinfo->pr_zomb = psinfo->pr_sname == 'Z';
 	psinfo->pr_nice = task_nice(p);
 	psinfo->pr_flag = p->flags;
-	psinfo->pr_uid = NEW_TO_OLD_UID(p->uid);
-	psinfo->pr_gid = NEW_TO_OLD_GID(p->gid);
+	SET_UID(psinfo->pr_uid, p->uid);
+	SET_GID(psinfo->pr_gid, p->gid);
 	strncpy(psinfo->pr_fname, p->comm, sizeof(psinfo->pr_fname));
 	
 	return;
@@ -1186,7 +1192,7 @@ static int elf_dump_thread_status(long signr, struct task_struct * p, struct lis
  */
 static int elf_core_dump(long signr, struct pt_regs * regs, struct file * file)
 {
-#define	NUM_NOTES	5
+#define	NUM_NOTES	6
 	int has_dumped = 0;
 	mm_segment_t fs;
 	int segs;
@@ -1196,7 +1202,7 @@ static int elf_core_dump(long signr, struct pt_regs * regs, struct file * file)
 	struct elfhdr *elf = NULL;
 	off_t offset = 0, dataoff;
 	unsigned long limit = current->rlim[RLIMIT_CORE].rlim_cur;
-	int numnote = NUM_NOTES;
+	int numnote;
 	struct memelfnote *notes = NULL;
 	struct elf_prstatus *prstatus = NULL;	/* NT_PRSTATUS */
 	struct elf_prpsinfo *psinfo = NULL;	/* NT_PRPSINFO */
@@ -1208,6 +1214,7 @@ static int elf_core_dump(long signr, struct pt_regs * regs, struct file * file)
 	elf_fpxregset_t *xfpu = NULL;
 #endif
 	int thread_status_size = 0;
+	elf_addr_t *auxv;
 
 	/*
 	 * We no longer stop all VM operations.
@@ -1287,18 +1294,25 @@ static int elf_core_dump(long signr, struct pt_regs * regs, struct file * file)
 	
 	fill_note(notes +2, "CORE", NT_TASKSTRUCT, sizeof(*current), current);
   
+	numnote = 3;
+
+	auxv = (elf_addr_t *) current->mm->saved_auxv;
+
+	i = 0;
+	do
+		i += 2;
+	while (auxv[i - 2] != AT_NULL);
+	fill_note(&notes[numnote++], "CORE", NT_AUXV,
+		  i * sizeof (elf_addr_t), auxv);
+
   	/* Try to dump the FPU. */
 	if ((prstatus->pr_fpvalid = elf_core_copy_task_fpregs(current, regs, fpu)))
-		fill_note(notes +3, "CORE", NT_PRFPREG, sizeof(*fpu), fpu);
-	else
-		--numnote;
+		fill_note(notes + numnote++,
+			  "CORE", NT_PRFPREG, sizeof(*fpu), fpu);
 #ifdef ELF_CORE_COPY_XFPREGS
 	if (elf_core_copy_task_xfpregs(current, xfpu))
-		fill_note(notes +4, "LINUX", NT_PRXFPREG, sizeof(*xfpu), xfpu);
-	else
-		--numnote;
-#else
-	numnote--;
+		fill_note(notes + numnote++,
+			  "LINUX", NT_PRXFPREG, sizeof(*xfpu), xfpu);
 #endif	
   
 	fs = get_fs();

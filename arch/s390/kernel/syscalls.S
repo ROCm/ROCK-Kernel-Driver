@@ -249,7 +249,7 @@ SYSCALL(sys_tkill,sys_tkill,sys_tkill)
 SYSCALL(sys_futex,sys_futex,compat_sys_futex_wrapper)
 SYSCALL(sys_sched_setaffinity,sys_sched_setaffinity,sys32_sched_setaffinity_wrapper)
 SYSCALL(sys_sched_getaffinity,sys_sched_getaffinity,sys32_sched_getaffinity_wrapper)	/* 240 */
-NI_SYSCALL					
+SYSCALL(sys_tgkill,sys_tgkill,sys_tgkill)
 NI_SYSCALL							/* reserved for TUX */
 SYSCALL(sys_io_setup,sys_io_setup,sys_ni_syscall)
 SYSCALL(sys_io_destroy,sys_io_destroy,sys_ni_syscall)
@@ -268,6 +268,7 @@ SYSCALL(sys_timer_gettime,sys_timer_gettime,sys_ni_syscall)
 SYSCALL(sys_timer_getoverrun,sys_timer_getoverrun,sys_ni_syscall)
 SYSCALL(sys_timer_delete,sys_timer_delete,sys_ni_syscall)
 SYSCALL(sys_clock_settime,sys_clock_settime,sys_ni_syscall)
-SYSCALL(sys_clock_gettime,sys_clock_gettime,sys_ni_syscall)
+SYSCALL(sys_clock_gettime,sys_clock_gettime,sys_ni_syscall)	/* 260 */
 SYSCALL(sys_clock_getres,sys_clock_getres,sys_ni_syscall)
 SYSCALL(sys_clock_nanosleep,sys_clock_nanosleep,sys_ni_syscall)
+NI_SYSCALL							/* reserved for vserver */

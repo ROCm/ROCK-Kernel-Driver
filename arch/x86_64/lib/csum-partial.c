@@ -135,6 +135,8 @@ unsigned csum_partial(const unsigned char *buff, unsigned len, unsigned sum)
 	return add32_with_carry(do_csum(buff, len), sum); 
 }
 
+EXPORT_SYMBOL(csum_partial);
+
 /*
  * this routine is used for miscellaneous IP-like checksums, mainly
  * in icmp.c

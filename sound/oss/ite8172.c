@@ -54,7 +54,6 @@
  *    07.30.2003  Removed initialisation to zero for static variables
  *		   (spdif[NR_DEVICE], i2s_fmt[NR_DEVICE], and devindex)
  */
-#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/string.h>
 #include <linux/ioport.h>
@@ -2238,8 +2237,9 @@ static int __init it8172_setup(char *options)
 	if (!options || !*options)
 		return 0;
 
-	for(this_opt=strtok(options, ",");
-	    this_opt; this_opt=strtok(NULL, ",")) {
+	while (this_opt = strsep(&options, ",")) {
+		if (!*this_opt)
+			continue;
 		if (!strncmp(this_opt, "spdif", 5)) {
 			spdif[nr_dev] = 1;
 		} else if (!strncmp(this_opt, "i2s:", 4)) {

@@ -44,7 +44,6 @@ static ide_pci_host_proc_t siimage_procs[] __initdata = {
 static unsigned int init_chipset_siimage(struct pci_dev *, const char *);
 static void init_iops_siimage(ide_hwif_t *);
 static void init_hwif_siimage(ide_hwif_t *);
-static void init_dma_siimage(ide_hwif_t *, unsigned long);
 
 static ide_pci_device_t siimage_chipsets[] __devinitdata = {
 	{	/* 0 */
@@ -54,7 +53,6 @@ static ide_pci_device_t siimage_chipsets[] __devinitdata = {
 		.init_chipset	= init_chipset_siimage,
 		.init_iops	= init_iops_siimage,
 		.init_hwif	= init_hwif_siimage,
-		.init_dma	= init_dma_siimage,
 		.channels	= 2,
 		.autodma	= AUTODMA,
 		.enablebits	= {{0x00,0x00,0x00}, {0x00,0x00,0x00}},
@@ -67,7 +65,6 @@ static ide_pci_device_t siimage_chipsets[] __devinitdata = {
 		.init_chipset	= init_chipset_siimage,
 		.init_iops	= init_iops_siimage,
 		.init_hwif	= init_hwif_siimage,
-		.init_dma	= init_dma_siimage,
 		.channels	= 2,
 		.autodma	= AUTODMA,
 		.enablebits	= {{0x00,0x00,0x00}, {0x00,0x00,0x00}},
@@ -80,7 +77,6 @@ static ide_pci_device_t siimage_chipsets[] __devinitdata = {
 		.init_chipset	= init_chipset_siimage,
 		.init_iops	= init_iops_siimage,
 		.init_hwif	= init_hwif_siimage,
-		.init_dma	= init_dma_siimage,
 		.channels	= 2,
 		.autodma	= AUTODMA,
 		.enablebits	= {{0x00,0x00,0x00}, {0x00,0x00,0x00}},

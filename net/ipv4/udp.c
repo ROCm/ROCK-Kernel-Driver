@@ -83,6 +83,7 @@
 #include <asm/ioctls.h>
 #include <linux/types.h>
 #include <linux/fcntl.h>
+#include <linux/module.h>
 #include <linux/socket.h>
 #include <linux/sockios.h>
 #include <linux/in.h>
@@ -175,7 +176,9 @@ gotit:
 			if (inet2->num == snum &&
 			    sk2 != sk &&
 			    !ipv6_only_sock(sk2) &&
-			    sk2->sk_bound_dev_if == sk->sk_bound_dev_if &&
+			    (!sk2->sk_bound_dev_if ||
+			     !sk->sk_bound_dev_if ||
+			     sk2->sk_bound_dev_if == sk->sk_bound_dev_if) &&
 			    (!inet2->rcv_saddr ||
 			     !inet->rcv_saddr ||
 			     inet2->rcv_saddr == inet->rcv_saddr) &&
@@ -1532,3 +1535,17 @@ void udp4_proc_exit(void)
 	udp_proc_unregister(&udp4_seq_afinfo);
 }
 #endif /* CONFIG_PROC_FS */
+
+EXPORT_SYMBOL(udp_connect);
+EXPORT_SYMBOL(udp_disconnect);
+EXPORT_SYMBOL(udp_hash);
+EXPORT_SYMBOL(udp_hash_lock);
+EXPORT_SYMBOL(udp_ioctl);
+EXPORT_SYMBOL(udp_port_rover);
+EXPORT_SYMBOL(udp_prot);
+EXPORT_SYMBOL(udp_sendmsg);
+
+#ifdef CONFIG_PROC_FS
+EXPORT_SYMBOL(udp_proc_register);
+EXPORT_SYMBOL(udp_proc_unregister);
+#endif

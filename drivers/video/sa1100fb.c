@@ -1388,7 +1388,6 @@ static void sa1100fb_disable_controller(struct sa1100fb_info *fbi)
 	LCCR0 &= ~LCCR0_LEN;	/* Disable LCD Controller */
 
 	schedule_timeout(20 * HZ / 1000);
-	set_current_state(TASK_RUNNING);
 	remove_wait_queue(&fbi->ctrlr_wait, &wait);
 }
 

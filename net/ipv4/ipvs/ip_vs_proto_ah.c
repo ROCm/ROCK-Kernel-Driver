@@ -44,8 +44,11 @@ struct isakmp_hdr {
 
 
 static struct ip_vs_conn *
-ah_conn_in_get(struct sk_buff *skb, struct ip_vs_protocol *pp,
-	       struct iphdr *iph, union ip_vs_tphdr h, int inverse)
+ah_conn_in_get(const struct sk_buff *skb,
+	       struct ip_vs_protocol *pp,
+	       const struct iphdr *iph,
+	       unsigned int proto_off,
+	       int inverse)
 {
 	struct ip_vs_conn *cp;
 
@@ -66,11 +69,11 @@ ah_conn_in_get(struct sk_buff *skb, struct ip_vs_protocol *pp,
 	if (!cp) {
 		/*
 		 * We are not sure if the packet is from our
-		 * service, so the caller should check skip_nonexisting
+		 * service, so our conn_schedule hook should return NF_ACCEPT
 		 */
 		IP_VS_DBG(12, "Unknown ISAKMP entry for outin packet "
 			  "%s%s %u.%u.%u.%u->%u.%u.%u.%u\n",
-			  inverse?"ICMP+":"",
+			  inverse ? "ICMP+" : "",
 			  pp->name,
 			  NIPQUAD(iph->saddr),
 			  NIPQUAD(iph->daddr));
@@ -81,8 +84,8 @@ ah_conn_in_get(struct sk_buff *skb, struct ip_vs_protocol *pp,
 
 
 static struct ip_vs_conn *
-ah_conn_out_get(struct sk_buff *skb, struct ip_vs_protocol *pp,
-		struct iphdr *iph, union ip_vs_tphdr h, int inverse)
+ah_conn_out_get(const struct sk_buff *skb, struct ip_vs_protocol *pp,
+		const struct iphdr *iph, unsigned int proto_off, int inverse)
 {
 	struct ip_vs_conn *cp;
 
@@ -101,11 +104,6 @@ ah_conn_out_get(struct sk_buff *skb, struct ip_vs_protocol *pp,
 	}
 
 	if (!cp) {
-		/*
-		 * We are not sure if the packet is from our
-		 * service, so the caller should check skip_nonexisting
-		 * or our conn_schedule hook should return NF_ACCEPT
-		 */
 		IP_VS_DBG(12, "Unknown ISAKMP entry for inout packet "
 			  "%s%s %u.%u.%u.%u->%u.%u.%u.%u\n",
 			  inverse ? "ICMP+" : "",
@@ -119,8 +117,8 @@ ah_conn_out_get(struct sk_buff *skb, struct ip_vs_protocol *pp,
 
 
 static int
-ah_conn_schedule(struct sk_buff *skb, struct ip_vs_protocol *pp,
-		 struct iphdr *iph, union ip_vs_tphdr h,
+ah_conn_schedule(struct sk_buff *skb,
+		 struct ip_vs_protocol *pp,
 		 int *verdict, struct ip_vs_conn **cpp)
 {
 	/*
@@ -132,12 +130,18 @@ ah_conn_schedule(struct sk_buff *skb, struct ip_vs_protocol *pp,
 
 
 static void
-ah_debug_packet(struct ip_vs_protocol *pp, struct iphdr *iph, char *msg)
+ah_debug_packet(struct ip_vs_protocol *pp, const struct sk_buff *skb,
+		int offset, const char *msg)
 {
 	char buf[256];
+	struct iphdr iph;
 
-	sprintf(buf, "%s %u.%u.%u.%u->%u.%u.%u.%u",
-		pp->name, NIPQUAD(iph->saddr), NIPQUAD(iph->daddr));
+	if (skb_copy_bits(skb, offset, &iph, sizeof(iph)) < 0)
+		sprintf(buf, "%s TRUNCATED", pp->name);
+	else
+		sprintf(buf, "%s %u.%u.%u.%u->%u.%u.%u.%u",
+			pp->name, NIPQUAD(iph.saddr),
+			NIPQUAD(iph.daddr));
 
 	printk(KERN_DEBUG "IPVS: %s: %s\n", msg, buf);
 }
@@ -158,11 +162,7 @@ static void ah_exit(struct ip_vs_protocol *pp)
 struct ip_vs_protocol ip_vs_protocol_ah = {
 	.name =			"AH",
 	.protocol =		IPPROTO_AH,
-	.minhlen =		0,
-	.minhlen_icmp =		0,
 	.dont_defrag =		1,
-	.skip_nonexisting =	1,
-	.slave =		1,
 	.init =			ah_init,
 	.exit =			ah_exit,
 	.conn_schedule =	ah_conn_schedule,
@@ -170,11 +170,11 @@ struct ip_vs_protocol ip_vs_protocol_ah = {
 	.conn_out_get =		ah_conn_out_get,
 	.snat_handler =		NULL,
 	.dnat_handler =		NULL,
+	.csum_check =		NULL,
 	.state_transition =	NULL,
 	.register_app =		NULL,
 	.unregister_app =	NULL,
 	.app_conn_bind =	NULL,
-	.csum_check =		NULL,
 	.debug_packet =		ah_debug_packet,
 	.timeout_change =	NULL,		/* ISAKMP */
 	.set_state_timeout =	NULL,

@@ -196,7 +196,7 @@ struct page {
 #if defined(WANT_PAGE_VIRTUAL)
 	void *virtual;			/* Kernel virtual address (NULL if
 					   not kmapped, ie. highmem) */
-#endif /* CONFIG_HIGMEM || WANT_PAGE_VIRTUAL */
+#endif /* WANT_PAGE_VIRTUAL */
 };
 
 /*
@@ -323,7 +323,6 @@ static inline void put_page(struct page *page)
  * The zone field is never updated after free_area_init_core()
  * sets it, so none of the operations on it need to be atomic.
  */
-#define NODE_SHIFT 4
 #define ZONE_SHIFT (BITS_PER_LONG - 8)
 
 struct zone;

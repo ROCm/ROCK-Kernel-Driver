@@ -17,6 +17,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
@@ -69,23 +70,6 @@ enable_kernel_fp(void)
 	giveup_fpu(last_task_used_math);
 #endif /* CONFIG_SMP */
 }
-
-#ifdef CONFIG_SMP
-static void smp_unlazy_onefpu(void *arg)
-{
-	struct pt_regs *regs = current->thread.regs;
-
-	if (!regs)
-		return;
-	if (regs->msr & MSR_FP)
-		giveup_fpu(current);
-}
-
-void dump_smp_unlazy_fpu(void)
-{
-	smp_call_function(smp_unlazy_onefpu, NULL, 1, 1);
-}
-#endif
 
 int dump_task_fpu(struct task_struct *tsk, elf_fpregset_t *fpregs)
 {
@@ -447,6 +431,8 @@ void dump_stack(void)
 {
 	show_stack(current, (unsigned long *)_get_SP());
 }
+
+EXPORT_SYMBOL(dump_stack);
 
 void show_trace_task(struct task_struct *tsk)
 {

@@ -91,10 +91,10 @@ struct xfs_bmap_free;
  * Prototypes and functions for the Data Migration subsystem.
  */
 
-typedef int	(*xfs_send_data_t)(int, struct bhv_desc *,
+typedef int	(*xfs_send_data_t)(int, struct vnode *,
 			xfs_off_t, size_t, int, vrwlock_t *);
 typedef int	(*xfs_send_mmap_t)(struct vm_area_struct *, uint);
-typedef int	(*xfs_send_destroy_t)(struct bhv_desc *, dm_right_t);
+typedef int	(*xfs_send_destroy_t)(struct vnode *, dm_right_t);
 typedef int	(*xfs_send_namesp_t)(dm_eventtype_t, struct vnode *,
 			dm_right_t, struct vnode *, dm_right_t,
 			char *, char *, mode_t, int, int);
@@ -109,12 +109,12 @@ typedef struct xfs_dmops {
 	xfs_send_unmount_t	xfs_send_unmount;
 } xfs_dmops_t;
 
-#define XFS_SEND_DATA(mp, ev,bdp,off,len,fl,lock) \
-	(*(mp)->m_dm_ops.xfs_send_data)(ev,bdp,off,len,fl,lock)
+#define XFS_SEND_DATA(mp, ev,vp,off,len,fl,lock) \
+	(*(mp)->m_dm_ops.xfs_send_data)(ev,vp,off,len,fl,lock)
 #define XFS_SEND_MMAP(mp, vma,fl) \
 	(*(mp)->m_dm_ops.xfs_send_mmap)(vma,fl)
-#define XFS_SEND_DESTROY(mp, bdp,right) \
-	(*(mp)->m_dm_ops.xfs_send_destroy)(bdp,right)
+#define XFS_SEND_DESTROY(mp, vp,right) \
+	(*(mp)->m_dm_ops.xfs_send_destroy)(vp,right)
 #define XFS_SEND_NAMESP(mp, ev,b1,r1,b2,r2,n1,n2,mode,rval,fl) \
 	(*(mp)->m_dm_ops.xfs_send_namesp)(ev,b1,r1,b2,r2,n1,n2,mode,rval,fl)
 #define XFS_SEND_UNMOUNT(mp, vfsp,vp,right,mode,rval,fl) \

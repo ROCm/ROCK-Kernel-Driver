@@ -114,6 +114,8 @@ out:
 	return ret;
 }
 
+EXPORT_SYMBOL(register_blkdev);
+
 /* todo: make void - error printk here */
 int unregister_blkdev(unsigned int major, const char *name)
 {
@@ -141,6 +143,8 @@ int unregister_blkdev(unsigned int major, const char *name)
 	return ret;
 }
 
+EXPORT_SYMBOL(unregister_blkdev);
+
 static struct kobj_map *bdev_map;
 
 /*
@@ -155,12 +159,13 @@ void blk_register_region(dev_t dev, unsigned long range, struct module *module,
 	kobj_map(bdev_map, dev, range, module, probe, lock, data);
 }
 
+EXPORT_SYMBOL(blk_register_region);
+
 void blk_unregister_region(dev_t dev, unsigned long range)
 {
 	kobj_unmap(bdev_map, dev, range);
 }
 
-EXPORT_SYMBOL(blk_register_region);
 EXPORT_SYMBOL(blk_unregister_region);
 
 static struct kobject *exact_match(dev_t dev, int *part, void *data)
@@ -250,7 +255,7 @@ static int show_partition(struct seq_file *part, void *v)
 {
 	struct gendisk *sgp = v;
 	int n;
-	char buf[64];
+	char buf[BDEVNAME_SIZE];
 
 	if (&sgp->kobj.entry == block_subsys.kset.list.next)
 		seq_puts(part, "major minor  #blocks  name\n\n");
@@ -472,7 +477,7 @@ static void diskstats_stop(struct seq_file *part, void *v)
 static int diskstats_show(struct seq_file *s, void *v)
 {
 	struct gendisk *gp = v;
-	char buf[64];
+	char buf[BDEVNAME_SIZE];
 	int n = 0;
 
 	/*
@@ -545,6 +550,8 @@ struct gendisk *alloc_disk(int minors)
 	return disk;
 }
 
+EXPORT_SYMBOL(alloc_disk);
+
 struct kobject *get_disk(struct gendisk *disk)
 {
 	struct module *owner;
@@ -564,14 +571,14 @@ struct kobject *get_disk(struct gendisk *disk)
 
 }
 
+EXPORT_SYMBOL(get_disk);
+
 void put_disk(struct gendisk *disk)
 {
 	if (disk)
 		kobject_put(&disk->kobj);
 }
 
-EXPORT_SYMBOL(alloc_disk);
-EXPORT_SYMBOL(get_disk);
 EXPORT_SYMBOL(put_disk);
 
 void set_device_ro(struct block_device *bdev, int flag)
@@ -582,6 +589,8 @@ void set_device_ro(struct block_device *bdev, int flag)
 		bdev->bd_disk->policy = flag;
 }
 
+EXPORT_SYMBOL(set_device_ro);
+
 void set_disk_ro(struct gendisk *disk, int flag)
 {
 	int i;
@@ -589,6 +598,8 @@ void set_disk_ro(struct gendisk *disk, int flag)
 	for (i = 0; i < disk->minors - 1; i++)
 		if (disk->part[i]) disk->part[i]->policy = flag;
 }
+
+EXPORT_SYMBOL(set_disk_ro);
 
 int bdev_read_only(struct block_device *bdev)
 {
@@ -600,6 +611,8 @@ int bdev_read_only(struct block_device *bdev)
 		return bdev->bd_disk->policy;
 }
 
+EXPORT_SYMBOL(bdev_read_only);
+
 int invalidate_partition(struct gendisk *disk, int index)
 {
 	int res = 0;
@@ -610,7 +623,4 @@ int invalidate_partition(struct gendisk *disk, int index)
 	return res;
 }
 
-EXPORT_SYMBOL(bdev_read_only);
-EXPORT_SYMBOL(set_device_ro);
-EXPORT_SYMBOL(set_disk_ro);
 EXPORT_SYMBOL(invalidate_partition);

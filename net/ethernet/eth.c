@@ -37,6 +37,7 @@
  *		as published by the Free Software Foundation; either version
  *		2 of the License, or (at your option) any later version.
  */
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -241,3 +242,5 @@ void eth_header_cache_update(struct hh_cache *hh, struct net_device *dev, unsign
 	memcpy(((u8*)hh->hh_data) + HH_DATA_OFF(sizeof(struct ethhdr)),
 	       haddr, dev->addr_len);
 }
+
+EXPORT_SYMBOL(eth_type_trans);

@@ -13,6 +13,7 @@
 #include <linux/errno.h>
 #include <linux/kernel.h>
 #include <linux/kernel_stat.h>
+#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/mm.h>
 #include <linux/threads.h>
@@ -72,6 +73,8 @@ static int smp_secondary_alive __initdata = 0;
 /* Which cpus ids came online.  */
 unsigned long cpu_present_mask;
 cpumask_t cpu_online_map;
+
+EXPORT_SYMBOL(cpu_online_map);
 
 /* cpus reported in the hwrpb */
 static unsigned long hwrpb_cpu_present_mask __initdata = 0;
@@ -597,7 +600,7 @@ smp_cpus_done(unsigned int max_cpus)
 		if (cpu_online(cpu))
 			bogosum += cpu_data[cpu].loops_per_jiffy;
 	
-	printk(KERN_INFO "SMP: Total of %d processors activated "
+	printk(KERN_INFO "SMP: Total of %ld processors activated "
 	       "(%lu.%02lu BogoMIPS).\n",
 	       num_online_cpus(), 
 	       (bogosum + 2500) / (500000/HZ),

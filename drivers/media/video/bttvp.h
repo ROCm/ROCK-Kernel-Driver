@@ -24,8 +24,8 @@
 #ifndef _BTTVP_H_
 #define _BTTVP_H_
 
-
-#define BTTV_VERSION_CODE KERNEL_VERSION(0,9,11)
+#include <linux/version.h>
+#define BTTV_VERSION_CODE KERNEL_VERSION(0,9,12)
 
 #include <linux/types.h>
 #include <linux/wait.h>
@@ -33,9 +33,11 @@
 #include <linux/i2c-algo-bit.h>
 #include <linux/videodev.h>
 #include <linux/pci.h>
+#include <linux/input.h>
 #include <asm/scatterlist.h>
 #include <asm/io.h>
 
+#include <linux/device.h>
 #include <media/video-buf.h>
 #include <media/audiochip.h>
 #include <media/tuner.h>
@@ -43,6 +45,9 @@
 #include "bt848.h"
 #include "bttv.h"
 #include "btcx-risc.h"
+#ifdef CONFIG_VIDEO_IR
+#include "ir-common.h"
+#endif
 
 #ifdef __KERNEL__
 
@@ -141,6 +146,9 @@ struct bttv_overlay {
 struct bttv_fh {
 	struct bttv              *btv;
 	int resources;
+#ifdef VIDIOC_G_PRIORITY 
+	enum v4l2_priority       prio;
+#endif
 	enum v4l2_buf_type       type;
 
 	/* video capture */
@@ -210,6 +218,12 @@ void bttv_vbi_setlines(struct bttv_fh *fh, struct bttv *btv, int lines);
 
 extern struct videobuf_queue_ops bttv_vbi_qops;
 
+/* ---------------------------------------------------------- */
+/* bttv-input.c                                               */
+
+int bttv_input_init(struct bttv *btv);
+void bttv_input_fini(struct bttv *btv);
+void bttv_input_irq(struct bttv *btv);
 
 /* ---------------------------------------------------------- */
 /* bttv-driver.c                                              */
@@ -220,6 +234,7 @@ extern unsigned int bttv_debug;
 extern unsigned int bttv_gpio;
 extern void bttv_gpio_tracking(struct bttv *btv, char *comment);
 extern int init_bttv_i2c(struct bttv *btv);
+extern int fini_bttv_i2c(struct bttv *btv);
 extern int pvr_boot(struct bttv *btv);
 
 extern int bttv_common_ioctls(struct bttv *btv, unsigned int cmd, void *arg);
@@ -248,6 +263,18 @@ struct bttv_pll_info {
 	unsigned int pll_current;  /* Currently programmed ofreq */
 };
 
+#ifdef CONFIG_VIDEO_IR
+/* for gpio-connected remote control */
+struct bttv_input {
+	struct input_dev      dev;
+	struct ir_input_state ir;
+	char                  name[32];
+	char                  phys[32];
+	u32                   mask_keycode;
+	u32                   mask_keydown;
+};
+#endif
+
 struct bttv {
 	/* pci device config */
 	struct pci_dev *dev;
@@ -262,6 +289,7 @@ struct bttv {
 	unsigned int type;     /* card type (pointer into tvcards[])  */
         unsigned int tuner_type;  /* tuner chip type */
         unsigned int pinnacle_id;
+	unsigned int svhs;
 	struct bttv_pll_info pll;
 	int triton1;
 
@@ -277,22 +305,31 @@ struct bttv {
 	int                        i2c_state, i2c_rc;
 
 	/* video4linux (1) */
-	struct video_device video_dev;
-	struct video_device radio_dev;
-	struct video_device vbi_dev;
+	struct video_device *video_dev;
+	struct video_device *radio_dev;
+	struct video_device *vbi_dev;
+
+	/* infrared remote */
+	int has_remote;
+#ifdef CONFIG_VIDEO_IR
+	struct bttv_input *remote;
+#endif
 
 	/* locking */
 	spinlock_t s_lock;
         struct semaphore lock;
 	int resources;
         struct semaphore reslock;
-
+#ifdef VIDIOC_G_PRIORITY 
+	struct v4l2_prio_state prio;
+#endif
+	
 	/* video state */
 	unsigned int input;
 	unsigned int audio;
 	unsigned long freq;
 	int tvnorm,hue,contrast,bright,saturation;
-	struct video_buffer fbuf;
+	struct v4l2_framebuffer fbuf;
 	unsigned int field_count;
 
 	/* various options */
@@ -301,6 +338,7 @@ struct bttv {
 	int opt_automute;
 	int opt_chroma_agc;
 	int opt_adc_crush;
+	int opt_vcr_hack;
 
 	/* radio data/state */
 	int has_radio;
@@ -328,6 +366,7 @@ struct bttv {
 	struct list_head        capture;    /* video capture queue */
 	struct list_head        vcapture;   /* vbi capture queue   */
 	struct bttv_buffer_set  curr;       /* active buffers      */
+	int                     new_input;
 
 	unsigned long cap_ctl;
 	unsigned long dma_on;

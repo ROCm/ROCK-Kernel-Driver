@@ -97,11 +97,10 @@ izo_rep_cache_clean(struct presto_file_set *fset)
 struct izo_offset_rec *
 izo_rep_cache_find(struct presto_file_set *fset, char *uuid)
 {
-	struct list_head *buck = izo_rep_hash(fset->fset_clients, uuid);
-	struct list_head *tmp = buck;
+	struct list_head *tmp, *buck = izo_rep_hash(fset->fset_clients, uuid);
         struct izo_offset_rec *rec = NULL;
 
-        while ( (tmp = tmp->next) != buck ) {
+	list_for_each(tmp, buck) {
 		rec = list_entry(tmp, struct izo_offset_rec, or_list);
                 if ( memcmp(rec->or_uuid, uuid, sizeof(rec->or_uuid)) == 0 )
 			return rec;

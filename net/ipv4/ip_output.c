@@ -46,6 +46,7 @@
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -1294,12 +1295,9 @@ void ip_send_reply(struct sock *sk, struct sk_buff *skb, struct ip_reply_arg *ar
  *	IP protocol layer initialiser
  */
 
-static struct packet_type ip_packet_type =
-{
+static struct packet_type ip_packet_type = {
 	.type = __constant_htons(ETH_P_IP),
-	.dev  = NULL,	/* All devices */
 	.func = ip_rcv,
-	.data = PKT_CAN_SHARE_SKB,
 };
 
 /*
@@ -1317,3 +1315,13 @@ void __init ip_init(void)
 	igmp_mc_proc_init();
 #endif
 }
+
+EXPORT_SYMBOL(ip_finish_output);
+EXPORT_SYMBOL(ip_fragment);
+EXPORT_SYMBOL(ip_generic_getfrag);
+EXPORT_SYMBOL(ip_queue_xmit);
+EXPORT_SYMBOL(ip_send_check);
+
+#ifdef CONFIG_SYSCTL
+EXPORT_SYMBOL(sysctl_ip_default_ttl);
+#endif

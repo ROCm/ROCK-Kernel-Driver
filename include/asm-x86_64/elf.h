@@ -150,11 +150,6 @@ extern int dump_task_fpu (struct task_struct *, elf_fpregset_t *);
 #define ELF_CORE_COPY_TASK_REGS(tsk, elf_regs) dump_task_regs(tsk, elf_regs)
 #define ELF_CORE_COPY_FPREGS(tsk, elf_fpregs) dump_task_fpu(tsk, elf_fpregs)
 
-#ifdef CONFIG_SMP
-extern void dump_smp_unlazy_fpu(void);
-#define ELF_CORE_SYNC dump_smp_unlazy_fpu
-#endif
-
 #endif
 
 #endif

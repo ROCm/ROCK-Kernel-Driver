@@ -4,13 +4,13 @@
 /*
  * Header file for the GDT Disk Array/Storage RAID controllers driver for Linux
  * 
- * gdth.h Copyright (C) 1995-02 ICP vortex, an Intel company, Achim Leubner
+ * gdth.h Copyright (C) 1995-03 ICP vortex, Achim Leubner
  * See gdth.c for further informations and 
  * below for supported controller types
  *
- * <achim.leubner@intel.com>
+ * <achim_leubner@adaptec.com>
  *
- * $Id: gdth.h,v 1.48 2003/02/27 14:58:22 achim Exp $
+ * $Id: gdth.h,v 1.50 2003/09/17 08:29:58 achim Exp $
  */
 
 #include <linux/version.h>
@@ -26,9 +26,9 @@
 /* defines, macros */
 
 /* driver version */
-#define GDTH_VERSION_STR        "2.07"
+#define GDTH_VERSION_STR        "2.08"
 #define GDTH_VERSION            2
-#define GDTH_SUBVERSION         7
+#define GDTH_SUBVERSION         8
 
 /* protocol version */
 #define PROTOCOL_VERSION        1

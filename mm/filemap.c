@@ -151,6 +151,8 @@ int filemap_fdatawrite(struct address_space *mapping)
 	return __filemap_fdatawrite(mapping, WB_SYNC_ALL);
 }
 
+EXPORT_SYMBOL(filemap_fdatawrite);
+
 /*
  * This is a mostly non-blocking flush.  Not suitable for data-integrity
  * purposes.
@@ -216,6 +218,8 @@ restart:
 	return ret;
 }
 
+EXPORT_SYMBOL(filemap_fdatawait);
+
 /*
  * This adds a page to the page cache, starting out as locked, unreferenced,
  * not uptodate and with no errors.
@@ -253,6 +257,7 @@ int add_to_page_cache(struct page *page, struct address_space *mapping,
 	}
 	return error;
 }
+
 EXPORT_SYMBOL(add_to_page_cache);
 
 int add_to_page_cache_lru(struct page *page, struct address_space *mapping,
@@ -295,6 +300,7 @@ void wait_on_page_bit(struct page *page, int bit_nr)
 	} while (test_bit(bit_nr, &page->flags));
 	finish_wait(waitqueue, &wait);
 }
+
 EXPORT_SYMBOL(wait_on_page_bit);
 
 /**
@@ -323,6 +329,9 @@ void unlock_page(struct page *page)
 		wake_up_all(waitqueue);
 }
 
+EXPORT_SYMBOL(unlock_page);
+EXPORT_SYMBOL(lock_page);
+
 /*
  * End writeback against a page.
  */
@@ -339,6 +348,7 @@ void end_page_writeback(struct page *page)
 	if (waitqueue_active(waitqueue))
 		wake_up_all(waitqueue);
 }
+
 EXPORT_SYMBOL(end_page_writeback);
 
 /*
@@ -363,6 +373,7 @@ void __lock_page(struct page *page)
 	}
 	finish_wait(wqh, &wait);
 }
+
 EXPORT_SYMBOL(__lock_page);
 
 /*
@@ -385,6 +396,8 @@ struct page * find_get_page(struct address_space *mapping, unsigned long offset)
 	return page;
 }
 
+EXPORT_SYMBOL(find_get_page);
+
 /*
  * Same as above, but trylock it instead of incrementing the count.
  */
@@ -399,6 +412,8 @@ struct page *find_trylock_page(struct address_space *mapping, unsigned long offs
 	spin_unlock(&mapping->page_lock);
 	return page;
 }
+
+EXPORT_SYMBOL(find_trylock_page);
 
 /**
  * find_lock_page - locate, pin and lock a pagecache page
@@ -437,6 +452,8 @@ repeat:
 	spin_unlock(&mapping->page_lock);
 	return page;
 }
+
+EXPORT_SYMBOL(find_lock_page);
 
 /**
  * find_or_create_page - locate or add a pagecache page
@@ -481,6 +498,8 @@ repeat:
 		page_cache_release(cached_page);
 	return page;
 }
+
+EXPORT_SYMBOL(find_or_create_page);
 
 /**
  * find_get_pages - gang pagecache lookup
@@ -542,6 +561,8 @@ grab_cache_page_nowait(struct address_space *mapping, unsigned long index)
 	}
 	return page;
 }
+
+EXPORT_SYMBOL(grab_cache_page_nowait);
 
 /*
  * This is a generic file read routine, and uses the
@@ -699,6 +720,8 @@ no_cached_page:
 	update_atime(inode);
 }
 
+EXPORT_SYMBOL(do_generic_mapping_read);
+
 int file_read_actor(read_descriptor_t *desc, struct page *page,
 			unsigned long offset, unsigned long size)
 {
@@ -816,6 +839,8 @@ out:
 	return retval;
 }
 
+EXPORT_SYMBOL(__generic_file_aio_read);
+
 ssize_t
 generic_file_aio_read(struct kiocb *iocb, char __user *buf, size_t count, loff_t pos)
 {
@@ -824,8 +849,8 @@ generic_file_aio_read(struct kiocb *iocb, char __user *buf, size_t count, loff_t
 	BUG_ON(iocb->ki_pos != pos);
 	return __generic_file_aio_read(iocb, &local_iov, 1, &iocb->ki_pos);
 }
+
 EXPORT_SYMBOL(generic_file_aio_read);
-EXPORT_SYMBOL(__generic_file_aio_read);
 
 ssize_t
 generic_file_read(struct file *filp, char __user *buf, size_t count, loff_t *ppos)
@@ -840,6 +865,8 @@ generic_file_read(struct file *filp, char __user *buf, size_t count, loff_t *ppo
 		ret = wait_on_sync_kiocb(&kiocb);
 	return ret;
 }
+
+EXPORT_SYMBOL(generic_file_read);
 
 int file_send_actor(read_descriptor_t * desc, struct page *page, unsigned long offset, unsigned long size)
 {
@@ -879,6 +906,8 @@ ssize_t generic_file_sendfile(struct file *in_file, loff_t *ppos,
 		return desc.written;
 	return desc.error;
 }
+
+EXPORT_SYMBOL(generic_file_sendfile);
 
 static ssize_t
 do_readahead(struct address_space *mapping, struct file *filp,
@@ -1126,6 +1155,8 @@ page_not_uptodate:
 	return NULL;
 }
 
+EXPORT_SYMBOL(filemap_nopage);
+
 static struct page * filemap_getpage(struct file *file, unsigned long pgoff,
 					int nonblock)
 {
@@ -1330,6 +1361,9 @@ int generic_file_readonly_mmap(struct file * file, struct vm_area_struct * vma)
 }
 #endif /* CONFIG_MMU */
 
+EXPORT_SYMBOL(generic_file_mmap);
+EXPORT_SYMBOL(generic_file_readonly_mmap);
+
 static inline struct page *__read_cache_page(struct address_space *mapping,
 				unsigned long index,
 				int (*filler)(void *,struct page*),
@@ -1406,6 +1440,8 @@ retry:
 	return page;
 }
 
+EXPORT_SYMBOL(read_cache_page);
+
 /*
  * If the page was newly created, increment its refcount and add it to the
  * caller's lru-buffering pagevec.  This function is specifically for
@@ -1455,6 +1491,8 @@ void remove_suid(struct dentry *dentry)
 		notify_change(dentry, &newattrs);
 	}
 }
+
+EXPORT_SYMBOL(remove_suid);
 
 /*
  * Copy as much as we can into the page and return the number of bytes which
@@ -1638,6 +1676,7 @@ inline int generic_write_checks(struct inode *inode,
 	}
 	return 0;
 }
+
 EXPORT_SYMBOL(generic_write_checks);
 
 /*
@@ -1832,6 +1871,8 @@ out:
 	return err;
 }
 
+EXPORT_SYMBOL(generic_file_aio_write_nolock);
+
 ssize_t
 generic_file_write_nolock(struct file *file, const struct iovec *iov,
 				unsigned long nr_segs, loff_t *ppos)
@@ -1845,6 +1886,8 @@ generic_file_write_nolock(struct file *file, const struct iovec *iov,
 		ret = wait_on_sync_kiocb(&kiocb);
 	return ret;
 }
+
+EXPORT_SYMBOL(generic_file_write_nolock);
 
 ssize_t generic_file_aio_write(struct kiocb *iocb, const char __user *buf,
 			       size_t count, loff_t pos)
@@ -1863,8 +1906,8 @@ ssize_t generic_file_aio_write(struct kiocb *iocb, const char __user *buf,
 
 	return err;
 }
+
 EXPORT_SYMBOL(generic_file_aio_write);
-EXPORT_SYMBOL(generic_file_aio_write_nolock);
 
 ssize_t generic_file_write(struct file *file, const char __user *buf,
 			   size_t count, loff_t *ppos)
@@ -1880,6 +1923,8 @@ ssize_t generic_file_write(struct file *file, const char __user *buf,
 	return err;
 }
 
+EXPORT_SYMBOL(generic_file_write);
+
 ssize_t generic_file_readv(struct file *filp, const struct iovec *iov,
 			unsigned long nr_segs, loff_t *ppos)
 {
@@ -1893,6 +1938,8 @@ ssize_t generic_file_readv(struct file *filp, const struct iovec *iov,
 	return ret;
 }
 
+EXPORT_SYMBOL(generic_file_readv);
+
 ssize_t generic_file_writev(struct file *file, const struct iovec *iov,
 			unsigned long nr_segs, loff_t * ppos) 
 {
@@ -1904,6 +1951,8 @@ ssize_t generic_file_writev(struct file *file, const struct iovec *iov,
 	up(&inode->i_sem);
 	return ret;
 }
+
+EXPORT_SYMBOL(generic_file_writev);
 
 ssize_t
 generic_file_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
@@ -1927,3 +1976,5 @@ generic_file_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
 out:
 	return retval;
 }
+
+EXPORT_SYMBOL_GPL(generic_file_direct_IO);

@@ -2081,7 +2081,6 @@ static struct packet_type dn_dix_packet_type = {
 	.type =		__constant_htons(ETH_P_DNA_RT),
 	.dev =		NULL,		/* All devices */
 	.func =		dn_route_rcv,
-	.data =		PKT_CAN_SHARE_SKB,
 };
 
 #ifdef CONFIG_PROC_FS

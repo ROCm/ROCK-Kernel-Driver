@@ -439,20 +439,25 @@ ENTRY(soft_irq_mask)
 
 		.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
 /* FIXME: should not be using soo many LDRs here */
-		ldr	\irqnr, =IO_ADDRESS(INTEGRATOR_IC_BASE)
-		ldr	\irqstat, [\irqnr, #IRQ_STATUS]		@ get masked status
-		ldr	\irqnr, =IO_ADDRESS(INTEGRATOR_HDR_BASE)
-		ldr	\irqnr, [\irqnr, #(INTEGRATOR_HDR_IC_OFFSET+IRQ_STATUS)]
-		orr	\irqstat, \irqstat, \irqnr, lsl #INTEGRATOR_CM_INT0
+		ldr	\base, =IO_ADDRESS(INTEGRATOR_IC_BASE)
+		mov	\irqnr, #IRQ_PIC_START
+		ldr	\irqstat, [\base, #IRQ_STATUS]		@ get masked status
+		ldr	\base, =IO_ADDRESS(INTEGRATOR_HDR_BASE)
+		teq	\irqstat, #0
+		ldreq	\irqstat, [\base, #(INTEGRATOR_HDR_IC_OFFSET+IRQ_STATUS)]
+		moveq	\irqnr, #IRQ_CIC_START
 
-		mov	\irqnr, #0
-1001:		tst	\irqstat, #1
+1001:		tst	\irqstat, #15
 		bne	1002f
+		add	\irqnr, \irqnr, #4
+		movs	\irqstat, \irqstat, lsr #4
+		bne	1001b
+1002:		tst	\irqstat, #1
+		bne	1003f
 		add	\irqnr, \irqnr, #1
-		mov	\irqstat, \irqstat, lsr #1
-		cmp	\irqnr, #22
-		bcc	1001b
-1002:		/* EQ will be set if we reach 22 */
+		movs	\irqstat, \irqstat, lsr #1
+		bne	1002b
+1003:		/* EQ will be set if no irqs pending */
 		.endm
 
 		.macro	irq_prio_table
