@@ -5999,12 +5999,14 @@ static int ixj_build_filter_cadence(IXJ *j, IXJ_FILTER_CADENCE * cp)
 		if(ixjdebug & 0x0001) {
 			printk(KERN_INFO "Could not copy cadence to kernel\n");
 		}
+		kfree(lcp);
 		return -EFAULT;
 	}
 	if (lcp->filter > 5) {
 		if(ixjdebug & 0x0001) {
 			printk(KERN_INFO "Cadence out of range\n");
 		}
+		kfree(lcp);
 		return -1;
 	}
 	j->cadence_f[lcp->filter].state = 0;
