@@ -527,6 +527,15 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 	int need_auto_sense;
 	int result;
 
+	/*
+	 * Grab device's serialize mutex to prevent /usbfs and others from
+	 * sending out a command in the middle of ours (if libusb sends a
+	 * get_descriptor or something on pipe 0 after our CBW and before
+	 * our CSW, and then we get a stall, we have trouble)
+	 */
+
+	down (&(us->pusb_dev->serialize));
+
 	/* send the command to the transport layer */
 	srb->resid = 0;
 	result = us->transport(srb, us);
@@ -544,13 +553,13 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 		US_DEBUGP("-- transport indicates error, resetting\n");
 		us->transport_reset(us);
 		srb->result = DID_ERROR << 16;
-		return;
+		goto End_Transport;
 	}
 
 	/* if the transport provided its own sense data, don't auto-sense */
 	if (result == USB_STOR_TRANSPORT_NO_SENSE) {
 		srb->result = SAM_STAT_CHECK_CONDITION;
-		return;
+		goto End_Transport;
 	}
 
 	srb->result = SAM_STAT_GOOD;
@@ -676,7 +685,7 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 			if (!(us->flags & US_FL_SCM_MULT_TARG))
 				us->transport_reset(us);
 			srb->result = DID_ERROR << 16;
-			return;
+			goto End_Transport;
 		}
 
 		US_DEBUGP("-- Result from auto-sense is %d\n", temp_result);
@@ -708,7 +717,7 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 			srb->sense_buffer[0] = 0x0;
 		}
 	}
-	return;
+	goto End_Transport;
 
 	/* abort processing: the bulk-only transport requires a reset
 	 * following an abort */
@@ -720,6 +729,9 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 		clear_bit(US_FLIDX_ABORTING, &us->flags);
 		us->transport_reset(us);
 	}
+
+  End_Transport:
+	up(&(us->pusb_dev->serialize));
 }
 
 /* Stop the current URB transfer */
