@@ -831,19 +831,13 @@ static struct file_operations raw_seq_fops = {
 
 int __init raw_proc_init(void)
 {
-	struct proc_dir_entry *p;
-	int rc = 0;
-
-	p = create_proc_entry("raw", S_IRUGO, proc_net);
-	if (p)
-		p->proc_fops = &raw_seq_fops;
-	else
-		rc = -ENOMEM;
-	return rc;
+	if (!proc_net_fops_create("raw", S_IRUGO, &raw_seq_fops))
+		return -ENOMEM;
+	return 0;
 }
 
 void __init raw_proc_exit(void)
 {
-	remove_proc_entry("raw", proc_net);
+	proc_net_remove("raw");
 }
 #endif /* CONFIG_PROC_FS */

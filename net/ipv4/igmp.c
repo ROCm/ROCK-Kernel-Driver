@@ -2430,15 +2430,8 @@ static struct file_operations igmp_mcf_seq_fops = {
 
 int __init igmp_mc_proc_init(void)
 {
-	struct proc_dir_entry *p;
-
-	p = create_proc_entry("igmp", S_IRUGO, proc_net);
-	if (p)
-		p->proc_fops = &igmp_mc_seq_fops;
-
-	p = create_proc_entry("mcfilter", S_IRUGO, proc_net);
-	if (p)
-		p->proc_fops = &igmp_mcf_seq_fops;
+	proc_net_fops_create("igmp", S_IRUGO, &igmp_mc_seq_fops);
+	proc_net_fops_create("mcfilter", S_IRUGO, &igmp_mcf_seq_fops);
 	return 0;
 }
 #endif
