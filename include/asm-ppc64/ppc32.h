@@ -174,14 +174,12 @@ struct flock32 {
 
 struct stat32 {
 	__kernel_dev_t32   st_dev; /* 2 */
-	/* __kernel_dev_t32 __pad1; */ /* 2 */
 	__kernel_ino_t32   st_ino; /* 4  */
 	__kernel_mode_t32  st_mode; /* 2  */
 	short   	   st_nlink; /* 2 */
 	__kernel_uid_t32   st_uid; /* 2 */
 	__kernel_gid_t32   st_gid; /* 2 */
 	__kernel_dev_t32   st_rdev; /* 2 */
-	/* __kernel_dev_t32 __pad2; */ /* 2 */
 	__kernel_off_t32   st_size; /* 4 */
 	__kernel_off_t32   st_blksize; /* 4 */
 	__kernel_off_t32   st_blocks; /* 4 */
@@ -192,21 +190,6 @@ struct stat32 {
 	__kernel_time_t32  st_ctime; /* 4 */
 	unsigned int       __unused3; /* 4 */
 	unsigned int  __unused4[2]; /* 2*4 */
-};
-
-struct __old_kernel_stat32
-{
-	unsigned short st_dev;
-	unsigned short st_ino;
-	unsigned short st_mode;
-	unsigned short st_nlink;
-	unsigned short st_uid;
-	unsigned short st_gid;
-	unsigned short st_rdev;
-	unsigned int   st_size;
-	unsigned int   st_atime;
-	unsigned int   st_mtime;
-	unsigned int   st_ctime;
 };
 
 struct sigcontext32 {

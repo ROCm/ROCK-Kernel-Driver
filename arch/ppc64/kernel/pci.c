@@ -939,7 +939,7 @@ void dumpPci_Dev(struct pci_dev* Pci_Dev)
 	int i;
 	udbg_printf("\tpci_dev*        = 0x%p\n",Pci_Dev);
 	if ( Pci_Dev == NULL )  return;
-	udbg_printf("\tname            = %s  \n",Pci_Dev->name);
+	udbg_printf("\tname            = %s  \n",Pci_Dev->dev.name);
 	udbg_printf("\tbus*            = 0x%p\n",Pci_Dev->bus);
 	udbg_printf("\tsysdata*        = 0x%p\n",Pci_Dev->sysdata);
 	udbg_printf("\tDevice          = 0x%4X%02X:%02X.%02X 0x%04X:%04X\n",

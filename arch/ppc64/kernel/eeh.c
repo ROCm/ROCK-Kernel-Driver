@@ -95,10 +95,10 @@ unsigned long eeh_check_failure(void *token, unsigned long val)
 		dev = pci_find_slot(bus, devfn);
 		if (dev) {
 			printk(KERN_ERR "EEH:  MMIO failure (%ld) on device:\n  %s %s\n",
-			      rets[0], dev->slot_name, dev->name);
+			      rets[0], dev->slot_name, dev->dev.name);
 			PPCDBG_ENTER_DEBUGGER();
 			panic("EEH:  MMIO failure (%ld) on device:\n  %s %s\n",
-			      rets[0], dev->slot_name, dev->name);
+			      rets[0], dev->slot_name, dev->dev.name);
 		} else {
 			printk(KERN_ERR "EEH:  MMIO failure (%ld) on device buid %lx, config_addr %lx\n", rets[0], phb->buid, config_addr);
 			PPCDBG_ENTER_DEBUGGER();
@@ -224,7 +224,7 @@ int is_eeh_configured(struct pci_dev *dev)
 
 	if (!eeh_check_opts_config(dev, default_state)) {
 		if (default_state)
-			printk(KERN_INFO "EEH: %s %s user requested to run without EEH.\n", dev->slot_name, dev->name);
+			printk(KERN_INFO "EEH: %s %s user requested to run without EEH.\n", dev->slot_name, dev->dev.name);
 		return 0;
 	}
 

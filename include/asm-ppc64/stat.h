@@ -10,20 +10,6 @@
 
 #include <linux/types.h>
 
-struct __old_kernel_stat {
-	unsigned short st_dev;
-	unsigned short st_ino;
-	unsigned short st_mode;
-	unsigned short st_nlink;
-	unsigned short st_uid;
-	unsigned short st_gid;
-	unsigned short st_rdev;
-	unsigned long  st_size;
-	unsigned long  st_atime;
-	unsigned long  st_mtime;
-	unsigned long  st_ctime;
-};
-
 struct stat {
 	dev_t		st_dev;
 	ino_t		st_ino;
@@ -48,7 +34,7 @@ struct stat {
 
 #define STAT_HAVE_NSEC 1
 
-/* This matches struct stat64 in glibc2.1. */
+/* This matches struct stat64 in glibc2.1. Only used for 32 bit. */
 struct stat64 {
 	unsigned long st_dev; 		/* Device.  */
 	unsigned long st_ino;		/* File serial number.  */

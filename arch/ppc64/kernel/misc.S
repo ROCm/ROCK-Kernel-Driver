@@ -633,10 +633,10 @@ _GLOBAL(sys_call_table32)
 	.llong .sys32_adjtimex
 	.llong .sys_mprotect		/* 125 */
 	.llong .sys32_sigprocmask
-	.llong .sys32_create_module
+	.llong .sys_ni_syscall		/* old create_module syscall */
 	.llong .sys32_init_module
 	.llong .sys32_delete_module
-	.llong .sys32_get_kernel_syms	/* 130 */
+	.llong .sys_ni_syscall		/* 130 old get_kernel_syms syscall */
 	.llong .sys_quotactl
 	.llong .sys32_getpgid
 	.llong .sys_fchdir
@@ -672,7 +672,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys32_mremap
 	.llong .sys_setresuid
 	.llong .sys_getresuid	        /* 165 */
-	.llong .sys32_query_module
+	.llong .sys_ni_syscall		/* old query_module syscall */
 	.llong .sys_poll
 	.llong .sys32_nfsservctl
 	.llong .sys_setresgid
@@ -881,10 +881,10 @@ _GLOBAL(sys_call_table)
 	.llong .sys_adjtimex
 	.llong .sys_mprotect		/* 125 */
 	.llong .sys_sigprocmask
-	.llong .sys_create_module
+	.llong .sys_ni_syscall		/* old create_module syscall */
 	.llong .sys_init_module
 	.llong .sys_delete_module
-	.llong .sys_get_kernel_syms	/* 130 */
+	.llong .sys_ni_syscall		/* 130 old get_kernel_syms syscall */
 	.llong .sys_quotactl
 	.llong .sys_getpgid
 	.llong .sys_fchdir
@@ -920,7 +920,7 @@ _GLOBAL(sys_call_table)
 	.llong .sys_mremap
 	.llong .sys_setresuid
 	.llong .sys_getresuid	        /* 165 */
-	.llong .sys_query_module
+	.llong .sys_ni_syscall		/* old query_module syscall */
 	.llong .sys_poll
 	.llong .sys_nfsservctl
 	.llong .sys_setresgid
