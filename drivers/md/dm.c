@@ -369,6 +369,7 @@ static void __map_bio(struct dm_target *ti, struct bio *clone,
 		struct dm_io *io = tio->io;
 		free_tio(tio->io->md, tio);
 		dec_pending(io, -EIO);
+		bio_put(clone);
 	}
 }
 
