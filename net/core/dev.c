@@ -187,7 +187,6 @@ int netdev_fastroute_obstacles;
 
 extern int netdev_sysfs_init(void);
 extern int netdev_register_sysfs(struct net_device *);
-extern void netdev_unregister_sysfs(struct net_device *);
 
 
 /*******************************************************************************
@@ -2710,38 +2709,17 @@ out_err:
 	goto out;
 }
 
-/**
- *	netdev_finish_unregister - complete unregistration
- *	@dev: device
+/*
+ * netdev_wait_allrefs - wait until all references are gone.
  *
- *	Destroy and free a dead device. A value of zero is returned on
- *	success.
+ * This is called when unregistering network devices.
+ *
+ * Any protocol or device that holds a reference should register
+ * for netdevice notification, and cleanup and put back the
+ * reference if they receive an UNREGISTER event.
+ * We can get stuck here if buggy protocols don't correctly
+ * call dev_put. 
  */
-static int netdev_finish_unregister(struct net_device *dev)
-{
-	BUG_TRAP(!dev->ip_ptr);
-	BUG_TRAP(!dev->ip6_ptr);
-	BUG_TRAP(!dev->dn_ptr);
-
-	if (dev->reg_state != NETREG_UNREGISTERED) {
-		printk(KERN_ERR "Freeing alive device %p, %s\n",
-		       dev, dev->name);
-		return 0;
-	}
-#ifdef NET_REFCNT_DEBUG
-	printk(KERN_DEBUG "netdev_finish_unregister: %s%s.\n", dev->name,
-	       (dev->destructor != NULL)?"":", old style");
-#endif
-
-	/* It must be the very last action, after this 'dev' may point
-	 * to freed up memory.
-	 */
-	if (dev->destructor)
-		dev->destructor(dev);
-
-	return 0;
-}
-
 static void netdev_wait_allrefs(struct net_device *dev)
 {
 	unsigned long rebroadcast_time, warning_time;
@@ -2837,13 +2815,23 @@ void netdev_run_todo(void)
 			break;
 
 		case NETREG_UNREGISTERING:
-			netdev_unregister_sysfs(dev);
+			class_device_unregister(&dev->class_dev);
 			dev->reg_state = NETREG_UNREGISTERED;
 
 			netdev_wait_allrefs(dev);
+
+			/* paranoia */
 			BUG_ON(atomic_read(&dev->refcnt));
-				
-			netdev_finish_unregister(dev);
+			BUG_TRAP(!dev->ip_ptr);
+			BUG_TRAP(!dev->ip6_ptr);
+			BUG_TRAP(!dev->dn_ptr);
+
+
+			/* It must be the very last action, 
+			 * after this 'dev' may point to freed up memory.
+			 */
+			if (dev->destructor)
+				dev->destructor(dev);
 			break;
 
 		default:

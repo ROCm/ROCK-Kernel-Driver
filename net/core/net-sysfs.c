@@ -341,11 +341,6 @@ out:
 	return ret;
 }
 
-void netdev_unregister_sysfs(struct net_device *net)
-{
-	class_device_unregister(&net->class_dev);
-}
-
 int netdev_sysfs_init(void)
 {
 	return class_register(&net_class);
