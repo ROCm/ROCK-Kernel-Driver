@@ -277,7 +277,7 @@ int ps2pp_init(struct psmouse *psmouse, int set_properties)
 				protocol = PSMOUSE_PS2TPP;
 			}
 
-		} else if (get_model_info(model) != NULL) {
+		} else if (model_info != NULL) {
 
 			param[0] = param[1] = param[2] = 0;
 			ps2pp_cmd(psmouse, param, 0x39); /* Magic knock */
