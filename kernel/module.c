@@ -173,16 +173,19 @@ static int use_module(struct module *a, struct module *b)
 	struct module_use *use;
 	if (b == NULL || already_uses(a, b)) return 1;
 
+	if (!strong_try_module_get(b))
+		return 0;
+
 	DEBUGP("Allocating new usage for %s.\n", a->name);
 	use = kmalloc(sizeof(*use), GFP_ATOMIC);
 	if (!use) {
 		printk("%s: out of memory loading\n", a->name);
+		module_put(b);
 		return 0;
 	}
 
 	use->module_which_uses = a;
 	list_add(&use->list, &b->modules_which_use_me);
-	try_module_get(b); /* Can't fail */
 	return 1;
 }
 
@@ -1456,10 +1459,12 @@ sys_init_module(void *umod,
 	}
 
 	/* Now it's a first class citizen! */
+	down(&module_mutex);
 	mod->state = MODULE_STATE_LIVE;
 	module_free(mod, mod->module_init);
 	mod->module_init = NULL;
 	mod->init_size = 0;
+	up(&module_mutex);
 
 	return 0;
 }
