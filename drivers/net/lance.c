@@ -625,7 +625,7 @@ static int __init lance_probe1(struct net_device *dev, int ioaddr, int irq, int 
 		/* Trigger an initialization just for the interrupt. */
 		unsigned long irq_mask, delay;
 
-		irq_mask = probe_irq_on(0);
+		irq_mask = probe_irq_on();
 		outw(0x0041, ioaddr+LANCE_DATA);
 
 		delay = jiffies + HZ/25;
