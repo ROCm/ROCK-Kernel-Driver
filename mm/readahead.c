@@ -298,15 +298,10 @@ int force_page_cache_readahead(struct address_space *mapping, struct file *filp,
 int do_page_cache_readahead(struct address_space *mapping, struct file *filp,
 			unsigned long offset, unsigned long nr_to_read)
 {
-	int ret = 0;
-
-	if (!bdi_read_congested(mapping->backing_dev_info)) {
-		current->flags |= PF_READAHEAD;
-		ret = __do_page_cache_readahead(mapping, filp,
+	if (!bdi_read_congested(mapping->backing_dev_info))
+		return __do_page_cache_readahead(mapping, filp,
 						offset, nr_to_read);
-		current->flags &= ~PF_READAHEAD;
-	}
-	return ret;
+	return 0;
 }
 
 /*
