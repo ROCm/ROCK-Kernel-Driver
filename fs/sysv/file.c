@@ -13,8 +13,7 @@
  *  SystemV/Coherent regular file handling primitives
  */
 
-#include <linux/fs.h>
-#include <linux/sysv_fs.h>
+#include "sysv.h"
 
 /*
  * We have mostly NULLs here: the current defaults are OK for
