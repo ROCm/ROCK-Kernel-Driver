@@ -46,6 +46,8 @@
 #define __phys_to_virt__is_a_macro
 #define __phys_to_virt(ppage) ((ppage) + PAGE_OFFSET)
 
+#define BUS_OFFSET	(0x80000000UL)
+
 /*
  * Virtual view <-> DMA view memory address translations
  * virt_to_bus: Used to translate the virtual address to an
@@ -54,8 +56,8 @@
  *              to an address that the kernel can use.
  */
 #define __virt_to_bus__is_a_macro
-#define __virt_to_bus(x)	(x - PAGE_OFFSET + INTEGRATOR_HDR0_SDRAM_BASE)
+#define __virt_to_bus(x)	(x - PAGE_OFFSET + BUS_OFFSET)
 #define __bus_to_virt__is_a_macro
-#define __bus_to_virt(x)	(x - INTEGRATOR_HDR0_SDRAM_BASE + PAGE_OFFSET)
+#define __bus_to_virt(x)	(x - BUS_OFFSET + PAGE_OFFSET)
 
 #endif

@@ -8,6 +8,8 @@
  *
  * Code supporting TITAN systems (EV6+TITAN), currently:
  *      Privateer
+ *	Falcon
+ *	Granite
  */
 
 #include <linux/config.h>
@@ -34,12 +36,26 @@
 #include "irq_impl.h"
 #include "pci_impl.h"
 #include "machvec_impl.h"
+#include "err_impl.h"
 
-/* Note mask bit is true for ENABLED irqs. */
-static unsigned long cached_irq_mask;
-/* Titan boards handle at most four CPUs.  */
-static unsigned long cpu_irq_affinity[4] = { ~0UL, ~0UL, ~0UL, ~0UL };
+
+/*
+ * Titan generic
+ */
 
+/*
+ * Titan supports up to 4 CPUs
+ */
+static unsigned long titan_cpu_irq_affinity[4] = { ~0UL, ~0UL, ~0UL, ~0UL };
+
+/*
+ * Mask is set (1) if enabled
+ */
+static unsigned long titan_cached_irq_mask;
+
+/*
+ * Need SMP-safe access to interrupt CSRs
+ */
 spinlock_t titan_irq_lock = SPIN_LOCK_UNLOCKED;
 
 static void
@@ -55,10 +71,10 @@ titan_update_irq_hw(unsigned long mask)
 	unsigned long mask0, mask1, mask2, mask3, dummy;
 
 	mask &= ~isa_enable;
-	mask0 = mask & cpu_irq_affinity[0];
-	mask1 = mask & cpu_irq_affinity[1];
-	mask2 = mask & cpu_irq_affinity[2];
-	mask3 = mask & cpu_irq_affinity[3];
+	mask0 = mask & titan_cpu_irq_affinity[0];
+	mask1 = mask & titan_cpu_irq_affinity[1];
+	mask2 = mask & titan_cpu_irq_affinity[2];
+	mask3 = mask & titan_cpu_irq_affinity[3];
 
 	if (bcpu == 0) mask0 |= isa_enable;
 	else if (bcpu == 1) mask1 |= isa_enable;
@@ -97,79 +113,68 @@ titan_update_irq_hw(unsigned long mask)
 }
 
 static inline void
-privateer_enable_irq(unsigned int irq)
+titan_enable_irq(unsigned int irq)
 {
 	spin_lock(&titan_irq_lock);
-	cached_irq_mask |= 1UL << (irq - 16);
-	titan_update_irq_hw(cached_irq_mask);
+	titan_cached_irq_mask |= 1UL << (irq - 16);
+	titan_update_irq_hw(titan_cached_irq_mask);
 	spin_unlock(&titan_irq_lock);
 }
 
 static inline void
-privateer_disable_irq(unsigned int irq)
+titan_disable_irq(unsigned int irq)
 {
 	spin_lock(&titan_irq_lock);
-	cached_irq_mask &= ~(1UL << (irq - 16));
-	titan_update_irq_hw(cached_irq_mask);
+	titan_cached_irq_mask &= ~(1UL << (irq - 16));
+	titan_update_irq_hw(titan_cached_irq_mask);
 	spin_unlock(&titan_irq_lock);
 }
 
 static unsigned int
-privateer_startup_irq(unsigned int irq)
+titan_startup_irq(unsigned int irq)
 {
-	privateer_enable_irq(irq);
+	titan_enable_irq(irq);
 	return 0;	/* never anything pending */
 }
 
 static void
-privateer_end_irq(unsigned int irq)
+titan_end_irq(unsigned int irq)
 {
 	if (!(irq_desc[irq].status & (IRQ_DISABLED|IRQ_INPROGRESS)))
-		privateer_enable_irq(irq);
+		titan_enable_irq(irq);
 }
 
 static void
-cpu_set_irq_affinity(unsigned int irq, unsigned long affinity)
+titan_cpu_set_irq_affinity(unsigned int irq, unsigned long affinity)
 {
 	int cpu;
 
 	for (cpu = 0; cpu < 4; cpu++) {
 		if (affinity & (1UL << cpu))
-			cpu_irq_affinity[cpu] |= 1UL << irq;
+			titan_cpu_irq_affinity[cpu] |= 1UL << irq;
 		else
-			cpu_irq_affinity[cpu] &= ~(1UL << irq);
+			titan_cpu_irq_affinity[cpu] &= ~(1UL << irq);
 	}
 
 }
 
 static void
-privateer_set_affinity(unsigned int irq, unsigned long affinity)
+titan_set_irq_affinity(unsigned int irq, unsigned long affinity)
 { 
 	spin_lock(&titan_irq_lock);
-	cpu_set_irq_affinity(irq - 16, affinity);
-	titan_update_irq_hw(cached_irq_mask);
+	titan_cpu_set_irq_affinity(irq - 16, affinity);
+	titan_update_irq_hw(titan_cached_irq_mask);
 	spin_unlock(&titan_irq_lock);
 }
 
-static struct hw_interrupt_type privateer_irq_type = {
-	.typename	= "PRIVATEER",
-	.startup	= privateer_startup_irq,
-	.shutdown	= privateer_disable_irq,
-	.enable		= privateer_enable_irq,
-	.disable	= privateer_disable_irq,
-	.ack		= privateer_disable_irq,
-	.end		= privateer_end_irq,
-	.set_affinity	= privateer_set_affinity,
-};
-
 static void
-privateer_device_interrupt(unsigned long vector, struct pt_regs * regs)
+titan_device_interrupt(unsigned long vector, struct pt_regs * regs)
 {
-	printk("privateer_device_interrupt: NOT IMPLEMENTED YET!! \n");
+	printk("titan_device_interrupt: NOT IMPLEMENTED YET!! \n");
 }
 
 static void 
-privateer_srm_device_interrupt(unsigned long vector, struct pt_regs * regs)
+titan_srm_device_interrupt(unsigned long vector, struct pt_regs * regs)
 {
 	int irq;
 
@@ -182,186 +187,209 @@ static void __init
 init_titan_irqs(struct hw_interrupt_type * ops, int imin, int imax)
 {
 	long i;
-	for(i = imin; i <= imax; ++i) {
+	for (i = imin; i <= imax; ++i) {
 		irq_desc[i].status = IRQ_DISABLED | IRQ_LEVEL;
 		irq_desc[i].handler = ops;
 	}
 }
 
-static void __init
-privateer_init_irq(void)
+static struct hw_interrupt_type titan_irq_type = {
+       .typename       = "TITAN",
+       .startup        = titan_startup_irq,
+       .shutdown       = titan_disable_irq,
+       .enable         = titan_enable_irq,
+       .disable        = titan_disable_irq,
+       .ack            = titan_disable_irq,
+       .end            = titan_end_irq,
+       .set_affinity   = titan_set_irq_affinity,
+};
+
+static void
+titan_intr_nop(int irq, void *dev_id, struct pt_regs *regs)                    
 {
+      /*
+       * This is a NOP interrupt handler for the purposes of
+       * event counting -- just return.
+       */                                                                     
+}
+
+static void __init
+titan_init_irq(void)
+{
+	if (alpha_using_srm && !alpha_mv.device_interrupt)
+		alpha_mv.device_interrupt = titan_srm_device_interrupt;
+	if (!alpha_mv.device_interrupt)
+		alpha_mv.device_interrupt = titan_device_interrupt;
+
+	titan_update_irq_hw(0);
+
+	init_titan_irqs(&titan_irq_type, 16, 63 + 16);
+}
+  
+static void __init
+titan_legacy_init_irq(void)
+{
+	/* init the legacy dma controller */
 	outb(0, DMA1_RESET_REG);
 	outb(0, DMA2_RESET_REG);
 	outb(DMA_MODE_CASCADE, DMA2_MODE_REG);
 	outb(0, DMA2_MASK_REG);
 
-	if (alpha_using_srm)
-		alpha_mv.device_interrupt = privateer_srm_device_interrupt;
-
-	titan_update_irq_hw(0UL);
-
+	/* init the legacy irq controller */
 	init_i8259a_irqs();
-	init_titan_irqs(&privateer_irq_type, 16, 63 + 16);
-}
 
-/*
- * Privateer PCI Fixup configuration.
- *
- * PCHIP 0 BUS 0 (Hose 0)
- *
- *     IDSEL	Dev	What
- *     -----	---	----
- *	18	 7	Embedded Southbridge
- *	19	 8	Slot 0 
- *	20	 9	Slot 1
- *	21	10	Slot 2 
- *	22	11	Slot 3
- *	23	12	Embedded HotPlug controller
- *	27	16	Embedded Southbridge IDE
- *	29	18     	Embedded Southbridge PMU
- *	31	20	Embedded Southbridge USB
- *
- * PCHIP 1 BUS 0 (Hose 1)
- *
- *     IDSEL	Dev	What
- *     -----	---	----
- *	12	 1	Slot 0
- * 	13	 2	Slot 1
- *	17	 6	Embedded hotPlug controller
- *
- * PCHIP 0 BUS 1 (Hose 2)
- *
- *     IDSEL	What
- *     -----	----
- *	NONE	AGP
- *
- * PCHIP 1 BUS 1 (Hose 3)
- *
- *     IDSEL	Dev	What
- *     -----	---	----
- *	12	 1	Slot 0
- * 	13	 2	Slot 1
- *	17	 6	Embedded hotPlug controller
- *
- * Summary @ TITAN_CSR_DIM0:
- * Bit      Meaning
- *  0-7     Unused
- *  8       PCHIP 0 BUS 1 YUKON (if present)
- *  9       PCHIP 1 BUS 1 YUKON
- * 10       PCHIP 1 BUS 0 YUKON
- * 11       PCHIP 0 BUS 0 YUKON
- * 12       PCHIP 0 BUS 0 SLOT 2 INT A
- * 13       PCHIP 0 BUS 0 SLOT 2 INT B
- * 14       PCHIP 0 BUS 0 SLOT 2 INT C
- * 15       PCHIP 0 BUS 0 SLOT 2 INT D
- * 16       PCHIP 0 BUS 0 SLOT 3 INT A
- * 17       PCHIP 0 BUS 0 SLOT 3 INT B
- * 18       PCHIP 0 BUS 0 SLOT 3 INT C
- * 19       PCHIP 0 BUS 0 SLOT 3 INT D
- * 20       PCHIP 0 BUS 0 SLOT 0 INT A
- * 21       PCHIP 0 BUS 0 SLOT 0 INT B
- * 22       PCHIP 0 BUS 0 SLOT 0 INT C
- * 23       PCHIP 0 BUS 0 SLOT 0 INT D
- * 24       PCHIP 0 BUS 0 SLOT 1 INT A
- * 25       PCHIP 0 BUS 0 SLOT 1 INT B
- * 26       PCHIP 0 BUS 0 SLOT 1 INT C
- * 27       PCHIP 0 BUS 0 SLOT 1 INT D
- * 28       PCHIP 1 BUS 0 SLOT 0 INT A
- * 29       PCHIP 1 BUS 0 SLOT 0 INT B
- * 30       PCHIP 1 BUS 0 SLOT 0 INT C
- * 31       PCHIP 1 BUS 0 SLOT 0 INT D
- * 32       PCHIP 1 BUS 0 SLOT 1 INT A
- * 33       PCHIP 1 BUS 0 SLOT 1 INT B
- * 34       PCHIP 1 BUS 0 SLOT 1 INT C
- * 35       PCHIP 1 BUS 0 SLOT 1 INT D
- * 36       PCHIP 1 BUS 1 SLOT 0 INT A
- * 37       PCHIP 1 BUS 1 SLOT 0 INT B
- * 38       PCHIP 1 BUS 1 SLOT 0 INT C
- * 39       PCHIP 1 BUS 1 SLOT 0 INT D
- * 40       PCHIP 1 BUS 1 SLOT 1 INT A
- * 41       PCHIP 1 BUS 1 SLOT 1 INT B
- * 42       PCHIP 1 BUS 1 SLOT 1 INT C
- * 43       PCHIP 1 BUS 1 SLOT 1 INT D
- * 44       AGP INT A
- * 45       AGP INT B
- * 46-47    Unused
- * 49       Reserved for Sleep mode
- * 50       Temperature Warning (optional)
- * 51       Power Warning (optional)
- * 52       Reserved
- * 53       South Bridge NMI
- * 54       South Bridge SMI INT
- * 55       South Bridge ISA Interrupt
- * 56-58    Unused
- * 59       PCHIP1_C_ERROR
- * 60       PCHIP0_C_ERROR 
- * 61       PCHIP1_H_ERROR
- * 62       PCHIP0_H_ERROR
- * 63       Reserved
- *
- */
-static int __init
-privateer_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
-{
-	u8 irq;
-	
-	pci_read_config_byte(dev, PCI_INTERRUPT_LINE, &irq);
-
-	/* is it routed through ISA? */
-	if ((irq & 0xF0) == 0xE0)
-		return (int)irq;
-
-	return (int)irq + 16;	/* HACK -- this better only be called once */
-}
-
-#ifdef CONFIG_VGA_HOSE
-static struct pci_controller * __init
-privateer_vga_hose_select(struct pci_controller *h1, struct pci_controller *h2)
-{
-	struct pci_controller *hose = h1;
-	int agp1, agp2;
-
-	/* which hose(s) are agp? */
-	agp1 = (0 != (TITAN_agp & (1 << h1->index)));
-	agp2 = (0 != (TITAN_agp & (1 << h2->index)));
-       
-	hose = h1;			/* default to h1 */
-	if (agp1 ^ agp2) {
-		if (agp2) hose = h2;	/* take agp if only one */
-	} else if (h2->index < h1->index)
-		hose = h2;		/* first hose if 2xpci or 2xagp */
-
-	return hose;
-}
-#endif
-
-static void __init
-privateer_init_pci(void)
-{
-	common_init_pci();
-	SMC669_Init(0);
-#ifdef CONFIG_VGA_HOSE
-	locate_and_init_vga(privateer_vga_hose_select);
-#endif
+	/* init the titan irqs */
+	titan_init_irq();
 }
 
 void
-privateer_machine_check(unsigned long vector, unsigned long la_ptr,
-			struct pt_regs * regs)
+titan_dispatch_irqs(u64 mask, struct pt_regs *regs)
 {
-	/* only handle system events here */
-	if (vector != SCB_Q_SYSEVENT) 
-		return titan_machine_check(vector, la_ptr, regs);
+	unsigned long vector;
 
-	/* it's a system event, handle it here */
-	printk("PRIVATEER 680 Machine Check on CPU %d\n", smp_processor_id());
+	/*
+	 * Mask down to those interrupts which are enable on this processor
+	 */
+	mask &= titan_cpu_irq_affinity[smp_processor_id()];
+
+	/*
+	 * Dispatch all requested interrupts 
+	 */
+	while (mask) {
+		/* convert to SRM vector... priority is <63> -> <0> */
+		__asm__("ctlz %1, %0" : "=r"(vector) : "r"(mask));
+		vector = 63 - vector;
+		mask &= ~(1UL << vector);	/* clear it out 	 */
+		vector = 0x900 + (vector << 4);	/* convert to SRM vector */
+		
+		/* dispatch it */
+		alpha_mv.device_interrupt(vector, regs);
+	}
+}
+  
+
+/*
+ * Titan Family
+ */
+static void __init
+titan_late_init(void)
+{
+	/*
+	 * Enable the system error interrupts. These interrupts are 
+	 * all reported to the kernel as machine checks, so the handler
+	 * is a nop so it can be called to count the individual events.
+	 */
+	request_irq(63+16, titan_intr_nop, SA_INTERRUPT, 
+		    "CChip Error", NULL);
+	request_irq(62+16, titan_intr_nop, SA_INTERRUPT, 
+		    "PChip 0 H_Error", NULL);
+	request_irq(61+16, titan_intr_nop, SA_INTERRUPT, 
+		    "PChip 1 H_Error", NULL);
+	request_irq(60+16, titan_intr_nop, SA_INTERRUPT, 
+		    "PChip 0 C_Error", NULL);
+	request_irq(59+16, titan_intr_nop, SA_INTERRUPT, 
+		    "PChip 1 C_Error", NULL);
+
+	/* 
+	 * Register our error handlers.
+	 */
+	titan_register_error_handlers();
+
+	/*
+	 * Check if the console left us any error logs.
+	 */
+	cdl_check_console_data_log();
+
 }
 
+static int __devinit
+titan_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
+{
+	u8 intline;
+	int irq;
 
+ 	/* Get the current intline.  */
+	pci_read_config_byte(dev, PCI_INTERRUPT_LINE, &intline);
+	irq = intline;
+
+ 	/* Is it explicitly routed through ISA?  */
+ 	if ((irq & 0xF0) == 0xE0)
+ 		return irq;
+ 
+ 	/* Offset by 16 to make room for ISA interrupts 0 - 15.  */
+ 	return irq + 16;
+}
+
+static void __init
+titan_init_pci(void)
+{
+ 	/*
+ 	 * This isn't really the right place, but there's some init
+ 	 * that needs to be done after everything is basically up.
+ 	 */
+ 	titan_late_init();
+ 
+	pci_probe_only = 1;
+	common_init_pci();
+	SMC669_Init(0);
+#ifdef CONFIG_VGA_HOSE
+	locate_and_init_vga(NULL);
+#endif
+}
+
+
 /*
- * The System Vectors
+ * Privateer
  */
+static void __init
+privateer_init_pci(void)
+{
+	/*
+	 * Hook a couple of extra err interrupts that the
+	 * common titan code won't.
+	 */
+	request_irq(53+16, titan_intr_nop, SA_INTERRUPT, 
+		    "NMI", NULL);
+	request_irq(50+16, titan_intr_nop, SA_INTERRUPT, 
+		    "Temperature Warning", NULL);
+
+	/*
+	 * Finish with the common version.
+	 */
+	return titan_init_pci();
+}
+
+
+/*
+ * The System Vectors.
+ */
+struct alpha_machine_vector titan_mv __initmv = {
+	.vector_name		= "TITAN",
+	DO_EV6_MMU,
+	DO_DEFAULT_RTC,
+	DO_TITAN_IO,
+	DO_TITAN_BUS,
+	.machine_check		= titan_machine_check,
+	.max_isa_dma_address	= ALPHA_MAX_ISA_DMA_ADDRESS,
+	.min_io_address		= DEFAULT_IO_BASE,
+	.min_mem_address	= DEFAULT_MEM_BASE,
+	.pci_dac_offset		= TITAN_DAC_OFFSET,
+
+	.nr_irqs		= 80,	/* 64 + 16 */
+	/* device_interrupt will be filled in by titan_init_irq */
+
+	.agp_info		= titan_agp_info,
+
+	.init_arch		= titan_init_arch,
+	.init_irq		= titan_legacy_init_irq,
+	.init_rtc		= common_init_rtc,
+	.init_pci		= titan_init_pci,
+
+	.kill_arch		= titan_kill_arch,
+	.pci_map_irq		= titan_map_irq,
+	.pci_swizzle		= common_swizzle,
+};
+ALIAS_MV(titan)
 
 struct alpha_machine_vector privateer_mv __initmv = {
 	.vector_name		= "PRIVATEER",
@@ -376,14 +404,18 @@ struct alpha_machine_vector privateer_mv __initmv = {
 	.pci_dac_offset		= TITAN_DAC_OFFSET,
 
 	.nr_irqs		= 80,	/* 64 + 16 */
-	.device_interrupt	= privateer_device_interrupt,
+	/* device_interrupt will be filled in by titan_init_irq */
+
+	.agp_info		= titan_agp_info,
 
 	.init_arch		= titan_init_arch,
-	.init_irq		= privateer_init_irq,
+	.init_irq		= titan_legacy_init_irq,
 	.init_rtc		= common_init_rtc,
 	.init_pci		= privateer_init_pci,
+
 	.kill_arch		= titan_kill_arch,
-	.pci_map_irq		= privateer_map_irq,
+	.pci_map_irq		= titan_map_irq,
 	.pci_swizzle		= common_swizzle,
 };
-ALIAS_MV(privateer)
+/* No alpha_mv alias for privateer since we compile it 
+   in unconditionally with titan; setup_arch knows how to cope. */

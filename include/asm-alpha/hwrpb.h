@@ -64,6 +64,7 @@
 #define ST_DEC_CUSCO		 36	/* CUSCO systype	*/
 #define ST_DEC_EIGER		 37	/* Eiger systype	*/
 #define ST_DEC_TITAN		 38	/* Titan systype	*/
+#define ST_DEC_MARVEL		 39	/* Marvel systype	*/
 
 /* UNOFFICIAL!!! */
 #define ST_UNOFFICIAL_BIAS	100
