@@ -31,7 +31,7 @@ fixup_empeg(struct machine_desc *desc, struct param_struct *params,
 
 static struct map_desc empeg_io_desc[] __initdata = {
  /* virtual     physical    length      domain     r  w  c  b */
-  { EMPEG_FLASHBASE, 0x00000000, 0x00200000, DOMAIN_IO, 1, 1, 0, 0 }, /* Flash */
+  { EMPEG_FLASHBASE, 0x00000000, 0x00200000, DOMAIN_IO, 0, 1, 0, 0 }, /* Flash */
   LAST_DESC
 };
 

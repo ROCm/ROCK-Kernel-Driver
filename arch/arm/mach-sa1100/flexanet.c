@@ -172,10 +172,10 @@ fixup_flexanet(struct machine_desc *desc, struct param_struct *params,
 
 static struct map_desc flexanet_io_desc[] __initdata = {
  /* virtual     physical    length      domain     r  w  c  b */
-  { 0xf0000000, 0x10000000, 0x00001000, DOMAIN_IO, 1, 1, 0, 0 }, /* Board Control Register */
-  { 0xf1000000, 0x18000000, 0x01000000, DOMAIN_IO, 1, 1, 0, 0 }, /* Ethernet controller */
-  { 0xD0000000, 0x40000000, 0x01000000, DOMAIN_IO, 1, 1, 0, 0 }, /* Instrument boards */
-  { 0xD8000000, 0x48000000, 0x01000000, DOMAIN_IO, 1, 1, 0, 0 }, /* External peripherals */
+  { 0xf0000000, 0x10000000, 0x00001000, DOMAIN_IO, 0, 1, 0, 0 }, /* Board Control Register */
+  { 0xf1000000, 0x18000000, 0x01000000, DOMAIN_IO, 0, 1, 0, 0 }, /* Ethernet controller */
+  { 0xD0000000, 0x40000000, 0x01000000, DOMAIN_IO, 0, 1, 0, 0 }, /* Instrument boards */
+  { 0xD8000000, 0x48000000, 0x01000000, DOMAIN_IO, 0, 1, 0, 0 }, /* External peripherals */
   LAST_DESC
 };
 

@@ -489,9 +489,9 @@ static struct sa1100_port_fns h3600_port_fns __initdata = {
 
 static struct map_desc h3600_io_desc[] __initdata = {
  /* virtual	       physical    length      domain	  r  w	c  b */
-  { H3600_EGPIO_VIRT,  0x49000000, 0x01000000, DOMAIN_IO, 1, 1, 0, 0 }, /* EGPIO 0		 CS#5 */
-  { H3600_BANK_2_VIRT, 0x10000000, 0x02800000, DOMAIN_IO, 1, 1, 0, 0 }, /* static memory bank 2  CS#2 */
-  { H3600_BANK_4_VIRT, 0x40000000, 0x00800000, DOMAIN_IO, 1, 1, 0, 0 }, /* static memory bank 4  CS#4 */
+  { H3600_EGPIO_VIRT,  0x49000000, 0x01000000, DOMAIN_IO, 0, 1, 0, 0 }, /* EGPIO 0		 CS#5 */
+  { H3600_BANK_2_VIRT, 0x10000000, 0x02800000, DOMAIN_IO, 0, 1, 0, 0 }, /* static memory bank 2  CS#2 */
+  { H3600_BANK_4_VIRT, 0x40000000, 0x00800000, DOMAIN_IO, 0, 1, 0, 0 }, /* static memory bank 4  CS#4 */
   LAST_DESC
 };
 

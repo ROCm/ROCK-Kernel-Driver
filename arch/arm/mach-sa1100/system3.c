@@ -100,9 +100,9 @@ extern void convert_to_tag_list(struct param_struct *params, int mem_init);
 
 static struct map_desc system3_io_desc[] __initdata = {
  /* virtual     physical    length      domain     r  w  c  b */
-  { 0xe8000000, 0x00000000,		0x01000000, DOMAIN_IO, 1, 1, 0, 0 }, /* Flash bank 0 */
-  { 0xf3000000, PT_CPLD_BASE,	0x00100000, DOMAIN_IO, 1, 1, 0, 0 }, /* System Registers */
-  { 0xf4000000, PT_SA1111_BASE,	0x00100000, DOMAIN_IO, 1, 1, 0, 0 }, /* SA-1111 */
+  { 0xe8000000, 0x00000000,		0x01000000, DOMAIN_IO, 0, 1, 0, 0 }, /* Flash bank 0 */
+  { 0xf3000000, PT_CPLD_BASE,	0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* System Registers */
+  { 0xf4000000, PT_SA1111_BASE,	0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* SA-1111 */
   LAST_DESC
 };
 

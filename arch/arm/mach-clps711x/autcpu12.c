@@ -51,7 +51,7 @@ static struct map_desc autcpu12_io_desc[] __initdata = {
  /* virtual, physical, length, domain, r, w, c, b */
  /* memory-mapped extra io and CS8900A Ethernet chip */
  /* ethernet chip */
- 	{ AUTCPU12_VIRT_CS8900A, AUTCPU12_PHYS_CS8900A, SZ_1M, DOMAIN_IO, 1, 1, 0, 0 },
+ 	{ AUTCPU12_VIRT_CS8900A, AUTCPU12_PHYS_CS8900A, SZ_1M, DOMAIN_IO, 0, 1, 0, 0 },
 	
  	LAST_DESC
 };

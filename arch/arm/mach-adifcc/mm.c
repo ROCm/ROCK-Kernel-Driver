@@ -14,7 +14,7 @@
 
 static struct map_desc adifcc_io_desc[] __initdata = {
  /* on-board devices */
- { 0xff400000,   0x00400000,   0x00300000,   DOMAIN_IO, 1, 1, 0, 0},
+ { 0xff400000,   0x00400000,   0x00300000,   DOMAIN_IO, 0, 1, 0, 0},
  LAST_DESC
 };
 

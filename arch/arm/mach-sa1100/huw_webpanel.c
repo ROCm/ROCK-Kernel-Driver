@@ -77,7 +77,7 @@ fixup_huw_webpanel(struct machine_desc *desc, struct param_struct *params,
 **/
 static struct map_desc huw_webpanel_io_desc[] __initdata = {
  /* virtual     physical    length      domain     r  w  c  b */
-  { 0xf0000000, 0xc1fb8000, 0x00048000, DOMAIN_IO, 1, 1, 0, 0 }, /* Parameter */
+  { 0xf0000000, 0xc1fb8000, 0x00048000, DOMAIN_IO, 0, 1, 0, 0 }, /* Parameter */
   { 0xf1000000, 0x18000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* Paules CS3, write only */
   LAST_DESC
 };

@@ -305,10 +305,10 @@ stork_kbd_unexpected_up(unsigned char code)
 
 struct map_desc stork_io_desc[] __initdata = {
  /* virtual     physical    length      domain     r  w  c  b */
-  { 0xe8000000, 0x00000000, 0x02000000, DOMAIN_IO, 1, 1, 0, 0 }, /* Flash bank 0 */
-  { STORK_VM_BASE_CS1, STORK_VM_OFF_CS1, 0x01000000, DOMAIN_IO, 1, 1, 0, 0 }, /* EGPIO 0 */
-  { 0xf1000000, 0x10000000, 0x02800000, DOMAIN_IO, 1, 1, 0, 0 }, /* static memory bank 2 */
-  { 0xf3800000, 0x40000000, 0x00800000, DOMAIN_IO, 1, 1, 0, 0 }, /* static memory bank 4 */
+  { 0xe8000000, 0x00000000, 0x02000000, DOMAIN_IO, 0, 1, 0, 0 }, /* Flash bank 0 */
+  { STORK_VM_BASE_CS1, STORK_VM_OFF_CS1, 0x01000000, DOMAIN_IO, 0, 1, 0, 0 }, /* EGPIO 0 */
+  { 0xf1000000, 0x10000000, 0x02800000, DOMAIN_IO, 0, 1, 0, 0 }, /* static memory bank 2 */
+  { 0xf3800000, 0x40000000, 0x00800000, DOMAIN_IO, 0, 1, 0, 0 }, /* static memory bank 4 */
   LAST_DESC
 };
 
