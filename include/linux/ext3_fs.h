@@ -64,8 +64,6 @@
  */
 #define	EXT3_BAD_INO		 1	/* Bad blocks inode */
 #define EXT3_ROOT_INO		 2	/* Root inode */
-#define EXT3_ACL_IDX_INO	 3	/* ACL inode */
-#define EXT3_ACL_DATA_INO	 4	/* ACL inode */
 #define EXT3_BOOT_LOADER_INO	 5	/* Boot loader inode */
 #define EXT3_UNDEL_DIR_INO	 6	/* Undelete directory inode */
 #define EXT3_RESIZE_INO		 7	/* Reserved group descriptors inode */
@@ -95,7 +93,6 @@
 #else
 # define EXT3_BLOCK_SIZE(s)		(EXT3_MIN_BLOCK_SIZE << (s)->s_log_block_size)
 #endif
-#define EXT3_ACLE_PER_BLOCK(s)		(EXT3_BLOCK_SIZE(s) / sizeof (struct ext3_acl_entry))
 #define	EXT3_ADDR_PER_BLOCK(s)		(EXT3_BLOCK_SIZE(s) / sizeof (__u32))
 #ifdef __KERNEL__
 # define EXT3_BLOCK_SIZE_BITS(s)	((s)->s_blocksize_bits)
@@ -128,28 +125,6 @@
 # define EXT3_FRAG_SIZE(s)		(EXT3_MIN_FRAG_SIZE << (s)->s_log_frag_size)
 # define EXT3_FRAGS_PER_BLOCK(s)	(EXT3_BLOCK_SIZE(s) / EXT3_FRAG_SIZE(s))
 #endif
-
-/*
- * ACL structures
- */
-struct ext3_acl_header	/* Header of Access Control Lists */
-{
-	__u32	aclh_size;
-	__u32	aclh_file_count;
-	__u32	aclh_acle_count;
-	__u32	aclh_first_acle;
-};
-
-struct ext3_acl_entry	/* Access Control List Entry */
-{
-	__u32	acle_size;
-	__u16	acle_perms;	/* Access permissions */
-	__u16	acle_type;	/* Type of entry */
-	__u16	acle_tag;	/* User or group identity */
-	__u16	acle_pad1;
-	__u32	acle_next;	/* Pointer on next entry for the */
-					/* same inode or on next free entry */
-};
 
 /*
  * Structure of a blocks group descriptor
@@ -347,6 +322,8 @@ struct ext3_inode {
   #define EXT3_MOUNT_WRITEBACK_DATA	0x0C00	/* No data ordering */
 #define EXT3_MOUNT_UPDATE_JOURNAL	0x1000	/* Update the journal format */
 #define EXT3_MOUNT_NO_UID32		0x2000  /* Disable 32-bit UIDs */
+#define EXT3_MOUNT_XATTR_USER		0x4000	/* Extended user attributes */
+#define EXT3_MOUNT_POSIX_ACL		0x8000	/* POSIX Access Control Lists */
 
 /* Compatibility, for having both ext2_fs.h and ext3_fs.h included at once */
 #ifndef _LINUX_EXT2_FS_H
@@ -449,7 +426,9 @@ struct ext3_super_block {
 	__u8	s_def_hash_version;	/* Default hash version to use */
 	__u8	s_reserved_char_pad;
 	__u16	s_reserved_word_pad;
-	__u32	s_reserved[192];	/* Padding to the end of the block */
+	__u32	s_default_mount_opts;
+	__u32	s_first_meta_bg; 	/* First metablock block group */
+	__u32	s_reserved[190];	/* Padding to the end of the block */
 };
 
 #ifdef __KERNEL__
@@ -528,8 +507,11 @@ static inline struct ext3_inode_info *EXT3_I(struct inode *inode)
 #define EXT3_FEATURE_INCOMPAT_FILETYPE		0x0002
 #define EXT3_FEATURE_INCOMPAT_RECOVER		0x0004 /* Needs recovery */
 #define EXT3_FEATURE_INCOMPAT_JOURNAL_DEV	0x0008 /* Journal device */
+#define EXT3_FEATURE_INCOMPAT_META_BG		0x0010
 
-#define EXT3_FEATURE_COMPAT_SUPP	0
+#define EXT3_FEATURE_COMPAT_SUPP	EXT2_FEATURE_COMPAT_EXT_ATTR
+#define EXT2_FEATURE_INCOMPAT_SUPP	(EXT2_FEATURE_INCOMPAT_FILETYPE| \
+					 EXT2_FEATURE_INCOMPAT_META_BG)
 #define EXT3_FEATURE_INCOMPAT_SUPP	(EXT3_FEATURE_INCOMPAT_FILETYPE| \
 					 EXT3_FEATURE_INCOMPAT_RECOVER)
 #define EXT3_FEATURE_RO_COMPAT_SUPP	(EXT3_FEATURE_RO_COMPAT_SPARSE_SUPER| \
@@ -541,6 +523,19 @@ static inline struct ext3_inode_info *EXT3_I(struct inode *inode)
  */
 #define	EXT3_DEF_RESUID		0
 #define	EXT3_DEF_RESGID		0
+
+/*
+ * Default mount options
+ */
+#define EXT3_DEFM_DEBUG		0x0001
+#define EXT3_DEFM_BSDGROUPS	0x0002
+#define EXT3_DEFM_XATTR_USER	0x0004
+#define EXT3_DEFM_ACL		0x0008
+#define EXT3_DEFM_UID16		0x0010
+#define EXT3_DEFM_JMODE		0x0060
+#define EXT3_DEFM_JMODE_DATA	0x0020
+#define EXT3_DEFM_JMODE_ORDERED	0x0040
+#define EXT3_DEFM_JMODE_WBACK	0x0060
 
 /*
  * Structure of a directory entry
@@ -713,6 +708,7 @@ extern unsigned long ext3_count_free (struct buffer_head *, unsigned);
 
 
 /* inode.c */
+extern int ext3_forget(handle_t *, int, struct inode *, struct buffer_head *, int);
 extern struct buffer_head * ext3_getblk (handle_t *, struct inode *, long, int, int *);
 extern struct buffer_head * ext3_bread (handle_t *, struct inode *, int, int, int *);
 
@@ -781,8 +777,10 @@ extern struct address_space_operations ext3_writeback_aops;
 
 /* namei.c */
 extern struct inode_operations ext3_dir_inode_operations;
+extern struct inode_operations ext3_special_inode_operations;
 
 /* symlink.c */
+extern struct inode_operations ext3_symlink_inode_operations;
 extern struct inode_operations ext3_fast_symlink_inode_operations;
 
 

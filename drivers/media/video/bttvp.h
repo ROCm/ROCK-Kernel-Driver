@@ -24,7 +24,7 @@
 #ifndef _BTTVP_H_
 #define _BTTVP_H_
 
-#define BTTV_VERSION_CODE KERNEL_VERSION(0,8,42)
+#define BTTV_VERSION_CODE KERNEL_VERSION(0,9,1)
 
 #include <linux/types.h>
 #include <linux/wait.h>
@@ -54,7 +54,8 @@
 #define RISC_SLOT_LOOP        14
 
 #define RESOURCE_OVERLAY       1
-#define RESOURCE_STREAMING     2
+#define RESOURCE_VIDEO         2
+#define RESOURCE_VBI           3
 
 #define RAW_LINES            640
 #define RAW_BPL             1024
@@ -63,15 +64,17 @@
 
 struct bttv_tvnorm 
 {
-	int v4l2_id;
-        u32 Fsc;
-        u16 swidth, sheight; /* scaled standard width, height */
-	u16 totalwidth;
-	u8 adelay, bdelay, iform;
-	u32 scaledtwidth;
-	u16 hdelayx1, hactivex1;
-	u16 vdelay;
-        u8 vbipack;
+	int   v4l2_id;
+	char  *name;
+        u32   Fsc;
+        u16   swidth, sheight; /* scaled standard width, height */
+	u16   totalwidth;
+	u8    adelay, bdelay, iform;
+	u32   scaledtwidth;
+	u16   hdelayx1, hactivex1;
+	u16   vdelay;
+        u8    vbipack;
+	int   sram;
 };
 extern const struct bttv_tvnorm bttv_tvnorms[];
 extern const int BTTV_TVNORMS;
@@ -99,8 +102,8 @@ struct bttv_geometry {
 
 struct bttv_riscmem {
 	unsigned int   size;
-	unsigned long  *cpu;
-	unsigned long  *jmp;
+	u32            *cpu;
+	u32            *jmp;
 	dma_addr_t     dma;
 };
 
@@ -114,32 +117,34 @@ struct bttv_buffer {
 	int                        btformat;
 	int                        btswap;
 	struct bttv_geometry       geo;
-	struct bttv_riscmem        even;
-	struct bttv_riscmem        odd;
+	struct bttv_riscmem        top;
+	struct bttv_riscmem        bottom;
 };
 
 struct bttv_overlay {
 	int tvnorm;
-	int x,y,width,height;
-	struct video_clip      *clips;
+	struct v4l2_rect       w;
+	enum v4l2_field        field;
+	struct v4l2_clip       *clips;
 	int                    nclips;
-};
-
-struct bttv_vbi {
-	int                      users;
-	int                      lines;
-	struct videobuf_queue    q;
 };
 
 struct bttv_fh {
 	struct bttv              *btv;
-	struct videobuf_queue    q;
 	int resources;
-	
+	enum v4l2_buf_type       type;
+
+	/* video capture */
+	struct videobuf_queue    cap;
+	struct bttv_buffer       buf;
+
 	/* current settings */
 	const struct bttv_format *ovfmt;
 	struct bttv_overlay      ov;
-	struct bttv_buffer       buf;
+
+	/* video overlay */
+	struct videobuf_queue    vbi;
+	int                      lines;
 };
 
 /* ---------------------------------------------------------- */
@@ -163,18 +168,18 @@ int bttv_risc_planar(struct bttv *btv, struct bttv_riscmem *risc,
 		     int cpadding);
 
 /* risc code generator + helpers - screen overlay */
-int bttv_screen_clips(struct video_buffer *fbuf,
-		      int x, int y, int width, int height,
-		      struct video_clip *clips, int n);
-void bttv_sort_clips(struct video_clip *clips, int nclips);
+int bttv_screen_clips(int swidth, int sheight, struct v4l2_rect *win,
+		      struct v4l2_clip *clips, int n);
+void bttv_sort_clips(struct v4l2_clip *clips, int nclips);
 int bttv_risc_overlay(struct bttv *btv, struct bttv_riscmem *risc,
 		      const struct bttv_format *fmt,
-		      struct bttv_overlay *ov, int flags);
+		      struct bttv_overlay *ov,
+		      int skip_top, int skip_bottom);
 
 /* calculate / apply geometry settings */
 void bttv_calc_geo(struct bttv *btv, struct bttv_geometry *geo,
 		   int width, int height, int interleaved, int norm);
-void bttv_apply_geo(struct bttv *btv, struct bttv_geometry *geo, int odd);
+void bttv_apply_geo(struct bttv *btv, struct bttv_geometry *geo, int top);
 
 /* control dma register + risc main loop */
 void bttv_set_dma(struct bttv *btv, int override, int irqflags);
@@ -183,11 +188,9 @@ int bttv_risc_hook(struct bttv *btv, int slot, struct bttv_riscmem *risc,
 		   int irqflags);
 
 /* capture buffer handling */
-int bttv_buffer_field(struct bttv *btv, int field, int def_field,
-		      int tvnorm, int height);
 int bttv_buffer_risc(struct bttv *btv, struct bttv_buffer *buf);
-int bttv_buffer_activate(struct bttv *btv, struct bttv_buffer *odd,
-			 struct bttv_buffer *even);
+int bttv_buffer_activate(struct bttv *btv, struct bttv_buffer *top,
+			 struct bttv_buffer *bottom);
 void bttv_dma_free(struct bttv *btv, struct bttv_buffer *buf);
 
 /* overlay handling */
@@ -199,8 +202,10 @@ int bttv_overlay_risc(struct bttv *btv, struct bttv_overlay *ov,
 /* ---------------------------------------------------------- */
 /* bttv-vbi.c                                                 */
 
-extern struct video_device bttv_vbi_template;
-extern struct videobuf_queue_ops vbi_qops;
+void bttv_vbi_fmt(struct bttv_fh *fh, struct v4l2_format *f);
+void bttv_vbi_setlines(struct bttv_fh *fh, struct bttv *btv, int lines);
+
+extern struct videobuf_queue_ops bttv_vbi_qops;
 
 
 /* ---------------------------------------------------------- */
@@ -212,6 +217,7 @@ extern unsigned int bttv_debug;
 extern unsigned int bttv_gpio;
 extern void bttv_gpio_tracking(struct bttv *btv, char *comment);
 extern int init_bttv_i2c(struct bttv *btv);
+extern int pvr_boot(struct bttv *btv);
 
 extern int bttv_common_ioctls(struct bttv *btv, unsigned int cmd, void *arg);
 extern void bttv_reinit_bt848(struct bttv *btv);
@@ -285,6 +291,7 @@ struct bttv {
 	int tvnorm,hue,contrast,bright,saturation;
 	struct video_buffer fbuf;
 	int field_count;
+	int digital_video;
 
 	/* various options */
 	int opt_combfilter;
@@ -293,27 +300,32 @@ struct bttv {
 	int opt_chroma_agc;
 	int opt_adc_crush;
 
-	/* vbi data/state */
-	struct bttv_vbi vbi;
-
 	/* radio data/state */
 	int has_radio;
+	int radio_user;
+
+	/* miro/pinnacle + Aimslab VHX
+	   philips matchbox (tea5757 radio tuner) support */
 	int has_matchbox;
-        int mbox_we;
+	int mbox_we;
 	int mbox_data;
 	int mbox_clk;
 	int mbox_most;
 	int mbox_mask;
-	int radio_user;
-	
+
+	/* ISA stuff (Terratec Active Radio Upgrade) */
+	int mbox_ior;
+	int mbox_iow;
+	int mbox_csel;
+
 	/* risc memory management data
 	   - must aquire s_lock before changing these
 	   - only the irq handler is supported to touch odd + even */
 	struct bttv_riscmem    main;
-	struct bttv_buffer     *odd;       /* current active odd field   */
-	struct bttv_buffer     *even;      /* current active even field  */
-	struct bttv_buffer     *screen;    /* overlay                    */
-	struct list_head       capture;    /* capture buffer queue       */
+	struct bttv_buffer     *top;       /* current active top field    */
+	struct bttv_buffer     *bottom;    /* current active bottom field */
+	struct bttv_buffer     *screen;    /* overlay                     */
+	struct list_head       capture;    /* capture buffer queue        */
 	struct bttv_buffer     *vcurr;
 	struct list_head       vcapture;
 

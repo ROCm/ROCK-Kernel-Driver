@@ -16,6 +16,7 @@
 #include <linux/fs.h>
 #include <linux/personality.h>
 #include <linux/security.h>
+#include <linux/hugetlb.h>
 #include <linux/profile.h>
 
 #include <asm/uaccess.h>
@@ -939,7 +940,7 @@ no_mmaps:
  * By the time this function is called, the area struct has been
  * removed from the process mapping list.
  */
-static void unmap_vma(struct mm_struct *mm, struct vm_area_struct *area)
+void unmap_vma(struct mm_struct *mm, struct vm_area_struct *area)
 {
 	size_t len = area->vm_end - area->vm_start;
 
@@ -1024,14 +1025,10 @@ static struct vm_area_struct *touched_by_munmap(struct mm_struct *mm,
 	touched = NULL;
 	do {
 		struct vm_area_struct *next = mpnt->vm_next;
-		if (!(is_vm_hugetlb_page(mpnt))) {
-			mpnt->vm_next = touched;
-			touched = mpnt;
-			rb_erase(&mpnt->vm_rb, &mm->mm_rb);
-			mm->map_count--;
-		}
-		else
-			free_hugepages(mpnt);
+		mpnt->vm_next = touched;
+		touched = mpnt;
+		rb_erase(&mpnt->vm_rb, &mm->mm_rb);
+		mm->map_count--;
 		mpnt = next;
 	} while (mpnt && mpnt->vm_start < end);
 	*npp = mpnt;
@@ -1284,10 +1281,7 @@ void exit_mmap(struct mm_struct * mm)
 			vm_unacct_memory((end - start) >> PAGE_SHIFT);
 
 		mm->map_count--;
-		if (!(is_vm_hugetlb_page(mpnt)))
-			unmap_page_range(tlb, mpnt, start, end);
-		else
-			mpnt->vm_ops->close(mpnt);
+		unmap_page_range(tlb, mpnt, start, end);
 		mpnt = mpnt->vm_next;
 	}
 

@@ -64,6 +64,7 @@
 #include <linux/proc_fs.h>
 #include <linux/ioport.h>
 #include <linux/mm.h>
+#include <linux/hugetlb.h>
 #include <linux/pagemap.h>
 #include <linux/swap.h>
 #include <linux/slab.h>

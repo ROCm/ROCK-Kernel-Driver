@@ -88,6 +88,7 @@ struct shmid_kernel /* private to the kernel */
 /* shm_mode upper byte flags */
 #define	SHM_DEST	01000	/* segment will be destroyed on last detach */
 #define SHM_LOCKED      02000   /* segment will not be swapped */
+#define SHM_HUGETLB     04000   /* segment will use huge TLB pages */
 
 asmlinkage long sys_shmget (key_t key, size_t size, int flag);
 asmlinkage long sys_shmat (int shmid, char *shmaddr, int shmflg, unsigned long *addr);

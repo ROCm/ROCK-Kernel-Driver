@@ -13,11 +13,13 @@
  */
 
 #include <linux/config.h>
-#include "ext2.h"
 #include <linux/quotaops.h>
 #include <linux/sched.h>
 #include <linux/backing-dev.h>
 #include <linux/buffer_head.h>
+#include "ext2.h"
+#include "xattr.h"
+#include "acl.h"
 
 /*
  * ialloc.c contains the inodes allocation and deallocation routines
@@ -97,6 +99,7 @@ void ext2_free_inode (struct inode * inode)
 	 */
 	if (!is_bad_inode(inode)) {
 		/* Quota is already initialized in iput() */
+		ext2_xattr_delete_inode(inode);
 	    	DQUOT_FREE_INODE(inode);
 		DQUOT_DROP(inode);
 	}
@@ -300,7 +303,6 @@ struct inode * ext2_new_inode(struct inode * dir, int mode)
 	struct ext2_super_block * es;
 	struct ext2_inode_info *ei;
 	int err;
-	struct inode *ret;
 
 	sb = dir->i_sb;
 	inode = new_inode(sb);
@@ -321,7 +323,6 @@ repeat:
 		goto fail;
 
 	err = -EIO;
-	brelse(bitmap_bh);
 	bitmap_bh = read_inode_bitmap(sb, group);
 	if (!bitmap_bh)
 		goto fail2;
@@ -337,6 +338,7 @@ repeat:
 		ll_rw_block(WRITE, 1, &bitmap_bh);
 		wait_on_buffer(bitmap_bh);
 	}
+	brelse(bitmap_bh);
 
 	ino = group * EXT2_INODES_PER_GROUP(sb) + i + 1;
 	if (ino < EXT2_FIRST_INO(sb) || ino > le32_to_cpu(es->s_inodes_count)) {
@@ -386,27 +388,34 @@ repeat:
 	ei->i_prealloc_block = 0;
 	ei->i_prealloc_count = 0;
 	ei->i_dir_start_lookup = 0;
+	ei->i_state = EXT2_STATE_NEW;
 	if (ei->i_flags & EXT2_SYNC_FL)
 		inode->i_flags |= S_SYNC;
 	if (ei->i_flags & EXT2_DIRSYNC_FL)
 		inode->i_flags |= S_DIRSYNC;
 	inode->i_generation = EXT2_SB(sb)->s_next_generation++;
 	insert_inode_hash(inode);
-	mark_inode_dirty(inode);
 
 	unlock_super(sb);
-	ret = inode;
 	if(DQUOT_ALLOC_INODE(inode)) {
 		DQUOT_DROP(inode);
-		inode->i_flags |= S_NOQUOTA;
-		inode->i_nlink = 0;
-		iput(inode);
-		ret = ERR_PTR(-EDQUOT);
-	} else {
-		ext2_debug("allocating inode %lu\n", inode->i_ino);
-		ext2_preread_inode(inode);
+		goto fail3;
 	}
-	goto out;
+	err = ext2_init_acl(inode, dir);
+	if (err) {
+		DQUOT_FREE_INODE(inode);
+		goto fail3;
+	}
+	mark_inode_dirty(inode);
+	ext2_debug("allocating inode %lu\n", inode->i_ino);
+	ext2_preread_inode(inode);
+	return inode;
+
+fail3:
+	inode->i_flags |= S_NOQUOTA;
+	inode->i_nlink = 0;
+	iput(inode);
+	return ERR_PTR(err);
 
 fail2:
 	desc = ext2_get_group_desc (sb, group, &bh2);
@@ -420,10 +429,10 @@ fail:
 	unlock_super(sb);
 	make_bad_inode(inode);
 	iput(inode);
-	ret = ERR_PTR(err);
-	goto out;
+	return ERR_PTR(err);
 
 bad_count:
+	brelse(bitmap_bh);
 	ext2_error (sb, "ext2_new_inode",
 		    "Free inodes count corrupted in group %d",
 		    group);
@@ -436,9 +445,6 @@ bad_count:
 	desc->bg_free_inodes_count = 0;
 	mark_buffer_dirty(bh2);
 	goto repeat;
-out:
-	brelse(bitmap_bh);
-	return ret;
 }
 
 unsigned long ext2_count_free_inodes (struct super_block * sb)

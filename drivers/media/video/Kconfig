@@ -212,5 +212,17 @@ config VIDEO_MEYE
 	  whenever you want). If you want to compile it as a module, say M
 	  here and read <file:Documentation/modules.txt>.
 
+config VIDEO_SAA7134
+	tristate "Philips SAA7134 support"
+	depends on VIDEO_DEV && PCI && I2C
+	---help---
+	  This is a video4linux driver for Philips SAA7130/7134 based
+	  TV cards.
+
+	  This driver is available as a module called saa7134.o ( = code
+	  which can be inserted in and removed from the running kernel
+	  whenever you want). If you want to compile it as a module, say M
+	  here and read <file:Documentation/modules.txt>.
+
 endmenu
 

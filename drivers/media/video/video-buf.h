@@ -28,12 +28,14 @@
 struct scatterlist* videobuf_vmalloc_to_sg(unsigned char *virt, int nr_pages);
 
 /*
- * Return a scatterlist for a an array of userpages (NULL on errors).  Memory
- * for the scatterlist is allocated using kmalloc.  The caller must
- * free the memory.
+ * Return a scatterlist for a an array of userpages (NULL on errors).
+ * Memory for the scatterlist is allocated using kmalloc.  The caller
+ * must free the memory.
  */
-struct scatterlist *videobuf_pages_to_sg(struct page **pages, int nr_pages,
+struct scatterlist* videobuf_pages_to_sg(struct page **pages, int nr_pages,
 					 int offset);
+int videobuf_lock(struct page **pages, int nr_pages);
+int videobuf_unlock(struct page **pages, int nr_pages);
 
 /* --------------------------------------------------------------------- */
 
@@ -58,8 +60,8 @@ struct scatterlist *videobuf_pages_to_sg(struct page **pages, int nr_pages,
 
 struct videobuf_dmabuf {
 	/* for userland buffer */
-	struct page         **pages;
 	int                 offset;
+	struct page         **pages;
 
 	/* for kernel buffers */
 	void                *vmalloc;
@@ -115,10 +117,6 @@ struct videobuf_mapping {
 	struct videobuf_queue *q;
 };
 
-#define VBUF_FIELD_EVEN  1
-#define VBUF_FIELD_ODD   2
-#define VBUF_FIELD_INTER 4
-
 enum videobuf_state {
 	STATE_NEEDS_INIT = 0,
 	STATE_PREPARED   = 1,
@@ -136,30 +134,27 @@ struct videobuf_buffer {
 	int                     width;
 	int                     height;
 	long                    size;
-	int                     field;
+	enum v4l2_field         field;
 	enum videobuf_state     state;
 	struct videobuf_dmabuf  dma;
 	struct list_head        stream;  /* QBUF/DQBUF list */
 
 	/* for mmap'ed buffers */
-	unsigned long  boff;             /* buffer offset (mmap) */
-	unsigned long  bsize;            /* buffer size */
-	unsigned long  baddr;            /* buffer addr (userland ptr!) */
+	off_t                   boff;    /* buffer offset (mmap) */
+	size_t                  bsize;   /* buffer size */
+	unsigned long           baddr;   /* buffer addr (userland ptr!) */
 	struct videobuf_mapping *map;
 
 	/* touched by irq handler */
 	struct list_head        queue;
 	wait_queue_head_t       done;
 	int                     field_count;
-#ifdef HAVE_V4L2
-	stamp_t                 ts;
-#endif
+	struct timeval          ts;
 };
 
 struct videobuf_queue_ops {
 	int (*buf_setup)(struct file *file, int *count, int *size);
-	int (*buf_prepare)(struct file *file,struct videobuf_buffer *vb,
-			   int field);
+	int (*buf_prepare)(struct file *file,struct videobuf_buffer *vb);
 	void (*buf_queue)(struct file *file,struct videobuf_buffer *vb);
 	void (*buf_release)(struct file *file,struct videobuf_buffer *vb);
 };
@@ -169,7 +164,7 @@ struct videobuf_queue {
 	spinlock_t                 *irqlock;
 	struct pci_dev             *pci;
 
-	int                        type;
+	enum v4l2_buf_type         type;
 	int                        msize;
 	struct videobuf_buffer     *bufs[VIDEO_MAX_FRAME];
 	struct videobuf_queue_ops  *ops;
@@ -191,12 +186,12 @@ int videobuf_iolock(struct pci_dev *pci, struct videobuf_buffer *vb);
 void videobuf_queue_init(struct videobuf_queue *q,
 			 struct videobuf_queue_ops *ops,
 			 struct pci_dev *pci, spinlock_t *irqlock,
-			 int type, int msize);
+			 enum v4l2_buf_type type, int msize);
+int  videobuf_queue_is_busy(struct videobuf_queue *q);
 void videobuf_queue_cancel(struct file *file, struct videobuf_queue *q);
 
-#ifdef HAVE_V4L2
 void videobuf_status(struct v4l2_buffer *b, struct videobuf_buffer *vb,
-		     int type);
+		     enum v4l2_buf_type type);
 int videobuf_reqbufs(struct file *file, struct videobuf_queue *q,
 		     struct v4l2_requestbuffers *req);
 int videobuf_querybuf(struct videobuf_queue *q, struct v4l2_buffer *b);
@@ -204,7 +199,6 @@ int videobuf_qbuf(struct file *file, struct videobuf_queue *q,
 		  struct v4l2_buffer *b);
 int videobuf_dqbuf(struct file *file, struct videobuf_queue *q,
 		   struct v4l2_buffer *b);
-#endif
 int videobuf_streamon(struct file *file, struct videobuf_queue *q);
 int videobuf_streamoff(struct file *file, struct videobuf_queue *q);
 

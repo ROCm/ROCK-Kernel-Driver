@@ -22,7 +22,6 @@
  *  Assorted race fixes, rewrite of ext2_get_block() by Al Viro, 2000
  */
 
-#include "ext2.h"
 #include <linux/smp_lock.h>
 #include <linux/time.h>
 #include <linux/highuid.h>
@@ -31,12 +30,26 @@
 #include <linux/module.h>
 #include <linux/buffer_head.h>
 #include <linux/mpage.h>
+#include "ext2.h"
+#include "acl.h"
 
 MODULE_AUTHOR("Remy Card and others");
 MODULE_DESCRIPTION("Second Extended Filesystem");
 MODULE_LICENSE("GPL");
 
 static int ext2_update_inode(struct inode * inode, int do_sync);
+
+/*
+ * Test whether an inode is a fast symlink.
+ */
+static inline int ext2_inode_is_fast_symlink(struct inode *inode)
+{
+	int ea_blocks = EXT2_I(inode)->i_file_acl ?
+		(inode->i_sb->s_blocksize >> 9) : 0;
+
+	return (S_ISLNK(inode->i_mode) &&
+		inode->i_blocks - ea_blocks == 0);
+}
 
 /*
  * Called at each iput()
@@ -51,9 +64,7 @@ void ext2_put_inode (struct inode * inode)
  */
 void ext2_delete_inode (struct inode * inode)
 {
-	if (is_bad_inode(inode) ||
-	    inode->i_ino == EXT2_ACL_IDX_INO ||
-	    inode->i_ino == EXT2_ACL_DATA_INO)
+	if (is_bad_inode(inode))
 		goto no_delete;
 	EXT2_I(inode)->i_dtime	= CURRENT_TIME;
 	mark_inode_dirty(inode);
@@ -843,6 +854,8 @@ void ext2_truncate (struct inode * inode)
 	if (!(S_ISREG(inode->i_mode) || S_ISDIR(inode->i_mode) ||
 	    S_ISLNK(inode->i_mode)))
 		return;
+	if (ext2_inode_is_fast_symlink(inode))
+		return;
 	if (IS_APPEND(inode) || IS_IMMUTABLE(inode))
 		return;
 
@@ -929,8 +942,7 @@ static struct ext2_inode *ext2_get_inode(struct super_block *sb, ino_t ino,
 	struct ext2_group_desc * gdp;
 
 	*p = NULL;
-	if ((ino != EXT2_ROOT_INO && ino != EXT2_ACL_IDX_INO &&
-	     ino != EXT2_ACL_DATA_INO && ino < EXT2_FIRST_INO(sb)) ||
+	if ((ino != EXT2_ROOT_INO && ino < EXT2_FIRST_INO(sb)) ||
 	    ino > le32_to_cpu(EXT2_SB(sb)->s_es->s_inodes_count))
 		goto Einval;
 
@@ -971,6 +983,10 @@ void ext2_read_inode (struct inode * inode)
 	struct ext2_inode * raw_inode = ext2_get_inode(inode->i_sb, ino, &bh);
 	int n;
 
+#ifdef CONFIG_EXT2_FS_POSIX_ACL
+	ei->i_acl = EXT2_ACL_NOT_CACHED;
+	ei->i_default_acl = EXT2_ACL_NOT_CACHED;
+#endif
 	if (IS_ERR(raw_inode))
  		goto bad_inode;
 
@@ -1012,6 +1028,7 @@ void ext2_read_inode (struct inode * inode)
 		ei->i_dir_acl = le32_to_cpu(raw_inode->i_dir_acl);
 	ei->i_dtime = 0;
 	inode->i_generation = le32_to_cpu(raw_inode->i_generation);
+	ei->i_state = 0;
 	ei->i_next_alloc_block = 0;
 	ei->i_next_alloc_goal = 0;
 	ei->i_prealloc_count = 0;
@@ -1025,9 +1042,7 @@ void ext2_read_inode (struct inode * inode)
 	for (n = 0; n < EXT2_N_BLOCKS; n++)
 		ei->i_data[n] = raw_inode->i_block[n];
 
-	if (ino == EXT2_ACL_IDX_INO || ino == EXT2_ACL_DATA_INO)
-		/* Nothing to do */ ;
-	else if (S_ISREG(inode->i_mode)) {
+	if (S_ISREG(inode->i_mode)) {
 		inode->i_op = &ext2_file_inode_operations;
 		inode->i_fop = &ext2_file_operations;
 		inode->i_mapping->a_ops = &ext2_aops;
@@ -1036,15 +1051,17 @@ void ext2_read_inode (struct inode * inode)
 		inode->i_fop = &ext2_dir_operations;
 		inode->i_mapping->a_ops = &ext2_aops;
 	} else if (S_ISLNK(inode->i_mode)) {
-		if (!inode->i_blocks)
+		if (ext2_inode_is_fast_symlink(inode))
 			inode->i_op = &ext2_fast_symlink_inode_operations;
 		else {
-			inode->i_op = &page_symlink_inode_operations;
+			inode->i_op = &ext2_symlink_inode_operations;
 			inode->i_mapping->a_ops = &ext2_aops;
 		}
-	} else 
+	} else {
+		inode->i_op = &ext2_special_inode_operations;
 		init_special_inode(inode, inode->i_mode,
 				   le32_to_cpu(raw_inode->i_block[0]));
+	}
 	brelse (bh);
 	if (ei->i_flags & EXT2_SYNC_FL)
 		inode->i_flags |= S_SYNC;
@@ -1076,12 +1093,11 @@ static int ext2_update_inode(struct inode * inode, int do_sync)
 	if (IS_ERR(raw_inode))
  		return -EIO;
 
-	if (ino == EXT2_ACL_IDX_INO || ino == EXT2_ACL_DATA_INO) {
-		ext2_error (sb, "ext2_write_inode", "bad inode number: %lu",
-			    (unsigned long) ino);
-		brelse(bh);
-		return -EIO;
-	}
+	/* For fields not not tracking in the in-memory inode,
+	 * initialise them to zero for new inodes. */
+	if (ei->i_state & EXT2_STATE_NEW)
+		memset(raw_inode, 0, EXT2_SB(sb)->s_inode_size);
+
 	raw_inode->i_mode = cpu_to_le16(inode->i_mode);
 	if (!(test_opt(sb, NO_UID32))) {
 		raw_inode->i_uid_low = cpu_to_le16(low_16_bits(uid));
@@ -1152,6 +1168,7 @@ static int ext2_update_inode(struct inode * inode, int do_sync)
 			err = -EIO;
 		}
 	}
+	ei->i_state &= ~EXT2_STATE_NEW;
 	brelse (bh);
 	return err;
 }
@@ -1165,3 +1182,18 @@ int ext2_sync_inode (struct inode *inode)
 {
 	return ext2_update_inode (inode, 1);
 }
+
+int ext2_setattr(struct dentry *dentry, struct iattr *iattr)
+{
+	struct inode *inode = dentry->d_inode;
+	int error;
+
+	error = inode_change_ok(inode, iattr);
+	if (error)
+		return error;
+	inode_setattr(inode, iattr);
+	if (iattr->ia_valid & ATTR_MODE)
+		error = ext2_acl_chmod(inode);
+	return error;
+}
+

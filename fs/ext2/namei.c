@@ -29,8 +29,10 @@
  *        David S. Miller (davem@caip.rutgers.edu), 1995
  */
 
-#include "ext2.h"
 #include <linux/pagemap.h>
+#include "ext2.h"
+#include "xattr.h"
+#include "acl.h"
 
 /*
  * Couple of helper functions - make the code slightly cleaner.
@@ -137,7 +139,10 @@ static int ext2_mknod (struct inode * dir, struct dentry *dentry, int mode, int 
 	struct inode * inode = ext2_new_inode (dir, mode);
 	int err = PTR_ERR(inode);
 	if (!IS_ERR(inode)) {
-		init_special_inode(inode, mode, rdev);
+		init_special_inode(inode, inode->i_mode, rdev);
+#ifdef CONFIG_EXT2_FS_EXT_ATTR
+		inode->i_op = &ext2_special_inode_operations;
+#endif
 		mark_inode_dirty(inode);
 		err = ext2_add_nondir(dentry, inode);
 	}
@@ -162,7 +167,7 @@ static int ext2_symlink (struct inode * dir, struct dentry * dentry,
 
 	if (l > sizeof (EXT2_I(inode)->i_data)) {
 		/* slow symlink */
-		inode->i_op = &page_symlink_inode_operations;
+		inode->i_op = &ext2_symlink_inode_operations;
 		inode->i_mapping->a_ops = &ext2_aops;
 		err = page_symlink(inode, symname, l);
 		if (err)
@@ -368,4 +373,19 @@ struct inode_operations ext2_dir_inode_operations = {
 	.rmdir		= ext2_rmdir,
 	.mknod		= ext2_mknod,
 	.rename		= ext2_rename,
+	.setxattr	= ext2_setxattr,
+	.getxattr	= ext2_getxattr,
+	.listxattr	= ext2_listxattr,
+	.removexattr	= ext2_removexattr,
+	.setattr	= ext2_setattr,
+	.permission	= ext2_permission,
+};
+
+struct inode_operations ext2_special_inode_operations = {
+	.setxattr	= ext2_setxattr,
+	.getxattr	= ext2_getxattr,
+	.listxattr	= ext2_listxattr,
+	.removexattr	= ext2_removexattr,
+	.setattr	= ext2_setattr,
+	.permission	= ext2_permission,
 };

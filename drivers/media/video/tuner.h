@@ -62,7 +62,9 @@
 #define TUNER_TEMIC_4012FY5	35	/* 4012 FY5 (3X 0971, 1099)*/
 #define TUNER_TEMIC_4136FY5	36	/* 4136 FY5 (3X 7708, 7746)*/
 #define TUNER_LG_PAL_NEW_TAPC   37
-#define TUNER_PHILIPS_FM1216ME  38
+#define TUNER_PHILIPS_FM1216ME_MK3  38
+#define TUNER_LG_NTSC_NEW_TAPC   39
+
 
 
 
@@ -84,7 +86,9 @@
 
 #define TUNER_SET_TYPE               _IOW('t',1,int)    /* set tuner type */
 #define TUNER_SET_TVFREQ             _IOW('t',2,int)    /* set tv freq */
-#define TUNER_SET_RADIOFREQ          _IOW('t',3,int)    /* set radio freq */
-#define TUNER_SET_MODE               _IOW('t',4,int)    /* set tuner mode */
+#if 0 /* obsolete */
+# define TUNER_SET_RADIOFREQ         _IOW('t',3,int)    /* set radio freq */
+# define TUNER_SET_MODE              _IOW('t',4,int)    /* set tuner mode */
+#endif
 
 #endif

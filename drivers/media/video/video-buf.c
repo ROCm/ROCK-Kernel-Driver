@@ -26,6 +26,11 @@
 #include <asm/page.h>
 #include <asm/pgtable.h>
 
+#ifndef TryLockPage
+# include "linux/page-flags.h"
+# define TryLockPage TestSetPageLocked
+#endif
+
 #include "video-buf.h"
 
 static int debug = 0;
@@ -65,12 +70,12 @@ videobuf_vmalloc_to_sg(unsigned char *virt, int nr_pages)
 	return NULL;
 }
 
-struct scatterlist *
+struct scatterlist*
 videobuf_pages_to_sg(struct page **pages, int nr_pages, int offset)
 {
 	struct scatterlist *sglist;
 	int i = 0;
-	
+
 	if (NULL == pages[0])
 		return NULL;
 	sglist = kmalloc(sizeof(*sglist) * nr_pages, GFP_KERNEL);
@@ -80,21 +85,27 @@ videobuf_pages_to_sg(struct page **pages, int nr_pages, int offset)
 
 	if (PageHighMem(pages[0]))
 		/* DMA to highmem pages might not work */
-		goto err;
+		goto highmem;
 	sglist[0].page   = pages[0];
 	sglist[0].offset = offset;
 	sglist[0].length = PAGE_SIZE - offset;
 	for (i = 1; i < nr_pages; i++) {
 		if (NULL == pages[i])
-			goto err;
+			goto nopage;
 		if (PageHighMem(pages[i]))
-			goto err;
+			goto highmem;
 		sglist[i].page   = pages[i];
 		sglist[i].length = PAGE_SIZE;
 	}
 	return sglist;
 
- err:
+ nopage:
+	dprintk(2,"sgl: oops - no page\n");
+	kfree(sglist);
+	return NULL;
+
+ highmem:
+	dprintk(2,"sgl: oops - highmem page\n");
 	kfree(sglist);
 	return NULL;
 }
@@ -103,14 +114,18 @@ int videobuf_lock(struct page **pages, int nr_pages)
 {
 	int i;
 
+	dprintk(2,"lock start ...\n");
 	for (i = 0; i < nr_pages; i++)
-		if (TestSetPageLocked(pages[i]))
+		if (TryLockPage(pages[i]))
 			goto err;
+	dprintk(2,"lock ok\n");
 	return 0;
 
  err:
+	dprintk(2,"lock failed, unlock ...\n");
 	while (i > 0)
 		unlock_page(pages[--i]);
+	dprintk(2,"lock quit\n");
 	return -EINVAL;
 }
 
@@ -118,8 +133,10 @@ int videobuf_unlock(struct page **pages, int nr_pages)
 {
 	int i;
 
+	dprintk(2,"unlock start ...\n");
 	for (i = 0; i < nr_pages; i++)
 		unlock_page(pages[i]);
+	dprintk(2,"unlock ok\n");
 	return 0;
 }
 
@@ -128,6 +145,7 @@ int videobuf_unlock(struct page **pages, int nr_pages)
 int videobuf_dma_init_user(struct videobuf_dmabuf *dma, int direction,
 			   unsigned long data, unsigned long size)
 {
+	unsigned long first,last;
 	int err, rw = 0;
 
 	dma->direction = direction;
@@ -137,25 +155,35 @@ int videobuf_dma_init_user(struct videobuf_dmabuf *dma, int direction,
 	default:                 BUG();
 	}
 
-	dma->offset   = data & PAGE_MASK;
-	dma->nr_pages = ((((data+size) & ~PAGE_MASK) -
-			  (data & ~PAGE_MASK)) >> PAGE_SHIFT) +1;
-	dma->pages    = kmalloc(dma->nr_pages * sizeof(struct page*),
-				GFP_KERNEL);
+	first = (data          & PAGE_MASK) >> PAGE_SHIFT;
+	last  = ((data+size-1) & PAGE_MASK) >> PAGE_SHIFT;
+	dma->offset   = data & ~PAGE_MASK;
+	dma->nr_pages = last-first+1;
+	dma->pages = kmalloc(dma->nr_pages * sizeof(struct page*),
+			     GFP_KERNEL);
 	if (NULL == dma->pages)
 		return -ENOMEM;
+	dprintk(1,"init user [0x%lx+0x%lx => %d pages]\n",
+		data,size,dma->nr_pages);
+
 	down_read(&current->mm->mmap_sem);
         err = get_user_pages(current,current->mm,
-			     data, dma->nr_pages,
-			     rw == READ, 0, /* don't force */
+			     data & PAGE_MASK, dma->nr_pages,
+			     rw == READ, 1, /* force */
 			     dma->pages, NULL);
 	up_read(&current->mm->mmap_sem);
-	return err;
+	if (err != dma->nr_pages) {
+		dma->nr_pages = (err >= 0) ? err : 0;
+		dprintk(1,"get_user_pages: err=%d [%d]\n",err,dma->nr_pages);
+		return err < 0 ? err : -EINVAL;
+	}
+	return 0;
 }
 
 int videobuf_dma_init_kernel(struct videobuf_dmabuf *dma, int direction,
 			     int nr_pages)
 {
+	dprintk(1,"init kernel [%d pages]\n",nr_pages);
 	dma->direction = direction;
 	dma->vmalloc = vmalloc_32(nr_pages << PAGE_SHIFT);
 	if (NULL == dma->vmalloc) {
@@ -176,13 +204,14 @@ int videobuf_dma_pci_map(struct pci_dev *dev, struct videobuf_dmabuf *dma)
 	
 	if (dma->pages) {
 		if (0 != (err = videobuf_lock(dma->pages, dma->nr_pages))) {
-			dprintk(1,"videobuf_lock_pages: %d\n",err);
+			dprintk(1,"videobuf_lock: %d\n",err);
 			return err;
 		}
 		dma->sglist = videobuf_pages_to_sg(dma->pages, dma->nr_pages,
 						   dma->offset);
+		if (NULL == dma->sglist)
+			videobuf_unlock(dma->pages, dma->nr_pages);
 	}
-
 	if (dma->vmalloc) {
 		dma->sglist = videobuf_vmalloc_to_sg
 			(dma->vmalloc,dma->nr_pages);
@@ -215,7 +244,7 @@ int videobuf_dma_pci_unmap(struct pci_dev *dev, struct videobuf_dmabuf *dma)
 	dma->sglist = NULL;
 	dma->sglen = 0;
 	if (dma->pages)
-		videobuf_lock(dma->pages, dma->nr_pages);
+		videobuf_unlock(dma->pages, dma->nr_pages);
 	return 0;
 }
 
@@ -231,7 +260,6 @@ int videobuf_dma_free(struct videobuf_dmabuf *dma)
 		kfree(dma->pages);
 		dma->pages = NULL;
 	}
-
 	if (dma->vmalloc) {
 		vfree(dma->vmalloc);
 		dma->vmalloc = NULL;
@@ -286,16 +314,12 @@ videobuf_iolock(struct pci_dev *pci, struct videobuf_buffer *vb)
 	if (0 == vb->baddr) {
 		/* no userspace addr -- kernel bounce buffer */
 		pages = PAGE_ALIGN(vb->size) >> PAGE_SHIFT;
-		dprintk(1,"kernel buf size=%ld (%d pages)\n",
-			vb->size,pages);
 		err = videobuf_dma_init_kernel(&vb->dma,PCI_DMA_FROMDEVICE,
 					       pages);
 		if (0 != err)
 			return err;
 	} else {
 		/* dma directly to userspace */
-		dprintk(1,"user buf addr=%08lx size=%ld\n",
-			vb->baddr,vb->bsize);
 		err = videobuf_dma_init_user(&vb->dma,PCI_DMA_FROMDEVICE,
 					     vb->baddr,vb->bsize);
 		if (0 != err)
@@ -314,7 +338,7 @@ videobuf_queue_init(struct videobuf_queue *q,
 		    struct videobuf_queue_ops *ops,
 		    struct pci_dev *pci,
 		    spinlock_t *irqlock,
-		    int type,
+		    enum v4l2_buf_type type,
 		    int msize)
 {
 	memset(q,0,sizeof(*q));
@@ -327,6 +351,30 @@ videobuf_queue_init(struct videobuf_queue *q,
 
 	init_MUTEX(&q->lock);
 	INIT_LIST_HEAD(&q->stream);
+}
+
+int 
+videobuf_queue_is_busy(struct videobuf_queue *q)
+{
+	int i;
+	
+	if (q->reading)
+		return 1;
+	if (q->streaming)
+		return 1;
+	if (q->read_buf)
+		return 1;
+	for (i = 0; i < VIDEO_MAX_FRAME; i++) {
+		if (NULL == q->bufs[i])
+			continue;
+		if (q->bufs[i]->map)
+			return 1;
+		if (q->bufs[i]->state == STATE_QUEUED)
+			return 1;
+		if (q->bufs[i]->state == STATE_ACTIVE)
+			return 1;
+	}
+	return 0;
 }
 
 void
@@ -358,15 +406,15 @@ videobuf_queue_cancel(struct file *file, struct videobuf_queue *q)
 
 /* --------------------------------------------------------------------- */
 
-#ifdef HAVE_V4L2
 void
-videobuf_status(struct v4l2_buffer *b, struct videobuf_buffer *vb, int type)
+videobuf_status(struct v4l2_buffer *b, struct videobuf_buffer *vb,
+		enum v4l2_buf_type type)
 {
-	b->index  = vb->i;
-	b->type   = type;
-	b->offset = vb->boff;
-	b->length = vb->bsize;
-	b->flags  = 0;
+	b->index    = vb->i;
+	b->type     = type;
+	b->m.offset = vb->boff;
+	b->length   = vb->bsize;
+	b->flags    = 0;
 	if (vb->map)
 		b->flags |= V4L2_BUF_FLAG_MAPPED;
 	switch (vb->state) {
@@ -384,12 +432,7 @@ videobuf_status(struct v4l2_buffer *b, struct videobuf_buffer *vb, int type)
 		/* nothing */
 		break;
 	}
-	if (!(vb->field & VBUF_FIELD_INTER)) {
-		if (vb->field & VBUF_FIELD_ODD)
-			b->flags |= V4L2_BUF_FLAG_TOPFIELD;
-		if (vb->field & VBUF_FIELD_EVEN)
-			b->flags |= V4L2_BUF_FLAG_BOTFIELD;
-	}
+	b->field     = vb->field;
 	b->timestamp = vb->ts;
 	b->bytesused = vb->size;
 	b->sequence  = vb->field_count >> 1;
@@ -401,7 +444,7 @@ videobuf_reqbufs(struct file *file, struct videobuf_queue *q,
 {
 	int size,count,retval;
 
-	if ((req->type & V4L2_BUF_TYPE_field) != q->type)
+	if (req->type != q->type)
 		return -EINVAL;
 	if (req->count < 1)
 		return -EINVAL;
@@ -428,11 +471,11 @@ videobuf_reqbufs(struct file *file, struct videobuf_queue *q,
 int
 videobuf_querybuf(struct videobuf_queue *q, struct v4l2_buffer *b)
 {
-	if ((b->type & V4L2_BUF_TYPE_field) != q->type)
+	if (unlikely(b->type != q->type))
 		return -EINVAL;
-	if (b->index < 0 || b->index >= VIDEO_MAX_FRAME)
+	if (unlikely(b->index < 0 || b->index >= VIDEO_MAX_FRAME))
 		return -EINVAL;
-	if (NULL == q->bufs[b->index])
+	if (unlikely(NULL == q->bufs[b->index]))
 		return -EINVAL;
 	videobuf_status(b,q->bufs[b->index],q->type);
 	return 0;
@@ -444,7 +487,6 @@ videobuf_qbuf(struct file *file, struct videobuf_queue *q,
 {
 	struct videobuf_buffer *buf;
 	unsigned long flags;
-	int field = 0;
 	int retval;
 
 	down(&q->lock);
@@ -452,7 +494,7 @@ videobuf_qbuf(struct file *file, struct videobuf_queue *q,
 	if (q->reading)
 		goto done;
 	retval = -EINVAL;
-	if ((b->type & V4L2_BUF_TYPE_field) != q->type)
+	if (b->type != q->type)
 		goto done;
 	if (b->index < 0 || b->index >= VIDEO_MAX_FRAME)
 		goto done;
@@ -465,11 +507,7 @@ videobuf_qbuf(struct file *file, struct videobuf_queue *q,
 	    buf->state == STATE_ACTIVE)
 		goto done;
 
-	if (b->flags & V4L2_BUF_FLAG_TOPFIELD)
-		field |= VBUF_FIELD_ODD;
-	if (b->flags & V4L2_BUF_FLAG_BOTFIELD)
-		field |= VBUF_FIELD_EVEN;
-	retval = q->ops->buf_prepare(file,buf,field);
+	retval = q->ops->buf_prepare(file,buf);
 	if (0 != retval)
 		goto done;
 	
@@ -498,7 +536,7 @@ videobuf_dqbuf(struct file *file, struct videobuf_queue *q,
 	if (q->reading)
 		goto done;
 	retval = -EINVAL;
-	if ((b->type & V4L2_BUF_TYPE_field) != q->type)
+	if (b->type != q->type)
 		goto done;
 	if (list_empty(&q->stream))
 		goto done;
@@ -526,7 +564,6 @@ videobuf_dqbuf(struct file *file, struct videobuf_queue *q,
 	up(&q->lock);
 	return retval;
 }
-#endif /* HAVE_V4L2 */
 
 int videobuf_streamon(struct file *file, struct videobuf_queue *q)
 {
@@ -586,7 +623,7 @@ videobuf_read_zerocopy(struct file *file, struct videobuf_queue *q,
 
 	q->read_buf->baddr = (unsigned long)data;
         q->read_buf->bsize = count;
-	retval = q->ops->buf_prepare(file,q->read_buf,0);
+	retval = q->ops->buf_prepare(file,q->read_buf);
 	if (0 != retval)
 		goto done;
 	
@@ -631,7 +668,7 @@ ssize_t videobuf_read_one(struct file *file, struct videobuf_queue *q,
 		q->read_buf = videobuf_alloc(q->msize);
 		if (NULL == q->read_buf)
 			goto done;
-		retval = q->ops->buf_prepare(file,q->read_buf,0);
+		retval = q->ops->buf_prepare(file,q->read_buf);
 		if (0 != retval)
 			goto done;
 		q->ops->buf_queue(file,q->read_buf);
@@ -683,7 +720,7 @@ int videobuf_read_start(struct file *file, struct videobuf_queue *q)
 	if (err)
 		return err;
 	for (i = 0; i < count; i++) {
-		err = q->ops->buf_prepare(file,q->bufs[i],0);
+		err = q->ops->buf_prepare(file,q->bufs[i]);
 		if (err)
 			return err;
 		list_add_tail(&q->bufs[i]->stream, &q->stream);
@@ -1008,6 +1045,8 @@ int videobuf_mmap_mapper(struct vm_area_struct *vma,
 /* --------------------------------------------------------------------- */
 
 EXPORT_SYMBOL_GPL(videobuf_vmalloc_to_sg);
+EXPORT_SYMBOL_GPL(videobuf_lock);
+EXPORT_SYMBOL_GPL(videobuf_unlock);
 
 EXPORT_SYMBOL_GPL(videobuf_dma_init_user);
 EXPORT_SYMBOL_GPL(videobuf_dma_init_kernel);
@@ -1022,14 +1061,13 @@ EXPORT_SYMBOL_GPL(videobuf_iolock);
 
 EXPORT_SYMBOL_GPL(videobuf_queue_init);
 EXPORT_SYMBOL_GPL(videobuf_queue_cancel);
+EXPORT_SYMBOL_GPL(videobuf_queue_is_busy);
 
-#ifdef HAVE_V4L2
 EXPORT_SYMBOL_GPL(videobuf_status);
 EXPORT_SYMBOL_GPL(videobuf_reqbufs);
 EXPORT_SYMBOL_GPL(videobuf_querybuf);
 EXPORT_SYMBOL_GPL(videobuf_qbuf);
 EXPORT_SYMBOL_GPL(videobuf_dqbuf);
-#endif
 EXPORT_SYMBOL_GPL(videobuf_streamon);
 EXPORT_SYMBOL_GPL(videobuf_streamoff);
 
