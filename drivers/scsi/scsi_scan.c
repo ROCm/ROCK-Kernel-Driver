@@ -533,7 +533,8 @@ static int scsi_add_lun(struct scsi_device *sdev, char *inq_result, int *bflags)
 		 */
 		inq_result[0] = TYPE_ROM;
 		inq_result[1] |= 0x80;	/* removable */
-	}
+	} else if (*bflags & BLIST_NO_ULD_ATTACH)
+		sdev->no_uld_attach = 1;
 
 	switch (sdev->type = (inq_result[0] & 0x1f)) {
 	case TYPE_TAPE:
