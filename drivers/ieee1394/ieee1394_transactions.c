@@ -137,7 +137,7 @@ int hpsb_get_tlabel(struct hpsb_packet *packet)
 
 	tp = &packet->host->tpool[packet->node_id & NODE_MASK];
 
-	if (in_interrupt() || in_atomic()) {
+	if (irqs_disabled() || in_atomic()) {
 		if (down_trylock(&tp->count))
 			return 1;
 	} else {

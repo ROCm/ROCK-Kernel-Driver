@@ -202,6 +202,7 @@ static int read_maps(struct hpsb_host *host, int nodeid, quadlet_t *buffer,
 
         if (csraddr < CSR_TOPOLOGY_MAP) {
                 if (csraddr + length > CSR_CONFIG_ROM + host->csr.rom_size) {
+                        spin_unlock_irqrestore(&host->csr.lock, flags);
                         return RCODE_ADDRESS_ERROR;
                 }
                 src = ((char *)host->csr.rom) + csraddr - CSR_CONFIG_ROM;
