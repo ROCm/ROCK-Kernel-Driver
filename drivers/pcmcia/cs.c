@@ -1549,30 +1549,23 @@ int pcmcia_request_irq(client_handle_t handle, irq_req_t *req)
 	return CS_IN_USE;
 
 #ifdef CONFIG_PCMCIA_PROBE
-    if (s->irq.AssignedIRQ != 0) {
-	/* If the interrupt is already assigned, it must match */
-	irq = s->irq.AssignedIRQ;
-	if (req->IRQInfo1 & IRQ_INFO2_VALID) {
-	    u_int mask = req->IRQInfo2 & s->irq_mask;
-	    ret = ((mask >> irq) & 1) ? 0 : CS_BAD_ARGS;
-	} else
-	    ret = ((req->IRQInfo1&IRQ_MASK) == irq) ? 0 : CS_BAD_ARGS;
-    } else {
-	if (req->IRQInfo1 & IRQ_INFO2_VALID) {
-	    u_int try, mask = req->IRQInfo2 & s->irq_mask;
-	    for (try = 0; try < 2; try++) {
-		for (irq = 0; irq < 32; irq++)
-		    if ((mask >> irq) & 1) {
-			ret = try_irq(req->Attributes, irq, try);
-			if (ret == 0) break;
-		    }
-		if (ret == 0) break;
-	    }
+	if (s->irq.AssignedIRQ != 0) {
+		/* If the interrupt is already assigned, it must be the same */
+		irq = s->irq.AssignedIRQ;
 	} else {
-	    irq = req->IRQInfo1 & IRQ_MASK;
-	    ret = try_irq(req->Attributes, irq, 1);
+		u_int try, mask = s->irq_mask;
+		for (try = 0; try < 2; try++) {
+			for (irq = 0; irq < 32; irq++) {
+				if ((mask >> irq) & 1) {
+					ret = try_irq(req->Attributes, irq, try);
+					if (!ret)
+						break;
+				}
+			}
+			if (!ret)
+				break;
+		}
 	}
-    }
 #endif
     if (ret != 0) {
 	if (!s->pci_irq)
