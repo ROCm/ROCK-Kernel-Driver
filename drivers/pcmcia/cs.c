@@ -401,9 +401,17 @@ static void shutdown_socket(struct pcmcia_socket *s)
 ======================================================================*/
 
 
-static int pcmcia_send_event(struct pcmcia_socket *s, event_t event, int priority)
+/* NOTE: send_event needs to be called with skt->sem held. */
+
+static int send_event(struct pcmcia_socket *s, event_t event, int priority)
 {
 	int ret;
+
+	if (s->state & SOCKET_CARDBUS)
+		return 0;
+
+	cs_dbg(s, 1, "send_event(event %d, pri %d, callback 0x%p)\n",
+	   event, priority, s->callback);
 
 	if (!s->callback)
 		return 0;
@@ -416,35 +424,6 @@ static int pcmcia_send_event(struct pcmcia_socket *s, event_t event, int priorit
 
 	return ret;
 }
-
-
-/* NOTE: send_event needs to be called with skt->sem held. */
-
-static int send_event(struct pcmcia_socket *s, event_t event, int priority)
-{
-    client_t *client = s->clients;
-    int ret;
-    cs_dbg(s, 1, "send_event(event %d, pri %d)\n",
-	   event, priority);
-    ret = 0;
-    if (s->state & SOCKET_CARDBUS)
-	    return 0;
-
-    ret = pcmcia_send_event(s, event, priority);
-    if (ret)
-	    return (ret);
-
-    for (; client; client = client->next) { 
-	if (client->state & (CLIENT_UNBOUND|CLIENT_STALE))
-	    continue;
-	if (client->EventMask & event) {
-	    ret = EVENT(client, event, priority);
-	    if (ret != 0)
-		return ret;
-	}
-    }
-    return ret;
-} /* send_event */
 
 static void socket_remove_drivers(struct pcmcia_socket *skt)
 {
@@ -1404,7 +1383,7 @@ int pccard_register_pcmcia(struct pcmcia_socket *s, struct pcmcia_callback *c)
 		s->callback = c;
 
 		if ((s->state & (SOCKET_PRESENT|SOCKET_CARDBUS)) == SOCKET_PRESENT)
-			pcmcia_send_event(s, CS_EVENT_CARD_INSERTION, CS_EVENT_PRI_LOW);
+			send_event(s, CS_EVENT_CARD_INSERTION, CS_EVENT_PRI_LOW);
 	} else
 		s->callback = NULL;
  err:

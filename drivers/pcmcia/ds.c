@@ -117,7 +117,6 @@ struct pcmcia_bus_socket {
 	user_info_t		*user;
 	int			req_pending, req_result;
 	wait_queue_head_t	queue, request;
-	struct work_struct	removal;
 	socket_bind_t		*bind;
 	struct pcmcia_socket	*parent;
 };
@@ -471,48 +470,68 @@ static int handle_request(struct pcmcia_bus_socket *s, event_t event)
     return CS_SUCCESS;
 }
 
-static void handle_removal(void *data)
-{
-    struct pcmcia_bus_socket *s = data;
-    handle_event(s, CS_EVENT_CARD_REMOVAL);
-    s->state &= ~DS_SOCKET_REMOVAL_PENDING;
-}
-
 /*======================================================================
 
     The card status event handler.
     
 ======================================================================*/
 
+static int send_event(struct pcmcia_socket *s, event_t event, int priority)
+{
+	int ret = 0;
+	client_t *client;
+
+	for (client = s->clients; client; client = client->next) {
+		if (client->state & (CLIENT_UNBOUND|CLIENT_STALE))
+			continue;
+		if (client->EventMask & event) {
+			ret = EVENT(client, event, priority);
+			if (ret != 0)
+				return ret;
+		}
+	}
+	return ret;
+} /* send_event */
+
+
+/* Normally, the event is passed to individual drivers after
+ * informing userspace. Only for CS_EVENT_CARD_REMOVAL this
+ * is inversed to maintain historic compatibility.
+ */
+
 static int ds_event(struct pcmcia_socket *skt, event_t event, int priority)
 {
-    struct pcmcia_bus_socket *s = skt->pcmcia;
+	struct pcmcia_bus_socket *s = skt->pcmcia;
+	int ret = 0;
 
-    ds_dbg(1, "ds_event(0x%06x, %d, 0x%p)\n",
-	  event, priority, s);
+	ds_dbg(1, "ds_event(0x%06x, %d, 0x%p)\n",
+	       event, priority, s);
     
-    switch (event) {
-	
-    case CS_EVENT_CARD_REMOVAL:
-	s->state &= ~DS_SOCKET_PRESENT;
-	if (!(s->state & DS_SOCKET_REMOVAL_PENDING)) {
-		s->state |= DS_SOCKET_REMOVAL_PENDING;
-		schedule_delayed_work(&s->removal,  HZ/10);
-	}
-	break;
-	
-    case CS_EVENT_CARD_INSERTION:
-	s->state |= DS_SOCKET_PRESENT;
-	handle_event(s, event);
-	break;
+	switch (event) {
 
-    case CS_EVENT_EJECTION_REQUEST:
-	return handle_request(s, event);
-	break;
+	case CS_EVENT_CARD_REMOVAL:
+		s->state &= ~DS_SOCKET_PRESENT;
+	    	send_event(skt, event, priority);
+		handle_event(s, event);
+		break;
 	
-    default:
-	handle_event(s, event);
-	break;
+	case CS_EVENT_CARD_INSERTION:
+		s->state |= DS_SOCKET_PRESENT;
+		handle_event(s, event);
+		send_event(skt, event, priority);
+		break;
+
+	case CS_EVENT_EJECTION_REQUEST:
+		ret = handle_request(s, event);
+		if (ret)
+			break;
+		ret = send_event(skt, event, priority);
+		break;
+
+	default:
+		handle_event(s, event);
+		send_event(skt, event, priority);
+		break;
     }
 
     return 0;
@@ -1099,7 +1118,6 @@ static int __devinit pcmcia_bus_add_socket(struct class_device *class_dev)
 	init_waitqueue_head(&s->request);
 
 	/* initialize data */
-	INIT_WORK(&s->removal, handle_removal, s);
 	s->parent = socket;
 
 	/* Set up hotline to Card Services */
@@ -1127,8 +1145,6 @@ static void pcmcia_bus_remove_socket(struct class_device *class_dev)
 		return;
 
 	pccard_register_pcmcia(socket, NULL);
-
-	flush_scheduled_work();
 
 	socket->pcmcia->state |= DS_SOCKET_DEAD;
 	pcmcia_put_bus_socket(socket->pcmcia);
