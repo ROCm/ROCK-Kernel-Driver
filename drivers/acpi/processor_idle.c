@@ -834,7 +834,7 @@ static int acpi_processor_power_seq_show(struct seq_file *seq, void *offset)
 	if (!pr)
 		goto end;
 
-	seq_printf(seq, "active state:            %d\n"
+	seq_printf(seq, "active state:            C%d\n"
 			"max_cstate:              C%d\n"
 			"bus master activity:     %08x\n",
 			pr->power.state ? pr->power.state - pr->power.states : 0,
@@ -844,7 +844,7 @@ static int acpi_processor_power_seq_show(struct seq_file *seq, void *offset)
 	seq_puts(seq, "states:\n");
 
 	for (i = 1; i <= pr->power.count; i++) {
-		seq_printf(seq, "   %c%d:                  ",
+		seq_printf(seq, "   %cC%d:                  ",
 			(&pr->power.states[i] == pr->power.state?'*':' '), i);
 
 		if (!pr->power.states[i].valid) {
@@ -868,18 +868,18 @@ static int acpi_processor_power_seq_show(struct seq_file *seq, void *offset)
 		}
 
 		if (pr->power.states[i].promotion.state)
-			seq_printf(seq, "promotion[%d] ",
+			seq_printf(seq, "promotion[C%d] ",
 				(pr->power.states[i].promotion.state -
 				 pr->power.states));
 		else
-			seq_puts(seq, "promotion[-] ");
+			seq_puts(seq, "promotion[--] ");
 
 		if (pr->power.states[i].demotion.state)
-			seq_printf(seq, "demotion[%d] ",
+			seq_printf(seq, "demotion[C%d] ",
 				(pr->power.states[i].demotion.state -
 				 pr->power.states));
 		else
-			seq_puts(seq, "demotion[-] ");
+			seq_puts(seq, "demotion[--] ");
 
 		seq_printf(seq, "latency[%03d] usage[%08d]\n",
 			pr->power.states[i].latency,
@@ -939,7 +939,7 @@ int acpi_processor_power_init(struct acpi_processor *pr, struct acpi_device *dev
 		printk(KERN_INFO PREFIX "CPU%d (power states:", pr->id);
 		for (i = 1; i <= pr->power.count; i++)
 			if (pr->power.states[i].valid)
-				printk(" %d[C%d]", i, pr->power.states[i].type);
+				printk(" C%d[C%d]", i, pr->power.states[i].type);
 		printk(")\n");
 
 		if (pr->id == 0) {
