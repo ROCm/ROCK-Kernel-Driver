@@ -909,6 +909,7 @@ direct_io_worker(int rw, struct kiocb *iocb, struct inode *inode,
 	ssize_t ret = 0;
 	ssize_t ret2;
 	size_t bytes;
+	int enotblk = 0;
 
 	dio->bio = NULL;
 	dio->inode = inode;
@@ -990,6 +991,7 @@ direct_io_worker(int rw, struct kiocb *iocb, struct inode *inode,
 		 * be handled by buffered I/O when we return
 		 */
 		ret = 0;
+		enotblk = 1;
 	}
 	/*
 	 * There may be some unwritten disk at the end of a part-written
@@ -1085,6 +1087,8 @@ direct_io_worker(int rw, struct kiocb *iocb, struct inode *inode,
 			aio_complete(iocb, ret, 0);
 		kfree(dio);
 	}
+	if (enotblk && ret > 0)
+		ret = 0;
 	return ret;
 }
 
