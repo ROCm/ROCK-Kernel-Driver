@@ -17,7 +17,7 @@ GZFLAGS		:=-9
 CFLAGS		:=$(CFLAGS:-O2=-Os)
 
 ifeq ($(CONFIG_FRAME_POINTER),y)
-CFLAGS		:=$(CFLAGS:-fomit-frame-pointer=-mapcs -mno-sched-prolog)
+CFLAGS		+=-fno-omit-frame-pointer -mapcs -mno-sched-prolog
 endif
 
 ifeq ($(CONFIG_DEBUG_INFO),y)
@@ -36,7 +36,7 @@ apcs-$(CONFIG_CPU_26)		:=-mapcs-26 -mcpu=arm3
 # series of macros.
 arch-$(CONFIG_CPU_32v3)		:=-D__LINUX_ARM_ARCH__=3 -march=armv3
 arch-$(CONFIG_CPU_32v4)		:=-D__LINUX_ARM_ARCH__=4 -march=armv4
-arch-$(CONFIG_CPU_32v5)		:=-D__LINUX_ARM_ARCH__=5 -march=armv5
+arch-$(CONFIG_CPU_32v5)		:=-D__LINUX_ARM_ARCH__=5 -march=armv5te
 arch-$(CONFIG_CPU_XSCALE)	:=-D__LINUX_ARM_ARCH__=5 -march=armv4 -Wa,-mxscale #-march=armv5te
 
 # This selects how we optimise for the processor.
@@ -124,10 +124,10 @@ FASTFPE_OBJ	:=$(FASTFPE)/
 endif
 
 # If we have a machine-specific directory, then include it in the build.
+core-y				+= arch/arm/kernel/ arch/arm/mm/ arch/arm/common/
 ifneq ($(MACHINE),)
 core-y				+= arch/arm/mach-$(MACHINE)/
 endif
-core-y				+= arch/arm/kernel/ arch/arm/mm/
 core-$(CONFIG_FPE_NWFPE)	+= arch/arm/nwfpe/
 core-$(CONFIG_FPE_FASTFPE)	+= $(FASTFPE_OBJ)
 

@@ -53,7 +53,8 @@ static const char *handler[]= { "prefetch abort", "data abort", "address excepti
 void dump_backtrace_entry(unsigned long where, unsigned long from)
 {
 	printk("Function entered at [<%08lx>] from [<%08lx>]\n", where, from);
-	print_symbol("  %s\n", where);
+	print_symbol("  %s", where);
+	printk("\n");
 }
 
 /*

@@ -881,6 +881,90 @@ static void ecard_proc_init(void)
 		get_ecard_dev_info);
 }
 
+#define ec_set_resource(ec,nr,st,sz,flg)			\
+	do {							\
+		(ec)->resource[nr].name = ec->dev.name;		\
+		(ec)->resource[nr].start = st;			\
+		(ec)->resource[nr].end = (st) + (sz) - 1;	\
+		(ec)->resource[nr].flags = flg;			\
+	} while (0)
+
+static void __init ecard_init_resources(struct expansion_card *ec)
+{
+	unsigned long base = PODSLOT_IOC4_BASE;
+	unsigned int slot = ec->slot_no;
+	int i;
+
+	if (slot < 4) {
+		ec_set_resource(ec, ECARD_RES_MEMC,
+				PODSLOT_MEMC_BASE + (slot << 14),
+				PODSLOT_MEMC_SIZE, IORESOURCE_MEM);
+		base = PODSLOT_IOC0_BASE;
+	}
+
+#ifdef CONFIG_ARCH_RPC
+	if (slot < 8) {
+		ec_set_resource(ec, ECARD_RES_EASI,
+				PODSLOT_EASI_BASE + (slot << 24),
+				PODSLOT_EASI_SIZE, IORESOURCE_MEM);
+	}
+
+	if (slot == 8) {
+		ec_set_resource(ec, ECARD_RES_MEMC, NETSLOT_BASE,
+				NETSLOT_SIZE, IORESOURCE_MEM);
+	} else
+#endif
+
+	for (i = 0; i < ECARD_RES_IOCSYNC - ECARD_RES_IOCSLOW; i++) {
+		ec_set_resource(ec, i + ECARD_RES_IOCSLOW,
+				base + (slot << 14) + (i << 19),
+				PODSLOT_IOC_SIZE, IORESOURCE_MEM);
+	}
+
+	for (i = 0; i < ECARD_NUM_RESOURCES; i++) {
+		if (ec->resource[i].start &&
+		    request_resource(&iomem_resource, &ec->resource[i])) {
+			printk(KERN_ERR "%s: resource(s) not available\n",
+				ec->dev.bus_id);
+			ec->resource[i].end -= ec->resource[i].start;
+			ec->resource[i].start = 0;
+		}
+	}
+}
+
+static ssize_t ecard_show_irq(struct device *dev, char *buf)
+{
+	struct expansion_card *ec = ECARD_DEV(dev);
+	return sprintf(buf, "%u\n", ec->irq);
+}
+
+static DEVICE_ATTR(irq, S_IRUGO, ecard_show_irq, NULL);
+
+static ssize_t ecard_show_dma(struct device *dev, char *buf)
+{
+	struct expansion_card *ec = ECARD_DEV(dev);
+	return sprintf(buf, "%u\n", ec->dma);
+}
+
+static DEVICE_ATTR(dma, S_IRUGO, ecard_show_dma, NULL);
+
+static ssize_t ecard_show_resources(struct device *dev, char *buf)
+{
+	struct expansion_card *ec = ECARD_DEV(dev);
+	char *str = buf;
+	int i;
+
+	for (i = 0; i < ECARD_NUM_RESOURCES; i++)
+		str += sprintf(str, "%08lx %08lx %08lx\n",
+				ec->resource[i].start,
+				ec->resource[i].end,
+				ec->resource[i].flags);
+
+	return str - buf;
+}
+
+static DEVICE_ATTR(resource, S_IRUGO, ecard_show_resources, NULL);
+
 /*
  * Probe for an expansion card.
  *
@@ -949,6 +1033,16 @@ ecard_probe(int slot, card_type_t type)
 			break;
 		}
 
+	snprintf(ec->dev.bus_id, sizeof(ec->dev.bus_id), "ecard%d", slot);
+	snprintf(ec->dev.name, sizeof(ec->dev.name), "ecard %04x:%04x",
+		 ec->cid.manufacturer, ec->cid.product);
+	ec->dev.parent = NULL;
+	ec->dev.bus    = &ecard_bus_type;
+	ec->dev.dma_mask = &ec->dma_mask;
+	ec->dma_mask = (u64)0xffffffff;
+
+	ecard_init_resources(ec);
+
 	/*
 	 * hook the interrupt handlers
 	 */
@@ -974,14 +1068,10 @@ ecard_probe(int slot, card_type_t type)
 	*ecp = ec;
 	slot_to_expcard[slot] = ec;
 
-	snprintf(ec->dev.bus_id, sizeof(ec->dev.bus_id), "ecard%d", slot);
-	strcpy(ec->dev.name, "fixme!");
-	ec->dev.parent = NULL;
-	ec->dev.bus    = &ecard_bus_type;
-	ec->dev.dma_mask = &ec->dma_mask;
-	ec->dma_mask = (u64)0xffffffff;
-
 	device_register(&ec->dev);
+	device_create_file(&ec->dev, &dev_attr_dma);
+	device_create_file(&ec->dev, &dev_attr_irq);
+	device_create_file(&ec->dev, &dev_attr_resource);
 
 	return 0;
 
