@@ -115,7 +115,7 @@ static struct display disp;
 
 /* frame buffer operations */
 
-static int dn_fb_blank(int blank, struct fb_info *info);
+static int dnfb_blank(int blank, struct fb_info *info);
 static void dnfb_copyarea(struct fb_info *info, struct fb_copyarea *area);
 
 static struct fb_ops dn_fb_ops = {
@@ -165,7 +165,6 @@ void dnfb_copyarea(struct fb_info *info, struct fb_copyarea *area)
 {
 
 	int incr, y_delta, pre_read = 0, x_end, x_word_count;
-	int x_count, y_count;
 	ushort *src, dummy;
 	uint start_mask, end_mask, dest;
 	short i, j;
@@ -173,13 +172,13 @@ void dnfb_copyarea(struct fb_info *info, struct fb_copyarea *area)
 	incr = (area->dy <= area->sy) ? 1 : -1;
 
 	src =
-	    (ushort *) (info->screen_base + area->sy * info->fix.next_line +
+	    (ushort *) (info->screen_base + area->sy * info->fix.line_length +
 			(area->sx >> 4));
-	dest = area->dy * (info->fix.next_line >> 1) + (area->dx >> 4);
+	dest = area->dy * (info->fix.line_length >> 1) + (area->dx >> 4);
 
 	if (incr > 0) {
-		y_delta = (info->fix.next_line * 8) - area->sx - x_count;
-		x_end = area->dx + x_count - 1;
+		y_delta = (info->fix.line_length * 8) - area->sx - area->width;
+		x_end = area->dx + area->width - 1;
 		x_word_count = (x_end >> 4) - (area->dx >> 4) + 1;
 		start_mask = 0xffff0000 >> (area->dx & 0xf);
 		end_mask = 0x7ffff >> (x_end & 0xf);
@@ -188,8 +187,8 @@ void dnfb_copyarea(struct fb_info *info, struct fb_copyarea *area)
 		if ((area->dx & 0xf) < (area->sx & 0xf))
 			pre_read = 1;
 	} else {
-		y_delta = -((info->fix.next_line * 8) - area->sx - x_count);
-		x_end = area->dx - x_count + 1;
+		y_delta = -((info->fix.line_length * 8) - area->sx - area->width);
+		x_end = area->dx - area->width + 1;
 		x_word_count = (area->dx >> 4) - (x_end >> 4) + 1;
 		start_mask = 0x7ffff >> (area->dx & 0xf);
 		end_mask = 0xffff0000 >> (x_end & 0xf);
@@ -199,7 +198,7 @@ void dnfb_copyarea(struct fb_info *info, struct fb_copyarea *area)
 			pre_read = 1;
 	}
 
-	for (i = 0; i < y_count; i++) {
+	for (i = 0; i < area->height; i++) {
 
 		outb(0xc | (dest >> 16), AP_CONTROL_3A);
 
@@ -242,7 +241,7 @@ unsigned long __init dnfb_init(unsigned long mem_start)
 {
 	int err;
 
-	strcpy(&fb_info.modename, dnfb_fix);
+	strcpy(fb_info.modename, dnfb_fix.id);
 	fb_info.changevar = NULL;
 	fb_info.fontname[0] = 0;
 	fb_info.disp = &disp;

@@ -131,7 +131,11 @@ static int scc_init_drivers(void)
 	memset(&scc_driver, 0, sizeof(scc_driver));
 	scc_driver.magic = TTY_DRIVER_MAGIC;
 	scc_driver.driver_name = "scc";
+#ifdef CONFIG_DEVFS_FS
+	scc_driver.name = "tts/%d";
+#else
 	scc_driver.name = "ttyS";
+#endif
 	scc_driver.major = TTY_MAJOR;
 	scc_driver.minor_start = SCC_MINOR_BASE;
 	scc_driver.num = 2;
@@ -164,7 +168,11 @@ static int scc_init_drivers(void)
 	scc_driver.break_ctl = scc_break_ctl;
 
 	scc_callout_driver = scc_driver;
+#ifdef CONFIG_DEVFS_FS
+	scc_callout_driver.name = "cua/%d";
+#else
 	scc_callout_driver.name = "cua";
+#endif
 	scc_callout_driver.major = TTYAUX_MAJOR;
 	scc_callout_driver.subtype = SERIAL_TYPE_CALLOUT;
 
@@ -731,12 +739,10 @@ static int scc_set_real_termios (void *ptr)
 #ifdef CONFIG_MVME147_SCC
 	if (MACH_IS_MVME147)
 		brgval = (M147_SCC_PCLK + baud/2) / (16 * 2 * baud) - 2;
-	else
 #endif
 #ifdef CONFIG_MVME162_SCC
 	if (MACH_IS_MVME16x)
 		brgval = (MVME_SCC_PCLK + baud/2) / (16 * 2 * baud) - 2;
-	else
 #endif
 #ifdef CONFIG_BVME6000_SCC
 	if (MACH_IS_BVME6000)
@@ -783,6 +789,15 @@ static int scc_chars_in_buffer (void *ptr)
 }
 
 
+/* Comment taken from sx.c (2.4.0):
+   I haven't the foggiest why the decrement use count has to happen
+   here. The whole linux serial drivers stuff needs to be redesigned.
+   My guess is that this is a hack to minimize the impact of a bug
+   elsewhere. Thinking about it some more. (try it sometime) Try
+   running minicom on a serial port that is driven by a modularized
+   driver. Have the modem hangup. Then remove the driver module. Then
+   exit minicom.  I expect an "oops".  -- REW */
+
 static void scc_hungup(void *ptr)
 {
 	scc_disable_tx_interrupts(ptr);
@@ -795,6 +810,7 @@ static void scc_close(void *ptr)
 {
 	scc_disable_tx_interrupts(ptr);
 	scc_disable_rx_interrupts(ptr);
+	MOD_DEC_USE_COUNT;
 }
 
 
@@ -809,6 +825,7 @@ static void scc_setsignals(struct scc_port *port, int dtr, int rts)
 	SCC_ACCESS_INIT(port);
 
 	save_flags(flags);
+	cli();
 	t = SCCread(TX_CTRL_REG);
 	if (dtr >= 0) t = dtr? (t | TCR_DTR): (t & ~TCR_DTR);
 	if (rts >= 0) t = rts? (t | TCR_RTS): (t & ~TCR_RTS);
@@ -933,7 +950,7 @@ static int scc_open (struct tty_struct * tty, struct file * filp)
 	if (port->gs.count == 1) {
 		MOD_INC_USE_COUNT;
 	}
-	retval = block_til_ready(port, filp);
+	retval = gs_block_til_ready(port, filp);
 
 	if (retval) {
 		MOD_DEC_USE_COUNT;

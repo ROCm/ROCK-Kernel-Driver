@@ -229,8 +229,8 @@ static long via_read_time(void)
 	do {
 		if (++ct > 10) {
 			printk("via_read_time: couldn't get valid time, "
-			       "last read = 0x%08X and 0x%08X\n", last_result.idata,
-			       result.idata);
+			       "last read = 0x%08lx and 0x%08lx\n",
+			       last_result.idata, result.idata);
 			break;
 		}
 

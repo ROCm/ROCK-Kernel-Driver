@@ -61,7 +61,6 @@
 #include <asm/amigahw.h>
 #include <asm/amigaints.h>
 #include <asm/setup.h>
-#include <asm/io.h>
 
 #include <video/fbcon.h>
 #include <video/fbcon-afb.h>
@@ -1173,16 +1172,51 @@ static struct fb_ops amifb_ops = {
 	fb_set_cmap:	gen_set_cmap,
 	fb_setcolreg:	amifb_setcolreg,
 	fb_pan_display:	amifb_pan_display,
-	fb_blankL:	amifb_blank,
+	fb_blank:	amifb_blank,
 	fb_ioctl:	amifb_ioctl,
 };
+
+static void __init amifb_setup_mcap(char *spec)
+{
+	char *p;
+	int vmin, vmax, hmin, hmax;
+
+	/* Format for monitor capabilities is: <Vmin>;<Vmax>;<Hmin>;<Hmax>
+	 * <V*> vertical freq. in Hz
+	 * <H*> horizontal freq. in kHz
+	 */
+
+	if (!(p = strsep(&spec, ";")) || !*p)
+		return;
+	vmin = simple_strtoul(p, NULL, 10);
+	if (vmin <= 0)
+		return;
+	if (!(p = strsep(&spec, ";")) || !*p)
+		return;
+	vmax = simple_strtoul(p, NULL, 10);
+	if (vmax <= 0 || vmax <= vmin)
+		return;
+	if (!(p = strsep(&spec, ";")) || !*p)
+		return;
+	hmin = 1000 * simple_strtoul(p, NULL, 10);
+	if (hmin <= 0)
+		return;
+	if (!(p = strsep(&spec, "")) || !*p)
+		return;
+	hmax = 1000 * simple_strtoul(p, NULL, 10);
+	if (hmax <= 0 || hmax <= hmin)
+		return;
+
+	fb_info.monspecs.vfmin = vmin;
+	fb_info.monspecs.vfmax = vmax;
+	fb_info.monspecs.hfmin = hmin;
+	fb_info.monspecs.hfmax = hmax;
+}
 
 int __init amifb_setup(char *options)
 {
 	char *this_opt;
-	char mcap_spec[80];
 
-	mcap_spec[0] = '\0';
 	fb_info.fontname[0] = '\0';
 
 	if (!options || !*options)
@@ -1199,7 +1233,7 @@ int __init amifb_setup(char *options)
 		} else if (!strcmp(this_opt, "ilbm"))
 			amifb_ilbm = 1;
 		else if (!strncmp(this_opt, "monitorcap:", 11))
-			strcpy(mcap_spec, this_opt+11);
+			amifb_setup_mcap(this_opt+11);
 		else if (!strncmp(this_opt, "font:", 5))
 			strcpy(fb_info.fontname, this_opt+5);
 		else if (!strncmp(this_opt, "fstart:", 7))
@@ -1211,43 +1245,6 @@ int __init amifb_setup(char *options)
 	if (min_fstrt < 48)
 		min_fstrt = 48;
 
-	if (*mcap_spec) {
-		char *p;
-		int vmin, vmax, hmin, hmax;
-
-	/* Format for monitor capabilities is: <Vmin>;<Vmax>;<Hmin>;<Hmax>
-	 * <V*> vertical freq. in Hz
-	 * <H*> horizontal freq. in kHz
-	 */
-
-		if (!(p = strsep(&mcap_spec, ";")) || !*p)
-			goto cap_invalid;
-		vmin = simple_strtoul(p, NULL, 10);
-		if (vmin <= 0)
-			goto cap_invalid;
-		if (!(p = strsep(&mcap_spec, ";")) || !*p)
-			goto cap_invalid;
-		vmax = simple_strtoul(p, NULL, 10);
-		if (vmax <= 0 || vmax <= vmin)
-			goto cap_invalid;
-		if (!(p = strsep(&mcap_spec, ";")) || !*p)
-			goto cap_invalid;
-		hmin = 1000 * simple_strtoul(p, NULL, 10);
-		if (hmin <= 0)
-			goto cap_invalid;
-		if (!(p = strsep(&mcap_spec, "")) || !*p)
-			goto cap_invalid;
-		hmax = 1000 * simple_strtoul(p, NULL, 10);
-		if (hmax <= 0 || hmax <= hmin)
-			goto cap_invalid;
-
-		fb_info.monspecs.vfmin = vmin;
-		fb_info.monspecs.vfmax = vmax;
-		fb_info.monspecs.hfmin = hmin;
-		fb_info.monspecs.hfmax = hmax;
-cap_invalid:
-		;
-	}
 	return 0;
 }
 

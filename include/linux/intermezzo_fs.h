@@ -19,6 +19,7 @@
 #ifdef __KERNEL__
 #include <linux/smp.h>
 #include <linux/fsfilter.h>
+#include <linux/namei.h>
 
 /* fixups for fs.h */
 #ifndef fs_down

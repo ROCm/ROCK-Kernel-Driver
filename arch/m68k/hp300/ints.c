@@ -22,6 +22,7 @@
 #include <asm/system.h>
 #include <asm/traps.h>
 #include <asm/ptrace.h>
+#include <asm/errno.h>
 #include "ints.h"
 
 /* Each ipl has a linked list of interrupt service routines.
@@ -142,7 +143,9 @@ void hp300_free_irq(unsigned int irq, void *dev_id)
         }
         /* remove the entry after t: */
         t->next->flags = IRQ_FLG_STD;
-        t->next->dev_id = t->next->devname = t->next->handler = NULL;
+        t->next->dev_id = NULL;
+	t->next->devname = NULL;
+	t->next->handler = NULL;
         t->next = t->next->next;
         
 	spin_unlock_irqrestore(&irqlist_lock, flags);

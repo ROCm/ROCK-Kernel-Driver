@@ -36,7 +36,7 @@ extern unsigned long mac_videobase;
 extern unsigned long mac_videodepth;
 extern unsigned long mac_rowbytes;
 
-extern void mac_serial_print(char *);
+extern void mac_serial_print(const char *);
 
 #define DEBUG_HEADS
 #undef DEBUG_SCREEN
@@ -137,7 +137,7 @@ void mac_debugging_long(int pos, long addr)
  * TODO: serial debug code
  */
 
-struct SCC
+struct mac_SCC
  {
   u_char cha_b_ctrl;
   u_char char_dummy1;
@@ -148,7 +148,7 @@ struct SCC
   u_char cha_a_data;
  };
 
-# define scc (*((volatile struct SCC*)mac_bi_data.sccbase))
+# define scc (*((volatile struct mac_SCC*)mac_bi_data.sccbase))
 
 /* Flag that serial port is already initialized and used */
 int mac_SCC_init_done = 0;
@@ -159,9 +159,9 @@ int mac_SCC_reset_done = 0;
 static int scc_port = -1;
 
 static struct console mac_console_driver = {
-	name:		"debug",
-	flags:		CON_PRINTBUFFER,
-	index:		-1,
+	.name =		"debug",
+	.flags =	CON_PRINTBUFFER,
+	.index =	-1,
 };
 
 /*
@@ -235,20 +235,6 @@ void mac_scca_console_write (struct console *co, const char *str,
     }
 }
 
-#if defined(CONFIG_SERIAL_CONSOLE) || defined(DEBUG_SERIAL)
-int mac_sccb_console_wait_key(struct console *co)
-{
-    int i;
-    do {
-	for( i = uSEC; i > 0; --i )
-		barrier();
-    } while( !(scc.cha_b_ctrl & 0x01) ); /* wait for rx buf filled */
-    for( i = uSEC; i > 0; --i )
-	barrier();
-    return( scc.cha_b_data );
-}
-
-#endif
 
 /* The following two functions do a quick'n'dirty initialization of the MFP or
  * SCC serial ports. They're used by the debugging interface, kgdb, and the
@@ -390,9 +376,6 @@ void __init mac_debug_init(void)
 	/* Mac printer port */
 	mac_init_scc_port( B9600|CS8, 1 );
 	mac_console_driver.write = mac_sccb_console_write;
-#ifdef CONFIG_SERIAL_CONSOLE
-	mac_console_driver.wait_key = mac_sccb_console_wait_key;
-#endif
 	scc_port = 1;
     }
 #endif

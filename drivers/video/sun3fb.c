@@ -48,6 +48,13 @@
 
 #ifdef CONFIG_SUN3
 #include <asm/oplib.h>
+#include <asm/machines.h>
+#include <asm/idprom.h>
+
+#define CGFOUR_OBMEM_ADDR 0x1f300000
+#define BWTWO_OBMEM_ADDR 0x1f000000
+#define BWTWO_OBMEM50_ADDR 0x00100000
+
 #endif
 #ifdef CONFIG_SUN3X
 #include <asm/sun3x.h>
@@ -59,12 +66,14 @@
 #define CURSOR_SHAPE			1
 #define CURSOR_BLINK			2
 
+#define mymemset(x,y) memset(x,0,y)
+
     /*
      *  Interface used by the world
      */
 
 int sun3fb_init(void);
-int sun3fb_setup(char *options);
+void sun3fb_setup(char *options);
 
 static char fontname[40] __initdata = { 0 };
 static int curblink __initdata = 1;
@@ -113,6 +122,8 @@ static struct fb_ops sun3fb_ops = {
 static void sun3fb_clear_margin(struct display *p, int s)
 {
 	struct fb_info_sbusfb *fb = sbusfbinfod(p);
+	
+	return;
 
 	if (fb->switch_from_graph)
 		(*fb->switch_from_graph)(fb);
@@ -352,7 +363,7 @@ void __init sun3fb_setup(char *options)
 		p++;
 	}
 
-	return 0;
+	return;
 }
 
 static int sun3fbcon_switch(int con, struct fb_info *info)
@@ -408,6 +419,7 @@ static int sun3fb_blank(int blank, struct fb_info *info)
     	return fb->blank(fb);
     else if (!blank && fb->unblank)
     	return fb->unblank(fb);
+    return 0;
 }
 
     /*
@@ -505,7 +517,7 @@ void sun3fb_palette(int enter)
      */
 static int __init sun3fb_init_fb(int fbtype, unsigned long addr)
 {
-	static struct linux_sbus_device sdb;
+	static struct sbus_dev sdb;
 	struct fb_fix_screeninfo *fix;
 	struct fb_var_screeninfo *var;
 	struct display *disp;
@@ -513,7 +525,7 @@ static int __init sun3fb_init_fb(int fbtype, unsigned long addr)
 	struct fbtype *type;
 	int linebytes, w, h, depth;
 	char *p = NULL;
-
+	
 	fb = kmalloc(sizeof(struct fb_info_sbusfb), GFP_ATOMIC);
 	if (!fb)
 		return -ENOMEM;
@@ -535,9 +547,11 @@ sizechange:
 	type->fb_depth  = depth = (fbtype == FBTYPE_SUN2BW) ? 1 : 8;
 	linebytes = w * depth / 8;
 	type->fb_size   = PAGE_ALIGN((linebytes) * h);
-	
+/*	
 	fb->x_margin = (w & 7) / 2;
 	fb->y_margin = (h & 15) / 2;
+*/
+	fb->x_margin = fb->y_margin = 0;
 
 	var->xres_virtual = w;
 	var->yres_virtual = h;
@@ -582,8 +596,14 @@ sizechange:
 	case FBTYPE_SUN2BW:
 		p = bwtwofb_init(fb); break;
 #endif
+#ifdef CONFIG_FB_CGTHREE
+	case FBTYPE_SUN4COLOR:
+	case FBTYPE_SUN3COLOR:
+		type->fb_size = 0x100000;
+		p = cgthreefb_init(fb); break;
+#endif
 	}
-	fix->smem_start = fb->info.screen_base;
+	fix->smem_start = (unsigned long)fb->info.screen_base;	// FIXME
 	
 	if (!p) {
 		kfree(fb);
@@ -638,17 +658,25 @@ int __init sun3fb_init(void)
 	unsigned long addr;
 	char p4id;
 	
-	if (!con_is_present()) return;
-	printk("sun3fb_init()\n");
+	if (!con_is_present()) return -ENODEV;
 #ifdef CONFIG_SUN3
-	addr = 0xfe20000;
         switch(*(romvec->pv_fbtype))
         {
-		case FBTYPE_SUN2BW:
-			return sun3fb_init_fb(FBTYPE_SUN2BW, addr);
-		case FBTYPE_SUN3COLOR:
-			printk("cg3 detected but not supported\n");
-			return -EINVAL;
+	case FBTYPE_SUN2BW:
+		addr = 0xfe20000;
+		return sun3fb_init_fb(FBTYPE_SUN2BW, addr);
+	case FBTYPE_SUN3COLOR:
+	case FBTYPE_SUN4COLOR:
+		if(idprom->id_machtype != (SM_SUN3|SM_3_60)) {
+			printk("sun3fb: cgthree/four only supported on 3/60\n");
+			return -ENODEV;
+		}
+		
+		addr = CGFOUR_OBMEM_ADDR;
+		return sun3fb_init_fb(*(romvec->pv_fbtype), addr);
+	default:
+		printk("sun3fb: unsupported framebuffer\n");
+		return -ENODEV;
 	}
 #else
 	addr = SUN3X_VIDEO_BASE;
@@ -660,16 +688,18 @@ int __init sun3fb_init(void)
 			return sun3fb_init_fb(FBTYPE_SUN2BW, addr);
 #if 0 /* not yet */
 		case 0x40:
-			sun3fb_init_fb(FBTYPE_SUN4COLOR, addr);
+			return sun3fb_init_fb(FBTYPE_SUN4COLOR, addr);
 			break;
 		case 0x45:
-			sun3fb_init_fb(FBTYPE_SUN8COLOR, addr);
+			return sun3fb_init_fb(FBTYPE_SUN8COLOR, addr);
 			break;
 #endif
 		case 0x60:
 			return sun3fb_init_fb(FBTYPE_SUNFAST_COLOR, addr);
 	}
 #endif			
+	
+	return -ENODEV;
 }
 
 MODULE_LICENSE("GPL");

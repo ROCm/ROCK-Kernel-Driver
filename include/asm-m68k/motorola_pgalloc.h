@@ -14,9 +14,9 @@ static inline pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long ad
 	pte = (pte_t *) __get_free_page(GFP_KERNEL);
 	if (pte) {
 		clear_page(pte);
-		__flush_page_to_ram((unsigned long)pte);
-		flush_tlb_kernel_page((unsigned long)pte);
-		nocache_page((unsigned long)pte);
+		__flush_page_to_ram(pte);
+		flush_tlb_kernel_page(pte);
+		nocache_page(pte);
 	}
 
 	return pte;
@@ -24,7 +24,7 @@ static inline pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long ad
 
 static inline void pte_free_kernel(pte_t *pte)
 {
-	cache_page((unsigned long)pte);
+	cache_page(pte);
 	free_page((unsigned long) pte);
 }
 
@@ -39,9 +39,9 @@ static inline struct page *pte_alloc_one(struct mm_struct *mm, unsigned long add
 	pte = kmap(page);
 	if (pte) {
 		clear_page(pte);
-		__flush_page_to_ram((unsigned long)pte);
-		flush_tlb_kernel_page((unsigned long)pte);
-		nocache_page((unsigned long)pte);
+		__flush_page_to_ram(pte);
+		flush_tlb_kernel_page(pte);
+		nocache_page(pte);
 	}
 	kunmap(pte);
 
@@ -50,14 +50,14 @@ static inline struct page *pte_alloc_one(struct mm_struct *mm, unsigned long add
 
 static inline void pte_free(struct page *page)
 {
-	cache_page((unsigned long)kmap(page));
+	cache_page(kmap(page));
 	kunmap(page);
 	__free_page(page);
 }
 
 static inline void pte_free_tlb(mmu_gather_t *tlb, struct page *page)
 {
-	cache_page((unsigned long)kmap(page));
+	cache_page(kmap(page));
 	kunmap(page);
 	__free_page(page);
 }
@@ -104,8 +104,5 @@ static inline void pgd_populate(struct mm_struct *mm, pgd_t *pgd, pmd_t *pmd)
 {
 	pgd_set(pgd, pmd);
 }
-
-
-#define check_pgt_cache()	do { } while (0)
 
 #endif /* _MOTOROLA_PGALLOC_H */

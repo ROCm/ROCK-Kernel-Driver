@@ -37,7 +37,7 @@ struct cyclades_port {
 	int			ignore_status_mask;
 	int			close_delay;
 	int			IER; 	/* Interrupt Enable Register */
-	int			event;
+	unsigned long		event;
 	unsigned long		last_active;
 	int			count;	/* # of fd on device */
 	int                     x_char; /* to be pushed out ASAP */

@@ -42,7 +42,7 @@
 	5000  A2620 68020 [Accelerator and RAM Expansion]
 	5100  A2630 68030 [Accelerator and RAM Expansion]
 	5400  A4091 [SCSI Host Adapter]
-	5a00  A2065 [Ethernet Card]]
+	5a00  A2065 [Ethernet Card]
 	6000  Romulator Card
 	6100  A3000 Test Fixture [Miscellaneous Expansion Card]
 	6700  A2386-SX [ISA Bus Bridge]
@@ -56,7 +56,7 @@
 02ff  Kolff Computer Supplies
 	0000  KCS Power PC [ISA Bus Bridge]
 03ec  Cardco Ltd.
-	0400  Kronos 2000 [SCSI Host Adapter]]
+	0400  Kronos 2000 [SCSI Host Adapter]
 	0c00  A1000 [SCSI Host Adapter]
 	0e00  Escort [SCSI Host Adapter]
 	f500  A2410 HiRes [Graphics Card]

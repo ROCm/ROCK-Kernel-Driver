@@ -17,7 +17,9 @@ obj-	:=
 
 obj-$(CONFIG_PMAC_PBOOK)	+= mediabay.o
 obj-$(CONFIG_MAC_SERIAL)	+= macserial.o
-obj-$(CONFIG_NVRAM)		+= nvram.o
+ifneq ($(CONFIG_MAC),y)
+  obj-$(CONFIG_NVRAM)		+= nvram.o
+endif
 obj-$(CONFIG_MAC_HID)		+= mac_hid.o
 obj-$(CONFIG_INPUT_ADBHID)	+= adbhid.o
 obj-$(CONFIG_PPC_RTC)		+= rtc.o

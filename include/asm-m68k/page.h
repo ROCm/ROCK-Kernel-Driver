@@ -76,8 +76,8 @@ static inline void clear_page(void *page)
 #define copy_page(to,from)	memcpy((to), (from), PAGE_SIZE)
 #endif
 
-#define clear_user_page(page, vaddr)	clear_page(page)
-#define copy_user_page(to, from, vaddr)	copy_page(to, from)
+#define clear_user_page(page, vaddr, pg)	clear_page(page)
+#define copy_user_page(to, from, vaddr, pg)	copy_page(to, from)
 
 /*
  * These are used to make use of C type-checking..
@@ -159,10 +159,25 @@ static inline void *__va(unsigned long x)
 }
 #endif	/* CONFIG_SUN3 */
 
-#define MAP_NR(addr)		(((unsigned long)(addr)-PAGE_OFFSET) >> PAGE_SHIFT)
-#define virt_to_page(kaddr)	(mem_map + (((unsigned long)(kaddr)-PAGE_OFFSET) >> PAGE_SHIFT))
-#define VALID_PAGE(page)	((page - mem_map) < max_mapnr)
+/*
+ * NOTE: virtual isn't really correct, actually it should be the offset into the
+ * memory node, but we have no highmem, so that works for now.
+ * TODO: implement (fast) pfn<->pgdat_idx conversion functions, this makes lots
+ * of the shifts unneccessary.
+ */
+#define virt_to_pfn(kaddr)	(__pa(kaddr) >> PAGE_SHIFT)
+#define pfn_to_virt(pfn)	__va((pfn) << PAGE_SHIFT)
 
+#define virt_to_page(kaddr)	(mem_map + (((unsigned long)(kaddr)-PAGE_OFFSET) >> PAGE_SHIFT))
+#define page_to_virt(page)	((((page) - mem_map) << PAGE_SHIFT) + PAGE_OFFSET)
+
+#define pfn_to_page(pfn)	virt_to_page(pfn_to_virt(pfn))
+#define page_to_pfn(page)	virt_to_pfn(page_to_virt(page))
+
+#define virt_addr_valid(kaddr)	((void *)(kaddr) >= (void *)PAGE_OFFSET && (void *)(kaddr) < high_memory)
+#define pfn_valid(pfn)		virt_addr_valid(pfn_to_virt(pfn))
+
+#ifdef CONFIG_DEBUG_BUGVERBOSE
 #ifndef CONFIG_SUN3
 #define BUG() do { \
 	printk("kernel BUG at %s:%d!\n", __FILE__, __LINE__); \
@@ -172,6 +187,11 @@ static inline void *__va(unsigned long x)
 #define BUG() do { \
 	printk("kernel BUG at %s:%d!\n", __FILE__, __LINE__); \
 	panic("BUG!"); \
+} while (0)
+#endif
+#else
+#define BUG() do { \
+	asm volatile("illegal"); \
 } while (0)
 #endif
 

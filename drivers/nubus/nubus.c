@@ -961,18 +961,18 @@ static int sprint_nubus_board(struct nubus_board* board, char* ptr, int len)
 	return strlen(ptr);
 }
 
-static int nubus_read_proc(char *buf, char **start, off_t off,
+static int nubus_read_proc(char *page, char **start, off_t off,
 				int count, int *eof, void *data)
 {
 	int nprinted, len, begin = 0;
-	int slot,size;
+	int size = PAGE_SIZE;
 	struct nubus_board* board;
 	
-	len   = sprintf(buf, "Nubus devices found:\n");
+	len   = sprintf(page, "Nubus devices found:\n");
 	/* Walk the list of NuBus boards */
 	for (board = nubus_boards; board != NULL; board = board->next)
 	{
-		nprinted = sprint_nubus_board(board, buf + len, size - len);
+		nprinted = sprint_nubus_board(board, page + len, size - len);
 		if (nprinted < 0)
 			break;
 		len += nprinted;
@@ -983,10 +983,10 @@ static int nubus_read_proc(char *buf, char **start, off_t off,
 		if (len+begin >= off+count)
 			break;
 	}
-	if (slot==16 || len+begin < off)
+	if (len+begin < off)
 		*eof = 1;
 	off -= begin;
-	*start = buf + off;
+	*start = page + off;
 	len -= off;
 	if (len>count)
 		len = count;
@@ -1009,10 +1009,10 @@ void __init nubus_scan_bus(void)
 	}
 }
 
-void __init nubus_init(void)
+static int __init nubus_init(void)
 {
 	if (!MACH_IS_MAC) 
-		return;
+		return 0;
 
 	/* Initialize the NuBus interrupts */
 	if (oss_present) {
@@ -1038,6 +1038,7 @@ void __init nubus_init(void)
 	create_proc_read_entry("nubus", 0, NULL, nubus_read_proc, NULL);
 	nubus_proc_init();
 #endif
+	return 0;
 }
 
 subsys_initcall(nubus_init);

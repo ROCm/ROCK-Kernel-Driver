@@ -624,7 +624,7 @@ static void fbcon_setup(int con, int init, int logo)
     }
     
     if (!fontwidthvalid(p,fontwidth(p))) {
-#ifdef CONFIG_MAC
+#ifdef CONFIG_FBCON_MAC
 	if (MACH_IS_MAC)
 	    /* ++Geert: hack to make 6x11 fonts work on mac */
 	    p->dispsw = &fbcon_mac;
@@ -2401,7 +2401,7 @@ static int __init fbcon_show_logo( void )
 		else
 		    dst = fb + y1*line + x/8;
 		for( x1 = 0; x1 < LOGO_LINE; ++x1 )
-		    fb_writeb(fb_readb(src++) ^ inverse, dst++);
+		    fb_writeb(*src++ ^ inverse, dst++);
 	    }
 	    done = 1;
 	}

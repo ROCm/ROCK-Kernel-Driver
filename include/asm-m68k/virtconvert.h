@@ -73,6 +73,10 @@ extern inline void * phys_to_virt(unsigned long address)
 }
 #endif
 
+/* Permanent address of a page. */
+#define __page_address(page)	(PAGE_OFFSET + (((page) - mem_map) << PAGE_SHIFT))
+#define page_to_phys(page)	virt_to_phys((void *)__page_address(page))
+
 /*
  * IO bus memory addresses are 1:1 with the physical address,
  * except on the PCI bus of the Hades.

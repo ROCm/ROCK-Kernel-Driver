@@ -31,9 +31,9 @@ int atari_SCC_init_done = 0;
 int atari_SCC_reset_done = 0;
 
 static struct console atari_console_driver = {
-	name:		"debug",
-	flags:		CON_PRINTBUFFER,
-	index:		-1,
+	.name =		"debug",
+	.flags =	CON_PRINTBUFFER,
+	.index =	-1,
 };
 
 
