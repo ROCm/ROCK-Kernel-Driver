@@ -612,7 +612,7 @@ acpi_bus_init (void)
 #ifdef CONFIG_X86
 	/* Ensure the SCI is set to level-triggered, active-low */
 	if (acpi_ioapic)
-		mp_override_legacy_irq(acpi_fadt.sci_int, 3, 3, acpi_fadt.sci_int);
+		mp_config_ioapic_for_sci(acpi_fadt.sci_int);
 	else
 		eisa_set_level_irq(acpi_fadt.sci_int);
 #endif

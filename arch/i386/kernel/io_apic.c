@@ -1885,7 +1885,7 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq)
 	io_apic_write(ioapic, 0x10+2*pin, *(((int *)&entry)+0));
 	spin_unlock_irqrestore(&ioapic_lock, flags);
 
-	return entry.vector;
+	return 0;
 }
 
 #endif /*CONFIG_ACPI_BOOT*/
