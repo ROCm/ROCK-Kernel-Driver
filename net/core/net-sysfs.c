@@ -294,7 +294,7 @@ int netdev_register_sysfs(struct net_device *net)
 	class_dev->class = &net_class;
 	class_dev->class_data = net;
 
-	snprintf(class_dev->class_id, BUS_ID_SIZE, net->name);
+	strlcpy(class_dev->class_id, net->name, BUS_ID_SIZE);
 	if ((ret = class_device_register(class_dev)))
 		goto out;
 
@@ -303,17 +303,18 @@ int netdev_register_sysfs(struct net_device *net)
 		    goto out_unreg;
 	}
 
+	
+	net->stats_kobj.parent = NULL;
 	if (net->get_stats) {
 		struct kobject *k = &net->stats_kobj;
 
-		memset(k, 0, sizeof(*k));
 		k->parent = kobject_get(&class_dev->kobj);
 		if (!k->parent) {
 			ret = -EBUSY;
 			goto out_unreg;
 		}
 
-		snprintf(k->name, KOBJ_NAME_LEN, "%s", "statistics");
+		strlcpy(k->name, "statistics", KOBJ_NAME_LEN);
 		k->ktype = &netstat_ktype;
 
 		if((ret = kobject_register(k))) 
@@ -331,8 +332,9 @@ out_unreg:
 
 void netdev_unregister_sysfs(struct net_device *net)
 {
-	if (net->get_stats)
-		kobject_del(&net->stats_kobj);
+	if (net->stats_kobj.parent) 
+		kobject_unregister(&net->stats_kobj);
+
 	class_device_unregister(&net->class_dev);
 }
 
