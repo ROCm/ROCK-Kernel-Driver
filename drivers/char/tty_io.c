@@ -2043,7 +2043,7 @@ static void initialize_tty_struct(struct tty_struct *tty)
 /*
  * The default put_char routine if the driver did not define one.
  */
-void tty_default_put_char(struct tty_struct *tty, unsigned char ch)
+static void tty_default_put_char(struct tty_struct *tty, unsigned char ch)
 {
 	tty->driver.write(tty, 0, &ch, 1);
 }

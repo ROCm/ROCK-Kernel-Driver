@@ -3,8 +3,8 @@
 #ifndef __AMDTP_H
 #define __AMDTP_H
 
-#include <asm/ioctl.h>
 #include <asm/types.h>
+#include "ieee1394-ioctl.h"
 
 /* The userspace interface for the Audio & Music Data Transmission
  * Protocol driver is really simple. First, open /dev/amdtp, use the
@@ -56,13 +56,6 @@
  *   | lsb | msb | lsb | msb | lsb | msb | lsb | msb | lsb | msb | ...
  *
  */
-
-/* We use '#' for our ioctl magic number because it's cool. */
-
-#define AMDTP_IOC_CHANNEL _IOW('#', 0, sizeof (struct amdtp_ioctl))
-#define AMDTP_IOC_PLUG    _IOW('#', 1, sizeof (struct amdtp_ioctl))
-#define AMDTP_IOC_PING    _IOW('#', 2, sizeof (struct amdtp_ioctl))
-#define AMDTP_IOC_ZAP     _IO('#', 3)
 
 enum {
 	AMDTP_FORMAT_RAW,

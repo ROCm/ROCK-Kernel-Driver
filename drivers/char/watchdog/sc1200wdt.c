@@ -297,18 +297,18 @@ static struct notifier_block sc1200wdt_notifier =
 
 static struct file_operations sc1200wdt_fops =
 {
-	owner:		THIS_MODULE,
-	write:		sc1200wdt_write,
-	ioctl:		sc1200wdt_ioctl,
-	open:		sc1200wdt_open,
-	release:	sc1200wdt_release
+	.owner		= THIS_MODULE,
+	.write		= sc1200wdt_write,
+	.ioctl		= sc1200wdt_ioctl,
+	.open		= sc1200wdt_open,
+	.release	= sc1200wdt_release
 };
 
 static struct miscdevice sc1200wdt_miscdev =
 {
-	minor:		WATCHDOG_MINOR,
-	name:		"watchdog",
-	fops:		&sc1200wdt_fops,
+	.minor		= WATCHDOG_MINOR,
+	.name		= "watchdog",
+	.fops		= &sc1200wdt_fops,
 };
 
 
@@ -397,10 +397,12 @@ static int __init sc1200wdt_init(void)
 		goto out_clean;
 	}
 
+#if defined CONFIG_PNP
 	/* now that the user has specified an IO port and we haven't detected
 	 * any devices, disable pnp support */
 	isapnp = 0;
 	pnp_unregister_driver(&scl200wdt_pnp_driver);
+#endif
 
 	if (!request_region(io, io_len, SC1200_MODULE_NAME)) {
 		printk(KERN_ERR PFX "Unable to register IO port %#x\n", io);
@@ -484,5 +486,3 @@ module_exit(sc1200wdt_exit);
 MODULE_AUTHOR("Zwane Mwaikambo <zwane@commfireservices.com>");
 MODULE_DESCRIPTION("Driver for National Semiconductor PC87307/PC97307 watchdog component");
 MODULE_LICENSE("GPL");
-EXPORT_NO_SYMBOLS;
-

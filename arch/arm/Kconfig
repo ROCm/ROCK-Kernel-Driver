@@ -539,8 +539,8 @@ config CPU_FREQ_24_API
 	depends on CPU_FREQ
 	default y
 
-config CPU_FREQ_26_API
-	bool
+config CPU_FREQ_PROC_INTF
+	tristate
 	depends on CPU_FREQ
 	default y
 

@@ -211,19 +211,37 @@ static void rtc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
  * sysctl-tuning infrastructure.
  */
 static ctl_table rtc_table[] = {
-    { 1, "max-user-freq", &rtc_max_user_freq, sizeof(int), 0644, NULL,
-      &proc_dointvec, NULL, },
-    { 0, }
+	{
+		.ctl_name	= 1,
+		.procname	= "max-user-freq",
+		.data		= &rtc_max_user_freq,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{ .ctl_name = 0 }
 };
 
 static ctl_table rtc_root[] = {
-    { 1, "rtc", NULL, 0, 0555, rtc_table, },
-    { 0, }
+	{
+		.ctl_name	= 1,
+		.procname	= "rtc",
+		.maxlen		= 0,
+		.mode		= 0555,
+		.child		= rtc_table,
+	},
+	{ .ctl_name = 0 }
 };
 
 static ctl_table dev_root[] = {
-    { CTL_DEV, "dev", NULL, 0, 0555, rtc_root, },
-    { 0, }
+	{
+		.ctl_name	= CTL_DEV,
+		.procname	= "dev",
+		.maxlen		= 0,
+		.mode		= 0555,
+		.child		= rtc_root,
+	},
+	{ .ctl_name = 0 }
 };
 
 static struct ctl_table_header *sysctl_header;

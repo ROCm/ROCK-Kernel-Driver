@@ -56,6 +56,7 @@
 #include <linux/watchdog.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>
+#include <linux/reboot.h>
 
 #include <asm/uaccess.h>
 #include <asm/io.h>
@@ -197,28 +198,30 @@ void pcwd_showprevstate(void)
 
 	if (revision == PCWD_REVISION_A) {
 		if (card_status & WD_WDRST)
-			printk("pcwd: Previous reboot was caused by the card.\n");
+			printk(KERN_INFO "pcwd: Previous reboot was caused by the card.\n");
 
 		if (card_status & WD_T110) {
-			printk("pcwd: Card senses a CPU Overheat.  Panicking!\n");
-			panic("pcwd: CPU Overheat.\n");
+			printk(KERN_EMERG "pcwd: Card senses a CPU Overheat.  Panicking!\n");
+			printk(KERN_EMERG "pcwd: CPU Overheat.\n");
+			machine_power_off();
 		}
 
 		if ((!(card_status & WD_WDRST)) &&
 		    (!(card_status & WD_T110)))
-			printk("pcwd: Cold boot sense.\n");
+			printk(KERN_INFO "pcwd: Cold boot sense.\n");
 	} else {
 		if (card_status & 0x01)
-			printk("pcwd: Previous reboot was caused by the card.\n");
+			printk(KERN_INFO "pcwd: Previous reboot was caused by the card.\n");
 
 		if (card_status & 0x04) {
-			printk("pcwd: Card senses a CPU Overheat.  Panicking!\n");
-			panic("pcwd: CPU Overheat.\n");
+			printk(KERN_EMERG "pcwd: Card senses a CPU Overheat.  Panicking!\n");
+			printk(KERN_EMERG "pcwd: CPU Overheat.\n");
+			machine_power_off();
 		}
 
 		if ((!(card_status & 0x01)) &&
 		    (!(card_status & 0x04)))
-			printk("pcwd: Cold boot sense.\n");
+			printk(KERN_INFO "pcwd: Cold boot sense.\n");
 	}
 }
 
@@ -275,8 +278,10 @@ static int pcwd_ioctl(struct inode *inode, struct file *file,
 			{
 				rv |= WDIOF_OVERHEAT;
 
-				if (temp_panic)
-					panic("pcwd: Temperature overheat trip!\n");
+				if (temp_panic) {
+					printk (KERN_INFO "pcwd: Temperature overheat trip!\n");
+					machine_power_off();
+				}
 			}
 		}
 		else 
@@ -288,8 +293,10 @@ static int pcwd_ioctl(struct inode *inode, struct file *file,
 			{
 				rv |= WDIOF_OVERHEAT;
 
-				if (temp_panic)
-					panic("pcwd: Temperature overheat trip!\n");
+				if (temp_panic) {
+					printk (KERN_INFO "pcwd: Temperature overheat trip!\n");
+					machine_power_off();
+				}
 			}
 		}
 
@@ -350,7 +357,7 @@ static int pcwd_ioctl(struct inode *inode, struct file *file,
 				spin_unlock(&io_lock);
 				if ((cdat & 0x10) == 0) 
 				{
-					printk("pcwd: Could not disable card.\n");
+					printk(KERN_INFO "pcwd: Could not disable card.\n");
 					return -EIO;
 				}
 
@@ -365,7 +372,7 @@ static int pcwd_ioctl(struct inode *inode, struct file *file,
 				spin_unlock(&io_lock);
 				if (cdat & 0x10) 
 				{
-					printk("pcwd: Could not enable card.\n");
+					printk(KERN_INFO "pcwd: Could not enable card.\n");
 					return -EIO;
 				}
 				return 0;
@@ -592,7 +599,7 @@ static int __init pcwatchdog_init(void)
 	
 	revision = PCWD_REVISION_A;
 
-	printk("pcwd: v%s Ken Hollis (kenji@bitgate.com)\n", WD_VER);
+	printk(KERN_INFO "pcwd: v%s Ken Hollis (kenji@bitgate.com)\n", WD_VER);
 
 	/* Initial variables */
 	supports_temp = 0;
@@ -611,7 +618,7 @@ static int __init pcwatchdog_init(void)
 	}
 
 	if (!found) {
-		printk("pcwd: No card detected, or port not available.\n");
+		printk(KERN_INFO "pcwd: No card detected, or port not available.\n");
 		return(-EIO);
 	}
 #endif
@@ -624,9 +631,9 @@ static int __init pcwatchdog_init(void)
 	revision = get_revision();
 
 	if (revision == PCWD_REVISION_A)
-		printk("pcwd: PC Watchdog (REV.A) detected at port 0x%03x\n", current_readport);
+		printk(KERN_INFO "pcwd: PC Watchdog (REV.A) detected at port 0x%03x\n", current_readport);
 	else if (revision == PCWD_REVISION_C)
-		printk("pcwd: PC Watchdog (REV.C) detected at port 0x%03x (Firmware version: %s)\n",
+		printk(KERN_INFO "pcwd: PC Watchdog (REV.C) detected at port 0x%03x (Firmware version: %s)\n",
 			current_readport, get_firmware());
 	else {
 		/* Should NEVER happen, unless get_revision() fails. */
@@ -635,7 +642,7 @@ static int __init pcwatchdog_init(void)
 	}
 
 	if (supports_temp)
-		printk("pcwd: Temperature Option Detected.\n");
+		printk(KERN_INFO "pcwd: Temperature Option Detected.\n");
 
 	debug_off();
 

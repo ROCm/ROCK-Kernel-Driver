@@ -1,6 +1,6 @@
 VERSION = 2
 PATCHLEVEL = 5
-SUBLEVEL = 60
+SUBLEVEL = 61
 EXTRAVERSION =
 
 # *DOCUMENTATION*
@@ -405,29 +405,16 @@ $(SUBDIRS): prepare
 
 .PHONY: prepare
 prepare: include/linux/version.h include/asm include/config/MARKER
-ifdef CONFIG_MODVERSIONS
 ifdef KBUILD_MODULES
 ifeq ($(origin SUBDIRS),file)
 	$(Q)rm -rf $(MODVERDIR)
-	$(Q)mkdir $(MODVERDIR)
 else
 	@echo '*** Warning: Overriding SUBDIRS on the command line can cause'
-	@echo '***          inconsistencies with module symbol versions'
+	@echo '***          inconsistencies'
 endif
-endif
+	$(Q)mkdir -p $(MODVERDIR)
 endif
 	@echo '  Starting the build. KBUILD_BUILTIN=$(KBUILD_BUILTIN) KBUILD_MODULES=$(KBUILD_MODULES)'
-
-#	We need to build init/vermagic.o before descending since all modules
-#	(*.ko) need it already
-
-ifdef CONFIG_MODULES
-
-prepare: init/vermagic.o
-
-init/vermagic.o: include/linux/version.h
-
-endif
 
 #	This can be used by arch/$ARCH/Makefile to preprocess
 #	their vmlinux.lds.S file
@@ -518,21 +505,15 @@ all: modules
 
 #	Build modules
 
-.PHONY: modules __modversions
-modules: $(SUBDIRS) __modversions
-
-ifdef CONFIG_MODVERSIONS
-
-__modversions: vmlinux $(SUBDIRS)
-	@echo '  Recording module symbol versions.';
-	$(Q)$(MAKE) -rR -f scripts/Makefile.modver
-
-endif
+.PHONY: modules
+modules: $(SUBDIRS) $(if $(CONFIG_MODVERSIONS),vmlinux)
+	@echo '  Building modules, stage 2.';
+	$(Q)$(MAKE) -rR -f scripts/Makefile.modpost
 
 #	Install modules
 
 .PHONY: modules_install
-modules_install: _modinst_ $(patsubst %, _modinst_%, $(SUBDIRS)) _modinst_post
+modules_install: _modinst_ _modinst_post
 
 .PHONY: _modinst_
 _modinst_:
@@ -540,6 +521,7 @@ _modinst_:
 	@rm -f $(MODLIB)/build
 	@mkdir -p $(MODLIB)/kernel
 	@ln -s $(TOPDIR) $(MODLIB)/build
+	$(Q)$(MAKE) -rR -f scripts/Makefile.modinst
 
 # If System.map exists, run depmod.  This deliberately does not have a
 # dependency on System.map since that would run the dependency tree on
@@ -552,12 +534,8 @@ else
 depmod_opts	:= -b $(INSTALL_MOD_PATH) -r
 endif
 .PHONY: _modinst_post
-_modinst_post:
+_modinst_post: _modinst_
 	if [ -r System.map ]; then $(DEPMOD) -ae -F System.map $(depmod_opts) $(KERNELRELEASE); fi
-
-.PHONY: $(patsubst %, _modinst_%, $(SUBDIRS))
-$(patsubst %, _modinst_%, $(SUBDIRS)) :
-	$(Q)$(MAKE) -rR -f scripts/Makefile.modinst obj=$(patsubst _modinst_%,%,$@)
 
 else # CONFIG_MODULES
 
@@ -726,8 +704,8 @@ clean: archclean $(clean-dirs)
 	$(call cmd,rmclean)
 	@find . $(RCS_FIND_IGNORE) \
 	 	\( -name '*.[oas]' -o -name '*.ko' -o -name '.*.cmd' \
-		-o -name '.*.d' -o -name '.*.tmp' \) -type f \
-		-print | xargs rm -f
+		-o -name '.*.d' -o -name '.*.tmp' -o -name '*.mod.c' \) \
+		-type f -print | xargs rm -f
 
 # mrproper - delete configuration + modules + core files
 #

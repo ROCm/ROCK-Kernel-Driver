@@ -75,6 +75,11 @@ config ACPI_SLEEP
 	  This option is not recommended for anyone except those doing driver
 	  power management development.
 
+config ACPI_SLEEP_PROC_FS
+	bool
+	depends on ACPI_SLEEP && PROC_FS
+	default y
+
 config ACPI_AC
 	tristate "AC Adapter"
 	depends on X86 && ACPI && !ACPI_HT_ONLY

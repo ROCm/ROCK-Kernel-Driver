@@ -23,8 +23,8 @@
  */
 
 
-#include "acpi.h"
-#include "actables.h"
+#include <acpi/acpi.h>
+#include <acpi/actables.h>
 
 
 #define _COMPONENT          ACPI_TABLES

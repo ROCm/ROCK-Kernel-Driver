@@ -305,7 +305,7 @@ static void __init gscps2_reset(char * addr)
  * Receives a keyboard scancode, analyses it and sends it to the input layer.
  */
 
-static void gscps2_kbd_docode(void)
+static void gscps2_kbd_docode(struct pt_regs *regs)
 {
 	int scancode = gscps2_readb_input(hpkeyb.addr);
 	DPRINTK("rel=%d scancode=%d, esc=%d ", hpkeyb.released, scancode, hpkeyb.escaped);
@@ -341,6 +341,7 @@ static void gscps2_kbd_docode(void)
 		default:
 			hpkeyb.scancode = scancode;
 			DPRINTK("sent=%d, rel=%d\n",hpkeyb.scancode, hpkeyb.released);
+			input_regs(regs);
 			input_report_key(&hpkeyb.dev, hpkeyb_keycode[hpkeyb.scancode], !hpkeyb.released);
 			input_sync(&hpkeyb.dev);
 			if (hpkeyb.escaped)
@@ -359,7 +360,7 @@ static void gscps2_kbd_docode(void)
  * correct events to the input layer.
  */
 
-static void gscps2_mouse_docode(void)
+static void gscps2_mouse_docode(struct pt_regs *regs)
 {
 	int xrel, yrel;
 
@@ -368,7 +369,7 @@ static void gscps2_mouse_docode(void)
 		hpmouse.nbread--;
 
 	/* stolen from psmouse.c */
-	if (hpmouse.nbread && time_after(jiffies, hpmouse.last + HZ/20)) {
+	if (hpmouse.nbread && time_after(jiffies, hpmouse.last + HZ/2)) {
 		printk(KERN_DEBUG "%s:%d : Lost mouse synchronization, throwing %d bytes away.\n", __FILE__, __LINE__,
 				hpmouse.nbread);
 		hpmouse.nbread = 0;
@@ -387,6 +388,8 @@ static void gscps2_mouse_docode(void)
 		if ((hpmouse.bytes[PACKET_CTRL] & (MOUSE_XOVFLOW | MOUSE_YOVFLOW)))
 			DPRINTK("Mouse: position overflow\n");
 		
+		input_regs(regs);
+
 		input_report_key(&hpmouse.dev, BTN_LEFT, hpmouse.bytes[PACKET_CTRL] & MOUSE_LEFTBTN);
 		input_report_key(&hpmouse.dev, BTN_MIDDLE, hpmouse.bytes[PACKET_CTRL] & MOUSE_MIDBTN);
 		input_report_key(&hpmouse.dev, BTN_RIGHT, hpmouse.bytes[PACKET_CTRL] & MOUSE_RIGHTBTN);
@@ -421,11 +424,11 @@ static void gscps2_interrupt(int irq, void *dev, struct pt_regs *reg)
 {
 	/* process mouse actions */
 	while (gscps2_readb_status(hpmouse.addr) & GSC_STAT_RBNE)
-		gscps2_mouse_docode();
+		gscps2_mouse_docode(reg);
 	
 	/* process keyboard scancode */
 	while (gscps2_readb_status(hpkeyb.addr) & GSC_STAT_RBNE)
-		gscps2_kbd_docode();
+		gscps2_kbd_docode(reg);
 }
 
 

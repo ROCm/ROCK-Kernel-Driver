@@ -151,8 +151,6 @@ static inline void sigfillset(sigset_t *set)
 	}
 }
 
-extern char * render_sigset_t(sigset_t *set, char *buffer);
-
 /* Some extensions for manipulating the low 32 signals in particular.  */
 
 static inline void sigaddsetmask(sigset_t *set, unsigned long mask)

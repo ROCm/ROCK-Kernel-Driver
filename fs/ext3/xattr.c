@@ -88,8 +88,9 @@
 # define ea_bdebug(f...)
 #endif
 
-static int ext3_xattr_set2(handle_t *, struct inode *, struct buffer_head *,
-			   struct ext3_xattr_header *);
+static int ext3_xattr_set_handle2(handle_t *, struct inode *,
+				  struct buffer_head *,
+				  struct ext3_xattr_header *);
 
 static int ext3_xattr_cache_insert(struct buffer_head *);
 static struct buffer_head *ext3_xattr_cache_find(struct inode *,
@@ -194,7 +195,7 @@ ext3_xattr_handler(int name_index)
  */
 ssize_t
 ext3_getxattr(struct dentry *dentry, const char *name,
-	      void *buffer, size_t size)
+	      void *buffer, size_t size, int flags)
 {
 	struct ext3_xattr_handler *handler;
 	struct inode *inode = dentry->d_inode;
@@ -202,7 +203,7 @@ ext3_getxattr(struct dentry *dentry, const char *name,
 	handler = ext3_xattr_resolve_name(&name);
 	if (!handler)
 		return -EOPNOTSUPP;
-	return handler->get(inode, name, buffer, size);
+	return handler->get(inode, name, buffer, size, flags);
 }
 
 /*
@@ -211,9 +212,9 @@ ext3_getxattr(struct dentry *dentry, const char *name,
  * dentry->d_inode->i_sem down
  */
 ssize_t
-ext3_listxattr(struct dentry *dentry, char *buffer, size_t size)
+ext3_listxattr(struct dentry *dentry, char *buffer, size_t size, int flags)
 {
-	return ext3_xattr_list(dentry->d_inode, buffer, size);
+	return ext3_xattr_list(dentry->d_inode, buffer, size, flags);
 }
 
 /*
@@ -242,7 +243,7 @@ ext3_setxattr(struct dentry *dentry, const char *name,
  * dentry->d_inode->i_sem down
  */
 int
-ext3_removexattr(struct dentry *dentry, const char *name)
+ext3_removexattr(struct dentry *dentry, const char *name, int flags)
 {
 	struct ext3_xattr_handler *handler;
 	struct inode *inode = dentry->d_inode;
@@ -250,7 +251,7 @@ ext3_removexattr(struct dentry *dentry, const char *name)
 	handler = ext3_xattr_resolve_name(&name);
 	if (!handler)
 		return -EOPNOTSUPP;
-	return handler->set(inode, name, NULL, 0, XATTR_REPLACE);
+	return handler->set(inode, name, NULL, 0, flags | XATTR_REPLACE);
 }
 
 /*
@@ -363,7 +364,8 @@ cleanup:
  * used / required on success.
  */
 int
-ext3_xattr_list(struct inode *inode, char *buffer, size_t buffer_size)
+ext3_xattr_list(struct inode *inode, char *buffer, size_t buffer_size,
+		int flags)
 {
 	struct buffer_head *bh = NULL;
 	struct ext3_xattr_entry *entry;
@@ -401,10 +403,9 @@ bad_block:	ext3_error(inode->i_sb, "ext3_xattr_list",
 			goto bad_block;
 
 		handler = ext3_xattr_handler(entry->e_name_index);
-		if (handler) {
+		if (handler)
 			size += handler->list(NULL, inode, entry->e_name,
-					      entry->e_name_len) + 1;
-		}
+					      entry->e_name_len, flags);
 	}
 
 	if (ext3_xattr_cache_insert(bh))
@@ -425,11 +426,9 @@ bad_block:	ext3_error(inode->i_sb, "ext3_xattr_list",
 		struct ext3_xattr_handler *handler;
 
 		handler = ext3_xattr_handler(entry->e_name_index);
-		if (handler) {
+		if (handler)
 			buf += handler->list(buf, inode, entry->e_name,
-					     entry->e_name_len);
-			*buf++ = '\0';
-		}
+					     entry->e_name_len, flags);
 	}
 	error = size;
 
@@ -459,7 +458,7 @@ static void ext3_xattr_update_super_block(handle_t *handle,
 }
 
 /*
- * ext3_xattr_set()
+ * ext3_xattr_set_handle()
  *
  * Create, replace or remove an extended attribute for this inode. Buffer
  * is NULL to remove an existing extended attribute, and non-NULL to
@@ -471,8 +470,9 @@ static void ext3_xattr_update_super_block(handle_t *handle,
  * Returns 0, or a negative error number on failure.
  */
 int
-ext3_xattr_set(handle_t *handle, struct inode *inode, int name_index,
-	       const char *name, const void *value, size_t value_len, int flags)
+ext3_xattr_set_handle(handle_t *handle, struct inode *inode, int name_index,
+		      const char *name, const void *value, size_t value_len,
+		      int flags)
 {
 	struct super_block *sb = inode->i_sb;
 	struct buffer_head *bh = NULL;
@@ -673,7 +673,8 @@ bad_block:		ext3_error(sb, "ext3_xattr_set",
 			/* Remove this attribute. */
 			if (EXT3_XATTR_NEXT(ENTRY(header+1)) == last) {
 				/* This block is now empty. */
-				error = ext3_xattr_set2(handle, inode, bh,NULL);
+				error = ext3_xattr_set_handle2(handle, inode,
+							       bh, NULL);
 				goto cleanup;
 			} else {
 				/* Remove the old name. */
@@ -701,7 +702,7 @@ bad_block:		ext3_error(sb, "ext3_xattr_set",
 	}
 	ext3_xattr_rehash(header, here);
 
-	error = ext3_xattr_set2(handle, inode, bh, header);
+	error = ext3_xattr_set_handle2(handle, inode, bh, header);
 
 cleanup:
 	brelse(bh);
@@ -713,11 +714,12 @@ cleanup:
 }
 
 /*
- * Second half of ext3_xattr_set(): Update the file system.
+ * Second half of ext3_xattr_set_handle(): Update the file system.
  */
 static int
-ext3_xattr_set2(handle_t *handle, struct inode *inode,
-		struct buffer_head *old_bh, struct ext3_xattr_header *header)
+ext3_xattr_set_handle2(handle_t *handle, struct inode *inode,
+		       struct buffer_head *old_bh,
+		       struct ext3_xattr_header *header)
 {
 	struct super_block *sb = inode->i_sb;
 	struct buffer_head *new_bh = NULL;
@@ -829,6 +831,34 @@ cleanup:
 		brelse(new_bh);
 
 	return error;
+}
+
+/*
+ * ext3_xattr_set()
+ *
+ * Like ext3_xattr_set_handle, but start from an inode. This extended
+ * attribute modification is a filesystem transaction by itself.
+ *
+ * Returns 0, or a negative error number on failure.
+ */
+int
+ext3_xattr_set(struct inode *inode, int name_index, const char *name,
+	       const void *value, size_t value_len, int flags)
+{
+	handle_t *handle;
+	int error, error2;
+
+	lock_kernel();
+	handle = ext3_journal_start(inode, EXT3_XATTR_TRANS_BLOCKS);
+	if (IS_ERR(handle))
+		error = PTR_ERR(handle);
+	else
+		error = ext3_xattr_set_handle(handle, inode, name_index, name,
+					      value, value_len, flags);
+	error2 = ext3_journal_stop(handle, inode);
+	unlock_kernel();
+
+	return error ? error : error2;
 }
 
 /*
@@ -1103,27 +1133,35 @@ init_ext3_xattr(void)
 {
 	int	err;
 	
-	err = ext3_xattr_register(EXT3_XATTR_INDEX_USER, &ext3_xattr_user_handler);
+	err = ext3_xattr_register(EXT3_XATTR_INDEX_USER,
+				  &ext3_xattr_user_handler);
 	if (err)
 		return err;
+	err = ext3_xattr_register(EXT3_XATTR_INDEX_TRUSTED,
+				  &ext3_xattr_trusted_handler);
+	if (err)
+		goto out;
 #ifdef CONFIG_EXT3_FS_POSIX_ACL
 	err = init_ext3_acl();
 	if (err)
-		goto out;
+		goto out1;
 #endif
 	ext3_xattr_cache = mb_cache_create("ext3_xattr", NULL,
 		sizeof(struct mb_cache_entry) +
 		sizeof(struct mb_cache_entry_index), 1, 6);
 	if (!ext3_xattr_cache) {
 		err = -ENOMEM;
-		goto out1;
+		goto out2;
 	}
 	return 0;
-out1:
+out2:
 #ifdef CONFIG_EXT3_FS_POSIX_ACL
 	exit_ext3_acl();
-out:
+out1:
 #endif
+	ext3_xattr_unregister(EXT3_XATTR_INDEX_TRUSTED,
+			      &ext3_xattr_trusted_handler);
+out:
 	ext3_xattr_unregister(EXT3_XATTR_INDEX_USER,
 			      &ext3_xattr_user_handler);
 	return err;
@@ -1138,5 +1176,8 @@ exit_ext3_xattr(void)
 #ifdef CONFIG_EXT3_FS_POSIX_ACL
 	exit_ext3_acl();
 #endif
-	ext3_xattr_unregister(EXT3_XATTR_INDEX_USER, &ext3_xattr_user_handler);
+	ext3_xattr_unregister(EXT3_XATTR_INDEX_TRUSTED,
+			      &ext3_xattr_trusted_handler);
+	ext3_xattr_unregister(EXT3_XATTR_INDEX_USER,
+			      &ext3_xattr_user_handler);
 }

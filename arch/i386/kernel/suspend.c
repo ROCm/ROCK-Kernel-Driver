@@ -32,6 +32,8 @@ unsigned long saved_context_eax, saved_context_ebx, saved_context_ecx, saved_con
 unsigned long saved_context_esp, saved_context_ebp, saved_context_esi, saved_context_edi;
 unsigned long saved_context_eflags;
 
+extern void enable_sep_cpu(void *);
+
 void save_processor_state(void)
 {
 	kernel_fpu_begin();
@@ -95,6 +97,12 @@ void restore_processor_state(void)
 	asm volatile ("lgdt %0" :: "m" (saved_context.gdt_limit));
 	asm volatile ("lidt %0" :: "m" (saved_context.idt_limit));
 	asm volatile ("lldt %0" :: "m" (saved_context.ldt));
+
+	/*
+	 * sysenter MSRs
+	 */
+	if (boot_cpu_has(X86_FEATURE_SEP))
+		enable_sep_cpu(NULL);
 
 	fix_processor_context();
 	do_fpu_end();

@@ -5,6 +5,7 @@
 
 #include "linux/slab.h"
 #include "linux/smp_lock.h"
+#include "linux/ptrace.h"
 #include "asm/ptrace.h"
 #include "asm/pgtable.h"
 #include "asm/tlbflush.h"

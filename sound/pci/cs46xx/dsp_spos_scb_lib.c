@@ -1543,7 +1543,7 @@ int cs46xx_dsp_enable_spdif_out (cs46xx_t *chip)
 	/* dont touch anything if SPDIF is open */
 	if ( ins->spdif_status_out & DSP_SPDIF_STATUS_PLAYBACK_OPEN) {
 		/* when cs46xx_iec958_post_close(...) is called it
-		   will call this function if necesary depending on
+		   will call this function if necessary depending on
 		   this bit */
 		ins->spdif_status_out |= DSP_SPDIF_STATUS_OUTPUT_ENABLED;
 

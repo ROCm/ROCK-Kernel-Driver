@@ -2095,21 +2095,6 @@ static void show_task(task_t * p)
 	}
 }
 
-char * render_sigset_t(sigset_t *set, char *buffer)
-{
-	int i = _NSIG, x;
-	do {
-		i -= 4, x = 0;
-		if (sigismember(set, i+1)) x |= 1;
-		if (sigismember(set, i+2)) x |= 2;
-		if (sigismember(set, i+3)) x |= 4;
-		if (sigismember(set, i+4)) x |= 8;
-		*buffer++ = (x < 10 ? '0' : 'a' - 10) + x;
-	} while (i >= 4);
-	*buffer = 0;
-	return buffer;
-}
-
 void show_state(void)
 {
 	task_t *g, *p;

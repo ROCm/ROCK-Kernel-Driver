@@ -1,3 +1,4 @@
+
 #
 # Network device configuration
 #
@@ -213,7 +214,7 @@ config NET_ETHERNET
 	  the questions about Ethernet network cards. If unsure, say N.
 
 config MII
-	tristate "generic Media Independent Interface device support"
+	tristate "Generic Media Independent Interface device support"
 	depends on NET_ETHERNET
 	help
 	  Most ethernet controllers have MII transceiver either as an external
@@ -745,6 +746,26 @@ config VORTEX
 	  say M here and read <file:Documentation/modules.txt> as well as
 	  <file:Documentation/networking/net-modules.txt>.
 
+config TYPHOON
+	tristate "3cr990 series \"Typhoon\" support"
+	depends on NET_VENDOR_3COM && PCI
+	---help---
+	  This option enables driver support for the 3cr990 series of cards:
+
+	  3C990-TX, 3CR990-TX-95, 3CR990-TX-97, 3CR990-FX-95, 3CR990-FX-97,
+	  3CR990SVR, 3CR990SVR95, 3CR990SVR97, 3CR990-FX-95 Server,
+	  3CR990-FX-97 Server, 3C990B-TX-M, 3C990BSVR
+
+	  If you have a network (Ethernet) card of this type, say Y and read
+	  the Ethernet-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called typhoon.o.  If you want to compile it as a
+	  module, say M here and read <file:Documentation/modules.txt> as well
+	  as <file:Documentation/networking/net-modules.txt>.
+
 config LANCE
 	tristate "AMD LANCE and PCnet (AT1500 and NE2100) support"
 	depends on NET_ETHERNET && ISA
@@ -1258,6 +1279,18 @@ config ADAPTEC_STARFIRE
 	  say M here and read <file:Documentation/modules.txt>.  This is
 	  recommended.  The module will be called starfire.
 
+config ADAPTEC_STARFIRE_NAPI
+	bool "Use Rx Polling (NAPI) (EXPERIMENTAL)"
+	depends on ADAPTEC_STARFIRE && EXPERIMENTAL
+	help
+	  NAPI is a new driver API designed to reduce CPU and interrupt load
+	  when the driver is receiving lots of packets from the card. It is
+	  still somewhat experimental and thus not yet enabled by default.
+
+	  If your estimated Rx load is 10kpps or more, or if the card will be
+	  deployed on potentially unfriendly networks (e.g. in a firewall),
+	  then say Y here.
+
 config AC3200
 	tristate "Ansel Communications EISA 3200 support (EXPERIMENTAL)"
 	depends on NET_PCI && (ISA || EISA) && EXPERIMENTAL
@@ -1346,6 +1379,17 @@ config EEPRO100
 	  The module will be called eepro100.  If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt> as
 	  well as <file:Documentation/networking/net-modules.txt>.
+
+
+config EEPRO100_PIO
+	bool "Use PIO instead of MMIO" if !X86_VISWS
+	depends on EEPRO100
+	default y if X86_VISWS
+	help
+	  This instructs the driver to use programmed I/O ports (PIO) instead
+	  of PCI shared memory (MMIO).  This can possibly solve some problems
+	  in case your mainboard has memory consistency issues.  If unsure,
+	  say N.
 
 config E100
 	tristate "EtherExpressPro/100 support (e100, Alternate Intel driver)"

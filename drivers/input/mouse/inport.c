@@ -131,6 +131,8 @@ static void inport_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	outb(INPORT_REG_MODE, INPORT_CONTROL_PORT);
 	outb(INPORT_MODE_HOLD | INPORT_MODE_IRQ | INPORT_MODE_BASE, INPORT_DATA_PORT);
 
+	input_regs(&inport_dev, regs);
+
 	outb(INPORT_REG_X, INPORT_CONTROL_PORT);
 	input_report_rel(&inport_dev, REL_X, inb(INPORT_DATA_PORT));
 

@@ -28,6 +28,7 @@
 #include <linux/slab.h>
 
 static void blk_unplug_work(void *data);
+static void blk_unplug_timeout(unsigned long data);
 
 /*
  * For the allocated request tables
@@ -246,6 +247,9 @@ void blk_queue_make_request(request_queue_t * q, make_request_fn * mfn)
 
 	init_timer(&q->unplug_timer);
 	INIT_WORK(&q->unplug_work, blk_unplug_work, q);
+
+	q->unplug_timer.function = blk_unplug_timeout;
+	q->unplug_timer.data = (unsigned long)q;
 
 	/*
 	 * by default assume old behaviour and bounce for any highmem page
@@ -1298,9 +1302,6 @@ int blk_init_queue(request_queue_t *q, request_fn_proc *rfn, spinlock_t *lock)
 	blk_queue_make_request(q, __make_request);
 	blk_queue_max_segment_size(q, MAX_SEGMENT_SIZE);
 
-	q->unplug_timer.function = blk_unplug_timeout;
-	q->unplug_timer.data = (unsigned long)q;
-
 	blk_queue_max_hw_segments(q, MAX_HW_SEGMENTS);
 	blk_queue_max_phys_segments(q, MAX_PHYS_SEGMENTS);
 
@@ -1357,11 +1358,19 @@ static struct request *get_request_wait(request_queue_t *q, int rw)
 
 	generic_unplug_device(q);
 	do {
+		int block = 0;
+
 		prepare_to_wait_exclusive(&rl->wait, &wait,
 					TASK_UNINTERRUPTIBLE);
+		spin_lock_irq(q->queue_lock);
 		if (!rl->count)
+			block = 1;
+		spin_unlock_irq(q->queue_lock);
+
+		if (block)
 			io_schedule();
 		finish_wait(&rl->wait, &wait);
+
 		spin_lock_irq(q->queue_lock);
 		rq = get_request(q, rw);
 		spin_unlock_irq(q->queue_lock);
@@ -1595,13 +1604,9 @@ void blk_congestion_wait(int rw, long timeout)
 	DEFINE_WAIT(wait);
 	struct congestion_state *cs = &congestion_states[rw];
 
-	if (!atomic_read(&cs->nr_active_queues))
-		return;
-
 	blk_run_queues();
 	prepare_to_wait(&cs->wqh, &wait, TASK_UNINTERRUPTIBLE);
-	if (atomic_read(&cs->nr_active_queues))
-		io_schedule_timeout(timeout);
+	io_schedule_timeout(timeout);
 	finish_wait(&cs->wqh, &wait);
 }
 

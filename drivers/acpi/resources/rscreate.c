@@ -23,10 +23,10 @@
  */
 
 
-#include "acpi.h"
-#include "acresrc.h"
-#include "amlcode.h"
-#include "acnamesp.h"
+#include <acpi/acpi.h>
+#include <acpi/acresrc.h>
+#include <acpi/amlcode.h>
+#include <acpi/acnamesp.h>
 
 #define _COMPONENT          ACPI_RESOURCES
 	 ACPI_MODULE_NAME    ("rscreate")

@@ -2045,7 +2045,7 @@ int init_module(void)
 void cleanup_module(void)
 {
 	int i = 0;
-	struct arlan_private ap;
+	struct arlan_private *ap;
 
 	ARLAN_DEBUG_ENTRY("cleanup_module");
 

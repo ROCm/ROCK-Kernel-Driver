@@ -44,8 +44,6 @@ MODULE_AUTHOR("Vojtech Pavlik, Russell King");
 MODULE_DESCRIPTION("Acorn RiscPC PS/2 keyboard controller driver");
 MODULE_LICENSE("GPL");
 
-extern struct pt_regs *kbd_pt_regs;
-
 static int rpckbd_write(struct serio *port, unsigned char val)
 {
 	while (!(iomd_readb(IOMD_KCTRL) & (1 << 7)))
@@ -60,12 +58,11 @@ static void rpckbd_rx(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct serio *port = dev_id;
 	unsigned int byte;
-	kbd_pt_regs = regs;
 
 	while (iomd_readb(IOMD_KCTRL) & (1 << 5)) {
 		byte = iomd_readb(IOMD_KARTRX);
 
-		serio_interrupt(port, byte, 0);
+		serio_interrupt(port, byte, 0, regs);
 	}
 }
 

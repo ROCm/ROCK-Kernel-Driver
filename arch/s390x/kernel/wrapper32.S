@@ -1088,13 +1088,13 @@ sys32_fstat64_wrapper:
 	llgfr	%r4,%r4			# long
 	jg	sys32_fstat64		# branch to system call
 
-	.globl  sys32_futex_wrapper 
-sys32_futex_wrapper:
-	llgtr	%r2,%r2			# void *
+	.globl  compat_sys_futex_wrapper 
+compat_sys_futex_wrapper:
+	llgtr	%r2,%r2			# u32 *
 	lgfr	%r3,%r3			# int
 	lgfr	%r4,%r4			# int
-	llgtr	%r5,%r5			# struct timespec *
-	jg	sys32_futex		# branch to system call
+	llgtr	%r5,%r5			# struct compat_timespec *
+	jg	compat_sys_futex	# branch to system call
 
 	.globl	sys32_setxattr_wrapper
 sys32_setxattr_wrapper:

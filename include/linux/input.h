@@ -774,6 +774,7 @@ struct input_dev {
 	struct timer_list timer;
 
 	struct pm_dev *pm_dev;
+	struct pt_regs *regs;
 	int state;
 
 	int sync;
@@ -899,12 +900,14 @@ void input_unregister_minor(devfs_handle_t handle);
 
 void input_event(struct input_dev *dev, unsigned int type, unsigned int code, int value);
 
-#define input_sync(a)		input_event(a, EV_SYN, SYN_REPORT, 0)
 #define input_report_key(a,b,c) input_event(a, EV_KEY, b, !!(c))
 #define input_report_rel(a,b,c) input_event(a, EV_REL, b, c)
 #define input_report_abs(a,b,c) input_event(a, EV_ABS, b, c)
 #define input_report_ff(a,b,c)	input_event(a, EV_FF, b, c)
 #define input_report_ff_status(a,b,c)	input_event(a, EV_FF_STATUS, b, c)
+
+#define input_regs(a,b)		do { (a)->regs = (b); } while (0)
+#define input_sync(a)		do { input_event(a, EV_SYN, SYN_REPORT, 0); (a)->regs = NULL; } while (0)
 
 extern struct device_class input_devclass;
 

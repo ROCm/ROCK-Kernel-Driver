@@ -20,6 +20,7 @@
 #define EXT3_XATTR_INDEX_USER			1
 #define EXT3_XATTR_INDEX_POSIX_ACL_ACCESS	2
 #define EXT3_XATTR_INDEX_POSIX_ACL_DEFAULT	3
+#define EXT3_XATTR_INDEX_TRUSTED		4
 
 struct ext3_xattr_header {
 	__u32	h_magic;	/* magic number for identification */
@@ -56,9 +57,9 @@ struct ext3_xattr_entry {
 struct ext3_xattr_handler {
 	char *prefix;
 	size_t (*list)(char *list, struct inode *inode, const char *name,
-		       int name_len);
+		       int name_len, int flags);
 	int (*get)(struct inode *inode, const char *name, void *buffer,
-		   size_t size);
+		   size_t size, int flags);
 	int (*set)(struct inode *inode, const char *name, const void *buffer,
 		   size_t size, int flags);
 };
@@ -67,13 +68,14 @@ extern int ext3_xattr_register(int, struct ext3_xattr_handler *);
 extern void ext3_xattr_unregister(int, struct ext3_xattr_handler *);
 
 extern int ext3_setxattr(struct dentry *, const char *, const void *, size_t, int);
-extern ssize_t ext3_getxattr(struct dentry *, const char *, void *, size_t);
-extern ssize_t ext3_listxattr(struct dentry *, char *, size_t);
-extern int ext3_removexattr(struct dentry *, const char *);
+extern ssize_t ext3_getxattr(struct dentry *, const char *, void *, size_t, int);
+extern ssize_t ext3_listxattr(struct dentry *, char *, size_t, int);
+extern int ext3_removexattr(struct dentry *, const char *, int);
 
 extern int ext3_xattr_get(struct inode *, int, const char *, void *, size_t);
-extern int ext3_xattr_list(struct inode *, char *, size_t);
-extern int ext3_xattr_set(handle_t *handle, struct inode *, int, const char *, const void *, size_t, int);
+extern int ext3_xattr_list(struct inode *, char *, size_t, int flags);
+extern int ext3_xattr_set(struct inode *, int, const char *, const void *, size_t, int);
+extern int ext3_xattr_set_handle(handle_t *, struct inode *, int, const char *, const void *, size_t, int);
 
 extern void ext3_xattr_delete_inode(handle_t *, struct inode *);
 extern void ext3_xattr_put_super(struct super_block *);
@@ -101,7 +103,14 @@ ext3_xattr_list(struct inode *inode, void *buffer, size_t size, int flags)
 }
 
 static inline int
-ext3_xattr_set(handle_t *handle, struct inode *inode, int name_index,
+ext3_xattr_set(struct inode *inode, int name_index, const char *name,
+	       const void *value, size_t size, int flags)
+{
+	return -EOPNOTSUPP;
+}
+
+static inline int
+ext3_xattr_set_handle(handle_t *handle, struct inode *inode, int name_index,
 	       const char *name, const void *value, size_t size, int flags)
 {
 	return -EOPNOTSUPP;
@@ -131,3 +140,4 @@ exit_ext3_xattr(void)
 # endif  /* CONFIG_EXT3_FS_XATTR */
 
 extern struct ext3_xattr_handler ext3_xattr_user_handler;
+extern struct ext3_xattr_handler ext3_xattr_trusted_handler;

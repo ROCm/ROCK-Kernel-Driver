@@ -5,6 +5,7 @@
 
 #include "linux/sched.h"
 #include "linux/slab.h"
+#include "linux/ptrace.h"
 #include "kern_util.h"
 #include "time_user.h"
 #include "signal_user.h"

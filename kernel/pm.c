@@ -24,6 +24,7 @@
 #include <linux/slab.h>
 #include <linux/pm.h>
 #include <linux/interrupt.h>
+#include <linux/sysrq.h>
 
 int pm_active;
 
@@ -292,3 +293,41 @@ EXPORT_SYMBOL(pm_send);
 EXPORT_SYMBOL(pm_send_all);
 EXPORT_SYMBOL(pm_find);
 EXPORT_SYMBOL(pm_active);
+
+
+#ifdef CONFIG_MAGIC_SYSRQ
+
+/**
+ * handle_poweroff	-	sysrq callback for power down
+ * @key: key pressed (unused)
+ * @pt_regs: register state (unused)
+ * @kbd: keyboard state (unused)
+ * @tty: tty involved (unused)
+ *
+ * When the user hits Sys-Rq o to power down the machine this is the
+ * callback we use.
+ */
+
+static void handle_poweroff (int key, struct pt_regs *pt_regs,
+			     struct tty_struct *tty)
+{
+	if (pm_power_off)
+		pm_power_off();
+}
+
+static struct sysrq_key_op	sysrq_poweroff_op = {
+	.handler        = handle_poweroff,
+	.help_msg       = "powerOff",
+	.action_msg     = "Power Off\n"
+};
+
+#endif  /* CONFIG_MAGIC_SYSRQ */
+
+
+static int pm_init(void)
+{
+	register_sysrq_key('o', &sysrq_poweroff_op);
+	return 0;
+}
+
+subsys_initcall(pm_init);

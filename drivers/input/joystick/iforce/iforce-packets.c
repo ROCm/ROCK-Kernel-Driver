@@ -151,7 +151,7 @@ static int mark_core_as_ready(struct iforce *iforce, unsigned short addr)
 	return -1;
 }
 
-void iforce_process_packet(struct iforce *iforce, u16 cmd, unsigned char *data)
+void iforce_process_packet(struct iforce *iforce, u16 cmd, unsigned char *data, struct pt_regs *regs)
 {
 	struct input_dev *dev = &iforce->dev;
 	int i;
@@ -180,6 +180,8 @@ void iforce_process_packet(struct iforce *iforce, u16 cmd, unsigned char *data)
 
 		case 0x01:	/* joystick position data */
 		case 0x03:	/* wheel position data */
+
+			input_regs(dev, regs);
 
 			if (HI(cmd) == 1) {
 				input_report_abs(dev, ABS_X, (__s16) (((__s16)data[1] << 8) | data[0]));
@@ -219,6 +221,7 @@ void iforce_process_packet(struct iforce *iforce, u16 cmd, unsigned char *data)
 			break;
 
 		case 0x02:	/* status report */
+			input_regs(dev, regs);
 			input_report_key(dev, BTN_DEAD, data[0] & 0x02);
 			input_sync(dev);
 

@@ -30,8 +30,7 @@ static int psmouse_noext;
 #define PSMOUSE_CMD_GETINFO	0x03e9
 #define PSMOUSE_CMD_SETSTREAM	0x00ea
 #define PSMOUSE_CMD_POLL	0x03eb	
-#define PSMOUSE_CMD_GETID	0x01f2
-#define PSMOUSE_CMD_GETID2	0x0100
+#define PSMOUSE_CMD_GETID	0x02f2
 #define PSMOUSE_CMD_SETRATE	0x10f3
 #define PSMOUSE_CMD_ENABLE	0x00f4
 #define PSMOUSE_CMD_RESET_DIS	0x00f6
@@ -54,7 +53,7 @@ struct psmouse {
 	unsigned char model;
 	unsigned long last;
 	char acking;
-	char ack;
+	volatile char ack;
 	char error;
 	char devname[64];
 	char phys[32];
@@ -74,10 +73,12 @@ static char *psmouse_protocols[] = { "None", "PS/2", "PS2++", "PS2T++", "GenPS/2
  * reports relevant events to the input module.
  */
 
-static void psmouse_process_packet(struct psmouse *psmouse)
+static void psmouse_process_packet(struct psmouse *psmouse, struct pt_regs *regs)
 {
 	struct input_dev *dev = &psmouse->dev;
 	unsigned char *packet = psmouse->packet;
+
+	input_regs(dev, regs);
 
 /*
  * The PS2++ protocol is a little bit complex
@@ -85,9 +86,9 @@ static void psmouse_process_packet(struct psmouse *psmouse)
 
 	if (psmouse->type == PSMOUSE_PS2PP || psmouse->type == PSMOUSE_PS2TPP) {
 
-		if ((packet[0] & 0x40) == 0x40 && (int) packet[1] - (int) ((packet[0] & 0x10) << 4) > 191 ) {
+		if ((packet[0] & 0x40) == 0x40 && abs((int)packet[1] - (((int)packet[0] & 0x10) << 4)) > 191 ) {
 
-			switch (((packet[1] >> 4) & 0x03) | ((packet[0] >> 2) & 0xc0)) {
+			switch (((packet[1] >> 4) & 0x03) | ((packet[0] >> 2) & 0x0c)) {
 
 			case 1: /* Mouse extra info */
 
@@ -106,10 +107,11 @@ static void psmouse_process_packet(struct psmouse *psmouse)
 
 				break;
 
+#ifdef DEBUG
 			default:
-
 				printk(KERN_WARNING "psmouse.c: Received PS2++ packet #%x, but don't know how to handle.\n",
-					((packet[1] >> 4) & 0x03) | ((packet[0] >> 2) & 0xc0));
+					((packet[1] >> 4) & 0x03) | ((packet[0] >> 2) & 0x0c));
+#endif
 
 			}
 
@@ -165,7 +167,7 @@ static void psmouse_process_packet(struct psmouse *psmouse)
  * packets or passing them to the command routine as command output.
  */
 
-static void psmouse_interrupt(struct serio *serio, unsigned char data, unsigned int flags)
+static void psmouse_interrupt(struct serio *serio, unsigned char data, unsigned int flags, struct pt_regs *regs)
 {
 	struct psmouse *psmouse = serio->private;
 
@@ -201,7 +203,7 @@ static void psmouse_interrupt(struct serio *serio, unsigned char data, unsigned 
 	psmouse->packet[psmouse->pktcnt++] = data;
 
 	if (psmouse->pktcnt == 3 + (psmouse->type >= PSMOUSE_GENPS)) {
-		psmouse_process_packet(psmouse);
+		psmouse_process_packet(psmouse, regs);
 		psmouse->pktcnt = 0;
 		return;
 	}
@@ -248,6 +250,9 @@ static int psmouse_command(struct psmouse *psmouse, unsigned char *param, int co
 
 	psmouse->cmdcnt = receive;
 
+	if (command == PSMOUSE_CMD_RESET_BAT)
+                timeout = 2000000; /* 2 sec */
+
 	if (command & 0xff)
 		if (psmouse_sendbyte(psmouse, command & 0xff))
 			return (psmouse->cmdcnt = 0) - 1;
@@ -256,7 +261,19 @@ static int psmouse_command(struct psmouse *psmouse, unsigned char *param, int co
 		if (psmouse_sendbyte(psmouse, param[i]))
 			return (psmouse->cmdcnt = 0) - 1;
 
-	while (psmouse->cmdcnt && timeout--) udelay(1);
+	while (psmouse->cmdcnt && timeout--) {
+	
+		if (psmouse->cmdcnt == 1 && command == PSMOUSE_CMD_RESET_BAT)
+			timeout = 100000;
+
+		if (psmouse->cmdcnt == 1 && command == PSMOUSE_CMD_GETID &&
+		    psmouse->cmdbuf[1] != 0xab && psmouse->cmdbuf[1] != 0xac) {
+			psmouse->cmdcnt = 0;
+			break;
+		}
+
+		udelay(1);
+	}
 
 	for (i = 0; i < receive; i++)
 		param[i] = psmouse->cmdbuf[(receive - 1) - i];
@@ -497,11 +514,6 @@ static int psmouse_probe(struct psmouse *psmouse)
 
 	if (psmouse_command(psmouse, param, PSMOUSE_CMD_GETID))
 		return -1;
-
-	if (param[0] == 0xab || param[0] == 0xac) {
-		psmouse_command(psmouse, param, PSMOUSE_CMD_GETID2);
-		return -1;
-	}
 
 	if (param[0] != 0x00 && param[0] != 0x03 && param[0] != 0x04)
 		return -1;

@@ -87,6 +87,7 @@
 #include <linux/delay.h>
 #include <linux/mca.h>
 #include <linux/spinlock.h>
+#include <linux/mca-legacy.h>
 
 #include <asm/io.h>
 #include <asm/system.h>
@@ -732,7 +733,7 @@ static void fd_mcs_intr(int irq, void *dev_id, struct pt_regs *regs)
 		outb(0x40 | FIFO_COUNT, Interrupt_Cntl_port);
 
 		outb(0x82, SCSI_Cntl_port);	/* Bus Enable + Select */
-		outb(adapter_mask | (1 << current_SC->target), SCSI_Data_NoACK_port);
+		outb(adapter_mask | (1 << current_SC->device->id), SCSI_Data_NoACK_port);
 
 		/* Stop arbitration and enable parity */
 		outb(0x10 | PARITY_MASK, TMC_Cntl_port);
@@ -744,7 +745,7 @@ static void fd_mcs_intr(int irq, void *dev_id, struct pt_regs *regs)
 		status = inb(SCSI_Status_port);
 		if (!(status & 0x01)) {
 			/* Try again, for slow devices */
-			if (fd_mcs_select(shpnt, current_SC->target)) {
+			if (fd_mcs_select(shpnt, current_SC->device->id)) {
 #if EVERY_ACCESS
 				printk(" SFAIL ");
 #endif
@@ -802,7 +803,7 @@ static void fd_mcs_intr(int irq, void *dev_id, struct pt_regs *regs)
 #endif
 #if ERRORS_ONLY
 			if (current_SC->SCp.Status && current_SC->SCp.Status != 2 && current_SC->SCp.Status != 8) {
-				printk("ERROR fd_mcs: target = %d, command = %x, status = %x\n", current_SC->target, current_SC->cmnd[0], current_SC->SCp.Status);
+				printk("ERROR fd_mcs: target = %d, command = %x, status = %x\n", current_SC->device->id, current_SC->cmnd[0], current_SC->SCp.Status);
 			}
 #endif
 			break;
@@ -1150,7 +1151,7 @@ static int fd_mcs_release(struct Scsi_Host *shpnt)
 
 static int fd_mcs_queue(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 {
-	struct Scsi_Host *shpnt = SCpnt->host;
+	struct Scsi_Host *shpnt = SCpnt->device->host;
 
 	if (in_command) {
 		panic("fd_mcs: fd_mcs_queue() NOT REENTRANT!\n");
@@ -1243,7 +1244,7 @@ static void fd_mcs_print_info(Scsi_Cmnd * SCpnt)
 		break;
 	}
 
-	printk("(%d), target = %d cmnd = 0x%02x pieces = %d size = %u\n", SCpnt->SCp.phase, SCpnt->target, *(unsigned char *) SCpnt->cmnd, SCpnt->use_sg, SCpnt->request_bufflen);
+	printk("(%d), target = %d cmnd = 0x%02x pieces = %d size = %u\n", SCpnt->SCp.phase, SCpnt->device->id, *(unsigned char *) SCpnt->cmnd, SCpnt->use_sg, SCpnt->request_bufflen);
 	printk("sent_command = %d, have_data_in = %d, timeout = %d\n", SCpnt->SCp.sent_command, SCpnt->SCp.have_data_in, SCpnt->timeout);
 #if DEBUG_RACE
 	printk("in_interrupt_flag = %d\n", in_interrupt_flag);
@@ -1286,7 +1287,7 @@ static void fd_mcs_print_info(Scsi_Cmnd * SCpnt)
 
 static int fd_mcs_abort(Scsi_Cmnd * SCpnt)
 {
-	struct Scsi_Host *shpnt = SCpnt->host;
+	struct Scsi_Host *shpnt = SCpnt->device->host;
 
 	unsigned long flags;
 #if EVERY_ACCESS || ERRORS_ONLY || DEBUG_ABORT
@@ -1331,7 +1332,7 @@ static int fd_mcs_device_reset(Scsi_Cmnd * SCpnt)
 }
 
 static int fd_mcs_bus_reset(Scsi_Cmnd * SCpnt) {
-	struct Scsi_Host *shpnt = SCpnt->host;
+	struct Scsi_Host *shpnt = SCpnt->device->host;
 
 #if DEBUG_RESET
 	static int called_once = 0;

@@ -369,15 +369,14 @@ static char eppconfig_path[256] = "/usr/sbin/eppfpga";
 
 static char *envp[] = { "HOME=/", "TERM=linux", "PATH=/usr/bin:/bin", NULL };
 
-static int errno;
-
-static int exec_eppfpga(void *b)
+/* eppconfig: called during ifconfig up to configure the modem */
+static int eppconfig(struct baycom_state *bc)
 {
-	struct baycom_state *bc = (struct baycom_state *)b;
 	char modearg[256];
 	char portarg[16];
-        char *argv[] = { eppconfig_path, "-s", "-p", portarg, "-m", modearg, NULL};
-        int i;
+        char *argv[] = { eppconfig_path, "-s", "-p", portarg, "-m", modearg,
+			 NULL };
+        int ret;
 
 	/* set up arguments */
 	sprintf(modearg, "%sclk,%smodem,fclk=%d,bps=%d,divider=%d%s,extstat",
@@ -388,39 +387,7 @@ static int exec_eppfpga(void *b)
 	sprintf(portarg, "%ld", bc->pdev->port->base);
 	printk(KERN_DEBUG "%s: %s -s -p %s -m %s\n", bc_drvname, eppconfig_path, portarg, modearg);
 
-	i = exec_usermodehelper(eppconfig_path, argv, envp);
-	if (i < 0) {
-                printk(KERN_ERR "%s: failed to exec %s -s -p %s -m %s, errno = %d\n",
-                       bc_drvname, eppconfig_path, portarg, modearg, i);
-                return i;
-        }
-        return 0;
-}
-
-
-/* eppconfig: called during ifconfig up to configure the modem */
-
-static int eppconfig(struct baycom_state *bc)
-{
-        int i, pid, r;
-	mm_segment_t fs;
-
-        pid = kernel_thread(exec_eppfpga, bc, CLONE_FS);
-        if (pid < 0) {
-                printk(KERN_ERR "%s: fork failed, errno %d\n", bc_drvname, -pid);
-                return pid;
-        }
-	fs = get_fs();
-        set_fs(KERNEL_DS);      /* Allow i to be in kernel space. */
-	r = waitpid(pid, &i, __WCLONE);
-	set_fs(fs);
-        if (r != pid) {
-                printk(KERN_ERR "%s: waitpid(%d) failed, returning %d\n",
-		       bc_drvname, pid, r);
-		return -1;
-        }
-	printk(KERN_DEBUG "%s: eppfpga returned %d\n", bc_drvname, i);
-	return i;
+	return call_usermodehelper(eppconfig_path, argv, envp, 1);
 }
 
 /* ---------------------------------------------------------------------- */

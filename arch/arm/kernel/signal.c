@@ -522,7 +522,7 @@ static int do_signal(sigset_t *oldset, struct pt_regs *regs, int syscall)
 		struct k_sigaction *ka;
 
 		spin_lock_irq(&current->sighand->siglock);
-		signr = dequeue_signal(&current->blocked, &info);
+		signr = dequeue_signal(current, &current->blocked, &info);
 		spin_unlock_irq(&current->sighand->siglock);
 
 		if (!signr)

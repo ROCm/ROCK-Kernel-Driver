@@ -32,8 +32,8 @@
 #include <linux/pm.h>
 #include <linux/pci.h>
 #include <linux/acpi.h>
-#include "acpi_bus.h"
-#include "acpi_drivers.h"
+#include <acpi/acpi_bus.h>
+#include <acpi/acpi_drivers.h>
 
 
 #define _COMPONENT		ACPI_PCI_COMPONENT
@@ -185,7 +185,7 @@ acpi_pci_bind (
 	 */
 	data->dev = pci_find_slot(data->id.bus, PCI_DEVFN(data->id.device, data->id.function));
 	if (!data->dev) {
-		ACPI_DEBUG_PRINT((ACPI_DB_WARN, 
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
 			"Device %02x:%02x:%02x.%02x not present in PCI namespace\n",
 			data->id.segment, data->id.bus, 
 			data->id.device, data->id.function));

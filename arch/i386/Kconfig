@@ -136,6 +136,7 @@ config M386
 	  - "Winchip-2" for IDT Winchip 2.
 	  - "Winchip-2A" for IDT Winchips with 3dNow! capabilities.
 	  - "CyrixIII/VIA C3" for VIA Cyrix III or VIA C3.
+	  - "VIA C3-2 for VIA C3-2 "Nehemiah" (model 9 and above).
 
 	  If you don't know what to do, choose "386".
 
@@ -174,7 +175,7 @@ config M686
 	  against the f00f bug found in earlier Pentiums.
 
 config MPENTIUMII
-       bool "Pentium-II/Celeron(pre-Coppermine)"
+	bool "Pentium-II/Celeron(pre-Coppermine)"
 	help
 	  Select this for Intel chips based on the Pentium-II and
 	  pre-Coppermine Celeron core.  This option enables an unaligned
@@ -260,6 +261,16 @@ config MCYRIXIII
 	  treat this chip as a generic 586. Whilst the CPU is 686 class,
 	  it lacks the cmov extension which gcc assumes is present when
 	  generating 686 code.
+	  Note, that Nehemiah (Model 9) and above will not boot with this
+	  kernel due to them lacking the 3dnow instructions used in earlier
+	  incarnations of the CPU.
+
+config MVIAC3_2
+	bool "VIA C3-2 (Nehemiah)"
+	help
+	  Select this for a VIA C3 "Nehemiah". Selecting this enables usage of SSE
+	  and tells gcc to treat the CPU as a 686.
+	  Note, this kernel will not boot on older (pre model 9) C3s.
 
 endchoice
 
@@ -278,8 +289,8 @@ config X86_XADD
 
 config X86_L1_CACHE_SHIFT
 	int
-	default "5" if MWINCHIP3D || MWINCHIP2 || MWINCHIPC6 || MCRUSOE || MCYRIXIII || MK6 || MPENTIUMIII || MPENTIUMII || M686 || M586MMX || M586TSC || M586
 	default "4" if MELAN || M486 || M386
+	default "5" if MWINCHIP3D || MWINCHIP2 || MWINCHIPC6 || MCRUSOE || MCYRIXIII || MK6 || MPENTIUMIII || MPENTIUMII || M686 || M586MMX || M586TSC || M586 || MVIAC3_2
 	default "6" if MK7 || MK8
 	default "7" if MPENTIUM4
 
@@ -325,12 +336,12 @@ config X86_POPAD_OK
 
 config X86_ALIGNMENT_16
 	bool
-	depends on MWINCHIP3D || MWINCHIP2 || MWINCHIPC6 || MCYRIXIII || MELAN || MK6 || M586MMX || M586TSC || M586 || M486
+	depends on MWINCHIP3D || MWINCHIP2 || MWINCHIPC6 || MCYRIXIII || MELAN || MK6 || M586MMX || M586TSC || M586 || M486 || MVIAC3_2
 	default y
 
 config X86_TSC
 	bool
-	depends on MWINCHIP3D || MWINCHIP2 || MCRUSOE || MCYRIXIII || MK7 || MK6 || MPENTIUM4 || MPENTIUMIII || MPENTIUMII || M686 || M586MMX || M586TSC || MK8
+	depends on MWINCHIP3D || MWINCHIP2 || MCRUSOE || MCYRIXIII || MK7 || MK6 || MPENTIUM4 || MPENTIUMIII || MPENTIUMII || M686 || M586MMX || M586TSC || MK8 || MVIAC3_2
 	default y
 
 config X86_GOOD_APIC
@@ -345,7 +356,7 @@ config X86_INTEL_USERCOPY
 
 config X86_USE_PPRO_CHECKSUM
 	bool
-	depends on MWINCHIP3D || MWINCHIP2 || MWINCHIPC6 || MCYRIXIII || MK7 || MK6 || MPENTIUM4 || MPENTIUMIII || MPENTIUMII || M686 || MK8
+	depends on MWINCHIP3D || MWINCHIP2 || MWINCHIPC6 || MCYRIXIII || MK7 || MK6 || MPENTIUM4 || MPENTIUMIII || MPENTIUMII || M686 || MK8 || MVIAC3_2
 	default y
 
 config X86_USE_3DNOW
@@ -360,7 +371,7 @@ config X86_OOSTORE
 
 config X86_PREFETCH
 	bool
-	depends on MPENTIUMIII || MPENTIUM4
+	depends on MPENTIUMIII || MPENTIUM4 || MVIAC3_2
 	default y
 
 config X86_SSE2
@@ -958,7 +969,7 @@ config CPU_FREQ
 	  If in doubt, say N.
 
 config CPU_FREQ_PROC_INTF
-	bool "/proc/cpufreq interface (DEPRECATED)"
+	tristate "/proc/cpufreq interface (DEPRECATED)"
 	depends on CPU_FREQ && PROC_FS
 	help
 	  This enables the /proc/cpufreq interface for controlling
@@ -983,9 +994,19 @@ config CPU_FREQ_24_API
 
 	  If in doubt, say N.
 
+config CPU_FREQ_TABLE
+       tristate "CPU frequency table helpers"
+       depends on CPU_FREQ
+       default y
+       help
+         Many CPUFreq drivers use these helpers, so only say N here if
+	 the CPUFreq driver of your choice doesn't need these helpers.
+
+	 If in doubt, say Y.
+
 config X86_ACPI_CPUFREQ
 	tristate "ACPI Processor P-States driver"
-	depends on CPU_FREQ && ACPI_PROCESSOR
+	depends on CPU_FREQ_TABLE && ACPI_PROCESSOR
 	help
 	  This driver adds a CPUFreq driver which utilizes the ACPI
 	  Processor Performance States.
@@ -996,7 +1017,7 @@ config X86_ACPI_CPUFREQ
 
 config X86_POWERNOW_K6
 	tristate "AMD Mobile K6-2/K6-3 PowerNow!"
-	depends on CPU_FREQ
+	depends on CPU_FREQ_TABLE
 	help
 	  This adds the CPUFreq driver for mobile AMD K6-2+ and mobile
 	  AMD K6-3+ processors.
@@ -1005,9 +1026,19 @@ config X86_POWERNOW_K6
 
 	  If in doubt, say N.
 
+config X86_POWERNOW_K7
+	tristate "AMD Mobile Athlon/Duron PowerNow!"
+	depends on CPU_FREQ_TABLE
+	help
+	  This adds the CPUFreq driver for mobile AMD K7 mobile processors.
+
+	  For details, take a look at linux/Documentation/cpufreq. 
+
+	  If in doubt, say N.
+
 config ELAN_CPUFREQ
 	tristate "AMD Elan"
-	depends on CPU_FREQ && MELAN
+	depends on CPU_FREQ_TABLE && MELAN
 	---help---
 	  This adds the CPUFreq driver for AMD Elan SC400 and SC410
 	  processors.
@@ -1034,7 +1065,7 @@ config X86_LONGHAUL
 
 config X86_SPEEDSTEP
 	tristate "Intel Speedstep"
-	depends on CPU_FREQ
+	depends on CPU_FREQ_TABLE
 	help
 	  This adds the CPUFreq driver for certain mobile Intel Pentium III
 	  (Coppermine), all mobile Intel Pentium III-M (Tulatin) and all
@@ -1046,7 +1077,7 @@ config X86_SPEEDSTEP
 
 config X86_P4_CLOCKMOD
 	tristate "Intel Pentium 4 clock modulation"
-	depends on CPU_FREQ
+	depends on CPU_FREQ_TABLE
 	help
 	  This adds the CPUFreq driver for Intel Pentium 4 / XEON
 	  processors.

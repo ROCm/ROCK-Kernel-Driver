@@ -100,6 +100,14 @@ enum sctp_optname {
 #define SCTP_SOCKOPT_BINDX_REM	SCTP_SOCKOPT_BINDX_REM
 	SCTP_SOCKOPT_PEELOFF, 	/* peel off association. */
 #define SCTP_SOCKOPT_PEELOFF	SCTP_SOCKOPT_PEELOFF
+	SCTP_GET_PEER_ADDRS_NUM, 	/* Get number of peer addresss. */
+#define SCTP_GET_PEER_ADDRS_NUM	SCTP_GET_PEER_ADDRS_NUM
+	SCTP_GET_PEER_ADDRS, 	/* Get all peer addresss. */
+#define SCTP_GET_PEER_ADDRS	SCTP_GET_PEER_ADDRS
+	SCTP_GET_LOCAL_ADDRS_NUM, 	/* Get number of local addresss. */
+#define SCTP_GET_LOCAL_ADDRS_NUM	SCTP_GET_LOCAL_ADDRS_NUM
+	SCTP_GET_LOCAL_ADDRS, 	/* Get all local addresss. */
+#define SCTP_GET_LOCAL_ADDRS	SCTP_GET_LOCAL_ADDRS
 };
 
 
@@ -576,6 +584,15 @@ struct sctp_setstrm_timeout   {
 	__u16		ssto_streamid_end;
 };
 
+/*
+ * 8.3 8.5 get all peer/local addresses on a socket
+ * This parameter struct is for getsockopt
+ */
+struct sctp_getaddrs {
+	sctp_assoc_t            assoc_id;
+	int			addr_num;
+	struct sockaddr_storage *addrs;
+};
 
 /* These are bit fields for msghdr->msg_flags.  See section 5.1.  */
 /* On user space Linux, these live in <bits/socket.h> as an enum.  */

@@ -22,8 +22,8 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include "acpi.h"
-#include "acevents.h"
+#include <acpi/acpi.h>
+#include <acpi/acevents.h>
 
 #define _COMPONENT          ACPI_EVENTS
 	 ACPI_MODULE_NAME    ("evevent")

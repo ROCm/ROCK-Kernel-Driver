@@ -294,7 +294,7 @@
 #define IW_PRIV_TYPE_FLOAT	0x5000	/* struct iw_freq */
 #define IW_PRIV_TYPE_ADDR	0x6000	/* struct sockaddr */
 
-#define IW_PRIV_SIZE_FIXED	0x0800	/* Variable or fixed nuber of args */
+#define IW_PRIV_SIZE_FIXED	0x0800	/* Variable or fixed number of args */
 
 #define IW_PRIV_SIZE_MASK	0x07FF	/* Max number of those args */
 

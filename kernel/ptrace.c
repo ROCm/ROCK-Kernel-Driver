@@ -252,49 +252,30 @@ int ptrace_writedata(struct task_struct *tsk, char * src, unsigned long dst, int
 
 static int ptrace_setoptions(struct task_struct *child, long data)
 {
+	child->ptrace &= ~PT_TRACE_MASK;
+
 	if (data & PTRACE_O_TRACESYSGOOD)
 		child->ptrace |= PT_TRACESYSGOOD;
-	else
-		child->ptrace &= ~PT_TRACESYSGOOD;
 
 	if (data & PTRACE_O_TRACEFORK)
 		child->ptrace |= PT_TRACE_FORK;
-	else
-		child->ptrace &= ~PT_TRACE_FORK;
 
 	if (data & PTRACE_O_TRACEVFORK)
 		child->ptrace |= PT_TRACE_VFORK;
-	else
-		child->ptrace &= ~PT_TRACE_VFORK;
 
 	if (data & PTRACE_O_TRACECLONE)
 		child->ptrace |= PT_TRACE_CLONE;
-	else
-		child->ptrace &= ~PT_TRACE_CLONE;
 
 	if (data & PTRACE_O_TRACEEXEC)
 		child->ptrace |= PT_TRACE_EXEC;
-	else
-		child->ptrace &= ~PT_TRACE_EXEC;
 
 	if (data & PTRACE_O_TRACEVFORKDONE)
 		child->ptrace |= PT_TRACE_VFORK_DONE;
-	else
-		child->ptrace &= ~PT_TRACE_VFORK_DONE;
 
 	if (data & PTRACE_O_TRACEEXIT)
 		child->ptrace |= PT_TRACE_EXIT;
-	else
-		child->ptrace &= ~PT_TRACE_EXIT;
 
-	if ((data & (PTRACE_O_TRACESYSGOOD | PTRACE_O_TRACEFORK
-		    | PTRACE_O_TRACEVFORK | PTRACE_O_TRACECLONE
-		    | PTRACE_O_TRACEEXEC | PTRACE_O_TRACEEXIT
-		    | PTRACE_O_TRACEVFORKDONE))
-	    != data)
-		return -EINVAL;
-
-	return 0;
+	return (data & ~PTRACE_O_MASK) ? -EINVAL : 0;
 }
 
 static int ptrace_getsiginfo(struct task_struct *child, long data)
@@ -351,4 +332,9 @@ void ptrace_notify(int exit_code)
 	set_current_state(TASK_STOPPED);
 	notify_parent(current, SIGCHLD);
 	schedule();
+
+	/*
+	 * Signals sent while we were stopped might set TIF_SIGPENDING.
+	 */
+	recalc_sigpending();
 }

@@ -10,6 +10,17 @@
    *  11 May 2001: 0.4 fixed for SMP, included into kernel source tree
    *  17 May 2001: 0.5 draining code didn't work on new cards
    *  18 May 2001: 0.6 remove synchronize_irq() call 
+   *  17 Jul 2001: 0.7 updated xrmectrl to make it work for newer cards
+   *   2 feb 2002: 0.8 fixed pci device handling, see below for patches from Heiko (Thanks!)
+                       Marcus Meissner <Marcus.Meissner@caldera.de>
+
+		       Modifications - Heiko Purnhagen <purnhage@tnt.uni-hannover.de>
+		       HP20020108 fixed handling of "large" read()
+		       HP20020116 towards REV 1.5 support, based on ALSA's card-rme9652.c
+		       HP20020118 made mixer ioctl and handling of devices>1 more safe
+		       HP20020201 fixed handling of "large" read() properly
+		       added REV 1.5 S/P-DIF receiver support
+		       SNDCTL_DSP_SPEED now returns the actual speed
    *  10 Aug 2002: added synchronize_irq() again
 
 TODO:
@@ -20,15 +31,17 @@ TODO:
    - mixer mmap interface
    - mixer ioctl
    - get rid of noise upon first open (why ??)
-   - allow multiple open(at least for read)
+   - allow multiple open (at least for read)
    - allow multiple open for non overlapping regions
    - recheck the multiple devices part (offsets of different devices, etc)
    - do decent draining in _release --- done
    - SMP support
+   - what about using fragstotal>2 for small fragsize? (HP20020118)
+   - add support for AFMT_S32_LE
 */
 
 #ifndef RMEVERSION
-#define RMEVERSION "0.6"
+#define RMEVERSION "0.8"
 #endif
 
 #include <linux/version.h>
@@ -41,6 +54,8 @@ TODO:
 #include <linux/smp_lock.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
+#include <asm/dma.h>
+#include <asm/hardirq.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/poll.h>
@@ -134,45 +149,57 @@ MODULE_LICENSE("GPL");
 #define RME96xx_F_0          0x0400000 /*  000=64kHz, 100=88.2kHz, 011=96kHz  */
 #define RME96xx_F_1          0x0800000 /*  111=32kHz, 110=44.1kHz, 101=48kHz, */
 
-#define RME96xx_F_2          0x1000000 /*  od external Crystal Chip if ERF=1*/
+#define RME96xx_F_2          0x1000000 /*  001=Rev 1.5+ external Crystal Chip */
 #define RME96xx_ERF          0x2000000 /* Error-Flag of SDPIF Receiver (1=No Lock)*/
 #define RME96xx_buffer_id    0x4000000 /* toggles by each interrupt on rec/play */
 #define RME96xx_tc_valid     0x8000000 /* 1 = a signal is detected on time-code input */
+#define RME96xx_SPDIF_READ  0x10000000 /* byte available from Rev 1.5+ SPDIF interface */
 
 /* Status Register Fields */
 
 #define RME96xx_lock            (RME96xx_lock_0|RME96xx_lock_1|RME96xx_lock_2)
-#define RME96xx_buf_pos          0x000FFC0 
 #define RME96xx_sync            (RME96xx_sync_0|RME96xx_sync_1|RME96xx_sync_2)
 #define RME96xx_F               (RME96xx_F_0|RME96xx_F_1|RME96xx_F_2)
+#define rme96xx_decode_spdif_rate(x) ((x)>>22)
 
+/* Bit 6..15 : h/w buffer pointer */
+#define RME96xx_buf_pos          0x000FFC0 
+/* Bits 31,30,29 are bits 5,4,3 of h/w pointer position on later
+   Rev G EEPROMS and Rev 1.5 cards or later.
+*/ 
+#define RME96xx_REV15_buf_pos(x) ((((x)&0xE0000000)>>26)|((x)&RME96xx_buf_pos))
 
 
 /* Control-Register: */			    
 /*--------------------------------------------------------------------------------*/
 
-#define RME96xx_start_bit	   0x0001    /* start record/play */
-#define RME96xx_latency0	   0x0002    /* Bit 0 -  Buffer size or latency */
-#define RME96xx_latency1	   0x0004    /* Bit 1 - Buffer size or latency */
-#define RME96xx_latency2	   0x0008    /* Bit 2 - Buffer size or latency */
+#define RME96xx_start_bit	0x0001 /* start record/play */
+#define RME96xx_latency0	0x0002 /* Buffer size / latency */
+#define RME96xx_latency1	0x0004 /*   buffersize = 512Bytes * 2^n */
+#define RME96xx_latency2	0x0008 /*   0=64samples ... 7=8192samples */
 
-#define RME96xx_Master		   0x0010   /* Clock Mode Master=1,Slave/Auto=0 */
-#define RME96xx_IE		   0x0020   /* Interupt Enable */
-#define RME96xx_freq		   0x0040   /* samplerate 0=44.1/88.2, 1=48/96 kHz*/
+#define RME96xx_Master		0x0010 /* Clock Mode 1=Master, 0=Slave/Auto */
+#define RME96xx_IE		0x0020 /* Interupt Enable */
+#define RME96xx_freq		0x0040 /* samplerate 0=44.1/88.2, 1=48/96 kHz*/
+#define RME96xx_freq1		0x0080 /* samplerate 0=32 kHz, 1=other rates ??? (from ALSA, but may be wrong) */
+#define RME96xx_DS              0x0100 /* double speed 0=44.1/48, 1=88.2/96 Khz */
+#define RME96xx_PRO		0x0200 /* SPDIF-OUT 0=consumer, 1=professional */
+#define RME96xx_EMP		0x0400 /* SPDIF-OUT emphasis 0=off, 1=on */
+#define RME96xx_Dolby		0x0800 /* SPDIF-OUT non-audio bit 1=set, 0=unset */
 
+#define RME96xx_opt_out	        0x1000 /* use 1st optical OUT as SPDIF: 1=yes, 0=no */
+#define RME96xx_wsel            0x2000 /* use Wordclock as sync (overwrites master) */
+#define RME96xx_inp_0           0x4000 /* SPDIF-IN 00=optical (ADAT1), */
+#define RME96xx_inp_1           0x8000 /* 01=coaxial (Cinch), 10=internal CDROM */
 
-#define RME96xx_DS                 0x0100   /* Doule Speed 0=44.1/48, 1=88.2/96 Khz */
-#define RME96xx_PRO		   0x0200    /* spdif 0=consumer, 1=professional Mode*/
-#define RME96xx_EMP		   0x0400    /* spdif Emphasis 0=None, 1=ON */
-#define RME96xx_Dolby		   0x0800    /* spdif Non-audio bit 1=set, 0=unset */
+#define RME96xx_SyncRef0       0x10000 /* preferred sync-source in autosync */
+#define RME96xx_SyncRef1       0x20000 /* 00=ADAT1, 01=ADAT2, 10=ADAT3, 11=SPDIF */
 
-#define RME96xx_opt_out	           0x1000  /* Use 1st optical OUT as SPDIF: 1=yes,0=no */
-#define RME96xx_wsel               0x2000  /* use Wordclock as sync (overwrites master)*/
-#define RME96xx_inp_0              0x4000  /* SPDIF-IN: 00=optical (ADAT1),     */
-#define RME96xx_inp_1              0x8000  /* 01=koaxial (Cinch), 10=Internal CDROM*/
-
-#define RME96xx_SyncRef0           0x10000  /* preferred sync-source in autosync */
-#define RME96xx_SyncRef1           0x20000  /* 00=ADAT1,01=ADAT2,10=ADAT3,11=SPDIF */
+#define RME96xx_SPDIF_RESET    (1<<18) /* Rev 1.5+: h/w SPDIF receiver */
+#define RME96xx_SPDIF_SELECT   (1<<19)
+#define RME96xx_SPDIF_CLOCK    (1<<20)
+#define RME96xx_SPDIF_WRITE    (1<<21)
+#define RME96xx_ADAT1_INTERNAL (1<<22) /* Rev 1.5+: if set, internal CD connector carries ADAT */
 
 
 #define RME96xx_ctrl_init            (RME96xx_latency0 |\
@@ -186,7 +213,9 @@ MODULE_LICENSE("GPL");
 #define RME96xx_latency (RME96xx_latency0|RME96xx_latency1|RME96xx_latency2)
 #define RME96xx_inp         (RME96xx_inp_0|RME96xx_inp_1)
 #define RME96xx_SyncRef    (RME96xx_SyncRef0|RME96xx_SyncRef1)
-/* latency = 512Bytes * 2^n, where n is made from Bit3 ... Bit0 */
+#define RME96xx_mixer_allowed (RME96xx_Master|RME96xx_PRO|RME96xx_EMP|RME96xx_Dolby|RME96xx_opt_out|RME96xx_wsel|RME96xx_inp|RME96xx_SyncRef|RME96xx_ADAT1_INTERNAL)
+
+/* latency = 512Bytes * 2^n, where n is made from Bit3 ... Bit1  (??? HP20020201) */
 
 #define RME96xx_SET_LATENCY(x)   (((x)&0x7)<<1)
 #define RME96xx_GET_LATENCY(x)   (((x)>>1)&0x7)
@@ -211,6 +240,7 @@ MODULE_LICENSE("GPL");
 
 
 #define RME96xx_MAX_DEVS 4 /* we provide some OSS stereodevs */
+#define RME96xx_MASK_DEVS 0x3 /* RME96xx_MAX_DEVS-1 */
 
 #define RME_MESS "rme96xx:"
 /*------------------------------------------------------------------------ 
@@ -259,8 +289,10 @@ typedef struct _rme96xx_info {
 
 	u32 thru_bits; /* thru 1=on, 0=off channel 1=Bit1... channel 26= Bit26 */
 
-	int open_count;
+	int hw_rev;             /* h/w rev * 10 (i.e. 1.5 has hw_rev = 15) */
+	char *card_name;	/* hammerfall or hammerfall light names */
 
+	int open_count;         /* unused ???   HP20020201 */
 
 	int rate;
 	int latency;
@@ -323,6 +355,181 @@ inline void rme96xx_unset_ctrl(rme96xx_info* s,int mask)
 	writel(s->control_register,s->iobase + RME96xx_control_register);
 
 }
+
+inline int rme96xx_get_sample_rate_status(rme96xx_info* s)
+{
+	int val;
+	u32 status;
+	status = readl(s->iobase + RME96xx_status_register);
+	val = (status & RME96xx_fs48) ? 48000 : 44100;
+	if (status & RME96xx_DS_rd)
+		val *= 2;
+	return val;
+}
+
+inline int rme96xx_get_sample_rate_ctrl(rme96xx_info* s)
+{
+	int val;
+	val = (s->control_register & RME96xx_freq) ? 48000 : 44100;
+	if (s->control_register & RME96xx_DS)
+		val *= 2;
+	return val;
+}
+
+
+/* code from ALSA card-rme9652.c for rev 1.5 SPDIF receiver   HP 20020201 */
+
+static void rme96xx_spdif_set_bit (rme96xx_info* s, int mask, int onoff)
+{
+	if (onoff) 
+		s->control_register |= mask;
+	else 
+		s->control_register &= ~mask;
+		
+	writel(s->control_register,s->iobase + RME96xx_control_register);
+}
+
+static void rme96xx_spdif_write_byte (rme96xx_info* s, const int val)
+{
+	long mask;
+	long i;
+
+	for (i = 0, mask = 0x80; i < 8; i++, mask >>= 1) {
+		if (val & mask)
+			rme96xx_spdif_set_bit (s, RME96xx_SPDIF_WRITE, 1);
+		else 
+			rme96xx_spdif_set_bit (s, RME96xx_SPDIF_WRITE, 0);
+
+		rme96xx_spdif_set_bit (s, RME96xx_SPDIF_CLOCK, 1);
+		rme96xx_spdif_set_bit (s, RME96xx_SPDIF_CLOCK, 0);
+	}
+}
+
+static int rme96xx_spdif_read_byte (rme96xx_info* s)
+{
+	long mask;
+	long val;
+	long i;
+
+	val = 0;
+
+	for (i = 0, mask = 0x80;  i < 8; i++, mask >>= 1) {
+		rme96xx_spdif_set_bit (s, RME96xx_SPDIF_CLOCK, 1);
+		if (readl(s->iobase + RME96xx_status_register) & RME96xx_SPDIF_READ)
+			val |= mask;
+		rme96xx_spdif_set_bit (s, RME96xx_SPDIF_CLOCK, 0);
+	}
+
+	return val;
+}
+
+static void rme96xx_write_spdif_codec (rme96xx_info* s, const int address, const int data)
+{
+	rme96xx_spdif_set_bit (s, RME96xx_SPDIF_SELECT, 1);
+	rme96xx_spdif_write_byte (s, 0x20);
+	rme96xx_spdif_write_byte (s, address);
+	rme96xx_spdif_write_byte (s, data);
+	rme96xx_spdif_set_bit (s, RME96xx_SPDIF_SELECT, 0);
+}
+
+
+static int rme96xx_spdif_read_codec (rme96xx_info* s, const int address)
+{
+	int ret;
+
+	rme96xx_spdif_set_bit (s, RME96xx_SPDIF_SELECT, 1);
+	rme96xx_spdif_write_byte (s, 0x20);
+	rme96xx_spdif_write_byte (s, address);
+	rme96xx_spdif_set_bit (s, RME96xx_SPDIF_SELECT, 0);
+	rme96xx_spdif_set_bit (s, RME96xx_SPDIF_SELECT, 1);
+
+	rme96xx_spdif_write_byte (s, 0x21);
+	ret = rme96xx_spdif_read_byte (s);
+	rme96xx_spdif_set_bit (s, RME96xx_SPDIF_SELECT, 0);
+
+	return ret;
+}
+
+static void rme96xx_initialize_spdif_receiver (rme96xx_info* s)
+{
+	/* XXX what unsets this ? */
+	/* no idea ???   HP 20020201 */
+
+	s->control_register |= RME96xx_SPDIF_RESET;
+
+	rme96xx_write_spdif_codec (s, 4, 0x40);
+	rme96xx_write_spdif_codec (s, 17, 0x13);
+	rme96xx_write_spdif_codec (s, 6, 0x02);
+}
+
+static inline int rme96xx_spdif_sample_rate (rme96xx_info *s, int *spdifrate)
+{
+	unsigned int rate_bits;
+
+	*spdifrate = 0x1;
+	if (readl(s->iobase + RME96xx_status_register) & RME96xx_ERF) {
+		return -1;	/* error condition */
+	}
+	
+	if (s->hw_rev == 15) {
+
+		int x, y, ret;
+		
+		x = rme96xx_spdif_read_codec (s, 30);
+
+		if (x != 0) 
+			y = 48000 * 64 / x;
+		else
+			y = 0;
+
+		if      (y > 30400 && y < 33600)  {ret = 32000; *spdifrate = 0x7;}
+		else if (y > 41900 && y < 46000)  {ret = 44100; *spdifrate = 0x6;}
+		else if (y > 46000 && y < 50400)  {ret = 48000; *spdifrate = 0x5;}
+		else if (y > 60800 && y < 67200)  {ret = 64000; *spdifrate = 0x0;}
+		else if (y > 83700 && y < 92000)  {ret = 88200; *spdifrate = 0x4;}
+		else if (y > 92000 && y < 100000) {ret = 96000; *spdifrate = 0x3;}
+		else                              {ret = 0; *spdifrate = 0x1;}
+		return ret;
+	}
+
+	rate_bits = readl(s->iobase + RME96xx_status_register) & RME96xx_F;
+
+	switch (*spdifrate = rme96xx_decode_spdif_rate(rate_bits)) {
+	case 0x7:
+		return 32000;
+		break;
+
+	case 0x6:
+		return 44100;
+		break;
+
+	case 0x5:
+		return 48000;
+		break;
+
+	case 0x4:
+		return 88200;
+		break;
+
+	case 0x3:
+		return 96000;
+		break;
+
+	case 0x0:
+		return 64000;
+		break;
+
+	default:
+		/* was an ALSA warning ...
+		  snd_printk("%s: unknown S/PDIF input rate (bits = 0x%x)\n",
+		  s->card_name, rate_bits);
+		*/
+		return 0;
+		break;
+	}
+}
+
+/* end of code from ALSA card-rme9652.c */
 
 
 
@@ -662,6 +869,9 @@ static int rme96xx_dmabuf_init(rme96xx_info * s,struct dmabuf* dma,int ioffset,i
 int rme96xx_init(rme96xx_info* s)
 {
 	int i;
+	int status;
+	unsigned short rev;
+
 	DBG(printk(__FUNCTION__"\n"));
 	numcards++;
 
@@ -693,6 +903,56 @@ int rme96xx_init(rme96xx_info* s)
 		struct dmabuf * dma = &s->dma[i];
 		rme96xx_dmabuf_init(s,dma,2*i,2*i);
 	}
+
+	/* code from ALSA card-rme9652.c   HP 20020201 */
+        /* Determine the h/w rev level of the card. This seems like
+	   a particularly kludgy way to encode it, but its what RME
+	   chose to do, so we follow them ...
+	*/
+
+	status = readl(s->iobase + RME96xx_status_register);
+	if (rme96xx_decode_spdif_rate(status&RME96xx_F) == 1) {
+		s->hw_rev = 15;
+	} else {
+		s->hw_rev = 11;
+	}
+
+	/* Differentiate between the standard Hammerfall, and the
+	   "Light", which does not have the expansion board. This
+	   method comes from information received from Mathhias
+	   Clausen at RME. Display the EEPROM and h/w revID where
+	   relevant.  
+	*/
+
+	pci_read_config_word(s->pcidev, PCI_CLASS_REVISION, &rev);
+	switch (rev & 0xff) {
+	case 8: /* original eprom */
+		if (s->hw_rev == 15) {
+			s->card_name = "RME Digi9636 (Rev 1.5)";
+		} else {
+			s->card_name = "RME Digi9636";
+		}
+		break;
+	case 9: /* W36_G EPROM */
+		s->card_name = "RME Digi9636 (Rev G)";
+		break;
+	case 4: /* W52_G EPROM */
+		s->card_name = "RME Digi9652 (Rev G)";
+		break;
+	default:
+	case 3: /* original eprom */
+		if (s->hw_rev == 15) {
+			s->card_name = "RME Digi9652 (Rev 1.5)";
+		} else {
+			s->card_name = "RME Digi9652";
+		}
+		break;
+	}
+
+	printk(KERN_INFO RME_MESS" detected %s (hw_rev %d)\n",s->card_name,s->hw_rev); 
+
+	if (s->hw_rev == 15)
+		rme96xx_initialize_spdif_receiver (s);
 
 	s->started = 0;
 	rme96xx_setlatency(s,7);
@@ -734,7 +994,7 @@ static int __devinit rme96xx_probe(struct pci_dev *pcidev, const struct pci_devi
 
 	if (pci_enable_device(pcidev))
 		goto err_irq;
-	if (request_irq(s->irq, rme96xx_interrupt, SA_SHIRQ, "es1370", s)) {
+	if (request_irq(s->irq, rme96xx_interrupt, SA_SHIRQ, "rme96xx", s)) {
 		printk(KERN_ERR RME_MESS" irq %u in use\n", s->irq);
 		goto err_irq;
 	}
@@ -836,6 +1096,7 @@ static int __init init_rme96xx(void)
 	if (!pci_present())   /* No PCI bus in this machine! */
 		return -ENODEV;
 	printk(KERN_INFO RME_MESS" version "RMEVERSION" time " __TIME__ " " __DATE__ "\n");
+	devices = ((devices-1) & RME96xx_MASK_DEVS) + 1;
 	printk(KERN_INFO RME_MESS" reserving %d dsp device(s)\n",devices);
         numcards = 0;
 	return pci_module_init(&rme96xx_driver);
@@ -859,12 +1120,10 @@ module_exit(cleanup_rme96xx);
 ---------------------------------------------------------------------------*/
 
 #define RME96xx_FMT (AFMT_S16_LE|AFMT_U8|AFMT_S32_BLOCKED)
+/* AFTM_U8 is not (yet?) supported ...  HP20020201 */
 
-
-static int rme96xx_ioctl(struct inode *in, struct file *file, 
-						unsigned int cmd, unsigned long arg)
+static int rme96xx_ioctl(struct inode *in, struct file *file, unsigned int cmd, unsigned long arg)
 {
-
 
 	struct dmabuf * dma = (struct dmabuf *)file->private_data; 
 	rme96xx_info *s = dma->s;
@@ -918,14 +1177,23 @@ static int rme96xx_ioctl(struct inode *in, struct file *file,
 			case 96000: 
 				rme96xx_set_ctrl(s,RME96xx_freq);
 				break;
+			/* just report current rate as default
+			   e.g. use 0 to "select" current digital input rate
 			default:
 				rme96xx_unset_ctrl(s,RME96xx_freq);
 				val = 44100;
+			*/
 			}
 			if (val > 50000)
 				rme96xx_set_ctrl(s,RME96xx_DS);
 			else
 				rme96xx_unset_ctrl(s,RME96xx_DS);
+			/* set val to actual value  HP 20020201 */
+			/* NOTE: if not "Sync Master", reported rate might be not yet "updated" ... but I don't want to insert a long udelay() here */
+			if ((s->control_register & RME96xx_Master) && !(s->control_register & RME96xx_wsel))
+				val = rme96xx_get_sample_rate_ctrl(s);
+			else
+				val = rme96xx_get_sample_rate_status(s);
 			s->rate = val;
 			spin_unlock_irqrestore(&s->lock, flags);
 		}
@@ -1146,6 +1414,8 @@ static int rme96xx_ioctl(struct inode *in, struct file *file,
 		return 0;
 
         case SOUND_PCM_READ_RATE:
+		/* HP20020201 */
+		s->rate = rme96xx_get_sample_rate_status(s);
 		return put_user(s->rate, (int *)arg);
 
         case SOUND_PCM_READ_CHANNELS:
@@ -1179,28 +1449,29 @@ static int rme96xx_open(struct inode *in, struct file *f)
 {
 	int minor = minor(in->i_rdev);
 	struct list_head *list;
-	int devnum = ((minor-3)/16) % devices; /* default = 0 */
+	int devnum;
 	rme96xx_info *s;
 	struct dmabuf* dma;
 	DECLARE_WAITQUEUE(wait, current); 
 
 	DBG(printk("device num %d open\n",devnum));
 
-/* ??? */
 	for (list = devs.next; ; list = list->next) {
 		if (list == &devs)
 			return -ENODEV;
 		s = list_entry(list, rme96xx_info, devs);
-		if (!((s->dspnum[devnum] ^ minor) & ~0xf)) 
+		for (devnum=0; devnum<devices; devnum++)
+			if (!((s->dspnum[devnum] ^ minor) & ~0xf)) 
+				break;
+		if (devnum<devices)
 			break;
 	}
        	VALIDATE_STATE(s);
-/* ??? */
 
 	dma = &s->dma[devnum];
 	f->private_data = dma;
 	/* wait for device to become free */
-	down(&s->dma[devnum].open_sem);
+	down(&dma->open_sem);
 	while (dma->open_mode & f->f_mode) {
 		if (f->f_flags & O_NONBLOCK) {
 			up(&dma->open_sem);
@@ -1219,11 +1490,11 @@ static int rme96xx_open(struct inode *in, struct file *f)
 
 	COMM                ("hardware open")
 
-	if (!s->dma[devnum].opened) rme96xx_dmabuf_init(dma->s,dma,dma->inoffset,dma->outoffset);
+	if (!dma->opened) rme96xx_dmabuf_init(dma->s,dma,dma->inoffset,dma->outoffset);
 
-	s->dma[devnum].open_mode |= (f->f_mode & (FMODE_READ | FMODE_WRITE));
-	s->dma[devnum].opened = 1;
-	up(&s->dma[devnum].open_sem);
+	dma->open_mode |= (f->f_mode & (FMODE_READ | FMODE_WRITE));
+	dma->opened = 1;
+	up(&dma->open_sem);
 
 	DBG(printk("device num %d open finished\n",devnum));
 	return 0;
@@ -1232,7 +1503,7 @@ static int rme96xx_open(struct inode *in, struct file *f)
 static int rme96xx_release(struct inode *in, struct file *file)
 {
 	struct dmabuf * dma = (struct dmabuf*) file->private_data;
-	/* int hwp; */
+	/* int hwp;  ... was unused   HP20020201 */
 	DBG(printk(__FUNCTION__"\n"));
 
 	COMM          ("draining")
@@ -1261,8 +1532,7 @@ static int rme96xx_release(struct inode *in, struct file *file)
 }
 
 
-static ssize_t rme96xx_write(struct file *file, const char *buffer, 
-									  size_t count, loff_t *ppos)
+static ssize_t rme96xx_write(struct file *file, const char *buffer, size_t count, loff_t *ppos)
 {
 	struct dmabuf *dma = (struct dmabuf *)file->private_data;
 	ssize_t ret = 0;
@@ -1296,7 +1566,6 @@ static ssize_t rme96xx_write(struct file *file, const char *buffer,
 		dma->readptr = hwp;
 		dma->writeptr = hwp;
 		dma->started = 1;
-		COMM          ("first write done")
 	}
 
   	while (count > 0) {
@@ -1331,11 +1600,11 @@ static ssize_t rme96xx_write(struct file *file, const char *buffer,
 	return ret;
 }
 
-static ssize_t rme96xx_read(struct file *file, char *buffer,size_t count, loff_t *ppos)
+static ssize_t rme96xx_read(struct file *file, char *buffer, size_t count, loff_t *ppos)
 { 
 	struct dmabuf *dma = (struct dmabuf *)file->private_data;
 	ssize_t ret = 0;
-	int cnt;
+	int cnt; /* number of bytes from "buffer" that will/can be used */
 	int hop = count/dma->inchannels;
 	int hwp;
 	int exact = (file->f_flags & O_NONBLOCK); 
@@ -1355,9 +1624,6 @@ static ssize_t rme96xx_read(struct file *file, char *buffer,size_t count, loff_t
 
 	if (! (dma->open_mode  & FMODE_READ))
                 return -ENXIO;
-
-	if (count > ((dma->s->fragsize*dma->inchannels)>>dma->formatshift))
-	    return -EFAULT;
 
 	if (!dma->s->started) rme96xx_startcard(dma->s,exact);
 	hwp = rme96xx_gethwptr(dma->s,0);
@@ -1444,7 +1710,7 @@ static int rm96xx_mmap(struct file *file, struct vm_area_struct *vma) {
 
 
 /* this is the mapping */
-
+	vma->vm_flags &= ~VM_IO;
 	dma->mmapped = 1;
 	unlock_kernel();
 	return 0;
@@ -1529,8 +1795,12 @@ static int rme96xx_mixer_ioctl(struct inode *inode, struct file *file, unsigned 
 {
 	rme96xx_info *s = (rme96xx_info *)file->private_data;
 	u32 status;
+	int spdifrate;
 
 	status = readl(s->iobase + RME96xx_status_register);
+	/* hack to convert rev 1.5 SPDIF rate to "crystalrate" format   HP 20020201 */
+	rme96xx_spdif_sample_rate(s,&spdifrate);
+	status = (status & ~RME96xx_F) | ((spdifrate<<22) & RME96xx_F);
 
 	VALIDATE_STATE(s);
 	if (cmd == SOUND_MIXER_PRIVATE1) {
@@ -1538,9 +1808,21 @@ static int rme96xx_mixer_ioctl(struct inode *inode, struct file *file, unsigned 
 		if (copy_from_user(&mixer,(void*)arg,sizeof(mixer)))
 			return -EFAULT;
 		
-		if (file->f_mode & FMODE_WRITE) {
-		     s->dma[mixer.devnr].outoffset = mixer.o_offset;
-		     s->dma[mixer.devnr].inoffset = mixer.i_offset;
+		mixer.devnr &= RME96xx_MASK_DEVS;
+		if (mixer.devnr >= devices)
+			mixer.devnr = devices-1;
+		if (file->f_mode & FMODE_WRITE && !s->dma[mixer.devnr].opened) {
+			/* modify only if device not open */
+			if (mixer.o_offset < 0)
+				mixer.o_offset = 0;
+			if (mixer.o_offset >= RME96xx_CHANNELS_PER_CARD)
+				mixer.o_offset = RME96xx_CHANNELS_PER_CARD-1;
+			if (mixer.i_offset < 0)
+				mixer.i_offset = 0;
+			if (mixer.i_offset >= RME96xx_CHANNELS_PER_CARD)
+				mixer.i_offset = RME96xx_CHANNELS_PER_CARD-1;
+			s->dma[mixer.devnr].outoffset = mixer.o_offset;
+			s->dma[mixer.devnr].inoffset = mixer.i_offset;
 		}
 
 		mixer.o_offset = s->dma[mixer.devnr].outoffset;
@@ -1552,13 +1834,14 @@ static int rme96xx_mixer_ioctl(struct inode *inode, struct file *file, unsigned 
 		return put_user(status, (int *)arg);
 	}
 	if (cmd == SOUND_MIXER_PRIVATE3) {
-	     u32 control;
-	     if (copy_from_user(&control,(void*)arg,sizeof(control)))
-		     return -EFAULT;
-	     if (file->f_mode & FMODE_WRITE) {
-		  s->control_register = control;
-		  writel(control,s->iobase + RME96xx_control_register);
-	     }
+		u32 control;
+		if (copy_from_user(&control,(void*)arg,sizeof(control)))
+			return -EFAULT;
+		if (file->f_mode & FMODE_WRITE) {
+			s->control_register &= ~RME96xx_mixer_allowed;
+			s->control_register |= control & RME96xx_mixer_allowed;
+			writel(control,s->iobase + RME96xx_control_register);
+		}
 
 	     return put_user(s->control_register, (int *)arg);
 	}

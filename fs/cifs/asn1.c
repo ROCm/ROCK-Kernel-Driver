@@ -458,16 +458,18 @@ decode_negTokenInit(unsigned char *security_blob, int length,
 	unsigned int cls, con, tag, oidlen, rc;
 	int use_ntlmssp = FALSE;
 
+    *secType = NTLM; /* BB eventually make Kerberos or NLTMSSP the default */
+
 	/* cifs_dump_mem(" Received SecBlob ", security_blob, length); */
 
 	asn1_open(&ctx, security_blob, length);
 
 	if (asn1_header_decode(&ctx, &end, &cls, &con, &tag) == 0) {
-		cFYI(1, ("\nError decoding negTokenInit header "));
+		cFYI(1, ("Error decoding negTokenInit header "));
 		return 0;
 	} else if ((cls != ASN1_APL) || (con != ASN1_CON)
 		   || (tag != ASN1_EOC)) {
-		cFYI(1, ("\ncls = %d con = %d tag = %d", cls, con, tag));
+		cFYI(1, ("cls = %d con = %d tag = %d", cls, con, tag));
 		return 0;
 	} else {
 		/*      remember to free obj->oid */
@@ -486,51 +488,49 @@ decode_negTokenInit(unsigned char *security_blob, int length,
 		}
 
 		if (!rc) {
-			cFYI(1, ("\nError decoding negTokenInit header"));
+			cFYI(1, ("Error decoding negTokenInit header"));
 			return 0;
 		}
 
 		if (asn1_header_decode(&ctx, &end, &cls, &con, &tag) == 0) {
-			cFYI(1, ("\nError decoding negTokenInit "));
+			cFYI(1, ("Error decoding negTokenInit "));
 			return 0;
 		} else if ((cls != ASN1_CTX) || (con != ASN1_CON)
 			   || (tag != ASN1_EOC)) {
-			cFYI(1,
-			     ("\ncls = %d con = %d tag = %d end = %p (%d) exit 0",
+			cFYI(1,("cls = %d con = %d tag = %d end = %p (%d) exit 0",
 			      cls, con, tag, end, *end));
 			return 0;
 		}
 
 		if (asn1_header_decode(&ctx, &end, &cls, &con, &tag) == 0) {
-			cFYI(1, ("\nError decoding negTokenInit "));
+			cFYI(1, ("Error decoding negTokenInit "));
 			return 0;
 		} else if ((cls != ASN1_UNI) || (con != ASN1_CON)
 			   || (tag != ASN1_SEQ)) {
-			cFYI(1,
-			     ("\ncls = %d con = %d tag = %d end = %p (%d) exit 1",
+			cFYI(1,("cls = %d con = %d tag = %d end = %p (%d) exit 1",
 			      cls, con, tag, end, *end));
 			return 0;
 		}
 
 		if (asn1_header_decode(&ctx, &end, &cls, &con, &tag) == 0) {
-			cFYI(1, ("\nError decoding 2nd part of negTokenInit "));
+			cFYI(1, ("Error decoding 2nd part of negTokenInit "));
 			return 0;
 		} else if ((cls != ASN1_CTX) || (con != ASN1_CON)
 			   || (tag != ASN1_EOC)) {
 			cFYI(1,
-			     ("\ncls = %d con = %d tag = %d end = %p (%d) exit 0",
+			     ("cls = %d con = %d tag = %d end = %p (%d) exit 0",
 			      cls, con, tag, end, *end));
 			return 0;
 		}
 
 		if (asn1_header_decode
 		    (&ctx, &sequence_end, &cls, &con, &tag) == 0) {
-			cFYI(1, ("\nError decoding 2nd part of negTokenInit "));
+			cFYI(1, ("Error decoding 2nd part of negTokenInit "));
 			return 0;
 		} else if ((cls != ASN1_UNI) || (con != ASN1_CON)
 			   || (tag != ASN1_SEQ)) {
 			cFYI(1,
-			     ("\ncls = %d con = %d tag = %d end = %p (%d) exit 1",
+			     ("cls = %d con = %d tag = %d end = %p (%d) exit 1",
 			      cls, con, tag, end, *end));
 			return 0;
 		}
@@ -539,13 +539,13 @@ decode_negTokenInit(unsigned char *security_blob, int length,
 			rc = asn1_header_decode(&ctx, &end, &cls, &con, &tag);
 			if (!rc) {
 				cFYI(1,
-				     ("\nError 1 decoding negTokenInit header exit 2"));
+				     ("Error 1 decoding negTokenInit header exit 2"));
 				return 0;
 			}
 			if ((tag == ASN1_OJI) && (con == ASN1_PRI)) {
 				asn1_oid_decode(&ctx, end, &oid, &oidlen);
 				cFYI(1,
-				     ("\nOID len = %d oid = 0x%lx 0x%lx 0x%lx 0x%lx",
+				     ("OID len = %d oid = 0x%lx 0x%lx 0x%lx 0x%lx",
 				      oidlen, *oid, *(oid + 1), *(oid + 2),
 				      *(oid + 3)));
 				rc = compare_oid(oid, oidlen, NTLMSSP_OID,
@@ -554,54 +554,53 @@ decode_negTokenInit(unsigned char *security_blob, int length,
 				if (rc)
 					use_ntlmssp = TRUE;
 			} else {
-				cFYI(1,
-				     ("\nThis should be an oid what is going on? "));
+				cFYI(1,("This should be an oid what is going on? "));
 			}
 		}
 
 		if (asn1_header_decode(&ctx, &end, &cls, &con, &tag) == 0) {
 			cFYI(1,
-			     ("\nError decoding last part of negTokenInit exit 3"));
+			     ("Error decoding last part of negTokenInit exit 3"));
 			return 0;
 		} else if ((cls != ASN1_CTX) || (con != ASN1_CON)) {	/* tag = 3 indicating mechListMIC */
 			cFYI(1,
-			     ("\nExit 4 cls = %d con = %d tag = %d end = %p (%d)",
+			     ("Exit 4 cls = %d con = %d tag = %d end = %p (%d)",
 			      cls, con, tag, end, *end));
 			return 0;
 		}
 		if (asn1_header_decode(&ctx, &end, &cls, &con, &tag) == 0) {
 			cFYI(1,
-			     ("\nError decoding last part of negTokenInit exit 5"));
+			     ("Error decoding last part of negTokenInit exit 5"));
 			return 0;
 		} else if ((cls != ASN1_UNI) || (con != ASN1_CON)
 			   || (tag != ASN1_SEQ)) {
 			cFYI(1,
-			     ("\nExit 6 cls = %d con = %d tag = %d end = %p (%d)",
+			     ("Exit 6 cls = %d con = %d tag = %d end = %p (%d)",
 			      cls, con, tag, end, *end));
 		}
 
 		if (asn1_header_decode(&ctx, &end, &cls, &con, &tag) == 0) {
 			cFYI(1,
-			     ("\nError decoding last part of negTokenInit exit 7"));
+			     ("Error decoding last part of negTokenInit exit 7"));
 			return 0;
 		} else if ((cls != ASN1_CTX) || (con != ASN1_CON)) {
 			cFYI(1,
-			     ("\nExit 8 cls = %d con = %d tag = %d end = %p (%d)",
+			     ("Exit 8 cls = %d con = %d tag = %d end = %p (%d)",
 			      cls, con, tag, end, *end));
 			return 0;
 		}
 		if (asn1_header_decode(&ctx, &end, &cls, &con, &tag) == 0) {
 			cFYI(1,
-			     ("\nError decoding last part of negTokenInit exit 9"));
+			     ("Error decoding last part of negTokenInit exit 9"));
 			return 0;
 		} else if ((cls != ASN1_UNI) || (con != ASN1_PRI)
 			   || (tag != ASN1_GENSTR)) {
 			cFYI(1,
-			     ("\nExit 10 cls = %d con = %d tag = %d end = %p (%d)",
+			     ("Exit 10 cls = %d con = %d tag = %d end = %p (%d)",
 			      cls, con, tag, end, *end));
 			return 0;
 		}
-		cFYI(1, ("\nNeed to call asn1_octets_decode() function for this %s", ctx.pointer));	/* is this UTF-8 or ASCII? */
+		cFYI(1, ("Need to call asn1_octets_decode() function for this %s", ctx.pointer));	/* is this UTF-8 or ASCII? */
 	}
 
 	/* if (use_kerberos) 

@@ -71,12 +71,13 @@ cifs_read_super(struct super_block *sb, void *data, char *devname, int silent)
 	if(cifs_sb == NULL)
 		return -ENOMEM;
 	cifs_sb->local_nls = load_nls_default();	/* needed for ASCII cp to Unicode converts */
+
 	rc = cifs_mount(sb, cifs_sb, data, devname);
 
 	if (rc) {
 		if (!silent)
 			cERROR(1,
-			       ("cifs_mount failed w/return code = %d\n", rc));
+			       ("cifs_mount failed w/return code = %d", rc));
 		goto out_mount_failed;
 	}
 
@@ -97,13 +98,10 @@ cifs_read_super(struct super_block *sb, void *data, char *devname, int silent)
 	return 0;
 
 out_no_root:
-	cEVENT(1, ("cifs_read_super: get root inode failed\n"));
+	cERROR(1, ("cifs_read_super: get root inode failed"));
 	if (inode)
 		iput(inode);
 
-	if (rc) {
-		cERROR(1, ("cifs_mount failed with no root inode"));
-	}
 out_mount_failed:
 	if(cifs_sb)
 		kfree(cifs_sb);
@@ -116,15 +114,15 @@ cifs_put_super(struct super_block *sb)
 	int rc = 0;
 	struct cifs_sb_info *cifs_sb;
 
-	cFYI(1, ("In cifs_put_super\n"));
+	cFYI(1, ("In cifs_put_super"));
 	cifs_sb = CIFS_SB(sb);
 	if(cifs_sb == NULL) {
-		cFYI(1,("\nEmpty cifs superblock info passed to unmount"));
+		cFYI(1,("Empty cifs superblock info passed to unmount"));
 		return;
 	}
 	rc = cifs_umount(sb, cifs_sb); 
 	if (rc) {
-		cERROR(1, ("cifs_umount failed with return code %d\n", rc));
+		cERROR(1, ("cifs_umount failed with return code %d", rc));
 	}
 	unload_nls(cifs_sb->local_nls);
 	kfree(cifs_sb);
@@ -180,7 +178,8 @@ cifs_alloc_inode(struct super_block *sb)
 	cifs_inode->cifsAttrs = 0x20;	/* default */
 	atomic_set(&cifs_inode->inUse, 0);
 	cifs_inode->time = 0;
-	cifs_inode->clientCanCache = 0;
+    if(oplockEnabled)
+	    cifs_inode->clientCanCacheAll = 1;
 	INIT_LIST_HEAD(&cifs_inode->openFileList);
 	return &cifs_inode->vfs_inode;
 }
@@ -236,7 +235,7 @@ cifs_get_sb(struct file_system_type *fs_type,
 	int rc;
 	struct super_block *sb = sget(fs_type, NULL, set_anon_super, NULL);
 
-	cFYI(1, ("\nDevname: %s flags: %d ", dev_name, flags));
+	cFYI(1, ("Devname: %s flags: %d ", dev_name, flags));
 
 	if (IS_ERR(sb))
 		return sb;
@@ -277,8 +276,15 @@ struct inode_operations cifs_dir_inode_ops = {
 struct inode_operations cifs_file_inode_ops = {
 /*	revalidate:cifs_revalidate, */
 	.setattr = cifs_setattr,
-	.getattr = cifs_getattr,
+	.getattr = cifs_getattr, /* do we need this anymore? */
 	.rename = cifs_rename,
+#ifdef CIFS_XATTR
+	.setxattr = cifs_setxattr,
+	.getxattr = cifs_getxattr,
+	.listxattr = cifs_listxattr,
+	.removexattr = cifs_removexattr,
+	.permission = cifs_permission,
+#endif 
 };
 
 struct inode_operations cifs_symlink_inode_ops = {
@@ -287,16 +293,24 @@ struct inode_operations cifs_symlink_inode_ops = {
 	/* BB add the following two eventually */
 	/* revalidate: cifs_revalidate,
 	   setattr:    cifs_notify_change, *//* BB do we need notify change */
+#ifdef CIFS_XATTR
+	.setxattr = cifs_setxattr,
+	.getxattr = cifs_getxattr,
+	.listxattr = cifs_listxattr,
+	.removexattr = cifs_removexattr,
+#endif 
 };
 
 struct file_operations cifs_file_ops = {
 	.read = generic_file_read,
-	.write = generic_file_write,
+	.write = generic_file_write, 
 	.open = cifs_open,
 	.release = cifs_close,
 	.lock = cifs_lock,
 	.fsync = cifs_fsync,
+    .flush = cifs_flush,
 	.mmap  = cifs_file_mmap,
+	.sendfile = generic_file_sendfile,
 };
 
 struct file_operations cifs_dir_ops = {
@@ -333,7 +347,7 @@ void
 cifs_destroy_inodecache(void)
 {
 	if (kmem_cache_destroy(cifs_inode_cachep))
-		printk(KERN_INFO "cifs_inode_cache: error freeing\n");
+		printk(KERN_WARNING "cifs_inode_cache: error freeing\n");
 }
 
 int
@@ -353,7 +367,7 @@ void
 cifs_destroy_request_bufs(void)
 {
 	if (kmem_cache_destroy(cifs_req_cachep))
-		printk(KERN_INFO
+		printk(KERN_WARNING
 		       "cifs_destroy_request_cache: error not all structures were freed\n");
 }
 
@@ -373,7 +387,7 @@ void
 cifs_destroy_mids(void)
 {
 	if (kmem_cache_destroy(cifs_mid_cachep))
-		printk(KERN_INFO
+		printk(KERN_WARNING
 		       "cifs_destroy_mids: error not all structures were freed\n");
 }
 
@@ -426,7 +440,7 @@ init_cifs(void)
 static void __exit
 exit_cifs(void)
 {
-	cFYI(0, ("\nIn unregister ie exit_cifs"));
+	cFYI(0, ("In unregister ie exit_cifs"));
 #if CONFIG_PROC_FS
 	cifs_proc_clean();
 #endif

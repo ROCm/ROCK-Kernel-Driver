@@ -23,9 +23,9 @@
  */
 
 
-#include "acpi.h"
-#include "acnamesp.h"
-#include "acresrc.h"
+#include <acpi/acpi.h>
+#include <acpi/acnamesp.h>
+#include <acpi/acresrc.h>
 
 
 #define _COMPONENT          ACPI_RESOURCES

@@ -678,50 +678,6 @@ no_cached_page:
 	UPDATE_ATIME(inode);
 }
 
-/*
- * Fault a userspace page into pagetables.  Return non-zero on a fault.
- *
- * FIXME: this assumes that two userspace pages are always sufficient.  That's
- * not true if PAGE_CACHE_SIZE > PAGE_SIZE.
- */
-static inline int fault_in_pages_writeable(char *uaddr, int size)
-{
-	int ret;
-
-	/*
-	 * Writing zeroes into userspace here is OK, because we know that if
-	 * the zero gets there, we'll be overwriting it.
-	 */
-	ret = __put_user(0, uaddr);
-	if (ret == 0) {
-		char *end = uaddr + size - 1;
-
-		/*
-		 * If the page was already mapped, this will get a cache miss
-		 * for sure, so try to avoid doing it.
-		 */
-		if (((unsigned long)uaddr & PAGE_MASK) !=
-				((unsigned long)end & PAGE_MASK))
-		 	ret = __put_user(0, end);
-	}
-	return ret;
-}
-
-static void fault_in_pages_readable(const char *uaddr, int size)
-{
-	volatile char c;
-	int ret;
-
-	ret = __get_user(c, (char *)uaddr);
-	if (ret == 0) {
-		const char *end = uaddr + size - 1;
-
-		if (((unsigned long)uaddr & PAGE_MASK) !=
-				((unsigned long)end & PAGE_MASK))
-		 	__get_user(c, (char *)end);
-	}
-}
-
 int file_read_actor(read_descriptor_t *desc, struct page *page,
 			unsigned long offset, unsigned long size)
 {
@@ -805,13 +761,8 @@ __generic_file_aio_read(struct kiocb *iocb, const struct iovec *iov,
 			goto out; /* skip atime */
 		size = inode->i_size;
 		if (pos < size) {
-			if (pos + count > size) {
-				count = size - pos;
-				nr_segs = iov_shorten((struct iovec *)iov,
-							nr_segs, count);
-			}
 			retval = generic_file_direct_IO(READ, iocb,
-					iov, pos, nr_segs);
+						iov, pos, nr_segs);
 			if (retval >= 0 && !is_sync_kiocb(iocb))
 				retval = -EIOCBQUEUED;
 			if (retval > 0)
@@ -1530,6 +1481,91 @@ filemap_set_next_iovec(const struct iovec **iovp, size_t *basep, size_t bytes)
 	*basep = base;
 }
 
+/*
+ * Performs necessary checks before doing a write
+ *
+ * Can adjust writing position aor amount of bytes to write.
+ * Returns appropriate error code that caller should return or
+ * zero in case that write should be allowed.
+ */
+inline int generic_write_checks(struct inode *inode,
+		struct file *file, loff_t *pos, size_t *count, int isblk)
+{
+	unsigned long limit = current->rlim[RLIMIT_FSIZE].rlim_cur;
+
+        if (unlikely(*pos < 0))
+                return -EINVAL;
+
+        if (unlikely(file->f_error)) {
+                int err = file->f_error;
+                file->f_error = 0;
+                return err;
+        }
+
+	if (!isblk) {
+		/* FIXME: this is for backwards compatibility with 2.4 */
+		if (file->f_flags & O_APPEND)
+                        *pos = inode->i_size;
+
+		if (limit != RLIM_INFINITY) {
+			if (*pos >= limit) {
+				send_sig(SIGXFSZ, current, 0);
+				return -EFBIG;
+			}
+			if (*pos > 0xFFFFFFFFULL || *count > limit-(u32)*pos) {
+				/* send_sig(SIGXFSZ, current, 0); */
+				*count = limit - (u32)*pos;
+			}
+		}
+	}
+
+	/*
+	 * LFS rule
+	 */
+	if (unlikely(*pos + *count > MAX_NON_LFS &&
+				!(file->f_flags & O_LARGEFILE))) {
+		if (*pos >= MAX_NON_LFS) {
+			send_sig(SIGXFSZ, current, 0);
+			return -EFBIG;
+		}
+		if (*count > MAX_NON_LFS - (u32)*pos) {
+			/* send_sig(SIGXFSZ, current, 0); */
+			*count = MAX_NON_LFS - (u32)*pos;
+		}
+	}
+
+	/*
+	 * Are we about to exceed the fs block limit ?
+	 *
+	 * If we have written data it becomes a short write.  If we have
+	 * exceeded without writing data we send a signal and return EFBIG.
+	 * Linus frestrict idea will clean these up nicely..
+	 */
+	if (likely(!isblk)) {
+		if (unlikely(*pos >= inode->i_sb->s_maxbytes)) {
+			if (*count || *pos > inode->i_sb->s_maxbytes) {
+				send_sig(SIGXFSZ, current, 0);
+				return -EFBIG;
+			}
+			/* zero-length writes at ->s_maxbytes are OK */
+		}
+
+		if (unlikely(*pos + *count > inode->i_sb->s_maxbytes))
+			*count = inode->i_sb->s_maxbytes - *pos;
+	} else {
+		if (bdev_read_only(inode->i_bdev))
+			return -EPERM;
+		if (*pos >= inode->i_size) {
+			if (*count || *pos > inode->i_size)
+				return -ENOSPC;
+		}
+
+		if (*pos + *count > inode->i_size)
+			*count = inode->i_size - *pos;
+	}
+	return 0;
+}
+EXPORT_SYMBOL(generic_write_checks);
 
 /*
  * Write to a file through the page cache. 
@@ -1550,12 +1586,11 @@ generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 	size_t ocount;		/* original count */
 	size_t count;		/* after file limit checks */
 	struct inode 	*inode = mapping->host;
-	unsigned long	limit = current->rlim[RLIMIT_FSIZE].rlim_cur;
-	const int	isblk = S_ISBLK(inode->i_mode);
 	long		status = 0;
 	loff_t		pos;
 	struct page	*page;
 	struct page	*cached_page = NULL;
+	const int	isblk = S_ISBLK(inode->i_mode);
 	ssize_t		written;
 	ssize_t		err;
 	size_t		bytes;
@@ -1584,95 +1619,20 @@ generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 		ocount -= iv->iov_len;	/* This segment is no good */
 		break;
 	}
-	count = ocount;
 
+	count = ocount;
 	pos = *ppos;
-	if (unlikely(pos < 0))
-		return -EINVAL;
+	pagevec_init(&lru_pvec, 0);
 
 	/* We can write back this queue in page reclaim */
 	current->backing_dev_info = mapping->backing_dev_info;
-
-	pagevec_init(&lru_pvec, 0);
-
-	if (unlikely(file->f_error)) {
-		err = file->f_error;
-		file->f_error = 0;
-		goto out;
-	}
-
 	written = 0;
 
-	if (!isblk) {
-		/* FIXME: this is for backwards compatibility with 2.4 */
-		if (file->f_flags & O_APPEND)
-			pos = inode->i_size;
+	err = generic_write_checks(inode, file, &pos, &count, isblk);
+	if (err)
+		goto out;
 
-		if (limit != RLIM_INFINITY) {
-			if (pos >= limit) {
-				send_sig(SIGXFSZ, current, 0);
-				err = -EFBIG;
-				goto out;
-			}
-			if (pos > 0xFFFFFFFFULL || count > limit - (u32)pos) {
-				/* send_sig(SIGXFSZ, current, 0); */
-				count = limit - (u32)pos;
-			}
-		}
-	}
 
-	/*
-	 * LFS rule
-	 */
-	if (unlikely(pos + count > MAX_NON_LFS &&
-				!(file->f_flags & O_LARGEFILE))) {
-		if (pos >= MAX_NON_LFS) {
-			send_sig(SIGXFSZ, current, 0);
-			err = -EFBIG;
-			goto out;
-		}
-		if (count > MAX_NON_LFS - (u32)pos) {
-			/* send_sig(SIGXFSZ, current, 0); */
-			count = MAX_NON_LFS - (u32)pos;
-		}
-	}
-
-	/*
-	 * Are we about to exceed the fs block limit ?
-	 *
-	 * If we have written data it becomes a short write.  If we have
-	 * exceeded without writing data we send a signal and return EFBIG.
-	 * Linus frestrict idea will clean these up nicely..
-	 */
-	if (likely(!isblk)) {
-		if (unlikely(pos >= inode->i_sb->s_maxbytes)) {
-			if (count || pos > inode->i_sb->s_maxbytes) {
-				send_sig(SIGXFSZ, current, 0);
-				err = -EFBIG;
-				goto out;
-			}
-			/* zero-length writes at ->s_maxbytes are OK */
-		}
-
-		if (unlikely(pos + count > inode->i_sb->s_maxbytes))
-			count = inode->i_sb->s_maxbytes - pos;
-	} else {
-		if (bdev_read_only(inode->i_bdev)) {
-			err = -EPERM;
-			goto out;
-		}
-		if (pos >= inode->i_size) {
-			if (count || pos > inode->i_size) {
-				err = -ENOSPC;
-				goto out;
-			}
-		}
-
-		if (pos + count > inode->i_size)
-			count = inode->i_size - pos;
-	}
-
-	err = 0;
 	if (count == 0)
 		goto out;
 

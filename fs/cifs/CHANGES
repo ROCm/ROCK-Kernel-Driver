@@ -1,3 +1,42 @@
+Version 0.65
+------------
+Finish fixes to commit write for caching/readahead consistency.  fsx 
+now works to Samba servers.  Fix oops caused when readahead
+was interrupted by a signal.
+
+Version 0.64
+------------
+Fix data corruption (in partial page after truncate) that caused fsx to
+fail to Windows servers.  Cleaned up some extraneous error logging in
+common error paths.  Add generic sendfile support.
+
+Version 0.63
+------------
+Fix memory leak in AllocMidQEntry.
+Finish reconnection logic, so connection with server can be dropped
+(or server rebooted) and the cifs client will reconnect.  
+
+Version 0.62
+------------
+Fix temporary socket leak when bad userid or password specified 
+(or other SMBSessSetup failure).  Increase maximum buffer size to slightly
+over 16K to allow negotiation of up to Samba and Windows server default read 
+sizes.  Add support for readpages
+
+Version 0.61
+------------
+Fix oops when username not passed in on mount.  Extensive fixes and improvements
+to error logging (strip redundant newlines, change debug macros to ensure newline
+passed in and to be more consistent).  Fix writepage wrong file handle problem,
+a readonly file handle could be incorrectly used to attempt to write out
+file updates through the page cache to multiply open files.  This could cause
+the iozone benchmark to fail on the fwrite test. Fix bug mounting two different
+shares to the same Windows server when using different usernames
+(doing this to Samba servers worked but Windows was rejecting it) - now it is
+possible to use different userids when connecting to the same server from a
+Linux client. Fix oops when treeDisconnect called during unmount on
+previously freed socket.
+
 Version 0.60
 ------------
 Fix oops in readpages caused by not setting address space operations in inode in 

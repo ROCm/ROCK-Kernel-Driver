@@ -63,6 +63,31 @@ static u32 *	call_header(struct rpc_task *task);
 static u32 *	call_verify(struct rpc_task *task);
 
 
+static int
+rpc_setup_pipedir(struct rpc_clnt *clnt, char *dir_name)
+{
+	static uint32_t clntid;
+	int error;
+
+	if (dir_name == NULL)
+		return 0;
+	for (;;) {
+		snprintf(clnt->cl_pathname, sizeof(clnt->cl_pathname),
+				"%s/clnt%x", dir_name,
+				(unsigned int)clntid++);
+		clnt->cl_pathname[sizeof(clnt->cl_pathname) - 1] = '\0';
+		clnt->cl_dentry = rpc_mkdir(clnt->cl_pathname, clnt);
+		if (!IS_ERR(clnt->cl_dentry))
+			return 0;
+		error = PTR_ERR(clnt->cl_dentry);
+		if (error != -EEXIST) {
+			printk(KERN_INFO "RPC: Couldn't create pipefs entry %s, error %d\n",
+					clnt->cl_pathname, error);
+			return error;
+		}
+	}
+}
+
 /*
  * Create an RPC client
  * FIXME: This should also take a flags argument (as in task->tk_flags).
@@ -109,14 +134,9 @@ rpc_create_client(struct rpc_xprt *xprt, char *servname,
 
 	rpc_init_rtt(&clnt->cl_rtt, xprt->timeout.to_initval);
 
-	snprintf(clnt->cl_pathname, sizeof(clnt->cl_pathname),
-			"/%s/clnt%p", clnt->cl_protname, clnt);
-	clnt->cl_dentry = rpc_mkdir(clnt->cl_pathname, clnt);
-	if (IS_ERR(clnt->cl_dentry)) {
-		printk(KERN_INFO "RPC: Couldn't create pipefs entry %s\n",
-				clnt->cl_pathname);
+	if (rpc_setup_pipedir(clnt, program->pipe_dir_name) < 0)
 		goto out_no_path;
-	}
+
 	if (!rpcauth_create(flavor, clnt)) {
 		printk(KERN_INFO "RPC: Couldn't create auth handle (flavor %u)\n",
 				flavor);

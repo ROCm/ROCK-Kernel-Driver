@@ -1,8 +1,7 @@
 #ifndef IEEE1394_RAW1394_H
 #define IEEE1394_RAW1394_H
 
-#define RAW1394_DEVICE_MAJOR      171
-#define RAW1394_DEVICE_NAME       "raw1394"
+/* header for the raw1394 API that is exported to user-space */
 
 #define RAW1394_KERNELAPI_VERSION 4
 
@@ -94,21 +93,21 @@ struct raw1394_khost_list {
 };
 
 typedef struct arm_request {
-        nodeid_t        destination_nodeid;
-        nodeid_t        source_nodeid;
-        nodeaddr_t      destination_offset;
-        u8              tlabel;
-        u8              tcode;
-        u_int8_t        extended_transaction_code;
-        u_int32_t       generation;
-        arm_length_t    buffer_length;
-        byte_t          *buffer;
+        __u16           destination_nodeid;
+        __u16           source_nodeid;
+        __u64           destination_offset;
+        __u8            tlabel;
+        __u8            tcode;
+        __u8            extended_transaction_code;
+        __u32           generation;
+        __u16           buffer_length;
+        __u8            *buffer;
 } *arm_request_t;
 
 typedef struct arm_response {
-        int             response_code;
-        arm_length_t    buffer_length;
-        byte_t          *buffer;
+        __s32           response_code;
+        __u16           buffer_length;
+        __u8            *buffer;
 } *arm_response_t;
 
 typedef struct arm_request_response {
@@ -117,133 +116,59 @@ typedef struct arm_request_response {
 } *arm_request_response_t;
 
 /* rawiso API */
-
-/* ioctls */
-#define RAW1394_ISO_XMIT_INIT        1  /* arg: raw1394_iso_status* */
-#define RAW1394_ISO_RECV_INIT        2  /* arg: raw1394_iso_status* */
-#define RAW1394_ISO_RECV_START       3  /* arg: int, starting cycle */
-#define RAW1394_ISO_XMIT_START       8  /* arg: int[2], { starting cycle, prebuffer } */
-#define RAW1394_ISO_STOP             4
-#define RAW1394_ISO_GET_STATUS       5  /* arg: raw1394_iso_status* */
-#define RAW1394_ISO_PRODUCE_CONSUME  6  /* arg: int, # of packets */
-#define RAW1394_ISO_SHUTDOWN         7
+#include "ieee1394-ioctl.h"
 
 /* per-packet metadata embedded in the ringbuffer */
 /* must be identical to hpsb_iso_packet_info in iso.h! */
 struct raw1394_iso_packet_info {
-	unsigned short len;
-	unsigned short cycle;
-	unsigned char channel; /* recv only */
-	unsigned char tag;
-	unsigned char sy;
+	__u32 offset;
+	__u16 len;
+	__u16 cycle;   /* recv only */
+	__u8  channel; /* recv only */
+	__u8  tag;
+	__u8  sy;
+};
+
+/* argument for RAW1394_ISO_RECV/XMIT_PACKETS ioctls */
+struct raw1394_iso_packets {
+	__u32 n_packets;
+	struct raw1394_iso_packet_info *infos;
 };
 
 struct raw1394_iso_config {
-	unsigned int buf_packets;
-	unsigned int max_packet_size;
-	int channel;
-	int speed; /* xmit only */
-	int irq_interval;
+	/* size of packet data buffer, in bytes (will be rounded up to PAGE_SIZE) */
+	__u32 data_buf_size;
+
+	/* # of packets to buffer */
+	__u32 buf_packets;
+
+	/* iso channel (set to -1 for multi-channel recv) */
+	__s32 channel;
+
+	/* xmit only - iso transmission speed */
+	__u8 speed;
+
+	/* max. latency of buffer, in packets (-1 if you don't care) */
+	__s32 irq_interval;
 };
 
 /* argument to RAW1394_ISO_XMIT/RECV_INIT and RAW1394_ISO_GET_STATUS */
 struct raw1394_iso_status {
 	/* current settings */
 	struct raw1394_iso_config config;
-	
-	/* byte offset between successive packets in the buffer */
-	int buf_stride;
-
-	/* byte offset of data payload within each packet */
-	int packet_data_offset;
-	
-	/* byte offset of struct iso_packet_info within each packet */
-	int packet_info_offset;
-
-	/* index of next packet to fill with data (ISO transmission)
-	   or next packet containing data recieved (ISO reception) */
-	unsigned int first_packet;
 
 	/* number of packets waiting to be filled with data (ISO transmission)
 	   or containing data received (ISO reception) */
-	unsigned int n_packets;
+	__u32 n_packets;
 
 	/* approximate number of packets dropped due to overflow or
 	   underflow of the packet buffer (a value of zero guarantees
 	   that no packets have been dropped) */
-	unsigned int overflows;
+	__u32 overflows;
+
+	/* cycle number at which next packet will be transmitted;
+	   -1 if not known */
+	__s16 xmit_cycle;
 };
-
-#ifdef __KERNEL__
-
-struct iso_block_store {
-        atomic_t refcount;
-        size_t data_size;
-        quadlet_t data[0];
-};
-
-enum raw1394_iso_state { RAW1394_ISO_INACTIVE = 0,
-			 RAW1394_ISO_RECV = 1,
-			 RAW1394_ISO_XMIT = 2 };
-
-struct file_info {
-        struct list_head list;
-
-        enum { opened, initialized, connected } state;
-        unsigned int protocol_version;
-
-        struct hpsb_host *host;
-
-        struct list_head req_pending;
-        struct list_head req_complete;
-        struct semaphore complete_sem;
-        spinlock_t reqlists_lock;
-        wait_queue_head_t poll_wait_complete;
-
-        struct list_head addr_list;           
-
-        u8 *fcp_buffer;
-
-	/* old ISO API */
-        u64 listen_channels;
-        quadlet_t *iso_buffer;
-        size_t iso_buffer_length;
-
-        u8 notification; /* (busreset-notification) RAW1394_NOTIFY_OFF/ON */
-
-	/* new rawiso API */
-	enum raw1394_iso_state iso_state;
-	struct hpsb_iso *iso_handle;
-};
-
-struct arm_addr {
-        struct list_head addr_list; /* file_info list */
-        u64    start, end;
-        u64    arm_tag;
-        u8     access_rights;
-        u8     notification_options;
-        u8     client_transactions;
-        u64    recvb;
-        u16    rec_length;
-        u8     *addr_space_buffer; /* accessed by read/write/lock */
-};
-
-struct pending_request {
-        struct list_head list;
-        struct file_info *file_info;
-        struct hpsb_packet *packet;
-        struct iso_block_store *ibs;
-        quadlet_t *data;
-        int free_data;
-        struct raw1394_request req;
-};
-
-struct host_info {
-        struct list_head list;
-        struct hpsb_host *host;
-        struct list_head file_info_list;
-};
-
-#endif /* __KERNEL__ */
 
 #endif /* IEEE1394_RAW1394_H */

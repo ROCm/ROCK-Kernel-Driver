@@ -5,6 +5,7 @@
 .PHONY: __modversions
 __modversions:
 
+include .config
 include scripts/Makefile.lib
 
 #
@@ -26,9 +27,7 @@ quiet_cmd_ld_ko_o = LD [M]  $@
       cmd_ld_ko_o = $(LD) $(LDFLAGS) $(LDFLAGS_MODULE) -o $@ 		\
 			  $(filter-out FORCE,$^)
 
-init/vermagic.o: ;
-
-$(modules): %.ko :%.o %.ver.o init/vermagic.o FORCE
+$(modules): %.ko :%.o %.mod.o FORCE
 	$(call if_changed,ld_ko_o)
 
 targets += $(modules)
@@ -36,54 +35,31 @@ targets += $(modules)
 # Compile version info for unresolved symbols
 
 quiet_cmd_cc_o_c = CC      $@
-      cmd_cc_o_c = $(CC) $(CFLAGS) -c -o $@ $<
+      cmd_cc_o_c = $(CC) $(CFLAGS) $(CFLAGS_MODULE) -c -o $@ $<
 
-$(modules:.ko=.ver.o): %.ver.o: %.ver.c FORCE
+#	We have a fake dependency on compile.h to make sure that we
+#	notice if the compiler version changes under us.
+
+$(modules:.ko=.mod.o): %.mod.o: %.mod.c include/linux/compile.h FORCE
 	$(call if_changed,cc_o_c)
 
-targets += $(modules:.ko=.ver.o)
+targets += $(modules:.ko=.mod.o)
 
-# Generate C source with version info for unresolved symbols
+# All the .mod.c files are generated using the helper "modpost"
 
-define rule_mkver_o_c
-	echo '  MKVER   $@';						\
-	( echo "#include <linux/module.h>";				\
-	  echo "";							\
-	  echo "static const struct modversion_info ____versions[]";	\
-	  echo "__attribute__((section(\"__versions\"))) = {"; 	\
-	  for sym in `nm -u $<`; do					\
-		grep "\"$$sym\"" .tmp_all-versions			\
-		|| echo "*** Warning: $(<:.o=.ko): \"$$sym\" unresolved!" >&2;\
-	  done;								\
-	  echo "};";							\
-	) > $@
-endef
+.PHONY: __modpost
 
-$(modules:.ko=.ver.c): %.ver.c: %.o .tmp_all-versions FORCE
-	$(call if_changed_rule,mkver_o_c)
-
-targets += $(modules:.ko=.ver.c))
+$(modules:.ko=.mod.c): __modpost ;
 
 # Extract all checksums for all exported symbols
 
-export-objs := $(shell for m in vmlinux $(modules:.ko=.o); do objdump -h $$m | grep -q __ksymtab && echo $$m; done)
+quiet_cmd_modpost = MODPOST
+      cmd_modpost = scripts/modpost $^
 
-cmd_gen-all-versions = mksyms $(export-objs)
-define rule_gen-all-versions
-	echo '  MKSYMS  $@';						\
-	for mod in $(export-objs); do					\
-		modname=`basename $$mod`;				\
-		nm $$mod 						\
-		| grep ' __crc_'					\
-		| sed "s/\([^ ]*\) A __crc_\(.*\)/{ 0x\1, \"\2\" }, \/* $$modname *\//g;s/.* w __crc_\(.*\)/{ 0x0       , \"\1\" }, \/* $$modname *\//g"; \
-	done > $@;							\
-	echo 'cmd_$@ := $(cmd_$(1))' > $(@D)/.$(@F).cmd
-endef
+__modpost: $(wildcard vmlinux) $(modules:.ko=.o)
+	$(call if_changed,modpost)
 
-.tmp_all-versions: $(export-objs) FORCE
-	$(call if_changed_rule,gen-all-versions)
-
-targets += .tmp_all-versions
+targets += __modpost
 
 # Add FORCE to the prequisites of a target to force it to be always rebuilt.
 # ---------------------------------------------------------------------------

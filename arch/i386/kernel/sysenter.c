@@ -35,7 +35,7 @@ struct fake_sep_struct {
 	unsigned char stack[0];
 } __attribute__((aligned(8192)));
 	
-static void __init enable_sep_cpu(void *info)
+void enable_sep_cpu(void *info)
 {
 	int cpu = get_cpu();
 	struct tss_struct *tss = init_tss + cpu;

@@ -27,6 +27,7 @@
  *            eeprom via i2c and storing it in config ROM
  *        Reworked code for initiating bus resets
  *            (long, short, with or without hold-off)
+ *        Enhancements in async and iso send code
  */
 
 #include <linux/config.h>
@@ -127,23 +128,20 @@ static int bit_unreg(struct i2c_client *client)
 }
 
 static struct i2c_algo_bit_data bit_data = {
-	NULL,
-	bit_setsda,
-	bit_setscl,
-	bit_getsda,
-	bit_getscl,
-	5, 5, 100,		/*	waits, timeout */
+	.setsda			= bit_setsda,
+	.setscl			= bit_setscl,
+	.getsda			= bit_getsda,
+	.getscl			= bit_getscl,
+	.udelay			= 5,
+	.mdelay			= 5,
+	.timeout		= 100,
 }; 
 
 static struct i2c_adapter bit_ops = {
-	"PCILynx I2C adapter",
-	0xAA, //FIXME: probably we should get an id in i2c-id.h
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	bit_reg,
-	bit_unreg,
+	.name			= "PCILynx I2C adapter",
+	.id 			= 0xAA, //FIXME: probably we should get an id in i2c-id.h
+	.client_register	= bit_reg,
+	.client_unregister	= bit_unreg,
 };
 
 
@@ -476,7 +474,14 @@ static void send_next(struct ti_lynx *lynx, int what)
         struct hpsb_packet *packet;
 
         d = (what == hpsb_iso ? &lynx->iso_send : &lynx->async);
+        if (!list_empty(&d->pcl_queue)) {
+                PRINT(KERN_ERR, lynx->id, "trying to queue a new packet in nonempty fifo");
+                BUG();
+        }
+
         packet = driver_packet(d->queue.next);
+        list_del(&packet->driver_list);
+        list_add_tail(&packet->driver_list, &d->pcl_queue);
 
         d->header_dma = pci_map_single(lynx->dev, packet->header,
                                        packet->header_size, PCI_DMA_TODEVICE);
@@ -490,6 +495,7 @@ static void send_next(struct ti_lynx *lynx, int what)
 
         pcl.next = PCL_NEXT_INVALID;
         pcl.async_error_next = PCL_NEXT_INVALID;
+        pcl.pcl_status = 0;
 #ifdef __BIG_ENDIAN
         pcl.buffer[0].control = packet->speed_code << 14 | packet->header_size;
 #else
@@ -556,7 +562,7 @@ static int lynx_transmit(struct hpsb_host *host, struct hpsb_packet *packet)
         spin_lock_irqsave(&d->queue_lock, flags);
 
 	list_add_tail(&packet->driver_list, &d->queue);
-	if (d->queue.next == &packet->driver_list)
+	if (list_empty(&d->pcl_queue))
                 send_next(lynx, packet->type);
 
         spin_unlock_irqrestore(&d->queue_lock, flags);
@@ -748,7 +754,44 @@ static int lynx_devctl(struct hpsb_host *host, enum devctl_cmd cmd, int arg)
 		list_splice(&lynx->async.queue, &packet_list);
 		INIT_LIST_HEAD(&lynx->async.queue);
 
-                spin_unlock_irqrestore(&lynx->async.queue_lock, flags);
+                if (list_empty(&lynx->async.pcl_queue)) {
+                        spin_unlock_irqrestore(&lynx->async.queue_lock, flags);
+                        PRINTD(KERN_DEBUG, lynx->id, "no async packet in PCL to cancel");
+                } else {
+                        struct ti_pcl pcl;
+                        u32 ack;
+                        struct hpsb_packet *packet;
+
+                        PRINT(KERN_INFO, lynx->id, "cancelling async packet, that was already in PCL");
+
+                        get_pcl(lynx, lynx->async.pcl, &pcl);
+
+                        packet = driver_packet(lynx->async.pcl_queue.next);
+                        list_del(&packet->driver_list);
+
+                        pci_unmap_single(lynx->dev, lynx->async.header_dma,
+                                         packet->header_size, PCI_DMA_TODEVICE);
+                        if (packet->data_size) {
+                                pci_unmap_single(lynx->dev, lynx->async.data_dma,
+                                                 packet->data_size, PCI_DMA_TODEVICE);
+                        }
+
+                        spin_unlock_irqrestore(&lynx->async.queue_lock, flags);
+
+                        if (pcl.pcl_status & DMA_CHAN_STAT_PKTCMPL) {
+                                if (pcl.pcl_status & DMA_CHAN_STAT_SPECIALACK) {
+                                        ack = (pcl.pcl_status >> 15) & 0xf;
+                                        PRINTD(KERN_INFO, lynx->id, "special ack %d", ack);
+                                        ack = (ack == 1 ? ACKX_TIMEOUT : ACKX_SEND_ERROR);
+                                } else {
+                                        ack = (pcl.pcl_status >> 15) & 0xf;
+                                }
+                        } else {
+                                PRINT(KERN_INFO, lynx->id, "async packet was not completed");
+                                ack = ACKX_ABORTED;
+                        }
+                        hpsb_packet_sent(host, packet, ack);
+                }
 
 		while (!list_empty(&packet_list)) {
 			packet = driver_packet(packet_list.next);
@@ -759,13 +802,14 @@ static int lynx_devctl(struct hpsb_host *host, enum devctl_cmd cmd, int arg)
                 break;
 
         case MODIFY_USAGE:
-                if (arg) {
-                        MOD_INC_USE_COUNT;
-                } else {
-                        MOD_DEC_USE_COUNT;
-                }
+		if (arg) {
+			if (try_module_get(THIS_MODULE))
+				retval = 1;
+		} else {
+			module_put(THIS_MODULE);
+			retval = 1;
+		}
 
-                retval = 1;
                 break;
 
         case ISO_LISTEN_CHANNEL:
@@ -1021,20 +1065,12 @@ static ssize_t mem_read(struct file *file, char *buffer, size_t count,
         ssize_t retval;
         void *membase;
 
-	if (*offset != off)	/* Check for EOF before we trust wrap */
-		return 0;
-	
-	/* FIXME: Signed wrap is undefined in C - wants fixing up */
-	if (off + count > off)
-		return 0;
-		
-        if ((off + count) > PCILYNX_MAX_MEMORY + 1) {
-                count = PCILYNX_MAX_MEMORY + 1 - off;
+        if ((off + count) > PCILYNX_MAX_MEMORY+1) {
+                count = PCILYNX_MAX_MEMORY+1 - off;
         }
-        if (count == 0) {
-                return 0;
+        if (count == 0 || off > PCILYNX_MAX_MEMORY) {
+                return -ENOSPC;
         }
-
 
         switch (md->type) {
         case rom:
@@ -1145,10 +1181,10 @@ static void lynx_irq_handler(int irq, void *dev_id,
         linkint = reg_read(lynx, LINK_INT_STATUS);
         intmask = reg_read(lynx, PCI_INT_STATUS);
 
+        if (!(intmask & PCI_INT_INT_PEND)) return;
+
         PRINTD(KERN_DEBUG, lynx->id, "interrupt: 0x%08x / 0x%08x", intmask,
                linkint);
-
-        if (!(intmask & PCI_INT_INT_PEND)) return;
 
         reg_write(lynx, LINK_INT_STATUS, linkint);
         reg_write(lynx, PCI_INT_STATUS, intmask);
@@ -1248,62 +1284,96 @@ static void lynx_irq_handler(int irq, void *dev_id,
         }
 
         if (intmask & PCI_INT_DMA_HLT(CHANNEL_ASYNC_SEND)) {
-                u32 ack;
-                struct hpsb_packet *packet;
-                
+                PRINTD(KERN_DEBUG, lynx->id, "async sent");
                 spin_lock(&lynx->async.queue_lock);
 
-                ack = reg_read(lynx, DMA_CHAN_STAT(CHANNEL_ASYNC_SEND));
-
-		packet = driver_packet(lynx->async.queue.next);
-		list_del(&packet->driver_list);
-
-                pci_unmap_single(lynx->dev, lynx->async.header_dma,
-                                 packet->header_size, PCI_DMA_TODEVICE);
-                if (packet->data_size) {
-                        pci_unmap_single(lynx->dev, lynx->async.data_dma,
-                                         packet->data_size, PCI_DMA_TODEVICE);
-                }
-
-                if (!list_empty(&lynx->async.queue)) {
-                        send_next(lynx, hpsb_async);
-                }
-
-                spin_unlock(&lynx->async.queue_lock);
-
-                if (ack & DMA_CHAN_STAT_SPECIALACK) {
-                        ack = (ack >> 15) & 0xf;
-                        PRINTD(KERN_INFO, lynx->id, "special ack %d", ack);
-                        ack = (ack == 1 ? ACKX_TIMEOUT : ACKX_SEND_ERROR);
+                if (list_empty(&lynx->async.pcl_queue)) {
+                        spin_unlock(&lynx->async.queue_lock);
+                        PRINT(KERN_WARNING, lynx->id, "async dma halted, but no queued packet (maybe it was cancelled)");
                 } else {
-                        ack = (ack >> 15) & 0xf;
+                        struct ti_pcl pcl;
+                        u32 ack;
+                        struct hpsb_packet *packet;
+
+                        get_pcl(lynx, lynx->async.pcl, &pcl);
+
+                        packet = driver_packet(lynx->async.pcl_queue.next);
+                        list_del(&packet->driver_list);
+
+                        pci_unmap_single(lynx->dev, lynx->async.header_dma,
+                                         packet->header_size, PCI_DMA_TODEVICE);
+                        if (packet->data_size) {
+                                pci_unmap_single(lynx->dev, lynx->async.data_dma,
+                                                 packet->data_size, PCI_DMA_TODEVICE);
+                        }
+
+                        if (!list_empty(&lynx->async.queue)) {
+                                send_next(lynx, hpsb_async);
+                        }
+
+                        spin_unlock(&lynx->async.queue_lock);
+
+                        if (pcl.pcl_status & DMA_CHAN_STAT_PKTCMPL) {
+                                if (pcl.pcl_status & DMA_CHAN_STAT_SPECIALACK) {
+                                        ack = (pcl.pcl_status >> 15) & 0xf;
+                                        PRINTD(KERN_INFO, lynx->id, "special ack %d", ack);
+                                        ack = (ack == 1 ? ACKX_TIMEOUT : ACKX_SEND_ERROR);
+                                } else {
+                                        ack = (pcl.pcl_status >> 15) & 0xf;
+                                }
+                        } else {
+                                PRINT(KERN_INFO, lynx->id, "async packet was not completed");
+                                ack = ACKX_SEND_ERROR;
+                        }
+                        hpsb_packet_sent(host, packet, ack);
                 }
-                
-                hpsb_packet_sent(host, packet, ack);
         }
 
         if (intmask & PCI_INT_DMA_HLT(CHANNEL_ISO_SEND)) {
-                struct hpsb_packet *packet;
-
+                PRINTD(KERN_DEBUG, lynx->id, "iso sent");
                 spin_lock(&lynx->iso_send.queue_lock);
 
-		packet = driver_packet(lynx->iso_send.queue.next);
-		list_del(&packet->driver_list);
+                if (list_empty(&lynx->iso_send.pcl_queue)) {
+                        spin_unlock(&lynx->iso_send.queue_lock);
+                        PRINT(KERN_ERR, lynx->id, "iso send dma halted, but no queued packet");
+                } else {
+                        struct ti_pcl pcl;
+                        u32 ack;
+                        struct hpsb_packet *packet;
 
-                pci_unmap_single(lynx->dev, lynx->iso_send.header_dma,
-                                 packet->header_size, PCI_DMA_TODEVICE);
-                if (packet->data_size) {
-                        pci_unmap_single(lynx->dev, lynx->iso_send.data_dma,
-                                         packet->data_size, PCI_DMA_TODEVICE);
+                        get_pcl(lynx, lynx->iso_send.pcl, &pcl);
+
+                        packet = driver_packet(lynx->iso_send.pcl_queue.next);
+                        list_del(&packet->driver_list);
+
+                        pci_unmap_single(lynx->dev, lynx->iso_send.header_dma,
+                                         packet->header_size, PCI_DMA_TODEVICE);
+                        if (packet->data_size) {
+                                pci_unmap_single(lynx->dev, lynx->iso_send.data_dma,
+                                                 packet->data_size, PCI_DMA_TODEVICE);
+                        }
+
+                        if (!list_empty(&lynx->iso_send.queue)) {
+                                send_next(lynx, hpsb_iso);
+                        }
+
+                        spin_unlock(&lynx->iso_send.queue_lock);
+
+                        if (pcl.pcl_status & DMA_CHAN_STAT_PKTCMPL) {
+                                if (pcl.pcl_status & DMA_CHAN_STAT_SPECIALACK) {
+                                        ack = (pcl.pcl_status >> 15) & 0xf;
+                                        PRINTD(KERN_INFO, lynx->id, "special ack %d", ack);
+                                        ack = (ack == 1 ? ACKX_TIMEOUT : ACKX_SEND_ERROR);
+                                } else {
+                                        ack = (pcl.pcl_status >> 15) & 0xf;
+                                }
+                        } else {
+                                PRINT(KERN_INFO, lynx->id, "iso send packet was not completed");
+                                ack = ACKX_SEND_ERROR;
+                        }
+
+                        hpsb_packet_sent(host, packet, ack); //FIXME: maybe we should just use ACK_COMPLETE and ACKX_SEND_ERROR
                 }
-
-                if (!list_empty(&lynx->iso_send.queue)) {
-                        send_next(lynx, hpsb_iso);
-                }
-
-                spin_unlock(&lynx->iso_send.queue_lock);
-
-                hpsb_packet_sent(host, packet, ACK_COMPLETE);
         }
 
         if (intmask & PCI_INT_DMA_HLT(CHANNEL_ASYNC_RCV)) {
@@ -1605,7 +1675,9 @@ static int __devinit add_card(struct pci_dev *dev,
         lynx->phy_reg0 = -1;
 
 	INIT_LIST_HEAD(&lynx->async.queue);
+	INIT_LIST_HEAD(&lynx->async.pcl_queue);
 	INIT_LIST_HEAD(&lynx->iso_send.queue);
+	INIT_LIST_HEAD(&lynx->iso_send.pcl_queue);
 
         pcl.next = pcl_bus(lynx, lynx->rcv_pcl);
         put_pcl(lynx, lynx->rcv_pcl_start, &pcl);

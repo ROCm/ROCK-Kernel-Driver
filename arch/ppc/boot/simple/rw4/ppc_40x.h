@@ -41,9 +41,9 @@
 #define dbsr            0x3f0               /* debug status register         */
 #define dccr            0x3fa               /* data cache control reg.       */
 #define dcwr            0x3ba               /* data cache write-thru reg     */
-#define dear            0x3d5               /* data exeption address reg     */
-#define esr             0x3d4               /* execption syndrome registe    */
-#define evpr            0x3d6               /* exeption vector prefix reg    */
+#define dear            0x3d5               /* data exception address reg    */
+#define esr             0x3d4               /* exception syndrome registe    */
+#define evpr            0x3d6               /* exception vector prefix reg   */
 #define iccr            0x3fb               /* instruction cache cntrl re    */
 #define icdbdr          0x3d3               /* instr cache dbug data reg     */
 #define lrreg           0x008               /* link register                 */

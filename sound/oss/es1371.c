@@ -2963,7 +2963,8 @@ static int __devinit es1371_probe(struct pci_dev *pcidev, const struct pci_devic
 	/* turn on S/PDIF output driver if requested */
 	outl(cssr, s->io+ES1371_REG_STATUS);
 	/* register gameport */
-	gameport_register_port(&s->gameport);
+	if (s->gameport.io)
+		gameport_register_port(&s->gameport);
 	/* store it in the driver field */
 	pci_set_drvdata(pcidev, s);
 	/* put it into driver list */

@@ -598,6 +598,8 @@ static struct buffer *buffer_alloc(int size)
 	struct buffer *b;
 
 	b = kmalloc(sizeof *b + size, SLAB_KERNEL);
+	if (b == NULL)
+		return NULL;
 	b->head = 0;
 	b->tail = 0;
 	b->length = 0;

@@ -160,7 +160,6 @@ static void __init smp_store_cpu_info(int id)
 				goto valid_k7;
 
 		/* If we get here, it's not a certified SMP capable AMD system. */
-		printk (KERN_INFO "WARNING: This combination of AMD processors is not suitable for SMP.\n");
 		tainted |= TAINT_UNSAFE_SMP;
 	}
 
@@ -181,8 +180,6 @@ static atomic_t tsc_count_stop = ATOMIC_INIT(0);
 static unsigned long long tsc_values[NR_CPUS];
 
 #define NR_LOOPS 5
-
-extern unsigned long fast_gettimeoffset_quotient;
 
 /*
  * accurate 64-bit/32-bit division, expanded to 32-bit divisions and 64-bit
@@ -223,7 +220,8 @@ static void __init synchronize_tsc_bp (void)
 
 	printk("checking TSC synchronization across %u CPUs: ", num_booting_cpus());
 
-	one_usec = ((1<<30)/fast_gettimeoffset_quotient)*(1<<2);
+	/* convert from kcyc/sec to cyc/usec */
+	one_usec = cpu_khz / 1000;
 
 	atomic_set(&tsc_start_flag, 1);
 	wmb();
@@ -1069,6 +1067,15 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 
 	if (smp_b_stepping)
 		printk(KERN_WARNING "WARNING: SMP operation may be unreliable with B stepping processors.\n");
+
+	/* Don't taint if we are running SMP kernel on a single non-MP approved Athlon  */
+	if (tainted & TAINT_UNSAFE_SMP) {
+		if (cpucount)
+			printk (KERN_INFO "WARNING: This combination of AMD processors is not suitable for SMP.\n");
+		else
+			tainted &= ~TAINT_UNSAFE_SMP;
+	}
+
 	Dprintk("Boot done.\n");
 
 	/*

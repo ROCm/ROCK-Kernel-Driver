@@ -37,7 +37,7 @@
 #include <linux/workqueue.h>
 #include <acpi/acpi.h>
 #include <asm/io.h>
-#include "acpi_bus.h"
+#include <acpi/acpi_bus.h>
 
 #ifdef CONFIG_ACPI_EFI
 #include <linux/efi.h>
@@ -143,9 +143,9 @@ acpi_os_get_root_pointer(u32 flags, struct acpi_pointer *addr)
 #ifdef CONFIG_ACPI_EFI
 	addr->pointer_type = ACPI_PHYSICAL_POINTER;
 	if (efi.acpi20)
-		addr->pointer.physical = (ACPI_PHYSICAL_ADDRESS) virt_to_phys(efi.acpi20);
+		addr->pointer.physical = (acpi_physical_address) virt_to_phys(efi.acpi20);
 	else if (efi.acpi)
-		addr->pointer.physical = (ACPI_PHYSICAL_ADDRESS) virt_to_phys(efi.acpi);
+		addr->pointer.physical = (acpi_physical_address) virt_to_phys(efi.acpi);
 	else {
 		printk(KERN_ERR PREFIX "System description tables not found\n");
 		return AE_NOT_FOUND;

@@ -1337,7 +1337,7 @@ setup_604_hid0:
 	blr
 
 /* 7400 <= rev 2.7 and 7410 rev = 1.0 suffer from some
- * erratas we work around here.
+ * errata we work around here.
  * Moto MPC710CE.pdf describes them, those are errata
  * #3, #4 and #5
  * Note that we assume the firmware didn't choose to

@@ -31,6 +31,7 @@
 #include <linux/init.h>
 #include <linux/init_task.h>
 #include <linux/prctl.h>
+#include <linux/ptrace.h>
 
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>

@@ -918,6 +918,7 @@ static int do_dv1394_init(struct video_card *video, struct dv1394_init *init)
 	u64 chan_mask;
 	int retval = -EINVAL;
 
+	debug_printk( "dv1394: initialising %d\n", video->id );
 	if(init->api_version != DV1394_API_VERSION)
 		goto err;
 	
@@ -1186,6 +1187,7 @@ static void stop_dma(struct video_card *video)
 			if( (reg_read(video->ohci, video->ohci_IsoXmitContextControlClear) & (1 << 10)) ||
 			    (reg_read(video->ohci, video->ohci_IsoRcvContextControlClear)  & (1 << 10)) ) {
 				/* still active */
+				debug_printk("dv1394: stop_dma: DMA not stopped yet\n" );
 				mb();
 			} else {
 				debug_printk("dv1394: stop_dma: DMA stopped safely after %d ms\n", i/10);
@@ -1199,7 +1201,9 @@ static void stop_dma(struct video_card *video)
 			printk(KERN_ERR "dv1394: stop_dma: DMA still going after %d ms!\n", i/10);
 		}
 	}
-
+	else
+		debug_printk("dv1394: stop_dma: already stopped.\n");
+		
 	spin_unlock_irqrestore(&video->spinlock, flags);
 }
 
@@ -1226,7 +1230,8 @@ static int do_dv1394_shutdown(struct video_card *video, int free_dv_buf)
 		/* disable interrupts for IT context */
 		reg_write(video->ohci, OHCI1394_IsoXmitIntMaskClear, (1 << video->ohci_it_ctx));
 		
-		clear_bit(video->ohci_it_ctx, &video->ohci->it_ctx_usage);
+		/* remove tasklet */
+		ohci1394_unregister_iso_tasklet(video->ohci, &video->it_tasklet);
 		debug_printk("dv1394: IT context %d released\n", video->ohci_it_ctx);
 		video->ohci_it_ctx = -1;
 	}
@@ -1240,23 +1245,14 @@ static int do_dv1394_shutdown(struct video_card *video, int free_dv_buf)
 		/* disable interrupts for IR context */
 		reg_write(video->ohci, OHCI1394_IsoRecvIntMaskClear, (1 << video->ohci_ir_ctx));
 
-		clear_bit(video->ohci_ir_ctx, &video->ohci->ir_ctx_usage);
+		/* remove tasklet */
+		ohci1394_unregister_iso_tasklet(video->ohci, &video->ir_tasklet);
 		debug_printk("dv1394: IR context %d released\n", video->ohci_ir_ctx);
 		video->ohci_ir_ctx = -1;
 	}
 
 	spin_unlock_irqrestore(&video->spinlock, flags);
 
-	/* remove tasklets */
-	if(video->ohci_it_ctx != -1) {
-		ohci1394_unregister_iso_tasklet(video->ohci, &video->it_tasklet);
-		video->ohci_it_ctx = -1;
-	}
-	if(video->ohci_ir_ctx != -1) {
-		ohci1394_unregister_iso_tasklet(video->ohci, &video->ir_tasklet);
-		video->ohci_ir_ctx = -1;
-	}
-	
 	/* release the ISO channel */
 	if(video->channel != -1) {
 		u64 chan_mask;
@@ -1612,7 +1608,7 @@ static int dv1394_ioctl(struct inode *inode, struct file *file,
 
 	switch(cmd)
 	{
-	case DV1394_SUBMIT_FRAMES: {
+	case DV1394_IOC_SUBMIT_FRAMES: {
 		unsigned int n_submit;
 
 		if( !video_card_initialized(video) ) {
@@ -1666,7 +1662,7 @@ static int dv1394_ioctl(struct inode *inode, struct file *file,
 		break;
 	}
 
-	case DV1394_WAIT_FRAMES: {
+	case DV1394_IOC_WAIT_FRAMES: {
 		unsigned int n_wait;
 
 		if( !video_card_initialized(video) ) {
@@ -1715,7 +1711,7 @@ static int dv1394_ioctl(struct inode *inode, struct file *file,
 		break;
 	}
 
-	case DV1394_RECEIVE_FRAMES: {
+	case DV1394_IOC_RECEIVE_FRAMES: {
 		unsigned int n_recv;
 
 		if( !video_card_initialized(video) ) {
@@ -1748,7 +1744,7 @@ static int dv1394_ioctl(struct inode *inode, struct file *file,
 		break;
 	}
 
-	case DV1394_START_RECEIVE: {
+	case DV1394_IOC_START_RECEIVE: {
 		if( !video_card_initialized(video) ) {
 			ret = do_dv1394_init_default(video);
 			if(ret)
@@ -1765,7 +1761,7 @@ static int dv1394_ioctl(struct inode *inode, struct file *file,
 		break;
 	}
 
-	case DV1394_INIT: {
+	case DV1394_IOC_INIT: {
 		struct dv1394_init init;
 		if(arg == (unsigned long) NULL) {
 			ret = do_dv1394_init_default(video);
@@ -1779,12 +1775,12 @@ static int dv1394_ioctl(struct inode *inode, struct file *file,
 		break;
 	}
 
-	case DV1394_SHUTDOWN:
+	case DV1394_IOC_SHUTDOWN:
 		ret = do_dv1394_shutdown(video, 0);
 		break;
 
 
-        case DV1394_GET_STATUS: {
+        case DV1394_IOC_GET_STATUS: {
 		struct dv1394_status status;
 
 		if( !video_card_initialized(video) ) {
@@ -2346,6 +2342,7 @@ static void ir_tasklet_func(unsigned long data)
 				dbc = (int) (p->cip_h1 >> 24);
 				if ( video->continuity_counter != -1 && dbc > ((video->continuity_counter + 1) % 256) )
 				{
+					printk(KERN_WARNING "dv1394: discontinuity detected, dropping all frames\n" );
 					video->dropped_frames += video->n_clear_frames + 1;
 					video->first_frame = 0;
 					video->n_clear_frames = 0;
@@ -2364,9 +2361,8 @@ static void ir_tasklet_func(unsigned long data)
 					video->n_clear_frames++;
 					if (video->n_clear_frames > video->n_frames) {
 						video->dropped_frames++;
-						video->n_clear_frames--;
-						if (video->n_clear_frames < 0)
-							video->n_clear_frames = 0;
+						printk(KERN_WARNING "dv1394: dropped a frame during reception\n" );
+						video->n_clear_frames = video->n_frames-1;
 						video->first_clear_frame = (video->first_clear_frame + 1) % video->n_frames;
 					}
 					if (video->first_clear_frame == -1)
@@ -2375,7 +2371,6 @@ static void ir_tasklet_func(unsigned long data)
 					/* get the next frame */
 					video->active_frame = (video->active_frame + 1) % video->n_frames;
 					f = video->frames[video->active_frame];
-				
 					irq_printk("   frame received, active_frame = %d, n_clear_frames = %d, first_clear_frame = %d\n",
 						   video->active_frame, video->n_clear_frames, video->first_clear_frame);
 				}

@@ -224,7 +224,7 @@ static void i2o_scsi_reply(struct i2o_handler *h, struct i2o_controller *c, stru
 			spin_unlock_irqrestore(&retry_lock, flags);
 			/* Create a scsi error for this */
 			current_command = (Scsi_Cmnd *)m[3];
-			lock = current_command->host->host_lock;
+			lock = current_command->device->host->host_lock;
 			printk("Aborted %ld\n", current_command->serial_number);
 
 			spin_lock_irqsave(lock, flags);
@@ -328,7 +328,7 @@ static void i2o_scsi_reply(struct i2o_handler *h, struct i2o_controller *c, stru
 	else if (current_command->request_bufflen)
 		pci_unmap_single(c->pdev, (dma_addr_t)((long)current_command->SCp.ptr), current_command->request_bufflen, scsi_to_pci_dma_dir(current_command->sc_data_direction));
 
-	lock = current_command->host->host_lock;
+	lock = current_command->device->host->host_lock;
 	spin_lock_irqsave(lock, flags);
 	current_command->scsi_done(current_command);
 	spin_unlock_irqrestore(lock, flags);
@@ -606,7 +606,7 @@ static int i2o_scsi_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 	 *	Do the incoming paperwork
 	 */
 	 
-	host = SCpnt->host;
+	host = SCpnt->device->host;
 	hostdata = (struct i2o_scsi_host *)host->hostdata;
 	 
 	c = hostdata->controller;
@@ -615,13 +615,13 @@ static int i2o_scsi_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 
 	SCpnt->scsi_done = done;
 	
-	if(SCpnt->target > 15)
+	if(SCpnt->device->id > 15)
 	{
-		printk(KERN_ERR "i2o_scsi: Wild target %d.\n", SCpnt->target);
+		printk(KERN_ERR "i2o_scsi: Wild target %d.\n", SCpnt->device->id);
 		return -1;
 	}
 	
-	tid = hostdata->task[SCpnt->target][SCpnt->lun];
+	tid = hostdata->task[SCpnt->device->id][SCpnt->device->lun];
 	
 	dprintk(("qcmd: Tid = %d\n", tid));
 	
@@ -712,10 +712,10 @@ static int i2o_scsi_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 		 *	with tagged queueing. We throw in the odd ordered
 		 *	tag to stop them starving themselves.
 		 */
-		if((jiffies - hostdata->tagclock[SCpnt->target][SCpnt->lun]) > (5*HZ))
+		if((jiffies - hostdata->tagclock[SCpnt->device->id][SCpnt->device->lun]) > (5*HZ))
 		{
 			tag=0x01800000;		/* ORDERED! */
-			hostdata->tagclock[SCpnt->target][SCpnt->lun]=jiffies;
+			hostdata->tagclock[SCpnt->device->id][SCpnt->device->lun]=jiffies;
 		}
 		else
 		{
@@ -916,9 +916,9 @@ int i2o_scsi_abort(Scsi_Cmnd * SCpnt)
 	
 	printk(KERN_WARNING "i2o_scsi: Aborting command block.\n");
 	
-	host = SCpnt->host;
+	host = SCpnt->device->host;
 	hostdata = (struct i2o_scsi_host *)host->hostdata;
-	tid = hostdata->task[SCpnt->target][SCpnt->lun];
+	tid = hostdata->task[SCpnt->device->id][SCpnt->device->lun];
 	if(tid==-1)
 	{
 		printk(KERN_ERR "i2o_scsi: Impossible command to abort!\n");
@@ -982,7 +982,7 @@ static int i2o_scsi_bus_reset(Scsi_Cmnd * SCpnt)
 	 */
 
 	
-	host = SCpnt->host;
+	host = SCpnt->device->host;
 
 	spin_unlock_irq(host->host_lock);
 

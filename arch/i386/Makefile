@@ -46,6 +46,7 @@ cflags-$(CONFIG_MWINCHIP3D)	+= -march=i586
 cflags-$(CONFIG_MCYRIXIII)	+= $(call check_gcc,-march=c3,-march=i486)
 # The alignment flags change with gcc 3.2
 cflags-$(CONFIG_MCYRIXIII)	+= $(call check_gcc,-falign-functions=0 -falign-jumps=0 -falign-loops=0,-malign-functions=0 -malign-jumps=0 -malign-loops=0)
+cflags-$(CONFIG_MVIAC3_2)	+= $(call check_gcc,-march=c3-2,-march=i686)
 
 CFLAGS += $(cflags-y)
 

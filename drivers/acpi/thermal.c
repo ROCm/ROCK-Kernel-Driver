@@ -39,8 +39,8 @@
 #include <linux/sched.h>
 #include <linux/kmod.h>
 #include <linux/seq_file.h>
-#include "acpi_bus.h"
-#include "acpi_drivers.h"
+#include <acpi/acpi_bus.h>
+#include <acpi/acpi_drivers.h>
 
 #define ACPI_THERMAL_COMPONENT		0x04000000
 #define ACPI_THERMAL_CLASS		"thermal_zone"
@@ -82,8 +82,11 @@ static int acpi_thermal_remove (struct acpi_device *device, int type);
 static int acpi_thermal_state_open_fs(struct inode *inode, struct file *file);
 static int acpi_thermal_temp_open_fs(struct inode *inode, struct file *file);
 static int acpi_thermal_trip_open_fs(struct inode *inode, struct file *file);
+static int acpi_thermal_write_trip_points (struct file*,const char *,size_t,loff_t *);
 static int acpi_thermal_cooling_open_fs(struct inode *inode, struct file *file);
+static int acpi_thermal_write_cooling_mode (struct file*,const char *,size_t,loff_t *);
 static int acpi_thermal_polling_open_fs(struct inode *inode, struct file *file);
+static int acpi_thermal_write_polling(struct file*,const char *,size_t,loff_t *);
 
 static struct acpi_driver acpi_thermal_driver = {
 	.name =		ACPI_THERMAL_DRIVER_NAME,
@@ -179,6 +182,7 @@ static struct file_operations acpi_thermal_temp_fops = {
 static struct file_operations acpi_thermal_trip_fops = {
 	.open		= acpi_thermal_trip_open_fs,
 	.read		= seq_read,
+	.write		= acpi_thermal_write_trip_points,
 	.llseek		= seq_lseek,
 	.release	= single_release,
 };
@@ -186,6 +190,7 @@ static struct file_operations acpi_thermal_trip_fops = {
 static struct file_operations acpi_thermal_cooling_fops = {
 	.open		= acpi_thermal_cooling_open_fs,
 	.read		= seq_read,
+	.write		= acpi_thermal_write_cooling_mode,
 	.llseek		= seq_lseek,
 	.release	= single_release,
 };
@@ -193,6 +198,7 @@ static struct file_operations acpi_thermal_cooling_fops = {
 static struct file_operations acpi_thermal_polling_fops = {
 	.open		= acpi_thermal_polling_open_fs,
 	.read		= seq_read,
+	.write		= acpi_thermal_write_polling,
 	.llseek		= seq_lseek,
 	.release	= single_release,
 };
@@ -430,7 +436,7 @@ acpi_thermal_call_usermode (
 	envp[0] = "HOME=/";
 	envp[1] = "PATH=/sbin:/bin:/usr/sbin:/usr/bin";
 	
-	call_usermodehelper(argv[0], argv, envp);
+	call_usermodehelper(argv[0], argv, envp, 0);
 
 	return_VALUE(0);
 }
@@ -947,10 +953,11 @@ acpi_thermal_write_cooling_mode (
 	struct file		*file,
 	const char		*buffer,
 	size_t			count,
-	loff_t			*data)
+	loff_t			*ppos)
 {
+	struct seq_file		*m = (struct seq_file *)file->private_data;
+	struct acpi_thermal	*tz = (struct acpi_thermal *)m->private;
 	int			result = 0;
-	struct acpi_thermal	*tz = (struct acpi_thermal *) data;
 	char			mode_string[12] = {'\0'};
 
 	ACPI_FUNCTION_TRACE("acpi_thermal_write_cooling_mode");
@@ -1007,10 +1014,11 @@ acpi_thermal_write_polling (
 	struct file		*file,
 	const char		*buffer,
 	size_t			count,
-	loff_t			*data)
+	loff_t			*ppos)
 {
+	struct seq_file		*m = (struct seq_file *)file->private_data;
+	struct acpi_thermal	*tz = (struct acpi_thermal *)m->private;
 	int			result = 0;
-	struct acpi_thermal	*tz = (struct acpi_thermal *) data;
 	char			polling_string[12] = {'\0'};
 	int			seconds = 0;
 
@@ -1084,7 +1092,6 @@ acpi_thermal_add_fs (
 			ACPI_THERMAL_FILE_TRIP_POINTS));
 	else {
 		entry->proc_fops = &acpi_thermal_trip_fops;
-		entry->proc_fops->write = acpi_thermal_write_trip_points;
 		entry->data = acpi_driver_data(device);
 	}
 
@@ -1097,7 +1104,6 @@ acpi_thermal_add_fs (
 			ACPI_THERMAL_FILE_COOLING_MODE));
 	else {
 		entry->proc_fops = &acpi_thermal_cooling_fops;
-		entry->proc_fops->write = acpi_thermal_write_cooling_mode;
 		entry->data = acpi_driver_data(device);
 	}
 
@@ -1110,7 +1116,6 @@ acpi_thermal_add_fs (
 			ACPI_THERMAL_FILE_POLLING_FREQ));
 	else {
 		entry->proc_fops = &acpi_thermal_polling_fops;
-		entry->proc_fops->write = acpi_thermal_write_polling;
 		entry->data = acpi_driver_data(device);
 	}
 

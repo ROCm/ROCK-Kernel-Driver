@@ -19,6 +19,7 @@
 #include <linux/tty.h>
 #include <linux/binfmts.h>
 #include <linux/security.h>
+#include <linux/ptrace.h>
 #include <asm/param.h>
 #include <asm/uaccess.h>
 #include <asm/siginfo.h>
@@ -485,11 +486,11 @@ static int __dequeue_signal(struct sigpending *pending, sigset_t *mask,
  *
  * All callers have to hold the siglock.
  */
-int dequeue_signal(sigset_t *mask, siginfo_t *info)
+int dequeue_signal(struct task_struct *tsk, sigset_t *mask, siginfo_t *info)
 {
-	int signr = __dequeue_signal(&current->pending, mask, info);
+	int signr = __dequeue_signal(&tsk->pending, mask, info);
 	if (!signr)
-		signr = __dequeue_signal(&current->signal->shared_pending,
+		signr = __dequeue_signal(&tsk->signal->shared_pending,
 					 mask, info);
 	return signr;
 }
@@ -1456,7 +1457,7 @@ int get_signal_to_deliver(siginfo_t *info, struct pt_regs *regs, void *cookie)
 			continue;
 		}
 	dequeue:
-		signr = dequeue_signal(mask, info);
+		signr = dequeue_signal(current, mask, info);
 		spin_unlock_irq(&current->sighand->siglock);
 
 		if (!signr)
@@ -1811,7 +1812,7 @@ sys_rt_sigtimedwait(const sigset_t *uthese, siginfo_t *uinfo,
 	}
 
 	spin_lock_irq(&current->sighand->siglock);
-	sig = dequeue_signal(&these, &info);
+	sig = dequeue_signal(current, &these, &info);
 	if (!sig) {
 		timeout = MAX_SCHEDULE_TIMEOUT;
 		if (uts)
@@ -1831,7 +1832,7 @@ sys_rt_sigtimedwait(const sigset_t *uthese, siginfo_t *uinfo,
 			timeout = schedule_timeout(timeout);
 
 			spin_lock_irq(&current->sighand->siglock);
-			sig = dequeue_signal(&these, &info);
+			sig = dequeue_signal(current, &these, &info);
 			current->blocked = current->real_blocked;
 			siginitset(&current->real_blocked, 0);
 			recalc_sigpending();

@@ -23,8 +23,6 @@
 #include <asm/irq.h>
 #include <asm/hardware/amba_kmi.h>
 
-extern struct pt_regs *kbd_pt_regs;
-
 #define KMI_BASE	(kmi->base)
 
 struct amba_kmi_port {
@@ -42,10 +40,8 @@ static void amba_kmi_int(int irq, void *dev_id, struct pt_regs *regs)
 	struct amba_kmi_port *kmi = dev_id;
 	unsigned int status = __raw_readb(KMIIR);
 
-	kbd_pt_regs = regs;
-
 	while (status & KMIIR_RXINTR) {
-		serio_interrupt(&kmi->io, __raw_readb(KMIDATA), 0);
+		serio_interrupt(&kmi->io, __raw_readb(KMIDATA), 0, regs);
 		status = __raw_readb(KMIIR);
 	}
 }

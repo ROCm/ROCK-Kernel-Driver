@@ -89,8 +89,10 @@ static struct cciss_scsi_hba_t ccissscsi[MAX_CTLR] = {
    working even with the SCSI system.  It's so 
    scsi_unregister_host will differentiate the controllers. 
    When register_scsi_module is called, each host template is 
-   customized (name change) in cciss_register_scsi() 
-   (that's called from cciss.c:cciss_init_one()) */
+   customized (name change) in cciss_register_scsi() (that's
+   called from cciss_engage_scsi, called from
+   cciss.c:cciss_proc_write(), on "engage scsi" being received
+   from user space.) */
 
 static 
 Scsi_Host_Template driver_template[MAX_CTLR] =
@@ -199,14 +201,12 @@ scsi_cmd_free(ctlr_info_t *h, CommandList_struct *cmd)
 }
 
 static int
-scsi_cmd_stack_setup(int ctlr)
+scsi_cmd_stack_setup(int ctlr, struct cciss_scsi_adapter_data_t *sa)
 {
 	int i;
-	struct cciss_scsi_adapter_data_t *sa;
 	struct cciss_scsi_cmd_stack_t *stk;
 	size_t size;
 
-	sa = (struct cciss_scsi_adapter_data_t *) hba[ctlr]->scsi_ctlr;
 	stk = &sa->cmd_stack; 
 	size = sizeof(struct cciss_scsi_cmd_stack_elem_t) * CMD_STACK_SIZE;
 
@@ -535,126 +535,24 @@ lookup_scsi3addr(int ctlr, int bus, int target, int lun, char *scsi3addr)
 	return -1;
 }
 
-
 static void 
-cciss_find_non_disk_devices(int cntl_num)
+cciss_scsi_setup(int cntl_num)
 {
-	ReportLunData_struct *ld_buff;
-	InquiryData_struct *inq_buff;
-	int return_code;
-	int i;
-	int listlength = 0;
-	int num_luns;
-	unsigned char scsi3addr[8];
-	unsigned long flags;
-	int reportlunsize = sizeof(*ld_buff) + CISS_MAX_PHYS_LUN * 8;
+	struct cciss_scsi_adapter_data_t * shba;
 
-	hba[cntl_num]->scsi_ctlr = (void *)
-		kmalloc(sizeof(struct cciss_scsi_adapter_data_t),
-			GFP_KERNEL);	
-	if (hba[cntl_num]->scsi_ctlr == NULL)
-		return;
-
-	((struct cciss_scsi_adapter_data_t *) 
-		hba[cntl_num]->scsi_ctlr)->scsi_host = NULL;
-	((struct cciss_scsi_adapter_data_t *) 
-		hba[cntl_num]->scsi_ctlr)->lock = SPIN_LOCK_UNLOCKED;
-	((struct cciss_scsi_adapter_data_t *) 
-		hba[cntl_num]->scsi_ctlr)->registered = 0;
-
-	if (scsi_cmd_stack_setup(cntl_num) != 0) {
-		printk("Trouble, returned non-zero!\n");
-		return;
-	}
-
-	ld_buff = kmalloc(reportlunsize, GFP_KERNEL);
-	if (ld_buff == NULL) {
-		printk(KERN_ERR "cciss: out of memory\n");
-		return;
-	}
-	memset(ld_buff, 0, sizeof(ReportLunData_struct));
-	inq_buff = kmalloc(sizeof( InquiryData_struct), GFP_KERNEL);
-        if (inq_buff == NULL) {
-                printk(KERN_ERR "cciss: out of memory\n");
-                kfree(ld_buff);
-                return;
-        }
-
-	/* Get the physical luns */ 
-	return_code = sendcmd(CISS_REPORT_PHYS, cntl_num, ld_buff, 
-			reportlunsize, 0, 0, 0, NULL );
-
-	if( return_code == IO_OK) {
-		unsigned char *c = &ld_buff->LUNListLength[0];
-		listlength = (c[0] << 24) | (c[1] << 16) | (c[2] << 8) | c[3];
-	} 
-	else {  /* getting report of physical luns failed */
-		printk(KERN_WARNING "cciss: report physical luns"
-			" command failed\n");
-		listlength = 0;
-	}
-
-	CPQ_TAPE_LOCK(cntl_num, flags);
 	ccissscsi[cntl_num].ndevices = 0;
-	num_luns = listlength / 8; // 8 bytes pre entry
-	/* printk("Found %d LUNs\n", num_luns); */
-
-	if (num_luns > CISS_MAX_PHYS_LUN)
-	{
-		printk(KERN_WARNING 
-			"cciss: Maximum physical LUNs (%d) exceeded.  "
-			"%d LUNs ignored.\n", CISS_MAX_PHYS_LUN, 
-			num_luns - CISS_MAX_PHYS_LUN);
-		num_luns = CISS_MAX_PHYS_LUN;
+	shba = (struct cciss_scsi_adapter_data_t *)
+		kmalloc(sizeof(*shba), GFP_KERNEL);	
+	if (shba == NULL)
+		return;
+	shba->scsi_host = NULL;
+	shba->lock = SPIN_LOCK_UNLOCKED;
+	shba->registered = 0;
+	if (scsi_cmd_stack_setup(cntl_num, shba) != 0) {
+		kfree(shba);
+		shba = NULL;
 	}
-
-	for(i=0; i<num_luns; i++) {
-		/* Execute an inquiry to figure the device type */
-		memset(inq_buff, 0, sizeof(InquiryData_struct));
-		memcpy(scsi3addr, ld_buff->LUN[i], 8); /* ugly... */
-		return_code = sendcmd(CISS_INQUIRY, cntl_num, inq_buff,
-                	sizeof(InquiryData_struct), 2, 0 ,0, scsi3addr );
-	  	if (return_code == IO_OK) {
-			if(inq_buff->data_byte[8] == 0xFF)
-			{
-			   printk(KERN_WARNING "cciss: inquiry failed\n");
-                        } else {
-			   int devtype;
-
-			   /* printk("Inquiry...\n");
-			   print_bytes((unsigned char *) inq_buff, 36, 1, 1); */
-			   devtype = (inq_buff->data_byte[0] & 0x1f);
-
-			   switch (devtype)
-			   {
-			    case 0x01: /* sequential access, (tape) */
-			    case 0x08: /* medium changer */
-					  /* this is the only kind of dev */
-					  /* we want to expose here. */
-				if (cciss_scsi_add_entry(cntl_num, -1,
-					(unsigned char *) ld_buff->LUN[i],
-					devtype) != 0) 
-						i=num_luns; // leave loop
-				break;
-			    default: 
-				break;
-			   }
-
-			}
-		}
-		else printk("cciss: inquiry failed.\n");
-	}
-#if 0
-	for (i=0;i<ccissscsi[cntl_num].ndevices;i++)
-		printk("Tape device presented at c%db%dt%dl%d\n", 
-			cntl_num, // <-- this is wrong
-			ccissscsi[cntl_num].dev[i].bus,
-			ccissscsi[cntl_num].dev[i].target,
-			ccissscsi[cntl_num].dev[i].lun);
-#endif			
-	CPQ_TAPE_UNLOCK(cntl_num, flags);
-	kfree(ld_buff);
-	kfree(inq_buff);
+	hba[cntl_num]->scsi_ctlr = (void *) shba;
 	return;
 }
 
@@ -913,7 +811,7 @@ cciss_scsi_do_simple_cmd(ctlr_info_t *c,
 
 	memset(cp->Request.CDB, 0, sizeof(cp->Request.CDB));
 	memcpy(cp->Request.CDB, cdb, cdblen);
-	cp->Request.Timeout = 1000;		// guarantee completion. 
+	cp->Request.Timeout = 0;
 	cp->Request.CDBLen = cdblen;
 	cp->Request.Type.Type = TYPE_CMD;
 	cp->Request.Type.Attribute = ATTR_SIMPLE;
@@ -1208,6 +1106,12 @@ cciss_update_non_disk_devices(int cntl_num, int hostno)
 		{
 		  case 0x01: /* sequential access, (tape) */
 		  case 0x08: /* medium changer */
+			if (ncurrent >= CCISS_MAX_SCSI_DEVS_PER_HBA) {
+				printk(KERN_INFO "cciss%d: %s ignored, "
+					"too many devices.\n", cntl_num,
+					DEVICETYPE(devtype));
+				break;
+			}
 			memcpy(&currentsd[ncurrent].scsi3addr[0], 
 				&scsi3addr[0], 8);
 			currentsd[ncurrent].devtype = devtype;
@@ -1262,7 +1166,6 @@ cciss_scsi_proc_info(char *buffer, /* data buffer */
 
 	int buflen, datalen;
 	struct Scsi_Host *sh;
-	int found;
 	ctlr_info_t *ci;
 	int cntl_num;
 
@@ -1379,11 +1282,11 @@ cciss_scsi_queue_command (Scsi_Cmnd *cmd, void (* done)(Scsi_Cmnd *))
 
 	// Get the ptr to our adapter structure (hba[i]) out of cmd->host.
 	// We violate cmd->host privacy here.  (Is there another way?)
-	c = (ctlr_info_t **) &cmd->host->hostdata[0];	
+	c = (ctlr_info_t **) &cmd->device->host->hostdata[0];	
 	ctlr = (*c)->ctlr;
 
-	rc = lookup_scsi3addr(ctlr, cmd->channel, cmd->target, cmd->lun, 
-			scsi3addr);
+	rc = lookup_scsi3addr(ctlr, cmd->device->channel, cmd->device->id, 
+			cmd->device->lun, scsi3addr);
 	if (rc != 0) {
 		/* the scsi nexus does not match any that we presented... */
 		/* pretend to mid layer that we got selection timeout */
@@ -1428,7 +1331,7 @@ cciss_scsi_queue_command (Scsi_Cmnd *cmd, void (* done)(Scsi_Cmnd *))
 	
 	// Fill in the request block...
 
-	cp->Request.Timeout = 1000; // guarantee completion
+	cp->Request.Timeout = 0;
 	memset(cp->Request.CDB, 0, sizeof(cp->Request.CDB));
 	if (cmd->cmd_len > sizeof(cp->Request.CDB)) BUG();
 	cp->Request.CDBLen = cmd->cmd_len;
@@ -1531,7 +1434,7 @@ cciss_unregister_scsi(int ctlr)
 }
 
 static int 
-cciss_register_scsi(int ctlr, int this_is_init_time)
+cciss_register_scsi(int ctlr)
 {
 	unsigned long flags;
 
@@ -1541,14 +1444,9 @@ cciss_register_scsi(int ctlr, int this_is_init_time)
 	driver_template[ctlr].module = THIS_MODULE;;
 
 	/* Since this is really a block driver, the SCSI core may not be 
-	   initialized yet, in which case, calling scsi_register_host
-	   would hang.  instead, we will do it later, via /proc filesystem 
+	   initialized at init time, in which case, calling scsi_register_host
+	   would hang.  Instead, we do it later, via /proc filesystem
 	   and rc scripts, when we know SCSI core is good to go. */
-
-	if (this_is_init_time) {
-		CPQ_TAPE_UNLOCK(ctlr, flags);
-		return 0;
-	}
 
 	/* Only register if SCSI devices are detected. */
 	if (ccissscsi[ctlr].ndevices != 0) {
@@ -1583,7 +1481,7 @@ cciss_engage_scsi(int ctlr)
 	}
 	spin_unlock_irqrestore(CCISS_LOCK(ctlr), flags);
 	cciss_update_non_disk_devices(ctlr, -1);
-	cciss_register_scsi(ctlr, 0);
+	cciss_register_scsi(ctlr);
 	return 0;
 }
 
@@ -1607,9 +1505,9 @@ cciss_proc_tape_report(int ctlr, unsigned char *buffer, off_t *pos, off_t *len)
 
 /* If no tape support, then these become defined out of existence */
 
-#define cciss_find_non_disk_devices(cntl_num)
+#define cciss_scsi_setup(cntl_num)
 #define cciss_unregister_scsi(ctlr)
-#define cciss_register_scsi(ctlr, this_is_init_time)
+#define cciss_register_scsi(ctlr)
 #define cciss_proc_tape_report(ctlr, buffer, pos, len)
 
 #endif /* CONFIG_CISS_SCSI_TAPE */

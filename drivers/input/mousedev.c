@@ -454,7 +454,11 @@ static struct input_device_id mousedev_ids[] = {
 		.keybit = { [LONG(BTN_LEFT)] = BIT(BTN_LEFT) },
 		.relbit = { BIT(REL_X) | BIT(REL_Y) },
 	},	/* A mouse like device, at least one button, two relative axes */
-
+	{
+		.flags = INPUT_DEVICE_ID_MATCH_EVBIT | INPUT_DEVICE_ID_MATCH_RELBIT,
+		.evbit = { BIT(EV_KEY) | BIT(EV_REL) },
+		.relbit = { BIT(REL_WHEEL) },
+	},	/* A separate scrollwheel */
 	{
 		.flags = INPUT_DEVICE_ID_MATCH_EVBIT | INPUT_DEVICE_ID_MATCH_KEYBIT | INPUT_DEVICE_ID_MATCH_ABSBIT,
 		.evbit = { BIT(EV_KEY) | BIT(EV_ABS) },

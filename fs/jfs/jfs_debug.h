@@ -89,8 +89,7 @@ extern void dump_mem(char *label, void *data, int length);
 /* error event message: e.g., i/o error */
 #define jfs_err(fmt, arg...) do {			\
 	if (jfsloglevel >= JFS_LOGLEVEL_ERR)		\
-		printk(KERN_ERR "%s:%d " fmt "\n",	\
-		       __FILE__, __LINE__, ## arg);	\
+		printk(KERN_ERR fmt "\n", ## arg);	\
 } while (0)
 
 /*

@@ -258,7 +258,7 @@ static int wdt977_ioctl(struct inode *inode, struct file *file,
          unsigned int cmd, unsigned long arg)
 {
 static struct watchdog_info ident = {
-	identity	: "Winbond 83977"
+	.identity = "Winbond 83977"
 };
 
 int temp;

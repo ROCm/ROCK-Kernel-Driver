@@ -237,8 +237,12 @@ fix_alignment(struct pt_regs *regs)
 	dsisr = regs->dsisr;
 
 	/* Power4 doesn't set DSISR for an alignment interrupt */
-	if (__is_processor(PV_POWER4) || __is_processor(PV_POWER4p))
-		dsisr = make_dsisr( *((unsigned *)regs->nip) );
+	if (__is_processor(PV_POWER4) || __is_processor(PV_POWER4p)) {
+		unsigned int real_instr;
+		if (__get_user(real_instr, (unsigned int *)regs->nip))
+			return 0;
+		dsisr = make_dsisr(real_instr);
+	}
 
 	/* extract the operation and registers from the dsisr */
 	reg = (dsisr >> 5) & 0x1f;	/* source/dest register */

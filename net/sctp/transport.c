@@ -1,7 +1,7 @@
 /* SCTP kernel reference Implementation
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001 International Business Machines Corp.
+ * Copyright (c) 2001-2003 International Business Machines Corp.
  * Copyright (c) 2001 Intel Corp.
  * Copyright (c) 2001 La Monte H.P. Yarroll
  *
@@ -42,6 +42,7 @@
  *    Xingang Guo           <xingang.guo@intel.com>
  *    Hui Huang             <hui.huang@nokia.com>
  *    Sridhar Samudrala	    <sri@us.ibm.com>
+ *    Ardelle Fan	    <ardelle.fan@intel.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -53,11 +54,12 @@
 /* 1st Level Abstractions.  */
 
 /* Allocate and initialize a new transport.  */
-sctp_transport_t *sctp_transport_new(const union sctp_addr *addr, int priority)
+struct sctp_transport *sctp_transport_new(const union sctp_addr *addr,
+					  int priority)
 {
-        sctp_transport_t *transport;
+        struct sctp_transport *transport;
 
-        transport = t_new(sctp_transport_t, priority);
+        transport = t_new(struct sctp_transport, priority);
 	if (!transport)
 		goto fail;
 
@@ -77,9 +79,9 @@ fail:
 }
 
 /* Intialize a new transport from provided memory.  */
-sctp_transport_t *sctp_transport_init(sctp_transport_t *peer,
-				      const union sctp_addr *addr,
-				      int priority)
+struct sctp_transport *sctp_transport_init(struct sctp_transport *peer,
+					   const union sctp_addr *addr,
+					   int priority)
 {
 	sctp_protocol_t *proto = sctp_get_protocol();
 
@@ -87,6 +89,9 @@ sctp_transport_t *sctp_transport_init(sctp_transport_t *peer,
 	peer->ipaddr = *addr;
 	peer->af_specific = sctp_get_af_specific(addr->sa.sa_family);
 	peer->asoc = NULL;
+
+	peer->dst = NULL;
+	memset(&peer->saddr, 0, sizeof(union sctp_addr));
 
 	/* From 6.3.1 RTO Calculation:
 	 *
@@ -139,7 +144,7 @@ sctp_transport_t *sctp_transport_init(sctp_transport_t *peer,
 /* This transport is no longer needed.  Free up if possible, or
  * delay until it last reference count.
  */
-void sctp_transport_free(sctp_transport_t *transport)
+void sctp_transport_free(struct sctp_transport *transport)
 {
 	transport->dead = 1;
 
@@ -153,7 +158,7 @@ void sctp_transport_free(sctp_transport_t *transport)
 /* Destroy the transport data structure.
  * Assumes there are no more users of this structure.
  */
-void sctp_transport_destroy(sctp_transport_t *transport)
+void sctp_transport_destroy(struct sctp_transport *transport)
 {
 	SCTP_ASSERT(transport->dead, "Transport is not dead", return);
 
@@ -168,7 +173,7 @@ void sctp_transport_destroy(sctp_transport_t *transport)
 /* Start T3_rtx timer if it is not already running and update the heartbeat
  * timer.  This routine is called everytime a DATA chunk is sent.
  */
-void sctp_transport_reset_timers(sctp_transport_t *transport)
+void sctp_transport_reset_timers(struct sctp_transport *transport)
 {
 	/* RFC 2960 6.3.2 Retransmission Timer Rules
 	 *
@@ -177,96 +182,61 @@ void sctp_transport_reset_timers(sctp_transport_t *transport)
 	 * start it running so that it will expire after the RTO of that
 	 * address.
 	 */
-	if (!timer_pending(&transport->T3_rtx_timer)) {
+
+	if (!timer_pending(&transport->T3_rtx_timer))
 		if (!mod_timer(&transport->T3_rtx_timer,
 			       jiffies + transport->rto))
 			sctp_transport_hold(transport);
-	}
 
 	/* When a data chunk is sent, reset the heartbeat interval.  */
 	if (!mod_timer(&transport->hb_timer,
-		       transport->hb_interval + transport->rto + jiffies))
-		sctp_transport_hold(transport);
+		       sctp_transport_timeout(transport)))
+	    sctp_transport_hold(transport);
 }
 
 /* This transport has been assigned to an association.
  * Initialize fields from the association or from the sock itself.
  * Register the reference count in the association.
  */
-void sctp_transport_set_owner(sctp_transport_t *transport,
+void sctp_transport_set_owner(struct sctp_transport *transport,
 			      sctp_association_t *asoc)
 {
 	transport->asoc = asoc;
 	sctp_association_hold(asoc);
 }
 
-/* Caches the dst entry for a transport's destination address and an optional
- * souce address.
- */ 
-void sctp_transport_route(sctp_transport_t *transport, union sctp_addr *saddr,
-			  struct sctp_opt *opt)
+/* Initialize the pmtu of a transport. */ 
+void sctp_transport_pmtu(struct sctp_transport *transport)
+{
+	struct dst_entry *dst;
+
+	dst = transport->af_specific->get_dst(NULL, &transport->ipaddr, NULL);
+
+	if (dst) {
+		transport->pmtu = dst_pmtu(dst);
+		dst_release(dst);
+	} else
+		transport->pmtu = SCTP_DEFAULT_MAXSEGMENT;
+}
+
+/* Caches the dst entry and source address for a transport's destination
+ * address.
+ */
+void sctp_transport_route(struct sctp_transport *transport,
+			  union sctp_addr *saddr, struct sctp_opt *opt)
 {
 	sctp_association_t *asoc = transport->asoc;
 	struct sctp_af *af = transport->af_specific;
 	union sctp_addr *daddr = &transport->ipaddr;
-	sctp_bind_addr_t *bp;
-	rwlock_t *addr_lock;
-	struct sockaddr_storage_list *laddr;
-	struct list_head *pos;
 	struct dst_entry *dst;
-	union sctp_addr dst_saddr;
 
-	dst = af->get_dst(daddr, saddr);
+	dst = af->get_dst(asoc, daddr, saddr);
 
-	/* If there is no association or if a source address is passed,
-	 * no more validation is required.
-	 */
-	if (!asoc || saddr)
-		goto out;
+	if (saddr)
+		memcpy(&transport->saddr, saddr, sizeof(union sctp_addr));
+	else
+		af->get_saddr(asoc, dst, daddr, &transport->saddr);
 
-	if (SCTP_STATE_ESTABLISHED == asoc->state) {
-		bp = &asoc->base.bind_addr;
-		addr_lock = &asoc->base.addr_lock;
-	} else {
-		bp = &asoc->ep->base.bind_addr;
-		addr_lock = &asoc->ep->base.addr_lock;
-	}
-
-	if (dst) {
-		/* Walk through the bind address list and look for a bind
-		 * address that matches the source address of the returned dst.
-		 */
-		sctp_read_lock(addr_lock);
-		list_for_each(pos, &bp->address_list) {
-			laddr = list_entry(pos, struct sockaddr_storage_list,
-					   list);
-			af->dst_saddr(&dst_saddr, dst);
-	                if (opt->pf->cmp_addr(&dst_saddr, &laddr->a, opt))
-				goto out_unlock;
-		}
-		sctp_read_unlock(addr_lock);
-	
-		/* None of the bound addresses match the source address of the
-		 * dst. So release it.
-		 */	
-		dst_release(dst);
-	}
-
-	/* Walk through the bind address list and try to get a dst that
-	 * matches a bind address as the source address.
-	 */
-	sctp_read_lock(addr_lock);
-	list_for_each(pos, &bp->address_list) {
-		laddr = list_entry(pos, struct sockaddr_storage_list, list);
-
-		dst = af->get_dst(daddr, &laddr->a);
-		if (dst)
-			goto out_unlock;
-	}
-
-out_unlock:
-	sctp_read_unlock(addr_lock);
-out:
 	transport->dst = dst;
 	if (dst)
 		transport->pmtu = dst_pmtu(dst);
@@ -275,7 +245,7 @@ out:
 }
 
 /* Hold a reference to a transport.  */
-void sctp_transport_hold(sctp_transport_t *transport)
+void sctp_transport_hold(struct sctp_transport *transport)
 {
 	atomic_inc(&transport->refcnt);
 }
@@ -283,14 +253,14 @@ void sctp_transport_hold(sctp_transport_t *transport)
 /* Release a reference to a transport and clean up
  * if there are no more references.
  */
-void sctp_transport_put(sctp_transport_t *transport)
+void sctp_transport_put(struct sctp_transport *transport)
 {
 	if (atomic_dec_and_test(&transport->refcnt))
 		sctp_transport_destroy(transport);
 }
 
 /* Update transport's RTO based on the newly calculated RTT. */
-void sctp_transport_update_rto(sctp_transport_t *tp, __u32 rtt)
+void sctp_transport_update_rto(struct sctp_transport *tp, __u32 rtt)
 {
 	sctp_protocol_t *proto = sctp_get_protocol();
 
@@ -330,7 +300,7 @@ void sctp_transport_update_rto(sctp_transport_t *tp, __u32 rtt)
 	if (tp->rttvar == 0)
 		tp->rttvar = SCTP_CLOCK_GRANULARITY;
 
-	/* 6.3.1 C3) After the computation, update RTO <- SRTT + 4 * RTTVAR.  */
+	/* 6.3.1 C3) After the computation, update RTO <- SRTT + 4 * RTTVAR. */
 	tp->rto = tp->srtt + (tp->rttvar << 2);
 
 	/* 6.3.1 C6) Whenever RTO is computed, if it is less than RTO.Min
@@ -360,8 +330,8 @@ void sctp_transport_update_rto(sctp_transport_t *tp, __u32 rtt)
 /* This routine updates the transport's cwnd and partial_bytes_acked
  * parameters based on the bytes acked in the received SACK.
  */
-void sctp_transport_raise_cwnd(sctp_transport_t *transport, __u32 sack_ctsn,
-			       __u32 bytes_acked)
+void sctp_transport_raise_cwnd(struct sctp_transport *transport,
+			       __u32 sack_ctsn, __u32 bytes_acked)
 {
 	__u32 cwnd, ssthresh, flight_size, pba, pmtu;
 
@@ -389,8 +359,8 @@ void sctp_transport_raise_cwnd(sctp_transport_t *transport, __u32 sack_ctsn,
 		 * two conditions are met can the cwnd be increased otherwise
 		 * the cwnd MUST not be increased. If these conditions are met
 		 * then cwnd MUST be increased by at most the lesser of
-		 * 1) the total size of the previously outstanding DATA chunk(s)
-		 * acknowledged, and 2) the destination's path MTU.
+		 * 1) the total size of the previously outstanding DATA 
+		 * chunk(s) acknowledged, and 2) the destination's path MTU.
 		 */
 		if (bytes_acked > pmtu)
 			cwnd += pmtu;
@@ -403,18 +373,18 @@ void sctp_transport_raise_cwnd(sctp_transport_t *transport, __u32 sack_ctsn,
 				  transport, bytes_acked, cwnd,
 				  ssthresh, flight_size, pba);
 	} else {
-		/* RFC 2960 7.2.2 Whenever cwnd is greater than ssthresh, upon
-		 * each SACK arrival that advances the Cumulative TSN Ack Point,
-		 * increase partial_bytes_acked by the total number of bytes of
-		 * all new chunks acknowledged in that SACK including chunks
-		 * acknowledged by the new Cumulative TSN Ack and by Gap Ack
-		 * Blocks.
+		/* RFC 2960 7.2.2 Whenever cwnd is greater than ssthresh, 
+		 * upon each SACK arrival that advances the Cumulative TSN Ack 
+		 * Point, increase partial_bytes_acked by the total number of 
+		 * bytes of all new chunks acknowledged in that SACK including 
+		 * chunks acknowledged by the new Cumulative TSN Ack and by 
+		 * Gap Ack Blocks.
 		 *
-		 * When partial_bytes_acked is equal to or greater than cwnd and
-		 * before the arrival of the SACK the sender had cwnd or more
-		 * bytes of data outstanding (i.e., before arrival of the SACK,
-		 * flightsize was greater than or equal to cwnd), increase cwnd
-		 * by MTU, and reset partial_bytes_acked to
+		 * When partial_bytes_acked is equal to or greater than cwnd 
+		 * and before the arrival of the SACK the sender had cwnd or 
+		 * more bytes of data outstanding (i.e., before arrival of the 
+		 * SACK, flightsize was greater than or equal to cwnd), 
+		 * increase cwnd by MTU, and reset partial_bytes_acked to
 		 * (partial_bytes_acked - cwnd).
 		 */
 		pba += bytes_acked;
@@ -437,7 +407,7 @@ void sctp_transport_raise_cwnd(sctp_transport_t *transport, __u32 sack_ctsn,
 /* This routine is used to lower the transport's cwnd when congestion is
  * detected.
  */
-void sctp_transport_lower_cwnd(sctp_transport_t *transport,
+void sctp_transport_lower_cwnd(struct sctp_transport *transport,
 			       sctp_lower_cwnd_t reason)
 {
 	switch (reason) {
@@ -513,4 +483,13 @@ void sctp_transport_lower_cwnd(sctp_transport_t *transport,
 			  "%d ssthresh: %d\n", __FUNCTION__,
 			  transport, reason,
 			  transport->cwnd, transport->ssthresh);
+}
+
+/* What is the next timeout value for this transport? */
+unsigned long sctp_transport_timeout(struct sctp_transport *t)
+{
+	unsigned long timeout;
+	timeout = t->hb_interval + t->rto + sctp_jitter(t->rto);
+	timeout += jiffies;
+	return timeout;
 }
