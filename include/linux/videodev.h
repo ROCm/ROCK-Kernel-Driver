@@ -4,6 +4,18 @@
 #include <linux/types.h>
 #include <linux/version.h>
 
+#if 0
+/*
+ * v4l2 is still work-in-progress, integration planed for 2.5.x
+ *   v4l2 project homepage:   http://www.thedirks.org/v4l2/
+ *   patches available from:  http://bytesex.org/patches/
+ */ 
+# define HAVE_V4L2 1
+# include <linux/videodev2.h>
+#else
+# undef HAVE_V4L2
+#endif
+
 #ifdef __KERNEL__
 
 #include <linux/poll.h>
@@ -13,24 +25,25 @@
 struct video_device
 {
 	struct module *owner;
-	char name[32];
-	int type;
+     	char name[32];
+ 	int type;       /* v4l1 */
+ 	int type2;      /* v4l2 */
 	int hardware;
-
-	int (*open)(struct video_device *, int mode);
-	void (*close)(struct video_device *);
-	long (*read)(struct video_device *, char *, unsigned long, int noblock);
-	/* Do we need a write method ? */
-	long (*write)(struct video_device *, const char *, unsigned long, int noblock);
-#if LINUX_VERSION_CODE >= 0x020100
-	unsigned int (*poll)(struct video_device *, struct file *, poll_table *);
-#endif
-	int (*ioctl)(struct video_device *, unsigned int , void *);
-	int (*mmap)(struct vm_area_struct *vma, struct video_device *, const char *, unsigned long);
-	int (*initialize)(struct video_device *);	
-	void *priv;		/* Used to be 'private' but that upsets C++ */
-	int busy;
 	int minor;
+
+ 	/* new interface -- we will use file_operations directly
+ 	 * like soundcore does.
+ 	 * kernel_ioctl() will be called by video_generic_ioctl.
+ 	 * video_generic_ioctl() does the userspace copying of the
+ 	 * ioctl arguments */
+ 	struct file_operations *fops;
+ 	int (*kernel_ioctl)(struct inode *inode, struct file *file,
+ 			    unsigned int cmd, void *arg);
+	void *priv;		/* Used to be 'private' but that upsets C++ */
+
+	/* for videodev.c intenal usage -- don't touch */
+	int users;
+	struct semaphore lock;
 	devfs_handle_t devfs_handle;
 };
 
@@ -43,8 +56,13 @@ extern int video_register_device(struct video_device *, int type, int nr);
 #define VFL_TYPE_VTX		3
 
 extern void video_unregister_device(struct video_device *);
-#endif
+extern struct video_device* video_devdata(struct file*);
 
+extern int video_exclusive_open(struct inode *inode, struct file *file);
+extern int video_exclusive_release(struct inode *inode, struct file *file);
+extern int video_generic_ioctl(struct inode *inode, struct file *file,
+			       unsigned int cmd, unsigned long arg);
+#endif /* __KERNEL__ */
 
 #define VID_TYPE_CAPTURE	1	/* Can capture */
 #define VID_TYPE_TUNER		2	/* Can tune */
@@ -150,6 +168,7 @@ struct video_audio
 #define VIDEO_AUDIO_VOLUME	4
 #define VIDEO_AUDIO_BASS	8
 #define VIDEO_AUDIO_TREBLE	16	
+#define VIDEO_AUDIO_BALANCE	32
 	char    name[16];
 #define VIDEO_SOUND_MONO	1
 #define VIDEO_SOUND_STEREO	2
@@ -379,4 +398,10 @@ struct video_code
 #define VID_HARDWARE_MEYE	32	/* Sony Vaio MotionEye cameras */
 #define VID_HARDWARE_CPIA2	33
 
-#endif
+#endif /* __LINUX_VIDEODEV_H */
+
+/*
+ * Local variables:
+ * c-basic-offset: 8
+ * End:
+ */
