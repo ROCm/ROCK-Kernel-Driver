@@ -53,6 +53,8 @@ static pidmap_t pidmap_array[PIDMAP_ENTRIES] =
 
 static pidmap_t *map_limit = pidmap_array + PIDMAP_ENTRIES;
 
+static spinlock_t pidmap_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
+
 inline void free_pidmap(int pid)
 {
 	pidmap_t *map = pidmap_array + pid / BITS_PER_PAGE;
@@ -77,8 +79,13 @@ static inline pidmap_t *next_free_map(pidmap_t *map, int *max_steps)
 			 * Free the page if someone raced with us
 			 * installing it:
 			 */
-			if (cmpxchg(&map->page, NULL, (void *) page))
+			spin_lock(&pidmap_lock);
+			if (map->page)
 				free_page(page);
+			else
+				map->page = (void *)page;
+			spin_unlock(&pidmap_lock);
+
 			if (!map->page)
 				break;
 		}

@@ -329,12 +329,11 @@ static inline void prune_one_dentry(struct dentry * dentry)
 void prune_dcache(int count)
 {
 	spin_lock(&dcache_lock);
-	for (;;) {
+	for (; count ; count--) {
 		struct dentry *dentry;
 		struct list_head *tmp;
 
 		tmp = dentry_unused.prev;
-
 		if (tmp == &dentry_unused)
 			break;
 		list_del_init(tmp);
@@ -349,12 +348,8 @@ void prune_dcache(int count)
 		dentry_stat.nr_unused--;
 
 		/* Unused dentry with a count? */
-		if (atomic_read(&dentry->d_count))
-			BUG();
-
+		BUG_ON(atomic_read(&dentry->d_count));
 		prune_one_dentry(dentry);
-		if (!--count)
-			break;
 	}
 	spin_unlock(&dcache_lock);
 }
@@ -573,19 +568,11 @@ void shrink_dcache_anon(struct list_head *head)
 
 /*
  * This is called from kswapd when we think we need some
- * more memory, but aren't really sure how much. So we
- * carefully try to free a _bit_ of our dcache, but not
- * too much.
- *
- * Priority:
- *   1 - very urgent: shrink everything
- *  ...
- *   6 - base-level: try to shrink a bit.
+ * more memory. 
  */
-int shrink_dcache_memory(int priority, unsigned int gfp_mask)
+int shrink_dcache_memory(int ratio, unsigned int gfp_mask)
 {
-	int count = 0;
-
+	int entries = dentry_stat.nr_dentry / ratio + 1;
 	/*
 	 * Nasty deadlock avoidance.
 	 *
@@ -600,11 +587,8 @@ int shrink_dcache_memory(int priority, unsigned int gfp_mask)
 	if (!(gfp_mask & __GFP_FS))
 		return 0;
 
-	count = dentry_stat.nr_unused / priority;
-
-	prune_dcache(count);
-	kmem_cache_shrink(dentry_cache);
-	return 0;
+	prune_dcache(entries);
+	return entries;
 }
 
 #define NAME_ALLOC_LEN(len)	((len+16) & ~15)

@@ -2150,3 +2150,20 @@ void __init sched_init(void)
 	enter_lazy_tlb(&init_mm, current, smp_processor_id());
 }
 
+#ifdef CONFIG_DEBUG_KERNEL
+void __might_sleep(char *file, int line)
+{
+#if defined(in_atomic)
+	static unsigned long prev_jiffy;	/* ratelimiting */
+
+	if (in_atomic()) {
+		if (time_before(jiffies, prev_jiffy + HZ))
+			return;
+		prev_jiffy = jiffies;
+		printk("Sleeping function called from illegal"
+				" context at %s:%d\n", file, line);
+		dump_stack();
+	}
+#endif
+}
+#endif

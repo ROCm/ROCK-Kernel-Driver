@@ -157,18 +157,12 @@ struct loop_func_table *xfer_funcs[MAX_LO_CRYPT] = {
 
 #define MAX_DISK_SIZE 1024*1024*1024
 
-static unsigned long
-compute_loop_size(struct loop_device *lo, struct dentry * lo_dentry)
-{
-	loff_t size = lo_dentry->d_inode->i_mapping->host->i_size;
-	return (size - lo->lo_offset) >> BLOCK_SIZE_BITS;
-}
-
 static void figure_loop_size(struct loop_device *lo)
 {
-	set_capacity(disks + lo->lo_number, compute_loop_size(lo,
-					lo->lo_backing_file->f_dentry));
-					
+	loff_t size = lo->lo_backing_file->f_dentry->d_inode->i_size;
+
+	set_capacity(disks + lo->lo_number,
+		     (size - lo->lo_offset) >> 9);
 }
 
 static inline int lo_do_transfer(struct loop_device *lo, int cmd, char *rbuf,

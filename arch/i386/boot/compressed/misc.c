@@ -121,7 +121,7 @@ static int vidport;
 static int lines, cols;
 
 #ifdef CONFIG_MULTIQUAD
-static void * const xquad_portio = NULL;
+static void * xquad_portio = NULL;
 #endif
 
 #include "../../../../lib/inflate.c"

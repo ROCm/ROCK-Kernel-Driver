@@ -252,7 +252,7 @@ static int flock_make_lock(struct file *filp,
 		return -ENOMEM;
 
 	fl->fl_file = filp;
-	fl->fl_pid = current->pid;
+	fl->fl_pid = current->tgid;
 	fl->fl_flags = (cmd & LOCK_NB) ? FL_FLOCK : FL_FLOCK | FL_SLEEP;
 	fl->fl_type = type;
 	fl->fl_end = OFFSET_MAX;
@@ -308,7 +308,7 @@ static int flock_to_posix_lock(struct file *filp, struct file_lock *fl,
 		fl->fl_end = OFFSET_MAX;
 	
 	fl->fl_owner = current->files;
-	fl->fl_pid = current->pid;
+	fl->fl_pid = current->tgid;
 	fl->fl_file = filp;
 	fl->fl_flags = FL_POSIX;
 	fl->fl_notify = NULL;
@@ -348,7 +348,7 @@ static int flock64_to_posix_lock(struct file *filp, struct file_lock *fl,
 		fl->fl_end = OFFSET_MAX;
 	
 	fl->fl_owner = current->files;
-	fl->fl_pid = current->pid;
+	fl->fl_pid = current->tgid;
 	fl->fl_file = filp;
 	fl->fl_flags = FL_POSIX;
 	fl->fl_notify = NULL;
@@ -377,7 +377,7 @@ static int lease_alloc(struct file *filp, int type, struct file_lock **flp)
 		return -ENOMEM;
 
 	fl->fl_owner = current->files;
-	fl->fl_pid = current->pid;
+	fl->fl_pid = current->tgid;
 
 	fl->fl_file = filp;
 	fl->fl_flags = FL_LEASE;
@@ -669,7 +669,7 @@ int locks_mandatory_area(int read_write, struct inode *inode,
 	int error;
 
 	fl.fl_owner = current->files;
-	fl.fl_pid = current->pid;
+	fl.fl_pid = current->tgid;
 	fl.fl_file = filp;
 	fl.fl_flags = FL_POSIX | FL_ACCESS | FL_SLEEP;
 	fl.fl_type = (read_write == FLOCK_VERIFY_WRITE) ? F_WRLCK : F_RDLCK;
@@ -1241,7 +1241,7 @@ int fcntl_setlease(unsigned int fd, struct file *filp, long arg)
 	*before = fl;
 	list_add(&fl->fl_link, &file_lock_list);
 
-	error = f_setown(filp, current->pid, 1);
+	error = f_setown(filp, current->tgid, 1);
 out_unlock:
 	unlock_kernel();
 	return error;
@@ -1632,7 +1632,7 @@ void locks_remove_posix(struct file *filp, fl_owner_t owner)
 	lock.fl_start = 0;
 	lock.fl_end = OFFSET_MAX;
 	lock.fl_owner = owner;
-	lock.fl_pid = current->pid;
+	lock.fl_pid = current->tgid;
 	lock.fl_file = filp;
 
 	if (filp->f_op && filp->f_op->lock != NULL) {

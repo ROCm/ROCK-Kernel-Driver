@@ -272,10 +272,9 @@ get_addr(unsigned long addr, unsigned long len)
 			return -ENOMEM;
 		if (!vma || ((addr + len) < vma->vm_start))
 			goto found_addr;
-		addr = vma->vm_end;
+		addr = HPAGE_ALIGN(vma->vm_end);
 	}
 found_addr:
-	addr = HPAGE_ALIGN(addr);
 	return addr;
 }
 

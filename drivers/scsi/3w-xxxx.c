@@ -148,6 +148,11 @@
                  Fix bug in raw command post with data ioctl method.
                  Fix bug where rollcall sometimes failed with cable errors.
                  Print unit # on all command timeouts.
+   1.02.00.026 - Fix possible infinite retry bug with power glitch induced
+                 drive timeouts.
+                 Cleanup some AEN severity levels.
+   1.02.00.027 - Add drive not supported AEN code for SATA controllers.
+                 Remove spurious unknown ioctl error message.
 */
 
 #include <linux/module.h>
@@ -201,7 +206,7 @@ static struct notifier_block tw_notifier = {
 };
 
 /* Globals */
-char *tw_driver_version="1.02.00.025";
+char *tw_driver_version="1.02.00.027";
 TW_Device_Extension *tw_device_extension_list[TW_MAX_SLOT];
 int tw_device_extension_count = 0;
 
@@ -212,7 +217,7 @@ int tw_aen_complete(TW_Device_Extension *tw_dev, int request_id)
 {
 	TW_Param *param;
 	unsigned short aen;
-	int error = 0;
+	int error = 0, table_max = 0;
 
 	dprintk(KERN_WARNING "3w-xxxx: tw_aen_complete()\n");
 	if (tw_dev->alignment_virtual_address[request_id] == NULL) {
@@ -227,7 +232,8 @@ int tw_aen_complete(TW_Device_Extension *tw_dev, int request_id)
 	if (aen == 0x0ff) {
 		printk(KERN_WARNING "3w-xxxx: scsi%d: AEN: INFO: AEN queue overflow.\n", tw_dev->host->host_no);
 	} else {
-		if ((aen & 0x0ff) < TW_AEN_STRING_MAX) {
+		table_max = sizeof(tw_aen_string)/sizeof(char *);
+		if ((aen & 0x0ff) < table_max) {
 			if ((tw_aen_string[aen & 0xff][strlen(tw_aen_string[aen & 0xff])-1]) == '#') {
 				printk(KERN_WARNING "3w-xxxx: scsi%d: AEN: %s%d.\n", tw_dev->host->host_no, tw_aen_string[aen & 0xff], aen >> 8);
 			} else {
@@ -289,7 +295,7 @@ int tw_aen_drain_queue(TW_Device_Extension *tw_dev)
 	int first_reset = 0;
 	int queue = 0;
 	int imax, i;
-	int found = 0;
+	int found = 0, table_max = 0;
 
 	dprintk(KERN_NOTICE "3w-xxxx: tw_aen_drain_queue()\n");
 
@@ -409,7 +415,8 @@ int tw_aen_drain_queue(TW_Device_Extension *tw_dev)
 						if (aen == 0x0ff) {
 							printk(KERN_WARNING "3w-xxxx: AEN: INFO: AEN queue overflow.\n");
 						} else {
-							if ((aen & 0x0ff) < TW_AEN_STRING_MAX) {
+							table_max = sizeof(tw_aen_string)/sizeof(char *);
+							if ((aen & 0x0ff) < table_max) {
 								if ((tw_aen_string[aen & 0xff][strlen(tw_aen_string[aen & 0xff])-1]) == '#') {
 									printk(KERN_WARNING "3w-xxxx: AEN: %s%d.\n", tw_aen_string[aen & 0xff], aen >> 8);
 								} else {
@@ -1442,7 +1449,8 @@ static void tw_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 
 					/* If error, command failed */
 					if (error == 1) {
-						tw_dev->srb[request_id]->result = (DID_RESET << 16);
+						/* Ask for a host reset */
+						tw_dev->srb[request_id]->result = (DID_OK << 16) | (CHECK_CONDITION << 1);
 					}
 
 					/* Now complete the io */
@@ -1784,7 +1792,7 @@ int tw_ioctl(TW_Device_Extension *tw_dev, int request_id)
 				return 1;
 			}
 		default:
-			printk(KERN_WARNING "3w-xxxx: Unknown ioctl 0x%x.\n", opcode);
+			dprintk(KERN_WARNING "3w-xxxx: Unknown ioctl 0x%x.\n", opcode);
 			tw_dev->state[request_id] = TW_S_COMPLETED;
 			tw_state_request_finish(tw_dev, request_id);
 			tw_dev->srb[request_id]->result = (DID_OK << 16);

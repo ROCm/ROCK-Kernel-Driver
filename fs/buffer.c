@@ -128,22 +128,18 @@ void unlock_buffer(struct buffer_head *bh)
  */
 void __wait_on_buffer(struct buffer_head * bh)
 {
-	wait_queue_head_t *wq = bh_waitq_head(bh);
-	struct task_struct *tsk = current;
-	DECLARE_WAITQUEUE(wait, tsk);
+	wait_queue_head_t *wqh = bh_waitq_head(bh);
+	DEFINE_WAIT(wait);
 
 	get_bh(bh);
-	add_wait_queue(wq, &wait);
 	do {
+		prepare_to_wait(wqh, &wait, TASK_UNINTERRUPTIBLE);
 		blk_run_queues();
-		set_task_state(tsk, TASK_UNINTERRUPTIBLE);
-		if (!buffer_locked(bh))
-			break;
-		schedule();
+		if (buffer_locked(bh))
+			schedule();
 	} while (buffer_locked(bh));
-	tsk->state = TASK_RUNNING;
-	remove_wait_queue(wq, &wait);
 	put_bh(bh);
+	finish_wait(wqh, &wait);
 }
 
 static inline void
@@ -246,10 +242,12 @@ int fsync_bdev(struct block_device *bdev)
 }
 
 /*
- * sync everything.
+ * sync everything.  Start out by waking pdflush, because that writes back
+ * all queues in parallel.
  */
 asmlinkage long sys_sync(void)
 {
+	wakeup_bdflush(0);
 	sync_inodes(0);	/* All mappings and inodes, including block devices */
 	DQUOT_SYNC(NULL);
 	sync_supers();	/* Write the superblocks */
