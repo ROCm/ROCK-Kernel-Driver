@@ -698,7 +698,7 @@ static void balance_internal_when_delete (struct tree_balance * tb,
 
 
 /* Replace delimiting key of buffers L[h] and S[h] by the given key.*/
-void	replace_lkey (
+static void replace_lkey (
 		      struct tree_balance * tb,
 		      int h,
 		      struct item_head * key
@@ -718,7 +718,7 @@ void	replace_lkey (
 
 
 /* Replace delimiting key of buffers S[h] and R[h] by the given key.*/
-void	replace_rkey (
+static void replace_rkey (
 		      struct tree_balance * tb,
 		      int h,
 		      struct item_head * key

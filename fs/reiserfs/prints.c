@@ -286,7 +286,7 @@ void reiserfs_info (struct super_block *sb, const char * fmt, ...)
 }
 
 /* No newline.. reiserfs_printk calls can be followed by printk's */
-void reiserfs_printk (const char * fmt, ...)
+static void reiserfs_printk (const char * fmt, ...)
 {
   do_reiserfs_warning(fmt);
   printk (error_buf);
@@ -366,30 +366,6 @@ void reiserfs_panic (struct super_block * sb, const char * fmt, ...)
 	 reiserfs_bdevname (sb), error_buf);
 }
 
-static void
-do_handle_error (struct super_block *sb, int errno)
-{
-    if (reiserfs_error_panic (sb)) {
-        panic ("REISERFS: panic (device %s): Panic forced after error\n",
-               reiserfs_bdevname (sb));
-    }
-
-    if (reiserfs_error_ro (sb)) {
-        printk (KERN_CRIT "REISERFS: error (device %s): Re-mounting fs "
-                "readonly\n", reiserfs_bdevname (sb));
-        reiserfs_journal_abort (sb, errno);
-    }
-}
-
-void
-reiserfs_error (struct super_block * sb, int errno, const char *fmt, ...)
-{
-    do_reiserfs_warning (fmt);
-    printk (KERN_CRIT "REISERFS: error (device %s): %s\n",
-            reiserfs_bdevname (sb), error_buf);
-    do_handle_error (sb, errno);
-}
-
 void
 reiserfs_abort (struct super_block *sb, int errno, const char *fmt, ...)
 {
@@ -409,53 +385,6 @@ reiserfs_abort (struct super_block *sb, int errno, const char *fmt, ...)
     sb->s_flags |= MS_RDONLY;
     reiserfs_journal_abort (sb, errno);
 }
-
-void print_virtual_node (struct virtual_node * vn)
-{
-    int i;
-    struct virtual_item * vi;
-
-    printk ("VIRTUAL NODE CONTAINS %d items, has size %d,%s,%s, ITEM_POS=%d POS_IN_ITEM=%d MODE=\'%c\'\n",
-	    vn->vn_nr_item, vn->vn_size,
-	    (vn->vn_vi[0].vi_type & VI_TYPE_LEFT_MERGEABLE )? "left mergeable" : "", 
-	    (vn->vn_vi[vn->vn_nr_item - 1].vi_type & VI_TYPE_RIGHT_MERGEABLE) ? "right mergeable" : "",
-	    vn->vn_affected_item_num, vn->vn_pos_in_item, vn->vn_mode);
-    
-    vi = vn->vn_vi;
-    for (i = 0; i < vn->vn_nr_item; i ++, vi ++)
-	op_print_vi (vi);
-	
-}
-
-
-void print_path (struct tree_balance * tb, struct path * path)
-{
-    int h = 0;
-    struct buffer_head * bh;
-    
-    if (tb) {
-	while (tb->insert_size[h]) {
-	    bh = PATH_H_PBUFFER (path, h);
-	    printk ("block %llu (level=%d), position %d\n", bh ? (unsigned long long)bh->b_blocknr : 0LL,
-		    bh ? B_LEVEL (bh) : 0, PATH_H_POSITION (path, h));
-	    h ++;
-	}
-  } else {
-      int offset = path->path_length;
-      struct buffer_head * bh;
-      printk ("Offset    Bh     (b_blocknr, b_count) Position Nr_item\n");
-      while ( offset > ILLEGAL_PATH_ELEMENT_OFFSET ) {
-	  bh = PATH_OFFSET_PBUFFER (path, offset);
-	  printk ("%6d %10p (%9llu, %7d) %8d %7d\n", offset, 
-		  bh, bh ? (unsigned long long)bh->b_blocknr : 0LL, bh ? atomic_read (&(bh->b_count)) : 0,
-		  PATH_OFFSET_POSITION (path, offset), bh ? B_NR_ITEMS (bh) : -1);
-	  
-	  offset --;
-      }
-  }
-
-}
-
 
 /* this prints internal nodes (4 keys/items in line) (dc_number,
    dc_size)[k_dirid, k_objectid, k_offset, k_uniqueness](dc_number,
@@ -648,7 +577,7 @@ void print_block (struct buffer_head * bh, ...)//int print_mode, int first, int 
 
 
 
-char print_tb_buf[2048];
+static char print_tb_buf[2048];
 
 /* this stores initial state of tree balance in the print_tb_buf */
 void store_print_tb (struct tree_balance * tb)
