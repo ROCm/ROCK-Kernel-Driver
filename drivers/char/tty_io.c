@@ -423,8 +423,6 @@ void do_tty_hangup(void *data)
 		redirect = NULL;
 	}
 	spin_unlock(&redirect_lock);
-	if (f)
-		fput(f);
 	
 	check_tty_count(tty, "do_tty_hangup");
 	file_list_lock();
@@ -512,6 +510,8 @@ void do_tty_hangup(void *data)
 	} else if (tty->driver->hangup)
 		(tty->driver->hangup)(tty);
 	unlock_kernel();
+	if (f)
+		fput(f);
 }
 
 void tty_hangup(struct tty_struct * tty)
