@@ -171,7 +171,7 @@ static unsigned long timer_reload;
  * Returns number of ms since last clock interrupt.  Note that interrupts
  * will have been disabled by do_gettimeoffset()
  */
-static unsigned long integrator_gettimeoffset(void)
+unsigned long integrator_gettimeoffset(void)
 {
 	volatile TimerStruct_t *timer1 = (TimerStruct_t *)TIMER1_VA_BASE;
 	unsigned long ticks1, ticks2, status;

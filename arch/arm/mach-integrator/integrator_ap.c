@@ -40,6 +40,7 @@
 #include <asm/mach/flash.h>
 #include <asm/mach/irq.h>
 #include <asm/mach/map.h>
+#include <asm/mach/time.h>
 
 #include "common.h"
 
