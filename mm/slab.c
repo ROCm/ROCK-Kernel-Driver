@@ -2408,11 +2408,19 @@ static void *s_start(struct seq_file *m, loff_t *pos)
 		 * Output format version, so at least we can change it
 		 * without _too_ many complaints.
 		 */
-		seq_puts(m, "slabinfo - version: 1.2"
 #if STATS
-				" (statistics)"
+		seq_puts(m, "slabinfo - version: 2.0 (statistics)\n");
+#else
+		seq_puts(m, "slabinfo - version: 2.0\n");
 #endif
-				"\n");
+		seq_puts(m, "# name            <active_objs> <num_objs> <objsize> <objperslab> <pagesperslab>");
+		seq_puts(m, " : tunables <batchcount> <limit <sharedfactor>");
+		seq_puts(m, " : slabdata <active_slabs> <num_slabs> <sharedavail>");
+#if STATS
+		seq_puts(m, " : globalstat <listallocs> <maxobjs> <grown> <reaped> <error> <maxfreeable> <freelimit>");
+		seq_puts(m, " : cpustat <allochit <allocmiss <freehit <freemiss>");
+#endif
+		seq_putc(m, '\n');
 	}
 	p = cache_chain.next;
 	while (n--) {
@@ -2496,13 +2504,16 @@ static int s_show(struct seq_file *m, void *p)
 	if (error)
 		printk(KERN_ERR "slab: cache %s error: %s\n", name, error);
 
-	seq_printf(m, "%-17s %6lu %6lu %6u %4lu %4lu %4u",
+	seq_printf(m, "%-17s %6lu %6lu %6u %4u %4d",
 		name, active_objs, num_objs, cachep->objsize,
-		active_slabs, num_slabs, (1<<cachep->gfporder));
-
-	seq_printf(m, " : %4u %4u", cachep->limit, cachep->batchcount);
+		cachep->num, (1<<cachep->gfporder));
+	seq_printf(m, " : tunables %4u %4u %4u",
+			cachep->limit, cachep->batchcount,
+			cachep->lists.shared->limit/cachep->batchcount);
+	seq_printf(m, " : slabdata %6lu %6lu %6u",
+			active_slabs, num_slabs, cachep->lists.shared->avail);
 #if STATS
-	{	// list3 stats
+	{	/* list3 stats */
 		unsigned long high = cachep->high_mark;
 		unsigned long allocs = cachep->num_allocations;
 		unsigned long grown = cachep->grown;
@@ -2511,22 +2522,23 @@ static int s_show(struct seq_file *m, void *p)
 		unsigned long max_freeable = cachep->max_freeable;
 		unsigned long free_limit = cachep->free_limit;
 
-		seq_printf(m, " : %6lu %7lu %5lu %4lu %4lu %4lu %4lu",
-				high, allocs, grown, reaped, errors, 
+		seq_printf(m, " : globalstat %7lu %6lu %5lu %4lu %4lu %4lu %4lu",
+				allocs, high, grown, reaped, errors, 
 				max_freeable, free_limit);
 	}
-	{	// cpucache stats
+	/* cpu stats */
+	{
 		unsigned long allochit = atomic_read(&cachep->allochit);
 		unsigned long allocmiss = atomic_read(&cachep->allocmiss);
 		unsigned long freehit = atomic_read(&cachep->freehit);
 		unsigned long freemiss = atomic_read(&cachep->freemiss);
 
-		seq_printf(m, " : %6lu %6lu %6lu %6lu",
-				allochit, allocmiss, freehit, freemiss);
+		seq_printf(m, " : cpustat %6lu %6lu %6lu %6lu",
+			allochit, allocmiss, freehit, freemiss);
 	}
 #endif
-	spin_unlock_irq(&cachep->spinlock);
 	seq_putc(m, '\n');
+	spin_unlock_irq(&cachep->spinlock);
 	return 0;
 }
 
