@@ -73,6 +73,11 @@
 #define writea(value, ptr)		writel(value, ptr)
 #endif
 
+static inline struct net_device *port_to_dev(port_t *port)
+{
+	return port->dev;
+}
+
 static inline int sca_intr_status(card_t *card)
 {
 	u8 result = 0;
@@ -110,21 +115,10 @@ static inline int sca_intr_status(card_t *card)
 	return result;
 }
 
-
-
-static inline port_t* hdlc_to_port(hdlc_device *hdlc)
-{
-	return (port_t*)hdlc;
-}
-
-
-
 static inline port_t* dev_to_port(struct net_device *dev)
 {
-	return hdlc_to_port(dev_to_hdlc(dev));
+	return dev_to_hdlc(dev)->priv;
 }
-
-
 
 static inline u16 next_desc(port_t *port, u16 desc, int transmit)
 {
@@ -245,7 +239,7 @@ static void sca_init_sync_port(port_t *port)
 	}
 
 	hdlc_set_carrier(!(sca_in(get_msci(port) + ST3, card) & ST3_DCD),
-			 &port->hdlc);
+			 port_to_dev(port));
 }
 
 
@@ -262,13 +256,14 @@ static inline void sca_msci_intr(port_t *port)
 	sca_out(stat & (ST1_UDRN | ST1_CDCD), msci + ST1, card);
 
 	if (stat & ST1_UDRN) {
-		port->hdlc.stats.tx_errors++; /* TX Underrun error detected */
-		port->hdlc.stats.tx_fifo_errors++;
+		struct net_device_stats *stats = hdlc_stats(port_to_dev(port));
+		stats->tx_errors++; /* TX Underrun error detected */
+		stats->tx_fifo_errors++;
 	}
 
 	if (stat & ST1_CDCD)
 		hdlc_set_carrier(!(sca_in(msci + ST3, card) & ST3_DCD),
-				 &port->hdlc);
+				 port_to_dev(port));
 }
 #endif
 
@@ -276,6 +271,8 @@ static inline void sca_msci_intr(port_t *port)
 
 static inline void sca_rx(card_t *card, port_t *port, pkt_desc *desc, u16 rxin)
 {
+	struct net_device *dev = port_to_dev(port);
+	struct net_device_stats *stats = hdlc_stats(dev);
 	struct sk_buff *skb;
 	u16 len;
 	u32 buff;
@@ -287,7 +284,7 @@ static inline void sca_rx(card_t *card, port_t *port, pkt_desc *desc, u16 rxin)
 	len = readw(&desc->len);
 	skb = dev_alloc_skb(len);
 	if (!skb) {
-		port->hdlc.stats.rx_dropped++;
+		stats->rx_dropped++;
 		return;
 	}
 
@@ -313,15 +310,15 @@ static inline void sca_rx(card_t *card, port_t *port, pkt_desc *desc, u16 rxin)
 #endif
 	skb_put(skb, len);
 #ifdef DEBUG_PKT
-	printk(KERN_DEBUG "%s RX(%i):", hdlc_to_name(&port->hdlc), skb->len);
+	printk(KERN_DEBUG "%s RX(%i):", dev->name, skb->len);
 	debug_frame(skb);
 #endif
-	port->hdlc.stats.rx_packets++;
-	port->hdlc.stats.rx_bytes += skb->len;
+	stats->rx_packets++;
+	stats->rx_bytes += skb->len;
 	skb->mac.raw = skb->data;
-	skb->dev = hdlc_to_dev(&port->hdlc);
+	skb->dev = dev;
 	skb->dev->last_rx = jiffies;
-	skb->protocol = hdlc_type_trans(skb, hdlc_to_dev(&port->hdlc));
+	skb->protocol = hdlc_type_trans(skb, dev);
 	netif_rx(skb);
 }
 
@@ -333,7 +330,7 @@ static inline void sca_rx_intr(port_t *port)
 	u16 dmac = get_dmac_rx(port);
 	card_t *card = port_to_card(port);
 	u8 stat = sca_in(DSR_RX(phy_node(port)), card); /* read DMA Status */
-	struct net_device_stats *stats = &port->hdlc.stats;
+	struct net_device_stats *stats = hdlc_stats(port_to_dev(port));
 
 	/* Reset DSR status bits */
 	sca_out((stat & (DSR_EOT | DSR_EOM | DSR_BOF | DSR_COF)) | DSR_DWE,
@@ -380,6 +377,8 @@ static inline void sca_rx_intr(port_t *port)
 /* Transmit DMA interrupt service */
 static inline void sca_tx_intr(port_t *port)
 {
+	struct net_device *dev = port_to_dev(port);
+	struct net_device_stats *stats = hdlc_stats(dev);
 	u16 dmac = get_dmac_tx(port);
 	card_t* card = port_to_card(port);
 	u8 stat;
@@ -401,13 +400,13 @@ static inline void sca_tx_intr(port_t *port)
 			break;	/* Transmitter is/will_be sending this frame */
 
 		desc = desc_address(port, port->txlast, 1);
-		port->hdlc.stats.tx_packets++;
-		port->hdlc.stats.tx_bytes += readw(&desc->len);
+		stats->tx_packets++;
+		stats->tx_bytes += readw(&desc->len);
 		writeb(0, &desc->stat);	/* Free descriptor */
 		port->txlast = next_desc(port, port->txlast, 1);
 	}
 
-	netif_wake_queue(hdlc_to_dev(&port->hdlc));
+	netif_wake_queue(dev);
 	spin_unlock(&port->lock);
 }
 
@@ -508,9 +507,9 @@ static void sca_set_port(port_t *port)
 
 
 
-static void sca_open(hdlc_device *hdlc)
+static void sca_open(struct net_device *dev)
 {
-	port_t *port = hdlc_to_port(hdlc);
+	port_t *port = dev_to_port(dev);
 	card_t* card = port_to_card(port);
 	u16 msci = get_msci(port);
 	u8 md0, md2;
@@ -569,7 +568,7 @@ static void sca_open(hdlc_device *hdlc)
    - all DMA interrupts
 */
 
-	hdlc_set_carrier(!(sca_in(msci + ST3, card) & ST3_DCD), hdlc);
+	hdlc_set_carrier(!(sca_in(msci + ST3, card) & ST3_DCD), dev);
 
 #ifdef __HD64570_H
 	/* MSCI TX INT and RX INT A IRQ enable */
@@ -600,18 +599,18 @@ static void sca_open(hdlc_device *hdlc)
 	sca_out(CMD_TX_ENABLE, msci + CMD, card);
 	sca_out(CMD_RX_ENABLE, msci + CMD, card);
 
-	netif_start_queue(hdlc_to_dev(hdlc));
+	netif_start_queue(dev);
 }
 
 
 
-static void sca_close(hdlc_device *hdlc)
+static void sca_close(struct net_device *dev)
 {
-	port_t *port = hdlc_to_port(hdlc);
+	port_t *port = dev_to_port(dev);
 	card_t* card = port_to_card(port);
 
 	/* reset channel */
-	netif_stop_queue(hdlc_to_dev(hdlc));
+	netif_stop_queue(dev);
 	sca_out(CMD_RESET, get_msci(port) + CMD, port_to_card(port));
 #ifdef __HD64570_H
 	/* disable MSCI interrupts */
@@ -629,7 +628,7 @@ static void sca_close(hdlc_device *hdlc)
 
 
 
-static int sca_attach(hdlc_device *hdlc, unsigned short encoding,
+static int sca_attach(struct net_device *dev, unsigned short encoding,
 		      unsigned short parity)
 {
 	if (encoding != ENCODING_NRZ &&
@@ -650,17 +649,17 @@ static int sca_attach(hdlc_device *hdlc, unsigned short encoding,
 	    parity != PARITY_CRC16_PR1_CCITT)
 		return -EINVAL;
 
-	hdlc_to_port(hdlc)->encoding = encoding;
-	hdlc_to_port(hdlc)->parity = parity;
+	dev_to_port(dev)->encoding = encoding;
+	dev_to_port(dev)->parity = parity;
 	return 0;
 }
 
 
 
 #ifdef DEBUG_RINGS
-static void sca_dump_rings(hdlc_device *hdlc)
+static void sca_dump_rings(struct net_device *dev)
 {
-	port_t *port = hdlc_to_port(hdlc);
+	port_t *port = dev_to_port(dev);
 	card_t *card = port_to_card(port);
 	u16 cnt;
 #if !defined(PAGE0_ALWAYS_MAPPED) && !defined(ALL_PAGES_ALWAYS_MAPPED)
@@ -729,8 +728,7 @@ static void sca_dump_rings(hdlc_device *hdlc)
 
 static int sca_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	hdlc_device *hdlc = dev_to_hdlc(dev);
-	port_t *port = hdlc_to_port(hdlc);
+	port_t *port = dev_to_port(dev);
 	card_t *card = port_to_card(port);
 	pkt_desc *desc;
 	u32 buff, len;
@@ -753,7 +751,7 @@ static int sca_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 
 #ifdef DEBUG_PKT
-	printk(KERN_DEBUG "%s TX(%i):", hdlc_to_name(hdlc), skb->len);
+	printk(KERN_DEBUG "%s TX(%i):", dev->name, skb->len);
 	debug_frame(skb);
 #endif
 
@@ -790,7 +788,7 @@ static int sca_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	desc = desc_address(port, port->txin + 1, 1);
 	if (readb(&desc->stat)) /* allow 1 packet gap */
-		netif_stop_queue(hdlc_to_dev(&port->hdlc));
+		netif_stop_queue(dev);
 
 	spin_unlock_irq(&port->lock);
 
