@@ -60,8 +60,8 @@ read(struct file * file, char __user * userbuf, size_t count, loff_t * off)
 static int
 flush_write(struct dentry *dentry, char *buffer, loff_t offset, size_t count)
 {
-	struct bin_attribute *attr = to_bin_attr(dentry->d_parent);
-	struct kobject *kobj = to_kobj(dentry);
+	struct bin_attribute *attr = to_bin_attr(dentry);
+	struct kobject *kobj = to_kobj(dentry->d_parent);
 
 	return attr->write(kobj, buffer, offset, count);
 }
