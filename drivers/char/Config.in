@@ -8,6 +8,9 @@ bool 'Virtual terminal' CONFIG_VT
 if [ "$CONFIG_VT" = "y" ]; then
    bool '  Support for console on virtual terminal' CONFIG_VT_CONSOLE
 fi
+if [ "$CONFIG_VT" = "y" -a "$CONFIG_S390" != "y" -a "$CONFIG_UM" != "y" ]; then
+   define_bool CONFIG_HW_CONSOLE y
+fi
 bool 'Non-standard serial port support' CONFIG_SERIAL_NONSTANDARD
 if [ "$CONFIG_SERIAL_NONSTANDARD" = "y" ]; then
    tristate '  Computone IntelliPort Plus serial support' CONFIG_COMPUTONE
