@@ -26,6 +26,7 @@
 #include <linux/hdreg.h>
 #include <linux/bootmem.h>
 #include <linux/tty.h>
+#include <linux/gfp.h>
 #include <linux/percpu.h>
 #include <linux/kernel_stat.h>
 #include <linux/security.h>
@@ -388,6 +389,7 @@ asmlinkage void __init start_kernel(void)
 	setup_arch(&command_line);
 	setup_per_cpu_areas();
 	build_all_zonelists();
+	page_alloc_init();
 	printk("Kernel command line: %s\n", saved_command_line);
 	parse_options(command_line);
 	trap_init();

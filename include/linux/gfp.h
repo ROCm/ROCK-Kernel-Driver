@@ -86,4 +86,6 @@ extern void FASTCALL(free_pages(unsigned long addr, unsigned int order));
 #define __free_page(page) __free_pages((page), 0)
 #define free_page(addr) free_pages((addr),0)
 
+void page_alloc_init(void);
+
 #endif /* __LINUX_GFP_H */

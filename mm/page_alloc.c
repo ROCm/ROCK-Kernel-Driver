@@ -25,6 +25,7 @@
 #include <linux/pagevec.h>
 #include <linux/blkdev.h>
 #include <linux/slab.h>
+#include <linux/notifier.h>
 
 struct pglist_data *pgdat_list;
 unsigned long totalram_pages;
@@ -573,8 +574,8 @@ unsigned int nr_free_highpages (void)
  * The result is unavoidably approximate - it can change
  * during and after execution of this function.
  */
-struct page_state page_states[NR_CPUS] __cacheline_aligned;
-EXPORT_SYMBOL(page_states);
+DEFINE_PER_CPU(struct page_state, page_states) = {0};
+EXPORT_PER_CPU_SYMBOL(page_states);
 
 void __get_page_state(struct page_state *ret, int nr)
 {
@@ -587,7 +588,7 @@ void __get_page_state(struct page_state *ret, int nr)
 		if (!cpu_online(cpu))
 			continue;
 
-		in = (unsigned long *)(page_states + cpu);
+		in = (unsigned long *)&per_cpu(page_states, cpu);
 		out = (unsigned long *)ret;
 		for (off = 0; off < nr; off++)
 			*out++ += *in++;
@@ -1197,3 +1198,33 @@ struct seq_operations vmstat_op = {
 };
 
 #endif /* CONFIG_PROC_FS */
+
+static void __devinit init_page_alloc_cpu(int cpu)
+{
+	struct page_state *ps = &per_cpu(page_states, cpu);
+	memset(ps, 0, sizeof(*ps));
+}
+	
+static int __devinit page_alloc_cpu_notify(struct notifier_block *self, 
+				unsigned long action, void *hcpu)
+{
+	int cpu = (unsigned long)hcpu;
+	switch(action) {
+	case CPU_UP_PREPARE:
+		init_page_alloc_cpu(cpu);
+		break;
+	default:
+		break;
+	}
+	return NOTIFY_OK;
+}
+
+static struct notifier_block __devinitdata page_alloc_nb = {
+	.notifier_call	= page_alloc_cpu_notify,
+};
+
+void __init page_alloc_init(void)
+{
+	init_page_alloc_cpu(smp_processor_id());
+	register_cpu_notifier(&page_alloc_nb);
+}
