@@ -827,8 +827,6 @@ shrink_caches(struct zone **zones, int priority, int *total_scanned,
 			max_scan = to_reclaim * 2;
 		ret += shrink_zone(zone, max_scan, gfp_mask,
 				to_reclaim, total_scanned, ps);
-		if (ret >= nr_pages)
-			break;
 	}
 	return ret;
 }
