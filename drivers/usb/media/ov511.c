@@ -45,6 +45,7 @@
 #include <asm/semaphore.h>
 #include <asm/processor.h>
 #include <linux/mm.h>
+#include <linux/device.h>
 
 #if defined (__i386__)
 	#include <asm/cpufeature.h>
@@ -4042,7 +4043,7 @@ static int
 ov51x_v4l1_open(struct inode *inode, struct file *file)
 {
 	struct video_device *vdev = video_devdata(file);
-	struct usb_ov511 *ov = vdev->priv;
+	struct usb_ov511 *ov = video_get_drvdata(vdev);
 	int err, i;
 
 	PDEBUG(4, "opening");
@@ -4099,7 +4100,7 @@ static int
 ov51x_v4l1_close(struct inode *inode, struct file *file)
 {
 	struct video_device *vdev = file->private_data;
-	struct usb_ov511 *ov = vdev->priv;
+	struct usb_ov511 *ov = video_get_drvdata(vdev);
 
 	PDEBUG(4, "ov511_close");
 
@@ -4141,7 +4142,7 @@ ov51x_v4l1_ioctl_internal(struct inode *inode, struct file *file,
 			  unsigned int cmd, void *arg)
 {
 	struct video_device *vdev = file->private_data;
-	struct usb_ov511 *ov = vdev->priv;
+	struct usb_ov511 *ov = video_get_drvdata(vdev);
 	PDEBUG(5, "IOCtl: 0x%X", cmd);
 
 	if (!ov->dev)
@@ -4542,7 +4543,7 @@ redo:
 
 		memset(vu, 0, sizeof(struct video_unit));
 
-		vu->video = ov->vdev.minor;
+		vu->video = ov->vdev->minor;
 		vu->vbi = VIDEO_NO_UNIT;
 		vu->radio = VIDEO_NO_UNIT;
 		vu->audio = VIDEO_NO_UNIT;
@@ -4581,7 +4582,7 @@ ov51x_v4l1_ioctl(struct inode *inode, struct file *file,
 		 unsigned int cmd, unsigned long arg)
 {
 	struct video_device *vdev = file->private_data;
-	struct usb_ov511 *ov = vdev->priv;
+	struct usb_ov511 *ov = video_get_drvdata(vdev);
 	int rc;
 
 	if (down_interruptible(&ov->lock))
@@ -4599,7 +4600,7 @@ ov51x_v4l1_read(struct file *file, char *buf, size_t cnt, loff_t *ppos)
 	struct video_device *vdev = file->private_data;
 	int noblock = file->f_flags&O_NONBLOCK;
 	unsigned long count = cnt;
-	struct usb_ov511 *ov = vdev->priv;
+	struct usb_ov511 *ov = video_get_drvdata(vdev);
 	int i, rc = 0, frmx = -1;
 	struct ov511_frame *frame;
 
@@ -4753,7 +4754,7 @@ ov51x_v4l1_mmap(struct file *file, struct vm_area_struct *vma)
 	struct video_device *vdev = file->private_data;
 	unsigned long start = vma->vm_start;
 	unsigned long size  = vma->vm_end - vma->vm_start;
-	struct usb_ov511 *ov = vdev->priv;
+	struct usb_ov511 *ov = video_get_drvdata(vdev);
 	unsigned long page, pos;
 
 	if (ov->dev == NULL)
@@ -4805,6 +4806,8 @@ static struct video_device vdev_template = {
 	.type =		VID_TYPE_CAPTURE,
 	.hardware =	VID_HARDWARE_OV511,
 	.fops =		&ov511_fops,
+	.release =	video_device_release,
+	.minor =	-1,
 };
 
 /****************************************************************************
@@ -5688,7 +5691,6 @@ ov51x_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	struct usb_interface_descriptor *idesc;
 	struct usb_ov511 *ov;
 	int i;
-	int registered = 0;
 
 	PDEBUG(1, "probing for device...");
 
@@ -5748,7 +5750,7 @@ ov51x_probe(struct usb_interface *intf, const struct usb_device_id *id)
 		break;
 	default:
 		err("Unknown product ID 0x%04x", dev->descriptor.idProduct);
-		goto error_dealloc;
+		goto error;
 	}
 
 	info("USB %s video device found", symbolic(brglist, ov->bridge));
@@ -5765,7 +5767,7 @@ ov51x_probe(struct usb_interface *intf, const struct usb_device_id *id)
 
 	if (usb_make_path(dev, ov->usb_path, OV511_USB_PATH_LEN) < 0) {
 		err("usb_make_path error");
-		goto error_dealloc;
+		goto error;
 	}
 
 	/* Allocate control transfer buffer. */
@@ -5807,36 +5809,46 @@ ov51x_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	}
 #endif
 
-	memcpy(&ov->vdev, &vdev_template, sizeof(vdev_template));
-	ov->vdev.priv = ov;
+	ov->vdev = video_device_alloc();
+	if (!ov->vdev)
+		goto error;
+
+	memcpy(ov->vdev, &vdev_template, sizeof(*ov->vdev));
+	ov->vdev->dev = &dev->dev;
+	video_set_drvdata(ov->vdev, ov);
 
 	for (i = 0; i < OV511_MAX_UNIT_VIDEO; i++) {
 		/* Minor 0 cannot be specified; assume user wants autodetect */
 		if (unit_video[i] == 0)
 			break;
 
-		if (video_register_device(&ov->vdev, VFL_TYPE_GRABBER,
+		if (video_register_device(ov->vdev, VFL_TYPE_GRABBER,
 			unit_video[i]) >= 0) {
-			registered = 1;
 			break;
 		}
 	}
 
 	/* Use the next available one */
-	if (!registered &&
-	    video_register_device(&ov->vdev, VFL_TYPE_GRABBER, -1) < 0) {
+	if ((ov->vdev->minor == -1) &&
+	    video_register_device(ov->vdev, VFL_TYPE_GRABBER, -1) < 0) {
 		err("video_register_device failed");
 		goto error;
 	}
 
 	info("Device at %s registered to minor %d", ov->usb_path,
-	     ov->vdev.minor);
+	     ov->vdev->minor);
 
-
-	usb_set_intfdata (intf, ov);
+	usb_set_intfdata(intf, ov);
 	return 0;
 
 error:
+	if (ov->vdev) {
+		if (-1 == ov->vdev->minor)
+			video_device_release(ov->vdev);
+		else
+			video_unregister_device(ov->vdev);
+		ov->vdev = NULL;
+	}
 
 	if (ov->cbuf) {
 		down(&ov->cbuf_lock);
@@ -5845,7 +5857,6 @@ error:
 		up(&ov->cbuf_lock);
 	}
 
-error_dealloc:
 	if (ov) {
 		kfree(ov);
 		ov = NULL;
@@ -5859,7 +5870,7 @@ error_out:
 static void
 ov51x_disconnect(struct usb_interface *intf)
 {
-	struct usb_ov511 *ov = usb_get_intfdata (intf);
+	struct usb_ov511 *ov = usb_get_intfdata(intf);
 	int n;
 
 	PDEBUG(3, "");
@@ -5869,9 +5880,8 @@ ov51x_disconnect(struct usb_interface *intf)
 	if (!ov)
 		return;
 
-	video_unregister_device(&ov->vdev);
-	if (ov->user)
-		PDEBUG(3, "Device open...deferring video_unregister_device");
+	if (ov->vdev)
+		video_unregister_device(ov->vdev);
 
 	for (n = 0; n < OV511_NUMFRAMES; n++)
 		ov->frame[n].grabstate = FRAME_ERROR;
@@ -5886,7 +5896,6 @@ ov51x_disconnect(struct usb_interface *intf)
 
 	ov->streaming = 0;
 	ov51x_unlink_isoc(ov);
-
 
 	ov->dev = NULL;
 

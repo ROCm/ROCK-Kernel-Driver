@@ -407,9 +407,7 @@ struct ov51x_decomp_ops {
 };
 
 struct usb_ov511 {
-	struct video_device vdev;
-
-	/* Device structure */
+	struct video_device *vdev;
 	struct usb_device *dev;
 
 	int customid;
