@@ -9,7 +9,7 @@
  *
  * /proc interface for the dasd driver.
  *
- * $Revision: 1.26 $
+ * $Revision: 1.27 $
  */
 
 #include <linux/config.h>
@@ -77,7 +77,7 @@ dasd_devices_show(struct seq_file *m, void *v)
 	else
 		seq_printf(m, " is ????????");
 	/* Print devices features. */
-	substr = device->ro_flag ? "(ro)" : " ";
+	substr = test_bit(DASD_FLAG_RO, &device->flags) ? "(ro)" : " ";
 	seq_printf(m, "%4s: ", substr);
 	/* Print device status information. */
 	switch ((device != NULL) ? device->state : -1) {

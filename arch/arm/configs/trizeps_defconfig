@@ -493,7 +493,6 @@ CONFIG_BLK_DEV_IDECS=m
 # CONFIG_BLK_DEV_IDE_RAPIDE is not set
 # CONFIG_IDE_CHIPSETS is not set
 # CONFIG_IDEDMA_AUTO is not set
-# CONFIG_DMA_NONPCI is not set
 
 #
 # SCSI support

@@ -27,6 +27,9 @@
 #include <linux/ioctl32.h>
 #include <linux/init.h>
 #include <linux/sockios.h>	/* for SIOCDEVPRIVATE */
+#include <linux/smb.h>
+#include <linux/smb_mount.h>
+#include <linux/ncp_mount.h>
 #include <linux/smp_lock.h>
 #include <linux/syscalls.h>
 #include <linux/ctype.h>
@@ -642,3 +645,152 @@ compat_sys_io_submit(aio_context_t ctx_id, int nr, u32 *iocb)
 		ret = sys_io_submit(ctx_id, nr, iocb64);
 	return ret;
 }
+
+struct compat_ncp_mount_data {
+	compat_int_t version;
+	compat_uint_t ncp_fd;
+	compat_uid_t mounted_uid;
+	compat_pid_t wdog_pid;
+	unsigned char mounted_vol[NCP_VOLNAME_LEN + 1];
+	compat_uint_t time_out;
+	compat_uint_t retry_count;
+	compat_uint_t flags;
+	compat_uid_t uid;
+	compat_gid_t gid;
+	compat_mode_t file_mode;
+	compat_mode_t dir_mode;
+};
+
+struct compat_ncp_mount_data_v4 {
+	compat_int_t version;
+	compat_ulong_t flags;
+	compat_ulong_t mounted_uid;
+	compat_long_t wdog_pid;
+	compat_uint_t ncp_fd;
+	compat_uint_t time_out;
+	compat_uint_t retry_count;
+	compat_ulong_t uid;
+	compat_ulong_t gid;
+	compat_ulong_t file_mode;
+	compat_ulong_t dir_mode;
+};
+
+static void *do_ncp_super_data_conv(void *raw_data)
+{
+	int version = *(unsigned int *)raw_data;
+
+	if (version == 3) {
+		struct compat_ncp_mount_data *c_n = raw_data;
+		struct ncp_mount_data *n = raw_data;
+
+		n->dir_mode = c_n->dir_mode;
+		n->file_mode = c_n->file_mode;
+		n->gid = c_n->gid;
+		n->uid = c_n->uid;
+		memmove (n->mounted_vol, c_n->mounted_vol, (sizeof (c_n->mounted_vol) + 3 * sizeof (unsigned int)));
+		n->wdog_pid = c_n->wdog_pid;
+		n->mounted_uid = c_n->mounted_uid;
+	} else if (version == 4) {
+		struct compat_ncp_mount_data_v4 *c_n = raw_data;
+		struct ncp_mount_data_v4 *n = raw_data;
+
+		n->dir_mode = c_n->dir_mode;
+		n->file_mode = c_n->file_mode;
+		n->gid = c_n->gid;
+		n->uid = c_n->uid;
+		n->retry_count = c_n->retry_count;
+		n->time_out = c_n->time_out;
+		n->ncp_fd = c_n->ncp_fd;
+		n->wdog_pid = c_n->wdog_pid;
+		n->mounted_uid = c_n->mounted_uid;
+		n->flags = c_n->flags;
+	} else if (version != 5) {
+		return NULL;
+	}
+
+	return raw_data;
+}
+
+struct compat_smb_mount_data {
+	compat_int_t version;
+	compat_uid_t mounted_uid;
+	compat_uid_t uid;
+	compat_gid_t gid;
+	compat_mode_t file_mode;
+	compat_mode_t dir_mode;
+};
+
+static void *do_smb_super_data_conv(void *raw_data)
+{
+	struct smb_mount_data *s = raw_data;
+	struct compat_smb_mount_data *c_s = raw_data;
+
+	if (c_s->version != SMB_MOUNT_OLDVERSION)
+		goto out;
+	s->dir_mode = c_s->dir_mode;
+	s->file_mode = c_s->file_mode;
+	s->gid = c_s->gid;
+	s->uid = c_s->uid;
+	s->mounted_uid = c_s->mounted_uid;
+ out:
+	return raw_data;
+}
+
+extern int copy_mount_options (const void __user *, unsigned long *);
+
+#define SMBFS_NAME      "smbfs"
+#define NCPFS_NAME      "ncpfs"
+
+asmlinkage int compat_sys_mount(char __user * dev_name, char __user * dir_name,
+				char __user * type, unsigned long flags,
+				void __user * data)
+{
+	unsigned long type_page;
+	unsigned long data_page;
+	unsigned long dev_page;
+	char *dir_page;
+	int retval;
+
+	retval = copy_mount_options (type, &type_page);
+	if (retval < 0)
+		goto out;
+
+	dir_page = getname(dir_name);
+	retval = PTR_ERR(dir_page);
+	if (IS_ERR(dir_page))
+		goto out1;
+
+	retval = copy_mount_options (dev_name, &dev_page);
+	if (retval < 0)
+		goto out2;
+
+	retval = copy_mount_options (data, &data_page);
+	if (retval < 0)
+		goto out3;
+
+	retval = -EINVAL;
+
+	if (type_page) {
+		if (!strcmp((char *)type_page, SMBFS_NAME)) {
+			do_smb_super_data_conv((void *)data_page);
+		} else if (!strcmp((char *)type_page, NCPFS_NAME)) {
+			do_ncp_super_data_conv((void *)data_page);
+		}
+	}
+
+	lock_kernel();
+	retval = do_mount((char*)dev_page, dir_page, (char*)type_page,
+			flags, (void*)data_page);
+	unlock_kernel();
+
+	free_page(data_page);
+ out3:
+	free_page(dev_page);
+ out2:
+	putname(dir_page);
+ out1:
+	free_page(type_page);
+ out:
+	return retval;
+}
+

@@ -1,5 +1,5 @@
 /*
- * $Id: ctcmain.c,v 1.57 2004/03/02 15:34:01 mschwide Exp $
+ * $Id: ctcmain.c,v 1.58 2004/03/24 10:51:56 ptiedem Exp $
  *
  * CTC / ESCON network driver
  *
@@ -36,7 +36,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: CTC/ESCON network driver $Revision: 1.57 $
+ * RELEASE-TAG: CTC/ESCON network driver $Revision: 1.58 $
  *
  */
 
@@ -319,7 +319,7 @@ static void
 print_banner(void)
 {
 	static int printed = 0;
-	char vbuf[] = "$Revision: 1.57 $";
+	char vbuf[] = "$Revision: 1.58 $";
 	char *version = vbuf;
 
 	if (printed)
@@ -2067,7 +2067,8 @@ ctc_irq_handler(struct ccw_device *cdev, unsigned long intparm, struct irb *irb)
 		return;
 	}
 	
-	priv = cdev->dev.driver_data;
+	priv = ((struct ccwgroup_device *)cdev->dev.driver_data)
+		->dev.driver_data;
 
 	/* Try to extract channel from driver data. */
 	if (priv->channel[READ]->cdev == cdev)
@@ -2963,8 +2964,6 @@ ctc_probe_device(struct ccwgroup_device *cgdev)
 	cgdev->cdev[0]->handler = ctc_irq_handler;
 	cgdev->cdev[1]->handler = ctc_irq_handler;
 	cgdev->dev.driver_data = priv;
-	cgdev->cdev[0]->dev.driver_data = priv;
-	cgdev->cdev[1]->dev.driver_data = priv;
 
 	return 0;
 }

@@ -972,8 +972,10 @@ static struct sem_undo *find_undo(int semid)
 	if(sma==NULL)
 		goto out;
 	un = ERR_PTR(-EIDRM);
-	if (sem_checkid(sma,semid))
-		goto out_unlock;
+	if (sem_checkid(sma,semid)) {
+		sem_unlock(sma);
+		goto out;
+	}
 	nsems = sma->sem_nsems;
 	sem_unlock(sma);
 
@@ -1004,7 +1006,6 @@ static struct sem_undo *find_undo(int semid)
 	sma->undo = new;
 	sem_unlock(sma);
 	un = new;
-out_unlock:
 	unlock_semundo();
 out:
 	return un;

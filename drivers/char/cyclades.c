@@ -2679,7 +2679,8 @@ cy_wait_until_sent(struct tty_struct *tty, int timeout)
   struct cyclades_port * info = (struct cyclades_port *)tty->driver_data;
   unsigned char *base_addr;
   int card,chip,channel,index;
-  unsigned long orig_jiffies, char_time;
+  unsigned long orig_jiffies;
+  signed long char_time;
 	
     if (serial_paranoia_check(info, tty->name, "cy_wait_until_sent"))
 	return;
@@ -2699,7 +2700,7 @@ cy_wait_until_sent(struct tty_struct *tty, int timeout)
      */
     char_time = (info->timeout - HZ/50) / info->xmit_fifo_size;
     char_time = char_time / 5;
-    if (char_time == 0)
+    if (char_time <= 0)
 	char_time = 1;
     if (timeout < 0)
 	timeout = 0;

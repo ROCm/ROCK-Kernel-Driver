@@ -696,6 +696,8 @@ struct sparebufs {
 #define CARD_RDEV_ID(card) card->gdev->cdev[0]->dev.bus_id
 #define CARD_WDEV_ID(card) card->gdev->cdev[1]->dev.bus_id
 #define CARD_DDEV_ID(card) card->gdev->cdev[2]->dev.bus_id
+#define CARD_FROM_CDEV(cdev) (struct qeth_card *) \
+	((struct ccwgroup_device *) cdev->dev.driver_data)->dev.driver_data
 
 #define SENSE_COMMAND_REJECT_BYTE 0
 #define SENSE_COMMAND_REJECT_FLAG 0x80

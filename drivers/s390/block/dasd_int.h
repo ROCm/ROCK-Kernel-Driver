@@ -6,7 +6,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.55 $
+ * $Revision: 1.56 $
  */
 
 #ifndef DASD_INT_H
@@ -268,14 +268,12 @@ struct dasd_device {
 	struct gendisk *gdp;
 	request_queue_t *request_queue;
 	spinlock_t request_queue_lock;
+	struct block_device *bdev;
         unsigned int devindex;
 	unsigned long blocks;		/* size of volume in blocks */
 	unsigned int bp_block;		/* bytes per block */
 	unsigned int s2b_shift;		/* log2 (bp_block/512) */
-	int ro_flag;			/* read-only flag */
-	int use_diag_flag;		/* diag allowed flag */
-	int disconnect_error_flag;	/* return -EIO when disconnected */
-
+	unsigned long flags;		/* per device flags */
 
 	/* Device discipline stuff. */
 	struct dasd_discipline *discipline;
@@ -318,6 +316,11 @@ struct dasd_device {
 #define DASD_STOPPED_DC_WAIT 8         /* disconnected, wait */
 #define DASD_STOPPED_DC_EIO  16        /* disconnected, return -EIO */
 
+/* per device flags */
+#define DASD_FLAG_RO		0	/* device is read-only */
+#define DASD_FLAG_USE_DIAG	1	/* use diag disciplnie */
+#define DASD_FLAG_DSC_ERROR	2	/* return -EIO when disconnected */
+#define DASD_FLAG_OFFLINE	3	/* device is in offline processing */
 
 void dasd_put_device_wake(struct dasd_device *);
 
@@ -498,7 +501,7 @@ int  dasd_gendisk_init(void);
 void dasd_gendisk_exit(void);
 int dasd_gendisk_alloc(struct dasd_device *);
 void dasd_gendisk_free(struct dasd_device *);
-void dasd_scan_partitions(struct dasd_device *);
+int dasd_scan_partitions(struct dasd_device *);
 void dasd_destroy_partitions(struct dasd_device *);
 
 /* externals in dasd_ioctl.c */

@@ -202,8 +202,7 @@ tape_34xx_unsolicited_irq(struct tape_device *device, struct irb *irb)
 		tape_34xx_delete_sbid_from(device, 0);
 		tape_34xx_schedule_work(device, TO_MSEN);
 	} else {
-		DBF_EVENT(3, "unsol.irq! dev end: %s\n",
-				device->cdev->dev.bus_id);
+		DBF_EVENT(3, "unsol.irq! dev end: %08x\n", device->cdev_id);
 		PRINT_WARN("Unsolicited IRQ (Device End) caught.\n");
 		tape_dump_sense(device, NULL, irb);
 	}
@@ -1314,17 +1313,18 @@ static struct ccw_device_id tape_34xx_ids[] = {
 };
 
 static int
-tape_34xx_enable(struct ccw_device *cdev)
+tape_34xx_online(struct ccw_device *cdev)
 {
-	return tape_enable_device(cdev->dev.driver_data,
-				  &tape_discipline_34xx);
+	return tape_generic_online(
+		cdev->dev.driver_data,
+		&tape_discipline_34xx
+	);
 }
 
 static int
-tape_34xx_disable(struct ccw_device *cdev)
+tape_34xx_offline(struct ccw_device *cdev)
 {
-	tape_disable_device(cdev->dev.driver_data);
-	return 0;
+	return tape_generic_offline(cdev->dev.driver_data);
 }
 
 static struct ccw_driver tape_34xx_driver = {
@@ -1333,8 +1333,8 @@ static struct ccw_driver tape_34xx_driver = {
 	.ids = tape_34xx_ids,
 	.probe = tape_generic_probe,
 	.remove = tape_generic_remove,
-	.set_online = tape_34xx_enable,
-	.set_offline = tape_34xx_disable,
+	.set_online = tape_34xx_online,
+	.set_offline = tape_34xx_offline,
 };
 
 static int
@@ -1342,7 +1342,7 @@ tape_34xx_init (void)
 {
 	int rc;
 
-	DBF_EVENT(3, "34xx init: $Revision: 1.18 $\n");
+	DBF_EVENT(3, "34xx init: $Revision: 1.19 $\n");
 	/* Register driver for 3480/3490 tapes. */
 	rc = ccw_driver_register(&tape_34xx_driver);
 	if (rc)
@@ -1361,7 +1361,7 @@ tape_34xx_exit(void)
 MODULE_DEVICE_TABLE(ccw, tape_34xx_ids);
 MODULE_AUTHOR("(C) 2001-2002 IBM Deutschland Entwicklung GmbH");
 MODULE_DESCRIPTION("Linux on zSeries channel attached 3480 tape "
-		   "device driver ($Revision: 1.18 $)");
+		   "device driver ($Revision: 1.19 $)");
 MODULE_LICENSE("GPL");
 
 module_init(tape_34xx_init);

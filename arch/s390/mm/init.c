@@ -138,6 +138,8 @@ void __init paging_init(void)
                 }
         }
 
+	S390_lowcore.kernel_asce = pgdir_k;
+
         /* enable virtual mapping in kernel mode */
         __asm__ __volatile__("    LCTL  1,1,%0\n"
                              "    LCTL  7,7,%0\n"
@@ -222,6 +224,8 @@ void __init paging_init(void)
                         }
                 }
         }
+
+	S390_lowcore.kernel_asce = pgdir_k;
 
         /* enable virtual mapping in kernel mode */
         __asm__ __volatile__("lctlg 1,1,%0\n\t"

@@ -57,18 +57,7 @@
 /* regs is struct pt_regs, pr_reg is elf_gregset_t (which is
    now struct_user_regs, they are different) */
 
-#define ELF_CORE_COPY_REGS(pr_reg, regs)        \
-	{ \
-	int i; \
-	memcpy(&pr_reg.psw.mask, &regs->psw.mask, 4); \
-	memcpy(&pr_reg.psw.addr, ((char*)&regs->psw.addr)+4, 4); \
-	for(i=0; i<NUM_GPRS; i++) \
-		pr_reg.gprs[i] = regs->gprs[i]; \
-	for(i=0; i<NUM_ACRS; i++) \
-		pr_reg.acrs[i] = regs->acrs[i]; \
-	pr_reg.orig_gpr2 = regs->orig_gpr2; \
-	}
-
+#define ELF_CORE_COPY_REGS(pr_reg, regs) dump_regs32(regs, &pr_reg);
 
 
 /* This yields a mask that user programs can use to figure out what
@@ -106,6 +95,18 @@ typedef struct
 	__u32		orig_gpr2;
 } s390_regs32;
 typedef s390_regs32 elf_gregset_t;
+
+static inline int dump_regs32(struct pt_regs *ptregs, elf_gregset_t *regs)
+{
+	int i;
+
+	memcpy(&regs->psw.mask, &ptregs->psw.mask, 4);
+	memcpy(&regs->psw.addr, &ptregs->psw.addr, 4);
+	for (i = 0; i < NUM_GPRS; i++)
+		regs->gprs[i] = ptregs->gprs[i];
+	regs->orig_gpr2 = ptregs->orig_gpr2;
+	return 1;
+}
 
 #include <asm/processor.h>
 #include <linux/module.h>

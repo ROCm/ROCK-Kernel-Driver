@@ -5,7 +5,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 2000, 2001
  *
- * $Revision: 1.27 $
+ * $Revision: 1.28 $
  */
 
 #include <linux/timer.h>
@@ -229,7 +229,7 @@ dasd_3990_erp_block_queue(struct dasd_ccw_req * erp, int expires)
 	struct dasd_device *device = erp->device;
 
 	DEV_MESSAGE(KERN_INFO, device,
-		    "blocking request queue for %is", expires);
+		    "blocking request queue for %is", expires/HZ);
 
 	device->stopped |= DASD_STOPPED_PENDING;
 	erp->status = DASD_CQR_QUEUED;
@@ -2623,7 +2623,7 @@ dasd_3990_erp_action(struct dasd_ccw_req * cqr)
 
 #ifdef ERP_DEBUG
 	/* print current erp_chain */
-	DEV_MESSAGE(KERN_DEBUG, device, "%s",
+	DEV_MESSAGE(KERN_ERR, device, "%s",
 		    "ERP chain at BEGINNING of ERP-ACTION");
 	{
 		struct dasd_ccw_req *temp_erp = NULL;
@@ -2631,9 +2631,10 @@ dasd_3990_erp_action(struct dasd_ccw_req * cqr)
 		for (temp_erp = cqr;
 		     temp_erp != NULL; temp_erp = temp_erp->refers) {
 
-			DEV_MESSAGE(KERN_DEBUG, device,
-				    "	   erp %p refers to %p",
-				    temp_erp, temp_erp->refers);
+			DEV_MESSAGE(KERN_ERR, device,
+				    "   erp %p (%02x) refers to %p",
+				    temp_erp, temp_erp->status,
+				    temp_erp->refers);
 		}
 	}
 #endif				/* ERP_DEBUG */
@@ -2675,15 +2676,16 @@ dasd_3990_erp_action(struct dasd_ccw_req * cqr)
 
 #ifdef ERP_DEBUG
 	/* print current erp_chain */
-	DEV_MESSAGE(KERN_DEBUG, device, "%s", "ERP chain at END of ERP-ACTION");
+	DEV_MESSAGE(KERN_ERR, device, "%s", "ERP chain at END of ERP-ACTION");
 	{
 		struct dasd_ccw_req *temp_erp = NULL;
 		for (temp_erp = erp;
 		     temp_erp != NULL; temp_erp = temp_erp->refers) {
 
-			DEV_MESSAGE(KERN_DEBUG, device,
-				    "	   erp %p refers to %p",
-				    temp_erp, temp_erp->refers);
+			DEV_MESSAGE(KERN_ERR, device,
+				    "   erp %p (%02x) refers to %p",
+				    temp_erp, temp_erp->status,
+				    temp_erp->refers);
 		}
 	}
 #endif				/* ERP_DEBUG */

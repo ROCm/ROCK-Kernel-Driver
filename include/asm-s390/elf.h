@@ -155,9 +155,31 @@ typedef s390_regs elf_gregset_t;
 /* regs is struct pt_regs, pr_reg is elf_gregset_t (which is
    now struct_user_regs, they are different) */
 
-#define ELF_CORE_COPY_REGS(pr_reg, regs)	\
-	memcpy(&pr_reg,regs,sizeof(elf_gregset_t)); \
+static inline int dump_regs(struct pt_regs *ptregs, elf_gregset_t *regs)
+{
+	memcpy(&regs->psw, &ptregs->psw, sizeof(regs->psw)+sizeof(regs->gprs));
+	regs->orig_gpr2 = ptregs->orig_gpr2;
+	return 1;
+}
 
+#define ELF_CORE_COPY_REGS(pr_reg, regs) dump_regs(regs, &pr_reg);
+
+static inline int dump_task_regs(struct task_struct *tsk, elf_gregset_t *regs)
+{
+	dump_regs(__KSTK_PTREGS(tsk), regs);
+	memcpy(regs->acrs, tsk->thread.acrs, sizeof(regs->acrs));
+	return 1;
+}
+
+#define ELF_CORE_COPY_TASK_REGS(tsk, regs) dump_task_regs(tsk, regs)
+
+static inline int dump_task_fpu(struct task_struct *tsk, elf_fpregset_t *fpregs)
+{
+	memcpy(fpregs, &tsk->thread.fp_regs, sizeof(elf_fpregset_t));
+	return 1;
+}
+
+#define ELF_CORE_COPY_FPREGS(tsk, fpregs) dump_task_fpu(tsk, fpregs)
 
 
 /* This yields a mask that user programs can use to figure out what
