@@ -134,6 +134,8 @@ static int tvmixer_ioctl(struct inode *inode, struct file *file, unsigned int cm
 		va.volume  = max(left,right);
 		va.balance = (32768*min(left,right)) / (va.volume ? va.volume : 1);
 		va.balance = (left<right) ? (65535-va.balance) : va.balance;
+		if (va.volume)
+			va.flags &= ~VIDEO_AUDIO_MUTE;
 		client->driver->command(client,VIDIOCSAUDIO,&va);
 		client->driver->command(client,VIDIOCGAUDIO,&va);
 		/* fall throuth */
@@ -267,6 +269,7 @@ static int tvmixer_clients(struct i2c_client *client)
 #else
 	/* TV card ??? */
 	switch (client->adapter->id) {
+	case I2C_ALGO_BIT | I2C_HW_SMBUS_VOODOO3:
 	case I2C_ALGO_BIT | I2C_HW_B_BT848:
 	case I2C_ALGO_BIT | I2C_HW_B_RIVA:
 		/* ok, have a look ... */
