@@ -475,6 +475,8 @@ mptscsih_AddSGE(MPT_SCSI_HOST *hd, Scsi_Cmnd *SCpnt,
 			       (struct scatterlist *) SCpnt->request_buffer,
 			       SCpnt->use_sg,
 			       scsi_to_pci_dma_dir(SCpnt->sc_data_direction));
+		if (sges_left == 0) 
+			return FAILED;
 	} else if (SCpnt->request_bufflen) {
 		dma_addr_t	 buf_dma_addr;
 		scPrivate	*my_priv;
