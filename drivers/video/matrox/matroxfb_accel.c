@@ -470,7 +470,7 @@ static void matroxfb_imageblit(struct fb_info* info, const struct fb_image* imag
 
 	DBG_HEAVY(__FUNCTION__);
 
-	if (image->depth == 0) {
+	if (image->depth == 1) {
 		u_int32_t fgx, bgx;
 
 		fgx = ((u_int32_t*)info->pseudo_palette)[image->fg_color];

@@ -1750,6 +1750,12 @@ static int initMatrox2(WPMINFO struct board* b){
 	ACCESS_FBINFO(fbcon.pseudo_palette) = ACCESS_FBINFO(cmap);
 	/* after __init time we are like module... no logo */
 	ACCESS_FBINFO(fbcon.flags) = hotplug ? FBINFO_FLAG_MODULE : FBINFO_FLAG_DEFAULT;
+	ACCESS_FBINFO(fbcon.flags) |= FBINFO_PARTIAL_PAN_OK | 	 /* Prefer panning for scroll under MC viewer/edit */
+				      FBINFO_HWACCEL_COPYAREA |  /* We have hw-assisted bmove */
+				      FBINFO_HWACCEL_FILLRECT |  /* And fillrect */
+				      FBINFO_HWACCEL_IMAGEBLIT | /* And imageblit */
+				      FBINFO_HWACCEL_XPAN |      /* And we support both horizontal */
+				      FBINFO_HWACCEL_YPAN;       /* And vertical panning */
 	ACCESS_FBINFO(video.len_usable) &= PAGE_MASK;
 	fb_alloc_cmap(&ACCESS_FBINFO(fbcon.cmap), 256, 1);
 
