@@ -8,7 +8,7 @@
 #include <linux/mman.h>
 #include <linux/pagemap.h>
 #include <linux/syscalls.h>
-
+#include <linux/hugetlb.h>
 
 /*
  * We can potentially split a vm area into separate
@@ -18,18 +18,18 @@ static long madvise_behavior(struct vm_area_struct * vma, unsigned long start,
 			     unsigned long end, int behavior)
 {
 	struct mm_struct * mm = vma->vm_mm;
-	int error;
+	int error = 0;
 
 	if (start != vma->vm_start) {
 		error = split_vma(mm, vma, start, 1);
 		if (error)
-			return -EAGAIN;
+			goto out;
 	}
 
 	if (end != vma->vm_end) {
 		error = split_vma(mm, vma, end, 0);
 		if (error)
-			return -EAGAIN;
+			goto out;
 	}
 
 	/*
@@ -48,7 +48,10 @@ static long madvise_behavior(struct vm_area_struct * vma, unsigned long start,
 		break;
 	}
 
-	return 0;
+out:
+	if (error == -ENOMEM)
+		error = -EAGAIN;
+	return error;
 }
 
 /*
@@ -94,7 +97,7 @@ static long madvise_willneed(struct vm_area_struct * vma,
 static long madvise_dontneed(struct vm_area_struct * vma,
 			     unsigned long start, unsigned long end)
 {
-	if (vma->vm_flags & VM_LOCKED)
+	if ((vma->vm_flags & VM_LOCKED) || is_vm_hugetlb_page(vma))
 		return -EINVAL;
 
 	if (unlikely(vma->vm_flags & VM_NONLINEAR)) {

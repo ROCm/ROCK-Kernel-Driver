@@ -1747,6 +1747,9 @@ int split_vma(struct mm_struct * mm, struct vm_area_struct * vma,
 	struct mempolicy *pol;
 	struct vm_area_struct *new;
 
+	if (is_vm_hugetlb_page(vma) && (addr & ~HPAGE_MASK))
+		return -EINVAL;
+
 	if (mm->map_count >= sysctl_max_map_count)
 		return -ENOMEM;
 
@@ -1821,20 +1824,18 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len)
 	 * places tmp vma above, and higher split_vma places tmp vma below.
 	 */
 	if (start > mpnt->vm_start) {
-		if (is_vm_hugetlb_page(mpnt) && (start & ~HPAGE_MASK))
-			return -EINVAL;
-		if (split_vma(mm, mpnt, start, 0))
-			return -ENOMEM;
+		int error = split_vma(mm, mpnt, start, 0);
+		if (error)
+			return error;
 		prev = mpnt;
 	}
 
 	/* Does it split the last one? */
 	last = find_vma(mm, end);
 	if (last && end > last->vm_start) {
-		if (is_vm_hugetlb_page(last) && (end & ~HPAGE_MASK))
-			return -EINVAL;
-		if (split_vma(mm, last, end, 1))
-			return -ENOMEM;
+		int error = split_vma(mm, last, end, 1);
+		if (error)
+			return error;
 	}
 	mpnt = prev? prev->vm_next: mm->mmap;
 
