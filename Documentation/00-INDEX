@@ -70,6 +70,8 @@ dnotify.txt
 	- info about directory notification in Linux.
 driver-model.txt
 	- info about Linux driver model.
+early-userspace/
+	- info about initramfs, klibc, and userspace early during boot.
 exception.txt
 	- how Linux v2.2 handles exceptions without verify_area etc.
 fb/
