@@ -41,7 +41,7 @@
    */
 
 extern int ne2_probe(struct net_device *dev);
-extern int hp100_probe(struct net_device *dev);
+extern struct net_device *hp100_probe(int unit);
 extern struct net_device *ultra_probe(int unit);
 extern int ultra32_probe(struct net_device *dev);
 extern struct net_device *wd_probe(int unit);
@@ -197,14 +197,10 @@ static struct devprobe mca_probes[] __initdata = {
  * ISA probes that touch addresses < 0x400 (including those that also
  * look for EISA/PCI/MCA cards in addition to ISA cards).
  */
-static struct devprobe isa_probes[] __initdata = {
+static struct devprobe2 isa_probes2[] __initdata = {
 #ifdef CONFIG_HP100 		/* ISA, EISA & PCI */
 	{hp100_probe, 0},
 #endif	
-	{NULL, 0},
-};
-
-static struct devprobe2 isa_probes2[] __initdata = {
 #ifdef CONFIG_3C515
 	{tc515_probe, 0},
 #endif
@@ -382,8 +378,7 @@ static int __init ethif_probe(int unit)
 	if (probe_list(dev, m68k_probes) == 0 ||
 	    probe_list(dev, mips_probes) == 0 ||
 	    probe_list(dev, eisa_probes) == 0 ||
-	    probe_list(dev, mca_probes) == 0 ||
-	    probe_list(dev, isa_probes) == 0)
+	    probe_list(dev, mca_probes) == 0)
 		err = register_netdev(dev);
 
 	if (err)
