@@ -445,7 +445,7 @@ static enum si_sm_result bt_event(struct si_sm_data *bt, long time)
 
 	case BT_STATE_RESET1:
     		reset_flags(bt);
-    		bt->timeout = BT_RESET_DELAY;;
+    		bt->timeout = BT_RESET_DELAY;
 		bt->state = BT_STATE_RESET2;
 		break;
 

@@ -353,7 +353,7 @@ irqProceed:;
 		if ( WaitReady (padapter) )
 			{
 			OpDone (SCpnt, DID_TIME_OUT << 16);
-			goto irq_return;;
+			goto irq_return;
 			}
 
 		outb_p (tag0, padapter->mb0);										// get real error code
@@ -361,7 +361,7 @@ irqProceed:;
 		if ( WaitReady (padapter) )											// wait for controller to suck up the op
 			{
 			OpDone (SCpnt, DID_TIME_OUT << 16);
-			goto irq_return;;
+			goto irq_return;
 			}
 
 		error = inl (padapter->mb0);										// get error data
@@ -374,16 +374,16 @@ irqProceed:;
 			if ( bus )														// are we doint SCSI commands?
 				{
 				OpDone (SCpnt, (DID_OK << 16) | 2);
-				goto irq_return;;
+				goto irq_return;
 				}
 			if ( *SCpnt->cmnd == SCSIOP_TEST_UNIT_READY )
 				OpDone (SCpnt, (DRIVER_SENSE << 24) | (DID_OK << 16) | 2);	// test caller we have sense data too
 			else
 				OpDone (SCpnt, DID_ERROR << 16);
-			goto irq_return;;
+			goto irq_return;
 			}
 		OpDone (SCpnt, DID_ERROR << 16);
-		goto irq_return;;
+		goto irq_return;
 		}
 
 	outb_p (0xFF, padapter->tag);											// clear the op interrupt
