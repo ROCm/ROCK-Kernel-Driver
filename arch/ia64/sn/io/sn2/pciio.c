@@ -825,7 +825,7 @@ pciio_device_info_unregister(vertex_hdl_t connectpt,
 			     pciio_info_t pciio_info)
 {
     char		name[32];
-    vertex_hdl_t	pconn;
+    vertex_hdl_t	pconn = NULL;
 
     if (!pciio_info)
 	return;
@@ -838,7 +838,6 @@ pciio_device_info_unregister(vertex_hdl_t connectpt,
 
     hwgraph_vertex_unref(pconn);
     hwgraph_vertex_destroy(pconn);
-    
 }
 
 /*ARGSUSED */

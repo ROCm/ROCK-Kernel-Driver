@@ -1284,7 +1284,7 @@ mptbase_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		return r;
 	}
 
-	if (!pci_set_consistent_dma_mask(pdev, mask))
+	if (0 && !pci_set_consistent_dma_mask(pdev, mask))
 		dprintk((KERN_INFO MYNAM
 			": Using 64 bit consistent mask\n"));
 	else

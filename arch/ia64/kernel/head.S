@@ -816,7 +816,7 @@ GLOBAL_ENTRY(ia64_delay_loop)
 	br.ret.sptk.many rp
 END(ia64_delay_loop)
 
-GLOBAL_ENTRY(ia64_invoke_kernel_thread_helper)
+GLOBAL_ENTRY(start_kernel_thread)
 	.prologue
 	.save rp, r0				// this is the end of the call-chain
 	.body
@@ -827,7 +827,7 @@ GLOBAL_ENTRY(ia64_invoke_kernel_thread_helper)
 	mov out0 = r8
 	br.call.sptk.many rp = sys_exit;;
 1:	br.sptk.few 1b				// not reached
-END(ia64_invoke_kernel_thread_helper)
+END(start_kernel_thread)
 
 #ifdef CONFIG_IA64_BRL_EMU
 

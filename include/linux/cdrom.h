@@ -877,10 +877,15 @@ struct mode_page_header {
 #include <linux/fs.h>		/* not really needed, later.. */
 #include <linux/device.h>
 
+#define CDDA_OLD		0	/* old style */
+#define CDDA_BPC_SINGLE		1	/* block_pc, but single frame  */
+#define CDDA_BPC_FULL		2	/* full speed block pc */
+
 /* Uniform cdrom data structures for cdrom.c */
 struct cdrom_device_info {
 	struct cdrom_device_ops  *ops;  /* link to device_ops */
 	struct cdrom_device_info *next; /* next device_info for this major */
+	struct gendisk *disk;		/* matching block layer disk */
 	void *handle;		        /* driver-dependent data */
 /* specifications */
 	int mask;                       /* mask of capability: disables them */
@@ -894,6 +899,7 @@ struct cdrom_device_info {
 /* per-device flags */
         __u8 sanyo_slot		: 2;	/* Sanyo 3 CD changer support */
         __u8 reserved		: 6;	/* not used yet */
+	int cdda_method;		/* see flags */
 	int for_data;
 	int (*exit)(struct cdrom_device_info *);
 	int mrw_mode_page;

@@ -170,7 +170,7 @@ gsi_to_irq (unsigned int gsi)
 }
 
 static void
-set_rte (unsigned int vector, unsigned int dest)
+set_rte (unsigned int vector, unsigned int dest, int mask)
 {
 	unsigned long pol, trigger, dmode;
 	u32 low32, high32;
@@ -205,6 +205,7 @@ set_rte (unsigned int vector, unsigned int dest)
 	low32 = ((pol << IOSAPIC_POLARITY_SHIFT) |
 		 (trigger << IOSAPIC_TRIGGER_SHIFT) |
 		 (dmode << IOSAPIC_DELIVERY_SHIFT) |
+		 ((mask ? 1 : 0) << IOSAPIC_MASK_SHIFT) |
 		 vector);
 
 	/* dest contains both id and eid */
@@ -509,7 +510,7 @@ iosapic_register_intr (unsigned int gsi,
 	       (trigger == IOSAPIC_EDGE ? "edge" : "level"), dest, vector);
 
 	/* program the IOSAPIC routing table */
-	set_rte(vector, dest);
+	set_rte(vector, dest, 0);
 	return vector;
 }
 
@@ -557,7 +558,7 @@ iosapic_register_platform_intr (u32 int_type, unsigned int gsi,
 	       (trigger == IOSAPIC_EDGE ? "edge" : "level"), dest, vector);
 
 	/* program the IOSAPIC routing table */
-	set_rte(vector, dest);
+	set_rte(vector, dest, 0);
 	return vector;
 }
 
@@ -583,7 +584,7 @@ iosapic_override_isa_irq (unsigned int isa_irq, unsigned int gsi,
 	    trigger == IOSAPIC_EDGE ? "edge" : "level", dest, vector);
 
 	/* program the IOSAPIC routing table */
-	set_rte(vector, dest);
+	set_rte(vector, dest, 0);
 }
 
 void __init
@@ -669,7 +670,7 @@ iosapic_enable_intr (unsigned int vector)
 	/* direct the interrupt vector to the running cpu id */
 	dest = (ia64_getreg(_IA64_REG_CR_LID) >> 16) & 0xffff;
 #endif
-	set_rte(vector, dest);
+	set_rte(vector, dest, 1);
 
 	printk(KERN_INFO "IOSAPIC: vector %d -> CPU 0x%04x, enabled\n",
 	       vector, dest);
