@@ -49,6 +49,69 @@ struct isdn_slot {
 
 static struct isdn_slot slot[ISDN_MAX_CHANNELS]; 
 
+/* ====================================================================== */
+
+#define DRV_FLAG_RUNNING 1
+#define DRV_FLAG_REJBUS  2
+#define DRV_FLAG_LOADED  4
+
+/* Description of hardware-level-driver */
+struct isdn_driver {
+	unsigned long       online;           /* Channel Online flags        */
+	unsigned long       flags;            /* Misc driver Flags           */
+	int                 locks;            /* Number of locks             */
+	int                 channels;         /* Number of channels          */
+	wait_queue_head_t   st_waitq;         /* Wait-Queue for status-reads */
+	int                 maxbufsize;       /* Maximum Buffersize supported*/
+	int                 stavail;          /* Chars avail on Status-device*/
+	isdn_if            *interface;        /* Interface to driver         */
+	int                *rcverr;           /* Error-counters for B rx     */
+	int                *rcvcount;         /* Byte-counters for B rx      */
+#ifdef CONFIG_ISDN_AUDIO
+	unsigned long      DLEflag;           /* Insert DLE at next read     */
+#endif
+	struct sk_buff_head *rpqueue;         /* Pointers to rx queue        */
+	char               msn2eaz[10][ISDN_MSNLEN];  /*  MSN->EAZ           */
+	struct fsm_inst    fi;
+} driver;
+
+struct isdn_driver *drivers[ISDN_MAX_DRIVERS];
+
+int
+isdn_drv_queue_empty(int di, int ch)
+{
+	return skb_queue_empty(&drivers[di]->rpqueue[ch]);
+}
+
+void
+isdn_drv_queue_tail(int di, int ch, struct sk_buff *skb, int len)
+{
+	__skb_queue_tail(&drivers[di]->rpqueue[ch], skb);
+	drivers[di]->rcvcount[ch] += len;
+}
+
+int
+isdn_drv_maxbufsize(int di)
+{
+	return drivers[di]->maxbufsize;
+}
+
+int
+isdn_drv_writebuf_skb(int di, int ch, int x, struct sk_buff *skb)
+{
+	return drivers[di]->interface->writebuf_skb(di, ch, 1, skb);
+}
+
+int
+isdn_drv_hdrlen(int di)
+{
+	return drivers[di]->interface->hl_hdrlen;
+}
+
+static int isdn_add_channels(struct isdn_driver *, int, int, int);
+
+/* ====================================================================== */
+
 #if defined(CONFIG_ISDN_DIVERSION) || defined(CONFIG_ISDN_DIVERSION_MODULE)
 static isdn_divert_if *divert_if; /* = NULL */
 #else
@@ -75,7 +138,7 @@ isdn_lock_drivers(void)
 		cmd.arg = 0;
 		cmd.command = ISDN_CMD_LOCK;
 		isdn_command(&cmd);
-		dev->drv[i]->locks++;
+		drivers[i]->locks++;
 	}
 }
 
@@ -92,14 +155,14 @@ isdn_unlock_drivers(void)
 	int i;
 
 	for (i = 0; i < dev->drivers; i++)
-		if (dev->drv[i]->locks > 0) {
+		if (drivers[i]->locks > 0) {
 			isdn_ctrl cmd;
 
 			cmd.driver = i;
 			cmd.arg = 0;
 			cmd.command = ISDN_CMD_UNLOCK;
 			isdn_command(&cmd);
-			dev->drv[i]->locks--;
+			drivers[i]->locks--;
 		}
 }
 
@@ -342,7 +405,7 @@ isdn_command(isdn_ctrl *cmd)
 	}
 	if (cmd->command == ISDN_CMD_SETL2) {
 		unsigned long l2prot = (cmd->arg >> 8) & 255;
-		unsigned long features = (dev->drv[cmd->driver]->interface->features
+		unsigned long features = (drivers[cmd->driver]->interface->features
 						>> ISDN_FEATURE_L2_SHIFT) &
 						ISDN_FEATURE_L2_MASK;
 		unsigned long l2_feature = (1 << l2prot);
@@ -389,7 +452,7 @@ isdn_command(isdn_ctrl *cmd)
 		printk(KERN_DEBUG "%s: cmd = %d\n", __FUNCTION__, cmd->command);
 	}
 #endif
-	return dev->drv[cmd->driver]->interface->command(cmd);
+	return drivers[cmd->driver]->interface->command(cmd);
 }
 
 /*
@@ -441,19 +504,19 @@ isdn_status_callback(isdn_ctrl * c)
 			break;
 		case ISDN_STAT_STAVAIL:
 			spin_lock_irqsave(&stat_lock, flags);
-			dev->drv[di]->stavail += c->arg;
+			drivers[di]->stavail += c->arg;
 			spin_unlock_irqrestore(&stat_lock, flags);
-			wake_up_interruptible(&dev->drv[di]->st_waitq);
+			wake_up_interruptible(&drivers[di]->st_waitq);
 			break;
 		case ISDN_STAT_RUN:
-			dev->drv[di]->flags |= DRV_FLAG_RUNNING;
+			drivers[di]->flags |= DRV_FLAG_RUNNING;
 			for (i = 0; i < ISDN_MAX_CHANNELS; i++)
 				if (slot[i].di == di)
 					isdn_slot_all_eaz(i);
 			set_global_features();
 			break;
 		case ISDN_STAT_STOP:
-			dev->drv[di]->flags &= ~DRV_FLAG_RUNNING;
+			drivers[di]->flags &= ~DRV_FLAG_RUNNING;
 			break;
 		case ISDN_STAT_ICALL:
 			if (i < 0)
@@ -476,7 +539,7 @@ isdn_status_callback(isdn_ctrl * c)
                                          if (divert_if)
 						 if ((retval = divert_if->stat_callback(c))) 
 							 return(retval); /* processed */
-					if ((!retval) && (dev->drv[di]->flags & DRV_FLAG_REJBUS)) {
+					if ((!retval) && (drivers[di]->flags & DRV_FLAG_REJBUS)) {
 						/* No tty responding */
 						cmd.driver = di;
 						cmd.arg = c->arg;
@@ -565,7 +628,7 @@ isdn_status_callback(isdn_ctrl * c)
 			if (i < 0)
 				return -1;
 			dbg_statcallb("DHUP: %d\n", i);
-			dev->drv[di]->online &= ~(1 << (c->arg));
+			drivers[di]->online &= ~(1 << (c->arg));
 			isdn_info_update();
 			/* Signal hangup to network-devices */
 			if (isdn_net_stat_callback(i, c))
@@ -581,7 +644,7 @@ isdn_status_callback(isdn_ctrl * c)
 				return -1;
 			dbg_statcallb("BCONN: %ld\n", c->arg);
 			/* Signal B-channel-connect to network-devices */
-			dev->drv[di]->online |= (1 << (c->arg));
+			drivers[di]->online |= (1 << (c->arg));
 			isdn_info_update();
 			if (isdn_net_stat_callback(i, c))
 				break;
@@ -593,7 +656,7 @@ isdn_status_callback(isdn_ctrl * c)
 			if (i < 0)
 				return -1;
 			dbg_statcallb("BHUP: %d\n", i);
-			dev->drv[di]->online &= ~(1 << (c->arg));
+			drivers[di]->online &= ~(1 << (c->arg));
 			isdn_info_update();
 			/* Signal hangup to network-devices */
 			if (isdn_net_stat_callback(i, c))
@@ -612,7 +675,7 @@ isdn_status_callback(isdn_ctrl * c)
 				break;
 			break;
 		case ISDN_STAT_ADDCH:
-			if (isdn_add_channels(dev->drv[di], di, c->arg, 1))
+			if (isdn_add_channels(drivers[di], di, c->arg, 1))
 				return -1;
 			isdn_info_update();
 			break;
@@ -633,13 +696,13 @@ isdn_status_callback(isdn_ctrl * c)
 			restore_flags(flags);
 			break;
 		case ISDN_STAT_UNLOAD:
-			while (dev->drv[di]->locks > 0) {
+			while (drivers[di]->locks > 0) {
 				isdn_ctrl cmd;
 				cmd.driver = di;
 				cmd.arg = 0;
 				cmd.command = ISDN_CMD_UNLOCK;
 				isdn_command(&cmd);
-				dev->drv[di]->locks--;
+				drivers[di]->locks--;
 			}
 			save_flags(flags);
 			cli();
@@ -652,14 +715,14 @@ isdn_status_callback(isdn_ctrl * c)
 					isdn_unregister_devfs(i);
 				}
 			dev->drivers--;
-			dev->channels -= dev->drv[di]->channels;
-			kfree(dev->drv[di]->rcverr);
-			kfree(dev->drv[di]->rcvcount);
-			for (i = 0; i < dev->drv[di]->channels; i++)
-				skb_queue_purge(&dev->drv[di]->rpqueue[i]);
-			kfree(dev->drv[di]->rpqueue);
-			kfree(dev->drv[di]);
-			dev->drv[di] = NULL;
+			dev->channels -= drivers[di]->channels;
+			kfree(drivers[di]->rcverr);
+			kfree(drivers[di]->rcvcount);
+			for (i = 0; i < drivers[di]->channels; i++)
+				skb_queue_purge(&drivers[di]->rpqueue[i]);
+			kfree(drivers[di]->rpqueue);
+			kfree(drivers[di]);
+			drivers[di] = NULL;
 			dev->drvid[di][0] = '\0';
 			isdn_info_update();
 			set_global_features();
@@ -720,23 +783,23 @@ isdn_slot_readbchan(int sl, u_char * buf, u_char * fp, int len)
 	struct sk_buff *skb;
 	u_char *cp;
 
-	if (!dev->drv[di])
+	if (!drivers[di])
 		return 0;
-	if (skb_queue_empty(&dev->drv[di]->rpqueue[ch]))
+	if (skb_queue_empty(&drivers[di]->rpqueue[ch]))
 		return 0;
 
-	if (len > dev->drv[di]->rcvcount[ch])
-		len = dev->drv[di]->rcvcount[ch];
+	if (len > drivers[di]->rcvcount[ch])
+		len = drivers[di]->rcvcount[ch];
 	cp = buf;
 	count = 0;
 	while (len) {
-		if (!(skb = skb_peek(&dev->drv[di]->rpqueue[ch])))
+		if (!(skb = skb_peek(&drivers[di]->rpqueue[ch])))
 			break;
 #ifdef CONFIG_ISDN_AUDIO
 		if (ISDN_AUDIO_SKB_LOCK(skb))
 			break;
 		ISDN_AUDIO_SKB_LOCK(skb) = 1;
-		if ((ISDN_AUDIO_SKB_DLECOUNT(skb)) || (dev->drv[di]->DLEflag & (1 << ch))) {
+		if ((ISDN_AUDIO_SKB_DLECOUNT(skb)) || (drivers[di]->DLEflag & (1 << ch))) {
 			char *p = skb->data;
 			unsigned long DLEmask = (1 << ch);
 
@@ -744,13 +807,13 @@ isdn_slot_readbchan(int sl, u_char * buf, u_char * fp, int len)
 			count_pull = count_put = 0;
 			while ((count_pull < skb->len) && (len > 0)) {
 				len--;
-				if (dev->drv[di]->DLEflag & DLEmask) {
+				if (drivers[di]->DLEflag & DLEmask) {
 					*cp++ = DLE;
-					dev->drv[di]->DLEflag &= ~DLEmask;
+					drivers[di]->DLEflag &= ~DLEmask;
 				} else {
 					*cp++ = *p;
 					if (*p == DLE) {
-						dev->drv[di]->DLEflag |= DLEmask;
+						drivers[di]->DLEflag |= DLEmask;
 						(ISDN_AUDIO_SKB_DLECOUNT(skb))--;
 					}
 					p++;
@@ -789,7 +852,7 @@ isdn_slot_readbchan(int sl, u_char * buf, u_char * fp, int len)
 #ifdef CONFIG_ISDN_AUDIO
 			ISDN_AUDIO_SKB_LOCK(skb) = 0;
 #endif
-			skb = skb_dequeue(&dev->drv[di]->rpqueue[ch]);
+			skb = skb_dequeue(&drivers[di]->rpqueue[ch]);
 			dev_kfree_skb(skb);
 		} else {
 			/* Not yet emptied this buff, so it
@@ -801,7 +864,7 @@ isdn_slot_readbchan(int sl, u_char * buf, u_char * fp, int len)
 			ISDN_AUDIO_SKB_LOCK(skb) = 0;
 #endif
 		}
-		dev->drv[di]->rcvcount[ch] -= count_put;
+		drivers[di]->rcvcount[ch] -= count_put;
 	}
 	return count;
 }
@@ -852,8 +915,8 @@ isdn_statstr(void)
 	sprintf(p, "\nflags:\t");
 	p = istatbuf + strlen(istatbuf);
 	for (i = 0; i < ISDN_MAX_DRIVERS; i++) {
-		if (dev->drv[i]) {
-			sprintf(p, "%ld ", dev->drv[i]->online);
+		if (drivers[i]) {
+			sprintf(p, "%ld ", drivers[i]->online);
 			p = istatbuf + strlen(istatbuf);
 		} else {
 			sprintf(p, "? ");
@@ -1090,14 +1153,14 @@ isdn_ctrl_read(struct file *file, char *buf, size_t count, loff_t * off)
 		isdn_BUG();
 		return -ENODEV;
 	}
-	if (!dev->drv[drvidx]->interface->readstat) {
+	if (!drivers[drvidx]->interface->readstat) {
 		isdn_BUG();
 		return 0;
 	}
- 	add_wait_queue(&dev->drv[drvidx]->st_waitq, &wait);
+ 	add_wait_queue(&drivers[drvidx]->st_waitq, &wait);
 	for (;;) {
 		spin_lock_irqsave(&stat_lock, flags);
-		len = dev->drv[drvidx]->stavail;
+		len = drivers[drvidx]->stavail;
 		spin_unlock_irqrestore(&stat_lock, flags);
 		if (len > 0)
 			break;
@@ -1112,7 +1175,7 @@ isdn_ctrl_read(struct file *file, char *buf, size_t count, loff_t * off)
 		schedule();
 	}
 	__set_current_state(TASK_RUNNING);
-	remove_wait_queue(&dev->drv[drvidx]->st_waitq, &wait);
+	remove_wait_queue(&drivers[drvidx]->st_waitq, &wait);
 	
 	if (len < 0)
 		return len;
@@ -1120,15 +1183,15 @@ isdn_ctrl_read(struct file *file, char *buf, size_t count, loff_t * off)
 	if (count > len)
 		count = len;
 		
-	len = dev->drv[drvidx]->interface->readstat(buf, count, 1, drvidx,
-						    isdn_minor2chan(minor));
+	len = drivers[drvidx]->interface->readstat(buf, count, 1, drvidx,
+					       isdn_minor2chan(minor));
 
 	spin_lock_irqsave(&stat_lock, flags);
 	if (len) {
-		dev->drv[drvidx]->stavail -= len;
+		drivers[drvidx]->stavail -= len;
 	} else {
 		isdn_BUG();
-		dev->drv[drvidx]->stavail = 0;
+		drivers[drvidx]->stavail = 0;
 	}
 	spin_unlock_irqrestore(&stat_lock, flags);
 
@@ -1151,11 +1214,11 @@ isdn_ctrl_write(struct file *file, const char *buf, size_t count, loff_t *off)
 		retval = -ENODEV;
 		goto out;
 	}
-	if (!dev->drv[drvidx]->interface->writecmd) {
+	if (!drivers[drvidx]->interface->writecmd) {
 		retval = -EINVAL;
 		goto out;
 	}
-	retval = dev->drv[drvidx]->interface->
+	retval = drivers[drvidx]->interface->
 		writecmd(buf, count, 1, drvidx, isdn_minor2chan(minor - ISDN_MINOR_CTRL));
 
  out:
@@ -1174,9 +1237,9 @@ isdn_ctrl_poll(struct file *file, poll_table *wait)
 		/* driver deregistered while file open */
 		return POLLHUP;
 
-	poll_wait(file, &(dev->drv[drvidx]->st_waitq), wait);
+	poll_wait(file, &drivers[drvidx]->st_waitq, wait);
 	mask = POLLOUT | POLLWRNORM;
-	if (dev->drv[drvidx]->stavail)
+	if (drivers[drvidx]->stavail)
 		mask |= POLLIN | POLLRDNORM;
 
 	return mask;
@@ -1255,9 +1318,9 @@ isdn_ctrl_ioctl(struct inode *inode, struct file *file, uint cmd, ulong arg)
 		if (drvidx == -1)
 			return -ENODEV;
 		if (iocts.arg)
-			dev->drv[drvidx]->flags |= DRV_FLAG_REJBUS;
+			drivers[drvidx]->flags |= DRV_FLAG_REJBUS;
 		else
-			dev->drv[drvidx]->flags &= ~DRV_FLAG_REJBUS;
+			drivers[drvidx]->flags &= ~DRV_FLAG_REJBUS;
 		return 0;
 	case IIOCSIGPRF:
 		dev->profd = current;
@@ -1355,7 +1418,7 @@ isdn_ctrl_ioctl(struct inode *inode, struct file *file, uint cmd, ulong arg)
 							/* Fall through */
 						case ',':
 							bname[j] = '\0';
-							strcpy(dev->drv[drvidx]->msn2eaz[i], bname);
+							strcpy(drivers[drvidx]->msn2eaz[i], bname);
 							j = ISDN_MSNLEN;
 							break;
 						default:
@@ -1371,8 +1434,8 @@ isdn_ctrl_ioctl(struct inode *inode, struct file *file, uint cmd, ulong arg)
 				p = (char *) iocts.arg;
 				for (i = 0; i < 10; i++) {
 					sprintf(bname, "%s%s",
-						strlen(dev->drv[drvidx]->msn2eaz[i]) ?
-						dev->drv[drvidx]->msn2eaz[i] : "_",
+						strlen(drivers[drvidx]->msn2eaz[i]) ?
+						drivers[drvidx]->msn2eaz[i] : "_",
 						(i < 9) ? "," : "\0");
 					if (copy_to_user(p, bname, strlen(bname) + 1))
 						return -EFAULT;
@@ -1494,7 +1557,7 @@ static struct file_operations isdn_fops =
 char *
 isdn_map_eaz2msn(char *msn, int di)
 {
-	driver *this = dev->drv[di];
+	struct isdn_driver *this = drivers[di];
 	int i;
 
 	if (strlen(msn) == 1) {
@@ -1538,11 +1601,11 @@ isdn_get_free_slot(int usage, int l2_proto, int l3_proto,
 				continue;
 			if (slot[i].usage & ISDN_USAGE_DISABLED)
 			        continue; /* usage not allowed */
-			if (!dev->drv[d]->flags & DRV_FLAG_RUNNING)
+			if (!drivers[d]->flags & DRV_FLAG_RUNNING)
 				continue;
-			if (((dev->drv[d]->interface->features & features) == features) ||
-			    (((dev->drv[d]->interface->features & vfeatures) == vfeatures) &&
-			     (dev->drv[d]->interface->features & ISDN_FEATURE_L2_TRANS))) {
+			if (((drivers[d]->interface->features & features) == features) ||
+			    (((drivers[d]->interface->features & vfeatures) == vfeatures) &&
+			     (drivers[d]->interface->features & ISDN_FEATURE_L2_TRANS))) {
 				if (pre_dev < 0 || pre_chan < 0 ||
 				    (pre_dev == d && pre_chan == slot[i].ch)) {
 					isdn_slot_set_usage(i, usage);
@@ -1584,7 +1647,7 @@ isdn_slot_free(int sl)
 	slot[sl].iv110.v110 = NULL;
 // 20.10.99 JIM, try to reinitialize v110 !
 	isdn_slot_set_usage(sl, ISDN_USAGE_NONE);
-	skb_queue_purge(&dev->drv[isdn_slot_driver(sl)]->rpqueue[isdn_slot_channel(sl)]);
+	skb_queue_purge(&drivers[isdn_slot_driver(sl)]->rpqueue[isdn_slot_channel(sl)]);
 	restore_flags(flags);
 }
 
@@ -1615,7 +1678,7 @@ isdn_slot_write(int sl, struct sk_buff *skb)
 			return v110_ret;
 		}
 		/* V.110 must always be acknowledged */
-		ret = dev->drv[di]->interface->writebuf_skb(di, ch, 1, nskb);
+		ret = drivers[di]->interface->writebuf_skb(di, ch, 1, nskb);
 	} else {
 		int hl = isdn_slot_hdrlen(sl);
 
@@ -1633,14 +1696,14 @@ isdn_slot_write(int sl, struct sk_buff *skb)
 			skb_tmp = skb_realloc_headroom(skb, hl);
 			printk(KERN_DEBUG "isdn_writebuf_skb_stub: reallocating headroom%s\n", skb_tmp ? "" : " failed");
 			if (!skb_tmp) return -ENOMEM; /* 0 better? */
-			ret = dev->drv[di]->interface->writebuf_skb(di, ch, 1, skb_tmp);
+			ret = drivers[di]->interface->writebuf_skb(di, ch, 1, skb_tmp);
 			if( ret > 0 ){
 				dev_kfree_skb(skb);
 			} else {
 				dev_kfree_skb(skb_tmp);
 			}
 		} else {
-			ret = dev->drv[di]->interface->writebuf_skb(di, ch, 1, skb);
+			ret = drivers[di]->interface->writebuf_skb(di, ch, 1, skb);
 		}
 	}
 	if (ret > 0) {
@@ -1662,8 +1725,8 @@ isdn_slot_write(int sl, struct sk_buff *skb)
 	return ret;
 }
 
-int
-isdn_add_channels(driver *d, int drvidx, int n, int adding)
+static int
+isdn_add_channels(struct isdn_driver *d, int drvidx, int n, int adding)
 {
 	int j, k, m;
 	ulong flags;
@@ -1742,10 +1805,10 @@ set_global_features(void)
 
 	dev->global_features = 0;
 	for (drvidx = 0; drvidx < ISDN_MAX_DRIVERS; drvidx++) {
-		if (!dev->drv[drvidx])
+		if (!drivers[drvidx])
 			continue;
-		if (dev->drv[drvidx]->interface)
-			dev->global_features |= dev->drv[drvidx]->interface->features;
+		if (drivers[drvidx]->interface)
+			dev->global_features |= drivers[drvidx]->interface->features;
 	}
 }
 
@@ -1810,7 +1873,7 @@ EXPORT_SYMBOL(isdn_ppp_unregister_compressor);
 int
 register_isdn(isdn_if * i)
 {
-	driver *d;
+	struct isdn_driver *d;
 	int j;
 	ulong flags;
 	int drvidx;
@@ -1831,14 +1894,13 @@ register_isdn(isdn_if * i)
 	memset((char *) d, 0, sizeof(driver));
 
 	d->maxbufsize = i->maxbufsize;
-	d->pktcount = 0;
 	d->stavail = 0;
 	d->flags = DRV_FLAG_LOADED;
 	d->online = 0;
 	d->interface = i;
 	d->channels = 0;
 	for (drvidx = 0; drvidx < ISDN_MAX_DRIVERS; drvidx++)
-		if (!dev->drv[drvidx])
+		if (!drivers[drvidx])
 			break;
 	if (isdn_add_channels(d, drvidx, i->channels, 0)) {
 		kfree(d);
@@ -1854,7 +1916,7 @@ register_isdn(isdn_if * i)
 	for (j = 0; j < drvidx; j++)
 		if (!strcmp(i->id, dev->drvid[j]))
 			sprintf(i->id, "line%d", drvidx);
-	dev->drv[drvidx] = d;
+	drivers[drvidx] = d;
 	strcpy(dev->drvid[drvidx], i->id);
 	isdn_info_update();
 	dev->drivers++;
@@ -1884,7 +1946,7 @@ isdn_slot_hdrlen(int sl)
 {
 	int di = isdn_slot_driver(sl);
 	
-	return dev->drv[di]->interface->hl_hdrlen;
+	return drivers[di]->interface->hl_hdrlen;
 }
 
 char *
@@ -2041,9 +2103,9 @@ isdn_hard_header_len(void)
 	int max = 0;
 	
 	for (drvidx = 0; drvidx < ISDN_MAX_DRIVERS; drvidx++) {
-		if (dev->drv[drvidx] && 
-		    max < dev->drv[drvidx]->interface->hl_hdrlen) {
-			max = dev->drv[drvidx]->interface->hl_hdrlen;
+		if (drivers[drvidx] && 
+		    max < drivers[drvidx]->interface->hl_hdrlen) {
+			max = drivers[drvidx]->interface->hl_hdrlen;
 		}
 	}
 	return max;

@@ -63,7 +63,6 @@ extern char *isdn_map_eaz2msn(char *msn, int di);
 extern void isdn_timer_ctrl(int tf, int onoff);
 extern int isdn_getnum(char **);
 extern int isdn_msncmp( const char *,  const char *);
-extern int isdn_add_channels(driver *, int, int, int);
 #if defined(ISDN_DEBUG_NET_DUMP) || defined(ISDN_DEBUG_MODEM_DUMP)
 extern void isdn_dumppkt(char *, u_char *, int, int);
 #else
@@ -99,3 +98,9 @@ extern void  isdn_slot_set_m_idx(int slot, int midx);
 extern void  isdn_slot_set_priv(int sl, void *);
 extern void *isdn_slot_priv(int sl);
 extern int   isdn_hard_header_len(void);
+
+int  isdn_drv_queue_empty(int di, int ch);
+void isdn_drv_queue_tail(int di, int ch, struct sk_buff *skb, int len);
+int  isdn_drv_maxbufsize(int di);
+int  isdn_drv_writebuf_skb(int di, int ch, int x, struct sk_buff *skb);
+int  isdn_drv_hdrlen(int di);

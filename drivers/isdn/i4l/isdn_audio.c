@@ -564,8 +564,7 @@ isdn_audio_eval_dtmf(modem_info * info)
 			cli();
 			di = isdn_slot_driver(info->isdn_slot);
 			ch = isdn_slot_channel(info->isdn_slot);
-			__skb_queue_tail(&dev->drv[di]->rpqueue[ch], skb);
-			dev->drv[di]->rcvcount[ch] += 2;
+			isdn_drv_queue_tail(di, ch, skb, 2);
 			restore_flags(flags);
 			/* Schedule dequeuing */
 			if ((dev->modempoll) && (info->rcvsched))
@@ -684,8 +683,7 @@ isdn_audio_put_dle_code(modem_info * info, u_char code)
 	cli();
 	di = isdn_slot_driver(info->isdn_slot);
 	ch = isdn_slot_channel(info->isdn_slot);
-	__skb_queue_tail(&dev->drv[di]->rpqueue[ch], skb);
-	dev->drv[di]->rcvcount[ch] += 2;
+	isdn_drv_queue_tail(di, ch, skb, 2);
 	restore_flags(flags);
 	/* Schedule dequeuing */
 	if ((dev->modempoll) && (info->rcvsched))

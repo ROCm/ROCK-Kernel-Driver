@@ -13,6 +13,7 @@
 
 #include <linux/isdn.h>
 #include "isdn_v110.h"
+#include "isdn_common.h"
 
 #undef ISDN_V110_DEBUG
 
@@ -542,7 +543,7 @@ isdn_v110_stat_callback(struct isdn_v110 *iv110, isdn_ctrl *c)
 				else
 					skb = isdn_v110_idle(v);
 				if (skb) {
-					if (dev->drv[c->driver]->interface->writebuf_skb(c->driver, c->arg, 1, skb) <= 0) {
+					if (isdn_drv_writebuf_skb(c->driver, c->arg, 1, skb) <= 0) {
 						dev_kfree_skb(skb);
 						break;
 					} else {
@@ -569,8 +570,8 @@ isdn_v110_stat_callback(struct isdn_v110 *iv110, isdn_ctrl *c)
 			break;
 		case ISDN_STAT_BCONN:
 			if (iv110->v110emu && (iv110->v110 == NULL)) {
-				int hdrlen = dev->drv[c->driver]->interface->hl_hdrlen;
-				int maxsize = dev->drv[c->driver]->interface->maxbufsize;
+				int hdrlen = isdn_drv_hdrlen(c->driver);
+				int maxsize = isdn_drv_maxbufsize(c->driver);
 				atomic_inc(&iv110->v110use);
 				switch (iv110->v110emu) {
 					case ISDN_PROTO_L2_V11096:
@@ -587,7 +588,7 @@ isdn_v110_stat_callback(struct isdn_v110 *iv110, isdn_ctrl *c)
 				if ((v = iv110->v110)) {
 					while (v->SyncInit) {
 						struct sk_buff *skb = isdn_v110_sync(v);
-						if (dev->drv[c->driver]->interface->writebuf_skb(c->driver, c->arg, 1, skb) <= 0) {
+						if (isdn_drv_writebuf_skb(c->driver, c->arg, 1, skb) <= 0) {
 							dev_kfree_skb(skb);
 							/* Unable to send, try later */
 							break;

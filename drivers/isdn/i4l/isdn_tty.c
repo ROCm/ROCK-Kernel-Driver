@@ -264,7 +264,7 @@ isdn_tty_rcv_skb(int i, int di, int channel, struct sk_buff *skb)
 	/* Try to deliver directly via tty-flip-buf if queue is empty */
 	save_flags(flags);
 	cli();
-	if (skb_queue_empty(&dev->drv[di]->rpqueue[channel]))
+	if (isdn_drv_queue_empty(di, channel))
 		if (isdn_tty_try_read(info, skb)) {
 			restore_flags(flags);
 			return 1;
@@ -272,13 +272,11 @@ isdn_tty_rcv_skb(int i, int di, int channel, struct sk_buff *skb)
 	/* Direct deliver failed or queue wasn't empty.
 	 * Queue up for later dequeueing via timer-irq.
 	 */
-	__skb_queue_tail(&dev->drv[di]->rpqueue[channel], skb);
-	dev->drv[di]->rcvcount[channel] +=
-		(skb->len
+	isdn_drv_queue_tail(di, channel, skb, skb->len
 #ifdef CONFIG_ISDN_AUDIO
 		 + ISDN_AUDIO_SKB_DLECOUNT(skb)
 #endif
-			);
+			    );
 	restore_flags(flags);
 	/* Schedule dequeuing */
 	if ((dev->modempoll) && (info->rcvsched))
@@ -1109,8 +1107,8 @@ isdn_tty_write(struct tty_struct *tty, int from_user, const u_char * buf, int co
 		if (c > info->xmit_size - info->xmit_count)
 			c = info->xmit_size - info->xmit_count;
 		di = isdn_slot_driver(info->isdn_slot);
-		if (di >= 0 && c > dev->drv[di]->maxbufsize)
-			c = dev->drv[di]->maxbufsize;
+		if (di >= 0 && c > isdn_drv_maxbufsize(di))
+			c = isdn_drv_maxbufsize(di);
 		if (c <= 0)
 			break;
 		if ((info->online > 1)
@@ -2211,7 +2209,7 @@ isdn_tty_find_icall(int di, int ch, setup_parm *setup)
 	}
 	restore_flags(flags);
 	printk(KERN_INFO "isdn_tty: call from %s -> %s %s\n", nr, eaz,
-	       ((dev->drv[di]->flags & DRV_FLAG_REJBUS) && (wret != 2))? "rejected" : "ignored");
+	       (wret != 2)? "rejected" : "ignored");
 	return (wret == 2)?3:0;
 }
 
@@ -2441,7 +2439,7 @@ isdn_tty_at_cout(char *msg, modem_info * info)
 	/* data is in queue or flip buffer is full */
 	di = isdn_slot_driver(info->isdn_slot); ch = isdn_slot_channel(info->isdn_slot);
 	if ((info->online) && (((tty->flip.count + strlen(msg)) >= TTY_FLIPBUF_SIZE) ||
-	    (!skb_queue_empty(&dev->drv[di]->rpqueue[ch])))) {
+	    (!isdn_drv_queue_empty(di, ch)))) {
 		skb = alloc_skb(strlen(msg)
 #ifdef CONFIG_ISDN_AUDIO
 			+ sizeof(isdn_audio_skb)
@@ -2484,8 +2482,7 @@ isdn_tty_at_cout(char *msg, modem_info * info)
 		}
 	}
 	if (skb) {
-		__skb_queue_tail(&dev->drv[di]->rpqueue[ch], skb);
-		dev->drv[di]->rcvcount[ch] += skb->len;
+		isdn_drv_queue_tail(di, ch, skb, skb->len);
 		restore_flags(flags);
 		/* Schedule dequeuing */
 		if ((dev->modempoll) && (info->rcvsched))

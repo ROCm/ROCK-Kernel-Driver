@@ -413,30 +413,6 @@ typedef struct {
 	char *private;
 } infostruct;
 
-#define DRV_FLAG_RUNNING 1
-#define DRV_FLAG_REJBUS  2
-#define DRV_FLAG_LOADED  4
-
-/* Description of hardware-level-driver */
-typedef struct {
-	ulong               online;           /* Channel-Online flags             */
-	ulong               flags;            /* Misc driver Flags                */
-	int                 locks;            /* Number of locks for this driver  */
-	int                 channels;         /* Number of channels               */
-	wait_queue_head_t   st_waitq;         /* Wait-Queue for status-read's     */
-	int                 maxbufsize;       /* Maximum Buffersize supported     */
-	unsigned long       pktcount;         /* Until now: unused                */
-	int                 stavail;          /* Chars avail on Status-device     */
-	isdn_if            *interface;        /* Interface to driver              */
-	int                *rcverr;           /* Error-counters for B-Ch.-receive */
-	int                *rcvcount;         /* Byte-counters for B-Ch.-receive  */
-#ifdef CONFIG_ISDN_AUDIO
-	unsigned long      DLEflag;           /* Flags: Insert DLE at next read   */
-#endif
-	struct sk_buff_head *rpqueue;         /* Pointers to start of Rcv-Queue   */
-	char               msn2eaz[10][ISDN_MSNLEN];  /* Mapping-Table MSN->EAZ   */
-} driver;
-
 /* Main driver-data */
 typedef struct isdn_devt {
 	unsigned short    flags;		       /* Bitmapped Flags:           */
@@ -451,7 +427,6 @@ typedef struct isdn_devt {
 	infostruct        *infochain;                /* List of open info-devs.    */
 	wait_queue_head_t info_waitq;               /* Wait-Queue for isdninfo    */
 	struct timer_list timer;		       /* Misc.-function Timer       */
-	driver            *drv[ISDN_MAX_DRIVERS];    /* Array of drivers           */
 	char              drvid[ISDN_MAX_DRIVERS][20];/* Driver-ID                 */
 	struct task_struct *profd;                   /* For iprofd                 */
 	modem             mdm;		       /* tty-driver-data            */
