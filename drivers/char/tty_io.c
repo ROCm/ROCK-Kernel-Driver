@@ -155,6 +155,9 @@ extern void tub3270_init(void);
 extern void uart_console_init(void);
 extern void sgi_serial_console_init(void);
 extern void sci_console_init(void);
+extern void m68328_console_init(void);
+extern void mcfrs_console_init(void);
+extern void rs_360_init(void);
 extern void tx3912_console_init(void);
 extern void tx3912_rs_init(void);
 extern void hvc_console_init(void);
@@ -2279,6 +2282,15 @@ void __init console_init(void)
 #endif
 #ifdef CONFIG_ARC_CONSOLE
 	arc_console_init();
+#endif
+#ifdef CONFIG_SERIAL_68328
+	m68328_console_init();
+#endif
+#ifdef CONFIG_SERIAL_COLDFIRE
+	mcfrs_console_init();
+#endif
+#ifdef CONFIG_SERIAL_68360
+	rs_360_init();
 #endif
 #ifdef CONFIG_SERIAL_TX3912_CONSOLE
 	tx3912_console_init();
