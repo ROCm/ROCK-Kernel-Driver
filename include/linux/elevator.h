@@ -1,7 +1,7 @@
 #ifndef _LINUX_ELEVATOR_H
 #define _LINUX_ELEVATOR_H
 
-typedef int (elevator_merge_fn) (request_queue_t *, struct request **,
+typedef int (elevator_merge_fn) (request_queue_t *, struct list_head **,
 				 struct bio *);
 
 typedef void (elevator_merge_req_fn) (request_queue_t *, struct request *, struct request *);
@@ -42,7 +42,7 @@ struct elevator_s
  */
 extern void __elv_add_request(request_queue_t *, struct request *,
 			      struct list_head *);
-extern int elv_merge(request_queue_t *, struct request **, struct bio *);
+extern int elv_merge(request_queue_t *, struct list_head **, struct bio *);
 extern void elv_merge_requests(request_queue_t *, struct request *,
 			       struct request *);
 extern void elv_merged_request(request_queue_t *, struct request *);
@@ -78,7 +78,7 @@ extern void elevator_exit(request_queue_t *, elevator_t *);
 extern inline int bio_rq_in_between(struct bio *, struct request *, struct list_head *);
 extern inline int elv_rq_merge_ok(struct request *, struct bio *);
 extern inline int elv_try_merge(struct request *, struct bio *);
-extern inline int elv_try_last_merge(request_queue_t *, struct request **, struct bio *);
+extern inline int elv_try_last_merge(request_queue_t *, struct bio *);
 
 /*
  * Return values from elevator merger

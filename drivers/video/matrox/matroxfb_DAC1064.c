@@ -276,6 +276,7 @@ static void DAC1064_setmclk(WPMINFO int oscinfo, unsigned long fmem) {
 	hw->MXoptionReg = mx;
 }
 
+#ifdef CONFIG_FB_MATROX_G450
 static void g450_set_plls(WPMINFO2) {
 	u_int32_t c2_ctl;
 	unsigned int pxc;
@@ -365,6 +366,7 @@ static void g450_set_plls(WPMINFO2) {
 		}
 	}
 }
+#endif
 
 void DAC1064_global_init(WPMINFO2) {
 	struct matrox_hw_state* hw = &ACCESS_FBINFO(hw);
@@ -372,6 +374,7 @@ void DAC1064_global_init(WPMINFO2) {
 	hw->DACreg[POS1064_XMISCCTRL] &= M1064_XMISCCTRL_DAC_WIDTHMASK;
 	hw->DACreg[POS1064_XMISCCTRL] |= M1064_XMISCCTRL_LUT_EN;
 	hw->DACreg[POS1064_XPIXCLKCTRL] = M1064_XPIXCLKCTRL_PLL_UP | M1064_XPIXCLKCTRL_EN | M1064_XPIXCLKCTRL_SRC_PLL;
+#ifdef CONFIG_FB_MATROX_G450
 	if (ACCESS_FBINFO(devflags.g450dac)) {
 		hw->DACreg[POS1064_XPWRCTRL] = 0x1F;	/* powerup everything */
 		hw->DACreg[POS1064_XOUTPUTCONN] = 0x00;	/* disable outputs */
@@ -420,7 +423,9 @@ void DAC1064_global_init(WPMINFO2) {
 		}
 		/* Now set timming related variables... */
 		g450_set_plls(PMINFO2);
-	} else {
+	} else
+#endif
+	{
 		if (ACCESS_FBINFO(outputs[1]).src == MATROXFB_SRC_CRTC1) {
 			hw->DACreg[POS1064_XPIXCLKCTRL] = M1064_XPIXCLKCTRL_PLL_UP | M1064_XPIXCLKCTRL_EN | M1064_XPIXCLKCTRL_SRC_EXT;
 			hw->DACreg[POS1064_XMISCCTRL] |= GX00_XMISCCTRL_MFC_MAFC | G400_XMISCCTRL_VDO_MAFC12;
@@ -621,6 +626,7 @@ static struct matrox_altout m1064 = {
 	.compute = m1064_compute,
 };
 
+#ifdef CONFIG_FB_MATROX_G450
 static int g450_compute(void* out, struct my_timming* m) {
 #define minfo ((struct matrox_fb_info*)out)
 	if (m->mnp < 0) {
@@ -637,6 +643,7 @@ static struct matrox_altout g450out = {
 	.name	 = "Primary output",
 	.compute = g450_compute,
 };
+#endif
 
 #endif /* NEED_DAC1064 */
 
@@ -819,6 +826,7 @@ static void MGA1064_reset(WPMINFO2) {
 #endif
 
 #ifdef CONFIG_FB_MATROX_G100
+#ifdef CONFIG_FB_MATROX_G450
 static void g450_mclk_init(WPMINFO2) {
 	/* switch all clocks to PCI source */
 	pci_write_config_dword(ACCESS_FBINFO(pcidev), PCI_OPTION_REG, ACCESS_FBINFO(hw).MXoptionReg | 4);
@@ -936,6 +944,10 @@ static void g450_preinit(WPMINFO2) {
 	
 	return;
 }
+#else
+static inline void g450_preinit(WPMINFO2) {
+}
+#endif
 
 static int MGAG100_preinit(WPMINFO2) {
 	static const int vxres_g100[] = {  512,        640, 768,  800,  832,  960,
@@ -973,9 +985,12 @@ static int MGAG100_preinit(WPMINFO2) {
 	ACCESS_FBINFO(capable.plnwt) = ACCESS_FBINFO(devflags.accelerator) == FB_ACCEL_MATROX_MGAG100
 			? ACCESS_FBINFO(devflags.sgram) : 1;
 
+#ifdef CONFIG_FB_MATROX_G450
 	if (ACCESS_FBINFO(devflags.g450dac)) {
 		ACCESS_FBINFO(outputs[0]).output = &g450out;
-	} else {
+	} else
+#endif
+	{
 		ACCESS_FBINFO(outputs[0]).output = &m1064;
 	}
 	ACCESS_FBINFO(outputs[0]).src = MATROXFB_SRC_CRTC1;

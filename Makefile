@@ -173,6 +173,9 @@ noconfig_targets := xconfig menuconfig config oldconfig randconfig \
 		    help tags TAGS sgmldocs psdocs pdfdocs htmldocs \
 		    checkconfig checkhelp checkincludes
 
+RCS_FIND_IGNORE := \( -name SCCS -o -name BitKeeper -o -name .svn -o -name CVS \) -prune -o
+RCS_TAR_IGNORE := --exclude SCCS --exclude BitKeeper --exclude .svn --exclude CVS
+
 # Helpers built in scripts/
 # ---------------------------------------------------------------------------
 
@@ -581,13 +584,13 @@ spec:
 #	   will become invalid
 
 rpm:	clean spec
-	find . -name SCCS -prune -o -name BitKeeper -prune -o \
+	find . $(RCS_FIND_IGNORE) \
 		\( -size 0 -o -name .depend -o -name .hdepend \) \
 		-type f -print | xargs rm -f
 	set -e; \
 	cd $(TOPDIR)/.. ; \
 	ln -sf $(TOPDIR) $(KERNELPATH) ; \
-	tar -cvz --exclude CVS -f $(KERNELPATH).tar.gz $(KERNELPATH)/. ; \
+	tar -cvz $(RCS_TAR_IGNORE) -f $(KERNELPATH).tar.gz $(KERNELPATH)/. ; \
 	rm $(KERNELPATH) ; \
 	cd $(TOPDIR) ; \
 	. scripts/mkversion > .version ; \
@@ -717,7 +720,7 @@ include arch/$(ARCH)/Makefile
 
 clean:	archclean
 	@echo 'Cleaning up'
-	@find . -name SCCS -prune -o -name BitKeeper -prune -o \
+	@find . $(RCS_FIND_IGNORE) \
 		\( -name \*.[oas] -o -name core -o -name .\*.cmd -o \
 		-name .\*.tmp -o -name .\*.d \) -type f -print \
 		| grep -v lxdialog/ | xargs rm -f
@@ -726,7 +729,7 @@ clean:	archclean
 
 mrproper: clean archmrproper
 	@echo 'Making mrproper'
-	@find . -name SCCS -prune -o -name BitKeeper -prune -o \
+	@find . $(RCS_FIND_IGNORE) \
 		\( -name .depend -o -name .\*.cmd \) \
 		-type f -print | xargs rm -f
 	@rm -f $(MRPROPER_FILES)
@@ -736,7 +739,7 @@ mrproper: clean archmrproper
 
 distclean: mrproper
 	@echo 'Making distclean'
-	@find . -name SCCS -prune -o -name BitKeeper -prune -o \
+	@find . $(RCS_FIND_IGNORE) \
 		\( -not -type d \) -and \
 	 	\( -name '*.orig' -o -name '*.rej' -o -name '*~' \
 		-o -name '*.bak' -o -name '#*#' -o -name '.*.orig' \
@@ -747,18 +750,18 @@ distclean: mrproper
 # ---------------------------------------------------------------------------
 
 define all-sources
-	( find . \( -name SCCS -o -name BitKeeper -o -name include -o \
-		  -name arch \) -prune \
+	( find . $(RCS_FIND_IGNORE) \
+	       \( -name include -o -name arch \) -prune -o \
+	       -name '*.[chS]' -print; \
+	  find arch/$(ARCH) $(RCS_FIND_IGNORE) \
+	       -name '*.[chS]' -print; \
+	  find include $(RCS_FIND_IGNORE) \
+	       \( -name config -o -name 'asm-*' \) -prune -o \
 	       -o -name '*.[chS]' -print; \
-	  find arch/$(ARCH) \( -name SCCS -o -name BitKeeper \) -prune \
-	       -o -name '*.[chS]' -print; \
-	  find include \( -name SCCS -o -name BitKeeper -o -name config -o \
-			  -name 'asm-*' \) -prune \
-	       -o -name '*.[chS]' -print; \
-	  find include/asm-$(ARCH) \( -name SCCS -o -name BitKeeper \) -prune \
-	       -o -name '*.[chS]' -print; \
-	  find include/asm-generic \( -name SCCS -o -name BitKeeper \) -prune \
-	       -o -name '*.[chS]' -print )
+	  find include/asm-$(ARCH) $(RCS_FIND_IGNORE) \
+	       -name '*.[chS]' -print; \
+	  find include/asm-generic $(RCS_FIND_IGNORE) \
+	       -name '*.[chS]' -print )
 endef
 
 quiet_cmd_TAGS = MAKE   $@
@@ -825,17 +828,17 @@ sgmldocs psdocs pdfdocs htmldocs: scripts
 # ---------------------------------------------------------------------------
 
 checkconfig:
-	find * -name SCCS -prune -o -name BitKeeper -prune -o \
+	find * $(RCS_FIND_IGNORE) \
 		-name '*.[hcS]' -type f -print | sort \
 		| xargs $(PERL) -w scripts/checkconfig.pl
 
 checkhelp:
-	find * -name SCCS -prune -o -name BitKeeper -prune -o \
+	find * $(RCS_FIND_IGNORE) \
 		-name [cC]onfig.in -print | sort \
 		| xargs $(PERL) -w scripts/checkhelp.pl
 
 checkincludes:
-	find * -name SCCS -prune -o -name BitKeeper -prune -o \
+	find * $(RCS_FIND_IGNORE) \
 		-name '*.[hcS]' -type f -print | sort \
 		| xargs $(PERL) -w scripts/checkincludes.pl
 

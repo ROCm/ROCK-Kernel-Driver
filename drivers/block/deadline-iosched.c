@@ -137,8 +137,24 @@ deadline_find_hash(struct deadline_data *dd, sector_t offset)
 	return rq;
 }
 
+static sector_t deadline_get_last_sector(struct deadline_data *dd)
+{
+	sector_t last_sec = dd->last_sector;
+
+	/*
+	 * if dispatch is non-empty, disregard last_sector and check last one
+	 */
+	if (!list_empty(dd->dispatch)) {
+		struct request *__rq = list_entry_rq(dd->dispatch->prev);
+
+		last_sec = __rq->sector + __rq->nr_sectors;
+	}
+
+	return last_sec;
+}
+
 static int
-deadline_merge(request_queue_t *q, struct request **req, struct bio *bio)
+deadline_merge(request_queue_t *q, struct list_head **insert, struct bio *bio)
 {
 	struct deadline_data *dd = q->elevator.elevator_data;
 	const int data_dir = bio_data_dir(bio);
@@ -150,9 +166,11 @@ deadline_merge(request_queue_t *q, struct request **req, struct bio *bio)
 	/*
 	 * try last_merge to avoid going to hash
 	 */
-	ret = elv_try_last_merge(q, req, bio);
-	if (ret != ELEVATOR_NO_MERGE)
+	ret = elv_try_last_merge(q, bio);
+	if (ret != ELEVATOR_NO_MERGE) {
+		*insert = q->last_merge;
 		goto out;
+	}
 
 	/*
 	 * see if the merge hash can satisfy a back merge
@@ -161,12 +179,15 @@ deadline_merge(request_queue_t *q, struct request **req, struct bio *bio)
 		BUG_ON(__rq->sector + __rq->nr_sectors != bio->bi_sector);
 
 		if (elv_rq_merge_ok(__rq, bio)) {
-			*req = __rq;
+			*insert = &__rq->queuelist;
 			ret = ELEVATOR_BACK_MERGE;
 			goto out;
 		}
 	}
 
+	/*
+	 * scan list from back to find insertion point.
+	 */
 	entry = sort_list = &dd->sort_list[data_dir];
 	while ((entry = entry->prev) != sort_list) {
 		__rq = list_entry_rq(entry);
@@ -177,8 +198,8 @@ deadline_merge(request_queue_t *q, struct request **req, struct bio *bio)
 		if (!(__rq->flags & REQ_CMD))
 			continue;
 
-		if (!*req && bio_rq_in_between(bio, __rq, sort_list))
-			*req = __rq;
+		if (!*insert && bio_rq_in_between(bio, __rq, sort_list))
+			*insert = &__rq->queuelist;
 
 		if (__rq->flags & REQ_BARRIER)
 			break;
@@ -189,10 +210,21 @@ deadline_merge(request_queue_t *q, struct request **req, struct bio *bio)
 		if (__rq->sector - bio_sectors(bio) == bio->bi_sector) {
 			ret = elv_try_merge(__rq, bio);
 			if (ret != ELEVATOR_NO_MERGE) {
-				*req = __rq;
+				*insert = &__rq->queuelist;
 				break;
 			}
 		}
+	}
+
+	/*
+	 * no insertion point found, check the very front
+	 */
+	if (!*insert && !list_empty(sort_list)) {
+		__rq = list_entry_rq(sort_list->next);
+
+		if (bio->bi_sector + bio_sectors(bio) < __rq->sector &&
+		    bio->bi_sector > deadline_get_last_sector(dd))
+			*insert = sort_list;
 	}
 
 out:
@@ -254,17 +286,8 @@ deadline_move_to_dispatch(struct deadline_data *dd, struct request *rq)
 static void deadline_move_requests(struct deadline_data *dd, struct request *rq)
 {
 	struct list_head *sort_head = &dd->sort_list[rq_data_dir(rq)];
-	sector_t last_sec = dd->last_sector;
+	sector_t last_sec = deadline_get_last_sector(dd);
 	int batch_count = dd->fifo_batch;
-
-	/*
-	 * if dispatch is non-empty, disregard last_sector and check last one
-	 */
-	if (!list_empty(dd->dispatch)) {
-		struct request *__rq = list_entry_rq(dd->dispatch->prev);
-
-		last_sec = __rq->sector + __rq->nr_sectors;
-	}
 
 	do {
 		struct list_head *nxt = rq->queuelist.next;
