@@ -340,10 +340,9 @@ static inline void __activate_task(task_t *p, runqueue_t *rq)
  * Update all the scheduling statistics stuff. (sleep average
  * calculation, priority modifiers, etc.)
  */
-static inline int activate_task(task_t *p, runqueue_t *rq)
+static inline void activate_task(task_t *p, runqueue_t *rq)
 {
 	long sleep_time = jiffies - p->last_run - 1;
-	int requeue_waker = 0;
 
 	if (sleep_time > 0) {
 		int sleep_avg;
@@ -372,8 +371,6 @@ static inline int activate_task(task_t *p, runqueue_t *rq)
 		}
 	}
 	__activate_task(p, rq);
-
-	return requeue_waker;
 }
 
 /*
@@ -471,8 +468,8 @@ repeat:
  */
 static int try_to_wake_up(task_t * p, unsigned int state, int sync, int kick)
 {
-	int success = 0, requeue_waker = 0;
 	unsigned long flags;
+	int success = 0;
 	long old_state;
 	runqueue_t *rq;
 
@@ -498,7 +495,7 @@ repeat_lock_task:
 			if (sync)
 				__activate_task(p, rq);
 			else {
-				requeue_waker = activate_task(p, rq);
+				activate_task(p, rq);
 				if (p->prio < rq->curr->prio)
 					resched_task(rq->curr);
 			}
@@ -509,21 +506,6 @@ repeat_lock_task:
 		p->state = TASK_RUNNING;
 	}
 	task_rq_unlock(rq, &flags);
-
-	/*
-	 * We have to do this outside the other spinlock, the two
-	 * runqueues might be different:
-	 */
-	if (requeue_waker) {
-		prio_array_t *array;
-
-		rq = task_rq_lock(current, &flags);
-		array = current->array;
-		dequeue_task(current, array);
-		current->prio = effective_prio(current);
-		enqueue_task(current, array);
-		task_rq_unlock(rq, &flags);
-	}
 
 	return success;
 }
