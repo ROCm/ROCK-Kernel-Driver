@@ -142,7 +142,7 @@ version of ksymoops to decode the report; see REPORTING-BUGS in the
 root of the Linux source for more information.
 
 Module-Init-Tools
---------
+-----------------
 
 A new module loader is now in the kernel that requires module-init-tools
 to use.  It is backward compatible with the 2.4.x series kernels.
@@ -337,8 +337,8 @@ Ksymoops
 --------
 o  <ftp://ftp.kernel.org/pub/linux/utils/kernel/ksymoops/v2.4/>
 
-Modutils
---------
+Module-Init-Tools
+-----------------
 o  <ftp://ftp.kernel.org/pub/linux/kernel/people/rusty/modules/>
 
 Mkinitrd
