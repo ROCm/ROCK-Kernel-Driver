@@ -188,8 +188,8 @@ config FB_AMIGA_AGA
 	  otherwise say N.
 
 config FB_CYBER
-	tristate "Amiga CyberVision support"
-	depends on FB && ZORRO
+	tristate "Amiga CyberVision 64 support"
+	depends on FB && ZORRO && BROKEN
 	help
 	  This enables support for the Cybervision 64 graphics card from
 	  Phase5. Please note that its use is not all that intuitive (i.e. if
