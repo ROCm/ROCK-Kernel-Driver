@@ -43,7 +43,7 @@
  * anchor point for all the other drivers.
  */
 struct sa1111 {
-	struct device	dev;
+	struct device	*dev;
 	struct resource	res;
 	int		irq;
 	spinlock_t	lock;
@@ -64,7 +64,7 @@ static struct sa1111_dev usb_dev = {
 	.devid		= SA1111_DEVID_USB,
 	.irq = {
 		IRQ_USBPWR,
-		IRQ_NHCIM,
+		IRQ_HCIM,
 		IRQ_HCIBUFFACC,
 		IRQ_HCIRMTWKP,
 		IRQ_NHCIMFCIR,
@@ -148,7 +148,6 @@ static struct sa1111_dev *devs[] = {
 	&ssp_dev,
 	&kbd_dev,
 	&mse_dev,
-	&int_dev,
 	&pcmcia_dev,
 };
 
@@ -158,7 +157,6 @@ static unsigned int dev_offset[] = {
 	0x0800,
 	SA1111_KBD,
 	SA1111_MSE,
-	SA1111_INTC,
 	0x1800,
 };
 
@@ -372,136 +370,6 @@ static void __init sa1111_init_irq(struct sa1111_dev *sadev)
 	set_irq_chained_handler(sadev->irq[0], sa1111_irq_handler);
 }
 
-static struct device_driver sa1111_device_driver;
-
-/**
- *	sa1111_probe - probe for a single SA1111 chip.
- *	@phys_addr: physical address of device.
- *
- *	Probe for a SA1111 chip.  This must be called
- *	before any other SA1111-specific code.
- *
- *	Returns:
- *	%-ENODEV	device not found.
- *	%-EBUSY		physical address already marked in-use.
- *	%0		successful.
- */
-static int __init
-sa1111_probe(unsigned long phys_addr, int irq)
-{
-	struct sa1111 *sachip;
-	unsigned long id;
-	unsigned int has_devs;
-	int i, ret = -ENODEV;
-
-	sachip = kmalloc(sizeof(struct sa1111), GFP_KERNEL);
-	if (!sachip)
-		return -ENOMEM;
-
-	memset(sachip, 0, sizeof(struct sa1111));
-
-	spin_lock_init(&sachip->lock);
-
-	strncpy(sachip->dev.name, "Intel Corporation SA1111", sizeof(sachip->dev.name));
-	snprintf(sachip->dev.bus_id, sizeof(sachip->dev.bus_id), "%8.8lx", phys_addr);
-	sachip->dev.driver = &sa1111_device_driver;
-	sachip->dev.driver_data = sachip;
-
-	sachip->res.name  = sachip->dev.name;
-	sachip->res.start = phys_addr;
-	sachip->res.end   = phys_addr + 0x2000;
-	sachip->irq = irq;
-
-	if (request_resource(&iomem_resource, &sachip->res)) {
-		ret = -EBUSY;
-		goto out;
-	}
-
-	sachip->base = ioremap(phys_addr, PAGE_SIZE * 2);
-	if (!sachip->base) {
-		ret = -ENOMEM;
-		goto release;
-	}
-
-	/*
-	 * Probe for the chip.  Only touch the SBI registers.
-	 */
-	id = sa1111_readl(sachip->base + SA1111_SKID);
-	if ((id & SKID_ID_MASK) != SKID_SA1111_ID) {
-		printk(KERN_DEBUG "SA1111 not detected: ID = %08lx\n", id);
-		ret = -ENODEV;
-		goto unmap;
-	}
-
-	/*
-	 * We found the chip.
-	 */
-	ret = register_sys_device(&sachip->dev);
-	if (ret)
-		printk("sa1111 device_register failed: %d\n", ret);
-
-	printk(KERN_INFO "SA1111 Microprocessor Companion Chip: "
-		"silicon revision %lx, metal revision %lx\n",
-		(id & SKID_SIREV_MASK)>>4, (id & SKID_MTREV_MASK));
-
-	g_sa1111 = sachip;
-
-	has_devs = ~0;
-	if (machine_is_assabet() || machine_is_jornada720() ||
-	    machine_is_badge4())
-		has_devs &= ~(1 << 4);
-	else
-		has_devs &= ~(1 << 1);
-
-	for (i = 0; i < ARRAY_SIZE(devs); i++) {
-		if (!(has_devs & (1 << i)))
-			continue;
-
-		snprintf(devs[i]->dev.bus_id, sizeof(devs[i]->dev.bus_id),
-			 "%4.4x", dev_offset[i]);
-
-		devs[i]->dev.parent = &sachip->dev;
-		devs[i]->dev.bus    = &sa1111_bus_type;
-		devs[i]->res.start  = sachip->res.start + dev_offset[i];
-		devs[i]->res.end    = devs[i]->res.start + 511;
-		devs[i]->res.name   = devs[i]->dev.name;
-		devs[i]->res.flags  = IORESOURCE_MEM;
-		devs[i]->mapbase    = sachip->base + dev_offset[i];
-
-		if (request_resource(&sachip->res, &devs[i]->res)) {
-			printk("SA1111: failed to allocate resource for %s\n",
-				devs[i]->res.name);
-			continue;
-		}
-
-		device_register(&devs[i]->dev);
-	}
-
-	return 0;
-
- unmap:
-	iounmap(sachip->base);
- release:
-	release_resource(&sachip->res);
- out:
-	kfree(sachip);
-	return ret;
-}
-
-static void __sa1111_remove(struct sa1111 *sachip)
-{
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(devs); i++) {
-		put_device(&devs[i]->dev);
-		release_resource(&devs[i]->res);
-	}
-
-	iounmap(sachip->base);
-	release_resource(&sachip->res);
-	kfree(sachip);
-}
-
 /*
  * Bring the SA1111 out of reset.  This requires a set procedure:
  *  1. nRESET asserted (by hardware)
@@ -580,6 +448,169 @@ sa1111_configure_smc(struct sa1111 *sachip, int sdram, unsigned int drac,
 	sa1111_writel(smcr, sachip->base + SA1111_SMCR);
 }
 
+static void
+sa1111_init_one_child(struct sa1111 *sachip, struct sa1111_dev *sadev, unsigned int offset)
+{
+	snprintf(sadev->dev.bus_id, sizeof(sadev->dev.bus_id),
+		 "%4.4x", offset);
+
+	sadev->dev.parent = sachip->dev;
+	sadev->dev.bus    = &sa1111_bus_type;
+	sadev->res.start  = sachip->res.start + offset;
+	sadev->res.end    = sadev->res.start + 511;
+	sadev->res.name   = sadev->dev.name;
+	sadev->res.flags  = IORESOURCE_MEM;
+	sadev->mapbase    = sachip->base + offset;
+
+	if (request_resource(&sachip->res, &sadev->res)) {
+		printk("SA1111: failed to allocate resource for %s\n",
+			sadev->res.name);
+		return;
+	}
+
+	device_register(&sadev->dev);
+}
+
+/**
+ *	sa1111_probe - probe for a single SA1111 chip.
+ *	@phys_addr: physical address of device.
+ *
+ *	Probe for a SA1111 chip.  This must be called
+ *	before any other SA1111-specific code.
+ *
+ *	Returns:
+ *	%-ENODEV	device not found.
+ *	%-EBUSY		physical address already marked in-use.
+ *	%0		successful.
+ */
+static int __init
+__sa1111_probe(struct device *me, unsigned long phys_addr, int irq)
+{
+	struct sa1111 *sachip;
+	unsigned long id;
+	unsigned int has_devs, val;
+	int i, ret = -ENODEV;
+
+	sachip = kmalloc(sizeof(struct sa1111), GFP_KERNEL);
+	if (!sachip)
+		return -ENOMEM;
+
+	memset(sachip, 0, sizeof(struct sa1111));
+
+	spin_lock_init(&sachip->lock);
+
+	sachip->dev = me;
+	dev_set_drvdata(sachip->dev, sachip);
+
+	sachip->res.name  = me->name;
+	sachip->res.start = phys_addr;
+	sachip->res.end   = phys_addr + 0x2000;
+	sachip->irq = irq;
+
+	if (request_resource(&iomem_resource, &sachip->res)) {
+		ret = -EBUSY;
+		goto out;
+	}
+
+	/*
+	 * Map the whole region.  This also maps the
+	 * registers for our children.
+	 */
+	sachip->base = ioremap(phys_addr, PAGE_SIZE * 2);
+	if (!sachip->base) {
+		ret = -ENOMEM;
+		goto release;
+	}
+
+	/*
+	 * Probe for the chip.  Only touch the SBI registers.
+	 */
+	id = sa1111_readl(sachip->base + SA1111_SKID);
+	if ((id & SKID_ID_MASK) != SKID_SA1111_ID) {
+		printk(KERN_DEBUG "SA1111 not detected: ID = %08lx\n", id);
+		ret = -ENODEV;
+		goto unmap;
+	}
+
+	printk(KERN_INFO "SA1111 Microprocessor Companion Chip: "
+		"silicon revision %lx, metal revision %lx\n",
+		(id & SKID_SIREV_MASK)>>4, (id & SKID_MTREV_MASK));
+
+	/*
+	 * We found it.  Wake the chip up, and initialise.
+	 */
+	sa1111_wake(sachip);
+
+	/*
+	 * The SDRAM configuration of the SA1110 and the SA1111 must
+	 * match.  This is very important to ensure that SA1111 accesses
+	 * don't corrupt the SDRAM.  Note that this ungates the SA1111's
+	 * MBGNT signal, so we must have called sa1110_mb_disable()
+	 * beforehand.
+	 */
+	sa1111_configure_smc(sachip, 1,
+			     FExtr(MDCNFG, MDCNFG_SA1110_DRAC0),
+			     FExtr(MDCNFG, MDCNFG_SA1110_TDL0));
+
+	/*
+	 * We only need to turn on DCLK whenever we want to use the
+	 * DMA.  It can otherwise be held firmly in the off position.
+	 * (currently, we always enable it.)
+	 */
+	val = sa1111_readl(sachip->base + SA1111_SKPCR);
+	sa1111_writel(val | SKPCR_DCLKEN, sachip->base + SA1111_SKPCR);
+
+	/*
+	 * Enable the SA1110 memory bus request and grant signals.
+	 */
+	sa1110_mb_enable();
+
+	/*
+	 * The interrupt controller must be initialised before any
+	 * other device to ensure that the interrupts are available.
+	 */
+	int_dev.irq[0] = irq;
+	sa1111_init_one_child(sachip, &int_dev, SA1111_INTC);
+	sa1111_init_irq(&int_dev);
+
+	g_sa1111 = sachip;
+
+	has_devs = ~0;
+	if (machine_is_assabet() || machine_is_jornada720() ||
+	    machine_is_badge4())
+		has_devs &= ~(1 << 4);
+	else
+		has_devs &= ~(1 << 1);
+
+	for (i = 0; i < ARRAY_SIZE(devs); i++)
+		if (has_devs & (1 << i))
+			sa1111_init_one_child(sachip, devs[i], dev_offset[i]);
+
+	return 0;
+
+ unmap:
+	iounmap(sachip->base);
+ release:
+	release_resource(&sachip->res);
+ out:
+	kfree(sachip);
+	return ret;
+}
+
+static void __sa1111_remove(struct sa1111 *sachip)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(devs); i++) {
+		put_device(&devs[i]->dev);
+		release_resource(&devs[i]->res);
+	}
+
+	iounmap(sachip->base);
+	release_resource(&sachip->res);
+	kfree(sachip);
+}
+
 /*
  * According to the "Intel StrongARM SA-1111 Microprocessor Companion
  * Chip Specification Update" (June 2000), erratum #7, there is a
@@ -648,52 +679,6 @@ int sa1111_check_dma_bug(dma_addr_t addr)
 	return 0;
 }
 
-int sa1111_init(unsigned long phys, unsigned int irq)
-{
-	unsigned int val;
-	int ret;
-
-	ret = sa1111_probe(phys, irq);
-	if (ret < 0)
-		return ret;
-
-	/*
-	 * We found it.  Wake the chip up.
-	 */
-	sa1111_wake(g_sa1111);
-
-	/*
-	 * The SDRAM configuration of the SA1110 and the SA1111 must
-	 * match.  This is very important to ensure that SA1111 accesses
-	 * don't corrupt the SDRAM.  Note that this ungates the SA1111's
-	 * MBGNT signal, so we must have called sa1110_mb_disable()
-	 * beforehand.
-	 */
-	sa1111_configure_smc(g_sa1111, 1,
-			     FExtr(MDCNFG, MDCNFG_SA1110_DRAC0),
-			     FExtr(MDCNFG, MDCNFG_SA1110_TDL0));
-
-	/*
-	 * We only need to turn on DCLK whenever we want to use the
-	 * DMA.  It can otherwise be held firmly in the off position.
-	 */
-	val = sa1111_readl(g_sa1111->base + SA1111_SKPCR);
-	sa1111_writel(val | SKPCR_DCLKEN, g_sa1111->base + SA1111_SKPCR);
-
-	/*
-	 * Enable the SA1110 memory bus request and grant signals.
-	 */
-	sa1110_mb_enable();
-
-	/*
-	 * Initialise SA1111 IRQs
-	 */
-	int_dev.irq[0] = irq;
-	sa1111_init_irq(&int_dev);
-
-	return 0;
-}
-
 struct sa1111_save_data {
 	unsigned int	skcr;
 	unsigned int	skpcr;
@@ -717,7 +702,7 @@ struct sa1111_save_data {
 
 static int sa1111_suspend(struct device *dev, u32 state, u32 level)
 {
-	struct sa1111 *sachip = dev->driver_data;
+	struct sa1111 *sachip = dev_get_drvdata(dev);
 	unsigned long flags;
 	char *base;
 
@@ -789,7 +774,7 @@ static int sa1111_suspend(struct device *dev, u32 state, u32 level)
  */
 static int sa1111_resume(struct device *dev, u32 level)
 {
-	struct sa1111 *sachip = dev->driver_data;
+	struct sa1111 *sachip = dev_get_drvdata(dev);
 	struct sa1111_save_data *save;
 	unsigned long flags, id;
 	char *base;
@@ -809,6 +794,7 @@ static int sa1111_resume(struct device *dev, u32 level)
 	id = sa1111_readl(sachip->base + SA1111_SKID);
 	if ((id & SKID_ID_MASK) != SKID_SA1111_ID) {
 		__sa1111_remove(sachip);
+		dev_set_drvdata(dev, NULL);
 		kfree(save);
 		return 0;
 	}
@@ -840,10 +826,77 @@ static int sa1111_resume(struct device *dev, u32 level)
 	return 0;
 }
 
+static int sa1111_probe(struct device *dev)
+{
+	return -ENODEV;
+}
+
+static int sa1111_remove(struct device *dev)
+{
+	struct sa1111 *sachip = dev_get_drvdata(dev);
+
+	if (sachip) {
+		__sa1111_remove(sachip);
+		dev_set_drvdata(dev, NULL);
+
+		kfree(dev->saved_state);
+		dev->saved_state = NULL;
+	}
+
+	return 0;
+}
+
+/*
+ *	Not sure if this should be on the system bus or not yet.
+ *	We really want some way to register a system device at
+ *	the per-machine level, and then have this driver pick
+ *	up the registered devices.
+ *
+ *	We also need to handle the SDRAM configuration for
+ *	PXA250/SA1110 machine classes.
+ */
 static struct device_driver sa1111_device_driver = {
+	.name		= "SA1111",
+	.bus		= &system_bus_type,
+	.probe		= sa1111_probe,
+	.remove		= sa1111_remove,
 	.suspend	= sa1111_suspend,
 	.resume		= sa1111_resume,
 };
+
+/*
+ *	Register the SA1111 driver with LDM.
+ */
+static int sa1111_driver_init(void)
+{
+	driver_register(&sa1111_device_driver);
+	return 0;
+}
+
+arch_initcall(sa1111_driver_init);
+
+static struct sys_device sa1111_device = {
+	.name		= "SA1111",
+	.id		= 0,
+	.root		= NULL,
+	.dev = {
+		.name	= "Intel Corporation SA1111",
+		.driver	= &sa1111_device_driver,
+	},
+};
+
+int sa1111_init(unsigned long phys, unsigned int irq)
+{
+	int ret;
+
+	snprintf(sa1111_device.dev.bus_id, sizeof(sa1111_device.dev.bus_id), "%8.8lx", phys);
+
+	ret = sys_device_register(&sa1111_device);
+	if (ret)
+		printk("sa1111 device_register failed: %d\n", ret);
+
+	return __sa1111_probe(&sa1111_device.dev, phys, irq);
+}
 
 /*
  *	Get the parent device driver (us) structure
@@ -851,7 +904,7 @@ static struct device_driver sa1111_device_driver = {
  */
 static inline struct sa1111 *sa1111_chip_driver(struct sa1111_dev *sadev)
 {
-	return (struct sa1111 *)sadev->dev.parent->driver_data;
+	return (struct sa1111 *)dev_get_drvdata(sadev->dev.parent);
 }
 
 /*
