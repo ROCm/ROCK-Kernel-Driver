@@ -518,19 +518,19 @@ void start_hz_timer(struct pt_regs *regs)
  * Stop the HZ tick on the current CPU.
  * Only cpu_idle may call this function.
  */
-int stop_hz_timer(void)
+void stop_hz_timer(void)
 {
 	__u64 timer;
 
 	if (sysctl_hz_timer != 0)
-		return 1;
+		return;
 
 	/*
 	 * Leave the clock comparator set up for the next timer
 	 * tick if either rcu or a softirq is pending.
 	 */
 	if (rcu_pending(smp_processor_id()) || local_softirq_pending())
-		return 1;
+		return;
 
 	/*
 	 * This cpu is going really idle. Set up the clock comparator
@@ -540,8 +540,6 @@ int stop_hz_timer(void)
 	timer = (__u64) (next_timer_interrupt() - jiffies) + jiffies_64;
 	timer = jiffies_timer_cc + timer * CLK_TICKS_PER_JIFFY;
 	asm volatile ("SCKC %0" : : "m" (timer));
-
-	return 0;
 }
 #endif
 
@@ -572,8 +570,7 @@ int stop_timers(void)
 #endif
 
 #ifdef CONFIG_NO_IDLE_HZ
-	if (stop_hz_timer())
-		return 1;
+	stop_hz_timer();
 #endif
 
 	/* enable monitor call class 0 */

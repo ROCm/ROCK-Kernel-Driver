@@ -305,7 +305,8 @@ sysc_restart:
 #
 sysc_singlestep:
 	ni	__TI_flags+7(%r9),255-_TIF_SINGLE_STEP # clear TIF_SINGLE_STEP
-	mvi	SP_TRAP+1(%r15),0x28	# set trap indication to pgm check
+	lhi	%r0,__LC_PGM_OLD_PSW
+	sth	%r0,SP_TRAP(%r15)	# set trap indication to pgm check
 	la	%r2,SP_PTREGS(%r15)	# address of register-save area
 	larl	%r14,sysc_return	# load adr. of system return
 	jg	do_debugger_trap	# branch to do_debugger_trap

@@ -67,9 +67,9 @@ config MARCH_Z900
 	  on older 31 bit only CPUs.
 
 config MARCH_Z990
-	bool "IBM eServer zSeries model z990"
+	bool "IBM eServer zSeries model z890 and z990"
 	help
-	  Select this enable optimizations for model z990.
+	  Select this enable optimizations for model z890/z990.
 	  This will be slightly faster but does not work on
 	  older machines such as the z900.
 
@@ -154,7 +154,7 @@ config QDIO
 	tristate "QDIO support"
 	---help---
 	  This driver provides the Queued Direct I/O base support for the
-	  IBM S/390 (G5 and G6) and eServer zSeries (z800, z900 and z990).
+	  IBM S/390 (G5 and G6) and eServer zSeries (z800, z890, z900 and z990).
 
 	  For details please refer to the documentation provided by IBM at
 	  <http://www10.software.ibm.com/developerworks/opensource/linux390>
