@@ -7,7 +7,8 @@
 #
 # Copyright (C) 1995-2001 by Russell King
 
-LINKFLAGS	:=-p -X -T arch/arm/vmlinux.lds
+LDFLAGS_vmlinux	:=-p -X -T arch/arm/vmlinux.lds
+OBJCOPYFLAGS	:=-O binary -R .note -R .comment -S
 GZFLAGS		:=-9
 CFLAGS		+=-pipe
 

@@ -15,6 +15,10 @@ C-procfs-example = procfs_example.sgml
 $(TOPDIR)/scripts/docgen $(TOPDIR)/scripts/gen-all-syms \
 $(TOPDIR)/scripts/kernel-doc $(TOPDIR)/scripts/docproc: doc-progs ;
 
+dochelp:
+	@echo  '  Linux kernel internal documentation in different formats:'
+	@echo  '  sgmldocs (SGML), psdocs (Postscript), pdfdocs (PDF), htmldocs (HTML)'
+
 .PHONY: doc-progs
 doc-progs:
 	@$(MAKE) -C $(TOPDIR)/scripts doc-progs

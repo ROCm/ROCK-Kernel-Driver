@@ -51,9 +51,3 @@ obj-$(CONFIG_FUSION_CTL)	+= mptctl.o
 obj-$(CONFIG_FUSION_LAN)	+= mptlan.o
 
 include $(TOPDIR)/Rules.make
-
-
-#  EXP...
-## Fusion MPT extra's...
-##mptscsih.o: $(mptscsih-objs)
-##	$(LD) -r -o $@ $(mptscsih-objs)

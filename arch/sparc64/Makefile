@@ -28,7 +28,7 @@ AR		= sparc64-linux-ar
 RANLIB		= sparc64-linux-ranlib
 else
 AS		:= $(AS) -64
-LD		:= $(LD) -m elf64_sparc
+LDFLAGS		:= -m elf64_sparc
 endif
 ELFTOAOUT	= elftoaout
 ifneq ($(UNDECLARED_REGS),y)
@@ -53,7 +53,7 @@ ifeq ($(CONFIG_MCOUNT),y)
   CFLAGS := $(CFLAGS) -pg
 endif
 
-LINKFLAGS = -T arch/sparc64/vmlinux.lds
+LDFLAGS_vmlinux = -T arch/sparc64/vmlinux.lds
 
 HEAD := arch/sparc64/kernel/head.o arch/sparc64/kernel/init_task.o
 

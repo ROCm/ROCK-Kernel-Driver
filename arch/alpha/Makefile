@@ -10,7 +10,7 @@
 
 NM := $(NM) -B
 
-LINKFLAGS = -static -T arch/alpha/vmlinux.lds -N #-relax
+LDFLAGS_vmlinux = -static -T arch/alpha/vmlinux.lds -N #-relax
 CFLAGS := $(CFLAGS) -pipe -mno-fp-regs -ffixed-8
 
 # Determine if we can use the BWX instructions with GAS.

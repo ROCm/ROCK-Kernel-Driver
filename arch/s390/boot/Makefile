@@ -2,21 +2,19 @@
 # arch/s390/boot/Makefile
 #
 
-OBJCOPY = $(CROSS_COMPILE)objcopy
-
 EXTRA_AFLAGS := -traditional
 
 include $(TOPDIR)/Rules.make
 
 %.lnk: %.o
-	$(LD) -Ttext 0x0 -o $@ $<
+	$(LD) $(LDFLAGS) -Ttext 0x0 -o $@ $<
 
 %.boot: %.lnk
-	$(OBJCOPY) -O binary $< $@
+	$(OBJCOPY) $(OBJCOPYFLAGS) $< $@
 
 image: $(TOPDIR)/vmlinux \
 	iplfba.boot ipleckd.boot ipldump.boot
-	$(OBJCOPY) -O binary $(TOPDIR)/vmlinux image
+	$(OBJCOPY) $(OBJCOPYFLAGS) $(TOPDIR)/vmlinux image
 	$(NM) $(TOPDIR)/vmlinux | grep -v '\(compiled\)\|\( [aUw] \)\|\(\.\)\|\(LASH[RL]DI\)' | sort > $(TOPDIR)/System.map
 
 listing: ../../../vmlinux

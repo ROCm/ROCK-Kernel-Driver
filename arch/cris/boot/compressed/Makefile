@@ -8,7 +8,7 @@ CC = gcc-cris -melf -I $(TOPDIR)/include
 CFLAGS = -O2
 LD = ld-cris
 OBJCOPY = objcopy-cris
-
+OBJCOPYFLAGS = -O binary --remove-section=.bss
 OBJECTS = head.o misc.o
 
 # files to compress
@@ -18,7 +18,7 @@ all: vmlinuz
 
 decompress.bin: $(OBJECTS)
 	$(LD) -T decompress.ld -o decompress.o $(OBJECTS)
-	$(OBJCOPY) -O binary --remove-section=.bss decompress.o decompress.bin
+	$(OBJCOPY) $(OBJCOPYFLAGS) decompress.o decompress.bin
 # save it for mkprod in the topdir.
 	cp decompress.bin $(TOPDIR)
 

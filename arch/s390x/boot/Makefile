@@ -2,8 +2,6 @@
 # Makefile for the linux s390-specific parts of the memory manager.
 #
 
-OBJCOPY = $(CROSS_COMPILE)objcopy
-
 O_TARGET := 
 
 EXTRA_AFLAGS := -traditional
@@ -14,11 +12,11 @@ include $(TOPDIR)/Rules.make
 	$(LD) -Ttext 0x0 -o $@ $<
 
 %.boot: %.lnk
-	$(OBJCOPY) -O binary $< $@
+	$(OBJCOPY) $(OBJCOPYFLAGS) $< $@
 
 image: $(TOPDIR)/vmlinux \
 	iplfba.boot ipleckd.boot ipldump.boot
-	$(OBJCOPY) -O binary $(TOPDIR)/vmlinux image
+	$(OBJCOPY) $(OBJCOPYFLAGS) $< $@
 	$(NM) $(TOPDIR)/vmlinux | grep -v '\(compiled\)\|\( [aUw] \)\|\(\.\)\|\(LASH[RL]DI\)' | sort > $(TOPDIR)/System.map
 
 listing: ../../../vmlinux
