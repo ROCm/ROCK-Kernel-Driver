@@ -228,7 +228,7 @@ time_sleep_notify(struct pmu_sleep_notifier *self, int when)
 	case PBOOK_WAKE:
 		write_lock_irqsave(&xtime_lock, flags);
 		xtime.tv_sec = pmac_get_rtc_time() + time_diff;
-		xtime.tv_usec = 0;
+		xtime.tv_nsec = 0;
 		last_rtc_update = xtime.tv_sec;
 		write_unlock_irqrestore(&xtime_lock, flags);
 		break;
