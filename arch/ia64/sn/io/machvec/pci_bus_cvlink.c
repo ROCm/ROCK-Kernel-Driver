@@ -357,7 +357,20 @@ sn_pci_fixup_slot(struct pci_dev *dev)
                         if (dev->resource[PCI_ROM_RESOURCE].flags & IORESOURCE_MEM)
                                 cmd |= PCI_COMMAND_MEMORY;
                 }
-        }
+        } else {
+		/*
+		 * Remove other ROM resources since they don't have valid
+		 * CPU addresses.
+		 */
+                size = dev->resource[PCI_ROM_RESOURCE].end -
+                        dev->resource[PCI_ROM_RESOURCE].start;
+
+		if (size) {
+			dev->resource[PCI_ROM_RESOURCE].start = 0;
+			dev->resource[PCI_ROM_RESOURCE].end = 0;
+			dev->resource[PCI_ROM_RESOURCE].flags = 0;
+		}
+	}
 
 	/*
 	 * Update the Command Word on the Card.
