@@ -26,8 +26,6 @@
 #include <linux/highmem.h>
 #include <linux/smp_lock.h>
 #include <asm/mmu_context.h>
-#include <linux//pagemap.h>
-#include <asm/tlb.h>
 #include <linux/interrupt.h>
 #include <linux/completion.h>
 #include <linux/kernel_stat.h>
@@ -1302,14 +1300,6 @@ static void sched_migrate_task(task_t *p, int dest_cpu)
 		wake_up_process(mt);
 		put_task_struct(mt);
 		wait_for_completion(&req.done);
-
-		/*
-		 * we want a new context here. This eliminates TLB
-		 * flushes on the cpus where the process executed prior to
-		 * the migration.
-		 */
-		tlb_migrate_prepare(current->mm);
-
 		return;
 	}
 out:
