@@ -13,6 +13,7 @@
 #include <linux/time.h>
 #include <linux/mm.h>
 #include <linux/highuid.h>
+#include <linux/net.h>
 
 #include <linux/smb_fs.h>
 #include <linux/smb_mount.h>

@@ -18,6 +18,7 @@
 #include <linux/dirent.h>
 #include <linux/nls.h>
 #include <linux/smp_lock.h>
+#include <linux/net.h>
 
 #include <linux/smb_fs.h>
 #include <linux/smbno.h>

@@ -20,7 +20,7 @@
    and to fit the cifs vfs by 
    Steve French sfrench@us.ibm.com */
 
-#include <linux/fs.h>
+#include <linux/string.h>
 #include "md5.h"
 
 static void MD5Transform(__u32 buf[4], __u32 const in[16]);

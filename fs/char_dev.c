@@ -8,6 +8,7 @@
 #include <linux/init.h>
 #include <linux/fs.h>
 #include <linux/slab.h>
+#include <linux/string.h>
 
 #define HASH_BITS	6
 #define HASH_SIZE	(1UL << HASH_BITS)

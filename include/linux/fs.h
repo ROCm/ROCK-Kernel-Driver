@@ -18,16 +18,13 @@
 #include <linux/dcache.h>
 #include <linux/stat.h>
 #include <linux/cache.h>
-#include <linux/stddef.h>
-#include <linux/string.h>
 #include <linux/radix-tree.h>
-#include <linux/bitops.h>
-
 #include <asm/atomic.h>
 
-struct poll_table_struct;
 struct iovec;
 struct nameidata;
+struct pipe_inode_info;
+struct poll_table_struct;
 struct vm_area_struct;
 struct vfsmount;
 
@@ -219,9 +216,6 @@ typedef int (get_block_t)(struct inode *inode, sector_t iblock,
 typedef int (get_blocks_t)(struct inode *inode, sector_t iblock,
 			unsigned long max_blocks,
 			struct buffer_head *bh_result, int create);
-
-#include <linux/pipe_fs_i.h>
-/* #include <linux/umsdos_fs_i.h> */
 
 /*
  * Attribute flags.  These should be or-ed together to figure out what
@@ -415,8 +409,6 @@ struct inode {
 
 /* will die */
 #include <linux/coda_fs_i.h>
-#include <linux/ext3_fs_i.h>
-#include <linux/efs_fs_i.h>
 
 struct fown_struct {
 	rwlock_t lock;          /* protects pid, uid, euid fields */

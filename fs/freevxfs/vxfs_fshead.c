@@ -36,6 +36,7 @@
 #include <linux/buffer_head.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
+#include <linux/string.h>
 
 #include "vxfs.h"
 #include "vxfs_inode.h"

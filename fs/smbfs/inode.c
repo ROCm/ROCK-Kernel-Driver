@@ -23,6 +23,7 @@
 #include <linux/nls.h>
 #include <linux/seq_file.h>
 #include <linux/mount.h>
+#include <linux/net.h>
 
 #include <linux/smb_fs.h>
 #include <linux/smbno.h>

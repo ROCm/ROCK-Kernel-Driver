@@ -9,6 +9,7 @@
 #include <linux/types.h>
 #include <linux/fs.h>
 #include <linux/slab.h>
+#include <linux/net.h>
 
 #include <linux/smb_fs.h>
 #include <linux/smbno.h>
