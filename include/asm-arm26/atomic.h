@@ -2,12 +2,14 @@
  *  linux/include/asm-arm26/atomic.h
  *
  *  Copyright (c) 1996 Russell King.
+ *  Modified for arm26 by Ian Molton
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  *
  *  Changelog:
+ *   25-11-2004 IM	Updated for 2.6.9
  *   27-06-1996	RMK	Created
  *   13-04-1997	RMK	Made functions atomic!
  *   07-12-1997	RMK	Upgraded for v2.1.
@@ -31,102 +33,57 @@ typedef struct { volatile int counter; } atomic_t;
 #ifdef __KERNEL__
 #include <asm/system.h>
 
-#define atomic_read(v)	((v)->counter)
+#define atomic_read(v) ((v)->counter)
 #define atomic_set(v,i)	(((v)->counter) = (i))
 
-static inline void atomic_add(int i, volatile atomic_t *v)
+static inline int atomic_add_return(int i, atomic_t *v)
 {
-	unsigned long flags;
+        unsigned long flags;
+        int val;
 
-	local_irq_save(flags);
-	v->counter += i;
-	local_irq_restore(flags);
+        local_irq_save(flags);
+        val = v->counter;
+        v->counter = val += i;
+        local_irq_restore(flags);
+
+        return val;
 }
 
-static inline void atomic_sub(int i, volatile atomic_t *v)
+static inline int atomic_sub_return(int i, atomic_t *v)
 {
-	unsigned long flags;
+        unsigned long flags;
+        int val;
 
-	local_irq_save(flags);
-	v->counter -= i;
-	local_irq_restore(flags);
-}
+        local_irq_save(flags);
+        val = v->counter;
+        v->counter = val -= i;
+        local_irq_restore(flags);
 
-static inline void atomic_inc(volatile atomic_t *v)
-{
-	unsigned long flags;
-
-	local_irq_save(flags);
-	v->counter += 1;
-	local_irq_restore(flags);
-}
-
-static inline void atomic_dec(volatile atomic_t *v)
-{
-	unsigned long flags;
-
-	local_irq_save(flags);
-	v->counter -= 1;
-	local_irq_restore(flags);
-}
-
-static inline int atomic_dec_and_test(volatile atomic_t *v)
-{
-	unsigned long flags;
-	int val;
-
-	local_irq_save(flags);
-	val = v->counter;
-	v->counter = val -= 1;
-	local_irq_restore(flags);
-
-	return val == 0;
-}
-
-static inline int atomic_add_negative(int i, volatile atomic_t *v)
-{
-	unsigned long flags;
-	int val;
-
-	local_irq_save(flags);
-	val = v->counter;
-	v->counter = val += i;
-	local_irq_restore(flags);
-
-	return val < 0;
+        return val;
 }
 
 static inline void atomic_clear_mask(unsigned long mask, unsigned long *addr)
 {
-	unsigned long flags;
+        unsigned long flags;
 
-	local_irq_save(flags);
-	*addr &= ~mask;
-	local_irq_restore(flags);
+        local_irq_save(flags);
+        *addr &= ~mask;
+        local_irq_restore(flags);
 }
 
-static inline int atomic_add_return(int i, volatile atomic_t *v)
-{
-	unsigned long flags;
-	int val;
+#define atomic_add(i, v)        (void) atomic_add_return(i, v)
+#define atomic_inc(v)           (void) atomic_add_return(1, v)
+#define atomic_sub(i, v)        (void) atomic_sub_return(i, v)
+#define atomic_dec(v)           (void) atomic_sub_return(1, v)
 
-	local_irq_save(flags);
-	val = v->counter + i;
-	v->counter = val;
-	local_irq_restore(flags);
+#define atomic_inc_and_test(v)  (atomic_add_return(1, v) == 0)
+#define atomic_dec_and_test(v)  (atomic_sub_return(1, v) == 0)
+#define atomic_inc_return(v)    (atomic_add_return(1, v))
+#define atomic_dec_return(v)    (atomic_sub_return(1, v))
 
-	return val;
-}
+#define atomic_add_negative(i,v) (atomic_add_return(i, v) < 0)
 
-static inline int atomic_sub_return(int i, volatile atomic_t *v)
-{
-	return atomic_add_return(-i, v);
-}
-
-#define atomic_inc_return(v)  (atomic_add_return(1,v))
-#define atomic_dec_return(v)  (atomic_sub_return(1,v))
-
-/* Atomic operations are already serializing on ARM */
+/* Atomic operations are already serializing on ARM26 */
 #define smp_mb__before_atomic_dec()	barrier()
 #define smp_mb__after_atomic_dec()	barrier()
 #define smp_mb__before_atomic_inc()	barrier()
