@@ -135,9 +135,19 @@ static void nmi_restore_registers(struct op_msrs * msrs)
 
 static void nmi_cpu_shutdown(void * dummy)
 {
+	unsigned int v;
 	int cpu = smp_processor_id();
 	struct op_msrs * msrs = &cpu_msrs[cpu];
+ 
+	/* restoring APIC_LVTPC can trigger an apic error because the delivery
+	 * mode and vector nr combination can be illegal. That's by design: on
+	 * power on apic lvt contain a zero vector nr which are legal only for
+	 * NMI delivery mode. So inhibit apic err before restoring lvtpc
+	 */
+	v = apic_read(APIC_LVTERR);
+	apic_write(APIC_LVTERR, v | APIC_LVT_MASKED);
 	apic_write(APIC_LVTPC, saved_lvtpc[cpu]);
+	apic_write(APIC_LVTERR, v);
 	nmi_restore_registers(msrs);
 }
 
