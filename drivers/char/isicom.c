@@ -80,8 +80,6 @@ static struct tty_driver *isicom_normal;
 static struct isi_board isi_card[BOARD_COUNT];
 static struct isi_port  isi_ports[PORT_COUNT];
 
-DECLARE_TASK_QUEUE(tq_isicom);
-
 static struct timer_list tx;
 static char re_schedule = 1;
 #ifdef ISICOM_DEBUG
@@ -354,12 +352,6 @@ static inline int isicom_paranoia_check(struct isi_port const * port, char *name
 	return 0;
 }
 			
-static inline void schedule_bh(struct isi_port * port)
-{
-	queue_task(&port->bh_tqueue, &tq_isicom);
-	mark_bh(ISICOM_BH);
-} 
-
 /*	Transmitter	*/
 
 static void isicom_tx(unsigned long _data)
@@ -464,7 +456,7 @@ static void isicom_tx(unsigned long _data)
 		if (port->xmit_cnt <= 0)
 			port->status &= ~ISI_TXOK;
 		if (port->xmit_cnt <= WAKEUP_CHARS)
-			schedule_bh(port);
+			schedule_work(&port->bh_tqueue);
 		restore_flags(flags);
 	}	
 
@@ -482,12 +474,6 @@ sched_again:
 }		
  
 /* 	Interrupt handlers 	*/
-
-static void do_isicom_bh(void)
-{
-	run_task_queue(&tq_isicom);
-}
-
 
  
 static void isicom_bottomhalf(void * data)
@@ -584,7 +570,7 @@ static irqreturn_t isicom_interrupt(int irq, void *dev_id,
 							printk(KERN_DEBUG "ISICOM: interrupt: DCD->low.\n");
 #endif							
 							port->status &= ~ISI_DCD;
-							schedule_task(&port->hangup_tq);
+							schedule_work(&port->hangup_tq);
 						}
 					}
 					else {
@@ -611,7 +597,7 @@ static irqreturn_t isicom_interrupt(int irq, void *dev_id,
 							port->tty->hw_stopped = 0;
 							/* start tx ing */
 							port->status |= (ISI_TXOK | ISI_CTS);
-							schedule_bh(port);
+							schedule_work(&port->bh_tqueue);
 						}
 					}
 					else {
@@ -650,7 +636,7 @@ static irqreturn_t isicom_interrupt(int irq, void *dev_id,
 				tty->flip.count++;
 				if (port->flags & ASYNC_SAK)
 					do_SAK(tty);
-				queue_task(&tty->flip.tqueue, &tq_timer);
+				schedule_delayed_work(&tty->flip.work, 1);
 				break;
 				
 			case 2:	/* Statistics		 */
@@ -688,7 +674,7 @@ static irqreturn_t isicom_interrupt(int irq, void *dev_id,
 				byte_count -= 2;
 			}
 		}
-		queue_task(&tty->flip.tqueue, &tq_timer);
+		schedule_delayed_work(&tty->flip.work, 1);
 	}
 	if (card->isa == YES)
 		ClearInterrupt(base);
@@ -1806,10 +1792,6 @@ static int isicom_init(void)
 		return 0;		
 	}
 	
-	/* initialize bottom half  */
-	init_bh(ISICOM_BH, do_isicom_bh);
-
-
 	memset(isi_ports, 0, sizeof(isi_ports));
 	for (card = 0; card < BOARD_COUNT; card++) {
 		port = &isi_ports[card * 16];
@@ -1821,10 +1803,8 @@ static int isicom_init(void)
 			port->channel = channel;		
 		 	port->close_delay = 50 * HZ/100;
 		 	port->closing_wait = 3000 * HZ/100;
-			port->hangup_tq.routine = do_isicom_hangup;
-		 	port->hangup_tq.data = port;
-		 	port->bh_tqueue.routine = isicom_bottomhalf;
-		 	port->bh_tqueue.data = port;
+		 	INIT_WORK(&port->hangup_tq, do_isicom_hangup, port);
+		 	INIT_WORK(&port->bh_tqueue, isicom_bottomhalf, port);
 		 	port->status = 0;
 			init_waitqueue_head(&port->open_wait);	 				
 			init_waitqueue_head(&port->close_wait);
@@ -1956,8 +1936,6 @@ void cleanup_module(void)
 	set_current_state(TASK_INTERRUPTIBLE);
 	schedule_timeout(HZ);
 
-	remove_bh(ISICOM_BH);
-	
 #ifdef ISICOM_DEBUG	
 	printk("ISICOM: isicom_tx tx_count = %ld.\n", tx_count);
 #endif	
