@@ -226,16 +226,12 @@ int __init madgemc_probe(void)
 			goto getout;
 		}
 
-		request_region(dev->base_addr, MADGEMC_IO_EXTENT, "madgemc");
-#if 0
-		/* why is this not working? */
-		if (request_region(dev->base_addr, MADGEMC_IO_EXTENT, 
+		if (!request_region(dev->base_addr, MADGEMC_IO_EXTENT, 
 				   "madgemc")) {
 			printk(KERN_INFO "madgemc: unable to setup Smart MC in slot %d because of I/O base conflict at 0x%04lx\n", slot, dev->base_addr);
 			dev->base_addr += MADGEMC_SIF_OFFSET;
 			goto getout;
 		}
-#endif
 		dev->base_addr += MADGEMC_SIF_OFFSET;
 		
 		/*
