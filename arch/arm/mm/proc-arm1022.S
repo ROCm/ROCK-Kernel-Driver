@@ -372,31 +372,9 @@ ENTRY(cpu_arm1022_set_pte)
 #endif
 	mov	pc, lr
 
-
-ENTRY(cpu_arm1022_name)
-	.ascii	"arm1022"
-#ifndef CONFIG_CPU_ICACHE_DISABLE
-	.ascii	"i"
-#endif
-#ifndef CONFIG_CPU_DCACHE_DISABLE
-	.ascii	"d"
-#ifdef CONFIG_CPU_DCACHE_WRITETHROUGH
-	.ascii	"(wt)"
-#else
-	.ascii	"(wb)"
-#endif
-#endif
-#ifndef CONFIG_CPU_BPREDICT_DISABLE
-	.ascii	"B"
-#endif
-#ifdef CONFIG_CPU_CACHE_ROUND_ROBIN
-	.ascii	"RR"
-#endif
-	.ascii	"\0"
-	.align
-
 	__INIT
 
+	.type	__arm1022_setup, #function
 __arm1022_setup:
 	mov	r0, #0
 	mcr	p15, 0, r0, c7, c7		@ invalidate I,D caches on v4
@@ -430,8 +408,9 @@ __arm1022_setup:
 	orr	r0, r0, #0x1000 		@ ...I............
 #endif
 	mov	pc, lr
+	.size	__arm1022_setup, . - __arm1022_setup
 
-	.text
+	__INITDATA
 
 /*
  * Purpose : Function pointers used to access above functions - all calls
@@ -447,8 +426,9 @@ arm1022_processor_functions:
 	.word	cpu_arm1022_dcache_clean_area
 	.word	cpu_arm1022_switch_mm
 	.word	cpu_arm1022_set_pte
-
 	.size	arm1022_processor_functions, . - arm1022_processor_functions
+
+	.section ".rodata"
 
 	.type	cpu_arch_name, #object
 cpu_arch_name:
@@ -459,6 +439,30 @@ cpu_arch_name:
 cpu_elf_name:
 	.asciz	"v5"
 	.size	cpu_elf_name, . - cpu_elf_name
+
+	.type	cpu_arm1022_name, #object
+cpu_arm1022_name:
+	.ascii	"arm1022"
+#ifndef CONFIG_CPU_ICACHE_DISABLE
+	.ascii	"i"
+#endif
+#ifndef CONFIG_CPU_DCACHE_DISABLE
+	.ascii	"d"
+#ifdef CONFIG_CPU_DCACHE_WRITETHROUGH
+	.ascii	"(wt)"
+#else
+	.ascii	"(wb)"
+#endif
+#endif
+#ifndef CONFIG_CPU_BPREDICT_DISABLE
+	.ascii	"B"
+#endif
+#ifdef CONFIG_CPU_CACHE_ROUND_ROBIN
+	.ascii	"RR"
+#endif
+	.ascii	"\0"
+	.size	cpu_arm1022_name, . - cpu_arm1022_name
+
 	.align
 
 	.section ".proc.info", #alloc, #execinstr

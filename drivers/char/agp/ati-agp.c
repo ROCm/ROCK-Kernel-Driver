@@ -214,7 +214,7 @@ static int ati_configure(void)
         /*
 	pci_read_config_dword(agp_bridge.dev, AGP_APBASE, &temp);
 	agp_bridge.gart_bus_addr = (temp & PCI_BASE_ADDRESS_MEM_MASK);
-	printk(KERN_INFO "IGP320 gart_bus_addr: %x\n", agp_bridge.gart_bus_addr);
+	printk(KERN_INFO PFX "IGP320 gart_bus_addr: %x\n", agp_bridge.gart_bus_addr);
         */
 	OUTREG32(ati_generic_private.registers, ATI_GART_FEATURE_ID, 0x60000);
 
@@ -226,8 +226,6 @@ static int ati_configure(void)
 	OUTREG32(ati_generic_private.registers, ATI_GART_BASE,
 		 agp_bridge->gatt_bus_addr);
 
-	/* Flush the tlb */
-	OUTREG32(ati_generic_private.registers, ATI_GART_CACHE_CNTRL, 1);
 	return 0;
 }
 

@@ -413,6 +413,16 @@ config IA64_PALINFO
 	  To use this option, you have to ensure that the "/proc file system
 	  support" (CONFIG_PROC_FS) is enabled, too.
 
+config IA64_SALINFO
+	tristate "/proc/sal support"
+	help
+	  The /proc/sal directory exports the SAL (system abstraction layer)
+	  feature bits, like whether the platform is subject to ITC drift.  It
+	  is intended to be used by user programs that care about such things.
+
+	  To use this option, you have to ensure that the "/proc file system
+	  support" (CONFIG_PROC_FS) is enabled, too.
+
 config EFI_VARS
 	tristate "/proc/efi/vars support"
 	help
@@ -424,9 +434,15 @@ config EFI_VARS
 	  support" (CONFIG_PROC_FS) is enabled, too.
 
 config NR_CPUS
-	int "Maximum number of CPUs (2-64)"
+	int "Maximum number of CPUs"
 	depends on SMP
 	default "64"
+	help
+	  You should set this to the number of CPUs in your system, but
+	  keep in mind that a kernel compiled for, e.g., 2 CPUs will boot but
+	  only use 2 CPUs on a >2 CPU system.  Setting this to a value larger
+	  than 64 will cause the use of a CPU mask array, causing a small
+	  performance hit.
 
 source "fs/Kconfig.binfmt"
 

@@ -1,3 +1,5 @@
+#include <linux/version.h>
+
 #ifndef _IF_LMC_LINUXVER_
 #define _IF_LMC_LINUXVER_
 

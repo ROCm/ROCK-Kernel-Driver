@@ -74,7 +74,6 @@
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 
-#include <linux/version.h>
 #include <asm/uaccess.h>
 #include <linux/init.h>
 

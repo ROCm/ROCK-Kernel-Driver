@@ -43,7 +43,6 @@
 
 #undef ADDR
 
-#include <linux/version.h>
 #include <asm/io.h>
 #include <linux/netdevice.h>
 #include <linux/fddidevice.h>

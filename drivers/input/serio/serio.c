@@ -49,7 +49,9 @@ MODULE_LICENSE("GPL");
 
 EXPORT_SYMBOL(serio_interrupt);
 EXPORT_SYMBOL(serio_register_port);
+EXPORT_SYMBOL(serio_register_slave_port);
 EXPORT_SYMBOL(serio_unregister_port);
+EXPORT_SYMBOL(serio_unregister_slave_port);
 EXPORT_SYMBOL(serio_register_device);
 EXPORT_SYMBOL(serio_unregister_device);
 EXPORT_SYMBOL(serio_open);
@@ -166,6 +168,17 @@ void serio_register_port(struct serio *serio)
 	up(&serio_sem);
 }
 
+/*
+ * Same as serio_register_port but does not try to acquire serio_sem.
+ * Should be used when registering a serio from other input device's
+ * connect() function.
+ */
+void serio_register_slave_port(struct serio *serio)
+{
+	list_add_tail(&serio->node, &serio_list);
+	serio_find_dev(serio);
+}
+
 void serio_unregister_port(struct serio *serio)
 {
 	down(&serio_sem);
@@ -173,6 +186,18 @@ void serio_unregister_port(struct serio *serio)
 	if (serio->dev && serio->dev->disconnect)
 		serio->dev->disconnect(serio);
 	up(&serio_sem);
+}
+
+/*
+ * Same as serio_unregister_port but does not try to acquire serio_sem.
+ * Should be used when unregistering a serio from other input device's
+ * disconnect() function.
+ */
+void serio_unregister_slave_port(struct serio *serio)
+{
+	list_del_init(&serio->node);
+	if (serio->dev && serio->dev->disconnect)
+		serio->dev->disconnect(serio);
 }
 
 void serio_register_device(struct serio_dev *dev)
@@ -204,9 +229,11 @@ void serio_unregister_device(struct serio_dev *dev)
 /* called from serio_dev->connect/disconnect methods under serio_sem */
 int serio_open(struct serio *serio, struct serio_dev *dev)
 {
-	if (serio->open(serio))
-		return -1;
 	serio->dev = dev;
+	if (serio->open(serio)) {
+		serio->dev = NULL;
+		return -1;
+	}
 	return 0;
 }
 

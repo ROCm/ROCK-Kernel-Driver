@@ -897,14 +897,12 @@ static int	eepro_grab_irq(struct net_device *dev)
 		eepro_sw2bank0(ioaddr); /* Switch back to Bank 0 */
 
 		if (request_irq (*irqp, NULL, SA_SHIRQ, "bogus", dev) != EBUSY) {
-			unsigned long irq_mask, delay;
+			unsigned long irq_mask;
 			/* Twinkle the interrupt, and check if it's seen */
 			irq_mask = probe_irq_on();
 
 			eepro_diag(ioaddr); /* RESET the 82595 */
-
-			delay = jiffies + HZ/50;
-			while (time_before(jiffies, delay)) ;
+			mdelay(20);
 
 			if (*irqp == probe_irq_off(irq_mask))  /* It's a good IRQ line */
 				break;

@@ -361,7 +361,6 @@
  *	<linux/module.h>
  *
  *	"h/skdrv1st.h"
- *		<linux/version.h>
  *		<linux/types.h>
  *		<linux/kernel.h>
  *		<linux/string.h>

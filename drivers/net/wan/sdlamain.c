@@ -46,7 +46,6 @@
 * Jan 02, 1997	Gene Kozin	Initial version.
 *****************************************************************************/
 
-#include <linux/version.h>
 #include <linux/config.h>	/* OS configuration options */
 #include <linux/stddef.h>	/* offsetof(), etc. */
 #include <linux/errno.h>	/* return codes */
