@@ -97,7 +97,7 @@ const char *sctp_cname(const sctp_subtype_t cid)
 /* These are printable form of variable-length parameters. */
 const char *sctp_param_tbl[SCTP_PARAM_ECN_CAPABLE + 1] = {
 	"",
-	"PARAM_HEATBEAT_INFO",
+	"PARAM_HEARTBEAT_INFO",
 	"",
 	"",
 	"",

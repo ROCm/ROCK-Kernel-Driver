@@ -155,7 +155,7 @@ typedef struct sctp_paramhdr {
 typedef enum {
 
 	/* RFC 2960 Section 3.3.5 */
-	SCTP_PARAM_HEATBEAT_INFO		= __constant_htons(1),  
+	SCTP_PARAM_HEARTBEAT_INFO		= __constant_htons(1),  
 	/* RFC 2960 Section 3.3.2.1 */
 	SCTP_PARAM_IPV4_ADDRESS			= __constant_htons(5), 
 	SCTP_PARAM_IPV6_ADDRESS			= __constant_htons(6), 
@@ -190,6 +190,7 @@ typedef enum {
 	SCTP_PARAM_ACTION_SKIP_ERR    = __constant_htons(0xc000),
 } sctp_param_action_t; 
 
+enum { SCTP_PARAM_ACTION_MASK = __constant_htons(0xc000), };
 
 /* RFC 2960 Section 3.3.1 Payload Data (DATA) (0) */
 
