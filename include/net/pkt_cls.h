@@ -61,6 +61,93 @@ tcf_unbind_filter(struct tcf_proto *tp, struct tcf_result *r)
 		tp->q->ops->cl_ops->unbind_tcf(tp->q, cl);
 }
 
+struct tcf_exts
+{
+#ifdef CONFIG_NET_CLS_ACT
+	struct tc_action *action;
+#elif defined CONFIG_NET_CLS_POLICE
+	struct tcf_police *police;
+#endif
+};
+
+/* Map to export classifier specific extension TLV types to the
+ * generic extensions API. Unsupported extensions must be set to 0.
+ */
+struct tcf_ext_map
+{
+	int action;
+	int police;
+};
+
+/**
+ * tcf_exts_is_predicative - check if a predicative extension is present
+ * @exts: tc filter extensions handle
+ *
+ * Returns 1 if a predicative extension is present, i.e. an extension which
+ * might cause further actions and thus overrule the regular tcf_result.
+ */
+static inline int
+tcf_exts_is_predicative(struct tcf_exts *exts)
+{
+#ifdef CONFIG_NET_CLS_ACT
+	return !!exts->action;
+#elif defined CONFIG_NET_CLS_POLICE
+	return !!exts->police;
+#else
+	return 0;
+#endif
+}
+
+/**
+ * tcf_exts_is_available - check if at least one extension is present
+ * @exts: tc filter extensions handle
+ *
+ * Returns 1 if at least one extension is present.
+ */
+static inline int
+tcf_exts_is_available(struct tcf_exts *exts)
+{
+	/* All non-predicative extensions must be added here. */
+	return tcf_exts_is_predicative(exts);
+}
+
+/**
+ * tcf_exts_exec - execute tc filter extensions
+ * @skb: socket buffer
+ * @exts: tc filter extensions handle
+ * @res: desired result
+ *
+ * Executes all configured extensions. Returns 0 on a normal execution,
+ * a negative number if the filter must be considered unmatched or
+ * a positive action code (TC_ACT_*) which must be returned to the
+ * underlying layer.
+ */
+static inline int
+tcf_exts_exec(struct sk_buff *skb, struct tcf_exts *exts,
+	       struct tcf_result *res)
+{
+#ifdef CONFIG_NET_CLS_ACT
+	if (exts->action)
+		return tcf_action_exec(skb, exts->action, res);
+#elif defined CONFIG_NET_CLS_POLICE
+	if (exts->police)
+		return tcf_police(skb, exts->police);
+#endif
+
+	return 0;
+}
+
+extern int tcf_exts_validate(struct tcf_proto *tp, struct rtattr **tb,
+	                     struct rtattr *rate_tlv, struct tcf_exts *exts,
+	                     struct tcf_ext_map *map);
+extern void tcf_exts_destroy(struct tcf_proto *tp, struct tcf_exts *exts);
+extern void tcf_exts_change(struct tcf_proto *tp, struct tcf_exts *dst,
+	                     struct tcf_exts *src);
+extern int tcf_exts_dump(struct sk_buff *skb, struct tcf_exts *exts,
+	                 struct tcf_ext_map *map);
+extern int tcf_exts_dump_stats(struct sk_buff *skb, struct tcf_exts *exts,
+	                       struct tcf_ext_map *map);
+
 #ifdef CONFIG_NET_CLS_ACT
 static inline int
 tcf_change_act_police(struct tcf_proto *tp, struct tc_action **action,
