@@ -643,7 +643,6 @@ static int __init mwave_init(void)
 
 	/* sysfs */
 	memset(&mwave_device, 0, sizeof (struct device));
-	snprintf(mwave_device.name, DEVICE_NAME_SIZE, "mwave");
 	snprintf(mwave_device.bus_id, BUS_ID_SIZE, "mwave");
 
 	if (device_register(&mwave_device))
