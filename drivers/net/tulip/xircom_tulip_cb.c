@@ -450,7 +450,7 @@ static void __devinit read_mac_address(struct net_device *dev)
  */
 static void find_mii_transceivers(struct net_device *dev)
 {
-	struct xircom_private *tp = dev->priv;
+	struct xircom_private *tp = netdev_priv(dev);
 	int phy, phy_idx;
 
 	if (media_cap[tp->default_port] & MediaIsMII) {
@@ -505,7 +505,7 @@ static void find_mii_transceivers(struct net_device *dev)
  */
 static void transceiver_voodoo(struct net_device *dev)
 {
-	struct xircom_private *tp = dev->priv;
+	struct xircom_private *tp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 
 	/* Reset the chip, holding bit 0 set at least 50 PCI cycles. */
@@ -584,7 +584,7 @@ static int __devinit xircom_init_one(struct pci_dev *pdev, const struct pci_devi
 	/* Clear the missed-packet counter. */
 	(volatile int)inl(ioaddr + CSR8);
 
-	tp = dev->priv;
+	tp = netdev_priv(dev);
 
 	tp->lock = SPIN_LOCK_UNLOCKED;
 	tp->pdev = pdev;
@@ -749,7 +749,7 @@ static void mdio_write(struct net_device *dev, int phy_id, int location, int val
 static void
 xircom_up(struct net_device *dev)
 {
-	struct xircom_private *tp = dev->priv;
+	struct xircom_private *tp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	int i;
 
@@ -804,7 +804,7 @@ xircom_up(struct net_device *dev)
 static int
 xircom_open(struct net_device *dev)
 {
-	struct xircom_private *tp = dev->priv;
+	struct xircom_private *tp = netdev_priv(dev);
 
 	if (request_irq(dev->irq, &xircom_interrupt, SA_SHIRQ, dev->name, dev))
 		return -EAGAIN;
@@ -818,7 +818,7 @@ xircom_open(struct net_device *dev)
 
 static void xircom_tx_timeout(struct net_device *dev)
 {
-	struct xircom_private *tp = dev->priv;
+	struct xircom_private *tp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 
 	if (media_cap[dev->if_port] & MediaIsMII) {
@@ -870,7 +870,7 @@ static void xircom_tx_timeout(struct net_device *dev)
 /* Initialize the Rx and Tx rings, along with various 'dev' bits. */
 static void xircom_init_ring(struct net_device *dev)
 {
-	struct xircom_private *tp = dev->priv;
+	struct xircom_private *tp = netdev_priv(dev);
 	int i;
 
 	tp->tx_full = 0;
@@ -919,7 +919,7 @@ static void xircom_init_ring(struct net_device *dev)
 static int
 xircom_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct xircom_private *tp = dev->priv;
+	struct xircom_private *tp = netdev_priv(dev);
 	int entry;
 	u32 flag;
 
@@ -971,7 +971,7 @@ xircom_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 static void xircom_media_change(struct net_device *dev)
 {
-	struct xircom_private *tp = dev->priv;
+	struct xircom_private *tp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	u16 reg0, reg1, reg4, reg5;
 	u32 csr6 = inl(ioaddr + CSR6), newcsr6;
@@ -1032,7 +1032,7 @@ static void xircom_media_change(struct net_device *dev)
 
 static void check_duplex(struct net_device *dev)
 {
-	struct xircom_private *tp = dev->priv;
+	struct xircom_private *tp = netdev_priv(dev);
 	u16 reg0;
 
 	mdio_write(dev, tp->phys[0], MII_BMCR, BMCR_RESET);
@@ -1065,7 +1065,7 @@ static void check_duplex(struct net_device *dev)
 static irqreturn_t xircom_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_instance;
-	struct xircom_private *tp = dev->priv;
+	struct xircom_private *tp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	int csr5, work_budget = max_interrupt_work;
 	int handled = 0;
@@ -1203,7 +1203,7 @@ static irqreturn_t xircom_interrupt(int irq, void *dev_instance, struct pt_regs 
 static int
 xircom_rx(struct net_device *dev)
 {
-	struct xircom_private *tp = dev->priv;
+	struct xircom_private *tp = netdev_priv(dev);
 	int entry = tp->cur_rx % RX_RING_SIZE;
 	int rx_work_limit = tp->dirty_rx + RX_RING_SIZE - tp->cur_rx;
 	int work_done = 0;
@@ -1303,7 +1303,7 @@ static void
 xircom_down(struct net_device *dev)
 {
 	long ioaddr = dev->base_addr;
-	struct xircom_private *tp = dev->priv;
+	struct xircom_private *tp = netdev_priv(dev);
 
 	/* Disable interrupts by clearing the interrupt mask. */
 	outl(0, ioaddr + CSR7);
@@ -1321,7 +1321,7 @@ static int
 xircom_close(struct net_device *dev)
 {
 	long ioaddr = dev->base_addr;
-	struct xircom_private *tp = dev->priv;
+	struct xircom_private *tp = netdev_priv(dev);
 	int i;
 
 	if (xircom_debug > 1)
@@ -1359,7 +1359,7 @@ xircom_close(struct net_device *dev)
 
 static struct net_device_stats *xircom_get_stats(struct net_device *dev)
 {
-	struct xircom_private *tp = dev->priv;
+	struct xircom_private *tp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 
 	if (netif_device_present(dev))
@@ -1372,7 +1372,7 @@ static struct net_device_stats *xircom_get_stats(struct net_device *dev)
 static int xircom_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 {
 	struct ethtool_cmd ecmd;
-	struct xircom_private *tp = dev->priv;
+	struct xircom_private *tp = netdev_priv(dev);
 
 	if (copy_from_user(&ecmd, useraddr, sizeof(ecmd)))
 		return -EFAULT;
@@ -1470,7 +1470,7 @@ static int xircom_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 /* Provide ioctl() calls to examine the MII xcvr state. */
 static int xircom_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
-	struct xircom_private *tp = dev->priv;
+	struct xircom_private *tp = netdev_priv(dev);
 	u16 *data = (u16 *)&rq->ifr_ifru;
 	int phy = tp->phys[0] & 0x1f;
 	unsigned long flags;
@@ -1531,7 +1531,7 @@ static int xircom_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
    when re-entered but still correct. */
 static void set_rx_mode(struct net_device *dev)
 {
-	struct xircom_private *tp = dev->priv;
+	struct xircom_private *tp = netdev_priv(dev);
 	struct dev_mc_list *mclist;
 	long ioaddr = dev->base_addr;
 	int csr6 = inl(ioaddr + CSR6);
@@ -1672,7 +1672,7 @@ MODULE_DEVICE_TABLE(pci, xircom_pci_table);
 static int xircom_suspend(struct pci_dev *pdev, u32 state)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	struct xircom_private *tp = dev->priv;
+	struct xircom_private *tp = netdev_priv(dev);
 	printk(KERN_INFO "xircom_suspend(%s)\n", dev->name);
 	if (tp->open)
 		xircom_down(dev);
@@ -1688,7 +1688,7 @@ static int xircom_suspend(struct pci_dev *pdev, u32 state)
 static int xircom_resume(struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	struct xircom_private *tp = dev->priv;
+	struct xircom_private *tp = netdev_priv(dev);
 	printk(KERN_INFO "xircom_resume(%s)\n", dev->name);
 
 	pci_set_power_state(pdev,0);

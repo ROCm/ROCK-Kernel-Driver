@@ -532,7 +532,7 @@ ewrk3_hw_init(struct net_device *dev, u_long iobase)
 		printk("      is in I/O only mode");
 	}
 
-	lp = (struct ewrk3_private *) dev->priv;
+	lp = netdev_priv(dev);
 	lp->shmem_base = mem_start;
 	lp->shmem_length = shmem_length;
 	lp->lemac = lemac;
@@ -621,7 +621,7 @@ ewrk3_hw_init(struct net_device *dev, u_long iobase)
 
 static int ewrk3_open(struct net_device *dev)
 {
-	struct ewrk3_private *lp = (struct ewrk3_private *) dev->priv;
+	struct ewrk3_private *lp = netdev_priv(dev);
 	u_long iobase = dev->base_addr;
 	int i, status = 0;
 	u_char icr, csr;
@@ -684,7 +684,7 @@ static int ewrk3_open(struct net_device *dev)
  */
 static void ewrk3_init(struct net_device *dev)
 {
-	struct ewrk3_private *lp = (struct ewrk3_private *) dev->priv;
+	struct ewrk3_private *lp = netdev_priv(dev);
 	u_char csr, page;
 	u_long iobase = dev->base_addr;
 	int i;
@@ -725,7 +725,7 @@ static void ewrk3_init(struct net_device *dev)
  
 static void ewrk3_timeout(struct net_device *dev)
 {
-	struct ewrk3_private *lp = (struct ewrk3_private *) dev->priv;
+	struct ewrk3_private *lp = netdev_priv(dev);
 	u_char icr, csr;
 	u_long iobase = dev->base_addr;
 	
@@ -761,7 +761,7 @@ static void ewrk3_timeout(struct net_device *dev)
  */
 static int ewrk3_queue_pkt (struct sk_buff *skb, struct net_device *dev)
 {
-	struct ewrk3_private *lp = (struct ewrk3_private *) dev->priv;
+	struct ewrk3_private *lp = netdev_priv(dev);
 	u_long iobase = dev->base_addr;
 	u_long buf = 0;
 	u_char icr;
@@ -883,7 +883,7 @@ static irqreturn_t ewrk3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	u_long iobase;
 	u_char icr, cr, csr;
 
-	lp = (struct ewrk3_private *) dev->priv;
+	lp = netdev_priv(dev);
 	iobase = dev->base_addr;
 
 	/* get the interrupt information */
@@ -931,7 +931,7 @@ static irqreturn_t ewrk3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 /* Called with lp->hw_lock held */
 static int ewrk3_rx(struct net_device *dev)
 {
-	struct ewrk3_private *lp = (struct ewrk3_private *) dev->priv;
+	struct ewrk3_private *lp = netdev_priv(dev);
 	u_long iobase = dev->base_addr;
 	int i, status = 0;
 	u_char page;
@@ -1059,7 +1059,7 @@ static int ewrk3_rx(struct net_device *dev)
 */
 static int ewrk3_tx(struct net_device *dev)
 {
-	struct ewrk3_private *lp = (struct ewrk3_private *) dev->priv;
+	struct ewrk3_private *lp = netdev_priv(dev);
 	u_long iobase = dev->base_addr;
 	u_char tx_status;
 
@@ -1095,7 +1095,7 @@ static int ewrk3_tx(struct net_device *dev)
 
 static int ewrk3_close(struct net_device *dev)
 {
-	struct ewrk3_private *lp = (struct ewrk3_private *) dev->priv;
+	struct ewrk3_private *lp = netdev_priv(dev);
 	u_long iobase = dev->base_addr;
 	u_char icr, csr;
 
@@ -1130,7 +1130,7 @@ static int ewrk3_close(struct net_device *dev)
 
 static struct net_device_stats *ewrk3_get_stats(struct net_device *dev)
 {
-	struct ewrk3_private *lp = (struct ewrk3_private *) dev->priv;
+	struct ewrk3_private *lp = netdev_priv(dev);
 
 	/* Null body since there is no framing error counter */
 	return &lp->stats;
@@ -1141,7 +1141,7 @@ static struct net_device_stats *ewrk3_get_stats(struct net_device *dev)
  */
 static void set_multicast_list(struct net_device *dev)
 {
-	struct ewrk3_private *lp = (struct ewrk3_private *) dev->priv;
+	struct ewrk3_private *lp = netdev_priv(dev);
 	u_long iobase = dev->base_addr;
 	u_char csr;
 
@@ -1174,7 +1174,7 @@ static void set_multicast_list(struct net_device *dev)
  */
 static void SetMulticastFilter(struct net_device *dev)
 {
-	struct ewrk3_private *lp = (struct ewrk3_private *) dev->priv;
+	struct ewrk3_private *lp = netdev_priv(dev);
 	struct dev_mc_list *dmi = dev->mc_list;
 	u_long iobase = dev->base_addr;
 	int i;
@@ -1522,7 +1522,7 @@ static int __init EISA_signature(char *name, s32 eisa_id)
 
 static int ewrk3_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 {
-	struct ewrk3_private *lp = (struct ewrk3_private *) dev->priv;
+	struct ewrk3_private *lp = netdev_priv(dev);
 	u_long iobase = dev->base_addr;
 	u32 ethcmd;
 
@@ -1708,7 +1708,7 @@ static int ewrk3_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
  */
 static int ewrk3_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
-	struct ewrk3_private *lp = (struct ewrk3_private *) dev->priv;
+	struct ewrk3_private *lp = netdev_priv(dev);
 	struct ewrk3_ioctl *ioc = (struct ewrk3_ioctl *) &rq->ifr_ifru;
 	u_long iobase = dev->base_addr;
 	int i, j, status = 0;
