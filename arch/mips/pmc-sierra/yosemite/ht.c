@@ -414,11 +414,6 @@ struct pci_ops titan_pci_ops = {
         titan_ht_config_write_dword
 };
 
-
-struct pci_fixup pcibios_fixups[] = {
-        {0}
-};
-
 void __init pcibios_fixup_bus(struct pci_bus *c)
 {
         titan_ht_pcibios_fixup_bus(c);

@@ -279,7 +279,3 @@ static int __init sb1250_pcibios_init(void)
 	return 0;
 }
 arch_initcall(sb1250_pcibios_init);
-
-struct pci_fixup pcibios_fixups[] = {
-	{0}
-};
