@@ -34,6 +34,7 @@ ssize_t	raw_write(struct file *, const char *, size_t, loff_t *);
 int	raw_open(struct inode *, struct file *);
 int	raw_release(struct inode *, struct file *);
 int	raw_ctl_ioctl(struct inode *, struct file *, unsigned int, unsigned long);
+int	raw_ioctl(struct inode *, struct file *, unsigned int, unsigned long);
 
 
 static struct file_operations raw_fops = {
@@ -41,6 +42,7 @@ static struct file_operations raw_fops = {
 	write:		raw_write,
 	open:		raw_open,
 	release:	raw_release,
+	ioctl:		raw_ioctl,
 };
 
 static struct file_operations raw_ctl_fops = {
@@ -142,6 +144,25 @@ int raw_release(struct inode *inode, struct file *filp)
 }
 
 
+
+/* Forward ioctls to the underlying block device. */ 
+int raw_ioctl(struct inode *inode, 
+		  struct file *flip,
+		  unsigned int command, 
+		  unsigned long arg)
+{
+	int minor = minor(inode->i_rdev), err; 
+	struct block_device *b; 
+	if (minor < 1 && minor > 255)
+		return -ENODEV;
+
+	b = raw_devices[minor].binding;
+	err = -EINVAL; 
+	if (b && b->bd_inode && b->bd_op && b->bd_op->ioctl) { 
+		err = b->bd_op->ioctl(b->bd_inode, NULL, command, arg); 
+	} 
+	return err;
+} 
 
 /*
  * Deal with ioctls against the raw-device control interface, to bind
