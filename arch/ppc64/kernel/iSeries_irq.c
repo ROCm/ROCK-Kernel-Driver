@@ -109,10 +109,12 @@ static unsigned int iSeries_startup_IRQ(unsigned int irq)
 	return 0;
 }
 
+#if 0
 /*
  * Temporary hack
  */
 #define get_irq_desc(irq)	&irq_desc[(irq)]
+#endif
 
 /*
  * This is called out of iSeries_fixup to activate interrupt

@@ -64,7 +64,7 @@ void __init pagetable_init(void)
 
 	memset((void *)kptbl, 0, PAGE_SIZE << PGD_ORDER);
 	memset((void *)kpmdtbl, 0, PAGE_SIZE);
-	set_pgd(swapper_pg_dir, __pgd(kpmdtbl));
+	set_pgd(swapper_pg_dir, __pgd((unsigned long)kpmdtbl));
 
 	/*
 	 * The 64-bit kernel uses a flat pagetable for it's kernel mappings ...

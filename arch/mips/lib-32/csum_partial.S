@@ -103,8 +103,8 @@ small_csumcpy:
 
 	.align	5
 LEAF(csum_partial)
-	move sum, zero
-	move t7, zero
+	move	sum, zero
+	move	t7, zero
 
 	sltiu	t8, a1, 0x8
 	bnez	t8, small_csumcpy		/* < 8 bytes to copy */

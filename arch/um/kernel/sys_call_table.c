@@ -151,7 +151,6 @@ extern syscall_handler_t sys_mlockall;
 extern syscall_handler_t sys_munlockall;
 extern syscall_handler_t sys_sched_setparam;
 extern syscall_handler_t sys_sched_getparam;
-extern syscall_handler_t sys_sched_setscheduler;
 extern syscall_handler_t sys_sched_getscheduler;
 extern syscall_handler_t sys_sched_get_priority_max;
 extern syscall_handler_t sys_sched_get_priority_min;
@@ -441,7 +440,7 @@ syscall_handler_t *sys_call_table[] = {
 	[ __NR_munlockall ] = sys_munlockall,
 	[ __NR_sched_setparam ] = sys_sched_setparam,
 	[ __NR_sched_getparam ] = sys_sched_getparam,
-	[ __NR_sched_setscheduler ] = sys_sched_setscheduler,
+	[ __NR_sched_setscheduler ] = (syscall_handler_t *) sys_sched_setscheduler,
 	[ __NR_sched_getscheduler ] = sys_sched_getscheduler,
 	[ __NR_sched_yield ] = (syscall_handler_t *) yield,
 	[ __NR_sched_get_priority_max ] = sys_sched_get_priority_max,

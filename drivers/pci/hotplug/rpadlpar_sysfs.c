@@ -1,5 +1,6 @@
 /*
- * Interface for Dynamic Logical Partitioning of I/O Slots
+ * Interface for Dynamic Logical Partitioning of I/O Slots on
+ * RPA-compliant PPC64 platform.
  *
  * John Rose <johnrose@austin.ibm.com>
  * October 2003
@@ -66,7 +67,8 @@ static ssize_t add_slot_store(struct dlpar_io_attr *dlpar_attr,
 
 	memcpy(drc_name, buf, nbytes);
 
-	if (!(end = strchr(drc_name, '\n')))
+	end = strchr(drc_name, '\n');
+	if (!end)
 		end = &drc_name[nbytes];
 	*end = '\0';
 
@@ -86,7 +88,8 @@ static ssize_t remove_slot_store(struct dlpar_io_attr *dlpar_attr,
 
 	memcpy(drc_name, buf, nbytes);
 
-	if (!(end = strchr(drc_name, '\n')))
+	end = strchr(drc_name, '\n');
+	if (!end)
 		end = &drc_name[nbytes];
 	*end = '\0';
 

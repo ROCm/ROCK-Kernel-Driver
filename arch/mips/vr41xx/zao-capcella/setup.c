@@ -1,39 +1,36 @@
 /*
- * FILE NAME
- *	arch/mips/vr41xx/zao-capcella/setup.c
+ *  setup.c, Setup for the ZAO Networks Capcella.
  *
- * BRIEF MODULE DESCRIPTION
- *	Setup for the ZAO Networks Capcella.
+ *  Copyright (C) 2002-2003  Yoichi Yuasa <yuasa@hh.iij4u.or.jp>
  *
- * Copyright 2002 Yoichi Yuasa
- *                yuasa@hh.iij4u.or.jp
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2 of the License, or
+ *  (at your option) any later version.
  *
- *  This program is free software; you can redistribute it and/or modify it
- *  under the terms of the GNU General Public License as published by the
- *  Free Software Foundation; either version 2 of the License, or (at your
- *  option) any later version.
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program; if not, write to the Free Software
+ *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 #include <linux/config.h>
 #include <linux/init.h>
-#include <linux/console.h>
-#include <linux/ide.h>
 #include <linux/ioport.h>
 #include <linux/major.h>
 #include <linux/kdev_t.h>
 #include <linux/root_dev.h>
 
 #include <asm/pci_channel.h>
-#include <asm/reboot.h>
 #include <asm/time.h>
 #include <asm/vr41xx/capcella.h>
 
 #ifdef CONFIG_BLK_DEV_INITRD
 extern unsigned long initrd_start, initrd_end;
 extern void * __rd_start, * __rd_end;
-#endif
-
-#ifdef CONFIG_BLK_DEV_IDE
-extern struct ide_ops capcella_ide_ops;
 #endif
 
 #ifdef CONFIG_PCI
@@ -53,9 +50,10 @@ static struct resource vr41xx_pci_mem_resource = {
 
 extern struct pci_ops vr41xx_pci_ops;
 
-struct pci_channel mips_pci_channels[] = {
-	{&vr41xx_pci_ops, &vr41xx_pci_io_resource, &vr41xx_pci_mem_resource, 0, 256},
-	{NULL, NULL, NULL, 0, 0}
+struct pci_controller vr41xx_controller = {
+	.pci_ops	= &vr41xx_pci_ops,
+	.io_resource	= &vr41xx_pci_io_resource,
+	.mem_resource	= &vr41xx_pci_mem_resource,
 };
 
 struct vr41xx_pci_address_space vr41xx_pci_mem1 = {
@@ -83,7 +81,7 @@ static struct vr41xx_pci_address_map pci_address_map = {
 };
 #endif
 
-void __init zao_capcella_setup(void)
+static void __init zao_capcella_setup(void)
 {
 	set_io_port_base(IO_PORT_BASE);
 	ioport_resource.start = IO_PORT_RESOURCE_START;
@@ -97,24 +95,14 @@ void __init zao_capcella_setup(void)
 	initrd_end = (unsigned long)&__rd_end;
 #endif
 
-	_machine_restart = vr41xx_restart;
-	_machine_halt = vr41xx_halt;
-	_machine_power_off = vr41xx_power_off;
-
 	board_time_init = vr41xx_time_init;
 	board_timer_setup = vr41xx_timer_setup;
 
-#ifdef CONFIG_FB
-	conswitchp = &dummy_con;
-#endif
-
-#ifdef CONFIG_BLK_DEV_IDE
-	ide_ops = &capcella_ide_ops;
-#endif
-
 	vr41xx_bcu_init();
 
-	vr41xx_cmu_init(0x0102);
+	vr41xx_cmu_init();
+
+	vr41xx_pmu_init();
 
 #ifdef CONFIG_SERIAL_8250
 	vr41xx_siu_init(SIU_RS232C, 0);
@@ -125,3 +113,5 @@ void __init zao_capcella_setup(void)
 	vr41xx_pciu_init(&pci_address_map);
 #endif
 }
+
+early_initcall(zao_capcella_setup);

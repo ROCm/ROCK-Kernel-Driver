@@ -213,10 +213,6 @@ int __init scanlog_init(void)
 	}
 
 	if (proc_ppc64.rtas == NULL) {
-		proc_ppc64_init();
-	}
-
-	if (proc_ppc64.rtas == NULL) {
 		printk(KERN_ERR "Failed to create /proc/rtas in scanlog_init\n");
 		return -EIO;
 	}

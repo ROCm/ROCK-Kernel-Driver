@@ -2,7 +2,6 @@
  * PROM interface routines.
  */
 #include <linux/types.h>
-#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/string.h>
 #include <linux/ctype.h>
@@ -85,8 +84,6 @@ static void setup_prom_vectors(void)
 	prom_printf("prom vectors set up\n");
 }
 
-char arcs_cmdline[CL_SIZE];
-
 static struct at93c_defs at93c_defs[N_MACHTYPES] = {
 	{(void *)AT93C_REG_100, (void *)AT93C_RDATA_REG_100, AT93C_RDATA_SHIFT_100,
 	AT93C_WDATA_SHIFT_100, AT93C_CS_M_100, AT93C_CLK_M_100},
@@ -94,8 +91,11 @@ static struct at93c_defs at93c_defs[N_MACHTYPES] = {
 	AT93C_WDATA_SHIFT_200, AT93C_CS_M_200, AT93C_CLK_M_200},
 };
 
-void __init prom_init(int argc, char **argv, char **envp, int *prom_vec)
+void __init prom_init(void)
 {
+	int argc = fw_arg0;
+	char **argv = (char **) fw_arg1;
+
 	setup_prom_vectors();
 
 	if (current_cpu_data.cputype == CPU_R5000)
@@ -110,7 +110,7 @@ void __init prom_init(int argc, char **argv, char **envp, int *prom_vec)
 	mips_machgroup = MACH_GROUP_LASAT;
 
 	/* Get the command line */
-	if (argc>0) {
+	if (argc > 0) {
 		strncpy(arcs_cmdline, argv[0], CL_SIZE-1);
 		arcs_cmdline[CL_SIZE-1] = '\0';
 	}
@@ -119,14 +119,15 @@ void __init prom_init(int argc, char **argv, char **envp, int *prom_vec)
 	set_io_port_base(KSEG1);
 
 	/* Set memory regions */
-	ioport_resource.start = 0;		/* Should be KSEGx ???	*/
-	ioport_resource.end = 0xffffffff;	/* Should be ???	*/
+	ioport_resource.start = 0;
+	ioport_resource.end = 0xffffffff;	/* Wrong, fixme.  */
 
 	add_memory_region(0, lasat_board_info.li_memsize, BOOT_MEM_RAM);
 }
 
-void prom_free_prom_memory(void)
+unsigned long __init prom_free_prom_memory(void)
 {
+	return 0;
 }
 
 const char *get_system_type(void)

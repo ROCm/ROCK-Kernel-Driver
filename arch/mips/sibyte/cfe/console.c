@@ -1,5 +1,5 @@
+#include <linux/config.h>
 #include <linux/init.h>
-#include <linux/major.h>
 #include <linux/errno.h>
 #include <linux/console.h>
 
@@ -41,12 +41,6 @@ static void cfe_console_write(struct console *cons, const char *str,
 			
 }
 
-static struct tty_driver *cfe_console_device(struct console *c, int *index)
-{
-	*index = -1;
-	return NULL;
-}
-
 static int cfe_console_setup(struct console *cons, char *str)
 {
 	char consdev[32];
@@ -72,7 +66,6 @@ static int cfe_console_setup(struct console *cons, char *str)
 static struct console sb1250_cfe_cons = {
 	.name		= "cfe",
 	.write		= cfe_console_write,
-	.device		= cfe_console_device,
 	.setup		= cfe_console_setup,
 	.flags		= CON_PRINTBUFFER,
 	.index		= -1,

@@ -82,7 +82,7 @@
 #define M41T81REG_SQW	0x13		/* square wave register */
 
 #define M41T81_CCR_ADDRESS	0x68
-#define SMB_CSR(reg) (KSEG1 | A_SMB_REGISTER(1, reg))
+#define SMB_CSR(reg) (IOADDR(A_SMB_REGISTER(1, reg)))
 
 static int m41t81_read(uint8_t addr)
 {

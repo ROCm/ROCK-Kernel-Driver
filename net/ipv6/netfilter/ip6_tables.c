@@ -24,6 +24,7 @@
 #include <linux/udp.h>
 #include <linux/icmpv6.h>
 #include <net/ip.h>
+#include <net/ipv6.h>
 #include <asm/uaccess.h>
 #include <asm/semaphore.h>
 #include <linux/proc_fs.h>
@@ -1613,6 +1614,22 @@ tcp_match(const struct sk_buff *skb,
 		return 0;
 	}
 
+	tcpoff = (u8*)(skb->nh.ipv6h + 1) - skb->data;
+	tcpoff = ipv6_skip_exthdr(skb, tcpoff, &nexthdr, skb->len - tcpoff);
+	if (tcpoff < 0 || tcpoff > skb->len) {
+		duprintf("tcp_match: cannot skip exthdr. Dropping.\n");
+		*hotdrop = 1;
+		return 0;
+	} else if (nexthdr == IPPROTO_FRAGMENT)
+		return 0;
+	else if (nexthdr != IPPROTO_TCP ||
+		 skb->len - tcpoff < sizeof(struct tcphdr)) {
+		/* cannot be occured */
+		duprintf("tcp_match: cannot get TCP header. Dropping.\n");
+		*hotdrop = 1;
+		return 0;
+	}
+
 	if (!port_match(tcpinfo->spts[0], tcpinfo->spts[1],
 			ntohs(tcph.source),
 			!!(tcpinfo->invflags & IP6T_TCP_INV_SRCPT)))
@@ -1680,6 +1697,21 @@ udp_match(const struct sk_buff *skb,
 		/* We've been asked to examine this packet, and we
 		   can't.  Hence, no choice but to drop. */
 		duprintf("Dropping evil UDP tinygram.\n");
+		*hotdrop = 1;
+		return 0;
+	}
+
+	udpoff = (u8*)(skb->nh.ipv6h + 1) - skb->data;
+	udpoff = ipv6_skip_exthdr(skb, udpoff, &nexthdr, skb->len - udpoff);
+	if (udpoff < 0 || udpoff > skb->len) {
+		duprintf("udp_match: cannot skip exthdr. Dropping.\n");
+		*hotdrop = 1;
+		return 0;
+	} else if (nexthdr == IPPROTO_FRAGMENT)
+		return 0;
+	else if (nexthdr != IPPROTO_UDP ||
+		 skb->len - udpoff < sizeof(struct udphdr)) {
+		duprintf("udp_match: cannot get UDP header. Dropping.\n");
 		*hotdrop = 1;
 		return 0;
 	}

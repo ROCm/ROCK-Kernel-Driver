@@ -100,9 +100,6 @@ struct ip_nat_info
 	/* Manipulations to be done on this conntrack. */
 	struct ip_nat_info_manip manips[IP_NAT_MAX_MANIPS];
 
-	/* The mapping type which created us (NULL for null mapping). */
-	const struct ip_nat_mapping_type *mtype;
-
 	struct ip_nat_hash bysource, byipsproto;
 
 	/* Helper (NULL if none). */

@@ -450,6 +450,11 @@ done:
 			kfree(gsf);
 			break;
 		}
+		if (GROUP_FILTER_SIZE(gsf->gf_numsrc) > optlen) {
+			kfree(gsf);
+			retv = -EINVAL;
+			break;
+		}
 		retv = ip6_mc_msfilter(sk, gsf);
 		kfree(gsf);
 

@@ -29,7 +29,7 @@
  */
 
 #include <linux/types.h>
-#include <asm/au1000.h>
+#include <asm/mach-au1x00/au1000.h>
 
 #define SERIAL_BASE   UART_BASE
 #define SER_CMD       0x7
@@ -40,11 +40,11 @@
 #define SLOW_DOWN
 
 static const char digits[16] = "0123456789abcdef";
-static volatile unsigned long * const com1 = (unsigned char *)SERIAL_BASE;
+static volatile unsigned long * const com1 = (unsigned long *)SERIAL_BASE;
 
 
 #ifdef SLOW_DOWN
-static inline void slow_down()
+static inline void slow_down(void)
 {
     int k;
     for (k=0; k<10000; k++);

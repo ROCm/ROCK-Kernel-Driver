@@ -14,7 +14,6 @@
 #include <linux/config.h>
 #include <linux/init.h>
 
-#include <asm/cprefix.h>
 #include <asm/head.h>
 #include <asm/asi.h>
 #include <asm/contregs.h>
@@ -34,18 +33,18 @@
  */
 
 	.align 4
-        .globl  C_LABEL(cputyp)
-C_LABEL(cputyp):
+        .globl  cputyp
+cputyp:
         .word   1
 
 	.align 4
-	.globl C_LABEL(cputypval)
-C_LABEL(cputypval):
+	.globl cputypval
+cputypval:
 	.asciz "sun4c"
 	.ascii "     "
 
-C_LABEL(cputypvalend):
-C_LABEL(cputypvallen) = C_LABEL(cputypvar) - C_LABEL(cputypval)
+cputypvalend:
+cputypvallen = cputypvar - cputypval
 
 	.align 4
 /*
@@ -56,12 +55,12 @@ C_LABEL(cputypvallen) = C_LABEL(cputypvar) - C_LABEL(cputypval)
 /* Uh, actually Linus it is I who cannot spell. Too much murky
  * Sparc assembly will do this to ya.
  */
-C_LABEL(cputypvar):
+cputypvar:
 	.asciz "compatability"
 
 /* Tested on SS-5, SS-10. Probably someone at Sun applied a spell-checker. */
 	.align 4
-C_LABEL(cputypvar_sun4m):
+cputypvar_sun4m:
 	.asciz "compatible"
 
 	.align 4
@@ -88,14 +87,14 @@ sun4e_notsup:
 	/* The Sparc trap table, bootloader gives us control at _start. */
 	.text
 	.globl	start, _stext, _start, __stext
-	.globl  C_LABEL(trapbase)
+	.globl  trapbase
 _start:   /* danger danger */
 __stext:
 _stext:
 start:
-C_LABEL(trapbase):
+trapbase:
 #ifdef CONFIG_SMP
-C_LABEL(trapbase_cpu0):
+trapbase_cpu0:
 #endif
 /* We get control passed to us here at t_zero. */
 t_zero:	b gokernel; nop; nop; nop;
@@ -202,13 +201,13 @@ t_badfc:BAD_TRAP(0xfc) BAD_TRAP(0xfd)
 dbtrap:	BAD_TRAP(0xfe)                      /* Debugger/PROM breakpoint #1   */
 dbtrap2:BAD_TRAP(0xff)                      /* Debugger/PROM breakpoint #2   */	
 
-	.globl	C_LABEL(end_traptable)
-C_LABEL(end_traptable):
+	.globl	end_traptable
+end_traptable:
 
 #ifdef CONFIG_SMP
 	/* Trap tables for the other cpus. */
-	.globl	C_LABEL(trapbase_cpu1), C_LABEL(trapbase_cpu2), C_LABEL(trapbase_cpu3)
-C_LABEL(trapbase_cpu1):
+	.globl	trapbase_cpu1, trapbase_cpu2, trapbase_cpu3
+trapbase_cpu1:
 	BAD_TRAP(0x0) SRMMU_TFAULT TRAP_ENTRY(0x2, bad_instruction)
 	TRAP_ENTRY(0x3, priv_instruction) TRAP_ENTRY(0x4, fpd_trap_handler)
 	WINDOW_SPILL WINDOW_FILL TRAP_ENTRY(0x7, mna_handler)
@@ -276,7 +275,7 @@ C_LABEL(trapbase_cpu1):
 	BAD_TRAP(0xf7) BAD_TRAP(0xf8) BAD_TRAP(0xf9) BAD_TRAP(0xfa) BAD_TRAP(0xfb)
 	BAD_TRAP(0xfc) BAD_TRAP(0xfd) BAD_TRAP(0xfe) BAD_TRAP(0xff)
 
-C_LABEL(trapbase_cpu2):
+trapbase_cpu2:
 	BAD_TRAP(0x0) SRMMU_TFAULT TRAP_ENTRY(0x2, bad_instruction)
 	TRAP_ENTRY(0x3, priv_instruction) TRAP_ENTRY(0x4, fpd_trap_handler)
 	WINDOW_SPILL WINDOW_FILL TRAP_ENTRY(0x7, mna_handler)
@@ -344,7 +343,7 @@ C_LABEL(trapbase_cpu2):
 	BAD_TRAP(0xf7) BAD_TRAP(0xf8) BAD_TRAP(0xf9) BAD_TRAP(0xfa) BAD_TRAP(0xfb)
 	BAD_TRAP(0xfc) BAD_TRAP(0xfd) BAD_TRAP(0xfe) BAD_TRAP(0xff)
 
-C_LABEL(trapbase_cpu3):
+trapbase_cpu3:
 	BAD_TRAP(0x0) SRMMU_TFAULT TRAP_ENTRY(0x2, bad_instruction)
 	TRAP_ENTRY(0x3, priv_instruction) TRAP_ENTRY(0x4, fpd_trap_handler)
 	WINDOW_SPILL WINDOW_FILL TRAP_ENTRY(0x7, mna_handler)
@@ -418,25 +417,25 @@ C_LABEL(trapbase_cpu3):
 /* This was the only reasonable way I could think of to properly align
  * these page-table data structures.
  */
-	.globl C_LABEL(pg0), C_LABEL(pg1), C_LABEL(pg2), C_LABEL(pg3)
-	.globl C_LABEL(empty_bad_page)
-	.globl C_LABEL(empty_bad_page_table)
-	.globl C_LABEL(empty_zero_page)
-	.globl C_LABEL(swapper_pg_dir)
-C_LABEL(swapper_pg_dir):		.skip PAGE_SIZE
-C_LABEL(pg0):				.skip PAGE_SIZE
-C_LABEL(pg1):				.skip PAGE_SIZE
-C_LABEL(pg2):				.skip PAGE_SIZE
-C_LABEL(pg3):				.skip PAGE_SIZE
-C_LABEL(empty_bad_page):		.skip PAGE_SIZE
-C_LABEL(empty_bad_page_table):		.skip PAGE_SIZE
-C_LABEL(empty_zero_page):		.skip PAGE_SIZE
+	.globl pg0, pg1, pg2, pg3
+	.globl empty_bad_page
+	.globl empty_bad_page_table
+	.globl empty_zero_page
+	.globl swapper_pg_dir
+swapper_pg_dir:		.skip PAGE_SIZE
+pg0:			.skip PAGE_SIZE
+pg1:			.skip PAGE_SIZE
+pg2:			.skip PAGE_SIZE
+pg3:			.skip PAGE_SIZE
+empty_bad_page:		.skip PAGE_SIZE
+empty_bad_page_table:	.skip PAGE_SIZE
+empty_zero_page:	.skip PAGE_SIZE
 
-	.global C_LABEL(root_flags)
-	.global C_LABEL(ram_flags)
-	.global C_LABEL(root_dev)
-	.global C_LABEL(sparc_ramdisk_image)
-	.global C_LABEL(sparc_ramdisk_size)
+	.global root_flags
+	.global ram_flags
+	.global root_dev
+	.global sparc_ramdisk_image
+	.global sparc_ramdisk_size
 
 /* This stuff has to be in sync with SILO and other potential boot loaders
  * Fields should be kept upward compatible and whenever any change is made,
@@ -445,17 +444,17 @@ C_LABEL(empty_zero_page):		.skip PAGE_SIZE
 	.ascii	"HdrS"
 	.word	LINUX_VERSION_CODE
 	.half	0x0203		/* HdrS version */
-C_LABEL(root_flags):
+root_flags:
 	.half	1
-C_LABEL(root_dev):
+root_dev:
 	.half	0
-C_LABEL(ram_flags):
+ram_flags:
 	.half	0
-C_LABEL(sparc_ramdisk_image):
+sparc_ramdisk_image:
 	.word	0
-C_LABEL(sparc_ramdisk_size):
+sparc_ramdisk_size:
 	.word	0
-	.word	C_LABEL(reboot_command)
+	.word	reboot_command
 	.word	0, 0, 0
 	.word	_end
 
@@ -517,7 +516,7 @@ copy_prom_lvl14:
 		/* DJHR
 		 * preserve our linked/calculated instructions
 		 */
-		set	C_LABEL(lvl14_save), %g1
+		set	lvl14_save, %g1
 		set	t_irq14, %g3
 		sub	%g1, %l6, %g1		! translate to physical
 		sub	%g3, %l6, %g3		! translate to physical
@@ -761,11 +760,11 @@ execute_in_high_mem:
 		mov	%l0, %o0		! put back romvec
 		mov	%l1, %o1		! and debug_vec
 
-		sethi	%hi( C_LABEL(prom_vector_p) ), %g1
-		st	%o0, [%g1 + %lo( C_LABEL(prom_vector_p) )]
+		sethi	%hi(prom_vector_p), %g1
+		st	%o0, [%g1 + %lo(prom_vector_p)]
 
-		sethi	%hi( C_LABEL(linux_dbvec) ), %g1
-		st	%o1, [%g1 + %lo( C_LABEL(linux_dbvec) )]
+		sethi	%hi(linux_dbvec), %g1
+		st	%o1, [%g1 + %lo(linux_dbvec)]
 
 		ld	[%o0 + 0x4], %o3
 		and	%o3, 0x3, %o5			! get the version
@@ -808,10 +807,10 @@ found_version:
 		 or	%g0, %g0, %o0		! next_node(0) = first_node
 		or	%o0, %g0, %g6
 
-		sethi	%hi( C_LABEL(cputypvar) ), %o1	! First node has cpu-arch
-		or	%o1, %lo( C_LABEL(cputypvar) ), %o1
-		sethi	%hi( C_LABEL(cputypval) ), %o2	! information, the string
-		or	%o2, %lo( C_LABEL(cputypval) ), %o2
+		sethi	%hi(cputypvar), %o1	! First node has cpu-arch
+		or	%o1, %lo(cputypvar), %o1
+		sethi	%hi(cputypval), %o2	! information, the string
+		or	%o2, %lo(cputypval), %o2
 		ld	[%l1], %l0		! 'compatibility' tells
 		ld	[%l0 + 0xc], %l0	! that we want 'sun4x' where
 		call	%l0			! x is one of '', 'c', 'm',
@@ -824,17 +823,17 @@ found_version:
 		 nop
 
 		or	%g6, %g0, %o0
-		sethi	%hi( C_LABEL(cputypvar_sun4m) ), %o1
-		or	%o1, %lo( C_LABEL(cputypvar_sun4m) ), %o1
-		sethi	%hi( C_LABEL(cputypval) ), %o2
-		or	%o2, %lo( C_LABEL(cputypval) ), %o2
+		sethi	%hi(cputypvar_sun4m), %o1
+		or	%o1, %lo(cputypvar_sun4m), %o1
+		sethi	%hi(cputypval), %o2
+		or	%o2, %lo(cputypval), %o2
 		ld	[%l1], %l0
 		ld	[%l0 + 0xc], %l0
 		call	%l0
 		 nop
 
 got_prop:
-		set	C_LABEL(cputypval), %o2
+		set	cputypval, %o2
 		ldub	[%o2 + 0x4], %l1
 
 		cmp	%l1, ' '
@@ -853,7 +852,7 @@ got_prop:
 		b	no_sun4u_here		! AIEEE, a V9 sun4u... Get our BIG BROTHER kernel :))
 		 nop
 
-1:		set	C_LABEL(cputypval), %l1
+1:		set	cputypval, %l1
 		ldub	[%l1 + 0x4], %l1
 		cmp	%l1, 'm'		! Test for sun4d, sun4e ?
 		be	sun4m_init
@@ -875,8 +874,8 @@ got_prop:
 
 sun4d_init:
 	/* Need to patch call to handler_irq */
-	set	C_LABEL(patch_handler_irq), %g4
-	set	C_LABEL(sun4d_handler_irq), %g5
+	set	patch_handler_irq, %g4
+	set	sun4d_handler_irq, %g5
 	sethi	%hi(0x40000000), %g3		! call
 	sub	%g5, %g4, %g5
 	srl	%g5, 2, %g5
@@ -997,8 +996,8 @@ sun4c_continue_boot:
  * show-time!
  */
 
-		sethi	%hi( C_LABEL(cputyp) ), %o0
-		st	%g4, [%o0 + %lo( C_LABEL(cputyp) )]
+		sethi	%hi(cputyp), %o0
+		st	%g4, [%o0 + %lo(cputyp)]
 
 		/* Turn on Supervisor, EnableFloating, and all the PIL bits.
 		 * Also puts us in register window zero with traps off.
@@ -1008,14 +1007,14 @@ sun4c_continue_boot:
 		WRITE_PAUSE
 
 		/* I want a kernel stack NOW! */
-		set	C_LABEL(init_thread_union), %g1
+		set	init_thread_union, %g1
 		set	(THREAD_SIZE - STACKFRAME_SZ), %g2
 		add	%g1, %g2, %sp
 		mov	0, %fp			/* And for good luck */
 
 		/* Zero out our BSS section. */
-		set	C_LABEL(__bss_start) , %o0	! First address of BSS
-		set	C_LABEL(end) , %o1		! Last address of BSS
+		set	__bss_start , %o0	! First address of BSS
+		set	end , %o1		! Last address of BSS
 		add	%o0, 0x1, %o0
 1:	
 		stb	%g0, [%o0]
@@ -1026,11 +1025,11 @@ sun4c_continue_boot:
 		/* Initialize the uwinmask value for init task just in case.
 		 * But first make current_set[boot_cpu_id] point to something useful.
 		 */
-		set	C_LABEL(init_thread_union), %g6
-		set	C_LABEL(current_set), %g2
+		set	init_thread_union, %g6
+		set	current_set, %g2
 #ifdef CONFIG_SMP
-		sethi	%hi(C_LABEL(boot_cpu_id4)), %g3
-		ldub	[%g3 + %lo(C_LABEL(boot_cpu_id4))], %g3
+		sethi	%hi(boot_cpu_id4), %g3
+		ldub	[%g3 + %lo(boot_cpu_id4)], %g3
 		st	%g6, [%g2]
 		add	%g2, %g3, %g2
 #endif
@@ -1124,14 +1123,14 @@ sun4c_continue_boot:
 		st	%g4, [%g5 + 0x1c]
 
 2:		
-		sethi	%hi( C_LABEL(nwindows) ), %g4
-		st	%g3, [%g4 + %lo( C_LABEL(nwindows) )]	! store final value
+		sethi	%hi(nwindows), %g4
+		st	%g3, [%g4 + %lo(nwindows)]	! store final value
 		sub	%g3, 0x1, %g3
-		sethi	%hi( C_LABEL(nwindowsm1) ), %g4
-		st	%g3, [%g4 + %lo( C_LABEL(nwindowsm1) )]
+		sethi	%hi(nwindowsm1), %g4
+		st	%g3, [%g4 + %lo(nwindowsm1)]
 
 		/* Here we go, start using Linux's trap table... */
-		set	C_LABEL(trapbase), %g3
+		set	trapbase, %g3
 		wr	%g3, 0x0, %tbr
 		WRITE_PAUSE
 
@@ -1147,12 +1146,12 @@ sun4c_continue_boot:
 		 * off to start_kernel().
 		 */
 
-		sethi	%hi( C_LABEL(prom_vector_p) ), %g5
-		ld	[%g5 + %lo( C_LABEL(prom_vector_p) )], %o0
-		call	C_LABEL(prom_init)
+		sethi	%hi(prom_vector_p), %g5
+		ld	[%g5 + %lo(prom_vector_p)], %o0
+		call	prom_init
 		 nop
 
-		call 	C_LABEL(start_kernel)
+		call 	start_kernel
 		 nop
 	
 		/* We should not get here. */
@@ -1162,7 +1161,7 @@ sun4c_continue_boot:
 sun4_init:
 #ifdef CONFIG_SUN4
 /* There, happy now Adrian? */
-		set	C_LABEL(cputypval), %o2		! Let everyone know we
+		set	cputypval, %o2		! Let everyone know we
 		set	' ', %o0			! are a "sun4 " architecture
 		stb	%o0, [%o2 + 0x4]		
 
@@ -1289,8 +1288,8 @@ halt_me:
  * gets initialized in c-code so all routines can use it.
  */
 
-	.globl	C_LABEL(prom_vector_p)
-C_LABEL(prom_vector_p):
+	.globl	prom_vector_p
+prom_vector_p:
 		.word 0
 
 /* We calculate the following at boot time, window fills/spills and trap entry
@@ -1298,25 +1297,25 @@ C_LABEL(prom_vector_p):
  */
 
 	.align 4
-	.globl	C_LABEL(nwindows)
-	.globl	C_LABEL(nwindowsm1)
-C_LABEL(nwindows):
+	.globl	nwindows
+	.globl	nwindowsm1
+nwindows:
 	.word	8
-C_LABEL(nwindowsm1):
+nwindowsm1:
 	.word	7
 
 /* Boot time debugger vector value.  We need this later on. */
 
 	.align 4
-	.globl	C_LABEL(linux_dbvec)
-C_LABEL(linux_dbvec):
+	.globl	linux_dbvec
+linux_dbvec:
 	.word	0
 	.word	0
 
 	.align 8
 
-	.globl	C_LABEL(lvl14_save)
-C_LABEL(lvl14_save):
+	.globl	lvl14_save
+lvl14_save:
 	.word	0
 	.word	0
 	.word	0

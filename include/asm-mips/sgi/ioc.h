@@ -14,47 +14,12 @@
 #define _SGI_IOC_H
 
 #include <linux/types.h>
+#include <asm/sgi/pi1.h>
 
 /* 
  * All registers are 8-bit wide alligned on 32-bit boundary. Bad things
  * happen if you try word access them. You have been warned.
  */
-
-struct sgioc_pport_regs {
-	u8 _data[3];
-	volatile u8 data;
-	u8 _ctrl[3];
-	volatile u8 ctrl;
-#define SGIOC_PCTRL_STROBE	0x01
-#define SGIOC_PCTRL_AFD		0x02
-#define SGIOC_PCTRL_INIT	0x04
-#define SGIOC_PCTRL_SLIN	0x08
-#define SGIOC_PCTRL_DIRECTION	0x20
-#define SGIOC_PCTRL_SEL		0x40
-	u8 _status[3];
-	volatile u8 status;
-#define SGIOC_PSTAT_DEVID	0x03
-#define SGIOC_PSTAT_NOINK	0x04
-#define SGIOC_PSTAT_ERROR	0x08
-#define SGIOC_PSTAT_ONLINE	0x10
-#define SGIOC_PSTAT_PE		0x20
-#define SGIOC_PSTAT_ACK		0x40
-#define SGIOC_PSTAT_BUSY	0x80
-	u8 _dmactrl[3];
-	volatile u8 dmactrl;
-	u8 _intrstat[3];
-	volatile u8 intrstat;
-	u8 _intrmask[3];
-	volatile u8 intrmask;
-	u8 _timer1[3];
-	volatile u8 timer1;
-	u8 _timer2[3];
-	volatile u8 timer2;
-	u8 _timer3[3];
-	volatile u8 timer3;
-	u8 _timer4[3];
-	volatile u8 timer4;
-};
 
 struct sgioc_uart_regs {
 	u8 _ctrl1[3];
@@ -153,7 +118,7 @@ struct sgint_regs {
 extern u8 sgi_ioc_reset, sgi_ioc_write;
 
 struct sgioc_regs {
-	struct sgioc_pport_regs pport;
+	struct pi1_regs pport;
 	u32 _unused0[2];
 	struct sgioc_uart_regs serport;
 	struct sgioc_keyb_regs kbdmouse;

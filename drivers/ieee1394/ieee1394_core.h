@@ -215,5 +215,6 @@ static inline unsigned char ieee1394_file_to_instance(struct file *file)
 
 /* Our sysfs bus entry */
 extern struct bus_type ieee1394_bus_type;
+extern struct class hpsb_host_class;
 
 #endif /* _IEEE1394_CORE_H */

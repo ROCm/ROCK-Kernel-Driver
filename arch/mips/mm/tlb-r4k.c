@@ -19,9 +19,11 @@
 #include <asm/pgtable.h>
 #include <asm/system.h>
 
+extern void except_vec0_generic(void);
 extern void except_vec0_nevada(void);
 extern void except_vec0_r4000(void);
 extern void except_vec0_r4600(void);
+extern void except_vec1_generic(void);
 extern void except_vec1_r4k(void);
 
 /* CP0 hazard avoidance. */
@@ -50,7 +52,7 @@ void local_flush_tlb_all(void)
 		 * Make sure all entries differ.  If they're not different
 		 * MIPS32 will take revenge ...
 		 */
-		write_c0_entryhi(KSEG0 + entry * 0x2000);
+		write_c0_entryhi(CKSEG0 + (entry << (PAGE_SHIFT + 1)));
 		write_c0_index(entry);
 		BARRIER;
 		tlb_write_indexed();
@@ -104,7 +106,8 @@ void local_flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
 				if (idx < 0)
 					continue;
 				/* Make sure all entries differ. */
-				write_c0_entryhi(KSEG0 + idx * 0x2000);
+				write_c0_entryhi(CKSEG0 +
+				                 (idx << (PAGE_SHIFT + 1)));
 				BARRIER;
 				tlb_write_indexed();
 				BARRIER;
@@ -146,7 +149,7 @@ void local_flush_tlb_kernel_range(unsigned long start, unsigned long end)
 			if (idx < 0)
 				continue;
 			/* Make sure all entries differ. */
-			write_c0_entryhi(KSEG0 + idx * 0x2000);
+			write_c0_entryhi(CKSEG0 + (idx << (PAGE_SHIFT + 1)));
 			BARRIER;
 			tlb_write_indexed();
 			BARRIER;
@@ -180,7 +183,7 @@ void local_flush_tlb_page(struct vm_area_struct *vma, unsigned long page)
 		if (idx < 0)
 			goto finish;
 		/* Make sure all entries differ. */
-		write_c0_entryhi(KSEG0 + idx * 0x2000);
+		write_c0_entryhi(CKSEG0 + (idx << (PAGE_SHIFT + 1)));
 		BARRIER;
 		tlb_write_indexed();
 
@@ -212,7 +215,7 @@ void local_flush_tlb_one(unsigned long page)
 	write_c0_entrylo1(0);
 	if (idx >= 0) {
 		/* Make sure all entries differ. */
-		write_c0_entryhi(KSEG0+(idx<<(PAGE_SHIFT+1)));
+		write_c0_entryhi(CKSEG0 + (idx << (PAGE_SHIFT + 1)));
 		BARRIER;
 		tlb_write_indexed();
 	}
@@ -378,25 +381,25 @@ out:
 
 static void __init probe_tlb(unsigned long config)
 {
-	unsigned int prid, config1;
+	struct cpuinfo_mips *c = &current_cpu_data;
+	unsigned int reg;
 
-	prid = read_c0_prid() & ASID_MASK;
-	if (prid == PRID_IMP_RM7000 || !(config & (1 << 31)))
-		/*
-		 * Not a MIPS32/MIPS64 CPU..  Config 1 register not
-		 * supported, we assume R4k style.  Cpu probing already figured
-		 * out the number of tlb entries.
-		 */
+	/*
+	 * If this isn't a MIPS32 / MIPS64 compliant CPU.  Config 1 register
+	 * is not supported, we assume R4k style.  Cpu probing already figured
+	 * out the number of tlb entries.
+	 */
+	if ((c->processor_id  & 0xff0000) == PRID_COMP_LEGACY)
 		return;
 
-	config1 = read_c0_config1();
+	reg = read_c0_config1();
 	if (!((config >> 7) & 3))
-		panic("No MMU present");
-	else
-		current_cpu_data.tlbsize = ((config1 >> 25) & 0x3f) + 1;
+		panic("No TLB present");
+
+	c->tlbsize = ((reg >> 25) & 0x3f) + 1;
 }
 
-void __init r4k_tlb_init(void)
+void __init tlb_init(void)
 {
 	unsigned int config = read_c0_config();
 
@@ -408,7 +411,7 @@ void __init r4k_tlb_init(void)
 	 *     be set for 4kb pages.
 	 */
 	probe_tlb(config);
-	write_c0_pagemask(PM_4K);
+	write_c0_pagemask(PM_DEFAULT_MASK);
 	write_c0_wired(0);
 	temp_tlb_entry = current_cpu_data.tlbsize - 1;
 	local_flush_tlb_all();
@@ -420,10 +423,12 @@ void __init r4k_tlb_init(void)
 		memcpy((void *)KSEG0, &except_vec0_r4600, 0x80);
 	else
 		memcpy((void *)KSEG0, &except_vec0_r4000, 0x80);
-	flush_icache_range(KSEG0, KSEG0 + 0x80);
+	memcpy((void *)(KSEG0 + 0x080), &except_vec1_generic, 0x80);
+	flush_icache_range(KSEG0, KSEG0 + 0x100);
 #endif
 #ifdef CONFIG_MIPS64
-	memcpy((void *)(KSEG0 + 0x80), except_vec1_r4k, 0x80);
-	flush_icache_range(KSEG0 + 0x80, KSEG0 + 0x100);
+	memcpy((void *)(CKSEG0 + 0x00), &except_vec0_generic, 0x80);
+	memcpy((void *)(CKSEG0 + 0x80), except_vec1_r4k, 0x80);
+	flush_icache_range(CKSEG0 + 0x80, CKSEG0 + 0x100);
 #endif
 }

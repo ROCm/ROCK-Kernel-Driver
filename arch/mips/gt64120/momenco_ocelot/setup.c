@@ -39,7 +39,6 @@
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
-#include <linux/mc146818rtc.h>
 #include <linux/mm.h>
 #include <linux/swap.h>
 #include <linux/ioport.h>
@@ -51,22 +50,17 @@
 #include <asm/time.h>
 #include <asm/bootinfo.h>
 #include <asm/page.h>
-#include <asm/bootinfo.h>
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/pci.h>
 #include <asm/processor.h>
 #include <asm/ptrace.h>
 #include <asm/reboot.h>
-#include <asm/mc146818rtc.h>
 #include <asm/traps.h>
-#include <linux/version.h>
 #include <linux/bootmem.h>
 #include <linux/initrd.h>
-#include <asm/gt64120/gt64120.h>
+#include <asm/gt64120.h>
 #include "ocelot_pld.h"
-
-extern struct rtc_ops no_rtc_ops;
 
 unsigned long gt64120_base = KSEG1ADDR(GT_DEF_BASE);
 
@@ -156,7 +150,7 @@ void PMON_v2_setup()
 	gt64120_base = 0xe0000000;
 }
 
-void __init momenco_ocelot_setup(void)
+static void __init momenco_ocelot_setup(void)
 {
 	void (*l3func)(unsigned long)=KSEG1ADDR(&setup_l3cache);
 	unsigned int tmpword;
@@ -172,7 +166,6 @@ void __init momenco_ocelot_setup(void)
 	 * initrd_end = (ulong)ocelot_initrd_start + (ulong)ocelot_initrd_size;
 	 * initrd_below_start_ok = 1;
 	 */
-	rtc_ops = &no_rtc_ops;
 
 	/* do handoff reconfiguration */
 	if (gt64120_base == KSEG1ADDR(GT_DEF_BASE))
@@ -314,6 +307,8 @@ void __init momenco_ocelot_setup(void)
 	GT_WRITE(0x468, 0xfef73);
 }
 
+early_initcall(momenco_ocelot_setup);
+
 extern int rm7k_tcache_enabled;
 /*
  * This runs in KSEG1. See the verbiage in rm7k.c::probe_scache()
@@ -327,7 +322,7 @@ static void __init setup_l3cache(unsigned long size)
 	printk("Enabling L3 cache...");
 
 	/* Enable the L3 cache in the GT64120A's CPU Configuration register */
-	GT_READ(0, &tmp);
+	tmp =  GT_READ(0);
 	GT_WRITE(0, tmp | (1<<14));
 
 	/* Enable the L3 cache in the CPU */

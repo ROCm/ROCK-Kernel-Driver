@@ -34,6 +34,9 @@
  * Changes:
  *  MontaVista Software Inc. <yyuasa@mvista.com> or <source@mvista.com>
  *  - New creation, NEC VR4100 series are supported.
+ *
+ *  Yoichi Yuasa <yuasa@hh.iij4u.or.jp>
+ *  - Coped with INTASSIGN of NEC VR4133.
  */
 #include <asm/asm.h>
 #include <asm/regdef.h>
@@ -59,55 +62,52 @@
 		andi	t0, 0xff00
 		and	t0, t0, t1
 
-		andi	t1, t0, CAUSEF_IP7	# timer interrupt
-		beqz	t1, 1f
+		andi	t1, t0, CAUSEF_IP7	# MIPS timer interrupt
+		bnez	t1, handle_irq
 		li	a0, 7
-		jal	ll_timer_interrupt
-		move	a1, sp
-		j	ret_from_irq
 
-1:
-		andi	t1, t0, 0x7800		# check for IP3-6
-		beqz	t1, 2f
+		andi	t1, t0, 0x7800		# check for Int1-4
+		beqz	t1, 1f
 
-		andi	t1, t0, CAUSEF_IP3	# check for IP3
-		bnez	t1, handle_it
+		andi	t1, t0, CAUSEF_IP3	# check for Int1
+		bnez	t1, handle_int
+		li	a0, 1
+
+		andi	t1, t0, CAUSEF_IP4	# check for Int2
+		bnez	t1, handle_int
+		li	a0, 2
+
+		andi	t1, t0, CAUSEF_IP5	# check for Int3
+		bnez	t1, handle_int
 		li	a0, 3
 
-		andi	t1, t0, CAUSEF_IP4	# check for IP4
-		bnez	t1, handle_it
+		andi	t1, t0, CAUSEF_IP6	# check for Int4
+		bnez	t1, handle_int
 		li	a0, 4
 
-		andi	t1, t0, CAUSEF_IP5	# check for IP5
-		bnez	t1, handle_it
-		li	a0, 5
+1:
+		andi	t1, t0, CAUSEF_IP2	# check for Int0
+		bnez	t1, handle_int
+		li	a0, 0
 
-		andi	t1, t0, CAUSEF_IP6	# check for IP6
-		bnez	t1, handle_it
-		li	a0, 6
-
-2:
-		andi	t1, t0, CAUSEF_IP2	# check for IP2
-		beqz	t1, 3f
-		move	a0, sp
-		jal	icu_irqdispatch
-		nop
-		j	ret_from_irq
-		nop
-
-3:
 		andi	t1, t0, CAUSEF_IP0	# check for IP0
-		bnez	t1, handle_it
+		bnez	t1, handle_irq
 		li	a0, 0
 
 		andi	t1, t0, CAUSEF_IP1	# check for IP1
-		bnez	t1, handle_it
+		bnez	t1, handle_irq
 		li	a0, 1
 
 		j	spurious_interrupt
 		nop
 
-handle_it:
+handle_int:
+		jal	irq_dispatch
+		move	a1, sp
+		j	ret_from_irq
+		nop
+
+handle_irq:
 		jal	do_IRQ
 		move	a1, sp
 		j	ret_from_irq

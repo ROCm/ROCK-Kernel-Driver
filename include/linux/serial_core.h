@@ -46,6 +46,7 @@
  * separate so any additions to the old serial.c that occur before
  * we are merged can be easily merged here.
  */
+#define PORT_PXA	31
 #define PORT_AMBA	32
 #define PORT_CLPS711X	33
 #define PORT_SA1100	34

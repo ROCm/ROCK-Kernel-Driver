@@ -6,7 +6,6 @@
  * Copyright (C) 1998 Jakub Jelinek   (jj@ultra.linux.cz)
  */
 
-#include <asm/cprefix.h>
 #include <asm/ptrace.h>
 #include <asm/psr.h>
 #include <asm/smp.h>

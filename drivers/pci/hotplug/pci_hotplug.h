@@ -36,6 +36,9 @@ enum pci_bus_speed {
 	PCI_SPEED_66MHz_PCIX		= 0x02,
 	PCI_SPEED_100MHz_PCIX		= 0x03,
 	PCI_SPEED_133MHz_PCIX		= 0x04,
+	PCI_SPEED_66MHz_PCIX_ECC	= 0x05,
+	PCI_SPEED_100MHz_PCIX_ECC	= 0x06,
+	PCI_SPEED_133MHz_PCIX_ECC	= 0x07,
 	PCI_SPEED_66MHz_PCIX_266	= 0x09,
 	PCI_SPEED_100MHz_PCIX_266	= 0x0a,
 	PCI_SPEED_133MHz_PCIX_266	= 0x0b,
@@ -43,6 +46,24 @@ enum pci_bus_speed {
 	PCI_SPEED_100MHz_PCIX_533	= 0X12,
 	PCI_SPEED_133MHz_PCIX_533	= 0x13,
 	PCI_SPEED_UNKNOWN		= 0xff,
+};
+
+/* These values come from the PCI Express Spec */
+enum pcie_link_width {
+	PCIE_LNK_WIDTH_RESRV	= 0x00,
+	PCIE_LNK_X1		= 0x01,
+	PCIE_LNK_X2		= 0x02,
+	PCIE_LNK_X4		= 0x04,
+	PCIE_LNK_X8		= 0x08,
+	PCIE_LNK_X12		= 0x0C,
+	PCIE_LNK_X16		= 0x10,
+	PCIE_LNK_X32		= 0x20,
+	PCIE_LNK_WIDTH_UNKNOWN  = 0xFF,
+};
+
+enum pcie_link_speed {
+	PCIE_2PT5GB		= 0x14,
+	PCIE_LNK_SPEED_UNKNOWN	= 0xFF,
 };
 
 struct hotplug_slot;

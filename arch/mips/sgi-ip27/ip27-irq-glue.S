@@ -12,53 +12,34 @@
 #include <asm/stackframe.h>
 
 	.text
-	.set	noat
 	.align	5
 NESTED(ip27_irq, PT_SIZE, sp)
 	SAVE_ALL
 	CLI
-	.set	at
 
-	/* IP27 may signal interrupt which we're not interested in.
-	   Mask them out.  */
 	mfc0	s0, CP0_CAUSE
 	mfc0	t0, CP0_STATUS
 	and	s0, t0
+	move	a0, sp
+	la	ra, ret_from_irq
 
 	/* First check for RT interrupt.  */
-	andi	a0, s0, CAUSEF_IP4
-	beqz	a0, 1f
+	andi	t0, s0, CAUSEF_IP4
+	bnez	t0, ip4
+	andi	t0, s0, CAUSEF_IP2
+	bnez	t0, ip2
+	andi	t0, s0, CAUSEF_IP3
+	bnez	t0, ip3
+	andi	t0, s0, CAUSEF_IP5
+	bnez	t0, ip5
+	andi	t0, s0, CAUSEF_IP6
+	bnez	t0, ip6
+	j	ra
 
-	/* Ok, a timer interrupt. */
-	move	a0, sp
-	jal	rt_timer_interrupt
+ip2:	j	ip27_do_irq_mask0	# PI_INT_PEND_0 or CC_PEND_{A|B}
+ip3:	j	ip27_do_irq_mask1	# PI_INT_PEND_1
+ip4:	j	ip27_rt_timer_interrupt
+ip5:	j	ip27_prof_timer
+ip6:	j	ip27_hub_error
 
-	j	ret_from_irq
-
-1:	andi	a0, s0, (CAUSEF_IP2 | CAUSEF_IP3)
-	beqz	a0, 1f
-
-	/* ... a device interrupt ...  */
-	move	a0, sp
-	jal	ip27_do_irq
-
-	j	ret_from_irq
-
-1:
-#if 1
-	mfc0	a1, CP0_STATUS
-	srl	a1, a1, 8
-	andi	a1, 0xff
-
-	mfc0	a2, CP0_CAUSE
-	srl	a2, a2, 8
-	andi	a2, 0xff
-
-	move	a3, s0
-	PRINT("Spurious interrupt, c0_status = %02x, c0_cause = %02x, pending %02x.\n")
-	ld	a1, PT_EPC(sp)
-0:	b	0b
-#endif
-
-	j	ret_from_irq
 	END(ip27_irq)

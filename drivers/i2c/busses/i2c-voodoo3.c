@@ -144,7 +144,7 @@ static int bit_vooddc_getsda(void *data)
 
 static int config_v3(struct pci_dev *dev)
 {
-	unsigned int cadr;
+	unsigned long cadr;
 
 	/* map Voodoo3 memory */
 	cadr = dev->resource[0].start;

@@ -129,7 +129,7 @@ static __init void rm7k_sc_enable(void)
 
 static void rm7k_sc_disable(void)
 {
-	set_c0_config(1<<3);				/* CONF_SE */
+	clear_c0_config(1<<3);				/* CONF_SE */
 }
 
 static inline int __init rm7k_sc_probe(void)
@@ -140,11 +140,11 @@ static inline int __init rm7k_sc_probe(void)
 	if ((config >> 31) & 1)
 		return 0;
 
-	printk(KERN_INFO "Secondary cache size %ldK, linesize 32 bytes.\n",
+	printk(KERN_INFO "Secondary cache size %ldK, linesize %ld bytes.\n",
 	       (scache_size >> 10), sc_lsize);
 
-	if ((config >> 3) & 1)
-		return;
+	if ((config >> 3) & 1)                          /* CONF_SE */
+		return 1;
 
 	printk(KERN_INFO "Enabling secondary cache...");
 	func();

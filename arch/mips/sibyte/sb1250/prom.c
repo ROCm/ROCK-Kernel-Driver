@@ -27,8 +27,6 @@
 #include <asm/bootinfo.h>
 #include <asm/reboot.h>
 
-extern char arcs_cmdline[];
-
 #ifdef CONFIG_EMBEDDED_RAMDISK
 /* These are symbols defined by the ramdisk linker script */
 extern unsigned char __rd_start;
@@ -91,9 +89,9 @@ static void prom_linux_exit(void)
 }
 
 /*
- * prom_init is called just after the cpu type is determined, from init_arch()
+ * prom_init is called just after the cpu type is determined, from setup_arch()
  */
-__init int prom_init(int argc, char **argv, char **envp, int *prom_vec)
+void __init prom_init(void)
 {
 	_machine_restart   = (void (*)(char *))prom_linux_exit;
 	_machine_halt      = prom_linux_exit;
@@ -103,13 +101,12 @@ __init int prom_init(int argc, char **argv, char **envp, int *prom_vec)
 
 	mips_machgroup = MACH_GROUP_SIBYTE;
 	prom_meminit();
-
-	return 0;
 }
 
-void prom_free_prom_memory(void)
+unsigned long __init prom_free_prom_memory(void)
 {
 	/* Not sure what I'm supposed to do here.  Nothing, I think */
+	return 0;
 }
 
 void prom_putchar(char c)

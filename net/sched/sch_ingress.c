@@ -333,7 +333,7 @@ static struct Qdisc_class_ops ingress_class_ops = {
 	.dump		=	NULL,
 };
 
-struct Qdisc_ops ingress_qdisc_ops = {
+static struct Qdisc_ops ingress_qdisc_ops = {
 	.next		=	NULL,
 	.cl_ops		=	&ingress_class_ops,
 	.id		=	"ingress",
@@ -350,9 +350,7 @@ struct Qdisc_ops ingress_qdisc_ops = {
 	.owner		=	THIS_MODULE,
 };
 
-
-#ifdef MODULE
-int init_module(void)
+static int __init ingress_module_init(void)
 {
 	int ret = 0;
 
@@ -363,13 +361,12 @@ int init_module(void)
 
 	return ret;
 }
-
-
-void cleanup_module(void) 
+static void __exit ingress_module_exit(void) 
 {
 	unregister_qdisc(&ingress_qdisc_ops);
 	if (nf_registered)
 		nf_unregister_hook(&ing_ops);
 }
-#endif
+module_init(ingress_module_init)
+module_exit(ingress_module_exit)
 MODULE_LICENSE("GPL");

@@ -17,7 +17,9 @@
  *
  * This is the interface to the remote debugger stub.
  */
+#include <linux/types.h>
 #include <linux/config.h>
+#include <linux/serial.h>
 #include <linux/serialP.h>
 #include <linux/serial_reg.h>
 
@@ -44,7 +46,7 @@ static __inline__ void serial_out(struct async_struct *info, int offset,
 	outb(value, info->port+offset);
 }
 
-void rs_kgdb_hook(int tty_no) {
+int rs_kgdb_hook(int tty_no, int speed) {
 	int t;
 	struct serial_state *ser = &rs_table[tty_no];
 
@@ -79,17 +81,19 @@ void rs_kgdb_hook(int tty_no) {
 
 	/*
 	 * and set the speed of the serial port
-	 * (currently hardwired to 9600 8N1
 	 */
+	if (speed == 0)
+		speed = 9600;
 
-	/* baud rate is fixed to 9600 (is this sufficient?)*/
-	t = kdb_port_info.state->baud_base / 9600;
+	t = kdb_port_info.state->baud_base / speed;
 	/* set DLAB */
 	serial_out(&kdb_port_info, UART_LCR, UART_LCR_WLEN8 | UART_LCR_DLAB);
 	serial_out(&kdb_port_info, UART_DLL, t & 0xff);/* LS of divisor */
 	serial_out(&kdb_port_info, UART_DLM, t >> 8);  /* MS of divisor */
 	/* reset DLAB */
 	serial_out(&kdb_port_info, UART_LCR, UART_LCR_WLEN8);
+
+	return speed;
 }
 
 int putDebugChar(char c)
@@ -126,84 +130,5 @@ char rs_getDebugChar(void)
 	while (!(serial_in(&kdb_port_info, UART_LSR) & 1))
 		;
 
-	return(serial_in(&kdb_port_info, UART_RX));
+	return serial_in(&kdb_port_info, UART_RX);
 }
-
-
-#ifdef CONFIG_MIPS_ATLAS
-
-#include <asm/mips-boards/atlas.h>
-#include <asm/mips-boards/saa9730_uart.h>
-
-#define INB(a)     inb((unsigned long)a)
-#define OUTB(x,a)  outb(x,(unsigned long)a)
-
-/*
- * This is the interface to the remote debugger stub
- * if the Philips part is used for the debug port,
- * called from the platform setup code.
- *
- * PCI init will not have been done yet, we make a
- * universal assumption about the way the bootloader (YAMON)
- * have located and set up the chip.
- */
-static t_uart_saa9730_regmap *kgdb_uart = (void *)(ATLAS_SAA9730_REG + SAA9730_UART_REGS_ADDR);
-
-static int saa9730_kgdb_active = 0;
-
-void saa9730_kgdb_hook(void)
-{
-        volatile unsigned char t;
-
-        /*
-         * Clear all interrupts
-         */
-	t = INB(&kgdb_uart->Lsr);
-	t += INB(&kgdb_uart->Msr);
-	t += INB(&kgdb_uart->Thr_Rbr);
-	t += INB(&kgdb_uart->Iir_Fcr);
-
-        /*
-         * Now, initialize the UART
-         */
-	/* 8 data bits, one stop bit, no parity */
-	OUTB(SAA9730_LCR_DATA8, &kgdb_uart->Lcr);
-
-        /* baud rate is fixed to 9600 (is this sufficient?)*/
-	OUTB(0, &kgdb_uart->BaudDivMsb); /* HACK - Assumes standard crystal */
-	OUTB(23, &kgdb_uart->BaudDivLsb); /* HACK - known for MIPS Atlas */
-
-	/* Set RTS/DTR active */
-	OUTB(SAA9730_MCR_DTR | SAA9730_MCR_RTS, &kgdb_uart->Mcr);
-	saa9730_kgdb_active = 1;
-}
-
-int saa9730_putDebugChar(char c)
-{
-
-        if (!saa9730_kgdb_active) {     /* need to init device first */
-                return 0;
-        }
-
-        while (!(INB(&kgdb_uart->Lsr) & SAA9730_LSR_THRE))
-                ;
-	OUTB(c, &kgdb_uart->Thr_Rbr);
-
-        return 1;
-}
-
-char saa9730_getDebugChar(void)
-{
-	char c;
-
-        if (!saa9730_kgdb_active) {     /* need to init device first */
-                return 0;
-        }
-        while (!(INB(&kgdb_uart->Lsr) & SAA9730_LSR_DR))
-                ;
-
-	c = INB(&kgdb_uart->Thr_Rbr);
-        return(c);
-}
-
-#endif

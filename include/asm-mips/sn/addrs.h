@@ -16,7 +16,6 @@
 #endif /* !__ASSEMBLY__ */
 
 #include <asm/addrspace.h>
-#include <asm/reg.h>
 #include <asm/sn/kldir.h>
 
 #if defined(CONFIG_SGI_IP27)
@@ -439,9 +438,9 @@
 #define PI_ERROR_SIZE(nasid)	KLD_PI_ERROR(nasid)->size
 
 #define NODE_OFFSET_TO_K0(_nasid, _off)					\
-	PHYS_TO_K0((NODE_OFFSET(_nasid) + (_off)) | K0BASE)
+	PHYS_TO_K0((NODE_OFFSET(_nasid) + (_off)) | CAC_BASE)
 #define NODE_OFFSET_TO_K1(_nasid, _off)					\
-	TO_UNCAC((NODE_OFFSET(_nasid) + (_off)) | K1BASE)
+	TO_UNCAC((NODE_OFFSET(_nasid) + (_off)) | UNCAC_BASE)
 #define K0_TO_NODE_OFFSET(_k0addr)					\
 	((__psunsigned_t)(_k0addr) & NODE_ADDRSPACE_MASK)
 

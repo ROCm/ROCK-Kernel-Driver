@@ -33,6 +33,21 @@ extern int (*rtc_set_time)(unsigned long);
 extern int (*rtc_set_mmss)(unsigned long);
 
 /*
+ * Timer interrupt functions.
+ * mips_timer_state is needed for high precision timer calibration.
+ * mips_timer_ack may be NULL if the interrupt is self-recoverable.
+ */
+extern int (*mips_timer_state)(void);
+extern void (*mips_timer_ack)(void);
+
+/*
+ * High precision timer functions.
+ * If mips_hpt_read is NULL, an R4k-compatible timer setup is attempted.
+ */
+extern unsigned int (*mips_hpt_read)(void);
+extern void (*mips_hpt_init)(unsigned int);
+
+/*
  * to_tm() converts system time back to (year, mon, day, hour, min, sec).
  * It is intended to help implement rtc_set_time() functions.
  * Copied from PPC implementation.
@@ -45,11 +60,6 @@ extern void to_tm(unsigned long tim, struct rtc_time *tm);
  * Higher resolution versions are available, which give ~1us resolution.
  */
 extern unsigned long (*do_gettimeoffset)(void);
-
-extern unsigned long null_gettimeoffset(void);
-extern unsigned long fixed_rate_gettimeoffset(void);
-extern unsigned long calibrate_div32_gettimeoffset(void);
-extern unsigned long calibrate_div64_gettimeoffset(void);
 
 /*
  * high-level timer interrupt routines.
@@ -77,9 +87,10 @@ extern void (*board_time_init)(void);
 extern void (*board_timer_setup)(struct irqaction *irq);
 
 /*
- * mips_counter_frequency - must be set if you intend to use
- * counter as timer interrupt source or use fixed_rate_gettimeoffset.
+ * mips_hpt_frequency - must be set if you intend to use an R4k-compatible
+ * counter as a timer interrupt source; otherwise it can be set up
+ * automagically with an aid of mips_timer_state.
  */
-extern unsigned int mips_counter_frequency;
+extern unsigned int mips_hpt_frequency;
 
 #endif /* _ASM_TIME_H */

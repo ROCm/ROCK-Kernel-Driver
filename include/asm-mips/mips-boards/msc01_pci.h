@@ -1,19 +1,19 @@
 /*
- * mcs01_pci.h
+ * PCI Register definitions for the MIPS System Controller.
  *
  * Carsten Langgaard, carstenl@mips.com
  * Copyright (C) 2002 MIPS Technologies, Inc.  All rights reserved.
  *
- * ########################################################################
- *
- * PCI Register definitions for the MIPS System Controller.
+ * This file is subject to the terms and conditions of the GNU General Public
+ * License.  See the file "COPYING" in the main directory of this archive
+ * for more details.
  */
-#ifndef MSC01_PCI_H
-#define MSC01_PCI_H
+#ifndef __ASM_MIPS_BOARDS_MSC01_PCI_H
+#define __ASM_MIPS_BOARDS_MSC01_PCI_H
 
-/*****************************************************************************
+/*
  * Register offset addresses
- ****************************************************************************/
+ */
 
 #define MSC01_PCI_ID_OFS		0x0000
 #define MSC01_PCI_SC2PMBASL_OFS		0x0208
@@ -200,9 +200,24 @@
 #define MSC01_PCI_SWAP_NOSWAP		0
 #define MSC01_PCI_SWAP_BYTESWAP		1
 
-/*****************************************************************************
+/*
+ * MIPS System controller PCI register base.
+ *
+ * FIXME - are these macros specific to Malta and co or to the MSC?  If the
+ * latter, they should be moved elsewhere.
+ */
+#define MIPS_MSC01_PCI_REG_BASE	0x1bd00000
+
+extern unsigned long _pcictrl_msc;
+
+#define MSC01_PCI_REG_BASE	_pcictrl_msc
+
+#define MSC_WRITE(reg, data)	do { *(volatile u32 *)(reg) = data; } while (0)
+#define MSC_READ(reg, data)	do { data = *(volatile u32 *)(reg); } while (0)
+
+/*
  * Registers absolute addresses
- ****************************************************************************/
+ */
 
 #define MSC01_PCI_ID            (MSC01_PCI_REG_BASE + MSC01_PCI_ID_OFS)
 #define MSC01_PCI_SC2PMBASL     (MSC01_PCI_REG_BASE + MSC01_PCI_SC2PMBASL_OFS)
@@ -238,7 +253,4 @@
 #define MSC01_PCI_CFG		(MSC01_PCI_REG_BASE + MSC01_PCI_CFG_OFS)
 #define MSC01_PCI_SWAP		(MSC01_PCI_REG_BASE + MSC01_PCI_SWAP_OFS)
 
-#endif
-/*****************************************************************************
- *  End of msc01_pci.h
- *****************************************************************************/
+#endif /* __ASM_MIPS_BOARDS_MSC01_PCI_H */

@@ -1,5 +1,6 @@
 /*
- * Interface for Dynamic Logical Partitioning of I/O Slots
+ * Interface for Dynamic Logical Partitioning of I/O Slots on
+ * RPA-compliant PPC64 platform.
  *
  * John Rose <johnrose@austin.ibm.com>
  * Linda Xie <lxie@us.ibm.com>
@@ -21,9 +22,6 @@
 #include "rpaphp.h"
 #include "rpadlpar.h"
 
-#define MODULE_VERSION "1.0"
-#define MODULE_NAME "rpadlpar_io"
-
 static DECLARE_MUTEX(rpadlpar_sem);
 
 static inline int is_hotplug_capable(struct device_node *dn)
@@ -38,7 +36,8 @@ static char *get_node_drc_name(struct device_node *dn)
 	char *ptr = NULL;
 	int *drc_names;
 
-	if ((drc_names = (int *) get_property(dn, "ibm,drc-names", NULL)))
+	drc_names = (int *) get_property(dn, "ibm,drc-names", NULL);
+	if (drc_names)
 		ptr = (char *) &drc_names[1];
 
 	return ptr;
@@ -63,7 +62,8 @@ static inline struct hotplug_slot *find_php_slot(char *drc_name)
 {
 	struct kobject *k;
 
-	if (!(k = kset_find_obj(&pci_hotplug_slots_subsys.kset, drc_name)))
+	k = kset_find_obj(&pci_hotplug_slots_subsys.kset, drc_name);
+	if (!k)
 		return NULL;
 
 	return to_hotplug_slot(k);
@@ -71,9 +71,9 @@ static inline struct hotplug_slot *find_php_slot(char *drc_name)
 
 static struct slot *find_slot(char *drc_name)
 {
-	struct hotplug_slot *php_slot;
-
-	if (!(php_slot = find_php_slot(drc_name)))
+	struct hotplug_slot *php_slot = find_php_slot(drc_name);
+	
+	if (!php_slot)
 		return NULL;
 
 	return (struct slot *) php_slot->private;
@@ -156,7 +156,8 @@ static struct pci_dev *dlpar_pci_add_bus(struct device_node *dn)
 	pci_bus_add_devices(hose->bus);
 
 	/* Confirm new bridge dev was created */
-	if (!(dev = rpaphp_find_pci_dev(dn))) {
+	dev = rpaphp_find_pci_dev(dn);
+	if (!dev) {
 		printk(KERN_ERR "%s: failed to add pci device\n", __FUNCTION__);
 		return NULL;
 	}
@@ -178,8 +179,8 @@ static int dlpar_pci_remove_bus(struct pci_dev *bridge_dev)
 	struct pci_bus *secondary_bus;
 
 	if (!bridge_dev) {
-		printk(KERN_ERR "%s: %s() unexpected null device\n",
-				MODULE_NAME, __FUNCTION__);
+		printk(KERN_ERR "%s: unexpected null device\n",
+				__FUNCTION__);
 		return 1;
 	}
 
@@ -277,31 +278,32 @@ int dlpar_remove_slot(char *drc_name)
 		goto exit;
 	}
 
-	if (!(slot = find_slot(drc_name))) {
+	slot = find_slot(drc_name);
+	if (!slot) {
 		rc = -EINVAL;
 		goto exit;
 	}
 
 	bridge_dev = slot->bridge;
 	if (!bridge_dev) {
-		printk(KERN_ERR "%s: %s(): unexpected null bridge device\n",
-				MODULE_NAME, __FUNCTION__);
+		printk(KERN_ERR "%s: unexpected null bridge device\n",
+				__FUNCTION__);
 		rc = -EIO;
 		goto exit;
 	}
 
 	/* Remove hotplug slot */
 	if (rpaphp_remove_slot(slot)) {
-		printk(KERN_ERR "%s: %s(): unable to remove hotplug slot %s\n",
-				MODULE_NAME, __FUNCTION__, drc_name);
+		printk(KERN_ERR "%s: unable to remove hotplug slot %s\n",
+				__FUNCTION__, drc_name);
 		rc = -EIO;
 		goto exit;
 	}
 
 	/* Remove pci bus */
 	if (dlpar_pci_remove_bus(bridge_dev)) {
-		printk(KERN_ERR "%s: %s() unable to remove pci bus %s\n",
-				MODULE_NAME, __FUNCTION__, drc_name);
+		printk(KERN_ERR "%s: unable to remove pci bus %s\n",
+				__FUNCTION__, drc_name);
 		rc = -EIO;
 	}
 exit:
@@ -318,18 +320,16 @@ static inline int is_dlpar_capable(void)
 
 int __init rpadlpar_io_init(void)
 {
-	int rc;
+	int rc = 0;
 
 	if (!is_dlpar_capable()) {
-		printk(KERN_WARNING "partition not DLPAR capable, exiting %s\n",
-				MODULE_NAME);
+		printk(KERN_WARNING "%s: partition not DLPAR capable\n",
+				__FUNCTION__);
 		return -EPERM;
 	}
 
-	if ((rc = dlpar_sysfs_init()))
-		return rc;
-
-	return 0;
+	rc = dlpar_sysfs_init();
+	return rc;
 }
 
 void rpadlpar_io_exit(void)

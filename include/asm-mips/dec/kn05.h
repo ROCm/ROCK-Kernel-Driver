@@ -50,6 +50,7 @@
  */
 #define KN05_MB_INT_TC		(1<<0)		/* TURBOchannel? */
 #define KN05_MB_INT_RTC		(1<<1)		/* RTC? */
+#define KN05_MB_INT_MT		(1<<3)		/* ??? */
 
 /*
  * Bits for the MB control & status register.

@@ -667,7 +667,7 @@ rtattr_failure:
 	return -1;
 }
 
-struct tcf_proto_ops RSVP_OPS = {
+static struct tcf_proto_ops RSVP_OPS = {
 	.next		=	NULL,
 	.kind		=	RSVP_ID,
 	.classify	=	rsvp_classify,
@@ -682,14 +682,15 @@ struct tcf_proto_ops RSVP_OPS = {
 	.owner		=	THIS_MODULE,
 };
 
-#ifdef MODULE
-int init_module(void)
+static int __init init_rsvp(void)
 {
 	return register_tcf_proto_ops(&RSVP_OPS);
 }
 
-void cleanup_module(void) 
+static void __exit exit_rsvp(void) 
 {
 	unregister_tcf_proto_ops(&RSVP_OPS);
 }
-#endif
+
+module_init(init_rsvp)
+module_exit(exit_rsvp)

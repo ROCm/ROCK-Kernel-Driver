@@ -18,55 +18,23 @@
 
 #include <asm/vr41xx/capcella.h>
 
-void __init pcibios_fixup_resources(struct pci_dev *dev)
+/*
+ * Shortcuts
+ */
+#define INT1	RTL8139_1_IRQ
+#define INT2	RTL8139_2_IRQ
+#define INTA	PC104PLUS_INTA_IRQ
+#define INTB	PC104PLUS_INTB_IRQ
+#define INTC	PC104PLUS_INTC_IRQ
+#define INTD	PC104PLUS_INTD_IRQ
+
+static char irq_tab_capcella[][5] __initdata = {
+ [11] = { -1, INT1, INT1, INT1, INT1 },
+ [12] = { -1, INT2, INT2, INT2, INT2 },
+ [14] = { -1, INTA, INTB, INTC, INTD }
+};
+
+int __init pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 {
-}
-
-void __init pcibios_fixup(void)
-{
-}
-
-void __init pcibios_fixup_irqs(void)
-{
-	struct pci_dev *dev = NULL;
-	u8 slot, func, pin;
-
-	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
-		slot = PCI_SLOT(dev->devfn);
-		func = PCI_FUNC(dev->devfn);
-		dev->irq = 0;
-
-		switch (slot) {
-		case 11:
-			dev->irq = RTL8139_1_IRQ;
-			break;
-		case 12:
-			dev->irq = RTL8139_2_IRQ;
-			break;
-		case 14:
-			pci_read_config_byte(dev, PCI_INTERRUPT_PIN, &pin);
-			switch (pin) {
-			case 1:
-				dev->irq = PC104PLUS_INTA_IRQ;
-				break;
-			case 2:
-				dev->irq = PC104PLUS_INTB_IRQ;
-				break;
-			case 3:
-				dev->irq = PC104PLUS_INTC_IRQ;
-				break;
-			case 4:
-				dev->irq = PC104PLUS_INTD_IRQ;
-				break;
-			}
-			break;
-		}
-
-		pci_write_config_byte(dev, PCI_INTERRUPT_LINE, dev->irq);
-	}
-}
-
-unsigned int pcibios_assign_all_busses(void)
-{
-	return 0;
+	return irq_tab_capcella[slot][pin];
 }

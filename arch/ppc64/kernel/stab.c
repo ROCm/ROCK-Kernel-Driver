@@ -324,7 +324,7 @@ static void make_slbe(unsigned long esid, unsigned long vsid, int large,
 			castout_entry = 1; 
 		asm volatile("slbmfee  %0,%1" : "=r" (esid_data) : "r" (entry));
 	} while (esid_data.data.v &&
-		 esid_data.data.esid == GET_ESID((unsigned long)_get_SP()));
+		 esid_data.data.esid == GET_ESID(__get_SP()));
 
 	get_paca()->xStab_data.next_round_robin = castout_entry;
 

@@ -1,3 +1,4 @@
+#include <linux/kallsyms.h>
 #include <linux/kernel.h>
 #include <linux/mmzone.h>
 #include <linux/spinlock.h>
@@ -51,24 +52,102 @@ void install_cpu_nmi_handler(int slice)
  * into the eframe format for the node under consideration.
  */
 
-void
-nmi_cpu_eframe_save(nasid_t nasid,
-		    int	    slice)
+void nmi_cpu_eframe_save(nasid_t nasid, int slice)
 {
-	int 		i, numberof_nmi_cpu_regs;
-	machreg_t	*prom_format;
-
-	/* Get the total number of registers being saved by the prom */
-	numberof_nmi_cpu_regs = sizeof(struct reg_struct) / sizeof(machreg_t);
+	struct reg_struct *nr;
+	int 		i;
 
 	/* Get the pointer to the current cpu's register set. */
-	prom_format =
-	    (machreg_t *)(TO_UNCAC(TO_NODE(nasid, IP27_NMI_KREGS_OFFSET)) +
-			  slice * IP27_NMI_KREGS_CPU_SIZE);
+	nr = (struct reg_struct *)
+		(TO_UNCAC(TO_NODE(nasid, IP27_NMI_KREGS_OFFSET)) +
+		slice * IP27_NMI_KREGS_CPU_SIZE);
 
 	printk("NMI nasid %d: slice %d\n", nasid, slice);
-	for (i = 0; i < numberof_nmi_cpu_regs; i++)
-		printk("0x%lx  ", prom_format[i]);
+
+	/*
+	 * Saved main processor registers
+	 */
+	for (i = 0; i < 32; ) {
+		if ((i % 4) == 0)
+			printk("$%2d   :", i);
+		printk(" %016lx", nr->gpr[i]);
+
+		i++;
+		if ((i % 4) == 0)
+			printk("\n");
+	}
+
+	printk("Hi    : (value lost)\n");
+	printk("Lo    : (value lost)\n");
+
+	/*
+	 * Saved cp0 registers
+	 */
+	printk("epc   : %016lx ", nr->epc);
+	print_symbol("%s ", nr->epc);
+	printk("%s\n", print_tainted());
+	printk("ErrEPC: %016lx ", nr->error_epc);
+	print_symbol("%s\n", nr->error_epc);
+	printk("ra    : %016lx ", nr->gpr[31]);
+	print_symbol("%s\n", nr->gpr[31]);
+	printk("Status: %08lx         ", nr->sr);
+
+	if (nr->sr & ST0_KX)
+		printk("KX ");
+	if (nr->sr & ST0_SX)
+		printk("SX 	");
+	if (nr->sr & ST0_UX)
+		printk("UX ");
+
+	switch (nr->sr & ST0_KSU) {
+	case KSU_USER:
+		printk("USER ");
+		break;
+	case KSU_SUPERVISOR:
+		printk("SUPERVISOR ");
+		break;
+	case KSU_KERNEL:
+		printk("KERNEL ");
+		break;
+	default:
+		printk("BAD_MODE ");
+		break;
+	}
+
+	if (nr->sr & ST0_ERL)
+		printk("ERL ");
+	if (nr->sr & ST0_EXL)
+		printk("EXL ");
+	if (nr->sr & ST0_IE)
+		printk("IE ");
+	printk("\n");
+
+	printk("Cause : %08lx\n", nr->cause);
+	printk("PrId  : %08x\n", read_c0_prid());
+	printk("BadVA : %016lx\n", nr->badva);
+	printk("CErr  : %016lx\n", nr->cache_err);
+	printk("NMI_SR: %016lx\n", nr->nmi_sr);
+
+	printk("\n");
+}
+
+void nmi_dump_hub_irq(nasid_t nasid, int slice)
+{
+	hubreg_t mask0, mask1, pend0, pend1;
+
+	if (slice == 0) {				/* Slice A */
+		mask0 = REMOTE_HUB_L(nasid, PI_INT_MASK0_A);
+		mask1 = REMOTE_HUB_L(nasid, PI_INT_MASK1_A);
+	} else {					/* Slice B */
+		mask0 = REMOTE_HUB_L(nasid, PI_INT_MASK0_B);
+		mask1 = REMOTE_HUB_L(nasid, PI_INT_MASK1_B);
+	}
+
+	pend0 = REMOTE_HUB_L(nasid, PI_INT_PEND0);
+	pend1 = REMOTE_HUB_L(nasid, PI_INT_PEND1);
+
+	printk("PI_INT_MASK0: %16lx PI_INT_MASK1: %16lx\n", mask0, mask1);
+	printk("PI_INT_PEND0: %16lx PI_INT_PEND1: %16lx\n", pend0, pend1);
 	printk("\n\n");
 }
 
@@ -76,11 +155,10 @@ nmi_cpu_eframe_save(nasid_t nasid,
  * Copy the cpu registers which have been saved in the IP27prom format
  * into the eframe format for the node under consideration.
  */
-void
-nmi_node_eframe_save(cnodeid_t  cnode)
+void nmi_node_eframe_save(cnodeid_t  cnode)
 {
-	int		cpu;
-	nasid_t		nasid;
+	nasid_t nasid;
+	int slice;
 
 	/* Make sure that we have a valid node */
 	if (cnode == CNODEID_NONE)
@@ -91,8 +169,10 @@ nmi_node_eframe_save(cnodeid_t  cnode)
 		return;
 
 	/* Save the registers into eframe for each cpu */
-	for(cpu = 0; cpu < NODE_NUM_CPUS(cnode); cpu++)
-		nmi_cpu_eframe_save(nasid, cpu);
+	for (slice = 0; slice < NODE_NUM_CPUS(slice); slice++) {
+		nmi_cpu_eframe_save(nasid, slice);
+		nmi_dump_hub_irq(nasid, slice);
+	}
 }
 
 /*

@@ -3217,10 +3217,6 @@ static int __init net_dev_init(void)
 
 	dst_init();
 	dev_mcast_init();
-
-#ifdef CONFIG_NET_SCHED
-	pktsched_init();
-#endif
 	rc = 0;
 out:
 	return rc;

@@ -470,7 +470,7 @@ extern void baget_machine_restart(char *command);
 extern void baget_machine_halt(void);
 extern void baget_machine_power_off(void);
 
-void __init baget_setup(void)
+static void __init baget_setup(void)
 {
 	printk("BT23/63-201n found.\n");
 	*BAGET_WRERR_ACK = 0;
@@ -485,3 +485,5 @@ void __init baget_setup(void)
 	vac_start();
 	vic_start();
 }
+
+early_initcall(baget_setup);

@@ -4,7 +4,6 @@
  */
 
 #include <linux/config.h>
-#include <asm/cprefix.h>
 #include <asm/ptrace.h>
 #include <asm/psr.h>
 

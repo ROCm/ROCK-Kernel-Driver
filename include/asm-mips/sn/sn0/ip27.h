@@ -84,14 +84,9 @@
 
 /* Sanity hazzard ...  Below all the Origin hacks are following.  */
 
-#define CPU_RESCHED_A_IRQ	0
-#define CPU_RESCHED_B_IRQ	1
-#define CPU_CALL_A_IRQ		2
-#define CPU_CALL_B_IRQ		3
-#define BASE_PCI_IRQ		4
-
 #define SN00_BRIDGE		0x9200000008000000
 #define SN00I_BRIDGE0		0x920000000b000000
 #define SN00I_BRIDGE1		0x920000000e000000
 #define SN00I_BRIDGE2		0x920000000f000000
+
 #endif /* _ASM_SN_SN0_IP27_H */

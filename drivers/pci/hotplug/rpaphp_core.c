@@ -1,6 +1,6 @@
 /*
- * PRA PCI Hot Plug Controller Driver
- * Copyright (c) 2003 Linda Xie <lxie@us.ibm.com>
+ * PCI Hot Plug Controller Driver for RPA-compliant PPC64 platform.
+ * Copyright (C) 2003 Linda Xie <lxie@us.ibm.com>
  *
  * All rights reserved.
  *
@@ -25,6 +25,7 @@
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/smp.h>
@@ -38,30 +39,31 @@
 #include "pci_hotplug.h"
 
 
-static int debug;
+static int debug = 1;
 static struct semaphore rpaphp_sem;
-static int rpaphp_debug;
 static LIST_HEAD (rpaphp_slot_head);
-static int num_slots = 0;
+static int num_slots;
 
 #define DRIVER_VERSION	"0.1"
 #define DRIVER_AUTHOR	"Linda Xie <lxie@us.ibm.com>"
 #define DRIVER_DESC	"RPA HOT Plug PCI Controller Driver"
 
+#define MAX_LOC_CODE 128
+
 MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
-MODULE_PARM(debug, "i");
-MODULE_PARM_DESC(debug, "Debugging mode enabled or not");
 
-static int enable_slot		(struct hotplug_slot *slot);
-static int disable_slot		(struct hotplug_slot *slot);
-static int set_attention_status (struct hotplug_slot *slot, u8 value);
-static int get_power_status	(struct hotplug_slot *slot, u8 *value);
-static int get_attention_status	(struct hotplug_slot *slot, u8 *value);
-static int get_adapter_status	(struct hotplug_slot *slot, u8 *value);
-static int get_max_bus_speed	(struct hotplug_slot *hotplug_slot, enum pci_bus_speed *value);
-static int get_cur_bus_speed	(struct hotplug_slot *hotplug_slot, enum pci_bus_speed *value);
+module_param(debug, int, 0644);
+
+static int enable_slot(struct hotplug_slot *slot);
+static int disable_slot(struct hotplug_slot *slot);
+static int set_attention_status(struct hotplug_slot *slot, u8 value);
+static int get_power_status(struct hotplug_slot *slot, u8 *value);
+static int get_attention_status(struct hotplug_slot *slot, u8 *value);
+static int get_adapter_status(struct hotplug_slot *slot, u8 *value);
+static int get_max_bus_speed(struct hotplug_slot *hotplug_slot, enum pci_bus_speed *value);
+static int get_cur_bus_speed(struct hotplug_slot *hotplug_slot, enum pci_bus_speed *value);
 
 static struct hotplug_slot_ops rpaphp_hotplug_slot_ops = {
 	.owner			= THIS_MODULE,
@@ -94,22 +96,13 @@ static int rpaphp_get_sensor_state(int index, int *state)
 
 static struct pci_dev *rpaphp_find_bridge_pdev(struct slot *slot)
 {
-	struct pci_dev		*retval_dev = NULL;
-
-	retval_dev = rpaphp_find_pci_dev(slot->dn);
-
-	return retval_dev;
+	return rpaphp_find_pci_dev(slot->dn);
 }
 
 static struct pci_dev *rpaphp_find_adapter_pdev(struct slot *slot)
 {
-	struct pci_dev * retval_dev = NULL;
-
-	retval_dev = rpaphp_find_pci_dev(slot->dn->child);
-
-	return retval_dev;
+	return rpaphp_find_pci_dev(slot->dn->child);
 }
-
 
 /* Inline functions to check the sanity of a pointer that is passed to us */
 static inline int slot_paranoia_check(struct slot *slot, const char *function)
@@ -271,7 +264,7 @@ static int rpaphp_get_adapter_status(struct slot *slot, int is_init, u8 *value)
 	rc = rpaphp_get_sensor_state(slot->index, &state);
 
 	if (rc)
-		goto exit;
+		return rc;
 
 	if (state == PRESENT) {
 		dbg("slot is occupied\n");
@@ -292,15 +285,13 @@ static int rpaphp_get_adapter_status(struct slot *slot, int is_init, u8 *value)
 				*value = NOT_CONFIGURED;
 				}
 		}
-	}
-	else
+	} else
 		if (state == EMPTY) {
 		dbg("slot is empty\n");
 			*value = state;
 		}
-
-exit:    
-	return rc;
+	
+	return 0;
 }
 
 static int get_adapter_status (struct hotplug_slot *hotplug_slot, u8 *value)
@@ -389,7 +380,6 @@ static int get_cur_bus_speed (struct hotplug_slot *hotplug_slot, enum pci_bus_sp
 static int rpaphp_validate_slot(const char *slot_name, const int slot_index)
 {
 	struct device_node	*dn;
-	int			retval = 0;
 
 	for(dn = find_all_nodes(); dn; dn = dn->next) {
 
@@ -399,28 +389,35 @@ static int rpaphp_validate_slot(const char *slot_name, const int slot_index)
 		index  = (int *)get_property(dn, "ibm,my-drc-index", NULL);
 
 		if (index && *index == slot_index) {
-		char *slash, tmp_str[128];
+			char *slash, *tmp_str;
 
 			loc_code = get_property(dn, "ibm,loc-code", NULL);
-		if (!loc_code) {
-			retval = -1;
-			goto exit;
-		}
+			if (!loc_code) { 
+				return -1;
+			}
 
-		strcpy(tmp_str, loc_code);
-		slash = strrchr(tmp_str, '/');
-		if (slash) {
-			*slash = '\0';
-		}
-		if (strcmp(slot_name, tmp_str))
-			retval = -1;
-		goto exit;
-		}
+			tmp_str = kmalloc(MAX_LOC_CODE, GFP_KERNEL); 
+			if (!tmp_str) {
+				err("%s: out of memory\n", __FUNCTION__);
+				return -1;
+			}
+				
+			strcpy(tmp_str, loc_code);
+			slash = strrchr(tmp_str, '/');
+			if (slash) 
+				*slash = '\0';
+			
+			if (strcmp(slot_name, tmp_str)) {
+				kfree(tmp_str);
+				return -1;
+			}
 
+			kfree(tmp_str);
+			break;
+		}
 	}
-
-exit:
-	return retval;
+	
+	return 0;
 }
 
 /* Must be called before pci_bus_add_devices */
@@ -477,8 +474,7 @@ static struct pci_dev *rpaphp_config_adapter(struct slot *slot)
 		}
 
 		dev = rpaphp_find_pci_dev(slot->dn->child);
-	}
-	else {
+	} else {
 		/* slot is not enabled */
 		err("slot doesn't have pci_dev structure\n");
 		dev = NULL;
@@ -493,14 +489,11 @@ exit:
 
 static int rpaphp_unconfig_adapter(struct slot *slot)
 {
-	int			retval = 0;
-
 	if (!slot->dev) {
 		info("%s: no card in slot[%s]\n",
 			__FUNCTION__, slot->name);
 
-		retval = -EINVAL;
-		goto exit;
+		return -EINVAL;
 	}
 
 	/* remove the device from the pci core */
@@ -511,9 +504,7 @@ static int rpaphp_unconfig_adapter(struct slot *slot)
 
 	dbg("%s: adapter in slot[%s] unconfigured.\n", __FUNCTION__, slot->name);
 
-exit:
-	return retval;
-
+	return 0;
 }
 
 /* free up the memory user be a slot */
@@ -704,7 +695,8 @@ int rpaphp_add_slot(char *slot_name)
 					continue;
 				}
 
-				if (!(slot = alloc_slot_struct())) {
+				slot = alloc_slot_struct();
+				if (!slot) {
 					retval = -ENOMEM;
 					goto exit;
 				}
@@ -745,8 +737,7 @@ int rpaphp_add_slot(char *slot_name)
 				if (slot->hotplug_slot->info->adapter_status == EMPTY) {
 					slot->state = EMPTY;  /* slot is empty */
 					slot->dev = NULL;
-				}
-				else {  /* slot is occupied */
+				} else {  /* slot is occupied */
 					if(!(slot->dn->child)) { /* non-empty slot has to have child */
 						err("%s: slot[%s]'s device_node doesn't have child for adapter\n",
 						__FUNCTION__, slot->name);
@@ -762,18 +753,18 @@ int rpaphp_add_slot(char *slot_name)
 					if(slot->dev) {
 						slot->state = CONFIGURED;
 						pci_dev_get(slot->dev);
-					}
-					else {
+					} else {
 						/* DLPAR add as opposed to
 						 * boot time */
 						slot->state = NOT_CONFIGURED;
-					}
+						}
 				}
 				dbg("%s registering slot:path[%s] index[%x], name[%s] pdomain[%x] type[%d]\n",
 					__FUNCTION__, dn->full_name, slot->index, slot->name,
 					slot->power_domain, slot->type);
 
-				if ((retval = register_slot(slot)))
+				retval = register_slot(slot);
+				if (retval)
 					goto exit;
 
 				num_slots++;
@@ -847,8 +838,6 @@ static int __init rpaphp_init(void)
 
 	info(DRIVER_DESC " version: " DRIVER_VERSION "\n");
 
-	rpaphp_debug = debug;
-
 	/* read all the PRA info from the system */
 	retval = init_rpa();
 
@@ -892,26 +881,25 @@ static int enable_slot(struct hotplug_slot *hotplug_slot)
 	if (state == PRESENT) {
 		dbg("%s : slot[%s] is occupid.\n", __FUNCTION__, slot->name);
 
-		if ((slot->dev = rpaphp_config_adapter(slot)) != NULL) {
+		
+		slot->dev = rpaphp_config_adapter(slot);
+		if (slot->dev != NULL) {
 			slot->state = CONFIGURED;
 
 			dbg("%s: adapter %s in slot[%s] has been configured\n",
 				__FUNCTION__, slot->dev->slot_name,
 				slot->name);
-		}
-		else {
+		} else {
 			slot->state = NOT_CONFIGURED;
 
 			dbg("%s: no pci_dev struct for adapter in slot[%s]\n",
 				__FUNCTION__, slot->name);
 		}
 
-	}
-	else if (state == EMPTY) {
+	} else if (state == EMPTY) {
 		dbg("%s : slot[%s] is empty\n", __FUNCTION__, slot->name);
 		slot->state = EMPTY;
-	}
-	else {
+	} else {
 		err("%s: slot[%s] is in invalid state\n", __FUNCTION__, slot->name);
 		slot->state = NOT_VALID;
 		retval = -EINVAL;

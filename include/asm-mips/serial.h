@@ -10,7 +10,6 @@
 #define _ASM_SERIAL_H
 
 #include <linux/config.h>
-#include <asm/jazz.h>
 
 /*
  * This assumes you have a 1.8432 MHz clock for your UART.
@@ -20,15 +19,6 @@
  * megabits/second; but this requires the faster clock.
  */
 #define BASE_BAUD (1843200 / 16)
-
-#ifndef CONFIG_OLIVETTI_M700
-   /* Some Jazz machines seem to have an 8MHz crystal clock but I don't know
-      exactly which ones ... XXX */
-#define JAZZ_BASE_BAUD ( 8000000 / 16 ) /* ( 3072000 / 16) */
-#else
-/* but the M700 isn't such a strange beast */
-#define JAZZ_BASE_BAUD BASE_BAUD
-#endif
 
 /* Standard COM flags (except for COM4, because of the 8514 problem) */
 #ifdef CONFIG_SERIAL_DETECT_IRQ
@@ -66,6 +56,17 @@
 #define C_P(card,port) (((card)<<6|(port)<<3) + 1)
 
 #ifdef CONFIG_MIPS_JAZZ
+#include <asm/jazz.h>
+
+#ifndef CONFIG_OLIVETTI_M700
+   /* Some Jazz machines seem to have an 8MHz crystal clock but I don't know
+      exactly which ones ... XXX */
+#define JAZZ_BASE_BAUD ( 8000000 / 16 ) /* ( 3072000 / 16) */
+#else
+/* but the M700 isn't such a strange beast */
+#define JAZZ_BASE_BAUD BASE_BAUD
+#endif
+
 #define _JAZZ_SERIAL_INIT(int, base)					\
 	{ .baud_base = JAZZ_BASE_BAUD, .irq = int, .flags = STD_COM_FLAGS,	\
 	  .iomem_base = (u8 *) base, .iomem_reg_shift = 0,			\
@@ -75,26 +76,6 @@
 	_JAZZ_SERIAL_INIT(JAZZ_SERIAL2_IRQ, JAZZ_SERIAL2_BASE),
 #else
 #define JAZZ_SERIAL_PORT_DEFNS
-#endif
-
-#ifdef CONFIG_MIPS_ATLAS
-#include <asm/mips-boards/atlas.h>
-#include <asm/mips-boards/atlasint.h>
-#define ATLAS_SERIAL_PORT_DEFNS			\
-	/* UART CLK   PORT IRQ     FLAGS        */			\
-	{ 0, ATLAS_BASE_BAUD, ATLAS_UART_REGS_BASE, ATLASINT_UART, STD_COM_FLAGS },     /* ttyS0 */
-#else
-#define ATLAS_SERIAL_PORT_DEFNS
-#endif
-
-#ifdef CONFIG_MIPS_SEAD
-#include <asm/mips-boards/sead.h>
-#include <asm/mips-boards/seadint.h>
-#define SEAD_SERIAL_PORT_DEFNS			\
-	/* UART CLK   PORT IRQ     FLAGS        */			\
-	{ 0, SEAD_BASE_BAUD, SEAD_UART0_REGS_BASE, SEADINT_UART0, STD_COM_FLAGS },     /* ttyS0 */
-#else
-#define SEAD_SERIAL_PORT_DEFNS
 #endif
 
 #ifdef CONFIG_MIPS_COBALT
@@ -158,35 +139,6 @@
 #define IVR_SERIAL_PORT_DEFNS
 #endif
 
-#ifdef CONFIG_LASAT
-/* This dummy definition allocates one element in the SERIAL_PORT_DFNS
- * list below. This element is filled out by the the code in serial_init() 
- * in arch/mips/lasat/setup.c which autoselects the configuration based 
- * on machine type. */
-#define LASAT_SERIAL_PORT_DEFNS { },
-#else
-#define LASAT_SERIAL_PORT_DEFNS
-#endif
-
-#ifdef CONFIG_SERIAL_AU1X00
-#include <asm/au1000.h>
-#define AU1X00_SERIAL_PORT_DEFNS                                    \
-    { .baud_base = 0, .iomem_base = (u8 *)UART0_ADDR,               \
-	    .irq = AU1000_UART0_INT,  .flags = STD_COM_FLAGS,       \
-		    .iomem_reg_shift = 2, },                        \
-    { .baud_base = 0, .iomem_base = (u8 *)UART1_ADDR,               \
-	    .irq = AU1000_UART1_INT,  .flags = STD_COM_FLAGS,       \
-		    .iomem_reg_shift = 2 },                         \
-    { .baud_base = 0, .iomem_base = (u8 *)UART2_ADDR,               \
-	    .irq = AU1000_UART2_INT,  .flags = STD_COM_FLAGS,       \
-		    .iomem_reg_shift = 2},                          \
-    { .baud_base = 0, .iomem_base = (u8 *)UART3_ADDR,               \
-	    .irq = AU1000_UART3_INT,  .flags = STD_COM_FLAGS,       \
-		    .iomem_reg_shift = 2},
-#else
-#define AU1X00_SERIAL_PORT_DEFNS
-#endif
-
 #ifdef CONFIG_TOSHIBA_JMR3927
 #include <asm/jmr3927/jmr3927.h>
 #define TXX927_SERIAL_PORT_DEFNS                              \
@@ -196,6 +148,21 @@
       .flags = UART1_FLAGS, .type = 1 },
 #else
 #define TXX927_SERIAL_PORT_DEFNS
+#endif
+
+#ifdef CONFIG_SERIAL_AU1X00
+#include <asm/mach-au1x00/au1000.h>
+#define AU1000_SERIAL_PORT_DEFNS                              \
+    { .baud_base = 0, .port = UART0_ADDR, .irq = AU1000_UART0_INT,  \
+      .flags = STD_COM_FLAGS, .type = 1 },                        \
+    { .baud_base = 0, .port = UART1_ADDR, .irq = AU1000_UART1_INT,  \
+      .flags = STD_COM_FLAGS, .type = 1 },     \
+    { .baud_base = 0, .port = UART2_ADDR, .irq = AU1000_UART2_INT,  \
+      .flags = STD_COM_FLAGS, .type = 1 },    \
+    { .baud_base = 0, .port = UART3_ADDR, .irq = AU1000_UART3_INT,  \
+      .flags = STD_COM_FLAGS, .type = 1 },
+#else
+#define AU1000_SERIAL_PORT_DEFNS
 #endif
 
 #ifdef CONFIG_HAVE_STD_PC_SERIAL_PORT
@@ -341,6 +308,24 @@
 #define MOMENCO_OCELOT_C_SERIAL_PORT_DEFNS
 #endif
 
+#ifdef CONFIG_TITAN_SERIAL
+/* 16552 20 MHz crystal */
+#define TITAN_SERIAL_BASE_BAUD	( 20000000 / 16 )
+#define	TITAN_SERIAL_IRQ	XXX
+#define	TITAN_SERIAL_BASE	0xffffffff
+
+#define	_TITAN_SERIAL_INIT(int, base)					\
+	{ baud_base: TITAN_SERIAL_BASE_BAUD, irq: int,			\
+	  flags: STD_COM_FLAGS,	iomem_base: (u8 *) base,		\
+	  iomem_reg_shift: 2, io_type: SERIAL_IO_MEM			\
+	}
+
+#define TITAN_SERIAL_PORT_DEFNS						\
+	_TITAN_SERIAL_INIT(TITAN_SERIAL_IRQ, TITAN_SERIAL_BASE)
+#else
+#define TITAN_SERIAL_PORT_DEFNS
+#endif
+
 #ifdef CONFIG_DDB5477
 #include <asm/ddb5xxx/ddb5477.h>
 #define DDB5477_SERIAL_PORT_DEFNS                                       \
@@ -354,95 +339,33 @@
 #define DDB5477_SERIAL_PORT_DEFNS
 #endif
 
-#ifdef CONFIG_SGI_IP27
-
-/*
- * Note about serial ports and consoles:
- * For console output, everyone uses the IOC3 UARTA (offset 0x178)
- * connected to the master node (look in ip27_setup_console() and
- * ip27prom_console_write()).
- *
- * For serial (/dev/ttyS0 etc), we can not have hardcoded serial port
- * addresses on a partitioned machine. Since we currently use the ioc3
- * serial ports, we use dynamic serial port discovery that the serial.c
- * driver uses for pci/pnp ports (there is an entry for the SGI ioc3
- * boards in pci_boards[]). Unfortunately, UARTA's pio address is greater
- * than UARTB's, although UARTA on o200s has traditionally been known as
- * port 0. So, we just use one serial port from each ioc3 (since the
- * serial driver adds addresses to get to higher ports).
- *
- * The first one to do a register_console becomes the preferred console
- * (if there is no kernel command line console= directive). /dev/console
- * (ie 5, 1) is then "aliased" into the device number returned by the
- * "device" routine referred to in this console structure
- * (ip27prom_console_dev).
- *
- * Also look in ip27-pci.c:pci_fixuop_ioc3() for some comments on working
- * around ioc3 oddities in this respect.
- *
- * The IOC3 serials use a 22MHz clock rate with an additional divider by 3.
- * (IOC3_BAUD = (22000000 / (3*16)))
- *
- * At the moment this is only a skeleton definition as we register all serials
- * at runtime.
- */
-
-#define IP27_SERIAL_PORT_DEFNS
-#else
-#define IP27_SERIAL_PORT_DEFNS
-#endif /* CONFIG_SGI_IP27 */
-
 #ifdef CONFIG_SGI_IP32
-
-#include <asm/ip32/ip32_ints.h>
-
 /*
  * The IP32 (SGI O2) has standard serial ports (UART 16550A) mapped in memory
+ * They are initialized in ip32_setup
  */
-
-/* Standard COM flags (except for COM4, because of the 8514 problem) */
-#ifdef CONFIG_SERIAL_DETECT_IRQ
-#define STD_COM_FLAGS (ASYNC_BOOT_AUTOCONF | ASYNC_SKIP_TEST | ASYNC_AUTO_IRQ)
-#define STD_COM4_FLAGS (ASYNC_BOOT_AUTOCONF | ASYNC_AUTO_IRQ)
-#else
-#define STD_COM_FLAGS (ASYNC_BOOT_AUTOCONF/* | ASYNC_SKIP_TEST*/)
-#define STD_COM4_FLAGS ASYNC_BOOT_AUTOCONF
-#endif
-
 #define IP32_SERIAL_PORT_DEFNS				\
-        { .baud_base = BASE_BAUD,				\
-	  .irq = MACEISA_SERIAL1_IRQ,			\
-          .flags = STD_COM_FLAGS,				\
-          .iomem_base = (u8*)MACE_BASE+MACEISA_SER1_BASE,	\
-          .iomem_reg_shift = 8,				\
-          .io_type = SERIAL_IO_MEM},                      \
-        { .baud_base = BASE_BAUD,				\
-	  .irq = MACEISA_SERIAL2_IRQ,			\
-          .flags = STD_COM_FLAGS,				\
-          .iomem_base = (u8*)MACE_BASE+MACEISA_SER2_BASE,	\
-          .iomem_reg_shift = 8,				\
-          .io_type = SERIAL_IO_MEM},
+        {},{},
 #else
 #define IP32_SERIAL_PORT_DEFNS
-#endif /* CONFIG_SGI_IP31 */
+#endif /* CONFIG_SGI_IP32 */
 
 #define SERIAL_PORT_DFNS				\
-	IVR_SERIAL_PORT_DEFNS           		\
-	ITE_SERIAL_PORT_DEFNS           		\
-	ATLAS_SERIAL_PORT_DEFNS				\
-	SEAD_SERIAL_PORT_DEFNS				\
 	COBALT_SERIAL_PORT_DEFNS			\
-	LASAT_SERIAL_PORT_DEFNS				\
+	DDB5477_SERIAL_PORT_DEFNS			\
 	EV96100_SERIAL_PORT_DEFNS			\
-	JAZZ_SERIAL_PORT_DEFNS				\
-	STD_SERIAL_PORT_DEFNS				\
 	EXTRA_SERIAL_PORT_DEFNS				\
 	HUB6_SERIAL_PORT_DFNS				\
-	MOMENCO_OCELOT_SERIAL_PORT_DEFNS		\
+	IP32_SERIAL_PORT_DEFNS                          \
+	ITE_SERIAL_PORT_DEFNS           		\
+	IVR_SERIAL_PORT_DEFNS           		\
+	JAZZ_SERIAL_PORT_DEFNS				\
+	STD_SERIAL_PORT_DEFNS				\
 	MOMENCO_OCELOT_G_SERIAL_PORT_DEFNS		\
 	MOMENCO_OCELOT_C_SERIAL_PORT_DEFNS		\
-	AU1X00_SERIAL_PORT_DEFNS			\
-	TXX927_SERIAL_PORT_DEFNS        		\
-	DDB5477_SERIAL_PORT_DEFNS
+	MOMENCO_OCELOT_SERIAL_PORT_DEFNS		\
+	TITAN_SERIAL_PORT_DEFNS				\
+	TXX927_SERIAL_PORT_DEFNS                        \
+	AU1000_SERIAL_PORT_DEFNS
 
 #endif /* _ASM_SERIAL_H */

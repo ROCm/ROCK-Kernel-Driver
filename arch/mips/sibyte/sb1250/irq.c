@@ -64,9 +64,6 @@ extern unsigned long ldt_eoi_space;
 #include <asm/gdb-stub.h>
 extern void breakpoint(void);
 static int kgdb_irq;
-#ifdef CONFIG_GDB_CONSOLE
-extern void register_gdb_console(void);
-#endif
 
 /* kgdb is on when configured.  Pass "nokgdb" kernel arg to turn it off */
 static int kgdb_flag = 1;
@@ -110,9 +107,9 @@ void sb1250_mask_irq(int cpu, int irq)
 	u64 cur_ints;
 
 	spin_lock_irqsave(&sb1250_imr_lock, flags);
-	cur_ints = ____raw_readq(KSEG1 + A_IMR_MAPPER(cpu) + R_IMR_INTERRUPT_MASK);
+	cur_ints = ____raw_readq(IOADDR(A_IMR_MAPPER(cpu) + R_IMR_INTERRUPT_MASK));
 	cur_ints |= (((u64) 1) << irq);
-	____raw_writeq(cur_ints, KSEG1 + A_IMR_MAPPER(cpu) + R_IMR_INTERRUPT_MASK);
+	____raw_writeq(cur_ints, IOADDR(A_IMR_MAPPER(cpu) + R_IMR_INTERRUPT_MASK));
 	spin_unlock_irqrestore(&sb1250_imr_lock, flags);
 }
 
@@ -122,9 +119,9 @@ void sb1250_unmask_irq(int cpu, int irq)
 	u64 cur_ints;
 
 	spin_lock_irqsave(&sb1250_imr_lock, flags);
-	cur_ints = ____raw_readq(KSEG1 + A_IMR_MAPPER(cpu) + R_IMR_INTERRUPT_MASK);
+	cur_ints = ____raw_readq(IOADDR(A_IMR_MAPPER(cpu) + R_IMR_INTERRUPT_MASK));
 	cur_ints &= ~(((u64) 1) << irq);
-	____raw_writeq(cur_ints, KSEG1 + A_IMR_MAPPER(cpu) + R_IMR_INTERRUPT_MASK);
+	____raw_writeq(cur_ints, IOADDR(A_IMR_MAPPER(cpu) + R_IMR_INTERRUPT_MASK));
 	spin_unlock_irqrestore(&sb1250_imr_lock, flags);
 }
 
@@ -159,19 +156,19 @@ static void sb1250_set_affinity(unsigned int irq, unsigned long mask)
 
 	/* Swizzle each CPU's IMR (but leave the IP selection alone) */
 	old_cpu = sb1250_irq_owner[irq];
-	cur_ints = ____raw_readq(KSEG1 + A_IMR_MAPPER(old_cpu) + R_IMR_INTERRUPT_MASK);
+	cur_ints = ____raw_readq(IOADDR(A_IMR_MAPPER(old_cpu) + R_IMR_INTERRUPT_MASK));
 	int_on = !(cur_ints & (((u64) 1) << irq));
 	if (int_on) {
 		/* If it was on, mask it */
 		cur_ints |= (((u64) 1) << irq);
-		____raw_writeq(cur_ints, KSEG1 + A_IMR_MAPPER(old_cpu) + R_IMR_INTERRUPT_MASK);
+		____raw_writeq(cur_ints, IOADDR(A_IMR_MAPPER(old_cpu) + R_IMR_INTERRUPT_MASK));
 	}
 	sb1250_irq_owner[irq] = cpu;
 	if (int_on) {
 		/* unmask for the new CPU */
-		cur_ints = ____raw_readq(KSEG1 + A_IMR_MAPPER(cpu) + R_IMR_INTERRUPT_MASK);
+		cur_ints = ____raw_readq(IOADDR(A_IMR_MAPPER(cpu) + R_IMR_INTERRUPT_MASK));
 		cur_ints &= ~(((u64) 1) << irq);
-		____raw_writeq(cur_ints, KSEG1 + A_IMR_MAPPER(cpu) + R_IMR_INTERRUPT_MASK);
+		____raw_writeq(cur_ints, IOADDR(A_IMR_MAPPER(cpu) + R_IMR_INTERRUPT_MASK));
 	}
 	spin_unlock(&sb1250_imr_lock);
 	spin_unlock_irqrestore(&desc->lock, flags);
@@ -214,19 +211,24 @@ static void ack_sb1250_irq(unsigned int irq)
 	 * deliver the interrupts to all CPUs (which makes affinity
 	 * changing easier for us)
 	 */
-	pending = __raw_readq(KSEG1 + A_IMR_REGISTER(sb1250_irq_owner[irq],
-						     R_IMR_LDT_INTERRUPT));
+	pending = __raw_readq(IOADDR(A_IMR_REGISTER(sb1250_irq_owner[irq],
+						    R_IMR_LDT_INTERRUPT)));
 	pending &= ((u64)1 << (irq));
 	if (pending) {
 		int i;
 		for (i=0; i<NR_CPUS; i++) {
+			int cpu;
+#ifdef CONFIG_SMP
+			cpu = cpu_logical_map(i);
+#else
+			cpu = i;
+#endif
 			/*
 			 * Clear for all CPUs so an affinity switch
 			 * doesn't find an old status
 			 */
 			__raw_writeq(pending, 
-				     KSEG1+A_IMR_REGISTER(cpu_logical_map(i),
-							  R_IMR_LDT_INTERRUPT_CLR));
+				     IOADDR(A_IMR_REGISTER(cpu, R_IMR_LDT_INTERRUPT_CLR)));
 		}
 
 		/*
@@ -341,13 +343,13 @@ void __init init_IRQ(void)
 	/* Default everything to IP2 */
 	for (i = 0; i < SB1250_NR_IRQS; i++) {	/* was I0 */
 		__raw_writeq(IMR_IP2_VAL,
-			     KSEG1 + A_IMR_REGISTER(0,
-						    R_IMR_INTERRUPT_MAP_BASE) +
-		      (i << 3));
+			     IOADDR(A_IMR_REGISTER(0,
+						   R_IMR_INTERRUPT_MAP_BASE) +
+				    (i << 3)));
 		__raw_writeq(IMR_IP2_VAL,
-			     KSEG1 + A_IMR_REGISTER(1,
+			     IOADDR(A_IMR_REGISTER(1,
 						    R_IMR_INTERRUPT_MAP_BASE) +
-		      (i << 3));
+				    (i << 3)));
 	}
 
 	init_sb1250_irqs();
@@ -357,32 +359,30 @@ void __init init_IRQ(void)
 	 * inter-cpu messages
 	 */
 	/* Was I1 */
-	__raw_writeq(IMR_IP3_VAL, KSEG1 + A_IMR_REGISTER(0, R_IMR_INTERRUPT_MAP_BASE) +
-	                   (K_INT_MBOX_0 << 3));
-	__raw_writeq(IMR_IP3_VAL, KSEG1 + A_IMR_REGISTER(1, R_IMR_INTERRUPT_MAP_BASE) +
-	                   (K_INT_MBOX_0 << 3));
+	__raw_writeq(IMR_IP3_VAL, IOADDR(A_IMR_REGISTER(0, R_IMR_INTERRUPT_MAP_BASE) +
+					 (K_INT_MBOX_0 << 3)));
+	__raw_writeq(IMR_IP3_VAL, IOADDR(A_IMR_REGISTER(1, R_IMR_INTERRUPT_MAP_BASE) +
+					 (K_INT_MBOX_0 << 3)));
 
 	/* Clear the mailboxes.  The firmware may leave them dirty */
 	__raw_writeq(0xffffffffffffffff,
-		     KSEG1 + A_IMR_REGISTER(0, R_IMR_MAILBOX_CLR_CPU));
+		     IOADDR(A_IMR_REGISTER(0, R_IMR_MAILBOX_CLR_CPU)));
 	__raw_writeq(0xffffffffffffffff,
-		     KSEG1 + A_IMR_REGISTER(1, R_IMR_MAILBOX_CLR_CPU));
+		     IOADDR(A_IMR_REGISTER(1, R_IMR_MAILBOX_CLR_CPU)));
 
 	/* Mask everything except the mailbox registers for both cpus */
 	tmp = ~((u64) 0) ^ (((u64) 1) << K_INT_MBOX_0);
-	__raw_writeq(tmp, KSEG1 + A_IMR_REGISTER(0, R_IMR_INTERRUPT_MASK));
-	__raw_writeq(tmp, KSEG1 + A_IMR_REGISTER(1, R_IMR_INTERRUPT_MASK));
+	__raw_writeq(tmp, IOADDR(A_IMR_REGISTER(0, R_IMR_INTERRUPT_MASK)));
+	__raw_writeq(tmp, IOADDR(A_IMR_REGISTER(1, R_IMR_INTERRUPT_MASK)));
 
 	sb1250_steal_irq(K_INT_MBOX_0);
 
 	/*
 	 * Note that the timer interrupts are also mapped, but this is
-	 * done in sb1250_time_init()
+	 * done in sb1250_time_init().  Also, the profiling driver 
+	 * does its own management of IP7.
 	 */
 
-#ifdef CONFIG_BCM1250_PROF
-	imask |= STATUSF_IP7;
-#endif
 #ifdef CONFIG_KGDB
 	imask |= STATUSF_IP6;
 #endif
@@ -398,17 +398,14 @@ void __init init_IRQ(void)
 		sb1250_duart_present[kgdb_port] = 0;
 #endif
 		/* Setup uart 1 settings, mapper */
-		__raw_writeq(M_DUART_IMR_BRK, IO_SPACE_BASE + A_DUART_IMRREG(kgdb_port));
+		__raw_writeq(M_DUART_IMR_BRK, IOADDR(A_DUART_IMRREG(kgdb_port)));
 
 		sb1250_steal_irq(kgdb_irq);
 		__raw_writeq(IMR_IP6_VAL,
-			     IO_SPACE_BASE + A_IMR_REGISTER(0, R_IMR_INTERRUPT_MAP_BASE) +
-			     (kgdb_irq<<3));
+			     IOADDR(A_IMR_REGISTER(0, R_IMR_INTERRUPT_MAP_BASE) +
+				    (kgdb_irq<<3)));
 		sb1250_unmask_irq(0, kgdb_irq);
 
-#ifdef CONFIG_GDB_CONSOLE
-		register_gdb_console();
-#endif
 		prom_printf("Waiting for GDB on UART port %d\n", kgdb_port);
 		set_debug_traps();
 		breakpoint();
@@ -420,8 +417,8 @@ void __init init_IRQ(void)
 
 #include <linux/delay.h>
 
-#define duart_out(reg, val)     csr_out32(val, KSEG1 + A_DUART_CHANREG(kgdb_port,reg))
-#define duart_in(reg)           csr_in32(KSEG1 + A_DUART_CHANREG(kgdb_port,reg))
+#define duart_out(reg, val)     csr_out32(val, IOADDR(A_DUART_CHANREG(kgdb_port,reg)))
+#define duart_in(reg)           csr_in32(IOADDR(A_DUART_CHANREG(kgdb_port,reg)))
 
 void sb1250_kgdb_interrupt(struct pt_regs *regs)
 {
@@ -430,7 +427,7 @@ void sb1250_kgdb_interrupt(struct pt_regs *regs)
 	 * host to stop the break, since we would see another
 	 * interrupt on the end-of-break too)
 	 */
-	kstat_this_cpu.irqs[K_INT_UART_1]++;
+	kstat_this_cpu.irqs[kgdb_irq]++;
 	mdelay(500);
 	duart_out(R_DUART_CMD, V_DUART_MISC_CMD_RESET_BREAK_INT |
 				M_DUART_RX_EN | M_DUART_TX_EN);

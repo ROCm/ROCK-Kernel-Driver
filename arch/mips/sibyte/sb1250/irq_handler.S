@@ -31,7 +31,6 @@
 #include <linux/config.h>
 
 #include <asm/addrspace.h>
-#include <asm/processor.h>
 #include <asm/asm.h>
 #include <asm/mipsregs.h>
 #include <asm/regdef.h>
@@ -53,8 +52,7 @@
 	.set	push
 	.set	noreorder
 	.set	noat
-	#.set	mips64
-	.set	mips4
+	.set	mips64
 	.align	5
 	NESTED(sb1250_irq_handler, PT_SIZE, sp)
 	SAVE_ALL
@@ -136,8 +134,7 @@
 	beqz	s0, 4f		/* No interrupts.  Return */
 	 move	a1, sp
 
-3:	#dclz	s1, s0		/* Find the next interrupt */
-	.word   0x72118824	# dclz s1, s0
+3:	dclz	s1, s0		/* Find the next interrupt */
 	dsubu	a0, zero, s1
 	daddiu	a0, a0, 63
 	jal	 do_IRQ

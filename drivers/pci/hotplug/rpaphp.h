@@ -1,7 +1,7 @@
 /*
- * PPC64 PCI Hot Plug Controller Driver
+ * PCI Hot Plug Controller Driver for RPA-compliant PPC64 platform.
  *
- * Copyright (c) 2003 Linda Xie <lxie@us.ibm.com>
+ * Copyright (C) 2003 Linda Xie <lxie@us.ibm.com>
  *
  * All rights reserved.
  *
@@ -50,16 +50,11 @@
 #define EMPTY	0       /* No card in slot */
 #define PRESENT	1       /* Card in slot */
 
-#if !defined(CONFIG_HOTPLUG_PCI_MODULE)
-	#define MY_NAME "rpaphp"
-#else
-	#define MY_NAME THIS_MODULE->name
-#endif
-
+#define MY_NAME "rpaphp"
 
 #define dbg(format, arg...)					\
 	do {							\
-		if (rpaphp_debug)				\
+		if (debug)				\
 			printk(KERN_DEBUG "%s: " format,	\
 				MY_NAME , ## arg); 		\
 	} while (0)

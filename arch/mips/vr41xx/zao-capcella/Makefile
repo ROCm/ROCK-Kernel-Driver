@@ -3,4 +3,3 @@
 #
 
 obj-y			+= init.o setup.o
-obj-$(CONFIG_IDE)	+= ide-capcella.o

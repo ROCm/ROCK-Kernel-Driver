@@ -1,6 +1,8 @@
 		The MSI Driver Guide HOWTO
 	Tom L Nguyen tom.l.nguyen@intel.com
 			10/03/2003
+	Revised Feb 12, 2004 by Martine Silbermann
+		email: Martine.Silbermann@hp.com
 
 1. About this guide
 
@@ -90,17 +92,14 @@ increase scalability.
 5. Configuring a driver to use MSI/MSI-X
 
 By default, the kernel will not enable MSI/MSI-X on all devices that
-support this capability once the patch is installed. A kernel
-configuration option must be selected to enable MSI/MSI-X support.
+support this capability. The CONFIG_PCI_USE_VECTOR kernel option
+must be selected to enable MSI/MSI-X support.
 
 5.1 Including MSI support into the kernel
 
-To include MSI support into the kernel requires users to patch the
-VECTOR-base patch first and then the MSI patch because the MSI
-support needs VECTOR based scheme. Once these patches are installed,
-setting CONFIG_PCI_USE_VECTOR enables the VECTOR based scheme and
-the option for MSI-capable device drivers to selectively enable MSI
-(using pci_enable_msi as desribed below).
+To allow MSI-Capable device drivers to selectively enable MSI (using
+pci_enable_msi as described below), the VECTOR based scheme needs to
+be enabled by setting CONFIG_PCI_USE_VECTOR.
 
 Since the target of the inbound message is the local APIC, providing
 CONFIG_PCI_USE_VECTOR is dependent on whether CONFIG_X86_LOCAL_APIC
@@ -130,7 +129,7 @@ PIN-IRQ assertion mode.
 5.2 Configuring for MSI support
 
 Due to the non-contiguous fashion in vector assignment of the
-existing Linux kernel, this patch does not support multiple
+existing Linux kernel, this version does not support multiple
 messages regardless of the device function is capable of supporting
 more than one vector. The bus driver initializes only entry 0 of
 this capability if pci_enable_msi(...) is called successfully by
@@ -232,7 +231,7 @@ however, in UP environment, users must manually set
 CONFIG_X86_LOCAL_APIC. Once CONFIG_X86_LOCAL_APIC=y, setting
 CONFIG_PCI_USE_VECTOR enables the VECTOR based scheme and
 the option for MSI-capable device drivers to selectively enable
-MSI (using pci_enable_msi as desribed below).
+MSI (using pci_enable_msi as described below).
 
 Note that CONFIG_X86_IO_APIC setting is irrelevant because MSI
 vector is allocated new during runtime and MSI support does not

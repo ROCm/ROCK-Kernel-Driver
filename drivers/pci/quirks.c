@@ -703,9 +703,12 @@ static void __init asus_hides_smbus_hostbridge(struct pci_dev *dev)
 	    	case 0x8088: /* P4B533 */
 			asus_hides_smbus = 1;
 		}
-	if ((dev->device == PCI_DEVICE_ID_INTEL_82845G_HB) &&
-	    (dev->subsystem_device == 0x80b2)) /* P4PE */
-		asus_hides_smbus = 1;
+	if (dev->device == PCI_DEVICE_ID_INTEL_82845G_HB)
+		switch(dev->subsystem_device) {
+		case 0x80b2: /* P4PE */
+ 		case 0x8093: /* P4B533-V */
+			asus_hides_smbus = 1;
+		}
 	if ((dev->device == PCI_DEVICE_ID_INTEL_82850_HB) &&
 	    (dev->subsystem_device == 0x8030)) /* P4T533 */
 		asus_hides_smbus = 1;

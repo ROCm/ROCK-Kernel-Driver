@@ -453,7 +453,7 @@ static void red_destroy(struct Qdisc *sch)
 {
 }
 
-struct Qdisc_ops red_qdisc_ops = {
+static struct Qdisc_ops red_qdisc_ops = {
 	.next		=	NULL,
 	.cl_ops		=	NULL,
 	.id		=	"red",
@@ -470,16 +470,14 @@ struct Qdisc_ops red_qdisc_ops = {
 	.owner		=	THIS_MODULE,
 };
 
-
-#ifdef MODULE
-int init_module(void)
+static int __init red_module_init(void)
 {
 	return register_qdisc(&red_qdisc_ops);
 }
-
-void cleanup_module(void) 
+static void __exit red_module_exit(void) 
 {
 	unregister_qdisc(&red_qdisc_ops);
 }
-#endif
+module_init(red_module_init)
+module_exit(red_module_exit)
 MODULE_LICENSE("GPL");

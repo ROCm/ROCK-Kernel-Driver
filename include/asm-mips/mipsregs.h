@@ -15,6 +15,7 @@
 
 #include <linux/config.h>
 #include <linux/linkage.h>
+#include <asm/hazards.h>
 
 /*
  * The following macros are especially useful for __asm__
@@ -183,6 +184,20 @@
 #define PM_256M		0x1fffe000
 
 #endif
+
+/*
+ * Default page size for a given kernel configuration
+ */
+#ifdef CONFIG_PAGE_SIZE_4KB
+#define PM_DEFAULT_MASK	PM_4K
+#elif defined(CONFIG_PAGE_SIZE_16KB)
+#define PM_DEFAULT_MASK	PM_16K
+#elif defined(CONFIG_PAGE_SIZE_64KB)
+#define PM_DEFAULT_MASK	PM_64K
+#else
+#error Bad page size configuration!
+#endif
+
 
 /*
  * Values used for computation of new tlb entries
@@ -578,13 +593,13 @@ do {									\
 	if (sel == 0)							\
 		__asm__ __volatile__(					\
 			"mtc0\t%z0, " #register "\n\t"			\
-			: : "Jr" (value));				\
+			: : "Jr" ((unsigned int)value));		\
 	else								\
 		__asm__ __volatile__(					\
 			".set\tmips32\n\t"				\
 			"mtc0\t%z0, " #register ", " #sel "\n\t"	\
 			".set\tmips0"					\
-			: : "Jr" (value));				\
+			: : "Jr" ((unsigned int)value));		\
 } while (0)
 
 #define __write_64bit_c0_register(register, sel, value)			\
@@ -821,37 +836,47 @@ do {									\
         : "=r" (__res));                                        \
         __res;})
 
-/* TLB operations. */
+/*
+ * TLB operations.
+ */
 static inline void tlb_probe(void)
 {
+	rm9000_tlb_hazard();
 	__asm__ __volatile__(
 		".set noreorder\n\t"
 		"tlbp\n\t"
 		".set reorder");
+	rm9000_tlb_hazard();
 }
 
 static inline void tlb_read(void)
 {
+	rm9000_tlb_hazard();
 	__asm__ __volatile__(
 		".set noreorder\n\t"
 		"tlbr\n\t"
 		".set reorder");
+	rm9000_tlb_hazard();
 }
 
 static inline void tlb_write_indexed(void)
 {
+	rm9000_tlb_hazard();
 	__asm__ __volatile__(
 		".set noreorder\n\t"
 		"tlbwi\n\t"
 		".set reorder");
+	rm9000_tlb_hazard();
 }
 
 static inline void tlb_write_random(void)
 {
+	rm9000_tlb_hazard();
 	__asm__ __volatile__(
 		".set noreorder\n\t"
 		"tlbwr\n\t"
 		".set reorder");
+	rm9000_tlb_hazard();
 }
 
 /*
@@ -898,6 +923,7 @@ change_c0_##name(unsigned int change, unsigned int new)		\
 __BUILD_SET_C0(status,CP0_STATUS)
 __BUILD_SET_C0(cause,CP0_CAUSE)
 __BUILD_SET_C0(config,CP0_CONFIG)
+__BUILD_SET_C0(intcontrol,CP0_CONFIG)
 
 #endif /* !__ASSEMBLY__ */
 

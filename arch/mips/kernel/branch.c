@@ -11,6 +11,7 @@
 #include <linux/signal.h>
 #include <asm/branch.h>
 #include <asm/cpu.h>
+#include <asm/cpu-features.h>
 #include <asm/inst.h>
 #include <asm/ptrace.h>
 #include <asm/uaccess.h>

@@ -1,5 +1,6 @@
 /*
- * Interface for Dynamic Logical Partitioning of I/O Slots
+ * Interface for Dynamic Logical Partitioning of I/O Slots on
+ * RPA-compliant PPC64 platform.
  *
  * John Rose <johnrose@austin.ibm.com>
  * October 2003

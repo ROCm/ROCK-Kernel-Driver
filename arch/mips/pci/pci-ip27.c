@@ -3,6 +3,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
+ * Copyright (C) 2003 Christoph Hellwig (hch@lst.de)
  * Copyright (C) 1999, 2000 Ralf Baechle (ralf@gnu.org)
  * Copyright (C) 1999, 2000 Silicon Graphics, Inc.
  */
@@ -11,8 +12,9 @@
 #include <linux/pci.h>
 #include <asm/sn/arch.h>
 #include <asm/pci/bridge.h>
+#include <asm/pci_channel.h>
 #include <asm/paccess.h>
-#include <asm/sn/sn0/ip27.h>
+#include <asm/sn/intr.h>
 #include <asm/sn/sn0/hub.h>
 
 /*
@@ -26,6 +28,12 @@
 #define MAX_DEVICES_PER_PCIBUS	8
 
 /*
+ * XXX: No kmalloc available when we do our crosstalk scan,
+ * 	we should try to move it later in the boot process.
+ */
+static struct bridge_controller bridges[MAX_PCI_BUSSES];
+
+/*
  * No locking needed until PCI initialization is done parallely.
  */
 int irqstore[MAX_PCI_BUSSES][MAX_DEVICES_PER_PCIBUS];
@@ -34,7 +42,7 @@ int lastirq = BASE_PCI_IRQ;
 /*
  * Translate from irq to software PCI bus number and PCI slot.
  */
-int irq_to_bus[MAX_PCI_BUSSES * MAX_DEVICES_PER_PCIBUS];
+struct bridge_controller *irq_to_bridge[MAX_PCI_BUSSES * MAX_DEVICES_PER_PCIBUS];
 int irq_to_slot[MAX_PCI_BUSSES * MAX_DEVICES_PER_PCIBUS];
 
 /*
@@ -42,90 +50,136 @@ int irq_to_slot[MAX_PCI_BUSSES * MAX_DEVICES_PER_PCIBUS];
  * not really documented, so right now I can't write code which uses it.
  * Therefore we use type 0 accesses for now even though they won't work
  * correcly for PCI-to-PCI bridges.
+ *
+ * The function is complicated by the ultimate brokeness of the IOC3 chip
+ * which is used in SGI systems.  The IOC3 can only handle 32-bit PCI
+ * accesses and does only decode parts of it's address space.
  */
-#define CF0_READ_PCI_CFG(bus,devfn,where,value,bm,mask)			\
-do {									\
-	bridge_t *bridge;                                               \
-	int slot = PCI_SLOT(devfn);					\
-	int fn = PCI_FUNC(devfn);					\
-	volatile u32 *addr;						\
-	u32 cf, __bit;							\
-	unsigned int bus_id = (unsigned) bus->number;              	\
-									\
-	bridge = (bridge_t *) NODE_SWIN_BASE(bus_to_nid[bus_id],        \
-                                             bus_to_wid[bus_id]);       \
-                                                                        \
-	__bit = (((where) & (bm)) << 3);				\
-	addr = &bridge->b_type0_cfg_dev[slot].f[fn].l[where >> 2];	\
-	if (get_dbe(cf, addr))						\
-		return PCIBIOS_DEVICE_NOT_FOUND;			\
-	*value = (cf >> __bit) & (mask);				\
-	return PCIBIOS_SUCCESSFUL;					\
-} while (0)
 
 static int pci_conf0_read_config(struct pci_bus *bus, unsigned int devfn,
 				 int where, int size, u32 * value)
 {
-	u32 vprod;
+	struct bridge_controller *bc = BRIDGE_CONTROLLER(bus);
+	bridge_t *bridge = bc->base;
+	int slot = PCI_SLOT(devfn);
+	int fn = PCI_FUNC(devfn);
+	volatile void *addr;
+	u32 cf, shift, mask;
+	int res;
 
-	CF0_READ_PCI_CFG(bus, devfn, PCI_VENDOR_ID, &vprod, 0, 0xffffffff);
-	if (vprod == (PCI_VENDOR_ID_SGI | (PCI_DEVICE_ID_SGI_IOC3 << 16))
-	    && ((where >= 0x14 && where < 0x40) || (where >= 0x48))) {
+	addr = &bridge->b_type0_cfg_dev[slot].f[fn].c[PCI_VENDOR_ID];
+	if (get_dbe(cf, (u32 *) addr))
+		return PCIBIOS_DEVICE_NOT_FOUND;
+
+	/*
+	 * IOC3 is fucked fucked beyond believe ...  Don't even give the
+	 * generic PCI code a chance to look at it for real ...
+	 */
+	if (cf == (PCI_VENDOR_ID_SGI | (PCI_DEVICE_ID_SGI_IOC3 << 16)))
+		goto oh_my_gawd;
+
+	addr = &bridge->b_type0_cfg_dev[slot].f[fn].c[where ^ (4 - size)];
+
+	if (size == 1)
+		res = get_dbe(*value, (u8 *) addr);
+	else if (size == 2)
+		res = get_dbe(*value, (u16 *) addr);
+	else
+		res = get_dbe(*value, (u32 *) addr);
+
+	return PCIBIOS_SUCCESSFUL;
+
+oh_my_gawd:
+
+	/*
+	 * IOC3 is fucked fucked beyond believe ...  Don't even give the
+	 * generic PCI code a chance to look at the wrong register.
+	 */
+	if ((where >= 0x14 && where < 0x40) || (where >= 0x48)) {
 		*value = 0;
 		return PCIBIOS_SUCCESSFUL;
 	}
 
-	if (size == 1)
-		CF0_READ_PCI_CFG(bus, devfn, where, (u8 *) value, 3, 0xff);
-	else if (size == 2)
-		CF0_READ_PCI_CFG(bus, devfn, where, (u16 *) value, 2,
-				 0xffff);
-	else
-		CF0_READ_PCI_CFG(bus, devfn, where, (u32 *) value, 0,
-				 0xffffffff);
-}
+	/*
+	 * IOC3 is fucked fucked beyond believe ...  Don't try to access
+	 * anything but 32-bit words ...
+	 */
+	addr = &bridge->b_type0_cfg_dev[slot].f[fn].l[where >> 2];
 
-#define CF0_WRITE_PCI_CFG(bus,devfn,where,value,bm,mask)		\
-do {									\
-	bridge_t *bridge;                                               \
-	int slot = PCI_SLOT(devfn);					\
-	int fn = PCI_FUNC(devfn);					\
-	volatile u32 *addr;						\
-	u32 cf, __bit;							\
-	unsigned int bus_id = (unsigned) bus->number;              	\
-									\
-	bridge = (bridge_t *) NODE_SWIN_BASE(bus_to_nid[bus_id],        \
-                                             bus_to_wid[bus_id]);       \
-                                                                        \
-	__bit = (((where) & (bm)) << 3);				\
-	addr = &bridge->b_type0_cfg_dev[slot].f[fn].l[where >> 2];	\
-	if (get_dbe(cf, addr))						\
-		return PCIBIOS_DEVICE_NOT_FOUND;			\
-	cf &= (~mask);							\
-	cf |= (value);							\
-	put_dbe(cf, addr);						\
-	return PCIBIOS_SUCCESSFUL;					\
-} while (0)
+	if (get_dbe(cf, (u32 *) addr))
+		return PCIBIOS_DEVICE_NOT_FOUND;
+
+	shift = ((where & 3) << 3);
+	mask = (0xffffffffU >> ((4 - size) << 3));
+	*value = (cf >> shift) & mask;
+
+	return PCIBIOS_SUCCESSFUL;
+}
 
 static int pci_conf0_write_config(struct pci_bus *bus, unsigned int devfn,
 				  int where, int size, u32 value)
 {
-	u32 vprod;
+	struct bridge_controller *bc = BRIDGE_CONTROLLER(bus);
+	bridge_t *bridge = bc->base;
+	int slot = PCI_SLOT(devfn);
+	int fn = PCI_FUNC(devfn);
+	volatile void *addr;
+	u32 cf, shift, mask, smask;
+	int res;
 
-	CF0_READ_PCI_CFG(bus, devfn, PCI_VENDOR_ID, &vprod, 0, 0xffffffff);
-	if (vprod == (PCI_VENDOR_ID_SGI | (PCI_DEVICE_ID_SGI_IOC3 << 16))
-	    && ((where >= 0x14 && where < 0x40) || (where >= 0x48))) {
-		return PCIBIOS_SUCCESSFUL;
+	addr = &bridge->b_type0_cfg_dev[slot].f[fn].c[PCI_VENDOR_ID];
+	if (get_dbe(cf, (u32 *) addr))
+		return PCIBIOS_DEVICE_NOT_FOUND;
+
+	/*
+	 * IOC3 is fucked fucked beyond believe ...  Don't even give the
+	 * generic PCI code a chance to look at it for real ...
+	 */
+	if (cf == (PCI_VENDOR_ID_SGI | (PCI_DEVICE_ID_SGI_IOC3 << 16)))
+		goto oh_my_gawd;
+
+	addr = &bridge->b_type0_cfg_dev[slot].f[fn].c[where ^ (4 - size)];
+
+	if (size == 1) {
+		res = put_dbe(value, (u8 *) addr);
+	} else if (size == 2) {
+		res = put_dbe(value, (u16 *) addr);
+	} else {
+		res = put_dbe(value, (u32 *) addr);
 	}
 
-	if (size == 1)
-		CF0_WRITE_PCI_CFG(bus, devfn, where, (u8) value, 3, 0xff);
-	else if (size == 2)
-		CF0_WRITE_PCI_CFG(bus, devfn, where, (u16) value, 2,
-				  0xffff);
-	else
-		CF0_WRITE_PCI_CFG(bus, devfn, where, (u32) value, 0,
-				  0xffffffff);
+	if (res)
+		return PCIBIOS_DEVICE_NOT_FOUND;
+
+	return PCIBIOS_SUCCESSFUL;
+
+oh_my_gawd:
+
+	/*
+	 * IOC3 is fucked fucked beyond believe ...  Don't even give the
+	 * generic PCI code a chance to touch the wrong register.
+	 */
+	if ((where >= 0x14 && where < 0x40) || (where >= 0x48))
+		return PCIBIOS_SUCCESSFUL;
+
+	/*
+	 * IOC3 is fucked fucked beyond believe ...  Don't try to access
+	 * anything but 32-bit words ...
+	 */
+	addr = &bridge->b_type0_cfg_dev[slot].f[fn].l[where >> 2];
+
+	if (get_dbe(cf, (u32 *) addr))
+		return PCIBIOS_DEVICE_NOT_FOUND;
+
+	shift = ((where & 3) << 3);
+	mask = (0xffffffffU >> ((4 - size) << 3));
+	smask = mask << shift;
+
+	cf = (cf & ~smask) | ((value & mask) << shift);
+	if (put_dbe(cf, (u32 *) addr))
+		return PCIBIOS_DEVICE_NOT_FOUND;
+
+	return PCIBIOS_SUCCESSFUL;
 }
 
 static struct pci_ops bridge_pci_ops = {
@@ -133,39 +187,79 @@ static struct pci_ops bridge_pci_ops = {
 	.write = pci_conf0_write_config,
 };
 
-static int __init pcibios_init(void)
+int __init bridge_probe(nasid_t nasid, int widget_id, int masterwid)
 {
-	struct pci_ops *ops = &bridge_pci_ops;
-	int i;
+	struct bridge_controller *bc;
+	bridge_t *bridge;
+	static int num_bridges = 0;
 
-	ioport_resource.end = ~0UL;
+	printk("a bridge\n");
 
-	for (i = 0; i < num_bridges; i++) {
-		printk("PCI: Probing PCI hardware on host bus %2d.\n", i);
-		pci_scan_bus(i, ops, NULL);
-	}
+	/* XXX: kludge alert.. */
+	if (!num_bridges)
+		ioport_resource.end = ~0UL;
 
+	bc = &bridges[num_bridges++];
+
+	bc->pc.pci_ops		= &bridge_pci_ops;
+	bc->pc.mem_resource	= &bc->mem;
+	bc->pc.io_resource	= &bc->io;
+
+	bc->mem.name		= "Bridge PCI MEM";
+	bc->pc.mem_offset	= 0;
+	bc->mem.start		= 0;
+	bc->mem.end		= ~0UL;
+	bc->mem.flags		= IORESOURCE_MEM;
+
+	bc->io.name		= "Bridge IO MEM";
+	bc->io.start		= 0UL;
+	bc->pc.io_offset	= 0UL;
+	bc->io.end		= ~0UL;
+	bc->io.flags		= IORESOURCE_IO;
+
+	bc->irq_cpu = smp_processor_id();
+	bc->widget_id = widget_id;
+	bc->nasid = nasid;
+
+	bc->baddr = (u64)masterwid << 60;
+	bc->baddr |= (1UL << 56);	/* Barrier set */
+
+	/*
+	 * point to this bridge
+	 */
+	bridge = (bridge_t *) RAW_NODE_SWIN_BASE(nasid, widget_id);
+
+	/*
+ 	 * Clear all pending interrupts.
+ 	 */
+	bridge->b_int_rst_stat = BRIDGE_IRR_ALL_CLR;
+
+	/*
+ 	 * Until otherwise set up, assume all interrupts are from slot 0
+ 	 */
+	bridge->b_int_device = (u32) 0x0;
+
+	/*
+ 	 * swap pio's to pci mem and io space (big windows)
+ 	 */
+	bridge->b_wid_control |= BRIDGE_CTRL_IO_SWAP |
+	                         BRIDGE_CTRL_MEM_SWAP;
+
+	/*
+	 * Hmm...  IRIX sets additional bits in the address which
+	 * are documented as reserved in the bridge docs.
+	 */
+	bridge->b_wid_int_upper = 0x8000 | (masterwid << 16);
+	bridge->b_wid_int_lower = 0x01800090;	/* PI_INT_PEND_MOD off*/
+	bridge->b_dir_map = (masterwid << 20);	/* DMA */
+	bridge->b_int_enable = 0;
+
+	bridge->b_wid_tflush;     /* wait until Bridge PIO complete */
+
+	bc->base = bridge;
+
+	register_pci_controller(&bc->pc);
 	return 0;
-}
-
-subsys_initcall(pcibios_init);
-
-static inline u8 bridge_swizzle(u8 pin, u8 slot)
-{
-	return (((pin - 1) + slot) % 4) + 1;
-}
-
-static u8 __devinit pci_swizzle(struct pci_dev *dev, u8 * pinp)
-{
-	u8 pin = *pinp;
-
-	while (dev->bus->self) {	/* Move up the chain of bridges. */
-		pin = bridge_swizzle(pin, PCI_SLOT(dev->devfn));
-		dev = dev->bus->self;
-	}
-	*pinp = pin;
-
-	return PCI_SLOT(dev->devfn);
 }
 
 /*
@@ -177,9 +271,12 @@ static u8 __devinit pci_swizzle(struct pci_dev *dev, u8 * pinp)
  * A given PCI device, in general, should be able to intr any of the cpus
  * on any one of the hubs connected to its xbow.
  */
-static int __devinit pci_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
+int __devinit pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 {
-	if ((dev->bus->number >= MAX_PCI_BUSSES)
+	struct bridge_controller *bc = BRIDGE_CONTROLLER(dev->bus);
+	int busno = dev->bus->number;
+
+	if ((busno >= MAX_PCI_BUSSES)
 	    || (pin != 1)
 	    || (slot >= MAX_DEVICES_PER_PCIBUS))
 		panic("Increase supported PCI busses %d,%d,%d",
@@ -188,47 +285,14 @@ static int __devinit pci_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 	/*
 	 * Already assigned? Then return previously assigned value ...
 	 */
-	if (irqstore[dev->bus->number][slot])
-		return irqstore[dev->bus->number][slot];
+	if (irqstore[busno][slot])
+		return irqstore[busno][slot];
 
-	irq_to_bus[lastirq] = dev->bus->number;
+	irq_to_bridge[lastirq] = bc;
 	irq_to_slot[lastirq] = slot;
-	irqstore[dev->bus->number][slot] = lastirq;
-	lastirq++;
-	return lastirq - 1;
-}
+	irqstore[busno][slot] = lastirq;
 
-void __init pcibios_update_irq(struct pci_dev *dev, int irq)
-{
-	pci_write_config_byte(dev, PCI_INTERRUPT_LINE, irq);
-}
-
-void __devinit pcibios_fixup_bus(struct pci_bus *b)
-{
-	pci_fixup_irqs(pci_swizzle, pci_map_irq);
-}
-
-int pcibios_enable_device(struct pci_dev *dev, int mask)
-{
-	/* Not needed, since we enable all devices at startup.  */
-	return 0;
-}
-
-void pcibios_align_resource(void *data, struct resource *res,
-			    unsigned long size, unsigned long align)
-{
-}
-
-unsigned int pcibios_assign_all_busses(void)
-{
-	return 0;
-}
-
-char *__devinit pcibios_setup(char *str)
-{
-	/* Nothing to do for now.  */
-
-	return str;
+	return lastirq++;
 }
 
 /*
@@ -240,9 +304,8 @@ char *__devinit pcibios_setup(char *str)
 
 static void __init pci_disable_swapping(struct pci_dev *dev)
 {
-	unsigned int bus_id = (unsigned) dev->bus->number;
-	bridge_t *bridge = (bridge_t *) NODE_SWIN_BASE(bus_to_nid[bus_id],
-						       bus_to_wid[bus_id]);
+	struct bridge_controller *bc = BRIDGE_CONTROLLER(dev->bus);
+	bridge_t *bridge = bc->base;
 	int slot = PCI_SLOT(dev->devfn);
 
 	/* Turn off byte swapping */
@@ -252,9 +315,8 @@ static void __init pci_disable_swapping(struct pci_dev *dev)
 
 static void __init pci_enable_swapping(struct pci_dev *dev)
 {
-	unsigned int bus_id = (unsigned) dev->bus->number;
-	bridge_t *bridge = (bridge_t *) NODE_SWIN_BASE(bus_to_nid[bus_id],
-						       bus_to_wid[bus_id]);
+	struct bridge_controller *bc = BRIDGE_CONTROLLER(dev->bus);
+	bridge_t *bridge = bc->base;
 	int slot = PCI_SLOT(dev->devfn);
 
 	/* Turn on byte swapping */
@@ -264,23 +326,23 @@ static void __init pci_enable_swapping(struct pci_dev *dev)
 
 static void __init pci_fixup_ioc3(struct pci_dev *d)
 {
-	unsigned long bus_id = (unsigned) d->bus->number;
+	struct bridge_controller *bc = BRIDGE_CONTROLLER(d->bus);
+	unsigned long offset = NODE_OFFSET(bc->nasid);
 
-	printk("PCI: Fixing base addresses for IOC3 device %s\n",
-	       pci_name(d));
+	printk("PCI: Fixing base addresses for IOC3 device %s\n", pci_name(d));
 
-	d->resource[0].start |= NODE_OFFSET(bus_to_nid[bus_id]);
-	d->resource[0].end |= NODE_OFFSET(bus_to_nid[bus_id]);
+	d->resource[0].start |= offset;
+	d->resource[0].end |= offset;
 
 	pci_disable_swapping(d);
 }
 
 static void __init pci_fixup_isp1020(struct pci_dev *d)
 {
+	struct bridge_controller *bc = BRIDGE_CONTROLLER(d->bus);
 	unsigned short command;
 
-	d->resource[0].start |=
-	    ((unsigned long) (bus_to_nid[d->bus->number]) << 32);
+	d->resource[0].start |= (unsigned long) bc->nasid << 32;
 	printk("PCI: Fixing isp1020 in [bus:slot.fn] %s\n", pci_name(d));
 
 	/*
@@ -289,7 +351,6 @@ static void __init pci_fixup_isp1020(struct pci_dev *d)
 	 * bit set. Things stop working if we program the controllers as not
 	 * having PCI_COMMAND_MEMORY, so we have to fudge the mem_flags.
 	 */
-
 	pci_set_master(d);
 	pci_read_config_word(d, PCI_COMMAND, &command);
 	command |= PCI_COMMAND_MEMORY;
@@ -302,9 +363,8 @@ static void __init pci_fixup_isp1020(struct pci_dev *d)
 
 static void __init pci_fixup_isp2x00(struct pci_dev *d)
 {
-	unsigned int bus_id = (unsigned) d->bus->number;
-	bridge_t *bridge = (bridge_t *) NODE_SWIN_BASE(bus_to_nid[bus_id],
-						       bus_to_wid[bus_id]);
+	struct bridge_controller *bc = BRIDGE_CONTROLLER(d->bus);
+	bridge_t *bridge = bc->base;
 	bridgereg_t devreg;
 	int i;
 	int slot = PCI_SLOT(d->devfn);
@@ -378,14 +438,11 @@ static void __init pci_fixup_isp2x00(struct pci_dev *d)
 struct pci_fixup pcibios_fixups[] = {
 	{PCI_FIXUP_HEADER, PCI_VENDOR_ID_SGI, PCI_DEVICE_ID_SGI_IOC3,
 	 pci_fixup_ioc3},
-	{PCI_FIXUP_HEADER, PCI_VENDOR_ID_QLOGIC,
-	 PCI_DEVICE_ID_QLOGIC_ISP1020,
+	{PCI_FIXUP_HEADER, PCI_VENDOR_ID_QLOGIC, PCI_DEVICE_ID_QLOGIC_ISP1020,
 	 pci_fixup_isp1020},
-	{PCI_FIXUP_HEADER, PCI_VENDOR_ID_QLOGIC,
-	 PCI_DEVICE_ID_QLOGIC_ISP2100,
+	{PCI_FIXUP_HEADER, PCI_VENDOR_ID_QLOGIC, PCI_DEVICE_ID_QLOGIC_ISP2100,
 	 pci_fixup_isp2x00},
-	{PCI_FIXUP_HEADER, PCI_VENDOR_ID_QLOGIC,
-	 PCI_DEVICE_ID_QLOGIC_ISP2200,
+	{PCI_FIXUP_HEADER, PCI_VENDOR_ID_QLOGIC, PCI_DEVICE_ID_QLOGIC_ISP2200,
 	 pci_fixup_isp2x00},
 	{0}
 };

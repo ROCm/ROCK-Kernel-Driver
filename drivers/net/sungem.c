@@ -1836,9 +1836,9 @@ static void gem_init_pause_thresholds(struct gem *gp)
 	/* If Infinite Burst didn't stick, then use different
 	 * thresholds (and Apple bug fixes don't exist)
 	 */
-	if (readl(gp->regs + GREG_CFG) & GREG_CFG_IBURST) {
+	if (!(readl(gp->regs + GREG_CFG) & GREG_CFG_IBURST)) {
 		cfg = ((2 << 1) & GREG_CFG_TXDMALIM);
-		cfg = ((8 << 6) & GREG_CFG_RXDMALIM);
+		cfg |= ((8 << 6) & GREG_CFG_RXDMALIM);
 		writel(cfg, gp->regs + GREG_CFG);
 	}	
 }

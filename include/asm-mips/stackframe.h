@@ -26,8 +26,10 @@
 
 		.macro	SAVE_TEMP
 		mfhi	v1
+#ifdef CONFIG_MIPS32
 		LONG_S	$8, PT_R8(sp)
 		LONG_S	$9, PT_R9(sp)
+#endif
 		LONG_S	v1, PT_HI(sp)
 		mflo	v1
 		LONG_S	$10, PT_R10(sp)
@@ -79,7 +81,7 @@
 		mfc0	\temp, CP0_CONTEXT
 		srl	\temp, 23
 		sll	\temp, 2
-		LONG_S	\stackp, kernelsp(temp)
+		LONG_S	\stackp, kernelsp(\temp)
 #endif
 #ifdef CONFIG_MIPS64
 		lw	\temp, TI_CPU(gp)
@@ -137,6 +139,10 @@
 		LONG_S	$6, PT_R6(sp)
 		MFC0	v1, CP0_EPC
 		LONG_S	$7, PT_R7(sp)
+#ifdef CONFIG_MIPS64
+		LONG_S	$8, PT_R8(sp)
+		LONG_S	$9, PT_R9(sp)
+#endif
 		LONG_S	v1, PT_EPC(sp)
 		LONG_S	$25, PT_R25(sp)
 		LONG_S	$28, PT_R28(sp)
@@ -163,8 +169,10 @@
 
 		.macro	RESTORE_TEMP
 		LONG_L	$24, PT_LO(sp)
+#ifdef CONFIG_MIPS32
 		LONG_L	$8, PT_R8(sp)
 		LONG_L	$9, PT_R9(sp)
+#endif
 		mtlo	$24
 		LONG_L	$24, PT_HI(sp)
 		LONG_L	$10, PT_R10(sp)
@@ -194,27 +202,32 @@
 		.macro	RESTORE_SOME
 		.set	push
 		.set	reorder
-		mfc0	t0, CP0_STATUS
-		.set	pop
-		ori	t0, 0x1f
-		xori	t0, 0x1f
-		mtc0	t0, CP0_STATUS
+		.set	noat
+		mfc0	a0, CP0_STATUS
+		ori	a0, 0x1f
+		xori	a0, 0x1f
+		mtc0	a0, CP0_STATUS
 		li	v1, 0xff00
-		and	t0, v1
+		and	a0, v1
 		LONG_L	v0, PT_STATUS(sp)
 		nor	v1, $0, v1
 		and	v0, v1
-		or	v0, t0
+		or	v0, a0
 		mtc0	v0, CP0_STATUS
 		LONG_L	$31, PT_R31(sp)
 		LONG_L	$28, PT_R28(sp)
 		LONG_L	$25, PT_R25(sp)
+#ifdef CONFIG_MIPS64
+		LONG_L	$8, PT_R8(sp)
+		LONG_L	$9, PT_R9(sp)
+#endif
 		LONG_L	$7,  PT_R7(sp)
 		LONG_L	$6,  PT_R6(sp)
 		LONG_L	$5,  PT_R5(sp)
 		LONG_L	$4,  PT_R4(sp)
 		LONG_L	$3,  PT_R3(sp)
 		LONG_L	$2,  PT_R2(sp)
+		.set	pop
 		.endm
 
 		.macro	RESTORE_SP_AND_RET
@@ -232,29 +245,34 @@
 		.macro	RESTORE_SOME
 		.set	push
 		.set	reorder
-		mfc0	t0, CP0_STATUS
-		.set	pop
-		ori	t0, 0x1f
-		xori	t0, 0x1f
-		mtc0	t0, CP0_STATUS
+		.set	noat
+		mfc0	a0, CP0_STATUS
+		ori	a0, 0x1f
+		xori	a0, 0x1f
+		mtc0	a0, CP0_STATUS
 		li	v1, 0xff00
-		and	t0, v1
+		and	a0, v1
 		LONG_L	v0, PT_STATUS(sp)
 		nor	v1, $0, v1
 		and	v0, v1
-		or	v0, t0
+		or	v0, a0
 		mtc0	v0, CP0_STATUS
 		LONG_L	v1, PT_EPC(sp)
 		MTC0	v1, CP0_EPC
 		LONG_L	$31, PT_R31(sp)
 		LONG_L	$28, PT_R28(sp)
 		LONG_L	$25, PT_R25(sp)
+#ifdef CONFIG_MIPS64
+		LONG_L	$8, PT_R8(sp)
+		LONG_L	$9, PT_R9(sp)
+#endif
 		LONG_L	$7,  PT_R7(sp)
 		LONG_L	$6,  PT_R6(sp)
 		LONG_L	$5,  PT_R5(sp)
 		LONG_L	$4,  PT_R4(sp)
 		LONG_L	$3,  PT_R3(sp)
 		LONG_L	$2,  PT_R2(sp)
+		.set	pop
 		.endm
 
 		.macro	RESTORE_SP_AND_RET
@@ -271,18 +289,18 @@
 		.endm
 
 		.macro	RESTORE_ALL
-		RESTORE_SOME
-		RESTORE_AT
 		RESTORE_TEMP
+		RESTORE_AT
 		RESTORE_STATIC
+		RESTORE_SOME
 		RESTORE_SP
 		.endm
 
 		.macro	RESTORE_ALL_AND_RET
-		RESTORE_SOME
-		RESTORE_AT
 		RESTORE_TEMP
+		RESTORE_AT
 		RESTORE_STATIC
+		RESTORE_SOME
 		RESTORE_SP_AND_RET
 		.endm
 

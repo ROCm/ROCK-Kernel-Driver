@@ -1,6 +1,6 @@
 /*
- * PRA PCI Hot Plug Controller Driver
- * Copyright (c) 2003 Linda Xie <lxie@us.ibm.com>
+ * PCI Hot Plug Controller Driver for RPA-compliant PPC64 platform.
+ * Copyright (C) 2003 Linda Xie <lxie@us.ibm.com>
  *
  * All rights reserved.
  *

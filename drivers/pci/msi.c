@@ -1,5 +1,9 @@
 /*
- * linux/drivers/pci/msi.c
+ * File:	msi.c
+ * Purpose:	PCI Message Signaled Interrupt (MSI)
+ *
+ * Copyright (C) 2003-2004 Intel
+ * Copyright (C) Tom Long Nguyen (tom.l.nguyen@intel.com)
  */
 
 #include <linux/mm.h>

@@ -11,6 +11,7 @@
 #define _ASM_ADDRSPACE_H
 
 #include <linux/config.h>
+#include <spaces.h>
 
 /*
  *  Configure language
@@ -45,8 +46,6 @@
 #define KSEG1			0xa0000000
 #define KSEG2			0xc0000000
 #define KSEG3			0xe0000000
-
-//#define K0BASE			KSEG0
 
 /*
  * Returns the kernel segment base of a given address
@@ -148,25 +147,23 @@
 #define KUBASE			0
 #define KUSIZE_32		0x0000000080000000	/* KUSIZE
 							   for a 32 bit proc */
-//#define K0BASE			0xa800000000000000
-#define K0BASE_EXL_WR		K0BASE			/* exclusive on write */
+#define K0BASE_EXL_WR		0xa800000000000000	/* exclusive on write */
 #define K0BASE_NONCOH		0x9800000000000000	/* noncoherent */
 #define K0BASE_EXL		0xa000000000000000	/* exclusive */
 
-#ifdef CONFIG_SGI_IP27
-#define K1BASE			0x9600000000000000	/* uncached attr 3,
-							   uncac */
-#else
-#define K1BASE			0x9000000000000000
-#endif
-#define K2BASE			0xc000000000000000
+#ifndef CONFIG_CPU_R8000
 
-#if !defined (CONFIG_CPU_R8000)
+/*
+ * The R8000 doesn't have the 32-bit compat spaces so we don't define them
+ * in order to catch bugs in the source code.
+ */
+
 #define COMPAT_K1BASE32		0xffffffffa0000000
 #define PHYS_TO_COMPATK1(x)	((x) | COMPAT_K1BASE32) /* 32-bit compat k1 */
+
 #endif
 
 #define KDM_TO_PHYS(x)		(_ACAST64_ (x) & TO_PHYS_MASK)
-#define PHYS_TO_K0(x)		(_ACAST64_ (x) | K0BASE)
+#define PHYS_TO_K0(x)		(_ACAST64_ (x) | CAC_BASE)
 
 #endif /* _ASM_ADDRSPACE_H */

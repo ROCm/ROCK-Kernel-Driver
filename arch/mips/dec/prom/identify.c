@@ -2,11 +2,12 @@
  * identify.c: machine identification code.
  *
  * Copyright (C) 1998 Harald Koerfgen and Paul M. Antoine
- * Copyright (C) 2002, 2003  Maciej W. Rozycki
+ * Copyright (C) 2002, 2003, 2004  Maciej W. Rozycki
  */
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/mc146818rtc.h>
+#include <linux/module.h>
 #include <linux/string.h>
 #include <linux/types.h>
 
@@ -61,6 +62,10 @@ const char *get_system_type(void)
  * early.  Semantically the functions belong to prom/init.c, but they
  * are compact enough we want them inlined. --macro
  */
+volatile u8 *dec_rtc_base;
+
+EXPORT_SYMBOL(dec_rtc_base);
+
 static inline void prom_init_kn01(void)
 {
 	dec_rtc_base = (void *)KN01_RTC_BASE;
@@ -100,11 +105,13 @@ void __init prom_identify_arch(u32 magic)
 	u32 dec_sysid;
 
 	if (!prom_is_rex(magic)) {
-		dec_sysid = simple_strtoul(prom_getenv("systype"), (char **)0, 0);
+		dec_sysid = simple_strtoul(prom_getenv("systype"),
+					   (char **)0, 0);
 	} else {
 		dec_sysid = rex_getsysid();
 		if (dec_sysid == 0) {
-			prom_printf("Zero sysid returned from PROMs! Assuming PMAX-like machine.\n");
+			printk("Zero sysid returned from PROM! "
+			       "Assuming a PMAX-like machine.\n");
 			dec_sysid = 1;
 		}
 	}
@@ -163,10 +170,8 @@ void __init prom_identify_arch(u32 magic)
 	}
 
 	if (mips_machtype == MACH_DSUNKNOWN)
-		prom_printf("This is an %s, id is %x\n",
-			    dec_system_strings[mips_machtype],
-			    dec_systype);
+		printk("This is an %s, id is %x\n",
+		       dec_system_strings[mips_machtype], dec_systype);
 	else
-		prom_printf("This is a %s\n",
-			    dec_system_strings[mips_machtype]);
+		printk("This is a %s\n", dec_system_strings[mips_machtype]);
 }
