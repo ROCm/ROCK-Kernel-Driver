@@ -680,16 +680,21 @@ Module parameters
 			* ALi m5455
 
     ac97_clock	  - AC'97 codec clock base (0 = auto-detect)
-    ac97_quirk    - AC'97 workaround for strange hardware (-1 = default)
-                    -1 = default, don't override
-                     0 = disable
-                     1 = use headphone control as master
-                     2 = swap headphone and master controls
-                     3 = for AD1985, turn on OMS bit and use headphone
-                     4 = for ALC65x, turn on the jack sense mode
-                     5 = inverted EAPD implementation
-    buggy_irq      - Enable workaround for buggy interrupts on some
-                     motherboards (default off)
+    ac97_quirk    - AC'97 workaround for strange hardware
+                    The following strings are accepted:
+                      default = don't override the default setting
+                      disable = disable the quirk
+                      hp_only = use headphone control as master
+                      swap_hp = swap headphone and master controls
+                      swap_surround = swap master and surround controls
+                      ad_shring = for AD1985, turn on OMS bit and use headphone
+                      alc_jack = for ALC65x, turn on the jack sense mode
+                      inv_eapd = inverted EAPD implementation
+                      mute_led = bind EAPD bit for turning on/off mute LED
+                    For backward compatibility, the corresponding integer
+                    value -1, 0, ... are accepted, too.
+    buggy_irq     - Enable workaround for buggy interrupts on some
+                    motherboards (default off)
 
     Module supports autoprobe and multiple bus-master chips (max 8).
 
