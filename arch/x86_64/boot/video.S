@@ -437,6 +437,7 @@ setalias:
 
 # Setting of user mode (AX=mode ID) => CF=success
 mode_set:
+       	movw    %ax, %fs:(0x01fa)
 	movw	%ax, %bx
 	cmpb	$0xff, %ah
 	jz	setalias

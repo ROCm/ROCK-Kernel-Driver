@@ -1,6 +1,12 @@
-#ifndef __ARCH_I386_PERCPU__
-#define __ARCH_I386_PERCPU__
+#ifndef __ARCH_X8664_PERCPU__
+#define __ARCH_X8664_PERCPU__
 
-#include <asm-generic/percpu.h>
+#include <asm/pda.h>
 
-#endif /* __ARCH_I386_PERCPU__ */
+/* var is in discarded region: offset to particular copy we want */
+#define this_cpu(var)     (*RELOC_HIDE(&var, read_pda(cpudata_offset)))
+#define per_cpu(var, cpu) (*RELOC_HIDE(&var, per_cpu_pda[cpu]))
+
+void setup_per_cpu_areas(void);
+
+#endif /* __ARCH_X8664_PERCPU__ */

@@ -2579,6 +2579,8 @@ int sys32_uname(struct old_utsname * name)
 	down_read(&uts_sem);
 	err=copy_to_user(name, &system_utsname, sizeof (*name));
 	up_read(&uts_sem);
+	if (current->personality == PER_LINUX32) 
+		err |= copy_to_user(&name->machine, "i386", 5);
 	return err?-EFAULT:0;
 }
 
@@ -3125,3 +3127,6 @@ static int __init ia32_init (void)
 }
 
 __initcall(ia32_init);
+
+extern unsigned long ia32_sys_call_table[];
+EXPORT_SYMBOL(ia32_sys_call_table);

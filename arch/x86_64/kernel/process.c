@@ -57,6 +57,8 @@
 
 asmlinkage extern void ret_from_fork(void);
 
+unsigned long kernel_thread_flags = CLONE_VM;
+
 int hlt_counter;
 
 /*
@@ -318,43 +320,10 @@ void show_regs(struct pt_regs * regs)
 	printk("CR2: %016lx CR3: %016lx CR4: %016lx\n", cr2, cr3, cr4);
 }
 
-/*
- * No need to lock the MM as we are the last user
- */
-void release_segments(struct mm_struct *mm)
-{
-	void * ldt = mm->context.segments;
-
-	/*
-	 * free the LDT
-	 */
-	if (ldt) {
-		mm->context.segments = NULL;
-		clear_LDT();
-		vfree(ldt);
-	}
-}
-
-void load_gs_index(unsigned gs)
-{
-	int access; 
-	/* should load gs in syscall exit after swapgs instead */ 
-	/* XXX need to add LDT locking for SMP to protect against parallel changes */ 
-	asm volatile("pushf\n\t" 
-		     "cli\n\t"
-		     "swapgs\n\t"
-		     "lar %1,%0\n\t"
-		     "jnz 1f\n\t"
-		     "movl %1,%%eax\n\t"
-		     "movl %%eax,%%gs\n\t"
-		     "jmp 2f\n\t"
-		     "1: movl %2,%%gs\n\t"
-		     "2: swapgs\n\t"
-		     "popf" : "=g" (access) : "g" (gs), "r" (0) : "rax"); 
-}
-	
 #define __STR(x) #x
 #define __STR2(x) __STR(x)
+
+extern void load_gs_index(unsigned);
 
 /*
  * Free current thread data structures etc..
@@ -379,41 +348,14 @@ void flush_thread(void)
 void release_thread(struct task_struct *dead_task)
 {
 	if (dead_task->mm) {
-		void * ldt = dead_task->mm->context.segments;
-
-		// temporary debugging check
-		if (ldt) {
-			printk("WARNING: dead process %8s still has LDT? <%p>\n",
-					dead_task->comm, ldt);
+		if (dead_task->mm->context.size) {
+			printk("WARNING: dead process %8s still has LDT? <%p/%d>\n",
+					dead_task->comm,
+					dead_task->mm->context.ldt,
+					dead_task->mm->context.size);
 			BUG();
 		}
 	}
-}
-
-/*
- * we do not have to muck with descriptors here, that is
- * done in switch_mm() as needed.
- */
-void copy_segments(struct task_struct *p, struct mm_struct *new_mm)
-{
-	struct mm_struct * old_mm;
-	void *old_ldt, *ldt;
- 
-	ldt = NULL;
-	old_mm = current->mm;
-	if (old_mm && (old_ldt = old_mm->context.segments) != NULL) {
-		/*
-		 * Completely new LDT, we initialize it from the parent:
-		 */
-		ldt = vmalloc(LDT_ENTRIES*LDT_ENTRY_SIZE);
-		if (!ldt)
-			printk(KERN_WARNING "ldt allocation failed\n");
-		else
-			memcpy(ldt, old_ldt, LDT_ENTRIES*LDT_ENTRY_SIZE);
-	}
-	new_mm->context.segments = ldt;
-	new_mm->context.cpuvalid = 0UL;
-	return;
 }
 
 int copy_thread(int nr, unsigned long clone_flags, unsigned long rsp, 

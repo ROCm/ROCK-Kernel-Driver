@@ -10,6 +10,7 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/string.h>
+#include <linux/bootmem.h>
 #include <asm/pda.h>
 #include <asm/pgtable.h>
 #include <asm/processor.h>
@@ -31,42 +32,64 @@ extern void ia32_cstar_target(void);
 
 extern struct task_struct init_task;
 
+extern unsigned char __per_cpu_start[], __per_cpu_end[]; 
+
 struct desc_ptr gdt_descr = { 0 /* filled in */, (unsigned long) gdt_table }; 
 struct desc_ptr idt_descr = { 256 * 16, (unsigned long) idt_table }; 
 
 char boot_cpu_stack[IRQSTACKSIZE] __cacheline_aligned;
 
+void __init setup_per_cpu_areas(void)
+{ 
+	unsigned long size, i;
+	unsigned char *ptr;
+
+	/* Copy section for each CPU (we discard the original) */
+	size = ALIGN(__per_cpu_end - __per_cpu_start, SMP_CACHE_BYTES);
+	if (!size)
+		return;
+
+	ptr = alloc_bootmem(size * NR_CPUS);
+
+	for (i = 0; i < NR_CPUS; i++, ptr += size) {
+		cpu_pda[cpu_logical_map(i)].cpudata_offset = ptr - __per_cpu_start;
+		memcpy(ptr, __per_cpu_start, size);
+	}
+} 
+
 void pda_init(int cpu)
 { 
         pml4_t *level4;
+	struct x8664_pda *pda = &cpu_pda[cpu];
 
 	if (cpu == 0) {
 		/* others are initialized in smpboot.c */
-		cpu_pda[cpu].pcurrent = &init_task;
-		cpu_pda[cpu].irqstackptr = boot_cpu_stack; 
+		pda->pcurrent = &init_task;
+		pda->irqstackptr = boot_cpu_stack; 
 		level4 = init_level4_pgt; 
 	} else {
-		cpu_pda[cpu].irqstackptr = (char *)
+		pda->irqstackptr = (char *)
 			__get_free_pages(GFP_ATOMIC, IRQSTACK_ORDER);
-		if (!cpu_pda[cpu].irqstackptr)
+		if (!pda->irqstackptr)
 			panic("cannot allocate irqstack for cpu %d\n", cpu); 
 		level4 = (pml4_t *)__get_free_pages(GFP_ATOMIC, 0); 
 	}
 	if (!level4) 
 		panic("Cannot allocate top level page for cpu %d", cpu); 
 
-	cpu_pda[cpu].level4_pgt = (unsigned long *)level4; 
+	pda->level4_pgt = (unsigned long *)level4; 
 	if (level4 != init_level4_pgt)
 		memcpy(level4, &init_level4_pgt, PAGE_SIZE); 
 	set_pml4(level4 + 510, mk_kernel_pml4(__pa_symbol(boot_vmalloc_pgt)));
 	asm volatile("movq %0,%%cr3" :: "r" (__pa(level4))); 
 
-	cpu_pda[cpu].irqstackptr += IRQSTACKSIZE-64;
-	cpu_pda[cpu].cpunumber = cpu; 
-	cpu_pda[cpu].irqcount = -1;
-	cpu_pda[cpu].kernelstack = 
+	pda->irqstackptr += IRQSTACKSIZE-64;
+	pda->cpunumber = cpu; 
+	pda->irqcount = -1;
+	pda->kernelstack = 
 		(unsigned long)stack_thread_info() - PDA_STACKOFFSET + THREAD_SIZE; 
-	cpu_pda[cpu].me = &cpu_pda[cpu];
+	pda->me = pda;
+	pda->cpudata_offset = 0;
 
 	asm volatile("movl %0,%%fs ; movl %0,%%gs" :: "r" (0)); 
 	wrmsrl(MSR_GS_BASE, cpu_pda + cpu);
@@ -74,7 +97,6 @@ void pda_init(int cpu)
 
 #define EXCEPTION_STK_ORDER 0 /* >= N_EXCEPTION_STACKS*EXCEPTION_STKSZ */
 char boot_exception_stacks[N_EXCEPTION_STACKS*EXCEPTION_STKSZ];
-
 
 /*
  * cpu_init() initializes state that is per-CPU. Some data is already
@@ -93,6 +115,7 @@ void __init cpu_init (void)
 	struct tss_struct * t = &init_tss[nr];
 	unsigned long v; 
 	char *estacks; 
+	struct task_struct *me;
 
 	/* CPU 0 is initialised in head64.c */
 	if (nr != 0) {
@@ -102,6 +125,8 @@ void __init cpu_init (void)
 		pda_init(nr);  
 	} else 
 		estacks = boot_exception_stacks; 
+
+	me = current;
 
 	if (test_and_set_bit(nr, &cpu_initialized))
 		panic("CPU#%d already initialized!\n", nr);
@@ -150,14 +175,14 @@ void __init cpu_init (void)
 	}
 
 	atomic_inc(&init_mm.mm_count);
-	current->active_mm = &init_mm;
-	if(current->mm)
+	me->active_mm = &init_mm;
+	if (me->mm)
 		BUG();
-	enter_lazy_tlb(&init_mm, current, nr);
+	enter_lazy_tlb(&init_mm, me, nr);
 
 	set_tss_desc(nr, t);
 	load_TR(nr);
-	load_LDT(&init_mm);
+	load_LDT(&init_mm.context);
 
 	/*
 	 * Clear all 6 debug registers:

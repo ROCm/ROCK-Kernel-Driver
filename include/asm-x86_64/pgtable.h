@@ -65,6 +65,7 @@ extern unsigned long empty_zero_page[1024];
 #define pgd_ERROR(e) \
 	printk("%s:%d: bad pgd %p(%016lx).\n", __FILE__, __LINE__, &(e), pgd_val(e))
 
+
 #define pml4_none(x)	(!pml4_val(x))
 #define pgd_none(x)	(!pgd_val(x))
 
@@ -98,13 +99,8 @@ static inline void set_pml4(pml4_t *dst, pml4_t val)
 #define pgd_page(pgd) \
 ((unsigned long) __va(pgd_val(pgd) & PAGE_MASK))
 
-/* Find an entry in the second-level page table.. */
-#define pmd_offset(dir, address) ((pmd_t *) pgd_page(*(dir)) + \
-			__pmd_offset(address))
-
 #define ptep_get_and_clear(xp)	__pte(xchg(&(xp)->pte, 0))
 #define pte_same(a, b)		((a).pte == (b).pte)
-#define __mk_pte(page_nr,pgprot) __pte(((page_nr) << PAGE_SHIFT) | pgprot_val(pgprot))
 
 #define PMD_SIZE	(1UL << PMD_SHIFT)
 #define PMD_MASK	(~(PMD_SIZE-1))
@@ -202,7 +198,7 @@ static inline void set_pml4(pml4_t *dst, pml4_t val)
 static inline unsigned long pgd_bad(pgd_t pgd) 
 { 
        unsigned long val = pgd_val(pgd);
-       val &= ~PAGE_MASK; 
+       val &= ~PTE_MASK; 
        val &= ~(_PAGE_USER | _PAGE_DIRTY); 
        return val & ~(_PAGE_PRESENT | _PAGE_RW | _PAGE_ACCESSED);      
 } 
@@ -211,14 +207,18 @@ static inline unsigned long pgd_bad(pgd_t pgd)
 #define pte_present(x)	(pte_val(x) & (_PAGE_PRESENT | _PAGE_PROTNONE))
 #define pte_clear(xp)	do { set_pte(xp, __pte(0)); } while (0)
 
-#define pmd_none(x)	(!pmd_val(x))
-#define pmd_present(x)	(pmd_val(x) & _PAGE_PRESENT)
-#define pmd_clear(xp)	do { set_pmd(xp, __pmd(0)); } while (0)
-#define	pmd_bad(x)	((pmd_val(x) & (~PAGE_MASK & ~_PAGE_USER)) != _KERNPG_TABLE )
-
 #define pages_to_mb(x) ((x) >> (20-PAGE_SHIFT))	/* FIXME: is this
 						   right? */
-#define pte_page(x) (mem_map+((unsigned long)((pte_val(x) >> PAGE_SHIFT))))
+#define pte_page(x)	pfn_to_page(pte_pfn(x))
+#define pte_pfn(x)  ((pte_val(x) >> PAGE_SHIFT) & __PHYSICAL_MASK)
+
+static inline pte_t pfn_pte(unsigned long page_nr, pgprot_t pgprot)
+{
+	pte_t pte;
+	pte_val(pte) = (page_nr << PAGE_SHIFT) | pgprot_val(pgprot); 
+	return pte;
+}
+
 
 /*
  * The following only work if pte_present() is true.
@@ -256,7 +256,7 @@ static inline void ptep_mkdirty(pte_t *ptep)			{ set_bit(_PAGE_BIT_DIRTY, ptep);
  * Level 4 access.
  * Never use these in the common code.
  */
-#define pml4_page(pml4) ((unsigned long) __va(pml4_val(pml4) & PAGE_MASK))
+#define pml4_page(pml4) ((unsigned long) __va(pml4_val(pml4) & PTE_MASK))
 #define pml4_index(address) ((address >> PML4_SHIFT) & (PTRS_PER_PML4-1))
 #define pml4_offset_k(address) (init_level4_pgt + pml4_index(address))
 #define mk_kernel_pml4(address) ((pml4_t){ (address) | _KERNPG_TABLE })
@@ -277,41 +277,42 @@ static inline pgd_t *pgd_offset_k(unsigned long address)
 	pml4_t pml4;
 
 	pml4 = init_level4_pgt[pml4_index(address)];
-	return __pgd_offset_k(__va(pml4_val(pml4) & PAGE_MASK), address);
+	return __pgd_offset_k(__va(pml4_val(pml4) & PTE_MASK), address);
 }
 
 #define __pgd_offset(address) pgd_index(address)
 #define pgd_offset(mm, address) ((mm)->pgd+pgd_index(address))
 
 /* PMD  - Level 2 access */
-#define pmd_page_kernel(pmd) ((unsigned long) __va(pmd_val(pmd) & PAGE_MASK))
-#define pmd_page(pmd)        (mem_map + (pmd_val(pmd) >> PAGE_SHIFT))
-
-#define __pmd_offset(address) \
-		(((address) >> PMD_SHIFT) & (PTRS_PER_PMD-1))
+#define pmd_page_kernel(pmd) ((unsigned long) __va(pmd_val(pmd) & PTE_MASK))
+#define pmd_page(pmd)        (mem_map + ((pmd_val(pmd) & PTE_MASK)>>PAGE_SHIFT))
+#define __pmd_offset(address) (((address) >> PMD_SHIFT) & (PTRS_PER_PMD-1))
+#define pmd_offset(dir, address) ((pmd_t *) pgd_page(*(dir)) + \
+			__pmd_offset(address))
+#define pmd_none(x)	(!pmd_val(x))
+#define pmd_present(x)	(pmd_val(x) & _PAGE_PRESENT)
+#define pmd_clear(xp)	do { set_pmd(xp, __pmd(0)); } while (0)
+#define	pmd_bad(x)	((pmd_val(x) & (~PTE_MASK & ~_PAGE_USER)) != _KERNPG_TABLE )
+#define pfn_pmd(nr,prot) (__pmd(((nr) << PAGE_SHIFT) | pgprot_val(prot)))
 
 /* PTE - Level 1 access. */
 
-#define mk_pte(page,pgprot) \
-({                                                                     \
-       pte_t __pte;                                                    \
-                                                                       \
-       set_pte(&__pte, __pte(((page)-mem_map) *                        \
-               (unsigned long long)PAGE_SIZE + pgprot_val(pgprot)));   \
-       __pte;                                                          \
-})
+/* page, protection -> pte */
+#define mk_pte(page, pgprot)	pfn_pte(page_to_pfn(page), (pgprot))
  
-/* This takes a physical page address that is used by the remapping functions */
+/* physical address -> PTE */
 static inline pte_t mk_pte_phys(unsigned long physpage, pgprot_t pgprot)
 { 
-       pte_t __pte; 
-       set_pte(&__pte, __pte(physpage + pgprot_val(pgprot))); 
-       return __pte;
+	pte_t pte;
+	pte_val(pte) = physpage | pgprot_val(pgprot); 
+	return pte; 
 }
  
+/* Change flags of a PTE */
 extern inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 { 
-       set_pte(&pte, __pte((pte_val(pte) & _PAGE_CHG_MASK) | pgprot_val(newprot))); 
+	pte_val(pte) &= _PAGE_CHG_MASK;
+	pte_val(pte) |= pgprot_val(newprot);
        return pte; 
 }
 

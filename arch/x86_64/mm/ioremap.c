@@ -9,6 +9,7 @@
  */
 
 #include <linux/vmalloc.h>
+#include <linux/init.h>
 #include <asm/io.h>
 #include <asm/pgalloc.h>
 #include <asm/fixmap.h>
@@ -165,5 +166,5 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
 void iounmap(void *addr)
 {
 	if (addr > high_memory)
-		return vfree((void *) (PAGE_MASK & (unsigned long) addr));
+		vfree((void *) (PAGE_MASK & (unsigned long) addr));
 }
