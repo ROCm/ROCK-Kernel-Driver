@@ -4,12 +4,18 @@
 
 export-objs := shmem.o filemap.o mempool.o page_alloc.o page-writeback.o
 
-obj-y	 := memory.o mmap.o filemap.o fremap.o mprotect.o mlock.o mremap.o \
-	    vmalloc.o slab.o bootmem.o swap.o vmscan.o page_alloc.o \
-	    oom_kill.o shmem.o highmem.o mempool.o msync.o mincore.o \
-	    readahead.o pdflush.o page-writeback.o rmap.o madvise.o \
-	    vcache.o truncate.o
+obj-y	    := bootmem.o filemap.o mempool.o oom_kill.o page_alloc.o \
+	       page-writeback.o pdflush.o readahead.o slab.o swap.o \
+	       truncate.o vcache.o vmscan.o
+
+obj-$(CONFIG_MMU)	+= fremap.o highmem.o madvise.o memory.o \
+			   mincore.o mlock.o mmap.o mprotect.o mremap.o \
+			   msync.o rmap.o shmem.o vmalloc.o
 
 obj-$(CONFIG_SWAP)	+= page_io.o swap_state.o swapfile.o
+
+ifneq ($(CONFIG_MMU),y)
+obj-y			+= nommu.o
+endif
 
 include $(TOPDIR)/Rules.make
