@@ -337,7 +337,7 @@ EXPORT_SYMBOL(cpm_free_handler);
 #if defined(CONFIG_8xx) || defined(CONFIG_4xx)
 EXPORT_SYMBOL(__res);
 #endif
-#if defined(CONFIG_8xx) || defined(CONFIG_8260)
+#if defined(CONFIG_8xx)
 EXPORT_SYMBOL(request_8xxirq);
 #endif
 

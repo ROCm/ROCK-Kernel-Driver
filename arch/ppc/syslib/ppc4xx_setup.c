@@ -228,8 +228,8 @@ ppc4xx_progress(char *s, unsigned short hex)
  */
 #if defined(CONFIG_PCI) && defined(CONFIG_IDE)
 static void
-ppc4xx_ide_init_hwif_ports(hw_regs_t * hw, ide_ioreg_t data_port,
-			   ide_ioreg_t ctrl_port, int *irq)
+ppc4xx_ide_init_hwif_ports(hw_regs_t * hw, unsigned long data_port,
+			   unsigned long ctrl_port, int *irq)
 {
 	int i;
 

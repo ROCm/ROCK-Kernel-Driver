@@ -807,7 +807,7 @@ int __init scc_enet_init(void)
 
 	/* Install our interrupt handler.
 	*/
-	request_8xxirq(SIU_INT_ENET, scc_enet_interrupt, 0, "enet", dev);
+	request_irq(SIU_INT_ENET, scc_enet_interrupt, 0, "enet", dev);
 
 	/* Set GSMR_H to enable all normal operating modes.
 	 * Set GSMR_L to enable Ethernet to MC68160.

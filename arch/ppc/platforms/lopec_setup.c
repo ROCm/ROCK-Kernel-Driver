@@ -104,9 +104,9 @@ lopec_power_off(void)
 
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
 int lopec_ide_ports_known = 0;
-static ide_ioreg_t lopec_ide_regbase[MAX_HWIFS];
-static ide_ioreg_t lopec_ide_ctl_regbase[MAX_HWIFS];
-static ide_ioreg_t lopec_idedma_regbase;
+static unsigned long lopec_ide_regbase[MAX_HWIFS];
+static unsigned long lopec_ide_ctl_regbase[MAX_HWIFS];
+static unsigned long lopec_idedma_regbase;
 
 static void
 lopec_ide_probe(void)
@@ -126,7 +126,7 @@ lopec_ide_probe(void)
 }
 
 static int
-lopec_ide_default_irq(ide_ioreg_t base)
+lopec_ide_default_irq(unsigned long base)
 {
 	if (lopec_ide_ports_known == 0)
 		lopec_ide_probe();
@@ -139,7 +139,7 @@ lopec_ide_default_irq(ide_ioreg_t base)
 		return 0;
 }
 
-static ide_ioreg_t
+static unsigned long
 lopec_ide_default_io_base(int index)
 {
 	if (lopec_ide_ports_known == 0)
@@ -148,10 +148,10 @@ lopec_ide_default_io_base(int index)
 }
 
 static void __init
-lopec_ide_init_hwif_ports(hw_regs_t *hw, ide_ioreg_t data,
-			  ide_ioreg_t ctl, int *irq)
+lopec_ide_init_hwif_ports(hw_regs_t *hw, unsigned long data,
+			  unsigned long ctl, int *irq)
 {
-	ide_ioreg_t reg = data;
+	unsigned long reg = data;
 	uint alt_status_base;
 	int i;
 

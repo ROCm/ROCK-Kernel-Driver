@@ -235,7 +235,7 @@ pplus_init_IRQ(void)
  * IDE stuff.
  */
 static int 
-pplus_ide_default_irq(ide_ioreg_t base)
+pplus_ide_default_irq(unsigned long base)
 {
 	switch (base) {
 		case 0x1f0: return 14;
@@ -244,7 +244,7 @@ pplus_ide_default_irq(ide_ioreg_t base)
 	}
 }
 
-static ide_ioreg_t 
+static unsigned long 
 pplus_ide_default_io_base(int index)
 {
 	switch (index) {
@@ -256,9 +256,9 @@ pplus_ide_default_io_base(int index)
 }
 
 static void __init
-pplus_ide_init_hwif_ports (hw_regs_t *hw, ide_ioreg_t data_port, ide_ioreg_t ctrl_port, int *irq)
+pplus_ide_init_hwif_ports (hw_regs_t *hw, unsigned long data_port, unsigned long ctrl_port, int *irq)
 {
-	ide_ioreg_t reg = data_port;
+	unsigned long reg = data_port;
 	int i;
 
 	for (i = IDE_DATA_OFFSET; i <= IDE_STATUS_OFFSET; i++) {

@@ -28,11 +28,8 @@ obj-$(CONFIG_PCI)		+= pci-dma.o
 obj-$(CONFIG_KGDB)		+= ppc-stub.o
 obj-$(CONFIG_SMP)		+= smp.o
 obj-$(CONFIG_TAU)		+= temp.o
-ifeq ($(CONFIG_8xx),y)
-ifneq ($(CONFIG_MATH_EMULATION),n)
-obj-y				+= softemu8xx.o
-endif
+
+ifdef CONFIG_MATH_EMULATION
+obj-$(CONFIG_8xx)		+= softemu8xx.o
 endif
 
-find_name : find_name.c
-	$(HOSTCC) $(HOSTCFLAGS) -o find_name find_name.c
