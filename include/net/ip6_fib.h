@@ -20,6 +20,7 @@
 #include <net/dst.h>
 #include <net/flow.h>
 #include <linux/rtnetlink.h>
+#include <linux/spinlock.h>
 
 struct rt6_info;
 

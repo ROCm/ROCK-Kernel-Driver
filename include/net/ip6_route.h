@@ -11,8 +11,10 @@
 
 #include <net/flow.h>
 #include <net/ip6_fib.h>
+#include <net/sock.h>
 #include <linux/tcp.h>
 #include <linux/ip.h>
+#include <linux/ipv6.h>
 
 struct pol_chain {
 	int			type;
