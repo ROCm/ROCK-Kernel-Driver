@@ -637,12 +637,10 @@ static struct of_platform_driver i2c_keywest_of_platform_driver =
 static int __init
 i2c_keywest_init(void)
 {
-	int rc;
+	macio_register_driver(&i2c_keywest_macio_driver);
+	of_register_driver(&i2c_keywest_of_platform_driver);
 
-	rc = macio_register_driver(&i2c_keywest_macio_driver);
-	rc |= of_register_driver(&i2c_keywest_of_platform_driver);
-	
-	return (rc == 0) ? 0 : -ENODEV;
+	return 0;
 }
 
 static void __exit
