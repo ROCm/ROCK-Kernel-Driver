@@ -471,7 +471,6 @@ static inline struct inode *SOCK_INODE(struct socket *socket)
 	return &list_entry(socket, struct socket_alloc, socket)->vfs_inode;
 }
 
-#include <linux/shmem_fs.h>
 /* will die */
 #include <linux/coda_fs_i.h>
 #include <linux/ext3_fs_i.h>
@@ -697,7 +696,6 @@ struct super_block {
 		struct sysv_sb_info	sysv_sb;
 		struct affs_sb_info	affs_sb;
 		struct ufs_sb_info	ufs_sb;
-		struct shmem_sb_info	shmem_sb;
 		struct romfs_sb_info	romfs_sb;
 		struct hfs_sb_info	hfs_sb;
 		struct adfs_sb_info	adfs_sb;
