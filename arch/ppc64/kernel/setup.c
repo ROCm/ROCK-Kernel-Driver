@@ -67,6 +67,7 @@ extern void  pmac_init(unsigned long r3,
 		       unsigned long r6,
 		       unsigned long r7);
 
+extern void fw_feature_init(void);
 extern void iSeries_init( void );
 extern void iSeries_init_early( void );
 extern void pSeries_init_early( void );
@@ -279,11 +280,13 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 
 #ifdef CONFIG_PPC_PSERIES
 	case PLATFORM_PSERIES:
+		fw_feature_init();
 		pSeries_init_early();
 		parse_bootinfo();
 		break;
 
 	case PLATFORM_PSERIES_LPAR:
+		fw_feature_init();
 		pSeriesLP_init_early();
 		parse_bootinfo();
 		break;
