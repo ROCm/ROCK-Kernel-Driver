@@ -7,7 +7,7 @@ comment 'ISDN subsystem'
 if [ "$CONFIG_NET" != "n" ]; then
    bool 'ISDN support' CONFIG_ISDN_BOOL
 
-   if [ "$CONFIG_ISDN_BOOL" == "y" ]; then
+   if [ "$CONFIG_ISDN_BOOL" = "y" ]; then
       mainmenu_option next_comment
       comment 'Old ISDN4Linux'
 
