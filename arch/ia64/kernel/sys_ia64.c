@@ -2,7 +2,7 @@
  * This file contains various system calls that have different calling
  * conventions on different platforms.
  *
- * Copyright (C) 1999-2000, 2002 Hewlett-Packard Co
+ * Copyright (C) 1999-2000, 2002-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 #include <linux/config.h>
@@ -20,6 +20,7 @@
 
 #include <asm/shmparam.h>
 #include <asm/uaccess.h>
+#include <asm/unistd.h>
 
 unsigned long
 arch_get_unmapped_area (struct file *filp, unsigned long addr, unsigned long len,
