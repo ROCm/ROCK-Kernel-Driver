@@ -147,6 +147,7 @@ static unsigned long __inline__ count_leading_zeros64( unsigned long x )
 	return lz;
 }
 
+#ifdef CONFIG_PPC_ISERIES
 static void tce_build_iSeries(struct TceTable *tbl, long tcenum, 
 			       unsigned long uaddr, int direction )
 {
@@ -180,7 +181,9 @@ static void tce_build_iSeries(struct TceTable *tbl, long tcenum,
 		panic("PCI_DMA: HvCallXm_setTce failed, Rc: 0x%lx\n", setTceRc);
 	}
 }
+#endif
 
+#ifdef CONFIG_PPC_PSERIES
 static void tce_build_pSeries(struct TceTable *tbl, long tcenum, 
 			       unsigned long uaddr, int direction )
 {
@@ -199,8 +202,8 @@ static void tce_build_pSeries(struct TceTable *tbl, long tcenum,
 
 	tce_addr = ((union Tce *)tbl->base) + tcenum;
 	*tce_addr = (union Tce)tce.wholeTce;
-
 }
+#endif
 
 /* 
  * Build a TceTable structure.  This contains a multi-level bit map which
@@ -548,6 +551,7 @@ static inline dma_addr_t get_tces( struct TceTable *tbl, unsigned order, void *p
 	return retTce; 
 }
 
+#ifdef CONFIG_PPC_ISERIES
 static void tce_free_one_iSeries( struct TceTable *tbl, long tcenum )
 {
 	u64 set_tce_rc;
@@ -560,7 +564,9 @@ static void tce_free_one_iSeries( struct TceTable *tbl, long tcenum )
 		panic("PCI_DMA: HvCallXm_setTce failed, Rc: 0x%lx\n", set_tce_rc);
 
 }
+#endif
 
+#ifdef CONFIG_PPC_PSERIES
 static void tce_free_one_pSeries( struct TceTable *tbl, long tcenum )
 {
 	union Tce tce;
@@ -572,6 +578,7 @@ static void tce_free_one_pSeries( struct TceTable *tbl, long tcenum )
 	*tce_addr = (union Tce)tce.wholeTce;
 
 }
+#endif
 
 static void tce_free(struct TceTable *tbl, dma_addr_t dma_addr, 
 			     unsigned order, unsigned num_pages)
@@ -609,6 +616,7 @@ static void tce_free(struct TceTable *tbl, dma_addr_t dma_addr,
 	free_tce_range( tbl, free_tce, order );
 }
 
+#ifdef CONFIG_PPC_ISERIES
 void __init create_virtual_bus_tce_table(void)
 {
 	struct TceTable *t;
@@ -661,6 +669,7 @@ void __init create_virtual_bus_tce_table(void)
 	}
 	else printk( "Virtual Bus VIO TCE table failed.\n");
 }
+#endif
 
 void create_tce_tables_for_buses(struct list_head *bus_list)
 {
@@ -842,6 +851,7 @@ static struct TceTable* findHwTceTable(struct TceTable * newTceTable )
 static void getTceTableParmsiSeries(struct iSeries_Device_Node* DevNode,
 				    struct TceTable* newTceTable )
 {
+#ifdef CONFIG_PPC_ISERIES
 	struct TceTableManagerCB* pciBusTceTableParms = (struct TceTableManagerCB*)kmalloc( sizeof(struct TceTableManagerCB), GFP_KERNEL );
 	if(pciBusTceTableParms == NULL) panic("PCI_DMA: TCE Table Allocation failed.");
 
@@ -872,6 +882,7 @@ static void getTceTableParmsiSeries(struct iSeries_Device_Node* DevNode,
 	newTceTable->tceType     = TCE_PCI;
 
 	kfree(pciBusTceTableParms);
+#endif
 }
 
 static void getTceTableParmsPSeries(struct pci_controller *phb,
@@ -1440,15 +1451,19 @@ void pci_unmap_sg(struct pci_dev *pdev, struct scatterlist *sglist, int nelems,
 }
 #endif
 
+#ifdef CONFIG_PPC_PSERIES
 /* These are called very early. */
 void tce_init_pSeries(void)
 {
 	ppc_md.tce_build = tce_build_pSeries;
 	ppc_md.tce_free_one = tce_free_one_pSeries;
 }
+#endif
 
+#ifdef CONFIG_PPC_ISERIES
 void tce_init_iSeries(void)
 {
 	ppc_md.tce_build = tce_build_iSeries;
 	ppc_md.tce_free_one = tce_free_one_iSeries;
 }
+#endif

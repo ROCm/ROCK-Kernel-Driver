@@ -86,6 +86,7 @@ static inline void set_tb(unsigned int upper, unsigned int lower)
 	mttbl(lower);
 }
 
+#ifdef CONFIG_PPC_ISERIES
 void iSeries_smp_message_recv( struct pt_regs * regs )
 {
 	int cpu = smp_processor_id();
@@ -117,7 +118,6 @@ static void smp_iSeries_message_pass(int target, int msg, unsigned long data, in
 	}
 }
 
-#ifdef CONFIG_PPC_ISERIES
 static int smp_iSeries_numProcs(void)
 {
 	unsigned np, i;
@@ -132,7 +132,6 @@ static int smp_iSeries_numProcs(void)
         }
 	return np;
 }
-#endif
 
 static int smp_iSeries_probe(void)
 {
@@ -189,13 +188,12 @@ void __init smp_init_iSeries(void)
 	smp_ops->probe        = smp_iSeries_probe;
 	smp_ops->kick_cpu     = smp_iSeries_kick_cpu;
 	smp_ops->setup_cpu    = smp_iSeries_setup_cpu;
-#ifdef CONFIG_PPC_ISERIES
 #warning fix for iseries
 	naca->processorCount	= smp_iSeries_numProcs();
-#endif
 }
+#endif
 
-
+#ifdef CONFIG_PPC_PSERIES
 static void
 smp_openpic_message_pass(int target, int msg, unsigned long data, int wait)
 {
@@ -257,6 +255,7 @@ smp_kick_cpu(int nr)
 	 */
 	paca[nr].xProcStart = 1;
 }
+#endif
 
 static void __init smp_space_timers(unsigned int max_cpus)
 {
@@ -273,6 +272,7 @@ static void __init smp_space_timers(unsigned int max_cpus)
 	}
 }
 
+#ifdef CONFIG_PPC_PSERIES
 static void __devinit pSeries_setup_cpu(int cpu)
 {
 	if (OpenPIC_Addr) {
@@ -361,6 +361,7 @@ void __init smp_init_pSeries(void)
 	smp_ops->kick_cpu = smp_kick_cpu;
 	smp_ops->setup_cpu = pSeries_setup_cpu;
 }
+#endif
 
 void smp_local_timer_interrupt(struct pt_regs * regs)
 {

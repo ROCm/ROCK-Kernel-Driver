@@ -301,9 +301,11 @@ int timer_interrupt(struct pt_regs * regs)
         	next_dec = lpaca->default_decr;
 	set_dec(next_dec);
 
+#ifdef CONFIG_PPC_ISERIES
 	lpq = lpaca->lpQueuePtr;
 	if (lpq && ItLpQueue_isLpIntPending(lpq))
 		lpEvent_count += ItLpQueue_process(lpq, regs); 
+#endif
 
 	irq_exit();
 
@@ -458,9 +460,11 @@ void __init time_init(void)
 
 	ppc_md.calibrate_decr();
 
-	if ( ! piranha_simulator ) {
+#ifdef CONFIG_PPC_ISERIES
+	if (!piranha_simulator)
+#endif
 		ppc_md.get_boot_time(&tm);
-	}
+
 	write_lock_irqsave(&xtime_lock, flags);
 	xtime.tv_sec = mktime(tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
 			      tm.tm_hour, tm.tm_min, tm.tm_sec);

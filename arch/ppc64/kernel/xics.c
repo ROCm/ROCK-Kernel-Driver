@@ -22,7 +22,7 @@
 #include <asm/naca.h>
 #include <asm/rtas.h>
 #include "i8259.h"
-#include "xics.h"
+#include <asm/xics.h>
 #include <asm/ppcdebug.h>
 #include <asm/machdep.h>
 
@@ -428,15 +428,6 @@ nextnode:
 	irq_desc[XICS_IPI+XICS_IRQ_OFFSET].status |= IRQ_PER_CPU;
 #endif
 	ppc64_boot_msg(0x21, "XICS Done");
-}
-
-void xics_isa_init(void)
-{
-	return;
-	if (request_irq(xics_irq_8259_cascade + XICS_IRQ_OFFSET, no_action,
-			0, "8259 cascade", 0))
-		printk(KERN_ERR "xics_init_IRQ: couldn't get 8259 cascade\n");
-	i8259_init();
 }
 
 void xics_set_affinity(unsigned int virq, unsigned long cpumask)
