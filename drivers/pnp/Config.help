@@ -6,15 +6,22 @@ CONFIG_PNP
   or using a user-space utility.
 
   Say Y here if you would like Linux to configure your Plug and Play
-  devices. You should then also say Y to "ISA Plug and Play support",
-  below. Alternatively, you can say N here and configure your PnP
-  devices using the user space utilities contained in the isapnptools
-  package.
+  devices. You should then also say Y to all of the protocols below.
+  Alternatively, you can say N here and configure your PnP devices
+  using user space utilities such as the isapnptools package.
 
-  This support is also available as a module ( = code which can be
-  inserted in and removed from the running kernel whenever you want).
-  If you want to compile it as a module, say M here and read
-  <file:Documentation/modules.txt>.
+  If unsure, say Y.
+
+CONFIG_PNP_NAMES
+  Select Y if you want the Plug and Play Layer to keep a database of
+  human readable names for your PnP devices.  It will increase the size
+  of the kernel image by around 5 KB and use 16 KB of system memory.
+
+  If unsure, say Y.
+
+CONFIG_PNP_DEBUG
+  Say Y if you want the Plug and Play Layer to print debug messages.  
+  This is useful if you are developing a PnP driver or troubleshooting.
 
 CONFIG_ISAPNP
   Say Y here if you would like support for ISA Plug and Play devices.
@@ -32,8 +39,8 @@ CONFIG_PNPBIOS
   Specification Version 1.0A May 5, 1994" to autodetect built-in
   mainboard resources (e.g. parallel port resources).
 
-  Other features (e.g. change resources, ESCD, event notification,
-  Docking station information, ISAPNP services) are not used.
+  Some features (e.g. event notification, docking station information,
+  ISAPNP services) are not used.
 
   Note: ACPI is expected to supersede PNPBIOS some day, currently it
   co-exists nicely.

@@ -7,6 +7,8 @@
  *
  *  Copyright (C) 2001 Russell King, All Rights Reserved.
  *
+ *  Ported to the Linux PnP Layer - (C) Adam Belay.
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License.
@@ -16,7 +18,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/pci.h>
-#include <linux/isapnp.h>
+#include <linux/pnp.h>
 #include <linux/string.h>
 #include <linux/kernel.h>
 #include <linux/serial.h>
@@ -28,13 +30,15 @@
 
 #include "8250.h"
 
-struct pnpbios_device_id
-{
-	char id[8];
-	unsigned long driver_data;
+#define UNKNOWN_DEV 0x3000
+
+
+static const struct pnp_id pnp_card_table[] = {
+	{	"ANYDEVS",		0	},
+	{	"",			0	}
 };
 
-static const struct pnpbios_device_id pnp_dev_table[] = {
+static const struct pnp_id pnp_dev_table[] = {
 	/* Archtek America Corp. */
 	/* Archtek SmartLink Modem 3334BT Plug & Play */
 	{	"AAC000F",		0	},
@@ -43,6 +47,8 @@ static const struct pnpbios_device_id pnp_dev_table[] = {
 	{	"ADC0001",		0	},
 	/* SXPro 288 External Data Fax Modem Plug & Play */
 	{	"ADC0002",		0	},
+	/* Actiontec ISA PNP 56K X2 Fax Modem */
+	{	"AEI1240",		0	},
 	/* Rockwell 56K ACF II Fax+Data+Voice Modem */
 	{	"AKY1021",		SPCI_FL_NO_SHIRQ	},
 	/* AZT3005 PnP SOUND DEVICE */
@@ -303,18 +309,22 @@ static const struct pnpbios_device_id pnp_dev_table[] = {
 	{	"USR9180",		0	},
 	/* U.S. Robotics 56K Voice INT PnP*/
 	{	"USR9190",		0	},
+	/* Unkown PnP modems */
+	{	"PNPCXXX",		UNKNOWN_DEV	},
+	/* More unkown PnP modems */
+	{	"PNPDXXX",		UNKNOWN_DEV	},
 	{	"",			0	}
 };
 
-static void inline avoid_irq_share(struct pci_dev *dev)
+static void inline avoid_irq_share(struct pnp_dev *dev)
 {
 	unsigned int map = 0x1FF8;
-	struct isapnp_irq *irq;
-	struct isapnp_resources *res = dev->sysdata;
+	struct pnp_irq *irq;
+	struct pnp_resources *res = dev->res;
 
 	serial8250_get_irq_map(&map);
 
-	for ( ; res; res = res->alt)
+	for ( ; res; res = res->dep)
 		for (irq = res->irq; irq; irq = irq->next)
 			irq->map = map;
 }
@@ -337,43 +347,30 @@ static int __devinit check_name(char *name)
 	return 0;
 }
 
-static int inline check_compatible_id(struct pci_dev *dev)
-{
-	int i;
-	for (i = 0; i < DEVICE_COUNT_COMPATIBLE; i++)
-		if ((dev->vendor_compatible[i] ==
-		     ISAPNP_VENDOR('P', 'N', 'P')) &&
-		    (swab16(dev->device_compatible[i]) >= 0xc000) &&
-		    (swab16(dev->device_compatible[i]) <= 0xdfff))
-			return 0;
-	return 1;
-}
-
 /*
- * Given a complete unknown ISA PnP device, try to use some heuristics to
+ * Given a complete unknown PnP device, try to use some heuristics to
  * detect modems. Currently use such heuristic set:
  *     - dev->name or dev->bus->name must contain "modem" substring;
  *     - device must have only one IO region (8 byte long) with base adress
  *       0x2e8, 0x3e8, 0x2f8 or 0x3f8.
  *
  * Such detection looks very ugly, but can detect at least some of numerous
- * ISA PnP modems, alternatively we must hardcode all modems in pnp_devices[]
+ * PnP modems, alternatively we must hardcode all modems in pnp_devices[]
  * table.
  */
-static int serial_pnp_guess_board(struct pci_dev *dev, int *flags)
+static int serial_pnp_guess_board(struct pnp_dev *dev, int *flags)
 {
-	struct isapnp_resources *res = (struct isapnp_resources *)dev->sysdata;
-	struct isapnp_resources *resa;
+	struct pnp_resources *res = dev->res;
+	struct pnp_resources *resa;
 
-	if (!(check_name(dev->name) || check_name(dev->bus->name)) &&
-	    !(check_compatible_id(dev)))
+	if (!(check_name(dev->name) || check_name(dev->card->name)))
 		return -ENODEV;
 
-	if (!res || res->next)
+	if (!res)
 		return -ENODEV;
 
-	for (resa = res->alt; resa; resa = resa->alt) {
-		struct isapnp_port *port;
+	for (resa = res->dep; resa; resa = resa->dep) {
+		struct pnp_port *port;
 		for (port = res->port; port; port = port->next)
 			if ((port->size == 8) &&
 			    ((port->min == 0x2f8) ||
@@ -387,42 +384,19 @@ static int serial_pnp_guess_board(struct pci_dev *dev, int *flags)
 }
 
 static int
-pnp_init_one(struct pci_dev *dev, const struct pnpbios_device_id *ent,
-	     char *slot_name)
+serial_pnp_probe(struct pnp_dev * dev, const struct pnp_id *card_id, const struct pnp_id *dev_id)
 {
 	struct serial_struct serial_req;
-	int ret, line, flags = ent ? ent->driver_data : 0;
-
-	if (!ent) {
+	int ret, line, flags = dev_id->driver_data;
+	if (flags & UNKNOWN_DEV)
 		ret = serial_pnp_guess_board(dev, &flags);
-		if (ret)
-			return ret;
-	}
-
-	if (dev->prepare(dev) < 0) {
-		printk("serial: PNP device '%s' prepare failed\n",
-			slot_name);
-		return -ENODEV;
-	}
-
-	if (dev->active)
-		return -ENODEV;
-
 	if (flags & SPCI_FL_NO_SHIRQ)
 		avoid_irq_share(dev);
-
-	if (dev->activate(dev) < 0) {
-		printk("serial: PNP device '%s' activate failed\n",
-			slot_name);
-		return -ENODEV;
-	}
-
 	memset(&serial_req, 0, sizeof(serial_req));
 	serial_req.irq = dev->irq_resource[0].start;
 	serial_req.port = pci_resource_start(dev, 0);
 	if (HIGH_BITS_OFFSET)
-		serial_req.port = pci_resource_start(dev, 0) >> HIGH_BITS_OFFSET;
-
+		serial_req.port = dev->resource[0].start >> HIGH_BITS_OFFSET;
 #ifdef SERIAL_DEBUG_PNP
 	printk("Setup PNP port: port %x, irq %d, type %d\n",
 	       serial_req.port, serial_req.irq, serial_req.io_type);
@@ -432,110 +406,33 @@ pnp_init_one(struct pci_dev *dev, const struct pnpbios_device_id *ent,
 	serial_req.baud_base = 115200;
 	line = register_serial(&serial_req);
 
-	if (line >= 0) {
-		pci_set_drvdata(dev, (void *)(line + 1));
-
-		/*
-		 * Public health warning: remove this once the 2.5
-		 * pnpbios_module_init() stuff is incorporated.
-		 */
-		dev->driver = (void *)pnp_dev_table;
-	} else
-		dev->deactivate(dev);
-
+	if (line >= 0)
+		dev->driver_data = (void *)(line + 1);
 	return line >= 0 ? 0 : -ENODEV;
+
 }
 
-static void pnp_remove_one(struct pci_dev *dev)
+static void serial_pnp_remove(struct pnp_dev * dev)
 {
-	int line = (int)pci_get_drvdata(dev);
-
-	if (line) {
-		pci_set_drvdata(dev, NULL);
-
-		unregister_serial(line - 1);
-
-		dev->deactivate(dev);
-	}
+	return;
 }
 
-static char hex[] = "0123456789ABCDEF";
-
-/*
- * This function should vanish when 2.5 comes around and
- * we have pnpbios_module_init()
- */
-static int pnp_init(void)
-{
-	const struct pnpbios_device_id *id;
-	struct pci_dev *dev = NULL;
-	int nr = 0, rc = -ENODEV;
-
-#ifdef SERIAL_DEBUG_PNP
-	printk("Entered probe_serial_pnp()\n");
-#endif
-
-	isapnp_for_each_dev(dev) {
-		char slot_name[8];
-		u32 pnpid;
-
-		if (dev->active)
-			continue;
-
-		pnpid = dev->vendor << 16 | dev->device;
-		pnpid = cpu_to_le32(pnpid);
-
-#define HEX(id,a) hex[((id)>>a) & 15]
-#define CHAR(id,a) (0x40 + (((id)>>a) & 31))
-		slot_name[0] = CHAR(pnpid, 26);
-		slot_name[1] = CHAR(pnpid, 21);
-		slot_name[2] = CHAR(pnpid, 16);
-		slot_name[3] = HEX(pnpid, 12);
-		slot_name[4] = HEX(pnpid, 8);
-		slot_name[5] = HEX(pnpid, 4);
-		slot_name[6] = HEX(pnpid, 0);
-		slot_name[7] = '\0';
-		
-		for (id = pnp_dev_table; id->id[0]; id++)
-			if (memcmp(id->id, slot_name, 7) == 0)
-				break;
-
-		if (id->id[0])
-			rc = pnp_init_one(dev, id, slot_name);
-		else
-			rc = pnp_init_one(dev, NULL, slot_name);
-
-		if (rc == 0)
-			nr++;
-	}
-
-#ifdef SERIAL_DEBUG_PNP
-	printk("Leaving probe_serial_pnp() (probe finished)\n");
-#endif
-
-	return nr == 0 ? rc : 0;
-}
+static struct pnp_driver serial_pnp_driver = {
+	.name		= "serial",
+	.card_id_table	= pnp_card_table,
+	.id_table	= pnp_dev_table,
+	.probe		= serial_pnp_probe,
+	.remove		= serial_pnp_remove,
+};
 
 static int __init serial8250_pnp_init(void)
 {
-	if (!isapnp_present()) {
-#ifdef SERIAL_DEBUG_PNP
-		printk("Leaving probe_serial_pnp() (no isapnp)\n");
-#endif
-		return -ENODEV;
-	}
-	return pnp_init();
+	return pnp_register_driver(&serial_pnp_driver);
 }
 
 static void __exit serial8250_pnp_exit(void)
 {
-	struct pci_dev *dev = NULL;
-
-	isapnp_for_each_dev(dev) {
-		if (dev->driver != (void *)pnp_dev_table)
-			continue;
-		pnp_remove_one(dev);
-	}
+	/* FIXME */
 }
 
 module_init(serial8250_pnp_init);
@@ -544,5 +441,6 @@ module_exit(serial8250_pnp_exit);
 EXPORT_NO_SYMBOLS;
 
 MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("Generic 8250/16x50 PNPBIOS serial probe module");
-MODULE_DEVICE_TABLE(pnpbios, pnp_dev_table);
+MODULE_DESCRIPTION("Generic 8250/16x50 PnP serial driver");
+/* FIXME */
+/*MODULE_DEVICE_TABLE(pnpbios, pnp_dev_table);*/

@@ -15,6 +15,9 @@
  *   Thomas Hood <jdthood@mail.com>
  *   Brian Gerst <bgerst@didntduck.org>
  *
+ * Ported to the PnP Layer and several additional improvements (C) 2002
+ * by Adam Belay <ambx1@neo.rr.com>
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
  * Free Software Foundation; either version 2, or (at your option) any
@@ -36,6 +39,8 @@
 #include <linux/linkage.h>
 #include <linux/kernel.h>
 #include <linux/pnpbios.h>
+#include <linux/device.h>
+#include <linux/pnp.h>
 #include <asm/page.h>
 #include <asm/system.h>
 #include <linux/mm.h>
@@ -242,9 +247,6 @@ static int pnp_bios_present(void)
 	return (pnp_bios_hdr != NULL);
 }
 
-/* Forward declaration */
-static void update_devlist( u8 nodenum, struct pnp_bios_node *data );
-
 
 /*
  *
@@ -351,11 +353,9 @@ int pnp_bios_set_dev_node(u8 nodenum, char boot, struct pnp_bios_node *data)
 		return status;
 	}
 	if ( !boot ) { /* Update devlist */
-		u8 thisnodenum = nodenum;
 		status =  pnp_bios_get_dev_node( &nodenum, boot, data );
 		if ( status )
 			return status;
-		update_devlist( thisnodenum, data );
 	}
 	return status;
 }
@@ -658,20 +658,17 @@ static int pnp_dock_thread(void * unused)
 #endif
 			}
 		}
-	}	
+	}
 	complete_and_exit(&unload_sem, 0);
 }
 
 #endif   /* CONFIG_HOTPLUG */
 
 
-/*
- *
- * NODE DATA PARSING FUNCTIONS
- *
- */
+/* pnp current resource reading functions */
 
-static void add_irqresource(struct pci_dev *dev, int irq)
+
+static void add_irqresource(struct pnp_dev *dev, int irq)
 {
 	int i = 0;
 	while (!(dev->irq_resource[i].flags & IORESOURCE_UNSET) && i < DEVICE_COUNT_IRQ) i++;
@@ -681,9 +678,9 @@ static void add_irqresource(struct pci_dev *dev, int irq)
 	}
 }
 
-static void add_dmaresource(struct pci_dev *dev, int dma)
+static void add_dmaresource(struct pnp_dev *dev, int dma)
 {
-	int i = 0;
+	int i = 8;
 	while (!(dev->dma_resource[i].flags & IORESOURCE_UNSET) && i < DEVICE_COUNT_DMA) i++;
 	if (i < DEVICE_COUNT_DMA) {
 		dev->dma_resource[i].start = (unsigned long) dma;
@@ -691,7 +688,7 @@ static void add_dmaresource(struct pci_dev *dev, int dma)
 	}
 }
 
-static void add_ioresource(struct pci_dev *dev, int io, int len)
+static void add_ioresource(struct pnp_dev *dev, int io, int len)
 {
 	int i = 0;
 	while (!(dev->resource[i].flags & IORESOURCE_UNSET) && i < DEVICE_COUNT_RESOURCE) i++;
@@ -702,7 +699,7 @@ static void add_ioresource(struct pci_dev *dev, int io, int len)
 	}
 }
 
-static void add_memresource(struct pci_dev *dev, int mem, int len)
+static void add_memresource(struct pnp_dev *dev, int mem, int len)
 {
 	int i = 0;
 	while (!(dev->resource[i].flags & IORESOURCE_UNSET) && i < DEVICE_COUNT_RESOURCE) i++;
@@ -713,7 +710,7 @@ static void add_memresource(struct pci_dev *dev, int mem, int len)
 	}
 }
 
-static void node_resource_data_to_dev(struct pnp_bios_node *node, struct pci_dev *dev)
+static unsigned char *node_current_resource_data_to_dev(struct pnp_bios_node *node, struct pnp_dev *dev)
 {
 	unsigned char *p = node->data, *lastp=NULL;
 	int i;
@@ -774,8 +771,11 @@ static void node_resource_data_to_dev(struct pnp_bios_node *node, struct pci_dev
                         p = p + p[1] + p[2]*256 + 3;
                         continue;
                 }
-                if ((p[0]>>3) == 0x0f) // end tag
+                if ((p[0]>>3) == 0x0f){ // end tag
+			p = p + 2;
+			goto end;
                         break;
+			}
                 switch (p[0]>>3) {
                 case 0x04: // irq
                 {
@@ -814,53 +814,510 @@ static void node_resource_data_to_dev(struct pnp_bios_node *node, struct pci_dev
                 p = p + (p[0] & 0x07) + 1;
 
         } /* while */
-
-        return;
+	end:
+	if ((dev->resource[0].start == 0) &&
+	    (dev->irq_resource[0].start == -1) &&
+	    (dev->dma_resource[0].start == -1))
+		dev->active = 0;
+	else
+		dev->active = 1;
+        return (unsigned char *)p;
 }
 
 
-/*
- *
- * DEVICE LIST MANAGEMENT FUNCTIONS
- *
- *
- * Some of these are exported to give public access
- *
- * Question: Why maintain a device list when the PnP BIOS can 
- * list devices for us?  Answer: Some PnP BIOSes can't report
- * the current configuration, only the boot configuration.
- * The boot configuration can be changed, so we need to keep
- * a record of what the configuration was when we booted;
- * presumably it continues to describe the current config.
- * For those BIOSes that can change the current config, we
- * keep the information in the devlist up to date.
- *
- * Note that it is currently assumed that the list does not
- * grow or shrink in size after init time, and slot_name
- * never changes.  The list is protected by a spinlock.
- */
+/* pnp possible resource reading functions */
 
-static LIST_HEAD(pnpbios_devices);
-
-static spinlock_t pnpbios_devices_lock;
-
-static int inline insert_device(struct pci_dev *dev)
+static void read_lgtag_mem(unsigned char *p, int size, int depnum, struct pnp_dev *dev)
 {
+	struct pnp_mem * mem;
+	mem = pnpbios_kmalloc(sizeof(struct pnp_mem),GFP_KERNEL);
+	if (!mem)
+		return;
+	memset(mem,0,sizeof(struct pnp_mem));
+	mem->min = ((p[3] << 8) | p[2]) << 8;
+	mem->max = ((p[5] << 8) | p[4]) << 8;
+	mem->align = (p[7] << 8) | p[6];
+	mem->size = ((p[9] << 8) | p[8]) << 8;
+	mem->flags = p[1];
+	pnp_add_mem_resource(dev,depnum,mem);
+	return;
+}
 
-	/*
-	 * FIXME: Check for re-add of existing node;
-	 * return -1 if node already present
-	 */
+static void read_lgtag_mem32(unsigned char *p, int size, int depnum, struct pnp_dev *dev)
+{
+	struct pnp_mem32 * mem;
+	mem = pnpbios_kmalloc(sizeof(struct pnp_mem32),GFP_KERNEL);
+	if (!mem)
+		return;
+	memset(mem,0,sizeof(struct pnp_mem32));
+	memcpy(mem->data, p, 17);
+	pnp_add_mem32_resource(dev,depnum,mem);
+	return;
+}
 
-	/* We don't lock because we only do this at init time */
-	list_add_tail(&dev->global_list, &pnpbios_devices);
+static void read_lgtag_fmem32(unsigned char *p, int size, int depnum, struct pnp_dev *dev)
+{
+	struct pnp_mem32 * mem;
+	mem = pnpbios_kmalloc(sizeof(struct pnp_mem32),GFP_KERNEL);
+	if (!mem)
+		return;
+	memset(mem,0,sizeof(struct pnp_mem32));
+	memcpy(mem->data, p, 17);
+	pnp_add_mem32_resource(dev,depnum,mem);
+	return;
+}
 
+static void read_smtag_irq(unsigned char *p, int size, int depnum, struct pnp_dev *dev)
+{
+	struct pnp_irq * irq;
+	irq = pnpbios_kmalloc(sizeof(struct pnp_irq),GFP_KERNEL);
+	if (!irq)
+		return;
+	memset(irq,0,sizeof(struct pnp_irq));
+	irq->map = (p[2] << 8) | p[1];
+	if (size > 2)
+		irq->flags = p[3];
+	pnp_add_irq_resource(dev,depnum,irq);
+	return;
+}
+
+static void read_smtag_dma(unsigned char *p, int size, int depnum, struct pnp_dev *dev)
+{
+	struct pnp_dma * dma;
+	dma = pnpbios_kmalloc(sizeof(struct pnp_dma),GFP_KERNEL);
+	if (!dma)
+		return;
+	memset(dma,0,sizeof(struct pnp_dma));
+	dma->map = p[1];
+	dma->flags = p[2];
+	pnp_add_dma_resource(dev,depnum,dma);
+	return;
+}
+
+static void read_smtag_port(unsigned char *p, int size, int depnum, struct pnp_dev *dev)
+{
+	struct pnp_port * port;
+	port = pnpbios_kmalloc(sizeof(struct pnp_port),GFP_KERNEL);
+	if (!port)
+		return;
+	memset(port,0,sizeof(struct pnp_port));
+	port->min = (p[3] << 8) | p[2];
+	port->max = (p[5] << 8) | p[4];
+	port->align = p[6];
+	port->size = p[7];
+	port->flags = p[1] ? PNP_PORT_FLAG_16BITADDR : 0;
+	pnp_add_port_resource(dev,depnum,port);
+	return;
+}
+
+static void read_smtag_fport(unsigned char *p, int size, int depnum, struct pnp_dev *dev)
+{
+	struct pnp_port * port;
+	port = pnpbios_kmalloc(sizeof(struct pnp_port),GFP_KERNEL);
+	if (!port)
+		return;
+	memset(port,0,sizeof(struct pnp_port));
+	port->min = port->max = (p[2] << 8) | p[1];
+	port->size = p[3];
+	port->align = 0;
+	port->flags = PNP_PORT_FLAG_FIXED;
+	pnp_add_port_resource(dev,depnum,port);
+	return;
+}
+
+static unsigned char *node_possible_resource_data_to_dev(unsigned char *p, struct pnp_bios_node *node, struct pnp_dev *dev)
+{
+	unsigned char *lastp = NULL;
+	int len, depnum, dependent;
+
+	if ((char *)p == NULL)
+		return NULL;
+	if (pnp_build_resource(dev, 0) == NULL)
+		return NULL;
+	depnum = 0; /*this is the first so it should be 0 */
+	dependent = 0;
+        while ( (char *)p < ((char *)node->data + node->size )) {
+
+                if( p[0] & 0x80 ) {// large item
+			len = (p[2] << 8) | p[1];
+			switch (p[0] & 0x7f) {
+			case 0x01: // memory
+			{
+				if (len != 9)
+					goto __skip;
+				read_lgtag_mem(p,len,depnum,dev);
+				break;
+			}
+			case 0x05: // 32-bit memory
+			{
+				if (len != 17)
+					goto __skip;
+				read_lgtag_mem32(p,len,depnum,dev);
+				break;
+			}
+			case 0x06: // fixed location 32-bit memory
+			{
+				if (len != 17)
+					goto __skip;
+				read_lgtag_fmem32(p,len,depnum,dev);
+				break;
+			}
+			} /* switch */
+                        lastp = p+3;
+                        p = p + p[1] + p[2]*256 + 3;
+                        continue;
+                }
+		len = p[0] & 0x07;
+                switch ((p[0]>>3) & 0x0f) {
+		case 0x0f:
+		{
+			p = p + 2;
+        		return (unsigned char *)p;
+			break;
+		}
+                case 0x04: // irq
+                {
+			if (len < 2 || len > 3)
+				goto __skip;
+			read_smtag_irq(p,len,depnum,dev);
+			break;
+                }
+                case 0x05: // dma
+                {
+			if (len != 2)
+				goto __skip;
+			read_smtag_dma(p,len,depnum,dev);
+                        break;
+                }
+                case 0x06: // start dep
+                {
+			if (len > 1)
+				goto __skip;
+			dependent = 0x100 | PNP_RES_PRIORITY_ACCEPTABLE;
+			if (len > 0)
+				dependent = 0x100 | p[1];
+			pnp_build_resource(dev,dependent);
+			depnum = pnp_get_max_depnum(dev);
+                        break;
+                }
+                case 0x07: // end dep
+                {
+			if (len != 0)
+				goto __skip;
+			depnum = 0;
+                        break;
+                }
+                case 0x08: // io
+                {
+			if (len != 7)
+				goto __skip;
+			read_smtag_port(p,len,depnum,dev);
+                        break;
+                }
+		case 0x09: // fixed location io
+		{
+			if (len != 3)
+				goto __skip;
+			read_smtag_fport(p,len,depnum,dev);
+			break;
+		}
+                } /* switch */
+		__skip:
+                p += len + 1;
+
+        } /* while */
+
+        return NULL;
+}
+
+
+/* pnp resource writing functions */
+
+static void write_lgtag_mem(unsigned char *p, int size, struct pnp_mem *mem)
+{
+	if (!mem)
+		return;
+	p[2] = (mem->min >> 8) & 0xff;
+	p[3] = ((mem->min >> 8) >> 8) & 0xff;
+	p[4] = (mem->max >> 8) & 0xff;
+	p[5] = ((mem->max >> 8) >> 8) & 0xff;
+	p[6] = mem->align & 0xff;
+	p[7] = (mem->align >> 8) & 0xff;
+	p[8] = (mem->size >> 8) & 0xff;
+	p[9] = ((mem->size >> 8) >> 8) & 0xff;
+	p[1] = mem->flags & 0xff;
+	return;
+}
+
+static void write_smtag_irq(unsigned char *p, int size, struct pnp_irq *irq)
+{
+	if (!irq)
+		return;
+	p[1] = irq->map & 0xff;
+	p[2] = (irq->map >> 8) & 0xff;
+	if (size > 2)
+		p[3] = irq->flags & 0xff;
+	return;
+}
+
+static void write_smtag_dma(unsigned char *p, int size, struct pnp_dma *dma)
+{
+	if (!dma)
+		return;
+	p[1] = dma->map & 0xff;
+	p[2] = dma->flags & 0xff;
+	return;
+}
+
+static void write_smtag_port(unsigned char *p, int size, struct pnp_port *port)
+{
+	if (!port)
+		return;
+	p[2] = port->min & 0xff;
+	p[3] = (port->min >> 8) & 0xff;
+	p[4] = port->max & 0xff;
+	p[5] = (port->max >> 8) & 0xff;
+	p[6] = port->align & 0xff;
+	p[7] = port->size & 0xff;
+	p[1] = port->flags & 0xff;
+	return;
+}
+
+static void write_smtag_fport(unsigned char *p, int size, struct pnp_port *port)
+{
+	if (!port)
+		return;
+	p[1] = port->min & 0xff;
+	p[2] = (port->min >> 8) & 0xff;
+	p[3] = port->size & 0xff;
+	return;
+}
+
+static int node_set_resources(struct pnp_bios_node *node, struct pnp_cfg *config)
+{
+	int error = 0;
+	unsigned char *p = (char *)node->data, *lastp = NULL;
+	int len, port = 0, irq = 0, dma = 0, mem = 0;
+
+	if (!node)
+		return -EINVAL;
+	if ((char *)p == NULL)
+		return -EINVAL;
+        while ( (char *)p < ((char *)node->data + node->size )) {
+
+                if( p[0] & 0x80 ) {// large item
+			len = (p[2] << 8) | p[1];
+			switch (p[0] & 0x7f) {
+			case 0x01: // memory
+			{
+				if (len != 9)
+					goto __skip;
+				write_lgtag_mem(p,len,config->mem[mem]);
+				mem++;
+				break;
+			}
+			case 0x05: // 32-bit memory
+			{
+				if (len != 17)
+					goto __skip;
+				/* FIXME */
+				break;
+			}
+			case 0x06: // fixed location 32-bit memory
+			{
+				if (len != 17)
+					goto __skip;
+				/* FIXME */
+				break;
+			}
+			} /* switch */
+                        lastp = p+3;
+                        p = p + p[1] + p[2]*256 + 3;
+                        continue;
+                }
+		len = p[0] & 0x07;
+                switch ((p[0]>>3) & 0x0f) {
+		case 0x0f:
+		{
+        		goto done;
+			break;
+		}
+                case 0x04: // irq
+                {
+			if (len < 2 || len > 3)
+				goto __skip;
+			write_smtag_irq(p,len,config->irq[irq]);
+			irq++;
+			break;
+                }
+                case 0x05: // dma
+                {
+			if (len != 2)
+				goto __skip;
+			write_smtag_dma(p,len,config->dma[dma]);
+			dma++;
+                        break;
+                }
+                case 0x08: // io
+                {
+			if (len != 7)
+				goto __skip;
+			write_smtag_port(p,len,config->port[port]);
+			port++;
+                        break;
+                }
+		case 0x09: // fixed location io
+		{
+			if (len != 3)
+				goto __skip;
+			write_smtag_fport(p,len,config->port[port]);
+			port++;
+			break;
+		}
+                } /* switch */
+		__skip:
+                p += len + 1;
+
+        } /* while */
+
+	/* we never got an end tag so this data is corrupt or invalid */
+	return -EINVAL;
+
+	done:
+	error = pnp_bios_set_dev_node(node->handle, (char)0, node);
+        return error;
+}
+
+static int pnpbios_get_resources(struct pnp_dev *dev)
+{
+	struct pnp_dev_node_info node_info;
+	u8 nodenum = dev->number;
+	struct pnp_bios_node * node;
+	if (pnp_bios_dev_node_info(&node_info) != 0)
+		return -ENODEV;
+	node = pnpbios_kmalloc(node_info.max_node_size, GFP_KERNEL);
+	if (!node)
+		return -1;
+	if (pnp_bios_get_dev_node(&nodenum, (char )0, node))
+		return -ENODEV;
+	node_current_resource_data_to_dev(node,dev);
+	kfree(node);
+	return 0;
+}
+
+static int pnpbios_set_resources(struct pnp_dev *dev, struct pnp_cfg *config, char flags)
+{
+	struct pnp_dev_node_info node_info;
+	u8 nodenum = dev->number;
+	struct pnp_bios_node * node;
+	node = pnpbios_kmalloc(node_info.max_node_size, GFP_KERNEL);
+
+	if (pnp_bios_dev_node_info(&node_info) != 0)
+		return -ENODEV;
+	if (!node)
+		return -1;
+	if (pnp_bios_get_dev_node(&nodenum, (char )1, node))
+		return -ENODEV;
+	if(node_set_resources(node, config)<0){
+		return -1;
+	}
+	kfree(node);
+	return 0;
+}
+
+static int pnpbios_disable_resources(struct pnp_dev *dev)
+{
+	struct pnp_cfg * config = kmalloc(sizeof(struct pnp_cfg), GFP_KERNEL);
+	/* first we need to set everything to a disabled value */
+	struct pnp_port	port = {
+	max:	0,
+	min:	0,
+	align:	0,
+	size:	0,
+	flags:	0,
+	pad:	0,
+	};
+	struct pnp_mem	mem = {
+	max:	0,
+	min:	0,
+	align:	0,
+	size:	0,
+	flags:	0,
+	pad:	0,
+	};
+	struct pnp_dma	dma = {
+	map:	0,
+	flags:	0,
+	};
+	struct pnp_irq	irq = {
+	map:	0,
+	flags:	0,
+	pad:	0,
+	};
+	int i;
+	struct pnp_dev_node_info node_info;
+	u8 nodenum = dev->number;
+	struct pnp_bios_node * node;
+	if (!config)
+		return -1;
+	memset(config, 0, sizeof(struct pnp_cfg));
+	if (!dev || !dev->active)
+		return -EINVAL;
+	for (i=0; i <= 8; i++)
+		config->port[i] = &port;
+	for (i=0; i <= 4; i++)
+		config->mem[i] = &mem;
+	for (i=0; i <= 2; i++)
+		config->irq[i] = &irq;
+	for (i=0; i <= 2; i++)
+		config->dma[i] = &dma;
+	dev->active = 0;
+
+	if (pnp_bios_dev_node_info(&node_info) != 0)
+		return -ENODEV;
+	node = pnpbios_kmalloc(node_info.max_node_size, GFP_KERNEL);
+	if (!node)
+		return -1;
+	if (pnp_bios_get_dev_node(&nodenum, (char )1, node))
+		goto failed;
+	if(node_set_resources(node, config)<0)
+		goto failed;
+	kfree(config);
+	kfree(node);
+	return 0;
+ failed:
+	kfree(node);
+	kfree(config);
+	return -1;
+}
+
+
+/* PnP Layer support */
+
+static struct pnp_protocol pnpbios_protocol = {
+	name:	"Plug and Play BIOS",
+	get:	pnpbios_get_resources,
+	set:	pnpbios_set_resources,
+	disable:pnpbios_disable_resources,
+};
+
+static int inline insert_device(struct pnp_dev *dev)
+{
+	struct list_head * pos;
+	struct pnp_dev * pnp_dev;
+	list_for_each (pos, &pnpbios_protocol.devices){
+		pnp_dev = list_entry(pos, struct pnp_dev, dev_list);
+		if (dev->number == pnp_dev->number)
+			return -1;
+	}
+	pnp_add_device(dev);
 	return 0;
 }
 
 #define HEX(id,a) hex[((id)>>a) & 15]
 #define CHAR(id,a) (0x40 + (((id)>>a) & 31))
 //
+
 static void inline pnpid32_to_pnpid(u32 id, char *str)
 {
 	const char *hex = "0123456789abcdef";
@@ -876,24 +1333,24 @@ static void inline pnpid32_to_pnpid(u32 id, char *str)
 	str[7] = '\0';
 
 	return;
-}                                              
+}
 //
 #undef CHAR
-#undef HEX 
+#undef HEX
 
-/*
- * Build a linked list of pci_devs in order of ascending node number
- * Called only at init time.
- */
+
 static void __init build_devlist(void)
 {
 	u8 nodenum;
+	char id[7];
+	unsigned char *pos;
 	unsigned int nodes_got = 0;
 	unsigned int devs = 0;
 	struct pnp_bios_node *node;
 	struct pnp_dev_node_info node_info;
-	struct pci_dev *dev;
-	
+	struct pnp_dev *dev;
+	struct pnp_id *dev_id;
+
 	if (!pnp_bios_present())
 		return;
 
@@ -910,17 +1367,29 @@ static void __init build_devlist(void)
 		 * asking for the "current" config causes some
 		 * BIOSes to crash.
 		 */
-		if (pnp_bios_get_dev_node(&nodenum, (char )1 , node))
+		if (pnp_bios_get_dev_node(&nodenum, (char )0 , node))
 			break;
 		nodes_got++;
-		dev =  pnpbios_kmalloc(sizeof (struct pci_dev), GFP_KERNEL);
+		dev =  pnpbios_kmalloc(sizeof (struct pnp_dev), GFP_KERNEL);
 		if (!dev)
 			break;
-		memset(dev,0,sizeof(struct pci_dev));
-		dev->devfn = thisnodenum;
-		memcpy(dev->name,"PNPBIOS",8);
-		pnpid32_to_pnpid(node->eisa_id,dev->slot_name);
-		node_resource_data_to_dev(node,dev);
+		memset(dev,0,sizeof(struct pnp_dev));
+		dev_id =  pnpbios_kmalloc(sizeof (struct pnp_id), GFP_KERNEL);
+		if (!dev_id)
+			break;
+		memset(dev_id,0,sizeof(struct pnp_id));
+		pnp_init_device(dev);
+		dev->number = thisnodenum;
+		memcpy(dev->name,"Unknown Device",13);
+		dev->name[14] = '\0';
+		pnpid32_to_pnpid(node->eisa_id,id);
+		memcpy(dev_id->id,id,8);
+		pnp_add_id(dev_id, dev);
+		pos = node_current_resource_data_to_dev(node,dev);
+		node_possible_resource_data_to_dev(pos,node,dev);
+
+		dev->protocol = &pnpbios_protocol;
+
 		if(insert_device(dev)<0)
 			kfree(dev);
 		else
@@ -936,254 +1405,7 @@ static void __init build_devlist(void)
 		nodes_got, nodes_got != 1 ? "s" : "", devs);
 }
 
-static struct pci_dev *find_device_by_nodenum( u8 nodenum )
-{
-	struct pci_dev *dev;
-
-	pnpbios_for_each_dev(dev) {
-		if(dev->devfn == nodenum)
-			return dev;
-	}
-
-	return NULL;
-}
-
-static void update_devlist( u8 nodenum, struct pnp_bios_node *data )
-{
-	unsigned long flags;
-	struct pci_dev *dev;
-
-	spin_lock_irqsave(&pnpbios_devices_lock, flags);
-	dev = find_device_by_nodenum( nodenum );
-	if ( dev ) {
-		node_resource_data_to_dev(data,dev);
-	}
-	spin_unlock_irqrestore(&pnpbios_devices_lock, flags);
-
-	return;
-}
-
-
 /*
- *
- * DRIVER REGISTRATION FUNCTIONS
- *
- *
- * Exported to give public access
- *
- */
-
-static LIST_HEAD(pnpbios_drivers);
-
-static const struct pnpbios_device_id *
-match_device(const struct pnpbios_device_id *ids, const struct pci_dev *dev)
-{
-	while (*ids->id)
-	{
-		if(memcmp(ids->id, dev->slot_name, 7)==0)
-			return ids;
-		ids++;
-	}
-	return NULL;
-}
-
-static int announce_device(struct pnpbios_driver *drv, struct pci_dev *dev)
-{
-	const struct pnpbios_device_id *id;
-	struct pci_dev tmpdev;
-	int ret;
-
-	if (drv->id_table) {
-		id = match_device(drv->id_table, dev);
-		if (!id)
-			return 0;
-	} else
-		id = NULL;
-
-	memcpy( &tmpdev, dev, sizeof(struct pci_dev));
-	tmpdev.global_list.prev = NULL;
-	tmpdev.global_list.next = NULL;
-
-	dev_probe_lock();
-	/* Obviously, probe() should not call any pnpbios functions */
-	ret = drv->probe(&tmpdev, id);
-	dev_probe_unlock();
-	if (ret < 1)
-		return 0;
-
-	dev->driver = (void *)drv;
-
-	return 1;
-}
-
-/**
- * pnpbios_register_driver - register a new pci driver
- * @drv: the driver structure to register
- * 
- * Adds the driver structure to the list of registered drivers
- *
- * For each device in the pnpbios device list that matches one of
- * the ids in drv->id_table, calls the driver's "probe" function with
- * arguments (1) a pointer to a *temporary* struct pci_dev containing
- * resource info for the device, and (2) a pointer to the id string
- * of the device.  Expects the probe function to return 1 if the
- * driver claims the device (otherwise 0) in which case, marks the
- * device as having this driver.
- * 
- * Returns the number of pci devices which were claimed by the driver
- * during registration.  The driver remains registered even if the
- * return value is zero.
- */
-int pnpbios_register_driver(struct pnpbios_driver *drv)
-{
-	struct pci_dev *dev;
-	unsigned long flags;
-	int count = 0;
-
-	list_add_tail(&drv->node, &pnpbios_drivers);
-	spin_lock_irqsave(&pnpbios_devices_lock, flags);
-	pnpbios_for_each_dev(dev) {
-		if (!pnpbios_dev_driver(dev))
-			count += announce_device(drv, dev);
-	}
-	spin_unlock_irqrestore(&pnpbios_devices_lock, flags);
-	return count;
-}
-
-EXPORT_SYMBOL(pnpbios_register_driver);
-
-/**
- * pnpbios_unregister_driver - unregister a pci driver
- * @drv: the driver structure to unregister
- * 
- * Deletes the driver structure from the list of registered PnPBIOS
- * drivers, gives it a chance to clean up by calling its "remove"
- * function for each device it was responsible for, and marks those
- * devices as driverless.
- */
-void pnpbios_unregister_driver(struct pnpbios_driver *drv)
-{
-	unsigned long flags;
-	struct pci_dev *dev;
-
-	list_del(&drv->node);
-	spin_lock_irqsave(&pnpbios_devices_lock, flags);
-	pnpbios_for_each_dev(dev) {
-		if (dev->driver == (void *)drv) {
-			if (drv->remove)
-				drv->remove(dev);
-			dev->driver = NULL;
-		}
-	}
-	spin_unlock_irqrestore(&pnpbios_devices_lock, flags);
-}
-
-EXPORT_SYMBOL(pnpbios_unregister_driver);
-
-
-/*
- *
- * RESOURCE RESERVATION FUNCTIONS
- *
- *
- * Used only at init time
- *
- */
-
-static void __init reserve_ioport_range(char *pnpid, int start, int end)
-{
-	struct resource *res;
-	char *regionid;
-
-	regionid = pnpbios_kmalloc(16, GFP_KERNEL);
-	if ( regionid == NULL )
-		return;
-	snprintf(regionid, 16, "PnPBIOS %s", pnpid);
-	res = request_region(start,end-start+1,regionid);
-	if ( res == NULL )
-		kfree( regionid );
-	else
-		res->flags &= ~IORESOURCE_BUSY;
-	/*
-	 * Failures at this point are usually harmless. pci quirks for
-	 * example do reserve stuff they know about too, so we may well
-	 * have double reservations.
-	 */
-	printk(KERN_INFO
-		"PnPBIOS: %s: ioport range 0x%x-0x%x %s reserved\n",
-		pnpid, start, end,
-		NULL != res ? "has been" : "could not be"
-	);
-
-	return;
-}
-
-static void __init reserve_resources_of_dev( struct pci_dev *dev )
-{
-	int i;
-
-	for (i=0;i<DEVICE_COUNT_RESOURCE;i++) {
-		if ( dev->resource[i].flags & IORESOURCE_UNSET )
-			/* end of resources */
-			break;
-		if (dev->resource[i].flags & IORESOURCE_IO) {
-			/* ioport */
-			if ( dev->resource[i].start == 0 )
-				/* disabled */
-				/* Do nothing */
-				continue;
-			if ( dev->resource[i].start < 0x100 )
-				/*
-				 * Below 0x100 is only standard PC hardware
-				 * (pics, kbd, timer, dma, ...)
-				 * We should not get resource conflicts there,
-				 * and the kernel reserves these anyway
-				 * (see arch/i386/kernel/setup.c).
-				 * So, do nothing
-				 */
-				continue;
-			if ( dev->resource[i].end < dev->resource[i].start )
-				/* invalid endpoint */
-				/* Do nothing */
-				continue;
-			reserve_ioport_range(
-				dev->slot_name,
-				dev->resource[i].start,
-				dev->resource[i].end
-			);
-		} else if (dev->resource[i].flags & IORESOURCE_MEM) {
-			/* iomem */
-			/* For now do nothing */
-			continue;
-		} else {
-			/* Neither ioport nor iomem */
-			/* Do nothing */
-			continue;
-		}
-	}
-
-	return;
-}
-
-static void __init reserve_resources( void )
-{
-	struct pci_dev *dev;
-
-	pnpbios_for_each_dev(dev) {
-		if (
-			0 != strcmp(dev->slot_name,"PNP0c01") &&  /* memory controller */
-			0 != strcmp(dev->slot_name,"PNP0c02")     /* system peripheral: other */
-		) {
-			continue;
-		}  
-		reserve_resources_of_dev(dev);
-	}
-
-	return;
-}
-
-
-/* 
  *
  * INIT AND EXIT
  *
@@ -1232,7 +1454,6 @@ int __init pnpbios_init(void)
 	int i, length, r;
 
 	spin_lock_init(&pnp_bios_lock);
-	spin_lock_init(&pnpbios_devices_lock);
 
 	if(pnpbios_disabled) {
 		printk(KERN_INFO "PnPBIOS: Disabled\n");
@@ -1284,9 +1505,10 @@ int __init pnpbios_init(void)
 	}
 	if (!pnp_bios_present())
 		return -ENODEV;
+	pnp_protocol_register(&pnpbios_protocol);
 	build_devlist();
-	if ( ! dont_reserve_resources )
-		reserve_resources();
+	/*if ( ! dont_reserve_resources )*/
+		/*reserve_resources();*/
 #ifdef CONFIG_PROC_FS
 	r = pnpbios_proc_init();
 	if (r)
@@ -1297,11 +1519,11 @@ int __init pnpbios_init(void)
 
 static int __init pnpbios_thread_init(void)
 {
-#ifdef CONFIG_HOTPLUG	
+#ifdef CONFIG_HOTPLUG
 	init_completion(&unload_sem);
 	if (kernel_thread(pnp_dock_thread, NULL, CLONE_KERNEL) > 0)
 		unloading = 0;
-#endif		
+#endif
 	return 0;
 }
 

@@ -190,40 +190,49 @@ void isapnp_activate(unsigned char device);
 void isapnp_deactivate(unsigned char device);
 void isapnp_fixup_device(struct pci_dev *dev);
 void *isapnp_alloc(long size);
+
+#ifdef CONFIG_PROC_FS
 int isapnp_proc_init(void);
 int isapnp_proc_done(void);
-/* manager */
-struct pci_bus *isapnp_find_card(unsigned short vendor,
-				 unsigned short device,
-				 struct pci_bus *from);
-struct pci_dev *isapnp_find_dev(struct pci_bus *card,
-				unsigned short vendor,
-				unsigned short function,
-				struct pci_dev *from);
-int isapnp_probe_cards(const struct isapnp_card_id *ids,
-		       int (*probe)(struct pci_bus *card,
-				    const struct isapnp_card_id *id));
-int isapnp_probe_devs(const struct isapnp_device_id *ids,
-			int (*probe)(struct pci_dev *dev,
-				     const struct isapnp_device_id *id));
+#else
+static inline isapnp_proc_init(void) { return 0; }
+static inline isapnp_proc_done(void) { return 0; )
+#endif
+
 /* misc */
 void isapnp_resource_change(struct resource *resource,
 			    unsigned long start,
 			    unsigned long size);
-int isapnp_activate_dev(struct pci_dev *dev, const char *name);
 /* init/main.c */
 int isapnp_init(void);
+/* manager */
+static inline struct pci_bus *isapnp_find_card(unsigned short vendor,
+					       unsigned short device,
+					       struct pci_bus *from) { return NULL; }
+static inline struct pci_dev *isapnp_find_dev(struct pci_bus *card,
+					      unsigned short vendor,
+					      unsigned short function,
+					      struct pci_dev *from) { return NULL; }
+static inline int isapnp_probe_cards(const struct isapnp_card_id *ids,
+				     int (*probe)(struct pci_bus *card,
+						  const struct isapnp_card_id *id)) { return -ENODEV; }
+static inline int isapnp_probe_devs(const struct isapnp_device_id *ids,
+				    int (*probe)(struct pci_dev *dev,
+						 const struct isapnp_device_id *id)) { return -ENODEV; }
+static inline int isapnp_activate_dev(struct pci_dev *dev, const char *name) { return -ENODEV; }
+
+static inline int isapnp_register_driver(struct isapnp_driver *drv) { return 0; }
+
+static inline void isapnp_unregister_driver(struct isapnp_driver *drv) { }
 
 extern struct list_head isapnp_cards;
 extern struct list_head isapnp_devices;
+extern struct pnp_protocol isapnp_protocol;
 
 #define isapnp_for_each_card(card) \
-	for(card = pci_bus_b(isapnp_cards.next); card != pci_bus_b(&isapnp_cards); card = pci_bus_b(card->node.next))
+	for(card = to_pnp_card(isapnp_cards.next); card != to_pnp_card(&isapnp_cards); card = to_pnp_card(card->node.next))
 #define isapnp_for_each_dev(dev) \
-	for(dev = pci_dev_g(isapnp_devices.next); dev != pci_dev_g(&isapnp_devices); dev = pci_dev_g(dev->global_list.next))
-
-int isapnp_register_driver(struct isapnp_driver *drv);
-void isapnp_unregister_driver(struct isapnp_driver *drv);
+	for(dev = protocol_to_pnp_dev(isapnp_protocol.devices.next); dev != protocol_to_pnp_dev(&isapnp_protocol.devices); dev = protocol_to_pnp_dev(dev->dev_list.next))
 
 #else /* !CONFIG_ISAPNP */
 

@@ -52,6 +52,7 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/pci.h>
+#include <linux/pnp.h>
 #include <linux/sysctl.h>
 
 #include <asm/io.h>
@@ -2939,9 +2940,9 @@ static int __devinit parport_pc_pci_probe (struct pci_dev *dev,
 }
 
 static struct pci_driver parport_pc_pci_driver = {
-	name:		"parport_pc",
-	id_table:	parport_pc_pci_tbl,
-	probe:		parport_pc_pci_probe,
+	.name		= "parport_pc",
+	.id_table	= parport_pc_pci_tbl,
+	.probe		= parport_pc_pci_probe,
 };
 
 static int __init parport_pc_init_superio (int autoirq, int autodma)
@@ -2967,6 +2968,25 @@ static int __init parport_pc_init_superio (int autoirq, int autodma)
 static struct pci_driver parport_pc_pci_driver;
 static int __init parport_pc_init_superio(int autoirq, int autodma) {return 0;}
 #endif /* CONFIG_PCI */
+
+#ifdef CONFIG_PNP
+static const struct pnp_id pnp_dev_table[] = {
+	/* Standard LPT Printer Port */
+	{.id = "PNP0400", .driver_data = 0},
+	/* ECP Printer Port */
+	{.id = "PNP0401", .driver_data = 0},
+	{.id = ""}
+};
+
+/* we only need the pnp layer to activate the device, at least for now */
+static struct pnp_driver parport_pc_pnp_driver = {
+	.name		= "parport_pc",
+	.card_id_table	= NULL,
+	.id_table	= pnp_dev_table,
+};
+#else
+static const struct pnp_driver parport_pc_pnp_driver;
+#endif
 
 /* This is called by parport_pc_find_nonpci_ports (in asm/parport.h) */
 static int __init __attribute__((unused))
@@ -3021,6 +3041,8 @@ static int __init parport_pc_find_ports (int autoirq, int autodma)
 int __init parport_pc_init (int *io, int *io_hi, int *irq, int *dma)
 {
 	int count = 0, i = 0;
+	/* try to activate any PnP parports first */
+	pnp_register_driver(&parport_pc_pnp_driver);
 
 	if (io && *io) {
 		/* Only probe the ports we were given. */
@@ -3133,5 +3155,6 @@ void cleanup_module(void)
 
 		p = tmp;
 	}
+	pnp_unregister_driver (&parport_pc_pnp_driver);
 }
 #endif
