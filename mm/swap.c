@@ -214,34 +214,6 @@ void __pagevec_lru_add(struct pagevec *pvec)
 }
 
 /*
- * Remove the passed pages from the LRU, then drop the caller's refcount on
- * them.  Reinitialises the caller's pagevec.
- */
-void __pagevec_lru_del(struct pagevec *pvec)
-{
-	int i;
-	struct zone *zone = NULL;
-
-	for (i = 0; i < pagevec_count(pvec); i++) {
-		struct page *page = pvec->pages[i];
-		struct zone *pagezone = page_zone(page);
-
-		if (pagezone != zone) {
-			if (zone)
-				spin_unlock_irq(&zone->lru_lock);
-			zone = pagezone;
-			spin_lock_irq(&zone->lru_lock);
-		}
-		if (!TestClearPageLRU(page))
-			BUG();
-		del_page_from_lru(zone, page);
-	}
-	if (zone)
-		spin_unlock_irq(&zone->lru_lock);
-	pagevec_release(pvec);
-}
-
-/*
  * Perform any setup for the swap system
  */
 void __init swap_setup(void)

@@ -116,10 +116,10 @@ void invalidate_inode_pages(struct inode * inode)
 	struct list_head *head, *curr;
 	struct page * page;
 	struct address_space *mapping = inode->i_mapping;
-	struct pagevec lru_pvec;
+	struct pagevec pvec;
 
 	head = &mapping->clean_pages;
-	pagevec_init(&lru_pvec);
+	pagevec_init(&pvec);
 	write_lock(&mapping->page_lock);
 	curr = head->next;
 
@@ -143,8 +143,8 @@ void invalidate_inode_pages(struct inode * inode)
 
 		__remove_from_page_cache(page);
 		unlock_page(page);
-		if (!pagevec_add(&lru_pvec, page))
-			__pagevec_lru_del(&lru_pvec);
+		if (!pagevec_add(&pvec, page))
+			__pagevec_release(&pvec);
 		continue;
 unlock:
 		unlock_page(page);
@@ -152,7 +152,7 @@ unlock:
 	}
 
 	write_unlock(&mapping->page_lock);
-	pagevec_lru_del(&lru_pvec);
+	pagevec_release(&pvec);
 }
 
 static int do_invalidatepage(struct page *page, unsigned long offset)
