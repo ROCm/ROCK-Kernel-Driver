@@ -2934,6 +2934,7 @@ asmlinkage long sys_sched_getaffinity(pid_t pid, unsigned int len,
 	if (len < real_len)
 		return -EINVAL;
 
+	lock_cpu_hotplug();
 	read_lock(&tasklist_lock);
 
 	retval = -ESRCH;
@@ -2946,6 +2947,7 @@ asmlinkage long sys_sched_getaffinity(pid_t pid, unsigned int len,
 
 out_unlock:
 	read_unlock(&tasklist_lock);
+	unlock_cpu_hotplug();
 	if (retval)
 		return retval;
 	if (copy_to_user(user_mask_ptr, &mask, real_len))
