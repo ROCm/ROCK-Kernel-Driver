@@ -409,7 +409,7 @@ sys_timer_create(clockid_t which_clock,
 	do {
 		if (unlikely(!idr_pre_get(&posix_timers_id))) {
 			error = -EAGAIN;
-			new_timer_id = (timer_t)-1;
+			new_timer->it_id = (timer_t)-1;
 			goto out;
 		}
 		spin_lock_irq(&idr_lock);
@@ -1026,8 +1026,7 @@ sys_clock_settime(clockid_t which_clock, const struct timespec __user *tp)
 	if (posix_clocks[which_clock].clock_set)
 		return posix_clocks[which_clock].clock_set(&new_tp);
 
-	new_tp.tv_nsec /= NSEC_PER_USEC;
-	return do_sys_settimeofday((struct timeval *) &new_tp, NULL);
+	return do_sys_settimeofday(&new_tp, NULL);
 }
 
 asmlinkage long

@@ -1109,7 +1109,6 @@ asmlinkage long sys_nanosleep(struct timespec *rqtp, struct timespec *rmtp)
 asmlinkage long sys_sysinfo(struct sysinfo __user *info)
 {
 	struct sysinfo val;
-	u64 uptime;
 	unsigned long mem_total, sav_total;
 	unsigned int mem_unit, bitcount;
 	unsigned long seq;
@@ -1117,11 +1116,25 @@ asmlinkage long sys_sysinfo(struct sysinfo __user *info)
 	memset((char *)&val, 0, sizeof(struct sysinfo));
 
 	do {
+		struct timespec tp;
 		seq = read_seqbegin(&xtime_lock);
 
-		uptime = jiffies_64 - INITIAL_JIFFIES;
-		do_div(uptime, HZ);
-		val.uptime = (unsigned long) uptime;
+		/*
+		 * This is annoying.  The below is the same thing
+		 * posix_get_clock_monotonic() does, but it wants to
+		 * take the lock which we want to cover the loads stuff
+		 * too.
+		 */
+
+		do_gettimeofday((struct timeval *)&tp);
+		tp.tv_nsec *= NSEC_PER_USEC;
+		tp.tv_sec += wall_to_monotonic.tv_sec;
+		tp.tv_nsec += wall_to_monotonic.tv_nsec;
+		if (tp.tv_nsec - NSEC_PER_SEC >= 0) {
+			tp.tv_nsec = tp.tv_nsec - NSEC_PER_SEC;
+			tp.tv_sec++;
+		}
+		val.uptime = tp.tv_sec + (tp.tv_nsec ? 1 : 0);
 
 		val.loads[0] = avenrun[0] << (SI_LOAD_SHIFT - FSHIFT);
 		val.loads[1] = avenrun[1] << (SI_LOAD_SHIFT - FSHIFT);
