@@ -123,7 +123,7 @@
  */
 extern struct sctp_protocol sctp_proto;
 extern struct sock *sctp_get_ctl_sock(void);
-extern int sctp_copy_local_addr_list(struct sctp_protocol  *, 
+extern int sctp_copy_local_addr_list(struct sctp_protocol  *,
 				     struct sctp_bind_addr *,
 				     sctp_scope_t, int priority, int flags);
 extern struct sctp_pf *sctp_get_pf_specific(sa_family_t family);
@@ -414,11 +414,20 @@ static inline __s32 sctp_jitter(__u32 rto)
 	sctp_rand ^= (sctp_rand << 12);
 	sctp_rand ^= (sctp_rand >> 20);
 
-	/* Choose random number from 0 to rto, then move to -50% ~ +50% 
-	 * of rto. 
+	/* Choose random number from 0 to rto, then move to -50% ~ +50%
+	 * of rto.
 	 */
 	ret = sctp_rand % rto - (rto >> 1);
 	return ret;
+}
+
+/* Break down data chunks at this point.  */
+static inline int sctp_frag_point(int pmtu)
+{
+	pmtu -= SCTP_IP_OVERHEAD + sizeof(struct sctp_data_chunk);
+	pmtu -= sizeof(struct sctp_sack_chunk);
+
+	return pmtu;
 }
 
 /* Walk through a list of TLV parameters.  Don't trust the
