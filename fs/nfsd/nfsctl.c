@@ -124,7 +124,7 @@ nfsctl_getfs(struct nfsctl_fsparm *data, struct knfsd_fh *res)
 	if (!(clp = exp_getclient(sin)))
 		err = -EPERM;
 	else
-		err = exp_rootfh(clp, NODEV, 0, data->gd_path, res, data->gd_maxlen);
+		err = exp_rootfh(clp, data->gd_path, res, data->gd_maxlen);
 	exp_unlock();
 	return err;
 }
@@ -147,7 +147,7 @@ nfsctl_getfd(struct nfsctl_fdparm *data, __u8 *res)
 	if (!(clp = exp_getclient(sin)))
 		err = -EPERM;
 	else
-		err = exp_rootfh(clp, NODEV, 0, data->gd_path, &fh, NFS_FHSIZE);
+		err = exp_rootfh(clp, data->gd_path, &fh, NFS_FHSIZE);
 	exp_unlock();
 
 	if (err == 0) {
