@@ -75,7 +75,7 @@ flash_mmap(struct file *file, struct vm_area_struct *vma)
 	pgprot_val(vma->vm_page_prot) |= _PAGE_E;
 	vma->vm_flags |= (VM_SHM | VM_LOCKED);
 
-	if (remap_pfn_range(vma, vma->vm_start, addr, size, vma->vm_page_prot))
+	if (io_remap_pfn_range(vma, vma->vm_start, addr, size, vma->vm_page_prot))
 		return -EAGAIN;
 		
 	return 0;

@@ -76,6 +76,7 @@ struct hpet_dev {
 struct hpets {
 	struct hpets *hp_next;
 	struct hpet __iomem *hp_hpet;
+	unsigned long hp_hpet_phys;
 	struct time_interpolator *hp_interpolator;
 	unsigned long hp_period;
 	unsigned long hp_delta;
@@ -265,7 +266,7 @@ static int hpet_mmap(struct file *file, struct vm_area_struct *vma)
 		return -EINVAL;
 
 	devp = file->private_data;
-	addr = (unsigned long)devp->hd_hpet;
+	addr = devp->hd_hpets->hp_hpet_phys;
 
 	if (addr & (PAGE_SIZE - 1))
 		return -ENOSYS;
@@ -274,7 +275,7 @@ static int hpet_mmap(struct file *file, struct vm_area_struct *vma)
 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 	addr = __pa(addr);
 
-	if (remap_pfn_range(vma, vma->vm_start, addr >> PAGE_SHIFT,
+	if (io_remap_pfn_range(vma, vma->vm_start, addr >> PAGE_SHIFT,
 					PAGE_SIZE, vma->vm_page_prot)) {
 		printk(KERN_ERR "remap_pfn_range failed in hpet.c\n");
 		return -EAGAIN;
@@ -795,6 +796,7 @@ int hpet_alloc(struct hpet_data *hdp)
 
 	hpetp->hp_which = hpet_nhpet++;
 	hpetp->hp_hpet = hdp->hd_address;
+	hpetp->hp_hpet_phys = hdp->hd_phys_address;
 
 	hpetp->hp_ntimer = hdp->hd_nirqs;
 

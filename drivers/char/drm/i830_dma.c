@@ -157,7 +157,7 @@ int i830_mmap_buffers(struct file *filp, struct vm_area_struct *vma)
    	buf_priv->currently_mapped = I830_BUF_MAPPED;
 	unlock_kernel();
 
-	if (remap_pfn_range(DRM_RPR_ARG(vma) vma->vm_start,
+	if (io_remap_pfn_range(vma, vma->vm_start,
 			     VM_OFFSET(vma) >> PAGE_SHIFT,
 			     vma->vm_end - vma->vm_start,
 			     vma->vm_page_prot)) return -EAGAIN;

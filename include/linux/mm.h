@@ -828,6 +828,10 @@ extern struct page * follow_page(struct mm_struct *mm, unsigned long address,
 		int write);
 int remap_pfn_range(struct vm_area_struct *, unsigned long,
 		unsigned long, unsigned long, pgprot_t);
+/* Allow arch override for mapping of device and I/O (non-RAM) pages. */
+#ifndef io_remap_pfn_range
+#define io_remap_pfn_range remap_pfn_range
+#endif
 
 static inline __deprecated /* since 25 Sept 2004 -- wli */
 int remap_page_range(struct vm_area_struct *vma, unsigned long uvaddr,
