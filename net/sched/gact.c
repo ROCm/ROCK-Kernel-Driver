@@ -203,9 +203,9 @@ tcf_gact_dump(struct sk_buff *skb, struct tc_action *a, int bind, int ref)
 		RTA_PUT(skb, TCA_GACT_PROB, sizeof (p_opt), &p_opt);
 	} 
 #endif
-	t.install = jiffies - p->tm.install;
-	t.lastuse = jiffies - p->tm.lastuse;
-	t.expires = p->tm.expires;
+	t.install = jiffies_to_clock_t(jiffies - p->tm.install);
+	t.lastuse = jiffies_to_clock_t(jiffies - p->tm.lastuse);
+	t.expires = jiffies_to_clock_t(p->tm.expires);
 	RTA_PUT(skb, TCA_GACT_TM, sizeof (t), &t);
 	return skb->len;
 

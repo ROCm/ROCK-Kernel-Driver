@@ -1882,7 +1882,8 @@ int ip6_mc_add_src(struct inet6_dev *idev, struct in6_addr *pmca, int sfmode,
 	if (err) {
 		int j;
 
-		pmc->mca_sfcount[sfmode]--;
+		if (!delta)
+			pmc->mca_sfcount[sfmode]--;
 		for (j=0; j<i; j++)
 			(void) ip6_mc_del1_src(pmc, sfmode, &psfsrc[i]);
 	} else if (isexclude != (pmc->mca_sfcount[MCAST_EXCLUDE] != 0)) {

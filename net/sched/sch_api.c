@@ -451,11 +451,9 @@ qdisc_create(struct net_device *dev, u32 handle, struct rtattr **tca, int *errp)
         else
                 sch->handle = handle;
 
-	/* enqueue is accessed locklessly - make sure it's visible
-	 * before we set a netdevice's qdisc pointer to sch */
 	if (!ops->init || (err = ops->init(sch, tca[TCA_OPTIONS-1])) == 0) {
 		qdisc_lock_tree(dev);
-		list_add_tail_rcu(&sch->list, &dev->qdisc_list);
+		list_add_tail(&sch->list, &dev->qdisc_list);
 		qdisc_unlock_tree(dev);
 
 #ifdef CONFIG_NET_ESTIMATOR
@@ -727,19 +725,6 @@ graft:
 	}
 	return 0;
 }
-
-int qdisc_copy_stats(struct sk_buff *skb, struct tc_stats *st, spinlock_t *lock)
-{
-	spin_lock_bh(lock);
-	RTA_PUT(skb, TCA_STATS, sizeof(struct tc_stats), st);
-	spin_unlock_bh(lock);
-	return 0;
-
-rtattr_failure:
-	spin_unlock_bh(lock);
-	return -1;
-}
-
 
 static int tc_fill_qdisc(struct sk_buff *skb, struct Qdisc *q, u32 clid,
 			 u32 pid, u32 seq, unsigned flags, int event)
@@ -1271,7 +1256,6 @@ static int __init pktsched_init(void)
 
 subsys_initcall(pktsched_init);
 
-EXPORT_SYMBOL(qdisc_copy_stats);
 EXPORT_SYMBOL(qdisc_get_rtab);
 EXPORT_SYMBOL(qdisc_put_rtab);
 EXPORT_SYMBOL(register_qdisc);
