@@ -37,13 +37,14 @@
 	/* CPU Reset entry */
 SYMBOL_NAME_LABEL(_start)
 	mov.l	#RAMEND,sp
-	ldc	#0x07,exr
+	ldc	#0x80,ccr
+	ldc	#0x00,exr
 
 	/* Peripheral Setup */
 	bclr	#4,@INTCR:8	/* interrupt mode 2 */
 	bset	#5,@INTCR:8
 
-#if defined(CONFIG_BLK_DEV_BLKMEM)
+#if defined(CONFIG_MTD_UCLINUX)
 	/* move romfs image */
 	jsr	@__move_romfs	
 #endif
@@ -68,7 +69,7 @@ SYMBOL_NAME_LABEL(_start)
 	eepmov.w
 
 	/* uClinux kernel start */
-	ldc	#0x10,ccr	/* running kernel */
+	ldc	#0x90,ccr	/* running kernel */
 	mov.l	#SYMBOL_NAME(init_thread_union),sp
 	add.l	#0x2000,sp
 	jsr	@_start_kernel

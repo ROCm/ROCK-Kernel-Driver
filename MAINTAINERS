@@ -2169,6 +2169,12 @@ W:	http://www.ic.nec.co.jp/micro/uclinux/eng/
 W:	http://www.ee.nec.de/uclinux/
 S:	Supported
 
+UCLINUX FOR RENESAS H8/300
+P:	Yoshinori Sato
+M:	ysato@users.sourceforge.jp
+W:	http://uclinux-h8.sourceforge.jp/
+S:	Supported
+
 USB DIAMOND RIO500 DRIVER
 P:	Cesar Miquel
 M:	miquel@df.uba.ar

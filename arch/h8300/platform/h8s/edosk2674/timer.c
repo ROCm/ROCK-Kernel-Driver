@@ -26,10 +26,6 @@
 #define REGS(regs) __REGS(regs)
 #define __REGS(regs) #regs
 
-extern int request_irq_boot(unsigned int,
-		            irqreturn_t (*handler)(int, void *, struct pt_regs *),
-		            unsigned long, const char *, void *);
-
 int __init platform_timer_setup(irqreturn_t (*timer_int)(int, void *, struct pt_regs *))
 {
 	unsigned char mstpcrl;
@@ -38,7 +34,7 @@ int __init platform_timer_setup(irqreturn_t (*timer_int)(int, void *, struct pt_
 	outb(mstpcrl,MSTPCRL);
 	outb(H8300_TIMER_COUNT_DATA,_8TCORA1);
 	outb(0x00,_8TCSR1);
-	request_irq_boot(76,timer_int,0,"timer",0);
+	request_irq(76,timer_int,0,"timer",0);
 	outb(0x40|0x08|0x03,_8TCR1);
 	return 0;
 }

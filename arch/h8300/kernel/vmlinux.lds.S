@@ -2,56 +2,60 @@
 
 #ifdef CONFIG_H8300H_GENERIC
 #ifdef CONFIG_ROMKERNEL
-#include "platform/h8300h/generic/rom.ld"
+#include "../platform/h8300h/generic/rom.ld"
 #endif
 #ifdef CONFIG_RAMKERNEL
-#include "platform/h8300h/generic/ram.ld"
+#include "../platform/h8300h/generic/ram.ld"
 #endif
 #endif
 
 #ifdef CONFIG_H8300H_AKI3068NET
 #ifdef CONFIG_ROMKERNEL
-#include "platform/h8300h/aki3068net/rom.ld"
+#include "../platform/h8300h/aki3068net/rom.ld"
 #endif
 #ifdef CONFIG_RAMKERNEL
-#include "platform/h8300h/aki3068net/ram.ld"
+#include "../platform/h8300h/aki3068net/ram.ld"
 #endif
 #endif
 
 #ifdef CONFIG_H8300H_H8MAX
 #ifdef CONFIG_ROMKERNEL
-#include "platform/h8300h/h8max/rom.ld"
+#include "../platform/h8300h/h8max/rom.ld"
 #endif
 #ifdef CONFIG_RAMKERNEL
-#include "platform/h8300h/h8max/ram.ld"
+#include "../platform/h8300h/h8max/ram.ld"
 #endif
 #endif
 
 #ifdef CONFIG_H8300H_SIM
 #ifdef CONFIG_ROMKERNEL
-#include "platform/h8300h/generic/rom.ld"
+#include "../platform/h8300h/generic/rom.ld"
 #endif
 #ifdef CONFIG_RAMKERNEL
-#include "platform/h8300h/generic/ram.ld"
+#include "../platform/h8300h/generic/ram.ld"
 #endif
 #endif
 
 #ifdef CONFIG_H8S_SIM
 #ifdef CONFIG_ROMKERNEL
-#include "platform/h8s/generic/rom.ld"
+#include "../platform/h8s/generic/rom.ld"
 #endif
 #ifdef CONFIG_RAMKERNEL
-#include "platform/h8s/generic/ram.ld"
+#include "../platform/h8s/generic/ram.ld"
 #endif
 #endif
 
 #ifdef CONFIG_H8S_EDOSK2674
 #ifdef CONFIG_ROMKERNEL
-#include "platform/h8s/edosk2674/rom.ld"
+#include "../platform/h8s/edosk2674/rom.ld"
 #endif
 #ifdef CONFIG_RAMKERNEL
-#include "platform/h8s/edosk2674/ram.ld"
+#include "../platform/h8s/edosk2674/ram.ld"
 #endif
+#endif
+
+#if defined(CONFIG_H8300H_SIM) || defined(CONFIG_H8S_SIM)
+INPUT(romfs.o)
 #endif
 
 _jiffies = _jiffies_64 + 4;
@@ -168,6 +172,10 @@ SECTIONS
 	__ebss = . ;
 	__end = . ;
 	__ramstart = .;
+	} > ram
+        .romfs :	
+	{
+		*(.romfs*)
 	} > ram
         .dummy :
         {

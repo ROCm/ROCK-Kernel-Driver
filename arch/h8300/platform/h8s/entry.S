@@ -112,7 +112,7 @@ LRET	=	40
 	mov.l	er1,@(10:16,er0)
 
 	mov.l	@sp+,er1
-	add.l	#(LRET-LORIG),sp		/* remove LORIG - LRET */ 
+	add.l	#(LRET-LER1),sp			/* remove LORIG - LRET */ 
 	mov.l	sp,@SYMBOL_NAME(sw_ksp)
 	mov.l	er0,sp
 	bra	8f
@@ -252,6 +252,7 @@ SYMBOL_NAME_LABEL(ret_from_exception)
 	btst	#TIF_NEED_RESCHED,r1l
 	bne	@SYMBOL_NAME(reschedule):16
 	mov.l	sp,er1
+	subs	#4,er1			/* adjust retpc */
 	mov.l	er2,er0
 	jsr	@SYMBOL_NAME(do_signal)
 3:	 

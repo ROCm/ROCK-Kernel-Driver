@@ -52,7 +52,8 @@ typedef struct irq_handler {
 	const char  *devname;
 } irq_handler_t;
 
-irq_handler_t *irq_list[NR_IRQS];
+static irq_handler_t *irq_list[NR_IRQS];
+static int use_kmalloc;
 
 extern unsigned long *interrupt_redirect_table;
 
@@ -119,20 +120,6 @@ void __init init_IRQ(void)
 #endif
 }
 
-void __init request_irq_boot(unsigned int irq, 
-  	                     irqreturn_t (*handler)(int, void *, struct pt_regs *),
-                             unsigned long flags, const char *devname, void *dev_id)
-{
-	irq_handler_t *irq_handle;
-	irq_handle = alloc_bootmem(sizeof(irq_handler_t));
-	irq_handle->handler = handler;
-	irq_handle->flags   = flags;
-	irq_handle->count   = 0;
-	irq_handle->dev_id  = dev_id;
-	irq_handle->devname = devname;
-	irq_list[irq] = irq_handle;
-}
-
 int request_irq(unsigned int irq, 
 		irqreturn_t (*handler)(int, void *, struct pt_regs *),
                 unsigned long flags, const char *devname, void *dev_id)
@@ -154,7 +141,14 @@ int request_irq(unsigned int irq,
 			return -EBUSY;
 		H8300_GPIO_DDR(H8300_GPIO_P9, (irq - EXT_IRQ0), 0);
 	}
-	irq_handle = (irq_handler_t *)kmalloc(sizeof(irq_handler_t), GFP_ATOMIC);
+
+	if (use_kmalloc)
+		irq_handle = (irq_handler_t *)kmalloc(sizeof(irq_handler_t), GFP_ATOMIC);
+	else {
+		irq_handle = alloc_bootmem(sizeof(irq_handler_t));
+		(unsigned long)irq_handle |= 0x80000000; /* bootmem allocater */
+	}
+
 	if (irq_handle == NULL)
 		return -ENOMEM;
 
@@ -177,8 +171,10 @@ void free_irq(unsigned int irq, void *dev_id)
 		       irq, irq_list[irq]->devname);
 	if (irq >= EXT_IRQ0 && irq <= EXT_IRQ5)
 		*(volatile unsigned char *)IER &= ~(1 << (irq - EXT_IRQ0));
-	kfree(irq_list[irq]);
-	irq_list[irq] = NULL;
+	if ((irq_list[irq] & 0x80000000) == 0) {
+		kfree(irq_list[irq]);
+		irq_list[irq] = NULL;
+	}
 }
 
 /*
@@ -244,3 +240,9 @@ int show_interrupts(struct seq_file *p, void *v)
 void init_irq_proc(void)
 {
 }
+
+static void __init enable_kmalloc(void)
+{
+	use_kmalloc = 1;
+}
+__initcall(enable_kmalloc);
