@@ -821,6 +821,8 @@ acpi_ec_ecdt_probe (void)
 	if (ACPI_FAILURE(status)) {
 		goto error;
 	}
+	acpi_set_gpe_type (NULL, ec_ecdt->gpe_bit, ACPI_GPE_TYPE_RUNTIME);
+	acpi_enable_gpe (NULL, ec_ecdt->gpe_bit, ACPI_NOT_ISR);
 
 	status = acpi_install_address_space_handler (ACPI_ROOT_OBJECT,
 			ACPI_ADR_SPACE_EC, &acpi_ec_space_handler,
