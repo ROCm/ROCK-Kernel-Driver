@@ -32,6 +32,7 @@
 #include <linux/smp_lock.h>
 #include <linux/device.h>
 #include <linux/serial.h> /* for serial_state and serial_icounter_struct */
+#include <linux/delay.h>
 
 #include <asm/irq.h>
 #include <asm/uaccess.h>
@@ -1219,8 +1220,7 @@ static void uart_close(struct tty_struct *tty, struct file *filp)
 
 	if (state->info->blocked_open) {
 		if (state->close_delay) {
-			set_current_state(TASK_INTERRUPTIBLE);
-			schedule_timeout(state->close_delay);
+			msleep_interruptible(jiffies_to_msecs(state->close_delay));
 		}
 	} else if (!uart_console(port)) {
 		uart_change_pm(state, 3);
@@ -1285,8 +1285,7 @@ static void uart_wait_until_sent(struct tty_struct *tty, int timeout)
 	 * we wait.
 	 */
 	while (!port->ops->tx_empty(port)) {
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(char_time);
+		msleep_interruptible(jiffies_to_msecs(char_time));
 		if (signal_pending(current))
 			break;
 		if (time_after(jiffies, expire))
@@ -1843,10 +1842,8 @@ int uart_suspend_port(struct uart_driver *drv, struct uart_port *port)
 		 * Wait for the transmitter to empty.
 		 */
 		while (!ops->tx_empty(port)) {
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout(10*HZ/1000);
+			msleep(10);
 		}
-		set_current_state(TASK_RUNNING);
 
 		ops->shutdown(port);
 	}
