@@ -1038,11 +1038,13 @@ static struct inet_protocol igmp_protocol = {
 static struct inet_protocol tcp_protocol = {
 	.handler =	tcp_v4_rcv,
 	.err_handler =	tcp_v4_err,
+	.no_policy =	1,
 };
 
 static struct inet_protocol udp_protocol = {
 	.handler =	udp_rcv,
 	.err_handler =	udp_err,
+	.no_policy =	1,
 };
 
 static struct inet_protocol icmp_protocol = {

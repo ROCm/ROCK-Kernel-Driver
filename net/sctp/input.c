@@ -52,7 +52,7 @@
 #include <linux/ip.h>
 #include <linux/time.h> /* For struct timeval */
 #include <net/sock.h>
-#include <linux/ipsec.h>
+#include <net/xfrm.h>
 #include <net/sctp/sctp.h>
 #include <net/sctp/sm.h>
 
@@ -201,7 +201,7 @@ int sctp_rcv(struct sk_buff *skb)
 	rcvr = asoc ? &asoc->base : &ep->base;
 	sk = rcvr->sk;
 
-	if (!ipsec_sk_policy(sk, skb))
+	if (!xfrm_policy_check(sk, XFRM_POLICY_IN, skb))
 		goto discard_release;
 
 	/* Create an SCTP packet structure. */

@@ -44,6 +44,7 @@ struct dst_entry
 #define DST_HOST		1
 #define DST_NOXFRM		2
 #define DST_NOPOLICY		4
+#define DST_NOHASH		8
 	unsigned long		lastuse;
 	unsigned long		expires;
 
@@ -138,8 +139,15 @@ struct dst_entry * dst_clone(struct dst_entry * dst)
 static inline
 void dst_release(struct dst_entry * dst)
 {
-	if (dst)
+	if (dst) {
+		if (atomic_read(&dst->__refcnt) < 1) {
+			__label__ __lbl;
+			printk("BUG: dst underflow %d: %p\n",
+			       atomic_read(&dst->__refcnt), &&__lbl);
+__lbl:
+		}
 		atomic_dec(&dst->__refcnt);
+	}
 }
 
 /* Children define the path of the packet through the
@@ -237,7 +245,7 @@ extern void		dst_init(void);
 struct flowi;
 extern int xfrm_lookup(struct dst_entry **dst_p, struct flowi *fl,
 		       struct sock *sk, int flags);
-
+extern void xfrm_init(void);
 
 #endif
 

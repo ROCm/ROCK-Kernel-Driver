@@ -107,7 +107,8 @@ struct rt6_info ip6_null_entry = {
 			.error		= -ENETUNREACH,
 			.input		= ip6_pkt_discard,
 			.output		= ip6_pkt_discard,
-			.ops		= &ip6_dst_ops
+			.ops		= &ip6_dst_ops,
+			.path		= (struct dst_entry*)&ip6_null_entry,
 		}
 	},
 	.rt6i_flags	= (RTF_REJECT | RTF_NONEXTHOP),
@@ -1252,6 +1253,9 @@ static int rt6_mtu_change_route(struct rt6_info *rt, void *p_arg)
 	*/
 
 	idev = __in6_dev_get(arg->dev);
+	if (idev == NULL)
+		return 0;
+
 	/* For administrative MTU increase, there is no way to discover
 	   IPv6 PMTU increase, so PMTU increase should be updated here.
 	   Since RFC 1981 doesn't include administrative MTU increase

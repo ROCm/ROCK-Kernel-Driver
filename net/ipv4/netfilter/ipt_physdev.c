@@ -38,8 +38,8 @@ match(const struct sk_buff *skb,
 			& ((const unsigned long *)info->in_mask)[i];
 	}
 
-	if ((ret != 0) ^ !(info->invert & IPT_PHYSDEV_OP_MATCH_IN))
-		return 1;
+	if ((ret == 0) ^ !(info->invert & IPT_PHYSDEV_OP_MATCH_IN))
+		return 0;
 
 	for (i = 0, ret = 0; i < IFNAMSIZ/sizeof(unsigned long); i++) {
 		ret |= (((const unsigned long *)outdev)[i]
