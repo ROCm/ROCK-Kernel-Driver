@@ -462,6 +462,7 @@ static dev_link_t *netwave_attach(void)
     memset(priv, 0, sizeof(*priv));
     link = &priv->link; dev = &priv->dev;
     link->priv = dev->priv = priv;
+    init_timer(&link->release);
     link->release.function = &netwave_release;
     link->release.data = (u_long)link;
 	

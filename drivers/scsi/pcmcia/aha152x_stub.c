@@ -142,6 +142,7 @@ static dev_link_t *aha152x_attach(void)
     if (!info) return NULL;
     memset(info, 0, sizeof(*info));
     link = &info->link; link->priv = info;
+    init_timer(&link->release);
     link->release.function = &aha152x_release_cs;
     link->release.data = (u_long)link;
 

@@ -26,7 +26,7 @@
  *           at Cirrus for have helping me out with the DSP, however we
  *           still dont have sufficient documentation and technical
  *           references to be able to implement all fancy feutures
- *           supported by the cs46xx DPS's. 
+ *           supported by the cs46xx DSP's. 
  *           Benny <benny@hostmobility.com>
  *                
  *   This program is free software; you can redistribute it and/or modify
@@ -52,14 +52,14 @@
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/slab.h>
+#include <linux/gameport.h>
 
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/info.h>
+#include <sound/pcm.h>
+#include <sound/pcm_params.h>
 #include <sound/cs46xx.h>
-#ifndef LINUX_2_2
-#include <linux/gameport.h>
-#endif
 
 #include <asm/io.h>
 
@@ -273,9 +273,6 @@ static void snd_cs46xx_ac97_write(ac97_t *ac97,
 				   unsigned short val)
 {
 	cs46xx_t *chip = snd_magic_cast(cs46xx_t, ac97->private_data, return);
-#ifndef CONFIG_SND_CS46XX_NEW_DSP
-	int val2 = 0;
-#endif
 	int codec_index = -1;
 
 	/* UGGLY: nr_ac97_codecs == 0 primery codec detection is in progress */
@@ -287,59 +284,9 @@ static void snd_cs46xx_ac97_write(ac97_t *ac97,
 	else
 		snd_assert(0,return);
 
-#ifndef CONFIG_SND_CS46XX_NEW_DSP
-	if (reg == AC97_CD)
-		val2 = snd_cs46xx_codec_read(chip, AC97_CD, codec_index);
-#endif
-
+	chip->active_ctrl(chip, 1);
 	snd_cs46xx_codec_write(chip, reg, val, codec_index);
-
-#ifndef CONFIG_SND_CS46XX_NEW_DSP
-    /* Benny: I've not found *one* soundcard where
-       this code below could do any sense, and
-       with the HW mixering it's anyway broken, with
-       more then 1 PCM stream the amplifier will not
-       be turned off by unmuting CD channel. So just
-       lets skip it.
-    */
-	
-	/*
-	 *	Adjust power if the mixer is selected/deselected according
-	 *	to the CD.
-	 *
-	 *	IF the CD is a valid input source (mixer or direct) AND
-	 *		the CD is not muted THEN power is needed
-	 *
-	 *	We do two things. When record select changes the input to
-	 *	add/remove the CD we adjust the power count if the CD is
-	 *	unmuted.
-	 *
-	 *	When the CD mute changes we adjust the power level if the
-	 *	CD was a valid input.
-	 *
-	 *      We also check for CD volume != 0, as the CD mute isn't
-	 *      normally tweaked from userspace.
-	 */
-	 
-	/* CD mute change ? */
-
-	/* Benny: this hack dont seems to make any sense to me, at least on the Game Theater XP,
-	   Turning of the amplifier just make the PCM sound very distorcionated.
-	   is this really needed ????????????????
-	*/
-	if (reg == AC97_CD) {
-		/* Mute bit change ? */
-		if ((val2^val)&0x8000 || ((val2 == 0x1f1f || val == 0x1f1f) && val2 != val)) {
-			/* Mute on */
-			if(val&0x8000 || val == 0x1f1f)
-				chip->amplifier_ctrl(chip, -1);
-			else /* Mute off power on */
-				chip->amplifier_ctrl(chip, 1);
-		}
-	}
-
 	chip->active_ctrl(chip, -1);
-#endif
 }
 
 
@@ -732,9 +679,11 @@ static int snd_cs46xx_playback_transfer(snd_pcm_substream_t *substream,
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	snd_pcm_sframes_t diff;
 	cs46xx_pcm_t * cpcm;
-	int buffer_size = runtime->period_size * CS46XX_FRAGS * 4;
+	int buffer_size;
 
 	cpcm = snd_magic_cast(cs46xx_pcm_t, substream->runtime->private_data, return -ENXIO);
+
+	buffer_size = runtime->period_size * CS46XX_FRAGS << cpcm->shift;
 
 	diff = runtime->control->appl_ptr - cpcm->appl_ptr;
 	if (diff) {
@@ -776,7 +725,7 @@ static int snd_cs46xx_capture_transfer(snd_pcm_substream_t *substream,
 	cs46xx_t *chip = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	snd_pcm_sframes_t diff = runtime->control->appl_ptr - chip->capt.appl_ptr;
-	int buffer_size = runtime->period_size * CS46XX_FRAGS * 4;
+	int buffer_size = runtime->period_size * CS46XX_FRAGS << chip->capt.shift;
 	if (diff) {
 		if (diff < -(snd_pcm_sframes_t) (runtime->boundary / 2))
 			diff += runtime->boundary;
@@ -832,7 +781,7 @@ static snd_pcm_uframes_t snd_cs46xx_playback_indirect_pointer(snd_pcm_substream_
 	size_t ptr;
 	cs46xx_pcm_t *cpcm = snd_magic_cast(cs46xx_pcm_t, substream->runtime->private_data, return -ENXIO);
 	ssize_t bytes;
-	int buffer_size = substream->runtime->period_size * CS46XX_FRAGS * 4;
+	int buffer_size = substream->runtime->period_size * CS46XX_FRAGS << cpcm->shift;
 
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
 	snd_assert (cpcm->pcm_channel,return -ENXIO);
@@ -867,7 +816,7 @@ static snd_pcm_uframes_t snd_cs46xx_capture_indirect_pointer(snd_pcm_substream_t
 	cs46xx_t *chip = snd_pcm_substream_chip(substream);
 	size_t ptr = snd_cs46xx_peek(chip, BA1_CBA) - chip->capt.hw_addr;
 	ssize_t bytes = ptr - chip->capt.hw_io;
-	int buffer_size = substream->runtime->period_size * CS46XX_FRAGS * 4;
+	int buffer_size = substream->runtime->period_size * CS46XX_FRAGS << chip->capt.shift;
 
 	if (bytes < 0)
 		bytes += buffer_size;
@@ -1073,7 +1022,7 @@ static int snd_cs46xx_playback_hw_params(snd_pcm_substream_t * substream,
 	int err;
 	cs46xx_t *chip = snd_pcm_substream_chip(substream);
 	int sample_rate = params_rate(hw_params);
-	int period_size = params_period_size(hw_params);
+	int period_size = params_period_bytes(hw_params);
 	cpcm = snd_magic_cast(cs46xx_pcm_t, runtime->private_data, return -ENXIO);
 
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
@@ -1092,12 +1041,15 @@ static int snd_cs46xx_playback_hw_params(snd_pcm_substream_t * substream,
 		return -ENXIO;
 	}
 
-	if (cs46xx_dsp_pcm_channel_set_period (chip,cpcm->pcm_channel,period_size * 4)) {
+
+	if (cs46xx_dsp_pcm_channel_set_period (chip,cpcm->pcm_channel,period_size)) {
 		 up (&chip->spos_mutex);
 		 return -EINVAL;
 	 }
-	snd_printdd ("period_size (%d), periods (%d)\n",
-		     period_size, params_periods(hw_params));
+
+	snd_printdd ("period_size (%d), periods (%d) buffer_size(%d)\n",
+		     period_size, params_periods(hw_params),
+		     params_buffer_bytes(hw_params));
 #endif
 
 	if (params_periods(hw_params) == CS46XX_FRAGS) {
@@ -1257,12 +1209,10 @@ static int snd_cs46xx_capture_hw_params(snd_pcm_substream_t * substream,
 	cs46xx_t *chip = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	int err;
-	int period_size = params_period_size(hw_params);
+	int period_size = params_period_bytes(hw_params);
 
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
-	snd_printdd ("capture period size (%d)\n",period_size);
-
-	cs46xx_dsp_pcm_ostream_set_period (chip,period_size * 4);
+	cs46xx_dsp_pcm_ostream_set_period (chip,period_size);
 #endif
 	if (runtime->periods == CS46XX_FRAGS) {
 		if (runtime->dma_area != chip->capt.hw_area)
@@ -1447,7 +1397,7 @@ static snd_pcm_hardware_t snd_cs46xx_capture =
 	.fifo_size =		0,
 };
 
-static unsigned int period_sizes[] = { 8, 16, 32, 64, 128, 256, 512 };
+static unsigned int period_sizes[] = { 32, 64, 128, 256, 512, 1024, 2048 };
 
 #define PERIOD_SIZES sizeof(period_sizes) / sizeof(period_sizes[0])
 
@@ -1490,8 +1440,11 @@ static int _cs46xx_playback_open_channel (snd_pcm_substream_t * substream,int pc
 	cpcm->pcm_channel = NULL; 
 	cpcm->pcm_channel_id = pcm_channel_id;
 
-	snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_PERIOD_SIZE, 
+
+	snd_pcm_hw_constraint_list(runtime, 0,
+				   SNDRV_PCM_HW_PARAM_PERIOD_BYTES, 
 				   &hw_constraints_period_sizes);
+
 	up (&chip->spos_mutex);
 #else
 	chip->playback_pcm = cpcm; /* HACK */
@@ -1500,7 +1453,6 @@ static int _cs46xx_playback_open_channel (snd_pcm_substream_t * substream,int pc
 	if (chip->accept_valid)
 		substream->runtime->hw.info |= SNDRV_PCM_INFO_MMAP_VALID;
 	chip->active_ctrl(chip, 1);
-	chip->amplifier_ctrl(chip, 1);
 
 	return 0;
 }
@@ -1564,10 +1516,10 @@ static int snd_cs46xx_capture_open(snd_pcm_substream_t * substream)
 		substream->runtime->hw.info |= SNDRV_PCM_INFO_MMAP_VALID;
 
 	chip->active_ctrl(chip, 1);
-	chip->amplifier_ctrl(chip, 1);
 
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
-	snd_pcm_hw_constraint_list(substream->runtime, 0, SNDRV_PCM_HW_PARAM_PERIOD_SIZE, 
+	snd_pcm_hw_constraint_list(substream->runtime, 0,
+				   SNDRV_PCM_HW_PARAM_PERIOD_BYTES, 
 				   &hw_constraints_period_sizes);
 #endif
 	return 0;
@@ -1598,7 +1550,6 @@ static int snd_cs46xx_playback_close(snd_pcm_substream_t * substream)
 	cpcm->substream = NULL;
 	snd_free_pci_pages(chip->pci, cpcm->hw_size, cpcm->hw_area, cpcm->hw_addr);
 	chip->active_ctrl(chip, -1);
-	chip->amplifier_ctrl(chip, -1);
 
 	return 0;
 }
@@ -1610,7 +1561,6 @@ static int snd_cs46xx_capture_close(snd_pcm_substream_t * substream)
 	chip->capt.substream = NULL;
 	snd_free_pci_pages(chip->pci, chip->capt.hw_size, chip->capt.hw_area, chip->capt.hw_addr);
 	chip->active_ctrl(chip, -1);
-	chip->amplifier_ctrl(chip, -1);
 
 	return 0;
 }
@@ -2740,7 +2690,7 @@ int __devinit snd_cs46xx_midi(cs46xx_t *chip, int device, snd_rawmidi_t **rrawmi
  * gameport interface
  */
 
-#ifndef LINUX_2_2
+#if defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
 
 typedef struct snd_cs46xx_gameport {
 	struct gameport info;
@@ -2824,13 +2774,13 @@ void __devinit snd_cs46xx_gameport(cs46xx_t *chip)
 	gameport_register_port(&gp->info);
 }
 
-#else /* LINUX_2_2 */
+#else
 
 void __devinit snd_cs46xx_gameport(cs46xx_t *chip)
 {
 }
 
-#endif /* !LINUX_2_2 */
+#endif /* CONFIG_GAMEPORT */
 
 /*
  *  proc interface
@@ -2876,19 +2826,13 @@ static int __devinit snd_cs46xx_proc_init(snd_card_t * card, cs46xx_t *chip)
 	
 	for (idx = 0; idx < 5; idx++) {
 		snd_cs46xx_region_t *region = &chip->region.idx[idx];
-		entry = snd_info_create_card_entry(card, region->name, card->proc_root);
-		if (entry) {
+		if (! snd_card_proc_new(card, region->name, &entry)) {
 			entry->content = SNDRV_INFO_CONTENT_DATA;
 			entry->private_data = chip;
 			entry->c.ops = &snd_cs46xx_proc_io_ops;
 			entry->size = region->size;
 			entry->mode = S_IFREG | S_IRUSR;
-			if (snd_info_register(entry) < 0) {
-				snd_info_unregister(entry);
-				entry = NULL;
-			}
 		}
-		region->proc_entry = entry;
 	}
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
 	cs46xx_dsp_proc_init(card, chip);
@@ -2898,15 +2842,6 @@ static int __devinit snd_cs46xx_proc_init(snd_card_t * card, cs46xx_t *chip)
 
 static int snd_cs46xx_proc_done(cs46xx_t *chip)
 {
-	int idx;
-
-	for (idx = 0; idx < 5; idx++) {
-		snd_cs46xx_region_t *region = &chip->region.idx[idx];
-		if (region->proc_entry) {
-			snd_info_unregister((snd_info_entry_t *) region->proc_entry);
-			region->proc_entry = NULL;
-		}
-	}
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
 	cs46xx_dsp_proc_done(chip);
 #endif
@@ -2972,7 +2907,7 @@ static int snd_cs46xx_free(cs46xx_t *chip)
 	if (chip->active_ctrl)
 		chip->active_ctrl(chip, 1);
 
-#ifndef LINUX_2_2
+#if defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
 	if (chip->gameport) {
 		gameport_unregister_port(&chip->gameport->info);
 		kfree(chip->gameport);
@@ -3553,9 +3488,6 @@ static void voyetra_mixer_init (cs46xx_t *chip)
 {
 	snd_printdd ("initializing Voyetra mixer\n");
 
-	/* turnon Amplifier and leave it on */
-	chip->amplifier_ctrl(chip, 1);
-  
 	/* Enable SPDIF out */
 	snd_cs46xx_pokeBA0(chip, BA0_EGPIODR, EGPIODR_GPOE0);
 	snd_cs46xx_pokeBA0(chip, BA0_EGPIOPTR, EGPIODR_GPOE0);
@@ -3574,9 +3506,6 @@ static void hercules_mixer_init (cs46xx_t *chip)
 	snd_printdd ("initializing Hercules mixer\n");
 
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
-	/* turnon Amplifier and leave it on */
-	chip->amplifier_ctrl(chip, 1);
-
 	for (idx = 0 ; idx < sizeof(snd_hercules_controls) / 
 		     sizeof(snd_hercules_controls[0]) ; idx++) {
 		snd_kcontrol_t *kctl;
@@ -3716,18 +3645,23 @@ static struct cs_card_type __devinitdata cards[] = {
 #ifdef CONFIG_PM
 void snd_cs46xx_suspend(cs46xx_t *chip)
 {
+	int amp_saved;
+
 	snd_card_t *card = chip->card;
 
-	snd_power_lock(card);
 	if (card->power_state == SNDRV_CTL_POWER_D3hot)
-		goto __skip;
+		return;
 	snd_pcm_suspend_all(chip->pcm);
 	// chip->ac97_powerdown = snd_cs46xx_codec_read(chip, AC97_POWER_CONTROL);
 	// chip->ac97_general_purpose = snd_cs46xx_codec_read(chip, BA0_AC97_GENERAL_PURPOSE);
+	amp_saved = chip->amplifier;
+	/* turn off amp */
+	chip->amplifier_ctrl(chip, -chip->amplifier);
 	snd_cs46xx_hw_stop(chip);
+	/* disable CLKRUN */
+	chip->active_ctrl(chip, -chip->amplifier);
+	chip->amplifier = amp_saved; /* restore the status */
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
-      __skip:
-      	snd_power_unlock(card);
 }
 
 void snd_cs46xx_resume(cs46xx_t *chip)
@@ -3735,9 +3669,8 @@ void snd_cs46xx_resume(cs46xx_t *chip)
 	snd_card_t *card = chip->card;
 	int amp_saved;
 
-	snd_power_lock(card);
 	if (card->power_state == SNDRV_CTL_POWER_D0)
-		goto __skip;
+		return;
 
 	pci_enable_device(chip->pci);
 	amp_saved = chip->amplifier;
@@ -3760,14 +3693,11 @@ void snd_cs46xx_resume(cs46xx_t *chip)
 	snd_ac97_resume(chip->ac97[CS46XX_PRIMARY_CODEC_INDEX]);
 
 	if (amp_saved)
-		chip->amplifier_ctrl(chip, 1); /* try to turn on */
-	if (! amp_saved) {
-		chip->amplifier = 1;
-		chip->active_ctrl(chip, -1);
-	}
+		chip->amplifier_ctrl(chip, 1); /* turn amp on */
+	else
+		chip->active_ctrl(chip, -1); /* disable CLKRUN */
+	chip->amplifier = amp_saved;
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
-      __skip:
-      	snd_power_unlock(card);
 }
 
 static int snd_cs46xx_set_power_state(snd_card_t *card, unsigned int power_state)
@@ -3867,11 +3797,11 @@ int __devinit snd_cs46xx_create(snd_card_t * card,
 	for (cp = &cards[0]; cp->name; cp++) {
 		if (cp->vendor == ss_vendor && cp->id == ss_card) {
 			snd_printd ("hack for %s enabled\n", cp->name);
-			if (cp->init)
-				cp->init(chip);
 			chip->amplifier_ctrl = cp->amp;
 			chip->active_ctrl = cp->active;
 			chip->mixer_init = cp->mixer_init;
+			if (cp->init)
+				cp->init(chip);
 			break;
 		}
 	}
@@ -3892,7 +3822,7 @@ int __devinit snd_cs46xx_create(snd_card_t * card,
 	if (chip->active_ctrl == NULL)
 		chip->active_ctrl = amp_none;
 
-	chip->active_ctrl(chip, 1);
+	chip->active_ctrl(chip, 1); /* enable CLKRUN */
 
 	pci_set_master(pci);
 
@@ -3943,7 +3873,10 @@ int __devinit snd_cs46xx_create(snd_card_t * card,
 		return err;
 	}
 	
-	chip->active_ctrl(chip, -1);
+	/* turn on amplifier */
+	chip->amplifier_ctrl(chip, 1);
+
+	chip->active_ctrl(chip, -1); /* disable CLKRUN */
 
 	*rchip = chip;
 	return 0;

@@ -368,7 +368,6 @@ struct _snd_korg1212 {
 
         snd_pcm_substream_t *playback_substream;
         snd_pcm_substream_t *capture_substream;
-        snd_info_entry_t * proc_entry;
 
  	CardState cardState;
         int running;
@@ -1898,26 +1897,8 @@ static void __devinit snd_korg1212_proc_init(korg1212_t *korg1212)
 {
 	snd_info_entry_t *entry;
 
-	if ((entry = snd_info_create_card_entry(korg1212->card, "korg1212", korg1212->card->proc_root)) != NULL) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
-		entry->private_data = korg1212;
-		entry->mode = S_IFREG | S_IRUGO | S_IWUSR;
-		entry->c.text.read_size = 256;
-		entry->c.text.read = snd_korg1212_proc_read;
-		if (snd_info_register(entry) < 0) {
-			snd_info_free_entry(entry);
-			entry = NULL;
-		}
-	}
-	korg1212->proc_entry = entry;
-}
-
-static void snd_korg1212_proc_done(korg1212_t * korg1212)
-{
-	if (korg1212->proc_entry) {
-		snd_info_unregister(korg1212->proc_entry);
-		korg1212->proc_entry = NULL;
-	}
+	if (! snd_card_proc_new(korg1212->card, "korg1212", &entry))
+		snd_info_set_text_ops(entry, korg1212, snd_korg1212_proc_read);
 }
 
 static int __devinit snd_korg1212_create(korg1212_t *korg1212)
@@ -2173,8 +2154,6 @@ snd_korg1212_free(void *private_data)
         if (korg1212 == NULL) {
                 return;
         }
-
-        snd_korg1212_proc_done(korg1212);
 
         snd_korg1212_TurnOffIdleMonitor(korg1212);
 

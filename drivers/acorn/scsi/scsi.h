@@ -55,8 +55,6 @@ static inline unsigned char get_next_SCp_byte(Scsi_Pointer *SCp)
 
 	SCp->ptr += 1;
 	SCp->this_residual -= 1;
-	if (SCp->this_residual == 0)
-		next_SCp(SCp);
 
 	return c;
 }
@@ -66,8 +64,6 @@ static inline void put_next_SCp_byte(Scsi_Pointer *SCp, unsigned char c)
 	*SCp->ptr = c;
 	SCp->ptr += 1;
 	SCp->this_residual -= 1;
-	if (SCp->this_residual == 0)
-		next_SCp(SCp);
 }
 
 static inline void init_SCp(Scsi_Cmnd *SCpnt)
@@ -112,7 +108,7 @@ static inline void init_SCp(Scsi_Cmnd *SCpnt)
 	 * we aren't interested in the buffer pointer.
 	 */
 	if (SCpnt->SCp.this_residual == 0 && SCpnt->SCp.ptr) {
-#ifdef BELT_AND_BRACES
+#if 0 //def BELT_AND_BRACES
 		printk(KERN_WARNING "scsi%d.%c: zero length buffer passed for "
 		       "command ", SCpnt->host->host_no, '0' + SCpnt->target);
 		print_command(SCpnt->cmnd);

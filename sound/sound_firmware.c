@@ -1,47 +1,46 @@
 #include <linux/vmalloc.h>
-#define __KERNEL_SYSCALLS__
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/mm.h>
 #include <linux/slab.h>
-#include <linux/unistd.h>
 #include <asm/uaccess.h>
 
 static int do_mod_firmware_load(const char *fn, char **fp)
 {
-	int fd;
+	struct file* filp;
 	long l;
 	char *dp;
+	loff_t pos;
 
-	fd = open(fn, 0, 0);
-	if (fd == -1)
+	filp = filp_open(fn, 0, 0);
+	if (IS_ERR(filp))
 	{
 		printk(KERN_INFO "Unable to load '%s'.\n", fn);
 		return 0;
 	}
-	l = lseek(fd, 0L, 2);
+	l = filp->f_dentry->d_inode->i_size;
 	if (l <= 0 || l > 131072)
 	{
 		printk(KERN_INFO "Invalid firmware '%s'\n", fn);
-		sys_close(fd);
+		filp_close(filp, current->files);
 		return 0;
 	}
-	lseek(fd, 0L, 0);
 	dp = vmalloc(l);
 	if (dp == NULL)
 	{
 		printk(KERN_INFO "Out of memory loading '%s'.\n", fn);
-		sys_close(fd);
+		filp_close(filp, current->files);
 		return 0;
 	}
-	if (read(fd, dp, l) != l)
+	pos = 0;
+	if (vfs_read(filp, dp, l, &pos) != l)
 	{
 		printk(KERN_INFO "Failed to read '%s'.\n", fn);
 		vfree(dp);
-		sys_close(fd);
+		filp_close(filp, current->files);
 		return 0;
 	}
-	close(fd);
+	filp_close(filp, current->files);
 	*fp = dp;
 	return (int) l;
 }

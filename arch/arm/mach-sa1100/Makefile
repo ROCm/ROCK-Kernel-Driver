@@ -9,19 +9,17 @@ obj-n :=
 obj-  :=
 led-y := leds.o
 
-export-objs := dma.o generic.o pcipool.o pm.o sa1111.o sa1111-pcibuf.o
+export-objs := dma.o generic.o pm.o
 
 # This needs to be cleaned up.  We probably need to have SA1100
 # and SA1110 config symbols.
 ifeq ($(CONFIG_CPU_FREQ),y)
 obj-$(CONFIG_SA1100_ASSABET)		+= cpu-sa1110.o
 obj-$(CONFIG_SA1100_CERF)		+= cpu-sa1110.o
+obj-$(CONFIG_SA1100_HACKKIT)		+= cpu-sa1110.o
 obj-$(CONFIG_SA1100_LART)		+= cpu-sa1100.o
 obj-$(CONFIG_SA1100_PT_SYSTEM3)		+= cpu-sa1110.o
 endif
-
-# Next, the SA1111 stuff.
-obj-$(CONFIG_SA1111)			+= sa1111.o sa1111-pcibuf.o pcipool.o
 
 # Specific board support
 obj-$(CONFIG_SA1100_ADSBITSY)		+= adsbitsy.o
@@ -60,6 +58,9 @@ led-$(CONFIG_SA1100_GRAPHICSMASTER)	+= leds-graphicsmaster.o
 obj-$(CONFIG_SA1100_H3600)		+= h3600.o
 export-objs				+= h3600.o
 
+obj-$(CONFIG_SA1100_HACKKIT)		+= hackkit.o
+led-$(CONFIG_SA1100_HACKKIT)		+= leds-hackkit.o
+
 obj-$(CONFIG_SA1100_HUW_WEBPANEL)	+= huw_webpanel.o
 export-objs				+= huw_webpanel.o
 
@@ -94,6 +95,9 @@ led-$(CONFIG_SA1100_SIMPAD)		+= leds-simpad.o
 obj-$(CONFIG_SA1100_STORK)		+= stork.o
 export-objs				+= stork.o
 
+obj-$(CONFIG_SA1100_TRIZEPS)		+= trizeps.o
+export-objs				+= trizeps.o
+
 obj-$(CONFIG_SA1100_XP860)		+= xp860.o
 
 obj-$(CONFIG_SA1100_YOPY)		+= yopy.o
@@ -106,4 +110,4 @@ obj-$(CONFIG_LEDS) += $(led-y)
 #obj-$(CONFIG_SA1100_USB)		+= usb/
 
 # Miscelaneous functions
-obj-$(CONFIG_PM) += pm.o sleep.o
+obj-$(CONFIG_PM)			+= pm.o sleep.o

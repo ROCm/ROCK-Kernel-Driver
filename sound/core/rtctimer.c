@@ -83,7 +83,6 @@ rtctimer_open(snd_timer_t *t)
 	if (err < 0)
 		return err;
 	t->private_data = &rtc_task;
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -95,7 +94,6 @@ rtctimer_close(snd_timer_t *t)
 		rtc_unregister(rtc);
 		t->private_data = NULL;
 	}
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 

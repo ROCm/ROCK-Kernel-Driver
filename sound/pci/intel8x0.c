@@ -131,6 +131,9 @@ MODULE_PARM_SYNTAX(mpu_port, SNDRV_ENABLED ",allows:{{0},{0x330},{0x300}},dialog
 #ifndef PCI_DEVICE_ID_NVIDIA_MCP2_AUDIO
 #define PCI_DEVICE_ID_NVIDIA_MCP2_AUDIO	0x006a
 #endif
+#ifndef PCI_DEVICE_ID_NVIDIA_MCP3_AUDIO
+#define PCI_DEVICE_ID_NVIDIA_MCP3_AUDIO	0x00da
+#endif
 
 enum { DEVICE_INTEL, DEVICE_INTEL_ICH4, DEVICE_SIS, DEVICE_ALI };
 
@@ -319,7 +322,6 @@ typedef struct {
 	unsigned char piv_saved;
 	unsigned short picb_saved;
 #endif
-	snd_info_entry_t *proc_entry;
 } ichdev_t;
 
 typedef struct _snd_intel8x0 intel8x0_t;
@@ -365,7 +367,6 @@ struct _snd_intel8x0 {
 
 	spinlock_t reg_lock;
 	spinlock_t ac97_lock;
-	snd_info_entry_t *proc_entry;
 	
 	u32 bdbars_count;
 	u32 *bdbars;
@@ -388,6 +389,7 @@ static struct pci_device_id snd_intel8x0_ids[] __devinitdata = {
 	{ 0x1039, 0x7012, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_SIS },	/* SI7012 */
 	{ 0x10de, 0x01b1, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* NFORCE */
 	{ 0x10de, 0x006a, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* NFORCE2 */
+	{ 0x10de, 0x00da, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* NFORCE3 */
 	{ 0x1022, 0x746d, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* AMD8111 */
 	{ 0x1022, 0x7445, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* AMD768 */
 	{ 0x10b9, 0x5455, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_ALI },   /* Ali5455 */
@@ -1276,6 +1278,9 @@ static int __devinit snd_intel8x0_pcm_mic(intel8x0_t *chip, int device, snd_pcm_
 	sprintf(pcm->name, "%s - MIC ADC", chip->card->shortname);
 
 	chip->pcm_mic = pcm;	
+
+	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, 0, 128*1024);
+
 	if (rpcm)
 		*rpcm = pcm;
 	return 0;
@@ -1310,6 +1315,9 @@ static int __devinit snd_intel8x0_pcm_mic2(intel8x0_t *chip, int device, snd_pcm
 	sprintf(pcm->name, "%s - MIC2 ADC", chip->card->shortname);
 
 	chip->pcm_mic2 = pcm;	
+
+	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, 0, 128*1024);
+
 	if (rpcm)
 		*rpcm = pcm;
 	return 0;
@@ -1344,6 +1352,9 @@ static int __devinit snd_intel8x0_pcm_capture2(intel8x0_t *chip, int device, snd
 	sprintf(pcm->name, "%s - ADC2", chip->card->shortname);
 
 	chip->pcm2 = pcm;	
+
+	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, 0, 128*1024);
+
 	if (rpcm)
 		*rpcm = pcm;
 	return 0;
@@ -1378,6 +1389,9 @@ static int __devinit snd_intel8x0_pcm_spdif(intel8x0_t *chip, int device, snd_pc
 	sprintf(pcm->name, "%s - IEC958", chip->card->shortname);
 
 	chip->pcm_spdif = pcm;	
+
+	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, 64*1024, 128*1024);
+
 	if (rpcm)
 		*rpcm = pcm;
 	return 0;
@@ -1413,6 +1427,9 @@ static int __devinit snd_intel8x0_ali_spdif(intel8x0_t *chip, int device, snd_pc
 	sprintf(pcm->name, "%s - IEC958", chip->card->shortname);
 
 	chip->pcm_spdif = pcm;	
+
+	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, 64*1024, 128*1024);
+
 	if (rpcm)
 		*rpcm = pcm;
 	return 0;
@@ -1447,6 +1464,9 @@ static int __devinit snd_intel8x0_ali_ac97spdif(intel8x0_t *chip, int device, sn
 	sprintf(pcm->name, "%s - AC97 IEC958", chip->card->shortname);
 
 	chip->pcm_ac97spdif = pcm;	
+
+	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, 64*1024, 128*1024);
+
 	if (rpcm)
 		*rpcm = pcm;
 	return 0;
@@ -1788,6 +1808,10 @@ static int snd_intel8x0_ich_chip_init(intel8x0_t *chip)
 	} while (time_after_eq(end_time, jiffies));
 
       __ok3:      
+	if (chip->device_type == DEVICE_SIS) {
+		/* unmute the output on SIS7012 */
+		iputword(chip, 0x4c, igetword(chip, 0x4c) | 1);
+	}
       	return 0;
 }
 
@@ -1850,8 +1874,6 @@ static int snd_intel8x0_chip_init(intel8x0_t *chip)
 	return 0;
 }
 
-static void snd_intel8x0_proc_done(intel8x0_t * chip);
-
 static int snd_intel8x0_free(intel8x0_t *chip)
 {
 	int i;
@@ -1867,7 +1889,6 @@ static int snd_intel8x0_free(intel8x0_t *chip)
 	/* --- */
 	synchronize_irq(chip->irq);
       __hw_end:
-	snd_intel8x0_proc_done(chip);
 	if (chip->bdbars)
 		snd_free_pci_pages(chip->pci, chip->bdbars_count * sizeof(u32) * ICH_MAX_FRAGS * 2, chip->bdbars, chip->bdbars_addr);
 	if (chip->remap_addr)
@@ -1896,17 +1917,15 @@ static void intel8x0_suspend(intel8x0_t *chip)
 {
 	snd_card_t *card = chip->card;
 
-	chip->in_suspend = 1;
-	snd_power_lock(card);
-	if (card->power_state == SNDRV_CTL_POWER_D3hot)
-		goto __skip;
+	if (chip->in_suspend ||
+	    card->power_state == SNDRV_CTL_POWER_D3hot)
+		return;
 
+	chip->in_suspend = 1;
 	snd_pcm_suspend_all(chip->pcm);
 	if (chip->pcm_mic)
 		snd_pcm_suspend_all(chip->pcm_mic);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
-      __skip:
-      	snd_power_unlock(card);
 }
 
 static void intel8x0_resume(intel8x0_t *chip)
@@ -1914,9 +1933,9 @@ static void intel8x0_resume(intel8x0_t *chip)
 	snd_card_t *card = chip->card;
 	int i;
 
-	snd_power_lock(card);
-	if (card->power_state == SNDRV_CTL_POWER_D0)
-		goto __skip;
+	if (! chip->in_suspend ||
+	    card->power_state == SNDRV_CTL_POWER_D0)
+		return;
 
 	pci_enable_device(chip->pci);
 	snd_intel8x0_chip_init(chip);
@@ -1926,8 +1945,6 @@ static void intel8x0_resume(intel8x0_t *chip)
 
 	chip->in_suspend = 0;
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
-      __skip:
-      	snd_power_unlock(card);
 }
 
 #ifndef PCI_OLD_SUSPEND
@@ -2096,26 +2113,8 @@ static void __devinit snd_intel8x0_proc_init(intel8x0_t * chip)
 {
 	snd_info_entry_t *entry;
 
-	if ((entry = snd_info_create_card_entry(chip->card, "intel8x0", chip->card->proc_root)) != NULL) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
-		entry->private_data = chip;
-		entry->mode = S_IFREG | S_IRUGO | S_IWUSR;
-		entry->c.text.read_size = 2048;
-		entry->c.text.read = snd_intel8x0_proc_read;
-		if (snd_info_register(entry) < 0) {
-			snd_info_free_entry(entry);
-			entry = NULL;
-		}
-	}
-	chip->proc_entry = entry;
-}
-
-static void snd_intel8x0_proc_done(intel8x0_t * chip)
-{
-	if (chip->proc_entry) {
-		snd_info_unregister(chip->proc_entry);
-		chip->proc_entry = NULL;
-	}
+	if (! snd_card_proc_new(chip->card, "intel8x0", &entry))
+		snd_info_set_text_ops(entry, chip, snd_intel8x0_proc_read);
 }
 
 static int snd_intel8x0_dev_free(snd_device_t *device)
@@ -2247,7 +2246,7 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 	chip->bdbars_count = 3;
 	if (device_type == DEVICE_INTEL_ICH4 || device_type == DEVICE_ALI)
 		chip->bdbars_count = 6;
-	chip->bdbars = (u32 *)snd_malloc_pci_pages(pci, chip->bdbars_count * sizeof(unsigned int) * ICH_MAX_FRAGS * 2, &chip->bdbars_addr);
+	chip->bdbars = (u32 *)snd_malloc_pci_pages(pci, chip->bdbars_count * sizeof(u32) * ICH_MAX_FRAGS * 2, &chip->bdbars_addr);
 	if (chip->bdbars == NULL) {
 		snd_intel8x0_free(chip);
 		return -ENOMEM;
@@ -2304,6 +2303,7 @@ static struct shortname_table {
 	{ PCI_DEVICE_ID_SI_7012, "SiS SI7012" },
 	{ PCI_DEVICE_ID_NVIDIA_MCP_AUDIO, "NVidia NForce" },
 	{ PCI_DEVICE_ID_NVIDIA_MCP2_AUDIO, "NVidia NForce2" },
+	{ PCI_DEVICE_ID_NVIDIA_MCP3_AUDIO, "NVidia NForce3" },
 	{ 0x746d, "AMD AMD8111" },
 	{ 0x7445, "AMD AMD768" },
 	{ 0x5455, "ALi M5455" },
@@ -2488,6 +2488,8 @@ static struct pci_device_id snd_intel8x0_joystick_ids[] __devinitdata = {
 	// { 0x8086, 0x7195, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },	/* 440MX */
 	// { 0x1039, 0x7012, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },	/* SI7012 */
 	{ 0x10de, 0x01b2, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },	/* NFORCE */
+	{ 0x10de, 0x006b, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },	/* NFORCE2 */
+	{ 0x10de, 0x00db, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },	/* NFORCE3 */
 	{ 0, }
 };
 
@@ -2496,6 +2498,8 @@ static struct pci_driver joystick_driver = {
 	.id_table = snd_intel8x0_joystick_ids,
 	.probe = snd_intel8x0_joystick_probe,
 };
+
+static int have_joystick;
 #endif
 
 static int __init alsa_card_intel8x0_init(void)
@@ -2509,7 +2513,13 @@ static int __init alsa_card_intel8x0_init(void)
                 return err;
         }
 #if defined(SUPPORT_JOYSTICK) || defined(SUPPORT_MIDI)
-	pci_module_init(&joystick_driver);
+	if (pci_module_init(&joystick_driver) < 0) {
+		snd_printdd(KERN_INFO "no joystick found\n");
+		have_joystick = 0;
+	} else {
+		snd_printdd(KERN_INFO "joystick(s) found\n");
+		have_joystick = 1;
+	}
 #endif
         return 0;
 
@@ -2519,7 +2529,8 @@ static void __exit alsa_card_intel8x0_exit(void)
 {
 	pci_unregister_driver(&driver);
 #if defined(SUPPORT_JOYSTICK) || defined(SUPPORT_MIDI)
-	pci_unregister_driver(&joystick_driver);
+	if (have_joystick)
+		pci_unregister_driver(&joystick_driver);
 #endif
 }
 

@@ -132,26 +132,8 @@ void snd_gus_irq_profile_init(snd_gus_card_t *gus)
 {
 	snd_info_entry_t *entry;
 
-	gus->irq_entry = NULL;
-	entry = snd_info_create_card_entry(gus->card, "gusirq", gus->card->proc_root);
-	if (entry) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
-		entry->c.text.read_size = 512;
-		entry->c.text.read = snd_gus_irq_info_read;
-		entry->private_data = gus;
-		if (snd_info_register(entry) < 0) {
-			snd_info_free_entry(entry);
-			entry = NULL;
-		}
-	}
-	gus->irq_entry = entry;	
+	if (! snd_card_proc_new(gus->card, "gusirq", &entry))
+		snd_info_set_text_ops(entry, gus, snd_gus_irq_info_read);
 }
 
-void snd_gus_irq_profile_done(snd_gus_card_t *gus)
-{
-	if (gus->irq_entry) {
-		snd_info_unregister(gus->irq_entry);
-		gus->irq_entry = NULL;
-	}
-}
 #endif
