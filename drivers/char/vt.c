@@ -2531,7 +2531,8 @@ int __init vty_init(void)
 	memset(&console_driver, 0, sizeof(struct tty_driver));
 	console_driver.magic = TTY_DRIVER_MAGIC;
 	console_driver.owner = THIS_MODULE;
-	console_driver.name = "vc/";
+	console_driver.devfs_name = "vc/";
+	console_driver.name = "tty";
 	console_driver.name_base = 1;
 	console_driver.major = TTY_MAJOR;
 	console_driver.minor_start = 1;
