@@ -834,11 +834,6 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	paca[boot_cpuid].prof_counter = 1;
 	paca[boot_cpuid].prof_multiplier = 1;
 
-	/*
-	 * XXX very rough. 
-	 */
-	cache_decay_ticks = HZ/100;
-
 #ifndef CONFIG_PPC_ISERIES
 	paca[boot_cpuid].next_jiffy_update_tb = tb_last_stamp = get_tb();
 
@@ -992,3 +987,276 @@ void __init smp_cpus_done(unsigned int max_cpus)
 
 	set_cpus_allowed(current, old_mask);
 }
+
+#ifdef CONFIG_SCHED_SMT
+#ifdef CONFIG_NUMA
+static struct sched_group sched_group_cpus[NR_CPUS];
+static struct sched_group sched_group_phys[NR_CPUS];
+static struct sched_group sched_group_nodes[MAX_NUMNODES];
+static DEFINE_PER_CPU(struct sched_domain, phys_domains);
+static DEFINE_PER_CPU(struct sched_domain, node_domains);
+__init void arch_init_sched_domains(void)
+{
+	int i;
+	struct sched_group *first_cpu = NULL, *last_cpu = NULL;
+
+	/* Set up domains */
+	for_each_cpu(i) {
+		struct sched_domain *cpu_domain = cpu_sched_domain(i);
+		struct sched_domain *phys_domain = &per_cpu(phys_domains, i);
+		struct sched_domain *node_domain = &per_cpu(node_domains, i);
+		int node = cpu_to_node(i);
+		cpumask_t nodemask = node_to_cpumask(node);
+		cpumask_t my_cpumask = cpumask_of_cpu(i);
+		cpumask_t sibling_cpumask = cpumask_of_cpu(i ^ 0x1);
+
+		*cpu_domain = SD_SIBLING_INIT;
+		if (__is_processor(PV_POWER5))
+			cpus_or(cpu_domain->span, my_cpumask, sibling_cpumask);
+		else
+			cpu_domain->span = my_cpumask;
+
+		*phys_domain = SD_CPU_INIT;
+		phys_domain->span = nodemask;
+		// phys_domain->cache_hot_time = XXX;
+
+		*node_domain = SD_NODE_INIT;
+		node_domain->span = cpu_possible_map;
+		// node_domain->cache_hot_time = XXX;
+	}
+
+	/* Set up CPU (sibling) groups */
+	for_each_cpu(i) {
+		struct sched_domain *cpu_domain = cpu_sched_domain(i);
+		int j;
+		first_cpu = last_cpu = NULL;
+
+		if (i != first_cpu(cpu_domain->span)) {
+			cpu_sched_domain(i)->flags |= SD_SHARE_CPUPOWER;
+			cpu_sched_domain(first_cpu(cpu_domain->span))->flags |=
+				SD_SHARE_CPUPOWER;
+			continue;
+		}
+
+		for_each_cpu_mask(j, cpu_domain->span) {
+			struct sched_group *cpu = &sched_group_cpus[j];
+
+			cpus_clear(cpu->cpumask);
+			cpu_set(j, cpu->cpumask);
+			cpu->cpu_power = SCHED_LOAD_SCALE;
+
+			if (!first_cpu)
+				first_cpu = cpu;
+			if (last_cpu)
+				last_cpu->next = cpu;
+			last_cpu = cpu;
+		}
+		last_cpu->next = first_cpu;
+	}
+
+	for (i = 0; i < MAX_NUMNODES; i++) {
+		int j;
+		cpumask_t nodemask;
+		struct sched_group *node = &sched_group_nodes[i];
+		cpumask_t node_cpumask = node_to_cpumask(i);
+		cpus_and(nodemask, node_cpumask, cpu_online_map);
+
+		if (cpus_empty(nodemask))
+			continue;
+
+		first_cpu = last_cpu = NULL;
+		/* Set up physical groups */
+		for_each_cpu_mask(j, nodemask) {
+			struct sched_domain *cpu_domain = cpu_sched_domain(j);
+			struct sched_group *cpu = &sched_group_phys[j];
+
+			if (j != first_cpu(cpu_domain->span))
+				continue;
+
+			cpu->cpumask = cpu_domain->span;
+			/*
+			 * Make each extra sibling increase power by 10% of
+			 * the basic CPU. This is very arbitrary.
+			 */
+			cpu->cpu_power = SCHED_LOAD_SCALE + SCHED_LOAD_SCALE*(cpus_weight(cpu->cpumask)-1) / 10;
+			node->cpu_power += cpu->cpu_power;
+
+			if (!first_cpu)
+				first_cpu = cpu;
+			if (last_cpu)
+				last_cpu->next = cpu;
+			last_cpu = cpu;
+		}
+		last_cpu->next = first_cpu;
+	}
+
+	/* Set up nodes */
+	first_cpu = last_cpu = NULL;
+	for (i = 0; i < MAX_NUMNODES; i++) {
+		struct sched_group *cpu = &sched_group_nodes[i];
+		cpumask_t nodemask;
+		cpumask_t node_cpumask = node_to_cpumask(i);
+		cpus_and(nodemask, node_cpumask, cpu_possible_map);
+
+		if (cpus_empty(nodemask))
+			continue;
+
+		cpu->cpumask = nodemask;
+		/* ->cpu_power already setup */
+
+		if (!first_cpu)
+			first_cpu = cpu;
+		if (last_cpu)
+			last_cpu->next = cpu;
+		last_cpu = cpu;
+	}
+	last_cpu->next = first_cpu;
+
+	mb();
+	for_each_cpu(i) {
+		int node = cpu_to_node(i);
+		struct sched_domain *cpu_domain = cpu_sched_domain(i);
+		struct sched_domain *phys_domain = &per_cpu(phys_domains, i);
+		struct sched_domain *node_domain = &per_cpu(node_domains, i);
+		struct sched_group *cpu_group = &sched_group_cpus[i];
+		struct sched_group *phys_group = &sched_group_phys[first_cpu(cpu_domain->span)];
+		struct sched_group *node_group = &sched_group_nodes[node];
+
+		cpu_domain->parent = phys_domain;
+		phys_domain->parent = node_domain;
+
+		node_domain->groups = node_group;
+		phys_domain->groups = phys_group;
+		cpu_domain->groups = cpu_group;
+	}
+}
+#else /* !CONFIG_NUMA */
+static struct sched_group sched_group_cpus[NR_CPUS];
+static struct sched_group sched_group_phys[NR_CPUS];
+static DEFINE_PER_CPU(struct sched_domain, phys_domains);
+__init void arch_init_sched_domains(void)
+{
+	int i;
+	struct sched_group *first_cpu = NULL, *last_cpu = NULL;
+
+	/* Set up domains */
+	for_each_cpu(i) {
+		struct sched_domain *cpu_domain = cpu_sched_domain(i);
+		struct sched_domain *phys_domain = &per_cpu(phys_domains, i);
+		cpumask_t my_cpumask = cpumask_of_cpu(i);
+		cpumask_t sibling_cpumask = cpumask_of_cpu(i ^ 0x1);
+
+		*cpu_domain = SD_SIBLING_INIT;
+		if (__is_processor(PV_POWER5))
+			cpus_or(cpu_domain->span, my_cpumask, sibling_cpumask);
+		else
+			cpu_domain->span = my_cpumask;
+
+		*phys_domain = SD_CPU_INIT;
+		phys_domain->span = cpu_possible_map;
+		// phys_domain->cache_hot_time = XXX;
+	}
+
+	/* Set up CPU (sibling) groups */
+	for_each_cpu(i) {
+		struct sched_domain *cpu_domain = cpu_sched_domain(i);
+		int j;
+		first_cpu = last_cpu = NULL;
+
+		if (i != first_cpu(cpu_domain->span)) {
+			cpu_sched_domain(i)->flags |= SD_SHARE_CPUPOWER;
+			cpu_sched_domain(first_cpu(cpu_domain->span))->flags |=
+				SD_SHARE_CPUPOWER;
+			continue;
+		}
+
+		for_each_cpu_mask(j, cpu_domain->span) {
+			struct sched_group *cpu = &sched_group_cpus[j];
+
+			cpus_clear(cpu->cpumask);
+			cpu_set(j, cpu->cpumask);
+			cpu->cpu_power = SCHED_LOAD_SCALE;
+
+			if (!first_cpu)
+				first_cpu = cpu;
+			if (last_cpu)
+				last_cpu->next = cpu;
+			last_cpu = cpu;
+		}
+		last_cpu->next = first_cpu;
+	}
+
+	first_cpu = last_cpu = NULL;
+	/* Set up physical groups */
+	for_each_cpu(i) {
+		struct sched_domain *cpu_domain = cpu_sched_domain(i);
+		struct sched_group *cpu = &sched_group_phys[i];
+
+		if (i != first_cpu(cpu_domain->span))
+			continue;
+
+		cpu->cpumask = cpu_domain->span;
+		/* See SMT+NUMA setup for comment */
+		cpu->cpu_power = SCHED_LOAD_SCALE + SCHED_LOAD_SCALE*(cpus_weight(cpu->cpumask)-1) / 10;
+
+		if (!first_cpu)
+			first_cpu = cpu;
+		if (last_cpu)
+			last_cpu->next = cpu;
+		last_cpu = cpu;
+	}
+	last_cpu->next = first_cpu;
+
+	mb();
+	for_each_cpu(i) {
+		struct sched_domain *cpu_domain = cpu_sched_domain(i);
+		struct sched_domain *phys_domain = &per_cpu(phys_domains, i);
+		struct sched_group *cpu_group = &sched_group_cpus[i];
+		struct sched_group *phys_group = &sched_group_phys[first_cpu(cpu_domain->span)];
+		cpu_domain->parent = phys_domain;
+		phys_domain->groups = phys_group;
+		cpu_domain->groups = cpu_group;
+	}
+}
+#endif /* CONFIG_NUMA */
+#else /* !CONFIG_SCHED_SMT */
+
+static struct sched_group sched_group_cpus[NR_CPUS];
+
+__init void arch_init_sched_domains(void)
+{
+	int i;
+	struct sched_group *first_cpu = NULL, *last_cpu = NULL;
+
+	/* Set up domains */
+	for_each_cpu(i) {
+		struct sched_domain *cpu_sd = cpu_sched_domain(i);
+
+		*cpu_sd = SD_CPU_INIT;
+		cpu_sd->span = cpu_possible_map;
+		// cpu_sd->cache_hot_time = XXX;
+	}
+
+	/* Set up CPU groups */
+	for_each_cpu_mask(i, cpu_possible_map) {
+		struct sched_group *cpu = &sched_group_cpus[i];
+
+		cpus_clear(cpu->cpumask);
+		cpu_set(i, cpu->cpumask);
+		cpu->cpu_power = SCHED_LOAD_SCALE;
+
+		if (!first_cpu)
+			first_cpu = cpu;
+		if (last_cpu)
+			last_cpu->next = cpu;
+		last_cpu = cpu;
+	}
+	last_cpu->next = first_cpu;
+
+	mb();
+	for_each_cpu(i) {
+		struct sched_domain *cpu_sd = cpu_sched_domain(i);
+		cpu_sd->groups = &sched_group_cpus[i];
+	}
+}
+#endif
