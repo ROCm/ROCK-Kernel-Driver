@@ -40,6 +40,9 @@ static int pnp_assign_port(struct pnp_dev *dev, struct pnp_port *rule, int idx)
 	if (!(dev->res.port_resource[idx].flags & IORESOURCE_AUTO))
 		return 1;
 
+	if (!rule->size)
+		return 1; /* skip disabled resource requests */
+
 	start = &dev->res.port_resource[idx].start;
 	end = &dev->res.port_resource[idx].end;
 	flags = &dev->res.port_resource[idx].flags;
@@ -75,6 +78,9 @@ static int pnp_assign_mem(struct pnp_dev *dev, struct pnp_mem *rule, int idx)
 	/* check if this resource has been manually set, if so skip */
 	if (!(dev->res.mem_resource[idx].flags & IORESOURCE_AUTO))
 		return 1;
+
+	if (!rule->size)
+		return 1; /* skip disabled resource requests */
 
 	start = &dev->res.mem_resource[idx].start;
 	end = &dev->res.mem_resource[idx].end;
@@ -128,6 +134,9 @@ static int pnp_assign_irq(struct pnp_dev * dev, struct pnp_irq *rule, int idx)
 	if (!(dev->res.irq_resource[idx].flags & IORESOURCE_AUTO))
 		return 1;
 
+	if (!rule->map)
+		return 1; /* skip disabled resource requests */
+
 	start = &dev->res.irq_resource[idx].start;
 	end = &dev->res.irq_resource[idx].end;
 	flags = &dev->res.irq_resource[idx].flags;
@@ -167,6 +176,9 @@ static int pnp_assign_dma(struct pnp_dev *dev, struct pnp_dma *rule, int idx)
 	/* check if this resource has been manually set, if so skip */
 	if (!(dev->res.dma_resource[idx].flags & IORESOURCE_AUTO))
 		return 1;
+
+	if (!rule->map)
+		return 1; /* skip disabled resource requests */
 
 	start = &dev->res.dma_resource[idx].start;
 	end = &dev->res.dma_resource[idx].end;
