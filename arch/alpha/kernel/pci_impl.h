@@ -150,6 +150,9 @@ struct pci_iommu_arena
 extern struct pci_controller *hose_head, **hose_tail;
 extern struct pci_controller *pci_isa_hose;
 
+/* Indicate that we trust the console to configure things properly.  */
+extern int pci_probe_only;
+
 extern void common_init_pci(void);
 extern u8 common_swizzle(struct pci_dev *, u8 *);
 extern struct pci_controller *alloc_pci_controller(void);

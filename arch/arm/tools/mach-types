@@ -6,7 +6,7 @@
 # To add an entry into this database, please see Documentation/arm/README,
 # or contact rmk@arm.linux.org.uk
 #
-# Last update: Mon Dec 23 18:49:04 2002
+# Last update: Mon Jan 13 22:55:16 2003
 #
 # machine_is_xxx	CONFIG_xxxx		MACH_TYPE_xxx		number
 #
@@ -198,7 +198,7 @@ omaha			ARCH_OMAHA		OMAHA			186
 ta7			ARCH_TA7		TA7			187
 nova			SA1100_NOVA		NOVA			188
 hmk			ARCH_HMK		HMK			189
-inphinity		ARCH_INPHINITY		INPHINITY		190
+karo			ARCH_KARO		KARO			190
 fester			SA1100_FESTER		FESTER			191
 gpi			ARCH_GPI		GPI			192
 smdk2410		ARCH_SMDK2410		SMDK2410		193
@@ -273,3 +273,11 @@ prpmc1100		ARCH_PRPMC1100		PRPMC1100		261
 at91rm9200dk		ARCH_AT91RM9200DK	AT91RM9200DK		262
 armstick		ARCH_ARMSTICK		ARMSTICK		263
 armonie			ARCH_ARMONIE		ARMONIE			264
+mport1			ARCH_MPORT1		MPORT1			265
+s3c5410			ARCH_S3C5410		S3C5410			266
+zcp320a			ARCH_ZCP320A		ZCP320A			267
+i_box			ARCH_I_BOX		I_BOX			268
+stlc1502		ARCH_STLC1502		STLC1502		269
+siren			ARCH_SIREN		SIREN			270
+greenlake		ARCH_GREENLAKE		GREENLAKE		271
+argus			ARCH_ARGUS		ARGUS			272

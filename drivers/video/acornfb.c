@@ -12,6 +12,9 @@
  * NOTE: Most of the modes with X!=640 will disappear shortly.
  * NOTE: Startup setting of HS & VS polarity not supported.
  *       (do we need to support it if we're coming up in 640x480?)
+ *
+ * FIXME: (things broken by the "new improved" FBCON API)
+ *  - Blanking 8bpp displays with VIDC
  */
 
 #include <linux/config.h>
@@ -33,14 +36,6 @@
 #include <asm/mach-types.h>
 #include <asm/uaccess.h>
 
-#include <video/fbcon.h>
-#include <video/fbcon-mfb.h>
-#include <video/fbcon-cfb2.h>
-#include <video/fbcon-cfb4.h>
-#include <video/fbcon-cfb8.h>
-#include <video/fbcon-cfb16.h>
-#include <video/fbcon-cfb32.h>
-
 #include "acornfb.h"
 
 /*
@@ -58,25 +53,7 @@
  */
 #define DEFAULT_XRES	640
 #define DEFAULT_YRES	480
-/*
- * The order here defines which BPP we
- * pick depending on which resolutions
- * we have configured.
- */
-#if   defined(FBCON_HAS_CFB4)
-# define DEFAULT_BPP	4
-#elif defined(FBCON_HAS_CFB8)
-# define DEFAULT_BPP	8
-#elif defined(FBCON_HAS_CFB16)
-# define DEFAULT_BPP	16
-#elif defined(FBCON_HAS_CFB2)
-# define DEFAULT_BPP	2
-#elif defined(FBCON_HAS_MFB)
-# define DEFAULT_BPP	1
-#else
-#error No suitable framebuffers configured
-#endif
-
+#define DEFAULT_BPP	4
 
 /*
  * define this to debug the video mode selection
@@ -99,13 +76,10 @@ static struct fb_monspecs monspecs[NR_MONTYPES] __initdata = {
 	{ 30000, 70000, 60, 60, 0 }
 };
 
-static struct display global_disp;
 static struct fb_info fb_info;
 static struct acornfb_par current_par;
 static struct vidc_timing current_vidc;
-static struct fb_var_screeninfo __initdata init_var = {};
 
-extern int acornfb_depth;	/* set by setup.c */
 extern unsigned int vram_size;	/* set by setup.c */
 
 #ifdef HAS_VIDC
@@ -333,34 +307,26 @@ acornfb_set_timing(struct fb_var_screeninfo *var)
 #endif
 }
 
-static inline void
-acornfb_palette_write(u_int regno, union palette pal)
-{
-	vidc_writel(pal.p);
-}
-
-static inline union palette
-acornfb_palette_encode(u_int regno, u_int red, u_int green, u_int blue,
-		       u_int trans)
+static int
+acornfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+		  u_int trans, struct fb_info *info)
 {
 	union palette pal;
+
+	if (regno >= current_par.palette_size)
+		return 1;
 
 	pal.p = 0;
 	pal.vidc.reg   = regno;
 	pal.vidc.red   = red >> 12;
 	pal.vidc.green = green >> 12;
 	pal.vidc.blue  = blue >> 12;
-	return pal;
-}
 
-static void
-acornfb_palette_decode(u_int regno, u_int *red, u_int *green, u_int *blue,
-		       u_int *trans)
-{
-	*red   = EXTEND4(current_par.palette[regno].vidc.red);
-	*green = EXTEND4(current_par.palette[regno].vidc.green);
-	*blue  = EXTEND4(current_par.palette[regno].vidc.blue);
-	*trans = current_par.palette[regno].vidc.trans ? -1 : 0;
+	current_par.palette[regno] = pal;
+
+	vidc_writel(pal.p);
+
+	return 0;
 }
 #endif
 
@@ -513,34 +479,66 @@ acornfb_set_timing(struct fb_info *info, struct fb_var_screeninfo *var)
 #endif
 }
 
-static inline void
-acornfb_palette_write(u_int regno, union palette pal)
-{
-	vidc_writel(0x10000000 | regno);
-	vidc_writel(pal.p);
-}
-
-static inline union palette
-acornfb_palette_encode(u_int regno, u_int red, u_int green, u_int blue,
-		       u_int trans)
+/*
+ * We have to take note of the VIDC20's 16-bit palette here.
+ * The VIDC20 looks up a 16 bit pixel as follows:
+ *
+ *   bits   111111
+ *          5432109876543210
+ *   red            ++++++++  (8 bits,  7 to 0)
+ *  green       ++++++++      (8 bits, 11 to 4)
+ *   blue   ++++++++          (8 bits, 15 to 8)
+ *
+ * We use a pixel which looks like:
+ *
+ *   bits   111111
+ *          5432109876543210
+ *   red               +++++  (5 bits,  4 to  0)
+ *  green         +++++       (5 bits,  9 to  5)
+ *   blue    +++++            (5 bits, 14 to 10)
+ */
+static int
+acornfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+		  u_int trans, struct fb_info *info)
 {
 	union palette pal;
+	int bpp = info->var.bits_per_pixel;
+
+	if (regno >= current_par.palette_size)
+		return 1;
 
 	pal.p = 0;
 	pal.vidc20.red   = red >> 8;
 	pal.vidc20.green = green >> 8;
 	pal.vidc20.blue  = blue >> 8;
-	return pal;
-}
 
-static void
-acornfb_palette_decode(u_int regno, u_int *red, u_int *green, u_int *blue,
-		       u_int *trans)
-{
-	*red   = EXTEND8(current_par.palette[regno].vidc20.red);
-	*green = EXTEND8(current_par.palette[regno].vidc20.green);
-	*blue  = EXTEND8(current_par.palette[regno].vidc20.blue);
-	*trans = EXTEND4(current_par.palette[regno].vidc20.ext);
+	current_par.palette[regno] = pal;
+
+	if (bpp == 32 && regno < 16) {
+		current_par.cmap.cfb32[regno] =
+				regno | regno << 8 | regno << 16;
+	}
+	if (bpp == 16 && regno < 16) {
+		int i;
+
+		current_par.cmap.cfb16[regno] =
+				regno | regno << 5 | regno << 10;
+
+		pal.p = 0;
+		vidc_writel(0x10000000);
+		for (i = 0; i < 256; i += 1) {
+			pal.vidc20.red   = current_par.palette[ i       & 31].vidc20.red;
+			pal.vidc20.green = current_par.palette[(i >> 1) & 31].vidc20.green;
+			pal.vidc20.blue  = current_par.palette[(i >> 2) & 31].vidc20.blue;
+			vidc_writel(pal.p);
+			/* Palette register pointer auto-increments */
+		}
+	} else {
+		vidc_writel(0x10000000 | regno);
+		vidc_writel(pal.p);
+	}
+
+	return 0;
 }
 #endif
 
@@ -549,12 +547,9 @@ acornfb_palette_decode(u_int regno, u_int *red, u_int *green, u_int *blue,
  * the resolution to fit the rules.
  */
 static int
-acornfb_adjust_timing(struct fb_info *info, struct fb_var_screeninfo *var, int con)
+acornfb_adjust_timing(struct fb_info *info, struct fb_var_screeninfo *var, u_int fontht)
 {
-	u_int font_line_len;
-	u_int fontht;
-	u_int sam_size, min_size, size;
-	u_int nr_y;
+	u_int font_line_len, sam_size, min_size, size, nr_y;
 
 	/* xres must be even */
 	var->xres = (var->xres + 1) & ~1;
@@ -564,17 +559,6 @@ acornfb_adjust_timing(struct fb_info *info, struct fb_var_screeninfo *var, int c
 	 */
 	var->xres_virtual = var->xres;
 	var->xoffset = 0;
-
-	/*
-	 * Find the font height
-	 */
-	if (con == -1)
-		fontht = fontheight(&global_disp);
-	else
-		fontht = fontheight(fb_display + con);
-
-	if (fontht == 0)
-		fontht = 8;
 
 	if (current_par.using_vram)
 		sam_size = current_par.vram_half_sam * 2;
@@ -693,8 +677,8 @@ acornfb_validate_timing(struct fb_var_screeninfo *var,
 static inline void
 acornfb_update_dma(struct fb_info *info, struct fb_var_screeninfo *var)
 {
-	int off = (var->yoffset * var->xres_virtual *
-		   var->bits_per_pixel) >> 3;
+	u_int off = (var->yoffset * var->xres_virtual *
+		     var->bits_per_pixel) >> 3;
 
 #if defined(HAS_MEMC)
 	memc_write(VDMA_INIT, off >> 2);
@@ -704,130 +688,27 @@ acornfb_update_dma(struct fb_info *info, struct fb_var_screeninfo *var)
 }
 
 static int
-acornfb_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
-		  u_int *trans, struct fb_info *info)
+acornfb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 {
-	if (regno >= current_par.palette_size)
-		return 1;
-
-	acornfb_palette_decode(regno, red, green, blue, trans);
-
-	return 0;
-}
-
-/*
- * We have to take note of the VIDC20's 16-bit palette here.
- * The VIDC20 looks up a 16 bit pixel as follows:
- *
- *   bits   111111
- *          5432109876543210
- *   red            ++++++++  (8 bits,  7 to 0)
- *  green       ++++++++      (8 bits, 11 to 4)
- *   blue   ++++++++          (8 bits, 15 to 8)
- *
- * We use a pixel which looks like:
- *
- *   bits   111111
- *          5432109876543210
- *   red               +++++  (5 bits,  4 to  0)
- *  green         +++++       (5 bits,  9 to  5)
- *   blue    +++++            (5 bits, 14 to 10)
- */
-static int
-acornfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
-		  u_int trans, struct fb_info *info)
-{
-	union palette pal;
-	int bpp = fb_display[info->currcon].var.bits_per_pixel;
-
-	if (regno >= current_par.palette_size)
-		return 1;
-
-	pal = acornfb_palette_encode(regno, red, green, blue, trans);
-	current_par.palette[regno] = pal;
-
-#ifdef FBCON_HAS_CFB32
-	if (bpp == 32 && regno < 16) {
-		current_par.cmap.cfb32[regno] =
-				regno | regno << 8 | regno << 16;
-	}
-#endif
-#ifdef FBCON_HAS_CFB16
-	if (bpp == 16 && regno < 16) {
-		int i;
-
-		current_par.cmap.cfb16[regno] =
-				regno | regno << 5 | regno << 10;
-
-		pal.p = 0;
-		vidc_writel(0x10000000);
-		for (i = 0; i < 256; i += 1) {
-			pal.vidc20.red   = current_par.palette[ i       & 31].vidc20.red;
-			pal.vidc20.green = current_par.palette[(i >> 1) & 31].vidc20.green;
-			pal.vidc20.blue  = current_par.palette[(i >> 2) & 31].vidc20.blue;
-			vidc_writel(pal.p);
-			/* Palette register pointer auto-increments */
-		}
-	} else
-#endif
-		acornfb_palette_write(regno, pal);
-
-	return 0;
-}
-
-static int
-acornfb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
-		 struct fb_info *info)
-{
-	int err = 0;
-
-	if (con == info->currcon)
-		err = fb_get_cmap(cmap, kspc, acornfb_getcolreg, info);
-	else if (fb_display[con].cmap.len)
-		fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
-	else
-		fb_copy_cmap(fb_default_cmap(current_par.palette_size),
-			     cmap, kspc ? 0 : 2);
-	return err;
-}
-
-static int
-acornfb_decode_var(struct fb_info *info, struct fb_var_screeninfo *var, int con)
-{
+	u_int fontht;
 	int err;
 
-#if defined(HAS_VIDC20)
-	var->red.offset    = 0;
-	var->red.length    = 8;
-	var->green         = var->red;
-	var->blue          = var->red;
-	var->transp.offset = 0;
-	var->transp.length = 4;
-#elif defined(HAS_VIDC)
-	var->red.length	   = 4;
-	var->green         = var->red;
-	var->blue          = var->red;
-	var->transp.length = 1;
-#endif
+	/*
+	 * FIXME: Find the font height
+	 */
+	fontht = 8;
 
 	switch (var->bits_per_pixel) {
-#ifdef FBCON_HAS_MFB
-	case 1:
+	case 1:	case 2:	case 4:	case 8:
+		var->red.offset    = 0;
+		var->red.length    = var->bits_per_pixel;
+		var->green         = var->red;
+		var->blue          = var->red;
+		var->transp.offset = 0;
+		var->transp.length = 0;
 		break;
-#endif
-#ifdef FBCON_HAS_CFB2
-	case 2:
-		break;
-#endif
-#ifdef FBCON_HAS_CFB4
-	case 4:
-		break;
-#endif
-#ifdef FBCON_HAS_CFB8
-	case 8:
-		break;
-#endif
-#ifdef FBCON_HAS_CFB16
+
+#ifdef HAS_VIDC20
 	case 16:
 		var->red.offset    = 0;
 		var->red.length    = 5;
@@ -838,8 +719,7 @@ acornfb_decode_var(struct fb_info *info, struct fb_var_screeninfo *var, int con)
 		var->transp.offset = 15;
 		var->transp.length = 1;
 		break;
-#endif
-#ifdef FBCON_HAS_CFB32
+
 	case 32:
 		var->red.offset    = 0;
 		var->red.length    = 8;
@@ -865,7 +745,7 @@ acornfb_decode_var(struct fb_info *info, struct fb_var_screeninfo *var, int con)
 	 * Validate and adjust the resolution to
 	 * match the video generator hardware.
 	 */
-	err = acornfb_adjust_timing(info, var, con);
+	err = acornfb_adjust_timing(info, var, fontht);
 	if (err)
 		return err;
 
@@ -873,137 +753,61 @@ acornfb_decode_var(struct fb_info *info, struct fb_var_screeninfo *var, int con)
 	 * Validate the timing against the
 	 * monitor hardware.
 	 */
-	return acornfb_validate_timing(var, &fb_info.monspecs);
+	return acornfb_validate_timing(var, &info->monspecs);
 }
 
-static int
-acornfb_set_var(struct fb_var_screeninfo *var, int con, struct fb_info *info)
+static int acornfb_set_par(struct fb_info *info)
 {
-	struct display *display;
-	unsigned int visual, chgvar = 0;
-	int err;
-
-	if (con >= 0)
-		display = fb_display + con;
-	else
-		display = &global_disp;
-
-	err = acornfb_decode_var(info, var, con);
-	if (err)
-		return err;
-
-	switch (var->activate & FB_ACTIVATE_MASK) {
-	case FB_ACTIVATE_TEST:
-		return 0;
-
-	case FB_ACTIVATE_NXTOPEN:
-	case FB_ACTIVATE_NOW:
-		break;
-
-	default:
-		return -EINVAL;
-	}
-
-	if (con >= 0) {
-		if (display->var.xres != var->xres)
-			chgvar = 1;
-		if (display->var.yres != var->yres)
-			chgvar = 1;
-		if (display->var.xres_virtual != var->xres_virtual)
-			chgvar = 1;
-		if (display->var.yres_virtual != var->yres_virtual)
-			chgvar = 1;
-		if (memcmp(&display->var.red, &var->red, sizeof(var->red)))
-			chgvar = 1;
-		if (memcmp(&display->var.green, &var->green, sizeof(var->green)))
-			chgvar = 1;
-		if (memcmp(&display->var.blue, &var->blue, sizeof(var->blue)))
-			chgvar = 1;
-	}
-
-	display->var = *var;
-	display->var.activate &= ~FB_ACTIVATE_ALL;
-
-	if (var->activate & FB_ACTIVATE_ALL)
-		global_disp.var = display->var;
-
-	switch (display->var.bits_per_pixel) {
-#ifdef FBCON_HAS_MFB
+	switch (info->var.bits_per_pixel) {
 	case 1:
 		current_par.palette_size = 2;
-		display->dispsw = &fbcon_mfb;
-		visual = FB_VISUAL_MONO10;
+		info->fix.visual = FB_VISUAL_MONO10;
 		break;
-#endif
-#ifdef FBCON_HAS_CFB2
 	case 2:
 		current_par.palette_size = 4;
-		display->dispsw = &fbcon_cfb2;
-		visual = FB_VISUAL_PSEUDOCOLOR;
+		info->fix.visual = FB_VISUAL_PSEUDOCOLOR;
 		break;
-#endif
-#ifdef FBCON_HAS_CFB4
 	case 4:
 		current_par.palette_size = 16;
-		display->dispsw = &fbcon_cfb4;
-		visual = FB_VISUAL_PSEUDOCOLOR;
+		info->fix.visual = FB_VISUAL_PSEUDOCOLOR;
 		break;
-#endif
-#ifdef FBCON_HAS_CFB8
 	case 8:
 		current_par.palette_size = VIDC_PALETTE_SIZE;
-		display->dispsw = &fbcon_cfb8;
 #ifdef HAS_VIDC
-		visual = FB_VISUAL_STATIC_PSEUDOCOLOR;
+		info->fix.visual = FB_VISUAL_STATIC_PSEUDOCOLOR;
 #else
-		visual = FB_VISUAL_PSEUDOCOLOR;
+		info->fix.visual = FB_VISUAL_PSEUDOCOLOR;
 #endif
 		break;
-#endif
-#ifdef FBCON_HAS_CFB16
+#ifdef HAS_VIDC20
 	case 16:
 		current_par.palette_size = 32;
-		display->dispsw = &fbcon_cfb16;
-		display->dispsw_data = current_par.cmap.cfb16;
-		visual = FB_VISUAL_DIRECTCOLOR;
+		info->pseudo_palette = current_par.cmap.cfb16;
+		info->fix.visual = FB_VISUAL_DIRECTCOLOR;
 		break;
-#endif
-#ifdef FBCON_HAS_CFB32
 	case 32:
 		current_par.palette_size = VIDC_PALETTE_SIZE;
-		display->dispsw = &fbcon_cfb32;
-		display->dispsw_data = current_par.cmap.cfb32;
-		visual = FB_VISUAL_TRUECOLOR;
+		info->pseudo_palette = current_par.cmap.cfb32;
+		info->fix.visual = FB_VISUAL_TRUECOLOR;
 		break;
 #endif
 	default:
-		display->dispsw = &fbcon_dummy;
-		visual = FB_VISUAL_MONO10;
-		break;
+		BUG();
 	}
 
-	display->next_line      = (var->xres * var->bits_per_pixel) / 8;
-	display->can_soft_blank	= visual == FB_VISUAL_PSEUDOCOLOR ? 1 : 0;
-	display->inverse	= 0;
-
-	if (chgvar && info && info->changevar)
-		info->changevar(con);
-
-	if (con == info->currcon) {
-		struct fb_cmap *cmap;
-		unsigned long start, size;
-		int control;
-
-		info->fix.visual = visual;
+	info->fix.line_length	= (info->var.xres * info->var.bits_per_pixel) / 8;
 
 #if defined(HAS_MEMC)
-		start   = 0;
-		size    = info->fix.smem_len - VDMA_XFERSIZE;
-		control = 0;
+	{
+		unsigned long size = info->fix.smem_len - VDMA_XFERSIZE;
 
-		memc_write(VDMA_START, start);
+		memc_write(VDMA_START, 0);
 		memc_write(VDMA_END, size >> 2);
+	}
 #elif defined(HAS_IOMD)
+	{
+		unsigned long start, size;
+		u_int control;
 
 		start = info->fix.smem_start;
 		size  = current_par.screen_end;
@@ -1019,80 +823,27 @@ acornfb_set_var(struct fb_var_screeninfo *var, int con, struct fb_info *info)
 		iomd_writel(start,   IOMD_VIDSTART);
 		iomd_writel(size,    IOMD_VIDEND);
 		iomd_writel(control, IOMD_VIDCR);
-#endif
-		acornfb_update_dma(info, var);
-		acornfb_set_timing(info, var);
-
-		if (display->cmap.len)
-			cmap = &display->cmap;
-		else
-			cmap = fb_default_cmap(current_par.palette_size);
-
-		fb_set_cmap(cmap, 1, info);
 	}
+#endif
+
+	acornfb_update_dma(info, &info->var);
+	acornfb_set_timing(info, &info->var);
+
 	return 0;
 }
 
 static int
-acornfb_pan_display(struct fb_var_screeninfo *var, int con,
-		    struct fb_info *info)
+acornfb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
 {
-	u_int y_bottom;
-
-	if (var->xoffset)
-		return -EINVAL;
-
-	y_bottom = var->yoffset;
+	u_int y_bottom = var->yoffset;
 
 	if (!(var->vmode & FB_VMODE_YWRAP))
 		y_bottom += var->yres;
 
-	if (y_bottom > fb_display[con].var.yres_virtual)
-		return -EINVAL;
+	BUG_ON(y_bottom > var->yres_virtual);
 
 	acornfb_update_dma(info, var);
 
-	fb_display[con].var.yoffset = var->yoffset;
-	if (var->vmode & FB_VMODE_YWRAP)
-		fb_display[con].var.vmode |= FB_VMODE_YWRAP;
-	else
-		fb_display[con].var.vmode &= ~FB_VMODE_YWRAP;
-
-	return 0;
-}
-
-static int 
-acornfb_blank(int blank, struct fb_info *info)
-{
-	union palette p;
-	int i, bpp = fb_display[info->currcon].var.bits_per_pixel;
-
-#ifdef FBCON_HAS_CFB16
-	if (bpp == 16) {
-		p.p = 0;
-
-		for (i = 0; i < 256; i++) {
-			if (blank)
-				p = acornfb_palette_encode(i, 0, 0, 0, 0);
-			else {
-				p.vidc20.red   = current_par.palette[ i       & 31].vidc20.red;
-				p.vidc20.green = current_par.palette[(i >> 1) & 31].vidc20.green;
-				p.vidc20.blue  = current_par.palette[(i >> 2) & 31].vidc20.blue;
-			}
-			acornfb_palette_write(i, current_par.palette[i]);
-		}
-	} else
-#endif
-	{
-		for (i = 0; i < current_par.palette_size; i++) {
-			if (blank)
-				p = acornfb_palette_encode(i, 0, 0, 0, 0);
-			else
-				p = current_par.palette[i];
-
-			acornfb_palette_write(i, p);
-		}
-	}
 	return 0;
 }
 
@@ -1137,44 +888,15 @@ acornfb_mmap(struct fb_info *info, struct file *file, struct vm_area_struct *vma
 
 static struct fb_ops acornfb_ops = {
 	.owner		= THIS_MODULE,
-	.fb_set_var	= acornfb_set_var,
-	.fb_get_cmap	= acornfb_get_cmap,
-	.fb_set_cmap	= gen_set_cmap,
+	.fb_check_var	= acornfb_check_var,
+	.fb_set_par	= acornfb_set_par,
 	.fb_setcolreg	= acornfb_setcolreg,
 	.fb_pan_display	= acornfb_pan_display,
-	.fb_blank	= acornfb_blank,
+	.fb_fillrect	= cfb_fillrect,
+	.fb_copyarea	= cfb_copyarea,
+	.fb_imageblit	= cfb_imageblit,
 	.fb_mmap	= acornfb_mmap,
 };
-
-static int
-acornfb_updatevar(int con, struct fb_info *info)
-{
-	if (con == info->currcon)
-		acornfb_update_dma(info, &fb_display[con].var);
-
-	return 0;
-}
-
-static int
-acornfb_switch(int con, struct fb_info *info)
-{
-	struct fb_cmap *cmap;
-
-	if (info->currcon >= 0) {
-		cmap = &fb_display[info->currcon].cmap;
-
-		if (cmap->len)
-			fb_get_cmap(cmap, 1, acornfb_getcolreg, info);
-	}
-
-	info->currcon = con;
-
-	fb_display[con].var.activate = FB_ACTIVATE_NOW;
-
-	acornfb_set_var(&fb_display[con].var, con, info);
-
-	return 0;
-}
 
 /*
  * Everything after here is initialisation!!!
@@ -1248,8 +970,7 @@ acornfb_default_mode = {
 	.vmode =	FB_VMODE_NONINTERLACED
 };
 
-static void __init
-acornfb_init_fbinfo(void)
+static void __init acornfb_init_fbinfo(void)
 {
 	static int first = 1;
 
@@ -1257,15 +978,8 @@ acornfb_init_fbinfo(void)
 		return;
 	first = 0;
 
-	strcpy(fb_info.modename, "Acorn");
-	strcpy(fb_info.fontname, "Acorn8x8");
-
 	fb_info.node		= NODEV;
 	fb_info.fbops		= &acornfb_ops;
-	fb_info.disp		= &global_disp;
-	fb_info.changevar	= NULL;
-	fb_info.switch_con	= acornfb_switch;
-	fb_info.updatevar	= acornfb_updatevar;
 	fb_info.flags		= FBINFO_FLAG_DEFAULT;
 
 	strcpy(fb_info.fix.id, "Acorn");
@@ -1277,28 +991,26 @@ acornfb_init_fbinfo(void)
 	fb_info.fix.line_length	= 0;
 	fb_info.fix.accel	= FB_ACCEL_NONE;
 
-	global_disp.dispsw	= &fbcon_dummy;
-
 	/*
 	 * setup initial parameters
 	 */
-	memset(&init_var, 0, sizeof(init_var));
+	memset(&fb_info.var, 0, sizeof(fb_info.var));
 
 #if defined(HAS_VIDC20)
-	init_var.red.length	   = 8;
-	init_var.transp.length	   = 4;
+	fb_info.var.red.length	   = 8;
+	fb_info.var.transp.length  = 4;
 #elif defined(HAS_VIDC)
-	init_var.red.length	   = 4;
-	init_var.transp.length	   = 1;
+	fb_info.var.red.length	   = 4;
+	fb_info.var.transp.length  = 1;
 #endif
-	init_var.green		   = init_var.red;
-	init_var.blue		   = init_var.red;
-	init_var.nonstd		   = 0;
-	init_var.activate	   = FB_ACTIVATE_NOW;
-	init_var.height		   = -1;
-	init_var.width		   = -1;
-	init_var.vmode		   = FB_VMODE_NONINTERLACED;
-	init_var.accel_flags	   = FB_ACCELF_TEXT;
+	fb_info.var.green	   = fb_info.var.red;
+	fb_info.var.blue	   = fb_info.var.red;
+	fb_info.var.nonstd	   = 0;
+	fb_info.var.activate	   = FB_ACTIVATE_NOW;
+	fb_info.var.height	   = -1;
+	fb_info.var.width	   = -1;
+	fb_info.var.vmode	   = FB_VMODE_NONINTERLACED;
+	fb_info.var.accel_flags	   = FB_ACCELF_TEXT;
 
 	current_par.dram_size	   = 0;
 	current_par.montype	   = -1;
@@ -1307,9 +1019,6 @@ acornfb_init_fbinfo(void)
 
 /*
  * setup acornfb options:
- *
- *  font:fontname
- *	Set fontname
  *
  *  mon:hmin-hmax:vmin-vmax:dpms:width:height
  *	Set monitor parameters:
@@ -1337,12 +1046,6 @@ acornfb_init_fbinfo(void)
  *	size can optionally be followed by 'M' or 'K' for
  *	MB or KB respectively.
  */
-static void __init
-acornfb_parse_font(char *opt)
-{
-	strcpy(fb_info.fontname, opt);
-}
-
 static void __init
 acornfb_parse_mon(char *opt)
 {
@@ -1373,12 +1076,12 @@ acornfb_parse_mon(char *opt)
 	if (*p != ':')
 		goto check_values;
 
-	init_var.width = simple_strtoul(p + 1, &p, 0);
+	fb_info.var.width = simple_strtoul(p + 1, &p, 0);
 
 	if (*p != ':')
 		goto check_values;
 
-	init_var.height = simple_strtoul(p + 1, NULL, 0);
+	fb_info.var.height = simple_strtoul(p + 1, NULL, 0);
 
 check_values:
 	if (fb_info.monspecs.hfmax < fb_info.monspecs.hfmin ||
@@ -1460,7 +1163,6 @@ static struct options {
 	char *name;
 	void (*parse)(char *opt);
 } opt_table[] __initdata = {
-	{ "font",    acornfb_parse_font    },
 	{ "mon",     acornfb_parse_mon     },
 	{ "montype", acornfb_parse_montype },
 	{ "dram",    acornfb_parse_dram    },
@@ -1658,7 +1360,7 @@ acornfb_init(void)
 	 * the resolution, so we disable this feature.
 	 */
 	do {
-		rc = fb_find_mode(&init_var, &fb_info, NULL, modedb,
+		rc = fb_find_mode(&fb_info.var, &fb_info, NULL, modedb,
 				 sizeof(modedb) / sizeof(*modedb),
 				 &acornfb_default_mode, DEFAULT_BPP);
 		/*
@@ -1667,7 +1369,7 @@ acornfb_init(void)
 		if (rc == 1)
 			break;
 
-		rc = fb_find_mode(&init_var, &fb_info, NULL, NULL, 0,
+		rc = fb_find_mode(&fb_info.var, &fb_info, NULL, NULL, 0,
 				  &acornfb_default_mode, DEFAULT_BPP);
 		/*
 		 * If we found an exact match, all ok.
@@ -1675,13 +1377,13 @@ acornfb_init(void)
 		if (rc == 1)
 			break;
 
-		rc = fb_find_mode(&init_var, &fb_info, NULL, modedb,
+		rc = fb_find_mode(&fb_info.var, &fb_info, NULL, modedb,
 				 sizeof(modedb) / sizeof(*modedb),
 				 &acornfb_default_mode, DEFAULT_BPP);
 		if (rc)
 			break;
 
-		rc = fb_find_mode(&init_var, &fb_info, NULL, NULL, 0,
+		rc = fb_find_mode(&fb_info.var, &fb_info, NULL, NULL, 0,
 				  &acornfb_default_mode, DEFAULT_BPP);
 	} while (0);
 
@@ -1694,17 +1396,17 @@ acornfb_init(void)
 		return -EINVAL;
 	}
 
-	h_sync = 1953125000 / init_var.pixclock;
-	h_sync = h_sync * 512 / (init_var.xres + init_var.left_margin +
-		 init_var.right_margin + init_var.hsync_len);
-	v_sync = h_sync / (init_var.yres + init_var.upper_margin +
-		 init_var.lower_margin + init_var.vsync_len);
+	h_sync = 1953125000 / fb_info.var.pixclock;
+	h_sync = h_sync * 512 / (fb_info.var.xres + fb_info.var.left_margin +
+		 fb_info.var.right_margin + fb_info.var.hsync_len);
+	v_sync = h_sync / (fb_info.var.yres + fb_info.var.upper_margin +
+		 fb_info.var.lower_margin + fb_info.var.vsync_len);
 
 	printk(KERN_INFO "Acornfb: %dkB %cRAM, %s, using %dx%d, "
 		"%d.%03dkHz, %dHz\n",
 		fb_info.fix.smem_len / 1024,
 		current_par.using_vram ? 'V' : 'D',
-		VIDC_NAME, init_var.xres, init_var.yres,
+		VIDC_NAME, fb_info.var.xres, fb_info.var.yres,
 		h_sync / 1000, h_sync % 1000, v_sync);
 
 	printk(KERN_INFO "Acornfb: Monitor: %d.%03d-%d.%03dkHz, %d-%dHz%s\n",
@@ -1713,7 +1415,7 @@ acornfb_init(void)
 		fb_info.monspecs.vfmin, fb_info.monspecs.vfmax,
 		fb_info.monspecs.dpms ? ", DPMS" : "");
 
-	if (acornfb_set_var(&init_var, -1, &fb_info))
+	if (fb_set_var(&fb_info.var, &fb_info))
 		printk(KERN_ERR "Acornfb: unable to set display parameters\n");
 
 	if (register_framebuffer(&fb_info) < 0)
