@@ -709,7 +709,7 @@ static int __init acpi_init (void)
 		ACPI_CA_VERSION);
 
 	/* Initial core debug level excludes drivers, so include them now */
-	acpi_set_debug(ACPI_DEBUG_LOW);
+//	acpi_set_debug(ACPI_DEBUG_LOW);
 
 	if (acpi_disabled) {
 		printk(KERN_INFO PREFIX "Interpreter disabled.\n");
