@@ -137,7 +137,6 @@ char *disk_name (struct gendisk *hd, int minor, char *buf)
 			sprintf(s, "%s%d", "md", unit);
 			maj = s;
 			break;
-		case ACSI_MAJOR:
 		case I2O_MAJOR:
 		case DASD_MAJOR:
 			sprintf(s, "%s%c", hd->major_name, unit + 'a');
