@@ -376,6 +376,8 @@ done2:
 		return -ENOMEM;
 	}
 
+	create_debug_files (ehci);
+
 	/*
 	 * Start, enabling full USB 2.0 functionality ... usb 1.1 devices
 	 * are explicitly handed to companion controller(s), so no TT is
@@ -428,6 +430,8 @@ static void ehci_stop (struct usb_hcd *hcd)
 	if (hcd->state == USB_STATE_RUNNING)
 		ehci_ready (ehci);
 	ehci_reset (ehci);
+
+	remove_debug_files (ehci);
 
 	/* root hub is shut down separately (first, when possible) */
 	tasklet_disable (&ehci->tasklet);
