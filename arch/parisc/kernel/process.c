@@ -179,6 +179,7 @@ pid_t kernel_thread(int (*fn)(void *), void *arg, unsigned long flags)
 
 	return __kernel_thread(fn, arg, flags);
 }
+EXPORT_SYMBOL(kernel_thread);
 
 /*
  * Free current thread data structures etc..

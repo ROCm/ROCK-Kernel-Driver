@@ -232,7 +232,6 @@ do_settimeofday (struct timespec *tv)
 	write_sequnlock_irq(&xtime_lock);
 	return 0;
 }
-
 EXPORT_SYMBOL(do_settimeofday);
 
 /*

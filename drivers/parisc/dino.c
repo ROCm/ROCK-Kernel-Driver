@@ -165,6 +165,13 @@ struct dino_device
 
 #define DINO_CFG_TOK(bus,dfn,pos) ((u32) ((bus)<<16 | (dfn)<<8 | (pos)))
 
+/*
+ * keep the current highest bus count to assist in allocating busses.  This
+ * tries to keep a global bus count total so that when we discover an 
+ * entirely new bus, it can be given a unique bus number.
+ */
+static int dino_current_bus = 0;
+
 static int dino_cfg_read(struct pci_bus *bus, unsigned int devfn, int where,
 		int size, u32 *val)
 {
@@ -478,8 +485,7 @@ dino_card_setup(struct pci_bus *bus, unsigned long base_addr)
 
 	if (ccio_allocate_resource(dino_dev->hba.dev, res, _8MB,
 				F_EXTEND(0xf0000000UL) | _8MB,
-				F_EXTEND(0xffffffffUL) &~ _8MB, _8MB,
-				NULL, NULL) < 0) {
+				F_EXTEND(0xffffffffUL) &~ _8MB, _8MB) < 0) {
 		struct list_head *ln, *tmp_ln;
 
 		printk(KERN_ERR "Dino: cannot attach bus %s\n",
@@ -505,8 +511,6 @@ dino_card_setup(struct pci_bus *bus, unsigned long base_addr)
 	DBG("DINO GSC WRITE i=%d, start=%lx, dino addr = %lx\n",
 	    i, res->start, base_addr + DINO_IO_ADDR_EN);
 	gsc_writel(1 << i, base_addr + DINO_IO_ADDR_EN);
-
-	pci_bus_assign_resources(bus);
 }
 
 static void __init
@@ -547,6 +551,9 @@ dino_card_fixup(struct pci_dev *dev)
 	dino_cfg_write(dev->bus, dev->devfn, PCI_INTERRUPT_LINE, 1, dev->irq); 
 }
 
+/* The alignment contraints for PCI bridges under dino */
+#define DINO_BRIDGE_ALIGN 0x100000
+
 
 static void __init
 dino_fixup_bus(struct pci_bus *bus)
@@ -560,12 +567,47 @@ dino_fixup_bus(struct pci_bus *bus)
 			__FUNCTION__, bus, bus->secondary, bus->dev->platform_data);
 
 	/* Firmware doesn't set up card-mode dino, so we have to */
-	if (is_card_dino(&dino_dev->hba.dev->id))
+	if (is_card_dino(&dino_dev->hba.dev->id)) {
 		dino_card_setup(bus, dino_dev->hba.base_addr);
+	} else if(bus->parent == NULL) {
+		/* must have a dino above it, reparent the resources
+		 * into the dino window */
+		bus->resource[0] = &(dino_dev->hba.io_space);
+		bus->resource[1] = &(dino_dev->hba.lmmio_space); 
+	} else if(bus->self) {
+		int i;
 
-	/* If this is a PCI-PCI Bridge, read the window registers etc */
-	if (bus->self)
 		pci_read_bridge_bases(bus);
+
+
+		for(i = 0; i < PCI_NUM_RESOURCES; i++) {
+			if((bus->self->resource[i].flags & (IORESOURCE_IO | IORESOURCE_MEM)) == 0)
+				continue;
+			
+			if(bus->self->resource[i].flags & IORESOURCE_MEM) {
+				/* There's a quirk to alignment of
+				 * bridge memory resources: the start
+				 * is the alignment and start-end is
+				 * the size.  However, firmware will
+				 * have assigned start and end, so we
+				 * need to take this into account */
+				bus->self->resource[i].end = bus->self->resource[i].end - bus->self->resource[i].start + DINO_BRIDGE_ALIGN;
+				bus->self->resource[i].start = DINO_BRIDGE_ALIGN;
+				
+			}
+					
+			DBG("DEBUG %s assigning %d [0x%lx,0x%lx]\n",
+			    bus->self->dev.bus_id, i,
+			    bus->self->resource[i].start,
+			    bus->self->resource[i].end);
+			pci_assign_resource(bus->self, i);
+			DBG("DEBUG %s after assign %d [0x%lx,0x%lx]\n",
+			    bus->self->dev.bus_id, i,
+			    bus->self->resource[i].start,
+			    bus->self->resource[i].end);
+		}
+	}
+
 
 	list_for_each(ln, &bus->devices) {
 		int i;
@@ -596,9 +638,39 @@ dino_fixup_bus(struct pci_bus *bus)
 			}
 #endif
 		}
+		/* null out the ROM resource if there is one (we don't
+		 * care about an expansion rom on parisc, since it
+		 * usually contains (x86) bios code) */
+		dev->resource[PCI_ROM_RESOURCE].flags = 0;
+		dev->resource[PCI_ROM_RESOURCE].start = 0;
+		dev->resource[PCI_ROM_RESOURCE].end = 0;
+				
+		if(dev->irq == 255) {
 
-		/* Adjust INT_LINE for that busses region */
-		dev->irq = dino_dev->dino_region->data.irqbase + dev->irq;
+#ifdef DINO_FIX_UNASSIGNED_INTERRUPTS
+
+			/* This code tries to assign an unassigned
+			 * interrupt.  Leave it disabled unless you
+			 * *really* know what you're doing since the
+			 * pin<->interrupt line mapping varies by bus
+			 * and machine */
+
+			u32 irq_pin;
+			
+			dino_cfg_read(dev->bus, dev->devfn, PCI_INTERRUPT_PIN, 1, &irq_pin);
+			dev->irq = (irq_pin + PCI_SLOT(dev->devfn) - 1) % 4 ;
+			dino_cfg_write(dev->bus, dev->devfn, PCI_INTERRUPT_LINE, 1, dev->irq);
+			dev->irq += dino_dev->dino_region->data.irqbase
+			printk(KERN_WARNING "Device %s has undefined IRQ, setting to %d\n", dev->slot_name, irq_pin);
+#else
+			dev->irq = 65535;
+			printk(KERN_WARNING "Device %s has unassigned IRQ\n", dev->slot_name);	
+#endif
+		} else {
+
+			/* Adjust INT_LINE for that busses region */
+			dev->irq += dino_dev->dino_region->data.irqbase;
+		}
 	}
 }
 
@@ -827,6 +899,7 @@ dino_driver_callback(struct parisc_device *dev)
 	const int name_len = 32;
 	char *name;
 	int is_cujo = 0;
+	struct pci_bus *bus;
 
 	name = kmalloc(name_len, GFP_KERNEL);
 	if(name)
@@ -912,9 +985,20 @@ dino_driver_callback(struct parisc_device *dev)
 	** It's not used to avoid chicken/egg problems
 	** with configuration accessor functions.
 	*/
-	dino_dev->hba.hba_bus = 
-		pci_scan_bus_parented(&dev->dev, dino_dev->hba.hba_num,
-				      &dino_cfg_ops, NULL);
+	bus = pci_scan_bus_parented(&dev->dev, dino_current_bus,
+				    &dino_cfg_ops, NULL);
+	if(bus) {
+		/* This code *depends* on scanning being single threaded
+		 * if it isn't, this global bus number count will fail
+		 */
+		dino_current_bus = bus->subordinate + 1;
+		pci_bus_assign_resources(bus);
+	} else {
+		printk(KERN_ERR "ERROR: failed to scan PCI bus on %s (probably duplicate bus number %d)\n", dev->dev.bus_id, dino_current_bus);
+		/* increment the bus number in case of duplicates */
+		dino_current_bus++;
+	}
+	dino_dev->hba.hba_bus = bus;
 	return 0;
 }
 
@@ -923,10 +1007,13 @@ dino_driver_callback(struct parisc_device *dev)
  * the same sversion as Dino, so we have to check hversion as well.
  * Unfortunately, the J2240 PDC reports the wrong hversion for the first
  * Dino, so we have to test for Dino, Cujo and Dino-in-a-J2240.
+ * For card-mode Dino, most machines report an sversion of 9D.  But 715
+ * and 725 firmware misreport it as 0x08080 for no adequately explained
+ * reason.
  */
 static struct parisc_device_id dino_tbl[] = {
-	{ HPHW_A_DMA, HVERSION_REV_ANY_ID, 0x004, 0x0009D }, /* Card-mode Dino. */
-	{ HPHW_A_DMA, HVERSION_REV_ANY_ID, 0x444, 0x08080 }, /* Same card in a 715.  Bug? */
+	{ HPHW_A_DMA, HVERSION_REV_ANY_ID, 0x004, 0x0009D },/* Card-mode Dino */
+	{ HPHW_A_DMA, HVERSION_REV_ANY_ID, HVERSION_ANY_ID, 0x08080 }, /* XXX */
 	{ HPHW_BRIDGE, HVERSION_REV_ANY_ID, 0x680, 0xa }, /* Bridge-mode Dino */
 	{ HPHW_BRIDGE, HVERSION_REV_ANY_ID, 0x682, 0xa }, /* Bridge-mode Cujo */
 	{ HPHW_BRIDGE, HVERSION_REV_ANY_ID, 0x05d, 0xa }, /* Dino in a J2240 */

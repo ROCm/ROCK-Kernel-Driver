@@ -560,9 +560,9 @@ static void print_parisc_device(struct parisc_device *dev)
 	static int count;
 
 	print_pa_hwpath(dev, hw_path);
-	printk(KERN_INFO "%d. %s (%d) at 0x%lx [%s], versions 0x%x, 0x%x, 0x%x",
-		++count, dev->name, dev->id.hw_type, dev->hpa, hw_path,
-		dev->id.hversion, dev->id.hversion_rev, dev->id.sversion);
+	printk(KERN_INFO "%d. %s at 0x%lx [%s] { %d, 0x%x, 0x%.3x, 0x%.5x }",
+		++count, dev->name, dev->hpa, hw_path, dev->id.hw_type,
+		dev->id.hversion_rev, dev->id.hversion, dev->id.sversion);
 
 	if (dev->num_addrs) {
 		int k;
