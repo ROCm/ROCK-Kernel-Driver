@@ -829,7 +829,7 @@ static void rawv6_close(struct sock *sk, long timeout)
 
 static int rawv6_init_sk(struct sock *sk)
 {
-	if (sk->num == IPPROTO_ICMPV6){
+	if (inet_sk(sk)->num == IPPROTO_ICMPV6) {
 		struct raw6_opt *opt = raw6_sk(sk);
 		opt->checksum = 1;
 		opt->offset = 2;
