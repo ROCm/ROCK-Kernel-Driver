@@ -1106,9 +1106,11 @@ SLB_NUM_ENTRIES = 64
 	oris    r21,r23,2048   /* valid bit    */
 	rldimi  r21,r22,0,52   /* Insert entry */
 
-	isync
+	/* 
+	 * No need for an isync before or after this slbmte. The exception
+	 * we enter with and the rfid we exit with are context synchronizing .
+	 */
 	slbmte  r20,r21
-	isync
 
 	/* All done -- return from exception. */
 	mfsprg  r20,3                   /* Load the PACA pointer  */
