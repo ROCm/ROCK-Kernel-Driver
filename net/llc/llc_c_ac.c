@@ -102,13 +102,13 @@ int llc_conn_ac_disc_ind(struct sock *sk, struct sk_buff *skb)
 	if (ev->type == LLC_CONN_EV_TYPE_PDU) {
 		struct llc_pdu_un *pdu = llc_pdu_un_hdr(skb);
 
-		if (!LLC_PDU_IS_RSP(pdu) &&
-		    !LLC_PDU_TYPE_IS_U(pdu) &&
+		if (LLC_PDU_IS_RSP(pdu) &&
+		    LLC_PDU_TYPE_IS_U(pdu) &&
 		    LLC_U_PDU_RSP(pdu) == LLC_2_PDU_RSP_DM) {
 			reason = LLC_DISC_REASON_RX_DM_RSP_PDU;
 			rc = 0;
-		} else if (!LLC_PDU_IS_CMD(pdu) &&
-			   !LLC_PDU_TYPE_IS_U(pdu) &&
+		} else if (LLC_PDU_IS_CMD(pdu) &&
+			   LLC_PDU_TYPE_IS_U(pdu) &&
 			   LLC_U_PDU_CMD(pdu) == LLC_2_PDU_CMD_DISC) {
 			reason = LLC_DISC_REASON_RX_DISC_CMD_PDU;
 			rc = 0;
@@ -146,13 +146,13 @@ int llc_conn_ac_rst_ind(struct sock *sk, struct sk_buff *skb)
 
 	switch (ev->type) {
 	case LLC_CONN_EV_TYPE_PDU:
-		if (!LLC_PDU_IS_RSP(pdu) &&
-		    !LLC_PDU_TYPE_IS_U(pdu) &&
+		if (LLC_PDU_IS_RSP(pdu) &&
+		    LLC_PDU_TYPE_IS_U(pdu) &&
 		    LLC_U_PDU_RSP(pdu) == LLC_2_PDU_RSP_FRMR) {
 			reason = LLC_RESET_REASON_LOCAL;
 			rc = 0;
-		} else if (!LLC_PDU_IS_CMD(pdu) &&
-			   !LLC_PDU_TYPE_IS_U(pdu) &&
+		} else if (LLC_PDU_IS_CMD(pdu) &&
+			   LLC_PDU_TYPE_IS_U(pdu) &&
 			   LLC_U_PDU_CMD(pdu) == LLC_2_PDU_CMD_SABME) {
 			reason = LLC_RESET_REASON_REMOTE;
 			rc = 0;
@@ -198,9 +198,9 @@ int llc_conn_ac_clear_remote_busy_if_f_eq_1(struct sock *sk,
 {
 	struct llc_pdu_sn *pdu = llc_pdu_sn_hdr(skb);
 
-	if (!LLC_PDU_IS_RSP(pdu) &&
-	    !LLC_PDU_TYPE_IS_I(pdu) &&
-	    !LLC_I_PF_IS_1(pdu) && llc_sk(sk)->ack_pf)
+	if (LLC_PDU_IS_RSP(pdu) &&
+	    LLC_PDU_TYPE_IS_I(pdu) &&
+	    LLC_I_PF_IS_1(pdu) && llc_sk(sk)->ack_pf)
 		llc_conn_ac_clear_remote_busy(sk, skb);
 	return 0;
 }
@@ -310,7 +310,7 @@ int llc_conn_ac_send_frmr_rsp_f_set_x(struct sock *sk, struct sk_buff *skb)
 	struct llc_opt *llc = llc_sk(sk);
 
 	llc->rx_pdu_hdr = *((u32 *)pdu);
-	if (!LLC_PDU_IS_CMD(pdu))
+	if (LLC_PDU_IS_CMD(pdu))
 		llc_pdu_decode_pf_bit(skb, &f_bit);
 	else
 		f_bit = 0;
@@ -1228,7 +1228,7 @@ int llc_conn_ac_upd_p_flag(struct sock *sk, struct sk_buff *skb)
 {
 	struct llc_pdu_sn *pdu = llc_pdu_sn_hdr(skb);
 
-	if (!LLC_PDU_IS_RSP(pdu)) {
+	if (LLC_PDU_IS_RSP(pdu)) {
 		u8 f_bit;
 
 		llc_pdu_decode_pf_bit(skb, &f_bit);
