@@ -13,7 +13,7 @@ if [ "$CONFIG_MTD_PHYSMAP" = "y" -o "$CONFIG_MTD_PHYSMAP" = "m" ]; then
    int '    Bus width in octets' CONFIG_MTD_PHYSMAP_BUSWIDTH 2
 fi
 
-if [ "$CONFIG_SPARC" = "y" -o "$CONFIG_SPARC64" = "y" ]; then
+if [ "$CONFIG_SPARC32" = "y" -o "$CONFIG_SPARC64" = "y" ]; then
    dep_tristate '  Sun Microsystems userflash support' CONFIG_MTD_SUN_UFLASH $CONFIG_MTD_CFI
 fi
 
@@ -26,7 +26,7 @@ if [ "$CONFIG_X86" = "y" ]; then
    dep_tristate '  JEDEC Flash device mapped on Mixcom piggyback card' CONFIG_MTD_MIXMEM $CONFIG_MTD_JEDEC
    dep_tristate '  JEDEC Flash device mapped on Octagon 5066 SBC' CONFIG_MTD_OCTAGON $CONFIG_MTD_JEDEC
    dep_tristate '  JEDEC Flash device mapped on Tempustech VMAX SBC301' CONFIG_MTD_VMAX $CONFIG_MTD_JEDEC
-   dep_tristate '  BIOS flash chip on Intel L440GX boards' CONFIG_MTD_L440GX $CONFIG_I386 $CONFIG_MTD_JEDEC
+   dep_tristate '  BIOS flash chip on Intel L440GX boards' CONFIG_MTD_L440GX $CONFIG_X86 $CONFIG_MTD_JEDEC
 fi
 
 if [ "$CONFIG_PPC" = "y" ]; then
@@ -46,7 +46,7 @@ if [ "$CONFIG_MIPS" = "y" ]; then
    dep_tristate '  Momenco Ocelot boot flash device' CONFIG_MTD_OCELOT $CONFIG_MOMENCO_OCELOT
 fi
 
-if [ "$CONFIG_SH" = "y" ]; then
+if [ "$CONFIG_SUPERH" = "y" ]; then
    dep_tristate '  CFI Flash device mapped on Hitachi SolutionEngine' CONFIG_MTD_SOLUTIONENGINE $CONFIG_MTD_CFI $CONFIG_SH $CONFIG_MTD_REDBOOT_PARTS
 fi
 
