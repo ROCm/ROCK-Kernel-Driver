@@ -15,6 +15,7 @@
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/pci.h>
+#include <linux/delay.h>
 
 #include <scsi/scsi.h>
 #include <scsi/scsi_dbg.h>
@@ -1739,7 +1740,7 @@ scsi_device_quiesce(struct scsi_device *sdev)
 
 	scsi_run_queue(sdev->request_queue);
 	while (sdev->device_busy) {
-		schedule_timeout(HZ/5);
+		msleep_interruptible(200);
 		scsi_run_queue(sdev->request_queue);
 	}
 	return 0;
