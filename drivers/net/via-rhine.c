@@ -660,6 +660,7 @@ static int __devinit via_rhine_init_one (struct pci_dev *pdev,
 		goto err_out;
 	}
 	SET_MODULE_OWNER(dev);
+	SET_NETDEV_DEV(dev, &pdev->dev);
 	
 	if (pci_request_regions(pdev, shortname))
 		goto err_out_free_netdev;

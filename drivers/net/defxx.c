@@ -443,6 +443,7 @@ static int __devinit dfx_init_one_pci_or_eisa(struct pci_dev *pdev, long ioaddr)
 	}
 
 	SET_MODULE_OWNER(dev);
+	SET_NETDEV_DEV(dev, &pdev->dev);
 
 	bp = dev->priv;
 

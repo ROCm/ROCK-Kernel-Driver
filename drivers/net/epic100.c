@@ -409,6 +409,7 @@ static int __devinit epic_init_one (struct pci_dev *pdev,
 		return -ENOMEM;
 	}
 	SET_MODULE_OWNER(dev);
+	SET_NETDEV_DEV(dev, &pdev->dev);
 
 	if (pci_request_regions(pdev, DRV_NAME))
 		goto err_out_free_netdev;

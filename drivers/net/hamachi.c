@@ -613,6 +613,7 @@ static int __init hamachi_init_one (struct pci_dev *pdev,
 		goto err_out_iounmap;
 
 	SET_MODULE_OWNER(dev);
+	SET_NETDEV_DEV(dev, &pdev->dev);
 
 #ifdef TX_CHECKSUM
 	printk("check that skbcopy in ip_queue_xmit isn't happening\n");

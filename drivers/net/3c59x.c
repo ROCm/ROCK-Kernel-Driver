@@ -1115,6 +1115,7 @@ static int __devinit vortex_probe1(struct device *gendev,
 		goto out;
 	}
 	SET_MODULE_OWNER(dev);
+	SET_NETDEV_DEV(dev, gendev);
 	vp = dev->priv;
 
 	option = global_options;

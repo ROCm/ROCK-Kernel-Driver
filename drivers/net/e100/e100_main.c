@@ -591,6 +591,7 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 	bdp->device = dev;
 
 	pci_set_drvdata(pcid, dev);
+	SET_NETDEV_DEV(dev, &pcid->dev);
 
 	if ((rc = e100_alloc_space(bdp)) != 0) {
 		goto err_dev;

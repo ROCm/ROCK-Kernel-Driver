@@ -188,6 +188,9 @@ MODULE_DEVICE_TABLE(pci, acenic_pci_tbl);
 #define ACE_MOD_DEC_USE_COUNT		do{} while(0)
 #endif
 
+#ifndef SET_NETDEV_DEV
+#define SET_NETDEV_DEV(net, pdev)	do{} while(0)
+#endif
 
 #if LINUX_VERSION_CODE >= 0x2051c
 #define ace_sync_irq(irq)	synchronize_irq(irq)
@@ -651,6 +654,7 @@ int __devinit acenic_probe (ACE_PROBE_ARG)
 		}
 
 		SET_MODULE_OWNER(dev);
+		SET_NETDEV_DEV(dev, &pdev->dev);
 
 		if (!dev->priv)
 			dev->priv = kmalloc(sizeof(*ap), GFP_KERNEL);

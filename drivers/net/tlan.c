@@ -521,6 +521,7 @@ static int __devinit TLan_probe1(struct pci_dev *pdev,
 		return -ENOMEM;
 	}
 	SET_MODULE_OWNER(dev);
+	SET_NETDEV_DEV(dev, &pdev->dev);
 	
 	priv = dev->priv;
 

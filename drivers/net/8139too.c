@@ -768,6 +768,8 @@ static int __devinit rtl8139_init_board (struct pci_dev *pdev,
 		return -ENOMEM;
 	}
 	SET_MODULE_OWNER(dev);
+	SET_NETDEV_DEV(dev, &pdev->dev);
+
 	tp = dev->priv;
 	tp->pci_dev = pdev;
 

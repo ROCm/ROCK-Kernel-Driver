@@ -397,6 +397,7 @@ static int __devinit sis900_probe (struct pci_dev *pci_dev, const struct pci_dev
 	if (!net_dev)
 		return -ENOMEM;
 	SET_MODULE_OWNER(net_dev);
+	SET_NETDEV_DEV(net_dev, &pci_dev->dev);
 
 	/* We do a request_region() to register /proc/ioports info. */
 	ioaddr = pci_resource_start(pci_dev, 0);	
