@@ -164,9 +164,7 @@ static int check_mapped_name(mixer_build_t *state, int unitid, int control, char
 		if (p->id == unitid &&
 		    (! control || ! p->control || control == p->control)) {
 			buflen--;
-			strncpy(buf, p->name, buflen);
-			buf[buflen] = 0;
-			return strlen(buf);
+			return strlcpy(buf, p->name, buflen);
 		}
 	}
 	return 0;
@@ -816,7 +814,8 @@ static void build_feature_ctl(mixer_build_t *state, unsigned char *desc,
 			if (! len)
 				len = get_term_name(state, &state->oterm, kctl->id.name, sizeof(kctl->id.name), 1);
 			if (! len)
-				len = sprintf(kctl->id.name, "Feature %d", unitid);
+				len = snprintf(kctl->id.name, sizeof(kctl->id.name),
+					       "Feature %d", unitid);
 		}
 		/* determine the stream direction:
 		 * if the connected output is USB stream, then it's likely a
@@ -824,24 +823,19 @@ static void build_feature_ctl(mixer_build_t *state, unsigned char *desc,
 		 */
 		if (! mapped_name && ! (state->oterm.type >> 16)) {
 			if ((state->oterm.type & 0xff00) == 0x0100) {
-				if (len + 8 < sizeof(kctl->id.name)) {
-					strcpy(kctl->id.name + len, " Capture");
-					len += 8;
-				}
+				len = strlcat(kctl->id.name, " Capture", sizeof(kctl->id.name));
 			} else {
-				if (len + 9 < sizeof(kctl->id.name)) {
-					strcpy(kctl->id.name + len, " Playback");
-					len += 9;
-				}
+				len = strlcat(kctl->id.name + len, " Playback", sizeof(kctl->id.name));
 			}
 		}
-		if (len + 7 < sizeof(kctl->id.name))
-			strcpy(kctl->id.name + len, control == USB_FEATURE_MUTE ? " Switch" : " Volume");
+		strlcat(kctl->id.name + len, control == USB_FEATURE_MUTE ? " Switch" : " Volume",
+			sizeof(kctl->id.name));
 		break;
 
 	default:
 		if (! len)
-			strcpy(kctl->id.name, audio_feature_info[control-1].name);
+			strlcpy(kctl->id.name, audio_feature_info[control-1].name,
+				sizeof(kctl->id.name));
 		break;
 	}
 
@@ -969,8 +963,7 @@ static void build_mixer_unit_ctl(mixer_build_t *state, unsigned char *desc,
 		len = get_term_name(state, &iterm, kctl->id.name, sizeof(kctl->id.name), 0);
 	if (! len)
 		len = sprintf(kctl->id.name, "Mixer Source %d", in_ch);
-	if (len + 7 < sizeof(kctl->id.name))
-		strcpy(kctl->id.name + len, " Volume");
+	strlcat(kctl->id.name + len, " Volume", sizeof(kctl->id.name));
 
 	snd_printdd(KERN_INFO "[%d] MU [%s] ch = %d, val = %d/%d\n",
 		    cval->id, kctl->id.name, cval->channels, cval->min, cval->max);
@@ -1189,22 +1182,18 @@ static int build_audio_procunit(mixer_build_t *state, int unitid, unsigned char 
 		if (check_mapped_name(state, unitid, cval->control, kctl->id.name, sizeof(kctl->id.name)))
 			;
 		else if (info->name)
-			strcpy(kctl->id.name, info->name);
+			strlcpy(kctl->id.name, info->name, sizeof(kctl->id.name));
 		else {
 			nameid = dsc[12 + num_ins + dsc[11 + num_ins]];
 			len = 0;
 			if (nameid)
 				len = snd_usb_copy_string_desc(state, nameid, kctl->id.name, sizeof(kctl->id.name));
-			if (! len) {
-				strncpy(kctl->id.name, name, sizeof(kctl->id.name) - 1);
-				kctl->id.name[sizeof(kctl->id.name)-1] = 0;
-			}
+			if (! len)
+				strlcpy(kctl->id.name, name, sizeof(kctl->id.name));
 		}
-		len = strlen(kctl->id.name);
-		if (len + sizeof(valinfo->suffix) + 1 < sizeof(kctl->id.name)) {
-			kctl->id.name[len] = ' ';
-			strcpy(kctl->id.name + len + 1, valinfo->suffix);
-		}
+		strlcat(kctl->id.name, ' ', sizeof(kctl->id.name));
+		strlcat(kctl->id.name, valinfo->suffix, sizeof(kctl->id.name));
+
 		snd_printdd(KERN_INFO "[%d] PU [%s] ch = %d, val = %d/%d\n",
 			    cval->id, kctl->id.name, cval->channels, cval->min, cval->max);
 		if ((err = add_control_to_empty(state->chip->card, kctl)) < 0)
@@ -1402,14 +1391,12 @@ static int parse_audio_selector_unit(mixer_build_t *state, int unitid, unsigned 
 		len = get_term_name(state, &state->oterm,
 				    kctl->id.name, sizeof(kctl->id.name), 0);
 		if (! len)
-			len = sprintf(kctl->id.name, "USB");
-		if ((state->oterm.type & 0xff00) == 0x0100) {
-			if (len + 15 < sizeof(kctl->id.name))
-				strcpy(kctl->id.name + len, " Capture Source");
-		} else {
-			if (len + 16 < sizeof(kctl->id.name))
-				strcpy(kctl->id.name + len, " Playback Source");
-		}
+			strlcpy(kctl->id.name, "USB", sizeof(kctl->id.name));
+
+		if ((state->oterm.type & 0xff00) == 0x0100)
+			strlcat(kctl->id.name, " Capture Source", sizeof(kctl->id.name));
+		else
+			strlcat(kctl->id.name, " Playback Source", sizeof(kctl->id.name));
 	}
 
 	snd_printdd(KERN_INFO "[%d] SU [%s] items = %d\n",

@@ -1394,7 +1394,7 @@ int snd_rawmidi_new(snd_card_t * card, char *id, int device,
 	init_MUTEX(&rmidi->open_mutex);
 	init_waitqueue_head(&rmidi->open_wait);
 	if (id != NULL)
-		strncpy(rmidi->id, id, sizeof(rmidi->id) - 1);
+		strlcpy(rmidi->id, id, sizeof(rmidi->id));
 	if ((err = snd_rawmidi_alloc_substreams(rmidi, &rmidi->streams[SNDRV_RAWMIDI_STREAM_INPUT], SNDRV_RAWMIDI_STREAM_INPUT, input_count)) < 0) {
 		snd_rawmidi_free(rmidi);
 		return err;

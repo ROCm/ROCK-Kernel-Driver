@@ -1184,10 +1184,9 @@ static int snd_seq_ioctl_set_client_info(client_t * client, void __user *arg)
 		return -EINVAL;
 
 	/* fill the info fields */
-	if (client_info.name[0]) {
-		strncpy(client->name, client_info.name, sizeof(client->name)-1);
-		client->name[sizeof(client->name)-1] = '\0';
-	}
+	if (client_info.name[0])
+		strlcpy(client->name, client_info.name, sizeof(client->name));
+
 	client->filter = client_info.filter;
 	client->event_lost = client_info.event_lost;
 	memcpy(client->event_filter, client_info.event_filter, 32);
@@ -1487,9 +1486,8 @@ static int snd_seq_ioctl_create_queue(client_t *client, void __user *arg)
 
 	/* set queue name */
 	if (! info.name[0])
-		sprintf(info.name, "Queue-%d", q->queue);
-	strncpy(q->name, info.name, sizeof(q->name)-1);
-	q->name[sizeof(q->name)-1] = 0;
+		snprintf(info.name, sizeof(info.name), "Queue-%d", q->queue);
+	strlcpy(q->name, info.name, sizeof(q->name));
 	queuefree(q);
 
 	if (copy_to_user(arg, &info, sizeof(info)))
@@ -1526,8 +1524,7 @@ static int snd_seq_ioctl_get_queue_info(client_t *client, void __user *arg)
 	info.queue = q->queue;
 	info.owner = q->owner;
 	info.locked = q->locked;
-	strncpy(info.name, q->name, sizeof(info.name) - 1);
-	info.name[sizeof(info.name)-1] = 0;
+	strlcpy(info.name, q->name, sizeof(info.name));
 	queuefree(q);
 
 	if (copy_to_user(arg, &info, sizeof(info)))
@@ -1565,8 +1562,7 @@ static int snd_seq_ioctl_set_queue_info(client_t *client, void __user *arg)
 		queuefree(q);
 		return -EPERM;
 	}
-	strncpy(q->name, info.name, sizeof(q->name) - 1);
-	q->name[sizeof(q->name)-1] = 0;
+	strlcpy(q->name, info.name, sizeof(q->name));
 	queuefree(q);
 
 	return 0;

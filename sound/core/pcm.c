@@ -639,7 +639,7 @@ int snd_pcm_new(snd_card_t * card, char *id, int device,
 	pcm->card = card;
 	pcm->device = device;
 	if (id) {
-		strncpy(pcm->id, id, sizeof(pcm->id) - 1);
+		strlcpy(pcm->id, id, sizeof(pcm->id));
 	}
 	if ((err = snd_pcm_new_stream(pcm, SNDRV_PCM_STREAM_PLAYBACK, playback_count)) < 0) {
 		snd_pcm_free(pcm);

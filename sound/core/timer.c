@@ -749,7 +749,7 @@ int snd_timer_new(snd_card_t *card, char *id, snd_timer_id_t *tid, snd_timer_t *
 	timer->tmr_device = tid->device;
 	timer->tmr_subdevice = tid->subdevice;
 	if (id)
-		strncpy(timer->id, id, sizeof(timer->id) - 1);
+		strlcpy(timer->id, id, sizeof(timer->id));
 	INIT_LIST_HEAD(&timer->device_list);
 	INIT_LIST_HEAD(&timer->open_list_head);
 	INIT_LIST_HEAD(&timer->active_list_head);
@@ -1317,8 +1317,8 @@ static int snd_timer_user_ginfo(struct file *file, snd_timer_ginfo_t *_ginfo)
 		ginfo.card = t->card ? t->card->number : -1;
 		if (t->hw.flags & SNDRV_TIMER_HW_SLAVE)
 			ginfo.flags |= SNDRV_TIMER_FLG_SLAVE;
-		strncpy(ginfo.id, t->id, sizeof(ginfo.id)-1);
-		strncpy(ginfo.name, t->name, sizeof(ginfo.name)-1);
+		strlcpy(ginfo.id, t->id, sizeof(ginfo.id));
+		strlcpy(ginfo.name, t->name, sizeof(ginfo.name));
 		ginfo.resolution = t->hw.resolution;
 		if (t->hw.resolution_min > 0) {
 			ginfo.resolution_min = t->hw.resolution_min;
@@ -1457,8 +1457,8 @@ static int snd_timer_user_info(struct file *file, snd_timer_info_t *_info)
 	info.card = t->card ? t->card->number : -1;
 	if (t->hw.flags & SNDRV_TIMER_HW_SLAVE)
 		info.flags |= SNDRV_TIMER_FLG_SLAVE;
-	strncpy(info.id, t->id, sizeof(info.id)-1);
-	strncpy(info.name, t->name, sizeof(info.name)-1);
+	strlcpy(info.id, t->id, sizeof(info.id));
+	strlcpy(info.name, t->name, sizeof(info.name));
 	info.resolution = t->hw.resolution;
 	if (copy_to_user(_info, &info, sizeof(*_info)))
 		return -EFAULT;

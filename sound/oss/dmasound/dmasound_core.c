@@ -351,9 +351,8 @@ static int mixer_ioctl(struct inode *inode, struct file *file, u_int cmd,
 	    case SOUND_MIXER_INFO:
 		{
 		    mixer_info info;
-		    strncpy(info.id, dmasound.mach.name2, sizeof(info.id));
-		    strncpy(info.name, dmasound.mach.name2, sizeof(info.name));
-		    info.name[sizeof(info.name)-1] = 0;
+		    strlcpy(info.id, dmasound.mach.name2, sizeof(info.id));
+		    strlcpy(info.name, dmasound.mach.name2, sizeof(info.name));
 		    info.modify_counter = mixer.modify_counter;
 		    if (copy_to_user((int *)arg, &info, sizeof(info)))
 			    return -EFAULT;

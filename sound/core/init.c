@@ -76,7 +76,7 @@ snd_card_t *snd_card_new(int idx, const char *xid,
 	if (xid) {
 		if (!snd_info_check_reserved_words(xid))
 			goto __error;
-		strncpy(card->id, xid, sizeof(card->id) - 1);
+		strlcpy(card->id, xid, sizeof(card->id));
 	}
 	write_lock(&snd_card_rwlock);
 	if (idx < 0) {

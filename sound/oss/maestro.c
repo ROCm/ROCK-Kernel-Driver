@@ -2024,8 +2024,8 @@ static int mixer_ioctl(struct ess_card *card, unsigned int cmd, unsigned long ar
 	VALIDATE_CARD(card);
         if (cmd == SOUND_MIXER_INFO) {
 		mixer_info info;
-		strncpy(info.id, card_names[card->card_type], sizeof(info.id));
-		strncpy(info.name,card_names[card->card_type],sizeof(info.name));
+		strlcpy(info.id, card_names[card->card_type], sizeof(info.id));
+		strlcpy(info.name, card_names[card->card_type], sizeof(info.name));
 		info.modify_counter = card->mix.modcnt;
 		if (copy_to_user((void *)arg, &info, sizeof(info)))
 			return -EFAULT;
@@ -2033,8 +2033,8 @@ static int mixer_ioctl(struct ess_card *card, unsigned int cmd, unsigned long ar
 	}
 	if (cmd == SOUND_OLD_MIXER_INFO) {
 		_old_mixer_info info;
-		strncpy(info.id, card_names[card->card_type], sizeof(info.id));
-		strncpy(info.name,card_names[card->card_type],sizeof(info.name));
+		strlcpy(info.id, card_names[card->card_type], sizeof(info.id));
+		strlcpy(info.name, card_names[card->card_type], sizeof(info.name));
 		if (copy_to_user((void *)arg, &info, sizeof(info)))
 			return -EFAULT;
 		return 0;
