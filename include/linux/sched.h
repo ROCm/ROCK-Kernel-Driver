@@ -588,11 +588,6 @@ static inline int sas_ss_flags(unsigned long sp)
 		: on_sig_stack(sp) ? SS_ONSTACK : 0);
 }
 
-extern int request_irq(unsigned int,
-		       void (*handler)(int, void *, struct pt_regs *),
-		       unsigned long, const char *, void *);
-extern void free_irq(unsigned int, void *);
-
 /* capable prototype and code moved to security.[hc] */
 #include <linux/security.h>
 #if 0

@@ -65,6 +65,7 @@
 #include <linux/blk.h>
 #include <linux/blkdev.h>
 #include <linux/delay.h>
+#include <linux/interrupt.h>
 #include <linux/ioport.h>
 #include <linux/slab.h>
 #include <linux/pci.h>

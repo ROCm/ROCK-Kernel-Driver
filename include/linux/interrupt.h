@@ -3,15 +3,11 @@
 #define _LINUX_INTERRUPT_H
 
 #include <linux/config.h>
-#include <linux/sched.h>
-#include <linux/kernel.h>
-#include <linux/smp.h>
-#include <linux/cache.h>
 #include <linux/bitops.h>
-
 #include <asm/atomic.h>
-#include <asm/system.h>
+#include <asm/hardirq.h>
 #include <asm/ptrace.h>
+#include <asm/softirq.h>
 
 struct irqaction {
 	void (*handler)(int, void *, struct pt_regs *);
@@ -22,8 +18,10 @@ struct irqaction {
 	struct irqaction *next;
 };
 
-#include <asm/hardirq.h>
-#include <asm/softirq.h>
+extern int request_irq(unsigned int,
+		       void (*handler)(int, void *, struct pt_regs *),
+		       unsigned long, const char *, void *);
+extern void free_irq(unsigned int, void *);
 
 /*
  * Temporary defines for UP kernels, until all code gets fixed.
