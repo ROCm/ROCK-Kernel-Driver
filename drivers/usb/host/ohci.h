@@ -387,6 +387,7 @@ struct ohci_hcd {
 	unsigned long		flags;		/* for HC bugs */
 #define	OHCI_QUIRK_AMD756	0x01			/* erratum #4 */
 #define	OHCI_QUIRK_SUPERIO	0x02			/* natsemi */
+#define	OHCI_QUIRK_INITRESET	0x04			/* SiS, OPTi, ... */
 	// there are also chip quirks/bugs in init logic
 
 	/*

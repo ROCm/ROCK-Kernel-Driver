@@ -2,7 +2,7 @@
  * OHCI HCD (Host Controller Driver) for USB.
  *
  * (C) Copyright 1999 Roman Weissgaerber <weissg@vienna.at>
- * (C) Copyright 2000-2002 David Brownell <dbrownell@users.sourceforge.net>
+ * (C) Copyright 2000-2004 David Brownell <dbrownell@users.sourceforge.net>
  * 
  * [ Initialisation is based on Linus'  ]
  * [ uhci code and gregs ohci fragments ]
@@ -121,6 +121,16 @@
 #define	OHCI_CONTROL_INIT 	OHCI_CTRL_CBSR
 #define	OHCI_INTR_INIT \
 	(OHCI_INTR_MIE | OHCI_INTR_UE | OHCI_INTR_RD | OHCI_INTR_WDH)
+
+#ifdef __hppa__
+/* On PA-RISC, PDC can leave IR set incorrectly; ignore it there. */
+#define	IR_DISABLE
+#endif
+
+#ifdef CONFIG_ARCH_OMAP
+/* OMAP doesn't support IR (no SMM; not needed) */
+#define	IR_DISABLE
+#endif
 
 /*-------------------------------------------------------------------------*/
 
@@ -407,10 +417,8 @@ static int hc_reset (struct ohci_hcd *ohci)
 		/* also: power/overcurrent flags in roothub.a */
 	}
 
-	/* SMM owns the HC?  not for long!
-	 * On PA-RISC, PDC can leave IR set incorrectly; ignore it there.
-	 */
-#ifndef __hppa__
+#ifndef IR_DISABLE
+	/* SMM owns the HC?  not for long! */
 	if (ohci_readl (&ohci->regs->control) & OHCI_CTRL_IR) {
 		ohci_dbg (ohci, "USB HC TakeOver from BIOS/SMM\n");
 
@@ -435,18 +443,40 @@ static int hc_reset (struct ohci_hcd *ohci)
 	/* Disable HC interrupts */
 	writel (OHCI_INTR_MIE, &ohci->regs->intrdisable);
 
-	ohci_dbg (ohci, "reset, control = 0x%x\n",
-		  ohci_readl (&ohci->regs->control));
-
-  	/* Reset USB (needed by some controllers); RemoteWakeupConnected
+  	/* Reset USB nearly "by the book".  RemoteWakeupConnected
 	 * saved if boot firmware (BIOS/SMM/...) told us it's connected
 	 * (for OHCI integrated on mainboard, it normally is)
 	 */
 	ohci->hc_control = ohci_readl (&ohci->regs->control);
-	ohci->hc_control &= OHCI_CTRL_RWC;	/* hcfs 0 = RESET */
-	if (ohci->hc_control)
+	ohci_dbg (ohci, "resetting from state '%s', control = 0x%x\n",
+			hcfs2string (ohci->hc_control & OHCI_CTRL_HCFS),
+			ohci->hc_control);
+
+	if (ohci->hc_control & OHCI_CTRL_RWC
+			&& !(ohci->flags & OHCI_QUIRK_AMD756))
 		ohci->hcd.can_wakeup = 1;
+
+	switch (ohci->hc_control & OHCI_CTRL_HCFS) {
+	case OHCI_USB_OPER:
+		temp = 0;
+		break;
+	case OHCI_USB_SUSPEND:
+	case OHCI_USB_RESUME:
+		ohci->hc_control &= OHCI_CTRL_RWC;
+		ohci->hc_control |= OHCI_USB_RESUME;
+		temp = 10 /* msec wait */;
+		break;
+	// case OHCI_USB_RESET:
+	default:
+		ohci->hc_control &= OHCI_CTRL_RWC;
+		ohci->hc_control |= OHCI_USB_RESET;
+		temp = 50 /* msec wait */;
+		break;
+	}
 	writel (ohci->hc_control, &ohci->regs->control);
+	// flush the writes
+	(void) ohci_readl (&ohci->regs->control);
+	msleep(temp);
 	if (power_switching) {
 		unsigned ports = roothub_a (ohci) & RH_A_NDP; 
 
@@ -455,9 +485,8 @@ static int hc_reset (struct ohci_hcd *ohci)
 			writel (RH_PS_LSDA,
 				&ohci->regs->roothub.portstatus [temp]);
 	}
-	// flush those pci writes
+	// flush those writes
 	(void) ohci_readl (&ohci->regs->control);
-	msleep (50);
 
 	/* HC Reset requires max 10 us delay */
 	writel (OHCI_HCR,  &ohci->regs->cmdstatus);
@@ -469,6 +498,7 @@ static int hc_reset (struct ohci_hcd *ohci)
 		}
 		udelay (1);
 	}
+	periodic_reinit (ohci);
 
 	/* now we're in the SUSPEND state ... must go OPERATIONAL
 	 * within 2msec else HC enters RESUME
@@ -477,10 +507,11 @@ static int hc_reset (struct ohci_hcd *ohci)
 	 * (SiS, OPTi ...), so reset again instead.  SiS doesn't need
 	 * this if we write fmInterval after we're OPERATIONAL.
 	 */
-	writel (ohci->hc_control, &ohci->regs->control);
-	// flush those pci writes
-	(void) ohci_readl (&ohci->regs->control);
-
+	if (ohci->flags & OHCI_QUIRK_INITRESET) {
+		writel (ohci->hc_control, &ohci->regs->control);
+		// flush those writes
+		(void) ohci_readl (&ohci->regs->control);
+	}
 	return 0;
 }
 
@@ -505,8 +536,6 @@ static int hc_start (struct ohci_hcd *ohci)
 
 	/* a reset clears this */
 	writel ((u32) ohci->hcca_dma, &ohci->regs->hcca);
-
-	periodic_reinit (ohci);
 
 	/* some OHCI implementations are finicky about how they init.
 	 * bogus values here mean not even enumeration could work.
@@ -553,7 +582,7 @@ static int hc_start (struct ohci_hcd *ohci)
 	writel (tmp, &ohci->regs->roothub.a);
 	writel (RH_HS_LPSC, &ohci->regs->roothub.status);
 	writel (power_switching ? RH_B_PPCM : 0, &ohci->regs->roothub.b);
-	// flush those pci writes
+	// flush those writes
 	(void) ohci_readl (&ohci->regs->control);
 
 	// POTPGT delay is bits 24-31, in 2 ms units.
@@ -620,7 +649,8 @@ static irqreturn_t ohci_irq (struct usb_hcd *hcd, struct pt_regs *ptregs)
 		// e.g. due to PCI Master/Target Abort
 
 		ohci_dump (ohci, 1);
-		hc_reset (ohci);
+		ohci->hc_control &= OHCI_CTRL_RWC;	/* hcfs 0 = RESET */
+		writel (ohci->hc_control, &ohci->regs->control);
 	}
 
 	if (ints & OHCI_INTR_RD) {
@@ -655,7 +685,7 @@ static irqreturn_t ohci_irq (struct usb_hcd *hcd, struct pt_regs *ptregs)
 	if (HCD_IS_RUNNING(ohci->hcd.state)) {
 		writel (ints, &regs->intrstatus);
 		writel (OHCI_INTR_MIE, &regs->intrenable);	
-		// flush those pci writes
+		// flush those writes
 		(void) ohci_readl (&ohci->regs->control);
 	}
 

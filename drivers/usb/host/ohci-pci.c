@@ -61,6 +61,7 @@ ohci_pci_start (struct usb_hcd *hcd)
 				&& pdev->device == 0x740c) {
 			ohci->flags = OHCI_QUIRK_AMD756;
 			ohci_info (ohci, "AMD756 erratum 4 workaround\n");
+			// also somewhat erratum 10 (suspend/resume issues)
 		}
 
 		/* FIXME for some of the early AMD 760 southbridges, OHCI
@@ -75,6 +76,8 @@ ohci_pci_start (struct usb_hcd *hcd)
 				&& pdev->device == 0xc861) {
 			ohci_info (ohci,
 				"WARNING: OPTi workarounds unavailable\n");
+			/* OPTi sometimes acts wierd during init */
+			ohci->flags = OHCI_QUIRK_INITRESET;
 		}
 
 		/* Check for NSC87560. We have to look at the bridge (fn1) to
@@ -92,6 +95,12 @@ ohci_pci_start (struct usb_hcd *hcd)
 				ohci_info (ohci, "Using NSC SuperIO setup\n");
 			}
 		}
+
+		/* SiS sometimes acts wierd during init */
+		else if (pdev->vendor == PCI_VENDOR_ID_SI) {
+			ohci->flags = OHCI_QUIRK_INITRESET;
+			ohci_info(ohci, "SiS init quirk\n");
+		}
 	
 	}
 
@@ -99,6 +108,15 @@ ohci_pci_start (struct usb_hcd *hcd)
 	if ((ret = ohci_mem_init (ohci)) < 0) {
 		ohci_stop (hcd);
 		return ret;
+	}
+
+	/* NOTE: this is a second reset. the first one helps
+	 * keep bios/smm irqs from making trouble, but it was
+	 * probably more than 1msec ago...
+	 */
+	if (hc_reset (ohci) < 0) {
+		ohci_stop (hcd);
+		return -ENODEV;
 	}
 
 	if (hc_start (ohci) < 0) {
