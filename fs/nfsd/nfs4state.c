@@ -1402,7 +1402,7 @@ out:
  * Checks for sequence id mutating operations. 
  */
 int
-nfs4_preprocess_seqid_op(struct svc_fh *current_fh, u32 seqid, stateid_t *stateid, int flags, struct nfs4_stateowner **sopp, struct nfs4_stateid **stpp)
+nfs4_preprocess_seqid_op(struct svc_fh *current_fh, u32 seqid, stateid_t *stateid, int flags, struct nfs4_stateowner **sopp, struct nfs4_stateid **stpp, clientid_t *lockclid)
 {
 	int status;
 	struct nfs4_stateid *stp;
@@ -1438,6 +1438,21 @@ nfs4_preprocess_seqid_op(struct svc_fh *current_fh, u32 seqid, stateid_t *statei
 		goto no_nfs4_stateid;
 
 	status = nfserr_bad_stateid;
+
+	/* for new lock stateowners, check that the lock->v.new.open_stateid
+	 * refers to an open stateowner, and that the lockclid
+	 * (nfs4_lock->v.new.clientid) is the same as the
+	 * open_stateid->st_stateowner->so_client->clientid
+	 */
+	if (lockclid) {
+		struct nfs4_stateowner *sop = stp->st_stateowner;
+		struct nfs4_client *clp = sop->so_client;
+
+		if (!sop->so_is_open_owner)
+			goto out;
+		if (!cmp_clid(&clp->cl_clientid, lockclid))
+			goto out;
+	}
 
 	if ((flags & CHECK_FH) && nfs4_check_fh(current_fh, stp)) {
 		printk("NFSD: preprocess_seqid_op: fh-stateid mismatch!\n");
@@ -1525,7 +1540,7 @@ nfsd4_open_confirm(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfs
 	if ((status = nfs4_preprocess_seqid_op(current_fh, oc->oc_seqid,
 					&oc->oc_req_stateid,
 					CHECK_FH | CONFIRM | OPEN_STATE,
-					&oc->oc_stateowner, &stp)))
+					&oc->oc_stateowner, &stp, NULL)))
 		goto out; 
 
 	sop = oc->oc_stateowner;
@@ -1557,7 +1572,7 @@ nfsd4_open_downgrade(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct n
 	if ((status = nfs4_preprocess_seqid_op(current_fh, od->od_seqid, 
 					&od->od_stateid, 
 					CHECK_FH | OPEN_STATE, 
-					&od->od_stateowner, &stp)))
+					&od->od_stateowner, &stp, NULL)))
 		goto out; 
 
 	status = nfserr_inval;
@@ -1597,7 +1612,7 @@ nfsd4_close(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_clos
 	if ((status = nfs4_preprocess_seqid_op(current_fh, close->cl_seqid, 
 					&close->cl_stateid, 
 					CHECK_FH | OPEN_STATE, 
-					&close->cl_stateowner, &stp)))
+					&close->cl_stateowner, &stp, NULL)))
 		goto out; 
 	/*
 	*  Return success, but first update the stateid.
@@ -1853,12 +1868,15 @@ nfsd4_lock(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_lock 
 			printk("NFSD: nfsd4_lock: clientid is stale!\n");
 			goto out;
 		}
+		/* does the clientid in the lock owner own the open stateid? */
+
 		/* validate and update open stateid and open seqid */
 		status = nfs4_preprocess_seqid_op(current_fh, 
 				        lock->lk_new_open_seqid,
 		                        &lock->lk_new_open_stateid,
 		                        CHECK_FH | OPEN_STATE,
-		                        &open_sop, &open_stp);
+		                        &open_sop, &open_stp,
+					&lock->v.new.clientid);
 		if (status)
 			goto out;
 		/* create lockowner and lock stateid */
@@ -1890,7 +1908,7 @@ nfsd4_lock(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_lock 
 				       lock->lk_old_lock_seqid, 
 				       &lock->lk_old_lock_stateid, 
 				       CHECK_FH | LOCK_STATE, 
-				       &lock->lk_stateowner, &lock_stp);
+				       &lock->lk_stateowner, &lock_stp, NULL);
 		if (status)
 			goto out;
 	}
@@ -2095,7 +2113,7 @@ nfsd4_locku(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_lock
 					locku->lu_seqid, 
 					&locku->lu_stateid, 
 					CHECK_FH | LOCK_STATE, 
-					&locku->lu_stateowner, &stp)))
+					&locku->lu_stateowner, &stp, NULL)))
 		goto out;
 
 	filp = &stp->st_vfs_file;
