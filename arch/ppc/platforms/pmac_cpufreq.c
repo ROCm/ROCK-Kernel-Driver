@@ -498,7 +498,7 @@ static int __pmac pmac_cpufreq_init_7447A(struct device_node *cpunode)
  *  - Titanium PowerBook 800 (PMU based, 667Mhz & 800Mhz)
  *  - Titanium PowerBook 400 (PMU based, 300Mhz & 400Mhz)
  *  - Titanium PowerBook 500 (PMU based, 300Mhz & 500Mhz)
- *  - iBook2 500 (PMU based, 400Mhz & 500Mhz)
+ *  - iBook2 500/600 (PMU based, 400Mhz & 500/600Mhz)
  *  - iBook2 700 (CPU based, 400Mhz & 700Mhz, support low voltage)
  *  - Recent MacRISC3 laptops
  *  - iBook G4s and PowerBook G4s with 7447A CPUs
@@ -533,11 +533,8 @@ static int __init pmac_cpufreq_setup(void)
 		   machine_is_compatible("PowerBook3,5") ||
 		   machine_is_compatible("MacRISC3")) {
 		pmac_cpufreq_init_MacRISC3(cpunode);
-	/* Else check for iBook2 500 */
+	/* Else check for iBook2 500/600 */
 	} else if (machine_is_compatible("PowerBook4,1")) {
-		/* We only know about 500Mhz model */
-		if (cur_freq < 450000 || cur_freq > 550000)
-			goto out;
 		hi_freq = cur_freq;
 		low_freq = 400000;
 		set_speed_proc = pmu_set_cpu_speed;
