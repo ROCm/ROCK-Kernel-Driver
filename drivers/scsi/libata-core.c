@@ -73,12 +73,6 @@ static const char * thr_state_name[] = {
 	"THR_IDLE",
 	"THR_PROBE_SUCCESS",
 	"THR_PROBE_START",
-	"THR_PIO_POLL",
-	"THR_PIO_TMOUT",
-	"THR_PIO",
-	"THR_PIO_LAST",
-	"THR_PIO_LAST_POLL",
-	"THR_PIO_ERR",
 };
 
 /**
@@ -1997,20 +1991,20 @@ static int ata_sg_setup(struct ata_queued_cmd *qc)
 static unsigned long ata_pio_poll(struct ata_port *ap)
 {
 	u8 status;
-	unsigned int poll_state = THR_UNKNOWN;
-	unsigned int reg_state = THR_UNKNOWN;
-	const unsigned int tmout_state = THR_PIO_TMOUT;
+	unsigned int poll_state = PIO_ST_UNKNOWN;
+	unsigned int reg_state = PIO_ST_UNKNOWN;
+	const unsigned int tmout_state = PIO_ST_TMOUT;
 
-	switch (ap->thr_state) {
-	case THR_PIO:
-	case THR_PIO_POLL:
-		poll_state = THR_PIO_POLL;
-		reg_state = THR_PIO;
+	switch (ap->pio_task_state) {
+	case PIO_ST:
+	case PIO_ST_POLL:
+		poll_state = PIO_ST_POLL;
+		reg_state = PIO_ST;
 		break;
-	case THR_PIO_LAST:
-	case THR_PIO_LAST_POLL:
-		poll_state = THR_PIO_LAST_POLL;
-		reg_state = THR_PIO_LAST;
+	case PIO_ST_LAST:
+	case PIO_ST_LAST_POLL:
+		poll_state = PIO_ST_LAST_POLL;
+		reg_state = PIO_ST_LAST;
 		break;
 	default:
 		BUG();
@@ -2019,15 +2013,15 @@ static unsigned long ata_pio_poll(struct ata_port *ap)
 
 	status = ata_chk_status(ap);
 	if (status & ATA_BUSY) {
-		if (time_after(jiffies, ap->thr_timeout)) {
-			ap->thr_state = tmout_state;
+		if (time_after(jiffies, ap->pio_task_timeout)) {
+			ap->pio_task_state = tmout_state;
 			return 0;
 		}
-		ap->thr_state = poll_state;
+		ap->pio_task_state = poll_state;
 		return ATA_SHORT_PAUSE;
 	}
 
-	ap->thr_state = reg_state;
+	ap->pio_task_state = reg_state;
 	return 0;
 }
 
@@ -2048,7 +2042,7 @@ static void ata_pio_start (struct ata_queued_cmd *qc)
 	qc->flags |= ATA_QCFLAG_POLL;
 	qc->tf.ctl |= ATA_NIEN;	/* disable interrupts */
 	ata_tf_to_host_nolock(ap, &qc->tf);
-	ata_thread_wake(ap, THR_PIO);
+	queue_work(ata_wq, &ap->pio_task);
 }
 
 /**
@@ -2061,7 +2055,6 @@ static void ata_pio_start (struct ata_queued_cmd *qc)
 static void ata_pio_complete (struct ata_port *ap)
 {
 	struct ata_queued_cmd *qc;
-	unsigned long flags;
 	u8 drv_stat;
 
 	/*
@@ -2070,31 +2063,29 @@ static void ata_pio_complete (struct ata_port *ap)
 	 * a chk-status or two.  If not, the drive is probably seeking
 	 * or something.  Snooze for a couple msecs, then
 	 * chk-status again.  If still busy, fall back to
-	 * THR_PIO_POLL state.
+	 * PIO_ST_POLL state.
 	 */
 	drv_stat = ata_busy_wait(ap, ATA_BUSY | ATA_DRQ, 10);
 	if (drv_stat & (ATA_BUSY | ATA_DRQ)) {
 		msleep(2);
 		drv_stat = ata_busy_wait(ap, ATA_BUSY | ATA_DRQ, 10);
 		if (drv_stat & (ATA_BUSY | ATA_DRQ)) {
-			ap->thr_state = THR_PIO_LAST_POLL;
-			ap->thr_timeout = jiffies + ATA_TMOUT_PIO;
+			ap->pio_task_state = PIO_ST_LAST_POLL;
+			ap->pio_task_timeout = jiffies + ATA_TMOUT_PIO;
 			return;
 		}
 	}
 
 	drv_stat = ata_wait_idle(ap);
 	if (drv_stat & (ATA_BUSY | ATA_DRQ)) {
-		ap->thr_state = THR_PIO_ERR;
+		ap->pio_task_state = PIO_ST_ERR;
 		return;
 	}
 
 	qc = ata_qc_from_tag(ap, ap->active_tag);
 	assert(qc != NULL);
 
-	spin_lock_irqsave(&ap->host_set->lock, flags);
-	ap->thr_state = THR_IDLE;
-	spin_unlock_irqrestore(&ap->host_set->lock, flags);
+	ap->pio_task_state = PIO_ST_IDLE;
 
 	ata_irq_on(ap);
 
@@ -2122,22 +2113,22 @@ static void ata_pio_sector(struct ata_port *ap)
 	 * a chk-status or two.  If not, the drive is probably seeking
 	 * or something.  Snooze for a couple msecs, then
 	 * chk-status again.  If still busy, fall back to
-	 * THR_PIO_POLL state.
+	 * PIO_ST_POLL state.
 	 */
 	status = ata_busy_wait(ap, ATA_BUSY, 5);
 	if (status & ATA_BUSY) {
 		msleep(2);
 		status = ata_busy_wait(ap, ATA_BUSY, 10);
 		if (status & ATA_BUSY) {
-			ap->thr_state = THR_PIO_POLL;
-			ap->thr_timeout = jiffies + ATA_TMOUT_PIO;
+			ap->pio_task_state = PIO_ST_POLL;
+			ap->pio_task_timeout = jiffies + ATA_TMOUT_PIO;
 			return;
 		}
 	}
 
 	/* handle BSY=0, DRQ=0 as error */
 	if ((status & ATA_DRQ) == 0) {
-		ap->thr_state = THR_PIO_ERR;
+		ap->pio_task_state = PIO_ST_ERR;
 		return;
 	}
 
@@ -2148,7 +2139,7 @@ static void ata_pio_sector(struct ata_port *ap)
 	sg = qc->sg;
 
 	if (qc->cursect == (qc->nsect - 1))
-		ap->thr_state = THR_PIO_LAST;
+		ap->pio_task_state = PIO_ST_LAST;
 
 	buf = kmap(sg[qc->cursg].page) +
 	      sg[qc->cursg].offset + (qc->cursg_ofs * ATA_SECT_SIZE);
@@ -2174,6 +2165,49 @@ static void ata_pio_sector(struct ata_port *ap)
 		insl(ap->ioaddr.data_addr, buf, ATA_SECT_DWORDS);
 
 	kunmap(sg[qc->cursg].page);
+}
+
+static void ata_pio_task(void *_data)
+{
+	struct ata_port *ap = _data;
+	unsigned long timeout = 0;
+
+	switch (ap->pio_task_state) {
+	case PIO_ST:
+		ata_pio_sector(ap);
+		break;
+
+	case PIO_ST_LAST:
+		ata_pio_complete(ap);
+		break;
+
+	case PIO_ST_POLL:
+	case PIO_ST_LAST_POLL:
+		timeout = ata_pio_poll(ap);
+		break;
+
+	case PIO_ST_TMOUT:
+		printk(KERN_ERR "ata%d: FIXME: PIO_ST_TMOUT\n", /* FIXME */
+		       ap->id);
+		timeout = 11 * HZ;
+		break;
+
+	case PIO_ST_ERR:
+		printk(KERN_ERR "ata%d: FIXME: PIO_ST_ERR\n", /* FIXME */
+		       ap->id);
+		timeout = 11 * HZ;
+		break;
+	}
+
+	if (timeout) {
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(timeout);
+	}
+
+	if ((ap->pio_task_state != PIO_ST_IDLE) &&
+	    (ap->pio_task_state != PIO_ST_TMOUT) &&
+	    (ap->pio_task_state != PIO_ST_ERR))
+		queue_work(ata_wq, &ap->pio_task);
 }
 
 /**
@@ -2760,31 +2794,6 @@ static unsigned long ata_thread_iter(struct ata_port *ap)
 		timeout = 30 * HZ;
 		break;
 
-	case THR_PIO:
-		ata_pio_sector(ap);
-		break;
-
-	case THR_PIO_LAST:
-		ata_pio_complete(ap);
-		break;
-
-	case THR_PIO_POLL:
-	case THR_PIO_LAST_POLL:
-		timeout = ata_pio_poll(ap);
-		break;
-
-	case THR_PIO_TMOUT:
-		printk(KERN_ERR "ata%d: FIXME: THR_PIO_TMOUT\n", /* FIXME */
-		       ap->id);
-		timeout = 11 * HZ;
-		break;
-
-	case THR_PIO_ERR:
-		printk(KERN_ERR "ata%d: FIXME: THR_PIO_ERR\n", /* FIXME */
-		       ap->id);
-		timeout = 11 * HZ;
-		break;
-
 	default:
 		printk(KERN_DEBUG "ata%u: unknown thr state %s\n",
 		       ap->id, ata_thr_state_name(ap->thr_state));
@@ -3029,6 +3038,7 @@ static void ata_host_init(struct ata_port *ap, struct Scsi_Host *host,
 	ap->eng.flags = 0;
 	INIT_LIST_HEAD(&ap->eng.q);
 	INIT_WORK(&ap->packet_task, atapi_packet_task, ap);
+	INIT_WORK(&ap->pio_task, ata_pio_task, ap);
 
 	for (i = 0; i < ATA_MAX_DEVICES; i++)
 		ap->device[i].devno = i;

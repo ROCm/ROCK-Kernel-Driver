@@ -145,12 +145,6 @@ enum {
 	THR_IDLE		= (THR_PROBE_FAILED + 1),
 	THR_PROBE_SUCCESS	= (THR_IDLE + 1),
 	THR_PROBE_START		= (THR_PROBE_SUCCESS + 1),
-	THR_PIO_POLL		= (THR_PROBE_START + 1),
-	THR_PIO_TMOUT		= (THR_PIO_POLL + 1),
-	THR_PIO			= (THR_PIO_TMOUT + 1),
-	THR_PIO_LAST		= (THR_PIO + 1),
-	THR_PIO_LAST_POLL	= (THR_PIO_LAST + 1),
-	THR_PIO_ERR		= (THR_PIO_LAST_POLL + 1),
 
 	/* SATA port states */
 	PORT_UNKNOWN		= 0,
@@ -161,6 +155,17 @@ enum {
 	 * but not numberspace
 	 */
 	ATA_QCFLAG_TIMEOUT	= (1 << 0),
+};
+
+enum pio_task_states {
+	PIO_ST_UNKNOWN,
+	PIO_ST_IDLE,
+	PIO_ST_POLL,
+	PIO_ST_TMOUT,
+	PIO_ST,
+	PIO_ST_LAST,
+	PIO_ST_LAST_POLL,
+	PIO_ST_ERR,
 };
 
 /* forward declarations */
@@ -315,9 +320,12 @@ struct ata_port {
 	struct completion	thr_exited;
 	struct semaphore	thr_sem;
 	struct timer_list	thr_timer;
-	unsigned long		thr_timeout;
 
 	struct work_struct	packet_task;
+
+	struct work_struct	pio_task;
+	unsigned int		pio_task_state;
+	unsigned long		pio_task_timeout;
 
 	void			*private_data;
 };
