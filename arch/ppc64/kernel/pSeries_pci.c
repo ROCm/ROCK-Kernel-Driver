@@ -39,7 +39,6 @@
 #include <asm/ppcdebug.h>
 #include <asm/naca.h>
 #include <asm/pci_dma.h>
-#include <asm/eeh.h>
 
 #include "xics.h"
 #include "open_pic.h"
@@ -50,8 +49,6 @@
  *******************************************************************/
 struct pci_controller *alloc_phb(struct device_node *dev, char *model,
 				 unsigned int addr_size_words) ;
-static int rtas_fake_read(struct device_node *dn, int offset, int nbytes,
-			  unsigned long *returnval);
 
 /* RTAS tokens */
 static int read_pci_config;
@@ -74,8 +71,6 @@ static int rtas_read_config(struct device_node *dn, int where, int size, u32 *va
 	buid = dn->phb->buid;
 	if (buid) {
 		ret = rtas_call(ibm_read_pci_config, 4, 2, &returnval, addr, buid >> 32, buid & 0xffffffff, size);
-		if (ret < 0|| (returnval == 0xffffffff))
-			ret = rtas_fake_read(dn, where, size, &returnval);
 	} else {
 		ret = rtas_call(read_pci_config, 2, 2, &returnval, addr, size);
 	}
@@ -142,48 +137,6 @@ struct pci_ops rtas_pci_ops = {
 	rtas_pci_write_config
 };
 
-/*
- * Handle the case where rtas refuses to do a pci config read.
- * This currently only happens with some PHBs in which case we totally fake
- * out the values (and call it a speedwagaon -- something we could look up
- * in the device tree).
- */
-static int
-rtas_fake_read(struct device_node *dn, int offset, int nbytes, unsigned long *returnval)
-{
-	char *device_type = (char *)get_property(dn, "device_type", 0);
-	u32 *class_code = (u32 *)get_property(dn, "class-code", 0);
-
-	*returnval = ~0;	/* float by default */
-
-	/* udbg_printf("rtas_fake_read dn=%p, offset=0x%02x, nbytes=%d, device_type=%s\n", dn, offset, nbytes, device_type ? device_type : "<none>"); */
-	if (device_type && strcmp(device_type, "pci") != 0)
-		return -3;	/* Not a phb or bridge */
-
-	/* NOTE: class_code != NULL => EADS pci bridge.  Else a PHB */
-	if (nbytes == 1) {
-		if (offset == PCI_HEADER_TYPE)
-			*returnval = 0x80;	/* multifunction */
-		else if (offset == PCI_INTERRUPT_PIN || offset == PCI_INTERRUPT_LINE)
-			*returnval = 0;
-	} else if (nbytes == 2) {
-		if (offset == PCI_SUBSYSTEM_VENDOR_ID || offset == PCI_SUBSYSTEM_ID)
-			*returnval = 0;
-		else if (offset == PCI_COMMAND)
-			*returnval = PCI_COMMAND_PARITY|PCI_COMMAND_MASTER|PCI_COMMAND_MEMORY;
-	} else if (nbytes == 4) {
-		if (offset == PCI_VENDOR_ID)
-			*returnval = 0x1014 | ((class_code ? 0x8b : 0x102) << 16); /* a phb */
-		else if (offset == PCI_REVISION_ID)
-			*returnval = (class_code ? PCI_CLASS_BRIDGE_PCI : PCI_CLASS_BRIDGE_HOST) << 16; /* revs are zero */
-		else if ((offset >= PCI_BASE_ADDRESS_0 && offset <= PCI_BASE_ADDRESS_5) || offset == PCI_ROM_ADDRESS)
-			*returnval = 0;
-	}
-
-	/* printk("fake: %s nbytes=%d, offset=%lx ret=%lx\n", class_code ? "EADS" : "PHB", nbytes, offset, *returnval); */
-	return 0;
-}
-
 /******************************************************************
  * pci_read_irq_line
  *
@@ -249,8 +202,6 @@ find_and_init_phbs(void)
 	write_pci_config = rtas_token("write-pci-config");
 	ibm_read_pci_config = rtas_token("ibm,read-pci-config");
 	ibm_write_pci_config = rtas_token("ibm,write-pci-config");
-
-	eeh_init();
 
 	if (naca->interrupt_controller == IC_OPEN_PIC) {
 		opprop = (unsigned int *)get_property(find_path_device("/"),
@@ -350,24 +301,16 @@ find_and_init_phbs(void)
 				res = &phb->io_resource;
 				res->name = Pci_Node->full_name;
 				res->flags = IORESOURCE_IO;
-				if (is_eeh_implemented()) {
-					if (!isa_io_base && has_isa) {
-						/* map a page for ISA ports.  Not EEH protected. */
-						isa_io_base = (unsigned long)__ioremap(phb->io_base_phys, PAGE_SIZE, _PAGE_NO_CACHE);
-					}
-					res->start = phb->io_base_virt = eeh_token(index, 0, 0, 0);
-					res->end = eeh_token(index, 0xff, 0xff, 0xffffffff);
-				} else {
-					phb->io_base_virt = ioremap(phb->io_base_phys, range.size);
-					if (!pci_io_base) {
-						pci_io_base = (unsigned long)phb->io_base_virt;
-						if (has_isa)
-							isa_io_base = pci_io_base;
-					}
-					res->start = ((((unsigned long) range.child_addr.a_mid) << 32) | (range.child_addr.a_lo));
-					res->start += (unsigned long)phb->io_base_virt;
-					res->end =   res->start + range.size - 1;
+				phb->io_base_virt = __ioremap(phb->io_base_phys, range.size, _PAGE_NO_CACHE);
+				printk("back\n");
+				if (!pci_io_base) {
+					pci_io_base = (unsigned long)phb->io_base_virt;
+					if (has_isa)
+						isa_io_base = pci_io_base;
 				}
+				res->start = ((((unsigned long) range.child_addr.a_mid) << 32) | (range.child_addr.a_lo));
+				res->start += (unsigned long)phb->io_base_virt - pci_io_base;
+				res->end =   res->start + range.size - 1;
 				res->parent = NULL;
 				res->sibling = NULL;
 				res->child = NULL;
@@ -391,13 +334,8 @@ find_and_init_phbs(void)
 					++memno;
 					res->name = Pci_Node->full_name;
 					res->flags = IORESOURCE_MEM;
-					if (is_eeh_implemented()) {
-						res->start = eeh_token(index, 0, 0, 0);
-						res->end =   eeh_token(index, 0xff, 0xff, 0xffffffff);
-					} else {
-						res->start = range.parent_addr;
-						res->end =   range.parent_addr + range.size - 1;
-					}
+					res->start = range.parent_addr;
+					res->end =   range.parent_addr + range.size - 1;
 					res->parent = NULL;
 					res->sibling = NULL;
 					res->child = NULL;
@@ -574,7 +512,6 @@ fixup_resources(struct pci_dev *dev)
  	int i;
  	struct pci_controller *phb = PCI_GET_PHB_PTR(dev);
 	struct device_node *dn;
-	unsigned long eeh_disable_bit;
 
 	/* Add IBM loc code (slot) as a prefix to the device names for service */
 	dn = pci_device_to_OF_node(dev);
@@ -588,20 +525,6 @@ fixup_resources(struct pci_dev *dev)
 				dev->dev.name[loc_len] = ' ';
 				dev->dev.name[sizeof(dev->dev.name)-1] = '\0';
 			}
-		}
-	}
-
-	if (is_eeh_implemented()) {
-		if (is_eeh_configured(dev)) {
-			eeh_disable_bit = 0;
-			if (eeh_set_option(dev, EEH_ENABLE) != 0) {
-				printk("PCI: failed to enable EEH for %s %s\n", dev->slot_name, dev->dev.name);
-				eeh_disable_bit = EEH_TOKEN_DISABLED;
-			}
-		} else {
-			/* Assume device is by default EEH_DISABLE'd */
-			printk("PCI: eeh NOT configured for %s %s\n", dev->slot_name, dev->dev.name);
-			eeh_disable_bit = EEH_TOKEN_DISABLED;
 		}
 	}
 
@@ -633,19 +556,9 @@ fixup_resources(struct pci_dev *dev)
 		}
 
 		if (dev->resource[i].flags & IORESOURCE_IO) {
-			if (is_eeh_implemented()) {
-				unsigned int busno = dev->bus ? dev->bus->number : 0;
-				unsigned long size = dev->resource[i].end - dev->resource[i].start;
-				unsigned long addr = (unsigned long)__ioremap(dev->resource[i].start + phb->io_base_phys, size, _PAGE_NO_CACHE);
-				if (!addr)
-					panic("fixup_resources: ioremap failed!\n");
-				dev->resource[i].start = eeh_token(phb->global_number, busno, dev->devfn, addr) | eeh_disable_bit;
-				dev->resource[i].end = dev->resource[i].start + size;
-			} else {
-				unsigned long offset = (unsigned long)phb->io_base_virt;
-				dev->resource[i].start += offset;
-				dev->resource[i].end += offset;
-			}
+			unsigned long offset = (unsigned long)phb->io_base_virt - pci_io_base;
+			dev->resource[i].start += offset;
+			dev->resource[i].end += offset;
 			PPCDBG(PPCDBG_PHBINIT, "\t\t-> now [%lx .. %lx]\n",
 			       dev->resource[i].start, dev->resource[i].end);
 		} else if (dev->resource[i].flags & IORESOURCE_MEM) {
@@ -653,18 +566,8 @@ fixup_resources(struct pci_dev *dev)
 				/* Bogus.  Probably an unused bridge. */
 				dev->resource[i].end = 0;
 			} else {
-				if (is_eeh_implemented()) {
-					unsigned int busno = dev->bus ? dev->bus->number : 0;
-					unsigned long size = dev->resource[i].end - dev->resource[i].start;
-					unsigned long addr = (unsigned long)__ioremap(dev->resource[i].start + phb->pci_mem_offset, size, _PAGE_NO_CACHE);
-					if (!addr)
-						panic("fixup_resources: ioremap failed!\n");
-					dev->resource[i].start = eeh_token(phb->global_number, busno, dev->devfn, addr) | eeh_disable_bit;
-					dev->resource[i].end = dev->resource[i].start + size;
-				} else {
-					dev->resource[i].start += phb->pci_mem_offset;
-					dev->resource[i].end += phb->pci_mem_offset;
-				}
+				dev->resource[i].start += phb->pci_mem_offset;
+				dev->resource[i].end += phb->pci_mem_offset;
 			}
 			PPCDBG(PPCDBG_PHBINIT, "\t\t-> now [%lx..%lx]\n",
 			       dev->resource[i].start, dev->resource[i].end);

@@ -141,11 +141,12 @@ chrp_setup_arch(void)
 
 	fwnmi_init();
 
+#ifndef CONFIG_PPC_ISERIES
 	/* Find and initialize PCI host bridges */
 	/* iSeries needs to be done much later. */
- 	#ifndef CONFIG_PPC_ISERIES
-		find_and_init_phbs();
- 	#endif
+	eeh_init();
+	find_and_init_phbs();
+#endif
 
 	/* Find the Open PIC if present */
 	root = find_path_device("/");
