@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2001 Jeff Dike (jdike@karaya.com)
+ * Copyright (C) 2001, 2002 Jeff Dike (jdike@karaya.com)
  * Licensed under the GPL
  */
 
@@ -19,8 +19,22 @@ struct mc_device {
 	struct list_head list;
 	char *name;
 	int (*config)(char *);
+	int (*get_config)(char *, char *, int, char **);
 	int (*remove)(char *);
 };
+
+#define CONFIG_CHUNK(str, size, current, chunk, end) \
+do { \
+	current += strlen(chunk); \
+	if(current >= size) \
+		str = NULL; \
+	if(str != NULL){ \
+		strcpy(str, chunk); \
+		str += strlen(chunk); \
+	} \
+	if(end) \
+		current++; \
+} while(0)
 
 #ifdef CONFIG_MCONSOLE
 

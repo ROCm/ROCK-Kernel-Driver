@@ -3,11 +3,12 @@
  * Licensed under the GPL
  */
 
+#include <stdio.h>
 #include <stddef.h>
 #include <stdlib.h>
+#include <string.h>
 #include <errno.h>
 #include <unistd.h>
-#include <string.h>
 #include <termios.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -24,6 +25,7 @@ struct port_chan {
 	int raw;
 	struct termios tt;
 	void *kernel_data;
+	char dev[sizeof("32768\0")];
 };
 
 void *port_init(char *str, int device, struct chan_opts *opts)
@@ -50,11 +52,12 @@ void *port_init(char *str, int device, struct chan_opts *opts)
 	if((data = um_kmalloc(sizeof(*data))) == NULL) return(NULL);
 	*data = ((struct port_chan) { raw : 		opts->raw,
 				      kernel_data :	kern_data });
+	sprintf(data->dev, "%d", port);
 	
 	return(data);
 }
 
-int port_open(int input, int output, int primary, void *d)
+int port_open(int input, int output, int primary, void *d, char **dev_out)
 {
 	struct port_chan *data = d;
 	int fd;
@@ -64,6 +67,7 @@ int port_open(int input, int output, int primary, void *d)
 		tcgetattr(fd, &data->tt);
 		raw(fd, 0);
 	}
+	*dev_out = data->dev;
 	return(fd);
 }
 
@@ -91,6 +95,7 @@ void port_free(void *d)
 }
 
 struct chan_ops port_ops = {
+	type:		"port",
 	init:		port_init,
 	open:		port_open,
 	close:		port_close,

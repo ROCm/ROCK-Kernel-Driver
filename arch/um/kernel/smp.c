@@ -116,7 +116,8 @@ static int idle_proc(void *cpup)
 		panic("CPU#%d failed to create IPI pipe, errno = %d", cpu, 
 		      -err);
 
-	activate_ipi(cpu_data[cpu].ipi_pipe[0], current->thread.extern_pid);
+	activate_ipi(cpu_data[cpu].ipi_pipe[0], 
+		     current->thread.mode.tt.extern_pid);
  
 	wmb();
 	if (test_and_set_bit(cpu, &smp_callin_map)) {
@@ -143,10 +144,12 @@ static struct task_struct *idle_thread(int cpu)
 	if(IS_ERR(new_task)) panic("do_fork failed in idle_thread");
 
 	cpu_tasks[cpu] = ((struct cpu_task) 
-		          { .pid = 	new_task->thread.extern_pid,
+		          { .pid = 	new_task->thread.mode.tt.extern_pid,
 			    .task = 	new_task } );
 	idle_threads[cpu] = new_task;
-	write(new_task->thread.switch_pipe[1], &c, sizeof(c));
+	CHOOSE_MODE(write(new_task->thread.mode.tt.switch_pipe[1], &c, 
+			  sizeof(c)),
+		    ({ panic("skas mode doesn't support SMP"); }));
 	return(new_task);
 }
 
@@ -162,7 +165,8 @@ void smp_prepare_cpus(unsigned int maxcpus)
 	err = os_pipe(cpu_data[0].ipi_pipe, 1, 1);
 	if(err)	panic("CPU#0 failed to create IPI pipe, errno = %d", -err);
 
-	activate_ipi(cpu_data[0].ipi_pipe[0], current->thread.extern_pid);
+	activate_ipi(cpu_data[0].ipi_pipe[0], 
+		     current->thread.mode.tt.extern_pid);
 
 	for(cpu = 1; cpu < ncpus; cpu++){
 		printk("Booting processor %d...\n", cpu);
