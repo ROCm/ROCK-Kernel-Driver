@@ -1150,14 +1150,22 @@ kmem_cache_create (const char *name, size_t size, size_t align,
 		BUG();
 
 	if (align) {
-		/* minimum supported alignment: */
-		if (align < BYTES_PER_WORD)
-			align = BYTES_PER_WORD;
-
 		/* combinations of forced alignment and advanced debugging is
 		 * not yet implemented.
 		 */
 		flags &= ~(SLAB_RED_ZONE|SLAB_STORE_USER);
+	} else {
+		if (flags & SLAB_HWCACHE_ALIGN) {
+			/* Default alignment: as specified by the arch code.
+			 * Except if an object is really small, then squeeze multiple
+			 * into one cacheline.
+			 */
+			align = cache_line_size();
+			while (size <= align/2)
+				align /= 2;
+		} else {
+			align = BYTES_PER_WORD;
+		}
 	}
 
 	/* Get cache's description obj. */
@@ -1210,15 +1218,6 @@ kmem_cache_create (const char *name, size_t size, size_t align,
 		 */
 		flags |= CFLGS_OFF_SLAB;
 
-	if (!align) {
-		/* Default alignment: compile time specified l1 cache size.
-		 * Except if an object is really small, then squeeze multiple
-		 * into one cacheline.
-		 */
-		align = cache_line_size();
-		while (size <= align/2)
-			align /= 2;
-	}
 	size = ALIGN(size, align);
 
 	/* Cal size (in pages) of slabs, and the num of objs per slab.
