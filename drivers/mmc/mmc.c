@@ -300,8 +300,11 @@ static u32 mmc_select_voltage(struct mmc_host *host, u32 ocr)
 	return ocr;
 }
 
-static void mmc_decode_cid(struct mmc_cid *cid, u32 *resp)
+static void mmc_decode_cid(struct mmc_card *card)
 {
+	struct mmc_cid *cid = &card->cid;
+	u32 *resp = card->raw_cid;
+
 	memset(cid, 0, sizeof(struct mmc_cid));
 
 	cid->manfid	  = resp[0] >> 8;
@@ -320,9 +323,11 @@ static void mmc_decode_cid(struct mmc_cid *cid, u32 *resp)
 	cid->year	  = (resp[3] >> 8) & 15;
 }
 
-static void mmc_decode_csd(struct mmc_csd *csd, u32 *resp)
+static void mmc_decode_csd(struct mmc_card *card)
 {
+	struct mmc_csd *csd = &card->csd;
 	unsigned int e, m;
+	u32 *resp = card->raw_csd;
 
 	csd->mmc_prot	 = (resp[0] >> 26) & 15;
 	m = (resp[0] >> 19) & 15;
@@ -498,7 +503,7 @@ static void mmc_discover_cards(struct mmc_host *host)
 
 		err = mmc_wait_for_cmd(host, &cmd, CMD_RETRIES);
 		if (err != MMC_ERR_NONE)
-			card->state |= MMC_STATE_DEAD;
+			mmc_card_set_dead(card);
 	}
 }
 
@@ -519,14 +524,14 @@ static void mmc_read_csds(struct mmc_host *host)
 
 		err = mmc_wait_for_cmd(host, &cmd, CMD_RETRIES);
 		if (err != MMC_ERR_NONE) {
-			card->state |= MMC_STATE_DEAD;
+			mmc_card_set_dead(card);
 			continue;
 		}
 
 		memcpy(card->raw_csd, cmd.resp, sizeof(card->raw_csd));
 
-		mmc_decode_csd(&card->csd, cmd.resp);
-		mmc_decode_cid(&card->cid, card->raw_cid);
+		mmc_decode_csd(card);
+		mmc_decode_cid(card);
 	}
 }
 
@@ -572,7 +577,7 @@ static void mmc_check_cards(struct mmc_host *host)
 		if (err == MMC_ERR_NONE)
 			continue;
 
-		card->state |= MMC_STATE_DEAD;
+		mmc_card_set_dead(card);
 	}
 }
 
@@ -677,9 +682,9 @@ static void mmc_rescan(void *data)
 		 */
 		if (!mmc_card_present(card) && !mmc_card_dead(card)) {
 			if (mmc_register_card(card))
-				card->state |= MMC_STATE_DEAD;
+				mmc_card_set_dead(card);
 			else
-				card->state |= MMC_STATE_PRESENT;
+				mmc_card_set_present(card);
 		}
 
 		/*

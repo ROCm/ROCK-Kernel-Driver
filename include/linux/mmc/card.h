@@ -43,16 +43,22 @@ struct mmc_card {
 	struct device		dev;		/* the device */
 	unsigned int		rca;		/* relative card address of device */
 	unsigned int		state;		/* (our) card state */
-#define MMC_STATE_PRESENT	(1<<0)
-#define MMC_STATE_DEAD		(1<<1)
+#define MMC_STATE_PRESENT	(1<<0)		/* present in sysfs */
+#define MMC_STATE_DEAD		(1<<1)		/* device no longer in stack */
+#define MMC_STATE_BAD		(1<<2)		/* unrecognised device */
 	u32			raw_cid[4];	/* raw card CID */
 	u32			raw_csd[4];	/* raw card CSD */
 	struct mmc_cid		cid;		/* card identification */
 	struct mmc_csd		csd;		/* card specific */
 };
 
-#define mmc_card_dead(c)	((c)->state & MMC_STATE_DEAD)
 #define mmc_card_present(c)	((c)->state & MMC_STATE_PRESENT)
+#define mmc_card_dead(c)	((c)->state & MMC_STATE_DEAD)
+#define mmc_card_bad(c)		((c)->state & MMC_STATE_BAD)
+
+#define mmc_card_set_present(c)	((c)->state |= MMC_STATE_PRESENT)
+#define mmc_card_set_dead(c)	((c)->state |= MMC_STATE_DEAD)
+#define mmc_card_set_bad(c)	((c)->state |= MMC_STATE_BAD)
 
 #define mmc_card_name(c)	((c)->cid.prod_name)
 #define mmc_card_id(c)		((c)->dev.bus_id)
