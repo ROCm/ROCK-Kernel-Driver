@@ -118,14 +118,18 @@ int max_queued_signals = 1024;
 #define T(sig, mask) \
 	((1UL << (sig)) & mask)
 
-#define sig_user_specific(sig)		T(sig, SIG_USER_SPECIFIC_MASK)
+#define sig_user_specific(sig) \
+		(((sig) < SIGRTMIN)  && T(sig, SIG_USER_SPECIFIC_MASK))
 #define sig_user_load_balance(sig) \
-		(T(sig, SIG_USER_LOAD_BALANCE_MASK) || ((sig) >= SIGRTMIN))
-#define sig_kernel_specific(sig)	T(sig, SIG_KERNEL_SPECIFIC_MASK)
+		(((sig) >= SIGRTMIN) || T(sig, SIG_USER_LOAD_BALANCE_MASK))
+#define sig_kernel_specific(sig) \
+		(((sig) < SIGRTMIN)  && T(sig, SIG_KERNEL_SPECIFIC_MASK))
 #define sig_kernel_broadcast(sig) \
-		(T(sig, SIG_KERNEL_BROADCAST_MASK) || ((sig) >= SIGRTMIN))
-#define sig_kernel_only(sig)		T(sig, SIG_KERNEL_ONLY_MASK)
-#define sig_kernel_coredump(sig)	T(sig, SIG_KERNEL_COREDUMP_MASK)
+		(((sig) >= SIGRTMIN) || T(sig, SIG_KERNEL_BROADCAST_MASK))
+#define sig_kernel_only(sig) \
+		(((sig) < SIGRTMIN)  && T(sig, SIG_KERNEL_ONLY_MASK))
+#define sig_kernel_coredump(sig) \
+		(((sig) < SIGRTMIN)  && T(sig, SIG_KERNEL_COREDUMP_MASK))
 
 #define sig_user_defined(t, sig) \
 	(((t)->sig->action[(sig)-1].sa.sa_handler != SIG_DFL) &&	\
