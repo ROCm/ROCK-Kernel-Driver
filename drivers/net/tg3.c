@@ -56,8 +56,8 @@
 
 #define DRV_MODULE_NAME		"tg3"
 #define PFX DRV_MODULE_NAME	": "
-#define DRV_MODULE_VERSION	"3.2"
-#define DRV_MODULE_RELDATE	"April 26, 2004"
+#define DRV_MODULE_VERSION	"3.3"
+#define DRV_MODULE_RELDATE	"April 27, 2004"
 
 #define TG3_DEF_MAC_MODE	0
 #define TG3_DEF_RX_MODE		0
@@ -7038,7 +7038,7 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	if (tp->pci_chip_rev_id == CHIPREV_ID_5704_A0)
 		tp->tg3_flags2 |= TG3_FLG2_PHY_5704_A0_BUG;
 
-	/* Note: 5705 also needs this flag set to improve bit error rate. */
+	/* Note: 5750 also needs this flag set to improve bit error rate. */
 	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705)
 		tp->tg3_flags2 |= TG3_FLG2_PHY_BER_BUG;
 
