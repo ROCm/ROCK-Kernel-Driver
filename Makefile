@@ -810,7 +810,8 @@ help:
 	@$(MAKE) --no-print-directory -f Documentation/DocBook/Makefile dochelp
 	@echo  ''
 	@echo  'Architecture specific targets ($(ARCH)):'
-	@$(MAKE) --no-print-directory -f arch/$(ARCH)/boot/Makefile archhelp
+	@$(if $(archhelp),$(archhelp),\
+		echo '  No architecture specific help defined for $(ARCH)')
 	@echo  ''
 	@echo  'Execute "make" or "make all" to build all targets marked with [*] '
 	@echo  'For further info browse Documentation/kbuild/*'

@@ -109,3 +109,12 @@ install: vmlinux
 
 archclean:
 	$(Q)$(MAKE) $(clean)=arch/i386/boot
+
+define archhelp
+  echo  '* bzImage	- Compressed kernel image (arch/$(ARCH)/boot/bzImage)'
+  echo  '  install	- Install kernel using'
+  echo  '		   (your) ~/bin/installkernel or'
+  echo  '		   (distribution) /sbin/installkernel or'
+  echo  '		   install to $$(INSTALL_PATH) and run lilo'
+endef
+
