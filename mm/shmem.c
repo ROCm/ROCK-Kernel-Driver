@@ -35,6 +35,7 @@
 #include <linux/vfs.h>
 #include <linux/blkdev.h>
 #include <asm/uaccess.h>
+#include <asm/div64.h>
 
 /* This magic number is used in glibc for posix shared memory */
 #define TMPFS_MAGIC	0x01021994
@@ -1587,6 +1588,12 @@ static int shmem_parse_options(char *options, int *mode, uid_t *uid, gid_t *gid,
 		if (!strcmp(this_char,"size")) {
 			unsigned long long size;
 			size = memparse(value,&rest);
+			if (*rest == '%') {
+				size <<= PAGE_SHIFT;
+				size *= totalram_pages;
+				do_div(size, 100);
+				rest++;
+			}
 			if (*rest)
 				goto bad_val;
 			*blocks = size >> PAGE_CACHE_SHIFT;
@@ -1652,7 +1659,6 @@ static int shmem_fill_super(struct super_block *sb, void *data, int silent)
 	uid_t uid = current->fsuid;
 	gid_t gid = current->fsgid;
 	struct shmem_sb_info *sbinfo;
-	struct sysinfo si;
 	int err = -ENOMEM;
 
 	sbinfo = kmalloc(sizeof(struct shmem_sb_info), GFP_KERNEL);
@@ -1665,8 +1671,7 @@ static int shmem_fill_super(struct super_block *sb, void *data, int silent)
 	 * Per default we only allow half of the physical ram per
 	 * tmpfs instance
 	 */
-	si_meminfo(&si);
-	blocks = inodes = si.totalram / 2;
+	blocks = inodes = totalram_pages / 2;
 
 #ifdef CONFIG_TMPFS
 	if (shmem_parse_options(data, &mode, &uid, &gid, &blocks, &inodes)) {
