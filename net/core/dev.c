@@ -2678,8 +2678,6 @@ int unregister_netdevice(struct net_device *dev)
 		goto out;
 	}
 
-	kobject_unregister(&dev->kobj);
-
 	/* Last reference is our one */
 	if (atomic_read(&dev->refcnt) == 1)
 		goto out;
@@ -2740,6 +2738,7 @@ int unregister_netdevice(struct net_device *dev)
 		}
 	}
 out:
+	kobject_unregister(&dev->kobj);
 	dev_put(dev);
 	return 0;
 }
