@@ -111,7 +111,7 @@ static int __devinit fm801_gp_probe(struct pci_dev *pci, const struct pci_device
 
 	pci_set_drvdata(pci, gp);
 
-	outb(0x60, gp->gameport.io + 0x0d); /* enable joystick 1 and 2 */ 
+	outb(0x60, gp->gameport.io + 0x0d); /* enable joystick 1 and 2 */
 
 	gameport_register_port(&gp->gameport);
 

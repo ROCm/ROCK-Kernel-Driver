@@ -11,18 +11,18 @@
 /*
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or 
+ * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
- * 
+ *
  * Should you need to contact me, the author, you can do so either by
  * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
  * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
@@ -148,7 +148,7 @@ static int sunkbd_event(struct input_dev *dev, unsigned int type, unsigned int c
 		case EV_LED:
 
 			sunkbd->serio->write(sunkbd->serio, SUNKBD_CMD_SETLED);
-			sunkbd->serio->write(sunkbd->serio, 
+			sunkbd->serio->write(sunkbd->serio,
 				(!!test_bit(LED_CAPSL, dev->led) << 3) | (!!test_bit(LED_SCROLLL, dev->led) << 2) |
 				(!!test_bit(LED_COMPOSE, dev->led) << 1) | !!test_bit(LED_NUML, dev->led));
 			return 0;
@@ -160,7 +160,7 @@ static int sunkbd_event(struct input_dev *dev, unsigned int type, unsigned int c
 				case SND_CLICK:
 					sunkbd->serio->write(sunkbd->serio, SUNKBD_CMD_NOCLICK - value);
 					return 0;
-	
+
 				case SND_BELL:
 					sunkbd->serio->write(sunkbd->serio, SUNKBD_CMD_BELLOFF - value);
 					return 0;
@@ -210,7 +210,7 @@ static void sunkbd_reinit(void *data)
 	wait_event_interruptible_timeout(sunkbd->wait, sunkbd->reset >= 0, HZ);
 
 	sunkbd->serio->write(sunkbd->serio, SUNKBD_CMD_SETLED);
-	sunkbd->serio->write(sunkbd->serio, 
+	sunkbd->serio->write(sunkbd->serio,
 		(!!test_bit(LED_CAPSL, sunkbd->dev.led) << 3) | (!!test_bit(LED_SCROLLL, sunkbd->dev.led) << 2) |
 		(!!test_bit(LED_COMPOSE, sunkbd->dev.led) << 1) | !!test_bit(LED_NUML, sunkbd->dev.led));
 	sunkbd->serio->write(sunkbd->serio, SUNKBD_CMD_NOCLICK - !!test_bit(SND_CLICK, sunkbd->dev.snd));
@@ -231,7 +231,7 @@ static void sunkbd_connect(struct serio *serio, struct serio_dev *dev)
 
 	if ((serio->type & SERIO_PROTO) && (serio->type & SERIO_PROTO) != SERIO_SUNKBD)
 		return;
-	
+
 	if (!(sunkbd = kmalloc(sizeof(struct sunkbd), GFP_KERNEL)))
 		return;
 

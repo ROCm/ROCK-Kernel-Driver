@@ -942,6 +942,9 @@ void kbd_refresh_leds(struct input_handle *handle)
 
 #if defined(CONFIG_X86) || defined(CONFIG_IA64) || defined(CONFIG_ALPHA) || defined(CONFIG_MIPS) || defined(CONFIG_PPC) || defined(CONFIG_SPARC32) || defined(CONFIG_SPARC64) || defined(CONFIG_PARISC) || defined(CONFIG_SH_MPC1211)
 
+#define HW_RAW(dev) (test_bit(EV_MSC, dev->evbit) && test_bit(MSC_RAW, dev->mscbit) &&\
+			((dev)->id.bustype == BUS_I8042) && ((dev)->id.vendor == 0x0001) && ((dev)->id.product == 0x0001))
+
 static unsigned short x86_keycodes[256] =
 	{ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15,
 	 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
@@ -1008,6 +1011,8 @@ static int emulate_raw(struct vc_data *vc, unsigned int keycode,
 
 #else
 
+#define HW_RAW(dev)	0
+
 #warning "Cannot generate rawmode keyboard for your architecture yet."
 
 static int emulate_raw(struct vc_data *vc, unsigned int keycode, unsigned char up_flag)
@@ -1020,7 +1025,15 @@ static int emulate_raw(struct vc_data *vc, unsigned int keycode, unsigned char u
 }
 #endif
 
-void kbd_keycode(unsigned int keycode, int down, struct pt_regs *regs)
+void kbd_rawcode(unsigned char data)
+{
+	struct vc_data *vc = vc_cons[fg_console].d;
+	kbd = kbd_table + fg_console;
+	if (kbd->kbdmode == VC_RAW)
+		put_queue(vc, data);
+}
+
+void kbd_keycode(unsigned int keycode, int down, int hw_raw, struct pt_regs *regs)
 {
 	struct vc_data *vc = vc_cons[fg_console].d;
 	unsigned short keysym, *key_map;
@@ -1054,7 +1067,7 @@ void kbd_keycode(unsigned int keycode, int down, struct pt_regs *regs)
 		return;
 #endif /* CONFIG_MAC_EMUMOUSEBTN */
 
-	if ((raw_mode = (kbd->kbdmode == VC_RAW)))
+	if ((raw_mode = (kbd->kbdmode == VC_RAW)) && !hw_raw)
 		if (emulate_raw(vc, keycode, !down << 7))
 			if (keycode < BTN_MISC)
 				printk(KERN_WARNING "keyboard.c: can't emulate rawmode for keycode %d\n", keycode);
@@ -1149,11 +1162,12 @@ void kbd_keycode(unsigned int keycode, int down, struct pt_regs *regs)
 }
 
 static void kbd_event(struct input_handle *handle, unsigned int event_type, 
-		      unsigned int keycode, int down)
+		      unsigned int event_code, int value)
 {
-	if (event_type != EV_KEY)
-		return;
-	kbd_keycode(keycode, down, handle->dev->regs);
+	if (event_type == EV_MSC && event_code == MSC_RAW && HW_RAW(handle->dev))
+		kbd_rawcode(value);
+	if (event_type == EV_KEY)
+		kbd_keycode(event_code, value, HW_RAW(handle->dev), handle->dev->regs);
 	tasklet_schedule(&keyboard_tasklet);
 	do_poke_blanked_console = 1;
 	schedule_console_callback();

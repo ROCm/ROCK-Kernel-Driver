@@ -1,7 +1,7 @@
 /*
  *  i8042 keyboard and mouse controller driver for Linux
  *
- *  Copyright (c) 1999-2002 Vojtech Pavlik
+ *  Copyright (c) 1999-2004 Vojtech Pavlik
  */
 
 /*
@@ -52,6 +52,9 @@ static unsigned int i8042_dumbkbd;
 module_param_named(dumbkbd, i8042_dumbkbd, bool, 0);
 MODULE_PARM_DESC(dumbkbd, "Pretend that controller can only read data from keyboard");
 
+extern unsigned int i8042_dmi_noloop;
+static unsigned int i8042_noloop;
+
 __obsolete_setup("i8042_noaux");
 __obsolete_setup("i8042_nomux");
 __obsolete_setup("i8042_unlock");
@@ -95,6 +98,7 @@ static irqreturn_t i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 /*
  * The i8042_wait_read() and i8042_wait_write functions wait for the i8042 to
  * be ready for reading values from it / writing values to it.
+ * Called always with i8042_lock held.
  */
 
 static int i8042_wait_read(void)
@@ -150,9 +154,12 @@ static int i8042_flush(void)
  */
 
 static int i8042_command(unsigned char *param, int command)
-{ 
+{
 	unsigned long flags;
 	int retval = 0, i = 0;
+
+	if (i8042_noloop && command == I8042_CMD_AUX_LOOP)
+		return -1;
 
 	spin_lock_irqsave(&i8042_lock, flags);
 
@@ -161,7 +168,7 @@ static int i8042_command(unsigned char *param, int command)
 		dbg("%02x -> i8042 (command)", command & 0xff);
 		i8042_write_command(command & 0xff);
 	}
-	
+
 	if (!retval)
 		for (i = 0; i < ((command >> 12) & 0xf); i++) {
 			if ((retval = i8042_wait_write())) break;
@@ -172,7 +179,7 @@ static int i8042_command(unsigned char *param, int command)
 	if (!retval)
 		for (i = 0; i < ((command >> 8) & 0xf); i++) {
 			if ((retval = i8042_wait_read())) break;
-			if (i8042_read_status() & I8042_STR_AUXDATA) 
+			if (i8042_read_status() & I8042_STR_AUXDATA)
 				param[i] = ~i8042_read_data();
 			else
 				param[i] = i8042_read_data();
@@ -415,17 +422,17 @@ static irqreturn_t i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		} else dfl = 0;
 
 		dbg("%02x <- i8042 (interrupt, aux%d, %d%s%s)",
-			data, (str >> 6), irq, 
+			data, (str >> 6), irq,
 			dfl & SERIO_PARITY ? ", bad parity" : "",
 			dfl & SERIO_TIMEOUT ? ", timeout" : "");
 
 		serio_interrupt(i8042_mux_port + ((str >> 6) & 3), data, dfl, regs);
-		
+
 		goto irq_ret;
 	}
 
 	dbg("%02x <- i8042 (interrupt, %s, %d%s%s)",
-		data, (str & I8042_STR_AUXDATA) ? "aux" : "kbd", irq, 
+		data, (str & I8042_STR_AUXDATA) ? "aux" : "kbd", irq,
 		dfl & SERIO_PARITY ? ", bad parity" : "",
 		dfl & SERIO_TIMEOUT ? ", timeout" : "");
 
@@ -474,8 +481,17 @@ static int i8042_enable_mux_mode(struct i8042_values *values, unsigned char *mux
 	if (i8042_command(&param, I8042_CMD_AUX_LOOP) || param != 0xa9)
 		return -1;
 	param = 0xa4;
-	if (i8042_command(&param, I8042_CMD_AUX_LOOP) || param == 0x5b)
+	if (i8042_command(&param, I8042_CMD_AUX_LOOP) || param == 0x5b) {
+
+/*
+ * Do another loop test with the 0x5a value. Doing anything else upsets
+ * Profusion/ServerWorks OSB4 chipsets.
+ */
+
+		param = 0x5a;
+		i8042_command(&param, I8042_CMD_AUX_LOOP);
 		return -1;
+	}
 
 	if (mux_version)
 		*mux_version = ~param;
@@ -530,10 +546,10 @@ static int __init i8042_check_mux(struct i8042_values *values)
 
 	if (i8042_enable_mux_mode(values, &mux_version))
 		return -1;
-	
+
 	/* Workaround for broken chips which seem to support MUX, but in reality don't. */
-	/* They all report version 12.10 */
-	if (mux_version == 0xCA)
+	/* They all report version 10.12 */
+	if (mux_version == 0xAC)
 		return -1;
 
 	printk(KERN_INFO "i8042.c: Detected active multiplexing controller, rev %d.%d.\n",
@@ -598,7 +614,7 @@ static int __init i8042_check_aux(struct i8042_values *values)
 /*
  * Bit assignment test - filters out PS/2 i8042's in AT mode
  */
-	
+
 	if (i8042_command(&param, I8042_CMD_AUX_DISABLE))
 		return -1;
 	if (i8042_command(&param, I8042_CMD_CTL_RCTR) || (~param & I8042_CTR_AUXDIS)) {
@@ -609,7 +625,7 @@ static int __init i8042_check_aux(struct i8042_values *values)
 	if (i8042_command(&param, I8042_CMD_AUX_ENABLE))
 		return -1;
 	if (i8042_command(&param, I8042_CMD_CTL_RCTR) || (param & I8042_CTR_AUXDIS))
-		return -1;	
+		return -1;
 
 /*
  * Disable the interface.
@@ -639,7 +655,7 @@ static int __init i8042_port_register(struct i8042_values *values, struct serio 
 	if (i8042_command(&i8042_ctr, I8042_CMD_CTL_WCTR)) {
 		printk(KERN_WARNING "i8042.c: Can't write CTR while registering.\n");
 		values->exists = 0;
-		return -1; 
+		return -1;
 	}
 
 	printk(KERN_INFO "serio: i8042 %s port at %#lx,%#lx irq %d\n",
@@ -668,6 +684,7 @@ static void i8042_timer_func(unsigned long data)
 
 static int i8042_controller_init(void)
 {
+	unsigned long flags;
 
 /*
  * Test the i8042. We need to know if it thinks it's working correctly
@@ -714,12 +731,14 @@ static int i8042_controller_init(void)
  * Handle keylock.
  */
 
+	spin_lock_irqsave(&i8042_lock, flags);
 	if (~i8042_read_status() & I8042_STR_KEYLOCK) {
 		if (i8042_unlock)
 			i8042_ctr |= I8042_CTR_IGNKEYLOCK;
 		 else
 			printk(KERN_WARNING "i8042.c: Warning: Keylock active.\n");
 	}
+	spin_unlock_irqrestore(&i8042_lock, flags);
 
 /*
  * If the chip is configured into nontranslated mode by the BIOS, don't
@@ -868,7 +887,7 @@ static int i8042_controller_resume(void)
 static int i8042_notify_sys(struct notifier_block *this, unsigned long code,
         		    void *unused)
 {
-        if (code==SYS_DOWN || code==SYS_HALT) 
+        if (code == SYS_DOWN || code == SYS_HALT)
         	i8042_controller_cleanup();
         return NOTIFY_DONE;
 }
@@ -955,6 +974,13 @@ int __init i8042_init(void)
 	if (i8042_dumbkbd)
 		i8042_kbd_port.write = NULL;
 
+#ifdef __i386__
+	if (i8042_dmi_noloop) {
+		printk(KERN_INFO "i8042.c: AUX LoopBack command disabled by DMI.\n");
+		i8042_noloop = 1;
+	}
+#endif
+
 	if (!i8042_noaux && !i8042_check_aux(&i8042_aux_values)) {
 		if (!i8042_nomux && !i8042_check_mux(&i8042_aux_values))
 			for (i = 0; i < 4; i++) {
@@ -997,19 +1023,18 @@ void __exit i8042_exit(void)
 		sysdev_class_unregister(&kbc_sysclass);
 	}
 
-	del_timer_sync(&i8042_timer);
-
 	i8042_controller_cleanup();
-	
+
 	if (i8042_kbd_values.exists)
 		serio_unregister_port(&i8042_kbd_port);
 
 	if (i8042_aux_values.exists)
 		serio_unregister_port(&i8042_aux_port);
-	
+
 	for (i = 0; i < 4; i++)
 		if (i8042_mux_values[i].exists)
 			serio_unregister_port(i8042_mux_port + i);
+	del_timer_sync(&i8042_timer);
 
 	i8042_platform_exit();
 }
