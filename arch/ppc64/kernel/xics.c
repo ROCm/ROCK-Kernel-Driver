@@ -22,7 +22,7 @@
 #include <asm/naca.h>
 #include <asm/rtas.h>
 #include "i8259.h"
-#include "xics.h"
+#include <asm/xics.h>
 #include <asm/ppcdebug.h>
 #include <asm/machdep.h>
 
