@@ -166,6 +166,21 @@ xmit_restart_b(struct BCState *bcs)
 	bcs->count = 0;
 }
 
+/* called with the card lock held */
+static inline void
+xmit_restart_d(struct IsdnCardState *cs)
+{
+#ifdef ERROR_STATISTIC
+	cs->err_tx++;
+#endif
+	if (!cs->tx_skb) {
+		WARN_ON(1);
+		return;
+	}
+	skb_push(cs->tx_skb, cs->tx_cnt);
+	cs->tx_cnt = 0;
+}
+
 /* Useful for HSCX/ISAC work-alike's */
 /* ---------------------------------------------------------------------- */
 
@@ -225,6 +240,20 @@ xmit_xdu_b(struct BCState *bcs, void (*reset_xmit)(struct BCState *bcs))
 		xmit_restart_b(bcs);
 		reset_xmit(bcs);
 	}
+}
+
+/* XDU - transmit data underrun */
+/* called with the card lock held */
+static inline void
+xmit_xdu_d(struct IsdnCardState *cs, void (*reset_xmit)(struct IsdnCardState *cs))
+{
+	printk(KERN_WARNING "HiSax: D XDU\n");
+	if (cs->debug & L1_DEB_WARN)
+		debugl1(cs, "D XDU");
+
+	xmit_restart_d(cs);
+	if (reset_xmit)
+		reset_xmit(cs);
 }
 
 static inline unsigned char *

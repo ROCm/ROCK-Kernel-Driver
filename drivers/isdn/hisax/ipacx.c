@@ -421,16 +421,8 @@ dch_int(struct IsdnCardState *cs)
 	}  
 
 	if (istad &0x0C) {  // XDU or XMR
-		if (cs->debug &L1_DEB_WARN) debugl1(cs, "dch_int(): XDU");
-	  if (cs->tx_skb) {
-	    skb_push(cs->tx_skb, cs->tx_cnt); // retransmit
-	    cs->tx_cnt = 0;
-			dch_fill_fifo(cs);
-		} else {
-			printk(KERN_WARNING "HiSax: ISAC XDU no skb\n");
-			debugl1(cs, "ISAC XDU no skb");
-		}
-  }
+		xmit_xdu_d(cs, NULL);
+	}
 }
 
 //----------------------------------------------------------

@@ -366,21 +366,11 @@ W6692_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 		if (cs->debug & L1_DEB_WARN)
 			debugl1(cs, "W6692 D_EXIR %02x", exval);
 		if (exval & (W_D_EXI_XDUN | W_D_EXI_XCOL)) {	/* Transmit underrun/collision */
-			debugl1(cs, "W6692 D-chan underrun/collision");
-			printk(KERN_WARNING "HiSax: W6692 XDUN/XCOL\n");
 			if (test_and_clear_bit(FLG_DBUSY_TIMER, &cs->HW_Flags))
 				del_timer(&cs->dbusytimer);
 			if (test_and_clear_bit(FLG_L1_DBUSY, &cs->HW_Flags))
 				sched_d_event(cs, D_CLEARBUSY);
-			if (cs->tx_skb) {	/* Restart frame */
-				skb_push(cs->tx_skb, cs->tx_cnt);
-				cs->tx_cnt = 0;
-				W6692_fill_fifo(cs);
-			} else {
-				printk(KERN_WARNING "HiSax: W6692 XDUN/XCOL no skb\n");
-				debugl1(cs, "W6692 XDUN/XCOL no skb");
-				cs->writeW6692(cs, W_D_CMDR, W_D_CMDR_XRST);
-			}
+			xmit_xdu_d(cs, NULL);
 		}
 		if (exval & W_D_EXI_RDOV) {	/* RDOV */
 			debugl1(cs, "W6692 D-channel RDOV");

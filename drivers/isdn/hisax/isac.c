@@ -249,23 +249,11 @@ isac_interrupt(struct IsdnCardState *cs, u_char val)
 			printk(KERN_WARNING "HiSax: ISAC XMR\n");
 		}
 		if (exval & 0x40) {  /* XDU */
-			debugl1(cs, "ISAC XDU");
-			printk(KERN_WARNING "HiSax: ISAC XDU\n");
-#ifdef ERROR_STATISTIC
-			cs->err_tx++;
-#endif
 			if (test_and_clear_bit(FLG_DBUSY_TIMER, &cs->HW_Flags))
 				del_timer(&cs->dbusytimer);
 			if (test_and_clear_bit(FLG_L1_DBUSY, &cs->HW_Flags))
 				sched_d_event(cs, D_CLEARBUSY);
-			if (cs->tx_skb) { /* Restart frame */
-				skb_push(cs->tx_skb, cs->tx_cnt);
-				cs->tx_cnt = 0;
-				isac_fill_fifo(cs);
-			} else {
-				printk(KERN_WARNING "HiSax: ISAC XDU no skb\n");
-				debugl1(cs, "ISAC XDU no skb");
-			}
+			xmit_xdu_d(cs, NULL);
 		}
 		if (exval & 0x04) {  /* MOS */
 			v1 = cs->readisac(cs, ISAC_MOSR);
