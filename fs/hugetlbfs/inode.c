@@ -528,6 +528,8 @@ struct file *hugetlb_zero_setup(size_t size)
 	if (!capable(CAP_IPC_LOCK))
 		return ERR_PTR(-EPERM);
 
+	if (!is_hugepage_mem_enough(size))
+		return ERR_PTR(-ENOMEM);
 	n = atomic_read(&hugetlbfs_counter);
 	atomic_inc(&hugetlbfs_counter);
 
