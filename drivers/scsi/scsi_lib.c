@@ -13,6 +13,7 @@
 #include <linux/kernel.h>
 #include <linux/mempool.h>
 #include <linux/slab.h>
+#include <linux/init.h>
 
 #include "scsi.h"
 #include "hosts.h"
