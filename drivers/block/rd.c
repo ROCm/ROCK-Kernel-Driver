@@ -300,6 +300,8 @@ static int initrd_release(struct inode *inode,struct file *file)
 {
 	extern void free_initrd_mem(unsigned long, unsigned long);
 
+	blkdev_put(inode->i_bdev, BDEV_FILE);
+
 	spin_lock(&initrd_users_lock);
 	if (!--initrd_users) {
 		spin_unlock(&initrd_users_lock);
@@ -309,8 +311,6 @@ static int initrd_release(struct inode *inode,struct file *file)
 	} else {
 		spin_unlock(&initrd_users_lock);
 	}
-		
-	blkdev_put(inode->i_bdev, BDEV_FILE);
 	return 0;
 }
 
@@ -348,6 +348,7 @@ static int rd_open(struct inode * inode, struct file * filp)
 	 */
 	if (rd_bdev[unit] == NULL) {
 		struct block_device *bdev = inode->i_bdev;
+		atomic_inc(&bdev->bd_count);
 		rd_bdev[unit] = bdev;
 		bdev->bd_openers++;
 		bdev->bd_block_size = rd_blocksize;

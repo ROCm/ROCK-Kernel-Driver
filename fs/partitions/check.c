@@ -535,12 +535,13 @@ void del_gendisk(struct gendisk *disk)
 	disk->time_in_queue = 0;
 	disk->stamp = disk->stamp_idle = 0;
 	devfs_remove_partitions(disk);
-	kobject_unregister(&disk->kobj);
-	sysfs_remove_link(&disk->kobj, "device");
 	if (disk->driverfs_dev) {
+		sysfs_remove_link(&disk->kobj, "device");
 		sysfs_remove_link(&disk->driverfs_dev->kobj, "block");
 		put_device(disk->driverfs_dev);
 	}
+	kobject_get(&disk->kobj);	/* kobject model is fucked in head */
+	kobject_unregister(&disk->kobj);
 }
 
 struct dev_name {
