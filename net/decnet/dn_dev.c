@@ -181,30 +181,74 @@ static struct dn_dev_sysctl_table {
 } dn_dev_sysctl = {
 	NULL,
 	{
-	{NET_DECNET_CONF_DEV_FORWARDING, "forwarding",
-	(void *)DN_DEV_PARMS_OFFSET(forwarding),
-	sizeof(int), 0644, NULL,
-	dn_forwarding_proc, dn_forwarding_sysctl,
-	NULL, NULL, NULL},
-	{NET_DECNET_CONF_DEV_PRIORITY, "priority",
-	(void *)DN_DEV_PARMS_OFFSET(priority),
-	sizeof(int), 0644, NULL,
-	proc_dointvec_minmax, sysctl_intvec,
-	NULL, &min_priority, &max_priority},
-	{NET_DECNET_CONF_DEV_T2, "t2", (void *)DN_DEV_PARMS_OFFSET(t2),
-	sizeof(int), 0644, NULL,
-	proc_dointvec_minmax, sysctl_intvec,
-	NULL, &min_t2, &max_t2},
-	{NET_DECNET_CONF_DEV_T3, "t3", (void *)DN_DEV_PARMS_OFFSET(t3),
-	sizeof(int), 0644, NULL,
-	proc_dointvec_minmax, sysctl_intvec,
-	NULL, &min_t3, &max_t3},
+	{
+		.ctl_name = NET_DECNET_CONF_DEV_FORWARDING,
+		.procname = "forwarding",
+		.data = (void *)DN_DEV_PARMS_OFFSET(forwarding),
+		.maxlen = sizeof(int),
+		.mode = 0644,
+		.proc_handler = dn_forwarding_proc,
+		.strategy = dn_forwarding_sysctl,
+	},
+	{
+		.ctl_name = NET_DECNET_CONF_DEV_PRIORITY,
+		.procname = "priority",
+		.data = (void *)DN_DEV_PARMS_OFFSET(priority),
+		.maxlen = sizeof(int),
+		.mode = 0644,
+		.proc_handler = proc_dointvec_minmax,
+		.strategy = sysctl_intvec,
+		.extra1 = &min_priority,
+		.extra2 = &max_priority
+	},
+	{
+		.ctl_name = NET_DECNET_CONF_DEV_T2,
+		.procname = "t2",
+		.data = (void *)DN_DEV_PARMS_OFFSET(t2),
+		.maxlen = sizeof(int),
+		.mode = 0644,
+		.proc_handler = proc_dointvec_minmax,
+		.strategy = sysctl_intvec,
+		.extra1 = &min_t2,
+		.extra2 = &max_t2
+	},
+	{
+		.ctl_name = NET_DECNET_CONF_DEV_T3,
+		.procname = "t3",
+		.data = (void *)DN_DEV_PARMS_OFFSET(t3),
+		.maxlen = sizeof(int),
+		.mode = 0644,
+		.proc_handler = proc_dointvec_minmax,
+		.strategy = sysctl_intvec,
+		.extra1 = &min_t3,
+		.extra2 = &max_t3
+	},
 	{0}
 	},
-	{{0, "", NULL, 0, 0555, dn_dev_sysctl.dn_dev_vars}, {0}},
-	{{NET_DECNET_CONF, "conf", NULL, 0, 0555, dn_dev_sysctl.dn_dev_dev}, {0}},
-	{{NET_DECNET, "decnet", NULL, 0, 0555, dn_dev_sysctl.dn_dev_conf_dir}, {0}},
-	{{CTL_NET, "net", NULL, 0, 0555, dn_dev_sysctl.dn_dev_proto_dir}, {0}}
+	{{
+		.ctl_name = 0, 
+		.procname = "", 
+		.mode = 0555, 
+		.child = dn_dev_sysctl.dn_dev_vars
+	}, {0}},
+	{{
+		.ctl_name = NET_DECNET_CONF,
+		.procname = "conf", 
+		.mode = 0555, 
+		.child = dn_dev_sysctl.dn_dev_dev
+	}, {0}},
+	{{
+		.ctl_name = NET_DECNET, 
+		.procname = "decnet", 
+		.mode = 0555, 
+		.child = dn_dev_sysctl.dn_dev_conf_dir
+	}, {0}},
+	{{
+		.ctl_name = CTL_NET, 
+		.procname = "net", 
+		.mode = 0555, 
+		.child = dn_dev_sysctl.dn_dev_proto_dir
+	}, {0}}
 };
 
 static void dn_dev_sysctl_register(struct net_device *dev, struct dn_dev_parms *parms)
@@ -1211,8 +1255,10 @@ void dn_dev_devices_off(void)
 {
 	struct net_device *dev;
 
+	rtnl_lock();
 	for(dev = dev_base; dev; dev = dev->next)
 		dn_dev_down(dev);
+	rtnl_unlock();
 
 }
 
@@ -1220,10 +1266,12 @@ void dn_dev_devices_on(void)
 {
 	struct net_device *dev;
 
+	rtnl_lock();
 	for(dev = dev_base; dev; dev = dev->next) {
 		if (dev->flags & IFF_UP)
 			dn_dev_up(dev);
 	}
+	rtnl_unlock();
 }
 
 
