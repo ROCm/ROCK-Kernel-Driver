@@ -660,7 +660,7 @@ int agp_generic_free_gatt_table(void)
 	agp_gatt_table = NULL;
 	agp_bridge->gatt_table = NULL;
 	agp_bridge->gatt_table_real = NULL;
-	agp_bridge->gatt_bus_addr = NULL;
+	agp_bridge->gatt_bus_addr = 0;
 
 	return 0;
 }
