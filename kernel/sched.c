@@ -1854,6 +1854,13 @@ static void rebalance_tick(int this_cpu, runqueue_t *this_rq,
 	/* Update our load */
 	old_load = this_rq->cpu_load;
 	this_load = this_rq->nr_running * SCHED_LOAD_SCALE;
+	/*
+	 * Round up the averaging division if load is increasing. This
+	 * prevents us from getting stuck on 9 if the load is 10, for
+	 * example.
+	 */
+	if (this_load > old_load)
+		old_load++;
 	this_rq->cpu_load = (old_load + this_load) / 2;
 
 	for_each_domain(this_cpu, sd) {
