@@ -204,7 +204,7 @@ prism54_update_stats(islpci_private *priv)
 
 /* Noise floor.
  * I'm not sure if the unit is dBm.
- * Note : If we are not connected, this value seems to be irrevelant. */
+ * Note : If we are not connected, this value seems to be irrelevant. */
 
 	mgt_get_request(priv, DOT11_OID_NOISEFLOOR, 0, NULL, &r);
 	priv->local_iwstatistics.qual.noise = r.u;
@@ -216,8 +216,7 @@ prism54_update_stats(islpci_private *priv)
 	data = r.ptr;
 
 	/* copy this MAC to the bss */
-	for (j = 0; j < 6; j++)
-		bss.address[j] = data[j];
+	memcpy(bss.address, data, 6);
 	kfree(data);
 
 	/* now ask for the corresponding bss */
@@ -505,7 +504,7 @@ prism54_get_range(struct net_device *ndev, struct iw_request_info *info,
 		return 0;
 
 	/* Request the device for the supported frequencies
-	 * not really revelant since some devices will report the 5 GHz band
+	 * not really relevant since some devices will report the 5 GHz band
 	 * frequencies even if they don't support them.
 	 */
 	rvalue =
@@ -515,21 +514,12 @@ prism54_get_range(struct net_device *ndev, struct iw_request_info *info,
 	range->num_channels = freq->nr;
 	range->num_frequency = freq->nr;
 
-	/* Frequencies are not listed in the right order. The reordering is probably
-	 * firmware dependant and thus should work for everyone.
-	 */
 	m = min(IW_MAX_FREQUENCIES, (int) freq->nr);
-	for (i = 0; i < m - 12; i++) {
-		range->freq[i].m = freq->mhz[12 + i];
+	for (i = 0; i < m; i++) {
+		range->freq[i].m = freq->mhz[i];
 		range->freq[i].e = 6;
-		range->freq[i].i = i + 1;
+		range->freq[i].i = channel_of_freq(freq->mhz[i]);
 	}
-	for (i = m - 12; i < m; i++) {
-		range->freq[i].m = freq->mhz[i - m + 12];
-		range->freq[i].e = 6;
-		range->freq[i].i = i + 23;
-	}
-
 	kfree(freq);
 
 	rvalue |= mgt_get_request(priv, DOT11_OID_SUPPORTEDRATES, 0, NULL, &r);
@@ -1967,60 +1957,6 @@ prism54_get_prismhdr(struct net_device *ndev, struct iw_request_info *info,
 }
 
 int
-prism54_set_maxframeburst(struct net_device *ndev, struct iw_request_info *info,
-			  __u32 * uwrq, char *extra)
-{
-	islpci_private *priv = netdev_priv(ndev);
-	u32 max_burst;
-
-	max_burst = (*uwrq) ? *uwrq : CARD_DEFAULT_MAXFRAMEBURST;
-	mgt_set_request(priv, DOT11_OID_MAXFRAMEBURST, 0, &max_burst);
-
-	return -EINPROGRESS; /* Call commit handler */
-}
-
-int
-prism54_get_maxframeburst(struct net_device *ndev, struct iw_request_info *info,
-			  __u32 * uwrq, char *extra)
-{
-	islpci_private *priv = netdev_priv(ndev);
-	union oid_res_t r;
-	int rvalue;
-	
-	rvalue = mgt_get_request(priv, DOT11_OID_MAXFRAMEBURST, 0, NULL, &r);
-	*uwrq = r.u;
-	
-	return rvalue;
-}
-
-int
-prism54_set_profile(struct net_device *ndev, struct iw_request_info *info,
-		    __u32 * uwrq, char *extra)
-{
-	islpci_private *priv = netdev_priv(ndev);
-	u32 profile;
-
-	profile = (*uwrq) ? *uwrq : CARD_DEFAULT_PROFILE;
-	mgt_set_request(priv, DOT11_OID_PROFILES, 0, &profile);
-	
-	return -EINPROGRESS; /* Call commit handler */
-}
-
-int
-prism54_get_profile(struct net_device *ndev, struct iw_request_info *info,
-		    __u32 * uwrq, char *extra)
-{
-	islpci_private *priv = netdev_priv(ndev);
-	union oid_res_t r;
-	int rvalue;
-
-	rvalue = mgt_get_request(priv, DOT11_OID_PROFILES, 0, NULL, &r);
-	*uwrq = r.u;
-
-	return rvalue;
-}
-
-int
 prism54_debug_oid(struct net_device *ndev, struct iw_request_info *info,
 		  __u32 * uwrq, char *extra)
 {
@@ -2099,7 +2035,7 @@ prism54_debug_set_oid(struct net_device *ndev, struct iw_request_info *info,
 		}
 	}
 	
-	return ret;
+	return (ret ? ret : -EINPROGRESS);
 }
 
 static int
@@ -2205,16 +2141,16 @@ static const iw_handler prism54_handler[] = {
 #define PRISM54_GET_PRISMHDR	SIOCIWFIRSTPRIV+23
 #define PRISM54_SET_PRISMHDR	SIOCIWFIRSTPRIV+24
 
-#define IWPRIV_SET_U32(n,x)	{ n, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "set_"x }
-#define IWPRIV_SET_SSID(n,x)	{ n, IW_PRIV_TYPE_CHAR | IW_PRIV_SIZE_FIXED | 1, 0, "set_"x }
-#define IWPRIV_SET_ADDR(n,x)	{ n, IW_PRIV_TYPE_ADDR | IW_PRIV_SIZE_FIXED | 1, 0, "set_"x }
-#define IWPRIV_GET(n,x)	{ n, 0, IW_PRIV_TYPE_CHAR | IW_PRIV_SIZE_FIXED | PRIV_STR_SIZE, "get_"x }
+#define IWPRIV_SET_U32(n,x)	{ n, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "s_"x }
+#define IWPRIV_SET_SSID(n,x)	{ n, IW_PRIV_TYPE_CHAR | IW_PRIV_SIZE_FIXED | 1, 0, "s_"x }
+#define IWPRIV_SET_ADDR(n,x)	{ n, IW_PRIV_TYPE_ADDR | IW_PRIV_SIZE_FIXED | 1, 0, "s_"x }
+#define IWPRIV_GET(n,x)	{ n, 0, IW_PRIV_TYPE_CHAR | IW_PRIV_SIZE_FIXED | PRIV_STR_SIZE, "g_"x }
 
 #define IWPRIV_U32(n,x)		IWPRIV_SET_U32(n,x), IWPRIV_GET(n,x)
 #define IWPRIV_SSID(n,x)	IWPRIV_SET_SSID(n,x), IWPRIV_GET(n,x)
 #define IWPRIV_ADDR(n,x)	IWPRIV_SET_ADDR(n,x), IWPRIV_GET(n,x)
 
-/* Note : limited to 128 private ioctls */
+/* Note : limited to 128 private ioctls (wireless tools 26) */
 
 static const struct iw_priv_args prism54_private_args[] = {
 /*{ cmd, set_args, get_args, name } */
@@ -2352,5 +2288,6 @@ const struct iw_handler_def prism54_handler_def = {
 int
 prism54_ioctl(struct net_device *ndev, struct ifreq *rq, int cmd)
 {
+
 	return -EOPNOTSUPP;
 }

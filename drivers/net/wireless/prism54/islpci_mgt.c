@@ -63,7 +63,6 @@ display_buffer(char *buffer, int length)
     Queue handling for management frames
 ******************************************************************************/
 
-  
 /*
  * Helper function to create a PIMFOR management frame header.
  */
@@ -87,7 +86,7 @@ pimfor_decode_header(void *data, int len)
 	pimfor_header_t *h = data;
 
         while ((void *) h < data + len) {
-		if(h->flags & PIMFOR_FLAG_LITTLE_ENDIAN) {
+		if (h->flags & PIMFOR_FLAG_LITTLE_ENDIAN) {
 			le32_to_cpus(&h->oid);
 			le32_to_cpus(&h->length);
 		} else {
@@ -124,7 +123,8 @@ islpci_mgmt_rx_fill(struct net_device *ndev)
 		if (buf->mem == NULL) {
 			buf->mem = kmalloc(MGMT_FRAME_SIZE, GFP_ATOMIC);
 			if (!buf->mem) {
-				printk(KERN_WARNING "Error allocating management frame.\n");
+				printk(KERN_WARNING
+				       "Error allocating management frame.\n");
 				return -ENOMEM;
 			}
 			buf->size = MGMT_FRAME_SIZE;
@@ -133,8 +133,9 @@ islpci_mgmt_rx_fill(struct net_device *ndev)
 			buf->pci_addr = pci_map_single(priv->pdev, buf->mem,
 						       MGMT_FRAME_SIZE,
 						       PCI_DMA_FROMDEVICE);
-			if(!buf->pci_addr) {
-				printk(KERN_WARNING "Failed to make memory DMA'able\n.");
+			if (!buf->pci_addr) {
+				printk(KERN_WARNING
+				       "Failed to make memory DMA'able\n.");
 				return -ENOMEM;
 			}
 		}
@@ -149,8 +150,7 @@ islpci_mgmt_rx_fill(struct net_device *ndev)
                  * been written before announcing the frame buffer to
                  * device */
 		wmb();
-		cb->driver_curr_frag[ISL38XX_CB_RX_MGMTQ] =
-			cpu_to_le32(curr);
+		cb->driver_curr_frag[ISL38XX_CB_RX_MGMTQ] = cpu_to_le32(curr);
 	}
 	return 0;
 }
@@ -249,7 +249,7 @@ islpci_mgt_transmit(struct net_device *ndev, int operation, unsigned long oid,
 	 * been written before announcing the frame buffer to
 	 * device */
 	wmb();
-	cb->driver_curr_frag[ISL38XX_CB_TX_MGMTQ] = cpu_to_le32(curr_frag+1);
+	cb->driver_curr_frag[ISL38XX_CB_TX_MGMTQ] = cpu_to_le32(curr_frag + 1);
 	spin_unlock_irqrestore(&priv->slock, flags);
 
 	/* trigger the device */
@@ -281,14 +281,13 @@ islpci_mgt_receive(struct net_device *ndev)
 	DEBUG(SHOW_FUNCTION_CALLS, "islpci_mgt_receive \n");
 #endif
 
-
         /* Only once per interrupt, determine fragment range to
          * process.  This avoids an endless loop (i.e. lockup) if
          * frames come in faster than we can process them. */
 	curr_frag = le32_to_cpu(cb->device_curr_frag[ISL38XX_CB_RX_MGMTQ]);
 	barrier();
 
-	for ( ; priv->index_mgmt_rx < curr_frag; priv->index_mgmt_rx++) {
+	for (; priv->index_mgmt_rx < curr_frag; priv->index_mgmt_rx++) {
 		pimfor_header_t *header;
 		u32 index = priv->index_mgmt_rx % ISL38XX_CB_MGMT_QSIZE;
 		struct islpci_membuf *buf = &priv->mgmt_rx[index];
@@ -298,7 +297,7 @@ islpci_mgt_receive(struct net_device *ndev)
               
                 /* I have no idea (and no documentation) if flags != 0
                  * is possible.  Drop the frame, reuse the buffer. */
-                if(le16_to_cpu(cb->rx_data_mgmt[index].flags) != 0) {
+		if (le16_to_cpu(cb->rx_data_mgmt[index].flags) != 0) {
                         printk(KERN_WARNING "%s: unknown flags 0x%04x\n",
                                ndev->name,
                                le16_to_cpu(cb->rx_data_mgmt[index].flags));
@@ -314,8 +313,7 @@ islpci_mgt_receive(struct net_device *ndev)
                  * triggers, we likely have kernel heap corruption. */
                 if (frag_len > MGMT_FRAME_SIZE) {
                         printk(KERN_WARNING "%s: Bogus packet size of %d (%#x).\
-n",
-                               ndev->name, frag_len, frag_len);
+n", ndev->name, frag_len, frag_len);
                         frag_len = MGMT_FRAME_SIZE;
                 }
 
@@ -344,23 +342,25 @@ n",
 
 		/* display the buffer contents for debugging */
 		display_buffer((char *) header, PIMFOR_HEADER_SIZE);
-		display_buffer((char *) header + PIMFOR_HEADER_SIZE, header->length);
+		display_buffer((char *) header + PIMFOR_HEADER_SIZE,
+			       header->length);
 #endif
 
 		/* nobody sends these */
 		if (header->flags & PIMFOR_FLAG_APPLIC_ORIGIN) {
-			printk(KERN_DEBUG "%s: errant PIMFOR application frame\n",
+			printk(KERN_DEBUG
+			       "%s: errant PIMFOR application frame\n",
 			       ndev->name);
 			continue;
 		}
 
 		/* Determine frame size, skipping OID_INL_TUNNEL headers. */
 		size = PIMFOR_HEADER_SIZE + header->length;
-		frame = kmalloc(sizeof(struct islpci_mgmtframe) + size,
+		frame = kmalloc(sizeof (struct islpci_mgmtframe) + size,
 				GFP_ATOMIC);
 		if (!frame) {
-			printk(KERN_WARNING "%s: Out of memory, cannot handle oid 0x%08x\n",
-
+			printk(KERN_WARNING
+			       "%s: Out of memory, cannot handle oid 0x%08x\n",
 			       ndev->name, header->oid);
 			continue;        
 		}
@@ -392,14 +392,13 @@ n",
 			/* Signal the one waiting process that a response
 			 * has been received. */
 			if ((frame = xchg(&priv->mgmt_received, frame)) != NULL) {
-				printk(KERN_WARNING "%s: mgmt response not collected\n",
+				printk(KERN_WARNING
+				       "%s: mgmt response not collected\n",
 				       ndev->name);
 				kfree(frame);
 			}
-                              
 #if VERBOSE > SHOW_ERROR_MESSAGES
-			DEBUG(SHOW_TRACING,
-			      "Wake up Mgmt Queue\n");
+			DEBUG(SHOW_TRACING, "Wake up Mgmt Queue\n");
 #endif
 			wake_up(&priv->mgmt_wqueue);
 		}
@@ -431,7 +430,7 @@ islpci_mgt_cleanup_transmit(struct net_device *ndev)
 	curr_frag = le32_to_cpu(cb->device_curr_frag[ISL38XX_CB_TX_MGMTQ]); 
 	barrier();
 
-	for ( ; priv->index_mgmt_tx < curr_frag; priv->index_mgmt_tx++) {
+	for (; priv->index_mgmt_tx < curr_frag; priv->index_mgmt_tx++) {
 		int index = priv->index_mgmt_tx % ISL38XX_CB_MGMT_QSIZE;
 		struct islpci_membuf *buf = &priv->mgmt_tx[index];
 		pci_unmap_single(priv->pdev, buf->pci_addr, buf->size,
@@ -463,7 +462,7 @@ islpci_mgt_transaction(struct net_device *ndev,
 
 	prepare_to_wait(&priv->mgmt_wqueue, &wait, TASK_UNINTERRUPTIBLE);
 	err = islpci_mgt_transmit(ndev, operation, oid, senddata, sendlen);
-	if(err)
+	if (err)
 		goto out;
 
 	err = -ETIMEDOUT;
@@ -474,12 +473,22 @@ islpci_mgt_transaction(struct net_device *ndev,
 		timeleft = schedule_timeout(wait_cycle_jiffies);
 		frame = xchg(&priv->mgmt_received, NULL);
 		if (frame) {
+			if (frame->header->oid == oid) {
 			*recvframe = frame;
 			err = 0;
 			goto out;
+			} else {
+				printk(KERN_DEBUG
+				       "%s: expecting oid 0x%x, received 0x%x.\n",
+				       ndev->name, (unsigned int) oid,
+				       frame->header->oid);
+				kfree(frame);
+				frame = NULL;
 		}
-		if(timeleft == 0) {
-			printk(KERN_DEBUG "%s: timeout waiting for mgmt response %lu, trigging device\n",
+		}
+		if (timeleft == 0) {
+			printk(KERN_DEBUG
+			       "%s: timeout waiting for mgmt response %lu, trigging device\n",
 			       ndev->name, timeout_left);
 			islpci_trigger(priv);
 		}

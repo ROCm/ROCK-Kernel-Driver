@@ -40,17 +40,13 @@ channel_of_freq(int f)
 	if ((f >= 2412) && (f <= 2484)) {
 		while ((c < 14) && (f != frequency_list_bg[c]))
 			c++;
-		if (c >= 14)
-			return 0;
+		return (c >= 14) ? 0 : ++c;
 	} else if ((f >= (int) 5170) && (f <= (int) 5320)) {
 		while ((c < 12) && (f != frequency_list_a[c]))
 			c++;
-		if (c >= 12)
-			return 0;
+		return (c >= 12) ? 0 : (c + 37);
 	} else
 		return 0;
-
-	return ++c;
 }
 
 #define OID_STRUCT(name,oid,s,t) [name] = {oid, 0, sizeof(s), t}
