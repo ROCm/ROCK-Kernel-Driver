@@ -155,7 +155,16 @@ static void ip6_dst_destroy(struct dst_entry *dst)
 
 static void ip6_dst_ifdown(struct dst_entry *dst, int how)
 {
-	ip6_dst_destroy(dst);
+	struct rt6_info *rt = (struct rt6_info *)dst;
+	struct inet6_dev *idev = rt->rt6i_idev;
+
+	if (idev != NULL && idev->dev != &loopback_dev) {
+		struct inet6_dev *loopback_idev = in6_dev_get(&loopback_dev);
+		if (loopback_idev != NULL) {
+			rt->rt6i_idev = loopback_idev;
+			in6_dev_put(idev);
+		}
+	}
 }
 
 /*
