@@ -36,7 +36,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.h#132 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.h#133 $
  *
  */
 #ifndef _AIC79XX_LINUX_H_
@@ -293,7 +293,7 @@ ahd_scb_timer_reset(struct scb *scb, u_int usec)
 #define AHD_SCSI_HAS_HOST_LOCK 0
 #endif
 
-#define AIC79XX_DRIVER_VERSION "1.3.8"
+#define AIC79XX_DRIVER_VERSION "1.3.9"
 
 /**************************** Front End Queues ********************************/
 /*
