@@ -522,13 +522,13 @@ pcnet32_probe1(unsigned long ioaddr, unsigned int irq_line, int shared,
     u8 promaddr[6];
 
     /* reset the chip */
-    pcnet32_dwio_reset(ioaddr);
     pcnet32_wio_reset(ioaddr);
 
     /* NOTE: 16-bit check is first, otherwise some older PCnet chips fail */
     if (pcnet32_wio_read_csr(ioaddr, 0) == 4 && pcnet32_wio_check(ioaddr)) {
 	a = &pcnet32_wio;
     } else {
+	pcnet32_dwio_reset(ioaddr);
 	if (pcnet32_dwio_read_csr(ioaddr, 0) == 4 && pcnet32_dwio_check(ioaddr)) {
 	    a = &pcnet32_dwio;
 	} else
