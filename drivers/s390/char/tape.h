@@ -23,6 +23,8 @@
 #include <asm/debug.h>
 #include <asm/idals.h>
 
+struct gendisk;
+
 /*
  * macros s390 debug feature (dbf)
  */
@@ -173,6 +175,7 @@ struct tape_blk_data
 	struct tasklet_struct tasklet;
 	/* Current position on the tape. */
 	long block_position;
+	struct gendisk *disk;
 };
 #endif
 
