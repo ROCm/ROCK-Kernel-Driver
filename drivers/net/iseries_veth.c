@@ -747,59 +747,40 @@ static void veth_set_multicast_list(struct net_device *dev)
 	write_unlock_irqrestore(&port->mcast_gate, flags);
 }
 
-static int veth_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
+static void veth_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
 {
-#ifdef SIOCETHTOOL
-	struct ethtool_cmd ecmd;
-
-	if (cmd != SIOCETHTOOL)
-		return -EOPNOTSUPP;
-	if (copy_from_user(&ecmd, ifr->ifr_data, sizeof (ecmd)))
-		return -EFAULT;
-	switch (ecmd.cmd) {
-	case ETHTOOL_GSET:
-		ecmd.supported = (SUPPORTED_1000baseT_Full
-				  | SUPPORTED_Autoneg | SUPPORTED_FIBRE);
-		ecmd.advertising = (SUPPORTED_1000baseT_Full
-				    | SUPPORTED_Autoneg | SUPPORTED_FIBRE);
-
-		ecmd.port = PORT_FIBRE;
-		ecmd.transceiver = XCVR_INTERNAL;
-		ecmd.phy_address = 0;
-		ecmd.speed = SPEED_1000;
-		ecmd.duplex = DUPLEX_FULL;
-		ecmd.autoneg = AUTONEG_ENABLE;
-		ecmd.maxtxpkt = 120;
-		ecmd.maxrxpkt = 120;
-		if (copy_to_user(ifr->ifr_data, &ecmd, sizeof(ecmd)))
-			return -EFAULT;
-		return 0;
-
-	case ETHTOOL_GDRVINFO:{
-			struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
-			strncpy(info.driver, "veth", sizeof(info.driver) - 1);
-			info.driver[sizeof(info.driver) - 1] = '\0';
-			strncpy(info.version, "1.0", sizeof(info.version) - 1);
-			if (copy_to_user(ifr->ifr_data, &info, sizeof(info)))
-				return -EFAULT;
-			return 0;
-		}
-		/* get link status */
-	case ETHTOOL_GLINK:{
-			struct ethtool_value edata = { ETHTOOL_GLINK };
-			edata.data = 1;
-			if (copy_to_user(ifr->ifr_data, &edata, sizeof(edata)))
-				return -EFAULT;
-			return 0;
-		}
-
-	default:
-		break;
-	}
-
-#endif
-	return -EOPNOTSUPP;
+	strncpy(info->driver, "veth", sizeof(info->driver) - 1);
+	info->driver[sizeof(info->driver) - 1] = '\0';
+	strncpy(info->version, "1.0", sizeof(info->version) - 1);
 }
+
+static int veth_get_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
+{
+	ecmd->supported = (SUPPORTED_1000baseT_Full
+			  | SUPPORTED_Autoneg | SUPPORTED_FIBRE);
+	ecmd->advertising = (SUPPORTED_1000baseT_Full
+			    | SUPPORTED_Autoneg | SUPPORTED_FIBRE);
+	ecmd->port = PORT_FIBRE;
+	ecmd->transceiver = XCVR_INTERNAL;
+	ecmd->phy_address = 0;
+	ecmd->speed = SPEED_1000;
+	ecmd->duplex = DUPLEX_FULL;
+	ecmd->autoneg = AUTONEG_ENABLE;
+	ecmd->maxtxpkt = 120;
+	ecmd->maxrxpkt = 120;
+	return 0;
+}
+
+static u32 veth_get_link(struct net_device *dev)
+{
+	return 1;
+}
+
+static struct ethtool_ops ops = {
+	.get_drvinfo = veth_get_drvinfo,
+	.get_settings = veth_get_settings,
+	.get_link = veth_get_link,
+};
 
 static void veth_tx_timeout(struct net_device *dev)
 {
@@ -889,7 +870,7 @@ static struct net_device * __init veth_probe_one(int vlan, struct device *vdev)
 	dev->change_mtu = veth_change_mtu;
 	dev->set_mac_address = NULL;
 	dev->set_multicast_list = veth_set_multicast_list;
-	dev->do_ioctl = veth_ioctl;
+	SET_ETHTOOL_OPS(dev, &ops);
 
 	dev->watchdog_timeo = 2 * (VETH_ACKTIMEOUT * HZ / 1000000);
 	dev->tx_timeout = veth_tx_timeout;
