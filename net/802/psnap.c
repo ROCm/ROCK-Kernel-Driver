@@ -15,61 +15,90 @@
 #include <linux/netdevice.h>
 #include <linux/skbuff.h>
 #include <net/datalink.h>
-#include <net/p8022.h>
 #include <net/psnap.h>
+#include <net/llc_if.h>
+#include <net/llc_sap.h>
 #include <linux/mm.h>
 #include <linux/in.h>
 #include <linux/init.h>
+#include <linux/brlock.h>
 
-static struct datalink_proto *snap_list;
-static struct datalink_proto *snap_dl;		/* 802.2 DL for SNAP */
+LIST_HEAD(snap_list);
+static struct llc_sap *snap_sap;
 
 /*
  *	Find a snap client by matching the 5 bytes.
  */
 static struct datalink_proto *find_snap_client(unsigned char *desc)
 {
-	struct datalink_proto *proto = snap_list;
+	struct list_head *entry;
+	struct datalink_proto *proto = NULL, *p;
 
-	for (; proto && memcmp(proto->type, desc, 5); proto = proto->next);
+	if (list_empty(&snap_list))
+		goto out;
 
+	list_for_each(entry, &snap_list) {
+		p = list_entry(entry, struct datalink_proto, node);
+		if (!memcmp(p->type, desc, 5)) {
+			proto = p;
+			break;
+		}
+	}
+out:
 	return proto;
 }
 
 /*
  *	A SNAP packet has arrived
  */
-int snap_rcv(struct sk_buff *skb, struct net_device *dev,
-	     struct packet_type *pt)
+static int snap_indicate(struct llc_prim_if_block *prim)
 {
+	struct sk_buff *skb;
+	struct datalink_proto *proto;
+	int rc = 1;
 	static struct packet_type psnap_packet_type = {
 		.type = __constant_htons(ETH_P_SNAP),
-		.func = snap_rcv,
 	};
 
-	struct datalink_proto *proto = find_snap_client(skb->h.raw);
+	if (prim->prim != LLC_DATAUNIT_PRIM)
+		goto out;
+
+	skb = prim->data->udata.skb;
+	proto = find_snap_client(skb->h.raw);
 
 	if (proto) {
 		/* Pass the frame on. */
 		skb->h.raw  += 5;
-		skb->nh.raw += 5;
 		skb_pull(skb, 5);
-
-		return proto->rcvfunc(skb, dev, &psnap_packet_type);
+		rc = proto->rcvfunc(skb, skb->dev, &psnap_packet_type);
+	} else {
+		skb->sk = NULL;
+		kfree_skb(skb);
+		rc = 1;
 	}
-	skb->sk = NULL;
-	kfree_skb(skb);
-	return 0;
+out:
+	return rc;
 }
 
 /*
  *	Put a SNAP header on a frame and pass to 802.2
  */
-static void snap_datalink_header(struct datalink_proto *dl,
-				 struct sk_buff *skb, unsigned char *dest_node)
+static int snap_request(struct datalink_proto *dl,
+			struct sk_buff *skb, u8 *dest)
 {
+	union llc_u_prim_data prim_data;
+	struct llc_prim_if_block prim;
+
 	memcpy(skb_push(skb, 5), dl->type, 5);
-	snap_dl->datalink_header(snap_dl, skb, dest_node);
+	prim.data                 = &prim_data;
+	prim.sap                  = snap_sap;
+	prim.prim                 = LLC_DATAUNIT_PRIM;
+	prim_data.test.skb        = skb;
+	prim_data.test.saddr.lsap = snap_sap->laddr.lsap;
+	prim_data.test.daddr.lsap = snap_sap->laddr.lsap;
+	memcpy(prim_data.test.saddr.mac, skb->dev->dev_addr, IFHWADDRLEN);
+	memcpy(prim_data.test.daddr.mac, dest, IFHWADDRLEN);
+	return snap_sap->req(&prim);
 }
 
 /*
@@ -80,15 +109,23 @@ EXPORT_SYMBOL(unregister_snap_client);
 
 static int __init snap_init(void)
 {
-	snap_dl = register_8022_client(0xAA, snap_rcv);
+	snap_sap = llc_sap_open(snap_indicate, NULL, 0xAA);
 
-	if (!snap_dl)
+	if (!snap_sap)
 		printk(KERN_CRIT "SNAP - unable to register with 802.2\n");
 
 	return 0;
 }
 
 module_init(snap_init);
+
+static void __exit snap_exit(void)
+{
+	llc_sap_close(snap_sap);
+}
+
+module_exit(snap_exit);
+
 
 /*
  *	Register SNAP clients. We don't yet use this for IP.
@@ -100,46 +137,35 @@ struct datalink_proto *register_snap_client(unsigned char *desc,
 {
 	struct datalink_proto *proto = NULL;
 
+	br_write_lock_bh(BR_NETPROTO_LOCK);
+
 	if (find_snap_client(desc))
 		goto out;
 
 	proto = kmalloc(sizeof(*proto), GFP_ATOMIC);
 	if (proto) {
 		memcpy(proto->type, desc,5);
-		proto->type_len		= 5;
 		proto->rcvfunc		= rcvfunc;
-		proto->header_length	= 5 + snap_dl->header_length;
-		proto->datalink_header	= snap_datalink_header;
-		proto->string_name	= "SNAP";
-		proto->next		= snap_list;
-		snap_list		= proto;
+		proto->header_length	= 5 + 3; /* snap + 802.2 */
+		proto->request		= snap_request;
+		list_add(&proto->node, &snap_list);
 	}
 out:
+	br_write_unlock_bh(BR_NETPROTO_LOCK);
 	return proto;
 }
 
 /*
  *	Unregister SNAP clients. Protocols no longer want to play with us ...
  */
-void unregister_snap_client(unsigned char *desc)
+void unregister_snap_client(struct datalink_proto *proto)
 {
-	struct datalink_proto **clients = &snap_list;
-	struct datalink_proto *tmp;
-	unsigned long flags;
+	br_write_lock_bh(BR_NETPROTO_LOCK);
 
-	save_flags(flags);
-	cli();
+	list_del(&proto->node);
+	kfree(proto);
 
-	while ((tmp = *clients) != NULL) {
-		if (!memcmp(tmp->type, desc, 5)) {
-			*clients = tmp->next;
-			kfree(tmp);
-			break;
-		} else
-			clients = &tmp->next;
-	}
-
-	restore_flags(flags);
+	br_write_unlock_bh(BR_NETPROTO_LOCK);
 }
 
 MODULE_LICENSE("GPL");

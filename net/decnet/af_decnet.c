@@ -2238,7 +2238,7 @@ MODULE_PARM(addr, "2i");
 MODULE_PARM_DESC(addr, "The DECnet address of this machine: area,node");
 #endif
 
-static char banner[] __initdata = KERN_INFO "NET4: DECnet for Linux: V.2.4.15-pre5s (C) 1995-2001 Linux DECnet Project Team\n";
+static char banner[] __initdata = KERN_INFO "NET4: DECnet for Linux: V.2.4.20-pre1s (C) 1995-2002 Linux DECnet Project Team\n";
 
 static int __init decnet_init(void)
 {

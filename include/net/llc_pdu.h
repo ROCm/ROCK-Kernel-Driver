@@ -198,12 +198,27 @@ struct llc_pdu_sn {
 	u8 ctrl_2;
 };
 
+static __inline__ struct llc_pdu_sn *llc_pdu_sn_hdr(struct sk_buff *skb)
+{
+	return (struct llc_pdu_sn *)skb->nh.raw;
+}
+
 /* Un-numbered PDU format (3 bytes in length) */
 struct llc_pdu_un {
 	u8 dsap;
 	u8 ssap;
 	u8 ctrl_1;
 };
+
+static __inline__ struct llc_pdu_un *llc_pdu_un_hdr(struct sk_buff *skb)
+{
+	return (struct llc_pdu_un *)skb->nh.raw;
+}
+
+static __inline__ void *llc_set_pdu_hdr(struct sk_buff *skb, void *ptr)
+{
+	return skb->nh.raw = ptr;
+}
 
 /* LLC Type 1 XID command/response information fields format */
 struct llc_xid_info {

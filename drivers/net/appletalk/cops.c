@@ -181,7 +181,7 @@ struct cops_local
         int board;			/* Holds what board type is. */
 	int nodeid;			/* Set to 1 once have nodeid. */
         unsigned char node_acquire;	/* Node ID when acquired. */
-        struct at_addr node_addr;	/* Full node address */
+        struct atalk_addr node_addr;	/* Full node address */
 };
 
 /* Index to functions, as function prototypes. */
@@ -955,8 +955,8 @@ static int cops_hard_header(struct sk_buff *skb, struct net_device *dev,
 static int cops_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
         struct cops_local *lp = (struct cops_local *)dev->priv;
-        struct sockaddr_at *sa=(struct sockaddr_at *)&ifr->ifr_addr;
-        struct at_addr *aa=(struct at_addr *)&lp->node_addr;
+        struct sockaddr_at *sa = (struct sockaddr_at *)&ifr->ifr_addr;
+        struct atalk_addr *aa = (struct atalk_addr *)&lp->node_addr;
 
         switch(cmd)
         {
