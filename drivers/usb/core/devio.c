@@ -1090,12 +1090,10 @@ static int proc_ioctl (struct dev_state *ps, void *arg)
        else switch (ctrl.ioctl_code) {
 
        /* disconnect kernel driver from interface, leaving it unbound.  */
+       /* maybe unbound - you get no guarantee it stays unbound */
        case USBDEVFS_DISCONNECT:
-		/* this function is voodoo. */
-		/* which function ... usb_device_remove()?
-		 * FIXME either the module lock (BKL) should be involved
-		 * here too, or the 'default' case below is broken
-		 */
+		/* this function is misdesigned - retained for compatibility */
+		lock_kernel();
 		driver = ifp->driver;
 		if (driver) {
 			dbg ("disconnect '%s' from dev %d interface %d",
@@ -1103,11 +1101,14 @@ static int proc_ioctl (struct dev_state *ps, void *arg)
 			usb_device_remove(&ifp->dev);
 		} else
 			retval = -ENODATA;
+		unlock_kernel();
 		break;
 
 	/* let kernel drivers try to (re)bind to the interface */
 	case USBDEVFS_CONNECT:
+		lock_kernel();
 		retval = usb_device_probe (&ifp->dev);
+		unlock_kernel();
 		break;
 
 	/* talk directly to the interface's driver */
@@ -1129,11 +1130,10 @@ static int proc_ioctl (struct dev_state *ps, void *arg)
 			}
 			unlock_kernel ();
 			retval = driver->ioctl (ifp, ctrl.ioctl_code, buf);
+			if (retval == -ENOIOCTLCMD)
+				retval = -ENOTTY;
 			module_put (driver->owner);
 		}
-
-		if (retval == -ENOIOCTLCMD)
-			retval = -ENOTTY;
 	}
 
 	/* cleanup and return */
