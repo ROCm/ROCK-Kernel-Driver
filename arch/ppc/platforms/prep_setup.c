@@ -447,12 +447,6 @@ no_l2:
 }
 
 static void __prep
-prep_tiger1_progress(char *msg, unsigned short code)
-{
-	outw(code, PREP_IBM_DISP);
-}
-
-static void __prep
 prep_restart(char *cmd)
 {
 #define PREP_SP92	0x92	/* Special Port 92 */
@@ -678,6 +672,111 @@ prep_init_vesa(void)
 #endif
 }
 
+/*
+ * Set DBAT 2 to access 0x80000000 so early progress messages will work
+ */
+static __inline__ void
+prep_set_bat(void)
+{
+	/* wait for all outstanding memory access to complete */
+	mb();
+
+	/* setup DBATs */
+	mtspr(DBAT2U, 0x80001ffe);
+	mtspr(DBAT2L, 0x8000002a);
+
+	/* wait for updates */
+	mb();
+}
+
+/*
+ * IBM 3-digit status LED
+ */
+static unsigned int ibm_statusled_base __prepdata;
+
+static void __prep
+ibm_statusled_progress(char *s, unsigned short hex);
+
+static int __prep
+ibm_statusled_panic(struct notifier_block *dummy1, unsigned long dummy2,
+		    void * dummy3)
+{
+	ibm_statusled_progress(NULL, 0x505); /* SOS */
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block ibm_statusled_block __prepdata = {
+	ibm_statusled_panic,
+	NULL,
+	INT_MAX /* try to do it first */
+};
+
+static void __prep
+ibm_statusled_progress(char *s, unsigned short hex)
+{
+	static int notifier_installed;
+	/*
+	 * Progress uses 4 digits and we have only 3.  So, we map 0xffff to
+	 * 0xfff for display switch off.  Out of range values are mapped to
+	 * 0xeff, as I'm told 0xf00 and above are reserved for hardware codes.
+	 * Install the panic notifier when the display is first switched off.
+	 */
+	if (hex == 0xffff) {
+		hex = 0xfff;
+		if (!notifier_installed) {
+			++notifier_installed;
+			notifier_chain_register(&panic_notifier_list,
+						&ibm_statusled_block);
+		}
+	}
+	else
+		if (hex > 0xfff)
+			hex = 0xeff;
+
+	mb();
+	outw(hex, ibm_statusled_base);
+}
+
+static void __init
+ibm_statusled_init(void)
+{
+	/*
+	 * The IBM 3-digit LED display is specified in the residual data
+	 * as an operator panel device, type "System Status LED".  Find
+	 * that device and determine its address.  We validate all the
+	 * other parameters on the off-chance another, similar device
+	 * exists.
+	 */
+	if (have_residual_data) {
+		PPC_DEVICE *led;
+		PnP_TAG_PACKET *pkt;
+
+		led = residual_find_device(~0, NULL, SystemPeripheral,
+					   OperatorPanel, SystemStatusLED, 0);
+		if (!led)
+			return;
+
+		pkt = PnP_find_packet((unsigned char *)
+		       &res->DevicePnPHeap[led->AllocatedOffset], S8_Packet, 0);
+		if (!pkt)
+			return;
+
+		if (pkt->S8_Pack.IOInfo != ISAAddr16bit)
+			return;
+		if (*(unsigned short *)pkt->S8_Pack.RangeMin !=
+		    *(unsigned short *)pkt->S8_Pack.RangeMax)
+			return;
+		if (pkt->S8_Pack.IOAlign != 2)
+			return;
+		if (pkt->S8_Pack.IONum != 2)
+			return;
+
+		ibm_statusled_base = ld_le16((unsigned short *)
+					     (pkt->S8_Pack.RangeMin));
+		ppc_md.progress = ibm_statusled_progress;
+	}
+}
+
 static void __init
 prep_setup_arch(void)
 {
@@ -740,7 +839,6 @@ prep_setup_arch(void)
 				setup_ibm_pci = prep_tiger1_setup_pci;
 				ppc_md.power_off = prep_sig750_poweroff;
 				ppc_md.show_cpuinfo = prep_tiger1_cpuinfo;
-				ppc_md.progress = prep_tiger1_progress;
 				break;
 		}
 		printk("\n");
@@ -1004,6 +1102,10 @@ prep_init(unsigned long r3, unsigned long r4, unsigned long r5,
 		/* assume motorola if no residual (netboot?) */
 		_prep_type = _PREP_Motorola;
 	}
+
+	/* Initialise progress early to get maximum benefit */
+	prep_set_bat();
+	ibm_statusled_init();
 
 	ppc_md.setup_arch     = prep_setup_arch;
 	ppc_md.show_percpuinfo = prep_show_percpuinfo;
