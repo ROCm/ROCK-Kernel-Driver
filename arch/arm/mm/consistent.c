@@ -286,7 +286,7 @@ static int dma_mmap(struct device *dev, struct vm_area_struct *vma,
 	if (c) {
 		kern_size = (c->vm_end - c->vm_start) >> PAGE_SHIFT;
 
-		if (vma->vm_pgoff < kern_size ||
+		if (vma->vm_pgoff < kern_size &&
 		    user_size <= (kern_size - vma->vm_pgoff)) {
 			vma->vm_flags |= VM_RESERVED;
 			ret = remap_pfn_range(vma, vma->vm_start,
