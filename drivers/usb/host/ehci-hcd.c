@@ -644,7 +644,7 @@ static void ehci_free_config (struct usb_hcd *hcd, struct usb_device *udev)
 					spin_lock_irqsave (&ehci->lock, flags);
 				}
 			}
-			qh_unput (ehci, qh);
+			qh_put (ehci, qh);
 		}
 	}
 

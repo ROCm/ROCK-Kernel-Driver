@@ -194,7 +194,7 @@ static void ehci_urb_done (
 			    ? PCI_DMA_FROMDEVICE
 			    : PCI_DMA_TODEVICE);
 	if (likely (urb->hcpriv != 0)) {
-		qh_unput (ehci, (struct ehci_qh *) urb->hcpriv);
+		qh_put (ehci, (struct ehci_qh *) urb->hcpriv);
 		urb->hcpriv = 0;
 	}
 
@@ -815,9 +815,9 @@ submit_async (
 	 * the HC and TT handle it when the TT has a buffer ready.
 	 */
 	if (likely (qh != 0)) {
-		urb->hcpriv = qh_put (qh);
+		urb->hcpriv = qh_get (qh);
 		if (likely (qh->qh_state == QH_STATE_IDLE))
-			qh_link_async (ehci, qh_put (qh));
+			qh_link_async (ehci, qh_get (qh));
 	}
 	spin_unlock_irqrestore (&ehci->lock, flags);
 	if (unlikely (!qh))
@@ -835,7 +835,7 @@ static void end_unlink_async (struct ehci_hcd *ehci)
 
 	qh->qh_state = QH_STATE_IDLE;
 	qh->qh_next.qh = 0;
-	qh_unput (ehci, qh);			// refcount from reclaim 
+	qh_put (ehci, qh);			// refcount from reclaim 
 	ehci->reclaim = 0;
 	ehci->reclaim_ready = 0;
 
@@ -847,7 +847,7 @@ static void end_unlink_async (struct ehci_hcd *ehci)
 			&& HCD_IS_RUNNING (ehci->hcd.state))
 		qh_link_async (ehci, qh);
 	else
-		qh_unput (ehci, qh);		// refcount from async list
+		qh_put (ehci, qh);		// refcount from async list
 }
 
 
@@ -872,7 +872,7 @@ static void start_unlink_async (struct ehci_hcd *ehci, struct ehci_qh *qh)
 #endif
 
 	qh->qh_state = QH_STATE_UNLINK;
-	ehci->reclaim = qh = qh_put (qh);
+	ehci->reclaim = qh = qh_get (qh);
 
 	// dbg_qh ("start unlink", ehci, qh);
 
@@ -937,14 +937,14 @@ rescan:
 			/* clean any finished work for this qh */
 			if (!list_empty (&qh->qtd_list)) {
 				// dbg_qh ("scan_async", ehci, qh);
-				qh = qh_put (qh);
+				qh = qh_get (qh);
 				spin_unlock_irqrestore (&ehci->lock, flags);
 
 				/* concurrent unlink could happen here */
 				qh_completions (ehci, &qh->qtd_list, 1);
 
 				spin_lock_irqsave (&ehci->lock, flags);
-				qh_unput (ehci, qh);
+				qh_put (ehci, qh);
 			}
 
 			/* unlink idle entries (reduces PCI usage) */
