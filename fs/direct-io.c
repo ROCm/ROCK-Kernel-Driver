@@ -954,8 +954,12 @@ direct_io_worker(int rw, struct kiocb *iocb, struct inode *inode,
 	dio->waiter = NULL;
 
 	dio->pages_in_io = 0;
-	for (seg = 0; seg < nr_segs; seg++) 
-		dio->pages_in_io += (iov[seg].iov_len >> blkbits) + 2; 
+	for (seg = 0; seg < nr_segs; seg++) {
+		user_addr = (unsigned long)iov[seg].iov_base;
+		dio->pages_in_io +=
+			((user_addr+iov[seg].iov_len +PAGE_SIZE-1)/PAGE_SIZE
+				- user_addr/PAGE_SIZE);
+	}
 
 	for (seg = 0; seg < nr_segs; seg++) {
 		user_addr = (unsigned long)iov[seg].iov_base;
