@@ -34,12 +34,10 @@
  *	page_buf.c
  *
  *	The page_buf module provides an abstract buffer cache model on top of
- *	the Linux page cache.  Cached blocks for a file are hashed to the
- *	inode for that file, and can be held dirty in delayed write mode in
- *	the page cache.	 Cached metadata blocks for a file system are hashed
- *	to the inode for the mounted device.  The page_buf module assembles
- *	buffer (page_buf_t) objects on demand to aggregate such cached pages
- *	for I/O.
+ *	the Linux page cache.  Cached metadata blocks for a file system are
+ *	hashed to the inode for the block device.  The page_buf module
+ *	assembles buffer (page_buf_t) objects on demand to aggregate such
+ *	cached pages for I/O.
  *
  *
  *	Written by Steve Lord, Jim Mostek, Russell Cattelan
