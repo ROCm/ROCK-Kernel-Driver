@@ -305,6 +305,7 @@ static dev_link_t *tc574_attach(void)
 	link = &lp->link; dev = &lp->dev;
 	link->priv = dev->priv = link->irq.Instance = lp;
 	
+	init_timer(&link->release);
 	link->release.function = &tc574_release;
 	link->release.data = (u_long)link;
 	link->io.NumPorts1 = 32;
