@@ -4,7 +4,6 @@
 
 #include <linux/config.h>
 #include <linux/types.h>
-#include <linux/mm.h>
 
 #include <asm/page.h>
 #include <asm/byteorder.h>
