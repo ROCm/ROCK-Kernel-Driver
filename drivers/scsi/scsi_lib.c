@@ -810,7 +810,7 @@ void scsi_io_completion(struct scsi_cmnd *cmd, int good_sectors,
 			       cmd->device->host->host_no, (int) cmd->device->channel,
 			       (int) cmd->device->id, (int) cmd->device->lun);
 			print_command(cmd->data_cmnd);
-			print_sense("sd", cmd);
+			print_sense("", cmd);
 			cmd = scsi_end_request(cmd, 0, block_sectors, 1);
 			return;
 		default:
@@ -830,7 +830,7 @@ void scsi_io_completion(struct scsi_cmnd *cmd, int good_sectors,
 		struct Scsi_Device_Template *sdt;
 
 		sdt = scsi_get_request_dev(cmd->request);
-		printk("SCSI %s error : host %d channel %d id %d lun %d return code = %x\n",
+		printk("SCSI %s error : <%d %d %d %d> return code = 0x%x\n",
 		       (sdt ? sdt->name : "device"),
 		       cmd->device->host->host_no,
 		       cmd->device->channel,
@@ -838,7 +838,7 @@ void scsi_io_completion(struct scsi_cmnd *cmd, int good_sectors,
 		       cmd->device->lun, result);
 
 		if (driver_byte(result) & DRIVER_SENSE)
-			print_sense("sd", cmd);
+			print_sense("", cmd);
 		/*
 		 * Mark a single buffer as not uptodate.  Queue the remainder.
 		 * We sometimes get this cruft in the event that a medium error
