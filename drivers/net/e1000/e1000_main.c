@@ -1842,10 +1842,8 @@ e1000_tx_timeout_task(struct net_device *netdev)
 {
 	struct e1000_adapter *adapter = netdev->priv;
 
-	netif_device_detach(netdev);
 	e1000_down(adapter);
 	e1000_up(adapter);
-	netif_device_attach(netdev);
 }
 
 /**
