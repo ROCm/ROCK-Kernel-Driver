@@ -1090,6 +1090,26 @@ static void time_out_leases(struct inode *inode)
 	}
 }
 
+ /**
+*	remove_lease - let time_out_leases remove the lease.
+*	@@file_lock: the lease to remove
+*/
+void remove_lease(struct file_lock *fl)
+{
+	if (!IS_LEASE(fl))
+		return;
+
+	lock_kernel();
+
+	fl->fl_type = F_UNLCK | F_INPROGRESS;
+	fl->fl_break_time = jiffies - 10;
+	time_out_leases(fl->fl_file->f_dentry->d_inode);
+
+	unlock_kernel();
+}
+
+EXPORT_SYMBOL(remove_lease);
+
 /**
  *	__break_lease	-	revoke all outstanding leases on file
  *	@inode: the inode of the file to return
