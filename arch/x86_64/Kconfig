@@ -256,6 +256,7 @@ config SCHED_SMT
 
 config K8_NUMA
        bool "K8 NUMA support"
+       select NUMA
        depends on SMP
        help
 	  Enable NUMA (Non Unified Memory Architecture) support for
@@ -265,15 +266,23 @@ config K8_NUMA
 	  This code is recommended on all multiprocessor Opteron systems
 	  and normally doesn't hurt on others.
 
+config NUMA_EMU
+	bool "NUMA emulation support"
+	select NUMA
+	depends on SMP
+	help
+	  Enable NUMA emulation. A flat machine will be split
+	  into virtual nodes when booted with "numa=fake=N", where N is the
+	  number of nodes. This is only useful for debugging.
+
 config DISCONTIGMEM
        bool
-       depends on K8_NUMA
+       depends on NUMA
        default y
 
 config NUMA
        bool
-       depends on K8_NUMA
-       default y
+       default n
 
 config HAVE_DEC_LOCK
 	bool
