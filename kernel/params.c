@@ -233,6 +233,7 @@ int param_array(const char *name,
 	int ret;
 	unsigned int count = 0;
 	struct kernel_param kp;
+	char save;
 
 	/* Get the name right for errors. */
 	kp.name = name;
@@ -247,7 +248,6 @@ int param_array(const char *name,
 	/* We expect a comma-separated list of values. */
 	do {
 		int len;
-		char save;
 
 		if (count > max) {
 			printk(KERN_ERR "%s: can only take %i arguments\n",
@@ -256,18 +256,17 @@ int param_array(const char *name,
 		}
 		len = strcspn(val, ",");
 
-		/* Temporarily nul-terminate and parse */
+		/* nul-terminate and parse */
 		save = val[len];
 		((char *)val)[len] = '\0';
 		ret = set(val, &kp);
-		((char *)val)[len] = save;
 
 		if (ret != 0)
 			return ret;
 		kp.arg += elemsize;
 		val += len+1;
 		count++;
-	} while (val[-1] == ',');
+	} while (save == ',');
 
 	if (count < min) {
 		printk(KERN_ERR "%s: needs at least %i arguments\n",

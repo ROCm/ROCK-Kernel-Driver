@@ -35,6 +35,7 @@
 #include <linux/poll.h>
 #include <linux/proc_fs.h>
 #include <linux/smp_lock.h>
+#include <linux/bcd.h>
 
 #include <asm/m48t35.h>
 #include <asm/sn/ioc3.h>

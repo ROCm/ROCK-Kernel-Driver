@@ -274,9 +274,9 @@ int
 snd_emux_inc_count(snd_emux_t *emu)
 {
 	emu->used++;
-	if (!try_inc_mod_count(emu->ops.owner))
+	if (!try_module_get(emu->ops.owner))
 		goto __error;
-	if (!try_inc_mod_count(emu->card->module)) {
+	if (!try_module_get(emu->card->module)) {
 		module_put(emu->ops.owner);
 	      __error:
 		emu->used--;

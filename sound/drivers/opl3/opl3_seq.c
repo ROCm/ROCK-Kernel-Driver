@@ -37,7 +37,7 @@ MODULE_PARM_DESC(use_internal_drums, "Enable internal OPL2/3 drums.");
 
 int snd_opl3_synth_use_inc(opl3_t * opl3)
 {
-	if (!try_inc_mod_count(opl3->card->module))
+	if (!try_module_get(opl3->card->module))
 		return -EFAULT;
 	return 0;
 

@@ -145,6 +145,8 @@
 #define I2C_DRIVERID_LM92 1033
 #define I2C_DRIVERID_VT8231 1034
 #define I2C_DRIVERID_SMARTBATT 1035
+#define I2C_DRIVERID_BMCSENSORS 1036
+#define I2C_DRIVERID_FS451 1037
 
 /*
  * ---- Adapter types ----------------------------------------------------
@@ -164,6 +166,8 @@
 #define I2C_ALGO_IIC    0x080000 	/* ITE IIC bus */
 #define I2C_ALGO_SAA7134 0x090000
 #define I2C_ALGO_MPC824X 0x0a0000	/* Motorola 8240 / 8245         */
+#define I2C_ALGO_IPMI 	0x0b0000	/* IPMI dummy adapter */
+#define I2C_ALGO_IPMB 	0x0c0000	/* IPMB adapter */
 #define I2C_ALGO_EC     0x100000        /* ACPI embedded controller     */
 
 #define I2C_ALGO_MPC8XX 0x110000	/* MPC8xx PowerPC I2C algorithm */
@@ -196,6 +200,7 @@
 #define I2C_HW_B_VOO	0x0b	/* 3dfx Voodoo 3 / Banshee      	*/
 #define I2C_HW_B_PPORT  0x0c	/* Primitive parallel port adapter	*/
 #define I2C_HW_B_SAVG	0x0d	/* Savage 4                     	*/
+#define I2C_HW_B_SCX200	0x0e	/* Nat'l Semi SCx200 I2C        	*/
 #define I2C_HW_B_RIVA	0x10	/* Riva based graphics cards		*/
 #define I2C_HW_B_IOC	0x11	/* IOC bit-wiggling			*/
 #define I2C_HW_B_TSUNA  0x12	/* DEC Tsunami chipset			*/
@@ -234,8 +239,15 @@
 #define I2C_HW_SMBUS_SIS630	0x08
 #define I2C_HW_SMBUS_SIS645	0x09
 #define I2C_HW_SMBUS_AMD8111	0x0a
+#define I2C_HW_SMBUS_SCX200	0x0b
 
 /* --- ISA pseudo-adapter						*/
 #define I2C_HW_ISA 0x00
+
+/* --- IPMI pseudo-adapter						*/
+#define I2C_HW_IPMI 0x00
+
+/* --- IPMB adapter						*/
+#define I2C_HW_IPMB 0x00
 
 #endif /* I2C_ID_H */

@@ -275,11 +275,8 @@ static void *rt_cache_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 
 static void rt_cache_seq_stop(struct seq_file *seq, void *v)
 {
-	if (v && v != (void *)1) {
-		struct rt_cache_iter_state *st = seq->private;
-
+	if (v && v != (void *)1)
 		rcu_read_unlock();
-	}
 }
 
 static int rt_cache_seq_show(struct seq_file *seq, void *v)

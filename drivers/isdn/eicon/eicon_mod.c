@@ -54,10 +54,6 @@ extern int do_ioctl(struct inode *pDivasInode, struct file *pDivasFile,
 			unsigned int command, unsigned long arg);
 extern void eicon_pci_init_conf(eicon_card *card);
 
-#ifdef MODULE
-#define MOD_USE_COUNT (GET_USE_COUNT (&__this_module))
-#endif
-
 #define EICON_CTRL_VERSION 2 
 
 ulong DebugVar;
@@ -370,12 +366,6 @@ eicon_command(eicon_card * card, isdn_ctrl * c)
 					DebugVar = a;
 					eicon_log(card, 1, "Eicon: Debug Value set to %ld\n", DebugVar);
 					return 0;
-#ifdef MODULE
-				case EICON_IOCTL_FREEIT:
-					while (MOD_USE_COUNT > 0) MOD_DEC_USE_COUNT;
-					MOD_INC_USE_COUNT;
-					return 0;
-#endif
 				case EICON_IOCTL_LOADPCI:
 					eicon_log(card, 1, "Eicon: Wrong version of load-utility,\n");
 					eicon_log(card, 1, "Eicon: re-compile eiconctrl !\n");

@@ -160,7 +160,7 @@ retry:
 			read_unlock(&gendisk_lock);
 			return NULL;
 		}
-		if (!try_inc_mod_count(p->owner))
+		if (!try_module_get(p->owner))
 			continue;
 		owner = p->owner;
 		data = p->data;
@@ -422,7 +422,7 @@ struct gendisk *get_disk(struct gendisk *disk)
 	if (!disk->fops)
 		return NULL;
 	owner = disk->fops->owner;
-	if (owner && !try_inc_mod_count(owner))
+	if (owner && !try_module_get(owner))
 		return NULL;
 	return to_disk(kobject_get(&disk->kobj));
 }

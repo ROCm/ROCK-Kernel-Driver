@@ -59,7 +59,7 @@ static int snd_mixer_oss_open(struct inode *inode, struct file *file)
 #ifdef LINUX_2_2
 	MOD_INC_USE_COUNT;
 #endif
-	if (!try_inc_mod_count(card->module)) {
+	if (!try_module_get(card->module)) {
 		kfree(fmixer);
 #ifdef LINUX_2_2
 		MOD_DEC_USE_COUNT;

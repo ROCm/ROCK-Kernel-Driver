@@ -282,7 +282,7 @@ static int snd_virmidi_subscribe(void *private_data, snd_seq_port_subscribe_t *i
 	snd_virmidi_dev_t *rdev;
 
 	rdev = snd_magic_cast(snd_virmidi_dev_t, private_data, return -EINVAL);
-	if (!try_inc_mod_count(rdev->card->module))
+	if (!try_module_get(rdev->card->module))
 		return -EFAULT;
 	rdev->flags |= SNDRV_VIRMIDI_SUBSCRIBE;
 	return 0;
@@ -310,7 +310,7 @@ static int snd_virmidi_use(void *private_data, snd_seq_port_subscribe_t *info)
 	snd_virmidi_dev_t *rdev;
 
 	rdev = snd_magic_cast(snd_virmidi_dev_t, private_data, return -EINVAL);
-	if (!try_inc_mod_count(rdev->card->module))
+	if (!try_module_get(rdev->card->module))
 		return -EFAULT;
 	rdev->flags |= SNDRV_VIRMIDI_USE;
 	return 0;

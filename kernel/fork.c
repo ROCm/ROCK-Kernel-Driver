@@ -757,7 +757,6 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	p->thread_info->preempt_count = 1;
 #endif
 	p->did_exec = 0;
-	p->swappable = 0;
 	p->state = TASK_UNINTERRUPTIBLE;
 
 	copy_flags(clone_flags, p);
@@ -841,7 +840,6 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	p->parent_exec_id = p->self_exec_id;
 
 	/* ok, now we should be set up.. */
-	p->swappable = 1;
 	if (clone_flags & CLONE_DETACHED)
 		p->exit_signal = -1;
 	else
@@ -1078,7 +1076,7 @@ void __init proc_caches_init(void)
  
 	vm_area_cachep = kmem_cache_create("vm_area_struct",
 			sizeof(struct vm_area_struct), 0,
-			SLAB_HWCACHE_ALIGN, NULL, NULL);
+			0, NULL, NULL);
 	if(!vm_area_cachep)
 		panic("vma_init: Cannot alloc vm_area_struct SLAB cache");
 

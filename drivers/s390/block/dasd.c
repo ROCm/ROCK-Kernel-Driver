@@ -1734,7 +1734,7 @@ dasd_open(struct inode *inp, struct file *filp)
 	rc = 0;
 
 	if (atomic_inc_return(&device->open_count) == 1) {
-		if (!try_inc_mod_count(device->discipline->owner)) {
+		if (!try_module_get(device->discipline->owner)) {
 			/* Discipline is currently unloaded! */
 			atomic_dec(&device->open_count);
 			rc = -ENODEV;

@@ -44,7 +44,7 @@ static struct mtd_chip_driver *get_mtd_chip_driver (char *name)
 			break;
 		}
 	}
-	if (ret && !try_inc_mod_count(ret->module)) {
+	if (ret && !try_module_get(ret->module)) {
 		/* Eep. Failed. */
 		ret = NULL;
 	}

@@ -697,7 +697,7 @@ int dev_open(struct net_device *dev)
 	/*
 	 *	Call device private open method
 	 */
-	if (try_inc_mod_count(dev->owner)) {
+	if (try_module_get(dev->owner)) {
 		set_bit(__LINK_STATE_START, &dev->state);
 		if (dev->open) {
 			ret = dev->open(dev);

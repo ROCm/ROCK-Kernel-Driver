@@ -982,15 +982,9 @@ struct super_block *get_sb_pseudo(struct file_system_type *, char *,
 
 /* Alas, no aliases. Too much hassle with bringing module.h everywhere */
 #define fops_get(fops) \
-	(((fops) && (fops)->owner)	\
-		? (try_inc_mod_count((fops)->owner) ? (fops) : NULL) \
-		: (fops))
-
+	(((fops) && try_module_get((fops)->owner) ? (fops) : NULL))
 #define fops_put(fops) \
-do {	\
-	if ((fops) && (fops)->owner) \
-		module_put((fops)->owner);	\
-} while(0)
+	do { if (fops) module_put((fops)->owner); } while(0)
 
 extern int register_filesystem(struct file_system_type *);
 extern int unregister_filesystem(struct file_system_type *);

@@ -129,26 +129,6 @@ static int bit_lp_getsda2(void *data)
 			             PARPORT_STATUS_BUSY) ? 0 : 1;
 }
 
-static int bit_lp_reg(struct i2c_client *client)
-{
-	return 0;
-}
-
-static int bit_lp_unreg(struct i2c_client *client)
-{
-	return 0;
-}
-
-static void bit_lp_inc_use(struct i2c_adapter *adap)
-{
-	MOD_INC_USE_COUNT;
-}
-
-static void bit_lp_dec_use(struct i2c_adapter *adap)
-{
-	MOD_DEC_USE_COUNT;
-}
-
 /* ------------------------------------------------------------------------
  * Encapsulate the above functions in the correct operations structure.
  * This is only done when more than one hardware adapter is supported.
@@ -173,15 +153,9 @@ static struct i2c_algo_bit_data bit_lp_data2 = {
 }; 
 
 static struct i2c_adapter bit_lp_ops = {
-	"Philips Parallel port adapter",
-	I2C_HW_B_LP,
-	NULL,
-	NULL,
-	bit_lp_inc_use,
-	bit_lp_dec_use,
-	bit_lp_reg,
-
-	bit_lp_unreg,
+	.owner		= THIS_MODULE,
+	.name		= "Philips Parallel port adapter",
+	.id		= I2C_HW_B_LP,
 };
 
 static void i2c_parport_attach (struct parport *port)

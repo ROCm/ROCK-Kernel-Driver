@@ -1066,8 +1066,7 @@ static int ieee1394_get_chardev(int blocknum,
 	if(*file_ops == NULL)
 		goto out;
 
-	/* don't need try_inc_mod_count if the driver is non-modular */
-	if(*module && (try_inc_mod_count(*module) == 0))
+	if(!try_module_get(*module))
 		goto out;
 
 	/* success! */

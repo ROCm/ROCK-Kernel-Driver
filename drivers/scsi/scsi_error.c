@@ -172,8 +172,7 @@ void scsi_times_out(Scsi_Cmnd *scmd)
  *     see whether the host or the device is offline.
  *
  * Return value:
- *     FALSE when dev was taken offline by error recovery. TRUE OK to
- *     proceed.
+ *     0 when dev was taken offline by error recovery. 1 OK to proceed.
  **/
 int scsi_block_when_processing_errors(Scsi_Device *sdev)
 {
@@ -1157,7 +1156,7 @@ static void scsi_eh_offline_sdevs(Scsi_Cmnd *sc_todo, struct Scsi_Host *shost)
 		if (scsi_eh_eflags_chk(scmd, SCSI_EH_CMD_TIMEOUT))
 			scmd->result |= (DRIVER_TIMEOUT << 24);
 
-		scmd->device->online = FALSE;
+		scmd->device->online = 0;
 		scsi_eh_finish_cmd(scmd, shost);
 	}
 	return;
@@ -1222,7 +1221,7 @@ int scsi_decide_disposition(Scsi_Cmnd *scmd)
 	 * if the device is offline, then we clearly just pass the result back
 	 * up to the top level.
 	 */
-	if (scmd->device->online == FALSE) {
+	if (!scmd->device->online) {
 		SCSI_LOG_ERROR_RECOVERY(5, printk("%s: device offline - report"
 						  " as SUCCESS\n",
 						  __FUNCTION__));

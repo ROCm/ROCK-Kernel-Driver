@@ -1,10 +1,9 @@
 #ifndef __LINUX_CACHE_H
 #define __LINUX_CACHE_H
 
+#include <linux/kernel.h>
 #include <linux/config.h>
 #include <asm/cache.h>
-
-#define ALIGN(x,a) (((x)+(a)-1)&~((a)-1))
 
 #ifndef L1_CACHE_ALIGN
 #define L1_CACHE_ALIGN(x) ALIGN(x, L1_CACHE_BYTES)

@@ -397,26 +397,6 @@ static u32 scx200_acb_func(struct i2c_adapter *adapter)
 	       I2C_FUNC_SMBUS_BLOCK_DATA;
 }
 
-static int scx200_acb_reg(struct i2c_client *client)
-{
-	return 0;
-}
-
-static int scx200_acb_unreg(struct i2c_client *client)
-{
-	return 0;
-}
-
-static void scx200_acb_inc_use(struct i2c_adapter *adapter)
-{
-	MOD_INC_USE_COUNT;
-}
-
-static void scx200_acb_dec_use(struct i2c_adapter *adapter)
-{
-	MOD_DEC_USE_COUNT;
-}
-
 /* For now, we only handle combined mode (smbus) */
 static struct i2c_algorithm scx200_acb_algorithm = {
 	.name		= "NatSemi SCx200 ACCESS.bus",
@@ -479,12 +459,9 @@ static int  __init scx200_acb_create(int base, int index)
 	adapter = &iface->adapter;
 	adapter->data = iface;
 	sprintf(adapter->name, "SCx200 ACB%d", index);
+	adapter->owner = THIS_MODULE;
 	adapter->id = I2C_ALGO_SMBUS;
 	adapter->algo = &scx200_acb_algorithm;
-	adapter->inc_use = scx200_acb_inc_use;
-	adapter->dec_use = scx200_acb_dec_use;
-	adapter->client_register = scx200_acb_reg;
-	adapter->client_unregister = scx200_acb_unreg;
 
 	init_MUTEX(&iface->sem);
 

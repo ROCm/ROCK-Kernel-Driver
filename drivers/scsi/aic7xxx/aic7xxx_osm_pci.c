@@ -166,6 +166,9 @@ ahc_linux_pci_dev_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		ahc->flags |= AHC_39BIT_ADDRESSING;
 		ahc->platform_data->hw_dma_mask =
 		    (bus_addr_t)(0x7FFFFFFFFFULL & (bus_addr_t)~0);
+	} else {
+		ahc_pci_set_dma_mask(pdev, 0xffffffffULL);
+		ahc->platform_data->hw_dma_mask = 0xffffffffULL;
 	}
 #endif
 	ahc->dev_softc = pci;
