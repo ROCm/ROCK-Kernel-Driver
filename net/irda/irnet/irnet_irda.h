@@ -150,11 +150,11 @@ static void
 				    void *);
 #ifdef DISCOVERY_EVENTS
 static void
-	irnet_discovery_indication(discovery_t *,
+	irnet_discovery_indication(discinfo_t *,
 				   DISCOVERY_MODE,
 				   void *);
 static void
-	irnet_expiry_indication(discovery_t *,
+	irnet_expiry_indication(discinfo_t *,
 				DISCOVERY_MODE,
 				void *);
 #endif

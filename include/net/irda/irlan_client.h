@@ -34,7 +34,7 @@
 #include <net/irda/irlan_event.h>
 
 void irlan_client_start_kick_timer(struct irlan_cb *self, int timeout);
-void irlan_client_discovery_indication(discovery_t *, DISCOVERY_MODE, void *);
+void irlan_client_discovery_indication(discinfo_t *, DISCOVERY_MODE, void *);
 void irlan_client_wakeup(struct irlan_cb *self, __u32 saddr, __u32 daddr);
 
 void irlan_client_open_ctrl_tsap( struct irlan_cb *self);

@@ -401,8 +401,8 @@ int irlmp_connect_request(struct lsap_cb *self, __u8 dlsap_sel,
 		}
 
 		if (discovery) {
-			saddr = discovery->saddr;
-			daddr = discovery->daddr;
+			saddr = discovery->data.saddr;
+			daddr = discovery->data.daddr;
 		}
 		spin_unlock_irqrestore(&irlmp->cachelog->hb_spinlock, flags);
 	}
@@ -793,17 +793,17 @@ void irlmp_do_discovery(int nslots)
 	}
 
 	/* Construct new discovery info to be used by IrLAP, */
-	irlmp->discovery_cmd.hints.word = irlmp->hints.word;
+	u16ho(irlmp->discovery_cmd.data.hints) = irlmp->hints.word;
 
 	/*
 	 *  Set character set for device name (we use ASCII), and
 	 *  copy device name. Remember to make room for a \0 at the
 	 *  end
 	 */
-	irlmp->discovery_cmd.charset = CS_ASCII;
-	strncpy(irlmp->discovery_cmd.nickname, sysctl_devname,
+	irlmp->discovery_cmd.data.charset = CS_ASCII;
+	strncpy(irlmp->discovery_cmd.data.info, sysctl_devname,
 		NICKNAME_MAX_LEN);
-	irlmp->discovery_cmd.name_len = strlen(irlmp->discovery_cmd.nickname);
+	irlmp->discovery_cmd.name_len = strlen(irlmp->discovery_cmd.data.info);
 	irlmp->discovery_cmd.nslots = nslots;
 
 	/*
@@ -827,10 +827,13 @@ void irlmp_do_discovery(int nslots)
  *
  *    Do a discovery of devices in front of the computer
  *
+ * If the caller has registered a client discovery callback, this
+ * allow him to receive the full content of the discovery log through
+ * this callback (as normally he will receive only new discoveries).
  */
 void irlmp_discovery_request(int nslots)
 {
-	/* Return current cached discovery log */
+	/* Return current cached discovery log (in full) */
 	irlmp_discovery_confirm(irlmp->cachelog, DISCOVERY_LOG);
 
 	/*
@@ -854,6 +857,8 @@ void irlmp_discovery_request(int nslots)
  *
  *    Return the current discovery log
  *
+ * If discovery is not enabled, you should call this function again
+ * after 1 or 2 seconds (i.e. after discovery has been done).
  */
 struct irda_device_info *irlmp_get_discoveries(int *pn, __u16 mask, int nslots)
 {
@@ -875,49 +880,8 @@ struct irda_device_info *irlmp_get_discoveries(int *pn, __u16 mask, int nslots)
 	}
 
 	/* Return current cached discovery log */
-	return(irlmp_copy_discoveries(irlmp->cachelog, pn, mask));
+	return(irlmp_copy_discoveries(irlmp->cachelog, pn, mask, TRUE));
 }
-
-#if 0
-/*
- * Function irlmp_check_services (discovery)
- */
-void irlmp_check_services(discovery_t *discovery)
-{
-	struct irlmp_client *client;
-	__u8 *service_log;
-	__u8 service;
-	int i = 0;
-
-	IRDA_DEBUG(1, "IrDA Discovered: %s\n", discovery->info);
-	IRDA_DEBUG(1, "    Services: ");
-
-	service_log = irlmp_hint_to_service(discovery->hints.byte);
-	if (!service_log)
-		return;
-
-	/*
-	 *  Check all services on the device
-	 */
-	while ((service = service_log[i++]) != S_END) {
-		IRDA_DEBUG( 4, "service=%02x\n", service);
-		client = hashbin_lock_find(irlmp->registry, service, NULL);
-		if (entry && entry->discovery_callback) {
-			IRDA_DEBUG( 4, "discovery_callback!\n");
-
-			entry->discovery_callback(discovery);
-		} else {
-			/* Don't notify about the ANY service */
-			if (service == S_ANY)
-				continue;
-			/*
-			 * Found no clients for dealing with this service,
-			 */
-		}
-	}
-	kfree(service_log);
-}
-#endif
 
 /*
  * Function irlmp_notify_client (log)
@@ -935,7 +899,9 @@ static inline void
 irlmp_notify_client(irlmp_client_t *client,
 		    hashbin_t *log, DISCOVERY_MODE mode)
 {
-	discovery_t *discovery;
+	discinfo_t *discoveries;	/* Copy of the discovery log */
+	int	number;			/* Number of nodes in the log */
+	int	i;
 
 	IRDA_DEBUG(3, "%s()\n", __FUNCTION__);
 
@@ -944,28 +910,36 @@ irlmp_notify_client(irlmp_client_t *client,
 		return;
 
 	/*
+	 * Locking notes :
+	 * the old code was manipulating the log directly, which was
+	 * very racy. Now, we use copy_discoveries, that protects
+	 * itself while dumping the log for us.
+	 * The overhead of the copy is compensated by the fact that
+	 * we only pass new discoveries in normal mode and don't
+	 * pass the same old entry every 3s to the caller as we used
+	 * to do (virtual function calling is expensive).
+	 * Jean II
+	 */
+
+	/*
 	 * Now, check all discovered devices (if any), and notify client
 	 * only about the services that the client is interested in
-	 * Note : most often, we will get called immediately following
-	 * a discovery, so the log is not going to expire.
-	 * On the other hand, comming here through irlmp_discovery_request()
-	 * is *very* problematic - Jean II
-	 * Can't use hashbin_find_next(), key is not unique. I'm running
-	 * out of options :-( - Jean II
+	 * We also notify only about the new devices unless the caller
+	 * explicity request a dump of the log. Jean II
 	 */
-	discovery = (discovery_t *) hashbin_get_first(log);
-	while (discovery != NULL) {
-		IRDA_DEBUG(3, "discovery->daddr = 0x%08x\n", discovery->daddr);
+	discoveries = irlmp_copy_discoveries(log, &number,
+					     client->hint_mask.word,
+					     (mode == DISCOVERY_LOG));
+	/* Check if the we got some results */
+	if (discoveries == NULL)
+		return;	/* No nodes discovered */
 
-		/*
-		 * Any common hint bits? Remember to mask away the extension
-		 * bits ;-)
-		 */
-		if (client->hint_mask & discovery->hints.word & 0x7f7f)
-			client->disco_callback(discovery, mode, client->priv);
+	/* Pass all entries to the listener */
+	for(i = 0; i < number; i++)
+		client->disco_callback(&(discoveries[i]), mode, client->priv);
 
-		discovery = (discovery_t *) hashbin_get_next(log);
-	}
+	/* Free up our buffer */
+	kfree(discoveries);
 }
 
 /*
@@ -987,6 +961,7 @@ void irlmp_discovery_confirm(hashbin_t *log, DISCOVERY_MODE mode)
 	if (!(HASHBIN_GET_SIZE(log)))
 		return;
 
+	/* For each client - notify callback may touch client list */
 	client = (irlmp_client_t *) hashbin_get_first(irlmp->clients);
 	while (NULL != hashbin_find_next(irlmp->clients, (long) client, NULL,
 					 (void *) &client_next) ) {
@@ -1005,26 +980,34 @@ void irlmp_discovery_confirm(hashbin_t *log, DISCOVERY_MODE mode)
  *	registered for this event...
  *
  *	Note : called exclusively from discovery.c
- *	Note : as we are currently processing the log, the clients callback
- *	should *NOT* attempt to touch the log now.
+ *	Note : this is no longer called under discovery spinlock, so the
+ *		client can do whatever he wants in the callback.
  */
-void irlmp_discovery_expiry(discovery_t *expiry)
+void irlmp_discovery_expiry(discinfo_t *expiries, int number)
 {
 	irlmp_client_t *client;
 	irlmp_client_t *client_next;
+	int		i;
 
 	IRDA_DEBUG(3, "%s()\n", __FUNCTION__);
 
-	ASSERT(expiry != NULL, return;);
+	ASSERT(expiries != NULL, return;);
 
+	/* For each client - notify callback may touch client list */
 	client = (irlmp_client_t *) hashbin_get_first(irlmp->clients);
 	while (NULL != hashbin_find_next(irlmp->clients, (long) client, NULL,
 					 (void *) &client_next) ) {
-		/* Check if we should notify client */
-		if ((client->expir_callback) &&
-		    (client->hint_mask & expiry->hints.word & 0x7f7f))
-			client->expir_callback(expiry, EXPIRY_TIMEOUT,
-					       client->priv);
+
+		/* Pass all entries to the listener */
+		for(i = 0; i < number; i++) {
+			/* Check if we should notify client */
+			if ((client->expir_callback) &&
+			    (client->hint_mask.word & u16ho(expiries[i].hints)
+			     & 0x7f7f) )
+				client->expir_callback(&(expiries[i]),
+						       EXPIRY_TIMEOUT,
+						       client->priv);
+		}
 
 		/* Next client */
 		client = client_next;
@@ -1043,18 +1026,18 @@ discovery_t *irlmp_get_discovery_response()
 
 	ASSERT(irlmp != NULL, return NULL;);
 
-	irlmp->discovery_rsp.hints.word = irlmp->hints.word;
+	u16ho(irlmp->discovery_rsp.data.hints) = irlmp->hints.word;
 
 	/*
 	 *  Set character set for device name (we use ASCII), and
 	 *  copy device name. Remember to make room for a \0 at the
 	 *  end
 	 */
-	irlmp->discovery_rsp.charset = CS_ASCII;
+	irlmp->discovery_rsp.data.charset = CS_ASCII;
 
-	strncpy(irlmp->discovery_rsp.nickname, sysctl_devname,
+	strncpy(irlmp->discovery_rsp.data.info, sysctl_devname,
 		NICKNAME_MAX_LEN);
-	irlmp->discovery_rsp.name_len = strlen(irlmp->discovery_rsp.nickname);
+	irlmp->discovery_rsp.name_len = strlen(irlmp->discovery_rsp.data.info);
 
 	return &irlmp->discovery_rsp;
 }
@@ -1291,6 +1274,7 @@ void irlmp_flow_indication(struct lap_cb *self, LOCAL_FLOW flow)
 	}
 }
 
+#if 0
 /*
  * Function irlmp_hint_to_service (hint)
  *
@@ -1365,6 +1349,21 @@ __u8 *irlmp_hint_to_service(__u8 *hint)
 
 	return service;
 }
+#endif
+
+const __u16 service_hint_mapping[S_END][2] = {
+	{ HINT_PNP,		0 },			/* S_PNP */
+	{ HINT_PDA,		0 },			/* S_PDA */
+	{ HINT_COMPUTER,	0 },			/* S_COMPUTER */
+	{ HINT_PRINTER,		0 },			/* S_PRINTER */
+	{ HINT_MODEM,		0 },			/* S_MODEM */
+	{ HINT_FAX,		0 },			/* S_FAX */
+	{ HINT_LAN,		0 },			/* S_LAN */
+	{ HINT_EXTENSION,	HINT_TELEPHONY },	/* S_TELEPHONY */
+	{ HINT_EXTENSION,	HINT_COMM },		/* S_COMM */
+	{ HINT_EXTENSION,	HINT_OBEX },		/* S_OBEX */
+	{ 0xFF,			0xFF },			/* S_ANY */
+};
 
 /*
  * Function irlmp_service_to_hint (service)
@@ -1377,46 +1376,9 @@ __u16 irlmp_service_to_hint(int service)
 {
 	__u16_host_order hint;
 
-	hint.word = 0;
+	hint.byte[0] = service_hint_mapping[service][0];
+	hint.byte[1] = service_hint_mapping[service][1];
 
-	switch (service) {
-	case S_PNP:
-		hint.byte[0] |= HINT_PNP;
-		break;
-	case S_PDA:
-		hint.byte[0] |= HINT_PDA;
-		break;
-	case S_COMPUTER:
-		hint.byte[0] |= HINT_COMPUTER;
-		break;
-	case S_PRINTER:
-		hint.byte[0] |= HINT_PRINTER;
-		break;
-	case S_MODEM:
-		hint.byte[0] |= HINT_PRINTER;
-		break;
-	case S_LAN:
-		hint.byte[0] |= HINT_LAN;
-		break;
-	case S_COMM:
-		hint.byte[0] |= HINT_EXTENSION;
-		hint.byte[1] |= HINT_COMM;
-		break;
-	case S_OBEX:
-		hint.byte[0] |= HINT_EXTENSION;
-		hint.byte[1] |= HINT_OBEX;
-		break;
-	case S_TELEPHONY:
-		hint.byte[0] |= HINT_EXTENSION;
-		hint.byte[1] |= HINT_TELEPHONY;
-		break;
-	case S_ANY:
-		hint.word = 0xffff;
-		break;
-	default:
-		IRDA_DEBUG( 1, "%s(), Unknown service!\n", __FUNCTION__);
-		break;
-	}
 	return hint.word;
 }
 
@@ -1438,7 +1400,7 @@ void *irlmp_register_service(__u16 hints)
 		IRDA_DEBUG(1, "%s(), Unable to kmalloc!\n", __FUNCTION__);
 		return 0;
 	}
-	service->hints = hints;
+	service->hints.word = hints;
 	hashbin_insert(irlmp->services, (irda_queue_t *) service,
 		       (long) service, NULL);
 
@@ -1481,7 +1443,7 @@ int irlmp_unregister_service(void *handle)
 	spin_lock_irqsave(&irlmp->services->hb_spinlock, flags);
         service = (irlmp_service_t *) hashbin_get_first(irlmp->services);
         while (service) {
-		irlmp->hints.word |= service->hints;
+		irlmp->hints.word |= service->hints.word;
 
                 service = (irlmp_service_t *)hashbin_get_next(irlmp->services);
         }
@@ -1499,7 +1461,7 @@ int irlmp_unregister_service(void *handle)
  *    Returns: handle > 0 on success, 0 on error
  */
 void *irlmp_register_client(__u16 hint_mask, DISCOVERY_CALLBACK1 disco_clb,
-			    DISCOVERY_CALLBACK1 expir_clb, void *priv)
+			    DISCOVERY_CALLBACK2 expir_clb, void *priv)
 {
 	irlmp_client_t *client;
 
@@ -1514,7 +1476,7 @@ void *irlmp_register_client(__u16 hint_mask, DISCOVERY_CALLBACK1 disco_clb,
 	}
 
 	/* Register the details */
-	client->hint_mask = hint_mask;
+	client->hint_mask.word = hint_mask;
 	client->disco_callback = disco_clb;
 	client->expir_callback = expir_clb;
 	client->priv = priv;
@@ -1535,7 +1497,7 @@ void *irlmp_register_client(__u16 hint_mask, DISCOVERY_CALLBACK1 disco_clb,
  */
 int irlmp_update_client(void *handle, __u16 hint_mask,
 			DISCOVERY_CALLBACK1 disco_clb,
-			DISCOVERY_CALLBACK1 expir_clb, void *priv)
+			DISCOVERY_CALLBACK2 expir_clb, void *priv)
 {
 	irlmp_client_t *client;
 
@@ -1548,7 +1510,7 @@ int irlmp_update_client(void *handle, __u16 hint_mask,
 		return -1;
 	}
 
-	client->hint_mask = hint_mask;
+	client->hint_mask.word = hint_mask;
 	client->disco_callback = disco_clb;
 	client->expir_callback = expir_clb;
 	client->priv = priv;

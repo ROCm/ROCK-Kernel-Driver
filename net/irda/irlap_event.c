@@ -419,7 +419,7 @@ static int irlap_state_ndm(struct irlap_cb *self, IRLAP_EVENT event,
 								   info->s);
 			if (self->slot == info->s) {
 				discovery_rsp = irlmp_get_discovery_response();
-				discovery_rsp->daddr = info->daddr;
+				discovery_rsp->data.daddr = info->daddr;
 
 				irlap_send_discovery_xid_frame(self, info->S,
 							       self->slot,
@@ -576,7 +576,7 @@ static int irlap_state_query(struct irlap_cb *self, IRLAP_EVENT event,
 		ASSERT(info->discovery != NULL, return -1;);
 
 		IRDA_DEBUG(4, "%s(), daddr=%08x\n", __FUNCTION__,
-			   info->discovery->daddr);
+			   info->discovery->data.daddr);
 
 		if (!self->discovery_log) {
 			WARNING("%s: discovery log is gone! "
@@ -586,7 +586,7 @@ static int irlap_state_query(struct irlap_cb *self, IRLAP_EVENT event,
 		}
 		hashbin_insert(self->discovery_log,
 			       (irda_queue_t *) info->discovery,
-			       info->discovery->daddr, NULL);
+			       info->discovery->data.daddr, NULL);
 
 		/* Keep state */
 		/* irlap_next_state(self, LAP_QUERY);  */
@@ -704,7 +704,7 @@ static int irlap_state_reply(struct irlap_cb *self, IRLAP_EVENT event,
 			irlap_discovery_indication(self, info->discovery);
 		} else if ((info->s >= self->slot) && (!self->frame_sent)) {
 			discovery_rsp = irlmp_get_discovery_response();
-			discovery_rsp->daddr = info->daddr;
+			discovery_rsp->data.daddr = info->daddr;
 
 			irlap_send_discovery_xid_frame(self, info->S,
 						       self->slot, FALSE,

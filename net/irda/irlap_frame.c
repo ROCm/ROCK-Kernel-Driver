@@ -335,7 +335,7 @@ void irlap_send_discovery_xid_frame(struct irlap_cb *self, int S, __u8 s,
 	if (command)
 		frame->daddr = cpu_to_le32(bcast);
 	else
-		frame->daddr = cpu_to_le32(discovery->daddr);
+		frame->daddr = cpu_to_le32(discovery->data.daddr);
 
 	switch (S) {
 	case 1:
@@ -366,20 +366,20 @@ void irlap_send_discovery_xid_frame(struct irlap_cb *self, int S, __u8 s,
 	if (!command || (frame->slotnr == 0xff)) {
 		int len;
 
-		if (discovery->hints.byte[0] & HINT_EXTENSION) {
+		if (discovery->data.hints[0] & HINT_EXTENSION) {
 			info = skb_put(skb, 2);
-			info[0] = discovery->hints.byte[0];
-			info[1] = discovery->hints.byte[1];
+			info[0] = discovery->data.hints[0];
+			info[1] = discovery->data.hints[1];
 		} else {
 			info = skb_put(skb, 1);
-			info[0] = discovery->hints.byte[0];
+			info[0] = discovery->data.hints[0];
 		}
 		info = skb_put(skb, 1);
-		info[0] = discovery->charset;
+		info[0] = discovery->data.charset;
 
 		len = IRDA_MIN(discovery->name_len, skb_tailroom(skb));
 		info = skb_put(skb, len);
-		memcpy(info, discovery->nickname, len);
+		memcpy(info, discovery->data.info, len);
 	}
 	irlap_queue_xmit(self, skb);
 }
@@ -422,24 +422,25 @@ static void irlap_recv_discovery_xid_rsp(struct irlap_cb *self,
 	}
 	memset(discovery, 0, sizeof(discovery_t));
 
-	discovery->daddr = info->daddr;
-	discovery->saddr = self->saddr;
+	discovery->data.daddr = info->daddr;
+	discovery->data.saddr = self->saddr;
 	discovery->timestamp = jiffies;
 
-	IRDA_DEBUG(4, "%s(), daddr=%08x\n", __FUNCTION__, discovery->daddr);
+	IRDA_DEBUG(4, "%s(), daddr=%08x\n", __FUNCTION__,
+		   discovery->data.daddr);
 
 	discovery_info = skb_pull(skb, sizeof(struct xid_frame));
 
 	/* Get info returned from peer */
-	discovery->hints.byte[0] = discovery_info[0];
+	discovery->data.hints[0] = discovery_info[0];
 	if (discovery_info[0] & HINT_EXTENSION) {
 		IRDA_DEBUG(4, "EXTENSION\n");
-		discovery->hints.byte[1] = discovery_info[1];
-		discovery->charset = discovery_info[2];
+		discovery->data.hints[1] = discovery_info[1];
+		discovery->data.charset = discovery_info[2];
 		text = (char *) &discovery_info[3];
 	} else {
-		discovery->hints.byte[1] = 0;
-		discovery->charset = discovery_info[1];
+		discovery->data.hints[1] = 0;
+		discovery->data.charset = discovery_info[1];
 		text = (char *) &discovery_info[2];
 	}
 	/*
@@ -447,8 +448,8 @@ static void irlap_recv_discovery_xid_rsp(struct irlap_cb *self,
 	 *  FCS bytes resides.
 	 */
 	skb->data[skb->len] = '\0';
-	strncpy(discovery->nickname, text, NICKNAME_MAX_LEN);
-	discovery->name_len = strlen(discovery->nickname);
+	strncpy(discovery->data.info, text, NICKNAME_MAX_LEN);
+	discovery->name_len = strlen(discovery->data.info);
 
 	info->discovery = discovery;
 
@@ -523,18 +524,18 @@ static void irlap_recv_discovery_xid_cmd(struct irlap_cb *self,
 			return;
 		}
 
-		discovery->daddr = info->daddr;
-		discovery->saddr = self->saddr;
+		discovery->data.daddr = info->daddr;
+		discovery->data.saddr = self->saddr;
 		discovery->timestamp = jiffies;
 
-		discovery->hints.byte[0] = discovery_info[0];
+		discovery->data.hints[0] = discovery_info[0];
 		if (discovery_info[0] & HINT_EXTENSION) {
-			discovery->hints.byte[1] = discovery_info[1];
-			discovery->charset = discovery_info[2];
+			discovery->data.hints[1] = discovery_info[1];
+			discovery->data.charset = discovery_info[2];
 			text = (char *) &discovery_info[3];
 		} else {
-			discovery->hints.byte[1] = 0;
-			discovery->charset = discovery_info[1];
+			discovery->data.hints[1] = 0;
+			discovery->data.charset = discovery_info[1];
 			text = (char *) &discovery_info[2];
 		}
 		/*
@@ -542,8 +543,8 @@ static void irlap_recv_discovery_xid_cmd(struct irlap_cb *self,
 		 *  FCS bytes resides.
 		 */
 		skb->data[skb->len] = '\0';
-		strncpy(discovery->nickname, text, NICKNAME_MAX_LEN);
-		discovery->name_len = strlen(discovery->nickname);
+		strncpy(discovery->data.info, text, NICKNAME_MAX_LEN);
+		discovery->name_len = strlen(discovery->data.info);
 
 		info->discovery = discovery;
 	} else

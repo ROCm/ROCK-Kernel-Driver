@@ -1616,8 +1616,8 @@ irnet_discovervalue_confirm(int		result,
  *
  *    Got a discovery indication from IrLMP, post an event
  *
- * Note : IrLMP take care of matching the hint mask for us, we only
- * check if it is a "new" node...
+ * Note : IrLMP take care of matching the hint mask for us, and also
+ * check if it is a "new" node for us...
  *
  * As IrLMP filter on the IrLAN hint bit, we get both IrLAN and IrNET
  * nodes, so it's only at connection time that we will know if the
@@ -1633,7 +1633,7 @@ irnet_discovervalue_confirm(int		result,
  * is to messy, so we leave that to user space...
  */
 static void
-irnet_discovery_indication(discovery_t *	discovery,
+irnet_discovery_indication(discinfo_t *		discovery,
 			   DISCOVERY_MODE	mode,
 			   void *		priv)
 {
@@ -1643,21 +1643,12 @@ irnet_discovery_indication(discovery_t *	discovery,
   DASSERT(priv == &irnet_server, , IRDA_OCB_ERROR,
 	  "Invalid instance (0x%X) !!!\n", (unsigned int) priv);
 
-  /* Check if node is discovered is a new one or an old one.
-   * We check when how long ago this node was discovered, with a
-   * coarse timeout (we may miss some discovery events or be delayed).
-   */
-  if((jiffies - discovery->first_timestamp) >= (sysctl_discovery_timeout * HZ))
-    {
-      return;		/* Too old, not interesting -> goodbye */
-    }
-
   DEBUG(IRDA_OCB_INFO, "Discovered new IrNET/IrLAN node %s...\n",
-	discovery->nickname);
+	discovery->info);
 
   /* Notify the control channel */
   irnet_post_event(NULL, IRNET_DISCOVER,
-		   discovery->saddr, discovery->daddr, discovery->nickname);
+		   discovery->saddr, discovery->daddr, discovery->info);
 
   DEXIT(IRDA_OCB_TRACE, "\n");
 }
@@ -1672,7 +1663,7 @@ irnet_discovery_indication(discovery_t *	discovery,
  * check if it is a "new" node...
  */
 static void
-irnet_expiry_indication(discovery_t *	expiry,
+irnet_expiry_indication(discinfo_t *	expiry,
 			DISCOVERY_MODE	mode,
 			void *		priv)
 {
@@ -1683,11 +1674,11 @@ irnet_expiry_indication(discovery_t *	expiry,
 	  "Invalid instance (0x%X) !!!\n", (unsigned int) priv);
 
   DEBUG(IRDA_OCB_INFO, "IrNET/IrLAN node %s expired...\n",
-	expiry->nickname);
+	expiry->info);
 
   /* Notify the control channel */
   irnet_post_event(NULL, IRNET_EXPIRE,
-		   expiry->saddr, expiry->daddr, expiry->nickname);
+		   expiry->saddr, expiry->daddr, expiry->info);
 
   DEXIT(IRDA_OCB_TRACE, "\n");
 }
