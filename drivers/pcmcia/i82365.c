@@ -1584,6 +1584,10 @@ static struct pccard_operations pcic_operations = {
 
 /*====================================================================*/
 
+static struct pcmcia_socket_class_data i82365_data = {
+	.ops = &pcic_operations,
+};
+
 static struct device_driver i82365_driver = {
 	.name = "i82365",
 	.bus = &platform_bus_type,
@@ -1629,9 +1633,10 @@ static int __init init_i82365(void)
 #endif
     
     platform_device_register(&i82365_device);
-    if (register_ss_entry(sockets, &pcic_operations) != 0)
-	printk(KERN_NOTICE "i82365: register_ss_entry() failed\n");
 
+    i82365_data.nsock = sockets;
+    i82365_device.dev.class_data = &i82365_data;
+    
     /* Finally, schedule a polling interrupt */
     if (poll_interval != 0) {
 	poll_timer.function = pcic_interrupt_wrapper;
@@ -1651,7 +1656,6 @@ static void __exit exit_i82365(void)
 #ifdef CONFIG_PROC_FS
     for (i = 0; i < sockets; i++) pcic_proc_remove(i);
 #endif
-    unregister_ss_entry(&pcic_operations);
     platform_device_unregister(&i82365_device);
     if (poll_interval != 0)
 	del_timer_sync(&poll_timer);

@@ -376,6 +376,9 @@ static int __init get_tcic_id(void)
 
 /*====================================================================*/
 
+static struct pcmcia_socket_class_data tcic_data = {
+	.ops = &tcic_operations,
+};
 
 static struct device_driver tcic_driver = {
 	.name = "tcic-pcmcia",
@@ -521,15 +524,8 @@ static int __init init_tcic(void)
     /* jump start interrupt handler, if needed */
     tcic_interrupt(0, NULL, NULL);
 
-    if (register_ss_entry(sockets, &tcic_operations) != 0) {
-	printk(KERN_NOTICE "tcic: register_ss_entry() failed\n");
-	release_region(tcic_base, 16);
-	if (cs_irq != 0)
-	    free_irq(cs_irq, tcic_interrupt);
-	platform_device_unregister(&tcic_device);
-	driver_unregister(&tcic_driver);
-	return -ENODEV;
-    }
+    tcic_data.nsock = sockets;
+    tcic_device.dev.class_data = &tcic_data;
 
     return 0;
     
@@ -539,7 +535,6 @@ static int __init init_tcic(void)
 
 static void __exit exit_tcic(void)
 {
-    unregister_ss_entry(&tcic_operations);
     del_timer_sync(&poll_timer);
     if (cs_irq != 0) {
 	tcic_aux_setw(TCIC_AUX_SYSCFG, TCIC_SYSCFG_AUTOBUSY|0x0a00);

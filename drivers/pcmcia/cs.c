@@ -309,119 +309,123 @@ static void reset_socket(socket_info_t *);
 static void unreset_socket(socket_info_t *);
 static void parse_events(void *info, u_int events);
 
-socket_info_t *pcmcia_register_socket (int slot,
-	struct pccard_operations * ss_entry,
-	int use_bus_pm)
+#define to_class_data(dev) dev->class_data
+
+/**
+ * pcmcia_register_socket - add a new pcmcia socket device
+ */
+int pcmcia_register_socket(struct device *dev)
 {
-    socket_info_t *s;
-    int i;
+	struct pcmcia_socket_class_data *cls_d = to_class_data(dev);
+	socket_info_t *s_info;
+	unsigned int i, j;
 
-    DEBUG(0, "cs: pcmcia_register_socket(0x%p)\n", ss_entry);
+	if (!cls_d)
+		return -EINVAL;
 
-    s = kmalloc(sizeof(struct socket_info_t), GFP_KERNEL);
-    if (!s)
-    	return NULL;
-    memset(s, 0, sizeof(socket_info_t));
+	DEBUG(0, "cs: pcmcia_register_socket(0x%p)\n", cls_d->ops);
 
-    s->ss_entry = ss_entry;
-    s->sock = slot;
+	s_info = kmalloc(cls_d->nsock * sizeof(struct socket_info_t), GFP_KERNEL);
+	if (!s_info)
+		return -ENOMEM;
+	memset(s_info, 0, cls_d->nsock * sizeof(socket_info_t));
 
-    /* base address = 0, map = 0 */
-    s->cis_mem.flags = 0;
-    s->cis_mem.speed = cis_speed;
-    s->use_bus_pm = use_bus_pm;
-    s->erase_busy.next = s->erase_busy.prev = &s->erase_busy;
-    spin_lock_init(&s->lock);
+	/* socket initialization */
+	for (i = 0; i < cls_d->nsock; i++) {
+		socket_info_t *s = &s_info[i];
+
+		cls_d->s_info[i] = s;
+		s->ss_entry = cls_d->ops;
+		s->sock = i;
+
+		/* base address = 0, map = 0 */
+		s->cis_mem.flags = 0;
+		s->cis_mem.speed = cis_speed;
+		s->use_bus_pm = cls_d->use_bus_pm;
+		s->erase_busy.next = s->erase_busy.prev = &s->erase_busy;
+		spin_lock_init(&s->lock);
     
-    for (i = 0; i < sockets; i++)
-	if (socket_table[i] == NULL) break;
-    socket_table[i] = s;
-    if (i == sockets) sockets++;
+		/* TBD: remove usage of socket_table, use class_for_each_dev instead */
+		for (j = 0; j < sockets; j++)
+			if (socket_table[j] == NULL) break;
+		socket_table[j] = s;
+		if (j == sockets) sockets++;
 
-    init_socket(s);
-    ss_entry->inquire_socket(slot, &s->cap);
+		init_socket(s);
+		s->ss_entry->inquire_socket(i, &s->cap);
 #ifdef CONFIG_PROC_FS
-    if (proc_pccard) {
-	char name[3];
-	sprintf(name, "%02d", i);
-	s->proc = proc_mkdir(name, proc_pccard);
-	if (s->proc)
-	    ss_entry->proc_setup(slot, s->proc);
+		if (proc_pccard) {
+			char name[3];
+			sprintf(name, "%02d", i);
+			s->proc = proc_mkdir(name, proc_pccard);
+			if (s->proc)
+				s->ss_entry->proc_setup(i, s->proc);
 #ifdef PCMCIA_DEBUG
-	if (s->proc)
-	    create_proc_read_entry("clients", 0, s->proc,
-				   proc_read_clients, s);
+			if (s->proc)
+				create_proc_read_entry("clients", 0, s->proc,
+				       proc_read_clients, s);
 #endif
-    }
+		}
 #endif
-    return s;
+	}
+	return 0;
 } /* pcmcia_register_socket */
 
-int register_ss_entry(int nsock, struct pccard_operations * ss_entry)
+
+/**
+ * pcmcia_unregister_socket - remove a pcmcia socket device
+ */
+void pcmcia_unregister_socket(struct device *dev)
 {
-    int ns;
+	struct pcmcia_socket_class_data *cls_d = to_class_data(dev);
+	unsigned int i;
+	int j, socket = -1;
+	client_t *client;
+	socket_info_t *s;
 
-    DEBUG(0, "cs: register_ss_entry(%d, 0x%p)\n", nsock, ss_entry);
+	if (!cls_d)
+		return;
 
-    for (ns = 0; ns < nsock; ns++) {
-	pcmcia_register_socket (ns, ss_entry, 0);
-    }
-    
-    return 0;
-} /* register_ss_entry */
+	s = (socket_info_t *) cls_d->s_info;
 
-/*====================================================================*/
-
-void pcmcia_unregister_socket(socket_info_t *s)
-{
-    int j, socket = -1;
-    client_t *client;
-
-    for (j = 0; j < MAX_SOCK; j++)
-	if (socket_table [j] == s) {
-	    socket = j;
-	    break;
-	}
-    if (socket < 0)
-	return;
-
+	for (i = 0; i < cls_d->nsock; i++) {
+		for (j = 0; j < MAX_SOCK; j++)
+			if (socket_table [j] == s) {
+				socket = j;
+				break;
+			}
+		if (socket < 0)
+			continue;
+		
 #ifdef CONFIG_PROC_FS
-    if (proc_pccard) {
-	char name[3];
-	sprintf(name, "%02d", socket);
+		if (proc_pccard) {
+			char name[3];
+			sprintf(name, "%02d", socket);
 #ifdef PCMCIA_DEBUG
-	remove_proc_entry("clients", s->proc);
+			remove_proc_entry("clients", s->proc);
 #endif
-	remove_proc_entry(name, proc_pccard);
-    }
+			remove_proc_entry(name, proc_pccard);
+		}
 #endif
+		
+		shutdown_socket(s);
+		release_cis_mem(s);
+		while (s->clients) {
+			client = s->clients;
+			s->clients = s->clients->next;
+			kfree(client);
+		}
+		s->ss_entry = NULL;
+		socket_table[socket] = NULL;
+		for (j = socket; j < sockets-1; j++)
+			socket_table[j] = socket_table[j+1];
+		sockets--;
 
-    shutdown_socket(s);
-    release_cis_mem(s);
-    while (s->clients) {
-	client = s->clients;
-	s->clients = s->clients->next;
-	kfree(client);
-    }
-    s->ss_entry = NULL;
-    kfree(s);
-
-    socket_table[socket] = NULL;
-    for (j = socket; j < sockets-1; j++)
-	socket_table[j] = socket_table[j+1];
-    sockets--;
+		s++;
+	}
+	kfree(cls_d->s_info);
 } /* pcmcia_unregister_socket */
 
-void unregister_ss_entry(struct pccard_operations * ss_entry)
-{
-    int i;
-
-    for (i = sockets-1; i >= 0; i-- ) {
-	socket_info_t *socket = socket_table[i];
-	if (socket->ss_entry == ss_entry)
-		pcmcia_unregister_socket (socket);
-    }
-} /* unregister_ss_entry */
 
 /*======================================================================
 
@@ -2403,8 +2407,6 @@ EXPORT_SYMBOL(pcmcia_validate_cis);
 EXPORT_SYMBOL(pcmcia_write_memory);
 
 EXPORT_SYMBOL(dead_socket);
-EXPORT_SYMBOL(register_ss_entry);
-EXPORT_SYMBOL(unregister_ss_entry);
 EXPORT_SYMBOL(CardServices);
 EXPORT_SYMBOL(MTDHelperEntry);
 #ifdef CONFIG_PROC_FS
@@ -2418,6 +2420,8 @@ EXPORT_SYMBOL(pcmcia_resume_socket);
 
 struct device_class pcmcia_socket_class = {
 	.name = "pcmcia_socket",
+	.add_device = &pcmcia_register_socket,
+	.remove_device = &pcmcia_unregister_socket,
 };
 EXPORT_SYMBOL(pcmcia_socket_class);
 
