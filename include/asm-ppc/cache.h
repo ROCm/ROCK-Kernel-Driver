@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * include/asm-ppc/cache.h
  */
 #ifdef __KERNEL__

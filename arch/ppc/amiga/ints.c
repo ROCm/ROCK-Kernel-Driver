@@ -1,8 +1,5 @@
 /*
- * BK Id: SCCS/s.ints.c 1.5 05/17/01 18:14:20 cort
- */
-/*
- *  linux/arch/ppc/amiga/ints.c
+ *  arch/ppc/amiga/ints.c
  *
  *  Linux/m68k general interrupt handling code from arch/m68k/kernel/ints.c
  *  Needed to drive the m68k emulating IRQ hardware on the PowerUp boards.

@@ -1,6 +1,3 @@
-/*
- * BK Id: SCCS/s.ppc.h 1.5 05/17/01 18:14:23 cort
- */
 /* ppc.h -- Header file for PowerPC opcode table
    Copyright 1994 Free Software Foundation, Inc.
    Written by Ian Lance Taylor, Cygnus Support

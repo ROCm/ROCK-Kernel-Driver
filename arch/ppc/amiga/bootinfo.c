@@ -1,8 +1,5 @@
 /*
- * BK Id: SCCS/s.bootinfo.c 1.5 05/17/01 18:14:20 cort
- */
-/*
- *  linux/arch/ppc/amiga/bootinfo.c
+ *  arch/ppc/amiga/bootinfo.c
  *
  *  Extracted from arch/m68k/kernel/setup.c.
  *  Should be properly generalized and put somewhere else.

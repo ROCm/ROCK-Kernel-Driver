@@ -1,7 +1,4 @@
 /*
- * BK Id: SCCS/s.enet.c 1.9 09/14/01 18:01:16 trini
- */
-/*
  * Ethernet driver for Motorola MPC8260.
  * Copyright (c) 1999 Dan Malek (dmalek@jlc.net)
  * Copyright (c) 2000 MontaVista Software Inc. (source@mvista.com)

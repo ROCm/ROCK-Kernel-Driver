@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * Support for indirect PCI bridges.
  *
  * Copyright (C) 1998 Gabriel Paubert.

@@ -1,7 +1,3 @@
-/*
- * BK Id: %F% %I% %G% %U% %#%
- */
-
 /* This is the single file included by all MPC8xx build options.
  * Since there are many different boards and no standard configuration,
  * we have a unique include file for each.  Rather than change every

@@ -1,7 +1,4 @@
 /*
- * BK Id: SCCS/s.ivms8.h 1.8 10/26/01 10:14:09 trini
- */
-/*
  * Speech Design Integrated Voicemail board specific definitions
  * - IVMS8  (small,  8 channels)
  * - IVML24 (large, 24 channels)

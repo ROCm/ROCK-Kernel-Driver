@@ -1,10 +1,7 @@
-/*
- * BK Id: %F% %I% %G% %U% %#%
- */
 #define m68k_debug_device debug_device
 
 /*
- *  linux/arch/m68k/amiga/config.c
+ *  arch/ppc/amiga/config.c
  *
  *  Copyright (C) 1993 Hamish Macdonald
  *

@@ -1,6 +1,3 @@
-/*
- * BK Id: SCCS/s.ipcbuf.h 1.5 05/17/01 18:14:24 cort
- */
 #ifndef __PPC_IPCBUF_H__
 #define __PPC_IPCBUF_H__
 

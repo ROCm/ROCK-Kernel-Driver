@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * ppc-stub.c:  KGDB support for the Linux kernel.
  *
  * adapted from arch/sparc/kernel/sparc-stub.c for the PowerPC

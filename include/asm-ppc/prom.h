@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * Definitions for talking to the Open Firmware PROM on
  * Power Macintosh computers.
  *

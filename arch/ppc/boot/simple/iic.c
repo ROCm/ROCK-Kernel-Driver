@@ -1,7 +1,3 @@
-/*
- * BK Id: %F% %I% %G% %U% %#%
- */
-
 /* Minimal support functions to read configuration from IIC EEPROMS
  * on MPC8xx boards.  Originally written for RPGC RPX-Lite.
  * Dan Malek (dmalek@jlc.net).

@@ -1,6 +1,3 @@
-/*
- * BK Id: SCCS/s.termios.h 1.8 05/17/01 18:14:26 cort
- */
 #ifndef _PPC_TERMIOS_H
 #define _PPC_TERMIOS_H
 

@@ -1,8 +1,4 @@
 /*
- * BK Id: SCCS/s.commproc.c 1.10 10/16/01 16:21:52 trini
- */
-
-/*
  * General Purpose functions for the global management of the
  * 8260 Communication Processor Module.
  * Copyright (c) 1999 Dan Malek (dmalek@jlc.net)

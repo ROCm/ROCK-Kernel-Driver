@@ -1,6 +1,3 @@
-/*
- * BK Id: %F% %I% %G% %U% %#%
- */
 #ifdef __KERNEL__
 #ifndef _PPC_MACHDEP_H
 #define _PPC_MACHDEP_H

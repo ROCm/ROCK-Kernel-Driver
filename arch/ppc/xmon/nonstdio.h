@@ -1,6 +1,3 @@
-/*
- * BK Id: %F% %I% %G% %U% %#%
- */
 typedef int	FILE;
 extern FILE *xmon_stdin, *xmon_stdout;
 #define EOF	(-1)

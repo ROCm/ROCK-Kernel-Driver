@@ -1,6 +1,3 @@
-/*
- * BK Id: %F% %I% %G% %U% %#%
- */
 #ifdef __KERNEL__
 #ifndef __ASMPPC_GEMINI_SERIAL_H
 #define __ASMPPC_GEMINI_SERIAL_H

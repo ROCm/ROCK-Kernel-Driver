@@ -1,19 +1,8 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- *
  *    Copyright 2001 MontaVista Software Inc.
  *        <mlocke@mvista.com>
  *
- * 	Not much needed for the Embedded Planet 405gp board
- *
- *  	History: 11/09/2001 - armin
- *      added board_init to add in additional instuctions needed during platfrom_init
- *	cleaned up map_irq.
- *	 
- *	1/22/2002 - Armin
- *      converted pci to ocp
- *
-
+ * 	Not much is needed for the Embedded Planet 405gp board
  *
  */
 #include <linux/config.h>

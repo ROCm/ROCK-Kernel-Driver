@@ -1,5 +1,3 @@
-# BK Id: %F% %I% %G% %U% %#%
-#
 #
 # Makefile for Linux arch/m68k/amiga source directory
 #

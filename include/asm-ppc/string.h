@@ -1,6 +1,3 @@
-/*
- * BK Id: SCCS/s.string.h 1.5 05/17/01 18:14:26 cort
- */
 #ifndef _PPC_STRING_H_
 #define _PPC_STRING_H_
 

@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * keylargo.h: definitions for using the "KeyLargo" I/O controller chip.
  *
  */

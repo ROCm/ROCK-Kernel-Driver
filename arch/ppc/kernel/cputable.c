@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  *  arch/ppc/kernel/cputable.c
  *
  *  Copyright (C) 2001 Ben. Herrenschmidt (benh@kernel.crashing.org)

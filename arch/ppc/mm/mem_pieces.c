@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  *    Copyright (c) 1996 Paul Mackerras <paulus@cs.anu.edu.au>
  *      Changes to accomodate Power Macintoshes.
  *    Cort Dougan <cort@cs.nmt.edu>

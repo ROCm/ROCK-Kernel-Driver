@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * Copyright (C) Michel Dänzer <michdaen@iiic.ethz.ch>
  *
  * APUS PCI routines.

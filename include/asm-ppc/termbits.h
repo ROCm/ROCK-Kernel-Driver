@@ -1,6 +1,3 @@
-/*
- * BK Id: SCCS/s.termbits.h 1.5 05/17/01 18:14:26 cort
- */
 #ifndef _PPC_TERMBITS_H
 #define _PPC_TERMBITS_H
 

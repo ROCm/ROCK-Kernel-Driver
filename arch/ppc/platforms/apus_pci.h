@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * Phase5 CybervisionPPC (TVP4020) definitions for the Permedia2 framebuffer
  * driver.
  *

@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * This file contains the routines for initializing the MMU
  * on the 4xx series of chips.
  *  -- paulus

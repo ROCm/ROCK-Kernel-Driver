@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * Copyright (C) 1999 Cort Dougan <cort@cs.nmt.edu>
  */
 #ifdef __KERNEL__

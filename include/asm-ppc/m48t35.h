@@ -1,7 +1,4 @@
 /*
- * BK Id: SCCS/s.m48t35.h 1.8 10/16/01 15:58:42 trini
- */
-/*
  *  Registers for the SGS-Thomson M48T35 Timekeeper RAM chip
  *  and
  *  Registers for the SGS-Thomson M48T37 Timekeeper RAM chip

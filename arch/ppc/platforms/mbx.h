@@ -1,7 +1,4 @@
 /*
- * BK Id: SCCS/s.mbx.h 1.11 08/17/01 15:23:17 paulus
- */
-/*
  * A collection of structures, addresses, and values associated with
  * the Motorola MBX boards.  This was originally created for the
  * MBX860, and probably needs revisions for other boards (like the 821).

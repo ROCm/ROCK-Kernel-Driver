@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * arch/ppc/boot/simple/gt64260_tty.c
  * 
  * Bootloader version of the embedded MPSC/UART driver for the GT64260[A].

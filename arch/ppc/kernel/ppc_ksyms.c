@@ -1,6 +1,3 @@
-/*
- * BK Id: %F% %I% %G% %U% %#%
- */
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/threads.h>

@@ -1,7 +1,3 @@
-/*
- * BK Id: %F% %I% %G% %U% %#%
- */
-
 #include <linux/stddef.h>
 #include <linux/init.h>
 #include <linux/sched.h>

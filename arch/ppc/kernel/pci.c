@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * Common pmac/prep/chrp pci routines. -- Cort
  */
 

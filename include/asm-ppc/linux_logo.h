@@ -1,7 +1,4 @@
 /*
- * BK Id: SCCS/s.linux_logo.h 1.7 05/17/01 18:14:24 cort
- */
-/*
  * include/asm-ppc/linux_logo.h: A linux logo to be displayed on boot
  * (pinched from the sparc port).
  *

@@ -1,8 +1,5 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
- *  include/asm-ppc/platforms/gemini.h
+ *  arch/ppc/platforms/gemini.h
  *
  *
  *  Onboard registers and descriptions for Synergy Microsystems' 

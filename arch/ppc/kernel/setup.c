@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * Common prep/pmac/chrp boot and setup code.
  */
 

@@ -1,7 +1,4 @@
 /*
- * BK Id: SCCS/s.mknote.c 1.7 05/18/01 15:17:23 cort
- */
-/*
  * Copyright (C) Cort Dougan 1999.
  *
  * This program is free software; you can redistribute it and/or
