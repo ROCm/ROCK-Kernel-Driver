@@ -356,7 +356,7 @@ start_secondary (void *unused)
 	return cpu_idle();
 }
 
-struct pt_regs * __init idle_regs(struct pt_regs *regs)
+struct pt_regs * __devinit idle_regs(struct pt_regs *regs)
 {
 	return NULL;
 }
