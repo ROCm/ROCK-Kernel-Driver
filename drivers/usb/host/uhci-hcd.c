@@ -103,8 +103,8 @@ static void uhci_free_pending_tds(struct uhci_hcd *uhci);
 static void hc_state_transitions(struct uhci_hcd *uhci);
 
 /* If a transfer is still active after this much time, turn off FSBR */
-#define IDLE_TIMEOUT	(HZ / 20)	/* 50 ms */
-#define FSBR_DELAY	(HZ / 20)	/* 50 ms */
+#define IDLE_TIMEOUT	msecs_to_jiffies(50)
+#define FSBR_DELAY	msecs_to_jiffies(50)
 
 /* When we timeout an idle transfer for FSBR, we'll switch it over to */
 /* depth first traversal. We'll do it in groups of this number of TD's */
@@ -1611,6 +1611,7 @@ static void stall_callback(unsigned long ptr)
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
 	struct list_head list, *tmp, *head;
 	unsigned long flags;
+	int called_uhci_finish_completion = 0;
 
 	INIT_LIST_HEAD(&list);
 
@@ -1619,6 +1620,7 @@ static void stall_callback(unsigned long ptr)
 	    uhci_get_current_frame_number(uhci) != uhci->urb_remove_age) {
 		uhci_remove_pending_urbps(uhci);
 		uhci_finish_completion(hcd, NULL);
+		called_uhci_finish_completion = 1;
 	}
 
 	head = &uhci->urb_list;
@@ -1645,6 +1647,10 @@ static void stall_callback(unsigned long ptr)
 		spin_unlock(&u->lock);
 	}
 	spin_unlock_irqrestore(&uhci->schedule_lock, flags);
+
+	/* Wake up anyone waiting for an URB to complete */
+	if (called_uhci_finish_completion)
+		wake_up_all(&uhci->waitqh);
 
 	head = &list;
 	tmp = head->next;
@@ -1676,7 +1682,7 @@ static int init_stall_timer(struct usb_hcd *hcd)
 	init_timer(&uhci->stall_timer);
 	uhci->stall_timer.function = stall_callback;
 	uhci->stall_timer.data = (unsigned long)hcd;
-	uhci->stall_timer.expires = jiffies + (HZ / 10);
+	uhci->stall_timer.expires = jiffies + msecs_to_jiffies(100);
 	add_timer(&uhci->stall_timer);
 
 	return 0;
@@ -1831,16 +1837,20 @@ static void reset_hc(struct uhci_hcd *uhci)
 {
 	unsigned int io_addr = uhci->io_addr;
 
+	/* Turn off PIRQ, SMI, and all interrupts.  This also turns off
+	 * the BIOS's USB Legacy Support.
+	 */
+	pci_write_config_word(to_pci_dev(uhci_dev(uhci)), USBLEGSUP, 0);
+	outw(0, uhci->io_addr + USBINTR);
+
 	/* Global reset for 50ms */
 	uhci->state = UHCI_RESET;
 	outw(USBCMD_GRESET, io_addr + USBCMD);
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout((HZ*50+999) / 1000);
+	msleep(50);
 	outw(0, io_addr + USBCMD);
 
 	/* Another 10ms delay */
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout((HZ*10+999) / 1000);
+	msleep(10);
 	uhci->resume_detect = 0;
 }
 
@@ -1865,7 +1875,7 @@ static void wakeup_hc(struct uhci_hcd *uhci)
 			/* Global resume for >= 20ms */
 			outw(USBCMD_FGR | USBCMD_EGSM, io_addr + USBCMD);
 			uhci->state = UHCI_RESUMING_1;
-			uhci->state_end = jiffies + (20*HZ+999) / 1000;
+			uhci->state_end = jiffies + msecs_to_jiffies(20);
 			break;
 
 		case UHCI_RESUMING_1:		/* End global resume */
@@ -1990,7 +2000,9 @@ static void start_hc(struct uhci_hcd *uhci)
 		}
 	}
 
-	/* Turn on all interrupts */
+	/* Turn on PIRQ and all interrupts */
+	pci_write_config_word(to_pci_dev(uhci_dev(uhci)), USBLEGSUP,
+			USBLEGSUP_DEFAULT);
 	outw(USBINTR_TIMEOUT | USBINTR_RESUME | USBINTR_IOC | USBINTR_SP,
 		io_addr + USBINTR);
 
@@ -2054,15 +2066,10 @@ static int uhci_reset(struct usb_hcd *hcd)
 
 	uhci->io_addr = (unsigned long) hcd->regs;
 
-	/* Turn off all interrupts */
-	outw(0, uhci->io_addr + USBINTR);
-
-	/* Maybe kick BIOS off this hardware.  Then reset, so we won't get
+	/* Kick BIOS off this hardware and reset, so we won't get
 	 * interrupts from any previous setup.
 	 */
 	reset_hc(uhci);
-	pci_write_config_word(to_pci_dev(uhci_dev(uhci)), USBLEGSUP,
-			USBLEGSUP_DEFAULT);
 	return 0;
 }
 
@@ -2369,14 +2376,18 @@ static int uhci_resume(struct usb_hcd *hcd)
 		/*
 		 * Some systems don't maintain the UHCI register values
 		 * during a PM suspend/resume cycle, so reinitialize
-		 * the Frame Number, the Framelist Base Address, and the
-		 * Interrupt Enable registers.
+		 * the Frame Number, Framelist Base Address, Interrupt
+		 * Enable, and Legacy Support registers.
 		 */
+		pci_write_config_word(to_pci_dev(uhci_dev(uhci)), USBLEGSUP,
+				0);
 		outw(uhci->saved_framenumber, uhci->io_addr + USBFRNUM);
 		outl(uhci->fl->dma_handle, uhci->io_addr + USBFLBASEADD);
 		outw(USBINTR_TIMEOUT | USBINTR_RESUME | USBINTR_IOC |
 				USBINTR_SP, uhci->io_addr + USBINTR);
 		uhci->resume_detect = 1;
+		pci_write_config_word(to_pci_dev(uhci_dev(uhci)), USBLEGSUP,
+				USBLEGSUP_DEFAULT);
 	} else {
 		reset_hc(uhci);
 		start_hc(uhci);
