@@ -1645,19 +1645,11 @@ MODULE_DESCRIPTION("Ethernet driver for Marvell MV64340");
 /* locals */
 
 /* PHY routines */
-#ifdef MDD_CUT
-static void ethernet_phy_set(unsigned int eth_port_num, int phy_addr);
-#endif
 static int ethernet_phy_get(unsigned int eth_port_num);
 
 /* Ethernet Port routines */
 static int eth_port_uc_addr(unsigned int eth_port_num, unsigned char uc_nibble,
 	int option);
-
-#ifdef MDD_CUT
-static void eth_b_copy(unsigned int src_addr, unsigned int dst_addr,
-	int byte_count);
-#endif
 
 /*
  * eth_port_init - Initialize the Ethernet port driver
@@ -1956,38 +1948,6 @@ static void eth_clear_mib_counters(unsigned int eth_port_num)
 		MV_READ(MV64340_ETH_MIB_COUNTERS_BASE(eth_port_num) + i);
 }
 
-
-#ifdef MDD_CUT
-/*
- * ethernet_phy_set - Set the ethernet port PHY address.
- *
- * DESCRIPTION:
- *       This routine set the ethernet port PHY address according to given 
- *       parameter.
- *
- * INPUT:
- *		unsigned int   eth_port_num   Ethernet Port number.
- *
- * OUTPUT:
- *       Set PHY Address Register with given PHY address parameter.
- *
- * RETURN:
- *       None.
- */
-static void ethernet_phy_set(unsigned int eth_port_num, int phy_addr)
-{
-	unsigned int reg_data;
-
-	reg_data = MV_READ(MV64340_ETH_PHY_ADDR_REG);
-
-	reg_data &= ~(0x1F << (5 * eth_port_num));
-	reg_data |= (phy_addr << (5 * eth_port_num));
-
-	MV_WRITE(MV64340_ETH_PHY_ADDR_REG, reg_data);
-
-	return;
-}
-#endif
 
 /*
  * ethernet_phy_get - Get the ethernet port PHY address.
@@ -2684,39 +2644,3 @@ static ETH_FUNC_RET_STATUS eth_rx_return_buff(struct mv64340_private * mp,
 
 	return ETH_OK;
 }
-
-#ifdef MDD_CUT
-/*
- * eth_b_copy - Copy bytes from source to destination
- *
- * DESCRIPTION:
- *       This function supports the eight bytes limitation on Tx buffer size. 
- *       The routine will zero eight bytes starting from the destination address
- *       followed by copying bytes from the source address to the destination.
- *
- * INPUT:
- *       unsigned int src_addr    32 bit source address.
- *       unsigned int dst_addr    32 bit destination address.
- *       int        byte_count    Number of bytes to copy.
- *
- * OUTPUT:
- *       See description.
- *
- * RETURN:
- *       None.
- *
- */
-static void eth_b_copy(unsigned int src_addr, unsigned int dst_addr,
-		       int byte_count)
-{
-	/* Zero the dst_addr area */
-	*(unsigned int *) dst_addr = 0x0;
-
-	while (byte_count != 0) {
-		*(char *) dst_addr = *(char *) src_addr;
-		dst_addr++;
-		src_addr++;
-		byte_count--;
-	}
-}
-#endif
