@@ -169,6 +169,17 @@ ENTRY(lcall27)
 	movl %eax,EFLAGS(%esp)	#
 	movl %edx,EIP(%esp)	# Now we move them to their "normal" places
 	movl %ecx,CS(%esp)	#
+
+	#
+	# Call gates don't clear TF and NT in eflags like
+	# traps do, so we need to do it ourselves.
+	# %eax already contains eflags (but it may have
+	# DF set, clear that also)
+	#
+	andl $~(DF_MASK | TF_MASK | NT_MASK),%eax
+	pushl %eax
+	popfl
+
 	movl %esp, %ebx
 	pushl %ebx
 	andl $-8192, %ebx	# GET_THREAD_INFO
