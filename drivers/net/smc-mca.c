@@ -218,7 +218,7 @@ int __init ultramca_probe(struct device *gen_dev)
 
 	strncpy(gen_dev->name, smc_mca_adapter_names[adapter], sizeof(gen_dev->name));
 	mca_device_set_claim(mca_dev, 1);
-
+	ultra_found++;
 
 	dev->base_addr = ioaddr = mca_device_transform_ioport(mca_dev, tbase);
 	dev->irq       = mca_device_transform_irq(mca_dev, tirq);
