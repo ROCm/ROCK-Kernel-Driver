@@ -395,7 +395,7 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 		if (!perm)
 			return -EPERM;
 		if (arg)
-			arg = 1193180 / arg;
+			arg = 1193182 / arg;
 		kd_mksound(arg, 0);
 		return 0;
 
@@ -412,7 +412,7 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 		ticks = HZ * ((arg >> 16) & 0xffff) / 1000;
 		count = ticks ? (arg & 0xffff) : 0;
 		if (count)
-			count = 1193180 / count;
+			count = 1193182 / count;
 		kd_mksound(count, ticks);
 		return 0;
 	}
