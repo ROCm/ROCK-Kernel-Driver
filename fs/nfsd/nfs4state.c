@@ -1844,14 +1844,15 @@ nfs4_laundromat(void)
 {
 	struct nfs4_client *clp;
 	struct nfs4_stateowner *sop;
+	struct nfs4_delegation *dp;
 	struct list_head *pos, *next;
 	time_t cutoff = get_seconds() - NFSD_LEASE_TIME;
 	time_t t, clientid_val = NFSD_LEASE_TIME;
-	time_t u, close_val = NFSD_LEASE_TIME;
+	time_t u, test_val = NFSD_LEASE_TIME;
 
 	nfs4_lock_state();
 
-	dprintk("NFSD: laundromat service - starting, examining clients\n");
+	dprintk("NFSD: laundromat service - starting\n");
 	list_for_each_safe(pos, next, &client_lru) {
 		clp = list_entry(pos, struct nfs4_client, cl_lru);
 		if (time_after((unsigned long)clp->cl_time, (unsigned long)cutoff)) {
@@ -1864,12 +1865,30 @@ nfs4_laundromat(void)
 			clp->cl_clientid.cl_id);
 		expire_client(clp);
 	}
+	spin_lock(&recall_lock);
+	list_for_each_safe(pos, next, &del_recall_lru) {
+		dp = list_entry (pos, struct nfs4_delegation, dl_recall_lru);
+		if (atomic_read(&dp->dl_state) == NFS4_RECALL_COMPLETE)
+			goto reap;
+		if (time_after((unsigned long)dp->dl_time, (unsigned long)cutoff)) {
+			u = dp->dl_time - cutoff;
+			if (test_val > u)
+				test_val = u;
+			break;
+		}
+reap:
+		dprintk("NFSD: purging unused delegation dp %p, fp %p\n",
+			            dp, dp->dl_flock);
+		release_delegation(dp);
+	}
+	spin_unlock(&recall_lock);
+	test_val = NFSD_LEASE_TIME;
 	list_for_each_safe(pos, next, &close_lru) {
 		sop = list_entry(pos, struct nfs4_stateowner, so_close_lru);
 		if (time_after((unsigned long)sop->so_time, (unsigned long)cutoff)) {
 			u = sop->so_time - cutoff;
-			if (close_val > u)
-				close_val = u;
+			if (test_val > u)
+				test_val = u;
 			break;
 		}
 		dprintk("NFSD: purging unused open stateowner (so_id %d)\n",
