@@ -63,14 +63,20 @@
 	- Better rx buf size calculation (Donald Becker)
 
 	Version LK1.05 (D-Link):
-	- fix DFE-580TX packet drop issue
-	- fix reset_tx logic
+	- Fix DFE-580TX packet drop issue (for DL10050C)
+	- Fix reset_tx logic
+
+	Version LK1.06 (D-Link):
+	- Fix crash while unloading driver
+
+	Versin LK1.06b (D-Link):
+	- New tx scheme, adaptive tx_coalesce
 
 */
 
 #define DRV_NAME	"sundance"
-#define DRV_VERSION	"1.01+LK1.05"
-#define DRV_RELDATE	"28-Sep-2002"
+#define DRV_VERSION	"1.01+LK1.06b"
+#define DRV_RELDATE	"6-Nov-2002"
 
 
 /* The user-configurable values.
@@ -87,7 +93,6 @@ static int multicast_filter_limit = 32;
    This chip can receive into offset buffers, so the Alpha does not
    need a copy-align. */
 static int rx_copybreak;
-static int tx_coalesce=1;
 static int flowctrl=1;
 
 /* media[] specifies the media type the NIC operates at.
@@ -114,7 +119,7 @@ static char *media[MAX_UNITS];
    bonding and packet priority, and more than 128 requires modifying the
    Tx error recovery.
    Large receive rings merely waste memory. */
-#define TX_RING_SIZE	64
+#define TX_RING_SIZE	32
 #define TX_QUEUE_LEN	(TX_RING_SIZE - 1) /* Limit ring entries actually used.  */
 #define RX_RING_SIZE	64
 #define RX_BUDGET	32
@@ -459,7 +464,9 @@ struct netdev_private {
 	unsigned int an_enable:1;
 	unsigned int speed;
 	struct tasklet_struct rx_tasklet;
+	struct tasklet_struct tx_tasklet;
 	int budget;
+	int cur_task;
 	/* Multicast and receive mode. */
 	spinlock_t mcastlock;			/* SMP lock multicast updates. */
 	u16 mcast_filter[4];
@@ -468,6 +475,7 @@ struct netdev_private {
 	int mii_preamble_required;
 	unsigned char phys[MII_CNT];		/* MII device addresses, only first one used. */
 	struct pci_dev *pci_dev;
+	unsigned char pci_rev_id;
 };
 
 /* The station address location in the EEPROM. */
@@ -489,6 +497,7 @@ static int  start_tx(struct sk_buff *skb, struct net_device *dev);
 static int reset_tx (struct net_device *dev);
 static void intr_handler(int irq, void *dev_instance, struct pt_regs *regs);
 static void rx_poll(unsigned long data);
+static void tx_poll(unsigned long data);
 static void refill_rx (struct net_device *dev);
 static void netdev_error(struct net_device *dev, int intr_status);
 static void netdev_error(struct net_device *dev, int intr_status);
@@ -557,6 +566,7 @@ static int __devinit sundance_probe1 (struct pci_dev *pdev,
 	np->msg_enable = (1 << debug) - 1;
 	spin_lock_init(&np->lock);
 	tasklet_init(&np->rx_tasklet, rx_poll, (unsigned long)dev);
+	tasklet_init(&np->tx_tasklet, tx_poll, (unsigned long)dev);
 
 	ring_space = pci_alloc_consistent(pdev, TX_TOTAL_SIZE, &ring_dma);
 	if (!ring_space)
@@ -587,6 +597,8 @@ static int __devinit sundance_probe1 (struct pci_dev *pdev,
 	dev->watchdog_timeo = TX_TIMEOUT;
 	dev->change_mtu = &change_mtu;
 	pci_set_drvdata(pdev, dev);
+
+	pci_read_config_byte(pdev, PCI_REVISION_ID, &np->pci_rev_id);
 
 	i = register_netdev(dev);
 	if (i)
@@ -650,10 +662,6 @@ static int __devinit sundance_probe1 (struct pci_dev *pdev,
 				np->an_enable = 1;
 			}
 		}
-		if (tx_coalesce < 1)
-			tx_coalesce = 1;
-		else if (tx_coalesce > TX_QUEUE_LEN - 1)
-			tx_coalesce = TX_QUEUE_LEN - 1;
 		if (flowctrl == 0)
 			np->flowctrl = 0;
 	}
@@ -867,7 +875,8 @@ static int netdev_open(struct net_device *dev)
 	writeb(100, ioaddr + RxDMAPollPeriod);
 	writeb(127, ioaddr + TxDMAPollPeriod);
 	/* Fix DFE-580TX packet drop issue */
-	writeb(0x01, ioaddr + DebugCtrl1);
+	if (np->pci_rev_id >= 0x14)
+		writeb(0x01, ioaddr + DebugCtrl1);
 	netif_start_queue(dev);
 
 	writew(StatsEnable | RxEnable | TxEnable, ioaddr + MACCtrl1);
@@ -943,7 +952,9 @@ static void tx_timeout(struct net_device *dev)
 	struct netdev_private *np = dev->priv;
 	long ioaddr = dev->base_addr;
 	long flag;
-
+	
+	netif_stop_queue(dev);
+	tasklet_disable(&np->tx_tasklet);
 	writew(0, ioaddr + IntrEnable);
 	printk(KERN_WARNING "%s: Transmit timed out, TxStatus %2.2x "
 		   "TxFrameId %2.2x,"
@@ -952,31 +963,39 @@ static void tx_timeout(struct net_device *dev)
 
 	{
 		int i;
-		printk(KERN_DEBUG "  Rx ring %p: ", np->rx_ring);
-		for (i = 0; i < RX_RING_SIZE; i++)
-			printk(" %8.8x", (unsigned int)np->rx_ring[i].status);
-		printk("\n"KERN_DEBUG"  Tx ring %p: ", np->tx_ring);
-		for (i = 0; i < TX_RING_SIZE; i++)
-			printk(" %8.8x", np->tx_ring[i].status);
-		printk("\n");
-		printk(KERN_DEBUG "cur_tx=%d dirty_tx=%d\n", np->cur_tx, np->dirty_tx);
+		for (i=0; i<TX_RING_SIZE; i++) {
+			printk(KERN_DEBUG "%02x %08x %08x %08x(%02x) %08x %08x\n", i,
+				np->tx_ring_dma + i*sizeof(*np->tx_ring),	
+				np->tx_ring[i].next_desc,
+				np->tx_ring[i].status,
+				(np->tx_ring[i].status >> 2) & 0xff,
+				np->tx_ring[i].frag[0].addr, 
+				np->tx_ring[i].frag[0].length);
+		}
+		printk(KERN_DEBUG "TxListPtr=%08x netif_queue_stopped=%d\n", 
+			readl(dev->base_addr + TxListPtr), 
+			netif_queue_stopped(dev));
+		printk(KERN_DEBUG "cur_tx=%d(%02x) dirty_tx=%d(%02x)\n", 
+			np->cur_tx, np->cur_tx % TX_RING_SIZE,
+			np->dirty_tx, np->dirty_tx % TX_RING_SIZE);
 		printk(KERN_DEBUG "cur_rx=%d dirty_rx=%d\n", np->cur_rx, np->dirty_rx);
+		printk(KERN_DEBUG "cur_task=%d\n", np->cur_task);
 	}
 	spin_lock_irqsave(&np->lock, flag);
+
+	/* Stop and restart the chip's Tx processes . */
 	reset_tx(dev);
 	spin_unlock_irqrestore(&np->lock, flag);
 
-	/* Perhaps we should reinitialize the hardware here. */
 	dev->if_port = 0;
-	/* Stop and restart the chip's Tx processes . */
-
-	/* Trigger an immediate transmit demand. */
-	writew(DEFAULT_INTR, ioaddr + IntrEnable);
 
 	dev->trans_start = jiffies;
 	np->stats.tx_errors++;
-	if (!netif_queue_stopped(dev))
+	if (np->cur_tx - np->dirty_tx < TX_QUEUE_LEN - 4) {
 		netif_wake_queue(dev);
+	}
+	writew(DEFAULT_INTR, ioaddr + IntrEnable);
+	tasklet_enable(&np->tx_tasklet);
 }
 
 
@@ -988,6 +1007,7 @@ static void init_ring(struct net_device *dev)
 
 	np->cur_rx = np->cur_tx = 0;
 	np->dirty_rx = np->dirty_tx = 0;
+	np->cur_task = 0;
 
 	np->rx_buf_sz = (dev->mtu <= 1520 ? PKT_BUF_SZ : dev->mtu + 16);
 
@@ -1022,39 +1042,57 @@ static void init_ring(struct net_device *dev)
 	return;
 }
 
+static void tx_poll (unsigned long data)
+{
+	struct net_device *dev = (struct net_device *)data;
+	struct netdev_private *np = dev->priv;
+	unsigned head = np->cur_task % TX_RING_SIZE;
+	struct netdev_desc *txdesc = 
+		&np->tx_ring[(np->cur_tx - 1) % TX_RING_SIZE];
+	
+	/* Chain the next pointer */
+	for (; np->cur_tx - np->cur_task > 0; np->cur_task++) {
+		int entry = np->cur_task % TX_RING_SIZE;
+		txdesc = &np->tx_ring[entry];
+		if (np->last_tx) {
+			np->last_tx->next_desc = cpu_to_le32(np->tx_ring_dma +
+				entry*sizeof(struct netdev_desc));
+		}
+		np->last_tx = txdesc;
+	}
+	/* Indicate the latest descriptor of tx ring */
+	txdesc->status |= cpu_to_le32(DescIntrOnTx);
+
+	if (readl (dev->base_addr + TxListPtr) == 0)
+		writel (np->tx_ring_dma + head * sizeof(struct netdev_desc),
+			dev->base_addr + TxListPtr);
+	return;
+}
+
 static int
 start_tx (struct sk_buff *skb, struct net_device *dev)
 {
 	struct netdev_private *np = dev->priv;
 	struct netdev_desc *txdesc;
 	unsigned entry;
-	long ioaddr = dev->base_addr;
 
-	/* Note: Ordering is important here, set the field with the
-	   "ownership" bit last, and only then increment cur_tx. */
 	/* Calculate the next Tx descriptor entry. */
 	entry = np->cur_tx % TX_RING_SIZE;
 	np->tx_skbuff[entry] = skb;
 	txdesc = &np->tx_ring[entry];
 
 	txdesc->next_desc = 0;
-	/* Note: disable the interrupt generation here before releasing. */
-	if (entry % tx_coalesce == 0) {
-		txdesc->status = cpu_to_le32 ((entry << 2) |
-				 DescIntrOnTx | DisableAlign);
-
-	} else {
-		txdesc->status = cpu_to_le32 ((entry << 2) | DisableAlign);
-	}
+	txdesc->status = cpu_to_le32 ((entry << 2) | DisableAlign);
 	txdesc->frag[0].addr = cpu_to_le32 (pci_map_single (np->pci_dev, skb->data,
 							skb->len,
 							PCI_DMA_TODEVICE));
 	txdesc->frag[0].length = cpu_to_le32 (skb->len | LastFrag);
-	if (np->last_tx)
-		np->last_tx->next_desc = cpu_to_le32(np->tx_ring_dma +
-			entry*sizeof(struct netdev_desc));
-	np->last_tx = txdesc;
+
+	/* Increment cur_tx before tasklet_schedule() */
 	np->cur_tx++;
+	mb();
+	/* Schedule a tx_poll() task */
+	tasklet_schedule(&np->tx_tasklet);
 
 	/* On some architectures: explicitly flush cache lines here. */
 	if (np->cur_tx - np->dirty_tx < TX_QUEUE_LEN - 1
@@ -1063,23 +1101,16 @@ start_tx (struct sk_buff *skb, struct net_device *dev)
 	} else {
 		netif_stop_queue (dev);
 	}
-	/* Side effect: The read wakes the potentially-idle transmit channel. */
-	if (readl (dev->base_addr + TxListPtr) == 0)
-		writel (np->tx_ring_dma + entry*sizeof(*np->tx_ring),
-			dev->base_addr + TxListPtr);
-
 	dev->trans_start = jiffies;
-
 	if (netif_msg_tx_queued(np)) {
 		printk (KERN_DEBUG
 			"%s: Transmit frame #%d queued in slot %d.\n",
 			dev->name, np->cur_tx, entry);
 	}
-	if (tx_coalesce > 1)
-		writel (1000, ioaddr + DownCounter);
 	return 0;
 }
-/* Reset hardware tx and reset TxListPtr to TxFrameId */
+
+/* Reset hardware tx and free all of tx buffers */
 static int
 reset_tx (struct net_device *dev)
 {
@@ -1089,8 +1120,8 @@ reset_tx (struct net_device *dev)
 	int i;
 	int irq = in_interrupt();
 	
-	/* reset tx logic */
-	writel (0, dev->base_addr + TxListPtr);
+	/* Reset tx logic, TxListPtr will be cleaned */
+	writew (TxDisable, ioaddr + MACCtrl1);
 	writew (TxReset | DMAReset | FIFOReset | NetworkReset,
 			ioaddr + ASICCtrl + 2);
 	for (i=50; i > 0; i--) {
@@ -1114,11 +1145,13 @@ reset_tx (struct net_device *dev)
 		}
 	}
 	np->cur_tx = np->dirty_tx = 0;
+	np->cur_task = 0;
+	writew (StatsEnable | RxEnable | TxEnable, ioaddr + MACCtrl1);
 	return 0;
 }
 
-/* The interrupt handler does all of the Rx thread work and cleans up
-   after the Tx thread. */
+/* The interrupt handler cleans up after the Tx thread, 
+   and schedule a Rx thread work */
 static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 {
 	struct net_device *dev = (struct net_device *)dev_instance;
@@ -1126,6 +1159,8 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 	long ioaddr;
 	int boguscnt = max_interrupt_work;
 	int hw_frame_id;
+	int tx_cnt;
+	int tx_status;
 
 	ioaddr = dev->base_addr;
 	np = dev->priv;
@@ -1148,15 +1183,13 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 				np->budget = RX_BUDGET;
 			tasklet_schedule(&np->rx_tasklet);
 		}
-
 		if (intr_status & (IntrTxDone | IntrDrvRqst)) {
-			int boguscnt = 32;
-			int tx_status = readw (ioaddr + TxStatus);
-			while (tx_status & 0x80) {
+			tx_status = readw (ioaddr + TxStatus);
+			for (tx_cnt=32; tx_status & 0x80; --tx_cnt) {
 				if (netif_msg_tx_done(np))
 					printk
 					    ("%s: Transmit status is %2.2x.\n",
-					     dev->name, tx_status);
+				     	dev->name, tx_status);
 				if (tx_status & 0x1e) {
 					np->stats.tx_errors++;
 					if (tx_status & 0x10)
@@ -1179,35 +1212,62 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 				/* Yup, this is a documentation bug.  It cost me *hours*. */
 				writew (0, ioaddr + TxStatus);
 				tx_status = readw (ioaddr + TxStatus);
-				if (--boguscnt < 0)
+				if (tx_cnt < 0)
 					break;
 			}
+			hw_frame_id = (tx_status >> 8) & 0xff;
+		} else 	{
+			hw_frame_id = readb(ioaddr + TxFrameId);
 		}
-		spin_lock(&np->lock);
-		hw_frame_id = readb(ioaddr + TxFrameId);
-		for (; np->cur_tx - np->dirty_tx > 0; np->dirty_tx++) {
-			int entry = np->dirty_tx % TX_RING_SIZE;
-			struct sk_buff *skb;
-			int sw_frame_id;
-			sw_frame_id = (np->tx_ring[entry].status >> 2) & 0xff;
 			
-			if (sw_frame_id == hw_frame_id)
-				break;
-			skb = np->tx_skbuff[entry];
-			/* Free the original skb. */
-			pci_unmap_single(np->pci_dev,
-				np->tx_ring[entry].frag[0].addr,
-				skb->len, PCI_DMA_TODEVICE);
-			dev_kfree_skb_irq (np->tx_skbuff[entry]);
-			np->tx_skbuff[entry] = 0;
+		if (np->pci_rev_id >= 0x14) {	
+			spin_lock(&np->lock);
+			for (; np->cur_tx - np->dirty_tx > 0; np->dirty_tx++) {
+				int entry = np->dirty_tx % TX_RING_SIZE;
+				struct sk_buff *skb;
+				int sw_frame_id;
+				sw_frame_id = (np->tx_ring[entry].status >> 2) & 0xff;
+					if (sw_frame_id == hw_frame_id &&
+						!(np->tx_ring[entry].status & 0x00010000))
+						break;
+					if (sw_frame_id == (hw_frame_id + 1) % TX_RING_SIZE)
+						break;
+				skb = np->tx_skbuff[entry];
+				/* Free the original skb. */
+				pci_unmap_single(np->pci_dev,
+					np->tx_ring[entry].frag[0].addr,
+					skb->len, PCI_DMA_TODEVICE);
+				dev_kfree_skb_irq (np->tx_skbuff[entry]);
+				np->tx_skbuff[entry] = 0;
+				np->tx_ring[entry].frag[0].addr = 0;
+				np->tx_ring[entry].frag[0].length = 0;
+			}
+			spin_unlock(&np->lock);
+		} else {
+			spin_lock(&np->lock);
+			for (; np->cur_tx - np->dirty_tx > 0; np->dirty_tx++) {
+				int entry = np->dirty_tx % TX_RING_SIZE;
+				struct sk_buff *skb;
+				if (!(np->tx_ring[entry].status & 0x00010000))
+					break;
+				skb = np->tx_skbuff[entry];
+				/* Free the original skb. */
+				pci_unmap_single(np->pci_dev,
+					np->tx_ring[entry].frag[0].addr,
+					skb->len, PCI_DMA_TODEVICE);
+				dev_kfree_skb_irq (np->tx_skbuff[entry]);
+				np->tx_skbuff[entry] = 0;
+				np->tx_ring[entry].frag[0].addr = 0;
+				np->tx_ring[entry].frag[0].length = 0;
+			}
+			spin_unlock(&np->lock);
 		}
-		spin_unlock(&np->lock);
+		
 		if (netif_queue_stopped(dev) &&
 			np->cur_tx - np->dirty_tx < TX_QUEUE_LEN - 4) {
-			/* The ring is no longer full, clear tbusy. */
+			/* The ring is no longer full, clear busy flag. */
 			netif_wake_queue (dev);
 		}
-
 		/* Abnormal error summary/uncommon events handlers. */
 		if (intr_status & (IntrPCIErr | LinkChange | StatsMax))
 			netdev_error(dev, intr_status);
@@ -1223,8 +1283,7 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 	if (netif_msg_intr(np))
 		printk(KERN_DEBUG "%s: exiting interrupt, status=%#4.4x.\n",
 			   dev->name, readw(ioaddr + IntrStatus));
-	if (np->cur_tx - np->dirty_tx > 0 && tx_coalesce > 1)
-		writel(100, ioaddr + DownCounter);
+	writel(5000, ioaddr + DownCounter);
 
 }
 
@@ -1246,7 +1305,7 @@ static void rx_poll(unsigned long data)
 		if (--boguscnt < 0) {
 			goto not_done;
 		}
-		if (!(desc->status & DescOwn))
+		if (!(frame_status & DescOwn))
 			break;
 		pkt_len = frame_status & 0x1fff;	/* Chip omits the CRC. */
 		if (netif_msg_rx_status(np))
@@ -1555,6 +1614,7 @@ static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	struct netdev_private *np = dev->priv;
 	struct mii_ioctl_data *data = (struct mii_ioctl_data *) & rq->ifr_data;
 	int rc;
+	int i;
 
 	if (!netif_running(dev))
 		return -EINVAL;
@@ -1567,6 +1627,28 @@ static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		rc = generic_mii_ioctl(&np->mii_if, data, cmd, NULL);
 		spin_unlock_irq(&np->lock);
 	}
+	switch (cmd) {
+		case SIOCDEVPRIVATE:
+		for (i=0; i<TX_RING_SIZE; i++) {
+			printk(KERN_DEBUG "%02x %08x %08x %08x(%02x) %08x %08x\n", i,
+				np->tx_ring_dma + i*sizeof(*np->tx_ring),	
+				np->tx_ring[i].next_desc,
+				np->tx_ring[i].status,
+				(np->tx_ring[i].status >> 2) & 0xff,
+				np->tx_ring[i].frag[0].addr, 
+				np->tx_ring[i].frag[0].length);
+		}
+		printk(KERN_DEBUG "TxListPtr=%08x netif_queue_stopped=%d\n", 
+			readl(dev->base_addr + TxListPtr), 
+			netif_queue_stopped(dev));
+		printk(KERN_DEBUG "cur_tx=%d(%02x) dirty_tx=%d(%02x)\n", 
+			np->cur_tx, np->cur_tx % TX_RING_SIZE,
+			np->dirty_tx, np->dirty_tx % TX_RING_SIZE);
+		printk(KERN_DEBUG "cur_rx=%d dirty_rx=%d\n", np->cur_rx, np->dirty_rx);
+		printk(KERN_DEBUG "cur_task=%d\n", np->cur_task);
+			return 0;
+	}
+				
 
 	return rc;
 }
@@ -1594,6 +1676,10 @@ static int netdev_close(struct net_device *dev)
 
 	/* Stop the chip's Tx and Rx processes. */
 	writew(TxDisable | RxDisable | StatsDisable, ioaddr + MACCtrl1);
+
+	/* Wait and kill tasklet */
+	tasklet_kill(&np->rx_tasklet);
+	tasklet_kill(&np->tx_tasklet);
 
 #ifdef __i386__
 	if (netif_msg_hw(np)) {
