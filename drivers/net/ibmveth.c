@@ -874,14 +874,14 @@ static int __devinit ibmveth_probe(struct vio_dev *dev, const struct vio_device_
 	struct net_device *netdev;
 	struct ibmveth_adapter *adapter;
 
-	unsigned int *mac_addr_p;
+	unsigned char *mac_addr_p;
 	unsigned int *mcastFilterSize_p;
 
 
 	ibmveth_debug_printk_no_adapter("entering ibmveth_probe for UA 0x%x\n", 
 					dev->unit_address);
 
-	mac_addr_p = (unsigned int *) vio_get_attribute(dev, VETH_MAC_ADDR, 0);
+	mac_addr_p = (unsigned char *) vio_get_attribute(dev, VETH_MAC_ADDR, 0);
 	if(!mac_addr_p) {
 		ibmveth_error_printk("Can't find VETH_MAC_ADDR attribute\n");
 		return 0;
@@ -916,8 +916,8 @@ static int __devinit ibmveth_probe(struct vio_dev *dev, const struct vio_device_
 		The RPA doc specifies that the first byte must be 10b, so 
 		we'll just look for it to solve this 8 vs. 6 byte field issue */
 
-	while (*((char*)mac_addr_p) != (char)(0x02))
-		((char*)mac_addr_p)++;
+	if ((*mac_addr_p & 0x3) != 0x02)
+		mac_addr_p += 2;
 
 	adapter->mac_addr = 0;
 	memcpy(&adapter->mac_addr, mac_addr_p, 6);
