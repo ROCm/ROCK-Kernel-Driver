@@ -199,7 +199,7 @@ __arm720_setup:	mov	r0, #0
  */
 		.type	arm720_processor_functions, #object
 ENTRY(arm720_processor_functions)
-		.word	armv4t_late_abort
+		.word	v4t_late_abort
 		.word	cpu_arm720_check_bugs
 		.word	cpu_arm720_proc_init
 		.word	cpu_arm720_proc_fin
@@ -225,10 +225,6 @@ ENTRY(arm720_processor_functions)
 		.word	cpu_arm720_set_pgd
 		.word	cpu_arm720_set_pmd
 		.word	cpu_arm720_set_pte
-
-		/* misc */
-		.word	armv4_clear_user_page
-		.word	armv4_copy_user_page
 
 		.size	arm720_processor_functions, . - arm720_processor_functions
 
@@ -265,4 +261,5 @@ __arm720_proc_info:
 		.long	cpu_arm720_info				@ info
 		.long	arm720_processor_functions
 		.long	v4_tlb_fns
+		.long	v4_user_fns
 		.size	__arm720_proc_info, . - __arm720_proc_info

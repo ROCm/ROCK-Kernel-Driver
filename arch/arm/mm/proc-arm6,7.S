@@ -373,10 +373,6 @@ ENTRY(arm6_processor_functions)
 		.word	cpu_arm6_set_pmd
 		.word	cpu_arm6_set_pte
 
-		/* other */
-		.word	armv3_clear_user_page
-		.word	armv3_copy_user_page
-
 		.size	arm6_processor_functions, . - arm6_processor_functions
 
 /*
@@ -411,10 +407,6 @@ ENTRY(arm7_processor_functions)
 		.word	cpu_arm7_set_pgd
 		.word	cpu_arm7_set_pmd
 		.word	cpu_arm7_set_pte
-
-		/* other */
-		.word	armv3_clear_user_page
-		.word	armv3_copy_user_page
 
 		.size	arm7_processor_functions, . - arm7_processor_functions
 
@@ -465,6 +457,7 @@ __arm6_proc_info:
 		.long	cpu_arm6_info
 		.long	arm6_processor_functions
 		.long	v3_tlb_fns
+		.long	v3_user_fns
 		.size	__arm6_proc_info, . - __arm6_proc_info
 
 		.type	__arm610_proc_info, #object
@@ -479,6 +472,7 @@ __arm610_proc_info:
 		.long	cpu_arm610_info
 		.long	arm6_processor_functions
 		.long	v3_tlb_fns
+		.long	v3_user_fns
 		.size	__arm610_proc_info, . - __arm610_proc_info
 
 		.type	__arm7_proc_info, #object
@@ -493,6 +487,7 @@ __arm7_proc_info:
 		.long	cpu_arm7_info
 		.long	arm7_processor_functions
 		.long	v3_tlb_fns
+		.long	v3_user_fns
 		.size	__arm7_proc_info, . - __arm7_proc_info
 
 		.type	__arm710_proc_info, #object
@@ -507,4 +502,5 @@ __arm710_proc_info:
 		.long	cpu_arm710_info
 		.long	arm7_processor_functions
 		.long	v3_tlb_fns
+		.long	v3_user_fns
 		.size	__arm710_proc_info, . - __arm710_proc_info

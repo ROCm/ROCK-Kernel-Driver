@@ -113,7 +113,6 @@ static int __init integrator_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 extern void pci_v3_init(void *);
 
 struct hw_pci integrator_pci __initdata = {
-	mem_offset:		0x40000000,
 	swizzle:		integrator_swizzle,
 	map_irq:		integrator_map_irq,
 	setup:			pci_v3_setup,

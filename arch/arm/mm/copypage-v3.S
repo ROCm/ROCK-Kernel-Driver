@@ -20,7 +20,7 @@
  *
  * FIXME: do we need to handle cache stuff...
  */
-ENTRY(armv3_copy_user_page)
+ENTRY(v3_copy_user_page)
 	stmfd	sp!, {r4, lr}			@	2
 	mov	r2, #PAGE_SZ/64			@	1
 	ldmia	r1!, {r3, r4, ip, lr}		@	4+1
@@ -42,7 +42,7 @@ ENTRY(armv3_copy_user_page)
  *
  * FIXME: do we need to handle cache stuff...
  */
-ENTRY(armv3_clear_user_page)
+ENTRY(v3_clear_user_page)
 	str	lr, [sp, #-4]!
 	mov	r1, #PAGE_SZ/64			@ 1
 	mov	r2, #0				@ 1
@@ -57,3 +57,8 @@ ENTRY(armv3_clear_user_page)
 	bne	1b				@ 1
 	ldr	pc, [sp], #4
 
+	.section ".text.init", #alloc, #execinstr
+
+ENTRY(v3_user_fns)
+	.long	v3_clear_user_page
+	.long	v3_copy_user_page

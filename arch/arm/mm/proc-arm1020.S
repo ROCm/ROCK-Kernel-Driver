@@ -608,7 +608,7 @@ __arm1020_setup:
  */
 	.type	arm1020_processor_functions, #object
 arm1020_processor_functions:
-	.word	armv4t_early_abort
+	.word	v4t_early_abort
 	.word	cpu_arm1020_check_bugs
 	.word	cpu_arm1020_proc_init
 	.word	cpu_arm1020_proc_fin
@@ -634,10 +634,6 @@ arm1020_processor_functions:
 	.word	cpu_arm1020_set_pgd
 	.word	cpu_arm1020_set_pmd
 	.word	cpu_arm1020_set_pte
-
-	/* misc */
-	.word	armv4_clear_user_page
-	.word	armv4_copy_user_page
 
 	.size	arm1020_processor_functions, . - arm1020_processor_functions
 
@@ -672,4 +668,5 @@ __arm1020_proc_info:
 	.long	cpu_arm1020_info
 	.long	arm1020_processor_functions
 	.long	v4wbi_tlb_fns
+	.long	v4_user_fns
 	.size	__arm1020_proc_info, . - __arm1020_proc_info

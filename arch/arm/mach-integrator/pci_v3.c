@@ -435,7 +435,7 @@ static int __init pci_v3_setup_resources(struct resource **resource)
 	resource[1] = &non_mem;
 	resource[2] = &pre_mem;
 
-	return 0;
+	return 1;
 }
 
 /*
@@ -529,8 +529,10 @@ int __init pci_v3_setup(int nr, struct pci_sys_data *sys)
 {
 	int ret = 0;
 
-	if (nr == 0)
+	if (nr == 0) {
+		sys->mem_offset = 0x40000000;
 		ret = pci_v3_setup_resources(sys->resource);
+	}
 
 	return ret;
 }
@@ -634,7 +636,6 @@ void __init pci_v3_preinit(void)
 void __init pci_v3_postinit(void)
 {
 	unsigned int pci_cmd;
-	int ret;
 
 	pci_cmd = PCI_COMMAND_MEMORY |
 		  PCI_COMMAND_MASTER | PCI_COMMAND_INVALIDATE;
