@@ -144,7 +144,6 @@ struct {
  */
 extern int lmGroupCommit(log_t * log, tblock_t * tblk);
 extern void lmSync(log_t *);
-extern int readSuper(struct super_block *sb, metapage_t ** bpp);
 extern int jfs_commit_inode(struct inode *, int);
 extern int jfs_stop_threads;
 
