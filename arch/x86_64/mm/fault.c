@@ -85,7 +85,7 @@ void dump_pagetable(unsigned long address)
 }
 
 int page_fault_trace; 
-int exception_trace = 1;
+int exception_trace;
 
 /*
  * This routine handles page faults.  It determines the address,

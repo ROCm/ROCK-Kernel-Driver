@@ -8,7 +8,7 @@ MOD_TARGET = aic7xxx.o
 obj-$(CONFIG_SCSI_AIC7XXX)	+= aic7xxx_mod.o
 
 # Core files
-aix7xxx_mod-objs	+= aic7xxx.o aic7xxx_93cx6.o aic7770.o
+aic7xxx_mod-objs	+= aic7xxx.o aic7xxx_93cx6.o aic7770.o
 
 # Platform Specific Files
 aic7xxx_mod-objs	+= aic7xxx_linux.o aic7xxx_proc.o aic7770_linux.o

@@ -390,7 +390,7 @@ static int clear_prepared_bits(struct buffer_head *bh) {
 /* buffer is in current transaction */
 inline int buffer_journaled(const struct buffer_head *bh) {
   if (bh)
-    return test_bit(BH_JDirty, ( struct buffer_head * ) &bh->b_state) ;
+    return test_bit(BH_JDirty, &bh->b_state) ;
   else
     return 0 ;
 }
@@ -400,7 +400,7 @@ inline int buffer_journaled(const struct buffer_head *bh) {
 */ 
 inline int buffer_journal_new(const struct buffer_head *bh) {
   if (bh) 
-    return test_bit(BH_JNew, ( struct buffer_head * )&bh->b_state) ;
+    return test_bit(BH_JNew, &bh->b_state) ;
   else
     return 0 ;
 }

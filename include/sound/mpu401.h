@@ -67,7 +67,7 @@ struct _snd_mpu401 {
 	int irq;			/* IRQ number of MPU-401 chip (-1 = poll) */
 	int irq_flags;
 
-	unsigned int mode;		/* MPU401_MODE_XXXX */
+	unsigned long mode;		/* MPU401_MODE_XXXX */
 	int timer_invoked;
 
 	int (*open_input) (mpu401_t * mpu);

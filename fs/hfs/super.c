@@ -31,6 +31,7 @@
 #include <linux/blkdev.h>
 #include <linux/module.h>
 #include <linux/init.h>
+#include <linux/smp_lock.h>
 
 MODULE_LICENSE("GPL");
 
@@ -146,9 +147,10 @@ static void hfs_read_inode(struct inode *inode)
 static void hfs_write_super(struct super_block *sb)
 {
 	struct hfs_mdb *mdb = HFS_SB(sb)->s_mdb;
-
+	lock_kernel();
 	/* is this a valid hfs superblock? */
 	if (!sb || sb->s_magic != HFS_SUPER_MAGIC) {
+		unlock_kernel();
 		return;
 	}
 
@@ -157,6 +159,7 @@ static void hfs_write_super(struct super_block *sb)
 		hfs_mdb_commit(mdb, 0);
 	}
 	sb->s_dirt = 0;
+	unlock_kernel();
 }
 
 /*

@@ -34,6 +34,9 @@
 
 static kmem_cache_t *task_struct_cachep;
 
+extern int copy_semundo(unsigned long clone_flags, struct task_struct *tsk);
+extern void exit_semundo(struct task_struct *tsk);
+
 /* The idle threads do not count.. */
 int nr_threads;
 
@@ -710,8 +713,10 @@ int do_fork(unsigned long clone_flags, unsigned long stack_start,
 
 	retval = -ENOMEM;
 	/* copy all the process information */
-	if (copy_files(clone_flags, p))
+	if (copy_semundo(clone_flags, p))
 		goto bad_fork_cleanup;
+	if (copy_files(clone_flags, p))
+		goto bad_fork_cleanup_semundo;
 	if (copy_fs(clone_flags, p))
 		goto bad_fork_cleanup_files;
 	if (copy_sighand(clone_flags, p))
@@ -723,7 +728,6 @@ int do_fork(unsigned long clone_flags, unsigned long stack_start,
 	retval = copy_thread(0, clone_flags, stack_start, stack_size, p, regs);
 	if (retval)
 		goto bad_fork_cleanup_namespace;
-	p->semundo = NULL;
 	
 	/* Our parent execution domain becomes current domain
 	   These must match for thread signalling to apply */
@@ -815,6 +819,8 @@ bad_fork_cleanup_fs:
 	exit_fs(p); /* blocking */
 bad_fork_cleanup_files:
 	exit_files(p); /* blocking */
+bad_fork_cleanup_semundo:
+	exit_semundo(p);
 bad_fork_cleanup:
 	put_exec_domain(p->thread_info->exec_domain);
 	if (p->binfmt && p->binfmt->module)

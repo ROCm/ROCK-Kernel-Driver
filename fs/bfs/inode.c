@@ -206,9 +206,11 @@ static int bfs_statfs(struct super_block *s, struct statfs *buf)
 
 static void bfs_write_super(struct super_block *s)
 {
+	lock_kernel();
 	if (!(s->s_flags & MS_RDONLY))
 		mark_buffer_dirty(BFS_SB(s)->si_sbh);
 	s->s_dirt = 0;
+	unlock_kernel();
 }
 
 static kmem_cache_t * bfs_inode_cachep;

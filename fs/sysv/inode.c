@@ -33,6 +33,7 @@
 /* This is only called on sync() and umount(), when s_dirt=1. */
 static void sysv_write_super(struct super_block *sb)
 {
+	lock_kernel();
 	if (!(sb->s_flags & MS_RDONLY)) {
 		/* If we are going to write out the super block,
 		   then attach current time stamp.
@@ -46,6 +47,7 @@ static void sysv_write_super(struct super_block *sb)
 		mark_buffer_dirty(sb->sv_bh2);
 	}
 	sb->s_dirt = 0;
+	unlock_kernel();
 }
 
 static void sysv_put_super(struct super_block *sb)

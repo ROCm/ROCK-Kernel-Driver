@@ -153,7 +153,7 @@ __SYSCALL(__NR_semget, sys_semget)
 #define __NR_semop                              65
 __SYSCALL(__NR_semop, sys_semop)
 #define __NR_semctl                             66
-__SYSCALL(__NR_semctl, wrap_sys_semctl)
+__SYSCALL(__NR_semctl, sys_semctl)
 #define __NR_shmdt                              67
 __SYSCALL(__NR_shmdt, sys_shmdt)
 #define __NR_msgget                             68

@@ -791,7 +791,7 @@ flush_instr:
 #
 #	but we yet haven't reloaded the CS register, so the default size 
 #	of the target offset still is 16 bit.
-#       However, using an operant prefix (0x66), the CPU will properly
+#       However, using an operand prefix (0x66), the CPU will properly
 #	take our 48 bit far pointer. (INTeL 80386 Programmer's Reference
 #	Manual, Mixing 16-bit and 32-bit code, page 16-6)
 

@@ -110,7 +110,7 @@ put_inode:	no
 delete_inode:	no	
 clear_inode:	no	
 put_super:	yes	yes	maybe		(see below)
-write_super:	yes	yes	maybe		(see below)
+write_super:	no	yes	maybe		(see below)
 statfs:		yes	no	no
 remount_fs:	yes	yes	maybe		(see below)
 umount_begin:	yes	no	maybe		(see below)
