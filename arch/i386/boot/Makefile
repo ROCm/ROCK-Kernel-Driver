@@ -62,7 +62,7 @@ $(obj)/setup $(obj)/bootsect: %: %.o FORCE
 	$(call if_changed,ld)
 
 $(obj)/compressed/vmlinux: FORCE
-	@$(call descend,$(obj)/compressed,IMAGE_OFFSET=$(IMAGE_OFFSET) \
+	+@$(call descend,$(obj)/compressed,IMAGE_OFFSET=$(IMAGE_OFFSET) \
 		$(obj)/compressed/vmlinux)
 
 
@@ -83,7 +83,7 @@ clean:
 	@echo 'Cleaning up (boot)'
 	@rm -f $(addprefix $(obj)/,tools/build vmlinux.bin bvmlinux.bin \
 		bootsect zImage bsetup bbootsect bzImage)
-	@$(call descend,$(obj)/compressed) clean
+	+@$(call descend,$(obj)/compressed) clean
 
 archhelp:
 	@echo  '* bzImage	- Compressed kernel image (arch/$(ARCH)/boot/bzImage)'
