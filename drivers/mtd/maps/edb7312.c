@@ -71,14 +71,14 @@ static const char *probes[] = { "RedBoot", "cmdlinepart", NULL };
 
 #endif
 
-static int                   mtd_parts_nb = 0;
-static struct mtd_partition *mtd_parts    = 0;
+static int mtd_parts_nb;
+static struct mtd_partition *mtd_parts;
 
 int __init init_edb7312nor(void)
 {
 	static const char *rom_probe_types[] = PROBETYPES;
 	const char **type;
-	const char *part_type = 0;
+	const char *part_type = NULL;
 
        	printk(KERN_NOTICE MSG_PREFIX "0x%08x at 0x%08x\n", 
 	       WINDOW_SIZE, WINDOW_ADDR);
@@ -92,7 +92,7 @@ int __init init_edb7312nor(void)
 	
 	simple_map_init(&edb7312nor_map);
 
-	mymtd = 0;
+	mymtd = NULL;
 	type = rom_probe_types;
 	for(; !mymtd && *type; type++) {
 		mymtd = do_map_probe(*type, &edb7312nor_map);
