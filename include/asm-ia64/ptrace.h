@@ -235,6 +235,20 @@ struct switch_stack {
 	  !user_mode(_regs) && user_stack(_task, _regs);	\
   })
 
+  /*
+   * System call handlers that, upon successful completion, need to return a negative value
+   * should call force_successful_syscall_return() right before returning.  On architectures
+   * where the syscall convention provides for a separate error flag (e.g., alpha, ia64,
+   * ppc{,64}, sparc{,64}, possibly others), this macro can be used to ensure that the error
+   * flag will not get set.  On architectures which do not support a separate error flag,
+   * the macro is a no-op and the spurious error condition needs to be filtered out by some
+   * other means (e.g., in user-level, by passing an extra argument to the syscall handler,
+   * or something along those lines).
+   *
+   * On ia64, we can clear the user's pt_regs->r8 to force a successful syscall.
+   */
+# define force_successful_syscall_return()	(ia64_task_regs(current)->r8 = 0)
+
   struct task_struct;			/* forward decl */
   struct unw_frame_info;		/* forward decl */
 
