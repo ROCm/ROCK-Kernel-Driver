@@ -1572,7 +1572,8 @@ static int hid_probe (struct usb_interface *intf, const struct usb_device_id *id
 	int i;
 	char *c;
 
-	dbg("HID probe called for ifnum %d", intf->ifnum);
+	dbg("HID probe called for ifnum %d",
+			intf->altsetting->desc.bInterfaceNumber);
 
 	if (!(hid = usb_hid_configure(intf)))
 		return -EIO;
@@ -1590,6 +1591,7 @@ static int hid_probe (struct usb_interface *intf, const struct usb_device_id *id
 	dev_set_drvdata(&intf->dev, hid);
 
 	if (!hid->claimed) {
+		printk ("HID device not claimed by input or hiddev\n");
 		hid_disconnect(intf);
 		return -EIO;
 	}

@@ -10,7 +10,7 @@
  * of the GNU General Public License, incorporated herein by reference.
  */
 
-#ifndef __CAPIFUNC_H__ 
+#ifndef __CAPIFUNC_H__
 #define __CAPIFUNC_H__
 
 #define MAX_DESCRIPTORS  32

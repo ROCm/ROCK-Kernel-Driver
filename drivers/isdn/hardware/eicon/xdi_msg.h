@@ -1,4 +1,4 @@
-/* $Id: xdi_msg.h,v 1.1.2.2 2002/10/02 14:38:38 armin Exp $ */
+/* $Id: xdi_msg.h,v 1.1.2.2 2001/02/16 08:40:36 armin Exp $ */
 
 #ifndef __DIVA_XDI_UM_CFG_MESSSGE_H__
 #define __DIVA_XDI_UM_CFG_MESSAGE_H__
@@ -93,36 +93,35 @@ typedef struct _diva_xdi_um_cfg_cmd_data_start {
 } diva_xdi_um_cfg_cmd_data_start_t;
 
 typedef struct _diva_xdi_um_cfg_cmd_data_write_sdram {
-	dword	ram_number;
-	dword	offset;
-	dword	length;
+	dword ram_number;
+	dword offset;
+	dword length;
 } diva_xdi_um_cfg_cmd_data_write_sdram_t;
 
 typedef struct _diva_xdi_um_cfg_cmd_data_write_fpga {
-	dword	fpga_number;
-	dword	image_length;
+	dword fpga_number;
+	dword image_length;
 } diva_xdi_um_cfg_cmd_data_write_fpga_t;
 
 typedef struct _diva_xdi_um_cfg_cmd_data_read_sdram {
-	dword	ram_number;
-	dword	offset;
-	dword	length;
+	dword ram_number;
+	dword offset;
+	dword length;
 } diva_xdi_um_cfg_cmd_data_read_sdram_t;
 
 typedef union _diva_xdi_um_cfg_cmd_data {
-	diva_xdi_um_cfg_cmd_data_write_sdram_t	write_sdram;
-	diva_xdi_um_cfg_cmd_data_write_fpga_t	write_fpga;
-	diva_xdi_um_cfg_cmd_data_read_sdram_t	read_sdram;
-	diva_xdi_um_cfg_cmd_data_start_t	start;
-  diva_xdi_um_cfg_cmd_data_set_features_t features;
+	diva_xdi_um_cfg_cmd_data_write_sdram_t write_sdram;
+	diva_xdi_um_cfg_cmd_data_write_fpga_t write_fpga;
+	diva_xdi_um_cfg_cmd_data_read_sdram_t read_sdram;
+	diva_xdi_um_cfg_cmd_data_start_t start;
+	diva_xdi_um_cfg_cmd_data_set_features_t features;
 } diva_xdi_um_cfg_cmd_data_t;
 
 typedef struct _diva_xdi_um_cfg_cmd {
-  dword  adapter; /* Adapter number 1...N */
-  dword  command;
-  diva_xdi_um_cfg_cmd_data_t  command_data;
-  dword  data_length; /* Plain binary data will follow */
+	dword adapter;		/* Adapter number 1...N */
+	dword command;
+	diva_xdi_um_cfg_cmd_data_t command_data;
+	dword data_length;	/* Plain binary data will follow */
 } diva_xdi_um_cfg_cmd_t;
 
 #endif
-

@@ -138,9 +138,9 @@ ipppd_open(struct inode *ino, struct file *file)
 	init_waitqueue_head(&ipppd->wq);
 	skb_queue_head_init(&ipppd->rq);
 
-	spin_lock_irqsave(&ipppds, flags);
+	spin_lock_irqsave(&ipppds_lock, flags);
 	list_add(&ipppd->ipppds, &ipppds);
-	spin_unlock_irqrestore(&ipppds, flags);
+	spin_unlock_irqrestore(&ipppds_lock, flags);
 	
 	ipppd_debug(ipppd, "minor %d", minor);
 
@@ -160,9 +160,9 @@ ipppd_release(struct inode *ino, struct file *file)
 	if (ipppd->state == IPPPD_ST_CONNECTED)
 		isdn_net_hangup(ipppd->idev);
 
-	spin_lock_irqsave(&ipppds, flags);
+	spin_lock_irqsave(&ipppds_lock, flags);
 	list_del(&ipppd->ipppds);
-	spin_unlock_irqrestore(&ipppds, flags);
+	spin_unlock_irqrestore(&ipppds_lock, flags);
 
 	ipppd_put(ipppd);
 
@@ -676,7 +676,7 @@ isdn_ppp_bind(isdn_net_dev *idev)
 		return -ENOMEM;
 
 	spin_lock_irqsave(&ipppds_lock, flags);
-	if (idev->pppbind < 0) {  /* device bound to ippp device ? */
+	if (idev->pppbind < 0) {  /* device not bound to ippp device ? */
 		struct list_head *l;
 		char exclusive[ISDN_MAX_CHANNELS];	/* exclusive flags */
 		memset(exclusive, 0, ISDN_MAX_CHANNELS);
@@ -695,8 +695,7 @@ isdn_ppp_bind(isdn_net_dev *idev)
 			if (ipppd->state != IPPPD_ST_OPEN)
 				continue;
 			if (!exclusive[ipppd->minor])
-				break;
-			goto found;
+				goto found;
 		}
 	} else {
 		list_for_each_entry(ipppd, &ipppds, ipppds) {

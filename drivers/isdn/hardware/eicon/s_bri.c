@@ -459,9 +459,9 @@ static int bri_ISR (struct _ISDN_ADAPTER* IoAdapter) {
 static void disable_bri_interrupt (PISDN_ADAPTER IoAdapter) {
  if ( IoAdapter->reset )
  {
-  outpp (IoAdapter->reset, 0x00) ; // disable interrupts !
+  outpp (IoAdapter->reset, 0x00) ; /* disable interrupts ! */
  }
- outpp (IoAdapter->ctlReg, 0x00) ;    // clear int, halt cpu
+ outpp (IoAdapter->ctlReg, 0x00) ; /* clear int, halt cpu */
 }
 /* -------------------------------------------------------------------------
   Fill card entry points

@@ -41,7 +41,9 @@ config ISDN
 	  Therefore the old ISDN4Linux layer is becoming obsolete. It is 
 	  still usable, though, if you select this option.
 
+if ISDN
 source "drivers/isdn/i4l/Kconfig"
+endif
 
 endmenu
 

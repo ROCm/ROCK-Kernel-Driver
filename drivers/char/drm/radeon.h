@@ -51,7 +51,7 @@
 #define DRIVER_DATE		"20020828"
 
 #define DRIVER_MAJOR		1
-#define DRIVER_MINOR		6
+#define DRIVER_MINOR		7
 #define DRIVER_PATCHLEVEL	0
 
 /* Interface history:
@@ -73,6 +73,10 @@
  *       Add irq ioctls and irq_active getparam.
  *       Add wait command for cmdbuf ioctl
  *       Add agp offset query for getparam
+ * 1.7 - Add support for cube map registers: R200_PP_CUBIC_FACES_[0..5]
+ *       and R200_PP_CUBIC_OFFSET_F1_[0..5].
+ *       Added packets R200_EMIT_PP_CUBIC_FACES_[0..5] and
+ *       R200_EMIT_PP_CUBIC_OFFSETS_[0..5].  (brian)
  */
 #define DRIVER_IOCTLS							     \
  [DRM_IOCTL_NR(DRM_IOCTL_DMA)]               = { radeon_cp_buffers,  1, 0 }, \

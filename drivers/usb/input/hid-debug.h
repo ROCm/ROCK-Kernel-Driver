@@ -33,7 +33,7 @@ struct hid_usage_entry {
 	char     *description;
 };
 
-static struct hid_usage_entry hid_usage_table[] = {
+static const struct hid_usage_entry hid_usage_table[] = {
   {  0,      0, "Undefined" },
   {  1,      0, "GenericDesktop" },
     {0, 0x01, "Pointer"},
@@ -218,11 +218,95 @@ static struct hid_usage_entry hid_usage_table[] = {
     {0, 0xAA, "Shared_Parameter_Blocks"},
     {0, 0xAB, "Create_New_Effect_Report"},
     {0, 0xAC, "RAM_Pool_Available"},
+  { 0x84, 0, "Power Device" },
+    { 0x84, 0x02, "PresentStatus" },
+    { 0x84, 0x03, "ChangeStatus" },
+    { 0x84, 0x04, "UPS" },
+    { 0x84, 0x05, "PowerSupply" },
+    { 0x84, 0x10, "BatterySystem" },
+    { 0x84, 0x11, "BatterySystemID" },
+    { 0x84, 0x12, "Battery" },
+    { 0x84, 0x13, "BatteryID" },
+    { 0x84, 0x14, "Charger" },
+    { 0x84, 0x15, "ChargerID" },
+    { 0x84, 0x16, "PowerConverter" },
+    { 0x84, 0x17, "PowerConverterID" },
+    { 0x84, 0x18, "OutletSystem" },
+    { 0x84, 0x19, "OutletSystemID" },
+    { 0x84, 0x1a, "Input" },
+    { 0x84, 0x1b, "InputID" },
+    { 0x84, 0x1c, "Output" },
+    { 0x84, 0x1d, "OutputID" },
+    { 0x84, 0x1e, "Flow" },
+    { 0x84, 0x1f, "FlowID" },
+    { 0x84, 0x20, "Outlet" },
+    { 0x84, 0x21, "OutletID" },
+    { 0x84, 0x22, "Gang" },
+    { 0x84, 0x24, "PowerSummary" },
+    { 0x84, 0x25, "PowerSummaryID" },
+    { 0x84, 0x30, "Voltage" },
+    { 0x84, 0x31, "Current" },
+    { 0x84, 0x32, "Frequency" },
+    { 0x84, 0x33, "ApparentPower" },
+    { 0x84, 0x35, "PercentLoad" },
+    { 0x84, 0x40, "ConfigVoltage" },
+    { 0x84, 0x41, "ConfigCurrent" },
+    { 0x84, 0x43, "ConfigApparentPower" },
+    { 0x84, 0x53, "LowVoltageTransfer" },
+    { 0x84, 0x54, "HighVoltageTransfer" },
+    { 0x84, 0x56, "DelayBeforeStartup" },
+    { 0x84, 0x57, "DelayBeforeShutdown" },
+    { 0x84, 0x58, "Test" },
+    { 0x84, 0x5a, "AudibleAlarmControl" },
+    { 0x84, 0x60, "Present" },
+    { 0x84, 0x61, "Good" },
+    { 0x84, 0x62, "InternalFailure" },
+    { 0x84, 0x65, "Overload" },
+    { 0x84, 0x66, "OverCharged" },
+    { 0x84, 0x67, "OverTemperature" },
+    { 0x84, 0x68, "ShutdownRequested" },
+    { 0x84, 0x69, "ShutdownImminent" },
+    { 0x84, 0x6b, "SwitchOn/Off" },
+    { 0x84, 0x6c, "Switchable" },
+    { 0x84, 0x6d, "Used" },
+    { 0x84, 0x6e, "Boost" },
+    { 0x84, 0x73, "CommunicationLost" },
+    { 0x84, 0xfd, "iManufacturer" },
+    { 0x84, 0xfe, "iProduct" },
+    { 0x84, 0xff, "iSerialNumber" },
+  { 0x85, 0, "Battery System" },
+    { 0x85, 0x01, "SMBBatteryMode" },
+    { 0x85, 0x02, "SMBBatteryStatus" },
+    { 0x85, 0x03, "SMBAlarmWarning" },
+    { 0x85, 0x04, "SMBChargerMode" },
+    { 0x85, 0x05, "SMBChargerStatus" },
+    { 0x85, 0x06, "SMBChargerSpecInfo" },
+    { 0x85, 0x07, "SMBSelectorState" },
+    { 0x85, 0x08, "SMBSelectorPresets" },
+    { 0x85, 0x09, "SMBSelectorInfo" },
+    { 0x85, 0x29, "RemainingCapacityLimit" },
+    { 0x85, 0x2c, "CapacityMode" },
+    { 0x85, 0x42, "BelowRemainingCapacityLimit" },
+    { 0x85, 0x44, "Charging" },
+    { 0x85, 0x45, "Discharging" },
+    { 0x85, 0x4b, "NeedReplacement" },
+    { 0x85, 0x66, "RemainingCapacity" },
+    { 0x85, 0x68, "RunTimeToEmpty" },
+    { 0x85, 0x6a, "AverageTimeToFull" },
+    { 0x85, 0x83, "DesignCapacity" },
+    { 0x85, 0x85, "ManufacturerDate" },
+    { 0x85, 0x89, "iDeviceChemistry" },
+    { 0x85, 0x8b, "Rechargable" },
+    { 0x85, 0x8f, "iOEMInformation" },
+    { 0x85, 0x8d, "CapacityGranularity1" },
+    { 0x85, 0xd0, "ACPresent" },
+  /* pages 0xff00 to 0xffff are vendor-specific */
+  { 0xffff, 0, "Vendor-specific-FF" },
   { 0, 0, NULL }
 };
 
 static void resolv_usage_page(unsigned page) {
-	struct hid_usage_entry *p;
+	const struct hid_usage_entry *p;
 
 	for (p = hid_usage_table; p->description; p++)
 		if (p->page == page) {
@@ -233,13 +317,13 @@ static void resolv_usage_page(unsigned page) {
 }
 
 static void resolv_usage(unsigned usage) {
-	struct hid_usage_entry *p;
+	const struct hid_usage_entry *p;
 
 	resolv_usage_page(usage >> 16);
 	printk(".");
 	for (p = hid_usage_table; p->description; p++)
 		if (p->page == (usage >> 16)) {
-			for(++p; p->description && p->page == 0; p++)
+			for(++p; p->description && p->page != 0; p++)
 				if (p->usage == (usage & 0xffff)) {
 					printk("%s", p->description);
 					return;

@@ -1,4 +1,4 @@
-/* $Id: dsp_tst.h,v 1.1.2.2 2002/10/02 14:38:37 armin Exp $ */
+/* $Id: dsp_tst.h,v 1.1.2.2 2001/02/08 12:25:43 armin Exp $ */
 
 #ifndef __DIVA_PRI_HOST_TEST_DSPS_H__
 #define __DIVA_PRI_HOST_TEST_DSPS_H__
@@ -18,7 +18,7 @@
 #define DSP10_PORT      (0x840)
 #define DSP11_PORT      (0x848)
 #define DSP12_PORT      (0x850)
-#define DSP13_PORT      (0x858)        
+#define DSP13_PORT      (0x858)
 #define DSP14_PORT      (0x860)
 #define DSP15_PORT      (0x868)
 #define DSP16_PORT      (0x870)

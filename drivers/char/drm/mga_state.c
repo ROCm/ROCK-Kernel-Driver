@@ -26,7 +26,7 @@
  *
  * Authors:
  *    Jeff Hartmann <jhartmann@valinux.com>
- *    Keith Whitwell <keithw@valinux.com>
+ *    Keith Whitwell <keith@tungstengraphics.com>
  *
  * Rewritten by:
  *    Gareth Hughes <gareth@valinux.com>
@@ -1073,5 +1073,38 @@ int mga_dma_blit( DRM_IOCTL_ARGS )
 	 */
 	dev_priv->sarea_priv->dirty |= MGA_UPLOAD_CONTEXT;
 
+	return 0;
+}
+
+int mga_getparam( DRM_IOCTL_ARGS )
+{
+	DRM_DEVICE;
+	drm_mga_private_t *dev_priv = dev->dev_private;
+	drm_mga_getparam_t param;
+	int value;
+
+	if ( !dev_priv ) {
+		DRM_ERROR( "%s called with no initialization\n", __FUNCTION__ );
+		return DRM_ERR(EINVAL);
+	}
+
+	DRM_COPY_FROM_USER_IOCTL( param, (drm_mga_getparam_t *)data,
+			     sizeof(param) );
+
+	DRM_DEBUG( "pid=%d\n", DRM_CURRENTPID );
+
+	switch( param.param ) {
+	case MGA_PARAM_IRQ_NR:
+		value = dev->irq;
+		break;
+	default:
+		return DRM_ERR(EINVAL);
+	}
+
+	if ( DRM_COPY_TO_USER( param.value, &value, sizeof(int) ) ) {
+		DRM_ERROR( "copy_to_user\n" );
+		return DRM_ERR(EFAULT);
+	}
+	
 	return 0;
 }

@@ -673,31 +673,22 @@ void blk_recount_segments(request_queue_t *q, struct bio *bio)
 	seg_size = nr_phys_segs = nr_hw_segs = 0;
 	bio_for_each_segment(bv, bio, i) {
 		if (bvprv && cluster) {
-			int phys, seg;
-
-			if (seg_size + bv->bv_len > q->max_segment_size) {
-				nr_phys_segs++;
+			if (seg_size + bv->bv_len > q->max_segment_size)
 				goto new_segment;
-			}
-
-			phys = BIOVEC_PHYS_MERGEABLE(bvprv, bv);
-			seg = BIOVEC_SEG_BOUNDARY(q, bvprv, bv);
-			if (!phys || !seg)
-				nr_phys_segs++;
-			if (!seg)
+			if (!BIOVEC_PHYS_MERGEABLE(bvprv, bv))
 				goto new_segment;
-
-			if (!BIOVEC_VIRT_MERGEABLE(bvprv, bv))
+			if (!BIOVEC_SEG_BOUNDARY(q, bvprv, bv))
 				goto new_segment;
 
 			seg_size += bv->bv_len;
 			bvprv = bv;
 			continue;
-		} else {
-			nr_phys_segs++;
 		}
 new_segment:
-		nr_hw_segs++;
+		if (!bvprv || !BIOVEC_VIRT_MERGEABLE(bvprv, bv))
+			nr_hw_segs++;
+
+		nr_phys_segs++;
 		bvprv = bv;
 		seg_size = bv->bv_len;
 	}

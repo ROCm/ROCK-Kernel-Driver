@@ -67,7 +67,7 @@ static void generic_release (struct device_driver * drv)
 }
 
 static struct device_driver usb_generic_driver = {
-	.name =	"generic",
+	.name =	"usb",
 	.bus = &usb_bus_type,
 	.probe = generic_probe,
 	.remove = generic_remove,
@@ -514,17 +514,10 @@ static int usb_device_match (struct device *dev, struct device_driver *drv)
  * or other modules, configure the device, and more.  Drivers can provide
  * a MODULE_DEVICE_TABLE to help with module loading subtasks.
  *
- * Some synchronization is important: removes can't start processing
- * before the add-device processing completes, and vice versa.  That keeps
- * a stack of USB-related identifiers stable while they're in use.  If we
- * know that agents won't complete after they return (such as by forking
- * a process that completes later), it's enough to just waitpid() for the
- * agent -- as is currently done.
- *
- * The reason: we know we're called either from khubd (the typical case)
- * or from root hub initialization (init, kapmd, modprobe, etc).  In both
- * cases, we know no other thread can recycle our address, since we must
- * already have been serialized enough to prevent that.
+ * We're called either from khubd (the typical case) or from root hub
+ * (init, kapmd, modprobe, rmmod, etc), but the agents need to handle
+ * delays in event delivery.  Use sysfs (and DEVPATH) to make sure the
+ * device (and this configuration!) are still present.
  */
 static int usb_hotplug (struct device *dev, char **envp, int num_envp,
 			char *buffer, int buffer_size)
@@ -579,7 +572,7 @@ static int usb_hotplug (struct device *dev, char **envp, int num_envp,
 	scratch += length;
 #endif
 
-	/* per-device configuration hacks are common */
+	/* per-device configurations are common */
 	envp [i++] = scratch;
 	length += snprintf (scratch, buffer_size - length, "PRODUCT=%x/%x/%x",
 			    usb_dev->descriptor.idVendor,
@@ -604,10 +597,9 @@ static int usb_hotplug (struct device *dev, char **envp, int num_envp,
 	if (usb_dev->descriptor.bDeviceClass == 0) {
 		int alt = intf->act_altsetting;
 
-		/* a simple/common case: one config, one interface, one driver
-		 * with current altsetting being a reasonable setting.
-		 * everything needs a smart agent and usbfs; or can rely on
-		 * device-specific binding policies.
+		/* 2.4 only exposed interface zero.  in 2.5, hotplug
+		 * agents are called for all interfaces, and can use
+		 * $DEVPATH/bInterfaceNumber if necessary.
 		 */
 		envp [i++] = scratch;
 		length += snprintf (scratch, buffer_size - length,
@@ -949,6 +941,24 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 	int i;
 	int j;
 
+	/*
+	 * Set the driver for the usb device to point to the "generic" driver.
+	 * This prevents the main usb device from being sent to the usb bus
+	 * probe function.  Yes, it's a hack, but a nice one :)
+	 *
+	 * Do it asap, so more driver model stuff (like the device.h message
+	 * utilities) can be used in hcd submit/unlink code paths.
+	 */
+	usb_generic_driver.bus = &usb_bus_type;
+	dev->dev.parent = parent;
+	dev->dev.driver = &usb_generic_driver;
+	dev->dev.bus = &usb_bus_type;
+	if (dev->dev.bus_id[0] == 0)
+		sprintf (&dev->dev.bus_id[0], "%d-%s",
+			 dev->bus->busnum, dev->devpath);
+
+	/* USB device state == default ... it's not usable yet */
+
 	/* USB 2.0 section 5.5.3 talks about ep0 maxpacket ...
 	 * it's fixed size except for full speed devices.
 	 */
@@ -1010,6 +1020,8 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 		dev->epmaxpacketout[0] = dev->descriptor.bMaxPacketSize0;
 	}
 
+	/* USB device state == addressed ... still not usable */
+
 	err = usb_get_device_descriptor(dev);
 	if (err < (signed)sizeof(dev->descriptor)) {
 		if (err < 0)
@@ -1042,6 +1054,8 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 		return 1;
 	}
 
+	/* USB device state == configured ... tell the world! */
+
 	dbg("new device strings: Mfr=%d, Product=%d, SerialNumber=%d",
 		dev->descriptor.iManufacturer, dev->descriptor.iProduct, dev->descriptor.iSerialNumber);
 	set_device_description (dev);
@@ -1051,23 +1065,10 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 		usb_show_string(dev, "SerialNumber", dev->descriptor.iSerialNumber);
 #endif
 
-	/*
-	 * Set the driver for the usb device to point to the "generic" driver.
-	 * This prevents the main usb device from being sent to the usb bus
-	 * probe function.  Yes, it's a hack, but a nice one :)
-	 */
-	usb_generic_driver.bus = &usb_bus_type;
-	dev->dev.parent = parent;
-	dev->dev.driver = &usb_generic_driver;
-	dev->dev.bus = &usb_bus_type;
-	if (dev->dev.bus_id[0] == 0)
-		sprintf (&dev->dev.bus_id[0], "%d-%s",
-			 dev->bus->busnum, dev->devpath);
+	/* put into sysfs, with device and config specific files */
 	err = device_register (&dev->dev);
 	if (err)
 		return err;
-
-	/* add the USB device specific driverfs files */
 	usb_create_driverfs_dev_files (dev);
 
 	/* Register all of the interfaces for this device with the driver core.
