@@ -990,7 +990,7 @@ static int sctp_error(struct sock *sk, int flags, int err)
  * Note:  This function could use a rewrite especially when explicit
  * connect support comes in.
  */
-/* BUG:  We do not implement the equivalent of wait_for_tcp_memory(). */
+/* BUG:  We do not implement the equivalent of sk_stream_wait_memory(). */
 
 SCTP_STATIC int sctp_msghdr_parse(const struct msghdr *, sctp_cmsgs_t *);
 

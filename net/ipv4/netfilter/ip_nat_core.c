@@ -528,6 +528,7 @@ ip_nat_setup_info(struct ip_conntrack *conntrack,
 	MUST_BE_WRITE_LOCKED(&ip_nat_lock);
 	IP_NF_ASSERT(hooknum == NF_IP_PRE_ROUTING
 		     || hooknum == NF_IP_POST_ROUTING
+		     || hooknum == NF_IP_LOCAL_IN
 		     || hooknum == NF_IP_LOCAL_OUT);
 	IP_NF_ASSERT(info->num_manips < IP_NAT_MAX_MANIPS);
 	IP_NF_ASSERT(!(info->initialized & (1 << HOOK2MANIP(hooknum))));
@@ -816,7 +817,7 @@ do_bindings(struct ip_conntrack *ct,
 
 		/* Have to grab read lock before sibling_list traversal */
 		READ_LOCK(&ip_conntrack_lock);
-		list_for_each(cur_item, &ct->sibling_list) { 
+		list_for_each_prev(cur_item, &ct->sibling_list) { 
 			exp = list_entry(cur_item, struct ip_conntrack_expect, 
 					 expected_list);
 					 
@@ -899,10 +900,10 @@ icmp_reply_translation(struct sk_buff **pskb,
 
 	/* Must be RELATED */
 	IP_NF_ASSERT((*pskb)->nfct
-		     - (struct ip_conntrack *)(*pskb)->nfct->master
+		     - ((struct ip_conntrack *)(*pskb)->nfct->master)->infos
 		     == IP_CT_RELATED
 		     || (*pskb)->nfct
-		     - (struct ip_conntrack *)(*pskb)->nfct->master
+		     - ((struct ip_conntrack *)(*pskb)->nfct->master)->infos
 		     == IP_CT_RELATED+IP_CT_IS_REPLY);
 
 	/* Redirects on non-null nats must be dropped, else they'll

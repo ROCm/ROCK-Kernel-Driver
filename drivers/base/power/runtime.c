@@ -24,9 +24,9 @@ static void runtime_resume(struct device * dev)
  *	dpm_runtime_resume - Power one device back on.
  *	@dev:	Device.
  *
- *	Bring one device back to the on state by first powering it 
+ *	Bring one device back to the on state by first powering it
  *	on, then restoring state. We only operate on devices that aren't
- *	already on. 
+ *	already on.
  *	FIXME: We need to handle devices that are in an unknown state.
  */
 
@@ -55,7 +55,7 @@ int dpm_runtime_suspend(struct device * dev, u32 state)
 	if (dev->power.power_state)
 		runtime_resume(dev);
 
-	if (!(error = suspend_device(dev,state)))
+	if (!(error = suspend_device(dev, state)))
 		dev->power.power_state = state;
  Done:
 	up(&dpm_sem);
@@ -70,7 +70,7 @@ int dpm_runtime_suspend(struct device * dev, u32 state)
  *
  *	This is an update mechanism for drivers to notify the core
  *	what power state a device is in. Device probing code may not
- *	always be able to tell, but we need accurate information to 
+ *	always be able to tell, but we need accurate information to
  *	work reliably.
  */
 void dpm_set_power_state(struct device * dev, u32 state)

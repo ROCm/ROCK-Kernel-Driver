@@ -143,7 +143,14 @@ checkentry(const char *tablename,
 
 	if (matchsize != IP6T_ALIGN(sizeof(struct ip6t_owner_info)))
 		return 0;
-
+#ifdef CONFIG_SMP
+	/* files->file_lock can not be used in a BH */
+	if (((struct ip6t_owner_info *)matchinfo)->match
+	    & (IP6T_OWNER_PID|IP6T_OWNER_SID)) {
+		printk("ip6t_owner: pid and sid matching is broken on SMP.\n");
+		return 0;
+	}
+#endif
 	return 1;
 }
 

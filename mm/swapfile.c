@@ -652,7 +652,7 @@ static int try_to_unuse(unsigned int type)
 	 * open() method called) - so swap entries may be invisible
 	 * to swapoff for a while, then reappear - but that is rare.
 	 */
-	while ((i = find_next_to_unuse(si, i))) {
+	while ((i = find_next_to_unuse(si, i)) != 0) {
 		if (signal_pending(current)) {
 			retval = -EINTR;
 			break;

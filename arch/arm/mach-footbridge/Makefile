@@ -4,7 +4,7 @@
 
 # Object file lists.
 
-obj-y			:= arch.o dc21285.o dma.o irq.o isa-irq.o mm.o
+obj-y			:= arch.o dc21285.o dma.o irq.o isa-irq.o mm.o time.o
 obj-m			:=
 obj-n			:=
 obj-			:=

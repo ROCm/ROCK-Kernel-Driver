@@ -49,4 +49,5 @@ MACHINE_START(NANOENGINE, "BSE nanoEngine")
 	FIXUP(fixup_nanoengine)
 	MAPIO(nanoengine_map_io)
 	INITIRQ(sa1100_init_irq)
+	INITTIME(sa1100_init_time)
 MACHINE_END

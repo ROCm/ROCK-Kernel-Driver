@@ -198,10 +198,26 @@ static struct platform_device pxafb_device = {
 	.resource	= pxafb_resources,
 };
 
+static struct platform_device ffuart_device = {
+	.name		= "pxa2xx-uart",
+	.id		= 0,
+};
+static struct platform_device btuart_device = {
+	.name		= "pxa2xx-uart",
+	.id		= 1,
+};
+static struct platform_device stuart_device = {
+	.name		= "pxa2xx-uart",
+	.id		= 2,
+};
+
 static struct platform_device *devices[] __initdata = {
 	&pxamci_device,
 	&udc_device,
 	&pxafb_device,
+	&ffuart_device,
+	&btuart_device,
+	&stuart_device,
 };
 
 static int __init pxa_init(void)

@@ -68,7 +68,7 @@ firmware_timeout_show(struct class *class, char *buf)
  *	firmware will be provided.
  *
  *	Note: zero means 'wait for ever'
- *  
+ *
  **/
 static ssize_t
 firmware_timeout_store(struct class *class, const char *buf, size_t count)
@@ -121,7 +121,7 @@ firmware_loading_show(struct class_device *class_dev, char *buf)
 /**
  * firmware_loading_store: - loading control file
  * Description:
- *	The relevant values are: 
+ *	The relevant values are:
  *
  *	 1: Start a load, discarding any previous partial load.
  *	 0: Conclude the load and handle the data to the driver code.
@@ -376,7 +376,7 @@ out:
 	return retval;
 }
 
-/** 
+/**
  * request_firmware: - request firmware to hotplug and wait for it
  * Description:
  *	@firmware will be used to return a firmware image by the name
@@ -457,7 +457,7 @@ release_firmware(const struct firmware *fw)
 
 /**
  * register_firmware: - provide a firmware image for later usage
- * 
+ *
  * Description:
  *	Make sure that @data will be available by requesting firmware @name.
  *
@@ -541,7 +541,7 @@ request_firmware_nowait(
 
 	ret = kernel_thread(request_firmware_work_func, fw_work,
 			    CLONE_FS | CLONE_FILES);
-	
+
 	if (ret < 0) {
 		fw_work->cont(NULL, fw_work->context);
 		return ret;

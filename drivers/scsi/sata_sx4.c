@@ -153,7 +153,7 @@ static void pdc_eng_timeout(struct ata_port *ap);
 static void pdc_20621_phy_reset (struct ata_port *ap);
 static int pdc_port_start(struct ata_port *ap);
 static void pdc_port_stop(struct ata_port *ap);
-static void pdc20621_fill_sg(struct ata_queued_cmd *qc);
+static void pdc20621_qc_prep(struct ata_queued_cmd *qc);
 static void pdc_tf_load_mmio(struct ata_port *ap, struct ata_taskfile *tf);
 static void pdc_exec_command_mmio(struct ata_port *ap, struct ata_taskfile *tf);
 static void pdc20621_host_stop(struct ata_host_set *host_set);
@@ -200,7 +200,7 @@ static struct ata_port_operations pdc_20621_ops = {
 	.phy_reset		= pdc_20621_phy_reset,
 	.bmdma_setup            = pdc20621_dma_setup,
 	.bmdma_start            = pdc20621_dma_start,
-	.fill_sg		= pdc20621_fill_sg,
+	.qc_prep		= pdc20621_qc_prep,
 	.eng_timeout		= pdc_eng_timeout,
 	.irq_handler		= pdc20621_interrupt,
 	.port_start		= pdc_port_start,
@@ -434,7 +434,7 @@ static inline void pdc20621_host_pkt(struct ata_taskfile *tf, u8 *buf,
 		buf32[dw + 3]);
 }
 
-static void pdc20621_fill_sg(struct ata_queued_cmd *qc)
+static void pdc20621_qc_prep(struct ata_queued_cmd *qc)
 {
 	struct scatterlist *sg = qc->sg;
 	struct ata_port *ap = qc->ap;
@@ -445,6 +445,9 @@ static void pdc20621_fill_sg(struct ata_queued_cmd *qc)
 	unsigned int portno = ap->port_no;
 	unsigned int i, last, idx, total_len = 0, sgt_len;
 	u32 *buf = (u32 *) &pp->dimm_buf[PDC_DIMM_HEADER_SZ];
+
+	if (!(qc->flags & ATA_QCFLAG_SG))
+		return;
 
 	VPRINTK("ata%u: ENTER\n", ap->id);
 

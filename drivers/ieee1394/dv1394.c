@@ -1333,7 +1333,7 @@ static int dv1394_fasync(int fd, struct file *file, int on)
         return 0;
 }
 
-static ssize_t dv1394_write(struct file *file, const char *buffer, size_t count, loff_t *ppos)
+static ssize_t dv1394_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
 {
 	struct video_card *video = file_to_video_card(file);
 	DECLARE_WAITQUEUE(wait, current);
@@ -1430,7 +1430,7 @@ static ssize_t dv1394_write(struct file *file, const char *buffer, size_t count,
 }
 
 
-static ssize_t dv1394_read(struct file *file,  char *buffer, size_t count, loff_t *ppos)
+static ssize_t dv1394_read(struct file *file,  char __user *buffer, size_t count, loff_t *ppos)
 {
 	struct video_card *video = file_to_video_card(file);
 	DECLARE_WAITQUEUE(wait, current);
@@ -1549,6 +1549,7 @@ static int dv1394_ioctl(struct inode *inode, struct file *file,
 	struct video_card *video = file_to_video_card(file);
 	unsigned long flags;
 	int ret = -EINVAL;
+	void __user *argp = (void __user *)arg;
 
 	DECLARE_WAITQUEUE(wait, current);
 
@@ -1718,10 +1719,10 @@ static int dv1394_ioctl(struct inode *inode, struct file *file,
 
 	case DV1394_IOC_INIT: {
 		struct dv1394_init init;
-		if (arg == (unsigned long) NULL) {
+		if (!argp) {
 			ret = do_dv1394_init_default(video);
 		} else {
-			if (copy_from_user(&init, (void*)arg, sizeof(init))) {
+			if (copy_from_user(&init, argp, sizeof(init))) {
 				ret = -EFAULT;
 				goto out;
 			}
@@ -1767,7 +1768,7 @@ static int dv1394_ioctl(struct inode *inode, struct file *file,
 
 		spin_unlock_irqrestore(&video->spinlock, flags);
 
-		if (copy_to_user((void*)arg, &status, sizeof(status))) {
+		if (copy_to_user(argp, &status, sizeof(status))) {
 			ret = -EFAULT;
 			goto out;
 		}

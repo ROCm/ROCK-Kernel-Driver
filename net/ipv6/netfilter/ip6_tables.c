@@ -1845,6 +1845,15 @@ static inline int print_name(const char *i,
 	return 0;
 }
 
+static inline int print_target(const struct ip6t_target *t,
+                               off_t start_offset, char *buffer, int length,
+                               off_t *pos, unsigned int *count)
+{
+	if (t == &ip6t_standard_target || t == &ip6t_error_target)
+		return 0;
+	return print_name((char *)t, start_offset, buffer, length, pos, count);
+}
+
 static int ip6t_get_tables(char *buffer, char **start, off_t offset, int length)
 {
 	off_t pos = 0;
@@ -1871,7 +1880,7 @@ static int ip6t_get_targets(char *buffer, char **start, off_t offset, int length
 	if (down_interruptible(&ip6t_mutex) != 0)
 		return 0;
 
-	LIST_FIND(&ip6t_target, print_name, char *,
+	LIST_FIND(&ip6t_target, print_target, struct ip6t_target *,
 		  offset, buffer, length, &pos, &count);
 
 	up(&ip6t_mutex);

@@ -262,8 +262,8 @@ struct tcp_opt {
 	__u32	frto_highmark;	/* snd_nxt when RTO occurred */
 
 	__u8	unused_pad;
-	__u8	queue_shrunk;	/* Write queue has been shrunk recently.*/
 	__u8	defer_accept;	/* User waits for some data after accept() */
+	/* one byte hole, try to pack */
 
 /* RTT measurement */
 	__u8	backoff;	/* backoff				*/
@@ -297,7 +297,6 @@ struct tcp_opt {
 	struct sk_buff_head	out_of_order_queue; /* Out of order segments go here */
 
 	struct tcp_func		*af_specific;	/* Operations which are AF_INET{4,6} specific	*/
-	struct sk_buff		*send_head;	/* Front of stuff to transmit			*/
 
  	__u32	rcv_wnd;	/* Current receiver window		*/
 	__u32	rcv_wup;	/* rcv_nxt on last window update sent	*/
@@ -370,8 +369,6 @@ struct tcp_opt {
 	/* FIFO of established children */
 	struct open_request	*accept_queue;
 	struct open_request	*accept_queue_tail;
-
-	int			write_pending;	/* A write to socket waits to start. */
 
 	unsigned int		keepalive_time;	  /* time before keep alive takes place */
 	unsigned int		keepalive_intvl;  /* time interval between keep alive probes */

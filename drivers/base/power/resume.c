@@ -39,7 +39,7 @@ void dpm_resume(void)
 		if (!dev->power.prev_state)
 			resume_device(dev);
 
-		list_add_tail(entry,&dpm_active);
+		list_add_tail(entry, &dpm_active);
 	}
 }
 
@@ -48,7 +48,7 @@ void dpm_resume(void)
  *	device_resume - Restore state of each device in system.
  *
  *	Walk the dpm_off list, remove each entry, resume the device,
- *	then add it to the dpm_active list. 
+ *	then add it to the dpm_active list.
  */
 
 void device_resume(void)
@@ -62,14 +62,14 @@ EXPORT_SYMBOL(device_resume);
 
 
 /**
- *	device_power_up_irq - Power on some devices. 
+ *	device_power_up_irq - Power on some devices.
  *
- *	Walk the dpm_off_irq list and power each device up. This 
+ *	Walk the dpm_off_irq list and power each device up. This
  *	is used for devices that required they be powered down with
  *	interrupts disabled. As devices are powered on, they are moved to
  *	the dpm_suspended list.
  *
- *	Interrupts must be disabled when calling this. 
+ *	Interrupts must be disabled when calling this.
  */
 
 void dpm_power_up(void)
@@ -78,7 +78,7 @@ void dpm_power_up(void)
 		struct list_head * entry = dpm_off_irq.next;
 		list_del_init(entry);
 		resume_device(to_device(entry));
-		list_add_tail(entry,&dpm_active);
+		list_add_tail(entry, &dpm_active);
 	}
 }
 

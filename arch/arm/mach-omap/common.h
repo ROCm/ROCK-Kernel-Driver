@@ -28,6 +28,7 @@
 #define __ARCH_ARM_MACH_OMAP_COMMON_H
 
 extern void omap_map_io(void);
+extern void omap_init_time(void);
 
 #endif /* __ARCH_ARM_MACH_OMAP_COMMON_H */
 
