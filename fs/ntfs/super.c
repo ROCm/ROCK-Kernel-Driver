@@ -827,12 +827,12 @@ static BOOL parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b)
 }
 
 /**
- * setup_lcn_allocator - initialize the cluster allocator
- * @vol:	volume structure for which to setup the lcn allocator
+ * ntfs_setup_allocators - initialize the cluster and mft allocators
+ * @vol:	volume structure for which to setup the allocators
  *
- * Setup the cluster (lcn) allocator to the starting values.
+ * Setup the cluster (lcn) and mft allocators to the starting values.
  */
-static void setup_lcn_allocator(ntfs_volume *vol)
+static void ntfs_setup_allocators(ntfs_volume *vol)
 {
 #ifdef NTFS_RW
 	LCN mft_zone_size, mft_lcn;
@@ -902,6 +902,11 @@ static void setup_lcn_allocator(ntfs_volume *vol)
 	vol->data2_zone_pos = 0;
 	ntfs_debug("vol->data2_zone_pos = 0x%llx",
 			(unsigned long long)vol->data2_zone_pos);
+
+	/* Set the mft data allocation position to mft record 24. */
+	vol->mft_data_pos = 24;
+	ntfs_debug("vol->mft_data_pos = 0x%llx",
+			(unsigned long long)vol->mft_data_pos);
 #endif /* NTFS_RW */
 }
 
@@ -2334,8 +2339,8 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	 */
 	result = parse_ntfs_boot_sector(vol, (NTFS_BOOT_SECTOR*)bh->b_data);
 
-	/* Initialize the cluster allocator. */
-	setup_lcn_allocator(vol);
+	/* Initialize the cluster and mft allocators. */
+	ntfs_setup_allocators(vol);
 
 	brelse(bh);
 
