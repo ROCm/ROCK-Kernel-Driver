@@ -361,14 +361,13 @@ source "fs/Kconfig"
 
 menu "Kernel hacking"
 
-config CRASH_DUMP
-	tristate "Crash dump support (EXPERIMENTAL)"
-	depends on EXPERIMENTAL
-	default n
+config KERNTYPES
+	bool "Kerntypes debugging information"
+	default y
 	---help---
-	  Say Y here to enable saving an image of system memory when a panic
-	  or other error occurs. Dumps can also be forced with the SysRq+d
-	  key if MAGIC_SYSRQ is enabled.
+	  Say Y here to save additional kernel debugging information in the
+	  file init/kerntypes.o. This information is used by crash analysis
+	  tools such as lcrash to assign structures to kernel addresses.
 
 config DEBUG_KERNEL
 	bool "Kernel debugging"
