@@ -862,9 +862,7 @@ static int snd_atiixp_spdif_prepare(snd_pcm_substream_t *substream)
 			      ATI_REG_CMD_INTERLEAVE_OUT : 0);
 	} else {
 		atiixp_update(chip, CMD, ATI_REG_CMD_SPDF_CONFIG_MASK, 0);
-		atiixp_update(chip, CMD, ATI_REG_CMD_INTERLEAVE_SPDF,
-			      substream->runtime->format == SNDRV_PCM_FORMAT_S16_LE ?
-			      ATI_REG_CMD_INTERLEAVE_SPDF : 0);
+		atiixp_update(chip, CMD, ATI_REG_CMD_INTERLEAVE_SPDF, 0);
 	}
 	spin_unlock(&chip->reg_lock);
 	return 0;
@@ -1024,9 +1022,8 @@ static int snd_atiixp_pcm_open(snd_pcm_substream_t *substream, atiixp_dma_t *dma
 		runtime->hw.rates = chip->pcms[pcm_type]->rates;
 		snd_pcm_limit_hw_rates(runtime);
 	} else {
-		/* SPDIF */
-		runtime->hw.rates = SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_32000;
-		runtime->hw.rate_min = 32000;
+		/* direct SPDIF */
+		runtime->hw.formats = SNDRV_PCM_FMTBIT_IEC958_SUBFRAME_LE;
 	}
 	if ((err = snd_pcm_hw_constraint_integer(runtime, SNDRV_PCM_HW_PARAM_PERIODS)) < 0)
 		return err;
@@ -1277,7 +1274,10 @@ static int __devinit snd_atiixp_pcm_new(atiixp_t *chip)
 		return err;
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_atiixp_spdif_ops);
 	pcm->private_data = chip;
-	strcpy(pcm->name, "ATI IXP IEC958");
+	if (chip->spdif_over_aclink)
+		strcpy(pcm->name, "ATI IXP IEC958 (AC97)");
+	else
+		strcpy(pcm->name, "ATI IXP IEC958 (Direct)");
 	chip->pcmdevs[1] = pcm;
 
 	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
@@ -1584,7 +1584,7 @@ static int __devinit snd_atiixp_probe(struct pci_dev *pci,
 
 	pci_read_config_byte(pci, PCI_REVISION_ID, &revision);
 
-	strcpy(card->driver, "ATIIXP");
+	strcpy(card->driver, spdif_aclink[dev] ? "ATIIXP" : "ATIIXP-SPDMA");
 	strcpy(card->shortname, "ATI IXP");
 	if ((err = snd_atiixp_create(card, pci, &chip)) < 0)
 		goto __error;
