@@ -295,7 +295,6 @@ static int cpio_mkfile(const char *name, const char *location,
 	struct stat buf;
 	int file = -1;
 	int retval;
-	int i;
 	int rc = -1;
 
 	mode |= S_IFREG;
@@ -344,8 +343,7 @@ static int cpio_mkfile(const char *name, const char *location,
 	push_string(name);
 	push_pad();
 
-	for (i = 0; i < buf.st_size; ++i)
-		fputc(filebuf[i], stdout);
+	fwrite(filebuf, buf.st_size, 1, stdout);
 	offset += buf.st_size;
 	push_pad();
 	rc = 0;
