@@ -427,7 +427,7 @@ struct neighbour *neigh_create(struct neigh_table *tbl, const void *pkey,
 
 	write_lock_bh(&tbl->lock);
 
-	if (tbl->entries > (tbl->hash_mask + 1)) {
+	if (tbl->entries > (tbl->hash_mask + 1))
 		neigh_hash_grow(tbl, (tbl->hash_mask + 1) << 1);
 
 	hash_val = tbl->hash(pkey, dev) & tbl->hash_mask;
