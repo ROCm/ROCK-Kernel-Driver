@@ -60,7 +60,7 @@ Samples:
 Supporting Tools:
 -----------------
 Supporting tools include digiDload, digiConfig, buildPCI, and ditty.  See
-/usr/src/linux/Documentation/README.epca.dir/user.doc for more details.  Note,
+drivers/char/README.epca for more details.  Note,
 this driver REQUIRES that digiDload be executed prior to it being used. 
 Failure to do this will result in an ENODEV error.
 

@@ -148,7 +148,7 @@ THE SLICECOM DRIVER
 The SliceCOM board doesn't require firmware. You can have 4 of these cards
 in one machine. The driver doesn't (yet) support shared interrupts, so
 you will need a separate IRQ line for every board.
-Read linux/Documentation/networking/slicecom.txt for help on configuring
+Read Documentation/networking/slicecom.txt for help on configuring
 this adapter.
 
 THE HDLC/PPP LINE PROTOCOL DRIVER

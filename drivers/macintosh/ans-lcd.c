@@ -136,7 +136,7 @@ const char anslcd_logo[] =	"********************"  /* Line #1 */
 				"*    Welcome to    *"  /* Line #2 */
 				"********************"; /* Line #4 */
 
-int __init
+static int __init
 anslcd_init(void)
 {
 	int a;
@@ -173,5 +173,12 @@ anslcd_init(void)
 	return 0;
 }
 
-__initcall(anslcd_init);
+static void __exit
+anslcd_exit(void)
+{
+	misc_deregister(&anslcd_dev);
+	iounmap(anslcd_ptr);
+}
 
+module_init(anslcd_init);
+module_exit(anslcd_exit);

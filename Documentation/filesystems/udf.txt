@@ -1,5 +1,5 @@
 *
-* ./Documentation/filesystems/udf.txt
+* Documentation/filesystems/udf.txt
 *
 UDF Filesystem version 0.9.8.1
 

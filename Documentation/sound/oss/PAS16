@@ -9,7 +9,7 @@ and others whose names I could not find.
 This documentation is relevant for the PAS16 driver (pas2_card.c and
 friends) under kernel version 2.3.99 and later.  If you are
 unfamiliar with configuring sound under Linux, please read the
-Sound-HOWTO, linux/Documentation/sound/oss/Introduction and other
+Sound-HOWTO, Documentation/sound/oss/Introduction and other
 relevant docs first.
 
 The following information is relevant information from README.OSS
@@ -60,7 +60,7 @@ With PAS16 you can use two audio device files at the same time. /dev/dsp (and
 
 The new stuff for 2.3.99 and later
 ============================================================================
-The following configuration options from linux/Documentation/Configure.help
+The following configuration options from Documentation/Configure.help
 are relevant to configuring the PAS16:
 
 Sound card support

@@ -11,6 +11,7 @@
 
 #include <linux/skbuff.h>
 #include <linux/spinlock.h>
+#include <linux/icmpv6.h>
 #include <net/inet_ecn.h>
 #include <net/ipv6.h>
 #include <net/xfrm.h>
@@ -66,6 +67,23 @@ static void xfrm6_encap(struct sk_buff *skb)
 	top_iph->hop_limit = iph->hop_limit;
 	ipv6_addr_copy(&top_iph->saddr, (struct in6_addr *)&x->props.saddr);
 	ipv6_addr_copy(&top_iph->daddr, (struct in6_addr *)&x->id.daddr);
+}
+
+static int xfrm6_tunnel_check_size(struct sk_buff *skb)
+{
+	int mtu, ret = 0;
+	struct dst_entry *dst = skb->dst;
+
+	mtu = dst_pmtu(dst) - sizeof(struct ipv6hdr);
+	if (mtu < IPV6_MIN_MTU)
+		mtu = IPV6_MIN_MTU;
+
+	if (skb->len > mtu) {
+		icmpv6_send(skb, ICMPV6_PKT_TOOBIG, 0, mtu, skb->dev);
+		ret = -EMSGSIZE;
+	}
+
+	return ret;
 }
 
 int xfrm6_output(struct sk_buff **pskb)

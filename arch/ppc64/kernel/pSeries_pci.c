@@ -284,10 +284,10 @@ static void __init pci_process_bridge_OF_ranges(struct pci_controller *hose,
 				isa_dn = of_find_node_by_type(NULL, "isa");
 				if (isa_dn) {
 					isa_io_base = pci_io_base;
-					of_node_put(isa_dn);
 					pci_process_ISA_OF_ranges(isa_dn,
 						hose->io_base_phys,
 						hose->io_base_virt);
+					of_node_put(isa_dn);
                                         /* Allow all IO */
                                         io_page_mask = -1;
 				}
