@@ -127,7 +127,7 @@ config MD_RAID5
 
 config MD_RAID6
 	tristate "RAID-6 mode (EXPERIMENTAL)"
-	depends on BLK_DEV_MD && EXPERIMENTAL
+	depends on BLK_DEV_MD && EXPERIMENTAL && !PPC32
 	---help---
 	  WARNING: RAID-6 is currently highly experimental.  If you
 	  use it, there is no guarantee whatsoever that it won't
