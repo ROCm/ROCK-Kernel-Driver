@@ -16,9 +16,13 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 
+#include <scsi/scsi.h>
+#include <scsi/scsi_dbg.h>
+#include <scsi/scsi_device.h>
 #include <scsi/scsi_driver.h>
+#include <scsi/scsi_eh.h>
 #include <scsi/scsi_host.h>
-#include "scsi.h"
+#include <scsi/scsi_request.h>
 
 #include "scsi_priv.h"
 #include "scsi_logging.h"
@@ -837,8 +841,8 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes,
 			printk("scsi%d: ERROR on channel %d, id %d, lun %d, CDB: ",
 			       cmd->device->host->host_no, (int) cmd->device->channel,
 			       (int) cmd->device->id, (int) cmd->device->lun);
-			print_command(cmd->data_cmnd);
-			print_sense("", cmd);
+			__scsi_print_command(cmd->data_cmnd);
+			scsi_print_sense("", cmd);
 			cmd = scsi_end_request(cmd, 0, block_bytes, 1);
 			return;
 		default:
@@ -862,7 +866,7 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes,
 		       cmd->device->lun, result);
 
 		if (driver_byte(result) & DRIVER_SENSE)
-			print_sense("", cmd);
+			scsi_print_sense("", cmd);
 		/*
 		 * Mark a single buffer as not uptodate.  Queue the remainder.
 		 * We sometimes get this cruft in the event that a medium error

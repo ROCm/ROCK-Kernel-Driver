@@ -6,13 +6,16 @@
  *   by D. Gilbert and aeb (20020609)
  */
 
-#include <linux/module.h>
-
 #include <linux/config.h>
 #include <linux/blkdev.h>
+#include <linux/module.h>
 #include <linux/kernel.h>
-#include "scsi.h"
+
+#include <scsi/scsi.h>
+#include <scsi/scsi_device.h>
 #include <scsi/scsi_host.h>
+#include <scsi/scsi_request.h>
+
 
 #define CONST_COMMAND   0x01
 #define CONST_STATUS    0x02

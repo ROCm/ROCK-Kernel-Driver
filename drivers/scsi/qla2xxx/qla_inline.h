@@ -165,7 +165,7 @@ static __inline__ int qla2x00_is_wwn_zero(uint8_t *);
  *      wwn = Pointer to WW name to check
  *
  * Returns:
- *      TRUE if name is 0 else FALSE
+ *      1 if name is 0x00 else 0
  *
  * Context:
  *      Kernel context.
@@ -179,7 +179,7 @@ qla2x00_is_wwn_zero(uint8_t *wwn)
 		if (*wwn != 0)
 			break;
 	}
-	/* if zero return TRUE */
+	/* if zero return 1 */
 	if (cnt == WWN_SIZE)
 		return (1);
 	else

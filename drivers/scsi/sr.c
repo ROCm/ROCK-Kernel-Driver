@@ -46,11 +46,14 @@
 #include <linux/blkdev.h>
 #include <asm/uaccess.h>
 
-#include "scsi.h"
-#include <scsi/scsi_host.h>
-
+#include <scsi/scsi.h>
+#include <scsi/scsi_dbg.h>
+#include <scsi/scsi_device.h>
 #include <scsi/scsi_driver.h>
+#include <scsi/scsi_eh.h>
+#include <scsi/scsi_host.h>
 #include <scsi/scsi_ioctl.h>	/* For the door lock/unlock commands */
+#include <scsi/scsi_request.h>
 
 #include "scsi_logging.h"
 #include "sr.h"
@@ -282,7 +285,7 @@ static void rw_intr(struct scsi_cmnd * SCpnt)
 			 * user, but make sure that it's not treated as a
 			 * hard error.
 			 */
-			print_sense("sr", SCpnt);
+			scsi_print_sense("sr", SCpnt);
 			SCpnt->result = 0;
 			SCpnt->sense_buffer[0] = 0x0;
 			good_bytes = this_count;
@@ -335,11 +338,11 @@ static int sr_init_command(struct scsi_cmnd * SCpnt)
 
 		memcpy(SCpnt->cmnd, rq->cmd, sizeof(SCpnt->cmnd));
 		if (!rq->data_len)
-			SCpnt->sc_data_direction = SCSI_DATA_NONE;
+			SCpnt->sc_data_direction = DMA_NONE;
 		else if (rq_data_dir(rq) == WRITE)
-			SCpnt->sc_data_direction = SCSI_DATA_WRITE;
+			SCpnt->sc_data_direction = DMA_TO_DEVICE;
 		else
-			SCpnt->sc_data_direction = SCSI_DATA_READ;
+			SCpnt->sc_data_direction = DMA_FROM_DEVICE;
 
 		this_count = rq->data_len;
 		if (rq->timeout)
@@ -375,10 +378,10 @@ static int sr_init_command(struct scsi_cmnd * SCpnt)
 		if (!cd->device->writeable)
 			return 0;
 		SCpnt->cmnd[0] = WRITE_10;
-		SCpnt->sc_data_direction = SCSI_DATA_WRITE;
+		SCpnt->sc_data_direction = DMA_TO_DEVICE;
 	} else if (rq_data_dir(SCpnt->request) == READ) {
 		SCpnt->cmnd[0] = READ_10;
-		SCpnt->sc_data_direction = SCSI_DATA_READ;
+		SCpnt->sc_data_direction = DMA_FROM_DEVICE;
 	} else {
 		blk_dump_rq_flags(SCpnt->request, "Unknown sr command");
 		return 0;
@@ -674,7 +677,7 @@ static void get_sectorsize(struct scsi_cd *cd)
 		memset(buffer, 0, 8);
 
 		/* Do the command and wait.. */
-		SRpnt->sr_data_direction = SCSI_DATA_READ;
+		SRpnt->sr_data_direction = DMA_FROM_DEVICE;
 		scsi_wait_req(SRpnt, (void *) cmd, (void *) buffer,
 			      8, SR_TIMEOUT, MAX_RETRIES);
 

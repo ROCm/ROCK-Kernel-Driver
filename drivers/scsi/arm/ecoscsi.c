@@ -33,7 +33,7 @@
 #include <asm/system.h>
 
 #include "../scsi.h"
-#include "../hosts.h"
+#include <scsi/scsi_host.h>
 
 #define NCR5380_implementation_fields	int port, ctrl
 #define NCR5380_local_declare()		struct Scsi_Host *_instance

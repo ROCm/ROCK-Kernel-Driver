@@ -283,12 +283,6 @@ static struct pci_device_id tmscsim_pci_tbl[] = {
 };
 MODULE_DEVICE_TABLE(pci, tmscsim_pci_tbl);
 
-#define USE_SPINLOCKS 1
-
-#define DC390_IFLAGS unsigned long iflags
-#define DC390_LOCK_IO(dev) spin_lock_irqsave (((struct Scsi_Host *)dev)->host_lock, iflags)
-#define DC390_UNLOCK_IO(dev) spin_unlock_irqrestore (((struct Scsi_Host *)dev)->host_lock, iflags)
-
 /* These macros are used for uniform access to 2.0.x and 2.1.x PCI config space*/
 
 #define PDEV pdev
@@ -305,10 +299,6 @@ MODULE_DEVICE_TABLE(pci, tmscsim_pci_tbl);
 #define PCI_GET_IO_AND_IRQ do{io_port = pci_resource_start (pdev, 0); irq = pdev->irq;} while(0)
 
 #include "tmscsim.h"
-
-#ifndef __init
-# define __init
-#endif
 
 static UCHAR dc390_StartSCSI( PACB pACB, PDCB pDCB, PSRB pSRB );
 static void dc390_DataOut_0( PACB pACB, PSRB pSRB, PUCHAR psstatus);
@@ -343,8 +333,6 @@ static int    dc390_initAdapter( PSH psh, ULONG io_port, UCHAR Irq, UCHAR index 
 static void   dc390_initDCB( PACB pACB, PDCB *ppDCB, UCHAR id, UCHAR lun);
 static void   dc390_updateDCB (PACB pACB, PDCB pDCB);
 
-static int DC390_release(struct Scsi_Host *host);
-static int dc390_shutdown (struct Scsi_Host *host);
 static int DC390_proc_info (struct Scsi_Host *shpnt, char *buffer, char **start,
 			    off_t offset, int length, int inout);
 
@@ -433,7 +421,7 @@ static UCHAR  dc390_clock_speed[] = {100,80,67,57,50, 40, 31, 20};
  **********************************************************************/
 
 
-static void __init dc390_EnDisableCE( UCHAR mode, PDEVDECL, PUCHAR regval )
+static void __devinit dc390_EnDisableCE( UCHAR mode, PDEVDECL, PUCHAR regval )
 {
     UCHAR bval;
 
@@ -450,7 +438,7 @@ static void __init dc390_EnDisableCE( UCHAR mode, PDEVDECL, PUCHAR regval )
 
 
 /* Override EEprom values with explicitly set values */
-static void __init dc390_EEprom_Override (UCHAR index)
+static void __devinit dc390_EEprom_Override (UCHAR index)
 {
     PUCHAR ptr;
     UCHAR  id;
@@ -477,7 +465,7 @@ static void __init dc390_EEprom_Override (UCHAR index)
 }
 
 /* Handle "-1" case */
-static void __init dc390_check_for_safe_settings (void)
+static void __devinit dc390_check_for_safe_settings (void)
 {
 	if (tmscsim[0] == -1 || tmscsim[0] > 15) /* modules-2.0.0 passes -1 as string */
 	{
@@ -500,7 +488,7 @@ static int __initdata tmscsim_def[] = {7, 0 /* 10MHz */,
 		, 3 /* 16 Tags per LUN */, 1 /* s delay after Reset */ };
 
 /* Copy defaults over set values where missing */
-static void __init dc390_fill_with_defaults (void)
+static void __devinit dc390_fill_with_defaults (void)
 {
 	int i;
 	PARSEDEBUG(printk(KERN_INFO "DC390: setup %08x %08x %08x %08x %08x %08x\n", tmscsim[0],\
@@ -517,6 +505,7 @@ static void __init dc390_fill_with_defaults (void)
 	if (tmscsim[5] > 180) tmscsim[5] = 180;
 }
 
+#ifndef MODULE
 /* Override defaults on cmdline:
  * tmscsim: AdaptID, MaxSpeed (Index), DevMode (Bitmapped), AdaptMode (Bitmapped)
  */
@@ -536,11 +525,11 @@ static int __init dc390_setup (char *str)
 	/* dc390_checkparams (); */
 	return 1;
 }
-#ifndef MODULE
+
 __setup("tmscsim=", dc390_setup);
 #endif
 
-static void __init dc390_EEpromOutDI( PDEVDECL, PUCHAR regval, UCHAR Carry )
+static void __devinit dc390_EEpromOutDI( PDEVDECL, PUCHAR regval, UCHAR Carry )
 {
     UCHAR bval;
 
@@ -561,7 +550,7 @@ static void __init dc390_EEpromOutDI( PDEVDECL, PUCHAR regval, UCHAR Carry )
 }
 
 
-static UCHAR __init dc390_EEpromInDO( PDEVDECL )
+static UCHAR __devinit dc390_EEpromInDO( PDEVDECL )
 {
     UCHAR bval;
 
@@ -577,7 +566,7 @@ static UCHAR __init dc390_EEpromInDO( PDEVDECL )
 }
 
 
-static USHORT __init dc390_EEpromGetData1( PDEVDECL )
+static USHORT __devinit dc390_EEpromGetData1( PDEVDECL )
 {
     UCHAR i;
     UCHAR carryFlag;
@@ -594,7 +583,7 @@ static USHORT __init dc390_EEpromGetData1( PDEVDECL )
 }
 
 
-static void __init dc390_Prepare( PDEVDECL, PUCHAR regval, UCHAR EEpromCmd )
+static void __devinit dc390_Prepare( PDEVDECL, PUCHAR regval, UCHAR EEpromCmd )
 {
     UCHAR i,j;
     UCHAR carryFlag;
@@ -610,7 +599,7 @@ static void __init dc390_Prepare( PDEVDECL, PUCHAR regval, UCHAR EEpromCmd )
 }
 
 
-static void __init dc390_ReadEEprom( PDEVDECL, PUSHORT ptr)
+static void __devinit dc390_ReadEEprom( PDEVDECL, PUSHORT ptr)
 {
     UCHAR   regval,cmd;
     UCHAR   i;
@@ -626,13 +615,13 @@ static void __init dc390_ReadEEprom( PDEVDECL, PUSHORT ptr)
 }
 
 
-static void __init dc390_interpret_delay (UCHAR index)
+static void __devinit dc390_interpret_delay (UCHAR index)
 {
     char interpd [] = {1,3,5,10,16,30,60,120};
     dc390_eepromBuf[index][EE_DELAY] = interpd [dc390_eepromBuf[index][EE_DELAY]];
 }
 
-static UCHAR __init dc390_CheckEEpromCheckSum( PDEVDECL, UCHAR index )
+static UCHAR __devinit dc390_CheckEEpromCheckSum( PDEVDECL, UCHAR index )
 {
     UCHAR  i;
     char  EEbuf[128];
@@ -868,11 +857,11 @@ static void dc390_Waiting_process ( PACB pACB )
 static void DC390_waiting_timed_out (unsigned long ptr)
 {
 	PACB pACB = (PACB)ptr;
-	DC390_IFLAGS;
+	unsigned long iflags;
 	DEBUG0(printk ("DC390: Debug: Waiting queue woken up by timer!\n"));
-	DC390_LOCK_IO(pACB->pScsiHost);
+	spin_lock_irqsave(pACB->pScsiHost->host_lock, iflags);
 	dc390_Waiting_process (pACB);
-	DC390_UNLOCK_IO(pACB->pScsiHost);
+	spin_unlock_irqrestore(pACB->pScsiHost->host_lock, iflags);
 }
 
 /***********************************************************************
@@ -1691,7 +1680,7 @@ static void dc390_linkSRB( PACB pACB )
  *	    io_port, Irq, index: Resources and adapter index
  ***********************************************************************/
 
-static void __init dc390_initACB (PSH psh, ULONG io_port, UCHAR Irq, UCHAR index)
+static void __devinit dc390_initACB (PSH psh, ULONG io_port, UCHAR Irq, UCHAR index)
 {
     PACB    pACB;
     UCHAR   i;
@@ -1762,7 +1751,7 @@ static void __init dc390_initACB (PSH psh, ULONG io_port, UCHAR Irq, UCHAR index
  * Outputs: 0 on success, -1 on error
  ***********************************************************************/
 
-static int __init dc390_initAdapter (PSH psh, ULONG io_port, UCHAR Irq, UCHAR index)
+static int __devinit dc390_initAdapter (PSH psh, ULONG io_port, UCHAR Irq, UCHAR index)
 {
     PACB   pACB, pACB2;
     UCHAR  dstate;
@@ -1833,65 +1822,7 @@ static int __init dc390_initAdapter (PSH psh, ULONG io_port, UCHAR Irq, UCHAR in
 }
 
 
-/***********************************************************************
- * Function : static int DC390_init (struct Scsi_Host *host, ...)
- *
- * Purpose :  initialize the internal structures for a given SCSI host
- *
- * Inputs : host - pointer to this host adapter's structure
- *	    io_port - IO ports mapped to this adapter
- *	    irq - IRQ assigned to this adpater
- *	    struct pci_dev - PCI access handle
- *	    index - Adapter index
- *
- * Outputs: 0 on success, -1 on error
- *
- * Note: written in capitals, because the locking is only done here,
- *	not in DC390_detect, called from outside 
- ***********************************************************************/
-static int __init dc390_init (PSH psh, unsigned long io_port, u8 irq, struct pci_dev *pdev, UCHAR index)
-{
-    PACB  pACB;
-
-    if (dc390_CheckEEpromCheckSum (PDEV, index))
-    {
-	int speed;
-	dc390_adapname = "AM53C974";
-	printk (KERN_INFO "DC390_init: No EEPROM found! Trying default settings ...\n");
-	dc390_check_for_safe_settings ();
-	dc390_fill_with_defaults ();
-	dc390_EEprom_Override (index);
-	speed = dc390_clock_speed[tmscsim[1]];
-	printk (KERN_INFO "DC390: Used defaults: AdaptID=%i, SpeedIdx=%i (%i.%i MHz),"
-		" DevMode=0x%02x, AdaptMode=0x%02x, TaggedCmnds=%i (%i), DelayReset=%is\n", 
-		tmscsim[0], tmscsim[1], speed/10, speed%10,
-		(UCHAR)tmscsim[2], (UCHAR)tmscsim[3], tmscsim[4], 2 << (tmscsim[4]), tmscsim[5]);
-    }
-    else
-    {
-	dc390_check_for_safe_settings ();
-	dc390_EEprom_Override (index);
-    }
-    pACB = (PACB) psh->hostdata;
-
-    DEBUG0(printk(KERN_INFO "DC390: pSH = %8x, Index %02i\n", (UINT) psh, index));
-
-    dc390_initACB( psh, io_port, irq, index );
-        
-    PDEVSET;
-
-    if( !dc390_initAdapter( psh, io_port, irq, index ) )
-    {
-        return (0);
-    }
-    else
-    {
-	scsi_unregister( psh );
-	return( -1 );
-    }
-}
-
-static void __init dc390_set_pci_cfg (PDEVDECL)
+static void __devinit dc390_set_pci_cfg (PDEVDECL)
 {
 	USHORT cmd;
 	PCI_READ_CONFIG_WORD (PDEV, PCI_COMMAND, &cmd);
@@ -1984,7 +1915,31 @@ static int __devinit dc390_init_one(struct pci_dev *dev,
 
 	pACB = (PACB) scsi_host->hostdata;
 
-	if (dc390_init(scsi_host, io_port, irq, dev, dc390_adapterCnt)) {
+	if (dc390_CheckEEpromCheckSum (dev, dc390_adapterCnt)) {
+		int speed;
+		dc390_adapname = "AM53C974";
+		printk(KERN_INFO "DC390_init: No EEPROM found! Trying default settings ...\n");
+		dc390_check_for_safe_settings();
+		dc390_fill_with_defaults();
+		dc390_EEprom_Override(dc390_adapterCnt);
+		speed = dc390_clock_speed[tmscsim[1]];
+		printk(KERN_INFO "DC390: Used defaults: AdaptID=%i, SpeedIdx=%i (%i.%i MHz),"
+		       " DevMode=0x%02x, AdaptMode=0x%02x, TaggedCmnds=%i (%i), DelayReset=%is\n", 
+		       tmscsim[0], tmscsim[1], speed/10, speed%10,
+		       (UCHAR)tmscsim[2], (UCHAR)tmscsim[3], tmscsim[4], 2 << (tmscsim[4]), tmscsim[5]);
+	} else {
+		dc390_check_for_safe_settings();
+		dc390_EEprom_Override(dc390_adapterCnt);
+	}
+
+	DEBUG0(printk(KERN_INFO "DC390: pSH = %8x, Index %02i\n", (UINT) scsi_host, dc390_adapterCnt));
+
+	dc390_initACB(scsi_host, io_port, irq, dc390_adapterCnt);
+
+	pACB->pdev = dev;
+
+	if (dc390_initAdapter(scsi_host, io_port, irq, dc390_adapterCnt)) {
+		scsi_unregister(scsi_host);
 		ret = -EBUSY;
 		goto busy;
 	}
@@ -2011,6 +1966,52 @@ nomem:
 	return ret;
 }
 
+static void __devexit dc390_freeDCBs (struct Scsi_Host *host)
+{
+    PDCB pDCB, nDCB;
+    PACB pACB = (PACB) host->hostdata;
+    
+    pDCB = pACB->pLinkDCB;
+    if (!pDCB) return;
+    do
+    {
+	nDCB = pDCB->pNextDCB;
+	DCBDEBUG(printk (KERN_INFO "DC390: Free DCB (ID %i, LUN %i): %p\n",\
+			 pDCB->TargetID, pDCB->TargetLUN, pDCB));
+	//kfree (pDCB);
+	dc390_remove_dev (pACB, pDCB);
+	pDCB = nDCB;
+    } while (pDCB && pACB->pLinkDCB);
+}
+
+/***********************************************************************
+ * Function : static int dc390_shutdown (struct Scsi_Host *host)
+ *
+ * Purpose : does a clean (we hope) shutdown of the SCSI chip.
+ *	     Use prior to dumping core, unloading the driver, etc.
+ *
+ * Returns : 0 on success
+ ***********************************************************************/
+static int __devexit dc390_shutdown (struct Scsi_Host *host)
+{
+    UCHAR    bval;
+    PACB pACB = (PACB) host->hostdata;
+   
+/*  pACB->soft_reset(host); */
+
+    printk(KERN_INFO "DC390: shutdown\n");
+
+    pACB->ACBFlag = RESET_DEV;
+    bval = DC390_read8 (CtrlReg1);
+    bval |= DIS_INT_ON_SCSI_RST;
+    DC390_write8 (CtrlReg1, bval);	/* disable interrupt */
+    if (pACB->Gmode2 & RST_SCSI_BUS)
+		dc390_ResetSCSIBus (pACB);
+
+    if (timer_pending (&pACB->Waiting_Timer)) del_timer (&pACB->Waiting_Timer);
+    return( 0 );
+}
+
 /**
  * dc390_remove_one - Called to remove a single instance of the adapter.
  *
@@ -2019,9 +2020,25 @@ nomem:
 static void __devexit dc390_remove_one(struct pci_dev *dev)
 {
 	struct Scsi_Host *scsi_host = pci_get_drvdata(dev);
+	unsigned long iflags;
+	PACB pACB = (PACB) scsi_host->hostdata;
 
 	scsi_remove_host(scsi_host);
-	DC390_release(scsi_host);
+
+	spin_lock_irqsave(scsi_host->host_lock, iflags);
+
+	/* TO DO: We should check for outstanding commands first. */
+	dc390_shutdown(scsi_host);
+
+	if (scsi_host->irq != SCSI_IRQ_NONE) {
+		DEBUG0(printk(KERN_INFO "DC390: Free IRQ %i\n", scsi_host->irq));
+		free_irq(scsi_host->irq, pACB);
+	}
+
+	release_region(scsi_host->io_port, scsi_host->n_io_port);
+	dc390_freeDCBs(scsi_host);
+	spin_unlock_irqrestore(scsi_host->host_lock, iflags);
+
 	pci_disable_device(dev);
 	scsi_host_put(scsi_host);
 	pci_set_drvdata(dev, NULL);
@@ -2172,75 +2189,6 @@ static int DC390_proc_info (struct Scsi_Host *shpnt, char *buffer, char **start,
 
 #undef YESNO
 #undef SPRINTF
-
-/***********************************************************************
- * Function : static int dc390_shutdown (struct Scsi_Host *host)
- *
- * Purpose : does a clean (we hope) shutdown of the SCSI chip.
- *	     Use prior to dumping core, unloading the driver, etc.
- *
- * Returns : 0 on success
- ***********************************************************************/
-static int dc390_shutdown (struct Scsi_Host *host)
-{
-    UCHAR    bval;
-    PACB pACB = (PACB) host->hostdata;
-   
-/*  pACB->soft_reset(host); */
-
-    printk(KERN_INFO "DC390: shutdown\n");
-
-    pACB->ACBFlag = RESET_DEV;
-    bval = DC390_read8 (CtrlReg1);
-    bval |= DIS_INT_ON_SCSI_RST;
-    DC390_write8 (CtrlReg1, bval);	/* disable interrupt */
-    if (pACB->Gmode2 & RST_SCSI_BUS)
-		dc390_ResetSCSIBus (pACB);
-
-    if (timer_pending (&pACB->Waiting_Timer)) del_timer (&pACB->Waiting_Timer);
-    return( 0 );
-}
-
-static void dc390_freeDCBs (struct Scsi_Host *host)
-{
-    PDCB pDCB, nDCB;
-    PACB pACB = (PACB) host->hostdata;
-    
-    pDCB = pACB->pLinkDCB;
-    if (!pDCB) return;
-    do
-    {
-	nDCB = pDCB->pNextDCB;
-	DCBDEBUG(printk (KERN_INFO "DC390: Free DCB (ID %i, LUN %i): %p\n",\
-			 pDCB->TargetID, pDCB->TargetLUN, pDCB));
-	//kfree (pDCB);
-	dc390_remove_dev (pACB, pDCB);
-	pDCB = nDCB;
-    } while (pDCB && pACB->pLinkDCB);
-
-}
-
-static int DC390_release (struct Scsi_Host *host)
-{
-    DC390_IFLAGS;
-    PACB pACB = (PACB) host->hostdata;
-
-    DC390_LOCK_IO(host);
-
-    /* TO DO: We should check for outstanding commands first. */
-    dc390_shutdown (host);
-
-    if (host->irq != SCSI_IRQ_NONE)
-    {
-	DEBUG0(printk(KERN_INFO "DC390: Free IRQ %i\n",host->irq));
-	free_irq (host->irq, pACB);
-    }
-
-    release_region(host->io_port,host->n_io_port);
-    dc390_freeDCBs (host);
-    DC390_UNLOCK_IO(host);
-    return( 1 );
-}
 
 static struct pci_driver dc390_driver = {
 	.name           = "tmscsim",

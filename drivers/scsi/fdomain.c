@@ -284,8 +284,12 @@
 #include <asm/io.h>
 #include <asm/system.h>
 
-#include "scsi.h"
+#include <scsi/scsi.h>
+#include <scsi/scsi_cmnd.h>
+#include <scsi/scsi_device.h>
 #include <scsi/scsi_host.h>
+#include <scsi/scsi_ioctl.h>
+#include "fdomain.h"
 
 MODULE_AUTHOR("Rickard E. Faith");
 MODULE_DESCRIPTION("Future domain SCSI driver");
@@ -386,7 +390,7 @@ static int               PCI_bus;
 static int               Quantum;	/* Quantum board variant */
 static int               interrupt_level;
 static volatile int      in_command;
-static Scsi_Cmnd         *current_SC;
+static struct scsi_cmnd  *current_SC;
 static enum chip_type    chip              = unknown;
 static int               adapter_mask;
 static int               this_id;
@@ -415,7 +419,7 @@ static int               FIFO_Size = 0x2000; /* 8k FIFO for
 
 static irqreturn_t       do_fdomain_16x0_intr( int irq, void *dev_id,
 					    struct pt_regs * regs );
-int		 	fdomain_16x0_bus_reset(Scsi_Cmnd *SCpnt);
+static int		 fdomain_16x0_bus_reset(struct scsi_cmnd *SCpnt);
 
 /* Allow insmod parameters to be like LILO parameters.  For example:
    insmod fdomain fdomain=0x140,11 */
@@ -552,7 +556,7 @@ static void print_banner( struct Scsi_Host *shpnt )
    printk( "\n" );
 }
 
-int __init fdomain_setup(char *str)
+int fdomain_setup(char *str)
 {
 	int ints[4];
 
@@ -853,7 +857,7 @@ static int fdomain_pci_bios_detect( int *irq, int *iobase, struct pci_dev **ret_
 }
 #endif
 
-struct Scsi_Host *__fdomain_16x0_detect( Scsi_Host_Template *tpnt )
+struct Scsi_Host *__fdomain_16x0_detect(struct scsi_host_template *tpnt )
 {
    int              retcode;
    struct Scsi_Host *shpnt;
@@ -902,7 +906,7 @@ struct Scsi_Host *__fdomain_16x0_detect( Scsi_Host_Template *tpnt )
    Write_FIFO_port       = port_base + Write_FIFO;
    Write_SCSI_Data_port  = port_base + Write_SCSI_Data;
 
-   fdomain_16x0_bus_reset( NULL);
+   fdomain_16x0_bus_reset(NULL);
 
    if (fdomain_test_loopback()) {
       printk(KERN_ERR  "scsi: <fdomain> Detection failed (loopback test failed at port base 0x%x)\n", port_base);
@@ -971,7 +975,7 @@ struct Scsi_Host *__fdomain_16x0_detect( Scsi_Host_Template *tpnt )
    return shpnt;
 }
 
-static int fdomain_16x0_detect( Scsi_Host_Template *tpnt )
+static int fdomain_16x0_detect(struct scsi_host_template *tpnt)
 {
 	if (fdomain)
 		fdomain_setup(fdomain);
@@ -1255,7 +1259,7 @@ static irqreturn_t do_fdomain_16x0_intr(int irq, void *dev_id,
    if (chip == tmc1800 && !current_SC->SCp.have_data_in
        && (current_SC->SCp.sent_command >= current_SC->cmd_len)) {
       
-      if(scsi_to_pci_dma_dir(current_SC->sc_data_direction)	== PCI_DMA_TODEVICE)
+      if(current_SC->sc_data_direction == DMA_TO_DEVICE)
       {
 	 current_SC->SCp.have_data_in = -1;
 	 outb( 0xd0 | PARITY_MASK, TMC_Cntl_port );
@@ -1388,7 +1392,8 @@ static irqreturn_t do_fdomain_16x0_intr(int irq, void *dev_id,
    return IRQ_HANDLED;
 }
 
-static int fdomain_16x0_queue( Scsi_Cmnd * SCpnt, void (*done)(Scsi_Cmnd *))
+static int fdomain_16x0_queue(struct scsi_cmnd *SCpnt,
+		void (*done)(struct scsi_cmnd *))
 {
    if (in_command) {
       panic( "scsi: <fdomain> fdomain_16x0_queue() NOT REENTRANT!\n" );
@@ -1440,7 +1445,7 @@ static int fdomain_16x0_queue( Scsi_Cmnd * SCpnt, void (*done)(Scsi_Cmnd *))
 }
 
 #if DEBUG_ABORT
-static void print_info(Scsi_Cmnd *SCpnt)
+static void print_info(struct scsi_cmnd *SCpnt)
 {
    unsigned int imr;
    unsigned int irr;
@@ -1511,7 +1516,7 @@ static void print_info(Scsi_Cmnd *SCpnt)
 }
 #endif
 
-static int fdomain_16x0_abort( Scsi_Cmnd *SCpnt)
+static int fdomain_16x0_abort(struct scsi_cmnd *SCpnt)
 {
 #if EVERY_ACCESS || ERRORS_ONLY || DEBUG_ABORT
    printk( "scsi: <fdomain> abort " );
@@ -1537,7 +1542,7 @@ static int fdomain_16x0_abort( Scsi_Cmnd *SCpnt)
    return SUCCESS;
 }
 
-int fdomain_16x0_bus_reset(Scsi_Cmnd *SCpnt)
+static int fdomain_16x0_bus_reset(struct scsi_cmnd *SCpnt)
 {
    outb( 1, SCSI_Cntl_port );
    do_pause( 2 );
@@ -1547,18 +1552,6 @@ int fdomain_16x0_bus_reset(Scsi_Cmnd *SCpnt)
    outb( PARITY_MASK, TMC_Cntl_port );
    return SUCCESS;
 }
-
-static int fdomain_16x0_host_reset(Scsi_Cmnd *SCpnt)
-{
-  return FAILED;
-}
-
-static int fdomain_16x0_device_reset(Scsi_Cmnd *SCpnt)
-{
-  return FAILED;
-}
-
-#include <scsi/scsi_ioctl.h>
 
 static int fdomain_16x0_biosparam(struct scsi_device *sdev,
 		struct block_device *bdev,
@@ -1723,7 +1716,7 @@ static int fdomain_16x0_release(struct Scsi_Host *shpnt)
 	return 0;
 }
 
-Scsi_Host_Template fdomain_driver_template = {
+struct scsi_host_template fdomain_driver_template = {
 	.module			= THIS_MODULE,
 	.name			= "fdomain",
 	.proc_name		= "fdomain",
@@ -1732,8 +1725,6 @@ Scsi_Host_Template fdomain_driver_template = {
 	.queuecommand		= fdomain_16x0_queue,
 	.eh_abort_handler	= fdomain_16x0_abort,
 	.eh_bus_reset_handler	= fdomain_16x0_bus_reset,
-	.eh_device_reset_handler = fdomain_16x0_device_reset,
-	.eh_host_reset_handler	= fdomain_16x0_host_reset,
 	.bios_param		= fdomain_16x0_biosparam,
 	.release		= fdomain_16x0_release,
 	.can_queue		= 1,

@@ -88,10 +88,11 @@
 #include <asm/io.h>
 #include <asm/uaccess.h>
 
-#include <linux/kdev_t.h>	/* needed for access to Scsi_Host struct */
-#include <linux/blkdev.h>
-#include "../../scsi/scsi.h"
-#include "../../scsi/hosts.h"
+#include <scsi/scsi.h>
+#include <scsi/scsi_cmnd.h>
+#include <scsi/scsi_device.h>
+#include <scsi/scsi_host.h>
+#include <scsi/scsi_tcq.h>
 
 #define COPYRIGHT	"Copyright (c) 1999-2004 LSI Logic Corporation"
 #define MODULEAUTHOR	"Steven J. Ralston, Noah Romer, Pamela Delaney"
@@ -400,7 +401,7 @@ static int mptctl_bus_reset(MPT_IOCTL *ioctl)
 
 	/* Send request
 	 */
-	if ((mf = mpt_get_msg_frame(mptctl_id, ioctl->ioc->id)) == NULL) {
+	if ((mf = mpt_get_msg_frame(mptctl_id, ioctl->ioc)) == NULL) {
 		dctlprintk((MYIOC_s_WARN_FMT "IssueTaskMgmt, no msg frames!!\n",
 				ioctl->ioc->name));
 
@@ -435,7 +436,7 @@ static int mptctl_bus_reset(MPT_IOCTL *ioctl)
 	ioctl->status |= MPT_IOCTL_STATUS_TMTIMER_ACTIVE;
 	add_timer(&ioctl->TMtimer);
 
-	retval = mpt_send_handshake_request(mptctl_id, ioctl->ioc->id,
+	retval = mpt_send_handshake_request(mptctl_id, ioctl->ioc,
 			sizeof(SCSITaskMgmt_t), (u32*)pScsiTm, NO_SLEEP);
 
 	if (retval != 0) {
@@ -444,7 +445,7 @@ static int mptctl_bus_reset(MPT_IOCTL *ioctl)
 
 		mptctl_free_tm_flags(ioctl->ioc);
 		del_timer(&ioctl->TMtimer);
-		mpt_free_msg_frame(mptctl_id, ioctl->ioc->id, mf);
+		mpt_free_msg_frame(mptctl_id, ioctl->ioc, mf);
 		ioctl->tmPtr = NULL;
 	}
 
@@ -519,7 +520,7 @@ mptctl_ioc_reset(MPT_ADAPTER *ioc, int reset_phase)
 		if (ioctl && (ioctl->status & MPT_IOCTL_STATUS_TMTIMER_ACTIVE)){
 			ioctl->status &= ~MPT_IOCTL_STATUS_TMTIMER_ACTIVE;
 			del_timer(&ioctl->TMtimer);
-			mpt_free_msg_frame(mptctl_id, ioc->id, ioctl->tmPtr);
+			mpt_free_msg_frame(mptctl_id, ioc, ioctl->tmPtr);
 		}
 
 	} else {
@@ -751,7 +752,7 @@ mptctl_do_fw_download(int ioc, char __user *ufwbuf, size_t fwlen)
 
 	/*  Valid device. Get a message frame and construct the FW download message.
 	 */
-	if ((mf = mpt_get_msg_frame(mptctl_id, ioc)) == NULL)
+	if ((mf = mpt_get_msg_frame(mptctl_id, iocp)) == NULL)
 		return -EAGAIN;
 	dlmsg = (FWDownload_t*) mf;
 	ptsge = (FWDownloadTCSGE_t *) &dlmsg->SGL;
@@ -867,7 +868,7 @@ mptctl_do_fw_download(int ioc, char __user *ufwbuf, size_t fwlen)
 	 * Finally, perform firmware download.
 	 */
 	ReplyMsg = NULL;
-	mpt_put_msg_frame(mptctl_id, ioc, mf);
+	mpt_put_msg_frame(mptctl_id, iocp, mf);
 
 	/*
 	 *  Wait until the reply has been received
@@ -1318,6 +1319,7 @@ mptctl_gettargetinfo (unsigned long arg)
 	char			*pmem;
 	int			*pdata;
 	IOCPage2_t		*pIoc2;
+	IOCPage3_t		*pIoc3;
 	int			iocnum;
 	int			numDevices = 0;
 	unsigned int		max_id;
@@ -1394,53 +1396,57 @@ mptctl_gettargetinfo (unsigned long arg)
 		if (hd && hd->Targets) {
 			mpt_findImVolumes(ioc);
 			pIoc2 = ioc->spi_data.pIocPg2;
-			for ( id = 0; id <= max_id; id++ ) {
-				if ( pIoc2 && pIoc2->NumActiveVolumes &&
-					( id == pIoc2->RaidVolume[0].VolumeID ) ) {
-					if (maxWordsLeft <= 0) {
-						printk(KERN_ERR "mptctl_gettargetinfo - "
+			for ( id = 0; id <= max_id; ) {
+				if ( pIoc2 && pIoc2->NumActiveVolumes ) {
+					if ( id == pIoc2->RaidVolume[0].VolumeID ) {
+						if (maxWordsLeft <= 0) {
+							printk(KERN_ERR "mptctl_gettargetinfo - "
 			"buffer is full but volume is available on ioc %d\n, numDevices=%d", iocnum, numDevices);
-						goto data_space_full;
-					}
-                    			if ( ( pIoc2->RaidVolume[0].Flags & MPI_IOCPAGE2_FLAG_VOLUME_INACTIVE ) == 0 )
-                        			devType = 0x80;
-                    			else
-                        			devType = 0xC0;
-					bus_id = pIoc2->RaidVolume[0].VolumeBus;
-	            			numDevices++;
-                    			*pdata = ( (devType << 24) | (bus_id << 8) | id );
-					dctlprintk((KERN_ERR "mptctl_gettargetinfo - "
+							goto data_space_full;
+						}
+						if ( ( pIoc2->RaidVolume[0].Flags & MPI_IOCPAGE2_FLAG_VOLUME_INACTIVE ) == 0 )
+                        				devType = 0x80;
+                    				else
+                        				devType = 0xC0;
+						bus_id = pIoc2->RaidVolume[0].VolumeBus;
+	            				numDevices++;
+                    				*pdata = ( (devType << 24) | (bus_id << 8) | id );
+						dctlprintk((KERN_ERR "mptctl_gettargetinfo - "
 		"volume ioc=%d target=%x numDevices=%d pdata=%p\n", iocnum, *pdata, numDevices, pdata));
-                    			pdata++;
-					--maxWordsLeft;
-            			} else {
-					vdev = hd->Targets[id];
-					if (vdev) {
-						for (jj = 0; jj <= MPT_LAST_LUN; jj++) {
-							lun_index = (jj >> 5);
-							indexed_lun = (jj % 32);
-							lun = (1 << indexed_lun);
-							if (vdev->luns[lun_index] & lun) {
-								if (maxWordsLeft <= 0) {
-									printk(KERN_ERR
-									"mptctl_gettargetinfo - "
-									"buffer is full but more targets are available on ioc %d numDevices=%d\n",
-									iocnum, numDevices);
-									goto data_space_full;
-								}
-								bus_id = vdev->bus_id;
-								numDevices++;
-                            					*pdata = ( (jj << 16) | (bus_id << 8) | id );
-								dctlprintk((KERN_ERR
-								 "mptctl_gettargetinfo - "
-								 "target ioc=%d target=%x numDevices=%d pdata=%p\n",
-								 iocnum, *pdata, numDevices, pdata));
-								pdata++;
-								--maxWordsLeft;
-							}
+                    				pdata++;
+						--maxWordsLeft;
+						goto next_id;
+					} else {
+						pIoc3 = ioc->spi_data.pIocPg3;
+            					for ( jj = 0; jj < pIoc3->NumPhysDisks; jj++ ) {
+                    					if ( pIoc3->PhysDisk[jj].PhysDiskID == id )
+								goto next_id;
 						}
 					}
 				}
+				if ( (vdev = hd->Targets[id]) ) {
+					for (jj = 0; jj <= MPT_LAST_LUN; jj++) {
+						lun_index = (jj >> 5);
+						indexed_lun = (jj % 32);
+						lun = (1 << indexed_lun);
+						if (vdev->luns[lun_index] & lun) {
+							if (maxWordsLeft <= 0) {
+								printk(KERN_ERR "mptctl_gettargetinfo - "
+			"buffer is full but more targets are available on ioc %d numDevices=%d\n", iocnum, numDevices);
+								goto data_space_full;
+							}
+							bus_id = vdev->bus_id;
+							numDevices++;
+                            				*pdata = ( (jj << 16) | (bus_id << 8) | id );
+							dctlprintk((KERN_ERR "mptctl_gettargetinfo - "
+		"target ioc=%d target=%x numDevices=%d pdata=%p\n", iocnum, *pdata, numDevices, pdata));
+							pdata++;
+							--maxWordsLeft;
+						}
+					}
+				}
+next_id:
+				id++;
 			}
 		}
 	}
@@ -1682,12 +1688,8 @@ mptctl_replace_fw (unsigned long arg)
 	struct mpt_ioctl_replace_fw __user *uarg = (void __user *) arg;
 	struct mpt_ioctl_replace_fw	 karg;
 	MPT_ADAPTER		 *ioc;
-	fw_image_t		 **fwmem = NULL;
 	int			 iocnum;
 	int			 newFwSize;
-	int			 num_frags, alloc_sz;
-	int			 ii;
-	u32			 offset;
 
 	dctlprintk(("mptctl_replace_fw called.\n"));
 	if (copy_from_user(&karg, uarg, sizeof(struct mpt_ioctl_replace_fw))) {
@@ -1704,52 +1706,39 @@ mptctl_replace_fw (unsigned long arg)
 		return -ENODEV;
 	}
 
-	/* If not caching FW, return 0
+	/* If caching FW, Free the old FW image
 	 */
-	if ((ioc->cached_fw == NULL) && (ioc->alt_ioc) && (ioc->alt_ioc->cached_fw == NULL))
+	if (ioc->cached_fw == NULL)
 		return 0;
+
+	mpt_free_fw_memory(ioc);
 
 	/* Allocate memory for the new FW image
 	 */
 	newFwSize = karg.newImageSize;
-	fwmem = mpt_alloc_fw_memory(ioc, newFwSize, &num_frags, &alloc_sz);
-	if (fwmem == NULL)
+
+	if (newFwSize & 0x01)
+		newFwSize += 1;
+	if (newFwSize & 0x02)
+		newFwSize += 2;
+
+	mpt_alloc_fw_memory(ioc, newFwSize);
+	if (ioc->cached_fw == NULL)
 		return -ENOMEM;
 
-	offset = 0;
-	for (ii = 0; ii < num_frags; ii++) {
-		/* Copy the data from user memory to kernel space
-		 */
-		if (copy_from_user(fwmem[ii]->fw, uarg->newImage + offset, fwmem[ii]->size)) {
-			printk(KERN_ERR "%s@%d::mptctl_replace_fw - "
-				"Unable to read in mpt_ioctl_replace_fw image @ %p\n",
-					__FILE__, __LINE__, uarg);
-
-			mpt_free_fw_memory(ioc, fwmem);
-			return -EFAULT;
-		}
-		offset += fwmem[ii]->size;
-	}
-
-
-	/* Free the old FW image
+	/* Copy the data from user memory to kernel space
 	 */
-	if (ioc->cached_fw) {
-		mpt_free_fw_memory(ioc, 0);
-		ioc->cached_fw = fwmem;
-		ioc->alloc_total += alloc_sz;
-	} else if ((ioc->alt_ioc) && (ioc->alt_ioc->cached_fw)) {
-		mpt_free_fw_memory(ioc->alt_ioc, 0);
-		ioc->alt_ioc->cached_fw = fwmem;
-		ioc->alt_ioc->alloc_total += alloc_sz;
+	if (copy_from_user(ioc->cached_fw, uarg->newImage, newFwSize)) {
+		printk(KERN_ERR "%s@%d::mptctl_replace_fw - "
+				"Unable to read in mpt_ioctl_replace_fw image "
+				"@ %p\n", __FILE__, __LINE__, uarg);
+		mpt_free_fw_memory(ioc);
+		return -EFAULT;
 	}
 
 	/* Update IOCFactsReply
 	 */
 	ioc->facts.FWImageSize = newFwSize;
-	if (ioc->alt_ioc)
-		ioc->alt_ioc->facts.FWImageSize = newFwSize;
-
 	return 0;
 }
 
@@ -1863,7 +1852,7 @@ mptctl_do_mpt_command (struct mpt_ioctl_command karg, void __user *mfPtr)
 
 	/* Get a free request frame and save the message context.
 	 */
-        if ((mf = mpt_get_msg_frame(mptctl_id, ioc->id)) == NULL)
+        if ((mf = mpt_get_msg_frame(mptctl_id, ioc)) == NULL)
                 return -EAGAIN;
 
 	hdr = (MPIHeader_t *) mf;
@@ -2207,7 +2196,7 @@ mptctl_do_mpt_command (struct mpt_ioctl_command karg, void __user *mfPtr)
 	add_timer(&ioc->ioctl->timer);
 
 	if (hdr->Function == MPI_FUNCTION_SCSI_TASK_MGMT) {
-		rc = mpt_send_handshake_request(mptctl_id, ioc->id,
+		rc = mpt_send_handshake_request(mptctl_id, ioc,
 				sizeof(SCSITaskMgmt_t), (u32*)mf, CAN_SLEEP);
 		if (rc == 0) {
 			wait_event(mptctl_wait, ioc->ioctl->wait_done);
@@ -2217,10 +2206,10 @@ mptctl_do_mpt_command (struct mpt_ioctl_command karg, void __user *mfPtr)
 			del_timer(&ioc->ioctl->timer);
 			ioc->ioctl->status &= ~MPT_IOCTL_STATUS_TIMER_ACTIVE;
 			ioc->ioctl->status |= MPT_IOCTL_STATUS_TM_FAILED;
-			mpt_free_msg_frame(mptctl_id, ioc->id, mf);
+			mpt_free_msg_frame(mptctl_id, ioc, mf);
 		}
 	} else {
-		mpt_put_msg_frame(mptctl_id, ioc->id, mf);
+		mpt_put_msg_frame(mptctl_id, ioc, mf);
 		wait_event(mptctl_wait, ioc->ioctl->wait_done);
 	}
 
@@ -2335,7 +2324,7 @@ done_free_mem:
 	 * otherwise, failure occured after mf acquired.
 	 */
 	if (mf)
-		mpt_free_msg_frame(mptctl_id, ioc->id, mf);
+		mpt_free_msg_frame(mptctl_id, ioc, mf);
 
 	return rc;
 }

@@ -65,7 +65,7 @@
 #include <asm/scatterlist.h>
 
 #include "../scsi/scsi.h"
-#include "../scsi/hosts.h"
+#include <scsi/scsi_host.h>
 
 #include "csr1212.h"
 #include "ieee1394.h"
