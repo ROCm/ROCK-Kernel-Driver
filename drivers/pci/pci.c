@@ -248,13 +248,14 @@ pci_set_power_state(struct pci_dev *dev, pci_power_t state)
 	u16 pmcsr, pmc;
 
 	/* bound the state we're entering */
-	if (state > 3) state = 3;
+	if (state > PCI_D3hot)
+		state = PCI_D3hot;
 
 	/* Validate current state:
 	 * Can enter D0 from any state, but if we can only go deeper 
 	 * to sleep if we're already in a low power state
 	 */
-	if (state > 0 && dev->current_state > state)
+	if (state != PCI_D0 && dev->current_state > state)
 		return -EINVAL;
 	else if (dev->current_state == state) 
 		return 0;        /* we're already there */
@@ -263,7 +264,8 @@ pci_set_power_state(struct pci_dev *dev, pci_power_t state)
 	pm = pci_find_capability(dev, PCI_CAP_ID_PM);
 	
 	/* abort if the device doesn't support PM capabilities */
-	if (!pm) return -EIO; 
+	if (!pm)
+		return -EIO; 
 
 	pci_read_config_word(dev,pm + PCI_PM_PMC,&pmc);
 	if ((pmc & PCI_PM_CAP_VER_MASK) != 2) {
@@ -274,16 +276,18 @@ pci_set_power_state(struct pci_dev *dev, pci_power_t state)
 	}
 
 	/* check if this device supports the desired state */
-	if (state == 1 || state == 2) {
-		if (state == 1 && !(pmc & PCI_PM_CAP_D1)) return -EIO;
-		else if (state == 2 && !(pmc & PCI_PM_CAP_D2)) return -EIO;
+	if (state == PCI_D1 || state == PCI_D2) {
+		if (state == PCI_D1 && !(pmc & PCI_PM_CAP_D1))
+			return -EIO;
+		else if (state == PCI_D2 && !(pmc & PCI_PM_CAP_D2))
+			return -EIO;
 	}
 
 	/* If we're in D3, force entire word to 0.
 	 * This doesn't affect PME_Status, disables PME_En, and
 	 * sets PowerState to 0.
 	 */
-	if (dev->current_state >= 3)
+	if (dev->current_state >= PCI_D3hot)
 		pmcsr = 0;
 	else {
 		pci_read_config_word(dev, pm + PCI_PM_CTRL, &pmcsr);
@@ -296,9 +300,9 @@ pci_set_power_state(struct pci_dev *dev, pci_power_t state)
 
 	/* Mandatory power management transition delays */
 	/* see PCI PM 1.1 5.6.1 table 18 */
-	if(state == 3 || dev->current_state == 3)
+	if (state == PCI_D3hot || dev->current_state == PCI_D3hot)
 		msleep(10);
-	else if(state == 2 || dev->current_state == 2)
+	else if (state == PCI_D2 || dev->current_state == PCI_D2)
 		udelay(200);
 	dev->current_state = state;
 
@@ -325,6 +329,7 @@ pci_power_t pci_choose_state(struct pci_dev *dev, u32 state)
 	case 3: return PCI_D3hot;
 	default: BUG();
 	}
+	return PCI_D0;
 }
 
 EXPORT_SYMBOL(pci_choose_state);
