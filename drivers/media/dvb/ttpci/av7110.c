@@ -35,7 +35,6 @@
 
 #define __KERNEL_SYSCALLS__
 #include <linux/module.h>
-#include <linux/init.h>
 #include <linux/kmod.h>
 #include <linux/delay.h>
 #include <linux/fs.h>
@@ -43,7 +42,6 @@
 #include <linux/poll.h>
 #include <linux/unistd.h>
 #include <linux/byteorder/swabb.h>
-#include <linux/slab.h>
 #include <linux/smp_lock.h>
 #include <stdarg.h>
 
@@ -55,10 +53,8 @@
 #include <linux/ptrace.h>
 #include <linux/ioport.h>
 #include <linux/in.h>
-#include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/pci.h>
-#include <linux/init.h>
 #include <linux/vmalloc.h>
 #include <linux/netdevice.h>
 #include <linux/inetdevice.h>
@@ -108,6 +104,7 @@ static int vidmode=CVBS_RGB_OUT;
 static int pids_off;
 static int adac=DVB_ADAC_TI;
 static int hw_sections = 1;
+static int rgb_on = 0;
 
 int av7110_num = 0;
 
@@ -118,41 +115,11 @@ int av7110_num = 0;
  * DEBI functions
  ****************************************************************************/
 
+#define wait_for_debi_done(x) \
+       saa7146_wait_for_debi_done(x->dev) \
+
 /* This DEBI code is based on the Stradis driver 
    by Nathan Laredo <laredo@gnu.org> */
-
-static int wait_for_debi_done(struct av7110 *av7110)
-{
-	struct saa7146_dev *dev = av7110->dev;
-	int start;
-
-	/* wait for registers to be programmed */
-	start = jiffies;
-	while (1) {
-                if (saa7146_read(dev, MC2) & 2)
-                        break;
-		if (jiffies-start > HZ/20) {
-			printk ("%s: timed out while waiting for registers "
-				"getting programmed\n", __FUNCTION__);
-			return -ETIMEDOUT;
-		}
-	}
-
-	/* wait for transfer to complete */
-	start = jiffies;
-	while (1) {
-		if (!(saa7146_read(dev, PSR) & SPCI_DEBI_S))
-			break;
-		saa7146_read(dev, MC2);
-		if (jiffies-start > HZ/4) {
-			printk ("%s: timed out while waiting for transfer "
-				"completion\n", __FUNCTION__);
-			return -ETIMEDOUT;
-		}
-	}
-
-	return 0;
-}
 
 static int debiwrite(struct av7110 *av7110, u32 config, 
                      int addr, u32 val, int count)
@@ -375,7 +342,7 @@ static int record_cb(struct dvb_filter_pes2ts *p2t, u8 *buf, size_t len)
 {
         struct dvb_demux_feed *dvbdmxfeed=(struct dvb_demux_feed *) p2t->priv;
 
-	DEB_EE(("struct dvb_filter_pes2ts:%p\n",p2t));
+//	DEB_EE(("struct dvb_filter_pes2ts:%p\n",p2t));
 
         if (!(dvbdmxfeed->ts_type & TS_PACKET)) 
                 return 0;
@@ -385,14 +352,14 @@ static int record_cb(struct dvb_filter_pes2ts *p2t, u8 *buf, size_t len)
                 return dvbdmxfeed->cb.ts(buf, len, 0, 0, 
                                          &dvbdmxfeed->feed.ts, DMX_OK); 
         else
-                return dvb_filter_pes2ts(p2t, buf, len);
+                return dvb_filter_pes2ts(p2t, buf, len, 1);
 }
 
 static int dvb_filter_pes2ts_cb(void *priv, unsigned char *data)
 {
         struct dvb_demux_feed *dvbdmxfeed=(struct dvb_demux_feed *) priv;
 
-	DEB_EE(("dvb_demux_feed:%p\n",dvbdmxfeed));
+//	DEB_EE(("dvb_demux_feed:%p\n",dvbdmxfeed));
         
         dvbdmxfeed->cb.ts(data, 188, 0, 0,
                           &dvbdmxfeed->feed.ts,
@@ -886,10 +853,10 @@ static void gpioirq (unsigned long data)
         txbuf=irdebi(av7110, DEBINOSWAP, TX_BUFF, 0, 2);
         len=(av7110->debilen+3)&(~3);
 
-        DEB_D(("GPIO0 irq %d %d\n", av7110->debitype, av7110->debilen));
+//        DEB_D(("GPIO0 irq %d %d\n", av7110->debitype, av7110->debilen));
         print_time("gpio");
 
-        DEB_D(("GPIO0 irq %02x\n", av7110->debitype&0xff));        
+//       DEB_D(("GPIO0 irq %02x\n", av7110->debitype&0xff));        
         switch (av7110->debitype&0xff) {
 
         case DATA_TS_PLAY:
@@ -2706,9 +2673,9 @@ static int tuner_set_tv_freq (struct saa7146_dev *dev, u32 freq)
 	buf[1] = div & 0xff;
 	buf[2] = 0x8e;
 
-	if (freq < (u32) (16*168.25) ) 
+	if (freq < (u32) 16*168.25 )
 		config = 0xa0;
-	else if (freq < (u32) (16*447.25)) 
+	else if (freq < (u32) 16*447.25)
 		config = 0x90;
 	else
 		config = 0x30;
@@ -4294,8 +4261,10 @@ static void av7110_before_after_tune (fe_status_t s, void *data)
                         av7110->pids[DMX_PES_TELETEXT], 0, 
                         av7110->pids[DMX_PES_PCR]);
         	outcom(av7110, COMTYPE_PIDFILTER, Scan, 0);
-	} else 
+	} else {
 		SetPIDs(av7110, 0, 0, 0, 0, 0);
+        	outcom(av7110, COMTYPE_PIDFILTER, FlushTSQueue, 0);
+	}
 
         up(&av7110->pid_mutex);
 }
@@ -4553,7 +4522,7 @@ static int av7110_attach (struct saa7146_dev* dev, struct saa7146_pci_extension_
 	   get recognized before the main driver is fully loaded */
 	saa7146_write(dev, GPIO_CTRL, 0x500000);
 
-	saa7146_i2c_adapter_prepare(dev, NULL, SAA7146_I2C_BUS_BIT_RATE_3200);
+	saa7146_i2c_adapter_prepare(dev, NULL, SAA7146_I2C_BUS_BIT_RATE_120); /* 275 kHz */
 
 	av7110->i2c_bus = dvb_register_i2c_bus (master_xfer, dev,
 						av7110->dvb_adapter, 0);
@@ -4571,7 +4540,7 @@ static int av7110_attach (struct saa7146_dev* dev, struct saa7146_pci_extension_
 
 	/* set dd1 stream a & b */
       	saa7146_write(dev, DD1_STREAM_B, 0x00000000);
-	saa7146_write(dev, DD1_INIT, 0x02000000);
+	saa7146_write(dev, DD1_INIT, 0x03000000);
 	saa7146_write(dev, MC2, (MASK_09 | MASK_25 | MASK_10 | MASK_26));
 
 	/* upload all */
@@ -4729,7 +4698,7 @@ static int av7110_attach (struct saa7146_dev* dev, struct saa7146_pci_extension_
 		memcpy(standard,dvb_standard,sizeof(struct saa7146_standard)*2);
 		/* set dd1 stream a & b */
       		saa7146_write(dev, DD1_STREAM_B, 0x00000000);
-		saa7146_write(dev, DD1_INIT, 0x02000700);
+		saa7146_write(dev, DD1_INIT, 0x03000700);
 		saa7146_write(dev, MC2, (MASK_09 | MASK_25 | MASK_10 | MASK_26));
 	}
 	else if (dev->pci->subsystem_vendor == 0x110a) {
@@ -4747,7 +4716,8 @@ static int av7110_attach (struct saa7146_dev* dev, struct saa7146_pci_extension_
 		// switch DVB SCART on
 		outcom(av7110, COMTYPE_AUDIODAC, MainSwitch, 1, 0);
 		outcom(av7110, COMTYPE_AUDIODAC, ADSwitch, 1, 1);
-		//saa7146_setgpio(dev, 1, SAA7146_GPIO_OUTHI); // RGB on, SCART pin 16
+		if (rgb_on)
+			saa7146_setgpio(dev, 1, SAA7146_GPIO_OUTHI); // RGB on, SCART pin 16
 		//saa7146_setgpio(dev, 3, SAA7146_GPIO_OUTLO); // SCARTpin 8
 	}
 	
@@ -4858,7 +4828,7 @@ static void av7110_irq(struct saa7146_dev* dev, u32 *isr)
 {
 	struct av7110 *av7110 = (struct av7110*)dev->ext_priv;
 
-	DEB_INT(("dev: %p, av7110: %p\n",dev,av7110));
+//	DEB_INT(("dev: %p, av7110: %p\n",dev,av7110));
 
 	if (*isr & MASK_19)
 		tasklet_schedule (&av7110->debi_tasklet);
@@ -4887,7 +4857,7 @@ static struct saa7146_standard standard[] = {
 static struct saa7146_standard analog_standard[] = {
 	{
 		.name	= "PAL", 	.id		= V4L2_STD_PAL_BG,
-		.v_offset	= 0x18,	.v_field 	= 288,		.v_calc	= 576,
+		.v_offset	= 0x18 /* 0 */ ,	.v_field 	= 288,		.v_calc	= 576,
 		.h_offset	= 0x08,	.h_pixels 	= 708,		.h_calc	= 709,
 		.v_max_out	= 576,	.h_max_out	= 768,
 	}, {
@@ -4975,7 +4945,7 @@ static struct saa7146_ext_vv av7110_vv_data_st = {
 	.inputs		= 1,
 	.audios 	= 1,
 	.capabilities	= 0,
-	.flags		= SAA7146_EXT_SWAP_ODD_EVEN,
+	.flags		= 0, 
 
 	.stds		= &standard[0],
 	.num_stds	= sizeof(standard)/sizeof(struct saa7146_standard),
@@ -5002,6 +4972,7 @@ static struct saa7146_ext_vv av7110_vv_data_c = {
 
 static struct saa7146_extension av7110_extension = {
 	.name		= "dvb\0",
+	.flags		= SAA7146_I2C_SHORT_DELAY,
 
 	.module		= THIS_MODULE,
 	.pci_tbl	= &pci_tbl[0],
@@ -5054,4 +5025,6 @@ MODULE_PARM(adac,"i");
 MODULE_PARM_DESC(adac,"audio DAC type: 0 TI, 1 CRYSTAL, 2 MSP (use if autodetection fails)");
 MODULE_PARM(hw_sections, "i");
 MODULE_PARM_DESC(hw_sections, "0 use software section filter, 1 use hardware");
-
+MODULE_PARM(rgb_on, "i");
+MODULE_PARM_DESC(rgb_on, "For Siemens DVB-C cards only: Enable RGB control"
+		" signal on SCART pin 16 to switch SCART video mode from CVBS to RGB");

@@ -169,7 +169,8 @@ enum av7110_pid_command {
 	DelPIDFilter,
 	Scan,
 	SetDescr,
-        SetIR
+        SetIR,
+        FlushTSQueue
 };
 			
 enum av7110_mpeg_command {
