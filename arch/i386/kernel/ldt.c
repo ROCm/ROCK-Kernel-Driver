@@ -20,10 +20,10 @@
 #include <asm/desc.h>
 
 #ifdef CONFIG_SMP /* avoids "defined but not used" warnig */
-static void flush_ldt(void *mm)
+static void flush_ldt(void *null)
 {
-	if (current->mm)
-		load_LDT(&current->mm->context);
+	if (current->active_mm)
+		load_LDT(&current->active_mm->context);
 }
 #endif
 
