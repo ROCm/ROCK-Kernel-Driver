@@ -2107,15 +2107,10 @@ SCTP_STATIC int sctp_init_sock(struct sock *sk)
 	sp->assocparams.sasoc_cookie_life = (sctp_valid_cookie_life / HZ)
 					* 1000;
 
-	/* Initialize default event subscriptions.
-	 * the struct sock is initialized to zero, so only
-	 * enable the events needed.  By default, UDP-style
-	 * sockets enable io and association change notifications.
+	/* Initialize default event subscriptions. By default, all the
+	 * options are off. 
 	 */
-	if (sctp_style(sk, UDP)) {
-		sp->subscribe.sctp_data_io_event     = 1;
-		sp->subscribe.sctp_association_event = 1;
-	}
+	memset(&sp->subscribe, 0, sizeof(struct sctp_event_subscribe));
 
 	/* Default Peer Address Parameters.  These defaults can
 	 * be modified via SCTP_PEER_ADDR_PARAMS
