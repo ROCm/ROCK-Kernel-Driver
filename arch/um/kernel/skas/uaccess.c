@@ -25,7 +25,7 @@ static unsigned long maybe_map(unsigned long virt, int is_write)
 	int dummy_code;
 
 	if(IS_ERR(phys) || (is_write && !pte_write(pte))){
-		err = handle_page_fault(virt, 0, is_write, 0, &dummy_code);
+		err = handle_page_fault(virt, 0, is_write, 1, &dummy_code);
 		if(err)
 			return(0);
 		phys = um_virt_to_phys(current, virt, NULL);
