@@ -11,17 +11,15 @@
  */
 
 #include <linux/config.h>
-
-/* The following #define is to avoid a clash with hosts.c */
-#define PPA_CODE 1
-
+#include <linux/init.h>
+#include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/blkdev.h>
 #include <asm/io.h>
 #include <linux/parport.h>
 #include <linux/workqueue.h>
 #include "scsi.h"
 #include "hosts.h"
-static int ppa_release(struct Scsi_Host *);
 static void ppa_reset_pulse(unsigned int base);
 
 typedef struct {
@@ -74,17 +72,6 @@ static void ppa_wakeup(void *ref)
 	return;
 }
 
-static int ppa_release(struct Scsi_Host *host)
-{
-	ppa_struct *dev = ppa_dev(host);
-	int host_no = host->unique_id;
-
-	printk("Releasing ppa%i\n", host_no);
-	scsi_unregister(host);
-	parport_unregister_device(dev->dev);
-	return 0;
-}
-
 static int ppa_pb_claim(ppa_struct *dev)
 {
 	if (parport_claim(dev->dev)) {
@@ -104,25 +91,6 @@ static inline void ppa_pb_release(ppa_struct *dev)
 /***************************************************************************
  *                   Parallel port probing routines                        *
  ***************************************************************************/
-
-static Scsi_Host_Template driver_template = {
-	.proc_name = "ppa",
-	.proc_info = ppa_proc_info,
-	.name = "Iomega VPI0 (ppa) interface",
-	.detect = ppa_detect,
-	.release = ppa_release,
-	.queuecommand = ppa_queuecommand,
-	.eh_abort_handler = ppa_abort,
-	.eh_bus_reset_handler = ppa_reset,
-	.eh_host_reset_handler = ppa_reset,
-	.bios_param = ppa_biosparam,
-	.this_id = -1,
-	.sg_tablesize = SG_ALL,
-	.cmd_per_lun = 1,
-	.use_clustering = ENABLE_CLUSTERING,
-};
-
-#include  "scsi_module.c"
 
 /*
  * Start of Chipset kludges
@@ -227,11 +195,10 @@ static int ppa_detect(Scsi_Host_Template *host)
 
 		INIT_WORK(&dev->ppa_tq, ppa_interrupt, dev);
 
-		host->can_queue = PPA_CAN_QUEUE;
-		host->sg_tablesize = ppa_sg;
-		hreg = scsi_register(host, 0);
+		hreg = scsi_host_alloc(host, 0);
 		if (hreg == NULL)
 			continue;
+		list_add_tail(&hreg->sht_legacy_list, &host->legacy_hosts);
 		hreg->io_port = pb->base;
 		hreg->n_io_port = ports;
 		hreg->dma_channel = -1;
@@ -1137,4 +1104,65 @@ static int device_check(ppa_struct *dev)
 	return 1;
 }
 
+static Scsi_Host_Template ppa_template = {
+	.module			= THIS_MODULE,
+	.proc_name		= "ppa",
+	.proc_info		= ppa_proc_info,
+	.name			= "Iomega VPI0 (ppa) interface",
+	.queuecommand		= ppa_queuecommand,
+	.eh_abort_handler	= ppa_abort,
+	.eh_bus_reset_handler	= ppa_reset,
+	.eh_host_reset_handler	= ppa_reset,
+	.bios_param		= ppa_biosparam,
+	.this_id		= -1,
+	.sg_tablesize		= SG_ALL,
+	.cmd_per_lun		= 1,
+	.use_clustering		= ENABLE_CLUSTERING,
+	.can_queue		= 1,
+};
+
+static int __init ppa_driver_init(void)
+{
+	struct scsi_host_template *sht = &ppa_template;
+	struct Scsi_Host *shost;
+	struct list_head *l;
+	int error;
+
+	INIT_LIST_HEAD(&sht->legacy_hosts);
+
+	ppa_detect(sht);
+	if (list_empty(&sht->legacy_hosts))
+		return -ENODEV;
+
+	list_for_each_entry(shost, &sht->legacy_hosts, sht_legacy_list) {
+		error = scsi_add_host(shost, NULL);
+		if (error)
+			goto fail;
+		scsi_scan_host(shost);
+	}
+	return 0;
+ fail:
+	l = &shost->sht_legacy_list;
+	while ((l = l->prev) != &sht->legacy_hosts)
+		scsi_remove_host(list_entry(l, struct Scsi_Host, sht_legacy_list));
+	return error;
+}
+
+static void __exit ppa_driver_exit(void)
+{
+	struct scsi_host_template *sht = &ppa_template;
+	struct Scsi_Host *host, *s;
+
+	list_for_each_entry(host, &sht->legacy_hosts, sht_legacy_list)
+		scsi_remove_host(host);
+	list_for_each_entry_safe(host, s, &sht->legacy_hosts, sht_legacy_list) {
+		ppa_struct *dev = ppa_dev(host);
+		list_del(&host->sht_legacy_list);
+		scsi_host_put(host);
+		parport_unregister_device(dev->dev);
+	}
+}
+
+module_init(ppa_driver_init);
+module_exit(ppa_driver_exit);
 MODULE_LICENSE("GPL");
