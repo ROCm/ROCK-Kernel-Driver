@@ -1065,7 +1065,7 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 		wait_ms(10);	/* Let the SET_ADDRESS settle */
 
 		/* high and low speed devices don't need this... */
-		err = usb_get_descriptor(dev, USB_DT_DEVICE, 0, &dev->descriptor, 8);
+		err = usb_get_device_descriptor(dev, 8);
 		if (err >= 8)
 			break;
 		wait_ms(100);
@@ -1085,8 +1085,8 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 
 	/* USB device state == addressed ... still not usable */
 
-	err = usb_get_device_descriptor(dev);
-	if (err < (signed)sizeof(dev->descriptor)) {
+	err = usb_get_device_descriptor(dev, sizeof(dev->descriptor));
+	if (err != (signed)sizeof(dev->descriptor)) {
 		dev_err(&dev->dev, "device descriptor read/all, error %d\n", err);
 		goto fail;
 	}
