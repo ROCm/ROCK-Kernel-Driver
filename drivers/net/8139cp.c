@@ -468,7 +468,7 @@ static inline void cp_rx_skb (struct cp_private *cp, struct sk_buff *skb,
 
 #if CP_VLAN_TAG_USED
 	if (cp->vlgrp && (desc->opts2 & RxVlanTagged)) {
-		vlan_hwaccel_rx(skb, cp->vlgrp, desc->opts2 & 0xffff);
+		vlan_hwaccel_rx(skb, cp->vlgrp, be16_to_cpu(desc->opts2 & 0xffff));
 	} else
 #endif
 		netif_rx(skb);
@@ -776,7 +776,7 @@ static int cp_start_xmit (struct sk_buff *skb, struct net_device *dev)
 
 #if CP_VLAN_TAG_USED
 	if (cp->vlgrp && vlan_tx_tag_present(skb))
-		vlan_tag = TxVlanTag | vlan_tx_tag_get(skb);
+		vlan_tag = TxVlanTag | cpu_to_be16(vlan_tx_tag_get(skb));
 #endif
 
 	entry = cp->tx_head;
