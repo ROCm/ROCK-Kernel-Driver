@@ -1313,6 +1313,7 @@ static int sbp2_logout_device(struct scsi_id_instance_data *scsi_id)
 {
 	struct sbp2scsi_host_info *hi = scsi_id->hi;
 	quadlet_t data[2];
+	int error;
 
 	SBP2_DEBUG("sbp2_logout_device");
 
@@ -1353,7 +1354,7 @@ static int sbp2_logout_device(struct scsi_id_instance_data *scsi_id)
 
 	atomic_set(&scsi_id->sbp2_login_complete, 0);
 
-	int error = hpsb_node_write(scsi_id->ne,
+	error = hpsb_node_write(scsi_id->ne,
 	                            scsi_id->sbp2_management_agent_addr,
 	                            data, 8);
 	if (error)
@@ -1377,6 +1378,7 @@ static int sbp2_reconnect_device(struct scsi_id_instance_data *scsi_id)
 {
 	struct sbp2scsi_host_info *hi = scsi_id->hi;
 	quadlet_t data[2];
+	int error;
 
 	SBP2_DEBUG("sbp2_reconnect_device");
 
@@ -1423,7 +1425,7 @@ static int sbp2_reconnect_device(struct scsi_id_instance_data *scsi_id)
 
 	atomic_set(&scsi_id->sbp2_login_complete, 0);
 
-	int error = hpsb_node_write(scsi_id->ne,
+	error = hpsb_node_write(scsi_id->ne,
 	                            scsi_id->sbp2_management_agent_addr,
 	                            data, 8);
 	if (error)
