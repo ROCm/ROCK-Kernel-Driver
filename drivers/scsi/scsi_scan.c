@@ -478,6 +478,8 @@ out:
  **/
 static void scsi_free_sdev(struct scsi_device *sdev)
 {
+	unsigned int flags;
+
 	list_del(&sdev->siblings);
 	list_del(&sdev->same_target_siblings);
 
@@ -487,6 +489,14 @@ static void scsi_free_sdev(struct scsi_device *sdev)
 		sdev->host->hostt->slave_destroy(sdev);
 	if (sdev->inquiry)
 		kfree(sdev->inquiry);
+	if (sdev->single_lun) {
+		spin_lock_irqsave(sdev->host->host_lock, flags);
+		sdev->sdev_target->starget_refcnt--;
+		if (sdev->sdev_target->starget_refcnt == 0)
+			kfree(sdev->sdev_target);
+		spin_unlock_irqrestore(sdev->host->host_lock, flags);
+	}
+
 	kfree(sdev);
 }
 
@@ -1122,6 +1132,10 @@ static void scsi_probe_lun(Scsi_Request *sreq, char *inq_result,
 static int scsi_add_lun(Scsi_Device *sdev, Scsi_Request *sreq,
 		char *inq_result, int *bflags)
 {
+	struct scsi_device *sdev_sibling;
+	struct scsi_target *starget;
+	unsigned int flags;
+
 	/*
 	 * XXX do not save the inquiry, since it can change underneath us,
 	 * save just vendor/model/rev.
@@ -1243,10 +1257,38 @@ static int scsi_add_lun(Scsi_Device *sdev, Scsi_Request *sreq,
 
 	/*
 	 * If we need to allow I/O to only one of the luns attached to
-	 * this target id at a time, then we set this flag.
+	 * this target id at a time set single_lun, and allocate or modify
+	 * sdev_target.
 	 */
-	if (*bflags & BLIST_SINGLELUN)
+	if (*bflags & BLIST_SINGLELUN) {
 		sdev->single_lun = 1;
+		spin_lock_irqsave(sdev->host->host_lock, flags);
+		starget = NULL;
+		/*
+		 * Search for an existing target for this sdev.
+		 */
+		list_for_each_entry(sdev_sibling, &sdev->same_target_siblings,
+				    same_target_siblings) {
+			if (sdev_sibling->sdev_target != NULL) {
+				starget = sdev_sibling->sdev_target;
+				break;
+			}
+		}
+		if (!starget) {
+			starget = kmalloc(sizeof(*starget), GFP_KERNEL);
+			if (!starget) {
+				printk(ALLOC_FAILURE_MSG, __FUNCTION__);
+				spin_unlock_irqrestore(sdev->host->host_lock,
+						       flags);
+				return SCSI_SCAN_NO_RESPONSE;
+			}
+			starget->starget_refcnt = 0;
+			starget->starget_busy = 0;
+		}
+		starget->starget_refcnt++;
+		sdev->sdev_target = starget;
+		spin_unlock_irqrestore(sdev->host->host_lock, flags);
+	}
 
 	/* if the device needs this changing, it may do so in the detect
 	 * function */

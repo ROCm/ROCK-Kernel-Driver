@@ -327,46 +327,36 @@ void scsi_setup_cmd_retry(struct scsi_cmnd *cmd)
 }
 
 /*
- * Called for single_lun devices. The target associated with current_sdev can
- * only handle one active command at a time. Scan through all of the luns
- * on the same target as current_sdev, return 1 if any are active.
- */
-static int scsi_single_lun_check(struct scsi_device *current_sdev)
-{
-	struct scsi_device *sdev;
-
-	list_for_each_entry(sdev, &current_sdev->same_target_siblings,
-			    same_target_siblings)
-		if (sdev->device_busy)
-			return 1;
-	return 0;
-}
-
-/*
- * Called for single_lun devices on IO completion. If no requests
- * outstanding for current_sdev, call __blk_run_queue for the next
- * scsi_device on the same target that has requests.
+ * Called for single_lun devices on IO completion. Clear starget_busy, and
+ * Call __blk_run_queue for all the scsi_devices on the target - including
+ * current_sdev first.
  *
  * Called with *no* scsi locks held.
  */
-static void scsi_single_lun_run(struct scsi_device *current_sdev,
-				 struct request_queue *q)
+static void scsi_single_lun_run(struct scsi_device *current_sdev)
 {
 	struct scsi_device *sdev;
-	struct Scsi_Host *shost;
+	unsigned int flags, flags2;
 
-	shost = current_sdev->host;
-	if (blk_queue_empty(q) && current_sdev->device_busy == 0 &&
-	    !shost->host_blocked && !shost->host_self_blocked &&
-	    !((shost->can_queue > 0) &&
-	      (shost->host_busy >= shost->can_queue)))
-		list_for_each_entry(sdev, &current_sdev->same_target_siblings,
-				    same_target_siblings)
-			if (!sdev->device_blocked &&
-			    !blk_queue_empty(sdev->request_queue)) {
-				__blk_run_queue(sdev->request_queue);
-				break;
-			}
+	spin_lock_irqsave(current_sdev->request_queue->queue_lock, flags2);
+	spin_lock_irqsave(current_sdev->host->host_lock, flags);
+	WARN_ON(!current_sdev->sdev_target->starget_busy);
+	if (current_sdev->device_busy == 0)
+		current_sdev->sdev_target->starget_busy = 0;
+	spin_unlock_irqrestore(current_sdev->host->host_lock, flags);
+
+	/*
+	 * Call __blk_run_queue for all LUNs on the target, starting with
+	 * current_sdev.
+	 */
+	__blk_run_queue(current_sdev->request_queue);
+	spin_unlock_irqrestore(current_sdev->request_queue->queue_lock, flags2);
+	list_for_each_entry(sdev, &current_sdev->same_target_siblings,
+			    same_target_siblings) {
+		spin_lock_irqsave(sdev->request_queue->queue_lock, flags2);
+		__blk_run_queue(sdev->request_queue);
+		spin_unlock_irqrestore(sdev->request_queue->queue_lock, flags2);
+	}
 }
 
 /*
@@ -438,7 +428,7 @@ void scsi_queue_next_request(request_queue_t *q, struct scsi_cmnd *cmd)
 	sdev = q->queuedata;
 
 	if (sdev->single_lun)
-		scsi_single_lun_run(sdev, q);
+		scsi_single_lun_run(sdev);
 
 	shost = sdev->host;
 	spin_lock_irqsave(shost->host_lock, flags);
@@ -1166,7 +1156,8 @@ static void scsi_request_fn(request_queue_t *q)
 		if (scsi_check_shost(q, shost, sdev))
 			goto after_host_lock;
 
-		if (sdev->single_lun && scsi_single_lun_check(sdev))
+		if (sdev->single_lun && !sdev->device_busy &&
+		    sdev->sdev_target->starget_busy)
 			goto after_host_lock;
 
 		/*
@@ -1204,6 +1195,9 @@ static void scsi_request_fn(request_queue_t *q)
 		if (!(blk_queue_tagged(q) && (blk_queue_start_tag(q, req) == 0)))
 			blkdev_dequeue_request(req);
 	
+		if (sdev->single_lun)
+			sdev->sdev_target->starget_busy = 1;
+
 		shost->host_busy++;
 		spin_unlock_irqrestore(shost->host_lock, flags);
 

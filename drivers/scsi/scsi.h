@@ -531,6 +531,15 @@ extern struct list_head scsi_dev_info_list;
 extern int scsi_dev_info_list_add_str(char *);
 
 /*
+ * scsi_target: representation of a scsi target, for now, this is only
+ * used for single_lun devices.
+ */
+struct scsi_target {
+	unsigned int starget_busy;
+	unsigned int starget_refcnt;
+};
+
+/*
  *  The scsi_device struct contains what we know about each given scsi
  *  device.
  *
@@ -588,6 +597,7 @@ struct scsi_device {
 	unsigned char current_tag;	/* current tag */
 //	unsigned char sync_min_period;	/* Not less than this period */
 //	unsigned char sync_max_offset;	/* Not greater than this offset */
+	struct scsi_target      *sdev_target;   /* used only for single_lun */
 
 	unsigned online:1;
 	unsigned writeable:1;
