@@ -1749,8 +1749,8 @@ ret_sys_call:
 	cmp		%o0, -ENOIOCTLCMD
 	sllx		%g2, 32, %g2
 	bgeu,pn		%xcc, 1f
-
 	 andcc		%l0, _TIF_SYSCALL_TRACE, %l6	
+80:
 	andn		%g3, %g2, %g3		/* System call success, clear Carry condition code. */
 	stx		%g3, [%sp + PTREGS_OFF + PT_V9_TSTATE]	
 	bne,pn		%icc, linux_syscall_trace2
@@ -1760,9 +1760,21 @@ ret_sys_call:
 	 stx		%l2, [%sp + PTREGS_OFF + PT_V9_TNPC]
 
 1:
+	/* Really a failure?  Check if force_successful_syscall_return()
+	 * was invoked.
+	 */
+	ldx		[%curptr + TI_FLAGS], %l0		! Load
+	andcc		%l0, _TIF_SYSCALL_SUCCESS, %g0
+	be,pt		%icc, 1f
+	 andcc		%l0, _TIF_SYSCALL_TRACE, %l6	
+	andn		%l0, _TIF_SYSCALL_SUCCESS, %l0
+	ba,pt		%xcc, 80b
+	 stx		%l0, [%curptr + TI_FLAGS]
+
 	/* System call failure, set Carry condition code.
 	 * Also, get abs(errno) to return to the process.
 	 */
+1:
 	sub		%g0, %o0, %o0
 	or		%g3, %g2, %g3
 	stx		%o0, [%sp + PTREGS_OFF + PT_V9_I0]
