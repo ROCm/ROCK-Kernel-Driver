@@ -5,7 +5,7 @@
  *
  * This file contains the lowest level x86_64-specific interrupt
  * entry and irq statistics code. All the remaining irq logic is
- * done by the generic kernel/hardirq.c code and in the
+ * done by the generic kernel/irq/ code and in the
  * x86_64-specific irq controller code. (e.g. i8259.c and
  * io_apic.c.)
  */

@@ -330,7 +330,7 @@ config X86_MCE
 endmenu
 
 #
-# Use the generic interrupt handling code in kernel/hardirq.c:
+# Use the generic interrupt handling code in kernel/irq/:
 #
 config GENERIC_HARDIRQS
 	bool
