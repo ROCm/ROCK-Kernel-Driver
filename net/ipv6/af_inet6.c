@@ -824,7 +824,6 @@ proc_raw6_fail:
 	igmp6_cleanup();
 #endif
 igmp_fail:
-#endif
 	ndisc_cleanup();
 ndisc_fail:
 	icmpv6_cleanup();
