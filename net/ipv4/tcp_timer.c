@@ -227,7 +227,7 @@ static void tcp_delack_timer(unsigned long data)
 	if (sk->sk_state == TCP_CLOSE || !(tp->ack.pending & TCP_ACK_TIMER))
 		goto out;
 
-	if ((long)(tp->ack.timeout - jiffies) > 0) {
+	if (time_after(tp->ack.timeout, jiffies)) {
 		if (!mod_timer(&tp->delack_timer, tp->ack.timeout))
 			sock_hold(sk);
 		goto out;
@@ -436,7 +436,7 @@ static void tcp_write_timer(unsigned long data)
 	if (sk->sk_state == TCP_CLOSE || !tp->pending)
 		goto out;
 
-	if ((long)(tp->timeout - jiffies) > 0) {
+	if (time_after(tp->timeout, jiffies)) {
 		if (!mod_timer(&tp->retransmit_timer, tp->timeout))
 			sock_hold(sk);
 		goto out;
@@ -516,7 +516,7 @@ static void tcp_synack_timer(struct sock *sk)
 	do {
 		reqp=&lopt->syn_table[i];
 		while ((req = *reqp) != NULL) {
-			if ((long)(now - req->expires) >= 0) {
+			if (time_after_eq(now, req->expires)) {
 				if ((req->retrans < thresh ||
 				     (req->acked && req->retrans < max_retries))
 				    && !req->class->rtx_syn_ack(sk, req, NULL)) {
