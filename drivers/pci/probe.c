@@ -296,7 +296,10 @@ int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev * dev, int max
 	int is_cardbus = (dev->hdr_type == PCI_HEADER_TYPE_CARDBUS);
 
 	pci_read_config_dword(dev, PCI_PRIMARY_BUS, &buses);
-	DBG("Scanning behind PCI bridge %s, config %06x, pass %d\n", dev->slot_name, buses & 0xffffff, pass);
+
+	DBG("Scanning behind PCI bridge %s, config %06x, pass %d\n",
+	    dev->slot_name, buses & 0xffffff, pass);
+
 	if ((buses & 0xffff00) && !pcibios_assign_all_busses() && !is_cardbus) {
 		unsigned int cmax;
 		/*
@@ -358,6 +361,7 @@ int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev * dev, int max
 		child->subordinate = max;
 		pci_write_config_byte(dev, PCI_SUBORDINATE_BUS, max);
 	}
+
 	sprintf(child->name, (is_cardbus ? "PCI CardBus #%02x" : "PCI Bus #%02x"), child->number);
 
 	return max;
@@ -391,17 +395,20 @@ int pci_setup_device(struct pci_dev * dev)
 {
 	u32 class;
 
-	sprintf(dev->slot_name, "%02x:%02x.%d", dev->bus->number, PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn));
-	sprintf(dev->dev.name, "PCI device %04x:%04x", dev->vendor, dev->device);
+	sprintf(dev->slot_name, "%02x:%02x.%d", dev->bus->number,
+		PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn));
+	sprintf(dev->dev.name, "PCI device %04x:%04x",
+		dev->vendor, dev->device);
+
 	INIT_LIST_HEAD(&dev->pools);
-	
+
 	pci_read_config_dword(dev, PCI_CLASS_REVISION, &class);
 	class >>= 8;				    /* upper 3 bytes */
 	dev->class = class;
 	class >>= 8;
 
-	DBG("Found %02x:%02x [%04x/%04x] %06x %02x\n", dev->bus->number, dev->devfn,
-		dev->vendor, dev->device, class, dev->hdr_type);
+	DBG("Found %02x:%02x [%04x/%04x] %06x %02x\n", dev->bus->number,
+	    dev->devfn, dev->vendor, dev->device, class, dev->hdr_type);
 
 	/* "Unknown power state" */
 	dev->current_state = 4;
@@ -468,7 +475,8 @@ pci_scan_device(struct pci_bus *bus, int devfn)
 		return NULL;
 
 	/* some broken boards return 0 or ~0 if a slot is empty: */
-	if (l == 0xffffffff || l == 0x00000000 || l == 0x0000ffff || l == 0xffff0000)
+	if (l == 0xffffffff || l == 0x00000000 ||
+	    l == 0x0000ffff || l == 0xffff0000)
 		return NULL;
 
 	dev = kmalloc(sizeof(struct pci_dev), GFP_KERNEL);
