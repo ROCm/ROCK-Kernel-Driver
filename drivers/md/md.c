@@ -179,7 +179,6 @@ static void mddev_put(mddev_t *mddev)
 		mddev_map[mdidx(mddev)] = NULL;
 		blk_put_queue(mddev->queue);
 		kfree(mddev);
-		MOD_DEC_USE_COUNT;
 	}
 	spin_unlock(&all_mddevs_lock);
 }
@@ -201,7 +200,6 @@ static mddev_t * mddev_find(int unit)
 		mddev_map[unit] = new;
 		list_add(&new->all_mddevs, &all_mddevs);
 		spin_unlock(&all_mddevs_lock);
-		MOD_INC_USE_COUNT;
 		return new;
 	}
 	spin_unlock(&all_mddevs_lock);
@@ -640,14 +638,13 @@ static void super_90_sync(mddev_t *mddev, mdk_rdev_t *rdev)
 	/* make rdev->sb match mddev data..
 	 *
 	 * 1/ zero out disks
-	 * 2/ Add info for each disk, keeping track of highest desc_nr
-	 * 3/ any empty disks < highest become removed
+	 * 2/ Add info for each disk, keeping track of highest desc_nr (next_spare);
+	 * 3/ any empty disks < next_spare become removed
 	 *
 	 * disks[0] gets initialised to REMOVED because
 	 * we cannot be sure from other fields if it has
 	 * been initialised or not.
 	 */
-	int highest = 0;
 	int i;
 	int active=0, working=0,failed=0,spare=0,nr_disks=0;
 
@@ -718,17 +715,17 @@ static void super_90_sync(mddev_t *mddev, mdk_rdev_t *rdev)
 			spare++;
 			working++;
 		}
-		if (rdev2->desc_nr > highest)
-			highest = rdev2->desc_nr;
 	}
 	
-	/* now set the "removed" bit on any non-trailing holes */
-	for (i=0; i<highest; i++) {
+	/* now set the "removed" and "faulty" bits on any missing devices */
+	for (i=0 ; i < mddev->raid_disks ; i++) {
 		mdp_disk_t *d = &sb->disks[i];
 		if (d->state == 0 && d->number == 0) {
 			d->number = i;
 			d->raid_disk = i;
 			d->state = (1<<MD_DISK_REMOVED);
+			d->state |= (1<<MD_DISK_FAULTY);
+			failed++;
 		}
 	}
 	sb->nr_disks = nr_disks;
@@ -1612,12 +1609,6 @@ static int do_md_run(mddev_t * mddev)
 	spin_unlock(&pers_lock);
 
 	blk_queue_make_request(mddev->queue, mddev->pers->make_request);
-	printk("%s: setting max_sectors to %d, segment boundary to %d\n",
-		disk->disk_name,
-		chunk_size >> 9,
-		(chunk_size>>1)-1);
-	blk_queue_max_sectors(mddev->queue, chunk_size >> 9);
-	blk_queue_segment_boundary(mddev->queue, (chunk_size>>1) - 1);
 	mddev->queue->queuedata = mddev;
 
 	err = mddev->pers->run(mddev);
@@ -2366,17 +2357,14 @@ static int md_ioctl(struct inode *inode, struct file *file,
 			unsigned int cmd, unsigned long arg)
 {
 	char b[BDEVNAME_SIZE];
-	unsigned int minor;
+	unsigned int minor = iminor(inode);
 	int err = 0;
 	struct hd_geometry *loc = (struct hd_geometry *) arg;
 	mddev_t *mddev = NULL;
-	kdev_t dev;
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
 
-	dev = inode->i_rdev;
-	minor = minor(dev);
 	if (minor >= MAX_MD_DEVS) {
 		MD_BUG();
 		return -EINVAL;
@@ -2615,7 +2603,7 @@ static int md_open(struct inode *inode, struct file *file)
 	/*
 	 * Succeed if we can find or allocate a mddev structure.
 	 */
-	mddev_t *mddev = mddev_find(minor(inode->i_rdev));
+	mddev_t *mddev = mddev_find(iminor(inode));
 	int err = -ENOMEM;
 
 	if (!mddev)
@@ -3590,6 +3578,7 @@ static __exit void md_exit(void)
 		if (!disks[i])
 			continue;
 		mddev = disk->private_data;
+		export_array(mddev);
 		del_gendisk(disk);
 		put_disk(disk);
 		mddev_put(mddev);

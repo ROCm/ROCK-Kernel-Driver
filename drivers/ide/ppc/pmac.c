@@ -45,7 +45,7 @@
 #include <asm/pmac_feature.h>
 #include <asm/sections.h>
 #include <asm/irq.h>
-#include "ide_modes.h"
+
 #include "ide-timing.h"
 
 extern void ide_do_request(ide_hwgroup_t *hwgroup, int masked_irq);

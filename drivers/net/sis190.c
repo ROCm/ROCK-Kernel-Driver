@@ -1111,7 +1111,7 @@ SiS190_close(struct net_device *dev)
 
 	spin_unlock_irq(&tp->lock);
 
-	synchronize_irq();
+	synchronize_irq(dev->irq);
 	free_irq(dev->irq, dev);
 
 	SiS190_tx_clear(tp);

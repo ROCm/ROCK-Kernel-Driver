@@ -278,8 +278,8 @@ static char ixj_c_revision[] = "$Revision: 4.7 $";
 
 #include "ixj.h"
 
-#define TYPE(dev) (minor(dev) >> 4)
-#define NUM(dev) (minor(dev) & 0xf)
+#define TYPE(inode) (iminor(inode) >> 4)
+#define NUM(inode) (iminor(inode) & 0xf)
 
 static int ixjdebug;
 static int hertz = HZ;
@@ -2273,7 +2273,7 @@ int ixj_release(struct inode *inode, struct file *file_p)
 		schedule_timeout(1);
 	}
 	if (ixjdebug & 0x0002)
-		printk(KERN_INFO "Closing board %d\n", NUM(inode->i_rdev));
+		printk(KERN_INFO "Closing board %d\n", NUM(inode));
 
 	if (j->cardtype == QTI_PHONECARD)
 		ixj_set_port(j, PORT_SPEAKER);
@@ -2858,7 +2858,7 @@ static void alaw2ulaw(unsigned char *buff, unsigned long len)
 static ssize_t ixj_read(struct file * file_p, char *buf, size_t length, loff_t * ppos)
 {
 	unsigned long i = *ppos;
-	IXJ * j = get_ixj(NUM(file_p->f_dentry->d_inode->i_rdev));
+	IXJ * j = get_ixj(NUM(file_p->f_dentry->d_inode));
 
 	DECLARE_WAITQUEUE(wait, current);
 
@@ -2915,7 +2915,7 @@ static ssize_t ixj_enhanced_read(struct file * file_p, char *buf, size_t length,
 {
 	int pre_retval;
 	ssize_t read_retval = 0;
-	IXJ *j = get_ixj(NUM(file_p->f_dentry->d_inode->i_rdev));
+	IXJ *j = get_ixj(NUM(file_p->f_dentry->d_inode));
 
 	pre_retval = ixj_PreRead(j, 0L);
 	switch (pre_retval) {
@@ -2994,7 +2994,7 @@ static ssize_t ixj_enhanced_write(struct file * file_p, const char *buf, size_t 
 	int pre_retval;
 	ssize_t write_retval = 0;
 
-	IXJ *j = get_ixj(NUM(file_p->f_dentry->d_inode->i_rdev));
+	IXJ *j = get_ixj(NUM(file_p->f_dentry->d_inode));
 
 	pre_retval = ixj_PreWrite(j, 0L);
 	switch (pre_retval) {
@@ -4707,7 +4707,7 @@ static unsigned int ixj_poll(struct file *file_p, poll_table * wait)
 {
 	unsigned int mask = 0;
 
-	IXJ *j = get_ixj(NUM(file_p->f_dentry->d_inode->i_rdev));
+	IXJ *j = get_ixj(NUM(file_p->f_dentry->d_inode));
 
 	poll_wait(file_p, &(j->poll_q), wait);
 	if (j->read_buffer_ready > 0)
@@ -6208,10 +6208,10 @@ static int ixj_ioctl(struct inode *inode, struct file *file_p, unsigned int cmd,
 	IXJ_FILTER_RAW jfr;
 
 	unsigned int raise, mant;
-	unsigned int minor = minor(inode->i_rdev);
-	int board = NUM(inode->i_rdev);
+	unsigned int minor = iminor(inode);
+	int board = NUM(inode);
 
-	IXJ *j = get_ixj(NUM(inode->i_rdev));
+	IXJ *j = get_ixj(NUM(inode));
 
 	int retval = 0;
 
@@ -6764,7 +6764,7 @@ static int ixj_ioctl(struct inode *inode, struct file *file_p, unsigned int cmd,
 
 static int ixj_fasync(int fd, struct file *file_p, int mode)
 {
-	IXJ *j = get_ixj(NUM(file_p->f_dentry->d_inode->i_rdev));
+	IXJ *j = get_ixj(NUM(file_p->f_dentry->d_inode));
 
 	return fasync_helper(fd, file_p, mode, &j->async_queue);
 }

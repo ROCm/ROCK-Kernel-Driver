@@ -560,7 +560,7 @@ smp_cpus_done (unsigned int dummy)
 		if (cpu_online(cpu))
 			bogosum += cpu_data(cpu)->loops_per_jiffy;
 
-	printk(KERN_INFO "Total of %d processors activated (%lu.%02lu BogoMIPS).\n",
+	printk(KERN_INFO "Total of %lu processors activated (%lu.%02lu BogoMIPS).\n",
 	       num_online_cpus(), bogosum/(500000/HZ), (bogosum/(5000/HZ))%100);
 }
 

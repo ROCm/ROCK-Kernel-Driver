@@ -1551,7 +1551,7 @@ static int adpt_open(struct inode *inode, struct file *file)
 
 	//TODO check for root access
 	//
-	minor = minor(inode->i_rdev);
+	minor = iminor(inode);
 	if (minor >= hba_count) {
 		return -ENXIO;
 	}
@@ -1582,7 +1582,7 @@ static int adpt_close(struct inode *inode, struct file *file)
 	int minor;
 	adpt_hba* pHba;
 
-	minor = minor(inode->i_rdev);
+	minor = iminor(inode);
 	if (minor >= hba_count) {
 		return -ENXIO;
 	}
@@ -1878,7 +1878,7 @@ static int adpt_ioctl(struct inode *inode, struct file *file, uint cmd,
 	adpt_hba* pHba;
 	ulong flags;
 
-	minor = minor(inode->i_rdev);
+	minor = iminor(inode);
 	if (minor >= DPTI_MAX_HBA){
 		return -ENXIO;
 	}

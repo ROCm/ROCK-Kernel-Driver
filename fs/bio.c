@@ -793,10 +793,6 @@ static void __init biovec_init_pools(void)
 					mempool_free_slab, bp->slab);
 		if (!bp->pool)
 			panic("biovec: can't init mempool\n");
-
-		printk("biovec pool[%d]: %3d bvecs: %3d entries (%d bytes)\n",
-						i, bp->nr_vecs, pool_entries,
-						size);
 	}
 }
 
@@ -809,8 +805,6 @@ static int __init init_bio(void)
 	bio_pool = mempool_create(BIO_POOL_SIZE, mempool_alloc_slab, mempool_free_slab, bio_slab);
 	if (!bio_pool)
 		panic("bio: can't create mempool\n");
-
-	printk("BIO: pool of %d setup, %ZuKb (%Zd bytes/bio)\n", BIO_POOL_SIZE, BIO_POOL_SIZE * sizeof(struct bio) >> 10, sizeof(struct bio));
 
 	biovec_init_pools();
 

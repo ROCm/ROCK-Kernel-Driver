@@ -678,9 +678,9 @@ fsyscall_table:
 	data8 0				// clock_gettime
 	data8 0				// clock_getres		// 1255
 	data8 0				// clock_nanosleep
-	data8 0
-	data8 0
-	data8 0
+	data8 0				// fstatfs64
+	data8 0				// statfs64
+	data8 0				// fadvise64_64
 	data8 0							// 1260
 	data8 0
 	data8 0

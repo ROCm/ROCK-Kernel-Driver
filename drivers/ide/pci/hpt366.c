@@ -62,7 +62,6 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 
-#include "ide_modes.h"
 #include "hpt366.h"
 
 #if defined(DISPLAY_HPT366_TIMINGS) && defined(CONFIG_PROC_FS)
@@ -989,7 +988,40 @@ static void __init init_hwif_hpt366 (ide_hwif_t *hwif)
 	hwif->intrproc			= &hpt3xx_intrproc;
 	hwif->maskproc			= &hpt3xx_maskproc;
 
-	pci_read_config_byte(hwif->pci_dev, 0x5a, &ata66);
+	/*
+	 * The HPT37x uses the CBLID pins as outputs for MA15/MA16
+	 * address lines to access an external eeprom.  To read valid
+	 * cable detect state the pins must be enabled as inputs.
+	 */
+	if (hpt_minimum_revision(dev, 8) && PCI_FUNC(dev->devfn) & 1) {
+		/*
+		 * HPT374 PCI function 1
+		 * - set bit 15 of reg 0x52 to enable TCBLID as input
+		 * - set bit 15 of reg 0x56 to enable FCBLID as input
+		 */
+		u16 mcr3, mcr6;
+		pci_read_config_word(dev, 0x52, &mcr3);
+		pci_read_config_word(dev, 0x56, &mcr6);
+		pci_write_config_word(dev, 0x52, mcr3 | 0x8000);
+		pci_write_config_word(dev, 0x56, mcr6 | 0x8000);
+		/* now read cable id register */
+		pci_read_config_byte(dev, 0x5a, &ata66);
+		pci_write_config_word(dev, 0x52, mcr3);
+		pci_write_config_word(dev, 0x56, mcr6);
+	} else if (hpt_minimum_revision(dev, 3)) {
+		/*
+		 * HPT370/372 and 374 pcifn 0
+		 * - clear bit 0 of 0x5b to enable P/SCBLID as inputs
+		 */
+		u8 scr2;
+		pci_read_config_byte(dev, 0x5b, &scr2);
+		pci_write_config_byte(dev, 0x5b, scr2 & ~1);
+		/* now read cable id register */
+		pci_read_config_byte(dev, 0x5a, &ata66);
+		pci_write_config_byte(dev, 0x5b, scr2);
+	} else {
+		pci_read_config_byte(dev, 0x5a, &ata66);
+	}
 
 #ifdef DEBUG
 	printk("HPT366: reg5ah=0x%02x ATA-%s Cable Port%d\n",

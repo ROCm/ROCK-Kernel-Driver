@@ -308,7 +308,7 @@ static irqreturn_t sonypi_irq(int irq, void *dev_id, struct pt_regs *regs) {
 	int i, j;
 
 	v1 = inb_p(sonypi_device.ioport1);
-	v2 = inb_p(sonypi_device.ioport2);
+	v2 = inb_p(sonypi_device.ioport1 + sonypi_device.evtype_offset);
 
 	for (i = 0; sonypi_eventtypes[i].model; i++) {
 		if (sonypi_device.model != sonypi_eventtypes[i].model)
@@ -670,11 +670,13 @@ static int __devinit sonypi_probe(struct pci_dev *pcidev) {
 	if (sonypi_device.model == SONYPI_DEVICE_MODEL_TYPE2) {
 		ioport_list = sonypi_type2_ioport_list;
 		sonypi_device.region_size = SONYPI_TYPE2_REGION_SIZE;
+		sonypi_device.evtype_offset = SONYPI_TYPE2_EVTYPE_OFFSET;
 		irq_list = sonypi_type2_irq_list;
 	}
 	else {
 		ioport_list = sonypi_type1_ioport_list;
 		sonypi_device.region_size = SONYPI_TYPE1_REGION_SIZE;
+		sonypi_device.evtype_offset = SONYPI_TYPE1_EVTYPE_OFFSET;
 		irq_list = sonypi_type1_irq_list;
 	}
 

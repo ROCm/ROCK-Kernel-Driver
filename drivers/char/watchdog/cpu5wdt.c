@@ -134,7 +134,7 @@ static int cpu5wdt_stop(void)
 
 static int cpu5wdt_open(struct inode *inode, struct file *file)
 {
-	switch(minor(inode->i_rdev)) {
+	switch(iminor(inode)) {
 		case WATCHDOG_MINOR:
 			if ( test_and_set_bit(0, &cpu5wdt_device.inuse) )
 				return -EBUSY;
@@ -148,7 +148,7 @@ static int cpu5wdt_open(struct inode *inode, struct file *file)
 
 static int cpu5wdt_release(struct inode *inode, struct file *file)
 {
-	if(minor(inode->i_rdev)==WATCHDOG_MINOR) {
+	if(iminor(inode)==WATCHDOG_MINOR) {
 		clear_bit(0, &cpu5wdt_device.inuse);
 	}
 	return 0;

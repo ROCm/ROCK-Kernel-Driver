@@ -25,7 +25,6 @@
 
 #include <asm/io.h>
 
-#include "ide_modes.h"
 #include "cmd64x.h"
 
 #if defined(DISPLAY_CMD64X_TIMINGS) && defined(CONFIG_PROC_FS)

@@ -867,7 +867,7 @@ static int hal2_mixer_ioctl(hal2_card_t *hal2, unsigned int cmd,
 
 static int hal2_open_mixdev(struct inode *inode, struct file *file)
 {
-	hal2_card_t *hal2 = hal2_mixer_find_card(MINOR(inode->i_rdev));
+	hal2_card_t *hal2 = hal2_mixer_find_card(iminor(inode));
 
 	if (hal2) {
 		file->private_data = hal2;
@@ -1242,7 +1242,7 @@ static unsigned int hal2_poll(struct file *file, struct poll_table_struct *wait)
 static int hal2_open(struct inode *inode, struct file *file)
 {
 	int err;
-	hal2_card_t *hal2 = hal2_dsp_find_card(MINOR(inode->i_rdev));
+	hal2_card_t *hal2 = hal2_dsp_find_card(iminor(inode));
 
 	DEBUG("opening audio device.\n");
 

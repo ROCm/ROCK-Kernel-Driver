@@ -42,7 +42,6 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 
-#include "ide_modes.h"
 #include "hpt34x.h"
 
 #if defined(DISPLAY_HPT34X_TIMINGS) && defined(CONFIG_PROC_FS)

@@ -62,7 +62,7 @@ static struct drm_stub_info {
  */
 static int DRM(stub_open)(struct inode *inode, struct file *filp)
 {
-	int                    minor = minor(inode->i_rdev);
+	int                    minor = iminor(inode);
 	int                    err   = -ENODEV;
 	struct file_operations *old_fops;
 

@@ -374,7 +374,7 @@ static ssize_t slm_read( struct file *file, char *buf, size_t count,
 	if (!(page = __get_free_page( GFP_KERNEL )))
 		return( -ENOMEM );
 	
-	length = slm_getstats( (char *)page, MINOR(node->i_rdev) );
+	length = slm_getstats( (char *)page, iminor(node) );
 	if (length < 0) {
 		count = length;
 		goto out;
@@ -622,7 +622,7 @@ static ssize_t slm_write( struct file *file, const char *buf, size_t count,
 
 {
 	struct inode *node = file->f_dentry->d_inode;
-	int		device = MINOR( node->i_rdev );
+	int		device = iminor(node);
 	int		n, filled, w, h;
 
 	while( SLMState == PRINTING ||
@@ -694,7 +694,7 @@ static ssize_t slm_write( struct file *file, const char *buf, size_t count,
 static int slm_ioctl( struct inode *inode, struct file *file,
 					  unsigned int cmd, unsigned long arg )
 
-{	int		device = MINOR( inode->i_rdev ), err;
+{	int		device = iminor(inode), err;
 	
 	/* I can think of setting:
 	 *  - manual feed
@@ -768,7 +768,7 @@ static int slm_open( struct inode *inode, struct file *file )
 {	int device;
 	struct slm *sip;
 	
-	device = MINOR(inode->i_rdev);
+	device = iminor(inode);
 	if (device >= N_SLM_Printers)
 		return( -ENXIO );
 	sip = &slm_info[device];
@@ -797,7 +797,7 @@ static int slm_release( struct inode *inode, struct file *file )
 {	int device;
 	struct slm *sip;
 	
-	device = MINOR(inode->i_rdev);
+	device = iminor(inode);
 	sip = &slm_info[device];
 
 	if (file->f_mode & 2)

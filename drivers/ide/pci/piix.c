@@ -103,7 +103,6 @@
 
 #include <asm/io.h>
 
-#include "ide_modes.h"
 #include "piix.h"
 
 static int no_piix_dma;

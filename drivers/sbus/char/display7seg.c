@@ -91,7 +91,7 @@ static atomic_t d7s_users = ATOMIC_INIT(0);
 
 static int d7s_open(struct inode *inode, struct file *f)
 {
-	if (D7S_MINOR != minor(inode->i_rdev))
+	if (D7S_MINOR != iminor(inode))
 		return -ENODEV;
 	atomic_inc(&d7s_users);
 	return 0;
@@ -121,7 +121,7 @@ static int d7s_ioctl(struct inode *inode, struct file *f,
 	__u8 regs = readb(d7s_regs);
 	__u8 ireg = 0;
 
-	if (D7S_MINOR != minor(inode->i_rdev))
+	if (D7S_MINOR != iminor(inode))
 		return -ENODEV;
 
 	switch (cmd) {

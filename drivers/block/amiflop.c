@@ -55,24 +55,15 @@
 
 #include <linux/module.h>
 
-#include <linux/sched.h>
-#include <linux/fs.h>
-#include <linux/fcntl.h>
-#include <linux/kernel.h>
-#include <linux/timer.h>
 #include <linux/fd.h>
 #include <linux/hdreg.h>
-#include <linux/errno.h>
-#include <linux/types.h>
 #include <linux/delay.h>
-#include <linux/string.h>
-#include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/amifdreg.h>
 #include <linux/amifd.h>
-#include <linux/ioport.h>
 #include <linux/buffer_head.h>
-#include <linux/interrupt.h>
+#include <linux/blkdev.h>
+#include <linux/elevator.h>
 
 #include <asm/setup.h>
 #include <asm/uaccess.h>
@@ -1446,7 +1437,7 @@ static void do_fd_request(request_queue_t * q)
 static int fd_ioctl(struct inode *inode, struct file *filp,
 		    unsigned int cmd, unsigned long param)
 {
-	int drive = minor(inode->i_rdev) & 3;
+	int drive = iminor(inode) & 3;
 	static struct floppy_struct getprm;
 
 	switch(cmd){
@@ -1570,8 +1561,8 @@ static void fd_probe(int dev)
  */
 static int floppy_open(struct inode *inode, struct file *filp)
 {
-	int drive = minor(inode->i_rdev) & 3;
-	int system =  (minor(inode->i_rdev) & 4) >> 2;
+	int drive = iminor(inode) & 3;
+	int system =  (iminor(inode) & 4) >> 2;
 	int old_dev;
 	unsigned long flags;
 
@@ -1618,7 +1609,7 @@ static int floppy_open(struct inode *inode, struct file *filp)
 
 static int floppy_release(struct inode * inode, struct file * filp)
 {
-	int drive = minor(inode->i_rdev) & 3;
+	int drive = iminor(inode) & 3;
 
 	if (unit[drive].dirty == 1) {
 		del_timer (flush_track_timer + drive);

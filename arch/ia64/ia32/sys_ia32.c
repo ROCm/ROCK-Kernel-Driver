@@ -76,7 +76,6 @@
 
 #define OFFSET4K(a)		((a) & 0xfff)
 #define PAGE_START(addr)	((addr) & PAGE_MASK)
-#define PAGE_OFF(addr)		((addr) & ~PAGE_MASK)
 
 #define high2lowuid(uid) ((uid) > 65535 ? 65534 : (uid))
 #define high2lowgid(gid) ((gid) > 65535 ? 65534 : (gid))
@@ -170,9 +169,9 @@ sys32_execve (char *filename, unsigned int argv, unsigned int envp,
 		current->thread.map_base  = old_map_base;
 		current->thread.task_size = old_task_size;
 		set_fs(USER_DS);	/* establish new task-size as the address-limit */
-	  out:
-		kfree(av);
 	}
+  out:
+	kfree(av);
 	return r;
 }
 
@@ -271,11 +270,11 @@ mmap_subpage (struct file *file, unsigned long start, unsigned long end, int pro
 
 	if (old_prot) {
 		/* copy back the old page contents.  */
-		if (PAGE_OFF(start))
-			copy_to_user((void *) PAGE_START(start), page, PAGE_OFF(start));
-		if (PAGE_OFF(end))
-			copy_to_user((void *) end, page + PAGE_OFF(end),
-				     PAGE_SIZE - PAGE_OFF(end));
+		if (offset_in_page(start))
+			copy_to_user((void *) PAGE_START(start), page, offset_in_page(start));
+		if (offset_in_page(end))
+			copy_to_user((void *) end, page + offset_in_page(end),
+				     PAGE_SIZE - offset_in_page(end));
 	}
 
 	if (!(flags & MAP_ANONYMOUS)) {
@@ -330,7 +329,7 @@ emulate_mmap (struct file *file, unsigned long start, unsigned long len, int pro
 				       "%s(%d): emulate_mmap() can't share tail (end=0x%lx)\n",
 				       current->comm, current->pid, end);
 			ret = mmap_subpage(file, max(start, PAGE_START(end)), end, prot, flags,
-					   (off + len) - PAGE_OFF(end));
+					   (off + len) - offset_in_page(end));
 			if (IS_ERR((void *) ret))
 				return ret;
 			pend -= PAGE_SIZE;
@@ -347,14 +346,14 @@ emulate_mmap (struct file *file, unsigned long start, unsigned long len, int pro
 		tmp = arch_get_unmapped_area(file, pstart - fudge, pend - pstart, 0, flags);
 		if (tmp != pstart) {
 			pstart = tmp;
-			start = pstart + PAGE_OFF(off);	/* make start congruent with off */
+			start = pstart + offset_in_page(off);	/* make start congruent with off */
 			end = start + len;
 			pend = PAGE_ALIGN(end);
 		}
 	}
 
 	poff = off + (pstart - start);	/* note: (pstart - start) may be negative */
-	is_congruent = (flags & MAP_ANONYMOUS) || (PAGE_OFF(poff) == 0);
+	is_congruent = (flags & MAP_ANONYMOUS) || (offset_in_page(poff) == 0);
 
 	if ((flags & MAP_SHARED) && !is_congruent)
 		printk(KERN_INFO "%s(%d): emulate_mmap() can't share contents of incongruent mmap "
@@ -588,7 +587,7 @@ sys32_mprotect (unsigned int start, unsigned int len, int prot)
 
 	down(&ia32_mmap_sem);
 	{
-		if (PAGE_OFF(start)) {
+		if (offset_in_page(start)) {
 			/* start address is 4KB aligned but not page aligned. */
 			retval = mprotect_subpage(PAGE_START(start), prot);
 			if (retval < 0)
@@ -599,7 +598,7 @@ sys32_mprotect (unsigned int start, unsigned int len, int prot)
 				goto out;	/* retval is already zero... */
 		}
 
-		if (PAGE_OFF(end)) {
+		if (offset_in_page(end)) {
 			/* end address is 4KB aligned but not page aligned. */
 			retval = mprotect_subpage(PAGE_START(end), prot);
 			if (retval < 0)

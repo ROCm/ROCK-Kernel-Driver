@@ -42,5 +42,5 @@ paddr_to_nid(unsigned long paddr)
 		    paddr < node_memblk[i].start_paddr + node_memblk[i].size)
 			break;
 
-	return (i < num_memblks) ? node_memblk[i].nid : -1;
+	return (i < num_memblks) ? node_memblk[i].nid : (num_memblks ? -1 : 0);
 }

@@ -587,10 +587,10 @@
  *  |___________________ Reserved for diagnostics during debugging.
  */
 
-#define	TP_REWCLOSE(d)	((minor(d)&0x01) == 1)	   		/* rewind bit */
+#define	TP_REWCLOSE(d)	((d)&1)	   		/* rewind bit */
 			   /* rewind is only done if data has been transferred */
-#define	TP_DENS(dev)	((minor(dev) >> 1) & 0x07) 	      /* tape density */
-#define TP_UNIT(dev)	((minor(dev) >> 4) & 0x07)	       /* unit number */
+#define	TP_DENS(d)	(((d) >> 1) & 0x07) 	      /* tape density */
+#define TP_UNIT(d)	(((d) >> 4) & 0x07)	       /* unit number */
 
 /* print excessive diagnostics */
 #define TP_DIAGS(dev)	(QIC02_TAPE_DEBUG & TPQD_DIAGS)

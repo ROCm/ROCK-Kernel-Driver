@@ -92,8 +92,8 @@ asmlinkage unsigned long sunos_mmap(unsigned long addr, unsigned long len,
 	 * SunOS is so stupid some times... hmph!
 	 */
 	if (file) {
-		if(major(file->f_dentry->d_inode->i_rdev) == MEM_MAJOR &&
-		   minor(file->f_dentry->d_inode->i_rdev) == 5) {
+		if(imajor(file->f_dentry->d_inode) == MEM_MAJOR &&
+		   iminor(file->f_dentry->d_inode) == 5) {
 			flags |= MAP_ANONYMOUS;
 			fput(file);
 			file = 0;
