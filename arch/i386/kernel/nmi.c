@@ -50,7 +50,7 @@ extern void show_registers(struct pt_regs *regs);
  * This is maintained separately from nmi_active because the NMI
  * watchdog may also be driven from the I/O APIC timer.
  */
-static spinlock_t lapic_nmi_owner_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(lapic_nmi_owner_lock);
 static unsigned int lapic_nmi_owner;
 #define LAPIC_NMI_WATCHDOG	(1<<0)
 #define LAPIC_NMI_RESERVED	(1<<1)

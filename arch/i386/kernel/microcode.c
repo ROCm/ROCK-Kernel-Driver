@@ -109,7 +109,7 @@ MODULE_LICENSE("GPL");
 #define exttable_size(et) ((et)->count * EXT_SIGNATURE_SIZE + EXT_HEADER_SIZE)
 
 /* serialize access to the physical write to MSR 0x79 */
-static spinlock_t microcode_update_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(microcode_update_lock);
 
 /* no concurrent ->write()s are allowed on /dev/cpu/microcode */
 static DECLARE_MUTEX(microcode_sem);

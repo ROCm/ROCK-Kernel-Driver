@@ -31,7 +31,7 @@
 #include "irq_vectors.h"
 
 
-static spinlock_t cobalt_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(cobalt_lock);
 
 /*
  * Set the given Cobalt APIC Redirection Table entry to point

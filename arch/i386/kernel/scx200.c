@@ -37,8 +37,8 @@ static struct pci_driver scx200_pci_driver = {
 	.probe = scx200_probe,
 };
 
-spinlock_t scx200_gpio_lock = SPIN_LOCK_UNLOCKED;
-static spinlock_t scx200_gpio_config_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(scx200_gpio_lock);
+static DEFINE_SPINLOCK(scx200_gpio_config_lock);
 
 static int __devinit scx200_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
