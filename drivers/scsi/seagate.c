@@ -683,8 +683,8 @@ static int seagate_st0x_queue_command (Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmn
 
 	DANY ("seagate: que_command");
 	done_fn = done;
-	current_target = SCpnt->target;
-	current_lun = SCpnt->lun;
+	current_target = SCpnt->device->id;
+	current_lun = SCpnt->device->lun;
 	current_cmnd = SCpnt->cmnd;
 	current_data = (unsigned char *) SCpnt->request_buffer;
 	current_bufflen = SCpnt->request_bufflen;
@@ -713,7 +713,7 @@ static int seagate_st0x_queue_command (Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmn
 #endif				/* LINKED */
 			reconnect = CAN_RECONNECT;
 
-		result = internal_command(SCint->target, SCint->lun, SCint->cmnd,
+		result = internal_command(SCint->device->id, SCint->device->lun, SCint->cmnd,
 				      SCint->request_buffer, SCint->request_bufflen, reconnect);
 		if (msg_byte(result) == DISCONNECT)
 			break;
@@ -729,7 +729,7 @@ static int seagate_st0x_queue_command (Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmn
 
 static int seagate_st0x_command(Scsi_Cmnd * SCpnt)
 {
-	return internal_command (SCpnt->target, SCpnt->lun, SCpnt->cmnd,
+	return internal_command (SCpnt->device->id, SCpnt->device->lun, SCpnt->cmnd,
 				 SCpnt->request_buffer, SCpnt->request_bufflen,
 				 (int) NO_RECONNECT);
 }
