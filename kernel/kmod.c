@@ -155,7 +155,7 @@ static int ____call_usermodehelper(void *data)
 	/* Unblock all signals. */
 	flush_signals(current);
 	spin_lock_irq(&current->sighand->siglock);
-	flush_signal_handlers(current);
+	flush_signal_handlers(current, 1);
 	sigemptyset(&current->blocked);
 	recalc_sigpending();
 	spin_unlock_irq(&current->sighand->siglock);
