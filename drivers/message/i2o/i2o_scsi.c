@@ -496,56 +496,58 @@ static int i2o_scsi_reply(struct i2o_controller *c, u32 m,
 };
 
 /**
- *	i2o_scsi_notify - Retrieve notifications of controller added or removed
- *	@notify: the notification event which occurs
- *	@data: pointer to additional data
+ *	i2o_scsi_notify_controller_add - Retrieve notifications of added
+ *					 controllers
+ *	@c: the controller which was added
  *
  *	If a I2O controller is added, we catch the notification to add a
- *	corresponding Scsi_Host. On removal also remove the Scsi_Host.
+ *	corresponding Scsi_Host.
  */
-void i2o_scsi_notify(enum i2o_driver_notify notify, void *data)
+void i2o_scsi_notify_controller_add(struct i2o_controller *c)
 {
-	struct i2o_controller *c = data;
 	struct i2o_scsi_host *i2o_shost;
 	int rc;
 
-	switch (notify) {
-	case I2O_DRIVER_NOTIFY_CONTROLLER_ADD:
-		i2o_shost = i2o_scsi_host_alloc(c);
-		if (IS_ERR(i2o_shost)) {
-			printk(KERN_ERR "scsi-osm: Could not initialize"
-			       " SCSI host\n");
-			return;
-		}
-
-		rc = scsi_add_host(i2o_shost->scsi_host, &c->device);
-		if (rc) {
-			printk(KERN_ERR "scsi-osm: Could not add SCSI "
-			       "host\n");
-			scsi_host_put(i2o_shost->scsi_host);
-			return;
-		}
-
-		c->driver_data[i2o_scsi_driver.context] = i2o_shost;
-
-		pr_debug("new I2O SCSI host added\n");
-		break;
-
-	case I2O_DRIVER_NOTIFY_CONTROLLER_REMOVE:
-		i2o_shost = i2o_scsi_get_host(c);
-		if (!i2o_shost)
-			return;
-
-		c->driver_data[i2o_scsi_driver.context] = NULL;
-
-		scsi_remove_host(i2o_shost->scsi_host);
-		scsi_host_put(i2o_shost->scsi_host);
-		pr_debug("I2O SCSI host removed\n");
-		break;
-
-	default:
-		break;
+	i2o_shost = i2o_scsi_host_alloc(c);
+	if (IS_ERR(i2o_shost)) {
+		printk(KERN_ERR "scsi-osm: Could not initialize"
+		       " SCSI host\n");
+		return;
 	}
+
+	rc = scsi_add_host(i2o_shost->scsi_host, &c->device);
+	if (rc) {
+		printk(KERN_ERR "scsi-osm: Could not add SCSI "
+		       "host\n");
+		scsi_host_put(i2o_shost->scsi_host);
+		return;
+	}
+
+	c->driver_data[i2o_scsi_driver.context] = i2o_shost;
+
+	pr_debug("new I2O SCSI host added\n");
+};
+
+/**
+ *	i2o_scsi_notify_controller_remove - Retrieve notifications of removed
+ *					    controllers
+ *	@c: the controller which was removed
+ *
+ *	If a I2O controller is removed, we catch the notification to remove the
+ *	corresponding Scsi_Host.
+ */
+void i2o_scsi_notify_controller_remove(struct i2o_controller *c)
+{
+	struct i2o_scsi_host *i2o_shost;
+	i2o_shost = i2o_scsi_get_host(c);
+	if (!i2o_shost)
+		return;
+
+	c->driver_data[i2o_scsi_driver.context] = NULL;
+
+	scsi_remove_host(i2o_shost->scsi_host);
+	scsi_host_put(i2o_shost->scsi_host);
+	pr_debug("I2O SCSI host removed\n");
 };
 
 /* SCSI OSM driver struct */
@@ -553,7 +555,8 @@ static struct i2o_driver i2o_scsi_driver = {
 	.name = "scsi-osm",
 	.reply = i2o_scsi_reply,
 	.classes = i2o_scsi_class_id,
-	.notify = i2o_scsi_notify,
+	.notify_controller_add = i2o_scsi_notify_controller_add,
+	.notify_controller_remove = i2o_scsi_notify_controller_remove,
 	.driver = {
 		   .probe = i2o_scsi_probe,
 		   .remove = i2o_scsi_remove,

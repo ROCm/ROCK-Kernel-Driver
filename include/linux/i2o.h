@@ -33,11 +33,6 @@
 /* message queue empty */
 #define I2O_QUEUE_EMPTY		0xffffffff
 
-enum i2o_driver_notify {
-	I2O_DRIVER_NOTIFY_CONTROLLER_ADD = 0,
-	I2O_DRIVER_NOTIFY_CONTROLLER_REMOVE = 1,
-};
-
 /*
  *	Message structures
  */
@@ -115,7 +110,10 @@ struct i2o_driver {
 	struct device_driver driver;
 
 	/* notification of changes */
-	void (*notify) (enum i2o_driver_notify, void *);
+	void (*notify_controller_add) (struct i2o_controller *);
+	void (*notify_controller_remove) (struct i2o_controller *);
+	void (*notify_device_add) (struct i2o_device *);
+	void (*notify_device_remove) (struct i2o_device *);
 
 	struct semaphore lock;
 };
@@ -325,18 +323,61 @@ extern int i2o_driver_register(struct i2o_driver *);
 extern void i2o_driver_unregister(struct i2o_driver *);
 
 /**
- *	i2o_driver_notify - Send notification to a single I2O drivers
+ *	i2o_driver_notify_controller_add - Send notification of added controller
+ *					   to a single I2O driver
  *
- *	Send notifications to a single registered driver.
+ *	Send notification of added controller to a single registered driver.
  */
-static inline void i2o_driver_notify(struct i2o_driver *drv,
-				     enum i2o_driver_notify notify, void *data)
+static inline void i2o_driver_notify_controller_add(struct i2o_driver *drv,
+						    struct i2o_controller *c)
 {
-	if (drv->notify)
-		drv->notify(notify, data);
-}
+	if (drv->notify_controller_add)
+		drv->notify_controller_add(c);
+};
 
-extern void i2o_driver_notify_all(enum i2o_driver_notify, void *);
+/**
+ *	i2o_driver_notify_controller_remove - Send notification of removed
+ *					      controller to a single I2O driver
+ *
+ *	Send notification of removed controller to a single registered driver.
+ */
+static inline void i2o_driver_notify_controller_remove(struct i2o_driver *drv,
+						       struct i2o_controller *c)
+{
+	if (drv->notify_controller_remove)
+		drv->notify_controller_remove(c);
+};
+
+/**
+ *	i2o_driver_notify_device_add - Send notification of added device to a
+ *				       single I2O driver
+ *
+ *	Send notification of added device to a single registered driver.
+ */
+static inline void i2o_driver_notify_device_add(struct i2o_driver *drv,
+						struct i2o_device *i2o_dev)
+{
+	if (drv->notify_device_add)
+		drv->notify_device_add(i2o_dev);
+};
+
+/**
+ *	i2o_driver_notify_device_remove - Send notification of removed device
+ *					  to a single I2O driver
+ *
+ *	Send notification of removed device to a single registered driver.
+ */
+static inline void i2o_driver_notify_device_remove(struct i2o_driver *drv,
+						   struct i2o_device *i2o_dev)
+{
+	if (drv->notify_device_remove)
+		drv->notify_device_remove(i2o_dev);
+};
+
+extern void i2o_driver_notify_controller_add_all(struct i2o_controller *);
+extern void i2o_driver_notify_controller_remove_all(struct i2o_controller *);
+extern void i2o_driver_notify_device_add_all(struct i2o_device *);
+extern void i2o_driver_notify_device_remove_all(struct i2o_device *);
 
 /* I2O device functions */
 extern int i2o_device_claim(struct i2o_device *);

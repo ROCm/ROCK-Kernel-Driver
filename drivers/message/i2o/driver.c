@@ -110,8 +110,14 @@ int i2o_driver_register(struct i2o_driver *drv)
 
 	pr_debug("driver %s gets context id %d\n", drv->name, drv->context);
 
-	list_for_each_entry(c, &i2o_controllers, list)
-		i2o_driver_notify(drv, I2O_DRIVER_NOTIFY_CONTROLLER_ADD, c);
+	list_for_each_entry(c, &i2o_controllers, list) {
+		struct i2o_device *i2o_dev;
+
+		i2o_driver_notify_controller_add(drv, c);
+		list_for_each_entry(i2o_dev, &c->devices, list)
+			i2o_driver_notify_device_add(drv, i2o_dev);
+	}
+
 
 	rc = driver_register(&drv->driver);
 	if (rc)
@@ -136,8 +142,14 @@ void i2o_driver_unregister(struct i2o_driver *drv)
 
 	driver_unregister(&drv->driver);
 
-	list_for_each_entry(c, &i2o_controllers, list)
-		i2o_driver_notify(drv, I2O_DRIVER_NOTIFY_CONTROLLER_REMOVE, c);
+	list_for_each_entry(c, &i2o_controllers, list) {
+		struct i2o_device *i2o_dev;
+
+		list_for_each_entry(i2o_dev, &c->devices, list)
+			i2o_driver_notify_device_remove(drv, i2o_dev);
+
+		i2o_driver_notify_controller_remove(drv, c);
+	}
 
 	spin_lock_irqsave(&i2o_drivers_lock, flags);
 	i2o_drivers[drv->context] = NULL;
@@ -228,11 +240,13 @@ int i2o_driver_dispatch(struct i2o_controller *c, u32 m,
 }
 
 /**
- *	i2o_driver_notify_all - Send notification to all I2O drivers
+ *	i2o_driver_notify_controller_add_all - Send notify of added controller
+ *					       to all I2O drivers
  *
- *	Send notifications to all registered drivers.
+ *	Send notifications to all registered drivers that a new controller was
+ *	added.
  */
-void i2o_driver_notify_all(enum i2o_driver_notify evt, void *data) {
+void i2o_driver_notify_controller_add_all(struct i2o_controller *c) {
 	int i;
 	struct i2o_driver *drv;
 
@@ -240,7 +254,62 @@ void i2o_driver_notify_all(enum i2o_driver_notify evt, void *data) {
 		drv = i2o_drivers[i];
 
 		if(drv)
-			i2o_driver_notify(drv, evt, data);
+			i2o_driver_notify_controller_add(drv, c);
+	}
+}
+
+/**
+ *	i2o_driver_notify_controller_remove_all - Send notify of removed
+ *						  controller to all I2O drivers
+ *
+ *	Send notifications to all registered drivers that a controller was
+ *	removed.
+ */
+void i2o_driver_notify_controller_remove_all(struct i2o_controller *c) {
+	int i;
+	struct i2o_driver *drv;
+
+	for(i = 0; i < I2O_MAX_DRIVERS; i ++) {
+		drv = i2o_drivers[i];
+
+		if(drv)
+			i2o_driver_notify_controller_remove(drv, c);
+	}
+}
+
+/**
+ *	i2o_driver_notify_device_add_all - Send notify of added device to all
+ *					   I2O drivers
+ *
+ *	Send notifications to all registered drivers that a device was added.
+ */
+void i2o_driver_notify_device_add_all(struct i2o_device *i2o_dev) {
+	int i;
+	struct i2o_driver *drv;
+
+	for(i = 0; i < I2O_MAX_DRIVERS; i ++) {
+		drv = i2o_drivers[i];
+
+		if(drv)
+			i2o_driver_notify_device_add(drv, i2o_dev);
+	}
+}
+
+/**
+ *	i2o_driver_notify_device_remove_all - Send notify of removed device to
+ *					      all I2O drivers
+ *
+ *	Send notifications to all registered drivers that a device was removed.
+ */
+void i2o_driver_notify_device_remove_all(struct i2o_device *i2o_dev) {
+	int i;
+	struct i2o_driver *drv;
+
+	for(i = 0; i < I2O_MAX_DRIVERS; i ++) {
+		drv = i2o_drivers[i];
+
+		if(drv)
+			i2o_driver_notify_device_remove(drv, i2o_dev);
 	}
 }
 
@@ -292,4 +361,7 @@ void __exit i2o_driver_exit(void)
 
 EXPORT_SYMBOL(i2o_driver_register);
 EXPORT_SYMBOL(i2o_driver_unregister);
-EXPORT_SYMBOL(i2o_driver_notify_all);
+EXPORT_SYMBOL(i2o_driver_notify_controller_add_all);
+EXPORT_SYMBOL(i2o_driver_notify_controller_remove_all);
+EXPORT_SYMBOL(i2o_driver_notify_device_add_all);
+EXPORT_SYMBOL(i2o_driver_notify_device_remove_all);

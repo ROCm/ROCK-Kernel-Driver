@@ -815,7 +815,7 @@ void i2o_iop_remove(struct i2o_controller *c)
 
 	pr_debug("Deleting controller %s\n", c->name);
 
-	i2o_driver_notify_all(I2O_DRIVER_NOTIFY_CONTROLLER_REMOVE, c);
+	i2o_driver_notify_controller_remove_all(c);
 
 	list_del(&c->list);
 
@@ -1133,7 +1133,7 @@ int i2o_iop_add(struct i2o_controller *c)
 
 	list_add(&c->list, &i2o_controllers);
 
-	i2o_driver_notify_all(I2O_DRIVER_NOTIFY_CONTROLLER_ADD, c);
+	i2o_driver_notify_controller_add_all(c);
 
 	printk(KERN_INFO "%s: Controller added\n", c->name);
 

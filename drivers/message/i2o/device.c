@@ -239,6 +239,8 @@ struct i2o_device *i2o_device_add(struct i2o_controller *c,
 
 	class_device_register(&dev->classdev);
 
+	i2o_driver_notify_device_add_all(dev);
+
 	pr_debug("I2O device %s added\n", dev->device.bus_id);
 
 	return dev;
@@ -254,6 +256,7 @@ struct i2o_device *i2o_device_add(struct i2o_controller *c,
  */
 void i2o_device_remove(struct i2o_device *i2o_dev)
 {
+	i2o_driver_notify_device_remove_all(i2o_dev);
 	class_device_unregister(&i2o_dev->classdev);
 	list_del(&i2o_dev->list);
 	device_unregister(&i2o_dev->device);
