@@ -82,7 +82,7 @@ int StartListening(const int Port)
 	
 	MainSocket = sock;
 	
-	EnterFunction("StartListening");
+	LeaveFunction("StartListening");
 	return 1; 
 }	
 
