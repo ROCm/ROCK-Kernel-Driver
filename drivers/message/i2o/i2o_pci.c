@@ -27,14 +27,16 @@
 #include <linux/i2o.h>
 #include <linux/errno.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <linux/slab.h>
+
 #include <asm/io.h>
 
 #ifdef CONFIG_MTRR
 #include <asm/mtrr.h>
 #endif // CONFIG_MTRR
 
-static int dpt = 0;
+static int dpt;
 
 
 /**
