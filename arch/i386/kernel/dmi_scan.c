@@ -309,26 +309,6 @@ static __init int apm_likes_to_melt(struct dmi_blacklist *d)
 	return 0;
 }
 
-/*
- * Some machines, usually laptops, can't handle an enabled local APIC.
- * The symptoms include hangs or reboots when suspending or resuming,
- * attaching or detaching the power cord, or entering BIOS setup screens
- * through magic key sequences.
- */
-static int __init local_apic_kills_bios(struct dmi_blacklist *d)
-{
-#ifdef CONFIG_X86_LOCAL_APIC
-	extern int enable_local_apic;
-	if (enable_local_apic == 0) {
-		enable_local_apic = -1;
-		printk(KERN_WARNING "%s with broken BIOS detected. "
-		       "Refusing to enable the local APIC.\n",
-		       d->ident);
-	}
-#endif
-	return 0;
-}
-
 /* 
  * Don't access SMBus on IBM systems which get corrupted eeproms 
  */
@@ -793,30 +773,6 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			} },
 
 	/* Machines which have problems handling enabled local APICs */
-
-	{ local_apic_kills_bios, "Dell Inspiron", {
-			MATCH(DMI_SYS_VENDOR, "Dell Computer Corporation"),
-			MATCH(DMI_PRODUCT_NAME, "Inspiron"),
-			NO_MATCH, NO_MATCH
-			} },
-
-	{ local_apic_kills_bios, "Dell Latitude", {
-			MATCH(DMI_SYS_VENDOR, "Dell Computer Corporation"),
-			MATCH(DMI_PRODUCT_NAME, "Latitude"),
-			NO_MATCH, NO_MATCH
-			} },
-
-	{ local_apic_kills_bios, "IBM Thinkpad T20", {
-			MATCH(DMI_BOARD_VENDOR, "IBM"),
-			MATCH(DMI_BOARD_NAME, "264741U"),
-			NO_MATCH, NO_MATCH
-			} },
-
-	{ local_apic_kills_bios, "ASUS L3C", {
-			MATCH(DMI_BOARD_VENDOR, "ASUSTeK Computer INC."),
-			MATCH(DMI_BOARD_NAME, "P4_L3C"),
-			NO_MATCH, NO_MATCH
-			} },
 
 	{ broken_acpi_Sx, "ASUS K7V-RM", {		/* Bad ACPI Sx table */
 			MATCH(DMI_BIOS_VERSION,"ASUS K7V-RM ACPI BIOS Revision 1003A"),
