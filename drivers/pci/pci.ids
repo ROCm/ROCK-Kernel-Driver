@@ -497,8 +497,8 @@
 		1011 500b  DE500B Fast Ethernet
 		1014 0001  10/100 EtherJet Cardbus
 		1025 0315  ALN315 Fast Ethernet
-		1033 800c  PC-9821-CS01
-		1033 800d  PC-9821NR-B06
+		1033 800c  PC-9821-CS01 100BASE-TX Interface Card
+		1033 800d  PC-9821NR-B06 100BASE-TX Interface Card
 		108d 0016  Rapidfire 2327 10/100 Ethernet
 		108d 0017  GoCard 2250 Ethernet 10/100 Cardbus
 		10b8 2005  SMC8032DT Extreme Ethernet 10/100
@@ -1049,17 +1049,21 @@
 	0003  ATM Controller
 	0004  R4000 PCI Bridge
 	0005  PCI to 486-like bus Bridge
-	0006  GUI Accelerator
+	0006  PC-9800 Graphic Accelerator
 	0007  PCI to UX-Bus Bridge
-	0008  GUI Accelerator
-	0009  GUI Accelerator for W98
+	0008  PC-9800 Graphic Accelerator
+	0009  PCI to PC9800 Core-Graph Bridge
+	0016  PCI to VL Bridge
 	001a  [Nile II]
 	0021  Vrc4373 [Nile I]
 	0029  PowerVR PCX1
 	002a  PowerVR 3D
+	002c  Star Alpha 2
+	002d  PCI to C-bus Bridge
 	0035  USB
 		1179 0001  USB
 		12ee 7000  Root Hub
+	003b  PCI to C-bus Bridge
 	003e  NAPCCARD Cardbus Controller
 	0046  PowerVR PCX2 [midas]
 	005a  Vrc5074 [Nile 4]
@@ -3489,7 +3493,7 @@
 	5811  FW323
 		dead 0800  FireWire Host Bus Adapter
 11c2  Sand Microelectronics
-11c3  NEC Corp
+11c3  NEC Corporation
 11c4  Document Technologies, Inc
 11c5  Shiva Corporation
 11c6  Dainippon Screen Mfg. Co. Ltd
