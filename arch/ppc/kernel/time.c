@@ -75,7 +75,7 @@ u64 jiffies_64;
 
 unsigned long disarm_decr[NR_CPUS];
 
-extern int do_sys_settimeofday(struct timeval *tv, struct timezone *tz);
+extern struct timezone sys_tz;
 
 /* keep track of when we need to update the rtc */
 time_t last_rtc_update;
@@ -151,7 +151,7 @@ static inline void ppc_do_profile (unsigned long nip)
  * with interrupts disabled.
  * We set it up to overflow again in 1/HZ seconds.
  */
-int timer_interrupt(struct pt_regs * regs)
+void timer_interrupt(struct pt_regs * regs)
 {
 	int next_dec;
 	unsigned long cpu = smp_processor_id();
@@ -161,7 +161,7 @@ int timer_interrupt(struct pt_regs * regs)
 	if (atomic_read(&ppc_n_lost_interrupts) != 0)
 		do_IRQ(regs);
 
-	hardirq_enter(cpu);
+	irq_enter();
 	
 	while ((next_dec = tb_ticks_per_jiffy - tb_delta(&jiffy_stamp)) < 0) {
 		jiffy_stamp += tb_ticks_per_jiffy;
@@ -214,12 +214,7 @@ int timer_interrupt(struct pt_regs * regs)
 	if (ppc_md.heartbeat && !ppc_md.heartbeat_count--)
 		ppc_md.heartbeat();
 
-	hardirq_exit(cpu);
-
-	if (softirq_pending(cpu))
-		do_softirq();
-
-	return 1; /* lets ret_from_int know we can do checks */
+	irq_exit();
 }
 #endif /* CONFIG_PPC_ISERIES */
 
@@ -358,14 +353,11 @@ void __init time_init(void)
 	/* Not exact, but the timer interrupt takes care of this */
 	set_dec(tb_ticks_per_jiffy);
 
-	/* If platform provided a timezone (pmac), we correct the time
-	 * using do_sys_settimeofday() which in turn calls warp_clock()
-	 */
+	/* If platform provided a timezone (pmac), we correct the time */
         if (time_offset) {
-        	struct timezone tz;
-        	tz.tz_minuteswest = -time_offset / 60;
-        	tz.tz_dsttime = 0;
-        	do_sys_settimeofday(NULL, &tz);
+		sys_tz.tz_minuteswest = -time_offset / 60;
+		sys_tz.tz_dsttime = 0;
+		xtime.tv_sec -= time_offset;
         }
 }
 
@@ -373,6 +365,11 @@ void __init time_init(void)
 #define	STARTOFTIME		1970
 #define SECDAY			86400L
 #define SECYR			(SECDAY * 365)
+
+/*
+ * Note: this is wrong for 2100, but our signed 32-bit time_t will
+ * have overflowed long before that, so who cares.  -- paulus
+ */
 #define	leapyear(year)		((year) % 4 == 0)
 #define	days_in_year(a) 	(leapyear(a) ? 366 : 365)
 #define	days_in_month(a) 	(month_days[(a) - 1])

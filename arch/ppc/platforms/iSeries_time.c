@@ -102,7 +102,7 @@ int timerRetEnabled = 0;
 int timerRetDisabled = 0;
 
 extern unsigned long iSeries_dec_value;
-int timer_interrupt(struct pt_regs * regs)
+void timer_interrupt(struct pt_regs * regs)
 {
 	long next_dec;
 	struct Paca * paca;
@@ -117,7 +117,7 @@ int timer_interrupt(struct pt_regs * regs)
 	else
 	  timerRetDisabled++;
 	
-	hardirq_enter(cpu);
+	irq_enter();
 
 	if (!user_mode(regs))
 		ppc_do_profile(instruction_pointer(regs));
@@ -149,9 +149,5 @@ int timer_interrupt(struct pt_regs * regs)
 	paca->xLpPacaPtr->xDecrInt = 0;
 	set_dec( (unsigned)next_dec );
 
-	hardirq_exit(cpu);
-
-	if (softirq_pending(cpu))
-		do_softirq();
-	return 1;
+	irq_exit();
 }

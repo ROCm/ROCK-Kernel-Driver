@@ -18,7 +18,7 @@ extern spinlock_t kernel_flag;
 #ifdef CONFIG_SMP
 #define kernel_locked()		spin_is_locked(&kernel_flag)
 #elif defined(CONFIG_PREEMPT)
-#define kernel_locked()		preempt_get_count()
+#define kernel_locked()		preempt_count()
 #endif
 
 /*

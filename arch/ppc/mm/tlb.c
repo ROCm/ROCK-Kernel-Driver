@@ -31,13 +31,42 @@
 #include <linux/mm.h>
 #include <linux/init.h>
 #include <linux/highmem.h>
+#include <asm/tlbflush.h>
+#include <asm/tlb.h>
 
 #include "mmu_decl.h"
 
 /*
+ * Called when unmapping pages to flush entries from the TLB/hash table.
+ */
+void flush_hash_entry(struct mm_struct *mm, pte_t *ptep, unsigned long addr)
+{
+	unsigned long ptephys;
+
+	if (Hash != 0) {
+		ptephys = __pa(ptep) & PAGE_MASK;
+		flush_hash_pages(mm->context, addr, ptephys, 1);
+	}
+}
+
+/*
+ * Called at the end of a mmu_gather operation to make sure the
+ * TLB flush is completely done.
+ */
+void tlb_flush(mmu_gather_t *tlb)
+{
+	if (Hash == 0) {
+		/*
+		 * 603 needs to flush the whole TLB here since
+		 * it doesn't use a hash table.
+		 */
+		_tlbia();
+	}
+}
+
+/*
  * TLB flushing:
  *
- *  - flush_tlb_all() flushes all processes TLBs
  *  - flush_tlb_mm(mm) flushes the specified mm context TLB's
  *  - flush_tlb_page(vma, vmaddr) flushes one page
  *  - flush_tlb_range(vma, start, end) flushes a range of pages
@@ -92,29 +121,6 @@ static void flush_range(struct mm_struct *mm, unsigned long start,
 }
 
 /*
- * Flush all tlb/hash table entries (except perhaps for those
- * mapping RAM starting at PAGE_OFFSET, since they never change).
- */
-void
-flush_tlb_all(void)
-{
-	/*
-	 * Just flush the kernel part of the address space, that's
-	 * all that the current callers of this require.
-	 * Eventually I hope to persuade the powers that be that
-	 * we can and should dispense with flush_tlb_all().
-	 *  -- paulus.
-	 *
-	 * In fact this should never get called now that we
-	 * have flush_tlb_kernel_range.  -- paulus
-	 */
-	printk(KERN_ERR "flush_tlb_all called from %p\n",
-	       __builtin_return_address(0));
-	flush_range(&init_mm, TASK_SIZE, ~0UL);
-	FINISH_FLUSH;
-}
-
-/*
  * Flush kernel TLB entries in the given range
  */
 void flush_tlb_kernel_range(unsigned long start, unsigned long end)
@@ -124,24 +130,19 @@ void flush_tlb_kernel_range(unsigned long start, unsigned long end)
 }
 
 /*
- * Flush all the (user) entries for the address space described
- * by mm.  We can't rely on mm->mmap describing all the entries
- * that might be in the hash table.
+ * Flush all the (user) entries for the address space described by mm.
  */
 void flush_tlb_mm(struct mm_struct *mm)
 {
+	struct vm_area_struct *mp;
+
 	if (Hash == 0) {
 		_tlbia();
 		return;
 	}
 
-	if (mm->map_count) {
-		struct vm_area_struct *mp;
-		for (mp = mm->mmap; mp != NULL; mp = mp->vm_next)
-			flush_range(mp->vm_mm, mp->vm_start, mp->vm_end);
-	} else {
-		flush_range(mm, 0, TASK_SIZE);
-	}
+	for (mp = mm->mmap; mp != NULL; mp = mp->vm_next)
+		flush_range(mp->vm_mm, mp->vm_start, mp->vm_end);
 	FINISH_FLUSH;
 }
 
@@ -160,7 +161,6 @@ void flush_tlb_page(struct vm_area_struct *vma, unsigned long vmaddr)
 		flush_hash_pages(mm->context, vmaddr, pmd_val(*pmd), 1);
 	FINISH_FLUSH;
 }
-
 
 /*
  * For each address in the range, find the pte for the address

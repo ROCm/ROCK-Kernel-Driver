@@ -56,9 +56,9 @@ unsigned long orig_MSR;
 char *zimage_start;
 int zimage_size;
 
-#if defined(CONFIG_SERIAL_CONSOLE)
+#if defined(CONFIG_SERIAL_8250_CONSOLE)
 unsigned long com_port;
-#endif /* CONFIG_SERIAL_CONSOLE */
+#endif /* CONFIG_SERIAL_8250_CONSOLE */
 #ifdef CONFIG_VGA_CONSOLE
 char *vidmem = (char *)0xC00B8000;
 int lines = 25, cols = 80;
@@ -135,9 +135,9 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum,
 	unsigned int pci_viddid, pci_did, tulip_pci_base, tulip_base;
 
 	serial_fixups();
-#if defined(CONFIG_SERIAL_CONSOLE)
+#if defined(CONFIG_SERIAL_8250_CONSOLE)
 	com_port = serial_init(0, NULL);
-#endif /* CONFIG_SERIAL_CONSOLE */
+#endif /* CONFIG_SERIAL_8250_CONSOLE */
 #if defined(CONFIG_VGA_CONSOLE)
 	vga_init((unsigned char *)0xC0000000);
 #endif /* CONFIG_VGA_CONSOLE */

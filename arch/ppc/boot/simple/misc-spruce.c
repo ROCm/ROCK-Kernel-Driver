@@ -189,7 +189,7 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
 	unsigned char header_type;
 	unsigned int bar0;
 
-#ifdef CONFIG_SERIAL_CONSOLE
+#ifdef CONFIG_SERIAL_8250_CONSOLE
 	/* Initialize the serial console port */
 	com_port = serial_init(0, NULL);
 #endif

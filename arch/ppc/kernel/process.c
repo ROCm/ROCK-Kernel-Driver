@@ -202,8 +202,7 @@ void __switch_to(struct task_struct *prev, struct task_struct *new)
 	struct thread_struct *new_thread, *old_thread;
 	unsigned long s;
 	
-	local_save_flags(s);
-	local_irq_disable();
+	local_irq_save(s);
 #if CHECK_STACK
 	check_stack(prev);
 	check_stack(new);
