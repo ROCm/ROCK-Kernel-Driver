@@ -10,13 +10,28 @@ regardless of whatever else it is doing, unless it is completely locked up.
 *  How do I enable the magic SysRq key?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 You need to say "yes" to 'Magic SysRq key (CONFIG_MAGIC_SYSRQ)' when
-configuring the kernel. When running on a kernel with SysRq compiled in, it
-may be DISABLED at run-time using following command:
+configuring the kernel. When running a kernel with SysRq compiled in,
+/proc/sys/kernel/sysrq controls the functions allowed to be invoked via
+the SysRq key. By default the file contains 1 which means that every
+possible SysRq request is allowed (in older versions SysRq was disabled
+by default, and you were required to specifically enable it at run-time
+but this is not the case any more). Here is the list of possible values
+in /proc/sys/kernel/sysrq:
+   0 - disable sysrq completely
+   1 - enable all functions of sysrq
+  >1 - bitmask of allowed sysrq functions (see below for detailed function
+       description):
+          2 - enable control of console logging level
+          4 - enable control of keyboard (SAK, unraw)
+          8 - enable debugging dumps of processes etc.
+         16 - enable sync command
+         32 - enable remount read-only
+         64 - enable signalling of processes (term, kill, oom-kill)
+        128 - allow reboot/poweroff
+        256 - allow nicing of all RT tasks
 
-        echo "0" > /proc/sys/kernel/sysrq
-
-Note that previous versions disabled sysrq by default, and you were required
-to specifically enable it at run-time. That is not the case any longer.
+You can set the value in the file by the following command:
+    echo "number" >/proc/sys/kernel/sysrq
 
 *  How do I use the magic SysRq key?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -58,6 +58,7 @@ static struct sysrq_key_op sysrq_loglevel_op = {
 	.handler	= sysrq_handle_loglevel,
 	.help_msg	= "loglevel0-8",
 	.action_msg	= "Changing Loglevel",
+	.enable_mask	= SYSRQ_ENABLE_LOG,
 };
 
 
@@ -74,6 +75,7 @@ static struct sysrq_key_op sysrq_SAK_op = {
 	.handler	= sysrq_handle_SAK,
 	.help_msg	= "saK",
 	.action_msg	= "SAK",
+	.enable_mask	= SYSRQ_ENABLE_KEYBOARD,
 };
 #endif
 
@@ -91,6 +93,7 @@ static struct sysrq_key_op sysrq_unraw_op = {
 	.handler	= sysrq_handle_unraw,
 	.help_msg	= "unRaw",
 	.action_msg	= "Keyboard mode set to XLATE",
+	.enable_mask	= SYSRQ_ENABLE_KEYBOARD,
 };
 #endif /* CONFIG_VT */
 
@@ -106,6 +109,7 @@ static struct sysrq_key_op sysrq_reboot_op = {
 	.handler	= sysrq_handle_reboot,
 	.help_msg	= "reBoot",
 	.action_msg	= "Resetting",
+	.enable_mask	= SYSRQ_ENABLE_BOOT,
 };
 
 static void sysrq_handle_sync(int key, struct pt_regs *pt_regs,
@@ -118,6 +122,7 @@ static struct sysrq_key_op sysrq_sync_op = {
 	.handler	= sysrq_handle_sync,
 	.help_msg	= "Sync",
 	.action_msg	= "Emergency Sync",
+	.enable_mask	= SYSRQ_ENABLE_SYNC,
 };
 
 static void sysrq_handle_mountro(int key, struct pt_regs *pt_regs,
@@ -130,6 +135,7 @@ static struct sysrq_key_op sysrq_mountro_op = {
 	.handler	= sysrq_handle_mountro,
 	.help_msg	= "Unmount",
 	.action_msg	= "Emergency Remount R/O",
+	.enable_mask	= SYSRQ_ENABLE_REMOUNT,
 };
 
 /* END SYNC SYSRQ HANDLERS BLOCK */
@@ -147,6 +153,7 @@ static struct sysrq_key_op sysrq_showregs_op = {
 	.handler	= sysrq_handle_showregs,
 	.help_msg	= "showPc",
 	.action_msg	= "Show Regs",
+	.enable_mask	= SYSRQ_ENABLE_DUMP,
 };
 
 
@@ -159,6 +166,7 @@ static struct sysrq_key_op sysrq_showstate_op = {
 	.handler	= sysrq_handle_showstate,
 	.help_msg	= "showTasks",
 	.action_msg	= "Show State",
+	.enable_mask	= SYSRQ_ENABLE_DUMP,
 };
 
 
@@ -171,6 +179,7 @@ static struct sysrq_key_op sysrq_showmem_op = {
 	.handler	= sysrq_handle_showmem,
 	.help_msg	= "showMem",
 	.action_msg	= "Show Memory",
+	.enable_mask	= SYSRQ_ENABLE_DUMP,
 };
 
 /* SHOW SYSRQ HANDLERS BLOCK */
@@ -201,6 +210,7 @@ static struct sysrq_key_op sysrq_term_op = {
 	.handler	= sysrq_handle_term,
 	.help_msg	= "tErm",
 	.action_msg	= "Terminate All Tasks",
+	.enable_mask	= SYSRQ_ENABLE_SIGNAL,
 };
 
 static void sysrq_handle_kill(int key, struct pt_regs *pt_regs,
@@ -213,6 +223,7 @@ static struct sysrq_key_op sysrq_kill_op = {
 	.handler	= sysrq_handle_kill,
 	.help_msg	= "kIll",
 	.action_msg	= "Kill All Tasks",
+	.enable_mask	= SYSRQ_ENABLE_SIGNAL,
 };
 
 /* END SIGNAL SYSRQ HANDLERS BLOCK */
@@ -225,7 +236,8 @@ static void sysrq_handle_unrt(int key, struct pt_regs *pt_regs,
 static struct sysrq_key_op sysrq_unrt_op = {
 	.handler	= sysrq_handle_unrt,
 	.help_msg	= "Nice",
-	.action_msg	= "Nice All RT Tasks"
+	.action_msg	= "Nice All RT Tasks",
+	.enable_mask	= SYSRQ_ENABLE_RTNICE,
 };
 
 /* Key Operations table and lock */
@@ -335,9 +347,13 @@ void __handle_sysrq(int key, struct pt_regs *pt_regs, struct tty_struct *tty)
 
         op_p = __sysrq_get_key_op(key);
         if (op_p) {
-		printk ("%s\n", op_p->action_msg);
-		console_loglevel = orig_log_level;
-		op_p->handler(key, pt_regs, tty);
+		if (sysrq_enabled == 1 || sysrq_enabled & op_p->enable_mask) {
+			printk ("%s\n", op_p->action_msg);
+			console_loglevel = orig_log_level;
+			op_p->handler(key, pt_regs, tty);
+		}
+		else
+			printk("This sysrq operation is disabled.\n");
 	} else {
 		printk("HELP : ");
 		/* Only print the help msg once per handler */
