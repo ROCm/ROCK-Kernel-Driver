@@ -115,10 +115,10 @@ static int irlan_eth_open(struct net_device *dev)
 	self->disconnect_reason = 0;
 	irlan_client_wakeup(self, self->saddr, self->daddr);
 
-	/* Make sure we have a hardware address before we return, so DHCP clients gets happy */
-	interruptible_sleep_on(&self->open_wait);
-	
-	return 0;
+	/* Make sure we have a hardware address before we return, 
+	   so DHCP clients gets happy */
+	return wait_event_interruptible(self->open_wait,
+					!self->tsap_data->connected);
 }
 
 /*
