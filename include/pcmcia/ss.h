@@ -145,6 +145,7 @@ typedef struct io_window_t {
 	u_int			Attributes;
 	ioaddr_t		BasePort, NumPorts;
 	ioaddr_t		InUse, Config;
+	struct resource		*res;
 } io_window_t;
 
 #define WINDOW_MAGIC	0xB35C
