@@ -56,15 +56,13 @@ asmlinkage void do_softirq()
 	__u32 pending;
 	unsigned long flags;
 	__u32 mask;
-	int cpu;
 
 	if (in_interrupt())
 		return;
 
 	local_irq_save(flags);
-	cpu = smp_processor_id();
 
-	pending = softirq_pending(cpu);
+	pending = local_softirq_pending();
 
 	if (pending) {
 		struct softirq_action *h;
@@ -73,7 +71,7 @@ asmlinkage void do_softirq()
 		local_bh_disable();
 restart:
 		/* Reset the pending bitmask before enabling irqs */
-		softirq_pending(cpu) = 0;
+		local_softirq_pending() = 0;
 
 		local_irq_enable();
 
@@ -88,13 +86,13 @@ restart:
 
 		local_irq_disable();
 
-		pending = softirq_pending(cpu);
+		pending = local_softirq_pending();
 		if (pending & mask) {
 			mask &= ~pending;
 			goto restart;
 		}
 		if (pending)
-			wakeup_softirqd(cpu);
+			wakeup_softirqd(smp_processor_id());
 		__local_bh_enable();
 	}
 
@@ -106,7 +104,7 @@ void local_bh_enable(void)
 	__local_bh_enable();
 	BUG_ON(irqs_disabled());
 	if (unlikely(!in_interrupt() &&
-		     softirq_pending(smp_processor_id())))
+		     local_softirq_pending()))
 		do_softirq();
 	preempt_check_resched();
 }
@@ -326,12 +324,12 @@ static int ksoftirqd(void * __bind_cpu)
 	ksoftirqd_task(cpu) = current;
 
 	for (;;) {
-		if (!softirq_pending(cpu))
+		if (!local_softirq_pending())
 			schedule();
 
 		__set_current_state(TASK_RUNNING);
 
-		while (softirq_pending(cpu)) {
+		while (local_softirq_pending()) {
 			do_softirq();
 			cond_resched();
 		}
