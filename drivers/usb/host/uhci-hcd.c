@@ -1773,10 +1773,8 @@ static void stall_callback(unsigned long ptr)
 			uhci_fsbr_timeout(uhci, u);
 
 		/* Check if the URB timed out */
-		if (u->timeout && time_after_eq(jiffies, up->inserttime + u->timeout)) {
-			list_del(&up->urb_list);
-			list_add_tail(&up->urb_list, &list);
-		}
+		if (u->timeout && time_after_eq(jiffies, up->inserttime + u->timeout))
+			list_move_tail(&up->urb_list, &list);
 
 		spin_unlock(&u->lock);
 	}

@@ -426,6 +426,7 @@ static void CDC_SetEthernetPacketFilter (ether_dev_t *ether_dev)
 }
 #endif
 
+
 static void CDCEther_set_multicast( struct net_device *net )
 {
 	ether_dev_t *ether_dev = net->priv;

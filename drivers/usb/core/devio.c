@@ -215,8 +215,7 @@ extern __inline__ void async_removepending(struct async *as)
         unsigned long flags;
         
         spin_lock_irqsave(&ps->lock, flags);
-        list_del(&as->asynclist);
-        INIT_LIST_HEAD(&as->asynclist);
+        list_del_init(&as->asynclist);
         spin_unlock_irqrestore(&ps->lock, flags);
 }
 
@@ -228,8 +227,7 @@ extern __inline__ struct async *async_getcompleted(struct dev_state *ps)
         spin_lock_irqsave(&ps->lock, flags);
         if (!list_empty(&ps->async_completed)) {
                 as = list_entry(ps->async_completed.next, struct async, asynclist);
-                list_del(&as->asynclist);
-                INIT_LIST_HEAD(&as->asynclist);
+                list_del_init(&as->asynclist);
         }
         spin_unlock_irqrestore(&ps->lock, flags);
         return as;
@@ -247,8 +245,7 @@ extern __inline__ struct async *async_getpending(struct dev_state *ps, void *use
                 p = p->next;
                 if (as->userurb != userurb)
                         continue;
-                list_del(&as->asynclist);
-                INIT_LIST_HEAD(&as->asynclist);
+                list_del_init(&as->asynclist);
                 spin_unlock_irqrestore(&ps->lock, flags);
                 return as;
         }
@@ -263,8 +260,7 @@ static void async_completed(struct urb *urb)
 	struct siginfo sinfo;
 
         spin_lock(&ps->lock);
-        list_del(&as->asynclist);
-        list_add_tail(&as->asynclist, &ps->async_completed);
+        list_move_tail(&as->asynclist, &ps->async_completed);
         spin_unlock(&ps->lock);
         wake_up(&ps->wait);
 	if (as->signr) {
@@ -284,8 +280,7 @@ static void destroy_all_async(struct dev_state *ps)
         spin_lock_irqsave(&ps->lock, flags);
         while (!list_empty(&ps->async_pending)) {
                 as = list_entry(ps->async_pending.next, struct async, asynclist);
-                list_del(&as->asynclist);
-                INIT_LIST_HEAD(&as->asynclist);
+                list_del_init(&as->asynclist);
                 spin_unlock_irqrestore(&ps->lock, flags);
                 /* usb_unlink_urb calls the completion handler with status == -ENOENT */
                 usb_unlink_urb(as->urb);
@@ -528,8 +523,8 @@ static int usbdev_release(struct inode *inode, struct file *file)
 	unsigned int i;
 
 	lock_kernel();
-	list_del(&ps->list);
-	INIT_LIST_HEAD(&ps->list);
+	list_del_init(&ps->list);
+
 	if (ps->dev) {
 		for (i = 0; ps->ifclaimed && i < 8*sizeof(ps->ifclaimed); i++)
 			if (test_bit(i, &ps->ifclaimed))

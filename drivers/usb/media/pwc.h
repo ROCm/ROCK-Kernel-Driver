@@ -1,4 +1,4 @@
-/* (C) 1999-2001 Nemosoft Unv. (webcam@smcc.demon.nl)
+/* (C) 1999-2002 Nemosoft Unv. (webcam@smcc.demon.nl)
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -60,8 +60,8 @@
 
 /* Version block */
 #define PWC_MAJOR	8
-#define PWC_MINOR	5
-#define PWC_VERSION 	"8.5"
+#define PWC_MINOR	7
+#define PWC_VERSION 	"8.7"
 #define PWC_NAME 	"pwc"
 
 /* Turn certain features on/off */
@@ -247,6 +247,7 @@ extern int pwc_get_saturation(struct pwc_device *pdev);
 extern int pwc_set_saturation(struct pwc_device *pdev, int value);
 extern int pwc_set_leds(struct pwc_device *pdev, int on_value, int off_value);
 extern int pwc_get_leds(struct pwc_device *pdev, int *on_value, int *off_value);
+extern int pwc_get_cmos_sensor(struct pwc_device *pdev);
 
 /* Power down or up the camera; not supported by all models */
 extern int pwc_camera_power(struct pwc_device *pdev, int power);
