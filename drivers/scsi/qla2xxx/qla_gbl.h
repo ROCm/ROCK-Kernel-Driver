@@ -75,8 +75,6 @@ extern int ql2xsuspendcount;
 #if defined(MODULE)
 extern char *ql2xopts;
 #endif
-extern struct list_head qla_hostlist;
-extern rwlock_t qla_hostlist_lock;
 
 extern char *qla2x00_get_fw_version_str(struct scsi_qla_host *, char *);
 
