@@ -1,7 +1,7 @@
 /*
  * Architecture-specific unaligned trap handling.
  *
- * Copyright (C) 1999-2002 Hewlett-Packard Co
+ * Copyright (C) 1999-2002, 2004 Hewlett-Packard Co
  *	Stephane Eranian <eranian@hpl.hp.com>
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *
@@ -1328,7 +1328,7 @@ ia64_handle_unaligned (unsigned long ifa, struct pt_regs *regs)
 	 * handler into reading an arbitrary kernel addresses...
 	 */
 	if (!user_mode(regs))
-		eh = SEARCH_EXCEPTION_TABLE(regs);
+		eh = search_exception_tables(regs->cr_iip + ia64_psr(regs)->ri);
 	if (user_mode(regs) || eh) {
 		if ((current->thread.flags & IA64_THREAD_UAC_SIGBUS) != 0)
 			goto force_sigbus;
