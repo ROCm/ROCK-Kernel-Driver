@@ -1,3 +1,9 @@
+/*
+ * drivers/power/process.c - Functions for saving/restoring console.
+ *
+ * Originally from swsusp.
+ */
+
 #include <linux/vt_kern.h>
 #include <linux/kbd_kern.h>
 #include "power.h"
@@ -14,13 +20,13 @@ int pm_prepare_console(void)
 #ifdef SUSPEND_CONSOLE
 	orig_fgconsole = fg_console;
 
-	if(vc_allocate(SUSPEND_CONSOLE))
+	if (vc_allocate(SUSPEND_CONSOLE))
 	  /* we can't have a free VC for now. Too bad,
 	   * we don't want to mess the screen for now. */
 		return 1;
 
-	set_console (SUSPEND_CONSOLE);
-	if(vt_waitactive(SUSPEND_CONSOLE)) {
+	set_console(SUSPEND_CONSOLE);
+	if (vt_waitactive(SUSPEND_CONSOLE)) {
 		pr_debug("Suspend: Can't switch VCs.");
 		return 1;
 	}
@@ -34,7 +40,7 @@ void pm_restore_console(void)
 {
 	console_loglevel = orig_loglevel;
 #ifdef SUSPEND_CONSOLE
-	set_console (orig_fgconsole);
+	set_console(orig_fgconsole);
 #endif
 	return;
 }

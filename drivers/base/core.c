@@ -20,6 +20,7 @@
 #include <asm/semaphore.h>
 
 #include "base.h"
+#include "power/power.h"
 
 int (*platform_notify)(struct device * dev) = NULL;
 int (*platform_notify_remove)(struct device * dev) = NULL;
@@ -230,6 +231,8 @@ int device_add(struct device *dev)
 
 	bus_add_device(dev);
 
+	device_pm_add(dev);
+
 	/* notify platform of device entry */
 	if (platform_notify)
 		platform_notify(dev);
@@ -303,6 +306,8 @@ void put_device(struct device * dev)
 void device_del(struct device * dev)
 {
 	struct device * parent = dev->parent;
+
+	device_pm_remove(dev);
 
 	down_write(&devices_subsys.rwsem);
 	if (parent)
