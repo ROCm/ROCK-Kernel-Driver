@@ -22,6 +22,9 @@ extern struct acpi_device		*acpi_root;
 #define ACPI_BUS_DRIVER_NAME		"ACPI Bus Driver"
 #define ACPI_BUS_DEVICE_NAME		"System Bus"
 
+static LIST_HEAD(acpi_device_list);
+static spinlock_t acpi_device_lock = SPIN_LOCK_UNLOCKED;
+
 static int
 acpi_device_register (
 	struct acpi_device	*device,
@@ -168,100 +171,6 @@ acpi_bus_get_perf_flags (
 }
 
 /* --------------------------------------------------------------------------
-                               Namespace Management
-   -------------------------------------------------------------------------- */
-
-#define WALK_UP			0
-#define WALK_DOWN		1
-
-typedef int (*acpi_bus_walk_callback)(struct acpi_device*, int, void*);
-
-#define HAS_CHILDREN(d)		((d)->children.next != &((d)->children))
-#define HAS_SIBLINGS(d)		(((d)->parent) && ((d)->node.next != &(d)->parent->children))
-#define NODE_TO_DEVICE(n)	(list_entry(n, struct acpi_device, node))
-
-
-/**
- * acpi_bus_walk
- * -------------
- * Used to walk the ACPI Bus's device namespace.  Can walk down (depth-first)
- * or up.  Able to parse starting at any node in the namespace.  Note that a
- * callback return value of -ELOOP will terminate the walk.
- *
- * @start:	starting point
- * callback:	function to call for every device encountered while parsing
- * direction:	direction to parse (up or down)
- * @data:	context for this search operation
- */
-static int
-acpi_bus_walk (
-	struct acpi_device	*start, 
-	acpi_bus_walk_callback	callback, 
-	int			direction, 
-	void			*data)
-{
-	int			result = 0;
-	int			level = 0;
-	struct acpi_device	*device = NULL;
-
-	if (!start || !callback)
-		return -EINVAL;
-
-	device = start;
-
-	/*
-	 * Parse Namespace
-	 * ---------------
-	 * Parse a given subtree (specified by start) in the given direction.
-	 * Walking 'up' simply means that we execute the callback on leaf
-	 * devices prior to their parents (useful for things like removing
-	 * or powering down a subtree).
-	 */
-
-	while (device) {
-
-		if (direction == WALK_DOWN)
-			if (-ELOOP == callback(device, level, data))
-				break;
-
-		/* Depth First */
-
-		if (HAS_CHILDREN(device)) {
-			device = NODE_TO_DEVICE(device->children.next);
-			++level;
-			continue;
-		}
-
-		if (direction == WALK_UP)
-			if (-ELOOP == callback(device, level, data))
-				break;
-
-		/* Now Breadth */
-
-		if (HAS_SIBLINGS(device)) {
-			device = NODE_TO_DEVICE(device->node.next);
-			continue;
-		}
-
-		/* Scope Exhausted - Find Next */
-
-		while ((device = device->parent)) {
-			--level;
-			if (HAS_SIBLINGS(device)) {
-				device = NODE_TO_DEVICE(device->node.next);
-				break;
-			}
-		}
-	}
-
-	if ((direction == WALK_UP) && (result == 0))
-		callback(start, level, data);
-
-	return result;
-}
-
-
-/* --------------------------------------------------------------------------
                                  Driver Management
    -------------------------------------------------------------------------- */
 
@@ -383,94 +292,54 @@ acpi_bus_driver_init (
 	return_VALUE(0);
 }
 
-
-/**
- * acpi_bus_attach 
- * -------------
- * Callback for acpi_bus_walk() used to find devices that match a specific 
- * driver's criteria and then attach the driver.
- */
-static int
-acpi_bus_attach (
-	struct acpi_device	*device, 
-	int			level, 
-	void			*data)
+static int acpi_driver_attach(struct acpi_driver * drv)
 {
-	int			result = 0;
-	struct acpi_driver	*driver = NULL;
+	struct list_head * node, * next;
 
-	ACPI_FUNCTION_TRACE("acpi_bus_attach");
+	ACPI_FUNCTION_TRACE("acpi_driver_attach");
 
-	if (!device || !data)
-		return_VALUE(-EINVAL);
+	spin_lock(&acpi_device_lock);
+	list_for_each_safe(node,next,&acpi_device_list) {
+		struct acpi_device * dev = container_of(node,struct acpi_device,g_list);
 
-	driver = (struct acpi_driver *) data;
+		if (dev->driver || !dev->status.present)
+			continue;
+		spin_unlock(&acpi_device_lock);
 
-	if (device->driver)
-		return_VALUE(-EEXIST);
-
-	if (!device->status.present)
-		return_VALUE(-ENODEV);
-
-	result = acpi_bus_match(device, driver);
-	if (result)
-		return_VALUE(result);
-
-	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Found driver [%s] for device [%s]\n",
-		driver->name, device->pnp.bus_id));
-	
-	result = acpi_bus_driver_init(device, driver);
-	if (result)
-		return_VALUE(result);
-
-	down(&acpi_bus_drivers_lock);
-	++driver->references;
-	up(&acpi_bus_drivers_lock);
-
+		if (!acpi_bus_match(dev,drv)) {
+			if (!acpi_bus_driver_init(dev,drv)) {
+				atomic_inc(&drv->references);
+				ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Found driver [%s] for device [%s]\n",
+						  drv->name, dev->pnp.bus_id));
+			}
+		}
+		spin_lock(&acpi_device_lock);
+	}
+	spin_unlock(&acpi_device_lock);
 	return_VALUE(0);
 }
 
-
-/**
- * acpi_bus_unattach 
- * -----------------
- * Callback for acpi_bus_walk() used to find devices that match a specific 
- * driver's criteria and unattach the driver.
- */
-static int
-acpi_bus_unattach (
-	struct acpi_device	*device, 
-	int			level, 
-	void			*data)
+static int acpi_driver_detach(struct acpi_driver * drv)
 {
-	int			result = 0;
-	struct acpi_driver	*driver = (struct acpi_driver *) data;
+	struct list_head * node, * next;
 
-	ACPI_FUNCTION_TRACE("acpi_bus_unattach");
+	ACPI_FUNCTION_TRACE("acpi_driver_detach");
 
-	if (!device || !driver)
-		return_VALUE(-EINVAL);
+	spin_lock(&acpi_device_lock);
+	list_for_each_safe(node,next,&acpi_device_list) {
+		struct acpi_device * dev = container_of(node,struct acpi_device,g_list);
 
-	if (device->driver != driver)
-		return_VALUE(-ENOENT);
-
-	if (!driver->ops.remove)
-		return_VALUE(-ENOSYS);
-
-	result = driver->ops.remove(device, ACPI_BUS_REMOVAL_NORMAL);
-	if (result)
-		return_VALUE(result);
-
-	device->driver = NULL;
-	acpi_driver_data(device) = NULL;
-
-	down(&acpi_bus_drivers_lock);
-	driver->references--;
-	up(&acpi_bus_drivers_lock);
-
+		if (dev->driver == drv) {
+			if (drv->ops.remove)
+				drv->ops.remove(dev,ACPI_BUS_REMOVAL_NORMAL);
+			dev->driver = NULL;
+			dev->driver_data = NULL;
+			atomic_dec(&drv->references);
+		}
+	}
+	spin_unlock(&acpi_device_lock);
 	return_VALUE(0);
 }
-
 
 /**
  * acpi_bus_register_driver 
@@ -482,19 +351,19 @@ int
 acpi_bus_register_driver (
 	struct acpi_driver	*driver)
 {
+	int error = 0;
+
 	ACPI_FUNCTION_TRACE("acpi_bus_register_driver");
 
-	if (!driver)
-		return_VALUE(-EINVAL);
+	if (driver) {
+		spin_lock(&acpi_device_lock);
+		list_add_tail(&driver->node, &acpi_bus_drivers);
+		spin_unlock(&acpi_device_lock);
+		acpi_driver_attach(driver);
+	} else
+		error = -EINVAL;
 
-	down(&acpi_bus_drivers_lock);
-	list_add_tail(&driver->node, &acpi_bus_drivers);
-	up(&acpi_bus_drivers_lock);
-
-	acpi_bus_walk(acpi_root, acpi_bus_attach, 
-		WALK_DOWN, driver);
-
-	return_VALUE(driver->references);
+	return_VALUE(error);
 }
 
 
@@ -508,21 +377,21 @@ int
 acpi_bus_unregister_driver (
 	struct acpi_driver	*driver)
 {
+	int error = 0;
+
 	ACPI_FUNCTION_TRACE("acpi_bus_unregister_driver");
 
-	if (!driver)
-		return_VALUE(-EINVAL);
+	if (driver) {
+		acpi_driver_detach(driver);
 
-	acpi_bus_walk(acpi_root, acpi_bus_unattach, WALK_UP, driver);
-
-	if (driver->references)
-		return_VALUE(driver->references);
-
-	down(&acpi_bus_drivers_lock);
-	list_del(&driver->node);
-	up(&acpi_bus_drivers_lock);
-
-	return_VALUE(0);
+		if (!atomic_read(&driver->references)) {
+			spin_lock(&acpi_device_lock);
+			list_del_init(&driver->node);
+			spin_unlock(&acpi_device_lock);
+		} 
+	} else 
+		error = -EINVAL;
+	return_VALUE(error);
 }
 
 /**
@@ -535,33 +404,31 @@ static int
 acpi_bus_find_driver (
 	struct acpi_device	*device)
 {
-	int			result = -ENODEV;
-	struct list_head	*entry = NULL;
-	struct acpi_driver	*driver = NULL;
+	int			result = 0;
+	struct list_head	* node, *next;
 
 	ACPI_FUNCTION_TRACE("acpi_bus_find_driver");
 
-	if (!device || device->driver)
-		return_VALUE(-EINVAL);
+	if (!device->flags.hardware_id && !device->flags.compatible_ids)
+		goto Done;
 
-	down(&acpi_bus_drivers_lock);
+	spin_lock(&acpi_device_lock);
+	list_for_each_safe(node,next,&acpi_bus_drivers) {
+		struct acpi_driver * driver = container_of(node,struct acpi_driver,node);
 
-	list_for_each(entry, &acpi_bus_drivers) {
-
-		driver = list_entry(entry, struct acpi_driver, node);
-
-		if (acpi_bus_match(device, driver))
-			continue;
-
-		result = acpi_bus_driver_init(device, driver);
-		if (!result)
-			++driver->references;
-
-		break;
+		atomic_inc(&driver->references);
+		spin_unlock(&acpi_device_lock);
+		if (!acpi_bus_match(device, driver)) {
+			result = acpi_bus_driver_init(device, driver);
+			if (!result)
+				goto Done;
+		}
+		atomic_dec(&driver->references);
+		spin_lock(&acpi_device_lock);
 	}
+	spin_unlock(&acpi_device_lock);
 
-	up(&acpi_bus_drivers_lock);
-
+ Done:
 	return_VALUE(result);
 }
 
@@ -858,10 +725,16 @@ acpi_bus_add (
 	 * Link this device to its parent and siblings.
 	 */
 	INIT_LIST_HEAD(&device->children);
-	if (!device->parent)
-		INIT_LIST_HEAD(&device->node);
-	else
+	INIT_LIST_HEAD(&device->node);
+	INIT_LIST_HEAD(&device->g_list);
+
+	spin_lock(&acpi_device_lock);
+	if (device->parent) {
 		list_add_tail(&device->node, &device->parent->children);
+		list_add_tail(&device->g_list,&device->parent->g_list);
+	} else
+		list_add_tail(&device->g_list,&acpi_device_list);
+	spin_unlock(&acpi_device_lock);
 
 #ifdef CONFIG_ACPI_DEBUG
 	{
@@ -930,7 +803,6 @@ acpi_bus_add (
 	 *
 	 * TBD: Assumes LDM provides driver hot-plug capability.
 	 */
-	if (device->flags.hardware_id || device->flags.compatible_ids)
 		acpi_bus_find_driver(device);
 
 end:

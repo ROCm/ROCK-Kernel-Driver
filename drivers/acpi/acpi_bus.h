@@ -109,7 +109,7 @@ struct acpi_driver {
 	struct list_head	node;
 	char			name[80];
 	char			class[80];
-	int			references;
+	atomic_t		references;
 	char			*ids;		/* Supported Hardware IDs */
 	struct acpi_device_ops	ops;
 };
@@ -245,6 +245,7 @@ struct acpi_device {
 	struct acpi_device	*parent;
 	struct list_head	children;
 	struct list_head	node;
+	struct list_head	g_list;
 	struct acpi_device_status status;
 	struct acpi_device_flags flags;
 	struct acpi_device_pnp	pnp;
