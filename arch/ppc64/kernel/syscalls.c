@@ -86,8 +86,6 @@ sys_ipc (uint call, int first, int second, long third, void *ptr, long fifth)
 {
 	int version, ret;
 
-	PPCDBG(PPCDBG_SYS64X, "sys_ipc - entered - pid=%ld current=%lx comm=%s \n", current->pid, current, current->comm);
-	
 	version = call >> 16; /* hack for backward compatibility */
 	call &= 0xffff;
 
@@ -174,7 +172,6 @@ sys_ipc (uint call, int first, int second, long third, void *ptr, long fifth)
 		break;
 	}
 
-	PPCDBG(PPCDBG_SYS64X, "sys_ipc - exited - pid=%ld current=%lx comm=%s \n", current->pid, current, current->comm);
 	return ret;
 }
 
@@ -187,15 +184,12 @@ asmlinkage int sys_pipe(int *fildes)
 	int fd[2];
 	int error;
 	
-	PPCDBG(PPCDBG_SYS64X, "sys_pipe - entered - pid=%ld current=%lx comm=%s \n", current->pid, current, current->comm);
-
 	error = do_pipe(fd);
 	if (!error) {
 		if (copy_to_user(fildes, fd, 2*sizeof(int)))
 			error = -EFAULT;
 	}
 	
-	PPCDBG(PPCDBG_SYS64X, "sys_pipe - exited - pid=%ld current=%lx comm=%s \n", current->pid, current, current->comm);
 	return error;
 }
 
@@ -206,8 +200,6 @@ asmlinkage unsigned long sys_mmap(unsigned long addr, size_t len,
 	struct file * file = NULL;
 	unsigned long ret = -EBADF;
 
-	PPCDBG(PPCDBG_SYS64X, "sys_mmap - entered - addr=%lx, len=%lx - pid=%ld, comm=%s \n", addr, len, current->pid, current->comm);
-	
 	if (!(flags & MAP_ANONYMOUS)) {
 		if (!(file = fget(fd)))
 			goto out;
@@ -221,9 +213,6 @@ asmlinkage unsigned long sys_mmap(unsigned long addr, size_t len,
 		fput(file);
 
 out:
-	
-	PPCDBG(PPCDBG_SYS64X, "sys_mmap - exited - ret=%x \n", ret);
-	
 	return ret;
 }
 
@@ -240,14 +229,11 @@ asmlinkage int sys_uname(struct old_utsname * name)
 {
 	int err = -EFAULT;
 	
-	PPCDBG(PPCDBG_SYS64X, "sys_uname - entered - pid=%ld current=%lx comm=%s \n", current->pid, current, current->comm);
-
 	down_read(&uts_sem);
 	if (name && !copy_to_user(name, &system_utsname, sizeof (*name)))
 		err = 0;
 	up_read(&uts_sem);
 	
-	PPCDBG(PPCDBG_SYS64X, "sys_uname - exited - pid=%ld current=%lx comm=%s \n", current->pid, current, current->comm);
 	return err;
 }
 
@@ -255,8 +241,6 @@ asmlinkage int sys_olduname(struct oldold_utsname * name)
 {
 	int error;
 	
-	PPCDBG(PPCDBG_SYS64X, "sys_olduname - entered - pid=%ld current=%lx comm=%s \n", current->pid, current, current->comm);
-
 	if (!name)
 		return -EFAULT;
 	if (!access_ok(VERIFY_WRITE,name,sizeof(struct oldold_utsname)))
@@ -277,7 +261,6 @@ asmlinkage int sys_olduname(struct oldold_utsname * name)
 
 	error = error ? -EFAULT : 0;
 	
-	PPCDBG(PPCDBG_SYS64X, "sys_olduname - exited - pid=%ld current=%lx comm=%s \n", current->pid, current, current->comm);
 	return error;
 }
 
