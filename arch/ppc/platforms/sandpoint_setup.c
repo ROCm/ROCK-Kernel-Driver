@@ -433,9 +433,9 @@ sandpoint_show_cpuinfo(struct seq_file *m)
  * IDE support.
  */
 static int		sandpoint_ide_ports_known = 0;
-static ide_ioreg_t	sandpoint_ide_regbase[MAX_HWIFS];
-static ide_ioreg_t	sandpoint_ide_ctl_regbase[MAX_HWIFS];
-static ide_ioreg_t	sandpoint_idedma_regbase;
+static unsigned long	sandpoint_ide_regbase[MAX_HWIFS];
+static unsigned long	sandpoint_ide_ctl_regbase[MAX_HWIFS];
+static unsigned long	sandpoint_idedma_regbase;
 
 static void
 sandpoint_ide_probe(void)
@@ -457,7 +457,7 @@ sandpoint_ide_probe(void)
 }
 
 static int
-sandpoint_ide_default_irq(ide_ioreg_t base)
+sandpoint_ide_default_irq(unsigned long base)
 {
         if (sandpoint_ide_ports_known == 0)
 	        sandpoint_ide_probe();
@@ -470,7 +470,7 @@ sandpoint_ide_default_irq(ide_ioreg_t base)
 		return 0;
 }
 
-static ide_ioreg_t
+static unsigned long
 sandpoint_ide_default_io_base(int index)
 {
         if (sandpoint_ide_ports_known == 0)
@@ -480,10 +480,10 @@ sandpoint_ide_default_io_base(int index)
 }
 
 static void __init
-sandpoint_ide_init_hwif_ports(hw_regs_t *hw, ide_ioreg_t data_port,
-			      ide_ioreg_t ctrl_port, int *irq)
+sandpoint_ide_init_hwif_ports(hw_regs_t *hw, unsigned long data_port,
+			      unsigned long ctrl_port, int *irq)
 {
-	ide_ioreg_t reg = data_port;
+	unsigned long reg = data_port;
 	uint	alt_status_base;
 	int	i;
 

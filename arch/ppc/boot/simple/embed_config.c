@@ -431,7 +431,7 @@ clk_8260(bd_t *bd)
 }
 #endif
 
-#ifdef CONFIG_EST8260
+#if defined(CONFIG_EST8260) || defined(CONFIG_TQM8260)
 void
 embed_config(bd_t **bdp)
 {

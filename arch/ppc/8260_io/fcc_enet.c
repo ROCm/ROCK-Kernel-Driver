@@ -1705,12 +1705,12 @@ init_fcc_startup(fcc_info_t *fip, struct net_device *dev)
 
 	/* Install our interrupt handler.
 	*/
-	if (request_8xxirq(fip->fc_interrupt, fcc_enet_interrupt, 0,
+	if (request_irq(fip->fc_interrupt, fcc_enet_interrupt, 0,
 							"fenet", dev) < 0)
 		printk("Can't get FCC IRQ %d\n", fip->fc_interrupt);
 
 #ifdef	CONFIG_USE_MDIO
-	if (request_8xxirq(PHY_INTERRUPT, mii_link_interrupt, 0,
+	if (request_irq(PHY_INTERRUPT, mii_link_interrupt, 0,
 							"mii", dev) < 0)
 		printk("Can't get MII IRQ %d\n", fip->fc_interrupt);
 #endif	/* CONFIG_USE_MDIO */

@@ -194,10 +194,10 @@ menf1_map_io(void)
 /* IDE functions */
 
 static void __init
-menf1_ide_init_hwif_ports (hw_regs_t *hw, ide_ioreg_t data_port,
-		ide_ioreg_t ctrl_port, int *irq)
+menf1_ide_init_hwif_ports (hw_regs_t *hw, unsigned long data_port,
+		unsigned long ctrl_port, int *irq)
 {
-	ide_ioreg_t reg = data_port;
+	unsigned long reg = data_port;
 	int i = 8;
 
 	for (i = IDE_DATA_OFFSET; i <= IDE_STATUS_OFFSET; i++) {
@@ -215,7 +215,7 @@ menf1_ide_init_hwif_ports (hw_regs_t *hw, ide_ioreg_t data_port,
 }
 
 static int
-menf1_ide_default_irq(ide_ioreg_t base)
+menf1_ide_default_irq(unsigned long base)
 {
 	if (base == MENF1_IDE0_BASE_ADDR)
 		return 14;
@@ -225,7 +225,7 @@ menf1_ide_default_irq(ide_ioreg_t base)
 		return 0;
 }
 
-static ide_ioreg_t
+static unsigned long
 menf1_ide_default_io_base(int index)
 {
 	if (index == 0)

@@ -63,16 +63,6 @@ m8260_setup_arch(void)
 	m8260_cpm_reset();
 }
 
-static void
-abort(void)
-{
-#ifdef CONFIG_XMON
-	extern void xmon(void *);
-	xmon(0);
-#endif
-	machine_restart(NULL);
-}
-
 /* The decrementer counts at the system (internal) clock frequency
  * divided by four.
  */
@@ -93,29 +83,26 @@ m8260_calibrate_decr(void)
  */
 static uint rtc_time;
 
-static static int
+static int
 m8260_set_rtc_time(unsigned long time)
 {
-#ifdef CONFIG_TQM8260
-	((immap_t *)IMAP_ADDR)->im_sit.sit_tmcnt = time;
-	((immap_t *)IMAP_ADDR)->im_sit.sit_tmcntsc = 0x3;
-#else
 	rtc_time = time;
-#endif
+
 	return(0);
 }
 
 static unsigned long
 m8260_get_rtc_time(void)
 {
-#ifdef CONFIG_TQM8260
-	return ((immap_t *)IMAP_ADDR)->im_sit.sit_tmcnt;
-#else
 	/* Get time from the RTC.
 	*/
 	return((unsigned long)rtc_time);
-#endif
 }
+
+#ifndef BOOTROM_RESTART_ADDR
+#warning "Using default BOOTROM_RESTART_ADDR!"
+#define BOOTROM_RESTART_ADDR	0xff000104
+#endif
 
 static void
 m8260_restart(char *cmd)
@@ -127,31 +114,27 @@ m8260_restart(char *cmd)
 	 * of the reset vector.  If that doesn't work for you, change this
 	 * or the reboot program to send a proper address.
 	 */
-#ifdef CONFIG_TQM8260
-	startaddr = 0x40000104;
-#else
-	startaddr = 0xff000104;
-#endif
+	startaddr = BOOTROM_RESTART_ADDR;
 	if (cmd != NULL) {
 		if (!strncmp(cmd, "startaddr=", 10))
 			startaddr = simple_strtoul(&cmd[10], NULL, 0);
 	}
 
-	m8260_gorom((unsigned int)__pa(__res), startaddr);
-}
-
-static void
-m8260_power_off(void)
-{
-   m8260_restart(NULL);
+	m8260_gorom((void*)__pa(__res), startaddr);
 }
 
 static void
 m8260_halt(void)
 {
-   m8260_restart(NULL);
+	local_irq_disable();
+	while (1);
 }
 
+static void
+m8260_power_off(void)
+{
+	m8260_halt();
+}
 
 static int
 m8260_show_percpuinfo(struct seq_file *m, int i)
@@ -181,9 +164,6 @@ m8260_init_IRQ(void)
 	int i;
 	void cpm_interrupt_init(void);
 
-#if 0
-        ppc8260_pic.irq_offset = 0;
-#endif
         for ( i = 0 ; i < NR_SIU_INTS ; i++ )
                 irq_desc[i].handler = &ppc8260_pic;
 
@@ -194,7 +174,6 @@ m8260_init_IRQ(void)
 	immr->im_intctl.ic_siprr = 0x05309770;
 	immr->im_intctl.ic_scprrh = 0x05309770;
 	immr->im_intctl.ic_scprrl = 0x05309770;
-
 }
 
 /*
@@ -219,12 +198,29 @@ m8260_find_end_of_memory(void)
 static void __init
 m8260_map_io(void)
 {
-	io_block_mapping(0xf0000000, 0xf0000000, 0x10000000, _PAGE_IO);
-	io_block_mapping(0xe0000000, 0xe0000000, 0x10000000, _PAGE_IO);
+	uint addr;
+
+	/* Map IMMR region to a 256MB BAT */
+	addr = (immr != NULL) ? (uint)immr : IMAP_ADDR;
+	io_block_mapping(addr, addr, 0x10000000, _PAGE_IO);
+
+	/* Map I/O region to a 256MB BAT */
+	io_block_mapping(IO_VIRT_ADDR, IO_PHYS_ADDR, 0x10000000, _PAGE_IO);
 }
 
+/* Inputs:
+ *   r3 - Optional pointer to a board information structure.
+ *   r4 - Optional pointer to the physical starting address of the init RAM
+ *        disk.
+ *   r5 - Optional pointer to the physical ending address of the init RAM
+ *        disk.
+ *   r6 - Optional pointer to the physical starting address of any kernel
+ *        command-line parameters.
+ *   r7 - Optional pointer to the physical ending address of any kernel
+ *        command-line parameters.
+ */
 void __init
-platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
+m8260_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	      unsigned long r6, unsigned long r7)
 {
 	parse_bootinfo(find_bootinfo());
@@ -265,11 +261,3 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.setup_io_mappings	= m8260_map_io;
 }
 
-/* Mainly for ksyms.
-*/
-int
-request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *),
-		       unsigned long flag, const char *naem, void *dev)
-{
-	panic("request IRQ\n");
-}
