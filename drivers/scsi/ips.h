@@ -1221,6 +1221,7 @@ typedef struct {
 #define IPS_VER_BUILD 00
 #define IPS_VER_BUILD_STRING "00"
 #define IPS_VER_STRING "5.99.00"
+#define IPS_BUILD_IDENT 1132
 
 /* Version numbers for various adapters */
 #define IPS_VER_SERVERAID1 "2.25.01"

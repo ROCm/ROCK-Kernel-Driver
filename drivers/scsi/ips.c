@@ -1445,7 +1445,8 @@ ips_info(struct Scsi_Host *SH) {
    bp = &buffer[0];
    memset(bp, 0, sizeof(buffer));
 
-   sprintf(bp, "%s%s%s", "IBM PCI ServeRAID ", IPS_VERSION_HIGH, IPS_VERSION_LOW );
+   sprintf(bp, "%s%s%s Build %d", "IBM PCI ServeRAID ",
+               IPS_VERSION_HIGH, IPS_VERSION_LOW, IPS_BUILD_IDENT );
 
    if (ha->ad_type > 0 &&
        ha->ad_type <= MAX_ADAPTER_NAME) {
@@ -1590,6 +1591,7 @@ static int
 ips_make_passthru(ips_ha_t *ha, Scsi_Cmnd *SC, ips_scb_t *scb, int intr) {
    ips_passthru_t *pt;
    int length = 0;
+   int ret;
 
    METHOD_TRACE("ips_make_passthru", 1);
 
@@ -1656,9 +1658,11 @@ ips_make_passthru(ips_ha_t *ha, Scsi_Cmnd *SC, ips_scb_t *scb, int intr) {
          }
 
          if(ha->device_id == IPS_DEVICEID_COPPERHEAD &&
-            pt->CoppCP.cmd.flashfw.op_code == IPS_CMD_RW_BIOSFW)
-            return ips_flash_copperhead(ha, pt, scb);
-
+            pt->CoppCP.cmd.flashfw.op_code == IPS_CMD_RW_BIOSFW) {
+            ret = ips_flash_copperhead(ha, pt, scb);
+            ips_scmd_buf_write(SC, ha->ioctl_data, sizeof(ips_passthru_t));
+            return ret;
+         }
          if (ips_usrcmd(ha, pt, scb))
             return (IPS_SUCCESS);
          else
@@ -2081,6 +2085,9 @@ ips_host_info(ips_ha_t *ha, char *ptr, off_t offset, int len) {
 
    copy_info(&info, "\tDriver Version                    : %s%s\n",
              IPS_VERSION_HIGH, IPS_VERSION_LOW);
+
+   copy_info(&info, "\tDriver Build                      : %d\n",
+             IPS_BUILD_IDENT);
 
    copy_info(&info, "\tMax Physical Devices              : %d\n",
              ha->enq->ucMaxPhysicalDevices);
@@ -6464,6 +6471,8 @@ static void ips_version_check(ips_ha_t *ha, int intr) {
  uint8_t  BiosVersion[ IPS_COMPAT_ID_LENGTH + 1];
  int      MatchError;
  int      rc;
+ char     BiosString[10];
+ char     FirmwareString[10];
 
  METHOD_TRACE("ips_version_check", 1);
 
@@ -6496,28 +6505,30 @@ static void ips_version_check(ips_ha_t *ha, int intr) {
  MatchError = 0;
 
  if  (strncmp(FirmwareVersion, Compatable[ ha->nvram->adapter_type ], IPS_COMPAT_ID_LENGTH) != 0)
- {
-     if (ips_cd_boot == 0)                                                                              
-       printk(KERN_WARNING "Warning: Adapter %d Firmware Compatible Version is %s, but should be %s\n", 
-              ha->host_num, FirmwareVersion, Compatable[ ha->nvram->adapter_type ]);                    
      MatchError = 1;
- }
 
  if  (strncmp(BiosVersion, IPS_COMPAT_BIOS, IPS_COMPAT_ID_LENGTH) != 0)
- {
-     if (ips_cd_boot == 0)                                                                          
-       printk(KERN_WARNING "Warning: Adapter %d BIOS Compatible Version is %s, but should be %s\n", 
-              ha->host_num, BiosVersion, IPS_COMPAT_BIOS);                                          
      MatchError = 1;
- }
 
  ha->nvram->versioning = 1;          /* Indicate the Driver Supports Versioning */
 
  if  (MatchError)
  {
      ha->nvram->version_mismatch = 1;
-     if (ips_cd_boot == 0)                                               
-       printk(KERN_WARNING "Warning ! ! ! ServeRAID Version Mismatch\n");
+     if (ips_cd_boot == 0)
+     {
+         strncpy(&BiosString[0], ha->nvram->bios_high, 4);
+         strncpy(&BiosString[4], ha->nvram->bios_low, 4);
+         BiosString[8] = 0;
+
+         strncpy(&FirmwareString[0], ha->enq->CodeBlkVersion, 8);
+         FirmwareString[8] = 0;
+
+         printk(KERN_WARNING "Warning ! ! ! ServeRAID Version Mismatch\n");
+         printk(KERN_WARNING "Bios = %s, Firmware = %s, Device Driver = %s%s\n",
+                              BiosString, FirmwareString, IPS_VERSION_HIGH, IPS_VERSION_LOW );
+         printk(KERN_WARNING "These levels should match to avoid possible compatibility problems.\n" );
+     }
  }
  else
  {
