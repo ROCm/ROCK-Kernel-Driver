@@ -304,6 +304,17 @@ static __inline__ u32 _sbus_readl(unsigned long addr)
 	return ret;
 }
 
+static __inline__ u64 _sbus_readq(unsigned long addr)
+{
+	u64 ret;
+
+	__asm__ __volatile__("ldxa\t[%1] %2, %0\t/* sbus_readq */"
+			     : "=r" (ret)
+			     : "r" (addr), "i" (ASI_PHYS_BYPASS_EC_E));
+
+	return ret;
+}
+
 static __inline__ void _sbus_writeb(u8 b, unsigned long addr)
 {
 	__asm__ __volatile__("stba\t%r0, [%1] %2\t/* sbus_writeb */"
@@ -325,12 +336,21 @@ static __inline__ void _sbus_writel(u32 l, unsigned long addr)
 			     : "Jr" (l), "r" (addr), "i" (ASI_PHYS_BYPASS_EC_E));
 }
 
+static __inline__ void _sbus_writeq(u64 l, unsigned long addr)
+{
+	__asm__ __volatile__("stxa\t%r0, [%1] %2\t/* sbus_writeq */"
+			     : /* no outputs */
+			     : "Jr" (l), "r" (addr), "i" (ASI_PHYS_BYPASS_EC_E));
+}
+
 #define sbus_readb(__addr)		(_sbus_readb((unsigned long)(__addr)))
 #define sbus_readw(__addr)		(_sbus_readw((unsigned long)(__addr)))
 #define sbus_readl(__addr)		(_sbus_readl((unsigned long)(__addr)))
+#define sbus_readq(__addr)		(_sbus_readq((unsigned long)(__addr)))
 #define sbus_writeb(__b, __addr)	(_sbus_writeb((__b), (unsigned long)(__addr)))
 #define sbus_writew(__w, __addr)	(_sbus_writew((__w), (unsigned long)(__addr)))
 #define sbus_writel(__l, __addr)	(_sbus_writel((__l), (unsigned long)(__addr)))
+#define sbus_writeq(__l, __addr)	(_sbus_writeq((__l), (unsigned long)(__addr)))
 
 static inline void *_sbus_memset_io(unsigned long dst, int c, __kernel_size_t n)
 {
