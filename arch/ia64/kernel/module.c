@@ -313,10 +313,10 @@ static const struct plt_entry ia64_plt_template = {
 };
 
 static int
-patch_plt (struct plt_entry *plt, unsigned long target_ip, unsigned long target_gp)
+patch_plt (struct module *mod, struct plt_entry *plt, long target_ip, unsigned long target_gp)
 {
-	if (apply_imm64((struct insn *) (plt->bundle[0] + 2), target_ip)
-	    && apply_imm64((struct insn *) (plt->bundle[1] + 2), target_gp))
+	if (apply_imm64(mod, (struct insn *) (plt->bundle[0] + 2), target_ip)
+	    && apply_imm64(mod, (struct insn *) (plt->bundle[1] + 2), target_gp))
 		return 1;
 	return 0;
 }
@@ -837,9 +837,14 @@ apply_relocate_add (Elf64_Shdr *sechdrs, const char *strtab, unsigned int symind
 		 * XXX Should have an arch-hook for running this after final section
 		 *     addresses have been selected...
 		 */
+		/* See if gp can cover the entire core module:  */
 		uint64_t gp = (uint64_t) mod->module_core + MAX_LTOFF / 2;
-		if ((mod->arch.got->sh_addr + mod->arch.got->sh_size) - gp >= MAX_LTOFF)
-			gp = mod->arch.got->sh_addr + mod->arch.got->sh_size - MAX_LTOFF / 2;
+		if (mod->core_size >= MAX_LTOFF)
+			/*
+			 * This takes advantage of fact that SHF_ARCH_SMALL gets allocated
+			 * at the end of the module.
+			 */
+			gp = (uint64_t) mod->module_core + mod->core_size - MAX_LTOFF / 2;
 		mod->arch.gp = gp;
 		DEBUGP("%s: placing gp at 0x%lx\n", __FUNCTION__, gp);
 	}
@@ -860,7 +865,7 @@ int
 apply_relocate (Elf64_Shdr *sechdrs, const char *strtab, unsigned int symindex,
 		unsigned int relsec, struct module *mod)
 {
-	printk(KERN_ERR "module %s: REL relocs in section %u unsupported\n", relsec, mod->name);
+	printk(KERN_ERR "module %s: REL relocs in section %u unsupported\n", mod->name, relsec);
 	return -ENOEXEC;
 }
 
