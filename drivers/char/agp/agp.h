@@ -326,31 +326,6 @@ struct agp_bridge_data {
 #define ALI_CACHE_FLUSH_ADDR_MASK	0xFFFFF000
 #define ALI_CACHE_FLUSH_EN		0x100
 
-#ifndef PCI_VENDOR_ID_ATI
-#define PCI_VENDOR_ID_ATI		0x1002
-#endif
-#ifndef PCI_DEVICE_ID_ATI_RS100
-#define PCI_DEVICE_ID_ATI_RS100		0xcab0
-#endif
-#ifndef PCI_DEVICE_ID_ATI_RS200
-#define PCI_DEVICE_ID_ATI_RS200		0xcab2
-#endif
-#ifndef PCI_DEVICE_ID_ATI_RS250
-#define PCI_DEVICE_ID_ATI_RS250		0xcab3
-#endif
-#ifndef PCI_DEVICE_ID_ATI_RS300_100
-#define PCI_DEVICE_ID_ATI_RS300_100	0x5830
-#endif
-#ifndef PCI_DEVICE_ID_ATI_RS300_133
-#define PCI_DEVICE_ID_ATI_RS300_133	0x5831
-#endif
-#ifndef PCI_DEVICE_ID_ATI_RS300_166
-#define PCI_DEVICE_ID_ATI_RS300_166	0x5832
-#endif
-#ifndef PCI_DEVICE_ID_ATI_RS300_200
-#define PCI_DEVICE_ID_ATI_RS300_200	0x5833
-#endif
-
 /* ATI register */
 #define ATI_APBASE                  0x10
 #define ATI_GART_MMBASE_ADDR        0x14
