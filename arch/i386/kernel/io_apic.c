@@ -1167,11 +1167,8 @@ void __init setup_ExtINT_IRQ0_pin(unsigned int pin, int vector)
 	enable_8259A_irq(0);
 }
 
-void __init UNEXPECTED_IO_APIC(void)
+static inline void UNEXPECTED_IO_APIC(void)
 {
-	printk(KERN_WARNING "INFO: unexpected IO-APIC, please file a report at\n");
-	printk(KERN_WARNING "      http://bugzilla.kernel.org\n");
-	printk(KERN_WARNING "      if your kernel is less than 3 months old.\n");
 }
 
 void __init print_IO_APIC(void)
