@@ -22,18 +22,22 @@ config GSC_LASI
 	bool "Lasi I/O support"
 	depends on GSC
 	help
-	  Say Y here to directly support the Lasi controller chip found on
-	  PA-RISC workstations.  Linux-oriented documentation for this chip
-	  can be found at <http://www.parisc-linux.org/documentation/>.
+	  Say Y here to support the Lasi multifunction chip found in
+	  many PA-RISC workstations & servers.	It includes interfaces
+	  for a parallel port, serial port, NCR 53c710 SCSI, Apricot
+	  Ethernet, Harmony audio, PS/2 keyboard & mouse, ISDN, telephony
+	  and floppy.  Note that you must still enable all the individual
+	  drivers for these chips.
 
 config GSC_WAX
 	bool "Wax I/O support"
 	depends on GSC
 	help
-	  Say Y here to support the Wax GSC to EISA Bridge found in some older
-	  systems, including B/C/D/R class.  Some machines use Wax for other
-	  purposes, such as providing one of the serial ports or being an
-	  interface chip for an X.25 GSC card.
+	  Say Y here to support the Wax multifunction chip found in some
+	  older systems, including B/C/D/R class and 715/64, 715/80 and
+	  715/100.  Wax includes an EISA adapter, a serial port (not always
+	  used), a HIL interface chip and is also known to be used as the
+	  GSC bridge for an X.25 GSC card.
 
 config EISA
 	bool "EISA support"
@@ -64,7 +68,8 @@ config GSC_DINO
 	  machines from the B132 to the C360, the J2240 and the A180.  Some
 	  GSC/HSC cards (eg gigabit & dual 100 Mbit Ethernet) have a Dino on
 	  the card, and you also need to say Y here if you have such a card.
-	  If in doubt, say Y.
+	  Note that Dino also supplies one of the serial ports on certain
+	  machines.  If in doubt, say Y.
 
 config PCI_LBA
 	bool "LBA/Elroy PCI support"
@@ -84,6 +89,8 @@ config IOMMU_SBA
 	depends on PCI_LBA
 	default y
 
+source "drivers/pci/Kconfig"
+
 #config PCI_EPIC
 #	bool "EPIC/SAGA PCI support"
 #	depends on PCI
@@ -93,11 +100,18 @@ config SUPERIO
 	depends on PCI
 	help
 	  Say Y here to support the SuperIO chip found in Bxxxx, C3xxx and
-	  J5xxx+ machines.
-
-source "drivers/pci/Kconfig"
+	  J5xxx+ machines. This enables IDE, Floppy, Parallel Port, and
+	  Serial port on those machines.
 
 config CHASSIS_LCD_LED
 	bool "Chassis LCD and LED support"
+	help
+	  Say Y here if you want to enable support for the Heartbeat,
+	  Disk/Network activities LEDs on some PA-RISC machines,
+	  or support for the LCD that can be found on recent material.
+	
+	  This has nothing to do with LED State support for A, J and E class.
+	
+	  If unsure, say Y.
 
 endmenu

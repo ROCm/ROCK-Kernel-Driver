@@ -31,6 +31,7 @@
 #include <linux/reboot.h>
 #include <linux/proc_fs.h>
 #include <linux/ctype.h>
+#include <linux/blkdev.h>
 #include <asm/io.h>
 #include <asm/processor.h>
 #include <asm/hardware.h>
@@ -405,7 +406,7 @@ static void led_get_diskio_stats(int addvalue)
 	total = 0;
 	for (major = 0; major < DK_MAX_MAJOR; major++) {
 	    for (disk = 0; disk < DK_MAX_DISK; disk++)
-		total += kstat.dk_drive[major][disk];
+		total += dkstat.drive[major][disk];
 	}
 	total -= diskio_total_last;
 	

@@ -562,7 +562,7 @@ S: USA
 N: Randolph Chung
 E: tausq@debian.org
 D: Linux/PA-RISC hacker
-S: Fremont, CA 94538
+S: Los Altos, CA 94022
 S: USA
 
 N: Juan Jose Ciarlante
@@ -1141,11 +1141,11 @@ S: Stellenbosch, Western Cape
 S: South Africa
 
 N: Grant Grundler
-E: grundler@puffin.external.hp.com
-W: http://www.grundler.net/
+E: grundler@parisc-linux.org
 W: http://obmouse.sourceforge.net/
+W: http://www.parisc-linux.org/
 D: obmouse - rewrote Olivier Florent's Omnibook 600 "pop-up" mouse driver
-D: PA-RISC - IO Interrupt/PCI HBA/IO MMU author and architect
+D: PA-RISC - Interrupt/PCI HBA/IOMMU author and architect
 S: Mountain View, California
 S: USA
 
