@@ -403,7 +403,6 @@ asmlinkage int sparc_do_fork(unsigned long clone_flags,
 {
 	unsigned long parent_tid_ptr = 0;
 	unsigned long child_tid_ptr = 0;
-	struct task_struct *p;
 
 	clone_flags &= ~CLONE_IDLETASK;
 
@@ -411,11 +410,10 @@ asmlinkage int sparc_do_fork(unsigned long clone_flags,
 		parent_tid_ptr = regs->u_regs[UREG_G2];
 		child_tid_ptr = regs->u_regs[UREG_G3];
 	}
-	p = do_fork(clone_flags, stack_start,
-		    regs, stack_size,
-		    (int *) parent_tid_ptr,
-		    (int *) child_tid_ptr);
-	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
+	return do_fork(clone_flags, stack_start,
+		       regs, stack_size,
+		       (int *) parent_tid_ptr,
+		       (int *) child_tid_ptr);
 }
 
 /* Copy a Sparc thread.  The fork() return value conventions
