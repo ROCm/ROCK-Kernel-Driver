@@ -6,7 +6,7 @@
  * Author: Dan Cox
  *         danc@mvista.com
  *
- * Copyright 2001 MontaVista Software Inc.
+ * Copyright 2001-2002 MontaVista Software Inc.
  *
  * This program is free software; you can redistribute  it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the
@@ -44,21 +44,35 @@
 #include <asm/bootinfo.h>
 #include <asm/mpc10x.h>
 
-#define LOPEC_SIO_IRQ  16
-#define LOPEC_SYSSTAT1 0xffe00000
-
 extern void lopec_find_bridges(void);
 
-static u_char lopec_openpic_initsenses[32] __initdata = {
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 1, 0, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1
+/*
+ * Define all of the IRQ senses and polarities.  Taken from the
+ * LoPEC Programmer's Reference Guide.
+ */
+static u_char lopec_openpic_initsenses[16] __initdata = {
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* IRQ 0 */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* IRQ 1 */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* IRQ 2 */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* IRQ 3 */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* IRQ 4 */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* IRQ 5 */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* IRQ 6 */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* IRQ 7 */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* IRQ 8 */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* IRQ 9 */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* IRQ 10 */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* IRQ 11 */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* IRQ 12 */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* IRQ 13 */
+	(IRQ_SENSE_EDGE | IRQ_POLARITY_NEGATIVE),	/* IRQ 14 */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE)	/* IRQ 15 */
 };
-
 
 static int
 lopec_show_cpuinfo(struct seq_file *m)
 {
-	seq_printf(m, "machine\t\t: Motorola LoPec\n");
+	seq_printf(m, "machine\t\t: Motorola LoPEC\n");
 	return 0;
 }
 
@@ -74,6 +88,7 @@ lopec_irq_cannonicalize(u32 irq)
 static void
 lopec_restart(char *cmd)
 {
+#define LOPEC_SYSSTAT1 0xffe00000
 	/* force a hard reset, if possible */
 	unsigned char reg = *((unsigned char *) LOPEC_SYSSTAT1);
 	reg |= 0x80;
@@ -81,6 +96,7 @@ lopec_restart(char *cmd)
 
 	__cli();
 	while(1);
+#undef LOPEC_SYSSTAT1
 }
 
 static void
@@ -94,27 +110,6 @@ static void
 lopec_power_off(void)
 {
 	lopec_halt();
-}
-
-static int
-lopec_get_irq(struct pt_regs *regs)
-{
-	int irq, cascade_irq;
-
-	irq = openpic_irq();
-
-	if (irq == LOPEC_SIO_IRQ) {
-		cascade_irq = i8259_poll();
-
-		if (cascade_irq != -1) {
-			irq = cascade_irq;
-			openpic_eoi();
-		}
-	}
-	else if (irq == OPENPIC_VEC_SPURIOUS)
-		irq = -1;
-
-	return irq;
 }
 
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
@@ -202,24 +197,37 @@ lopec_init_IRQ(void)
 {
 	int i;
 
+	/*
+	 * Provide the open_pic code with the correct table of interrupts.
+	 */
 	OpenPIC_InitSenses = lopec_openpic_initsenses;
 	OpenPIC_NumInitSenses = sizeof(lopec_openpic_initsenses);
-	openpic_init(1, 0, NULL, -1);
 
+	/*
+	 * We need to tell openpic_set_sources where things actually are.
+	 * mpc10x_common will setup OpenPIC_Addr at ioremap(EUMB phys base +
+	 * EPIC offset (0x40000));  The EPIC IRQ Register Address Map -
+	 * Interrupt Source Configuration Registers gives these numbers
+	 * as offsets starting at 0x50200, we need to adjust occordinly.
+	 */
+	/* Map serial interrupts 0-15 */
+	openpic_set_sources(0, 16, OpenPIC_Addr + 0x10200);
+	/* Skip reserved space and map i2c and DMA Ch[01] */
+	openpic_set_sources(16, 3, OpenPIC_Addr + 0x11020);
+	/* Skip reserved space and map Message Unit Interrupt (I2O) */
+	openpic_set_sources(19, 1, OpenPIC_Addr + 0x110C0);
+
+	openpic_init(1, NUM_8259_INTERRUPTS, NULL, -1);
+
+	/* Map i8259 interrupts */
 	for(i = 0; i < NUM_8259_INTERRUPTS; i++)
 		irq_desc[i].handler = &i8259_pic;
 
-	if (request_irq(LOPEC_SIO_IRQ, no_action, SA_INTERRUPT,
-			"8259 cascade to EPIC", NULL)) {
-		printk("Unable to get EPIC %d for cascade.\n",
-		       LOPEC_SIO_IRQ);
-	}
-
-	i8259_init(NULL);
+	i8259_init(0);
 }
 
-static void __init
-lopec_init2(void)
+void __init
+lopec_request_io(void)
 {
 	outb(0x00, 0x4d0);
 	outb(0xc0, 0x4d1);
@@ -231,6 +239,8 @@ lopec_init2(void)
 	request_region(0xa0, 0x20, "pic2");
 	request_region(0xc0, 0x20, "dma2");
 }
+
+arch_initcall(lopec_request_io);
 
 static void __init
 lopec_map_io(void)
@@ -255,10 +265,47 @@ lopec_set_bat(void)
 		: "=r" (batu), "=r" (batl));
 }
 
+#ifdef  CONFIG_SERIAL_TEXT_DEBUG
+#include <linux/serial.h>
+#include <linux/serialP.h>
+#include <linux/serial_reg.h>
+#include <asm/serial.h>
+
+static struct serial_state rs_table[RS_TABLE_SIZE] = {
+	SERIAL_PORT_DFNS	/* Defined in <asm/serial.h> */
+};
+
+volatile unsigned char *com_port;
+volatile unsigned char *com_port_lsr;
+
+static void
+serial_writechar(char c)
+{
+	while ((*com_port_lsr & UART_LSR_THRE) == 0)
+		;
+	*com_port = c;
+}
+
+void
+lopec_progress(char *s, unsigned short hex)
+{
+	volatile char c;
+
+	com_port = (volatile unsigned char *) rs_table[0].port;
+	com_port_lsr = com_port + UART_LSR;
+
+	while ((c = *s++) != 0)
+		serial_writechar(c);
+
+	/* Most messages don't have a newline in them */
+	serial_writechar('\n');
+	serial_writechar('\r');
+}
+#endif	/* CONFIG_SERIAL_TEXT_DEBUG */
+
 static unsigned long __init
 lopec_find_end_of_memory(void)
 {
-	lopec_set_bat();
 	return mpc10x_get_mem_size(MPC10X_MEM_MAP_B);
 }
 
@@ -281,7 +328,7 @@ lopec_setup_arch(void)
 	else
 #elif defined(CONFIG_ROOT_NFS)
         	ROOT_DEV = to_kdev_t(0x00ff);
-#elif defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_ID_MODULE)
+#elif defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
 	        ROOT_DEV = to_kdev_t(0x0301);
 #else
         	ROOT_DEV = to_kdev_t(0x0801);
@@ -297,6 +344,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	      unsigned long r6, unsigned long r7)
 {
 	parse_bootinfo(find_bootinfo());
+	lopec_set_bat();
 
 	isa_io_base = MPC10X_MAPB_ISA_IO_BASE;
 	isa_mem_base = MPC10X_MAPB_ISA_MEM_BASE;
@@ -309,8 +357,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.show_cpuinfo = lopec_show_cpuinfo;
 	ppc_md.irq_cannonicalize = lopec_irq_cannonicalize;
 	ppc_md.init_IRQ = lopec_init_IRQ;
-	ppc_md.get_irq = lopec_get_irq;
-	ppc_md.init = lopec_init2;
+	ppc_md.get_irq = openpic_get_irq;
 
 	ppc_md.restart = lopec_restart;
 	ppc_md.power_off = lopec_power_off;
@@ -331,5 +378,8 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_ide_md.default_irq = lopec_ide_default_irq;
 	ppc_ide_md.default_io_base = lopec_ide_default_io_base;
 	ppc_ide_md.ide_init_hwif = lopec_ide_init_hwif_ports;
+#endif
+#ifdef CONFIG_SERIAL_TEXT_DEBUG
+	ppc_md.progress = lopec_progress;
 #endif
 }
