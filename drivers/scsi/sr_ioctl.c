@@ -99,7 +99,7 @@ int sr_do_ioctl(Scsi_CD *cd, struct cdrom_generic_command *cgc)
 		if (bounce_buffer == NULL) {
 			printk("SCSI DMA pool exhausted.");
 			err = -ENOMEM;
-			goto out;
+			goto out_free;
 		}
 		memcpy(bounce_buffer, cgc->buffer, cgc->buflen);
 		cgc->buffer = bounce_buffer;
@@ -107,7 +107,7 @@ int sr_do_ioctl(Scsi_CD *cd, struct cdrom_generic_command *cgc)
       retry:
 	if (!scsi_block_when_processing_errors(SDev)) {
 		err = -ENODEV;
-		goto out;
+		goto out_free;
 	}
 
 	scsi_wait_req(SRpnt, cgc->cmd, cgc->buffer, cgc->buflen,
@@ -179,6 +179,7 @@ int sr_do_ioctl(Scsi_CD *cd, struct cdrom_generic_command *cgc)
 		memcpy(cgc->sense, SRpnt->sr_sense_buffer, sizeof(*cgc->sense));
 
 	/* Wake up a process waiting for device */
+      out_free:
 	scsi_release_request(SRpnt);
 	SRpnt = NULL;
       out:
