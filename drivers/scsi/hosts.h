@@ -522,6 +522,11 @@ static inline void scsi_set_device(struct Scsi_Host *shost,
         shost->host_gendev = dev;
 }
 
+static inline struct device *scsi_get_device(struct Scsi_Host *shost)
+{
+        return shost->host_gendev;
+}
+
 static inline void scsi_set_pci_device(struct Scsi_Host *shost,
                                        struct pci_dev *pdev)
 {

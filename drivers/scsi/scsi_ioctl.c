@@ -395,7 +395,7 @@ error:
 static int
 scsi_ioctl_get_pci(Scsi_Device * sdev, void *arg)
 {
-	struct device *dev = sdev->host->host_driverfs_dev.parent;
+	struct device *dev = scsi_get_device(sdev->host);
 
         if (!dev) return -ENXIO;
         return copy_to_user(arg, dev->bus_id,

@@ -373,7 +373,7 @@ static void scsi_initialize_merge_fn(struct scsi_device *sd)
 {
 	request_queue_t *q = &sd->request_queue;
 	struct Scsi_Host *sh = sd->host;
-	struct device *dev = sh->host_driverfs_dev.parent;
+	struct device *dev = scsi_get_device(sh);
 	u64 bounce_limit;
 
 	if (sh->highmem_io) {
