@@ -41,6 +41,8 @@
 #define SCSI_SENSE_VALID(scmd) \
 	(((scmd)->sense_buffer[0] & 0x70) == 0x70)
 
+struct Scsi_Device_Template;
+
 
 /*
  * scsi_target: representation of a scsi target, for now, this is only
@@ -69,11 +71,15 @@ extern int scsi_retry_command(struct scsi_cmnd *cmd);
 extern int scsi_attach_device(struct scsi_device *sdev);
 extern void scsi_detach_device(struct scsi_device *sdev);
 extern void scsi_rescan_device(struct scsi_device *sdev);
-extern int scsi_get_device_flags(unsigned char *vendor, unsigned char *model);
 extern int scsi_insert_special_req(struct scsi_request *sreq, int);
 extern void scsi_init_cmd_from_req(struct scsi_cmnd *cmd,
 		struct scsi_request *sreq);
 extern void __scsi_release_request(struct scsi_request *sreq);
+
+/* scsi_devinfo.c */
+extern int scsi_get_device_flags(unsigned char *vendor, unsigned char *model);
+extern int scsi_init_devinfo(void);
+extern void scsi_exit_devinfo(void);
 
 /* scsi_error.c */
 extern void scsi_times_out(struct scsi_cmnd *cmd);
@@ -121,31 +127,5 @@ extern int scsi_sysfs_add_host(struct Scsi_Host *, struct device *);
 extern void scsi_sysfs_remove_host(struct Scsi_Host *);
 extern int scsi_sysfs_register(void);
 extern void scsi_sysfs_unregister(void);
-
-/*
- * dev_info: for the black/white list in the old scsi_static_device_list
- */
-struct dev_info {
-	char *vendor;
-	char *model;
-	char *revision;	/* revision known to be bad, unused */
-	unsigned flags;
-};
-
-extern struct dev_info scsi_static_device_list[];
-
-/*
- * scsi_dev_info_list: structure to hold black/white listed devices.
- */
-struct scsi_dev_info_list {
-	struct list_head dev_info_list;
-	char vendor[8];
-	char model[16];
-	unsigned flags;
-	unsigned compatible; /* for use with scsi_static_device_list entries */
-};
-
-extern struct list_head scsi_dev_info_list;
-extern int scsi_dev_info_list_add_str(char *);
 
 #endif /* _SCSI_PRIV_H */

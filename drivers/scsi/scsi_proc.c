@@ -200,77 +200,6 @@ static void proc_print_scsidevice(struct scsi_device* sdev, char *buffer,
 	return;
 }
 
-/* 
- * proc_scsi_dev_info_read: dump the scsi_dev_info_list via
- * /proc/scsi/device_info
- */
-static int proc_scsi_dev_info_read(char *buffer, char **start, off_t offset,
-				   int length)
-{
-	struct scsi_dev_info_list *devinfo;
-	int size, len = 0;
-	off_t begin = 0;
-	off_t pos = 0;
-
-	list_for_each_entry(devinfo, &scsi_dev_info_list, dev_info_list) {
-		size = sprintf(buffer + len, "'%.8s' '%.16s' 0x%x\n",
-			       devinfo->vendor, devinfo->model, devinfo->flags);
-		len += size;
-		pos = begin + len;
-		if (pos < offset) {
-			len = 0;
-			begin = pos;
-		}
-		if (pos > offset + length)
-			goto stop_output;
-	}
-
-stop_output:
-	*start = buffer + (offset - begin);	/* Start of wanted data */
-	len -= (offset - begin);	/* Start slop */
-	if (len > length)
-		len = length;	/* Ending slop */
-	return (len);
-}
-
-/* 
- * proc_scsi_dev_info_write: allow additions to the scsi_dev_info_list via
- * /proc.
- *
- * Use: echo "vendor:model:flag" > /proc/scsi/device_info
- *
- * To add a black/white list entry for vendor and model with an integer
- * value of flag to the scsi device info list.
- */
-static int proc_scsi_dev_info_write (struct file * file, const char * buf,
-                              unsigned long length, void *data)
-{
-	char *buffer;
-	int err = length;
-
-	if (!buf || length>PAGE_SIZE)
-		return -EINVAL;
-	if (!(buffer = (char *) __get_free_page(GFP_KERNEL)))
-		return -ENOMEM;
-	if (copy_from_user(buffer, buf, length)) {
-		err =-EFAULT;
-		goto out;
-	}
-
-	if (length < PAGE_SIZE)
-		buffer[length] = '\0';
-	else if (buffer[PAGE_SIZE-1]) {
-		err = -EINVAL;
-		goto out;
-	}
-
-	scsi_dev_info_list_add_str(buffer);
-
-out:
-	free_page((unsigned long)buffer);
-	return err;
-}
-
 static int scsi_proc_info(char *buffer, char **start, off_t offset, int length)
 {
 	struct Scsi_Host *shost;
@@ -358,7 +287,6 @@ out:
 	scsi_host_put(shost);
 	return error;
 }
-
 
 static int proc_scsi_gen_write(struct file * file, const char * buf,
                               unsigned long length, void *data)
@@ -517,15 +445,8 @@ int __init scsi_init_procfs(void)
 		goto err2;
 	pde->write_proc = proc_scsi_gen_write;
 
-	pde = create_proc_info_entry("scsi/device_info", 0, 0,
-					  proc_scsi_dev_info_read);
-	if (!pde)
-		goto err3;
-	pde->write_proc = proc_scsi_dev_info_write;
 	return 0;
 
-err3:
-	remove_proc_entry("scsi/scsi", 0);
 err2:
 	remove_proc_entry("scsi", 0);
 err1:
@@ -534,7 +455,6 @@ err1:
 
 void scsi_exit_procfs(void)
 {
-	remove_proc_entry("scsi/device_info", 0);
 	remove_proc_entry("scsi/scsi", 0);
 	remove_proc_entry("scsi", 0);
 }
