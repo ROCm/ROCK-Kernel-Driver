@@ -66,9 +66,6 @@
     */
    #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,20) || defined CONFIG_HIGHIO
       #define IPS_HIGHIO
-      #define IPS_HIGHMEM_IO     .highmem_io = 1,
-   #else
-      #define IPS_HIGHMEM_IO
    #endif
 
    #define IPS_HA(x)                   ((ips_ha_t *) x->hostdata)
@@ -94,20 +91,31 @@
                                          sizeof(IPS_ENH_SG_LIST) : sizeof(IPS_STD_SG_LIST))
 
    #if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,4)
-      #define pci_set_dma_mask(dev,mask) (1)
+      #define pci_set_dma_mask(dev,mask) ( mask > 0xffffffff ? 1:0 )
       #define scsi_set_pci_device(sh,dev) (0)
    #endif
 
    #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+      typedef void irqreturn_t;
+      #define IRQ_NONE
+      #define IRQ_HANDLED
+      #define IRQ_RETVAL(x)
       #define IPS_REGISTER_HOSTS(SHT)      scsi_register_module(MODULE_SCSI_HA,SHT)
       #define IPS_UNREGISTER_HOSTS(SHT)    scsi_unregister_module(MODULE_SCSI_HA,SHT)
       #define IPS_ADD_HOST(shost,device)
       #define IPS_REMOVE_HOST(shost)
+      #define IPS_SCSI_SET_DEVICE(sh,ha)   scsi_set_pci_device(sh, (ha)->pcidev)
+      #define IPS_PRINTK(level, pcidev, format, arg...)                 \
+            printk(level "%s %s:" format , (pcidev)->driver->name ,     \
+            (pcidev)->slot_name , ## arg)
    #else
       #define IPS_REGISTER_HOSTS(SHT)      (!ips_detect(SHT))
       #define IPS_UNREGISTER_HOSTS(SHT)
       #define IPS_ADD_HOST(shost,device)   scsi_add_host(shost,device)
       #define IPS_REMOVE_HOST(shost)       scsi_remove_host(shost)
+      #define IPS_SCSI_SET_DEVICE(sh,ha)   scsi_set_device(sh, &(ha)->pcidev->dev)
+      #define IPS_PRINTK(level, pcidev, format, arg...)                 \
+            dev_printk(level , &((pcidev)->dev) , format , ## arg)
    #endif
 
    #ifndef MDELAY
@@ -445,47 +453,10 @@
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
    static void ips_select_queue_depth(struct Scsi_Host *, Scsi_Device *);
    static int ips_biosparam(Disk *disk, kdev_t dev, int geom[]);
-#define IPS {	\
-	.detect				= ips_detect,	\
-	.release			= ips_release,	\
-	.info				= ips_info,	\
-	.queuecommand			= ips_queue,	\
-	.eh_abort_handler		= ips_eh_abort,	\
-	.eh_host_reset_handler		= ips_eh_reset,	\
-	.bios_param			= ips_biosparam,\
-	.select_queue_depths		= ips_select_queue_depth, \
-	.can_queue			= 0,		\
-	.this_id			= -1,		\
-	.sg_tablesize			= IPS_MAX_SG,	\
-	.cmd_per_lun			= 16,		\
-	.present			= 0,		\
-	.unchecked_isa_dma		= 0,		\
-	.use_clustering			= ENABLE_CLUSTERING,\
-	.use_new_eh_code		= 1, \
-	IPS_HIGHMEM_IO \
-}
 #else
    static int ips_biosparam(struct scsi_device *sdev, struct block_device *bdev,
 		sector_t capacity, int geom[]);
    int ips_slave_configure(Scsi_Device *SDptr);
-#define IPS {	\
-	.detect			= ips_detect,		\
-	.release		= ips_release,		\
-	.info			= ips_info,		\
-	.queuecommand		= ips_queue,		\
-	.eh_abort_handler	= ips_eh_abort,		\
-	.eh_host_reset_handler	= ips_eh_reset,		\
-	.slave_configure	= ips_slave_configure,	\
-	.bios_param		= ips_biosparam,	\
-	.can_queue		= 0,			\
-	.this_id		= -1,			\
-	.sg_tablesize		= IPS_MAX_SG,		\
-	.cmd_per_lun		= 3,			\
-	.present		= 0,			\
-	.unchecked_isa_dma	= 0,			\
-	.use_clustering		= ENABLE_CLUSTERING,	\
-	.highmem_io		= 1 \
-}
 #endif
 
 /*
@@ -1092,7 +1063,7 @@ typedef struct {
    int       (*programbios)(struct ips_ha *, char *, uint32_t, uint32_t);
    int       (*verifybios)(struct ips_ha *, char *, uint32_t, uint32_t);
    void      (*statinit)(struct ips_ha *);
-   void      (*intr)(struct ips_ha *);
+   int       (*intr)(struct ips_ha *);
    void      (*enableint)(struct ips_ha *);
    uint32_t (*statupd)(struct ips_ha *);
 } ips_hw_func_t;

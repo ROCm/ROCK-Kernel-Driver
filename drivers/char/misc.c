@@ -114,10 +114,8 @@ static int misc_open(struct inode * inode, struct file * file)
 	if (c != &misc_list)
 		new_fops = fops_get(c->fops);
 	if (!new_fops) {
-		char modname[20];
 		up(&misc_sem);
-		sprintf(modname, "char-major-%d-%d", MISC_MAJOR, minor);
-		request_module(modname);
+		request_module("char-major-%d-%d", MISC_MAJOR, minor);
 		down(&misc_sem);
 		c = misc_list.next;
 		while ((c != &misc_list) && (c->minor != minor))

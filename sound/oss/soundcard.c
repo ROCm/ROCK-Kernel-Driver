@@ -216,9 +216,7 @@ static int sound_open(struct inode *inode, struct file *file)
 	case SND_DEV_CTL:
 		dev >>= 4;
 		if (dev >= 0 && dev < MAX_MIXER_DEV && mixer_devs[dev] == NULL) {
-			char modname[20];
-			sprintf(modname, "mixer%d", dev);
-			request_module(modname);
+			request_module("mixer%d", dev);
 		}
 		if (dev && (dev >= num_mixers || mixer_devs[dev] == NULL))
 			return -ENXIO;
@@ -318,9 +316,7 @@ static int sound_mixer_ioctl(int mixdev, unsigned int cmd, caddr_t arg)
  		return -ENXIO;
  	/* Try to load the mixer... */
  	if (mixer_devs[mixdev] == NULL) {
- 		char modname[20];
- 		sprintf(modname, "mixer%d", mixdev);
- 		request_module(modname);
+ 		request_module("mixer%d", mixdev);
  	}
  	if (mixdev >= num_mixers || !mixer_devs[mixdev])
  		return -ENXIO;

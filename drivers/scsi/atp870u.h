@@ -37,22 +37,4 @@ extern const char *atp870u_info(struct Scsi_Host *);
 
 extern int atp870u_proc_info(char *, char **, off_t, int, int, int);
 
-#define ATP870U {						\
-	.proc_info = atp870u_proc_info,				\
-	.detect = atp870u_detect, 				\
-	.release = atp870u_release,				\
-	.info = atp870u_info,					\
-	.command = atp870u_command,				\
-	.queuecommand = atp870u_queuecommand,			\
-	.eh_abort_handler = atp870u_abort, 			\
-	.bios_param = atp870u_biosparam,				\
-	.can_queue = qcnt,	 /* max simultaneous cmds      */\
-	.this_id = 7,	       /* scsi id of host adapter    */\
-	.sg_tablesize = ATP870U_SCATTER,	/* max scatter-gather cmds    */\
-	.cmd_per_lun = ATP870U_CMDLUN,	/* cmds per lun (linked cmds) */\
-	.present = 0,		/* number of 7xxx's present   */\
-	.unchecked_isa_dma = 0,	/* no memory DMA restrictions */\
-	.use_clustering = ENABLE_CLUSTERING,			\
-}
-
 #endif

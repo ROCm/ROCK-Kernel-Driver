@@ -61,7 +61,8 @@ static struct hid_report *hid_register_report(struct hid_device *device, unsigne
 		return NULL;
 	memset(report, 0, sizeof(struct hid_report));
 
-	if (id != 0) report_enum->numbered = 1;
+	if (id != 0)
+		report_enum->numbered = 1;
 
 	report->id = id;
 	report->type = type;
@@ -539,11 +540,13 @@ static void hid_free_device(struct hid_device *device)
 
 		for (j = 0; j < 256; j++) {
 			struct hid_report *report = report_enum->report_id_hash[j];
-			if (report) hid_free_report(report);
+			if (report)
+				hid_free_report(report);
 		}
 	}
 
-	if (device->rdesc) kfree(device->rdesc);
+	if (device->rdesc)
+		kfree(device->rdesc);
 	kfree(device);
 }
 
@@ -741,7 +744,8 @@ static __inline__ __s32 snto32(__u32 value, unsigned n)
 static __inline__ __u32 s32ton(__s32 value, unsigned n)
 {
 	__s32 a = value >> (n - 1);
-	if (a && a != -1) return value < 0 ? 1 << (n - 1) : (1 << (n - 1)) - 1;
+	if (a && a != -1)
+		return value < 0 ? 1 << (n - 1) : (1 << (n - 1)) - 1;
 	return value & ((1 << n) - 1);
 }
 
@@ -769,7 +773,10 @@ static __inline__ void implement(__u8 *report, unsigned offset, unsigned n, __u3
 
 static __inline__ int search(__s32 *array, __s32 value, unsigned n)
 {
-	while (n--) if (*array++ == value) return 0;
+	while (n--) {
+		if (*array++ == value)
+			return 0;
+	}
 	return -1;
 }
 
@@ -814,9 +821,11 @@ static void hid_input_field(struct hid_device *hid, struct hid_field *field, __u
 		if (HID_MAIN_ITEM_VARIABLE & field->flags) {
 
 			if (field->flags & HID_MAIN_ITEM_RELATIVE) {
-				if (!value[n]) continue;
+				if (!value[n])
+					continue;
 			} else {
-				if (value[n] == field->value[n]) continue;
+				if (value[n] == field->value[n])
+					continue;
 			}	
 			hid_process_event(hid, field, &field->usage[n], value[n], regs);
 			continue;
@@ -1324,6 +1333,11 @@ void hid_init_reports(struct hid_device *hid)
 #define USB_VENDOR_ID_TOPMAX           0x0663
 #define USB_DEVICE_ID_TOPMAX_COBRAPAD  0x0103
 
+#define USB_VENDOR_ID_HAPP             0x078b
+#define USB_DEVICE_ID_UGCI_DRIVING     0x0010
+#define USB_DEVICE_ID_UGCI_FLYING      0x0020
+#define USB_DEVICE_ID_UGCI_FIGHTING    0x0030
+
 #define USB_VENDOR_ID_MGE              0x0463
 #define USB_DEVICE_ID_MGE_UPS          0xffff
 #define USB_DEVICE_ID_MGE_UPS1         0x0001
@@ -1357,11 +1371,11 @@ struct hid_blacklist {
 	{ USB_VENDOR_ID_WACOM, USB_DEVICE_ID_WACOM_PL + 3, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_WACOM, USB_DEVICE_ID_WACOM_PL + 4, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_WACOM, USB_DEVICE_ID_WACOM_PL + 5, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_WACOM, USB_DEVICE_ID_WACOM_INTUOS2, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_WACOM, USB_DEVICE_ID_WACOM_INTUOS2 + 1, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_WACOM, USB_DEVICE_ID_WACOM_INTUOS2 + 2, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_WACOM, USB_DEVICE_ID_WACOM_INTUOS2 + 3, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_WACOM, USB_DEVICE_ID_WACOM_INTUOS2 + 4, HID_QUIRK_IGNORE },
-	{ USB_VENDOR_ID_WACOM, USB_DEVICE_ID_WACOM_INTUOS2 + 5, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_KBGEAR, USB_DEVICE_ID_KBGEAR_JAMSTUDIO, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_AIPTEK, USB_DEVICE_ID_AIPTEK_6000, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_GRIFFIN, USB_DEVICE_ID_POWERMATE, HID_QUIRK_IGNORE },
@@ -1373,6 +1387,9 @@ struct hid_blacklist {
 	{ USB_VENDOR_ID_MGE, USB_DEVICE_ID_MGE_UPS, HID_QUIRK_HIDDEV },
 	{ USB_VENDOR_ID_MGE, USB_DEVICE_ID_MGE_UPS1, HID_QUIRK_HIDDEV },
 	{ USB_VENDOR_ID_TOPMAX, USB_DEVICE_ID_TOPMAX_COBRAPAD, HID_QUIRK_BADPAD },
+	{ USB_VENDOR_ID_HAPP, USB_DEVICE_ID_UGCI_DRIVING, HID_QUIRK_BADPAD },
+	{ USB_VENDOR_ID_HAPP, USB_DEVICE_ID_UGCI_FLYING, HID_QUIRK_BADPAD },
+	{ USB_VENDOR_ID_HAPP, USB_DEVICE_ID_UGCI_FIGHTING, HID_QUIRK_BADPAD },
 	{ USB_VENDOR_ID_ONTRAK, USB_DEVICE_ID_ONTRAK_ADU100, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_ONTRAK, USB_DEVICE_ID_ONTRAK_ADU100 + 100, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_ONTRAK, USB_DEVICE_ID_ONTRAK_ADU100 + 200, HID_QUIRK_IGNORE },
@@ -1558,9 +1575,12 @@ static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 
 fail:
 
-	if (hid->urbin) usb_free_urb(hid->urbin);
-	if (hid->urbout) usb_free_urb(hid->urbout);
-	if (hid->urbctrl) usb_free_urb(hid->urbctrl);
+	if (hid->urbin)
+		usb_free_urb(hid->urbin);
+	if (hid->urbout)
+		usb_free_urb(hid->urbout);
+	if (hid->urbctrl)
+		usb_free_urb(hid->urbctrl);
 	hid_free_buffers(dev, hid);
 	hid_free_device(hid);
 

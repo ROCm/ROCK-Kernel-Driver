@@ -157,7 +157,7 @@ int dcache_readdir(struct file * filp, void * dirent, filldir_t filldir)
 	return 0;
 }
 
-ssize_t generic_read_dir(struct file *filp, char *buf, size_t siz, loff_t *ppos)
+ssize_t generic_read_dir(struct file *filp, char __user *buf, size_t siz, loff_t *ppos)
 {
 	return -EISDIR;
 }

@@ -92,21 +92,22 @@ int bt_sock_unregister(int proto)
 
 static int bt_sock_create(struct socket *sock, int proto)
 {
+	int err = 0;
+
 	if (proto >= BT_MAX_PROTO)
 		return -EINVAL;
 
 #if defined(CONFIG_KMOD)
 	if (!bt_proto[proto]) {
-		char module_name[30];
-		sprintf(module_name, "bt-proto-%d", proto);
-		request_module(module_name);
+		request_module("bt-proto-%d", proto);
 	}
 #endif
-
-	if (!bt_proto[proto])
-		return -ENOENT;
-
-	return bt_proto[proto]->create(sock, proto);
+	err = -EPROTONOSUPPORT;
+	if (bt_proto[proto] && try_module_get(bt_proto[proto]->owner)) {
+		err = bt_proto[proto]->create(sock, proto);
+		module_put(bt_proto[proto]->owner);
+	}
+	return err; 
 }
 
 struct sock *bt_sock_alloc(struct socket *sock, int proto, int pi_size, int prio)

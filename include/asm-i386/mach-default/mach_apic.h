@@ -120,4 +120,9 @@ static inline int apic_id_registered(void)
 						&phys_cpu_present_map));
 }
 
+static inline unsigned int cpu_mask_to_apicid (unsigned long cpumask)
+{
+	return cpumask;
+}
+
 #endif /* __ASM_MACH_APIC_H */

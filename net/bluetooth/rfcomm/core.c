@@ -52,7 +52,7 @@
 #include <net/bluetooth/l2cap.h>
 #include <net/bluetooth/rfcomm.h>
 
-#define VERSION "0.3"
+#define VERSION "1.0"
 
 #ifndef CONFIG_BT_RFCOMM_DEBUG
 #undef  BT_DBG
@@ -203,6 +203,7 @@ static void rfcomm_dlc_clear_state(struct rfcomm_dlc *d)
 
 	d->state      = BT_OPEN;
 	d->flags      = 0;
+	d->mscex      = 0;
 	d->mtu        = RFCOMM_DEFAULT_MTU;
 	d->v24_sig    = RFCOMM_V24_RTC | RFCOMM_V24_RTR | RFCOMM_V24_DV;
 
@@ -304,10 +305,11 @@ static int __rfcomm_dlc_open(struct rfcomm_dlc *d, bdaddr_t *src, bdaddr_t *dst,
 
 	rfcomm_dlc_clear_state(d);
 
-	d->dlci    = dlci;
-	d->addr    = __addr(s->initiator, dlci);
+	d->dlci     = dlci;
+	d->addr     = __addr(s->initiator, dlci);
+	d->priority = 7;
 
-	d->state   = BT_CONFIG;
+	d->state    = BT_CONFIG;
 	rfcomm_dlc_link(s, d);
 
 	d->mtu     = s->mtu;
@@ -481,9 +483,12 @@ struct rfcomm_session *rfcomm_session_add(struct socket *sock, int state)
 	list_add(&s->list, &session_list);
 
 	/* Do not increment module usage count for listeting sessions.
-	 * Otherwise we won't be able to unload the module. */
+	 * Otherwise we won't be able to unload the module.
+	 * Non listening session are added either by a socket or a TTYs
+	 * which means that we already hold refcount to this module.
+	 */
 	if (state != BT_LISTEN)
-		MOD_INC_USE_COUNT;
+		__module_get(THIS_MODULE);
 	return s;
 }
 
@@ -502,7 +507,7 @@ void rfcomm_session_del(struct rfcomm_session *s)
 	kfree(s);
 
 	if (state != BT_LISTEN)
-		MOD_DEC_USE_COUNT;
+		module_put(THIS_MODULE);
 }
 
 struct rfcomm_session *rfcomm_session_get(bdaddr_t *src, bdaddr_t *dst)
@@ -741,7 +746,7 @@ static int rfcomm_send_pn(struct rfcomm_session *s, int cr, struct rfcomm_dlc *d
 
 	pn = (void *) ptr; ptr += sizeof(*pn);
 	pn->dlci        = d->dlci;
-	pn->priority    = 0;
+	pn->priority    = d->priority;
 	pn->ack_timer   = 0;
 	pn->max_retrans = 0;
 
@@ -1099,8 +1104,6 @@ static int rfcomm_apply_pn(struct rfcomm_dlc *d, int cr, struct rfcomm_pn *pn)
 			set_bit(RFCOMM_TX_THROTTLED, &d->flags);
 			d->credits = 0;
 		}
-
-		d->mtu = btohs(pn->mtu);
 	} else {
 		if (pn->flow_ctrl == 0xe0) {
 			d->tx_credits = pn->credits;
@@ -1108,9 +1111,11 @@ static int rfcomm_apply_pn(struct rfcomm_dlc *d, int cr, struct rfcomm_pn *pn)
 			set_bit(RFCOMM_TX_THROTTLED, &d->flags);
 			d->credits = 0;
 		}
-
-		d->mtu = btohs(pn->mtu);
 	}
+
+	d->priority = pn->priority;
+
+	d->mtu = btohs(pn->mtu);
 
 	return 0;
 }
@@ -1137,7 +1142,7 @@ static int rfcomm_recv_pn(struct rfcomm_session *s, int cr, struct sk_buff *skb)
 			switch (d->state) {
 			case BT_CONFIG:
 				rfcomm_apply_pn(d, cr, pn);
-				
+
 				d->state = BT_CONNECT;
 				rfcomm_send_sabm(s, d->dlci);
 				break;
@@ -1148,7 +1153,7 @@ static int rfcomm_recv_pn(struct rfcomm_session *s, int cr, struct sk_buff *skb)
 
 		if (!cr)
 			return 0;
-		
+
 		/* PN request for non existing DLC.
 		 * Assume incoming connection. */
 		if (rfcomm_connect_ind(s, channel, &d)) {
@@ -1157,7 +1162,7 @@ static int rfcomm_recv_pn(struct rfcomm_session *s, int cr, struct sk_buff *skb)
 			rfcomm_dlc_link(s, d);
 
 			rfcomm_apply_pn(d, cr, pn);
-			
+
 			d->state = BT_OPEN;
 			rfcomm_send_pn(s, 0, d);
 		} else {
@@ -1229,21 +1234,21 @@ static int rfcomm_recv_rpn(struct rfcomm_session *s, int cr, int len, struct sk_
 	if (rpn->param_mask & RFCOMM_RPN_PM_FLOW) {
 		if (rpn->flow_ctrl != RFCOMM_RPN_FLOW_NONE) {
 			BT_DBG("RPN flow ctrl mismatch 0x%x", rpn->flow_ctrl);
-			rpn->flow_ctrl = RFCOMM_RPN_FLOW_NONE;
+			flow_ctrl = RFCOMM_RPN_FLOW_NONE;
 			rpn_mask ^= RFCOMM_RPN_PM_FLOW;
 		}
 	}
 	if (rpn->param_mask & RFCOMM_RPN_PM_XON) {
 		if (rpn->xon_char != RFCOMM_RPN_XON_CHAR) {
 			BT_DBG("RPN XON char mismatch 0x%x", rpn->xon_char);
-			rpn->xon_char = RFCOMM_RPN_XON_CHAR;
+			xon_char = RFCOMM_RPN_XON_CHAR;
 			rpn_mask ^= RFCOMM_RPN_PM_XON;
 		}
 	}
 	if (rpn->param_mask & RFCOMM_RPN_PM_XOFF) {
 		if (rpn->xoff_char != RFCOMM_RPN_XOFF_CHAR) {
 			BT_DBG("RPN XOFF char mismatch 0x%x", rpn->xoff_char);
-			rpn->xoff_char = RFCOMM_RPN_XOFF_CHAR;
+			xoff_char = RFCOMM_RPN_XOFF_CHAR;
 			rpn_mask ^= RFCOMM_RPN_PM_XOFF;
 		}
 	}
@@ -1284,11 +1289,11 @@ static int rfcomm_recv_msc(struct rfcomm_session *s, int cr, struct sk_buff *skb
 
 	BT_DBG("dlci %d cr %d v24 0x%x", dlci, cr, msc->v24_sig);
 
-	if (!cr)
+	d = rfcomm_dlc_get(s, dlci);
+	if (!d) 
 		return 0;
 
-	d = rfcomm_dlc_get(s, dlci);
-	if (d) {
+	if (cr) {
 		if (msc->v24_sig & RFCOMM_V24_FC && !d->credits)
 			set_bit(RFCOMM_TX_THROTTLED, &d->flags);
 		else
@@ -1300,7 +1305,11 @@ static int rfcomm_recv_msc(struct rfcomm_session *s, int cr, struct sk_buff *skb
 		rfcomm_dlc_unlock(d);
 		
 		rfcomm_send_msc(s, 0, dlci, msc->v24_sig);
-	}
+
+		d->mscex |= RFCOMM_MSCEX_RX;
+	} else 
+		d->mscex |= RFCOMM_MSCEX_TX;
+
 	return 0;
 }
 
@@ -1524,7 +1533,8 @@ static inline void rfcomm_process_dlcs(struct rfcomm_session *s)
 			continue;
 		}
 
-		if (d->state == BT_CONNECTED || d->state == BT_DISCONN)
+		if ((d->state == BT_CONNECTED || d->state == BT_DISCONN) &&
+				d->mscex == RFCOMM_MSCEX_OK)
 			rfcomm_process_tx(d);
 	}
 }
@@ -1824,6 +1834,7 @@ static int rfcomm_seq_open(struct inode *inode, struct file *file)
 }
 
 static struct file_operations rfcomm_seq_fops = {
+	.owner	 = THIS_MODULE,
 	.open    = rfcomm_seq_open,
 	.read    = seq_read,
 	.llseek  = seq_lseek,
@@ -1868,6 +1879,8 @@ static void __exit rfcomm_proc_cleanup(void)
 /* ---- Initialization ---- */
 int  __init rfcomm_init(void)
 {
+	l2cap_load();
+
 	kernel_thread(rfcomm_run, NULL, CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
 
 	BT_INFO("RFCOMM ver %s", VERSION);

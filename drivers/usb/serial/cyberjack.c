@@ -284,7 +284,8 @@ static void cyberjack_read_int_callback( struct urb *urb, struct pt_regs *regs )
 	struct usb_serial *serial;
 	unsigned char *data = urb->transfer_buffer;
 
-	if (port_paranoia_check (port, __FUNCTION__)) return;
+	if (port_paranoia_check (port, __FUNCTION__))
+		return;
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
@@ -293,7 +294,8 @@ static void cyberjack_read_int_callback( struct urb *urb, struct pt_regs *regs )
 		return;
 
 	serial = port->serial;
-	if (serial_paranoia_check (serial, __FUNCTION__)) return;
+	if (serial_paranoia_check (serial, __FUNCTION__))
+		return;
 
 	usb_serial_debug_data (__FILE__, __FUNCTION__, urb->actual_length, data);
 
@@ -372,7 +374,8 @@ static void cyberjack_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 	/* Reduce urbs to do by one. */
 	priv->rdtodo-=urb->actual_length;
 	/* Just to be sure */
-	if( priv->rdtodo<0 ) priv->rdtodo=0;
+	if ( priv->rdtodo<0 )
+		priv->rdtodo = 0;
 
 	dbg("%s - rdtodo: %d", __FUNCTION__, priv->rdtodo);
 

@@ -18,7 +18,6 @@
 #include <linux/netdevice.h>
 #include <linux/miscdevice.h>
 #include <linux/if_bridge.h>
-#include "br_private_timer.h"
 
 #define BR_HASH_BITS 8
 #define BR_HASH_SIZE (1 << BR_HASH_BITS)
@@ -44,10 +43,11 @@ struct mac_addr
 struct net_bridge_fdb_entry
 {
 	struct hlist_node		hlist;
-	atomic_t			use_count;
-	mac_addr			addr;
 	struct net_bridge_port		*dst;
+	struct list_head		age_list;
+	atomic_t			use_count;
 	unsigned long			ageing_timer;
+	mac_addr			addr;
 	unsigned			is_local:1;
 	unsigned			is_static:1;
 };
@@ -71,10 +71,9 @@ struct net_bridge_port
 	unsigned			config_pending:1;
 	int				priority;
 
-	struct br_timer			forward_delay_timer;
-	struct br_timer			hold_timer;
-	struct br_timer			message_age_timer;
-
+	struct timer_list		forward_delay_timer;
+	struct timer_list		hold_timer;
+	struct timer_list		message_age_timer;
 	struct rcu_head			rcu;
 };
 
@@ -86,7 +85,7 @@ struct net_bridge
 	struct net_device_stats		statistics;
 	rwlock_t			hash_lock;
 	struct hlist_head		hash[BR_HASH_SIZE];
-	struct timer_list		tick;
+	struct list_head		age_list;
 
 	/* STP */
 	bridge_id			designated_root;
@@ -103,13 +102,12 @@ struct net_bridge
 	unsigned			topology_change:1;
 	unsigned			topology_change_detected:1;
 
-	struct br_timer			hello_timer;
-	struct br_timer			tcn_timer;
-	struct br_timer			topology_change_timer;
-	struct br_timer			gc_timer;
+	struct timer_list		hello_timer;
+	struct timer_list		tcn_timer;
+	struct timer_list		topology_change_timer;
+	struct timer_list		gc_timer;
 
 	int				ageing_time;
-	int				gc_interval;
 };
 
 extern struct notifier_block br_device_notifier;
@@ -128,8 +126,8 @@ extern int br_dev_xmit(struct sk_buff *skb, struct net_device *dev);
 
 /* br_fdb.c */
 extern void br_fdb_changeaddr(struct net_bridge_port *p,
-		       unsigned char *newaddr);
-extern void br_fdb_cleanup(struct net_bridge *br);
+			      const unsigned char *newaddr);
+extern void br_fdb_cleanup(unsigned long arg);
 extern void br_fdb_delete_by_port(struct net_bridge *br,
 			   struct net_bridge_port *p);
 extern struct net_bridge_fdb_entry *br_fdb_get(struct net_bridge *br,
@@ -140,9 +138,9 @@ extern int  br_fdb_get_entries(struct net_bridge *br,
 			int maxnum,
 			int offset);
 extern void br_fdb_insert(struct net_bridge *br,
-		   struct net_bridge_port *source,
-		   unsigned char *addr,
-		   int is_local);
+			  struct net_bridge_port *source,
+			  const unsigned char *addr,
+			  int is_local);
 
 /* br_forward.c */
 extern void br_deliver(const struct net_bridge_port *to,
@@ -188,10 +186,10 @@ extern int br_netfilter_init(void);
 extern void br_netfilter_fini(void);
 
 /* br_stp.c */
+extern void br_log_state(const struct net_bridge_port *p);
 extern struct net_bridge_port *br_get_port(struct net_bridge *br,
 				    int port_no);
 extern void br_init_port(struct net_bridge_port *p);
-extern port_id br_make_port_id(struct net_bridge_port *p);
 extern void br_become_designated_port(struct net_bridge_port *p);
 
 /* br_stp_if.c */
@@ -209,5 +207,9 @@ extern void br_stp_set_path_cost(struct net_bridge_port *p,
 
 /* br_stp_bpdu.c */
 extern void br_stp_handle_bpdu(struct sk_buff *skb);
+
+/* br_stp_timer.c */
+extern void br_stp_timer_init(struct net_bridge *br);
+extern void br_stp_port_timer_init(struct net_bridge_port *p);
 
 #endif

@@ -32,7 +32,6 @@
 #include <linux/in6.h>
 #include <linux/netdevice.h>
 #include <linux/if_arp.h>
-#include <linux/brlock.h>
 
 #include <net/sock.h>
 #include <net/snmp.h>
@@ -41,12 +40,14 @@
 #include <net/protocol.h>
 
 struct inet6_protocol *inet6_protos[MAX_INET_PROTOS];
+static spinlock_t inet6_proto_lock = SPIN_LOCK_UNLOCKED;
+
 
 int inet6_add_protocol(struct inet6_protocol *prot, unsigned char protocol)
 {
 	int ret, hash = protocol & (MAX_INET_PROTOS - 1);
 
-	br_write_lock_bh(BR_NETPROTO_LOCK);
+	spin_lock_bh(&inet6_proto_lock);
 
 	if (inet6_protos[hash]) {
 		ret = -1;
@@ -55,7 +56,7 @@ int inet6_add_protocol(struct inet6_protocol *prot, unsigned char protocol)
 		ret = 0;
 	}
 
-	br_write_unlock_bh(BR_NETPROTO_LOCK);
+	spin_unlock_bh(&inet6_proto_lock);
 
 	return ret;
 }
@@ -68,7 +69,7 @@ int inet6_del_protocol(struct inet6_protocol *prot, unsigned char protocol)
 {
 	int ret, hash = protocol & (MAX_INET_PROTOS - 1);
 
-	br_write_lock_bh(BR_NETPROTO_LOCK);
+	spin_lock_bh(&inet6_proto_lock);
 
 	if (inet6_protos[hash] != prot) {
 		ret = -1;
@@ -77,7 +78,9 @@ int inet6_del_protocol(struct inet6_protocol *prot, unsigned char protocol)
 		ret = 0;
 	}
 
-	br_write_unlock_bh(BR_NETPROTO_LOCK);
+	spin_unlock_bh(&inet6_proto_lock);
+
+	synchronize_net();
 
 	return ret;
 }

@@ -138,8 +138,7 @@ utf8_strlen(efi_char16_t *data, unsigned long maxlength)
 static inline unsigned long
 utf8_strsize(efi_char16_t *data, unsigned long maxlength)
 {
-	return utf8_strlen(data, maxlength/sizeof(efi_char16_t)) *
-		sizeof(efi_char16_t);
+	return utf8_strlen(data, maxlength/sizeof(efi_char16_t)) * sizeof(efi_char16_t);
 }
 
 
@@ -170,8 +169,7 @@ efivar_create_proc_entry(unsigned long variable_name_size,
 			 efi_guid_t *vendor_guid)
 {
 
-	int i, short_name_size = variable_name_size /
-		sizeof(efi_char16_t) + 38;
+	int i, short_name_size = variable_name_size / sizeof(efi_char16_t) + 38;
 	char *short_name;
 	efivar_entry_t *new_efivar;
 
@@ -192,7 +190,7 @@ efivar_create_proc_entry(unsigned long variable_name_size,
 
 	/* Convert Unicode to normal chars (assume top bits are 0),
 	   ala UTF-8 */
-	for (i=0; i<variable_name_size / sizeof(efi_char16_t); i++) {
+	for (i=0; i< (int) (variable_name_size / sizeof(efi_char16_t)); i++) {
 		short_name[i] = variable_name[i] & 0xFF;
 	}
 

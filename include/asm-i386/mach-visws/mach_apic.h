@@ -19,6 +19,14 @@
 #define check_apicid_used(bitmap, apicid) (bitmap & (1 << apicid))
 #define check_apicid_present(bit) (phys_cpu_present_map & (1 << bit))
 
+#define         APIC_ID_MASK            (0xF<<24)
+
+static inline unsigned get_apic_id(unsigned long x)
+{
+	        return (((x)>>24)&0xF);
+}
+#define         GET_APIC_ID(x)  get_apic_id(x)
+
 static inline int apic_id_registered(void)
 {
 	return (test_bit(GET_APIC_ID(apic_read(APIC_ID)), 
@@ -77,4 +85,8 @@ static inline int check_phys_apicid_present(int boot_cpu_physical_apicid)
 	return test_bit(boot_cpu_physical_apicid, &phys_cpu_present_map);
 }
 
+static inline unsigned int cpu_mask_to_apicid (unsigned long cpumask)
+{
+	return cpumask;
+}
 #endif /* __ASM_MACH_APIC_H */

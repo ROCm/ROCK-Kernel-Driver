@@ -12,7 +12,7 @@
 
 #include <linux/config.h>
 
-#if CONFIG_QIC02_TAPE || CONFIG_QIC02_TAPE_MODULE
+#if defined(CONFIG_QIC02_TAPE) || defined(CONFIG_QIC02_TAPE_MODULE)
 
 /* need to have QIC02_TAPE_DRIVE and QIC02_TAPE_IFC expand to something */
 #include <linux/mtio.h>

@@ -1549,6 +1549,18 @@ S: Tallak 95
 S: 8103 Rein
 S: Austria
 
+N: Mitsuru Kanda
+E: mk@linux-ipv6.org
+E: mk@isl.rdc.toshiba.co.jp
+E: mk@karaba.org
+W: http://www.karaba.org/~mk/
+P: 1024D/2EC7E30D 9A35 D378 F084 9EA4 EFBA  925B 1C93 B376 F0EF BE59
+D: IPsec, IPv6
+D: USAGI/WIDE Project, TOSHIBA CORPORATION
+S: 2-47-8, Takinogawa,
+S: Kita, Tokyo 114-0023
+S: Japan
+
 N: Jan Kara
 E: jack@atrey.karlin.mff.cuni.cz
 E: jack@suse.cz
@@ -2199,6 +2211,17 @@ D: Shared zlib
 S: 7406 Wheat Field Rd
 S: Garland, Texas 75044
 S: USA
+
+N: Kazunori Miyazawa
+E: miyazawa@linux-ipv6.org
+E: Kazunori.Miyazawa@jp.yokogawa.com
+E: kazunori@miyazawa.org
+W: http://www.miyazawa.org/~kazunori/
+D: IPsec, IPv6
+D: USAGI/WIDE Project, Yokogawa Electric Corporation
+S: 2-20-4-203, Nakacho,
+S: Musashino, Tokyo 180-0006
+S: Japan
 
 N: Patrick Mochel
 E: mochel@osdl.org
@@ -3440,6 +3463,17 @@ N: Hiroshi YOKOTA
 E: yokota@netlab.is.tsukuba.ac.jp
 D: Workbit NinjaSCSI-3/32Bi PCMCIA driver
 D: Workbit NinjaSCSI-32Bi/UDE driver
+S: Japan
+
+N: Hideaki YOSHIFUJI
+E: hideaki@yoshifuji.org
+E: yoshfuji@linux-ipv6.org
+W: http://www.yoshifuji.org/~hideaki/
+P: 1024D/E0620EEA 9022 65EB 1ECF 3AD1 0BDF  80D8 4807 F894 E062 0EEA
+D: IPv6 and other networking related stuff
+D: USAGI/WIDE Project, The University of Tokyo
+S: Green House #102, 1-15-5, Nishikata, 
+S: Bunkyo, Tokyo 113-0024
 S: Japan
 
 N: Eric Youngdale

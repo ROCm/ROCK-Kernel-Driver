@@ -33,7 +33,6 @@
 struct atm_vcc *sigd = NULL;
 static DECLARE_WAIT_QUEUE_HEAD(sigd_sleep);
 
-extern spinlock_t atm_dev_lock;
 
 static void sigd_put_skb(struct sk_buff *skb)
 {
@@ -98,7 +97,7 @@ static int sigd_send(struct atm_vcc *vcc,struct sk_buff *skb)
 	struct atm_vcc *session_vcc;
 
 	msg = (struct atmsvc_msg *) skb->data;
-	atomic_sub(skb->truesize+ATM_PDU_OVHD,&vcc->sk->wmem_alloc);
+	atomic_sub(skb->truesize, &vcc->sk->wmem_alloc);
 	DPRINTK("sigd_send %d (0x%lx)\n",(int) msg->type,
 	  (unsigned long) msg->vcc);
 	vcc = *(struct atm_vcc **) &msg->vcc;
@@ -211,6 +210,7 @@ static void purge_vccs(struct atm_vcc *vcc)
 
 static void sigd_close(struct atm_vcc *vcc)
 {
+	unsigned long flags;
 	struct atm_dev *dev;
 	struct list_head *p;
 
@@ -219,33 +219,29 @@ static void sigd_close(struct atm_vcc *vcc)
 	if (skb_peek(&vcc->sk->receive_queue))
 		printk(KERN_ERR "sigd_close: closing with requests pending\n");
 	skb_queue_purge(&vcc->sk->receive_queue);
-	purge_vccs(nodev_vccs);
 
-	spin_lock (&atm_dev_lock);
+	spin_lock(&atm_dev_lock);
 	list_for_each(p, &atm_devs) {
 		dev = list_entry(p, struct atm_dev, dev_list);
+		spin_lock_irqsave(&dev->lock, flags);
 		purge_vccs(dev->vccs);
+		spin_unlock_irqrestore(&dev->lock, flags);
 	}
-	spin_unlock (&atm_dev_lock);
+	spin_unlock(&atm_dev_lock);
 }
 
 
 static struct atmdev_ops sigd_dev_ops = {
-	.close =sigd_close,
+	.close = sigd_close,
 	.send =	sigd_send
 };
 
 
 static struct atm_dev sigd_dev = {
-	&sigd_dev_ops,
-	NULL,		/* no PHY */
-    	"sig",		/* type */
-	999,		/* dummy device number */
-	NULL,NULL,	/* pretend not to have any VCCs */
-	NULL,NULL,	/* no data */
-	0,		/* no flags */
-	NULL,		/* no local address */
-	{ 0 }		/* no ESI, no statistics */
+	.ops =		&sigd_dev_ops,
+	.type =		"sig",
+	.number =	999,
+	.lock =		SPIN_LOCK_UNLOCKED
 };
 
 

@@ -41,10 +41,11 @@ struct ps2if {
  * at the most one, but we loop for safety.  If there was a
  * framing error, we have to manually clear the status.
  */
-static void ps2_rxint(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t ps2_rxint(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct ps2if *ps2if = dev_id;
 	unsigned int scancode, flag, status;
+	int handled = IRQ_NONE;
 
 	status = sa1111_readl(ps2if->base + SA1111_PS2STAT);
 	while (status & PS2STAT_RXF) {
@@ -62,13 +63,17 @@ static void ps2_rxint(int irq, void *dev_id, struct pt_regs *regs)
 		serio_interrupt(&ps2if->io, scancode, flag, regs);
 
                	status = sa1111_readl(ps2if->base + SA1111_PS2STAT);
+
+               	handled = IRQ_HANDLED;
         }
+
+        return handled;
 }
 
 /*
  * Completion of ps2 write
  */
-static void ps2_txint(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t ps2_txint(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct ps2if *ps2if = dev_id;
 	unsigned int status;
@@ -83,6 +88,8 @@ static void ps2_txint(int irq, void *dev_id, struct pt_regs *regs)
 		ps2if->tail = (ps2if->tail + 1) & (sizeof(ps2if->buf) - 1);
 	}
 	spin_unlock(&ps2if->lock);
+
+	return IRQ_HANDLED;
 }
 
 /*

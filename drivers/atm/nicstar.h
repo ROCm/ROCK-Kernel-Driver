@@ -96,6 +96,7 @@
 /* ESI stuff ******************************************************************/
 
 #define NICSTAR_EPROM_MAC_ADDR_OFFSET 0x6C
+#define NICSTAR_EPROM_MAC_ADDR_OFFSET_ALT 0xF6
 
 
 /* #defines *******************************************************************/
@@ -747,6 +748,15 @@ typedef struct vc_map
                				   SCD. 0x00000000 for UBR/VBR/ABR */
    int tbd_count;
 } vc_map;
+
+
+struct ns_skb_data
+{
+	struct atm_vcc *vcc;
+	int iovcnt;
+};
+
+#define NS_SKB(skb) (((struct ns_skb_data *) (skb)->cb))
 
 
 typedef struct ns_dev

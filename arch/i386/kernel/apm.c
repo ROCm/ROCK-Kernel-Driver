@@ -226,6 +226,7 @@
 #include <asm/system.h>
 #include <asm/uaccess.h>
 #include <asm/desc.h>
+#include <asm/suspend.h>
 
 #include "io_ports.h"
 
@@ -1165,9 +1166,13 @@ static void get_time_diff(void)
 #endif
 }
 
-static inline void reinit_timer(void)
+static void reinit_timer(void)
 {
 #ifdef INIT_TIMER_AFTER_SUSPEND
+	unsigned long	flags;
+	extern spinlock_t i8253_lock;
+
+	spin_lock_irqsave(&i8253_lock, flags);
 	/* set the clock to 100 Hz */
 	outb_p(0x34, PIT_MODE);		/* binary, mode 2, LSB/MSB, ch 0 */
 	udelay(10);
@@ -1175,6 +1180,7 @@ static inline void reinit_timer(void)
 	udelay(10);
 	outb(LATCH >> 8, PIT_CH0);	/* MSB */
 	udelay(10);
+	spin_unlock_irqrestore(&i8253_lock, flags);
 #endif
 }
 
@@ -1212,7 +1218,9 @@ static int suspend(int vetoable)
 	spin_unlock(&i8253_lock);
 	write_sequnlock_irq(&xtime_lock);
 
+	save_processor_state();
 	err = set_system_power_state(APM_STATE_SUSPEND);
+	restore_processor_state();
 
 	write_seqlock_irq(&xtime_lock);
 	spin_lock(&i8253_lock);

@@ -59,30 +59,6 @@ extern int BusLogic_BIOSDiskParameters(struct scsi_device *,
 extern int BusLogic_ProcDirectoryInfo(char *, char **, off_t, int, int, int);
 extern int BusLogic_SlaveConfigure(SCSI_Device_T *);
 
-
-/*
-  Define the BusLogic SCSI Host Template structure.
-*/
-
-#define BUSLOGIC							       \
-  { .proc_name      = "BusLogic",			  /* ProcFS Directory Entry */ \
-    .proc_info      = BusLogic_ProcDirectoryInfo,	  /* ProcFS Info Function   */ \
-    .name           = "BusLogic",			  /* Driver Name            */ \
-    .detect         = BusLogic_DetectHostAdapter,	  /* Detect Host Adapter    */ \
-    .release        = BusLogic_ReleaseHostAdapter,  /* Release Host Adapter   */ \
-    .info           = BusLogic_DriverInfo,	  /* Driver Info Function   */ \
-    .queuecommand   = BusLogic_QueueCommand,	  /* Queue Command Function */ \
-    .slave_configure = BusLogic_SlaveConfigure,	  /* Configure a SCSI_Device*/ \
-    .bios_param     = BusLogic_BIOSDiskParameters,  /* BIOS Disk Parameters   */ \
-    .unchecked_isa_dma = 1,			  /* Default Initial Value  */ \
-    .max_sectors    = 128,			  /* I/O queue len limit    */ \
-    .use_clustering = ENABLE_CLUSTERING }		  /* Enable Clustering	    */
-
-
-/*
-  BusLogic_DriverVersion protects the private portion of this file.
-*/
-
 #ifdef BusLogic_DriverVersion
 
 

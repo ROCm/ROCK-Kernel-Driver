@@ -581,9 +581,8 @@ iosapic_override_isa_irq (unsigned int isa_irq, unsigned int gsi,
 	register_intr(gsi, vector, IOSAPIC_LOWEST_PRIORITY, polarity, trigger);
 
 	DBG("ISA: IRQ %u -> GSI 0x%x (%s,%s) -> CPU 0x%04x vector %d\n",
-	    isa_irq, gsi,
-	    polarity == IOSAPIC_POL_HIGH ? "high" : "low", trigger == IOSAPIC_EDGE ? "edge" : "level",
-	    dest, vector);
+	    isa_irq, gsi, polarity == IOSAPIC_POL_HIGH ? "high" : "low",
+	    trigger == IOSAPIC_EDGE ? "edge" : "level", dest, vector);
 
 	/* program the IOSAPIC routing table */
 	set_rte(vector, dest);
@@ -635,7 +634,6 @@ iosapic_init (unsigned long phys_addr, unsigned int gsi_base)
 	       (ver & 0xf0) >> 4, (ver & 0x0f), phys_addr, gsi_base, gsi_base + num_rte - 1);
 
 	if ((gsi_base == 0) && pcat_compat) {
-
 		/*
 		 * Map the legacy ISA devices into the IOSAPIC data.  Some of these may
 		 * get reprogrammed later on with data from the ACPI Interrupt Source
@@ -646,20 +644,11 @@ iosapic_init (unsigned long phys_addr, unsigned int gsi_base)
 	}
 }
 
-static void __init
-fixup_vector (int vector, unsigned int gsi, const char *pci_id)
+void
+iosapic_enable_intr (unsigned int vector)
 {
-	struct hw_interrupt_type *irq_type = &irq_type_iosapic_level;
-	irq_desc_t *idesc;
 	unsigned int dest;
 
-	idesc = irq_desc(vector);
-	if (idesc->handler != irq_type) {
-		if (idesc->handler != &no_irq_type)
-			printk(KERN_INFO "IOSAPIC: changing vector %d from %s to %s\n",
-			       vector, idesc->handler->typename, irq_type->typename);
-		idesc->handler = irq_type;
-	}
 #ifdef CONFIG_SMP
 	/*
 	 * For platforms that do not support interrupt redirect via the XTP interface, we
@@ -687,9 +676,11 @@ fixup_vector (int vector, unsigned int gsi, const char *pci_id)
 #endif
 	set_rte(vector, dest);
 
-	printk(KERN_INFO "IOSAPIC: %s -> GSI 0x%x -> CPU 0x%04x vector %d\n",
-	       pci_id, gsi, dest, vector);
+	printk(KERN_INFO "IOSAPIC: vector %d -> CPU 0x%04x, enabled\n",
+	       vector, dest);
 }
+
+#ifdef CONFIG_ACPI_PCI
 
 void __init
 iosapic_parse_prt (void)
@@ -699,6 +690,8 @@ iosapic_parse_prt (void)
 	unsigned int gsi;
 	int vector;
 	char pci_id[16];
+	struct hw_interrupt_type *irq_type = &irq_type_iosapic_level;
+	irq_desc_t *idesc;
 
 	list_for_each(node, &acpi_prt.entries) {
 		entry = list_entry(node, struct acpi_prt_entry, node);
@@ -711,6 +704,9 @@ iosapic_parse_prt (void)
 
 		vector = gsi_to_vector(gsi);
 		if (vector < 0) {
+			if (find_iosapic(gsi) < 0)
+				continue;
+
 			/* allocate a vector for this interrupt line */
 			if (pcat_compat && (gsi < 16))
 				vector = isa_irq_to_vector(gsi);
@@ -718,11 +714,22 @@ iosapic_parse_prt (void)
 				/* new GSI; allocate a vector for it */
 				vector = ia64_alloc_vector();
 
-			register_intr(gsi, vector, IOSAPIC_LOWEST_PRIORITY, IOSAPIC_POL_LOW, IOSAPIC_LEVEL);
+			register_intr(gsi, vector, IOSAPIC_LOWEST_PRIORITY, IOSAPIC_POL_LOW,
+				      IOSAPIC_LEVEL);
 		}
 		snprintf(pci_id, sizeof(pci_id), "%02x:%02x:%02x[%c]",
 			 entry->id.segment, entry->id.bus, entry->id.device, 'A' + entry->pin);
 
-		fixup_vector(vector, gsi, pci_id);
+		/*
+		 * If vector was previously initialized to a different
+		 * handler, re-initialize.
+		 */
+		idesc = irq_desc(vector);
+		if (idesc->handler != irq_type)
+			register_intr(gsi, vector, IOSAPIC_LOWEST_PRIORITY, IOSAPIC_POL_LOW,
+				      IOSAPIC_LEVEL);
+
 	}
 }
+
+#endif /* CONFIG_ACPI */

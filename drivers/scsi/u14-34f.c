@@ -1897,7 +1897,8 @@ static irqreturn_t do_interrupt_handler(int irq, void *shap,
    unsigned long spin_flags;
 
    /* Check if the interrupt must be processed by this handler */
-   if ((j = (unsigned int)((char *)shap - sha)) >= num_boards) return;
+   if ((j = (unsigned int)((char *)shap - sha)) >= num_boards)
+	   return IRQ_NONE;
 
    spin_lock_irqsave(sh[j]->host_lock, spin_flags);
    ihdlr(irq, j);
@@ -1929,8 +1930,19 @@ static int u14_34f_release(struct Scsi_Host *shpnt) {
    return FALSE;
 }
 
-static Scsi_Host_Template driver_template = ULTRASTOR_14_34F;
-
+static Scsi_Host_Template driver_template = {
+	.name         = "UltraStor 14F/34F rev. " U14_34F_VERSION " ",
+	.detect                  = u14_34f_detect,
+	.release                 = u14_34f_release,
+	.queuecommand            = u14_34f_queuecommand,
+	.eh_abort_handler        = u14_34f_eh_abort,
+	.eh_host_reset_handler   = u14_34f_eh_host_reset,
+	.bios_param              = u14_34f_bios_param,
+	.slave_configure         = u14_34f_slave_configure,
+	.this_id                 = 7,
+	.unchecked_isa_dma       = 1, 
+	.use_clustering          = ENABLE_CLUSTERING,
+};
 #include "scsi_module.c"
 
 #ifndef MODULE

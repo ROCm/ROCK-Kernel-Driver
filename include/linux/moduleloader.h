@@ -41,4 +41,7 @@ int module_finalize(const Elf_Ehdr *hdr,
 		    const Elf_Shdr *sechdrs,
 		    struct module *mod);
 
+/* Any cleanup needed when module leaves. */
+void module_arch_cleanup(struct module *mod);
+
 #endif

@@ -789,7 +789,7 @@ emulate_load_int (unsigned long ifa, load_store_t ld, struct pt_regs *regs)
 	 *
 	 * ldX.a (advanced load):
 	 *	- suppose ldX.a r1=[r3]. If we get to the unaligned trap it's because the
-	 *	  address doesn't match requested size alignement. This means that we would
+	 *	  address doesn't match requested size alignment. This means that we would
 	 *	  possibly need more than one load to get the result.
 	 *
 	 *	  The load part can be handled just like a normal load, however the difficult

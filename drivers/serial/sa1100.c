@@ -312,7 +312,7 @@ static void sa1100_tx_chars(struct sa1100_port *sport)
 		sa1100_stop_tx(&sport->port, 0);
 }
 
-static void sa1100_int(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t sa1100_int(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct sa1100_port *sport = dev_id;
 	unsigned int status, pass_counter = 0;
@@ -347,6 +347,8 @@ static void sa1100_int(int irq, void *dev_id, struct pt_regs *regs)
 			  ~UTSR0_TFS;
 	} while (status & (UTSR0_TFS | UTSR0_RFS | UTSR0_RID));
 	spin_unlock(&sport->port.lock);
+
+	return IRQ_HANDLED;
 }
 
 /*
@@ -830,7 +832,7 @@ static struct console sa1100_console = {
 	.setup		= sa1100_console_setup,
 	.flags		= CON_PRINTBUFFER,
 	.index		= -1,
-	.data		= sa1100_reg,
+	.data		= &sa1100_reg,
 };
 
 static int __init sa1100_rs_console_init(void)

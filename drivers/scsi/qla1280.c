@@ -5939,15 +5939,24 @@ qla1280_debounce_register(volatile u16 * addr)
 	return ret;
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,0)
-#ifdef MODULE
-Scsi_Host_Template driver_template = QLA1280_LINUX_TEMPLATE;
+static Scsi_Host_Template driver_template = {
+	.proc_info		= qla1280_proc_info,
+	.name			= "Qlogic ISP 1280/12160",
+	.detect			= qla1280_detect,
+	.release		= qla1280_release,
+	.info			= qla1280_info,
+	.queuecommand		= qla1280_queuecommand,
+	.abort			= qla1280_abort,
+	.reset			= qla1280_reset,
+	.slave_configure	= qla1280_slave_configure,
+	.bios_param		= qla1280_biosparam,
+	.can_queue		= 255,
+	.this_id		= -1,
+	.sg_tablesize		= SG_ALL,
+	.cmd_per_lun		= 3,
+	.use_clustering		= ENABLE_CLUSTERING,			\
+};
 #include "scsi_module.c"
-#endif
-#else				/* new kernel scsi initialization scheme */
-static Scsi_Host_Template driver_template = QLA1280_LINUX_TEMPLATE;
-#include "scsi_module.c"
-#endif
 
 /************************************************************************
  * qla1280_check_for_dead_scsi_bus                                      *

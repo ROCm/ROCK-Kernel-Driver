@@ -337,7 +337,7 @@ static struct mtd_partition flexanet_partitions[] = {
 
 #ifdef CONFIG_SA1100_FREEBIRD
 static struct mtd_partition freebird_partitions[] = {
-#if CONFIG_SA1100_FREEBIRD_NEW
+#ifdef CONFIG_SA1100_FREEBIRD_NEW
 	{
 		.name		= "firmware",
 		.size		= 0x00040000,

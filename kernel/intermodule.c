@@ -143,7 +143,7 @@ const void *inter_module_get_request(const char *im_name, const char *modname)
 {
 	const void *result = inter_module_get(im_name);
 	if (!result) {
-		request_module(modname);
+		request_module("%s", modname);
 		result = inter_module_get(im_name);
 	}
 	return(result);

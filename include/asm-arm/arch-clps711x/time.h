@@ -25,11 +25,13 @@ extern void clps711x_setup_timer(void);
 /*
  * IRQ handler for the timer
  */
-static void p720t_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t
+p720t_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	do_leds();
 	do_timer(regs);
 	do_profile(regs);
+	return IRQ_HANDLED;
 }
 
 /*

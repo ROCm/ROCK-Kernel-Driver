@@ -38,7 +38,7 @@
 #include "ultrix.h"
 #include "efi.h"
 
-#if CONFIG_BLK_DEV_MD
+#ifdef CONFIG_BLK_DEV_MD
 extern void md_autodetect_dev(dev_t dev);
 #endif
 
@@ -340,7 +340,7 @@ void register_disk(struct gendisk *disk)
 			if (!size)
 				continue;
 			add_partition(disk, j, from, size);
-#if CONFIG_BLK_DEV_MD
+#ifdef CONFIG_BLK_DEV_MD
 			if (!state->parts[j].flags)
 				continue;
 			md_autodetect_dev(bdev->bd_dev+j);
@@ -374,7 +374,7 @@ int rescan_partitions(struct gendisk *disk, struct block_device *bdev)
 		if (!size)
 			continue;
 		add_partition(disk, p, from, size);
-#if CONFIG_BLK_DEV_MD
+#ifdef CONFIG_BLK_DEV_MD
 		if (state->parts[p].flags)
 			md_autodetect_dev(bdev->bd_dev+p);
 #endif

@@ -2484,6 +2484,21 @@ static int option_setup(char *str)
 
 __setup("ibmmcascsi=", option_setup);
 
-static Scsi_Host_Template driver_template = IBMMCA;
-
+static Scsi_Host_Template driver_template = {
+          .proc_name      = "ibmmca",
+	  .proc_info	  = ibmmca_proc_info,
+          .name           = "IBM SCSI-Subsystem",
+          .detect         = ibmmca_detect,
+          .release        = ibmmca_release,
+          .command        = ibmmca_command,
+          .queuecommand   = ibmmca_queuecommand,
+	  .eh_abort_handler = ibmmca_abort,
+	  .eh_host_reset_handler = ibmmca_host_reset,
+          .bios_param     = ibmmca_biosparam,
+          .can_queue      = 16,
+          .this_id        = 7,
+          .sg_tablesize   = 16,
+          .cmd_per_lun    = 1,
+          .use_clustering = ENABLE_CLUSTERING,
+};
 #include "scsi_module.c"

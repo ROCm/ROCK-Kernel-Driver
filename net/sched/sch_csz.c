@@ -301,8 +301,8 @@ struct csz_sched_data
 
 #if 0
 /* Scan forward */
-extern __inline__ void csz_insert_finish(struct csz_head *b,
-					 struct csz_flow *this)
+static inline void csz_insert_finish(struct csz_head *b,
+				     struct csz_flow *this)
 {
 	struct csz_head *f = b->fnext;
 	unsigned long finish = this->finish;
@@ -318,8 +318,8 @@ extern __inline__ void csz_insert_finish(struct csz_head *b,
 }
 #else
 /* Scan backward */
-extern __inline__ void csz_insert_finish(struct csz_head *b,
-					 struct csz_flow *this)
+static inline void csz_insert_finish(struct csz_head *b,
+				     struct csz_flow *this)
 {
 	struct csz_head *f = b->fprev;
 	unsigned long finish = this->finish;
@@ -339,8 +339,8 @@ extern __inline__ void csz_insert_finish(struct csz_head *b,
    flow with greater start number.
  */
 
-extern __inline__ void csz_insert_start(struct csz_head *b,
-					struct csz_flow *this)
+static inline void csz_insert_start(struct csz_head *b,
+				    struct csz_flow *this)
 {
 	struct csz_head *f = b->snext;
 	unsigned long start = this->start;

@@ -238,20 +238,43 @@
 static const char   ips_name[] = "ips";
 static struct Scsi_Host *ips_sh[IPS_MAX_ADAPTERS];   /* Array of host controller structures */
 static ips_ha_t    *ips_ha[IPS_MAX_ADAPTERS];        /* Array of HA structures */
-static unsigned int ips_next_controller = 0;
-static unsigned int ips_num_controllers = 0;
-static unsigned int ips_released_controllers = 0;
+static unsigned int ips_next_controller;
+static unsigned int ips_num_controllers;
+static unsigned int ips_released_controllers;
 static int          ips_hotplug;
 static int          ips_cmd_timeout = 60;
 static int          ips_reset_timeout = 60 * 5;
 static int          ips_force_memio = 1;             /* Always use Memory Mapped I/O    */
 static int          ips_force_i2o = 1;               /* Always use I2O command delivery */
 static int          ips_ioctlsize = IPS_IOCTL_SIZE;  /* Size of the ioctl buffer        */
-static int          ips_cd_boot = 0;                 /* Booting from Manager CD         */
+static int          ips_cd_boot;                     /* Booting from Manager CD         */
 static char        *ips_FlashData = NULL;            /* CD Boot - Flash Data Buffer      */
-static long         ips_FlashDataInUse = 0;          /* CD Boot - Flash Data In Use Flag */
+static long         ips_FlashDataInUse;              /* CD Boot - Flash Data In Use Flag */
 static uint32_t     MaxLiteCmds = 32;                /* Max Active Cmds for a Lite Adapter */  
-static Scsi_Host_Template ips_driver_template = IPS;
+static Scsi_Host_Template ips_driver_template = {
+	.detect			= ips_detect,
+	.release		= ips_release,
+	.info			= ips_info,
+	.queuecommand		= ips_queue,
+	.eh_abort_handler	= ips_eh_abort,
+	.eh_host_reset_handler	= ips_eh_reset,
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
+	.slave_configure	= ips_slave_configure,
+#else
+	.select_queue_depths	= ips_select_queue_depth,
+#endif
+	.bios_param		= ips_biosparam,
+	.this_id		= -1,
+	.sg_tablesize		= IPS_MAX_SG,
+	.cmd_per_lun		= 3,
+	.use_clustering		= ENABLE_CLUSTERING,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,20) || (defined CONFIG_HIGHIO)
+	.highmem_io		= 1,
+#endif
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+	.use_new_eh_code	= 1,
+#endif
+};
 
 IPS_DEFINE_COMPAT_TABLE( Compatable );               /* Version Compatability Table      */
 
@@ -426,8 +449,8 @@ static void ips_chkstatus(ips_ha_t *, IPS_STATUS *);
 static void ips_enable_int_copperhead(ips_ha_t *);
 static void ips_enable_int_copperhead_memio(ips_ha_t *);
 static void ips_enable_int_morpheus(ips_ha_t *);
-static void ips_intr_copperhead(ips_ha_t *);
-static void ips_intr_morpheus(ips_ha_t *);
+static int ips_intr_copperhead(ips_ha_t *);
+static int ips_intr_morpheus(ips_ha_t *);
 static void ips_next(ips_ha_t *, int);
 static void ipsintr_blocking(ips_ha_t *, struct ips_scb *);
 static void ipsintr_done(ips_ha_t *, struct ips_scb *);
@@ -562,8 +585,6 @@ ips_detect(Scsi_Host_Template *SHT) {
          printk( KERN_WARNING "ERROR: Can't Allocate Large Buffer for Flashing\n" );
       }
    }                                                                               
-   if (!pci_present())
-      return (0);
 
    SHT->proc_info = ips_proc_info;
    SHT->proc_name = "ips";
@@ -682,13 +703,13 @@ ips_release(struct Scsi_Host *sh) {
    scb->cmd.flush_cache.reserved3 = 0;
    scb->cmd.flush_cache.reserved4 = 0;
 
-   printk(KERN_NOTICE "(%s%d) Flushing Cache.\n", ips_name, ha->host_num);
+   IPS_PRINTK(KERN_WARNING, ha->pcidev, "Flushing Cache.\n");
 
    /* send command */
    if (ips_send_wait(ha, scb, ips_cmd_timeout, IPS_INTR_ON) == IPS_FAILURE)
-      printk(KERN_NOTICE "(%s%d) Incomplete Flush.\n", ips_name, ha->host_num);
+      IPS_PRINTK(KERN_WARNING, ha->pcidev, "Incomplete Flush.\n");
 
-   printk(KERN_NOTICE "(%s%d) Flushing Complete.\n", ips_name, ha->host_num);
+   IPS_PRINTK(KERN_WARNING, ha->pcidev, "Flushing Complete.\n");
 
    ips_sh[i] = NULL;
    ips_ha[i] = NULL;
@@ -755,13 +776,13 @@ ips_halt(struct notifier_block *nb, ulong event, void *buf) {
       scb->cmd.flush_cache.reserved3 = 0;
       scb->cmd.flush_cache.reserved4 = 0;
 
-      printk(KERN_NOTICE "(%s%d) Flushing Cache.\n", ips_name, ha->host_num);
+      IPS_PRINTK(KERN_WARNING, ha->pcidev, "Flushing Cache.\n");
 
       /* send command */
       if (ips_send_wait(ha, scb, ips_cmd_timeout, IPS_INTR_ON) == IPS_FAILURE)
-         printk(KERN_NOTICE "(%s%d) Incomplete Flush.\n", ips_name, ha->host_num);
+         IPS_PRINTK(KERN_WARNING, ha->pcidev, "Incomplete Flush.\n");
       else
-         printk(KERN_NOTICE "(%s%d) Flushing Complete.\n", ips_name, ha->host_num);
+         IPS_PRINTK(KERN_WARNING, ha->pcidev, "Flushing Complete.\n");
    }
 
    return (NOTIFY_OK);
@@ -911,7 +932,7 @@ ips_eh_reset(Scsi_Cmnd *SC) {
       /* Attempt the flush command */
       ret = ips_send_wait(ha, scb, ips_cmd_timeout, IPS_INTR_IORL);
       if (ret == IPS_SUCCESS) {
-         printk(KERN_NOTICE "(%s%d) Reset Request - Flushed Cache\n", ips_name, ha->host_num);
+         IPS_PRINTK(KERN_NOTICE, ha->pcidev, "Reset Request - Flushed Cache\n");
          return (SUCCESS);
          }
    }
@@ -925,16 +946,14 @@ ips_eh_reset(Scsi_Cmnd *SC) {
     * command must have already been sent
     * reset the controller
     */
-   printk(KERN_NOTICE "(%s%d) Resetting controller.\n",
-          ips_name, ha->host_num);
+   IPS_PRINTK(KERN_NOTICE, ha->pcidev, "Resetting controller.\n");
    ret = (*ha->func.reset)(ha);
 
    if (!ret) {
       Scsi_Cmnd *scsi_cmd;
 
-      printk(KERN_NOTICE
-             "(%s%d) Controller reset failed - controller now offline.\n",
-             ips_name, ha->host_num);
+      IPS_PRINTK(KERN_NOTICE, ha->pcidev,
+                 "Controller reset failed - controller now offline.\n");
 
       /* Now fail all of the active commands */
       DEBUG_VAR(1, "(%s%d) Failing active commands",
@@ -962,9 +981,8 @@ ips_eh_reset(Scsi_Cmnd *SC) {
    if (!ips_clear_adapter(ha, IPS_INTR_IORL)) {
       Scsi_Cmnd *scsi_cmd;
 
-      printk(KERN_NOTICE
-             "(%s%d) Controller reset failed - controller now offline.\n",
-             ips_name, ha->host_num);
+      IPS_PRINTK(KERN_NOTICE, ha->pcidev,
+                 "Controller reset failed - controller now offline.\n");
 
       /* Now fail all of the active commands */
       DEBUG_VAR(1, "(%s%d) Failing active commands",
@@ -1269,7 +1287,8 @@ do_ipsintr(int irq, void *dev_id, struct pt_regs *regs) {
    ips_ha_t         *ha;
    unsigned long     cpu_flags;
    struct Scsi_Host *host;
-
+   int       irqstatus;
+   
    METHOD_TRACE("do_ipsintr", 2);
 
    ha = (ips_ha_t *) dev_id;
@@ -1289,13 +1308,13 @@ do_ipsintr(int irq, void *dev_id, struct pt_regs *regs) {
       return IRQ_HANDLED;
    }
 
-   (*ha->func.intr)(ha);
+   irqstatus = (*ha->func.intr)(ha);
 
    IPS_UNLOCK_RESTORE(host->host_lock, cpu_flags);
 
    /* start the next command */
    ips_next(ha, IPS_INTR_ON);
-   return IRQ_HANDLED;
+   return IRQ_RETVAL(irqstatus);
 }
 
 /****************************************************************************/
@@ -1309,7 +1328,7 @@ do_ipsintr(int irq, void *dev_id, struct pt_regs *regs) {
 /*   ASSUMES interrupts are disabled                                        */
 /*                                                                          */
 /****************************************************************************/
-void
+int
 ips_intr_copperhead(ips_ha_t *ha) {
    ips_stat_t       *sp;
    ips_scb_t        *scb;
@@ -1319,10 +1338,10 @@ ips_intr_copperhead(ips_ha_t *ha) {
    METHOD_TRACE("ips_intr", 2);
 
    if (!ha)
-      return;
+      return 0;
 
    if (!ha->active)
-      return;
+      return 0;
 
    intrstatus = (*ha->func.isintr)(ha);
 
@@ -1331,7 +1350,7 @@ ips_intr_copperhead(ips_ha_t *ha) {
        * Unexpected/Shared interrupt
        */
 
-      return;
+      return 0;
    }
 
    while (TRUE) {
@@ -1358,6 +1377,7 @@ ips_intr_copperhead(ips_ha_t *ha) {
        */
       (*scb->callback) (ha, scb);
    } /* end while */
+   return 1;
 }
 
 /****************************************************************************/
@@ -1371,7 +1391,7 @@ ips_intr_copperhead(ips_ha_t *ha) {
 /*   ASSUMES interrupts are disabled                                        */
 /*                                                                          */
 /****************************************************************************/
-void
+int
 ips_intr_morpheus(ips_ha_t *ha) {
    ips_stat_t       *sp;
    ips_scb_t        *scb;
@@ -1381,10 +1401,10 @@ ips_intr_morpheus(ips_ha_t *ha) {
    METHOD_TRACE("ips_intr_morpheus", 2);
 
    if (!ha)
-      return;
+      return 0;
 
    if (!ha->active)
-      return;
+      return 0;
 
    intrstatus = (*ha->func.isintr)(ha);
 
@@ -1393,7 +1413,7 @@ ips_intr_morpheus(ips_ha_t *ha) {
        * Unexpected/Shared interrupt
        */
 
-      return;
+      return 0;
    }
 
    while (TRUE) {
@@ -1411,8 +1431,7 @@ ips_intr_morpheus(ips_ha_t *ha) {
          break;
 
       if (cstatus.fields.command_id > (IPS_MAX_CMDS - 1)) {
-         printk(KERN_WARNING "(%s%d) Spurious interrupt; no ccb.\n",
-                ips_name, ha->host_num);
+         IPS_PRINTK(KERN_WARNING, ha->pcidev, "Spurious interrupt; no ccb.\n");
 
          continue;
       }
@@ -1426,6 +1445,7 @@ ips_intr_morpheus(ips_ha_t *ha) {
        */
       (*scb->callback) (ha, scb);
    } /* end while */
+   return 1;
 }
 
 /****************************************************************************/
@@ -1728,7 +1748,7 @@ ips_flash_copperhead(ips_ha_t *ha, ips_passthru_t *pt, ips_scb_t *scb){
       if(pt->CoppCP.cmd.flashfw.count + ha->flash_datasize >
         (PAGE_SIZE << ha->flash_order)){
          ips_free_flash_copperhead(ha);
-         printk(KERN_WARNING "failed size sanity check\n");
+         IPS_PRINTK(KERN_WARNING, ha->pcidev, "failed size sanity check\n");
          return IPS_FAILURE;
       }
    }
@@ -2400,6 +2420,7 @@ ips_get_bios_version(ips_ha_t *ha, int intr) {
          minor    = buffer[0x1fe + 0xC0];  /* Offset 0x1fe after the header (0xc0) */
          subminor = buffer[0x1fd + 0xC0];  /* Offset 0x1fd after the header (0xc0) */
       } else {
+         kfree(buffer);
          return;
       }
 
@@ -2450,15 +2471,13 @@ ips_hainit(ips_ha_t *ha) {
    ips_ffdc_reset(ha, IPS_INTR_IORL);
 
    if (!ips_read_config(ha, IPS_INTR_IORL)) {
-      printk(KERN_WARNING "(%s%d) unable to read config from controller.\n",
-             ips_name, ha->host_num);
+      IPS_PRINTK(KERN_WARNING, ha->pcidev, "unable to read config from controller.\n");
 
       return (0);
    } /* end if */
 
    if (!ips_read_adapter_status(ha, IPS_INTR_IORL)) {
-      printk(KERN_WARNING "(%s%d) unable to read controller status.\n",
-             ips_name, ha->host_num);
+      IPS_PRINTK(KERN_WARNING, ha->pcidev, "unable to read controller status.\n");
 
       return (0);
    }
@@ -2467,16 +2486,14 @@ ips_hainit(ips_ha_t *ha) {
    ips_identify_controller(ha);
 
    if (!ips_read_subsystem_parameters(ha, IPS_INTR_IORL)) {
-      printk(KERN_WARNING "(%s%d) unable to read subsystem parameters.\n",
-             ips_name, ha->host_num);
+      IPS_PRINTK(KERN_WARNING, ha->pcidev, "unable to read subsystem parameters.\n");
 
       return (0);
    }
 
    /* write nvram user page 5 */
    if (!ips_write_driver_status(ha, IPS_INTR_IORL)) {
-      printk(KERN_WARNING "(%s%d) unable to write driver info to controller.\n",
-             ips_name, ha->host_num);
+      IPS_PRINTK(KERN_WARNING, ha->pcidev, "unable to write driver info to controller.\n");
 
       return (0);
    }
@@ -3233,16 +3250,14 @@ ipsintr_done(ips_ha_t *ha, ips_scb_t *scb) {
    METHOD_TRACE("ipsintr_done", 2);
 
    if (!scb) {
-      printk(KERN_WARNING "(%s%d) Spurious interrupt; scb NULL.\n",
-             ips_name, ha->host_num);
+      IPS_PRINTK(KERN_WARNING, ha->pcidev, "Spurious interrupt; scb NULL.\n");
 
       return ;
    }
 
    if (scb->scsi_cmd == NULL) {
       /* unexpected interrupt */
-      printk(KERN_WARNING "(%s%d) Spurious interrupt; scsi_cmd not set.\n",
-             ips_name, ha->host_num);
+      IPS_PRINTK(KERN_WARNING, ha->pcidev, "Spurious interrupt; scsi_cmd not set.\n");
 
       return;
    }
@@ -4677,8 +4692,8 @@ ips_init_copperhead(ips_ha_t *ha) {
    }
 
    if (PostByte[0] < IPS_GOOD_POST_STATUS) {
-      printk(KERN_WARNING "(%s%d) reset controller fails (post status %x %x).\n",
-             ips_name, ha->host_num, PostByte[0], PostByte[1]);
+      IPS_PRINTK(KERN_WARNING, ha->pcidev, "reset controller fails (post status %x %x).\n",
+                 PostByte[0], PostByte[1]);
 
       return (0);
    }
@@ -4769,8 +4784,8 @@ ips_init_copperhead_memio(ips_ha_t *ha) {
    }
 
    if (PostByte[0] < IPS_GOOD_POST_STATUS) {
-      printk(KERN_WARNING "(%s%d) reset controller fails (post status %x %x).\n",
-             ips_name, ha->host_num, PostByte[0], PostByte[1]);
+      IPS_PRINTK(KERN_WARNING, ha->pcidev, "reset controller fails (post status %x %x).\n",
+                 PostByte[0], PostByte[1]);
 
       return (0);
    }
@@ -4856,8 +4871,7 @@ ips_init_morpheus(ips_ha_t *ha) {
 
    if (i >= 45) {
       /* error occurred */
-      printk(KERN_WARNING "(%s%d) timeout waiting for post.\n",
-             ips_name, ha->host_num);
+      IPS_PRINTK(KERN_WARNING, ha->pcidev, "timeout waiting for post.\n");
 
       return (0);
    }
@@ -4865,7 +4879,7 @@ ips_init_morpheus(ips_ha_t *ha) {
    Post = readl(ha->mem_ptr + IPS_REG_I960_MSG0);
 
    if (Post == 0x4F00) {                          /* If Flashing the Battery PIC         */
-       printk(KERN_WARNING "Flashing Battery PIC, Please wait ...\n" );
+      IPS_PRINTK(KERN_WARNING, ha->pcidev, "Flashing Battery PIC, Please wait ...\n" );
 
        /* Clear the interrupt bit */
        Isr = (uint32_t) IPS_BIT_I960_MSG0I;
@@ -4880,8 +4894,7 @@ ips_init_morpheus(ips_ha_t *ha) {
        }
 
        if (i >= 120) {
-          printk(KERN_WARNING "(%s%d) timeout waiting for Battery PIC Flash\n",
-                 ips_name, ha->host_num);
+          IPS_PRINTK(KERN_WARNING, ha->pcidev, "timeout waiting for Battery PIC Flash\n");
           return (0);
        }
 
@@ -4892,8 +4905,7 @@ ips_init_morpheus(ips_ha_t *ha) {
    writel(Isr, ha->mem_ptr + IPS_REG_I2O_HIR);
 
    if (Post < (IPS_GOOD_POST_STATUS << 8)) {
-      printk(KERN_WARNING "(%s%d) reset controller fails (post status %x).\n",
-             ips_name, ha->host_num, Post);
+      IPS_PRINTK(KERN_WARNING, ha->pcidev, "reset controller fails (post status %x).\n", Post);
 
       return (0);
    }
@@ -4911,8 +4923,7 @@ ips_init_morpheus(ips_ha_t *ha) {
 
    if (i >= 240) {
       /* error occurred */
-      printk(KERN_WARNING "(%s%d) timeout waiting for config.\n",
-             ips_name, ha->host_num);
+      IPS_PRINTK(KERN_WARNING, ha->pcidev, "timeout waiting for config.\n");
 
       return (0);
    }
@@ -5239,10 +5250,8 @@ ips_issue_copperhead(ips_ha_t *ha, ips_scb_t *scb) {
          if (!(val & IPS_BIT_START_STOP))
             break;
 
-         printk(KERN_WARNING "(%s%d) ips_issue val [0x%x].\n",
-                ips_name, ha->host_num, val);
-         printk(KERN_WARNING "(%s%d) ips_issue semaphore chk timeout.\n",
-                ips_name, ha->host_num);
+         IPS_PRINTK(KERN_WARNING, ha->pcidev, "ips_issue val [0x%x].\n", val);
+         IPS_PRINTK(KERN_WARNING, ha->pcidev, "ips_issue semaphore chk timeout.\n");
 
          return (IPS_FAILURE);
       } /* end if */
@@ -5295,10 +5304,8 @@ ips_issue_copperhead_memio(ips_ha_t *ha, ips_scb_t *scb) {
          if (!(val & IPS_BIT_START_STOP))
             break;
 
-         printk(KERN_WARNING "(%s%d) ips_issue val [0x%x].\n",
-                ips_name, ha->host_num, val);
-         printk(KERN_WARNING "(%s%d) ips_issue semaphore chk timeout.\n",
-                ips_name, ha->host_num);
+         IPS_PRINTK(KERN_WARNING, ha->pcidev, "ips_issue val [0x%x].\n", val);
+         IPS_PRINTK(KERN_WARNING, ha->pcidev, "ips_issue semaphore chk timeout.\n");
 
          return (IPS_FAILURE);
       } /* end if */
@@ -5538,8 +5545,7 @@ ips_write_driver_status(ips_ha_t *ha, int intr) {
    METHOD_TRACE("ips_write_driver_status", 1);
 
    if (!ips_readwrite_page5(ha, FALSE, intr)) {
-      printk(KERN_WARNING "(%s%d) unable to read NVRAM page 5.\n",
-             ips_name, ha->host_num);
+      IPS_PRINTK(KERN_WARNING, ha->pcidev, "unable to read NVRAM page 5.\n");
 
       return (0);
    }
@@ -5574,8 +5580,7 @@ ips_write_driver_status(ips_ha_t *ha, int intr) {
 
    /* now update the page */
    if (!ips_readwrite_page5(ha, TRUE, intr)) {
-      printk(KERN_WARNING "(%s%d) unable to write NVRAM page 5.\n",
-             ips_name, ha->host_num);
+      IPS_PRINTK(KERN_WARNING, ha->pcidev, "unable to write NVRAM page 5.\n");
 
       return (0);
    }
@@ -6538,10 +6543,10 @@ static void ips_version_check(ips_ha_t *ha, int intr) {
          strncpy(&FirmwareString[0], ha->enq->CodeBlkVersion, 8);
          FirmwareString[8] = 0;
 
-         printk(KERN_WARNING "Warning ! ! ! ServeRAID Version Mismatch\n");
-         printk(KERN_WARNING "Bios = %s, Firmware = %s, Device Driver = %s%s\n",
-                              BiosString, FirmwareString, IPS_VERSION_HIGH, IPS_VERSION_LOW );
-         printk(KERN_WARNING "These levels should match to avoid possible compatibility problems.\n" );
+         IPS_PRINTK(KERN_WARNING, ha->pcidev, "Warning ! ! ! ServeRAID Version Mismatch\n");
+         IPS_PRINTK(KERN_WARNING, ha->pcidev, "Bios = %s, Firmware = %s, Device Driver = %s%s\n",
+                    BiosString, FirmwareString, IPS_VERSION_HIGH, IPS_VERSION_LOW );
+         IPS_PRINTK(KERN_WARNING, ha->pcidev, "These levels should match to avoid possible compatibility problems.\n");
      }
  }
  else
@@ -6682,6 +6687,7 @@ ips_order_controllers(void){
 					}
 					break;
 				default:
+					break;
 				}
 			}
 		}
@@ -6725,19 +6731,18 @@ ips_order_controllers(void){
 static int
 ips_register_scsi( int index){
 	struct Scsi_Host *sh;
-	ips_ha_t *ha, *oldha;
+	ips_ha_t *ha, *oldha = ips_ha[index];
 	sh = scsi_register(&ips_driver_template, sizeof(ips_ha_t));
 	if(!sh) {
-		printk(KERN_WARNING "Unable to register controller with SCSI subsystem\n" );
+		IPS_PRINTK(KERN_WARNING, oldha->pcidev, "Unable to register controller with SCSI subsystem\n");
 		return -1;
 	}
-	oldha = ips_ha[index];
 	ha = IPS_HA(sh);
 	memcpy(ha, oldha, sizeof(ips_ha_t));
 	free_irq(oldha->irq, oldha);
 	/* Install the interrupt handler with the new ha */
 	if (request_irq(ha->irq, do_ipsintr, SA_SHIRQ, ips_name, ha)) {
-		printk(KERN_WARNING "Unable to install interrupt handler\n" );
+		IPS_PRINTK(KERN_WARNING, ha->pcidev, "Unable to install interrupt handler\n" );
 		scsi_unregister(sh);
 		return -1;
 	}
@@ -6745,7 +6750,7 @@ ips_register_scsi( int index){
 	kfree(oldha);
 	ips_sh[index] = sh;
 	ips_ha[index] = ha;
-	scsi_set_device(sh, &ha->pcidev->dev);
+	IPS_SCSI_SET_DEVICE(sh, ha);
 
 	/* Store away needed values for later use */
 	sh->io_port = ha->io_addr;
@@ -6940,7 +6945,7 @@ static int ips_init_phase1( struct pci_dev *pci_dev, int *indexPtr )
        uint32_t offs;
 
        if (!request_mem_region(mem_addr, mem_len, "ips")) {
-          printk(KERN_WARNING "Couldn't allocate IO Memory space %x len %d.\n", mem_addr, mem_len);
+          IPS_PRINTK(KERN_WARNING, pci_dev, "Couldn't allocate IO Memory space %x len %d.\n", mem_addr, mem_len);
           return -1;
           }
 
@@ -6956,14 +6961,14 @@ static int ips_init_phase1( struct pci_dev *pci_dev, int *indexPtr )
     /* setup I/O mapped area (if applicable) */
     if (io_addr) {
        if (!request_region(io_addr, io_len, "ips")) {
-          printk(KERN_WARNING "Couldn't allocate IO space %x len %d.\n", io_addr, io_len);
+          IPS_PRINTK(KERN_WARNING, pci_dev, "Couldn't allocate IO space %x len %d.\n", io_addr, io_len);
           return -1;
        }
     }
 
     /* get the revision ID */
     if (pci_read_config_byte(pci_dev, PCI_REVISION_ID, &revision_id)) {
-       printk(KERN_WARNING "Can't get revision id.\n" );
+       IPS_PRINTK(KERN_WARNING, pci_dev, "Can't get revision id.\n");
        return -1;
     }
 
@@ -6972,7 +6977,7 @@ static int ips_init_phase1( struct pci_dev *pci_dev, int *indexPtr )
     /* found a controller */
     ha = kmalloc(sizeof(ips_ha_t), GFP_KERNEL);
     if (ha == NULL) {
-       printk(KERN_WARNING "Unable to allocate temporary ha struct\n" );
+       IPS_PRINTK(KERN_WARNING, pci_dev, "Unable to allocate temporary ha struct\n");
        return -1;
     }
 
@@ -7007,20 +7012,23 @@ static int ips_init_phase1( struct pci_dev *pci_dev, int *indexPtr )
          !pci_set_dma_mask(ha->pcidev, (u64)0xffffffffffffffff)) {
        (ha)->flags |= IPS_HA_ENH_SG;
     } else {
-       pci_set_dma_mask(ha->pcidev, (u64)0xffffffff);
+       if ( pci_set_dma_mask(ha->pcidev, (u64)0xffffffff) != 0 ) { 
+          printk(KERN_WARNING "Unable to set DMA Mask\n");
+          return ips_abort_init(ha, index);
+       }
     }
 
     ha->enq = kmalloc(sizeof(IPS_ENQ), IPS_INIT_GFP);
 
     if (!ha->enq) {
-       printk(KERN_WARNING "Unable to allocate host inquiry structure\n" );
+       IPS_PRINTK(KERN_WARNING, pci_dev, "Unable to allocate host inquiry structure\n" );
        return ips_abort_init(ha, index);
     }
 
     ha->adapt = pci_alloc_consistent(pci_dev, sizeof(IPS_ADAPTER) +
                                      sizeof(IPS_IO_CMD), &dma_address);
     if (!ha->adapt) {
-       printk(KERN_WARNING "Unable to allocate host adapt & dummy structures\n");
+       IPS_PRINTK(KERN_WARNING, pci_dev, "Unable to allocate host adapt & dummy structures\n");
        return ips_abort_init(ha, index);
     }
     ha->adapt->hw_status_start = dma_address;
@@ -7029,21 +7037,21 @@ static int ips_init_phase1( struct pci_dev *pci_dev, int *indexPtr )
     ha->conf = kmalloc(sizeof(IPS_CONF), IPS_INIT_GFP);
 
     if (!ha->conf) {
-       printk(KERN_WARNING "Unable to allocate host conf structure\n" );
+       IPS_PRINTK(KERN_WARNING, pci_dev, "Unable to allocate host conf structure\n");
        return ips_abort_init(ha, index);
     }
 
     ha->nvram = kmalloc(sizeof(IPS_NVRAM_P5), IPS_INIT_GFP);
 
     if (!ha->nvram) {
-       printk(KERN_WARNING "Unable to allocate host NVRAM structure\n" );
+       IPS_PRINTK(KERN_WARNING, pci_dev, "Unable to allocate host NVRAM structure\n");
        return ips_abort_init(ha, index);
     }
 
     ha->subsys = kmalloc(sizeof(IPS_SUBSYS), IPS_INIT_GFP);
 
     if (!ha->subsys) {
-       printk(KERN_WARNING "Unable to allocate host subsystem structure\n" );
+       IPS_PRINTK(KERN_WARNING, pci_dev, "Unable to allocate host subsystem structure\n");
        return ips_abort_init(ha, index);
     }
 
@@ -7055,7 +7063,7 @@ static int ips_init_phase1( struct pci_dev *pci_dev, int *indexPtr )
     ha->ioctl_datasize = count;
 
     if (!ha->ioctl_data) {
-       printk(KERN_WARNING "Unable to allocate IOCTL data\n" );
+       IPS_PRINTK(KERN_WARNING, pci_dev, "Unable to allocate IOCTL data\n");
        ha->ioctl_data = NULL;
        ha->ioctl_order = 0;
        ha->ioctl_datasize = 0;
@@ -7083,7 +7091,7 @@ static int ips_init_phase1( struct pci_dev *pci_dev, int *indexPtr )
           /*
            * Initialization failed
            */
-          printk(KERN_WARNING "Unable to initialize controller\n" );
+          IPS_PRINTK(KERN_WARNING, pci_dev, "Unable to initialize controller\n");
           return ips_abort_init(ha, index);
        }
     }
@@ -7115,7 +7123,7 @@ static int ips_init_phase2( int index )
 
     /* Install the interrupt handler */
      if (request_irq(ha->irq, do_ipsintr, SA_SHIRQ, ips_name, ha)) {
-       printk(KERN_WARNING "Unable to install interrupt handler\n" );
+       IPS_PRINTK(KERN_WARNING, ha->pcidev, "Unable to install interrupt handler\n");
        return ips_abort_init(ha, index);
     }
 
@@ -7124,13 +7132,13 @@ static int ips_init_phase2( int index )
      */
     ha->max_cmds = 1;
     if (!ips_allocatescbs(ha)) {
-       printk(KERN_WARNING "Unable to allocate a CCB\n" );
+       IPS_PRINTK(KERN_WARNING, ha->pcidev, "Unable to allocate a CCB\n");
        free_irq(ha->irq, ha);
        return ips_abort_init(ha, index);
     }
 
     if (!ips_hainit(ha)) {
-       printk(KERN_WARNING "Unable to initialize controller\n" );
+       IPS_PRINTK(KERN_WARNING, ha->pcidev, "Unable to initialize controller\n");
        free_irq(ha->irq, ha);
        return ips_abort_init(ha, index);
     }
@@ -7139,7 +7147,7 @@ static int ips_init_phase2( int index )
 
     /* allocate CCBs */
     if (!ips_allocatescbs(ha)) {
-       printk(KERN_WARNING "Unable to allocate CCBs\n" );
+       IPS_PRINTK(KERN_WARNING, ha->pcidev, "Unable to allocate CCBs\n");
        free_irq(ha->irq, ha);
        return ips_abort_init(ha, index);
     }

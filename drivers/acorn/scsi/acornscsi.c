@@ -2466,17 +2466,13 @@ intr_ret_t acornscsi_sbicintr(AS_Host *host, int in_irq)
  *	      dev_id - device specific data (AS_Host structure)
  *	      regs   - processor registers when interrupt occurred
  */
-static
-void acornscsi_intr(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t
+acornscsi_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
     AS_Host *host = (AS_Host *)dev_id;
     intr_ret_t ret;
     int iostatus;
     int in_irq = 0;
-
-    if (host->scsi.interrupt)
-	printk("scsi%d: interrupt re-entered\n", host->host->host_no);
-    host->scsi.interrupt = 1;
 
     do {
 	ret = INTR_IDLE;
@@ -2505,7 +2501,7 @@ void acornscsi_intr(int irq, void *dev_id, struct pt_regs *regs)
 	in_irq = 1;
     } while (ret != INTR_IDLE);
 
-    host->scsi.interrupt = 0;
+    return IRQ_HANDLED;
 }
 
 /*=============================================================================================
@@ -2935,37 +2931,6 @@ int acornscsi_proc_info(char *buffer, char **start, off_t offset,
 	}
     }
 
-    p += sprintf(p, "\nAttached devices:\n");
-
-    list_for_each_entry(scd, &instance->my_devices, siblings) {
-	int len;
-
-	proc_print_scsidevice(scd, p, &len, 0);
-	p += len;
-
-	p += sprintf(p, "Extensions: ");
-
-	if (scd->tagged_supported)
-	    p += sprintf(p, "TAG %sabled [%d] ",
-			  scd->tagged_queue ? "en" : "dis", scd->current_tag);
-	p += sprintf(p, "\nTransfers: ");
-	if (host->device[scd->id].sync_xfer & 15)
-	    p += sprintf(p, "sync, offset %d, %d ns\n",
-			  host->device[scd->id].sync_xfer & 15,
-			  acornscsi_getperiod(host->device[scd->id].sync_xfer));
-	else
-	    p += sprintf(p, "async\n");
-
-	pos = p - buffer;
-	if (pos + begin < offset) {
-	    begin += pos;
-	    p = buffer;
-	}
-	pos = p - buffer;
-	if (pos + begin > offset + length)
-	    break;
-    }
-
     pos = p - buffer;
 
     *start = buffer + (offset - begin);
@@ -3110,7 +3075,6 @@ static struct ecard_driver acornscsi_driver = {
 	.remove		= __devexit_p(acornscsi_remove),
 	.id_table	= acornscsi_cids,
 	.drv = {
-		.devclass	= &shost_devclass,
 		.name		= "acornscsi",
 	},
 };

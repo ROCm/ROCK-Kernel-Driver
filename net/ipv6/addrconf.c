@@ -32,6 +32,7 @@
  *						support.
  *	Yuji SEKIYA @USAGI		:	Don't assign a same IPv6
  *						address on a same interface.
+ *	YOSHIFUJI Hideaki @USAGI	:	ARCnet support
  */
 
 #include <linux/config.h>
@@ -44,6 +45,7 @@
 #include <linux/in6.h>
 #include <linux/netdevice.h>
 #include <linux/if_arp.h>
+#include <linux/if_arcnet.h>
 #include <linux/route.h>
 #include <linux/inetdevice.h>
 #include <linux/init.h>
@@ -1061,6 +1063,13 @@ static int ipv6_generate_eui64(u8 *eui, struct net_device *dev)
 		eui[4] = 0xFE;
 		eui[0] ^= 2;
 		return 0;
+	case ARPHRD_ARCNET:
+		/* XXX: inherit EUI-64 fro mother interface -- yoshfuji */
+		if (dev->addr_len != ARCNET_ALEN)
+			return -1;
+		memset(eui, 0, 7);
+		eui[7] = *(u8*)dev->dev_addr;
+		return 0;
 	}
 	return -1;
 }
@@ -1195,7 +1204,7 @@ addrconf_prefix_route(struct in6_addr *pfx, int plen, struct net_device *dev,
 	struct in6_rtmsg rtmsg;
 
 	memset(&rtmsg, 0, sizeof(rtmsg));
-	memcpy(&rtmsg.rtmsg_dst, pfx, sizeof(struct in6_addr));
+	ipv6_addr_copy(&rtmsg.rtmsg_dst, pfx);
 	rtmsg.rtmsg_dst_len = plen;
 	rtmsg.rtmsg_metric = IP6_RT_PRIO_ADDRCONF;
 	rtmsg.rtmsg_ifindex = dev->ifindex;
@@ -1210,7 +1219,7 @@ addrconf_prefix_route(struct in6_addr *pfx, int plen, struct net_device *dev,
 	if (dev->type == ARPHRD_SIT && (dev->flags&IFF_POINTOPOINT))
 		rtmsg.rtmsg_flags |= RTF_NONEXTHOP;
 
-	ip6_route_add(&rtmsg, NULL);
+	ip6_route_add(&rtmsg, NULL, NULL);
 }
 
 /* Create "default" multicast route to the interface */
@@ -1227,7 +1236,7 @@ static void addrconf_add_mroute(struct net_device *dev)
 	rtmsg.rtmsg_ifindex = dev->ifindex;
 	rtmsg.rtmsg_flags = RTF_UP|RTF_ADDRCONF;
 	rtmsg.rtmsg_type = RTMSG_NEWROUTE;
-	ip6_route_add(&rtmsg, NULL);
+	ip6_route_add(&rtmsg, NULL, NULL);
 }
 
 static void sit_route_add(struct net_device *dev)
@@ -1244,7 +1253,7 @@ static void sit_route_add(struct net_device *dev)
 	rtmsg.rtmsg_flags	= RTF_UP|RTF_NONEXTHOP;
 	rtmsg.rtmsg_ifindex	= dev->ifindex;
 
-	ip6_route_add(&rtmsg, NULL);
+	ip6_route_add(&rtmsg, NULL, NULL);
 }
 
 static void addrconf_add_lroute(struct net_device *dev)
@@ -1336,7 +1345,7 @@ void addrconf_prefix_rcv(struct net_device *dev, u8 *opt, int len)
 	if (rt && ((rt->rt6i_flags & (RTF_GATEWAY | RTF_DEFAULT)) == 0)) {
 		if (rt->rt6i_flags&RTF_EXPIRES) {
 			if (pinfo->onlink == 0 || valid_lft == 0) {
-				ip6_del_rt(rt, NULL);
+				ip6_del_rt(rt, NULL, NULL);
 				rt = NULL;
 			} else {
 				rt->rt6i_expires = rt_expires;
@@ -1732,7 +1741,8 @@ static void addrconf_dev_config(struct net_device *dev)
 
 	if ((dev->type != ARPHRD_ETHER) && 
 	    (dev->type != ARPHRD_FDDI) &&
-	    (dev->type != ARPHRD_IEEE802_TR)) {
+	    (dev->type != ARPHRD_IEEE802_TR) &&
+	    (dev->type != ARPHRD_ARCNET)) {
 		/* Alas, we support only Ethernet autoconfiguration. */
 		return;
 	}
@@ -1960,7 +1970,7 @@ static void addrconf_rs_timer(unsigned long data)
 
 		rtmsg.rtmsg_ifindex = ifp->idev->dev->ifindex;
 
-		ip6_route_add(&rtmsg, NULL);
+		ip6_route_add(&rtmsg, NULL, NULL);
 	}
 
 out:
@@ -2715,6 +2725,7 @@ void __init addrconf_init(void)
 		case ARPHRD_ETHER:
 		case ARPHRD_FDDI:
 		case ARPHRD_IEEE802_TR:	
+		case ARPHRD_ARCNET:
 			addrconf_dev_config(dev);
 			break;
 		default:;

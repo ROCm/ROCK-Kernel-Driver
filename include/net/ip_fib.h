@@ -20,6 +20,9 @@
 #include <net/flow.h>
 #include <linux/seq_file.h>
 
+/* WARNING: The ordering of these elements must match ordering
+ *          of RTA_* rtnetlink attribute numbers.
+ */
 struct kern_rta
 {
 	void		*rta_dst;
@@ -32,8 +35,9 @@ struct kern_rta
 	struct rtattr	*rta_mx;
 	struct rtattr	*rta_mp;
 	unsigned char	*rta_protoinfo;
-	unsigned char	*rta_flow;
+	u32		*rta_flow;
 	struct rta_cacheinfo *rta_ci;
+	struct rta_session *rta_sess;
 };
 
 struct fib_nh

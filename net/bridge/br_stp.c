@@ -12,13 +12,24 @@
  *	as published by the Free Software Foundation; either version
  *	2 of the License, or (at your option) any later version.
  */
-
 #include <linux/kernel.h>
 #include <linux/if_bridge.h>
 #include <linux/smp_lock.h>
 #include <asm/uaccess.h>
 #include "br_private.h"
 #include "br_private_stp.h"
+
+static const char *br_port_state_names[] = {
+	"disabled", "learning", "forwarding", "blocking",
+};
+
+void br_log_state(const struct net_bridge_port *p)
+{
+	pr_info("%s: port %d(%s) entering %s state\n",
+		p->br->dev.name, p->port_no, p->dev->name, 
+		br_port_state_names[p->state]);
+
+}
 
 /* called under bridge lock */
 struct net_bridge_port *br_get_port(struct net_bridge *br, int port_no)
@@ -34,7 +45,8 @@ struct net_bridge_port *br_get_port(struct net_bridge *br, int port_no)
 }
 
 /* called under bridge lock */
-static int br_should_become_root_port(struct net_bridge_port *p, int root_port)
+static int br_should_become_root_port(const struct net_bridge_port *p, 
+				      int root_port)
 {
 	struct net_bridge *br;
 	struct net_bridge_port *rp;
@@ -116,9 +128,12 @@ void br_become_root_bridge(struct net_bridge *br)
 	br->hello_time = br->bridge_hello_time;
 	br->forward_delay = br->bridge_forward_delay;
 	br_topology_change_detection(br);
-	br_timer_clear(&br->tcn_timer);
-	br_config_bpdu_generation(br);
-	br_timer_set(&br->hello_timer, jiffies);
+	del_timer(&br->tcn_timer);
+
+	if (br->dev.flags & IFF_UP) {
+		br_config_bpdu_generation(br);
+		mod_timer(&br->hello_timer, jiffies + br->hello_time);
+	}
 }
 
 /* called under bridge lock */
@@ -127,7 +142,8 @@ void br_transmit_config(struct net_bridge_port *p)
 	struct br_config_bpdu bpdu;
 	struct net_bridge *br;
 
-	if (br_timer_is_running(&p->hold_timer)) {
+
+	if (timer_pending(&p->hold_timer)) {
 		p->config_pending = 1;
 		return;
 	}
@@ -142,12 +158,11 @@ void br_transmit_config(struct net_bridge_port *p)
 	bpdu.port_id = p->port_id;
 	bpdu.message_age = 0;
 	if (!br_is_root_bridge(br)) {
-		struct net_bridge_port *root;
-		unsigned long age;
+		struct net_bridge_port *root
+			= br_get_port(br, br->root_port);
+		bpdu.max_age = root->message_age_timer.expires - jiffies;
 
-		root = br_get_port(br, br->root_port);
-		age = br_timer_get_residue(&root->message_age_timer) + 1;
-		bpdu.message_age = age;
+		if (bpdu.max_age <= 0) bpdu.max_age = 1;
 	}
 	bpdu.max_age = br->max_age;
 	bpdu.hello_time = br->hello_time;
@@ -157,22 +172,26 @@ void br_transmit_config(struct net_bridge_port *p)
 
 	p->topology_change_ack = 0;
 	p->config_pending = 0;
-	br_timer_set(&p->hold_timer, jiffies);
+	
+	mod_timer(&p->hold_timer, jiffies + BR_HOLD_TIME);
 }
 
 /* called under bridge lock */
-static void br_record_config_information(struct net_bridge_port *p, struct br_config_bpdu *bpdu)
+static inline void br_record_config_information(struct net_bridge_port *p, 
+						const struct br_config_bpdu *bpdu)
 {
 	p->designated_root = bpdu->root;
 	p->designated_cost = bpdu->root_path_cost;
 	p->designated_bridge = bpdu->bridge_id;
 	p->designated_port = bpdu->port_id;
 
-	br_timer_set(&p->message_age_timer, jiffies - bpdu->message_age);
+	mod_timer(&p->message_age_timer, jiffies 
+		  + (p->br->max_age - bpdu->message_age));
 }
 
 /* called under bridge lock */
-static void br_record_config_timeout_values(struct net_bridge *br, struct br_config_bpdu *bpdu)
+static inline void br_record_config_timeout_values(struct net_bridge *br, 
+					    const struct br_config_bpdu *bpdu)
 {
 	br->max_age = bpdu->max_age;
 	br->hello_time = bpdu->hello_time;
@@ -187,7 +206,7 @@ void br_transmit_tcn(struct net_bridge *br)
 }
 
 /* called under bridge lock */
-static int br_should_become_designated_port(struct net_bridge_port *p)
+static int br_should_become_designated_port(const struct net_bridge_port *p)
 {
 	struct net_bridge *br;
 	int t;
@@ -261,25 +280,28 @@ static int br_supersedes_port_info(struct net_bridge_port *p, struct br_config_b
 }
 
 /* called under bridge lock */
-static void br_topology_change_acknowledged(struct net_bridge *br)
+static inline void br_topology_change_acknowledged(struct net_bridge *br)
 {
 	br->topology_change_detected = 0;
-	br_timer_clear(&br->tcn_timer);
+	del_timer(&br->tcn_timer);
 }
 
 /* called under bridge lock */
 void br_topology_change_detection(struct net_bridge *br)
 {
-	printk(KERN_INFO "%s: topology change detected", br->dev.name);
+	if (!(br->dev.flags & IFF_UP))
+		return;
 
+	pr_info("%s: topology change detected", br->dev.name);
 	if (br_is_root_bridge(br)) {
 		printk(", propagating");
 		br->topology_change = 1;
-		br_timer_set(&br->topology_change_timer, jiffies);
+		mod_timer(&br->topology_change_timer, jiffies
+			  + br->bridge_forward_delay + br->bridge_max_age);
 	} else if (!br->topology_change_detected) {
 		printk(", sending tcn bpdu");
 		br_transmit_tcn(br);
-		br_timer_set(&br->tcn_timer, jiffies);
+		mod_timer(&br->tcn_timer, jiffies + br->bridge_hello_time);
 	}
 
 	printk("\n");
@@ -299,7 +321,7 @@ void br_config_bpdu_generation(struct net_bridge *br)
 }
 
 /* called under bridge lock */
-static void br_reply(struct net_bridge_port *p)
+static inline void br_reply(struct net_bridge_port *p)
 {
 	br_transmit_config(p);
 }
@@ -323,6 +345,7 @@ void br_become_designated_port(struct net_bridge_port *p)
 	p->designated_port = p->port_id;
 }
 
+
 /* called under bridge lock */
 static void br_make_blocking(struct net_bridge_port *p)
 {
@@ -332,11 +355,9 @@ static void br_make_blocking(struct net_bridge_port *p)
 		    p->state == BR_STATE_LEARNING)
 			br_topology_change_detection(p->br);
 
-		printk(KERN_INFO "%s: port %i(%s) entering %s state\n",
-		       p->br->dev.name, p->port_no, p->dev->name, "blocking");
-
 		p->state = BR_STATE_BLOCKING;
-		br_timer_clear(&p->forward_delay_timer);
+		br_log_state(p);
+		del_timer(&p->forward_delay_timer);
 	}
 }
 
@@ -345,20 +366,12 @@ static void br_make_forwarding(struct net_bridge_port *p)
 {
 	if (p->state == BR_STATE_BLOCKING) {
 		if (p->br->stp_enabled) {
-			printk(KERN_INFO "%s: port %i(%s) entering %s state\n",
-			       p->br->dev.name, p->port_no, p->dev->name,
-			       "listening");
-
 			p->state = BR_STATE_LISTENING;
 		} else {
-			printk(KERN_INFO "%s: port %i(%s) entering %s state\n",
-			       p->br->dev.name, p->port_no, p->dev->name,
-			       "learning");
-
 			p->state = BR_STATE_LEARNING;
 		}
-		br_timer_set(&p->forward_delay_timer, jiffies);
-	}
+		br_log_state(p);
+		mod_timer(&p->forward_delay_timer, jiffies + p->br->forward_delay);	}
 }
 
 /* called under bridge lock */
@@ -373,7 +386,7 @@ void br_port_state_selection(struct net_bridge *br)
 				p->topology_change_ack = 0;
 				br_make_forwarding(p);
 			} else if (br_is_designated_port(p)) {
-				br_timer_clear(&p->message_age_timer);
+				del_timer(&p->message_age_timer);
 				br_make_forwarding(p);
 			} else {
 				p->config_pending = 0;
@@ -381,11 +394,12 @@ void br_port_state_selection(struct net_bridge *br)
 				br_make_blocking(p);
 			}
 		}
+
 	}
 }
 
 /* called under bridge lock */
-static void br_topology_change_acknowledge(struct net_bridge_port *p)
+static inline void br_topology_change_acknowledge(struct net_bridge_port *p)
 {
 	p->topology_change_ack = 1;
 	br_transmit_config(p);
@@ -396,20 +410,23 @@ void br_received_config_bpdu(struct net_bridge_port *p, struct br_config_bpdu *b
 {
 	struct net_bridge *br;
 	int was_root;
-
+ 
 	br = p->br;
 	was_root = br_is_root_bridge(br);
+
 	if (br_supersedes_port_info(p, bpdu)) {
 		br_record_config_information(p, bpdu);
 		br_configuration_update(br);
 		br_port_state_selection(br);
 
 		if (!br_is_root_bridge(br) && was_root) {
-			br_timer_clear(&br->hello_timer);
+			del_timer(&br->hello_timer);
 			if (br->topology_change_detected) {
-				br_timer_clear(&br->topology_change_timer);
+				del_timer(&br->topology_change_timer);
 				br_transmit_tcn(br);
-				br_timer_set(&br->tcn_timer, jiffies);
+
+				mod_timer(&br->tcn_timer, 
+					  jiffies + br->bridge_hello_time);
 			}
 		}
 
@@ -428,7 +445,7 @@ void br_received_config_bpdu(struct net_bridge_port *p, struct br_config_bpdu *b
 void br_received_tcn_bpdu(struct net_bridge_port *p)
 {
 	if (br_is_designated_port(p)) {
-		printk(KERN_INFO "%s: received tcn bpdu on port %i(%s)\n",
+		pr_info("%s: received tcn bpdu on port %i(%s)\n",
 		       p->br->dev.name, p->port_no, p->dev->name);
 
 		br_topology_change_detection(p->br);

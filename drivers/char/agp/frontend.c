@@ -53,11 +53,12 @@ static agp_memory *agp_find_mem_by_key(int key)
 
 	while (curr != NULL) {
 		if (curr->key == key)
-			return curr;
+			break;
 		curr = curr->next;
 	}
 
-	return NULL;
+	DBG("key=%d -> mem=%p", key, curr);
+	return curr;
 }
 
 static void agp_remove_from_pool(agp_memory * temp)
@@ -67,6 +68,7 @@ static void agp_remove_from_pool(agp_memory * temp)
 
 	/* Check to see if this is even in the memory pool */
 
+	DBG("mem=%p", temp);
 	if (agp_find_mem_by_key(temp->key) != NULL) {
 		next = temp->next;
 		prev = temp->prev;
@@ -92,11 +94,12 @@ static void agp_remove_from_pool(agp_memory * temp)
  * to each auth'ed client.
  */
 
-static agp_segment_priv *agp_find_seg_in_client(const agp_client * client,
+static struct
+agp_segment_priv *agp_find_seg_in_client(const struct agp_client *client,
 						unsigned long offset,
 					    int size, pgprot_t page_prot)
 {
-	agp_segment_priv *seg;
+	struct agp_segment_priv *seg;
 	int num_segments, i;
 	off_t pg_start;
 	size_t pg_count;
@@ -117,25 +120,32 @@ static agp_segment_priv *agp_find_seg_in_client(const agp_client * client,
 	return NULL;
 }
 
-static void agp_remove_seg_from_client(agp_client * client)
+static void agp_remove_seg_from_client(struct agp_client *client)
 {
+	DBG("client=%p", client);
+
 	if (client->segments != NULL) {
-		if (*(client->segments) != NULL)
+		if (*(client->segments) != NULL) {
+			DBG("Freeing %p from client %p", *(client->segments), client);
 			kfree(*(client->segments));
+		}
+		DBG("Freeing %p from client %p", client->segments, client);
 		kfree(client->segments);
+		client->segments = NULL;
 	}
 }
 
-static void agp_add_seg_to_client(agp_client * client,
-			       agp_segment_priv ** seg, int num_segments)
+static void agp_add_seg_to_client(struct agp_client *client,
+			       struct agp_segment_priv ** seg, int num_segments)
 {
-	agp_segment_priv **prev_seg;
+	struct agp_segment_priv **prev_seg;
 
 	prev_seg = client->segments;
 
 	if (prev_seg != NULL)
 		agp_remove_seg_from_client(client);
 
+	DBG("Adding seg %p (%d segments) to client %p", seg, num_segments, client);
 	client->num_segments = num_segments;
 	client->segments = seg;
 }
@@ -171,19 +181,20 @@ static pgprot_t agp_convert_mmap_flags(int prot)
 	return temp;
 }
 
-static int agp_create_segment(agp_client * client, agp_region * region)
+static int agp_create_segment(struct agp_client *client, struct agp_region *region)
 {
-	agp_segment_priv **ret_seg;
-	agp_segment_priv *seg;
-	agp_segment *user_seg;
+	struct agp_segment_priv **ret_seg;
+	struct agp_segment_priv *seg;
+	struct agp_segment *user_seg;
 	size_t i;
 
-	seg = kmalloc((sizeof(agp_segment_priv) * region->seg_count), GFP_KERNEL);
+	seg = kmalloc((sizeof(struct agp_segment_priv) * region->seg_count), GFP_KERNEL);
 	if (seg == NULL) {
 		kfree(region->seg_list);
+		region->seg_list = NULL;
 		return -ENOMEM;
 	}
-	memset(seg, 0, (sizeof(agp_segment_priv) * region->seg_count));
+	memset(seg, 0, (sizeof(struct agp_segment_priv) * region->seg_count));
 	user_seg = region->seg_list;
 
 	for (i = 0; i < region->seg_count; i++) {
@@ -191,14 +202,15 @@ static int agp_create_segment(agp_client * client, agp_region * region)
 		seg[i].pg_count = user_seg[i].pg_count;
 		seg[i].prot = agp_convert_mmap_flags(user_seg[i].prot);
 	}
+	kfree(region->seg_list);
+	region->seg_list = NULL;
+
 	ret_seg = kmalloc(sizeof(void *), GFP_KERNEL);
 	if (ret_seg == NULL) {
-		kfree(region->seg_list);
 		kfree(seg);
 		return -ENOMEM;
 	}
 	*ret_seg = seg;
-	kfree(region->seg_list);
 	agp_add_seg_to_client(client, ret_seg, region->seg_count);
 	return 0;
 }
@@ -222,9 +234,9 @@ static void agp_insert_into_pool(agp_memory * temp)
 
 /* File private list routines */
 
-agp_file_private *agp_find_private(pid_t pid)
+struct agp_file_private *agp_find_private(pid_t pid)
 {
-	agp_file_private *curr;
+	struct agp_file_private *curr;
 
 	curr = agp_fe.file_priv_list;
 
@@ -237,9 +249,9 @@ agp_file_private *agp_find_private(pid_t pid)
 	return NULL;
 }
 
-void agp_insert_file_private(agp_file_private * priv)
+void agp_insert_file_private(struct agp_file_private * priv)
 {
-	agp_file_private *prev;
+	struct agp_file_private *prev;
 
 	prev = agp_fe.file_priv_list;
 
@@ -249,10 +261,10 @@ void agp_insert_file_private(agp_file_private * priv)
 	agp_fe.file_priv_list = priv;
 }
 
-void agp_remove_file_private(agp_file_private * priv)
+void agp_remove_file_private(struct agp_file_private * priv)
 {
-	agp_file_private *next;
-	agp_file_private *prev;
+	struct agp_file_private *next;
+	struct agp_file_private *prev;
 
 	next = priv->next;
 	prev = priv->prev;
@@ -301,9 +313,9 @@ static agp_memory *agp_allocate_memory_wrap(size_t pg_count, u32 type)
  * controllers
  */
 
-static agp_controller *agp_find_controller_by_pid(pid_t id)
+static struct agp_controller *agp_find_controller_by_pid(pid_t id)
 {
-	agp_controller *controller;
+	struct agp_controller *controller;
 
 	controller = agp_fe.controllers;
 
@@ -316,24 +328,24 @@ static agp_controller *agp_find_controller_by_pid(pid_t id)
 	return NULL;
 }
 
-static agp_controller *agp_create_controller(pid_t id)
+static struct agp_controller *agp_create_controller(pid_t id)
 {
-	agp_controller *controller;
+	struct agp_controller *controller;
 
-	controller = kmalloc(sizeof(agp_controller), GFP_KERNEL);
+	controller = kmalloc(sizeof(struct agp_controller), GFP_KERNEL);
 
 	if (controller == NULL)
 		return NULL;
 
-	memset(controller, 0, sizeof(agp_controller));
+	memset(controller, 0, sizeof(struct agp_controller));
 	controller->pid = id;
 
 	return controller;
 }
 
-static int agp_insert_controller(agp_controller * controller)
+static int agp_insert_controller(struct agp_controller *controller)
 {
-	agp_controller *prev_controller;
+	struct agp_controller *prev_controller;
 
 	prev_controller = agp_fe.controllers;
 	controller->next = prev_controller;
@@ -346,15 +358,15 @@ static int agp_insert_controller(agp_controller * controller)
 	return 0;
 }
 
-static void agp_remove_all_clients(agp_controller * controller)
+static void agp_remove_all_clients(struct agp_controller *controller)
 {
-	agp_client *client;
-	agp_client *temp;
+	struct agp_client *client;
+	struct agp_client *temp;
 
 	client = controller->clients;
 
 	while (client) {
-		agp_file_private *priv;
+		struct agp_file_private *priv;
 
 		temp = client;
 		agp_remove_seg_from_client(temp);
@@ -369,7 +381,7 @@ static void agp_remove_all_clients(agp_controller * controller)
 	}
 }
 
-static void agp_remove_all_memory(agp_controller * controller)
+static void agp_remove_all_memory(struct agp_controller *controller)
 {
 	agp_memory *memory;
 	agp_memory *temp;
@@ -383,10 +395,10 @@ static void agp_remove_all_memory(agp_controller * controller)
 	}
 }
 
-static int agp_remove_controller(agp_controller * controller)
+static int agp_remove_controller(struct agp_controller *controller)
 {
-	agp_controller *prev_controller;
-	agp_controller *next_controller;
+	struct agp_controller *prev_controller;
+	struct agp_controller *next_controller;
 
 	prev_controller = controller->prev;
 	next_controller = controller->next;
@@ -415,14 +427,14 @@ static int agp_remove_controller(agp_controller * controller)
 	return 0;
 }
 
-static void agp_controller_make_current(agp_controller * controller)
+static void agp_controller_make_current(struct agp_controller *controller)
 {
-	agp_client *clients;
+	struct agp_client *clients;
 
 	clients = controller->clients;
 
 	while (clients != NULL) {
-		agp_file_private *priv;
+		struct agp_file_private *priv;
 
 		priv = agp_find_private(clients->pid);
 
@@ -436,16 +448,16 @@ static void agp_controller_make_current(agp_controller * controller)
 	agp_fe.current_controller = controller;
 }
 
-static void agp_controller_release_current(agp_controller * controller,
-				      agp_file_private * controller_priv)
+static void agp_controller_release_current(struct agp_controller *controller,
+				      struct agp_file_private *controller_priv)
 {
-	agp_client *clients;
+	struct agp_client *clients;
 
 	clear_bit(AGP_FF_IS_VALID, &controller_priv->access_flags);
 	clients = controller->clients;
 
 	while (clients != NULL) {
-		agp_file_private *priv;
+		struct agp_file_private *priv;
 
 		priv = agp_find_private(clients->pid);
 
@@ -465,10 +477,10 @@ static void agp_controller_release_current(agp_controller * controller,
  * These routines are for managing the list of auth'ed clients.
  */
 
-static agp_client *agp_find_client_in_controller(agp_controller * controller,
-						 pid_t id)
+static struct agp_client
+*agp_find_client_in_controller(struct agp_controller *controller, pid_t id)
 {
-	agp_client *client;
+	struct agp_client *client;
 
 	if (controller == NULL)
 		return NULL;
@@ -484,9 +496,9 @@ static agp_client *agp_find_client_in_controller(agp_controller * controller,
 	return NULL;
 }
 
-static agp_controller *agp_find_controller_for_client(pid_t id)
+static struct agp_controller *agp_find_controller_for_client(pid_t id)
 {
-	agp_controller *controller;
+	struct agp_controller *controller;
 
 	controller = agp_fe.controllers;
 
@@ -499,9 +511,9 @@ static agp_controller *agp_find_controller_for_client(pid_t id)
 	return NULL;
 }
 
-static agp_client *agp_find_client_by_pid(pid_t id)
+static struct agp_client *agp_find_client_by_pid(pid_t id)
 {
-	agp_client *temp;
+	struct agp_client *temp;
 
 	if (agp_fe.current_controller == NULL)
 		return NULL;
@@ -510,9 +522,9 @@ static agp_client *agp_find_client_by_pid(pid_t id)
 	return temp;
 }
 
-static void agp_insert_client(agp_client * client)
+static void agp_insert_client(struct agp_client *client)
 {
-	agp_client *prev_client;
+	struct agp_client *prev_client;
 
 	prev_client = agp_fe.current_controller->clients;
 	client->next = prev_client;
@@ -524,16 +536,16 @@ static void agp_insert_client(agp_client * client)
 	agp_fe.current_controller->num_clients++;
 }
 
-static agp_client *agp_create_client(pid_t id)
+static struct agp_client *agp_create_client(pid_t id)
 {
-	agp_client *new_client;
+	struct agp_client *new_client;
 
-	new_client = kmalloc(sizeof(agp_client), GFP_KERNEL);
+	new_client = kmalloc(sizeof(struct agp_client), GFP_KERNEL);
 
 	if (new_client == NULL)
 		return NULL;
 
-	memset(new_client, 0, sizeof(agp_client));
+	memset(new_client, 0, sizeof(struct agp_client));
 	new_client->pid = id;
 	agp_insert_client(new_client);
 	return new_client;
@@ -541,10 +553,10 @@ static agp_client *agp_create_client(pid_t id)
 
 static int agp_remove_client(pid_t id)
 {
-	agp_client *client;
-	agp_client *prev_client;
-	agp_client *next_client;
-	agp_controller *controller;
+	struct agp_client *client;
+	struct agp_client *prev_client;
+	struct agp_client *next_client;
+	struct agp_controller *controller;
 
 	controller = agp_find_controller_for_client(id);
 	if (controller == NULL)
@@ -582,11 +594,11 @@ static int agp_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	unsigned int size, current_size;
 	unsigned long offset;
-	agp_client *client;
-	agp_file_private *priv = (agp_file_private *) file->private_data;
+	struct agp_client *client;
+	struct agp_file_private *priv = file->private_data;
 	agp_kern_info kerninfo;
 
-	AGP_LOCK();
+	down(&(agp_fe.agp_mutex));
 
 	if (agp_fe.backend_acquired != TRUE)
 		goto out_eperm;
@@ -599,6 +611,7 @@ static int agp_mmap(struct file *file, struct vm_area_struct *vma)
 	current_size = kerninfo.aper_size;
 	current_size = current_size * 0x100000;
 	offset = vma->vm_pgoff << PAGE_SHIFT;
+	DBG("%lx:%lx", offset, offset+size);
 
 	if (test_bit(AGP_FF_IS_CLIENT, &priv->access_flags)) {
 		if ((size + offset) > current_size)
@@ -612,6 +625,7 @@ static int agp_mmap(struct file *file, struct vm_area_struct *vma)
 		if (!agp_find_seg_in_client(client, offset, size, vma->vm_page_prot))
 			goto out_inval;
 
+		DBG("client vm_ops=%p", kerninfo.vm_ops);
 		if (kerninfo.vm_ops) {
 			vma->vm_ops = kerninfo.vm_ops;
 		} else if (remap_page_range(vma, vma->vm_start, 
@@ -619,7 +633,7 @@ static int agp_mmap(struct file *file, struct vm_area_struct *vma)
 					    size, vma->vm_page_prot)) {
 			goto out_again;
 		}
-		AGP_UNLOCK();
+		up(&(agp_fe.agp_mutex));
 		return 0;
 	}
 
@@ -627,6 +641,7 @@ static int agp_mmap(struct file *file, struct vm_area_struct *vma)
 		if (size != current_size)
 			goto out_inval;
 
+		DBG("controller vm_ops=%p", kerninfo.vm_ops);
 		if (kerninfo.vm_ops) {
 			vma->vm_ops = kerninfo.vm_ops;
 		} else if (remap_page_range(vma, vma->vm_start, 
@@ -634,68 +649,71 @@ static int agp_mmap(struct file *file, struct vm_area_struct *vma)
 					    size, vma->vm_page_prot)) {
 			goto out_again;
 		}
-		AGP_UNLOCK();
+		up(&(agp_fe.agp_mutex));
 		return 0;
 	}
 
 out_eperm:
-	AGP_UNLOCK();
+	up(&(agp_fe.agp_mutex));
 	return -EPERM;
 
 out_inval:
-	AGP_UNLOCK();
+	up(&(agp_fe.agp_mutex));
 	return -EINVAL;
 
 out_again:
-	AGP_UNLOCK();
+	up(&(agp_fe.agp_mutex));
 	return -EAGAIN;
 }
 
 static int agp_release(struct inode *inode, struct file *file)
 {
-	agp_file_private *priv = (agp_file_private *) file->private_data;
+	struct agp_file_private *priv = file->private_data;
 
-	AGP_LOCK();
+	down(&(agp_fe.agp_mutex));
+
+	DBG("priv=%p", priv);
 
 	if (test_bit(AGP_FF_IS_CONTROLLER, &priv->access_flags)) {
-		agp_controller *controller;
+		struct agp_controller *controller;
 
 		controller = agp_find_controller_by_pid(priv->my_pid);
 
 		if (controller != NULL) {
-			if (controller == agp_fe.current_controller) {
-				agp_controller_release_current(controller,
-							       priv);
-			}
+			if (controller == agp_fe.current_controller)
+				agp_controller_release_current(controller, priv);
 			agp_remove_controller(controller);
+			controller = NULL;
 		}
 	}
-	if (test_bit(AGP_FF_IS_CLIENT, &priv->access_flags)) {
+
+	if (test_bit(AGP_FF_IS_CLIENT, &priv->access_flags))
 		agp_remove_client(priv->my_pid);
-	}
+
 	agp_remove_file_private(priv);
 	kfree(priv);
-	AGP_UNLOCK();
+	file->private_data = NULL;
+	up(&(agp_fe.agp_mutex));
 	return 0;
 }
 
 static int agp_open(struct inode *inode, struct file *file)
 {
 	int minor = minor(inode->i_rdev);
-	agp_file_private *priv;
-	agp_client *client;
+	struct agp_file_private *priv;
+	struct agp_client *client;
 	int rc = -ENXIO;
 
-	AGP_LOCK();
+	down(&(agp_fe.agp_mutex));
 
 	if (minor != AGPGART_MINOR)
 		goto err_out;
 
-	priv = kmalloc(sizeof(agp_file_private), GFP_KERNEL);
+	priv = kmalloc(sizeof(struct agp_file_private), GFP_KERNEL);
 	if (priv == NULL)
 		goto err_out_nomem;
 
-	memset(priv, 0, sizeof(agp_file_private));
+	memset(priv, 0, sizeof(struct agp_file_private));
 	set_bit(AGP_FF_ALLOW_CLIENT, &priv->access_flags);
 	priv->my_pid = current->pid;
 
@@ -711,13 +729,14 @@ static int agp_open(struct inode *inode, struct file *file)
 	}
 	file->private_data = (void *) priv;
 	agp_insert_file_private(priv);
-	AGP_UNLOCK();
+	DBG("private=%p, client=%p", priv, client);
+	up(&(agp_fe.agp_mutex));
 	return 0;
 
 err_out_nomem:
 	rc = -ENOMEM;
 err_out:
-	AGP_UNLOCK();
+	up(&(agp_fe.agp_mutex));
 	return rc;
 }
 
@@ -734,9 +753,9 @@ static ssize_t agp_write(struct file *file, const char *buf,
 	return -EINVAL;
 }
 
-static int agpioc_info_wrap(agp_file_private * priv, unsigned long arg)
+static int agpioc_info_wrap(struct agp_file_private *priv, unsigned long arg)
 {
-	agp_info userinfo;
+	struct agp_info userinfo;
 	agp_kern_info kerninfo;
 
 	agp_copy_info(&kerninfo);
@@ -751,17 +770,19 @@ static int agpioc_info_wrap(agp_file_private * priv, unsigned long arg)
 	userinfo.pg_total = userinfo.pg_system = kerninfo.max_memory;
 	userinfo.pg_used = kerninfo.current_memory;
 
-	if (copy_to_user((void *) arg, &userinfo, sizeof(agp_info)))
+	if (copy_to_user((void *) arg, &userinfo, sizeof(struct agp_info)))
 		return -EFAULT;
 
 	return 0;
 }
 
-static int agpioc_acquire_wrap(agp_file_private * priv, unsigned long arg)
+static int agpioc_acquire_wrap(struct agp_file_private *priv, unsigned long arg)
 {
 	int ret;
+	struct agp_controller *controller;
 
-	agp_controller *controller;
+	DBG("");
+
 	if (!(test_bit(AGP_FF_ALLOW_CONTROLLER, &priv->access_flags)))
 		return -EPERM;
 
@@ -795,33 +816,36 @@ static int agpioc_acquire_wrap(agp_file_private * priv, unsigned long arg)
 	return 0;
 }
 
-static int agpioc_release_wrap(agp_file_private * priv, unsigned long arg)
+static int agpioc_release_wrap(struct agp_file_private *priv, unsigned long arg)
 {
+	DBG("");
 	agp_controller_release_current(agp_fe.current_controller, priv);
 	return 0;
 }
 
-static int agpioc_setup_wrap(agp_file_private * priv, unsigned long arg)
+static int agpioc_setup_wrap(struct agp_file_private *priv, unsigned long arg)
 {
-	agp_setup mode;
+	struct agp_setup mode;
 
-	if (copy_from_user(&mode, (void *) arg, sizeof(agp_setup))) {
+	DBG("");
+	if (copy_from_user(&mode, (void *) arg, sizeof(struct agp_setup)))
 		return -EFAULT;
-	}
+
 	agp_enable(mode.agp_mode);
 	return 0;
 }
 
-static int agpioc_reserve_wrap(agp_file_private * priv, unsigned long arg)
+static int agpioc_reserve_wrap(struct agp_file_private *priv, unsigned long arg)
 {
-	agp_region reserve;
-	agp_client *client;
-	agp_file_private *client_priv;
+	struct agp_region reserve;
+	struct agp_client *client;
+	struct agp_file_private *client_priv;
 
-	if (copy_from_user(&reserve, (void *) arg, sizeof(agp_region)))
+	DBG("");
+	if (copy_from_user(&reserve, (void *) arg, sizeof(struct agp_region)))
 		return -EFAULT;
 
-	if ((unsigned) reserve.seg_count >= ~0U/sizeof(agp_segment))
+	if ((unsigned) reserve.seg_count >= ~0U/sizeof(struct agp_segment))
 		return -EFAULT;
 
 	client = agp_find_client_by_pid(reserve.pid);
@@ -831,10 +855,8 @@ static int agpioc_reserve_wrap(agp_file_private * priv, unsigned long arg)
 		client_priv = agp_find_private(reserve.pid);
 
 		if (client_priv != NULL) {
-			set_bit(AGP_FF_IS_CLIENT,
-				&client_priv->access_flags);
-			set_bit(AGP_FF_IS_VALID,
-				&client_priv->access_flags);
+			set_bit(AGP_FF_IS_CLIENT, &client_priv->access_flags);
+			set_bit(AGP_FF_IS_VALID, &client_priv->access_flags);
 		}
 		if (client == NULL) {
 			/* client is already removed */
@@ -842,19 +864,19 @@ static int agpioc_reserve_wrap(agp_file_private * priv, unsigned long arg)
 		}
 		return agp_remove_client(reserve.pid);
 	} else {
-		agp_segment *segment;
+		struct agp_segment *segment;
 
 		if (reserve.seg_count >= 16384)
 			return -EINVAL;
-			
-		segment = kmalloc((sizeof(agp_segment) * reserve.seg_count),
+
+		segment = kmalloc((sizeof(struct agp_segment) * reserve.seg_count),
 				  GFP_KERNEL);
 
 		if (segment == NULL)
 			return -ENOMEM;
 
 		if (copy_from_user(segment, (void *) reserve.seg_list,
-				   sizeof(agp_segment) * reserve.seg_count)) {
+				   sizeof(struct agp_segment) * reserve.seg_count)) {
 			kfree(segment);
 			return -EFAULT;
 		}
@@ -871,32 +893,30 @@ static int agpioc_reserve_wrap(agp_file_private * priv, unsigned long arg)
 			client_priv = agp_find_private(reserve.pid);
 
 			if (client_priv != NULL) {
-				set_bit(AGP_FF_IS_CLIENT,
-					&client_priv->access_flags);
-				set_bit(AGP_FF_IS_VALID,
-					&client_priv->access_flags);
+				set_bit(AGP_FF_IS_CLIENT, &client_priv->access_flags);
+				set_bit(AGP_FF_IS_VALID, &client_priv->access_flags);
 			}
-			return agp_create_segment(client, &reserve);
-		} else {
-			return agp_create_segment(client, &reserve);
 		}
+		return agp_create_segment(client, &reserve);
 	}
 	/* Will never really happen */
 	return -EINVAL;
 }
 
-static int agpioc_protect_wrap(agp_file_private * priv, unsigned long arg)
+static int agpioc_protect_wrap(struct agp_file_private *priv, unsigned long arg)
 {
+	DBG("");
 	/* This function is not currently implemented */
 	return -EINVAL;
 }
 
-static int agpioc_allocate_wrap(agp_file_private * priv, unsigned long arg)
+static int agpioc_allocate_wrap(struct agp_file_private *priv, unsigned long arg)
 {
 	agp_memory *memory;
-	agp_allocate alloc;
+	struct agp_allocate alloc;
 
-	if (copy_from_user(&alloc, (void *) arg, sizeof(agp_allocate)))
+	DBG("");
+	if (copy_from_user(&alloc, (void *) arg, sizeof(struct agp_allocate)))
 		return -EFAULT;
 
 	memory = agp_allocate_memory_wrap(alloc.pg_count, alloc.type);
@@ -907,17 +927,18 @@ static int agpioc_allocate_wrap(agp_file_private * priv, unsigned long arg)
 	alloc.key = memory->key;
 	alloc.physical = memory->physical;
 
-	if (copy_to_user((void *) arg, &alloc, sizeof(agp_allocate))) {
+	if (copy_to_user((void *) arg, &alloc, sizeof(struct agp_allocate))) {
 		agp_free_memory_wrap(memory);
 		return -EFAULT;
 	}
 	return 0;
 }
 
-static int agpioc_deallocate_wrap(agp_file_private * priv, unsigned long arg)
+static int agpioc_deallocate_wrap(struct agp_file_private *priv, unsigned long arg)
 {
 	agp_memory *memory;
 
+	DBG("");
 	memory = agp_find_mem_by_key((int) arg);
 
 	if (memory == NULL)
@@ -927,12 +948,13 @@ static int agpioc_deallocate_wrap(agp_file_private * priv, unsigned long arg)
 	return 0;
 }
 
-static int agpioc_bind_wrap(agp_file_private * priv, unsigned long arg)
+static int agpioc_bind_wrap(struct agp_file_private *priv, unsigned long arg)
 {
-	agp_bind bind_info;
+	struct agp_bind bind_info;
 	agp_memory *memory;
 
-	if (copy_from_user(&bind_info, (void *) arg, sizeof(agp_bind)))
+	DBG("");
+	if (copy_from_user(&bind_info, (void *) arg, sizeof(struct agp_bind)))
 		return -EFAULT;
 
 	memory = agp_find_mem_by_key(bind_info.key);
@@ -943,12 +965,13 @@ static int agpioc_bind_wrap(agp_file_private * priv, unsigned long arg)
 	return agp_bind_memory(memory, bind_info.pg_start);
 }
 
-static int agpioc_unbind_wrap(agp_file_private * priv, unsigned long arg)
+static int agpioc_unbind_wrap(struct agp_file_private *priv, unsigned long arg)
 {
 	agp_memory *memory;
-	agp_unbind unbind;
+	struct agp_unbind unbind;
 
-	if (copy_from_user(&unbind, (void *) arg, sizeof(agp_unbind)))
+	DBG("");
+	if (copy_from_user(&unbind, (void *) arg, sizeof(struct agp_unbind)))
 		return -EFAULT;
 
 	memory = agp_find_mem_by_key(unbind.key);
@@ -962,10 +985,11 @@ static int agpioc_unbind_wrap(agp_file_private * priv, unsigned long arg)
 static int agp_ioctl(struct inode *inode, struct file *file,
 		     unsigned int cmd, unsigned long arg)
 {
-	agp_file_private *curr_priv = (agp_file_private *) file->private_data;
+	struct agp_file_private *curr_priv = file->private_data;
 	int ret_val = -ENOTTY;
 
-	AGP_LOCK();
+	DBG("priv=%p, cmd=%x", curr_priv, cmd);
+	down(&(agp_fe.agp_mutex));
 
 	if ((agp_fe.current_controller == NULL) &&
 	    (cmd != AGPIOC_ACQUIRE)) {
@@ -1034,7 +1058,8 @@ static int agp_ioctl(struct inode *inode, struct file *file,
 	}
 
 ioctl_out:
-	AGP_UNLOCK();
+	DBG("ioctl returns %d\n", ret_val);
+	up(&(agp_fe.agp_mutex));
 	return ret_val;
 }
 
@@ -1060,7 +1085,7 @@ static struct miscdevice agp_miscdev =
 int agp_frontend_initialize(void)
 {
 	memset(&agp_fe, 0, sizeof(struct agp_front_data));
-	AGP_LOCK_INIT();
+	sema_init(&(agp_fe.agp_mutex), 1);
 
 	if (misc_register(&agp_miscdev)) {
 		printk(KERN_ERR PFX "unable to get minor: %d\n", AGPGART_MINOR);

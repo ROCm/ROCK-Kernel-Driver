@@ -949,7 +949,7 @@ kmem_cache_create (const char *name, size_t size, size_t offset,
 	 *   with object sizes just above a power of two have a significant
 	 *   amount of internal fragmentation
 	 */
-	if ((size < (PAGE_SIZE>>3) || fls(size-1) == fls(size-1+3*BYTES_PER_WORD))
+	if ((size < 4096 || fls(size-1) == fls(size-1+3*BYTES_PER_WORD))
 			&& !(flags & SLAB_MUST_HWCACHE_ALIGN)) {
 		flags |= SLAB_RED_ZONE|SLAB_STORE_USER;
 	}
@@ -2448,7 +2448,7 @@ struct seq_operations slabinfo_op = {
  * @count: data len
  * @data: unused
  */
-ssize_t slabinfo_write(struct file *file, const char *buffer,
+ssize_t slabinfo_write(struct file *file, const char __user *buffer,
 				size_t count, loff_t *ppos)
 {
 	char kbuf[MAX_SLABINFO_WRITE+1], *tmp;

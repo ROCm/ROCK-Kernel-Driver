@@ -20,7 +20,7 @@
 #include "br_private.h"
 #include "br_private_stp.h"
 
-__u16 br_make_port_id(struct net_bridge_port *p)
+static inline __u16 br_make_port_id(const struct net_bridge_port *p)
 {
 	return (p->priority << 8) | p->port_no;
 }
@@ -33,33 +33,25 @@ void br_init_port(struct net_bridge_port *p)
 	p->state = BR_STATE_BLOCKING;
 	p->topology_change_ack = 0;
 	p->config_pending = 0;
-	br_timer_clear(&p->message_age_timer);
-	br_timer_clear(&p->forward_delay_timer);
-	br_timer_clear(&p->hold_timer);
+
+	br_stp_port_timer_init(p);
 }
 
 /* called under bridge lock */
 void br_stp_enable_bridge(struct net_bridge *br)
 {
 	struct net_bridge_port *p;
-	struct timer_list *timer = &br->tick;
 
 	spin_lock_bh(&br->lock);
-	init_timer(timer);
-	timer->data = (unsigned long) br;
-	timer->function = br_tick;
-	timer->expires = jiffies + 1;
-	add_timer(timer);
-
-	br_timer_set(&br->hello_timer, jiffies);
+	br->hello_timer.expires = jiffies + br->hello_time;
+	add_timer(&br->hello_timer);
 	br_config_bpdu_generation(br);
 
 	list_for_each_entry(p, &br->port_list, list) {
 		if (p->dev->flags & IFF_UP)
 			br_stp_enable_port(p);
-	}
 
-	br_timer_set(&br->gc_timer, jiffies);
+	}
 	spin_unlock_bh(&br->lock);
 }
 
@@ -68,22 +60,22 @@ void br_stp_disable_bridge(struct net_bridge *br)
 {
 	struct net_bridge_port *p;
 
-	spin_lock_bh(&br->lock);
-	br->topology_change = 0;
-	br->topology_change_detected = 0;
-	br_timer_clear(&br->hello_timer);
-	br_timer_clear(&br->topology_change_timer);
-	br_timer_clear(&br->tcn_timer);
-	br_timer_clear(&br->gc_timer);
-	br_fdb_cleanup(br);
-
+	spin_lock(&br->lock);
 	list_for_each_entry(p, &br->port_list, list) {
 		if (p->state != BR_STATE_DISABLED)
 			br_stp_disable_port(p);
-	}
-	spin_unlock_bh(&br->lock);
 
-	del_timer_sync(&br->tick);
+	}
+
+	br->topology_change = 0;
+	br->topology_change_detected = 0;
+	spin_unlock(&br->lock);
+
+	del_timer_sync(&br->hello_timer);
+	del_timer_sync(&br->topology_change_timer);
+	del_timer_sync(&br->tcn_timer);
+	del_timer_sync(&br->gc_timer);
+
 }
 
 /* called under bridge lock */
@@ -108,10 +100,13 @@ void br_stp_disable_port(struct net_bridge_port *p)
 	p->state = BR_STATE_DISABLED;
 	p->topology_change_ack = 0;
 	p->config_pending = 0;
-	br_timer_clear(&p->message_age_timer);
-	br_timer_clear(&p->forward_delay_timer);
-	br_timer_clear(&p->hold_timer);
+
+	del_timer(&p->message_age_timer);
+	del_timer(&p->forward_delay_timer);
+	del_timer(&p->hold_timer);
+
 	br_configuration_update(br);
+
 	br_port_state_selection(br);
 
 	if (br_is_root_bridge(br) && !wasroot)

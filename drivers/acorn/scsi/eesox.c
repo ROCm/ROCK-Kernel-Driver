@@ -141,12 +141,12 @@ eesoxscsi_terminator_ctl(struct Scsi_Host *host, int on_off)
  *	      dev_id - user-defined (Scsi_Host structure)
  *	      regs   - processor registers at interrupt
  */
-static void
+static irqreturn_t
 eesoxscsi_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct eesoxscsi_info *info = dev_id;
 
-	fas216_intr(&info->info);
+	return fas216_intr(&info->info);
 }
 
 /* Prototype: fasdmatype_t eesoxscsi_dma_setup(host, SCpnt, direction, min_type)
@@ -452,25 +452,6 @@ int eesoxscsi_proc_info(char *buffer, char **start, off_t offset,
 
 	pos += fas216_print_stats(&info->info, buffer + pos);
 
-	pos += sprintf(buffer+pos, "\nAttached devices:\n");
-
-	list_for_each_entry(scd, &host->my_devices, siblings) {
-		int len;
-
-		proc_print_scsidevice(scd, buffer, &len, pos);
-		pos += len;
-		pos += sprintf(buffer+pos, "Extensions: ");
-		if (scd->tagged_supported)
-			pos += sprintf(buffer+pos, "TAG %sabled [%d] ",
-					scd->tagged_queue ? "en" : "dis",
-					scd->current_tag);
-		pos += sprintf (buffer+pos, "\n");
-
-		if (pos + begin < offset) {
-			begin += pos;
-			pos = 0;
-		}
-	}
 	*start = buffer + (offset - begin);
 	pos -= offset - begin;
 	if (pos > length)
@@ -679,7 +660,6 @@ static struct ecard_driver eesoxscsi_driver = {
 	.remove		= __devexit_p(eesoxscsi_remove),
 	.id_table	= eesoxscsi_cids,
 	.drv = {
-		.devclass	= &shost_devclass,
 		.name		= "eesoxscsi",
 	},
 };

@@ -163,21 +163,4 @@ int imm_proc_info(char *, char **, off_t, int, int, int);
 int imm_biosparam(struct scsi_device *, struct block_device *,
 		sector_t, int *);
 
-#define IMM {	.proc_name			= "imm",			\
-		.proc_info			= imm_proc_info,		\
-		.name				= "Iomega VPI2 (imm) interface",\
-		.detect				= imm_detect,		\
-		.release			= imm_release,		\
-		.command			= imm_command,		\
-		.queuecommand			= imm_queuecommand,	\
-                .eh_abort_handler               = imm_abort,              \
-                .eh_device_reset_handler        = NULL,                   \
-                .eh_bus_reset_handler           = imm_reset,              \
-                .eh_host_reset_handler          = imm_reset,              \
-		.bios_param		        = imm_biosparam,		\
-		.this_id			= 7,			\
-		.sg_tablesize			= SG_ALL,			\
-		.cmd_per_lun			= 1,			\
-		.use_clustering			= ENABLE_CLUSTERING	\
-}
 #endif				/* _IMM_H */

@@ -3725,16 +3725,13 @@ static int st_attach(Scsi_Device * SDp)
 		return 1;
 	}
 
-	if (scsi_slave_attach(SDp))
-		return 1;
-
 	i = SDp->host->sg_tablesize;
 	if (st_max_sg_segs < i)
 		i = st_max_sg_segs;
 	buffer = new_tape_buffer(TRUE, (SDp->host)->unchecked_isa_dma, i);
 	if (buffer == NULL) {
 		printk(KERN_ERR "st: Can't allocate new tape buffer. Device not attached.\n");
-		goto out_slave_detach;
+		goto out;
 	}
 
 	disk = alloc_disk(1);
@@ -3920,8 +3917,7 @@ out_put_disk:
 	put_disk(disk);
 out_buffer_free:
 	kfree(buffer);
-out_slave_detach:
-	scsi_slave_detach(SDp);
+out:
 	return 1;
 };
 
@@ -3959,7 +3955,6 @@ static void st_detach(Scsi_Device * SDp)
 				normalize_buffer(tpnt->buffer);
 				kfree(tpnt->buffer);
 			}
-			scsi_slave_detach(SDp);
 			put_disk(tpnt->disk);
 			kfree(tpnt);
 			return;

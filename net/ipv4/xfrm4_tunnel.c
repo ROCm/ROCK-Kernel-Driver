@@ -163,36 +163,32 @@ static int ipip_rcv(struct sk_buff *skb)
 			      skb->nh.iph->saddr,
 			      IPPROTO_IPIP, AF_INET);
 
-	if (x) {
-		spin_lock(&x->lock);
+	if (!x)
+		goto drop;
 
-		if (unlikely(x->km.state != XFRM_STATE_VALID))
-			goto drop_unlock;
-	}
+	spin_lock(&x->lock);
+
+	if (unlikely(x->km.state != XFRM_STATE_VALID))
+		goto drop_unlock;
 
 	err = ipip_xfrm_rcv(x, NULL, skb);
 	if (err)
 		goto drop_unlock;
 
-	if (x) {
-		x->curlft.bytes += skb->len;
-		x->curlft.packets++;
-
-		spin_unlock(&x->lock);
-
-		xfrm_state_put(x);
-	}
-
-	return 0;
+	x->curlft.bytes += skb->len;
+	x->curlft.packets++;
+	spin_unlock(&x->lock);
+	xfrm_state_put(x);
+out:	
+	return err;
 
 drop_unlock:
-	if (x) {
-		spin_unlock(&x->lock);
-		xfrm_state_put(x);
-	}
+	spin_unlock(&x->lock);
+	xfrm_state_put(x);
+drop:
+	err = NET_RX_DROP;
 	kfree_skb(skb);
-out:
-	return 0;
+	goto out;
 }
 
 static void ipip_err(struct sk_buff *skb, u32 info)

@@ -70,7 +70,7 @@
 
 typedef struct chdlc_private_area
 {
-	netdevice_t 	*slave;
+	struct net_device *slave;
 	sdla_t		*card;
 	int 		TracingEnabled;		/* For enabling Tracing */
 	unsigned long 	curr_trace_addr;	/* Used for Tracing */

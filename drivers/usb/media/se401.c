@@ -170,7 +170,8 @@ static int se401_read_proc(char *page, char **start, off_t off, int count,
 	len -= off;
 	if (len < count) {
 		*eof = 1;
-			if (len <= 0) return 0;
+		if (len <= 0)
+			return 0;
 	} else
 		len = count;
 
@@ -749,7 +750,8 @@ static inline void decode_JangGu_vlc (struct usb_se401 *se401, unsigned char *da
 				}
 			} else {
 				if (vlc_cod==2) {
-					if (!bit) vlc_data=-(1<<vlc_size)+1;
+					if (!bit)
+						vlc_data =  -(1<<vlc_size) + 1;
 					vlc_cod--;
 				}
 				vlc_size--;
@@ -1046,15 +1048,12 @@ static int se401_open(struct inode *inode, struct file *file)
 
 	if (se401->user)
 		return -EBUSY;
-	se401->user=1;
-	se401->fbuf=rvmalloc(se401->maxframesize * SE401_NUMFRAMES);
-	if(!se401->fbuf) err=-ENOMEM;
-
-        if (0 != err) {
-		se401->user = 0;
-	} else {
+	se401->fbuf = rvmalloc(se401->maxframesize * SE401_NUMFRAMES);
+	if (se401->fbuf)
 		file->private_data = dev;
-	}
+	else 
+		err = -ENOMEM;
+	se401->user = !err;
 
 	return err;
 }

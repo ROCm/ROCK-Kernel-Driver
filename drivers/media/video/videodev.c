@@ -83,11 +83,8 @@ static int video_open(struct inode *inode, struct file *file)
 	down(&videodev_lock);
 	vfl=video_device[minor];
 	if(vfl==NULL) {
-		char modname[20];
-
 		up(&videodev_lock);
-		sprintf (modname, "char-major-%d-%d", VIDEO_MAJOR, minor);
-		request_module(modname);
+		request_module("char-major-%d-%d", VIDEO_MAJOR, minor);
 		down(&videodev_lock);
 		vfl=video_device[minor];
 		if (vfl==NULL) {
@@ -311,8 +308,10 @@ static void videodev_proc_create_dev (struct video_device *vfd, char *name)
 		return;
 
 	p = create_proc_entry(name, S_IFREG|S_IRUGO|S_IWUSR, video_dev_proc_entry);
-	if (!p)
+	if (!p) {
+		kfree(d);
 		return;
+	}
 	p->data = vfd;
 	p->read_proc = videodev_proc_read;
 

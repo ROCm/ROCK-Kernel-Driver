@@ -132,6 +132,16 @@ The following information is available in this file:
 
 2. Version History
 
+        6.2.33 - Dynamically disable PCI parity error reporting after
+		 10 errors are reported to the user.  These errors are
+		 the result of some other device issuing PCI transactions
+		 with bad parity.  Once the user has been informed of the
+		 problem, continuing to report the errors just degrades
+		 our performance.
+
+        6.2.32 - Dynamically sized S/G lists to avoid SCSI malloc
+		 pool fragmentation and SCSI mid-layer deadlock.
+
         6.2.28 - Domain Validation Fixes
                  PCI parity error disable
                  Enhanced Memory Mapped I/O probe
@@ -160,6 +170,7 @@ The following information is available in this file:
        Default Value: 0x0000
    -----------------------------------------------------------------
               Option: no_probe
+              Option: probe_eisa_vl
           Definition: Do not probe for EISA/VLB controllers.
                       This is a toggle.  If the driver is compiled
                       to not probe EISA/VLB controllers by default,
@@ -339,9 +350,33 @@ The following information is available in this file:
     - Fax Technical Support at +852-2869-7100
 
 -------------------------------------------------------------------
-
-(c) 2002 Adaptec, Inc. All Rights Reserved. No part of this 
-publication may be reproduced, stored in a retrieval system, or 
-transmitted in any form or by any means, electronic, mechanical, 
-photocopying, recording or otherwise, without prior written consent 
-of Adaptec, Inc., 691 South Milpitas Blvd., Milpitas, CA 95035.
+/*
+ * Copyright (c) 2003 Adaptec Inc. 691 S. Milpitas Blvd., Milpitas CA 95035 USA.
+ * All rights reserved.
+ *
+ * You are permitted to redistribute, use and modify this README file in whole
+ * or in part in conjunction with redistribution of software governed by the
+ * General Public License, provided that the following conditions are met:
+ * 1. Redistributions of README file must retain the above copyright
+ *    notice, this list of conditions, and the following disclaimer,
+ *    without modification.
+ * 2. The name of the author may not be used to endorse or promote products
+ *    derived from this software without specific prior written permission.
+ * 3. Modifications or new contributions must be attributed in a copyright
+ *    notice identifying the author ("Contributor") and added below the
+ *    original copyright notice. The copyright notice is for purposes of
+ *    identifying contributors and should not be deemed as permission to alter
+ *    the permissions given by Adaptec.
+ *
+ * THIS README FILE IS PROVIDED BY ADAPTEC AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, ANY
+ * WARRANTIES OF NON-INFRINGEMENT OR THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+ * ADAPTEC OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS README
+ * FILE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */

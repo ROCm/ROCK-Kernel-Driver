@@ -63,13 +63,19 @@ static int check_ci(struct atm_vcc *vcc,short vpi,int vci)
 
 int atm_find_ci(struct atm_vcc *vcc,short *vpi,int *vci)
 {
+	unsigned long flags;
 	static short p = 0; /* poor man's per-device cache */
 	static int c = 0;
 	short old_p;
 	int old_c;
+	int err;
 
-	if (*vpi != ATM_VPI_ANY && *vci != ATM_VCI_ANY)
-		return check_ci(vcc,*vpi,*vci);
+	spin_lock_irqsave(&vcc->dev->lock, flags);
+	if (*vpi != ATM_VPI_ANY && *vci != ATM_VCI_ANY) {
+		err = check_ci(vcc,*vpi,*vci);
+		spin_unlock_irqrestore(&vcc->dev->lock, flags);
+		return err;
+	}
 	/* last scan may have left values out of bounds for current device */
 	if (*vpi != ATM_VPI_ANY) p = *vpi;
 	else if (p >= 1 << vcc->dev->ci_range.vpi_bits) p = 0;
@@ -82,6 +88,7 @@ int atm_find_ci(struct atm_vcc *vcc,short *vpi,int *vci)
 		if (!check_ci(vcc,p,c)) {
 			*vpi = p;
 			*vci = c;
+			spin_unlock_irqrestore(&vcc->dev->lock, flags);
 			return 0;
 		}
 		if (*vci == ATM_VCI_ANY) {
@@ -96,6 +103,7 @@ int atm_find_ci(struct atm_vcc *vcc,short *vpi,int *vci)
 		}
 	}
 	while (old_p != p || old_c != c);
+	spin_unlock_irqrestore(&vcc->dev->lock, flags);
 	return -EADDRINUSE;
 }
 

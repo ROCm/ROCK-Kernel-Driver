@@ -370,9 +370,9 @@ static inline struct sock *__tcp_v6_lookup(struct in6_addr *saddr, u16 sport,
 	return tcp_v6_lookup_listener(daddr, hnum, dif);
 }
 
-__inline__ struct sock *tcp_v6_lookup(struct in6_addr *saddr, u16 sport,
-				      struct in6_addr *daddr, u16 dport,
-				      int dif)
+inline struct sock *tcp_v6_lookup(struct in6_addr *saddr, u16 sport,
+				  struct in6_addr *daddr, u16 dport,
+				  int dif)
 {
 	struct sock *sk;
 
@@ -505,7 +505,6 @@ unique:
 		/* Silly. Should hash-dance instead... */
 		local_bh_disable();
 		tcp_tw_deschedule(tw);
-		tcp_timewait_kill(tw);
 		NET_INC_STATS_BH(TimeWaitRecycled);
 		local_bh_enable();
 
@@ -1698,7 +1697,6 @@ do_time_wait:
 		sk2 = tcp_v6_lookup_listener(&skb->nh.ipv6h->daddr, ntohs(th->dest), tcp_v6_iif(skb));
 		if (sk2 != NULL) {
 			tcp_tw_deschedule((struct tcp_tw_bucket *)sk);
-			tcp_timewait_kill((struct tcp_tw_bucket *)sk);
 			tcp_tw_put((struct tcp_tw_bucket *)sk);
 			sk = sk2;
 			goto process;

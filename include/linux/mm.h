@@ -23,7 +23,12 @@ extern int page_cluster;
 
 #include <asm/page.h>
 #include <asm/pgtable.h>
+#include <asm/processor.h>
 #include <asm/atomic.h>
+
+#ifndef MM_VM_SIZE
+#define MM_VM_SIZE(mm)	TASK_SIZE
+#endif
 
 /*
  * Linux kernel virtual memory manager primitives.
@@ -106,10 +111,14 @@ struct vm_area_struct {
 #define VM_ACCOUNT	0x00100000	/* Is a VM accounted object */
 #define VM_HUGETLB	0x00400000	/* Huge TLB Page VM */
 
+#ifndef VM_STACK_DEFAULT_FLAGS		/* arch can override this */
+#define VM_STACK_DEFAULT_FLAGS VM_DATA_DEFAULT_FLAGS
+#endif
+
 #ifdef CONFIG_STACK_GROWSUP
-#define VM_STACK_FLAGS	(VM_GROWSUP | VM_DATA_DEFAULT_FLAGS | VM_ACCOUNT)
+#define VM_STACK_FLAGS	(VM_GROWSUP | VM_STACK_DEFAULT_FLAGS | VM_ACCOUNT)
 #else
-#define VM_STACK_FLAGS	(VM_GROWSDOWN | VM_DATA_DEFAULT_FLAGS | VM_ACCOUNT)
+#define VM_STACK_FLAGS	(VM_GROWSDOWN | VM_STACK_DEFAULT_FLAGS | VM_ACCOUNT)
 #endif
 
 #define VM_READHINTMASK			(VM_SEQ_READ | VM_RAND_READ)
@@ -421,7 +430,8 @@ extern int handle_mm_fault(struct mm_struct *mm,struct vm_area_struct *vma, unsi
 extern int make_pages_present(unsigned long addr, unsigned long end);
 extern int access_process_vm(struct task_struct *tsk, unsigned long addr, void *buf, int len, int write);
 extern long sys_remap_file_pages(unsigned long start, unsigned long size, unsigned long prot, unsigned long pgoff, unsigned long nonblock);
-
+void put_dirty_page(struct task_struct *tsk, struct page *page,
+			unsigned long address, pgprot_t prot);
 
 int get_user_pages(struct task_struct *tsk, struct mm_struct *mm, unsigned long start,
 		int len, int write, int force, struct page **pages, struct vm_area_struct **vmas);

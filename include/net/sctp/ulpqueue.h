@@ -50,14 +50,15 @@
 struct sctp_ulpq {
 	char malloced;
 	char pd_mode;
-	sctp_association_t *asoc;
+	struct sctp_association *asoc;
 	struct sk_buff_head reasm;
 	struct sk_buff_head lobby;
 };
 
 /* Prototypes. */
-struct sctp_ulpq *sctp_ulpq_new(sctp_association_t *asoc, int priority);
-struct sctp_ulpq *sctp_ulpq_init(struct sctp_ulpq *, sctp_association_t *);
+struct sctp_ulpq *sctp_ulpq_new(struct sctp_association *asoc, int gfp);
+struct sctp_ulpq *sctp_ulpq_init(struct sctp_ulpq *,
+				 struct sctp_association *);
 void sctp_ulpq_free(struct sctp_ulpq *);
 
 /* Add a new DATA chunk for processing. */

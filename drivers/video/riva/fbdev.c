@@ -1469,10 +1469,10 @@ static void rivafb_imageblit(struct fb_info *info,
 static int rivafb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 {
 	struct riva_par *par = (struct riva_par *) info->par;
-	int i, j, d_idx = 0, s_idx = 0;
 	u8 data[MAX_CURS * MAX_CURS/8];
 	u8 mask[MAX_CURS * MAX_CURS/8];
 	u16 fg, bg;
+	int i;
 
 	par->riva.ShowHideCursor(&par->riva, 0);
 

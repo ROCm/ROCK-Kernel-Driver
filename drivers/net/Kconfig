@@ -158,7 +158,7 @@ config ETHERTAP
 
 config NET_SB1000
 	tristate "General Instruments Surfboard 1000"
-	depends on NETDEVICES && ISAPNP
+	depends on NETDEVICES && PNP
 	---help---
 	  This is a driver for the General Instrument (also known as
 	  NextLevel) SURFboard 1000 internal

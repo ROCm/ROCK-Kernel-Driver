@@ -348,12 +348,12 @@ static void	PortReInitBmu(SK_AC*, int);
 static int	SkGeIocMib(DEV_NET*, unsigned int, int);
 
 
-/*Extern */
+static const char SK_Root_Dir_entry[] = "sk98lin";
+static struct proc_dir_entry *pSkRootDir;
 
-extern struct proc_dir_entry *pSkRootDir;
 
 //extern struct proc_dir_entry Our_Proc_Dir;
-extern int proc_read(char *buffer, char **buffer_location,
+extern int sk_proc_read(char *buffer, char **buffer_location,
 	off_t offset, int buffer_length, int *eof, void *data);
 
 
@@ -374,17 +374,6 @@ struct inode_operations SkInodeOps;
 /* local variables **********************************************************/
 static uintptr_t TxQueueAddr[SK_MAX_MACS][2] = {{0x680, 0x600},{0x780, 0x700}};
 static uintptr_t RxQueueAddr[SK_MAX_MACS] = {0x400, 0x480};
-
-
-
-void proc_fill_inode(struct inode *inode, int fill)
-{
-	if (fill)
-		MOD_INC_USE_COUNT;
-	else
-		MOD_DEC_USE_COUNT;
-}
-
 
 
 /*****************************************************************************
@@ -481,20 +470,20 @@ static int __init skge_probe (void)
 		dev->change_mtu =	&SkGeChangeMtu;
 
 		if(!proc_root_initialized) {
-			pSkRootDir = create_proc_entry("sk98lin",
+			pSkRootDir = create_proc_entry(SK_Root_Dir_entry,
 				S_IFDIR | S_IWUSR | S_IRUGO | S_IXUGO, proc_net);
 			pSkRootDir->owner = THIS_MODULE;
-
 			proc_root_initialized = 1;
 		}
 
 		pProcFile = create_proc_entry(dev->name, 
 			S_IFREG | 0444, pSkRootDir);
-		pProcFile->read_proc = proc_read;
+ 		pProcFile->read_proc = sk_proc_read;
 		pProcFile->write_proc = NULL;
 		pProcFile->nlink = 1;
 		pProcFile->size = sizeof(dev->name+1);
 		pProcFile->data = (void*)pProcFile;
+		pProcFile->owner = THIS_MODULE;
 
 		/*
 		 * Dummy value.
@@ -571,11 +560,12 @@ static int __init skge_probe (void)
 
 			pProcFile = create_proc_entry(dev->name, 
 				S_IFREG | 0444, pSkRootDir);
-			pProcFile->read_proc = proc_read;
+			pProcFile->read_proc = sk_proc_read;
 			pProcFile->write_proc = NULL;
 			pProcFile->nlink = 1;
 			pProcFile->size = sizeof(dev->name+1);
 			pProcFile->data = (void*)pProcFile;
+			pProcFile->owner = THIS_MODULE;
 
 			memcpy((caddr_t) &dev->dev_addr,
 			(caddr_t) &pAC->Addr.Net[1].CurrentMacAddress, 6);

@@ -182,7 +182,7 @@ typedef struct {
 /* Create a new sctp_command_sequence.
  * Return NULL if creating a new sequence fails.
  */
-sctp_cmd_seq_t *sctp_new_cmd_seq(int priority);
+sctp_cmd_seq_t *sctp_new_cmd_seq(int gfp);
 
 /* Initialize a block of memory as a command sequence.
  * Return 0 if the initialization fails.

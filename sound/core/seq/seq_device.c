@@ -131,7 +131,6 @@ void snd_seq_device_load_drivers(void)
 {
 #ifdef CONFIG_KMOD
 	struct list_head *head;
-	char modname[64];
 
 	down(&ops_mutex);
 	list_for_each(head, &opslist) {
@@ -141,8 +140,7 @@ void snd_seq_device_load_drivers(void)
 			ops->used++;
 			up(&ops_mutex);
 			ops->driver |= DRIVER_REQUESTED;
-			sprintf(modname, "snd-%s", ops->id);
-			request_module(modname);
+			request_module("snd-%s", ops->id);
 			down(&ops_mutex);
 			ops->used--;
 		}

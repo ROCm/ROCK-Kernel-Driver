@@ -887,7 +887,6 @@ ehci_endpoint_disable (struct usb_hcd *hcd, struct hcd_dev *dev, int ep)
 	/* ASSERT:  any requests/urbs are being unlinked */
 	/* ASSERT:  nobody can be submitting urbs for this any more */
 
-	ehci_dbg (ehci, "ep %02x disable\n", ep);
 	epnum = ep & USB_ENDPOINT_NUMBER_MASK;
 	if (epnum != 0 && (ep & USB_DIR_IN))
 		epnum |= 0x10;

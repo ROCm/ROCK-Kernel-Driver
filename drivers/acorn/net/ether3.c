@@ -82,7 +82,7 @@ static int	ether3_rx(struct net_device *dev, struct dev_priv *priv, unsigned int
 static void	ether3_tx(struct net_device *dev, struct dev_priv *priv);
 static int	ether3_open (struct net_device *dev);
 static int	ether3_sendpacket (struct sk_buff *skb, struct net_device *dev);
-static void	ether3_interrupt (int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t ether3_interrupt (int irq, void *dev_id, struct pt_regs *regs);
 static int	ether3_close (struct net_device *dev);
 static struct net_device_stats *ether3_getstats (struct net_device *dev);
 static void	ether3_setmulticastlist (struct net_device *dev);
@@ -576,12 +576,12 @@ ether3_sendpacket(struct sk_buff *skb, struct net_device *dev)
 	return 0;
 }
 
-static void
+static irqreturn_t
 ether3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *)dev_id;
 	struct dev_priv *priv;
-	unsigned int status;
+	unsigned int status, handled = IRQ_NONE;
 
 #if NET_DEBUG > 1
 	if(net_debug & DEBUG_INT)
@@ -595,17 +595,20 @@ ether3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	if (status & STAT_INTRX) {
 		ether3_outw(CMD_ACKINTRX | priv->regs.command, REG_COMMAND);
 		ether3_rx(dev, priv, 12);
+		handled = IRQ_HANDLED;
 	}
 
 	if (status & STAT_INTTX) {
 		ether3_outw(CMD_ACKINTTX | priv->regs.command, REG_COMMAND);
 		ether3_tx(dev, priv);
+		handled = IRQ_HANDLED;
 	}
 
 #if NET_DEBUG > 1
 	if(net_debug & DEBUG_INT)
 		printk("done\n");
 #endif
+	return handled;
 }
 
 /*

@@ -8,7 +8,7 @@
 
 L_TARGET := lib.a
 
-obj-y := errno.o ctype.o string.o vsprintf.o brlock.o cmdline.o \
+obj-y := errno.o ctype.o string.o vsprintf.o cmdline.o \
 	 bust_spinlocks.o rbtree.o radix-tree.o dump_stack.o \
 	 kobject.o idr.o
 

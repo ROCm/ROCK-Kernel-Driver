@@ -38,7 +38,7 @@ struct display {
 
 /* drivers/video/console/fbcon.c */
 extern char con2fb_map[MAX_NR_CONSOLES];
-extern void set_con2fb_map(int unit, int newidx);
+extern int set_con2fb_map(int unit, int newidx);
 
     /*
      *  Attribute Decoding

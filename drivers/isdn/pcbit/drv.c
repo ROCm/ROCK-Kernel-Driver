@@ -1071,6 +1071,7 @@ static void pcbit_set_msn(struct pcbit_dev *dev, char *list)
 		ptr->msn = kmalloc(len, GFP_ATOMIC);
 		if (!ptr->msn) {
 			printk(KERN_WARNING "kmalloc failed\n");
+			kfree(ptr);
 			return;
 		}
 

@@ -223,6 +223,7 @@ static struct pci_device_id tulip_pci_tbl[] __devinitdata = {
 	{ 0x1626, 0x8410, PCI_ANY_ID, PCI_ANY_ID, 0, 0, COMET },
 	{ 0x1737, 0xAB09, PCI_ANY_ID, PCI_ANY_ID, 0, 0, COMET },
 	{ 0x17B3, 0xAB08, PCI_ANY_ID, PCI_ANY_ID, 0, 0, COMET },
+ 	{ 0x10b9, 0x5261, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DM910X },	/* ALi 1563 integrated ethernet */
 	{ } /* terminate list */
 };
 MODULE_DEVICE_TABLE(pci, tulip_pci_tbl);
@@ -1325,12 +1326,14 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 		csr0 &= ~0xfff10000; /* zero reserved bits 31:20, 16 */
 
 	/* DM9102A has troubles with MRM & clear reserved bits 24:22, 20, 16, 7:1 */
-	if (pdev->vendor == 0x1282 && pdev->device == 0x9102)
+	if ((pdev->vendor == 0x1282 && pdev->device == 0x9102)
+		|| (pdev->vendor == 0x10b9 && pdev->device == 0x5261))
 		csr0 &= ~0x01f100ff;
 
 #if defined(__sparc__)
         /* DM9102A needs 32-dword alignment/burst length on sparc - chip bug? */
-        if (pdev->vendor == 0x1282 && pdev->device == 0x9102)
+	if ((pdev->vendor == 0x1282 && pdev->device == 0x9102)
+		|| (pdev->vendor == 0x10b9 && pdev->device == 0x5261))
                 csr0 = (csr0 & ~0xff00) | 0xe000;
 #endif
 

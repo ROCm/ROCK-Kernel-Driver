@@ -2420,7 +2420,6 @@ static void nsp32_adjust_busfree(nsp32_hw_data *data, unsigned int s_sacklen)
 static void nsp32_msgout_occur(nsp32_hw_data *data)
 {
 	unsigned int base = data->BaseAddress;
-	unsigned short command;
 	long new_sgtp;
 	int i;
 	

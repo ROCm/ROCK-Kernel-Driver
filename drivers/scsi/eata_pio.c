@@ -106,7 +106,6 @@ static int eata_pio_proc_info(char *buffer, char **start, off_t offset,
 			      int length, int hostno, int rw)
 {
     struct Scsi_Host *shost;
-    struct scsi_device *sdev;
     static u8 buff[512];
     int size, len = 0;
     off_t begin = 0, pos = 0;

@@ -397,7 +397,6 @@ static struct ecard_driver arxescsi_driver = {
 	.remove		= __devexit_p(arxescsi_remove),
 	.id_table	= arxescsi_cids,
 	.drv = {
-		.devclass	= &shost_devclass,
 		.name		= "arxescsi",
 	},
 };

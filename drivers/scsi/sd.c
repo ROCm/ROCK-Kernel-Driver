@@ -52,6 +52,9 @@
 #include <scsi/scsi_ioctl.h>
 #include <scsi/scsicam.h>
 
+#include "scsi_logging.h"
+
+
 /*
  * Remaining dev_t-handling stuff
  */
@@ -696,7 +699,7 @@ static void sd_rw_intr(struct scsi_cmnd * SCpnt)
 	int good_sectors = (result == 0 ? this_count : 0);
 	sector_t block_sectors = 1;
 	sector_t error_sector;
-#if CONFIG_SCSI_LOGGING
+#ifdef CONFIG_SCSI_LOGGING
 	SCSI_LOG_HLCOMPLETE(1, printk("sd_rw_intr: %s: res=0x%x\n", 
 				SCpnt->request->rq_disk->disk_name, result));
 	if (0 != result) {
@@ -808,7 +811,8 @@ sd_spinup_disk(struct scsi_disk *sdkp, char *diskname,
 	       struct scsi_request *SRpnt, unsigned char *buffer) {
 	unsigned char cmd[10];
 	unsigned long spintime_value = 0;
-	int the_result, retries, spintime;
+	int retries, spintime;
+	unsigned int the_result;
 
 	spintime = 0;
 
@@ -817,7 +821,7 @@ sd_spinup_disk(struct scsi_disk *sdkp, char *diskname,
 	do {
 		retries = 0;
 
-		while (retries < 3) {
+		do {
 			cmd[0] = TEST_UNIT_READY;
 			memset((void *) &cmd[1], 0, 9);
 
@@ -831,10 +835,9 @@ sd_spinup_disk(struct scsi_disk *sdkp, char *diskname,
 
 			the_result = SRpnt->sr_result;
 			retries++;
-			if (the_result == 0
-			    || SRpnt->sr_sense_buffer[2] != UNIT_ATTENTION)
-				break;
-		}
+		} while (retries < 3 && !scsi_status_is_good(the_result)
+			 && ((driver_byte(the_result) & DRIVER_SENSE)
+			     && SRpnt->sr_sense_buffer[2] == UNIT_ATTENTION));
 
 		/*
 		 * If the drive has indicated to us that it doesn't have
@@ -844,8 +847,15 @@ sd_spinup_disk(struct scsi_disk *sdkp, char *diskname,
 		if (media_not_present(sdkp, SRpnt))
 			return;
 
-		if (the_result == 0)
-			break;		/* all is well now */
+		if ((driver_byte(the_result) & DRIVER_SENSE) == 0) {
+			/* no sense, TUR either succeeded or failed
+			 * with a status error */
+			if(!spintime && !scsi_status_is_good(the_result))
+				printk(KERN_NOTICE "%s: Unit Not Ready, error = 0x%x\n", diskname, the_result);
+			break;
+		}
+					
+					
 
 		/*
 		 * If manual intervention is required, or this is an
@@ -853,13 +863,13 @@ sd_spinup_disk(struct scsi_disk *sdkp, char *diskname,
 		 */
 		if (SRpnt->sr_sense_buffer[2] == NOT_READY &&
 		    SRpnt->sr_sense_buffer[12] == 4 /* not ready */ &&
-		    SRpnt->sr_sense_buffer[13] == 3)
+		    SRpnt->sr_sense_buffer[13] == 3) {
 			break;		/* manual intervention required */
 
 		/*
 		 * Issue command to spin up drive when not ready
 		 */
-		if (SRpnt->sr_sense_buffer[2] == NOT_READY) {
+		} else if (SRpnt->sr_sense_buffer[2] == NOT_READY) {
 			unsigned long time1;
 			if (!spintime) {
 				printk(KERN_NOTICE "%s: Spinning up disk...",
@@ -886,15 +896,24 @@ sd_spinup_disk(struct scsi_disk *sdkp, char *diskname,
 				time1 = schedule_timeout(time1);
 			} while(time1);
 			printk(".");
+		} else {
+			/* we don't understand the sense code, so it's
+			 * probably pointless to loop */
+			if(!spintime) {
+				printk(KERN_NOTICE "%s: Unit Not Ready, sense:\n", diskname);
+				print_req_sense("", SRpnt);
+			}
+			break;
 		}
+				
 	} while (spintime &&
 		 time_after(spintime_value + 100 * HZ, jiffies));
 
 	if (spintime) {
-		if (the_result)
-			printk("not responding...\n");
-		else
+		if (scsi_status_is_good(the_result))
 			printk("ready\n");
+		else
+			printk("not responding...\n");
 	}
 }
 
@@ -1299,14 +1318,10 @@ static int sd_attach(struct scsi_device * sdp)
 	SCSI_LOG_HLQUEUE(3, printk("sd_attach: scsi device: <%d,%d,%d,%d>\n", 
 			 sdp->host->host_no, sdp->channel, sdp->id, sdp->lun));
 
-	error = scsi_slave_attach(sdp);
-	if (error)
-		goto out;
-
 	error = -ENOMEM;
 	sdkp = kmalloc(sizeof(*sdkp), GFP_KERNEL);
 	if (!sdkp)
-		goto out_detach;
+		goto out;
 
 	gd = alloc_disk(16);
 	if (!gd)
@@ -1365,8 +1380,6 @@ out_put:
 	put_disk(gd);
 out_free:
 	kfree(sdkp);
-out_detach:
-	scsi_slave_detach(sdp);
 out:
 	return error;
 }
@@ -1403,7 +1416,6 @@ static void sd_detach(struct scsi_device * sdp)
 
 	sd_devlist_remove(sdkp);
 	del_gendisk(sdkp->disk);
-	scsi_slave_detach(sdp);
 
 	spin_lock(&sd_index_lock);
 	clear_bit(sdkp->index, sd_index_bits);
@@ -1502,7 +1514,8 @@ static int sd_synchronize_cache(struct scsi_disk *sdkp, int verbose)
 			printk("FAILED\n  No memory for request\n");
 		return 0;
 	}
-		
+
+	SRpnt->sr_data_direction = SCSI_DATA_NONE;
 
 	for(retries = 3; retries > 0; --retries) {
 		unsigned char cmd[10] = { 0 };

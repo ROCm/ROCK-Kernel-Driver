@@ -5397,15 +5397,10 @@ static int osst_attach(Scsi_Device * SDp)
 	if (SDp->type != TYPE_TAPE || !osst_supports(SDp))
 		return 1;
 
-	if (scsi_slave_attach(SDp)) {
-		printk(KERN_ERR "osst :E: Failed to attach scsi slave.\n");
-		return 1;
-	}
-
 	drive = alloc_disk(1);
 	if (!drive) {
 		printk(KERN_ERR "osst :E: Out of memory. Device not attached.\n");
-		goto out_slave_detach;
+		return 1;
 	}
 
 	/* if this is the first attach, build the infrastructure */
@@ -5580,8 +5575,6 @@ static int osst_attach(Scsi_Device * SDp)
 
 out_put_disk:
         put_disk(drive);
-out_slave_detach:
-        scsi_slave_detach(SDp);
         return 1;
 };
 
@@ -5604,7 +5597,6 @@ static void osst_detach(Scsi_Device * SDp)
 		devfs_unregister_tape(tpnt->drive->number);
 		put_disk(tpnt->drive);
 		os_scsi_tapes[i] = NULL;
-		scsi_slave_detach(SDp);
 		osst_nr_dev--;
 		write_unlock(&os_scsi_tapes_lock);
 		for (mode = 0; mode < ST_NBR_MODES; ++mode) {

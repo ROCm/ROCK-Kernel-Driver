@@ -141,7 +141,7 @@ struct page *pte_alloc_one(struct mm_struct *mm, unsigned long address)
 {
 	struct page *pte;
 
-#if CONFIG_HIGHPTE
+#ifdef CONFIG_HIGHPTE
 	pte = alloc_pages(GFP_KERNEL|__GFP_HIGHMEM|__GFP_REPEAT, 0);
 #else
 	pte = alloc_pages(GFP_KERNEL|__GFP_REPEAT, 0);
@@ -151,7 +151,7 @@ struct page *pte_alloc_one(struct mm_struct *mm, unsigned long address)
 	return pte;
 }
 
-#if CONFIG_X86_PAE
+#ifdef CONFIG_X86_PAE
 
 pgd_t *pgd_alloc(struct mm_struct *mm)
 {

@@ -497,26 +497,4 @@ int tw_state_request_finish(TW_Device_Extension *tw_dev,int request_id);
 int tw_state_request_start(TW_Device_Extension *tw_dev, int *request_id);
 void tw_unmask_command_interrupt(TW_Device_Extension *tw_dev);
 
-/* Scsi_Host_Template Initializer */
-#define TWXXXX {					\
-	.proc_name	= "3w-xxxx",			\
-	.proc_info	= tw_scsi_proc_info,		\
-	.name		= "3ware Storage Controller",	\
-	.detect		= tw_scsi_detect,		\
-	.release	= tw_scsi_release,		\
-	.queuecommand	= tw_scsi_queue,		\
-	.eh_abort_handler	= tw_scsi_eh_abort,	\
-	.eh_host_reset_handler	= tw_scsi_eh_reset,	\
-	.bios_param	= tw_scsi_biosparam,		\
-	.can_queue	= TW_Q_LENGTH-2,		\
-	.this_id	= -1,				\
-	.sg_tablesize	= TW_MAX_SGL_LENGTH,		\
-	.max_sectors    = TW_MAX_SECTORS,		\
-	.cmd_per_lun	= TW_MAX_CMDS_PER_LUN,		\
-	.present	= 0,				\
-	.unchecked_isa_dma	= 0,			\
-	.use_clustering	= ENABLE_CLUSTERING,		\
-	.emulated	= 1,				\
-	.highmem_io	= 1				\
-}
 #endif /* _3W_XXXX_H */

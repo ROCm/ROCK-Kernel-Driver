@@ -11,7 +11,7 @@
 
 
 extern struct list_head atm_devs;
-extern struct atm_vcc *nodev_vccs; /* VCCs not linked to any device */
+extern spinlock_t atm_dev_lock;
 
 
 struct sock *alloc_atm_vcc_sk(int family);

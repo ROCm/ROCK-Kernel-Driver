@@ -1988,8 +1988,10 @@ int ext3_statfs (struct super_block * sb, struct statfs * buf)
 
 #ifdef CONFIG_QUOTA
 
-#define EXT3_OLD_QFMT_BLOCKS 2
-#define EXT3_V0_QFMT_BLOCKS 6
+/* Blocks: (2 data blocks) * (3 indirect + 1 descriptor + 1 bitmap) + superblock */
+#define EXT3_OLD_QFMT_BLOCKS 11
+/* Blocks: quota info + (4 pointer blocks + 1 entry block) * (3 indirect + 1 descriptor + 1 bitmap) + superblock */
+#define EXT3_V0_QFMT_BLOCKS 27
 
 static int (*old_sync_dquot)(struct dquot *dquot);
 

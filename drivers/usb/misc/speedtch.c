@@ -952,19 +952,15 @@ static int udsl_atm_open (struct atm_vcc *vcc, short vpi, int vci)
 		return -EAGAIN;
 	}
 
-	MOD_INC_USE_COUNT;
-
 	down (&instance->serialize); /* vs self, udsl_atm_close */
 
 	if (udsl_find_vcc (instance, vpi, vci)) {
 		up (&instance->serialize);
-		MOD_DEC_USE_COUNT;
 		return -EADDRINUSE;
 	}
 
 	if (!(new = kmalloc (sizeof (struct udsl_vcc_data), GFP_KERNEL))) {
 		up (&instance->serialize);
-		MOD_DEC_USE_COUNT;
 		return -ENOMEM;
 	}
 
@@ -1033,8 +1029,6 @@ static void udsl_atm_close (struct atm_vcc *vcc)
 	clear_bit (ATM_VF_ADDR, &vcc->flags);
 
 	up (&instance->serialize);
-
-	MOD_DEC_USE_COUNT;
 
 	dbg ("udsl_atm_close successful");
 }

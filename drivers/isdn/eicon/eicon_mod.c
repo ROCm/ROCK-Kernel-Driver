@@ -245,7 +245,7 @@ eicon_command(eicon_card * card, isdn_ctrl * c)
 							card->hwif.isa.shmem = (eicon_isa_shmem *)a;
 							return 0;
 						case EICON_BUS_MCA:
-#if CONFIG_MCA
+#ifdef CONFIG_MCA
 							if (eicon_mca_find_card(
 								0, a,
 								card->hwif.isa.irq,
@@ -853,7 +853,7 @@ eicon_alloccard(int Type, int membase, int irq, char *id, int card_id)
 		card->type = Type;
 		switch (Type) {
 #ifdef CONFIG_ISDN_DRV_EICON_ISA
-#if CONFIG_MCA /* only needed for MCA */
+#ifdef CONFIG_MCA /* only needed for MCA */
                         case EICON_CTYPE_S:
                         case EICON_CTYPE_SX:
                         case EICON_CTYPE_SCOM:
@@ -1342,7 +1342,7 @@ card_t DivasCards[1];
 static void __exit
 eicon_exit(void)
 {
-#if CONFIG_PCI	
+#ifdef CONFIG_PCI	
 #ifdef CONFIG_ISDN_DRV_EICON_PCI
 	card_t *pCard;
 	word wCardIndex;
@@ -1374,7 +1374,7 @@ eicon_exit(void)
 		eicon_freecard(last);
         }
 
-#if CONFIG_PCI	
+#ifdef CONFIG_PCI	
 #ifdef CONFIG_ISDN_DRV_EICON_PCI
 	pCard = DivasCards;
 	for (wCardIndex = 0; wCardIndex < MAX_CARDS; wCardIndex++)

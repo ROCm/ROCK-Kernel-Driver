@@ -302,7 +302,22 @@ static int fcal_encode_addr(Scsi_Cmnd *SCpnt, u16 *addr, fc_channel *fc, fcp_cmn
 	return 0;
 }
 
-static Scsi_Host_Template driver_template = FCAL;
-
+static Scsi_Host_Template driver_template = {
+	.name			= "Fibre Channel Arbitrated Loop",
+	.detect			= fcal_detect,
+	.release		= fcal_release,	
+	.proc_info		= fcal_proc_info,
+	.queuecommand		= fcp_scsi_queuecommand,
+	.slave_configure	= fcal_slave_configure,
+	.can_queue		= FCAL_CAN_QUEUE,
+	.this_id		= -1,
+	.sg_tablesize		= 1,
+	.cmd_per_lun		= 1,
+	.use_clustering		= ENABLE_CLUSTERING,
+	.eh_abort_handler	= fcp_scsi_abort,
+	.eh_device_reset_handler = fcp_scsi_dev_reset,
+	.eh_bus_reset_handler	= fcp_scsi_bus_reset,
+	.eh_host_reset_handler	= fcp_scsi_host_reset,
+};
 #include "scsi_module.c"
 

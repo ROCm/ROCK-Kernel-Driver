@@ -121,6 +121,21 @@ static int dmx3191d_release_resources(struct Scsi_Host *instance)
 
 MODULE_LICENSE("GPL");
 
-static Scsi_Host_Template driver_template = DMX3191D;
+static Scsi_Host_Template driver_template = {
+	.proc_info		= dmx3191d_proc_info,
+	.name			= "Domex DMX3191D",
+	.detect			= dmx3191d_detect,
+	.release		= dmx3191d_release_resources,
+	.info			= dmx3191d_info,
+	.queuecommand		= dmx3191d_queue_command,
+	.eh_abort_handler	= dmx3191d_abort,
+	.eh_bus_reset_handler	= dmx3191d_bus_reset,
+	.eh_device_reset_handler = dmx3191d_device_reset,
+	.eh_host_reset_handler	= dmx3191d_host_reset,
+	.can_queue		= 32,
+        .this_id		= 7,
+        .sg_tablesize		= SG_ALL,
+	.cmd_per_lun		= 2,
+        .use_clustering		= DISABLE_CLUSTERING,
+};
 #include "scsi_module.c"
-

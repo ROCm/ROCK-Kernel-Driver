@@ -55,7 +55,7 @@
 
 #include "jffs_fm.h"
 #include "intrep.h"
-#if CONFIG_JFFS_PROC_FS
+#ifdef CONFIG_JFFS_PROC_FS
 #include "jffs_proc.h"
 #endif
 

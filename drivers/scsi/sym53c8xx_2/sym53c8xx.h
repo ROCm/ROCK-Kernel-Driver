@@ -79,57 +79,10 @@
 #endif
 #endif
 
-int sym53c8xx_detect(Scsi_Host_Template *tpnt);
-const char *sym53c8xx_info(struct Scsi_Host *host);
-
-int sym53c8xx_queue_command(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
-
-int sym53c8xx_eh_abort_handler(Scsi_Cmnd *);
-int sym53c8xx_eh_device_reset_handler(Scsi_Cmnd *);
-int sym53c8xx_eh_bus_reset_handler(Scsi_Cmnd *);
-int sym53c8xx_eh_host_reset_handler(Scsi_Cmnd *);
-
-int sym53c8xx_slave_configure(Scsi_Device *);
-
-#ifdef MODULE
-int sym53c8xx_release(struct Scsi_Host *);
-#else
-#define sym53c8xx_release NULL
-#endif
-
-
-/*
- *  Host template defintion
- */
-#if (LINUX_VERSION_CODE >= 0x020400) || defined(HOSTS_C) || defined(MODULE)
-
-#include <scsi/scsicam.h>
-
-#define SYM53C8XX {							\
-	.name			= "sym53c8xx",				\
-	.detect			= sym53c8xx_detect,			\
-	.release		= sym53c8xx_release,			\
-	.info			= sym53c8xx_info, 			\
-	.queuecommand		= sym53c8xx_queue_command,		\
-	.slave_configure	= sym53c8xx_slave_configure,		\
-	.eh_abort_handler	= sym53c8xx_eh_abort_handler,		\
-	.eh_device_reset_handler	= sym53c8xx_eh_device_reset_handler,\
-	.eh_bus_reset_handler	= sym53c8xx_eh_bus_reset_handler,	\
-	.eh_host_reset_handler	= sym53c8xx_eh_host_reset_handler,	\
-	.can_queue		= 0,					\
-	.this_id		= 7,					\
-	.sg_tablesize		= 0,					\
-	.cmd_per_lun		= 0,					\
-	.use_clustering		= DISABLE_CLUSTERING,			\
-	.highmem_io		= 1}
-
-#endif /* defined(HOSTS_C) || defined(MODULE) */ 
-
 /*
  *  Translate kernel configuration parameters
  *  into corresponding driver parameters.
  */
-#if !defined(HOSTS_C)
 
 /*
  *  Use normal IO if configured.
@@ -366,7 +319,5 @@ extern u_int sym_debug_flags;
 #define DEBUG_FLAGS	sym_debug_flags
 #endif
 #define boot_verbose	sym_driver_setup.verbose
-
-#endif /* !defined(HOSTS_C) */ 
 
 #endif /* SYM53C8XX_H */

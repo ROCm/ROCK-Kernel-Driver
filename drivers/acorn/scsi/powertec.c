@@ -113,12 +113,12 @@ powertecscsi_terminator_ctl(struct Scsi_Host *host, int on_off)
  *	      dev_id - user-defined (Scsi_Host structure)
  *	      regs   - processor registers at interrupt
  */
-static void
+static irqreturn_t
 powertecscsi_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct powertec_info *info = dev_id;
 
-	fas216_intr(&info->info);
+	return fas216_intr(&info->info);
 }
 
 /* Prototype: fasdmatype_t powertecscsi_dma_setup(host, SCpnt, direction, min_type)
@@ -475,7 +475,6 @@ static struct ecard_driver powertecscsi_driver = {
 	.remove		= __devexit_p(powertecscsi_remove),
 	.id_table	= powertecscsi_cids,
 	.drv = {
-		.devclass	= &shost_devclass,
 		.name		= "powertecscsi",
 	},
 };

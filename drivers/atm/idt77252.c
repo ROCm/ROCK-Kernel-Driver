@@ -1986,7 +1986,7 @@ idt77252_send_skb(struct atm_vcc *vcc, struct sk_buff *skb, int oam)
 		return -EINVAL;
 	}
 
-	if (ATM_SKB(skb)->iovcnt != 0) {
+	if (skb_shinfo(skb)->nr_frags != 0) {
 		printk("%s: No scatter-gather yet.\n", card->name);
 		atomic_inc(&vcc->stats->tx_err);
 		dev_kfree_skb(skb);
@@ -2023,8 +2023,7 @@ idt77252_send_oam(struct atm_vcc *vcc, void *cell, int flags)
 		atomic_inc(&vcc->stats->tx_err);
 		return -ENOMEM;
 	}
-	atomic_add(skb->truesize + ATM_PDU_OVHD, &vcc->sk->wmem_alloc);
-	ATM_SKB(skb)->iovcnt = 0;
+	atomic_add(skb->truesize, &vcc->sk->wmem_alloc);
 
 	memcpy(skb_put(skb, 52), cell, 52);
 
@@ -2403,8 +2402,10 @@ idt77252_init_rx(struct idt77252_dev *card, struct vc_map *vc,
 static int
 idt77252_find_vcc(struct atm_vcc *vcc, short *vpi, int *vci)
 {
+	unsigned long flags;
 	struct atm_vcc *walk;
 
+	spin_lock_irqsave(&vcc->dev->lock, flags);
 	if (*vpi == ATM_VPI_ANY) {
 		*vpi = 0;
 		walk = vcc->dev->vccs;
@@ -2431,6 +2432,7 @@ idt77252_find_vcc(struct atm_vcc *vcc, short *vpi, int *vci)
 		}
 	}
 
+	spin_unlock_irqrestore(&vcc->dev->lock, flags);
 	return 0;
 }
 

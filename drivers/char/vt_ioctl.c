@@ -869,13 +869,13 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 		if (clin > 32)
 			return -EINVAL;
 		    
-		if (vlin)
-			vc->vc_scan_lines = vlin;
-		if (clin)
-			vc->vc_font.height = clin;
-	
-		for (i = 0; i < MAX_NR_CONSOLES; i++)
+		for (i = 0; i < MAX_NR_CONSOLES; i++) {
+			if (vlin)
+				vc_cons[i].d->vc_scan_lines = vlin;
+			if (clin)
+				vc_cons[i].d->vc_font.height = clin;
 			vc_resize(i, cc, ll);
+		}
   		return 0;
 	}
 

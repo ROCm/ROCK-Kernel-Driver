@@ -81,7 +81,7 @@ static int deflate_comp_init(struct deflate_ctx *ctx)
 		ret = -ENOMEM;
 		goto out;
 	}
-	memset(stream->workspace, 0, sizeof(stream->workspace));
+	memset(stream->workspace, 0, zlib_deflate_workspacesize());
 	ret = zlib_deflateInit2(stream, DEFLATE_DEF_LEVEL, Z_DEFLATED,
 	                        -DEFLATE_DEF_WINBITS, DEFLATE_DEF_MEMLEVEL,
 	                        Z_DEFAULT_STRATEGY);
@@ -108,7 +108,7 @@ static int deflate_decomp_init(struct deflate_ctx *ctx)
 		ret = -ENOMEM;
 		goto out;
 	}
-	memset(stream->workspace, 0, sizeof(stream->workspace));
+	memset(stream->workspace, 0, zlib_inflate_workspacesize());
 	ret = zlib_inflateInit2(stream, -DEFLATE_DEF_WINBITS);
 	if (ret != Z_OK) {
 		ret = -EINVAL;

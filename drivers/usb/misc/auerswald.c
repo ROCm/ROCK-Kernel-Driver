@@ -572,7 +572,8 @@ static int auerchain_setup (pauerchain_t acp, unsigned int numElements)
         /* fill the list of free elements */
         for (;numElements; numElements--) {
                 acep = (pauerchainelement_t) kmalloc (sizeof (auerchainelement_t), GFP_KERNEL);
-                if (!acep) goto ac_fail;
+                if (!acep)
+			goto ac_fail;
 		memset (acep, 0, sizeof (auerchainelement_t));
                 INIT_LIST_HEAD (&acep->list);
                 list_add_tail (&acep->list, &acp->free_list);
@@ -780,16 +781,20 @@ static int auerbuf_setup (pauerbufctl_t bcp, unsigned int numElements, unsigned 
         /* fill the list of free elements */
         for (;numElements; numElements--) {
                 bep = (pauerbuf_t) kmalloc (sizeof (auerbuf_t), GFP_KERNEL);
-                if (!bep) goto bl_fail;
+                if (!bep)
+			goto bl_fail;
 	        memset (bep, 0, sizeof (auerbuf_t));
                 bep->list = bcp;
                 INIT_LIST_HEAD (&bep->buff_list);
                 bep->bufp = (char *) kmalloc (bufsize, GFP_KERNEL);
-                if (!bep->bufp) goto bl_fail;
+                if (!bep->bufp)
+			goto bl_fail;
                 bep->dr = (struct usb_ctrlrequest *) kmalloc (sizeof (struct usb_ctrlrequest), GFP_KERNEL);
-                if (!bep->dr) goto bl_fail;
+                if (!bep->dr)
+			goto bl_fail;
                 bep->urbp = usb_alloc_urb (0, GFP_KERNEL);
-                if (!bep->urbp) goto bl_fail;
+                if (!bep->urbp)
+			goto bl_fail;
                 list_add_tail (&bep->buff_list, &bcp->free_buff_list);
         }
         return 0;
@@ -1242,7 +1247,8 @@ static void auerchar_ctrlread_dispatch (pauerscon_t scp, pauerbuf_t bp)
 static void auerswald_delete( pauerswald_t cp)
 {
 	dbg( "auerswald_delete");
-	if (cp == NULL) return;
+	if (cp == NULL)
+		return;
 
 	/* Wake up all processes waiting for a buffer */
 	wake_up (&cp->bufferwait);
@@ -1261,7 +1267,8 @@ static void auerswald_delete( pauerswald_t cp)
 static void auerchar_delete( pauerchar_t ccp)
 {
 	dbg ("auerchar_delete");
-	if (ccp == NULL) return;
+	if (ccp == NULL)
+		return;
 
         /* wake up pending synchronous reads */
 	ccp->removed = 1;
@@ -1335,7 +1342,8 @@ static void auerswald_removeservice (pauerswald_t cp, pauerscon_t scp)
 	dbg ("auerswald_removeservice called");
 
 	/* check if we have a service allocated */
-	if (scp->id == AUH_UNASSIGNED) return;
+	if (scp->id == AUH_UNASSIGNED)
+		return;
 
 	/* If there is a device: close the channel */
 	if (cp->usbdev) {
@@ -1494,7 +1502,8 @@ static int auerchar_ioctl (struct inode *inode, struct file *file, unsigned int 
 		u = 0;	/* no data */
 		if (ccp->readbuf) {
 			int restlen = ccp->readbuf->len - ccp->readoffset;
-			if (restlen > 0) u = 1;
+			if (restlen > 0)
+				u = 1;
 		}
 		if (!u) {
         		if (!list_empty (&ccp->bufctl.rec_buff_list)) {
@@ -1787,7 +1796,8 @@ write_again:
 	}
 
 	/* protect against too big write requests */
-	if (len > cp->maxControlLength) len = cp->maxControlLength;
+	if (len > cp->maxControlLength)
+		len = cp->maxControlLength;
 
 	/* Fill the buffer */
 	if (copy_from_user ( bp->bufp+AUH_SIZE, buf, len)) {
@@ -2096,7 +2106,8 @@ static void auerswald_disconnect (struct usb_interface *intf)
 		/* Inform all waiting readers */
 		for ( u = 0; u < AUH_TYPESIZE; u++) {
 			pauerscon_t scp = cp->services[u];
-			if (scp) scp->disconnect( scp);
+			if (scp)
+				scp->disconnect( scp);
 		}
 	}
 }

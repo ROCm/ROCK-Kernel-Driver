@@ -7,14 +7,14 @@ menu "ATM drivers"
 
 config ATM_TCP
 	tristate "ATM over TCP"
-	depends on INET
+	depends on INET && ATM
 	help
 	  ATM over TCP driver. Useful mainly for development and for
 	  experiments. If unsure, say N.
 
 config ATM_LANAI
 	tristate "Efficient Networks Speedstream 3010"
-	depends on PCI
+	depends on PCI && ATM
 	help
 	  Supports ATM cards based on the Efficient Networks "Lanai"
 	  chipset such as the Speedstream 3010 and the ENI-25p.  The
@@ -23,7 +23,7 @@ config ATM_LANAI
 
 config ATM_ENI
 	tristate "Efficient Networks ENI155P"
-	depends on PCI
+	depends on PCI && ATM
 	---help---
 	  Driver for the Efficient Networks ENI155p series and SMC ATM
 	  Power155 155 Mbps ATM adapters. Both, the versions with 512KB and
@@ -133,7 +133,7 @@ config ATM_ENI_BURST_RX_2W
 
 config ATM_FIRESTREAM
 	tristate "Fujitsu FireStream (FS50/FS155) "
-	depends on PCI
+	depends on PCI && ATM
 	help
 	  Driver for the Fujitsu FireStream 155 (MB86697) and
 	  FireStream 50 (MB86695) ATM PCI chips.
@@ -145,7 +145,7 @@ config ATM_FIRESTREAM
 
 config ATM_ZATM
 	tristate "ZeitNet ZN1221/ZN1225"
-	depends on PCI
+	depends on PCI && ATM
 	help
 	  Driver for the ZeitNet ZN1221 (MMF) and ZN1225 (UTP-5) 155 Mbps ATM
 	  adapters.
@@ -182,7 +182,7 @@ config ATM_ZATM_EXACT_TS
 #   fi
 config ATM_NICSTAR
 	tristate "IDT 77201 (NICStAR) (ForeRunnerLE)"
-	depends on PCI
+	depends on PCI && ATM
 	help
 	  The NICStAR chipset family is used in a large number of ATM NICs for
 	  25 and for 155 Mbps, including IDT cards and the Fore ForeRunnerLE
@@ -217,7 +217,7 @@ config ATM_NICSTAR_USE_IDT77105
 
 config ATM_IDT77252
 	tristate "IDT 77252 (NICStAR II)"
-	depends on PCI
+	depends on PCI && ATM
 	help
 	  Driver for the IDT 77252 ATM PCI chips.
 
@@ -253,7 +253,7 @@ config ATM_IDT77252_USE_SUNI
 
 config ATM_AMBASSADOR
 	tristate "Madge Ambassador (Collage PCI 155 Server)"
-	depends on PCI
+	depends on PCI && ATM
 	help
 	  This is a driver for ATMizer based ATM card produced by Madge
 	  Networks Ltd. Say Y (or M to compile as a module named ambassador)
@@ -277,7 +277,7 @@ config ATM_AMBASSADOR_DEBUG
 
 config ATM_HORIZON
 	tristate "Madge Horizon [Ultra] (Collage PCI 25 and Collage PCI 155 Client)"
-	depends on PCI
+	depends on PCI && ATM
 	help
 	  This is a driver for the Horizon chipset ATM adapter cards once
 	  produced by Madge Networks Ltd. Say Y (or M to compile as a module
@@ -301,7 +301,7 @@ config ATM_HORIZON_DEBUG
 
 config ATM_IA
 	tristate "Interphase ATM PCI x575/x525/x531"
-	depends on PCI
+	depends on PCI && ATM
 	---help---
 	  This is a driver for the Interphase (i)ChipSAR adapter cards
 	  which include a variety of variants in term of the size of the
@@ -334,7 +334,7 @@ config ATM_IA_DEBUG
 
 config ATM_FORE200E_MAYBE
 	tristate "FORE Systems 200E-series"
-	depends on PCI || SBUS
+	depends on (PCI || SBUS) && ATM
 	---help---
 	  This is a driver for the FORE Systems 200E-series ATM adapter
 	  cards. It simultaneously supports PCA-200E and SBA-200E models

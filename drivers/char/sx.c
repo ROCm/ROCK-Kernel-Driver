@@ -1739,8 +1739,10 @@ static int sx_fw_ioctl (struct inode *inode, struct file *filp,
 				if (copy_from_user(tmp, (char *)data + i, 
 						   (i + SX_CHUNK_SIZE >
 						    nbytes) ? nbytes - i :
-						   	      SX_CHUNK_SIZE))
+						   	      SX_CHUNK_SIZE)) {
+					kfree (tmp);
 					return -EFAULT;
+				}
 				memcpy_toio    ((char *) (board->base2 + offset + i), tmp, 
 				                (i+SX_CHUNK_SIZE>nbytes)?nbytes-i:SX_CHUNK_SIZE);
 			}

@@ -1,7 +1,7 @@
 /*
- *  linux/arch/arm/lib/calls.h
+ *  linux/arch/arm/kernel/calls.S
  *
- *  Copyright (C) 1995-1998 Russell King
+ *  Copyright (C) 1995-2003 Russell King
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as

@@ -19,7 +19,6 @@
 
 DECLARE_MUTEX(xfrm_cfg_sem);
 
-static u32      xfrm_policy_genid;
 static rwlock_t xfrm_policy_lock = RW_LOCK_UNLOCKED;
 
 struct xfrm_policy *xfrm_policy_list[XFRM_POLICY_MAX*2];
@@ -28,142 +27,6 @@ static rwlock_t xfrm_policy_afinfo_lock = RW_LOCK_UNLOCKED;
 static struct xfrm_policy_afinfo *xfrm_policy_afinfo[NPROTO];
 
 kmem_cache_t *xfrm_dst_cache;
-
-/* Limited flow cache. Its function now is to accelerate search for
- * policy rules.
- *
- * Flow cache is private to cpus, at the moment this is important
- * mostly for flows which do not match any rule, so that flow lookups
- * are absolultely cpu-local. When a rule exists we do some updates
- * to rule (refcnt, stats), so that locality is broken. Later this
- * can be repaired.
- */
-
-struct flow_entry
-{
-	struct flow_entry	*next;
-	struct flowi		fl;
-	u8			dir;
-	u32			genid;
-	struct xfrm_policy	*pol;
-};
-
-static kmem_cache_t *flow_cachep;
-
-struct flow_entry **flow_table;
-
-static int flow_lwm = 2*XFRM_FLOWCACHE_HASH_SIZE;
-static int flow_hwm = 4*XFRM_FLOWCACHE_HASH_SIZE;
-
-static int flow_number[NR_CPUS] __cacheline_aligned;
-
-#define flow_count(cpu)		(flow_number[cpu])
-
-static void flow_cache_shrink(int cpu)
-{
-	int i;
-	struct flow_entry *fle, **flp;
-	int shrink_to = flow_lwm/XFRM_FLOWCACHE_HASH_SIZE;
-
-	for (i=0; i<XFRM_FLOWCACHE_HASH_SIZE; i++) {
-		int k = 0;
-		flp = &flow_table[cpu*XFRM_FLOWCACHE_HASH_SIZE+i];
-		while ((fle=*flp) != NULL && k<shrink_to) {
-			k++;
-			flp = &fle->next;
-		}
-		while ((fle=*flp) != NULL) {
-			*flp = fle->next;
-			if (fle->pol)
-				xfrm_pol_put(fle->pol);
-			kmem_cache_free(flow_cachep, fle);
-		}
-	}
-}
-
-struct xfrm_policy *flow_lookup(int dir, struct flowi *fl, 
-				unsigned short family)
-{
-	struct xfrm_policy *pol = NULL;
-	struct flow_entry *fle;
-	u32 hash;
-	int cpu;
-
-	hash = flow_hash(fl, family);
-
-	local_bh_disable();
-	cpu = smp_processor_id();
-
-	for (fle = flow_table[cpu*XFRM_FLOWCACHE_HASH_SIZE+hash];
-	     fle; fle = fle->next) {
-		if (memcmp(fl, &fle->fl, sizeof(fle->fl)) == 0 &&
-		    fle->dir == dir) {
-			if (fle->genid == xfrm_policy_genid) {
-				if ((pol = fle->pol) != NULL)
-					atomic_inc(&pol->refcnt);
-				local_bh_enable();
-				return pol;
-			}
-			break;
-		}
-	}
-
-	pol = xfrm_policy_lookup(dir, fl, family);
-
-	if (fle) {
-		/* Stale flow entry found. Update it. */
-		fle->genid = xfrm_policy_genid;
-
-		if (fle->pol)
-			xfrm_pol_put(fle->pol);
-		fle->pol = pol;
-		if (pol)
-			atomic_inc(&pol->refcnt);
-	} else {
-		if (flow_count(cpu) > flow_hwm)
-			flow_cache_shrink(cpu);
-
-		fle = kmem_cache_alloc(flow_cachep, SLAB_ATOMIC);
-		if (fle) {
-			flow_count(cpu)++;
-			fle->fl = *fl;
-			fle->genid = xfrm_policy_genid;
-			fle->dir = dir;
-			fle->pol = pol;
-			if (pol)
-				atomic_inc(&pol->refcnt);
-			fle->next = flow_table[cpu*XFRM_FLOWCACHE_HASH_SIZE+hash];
-			flow_table[cpu*XFRM_FLOWCACHE_HASH_SIZE+hash] = fle;
-		}
-	}
-	local_bh_enable();
-	return pol;
-}
-
-void __init flow_cache_init(void)
-{
-	int order;
-
-	flow_cachep = kmem_cache_create("flow_cache",
-					sizeof(struct flow_entry),
-					0, SLAB_HWCACHE_ALIGN,
-					NULL, NULL);
-
-	if (!flow_cachep)
-		panic("NET: failed to allocate flow cache slab\n");
-
-	for (order = 0;
-	     (PAGE_SIZE<<order) < (NR_CPUS*sizeof(struct flow_entry *)*XFRM_FLOWCACHE_HASH_SIZE);
-	     order++)
-		/* NOTHING */;
-
-	flow_table = (struct flow_entry **)__get_free_pages(GFP_ATOMIC, order);
-
-	if (!flow_table)
-		panic("Failed to allocate flow cache hash table\n");
-
-	memset(flow_table, 0, PAGE_SIZE<<order);
-}
 
 int xfrm_register_type(struct xfrm_type *type, unsigned short family)
 {
@@ -274,7 +137,7 @@ static void xfrm_policy_timer(unsigned long data)
 	}
 	if (next != LONG_MAX &&
 	    !mod_timer(&xp->timer, jiffies + make_jiffies(next)))
-		atomic_inc(&xp->refcnt);
+		xfrm_pol_hold(xp);
 
 out:
 	xfrm_pol_put(xp);
@@ -392,16 +255,16 @@ int xfrm_policy_insert(int dir, struct xfrm_policy *policy, int excl)
 			break;
 		}
 	}
-	atomic_inc(&policy->refcnt);
+	xfrm_pol_hold(policy);
 	policy->next = pol ? pol->next : NULL;
 	*p = policy;
-	xfrm_policy_genid++;
+	atomic_inc(&flow_cache_genid);
 	policy->index = pol ? pol->index : xfrm_gen_index(dir);
 	policy->curlft.add_time = (unsigned long)xtime.tv_sec;
 	policy->curlft.use_time = 0;
 	if (policy->lft.hard_add_expires_seconds &&
 	    !mod_timer(&policy->timer, jiffies + HZ))
-		atomic_inc(&policy->refcnt);
+		xfrm_pol_hold(policy);
 	write_unlock_bh(&xfrm_policy_lock);
 
 	if (pol) {
@@ -424,7 +287,7 @@ struct xfrm_policy *xfrm_policy_delete(int dir, struct xfrm_selector *sel)
 		}
 	}
 	if (pol)
-		xfrm_policy_genid++;
+		atomic_inc(&flow_cache_genid);
 	write_unlock_bh(&xfrm_policy_lock);
 	return pol;
 }
@@ -443,9 +306,9 @@ struct xfrm_policy *xfrm_policy_byid(int dir, u32 id, int delete)
 	}
 	if (pol) {
 		if (delete)
-			xfrm_policy_genid++;
+			atomic_inc(&flow_cache_genid);
 		else
-			atomic_inc(&pol->refcnt);
+			xfrm_pol_hold(pol);
 	}
 	write_unlock_bh(&xfrm_policy_lock);
 	return pol;
@@ -468,7 +331,7 @@ void xfrm_policy_flush()
 			write_lock_bh(&xfrm_policy_lock);
 		}
 	}
-	xfrm_policy_genid++;
+	atomic_inc(&flow_cache_genid);
 	write_unlock_bh(&xfrm_policy_lock);
 }
 
@@ -507,8 +370,8 @@ out:
 
 /* Find policy to apply to this flow. */
 
-struct xfrm_policy *xfrm_policy_lookup(int dir, struct flowi *fl, 
-				       unsigned short family)
+void xfrm_policy_lookup(struct flowi *fl, u16 family, u8 dir,
+			void **objp, atomic_t **obj_refp)
 {
 	struct xfrm_policy *pol;
 
@@ -522,12 +385,13 @@ struct xfrm_policy *xfrm_policy_lookup(int dir, struct flowi *fl,
 
 		match = xfrm_selector_match(sel, fl, family);
 		if (match) {
-			atomic_inc(&pol->refcnt);
+			xfrm_pol_hold(pol);
 			break;
 		}
 	}
 	read_unlock_bh(&xfrm_policy_lock);
-	return pol;
+	if ((*objp = (void *) pol) != NULL)
+		*obj_refp = &pol->refcnt;
 }
 
 struct xfrm_policy *xfrm_sk_policy_lookup(struct sock *sk, int dir, struct flowi *fl)
@@ -540,7 +404,7 @@ struct xfrm_policy *xfrm_sk_policy_lookup(struct sock *sk, int dir, struct flowi
 
 		match = xfrm_selector_match(&pol->selector, fl, sk->family);
 		if (match)
-			atomic_inc(&pol->refcnt);
+			xfrm_pol_hold(pol);
 		else
 			pol = NULL;
 	}
@@ -552,7 +416,7 @@ void xfrm_sk_policy_link(struct xfrm_policy *pol, int dir)
 {
 	pol->next = xfrm_policy_list[XFRM_POLICY_MAX+dir];
 	xfrm_policy_list[XFRM_POLICY_MAX+dir] = pol;
-	atomic_inc(&pol->refcnt);
+	xfrm_pol_hold(pol);
 }
 
 void xfrm_sk_policy_unlink(struct xfrm_policy *pol, int dir)
@@ -719,6 +583,23 @@ xfrm_bundle_create(struct xfrm_policy *policy, struct xfrm_state **xfrm, int nx,
 	return err;
 }
 
+static inline int policy_to_flow_dir(int dir)
+{
+	if (XFRM_POLICY_IN == FLOW_DIR_IN &&
+	    XFRM_POLICY_OUT == FLOW_DIR_OUT &&
+	    XFRM_POLICY_FWD == FLOW_DIR_FWD)
+		return dir;
+	switch (dir) {
+	default:
+	case XFRM_POLICY_IN:
+		return FLOW_DIR_IN;
+	case XFRM_POLICY_OUT:
+		return FLOW_DIR_OUT;
+	case XFRM_POLICY_FWD:
+		return FLOW_DIR_FWD;
+	};
+}
+
 /* Main function: finds/creates a bundle for given flow.
  *
  * At the moment we eat a raw IP route. Mostly to speed up lookups
@@ -749,7 +630,7 @@ int xfrm_lookup(struct dst_entry **dst_p, struct flowi *fl,
 	}
 
 restart:
-	genid = xfrm_policy_genid;
+	genid = atomic_read(&flow_cache_genid);
 	policy = NULL;
 	if (sk && sk->policy[1])
 		policy = xfrm_sk_policy_lookup(sk, XFRM_POLICY_OUT, fl);
@@ -759,7 +640,9 @@ restart:
 		if ((rt->u.dst.flags & DST_NOXFRM) || !xfrm_policy_list[XFRM_POLICY_OUT])
 			return 0;
 
-		policy = flow_lookup(XFRM_POLICY_OUT, fl, family);
+		policy = flow_cache_lookup(fl, family,
+					   policy_to_flow_dir(XFRM_POLICY_OUT),
+					   xfrm_policy_lookup);
 	}
 
 	if (!policy)
@@ -817,7 +700,7 @@ restart:
 					goto error;
 				}
 				if (err == -EAGAIN ||
-				    genid != xfrm_policy_genid)
+				    genid != atomic_read(&flow_cache_genid))
 					goto restart;
 			}
 			if (err)
@@ -941,7 +824,9 @@ int __xfrm_policy_check(struct sock *sk, int dir, struct sk_buff *skb,
 		pol = xfrm_sk_policy_lookup(sk, dir, &fl);
 
 	if (!pol)
-		pol = flow_lookup(dir, &fl, family);
+		pol = flow_cache_lookup(&fl, family,
+					policy_to_flow_dir(dir),
+					xfrm_policy_lookup);
 
 	if (!pol)
 		return 1;
@@ -1237,7 +1122,6 @@ void __init xfrm_policy_init(void)
 void __init xfrm_init(void)
 {
 	xfrm_state_init();
-	flow_cache_init();
 	xfrm_policy_init();
 }
 

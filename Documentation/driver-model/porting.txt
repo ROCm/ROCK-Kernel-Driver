@@ -128,7 +128,7 @@ static inline struct pci_dev * to_pci_dev(struct kobject * kobj)
 
   The bus_id is an ASCII string that contains the device's address on
   the bus. The format of this string is bus-specific. This is
-  necessary for representing device in sysfs. 
+  necessary for representing devices in sysfs. 
 
   parent is the physical parent of the device. It is important that
   the bus driver sets this field correctly. 
@@ -286,7 +286,7 @@ parameters.
 It would be difficult and tedious to force every driver on a bus to
 simultaneously convert their drivers to generic format. Instead, the
 bus driver should define single instances of the generic methods that
-forward calls to the bus-specific drivers. For instance: 
+forward call to the bus-specific drivers. For instance: 
 
 
 static int pci_device_remove(struct device * dev)
@@ -330,8 +330,8 @@ registered with the bus at any time. When registration happens,
 devices must be bound to a driver, or drivers must be bound to all
 devices that it supports. 
 
-Drivers typically contain a list of device IDs that it supports. The
-bus driver compares this ID to the ID of devices registered with it. 
+A driver typically contains a list of device IDs that it supports. The
+bus driver compares these IDs to the IDs of devices registered with it. 
 The format of the device IDs, and the semantics for comparing them are
 bus-specific, so the generic model does attempt to generalize them. 
 
@@ -396,7 +396,7 @@ This is called immediately before /sbin/hotplug is executed.
 Step 7: Cleaning up the bus driver.
 
 The generic bus, device, and driver structures provide several fields
-that can replace those define privately to the bus driver. 
+that can replace those defined privately to the bus driver. 
 
 - Device list.
 

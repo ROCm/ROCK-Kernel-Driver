@@ -57,6 +57,7 @@ extern void __init iosapic_init (unsigned long address,
 extern int gsi_to_vector (unsigned int gsi);
 extern int gsi_to_irq (unsigned int gsi);
 extern void __init iosapic_parse_prt (void);
+extern void iosapic_enable_intr (unsigned int vector);
 extern int iosapic_register_intr (unsigned int gsi, unsigned long polarity,
 				  unsigned long trigger);
 extern void __init iosapic_override_isa_irq (unsigned int isa_irq, unsigned int gsi,

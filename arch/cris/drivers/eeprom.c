@@ -163,7 +163,7 @@ int __init eeprom_init(void)
   init_waitqueue_head(&eeprom.wait_q);
   eeprom.busy = 0;
 
-#if CONFIG_ETRAX_I2C_EEPROM_PROBE
+#ifdef CONFIG_ETRAX_I2C_EEPROM_PROBE
 #define EETEXT "Found"
 #else
 #define EETEXT "Assuming"
@@ -191,7 +191,7 @@ int __init eeprom_init(void)
   eeprom.usec_delay_step = 128;
   eeprom.adapt_state = 0;
   
-#if CONFIG_ETRAX_I2C_EEPROM_PROBE
+#ifdef CONFIG_ETRAX_I2C_EEPROM_PROBE
   i2c_start();
   i2c_outbyte(0x80);
   if(!i2c_getack())

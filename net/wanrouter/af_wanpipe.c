@@ -170,7 +170,7 @@ struct wanpipe_opt
 {
 	void   *mbox;		/* Mail box  */
 	void   *card; 		/* Card bouded to */
-	netdevice_t *dev;	/* Bounded device */
+	struct net_device *dev;	/* Bounded device */
 	unsigned short lcn;	/* Binded LCN */
 	unsigned char  svc;	/* 0=pvc, 1=svc */
 	unsigned char  timer;   /* flag for delayed transmit*/	
@@ -185,25 +185,26 @@ static int sk_count;
 extern struct proto_ops wanpipe_ops;
 static unsigned long find_free_critical;
 
-static void wanpipe_unlink_driver (struct sock *);
-static void wanpipe_link_driver (netdevice_t *,struct sock *sk);
+static void wanpipe_unlink_driver(struct sock *sk);
+static void wanpipe_link_driver(struct net_device *dev, struct sock *sk);
 static void wanpipe_wakeup_driver(struct sock *sk);
 static int execute_command(struct sock *, unsigned char, unsigned int);
-static int check_dev (netdevice_t *, sdla_t *);
-netdevice_t * wanpipe_find_free_dev (sdla_t *);
+static int check_dev(struct net_device *dev, sdla_t *card);
+struct net_device *wanpipe_find_free_dev(sdla_t *card);
 static void wanpipe_unlink_card (struct sock *);
 static int wanpipe_link_card (struct sock *);
 static struct sock *wanpipe_make_new(struct sock *);
 static struct sock *wanpipe_alloc_socket(void);
-static inline int get_atomic_device (netdevice_t *);
+static inline int get_atomic_device(struct net_device *dev);
 static int wanpipe_exec_cmd(struct sock *, int, unsigned int);
 static int get_ioctl_cmd (struct sock *, void *);
 static int set_ioctl_cmd (struct sock *, void *);
-static void release_device (netdevice_t *);
+static void release_device(struct net_device *dev);
 static void wanpipe_kill_sock_timer (unsigned long data);
 static void wanpipe_kill_sock_irq (struct sock *);
 static void wanpipe_kill_sock_accept (struct sock *);
-static int wanpipe_do_bind(struct sock *, netdevice_t *, int);
+static int wanpipe_do_bind(struct sock *sk, struct net_device *dev,
+			   int protocol);
 struct sock * get_newsk_from_skb (struct sk_buff *);
 static int wanpipe_debug (struct sock *, void *);
 static void wanpipe_delayed_transmit (unsigned long data);
@@ -225,7 +226,8 @@ static int check_driver_busy (struct sock *);
  *      WANPIPE driver private.
  *===========================================================*/
 
-static int wanpipe_rcv(struct sk_buff *skb, netdevice_t *dev,  struct sock *sk)
+static int wanpipe_rcv(struct sk_buff *skb, struct net_device *dev,
+		       struct sock *sk)
 {
 	struct wan_sockaddr_ll *sll = (struct wan_sockaddr_ll*)skb->cb;
 	wanpipe_common_t *chan = dev->priv;
@@ -323,7 +325,7 @@ static int wanpipe_listen_rcv (struct sk_buff *skb,  struct sock *sk)
 	wanpipe_opt *wp = wp_sk(sk), *newwp;
 	struct wan_sockaddr_ll *sll = (struct wan_sockaddr_ll*)skb->cb;
 	struct sock *newsk;
-	netdevice_t *dev; 
+	struct net_device *dev; 
 	sdla_t *card;
 	mbox_cmd_t *mbox_ptr;
 	wanpipe_common_t *chan;
@@ -539,7 +541,7 @@ static int wanpipe_sendmsg(struct kiocb *iocb, struct socket *sock,
 	struct sock *sk = sock->sk;
 	struct wan_sockaddr_ll *saddr=(struct wan_sockaddr_ll *)msg->msg_name;
 	struct sk_buff *skb;
-	netdevice_t *dev;
+	struct net_device *dev;
 	unsigned short proto;
 	unsigned char *addr;
 	int ifindex, err, reserve = 0;
@@ -664,7 +666,7 @@ static void wanpipe_delayed_transmit (unsigned long data)
 	struct sock *sk=(struct sock *)data;
 	struct sk_buff *skb;
 	wanpipe_opt *wp = wp_sk(sk);
-	netdevice_t *dev = wp->dev;
+	struct net_device *dev = wp->dev;
 	sdla_t *card = (sdla_t*)wp->card;
 
 	if (!card || !dev){
@@ -756,7 +758,7 @@ static void wanpipe_delayed_transmit (unsigned long data)
 static int execute_command(struct sock *sk,  unsigned char cmd, unsigned int flags)
 {
 	wanpipe_opt *wp = wp_sk(sk);
-	netdevice_t *dev;
+	struct net_device *dev;
 	wanpipe_common_t *chan=NULL;
 	int err=0;
 	DECLARE_WAITQUEUE(wait, current);
@@ -861,7 +863,7 @@ static void wanpipe_destroy_timer(unsigned long data)
  *===========================================================*/
 static void wanpipe_unlink_driver (struct sock *sk)
 {
-	netdevice_t *dev;
+	struct net_device *dev;
 	wanpipe_common_t *chan=NULL;
 
 	sk->zapped=0;
@@ -901,7 +903,7 @@ static void wanpipe_unlink_driver (struct sock *sk)
  *      data up the socket.
  *===========================================================*/
 
-static void wanpipe_link_driver (netdevice_t *dev, struct sock *sk)
+static void wanpipe_link_driver(struct net_device *dev, struct sock *sk)
 {
 	wanpipe_opt *wp = wp_sk(sk);
 	wanpipe_common_t *chan = dev->priv;
@@ -926,7 +928,7 @@ static void wanpipe_link_driver (netdevice_t *dev, struct sock *sk)
  *===========================================================*/
 
 
-static void release_device (netdevice_t *dev)
+static void release_device(struct net_device *dev)
 {
 	wanpipe_common_t *chan=dev->priv;
 	clear_bit(0,(void*)&chan->rw_bind);
@@ -965,7 +967,7 @@ static int wanpipe_release(struct socket *sock)
 
 	if (wp->num == htons(X25_PROT) &&
 	    sk->state != WANSOCK_DISCONNECTED && sk->zapped) {
-		netdevice_t *dev = dev_get_by_index(sk->bound_dev_if);
+		struct net_device *dev = dev_get_by_index(sk->bound_dev_if);
 		wanpipe_common_t *chan;
 		if (dev){
 			chan=dev->priv;
@@ -1153,7 +1155,7 @@ static void wanpipe_kill_sock_timer (unsigned long data)
 
 	if (wp_sk(sk)->num == htons(X25_PROT) &&
 	    sk->state != WANSOCK_DISCONNECTED){
-		netdevice_t *dev = dev_get_by_index(sk->bound_dev_if);
+		struct net_device *dev = dev_get_by_index(sk->bound_dev_if);
 		wanpipe_common_t *chan;
 		if (dev){
 			chan=dev->priv;
@@ -1268,7 +1270,8 @@ static void wanpipe_kill_sock_irq (struct sock *sk)
  *      sock to the driver.
  *===========================================================*/
 
-static int wanpipe_do_bind(struct sock *sk, netdevice_t *dev, int protocol)
+static int wanpipe_do_bind(struct sock *sk, struct net_device *dev,
+			   int protocol)
 {
 	wanpipe_opt *wp = wp_sk(sk);
 	wanpipe_common_t *chan=NULL;
@@ -1341,7 +1344,7 @@ static int wanpipe_bind(struct socket *sock, struct sockaddr *uaddr, int addr_le
 	struct wan_sockaddr_ll *sll = (struct wan_sockaddr_ll*)uaddr;
 	struct sock *sk=sock->sk;
 	wanpipe_opt *wp = wp_sk(sk);
-	netdevice_t *dev = NULL;
+	struct net_device *dev = NULL;
 	sdla_t *card=NULL;
 	char name[15];
 
@@ -1436,7 +1439,7 @@ static int wanpipe_bind(struct socket *sock, struct sockaddr *uaddr, int addr_le
  *===========================================================*/
 
 
-static inline int get_atomic_device (netdevice_t *dev)
+static inline int get_atomic_device(struct net_device *dev)
 {
 	wanpipe_common_t *chan = dev->priv;
 	if (!test_and_set_bit(0,(void *)&chan->rw_bind)){
@@ -1451,11 +1454,12 @@ static inline int get_atomic_device (netdevice_t *dev)
  *  	Check that device name belongs to a particular card.
  *===========================================================*/
 
-static int check_dev (netdevice_t *dev, sdla_t *card)
+static int check_dev(struct net_device *dev, sdla_t *card)
 {
-	netdevice_t* tmp_dev;
+	struct net_device* tmp_dev;
 
-	for (tmp_dev = card->wandev.dev; tmp_dev; tmp_dev=*((netdevice_t**)tmp_dev->priv)){
+	for (tmp_dev = card->wandev.dev; tmp_dev;
+	     tmp_dev = *((struct net_device **)tmp_dev->priv)) {
 		if (tmp_dev->ifindex == dev->ifindex){ 
 			return 0;	
 		}
@@ -1471,16 +1475,17 @@ static int check_dev (netdevice_t *dev, sdla_t *card)
  *      X25API Specific.
  *===========================================================*/
 
-netdevice_t * wanpipe_find_free_dev (sdla_t *card)
+struct net_device *wanpipe_find_free_dev(sdla_t *card)
 {
-	netdevice_t* dev;
+	struct net_device* dev;
 	volatile wanpipe_common_t *chan;
 
 	if (test_and_set_bit(0,&find_free_critical)){
 		printk(KERN_INFO "CRITICAL in Find Free\n");
 	}	
 
-	for (dev = card->wandev.dev; dev; dev=*((netdevice_t**)dev->priv)){
+	for (dev = card->wandev.dev; dev;
+	     dev = *((struct net_device **)dev->priv)) {
 		chan = dev->priv;
 		if (!chan) 
 			continue;
@@ -1646,7 +1651,7 @@ out:
 
 static void wanpipe_wakeup_driver(struct sock *sk)
 {
-	netdevice_t *dev=NULL;
+	struct net_device *dev = NULL;
 	wanpipe_common_t *chan=NULL;
 
 	dev = dev_get_by_index(sk->bound_dev_if);
@@ -1680,7 +1685,7 @@ static void wanpipe_wakeup_driver(struct sock *sk)
 static int wanpipe_getname(struct socket *sock, struct sockaddr *uaddr,
 			  int *uaddr_len, int peer)
 {
-	netdevice_t *dev;
+	struct net_device *dev;
 	struct sock *sk = sock->sk;
 	struct wan_sockaddr_ll *sll = (struct wan_sockaddr_ll*)uaddr;
 
@@ -1718,7 +1723,7 @@ static int wanpipe_getname(struct socket *sock, struct sockaddr *uaddr,
 static int wanpipe_notifier(struct notifier_block *this, unsigned long msg, void *data)
 {
 	struct sock *sk;
-	netdevice_t *dev = (netdevice_t*)data;
+	struct net_device *dev = (struct net_device *)data;
 	struct wanpipe_opt *po;
 
 	for (sk = wanpipe_sklist; sk; sk = sk->next) {
@@ -1867,7 +1872,7 @@ static int wanpipe_ioctl(struct socket *sock, unsigned int cmd, unsigned long ar
 static int wanpipe_debug (struct sock *origsk, void *arg)
 {
 	struct sock *sk=NULL;
-	netdevice_t *dev=NULL;
+	struct net_device *dev = NULL;
 	wanpipe_common_t *chan=NULL;
 	int cnt=0, err=0;
 	wan_debug_t *dbg_data = (wan_debug_t *)arg;
@@ -2010,7 +2015,7 @@ static int set_ioctl_cmd (struct sock *sk, void *arg)
 
 	if (!wp_sk(sk)->mbox) {
 		void *mbox_ptr;
-		netdevice_t *dev = dev_get_by_index(sk->bound_dev_if);
+		struct net_device *dev = dev_get_by_index(sk->bound_dev_if);
 		if (!dev)
 			return -ENODEV;
 
@@ -2351,7 +2356,7 @@ static int wanpipe_exec_cmd(struct sock *sk, int cmd, unsigned int flags)
 
 static int check_driver_busy (struct sock *sk)
 {
-	netdevice_t *dev = dev_get_by_index(sk->bound_dev_if);
+	struct net_device *dev = dev_get_by_index(sk->bound_dev_if);
 	wanpipe_common_t *chan;
 
 	if (!dev)
@@ -2456,7 +2461,7 @@ static int wanpipe_accept(struct socket *sock, struct socket *newsock, int flags
 
 struct sock * get_newsk_from_skb (struct sk_buff *skb)
 {
-	netdevice_t *dev = skb->dev;
+	struct net_device *dev = skb->dev;
 	wanpipe_common_t *chan;	
 
 	if (!dev){
@@ -2486,7 +2491,7 @@ static int wanpipe_connect(struct socket *sock, struct sockaddr *uaddr, int addr
 {
 	struct sock *sk = sock->sk;
 	struct wan_sockaddr_ll *addr = (struct wan_sockaddr_ll*)uaddr;
-	netdevice_t *dev;
+	struct net_device *dev;
 	int err;
 
 	if (wp_sk(sk)->num != htons(X25_PROT))

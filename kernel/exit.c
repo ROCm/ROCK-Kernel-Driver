@@ -756,7 +756,7 @@ task_t *next_thread(task_t *p)
 	struct pid_link *link = p->pids + PIDTYPE_TGID;
 	struct list_head *tmp, *head = &link->pidptr->task_list;
 
-#if CONFIG_SMP
+#ifdef CONFIG_SMP
 	if (!p->sighand)
 		BUG();
 	if (!spin_is_locked(&p->sighand->siglock) &&

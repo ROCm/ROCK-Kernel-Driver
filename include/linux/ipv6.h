@@ -89,6 +89,12 @@ struct ipv6_esp_hdr {
 	__u8  enc_data[0];      /* Length variable but >=8. Mind the 64 bit alignment! */
 };
 
+struct ipv6_comp_hdr {
+	__u8 nexthdr;
+	__u8 flags;
+	__u16 cpi;
+};
+
 /*
  *	IPv6 fixed header
  *
@@ -121,6 +127,7 @@ struct ipv6hdr {
 #include <linux/icmpv6.h>
 #include <net/if_inet6.h>       /* struct ipv6_mc_socklist */
 #include <linux/tcp.h>
+#include <linux/udp.h>
 
 /* 
    This structure contains results of exthdrs parsing
@@ -178,6 +185,11 @@ struct ipv6_pinfo {
 
 	struct ipv6_txoptions	*opt;
 	struct sk_buff		*pktoptions;
+	struct {
+		struct ipv6_txoptions *opt;
+		struct rt6_info	*rt;
+		struct flowi *fl;
+	} cork;
 };
 
 struct raw6_opt {
@@ -200,6 +212,7 @@ struct udp6_sock {
 	struct sock	  sk;
 	struct ipv6_pinfo *pinet6;
 	struct inet_opt   inet;
+	struct udp_opt	  udp;
 	struct ipv6_pinfo inet6;
 };
 

@@ -32,19 +32,19 @@
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/mm.h>
-#include <linux/proc_fs.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/list.h>
 #include <linux/completion.h>
-
-#define __KERNEL_SYSCALLS__
-
 #include <linux/unistd.h>
 #include <asm/dma.h>
 
 #include "scsi.h"
 #include "hosts.h"
+
+#include "scsi_priv.h"
+#include "scsi_logging.h"
+
 
 static LIST_HEAD(scsi_host_list);
 static spinlock_t scsi_host_list_lock = SPIN_LOCK_UNLOCKED;
@@ -193,62 +193,6 @@ static int scsi_host_legacy_release(struct Scsi_Host *shost)
 	return 0;
 }
 
-static int scsi_remove_legacy_host(struct Scsi_Host *shost)
-{
-	int error;
-
-	error = scsi_remove_host(shost);
-	if (!error)
-		(*shost->hostt->release)(shost);
-	return 0;
-}
-
-static int scsi_check_device_busy(struct scsi_device *sdev)
-{
-	struct Scsi_Host *shost = sdev->host;
-	struct scsi_cmnd *scmd;
-	unsigned long flags;
-
-	/*
-	 * Loop over all of the commands associated with the
-	 * device.  If any of them are busy, then set the state
-	 * back to inactive and bail.
-	 */
-	spin_lock_irqsave(&sdev->list_lock, flags);
-	list_for_each_entry(scmd, &sdev->cmd_list, list) {
-		if (scmd->request && scmd->request->rq_status != RQ_INACTIVE)
-			goto active;
-
-		/*
-		 * No, this device is really free.  Mark it as such, and
-		 * continue on.
-		 */
-		scmd->state = SCSI_STATE_DISCONNECTING;
-		if (scmd->request)
-			scmd->request->rq_status = RQ_SCSI_DISCONNECTING;
-	}
-	spin_unlock_irqrestore(&sdev->list_lock, flags);
-
-	return 0;
-
-active:
-	printk(KERN_ERR "SCSI device not inactive - rq_status=%d, target=%d, "
-			"pid=%ld, state=%d, owner=%d.\n",
-			scmd->request->rq_status, scmd->device->id,
-			scmd->pid, scmd->state, scmd->owner);
-
-	list_for_each_entry(sdev, &shost->my_devices, siblings) {
-		list_for_each_entry(scmd, &sdev->cmd_list, list) {
-			if (scmd->request->rq_status == RQ_SCSI_DISCONNECTING)
-				scmd->request->rq_status = RQ_INACTIVE;
-		}
-	}
-
-	spin_unlock_irqrestore(&sdev->list_lock, flags);
-	printk(KERN_ERR "Device busy???\n");
-	return 1;
-}
-
 /**
  * scsi_remove_host - check a scsi host for release and release
  * @shost:	a pointer to a scsi host to release
@@ -268,11 +212,9 @@ int scsi_remove_host(struct Scsi_Host *shost)
 	list_for_each_entry(sdev, &shost->my_devices, siblings)
 		sdev->online = FALSE;
 
-	list_for_each_entry(sdev, &shost->my_devices, siblings)
-		if (scsi_check_device_busy(sdev))
-			return 1;
-
+	scsi_proc_host_rm(shost);
 	scsi_forget_host(shost);
+	scsi_sysfs_remove_host(shost);
 	return 0;
 }
 
@@ -293,9 +235,11 @@ int scsi_add_host(struct Scsi_Host *shost, struct device *dev)
 	printk(KERN_INFO "scsi%d : %s\n", shost->host_no,
 			sht->info ? sht->info(shost) : sht->name);
 
-	if (dev) {
-		shost->host_gendev = dev;
-	}
+	error = scsi_sysfs_add_host(shost, dev);
+	if (error)
+		return error;
+
+	scsi_proc_host_add(shost);
 
 	scsi_scan_host(shost);
 			
@@ -313,6 +257,15 @@ int scsi_add_host(struct Scsi_Host *shost, struct device *dev)
  * @shost:	scsi host to be unregistered
  **/
 void scsi_unregister(struct Scsi_Host *shost)
+{
+	scsi_host_put(shost);
+}
+
+/**
+ * scsi_free_sdev - free a scsi hosts resources
+ * @shost:	scsi host to free 
+ **/
+void scsi_free_shost(struct Scsi_Host *shost)
 {
 	/* Remove shost from scsi_host_list */
 	spin_lock(&scsi_host_list_lock);
@@ -332,7 +285,6 @@ void scsi_unregister(struct Scsi_Host *shost)
 	}
 
 	shost->hostt->present--;
-	scsi_proc_host_rm(shost);
 	scsi_destroy_command_freelist(shost);
 	kfree(shost);
 }
@@ -423,8 +375,14 @@ struct Scsi_Host * scsi_register(Scsi_Host_Template *shost_tp, int xtr_bytes)
 	shost->use_clustering = shost_tp->use_clustering;
 	if (!blk_nohighio)
 		shost->highmem_io = shost_tp->highmem_io;
-
-	shost->max_sectors = shost_tp->max_sectors;
+	if (!shost_tp->max_sectors) {
+		/*
+		 * Driver imposes no hard sector transfer limit.
+		 * start at machine infinity initially.
+		 */
+		shost->max_sectors = SCSI_DEFAULT_MAX_SECTORS;
+	} else
+		shost->max_sectors = shost_tp->max_sectors;
 	shost->use_blk_tcq = shost_tp->use_blk_tcq;
 
 	spin_lock(&scsi_host_list_lock);
@@ -447,7 +405,8 @@ found:
 	rval = scsi_setup_command_freelist(shost);
 	if (rval)
 		goto fail;
-	scsi_proc_host_add(shost);
+
+	scsi_sysfs_init_host(shost);
 
 	shost->eh_notify = &sem;
 	kernel_thread((int (*)(void *)) scsi_error_handler, (void *) shost, 0);
@@ -525,7 +484,7 @@ out_of_space:
  **/
 int scsi_unregister_host(Scsi_Host_Template *shost_tp)
 {
-	scsi_tp_for_each_host(shost_tp, scsi_remove_legacy_host);
+	scsi_tp_for_each_host(shost_tp, scsi_remove_host);
 	return 0;
 
 }
@@ -576,15 +535,26 @@ struct Scsi_Host *scsi_host_hn_get(unsigned short host_no)
 }
 
 /**
+ * *scsi_host_get - inc a Scsi_Host ref count
+ * @shost:	Pointer to Scsi_Host to inc.
+ **/
+void scsi_host_get(struct Scsi_Host *shost)
+{
+
+	get_device(&shost->host_gendev);
+	class_device_get(&shost->class_dev);
+	return;
+}
+
+/**
  * *scsi_host_put - dec a Scsi_Host ref count
  * @shost:	Pointer to Scsi_Host to dec.
  **/
 void scsi_host_put(struct Scsi_Host *shost)
 {
 
-	/* XXX Get list lock */
-	/* XXX dec ref count */
-	/* XXX Release list lock */
+	class_device_put(&shost->class_dev);
+	put_device(&shost->host_gendev);
 	return;
 }
 

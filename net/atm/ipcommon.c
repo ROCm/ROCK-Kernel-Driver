@@ -67,4 +67,5 @@ void skb_migrate(struct sk_buff_head *from,struct sk_buff_head *to)
 }
 
 
+EXPORT_SYMBOL(llc_oui);
 EXPORT_SYMBOL(skb_migrate);

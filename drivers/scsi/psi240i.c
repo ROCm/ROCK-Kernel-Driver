@@ -718,8 +718,19 @@ int Psi240i_BiosParam (struct scsi_device *sdev, struct block_device *dev,
 
 MODULE_LICENSE("GPL");
 
-/* Eventually this will go into an include file, but this will be later */
-static Scsi_Host_Template driver_template = PSI240I;
-
+static Scsi_Host_Template driver_template = {
+	.proc_name		= "psi240i", 
+	.name			= "PSI-240I EIDE Disk Controller",
+	.detect			= Psi240i_Detect,
+	.command		= Psi240i_Command,
+	.queuecommand		= Psi240i_QueueCommand,
+	.abort	  		= Psi240i_Abort,
+	.reset	  		= Psi240i_Reset,
+	.bios_param	  	= Psi240i_BiosParam,
+	.can_queue	  	= 1,
+	.this_id	  	= -1,
+	.sg_tablesize	  	= SG_NONE,
+	.cmd_per_lun	  	= 1, 
+	.use_clustering		= DISABLE_CLUSTERING,
+};
 #include "scsi_module.c"
-

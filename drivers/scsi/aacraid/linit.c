@@ -35,7 +35,7 @@
  *	
  */
 
-#define AAC_DRIVER_VERSION		"0.9.9ac6-TEST"
+#define AAC_DRIVER_VERSION		"1.1.2"
 #define AAC_DRIVER_BUILD_DATE		__DATE__
 
 #include <linux/module.h>
@@ -53,20 +53,23 @@
 #include <linux/blk.h>
 #include "scsi.h"
 #include "hosts.h"
-
 #include <scsi/scsicam.h>
 
 #include "aacraid.h"
 
+
 #define AAC_DRIVERNAME	"aacraid"
 
 MODULE_AUTHOR("Red Hat Inc and Adaptec");
-MODULE_DESCRIPTION("Supports Dell PERC2, 2/Si, 3/Si, 3/Di, PERC 320/DC, Adaptec 2120S, 2200S, 5400S, and HP NetRAID-4M devices. http://domsch.com/linux/ or http://linux.adaptec.com");
+MODULE_DESCRIPTION("Supports Dell PERC2, 2/Si, 3/Si, 3/Di, Adaptec Advanced Raid Products, and HP NetRAID-4M devices. http://domsch.com/linux/ or http://linux.adaptec.com");
 MODULE_LICENSE("GPL");
 MODULE_PARM(nondasd, "i");
 MODULE_PARM_DESC(nondasd, "Control scanning of hba for nondasd devices. 0=off, 1=on");
+MODULE_PARM(paemode, "i");
+MODULE_PARM_DESC(paemode, "Control whether dma addressing is using PAE. 0=off, 1=on");
 
-static int nondasd=-1;
+int nondasd=-1;
+int paemode=-1;
 
 struct aac_dev *aac_devices[MAXIMUM_NUM_ADAPTERS];
 
@@ -76,12 +79,12 @@ static int aac_cfg_major = -1;
 /*
  * Because of the way Linux names scsi devices, the order in this table has
  * become important.  Check for on-board Raid first, add-in cards second.
- *
+ */
+/*
  * dmb - For now we add the number of channels to this structure.  
  * In the future we should add a fib that reports the number of channels
  * for the card.  At that time we can remove the channels from here
  */
- 
 static struct aac_driver_ident aac_drivers[] = {
 	{ 0x1028, 0x0001, 0x1028, 0x0001, aac_rx_init, "percraid", "DELL    ", "PERCRAID        ", 2 }, /* PERC 2/Si */
 	{ 0x1028, 0x0002, 0x1028, 0x0002, aac_rx_init, "percraid", "DELL    ", "PERCRAID        ", 2 }, /* PERC 3/Di */
@@ -97,11 +100,22 @@ static struct aac_driver_ident aac_drivers[] = {
 	{ 0x9005, 0x0285, 0x9005, 0x0286, aac_rx_init, "aacraid",  "ADAPTEC ", "Adaptec 2120S   ", 1 }, /* Adaptec 2120S (Crusader)*/
 	{ 0x9005, 0x0285, 0x9005, 0x0285, aac_rx_init, "aacraid",  "ADAPTEC ", "Adaptec 2200S   ", 2 }, /* Adaptec 2200S (Vulcan)*/
 	{ 0x9005, 0x0285, 0x9005, 0x0287, aac_rx_init, "aacraid",  "ADAPTEC ", "Adaptec 2200S   ", 2 }, /* Adaptec 2200S (Vulcan-2m)*/
-	{ 0x9005, 0x0285, 0x1028, 0x0287, aac_rx_init, "percraid", "DELL    ", "PERCRAID        ", 2 }, /* Dell PERC 320/DC */
+	{ 0x9005, 0x0285, 0x17aa, 0x0286, aac_rx_init, "aacraid",  "Legend  ", "Legend S220     ", 1 }, /* Legend S220*/
+	{ 0x9005, 0x0285, 0x17aa, 0x0287, aac_rx_init, "aacraid",  "Legend  ", "Legend S230     ", 2 }, /* Legend S230*/
+
+	{ 0x9005, 0x0285, 0x9005, 0x0288, aac_rx_init, "aacraid",  "ADAPTEC ", "Adaptec 3230S   ", 2 }, /* Adaptec 3230S (Harrier)*/
+	{ 0x9005, 0x0285, 0x9005, 0x0289, aac_rx_init, "aacraid",  "ADAPTEC ", "Adaptec 3240S   ", 2 }, /* Adaptec 3240S (Tornado)*/
+	{ 0x9005, 0x0285, 0x9005, 0x028a, aac_rx_init, "aacraid",  "ADAPTEC ", "ASR-2020S PCI-X ", 2 }, /* ASR-2020S PCI-X ZCR (Skyhawk)*/
+	{ 0x9005, 0x0285, 0x9005, 0x028b, aac_rx_init, "aacraid",  "ADAPTEC ", "ASR-2020S PCI-X ", 2 }, /* ASR-2020S SO-DIMM PCI-X ZCR(Terminator)*/
+	{ 0x9005, 0x0285, 0x9005, 0x0290, aac_rx_init, "aacraid",  "ADAPTEC ", "AAR-2410SA SATA ", 2 }, /* AAR-2410SA PCI SATA 4ch (Jaguar II)*/
+	{ 0x9005, 0x0250, 0x1014, 0x0279, aac_rx_init, "aacraid",  "ADAPTEC ", "Adaptec         ", 2 }, /* (Marco)*/
+	{ 0x9005, 0x0250, 0x1014, 0x028c, aac_rx_init, "aacraid",  "ADAPTEC ", "Adaptec         ", 2 }, /* (Sebring)*/
+
+	{ 0x9005, 0x0285, 0x1028, 0x0287, aac_rx_init, "percraid", "DELL    ", "PERC 320/DC     ", 2 }, /* Perc 320/DC*/
 	{ 0x1011, 0x0046, 0x9005, 0x0365, aac_sa_init, "aacraid",  "ADAPTEC ", "Adaptec 5400S   ", 4 }, /* Adaptec 5400S (Mustang)*/
 	{ 0x1011, 0x0046, 0x9005, 0x0364, aac_sa_init, "aacraid",  "ADAPTEC ", "AAC-364         ", 4 }, /* Adaptec 5400S (Mustang)*/
 	{ 0x1011, 0x0046, 0x9005, 0x1364, aac_sa_init, "percraid", "DELL    ", "PERCRAID        ", 4 }, /* Dell PERC2 "Quad Channel" */
-	{ 0x1011, 0x0046, 0x103c, 0x10c2, aac_sa_init, "hpnraid",  "HP      ", "NetRAID-4M      ", 4 }  /* HP NetRAID-4M */
+	{ 0x1011, 0x0046, 0x103c, 0x10c2, aac_sa_init, "hpnraid",  "HP      ", "NetRAID         ", 4 }  /* HP NetRAID-4M */
 };
 
 #define NUM_AACTYPES	(sizeof(aac_drivers) / sizeof(struct aac_driver_ident))
@@ -122,7 +136,7 @@ static int aac_detect(Scsi_Host_Template *);
 static int aac_release(struct Scsi_Host *);
 static int aac_queuecommand(Scsi_Cmnd *, void (*CompletionRoutine)(Scsi_Cmnd *));
 static int aac_biosparm(struct scsi_device *, struct block_device *,
-		sector_t, int *);
+			sector_t, int *);
 static int aac_procinfo(char *, char **, off_t, int, int, int);
 static int aac_ioctl(Scsi_Device *, int, void *);
 static int aac_eh_abort(Scsi_Cmnd * cmd);
@@ -130,7 +144,7 @@ static int aac_eh_device_reset(Scsi_Cmnd* cmd);
 static int aac_eh_bus_reset(Scsi_Cmnd* cmd);
 static int aac_eh_reset(Scsi_Cmnd* cmd);
 
-static int aac_slave_configure(Scsi_Device *);
+static int aac_slave_configure(struct scsi_device *);
 
 /**
  *	aac_detect	-	Probe for aacraid cards
@@ -162,13 +176,12 @@ static int aac_detect(Scsi_Host_Template *template)
 	struct fsa_scsi_hba *fsa_dev_ptr;
 	char *name = NULL;
 	
-	printk(KERN_INFO "Red Hat/Adaptec aacraid driver, %s\n", AAC_DRIVER_BUILD_DATE);
+	printk(KERN_INFO "Red Hat/Adaptec aacraid driver (%s %s)\n", AAC_DRIVER_VERSION, AAC_DRIVER_BUILD_DATE);
 
 	/* setting up the proc directory structure */
 	template->proc_name = "aacraid";
 
-	for( index = 0; index != num_aacdrivers; index++ )
-	{
+	for( index = 0; index != num_aacdrivers; index++ ) {
 		device_id = aac_drivers[index].device;
 		vendor_id = aac_drivers[index].vendor;
 		name = aac_drivers[index].name;
@@ -206,16 +219,10 @@ static int aac_detect(Scsi_Host_Template *template)
 			 * specific information.
 			 */
 			host_ptr = scsi_register( template, sizeof(struct aac_dev) );
-			if(host_ptr == NULL)
-				continue;
-
 			/* 
 			 * These three parameters can be used to allow for wide SCSI 
 			 * and for host adapters that support multiple buses.
 			 */
-			host_ptr->max_id = 17;
-			host_ptr->max_lun = 8;
-			host_ptr->max_channel = 1;
 			host_ptr->irq = dev->irq;		/* Adapter IRQ number */
 			/* host_ptr->base = ( char * )(dev->resource[0].start & ~0xff); */
 			host_ptr->base = dev->resource[0].start;
@@ -236,9 +243,13 @@ static int aac_detect(Scsi_Host_Template *template)
 			/* attach a pointer back to Scsi_Host */
 			aac->scsi_host_ptr = host_ptr;	
 			aac->pdev = dev;
-			aac->cardtype =  index;
 			aac->name = aac->scsi_host_ptr->hostt->name;
 			aac->id = aac->scsi_host_ptr->unique_id;
+			aac->cardtype =  index;
+
+			aac->fibs = (struct fib*) kmalloc(sizeof(struct fib)*AAC_NUM_FIB, GFP_KERNEL);
+			spin_lock_init(&aac->fib_lock);
+
 			/* Initialize the ordinal number of the device to -1 */
 			fsa_dev_ptr = &(aac->fsa_dev);
 			for( container = 0; container < MAXIMUM_NUM_CONTAINERS; container++ )
@@ -255,46 +266,28 @@ static int aac_detect(Scsi_Host_Template *template)
 			} 
 			dprintk((KERN_DEBUG "%s:%d device initialization successful.\n", name, host_ptr->unique_id));
 			aac_get_adapter_info(aac);
-			if(nondasd != -1) 
-			{
-				/* someone told us how to set this on the cmdline */
-				aac->nondasd_support = (nondasd!=0);
-			}
-			if(aac->nondasd_support != 0){
-				printk(KERN_INFO "%s%d: Non-DASD support enabled\n", aac->name, aac->id);
-			}
-			dprintk((KERN_DEBUG "%s:%d options flag %04x.\n",name, host_ptr->unique_id,aac->adapter_info.options));
-			if(aac->nondasd_support == 1)
-			{
-				/*
-				 * max channel will be the physical channels plus 1 virtual channel 
-				 * all containers are on the virtual channel 0
-				 * physical channels are address by their actual physical number+1
-				 */
+			if(aac->nondasd_support == 1){
+			/*
+			 * max channel will be the physical channels plus 1 virtual channel 
+			 * all containers are on the virtual channel 0
+			 * physical channels are address by their actual physical number+1
+			 */
 				host_ptr->max_channel = aac_drivers[index].channels+1;
 			} else {
 				host_ptr->max_channel = 1;
- 			}
-			dprintk((KERN_DEBUG "Device has %d logical channels\n", host_ptr->max_channel));
+			}
+			dprintk((KERN_DEBUG "Device has %d logical channels\n",host_ptr->max_channel));
 			aac_get_containers(aac);
 			aac_devices[aac_count-1] = aac;
+//			spin_unlock_irqrestore(&aac->fib_lock, flags);
 
 			/*
-			 * dmb - we may need to move these 3 parms somewhere else once
+			 * dmb - we may need to move the setting of these parms somewhere else once
 			 * we get a fib that can report the actual numbers
 			 */
 			host_ptr->max_id = AAC_MAX_TARGET;
 			host_ptr->max_lun = AAC_MAX_LUN;
-			
-			/*
-			 *  If we are PAE capable then our future DMA mappings
-			 *  (for read/write commands) are 64bit clean and don't 
-			 *  need bouncing. This assumes we do no other 32bit only
-			 *  allocations (eg fib table expands) after this point.
-			 */
-			 
-			if(aac->pae_support)
-				pci_set_dma_mask(dev, 0xFFFFFFFFFFFFFFFFUL);
+
 		}
 	}
 
@@ -356,17 +349,19 @@ static int aac_release(struct Scsi_Host *host_ptr)
  *	Queues a command for execution by the associated Host Adapter.
  */ 
 
-static int aac_queuecommand(Scsi_Cmnd *scsi_cmnd_ptr, void (*complete)(Scsi_Cmnd *))
+static int aac_queuecommand(Scsi_Cmnd *scsi_cmnd_ptr, void (*CompletionRoutine)(Scsi_Cmnd *))
 {
 	int ret;
 
-	scsi_cmnd_ptr->scsi_done = complete;
+	scsi_cmnd_ptr->scsi_done = CompletionRoutine;
 	/*
 	 *	aac_scsi_cmd() handles command processing, setting the 
 	 *	result code and calling completion routine. 
 	 */
-	if((ret = aac_scsi_cmd(scsi_cmnd_ptr)) != 0)
+	if((ret = aac_scsi_cmd(scsi_cmnd_ptr)) != 0){
 		dprintk((KERN_DEBUG "aac_scsi_cmd failed.\n"));
+		return FAILED;
+	}
 	return ret;
 } 
 
@@ -396,8 +391,9 @@ struct aac_driver_ident* aac_get_driver_ident(int devtype)
 
 /**
  *	aac_biosparm	-	return BIOS parameters for disk
- *	@disk: SCSI disk object to process
- *	@device: Disk in question
+ *	@sdev: The scsi device corresponding to the disk
+ *	@bdev: the block device corresponding to the disk
+ *	@capacity: the sector capacity of the disk
  *	@geom: geometry block to fill in
  *
  *	Return the Heads/Sectors/Cylinders BIOS Disk Parameters for Disk.  
@@ -416,10 +412,10 @@ struct aac_driver_ident* aac_get_driver_ident(int devtype)
  */
  
 static int aac_biosparm(struct scsi_device *sdev, struct block_device *bdev,
-		sector_t capacity, int *geom)
+			sector_t capacity, int *geom)
 {
 	struct diskparm *param = (struct diskparm *)geom;
-	u8 *buf;
+	unsigned char *buf;
 
 	dprintk((KERN_DEBUG "aac_biosparm.\n"));
 
@@ -445,15 +441,14 @@ static int aac_biosparm(struct scsi_device *sdev, struct block_device *bdev,
 		param->sectors = 32;
 	}
 
-	param->cylinders = cap_to_cyls(capacity,
-			(param->heads * param->sectors));
+	param->cylinders = cap_to_cyls(capacity, param->heads * param->sectors);
 
 	/*
-	 *	Read the partition table block
+	 *	Read the first 1024 bytes from the disk device
 	 */
 
 	buf = scsi_bios_ptable(bdev);
-	
+
 	/* 
 	 *	If the boot sector partition table is valid, search for a partition 
 	 *	table entry whose end_head matches one of the standard geometry 
@@ -462,7 +457,7 @@ static int aac_biosparm(struct scsi_device *sdev, struct block_device *bdev,
 	 
 	if(*(unsigned short *)(buf + 0x40) == cpu_to_le16(0xaa55))
 	{
-		struct partition *first = (struct partition *)buf;
+		struct partition *first = (struct partition * )buf;
 		struct partition *entry = first;
 		int saved_cylinders = param->cylinders;
 		int num;
@@ -500,8 +495,7 @@ static int aac_biosparm(struct scsi_device *sdev, struct block_device *bdev,
 			end_sec = first->end_sector & 0x3f;
 		}
 
-		param->cylinders = cap_to_cyls(capacity,
-				(param->heads * param->sectors));
+		param->cylinders = cap_to_cyls(capacity, param->heads * param->sectors);
 
 		if(num < 4 && end_sec == param->sectors)
 		{
@@ -522,15 +516,17 @@ static int aac_biosparm(struct scsi_device *sdev, struct block_device *bdev,
 }
 
 /**
- *	aac_slave_configure	-	do device specific setup
- *	@dev:	SCSI device we are attaching
+ *	aac_queuedepth		-	compute queue depths
+ *	@host:	SCSI host in question
+ *	@dev:	SCSI device we are considering
  *
- * 	Currently, all we do is set the queue depth on the device.
+ *	Selects queue depths for each target device based on the host adapter's
+ *	total capacity and the queue depth supported by the target device.
+ *	A queue depth of one automatically disables tagged queueing.
  */
 
-static int aac_slave_configure(Scsi_Device * dev )
+static int aac_slave_configure(struct scsi_device * dev )
 {
-
 	if(dev->tagged_supported)
 		scsi_adjust_queue_depth(dev, MSG_ORDERED_TAG, 128);
 	else
@@ -543,75 +539,13 @@ static int aac_slave_configure(Scsi_Device * dev )
 	return 0;
 }
 
+/*------------------------------------------------------------------------------
+	aac_ioctl()
 
-/**
- *	aac_eh_abort	-	Abort command if possible.
- *	@cmd:	SCSI command block to abort
- *
- *	Called when the midlayer wishes to abort a command. We don't support
- *	this facility, and our firmware looks after life for us. We just
- *	report this as failing
- */
- 
-static int aac_eh_abort(Scsi_Cmnd *cmd)
-{
-	return FAILED;
-}
-
-/**
- *	aac_eh_device_reset	-	Reset command handling
- *	@cmd:	SCSI command block causing the reset
- *
- *	Issue a reset of a SCSI device. We are ourselves not truely a SCSI
- *	controller and our firmware will do the work for us anyway. Thus this
- *	is a no-op. We just return FAILED.
- */
-
-static int aac_eh_device_reset(Scsi_Cmnd *cmd)
-{
-	return FAILED;
-}
-
-/**
- *	aac_eh_bus_reset	-	Reset command handling
- *	@scsi_cmd:	SCSI command block causing the reset
- *
- *	Issue a reset of a SCSI bus. We are ourselves not truely a SCSI
- *	controller and our firmware will do the work for us anyway. Thus this
- *	is a no-op. We just return FAILED.
- */
-
-static int aac_eh_bus_reset(Scsi_Cmnd* cmd)
-{
-	return FAILED;
-}
-
-/**
- *	aac_eh_hba_reset	-	Reset command handling
- *	@scsi_cmd:	SCSI command block causing the reset
- *
- *	Issue a reset of a SCSI host. If things get this bad then arguably we should
- *	go take a look at what the host adapter is doing and see if something really
- *	broke (as can occur at least on my Dell QC card if a drive keeps failing spinup)
- */
-
-static int aac_eh_reset(Scsi_Cmnd* cmd)
-{
-	printk(KERN_ERR "aacraid: Host adapter reset request. SCSI hang ?\n");
-	return FAILED;
-}
-
-/**
- *	aac_ioctl 	-	Handle SCSI ioctls
- *	@scsi_dev_ptr: scsi device to operate upon
- *	@cmd: ioctl command to use issue
- *	@arg: ioctl data pointer
- *
- *	Issue an ioctl on an aacraid device. Returns a standard unix error code or
- *	zero for success
- */
- 
+		Handle SCSI ioctls
+ *----------------------------------------------------------------------------*/
 static int aac_ioctl(Scsi_Device * scsi_dev_ptr, int cmd, void * arg)
+/*----------------------------------------------------------------------------*/
 {
 	struct aac_dev *dev;
 	dprintk((KERN_DEBUG "aac_ioctl.\n"));
@@ -694,13 +628,58 @@ static Scsi_Host_Template driver_template = {
 	.this_id        		= 16,
 	.sg_tablesize   		= 16,
 	.max_sectors    		= 128,
-	.cmd_per_lun    		= 1,
-	.eh_abort_handler       	= aac_eh_abort,
-	.eh_device_reset_handler 	= aac_eh_device_reset,
+	.cmd_per_lun    		= AAC_NUM_IO_FIB, 
+	.eh_abort_handler		= aac_eh_abort,
+	.eh_device_reset_handler	= aac_eh_device_reset,
 	.eh_bus_reset_handler		= aac_eh_bus_reset,
 	.eh_host_reset_handler		= aac_eh_reset,
 	.use_clustering			= ENABLE_CLUSTERING,
 };
+
+/*===========================================================================
+ * Error Handling routines
+ *===========================================================================
+ */
+
+
+/*
+ *
+ * We don't support abortting commands.
+ */
+static int aac_eh_abort(Scsi_Cmnd * scsicmd)
+{
+	printk("aacraid: abort failed\n");
+	return FAILED;
+}
+
+/*
+ * We don't support device resets.
+ */
+static int aac_eh_device_reset(Scsi_Cmnd* cmd)
+{
+	printk("aacraid: device reset failed\n");
+	return FAILED;
+}
+
+
+static int aac_eh_bus_reset(Scsi_Cmnd* cmd)
+{
+	printk("aacraid: bus reset failed\n");
+	return FAILED;
+}
+
+static int aac_eh_reset(Scsi_Cmnd* cmd)
+{
+	printk("aacraid: hba reset failed\n");
+	return FAILED;
+}
+
+
+/*===========================================================================
+ * 
+ *===========================================================================
+ */
+
 
 #include "scsi_module.c"
 

@@ -91,7 +91,7 @@ static const char *rse_hints[]={
 	"eager loads and stores"
 };
 
-#define RSE_HINTS_COUNT (sizeof(rse_hints)/sizeof(const char *))
+#define RSE_HINTS_COUNT ARRAY_SIZE(rse_hints)
 
 static const char *mem_attrib[]={
 	"WB",		/* 000 */
@@ -192,15 +192,15 @@ power_info(char *page)
 
 	for (i=0; i < 8 ; i++ ) {
 		if (halt_info[i].pal_power_mgmt_info_s.im == 1) {
-			p += sprintf(p,	"Power level %d:\n" \
-					"\tentry_latency       : %d cycles\n" \
-					"\texit_latency        : %d cycles\n" \
-					"\tpower consumption   : %d mW\n" \
-					"\tCache+TLB coherency : %s\n", i,
-				halt_info[i].pal_power_mgmt_info_s.entry_latency,
-				halt_info[i].pal_power_mgmt_info_s.exit_latency,
-				halt_info[i].pal_power_mgmt_info_s.power_consumption,
-				halt_info[i].pal_power_mgmt_info_s.co ? "Yes" : "No");
+			p += sprintf(p,	"Power level %d:\n"
+				     "\tentry_latency       : %d cycles\n"
+				     "\texit_latency        : %d cycles\n"
+				     "\tpower consumption   : %d mW\n"
+				     "\tCache+TLB coherency : %s\n", i,
+				     halt_info[i].pal_power_mgmt_info_s.entry_latency,
+				     halt_info[i].pal_power_mgmt_info_s.exit_latency,
+				     halt_info[i].pal_power_mgmt_info_s.power_consumption,
+				     halt_info[i].pal_power_mgmt_info_s.co ? "Yes" : "No");
 		} else {
 			p += sprintf(p,"Power level %d: not implemented\n",i);
 		}
@@ -212,9 +212,9 @@ static int
 cache_info(char *page)
 {
 	char *p = page;
-	u64 levels, unique_caches;
+	u64 i, levels, unique_caches;
 	pal_cache_config_info_t cci;
-	int i,j, k;
+	int j, k;
 	s64 status;
 
 	if ((status = ia64_pal_cache_summary(&levels, &unique_caches)) != 0) {
@@ -232,48 +232,50 @@ cache_info(char *page)
 			if ((status=ia64_pal_cache_config_info(i,j, &cci)) != 0) {
 				continue;
 			}
-			p += sprintf(p, "%s Cache level %d:\n" \
-					"\tSize           : %ld bytes\n" \
-					"\tAttributes     : ",
-					cache_types[j+cci.pcci_unified], i+1,
-					cci.pcci_cache_size);
+			p += sprintf(p,
+				     "%s Cache level %lu:\n"
+				     "\tSize           : %lu bytes\n"
+				     "\tAttributes     : ",
+				     cache_types[j+cci.pcci_unified], i+1,
+				     cci.pcci_cache_size);
 
 			if (cci.pcci_unified) p += sprintf(p, "Unified ");
 
 			p += sprintf(p, "%s\n", cache_mattrib[cci.pcci_cache_attr]);
 
-			p += sprintf(p, "\tAssociativity  : %d\n" \
-					"\tLine size      : %d bytes\n" \
-					"\tStride         : %d bytes\n",
-					cci.pcci_assoc,
-					1<<cci.pcci_line_size,
-					1<<cci.pcci_stride);
+			p += sprintf(p,
+				     "\tAssociativity  : %d\n"
+				     "\tLine size      : %d bytes\n"
+				     "\tStride         : %d bytes\n",
+				     cci.pcci_assoc, 1<<cci.pcci_line_size, 1<<cci.pcci_stride);
 			if (j == 1)
 				p += sprintf(p, "\tStore latency  : N/A\n");
 			else
 				p += sprintf(p, "\tStore latency  : %d cycle(s)\n",
 						cci.pcci_st_latency);
 
-			p += sprintf(p, "\tLoad latency   : %d cycle(s)\n" \
-					"\tStore hints    : ",
-					cci.pcci_ld_latency);
+			p += sprintf(p,
+				     "\tLoad latency   : %d cycle(s)\n"
+				     "\tStore hints    : ", cci.pcci_ld_latency);
 
 			for(k=0; k < 8; k++ ) {
-				if ( cci.pcci_st_hints & 0x1) p += sprintf(p, "[%s]", cache_st_hints[k]);
+				if ( cci.pcci_st_hints & 0x1)
+					p += sprintf(p, "[%s]", cache_st_hints[k]);
 				cci.pcci_st_hints >>=1;
 			}
 			p += sprintf(p, "\n\tLoad hints     : ");
 
 			for(k=0; k < 8; k++ ) {
-				if ( cci.pcci_ld_hints & 0x1) p += sprintf(p, "[%s]", cache_ld_hints[k]);
+				if (cci.pcci_ld_hints & 0x1)
+					p += sprintf(p, "[%s]", cache_ld_hints[k]);
 				cci.pcci_ld_hints >>=1;
 			}
-			p += sprintf(p, "\n\tAlias boundary : %d byte(s)\n" \
-					"\tTag LSB        : %d\n" \
-					"\tTag MSB        : %d\n",
-					1<<cci.pcci_alias_boundary,
-					cci.pcci_tag_lsb,
-					cci.pcci_tag_msb);
+			p += sprintf(p,
+				     "\n\tAlias boundary : %d byte(s)\n"
+				     "\tTag LSB        : %d\n"
+				     "\tTag MSB        : %d\n",
+				     1<<cci.pcci_alias_boundary, cci.pcci_tag_lsb,
+				     cci.pcci_tag_msb);
 
 			/* when unified, data(j=2) is enough */
 			if (cci.pcci_unified) break;
@@ -303,20 +305,20 @@ vm_info(char *page)
 	}
 
 
-	p += sprintf(p, "Physical Address Space         : %d bits\n" \
-			"Virtual Address Space          : %d bits\n" \
-			"Protection Key Registers(PKR)  : %d\n" \
-			"Implemented bits in PKR.key    : %d\n" \
-			"Hash Tag ID                    : 0x%x\n" \
-			"Size of RR.rid                 : %d\n",
-			vm_info_1.pal_vm_info_1_s.phys_add_size,
-			vm_info_2.pal_vm_info_2_s.impl_va_msb+1,
-			vm_info_1.pal_vm_info_1_s.max_pkr+1,
-			vm_info_1.pal_vm_info_1_s.key_size,
-			vm_info_1.pal_vm_info_1_s.hash_tag_id,
-			vm_info_2.pal_vm_info_2_s.rid_size);
+	p += sprintf(p,
+		     "Physical Address Space         : %d bits\n"
+		     "Virtual Address Space          : %d bits\n"
+		     "Protection Key Registers(PKR)  : %d\n"
+		     "Implemented bits in PKR.key    : %d\n"
+		     "Hash Tag ID                    : 0x%x\n"
+		     "Size of RR.rid                 : %d\n",
+		     vm_info_1.pal_vm_info_1_s.phys_add_size,
+		     vm_info_2.pal_vm_info_2_s.impl_va_msb+1, vm_info_1.pal_vm_info_1_s.max_pkr+1,
+		     vm_info_1.pal_vm_info_1_s.key_size, vm_info_1.pal_vm_info_1_s.hash_tag_id,
+		     vm_info_2.pal_vm_info_2_s.rid_size);
 
-	if (ia64_pal_mem_attrib(&attrib) != 0) return 0;
+	if (ia64_pal_mem_attrib(&attrib) != 0)
+		return 0;
 
 	p += sprintf(p, "Supported memory attributes    : ");
 	sep = "";
@@ -333,13 +335,14 @@ vm_info(char *page)
 		return 0;
 	}
 
-	p += sprintf(p, "\nTLB walker                     : %simplemented\n" \
-			"Number of DTR                  : %d\n" \
-			"Number of ITR                  : %d\n" \
-			"TLB insertable page sizes      : ",
-			vm_info_1.pal_vm_info_1_s.vw ? "" : "not ",
-			vm_info_1.pal_vm_info_1_s.max_dtr_entry+1,
-			vm_info_1.pal_vm_info_1_s.max_itr_entry+1);
+	p += sprintf(p,
+		     "\nTLB walker                     : %simplemented\n"
+		     "Number of DTR                  : %d\n"
+		     "Number of ITR                  : %d\n"
+		     "TLB insertable page sizes      : ",
+		     vm_info_1.pal_vm_info_1_s.vw ? "" : "not ",
+		     vm_info_1.pal_vm_info_1_s.max_dtr_entry+1,
+		     vm_info_1.pal_vm_info_1_s.max_itr_entry+1);
 
 
 	p = bitvector_process(p, tr_pages);
@@ -353,21 +356,19 @@ vm_info(char *page)
 		return 0;
 	}
 
-	p += sprintf(p, "\nPurge base address             : 0x%016lx\n" \
-			"Purge outer loop count         : %d\n" \
-			"Purge inner loop count         : %d\n" \
-			"Purge outer loop stride        : %d\n" \
-			"Purge inner loop stride        : %d\n",
-			ptce.base,
-			ptce.count[0],
-			ptce.count[1],
-			ptce.stride[0],
-			ptce.stride[1]);
+	p += sprintf(p,
+		     "\nPurge base address             : 0x%016lx\n"
+		     "Purge outer loop count         : %d\n"
+		     "Purge inner loop count         : %d\n"
+		     "Purge outer loop stride        : %d\n"
+		     "Purge inner loop stride        : %d\n",
+		     ptce.base, ptce.count[0], ptce.count[1], ptce.stride[0], ptce.stride[1]);
 
-	p += sprintf(p, "TC Levels                      : %d\n" \
-			"Unique TC(s)                   : %d\n",
-			vm_info_1.pal_vm_info_1_s.num_tc_levels,
-			vm_info_1.pal_vm_info_1_s.max_unique_tcs);
+	p += sprintf(p,
+		     "TC Levels                      : %d\n"
+		     "Unique TC(s)                   : %d\n",
+		     vm_info_1.pal_vm_info_1_s.num_tc_levels,
+		     vm_info_1.pal_vm_info_1_s.max_unique_tcs);
 
 	for(i=0; i < vm_info_1.pal_vm_info_1_s.num_tc_levels; i++) {
 		for (j=2; j>0 ; j--) {
@@ -379,15 +380,14 @@ vm_info(char *page)
 				continue;
 			}
 
-			p += sprintf(p, "\n%s Translation Cache Level %d:\n" \
-					"\tHash sets           : %d\n" \
-					"\tAssociativity       : %d\n" \
-					"\tNumber of entries   : %d\n" \
-					"\tFlags               : ",
-					cache_types[j+tc_info.tc_unified], i+1,
-					tc_info.tc_num_sets,
-					tc_info.tc_associativity,
-					tc_info.tc_num_entries);
+			p += sprintf(p,
+				     "\n%s Translation Cache Level %d:\n"
+				     "\tHash sets           : %d\n"
+				     "\tAssociativity       : %d\n"
+				     "\tNumber of entries   : %d\n"
+				     "\tFlags               : ",
+				     cache_types[j+tc_info.tc_unified], i+1, tc_info.tc_num_sets,
+				     tc_info.tc_associativity, tc_info.tc_num_entries);
 
 			if (tc_info.tc_pf) p += sprintf(p, "PreferredPageSizeOptimized ");
 			if (tc_info.tc_unified) p += sprintf(p, "Unified ");
@@ -436,17 +436,18 @@ register_info(char *page)
 
 	if (ia64_pal_rse_info(&phys_stacked, &hints) != 0) return 0;
 
-	p += sprintf(p, "RSE stacked physical registers   : %ld\n" \
-			"RSE load/store hints             : %ld (%s)\n",
-			phys_stacked,
-			hints.ph_data,
-			hints.ph_data < RSE_HINTS_COUNT ? rse_hints[hints.ph_data]: "(\?\?)");
+	p += sprintf(p,
+		     "RSE stacked physical registers   : %ld\n"
+		     "RSE load/store hints             : %ld (%s)\n",
+		     phys_stacked, hints.ph_data,
+		     hints.ph_data < RSE_HINTS_COUNT ? rse_hints[hints.ph_data]: "(\?\?)");
 
-	if (ia64_pal_debug_info(&iregs, &dregs)) return 0;
+	if (ia64_pal_debug_info(&iregs, &dregs))
+		return 0;
 
-	p += sprintf(p, "Instruction debug register pairs : %ld\n" \
-			"Data debug register pairs        : %ld\n",
-			iregs, dregs);
+	p += sprintf(p,
+		     "Instruction debug register pairs : %ld\n"
+		     "Data debug register pairs        : %ld\n", iregs, dregs);
 
 	return p - page;
 }
@@ -563,26 +564,21 @@ version_info(char *page)
 	 */
 	if (ia64_pal_version(&min_ver, &cur_ver) != 0) return 0;
 
-	p += sprintf(p, "PAL_vendor : 0x%02x (min=0x%02x)\n" \
-			"PAL_A      : %x.%x.%x (min=%x.%x.%x)\n" \
-			"PAL_B      : %x.%x.%x (min=%x.%x.%x)\n",
-			cur_ver.pal_version_s.pv_pal_vendor,
-			min_ver.pal_version_s.pv_pal_vendor,
+	p += sprintf(p,
+		     "PAL_vendor : 0x%02x (min=0x%02x)\n"
+		     "PAL_A      : %x.%x.%x (min=%x.%x.%x)\n"
+		     "PAL_B      : %x.%x.%x (min=%x.%x.%x)\n",
+		     cur_ver.pal_version_s.pv_pal_vendor, min_ver.pal_version_s.pv_pal_vendor,
 
-			cur_ver.pal_version_s.pv_pal_a_model>>4,
-			cur_ver.pal_version_s.pv_pal_a_model&0xf,
-			cur_ver.pal_version_s.pv_pal_a_rev,
-			min_ver.pal_version_s.pv_pal_a_model>>4,
-			min_ver.pal_version_s.pv_pal_a_model&0xf,
-			min_ver.pal_version_s.pv_pal_a_rev,
+		     cur_ver.pal_version_s.pv_pal_a_model>>4,
+		     cur_ver.pal_version_s.pv_pal_a_model&0xf, cur_ver.pal_version_s.pv_pal_a_rev,
+		     min_ver.pal_version_s.pv_pal_a_model>>4,
+		     min_ver.pal_version_s.pv_pal_a_model&0xf, min_ver.pal_version_s.pv_pal_a_rev,
 
-			cur_ver.pal_version_s.pv_pal_b_model>>4,
-			cur_ver.pal_version_s.pv_pal_b_model&0xf,
-			cur_ver.pal_version_s.pv_pal_b_rev,
-			min_ver.pal_version_s.pv_pal_b_model>>4,
-			min_ver.pal_version_s.pv_pal_b_model&0xf,
-			min_ver.pal_version_s.pv_pal_b_rev);
-
+		     cur_ver.pal_version_s.pv_pal_b_model>>4,
+		     cur_ver.pal_version_s.pv_pal_b_model&0xf, cur_ver.pal_version_s.pv_pal_b_rev,
+		     min_ver.pal_version_s.pv_pal_b_model>>4,
+		     min_ver.pal_version_s.pv_pal_b_model&0xf, min_ver.pal_version_s.pv_pal_b_rev);
 	return p - page;
 }
 
@@ -595,26 +591,20 @@ perfmon_info(char *page)
 
 	if (ia64_pal_perf_mon_info(pm_buffer, &pm_info) != 0) return 0;
 
-	p += sprintf(p, "PMC/PMD pairs                 : %d\n" \
-			"Counter width                 : %d bits\n" \
-			"Cycle event number            : %d\n" \
-			"Retired event number          : %d\n" \
-			"Implemented PMC               : ",
-			pm_info.pal_perf_mon_info_s.generic,
-			pm_info.pal_perf_mon_info_s.width,
-			pm_info.pal_perf_mon_info_s.cycles,
-			pm_info.pal_perf_mon_info_s.retired);
+	p += sprintf(p,
+		     "PMC/PMD pairs                 : %d\n"
+		     "Counter width                 : %d bits\n"
+		     "Cycle event number            : %d\n"
+		     "Retired event number          : %d\n"
+		     "Implemented PMC               : ",
+		     pm_info.pal_perf_mon_info_s.generic, pm_info.pal_perf_mon_info_s.width,
+		     pm_info.pal_perf_mon_info_s.cycles, pm_info.pal_perf_mon_info_s.retired);
 
 	p = bitregister_process(p, pm_buffer, 256);
-
 	p += sprintf(p, "\nImplemented PMD               : ");
-
 	p = bitregister_process(p, pm_buffer+4, 256);
-
 	p += sprintf(p, "\nCycles count capable          : ");
-
 	p = bitregister_process(p, pm_buffer+8, 256);
-
 	p += sprintf(p, "\nRetired bundles count capable : ");
 
 #ifdef CONFIG_ITANIUM
@@ -646,12 +636,11 @@ frequency_info(char *page)
 
 	if (ia64_pal_freq_ratios(&proc, &bus, &itc) != 0) return 0;
 
-	p += sprintf(p, "Processor/Clock ratio   : %ld/%ld\n" \
-			"Bus/Clock ratio         : %ld/%ld\n" \
-			"ITC/Clock ratio         : %ld/%ld\n",
-			proc.num, proc.den,
-			bus.num, bus.den,
-			itc.num, itc.den);
+	p += sprintf(p,
+		     "Processor/Clock ratio   : %ld/%ld\n"
+		     "Bus/Clock ratio         : %ld/%ld\n"
+		     "ITC/Clock ratio         : %ld/%ld\n",
+		     proc.num, proc.den, bus.num, bus.den, itc.num, itc.den);
 
 	return p - page;
 }
@@ -665,7 +654,7 @@ tr_info(char *page)
 	u64 tr_buffer[4];
 	pal_vm_info_1_u_t vm_info_1;
 	pal_vm_info_2_u_t vm_info_2;
-	int i, j;
+	u64 i, j;
 	u64 max[3], pgm;
 	struct ifa_reg {
 		u64 valid:1;
@@ -711,7 +700,7 @@ tr_info(char *page)
 
 		status = ia64_pal_tr_read(j, i, tr_buffer, &tr_valid);
 		if (status != 0) {
-			printk(KERN_ERR "palinfo: pal call failed on tr[%d:%d]=%ld\n",
+			printk(KERN_ERR "palinfo: pal call failed on tr[%lu:%lu]=%ld\n",
 			       i, j, status);
 			continue;
 		}
@@ -725,34 +714,29 @@ tr_info(char *page)
 		rid_reg  = (struct rid_reg *)&tr_buffer[3];
 
 		pgm	 = -1 << (itir_reg->ps - 12);
-		p += sprintf(p, "%cTR%d: av=%d pv=%d dv=%d mv=%d\n" \
-				"\tppn  : 0x%lx\n" \
-				"\tvpn  : 0x%lx\n" \
-				"\tps   : ",
-
-				"ID"[i],
-				j,
-				tr_valid.pal_tr_valid_s.access_rights_valid,
-				tr_valid.pal_tr_valid_s.priv_level_valid,
-				tr_valid.pal_tr_valid_s.dirty_bit_valid,
-				tr_valid.pal_tr_valid_s.mem_attr_valid,
-				(gr_reg->ppn & pgm)<< 12,
-				(ifa_reg->vpn & pgm)<< 12);
+		p += sprintf(p,
+			     "%cTR%lu: av=%d pv=%d dv=%d mv=%d\n"
+			     "\tppn  : 0x%lx\n"
+			     "\tvpn  : 0x%lx\n"
+			     "\tps   : ",
+			     "ID"[i], j,
+			     tr_valid.pal_tr_valid_s.access_rights_valid,
+			     tr_valid.pal_tr_valid_s.priv_level_valid,
+			     tr_valid.pal_tr_valid_s.dirty_bit_valid,
+			     tr_valid.pal_tr_valid_s.mem_attr_valid,
+			     (gr_reg->ppn & pgm)<< 12, (ifa_reg->vpn & pgm)<< 12);
 
 		p = bitvector_process(p, 1<< itir_reg->ps);
 
-		p += sprintf(p, "\n\tpl   : %d\n" \
-				"\tar   : %d\n" \
-				"\trid  : %x\n" \
-				"\tp    : %d\n" \
-				"\tma   : %d\n" \
-				"\td    : %d\n",
-				gr_reg->pl,
-				gr_reg->ar,
-				rid_reg->rid,
-				gr_reg->p,
-				gr_reg->ma,
-				gr_reg->d);
+		p += sprintf(p,
+			     "\n\tpl   : %d\n"
+			     "\tar   : %d\n"
+			     "\trid  : %x\n"
+			     "\tp    : %d\n"
+			     "\tma   : %d\n"
+			     "\td    : %d\n",
+			     gr_reg->pl, gr_reg->ar, rid_reg->rid, gr_reg->p, gr_reg->ma,
+			     gr_reg->d);
 		}
 	}
 	return p - page;
@@ -776,7 +760,7 @@ static palinfo_entry_t palinfo_entries[]={
 	{ "tr_info",		tr_info, }
 };
 
-#define NR_PALINFO_ENTRIES	(sizeof(palinfo_entries)/sizeof(palinfo_entry_t))
+#define NR_PALINFO_ENTRIES	(int) ARRAY_SIZE(palinfo_entries)
 
 /*
  * this array is used to keep track of the proc entries we create. This is

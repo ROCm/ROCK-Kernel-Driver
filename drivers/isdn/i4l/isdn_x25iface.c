@@ -222,6 +222,8 @@ int isdn_x25iface_connect_ind(struct concap_proto *cprot)
 		printk(KERN_WARNING 
 		       "isdn_x25iface_connect_ind while unconfigured %s\n"
 		       , MY_DEVNAME(cprot->net_dev) );
+		if (skb)
+			dev_kfree_skb(skb);
 		return -1;
 	}
 	*state_p = WAN_CONNECTED;

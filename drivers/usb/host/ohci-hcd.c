@@ -323,7 +323,6 @@ ohci_endpoint_disable (struct usb_hcd *hcd, struct hcd_dev *dev, int ep)
 	/* ASSERT:  any requests/urbs are being unlinked */
 	/* ASSERT:  nobody can be submitting urbs for this any more */
 
-	ohci_dbg (ohci, "ep %02x disable\n", ep);
 	epnum <<= 1;
 	if (epnum != 0 && !(ep & USB_DIR_IN))
 		epnum |= 1;

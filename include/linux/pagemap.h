@@ -172,7 +172,7 @@ extern void end_page_writeback(struct page *page);
  * This assumes that two userspace pages are always sufficient.  That's
  * not true if PAGE_CACHE_SIZE > PAGE_SIZE.
  */
-static inline int fault_in_pages_writeable(char *uaddr, int size)
+static inline int fault_in_pages_writeable(char __user *uaddr, int size)
 {
 	int ret;
 
@@ -182,7 +182,7 @@ static inline int fault_in_pages_writeable(char *uaddr, int size)
 	 */
 	ret = __put_user(0, uaddr);
 	if (ret == 0) {
-		char *end = uaddr + size - 1;
+		char __user *end = uaddr + size - 1;
 
 		/*
 		 * If the page was already mapped, this will get a cache miss
@@ -195,14 +195,14 @@ static inline int fault_in_pages_writeable(char *uaddr, int size)
 	return ret;
 }
 
-static inline void fault_in_pages_readable(const char *uaddr, int size)
+static inline void fault_in_pages_readable(const char __user *uaddr, int size)
 {
 	volatile char c;
 	int ret;
 
 	ret = __get_user(c, (char *)uaddr);
 	if (ret == 0) {
-		const char *end = uaddr + size - 1;
+		const char __user *end = uaddr + size - 1;
 
 		if (((unsigned long)uaddr & PAGE_MASK) !=
 				((unsigned long)end & PAGE_MASK))

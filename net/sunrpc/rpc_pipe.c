@@ -156,7 +156,7 @@ rpc_pipe_release(struct inode *inode, struct file *filp)
 }
 
 static ssize_t
-rpc_pipe_read(struct file *filp, char *buf, size_t len, loff_t *offset)
+rpc_pipe_read(struct file *filp, char __user *buf, size_t len, loff_t *offset)
 {
 	struct inode *inode = filp->f_dentry->d_inode;
 	struct rpc_inode *rpci = RPC_I(inode);
@@ -193,7 +193,7 @@ out_unlock:
 }
 
 static ssize_t
-rpc_pipe_write(struct file *filp, const char *buf, size_t len, loff_t *offset)
+rpc_pipe_write(struct file *filp, const char __user *buf, size_t len, loff_t *offset)
 {
 	struct inode *inode = filp->f_dentry->d_inode;
 	struct rpc_inode *rpci = RPC_I(inode);
@@ -310,6 +310,7 @@ rpc_info_release(struct inode *inode, struct file *file)
 }
 
 static struct file_operations rpc_info_operations = {
+	.owner		= THIS_MODULE,
 	.open		= rpc_info_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,

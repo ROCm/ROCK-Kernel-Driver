@@ -2101,7 +2101,7 @@ out:
 
 /* These states need RST on ABORT according to RFC793 */
 
-extern __inline__ int tcp_need_reset(int state)
+static inline int tcp_need_reset(int state)
 {
 	return (1 << state) &
 	       (TCPF_ESTABLISHED | TCPF_CLOSE_WAIT | TCPF_FIN_WAIT1 |
@@ -2140,17 +2140,8 @@ int tcp_disconnect(struct sock *sk, int flags)
 
 	inet->dport = 0;
 
-	if (!(sk->userlocks & SOCK_BINDADDR_LOCK)) {
-		inet->rcv_saddr = inet->saddr = 0;
-#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
-		if (sk->family == PF_INET6) {
-			struct ipv6_pinfo *np = inet6_sk(sk);
-
-			memset(&np->saddr, 0, 16);
-			memset(&np->rcv_saddr, 0, 16);
-		}
-#endif
-	}
+	if (!(sk->userlocks & SOCK_BINDADDR_LOCK))
+		inet_reset_saddr(sk);
 
 	sk->shutdown = 0;
 	__clear_bit(SOCK_DONE, &sk->flags);

@@ -3,7 +3,7 @@
 *
 * Author:	Arnaldo Carvalho de Melo <acme@conectiva.com.br>
 *
-* Copyright:	(c) 1998-2001 Arnaldo Carvalho de Melo
+* Copyright:	(c) 1998-2003 Arnaldo Carvalho de Melo
 *
 * Based on sdlamain.c by Gene Kozin <genek@compuserve.com> &
 *			 Jaspreet Singh	<jaspreet@sangoma.com>
@@ -70,12 +70,12 @@ MODULE_PARM_DESC(cycx_debug, "cyclomx debug level");
 /* Function Prototypes */
 
 /* WAN link driver entry points */
-static int setup (wan_device_t *wandev, wandev_conf_t *conf);
-static int shutdown (wan_device_t *wandev);
-static int ioctl (wan_device_t *wandev, unsigned cmd, unsigned long arg);
+static int setup(struct wan_device *wandev, wandev_conf_t *conf);
+static int shutdown(struct wan_device *wandev);
+static int ioctl(struct wan_device *wandev, unsigned cmd, unsigned long arg);
 
 /* Miscellaneous functions */
-static irqreturn_t cycx_isr (int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t cycx_isr(int irq, void *dev_id, struct pt_regs *regs);
 
 /* Global Data
  * Note: All data must be explicitly initialized!!!
@@ -87,7 +87,7 @@ static char fullname[]	= "CYCLOM 2X(tm) Sync Card Driver";
 static char copyright[] = "(c) 1998-2001 Arnaldo Carvalho de Melo "
 			  "<acme@conectiva.com.br>";
 static int ncards = CONFIG_CYCLOMX_CARDS;
-static cycx_t *card_array;	/* adapter data space */
+static struct cycx_device *card_array;	/* adapter data space */
 
 /* Kernel Loadable Module Entry Points */
 
@@ -103,7 +103,7 @@ static cycx_t *card_array;	/* adapter data space */
  *		< 0	error.
  * Context:	process
  */
-int __init cyclomx_init (void)
+int __init cyclomx_init(void)
 {
 	int cnt, err = -ENOMEM;
 
@@ -113,16 +113,16 @@ int __init cyclomx_init (void)
 	/* Verify number of cards and allocate adapter data space */
 	ncards = min_t(int, ncards, MAX_CARDS);
 	ncards = max_t(int, ncards, 1);
-	card_array = kmalloc(sizeof(cycx_t) * ncards, GFP_KERNEL);
+	card_array = kmalloc(sizeof(struct cycx_device) * ncards, GFP_KERNEL);
 	if (!card_array)
 		goto out;
 
-	memset(card_array, 0, sizeof(cycx_t) * ncards);
+	memset(card_array, 0, sizeof(struct cycx_device) * ncards);
 
 	/* Register adapters with WAN router */
 	for (cnt = 0; cnt < ncards; ++cnt) {
-		cycx_t *card = &card_array[cnt];
-		wan_device_t *wandev = &card->wandev;
+		struct cycx_device *card = &card_array[cnt];
+		struct wan_device *wandev = &card->wandev;
 
 		sprintf(card->devname, "%s%d", drvname, cnt + 1);
 		wandev->magic    = ROUTER_MAGIC;
@@ -156,12 +156,12 @@ out:	return err;
  * o unregister all adapters from the WAN router
  * o release all remaining system resources
  */
-static void __exit cyclomx_cleanup (void)
+static void __exit cyclomx_cleanup(void)
 {
 	int i = 0;
 
 	for (; i < ncards; ++i) {
-		cycx_t *card = &card_array[i];
+		struct cycx_device *card = &card_array[i];
 		unregister_wan_device(card->devname);
 	}
 
@@ -181,14 +181,14 @@ static void __exit cyclomx_cleanup (void)
  * configuration structure is in kernel memory (including extended data, if
  * any).
  */
-static int setup (wan_device_t *wandev, wandev_conf_t *conf)
+static int setup(struct wan_device *wandev, wandev_conf_t *conf)
 {
 	int err = -EFAULT;
-	cycx_t *card;
+	struct cycx_device *card;
 	int irq;
 
 	/* Sanity checks */
-	
+
 	if (!wandev || !wandev->private || !conf)
 		goto out;
 
@@ -220,7 +220,7 @@ static int setup (wan_device_t *wandev, wandev_conf_t *conf)
 	}
 
 	/* Configure hardware, load firmware, etc. */
-	memset(&card->hw, 0, sizeof(cycxhw_t));
+	memset(&card->hw, 0, sizeof(card->hw));
 	card->hw.irq	 = irq;
 	card->hw.dpmbase = conf->maddr;
 	card->hw.dpmsize = CYCX_WINDOWSIZE;
@@ -243,14 +243,14 @@ static int setup (wan_device_t *wandev, wandev_conf_t *conf)
 	/* Protocol-specific initialization */
 	switch (card->hw.fwid) {
 #ifdef CONFIG_CYCLOMX_X25
-		case CFID_X25_2X:
-			err = cyx_init(card, conf);
-			break;
+	case CFID_X25_2X:
+		err = cyx_init(card, conf);
+		break;
 #endif
-		default:
-			printk(KERN_ERR "%s: this firmware is not supported!\n",
-					wandev->name);
-			err = -EINVAL;
+	default:
+		printk(KERN_ERR "%s: this firmware is not supported!\n",
+				wandev->name);
+		err = -EINVAL;
 	}
 
 	if (err) {
@@ -266,17 +266,17 @@ out_irq:
 }
 
 /*
- * Shut down WAN link driver. 
+ * Shut down WAN link driver.
  * o shut down adapter hardware
  * o release system resources.
  *
  * This function is called by the router when device is being unregistered or
  * when it handles ROUTER_DOWN IOCTL.
  */
-static int shutdown (wan_device_t *wandev)
+static int shutdown(struct wan_device *wandev)
 {
 	int ret = -EFAULT;
-	cycx_t *card;
+	struct cycx_device *card;
 
 	/* sanity checks */
 	if (!wandev || !wandev->private)
@@ -296,7 +296,7 @@ out:	return ret;
 }
 
 /*
- * Driver I/O control. 
+ * Driver I/O control.
  * o verify arguments
  * o perform requested action
  *
@@ -305,7 +305,7 @@ out:	return ret;
  *
  * no reserved ioctls for the cyclom 2x up to now
  */
-static int ioctl (wan_device_t *wandev, unsigned cmd, unsigned long arg)
+static int ioctl(struct wan_device *wandev, unsigned cmd, unsigned long arg)
 {
 	return -EINVAL;
 }
@@ -316,9 +316,9 @@ static int ioctl (wan_device_t *wandev, unsigned cmd, unsigned long arg)
  * o acknowledge Cyclom 2X hardware interrupt.
  * o call protocol-specific interrupt service routine, if any.
  */
-static irqreturn_t cycx_isr (int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t cycx_isr(int irq, void *dev_id, struct pt_regs *regs)
 {
-	cycx_t *card = (cycx_t *)dev_id;
+	struct cycx_device *card = (struct cycx_device *)dev_id;
 
 	if (!card || card->wandev.state == WAN_UNCONFIGURED)
 		goto out;
@@ -335,32 +335,8 @@ static irqreturn_t cycx_isr (int irq, void *dev_id, struct pt_regs *regs)
 out:	return IRQ_NONE;
 }
 
-/*
- * This routine is called by the protocol-specific modules when network
- * interface is being open.  The only reason we need this, is because we
- * have to call MOD_INC_USE_COUNT, but cannot include 'module.h' where it's
- * defined more than once into the same kernel module.
- */
-void cyclomx_mod_inc_use_count (cycx_t *card)
-{
-	++card->open_cnt;
-	MOD_INC_USE_COUNT;
-}
-
-/*
- * This routine is called by the protocol-specific modules when network
- * interface is being closed.  The only reason we need this, is because we
- * have to call MOD_DEC_USE_COUNT, but cannot include 'module.h' where it's
- * defined more than once into the same kernel module.
- */
-void cyclomx_mod_dec_use_count (cycx_t *card)
-{
-	--card->open_cnt;
-	MOD_DEC_USE_COUNT;
-}
-
 /* Set WAN device state.  */
-void cyclomx_set_state (cycx_t *card, int state)
+void cyclomx_set_state(struct cycx_device *card, int state)
 {
 	unsigned long flags;
 	char *string_state = NULL;
@@ -369,15 +345,13 @@ void cyclomx_set_state (cycx_t *card, int state)
 
 	if (card->wandev.state != state) {
 		switch (state) {
-			case WAN_CONNECTED:
-				string_state = "connected!";
-				break;
-
-			case WAN_DISCONNECTED:
-				string_state = "disconnected!";
-				break;
+		case WAN_CONNECTED:
+			string_state = "connected!";
+			break;
+		case WAN_DISCONNECTED:
+			string_state = "disconnected!";
+			break;
 		}
-
 		printk(KERN_INFO "%s: link %s\n", card->devname, string_state);
 		card->wandev.state = state;
 	}

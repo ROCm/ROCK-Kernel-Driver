@@ -21,20 +21,20 @@ struct firewall_ops
 {
 	struct firewall_ops *next;
 	int (*fw_forward)(struct firewall_ops *this, int pf,
-			  struct net_device *dev, void *phdr, void *arg,
+			  struct net_device *dev, void *arg,
 			  struct sk_buff **pskb);
 	int (*fw_input)(struct firewall_ops *this, int pf,
-			struct net_device *dev, void *phdr, void *arg,
+			struct net_device *dev, void *arg,
 			struct sk_buff **pskb);
 	int (*fw_output)(struct firewall_ops *this, int pf,
-			 struct net_device *dev, void *phdr, void *arg,
+			 struct net_device *dev, void *arg,
 			 struct sk_buff **pskb);
 	/* These may be NULL. */
 	int (*fw_acct_in)(struct firewall_ops *this, int pf,
-			  struct net_device *dev, void *phdr, void *arg,
+			  struct net_device *dev, void *arg,
 			  struct sk_buff **pskb);
 	int (*fw_acct_out)(struct firewall_ops *this, int pf,
-			   struct net_device *dev, void *phdr, void *arg,
+			   struct net_device *dev, void *arg,
 			   struct sk_buff **pskb);
 };
 

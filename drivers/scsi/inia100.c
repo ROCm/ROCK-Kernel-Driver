@@ -91,7 +91,21 @@
 #include "hosts.h"
 #include "inia100.h"
 
-static Scsi_Host_Template driver_template = INIA100;
+static Scsi_Host_Template driver_template = {
+	.proc_name	= "inia100",
+	.name		= inia100_REVID,
+	.detect		= inia100_detect,
+	.release	= inia100_release,
+	.queuecommand	= inia100_queue,
+	.eh_abort_handler = inia100_abort,
+	.eh_bus_reset_handler	= inia100_bus_reset,
+	.eh_device_reset_handler = inia100_device_reset,
+	.can_queue	= 1,
+	.this_id	= 1,
+	.sg_tablesize	= SG_ALL,
+	.cmd_per_lun 	= 1,
+	.use_clustering	= ENABLE_CLUSTERING,
+};
 #include "scsi_module.c"
 
 #define ORC_RDWORD(x,y)         (short)(inl((int)((ULONG)((ULONG)x+(UCHAR)y)) ))

@@ -1,5 +1,5 @@
 /*
- * IP Payload Compression Protocol (IPComp) - RFC3713.
+ * IP Payload Compression Protocol (IPComp) - RFC3173.
  *
  * Copyright (c) 2003 James Morris <jmorris@intercode.com.au>
  *
@@ -22,20 +22,7 @@
 #include <net/xfrm.h>
 #include <net/icmp.h>
 #include <net/esp.h>
-
-#define IPCOMP_SCRATCH_SIZE	65400
-
-struct ipcomp_hdr {
-	u8 nexthdr;
-	u8 flags;
-	u16 cpi;
-};
-
-struct ipcomp_data {
-	u16 threshold;
-	u8 *scratch;
-	struct crypto_tfm *tfm;
-};
+#include <net/ipcomp.h>
 
 static int ipcomp_decompress(struct xfrm_state *x, struct sk_buff *skb)
 {
@@ -52,7 +39,7 @@ static int ipcomp_decompress(struct xfrm_state *x, struct sk_buff *skb)
 	if (err)
 		goto out;
 
-	if (dlen < (plen + sizeof(struct ipcomp_hdr))) {
+	if (dlen < (plen + sizeof(struct ip_comp_hdr))) {
 		err = -EINVAL;
 		goto out;
 	}
@@ -93,9 +80,11 @@ static int ipcomp_input(struct xfrm_state *x,
 	iph = skb->nh.iph;
 	memcpy(&tmp_iph, iph, iph->ihl * 4);
 	nexthdr = *(u8 *)skb->data;
-	skb_pull(skb, sizeof(struct ipcomp_hdr));
+	skb_pull(skb, sizeof(struct ip_comp_hdr));
+	skb->nh.raw += sizeof(struct ip_comp_hdr);
 	memcpy(skb->nh.raw, &tmp_iph, tmp_iph.iph.ihl * 4);
-	iph->tot_len = htons(ntohs(iph->tot_len) - sizeof(struct ipcomp_hdr));
+	iph = skb->nh.iph;
+	iph->tot_len = htons(ntohs(iph->tot_len) - sizeof(struct ip_comp_hdr));
 	iph->protocol = nexthdr;
 	skb->h.raw = skb->data;
 	err = ipcomp_decompress(x, skb);
@@ -120,7 +109,7 @@ static int ipcomp_compress(struct xfrm_state *x, struct sk_buff *skb)
 	if (err)
 		goto out;
 
-	if ((dlen + sizeof(struct ipcomp_hdr)) >= plen) {
+	if ((dlen + sizeof(struct ip_comp_hdr)) >= plen) {
 		err = -EMSGSIZE;
 		goto out;
 	}
@@ -160,7 +149,7 @@ static int ipcomp_output(struct sk_buff *skb)
 	struct dst_entry *dst = skb->dst;
 	struct xfrm_state *x = dst->xfrm;
 	struct iphdr *iph, *top_iph;
-	struct ipcomp_hdr *ipch;
+	struct ip_comp_hdr *ipch;
 	struct ipcomp_data *ipcd = x->data;
 	union {
 		struct iphdr	iph;
@@ -213,13 +202,13 @@ static int ipcomp_output(struct sk_buff *skb)
 	/* Install ipcomp header, convert into ipcomp datagram. */
 	iph = skb->nh.iph;
 	memcpy(&tmp_iph, iph, iph->ihl * 4);
-	top_iph = (struct iphdr *)skb_push(skb, sizeof(struct ipcomp_hdr));
+	top_iph = (struct iphdr *)skb_push(skb, sizeof(struct ip_comp_hdr));
 	memcpy(top_iph, &tmp_iph, iph->ihl * 4);
 	iph = top_iph;
 	iph->tot_len = htons(skb->len);
 	iph->protocol = IPPROTO_COMP;
 	iph->check = 0;
-	ipch = (struct ipcomp_hdr *)((char *)iph + iph->ihl * 4);
+	ipch = (struct ip_comp_hdr *)((char *)iph + iph->ihl * 4);
 	ipch->nexthdr = x->props.mode ? IPPROTO_IPIP : tmp_iph.iph.protocol;
 	ipch->flags = 0;
 	ipch->cpi = htons((u16 )ntohl(x->id.spi));
@@ -250,7 +239,7 @@ static void ipcomp4_err(struct sk_buff *skb, u32 info)
 {
 	u32 spi;
 	struct iphdr *iph = (struct iphdr *)skb->data;
-	struct ipcomp_hdr *ipch = (struct ipcomp_hdr *)(skb->data+(iph->ihl<<2));
+	struct ip_comp_hdr *ipch = (struct ip_comp_hdr *)(skb->data+(iph->ihl<<2));
 	struct xfrm_state *x;
 
 	if (skb->h.icmph->type != ICMP_DEST_UNREACH ||
@@ -265,6 +254,67 @@ static void ipcomp4_err(struct sk_buff *skb, u32 info)
 	printk(KERN_DEBUG "pmtu discvovery on SA IPCOMP/%08x/%u.%u.%u.%u\n",
 	       spi, NIPQUAD(iph->daddr));
 	xfrm_state_put(x);
+}
+
+/* We always hold one tunnel user reference to indicate a tunnel */ 
+static struct xfrm_state *ipcomp_tunnel_create(struct xfrm_state *x)
+{
+	struct xfrm_state *t;
+	
+	t = xfrm_state_alloc();
+	if (t == NULL)
+		goto out;
+
+	t->id.proto = IPPROTO_IPIP;
+	t->id.spi = x->props.saddr.a4;
+	t->id.daddr.a4 = x->id.daddr.a4;
+	memcpy(&t->sel, &x->sel, sizeof(t->sel));
+	t->props.family = AF_INET;
+	t->props.mode = 1;
+	t->props.saddr.a4 = x->props.saddr.a4;
+	
+	t->type = xfrm_get_type(IPPROTO_IPIP, t->props.family);
+	if (t->type == NULL)
+		goto error;
+		
+	if (t->type->init_state(t, NULL))
+		goto error;
+
+	t->km.state = XFRM_STATE_VALID;
+	atomic_set(&t->tunnel_users, 1);
+out:
+	return t;
+
+error:
+	xfrm_state_put(t);
+	t = NULL;
+	goto out;
+}
+
+/*
+ * Must be protected by xfrm_cfg_sem.  State and tunnel user references are
+ * always incremented on success.
+ */
+static int ipcomp_tunnel_attach(struct xfrm_state *x)
+{
+	int err = 0;
+	struct xfrm_state *t;
+
+	t = xfrm_state_lookup((xfrm_address_t *)&x->id.daddr.a4,
+	                      x->props.saddr.a4, IPPROTO_IPIP, AF_INET);
+	if (!t) {
+		t = ipcomp_tunnel_create(x);
+		if (!t) {
+			err = -EINVAL;
+			goto out;
+		}
+		xfrm_state_insert(t);
+		xfrm_state_hold(t);
+	}
+	x->tunnel = t;
+	atomic_inc(&t->tunnel_users);
+out:
+	return err;
 }
 
 static void ipcomp_free_data(struct ipcomp_data *ipcd)
@@ -293,7 +343,7 @@ static int ipcomp_init_state(struct xfrm_state *x, void *args)
 		goto error;
 
 	memset(ipcd, 0, sizeof(*ipcd));
-	x->props.header_len = sizeof(struct ipcomp_hdr);
+	x->props.header_len = sizeof(struct ip_comp_hdr);
 	if (x->props.mode)
 		x->props.header_len += sizeof(struct iphdr);
 	x->data = ipcd;
@@ -305,6 +355,12 @@ static int ipcomp_init_state(struct xfrm_state *x, void *args)
 	ipcd->tfm = crypto_alloc_tfm(x->calg->alg_name, 0);
 	if (!ipcd->tfm)
 		goto error;
+
+	if (x->props.mode) {
+		err = ipcomp_tunnel_attach(x);
+		if (err)
+			goto error;
+	}
 
 	calg_desc = xfrm_calg_get_byname(x->calg->alg_name);
 	BUG_ON(!calg_desc);
@@ -364,6 +420,6 @@ module_init(ipcomp4_init);
 module_exit(ipcomp4_fini);
 
 MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("IP Payload Compression Protocol (IPComp) - RFC3713");
+MODULE_DESCRIPTION("IP Payload Compression Protocol (IPComp) - RFC3173");
 MODULE_AUTHOR("James Morris <jmorris@intercode.com.au>");
 

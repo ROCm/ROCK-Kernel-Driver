@@ -232,6 +232,9 @@ int ndisc_mc_map(struct in6_addr *addr, char *buf, struct net_device *dev, int d
 	case ARPHRD_IEEE802_TR:
 		ipv6_tr_mc_map(addr,buf);
 		return 0;
+	case ARPHRD_ARCNET:
+		ipv6_arcnet_mc_map(addr, buf);
+		return 0;
 	default:
 		if (dir) {
 			memcpy(buf, dev->broadcast, dev->addr_len);
@@ -394,7 +397,7 @@ static inline void ndisc_rt_init(struct rt6_info *rt, struct net_device *dev,
 	rt->rt6i_expires  = 0;
 	rt->rt6i_flags    = RTF_LOCAL;
 	rt->rt6i_metric   = 0;
-	rt->rt6i_hoplimit = 255;
+	rt->u.dst.metrics[RTAX_HOPLIMIT-1] = 255;
 	rt->u.dst.output  = ndisc_output;
 }
 
@@ -976,7 +979,7 @@ void ndisc_recv_na(struct sk_buff *skb)
 				struct rt6_info *rt;
 				rt = rt6_get_dflt_router(saddr, dev);
 				if (rt)
-					ip6_del_rt(rt, NULL);
+					ip6_del_rt(rt, NULL, NULL);
 			}
 		} else {
 			if (msg->icmph.icmp6_router)
@@ -1050,7 +1053,7 @@ static void ndisc_router_discovery(struct sk_buff *skb)
 	rt = rt6_get_dflt_router(&skb->nh.ipv6h->saddr, skb->dev);
 
 	if (rt && lifetime == 0) {
-		ip6_del_rt(rt, NULL);
+		ip6_del_rt(rt, NULL, NULL);
 		rt = NULL;
 	}
 

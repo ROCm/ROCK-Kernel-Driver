@@ -103,10 +103,10 @@ int proc_dol2crvec(ctl_table *table, int write, struct file *filp,
 extern int acct_parm[];
 #endif
 
-static int parse_table(int *, int, void *, size_t *, void *, size_t,
+static int parse_table(int __user *, int, void __user *, size_t __user *, void __user *, size_t,
 		       ctl_table *, void **);
 static int proc_doutsstring(ctl_table *table, int write, struct file *filp,
-		  void *buffer, size_t *lenp);
+		  void __user *buffer, size_t *lenp);
 
 static ctl_table root_table[];
 static struct ctl_table_header root_table_header =
@@ -127,8 +127,8 @@ extern ctl_table random_table[];
 
 #ifdef CONFIG_PROC_FS
 
-static ssize_t proc_readsys(struct file *, char *, size_t, loff_t *);
-static ssize_t proc_writesys(struct file *, const char *, size_t, loff_t *);
+static ssize_t proc_readsys(struct file *, char __user *, size_t, loff_t *);
+static ssize_t proc_writesys(struct file *, const char __user *, size_t, loff_t *);
 static int proc_sys_permission(struct inode *, int);
 
 struct file_operations proc_sys_file_operations = {
@@ -374,8 +374,8 @@ void __init sysctl_init(void)
 #endif
 }
 
-int do_sysctl(int *name, int nlen, void *oldval, size_t *oldlenp,
-	       void *newval, size_t newlen)
+int do_sysctl(int __user *name, int nlen, void __user *oldval, size_t __user *oldlenp,
+	       void __user *newval, size_t newlen)
 {
 	struct list_head *tmp;
 
@@ -443,7 +443,7 @@ static inline int ctl_perm(ctl_table *table, int op)
 	return test_perm(table->mode, op);
 }
 
-static int parse_table(int *name, int nlen,
+static int parse_table(int __user *name, int nlen,
 		       void __user *oldval, size_t __user *oldlenp,
 		       void __user *newval, size_t newlen,
 		       ctl_table *table, void **context)
@@ -484,7 +484,7 @@ repeat:
 
 /* Perform the actual read/write of a sysctl table entry. */
 int do_sysctl_strategy (ctl_table *table, 
-			int *name, int nlen,
+			int __user *name, int nlen,
 			void __user *oldval, size_t __user *oldlenp,
 			void __user *newval, size_t newlen, void **context)
 {
@@ -721,7 +721,7 @@ static void unregister_proc_table(ctl_table * table, struct proc_dir_entry *root
 	}
 }
 
-static ssize_t do_rw_proc(int write, struct file * file, char * buf,
+static ssize_t do_rw_proc(int write, struct file * file, char __user * buf,
 			  size_t count, loff_t *ppos)
 {
 	int op;
@@ -752,16 +752,16 @@ static ssize_t do_rw_proc(int write, struct file * file, char * buf,
 	return res;
 }
 
-static ssize_t proc_readsys(struct file * file, char * buf,
+static ssize_t proc_readsys(struct file * file, char __user * buf,
 			    size_t count, loff_t *ppos)
 {
 	return do_rw_proc(0, file, buf, count, ppos);
 }
 
-static ssize_t proc_writesys(struct file * file, const char * buf,
+static ssize_t proc_writesys(struct file * file, const char __user * buf,
 			     size_t count, loff_t *ppos)
 {
-	return do_rw_proc(1, file, (char *) buf, count, ppos);
+	return do_rw_proc(1, file, (char __user *) buf, count, ppos);
 }
 
 static int proc_sys_permission(struct inode *inode, int op)
@@ -1345,7 +1345,7 @@ int proc_doulongvec_ms_jiffies_minmax(ctl_table *table, int write,
  */
 
 /* The generic string strategy routine: */
-int sysctl_string(ctl_table *table, int *name, int nlen,
+int sysctl_string(ctl_table *table, int __user *name, int nlen,
 		  void __user *oldval, size_t __user *oldlenp,
 		  void __user *newval, size_t newlen, void **context)
 {
@@ -1388,9 +1388,9 @@ int sysctl_string(ctl_table *table, int *name, int nlen,
  * are between the minimum and maximum values given in the arrays
  * table->extra1 and table->extra2, respectively.
  */
-int sysctl_intvec(ctl_table *table, int *name, int nlen,
-		void *oldval, size_t *oldlenp,
-		void *newval, size_t newlen, void **context)
+int sysctl_intvec(ctl_table *table, int __user *name, int nlen,
+		void __user *oldval, size_t __user *oldlenp,
+		void __user *newval, size_t newlen, void **context)
 {
 	int i, *vec, *min, *max;
 	size_t length;
@@ -1423,9 +1423,9 @@ int sysctl_intvec(ctl_table *table, int *name, int nlen,
 }
 
 /* Strategy function to convert jiffies to seconds */ 
-int sysctl_jiffies(ctl_table *table, int *name, int nlen,
-		void *oldval, size_t *oldlenp,
-		void *newval, size_t newlen, void **context)
+int sysctl_jiffies(ctl_table *table, int __user *name, int nlen,
+		void __user *oldval, size_t __user *oldlenp,
+		void __user *newval, size_t newlen, void **context)
 {
 	if (oldval) {
 		size_t olen;
@@ -1459,47 +1459,47 @@ extern asmlinkage long sys_sysctl(struct __sysctl_args __user *args)
 	return -ENOSYS;
 }
 
-int sysctl_string(ctl_table *table, int *name, int nlen,
-		  void *oldval, size_t *oldlenp,
-		  void *newval, size_t newlen, void **context)
+int sysctl_string(ctl_table *table, int __user *name, int nlen,
+		  void __user *oldval, size_t __user *oldlenp,
+		  void __user *newval, size_t newlen, void **context)
 {
 	return -ENOSYS;
 }
 
-int sysctl_intvec(ctl_table *table, int *name, int nlen,
-		void *oldval, size_t *oldlenp,
-		void *newval, size_t newlen, void **context)
+int sysctl_intvec(ctl_table *table, int __user *name, int nlen,
+		void __user *oldval, size_t __user *oldlenp,
+		void __user *newval, size_t newlen, void **context)
 {
 	return -ENOSYS;
 }
 
-int sysctl_jiffies(ctl_table *table, int *name, int nlen,
-		void *oldval, size_t *oldlenp,
-		void *newval, size_t newlen, void **context)
+int sysctl_jiffies(ctl_table *table, int __user *name, int nlen,
+		void __user *oldval, size_t __user *oldlenp,
+		void __user *newval, size_t newlen, void **context)
 {
 	return -ENOSYS;
 }
 
 int proc_dostring(ctl_table *table, int write, struct file *filp,
-		  void *buffer, size_t *lenp)
+		  void __user *buffer, size_t *lenp)
 {
 	return -ENOSYS;
 }
 
 int proc_dointvec(ctl_table *table, int write, struct file *filp,
-		  void *buffer, size_t *lenp)
+		  void __user *buffer, size_t *lenp)
 {
 	return -ENOSYS;
 }
 
 int proc_dointvec_bset(ctl_table *table, int write, struct file *filp,
-			void *buffer, size_t *lenp)
+			void __user *buffer, size_t *lenp)
 {
 	return -ENOSYS;
 }
 
 int proc_dointvec_minmax(ctl_table *table, int write, struct file *filp,
-		    void *buffer, size_t *lenp)
+		    void __user *buffer, size_t *lenp)
 {
 	return -ENOSYS;
 }
@@ -1511,14 +1511,14 @@ int proc_dointvec_jiffies(ctl_table *table, int write, struct file *filp,
 }
 
 int proc_doulongvec_minmax(ctl_table *table, int write, struct file *filp,
-		    void *buffer, size_t *lenp)
+		    void __user *buffer, size_t *lenp)
 {
 	return -ENOSYS;
 }
 
 int proc_doulongvec_ms_jiffies_minmax(ctl_table *table, int write,
 				      struct file *filp,
-				      void *buffer, size_t *lenp)
+				      void __user *buffer, size_t *lenp)
 {
     return -ENOSYS;
 }

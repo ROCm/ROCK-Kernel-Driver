@@ -58,7 +58,7 @@ match(): Attaching Drivers to Devices
 
 The format of device ID structures and the semantics for comparing
 them are inherently bus-specific. Drivers typically declare an array
-of device IDs of device they support that reside in a bus-specific
+of device IDs of devices they support that reside in a bus-specific
 driver structure. 
 
 The purpose of the match callback is provide the bus an opportunity to
@@ -153,7 +153,7 @@ directory:
 	    |-- agpgart
 	    `-- e100
 
-Each device that is discovered a bus of that type gets a symlink in
+Each device that is discovered on a bus of that type gets a symlink in
 the bus's devices directory to the device's directory in the physical
 hierarchy:
 

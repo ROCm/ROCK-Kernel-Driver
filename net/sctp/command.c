@@ -43,9 +43,9 @@
 #include <net/sctp/sm.h>
 
 /* Create a new sctp_command_sequence.  */
-sctp_cmd_seq_t *sctp_new_cmd_seq(int priority)
+sctp_cmd_seq_t *sctp_new_cmd_seq(int gfp)
 {
-	sctp_cmd_seq_t *retval = t_new(sctp_cmd_seq_t, priority);
+	sctp_cmd_seq_t *retval = t_new(sctp_cmd_seq_t, gfp);
 
 	if (retval)
 		sctp_init_cmd_seq(retval);

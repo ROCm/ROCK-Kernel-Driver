@@ -4,7 +4,7 @@
 *
 * Author:	Arnaldo Carvalho de Melo <acme@conectiva.com.br>
 *
-* Copyright:	(c) 1998-2000 Arnaldo Carvalho de Melo
+* Copyright:	(c) 1998-2003 Arnaldo Carvalho de Melo
 *
 * Based on sdlasfm.h by Gene Kozin <74604.152@compuserve.com>
 *
@@ -45,38 +45,57 @@
 
 #define	CFID_X25_2X	5200
 
-/* Data Types */
+/**
+ *	struct cycx_fw_info - firmware module information.
+ *	@codeid - firmware ID
+ *	@version - firmware version number
+ *	@adapter - compatible adapter types
+ *	@memsize - minimum memory size
+ *	@reserved - reserved
+ *	@startoffs - entry point offset
+ *	@winoffs - dual-port memory window offset
+ *	@codeoffs - code load offset
+ *	@codesize - code size
+ *	@dataoffs - configuration data load offset
+ *	@datasize - configuration data size
+ */
+struct cycx_fw_info {
+	unsigned short	codeid;
+	unsigned short	version;
+	unsigned short	adapter[CFM_MAX_CYCX];
+	unsigned long	memsize;
+	unsigned short	reserved[2];
+	unsigned short	startoffs;
+	unsigned short	winoffs;
+	unsigned short	codeoffs;
+	unsigned long	codesize;
+	unsigned short	dataoffs;
+	unsigned long	datasize;
+};
 
-typedef struct	cfm_info		/* firmware module information */
-{
-	unsigned short	codeid;		/* firmware ID */
-	unsigned short	version;	/* firmware version number */
-	unsigned short	adapter[CFM_MAX_CYCX]; /* compatible adapter types */
-	unsigned long	memsize;	/* minimum memory size */
-	unsigned short	reserved[2];	/* reserved */
-	unsigned short	startoffs;	/* entry point offset */
-	unsigned short	winoffs;	/* dual-port memory window offset */
-	unsigned short	codeoffs;	/* code load offset */
-	unsigned long	codesize;	/* code size */
-	unsigned short	dataoffs;	/* configuration data load offset */
-	unsigned long	datasize;	/* configuration data size */
-} cfm_info_t;
+/**
+ *	struct cycx_firmware - CYCX firmware file structure
+ *	@signature - CFM file signature
+ *	@version - file format version
+ *	@checksum - info + image
+ *	@reserved - reserved
+ *	@descr - description string
+ *	@info - firmware module info
+ *	@image - code image (variable size)
+ */
+struct cycx_firmware {
+	char		    signature[80];
+	unsigned short	    version;
+	unsigned short	    checksum;
+	unsigned short	    reserved[6];
+	char		    descr[CFM_DESCR_LEN];
+	struct cycx_fw_info info;
+	unsigned char	    image[1];
+};
 
-typedef struct cfm			/* CYCX firmware file structure */
-{
-	char		signature[80];	/* CFM file signature */
-	unsigned short	version;	/* file format version */
-	unsigned short	checksum;	/* info + image */
-	unsigned short	reserved[6];	/* reserved */
-	char		descr[CFM_DESCR_LEN]; /* description string */
-	cfm_info_t	info;		/* firmware module info */
-	unsigned char	image[1];	/* code image (variable size) */
-} cfm_t;
-
-typedef struct cycx_header_s {
+struct cycx_fw_header {
 	unsigned long  reset_size;
 	unsigned long  data_size;
 	unsigned long  code_size;
-} cycx_header_t;
-
+};
 #endif	/* _CYCX_CFM_H */

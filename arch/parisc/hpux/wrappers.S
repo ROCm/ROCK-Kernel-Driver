@@ -129,7 +129,7 @@ fork_exit:
 	/* Set the return value for the child */
 
 hpux_child_return:
-#if CONFIG_SMP || CONFIG_PREEMPT
+#if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
 	bl	schedule_tail, %r2
 	nop
 #endif

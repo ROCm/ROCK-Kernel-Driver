@@ -169,7 +169,7 @@ static unix_socket *unix_peer_get(unix_socket *s)
 	return peer;
 }
 
-extern inline void unix_release_addr(struct unix_address *addr)
+static inline void unix_release_addr(struct unix_address *addr)
 {
 	if (atomic_dec_and_test(&addr->refcnt))
 		kfree(addr);

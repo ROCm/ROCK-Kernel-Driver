@@ -58,11 +58,14 @@ char modprobe_path[256] = "/sbin/modprobe";
  * If module auto-loading support is disabled then this function
  * becomes a no-operation.
  */
-int request_module(const char *module_name)
+#define MODULENAME_SIZE 32
+int request_module(const char *fmt, ...)
 {
+	va_list args;
+	char module_name[MODULENAME_SIZE];
 	unsigned int max_modprobes;
 	int ret;
-	char *argv[] = { modprobe_path, "--", (char*)module_name, NULL };
+	char *argv[] = { modprobe_path, "--", module_name, NULL };
 	static char *envp[] = { "HOME=/",
 				"TERM=linux",
 				"PATH=/sbin:/usr/sbin:/bin:/usr/bin",
@@ -70,6 +73,12 @@ int request_module(const char *module_name)
 	static atomic_t kmod_concurrent = ATOMIC_INIT(0);
 #define MAX_KMOD_CONCURRENT 50	/* Completely arbitrary value - KAO */
 	static int kmod_loop_msg;
+
+	va_start(args, fmt);
+	ret = vsnprintf(module_name, MODULENAME_SIZE, fmt, args);
+	va_end(args);
+	if (ret >= MODULENAME_SIZE)
+		return -ENAMETOOLONG;
 
 	/* If modprobe needs a service that is in a module, we get a recursive
 	 * loop.  Limit the number of running kmod threads to max_threads/2 or
@@ -80,7 +89,6 @@ int request_module(const char *module_name)
 	 * and it is not worth changing the proc code just to handle this case. 
 	 * KAO.
 	 *
-
 	 * "trace the ppid" is simple, but will fail if someone's
 	 * parent exits.  I think this is as good as it gets. --RR
 	 */

@@ -47,7 +47,8 @@ static unsigned long pxa_gettimeoffset (void)
 	return usec;
 }
 
-static void pxa_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t
+pxa_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	int next_match;
 
@@ -66,6 +67,8 @@ static void pxa_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		OSSR = OSSR_M0;  /* Clear match on timer 0 */
 		next_match = (OSMR0 += LATCH);
 	} while( (signed long)(next_match - OSCR) <= 0 );
+
+	return IRQ_HANDLED;
 }
 
 void __init time_init(void)

@@ -396,11 +396,8 @@ qdisc_create(struct net_device *dev, u32 handle, struct rtattr **tca, int *errp)
 	ops = qdisc_lookup_ops(kind);
 #ifdef CONFIG_KMOD
 	if (ops==NULL && tca[TCA_KIND-1] != NULL) {
-		char module_name[4 + IFNAMSIZ + 1];
-
 		if (RTA_PAYLOAD(kind) <= IFNAMSIZ) {
-			sprintf(module_name, "sch_%s", (char*)RTA_DATA(kind));
-			request_module (module_name);
+			request_module("sch_%s", (char*)RTA_DATA(kind));
 			ops = qdisc_lookup_ops(kind);
 		}
 	}

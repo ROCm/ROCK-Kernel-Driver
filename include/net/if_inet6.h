@@ -264,5 +264,10 @@ static inline void ipv6_tr_mc_map(struct in6_addr *addr, char *buf)
 		buf[5]=0x00;
 	}
 }
+
+static inline void ipv6_arcnet_mc_map(const struct in6_addr *addr, char *buf)
+{
+	buf[0] = 0x00;
+}
 #endif
 #endif

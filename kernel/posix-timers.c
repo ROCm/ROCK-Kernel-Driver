@@ -357,11 +357,8 @@ static inline struct task_struct * good_sigevent(sigevent_t * event)
 			rtn->tgid != current->tgid))
 		return NULL;
 
-	if ((event->sigev_notify & SIGEV_SIGNAL & MIPS_SIGEV) &&
+	if ((event->sigev_notify & ~SIGEV_NONE & MIPS_SIGEV) &&
 			((unsigned) (event->sigev_signo > SIGRTMAX)))
-		return NULL;
-
-	if (event->sigev_notify & ~(SIGEV_SIGNAL | SIGEV_THREAD_ID))
 		return NULL;
 
 	return rtn;

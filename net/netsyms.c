@@ -45,6 +45,9 @@ extern __u32 sysctl_rmem_max;
 #include <linux/ip.h>
 #include <net/protocol.h>
 #include <net/arp.h>
+#if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
+#include <net/atmclip.h>
+#endif
 #include <net/ip.h>
 #include <net/udp.h>
 #include <net/tcp.h>
@@ -228,13 +231,11 @@ EXPORT_SYMBOL(destroy_EII_client);
 #if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
 EXPORT_SYMBOL(dev_change_flags);
 #endif
-EXPORT_SYMBOL(vlan_ioctl_set);
 
 EXPORT_SYMBOL(scm_detach_fds);
 
 #if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
 EXPORT_SYMBOL(br_handle_frame_hook);
-EXPORT_SYMBOL(brioctl_set);
 #endif
 
 #ifdef CONFIG_NET_DIVERT
@@ -285,18 +286,12 @@ EXPORT_SYMBOL(unregister_inetaddr_notifier);
 /* needed for ip_gre -cw */
 EXPORT_SYMBOL(ip_statistics);
 
-#ifdef CONFIG_DLCI_MODULE
-extern int (*dlci_ioctl_hook)(unsigned int, void *);
-EXPORT_SYMBOL(dlci_ioctl_hook);
-#endif
-
 EXPORT_SYMBOL(xfrm_user_policy);
 EXPORT_SYMBOL(km_waitq);
 EXPORT_SYMBOL(km_new_mapping);
 EXPORT_SYMBOL(xfrm_cfg_sem);
 EXPORT_SYMBOL(xfrm_policy_alloc);
 EXPORT_SYMBOL(__xfrm_policy_destroy);
-EXPORT_SYMBOL(xfrm_policy_lookup);
 EXPORT_SYMBOL(xfrm_lookup);
 EXPORT_SYMBOL(__xfrm_policy_check);
 EXPORT_SYMBOL(__xfrm_route_forward);
@@ -311,6 +306,7 @@ EXPORT_SYMBOL(xfrm_state_register_afinfo);
 EXPORT_SYMBOL(xfrm_state_unregister_afinfo);
 EXPORT_SYMBOL(xfrm_state_get_afinfo);
 EXPORT_SYMBOL(xfrm_state_put_afinfo);
+EXPORT_SYMBOL(xfrm_state_delete_tunnel);
 EXPORT_SYMBOL(xfrm_replay_check);
 EXPORT_SYMBOL(xfrm_replay_advance);
 EXPORT_SYMBOL(xfrm_check_selectors);
@@ -365,6 +361,9 @@ EXPORT_SYMBOL_GPL(skb_cow_data);
 EXPORT_SYMBOL_GPL(pskb_put);
 EXPORT_SYMBOL_GPL(skb_to_sgvec);
 #endif
+
+EXPORT_SYMBOL(flow_cache_lookup);
+EXPORT_SYMBOL(flow_cache_genid);
 
 #if defined (CONFIG_IPV6_MODULE) || defined (CONFIG_IP_SCTP_MODULE)
 /* inet functions common to v4 and v6 */
@@ -423,7 +422,6 @@ EXPORT_SYMBOL(tcp_statistics);
 EXPORT_SYMBOL(tcp_rcv_state_process);
 EXPORT_SYMBOL(tcp_timewait_state_process);
 EXPORT_SYMBOL(tcp_timewait_cachep);
-EXPORT_SYMBOL(tcp_timewait_kill);
 EXPORT_SYMBOL(tcp_sendmsg);
 EXPORT_SYMBOL(tcp_v4_rebuild_header);
 EXPORT_SYMBOL(tcp_v4_send_check);
@@ -472,6 +470,8 @@ extern int sysctl_tcp_tw_recycle;
 EXPORT_SYMBOL(sysctl_tcp_tw_recycle); 
 EXPORT_SYMBOL(sysctl_max_syn_backlog);
 #endif
+
+EXPORT_SYMBOL(ip_generic_getfrag);
 
 #endif
 
@@ -530,6 +530,9 @@ EXPORT_SYMBOL(xrlim_allow);
 EXPORT_SYMBOL(ip_rcv);
 EXPORT_SYMBOL(arp_rcv);
 EXPORT_SYMBOL(arp_tbl);
+#if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
+EXPORT_SYMBOL(clip_tbl_hook);
+#endif
 EXPORT_SYMBOL(arp_find);
 
 #endif  /* CONFIG_INET */
@@ -577,6 +580,7 @@ EXPORT_SYMBOL(netif_rx);
 EXPORT_SYMBOL(netif_receive_skb);
 EXPORT_SYMBOL(dev_add_pack);
 EXPORT_SYMBOL(dev_remove_pack);
+EXPORT_SYMBOL(__dev_remove_pack);
 EXPORT_SYMBOL(dev_get);
 EXPORT_SYMBOL(dev_alloc);
 EXPORT_SYMBOL(dev_alloc_name);
@@ -673,10 +677,13 @@ EXPORT_SYMBOL(register_gifconf);
 EXPORT_SYMBOL(softnet_data);
 
 #ifdef CONFIG_NET_RADIO
-/* Don't include the whole header mess for a single function */
-union iwreq_data;
-extern void wireless_send_event(struct net_device *dev, unsigned int cmd, union iwreq_data *wrqu, char *extra);
+#include <net/iw_handler.h>		/* Wireless Extensions driver API */
 EXPORT_SYMBOL(wireless_send_event);
+EXPORT_SYMBOL(iw_handler_set_spy);
+EXPORT_SYMBOL(iw_handler_get_spy);
+EXPORT_SYMBOL(iw_handler_set_thrspy);
+EXPORT_SYMBOL(iw_handler_get_thrspy);
+EXPORT_SYMBOL(wireless_spy_update);
 #endif	/* CONFIG_NET_RADIO */
 
 EXPORT_SYMBOL(linkwatch_fire_event);

@@ -1149,11 +1149,13 @@ int __devinit __cpu_up(unsigned int cpu)
 
 void __init smp_cpus_done(unsigned int max_cpus)
 {
+#ifdef CONFIG_X86_IO_APIC
 	setup_ioapic_dest(TARGET_CPUS);
+#endif
 	zap_low_mappings();
 }
 
-void __init smp_intr_init()
+void __init smp_intr_init(void)
 {
 	/*
 	 * IRQ0 must be given a fixed assignment and initialized,

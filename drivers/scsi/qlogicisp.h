@@ -70,20 +70,4 @@ int isp1020_biosparam(struct scsi_device *, struct block_device *,
 #ifndef NULL
 #define NULL (0)
 #endif
-
-#define QLOGICISP {							   \
-	.detect			= isp1020_detect,				   \
-	.release		= isp1020_release,			   \
-	.info			= isp1020_info,				   \
-	.queuecommand		= isp1020_queuecommand,			   \
-	.bios_param		= isp1020_biosparam,			   \
-	.can_queue		= QLOGICISP_REQ_QUEUE_LEN,		   \
-	.this_id		= -1,					   \
-	.sg_tablesize		= QLOGICISP_MAX_SG(QLOGICISP_REQ_QUEUE_LEN), \
-	.cmd_per_lun		= 1,					   \
-	.present		= 0,					   \
-	.unchecked_isa_dma	= 0,					   \
-	.use_clustering		= DISABLE_CLUSTERING			   \
-}
-
 #endif /* _QLOGICISP_H */

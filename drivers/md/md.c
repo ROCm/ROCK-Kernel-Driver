@@ -1564,9 +1564,7 @@ static int do_md_run(mddev_t * mddev)
 #ifdef CONFIG_KMOD
 	if (!pers[pnum])
 	{
-		char module_name[80];
-		sprintf (module_name, "md-personality-%d", pnum);
-		request_module (module_name);
+		request_module("md-personality-%d", pnum);
 	}
 #endif
 

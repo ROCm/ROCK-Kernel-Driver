@@ -39,7 +39,7 @@ static unsigned char mincore_page(struct vm_area_struct * vma,
 }
 
 static long mincore_vma(struct vm_area_struct * vma,
-	unsigned long start, unsigned long end, unsigned char * vec)
+	unsigned long start, unsigned long end, unsigned char __user * vec)
 {
 	long error, i, remaining;
 	unsigned char * tmp;
@@ -106,7 +106,7 @@ static long mincore_vma(struct vm_area_struct * vma,
  *  -EAGAIN - A kernel resource was temporarily unavailable.
  */
 asmlinkage long sys_mincore(unsigned long start, size_t len,
-	unsigned char * vec)
+	unsigned char __user * vec)
 {
 	int index = 0;
 	unsigned long end;

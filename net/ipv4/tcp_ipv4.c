@@ -74,7 +74,6 @@
 #include <linux/seq_file.h>
 
 extern int sysctl_ip_dynaddr;
-extern int sysctl_ip_default_ttl;
 int sysctl_tcp_tw_reuse;
 int sysctl_tcp_low_latency;
 
@@ -171,7 +170,7 @@ static __inline__ void __tcp_inherit_port(struct sock *sk, struct sock *child)
 	spin_unlock(&head->lock);
 }
 
-__inline__ void tcp_inherit_port(struct sock *sk, struct sock *child)
+inline void tcp_inherit_port(struct sock *sk, struct sock *child)
 {
 	local_bh_disable();
 	__tcp_inherit_port(sk, child);
@@ -316,7 +315,7 @@ static void __tcp_put_port(struct sock *sk)
 	spin_unlock(&head->lock);
 }
 
-__inline__ void tcp_put_port(struct sock *sk)
+inline void tcp_put_port(struct sock *sk)
 {
 	local_bh_disable();
 	__tcp_put_port(sk);
@@ -458,8 +457,8 @@ static struct sock *__tcp_v4_lookup_listener(struct sock *sk, u32 daddr,
 }
 
 /* Optimize the common listener case. */
-__inline__ struct sock *tcp_v4_lookup_listener(u32 daddr, unsigned short hnum,
-					       int dif)
+inline struct sock *tcp_v4_lookup_listener(u32 daddr, unsigned short hnum,
+					   int dif)
 {
 	struct sock *sk;
 
@@ -529,8 +528,8 @@ static inline struct sock *__tcp_v4_lookup(u32 saddr, u16 sport,
 	return sk ? : tcp_v4_lookup_listener(daddr, hnum, dif);
 }
 
-__inline__ struct sock *tcp_v4_lookup(u32 saddr, u16 sport, u32 daddr,
-				      u16 dport, int dif)
+inline struct sock *tcp_v4_lookup(u32 saddr, u16 sport, u32 daddr,
+				  u16 dport, int dif)
 {
 	struct sock *sk;
 
@@ -633,7 +632,6 @@ unique:
 	} else if (tw) {
 		/* Silly. Should hash-dance instead... */
 		tcp_tw_deschedule(tw);
-		tcp_timewait_kill(tw);
 		NET_INC_STATS_BH(TimeWaitRecycled);
 
 		tcp_tw_put(tw);
@@ -737,7 +735,6 @@ ok:
 
  		if (tw) {
  			tcp_tw_deschedule(tw);
- 			tcp_timewait_kill(tw);
  			tcp_tw_put(tw);
  		}
 
@@ -1215,7 +1212,6 @@ static void tcp_v4_send_reset(struct sk_buff *skb)
 				      sizeof(struct tcphdr), IPPROTO_TCP, 0);
 	arg.csumoffset = offsetof(struct tcphdr, check) / 2;
 
-	inet_sk(tcp_socket->sk)->ttl = sysctl_ip_default_ttl;
 	ip_send_reply(tcp_socket->sk, skb, &arg, sizeof rth);
 
 	TCP_INC_STATS_BH(TcpOutSegs);
@@ -1853,7 +1849,6 @@ do_time_wait:
 							  tcp_v4_iif(skb));
 		if (sk2) {
 			tcp_tw_deschedule((struct tcp_tw_bucket *)sk);
-			tcp_timewait_kill((struct tcp_tw_bucket *)sk);
 			tcp_tw_put((struct tcp_tw_bucket *)sk);
 			sk = sk2;
 			goto process;
@@ -2569,6 +2564,7 @@ out_kfree:
 }
 
 static struct file_operations tcp_seq_fops = {
+	.owner		=	THIS_MODULE,
 	.open		=	tcp_seq_open,
 	.read		=	seq_read,
 	.llseek		=	seq_lseek,
@@ -2621,7 +2617,7 @@ void __init tcp_v4_init(struct net_proto_family *ops)
 	if (err < 0)
 		panic("Failed to create the TCP control socket.\n");
 	tcp_socket->sk->allocation   = GFP_ATOMIC;
-	inet_sk(tcp_socket->sk)->ttl = MAXTTL;
+	inet_sk(tcp_socket->sk)->uc_ttl = -1;
 
 	/* Unhash it so that IP input processing does not even
 	 * see it, we do not wish this socket to see incoming

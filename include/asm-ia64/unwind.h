@@ -2,8 +2,8 @@
 #define _ASM_IA64_UNWIND_H
 
 /*
- * Copyright (C) 1999-2000 Hewlett-Packard Co
- * Copyright (C) 1999-2000 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1999-2000, 2003 Hewlett-Packard Co
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  *
  * A simple API for unwinding kernel stacks.  This is used for
  * debugging and error reporting purposes.  The kernel doesn't need
@@ -106,6 +106,13 @@ extern void unw_remove_unwind_table (void *handle);
  * Prepare to unwind blocked task t.
  */
 extern void unw_init_from_blocked_task (struct unw_frame_info *info, struct task_struct *t);
+
+/*
+ * Prepare to unwind from interruption.  The pt-regs and switch-stack structures must have
+ * be "adjacent" (no state modifications between pt-regs and switch-stack).
+ */
+extern void unw_init_from_interruption (struct unw_frame_info *info, struct task_struct *t,
+					struct pt_regs *pt, struct switch_stack *sw);
 
 extern void unw_init_frame_info (struct unw_frame_info *info, struct task_struct *t,
 				 struct switch_stack *sw);

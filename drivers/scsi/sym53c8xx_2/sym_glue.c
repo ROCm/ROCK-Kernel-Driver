@@ -2558,33 +2558,15 @@ sym53c8xx_pci_init(Scsi_Host_Template *tpnt, pcidev_t pdev, sym_device *device)
 	bcopy(chip, &device->chip, sizeof(device->chip));
 	device->chip.revision_id = revision;
 
+	if (pci_enable_device(pdev))
+		return -1;
+
+	pci_set_master(pdev);
+
 	/*
 	 *  Read additionnal info from the configuration space.
 	 */
-	pci_read_config_word(pdev, PCI_COMMAND,		&command);
 	pci_read_config_byte(pdev, PCI_CACHE_LINE_SIZE,	&cache_line_size);
-
-	/*
-	 * Enable missing capabilities in the PCI COMMAND register.
-	 */
-#ifdef SYM_CONF_IOMAPPED
-#define	PCI_COMMAND_BITS_TO_ENABLE (PCI_COMMAND_IO | \
-	PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER | PCI_COMMAND_PARITY)
-#else
-#define	PCI_COMMAND_BITS_TO_ENABLE \
-	(PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER | PCI_COMMAND_PARITY)
-#endif
-	if ((command & PCI_COMMAND_BITS_TO_ENABLE)
-		    != PCI_COMMAND_BITS_TO_ENABLE) {
-		printf_info("%s: setting%s%s%s%s...\n", sym_name(device),
-		(command & PCI_COMMAND_IO)     ? "" : " PCI_COMMAND_IO",
-		(command & PCI_COMMAND_MEMORY) ? "" : " PCI_COMMAND_MEMORY",
-		(command & PCI_COMMAND_MASTER) ? "" : " PCI_COMMAND_MASTER",
-		(command & PCI_COMMAND_PARITY) ? "" : " PCI_COMMAND_PARITY");
-		command |= PCI_COMMAND_BITS_TO_ENABLE;
-		pci_write_config_word(pdev, PCI_COMMAND, command);
-	}
-#undef	PCI_COMMAND_BITS_TO_ENABLE
 
 	/*
 	 *  If cache line size is not configured, suggest
@@ -2625,6 +2607,7 @@ sym53c8xx_pci_init(Scsi_Host_Template *tpnt, pcidev_t pdev, sym_device *device)
 		            sym_name(device), cache_line_size);
 	}
 
+	pci_read_config_word(pdev, PCI_COMMAND,	&command);
 	if ((pci_fix_up & 2) && cache_line_size &&
 	    (chip->features & FE_WRIE) && !(command & PCI_COMMAND_INVALIDATE)) {
 		printf_info("%s: setting PCI_COMMAND_INVALIDATE.\n",
@@ -2725,15 +2708,6 @@ int __init sym53c8xx_detect(Scsi_Host_Template *tpnt)
 	/*
 	 *    Initialize driver general stuff.
 	 */
-#ifdef SYM_LINUX_PROC_INFO_SUPPORT
-#if LINUX_VERSION_CODE < LinuxVersionCode(2,3,27)
-     tpnt->proc_dir  = &proc_scsi_sym53c8xx;
-#else
-     tpnt->proc_name = NAME53C8XX;
-#endif
-     tpnt->proc_info = sym53c8xx_proc_info;
-#endif
-
 #ifdef SYM_LINUX_BOOT_COMMAND_LINE_SUPPORT
 #ifdef MODULE
 if (sym53c8xx)
@@ -2916,7 +2890,6 @@ next:
 
 
 
-#ifdef MODULE
 /*
  *  Linux release module stuff.
  *
@@ -2980,7 +2953,6 @@ int sym53c8xx_release(struct Scsi_Host *host)
 
      return 0;
 }
-#endif /* MODULE */
 
 /*
  * For bigots to keep silent. :)
@@ -2992,10 +2964,27 @@ MODULE_LICENSE("Dual BSD/GPL");
 /*
  * Driver host template.
  */
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,4,0)
-static
+static Scsi_Host_Template driver_template = {
+	.name			= "sym53c8xx",
+	.detect			= sym53c8xx_detect,
+	.release		= sym53c8xx_release,
+	.info			= sym53c8xx_info, 
+	.queuecommand		= sym53c8xx_queue_command,
+	.slave_configure	= sym53c8xx_slave_configure,
+	.eh_abort_handler	= sym53c8xx_eh_abort_handler,
+	.eh_device_reset_handler = sym53c8xx_eh_device_reset_handler,
+	.eh_bus_reset_handler	= sym53c8xx_eh_bus_reset_handler,
+	.eh_host_reset_handler	= sym53c8xx_eh_host_reset_handler,
+	.this_id		= 7,
+	.use_clustering		= DISABLE_CLUSTERING,
+	.highmem_io		= 1,
+#ifdef SYM_LINUX_PROC_INFO_SUPPORT
+	.proc_info		= sym53c8xx_proc_info,
+#if LINUX_VERSION_CODE < LinuxVersionCode(2,3,27)
+	.proc_dir		= &proc_scsi_sym53c8xx,
+#else
+	.proc_name		= NAME53C8XX,
 #endif
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,4,0) || defined(MODULE)
-Scsi_Host_Template driver_template = SYM53C8XX;
+#endif
+};
 #include "../scsi_module.c"
-#endif

@@ -600,9 +600,21 @@ static inline int NCR5380_pwrite (struct Scsi_Host *instance, unsigned char *src
 
 #include "NCR5380.c"
 
-/* Eventually this will go into an include file, but this will be later */
-static Scsi_Host_Template driver_template = MV_PAS16;
-
+static Scsi_Host_Template driver_template = {
+	.name           = "Pro Audio Spectrum-16 SCSI",
+	.detect         = pas16_detect,
+	.queuecommand   = pas16_queue_command,
+	.eh_abort_handler = pas16_abort,
+	.eh_bus_reset_handler = pas16_bus_reset,
+	.eh_device_reset_handler = pas16_device_reset,
+	.eh_host_reset_handler = pas16_host_reset,
+	.bios_param     = pas16_biosparam, 
+	.can_queue      = CAN_QUEUE,
+	.this_id        = 7,
+	.sg_tablesize   = SG_ALL,
+	.cmd_per_lun    = CMD_PER_LUN,
+	.use_clustering = DISABLE_CLUSTERING,
+};
 #include "scsi_module.c"
 
 #ifdef MODULE

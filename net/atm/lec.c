@@ -204,7 +204,6 @@ lec_send(struct atm_vcc *vcc, struct sk_buff *skb, struct lec_priv *priv)
 	if (atm_may_send(vcc, skb->len)) {
 		atomic_add(skb->truesize, &vcc->sk->wmem_alloc);
 	        ATM_SKB(skb)->vcc = vcc;
-	        ATM_SKB(skb)->iovcnt = 0;
 	        ATM_SKB(skb)->atm_options = vcc->atm_options;
 		priv->stats.tx_packets++;
 		priv->stats.tx_bytes += skb->len;
@@ -399,7 +398,7 @@ lec_atm_send(struct atm_vcc *vcc, struct sk_buff *skb)
         int i;
         char *tmp; /* FIXME */
 
-	atomic_sub(skb->truesize+ATM_PDU_OVHD, &vcc->sk->wmem_alloc);
+	atomic_sub(skb->truesize, &vcc->sk->wmem_alloc);
         mesg = (struct atmlec_msg *)skb->data;
         tmp = skb->data;
         tmp += sizeof(struct atmlec_msg);
@@ -555,6 +554,7 @@ static struct atm_dev lecatm_dev = {
 	.ops	= &lecdev_ops,
 	.type	= "lec",
 	.number	= 999,	/* dummy device number */
+	.lock	= SPIN_LOCK_UNLOCKED
 };
 
 /*
@@ -715,6 +715,7 @@ lec_push(struct atm_vcc *vcc, struct sk_buff *skb)
                 skb->protocol = eth_type_trans(skb, dev);
                 priv->stats.rx_packets++;
                 priv->stats.rx_bytes += skb->len;
+                memset(ATM_SKB(skb), 0, sizeof(struct atm_skb_data));
                 netif_rx(skb);
         }
 }

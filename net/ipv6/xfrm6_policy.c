@@ -153,7 +153,6 @@ __xfrm6_bundle_create(struct xfrm_policy *policy, struct xfrm_state **xfrm, int 
 		x->u.rt6.rt6i_flags    = rt0->rt6i_flags&(RTCF_BROADCAST|RTCF_MULTICAST|RTCF_LOCAL);
 		x->u.rt6.rt6i_metric   = rt0->rt6i_metric;
 		x->u.rt6.rt6i_node     = rt0->rt6i_node;
-		x->u.rt6.rt6i_hoplimit = rt0->rt6i_hoplimit;
 		x->u.rt6.rt6i_gateway  = rt0->rt6i_gateway;
 		memcpy(&x->u.rt6.rt6i_gateway, &rt0->rt6i_gateway, sizeof(x->u.rt6.rt6i_gateway)); 
 		header_len -= x->u.dst.xfrm->props.header_len;

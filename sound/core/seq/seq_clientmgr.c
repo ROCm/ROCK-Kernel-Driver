@@ -136,7 +136,6 @@ client_t *snd_seq_client_use_ptr(int clientid)
 		static char card_requested[SNDRV_CARDS];
 		if (clientid < 64) {
 			int idx;
-			char name[32];
 			
 			if (! client_requested[clientid]) {
 				client_requested[clientid] = 1;
@@ -144,8 +143,7 @@ client_t *snd_seq_client_use_ptr(int clientid)
 					if (seq_client_load[idx] < 0)
 						break;
 					if (seq_client_load[idx] == clientid) {
-						sprintf(name, "snd-seq-client-%i", clientid);
-						request_module(name);
+						request_module("snd-seq-client-%i", clientid);
 						break;
 					}
 				}
@@ -365,7 +363,7 @@ static int snd_seq_release(struct inode *inode, struct file *file)
  *	-EINVAL	no enough user-space buffer to write the whole event
  *	-EFAULT	seg. fault during copy to user space
  */
-static ssize_t snd_seq_read(struct file *file, char *buf, size_t count, loff_t *offset)
+static ssize_t snd_seq_read(struct file *file, char __user *buf, size_t count, loff_t *offset)
 {
 	client_t *client = (client_t *) file->private_data;
 	fifo_t *fifo;
@@ -959,7 +957,7 @@ static int check_event_type_and_length(snd_seq_event_t *ev)
  *	-EMLINK	too many hops
  *	others	depends on return value from driver callback
  */
-static ssize_t snd_seq_write(struct file *file, const char *buf, size_t count, loff_t *offset)
+static ssize_t snd_seq_write(struct file *file, const char __user *buf, size_t count, loff_t *offset)
 {
 	client_t *client = (client_t *) file->private_data;
 	int written = 0, len;
@@ -1077,7 +1075,7 @@ static unsigned int snd_seq_poll(struct file *file, poll_table * wait)
 
 
 /* SYSTEM_INFO ioctl() */
-static int snd_seq_ioctl_system_info(client_t *client, unsigned long arg)
+static int snd_seq_ioctl_system_info(client_t *client, void __user *arg)
 {
 	snd_seq_system_info_t info;
 
@@ -1090,20 +1088,20 @@ static int snd_seq_ioctl_system_info(client_t *client, unsigned long arg)
 	info.cur_clients = client_usage.cur;
 	info.cur_queues = snd_seq_queue_get_cur_queues();
 
-	if (copy_to_user((void*)arg, &info, sizeof(info)))
+	if (copy_to_user(arg, &info, sizeof(info)))
 		return -EFAULT;
 	return 0;
 }
 
 
 /* RUNNING_MODE ioctl() */
-static int snd_seq_ioctl_running_mode(client_t *client, unsigned long arg)
+static int snd_seq_ioctl_running_mode(client_t *client, void __user *arg)
 {
 	struct sndrv_seq_running_info info;
 	client_t *cptr;
 	int err = 0;
 
-	if (copy_from_user(&info, (void*)arg, sizeof(info)))
+	if (copy_from_user(&info, arg, sizeof(info)))
 		return -EFAULT;
 
 	/* requested client number */
@@ -1148,12 +1146,12 @@ static void get_client_info(client_t *cptr, snd_seq_client_info_t *info)
 	memset(info->reserved, 0, sizeof(info->reserved));
 }
 
-static int snd_seq_ioctl_get_client_info(client_t * client, unsigned long arg)
+static int snd_seq_ioctl_get_client_info(client_t * client, void __user *arg)
 {
 	client_t *cptr;
 	snd_seq_client_info_t client_info;
 
-	if (copy_from_user(&client_info, (void*)arg, sizeof(client_info)))
+	if (copy_from_user(&client_info, arg, sizeof(client_info)))
 		return -EFAULT;
 
 	/* requested client number */
@@ -1164,18 +1162,18 @@ static int snd_seq_ioctl_get_client_info(client_t * client, unsigned long arg)
 	get_client_info(cptr, &client_info);
 	snd_seq_client_unlock(cptr);
 
-	if (copy_to_user((void*)arg, &client_info, sizeof(client_info)))
+	if (copy_to_user(arg, &client_info, sizeof(client_info)))
 		return -EFAULT;
 	return 0;
 }
 
 
 /* CLIENT_INFO ioctl() */
-static int snd_seq_ioctl_set_client_info(client_t * client, unsigned long arg)
+static int snd_seq_ioctl_set_client_info(client_t * client, void __user *arg)
 {
 	snd_seq_client_info_t client_info;
 
-	if (copy_from_user(&client_info, (void*)arg, sizeof(client_info)))
+	if (copy_from_user(&client_info, arg, sizeof(client_info)))
 		return -EFAULT;
 
 	/* it is not allowed to set the info fields for an another client */
@@ -1201,13 +1199,13 @@ static int snd_seq_ioctl_set_client_info(client_t * client, unsigned long arg)
 /* 
  * CREATE PORT ioctl() 
  */
-static int snd_seq_ioctl_create_port(client_t * client, unsigned long arg)
+static int snd_seq_ioctl_create_port(client_t * client, void __user *arg)
 {
 	client_port_t *port;
 	snd_seq_port_info_t info;
 	snd_seq_port_callback_t *callback;
 
-	if (copy_from_user(&info, (void*)arg, sizeof(info)))
+	if (copy_from_user(&info, arg, sizeof(info)))
 		return -EFAULT;
 
 	/* it is not allowed to create the port for an another client */
@@ -1242,7 +1240,7 @@ static int snd_seq_ioctl_create_port(client_t * client, unsigned long arg)
 	snd_seq_set_port_info(port, &info);
 	snd_seq_system_client_ev_port_start(port->addr.client, port->addr.port);
 
-	if (copy_to_user((void*)arg, &info, sizeof(info)))
+	if (copy_to_user(arg, &info, sizeof(info)))
 		return -EFAULT;
 
 	return 0;
@@ -1251,13 +1249,13 @@ static int snd_seq_ioctl_create_port(client_t * client, unsigned long arg)
 /* 
  * DELETE PORT ioctl() 
  */
-static int snd_seq_ioctl_delete_port(client_t * client, unsigned long arg)
+static int snd_seq_ioctl_delete_port(client_t * client, void __user *arg)
 {
 	snd_seq_port_info_t info;
 	int err;
 
 	/* set passed parameters */
-	if (copy_from_user(&info, (void*)arg, sizeof(info)))
+	if (copy_from_user(&info, arg, sizeof(info)))
 		return -EFAULT;
 	
 	/* it is not allowed to remove the port for an another client */
@@ -1274,13 +1272,13 @@ static int snd_seq_ioctl_delete_port(client_t * client, unsigned long arg)
 /* 
  * GET_PORT_INFO ioctl() (on any client) 
  */
-static int snd_seq_ioctl_get_port_info(client_t *client, unsigned long arg)
+static int snd_seq_ioctl_get_port_info(client_t *client, void __user *arg)
 {
 	client_t *cptr;
 	client_port_t *port;
 	snd_seq_port_info_t info;
 
-	if (copy_from_user(&info, (void*)arg, sizeof(info)))
+	if (copy_from_user(&info, arg, sizeof(info)))
 		return -EFAULT;
 	cptr = snd_seq_client_use_ptr(info.addr.client);
 	if (cptr == NULL)
@@ -1297,7 +1295,7 @@ static int snd_seq_ioctl_get_port_info(client_t *client, unsigned long arg)
 	snd_seq_port_unlock(port);
 	snd_seq_client_unlock(cptr);
 
-	if (copy_to_user((void*)arg, &info, sizeof(info)))
+	if (copy_to_user(arg, &info, sizeof(info)))
 		return -EFAULT;
 	return 0;
 }
@@ -1306,12 +1304,12 @@ static int snd_seq_ioctl_get_port_info(client_t *client, unsigned long arg)
 /* 
  * SET_PORT_INFO ioctl() (only ports on this/own client) 
  */
-static int snd_seq_ioctl_set_port_info(client_t * client, unsigned long arg)
+static int snd_seq_ioctl_set_port_info(client_t * client, void __user *arg)
 {
 	client_port_t *port;
 	snd_seq_port_info_t info;
 
-	if (copy_from_user(&info, (void*)arg, sizeof(info)))
+	if (copy_from_user(&info, arg, sizeof(info)))
 		return -EFAULT;
 
 	if (info.addr.client != client->number) /* only set our own ports ! */
@@ -1381,14 +1379,14 @@ int snd_seq_client_notify_subscription(int client, int port,
 /* 
  * add to port's subscription list IOCTL interface 
  */
-static int snd_seq_ioctl_subscribe_port(client_t * client, unsigned long arg)
+static int snd_seq_ioctl_subscribe_port(client_t * client, void __user *arg)
 {
 	int result = -EINVAL;
 	client_t *receiver = NULL, *sender = NULL;
 	client_port_t *sport = NULL, *dport = NULL;
 	snd_seq_port_subscribe_t subs;
 
-	if (copy_from_user(&subs, (void*)arg, sizeof(subs)))
+	if (copy_from_user(&subs, arg, sizeof(subs)))
 		return -EFAULT;
 
 	if ((receiver = snd_seq_client_use_ptr(subs.dest.client)) == NULL)
@@ -1425,14 +1423,14 @@ static int snd_seq_ioctl_subscribe_port(client_t * client, unsigned long arg)
 /* 
  * remove from port's subscription list 
  */
-static int snd_seq_ioctl_unsubscribe_port(client_t * client, unsigned long arg)
+static int snd_seq_ioctl_unsubscribe_port(client_t * client, void __user *arg)
 {
 	int result = -ENXIO;
 	client_t *receiver = NULL, *sender = NULL;
 	client_port_t *sport = NULL, *dport = NULL;
 	snd_seq_port_subscribe_t subs;
 
-	if (copy_from_user(&subs, (void*)arg, sizeof(subs)))
+	if (copy_from_user(&subs, arg, sizeof(subs)))
 		return -EFAULT;
 
 	if ((receiver = snd_seq_client_use_ptr(subs.dest.client)) == NULL)
@@ -1466,13 +1464,13 @@ static int snd_seq_ioctl_unsubscribe_port(client_t * client, unsigned long arg)
 
 
 /* CREATE_QUEUE ioctl() */
-static int snd_seq_ioctl_create_queue(client_t *client, unsigned long arg)
+static int snd_seq_ioctl_create_queue(client_t *client, void __user *arg)
 {
 	snd_seq_queue_info_t info;
 	int result;
 	queue_t *q;
 
-	if (copy_from_user(&info, (void*)arg, sizeof(info)))
+	if (copy_from_user(&info, arg, sizeof(info)))
 		return -EFAULT;
 
 	result = snd_seq_queue_alloc(client->number, info.locked, info.flags);
@@ -1494,30 +1492,30 @@ static int snd_seq_ioctl_create_queue(client_t *client, unsigned long arg)
 	q->name[sizeof(q->name)-1] = 0;
 	queuefree(q);
 
-	if (copy_to_user((void*)arg, &info, sizeof(info)))
+	if (copy_to_user(arg, &info, sizeof(info)))
 		return -EFAULT;
 
 	return 0;
 }
 
 /* DELETE_QUEUE ioctl() */
-static int snd_seq_ioctl_delete_queue(client_t *client, unsigned long arg)
+static int snd_seq_ioctl_delete_queue(client_t *client, void __user *arg)
 {
 	snd_seq_queue_info_t info;
 
-	if (copy_from_user(&info, (void*)arg, sizeof(info)))
+	if (copy_from_user(&info, arg, sizeof(info)))
 		return -EFAULT;
 
 	return snd_seq_queue_delete(client->number, info.queue);
 }
 
 /* GET_QUEUE_INFO ioctl() */
-static int snd_seq_ioctl_get_queue_info(client_t *client, unsigned long arg)
+static int snd_seq_ioctl_get_queue_info(client_t *client, void __user *arg)
 {
 	snd_seq_queue_info_t info;
 	queue_t *q;
 
-	if (copy_from_user(&info, (void*)arg, sizeof(info)))
+	if (copy_from_user(&info, arg, sizeof(info)))
 		return -EFAULT;
 
 	q = queueptr(info.queue);
@@ -1532,19 +1530,19 @@ static int snd_seq_ioctl_get_queue_info(client_t *client, unsigned long arg)
 	info.name[sizeof(info.name)-1] = 0;
 	queuefree(q);
 
-	if (copy_to_user((void*)arg, &info, sizeof(info)))
+	if (copy_to_user(arg, &info, sizeof(info)))
 		return -EFAULT;
 
 	return 0;
 }
 
 /* SET_QUEUE_INFO ioctl() */
-static int snd_seq_ioctl_set_queue_info(client_t *client, unsigned long arg)
+static int snd_seq_ioctl_set_queue_info(client_t *client, void __user *arg)
 {
 	snd_seq_queue_info_t info;
 	queue_t *q;
 
-	if (copy_from_user(&info, (void*)arg, sizeof(info)))
+	if (copy_from_user(&info, arg, sizeof(info)))
 		return -EFAULT;
 
 	if (info.owner != client->number)
@@ -1575,12 +1573,12 @@ static int snd_seq_ioctl_set_queue_info(client_t *client, unsigned long arg)
 }
 
 /* GET_NAMED_QUEUE ioctl() */
-static int snd_seq_ioctl_get_named_queue(client_t *client, unsigned long arg)
+static int snd_seq_ioctl_get_named_queue(client_t *client, void __user *arg)
 {
 	snd_seq_queue_info_t info;
 	queue_t *q;
 
-	if (copy_from_user(&info, (void*)arg, sizeof(info)))
+	if (copy_from_user(&info, arg, sizeof(info)))
 		return -EFAULT;
 
 	q = snd_seq_queue_find_name(info.name);
@@ -1591,20 +1589,20 @@ static int snd_seq_ioctl_get_named_queue(client_t *client, unsigned long arg)
 	info.locked = q->locked;
 	queuefree(q);
 
-	if (copy_to_user((void*)arg, &info, sizeof(info)))
+	if (copy_to_user(arg, &info, sizeof(info)))
 		return -EFAULT;
 
 	return 0;
 }
 
 /* GET_QUEUE_STATUS ioctl() */
-static int snd_seq_ioctl_get_queue_status(client_t * client, unsigned long arg)
+static int snd_seq_ioctl_get_queue_status(client_t * client, void __user *arg)
 {
 	snd_seq_queue_status_t status;
 	queue_t *queue;
 	seq_timer_t *tmr;
 
-	if (copy_from_user(&status, (void*)arg, sizeof(status)))
+	if (copy_from_user(&status, arg, sizeof(status)))
 		return -EFAULT;
 
 	queue = queueptr(status.queue);
@@ -1624,20 +1622,20 @@ static int snd_seq_ioctl_get_queue_status(client_t * client, unsigned long arg)
 	status.flags = queue->flags;
 	queuefree(queue);
 
-	if (copy_to_user((void*)arg, &status, sizeof(status)))
+	if (copy_to_user(arg, &status, sizeof(status)))
 		return -EFAULT;
 	return 0;
 }
 
 
 /* GET_QUEUE_TEMPO ioctl() */
-static int snd_seq_ioctl_get_queue_tempo(client_t * client, unsigned long arg)
+static int snd_seq_ioctl_get_queue_tempo(client_t * client, void __user *arg)
 {
 	snd_seq_queue_tempo_t tempo;
 	queue_t *queue;
 	seq_timer_t *tmr;
 
-	if (copy_from_user(&tempo, (void*)arg, sizeof(tempo)))
+	if (copy_from_user(&tempo, arg, sizeof(tempo)))
 		return -EFAULT;
 
 	queue = queueptr(tempo.queue);
@@ -1654,19 +1652,19 @@ static int snd_seq_ioctl_get_queue_tempo(client_t * client, unsigned long arg)
 	tempo.skew_base = tmr->skew_base;
 	queuefree(queue);
 
-	if (copy_to_user((void*)arg, &tempo, sizeof(tempo)))
+	if (copy_to_user(arg, &tempo, sizeof(tempo)))
 		return -EFAULT;
 	return 0;
 }
 
 
 /* SET_QUEUE_TEMPO ioctl() */
-static int snd_seq_ioctl_set_queue_tempo(client_t * client, unsigned long arg)
+static int snd_seq_ioctl_set_queue_tempo(client_t * client, void __user *arg)
 {
 	int result;
 	snd_seq_queue_tempo_t tempo;
 
-	if (copy_from_user(&tempo, (void*)arg, sizeof(tempo)))
+	if (copy_from_user(&tempo, arg, sizeof(tempo)))
 		return -EFAULT;
 
 	if (snd_seq_queue_check_access(tempo.queue, client->number)) {
@@ -1682,13 +1680,13 @@ static int snd_seq_ioctl_set_queue_tempo(client_t * client, unsigned long arg)
 
 
 /* GET_QUEUE_TIMER ioctl() */
-static int snd_seq_ioctl_get_queue_timer(client_t * client, unsigned long arg)
+static int snd_seq_ioctl_get_queue_timer(client_t * client, void __user *arg)
 {
 	snd_seq_queue_timer_t timer;
 	queue_t *queue;
 	seq_timer_t *tmr;
 
-	if (copy_from_user(&timer, (void*)arg, sizeof(timer)))
+	if (copy_from_user(&timer, arg, sizeof(timer)))
 		return -EFAULT;
 
 	queue = queueptr(timer.queue);
@@ -1711,19 +1709,19 @@ static int snd_seq_ioctl_get_queue_timer(client_t * client, unsigned long arg)
 	up(&queue->timer_mutex);
 	queuefree(queue);
 	
-	if (copy_to_user((void*)arg, &timer, sizeof(timer)))
+	if (copy_to_user(arg, &timer, sizeof(timer)))
 		return -EFAULT;
 	return 0;
 }
 
 
 /* SET_QUEUE_TIMER ioctl() */
-static int snd_seq_ioctl_set_queue_timer(client_t * client, unsigned long arg)
+static int snd_seq_ioctl_set_queue_timer(client_t * client, void __user *arg)
 {
 	int result = 0;
 	snd_seq_queue_timer_t timer;
 
-	if (copy_from_user(&timer, (void*)arg, sizeof(timer)))
+	if (copy_from_user(&timer, arg, sizeof(timer)))
 		return -EFAULT;
 
 	if (timer.type != SNDRV_SEQ_TIMER_ALSA)
@@ -1759,12 +1757,12 @@ static int snd_seq_ioctl_set_queue_timer(client_t * client, unsigned long arg)
 
 
 /* GET_QUEUE_CLIENT ioctl() */
-static int snd_seq_ioctl_get_queue_client(client_t * client, unsigned long arg)
+static int snd_seq_ioctl_get_queue_client(client_t * client, void __user *arg)
 {
 	snd_seq_queue_client_t info;
 	int used;
 
-	if (copy_from_user(&info, (void*)arg, sizeof(info)))
+	if (copy_from_user(&info, arg, sizeof(info)))
 		return -EFAULT;
 
 	used = snd_seq_queue_is_used(info.queue, client->number);
@@ -1773,19 +1771,19 @@ static int snd_seq_ioctl_get_queue_client(client_t * client, unsigned long arg)
 	info.used = used;
 	info.client = client->number;
 
-	if (copy_to_user((void*)arg, &info, sizeof(info)))
+	if (copy_to_user(arg, &info, sizeof(info)))
 		return -EFAULT;
 	return 0;
 }
 
 
 /* SET_QUEUE_CLIENT ioctl() */
-static int snd_seq_ioctl_set_queue_client(client_t * client, unsigned long arg)
+static int snd_seq_ioctl_set_queue_client(client_t * client, void __user *arg)
 {
 	int err;
 	snd_seq_queue_client_t info;
 
-	if (copy_from_user(&info, (void*)arg, sizeof(info)))
+	if (copy_from_user(&info, arg, sizeof(info)))
 		return -EFAULT;
 
 	if (info.used >= 0) {
@@ -1799,12 +1797,12 @@ static int snd_seq_ioctl_set_queue_client(client_t * client, unsigned long arg)
 
 
 /* GET_CLIENT_POOL ioctl() */
-static int snd_seq_ioctl_get_client_pool(client_t * client, unsigned long arg)
+static int snd_seq_ioctl_get_client_pool(client_t * client, void __user *arg)
 {
 	snd_seq_client_pool_t info;
 	client_t *cptr;
 
-	if (copy_from_user(&info, (void*)arg, sizeof(info)))
+	if (copy_from_user(&info, arg, sizeof(info)))
 		return -EFAULT;
 
 	cptr = snd_seq_client_use_ptr(info.client);
@@ -1827,18 +1825,18 @@ static int snd_seq_ioctl_get_client_pool(client_t * client, unsigned long arg)
 	}
 	snd_seq_client_unlock(cptr);
 	
-	if (copy_to_user((void*)arg, &info, sizeof(info)))
+	if (copy_to_user(arg, &info, sizeof(info)))
 		return -EFAULT;
 	return 0;
 }
 
 /* SET_CLIENT_POOL ioctl() */
-static int snd_seq_ioctl_set_client_pool(client_t * client, unsigned long arg)
+static int snd_seq_ioctl_set_client_pool(client_t * client, void __user *arg)
 {
 	snd_seq_client_pool_t info;
 	int rc;
 
-	if (copy_from_user(&info, (void*)arg, sizeof(info)))
+	if (copy_from_user(&info, arg, sizeof(info)))
 		return -EFAULT;
 
 	if (client->number != info.client)
@@ -1877,11 +1875,11 @@ static int snd_seq_ioctl_set_client_pool(client_t * client, unsigned long arg)
 
 
 /* REMOVE_EVENTS ioctl() */
-static int snd_seq_ioctl_remove_events(client_t * client, unsigned long arg)
+static int snd_seq_ioctl_remove_events(client_t * client, void __user *arg)
 {
 	snd_seq_remove_events_t info;
 
-	if (copy_from_user(&info, (void*)arg, sizeof(info)))
+	if (copy_from_user(&info, arg, sizeof(info)))
 		return -EFAULT;
 
 	/*
@@ -1906,7 +1904,7 @@ static int snd_seq_ioctl_remove_events(client_t * client, unsigned long arg)
 /*
  * get subscription info
  */
-static int snd_seq_ioctl_get_subscription(client_t *client, unsigned long arg)
+static int snd_seq_ioctl_get_subscription(client_t *client, void __user *arg)
 {
 	int result;
 	client_t *sender = NULL;
@@ -1914,7 +1912,7 @@ static int snd_seq_ioctl_get_subscription(client_t *client, unsigned long arg)
 	snd_seq_port_subscribe_t subs;
 	subscribers_t *p;
 
-	if (copy_from_user(&subs, (void*)arg, sizeof(subs)))
+	if (copy_from_user(&subs, arg, sizeof(subs)))
 		return -EFAULT;
 
 	result = -EINVAL;
@@ -1935,7 +1933,7 @@ static int snd_seq_ioctl_get_subscription(client_t *client, unsigned long arg)
 	if (sender)
 		snd_seq_client_unlock(sender);
 	if (result >= 0) {
-		if (copy_to_user((void*)arg, &subs, sizeof(subs)))
+		if (copy_to_user(arg, &subs, sizeof(subs)))
 			return -EFAULT;
 	}
 	return result;
@@ -1945,7 +1943,7 @@ static int snd_seq_ioctl_get_subscription(client_t *client, unsigned long arg)
 /*
  * get subscription info - check only its presence
  */
-static int snd_seq_ioctl_query_subs(client_t *client, unsigned long arg)
+static int snd_seq_ioctl_query_subs(client_t *client, void __user *arg)
 {
 	int result = -ENXIO;
 	client_t *cptr = NULL;
@@ -1955,7 +1953,7 @@ static int snd_seq_ioctl_query_subs(client_t *client, unsigned long arg)
 	struct list_head *p;
 	int i;
 
-	if (copy_from_user(&subs, (void*)arg, sizeof(subs)))
+	if (copy_from_user(&subs, arg, sizeof(subs)))
 		return -EFAULT;
 
 	if ((cptr = snd_seq_client_use_ptr(subs.root.client)) == NULL)
@@ -2004,7 +2002,7 @@ static int snd_seq_ioctl_query_subs(client_t *client, unsigned long arg)
 	if (cptr)
 		snd_seq_client_unlock(cptr);
 	if (result >= 0) {
-		if (copy_to_user((void*)arg, &subs, sizeof(subs)))
+		if (copy_to_user(arg, &subs, sizeof(subs)))
 			return -EFAULT;
 	}
 	return result;
@@ -2014,12 +2012,12 @@ static int snd_seq_ioctl_query_subs(client_t *client, unsigned long arg)
 /*
  * query next client
  */
-static int snd_seq_ioctl_query_next_client(client_t *client, unsigned long arg)
+static int snd_seq_ioctl_query_next_client(client_t *client, void __user *arg)
 {
 	client_t *cptr = NULL;
 	snd_seq_client_info_t info;
 
-	if (copy_from_user(&info, (void*)arg, sizeof(info)))
+	if (copy_from_user(&info, arg, sizeof(info)))
 		return -EFAULT;
 
 	/* search for next client */
@@ -2037,7 +2035,7 @@ static int snd_seq_ioctl_query_next_client(client_t *client, unsigned long arg)
 	get_client_info(cptr, &info);
 	snd_seq_client_unlock(cptr);
 
-	if (copy_to_user((void*)arg, &info, sizeof(info)))
+	if (copy_to_user(arg, &info, sizeof(info)))
 		return -EFAULT;
 	return 0;
 }
@@ -2045,13 +2043,13 @@ static int snd_seq_ioctl_query_next_client(client_t *client, unsigned long arg)
 /* 
  * query next port
  */
-static int snd_seq_ioctl_query_next_port(client_t *client, unsigned long arg)
+static int snd_seq_ioctl_query_next_port(client_t *client, void __user *arg)
 {
 	client_t *cptr;
 	client_port_t *port = NULL;
 	snd_seq_port_info_t info;
 
-	if (copy_from_user(&info, (void*)arg, sizeof(info)))
+	if (copy_from_user(&info, arg, sizeof(info)))
 		return -EFAULT;
 	cptr = snd_seq_client_use_ptr(info.addr.client);
 	if (cptr == NULL)
@@ -2071,7 +2069,7 @@ static int snd_seq_ioctl_query_next_port(client_t *client, unsigned long arg)
 	snd_seq_port_unlock(port);
 	snd_seq_client_unlock(cptr);
 
-	if (copy_to_user((void*)arg, &info, sizeof(info)))
+	if (copy_to_user(arg, &info, sizeof(info)))
 		return -EFAULT;
 	return 0;
 }
@@ -2080,7 +2078,7 @@ static int snd_seq_ioctl_query_next_port(client_t *client, unsigned long arg)
 
 static struct seq_ioctl_table {
 	unsigned int cmd;
-	int (*func)(client_t *client, unsigned long arg);
+	int (*func)(client_t *client, void __user * arg);
 } ioctl_tables[] = {
 	{ SNDRV_SEQ_IOCTL_SYSTEM_INFO, snd_seq_ioctl_system_info },
 	{ SNDRV_SEQ_IOCTL_RUNNING_MODE, snd_seq_ioctl_running_mode },
@@ -2114,7 +2112,7 @@ static struct seq_ioctl_table {
 	{ 0, NULL },
 };
 
-static int snd_seq_do_ioctl(client_t *client, unsigned int cmd, unsigned long arg)
+static int snd_seq_do_ioctl(client_t *client, unsigned int cmd, void __user *arg)
 {
 	struct seq_ioctl_table *p;
 
@@ -2131,7 +2129,7 @@ static int snd_seq_do_ioctl(client_t *client, unsigned int cmd, unsigned long ar
 		return -EFAULT;
 	for (p = ioctl_tables; p->cmd; p++) {
 		if (p->cmd == cmd)
-			return p->func(client, arg);
+			return p->func(client, (void __user *) arg);
 	}
 	snd_printd("seq unknown ioctl() 0x%x (type='%c', number=0x%2x)\n",
 		   cmd, _IOC_TYPE(cmd), _IOC_NR(cmd));
@@ -2146,7 +2144,7 @@ static int snd_seq_ioctl(struct inode *inode, struct file *file,
 
 	snd_assert(client != NULL, return -ENXIO);
 		
-	return snd_seq_do_ioctl(client, cmd, arg);
+	return snd_seq_do_ioctl(client, cmd, (void __user *) arg);
 }
 
 
@@ -2315,7 +2313,7 @@ int snd_seq_kernel_client_dispatch(int client, snd_seq_event_t * ev,
  * exported, called by kernel clients to perform same functions as with
  * userland ioctl() 
  */
-int snd_seq_kernel_client_ctl(int clientid, unsigned int cmd, void *arg)
+int snd_seq_kernel_client_ctl(int clientid, unsigned int cmd, void __user *arg)
 {
 	client_t *client;
 	mm_segment_t fs;
@@ -2325,7 +2323,7 @@ int snd_seq_kernel_client_ctl(int clientid, unsigned int cmd, void *arg)
 	if (client == NULL)
 		return -ENXIO;
 	fs = snd_enter_user();
-	result = snd_seq_do_ioctl(client, cmd, (unsigned long)arg);
+	result = snd_seq_do_ioctl(client, cmd, arg);
 	snd_leave_user(fs);
 	return result;
 }

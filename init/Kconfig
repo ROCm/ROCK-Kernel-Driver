@@ -142,7 +142,7 @@ config MODULE_FORCE_UNLOAD
 	  This option allows you to force a module to unload, even if the
 	  kernel believes it is unsafe: the kernel will remove the module
 	  without waiting for anyone to stop using it (using the -f option to
-	  rmmod).  This is mainly for kernel developers and desparate users.
+	  rmmod).  This is mainly for kernel developers and desperate users.
 	  If unsure, say N.
 
 config OBSOLETE_MODPARM

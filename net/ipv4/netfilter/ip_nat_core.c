@@ -717,9 +717,12 @@ manip_pkt(u_int16_t proto,
 	iph = (void *)(*pskb)->data + iphdroff;
 
 	/* Manipulate protcol part. */
-	if (!find_nat_proto(proto)->manip_pkt(pskb, iphdroff + iph->ihl*4,
+	if (!find_nat_proto(proto)->manip_pkt(pskb,
+					      iphdroff + iph->ihl*4,
 					      manip, maniptype))
 		return 0;
+
+	iph = (void *)(*pskb)->data + iphdroff;
 
 	if (maniptype == IP_NAT_MANIP_SRC) {
 		iph->check = ip_nat_cheat_check(~iph->saddr, manip->ip,
@@ -773,9 +776,9 @@ do_bindings(struct ip_conntrack *ct,
 			       ? "SRC" : "DST",
 			       NIPQUAD(info->manips[i].manip.ip),
 			       htons(info->manips[i].manip.u.all));
-			if (manip_pkt(proto, pskb, 0,
-				      &info->manips[i].manip,
-				      info->manips[i].maniptype) < 0) {
+			if (!manip_pkt(proto, pskb, 0,
+				       &info->manips[i].manip,
+				       info->manips[i].maniptype)) {
 				READ_UNLOCK(&ip_nat_lock);
 				return NF_DROP;
 			}
@@ -861,6 +864,7 @@ icmp_reply_translation(struct sk_buff **pskb,
 	} *inside;
 	unsigned int i;
 	struct ip_nat_info *info = &conntrack->nat.info;
+	int hdrlen;
 
 	if (!skb_ip_make_writable(pskb,(*pskb)->nh.iph->ihl*4+sizeof(*inside)))
 		return 0;
@@ -868,10 +872,12 @@ icmp_reply_translation(struct sk_buff **pskb,
 
 	/* We're actually going to mangle it beyond trivial checksum
 	   adjustment, so make sure the current checksum is correct. */
-	if ((*pskb)->ip_summed != CHECKSUM_UNNECESSARY
-	    && (u16)csum_fold(skb_checksum(*pskb, (*pskb)->nh.iph->ihl*4,
-					   (*pskb)->len, 0)))
-		return 0;
+	if ((*pskb)->ip_summed != CHECKSUM_UNNECESSARY) {
+		hdrlen = (*pskb)->nh.iph->ihl * 4;
+		if ((u16)csum_fold(skb_checksum(*pskb, hdrlen,
+						(*pskb)->len - hdrlen, 0)))
+			return 0;
+	}
 
 	/* Must be RELATED */
 	IP_NF_ASSERT((*pskb)->nfct
@@ -924,11 +930,11 @@ icmp_reply_translation(struct sk_buff **pskb,
 			       ? "DST" : "SRC",
 			       NIPQUAD(info->manips[i].manip.ip),
 			       ntohs(info->manips[i].manip.u.udp.port));
-			if (manip_pkt(inside->ip.protocol, pskb,
-				      (*pskb)->nh.iph->ihl*4
-				      + sizeof(inside->icmp),
-				      &info->manips[i].manip,
-				      !info->manips[i].maniptype) < 0)
+			if (!manip_pkt(inside->ip.protocol, pskb,
+				       (*pskb)->nh.iph->ihl*4
+				       + sizeof(inside->icmp),
+				       &info->manips[i].manip,
+				       !info->manips[i].maniptype))
 				goto unlock_fail;
 
 			/* Outer packet needs to have IP header NATed like
@@ -940,18 +946,22 @@ icmp_reply_translation(struct sk_buff **pskb,
 			       info->manips[i].maniptype == IP_NAT_MANIP_SRC
 			       ? "SRC" : "DST",
 			       NIPQUAD(info->manips[i].manip.ip));
-			if (manip_pkt(0, pskb, 0,
-				      &info->manips[i].manip,
-				      info->manips[i].maniptype) < 0)
+			if (!manip_pkt(0, pskb, 0,
+				       &info->manips[i].manip,
+				       info->manips[i].maniptype))
 				goto unlock_fail;
 		}
 	}
 	READ_UNLOCK(&ip_nat_lock);
 
+	hdrlen = (*pskb)->nh.iph->ihl * 4;
+
+	inside = (void *)(*pskb)->data + (*pskb)->nh.iph->ihl*4;
+
 	inside->icmp.checksum = 0;
-	inside->icmp.checksum = csum_fold(skb_checksum(*pskb,
-						       (*pskb)->nh.iph->ihl*4,
-						       (*pskb)->len, 0));
+	inside->icmp.checksum = csum_fold(skb_checksum(*pskb, hdrlen,
+						       (*pskb)->len - hdrlen,
+						       0));
 	return 1;
 
  unlock_fail:

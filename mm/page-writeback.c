@@ -270,7 +270,7 @@ int wakeup_bdflush(long nr_pages)
 		struct page_state ps;
 
 		get_page_state(&ps);
-		nr_pages = ps.nr_dirty;
+		nr_pages = ps.nr_dirty + ps.nr_unstable;
 	}
 	return pdflush_operation(background_writeout, nr_pages);
 }

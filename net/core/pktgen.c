@@ -226,21 +226,20 @@ static struct net_device *setup_inject(struct pktgen_info* info)
 {
 	struct net_device *odev;
 
-	rtnl_lock();
-	odev = __dev_get_by_name(info->outdev);
+	odev = dev_get_by_name(info->outdev);
 	if (!odev) {
 		sprintf(info->result, "No such netdevice: \"%s\"", info->outdev);
-		goto out_unlock;
+		goto out;
 	}
 
 	if (odev->type != ARPHRD_ETHER) {
 		sprintf(info->result, "Not ethernet device: \"%s\"", info->outdev);
-		goto out_unlock;
+		goto out_put;
 	}
 
 	if (!netif_running(odev)) {
 		sprintf(info->result, "Device is down: \"%s\"", info->outdev);
-		goto out_unlock;
+		goto out_put;
 	}
 
 	/* Default to the interface's mac if not explicitly set. */
@@ -257,13 +256,13 @@ static struct net_device *setup_inject(struct pktgen_info* info)
 	info->saddr_min = 0;
 	info->saddr_max = 0;
 	if (strlen(info->src_min) == 0) {
-		if (odev->ip_ptr) {
-			struct in_device *in_dev = odev->ip_ptr;
-
+		struct in_device *in_dev = in_dev_get(odev);
+		if (in_dev) {
 			if (in_dev->ifa_list) {
 				info->saddr_min = in_dev->ifa_list->ifa_address;
 				info->saddr_max = info->saddr_min;
 			}
+			in_dev_put(in_dev);
 		}
 	}
 	else {
@@ -282,13 +281,11 @@ static struct net_device *setup_inject(struct pktgen_info* info)
 	info->cur_udp_dst = info->udp_dst_min;
 	info->cur_udp_src = info->udp_src_min;
 	
-	atomic_inc(&odev->refcnt);
-	rtnl_unlock();
-
 	return odev;
 
-out_unlock:
-	rtnl_unlock();
+out_put:
+	dev_put(odev);
+out:
 	return NULL;
 }
 
@@ -1258,7 +1255,6 @@ static int proc_write(struct file *file, const char *user_buffer,
 	}
 
 	if (!strcmp(name, "inject") || !strcmp(name, "start")) {
-		MOD_INC_USE_COUNT;
 		if (info->busy) {
 			strcpy(info->result, "Already running...\n");
 		}
@@ -1268,7 +1264,6 @@ static int proc_write(struct file *file, const char *user_buffer,
 			inject(info);
 			info->busy = 0;
 		}
-		MOD_DEC_USE_COUNT;
 		return count;
 	}
 
@@ -1337,6 +1332,7 @@ static int __init init(void)
 		pginfos[i].proc_ent->read_proc = proc_read;
 		pginfos[i].proc_ent->write_proc = proc_write;
 		pginfos[i].proc_ent->data = (void*)(long)(i);
+		pginfos[i].proc_ent->owner = THIS_MODULE;
 
 		sprintf(pginfos[i].busy_fname, "net/%s/pg_busy%i",  PG_PROC_DIR, i);
 		pginfos[i].busy_proc_ent = create_proc_entry(pginfos[i].busy_fname, 0, 0);

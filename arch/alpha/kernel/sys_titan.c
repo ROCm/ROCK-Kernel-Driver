@@ -204,13 +204,14 @@ static struct hw_interrupt_type titan_irq_type = {
        .set_affinity   = titan_set_irq_affinity,
 };
 
-static void
+static irqreturn_t
 titan_intr_nop(int irq, void *dev_id, struct pt_regs *regs)                    
 {
       /*
        * This is a NOP interrupt handler for the purposes of
        * event counting -- just return.
        */                                                                     
+       return IRQ_HANDLED;
 }
 
 static void __init

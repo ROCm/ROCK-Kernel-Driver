@@ -20,8 +20,6 @@
 #include <asm/tlb.h>
 #include <asm/tlbflush.h>
 
-#include <linux/sysctl.h>
-
 static long    htlbpagemem;
 int     htlbpage_max;
 static long    htlbzone_pages;
@@ -398,8 +396,6 @@ int set_hugetlb_mem_size(int count)
 {
 	int lcount;
 	struct page *page;
-	extern long htlbzone_pages;
-	extern struct list_head htlbpage_freelist;
 
 	if (count < 0)
 		lcount = count;

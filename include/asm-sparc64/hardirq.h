@@ -8,7 +8,6 @@
 
 #include <linux/config.h>
 #include <linux/threads.h>
-#include <linux/brlock.h>
 #include <linux/spinlock.h>
 #include <linux/cache.h>
 
@@ -85,7 +84,7 @@ typedef struct {
 
 #define irq_enter()		(preempt_count() += HARDIRQ_OFFSET)
 
-#if CONFIG_PREEMPT
+#ifdef CONFIG_PREEMPT
 # define in_atomic()	(preempt_count() != kernel_locked())
 # define IRQ_EXIT_OFFSET (HARDIRQ_OFFSET-1)
 #else

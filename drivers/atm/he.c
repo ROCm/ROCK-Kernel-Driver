@@ -51,7 +51,7 @@
 	4096 supported 'connections'
 	group 0 is used for all traffic
 	interrupt queue 0 is used for all interrupts
-	aal0 support for receive only
+	aal0 support (based on work from ulrich.u.muller@nokia.com)
 
  */
 
@@ -96,16 +96,30 @@ void sn_delete_polled_interrupt(int irq);
 #define USE_TPD_POOL
 /* #undef CONFIG_ATM_HE_USE_SUNI */
 
-/* 2.2 kernel support */
+/* compatibility */
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,43)
-#define dev_kfree_skb_irq(skb)		dev_kfree_skb(skb)
-#define dev_kfree_skb_any(skb)		dev_kfree_skb(skb)
-#undef USE_TASKLET
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,69)
+typedef void irqreturn_t;
+#define IRQ_NONE
+#define IRQ_HANDLED
+#define IRQ_RETVAL(x)
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,2,18)
-#define set_current_state(x)		current->state = (x);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,9)
+#define __devexit_p(func)		func
+#endif
+
+#ifndef MODULE_LICENSE
+#define MODULE_LICENSE(x)
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,3)
+#define pci_set_drvdata(pci_dev, data)	(pci_dev)->driver_data = (data)
+#define pci_get_drvdata(pci_dev)	(pci_dev)->driver_data
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,44)
+#define pci_pool_create(a, b, c, d, e)	pci_pool_create(a, b, c, d, e, SLAB_KERNEL)
 #endif
 
 #include "he.h"
@@ -114,26 +128,19 @@ void sn_delete_polled_interrupt(int irq);
 
 #include <linux/atm_he.h>
 
-#define hprintk(fmt,args...)	printk(DEV_LABEL "%d: " fmt, he_dev->number, args)
-#define hprintk1(fmt)		printk(DEV_LABEL "%d: " fmt, he_dev->number)
+#define hprintk(fmt,args...)	printk(KERN_ERR DEV_LABEL "%d: " fmt, he_dev->number , ##args)
 
 #undef DEBUG
 #ifdef DEBUG
 #define HPRINTK(fmt,args...)	hprintk(fmt,args)
-#define HPRINTK1(fmt)		hprintk1(fmt)
 #else
-#define HPRINTK(fmt,args...)
-#define HPRINTK1(fmt,args...)
+#define HPRINTK(fmt,args...)	do { } while(0)
 #endif /* DEBUG */
 
 
 /* version definition */
 
 static char *version = "$Id: he.c,v 1.18 2003/05/06 22:57:15 chas Exp $";
-
-/* defines */
-#define ALIGN_ADDRESS(addr, alignment) \
-	((((unsigned long) (addr)) + (((unsigned long) (alignment)) - 1)) & ~(((unsigned long) (alignment)) - 1))
 
 /* declarations */
 
@@ -142,11 +149,7 @@ static void he_close(struct atm_vcc *vcc);
 static int he_send(struct atm_vcc *vcc, struct sk_buff *skb);
 static int he_sg_send(struct atm_vcc *vcc, unsigned long start, unsigned long size);
 static int he_ioctl(struct atm_dev *dev, unsigned int cmd, void *arg);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,69)
 static irqreturn_t he_irq_handler(int irq, void *dev_id, struct pt_regs *regs);
-#else
-static void he_irq_handler(int irq, void *dev_id, struct pt_regs *regs);
-#endif
 static void he_tasklet(unsigned long data);
 static int he_proc_read(struct atm_dev *dev,loff_t *pos,char *page);
 static int he_start(struct atm_dev *dev);
@@ -342,6 +345,7 @@ he_readl_internal(struct he_dev *he_dev, unsigned addr, unsigned flags)
 static __inline__ struct atm_vcc*
 he_find_vcc(struct he_dev *he_dev, unsigned cid)
 {
+	unsigned long flags;
 	struct atm_vcc *vcc;
 	short vpi;
 	int vci;
@@ -349,59 +353,71 @@ he_find_vcc(struct he_dev *he_dev, unsigned cid)
 	vpi = cid >> he_dev->vcibits;
 	vci = cid & ((1<<he_dev->vcibits)-1);
 
+	spin_lock_irqsave(&he_dev->atm_dev->lock, flags);
 	for (vcc = he_dev->atm_dev->vccs; vcc; vcc = vcc->next)
 		if (vcc->vci == vci && vcc->vpi == vpi
-			&& vcc->qos.rxtp.traffic_class != ATM_NONE) return vcc;
+			&& vcc->qos.rxtp.traffic_class != ATM_NONE) {
+				spin_unlock_irqrestore(&he_dev->atm_dev->lock, flags);
+				return vcc;
+			}
 
+	spin_unlock_irqrestore(&he_dev->atm_dev->lock, flags);
 	return NULL;
 }
 
 static int __devinit
 he_init_one(struct pci_dev *pci_dev, const struct pci_device_id *pci_ent)
 {
-	struct atm_dev *atm_dev;
-	struct he_dev *he_dev;
+	struct atm_dev *atm_dev = NULL;
+	struct he_dev *he_dev = NULL;
+	int err = 0;
 
 	printk(KERN_INFO "he: %s\n", version);
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,3,43)
 	if (pci_enable_device(pci_dev)) return -EIO;
-#endif
-	if (pci_set_dma_mask(pci_dev, HE_DMA_MASK) != 0)
-	{
+	if (pci_set_dma_mask(pci_dev, HE_DMA_MASK) != 0) {
 		printk(KERN_WARNING "he: no suitable dma available\n");
-		return -EIO;
+		err = -EIO;
+		goto init_one_failure;
 	}
 
 	atm_dev = atm_dev_register(DEV_LABEL, &he_ops, -1, 0);
-	if (!atm_dev) return -ENODEV;
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,4,3)
+	if (!atm_dev) {
+		err = -ENODEV;
+		goto init_one_failure;
+	}
 	pci_set_drvdata(pci_dev, atm_dev);
-#else
-	pci_dev->driver_data = atm_dev;
-#endif
 
 	he_dev = (struct he_dev *) kmalloc(sizeof(struct he_dev),
 							GFP_KERNEL);
-	if (!he_dev) return -ENOMEM;
+	if (!he_dev) {
+		err = -ENOMEM;
+		goto init_one_failure;
+	}
 	memset(he_dev, 0, sizeof(struct he_dev));
 
 	he_dev->pci_dev = pci_dev;
 	he_dev->atm_dev = atm_dev;
 	he_dev->atm_dev->dev_data = he_dev;
 	HE_DEV(atm_dev) = he_dev;
-	he_dev->number = atm_dev->number;	/* was devs */
+	he_dev->number = atm_dev->number;
 	if (he_start(atm_dev)) {
-		atm_dev_deregister(atm_dev);
 		he_stop(he_dev);
-		kfree(he_dev);
-		return -ENODEV;
+		err = -ENODEV;
+		goto init_one_failure;
 	}
 	he_dev->next = NULL;
 	if (he_devs) he_dev->next = he_devs;
 	he_devs = he_dev;
-
 	return 0;
+
+init_one_failure:
+	if (atm_dev)
+		atm_dev_deregister(atm_dev);
+	if (he_dev)
+		kfree(he_dev);
+	pci_disable_device(pci_dev);
+	return err;
 }
 
 static void __devexit
@@ -410,11 +426,7 @@ he_remove_one (struct pci_dev *pci_dev)
 	struct atm_dev *atm_dev;
 	struct he_dev *he_dev;
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,4,3)
 	atm_dev = pci_get_drvdata(pci_dev);
-#else
-	atm_dev = pci_dev->driver_data;
-#endif
 	he_dev = HE_DEV(atm_dev);
 
 	/* need to remove from he_devs */
@@ -423,11 +435,8 @@ he_remove_one (struct pci_dev *pci_dev)
 	atm_dev_deregister(atm_dev);
 	kfree(he_dev);
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,4,3)
 	pci_set_drvdata(pci_dev, NULL);
-#else
-	pci_dev->driver_data = NULL;
-#endif
+	pci_disable_device(pci_dev);
 }
 
 
@@ -555,7 +564,7 @@ he_init_tpdrq(struct he_dev *he_dev)
 		CONFIG_TPDRQ_SIZE * sizeof(struct he_tpdrq), &he_dev->tpdrq_phys);
 	if (he_dev->tpdrq_base == NULL) 
 	{
-		hprintk1("failed to alloc tpdrq\n");
+		hprintk("failed to alloc tpdrq\n");
 		return -ENOMEM;
 	}
 	memset(he_dev->tpdrq_base, 0,
@@ -790,23 +799,18 @@ he_init_group(struct he_dev *he_dev, int group)
 #ifdef USE_RBPS
 	/* small buffer pool */
 #ifdef USE_RBPS_POOL
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,44)
-	he_dev->rbps_pool = pci_pool_create("rbps", he_dev->pci_dev,
-			CONFIG_RBPS_BUFSIZE, 8, 0, SLAB_KERNEL);
-#else
 	he_dev->rbps_pool = pci_pool_create("rbps", he_dev->pci_dev,
 			CONFIG_RBPS_BUFSIZE, 8, 0);
-#endif
 	if (he_dev->rbps_pool == NULL)
 	{
-		hprintk1("unable to create rbps pages\n");
+		hprintk("unable to create rbps pages\n");
 		return -ENOMEM;
 	}
 #else /* !USE_RBPS_POOL */
 	he_dev->rbps_pages = pci_alloc_consistent(he_dev->pci_dev,
 		CONFIG_RBPS_SIZE * CONFIG_RBPS_BUFSIZE, &he_dev->rbps_pages_phys);
 	if (he_dev->rbps_pages == NULL) {
-		hprintk1("unable to create rbps page pool\n");
+		hprintk("unable to create rbps page pool\n");
 		return -ENOMEM;
 	}
 #endif /* USE_RBPS_POOL */
@@ -815,7 +819,7 @@ he_init_group(struct he_dev *he_dev, int group)
 		CONFIG_RBPS_SIZE * sizeof(struct he_rbp), &he_dev->rbps_phys);
 	if (he_dev->rbps_base == NULL)
 	{
-		hprintk1("failed to alloc rbps\n");
+		hprintk("failed to alloc rbps\n");
 		return -ENOMEM;
 	}
 	memset(he_dev->rbps_base, 0, CONFIG_RBPS_SIZE * sizeof(struct he_rbp));
@@ -862,16 +866,11 @@ he_init_group(struct he_dev *he_dev, int group)
 
 	/* large buffer pool */
 #ifdef USE_RBPL_POOL
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,44)
-	he_dev->rbpl_pool = pci_pool_create("rbpl", he_dev->pci_dev,
-			CONFIG_RBPL_BUFSIZE, 8, 0, SLAB_KERNEL);
-#else
 	he_dev->rbpl_pool = pci_pool_create("rbpl", he_dev->pci_dev,
 			CONFIG_RBPL_BUFSIZE, 8, 0);
-#endif
 	if (he_dev->rbpl_pool == NULL)
 	{
-		hprintk1("unable to create rbpl pool\n");
+		hprintk("unable to create rbpl pool\n");
 		return -ENOMEM;
 	}
 #else /* !USE_RBPL_POOL */
@@ -879,7 +878,7 @@ he_init_group(struct he_dev *he_dev, int group)
 		CONFIG_RBPL_SIZE * CONFIG_RBPL_BUFSIZE, &he_dev->rbpl_pages_phys);
 	if (he_dev->rbpl_pages == NULL)
 	{
-		hprintk1("unable to create rbpl pages\n");
+		hprintk("unable to create rbpl pages\n");
 		return -ENOMEM;
 	}
 #endif /* USE_RBPL_POOL */
@@ -888,7 +887,7 @@ he_init_group(struct he_dev *he_dev, int group)
 		CONFIG_RBPL_SIZE * sizeof(struct he_rbp), &he_dev->rbpl_phys);
 	if (he_dev->rbpl_base == NULL)
 	{
-		hprintk1("failed to alloc rbpl\n");
+		hprintk("failed to alloc rbpl\n");
 		return -ENOMEM;
 	}
 	memset(he_dev->rbpl_base, 0, CONFIG_RBPL_SIZE * sizeof(struct he_rbp));
@@ -932,7 +931,7 @@ he_init_group(struct he_dev *he_dev, int group)
 		CONFIG_RBRQ_SIZE * sizeof(struct he_rbrq), &he_dev->rbrq_phys);
 	if (he_dev->rbrq_base == NULL)
 	{
-		hprintk1("failed to allocate rbrq\n");
+		hprintk("failed to allocate rbrq\n");
 		return -ENOMEM;
 	}
 	memset(he_dev->rbrq_base, 0, CONFIG_RBRQ_SIZE * sizeof(struct he_rbrq));
@@ -945,7 +944,7 @@ he_init_group(struct he_dev *he_dev, int group)
 						G0_RBRQ_Q + (group * 16));
 	if (irq_coalesce)
 	{
-		hprintk1("coalescing interrupts\n");
+		hprintk("coalescing interrupts\n");
 		he_writel(he_dev, RBRQ_TIME(768) | RBRQ_COUNT(7),
 						G0_RBRQ_I + (group * 16));
 	}
@@ -959,7 +958,7 @@ he_init_group(struct he_dev *he_dev, int group)
 		CONFIG_TBRQ_SIZE * sizeof(struct he_tbrq), &he_dev->tbrq_phys);
 	if (he_dev->tbrq_base == NULL)
 	{
-		hprintk1("failed to allocate tbrq\n");
+		hprintk("failed to allocate tbrq\n");
 		return -ENOMEM;
 	}
 	memset(he_dev->tbrq_base, 0, CONFIG_TBRQ_SIZE * sizeof(struct he_tbrq));
@@ -986,7 +985,7 @@ he_init_irq(struct he_dev *he_dev)
 			(CONFIG_IRQ_SIZE+1) * sizeof(struct he_irq), &he_dev->irq_phys);
 	if (he_dev->irq_base == NULL)
 	{
-		hprintk1("failed to allocate irq\n");
+		hprintk("failed to allocate irq\n");
 		return -ENOMEM;
 	}
 	he_dev->irq_tailoffset = (unsigned *)
@@ -1060,11 +1059,7 @@ he_start(struct atm_dev *dev)
         he_dev = HE_DEV(dev);
         pci_dev = he_dev->pci_dev;
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,3,3)
 	he_dev->membase = pci_dev->resource[0].start;
-#else
-	he_dev->membase = pci_dev->base_address[0] & PCI_BASE_ADDRESS_MEM_MASK;
-#endif
 	HPRINTK("membase = 0x%lx  irq = %d.\n", he_dev->membase, pci_dev->irq);
 
 	/*
@@ -1074,32 +1069,32 @@ he_start(struct atm_dev *dev)
 	/* 4.3 pci bus controller-specific initialization */
 	if (pci_read_config_dword(pci_dev, GEN_CNTL_0, &gen_cntl_0) != 0)
 	{
-		hprintk1("can't read GEN_CNTL_0\n");
+		hprintk("can't read GEN_CNTL_0\n");
 		return -EINVAL;
 	}
 	gen_cntl_0 |= (MRL_ENB | MRM_ENB | IGNORE_TIMEOUT);
 	if (pci_write_config_dword(pci_dev, GEN_CNTL_0, gen_cntl_0) != 0)
 	{
-		hprintk1("can't write GEN_CNTL_0.\n");
+		hprintk("can't write GEN_CNTL_0.\n");
 		return -EINVAL;
 	}
 
 	if (pci_read_config_word(pci_dev, PCI_COMMAND, &command) != 0)
 	{
-		hprintk1("can't read PCI_COMMAND.\n");
+		hprintk("can't read PCI_COMMAND.\n");
 		return -EINVAL;
 	}
 
 	command |= (PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER | PCI_COMMAND_INVALIDATE);
 	if (pci_write_config_word(pci_dev, PCI_COMMAND, command) != 0)
 	{
-		hprintk1("can't enable memory.\n");
+		hprintk("can't enable memory.\n");
 		return -EINVAL;
 	}
 
 	if (pci_read_config_byte(pci_dev, PCI_CACHE_LINE_SIZE, &cache_size))
 	{
-		hprintk1("can't read cache line size?\n");
+		hprintk("can't read cache line size?\n");
 		return -EINVAL;
 	}
 
@@ -1112,7 +1107,7 @@ he_start(struct atm_dev *dev)
 
 	if (pci_read_config_byte(pci_dev, PCI_LATENCY_TIMER, &timer))
 	{
-		hprintk1("can't read latency timer?\n");
+		hprintk("can't read latency timer?\n");
 		return -EINVAL;
 	}
 
@@ -1134,7 +1129,7 @@ he_start(struct atm_dev *dev)
 	}
 
 	if (!(he_dev->membase = (unsigned long) ioremap(he_dev->membase, HE_REGMAP_SIZE))) {
-		hprintk1("can't set up page mapping\n");
+		hprintk("can't set up page mapping\n");
 		return -EINVAL;
 	}
 	      
@@ -1146,7 +1141,7 @@ he_start(struct atm_dev *dev)
 	status = he_readl(he_dev, RESET_CNTL);
 	if ((status & BOARD_RST_STATUS) == 0)
 	{
-		hprintk1("reset failed\n");
+		hprintk("reset failed\n");
 		return -EINVAL;
 	}
 
@@ -1159,11 +1154,11 @@ he_start(struct atm_dev *dev)
 
 	if (disable64 == 1)
 	{
-		hprintk1("disabling 64-bit pci bus transfers\n");
+		hprintk("disabling 64-bit pci bus transfers\n");
 		gen_cntl_0 &= ~ENBL_64;
 	}
 
-	if (gen_cntl_0 & ENBL_64) hprintk1("64-bit transfers enabled\n");
+	if (gen_cntl_0 & ENBL_64) hprintk("64-bit transfers enabled\n");
 
 	pci_write_config_dword(pci_dev, GEN_CNTL_0, gen_cntl_0);
 
@@ -1526,16 +1521,11 @@ he_start(struct atm_dev *dev)
 	he_init_tpdrq(he_dev);
 
 #ifdef USE_TPD_POOL
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,44)
-	he_dev->tpd_pool = pci_pool_create("tpd", he_dev->pci_dev,
-		sizeof(struct he_tpd), TPD_ALIGNMENT, 0, SLAB_KERNEL);
-#else
 	he_dev->tpd_pool = pci_pool_create("tpd", he_dev->pci_dev,
 		sizeof(struct he_tpd), TPD_ALIGNMENT, 0);
-#endif
 	if (he_dev->tpd_pool == NULL)
 	{
-		hprintk1("unable to create tpd pci_pool\n");
+		hprintk("unable to create tpd pci_pool\n");
 		return -ENOMEM;         
 	}
 
@@ -1592,7 +1582,7 @@ he_start(struct atm_dev *dev)
 				sizeof(struct he_hsp), &he_dev->hsp_phys);
 	if (he_dev->hsp == NULL)
 	{
-		hprintk1("failed to allocate host status page\n");
+		hprintk("failed to allocate host status page\n");
 		return -ENOMEM;
 	}
 	memset(he_dev->hsp, 0, sizeof(struct he_hsp));
@@ -1632,7 +1622,7 @@ he_start(struct atm_dev *dev)
 			(1 << (he_dev->vcibits + he_dev->vpibits)), GFP_KERNEL);
 	if (he_dev->he_vcc_table == NULL)
 	{
-		hprintk1("failed to alloc he_vcc_table\n");
+		hprintk("failed to alloc he_vcc_table\n");
 		return -ENOMEM;
 	}
 	memset(he_dev->he_vcc_table, 0, sizeof(struct he_vcc_table) *
@@ -1868,7 +1858,7 @@ he_service_rbrq(struct he_dev *he_dev, int group)
 	struct sk_buff *skb;
 	struct atm_vcc *vcc = NULL;
 	struct he_vcc *he_vcc;
-	struct iovec *iov;
+	struct he_iovec *iov;
 	int pdus_assembled = 0;
 	int updated = 0;
 
@@ -1926,15 +1916,11 @@ he_service_rbrq(struct he_dev *he_dev, int group)
 		if (RBRQ_HBUF_ERR(he_dev->rbrq_head))
 		{
 			hprintk("HBUF_ERR!  (cid 0x%x)\n", cid);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,99)
-				++vcc->stats->rx_drop;
-#else
 				atomic_inc(&vcc->stats->rx_drop);
-#endif
 			goto return_host_buffers;
 		}
 
-		he_vcc->iov_tail->iov_base = (void *) RBRQ_ADDR(he_dev->rbrq_head);
+		he_vcc->iov_tail->iov_base = RBRQ_ADDR(he_dev->rbrq_head);
 		he_vcc->iov_tail->iov_len = buf_len;
 		he_vcc->pdu_len += buf_len;
 		++he_vcc->iov_tail;
@@ -1948,7 +1934,7 @@ he_service_rbrq(struct he_dev *he_dev, int group)
 		}
 
 #ifdef notdef
-		if (he_vcc->iov_tail - he_vcc->iov_head > 32)
+		if ((he_vcc->iov_tail - he_vcc->iov_head) > HE_MAXIOV)
 		{
 			hprintk("iovec full!  cid 0x%x\n", cid);
 			goto return_host_buffers;
@@ -1965,27 +1951,12 @@ he_service_rbrq(struct he_dev *he_dev, int group)
 				RBRQ_LEN_ERR(he_dev->rbrq_head)
 							? "LEN_ERR" : "",
 							vcc->vpi, vcc->vci);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,99)
-			++vcc->stats->rx_err;
-#else
 			atomic_inc(&vcc->stats->rx_err);
-#endif
 			goto return_host_buffers;
 		}
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,15)
 		skb = atm_alloc_charge(vcc, he_vcc->pdu_len + rx_skb_reserve,
 							GFP_ATOMIC);
-#else
-		if (!atm_charge(vcc, atm_pdu2truesize(he_vcc->pdu_len + rx_skb_reserve)))
-			skb = NULL;
-		else
-		{
-			skb = alloc_skb(he_vcc->pdu_len + rx_skb_reserve, GFP_ATOMIC);
-			if (!skb) atm_return(vcc,
-				atm_pdu2truesize(he_vcc->pdu_len + rx_skb_reserve));
-		}
-#endif
 		if (!skb)
 		{
 			HPRINTK("charge failed (%d.%d)\n", vcc->vpi, vcc->vci);
@@ -2000,7 +1971,7 @@ he_service_rbrq(struct he_dev *he_dev, int group)
 				iov < he_vcc->iov_tail; ++iov)
 		{
 #ifdef USE_RBPS
-			if ((u32)iov->iov_base & RBP_SMALLBUF)
+			if (iov->iov_base & RBP_SMALLBUF)
 				memcpy(skb_put(skb, iov->iov_len),
 					he_dev->rbps_virt[RBP_INDEX(iov->iov_base)].virt, iov->iov_len);
 			else
@@ -2042,11 +2013,7 @@ he_service_rbrq(struct he_dev *he_dev, int group)
 #endif
 		vcc->push(vcc, skb);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,99)
-		++vcc->stats->rx;
-#else
 		atomic_inc(&vcc->stats->rx);
-#endif
 
 return_host_buffers:
 		++pdus_assembled;
@@ -2055,7 +2022,7 @@ return_host_buffers:
 				iov < he_vcc->iov_tail; ++iov)
 		{
 #ifdef USE_RBPS
-			if ((u32)iov->iov_base & RBP_SMALLBUF)
+			if (iov->iov_base & RBP_SMALLBUF)
 				rbp = &he_dev->rbps_base[RBP_INDEX(iov->iov_base)];
 			else
 #endif
@@ -2309,13 +2276,13 @@ he_tasklet(unsigned long data)
 					he_dev->atm_dev->phy->interrupt(he_dev->atm_dev);
 				HE_SPIN_LOCK(he_dev, flags);
 #endif
-				HPRINTK1("phy interrupt\n");
+				HPRINTK("phy interrupt\n");
 				break;
 			case ITYPE_OTHER:
 				switch (type|group)
 				{
 					case ITYPE_PARITY:
-						hprintk1("parity error\n");
+						hprintk("parity error\n");
 						break;
 					case ITYPE_ABORT:
 						hprintk("abort 0x%x\n", he_readl(he_dev, ABORT_ADDR));
@@ -2362,11 +2329,7 @@ he_tasklet(unsigned long data)
 #endif
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,69)
 static irqreturn_t
-#else
-static void
-#endif
 he_irq_handler(int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned long flags;
@@ -2374,11 +2337,7 @@ he_irq_handler(int irq, void *dev_id, struct pt_regs *regs)
 	int handled = 0;
 
 	if (he_dev == NULL)
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,69)
 		return IRQ_NONE;
-#else
-		return;
-#endif
 
 	HE_SPIN_LOCK(he_dev, flags);
 
@@ -2387,7 +2346,7 @@ he_irq_handler(int irq, void *dev_id, struct pt_regs *regs)
 
 	if (he_dev->irq_tail == he_dev->irq_head)
 	{
-		HPRINTK1("tailoffset not updated?\n");
+		HPRINTK("tailoffset not updated?\n");
 		he_dev->irq_tail = (struct he_irq *) ((unsigned long)he_dev->irq_base |
 			((he_readl(he_dev, IRQ0_BASE) & IRQ_MASK) << 2));
 		(void) he_readl(he_dev, INT_FIFO);	/* 8.1.2 controller errata */
@@ -2395,7 +2354,7 @@ he_irq_handler(int irq, void *dev_id, struct pt_regs *regs)
 
 #ifdef DEBUG
 	if (he_dev->irq_head == he_dev->irq_tail /* && !IRQ_PENDING */)
-		hprintk1("spurious (or shared) interrupt?\n");
+		hprintk("spurious (or shared) interrupt?\n");
 #endif
 
 	if (he_dev->irq_head != he_dev->irq_tail)
@@ -2413,11 +2372,7 @@ he_irq_handler(int irq, void *dev_id, struct pt_regs *regs)
 #endif
 	}
 	HE_SPIN_UNLOCK(he_dev, flags);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,69)
 	return IRQ_RETVAL(handled);
-#else
-	return;
-#endif
 
 }
 
@@ -2461,11 +2416,7 @@ __enqueue_tpd(struct he_dev *he_dev, struct he_tpd *tpd, unsigned cid)
 					tpd->vcc->pop(tpd->vcc, tpd->skb);
 				else
 					dev_kfree_skb_any(tpd->skb);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,99)
-				++tpd->vcc->stats->tx_err;
-#else
 				atomic_inc(&tpd->vcc->stats->tx_err);
-#endif
 			}
 #ifdef USE_TPD_POOL
 			pci_pool_free(he_dev->tpd_pool, tpd, TPD_ADDR(tpd->status));
@@ -2516,18 +2467,14 @@ he_open(struct atm_vcc *vcc, short vpi, int vci)
 
 	HPRINTK("open vcc %p %d.%d\n", vcc, vpi, vci);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,1)
-	vcc->flags |= ATM_VF_ADDR;
-#else
 	set_bit(ATM_VF_ADDR, &vcc->flags);
-#endif
 
 	cid = he_mkcid(he_dev, vpi, vci);
 
 	he_vcc = (struct he_vcc *) kmalloc(sizeof(struct he_vcc), GFP_ATOMIC);
 	if (he_vcc == NULL)
 	{
-		hprintk1("unable to allocate he_vcc during open\n");
+		hprintk("unable to allocate he_vcc during open\n");
 		return -ENOMEM;
 	}
 
@@ -2535,13 +2482,8 @@ he_open(struct atm_vcc *vcc, short vpi, int vci)
 	he_vcc->pdu_len = 0;
 	he_vcc->rc_index = -1;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,1)
-	init_waitqueue(&he_vcc->rx_waitq);
-	init_waitqueue(&he_vcc->tx_waitq);
-#else
 	init_waitqueue_head(&he_vcc->rx_waitq);
 	init_waitqueue_head(&he_vcc->tx_waitq);
-#endif
 
 	HE_VCC(vcc) = he_vcc;
 
@@ -2736,20 +2678,10 @@ open_failed:
 	if (err)
 	{
 		if (he_vcc) kfree(he_vcc);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,1)
-		vcc->flags &= ~ATM_VF_ADDR;
-#else
 		clear_bit(ATM_VF_ADDR, &vcc->flags);
-#endif
 	}
 	else
-	{
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,1)
-		vcc->flags |= ATM_VF_READY;
-#else
 		set_bit(ATM_VF_READY, &vcc->flags);
-#endif
-	}
 
 	return err;
 }
@@ -2758,11 +2690,7 @@ static void
 he_close(struct atm_vcc *vcc)
 {
 	unsigned long flags;
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,3,1)
 	DECLARE_WAITQUEUE(wait, current);
-#else
-	struct wait_queue wait = { current, NULL };
-#endif
 	struct he_dev *he_dev = HE_DEV(vcc->dev);
 	struct he_tpd *tpd;
 	unsigned cid;
@@ -2772,11 +2700,7 @@ he_close(struct atm_vcc *vcc)
 
 	HPRINTK("close vcc %p %d.%d\n", vcc, vcc->vpi, vcc->vci);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,1)
-	vcc->flags &= ~ATM_VF_READY;
-#else
 	clear_bit(ATM_VF_READY, &vcc->flags);
-#endif
 	cid = he_mkcid(he_dev, vcc->vpi, vcc->vci);
 
 	if (vcc->qos.rxtp.traffic_class != ATM_NONE)
@@ -2936,11 +2860,7 @@ close_tx_incomplete:
 
 	kfree(he_vcc);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,1)
-	vcc->flags &= ~ATM_VF_ADDR;
-#else
 	clear_bit(ATM_VF_ADDR, &vcc->flags);
-#endif
 }
 
 static int
@@ -2976,27 +2896,19 @@ he_send(struct atm_vcc *vcc, struct sk_buff *skb)
 			vcc->pop(vcc, skb);
 		else
 			dev_kfree_skb_any(skb);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,99)
-		++vcc->stats->tx_err;
-#else
 		atomic_inc(&vcc->stats->tx_err);
-#endif
 		return -EINVAL;
 	}
 
 #ifndef USE_SCATTERGATHER
 	if (skb_shinfo(skb)->nr_frags)
 	{
-		hprintk1("no scatter/gather support\n");
+		hprintk("no scatter/gather support\n");
 		if (vcc->pop)
 			vcc->pop(vcc, skb);
 		else
 			dev_kfree_skb_any(skb);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,99)
-		++vcc->stats->tx_err;
-#else
 		atomic_inc(&vcc->stats->tx_err);
-#endif
 		return -EINVAL;
 	}
 #endif
@@ -3009,11 +2921,7 @@ he_send(struct atm_vcc *vcc, struct sk_buff *skb)
 			vcc->pop(vcc, skb);
 		else
 			dev_kfree_skb_any(skb);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,99)
-		++vcc->stats->tx_err;
-#else
 		atomic_inc(&vcc->stats->tx_err);
-#endif
 		HE_SPIN_UNLOCK(he_dev, flags);
 		return -ENOMEM;
 	}
@@ -3058,12 +2966,8 @@ he_send(struct atm_vcc *vcc, struct sk_buff *skb)
 					vcc->pop(vcc, skb);
 				else
 					dev_kfree_skb_any(skb);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,99)
-				++vcc->stats->tx_err;
-#else
 				atomic_inc(&vcc->stats->tx_err);
 				HE_SPIN_UNLOCK(he_dev, flags);
-#endif
 				return -ENOMEM;
 			}
 			tpd->status |= TPD_USERCELL;
@@ -3093,11 +2997,7 @@ he_send(struct atm_vcc *vcc, struct sk_buff *skb)
 	__enqueue_tpd(he_dev, tpd, cid);
 	HE_SPIN_UNLOCK(he_dev, flags);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,99)
-	++vcc->stats->tx;
-#else
 	atomic_inc(&vcc->stats->tx);
-#endif
 
 	return 0;
 }
@@ -3323,6 +3223,7 @@ read_prom_byte(struct he_dev *he_dev, int addr)
         return (byte_read);
 }
 
+MODULE_LICENSE("GPL");
 MODULE_AUTHOR("chas williams <chas@cmf.nrl.navy.mil>");
 MODULE_DESCRIPTION("ForeRunnerHE ATM Adapter driver");
 MODULE_PARM(disable64, "h");
@@ -3338,7 +3239,6 @@ MODULE_PARM_DESC(irq_coalesce, "use interrupt coalescing (default 1)");
 MODULE_PARM(sdh, "i");
 MODULE_PARM_DESC(sdh, "use SDH framing (default 0)");
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,3,1)
 static struct pci_device_id he_pci_tbl[] __devinitdata = {
 	{ PCI_VENDOR_ID_FORE, PCI_DEVICE_ID_FORE_HE, PCI_ANY_ID, PCI_ANY_ID,
 	  0, 0, 0 },
@@ -3348,11 +3248,7 @@ static struct pci_device_id he_pci_tbl[] __devinitdata = {
 static struct pci_driver he_driver = {
 	.name =		"he",
 	.probe =	he_init_one,
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,4,9)
 	.remove =	__devexit_p(he_remove_one),
-#else
-	.remove =	he_remove_one,
-#endif
 	.id_table =	he_pci_tbl,
 };
 
@@ -3368,52 +3264,3 @@ static void __exit he_cleanup(void)
 
 module_init(he_init);
 module_exit(he_cleanup);
-#else
-static int __init
-he_init()
-{
-	if (!pci_present())
-		return -EIO;
-
-#ifdef CONFIG_ATM_HE_USE_SUNI_MODULE
-	/* request_module("suni"); */
-#endif
-
-	pci_dev = NULL;
-	while ((pci_dev = pci_find_device(PCI_VENDOR_ID_FORE,
-					PCI_DEVICE_ID_FORE_HE, pci_dev)) != NULL)
-		if (he_init_one(pci_dev, NULL) == 0)
-			++ndevs;
-
-	return (ndevs ? 0 : -ENODEV);
-}
-
-static void __devexit
-he_cleanup(void)
-{
-	while (he_devs)
-	{
-		struct he_dev *next = he_devs->next;
-		he_stop(he_devs);
-		atm_dev_deregister(he_devs->atm_dev);
-		kfree(he_devs);
-
-		he_devs = next;
-	}
-
-}
-
-int init_module(void)
-{
-	return he_init();
-}
-
-void cleanup_module(void)
-{
-	he_cleanup();
-}
-#endif
-
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,4,7)
-MODULE_LICENSE("GPL");
-#endif

@@ -51,6 +51,7 @@
 #include <linux/delay.h>
 #include <linux/ctype.h>
 #include <linux/blk.h>
+#include <asm/io.h>
 #include "scsi.h"
 #include "hosts.h"
 #include "dc395x.h"

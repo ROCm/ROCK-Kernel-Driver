@@ -65,7 +65,6 @@ unsigned int aac_response_normal(struct aac_queue * q)
 	unsigned long flags;
 
 	spin_lock_irqsave(q->lock, flags);	
-
 	/*
 	 *	Keep pulling response QEs off the response queue and waking
 	 *	up the waiters until there are no more QEs. We then return
@@ -74,12 +73,13 @@ unsigned int aac_response_normal(struct aac_queue * q)
 	 */
 	while(aac_consumer_get(dev, q, &entry))
 	{
-		int fast;
-
-		fast = (int) (entry->addr & 0x01);
-		hwfib = addr2fib(entry->addr & ~0x01);
-		aac_consumer_free(dev, q, HostNormRespQueue);
+		u32 fast ;
+		fast = (entry->addr & cpu_to_le32(0x01));
+		hwfib = (struct hw_fib *)((char *)dev->hw_fib_va + 
+				((entry->addr & ~0x01) - dev->hw_fib_pa));
 		fib = &dev->fibs[hwfib->header.SenderData];
+
+		aac_consumer_free(dev, q, HostNormRespQueue);
 		/*
 		 *	Remove this fib from the Outstanding I/O queue.
 		 *	But only if it has not already been timed out.
@@ -93,6 +93,7 @@ unsigned int aac_response_normal(struct aac_queue * q)
 			dev->queues->queue[AdapNormCmdQueue].numpending--;
 		} else {
 			printk(KERN_WARNING "aacraid: FIB timeout (%x).\n", fib->flags);
+			printk(KERN_DEBUG"aacraid: hwfib=%p fib index=%i fib=%p\n",hwfib, hwfib->header.SenderData,fib);
 			continue;
 		}
 		spin_unlock_irqrestore(q->lock, flags);
@@ -171,11 +172,12 @@ unsigned int aac_command_normal(struct aac_queue *q)
 	 */
 	while(aac_consumer_get(dev, q, &entry))
 	{
-		struct hw_fib * fib;
-		fib = addr2fib(entry->addr);
+		struct hw_fib * hw_fib;
+		hw_fib = (struct hw_fib *)((char *)dev->hw_fib_va + 
+				((entry->addr & ~0x01) - dev->hw_fib_pa));
 
 		if (dev->aif_thread) {
-		        list_add_tail(&fib->header.FibLinks, &q->cmdq);
+		        aac_list_add_tail(&hw_fib->header.FibLinks, &q->cmdq);
 	 	        aac_consumer_free(dev, q, HostNormCmdQueue);
 		        wake_up_interruptible(&q->cmdready);
 		} else {
@@ -185,13 +187,13 @@ unsigned int aac_command_normal(struct aac_queue *q)
 			memset(&fibctx, 0, sizeof(struct fib));
 			fibctx.type = FSAFS_NTC_FIB_CONTEXT;
 			fibctx.size = sizeof(struct fib);
-			fibctx.fib = fib;
-			fibctx.data = fib->data;
+			fibctx.hw_fib = hw_fib;
+			fibctx.data = hw_fib->data;
 			fibctx.dev = dev;
 			/*
 			 *	Set the status of this FIB
 			 */
-			*(u32 *)fib->data = cpu_to_le32(ST_OK);
+			*(u32 *)hw_fib->data = cpu_to_le32(ST_OK);
 			fib_adapter_complete(&fibctx, sizeof(u32));
 			spin_lock_irqsave(q->lock, flags);
 		}		

@@ -355,21 +355,24 @@ struct he_dev {
 	struct he_dev *next;
 };
 
+struct he_iovec
+{
+	u32 iov_base;
+	u32 iov_len;
+};
+
+#define HE_MAXIOV 20
+
 struct he_vcc
 {
-	struct iovec iov_head[32];
-	struct iovec *iov_tail;
+	struct he_iovec iov_head[HE_MAXIOV];
+	struct he_iovec *iov_tail;
 	int pdu_len;
 
 	int rc_index;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,1)
-	struct wait_queue *rx_waitq;
-	atruct wait_queue *tx_waitq;
-#else
 	wait_queue_head_t rx_waitq;
 	wait_queue_head_t tx_waitq;
-#endif
 };
 
 #define HE_VCC(vcc)	((struct he_vcc *)(vcc->dev_data))

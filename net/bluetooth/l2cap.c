@@ -145,8 +145,6 @@ static struct l2cap_conn *l2cap_conn_add(struct hci_conn *hcon, u8 status)
 	conn->chan_list.lock = RW_LOCK_UNLOCKED;
 
 	BT_DBG("hcon %p conn %p", hcon, conn);
-
-	MOD_INC_USE_COUNT;
 	return conn;
 }
 
@@ -173,8 +171,6 @@ static int l2cap_conn_del(struct hci_conn *hcon, int err)
 
 	hcon->l2cap_data = NULL;
 	kfree(conn);
-
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -242,8 +238,6 @@ static void l2cap_sock_destruct(struct sock *sk)
 
 	if (sk->protinfo)
 		kfree(sk->protinfo);
-	
-	MOD_DEC_USE_COUNT;
 }
 
 static void l2cap_sock_cleanup_listen(struct sock *parent)
@@ -356,6 +350,8 @@ static struct sock *l2cap_sock_alloc(struct socket *sock, int proto, int prio)
 	if (!sk)
 		return NULL;
 
+	sk_set_owner(sk, THIS_MODULE);
+
 	sk->destruct = l2cap_sock_destruct;
 	sk->sndtimeo = L2CAP_CONN_TIMEOUT;
 
@@ -365,8 +361,6 @@ static struct sock *l2cap_sock_alloc(struct socket *sock, int proto, int prio)
 	l2cap_sock_init_timer(sk);
 
 	bt_sock_link(&l2cap_sk_list, sk);
-
-	MOD_INC_USE_COUNT;
 	return sk;
 }
 
@@ -1319,15 +1313,18 @@ static int l2cap_build_conf_rsp(struct sock *sk, void *data, int *result)
 {
 	struct l2cap_conf_rsp *rsp = data;
 	void *ptr = rsp->data;
+	u16 flags = 0;
 
 	BT_DBG("sk %p complete %d", sk, result ? 1 : 0);
 
 	if (result)
 		*result = l2cap_conf_output(sk, &ptr);
+	else
+		flags = 0x0001;
 
 	rsp->scid   = __cpu_to_le16(l2cap_pi(sk)->dcid);
 	rsp->result = __cpu_to_le16(result ? *result : 0);
-	rsp->flags  = __cpu_to_le16(0);
+	rsp->flags  = __cpu_to_le16(flags);
 
 	return ptr - data;
 }
@@ -1440,7 +1437,7 @@ static inline int l2cap_connect_rsp(struct l2cap_conn *conn, struct l2cap_cmd_hd
 	case L2CAP_CR_SUCCESS:
 		sk->state = BT_CONFIG;
 		l2cap_pi(sk)->dcid = dcid;
-		l2cap_pi(sk)->conf_state |= CONF_REQ_SENT;
+		l2cap_pi(sk)->conf_state |= L2CAP_CONF_REQ_SENT;
 
 		l2cap_send_req(conn, L2CAP_CONF_REQ, l2cap_build_conf_req(sk, req), req);
 		break;
@@ -1475,7 +1472,7 @@ static inline int l2cap_config_req(struct l2cap_conn *conn, struct l2cap_cmd_hdr
 
 	l2cap_parse_conf_req(sk, req->data, cmd->len - sizeof(*req));
 
-	if (flags & 0x01) {
+	if (flags & 0x0001) {
 		/* Incomplete config. Send empty response. */
 		l2cap_send_rsp(conn, cmd->ident, L2CAP_CONF_RSP, l2cap_build_conf_rsp(sk, rsp, NULL), rsp);
 		goto unlock;
@@ -1488,12 +1485,12 @@ static inline int l2cap_config_req(struct l2cap_conn *conn, struct l2cap_cmd_hdr
 		goto unlock;
 
 	/* Output config done */
-	l2cap_pi(sk)->conf_state |= CONF_OUTPUT_DONE;
+	l2cap_pi(sk)->conf_state |= L2CAP_CONF_OUTPUT_DONE;
 
-	if (l2cap_pi(sk)->conf_state & CONF_INPUT_DONE) {
+	if (l2cap_pi(sk)->conf_state & L2CAP_CONF_INPUT_DONE) {
 		sk->state = BT_CONNECTED;
 		l2cap_chan_ready(sk);
-	} else if (!(l2cap_pi(sk)->conf_state & CONF_REQ_SENT)) {
+	} else if (!(l2cap_pi(sk)->conf_state & L2CAP_CONF_REQ_SENT)) {
 		u8 req[64];
 		l2cap_send_req(conn, L2CAP_CONF_REQ, l2cap_build_conf_req(sk, req), req);
 	}
@@ -1538,9 +1535,9 @@ static inline int l2cap_config_rsp(struct l2cap_conn *conn, struct l2cap_cmd_hdr
 		goto done;
 
 	/* Input config done */
-	l2cap_pi(sk)->conf_state |= CONF_INPUT_DONE;
+	l2cap_pi(sk)->conf_state |= L2CAP_CONF_INPUT_DONE;
 
-	if (l2cap_pi(sk)->conf_state & CONF_OUTPUT_DONE) {
+	if (l2cap_pi(sk)->conf_state & L2CAP_CONF_OUTPUT_DONE) {
 		sk->state = BT_CONNECTED;
 		l2cap_chan_ready(sk);
 	}
@@ -1943,19 +1940,25 @@ static int l2cap_recv_acldata(struct hci_conn *hcon, struct sk_buff *skb, u16 fl
 		}
 
 		if (skb->len < 2) {
-			BT_ERR("Frame is too small (len %d)", skb->len);
+			BT_ERR("Frame is too short (len %d)", skb->len);
 			goto drop;
 		}
 
 		hdr = (struct l2cap_hdr *) skb->data;
 		len = __le16_to_cpu(hdr->len) + L2CAP_HDR_SIZE;
 
-		BT_DBG("Start: total len %d, frag len %d", len, skb->len);
-
 		if (len == skb->len) {
 			/* Complete frame received */
 			l2cap_recv_frame(conn, skb);
 			return 0;
+		}
+
+		BT_DBG("Start: total len %d, frag len %d", len, skb->len);
+
+		if (skb->len > len) {
+			BT_ERR("Frame is too long (len %d, expected len %d)",
+				skb->len, len);
+			goto drop;
 		}
 
 		/* Allocate skb for the complete frame (with header) */
@@ -1973,7 +1976,7 @@ static int l2cap_recv_acldata(struct hci_conn *hcon, struct sk_buff *skb, u16 fl
 		}
 
 		if (skb->len > conn->rx_len) {
-			BT_ERR("Fragment is too large (len %d, expect %d)",
+			BT_ERR("Fragment is too long (len %d, expected %d)",
 					skb->len, conn->rx_len);
 			kfree_skb(conn->rx_skb);
 			conn->rx_skb = NULL;
@@ -2048,6 +2051,7 @@ static int l2cap_seq_open(struct inode *inode, struct file *file)
 }
 
 static struct file_operations l2cap_seq_fops = {
+	.owner	 = THIS_MODULE,
 	.open    = l2cap_seq_open,
 	.read    = seq_read,
 	.llseek  = seq_lseek,
@@ -2133,7 +2137,6 @@ int __init l2cap_init(void)
 		return err;
 	}
 
-
 	l2cap_proc_init();
 	
 	BT_INFO("L2CAP ver %s", VERSION);
@@ -2153,6 +2156,15 @@ void __exit l2cap_cleanup(void)
 	if (hci_unregister_proto(&l2cap_hci_proto))
 		BT_ERR("L2CAP protocol unregistration failed");
 }
+
+void l2cap_load(void)
+{
+	/* Dummy function to trigger automatic L2CAP module loading by 
+	   other modules that use L2CAP sockets but don not use any other
+	   symbols from it. */
+	return;
+}
+EXPORT_SYMBOL(l2cap_load);
 
 module_init(l2cap_init);
 module_exit(l2cap_cleanup);

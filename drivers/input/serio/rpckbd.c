@@ -54,20 +54,24 @@ static int rpckbd_write(struct serio *port, unsigned char val)
 	return 0;
 }
 
-static void rpckbd_rx(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t rpckbd_rx(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct serio *port = dev_id;
 	unsigned int byte;
+	int handled = IRQ_NONE;
 
 	while (iomd_readb(IOMD_KCTRL) & (1 << 5)) {
 		byte = iomd_readb(IOMD_KARTRX);
 
 		serio_interrupt(port, byte, 0, regs);
+		handled = IRQ_HANDLED;
 	}
+	return handled;
 }
 
-static void rpckbd_tx(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t rpckbd_tx(int irq, void *dev_id, struct pt_regs *regs)
 {
+	return IRQ_HANDLED;
 }
 
 static int rpckbd_open(struct serio *port)

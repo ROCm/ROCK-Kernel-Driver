@@ -10,13 +10,15 @@
  * sctp_ulpevent type is used to carry information from the state machine
  * upwards to the ULP.
  *
- * The SCTP reference implementation  is free software;
+ * This file is part of the SCTP kernel reference Implementation
+ *
+ * The SCTP reference implementation is free software;
  * you can redistribute it and/or modify it under the terms of
  * the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
  * any later version.
  *
- * the SCTP reference implementation  is distributed in the hope that it
+ * The SCTP reference implementation is distributed in the hope that it
  * will be useful, but WITHOUT ANY WARRANTY; without even the implied
  *                 ************************
  * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
@@ -27,12 +29,17 @@
  * the Free Software Foundation, 59 Temple Place - Suite 330,
  * Boston, MA 02111-1307, USA.
  *
- * Please send any bug reports or fixes you make to one of the
- * following email addresses:
+ * Please send any bug reports or fixes you make to the
+ * email address(es):
+ *    lksctp developers <lksctp-developers@lists.sourceforge.net>
  *
- * Jon Grimm <jgrimm@us.ibm.com>
- * La Monte H.P. Yarroll <piggy@acm.org>
- * Karl Knutson <karl@athena.chicago.il.us>
+ * Or submit a bug report through the following website:
+ *    http://www.sf.net/projects/lksctp
+ *
+ * Written or modified by:
+ *   Jon Grimm             <jgrimm@us.ibm.com>
+ *   La Monte H.P. Yarroll <piggy@acm.org>
+ *   Karl Knutson          <karl@athena.chicago.il.us>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -64,7 +71,7 @@ static inline struct sctp_ulpevent *sctp_skb2event(struct sk_buff *skb)
 	return (struct sctp_ulpevent *)skb->cb;
 }
 
-struct sctp_ulpevent *sctp_ulpevent_new(int size, int flags, int priority);
+struct sctp_ulpevent *sctp_ulpevent_new(int size, int flags, int gfp);
 struct sctp_ulpevent *sctp_ulpevent_init(struct sctp_ulpevent *, int flags);
 void sctp_ulpevent_free(struct sctp_ulpevent *);
 int sctp_ulpevent_is_notification(const struct sctp_ulpevent *);
@@ -76,7 +83,7 @@ struct sctp_ulpevent *sctp_ulpevent_make_assoc_change(
 	__u16 error,
 	__u16 outbound,
 	__u16 inbound,
-	int priority);
+	int gfp);
 
 struct sctp_ulpevent *sctp_ulpevent_make_peer_addr_change(
 	const struct sctp_association *asoc,
@@ -84,32 +91,32 @@ struct sctp_ulpevent *sctp_ulpevent_make_peer_addr_change(
 	int flags,
 	int state,
 	int error,
-	int priority);
+	int gfp);
 
 struct sctp_ulpevent *sctp_ulpevent_make_remote_error(
 	const struct sctp_association *asoc,
 	struct sctp_chunk *chunk,
 	__u16 flags,
-	int priority);
+	int gfp);
 struct sctp_ulpevent *sctp_ulpevent_make_send_failed(
 	const struct sctp_association *asoc,
 	struct sctp_chunk *chunk,
 	__u16 flags,
 	__u32 error,
-	int priority);
+	int gfp);
 
 struct sctp_ulpevent *sctp_ulpevent_make_shutdown_event(
 	const struct sctp_association *asoc,
 	__u16 flags,
-	int priority);
+	int gfp);
 
 struct sctp_ulpevent *sctp_ulpevent_make_pdapi(
 	const struct sctp_association *asoc,
-	__u32 indication, int priority);
+	__u32 indication, int gfp);
 
 struct sctp_ulpevent *sctp_ulpevent_make_rcvmsg(struct sctp_association *asoc,
 	struct sctp_chunk *chunk,
-	int priority);
+	int gfp);
 
 void sctp_ulpevent_read_sndrcvinfo(const struct sctp_ulpevent *event,
 	struct msghdr *);

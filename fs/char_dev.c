@@ -102,9 +102,7 @@ get_chrfops(unsigned int major, unsigned int minor)
 
 #ifdef CONFIG_KMOD
 	if (!ret) {
-		char name[32];
-		sprintf(name, "char-major-%d", major);
-		request_module(name);
+		request_module("char-major-%d", major);
 
 		read_lock(&chrdevs_lock);
 		ret = lookup_chrfops(major, minor);

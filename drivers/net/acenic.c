@@ -1871,7 +1871,9 @@ static void ace_watchdog(struct net_device *data)
 	} else {
 		printk(KERN_DEBUG "%s: BUG... transmitter died. Kicking it.\n",
 		       dev->name);
+#if 0
 		netif_wake_queue(dev);
+#endif
 	}
 }
 

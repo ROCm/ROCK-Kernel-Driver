@@ -144,7 +144,7 @@ static void xfrm_timer_handler(unsigned long data)
 resched:
 	if (next != LONG_MAX &&
 	    !mod_timer(&x->timer, jiffies + make_jiffies(next)))
-		atomic_inc(&x->refcnt);
+		xfrm_state_hold(x);
 	goto out;
 
 expired:
@@ -172,6 +172,7 @@ struct xfrm_state *xfrm_state_alloc(void)
 	if (x) {
 		memset(x, 0, sizeof(struct xfrm_state));
 		atomic_set(&x->refcnt, 1);
+		atomic_set(&x->tunnel_users, 0);
 		INIT_LIST_HEAD(&x->bydst);
 		INIT_LIST_HEAD(&x->byspi);
 		init_timer(&x->timer);
@@ -234,6 +235,7 @@ static void __xfrm_state_delete(struct xfrm_state *x)
 
 void xfrm_state_delete(struct xfrm_state *x)
 {
+	xfrm_state_delete_tunnel(x);
 	spin_lock_bh(&x->lock);
 	__xfrm_state_delete(x);
 	spin_unlock_bh(&x->lock);
@@ -248,8 +250,9 @@ void xfrm_state_flush(u8 proto)
 	for (i = 0; i < XFRM_DST_HSIZE; i++) {
 restart:
 		list_for_each_entry(x, xfrm_state_bydst+i, bydst) {
-			if (proto == IPSEC_PROTO_ANY || x->id.proto == proto) {
-				atomic_inc(&x->refcnt);
+			if (!xfrm_state_kern(x) &&
+			    (proto == IPSEC_PROTO_ANY || x->id.proto == proto)) {
+				xfrm_state_hold(x);
 				spin_unlock_bh(&xfrm_state_lock);
 
 				xfrm_state_delete(x);
@@ -329,7 +332,7 @@ xfrm_state_find(xfrm_address_t *daddr, xfrm_address_t *saddr,
 	}
 
 	if (best) {
-		atomic_inc(&best->refcnt);
+		xfrm_state_hold(best);
 		spin_unlock_bh(&xfrm_state_lock);
 		return best;
 	}
@@ -344,14 +347,14 @@ xfrm_state_find(xfrm_address_t *daddr, xfrm_address_t *saddr,
 		if (km_query(x, tmpl, pol) == 0) {
 			x->km.state = XFRM_STATE_ACQ;
 			list_add_tail(&x->bydst, xfrm_state_bydst+h);
-			atomic_inc(&x->refcnt);
+			xfrm_state_hold(x);
 			if (x->id.spi) {
 				h = xfrm_spi_hash(&x->id.daddr, x->id.spi, x->id.proto, family);
 				list_add(&x->byspi, xfrm_state_byspi+h);
-				atomic_inc(&x->refcnt);
+				xfrm_state_hold(x);
 			}
 			x->lft.hard_add_expires_seconds = XFRM_ACQ_EXPIRES;
-			atomic_inc(&x->refcnt);
+			xfrm_state_hold(x);
 			mod_timer(&x->timer, XFRM_ACQ_EXPIRES*HZ);
 		} else {
 			x->km.state = XFRM_STATE_DEAD;
@@ -373,15 +376,15 @@ void xfrm_state_insert(struct xfrm_state *x)
 
 	spin_lock_bh(&xfrm_state_lock);
 	list_add(&x->bydst, xfrm_state_bydst+h);
-	atomic_inc(&x->refcnt);
+	xfrm_state_hold(x);
 
 	h = xfrm_spi_hash(&x->id.daddr, x->id.spi, x->id.proto, x->props.family);
 
 	list_add(&x->byspi, xfrm_state_byspi+h);
-	atomic_inc(&x->refcnt);
+	xfrm_state_hold(x);
 
 	if (!mod_timer(&x->timer, jiffies + HZ))
-		atomic_inc(&x->refcnt);
+		xfrm_state_hold(x);
 
 	spin_unlock_bh(&xfrm_state_lock);
 	wake_up(&km_waitq);
@@ -399,7 +402,7 @@ int xfrm_state_check_expire(struct xfrm_state *x)
 	    x->curlft.packets >= x->lft.hard_packet_limit) {
 		km_expired(x);
 		if (!mod_timer(&x->timer, jiffies + XFRM_ACQ_EXPIRES*HZ))
-			atomic_inc(&x->refcnt);
+			xfrm_state_hold(x);
 		return -EINVAL;
 	}
 
@@ -466,7 +469,7 @@ struct xfrm_state * xfrm_find_acq_byseq(u32 seq)
 	for (i = 0; i < XFRM_DST_HSIZE; i++) {
 		list_for_each_entry(x, xfrm_state_bydst+i, bydst) {
 			if (x->km.seq == seq) {
-				atomic_inc(&x->refcnt);
+				xfrm_state_hold(x);
 				spin_unlock_bh(&xfrm_state_lock);
 				return x;
 			}
@@ -521,7 +524,7 @@ xfrm_alloc_spi(struct xfrm_state *x, u32 minspi, u32 maxspi)
 		spin_lock_bh(&xfrm_state_lock);
 		h = xfrm_spi_hash(&x->id.daddr, x->id.spi, x->id.proto, x->props.family);
 		list_add(&x->byspi, xfrm_state_byspi+h);
-		atomic_inc(&x->refcnt);
+		xfrm_state_hold(x);
 		spin_unlock_bh(&xfrm_state_lock);
 		wake_up(&km_waitq);
 	}
@@ -788,6 +791,20 @@ void xfrm_state_put_afinfo(struct xfrm_state_afinfo *afinfo)
 	if (unlikely(afinfo == NULL))
 		return;
 	read_unlock(&afinfo->lock);
+}
+
+/* Temporarily located here until net/xfrm/xfrm_tunnel.c is created */
+void xfrm_state_delete_tunnel(struct xfrm_state *x)
+{
+	if (x->tunnel) {
+		struct xfrm_state *t = x->tunnel;
+
+		if (atomic_read(&t->tunnel_users) == 2)
+			xfrm_state_delete(t);
+		atomic_dec(&t->tunnel_users);
+		xfrm_state_put(t);
+		x->tunnel = NULL;
+	}
 }
 
 void __init xfrm_state_init(void)

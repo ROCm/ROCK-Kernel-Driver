@@ -426,7 +426,7 @@ int ip_nat_helper_register(struct ip_nat_helper *me)
 			tmp += 6;
 			sprintf(name, "ip_conntrack%s", tmp);
 #ifdef CONFIG_KMOD
-			if (!request_module(name)
+			if (!request_module("ip_conntrack%s", tmp)
 			    && (ct_helper = ip_ct_find_helper(&me->tuple))) {
 				if (!try_module_get(ct_helper->me))
 					return -EBUSY;

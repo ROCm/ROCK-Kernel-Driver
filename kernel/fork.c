@@ -379,7 +379,6 @@ static struct mm_struct * mm_init(struct mm_struct * mm)
 	free_mm(mm);
 	return NULL;
 }
-	
 
 /*
  * Allocate and initialize an mm_struct.
@@ -450,7 +449,7 @@ void mm_release(struct task_struct *tsk, struct mm_struct *mm)
 		complete(vfork_done);
 	}
 	if (tsk->clear_child_tid && atomic_read(&mm->mm_users) > 1) {
-		u32 * tidptr = tsk->clear_child_tid;
+		u32 __user * tidptr = tsk->clear_child_tid;
 		tsk->clear_child_tid = NULL;
 
 		/*
@@ -543,7 +542,7 @@ static inline struct fs_struct *__copy_fs_struct(struct fs_struct *old)
 		} else {
 			fs->altrootmnt = NULL;
 			fs->altroot = NULL;
-		}	
+		}
 		read_unlock(&old->lock);
 	}
 	return fs;
@@ -562,14 +561,14 @@ static inline int copy_fs(unsigned long clone_flags, struct task_struct * tsk)
 	}
 	tsk->fs = __copy_fs_struct(current->fs);
 	if (!tsk->fs)
-		return -1;
+		return -ENOMEM;
 	return 0;
 }
 
 static int count_open_files(struct files_struct *files, int size)
 {
 	int i;
-	
+
 	/* Find the last open fd */
 	for (i = size/(8*sizeof(long)); i > 0; ) {
 		if (files->open_fds->fds_bits[--i])
@@ -669,7 +668,7 @@ static int copy_files(unsigned long clone_flags, struct task_struct * tsk)
 	if (newf->max_fdset > open_files) {
 		int left = (newf->max_fdset-open_files)/8;
 		int start = open_files / (8 * sizeof(unsigned long));
-		
+
 		memset(&newf->open_fds->fds_bits[start], 0, left);
 		memset(&newf->close_on_exec->fds_bits[start], 0, left);
 	}
@@ -697,7 +696,7 @@ static inline int copy_sighand(unsigned long clone_flags, struct task_struct * t
 	sig = kmem_cache_alloc(sighand_cachep, GFP_KERNEL);
 	tsk->sighand = sig;
 	if (!sig)
-		return -1;
+		return -ENOMEM;
 	spin_lock_init(&sig->siglock);
 	atomic_set(&sig->count, 1);
 	memcpy(sig->action, current->sighand->action, sizeof(sig->action));
@@ -715,7 +714,7 @@ static inline int copy_signal(unsigned long clone_flags, struct task_struct * ts
 	sig = kmem_cache_alloc(signal_cachep, GFP_KERNEL);
 	tsk->signal = sig;
 	if (!sig)
-		return -1;
+		return -ENOMEM;
 	atomic_set(&sig->count, 1);
 	sig->group_exit = 0;
 	sig->group_exit_code = 0;
@@ -738,7 +737,7 @@ static inline void copy_flags(unsigned long clone_flags, struct task_struct *p)
 	p->flags = new_flags;
 }
 
-asmlinkage long sys_set_tid_address(int *tidptr)
+asmlinkage long sys_set_tid_address(int __user *tidptr)
 {
 	current->clear_child_tid = tidptr;
 
@@ -757,8 +756,8 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 			    unsigned long stack_start,
 			    struct pt_regs *regs,
 			    unsigned long stack_size,
-			    int *parent_tidptr,
-			    int *child_tidptr)
+			    int __user *parent_tidptr,
+			    int __user *child_tidptr)
 {
 	int retval;
 	struct task_struct *p = NULL;
@@ -800,7 +799,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	 */
 	if (nr_threads >= max_threads)
 		goto bad_fork_cleanup_count;
-	
+
 	if (!try_module_get(p->thread_info->exec_domain->module))
 		goto bad_fork_cleanup_count;
 
@@ -860,23 +859,22 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	p->security = NULL;
 
 	retval = -ENOMEM;
-	if (security_task_alloc(p))
+	if ((retval = security_task_alloc(p)))
 		goto bad_fork_cleanup;
 	/* copy all the process information */
-	if (copy_semundo(clone_flags, p))
+	if ((retval = copy_semundo(clone_flags, p)))
 		goto bad_fork_cleanup_security;
-	if (copy_files(clone_flags, p))
+	if ((retval = copy_files(clone_flags, p)))
 		goto bad_fork_cleanup_semundo;
-	if (copy_fs(clone_flags, p))
+	if ((retval = copy_fs(clone_flags, p)))
 		goto bad_fork_cleanup_files;
-	if (copy_sighand(clone_flags, p))
+	if ((retval = copy_sighand(clone_flags, p)))
 		goto bad_fork_cleanup_fs;
-	if (copy_signal(clone_flags, p))
+	if ((retval = copy_signal(clone_flags, p)))
 		goto bad_fork_cleanup_sighand;
-	if (copy_mm(clone_flags, p))
+	if ((retval = copy_mm(clone_flags, p)))
 		goto bad_fork_cleanup_signal;
-	retval = copy_namespace(clone_flags, p);
-	if (retval)
+	if ((retval = copy_namespace(clone_flags, p)))
 		goto bad_fork_cleanup_mm;
 	retval = copy_thread(0, clone_flags, stack_start, stack_size, p, regs);
 	if (retval)
@@ -1073,8 +1071,8 @@ struct task_struct *do_fork(unsigned long clone_flags,
 			    unsigned long stack_start,
 			    struct pt_regs *regs,
 			    unsigned long stack_size,
-			    int *parent_tidptr,
-			    int *child_tidptr)
+			    int __user *parent_tidptr,
+			    int __user *child_tidptr)
 {
 	struct task_struct *p;
 	int trace = 0;

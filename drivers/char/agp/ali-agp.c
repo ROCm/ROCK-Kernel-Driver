@@ -19,9 +19,9 @@ static int ali_fetch_size(void)
 
 	pci_read_config_dword(agp_bridge->dev, ALI_ATTBASE, &temp);
 	temp &= ~(0xfffffff0);
-	values = A_SIZE_32(agp_bridge->aperture_sizes);
+	values = A_SIZE_32(agp_bridge->driver->aperture_sizes);
 
-	for (i = 0; i < agp_bridge->num_aperture_sizes; i++) {
+	for (i = 0; i < agp_bridge->driver->num_aperture_sizes; i++) {
 		if (temp == values[i].size_value) {
 			agp_bridge->previous_size =
 			    agp_bridge->current_size = (void *) (values + i);
@@ -118,47 +118,51 @@ static unsigned long ali_mask_memory(unsigned long addr, int type)
 {
 	/* Memory type is ignored */
 
-	return addr | agp_bridge->masks[0].mask;
+	return addr | agp_bridge->driver->masks[0].mask;
 }
 
-static void ali_cache_flush(void)
+static void m1541_cache_flush(void)
 {
-	global_cache_flush();
-
-	if (agp_bridge->type == ALI_M1541) {
-		int i, page_count;
-		u32 temp;
-
-		page_count = 1 << A_SIZE_32(agp_bridge->current_size)->page_order;
-		for (i = 0; i < PAGE_SIZE * page_count; i += PAGE_SIZE) {
-			pci_read_config_dword(agp_bridge->dev, ALI_CACHE_FLUSH_CTRL, &temp);
-			pci_write_config_dword(agp_bridge->dev, ALI_CACHE_FLUSH_CTRL,
-					(((temp & ALI_CACHE_FLUSH_ADDR_MASK) |
-					  (agp_bridge->gatt_bus_addr + i)) |
-					    ALI_CACHE_FLUSH_EN));
-		}
-	}
-}
-
-static void *ali_alloc_page(void)
-{
-	void *adr = agp_generic_alloc_page();
+	int i, page_count;
 	u32 temp;
 
-	if (adr == 0)
-		return 0;
+	global_cache_flush();
 
-	if (agp_bridge->type == ALI_M1541) {
-		pci_read_config_dword(agp_bridge->dev, ALI_CACHE_FLUSH_CTRL, &temp);
+	page_count = 1 << A_SIZE_32(agp_bridge->current_size)->page_order;
+	for (i = 0; i < PAGE_SIZE * page_count; i += PAGE_SIZE) {
+		pci_read_config_dword(agp_bridge->dev, ALI_CACHE_FLUSH_CTRL,
+				&temp);
 		pci_write_config_dword(agp_bridge->dev, ALI_CACHE_FLUSH_CTRL,
 				(((temp & ALI_CACHE_FLUSH_ADDR_MASK) |
-				  virt_to_phys(adr)) |
-				    ALI_CACHE_FLUSH_EN ));
+				  (agp_bridge->gatt_bus_addr + i)) |
+				 ALI_CACHE_FLUSH_EN));
 	}
-	return adr;
+}
+
+static void *m1541_alloc_page(void)
+{
+	void *addr = agp_generic_alloc_page();
+	u32 temp;
+
+	if (!addr)
+		return NULL;
+	
+	pci_read_config_dword(agp_bridge->dev, ALI_CACHE_FLUSH_CTRL, &temp);
+	pci_write_config_dword(agp_bridge->dev, ALI_CACHE_FLUSH_CTRL,
+			(((temp & ALI_CACHE_FLUSH_ADDR_MASK) |
+			  virt_to_phys(addr)) | ALI_CACHE_FLUSH_EN ));
+	return addr;
 }
 
 static void ali_destroy_page(void * addr)
+{
+	if (addr) {
+		global_cache_flush();	/* is this really needed?  --hch */
+		agp_generic_destroy_page(addr);
+	}
+}
+
+static void m1541_destroy_page(void * addr)
 {
 	u32 temp;
 
@@ -167,16 +171,13 @@ static void ali_destroy_page(void * addr)
 
 	global_cache_flush();
 
-	if (agp_bridge->type == ALI_M1541) {
-		pci_read_config_dword(agp_bridge->dev, ALI_CACHE_FLUSH_CTRL, &temp);
-		pci_write_config_dword(agp_bridge->dev, ALI_CACHE_FLUSH_CTRL,
-				(((temp & ALI_CACHE_FLUSH_ADDR_MASK) |
-				  virt_to_phys(addr)) |
-				    ALI_CACHE_FLUSH_EN));
-	}
-
+	pci_read_config_dword(agp_bridge->dev, ALI_CACHE_FLUSH_CTRL, &temp);
+	pci_write_config_dword(agp_bridge->dev, ALI_CACHE_FLUSH_CTRL,
+			(((temp & ALI_CACHE_FLUSH_ADDR_MASK) |
+			  virt_to_phys(addr)) | ALI_CACHE_FLUSH_EN));
 	agp_generic_destroy_page(addr);
 }
+
 
 /* Setup function */
 static struct gatt_mask ali_generic_masks[] =
@@ -195,170 +196,185 @@ static struct aper_size_info_32 ali_generic_sizes[7] =
 	{4, 1024, 0, 3}
 };
 
-static int __init ali_generic_setup (struct pci_dev *pdev)
-{
-	agp_bridge->masks = ali_generic_masks;
-	agp_bridge->aperture_sizes = (void *) ali_generic_sizes;
-	agp_bridge->size_type = U32_APER_SIZE;
-	agp_bridge->num_aperture_sizes = 7;
-	agp_bridge->dev_private_data = NULL;
-	agp_bridge->needs_scratch_page = FALSE;
-	agp_bridge->configure = ali_configure;
-	agp_bridge->fetch_size = ali_fetch_size;
-	agp_bridge->cleanup = ali_cleanup;
-	agp_bridge->tlb_flush = ali_tlbflush;
-	agp_bridge->mask_memory = ali_mask_memory;
-	agp_bridge->agp_enable = agp_generic_enable;
-	agp_bridge->cache_flush = ali_cache_flush;
-	agp_bridge->create_gatt_table = agp_generic_create_gatt_table;
-	agp_bridge->free_gatt_table = agp_generic_free_gatt_table;
-	agp_bridge->insert_memory = agp_generic_insert_memory;
-	agp_bridge->remove_memory = agp_generic_remove_memory;
-	agp_bridge->alloc_by_type = agp_generic_alloc_by_type;
-	agp_bridge->free_by_type = agp_generic_free_by_type;
-	agp_bridge->agp_alloc_page = ali_alloc_page;
-	agp_bridge->agp_destroy_page = ali_destroy_page;
-	agp_bridge->suspend = agp_generic_suspend;
-	agp_bridge->resume = agp_generic_resume;
-	agp_bridge->cant_use_aperture = 0;
-	return 0;
-}
+struct agp_bridge_driver ali_generic_bridge = {
+	.owner			= THIS_MODULE,
+	.masks			= ali_generic_masks,
+	.aperture_sizes		= ali_generic_sizes,
+	.size_type		= U32_APER_SIZE,
+	.num_aperture_sizes	= 7,
+	.configure		= ali_configure,
+	.fetch_size		= ali_fetch_size,
+	.cleanup		= ali_cleanup,
+	.tlb_flush		= ali_tlbflush,
+	.mask_memory		= ali_mask_memory,
+	.agp_enable		= agp_generic_enable,
+	.cache_flush		= global_cache_flush,
+	.create_gatt_table	= agp_generic_create_gatt_table,
+	.free_gatt_table	= agp_generic_free_gatt_table,
+	.insert_memory		= agp_generic_insert_memory,
+	.remove_memory		= agp_generic_remove_memory,
+	.alloc_by_type		= agp_generic_alloc_by_type,
+	.free_by_type		= agp_generic_free_by_type,
+	.agp_alloc_page		= agp_generic_alloc_page,
+	.agp_destroy_page	= ali_destroy_page,
+	.suspend		= agp_generic_suspend,
+	.resume			= agp_generic_resume,
+};
+
+struct agp_bridge_driver ali_m1541_bridge = {
+	.owner			= THIS_MODULE,
+	.masks			= ali_generic_masks,
+	.aperture_sizes		= ali_generic_sizes,
+	.size_type		= U32_APER_SIZE,
+	.num_aperture_sizes	= 7,
+	.configure		= ali_configure,
+	.fetch_size		= ali_fetch_size,
+	.cleanup		= ali_cleanup,
+	.tlb_flush		= ali_tlbflush,
+	.mask_memory		= ali_mask_memory,
+	.agp_enable		= agp_generic_enable,
+	.cache_flush		= m1541_cache_flush,
+	.create_gatt_table	= agp_generic_create_gatt_table,
+	.free_gatt_table	= agp_generic_free_gatt_table,
+	.insert_memory		= agp_generic_insert_memory,
+	.remove_memory		= agp_generic_remove_memory,
+	.alloc_by_type		= agp_generic_alloc_by_type,
+	.free_by_type		= agp_generic_free_by_type,
+	.agp_alloc_page		= m1541_alloc_page,
+	.agp_destroy_page	= m1541_destroy_page,
+	.suspend		= agp_generic_suspend,
+	.resume			= agp_generic_resume,
+};
+
 
 struct agp_device_ids ali_agp_device_ids[] __initdata =
 {
 	{
 		.device_id	= PCI_DEVICE_ID_AL_M1541,
-		.chipset	= ALI_M1541,
 		.chipset_name	= "M1541",
 	},
 	{
 		.device_id	= PCI_DEVICE_ID_AL_M1621,
-		.chipset	= ALI_M1621,
 		.chipset_name	= "M1621",
 	},
 	{
 		.device_id	= PCI_DEVICE_ID_AL_M1631,
-		.chipset	= ALI_M1631,
 		.chipset_name	= "M1631",
 	},
 	{
 		.device_id	= PCI_DEVICE_ID_AL_M1632,
-		.chipset	= ALI_M1632,
 		.chipset_name	= "M1632",
 	},
 	{
 		.device_id	= PCI_DEVICE_ID_AL_M1641,
-		.chipset	= ALI_M1641,
 		.chipset_name	= "M1641",
 	},
 	{
 		.device_id	= PCI_DEVICE_ID_AL_M1644,
-		.chipset	= ALI_M1644,
 		.chipset_name	= "M1644",
 	},
 	{
 		.device_id	= PCI_DEVICE_ID_AL_M1647,
-		.chipset	= ALI_M1647,
 		.chipset_name	= "M1647",
 	},
 	{
 		.device_id	= PCI_DEVICE_ID_AL_M1651,
-		.chipset	= ALI_M1651,
 		.chipset_name	= "M1651",
 	},
 	{
 		.device_id	= PCI_DEVICE_ID_AL_M1671,
-		.chipset	= ALI_M1671,
 		.chipset_name	= "M1671",
 	},
 	{ }, /* dummy final entry, always present */
 };
 
-/* scan table above for supported devices */
-static int __init agp_lookup_host_bridge (struct pci_dev *pdev)
+static int __init agp_ali_probe(struct pci_dev *pdev,
+				const struct pci_device_id *ent)
 {
-	int j=0;
-	struct agp_device_ids *devs;
-	
-	devs = ali_agp_device_ids;
+	struct agp_device_ids *devs = ali_agp_device_ids;
+	struct agp_bridge_data *bridge;
+	u8 hidden_1621_id, cap_ptr;
+	int j;
 
-	while (devs[j].chipset_name != NULL) {
-		if (pdev->device == devs[j].device_id) {
-			if (pdev->device == PCI_DEVICE_ID_AL_M1621) {
-				u8 hidden_1621_id;
-
-				pci_read_config_byte(pdev, 0xFB, &hidden_1621_id);
-				switch (hidden_1621_id) {
-				case 0x31:
-					devs[j].chipset_name="M1631";
-					break;
-				case 0x32:
-					devs[j].chipset_name="M1632";
-					break;
-				case 0x41:
-					devs[j].chipset_name="M1641";
-					break;
-				case 0x43:
-					break;
-				case 0x47:
-					devs[j].chipset_name="M1647";
-					break;
-				case 0x51:
-					devs[j].chipset_name="M1651";
-					break;
-				default:
-					break;
-				}
-			}
-
-			printk (KERN_INFO PFX "Detected ALi %s chipset\n",
-				devs[j].chipset_name);
-			agp_bridge->type = devs[j].chipset;
-
-			if (devs[j].chipset_setup != NULL)
-				return devs[j].chipset_setup(pdev);
-			else
-				return ali_generic_setup(pdev);
-		}
-		j++;
-	}
-
-	/* try init anyway, if user requests it */
-	if (agp_try_unsupported) {
-		printk(KERN_WARNING PFX "Trying generic ALi routines"
-		       " for device id: %04x\n", pdev->device);
-		agp_bridge->type = ALI_GENERIC;
-		return ali_generic_setup(pdev);
-	}
-
-	printk(KERN_ERR PFX "Unsupported ALi chipset (device id: %04x),"
-		" you might want to try agp_try_unsupported=1.\n", pdev->device);
-	return -ENODEV;
-}
-
-static struct agp_driver ali_agp_driver = {
-	.owner = THIS_MODULE,
-};
-
-static int __init agp_ali_probe (struct pci_dev *dev, const struct pci_device_id *ent)
-{
-	u8 cap_ptr = 0;
-
-	cap_ptr = pci_find_capability(dev, PCI_CAP_ID_AGP);
-	if (cap_ptr == 0)
+	cap_ptr = pci_find_capability(pdev, PCI_CAP_ID_AGP);
+	if (!cap_ptr)
 		return -ENODEV;
 
 	/* probe for known chipsets */
-	if (agp_lookup_host_bridge(dev) != -ENODEV) {
-		agp_bridge->dev = dev;
-		agp_bridge->capndx = cap_ptr;
-		/* Fill in the mode register */
-		pci_read_config_dword(agp_bridge->dev, agp_bridge->capndx+PCI_AGP_STATUS, &agp_bridge->mode);
-		ali_agp_driver.dev = dev;
-		agp_register_driver(&ali_agp_driver);
-		return 0;
+	for (j = 0; devs[j].chipset_name; j++) {
+		if (pdev->device == devs[j].device_id)
+			goto found;
 	}
-	return -ENODEV;	
+
+	if (!agp_try_unsupported) {
+		printk(KERN_ERR PFX
+		     "Unsupported ALi chipset (device id: %04x),"
+		     " you might want to try agp_try_unsupported=1.\n",
+		     pdev->device);
+		return -ENODEV;
+	}
+
+	printk(KERN_WARNING PFX "Trying generic ALi routines"
+	       " for device id: %04x\n", pdev->device);
+
+found:
+	bridge = agp_alloc_bridge();
+	if (!bridge)
+		return -ENOMEM;
+
+	bridge->dev = pdev;
+	bridge->capndx = cap_ptr;
+
+	switch (pdev->device) {
+	case PCI_DEVICE_ID_AL_M1541:
+		bridge->driver = &ali_m1541_bridge;
+		break;
+	case PCI_DEVICE_ID_AL_M1621:
+		pci_read_config_byte(pdev, 0xFB, &hidden_1621_id);
+		switch (hidden_1621_id) {
+		case 0x31:
+			devs[j].chipset_name = "M1631";
+			break;
+		case 0x32:
+			devs[j].chipset_name = "M1632";
+			break;
+		case 0x41:
+			devs[j].chipset_name = "M1641";
+			break;
+		case 0x43:
+			break;
+		case 0x47:
+			devs[j].chipset_name = "M1647";
+			break;
+		case 0x51:
+			devs[j].chipset_name = "M1651";
+			break;
+		default:
+			break;
+		}
+		/*FALLTHROUGH*/
+	default:
+		bridge->driver = &ali_generic_bridge;
+	}
+
+	printk(KERN_INFO PFX "Detected ALi %s chipset\n",
+			devs[j].chipset_name);
+
+	/* Fill in the mode register */
+	pci_read_config_dword(pdev,
+			bridge->capndx+PCI_AGP_STATUS,
+			&bridge->mode);
+
+	pci_set_drvdata(pdev, bridge);
+	return agp_add_bridge(bridge);
+}
+
+static void __devexit agp_ali_remove(struct pci_dev *pdev)
+{
+	struct agp_bridge_data *bridge = pci_get_drvdata(pdev);
+
+	agp_remove_bridge(bridge);
+	agp_put_bridge(bridge);
 }
 
 static struct pci_device_id agp_ali_pci_table[] __initdata = {
@@ -379,22 +395,16 @@ static struct __initdata pci_driver agp_ali_pci_driver = {
 	.name		= "agpgart-ali",
 	.id_table	= agp_ali_pci_table,
 	.probe		= agp_ali_probe,
+	.remove		= agp_ali_remove,
 };
 
 static int __init agp_ali_init(void)
 {
-	int ret_val;
-
-	ret_val = pci_module_init(&agp_ali_pci_driver);
-	if (ret_val)
-		agp_bridge->type = NOT_SUPPORTED;
-
-	return ret_val;
+	return pci_module_init(&agp_ali_pci_driver);
 }
 
 static void __exit agp_ali_cleanup(void)
 {
-	agp_unregister_driver(&ali_agp_driver);
 	pci_unregister_driver(&agp_ali_pci_driver);
 }
 

@@ -29,6 +29,10 @@
 #include "scsi.h"
 #include "hosts.h"
 
+#include "scsi_priv.h"
+#include "scsi_logging.h"
+
+
 /* 4K page size, but our output routines, use some slack for overruns */
 #define PROC_BLOCK_SIZE (3*1024)
 
@@ -196,77 +200,6 @@ static void proc_print_scsidevice(struct scsi_device* sdev, char *buffer,
 	return;
 }
 
-/* 
- * proc_scsi_dev_info_read: dump the scsi_dev_info_list via
- * /proc/scsi/device_info
- */
-static int proc_scsi_dev_info_read(char *buffer, char **start, off_t offset,
-				   int length)
-{
-	struct scsi_dev_info_list *devinfo;
-	int size, len = 0;
-	off_t begin = 0;
-	off_t pos = 0;
-
-	list_for_each_entry(devinfo, &scsi_dev_info_list, dev_info_list) {
-		size = sprintf(buffer + len, "'%.8s' '%.16s' 0x%x\n",
-			       devinfo->vendor, devinfo->model, devinfo->flags);
-		len += size;
-		pos = begin + len;
-		if (pos < offset) {
-			len = 0;
-			begin = pos;
-		}
-		if (pos > offset + length)
-			goto stop_output;
-	}
-
-stop_output:
-	*start = buffer + (offset - begin);	/* Start of wanted data */
-	len -= (offset - begin);	/* Start slop */
-	if (len > length)
-		len = length;	/* Ending slop */
-	return (len);
-}
-
-/* 
- * proc_scsi_dev_info_write: allow additions to the scsi_dev_info_list via
- * /proc.
- *
- * Use: echo "vendor:model:flag" > /proc/scsi/device_info
- *
- * To add a black/white list entry for vendor and model with an integer
- * value of flag to the scsi device info list.
- */
-static int proc_scsi_dev_info_write (struct file * file, const char * buf,
-                              unsigned long length, void *data)
-{
-	char *buffer;
-	int err = length;
-
-	if (!buf || length>PAGE_SIZE)
-		return -EINVAL;
-	if (!(buffer = (char *) __get_free_page(GFP_KERNEL)))
-		return -ENOMEM;
-	if (copy_from_user(buffer, buf, length)) {
-		err =-EFAULT;
-		goto out;
-	}
-
-	if (length < PAGE_SIZE)
-		buffer[length] = '\0';
-	else if (buffer[PAGE_SIZE-1]) {
-		err = -EINVAL;
-		goto out;
-	}
-
-	scsi_dev_info_list_add_str(buffer);
-
-out:
-	free_page((unsigned long)buffer);
-	return err;
-}
-
 static int scsi_proc_info(char *buffer, char **start, off_t offset, int length)
 {
 	struct Scsi_Host *shost;
@@ -312,91 +245,6 @@ stop_output:
 	return (len);
 }
 
-#ifdef CONFIG_SCSI_LOGGING
-/*
- * Function:    scsi_dump_status
- *
- * Purpose:     Brain dump of scsi system, used for problem solving.
- *
- * Arguments:   level - used to indicate level of detail.
- *
- * Notes:       The level isn't used at all yet, but we need to find some
- *		way of sensibly logging varying degrees of information.
- *		A quick one-line display of each command, plus the status
- *		would be most useful.
- *
- *              This does depend upon CONFIG_SCSI_LOGGING - I do want some
- *		way of turning it all off if the user wants a lean and mean
- *		kernel.  It would probably also be useful to allow the user
- *		to specify one single host to be dumped.  A second argument
- *		to the function would be useful for that purpose.
- *
- *              FIXME - some formatting of the output into tables would be
- *		        very handy.
- */
-static void scsi_dump_status(int level)
-{
-	int i;
-	struct Scsi_Host *shpnt;
-	Scsi_Cmnd *SCpnt;
-	Scsi_Device *SDpnt;
-	printk(KERN_INFO "Dump of scsi host parameters:\n");
-	i = 0;
-	for (shpnt = scsi_host_get_next(NULL); shpnt;
-	     shpnt = scsi_host_get_next(shpnt)) {
-		printk(KERN_INFO " %d %d : %d %d\n",
-		       shpnt->host_failed,
-		       shpnt->host_busy,
-		       shpnt->host_blocked,
-		       shpnt->host_self_blocked);
-	}
-
-	printk(KERN_INFO "\n\n");
-	printk(KERN_INFO "Dump of scsi command parameters:\n");
-	for (shpnt = scsi_host_get_next(NULL); shpnt;
-	     shpnt = scsi_host_get_next(shpnt)) {
-		printk(KERN_INFO "h:c:t:l (dev sect nsect cnumsec sg) "
-			"(ret all flg) (to/cmd to ito) cmd snse result\n");
-		list_for_each_entry(SDpnt, &shpnt->my_devices, siblings) {
-			unsigned long flags;
-
-			spin_lock_irqsave(&SDpnt->list_lock, flags);
-			list_for_each_entry(SCpnt, &SDpnt->cmd_list, list) {
-				/*  (0) h:c:t:l (dev sect nsect cnumsec sg) (ret all flg) (to/cmd to ito) cmd snse result %d %x      */
-				printk(KERN_INFO "(%3d) %2d:%1d:%2d:%2d (%6s %4llu %4ld %4ld %4x %1d) (%1d %1d 0x%2x) (%4d %4d %4d) 0x%2.2x 0x%2.2x 0x%8.8x\n",
-				       i++,
-
-				       SCpnt->device->host->host_no,
-				       SCpnt->device->channel,
-                                       SCpnt->device->id,
-                                       SCpnt->device->lun,
-
-                                       SCpnt->request->rq_disk ?
-                                       SCpnt->request->rq_disk->disk_name : "?",
-                                       (unsigned long long)SCpnt->request->sector,
-				       SCpnt->request->nr_sectors,
-				       (long)SCpnt->request->current_nr_sectors,
-				       SCpnt->request->rq_status,
-				       SCpnt->use_sg,
-
-				       SCpnt->retries,
-				       SCpnt->allowed,
-				       SCpnt->flags,
-
-				       SCpnt->timeout_per_command,
-				       SCpnt->timeout,
-				       SCpnt->internal_timeout,
-
-				       SCpnt->cmnd[0],
-				       SCpnt->sense_buffer[2],
-				       SCpnt->result);
-			}
-			spin_unlock_irqrestore(&SDpnt->list_lock, flags);
-		}
-	}
-}
-#endif	/* CONFIG_SCSI_LOGGING */ 
-
 static int scsi_add_single_device(uint host, uint channel, uint id, uint lun)
 {
 	struct Scsi_Host *shost;
@@ -440,7 +288,6 @@ out:
 	return error;
 }
 
-
 static int proc_scsi_gen_write(struct file * file, const char * buf,
                               unsigned long length, void *data)
 {
@@ -470,22 +317,6 @@ static int proc_scsi_gen_write(struct file * file, const char * buf,
 		goto out;
 
 #ifdef CONFIG_SCSI_LOGGING
-	/*
-	 * Usage: echo "scsi dump #N" > /proc/scsi/scsi
-	 * to dump status of all scsi commands.  The number is used to
-	 * specify the level of detail in the dump.
-	 */
-	if (!strncmp("dump", buffer + 5, 4)) {
-		unsigned int level;
-
-		p = buffer + 10;
-
-		if (*p == '\0')
-			goto out;
-
-		level = simple_strtoul(p, NULL, 0);
-		scsi_dump_status(level);
-	}
 	/*
 	 * Usage: echo "scsi log token #N" > /proc/scsi/scsi
 	 * where token is one of [error,scan,mlqueue,mlcomplete,llqueue,
@@ -614,15 +445,8 @@ int __init scsi_init_procfs(void)
 		goto err2;
 	pde->write_proc = proc_scsi_gen_write;
 
-	pde = create_proc_info_entry("scsi/device_info", 0, 0,
-					  proc_scsi_dev_info_read);
-	if (!pde)
-		goto err3;
-	pde->write_proc = proc_scsi_dev_info_write;
 	return 0;
 
-err3:
-	remove_proc_entry("scsi/scsi", 0);
 err2:
 	remove_proc_entry("scsi", 0);
 err1:
@@ -631,7 +455,6 @@ err1:
 
 void scsi_exit_procfs(void)
 {
-	remove_proc_entry("scsi/device_info", 0);
 	remove_proc_entry("scsi/scsi", 0);
 	remove_proc_entry("scsi", 0);
 }

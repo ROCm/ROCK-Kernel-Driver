@@ -1015,7 +1015,7 @@ STATIC int inflate(void)
 
 static ulg crc_32_tab[256];
 static ulg crc;		/* initialized in makecrc() so it'll reside in bss */
-#define CRC_VALUE (crc ^ 0xffffffffL)
+#define CRC_VALUE (crc ^ 0xffffffffUL)
 
 /*
  * Code to compute the CRC-32 table. Borrowed from 
@@ -1055,7 +1055,7 @@ makecrc(void)
   }
 
   /* this is initialized here so this code could reside in ROM */
-  crc = (ulg)0xffffffffL; /* shift register contents */
+  crc = (ulg)0xffffffffUL; /* shift register contents */
 }
 
 /* gzip flag byte */

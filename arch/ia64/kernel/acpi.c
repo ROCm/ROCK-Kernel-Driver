@@ -115,134 +115,6 @@ acpi_get_sysname (void)
 #endif
 }
 
-#ifdef CONFIG_ACPI
-
-/**
- * acpi_get_crs - Return the current resource settings for a device
- * obj: A handle for this device
- * buf: A buffer to be populated by this call.
- *
- * Pass a valid handle, typically obtained by walking the namespace and a
- * pointer to an allocated buffer, and this function will fill in the buffer
- * with a list of acpi_resource structures.
- */
-acpi_status
-acpi_get_crs (acpi_handle obj, struct acpi_buffer *buf)
-{
-	acpi_status result;
-	buf->length = 0;
-	buf->pointer = NULL;
-
-	result = acpi_get_current_resources(obj, buf);
-	if (result != AE_BUFFER_OVERFLOW)
-		return result;
-	buf->pointer = kmalloc(buf->length, GFP_KERNEL);
-	if (!buf->pointer)
-		return -ENOMEM;
-
-	return acpi_get_current_resources(obj, buf);
-}
-
-struct acpi_resource *
-acpi_get_crs_next (struct acpi_buffer *buf, int *offset)
-{
-	struct acpi_resource *res;
-
-	if (*offset >= buf->length)
-		return NULL;
-
-	res = buf->pointer + *offset;
-	*offset += res->length;
-	return res;
-}
-
-union acpi_resource_data *
-acpi_get_crs_type (struct acpi_buffer *buf, int *offset, int type)
-{
-	for (;;) {
-		struct acpi_resource *res = acpi_get_crs_next(buf, offset);
-		if (!res)
-			return NULL;
-		if (res->id == type)
-			return &res->data;
-	}
-}
-
-void
-acpi_dispose_crs (struct acpi_buffer *buf)
-{
-	kfree(buf->pointer);
-}
-
-void
-acpi_get_crs_addr (struct acpi_buffer *buf, int type, u64 *base, u64 *size, u64 *tra)
-{
-	int offset = 0;
-	struct acpi_resource_address16 *addr16;
-	struct acpi_resource_address32 *addr32;
-	struct acpi_resource_address64 *addr64;
-
-	for (;;) {
-		struct acpi_resource *res = acpi_get_crs_next(buf, &offset);
-		if (!res)
-			return;
-		switch (res->id) {
-			case ACPI_RSTYPE_ADDRESS16:
-				addr16 = (struct acpi_resource_address16 *) &res->data;
-
-				if (type == addr16->resource_type) {
-					*base = addr16->min_address_range;
-					*size = addr16->address_length;
-					*tra = addr16->address_translation_offset;
-					return;
-				}
-				break;
-			case ACPI_RSTYPE_ADDRESS32:
-				addr32 = (struct acpi_resource_address32 *) &res->data;
-				if (type == addr32->resource_type) {
-					*base = addr32->min_address_range;
-					*size = addr32->address_length;
-					*tra = addr32->address_translation_offset;
-					return;
-				}
-				break;
-			case ACPI_RSTYPE_ADDRESS64:
-				addr64 = (struct acpi_resource_address64 *) &res->data;
-				if (type == addr64->resource_type) {
-					*base = addr64->min_address_range;
-					*size = addr64->address_length;
-					*tra = addr64->address_translation_offset;
-					return;
-				}
-				break;
-		}
-	}
-}
-
-int
-acpi_get_addr_space(void *obj, u8 type, u64 *base, u64 *length, u64 *tra)
-{
-	acpi_status status;
-	struct acpi_buffer buf;
-
-	*base = 0;
-	*length = 0;
-	*tra = 0;
-
-	status = acpi_get_crs((acpi_handle)obj, &buf);
-	if (ACPI_FAILURE(status)) {
-		printk(KERN_ERR PREFIX "Unable to get _CRS data on object\n");
-		return status;
-	}
-
-	acpi_get_crs_addr(&buf, type, base, length, tra);
-
-	acpi_dispose_crs(&buf);
-
-	return AE_OK;
-}
-#endif /* CONFIG_ACPI */
-
 #ifdef CONFIG_ACPI_BOOT
 
 #define ACPI_MAX_PLATFORM_INTERRUPTS	256
@@ -324,7 +196,8 @@ acpi_parse_lsapic (acpi_table_entry_header *header)
 		printk(" enabled");
 #ifdef CONFIG_SMP
 		smp_boot_data.cpu_phys_id[total_cpus] = (lsapic->id << 8) | lsapic->eid;
-		if (hard_smp_processor_id() == smp_boot_data.cpu_phys_id[total_cpus])
+		if (hard_smp_processor_id()
+		    == (unsigned int) smp_boot_data.cpu_phys_id[total_cpus])
 			printk(" (BSP)");
 #endif
 	}
@@ -918,8 +791,7 @@ acpi_register_irq (u32 gsi, u32 polarity, u32 trigger)
 		return 0;
 
 	/* Turn it on */
-	vector = iosapic_register_intr (gsi, polarity ? IOSAPIC_POL_HIGH : IOSAPIC_POL_LOW,
-			trigger ? IOSAPIC_EDGE : IOSAPIC_LEVEL);
+	vector = iosapic_register_intr (gsi, polarity, trigger);
 	return vector;
 }
 

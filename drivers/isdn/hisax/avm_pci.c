@@ -730,7 +730,7 @@ setup_avm_pcipnp(struct IsdnCard *card)
 			}
 		}
 #endif
-#if CONFIG_PCI
+#ifdef CONFIG_PCI
 		if ((dev_avm = pci_find_device(PCI_VENDOR_ID_AVM,
 			PCI_DEVICE_ID_AVM_A1,  dev_avm))) {
 			if (avm_pci_probe(card->cs, dev_avm))

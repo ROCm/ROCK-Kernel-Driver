@@ -54,7 +54,7 @@ int tcp_tw_count;
 
 
 /* Must be called with locally disabled BHs. */
-void tcp_timewait_kill(struct tcp_tw_bucket *tw)
+static void tcp_timewait_kill(struct tcp_tw_bucket *tw)
 {
 	struct tcp_ehash_bucket *ehead;
 	struct tcp_bind_hashbucket *bhead;
@@ -166,7 +166,6 @@ tcp_timewait_state_process(struct tcp_tw_bucket *tw, struct sk_buff *skb,
 		if (!th->fin || TCP_SKB_CB(skb)->end_seq != tw->rcv_nxt+1) {
 kill_with_rst:
 			tcp_tw_deschedule(tw);
-			tcp_timewait_kill(tw);
 			tcp_tw_put(tw);
 			return TCP_TW_RST;
 		}
@@ -223,7 +222,6 @@ kill_with_rst:
 			if (sysctl_tcp_rfc1337 == 0) {
 kill:
 				tcp_tw_deschedule(tw);
-				tcp_timewait_kill(tw);
 				tcp_tw_put(tw);
 				return TCP_TW_SUCCESS;
 			}
@@ -381,10 +379,8 @@ void tcp_time_wait(struct sock *sk, int state, int timeo)
 		if(tw->family == PF_INET6) {
 			struct ipv6_pinfo *np = inet6_sk(sk);
 
-			memcpy(&tw->v6_daddr, &np->daddr,
-			       sizeof(struct in6_addr));
-			memcpy(&tw->v6_rcv_saddr, &np->rcv_saddr,
-			       sizeof(struct in6_addr));
+			ipv6_addr_copy(&tw->v6_daddr, &np->daddr);
+			ipv6_addr_copy(&tw->v6_rcv_saddr, &np->rcv_saddr);
 		}
 #endif
 		/* Linkage updates. */
@@ -486,6 +482,7 @@ void tcp_tw_deschedule(struct tcp_tw_bucket *tw)
 			del_timer(&tcp_tw_timer);
 	}
 	spin_unlock(&tw_death_lock);
+	tcp_timewait_kill(tw);
 }
 
 /* Short-time timewait calendar */
@@ -760,6 +757,7 @@ struct sock *tcp_create_openreq_child(struct sock *sk, struct open_request *req,
 			tcp_reset_keepalive_timer(newsk, keepalive_time_when(newtp));
 		newsk->socket = NULL;
 		newsk->sleep = NULL;
+		newsk->owner = NULL;
 
 		newtp->tstamp_ok = req->tstamp_ok;
 		if((newtp->sack_ok = req->sack_ok) != 0) {

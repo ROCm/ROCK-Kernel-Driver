@@ -1342,7 +1342,7 @@ asmlinkage long sys_flock(unsigned int fd, unsigned int cmd)
 /* Report the first existing lock that would conflict with l.
  * This implements the F_GETLK command of fcntl().
  */
-int fcntl_getlk(struct file *filp, struct flock *l)
+int fcntl_getlk(struct file *filp, struct flock __user *l)
 {
 	struct file_lock *fl, file_lock;
 	struct flock flock;
@@ -1404,7 +1404,7 @@ out:
 /* Apply the lock described by l to an open file descriptor.
  * This implements both the F_SETLK and F_SETLKW commands of fcntl().
  */
-int fcntl_setlk(struct file *filp, unsigned int cmd, struct flock *l)
+int fcntl_setlk(struct file *filp, unsigned int cmd, struct flock __user *l)
 {
 	struct file_lock *file_lock = locks_alloc_lock();
 	struct flock flock;
@@ -1492,7 +1492,7 @@ int fcntl_setlk(struct file *filp, unsigned int cmd, struct flock *l)
 /* Report the first existing lock that would conflict with l.
  * This implements the F_GETLK command of fcntl().
  */
-int fcntl_getlk64(struct file *filp, struct flock64 *l)
+int fcntl_getlk64(struct file *filp, struct flock64 __user *l)
 {
 	struct file_lock *fl, file_lock;
 	struct flock64 flock;
@@ -1542,7 +1542,7 @@ out:
 /* Apply the lock described by l to an open file descriptor.
  * This implements both the F_SETLK and F_SETLKW commands of fcntl().
  */
-int fcntl_setlk64(struct file *filp, unsigned int cmd, struct flock64 *l)
+int fcntl_setlk64(struct file *filp, unsigned int cmd, struct flock64 __user *l)
 {
 	struct file_lock *file_lock = locks_alloc_lock();
 	struct flock64 flock;

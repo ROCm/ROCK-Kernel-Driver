@@ -2846,7 +2846,6 @@ static const struct atmdev_ops ops = {
 	.phy_get	= NULL,
 	.feedback	= NULL,
 	.change_qos	= lanai_change_qos,
-	.free_rx_skb	= NULL,
 	.proc_read	= lanai_proc_read
 };
 

@@ -434,9 +434,6 @@ static int fib6_add_rt2node(struct fib6_node *fn, struct rt6_info *rt,
 	if (fn->fn_flags&RTN_TL_ROOT &&
 	    fn->leaf == &ip6_null_entry &&
 	    !(rt->rt6i_flags & (RTF_DEFAULT | RTF_ADDRCONF | RTF_ALLONLINK)) ){
-		/*
-		 * The top fib of ip6 routing table includes ip6_null_entry.
-		 */
 		fn->leaf = rt;
 		rt->u.next = NULL;
 		goto out;
@@ -505,7 +502,7 @@ static __inline__ void fib6_start_gc(struct rt6_info *rt)
  *	with source addr info in sub-trees
  */
 
-int fib6_add(struct fib6_node *root, struct rt6_info *rt, struct nlmsghdr *nlh)
+int fib6_add(struct fib6_node *root, struct rt6_info *rt, struct nlmsghdr *nlh, void *_rtattr)
 {
 	struct fib6_node *fn;
 	int err = -ENOMEM;
@@ -887,7 +884,7 @@ static struct fib6_node * fib6_repair_tree(struct fib6_node *fn)
 }
 
 static void fib6_del_route(struct fib6_node *fn, struct rt6_info **rtp,
-    struct nlmsghdr *nlh)
+    struct nlmsghdr *nlh, void *_rtattr)
 {
 	struct fib6_walker_t *w;
 	struct rt6_info *rt = *rtp;
@@ -946,7 +943,7 @@ static void fib6_del_route(struct fib6_node *fn, struct rt6_info **rtp,
 	rt6_release(rt);
 }
 
-int fib6_del(struct rt6_info *rt, struct nlmsghdr *nlh)
+int fib6_del(struct rt6_info *rt, struct nlmsghdr *nlh, void *_rtattr)
 {
 	struct fib6_node *fn = rt->rt6i_node;
 	struct rt6_info **rtp;
@@ -971,7 +968,7 @@ int fib6_del(struct rt6_info *rt, struct nlmsghdr *nlh)
 
 	for (rtp = &fn->leaf; *rtp; rtp = &(*rtp)->u.next) {
 		if (*rtp == rt) {
-			fib6_del_route(fn, rtp, nlh);
+			fib6_del_route(fn, rtp, nlh, _rtattr);
 			return 0;
 		}
 	}
@@ -1100,7 +1097,7 @@ static int fib6_clean_node(struct fib6_walker_t *w)
 		res = c->func(rt, c->arg);
 		if (res < 0) {
 			w->leaf = rt;
-			res = fib6_del(rt, NULL);
+			res = fib6_del(rt, NULL, NULL);
 			if (res) {
 #if RT6_DEBUG >= 2
 				printk(KERN_DEBUG "fib6_clean_node: del failed: rt=%p@%p err=%d\n", rt, rt->rt6i_node, res);
@@ -1230,17 +1227,17 @@ void fib6_run_gc(unsigned long dummy)
 
 void __init fib6_init(void)
 {
-	if (!fib6_node_kmem)
-		fib6_node_kmem = kmem_cache_create("fib6_nodes",
-						   sizeof(struct fib6_node),
-						   0, SLAB_HWCACHE_ALIGN,
-						   NULL, NULL);
+	fib6_node_kmem = kmem_cache_create("fib6_nodes",
+					   sizeof(struct fib6_node),
+					   0, SLAB_HWCACHE_ALIGN,
+					   NULL, NULL);
 }
 
 #ifdef MODULE
 void fib6_gc_cleanup(void)
 {
 	del_timer(&ip6_fib_timer);
+	kmem_cache_destroy(fib6_node_kmem);
 }
 #endif
 

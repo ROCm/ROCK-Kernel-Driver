@@ -56,6 +56,7 @@ struct ArcProto rfc1201_proto =
 void __init arcnet_rfc1201_init(void)
 {
 	arc_proto_map[ARC_P_IP]
+	    = arc_proto_map[ARC_P_IPV6]
 	    = arc_proto_map[ARC_P_ARP]
 	    = arc_proto_map[ARC_P_RARP]
 	    = arc_proto_map[ARC_P_IPX]
@@ -114,6 +115,8 @@ static unsigned short type_trans(struct sk_buff *skb, struct net_device *dev)
 	switch (soft->proto) {
 	case ARC_P_IP:
 		return htons(ETH_P_IP);
+	case ARC_P_IPV6:
+		return htons(ETH_P_IPV6);
 	case ARC_P_ARP:
 		return htons(ETH_P_ARP);
 	case ARC_P_RARP:
@@ -388,6 +391,9 @@ static int build_header(struct sk_buff *skb, unsigned short type,
 	switch (type) {
 	case ETH_P_IP:
 		soft->proto = ARC_P_IP;
+		break;
+	case ETH_P_IPV6:
+		soft->proto = ARC_P_IPV6;
 		break;
 	case ETH_P_ARP:
 		soft->proto = ARC_P_ARP;

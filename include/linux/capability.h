@@ -14,6 +14,7 @@
 #define _LINUX_CAPABILITY_H
 
 #include <linux/types.h>
+#include <linux/compiler.h>
 
 /* User-level do most of the mapping between kernel and user
    capabilities based on the version tag given by the kernel. The
@@ -31,13 +32,13 @@
 typedef struct __user_cap_header_struct {
 	__u32 version;
 	int pid;
-} *cap_user_header_t;
+} __user *cap_user_header_t;
  
 typedef struct __user_cap_data_struct {
         __u32 effective;
         __u32 permitted;
         __u32 inheritable;
-} *cap_user_data_t;
+} __user *cap_user_data_t;
   
 #ifdef __KERNEL__
 

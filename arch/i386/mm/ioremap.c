@@ -222,7 +222,6 @@ void iounmap(void *addr)
 		return;
 	} 
 
-	unmap_vm_area(p);
 	if (p->flags && p->phys_addr < virt_to_phys(high_memory)) { 
 		change_page_attr(virt_to_page(__va(p->phys_addr)),
 				 p->size >> PAGE_SHIFT,

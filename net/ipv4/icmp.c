@@ -185,8 +185,6 @@ struct icmp_err icmp_err_convert[] = {
 	},
 };
 
-extern int sysctl_ip_default_ttl;
-
 /* Control parameters for ECHO replies. */
 int sysctl_icmp_echo_ignore_all;
 int sysctl_icmp_echo_ignore_broadcasts;
@@ -384,7 +382,6 @@ static void icmp_reply(struct icmp_bxm *icmp_param, struct sk_buff *skb)
 	icmp_out_count(icmp_param->data.icmph.type);
 
 	inet->tos = skb->nh.iph->tos;
-	inet->ttl = sysctl_ip_default_ttl;
 	daddr = ipc.addr = rt->rt_src;
 	ipc.opt = NULL;
 	if (icmp_param->replyopts.optlen) {
@@ -539,7 +536,6 @@ void icmp_send(struct sk_buff *skb_in, int type, int code, u32 info)
 	icmp_param.offset = skb_in->nh.raw - skb_in->data;
 	icmp_out_count(icmp_param.data.icmph.type);
 	inet_sk(icmp_socket->sk)->tos = tos;
-	inet_sk(icmp_socket->sk)->ttl = sysctl_ip_default_ttl;
 	ipc.addr = iph->saddr;
 	ipc.opt = &icmp_param.replyopts;
 	if (icmp_param.replyopts.srr) {
@@ -695,15 +691,12 @@ static void icmp_unreach(struct sk_buff *skb)
 	}
 	read_unlock(&raw_v4_lock);
 
-	/*
-	 *	This can't change while we are doing it.
-	 *	Callers have obtained BR_NETPROTO_LOCK so
-	 *	we are OK.
-	 */
-
+	rcu_read_lock();
 	ipprot = inet_protos[hash];
+	smp_read_barrier_depends();
 	if (ipprot && ipprot->err_handler)
 		ipprot->err_handler(skb, info);
+	rcu_read_unlock();
 
 out:
 	return;
@@ -1129,7 +1122,7 @@ void __init icmp_init(struct net_proto_family *ops)
 		per_cpu(__icmp_socket, i)->sk->allocation = GFP_ATOMIC;
 		per_cpu(__icmp_socket, i)->sk->sndbuf = SK_WMEM_MAX * 2;
 		inet = inet_sk(per_cpu(__icmp_socket, i)->sk);
-		inet->ttl = MAXTTL;
+		inet->uc_ttl = -1;
 		inet->pmtudisc = IP_PMTUDISC_DONT;
 
 		/* Unhash it so that IP input processing does not even

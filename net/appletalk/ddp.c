@@ -88,7 +88,8 @@ static struct proto_ops atalk_dgram_ops;
 struct sock *atalk_sockets;
 rwlock_t atalk_sockets_lock = RW_LOCK_UNLOCKED;
 
-extern inline void atalk_insert_socket(struct sock *sk)
+#if 0 /* currently unused -DaveM */
+static inline void atalk_insert_socket(struct sock *sk)
 {
 	write_lock_bh(&atalk_sockets_lock);
 	sk->next = atalk_sockets;
@@ -98,8 +99,9 @@ extern inline void atalk_insert_socket(struct sock *sk)
 	sk->pprev = &atalk_sockets;
 	write_unlock_bh(&atalk_sockets_lock);
 }
+#endif
 
-extern inline void atalk_remove_socket(struct sock *sk)
+static inline void atalk_remove_socket(struct sock *sk)
 {
 	write_lock_bh(&atalk_sockets_lock);
 	if (sk->pprev) {
@@ -198,7 +200,7 @@ static void atalk_destroy_timer(unsigned long data)
 	}
 }
 
-extern inline void atalk_destroy_socket(struct sock *sk)
+static inline void atalk_destroy_socket(struct sock *sk)
 {
 	atalk_remove_socket(sk);
 	skb_queue_purge(&sk->receive_queue);

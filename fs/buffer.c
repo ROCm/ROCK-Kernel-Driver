@@ -253,6 +253,8 @@ static void do_sync(unsigned long wait)
 	sync_filesystems(0);	/* Start syncing the filesystems */
 	sync_filesystems(wait);	/* Waitingly sync the filesystems */
 	sync_inodes(wait);	/* Mappings, inodes and blockdevs, again. */
+	if (!wait)
+		printk("Emergency Sync complete\n");
 }
 
 asmlinkage long sys_sync(void)

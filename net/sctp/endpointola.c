@@ -54,27 +54,27 @@
 #include <linux/slab.h>
 #include <linux/in.h>
 #include <linux/random.h>	/* get_random_bytes() */
+#include <linux/crypto.h>
 #include <net/sock.h>
 #include <net/ipv6.h>
 #include <net/sctp/sctp.h>
 #include <net/sctp/sm.h>
 
 /* Forward declarations for internal helpers. */
-static void sctp_endpoint_bh_rcv(sctp_endpoint_t *ep);
+static void sctp_endpoint_bh_rcv(struct sctp_endpoint *ep);
 
-/* Create a sctp_endpoint_t with all that boring stuff initialized.
+/* Create a sctp_endpoint with all that boring stuff initialized.
  * Returns NULL if there isn't enough memory.
  */
-sctp_endpoint_t *sctp_endpoint_new(struct sctp_protocol *proto,
-				   struct sock *sk, int priority)
+struct sctp_endpoint *sctp_endpoint_new(struct sock *sk, int gfp)
 {
-	sctp_endpoint_t *ep;
+	struct sctp_endpoint *ep;
 
 	/* Build a local endpoint. */
-	ep = t_new(sctp_endpoint_t, priority);
+	ep = t_new(struct sctp_endpoint, gfp);
 	if (!ep)
 		goto fail;
-	if (!sctp_endpoint_init(ep, proto, sk, priority))
+	if (!sctp_endpoint_init(ep, sk, gfp))
 		goto fail_init;
 	ep->base.malloced = 1;
 	SCTP_DBG_OBJCNT_INC(ep);
@@ -89,12 +89,11 @@ fail:
 /*
  * Initialize the base fields of the endpoint structure.
  */
-sctp_endpoint_t *sctp_endpoint_init(sctp_endpoint_t *ep, 
-				    struct sctp_protocol *proto,
-				    struct sock *sk, int priority)
+struct sctp_endpoint *sctp_endpoint_init(struct sctp_endpoint *ep,
+					 struct sock *sk, int gfp)
 {
 	struct sctp_opt *sp = sctp_sk(sk);
-	memset(ep, 0, sizeof(sctp_endpoint_t));
+	memset(ep, 0, sizeof(struct sctp_endpoint));
 
 	/* Initialize the base structure. */
 	/* What type of endpoint are we?  */
@@ -110,8 +109,7 @@ sctp_endpoint_t *sctp_endpoint_init(sctp_endpoint_t *ep,
 
 	/* Set its top-half handler */
 	sctp_inq_set_th_handler(&ep->base.inqueue,
-				    (void (*)(void *))sctp_endpoint_bh_rcv,
-				    ep);
+				(void (*)(void *))sctp_endpoint_bh_rcv, ep);
 
 	/* Initialize the bind addr area */
 	sctp_bind_addr_init(&ep->base.bind_addr, 0);
@@ -121,21 +119,16 @@ sctp_endpoint_t *sctp_endpoint_init(sctp_endpoint_t *ep,
 	ep->base.sk = sk;
 	sock_hold(ep->base.sk);
 
-	/* This pointer is useful to access the default protocol parameter
-	 * values.
-	 */
-	ep->proto = proto;
-
 	/* Create the lists of associations.  */
 	INIT_LIST_HEAD(&ep->asocs);
 
 	/* Set up the base timeout information.  */
 	ep->timeouts[SCTP_EVENT_TIMEOUT_NONE] = 0;
-	ep->timeouts[SCTP_EVENT_TIMEOUT_T1_COOKIE] = 
+	ep->timeouts[SCTP_EVENT_TIMEOUT_T1_COOKIE] =
 		SCTP_DEFAULT_TIMEOUT_T1_COOKIE;
-	ep->timeouts[SCTP_EVENT_TIMEOUT_T1_INIT] = 
+	ep->timeouts[SCTP_EVENT_TIMEOUT_T1_INIT] =
 		SCTP_DEFAULT_TIMEOUT_T1_INIT;
-	ep->timeouts[SCTP_EVENT_TIMEOUT_T2_SHUTDOWN] = 
+	ep->timeouts[SCTP_EVENT_TIMEOUT_T2_SHUTDOWN] =
 		sp->rtoinfo.srto_initial;
 	ep->timeouts[SCTP_EVENT_TIMEOUT_T3_RTX] = 0;
 
@@ -146,11 +139,11 @@ sctp_endpoint_t *sctp_endpoint_init(sctp_endpoint_t *ep,
         ep->timeouts[SCTP_EVENT_TIMEOUT_T5_SHUTDOWN_GUARD]
 		= 5 * sp->rtoinfo.srto_max;
 
-	ep->timeouts[SCTP_EVENT_TIMEOUT_HEARTBEAT] = 
+	ep->timeouts[SCTP_EVENT_TIMEOUT_HEARTBEAT] =
 		SCTP_DEFAULT_TIMEOUT_HEARTBEAT;
-	ep->timeouts[SCTP_EVENT_TIMEOUT_SACK] = 
+	ep->timeouts[SCTP_EVENT_TIMEOUT_SACK] =
 		SCTP_DEFAULT_TIMEOUT_SACK;
-	ep->timeouts[SCTP_EVENT_TIMEOUT_AUTOCLOSE] = 
+	ep->timeouts[SCTP_EVENT_TIMEOUT_AUTOCLOSE] =
 		sp->autoclose * HZ;
 
 	/* Set up the default send/receive buffer space.  */
@@ -175,7 +168,8 @@ sctp_endpoint_t *sctp_endpoint_init(sctp_endpoint_t *ep,
 }
 
 /* Add an association to an endpoint.  */
-void sctp_endpoint_add_asoc(sctp_endpoint_t *ep, sctp_association_t *asoc)
+void sctp_endpoint_add_asoc(struct sctp_endpoint *ep,
+			    struct sctp_association *asoc)
 {
 	struct sock *sk = ep->base.sk;
 
@@ -183,22 +177,21 @@ void sctp_endpoint_add_asoc(sctp_endpoint_t *ep, sctp_association_t *asoc)
 	list_add_tail(&asoc->asocs, &ep->asocs);
 
 	/* Increment the backlog value for a TCP-style listening socket. */
-	if ((SCTP_SOCKET_TCP == sctp_sk(sk)->type) &&
-	    (SCTP_SS_LISTENING == sk->state))
+	if (sctp_style(sk, TCP) && sctp_sstate(sk, LISTENING))
 		sk->ack_backlog++;
 }
 
 /* Free the endpoint structure.  Delay cleanup until
  * all users have released their reference count on this structure.
  */
-void sctp_endpoint_free(sctp_endpoint_t *ep)
+void sctp_endpoint_free(struct sctp_endpoint *ep)
 {
 	ep->base.dead = 1;
 	sctp_endpoint_put(ep);
 }
 
 /* Final destructor for endpoint.  */
-void sctp_endpoint_destroy(sctp_endpoint_t *ep)
+void sctp_endpoint_destroy(struct sctp_endpoint *ep)
 {
 	SCTP_ASSERT(ep->base.dead, "Endpoint is not dead", return);
 
@@ -207,9 +200,12 @@ void sctp_endpoint_destroy(sctp_endpoint_t *ep)
 	/* Unlink this endpoint, so we can't find it again! */
 	sctp_unhash_endpoint(ep);
 
-	/* Cleanup the inqueue. */
-	sctp_inq_free(&ep->base.inqueue);
+	/* Free up the HMAC transform. */
+	if (sctp_sk(ep->base.sk)->hmac)
+		sctp_crypto_free_tfm(sctp_sk(ep->base.sk)->hmac);
 
+	/* Cleanup. */
+	sctp_inq_free(&ep->base.inqueue);
 	sctp_bind_addr_free(&ep->base.bind_addr);
 
 	/* Remove and free the port */
@@ -228,7 +224,7 @@ void sctp_endpoint_destroy(sctp_endpoint_t *ep)
 }
 
 /* Hold a reference to an endpoint. */
-void sctp_endpoint_hold(sctp_endpoint_t *ep)
+void sctp_endpoint_hold(struct sctp_endpoint *ep)
 {
 	atomic_inc(&ep->base.refcnt);
 }
@@ -236,17 +232,17 @@ void sctp_endpoint_hold(sctp_endpoint_t *ep)
 /* Release a reference to an endpoint and clean up if there are
  * no more references.
  */
-void sctp_endpoint_put(sctp_endpoint_t *ep)
+void sctp_endpoint_put(struct sctp_endpoint *ep)
 {
 	if (atomic_dec_and_test(&ep->base.refcnt))
 		sctp_endpoint_destroy(ep);
 }
 
 /* Is this the endpoint we are looking for?  */
-sctp_endpoint_t *sctp_endpoint_is_match(sctp_endpoint_t *ep,
-					const union sctp_addr *laddr)
+struct sctp_endpoint *sctp_endpoint_is_match(struct sctp_endpoint *ep,
+					       const union sctp_addr *laddr)
 {
-	sctp_endpoint_t *retval;
+	struct sctp_endpoint *retval;
 
 	sctp_read_lock(&ep->base.addr_lock);
 	if (ep->base.bind_addr.port == laddr->v4.sin_port) {
@@ -268,19 +264,19 @@ out:
  * We do a linear search of the associations for this endpoint.
  * We return the matching transport address too.
  */
-sctp_association_t *__sctp_endpoint_lookup_assoc(
-	const sctp_endpoint_t *endpoint,
+struct sctp_association *__sctp_endpoint_lookup_assoc(
+	const struct sctp_endpoint *ep,
 	const union sctp_addr *paddr,
 	struct sctp_transport **transport)
 {
 	int rport;
-	sctp_association_t *asoc;
+	struct sctp_association *asoc;
 	struct list_head *pos;
 
 	rport = paddr->v4.sin_port;
 
-	list_for_each(pos, &endpoint->asocs) {
-		asoc = list_entry(pos, sctp_association_t, asocs);
+	list_for_each(pos, &ep->asocs) {
+		asoc = list_entry(pos, struct sctp_association, asocs);
 		if (rport == asoc->peer.port) {
 			sctp_read_lock(&asoc->base.addr_lock);
 			*transport = sctp_assoc_lookup_paddr(asoc, paddr);
@@ -296,12 +292,12 @@ sctp_association_t *__sctp_endpoint_lookup_assoc(
 }
 
 /* Lookup association on an endpoint based on a peer address.  BH-safe.  */
-sctp_association_t *sctp_endpoint_lookup_assoc(
-	const sctp_endpoint_t *ep,
+struct sctp_association *sctp_endpoint_lookup_assoc(
+	const struct sctp_endpoint *ep,
 	const union sctp_addr *paddr,
 	struct sctp_transport **transport)
 {
-	sctp_association_t *asoc;
+	struct sctp_association *asoc;
 
 	sctp_local_bh_disable();
 	asoc = __sctp_endpoint_lookup_assoc(ep, paddr, transport);
@@ -313,12 +309,12 @@ sctp_association_t *sctp_endpoint_lookup_assoc(
 /* Look for any peeled off association from the endpoint that matches the
  * given peer address.
  */
-int sctp_endpoint_is_peeled_off(sctp_endpoint_t *ep,
+int sctp_endpoint_is_peeled_off(struct sctp_endpoint *ep,
 				const union sctp_addr *paddr)
 {
 	struct list_head *pos;
 	struct sockaddr_storage_list *addr;
-	sctp_bind_addr_t *bp;
+	struct sctp_bind_addr *bp;
 
 	sctp_read_lock(&ep->base.addr_lock);
 	bp = &ep->base.bind_addr;
@@ -337,12 +333,12 @@ int sctp_endpoint_is_peeled_off(sctp_endpoint_t *ep,
 /* Do delayed input processing.  This is scheduled by sctp_rcv().
  * This may be called on BH or task time.
  */
-static void sctp_endpoint_bh_rcv(sctp_endpoint_t *ep)
+static void sctp_endpoint_bh_rcv(struct sctp_endpoint *ep)
 {
-	sctp_association_t *asoc;
+	struct sctp_association *asoc;
 	struct sock *sk;
 	struct sctp_transport *transport;
-	sctp_chunk_t *chunk;
+	struct sctp_chunk *chunk;
 	struct sctp_inq *inqueue;
 	sctp_subtype_t subtype;
 	sctp_state_t state;
@@ -355,7 +351,7 @@ static void sctp_endpoint_bh_rcv(sctp_endpoint_t *ep)
 	inqueue = &ep->base.inqueue;
 	sk = ep->base.sk;
 
-	while (NULL != (chunk = sctp_inq_pop(inqueue))) {		
+	while (NULL != (chunk = sctp_inq_pop(inqueue))) {
 		subtype.chunk = chunk->chunk_hdr->type;
 
 		/* We might have grown an association since last we

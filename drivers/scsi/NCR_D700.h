@@ -14,22 +14,6 @@
 /* The MCA identifier */
 #define NCR_D700_MCA_ID		0x0092
 
-static int D700_detect(Scsi_Host_Template *);
-static int D700_release(struct Scsi_Host *host);
-
-
-/* Host template.  Note the name and proc_name are optional, all the
- * remaining parameters shown below must be filled in.  The 53c700
- * routine NCR_700_detect will fill in all of the missing routines */
-#define NCR_D700_SCSI {						\
-	.name =				"NCR Dual 700 MCA",	\
-	.proc_name =			"NCR_D700",		\
-	.detect = 			D700_detect,		\
-	.release =			D700_release,		\
-	.this_id =			7,			\
-}
-
-
 /* Defines for the Board registers */
 #define	BOARD_RESET		0x80	/* board level reset */
 #define ADD_PARENB		0x04	/* Address Parity Enabled */

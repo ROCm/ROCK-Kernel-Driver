@@ -133,6 +133,21 @@ static void class_device_dev_unlink(struct class_device * class_dev)
 		sysfs_remove_link(&class_dev->kobj, "device");
 }
 
+static int class_device_driver_link(struct class_device * class_dev)
+{
+	if ((class_dev->dev) && (class_dev->dev->driver))
+		return sysfs_create_link(&class_dev->kobj,
+					 &class_dev->dev->driver->kobj, "driver");
+	return 0;
+}
+
+static void class_device_driver_unlink(struct class_device * class_dev)
+{
+	if ((class_dev->dev) && (class_dev->dev->driver))
+		sysfs_remove_link(&class_dev->kobj, "driver");
+}
+
+
 #define to_class_dev(obj) container_of(obj,struct class_device,kobj)
 #define to_class_dev_attr(_attr) container_of(_attr,struct class_device_attribute,attr)
 
@@ -244,7 +259,6 @@ int class_device_add(struct class_device *class_dev)
 
 	/* first, register with generic layer. */
 	strncpy(class_dev->kobj.name, class_dev->class_id, KOBJ_NAME_LEN);
-	kobj_set_kset_s(class_dev, class_subsys);
 	kobj_set_kset_s(class_dev, class_obj_subsys);
 	if (parent)
 		class_dev->kobj.parent = &parent->subsys.kset.kobj;
@@ -265,6 +279,7 @@ int class_device_add(struct class_device *class_dev)
 	}
 
 	class_device_dev_link(class_dev);
+	class_device_driver_link(class_dev);
 
  register_done:
 	if (error && parent)
@@ -298,6 +313,7 @@ void class_device_del(struct class_device *class_dev)
 
 	if (class_dev->dev) {
 		class_device_dev_unlink(class_dev);
+		class_device_driver_unlink(class_dev);
 		put_device(class_dev->dev);
 	}
 	

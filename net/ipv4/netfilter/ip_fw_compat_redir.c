@@ -28,6 +28,7 @@ static DECLARE_LOCK(redir_lock);
 #define ASSERT_WRITE_LOCK(x) MUST_BE_LOCKED(&redir_lock)
 
 #include <linux/netfilter_ipv4/listhelp.h>
+#include "ip_fw_compat.h"
 
 #if 0
 #define DEBUGP printk

@@ -39,6 +39,7 @@
 #include <linux/slab.h>
 #include <linux/blk.h>
 #include <linux/completion.h>
+#include <linux/mm.h>
 #include <asm/semaphore.h>
 #include "scsi.h"
 #include "hosts.h"
@@ -58,10 +59,11 @@ static int aac_alloc_comm(struct aac_dev *dev, void **commaddr, unsigned long co
 	struct aac_init *init;
 	dma_addr_t phys;
 
-	/* FIXME: Adaptec add 128 bytes to this value - WHY ?? */
 	size = fibsize + sizeof(struct aac_init) + commsize + commalign + printfbufsiz;
 
+ 
 	base = pci_alloc_consistent(dev->pdev, size, &phys);
+
 	if(base == NULL)
 	{
 		printk(KERN_ERR "aacraid: unable to create mapping.\n");
@@ -70,17 +72,9 @@ static int aac_alloc_comm(struct aac_dev *dev, void **commaddr, unsigned long co
 	dev->comm_addr = (void *)base;
 	dev->comm_phys = phys;
 	dev->comm_size = size;
-
+	
 	dev->init = (struct aac_init *)(base + fibsize);
 	dev->init_pa = phys + fibsize;
-
-	/*
-	 *	Cache the upper bits of the virtual mapping for 64bit boxes
-	 *	FIXME: this crap should be rewritten
-	 */
-#if BITS_PER_LONG >= 64 
-	dev->fib_base_va = ((ulong)base & 0xffffffff00000000);
-#endif
 
 	init = dev->init;
 
@@ -92,16 +86,19 @@ static int aac_alloc_comm(struct aac_dev *dev, void **commaddr, unsigned long co
 	 *	Adapter Fibs are the first thing allocated so that they
 	 *	start page aligned
 	 */
-	init->AdapterFibsVirtualAddress = cpu_to_le32((u32)base);
-	init->AdapterFibsPhysicalAddress = cpu_to_le32(phys);
+	dev->fib_base_va = (ulong)base;
+	
+	init->AdapterFibsVirtualAddress = cpu_to_le32((u32)(ulong)phys);
+	init->AdapterFibsPhysicalAddress = cpu_to_le32((u32)phys);
 	init->AdapterFibsSize = cpu_to_le32(fibsize);
 	init->AdapterFibAlign = cpu_to_le32(sizeof(struct hw_fib));
+	init->HostPhysMemPages = cpu_to_le32(num_physpages);		// number of 4k pages of host physical memory
 
 	/*
 	 * Increment the base address by the amount already used
 	 */
 	base = base + fibsize + sizeof(struct aac_init);
-	phys = phys + fibsize + sizeof(struct aac_init);
+	phys = (dma_addr_t)((ulong)phys + fibsize + sizeof(struct aac_init));
 	/*
 	 *	Align the beginning of Headers to commalign
 	 */
@@ -111,8 +108,8 @@ static int aac_alloc_comm(struct aac_dev *dev, void **commaddr, unsigned long co
 	/*
 	 *	Fill in addresses of the Comm Area Headers and Queues
 	 */
-	*commaddr = (unsigned long *)base;
-	init->CommHeaderAddress = cpu_to_le32(phys);
+	*commaddr = base;
+	init->CommHeaderAddress = cpu_to_le32((u32)phys);
 	/*
 	 *	Increment the base address by the size of the CommArea
 	 */
@@ -134,14 +131,14 @@ static void aac_queue_init(struct aac_dev * dev, struct aac_queue * q, u32 *mem,
 	q->dev = dev;
 	INIT_LIST_HEAD(&q->pendingq);
 	init_waitqueue_head(&q->cmdready);
-	INIT_LIST_HEAD(&q->cmdq);
+	AAC_INIT_LIST_HEAD(&q->cmdq);
 	init_waitqueue_head(&q->qfull);
 	spin_lock_init(&q->lockdata);
 	q->lock = &q->lockdata;
 	q->headers.producer = mem;
 	q->headers.consumer = mem+1;
-	*q->headers.producer = cpu_to_le32(qsize);
-	*q->headers.consumer = cpu_to_le32(qsize);
+	*(q->headers.producer) = cpu_to_le32(qsize);
+	*(q->headers.consumer) = cpu_to_le32(qsize);
 	q->entries = qsize;
 }
 
@@ -227,7 +224,6 @@ int aac_comm_init(struct aac_dev * dev)
 	struct aac_entry * queues;
 	unsigned long size;
 	struct aac_queue_block * comm = dev->queues;
-
 	/*
 	 *	Now allocate and initialize the zone structures used as our 
 	 *	pool of FIB context records.  The size of the zone is based
@@ -246,9 +242,9 @@ int aac_comm_init(struct aac_dev * dev)
 	if (!aac_alloc_comm(dev, (void * *)&headers, size, QUEUE_ALIGNMENT))
 		return -ENOMEM;
 
-	queues = (struct aac_entry *)((unsigned char *)headers + hdrsize);
+	queues = (struct aac_entry *)(((ulong)headers) + hdrsize);
 
-	/* Adapter to Host normal proirity Command queue */ 
+	/* Adapter to Host normal priority Command queue */ 
 	comm->queue[HostNormCmdQueue].base = queues;
 	aac_queue_init(dev, &comm->queue[HostNormCmdQueue], headers, HOST_NORM_CMD_ENTRIES);
 	queues += HOST_NORM_CMD_ENTRIES;
@@ -278,7 +274,6 @@ int aac_comm_init(struct aac_dev * dev)
 	/* adapter to host normal priority response queue */
 	comm->queue[HostNormRespQueue].base = queues;
 	aac_queue_init(dev, &comm->queue[HostNormRespQueue], headers, HOST_NORM_RESP_ENTRIES);
-    
 	queues += HOST_NORM_RESP_ENTRIES;
 	headers += 2;
 
@@ -313,6 +308,7 @@ struct aac_dev *aac_init_adapter(struct aac_dev *dev)
 	/*
 	 *	Ok now init the communication subsystem
 	 */
+
 	dev->queues = (struct aac_queue_block *) kmalloc(sizeof(struct aac_queue_block), GFP_KERNEL);
 	if (dev->queues == NULL) {
 		printk(KERN_ERR "Error could not allocate comm region.\n");
@@ -320,13 +316,17 @@ struct aac_dev *aac_init_adapter(struct aac_dev *dev)
 	}
 	memset(dev->queues, 0, sizeof(struct aac_queue_block));
 
-	if (aac_comm_init(dev)<0)
+	if (aac_comm_init(dev)<0){
+		kfree(dev->queues);
 		return NULL;
+	}
 	/*
 	 *	Initialize the list of fibs
 	 */
-	if(fib_setup(dev)<0)
+	if(fib_setup(dev)<0){
+		kfree(dev->queues);
 		return NULL;
+	}
 		
 	INIT_LIST_HEAD(&dev->fib_list);
 	init_completion(&dev->aif_completion);

@@ -25,8 +25,8 @@ __xfrm6_init_tempsel(struct xfrm_state *x, struct flowi *fl,
 {
 	/* Initialize temporary selector matching only
 	 * to current session. */
-	memcpy(&x->sel.daddr, fl->fl6_dst, sizeof(struct in6_addr));
-	memcpy(&x->sel.saddr, fl->fl6_src, sizeof(struct in6_addr));
+	ipv6_addr_copy((struct in6_addr *)&x->sel.daddr, fl->fl6_dst);
+	ipv6_addr_copy((struct in6_addr *)&x->sel.saddr, fl->fl6_src);
 	x->sel.dport = fl->fl_ip_dport;
 	x->sel.dport_mask = ~0;
 	x->sel.sport = fl->fl_ip_sport;
@@ -57,7 +57,7 @@ __xfrm6_state_lookup(xfrm_address_t *daddr, u32 spi, u8 proto)
 		    spi == x->id.spi &&
 		    !ipv6_addr_cmp((struct in6_addr *)daddr, (struct in6_addr *)x->id.daddr.a6) &&
 		    proto == x->id.proto) {
-			atomic_inc(&x->refcnt);
+			xfrm_state_hold(x);
 			return x;
 		}
 	}
@@ -91,23 +91,27 @@ __xfrm6_find_acq(u8 mode, u16 reqid, u8 proto,
 		    }
 	}
 	if (x0) {
-		atomic_inc(&x0->refcnt);
+		xfrm_state_hold(x0);
 	} else if (create && (x0 = xfrm_state_alloc()) != NULL) {
-		memcpy(x0->sel.daddr.a6, daddr, sizeof(struct in6_addr));
-		memcpy(x0->sel.saddr.a6, saddr, sizeof(struct in6_addr));
+		ipv6_addr_copy((struct in6_addr *)x0->sel.daddr.a6,
+			       (struct in6_addr *)daddr);
+		ipv6_addr_copy((struct in6_addr *)x0->sel.saddr.a6,
+			       (struct in6_addr *)saddr);
 		x0->sel.prefixlen_d = 128;
 		x0->sel.prefixlen_s = 128;
-		memcpy(x0->props.saddr.a6, saddr, sizeof(struct in6_addr));
+		ipv6_addr_copy((struct in6_addr *)x0->props.saddr.a6,
+			       (struct in6_addr *)saddr);
 		x0->km.state = XFRM_STATE_ACQ;
-		memcpy(x0->id.daddr.a6, daddr, sizeof(struct in6_addr));
+		ipv6_addr_copy((struct in6_addr *)x0->id.daddr.a6,
+			       (struct in6_addr *)daddr);
 		x0->id.proto = proto;
 		x0->props.family = AF_INET6;
 		x0->props.mode = mode;
 		x0->props.reqid = reqid;
 		x0->lft.hard_add_expires_seconds = XFRM_ACQ_EXPIRES;
-		atomic_inc(&x0->refcnt);
+		xfrm_state_hold(x0);
 		mod_timer(&x0->timer, jiffies + XFRM_ACQ_EXPIRES*HZ);
-		atomic_inc(&x0->refcnt);
+		xfrm_state_hold(x0);
 		list_add_tail(&x0->bydst, xfrm6_state_afinfo.state_bydst+h);
 		wake_up(&km_waitq);
 	}

@@ -87,34 +87,6 @@ extern int i91u_biosparam(struct scsi_device *, struct block_device *,
 
 #define i91u_REVID "Initio INI-9X00U/UW SCSI device driver; Revision: 1.03g"
 
-#define INI9100U	{ \
-	.next		= NULL,						\
-	.module		= NULL,						\
-	.proc_name	= "INI9100U", \
-	.proc_info	= NULL,				\
-	.name		= i91u_REVID, \
-	.detect		= i91u_detect, \
-	.release	= i91u_release, \
-	.info		= NULL,					\
-	.command	= i91u_command, \
-	.queuecommand	= i91u_queue, \
- 	.eh_strategy_handler = NULL, \
- 	.eh_abort_handler = NULL, \
- 	.eh_device_reset_handler = NULL, \
- 	.eh_bus_reset_handler = NULL, \
- 	.eh_host_reset_handler = NULL, \
-	.abort		= i91u_abort, \
-	.reset		= i91u_reset, \
-	.bios_param	= i91u_biosparam, \
-	.can_queue	= 1, \
-	.this_id	= 1, \
-	.sg_tablesize	= SG_ALL, \
-	.cmd_per_lun 	= 1, \
-	.present	= 0, \
-	.unchecked_isa_dma = 0, \
-	.use_clustering	= ENABLE_CLUSTERING, \
-}
-
 #define VIRT_TO_BUS(i)  (unsigned int) virt_to_bus((void *)(i))
 #define ULONG   unsigned long
 #define USHORT  unsigned short

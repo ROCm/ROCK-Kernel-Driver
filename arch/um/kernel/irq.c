@@ -48,7 +48,7 @@ static void ack_none(unsigned int irq)
  * each architecture has to answer this themselves, it doesn't deserve
  * a generic callback i think.
  */
-#if CONFIG_X86
+#ifdef CONFIG_X86
 	printk(KERN_ERR "unexpected IRQ trap at vector %02x\n", irq);
 #ifdef CONFIG_X86_LOCAL_APIC
 	/*
@@ -121,7 +121,7 @@ int get_irq_list(char *buf)
 	}
 	p += sprintf(p, "\n");
 #ifdef notdef
-#if CONFIG_SMP
+#ifdef CONFIG_SMP
 	p += sprintf(p, "LOC: ");
 	for (j = 0; j < num_online_cpus(); j++)
 		p += sprintf(p, "%10u ",
@@ -198,7 +198,7 @@ inline void disable_irq_nosync(unsigned int irq)
 	spin_unlock_irqrestore(&desc->lock, flags);
 }
 
-#if CONFIG_SMP
+#ifdef CONFIG_SMP
 inline void synchronize_irq(unsigned int irq)
 {
 	/* is there anything to synchronize with? */
@@ -621,7 +621,7 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 
 	err = parse_hex_value(buffer, count, &new_value);
 
-#if CONFIG_SMP
+#ifdef CONFIG_SMP
 	/*
 	 * Do not allow disabling IRQs completely - it's a too easy
 	 * way to make the system unusable accidentally :-) At least

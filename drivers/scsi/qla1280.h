@@ -1319,31 +1319,4 @@ static int qla1280_slave_configure(Scsi_Device *);
 irqreturn_t qla1280_intr_handler(int, void *, struct pt_regs *);
 void qla1280_setup(char *s, int *dummy);
 
-/*
- * Scsi_Host_template (see hosts.h)
- * Device driver Interfaces to mid-level SCSI driver.
- */
-
-#define QLA1280_LINUX_TEMPLATE {				\
-	.proc_info = qla1280_proc_info,				\
-	.name = "Qlogic ISP 1280/12160",				\
-	.detect = qla1280_detect,					\
-	.release = qla1280_release,				\
-	.info = qla1280_info,					\
-	.queuecommand = qla1280_queuecommand,			\
-/*	use_new_eh_code: 0, */					\
-	.abort = qla1280_abort,					\
-	.reset = qla1280_reset,					\
-	.slave_configure = qla1280_slave_configure,		\
-	.bios_param = qla1280_biosparam,				\
-	.can_queue = 255,		/* max simultaneous cmds      */\
-	.this_id = -1,		/* scsi id of host adapter    */\
-	.sg_tablesize = SG_ALL,	/* max scatter-gather cmds    */\
-	.cmd_per_lun = 3,		/* cmds per lun (linked cmds) */\
-	.present = 0,		/* number of 1280's present   */\
-	.unchecked_isa_dma = 0,	/* no memory DMA restrictions */\
-	.use_clustering = ENABLE_CLUSTERING,			\
-	.emulated = 0						\
-}
-
 #endif				/* _IO_HBA_QLA1280_H */

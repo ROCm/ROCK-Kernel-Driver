@@ -214,6 +214,8 @@ static void module_unload_init(struct module *mod)
 	INIT_LIST_HEAD(&mod->modules_which_use_me);
 	for (i = 0; i < NR_CPUS; i++)
 		atomic_set(&mod->ref[i].count, 0);
+	/* Hold reference count during initialization. */
+	atomic_set(&mod->ref[smp_processor_id()].count, 1);
 	/* Backwards compatibility macros put refcount during init. */
 	mod->waiter = current;
 }
@@ -462,6 +464,21 @@ void cleanup_module(void)
 }
 EXPORT_SYMBOL(cleanup_module);
 
+static void wait_for_zero_refcount(struct module *mod)
+{
+	/* Since we might sleep for some time, drop the semaphore first */
+	up(&module_mutex);
+	for (;;) {
+		DEBUGP("Looking at refcount...\n");
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		if (module_refcount(mod) == 0)
+			break;
+		schedule();
+	}
+	current->state = TASK_RUNNING;
+	down(&module_mutex);
+}
+
 asmlinkage long
 sys_delete_module(const char __user *name_user, unsigned int flags)
 {
@@ -500,16 +517,6 @@ sys_delete_module(const char __user *name_user, unsigned int flags)
 		goto out;
 	}
 
-	/* Coming up?  Allow force on stuck modules. */
-	if (mod->state == MODULE_STATE_COMING) {
-		forced = try_force(flags);
-		if (!forced) {
-			/* This module can't be removed */
-			ret = -EBUSY;
-			goto out;
-		}
-	}
-
 	/* If it has an init func, it must have an exit func to unload */
 	if ((mod->init != init_module && mod->exit == cleanup_module)
 	    || mod->unsafe) {
@@ -529,35 +536,22 @@ sys_delete_module(const char __user *name_user, unsigned int flags)
 	/* If it's not unused, quit unless we are told to block. */
 	if ((flags & O_NONBLOCK) && module_refcount(mod) != 0) {
 		forced = try_force(flags);
-		if (!forced)
+		if (!forced) {
 			ret = -EWOULDBLOCK;
-	} else {
-		mod->waiter = current;
-		mod->state = MODULE_STATE_GOING;
+			restart_refcounts();
+			goto out;
+		}
 	}
+
+	/* Mark it as dying. */
+	mod->waiter = current;
+	mod->state = MODULE_STATE_GOING;
 	restart_refcounts();
 
-	if (ret != 0)
-		goto out;
+	/* Never wait if forced. */
+	if (!forced && module_refcount(mod) != 0)
+		wait_for_zero_refcount(mod);
 
-	if (forced)
-		goto destroy;
-
-	/* Since we might sleep for some time, drop the semaphore first */
-	up(&module_mutex);
-	for (;;) {
-		DEBUGP("Looking at refcount...\n");
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		if (module_refcount(mod) == 0)
-			break;
-		schedule();
-	}
-	current->state = TASK_RUNNING;
-
-	DEBUGP("Regrabbing mutex...\n");
-	down(&module_mutex);
-
- destroy:
 	/* Final destruction now noone is using it. */
 	mod->exit();
 	free_module(mod);
@@ -909,6 +903,9 @@ static void free_module(struct module *mod)
 	spin_lock_irq(&modlist_lock);
 	list_del(&mod->list);
 	spin_unlock_irq(&modlist_lock);
+
+	/* Arch-specific cleanup. */
+	module_arch_cleanup(mod);
 
 	/* Module unload stuff */
 	module_unload_free(mod);
@@ -1276,6 +1273,7 @@ static struct module *load_module(void __user *umod,
 	mod->module_init = ptr;
 
 	/* Transfer each section which specifies SHF_ALLOC */
+	DEBUGP("final section addresses:\n");
 	for (i = 0; i < hdr->e_shnum; i++) {
 		void *dest;
 
@@ -1293,6 +1291,7 @@ static struct module *load_module(void __user *umod,
 			       sechdrs[i].sh_size);
 		/* Update sh_addr to point to copy in image. */
 		sechdrs[i].sh_addr = (unsigned long)dest;
+		DEBUGP("\t0x%lx %s\n", sechdrs[i].sh_addr, secstrings + sechdrs[i].sh_name);
 	}
 	/* Module has been moved. */
 	mod = (void *)sechdrs[modindex].sh_addr;
@@ -1448,6 +1447,7 @@ sys_init_module(void __user *umod,
 			printk(KERN_ERR "%s: module is now stuck!\n",
 			       mod->name);
 		else {
+			module_put(mod);
 			down(&module_mutex);
 			free_module(mod);
 			up(&module_mutex);
@@ -1458,6 +1458,8 @@ sys_init_module(void __user *umod,
 	/* Now it's a first class citizen! */
 	down(&module_mutex);
 	mod->state = MODULE_STATE_LIVE;
+	/* Drop initial reference. */
+	module_put(mod);
 	module_free(mod, mod->module_init);
 	mod->module_init = NULL;
 	mod->init_size = 0;

@@ -728,6 +728,7 @@ void bio_endio(struct bio *bio, unsigned int bytes_done, int error)
 	}
 
 	bio->bi_size -= bytes_done;
+	bio->bi_sector += (bytes_done >> 9);
 
 	if (bio->bi_end_io)
 		bio->bi_end_io(bio, bytes_done, error);

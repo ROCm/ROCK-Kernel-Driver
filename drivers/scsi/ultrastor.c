@@ -252,7 +252,7 @@ static struct ultrastor_config
 #if ULTRASTOR_MAX_CMDS == 1
   unsigned char mscp_busy;
 #else
-  unsigned short mscp_free;
+  unsigned long mscp_free;
 #endif
   volatile unsigned char aborted[ULTRASTOR_MAX_CMDS];
   struct mscp mscp[ULTRASTOR_MAX_CMDS];
@@ -1174,7 +1174,18 @@ static irqreturn_t do_ultrastor_interrupt(int irq, void *dev_id,
 
 MODULE_LICENSE("GPL");
 
-/* Eventually this will go into an include file, but this will be later */
-static Scsi_Host_Template driver_template = ULTRASTOR_14F;
-
+static Scsi_Host_Template driver_template = {
+	.name              = "UltraStor 14F/24F/34F",
+	.detect            = ultrastor_detect,
+	.info              = ultrastor_info,
+	.queuecommand      = ultrastor_queuecommand,
+	.eh_abort_handler  = ultrastor_abort,
+	.eh_host_reset_handler  = ultrastor_host_reset,	
+	.bios_param        = ultrastor_biosparam,
+	.can_queue         = ULTRASTOR_MAX_CMDS,
+	.sg_tablesize      = ULTRASTOR_14F_MAX_SG,
+	.cmd_per_lun       = ULTRASTOR_MAX_CMDS_PER_LUN,
+	.unchecked_isa_dma = 1,
+	.use_clustering    = ENABLE_CLUSTERING,
+};
 #include "scsi_module.c"

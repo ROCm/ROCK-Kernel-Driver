@@ -521,12 +521,12 @@ extern struct list_head file_lock_list;
 
 #include <linux/fcntl.h>
 
-extern int fcntl_getlk(struct file *, struct flock *);
-extern int fcntl_setlk(struct file *, unsigned int, struct flock *);
+extern int fcntl_getlk(struct file *, struct flock __user *);
+extern int fcntl_setlk(struct file *, unsigned int, struct flock __user *);
 
 #if BITS_PER_LONG == 32
-extern int fcntl_getlk64(struct file *, struct flock64 *);
-extern int fcntl_setlk64(struct file *, unsigned int, struct flock64 *);
+extern int fcntl_getlk64(struct file *, struct flock64 __user *);
+extern int fcntl_setlk64(struct file *, unsigned int, struct flock64 __user *);
 #endif
 
 /* fs/locks.c */
@@ -691,7 +691,7 @@ struct block_device_operations {
 typedef struct {
 	size_t written;
 	size_t count;
-	char * buf;
+	char __user * buf;
 	int error;
 } read_descriptor_t;
 
@@ -722,7 +722,7 @@ struct file_operations {
 	int (*lock) (struct file *, int, struct file_lock *);
 	ssize_t (*readv) (struct file *, const struct iovec *, unsigned long, loff_t *);
 	ssize_t (*writev) (struct file *, const struct iovec *, unsigned long, loff_t *);
-	ssize_t (*sendfile) (struct file *, loff_t *, size_t, read_actor_t, void *);
+	ssize_t (*sendfile) (struct file *, loff_t *, size_t, read_actor_t, void __user *);
 	ssize_t (*sendpage) (struct file *, struct page *, int, size_t, loff_t *, int);
 	unsigned long (*get_unmapped_area)(struct file *, unsigned long, unsigned long, unsigned long, unsigned long);
 };
@@ -1017,7 +1017,7 @@ static inline int break_lease(struct inode *inode, unsigned int mode)
 
 /* fs/open.c */
 
-asmlinkage long sys_open(const char *, int, int);
+asmlinkage long sys_open(const char __user *, int, int);
 asmlinkage long sys_close(unsigned int);	/* yes, it's really unsigned */
 extern int do_truncate(struct dentry *, loff_t start);
 
@@ -1207,15 +1207,15 @@ extern ssize_t generic_file_read(struct file *, char __user *, size_t, loff_t *)
 int generic_write_checks(struct inode *inode, struct file *file,
 			loff_t *pos, size_t *count, int isblk);
 extern ssize_t generic_file_write(struct file *, const char __user *, size_t, loff_t *);
-extern ssize_t generic_file_aio_read(struct kiocb *, char *, size_t, loff_t);
-extern ssize_t generic_file_aio_write(struct kiocb *, const char *, size_t, loff_t);
+extern ssize_t generic_file_aio_read(struct kiocb *, char __user *, size_t, loff_t);
+extern ssize_t generic_file_aio_write(struct kiocb *, const char __user *, size_t, loff_t);
 extern ssize_t generic_file_aio_write_nolock(struct kiocb *, const struct iovec *,
 				unsigned long, loff_t *);
 extern ssize_t do_sync_read(struct file *filp, char __user *buf, size_t len, loff_t *ppos);
 extern ssize_t do_sync_write(struct file *filp, const char __user *buf, size_t len, loff_t *ppos);
 ssize_t generic_file_write_nolock(struct file *file, const struct iovec *iov,
 				unsigned long nr_segs, loff_t *ppos);
-extern ssize_t generic_file_sendfile(struct file *, loff_t *, size_t, read_actor_t, void *);
+extern ssize_t generic_file_sendfile(struct file *, loff_t *, size_t, read_actor_t, void __user *);
 extern void do_generic_mapping_read(struct address_space *, struct file_ra_state *, struct file *,
 				    loff_t *, read_descriptor_t *, read_actor_t);
 extern void
@@ -1263,8 +1263,8 @@ void inode_set_bytes(struct inode *inode, loff_t bytes);
 
 extern int vfs_readdir(struct file *, filldir_t, void *);
 
-extern int vfs_stat(char *, struct kstat *);
-extern int vfs_lstat(char *, struct kstat *);
+extern int vfs_stat(char __user *, struct kstat *);
+extern int vfs_lstat(char __user *, struct kstat *);
 extern int vfs_fstat(unsigned int, struct kstat *);
 
 extern struct file_system_type *get_fs_type(const char *name);
@@ -1291,7 +1291,7 @@ extern int simple_commit_write(struct file *file, struct page *page,
 				unsigned offset, unsigned to);
 
 extern struct dentry *simple_lookup(struct inode *, struct dentry *);
-extern ssize_t generic_read_dir(struct file *, char *, size_t, loff_t *);
+extern ssize_t generic_read_dir(struct file *, char __user *, size_t, loff_t *);
 extern struct file_operations simple_dir_operations;
 extern struct inode_operations simple_dir_inode_operations;
 struct tree_descr { char *name; struct file_operations *ops; int mode; };
