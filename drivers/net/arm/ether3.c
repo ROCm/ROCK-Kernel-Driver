@@ -881,10 +881,6 @@ ether3_probe(struct expansion_card *ec, const struct ecard_id *id)
 		break;
 	}
 
-	printk("%s: %s in slot %d, ", dev->name, name, ec->slot_no);
-	for (i = 0; i < 6; i++)
-		printk("%2.2x%c", dev->dev_addr[i], i == 5 ? '\n' : ':');
-
 	if (ether3_init_2(dev)) {
 		ret = -ENODEV;
 		goto failed;
@@ -901,6 +897,10 @@ ether3_probe(struct expansion_card *ec, const struct ecard_id *id)
 	ret = register_netdev(dev);
 	if (ret)
 		goto failed;
+
+	printk("%s: %s in slot %d, ", dev->name, name, ec->slot_no);
+	for (i = 0; i < 6; i++)
+		printk("%2.2x%c", dev->dev_addr[i], i == 5 ? '\n' : ':');
 
 	ecard_set_drvdata(ec, dev);
 	return 0;

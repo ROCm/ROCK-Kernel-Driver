@@ -136,7 +136,7 @@ typedef struct ibmtr_dev_t {
     struct net_device	*dev;
     dev_node_t          node;
     window_handle_t     sram_win_handle;
-    struct tok_info	ti;
+    struct tok_info	*ti;
 } ibmtr_dev_t;
 
 static void netdev_get_drvinfo(struct net_device *dev,
@@ -168,13 +168,18 @@ static dev_link_t *ibmtr_attach(void)
     DEBUG(0, "ibmtr_attach()\n");
 
     /* Create new token-ring device */
-    dev = alloc_trdev(sizeof(*info));
-    if (!dev)
-	    return NULL;
-    info = dev->priv;
+    info = kmalloc(sizeof(*info), GFP_KERNEL); 
+    if (!info) return NULL;
+    memset(info,0,sizeof(*info));
+    dev = alloc_trdev(sizeof(struct tok_info));
+    if (!dev) { 
+	kfree(info); 
+	return NULL;
+    } 
 
     link = &info->link;
     link->priv = info;
+    info->ti = dev->priv; 
 
     link->io.Attributes1 = IO_DATA_PATH_WIDTH_8;
     link->io.NumPorts1 = 4;
@@ -265,6 +270,7 @@ static void ibmtr_detach(dev_link_t *link)
     *linkp = link->next;
     unregister_netdev(dev);
     free_netdev(dev);
+    kfree(info); 
 } /* ibmtr_detach */
 
 /*======================================================================
