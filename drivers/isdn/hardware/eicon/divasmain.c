@@ -70,8 +70,6 @@ extern void diva_get_vserial_number(PISDN_ADAPTER IoAdapter, char *buf);
 extern int divasfunc_init(void);
 extern void divasfunc_exit(void);
 
-static devfs_handle_t devfs_handle;
-
 typedef struct _diva_os_thread_dpc {
 	struct tasklet_struct divas_task;
 	struct work_struct trap_script_task;
@@ -779,8 +777,7 @@ static struct file_operations divas_fops = {
 
 static void divas_unregister_chrdev(void)
 {
-	if (devfs_handle)
-		devfs_unregister(devfs_handle);
+	devfs_remove("Divas");
 	unregister_chrdev(major, "Divas");
 }
 
@@ -792,9 +789,8 @@ static int DIVA_INIT_FUNCTION divas_register_chrdev(void)
 		       DRIVERLNAME);
 		return (0);
 	}
-	devfs_handle =
-	    devfs_register(NULL, "Divas", DEVFS_FL_DEFAULT, major, 0,
-			   S_IFCHR | S_IRUSR | S_IWUSR, &divas_fops, NULL);
+	devfs_register(NULL, "Divas", DEVFS_FL_DEFAULT, major, 0,
+		       S_IFCHR | S_IRUSR | S_IWUSR, &divas_fops, NULL);
 
 	return (1);
 }

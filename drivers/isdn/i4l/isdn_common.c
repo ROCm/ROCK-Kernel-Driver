@@ -2165,22 +2165,19 @@ isdn_hard_header_len(void)
 
 #ifdef CONFIG_DEVFS_FS
 
-static devfs_handle_t devfs_handle;
-
 static void isdn_register_devfs(int k)
 {
-	char buf[11];
+	char buf[16];
 
-	sprintf (buf, "isdnctrl%d", k);
-	dev->devfs_handle_isdnctrlX[k] =
-	    devfs_register (devfs_handle, buf, DEVFS_FL_DEFAULT,
-			    ISDN_MAJOR, ISDN_MINOR_CTRL + k, 0600 | S_IFCHR,
-			    &isdn_fops, NULL);
+	sprintf (buf, "isdn/isdnctrl%d", k);
+	devfs_register(NULL, buf, DEVFS_FL_DEFAULT,
+		       ISDN_MAJOR, ISDN_MINOR_CTRL + k, 0600 | S_IFCHR,
+		       &isdn_fops, NULL);
 }
 
 static void isdn_unregister_devfs(int k)
 {
-	devfs_unregister (dev->devfs_handle_isdnctrlX[k]);
+	devfs_remove("isdn/isdnctrl%d", k);
 }
 
 static void isdn_init_devfs(void)
@@ -2189,27 +2186,24 @@ static void isdn_init_devfs(void)
 	int i;
 #  endif
 
-	devfs_handle = devfs_mk_dir (NULL, "isdn", NULL);
+	devfs_mk_dir (NULL, "isdn", NULL);
 #  ifdef CONFIG_ISDN_PPP
 	for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
-		char buf[8];
+		char buf[16];
 
-		sprintf (buf, "ippp%d", i);
-		dev->devfs_handle_ipppX[i] =
-		    devfs_register (devfs_handle, buf, DEVFS_FL_DEFAULT,
-				    ISDN_MAJOR, ISDN_MINOR_PPP + i,
-				    0600 | S_IFCHR, &isdn_fops, NULL);
+		sprintf (buf, "isdn/ippp%d", i);
+		devfs_register(NULL, buf, DEVFS_FL_DEFAULT,
+			       ISDN_MAJOR, ISDN_MINOR_PPP + i,
+			       0600 | S_IFCHR, &isdn_fops, NULL);
 	}
 #  endif
 
-	dev->devfs_handle_isdninfo =
-	    devfs_register (devfs_handle, "isdninfo", DEVFS_FL_DEFAULT,
-			    ISDN_MAJOR, ISDN_MINOR_STATUS, 0600 | S_IFCHR,
-			    &isdn_fops, NULL);
-	dev->devfs_handle_isdnctrl =
-	    devfs_register (devfs_handle, "isdnctrl", DEVFS_FL_DEFAULT,
-			    ISDN_MAJOR, ISDN_MINOR_CTRL, 0600 | S_IFCHR, 
-			    &isdn_fops, NULL);
+	devfs_register(NULL, "isdn/isdninfo", DEVFS_FL_DEFAULT,
+		       ISDN_MAJOR, ISDN_MINOR_STATUS, 0600 | S_IFCHR,
+		       &isdn_fops, NULL);
+	devfs_register(NULL, "isdn/isdnctrl", DEVFS_FL_DEFAULT,
+		       ISDN_MAJOR, ISDN_MINOR_CTRL, 0600 | S_IFCHR, 
+		       &isdn_fops, NULL);
 }
 
 static void isdn_cleanup_devfs(void)
@@ -2217,11 +2211,11 @@ static void isdn_cleanup_devfs(void)
 #  ifdef CONFIG_ISDN_PPP
 	int i;
 	for (i = 0; i < ISDN_MAX_CHANNELS; i++) 
-		devfs_unregister (dev->devfs_handle_ipppX[i]);
+		devfs_remove("isdn/ippp%d", i);
 #  endif
-	devfs_unregister (dev->devfs_handle_isdninfo);
-	devfs_unregister (dev->devfs_handle_isdnctrl);
-	devfs_unregister (devfs_handle);
+	devfs_remove("isdn/isdninfo");
+	devfs_remove("isdn/isdnctrl");
+	devfs_remove("isdn");
 }
 
 #else   /* CONFIG_DEVFS_FS */
