@@ -1063,7 +1063,7 @@ rpciod(void *ptr)
 
 	spin_lock_irq(&current->sigmask_lock);
 	siginitsetinv(&current->blocked, sigmask(SIGKILL));
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 
 	strcpy(current->comm, "rpciod");
@@ -1119,7 +1119,7 @@ rpciod_killall(void)
 	}
 
 	spin_lock_irqsave(&current->sigmask_lock, flags);
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irqrestore(&current->sigmask_lock, flags);
 }
 
@@ -1197,7 +1197,7 @@ rpciod_down(void)
 		interruptible_sleep_on(&rpciod_killer);
 	}
 	spin_lock_irqsave(&current->sigmask_lock, flags);
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irqrestore(&current->sigmask_lock, flags);
 out:
 	up(&rpciod_sema);

@@ -115,7 +115,7 @@ static int MainDaemon(void *cpu_pointer)
 	spin_lock_irq(&current->sigmask_lock);
 	tmpsig = current->blocked;
 	siginitsetinv(&current->blocked, sigmask(SIGKILL) | sigmask(SIGSTOP)| sigmask(SIGHUP));
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 	
 	
@@ -203,7 +203,7 @@ static int ManagementDaemon(void *unused)
 	spin_lock_irq(&current->sigmask_lock);
 	tmpsig = current->blocked;
 	siginitsetinv(&current->blocked, sigmask(SIGKILL) | sigmask(SIGSTOP) );
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 
 

@@ -477,7 +477,7 @@ int mtdblock_thread(void *dummy)
 	strcpy(tsk->comm, "mtdblockd");
 	spin_lock_irq(&tsk->sigmask_lock);
 	sigfillset(&tsk->blocked);
-	recalc_sigpending(tsk);
+	recalc_sigpending();
 	spin_unlock_irq(&tsk->sigmask_lock);
 	daemonize();
 

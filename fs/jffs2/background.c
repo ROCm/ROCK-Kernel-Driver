@@ -114,7 +114,7 @@ static int jffs2_garbage_collect_thread(void *_c)
 	for (;;) {
 		spin_lock_irq(&current->sigmask_lock);
 		siginitsetinv (&current->blocked, sigmask(SIGHUP) | sigmask(SIGKILL) | sigmask(SIGSTOP) | sigmask(SIGCONT));
-		recalc_sigpending(current);
+		recalc_sigpending();
 		spin_unlock_irq(&current->sigmask_lock);
 
 		if (!thread_should_wake(c)) {
@@ -164,7 +164,7 @@ static int jffs2_garbage_collect_thread(void *_c)
 		/* We don't want SIGHUP to interrupt us. STOP and KILL are OK though. */
 		spin_lock_irq(&current->sigmask_lock);
 		siginitsetinv (&current->blocked, sigmask(SIGKILL) | sigmask(SIGSTOP) | sigmask(SIGCONT));
-		recalc_sigpending(current);
+		recalc_sigpending();
 		spin_unlock_irq(&current->sigmask_lock);
 
 		D1(printk(KERN_DEBUG "jffs2_garbage_collect_thread(): pass\n"));

@@ -407,7 +407,7 @@ int fdc_interrupt_wait(unsigned int time)
 	spin_lock_irq(&current->sigmask_lock);
 	old_sigmask = current->blocked;
 	sigfillset(&current->blocked);
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 
 	current->state = TASK_INTERRUPTIBLE;
@@ -418,7 +418,7 @@ int fdc_interrupt_wait(unsigned int time)
 
 	spin_lock_irq(&current->sigmask_lock);
 	current->blocked = old_sigmask;
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 	
 	remove_wait_queue(&ftape_wait_intr, &wait);

@@ -148,7 +148,7 @@ nlmclnt_proc(struct inode *inode, int cmd, struct file_lock *fl)
 	    && fl->fl_type == F_UNLCK
 	    && (current->flags & PF_EXITING)) {
 		sigfillset(&current->blocked);	/* Mask all signals */
-		recalc_sigpending(current);
+		recalc_sigpending();
 		spin_unlock_irqrestore(&current->sigmask_lock, flags);
 
 		call = nlmclnt_alloc_call();
@@ -185,7 +185,7 @@ nlmclnt_proc(struct inode *inode, int cmd, struct file_lock *fl)
  out_restore:
 	spin_lock_irqsave(&current->sigmask_lock, flags);
 	current->blocked = oldset;
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irqrestore(&current->sigmask_lock, flags);
 
 done:
@@ -595,7 +595,7 @@ nlmclnt_cancel(struct nlm_host *host, struct file_lock *fl)
 	spin_lock_irqsave(&current->sigmask_lock, flags);
 	oldset = current->blocked;
 	sigfillset(&current->blocked);
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irqrestore(&current->sigmask_lock, flags);
 
 	req = nlmclnt_alloc_call();
@@ -613,7 +613,7 @@ nlmclnt_cancel(struct nlm_host *host, struct file_lock *fl)
 
 	spin_lock_irqsave(&current->sigmask_lock, flags);
 	current->blocked = oldset;
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irqrestore(&current->sigmask_lock, flags);
 
 	return status;

@@ -104,7 +104,7 @@ osf_sigprocmask(int how, unsigned long newmask, long a2, long a3,
 		if (_NSIG_WORDS > 1 && sign > 0)
 			sigemptyset(&current->blocked);
 		current->blocked.sig[0] = newmask;
-		recalc_sigpending(current);
+		recalc_sigpending();
 		spin_unlock_irq(&current->sigmask_lock);
 
 		(&regs)->r0 = 0;		/* special no error return */
@@ -182,7 +182,7 @@ do_sigsuspend(old_sigset_t mask, struct pt_regs *reg, struct switch_stack *sw)
 	spin_lock_irq(&current->sigmask_lock);
 	oldset = current->blocked;
 	siginitset(&current->blocked, mask);
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 
 	while (1) {
@@ -209,7 +209,7 @@ do_rt_sigsuspend(sigset_t *uset, size_t sigsetsize,
 	spin_lock_irq(&current->sigmask_lock);
 	oldset = current->blocked;
 	current->blocked = set;
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 
 	while (1) {
@@ -316,7 +316,7 @@ do_sigreturn(struct sigframe *frame, struct pt_regs *regs,
 	sigdelsetmask(&set, ~_BLOCKABLE);
 	spin_lock_irq(&current->sigmask_lock);
 	current->blocked = set;
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 
 	if (restore_sigcontext(&frame->sc, regs, sw))
@@ -347,7 +347,7 @@ do_rt_sigreturn(struct rt_sigframe *frame, struct pt_regs *regs,
 	sigdelsetmask(&set, ~_BLOCKABLE);
 	spin_lock_irq(&current->sigmask_lock);
 	current->blocked = set;
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 
 	if (restore_sigcontext(&frame->uc.uc_mcontext, regs, sw))
@@ -579,7 +579,7 @@ handle_signal(int sig, struct k_sigaction *ka, siginfo_t *info,
 		spin_lock_irq(&current->sigmask_lock);
 		sigorsets(&current->blocked,&current->blocked,&ka->sa.sa_mask);
 		sigaddset(&current->blocked,sig);
-		recalc_sigpending(current);
+		recalc_sigpending();
 		spin_unlock_irq(&current->sigmask_lock);
 	}
 }

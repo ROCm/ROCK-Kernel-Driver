@@ -2614,7 +2614,7 @@ int bdflush(void *startup)
 	spin_lock_irq(&tsk->sigmask_lock);
 	flush_signals(tsk);
 	sigfillset(&tsk->blocked);
-	recalc_sigpending(tsk);
+	recalc_sigpending();
 	spin_unlock_irq(&tsk->sigmask_lock);
 
 	complete((struct completion *)startup);
@@ -2649,7 +2649,7 @@ int kupdate(void *startup)
 	spin_lock_irq(&tsk->sigmask_lock);
 	sigfillset(&tsk->blocked);
 	siginitsetinv(&current->blocked, sigmask(SIGCONT) | sigmask(SIGSTOP));
-	recalc_sigpending(tsk);
+	recalc_sigpending();
 	spin_unlock_irq(&tsk->sigmask_lock);
 
 	complete((struct completion *)startup);
@@ -2675,7 +2675,7 @@ int kupdate(void *startup)
 				sigdelset(&tsk->pending.signal, SIGSTOP);
 				stopped = 1;
 			}
-			recalc_sigpending(tsk);
+			recalc_sigpending();
 			spin_unlock_irq(&tsk->sigmask_lock);
 			if (stopped)
 				goto stop_kupdate;

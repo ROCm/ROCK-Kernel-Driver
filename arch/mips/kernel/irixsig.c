@@ -147,7 +147,7 @@ static inline void handle_signal(unsigned long sig, struct k_sigaction *ka,
 		spin_lock_irq(&current->sigmask_lock);
 		sigorsets(&current->blocked,&current->blocked,&ka->sa.sa_mask);
 	sigaddset(&current->blocked,sig);
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 	}
 }
@@ -263,7 +263,7 @@ asmlinkage int do_irix_signal(sigset_t *oldset, struct pt_regs *regs)
 
 			default:
 				sigaddset(&current->pending.signal, signr);
-				recalc_sigpending(current);
+				recalc_sigpending();
 				current->flags |= PF_SIGNALED;
 				do_exit(exit_code);
 				/* NOTREACHED */
@@ -344,7 +344,7 @@ irix_sigreturn(struct pt_regs *regs)
 	sigdelsetmask(&blocked, ~_BLOCKABLE);
 	spin_lock_irq(&current->sigmask_lock);
 	current->blocked = blocked;
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 
 	/*
@@ -464,7 +464,7 @@ asmlinkage int irix_sigprocmask(int how, irix_sigset_t *new, irix_sigset_t *old)
 		default:
 			return -EINVAL;
 		}
-		recalc_sigpending(current);
+		recalc_sigpending();
 		spin_unlock_irq(&current->sigmask_lock);
 	}
 	if(old) {
@@ -489,7 +489,7 @@ asmlinkage int irix_sigsuspend(struct pt_regs *regs)
 	spin_lock_irq(&current->sigmask_lock);
 	saveset = current->blocked;
 	current->blocked = newset;
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 
 	regs->regs[2] = -EINTR;

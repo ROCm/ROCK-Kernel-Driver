@@ -1557,7 +1557,7 @@ static int rtl8139_thread (void *data)
 	reparent_to_init();
 	spin_lock_irq(&current->sigmask_lock);
 	sigemptyset(&current->blocked);
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 
 	strncpy (current->comm, dev->name, sizeof(current->comm) - 1);

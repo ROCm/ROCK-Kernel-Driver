@@ -445,7 +445,7 @@ exp_writelock(void)
 
 	/* restore the task's signals */
 	spin_lock_irq(&current->sigmask_lock);
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 
 	if (!hash_count && !hash_lock)

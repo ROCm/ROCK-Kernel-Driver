@@ -238,7 +238,7 @@ asmlinkage u32 sunos_sigblock(u32 blk_mask)
 	spin_lock_irq(&current->sigmask_lock);
 	old = (u32) current->blocked.sig[0];
 	current->blocked.sig[0] |= (blk_mask & _BLOCKABLE);
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 	return old;
 }
@@ -250,7 +250,7 @@ asmlinkage u32 sunos_sigsetmask(u32 newmask)
 	spin_lock_irq(&current->sigmask_lock);
 	retval = (u32) current->blocked.sig[0];
 	current->blocked.sig[0] = (newmask & _BLOCKABLE);
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 	return retval;
 }

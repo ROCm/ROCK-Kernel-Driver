@@ -104,7 +104,7 @@ static int nbd_xmit(int send, struct socket *sock, char *buf, int size, int msg_
 	spin_lock_irqsave(&current->sigmask_lock, flags);
 	oldset = current->blocked;
 	sigfillset(&current->blocked);
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irqrestore(&current->sigmask_lock, flags);
 
 
@@ -139,7 +139,7 @@ static int nbd_xmit(int send, struct socket *sock, char *buf, int size, int msg_
 
 	spin_lock_irqsave(&current->sigmask_lock, flags);
 	current->blocked = oldset;
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irqrestore(&current->sigmask_lock, flags);
 
 	set_fs(oldfs);

@@ -847,9 +847,17 @@ static inline void cond_resched(void)
    This is required every time the blocked sigset_t changes.
    Athread cathreaders should have t->sigmask_lock.  */
 
-static inline void recalc_sigpending(struct task_struct *t)
+static inline void recalc_sigpending_tsk(struct task_struct *t)
 {
 	if (has_pending_signals(&t->pending.signal, &t->blocked))
+		set_tsk_thread_flag(t, TIF_SIGPENDING);
+	else
+		clear_tsk_thread_flag(t, TIF_SIGPENDING);
+}
+
+static inline void recalc_sigpending(void)
+{
+	if (has_pending_signals(&current->pending.signal, &current->blocked))
 		set_thread_flag(TIF_SIGPENDING);
 	else
 		clear_thread_flag(TIF_SIGPENDING);

@@ -263,7 +263,7 @@ static int write_queue_task(void *data)
   tsk->tty = NULL;
   spin_lock_irq(&tsk->sigmask_lock);
   sigfillset(&tsk->blocked);
-  recalc_sigpending(tsk);
+  recalc_sigpending();
   spin_unlock_irq(&tsk->sigmask_lock);
 
   if(alloc_kiovec(1, &iobuf))

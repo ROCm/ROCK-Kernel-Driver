@@ -112,7 +112,7 @@ sys32_sigsuspend(struct pt_regs * regs,int history0, int history1, old_sigset_t 
 	spin_lock_irq(&current->sigmask_lock);
 	saveset = current->blocked;
 	siginitset(&current->blocked, mask);
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 	regs->gprs[2] = -EINTR;
 
@@ -147,7 +147,7 @@ sys32_rt_sigsuspend(struct pt_regs * regs,sigset_t32 *unewset, size_t sigsetsize
         spin_lock_irq(&current->sigmask_lock);
         saveset = current->blocked;
         current->blocked = newset;
-        recalc_sigpending(current);
+        recalc_sigpending();
         spin_unlock_irq(&current->sigmask_lock);
         regs->gprs[2] = -EINTR;
 
@@ -351,7 +351,7 @@ asmlinkage long sys32_sigreturn(struct pt_regs *regs)
 	sigdelsetmask(&set, ~_BLOCKABLE);
 	spin_lock_irq(&current->sigmask_lock);
 	current->blocked = set;
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 
 	if (restore_sigregs32(regs, &frame->sregs))
@@ -380,7 +380,7 @@ asmlinkage long sys32_rt_sigreturn(struct pt_regs *regs)
 	sigdelsetmask(&set, ~_BLOCKABLE);
 	spin_lock_irq(&current->sigmask_lock);
 	current->blocked = set;
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 
 	if (restore_sigregs32(regs, &frame->uc.uc_mcontext))
@@ -584,7 +584,7 @@ handle_signal32(unsigned long sig, struct k_sigaction *ka,
 		spin_lock_irq(&current->sigmask_lock);
 		sigorsets(&current->blocked,&current->blocked,&ka->sa.sa_mask);
 		sigaddset(&current->blocked,sig);
-		recalc_sigpending(current);
+		recalc_sigpending();
 		spin_unlock_irq(&current->sigmask_lock);
 	}
 }

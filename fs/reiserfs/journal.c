@@ -1877,7 +1877,7 @@ static int reiserfs_journal_commit_thread(void *nullp) {
 
   spin_lock_irq(&current->sigmask_lock);
   sigfillset(&current->blocked);
-  recalc_sigpending(current);
+  recalc_sigpending();
   spin_unlock_irq(&current->sigmask_lock);
 
   sprintf(current->comm, "kreiserfsd") ;

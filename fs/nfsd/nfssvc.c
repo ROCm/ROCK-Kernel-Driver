@@ -180,7 +180,7 @@ nfsd(struct svc_rqst *rqstp)
 		/* Block all but the shutdown signals */
 		spin_lock_irq(&current->sigmask_lock);
 		siginitsetinv(&current->blocked, SHUTDOWN_SIGS);
-		recalc_sigpending(current);
+		recalc_sigpending();
 		spin_unlock_irq(&current->sigmask_lock);
 
 		/*
@@ -205,7 +205,7 @@ nfsd(struct svc_rqst *rqstp)
 		/* Process request with signals blocked.  */
 		spin_lock_irq(&current->sigmask_lock);
 		siginitsetinv(&current->blocked, ALLOWED_SIGS);
-		recalc_sigpending(current);
+		recalc_sigpending();
 		spin_unlock_irq(&current->sigmask_lock);
 
 		svc_process(serv, rqstp);
