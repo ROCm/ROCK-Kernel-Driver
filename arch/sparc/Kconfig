@@ -148,7 +148,7 @@ config EISA
 config MCA
 	bool
 	help
-	  EISA is not supported.
+	  MCA is not supported.
 	  Say N
 
 config PCMCIA
