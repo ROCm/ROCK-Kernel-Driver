@@ -888,6 +888,8 @@ no_mmaps:
 	 * old method of shifting the VA >> by PGDIR_SHIFT doesn't work.
 	 */
 	start_index = pgd_index(first);
+	if (start_index < FIRST_USER_PGD_NR)
+		start_index = FIRST_USER_PGD_NR;
 	end_index = pgd_index(last);
 	if (end_index > start_index) {
 		clear_page_tables(tlb, start_index, end_index - start_index);
