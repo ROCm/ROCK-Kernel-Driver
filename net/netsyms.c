@@ -234,8 +234,8 @@ EXPORT_SYMBOL(scm_detach_fds);
 
 #if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
 EXPORT_SYMBOL(br_handle_frame_hook);
+EXPORT_SYMBOL(brioctl_set);
 #endif
-EXPORT_SYMBOL(br_ioctl_hook);
 
 #ifdef CONFIG_NET_DIVERT
 EXPORT_SYMBOL(alloc_divert_blk);

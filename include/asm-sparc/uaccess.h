@@ -8,6 +8,7 @@
 #define _ASM_UACCESS_H
 
 #ifdef __KERNEL__
+#include <linux/compiler.h>
 #include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/errno.h>
@@ -45,7 +46,7 @@
 #define __access_ok(addr,size) (__user_ok((addr) & get_fs().seg,(size)))
 #define access_ok(type,addr,size) __access_ok((unsigned long)(addr),(size))
 
-extern inline int verify_area(int type, const void * addr, unsigned long size)
+static inline int verify_area(int type, const void __user * addr, unsigned long size)
 {
 	return access_ok(type,addr,size)?0:-EFAULT;
 }
@@ -291,87 +292,87 @@ __asm__ __volatile__(							\
 
 extern int __get_user_bad(void);
 
-extern __kernel_size_t __copy_user(void *to, void *from, __kernel_size_t size);
+extern unsigned long __copy_user(void *to, const void *from, unsigned long size);
 
-#define copy_to_user(to,from,n) ({ \
-void *__copy_to = (void *) (to); \
-__kernel_size_t __copy_size = (__kernel_size_t) (n); \
-__kernel_size_t __copy_res; \
-if(__copy_size && __access_ok((unsigned long)__copy_to, __copy_size)) { \
-__copy_res = __copy_user(__copy_to, (void *) (from), __copy_size); \
-} else __copy_res = __copy_size; \
-__copy_res; })
-
-#define __copy_to_user(to,from,n)		\
-	__copy_user((void *)(to),		\
-		    (void *)(from), n)
-
-#define copy_from_user(to,from,n) ({ \
-void *__copy_to = (void *) (to); \
-void *__copy_from = (void *) (from); \
-__kernel_size_t __copy_size = (__kernel_size_t) (n); \
-__kernel_size_t __copy_res; \
-if(__copy_size && __access_ok((unsigned long)__copy_from, __copy_size)) { \
-__copy_res = __copy_user(__copy_to, __copy_from, __copy_size); \
-} else __copy_res = __copy_size; \
-__copy_res; })
-
-#define __copy_from_user(to,from,n)		\
-	__copy_user((void *)(to),		\
-		    (void *)(from), n)
-
-extern __inline__ __kernel_size_t __clear_user(void *addr, __kernel_size_t size)
+static inline unsigned long copy_to_user(void __user *to, const void *from, unsigned long n)
 {
-  __kernel_size_t ret;
-  __asm__ __volatile__ (
-	".section __ex_table,#alloc\n\t"
-	".align 4\n\t"
-	".word 1f,3\n\t"
-	".previous\n\t"
-	"mov %2, %%o1\n"
-	"1:\n\t"
-	"call __bzero\n\t"
-	" mov %1, %%o0\n\t"
-	"mov %%o0, %0\n"
-	: "=r" (ret) : "r" (addr), "r" (size) :
-	"o0", "o1", "o2", "o3", "o4", "o5", "o7",
-	"g1", "g2", "g3", "g4", "g5", "g7", "cc");
-  return ret;
+	if (n && __access_ok((unsigned long) to, n))
+		return __copy_user((void *) to, from, n);
+	else
+		return n;
 }
 
-#define clear_user(addr,n) ({ \
-void *__clear_addr = (void *) (addr); \
-__kernel_size_t __clear_size = (__kernel_size_t) (n); \
-__kernel_size_t __clear_res; \
-if(__clear_size && __access_ok((unsigned long)__clear_addr, __clear_size)) { \
-__clear_res = __clear_user(__clear_addr, __clear_size); \
-} else __clear_res = __clear_size; \
-__clear_res; })
-
-extern int __strncpy_from_user(unsigned long dest, unsigned long src, int count);
-
-#define strncpy_from_user(dest,src,count) ({ \
-unsigned long __sfu_src = (unsigned long) (src); \
-int __sfu_count = (int) (count); \
-long __sfu_res = -EFAULT; \
-if(__access_ok(__sfu_src, __sfu_count)) { \
-__sfu_res = __strncpy_from_user((unsigned long) (dest), __sfu_src, __sfu_count); \
-} __sfu_res; })
-
-extern int __strlen_user(const char *);
-extern int __strnlen_user(const char *, long len);
-
-extern __inline__ int strlen_user(const char *str)
+static inline unsigned long __copy_to_user(void __user *to, const void *from, unsigned long n)
 {
-	if(!access_ok(VERIFY_READ, str, 0))
+	return __copy_user((void *)to, from, n);
+}
+
+static inline unsigned long copy_from_user(void *to, const void __user *from, unsigned long n)
+{
+	if (n && __access_ok((unsigned long) from, n))
+		return __copy_user(to, (void *) from, n);
+	else
+		return n;
+}
+
+static inline unsigned long __copy_from_user(void *to, const void __user *from, unsigned long n)
+{
+	return __copy_user(to, (void *)from, n);
+}
+
+static inline unsigned long __clear_user(void __user *addr, unsigned long size)
+{
+	unsigned long ret;
+
+	__asm__ __volatile__ (
+		".section __ex_table,#alloc\n\t"
+		".align 4\n\t"
+		".word 1f,3\n\t"
+		".previous\n\t"
+		"mov %2, %%o1\n"
+		"1:\n\t"
+		"call __bzero\n\t"
+		" mov %1, %%o0\n\t"
+		"mov %%o0, %0\n"
+		: "=r" (ret) : "r" (addr), "r" (size) :
+		"o0", "o1", "o2", "o3", "o4", "o5", "o7",
+		"g1", "g2", "g3", "g4", "g5", "g7", "cc");
+
+	return ret;
+}
+
+static inline unsigned long clear_user(void __user *addr, unsigned long n)
+{
+	if (n && __access_ok((unsigned long) addr, n))
+		return __clear_user(addr, n);
+	else
+		return n;
+}
+
+extern long __strncpy_from_user(char *dest, const char __user *src, long count);
+
+static inline long strncpy_from_user(char *dest, const char __user *src, long count)
+{
+	if (__access_ok((unsigned long) src, count))
+		return __strncpy_from_user(dest, src, count);
+	else
+		return -EFAULT;
+}
+
+extern long __strlen_user(const char __user *);
+extern long __strnlen_user(const char __user *, long len);
+
+static inline long strlen_user(const char __user *str)
+{
+	if (!access_ok(VERIFY_READ, str, 0))
 		return 0;
 	else
 		return __strlen_user(str);
 }
 
-extern __inline__ int strnlen_user(const char *str, long len)
+static inline long strnlen_user(const char __user *str, long len)
 {
-	if(!access_ok(VERIFY_READ, str, 0))
+	if (!access_ok(VERIFY_READ, str, 0))
 		return 0;
 	else
 		return __strnlen_user(str, len);

@@ -53,6 +53,7 @@ static int br_ioctl_device(struct net_bridge *br,
 	{
 		struct __bridge_info b;
 
+	        read_lock(&br->lock);
 		memset(&b, 0, sizeof(struct __bridge_info));
 		memcpy(&b.designated_root, &br->designated_root, 8);
 		memcpy(&b.bridge_id, &br->bridge_id, 8);
@@ -73,6 +74,7 @@ static int br_ioctl_device(struct net_bridge *br,
 		b.tcn_timer_value = br_timer_get_residue(&br->tcn_timer);
 		b.topology_change_timer_value = br_timer_get_residue(&br->topology_change_timer);
 		b.gc_timer_value = br_timer_get_residue(&br->gc_timer);
+	        read_unlock(&br->lock);
 
 		if (copy_to_user((void *)arg0, &b, sizeof(b)))
 			return -EFAULT;
@@ -96,21 +98,27 @@ static int br_ioctl_device(struct net_bridge *br,
 	}
 
 	case BRCTL_SET_BRIDGE_FORWARD_DELAY:
+		write_lock(&br->lock);
 		br->bridge_forward_delay = arg0;
 		if (br_is_root_bridge(br))
 			br->forward_delay = arg0;
+		write_unlock(&br->lock);
 		return 0;
 
 	case BRCTL_SET_BRIDGE_HELLO_TIME:
+		write_lock(&br->lock);
 		br->bridge_hello_time = arg0;
 		if (br_is_root_bridge(br))
 			br->hello_time = arg0;
+		write_unlock(&br->lock);
 		return 0;
 
 	case BRCTL_SET_BRIDGE_MAX_AGE:
+		write_lock(&br->lock);
 		br->bridge_max_age = arg0;
 		if (br_is_root_bridge(br))
 			br->max_age = arg0;
+		write_unlock(&br->lock);
 		return 0;
 
 	case BRCTL_SET_AGEING_TIME:
@@ -126,6 +134,7 @@ static int br_ioctl_device(struct net_bridge *br,
 		struct __port_info p;
 		struct net_bridge_port *pt;
 
+		read_lock(&br->lock);
 		if ((pt = br_get_port(br, arg1)) == NULL)
 			return -EINVAL;
 
@@ -143,6 +152,8 @@ static int br_ioctl_device(struct net_bridge *br,
 		p.forward_delay_timer_value = br_timer_get_residue(&pt->forward_delay_timer);
 		p.hold_timer_value = br_timer_get_residue(&pt->hold_timer);
 
+		read_unlock(&br->lock);
+
 		if (copy_to_user((void *)arg0, &p, sizeof(p)))
 			return -EFAULT;
 
@@ -154,16 +165,20 @@ static int br_ioctl_device(struct net_bridge *br,
 		return 0;
 
 	case BRCTL_SET_BRIDGE_PRIORITY:
+		write_lock(&br->lock);
 		br_stp_set_bridge_priority(br, arg0);
+		write_unlock(&br->lock);
 		return 0;
 
 	case BRCTL_SET_PORT_PRIORITY:
 	{
 		struct net_bridge_port *p;
 
+		write_lock(&br->lock);
 		if ((p = br_get_port(br, arg0)) == NULL)
 			return -EINVAL;
 		br_stp_set_port_priority(p, arg1);
+		write_unlock(&br->lock);
 		return 0;
 	}
 
@@ -171,9 +186,11 @@ static int br_ioctl_device(struct net_bridge *br,
 	{
 		struct net_bridge_port *p;
 
+		write_lock(&br->lock);
 		if ((p = br_get_port(br, arg0)) == NULL)
 			return -EINVAL;
 		br_stp_set_path_cost(p, arg1);
+		write_unlock(&br->lock);
 		return 0;
 	}
 
@@ -230,11 +247,9 @@ static int br_ioctl_deviceless(unsigned int cmd,
 	return -EOPNOTSUPP;
 }
 
-static DECLARE_MUTEX(ioctl_mutex);
 
 int br_ioctl_deviceless_stub(unsigned long arg)
 {
-	int err;
 	unsigned long i[3];
 
 	if (!capable(CAP_NET_ADMIN))
@@ -243,11 +258,7 @@ int br_ioctl_deviceless_stub(unsigned long arg)
 	if (copy_from_user(i, (void *)arg, 3*sizeof(unsigned long)))
 		return -EFAULT;
 
-	down(&ioctl_mutex);
-	err = br_ioctl_deviceless(i[0], i[1], i[2]);
-	up(&ioctl_mutex);
-
-	return err;
+	return br_ioctl_deviceless(i[0], i[1], i[2]);
 }
 
 int br_ioctl(struct net_bridge *br, unsigned int cmd, unsigned long arg0, unsigned long arg1, unsigned long arg2)
@@ -257,18 +268,9 @@ int br_ioctl(struct net_bridge *br, unsigned int cmd, unsigned long arg0, unsign
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
 
-	down(&ioctl_mutex);
 	err = br_ioctl_deviceless(cmd, arg0, arg1);
 	if (err == -EOPNOTSUPP)
 		err = br_ioctl_device(br, cmd, arg0, arg1, arg2);
-	up(&ioctl_mutex);
 
 	return err;
-}
-
-void br_call_ioctl_atomic(void (*fn)(void))
-{
-	down(&ioctl_mutex);
-	fn();
-	up(&ioctl_mutex);
 }

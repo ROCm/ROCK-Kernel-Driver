@@ -51,7 +51,7 @@ static inline void wakeup_softirqd(unsigned cpu)
 		wake_up_process(tsk);
 }
 
-asmlinkage void do_softirq()
+asmlinkage void do_softirq(void)
 {
 	__u32 pending;
 	unsigned long flags;
@@ -296,7 +296,7 @@ static struct notifier_block tasklet_nb = {
 	.next		= NULL,
 };
 
-void __init softirq_init()
+void __init softirq_init(void)
 {
 	open_softirq(TASKLET_SOFTIRQ, tasklet_action, NULL);
 	open_softirq(HI_SOFTIRQ, tasklet_hi_action, NULL);

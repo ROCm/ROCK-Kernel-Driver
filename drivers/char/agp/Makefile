@@ -3,8 +3,7 @@
 # space ioctl interface to use agp memory.  It also adds a kernel interface
 # that other drivers could use to manipulate agp memory.
 
-agpgart-y := backend.o frontend.o generic.o
-agpgart-$(CONFIG_AGP3) += generic-3.0.o
+agpgart-y := backend.o frontend.o generic.o generic-3.0.o
 agpgart-objs := $(agpgart-y)
 obj-$(CONFIG_AGP) += agpgart.o
 
@@ -19,5 +18,4 @@ obj-$(CONFIG_AGP_HP_ZX1)	+= hp-agp.o
 obj-$(CONFIG_AGP_AMD_8151)	+= amd-k8-agp.o
 obj-$(CONFIG_AGP_ALPHA_CORE)	+= alpha-agp.o
 
-obj-$(CONFIG_AGP_I7x05)		+= i7x05-agp.o
 

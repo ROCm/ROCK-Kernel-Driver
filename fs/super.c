@@ -407,7 +407,7 @@ rescan:
 	return NULL;
 }
 
-asmlinkage long sys_ustat(dev_t dev, struct ustat * ubuf)
+asmlinkage long sys_ustat(dev_t dev, struct ustat __user * ubuf)
 {
         struct super_block *s;
         struct ustat tmp;

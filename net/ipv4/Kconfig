@@ -362,5 +362,13 @@ config INET_ESP
 
 	  If unsure, say Y.
 
+config INET_IPCOMP
+	tristate "IP: IPComp transformation"
+	---help---
+	  Support for IP Paylod Compression (RFC3173), typically needed
+	  for IPsec.
+	  
+	  If unsure, say Y.
+
 source "net/ipv4/netfilter/Kconfig"
 

@@ -605,7 +605,7 @@ static int gamma_do_init_dma( drm_device_t *dev, drm_gamma_init_t *init )
 	memset( dev_priv, 0, sizeof(drm_gamma_private_t) );
 
 	list_for_each(list, &dev->maplist->head) {
-		drm_map_list_t *r_list = (drm_map_list_t *)list;
+		drm_map_list_t *r_list = list_entry(list, drm_map_list_t, head);
 		if( r_list->map &&
 		    r_list->map->type == _DRM_SHM &&
 		    r_list->map->flags & _DRM_CONTAINS_LOCK ) {
@@ -809,7 +809,7 @@ int gamma_setsareactx(struct inode *inode, struct file *filp,
 	down(&dev->struct_sem);
 	r_list = NULL;
 	list_for_each(list, &dev->maplist->head) {
-		r_list = (drm_map_list_t *)list;
+		r_list = list_entry(list, drm_map_list_t, head);
 		if(r_list->map &&
 		   r_list->map->handle == request.handle) break;
 	}

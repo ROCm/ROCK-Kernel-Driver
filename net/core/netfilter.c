@@ -477,11 +477,6 @@ int nf_hook_slow(int pf, unsigned int hook, struct sk_buff *skb,
 	unsigned int verdict;
 	int ret = 0;
 
-	/* This stopgap cannot be removed until all the hooks are audited. */
-	if (skb_is_nonlinear(skb) && skb_linearize(skb, GFP_ATOMIC) != 0) {
-		kfree_skb(skb);
-		return -ENOMEM;
-	}
 	if (skb->ip_summed == CHECKSUM_HW) {
 		if (outdev == NULL) {
 			skb->ip_summed = CHECKSUM_NONE;

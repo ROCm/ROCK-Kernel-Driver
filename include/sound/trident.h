@@ -403,10 +403,6 @@ struct _snd_trident_pcm_mixer {
 	unsigned char rvol;		/* rear volume */
 	unsigned char cvol;		/* center volume */
 	unsigned char pad;
-	snd_kcontrol_t *ctl_vol;	/* front volume */
-	snd_kcontrol_t *ctl_pan;	/* pan */
-	snd_kcontrol_t *ctl_rvol;	/* rear volume */
-	snd_kcontrol_t *ctl_cvol;	/* center volume */
 };
 
 struct _snd_trident {
@@ -458,6 +454,10 @@ struct _snd_trident {
 
 	unsigned int musicvol_wavevol;
 	snd_trident_pcm_mixer_t pcm_mixer[32];
+	snd_kcontrol_t *ctl_vol;	/* front volume */
+	snd_kcontrol_t *ctl_pan;	/* pan */
+	snd_kcontrol_t *ctl_rvol;	/* rear volume */
+	snd_kcontrol_t *ctl_cvol;	/* center volume */
 
 	spinlock_t reg_lock;
 

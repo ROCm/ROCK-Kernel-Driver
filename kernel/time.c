@@ -90,7 +90,7 @@ asmlinkage long sys_stime(int * tptr)
 
 #endif
 
-asmlinkage long sys_gettimeofday(struct timeval *tv, struct timezone *tz)
+asmlinkage long sys_gettimeofday(struct timeval __user *tv, struct timezone __user *tz)
 {
 	if (likely(tv != NULL)) {
 		struct timeval ktv;
@@ -166,7 +166,7 @@ int do_sys_settimeofday(struct timeval *tv, struct timezone *tz)
 	return 0;
 }
 
-asmlinkage long sys_settimeofday(struct timeval *tv, struct timezone *tz)
+asmlinkage long sys_settimeofday(struct timeval __user *tv, struct timezone __user *tz)
 {
 	struct timeval	new_tv;
 	struct timezone new_tz;
@@ -387,7 +387,7 @@ leave:	if ((time_status & (STA_UNSYNC|STA_CLOCKERR)) != 0
 	return(result);
 }
 
-asmlinkage long sys_adjtimex(struct timex *txc_p)
+asmlinkage long sys_adjtimex(struct timex __user *txc_p)
 {
 	struct timex txc;		/* Local copy of parameter */
 	int ret;

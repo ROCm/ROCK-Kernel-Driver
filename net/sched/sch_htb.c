@@ -102,7 +102,9 @@
 #define HTB_PASSQ q,
 #define HTB_ARGQ struct htb_sched *q,
 #define static
+#undef __inline__
 #define __inline__
+#undef inline
 #define inline
 #define HTB_CMAGIC 0xFEFAFEF1
 #define htb_safe_rb_erase(N,R) do { BUG_TRAP((N)->rb_color != -1); \

@@ -18,8 +18,8 @@
       </affiliation>
      </author>
 
-     <date>Dec. 27, 2002</date>
-     <edition>0.2 (reborn at Christmas)</edition>
+     <date>Mar. 26, 2003</date>
+     <edition>0.3</edition>
 
     <abstract>
       <para>
@@ -30,7 +30,7 @@
 
     <legalnotice>
     <para>
-    Copyright (c) 2002  Takashi Iwai <email>tiwai@suse.de</email>
+    Copyright (c) 2002, 2003  Takashi Iwai <email>tiwai@suse.de</email>
     </para>
 
     <para>
@@ -1425,11 +1425,11 @@
     <section id="pci-resource-resource-allocation">
       <title>Resource Allocation</title>
       <para>
-        The allocation of ports and irqs are done via standard kernel
+        The allocation of I/O ports and irqs are done via standard kernel
       functions. Unlike ALSA ver.0.5.x., there are no helpers for
       that. And these resources must be released in the destructor
-      function (see below). Also, on ALSA 0.9.x, you don't need
-      allocate (pseudo-)DMA for PCI like 0.5.x. 
+      function (see below). Also, on ALSA 0.9.x, you don't need to
+      allocate (pseudo-)DMA for PCI like ALSA 0.5.x. 
       </para>
 
       <para>
@@ -1461,7 +1461,7 @@
       since irq 0 is valid. The port address and its resource pointer
       can be initialized as null by
       <function>snd_magic_kcalloc()</function> automatically, so you
-      don't have to take care of it. 
+      don't have to take care of resetting them. 
       </para>
 
       <para>
@@ -2227,6 +2227,449 @@
       </para>
     </section>
 
+    <section id="pcm-interface-runtime">
+      <title>Runtime Pointer - The Chest of PCM Information</title>
+	<para>
+	  When the PCM substream is opened, a PCM runtime instance is
+	allocated and assigned to the substream. This pointer is
+	accessible via <constant>substream-&gt;runtime</constant>.
+	This runtime pointer holds the various information; it holds
+	the copy of hw_params and sw_params configurations, the buffer
+	pointers, mmap records, spinlocks, etc.  Almost everyhing you
+	need for controlling the PCM can be found there.
+	</para>
+
+	<para>
+	The definition of runtime instance is found in
+	<filename>&lt;sound/pcm.h&gt;</filename>.  Here is the
+	copy from the file.
+          <informalexample>
+            <programlisting>
+<![CDATA[
+struct _snd_pcm_runtime {
+	/* -- Status -- */
+	snd_pcm_substream_t *trigger_master;
+	snd_timestamp_t trigger_tstamp;	/* trigger timestamp */
+	int overrange;
+	snd_pcm_uframes_t avail_max;
+	snd_pcm_uframes_t hw_ptr_base;	/* Position at buffer restart */
+	snd_pcm_uframes_t hw_ptr_interrupt; /* Position at interrupt time*/
+
+	/* -- HW params -- */
+	snd_pcm_access_t access;	/* access mode */
+	snd_pcm_format_t format;	/* SNDRV_PCM_FORMAT_* */
+	snd_pcm_subformat_t subformat;	/* subformat */
+	unsigned int rate;		/* rate in Hz */
+	unsigned int channels;		/* channels */
+	snd_pcm_uframes_t period_size;	/* period size */
+	unsigned int periods;		/* periods */
+	snd_pcm_uframes_t buffer_size;	/* buffer size */
+	unsigned int tick_time;		/* tick time */
+	snd_pcm_uframes_t min_align;	/* Min alignment for the format */
+	size_t byte_align;
+	unsigned int frame_bits;
+	unsigned int sample_bits;
+	unsigned int info;
+	unsigned int rate_num;
+	unsigned int rate_den;
+
+	/* -- SW params -- */
+	int tstamp_timespec;		/* use timeval (0) or timespec (1) */
+	snd_pcm_tstamp_t tstamp_mode;	/* mmap timestamp is updated */
+  	unsigned int period_step;
+	unsigned int sleep_min;		/* min ticks to sleep */
+	snd_pcm_uframes_t xfer_align;	/* xfer size need to be a multiple */
+	snd_pcm_uframes_t start_threshold;
+	snd_pcm_uframes_t stop_threshold;
+	snd_pcm_uframes_t silence_threshold; /* Silence filling happens when
+						noise is nearest than this */
+	snd_pcm_uframes_t silence_size;	/* Silence filling size */
+	snd_pcm_uframes_t boundary;	/* pointers wrap point */
+
+	snd_pcm_uframes_t silenced_start;
+	snd_pcm_uframes_t silenced_size;
+
+	snd_pcm_sync_id_t sync;		/* hardware synchronization ID */
+
+	/* -- mmap -- */
+	volatile snd_pcm_mmap_status_t *status;
+	volatile snd_pcm_mmap_control_t *control;
+	atomic_t mmap_count;
+
+	/* -- locking / scheduling -- */
+	spinlock_t lock;
+	wait_queue_head_t sleep;
+	struct timer_list tick_timer;
+	struct fasync_struct *fasync;
+
+	/* -- private section -- */
+	void *private_data;
+	void (*private_free)(snd_pcm_runtime_t *runtime);
+
+	/* -- hardware description -- */
+	snd_pcm_hardware_t hw;
+	snd_pcm_hw_constraints_t hw_constraints;
+
+	/* -- interrupt callbacks -- */
+	void (*transfer_ack_begin)(snd_pcm_substream_t *substream);
+	void (*transfer_ack_end)(snd_pcm_substream_t *substream);
+
+	/* -- timer -- */
+	unsigned int timer_resolution;	/* timer resolution */
+
+	/* -- DMA -- */           
+	unsigned char *dma_area;	/* DMA area */
+	dma_addr_t dma_addr;		/* physical bus address (not accessible from main CPU) */
+	size_t dma_bytes;		/* size of DMA area */
+	void *dma_private;		/* private DMA data for the memory allocator */
+
+#if defined(CONFIG_SND_PCM_OSS) || defined(CONFIG_SND_PCM_OSS_MODULE)
+	/* -- OSS things -- */
+	snd_pcm_oss_runtime_t oss;
+#endif
+};
+]]>
+            </programlisting>
+          </informalexample>
+	</para>
+
+	<para>
+	  For the operators (callbacks) of each sound driver, most of
+	these records are supposed to be read-only.  Only the PCM
+	middle-layer changes / updates these info.  The excpetions are
+	the hardware description (hw), interrupt callbacks
+	(transfer_ack_xxx), DMA buffer information, and the private
+	data.  Besides, if you use the standard buffer allocation
+	method via <function>snd_pcm_lib_malloc_pages()</function>,
+	you don't need to set the DMA buffer information by yourself.
+	</para>
+
+	<para>
+	In the sections below, important records are explained.
+	</para>
+
+	<section id="pcm-interface-runtime-hw">
+	<title>Hardware Description</title>
+	<para>
+	  The hardware descriptor (<type>snd_pcm_hardware_t</type>)
+	contains the definitions of the fundamental hardware
+	configuration.  Above all, you'll need to define this in
+	<link linkend="pcm-interface-operators-open-callback"><citetitle>
+	the open callback</citetitle></link>.
+	Note that the runtime instance holds the copy of the
+	descriptor, not the pointer to the existing descriptor.  That
+	is, in the open callback, you can modify the copied descriptor
+	(<constant>runtime-&gt;hw</constant>) as you need.  For example, if the maximum
+	number of channels is 1 only on some chip models, you can
+	still use the same hardware descriptor and change the
+	channels_max later:
+          <informalexample>
+            <programlisting>
+<![CDATA[
+          snd_pcm_runtime_t *runtime = substream->runtime;
+          ...
+          runtime->hw = snd_mychip_playback_hw; // common definition
+          if (chip->model == VERY_OLD_ONE)
+                  runtime->hw.channels_max = 1;
+]]>
+            </programlisting>
+          </informalexample>
+	</para>
+
+	<para>
+	  Typically, you'll have a hardware descriptor like below:
+          <informalexample>
+            <programlisting>
+<![CDATA[
+  static snd_pcm_hardware_t snd_mychip_playback_hw = {
+          .info = (SNDRV_PCM_INFO_MMAP |
+                   SNDRV_PCM_INFO_INTERLEAVED |
+                   SNDRV_PCM_INFO_BLOCK_TRANSFER |
+                   SNDRV_PCM_INFO_MMAP_VALID),
+          .formats =          SNDRV_PCM_FMTBIT_S16_LE,
+          .rates =            SNDRV_PCM_RATE_8000_48000,
+          .rate_min =         8000,
+          .rate_max =         48000,
+          .channels_min =     2,
+          .channels_max =     2,
+          .buffer_bytes_max = 32768,
+          .period_bytes_min = 4096,
+          .period_bytes_max = 32768,
+          .periods_min =      1,
+          .periods_max =      1024,
+  };
+]]>
+            </programlisting>
+          </informalexample>
+        </para>
+
+        <para>
+	<itemizedlist>
+	<listitem><para>
+          The <structfield>info</structfield> field contains the type and
+        capabilities of this pcm. The bit flags are defined in
+        <filename>&lt;sound/asound.h&gt;</filename> as
+        <constant>SNDRV_PCM_INFO_XXX</constant>. Here, at least, you
+        have to specify whether the mmap is supported and which
+        interleaved format is supported.
+        When the mmap is supported, add
+        <constant>SNDRV_PCM_INFO_MMAP</constant> flag here. When the
+        hardware supports the interleaved or the non-interleaved
+        format, <constant>SNDRV_PCM_INFO_INTERLEAVED</constant> or
+        <constant>SNDRV_PCM_INFO_NONINTERLEAVED</constant> flag must
+        be set, respectively. If both are supported, you can set both,
+        too. 
+        </para>
+
+        <para>
+          In the above example, <constant>MMAP_VALID</constant> and
+        <constant>BLOCK_TRANSFER</constant> are specified for OSS mmap
+        mode. Usually both are set. Of course,
+        <constant>MMAP_VALID</constant> is set only if the mmap is
+        really supported. 
+        </para>
+
+        <para>
+          The other possible flags are
+        <constant>SNDRV_PCM_INFO_PAUSE</constant> and
+        <constant>SNDRV_PCM_INFO_RESUME</constant>. The
+        <constant>PAUSE</constant> bit means that the pcm supports the
+        <quote>pause</quote> operation, while the
+        <constant>RESUME</constant> bit means that the pcm supports
+        the <quote>suspend/resume</quote> operation. If these flags
+        are set, the <structfield>trigger</structfield> callback below
+        must handle the corresponding commands. 
+        </para>
+
+	<para>
+	  When the PCM substreams can be synchronized (typically,
+	synchorinized start/stop of a playback and a capture streams),
+	you can give <constant>SNDRV_PCM_INFO_SYNC_START</constant>,
+	too.  In this case, you'll need to check the linked-list of
+	PCM substreams in the trigger callback.  This will be
+	described in the later section.
+	</para>
+	</listitem>
+
+	<listitem>
+        <para>
+          <structfield>formats</structfield> field contains the bit-flags
+        of supported formats (<constant>SNDRV_PCM_FMTBIT_XXX</constant>).
+        If the hardware supports more than one format, give all or'ed
+        bits.  In the example above, the signed 16bit little-endian
+        format is specified.
+        </para>
+	</listitem>
+
+	<listitem>
+        <para>
+        <structfield>rates</structfield> field contains the bit-flags of
+        supported rates (<constant>SNDRV_PCM_RATE_XXX</constant>).
+        When the chip supports continuous rates, pass
+        <constant>CONTINUOUS</constant> bit additionally.
+        The pre-defined rate bits are provided only for typical
+	rates. If your chip supports unconventional rates, you need to add
+        <constant>KNOT</constant> bit and set up the hardware
+        constraint manually (explained later).
+        </para>
+	</listitem>
+
+	<listitem>
+	<para>
+	<structfield>rate_min</structfield> and
+	<structfield>rate_max</structfield> define the minimal and
+	maximal sample rate.  This should correspond somehow to
+	<structfield>rates</structfield> bits.
+	</para>
+	</listitem>
+
+	<listitem>
+	<para>
+	<structfield>channel_min</structfield> and
+	<structfield>channel_max</structfield> 
+	define, as you might already expected, the minimal and maximal
+	number of channels.
+	</para>
+	</listitem>
+
+	<listitem>
+	<para>
+	<structfield>buffer_bytes_max</structfield> defines the
+	maximal buffer size in bytes.  There is no
+	<structfield>buffer_bytes_min</structfield> field, since
+	it can be calculated from the minimal period size and the
+	minimal number of periods.
+	Meanwhile, <structfield>period_bytes_min</structfield> and
+	define the minimal and maximal size of the period in bytes.
+	<structfield>periods_max</structfield> and
+	<structfield>periods_min</structfield> define the maximal and
+	minimal number of periods in the buffer.
+        </para>
+
+	<para>
+	The <quote>period</quote> is a term, that corresponds to
+	fragment in the OSS world.  The period defines the size at
+	which the PCM interrupt is generated. This size strongly
+	depends on the hardware. 
+	Generally, the smaller period size will give you more
+	interrupts, that is, more controls. 
+	In the case of capture, this size defines the input latency.
+	On the other hand, the whole buffer size defines the
+	output latency for the playback direction.
+	</para>
+	</listitem>
+
+	<listitem>
+	<para>
+	There is also a field <structfield>fifo_size</structfield>.
+	This specifies the size of the hardware FIFO, but it's not
+	used currently in the driver nor in the alsa-lib.  So, you
+	can ignore this field.
+	</para>
+	</listitem>
+	</itemizedlist>
+	</para>
+	</section>
+
+	<section id="pcm-interface-runtime-config">
+	<title>PCM Configurations</title>
+	<para>
+	Ok, let's go back again to the PCM runtime records.
+	The most frequently referred records in the runtime instance are
+	the PCM configurations.
+	The PCM configurations are stored on runtime instance
+	after the application sends <type>hw_params</type> data via
+	alsa-lib.  There are many fields copied from hw_params and
+	sw_params structs.  For example,
+	<structfield>format</structfield> holds the format type
+	chosen by the application.  This field contains the enum value
+	<constant>SNDRV_PCM_FORMAT_XXX</constant>.
+	</para>
+
+	<para>
+	One thing to be noted is that the configured buffer and period
+	sizes are stored in <quote>frames</quote> in the runtime
+        In the ALSA world, 1 frame = channels * samples-size.
+	For conversion between frames and bytes, you can use the
+	helper functions, <function>frames_to_bytes()</function> and
+          <function>bytes_to_frames()</function>. 
+          <informalexample>
+            <programlisting>
+<![CDATA[
+  period_bytes = frames_to_bytes(runtime, runtime->period_size);
+]]>
+            </programlisting>
+          </informalexample>
+        </para>
+
+	<para>
+	Also, many software parameters (sw_params) are
+	stored in frames, too.  Please check the type of the field.
+	<type>snd_pcm_uframes_t</type> is for the frames as unsigned
+	integer while <type>snd_pcm_sframes_t</type> is for the frames
+	as signed integer.
+	</para>
+	</section>
+
+	<section id="pcm-interface-runtime-dma">
+	<title>DMA Buffer Information</title>
+	<para>
+	The DMA buffer is defined by the following four fields,
+	<structfield>dma_area</structfield>,
+	<structfield>dma_addr</structfield>,
+	<structfield>dma_bytes</structfield> and
+	<structfield>dma_private</structfield>.
+	The <structfield>dma_area</structfield> holds the buffer
+	pointer (the logical address).  You can call
+	<function>memcpy</function> from/to 
+	this pointer.  Meanwhile, <structfield>dma_addr</structfield>
+	holds the physical address of the buffer.  This field is
+	specified only when the buffer is a linear buffer.
+	<structfield>dma_bytes</structfield> holds the size of buffer
+	in bytes.  <structfield>dma_private</structfield> is used for
+	the ALSA DMA allocator.
+	</para>
+
+	<para>
+	If you use a standard ALSA function,
+	<function>snd_pcm_lib_malloc_pages()</function>, for
+	allocating the buffer, these fields are set by the ALSA middle
+	layer, and you should <emphasis>not</emphasis> change them by
+	yourself.  You can read them but not write them.
+	On the other hand, if you want to allocate the buffer by
+	yourself, you'll need to manage it in hw_params callback.
+	At least, <structfield>dma_bytes</structfield> is mandatory.
+	<structfield>dma_area</structfield> is necessary when the
+	buffer is mmapped.  If your driver doesn't support mmap, this
+	field is not necessary.  <structfield>dma_addr</structfield>
+	is also not mandatory.  You can use
+	<structfield>dma_private</structfield> as you like, too.
+	</para>
+	</section>
+
+	<section id="pcm-interface-runtime-status">
+	<title>Running Status</title>
+	<para>
+	The running status can be referred via <constant>runtime-&gt;status</constant>.
+	This is the pointer to <type>snd_pcm_mmap_status_t</type>
+	record.  For example, you can get the current DMA hardware
+	pointer via <constant>runtime-&gt;status-&gt;hw_ptr</constant>.
+	</para>
+
+	<para>
+	The DMA application pointer can be referred via
+	<constant>runtime-&gt;control</constant>, which points
+	<type>snd_pcm_mmap_control_t</type> record.
+	However, accessing directly to this value is not recommended.
+	</para>
+	</section>
+
+	<section id="pcm-interface-runtime-private">
+	<title>Private Data</title> 
+	<para>
+	You can allocate a record for the substream and store it in
+	<constant>runtime-&gt;private_data</constant>.  Usually, this
+	done in
+	<link linkend="pcm-interface-operators-open-callback"><citetitle>
+	the open callback</citetitle></link>.
+        Since it's a void pointer, you should use magic-kmalloc and
+	magic-cast for such an object. 
+
+          <informalexample>
+            <programlisting>
+<![CDATA[
+  static int snd_xxx_open(snd_pcm_substream_t *substream)
+  {
+          my_pcm_data_t *data;
+          ....
+          data = snd_magic_kmalloc(my_pcm_data_t, 0, GFP_KERNEL);
+          substream->runtime->private_data = data;
+          ....
+  }
+]]>
+            </programlisting>
+          </informalexample>
+        </para>
+
+        <para>
+          The allocated object must be released in
+	<link linkend="pcm-interface-operators-open-callback"><citetitle>
+	the close callback</citetitle></link>.
+        </para>
+	</section>
+
+	<section id="pcm-interface-runtime-intr">
+	<title>Interrupt Callbacks</title>
+	<para>
+	The field <structfield>transfer_ack_begin</structfield> and
+	<structfield>transfer_ack_end</structfield> are called at
+	the beginning and the end of
+	<function>snd_pcm_period_elapsed()</function>, respectively. 
+	</para>
+	</section>
+
+    </section>
+
     <section id="pcm-interface-operators">
       <title>Operators</title>
       <para>
@@ -2279,7 +2722,7 @@
         </para>
 
         <para>
-          At least, here you have to initialize the runtime hardware
+          At least, here you have to initialize the runtime-&gt;hw
           record. Typically, this is done by like this: 
 
           <informalexample>
@@ -2298,133 +2741,21 @@
           </informalexample>
 
           where <parameter>snd_mychip_playback_hw</parameter> is the
-          pre-defined hardware record.
+          pre-defined hardware description.
+	</para>
 
-          <informalexample>
-            <programlisting>
-<![CDATA[
-  static snd_pcm_hardware_t snd_mychip_playback_hw = {
-          .info = (SNDRV_PCM_INFO_MMAP |
-                   SNDRV_PCM_INFO_INTERLEAVED |
-                   SNDRV_PCM_INFO_BLOCK_TRANSFER |
-                   SNDRV_PCM_INFO_MMAP_VALID),
-          .formats =          SNDRV_PCM_FMTBIT_S16_LE,
-          .rates =            SNDRV_PCM_RATE_8000_48000,
-          .rate_min =         8000,
-          .rate_max =         48000,
-          .channels_min =     2,
-          .channels_max =     2,
-          .buffer_bytes_max = 32768,
-          .period_bytes_min = 4096,
-          .period_bytes_max = 32768,
-          .periods_min =      1,
-          .periods_max =      1024,
-  };
-]]>
-            </programlisting>
-          </informalexample>
-        </para>
+	<para>
+	You can allocate a private data in this callback, as described
+	in <link linkend="pcm-interface-runtime-private"><citetitle>
+	Private Data</citetitle></link> section.
+	</para>
 
-        <para>
-          The similar struct exists on ALSA 0.5.x driver, so you can
-        guess the values if you already wrote a driver. 
-        </para>
-
-        <para>
-          The <structfield>info</structfield> field contains the type and
-        capabilities of this pcm. The bit flags are defined in
-        <filename>&lt;sound/asound.h&gt;</filename> as
-        <constant>SNDRV_PCM_INFO_XXX</constant>. Here, at least, you
-        have to specify whether the mmap is supported and which
-        interleaved format is supported.
-        When the mmap is supported, add
-        <constant>SNDRV_PCM_INFO_MMAP</constant> flag here. When the
-        hardware supports the interleaved or the non-interleaved
-        format, <constant>SNDRV_PCM_INFO_INTERLEAVED</constant> or
-        <constant>SNDRV_PCM_INFO_NONINTERLEAVED</constant> flag must
-        be set, respectively. If both are supported, you can set both,
-        too. 
-        </para>
-
-        <para>
-          In the above example, <constant>MMAP_VALID</constant> and
-        <constant>BLOCK_TRANSFER</constant> are specified for OSS mmap
-        mode. Usually both are set. Of course,
-        <constant>MMAP_VALID</constant> is set only if the mmap is
-        really supported. 
-        </para>
-
-        <para>
-          The other possible flags are
-        <constant>SNDRV_PCM_INFO_PAUSE</constant> and
-        <constant>SNDRV_PCM_INFO_RESUME</constant>. The
-        <constant>PAUSE</constant> bit means that the pcm supports the
-        <quote>pause</quote> operation, while the
-        <constant>RESUME</constant> bit means that the pcm supports
-        the <quote>suspend/resume</quote> operation. If these flags
-        are set, the <structfield>trigger</structfield> callback below
-        must handle the corresponding commands. 
-        </para>
-
-        <para>
-          <structfield>formats</structfield> field contains the bit-flags
-        of supported formats (<constant>SNDRV_PCM_FMTBIT_XXX</constant>).
-        If the hardware supports more than one format, give all or'ed
-        bits.  In the example above, the signed 16bit little-endian
-        format is specified.
-        </para>
-
-        <para>
-        <structfield>rates</structfield> field contains the bit-flags of
-        supported rates (<constant>SNDRV_PCM_RATE_XXX</constant>).
-        When the chip supports continuous rates, pass
-        <constant>CONTINUOUS</constant> bit additionally.
-        The pre-defined rate bits are only for typical rates. If your
-        chip supports unconventional rates, you need to add
-        <constant>KNOT</constant> bit and set up the
-        constraint manually (explained later).
-        </para>
-
-        <para>
-        There have been many changes of terminology between
-        ALSA 0.5.x and 0.9.x.
-        On the ALSA 0.9.x world, <quote>period</quote> means what is
-        known as <quote>fragment</quote> in the OSS.  It's the least
-        size of (a part of) the buffer to generate an interrupt.
-        </para>
-
-        <para>
-        Now, taking the new terminology into account, the other fields
-        are self-explanatory (I hope). Please note that here, both 
-        min/max buffer and period sizes are specified in bytes. 
-        </para>
-
-        <para>
-          Some drivers allocate the private instance for each pcm
-          substream. It can be stored in
-          <constant>substream->runtime-&gt;private_data</constant>.
-          Since it's a void pointer, you 
-          should use magic-kmalloc and magic-cast for such an object. 
-
-          <informalexample>
-            <programlisting>
-<![CDATA[
-  static int snd_xxx_open(snd_pcm_substream_t *substream)
-  {
-          my_pcm_data_t *data;
-          ....
-          data = snd_magic_kmalloc(my_pcm_data_t, 0, GFP_KERNEL);
-          substream->runtime->private_data = data;
-          ....
-  }
-]]>
-            </programlisting>
-          </informalexample>
-        </para>
-
-        <para>
-          The allocated object must be released in the close callback below.
-        </para>
+	<para>
+	If the hardware configuration needs more constraints, set the
+	hardware constraints here, too.
+	See <link linkend="pcm-interface-constraints"><citetitle>
+	Constraints</citetitle></link> for more details.
+	</para>
       </section>
 
       <section id="pcm-interface-operators-close-callback">
@@ -2619,23 +2950,6 @@
 	runtime-&gt;dma_area.  The buffer and period sizes are
 	in runtime-&gt;buffer_size and runtime-&gt;period_size,
 	respectively.
-        </para>
-
-        <para>
-          Note that the period and the buffer sizes are stored in
-          <quote>frames</quote>. In the ALSA world, 1 frame = channels
-          * samples-size. For conversion between frames and bytes, you
-          can use the helper functions,
-          <function>frames_to_bytes()</function> and
-          <function>bytes_to_frames()</function>. 
-
-          <informalexample>
-            <programlisting>
-<![CDATA[
-  period_bytes = frames_to_bytes(runtime, runtime->period_size);
-]]>
-            </programlisting>
-          </informalexample>
         </para>
 
         <para>
@@ -5115,6 +5429,217 @@
     </para>
   </chapter>
 
+
+<!-- ****************************************************** -->
+<!-- How To Put Your Driver  -->
+<!-- ****************************************************** -->
+  <chapter id="how-to-put-your-driver">
+    <title>How To Put Your Driver Into ALSA Tree</title>
+	<section>
+	<title>General</title>
+	<para>
+	So far, you've learned how to write the driver codes.
+	And you might have a question now: how to put my own
+	driver into the ALSA driver tree?
+	Here (finally :) the standard procedure is described briefly.
+	</para>
+
+	<para>
+	Suppose that you'll create a new PCI driver for the card
+	<quote>xyz</quote>.  The card module name would be
+	snd-xyz.  The new driver is usually put into alsa-driver
+	tree.  Then the driver is evaluated, audited and tested
+	by developers and users.  After a certain time, the driver
+	will go to alsa-kernel tree and eventually integrated into
+	Linux 2.5 tree.
+	</para>
+
+	<para>
+	In the following sections, the driver code is supposed
+	to be put into alsa-driver tree.  The two cases are assumed:
+	a driver consisting of a single source file and one consisting
+	of several source files.
+	</para>
+	</section>
+
+	<section>
+	<title>Driver with A Single Source File</title>
+	<para>
+	<orderedlist>
+	<listitem>
+	<para>
+	Modify alsa-driver/pci/Makefile
+	</para>
+
+	<para>
+	Suppose you have a file xyz.c.  Add the following
+	two lines
+      <informalexample>
+        <programlisting>
+<![CDATA[
+  snd-xyz-objs := xyz.o
+  extra-obj-$(CONFIG_SND_XYZ) += snd-xyz.o
+]]>
+        </programlisting>
+      </informalexample>
+	</para>
+	</listitem>
+
+	<listitem>
+	<para>
+	Modify alsa-driver/acore/Makefile
+	</para>
+
+	<para>
+	Here define the dependent modules.
+      <informalexample>
+        <programlisting>
+<![CDATA[
+  obj-$(CONFIG_SND_XYZ) += snd.o ...
+]]>
+        </programlisting>
+      </informalexample>
+
+	If the driver supports PCM, snd-pcm.o,
+	snd-timer.o and snd-page-alloc.o
+	will be needed.
+	</para>
+	<para>
+	For rawmidi, snd-rawmidi.o is needed in addition.
+	The MIDI stuff is also related to the sequencer.
+	You'll need to modify alsa-driver/acore/seq/Makefile.
+	</para>
+
+	<para>
+	For OPL3, snd-hwdep.o is needed, too.
+	It's involved with the sequencer, and as well as rawmidi,
+	you'll need to modify alsa-driver/acore/seq/Makefile
+	and acore/seq/instr/Makefile in addition.
+	Also, a new entry is necessary in
+	alsa-driver/drivers/opl3/Makefile.
+	</para>
+
+	</listitem>
+
+	<listitem>
+	<para>
+	Modify alsa-driver/utils/Modules.dep
+	</para>
+
+	<para>
+	Add the module definition for configure, here.
+	The beginning of the line must be a vertical bar, following
+	the card module name (snd-xyz) and the list of its all 
+	dependent modules.
+
+      <informalexample>
+        <programlisting>
+<![CDATA[
+  %dir linux/sound/pci
+  |snd-azt3328 snd-pcm snd-mpu401-uart snd-opl3-lib snd-opl3-synth
+  |snd-xyz snd-pcm ...
+]]>
+        </programlisting>
+      </informalexample>
+	</para>
+	</listitem>
+
+	<listitem>
+	<para>
+	Run cvscompile script to re-generate the configure script and
+	build the whole stuff again.
+	</para>
+	</listitem>
+	</orderedlist>
+	</para>
+	</section>
+
+	<section>
+	<title>Drivers with Several Source Files</title>
+	<para>
+	Suppose that the driver snd-xyz have several source files.
+	They are located in the new subdirectory,
+	pci/xyz.
+
+	<orderedlist>
+	<listitem>
+	<para>
+	Add a new directory (xyz) to extra-subdir-y list in alsa-driver/pci/Makefile
+
+      <informalexample>
+        <programlisting>
+<![CDATA[
+  extra-subdir-y := pdplus vx222 xyz
+]]>
+        </programlisting>
+      </informalexample>
+	</para>
+	</listitem>
+
+	<listitem>
+	<para>
+	Under the directory xyz, create a Makefile
+
+      <example>
+	<title>Sample Makefile for a driver xyz</title>
+        <programlisting>
+<![CDATA[
+  TOPDIR = ../..
+
+  include $(TOPDIR)/toplevel.config
+  include $(TOPDIR)/Makefile.conf
+
+  TOPDIR = $(MAINSRCDIR)
+
+  snd-xyz-objs := xyz.o abc.o def.o
+
+  obj-$(CONFIG_SND_XYZ) += snd-xyz.o
+
+  include $(TOPDIR)/Rules.make
+]]>
+        </programlisting>
+      </example>
+	</para>
+	</listitem>
+
+	<listitem>
+	<para>
+	Modify alsa-driver/acore/Makefile
+	</para>
+
+	<para>
+	This procedure is as same as in the last section.
+	</para>
+	</listitem>
+
+	<listitem>
+	<para>
+	Modify alsa-driver/utils/Modules.dep
+	</para>
+
+	<para>
+      <informalexample>
+        <programlisting>
+<![CDATA[
+	%dir linux/sound/pci/xyz
+	|snd-xyz snd-pcm ...
+]]>
+        </programlisting>
+      </informalexample>
+	</para>
+	</listitem>
+
+	<listitem>
+	<para>
+	Run cvscompile script to re-generate the configure script and
+	build the whole stuff again.
+	</para>
+	</listitem>
+	</orderedlist>
+	</para>
+	</section>
+
+  </chapter>
 
 <!-- ****************************************************** -->
 <!-- Useful Functions  -->

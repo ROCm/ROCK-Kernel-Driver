@@ -193,6 +193,7 @@ static int dsmark_enqueue(struct sk_buff *skb,struct Qdisc *sch)
 
 	D2PRINTK("dsmark_enqueue(skb %p,sch %p,[qdisc %p])\n",skb,sch,p);
 	if (p->set_tc_index) {
+		/* FIXME: Safe with non-linear skbs? --RR */
 		switch (skb->protocol) {
 			case __constant_htons(ETH_P_IP):
 				skb->tc_index = ipv4_get_dsfield(skb->nh.iph);

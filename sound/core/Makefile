@@ -17,7 +17,7 @@ snd-pcm-objs := pcm.o pcm_native.o pcm_lib.o pcm_timer.o pcm_misc.o \
 
 snd-page-alloc-objs := memalloc.o
 ifeq ($(CONFIG_PCI),y)
-snd-page-alloc-objs += sgbuf.o memory_wrapper.o
+snd-page-alloc-objs += sgbuf.o
 endif
 
 snd-rawmidi-objs  := rawmidi.o

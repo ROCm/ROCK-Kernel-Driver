@@ -1,6 +1,6 @@
 /*
  * AGPGART driver backend routines.
- * Copyright (C) 2002 Dave Jones.
+ * Copyright (C) 2002-2003 Dave Jones.
  * Copyright (C) 1999 Jeff Hartmann.
  * Copyright (C) 1999 Precision Insight, Inc.
  * Copyright (C) 1999 Xi Graphics, Inc.

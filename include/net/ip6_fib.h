@@ -72,6 +72,8 @@ struct rt6_info
 
 	struct rt6key			rt6i_dst;
 	struct rt6key			rt6i_src;
+
+	u8				rt6i_protocol;
 };
 
 struct fib6_walker_t
@@ -160,11 +162,14 @@ extern int			fib6_walk(struct fib6_walker_t *w);
 extern int			fib6_walk_continue(struct fib6_walker_t *w);
 
 extern int			fib6_add(struct fib6_node *root,
-					 struct rt6_info *rt);
+					 struct rt6_info *rt,
+					 struct nlmsghdr *nlh);
 
-extern int			fib6_del(struct rt6_info *rt);
+extern int			fib6_del(struct rt6_info *rt,
+					 struct nlmsghdr *nlh);
 
-extern void			inet6_rt_notify(int event, struct rt6_info *rt);
+extern void			inet6_rt_notify(int event, struct rt6_info *rt,
+						struct nlmsghdr *nlh);
 
 extern void			fib6_run_gc(unsigned long dummy);
 

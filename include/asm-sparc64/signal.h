@@ -123,10 +123,10 @@ struct sigstack {
 };
 
 /* Sigvec flags */
-#define SV_SSTACK    1     /* This signal handler should use sig-stack */
-#define SV_INTR      2     /* Sig return should not restart system call */
-#define SV_RESET     4     /* Set handler to SIG_DFL upon taken signal */
-#define SV_IGNCHILD  8     /* Do not send SIGCHLD */
+#define SV_SSTACK    1u    /* This signal handler should use sig-stack */
+#define SV_INTR      2u    /* Sig return should not restart system call */
+#define SV_RESET     4u    /* Set handler to SIG_DFL upon taken signal */
+#define SV_IGNCHILD  8u    /* Do not send SIGCHLD */
 
 /*
  * sa_flags values: SA_STACK is not currently supported, but will allow the
@@ -142,11 +142,11 @@ struct sigstack {
 #define SA_ONSTACK	SV_SSTACK
 #define SA_RESTART	SV_INTR
 #define SA_ONESHOT	SV_RESET
-#define SA_INTERRUPT	0x10
-#define SA_NOMASK	0x20
-#define SA_SHIRQ	0x40
-#define SA_NOCLDWAIT    0x100
-#define SA_SIGINFO      0x200
+#define SA_INTERRUPT	0x10u
+#define SA_NOMASK	0x20u
+#define SA_SHIRQ	0x40u
+#define SA_NOCLDWAIT    0x100u
+#define SA_SIGINFO      0x200u
 
 
 #define SIG_BLOCK          0x01	/* for blocking signals */

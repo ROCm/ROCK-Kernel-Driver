@@ -199,6 +199,7 @@ DEFINE_REGSET(SP, 0x60);	/* SPDIF out */
 #define   ICH_SIS_PCM_6		0x00000080	/* 6 channels (SIS7012) */
 #define   ICH_SIS_PCM_4		0x00000040	/* 4 channels (SIS7012) */
 #define   ICH_SIS_PCM_2		0x00000000	/* 2 channels (SIS7012) */
+#define   ICH_TRIE		0x00000040	/* tertiary resume interrupt enable */
 #define   ICH_SRIE		0x00000020	/* secondary resume interrupt enable */
 #define   ICH_PRIE		0x00000010	/* primary resume interrupt enable */
 #define   ICH_ACLINK		0x00000008	/* AClink shut off */
@@ -1609,10 +1610,11 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock)
 			udelay(1);
 		}
 	}
+	ac97.pci = chip->pci;
 	if ((err = snd_ac97_mixer(chip->card, &ac97, &x97)) < 0)
 		return err;
 	chip->ac97[0] = x97;
-	snd_ac97_tune_hardware(chip->ac97[0], chip->pci, ac97_quirks);
+	snd_ac97_tune_hardware(chip->ac97[0], ac97_quirks);
 	chip->ichd[ICHD_PCMOUT].ac97 = x97;
 	chip->ichd[ICHD_PCMIN].ac97 = x97;
 	if (x97->ext_id & AC97_EI_VRM)

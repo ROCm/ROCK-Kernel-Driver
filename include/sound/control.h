@@ -49,24 +49,30 @@ typedef struct _snd_kcontrol_new {
 	unsigned char *name;		/* ASCII name of item */
 	unsigned int index;		/* index of item */
 	unsigned int access;		/* access rights */
+	unsigned int count;		/* count of same elements */
 	snd_kcontrol_info_t *info;
 	snd_kcontrol_get_t *get;
 	snd_kcontrol_put_t *put;
 	unsigned long private_value;
 } snd_kcontrol_new_t;
 
+typedef struct _snd_kcontrol_volatile {
+	snd_ctl_file_t *owner;	/* locked */
+	pid_t owner_pid;
+	unsigned int access;	/* access rights */
+} snd_kcontrol_volatile_t;
+
 struct _snd_kcontrol {
 	struct list_head list;		/* list of controls */
 	snd_ctl_elem_id_t id;
-	snd_ctl_file_t *owner;		/* locked */
-	pid_t owner_pid;
-	unsigned int access;		/* access rights */
+	unsigned int count;		/* count of same elements */
 	snd_kcontrol_info_t *info;
 	snd_kcontrol_get_t *get;
 	snd_kcontrol_put_t *put;
 	unsigned long private_value;
 	void *private_data;
 	void (*private_free)(snd_kcontrol_t *kcontrol);
+	snd_kcontrol_volatile_t vd[0];	/* volatile data */
 };
 
 #define snd_kcontrol(n) list_entry(n, snd_kcontrol_t, list)
@@ -100,7 +106,7 @@ typedef int (*snd_kctl_ioctl_func_t) (snd_card_t * card,
 
 void snd_ctl_notify(snd_card_t * card, unsigned int mask, snd_ctl_elem_id_t * id);
 
-snd_kcontrol_t *snd_ctl_new(snd_kcontrol_t * kcontrol);
+snd_kcontrol_t *snd_ctl_new(snd_kcontrol_t * kcontrol, unsigned int access);
 snd_kcontrol_t *snd_ctl_new1(snd_kcontrol_new_t * kcontrolnew, void * private_data);
 void snd_ctl_free_one(snd_kcontrol_t * kcontrol);
 int snd_ctl_add(snd_card_t * card, snd_kcontrol_t * kcontrol);
@@ -116,5 +122,34 @@ int snd_ctl_can_unregister(snd_card_t *card);
 int snd_ctl_unregister(snd_card_t *card);
 int snd_ctl_register_ioctl(snd_kctl_ioctl_func_t fcn);
 int snd_ctl_unregister_ioctl(snd_kctl_ioctl_func_t fcn);
+
+static inline unsigned int snd_ctl_get_ioffnum(snd_kcontrol_t *kctl, snd_ctl_elem_id_t *id)
+{
+	return id->numid - kctl->id.numid;
+}
+
+static inline unsigned int snd_ctl_get_ioffidx(snd_kcontrol_t *kctl, snd_ctl_elem_id_t *id)
+{
+	return id->index - kctl->id.index;
+}
+
+static inline unsigned int snd_ctl_get_ioff(snd_kcontrol_t *kctl, snd_ctl_elem_id_t *id)
+{
+	if (id->numid) {
+		return snd_ctl_get_ioffnum(kctl, id);
+	} else {
+		return snd_ctl_get_ioffidx(kctl, id);
+	}
+}
+
+static inline snd_ctl_elem_id_t *snd_ctl_build_ioff(snd_ctl_elem_id_t *dst_id,
+						    snd_kcontrol_t *src_kctl,
+						    unsigned int offset)
+{
+	*dst_id = src_kctl->id;
+	dst_id->index += offset;
+	dst_id->numid += offset;
+	return dst_id;
+}
 
 #endif	/* __SOUND_CONTROL_H */

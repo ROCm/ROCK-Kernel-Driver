@@ -49,8 +49,8 @@
 #define NUM_G           64              /* use all channels */
 #define NUM_FXSENDS     4
 
-#define EMU10K1_DMA_MASK	0x1fffffffUL
-#define AUDIGY_DMA_MASK		0xffffffffUL
+#define EMU10K1_DMA_MASK	0x7fffffffUL	/* 31bit */
+#define AUDIGY_DMA_MASK		0xffffffffUL	/* 32bit */
 
 #define TMEMSIZE        256*1024
 #define TMEMSIZEREG     4
@@ -818,9 +818,6 @@ typedef struct {
 	unsigned char send_routing[3][8];
 	unsigned char send_volume[3][8];
 	unsigned short attn[3];
-	snd_kcontrol_t *ctl_send_routing;
-	snd_kcontrol_t *ctl_send_volume;
-	snd_kcontrol_t *ctl_attn;
 	emu10k1_pcm_t *epcm;
 } emu10k1_pcm_mixer_t;
 
@@ -980,6 +977,9 @@ struct _snd_emu10k1 {
 
 	emu10k1_voice_t voices[64];
 	emu10k1_pcm_mixer_t pcm_mixer[32];
+	snd_kcontrol_t *ctl_send_routing;
+	snd_kcontrol_t *ctl_send_volume;
+	snd_kcontrol_t *ctl_attn;
 
 	void (*hwvol_interrupt)(emu10k1_t *emu, unsigned int status);
 	void (*capture_interrupt)(emu10k1_t *emu, unsigned int status);

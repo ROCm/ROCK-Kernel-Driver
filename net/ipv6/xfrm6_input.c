@@ -172,6 +172,9 @@ int xfrm6_rcv(struct sk_buff **pskb)
 		if (x->props.replay_window && xfrm_replay_check(x, seq))
 			goto drop_unlock;
 
+		if (xfrm_state_check_expire(x))
+			goto drop_unlock;
+
 		nexthdr = x->type->input(x, &(xfrm_vec[xfrm_nr].decap), skb);
 		if (nexthdr <= 0)
 			goto drop_unlock;
