@@ -28,6 +28,7 @@
 #include <linux/mm.h>
 #include <linux/interrupt.h>
 #include <linux/ide.h>
+#include <linux/dma-mapping.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
