@@ -2361,7 +2361,7 @@ static ssize_t vscsi_target_store(struct kobject * kobj, struct attribute * attr
 	long flags;
 	long value = simple_strtol(buf, NULL, 10);
 
-	if (attr != &vscsi_target_active_attr) {
+	if (attr != &vscsi_target_active_attr && !vdev->disabled) {
 		err("Error: Can't modify properties while target is active.\n");
 		return -EPERM;
 	}
