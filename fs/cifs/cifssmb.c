@@ -236,9 +236,10 @@ CIFSSMBNegotiate(unsigned int xid, struct cifsSesInfo *ses)
 
 		if ((pSMBr->hdr.Flags2 & SMBFLG2_EXT_SEC) && 
 			(server->capabilities & CAP_EXTENDED_SECURITY)) {
-			if (pSMBr->ByteCount < 16)
+			__u16 count = le16_to_cpu(pSMBr->ByteCount);
+			if (count < 16)
 				rc = -EIO;
-			else if (pSMBr->ByteCount == 16) {
+			else if (count == 16) {
 				server->secType = RawNTLMSSP;
 				if (server->socketUseCount.counter > 1) {
 					if (memcmp
@@ -261,8 +262,8 @@ CIFSSMBNegotiate(unsigned int xid, struct cifsSesInfo *ses)
 				rc = decode_negTokenInit(pSMBr->u.
 							 extended_response.
 							 SecurityBlob,
-							 pSMBr->ByteCount -
-							 16, &server->secType);
+							 count - 16,
+							 &server->secType);
 			}
 		} else
 			server->capabilities &= ~CAP_EXTENDED_SECURITY;
