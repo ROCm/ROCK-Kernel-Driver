@@ -2182,6 +2182,24 @@ static int add_audio_endpoint(snd_usb_audio_t *chip, int stream, struct audiofor
 
 
 /*
+ * check if the device uses big-endian samples
+ */
+static int is_big_endian_format(struct usb_device *dev, struct audioformat *fp)
+{
+	/* M-Audio */
+	if (dev->descriptor.idVendor == 0x0763) {
+		/* Quattro: captured data only */
+		if (dev->descriptor.idProduct == 0x2001 &&
+		    fp->endpoint & USB_DIR_IN)
+			return 1;
+		/* Audiophile USB */
+		if (dev->descriptor.idProduct == 0x2003)
+			return 1;
+	}
+	return 0;
+}
+
+/*
  * parse the audio format type I descriptor
  * and returns the corresponding pcm format
  *
@@ -2217,17 +2235,13 @@ static int parse_audio_format_i_type(struct usb_device *dev, struct audioformat 
 			pcm_format = SNDRV_PCM_FORMAT_S8;
 			break;
 		case 2:
-			/* M-Audio audiophile USB workaround */
-			if (dev->descriptor.idVendor == 0x0763 &&
-			    dev->descriptor.idProduct == 0x2003)
+			if (is_big_endian_format(dev, fp))
 				pcm_format = SNDRV_PCM_FORMAT_S16_BE; /* grrr, big endian!! */
 			else
 				pcm_format = SNDRV_PCM_FORMAT_S16_LE;
 			break;
 		case 3:
-			/* M-Audio audiophile USB workaround */
-			if (dev->descriptor.idVendor == 0x0763 &&
-			    dev->descriptor.idProduct == 0x2003)
+			if (is_big_endian_format(dev, fp))
 				pcm_format = SNDRV_PCM_FORMAT_S24_3BE; /* grrr, big endian!! */
 			else
 				pcm_format = SNDRV_PCM_FORMAT_S24_3LE;
