@@ -588,13 +588,15 @@ cio_validate_subchannel (struct subchannel *sch, unsigned int irq)
  *
  */
 void
-do_IRQ (struct pt_regs regs)
+do_IRQ (struct pt_regs *regs)
 {
 	struct tpi_info *tpi_info;
 	struct subchannel *sch;
 	struct irb *irb;
 
 	irq_enter ();
+	if (S390_lowcore.int_clock >= S390_lowcore.jiffy_timer)
+		account_ticks(regs);
 	/*
 	 * Get interrupt information from lowcore
 	 */
@@ -663,7 +665,7 @@ wait_cons_dev (void)
 	do {
 		spin_unlock(&console_subchannel.lock);
 		if (!cio_tpi())
-			udelay (100);
+			cpu_relax();
 		spin_lock(&console_subchannel.lock);
 	} while (console_subchannel.schib.scsw.actl != 0);
 	/*

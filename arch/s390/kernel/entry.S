@@ -515,12 +515,9 @@ io_int_handler:
 	SAVE_ALL_BASE
         SAVE_ALL __LC_IO_OLD_PSW,0
         GET_THREAD_INFO           # load pointer to task_struct to R9
+	stck	__LC_INT_CLOCK
         l       %r1,BASED(.Ldo_IRQ)        # load address of do_IRQ
         la      %r2,SP_PTREGS(%r15) # address of register-save area
-        sr      %r3,%r3
-        icm     %r3,3,__LC_SUBCHANNEL_NR   # load subchannel nr & extend to int
-        l       %r4,__LC_IO_INT_PARM       # load interruption parm
-	l       %r5,__LC_IO_INT_WORD       # load interruption word
         basr    %r14,%r1          # branch to standard irq handler
 
 io_return:
@@ -609,26 +606,11 @@ ext_int_handler:
 	SAVE_ALL_BASE
         SAVE_ALL __LC_EXT_OLD_PSW,0
         GET_THREAD_INFO                # load pointer to task_struct to R9
+	stck	__LC_INT_CLOCK
+	la	%r2,SP_PTREGS(%r15)    # address of register-save area
+	lh	%r3,__LC_EXT_INT_CODE  # get interruption code
 	l	%r1,BASED(.Ldo_extint)
 	basr	%r14,%r1
-	lh	%r6,__LC_EXT_INT_CODE  # get interruption code
-	lr	%r1,%r6		       # calculate index = code & 0xff
-	n	%r1,BASED(.Lc0xff)
-	sll	%r1,2
-	l	%r7,BASED(.Lext_hash)
-	l	%r7,0(%r1,%r7)	       # get first list entry for hash value
-	ltr	%r7,%r7		       # == NULL ?
-	bz	BASED(io_return)       # yes, nothing to do, exit
-ext_int_loop:
-	ch	%r6,8(%r7)	       # compare external interrupt code
-	bne	BASED(ext_int_next)
-	l	%r1,4(%r7)	       # get handler address
-	la	%r2,SP_PTREGS(%r15)    # address of register-save area
-	lr	%r3,%r6		       # interruption code
-	basr	%r14,%r1	       # call handler
-ext_int_next:
-	icm	%r7,15,0(%r7)	       # next list entry
-	bnz	BASED(ext_int_loop)
 	b	BASED(io_return)
 
 /*

@@ -552,10 +552,8 @@ pgm_svc_nogo:
 io_int_handler:
         SAVE_ALL __LC_IO_OLD_PSW,0
         GET_THREAD_INFO                # load pointer to task_struct to R9
+	stck	__LC_INT_CLOCK
         la      %r2,SP_PTREGS(%r15)    # address of register-save area
-	llgh    %r3,__LC_SUBCHANNEL_NR # load subchannel number
-        llgf    %r4,__LC_IO_INT_PARM   # load interruption parm
-        llgf    %r5,__LC_IO_INT_WORD   # load interruption word
 	brasl   %r14,do_IRQ            # call standard irq handler
 
 io_return:
@@ -640,26 +638,10 @@ io_sigpending:
 ext_int_handler:
         SAVE_ALL __LC_EXT_OLD_PSW,0
         GET_THREAD_INFO                # load pointer to task_struct to R9
-	brasl   %r14,do_extint
-	llgh	%r6,__LC_EXT_INT_CODE  # get interruption code
-	lgr	%r1,%r6		       # calculate index = code & 0xff
-	nill	%r1,0xff
-	sll	%r1,3
-	larl	%r7,ext_int_hash
-	lg	%r7,0(%r1,%r7)	       # get first list entry for hash value
-	ltgr	%r7,%r7		       # == NULL ?
-	jz	io_return	       # yes, nothing to do, exit
-ext_int_loop:
-	ch	%r6,16(%r7)	       # compare external interrupt code
-	jne	ext_int_next
-	lg	%r1,8(%r7)	       # get handler address
+	stck	__LC_INT_CLOCK
 	la	%r2,SP_PTREGS(%r15)    # address of register-save area
-	lgr	%r3,%r6		       # interruption code
-	basr	%r14,%r1	       # call handler
-ext_int_next:
-	lg	%r7,0(%r7)	       # next list entry
-	ltgr	%r7,%r7
-	jnz	ext_int_loop
+	llgh	%r3,__LC_EXT_INT_CODE  # get interruption code
+	brasl   %r14,do_extint
 	j	io_return
 
 /*

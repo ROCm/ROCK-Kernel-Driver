@@ -87,6 +87,7 @@ do {									\
 	
 
 extern void do_call_softirq(void);
+extern void account_ticks(struct pt_regs *);
 
 #define invoke_softirq() do_call_softirq()
 
