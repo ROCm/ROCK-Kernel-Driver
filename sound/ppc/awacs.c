@@ -572,9 +572,20 @@ static snd_kcontrol_new_t snd_pmac_awacs_mixers[] __initdata = {
 	AWACS_VOLUME("Master Playback Volume", 2, 6, 1),
 	AWACS_SWITCH("Master Capture Switch", 1, SHIFT_LOOPTHRU, 0),
 	AWACS_VOLUME("Capture Volume", 0, 4, 0),
-	AWACS_SWITCH("Line Capture Switch", 0, SHIFT_MUX_LINE, 0),
 	AWACS_SWITCH("CD Capture Switch", 0, SHIFT_MUX_CD, 0),
+};
+
+/* FIXME: is this correct order?
+ * screamer (powerbook G3 pismo) seems to have different bits...
+ */
+static snd_kcontrol_new_t snd_pmac_awacs_mixers2[] __initdata = {
+	AWACS_SWITCH("Line Capture Switch", 0, SHIFT_MUX_LINE, 0),
 	AWACS_SWITCH("Mic Capture Switch", 0, SHIFT_MUX_MIC, 0),
+};
+
+static snd_kcontrol_new_t snd_pmac_screamer_mixers2[] __initdata = {
+	AWACS_SWITCH("Line Capture Switch", 0, SHIFT_MUX_MIC, 0),
+	AWACS_SWITCH("Mic Capture Switch", 0, SHIFT_MUX_LINE, 0),
 };
 
 static snd_kcontrol_new_t snd_pmac_awacs_master_sw __initdata =
@@ -816,6 +827,14 @@ snd_pmac_awacs_init(pmac_t *chip)
 
 	if ((err = build_mixers(chip, ARRAY_SIZE(snd_pmac_awacs_mixers),
 				snd_pmac_awacs_mixers)) < 0)
+		return err;
+	if (chip->model == PMAC_SCREAMER)
+		err = build_mixers(chip, num_controls(snd_pmac_screamer_mixers2),
+				   snd_pmac_screamer_mixers2);
+	else
+		err = build_mixers(chip, num_controls(snd_pmac_awacs_mixers2),
+				   snd_pmac_awacs_mixers2);
+	if (err < 0)
 		return err;
 	chip->master_sw_ctl = snd_ctl_new1(&snd_pmac_awacs_master_sw, chip);
 	if ((err = snd_ctl_add(chip->card, chip->master_sw_ctl)) < 0)

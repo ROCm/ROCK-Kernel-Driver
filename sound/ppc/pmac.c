@@ -84,7 +84,7 @@ static void snd_pmac_dbdma_free(pmac_dbdma_t *rec)
  * look up frequency table
  */
 
-static unsigned int snd_pmac_rate_index(pmac_t *chip, pmac_stream_t *rec, unsigned int rate)
+unsigned int snd_pmac_rate_index(pmac_t *chip, pmac_stream_t *rec, unsigned int rate)
 {
 	int i, ok, found;
 
@@ -647,7 +647,7 @@ int __init snd_pmac_pcm_new(pmac_t *chip)
 
 	pcm->private_data = chip;
 	pcm->private_free = pmac_pcm_free;
-	pcm->info_flags = 0;
+	pcm->info_flags = SNDRV_PCM_INFO_JOINT_DUPLEX;
 	strcpy(pcm->name, chip->card->shortname);
 	chip->pcm = pcm;
 
@@ -675,6 +675,35 @@ static void snd_pmac_dbdma_reset(pmac_t *chip)
 	snd_pmac_wait_ack(&chip->playback);
 	out_le32(&chip->capture.dma->control, (RUN|PAUSE|FLUSH|WAKE|DEAD) << 16);
 	snd_pmac_wait_ack(&chip->capture);
+}
+
+
+/*
+ * handling beep
+ */
+void snd_pmac_beep_dma_start(pmac_t *chip, int bytes, unsigned long addr, int speed)
+{
+	pmac_stream_t *rec = &chip->playback;
+
+	snd_pmac_dma_stop(rec);
+	st_le16(&chip->extra_dma.cmds->req_count, bytes);
+	st_le16(&chip->extra_dma.cmds->xfer_status, 0);
+	st_le32(&chip->extra_dma.cmds->cmd_dep, chip->extra_dma.addr);
+	st_le32(&chip->extra_dma.cmds->phy_addr, addr);
+	st_le16(&chip->extra_dma.cmds->command, OUTPUT_MORE + BR_ALWAYS);
+	out_le32(&chip->awacs->control,
+		 (in_le32(&chip->awacs->control) & ~0x1f00)
+		 | (speed << 8));
+	out_le32(&chip->awacs->byteswap, 0);
+	snd_pmac_dma_set_command(rec, &chip->extra_dma);
+	snd_pmac_dma_run(rec, RUN);
+}
+
+void snd_pmac_beep_dma_stop(pmac_t *chip)
+{
+	snd_pmac_dma_stop(&chip->playback);
+	st_le16(&chip->extra_dma.cmds->command, DBDMA_STOP);
+	snd_pmac_pcm_set_format(chip); /* reset format */
 }
 
 
@@ -771,6 +800,8 @@ static int snd_pmac_free(pmac_t *chip)
 	/* clean up mixer if any */
 	if (chip->mixer_free)
 		chip->mixer_free(chip);
+
+	snd_pmac_detach_beep(chip);
 
 	/* release resources */
 	if (chip->irq >= 0)
