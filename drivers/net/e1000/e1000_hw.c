@@ -270,6 +270,7 @@ e1000_set_mac_type(struct e1000_hw *hw)
     case E1000_DEV_ID_82546GB_COPPER:
     case E1000_DEV_ID_82546GB_FIBER:
     case E1000_DEV_ID_82546GB_SERDES:
+    case E1000_DEV_ID_82546GB_PCIE:
         hw->mac_type = e1000_82546_rev_3;
         break;
     case E1000_DEV_ID_82541EI:
@@ -2137,7 +2138,7 @@ e1000_check_for_link(struct e1000_hw *hw)
          * at gigabit speed, then TBI compatibility is not needed.  If we are
          * at gigabit speed, we turn on TBI compatibility.
          */
-	if(hw->tbi_compatibility_en) {
+        if(hw->tbi_compatibility_en) {
             uint16_t speed, duplex;
             e1000_get_speed_and_duplex(hw, &speed, &duplex);
             if(speed != SPEED_1000) {
@@ -2492,12 +2493,14 @@ e1000_read_phy_reg(struct e1000_hw *hw,
 
     DEBUGFUNC("e1000_read_phy_reg");
 
+
     if(hw->phy_type == e1000_phy_igp &&
        (reg_addr > MAX_PHY_MULTI_PAGE_REG)) {
         ret_val = e1000_write_phy_reg_ex(hw, IGP01E1000_PHY_PAGE_SELECT,
                                          (uint16_t)reg_addr);
-        if(ret_val)
+        if(ret_val) {
             return ret_val;
+        }
     }
 
     ret_val = e1000_read_phy_reg_ex(hw, IGP01E1000_PHY_PAGE_SELECT & reg_addr,
@@ -2596,12 +2599,14 @@ e1000_write_phy_reg(struct e1000_hw *hw,
 
     DEBUGFUNC("e1000_write_phy_reg");
 
+
     if(hw->phy_type == e1000_phy_igp &&
        (reg_addr > MAX_PHY_MULTI_PAGE_REG)) {
         ret_val = e1000_write_phy_reg_ex(hw, IGP01E1000_PHY_PAGE_SELECT,
                                          (uint16_t)reg_addr);
-        if(ret_val)
+        if(ret_val) {
             return ret_val;
+        }
     }
 
     ret_val = e1000_write_phy_reg_ex(hw, IGP01E1000_PHY_PAGE_SELECT & reg_addr,
