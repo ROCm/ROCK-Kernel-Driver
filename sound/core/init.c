@@ -21,15 +21,23 @@
 
 #include <sound/driver.h>
 #include <linux/init.h>
+#include <linux/sched.h>
+#include <linux/file.h>
 #include <linux/slab.h>
 #include <linux/time.h>
 #include <linux/ctype.h>
+#include <linux/smp_lock.h>
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/info.h>
 
+struct snd_shutdown_f_ops {
+	struct file_operations f_ops;
+	struct snd_shutdown_f_ops *next;
+};
+
 int snd_cards_count = 0;
-static unsigned int snd_cards_lock = 0;	/* locked for registering/using */
+unsigned int snd_cards_lock = 0;	/* locked for registering/using */
 snd_card_t *snd_cards[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)] = NULL};
 rwlock_t snd_card_rwlock = RW_LOCK_UNLOCKED;
 
@@ -42,6 +50,16 @@ static void snd_card_id_read(snd_info_entry_t *entry, snd_info_buffer_t * buffer
 	snd_iprintf(buffer, "%s\n", entry->card->id);
 }
 
+/**
+ *  snd_card_new: create and initialize a soundcard structure
+ *  @idx: card index (address) [0 ... (SNDRV_CARDS-1)]
+ *  @xid: card identification (ASCII string)
+ *  @module: top level module for locking
+ *  @extra_size: allocate this extra size after the main soundcard structure
+ *
+ *  Returns kmallocated snd_card_t structure. Creates the ALSA control interface
+ *  (which is blocked until #snd_card_register function is called).
+ */
 snd_card_t *snd_card_new(int idx, const char *xid,
 			 struct module *module, int extra_size)
 {
@@ -85,6 +103,8 @@ snd_card_t *snd_card_new(int idx, const char *xid,
 	rwlock_init(&card->control_owner_lock);
 	INIT_LIST_HEAD(&card->controls);
 	INIT_LIST_HEAD(&card->ctl_files);
+	spin_lock_init(&card->files_lock);
+	init_waitqueue_head(&card->shutdown_sleep);
 #ifdef CONFIG_PM
 	init_MUTEX(&card->power_lock);
 	init_waitqueue_head(&card->power_sleep);
@@ -110,17 +130,123 @@ snd_card_t *snd_card_new(int idx, const char *xid,
       	return NULL;
 }
 
+static unsigned int snd_disconnect_poll(struct file * file, poll_table * wait)
+{
+	return POLLERR | POLLNVAL;
+}
+
+/**
+ *  snd_card_disconnect: disconnect all APIs from the file-operations (user space)
+ *  @card: soundcard structure
+ *
+ *  Returns - zero, otherwise a negative error code.
+ *
+ *  Note: The current implementation replaces all active file->f_op with special
+ *        dummy file operations (they do nothing except release).
+ */
+int snd_card_disconnect(snd_card_t * card)
+{
+	struct snd_monitor_file *mfile;
+	struct file *file;
+	struct snd_shutdown_f_ops *s_f_ops;
+	struct file_operations *f_ops, *old_f_ops;
+	int err;
+
+	write_lock(&card->files_lock);
+	if (card->shutdown) {
+		write_unlock(&card->files_lock);
+		return 0;
+	}
+	card->shutdown = 1;
+	write_unlock(&card->files_lock);
+
+	/* phase 1: disable fops (user space) operations for ALSA API */
+	write_lock(&snd_card_rwlock);
+	snd_cards[card->number] = NULL;
+	write_unlock(&snd_card_rwlock);
+	
+	/* phase 2: replace file->f_op with special dummy operations */
+	
+	spin_lock(&card->files_lock);
+	mfile = card->files;
+	while (mfile) {
+		file = mfile->file;
+
+		/* it's critical part, use endless loop */
+		/* we have no room to fail */
+		s_f_ops = kmalloc(sizeof(struct snd_shutdown_f_ops), GFP_ATOMIC);
+		if (s_f_ops == NULL)
+			panic("Atomic allocation failed for snd_shutdown_f_ops!");
+
+		f_ops = &s_f_ops->f_ops;
+
+		memset(f_ops, 0, sizeof(*f_ops));
+		f_ops->owner = file->f_op->owner;
+		f_ops->release = file->f_op->release;
+		f_ops->poll = snd_disconnect_poll;
+
+		s_f_ops->next = card->s_f_ops;
+		card->s_f_ops = s_f_ops;
+		
+		f_ops = fops_get(f_ops);
+
+		old_f_ops = file->f_op;
+		file->f_op = f_ops;	/* must be atomic */
+		fops_put(old_f_ops);
+		
+		mfile = mfile->next;
+	}
+	spin_unlock(&card->files_lock);	
+
+	/* phase 3: notify all connected devices about disconnection */
+	/* at this point, they cannot respond to any calls except release() */
+
+	snd_ctl_disconnect(card);
+
+#if defined(CONFIG_SND_MIXER_OSS) || defined(CONFIG_SND_MIXER_OSS_MODULE)
+	if (snd_mixer_oss_notify_callback)
+		snd_mixer_oss_notify_callback(card, SND_MIXER_OSS_NOTIFY_DISCONNECT);
+#endif
+
+	/* notify all devices that we are disconnected */
+	err = snd_device_disconnect_all(card);
+	if (err < 0)
+		snd_printk(KERN_ERR "not all devices for card %i can be disconnected\n", card->number);
+
+	return 0;	
+}
+
+/**
+ *  snd_card_free: frees given soundcard structure
+ *  @card: soundcard structure
+ *
+ *  Returns - zero. Frees all associated devices and frees the control
+ *  interface associated to given soundcard.
+ */
 int snd_card_free(snd_card_t * card)
 {
+	wait_queue_t wait;
+	struct snd_shutdown_f_ops *s_f_ops;
+
 	if (card == NULL)
 		return -EINVAL;
 	write_lock(&snd_card_rwlock);
 	snd_cards[card->number] = NULL;
 	snd_cards_count--;
 	write_unlock(&snd_card_rwlock);
+
+	/* wait, until all devices are ready for the free operation */
+	init_waitqueue_entry(&wait, current);
+	add_wait_queue(&card->shutdown_sleep, &wait);
+	while (card->files) {
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(30 * HZ);
+	}
+	remove_wait_queue(&card->shutdown_sleep, &wait);
+
 #if defined(CONFIG_SND_MIXER_OSS) || defined(CONFIG_SND_MIXER_OSS_MODULE)
 	if (snd_mixer_oss_notify_callback)
-		snd_mixer_oss_notify_callback(card, 1);
+		snd_mixer_oss_notify_callback(card, SND_MIXER_OSS_NOTIFY_FREE);
 #endif
 	if (snd_device_free_all(card, SNDRV_DEV_CMD_PRE) < 0) {
 		snd_printk(KERN_ERR "unable to free all devices (pre)\n");
@@ -145,6 +271,11 @@ int snd_card_free(snd_card_t * card)
 		snd_printk(KERN_WARNING "unable to free card info\n");
 		/* Not fatal error */
 	}
+	while (card->s_f_ops) {
+		s_f_ops = card->s_f_ops;
+		card->s_f_ops = s_f_ops->next;
+		kfree(s_f_ops);
+	}
 	write_lock(&snd_card_rwlock);
 	snd_cards_lock &= ~(1 << card->number);
 	write_unlock(&snd_card_rwlock);
@@ -152,7 +283,65 @@ int snd_card_free(snd_card_t * card)
 	return 0;
 }
 
-static void choose_default_id(snd_card_t *card)
+static int snd_card_free_thread(void * __card)
+{
+	snd_card_t *card = __card;
+	struct module * module;
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 5, 0)
+	lock_kernel();
+#endif
+
+	daemonize();
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 5, 0)
+	reparent_to_init();
+#endif
+
+	strcpy(current->comm, "snd-free");
+
+	if (!try_inc_mod_count(module = card->module)) {
+		snd_printk(KERN_ERR "unable to lock toplevel module for card %i in free thread\n", card->number);
+		module = NULL;
+	}
+
+	wait_event(card->shutdown_sleep, card->files == NULL);
+
+	snd_card_free(card);
+
+	if (module)
+		__MOD_DEC_USE_COUNT(module);
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 5, 0)
+	unlock_kernel();
+#endif
+
+	return 0;
+}
+
+/**
+ *  snd_card_free_in_thread: call snd_card_free() in thread
+ *  @card: soundcard structure
+ *
+ *  Returns - zero otherwise a negative error code if the start of thread failed.
+ */
+int snd_card_free_in_thread(snd_card_t * card)
+{
+	int pid;
+
+	if (card->files == NULL) {
+		snd_card_free(card);
+		return 0;
+	}
+	pid = kernel_thread(snd_card_free_thread, card, 0);
+	if (pid >= 0)
+		return 0;
+	snd_printk(KERN_ERR "kernel_thread failed in snd_card_free_in_thread for card %i\n", card->number);
+	/* try to free the structure immediately */
+	snd_card_free(card);
+	return -EFAULT;
+}
+
+static void choose_default_id(snd_card_t * card)
 {
 	int i, len, idx_flag = 0, loops = 8;
 	char *id, *spos;
@@ -246,7 +435,7 @@ int snd_card_register(snd_card_t * card)
       __skip_info:
 #if defined(CONFIG_SND_MIXER_OSS) || defined(CONFIG_SND_MIXER_OSS_MODULE)
 	if (snd_mixer_oss_notify_callback)
-		snd_mixer_oss_notify_callback(card, 0);
+		snd_mixer_oss_notify_callback(card, SND_MIXER_OSS_NOTIFY_REGISTER);
 #endif
 	return 0;
 }
@@ -312,7 +501,6 @@ int __init snd_card_info_init(void)
 		return -ENOMEM;
 	}
 	snd_card_info_entry = entry;
-	
 	return 0;
 }
 
@@ -343,6 +531,56 @@ int snd_component_add(snd_card_t *card, const char *component)
 	return 0;
 }
 
+int snd_card_file_add(snd_card_t *card, struct file *file)
+{
+	struct snd_monitor_file *mfile;
+
+	mfile = kmalloc(sizeof(*mfile), GFP_KERNEL);
+	if (mfile == NULL)
+		return -ENOMEM;
+	mfile->file = file;
+	mfile->next = NULL;
+	spin_lock(&card->files_lock);
+	if (card->shutdown) {
+		spin_unlock(&card->files_lock);
+		kfree(mfile);
+		return -ENODEV;
+	}
+	mfile->next = card->files;
+	card->files = mfile;
+	spin_unlock(&card->files_lock);
+	return 0;
+}
+
+int snd_card_file_remove(snd_card_t *card, struct file *file)
+{
+	struct snd_monitor_file *mfile, *pfile = NULL;
+
+	spin_lock(&card->files_lock);
+	mfile = card->files;
+	while (mfile) {
+		if (mfile->file == file) {
+			if (pfile)
+				pfile->next = mfile->next;
+			else
+				card->files = mfile->next;
+			break;
+		}
+		pfile = mfile;
+		mfile = mfile->next;
+	}
+	spin_unlock(&card->files_lock);
+	if (card->files == NULL)
+		wake_up(&card->shutdown_sleep);
+	if (mfile) {
+		kfree(mfile);
+	} else {
+		snd_printk(KERN_ERR "ALSA card file remove problem (%p)\n", file);
+		return -ENOENT;
+	}
+	return 0;
+}
+
 #ifdef CONFIG_PM
 /* the power lock must be active before call */
 void snd_power_wait(snd_card_t *card)
@@ -352,6 +590,7 @@ void snd_power_wait(snd_card_t *card)
 	init_waitqueue_entry(&wait, current);
 	add_wait_queue(&card->power_sleep, &wait);
 	snd_power_unlock(card);
+	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout(30 * HZ);
 	remove_wait_queue(&card->power_sleep, &wait);
 	snd_power_lock(card);

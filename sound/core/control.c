@@ -62,9 +62,14 @@ static int snd_ctl_open(struct inode *inode, struct file *file)
 		err = -ENODEV;
 		goto __error1;
 	}
+	err = snd_card_file_add(card, file);
+	if (err < 0) {
+		err = -ENODEV;
+		goto __error1;
+	}
 	if (!try_inc_mod_count(card->module)) {
 		err = -EFAULT;
-		goto __error1;
+		goto __error2;
 	}
 	ctl = snd_magic_kcalloc(snd_ctl_file_t, 0, GFP_KERNEL);
 	if (ctl == NULL) {
@@ -84,6 +89,8 @@ static int snd_ctl_open(struct inode *inode, struct file *file)
 
       __error:
       	dec_mod_count(card->module);
+      __error2:
+	snd_card_file_remove(card, file);
       __error1:
 #ifdef LINUX_2_2
       	MOD_DEC_USE_COUNT;
@@ -118,7 +125,6 @@ static int snd_ctl_release(struct inode *inode, struct file *file)
 	card = ctl->card;
 	write_lock_irqsave(&card->control_rwlock, flags);
 	list_del(&ctl->list);
-	write_unlock_irqrestore(&card->control_rwlock, flags);
 	write_lock(&card->control_owner_lock);
 	list_for_each(list, &card->controls) {
 		control = snd_kcontrol(list);
@@ -126,9 +132,11 @@ static int snd_ctl_release(struct inode *inode, struct file *file)
 			control->owner = NULL;
 	}
 	write_unlock(&card->control_owner_lock);
+	write_unlock_irqrestore(&card->control_rwlock, flags);
 	snd_ctl_empty_read_queue(ctl);
 	snd_magic_kfree(ctl);
 	dec_mod_count(card->module);
+	snd_card_file_remove(card, file);
 #ifdef LINUX_2_2
 	MOD_DEC_USE_COUNT;
 #endif
@@ -805,6 +813,21 @@ int snd_ctl_register(snd_card_t *card)
 	if ((err = snd_register_device(SNDRV_DEVICE_TYPE_CONTROL,
 					card, 0, &snd_ctl_reg, name)) < 0)
 		return err;
+	return 0;
+}
+
+int snd_ctl_disconnect(snd_card_t *card)
+{
+	struct list_head *flist;
+	snd_ctl_file_t *ctl;
+
+	read_lock_irq(&card->control_rwlock);
+	list_for_each(flist, &card->ctl_files) {
+		ctl = snd_ctl_file(flist);
+		wake_up(&ctl->change_sleep);
+		kill_fasync(&ctl->fasync, SIGIO, POLL_ERR);
+	}
+	read_unlock_irq(&card->control_rwlock);
 	return 0;
 }
 

@@ -156,11 +156,10 @@ static int __init get_id(char **str, char **dst)
 	for (s = *str; isalpha(*s) || isdigit(*s) || *s == '_'; s++);
 	if (s != *str) {
 		*dst = (char *)kmalloc(s - *str, GFP_KERNEL);
-		if ((d = *dst) != NULL) {
-			s = *str;
-			while (isalpha(*s) || isdigit(*s) || *s == '_')
+		s = *str; d = *dst;
+		while (isalpha(*s) || isdigit(*s) || *s == '_')
+			if (d != NULL)
 				*d++ = *s++;
-		}
 	}
 	*str = s;
 	if (*s == ',') {

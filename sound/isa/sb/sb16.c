@@ -182,6 +182,8 @@ static struct isapnp_card_id snd_sb16_pnpids[] __devinitdata = {
 	/* Sound Blaster 16 PnP */
 	ISAPNP_SB16('C','T','L',0x0024,0x0031),
 	/* Sound Blaster 16 PnP */
+	ISAPNP_SB16('C','T','L',0x0025,0x0031),
+	/* Sound Blaster 16 PnP */
 	ISAPNP_SB16('C','T','L',0x0026,0x0031),
 	/* Sound Blaster 16 PnP */
 	ISAPNP_SB16('C','T','L',0x0027,0x0031),

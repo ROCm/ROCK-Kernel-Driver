@@ -933,11 +933,7 @@ snd_info_entry_t *snd_info_create_device(const char *name, unsigned int number, 
 	p = create_proc_entry(entry->name, entry->mode, snd_proc_dev);
 	if (p) {
 		snd_info_device_entry_prepare(p, entry);
-#ifndef LINUX_2_2
-		/* we should not set this - at least on 2.4.14 or later it causes
-		   problems! */
-		/* p->proc_fops = &snd_fops; */
-#else
+#ifdef LINUX_2_2
 		p->ops = &snd_info_device_inode_operations;
 #endif
 	} else {

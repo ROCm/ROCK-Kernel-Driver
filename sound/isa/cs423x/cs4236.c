@@ -263,6 +263,8 @@ static struct isapnp_card_id snd_card_pnpids[] __devinitdata = {
 	ISAPNP_CS4232('C','S','C',0xd937,0x0000,0x0010,0x0003),
 	/* CS4235 without MPU401 */
 	ISAPNP_CS4232_WOMPU('C','S','C',0xe825,0x0100,0x0110),
+	/* IBM IntelliStation M Pro 6898 11U - CS4236B */
+	ISAPNP_CS4232_WOMPU('C','S','C',0xe835,0x0000,0x0010),
 	/* Some noname CS4236 based card */
 	ISAPNP_CS4232('C','S','C',0xe936,0x0000,0x0010,0x0003),
 	/* CS4236B */
@@ -609,12 +611,10 @@ module_exit(alsa_card_cs423x_exit)
 
 /* format is: snd-cs4232=enable,index,id,isapnp,port,
 			 cport,mpu_port,fm_port,sb_port,
-			 irq,mpu_irq,dma1,dma1_size,
-			 dma2,dma2_size */
+			 irq,mpu_irq,dma1,dma2 */
 /* format is: snd-cs4236=enable,index,id,isapnp,port,
 			 cport,mpu_port,fm_port,sb_port,
-			 irq,mpu_irq,dma1,dma1_size,
-			 dma2,dma2_size */
+			 irq,mpu_irq,dma1,dma2 */
 
 static int __init alsa_card_cs423x_setup(char *str)
 {

@@ -2,6 +2,7 @@
  *   ALSA driver for RME Hammerfall DSP audio interface(s)
  *
  *      Copyright (c) 2002  Paul Davis
+ *                          Marcus Andersson
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -81,7 +82,7 @@ typedef enum {
 #define DIGIFACE_SS_CHANNELS     26
 #define DIGIFACE_DS_CHANNELS     14
 #define MULTIFACE_SS_CHANNELS    18
-#define MULTIFACE_DS_CHANNELS    10
+#define MULTIFACE_DS_CHANNELS    14
 
 /* Write registers. These are defined as byte-offsets from the iobase value.
  */
@@ -687,6 +688,7 @@ static int hdsp_set_rate(hdsp_t *hdsp, int rate)
 		rate = HDSP_Frequency96KHz;
 		break;
 	default:
+		spin_unlock_irq(&hdsp->lock);
 		return -EINVAL;
 	}
 
@@ -747,10 +749,12 @@ static void hdsp_set_thru(hdsp_t *hdsp, int channel, int enable)
 
 		mapped_channel = hdsp->channel_map[channel];
 
+		snd_assert(mapped_channel > -1, return);
+
 		if (enable) {
-			hdsp_write_gain (hdsp, INPUT_TO_OUTPUT_KEY(channel,channel), UNITY_GAIN);
+			hdsp_write_gain (hdsp, INPUT_TO_OUTPUT_KEY(mapped_channel,mapped_channel), UNITY_GAIN);
 		} else {
-			hdsp_write_gain (hdsp, INPUT_TO_OUTPUT_KEY(channel,channel), MINUS_INFINITY_GAIN);
+			hdsp_write_gain (hdsp, INPUT_TO_OUTPUT_KEY(mapped_channel,mapped_channel), MINUS_INFINITY_GAIN);
 		}
 	}
 }
@@ -1605,10 +1609,18 @@ static int snd_hdsp_get_playback_mixer(snd_kcontrol_t * kcontrol, snd_ctl_elem_v
 	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	int addr;
-	int chn;
+	int channel;
+	int mapped_channel;
 
-	chn = ucontrol->id.index - 1;
-	addr = PLAYBACK_TO_OUTPUT_KEY(chn, chn);
+	channel = ucontrol->id.index - 1;
+
+        snd_assert(channel >= 0 || channel < HDSP_MAX_CHANNELS, return -EINVAL);
+        
+	if ((mapped_channel = hdsp->channel_map[channel]) < 0) {
+		return -EINVAL;
+	}
+
+	addr = PLAYBACK_TO_OUTPUT_KEY(mapped_channel, mapped_channel);
 
 	spin_lock_irqsave(&hdsp->lock, flags);
 	ucontrol->value.integer.value[0] = hdsp_read_gain (hdsp, addr);
@@ -1622,14 +1634,22 @@ static int snd_hdsp_put_playback_mixer(snd_kcontrol_t * kcontrol, snd_ctl_elem_v
 	unsigned long flags;
 	int change;
 	int addr;
-	int chn;
+	int channel;
+	int mapped_channel;
 	int gain;
 
 	if (!snd_hdsp_use_is_exclusive(hdsp))
 		return -EBUSY;
 	
-	chn = ucontrol->id.index - 1;
-	addr = PLAYBACK_TO_OUTPUT_KEY(chn, chn);
+	channel = ucontrol->id.index - 1;
+
+        snd_assert(channel >= 0 || channel < HDSP_MAX_CHANNELS, return -EINVAL);
+        
+	if ((mapped_channel = hdsp->channel_map[channel]) < 0) {
+		return -EINVAL;
+	}
+
+	addr = PLAYBACK_TO_OUTPUT_KEY(mapped_channel, mapped_channel);
 	gain = ucontrol->value.integer.value[0];
 
 
@@ -2434,15 +2454,15 @@ static int snd_hdsp_channel_info(snd_pcm_substream_t *substream,
 				    snd_pcm_channel_info_t *info)
 {
 	hdsp_t *hdsp = _snd_pcm_substream_chip(substream);
-	int chn;
+	int mapped_channel;
 
 	snd_assert(info->channel < HDSP_MAX_CHANNELS, return -EINVAL);
 
-	if ((chn = hdsp->channel_map[info->channel]) < 0) {
+	if ((mapped_channel = hdsp->channel_map[info->channel]) < 0) {
 		return -EINVAL;
 	}
 
-	info->offset = chn * HDSP_CHANNEL_BUFFER_BYTES;
+	info->offset = mapped_channel * HDSP_CHANNEL_BUFFER_BYTES;
 	info->first = 0;
 	info->step = 32;
 	return 0;
@@ -2567,7 +2587,7 @@ static snd_pcm_hardware_t snd_hdsp_playback_subinfo =
 				 SNDRV_PCM_RATE_96000),
 	.rate_min =		32000,
 	.rate_max =		96000,
-	.channels_min =		10,
+	.channels_min =		14,
 	.channels_max =		HDSP_MAX_CHANNELS,
 	.buffer_bytes_max =	1024*1024,
 	.period_bytes_min =	1,
@@ -2592,7 +2612,7 @@ static snd_pcm_hardware_t snd_hdsp_capture_subinfo =
 				 SNDRV_PCM_RATE_96000),
 	.rate_min =		32000,
 	.rate_max =		96000,
-	.channels_min =		10,
+	.channels_min =		14,
 	.channels_max =		HDSP_MAX_CHANNELS,
 	.buffer_bytes_max =	1024*1024,
 	.period_bytes_min =	1,
@@ -2902,10 +2922,14 @@ static int __devinit snd_hdsp_initialize_firmware (hdsp_t *hdsp)
 			}
 		}
 		
-		if (hdsp_fifo_wait (hdsp, 3, HDSP_LONG_WAIT)) {
+		if (hdsp_fifo_wait (hdsp, 0, HDSP_LONG_WAIT)) {
 			snd_printk ("timeout at end of firmware loading\n");
 			return -EIO;
 		}
+
+		hdsp_write (hdsp, HDSP_jtagReg, 0);
+		snd_printk ("finished firmware loading\n");
+		mdelay(3000);
 
 	} else {
 

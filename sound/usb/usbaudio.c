@@ -1181,7 +1181,6 @@ static int snd_usb_pcm_open(snd_pcm_substream_t *substream, int direction,
 	runtime->private_data = subs;
 	subs->pcm_substream = substream;
 	setup_hw_info(runtime, subs);
-
 	return 0;
 }
 
@@ -1189,6 +1188,7 @@ static int snd_usb_pcm_close(snd_pcm_substream_t *substream, int direction)
 {
 	snd_usb_stream_t *as = snd_pcm_substream_chip(substream);
 	snd_usb_substream_t *subs = &as->substream[direction];
+
 	release_substream_urbs(subs);
 	if (subs->interface >= 0)
 		usb_set_interface(subs->dev, subs->interface, 0);
@@ -2171,6 +2171,10 @@ static void *snd_usb_audio_probe(struct usb_device *dev,
 	for (i = 0; i < SNDRV_CARDS; i++) {
 		if (usb_chip[i] && usb_chip[i]->dev == dev) {
 			chip = usb_chip[i];
+			if (chip->shutdown) {
+				snd_printk(KERN_ERR "USB device is in the shutdown state, cannot create a card instance\n");
+				goto __error;
+			}
 			break;
 		}
 	}
@@ -2247,14 +2251,41 @@ static void *snd_usb_audio_probe(struct usb_device *dev,
 static void snd_usb_audio_disconnect(struct usb_device *dev, void *ptr)
 {
 	snd_usb_audio_t *chip;
+	snd_card_t *card;
+	struct list_head *p;
+	snd_usb_stream_t *as;
+	snd_usb_substream_t *subs;
+	int idx;
 
 	if (ptr == (void *)-1)
 		return;
 
 	chip = snd_magic_cast(snd_usb_audio_t, ptr, return);
+	card = chip->card;
+	down(&register_mutex);
+	chip->shutdown = 1;
 	chip->num_interfaces--;
 	if (chip->num_interfaces <= 0)
-		snd_card_free(chip->card);
+		snd_card_disconnect(card);
+	list_for_each(p, &chip->pcm_list) {
+		as = list_entry(p, snd_usb_stream_t, list);
+		for (idx = 0; idx < 2; idx++) {
+			subs = &as->substream[idx];
+			if (!subs->num_formats)
+				continue;
+			release_substream_urbs(subs);
+			if (subs->interface >= 0) {
+				usb_set_interface(subs->dev, subs->interface, 0);
+				subs->interface = -1;
+			}
+		}
+	}
+	if (chip->num_interfaces <= 0) {
+		up(&register_mutex);
+		snd_card_free_in_thread(card);
+	} else {
+		up(&register_mutex);
+	}
 }
 
 
@@ -2317,7 +2348,7 @@ module_exit(snd_usb_audio_cleanup);
 
 #ifndef MODULE
 /*
- * format is snd-usb-audio=enable,index,id
+ * format is snd-usb-audio=enable,index,id,vid,pid
  */
 static int __init snd_usb_audio_module_setup(char* str)
 {
@@ -2327,7 +2358,9 @@ static int __init snd_usb_audio_module_setup(char* str)
 		return 0;
 	(void)(get_option(&str, &enable[nr_dev]) == 2 &&
 	       get_option(&str, &index[nr_dev]) == 2 &&
-	       get_id(&str, &id[nr_dev]) == 2);
+	       get_id(&str, &id[nr_dev]) == 2 &&
+	       get_option(&str, &vid[nr_dev]) == 2 &&
+	       get_option(&str, &pid[nr_dev]) == 2);
 	++nr_dev;
 	return 1;
 }

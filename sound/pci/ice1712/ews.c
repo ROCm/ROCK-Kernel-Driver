@@ -245,19 +245,18 @@ static void ews88_spdif_default_get(ice1712_t *ice, snd_ctl_elem_value_t * ucont
 
 static int ews88_spdif_default_put(ice1712_t *ice, snd_ctl_elem_value_t * ucontrol)
 {
-	unsigned long flags;
 	unsigned int val;
 	int change;
 
 	val = snd_cs8404_encode_spdif_bits(&ucontrol->value.iec958);
-	spin_lock_irqsave(&ice->reg_lock, flags);
+	spin_lock_irq(&ice->reg_lock);
 	change = ice->spdif.cs8403_bits != val;
 	ice->spdif.cs8403_bits = val;
 	if (change && ice->playback_pro_substream == NULL) {
-		spin_unlock_irqrestore(&ice->reg_lock, flags);
+		spin_unlock_irq(&ice->reg_lock);
 		snd_ice1712_ews_cs8404_spdif_write(ice, val);
 	} else {
-		spin_unlock_irqrestore(&ice->reg_lock, flags);
+		spin_unlock_irq(&ice->reg_lock);
 	}
 	return change;
 }
@@ -269,19 +268,18 @@ static void ews88_spdif_stream_get(ice1712_t *ice, snd_ctl_elem_value_t * ucontr
 
 static int ews88_spdif_stream_put(ice1712_t *ice, snd_ctl_elem_value_t * ucontrol)
 {
-	unsigned long flags;
 	unsigned int val;
 	int change;
 
 	val = snd_cs8404_encode_spdif_bits(&ucontrol->value.iec958);
-	spin_lock_irqsave(&ice->reg_lock, flags);
+	spin_lock_irq(&ice->reg_lock);
 	change = ice->spdif.cs8403_stream_bits != val;
 	ice->spdif.cs8403_stream_bits = val;
 	if (change && ice->playback_pro_substream != NULL) {
-		spin_unlock_irqrestore(&ice->reg_lock, flags);
+		spin_unlock_irq(&ice->reg_lock);
 		snd_ice1712_ews_cs8404_spdif_write(ice, val);
 	} else {
-		spin_unlock_irqrestore(&ice->reg_lock, flags);
+		spin_unlock_irq(&ice->reg_lock);
 	}
 	return change;
 }

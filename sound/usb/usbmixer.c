@@ -65,6 +65,8 @@ struct usb_mixer_build {
 	unsigned char *buffer;
 	unsigned int buflen;
 	unsigned int ctrlif;
+	unsigned short vendor;
+	unsigned short product;
 	DECLARE_BITMAP(unitbitmap, 32*32);
 	usb_audio_term_t oterm;
 	const struct usbmix_name_map *map;
@@ -78,8 +80,9 @@ struct usb_mixer_elem_info {
 	unsigned int cmask; /* channel mask bitmap: 0 = master */ 
 	int channels;
 	int val_type;
-	int min, max;
-	unsigned int initialized: 1;
+	int min, max, res;
+	unsigned int initialized: 1,
+		     hack_hole1: 1;		/* -256 value is missing */
 };
 
 
@@ -253,15 +256,16 @@ static int get_relative_value(usb_mixer_elem_info_t *cval, int val)
 	if (val < cval->min)
 		return 0;
 	else if (val > cval->max)
-		return cval->max - cval->min;
+		return (cval->max - cval->min) / cval->res;
 	else
-		return val - cval->min;
+		return (val - cval->min) / cval->res;
 }
 
 static int get_abs_value(usb_mixer_elem_info_t *cval, int val)
 {
 	if (val < 0)
 		return cval->min;
+	val *= cval->res;
 	val += cval->min;
 	if (val > cval->max)
 		return cval->max;
@@ -562,6 +566,7 @@ static int get_min_max(usb_mixer_elem_info_t *cval)
 	/* for failsafe */
 	cval->min = 0;
 	cval->max = 1;
+	cval->res = 1;
 
 	if (cval->val_type == USB_MIXER_BOOLEAN ||
 	    cval->val_type == USB_MIXER_INV_BOOLEAN) {
@@ -581,6 +586,21 @@ static int get_min_max(usb_mixer_elem_info_t *cval)
 			snd_printd(KERN_ERR "%d:%d: cannot get min/max values for control %d (id %d)\n", cval->id, cval->ctrlif, cval->control, cval->id);
 			return -EINVAL;
 		}
+		if (get_ctl_value(cval, GET_RES, (cval->control << 8) | minchn, &cval->res) < 0) {
+			cval->res = 1;
+		} else {
+			int last_valid_res = cval->res;
+		
+			while (cval->res > 1) {
+				if (set_ctl_value(cval, SET_RES, (cval->control << 8) | minchn, cval->res / 2) < 0)
+					break;
+				cval->res /= 2;
+			}
+			if (get_ctl_value(cval, GET_RES, (cval->control << 8) | minchn, &cval->res) < 0)
+				cval->res = last_valid_res;
+		}
+		if (cval->res == 0)
+			cval->res = 1;
 		cval->initialized = 1;
 	}
 	return 0;
@@ -606,7 +626,7 @@ static int mixer_ctl_feature_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t 
 		if (! cval->initialized)
 			get_min_max(cval);
 		uinfo->value.integer.min = 0;
-		uinfo->value.integer.max = cval->max - cval->min;
+		uinfo->value.integer.max = (cval->max - cval->min) / cval->res;
 	}
 	return 0;
 }
@@ -680,6 +700,7 @@ static int mixer_ctl_feature_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t 
 					set_cur_mix_value(cval, c + 1, val);
 					changed = 1;
 				}
+				get_cur_mix_value(cval, c + 1, &val);
 				cnt++;
 			}
 		}
@@ -812,8 +833,19 @@ static void build_feature_ctl(mixer_build_t *state, unsigned char *desc,
 		break;
 	}
 
-	snd_printdd(KERN_INFO "[%d] FU [%s] ch = %d, val = %d/%d\n",
-		    cval->id, kctl->id.name, cval->channels, cval->min, cval->max);
+	/* quirk for UDA1321/N101 */
+	/* note that detection between firmware 2.1.1.7 (N101) and later 2.1.1.21 */
+	/* is not very clear from datasheets */
+	/* I hope that the min value is -15360 for newer firmware --jk */
+	if (((state->vendor == 0x471 && (state->product == 0x104 || state->product == 0x105 || state->product == 0x101)) ||
+	     (state->vendor == 0x672 && state->product == 0x1041)) && !strcmp(kctl->id.name, "PCM Playback Volume") &&
+	     cval->min == -15616) {
+		snd_printk("USB Audio: using volume control quirk for the UDA1321/N101 chip\n");
+		cval->max = -256;
+	}
+
+	snd_printdd(KERN_INFO "[%d] FU [%s] ch = %d, val = %d/%d/%d\n",
+		    cval->id, kctl->id.name, cval->channels, cval->min, cval->max, cval->res);
 	add_control_to_empty(state->chip->card, kctl);
 }
 
@@ -1430,6 +1462,8 @@ int snd_usb_create_mixer(snd_usb_audio_t *chip, int ctrlif, unsigned char *buffe
 	state.buffer = buffer;
 	state.buflen = buflen;
 	state.ctrlif = ctrlif;
+	state.vendor = dev->idVendor;
+	state.product = dev->idProduct;
 
 	/* check the mapping table */
 	for (map = usbmix_ctl_maps; map->vendor; map++) {

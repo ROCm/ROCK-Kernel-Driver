@@ -133,6 +133,7 @@ struct snd_usb_audio {
 	int index;
 	struct usb_device *dev;
 	snd_card_t *card;
+	int shutdown;
 	int num_interfaces;
 
 	struct list_head pcm_list;	/* list of pcm streams */

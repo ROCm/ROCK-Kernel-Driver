@@ -81,7 +81,7 @@ void snd_ice1712_ak4524_write(ice1712_t *ice, int chip,
 		udelay(1);
 	}
 
-	if (ak->type == SND_AK4524) {
+	if (ak->type == SND_AK4524 || ak->type == SND_AK4528) {
 		if ((addr != 0x04 && addr != 0x05) || (data & 0x80) == 0)
 			ak->images[chip][addr] = data;
 		else
