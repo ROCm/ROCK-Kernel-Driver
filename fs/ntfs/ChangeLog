@@ -122,6 +122,12 @@ ToDo/Notes:
 	  ntfs inode as a parameter as this is confusing and misleading and the
 	  needed ntfs inode is available via NTFS_I(page->mapping->host).
 	  Adapt all callers to this change.
+	- Modify fs/ntfs/mft.c::write_mft_record_nolock() and
+	  fs/ntfs/aops.c::ntfs_write_mst_block() to only check the dirty state
+	  of the first buffer in a record and to take this as the ntfs record
+	  dirty state.  We cannot look at the dirty state for subsequent
+	  buffers because we might be racing with
+	  fs/ntfs/aops.c::mark_ntfs_record_dirty().
 
 2.1.20 - Fix two stupid bugs introduced in 2.1.18 release.
 

@@ -572,8 +572,10 @@ err_out:
  * ntfs inode @ni to backing store.  If the mft record @m has a counterpart in
  * the mft mirror, that is also updated.
  *
- * We only write the mft record if the ntfs inode @ni is dirty and the buffers
- * belonging to its mft record are dirty, too.
+ * We only write the mft record if the ntfs inode @ni is dirty and the first
+ * buffer belonging to its mft record is dirty, too.  We ignore the dirty state
+ * of subsequent buffers because we could have raced with
+ * fs/ntfs/aops.c::mark_ntfs_record_dirty().
  *
  * On success, clean the mft record and return 0.  On error, leave the mft
  * record dirty and return -errno.  The caller should call make_bad_inode() on
@@ -632,21 +634,23 @@ int write_mft_record_nolock(ntfs_inode *ni, MFT_RECORD *m, int sync)
 			continue;
 		if (unlikely(block_start >= m_end))
 			break;
-		/*
-		 * If the buffer is clean and it is the first buffer of the mft
-		 * record, it was written out by other means already so we are
-		 * done.  For safety we make sure all the other buffers are
-		 * clean also.  If it is clean but not the first buffer and the
-		 * first buffer was dirty it is a bug.
-		 */
-		if (!buffer_dirty(bh)) {
-			if (block_start == m_start)
+		if (block_start == m_start) {
+			/* This block is the first one in the record. */
+			if (!buffer_dirty(bh)) {
+				/* Clean records are not written out. */
 				rec_is_dirty = FALSE;
-			else
-				BUG_ON(rec_is_dirty);
-			continue;
+				continue;
+			}
+			rec_is_dirty = TRUE;
+		} else {
+			/*
+			 * This block is not the first one in the record.  We
+			 * ignore the buffer's dirty state because we could
+			 * have raced with a parallel mark_ntfs_record_dirty().
+			 */
+			if (!rec_is_dirty)
+				continue;
 		}
-		BUG_ON(!rec_is_dirty);
 		BUG_ON(!buffer_mapped(bh));
 		BUG_ON(!buffer_uptodate(bh));
 		BUG_ON(!nr_bhs && (m_start != block_start));

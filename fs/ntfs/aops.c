@@ -868,23 +868,24 @@ static int ntfs_write_mst_block(struct writeback_control *wbc,
 			clear_buffer_dirty(bh);
 			continue;
 		}
-		if (rec_block == block) {
+		if (likely(block < rec_block)) {
+			/*
+			 * This block is not the first one in the record.  We
+			 * ignore the buffer's dirty state because we could
+			 * have raced with a parallel mark_ntfs_record_dirty().
+			 */
+			if (!rec_is_dirty)
+				continue;
+		} else /* if (block == rec_block) */ {
+			BUG_ON(block > rec_block);
 			/* This block is the first one in the record. */
 			rec_block += bhs_per_rec;
 			if (!buffer_dirty(bh)) {
-				/* Clean buffers are not written out. */
+				/* Clean records are not written out. */
 				rec_is_dirty = FALSE;
 				continue;
 			}
 			rec_is_dirty = TRUE;
-		} else {
-			/* This block is not the first one in the record. */
-			if (!buffer_dirty(bh)) {
-				/* Clean buffers are not written out. */
-				BUG_ON(rec_is_dirty);
-				continue;
-			}
-			BUG_ON(!rec_is_dirty);
 		}
 		BUG_ON(!buffer_mapped(bh));
 		BUG_ON(!buffer_uptodate(bh));
@@ -973,10 +974,8 @@ static int ntfs_write_mst_block(struct writeback_control *wbc,
 			continue;
 		if (unlikely(test_set_buffer_locked(tbh)))
 			BUG();
-		if (unlikely(!test_clear_buffer_dirty(tbh))) {
-			unlock_buffer(tbh);
-			continue;
-		}
+		/* The buffer dirty state is now irrelevant, just clean it. */
+		clear_buffer_dirty(tbh);
 		BUG_ON(!buffer_uptodate(tbh));
 		BUG_ON(!buffer_mapped(tbh));
 		get_bh(tbh);
