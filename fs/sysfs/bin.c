@@ -2,6 +2,8 @@
  * bin.c - binary file operations for sysfs.
  */
 
+#undef DEBUG
+
 #include <linux/errno.h>
 #include <linux/fs.h>
 #include <linux/kobject.h>
@@ -48,7 +50,7 @@ read(struct file * file, char __user * userbuf, size_t count, loff_t * off)
 	if (copy_to_user(userbuf, buffer + offs, count) != 0)
 		return -EINVAL;
 
-	printk("offs = %lld, *off = %lld, count = %zd\n", offs, *off, count);
+	pr_debug("offs = %lld, *off = %lld, count = %zd\n", offs, *off, count);
 
 	*off = offs + count;
 
