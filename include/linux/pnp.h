@@ -433,7 +433,7 @@ static inline void pnp_remove_card(struct pnp_card *card) { ; }
 static inline int pnp_add_card_device(struct pnp_card *card, struct pnp_dev *dev) { return -ENODEV; }
 static inline void pnp_remove_card_device(struct pnp_dev *dev) { ; }
 static inline int pnp_add_card_id(struct pnp_id *id, struct pnp_card *card) { return -ENODEV; }
-static inline struct pnp_dev * pnp_request_card_device(struct pnp_card_link *clink, const char * id, struct pnp_dev * from) { return -ENODEV; }
+static inline struct pnp_dev * pnp_request_card_device(struct pnp_card_link *clink, const char * id, struct pnp_dev * from) { return NULL; }
 static inline void pnp_release_card_device(struct pnp_dev * dev) { ; }
 static inline int pnp_register_card_driver(struct pnp_card_driver * drv) { return -ENODEV; }
 static inline void pnp_unregister_card_driver(struct pnp_card_driver * drv) { ; }
