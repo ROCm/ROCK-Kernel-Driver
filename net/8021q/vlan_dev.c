@@ -766,28 +766,6 @@ int vlan_dev_stop(struct net_device *dev)
 	vlan_flush_mc_list(dev);
 	return 0;
 }
-
-int vlan_dev_init(struct net_device *dev)
-{
-	/* TODO:  figure this out, maybe do nothing?? */
-	return 0;
-}
-
-void vlan_dev_destruct(struct net_device *dev)
-{
-	if (dev) {
-		vlan_flush_mc_list(dev);
-		if (dev->priv) {
-			if (VLAN_DEV_INFO(dev)->dent)
-				BUG();
-
-			kfree(dev->priv);
-			dev->priv = NULL;
-		}
-		kfree(dev);
-	}
-}
-
 /** Taken from Gleb + Lennert's VLAN code, and modified... */
 void vlan_dev_set_multicast_list(struct net_device *vlan_dev)
 {
