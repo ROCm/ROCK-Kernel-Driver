@@ -37,10 +37,4 @@ struct ipv6_tlv_tnl_enc_lim {
 	__u8 encap_limit;	/* tunnel encapsulation limit   */
 } __attribute__ ((packed));
 
-#ifdef __KERNEL__
-#ifdef CONFIG_IPV6_TUNNEL
-extern int __init ip6_tunnel_init(void);
-extern void ip6_tunnel_cleanup(void);
-#endif
-#endif
 #endif

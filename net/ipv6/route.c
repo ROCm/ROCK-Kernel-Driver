@@ -1988,6 +1988,9 @@ void __init ip6_route_init(void)
 						     sizeof(struct rt6_info),
 						     0, SLAB_HWCACHE_ALIGN,
 						     NULL, NULL);
+	if (!ip6_dst_ops.kmem_cachep)
+		panic("cannot create ip6_dst_cache");
+
 	fib6_init();
 #ifdef 	CONFIG_PROC_FS
 	p = proc_net_create("ipv6_route", 0, rt6_proc_info);
