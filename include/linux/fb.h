@@ -424,9 +424,11 @@ struct fb_info {
 #define fb_readb __raw_readb
 #define fb_readw __raw_readw
 #define fb_readl __raw_readl
+#define fb_readq __raw_readq
 #define fb_writeb __raw_writeb
 #define fb_writew __raw_writew
 #define fb_writel __raw_writel
+#define fb_writeq __raw_writeq
 #define fb_memset memset_io
 
 #else

@@ -13,12 +13,12 @@
 #include <linux/proc_fs.h>
 #include <linux/stat.h>
 #include <linux/delay.h>
+#include <linux/interrupt.h>
 
 #include "scsi.h"
 #include "hosts.h"
 #include "NCR53C9x.h"
 
-#include "sun3x_esp.h"
 #include <asm/sun3x.h>
 #include <asm/dvma.h>
 #include <asm/irq.h>
@@ -374,7 +374,23 @@ static void dma_advance_sg (Scsi_Cmnd *sp)
     sp->SCp.ptr = (char *)((unsigned long)sp->SCp.buffer->dvma_address);
 }
 
-static Scsi_Host_Template driver_template = SCSI_SUN3X_ESP;
+static Scsi_Host_Template driver_template = {
+	.proc_name		= "esp",
+	.proc_info		= &esp_proc_info,
+	.name			= "Sun ESP 100/100a/200",
+	.detect			= sun3x_esp_detect,
+	.info			= esp_info,
+	.command		= esp_command,
+	.queuecommand		= esp_queue,
+	.eh_abort_handler	= esp_abort,
+	.eh_bus_reset_handler	= esp_reset,
+	.can_queue		= 7,
+	.this_id		= 7,
+	.sg_tablesize		= SG_ALL,
+	.cmd_per_lun		= 1,
+	.use_clustering		= DISABLE_CLUSTERING,
+};
+
 
 #include "scsi_module.c"
 

@@ -493,8 +493,7 @@ static int acsicmd_dma( const char *cmd, char *buffer, int blocks, int rwflag, i
 	acsi_delay_end(COMMAND_DELAY);
 	DISABLE_IRQ();
 
-	save_flags(flags);  
-	cli();
+	local_irq_save(flags);
 	/* Low on A1 */
 	dma_wd.dma_mode_status = 0x88 | rwflag;
 	MFPDELAY();
@@ -511,7 +510,7 @@ static int acsicmd_dma( const char *cmd, char *buffer, int blocks, int rwflag, i
 	else
 		dma_wd.dma_hi = (unsigned char)paddr;
 	MFPDELAY();
-	restore_flags(flags);
+	local_irq_restore(flags);
 
 	/* send the command bytes except the last */
 	for( i = 0; i < 5; ++i ) {

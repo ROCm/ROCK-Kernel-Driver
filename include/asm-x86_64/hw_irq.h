@@ -168,9 +168,24 @@ static inline void x86_do_profile (struct pt_regs *regs)
 
 struct notifier_block;
  
+#ifdef CONFIG_PROFILING
+
 int register_profile_notifier(struct notifier_block * nb);
 int unregister_profile_notifier(struct notifier_block * nb);
 
+#else
+
+static inline int register_profile_notifier(struct notifier_block * nb)
+{
+	return -ENOSYS;
+}
+
+static inline int unregister_profile_notifier(struct notifier_block * nb)
+{
+	return -ENOSYS;
+}
+
+#endif /* CONFIG_PROFILING */
 #ifdef CONFIG_SMP /*more of this file should probably be ifdefed SMP */
 static inline void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i) {
 	if (IO_APIC_IRQ(i))

@@ -28,6 +28,7 @@
 #include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 
 #include <linux/adb.h>
 #include <linux/pmu.h>
@@ -495,7 +496,7 @@ pmu_queue_request(struct adb_request *req)
 	req->next = 0;
 	req->sent = 0;
 	req->complete = 0;
-	save_flags(flags); cli();
+	local_irq_save(flags);
 
 	if (current_req != 0) {
 		last_req->next = req;
@@ -507,7 +508,7 @@ pmu_queue_request(struct adb_request *req)
 			pmu_start();
 	}
 
-	restore_flags(flags);
+	local_irq_restore(flags);
 	return 0;
 }
 
@@ -537,7 +538,7 @@ pmu_start()
 
 	/* assert pmu_state == idle */
 	/* get the packet to send */
-	save_flags(flags); cli();
+	local_irq_save(flags);
 	req = current_req;
 	if (req == 0 || pmu_state != idle
 	    || (req->reply_expected && req_awaiting_reply))
@@ -551,16 +552,15 @@ pmu_start()
 	send_byte(req->data[0]);
 
 out:
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 void 
 pmu_poll()
 {
-	unsigned long cpu_flags;
+	unsigned long flags;
 
-	save_flags(cpu_flags);
-	cli();
+	local_irq_save(flags);
 	if (via1[IFR] & SR_INT) {
 		via1[IFR] = SR_INT;
 		pmu_interrupt(IRQ_MAC_ADB_SR, NULL, NULL);
@@ -569,7 +569,7 @@ pmu_poll()
 		via1[IFR] = CB1_INT;
 		pmu_interrupt(IRQ_MAC_ADB_CL, NULL, NULL);
 	}
-	restore_flags(cpu_flags);
+	local_irq_restore(flags);
 }
 
 static void 
@@ -963,9 +963,9 @@ int __openfirmware powerbook_sleep(void)
 	asm volatile("mfspr %0,1008" : "=r" (hid0) :);
 	hid0 = (hid0 & ~(HID0_NAP | HID0_DOZE)) | HID0_SLEEP;
 	asm volatile("mtspr 1008,%0" : : "r" (hid0));
-	save_flags(msr);
+	local_save_flags(msr);
 	msr |= MSR_POW | MSR_EE;
-	restore_flags(msr);
+	local_irq_restore(msr);
 	udelay(10);
 
 	/* OK, we're awake again, start restoring things */

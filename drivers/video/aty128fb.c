@@ -1415,7 +1415,7 @@ aty128fb_setup(char *options)
 		}
 #endif
 #ifdef CONFIG_ALL_PPC
-		/* vmode and cmode depreciated */
+		/* vmode and cmode deprecated */
 		if (!strncmp(this_opt, "vmode:", 6)) {
 			unsigned int vmode = simple_strtoul(this_opt+6, NULL, 0);
 			if (vmode > 0 && vmode <= VMODE_MAX)

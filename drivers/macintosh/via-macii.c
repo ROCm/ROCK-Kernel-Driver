@@ -21,6 +21,7 @@
 #include <linux/delay.h>
 #include <linux/sched.h>
 #include <linux/adb.h>
+#include <linux/interrupt.h>
 #include <asm/macintosh.h>
 #include <asm/macints.h>
 #include <asm/machw.h>
@@ -144,8 +145,7 @@ int macii_init(void)
 	unsigned long flags;
 	int err;
 	
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 	
 	err = macii_init_via();
 	if (err) return err;
@@ -155,7 +155,7 @@ int macii_init(void)
 	if (err) return err;
 
 	macii_state = idle;
-	restore_flags(flags);	
+	local_irq_restore(flags);
 	return 0;
 }
 
@@ -196,13 +196,12 @@ static void macii_queue_poll(void)
 	adb_request(&req, NULL, ADBREQ_REPLY|ADBREQ_NOSEND, 1,
 		    ADB_READREG(device, 0));
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 
 	req.next = current_req;
 	current_req = &req;
 
-	restore_flags(flags);
+	local_irq_restore(flags);
 	macii_start();
 	in_poll--;
 }
@@ -221,8 +220,7 @@ static void macii_retransmit(int device)
 	adb_request(&rt, NULL, ADBREQ_REPLY|ADBREQ_NOSEND, 1,
 		    ADB_READREG(device, 0));
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 
 	if (current_req != NULL) {
 		last_req->next = &rt;
@@ -234,7 +232,7 @@ static void macii_retransmit(int device)
 
 	if (macii_state == idle) macii_start();
 
-	restore_flags(flags);
+	local_irq_restore(flags);
 	in_retransmit--;
 }
 
@@ -267,7 +265,7 @@ static int macii_write(struct adb_request *req)
 	req->complete = 0;
 	req->reply_len = 0;
 
-	save_flags(flags); cli();
+	local_irq_save(flags);
 
 	if (current_req != NULL) {
 		last_req->next = req;
@@ -278,7 +276,7 @@ static int macii_write(struct adb_request *req)
 		if (macii_state == idle) macii_start();
 	}
 
-	restore_flags(flags);
+	local_irq_restore(flags);
 	return 0;
 }
 
@@ -296,9 +294,9 @@ static void macii_poll(void)
 {
 	unsigned long flags;
 
-	save_flags(flags); cli();
+	local_irq_save(flags);
 	if (via[IFR] & SR_INT) macii_interrupt(0, 0, 0);
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 /* Reset the bus */
@@ -328,7 +326,7 @@ static void macii_start(void)
 		return;
 	}
 
-	save_flags(flags); cli();
+	local_irq_save(flags);
 	
 	/* 
 	 * IRQ signaled ?? (means ADB controller wants to send, or might 
@@ -356,7 +354,7 @@ static void macii_start(void)
 					(uint) via[B] & (ST_MASK|TREQ));
 			retry_req = req;
 			/* set ADB status here ? */
-			restore_flags(flags);
+			local_irq_restore(flags);
 			return;
 		} else {
 			need_poll = 0;
@@ -385,7 +383,7 @@ static void macii_start(void)
 	macii_state = sending;
 	data_index = 2;
 
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 /*
@@ -421,10 +419,10 @@ void macii_interrupt(int irq, void *arg, struct pt_regs *regs)
 	last_status = status;
 
 	/* prevent races due to SCSI enabling ints */
-	save_flags(flags); cli();
+	local_irq_save(flags);
 
 	if (driver_running) {
-		restore_flags(flags);
+		local_irq_restore(flags);
 		return;
 	}
 
@@ -650,5 +648,5 @@ void macii_interrupt(int irq, void *arg, struct pt_regs *regs)
 	}
 	/* reset mutex and interrupts */
 	driver_running = 0;
-	restore_flags(flags);
+	local_irq_restore(flags);
 }

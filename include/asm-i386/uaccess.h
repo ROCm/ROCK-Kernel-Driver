@@ -189,7 +189,7 @@ do {									\
 	  case 1: __put_user_asm(x,ptr,retval,"b","b","iq"); break;	\
 	  case 2: __put_user_asm(x,ptr,retval,"w","w","ir"); break;	\
 	  case 4: __put_user_asm(x,ptr,retval,"l","","ir"); break;	\
-	  case 8: __put_user_u64(x,ptr,retval); break;			\
+	  case 8: __put_user_u64((__typeof__(*ptr))(x),ptr,retval); break;	\
 	  default: __put_user_bad();					\
 	}								\
 } while (0)

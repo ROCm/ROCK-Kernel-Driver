@@ -160,19 +160,17 @@ static void iic_ite_handler(int this_irq, void *dev_id, struct pt_regs *regs)
  */
 static int iic_hw_resrc_init(void)
 {
-  	if (check_region(gpi.iic_base, ITE_IIC_IO_SIZE) < 0 ) {
-   	   return -ENODEV;
-  	} else {
-  	   request_region(gpi.iic_base, ITE_IIC_IO_SIZE, 
-		"i2c (i2c bus adapter)");
-  	}
-	if (gpi.iic_irq > 0) {
-	   if (request_irq(gpi.iic_irq, iic_ite_handler, 0, "ITE IIC", 0) < 0) {
-	      gpi.iic_irq = 0;
-	   } else
-	      DEB3(printk("Enabled IIC IRQ %d\n", gpi.iic_irq));
-	      enable_irq(gpi.iic_irq);
-	}
+	if (!request_region(gpi.iic_base, ITE_IIC_IO_SIZE, "i2c"))
+		return -ENODEV;
+  
+	if (gpi.iic_irq <= 0)
+		return 0;
+
+	if (request_irq(gpi.iic_irq, iic_ite_handler, 0, "ITE IIC", 0) < 0)
+		gpi.iic_irq = 0;
+	else
+		enable_irq(gpi.iic_irq);
+
 	return 0;
 }
 

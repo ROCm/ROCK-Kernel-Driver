@@ -51,9 +51,9 @@ CONFIG_VIDEO_DEV=m
 CONFIG_VIDEO_CPIA=m
 CONFIG_VIDEO_CPIA_PP=m
 
-For autoloading of all those modules you need to tell modutils some
-stuff. Add the following line to your modutils config-file
-(e.g. /etc/modules.conf or wherever your distribution does store that
+For autoloading of all those modules you need to tell module-init-tools
+some stuff. Add the following line to your module-init-tools config-file
+(e.g. /etc/modprobe.conf or wherever your distribution does store that
 stuff):
 
 options parport_pc io=0x378 irq=7 dma=3

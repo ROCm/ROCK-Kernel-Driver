@@ -500,12 +500,11 @@ static void slm_test_ready( unsigned long dummy )
 	int			   did_wait = 0;
 #endif
 
-	save_flags(flags);
-	cli();
-	
+	local_irq_save(flags);
+
 	addr = get_dma_addr();
 	if ((d = SLMEndAddr - addr) > 0) {
-		restore_flags(flags);
+		local_irq_restore(flags);
 		
 		/* slice not yet finished, decide whether to start another timer or to
 		 * busy-wait */
@@ -523,7 +522,7 @@ static void slm_test_ready( unsigned long dummy )
 		do_gettimeofday( &start_tm );
 		did_wait = 1;
 #endif
-		cli();
+		local_irq_disable();
 		while( get_dma_addr() < SLMEndAddr )
 			barrier();
 	}
@@ -547,7 +546,7 @@ static void slm_test_ready( unsigned long dummy )
 	DMA_LONG_WRITE( SLM_DMA_AMOUNT, 0x112 );
 #endif
 	
-	restore_flags(flags);
+	local_irq_restore(flags);
 
 #ifdef DEBUG
 	if (did_wait) {
@@ -584,10 +583,9 @@ static void slm_test_ready( unsigned long dummy )
 
 static void set_dma_addr( unsigned long paddr )
 
-{	unsigned long	flags;
-	
-	save_flags(flags);  
-	cli();
+{	unsigned long flags;
+
+	local_irq_save(flags);
 	dma_wd.dma_lo = (unsigned char)paddr;
 	paddr >>= 8;
 	MFPDELAY();
@@ -599,7 +597,7 @@ static void set_dma_addr( unsigned long paddr )
 	else
 		dma_wd.dma_hi = (unsigned char)paddr;
 	MFPDELAY();
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 

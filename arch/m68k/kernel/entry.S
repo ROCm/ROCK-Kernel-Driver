@@ -552,10 +552,10 @@ sys_call_table:
 	.long sys_adjtimex
 	.long sys_mprotect	/* 125 */
 	.long sys_sigprocmask
-	.long sys_create_module
+	.long sys_ni_syscall		/* old "create_module" */ 
 	.long sys_init_module
 	.long sys_delete_module
-	.long sys_get_kernel_syms	/* 130 */
+	.long sys_ni_syscall	/* 130 - old "get_kernel_syms" */
 	.long sys_quotactl
 	.long sys_getpgid
 	.long sys_fchdir
@@ -592,7 +592,7 @@ sys_call_table:
 	.long sys_setresuid16
 	.long sys_getresuid16	/* 165 */
 	.long sys_getpagesize
-	.long sys_query_module
+	.long sys_ni_syscall		/* old sys_query_module */
 	.long sys_poll
 	.long sys_nfsservctl
 	.long sys_setresgid16	/* 170 */

@@ -18,6 +18,7 @@
 #include <linux/adb.h>
 #include <linux/cuda.h>
 #include <linux/spinlock.h>
+#include <linux/interrupt.h>
 #ifdef CONFIG_PPC
 #include <asm/prom.h>
 #include <asm/machdep.h>

@@ -402,8 +402,7 @@ static int __init addr_accessible( volatile void *regp, int wordflag, int writef
 	long	flags;
 	long	*vbr, save_berr;
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 
 	__asm__ __volatile__ ( "movec	%/vbr,%0" : "=r" (vbr) : );
 	save_berr = vbr[2];
@@ -440,7 +439,7 @@ static int __init addr_accessible( volatile void *regp, int wordflag, int writef
 	);
 
 	vbr[2] = save_berr;
-	restore_flags(flags);
+	local_irq_restore(flags);
 
 	return( ret );
 }

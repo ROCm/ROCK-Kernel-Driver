@@ -83,15 +83,14 @@ static void adb_iop_complete(struct iop_msg *msg, struct pt_regs *regs)
 	struct adb_request *req;
 	uint flags;
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 
 	req = current_req;
 	if ((adb_iop_state == sending) && req && req->reply_expected) {
 		adb_iop_state = awaiting_reply;
 	}
 
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 /*
@@ -107,8 +106,7 @@ static void adb_iop_listen(struct iop_msg *msg, struct pt_regs *regs)
 	struct adb_request *req;
 	uint flags;
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 
 	req = current_req;
 
@@ -150,7 +148,7 @@ static void adb_iop_listen(struct iop_msg *msg, struct pt_regs *regs)
 		memcpy(msg->reply, msg->message, IOP_MSG_LEN);
 	}
 	iop_complete_message(msg);
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 /*
@@ -170,8 +168,7 @@ static void adb_iop_start(void)
 	req = current_req;
 	if (!req) return;
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 
 #ifdef DEBUG_ADB_IOP
 	printk("adb_iop_start: sending packet, %d bytes:", req->nbytes);
@@ -192,7 +189,7 @@ static void adb_iop_start(void)
 
 	req->sent = 1;
 	adb_iop_state = sending;
-	restore_flags(flags);
+	local_irq_restore(flags);
 
 	/* Now send it. The IOP manager will call adb_iop_complete */
 	/* when the packet has been sent.                          */
@@ -236,8 +233,7 @@ static int adb_iop_write(struct adb_request *req)
 		return -EINVAL;
 	}
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 
 	req->next = 0;
 	req->sent = 0;
@@ -252,7 +248,7 @@ static int adb_iop_write(struct adb_request *req)
 		last_req = req;
 	}
 
-	restore_flags(flags);
+	local_irq_restore(flags);
 	if (adb_iop_state == idle) adb_iop_start();
 	return 0;
 }

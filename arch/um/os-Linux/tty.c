@@ -35,7 +35,7 @@ int get_pty(void)
 	}
 
 	info.fd = fd;
-	tracing_cb(grantpt_cb, &info);
+	initial_thread_cb(grantpt_cb, &info);
 
 	if(info.res < 0){
 		printk("get_pty : Couldn't grant pty - errno = %d\n", 

@@ -574,7 +574,7 @@ static int __init mtrr_init(void)
 			   query the width (in bits) of the physical
 			   addressable memory on the Hammer family.
 			 */
-			if (boot_cpu_data.x86 >= 7 
+			if (boot_cpu_data.x86 == 15
 			    && (cpuid_eax(0x80000000) >= 0x80000008)) {
 				u32 phys_addr;
 				phys_addr = cpuid_eax(0x80000008) & 0xff;

@@ -25,11 +25,11 @@
 #include <linux/blk.h>
 #include <linux/proc_fs.h>
 #include <linux/stat.h>
+#include <linux/interrupt.h>
 
 #include "scsi.h"
 #include "hosts.h"
 #include "NCR53C9x.h"
-#include "blz1230.h"
 
 #include <linux/zorro.h>
 #include <asm/irq.h>
@@ -39,6 +39,42 @@
 #include <asm/pgtable.h>
 
 #define MKIV 1
+
+/* The controller registers can be found in the Z2 config area at these
+ * offsets:
+ */
+#define BLZ1230_ESP_ADDR 0x8000
+#define BLZ1230_DMA_ADDR 0x10000
+#define BLZ1230II_ESP_ADDR 0x10000
+#define BLZ1230II_DMA_ADDR 0x10021
+
+
+/* The Blizzard 1230 DMA interface
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * Only two things can be programmed in the Blizzard DMA:
+ *  1) The data direction is controlled by the status of bit 31 (1 = write)
+ *  2) The source/dest address (word aligned, shifted one right) in bits 30-0
+ *
+ * Program DMA by first latching the highest byte of the address/direction
+ * (i.e. bits 31-24 of the long word constructed as described in steps 1+2
+ * above). Then write each byte of the address/direction (starting with the
+ * top byte, working down) to the DMA address register.
+ *
+ * Figure out interrupt status by reading the ESP status byte.
+ */
+struct blz1230_dma_registers {
+	volatile unsigned char dma_addr; 	/* DMA address      [0x0000] */
+	unsigned char dmapad2[0x7fff];
+	volatile unsigned char dma_latch; 	/* DMA latch        [0x8000] */
+};
+
+struct blz1230II_dma_registers {
+	volatile unsigned char dma_addr; 	/* DMA address      [0x0000] */
+	unsigned char dmapad2[0xf];
+	volatile unsigned char dma_latch; 	/* DMA latch        [0x0010] */
+};
+
+#define BLZ1230_DMA_WRITE 0x80000000
 
 static int  dma_bytes_sent(struct NCR_ESP *esp, int fifo_count);
 static int  dma_can_transfer(struct NCR_ESP *esp, Scsi_Cmnd *sp);
@@ -279,12 +315,6 @@ static void dma_setup(struct NCR_ESP *esp, __u32 addr, int count, int write)
 
 #define HOSTS_C
 
-#include "blz1230.h"
-
-static Scsi_Host_Template driver_template = SCSI_BLZ1230;
-
-#include "scsi_module.c"
-
 int blz1230_esp_release(struct Scsi_Host *instance)
 {
 #ifdef MODULE
@@ -296,5 +326,26 @@ int blz1230_esp_release(struct Scsi_Host *instance)
 #endif
 	return 1;
 }
+
+
+static Scsi_Host_Template driver_template = {
+	.proc_name		= "esp-blz1230",
+	.proc_info		= esp_proc_info,
+	.name			= "Blizzard1230 SCSI IV",
+	.detect			= blz1230_esp_detect,
+	.release		= blz1230_esp_release,
+	.command		= esp_command,
+	.queuecommand		= esp_queue,
+	.eh_abort_handler	= esp_abort,
+	.eh_bus_reset_handler	= esp_reset,
+	.can_queue		= 7,
+	.this_id		= 7,
+	.sg_tablesize		= SG_ALL,
+	.cmd_per_lun		= 1,
+	.use_clustering		= ENABLE_CLUSTERING
+};
+
+
+#include "scsi_module.c"
 
 MODULE_LICENSE("GPL");

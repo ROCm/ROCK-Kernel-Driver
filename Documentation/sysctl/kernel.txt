@@ -286,9 +286,9 @@ can be ORed together:
 
   1 - A module with a non-GPL license has been loaded, this
       includes modules with no license.
-      Set by modutils >= 2.4.9.
+      Set by modutils >= 2.4.9 and module-init-tools.
   2 - A module was force loaded by insmod -f.
-      Set by modutils >= 2.4.9.
+      Set by modutils >= 2.4.9 and module-init-tools.
   4 - Unsafe SMP processors: SMP with CPUs not designed for SMP.
 
 ==============================================================

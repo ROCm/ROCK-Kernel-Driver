@@ -194,7 +194,7 @@ int __init mac8390_memsize(unsigned long membase)
 	unsigned long flags;
 	int i, j;
 	
-	save_flags(flags); cli();
+	local_irq_save(flags);
 	/* Check up to 32K in 4K increments */
 	for (i = 0; i < 8; i++) {
 		volatile unsigned short *m = (unsigned short *) (membase + (i * 0x1000));
@@ -217,7 +217,7 @@ int __init mac8390_memsize(unsigned long membase)
 				break;
  		}
  	}
-	restore_flags(flags);
+	local_irq_restore(flags);
 	/* in any case, we stopped once we tried one block too many,
            or once we reached 32K */
  	return i * 0x1000;

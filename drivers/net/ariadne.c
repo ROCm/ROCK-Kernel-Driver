@@ -604,8 +604,7 @@ static int ariadne_start_xmit(struct sk_buff *skb, struct net_device *dev)
     printk(" data 0x%08x len %d\n", (int)skb->data, (int)skb->len);
 #endif
 
-    save_flags(flags);
-    cli();
+    local_irq_save(flags);
 
     entry = priv->cur_tx % TX_RING_SIZE;
 
@@ -662,7 +661,7 @@ static int ariadne_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	netif_stop_queue(dev);
 	priv->tx_full = 1;
     }
-    restore_flags(flags);
+    local_irq_restore(flags);
 
     return 0;
 }
@@ -765,13 +764,12 @@ static struct net_device_stats *ariadne_get_stats(struct net_device *dev)
     short saved_addr;
     unsigned long flags;
 
-    save_flags(flags);
-    cli();
+    local_irq_save(flags);
     saved_addr = lance->RAP;
     lance->RAP = CSR112;		/* Missed Frame Count */
     priv->stats.rx_missed_errors = swapw(lance->RDP);
     lance->RAP = saved_addr;
-    restore_flags(flags);
+    local_irq_restore(flags);
 
     return &priv->stats;
 }

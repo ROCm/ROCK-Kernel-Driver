@@ -83,7 +83,7 @@ __uml_setup("xterm=", xterm_setup,
 "    are 'xterm=gnome-terminal,-t,-x'.\n\n"
 );
 
-int xterm_open(int input, int output, int primary, void *d)
+int xterm_open(int input, int output, int primary, void *d, char **dev_out)
 {
 	struct xterm_chan *data = d;
 	unsigned long stack;
@@ -92,6 +92,9 @@ int xterm_open(int input, int output, int primary, void *d)
 	char *argv[] = { terminal_emulator, title_switch, title, exec_switch, 
 			 "/usr/lib/uml/port-helper", "-uml-socket",
 			 file, NULL };
+
+	if(access(argv[4], X_OK))
+		argv[4] = "port-helper";
 
 	fd = mkstemp(file);
 	if(fd < 0){
@@ -141,6 +144,7 @@ int xterm_open(int input, int output, int primary, void *d)
 	if(data->raw) raw(new, 0);
 
 	data->pid = pid;
+	*dev_out = NULL;
 	return(new);
 }
 
@@ -168,6 +172,7 @@ int xterm_console_write(int fd, const char *buf, int n, void *d)
 }
 
 struct chan_ops xterm_ops = {
+	type:		"xterm",
 	init:		xterm_init,
 	open:		xterm_open,
 	close:		xterm_close,

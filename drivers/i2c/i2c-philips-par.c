@@ -297,14 +297,5 @@ MODULE_LICENSE("GPL");
 
 MODULE_PARM(type, "i");
 
-#ifdef MODULE
-int init_module(void)
-{
-	return i2c_bitlp_init();
-}
-
-void cleanup_module(void)
-{
-	i2c_bitlp_exit();
-}
-#endif
+module_init(i2c_bitlp_init);
+module_exit(i2c_bitlp_exit);

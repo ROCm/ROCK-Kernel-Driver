@@ -93,22 +93,6 @@ static int sun3scsi_release (struct Scsi_Host *);
 #define SUN3_SCSI_NAME "Sun3 NCR5380 SCSI"
 #endif
 
-#define SUN3_NCR5380 {							\
-.name =			SUN3_SCSI_NAME,					\
-.detect =		sun3scsi_detect,				\
-.release =		sun3scsi_release,	/* Release */		\
-.info =			sun3scsi_info,					\
-.queuecommand =		sun3scsi_queue_command,				\
-.abort =		sun3scsi_abort,					\
-.reset =		sun3scsi_reset,					\
-.can_queue =		CAN_QUEUE,		/* can queue */		\
-.this_id =		7,			/* id */		\
-.sg_tablesize =		SG_TABLESIZE,		/* sg_tablesize */	\
-.cmd_per_lun =		CMD_PER_LUN,		/* cmd per lun */	\
-.unchecked_isa_dma =	0,			/* unchecked_isa_dma */	\
-.use_clustering =	DISABLE_CLUSTERING				\
-	}
-
 #ifndef HOSTS_C
 
 #define NCR5380_implementation_fields \

@@ -40,7 +40,7 @@ int sun3_hwclk(int set, struct rtc_time *t)
 
         todintersil = (struct intersil_dt *) &intersil_clock->counter;
 
-	save_and_cli(flags);
+	local_irq_save(flags);
 
 	intersil_clock->cmd_reg = STOP_VAL;
 
@@ -68,7 +68,7 @@ int sun3_hwclk(int set, struct rtc_time *t)
 
 	intersil_clock->cmd_reg = START_VAL;
 
-	restore_flags(flags);
+	local_irq_restore(flags);
 
 	return 0;
 

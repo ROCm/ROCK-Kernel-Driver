@@ -43,6 +43,9 @@ __init_begin = .;
 	__setup_start = .;
 	.init.setup : { *(.init.setup) }
 	__setup_end = .;
+	__start___param = .;
+	__param : { *(__param) }
+	__stop___param = .;
 	__initcall_start = .;
 	.initcall.init : {
 		*(.initcall1.init) 
@@ -54,6 +57,10 @@ __init_begin = .;
 		*(.initcall7.init)
 	}
 	__initcall_end = .;
+	. = ALIGN(8192);
+	__initramfs_start = .;
+	.init.ramfs : { *(.init.ramfs) }
+	__initramfs_end = .;
 	. = ALIGN(8192);
 	__init_end = .;
 	.init.task : { *(init_task) }

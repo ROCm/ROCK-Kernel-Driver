@@ -54,7 +54,7 @@ Before you can use a module, you'll have to load it with
 
 	insmod scc.o
 
-please read 'man insmod' that comes with modutils.
+please read 'man insmod' that comes with module-init-tools.
 
 You should include the insmod in one of the /etc/rc.d/rc.* files,
 and don't forget to insert a call of sccinit after that. It

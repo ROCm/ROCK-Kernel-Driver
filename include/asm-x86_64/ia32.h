@@ -202,7 +202,7 @@ struct iovec32 {
 	int iov_len; 
 };
 
-#define IA32_PAGE_OFFSET 0xffff0000
+#define IA32_PAGE_OFFSET 0xffffe000
 #define IA32_STACK_TOP IA32_PAGE_OFFSET
 
 #endif /* !CONFIG_IA32_SUPPORT */

@@ -59,6 +59,8 @@ On other - If you know of the key combos for other architectures, please
 
 'm'     - Will dump current memory info to your console.
 
+'v'	- Dumps Voyager SMP processor info to your console.
+
 '0'-'9' - Sets the console log level, controlling which kernel messages
           will be printed to your console. ('0', for example would make
           it so that only emergency messages like PANICs or OOPSes would
