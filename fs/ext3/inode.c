@@ -1181,7 +1181,7 @@ static int ext3_commit_write(struct file *file, struct page *page,
  * So, if we see any bmap calls here on a modified, data-journaled file,
  * take extra steps to flush any blocks which might be in the cache. 
  */
-static int ext3_bmap(struct address_space *mapping, long block)
+static sector_t ext3_bmap(struct address_space *mapping, sector_t block)
 {
 	struct inode *inode = mapping->host;
 	journal_t *journal;

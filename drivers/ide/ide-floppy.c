@@ -1241,17 +1241,18 @@ static void idefloppy_create_rw_cmd (idefloppy_floppy_t *floppy, idefloppy_pc_t 
 /*
  *	idefloppy_do_request is our request handling function.	
  */
-static ide_startstop_t idefloppy_do_request (ide_drive_t *drive, struct request *rq, unsigned long block)
+static ide_startstop_t idefloppy_do_request (ide_drive_t *drive, struct request *rq, sector_t block_s)
 {
 	idefloppy_floppy_t *floppy = drive->driver_data;
 	idefloppy_pc_t *pc;
+	unsigned long block = (unsigned long)block_s;
 
 #if IDEFLOPPY_DEBUG_LOG
 	printk(KERN_INFO "rq_status: %d, rq_dev: %u, flags: %lx, errors: %d\n",
 			rq->rq_status, (unsigned int) rq->rq_dev,
 			rq->flags, rq->errors);
 	printk(KERN_INFO "sector: %ld, nr_sectors: %ld, "
-			"current_nr_sectors: %ld\n", rq->sector,
+			"current_nr_sectors: %ld\n", (long)rq->sector,
 			rq->nr_sectors, rq->current_nr_sectors);
 #endif /* IDEFLOPPY_DEBUG_LOG */
 

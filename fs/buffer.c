@@ -1776,7 +1776,7 @@ static int __block_prepare_write(struct inode *inode, struct page *page,
 		unsigned from, unsigned to, get_block_t *get_block)
 {
 	unsigned block_start, block_end;
-	unsigned long block;
+	sector_t block;
 	int err = 0;
 	unsigned blocksize, bbits;
 	struct buffer_head *bh, *head, *wait[2], **wait_bh=wait;
@@ -1792,7 +1792,7 @@ static int __block_prepare_write(struct inode *inode, struct page *page,
 	head = page_buffers(page);
 
 	bbits = inode->i_blkbits;
-	block = page->index << (PAGE_CACHE_SHIFT - bbits);
+	block = (sector_t)page->index << (PAGE_CACHE_SHIFT - bbits);
 
 	for(bh = head, block_start = 0; bh != head || !block_start;
 	    block++, block_start=block_end, bh = bh->b_this_page) {
@@ -1933,7 +1933,7 @@ static int __block_commit_write(struct inode *inode, struct page *page,
 int block_read_full_page(struct page *page, get_block_t *get_block)
 {
 	struct inode *inode = page->mapping->host;
-	unsigned long iblock, lblock;
+	sector_t iblock, lblock;
 	struct buffer_head *bh, *head, *arr[MAX_BUF_PER_PAGE];
 	unsigned int blocksize, blocks;
 	int nr, i;
@@ -1948,7 +1948,7 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
 	head = page_buffers(page);
 
 	blocks = PAGE_CACHE_SIZE >> inode->i_blkbits;
-	iblock = page->index << (PAGE_CACHE_SHIFT - inode->i_blkbits);
+	iblock = (sector_t)page->index << (PAGE_CACHE_SHIFT - inode->i_blkbits);
 	lblock = (inode->i_size+blocksize-1) >> inode->i_blkbits;
 	bh = head;
 	nr = 0;

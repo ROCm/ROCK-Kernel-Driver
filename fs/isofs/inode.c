@@ -1045,9 +1045,9 @@ static int isofs_bmap(struct inode *inode, int block)
 	return 0;
 }
 
-struct buffer_head *isofs_bread(struct inode *inode, unsigned int block)
+struct buffer_head *isofs_bread(struct inode *inode, sector_t block)
 {
-	unsigned int blknr = isofs_bmap(inode, block);
+	sector_t blknr = isofs_bmap(inode, block);
 	if (!blknr)
 		return NULL;
 	return sb_bread(inode->i_sb, blknr);
@@ -1058,7 +1058,7 @@ static int isofs_readpage(struct file *file, struct page *page)
 	return block_read_full_page(page,isofs_get_block);
 }
 
-static int _isofs_bmap(struct address_space *mapping, long block)
+static sector_t _isofs_bmap(struct address_space *mapping, sector_t block)
 {
 	return generic_block_bmap(mapping,block,isofs_get_block);
 }

@@ -2029,7 +2029,7 @@ int reiserfs_prepare_write(struct file *f, struct page *page,
 }
 
 
-static int reiserfs_aop_bmap(struct address_space *as, long block) {
+static sector_t reiserfs_aop_bmap(struct address_space *as, sector_t block) {
   return generic_block_bmap(as, block, reiserfs_bmap) ;
 }
 
