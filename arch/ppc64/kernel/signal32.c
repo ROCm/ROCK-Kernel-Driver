@@ -298,7 +298,8 @@ long sys32_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 	regs->dsisr = 0;
 	regs->result = (u64)(saved_regs[PT_RESULT]) & 0xFFFFFFFF;
 
-	if (copy_from_user(current->thread.fpr, &sr->fp_regs, sizeof(sr->fp_regs)))
+	if (copy_from_user(current->thread.fpr, &sr->fp_regs,
+			   sizeof(sr->fp_regs)))
 		goto badframe;
 
 	ret = regs->result;
@@ -508,6 +509,11 @@ long sys32_rt_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 	regs->dar = 0; 
 	regs->dsisr = 0;
 	regs->result = (u64)(saved_regs[PT_RESULT]) & 0xFFFFFFFF;
+
+	if (copy_from_user(current->thread.fpr, &sr->fp_regs,
+			   sizeof(sr->fp_regs)))
+		goto badframe;
+
 	ret = regs->result;
 	return ret;
 
