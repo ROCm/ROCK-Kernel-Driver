@@ -192,11 +192,6 @@ static ide_startstop_t chs_rw_disk (ide_drive_t *drive, struct request *rq, unsi
 	sectors = rq->nr_sectors;
 	if (sectors == 256)
 		sectors = 0;
-	if (command == WIN_MULTWRITE_EXT || command == WIN_MULTWRITE) {
-		sectors = drive->mult_count;
-		if (sectors > rq->current_nr_sectors)
-			sectors = rq->current_nr_sectors;
-	}
 
 	taskfile.sector_count	= sectors;
 	taskfile.sector_number	= sect;
@@ -241,11 +236,6 @@ static ide_startstop_t lba_28_rw_disk (ide_drive_t *drive, struct request *rq, u
 	sectors = rq->nr_sectors;
 	if (sectors == 256)
 		sectors = 0;
-	if (command == WIN_MULTWRITE_EXT || command == WIN_MULTWRITE) {
-		sectors = drive->mult_count;
-		if (sectors > rq->current_nr_sectors)
-			sectors = rq->current_nr_sectors;
-	}
 
 	memset(&taskfile, 0, sizeof(task_struct_t));
 	memset(&hobfile, 0, sizeof(hob_struct_t));
@@ -300,13 +290,8 @@ static ide_startstop_t lba_48_rw_disk (ide_drive_t *drive, struct request *rq, u
 	memset(&hobfile, 0, sizeof(hob_struct_t));
 
 	sectors = rq->nr_sectors;
-	if (sectors == 256)
+	if (sectors == 65536)
 		sectors = 0;
-	if (command == WIN_MULTWRITE_EXT || command == WIN_MULTWRITE) {
-		sectors = drive->mult_count;
-		if (sectors > rq->current_nr_sectors)
-			sectors = rq->current_nr_sectors;
-	}
 
 	taskfile.sector_count	= sectors;
 	hobfile.sector_count	= sectors >> 8;

@@ -255,6 +255,7 @@ int drive_is_ready (ide_drive_t *drive)
 	return 1;		/* drive ready: *might* be interrupting */
 }
 
+ide_startstop_t bio_mulout_intr (ide_drive_t *drive);
 ide_startstop_t do_rw_taskfile (ide_drive_t *drive, ide_task_t *task)
 {
 	task_struct_t *taskfile = (task_struct_t *) task->tfRegister;
@@ -263,7 +264,7 @@ ide_startstop_t do_rw_taskfile (ide_drive_t *drive, ide_task_t *task)
 	byte HIHI = (drive->addressing) ? 0xE0 : 0xEF;
 
 	/* (ks/hs): Moved to start, do not use for multiple out commands */
-	if (task->handler != task_mulout_intr) {
+	if (task->handler != task_mulout_intr && task->handler != bio_mulout_intr) {
 		if (IDE_CONTROL_REG)
 			OUT_BYTE(drive->ctl, IDE_CONTROL_REG);	/* clear nIEN */
 		SELECT_MASK(HWIF(drive), drive, 0);
@@ -313,7 +314,7 @@ void do_taskfile (ide_drive_t *drive, struct hd_drive_task_hdr *taskfile, struct
 	byte HIHI = (drive->addressing) ? 0xE0 : 0xEF;
 
 	/* (ks/hs): Moved to start, do not use for multiple out commands */
-	if (*handler != task_mulout_intr) {
+	if (*handler != task_mulout_intr && handler != bio_mulout_intr) {
 		if (IDE_CONTROL_REG)
 			OUT_BYTE(drive->ctl, IDE_CONTROL_REG);  /* clear nIEN */
 		SELECT_MASK(HWIF(drive), drive, 0);
@@ -936,15 +937,12 @@ ide_startstop_t task_out_intr (ide_drive_t *drive)
 	char *pBuf		= NULL;
 	unsigned long flags;
 
-	if (!rq->current_nr_sectors) { 
-		printk("task_out_intr: should not trigger\n");
-		ide_end_request(1, HWGROUP(drive));
-		return ide_stopped;
-	}
-
-	if (!OK_STAT(stat,DRIVE_READY,drive->bad_wstat)) {
+	if (!OK_STAT(stat,DRIVE_READY,drive->bad_wstat))
 		return ide_error(drive, "task_out_intr", stat);
-	}
+
+	if (!rq->current_nr_sectors)
+		if (!ide_end_request(1, HWGROUP(drive)))
+			return ide_stopped;
 
 	if ((rq->current_nr_sectors==1) ^ (stat & DRQ_STAT)) {
 		rq = HWGROUP(drive)->rq;
@@ -958,16 +956,8 @@ ide_startstop_t task_out_intr (ide_drive_t *drive)
 		rq->current_nr_sectors--;
 	}
 
-	if (rq->current_nr_sectors <= 0) {
-		if (ide_end_request(1, HWGROUP(drive))) {
-			ide_set_handler(drive, &task_out_intr, WAIT_CMD, NULL);
-			return ide_started;
-		}
-	} else {
-		ide_set_handler(drive, &task_out_intr, WAIT_CMD, NULL);
-		return ide_started;
-	}
-	return ide_stopped;
+	ide_set_handler(drive, task_out_intr, WAIT_CMD, NULL);
+	return ide_started;
 }
 
 /*
@@ -1061,14 +1051,132 @@ ide_startstop_t task_mulout_intr (ide_drive_t *drive)
 	return ide_started;
 }
 
+ide_startstop_t pre_bio_out_intr (ide_drive_t *drive, struct request *rq)
+{
+	ide_task_t *args = rq->special;
+	ide_startstop_t startstop;
+
+	/*
+	 * assign private copy for multi-write
+	 */
+	memcpy(&HWGROUP(drive)->wrq, rq, sizeof(struct request));
+
+	if (ide_wait_stat(&startstop, drive, DATA_READY, drive->bad_wstat, WAIT_DRQ))
+		return startstop;
+
+	/*
+	 * (ks/hs): Stuff the first sector(s)
+	 * by implicitly calling the handler
+	 */
+	if (!(drive_is_ready(drive))) {
+		int i;
+		/*
+		 * (ks/hs): FIXME: Replace hard-coded
+		 *               100, error handling?
+		 */
+		for (i=0; i<100; i++) {
+			if (drive_is_ready(drive))
+				break;
+		}
+	}
+
+	return args->handler(drive);
+}
+
+
+ide_startstop_t bio_mulout_intr (ide_drive_t *drive)
+{
+#ifdef ALTSTAT_SCREW_UP
+	byte stat	= altstat_multi_busy(drive, GET_ALTSTAT(), "write");
+#else
+	byte stat		= GET_STAT();
+#endif /* ALTSTAT_SCREW_UP */
+
+	byte io_32bit		= drive->io_32bit;
+	struct request *rq	= &HWGROUP(drive)->wrq;
+	ide_hwgroup_t *hwgroup	= HWGROUP(drive);
+	int mcount		= drive->mult_count;
+	ide_startstop_t startstop;
+
+	/*
+	 * (ks/hs): Handle last IRQ on multi-sector transfer,
+	 * occurs after all data was sent in this chunk
+	 */
+	if (!rq->nr_sectors) {
+		if (stat & (ERR_STAT|DRQ_STAT)) {
+			startstop = ide_error(drive, "bio_mulout_intr", stat);
+			memcpy(rq, HWGROUP(drive)->rq, sizeof(struct request));
+			return startstop;
+		}
+
+		__ide_end_request(HWGROUP(drive), 1, rq->hard_nr_sectors);
+		HWGROUP(drive)->wrq.bio = NULL;
+		return ide_stopped;
+	}
+
+	if (!OK_STAT(stat, DATA_READY, BAD_R_STAT)) {
+		if (stat & (ERR_STAT | DRQ_STAT)) {
+			startstop = ide_error(drive, "bio_mulout_intr", stat);
+			memcpy(rq, HWGROUP(drive)->rq, sizeof(struct request));
+			return startstop;
+		}
+
+		/* no data yet, so wait for another interrupt */
+		if (hwgroup->handler == NULL)
+			ide_set_handler(drive, bio_mulout_intr, WAIT_CMD, NULL);
+
+		return ide_started;
+	}
+
+	do {
+  		char *buffer;
+  		int nsect = rq->current_nr_sectors;
+		unsigned long flags;
+
+		if (nsect > mcount)
+			nsect = mcount;
+		mcount -= nsect;
+
+		buffer = ide_map_buffer(rq, &flags);
+		rq->sector += nsect;
+		rq->nr_sectors -= nsect;
+		rq->current_nr_sectors -= nsect;
+
+		/* Do we move to the next bio after this? */
+		if (!rq->current_nr_sectors) {
+			/* remember to fix this up /jens */
+			struct bio *bio = rq->bio->bi_next;
+
+			/* end early early we ran out of requests */
+			if (!bio) {
+				mcount = 0;
+			} else {
+				rq->bio = bio;
+				rq->current_nr_sectors = bio_iovec(bio)->bv_len >> 9;
+			}
+		}
+
+		/*
+		 * Ok, we're all setup for the interrupt
+		 * re-entering us on the last transfer.
+		 */
+		taskfile_output_data(drive, buffer, nsect * SECTOR_WORDS);
+		ide_unmap_buffer(buffer, &flags);
+	} while (mcount);
+
+	drive->io_32bit = io_32bit;
+	rq->errors = 0;
+	if (hwgroup->handler == NULL)
+		ide_set_handler(drive, bio_mulout_intr, WAIT_CMD, NULL);
+
+	return ide_started;
+}
+
 /* Called by internal to feature out type of command being called */
 ide_pre_handler_t * ide_pre_handler_parser (struct hd_drive_task_hdr *taskfile, struct hd_drive_hob_hdr *hobfile)
 {
 	switch(taskfile->command) {
 				/* IDE_DRIVE_TASK_RAW_WRITE */
-		case CFA_WRITE_MULTI_WO_ERASE:
-		case WIN_MULTWRITE:
-		case WIN_MULTWRITE_EXT:
 				/* IDE_DRIVE_TASK_OUT */
 		case WIN_WRITE:
 		case WIN_WRITE_EXT:
@@ -1077,7 +1185,10 @@ ide_pre_handler_t * ide_pre_handler_parser (struct hd_drive_task_hdr *taskfile, 
 		case CFA_WRITE_SECT_WO_ERASE:
 		case WIN_DOWNLOAD_MICROCODE:
 			return &pre_task_out_intr;
-				/* IDE_DRIVE_TASK_OUT */
+		case CFA_WRITE_MULTI_WO_ERASE:
+		case WIN_MULTWRITE:
+		case WIN_MULTWRITE_EXT:
+			return &pre_bio_out_intr;
 		case WIN_SMART:
 			if (taskfile->feature == SMART_WRITE_LOG_SECTOR)
 				return &pre_task_out_intr;
@@ -1120,7 +1231,7 @@ ide_handler_t * ide_handler_parser (struct hd_drive_task_hdr *taskfile, struct h
 		case CFA_WRITE_MULTI_WO_ERASE:
 		case WIN_MULTWRITE:
 		case WIN_MULTWRITE_EXT:
-			return &task_mulout_intr;
+			return &bio_mulout_intr;
 		case WIN_SMART:
 			switch(taskfile->feature) {
 				case SMART_READ_VALUES:
