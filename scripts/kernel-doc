@@ -1398,7 +1398,7 @@ sub push_parameter($$$) {
 
 	if ($type eq "" && $param eq "...")
 	{
-	    $type="...";
+	    $type="";
 	    $param="...";
 	    $parameterdescs{"..."} = "variable arguments";
 	}
