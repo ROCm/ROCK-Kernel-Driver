@@ -125,6 +125,7 @@ void __init gayle_init(void)
 	unsigned long base, ctrlport, irqport;
 	ide_ack_intr_t *ack_intr;
 	hw_regs_t hw;
+	ide_hwif_t *hwif;
 	int index;
 	unsigned long phys_base, res_start, res_n;
 
@@ -154,11 +155,12 @@ void __init gayle_init(void)
 
 	ide_setup_ports(&hw, base, gayle_offsets,
 			ctrlport, irqport, ack_intr,
-//			gaule_iops,
+//			&gayle_iops,
 			IRQ_AMIGA_PORTS);
 
-	index = ide_register_hw(&hw, NULL);
+	index = ide_register_hw(&hw, &hwif);
 	if (index != -1) {
+	    hwif->mmio = 2;
 	    switch (i) {
 		case 0:
 		    printk("ide%d: Gayle IDE interface (A%d style)\n", index,
