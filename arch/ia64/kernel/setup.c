@@ -292,7 +292,7 @@ setup_serial_legacy (void)
 static int __init
 early_console_setup (void)
 {
-#ifdef CONFIG_SGI_L1_SERIAL_CONSOLE
+#ifdef CONFIG_SERIAL_SGI_L1_CONSOLE
 	{
 		extern int sn_serial_console_early_setup(void);
 		if(!sn_serial_console_early_setup())
