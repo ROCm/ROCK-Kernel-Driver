@@ -42,6 +42,15 @@
 #define CR_XP	(1 << 23)	/* Extended page tables			*/
 #define CR_VE	(1 << 24)	/* Vectored interrupts			*/
 
+/*
+ * This is used to ensure the compiler did actually allocate the register we
+ * asked it for some inline assembly sequences.  Apparently we can't trust
+ * the compiler from one version to another so a bit of paranoia won't hurt.
+ * This string is meant to be concatenated with the inline asm string and
+ * will cause compilation to stop on mismatch.
+ */
+#define __asmeq(x, y)  ".ifnc " x "," y " ; .err ; .endif\n\t"
+
 #ifndef __ASSEMBLY__
 
 #include <linux/kernel.h>
