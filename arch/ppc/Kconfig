@@ -44,18 +44,18 @@ choice
 	default 6xx
 
 config 6xx
-	bool "6xx/7xx/74xx/8260"
+	bool "6xx/7xx/74xx/52xx/8260"
 	help
 	  There are four types of PowerPC chips supported.  The more common
 	  types (601, 603, 604, 740, 750, 7400), the Motorola embedded
-	  versions (821, 823, 850, 855, 860, 8260), the IBM embedded versions
-	  (403 and 405) and the high end 64 bit Power processors (POWER 3,
-	  POWER4, and IBM 970 also known as G5)
+	  versions (821, 823, 850, 855, 860, 52xx, 8260), the IBM embedded
+	  versions (403 and 405) and the high end 64 bit Power processors 
+	  (POWER 3, POWER4, and IBM 970 also known as G5)
 	  Unless you are building a kernel for one of the embedded processor
 	  systems, 64 bit IBM RS/6000 or an Apple G5, choose 6xx.
 	  Note that the kernel runs in 32-bit mode even on 64-bit chips.
-	  Also note that because the 82xx family has a 603e core, specific
-	  support for that chipset is asked later on.
+	  Also note that because the 52xx & 82xx family has a 603e core,
+	  specific support for that chipset is asked later on.
 
 config 40x
 	bool "40x"
@@ -601,6 +601,15 @@ config TQM8260
 config ADS8272
 	bool "ADS8272"
 
+config LITE5200
+	bool "Freescale LITE5200 / (IceCube)"
+	select PPC_MPC52xx
+	help
+	  Support for the LITE5200 dev board for the MPC5200 from Freescale.
+	  This is for the LITE5200 version 2.0 board. Don't know if it changes
+	  much but it's only been tested on this board version. I think this
+	  board is also known as IceCube.
+
 endchoice
 
 config PQ2ADS
@@ -617,6 +626,9 @@ config EMBEDDEDBOOT
 	bool
 	depends on 8xx || 8260
 	default y
+	
+config PPC_MPC52xx
+	bool
 
 config 8260
 	bool "CPM2 Support" if WILLOW
@@ -707,7 +719,7 @@ config MPC10X_BRIDGE
 
 config FSL_OCP
 	bool
-	depends on MPC10X_BRIDGE
+	depends on MPC10X_BRIDGE || PPC_MPC52xx
 	default y
 
 config MPC10X_OPENPIC
@@ -1363,7 +1375,7 @@ config BOOTX_TEXT
 
 config SERIAL_TEXT_DEBUG
 	bool "Support for early boot texts over serial port"
-	depends on 4xx || GT64260 || LOPEC || PPLUS || PRPMC800 || PPC_GEN550
+	depends on 4xx || GT64260 || LOPEC || PPLUS || PRPMC800 || PPC_GEN550 || PPC_MPC52xx
 
 config PPC_OCP
 	bool

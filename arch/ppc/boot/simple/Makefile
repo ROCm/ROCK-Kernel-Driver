@@ -113,6 +113,12 @@ zimageinitrd-$(CONFIG_SPRUCE)		:= zImage.initrd-TREE
   entrypoint-$(CONFIG_SPRUCE)		:= 0x00800000
         misc-$(CONFIG_SPRUCE)		+= misc-spruce.o
 
+      zimage-$(CONFIG_LITE5200)		:= zImage-STRIPELF
+zimageinitrd-$(CONFIG_LITE5200)		:= zImage.initrd-STRIPELF
+         end-$(CONFIG_LITE5200)		:= lite5200
+   cacheflag-$(CONFIG_LITE5200)		:= -include $(clear_L2_L3)
+
+
 # SMP images should have a '.smp' suffix.
          end-$(CONFIG_SMP)             := $(end-y).smp
 
@@ -144,6 +150,7 @@ boot-$(CONFIG_8xx)		+= m8xx_tty.o
 boot-$(CONFIG_8260)		+= m8260_tty.o
 boot-$(CONFIG_GT64260_CONSOLE)	+= gt64260_tty.o
 endif
+boot-$(CONFIG_SERIAL_MPC52xx_CONSOLE) += mpc52xx_tty.o
 
 LIBS				:= $(common)/lib.a $(bootlib)/lib.a
 ifeq ($(CONFIG_PPC_PREP),y)
