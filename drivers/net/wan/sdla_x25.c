@@ -1148,6 +1148,7 @@ static int if_init(struct net_device* dev)
 
         /* Set transmit buffer queue length */
         dev->tx_queue_len = 100;
+	SET_MODULE_OWNER(dev);
 
 	/* FIXME Why are we doing this */
 	set_chan_state(dev, WAN_DISCONNECTED);

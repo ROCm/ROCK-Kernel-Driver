@@ -914,7 +914,6 @@ static int if_init(struct net_device* dev)
 	dev->get_stats		= &if_stats;
 	dev->tx_timeout		= &if_tx_timeout;
 	dev->watchdog_timeo	= TX_TIMEOUT;
-
 	
 	/* Initialize media-specific parameters */
 	dev->flags		|= IFF_POINTOPOINT;
@@ -951,6 +950,7 @@ static int if_init(struct net_device* dev)
          * by stack.
 	 */
         dev->tx_queue_len = 100;
+	SET_MODULE_OWNER(dev);
    
 	return 0;
 }
