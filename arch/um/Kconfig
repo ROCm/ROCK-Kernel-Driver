@@ -1,3 +1,8 @@
+# UML uses the generic IRQ sugsystem
+config GENERIC_HARDIRQS
+	bool
+	default y
+
 config USERMODE
 	bool
 	default y

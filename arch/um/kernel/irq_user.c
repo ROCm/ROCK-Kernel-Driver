@@ -263,7 +263,7 @@ static int same_irq_and_dev(struct irq_fd *irq, void *d)
 	return((irq->irq == data->irq) && (irq->id == data->dev));
 }
 
-void free_irq_by_irq_and_dev(int irq, void *dev)
+void free_irq_by_irq_and_dev(unsigned int irq, void *dev)
 {
 	struct irq_and_dev data = ((struct irq_and_dev) { .irq  = irq,
 							  .dev  = dev });
