@@ -305,7 +305,7 @@ static ssize_t scsi_device_type_read(struct device *driverfs_dev, char *page,
 
 	return 0;
 }
-static DEVICE_ATTR(type,"type",S_IRUGO,scsi_device_type_read,NULL);
+static DEVICE_ATTR(type,S_IRUGO,scsi_device_type_read,NULL);
 
 /* end content handlers */
 
