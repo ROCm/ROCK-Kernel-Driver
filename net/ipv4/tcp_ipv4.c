@@ -178,9 +178,15 @@ void tcp_bind_hash(struct sock *sk, struct tcp_bind_bucket *tb,
 	tcp_sk(sk)->bind_hash = tb;
 }
 
+static inline const u32 tcp_v4_rcv_saddr(const struct sock *sk)
+{
+	return likely(sk->sk_state != TCP_TIME_WAIT) ?
+		inet_sk(sk)->rcv_saddr : tcptw_sk(sk)->tw_rcv_saddr;
+}
+
 static inline int tcp_bind_conflict(struct sock *sk, struct tcp_bind_bucket *tb)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	const u32 sk_rcv_saddr = tcp_v4_rcv_saddr(sk);
 	struct sock *sk2;
 	struct hlist_node *node;
 	int reuse = sk->sk_reuse;
@@ -193,9 +199,9 @@ static inline int tcp_bind_conflict(struct sock *sk, struct tcp_bind_bucket *tb)
 		     sk->sk_bound_dev_if == sk2->sk_bound_dev_if)) {
 			if (!reuse || !sk2->sk_reuse ||
 			    sk2->sk_state == TCP_LISTEN) {
-				struct inet_opt *inet2 = inet_sk(sk2);
-				if (!inet2->rcv_saddr || !inet->rcv_saddr ||
-				    inet2->rcv_saddr == inet->rcv_saddr)
+				const u32 sk2_rcv_saddr = tcp_v4_rcv_saddr(sk2);
+				if (!sk2_rcv_saddr || !sk_rcv_saddr ||
+				    sk2_rcv_saddr == sk_rcv_saddr)
 					break;
 			}
 		}
