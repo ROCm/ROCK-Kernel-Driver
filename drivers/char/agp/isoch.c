@@ -448,6 +448,8 @@ int agp_3_5_enable(struct agp_bridge_data *bridge)
 			printk(KERN_INFO PFX "Something bad happened setting "
 			       "up isochronous xfers.  Falling back to "
 			       "non-isochronous xfer mode.\n");
+		} else {
+			goto free_and_exit;
 		}
 	}
 	agp_3_5_nonisochronous_node_enable(bridge, dev_list, ndevs);
