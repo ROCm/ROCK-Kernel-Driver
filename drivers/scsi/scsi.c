@@ -1006,9 +1006,12 @@ static int __init init_scsi(void)
 	error = scsi_init_hosts();
 	if (error)
 		goto cleanup_devlist;
-	error = scsi_sysfs_register();
+	error = scsi_init_sysctl();
 	if (error)
 		goto cleanup_hosts;
+	error = scsi_sysfs_register();
+	if (error)
+		goto cleanup_sysctl;
 
 	for (i = 0; i < NR_CPUS; i++)
 		INIT_LIST_HEAD(&done_q[i]);
@@ -1018,6 +1021,8 @@ static int __init init_scsi(void)
 	printk(KERN_NOTICE "SCSI subsystem initialized\n");
 	return 0;
 
+cleanup_sysctl:
+	scsi_exit_sysctl();
 cleanup_hosts:
 	scsi_exit_hosts();
 cleanup_devlist:
@@ -1034,6 +1039,7 @@ cleanup_queue:
 static void __exit exit_scsi(void)
 {
 	scsi_sysfs_unregister();
+	scsi_exit_sysctl();
 	scsi_exit_hosts();
 	scsi_exit_devinfo();
 	devfs_remove("scsi");

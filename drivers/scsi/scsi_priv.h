@@ -132,6 +132,15 @@ extern void scsi_forget_host(struct Scsi_Host *);
 extern void scsi_free_sdev(struct scsi_device *);
 extern void scsi_rescan_device(struct device *);
 
+/* scsi_sysctl.c */
+#ifdef CONFIG_SYSCTL
+extern int scsi_init_sysctl(void);
+extern void scsi_exit_sysctl(void);
+#else
+# define scsi_init_sysctl()		(0)
+# define scsi_exit_sysctl()		do { } while (0)
+#endif /* CONFIG_SYSCTL */
+
 /* scsi_sysfs.c */
 extern int scsi_device_register(struct scsi_device *);
 extern int scsi_sysfs_add_host(struct Scsi_Host *);
