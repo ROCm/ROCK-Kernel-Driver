@@ -875,7 +875,9 @@ static int ioctl_passthru(unsigned long arg)
 	/* Copy in the user's I2O command */
 	if(copy_from_user((void*)msg, (void*)user_msg, size))
 		return -EFAULT;
-	get_user(reply_size, &user_reply[0]);
+	if(get_user(reply_size, &user_reply[0]) < 0)
+		return -EFAULT;
+
 	reply_size = reply_size>>16;
 	reply = kmalloc(REPLY_FRAME_SIZE*4, GFP_KERNEL);
 	if(!reply) {
@@ -889,6 +891,10 @@ static int ioctl_passthru(unsigned long arg)
 
 	memset(sg_list,0, sizeof(sg_list[0])*SG_TABLESIZE);
 	if(sg_offset) {
+		if(sg_offset * 4 >= size) {
+			rcode = -EFAULT;
+			goto cleanup;
+		}
 		// TODO 64bit fix
 		struct sg_simple_element *sg = (struct sg_simple_element*) (msg+sg_offset);
 		sg_count = (size - sg_offset*4) / sizeof(struct sg_simple_element);
