@@ -381,7 +381,7 @@ smb_file_permission(struct inode *inode, int mask)
 
 struct file_operations smb_file_operations =
 {
-	llseek:		generic_file_llseek,
+	llseek:		remote_llseek,
 	read:		smb_file_read,
 	write:		smb_file_write,
 	ioctl:		smb_ioctl,
