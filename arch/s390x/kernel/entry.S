@@ -452,7 +452,7 @@ sys_call_table:
         .long  SYSCALL(sys_umount,sys32_umount_wrapper)
         .long  SYSCALL(sys_ni_syscall,sys_ni_syscall) /* old lock syscall */
         .long  SYSCALL(sys_ioctl,sys32_ioctl_wrapper)
-        .long  SYSCALL(sys_fcntl,sys32_fcntl_wrapper)   /* 55 */
+        .long  SYSCALL(sys_fcntl,compat_sys_fcntl_wrapper)   /* 55 */
         .long  SYSCALL(sys_ni_syscall,sys_ni_syscall) /* intel mpx syscall */
         .long  SYSCALL(sys_setpgid,sys32_setpgid_wrapper)
         .long  SYSCALL(sys_ni_syscall,sys_ni_syscall) /* old ulimit syscall */
@@ -618,7 +618,7 @@ sys_call_table:
         .long  SYSCALL(sys_mincore,sys32_mincore_wrapper)
         .long  SYSCALL(sys_madvise,sys32_madvise_wrapper)
 	.long  SYSCALL(sys_getdents64,sys32_getdents64_wrapper)/* 220 */
-	.long  SYSCALL(sys_ni_syscall,sys32_fcntl64_wrapper)
+	.long  SYSCALL(sys_ni_syscall,compat_sys_fcntl64_wrapper)
 	.long  SYSCALL(sys_readahead,sys32_readahead)
 	.long  SYSCALL(sys_ni_syscall,sys32_sendfile64)
 	.long  SYSCALL(sys_setxattr,sys32_setxattr_wrapper)
