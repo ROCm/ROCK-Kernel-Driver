@@ -65,11 +65,6 @@ nfs4_setup_compound(struct nfs4_compound *cp, struct nfs4_op *ops,
 	memset(cp, 0, sizeof(*cp));
 	cp->ops = ops;
 	cp->server = server;
-
-#if NFS4_DEBUG
-	cp->taglen = strlen(tag);
-	cp->tag = tag;
-#endif
 }
 
 static void
@@ -373,6 +368,7 @@ nfs4_setup_open(struct nfs4_compound *cp, int flags, struct qstr *name,
 
 	BUG_ON(cp->flags);
 	
+	open->op_client_state = cp->server->nfs4_state;
 	open->op_share_access = flags & 3;
 	open->op_opentype = (flags & O_CREAT) ? NFS4_OPEN_CREATE : NFS4_OPEN_NOCREATE;
 	open->op_createmode = NFS4_CREATE_UNCHECKED;
@@ -527,6 +523,10 @@ nfs4_setup_rename(struct nfs4_compound *cp, struct qstr *old, struct qstr *new,
 static void
 nfs4_setup_renew(struct nfs4_compound *cp)
 {
+	struct nfs4_client **client_state = GET_OP(cp, renew);
+
+	*client_state = cp->server->nfs4_state;
+
 	OPNUM(cp) = OP_RENEW;
 	cp->req_nops++;
 	cp->renew_index = cp->req_nops;
@@ -575,6 +575,7 @@ nfs4_setup_setclientid(struct nfs4_compound *cp, u32 program, unsigned short por
 	sprintf(setclientid->sc_uaddr, "%s.%d.%d", server->ip_addr, port >> 8, port & 255);
 	setclientid->sc_prog = program;
 	setclientid->sc_cb_ident = 0;
+	setclientid->sc_state = server->nfs4_state;
 	
 	OPNUM(cp) = OP_SETCLIENTID;
 	cp->req_nops++;
@@ -583,6 +584,10 @@ nfs4_setup_setclientid(struct nfs4_compound *cp, u32 program, unsigned short por
 static void
 nfs4_setup_setclientid_confirm(struct nfs4_compound *cp)
 {
+	struct nfs4_client **client_state = GET_OP(cp, setclientid_confirm);
+
+	*client_state = cp->server->nfs4_state;
+
 	OPNUM(cp) = OP_SETCLIENTID_CONFIRM;
 	cp->req_nops++;
 	cp->renew_index = cp->req_nops;

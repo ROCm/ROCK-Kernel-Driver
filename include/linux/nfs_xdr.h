@@ -398,6 +398,7 @@ struct nfs4_lookup {
 };
 
 struct nfs4_open {
+	struct nfs4_client *		op_client_state;  /* request */
 	u32				op_share_access;  /* request */
 	u32				op_opentype;      /* request */
 	u32				op_createmode;    /* request */
@@ -472,6 +473,7 @@ struct nfs4_setclientid {
 	char				sc_netid[4];	  /* request */
 	char				sc_uaddr[24];     /* request */
 	u32				sc_cb_ident;      /* request */
+	struct nfs4_client *		sc_state;	  /* response */
 };
 
 struct nfs4_write {
@@ -504,8 +506,10 @@ struct nfs4_op {
 		struct nfs4_readlink	readlink;
 		struct nfs4_remove	remove;
 		struct nfs4_rename	rename;
+		struct nfs4_client *	renew;
 		struct nfs4_setattr	setattr;
 		struct nfs4_setclientid	setclientid;
+		struct nfs4_client *	setclientid_confirm;
 		struct nfs4_write	write;
 	} u;
 };
