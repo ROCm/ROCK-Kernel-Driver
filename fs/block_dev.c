@@ -308,6 +308,7 @@ struct block_device *bdget(dev_t dev)
 			new_bdev->bd_dev = dev;
 			new_bdev->bd_contains = NULL;
 			new_bdev->bd_inode = inode;
+			new_bdev->bd_block_size = (1 << inode->i_blkbits);
 			new_bdev->bd_part_count = 0;
 			new_bdev->bd_invalidated = 0;
 			inode->i_mode = S_IFBLK;
