@@ -87,26 +87,23 @@ isdn_net_get_locked_dev(isdn_net_local *mlp)
 {
 	unsigned long flags;
 	isdn_net_dev *idev;
-	isdn_net_dev *head;
 
-	spin_lock_irqsave(&mlp->queue_lock, flags);
-	head = mlp->queue;
-	idev = head; 
-	spin_lock_bh(&idev->xmit_lock);
-	while (isdn_net_dev_busy(idev)) {
-		spin_unlock_bh(&idev->xmit_lock);
-		mlp->queue = mlp->queue->next;
-		idev = mlp->queue;
-		if (idev == head) { /* not found -- should never happen */
-			idev = NULL;
-			goto errout;
-		}
+	spin_lock_irqsave(&mlp->online_lock, flags);
+
+	list_for_each_entry(idev, &mlp->online, online) {
 		spin_lock_bh(&idev->xmit_lock);
+		if (!isdn_net_dev_busy(idev)) {
+			/* point the head to next online channel */
+			list_del(&mlp->online);
+			list_add(&mlp->online, &idev->online);
+			goto found;
+		}
+		spin_unlock_bh(&idev->xmit_lock);
 	}
-	idev = mlp->queue;
-	mlp->queue = mlp->queue->next;
-errout:
-	spin_unlock_irqrestore(&mlp->queue_lock, flags);
+	idev = NULL;
+
+ found:
+	spin_unlock_irqrestore(&mlp->online_lock, flags);
 	return idev;
 }
 
@@ -116,19 +113,11 @@ errout:
 static inline void
 isdn_net_add_to_bundle(isdn_net_local *mlp, isdn_net_dev *idev)
 {
-	isdn_net_dev *qdev;
 	unsigned long flags;
 
-	spin_lock_irqsave(&mlp->queue_lock, flags);
-
-	qdev = mlp->queue;
-	idev->last = qdev->last;
-	qdev->last->next = idev;
-	qdev->last = idev;
-	idev->next = qdev;
-	mlp->queue = idev;
-
-	spin_unlock_irqrestore(&mlp->queue_lock, flags);
+	spin_lock_irqsave(&mlp->online_lock, flags);
+	list_add(&idev->online, &mlp->online);
+	spin_unlock_irqrestore(&mlp->online_lock, flags);
 }
 /*
  * remove a channel from the bundle it belongs to
@@ -144,14 +133,9 @@ isdn_net_rm_from_bundle(isdn_net_dev *idev)
 	else
 		mlp = &idev->local;
 
-	spin_lock_irqsave(&mlp->queue_lock, flags);
-	idev->last->next = idev->next;
-	idev->next->last = idev->last;
-	if (mlp->queue == idev) {
-		mlp->queue = idev->next;
-	}
-	idev->next = idev->last = idev;	/* (re)set own pointers */
-	spin_unlock_irqrestore(&mlp->queue_lock, flags);
+	spin_lock_irqsave(&mlp->online_lock, flags);
+	list_del(&idev->online);
+	spin_unlock_irqrestore(&mlp->online_lock, flags);
 }
 
 /*

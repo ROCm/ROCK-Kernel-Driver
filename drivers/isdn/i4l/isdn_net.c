@@ -126,9 +126,9 @@ isdn_net_dev_stop_queue(isdn_net_dev *idev)
 static inline int
 isdn_net_device_busy(isdn_net_dev *idev)
 {
-	isdn_net_dev *ndev;
 	isdn_net_local *mlp;
 	unsigned long flags;
+	int retval = 1;
 
 	if (!isdn_net_dev_busy(idev))
 		return 0;
@@ -138,17 +138,15 @@ isdn_net_device_busy(isdn_net_dev *idev)
 	else
 		mlp = &idev->local;
 	
-	spin_lock_irqsave(&mlp->queue_lock, flags);
-	ndev = idev->next;
-	while (ndev != idev) {
-		if (!isdn_net_dev_busy(ndev)) {
-			spin_unlock_irqrestore(&mlp->queue_lock, flags);
-			return 0;
+	spin_lock_irqsave(&mlp->online_lock, flags);
+	list_for_each_entry(idev, &mlp->online, online) {
+		if (!isdn_net_dev_busy(idev)) {
+			retval = 0;
+			break;
 		}
-		ndev = ndev->next;
 	}
-	spin_unlock_irqrestore(&mlp->queue_lock, flags);
-	return 1;
+	spin_unlock_irqrestore(&mlp->online_lock, flags);
+	return retval;
 }
 
 static inline
@@ -394,10 +392,14 @@ static void isdn_net_connected(isdn_net_dev *idev)
 	add_timer(&idev->hup_timer);
 
 	if (lp->p_encap != ISDN_NET_ENCAP_SYNCPPP) {
-		if (idev->master) { /* is lp a slave? */
-			isdn_net_local *mlp = idev->master;
-			isdn_net_add_to_bundle(mlp, idev);
-		}
+		isdn_net_local *mlp;
+		
+		if (idev->master)
+			mlp = idev->master;
+		else
+			mlp = &idev->local;
+
+		isdn_net_add_to_bundle(mlp, idev);
 	}
 	printk(KERN_INFO "isdn_net: %s connected\n", idev->name);
 	/* If first Chargeinfo comes before B-Channel connect,
@@ -994,7 +996,8 @@ isdn_net_xmit(struct net_device *ndev, struct sk_buff *skb)
 			idev->sqfull = 0;
 		}
 		/* this is a hack to allow auto-hangup for slaves on moderate loads */
-		mlp->queue = mlp->netdev;
+		list_del(&mlp->online);
+		list_add_tail(&mlp->online, &lp->netdev->online);
 	}
 
 	return retv;
@@ -1581,11 +1584,9 @@ isdn_net_new(char *name, struct net_device *master)
 	}
 	netdev->local.magic = ISDN_NET_MAGIC;
 
-	netdev->local.queue = netdev;
-	spin_lock_init(&netdev->local.queue_lock);
+	INIT_LIST_HEAD(&netdev->local.online);
+	spin_lock_init(&netdev->local.online_lock);
 
-	netdev->last = netdev;
-	netdev->next = netdev;
 	netdev->local.netdev = netdev;
 
 	tasklet_init(&netdev->tlet, isdn_net_tasklet, (unsigned long) netdev);

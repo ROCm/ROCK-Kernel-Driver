@@ -336,10 +336,10 @@ typedef struct isdn_net_local_s {
 				       /* phone[1] = Outgoing Numbers      */
   struct isdn_net_dev_s  *netdev;      /* Ptr to netdev                    */
 
-  struct isdn_net_dev_s  *queue;      /* circular list of all bundled
+  struct list_head       online;       /* circular list of all bundled
 					  channels, which are currently
 					  online                           */
-  spinlock_t queue_lock;               /* lock to protect queue            */
+  spinlock_t             online_lock;  /* lock to protect queue            */
 
 #ifdef CONFIG_ISDN_X25
   struct concap_device_ops *dops;      /* callbacks used by encapsulator   */
@@ -404,12 +404,10 @@ typedef struct isdn_net_dev_s {
   isdn_net_local        *master;       /* Ptr to Master device for slaves  */
   struct isdn_net_dev_s *slave;        /* Ptr to Slave device for masters  */
 
-  struct isdn_net_dev_s *next;         /* Ptr to next link in bundle       */
-  struct isdn_net_dev_s *last;         /* Ptr to last link in bundle       */
-
+  struct list_head       online;       /* Members of local->online         */
 
   char                   name[10];     /* Name of device                   */
-  struct list_head global_list;        /* global list of all isdn_net_devs */
+  struct list_head       global_list;  /* global list of all isdn_net_devs */
 #ifdef CONFIG_ISDN_PPP
   ippp_bundle * pb;		/* pointer to the common bundle structure
    			         * with the per-bundle data */

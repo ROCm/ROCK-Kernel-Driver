@@ -1396,7 +1396,7 @@ static int isdn_ppp_mp_init( isdn_net_local * lp, ippp_bundle * add_to )
 		is->mp_seqno = 0;
 		if ((lp->netdev->pb = isdn_ppp_mp_bundle_alloc()) == NULL)
 			return -ENOMEM;
-		idev->next = idev->last = idev;	/* nobody else in a queue */
+
 		lp->netdev->pb->frags = NULL;
 		lp->netdev->pb->frames = 0;
 		lp->netdev->pb->seq = LONG_MAX;
@@ -1468,7 +1468,7 @@ static void isdn_ppp_mp_receive(isdn_net_local *lp, isdn_net_dev *dev,
 	
 	/* find the minimum received sequence number over all links */
 	is->last_link_seqno = minseq = newseq;
-	for (qdev = lp->queue;;) {
+	list_for_each_entry(qdev, &lp->online, online) {
 		slot = qdev->ppp_slot;
 		if (slot < 0 || slot > ISDN_MAX_CHANNELS) {
 			printk(KERN_ERR "%s: lpq->ppp_slot(%d)\n",
@@ -1478,8 +1478,6 @@ static void isdn_ppp_mp_receive(isdn_net_local *lp, isdn_net_dev *dev,
 			if (MP_LT(lls, minseq))
 				minseq = lls;
 		}
-		if ((qdev = qdev->next) == lp->queue)
-			break;
 	}
 	if (MP_LT(minseq, mp->seq))
 		minseq = mp->seq;	/* can't go beyond already processed
@@ -1781,7 +1779,7 @@ isdn_ppp_bundle(struct ippp_struct *is, int unit)
     	spin_lock_irqsave(&p->pb->lock, flags);
 
 	nidev = is->idev;
-	idev = p->local.queue;
+	idev = list_entry(p->local.online.next, isdn_net_dev, online);
 	if( nidev->ppp_slot < 0 || nidev->ppp_slot >= ISDN_MAX_CHANNELS ||
 	    idev ->ppp_slot < 0 || idev ->ppp_slot >= ISDN_MAX_CHANNELS ) {
 		printk(KERN_ERR "ippp_bundle: binding to invalid slot %d\n",
