@@ -12,7 +12,7 @@ obj-y    := entry.o wof.o wuf.o etrap.o rtrap.o traps.o $(IRQ_OBJS) \
 	    sys_sparc.o sunos_asm.o systbls.o \
 	    time.o windows.o cpu.o devices.o sclow.o \
 	    tadpole.o tick14.o ptrace.o sys_solaris.o \
-	    unaligned.o muldiv.o semaphore.o sparc_ksyms.o
+	    unaligned.o muldiv.o semaphore.o
 
 obj-$(CONFIG_PCI) += pcic.o
 obj-$(CONFIG_SUN4) += sun4setup.o
@@ -20,7 +20,7 @@ obj-$(CONFIG_SMP) += trampoline.o smp.o sun4m_smp.o sun4d_smp.o
 obj-$(CONFIG_SUN_AUXIO) += auxio.o
 obj-$(CONFIG_PCI) += ebus.o
 obj-$(CONFIG_SUN_PM) += apc.o pmc.o
-obj-$(CONFIG_MODULES) += module.o
+obj-$(CONFIG_MODULES) += module.o sparc_ksyms.o
 
 ifdef CONFIG_SUNOS_EMUL
 obj-y += sys_sunos.o sunos_ioctl.o
