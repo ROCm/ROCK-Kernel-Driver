@@ -17,8 +17,6 @@
 
 #include <asm/types.h>
 
-#define CMD_LINE_SIZE 512
-
 /* We use a u32 for the type of the fields since they're written by
  * the bootloader which is a 32-bit process and read by the kernel
  * which is a 64-bit process.  This way they can both agree on the
