@@ -303,7 +303,7 @@ affs_new_inode(struct inode *dir)
 	inode->i_gid     = current->fsgid;
 	inode->i_ino     = block;
 	inode->i_nlink   = 1;
-	inode->i_mtime   = inode->i_atime = inode->i_ctime = CURRENT_TIME;
+	inode->i_mtime   = inode->i_atime = inode->i_ctime = CURRENT_TIME_SEC;
 	AFFS_I(inode)->i_opencnt = 0;
 	AFFS_I(inode)->i_blkcnt = 0;
 	AFFS_I(inode)->i_lc = NULL;

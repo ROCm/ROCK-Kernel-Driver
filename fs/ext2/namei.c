@@ -211,7 +211,7 @@ static int ext2_link (struct dentry * old_dentry, struct inode * dir,
 	if (inode->i_nlink >= EXT2_LINK_MAX)
 		return -EMLINK;
 
-	inode->i_ctime = CURRENT_TIME;
+	inode->i_ctime = CURRENT_TIME_SEC;
 	ext2_inc_count(inode);
 	atomic_inc(&inode->i_count);
 
@@ -337,7 +337,7 @@ static int ext2_rename (struct inode * old_dir, struct dentry * old_dentry,
 			goto out_dir;
 		ext2_inc_count(old_inode);
 		ext2_set_link(new_dir, new_de, new_page, old_inode);
-		new_inode->i_ctime = CURRENT_TIME;
+		new_inode->i_ctime = CURRENT_TIME_SEC;
 		if (dir_de)
 			new_inode->i_nlink--;
 		ext2_dec_count(new_inode);
@@ -362,7 +362,7 @@ static int ext2_rename (struct inode * old_dir, struct dentry * old_dentry,
  	 * rename.
 	 * ext2_dec_count() will mark the inode dirty.
 	 */
-	old_inode->i_ctime = CURRENT_TIME;
+	old_inode->i_ctime = CURRENT_TIME_SEC;
 
 	ext2_delete_entry (old_de, old_page);
 	ext2_dec_count(old_inode);

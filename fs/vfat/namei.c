@@ -735,10 +735,11 @@ static int vfat_add_entry(struct inode *dir,struct qstr* qname,
 
 	res = 0;
 	/* update timestamp */
-	dir->i_ctime = dir->i_mtime = dir->i_atime = CURRENT_TIME;
+	dir->i_ctime = dir->i_mtime = dir->i_atime = CURRENT_TIME_SEC;
 	mark_inode_dirty(dir);
 
 	fat_date_unix2dos(dir->i_mtime.tv_sec, &(*de)->time, &(*de)->date);
+	dir->i_mtime.tv_nsec = 0;
 	(*de)->ctime = (*de)->time;
 	(*de)->adate = (*de)->cdate = (*de)->date;
 
@@ -848,7 +849,7 @@ static int vfat_create(struct inode *dir, struct dentry* dentry, int mode,
 	if (!inode)
 		goto out;
 	res = 0;
-	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
+	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME_SEC;
 	mark_inode_dirty(inode);
 	inode->i_version++;
 	dir->i_version++;
@@ -866,7 +867,7 @@ static void vfat_remove_entry(struct inode *dir,struct vfat_slot_info *sinfo,
 	int i;
 
 	/* remove the shortname */
-	dir->i_mtime = dir->i_atime = CURRENT_TIME;
+	dir->i_mtime = dir->i_atime = CURRENT_TIME_SEC;
 	dir->i_version++;
 	mark_inode_dirty(dir);
 	de->name[0] = DELETED_FLAG;
@@ -900,7 +901,7 @@ static int vfat_rmdir(struct inode *dir, struct dentry* dentry)
 		goto out;
 	res = 0;
 	dentry->d_inode->i_nlink = 0;
-	dentry->d_inode->i_mtime = dentry->d_inode->i_atime = CURRENT_TIME;
+	dentry->d_inode->i_mtime = dentry->d_inode->i_atime = CURRENT_TIME_SEC;
 	fat_detach(dentry->d_inode);
 	mark_inode_dirty(dentry->d_inode);
 	/* releases bh */
@@ -923,7 +924,7 @@ static int vfat_unlink(struct inode *dir, struct dentry *dentry)
 	if (res < 0)
 		goto out;
 	dentry->d_inode->i_nlink = 0;
-	dentry->d_inode->i_mtime = dentry->d_inode->i_atime = CURRENT_TIME;
+	dentry->d_inode->i_mtime = dentry->d_inode->i_atime = CURRENT_TIME_SEC;
 	fat_detach(dentry->d_inode);
 	mark_inode_dirty(dentry->d_inode);
 	/* releases bh */
@@ -950,7 +951,7 @@ static int vfat_mkdir(struct inode *dir,struct dentry* dentry,int mode)
 	inode = fat_build_inode(sb, de, sinfo.i_pos, &res);
 	if (!inode)
 		goto out_brelse;
-	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
+	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME_SEC;
 	mark_inode_dirty(inode);
 	inode->i_version++;
 	dir->i_version++;
@@ -969,7 +970,7 @@ out:
 
 mkdir_failed:
 	inode->i_nlink = 0;
-	inode->i_mtime = inode->i_atime = CURRENT_TIME;
+	inode->i_mtime = inode->i_atime = CURRENT_TIME_SEC;
 	fat_detach(inode);
 	mark_inode_dirty(inode);
 	/* releases bh */
@@ -1038,11 +1039,11 @@ static int vfat_rename(struct inode *old_dir, struct dentry *old_dentry,
 	mark_inode_dirty(old_inode);
 
 	old_dir->i_version++;
-	old_dir->i_ctime = old_dir->i_mtime = CURRENT_TIME;
+	old_dir->i_ctime = old_dir->i_mtime = CURRENT_TIME_SEC;
 	mark_inode_dirty(old_dir);
 	if (new_inode) {
 		new_inode->i_nlink--;
-		new_inode->i_ctime=CURRENT_TIME;
+		new_inode->i_ctime = CURRENT_TIME_SEC;
 	}
 
 	if (is_dir) {

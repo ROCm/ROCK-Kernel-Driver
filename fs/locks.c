@@ -1228,7 +1228,7 @@ void lease_get_mtime(struct inode *inode, struct timespec *time)
 {
 	struct file_lock *flock = inode->i_flock;
 	if (flock && IS_LEASE(flock) && (flock->fl_type & F_WRLCK))
-		*time = CURRENT_TIME;
+		*time = current_fs_time(inode->i_sb);
 	else
 		*time = inode->i_mtime;
 }

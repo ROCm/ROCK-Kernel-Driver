@@ -59,7 +59,7 @@ int ext2_ioctl (struct inode * inode, struct file * filp, unsigned int cmd,
 		ei->i_flags = flags;
 
 		ext2_set_inode_flags(inode);
-		inode->i_ctime = CURRENT_TIME;
+		inode->i_ctime = CURRENT_TIME_SEC;
 		mark_inode_dirty(inode);
 		return 0;
 	}
@@ -72,7 +72,7 @@ int ext2_ioctl (struct inode * inode, struct file * filp, unsigned int cmd,
 			return -EROFS;
 		if (get_user(inode->i_generation, (int __user *) arg))
 			return -EFAULT;	
-		inode->i_ctime = CURRENT_TIME;
+		inode->i_ctime = CURRENT_TIME_SEC;
 		mark_inode_dirty(inode);
 		return 0;
 	default:

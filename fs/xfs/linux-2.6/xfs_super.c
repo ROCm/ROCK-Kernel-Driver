@@ -829,6 +829,7 @@ linvfs_fill_super(
 	sb->s_blocksize = statvfs.f_bsize;
 	sb->s_blocksize_bits = ffs(statvfs.f_bsize) - 1;
 	sb->s_maxbytes = xfs_max_file_offset(sb->s_blocksize_bits);
+	sb->s_time_gran = 1;
 	set_posix_acl_flag(sb);
 
 	VFS_ROOT(vfsp, &rootvp, error);

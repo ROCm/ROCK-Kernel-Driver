@@ -568,7 +568,7 @@ static struct buffer_head * inode_getblk(struct inode * inode, long block,
 	*new = 1;
 	UDF_I_NEXT_ALLOC_BLOCK(inode) = block;
 	UDF_I_NEXT_ALLOC_GOAL(inode) = newblocknum;
-	inode->i_ctime = CURRENT_TIME;
+	inode->i_ctime = current_fs_time(inode->i_sb);
 
 	if (IS_SYNC(inode))
 		udf_sync_inode(inode);
@@ -912,7 +912,7 @@ void udf_truncate(struct inode * inode)
 		udf_truncate_extents(inode);
 	}	
 
-	inode->i_mtime = inode->i_ctime = CURRENT_TIME;
+	inode->i_mtime = inode->i_ctime = current_fs_time(inode->i_sb);
 	if (IS_SYNC(inode))
 		udf_sync_inode (inode);
 	else

@@ -1567,6 +1567,7 @@ static int udf_fill_super(struct super_block *sb, void *options, int silent)
 	sb->dq_op = NULL;
 	sb->s_dirt = 0;
 	sb->s_magic = UDF_SUPER_MAGIC;
+	sb->s_time_gran = 1000;
 
 	if (udf_load_partition(sb, &fileset))
 	{

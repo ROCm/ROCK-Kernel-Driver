@@ -1743,8 +1743,9 @@ random_write(struct file * file, const char __user * buffer,
 	if (p == buffer) {
 		return (ssize_t)ret;
 	} else {
-		file->f_dentry->d_inode->i_mtime = CURRENT_TIME;
-		mark_inode_dirty(file->f_dentry->d_inode);
+		struct inode *inode = file->f_dentry->d_inode;
+	        inode->i_mtime = current_fs_time(inode->i_sb);
+		mark_inode_dirty(inode);
 		return (ssize_t)(p - buffer);
 	}
 }

@@ -1329,7 +1329,6 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 	if (!parse_options ((char *) data, sb, &journal_inum, NULL, 0))
 		goto failed_mount;
 
-	sb->s_flags |= MS_ONE_SECOND;
 	sb->s_flags = (sb->s_flags & ~MS_POSIXACL) |
 		((sbi->s_mount_opt & EXT3_MOUNT_POSIX_ACL) ? MS_POSIXACL : 0);
 

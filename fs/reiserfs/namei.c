@@ -534,7 +534,7 @@ static int reiserfs_add_entry (struct reiserfs_transaction_handle *th, struct in
     }
 
     dir->i_size += paste_size;
-    dir->i_mtime = dir->i_ctime = CURRENT_TIME;
+    dir->i_mtime = dir->i_ctime = CURRENT_TIME_SEC;
     if (!S_ISDIR (inode->i_mode) && visible)
 	// reiserfs_mkdir or reiserfs_rename will do that by itself
 	reiserfs_update_sd (th, dir);
@@ -874,7 +874,7 @@ static int reiserfs_rmdir (struct inode * dir, struct dentry *dentry)
 			  "!= 2 (%d)", __FUNCTION__, inode->i_nlink);
 
     inode->i_nlink = 0;
-    inode->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME;
+    inode->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME_SEC;
     reiserfs_update_sd (&th, inode);
 
     DEC_DIR_INODE_NLINK(dir)
@@ -963,11 +963,11 @@ static int reiserfs_unlink (struct inode * dir, struct dentry *dentry)
 	inode->i_nlink++;
 	goto end_unlink;
     }
-    inode->i_ctime = CURRENT_TIME;
+    inode->i_ctime = CURRENT_TIME_SEC;
     reiserfs_update_sd (&th, inode);
 
     dir->i_size -= (de.de_entrylen + DEH_SIZE);
-    dir->i_ctime = dir->i_mtime = CURRENT_TIME;
+    dir->i_ctime = dir->i_mtime = CURRENT_TIME_SEC;
     reiserfs_update_sd (&th, dir);
 
     if (!savelink)
@@ -1114,7 +1114,7 @@ static int reiserfs_link (struct dentry * old_dentry, struct inode * dir, struct
 	return err ? err : retval;
     }
 
-    inode->i_ctime = CURRENT_TIME;
+    inode->i_ctime = CURRENT_TIME_SEC;
     reiserfs_update_sd (&th, inode);
 
     atomic_inc(&inode->i_count) ;
@@ -1362,7 +1362,7 @@ static int reiserfs_rename (struct inode * old_dir, struct dentry *old_dentry,
 
     mark_de_hidden (old_de.de_deh + old_de.de_entry_num);
     journal_mark_dirty (&th, old_dir->i_sb, old_de.de_bh);
-    ctime = CURRENT_TIME;
+    ctime = CURRENT_TIME_SEC;
     old_dir->i_ctime = old_dir->i_mtime = ctime;
     new_dir->i_ctime = new_dir->i_mtime = ctime;
     /* thanks to Alex Adriaanse <alex_a@caltech.edu> for patch which adds ctime update of

@@ -464,7 +464,7 @@ static int jfs_fill_super(struct super_block *sb, void *data, int silent)
 	 */
 	sb->s_maxbytes = min(((u64) PAGE_CACHE_SIZE << 32) - 1, sb->s_maxbytes);
 #endif
-
+	sb->s_time_gran = 1;
 	return 0;
 
 out_no_root:

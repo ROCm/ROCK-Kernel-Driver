@@ -457,6 +457,7 @@ nfs_fill_super(struct super_block *sb, struct nfs_mount_data *data, int silent)
 	if (server->flags & NFS_MOUNT_VER3) {
 		if (server->namelen == 0 || server->namelen > NFS3_MAXNAMLEN)
 			server->namelen = NFS3_MAXNAMLEN;
+		sb->s_time_gran = 1;
 	} else {
 		if (server->namelen == 0 || server->namelen > NFS2_MAXNAMLEN)
 			server->namelen = NFS2_MAXNAMLEN;
@@ -1648,6 +1649,8 @@ static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data,
 			return -ENOMEM;
 		}
 	}
+
+	sb->s_time_gran = 1;
 
 	sb->s_op = &nfs4_sops;
 	err = nfs_sb_init(sb, authflavour);

@@ -1130,19 +1130,6 @@ sector_t bmap(struct inode * inode, sector_t block)
 
 EXPORT_SYMBOL(bmap);
 
-/*
- * Return true if the filesystem which backs this inode considers the two
- * passed timespecs to be sufficiently different to warrant flushing the
- * altered time out to disk.
- */
-static int inode_times_differ(struct inode *inode,
-			struct timespec *old, struct timespec *new)
-{
-	if (IS_ONE_SECOND(inode))
-		return old->tv_sec != new->tv_sec;
-	return !timespec_equal(old, new);
-}
-
 /**
  *	update_atime	-	update the access time
  *	@inode: inode accessed
@@ -1162,8 +1149,8 @@ void update_atime(struct inode *inode)
 	if (IS_RDONLY(inode))
 		return;
 
-	now = current_kernel_time();
-	if (inode_times_differ(inode, &inode->i_atime, &now)) {
+	now = current_fs_time(inode->i_sb);
+	if (!timespec_equal(&inode->i_atime, &now)) {
 		inode->i_atime = now;
 		mark_inode_dirty_sync(inode);
 	} else {
@@ -1193,14 +1180,13 @@ void inode_update_time(struct inode *inode, int ctime_too)
 	if (IS_RDONLY(inode))
 		return;
 
-	now = current_kernel_time();
-
-	if (inode_times_differ(inode, &inode->i_mtime, &now))
+	now = current_fs_time(inode->i_sb);
+	if (!timespec_equal(&inode->i_mtime, &now))
 		sync_it = 1;
 	inode->i_mtime = now;
 
 	if (ctime_too) {
-		if (inode_times_differ(inode, &inode->i_ctime, &now))
+		if (!timespec_equal(&inode->i_ctime, &now))
 			sync_it = 1;
 		inode->i_ctime = now;
 	}

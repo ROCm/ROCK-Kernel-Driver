@@ -84,6 +84,7 @@ static struct super_block *alloc_super(void)
 		s->dq_op = sb_dquot_ops;
 		s->s_qcop = sb_quotactl_ops;
 		s->s_op = &default_op;
+		s->s_time_gran = 1000000000;
 	}
 out:
 	return s;

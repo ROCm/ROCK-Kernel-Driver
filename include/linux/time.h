@@ -90,6 +90,7 @@ static inline unsigned long get_seconds(void)
 struct timespec current_kernel_time(void);
 
 #define CURRENT_TIME (current_kernel_time())
+#define CURRENT_TIME_SEC ((struct timespec) { xtime.tv_sec, 0 })
 
 extern void do_gettimeofday(struct timeval *tv);
 extern int do_settimeofday(struct timespec *tv);
@@ -102,6 +103,8 @@ struct itimerval;
 extern int do_setitimer(int which, struct itimerval *value, struct itimerval *ovalue);
 extern int do_getitimer(int which, struct itimerval *value);
 extern void getnstimeofday (struct timespec *tv);
+
+extern struct timespec timespec_trunc(struct timespec t, unsigned gran);
 
 static inline void
 set_normalized_timespec (struct timespec *ts, time_t sec, long nsec)

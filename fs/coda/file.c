@@ -83,7 +83,7 @@ coda_file_write(struct file *coda_file, const char __user *buf, size_t count, lo
 
 	coda_inode->i_size = host_inode->i_size;
 	coda_inode->i_blocks = (coda_inode->i_size + 511) >> 9;
-	coda_inode->i_mtime = coda_inode->i_ctime = CURRENT_TIME;
+	coda_inode->i_mtime = coda_inode->i_ctime = CURRENT_TIME_SEC;
 	up(&coda_inode->i_sem);
 
 	return ret;

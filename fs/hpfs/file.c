@@ -116,7 +116,7 @@ static ssize_t hpfs_file_write(struct file *file, const char __user *buf,
 	retval = generic_file_write(file, buf, count, ppos);
 	if (retval > 0) {
 		struct inode *inode = file->f_dentry->d_inode;
-		inode->i_mtime = CURRENT_TIME;
+		inode->i_mtime = CURRENT_TIME_SEC;
 		hpfs_i(inode)->i_dirty = 1;
 	}
 	return retval;

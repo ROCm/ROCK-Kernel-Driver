@@ -482,7 +482,7 @@ affs_file_write(struct file *file, const char __user *buf,
 	retval = generic_file_write (file, buf, count, ppos);
 	if (retval >0) {
 		struct inode *inode = file->f_dentry->d_inode;
-		inode->i_ctime = inode->i_mtime = CURRENT_TIME;
+		inode->i_ctime = inode->i_mtime = CURRENT_TIME_SEC;
 		mark_inode_dirty(inode);
 	}
 	return retval;

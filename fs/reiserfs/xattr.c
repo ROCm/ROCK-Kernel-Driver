@@ -594,7 +594,7 @@ open_file:
      * gets marked dirty, but won't (ever) make it onto the dirty list until
      * it's synced explicitly to clear I_DIRTY. This is bad. */
     if (!hlist_unhashed(&inode->i_hash)) {
-        inode->i_ctime = CURRENT_TIME;
+        inode->i_ctime = CURRENT_TIME_SEC;
         mark_inode_dirty (inode);
     }
 
@@ -768,7 +768,7 @@ reiserfs_xattr_del (struct inode *inode, const char *name)
     dput (dir);
 
     if (!err) {
-        inode->i_ctime = CURRENT_TIME;
+        inode->i_ctime = CURRENT_TIME_SEC;
         mark_inode_dirty (inode);
     }
 
@@ -1040,7 +1040,7 @@ reiserfs_removexattr (struct dentry *dentry, const char *name)
 
     err = reiserfs_xattr_del (dentry->d_inode, name);
 
-    dentry->d_inode->i_ctime = CURRENT_TIME;
+    dentry->d_inode->i_ctime = CURRENT_TIME_SEC;
     mark_inode_dirty (dentry->d_inode);
 
 out:

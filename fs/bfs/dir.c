@@ -100,7 +100,7 @@ static int bfs_create(struct inode * dir, struct dentry * dentry, int mode,
 	info->si_freei--;
 	inode->i_uid = current->fsuid;
 	inode->i_gid = (dir->i_mode & S_ISGID) ? dir->i_gid : current->fsgid;
-	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
+	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME_SEC;
 	inode->i_blocks = inode->i_blksize = 0;
 	inode->i_op = &bfs_file_inops;
 	inode->i_fop = &bfs_file_operations;
@@ -164,7 +164,7 @@ static int bfs_link(struct dentry * old, struct inode * dir, struct dentry * new
 		return err;
 	}
 	inode->i_nlink++;
-	inode->i_ctime = CURRENT_TIME;
+	inode->i_ctime = CURRENT_TIME_SEC;
 	mark_inode_dirty(inode);
 	atomic_inc(&inode->i_count);
 	d_instantiate(new, inode);
@@ -193,7 +193,7 @@ static int bfs_unlink(struct inode * dir, struct dentry * dentry)
 	}
 	de->ino = 0;
 	mark_buffer_dirty(bh);
-	dir->i_ctime = dir->i_mtime = CURRENT_TIME;
+	dir->i_ctime = dir->i_mtime = CURRENT_TIME_SEC;
 	mark_inode_dirty(dir);
 	inode->i_nlink--;
 	inode->i_ctime = dir->i_ctime;
@@ -245,11 +245,11 @@ static int bfs_rename(struct inode * old_dir, struct dentry * old_dentry,
 			goto end_rename;
 	}
 	old_de->ino = 0;
-	old_dir->i_ctime = old_dir->i_mtime = CURRENT_TIME;
+	old_dir->i_ctime = old_dir->i_mtime = CURRENT_TIME_SEC;
 	mark_inode_dirty(old_dir);
 	if (new_inode) {
 		new_inode->i_nlink--;
-		new_inode->i_ctime = CURRENT_TIME;
+		new_inode->i_ctime = CURRENT_TIME_SEC;
 		mark_inode_dirty(new_inode);
 	}
 	mark_buffer_dirty(old_bh);
@@ -300,9 +300,9 @@ static int bfs_add_entry(struct inode * dir, const char * name, int namelen, int
 			if (!de->ino) {
 				if ((block-sblock)*BFS_BSIZE + off >= dir->i_size) {
 					dir->i_size += BFS_DIRENT_SIZE;
-					dir->i_ctime = CURRENT_TIME;
+					dir->i_ctime = CURRENT_TIME_SEC;
 				}
-				dir->i_mtime = CURRENT_TIME;
+				dir->i_mtime = CURRENT_TIME_SEC;
 				mark_inode_dirty(dir);
 				de->ino = ino;
 				for (i=0; i<BFS_NAMELEN; i++)

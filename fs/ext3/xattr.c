@@ -1285,7 +1285,7 @@ getblk_failed:
 
 	/* Update the inode. */
 	EXT3_I(inode)->i_file_acl = new_bh ? new_bh->b_blocknr : 0;
-	inode->i_ctime = CURRENT_TIME;
+	inode->i_ctime = CURRENT_TIME_SEC;
 	ext3_mark_inode_dirty(handle, inode);
 	if (IS_SYNC(inode))
 		handle->h_sync = 1;
