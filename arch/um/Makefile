@@ -132,7 +132,7 @@ $(ARCH_DIR)/os:
 	cd $(ARCH_DIR) && ln -sf os-$(OS) os
 
 $(ARCH_DIR)/include/uml-config.h :
-	ln -sf $(TOPDIR)/include/linux/autoconf.h $@
+	sed 's/ CONFIG/ UML_CONFIG/' $(TOPDIR)/include/linux/autoconf.h > $@
 
 $(ARCH_DIR)/include/task.h : $(ARCH_DIR)/util/mk_task
 	$< > $@
