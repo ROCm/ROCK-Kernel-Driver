@@ -33,7 +33,6 @@ typedef struct
 {
 	struct usb_device	*dev;		/* USB device handle */
 	struct semaphore	mutex;		/* locks this struct */
-	struct semaphore	sem;
 
 	wait_queue_head_t	wait;		/* for timed waits */
 	wait_queue_head_t	remove_ok;
@@ -44,12 +43,6 @@ typedef struct
 	driver_state_t	state;			/* started/stopped */
 	int		opened;			/* tru if open */
 	int	remove_pending;
-
-	char	rd_buf[BULK_RCV_MAX];		/* read  buffer */
-	char	wr_buf[BULK_SND_MAX];		/* write buffer */
-
 } tiglusb_t, *ptiglusb_t;
-
-extern devfs_handle_t usb_devfs_handle;		/* /dev/usb dir. */
 
 #endif
