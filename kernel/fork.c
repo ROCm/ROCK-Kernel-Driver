@@ -1120,7 +1120,7 @@ static task_t *copy_process(unsigned long clone_flags,
 	}
 
 	SET_LINKS(p);
-	if (p->ptrace & PT_PTRACED)
+	if (unlikely(p->ptrace & PT_PTRACED))
 		__ptrace_link(p, current->parent);
 
 	attach_pid(p, PIDTYPE_PID, p->pid);
