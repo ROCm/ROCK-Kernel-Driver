@@ -924,7 +924,7 @@ static int TISendBulkTransferSync (struct usb_serial *serial, void *buffer, int 
 
 	status = usb_bulk_msg (serial->dev,
 				usb_sndbulkpipe(serial->dev,
-						serial->port[0].bulk_out_endpointAddress),
+						serial->port[0]->bulk_out_endpointAddress),
 				buffer,
 				length,
 				num_sent,
@@ -1682,7 +1682,7 @@ static void edge_interrupt_callback (struct urb *urb, struct pt_regs *regs)
 	function    = TIUMP_GET_FUNC_FROM_CODE (data[0]);
 	dbg ("%s - port_number %d, function %d, info 0x%x",
 	     __FUNCTION__, port_number, function, data[1]);
-	port = &edge_serial->serial->port[port_number];
+	port = edge_serial->serial->port[port_number];
 	if (port_paranoia_check (port, __FUNCTION__)) {
 		dbg ("%s - change found for port that is not present",
 		     __FUNCTION__);
@@ -1945,7 +1945,7 @@ static int edge_open (struct usb_serial_port *port, struct file * filp)
 	edge_serial = edge_port->edge_serial;
 	if (edge_serial->num_ports_open == 0) {
 		/* we are the first port to be opened, let's post the interrupt urb */
-		urb = edge_serial->serial->port[0].interrupt_in_urb;
+		urb = edge_serial->serial->port[0]->interrupt_in_urb;
 		if (!urb) {
 			dev_err (&port->dev, "%s - no interrupt urb present, exiting\n", __FUNCTION__);
 			return -EINVAL;
@@ -2034,7 +2034,7 @@ static void edge_close (struct usb_serial_port *port, struct file * filp)
 		--edge_port->edge_serial->num_ports_open;
 		if (edge_port->edge_serial->num_ports_open <= 0) {
 			/* last port is now closed, let's shut down our interrupt urb */
-			usb_unlink_urb (serial->port[0].interrupt_in_urb);
+			usb_unlink_urb (serial->port[0]->interrupt_in_urb);
 			edge_port->edge_serial->num_ports_open = 0;
 		}
 	edge_port->close_pending = 0;
@@ -2603,9 +2603,9 @@ static int edge_startup (struct usb_serial *serial)
 			return -ENOMEM;
 		}
 		memset (edge_port, 0, sizeof(struct edgeport_port));
-		edge_port->port = &serial->port[i];
+		edge_port->port = serial->port[i];
 		edge_port->edge_serial = edge_serial;
-		usb_set_serial_port_data(&serial->port[i], edge_port);
+		usb_set_serial_port_data(serial->port[i], edge_port);
 	}
 	
 	return 0;
@@ -2618,8 +2618,8 @@ static void edge_shutdown (struct usb_serial *serial)
 	dbg ("%s", __FUNCTION__);
 
 	for (i=0; i < serial->num_ports; ++i) {
-		kfree (usb_get_serial_port_data(&serial->port[i]));
-		usb_set_serial_port_data(&serial->port[i], NULL);
+		kfree (usb_get_serial_port_data(serial->port[i]));
+		usb_set_serial_port_data(serial->port[i], NULL);
 	}
 	kfree (usb_get_serial_data(serial));
 	usb_set_serial_data(serial, NULL);

@@ -850,25 +850,25 @@ static int treo_attach (struct usb_serial *serial)
 	 * "virtual serial port".  So let's force the endpoints to be
 	 * where we want them to be. */
 	for (i = serial->num_bulk_in; i < serial->num_ports; ++i) {
-		port = &serial->port[i];
-		port->read_urb = serial->port[0].read_urb;
-		port->bulk_in_endpointAddress = serial->port[0].bulk_in_endpointAddress;
-		port->bulk_in_buffer = serial->port[0].bulk_in_buffer;
+		port = serial->port[i];
+		port->read_urb = serial->port[0]->read_urb;
+		port->bulk_in_endpointAddress = serial->port[0]->bulk_in_endpointAddress;
+		port->bulk_in_buffer = serial->port[0]->bulk_in_buffer;
 	}
 
 	for (i = serial->num_bulk_out; i < serial->num_ports; ++i) {
-		port = &serial->port[i];
-		port->write_urb = serial->port[0].write_urb;
-		port->bulk_out_size = serial->port[0].bulk_out_size;
-		port->bulk_out_endpointAddress = serial->port[0].bulk_out_endpointAddress;
-		port->bulk_out_buffer = serial->port[0].bulk_out_buffer;
+		port = serial->port[i];
+		port->write_urb = serial->port[0]->write_urb;
+		port->bulk_out_size = serial->port[0]->bulk_out_size;
+		port->bulk_out_endpointAddress = serial->port[0]->bulk_out_endpointAddress;
+		port->bulk_out_buffer = serial->port[0]->bulk_out_buffer;
 	}
 
 	for (i = serial->num_interrupt_in; i < serial->num_ports; ++i) {
-		port = &serial->port[i];
-		port->interrupt_in_urb = serial->port[0].interrupt_in_urb;
-		port->interrupt_in_endpointAddress = serial->port[0].interrupt_in_endpointAddress;
-		port->interrupt_in_buffer = serial->port[0].interrupt_in_buffer;
+		port = serial->port[i];
+		port->interrupt_in_urb = serial->port[0]->interrupt_in_urb;
+		port->interrupt_in_endpointAddress = serial->port[0]->interrupt_in_endpointAddress;
+		port->interrupt_in_buffer = serial->port[0]->interrupt_in_buffer;
 	}
 
 	return 0;

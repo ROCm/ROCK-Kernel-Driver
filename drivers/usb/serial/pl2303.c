@@ -186,7 +186,7 @@ static int pl2303_startup (struct usb_serial *serial)
 			return -ENOMEM;
 		memset (priv, 0x00, sizeof (struct pl2303_private));
 		spin_lock_init(&priv->lock);
-		usb_set_serial_port_data(&serial->port[i], priv);
+		usb_set_serial_port_data(serial->port[i], priv);
 	}
 	return 0;
 }
@@ -592,8 +592,8 @@ static void pl2303_shutdown (struct usb_serial *serial)
 	dbg("%s", __FUNCTION__);
 
 	for (i = 0; i < serial->num_ports; ++i) {
-		kfree (usb_get_serial_port_data(&serial->port[i]));
-		usb_set_serial_port_data(&serial->port[i], NULL);
+		kfree (usb_get_serial_port_data(serial->port[i]));
+		usb_set_serial_port_data(serial->port[i], NULL);
 	}		
 }
 
