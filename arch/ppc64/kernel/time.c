@@ -267,7 +267,6 @@ int timer_interrupt(struct pt_regs * regs)
 	unsigned long cur_tb;
 	struct paca_struct *lpaca = get_paca();
 	unsigned long cpu = lpaca->xPacaIndex;
-	struct ItLpQueue * lpq;
 
 	irq_enter();
 
@@ -301,9 +300,11 @@ int timer_interrupt(struct pt_regs * regs)
 	set_dec(next_dec);
 
 #ifdef CONFIG_PPC_ISERIES
-	lpq = lpaca->lpQueuePtr;
-	if (lpq && ItLpQueue_isLpIntPending(lpq))
-		lpEvent_count += ItLpQueue_process(lpq, regs); 
+	{
+		struct ItLpQueue *lpq = lpaca->lpQueuePtr;
+		if (lpq && ItLpQueue_isLpIntPending(lpq))
+			lpEvent_count += ItLpQueue_process(lpq, regs);
+	}
 #endif
 
 	irq_exit();
