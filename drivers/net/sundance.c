@@ -87,11 +87,15 @@
 	Version LK1.09 (D-Link):
 	- Fix the flowctrl bug.	
 	- Set Pause bit in MII ANAR if flow control enabled.	
+
+	Version LK1.09a (ICPlus):
+	- Add the delay time in reading the contents of EEPROM
+
 */
 
 #define DRV_NAME	"sundance"
 #define DRV_VERSION	"1.01+LK1.09a"
-#define DRV_RELDATE	"16-May-2003"
+#define DRV_RELDATE	"10-Jul-2003"
 
 
 /* The user-configurable values.
@@ -744,12 +748,14 @@ static int change_mtu(struct net_device *dev, int new_mtu)
 	return 0;
 }
 
+#define eeprom_delay(ee_addr)	readl(ee_addr)
 /* Read the EEPROM and MII Management Data I/O (MDIO) interfaces. */
 static int __devinit eeprom_read(long ioaddr, int location)
 {
-	int boguscnt = 1000;		/* Typical 190 ticks. */
+	int boguscnt = 10000;		/* Typical 1900 ticks. */
 	writew(0x0200 | (location & 0xff), ioaddr + EECtrl);
 	do {
+		eeprom_delay(ioaddr + EECtrl);
 		if (! (readw(ioaddr + EECtrl) & 0x8000)) {
 			return readw(ioaddr + EEData);
 		}
