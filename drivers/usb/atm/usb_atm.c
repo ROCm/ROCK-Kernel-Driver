@@ -311,6 +311,15 @@ static void udsl_extract_cells(struct udsl_instance_data *instance,
 **  encode  **
 *************/
 
+static inline void udsl_fill_cell_header(unsigned char *target, struct atm_vcc *vcc)
+{
+	target[0] = vcc->vpi >> 4;
+	target[1] = (vcc->vpi << 4) | (vcc->vci >> 12);
+	target[2] = vcc->vci >> 4;
+	target[3] = vcc->vci << 4;
+	target[4] = 0xec;
+}
+
 static const unsigned char zeros[ATM_CELL_PAYLOAD];
 
 static void udsl_groom_skb(struct atm_vcc *vcc, struct sk_buff *skb)
@@ -320,11 +329,6 @@ static void udsl_groom_skb(struct atm_vcc *vcc, struct sk_buff *skb)
 	u32 crc;
 
 	ctrl->atm_data.vcc = vcc;
-	ctrl->cell_header[0] = vcc->vpi >> 4;
-	ctrl->cell_header[1] = (vcc->vpi << 4) | (vcc->vci >> 12);
-	ctrl->cell_header[2] = vcc->vci >> 4;
-	ctrl->cell_header[3] = vcc->vci << 4;
-	ctrl->cell_header[4] = 0xec;
 
 	ctrl->num_cells = UDSL_NUM_CELLS(skb->len);
 	ctrl->num_entire = skb->len / ATM_CELL_PAYLOAD;
@@ -366,7 +370,7 @@ static unsigned int udsl_write_cells(struct udsl_instance_data *instance,
 	ne = min(howmany, ctrl->num_entire);
 
 	for (i = 0; i < ne; i++) {
-		memcpy(target, ctrl->cell_header, ATM_CELL_HEADER);
+		udsl_fill_cell_header(target, ctrl->atm_data.vcc);
 		target += ATM_CELL_HEADER;
 		memcpy(target, skb->data, ATM_CELL_PAYLOAD);
 		target += ATM_CELL_PAYLOAD;
@@ -386,7 +390,7 @@ static unsigned int udsl_write_cells(struct udsl_instance_data *instance,
 		memset(target, 0, instance->snd_padding);
 		target += instance->snd_padding;
 	}
-	memcpy(target, ctrl->cell_header, ATM_CELL_HEADER);
+	udsl_fill_cell_header(target, ctrl->atm_data.vcc);
 	target += ATM_CELL_HEADER;
 	memcpy(target, skb->data, skb->len);
 	target += skb->len;
@@ -400,7 +404,7 @@ static unsigned int udsl_write_cells(struct udsl_instance_data *instance,
 			goto out;
 		}
 
-		memcpy(target, ctrl->cell_header, ATM_CELL_HEADER);
+		udsl_fill_cell_header(target, ctrl->atm_data.vcc);
 		target += ATM_CELL_HEADER;
 		memset(target, 0, ATM_CELL_PAYLOAD - ATM_AAL5_TRAILER);
 		target += ATM_CELL_PAYLOAD - ATM_AAL5_TRAILER;

@@ -91,7 +91,6 @@ struct udsl_control {
 	unsigned int num_cells;
 	unsigned int num_entire;
 	unsigned int pdu_padding;
-	unsigned char cell_header[ATM_CELL_HEADER];
 	unsigned char aal5_trailer[ATM_AAL5_TRAILER];
 };
 
