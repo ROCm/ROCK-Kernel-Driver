@@ -1395,7 +1395,6 @@ static int es1938_suspend(snd_card_t *card, unsigned int state)
 	outb(0x00, SLIO_REG(chip, IRQCONTROL)); /* disable irqs */
 
 	pci_disable_device(chip->pci);
-	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
 
@@ -1415,7 +1414,6 @@ static int es1938_resume(snd_card_t *card, unsigned int state)
 			snd_es1938_write(chip, *s, *d);
 	}
 
-	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 	return 0;
 }
 #endif /* CONFIG_PM */

@@ -741,12 +741,18 @@ static int snd_generic_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *
 
 	switch (rqst) {
 	case PM_SUSPEND:
+		if (card->power_state == SNDRV_CTL_POWER_D3hot)
+			break;
 		/* FIXME: the correct state value? */
 		card->pm_suspend(card, 0);
+		snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 		break;
 	case PM_RESUME:
+		if (card->power_state == SNDRV_CTL_POWER_D0)
+			break;
 		/* FIXME: the correct state value? */
 		card->pm_resume(card, 0);
+		snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 		break;
 	}
 	return 0;
@@ -789,6 +795,7 @@ int snd_card_pci_suspend(struct pci_dev *dev, u32 state)
 	/* FIXME: correct state value? */
 	err = card->pm_suspend(card, 0);
 	pci_save_state(dev);
+	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return err;
 }
 
@@ -802,7 +809,9 @@ int snd_card_pci_resume(struct pci_dev *dev)
 	/* restore the PCI config space */
 	pci_restore_state(dev);
 	/* FIXME: correct state value? */
-	return card->pm_resume(card, 0);
+	card->pm_resume(card, 0);
+	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
+	return 0;
 }
 #endif
 

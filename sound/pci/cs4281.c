@@ -2079,7 +2079,6 @@ static int cs4281_suspend(snd_card_t *card, unsigned int state)
 	snd_cs4281_pokeBA0(chip, BA0_CLKCR1, ulCLK);
 
 	pci_disable_device(chip->pci);
-	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
 
@@ -2112,7 +2111,6 @@ static int cs4281_resume(snd_card_t *card, unsigned int state)
 	ulCLK &= ~CLKCR1_CKRA;
 	snd_cs4281_pokeBA0(chip, BA0_CLKCR1, ulCLK);
 
-	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 	return 0;
 }
 #endif /* CONFIG_PM */

@@ -1054,7 +1054,6 @@ static int snd_via82xx_suspend(snd_card_t *card, unsigned int state)
 	snd_ac97_suspend(chip->ac97);
 	pci_set_power_state(chip->pci, 3);
 	pci_disable_device(chip->pci);
-	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
 
@@ -1074,7 +1073,6 @@ static int snd_via82xx_resume(snd_card_t *card, unsigned int state)
 	for (i = 0; i < chip->num_devs; i++)
 		snd_via82xx_channel_reset(chip, &chip->devs[i]);
 
-	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 	return 0;
 }
 #endif /* CONFIG_PM */

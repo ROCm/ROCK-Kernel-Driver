@@ -1275,7 +1275,6 @@ static int nm256_suspend(snd_card_t *card, unsigned int state)
 	snd_ac97_suspend(chip->ac97);
 	chip->coeffs_current = 0;
 	pci_disable_device(chip->pci);
-	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
 
@@ -1290,7 +1289,6 @@ static int nm256_resume(snd_card_t *card, unsigned int state)
 	/* restore ac97 */
 	snd_ac97_resume(chip->ac97);
 
-	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 	return 0;
 }
 #endif /* CONFIG_PM */

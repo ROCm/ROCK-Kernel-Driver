@@ -332,6 +332,7 @@ struct via_dev {
 	struct snd_via_sg_table *idx_table;
 	/* for recovery from the unexpected pointer */
 	unsigned int lastpos;
+	unsigned int fragsize;
 	unsigned int bufsize;
 	unsigned int bufsize2;
 };
@@ -478,6 +479,7 @@ static int build_via_table(viadev_t *dev, snd_pcm_substream_t *substream,
 	dev->tbl_entries = idx;
 	dev->bufsize = periods * fragsize;
 	dev->bufsize2 = dev->bufsize / 2;
+	dev->fragsize = fragsize;
 	return 0;
 }
 
@@ -706,29 +708,34 @@ static int snd_via82xx_pcm_trigger(snd_pcm_substream_t * substream, int cmd)
 
 static inline unsigned int calc_linear_pos(viadev_t *viadev, unsigned int idx, unsigned int count)
 {
-	unsigned int size, res;
+	unsigned int size, base, res;
 
 	size = viadev->idx_table[idx].size;
-	res = viadev->idx_table[idx].offset + size - count;
+	base = viadev->idx_table[idx].offset;
+	res = base + size - count;
 
 	/* check the validity of the calculated position */
 	if (size < count) {
 		snd_printd(KERN_ERR "invalid via82xx_cur_ptr (size = %d, count = %d)\n", (int)size, (int)count);
 		res = viadev->lastpos;
-	} else if (check_invalid_pos(viadev, res)) {
+	} else {
+		if (! count) {
+			/* Some mobos report count = 0 on the DMA boundary,
+			 * i.e. count = size indeed.
+			 * Let's check whether this step is above the expected size.
+			 */
+			int delta = res - viadev->lastpos;
+			if (delta < 0)
+				delta += viadev->bufsize;
+			if ((unsigned int)delta > viadev->fragsize)
+				res = base;
+		}
+		if (check_invalid_pos(viadev, res)) {
 #ifdef POINTER_DEBUG
-		printk("fail: idx = %i/%i, lastpos = 0x%x, bufsize2 = 0x%x, offsize = 0x%x, size = 0x%x, count = 0x%x\n", idx, viadev->tbl_entries, viadev->lastpos, viadev->bufsize2, viadev->idx_table[idx].offset, viadev->idx_table[idx].size, count);
+			printk(KERN_DEBUG "fail: idx = %i/%i, lastpos = 0x%x, bufsize2 = 0x%x, offsize = 0x%x, size = 0x%x, count = 0x%x\n", idx, viadev->tbl_entries, viadev->lastpos, viadev->bufsize2, viadev->idx_table[idx].offset, viadev->idx_table[idx].size, count);
 #endif
-		if (count && size < count) {
-			snd_printd(KERN_ERR "invalid via82xx_cur_ptr, using last valid pointer\n");
-			res = viadev->lastpos;
-		} else {
-			if (! count)
-				/* bogus count 0 on the DMA boundary? */
-				res = viadev->idx_table[idx].offset;
-			else
-				/* count register returns full size when end of buffer is reached */
-				res = viadev->idx_table[idx].offset + size;
+			/* count register returns full size when end of buffer is reached */
+			res = base + size;
 			if (check_invalid_pos(viadev, res)) {
 				snd_printd(KERN_ERR "invalid via82xx_cur_ptr (2), using last valid pointer\n");
 				res = viadev->lastpos;
@@ -778,12 +785,20 @@ static snd_pcm_uframes_t snd_via8233_pcm_pointer(snd_pcm_substream_t *substream)
 	via82xx_t *chip = snd_pcm_substream_chip(substream);
 	viadev_t *viadev = (viadev_t *)substream->runtime->private_data;
 	unsigned int idx, count, res;
+	int timeout = 5000;
 	
 	snd_assert(viadev->tbl_entries, return 0);
 	if (!(inb(VIADEV_REG(viadev, OFFSET_STATUS)) & VIA_REG_STAT_ACTIVE))
 		return 0;
 	spin_lock(&chip->reg_lock);
-	count = inl(VIADEV_REG(viadev, OFFSET_CURR_COUNT));
+	do {
+		count = inl(VIADEV_REG(viadev, OFFSET_CURR_COUNT));
+		/* some mobos read 0 count */
+		if ((count & 0xffffff) || ! viadev->running)
+			break;
+	} while (--timeout);
+	if (! timeout)
+		snd_printd(KERN_ERR "zero position is read\n");
 	idx = count >> 24;
 	if (idx >= viadev->tbl_entries) {
 #ifdef POINTER_DEBUG
@@ -1908,7 +1923,6 @@ static int snd_via82xx_suspend(snd_card_t *card, unsigned int state)
 
 	pci_set_power_state(chip->pci, 3);
 	pci_disable_device(chip->pci);
-	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
 
@@ -1943,7 +1957,6 @@ static int snd_via82xx_resume(snd_card_t *card, unsigned int state)
 	for (i = 0; i < chip->num_devs; i++)
 		snd_via82xx_channel_reset(chip, &chip->devs[i]);
 
-	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 	return 0;
 }
 #endif /* CONFIG_PM */

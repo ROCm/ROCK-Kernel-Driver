@@ -2153,7 +2153,6 @@ static int snd_ymfpci_suspend(snd_card_t *card, unsigned int state)
 	snd_ymfpci_writel(chip, YDSXGR_NATIVEDACOUTVOL, 0);
 	snd_ymfpci_disable_dsp(chip);
 	pci_disable_device(chip->pci);
-	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
 
@@ -2181,7 +2180,6 @@ static int snd_ymfpci_resume(snd_card_t *card, unsigned int state)
 		chip->active_bank = snd_ymfpci_readl(chip, YDSXGR_CTRLSELECT);
 		spin_unlock_irq(&chip->reg_lock);
 	}
-	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 	return 0;
 }
 #endif /* CONFIG_PM */

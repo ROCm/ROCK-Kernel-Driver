@@ -2424,7 +2424,6 @@ static int m3_suspend(snd_card_t *card, unsigned int state)
 	snd_m3_outw(chip, 0xffff, 0x56);
 
 	pci_disable_device(chip->pci);
-	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
 
@@ -2467,7 +2466,6 @@ static int m3_resume(snd_card_t *card, unsigned int state)
 	snd_m3_enable_ints(chip);
 	snd_m3_amp_enable(chip, 1);
 
-	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 	return 0;
 }
 #endif /* CONFIG_PM */

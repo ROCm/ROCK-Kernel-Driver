@@ -2415,7 +2415,6 @@ static int es1968_suspend(snd_card_t *card, unsigned int state)
 	snd_es1968_bob_stop(chip);
 	snd_es1968_set_acpi(chip, ACPI_D3);
 	pci_disable_device(chip->pci);
-	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
 
@@ -2446,7 +2445,6 @@ static int es1968_resume(snd_card_t *card, unsigned int state)
 	if (chip->bobclient)
 		snd_es1968_bob_start(chip);
 
-	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 	return 0;
 }
 #endif /* CONFIG_PM */

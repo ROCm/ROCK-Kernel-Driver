@@ -648,16 +648,12 @@ static int snd_ad1848_suspend(snd_card_t *card, unsigned int state)
 {
 	ad1848_t *chip = card->pm_private_data;
 
-	if (card->power_state == SNDRV_CTL_POWER_D3hot)
-		return 0;
-
 	snd_pcm_suspend_all(chip->pcm);
 	/* FIXME: save registers? */
 
 	if (chip->thinkpad_flag)
 		snd_ad1848_thinkpad_twiddle(chip, 0);
 
-	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
 
@@ -665,15 +661,11 @@ static int snd_ad1848_resume(snd_card_t *card, unsigned int state)
 {
 	ad1848_t *chip = card->pm_private_data;
 
-	if (card->power_state == SNDRV_CTL_POWER_D0)
-		return 0;
-
 	if (chip->thinkpad_flag)
 		snd_ad1848_thinkpad_twiddle(chip, 1);
 
 	/* FIXME: restore registers? */
 
-	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 	return 0;
 }
 #endif /* CONFIG_PM */

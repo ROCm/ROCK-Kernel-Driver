@@ -3946,7 +3946,6 @@ static int snd_trident_suspend(snd_card_t *card, unsigned int state)
 		break;
 	}
 	pci_disable_device(trident->pci);
-	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
 
@@ -3981,7 +3980,6 @@ static int snd_trident_resume(snd_card_t *card, unsigned int state)
 
 	snd_trident_enable_eso(trident);
 
-	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 	trident->in_suspend = 0;
 	return 0;
 }

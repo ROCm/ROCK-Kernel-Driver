@@ -5153,7 +5153,7 @@ struct _snd_pcm_runtime {
         <listitem><para>Call <function>snd_pcm_suspend_all()</function> to suspend the running PCM streams.</para></listitem>
         <listitem><para>Save the register values if necessary.</para></listitem>
         <listitem><para>Stop the hardware if necessary.</para></listitem>
-        <listitem><para>Set the power-state as D3hot by calling <function>snd_power_change_state()</function>.</para></listitem>
+        <listitem><para>Disable the PCI device by calling <function>pci_disable_device()</function>.</para></listitem>
       </orderedlist>
     </para>
 
@@ -5174,7 +5174,7 @@ struct _snd_pcm_runtime {
           /* (4) */
           snd_mychip_stop_hardware(chip);
           /* (5) */
-          snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
+          pci_disable_device(chip->pci);
           return 0;
   }
 ]]>
@@ -5194,8 +5194,6 @@ struct _snd_pcm_runtime {
     <listitem><para>Resume the mixer, e.g. calling
     <function>snd_ac97_resume()</function>.</para></listitem>
     <listitem><para>Restart the hardware (if any).</para></listitem>
-    <listitem><para>Set the power-state as D0 by calling
-    <function>snd_power_change_state()</function>.</para></listitem>
     </orderedlist>
     </para>
 
@@ -5219,8 +5217,6 @@ struct _snd_pcm_runtime {
           snd_ac97_resume(chip->ac97);
           /* (6) */
           snd_mychip_restart_chip(chip);
-          /* (7) */
-          snd_power_change_state(card, SNDRV_CTL_POWER_D0);
           return 0;
   }
 ]]>

@@ -1397,20 +1397,16 @@ static void snd_cs4231_resume(cs4231_t *chip)
 static int snd_cs4231_pm_suspend(snd_card_t *card, unsigned int state)
 {
 	cs4231_t *chip = card->pm_private_data;
-	if (chip->suspend) {
+	if (chip->suspend)
 		chip->suspend(chip);
-		snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
-	}
 	return 0;
 }
 
 static int snd_cs4231_pm_resume(snd_card_t *card, unsigned int state)
 {
 	cs4231_t *chip = card->pm_private_data;
-	if (chip->resume) {
+	if (chip->resume)
 		chip->resume(chip);
-		snd_power_change_state(card, SNDRV_CTL_POWER_D0);
-	}
 	return 0;
 }
 #endif /* CONFIG_PM */

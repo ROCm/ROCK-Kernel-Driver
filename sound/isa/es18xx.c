@@ -1624,7 +1624,6 @@ static int snd_es18xx_suspend(snd_card_t *card, unsigned int state)
 	snd_es18xx_write(chip, ES18XX_PM, chip->pm_reg);
 	snd_es18xx_write(chip, ES18XX_PM, chip->pm_reg ^= ES18XX_PM_SUS);
 
-	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
 
@@ -1635,7 +1634,6 @@ static int snd_es18xx_resume(snd_card_t *card, unsigned int state)
 	/* restore PM register, we won't wake till (not 0x07) i/o activity though */
 	snd_es18xx_write(chip, ES18XX_PM, chip->pm_reg ^= ES18XX_PM_FM);
 
-	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 	return 0;
 }
 #endif /* CONFIG_PM */
