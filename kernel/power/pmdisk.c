@@ -138,85 +138,9 @@ static int mark_swapfiles(swp_entry_t prev)
 	return error;
 }
 
-
-
-/**
- *	write_swap_page - Write one page to a fresh swap location.
- *	@addr:	Address we're writing.
- *	@loc:	Place to store the entry we used.
- *
- *	Allocate a new swap entry and 'sync' it. Note we discard -EIO
- *	errors. That is an artifact left over from swsusp. It did not 
- *	check the return of rw_swap_page_sync() at all, since most pages
- *	written back to swap would return -EIO.
- *	This is a partial improvement, since we will at least return other
- *	errors, though we need to eventually fix the damn code.
- */
-
-static int write_swap_page(unsigned long addr, swp_entry_t * loc)
-{
-	swp_entry_t entry;
-	int error = 0;
-
-	entry = get_swap_page();
-	if (swp_offset(entry) && 
-	    swapfile_used[swp_type(entry)] == SWAPFILE_SUSPEND) {
-		error = rw_swap_page_sync(WRITE, entry,
-					  virt_to_page(addr));
-		if (error == -EIO)
-			error = 0;
-		if (!error)
-			*loc = entry;
-	} else
-		error = -ENOSPC;
-	return error;
-}
-
-
-/**
- *	free_data - Free the swap entries used by the saved image.
- *
- *	Walk the list of used swap entries and free each one. 
- */
-
-static void free_data(void)
-{
-	swp_entry_t entry;
-	int i;
-
-	for (i = 0; i < nr_copy_pages; i++) {
-		entry = (pagedir_nosave + i)->swap_address;
-		if (entry.val)
-			swap_free(entry);
-		else
-			break;
-		(pagedir_nosave + i)->swap_address = (swp_entry_t){0};
-	}
-}
-
-
-/**
- *	write_data - Write saved image to swap.
- *
- *	Walk the list of pages in the image and sync each one to swap.
- */
-
-static int write_data(void)
-{
-	int error = 0;
-	int i;
-
-	printk( "Writing data to swap (%d pages): ", nr_copy_pages );
-	for (i = 0; i < nr_copy_pages && !error; i++) {
-		if (!(i%100))
-			printk( "." );
-		error = write_swap_page((pagedir_nosave+i)->address,
-					&((pagedir_nosave+i)->swap_address));
-	}
-	printk(" %d Pages done.\n",i);
-	return error;
-}
-
+extern int swsusp_write_page(unsigned long addr, swp_entry_t * entry);
+extern int swsusp_data_write(void);
+extern void swsusp_data_free(void);
 
 /**
  *	free_pagedir - Free pages used by the page directory.
@@ -247,7 +171,7 @@ static int write_pagedir(void)
 	pmdisk_info.pagedir_pages = n;
 	printk( "Writing pagedir (%d pages)\n", n);
 	for (i = 0; i < n && !error; i++, addr += PAGE_SIZE)
-		error = write_swap_page(addr,&pmdisk_info.pagedir[i]);
+		error = swsusp_write_page(addr,&pmdisk_info.pagedir[i]);
 	return error;
 }
 
@@ -283,6 +207,7 @@ static void init_header(void)
 
 	pmdisk_info.cpus = num_online_cpus();
 	pmdisk_info.image_pages = nr_copy_pages;
+	dump_pmdisk_info();
 }
 
 /**
@@ -297,8 +222,7 @@ static void init_header(void)
 
 static int write_header(swp_entry_t * entry)
 {
-	dump_pmdisk_info();
-	return write_swap_page((unsigned long)&pmdisk_info,entry);
+	return swsusp_write_page((unsigned long)&pmdisk_info,entry);
 }
 
 
@@ -313,9 +237,7 @@ static int write_suspend_image(void)
 	int error;
 	swp_entry_t prev = { 0 };
 
-	init_header();
-
-	if ((error = write_data()))
+	if ((error = swsusp_data_write()))
 		goto FreeData;
 
 	if ((error = write_pagedir()))
@@ -330,7 +252,7 @@ static int write_suspend_image(void)
  FreePagedir:
 	free_pagedir_entries();
  FreeData:
-	free_data();
+	swsusp_data_free();
 	goto Done;
 }
 
