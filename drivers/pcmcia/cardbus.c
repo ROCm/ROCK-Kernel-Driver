@@ -263,9 +263,9 @@ int cb_alloc(socket_info_t * s)
 		dev->sysdata = bus->sysdata;
 		dev->dev.parent = bus->dev;
 		dev->dev.bus = &pci_bus_type;
-
 		dev->devfn = i;
-		dev->vendor = vend;
+
+		pci_read_config_word(dev, PCI_VENDOR_ID, &dev->vendor);
 		pci_read_config_word(dev, PCI_DEVICE_ID, &dev->device);
 		dev->hdr_type = hdr & 0x7f;
 		dev->dma_mask = 0xffffffff;
