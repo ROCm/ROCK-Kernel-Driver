@@ -2241,7 +2241,7 @@ static struct pci_driver serial_pci_driver = {
 
 static int __init serial8250_pci_init(void)
 {
-	return pci_module_init(&serial_pci_driver);
+	return pci_register_driver(&serial_pci_driver);
 }
 
 static void __exit serial8250_pci_exit(void)
