@@ -2349,7 +2349,8 @@ snd_m3_enable_ints(m3_t *chip)
 {
 	unsigned long io = chip->iobase;
 
-	outw(ASSP_INT_ENABLE | MPU401_INT_ENABLE, io + HOST_INT_CTRL);
+	/* TODO: MPU401 not supported yet */
+	outw(ASSP_INT_ENABLE /*| MPU401_INT_ENABLE*/, io + HOST_INT_CTRL);
 	outb(inb(io + ASSP_CONTROL_C) | ASSP_HOST_INT_ENABLE,
 	     io + ASSP_CONTROL_C);
 }
