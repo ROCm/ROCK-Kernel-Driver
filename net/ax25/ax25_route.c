@@ -56,6 +56,7 @@
 #include <linux/netdevice.h>
 #include <linux/if_arp.h>
 #include <linux/skbuff.h>
+#include <linux/spinlock.h>
 #include <net/sock.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
@@ -65,6 +66,7 @@
 #include <linux/init.h>
 
 static ax25_route *ax25_route_list;
+static spinlock_t ax25_route_lock = SPIN_LOCK_UNLOCKED;
 
 static ax25_route *ax25_find_route(ax25_address *, struct net_device *);
 
@@ -86,8 +88,11 @@ static inline void ax25_route_invert(ax25_digi *in, ax25_digi *out)
 
 void ax25_rt_device_down(struct net_device *dev)
 {
-	ax25_route *s, *t, *ax25_rt = ax25_route_list;
-	
+	ax25_route *s, *t, *ax25_rt;
+	unsigned long flags;
+
+	spin_lock_irqsave(&ax25_route_lock, flags);
+	ax25_rt = ax25_route_list;
 	while (ax25_rt != NULL) {
 		s       = ax25_rt;
 		ax25_rt = ax25_rt->next;
@@ -111,6 +116,7 @@ void ax25_rt_device_down(struct net_device *dev)
 			}
 		}
 	}
+	spin_unlock_irqrestore(&ax25_route_lock, flags);
 }
 
 int ax25_rt_ioctl(unsigned int cmd, void *arg)
@@ -167,10 +173,11 @@ int ax25_rt_ioctl(unsigned int cmd, void *arg)
 					ax25_rt->digipeat->calls[i]    = route.digi_addr[i];
 				}
 			}
-			save_flags(flags); cli();
+			spin_lock_irqsave(&ax25_route_lock, flags);
 			ax25_rt->next   = ax25_route_list;
 			ax25_route_list = ax25_rt;
-			restore_flags(flags);
+			spin_unlock_irqrestore(&ax25_route_lock, flags);
+
 			break;
 
 		case SIOCDELRT:
@@ -239,13 +246,14 @@ int ax25_rt_ioctl(unsigned int cmd, void *arg)
 int ax25_rt_get_info(char *buffer, char **start, off_t offset, int length)
 {
 	ax25_route *ax25_rt;
+	unsigned long flags;
 	int len     = 0;
 	off_t pos   = 0;
 	off_t begin = 0;
 	char *callsign;
 	int i;
   
-	cli();
+	spin_lock_irqsave(&ax25_route_lock, flags);
 
 	len += sprintf(buffer, "callsign  dev  mode digipeaters\n");
 
@@ -286,13 +294,13 @@ int ax25_rt_get_info(char *buffer, char **start, off_t offset, int length)
 		if (pos > offset + length)
 			break;
 	}
-
-	sti();
+	spin_unlock_irqrestore(&ax25_route_lock, flags);
 
 	*start = buffer + (offset - begin);
 	len   -= (offset - begin);
 
-	if (len > length) len = length;
+	if (len > length)
+		len = length;
 
 	return len;
 } 
