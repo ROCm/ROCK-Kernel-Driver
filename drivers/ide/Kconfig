@@ -95,11 +95,13 @@ config BLK_DEV_IDE
 	  could say N here, and select the "Old hard disk driver" below
 	  instead to save about 13 KB of memory in the kernel.
 
+if BLK_DEV_IDE
+
 comment "Please see Documentation/ide.txt for help/info on IDE drives"
 
 config BLK_DEV_HD_IDE
 	bool "Use old disk-only driver on primary interface"
-	depends on BLK_DEV_IDE && X86 && X86_PC9800!=y
+	depends on X86 && X86_PC9800!=y
 	---help---
 	  There are two drivers for MFM/RLL/IDE disks.  Most people use just
 	  the new enhanced driver by itself.  This option however installs the
@@ -117,7 +119,7 @@ config BLK_DEV_HD_IDE
 
 config BLK_DEV_HD_IDE98
 	bool "Use old disk-only driver on primary interface"
-	depends on BLK_DEV_IDE && X86 && X86_PC9800
+	depends on X86 && X86_PC9800
 	---help---
 	  There are two drivers for MFM/RLL/IDE disks.  Most people use just
 	  the new enhanced driver by itself.  This option however installs the
@@ -135,7 +137,6 @@ config BLK_DEV_HD_IDE98
 
 config BLK_DEV_IDEDISK
 	tristate "Include IDE/ATA-2 DISK support"
-	depends on BLK_DEV_IDE
 	---help---
 	  This will include enhanced support for MFM/RLL/IDE hard disks.  If
 	  you have a MFM/RLL/IDE disk, and there is no special reason to use
@@ -176,14 +177,13 @@ config IDEDISK_STROKE
 
 config BLK_DEV_IDECS
 	tristate "PCMCIA IDE support"
-	depends on BLK_DEV_IDE && PCMCIA
+	depends on PCMCIA
 	help
 	  Support for outboard IDE disks, tape drives, and CD-ROM drives
 	  connected through a  PCMCIA card.
 
 config BLK_DEV_IDECD
 	tristate "Include IDE/ATAPI CDROM support"
-	depends on BLK_DEV_IDE
 	---help---
 	  If you have a CD-ROM drive using the ATAPI protocol, say Y. ATAPI is
 	  a newer protocol used by IDE CD-ROM and TAPE drives, similar to the
@@ -209,7 +209,6 @@ config BLK_DEV_IDECD
 #dep_tristate '  Include IDE/ATAPI TAPE support' CONFIG_BLK_DEV_IDETAPE $CONFIG_BLK_DEV_IDE
 config BLK_DEV_IDEFLOPPY
 	tristate "Include IDE/ATAPI FLOPPY support"
-	depends on BLK_DEV_IDE
 	---help---
 	  If you have an IDE floppy drive which uses the ATAPI protocol,
 	  answer Y.  ATAPI is a newer protocol used by IDE CD-ROM/tape/floppy
@@ -234,7 +233,7 @@ config BLK_DEV_IDEFLOPPY
 
 config BLK_DEV_IDESCSI
 	tristate "SCSI emulation support"
-	depends on BLK_DEV_IDE && SCSI
+	depends on SCSI
 	---help---
 	  This will provide SCSI host adapter emulation for IDE ATAPI devices,
 	  and will allow you to use a SCSI device driver instead of a native
@@ -260,7 +259,6 @@ config BLK_DEV_IDESCSI
 
 config IDE_TASK_IOCTL
 	bool "IDE Taskfile Access"
-	depends on BLK_DEV_IDE
 	help
 	  This is a direct raw access to the media.  It is a complex but
 	  elegant solution to test and validate the domain of the hardware and
@@ -271,7 +269,7 @@ config IDE_TASK_IOCTL
 
 config IDE_TASKFILE_IO
 	bool 'IDE Taskfile IO (EXPERIMENTAL)'
-	depends on BLK_DEV_IDE && EXPERIMENTAL
+	depends on EXPERIMENTAL
 	default n
 	---help---
 	  Use new taskfile IO code.
@@ -279,11 +277,10 @@ config IDE_TASKFILE_IO
 	  It is safe to say Y to this question, in most cases.
 
 comment "IDE chipset support/bugfixes"
-	depends on BLK_DEV_IDE
 
 config BLK_DEV_CMD640
 	bool "CMD640 chipset bugfix/support"
-	depends on BLK_DEV_IDE && X86
+	depends on X86
 	---help---
 	  The CMD-Technologies CMD640 IDE chip is used on many common 486 and
 	  Pentium motherboards, usually in combination with a "Neptune" or
@@ -317,7 +314,7 @@ config BLK_DEV_CMD640_ENHANCED
 
 config BLK_DEV_IDEPNP
 	bool "PNP EIDE support"
-	depends on BLK_DEV_IDE && PNP
+	depends on PNP
 	help
 	  If you have a PnP (Plug and Play) compatible EIDE card and
 	  would like the kernel to automatically detect and activate
@@ -325,7 +322,6 @@ config BLK_DEV_IDEPNP
 
 config BLK_DEV_IDEPCI
 	bool "PCI IDE chipset support" if PCI
-	depends on BLK_DEV_IDE
 	default BLK_DEV_IDEDMA_PMAC if PPC_PMAC && BLK_DEV_IDEDMA_PMAC
 	help
 	  Say Y here for PCI systems which use IDE drive(s).
@@ -806,7 +802,7 @@ config BLK_DEV_VIA82CXXX
 
 config BLK_DEV_IDE_PMAC
 	bool "Builtin PowerMac IDE support"
-	depends on BLK_DEV_IDE && PPC_PMAC
+	depends on PPC_PMAC
 	help
 	  This driver provides support for the built-in IDE controller on
 	  most of the recent Apple Power Macintoshes and PowerBooks.
@@ -834,11 +830,11 @@ config BLK_DEV_IDEDMA_PMAC_AUTO
 
 config BLK_DEV_IDE_SWARM
 	bool "SWARM onboard IDE support"
-	depends on BLK_DEV_IDE && SIBYTE_SWARM
+	depends on SIBYTE_SWARM
 
 config BLK_DEV_IDE_ICSIDE
 	tristate "ICS IDE interface support"
-	depends on BLK_DEV_IDE!=n && ARM && ARCH_ACORN
+	depends on ARM && ARCH_ACORN
 	help
 	  On Acorn systems, say Y here if you wish to use the ICS IDE
 	  interface card.  This is not required for ICS partition support.
@@ -866,14 +862,14 @@ config IDEDMA_ICS_AUTO
 
 config BLK_DEV_IDE_RAPIDE
 	tristate "RapIDE interface support"
-	depends on BLK_DEV_IDE!=n && ARM && ARCH_ACORN
+	depends on ARM && ARCH_ACORN
 	help
 	  Say Y here if you want to support the Yellowstone RapIDE controller
 	  manufactured for use with Acorn computers.
 
 config BLK_DEV_GAYLE
 	bool "Amiga Gayle IDE interface support"
-	depends on BLK_DEV_IDE && AMIGA
+	depends on AMIGA
 	help
 	  This is the IDE driver for the builtin IDE interface on some Amiga
 	  models. It supports both the `A1200 style' (used in A600 and A1200)
@@ -900,7 +896,7 @@ config BLK_DEV_IDEDOUBLER
 
 config BLK_DEV_BUDDHA
 	bool "Buddha/Catweasel/X-Surf IDE interface support (EXPERIMENTAL)"
-	depends on BLK_DEV_IDE && ZORRO && EXPERIMENTAL
+	depends on ZORRO && EXPERIMENTAL
 	help
 	  This is the IDE driver for the IDE interfaces on the Buddha, 
 	  Catweasel and X-Surf expansion boards.  It supports up to two interfaces 
@@ -912,7 +908,7 @@ config BLK_DEV_BUDDHA
 
 config BLK_DEV_FALCON_IDE
 	bool "Falcon IDE interface support"
-	depends on BLK_DEV_IDE && ATARI
+	depends on ATARI
 	help
 	  This is the IDE driver for the builtin IDE interface on the Atari
 	  Falcon. Say Y if you have a Falcon and want to use IDE devices (hard
@@ -921,7 +917,7 @@ config BLK_DEV_FALCON_IDE
 
 config BLK_DEV_MAC_IDE
 	bool "Macintosh Quadra/Powerbook IDE interface support"
-	depends on BLK_DEV_IDE && MAC
+	depends on MAC
 	help
 	  This is the IDE driver for the builtin IDE interface on some m68k
 	  Macintosh models. It supports both the `Quadra style' (used in
@@ -934,7 +930,7 @@ config BLK_DEV_MAC_IDE
 
 config BLK_DEV_Q40IDE
 	bool "Q40/Q60 IDE interface support"
-	depends on BLK_DEV_IDE && Q40
+	depends on Q40
 	help
 	  Enable the on-board IDE controller in the Q40/Q60.  This should
 	  normally be on; disable it only if you are running a custom hard
@@ -942,7 +938,7 @@ config BLK_DEV_Q40IDE
 
 config BLK_DEV_MPC8xx_IDE
 	bool "MPC8xx IDE support"
-	depends on BLK_DEV_IDE && 8xx
+	depends on 8xx
 	help
 	  This option provides support for IDE on Motorola MPC8xx Systems.
 	  Please see 'Type of MPC8xx IDE interface' for details.
@@ -982,7 +978,7 @@ endchoice
 # no isa -> no vlb
 config IDE_CHIPSETS
 	bool "Other IDE chipset support"
-	depends on BLK_DEV_IDE && ISA
+	depends on ISA
 	---help---
 	  Say Y here if you want to include enhanced support for various IDE
 	  interface chipsets used on motherboards and add-on cards. You can
@@ -997,7 +993,7 @@ config IDE_CHIPSETS
 	  People with SCSI-only systems can say N here.
 
 comment "Note: most of these also require special kernel boot parameters"
-	depends on BLK_DEV_IDE && IDE_CHIPSETS
+	depends on IDE_CHIPSETS
 
 config BLK_DEV_4DRIVES
 	bool "Generic 4 drives/port support"
@@ -1011,7 +1007,7 @@ config BLK_DEV_4DRIVES
 
 config BLK_DEV_ALI14XX
 	tristate "ALI M14xx support"
-	depends on IDE_CHIPSETS && BLK_DEV_IDE
+	depends on IDE_CHIPSETS
 	help
 	  This driver is enabled at runtime using the "ide0=ali14xx" kernel
 	  boot parameter.  It enables support for the secondary IDE interface
@@ -1022,7 +1018,7 @@ config BLK_DEV_ALI14XX
 
 config BLK_DEV_DTC2278
 	tristate "DTC-2278 support"
-	depends on IDE_CHIPSETS && BLK_DEV_IDE
+	depends on IDE_CHIPSETS
 	help
 	  This driver is enabled at runtime using the "ide0=dtc2278" kernel
 	  boot parameter. It enables support for the secondary IDE interface
@@ -1032,7 +1028,7 @@ config BLK_DEV_DTC2278
 
 config BLK_DEV_HT6560B
 	tristate "Holtek HT6560B support"
-	depends on IDE_CHIPSETS && BLK_DEV_IDE
+	depends on IDE_CHIPSETS
 	help
 	  This driver is enabled at runtime using the "ide0=ht6560b" kernel
 	  boot parameter. It enables support for the secondary IDE interface
@@ -1055,7 +1051,7 @@ config BLK_DEV_PDC4030
 
 config BLK_DEV_QD65XX
 	tristate "QDI QD65xx support"
-	depends on IDE_CHIPSETS && BLK_DEV_IDE
+	depends on IDE_CHIPSETS
 	help
 	  This driver is enabled at runtime using the "ide0=qd65xx" kernel
 	  boot parameter.  It permits faster I/O speeds to be set.  See the
@@ -1064,7 +1060,7 @@ config BLK_DEV_QD65XX
 
 config BLK_DEV_UMC8672
 	tristate "UMC-8672 support"
-	depends on IDE_CHIPSETS && BLK_DEV_IDE
+	depends on IDE_CHIPSETS
 	help
 	  This driver is enabled at runtime using the "ide0=umc8672" kernel
 	  boot parameter. It enables support for the secondary IDE interface
@@ -1074,7 +1070,6 @@ config BLK_DEV_UMC8672
 
 config BLK_DEV_IDEDMA
 	bool
-	depends on BLK_DEV_IDE
 	default BLK_DEV_IDEDMA_ICS if ARCH_ACORN
 	default BLK_DEV_IDEDMA_PMAC if PPC_PMAC && BLK_DEV_IDE_PMAC
 	default BLK_DEV_IDEDMA_PCI if PCI && BLK_DEV_IDEPCI
@@ -1104,6 +1099,8 @@ config DMA_NONPCI
 	bool
 	depends on BLK_DEV_TIVO
 	default y
+
+endif
 
 config BLK_DEV_HD_ONLY
 	bool "Old hard disk (MFM/RLL/IDE) driver"
