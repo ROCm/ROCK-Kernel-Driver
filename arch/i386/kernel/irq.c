@@ -153,7 +153,7 @@ int show_interrupts(struct seq_file *p, void *v)
 		for (j = 0; j < NR_CPUS; j++)
 			if (cpu_online(j))
 				p += seq_printf(p, "%10u ",
-					     kstat.irqs[j][i]);
+					     kstat_cpu(j).irqs[i]);
 #endif
 		seq_printf(p, " %14s", irq_desc[i].handler->typename);
 		seq_printf(p, "  %s", action->name);
@@ -345,7 +345,7 @@ asmlinkage unsigned int do_IRQ(struct pt_regs regs)
 		}
 	}
 #endif
-	kstat.irqs[cpu][irq]++;
+	kstat_cpu(cpu).irqs[irq]++;
 	spin_lock(&desc->lock);
 	desc->handler->ack(irq);
 	/*

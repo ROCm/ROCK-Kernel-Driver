@@ -289,6 +289,31 @@ config EXT3_FS
 	  of your root partition (the one containing the directory /) cannot
 	  be compiled as a module, and so this may be dangerous.
 
+config EXT3_FS_XATTR
+	bool "Ext3 extended attributes"
+	depends on EXT3_FS
+	default y
+	---help---
+	  Extended attributes are name:value pairs associated with inodes by
+	  the kernel or by users (see the attr(5) manual page, or visit
+	  <http://acl.bestbits.at/> for details).
+
+	  If unsure, say N.
+
+	  You need this for POSIX ACL support on ext3.
+
+config EXT3_FS_POSIX_ACL
+	bool "Ext3 POSIX Access Control Lists"
+	depends on EXT3_FS_XATTR
+	---help---
+	  Posix Access Control Lists (ACLs) support permissions for users and
+	  groups beyond the owner/group/world scheme.
+
+	  To learn more about Access Control Lists, visit the Posix ACLs for
+	  Linux website <http://acl.bestbits.at/>.
+
+	  If you don't know what Access Control Lists are, say N
+
 # CONFIG_JBD could be its own option (even modular), but until there are
 # other users than ext3, we will simply make it be the same as CONFIG_EXT3_FS
 # dep_tristate '  Journal Block Device support (JBD for ext3)' CONFIG_JBD $CONFIG_EXT3_FS
@@ -577,6 +602,10 @@ config RAMFS
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
 	  will be called ramfs.o.
+
+config HUGETLBFS
+	bool "HugeTLB file system support"
+	depends on HUGETLB_PAGE
 
 config ISO9660_FS
 	tristate "ISO 9660 CDROM file system support"
@@ -934,6 +963,28 @@ config EXT2_FS
 	  of your root partition (the one containing the directory /) cannot
 	  be compiled as a module, and so this could be dangerous.  Most
 	  everyone wants to say Y here.
+
+config EXT2_FS_XATTR
+	bool "Ext2 extended attributes"
+	depends on EXT2_FS
+	---help---
+	  Extended attributes are name:value pairs associated with inodes by
+	  the kernel or by users (see the attr(5) manual page, or visit
+	  <http://acl.bestbits.at/> for details).
+
+	  If unsure, say N.
+
+config EXT2_FS_POSIX_ACL
+	bool "Ext2 POSIX Access Control Lists"
+	depends on EXT2_FS_XATTR
+	---help---
+	  Posix Access Control Lists (ACLs) support permissions for users and
+	  groups beyond the owner/group/world scheme.
+
+	  To learn more about Access Control Lists, visit the Posix ACLs for
+	  Linux website <http://acl.bestbits.at/>.
+
+	  If you don't know what Access Control Lists are, say N
 
 config SYSV_FS
 	tristate "System V/Xenix/V7/Coherent file system support"
@@ -1406,6 +1457,18 @@ config ZISOFS_FS
 	depends on ZISOFS
 	default ISO9660_FS
 
+# Meta block cache for Extended Attributes (ext2/ext3)
+config FS_MBCACHE
+	tristate
+	depends on EXT2_FS_XATTR || EXT3_FS_XATTR
+	default m if EXT2_FS=m || EXT3_FS=m
+	default y if EXT2_FS=y || EXT3_FS=y
+
+# Posix ACL utility routines (for now, only ext2/ext3)
+config FS_POSIX_ACL
+	bool
+	depends on EXT2_FS_POSIX_ACL || EXT3_FS_POSIX_ACL
+	default y
 
 menu "Partition Types"
 

@@ -12,8 +12,10 @@
 #include <linux/rwsem.h>
 #include <asm/atomic.h>
 
+#define KOBJ_NAME_LEN	16
+
 struct kobject {
-	char			name[16];
+	char			name[KOBJ_NAME_LEN];
 	atomic_t		refcount;
 	struct list_head	entry;
 	struct kobject		* parent;

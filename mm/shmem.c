@@ -53,6 +53,7 @@
 
 /* Flag allocation requirements to shmem_getpage and shmem_swp_alloc */
 enum sgp_type {
+	SGP_QUICK,	/* don't try more than file page cache lookup */
 	SGP_READ,	/* don't exceed i_size, don't allocate page */
 	SGP_CACHE,	/* don't exceed i_size, may allocate page */
 	SGP_WRITE,	/* may exceed i_size, may allocate page */
@@ -757,6 +758,8 @@ repeat:
 	if (filepage && PageUptodate(filepage))
 		goto done;
 	error = 0;
+	if (sgp == SGP_QUICK)
+		goto failed;
 
 	spin_lock(&info->lock);
 	shmem_recalc_inode(inode);
@@ -947,6 +950,42 @@ struct page *shmem_nopage(struct vm_area_struct *vma, unsigned long address, int
 
 	flush_page_to_ram(page);
 	return page;
+}
+
+static int shmem_populate(struct vm_area_struct *vma,
+	unsigned long addr, unsigned long len,
+	unsigned long prot, unsigned long pgoff, int nonblock)
+{
+	struct inode *inode = vma->vm_file->f_dentry->d_inode;
+	struct mm_struct *mm = vma->vm_mm;
+	enum sgp_type sgp = nonblock? SGP_QUICK: SGP_CACHE;
+	unsigned long size;
+
+	size = (inode->i_size + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	if (pgoff >= size || pgoff + (len >> PAGE_SHIFT) > size)
+		return -EINVAL;
+	
+	while ((long) len > 0) {
+		struct page *page = NULL;
+		int err;
+		/*
+		 * Will need changing if PAGE_CACHE_SIZE != PAGE_SIZE
+		 */
+		err = shmem_getpage(inode, pgoff, &page, sgp);
+		if (err)
+			return err;
+		if (page) {
+			err = install_page(mm, vma, addr, page, prot);
+			if (err) {
+				page_cache_release(page);
+				return err;
+			}
+		}
+		len -= PAGE_SIZE;
+		addr += PAGE_SIZE;
+		pgoff++;
+	}
+	return 0;
 }
 
 void shmem_lock(struct file *file, int lock)
@@ -1821,6 +1860,7 @@ static struct super_operations shmem_ops = {
 
 static struct vm_operations_struct shmem_vm_ops = {
 	.nopage		= shmem_nopage,
+	.populate	= shmem_populate,
 };
 
 static struct super_block *shmem_get_sb(struct file_system_type *fs_type,

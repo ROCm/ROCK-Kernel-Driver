@@ -142,7 +142,7 @@ static struct inode *alloc_inode(struct super_block *sb)
 	return inode;
 }
 
-static void destroy_inode(struct inode *inode) 
+void destroy_inode(struct inode *inode) 
 {
 	if (inode_has_buffers(inode))
 		BUG();
@@ -363,57 +363,69 @@ int invalidate_device(kdev_t dev, int do_sync)
 	return res;
 }
 
+static int can_unuse(struct inode *inode)
+{
+	if (inode->i_state)
+		return 0;
+	if (inode_has_buffers(inode))
+		return 0;
+	if (atomic_read(&inode->i_count))
+		return 0;
+	return 1;
+}
 
 /*
- * This is called with the inode lock held. It searches
- * the in-use for freeable inodes, which are moved to a
- * temporary list and then placed on the unused list by
- * dispose_list. 
+ * Scan `goal' inodes on the unused list for freeable ones. They are moved to
+ * a temporary list and then are freed outside inode_lock by dispose_list().
  *
- * We don't expect to have to call this very often.
- *
- * N.B. The spinlock is released during the call to
- *      dispose_list.
+ * Any inodes which are pinned purely because of attached pagecache have their
+ * pagecache removed.  We expect the final iput() on that inode to add it to
+ * the front of the inode_unused list.  So look for it there and if the
+ * inode is still freeable, proceed.  The right inode is found 99.9% of the
+ * time in testing on a 4-way.
  */
-#define CAN_UNUSE(inode) \
-	((((inode)->i_state | (inode)->i_data.nrpages) == 0)  && \
-	 !inode_has_buffers(inode))
-#define INODE(entry)	(list_entry(entry, struct inode, i_list))
-
-static inline void prune_icache(int goal)
+static void prune_icache(int nr_to_scan)
 {
-	LIST_HEAD(list);
-	struct list_head *entry, *freeable = &list;
-	int count;
-	struct inode * inode;
+	LIST_HEAD(freeable);
+	int nr_pruned = 0;
+	int nr_scanned;
 
 	spin_lock(&inode_lock);
+	for (nr_scanned = 0; nr_scanned < nr_to_scan; nr_scanned++) {
+		struct inode *inode;
 
-	count = 0;
-	entry = inode_unused.prev;
-	for(; goal; goal--) {
-		struct list_head *tmp = entry;
-
-		if (entry == &inode_unused)
+		if (list_empty(&inode_unused))
 			break;
-		entry = entry->prev;
-		inode = INODE(tmp);
-		if (inode->i_state & (I_FREEING|I_CLEAR|I_LOCK))
-			continue;
-		if (!CAN_UNUSE(inode))
-			continue;
-		if (atomic_read(&inode->i_count))
-			continue;
-		list_del(tmp);
-		list_del_init(&inode->i_hash);
-		list_add(tmp, freeable);
-		inode->i_state |= I_FREEING;
-		count++;
-	}
-	inodes_stat.nr_unused -= count;
-	spin_unlock(&inode_lock);
 
-	dispose_list(freeable);
+		inode = list_entry(inode_unused.prev, struct inode, i_list);
+
+		if (!can_unuse(inode)) {
+			list_move(&inode->i_list, &inode_unused);
+			continue;
+		}
+		if (inode->i_data.nrpages) {
+			__iget(inode);
+			spin_unlock(&inode_lock);
+			invalidate_inode_pages(&inode->i_data);
+			iput(inode);
+			spin_lock(&inode_lock);
+
+			if (inode != list_entry(inode_unused.next,
+						struct inode, i_list))
+				continue;	/* wrong inode or list_empty */
+			if (!can_unuse(inode))
+				continue;
+			if (inode->i_data.nrpages)
+				continue;
+		}
+		list_del_init(&inode->i_hash);
+		list_move(&inode->i_list, &freeable);
+		inode->i_state |= I_FREEING;
+		nr_pruned++;
+	}
+	inodes_stat.nr_unused -= nr_pruned;
+	spin_unlock(&inode_lock);
+	dispose_list(&freeable);
 }
 
 /*

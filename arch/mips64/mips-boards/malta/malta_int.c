@@ -131,7 +131,7 @@ int show_interrupts(struct seq_file *p, void *v)
 		if (!action) 
 			continue;
 		seq_printf(p, "%2d: %8d %c %s",
-			num, kstat.irqs[0][num],
+			num, kstat_cpu(0).irqs[num],
 			(action->flags & SA_INTERRUPT) ? '+' : ' ',
 			action->name);
 		for (action=action->next; action; action = action->next) {
@@ -146,7 +146,7 @@ int show_interrupts(struct seq_file *p, void *v)
 		if (!action) 
 			continue;
 		seq_printf(p, "%2d: %8d %c %s",
-			num, kstat.irqs[0][num],
+			num, kstat_cpu(0).irqs[num],
 			(action->flags & SA_INTERRUPT) ? '+' : ' ',
 			action->name);
 		for (action=action->next; action; action = action->next) {
@@ -322,7 +322,7 @@ void malta_hw0_irqdispatch(struct pt_regs *regs)
 		return;
 
 	irq_enter(cpu, irq);
-	kstat.irqs[0][irq + 8]++;
+	kstat_cpu(0).irqs[irq + 8]++;
 	do {
 	        action->handler(irq, action->dev_id, regs);
 		action = action->next;

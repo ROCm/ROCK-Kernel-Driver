@@ -18,6 +18,7 @@
  */
 
 #include "ext2.h"
+#include "xattr.h"
 
 static int ext2_readlink(struct dentry *dentry, char *buffer, int buflen)
 {
@@ -31,7 +32,20 @@ static int ext2_follow_link(struct dentry *dentry, struct nameidata *nd)
 	return vfs_follow_link(nd, (char *)ei->i_data);
 }
 
+struct inode_operations ext2_symlink_inode_operations = {
+	.readlink	= page_readlink,
+	.follow_link	= page_follow_link,
+	.setxattr	= ext2_setxattr,
+	.getxattr	= ext2_getxattr,
+	.listxattr	= ext2_listxattr,
+	.removexattr	= ext2_removexattr,
+};
+ 
 struct inode_operations ext2_fast_symlink_inode_operations = {
 	.readlink	= ext2_readlink,
 	.follow_link	= ext2_follow_link,
+	.setxattr	= ext2_setxattr,
+	.getxattr	= ext2_getxattr,
+	.listxattr	= ext2_listxattr,
+	.removexattr	= ext2_removexattr,
 };

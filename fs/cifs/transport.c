@@ -59,9 +59,11 @@ AllocMidQEntry(struct smb_hdr *smb_buffer, struct cifsSesInfo *ses)
 		temp->tsk = current;
 	}
 	if (ses->status == CifsGood) {
+		write_lock(&GlobalMid_Lock);
 		list_add_tail(&temp->qhead, &ses->server->pending_mid_q);
 		atomic_inc(&midCount);
 		temp->midState = MID_REQUEST_ALLOCATED;
+		write_unlock(&GlobalMid_Lock);
 	} else {		/* BB add reconnect code here BB */
 
 		cERROR(1,
@@ -77,11 +79,13 @@ void
 DeleteMidQEntry(struct mid_q_entry *midEntry)
 {
 	/* BB add spinlock to protect midq for each session BB */
+	write_lock(&GlobalMid_Lock);
 	midEntry->midState = MID_FREE;
-	buf_release(midEntry->resp_buf);
 	list_del(&midEntry->qhead);
-	kmem_cache_free(cifs_mid_cachep, midEntry);
 	atomic_dec(&midCount);
+	write_unlock(&GlobalMid_Lock);
+	buf_release(midEntry->resp_buf);
+	kmem_cache_free(cifs_mid_cachep, midEntry);
 }
 
 int
@@ -93,8 +97,8 @@ smb_send(struct socket *ssocket, struct smb_hdr *smb_buffer,
 	struct iovec iov;
 	mm_segment_t temp_fs;
 
-    if(ssocket == NULL)
-        return -ENOTSOCK; /* BB eventually add reconnect code here */
+	if(ssocket == NULL)
+		return -ENOTSOCK; /* BB eventually add reconnect code here */
 /*  ssocket->sk->allocation = GFP_BUFFER; *//* BB is this spurious? */
 	iov.iov_base = smb_buffer;
 	iov.iov_len = smb_buf_length + 4;
@@ -159,8 +163,6 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 	rc = smb_send(ses->server->ssocket, in_buf, in_buf->smb_buf_length,
 		      (struct sockaddr *) &(ses->server->sockAddr));
 
-	cFYI(1, ("\ncifs smb_send rc %d", rc));	/* BB remove */
-	/* BB add code to wait for response and copy to out_buf */
 	if (long_op > 1)	/* writes past end of file can take a looooooong time */
 		timeout = 300 * HZ;
 	else if (long_op == 1)
@@ -174,10 +176,9 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 	/* Replace above line with wait_event to get rid of sleep_on per lk guidelines */
 
 	timeout = wait_event_interruptible_timeout(ses->server->response_q,
-						   midQ->
-						   midState &
-						   MID_RESPONSE_RECEIVED,
-						   15 * HZ);
+				midQ->
+				midState & MID_RESPONSE_RECEIVED,
+				timeout);
 	cFYI(1,
 	     (" with timeout %ld and Out_buf: %p  midQ->resp_buf: %p ", timeout,
 	      out_buf, midQ->resp_buf));
@@ -240,6 +241,8 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 			rc = -EIO;
 	}
 
-	DeleteMidQEntry(midQ);	/* BB what if process is killed ? - BB add background daemon to clean up Mid entries from killed processes BB test killing process with active mid */
+	DeleteMidQEntry(midQ);	/* BB what if process is killed?
+			 - BB add background daemon to clean up Mid entries from
+			 killed processes & test killing process with active mid */
 	return rc;
 }

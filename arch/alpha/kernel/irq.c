@@ -528,7 +528,7 @@ show_interrupts(struct seq_file *p, void *v)
 #else
 		for (j = 0; j < NR_CPUS; j++)
 			if (cpu_online(j))
-				seq_printf(p, "%10u ", kstat.irqs[j][i]);
+				seq_printf(p, "%10u ", kstat_cpu(i).irqs[j]);
 #endif
 		seq_printf(p, " %14s", irq_desc[i].handler->typename);
 		seq_printf(p, "  %c%s",
@@ -590,7 +590,7 @@ handle_irq(int irq, struct pt_regs * regs)
 	}
 
 	irq_enter();
-	kstat.irqs[cpu][irq]++;
+	kstat_cpu(i).irqs[irq]++;
 	spin_lock_irq(&desc->lock); /* mask also the higher prio events */
 	desc->handler->ack(irq);
 	/*

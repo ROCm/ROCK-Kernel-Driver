@@ -12,9 +12,14 @@ config VIDEO_DEV
 	  this are available from
 	  <ftp://ftp.uk.linux.org/pub/linux/video4linux/>.
 
-	  If you are interested in writing a driver for such an audio/video
-	  device or user software interacting with such a driver, please read
-	  the file <file:Documentation/video4linux/API.html>.
+	  This kernel includes support for the new Video for Linux Two API,
+	  (V4L2) as well as the original system. Drivers and applications
+	  need to be rewritten to use V4L2, but drivers for popular cards
+	  and applications for most video capture functions already exist.
+
+	  Documentation for the original API is included in the file
+	  Documentation/video4linux/API.html.  Documentation for V4L2 is
+	  available on the web at http://bytesex.org/v4l/
 
 	  This driver is also available as a module called videodev.o ( = code
 	  which can be inserted in and removed from the running kernel

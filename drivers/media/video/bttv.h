@@ -90,10 +90,26 @@
 #define BTTV_SENSORAY311    0x49
 #define BTTV_RV605          0x4a
 #define BTTV_WINDVR         0x4c
+#define BTTV_HAUPPAUGEPVR   0x50
+#define BTTV_GVBCTV5PCI     0x51
+#define BTTV_OSPREY1x0      0x52
+#define BTTV_OSPREY1x0_848  0x53
+#define BTTV_OSPREY101_848  0x54
+#define BTTV_OSPREY1x1      0x55
+#define BTTV_OSPREY1x1_SVID 0x56
+#define BTTV_OSPREY2xx      0x57
+#define BTTV_OSPREY2x0_SVID 0x58
+#define BTTV_OSPREY2x0      0x59
+#define BTTV_OSPREY500      0x5a
+#define BTTV_OSPREY540      0x5b
+#define BTTV_OSPREY2000     0x5c
+#define BTTV_IDS_EAGLE      0x5d
 
 /* i2c address list */
 #define I2C_TSA5522        0xc2
 #define I2C_TDA7432        0x8a
+#define I2C_BT832_ALT1	   0x88
+#define I2C_BT832_ALT2	   0x8a // alternate setting
 #define I2C_TDA8425        0x82
 #define I2C_TDA9840        0x84
 #define I2C_TDA9850        0xb6 /* also used by 9855,9873 */
@@ -105,6 +121,7 @@
 #define I2C_MSP3400        0x80
 #define I2C_TEA6300        0x80
 #define I2C_DPL3518	   0x84
+#define I2C_TDA9887	   0x86
 
 /* more card-specific defines */
 #define PT2254_L_CHANNEL 0x10
@@ -132,6 +149,7 @@ struct tvcard
 	/* i2c audio flags */
 	int no_msp34xx:1;
 	int no_tda9875:1;
+	int no_tda7432:1;
 	int needs_tvaudio:1;
 
 	/* other settings */
@@ -174,6 +192,7 @@ extern int bttv_handle_chipset(struct bttv *btv);
    returns negative value if error occurred 
 */
 extern int bttv_get_cardinfo(unsigned int card, int *type, int *cardid);
+extern struct pci_dev* bttv_get_pcidev(unsigned int card);
 
 /* obsolete, use bttv_get_cardinfo instead */
 extern int bttv_get_id(unsigned int card);
@@ -207,6 +226,11 @@ extern int bttv_write_gpio(unsigned int card,
    process data ASAP
 */
 extern wait_queue_head_t* bttv_get_gpio_queue(unsigned int card);
+
+/* call i2c clients
+*/
+extern void bttv_i2c_call(unsigned int card, unsigned int cmd, void *arg);
+
 
 /* i2c */
 #define I2C_CLIENTS_MAX 16

@@ -9,18 +9,16 @@
 #ifndef _SYSFS_H_
 #define _SYSFS_H_
 
-struct driver_dir_entry;
-struct attribute;
 struct kobject;
-
-struct sysfs_ops {
-	ssize_t	(*show)(struct kobject *, struct attribute *,char *, size_t, loff_t);
-	ssize_t	(*store)(struct kobject *,struct attribute *,const char *, size_t, loff_t);
-};
 
 struct attribute {
 	char			* name;
 	mode_t			mode;
+};
+
+struct sysfs_ops {
+	ssize_t	(*show)(struct kobject *, struct attribute *,char *, size_t, loff_t);
+	ssize_t	(*store)(struct kobject *,struct attribute *,const char *, size_t, loff_t);
 };
 
 extern int

@@ -357,7 +357,7 @@ int show_interrupts(struct seq_file *p, void *v)
 #ifdef CONFIG_SMP
 		for (j = 0; j < NR_CPUS; j++) {
 			if (cpu_online(j))
-				seq_printf(p, "%10u ", kstat.irqs[j][i]);
+				seq_printf(p, "%10u ", kstat_cpu(j).irqs[i]);
 		}
 #else		
 		seq_printf(p, "%10u ", kstat_irqs(i));
@@ -484,7 +484,7 @@ void ppc_irq_dispatch_handler(struct pt_regs *regs, int irq)
 	if (naca->interrupt_controller == IC_OPEN_PIC)
 		balance_irq(irq);
 
-	kstat.irqs[cpu][irq]++;
+	kstat_cpu(cpu).irqs[irq]++;
 	spin_lock(&desc->lock);
 	ack_irq(irq);	
 	/*

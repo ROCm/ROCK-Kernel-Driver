@@ -243,7 +243,7 @@ int show_interrupts(struct seq_file *p, void *v)
 		if (!action) 
 			continue;
 		seq_printf(p, "%2d: %8d %c %s",
-			num, kstat.irqs[0][num],
+			num, kstat_cpu(0).irqs[num],
 			(action->flags & SA_INTERRUPT) ? '+' : ' ',
 			action->name);
 		for (action=action->next; action; action = action->next) {
@@ -258,7 +258,7 @@ int show_interrupts(struct seq_file *p, void *v)
 		if (!action) 
 			continue;
 		seq_printf(p, "%2d: %8d %c %s",
-			num, kstat.irqs[0][num],
+			num, kstat_cpu(0).irqs[num],
 			(action->flags & SA_INTERRUPT) ? '+' : ' ',
 			action->name);
 		for (action=action->next; action; action = action->next) {
@@ -285,7 +285,7 @@ asmlinkage void do_IRQ(int irq, struct pt_regs * regs)
 
 	cpu = smp_processor_id();
 	irq_enter(cpu, irq);
-	kstat.irqs[0][irq]++;
+	kstat_cpu(0).irqs[irq]++;
 
 	panic(KERN_DEBUG "Got irq %d, press a key.", irq);
 
@@ -444,7 +444,7 @@ void indy_local0_irqdispatch(struct pt_regs *regs)
 	}
 
 	irq_enter(cpu, irq);
-	kstat.irqs[0][irq + 16]++;
+	kstat_cpu(0).irqs[irq + 16]++;
 	action->handler(irq, action->dev_id, regs);
 	irq_exit(cpu, irq);
 }
@@ -468,7 +468,7 @@ void indy_local1_irqdispatch(struct pt_regs *regs)
 		action = local_irq_action[irq];
 	}
 	irq_enter(cpu, irq);
-	kstat.irqs[0][irq + 24]++;
+	kstat_cpu(0).irqs[irq + 24]++;
 	action->handler(irq, action->dev_id, regs);
 	irq_exit(cpu, irq);
 }
@@ -479,7 +479,7 @@ void indy_buserror_irq(struct pt_regs *regs)
 	int irq = 6;
 
 	irq_enter(cpu, irq);
-	kstat.irqs[0][irq]++;
+	kstat_cpu(0).irqs[irq]++;
 	printk("Got a bus error IRQ, shouldn't happen yet\n");
 	show_regs(regs);
 	printk("Spinning...\n");

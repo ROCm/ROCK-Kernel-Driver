@@ -9,6 +9,7 @@
 #include <linux/errno.h>
 #include <linux/fs.h>
 #include <linux/mm.h>
+#include <linux/hugetlb.h>
 #include <linux/mman.h>
 #include <linux/sched.h>
 #include <linux/file.h>		/* doh, must come after sched.h... */

@@ -409,7 +409,6 @@ struct timespec xtime __attribute__ ((aligned (16)));
 /* Don't completely fail for HZ > 500.  */
 int tickadj = 500/HZ ? : 1;		/* microsecs */
 
-struct kernel_stat kstat;
 
 /*
  * phase-lock loop variables

@@ -12,6 +12,29 @@
 
 #define to_dev(node) container_of(node,struct device,driver_list)
 
+/*
+ * helpers for creating driver attributes in sysfs
+ */
+
+int driver_create_file(struct device_driver * drv, struct driver_attribute * attr)
+{
+	int error;
+	if (get_driver(drv)) {
+		error = sysfs_create_file(&drv->kobj,&attr->attr);
+		put_driver(drv);
+	} else
+		error = -EINVAL;
+	return error;
+}
+
+void driver_remove_file(struct device_driver * drv, struct driver_attribute * attr)
+{
+	if (get_driver(drv)) {
+		sysfs_remove_file(&drv->kobj,&attr->attr);
+		put_driver(drv);
+	}
+}
+
 int driver_for_each_dev(struct device_driver * drv, void * data, 
 			int (*callback)(struct device *, void * ))
 {
@@ -65,7 +88,6 @@ void put_driver(struct device_driver * drv)
 		return;
 	spin_unlock(&device_lock);
 	BUG_ON(drv->present);
-	bus_remove_driver(drv);
 	if (drv->release)
 		drv->release(drv);
 	put_bus(bus);
@@ -83,6 +105,11 @@ int driver_register(struct device_driver * drv)
 		return -EINVAL;
 
 	pr_debug("driver %s:%s: registering\n",drv->bus->name,drv->name);
+
+	kobject_init(&drv->kobj);
+	strncpy(drv->kobj.name,drv->name,KOBJ_NAME_LEN);
+	drv->kobj.subsys = &drv->bus->drvsubsys;
+	kobject_register(&drv->kobj);
 
 	get_bus(drv->bus);
 	atomic_set(&drv->refcount,2);
@@ -108,3 +135,6 @@ EXPORT_SYMBOL(driver_register);
 EXPORT_SYMBOL(driver_unregister);
 EXPORT_SYMBOL(get_driver);
 EXPORT_SYMBOL(put_driver);
+
+EXPORT_SYMBOL(driver_create_file);
+EXPORT_SYMBOL(driver_remove_file);

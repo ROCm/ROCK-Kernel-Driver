@@ -20,14 +20,9 @@
  */
 
 /* NT error codes - see nterr.h */
-#include "nterr.h"
 #include <linux/types.h>
 #include <linux/fs.h>
-
-struct nt_err_code_struct {
-	char *nt_errstr;
-	__u32 nt_errcode;
-};
+#include "nterr.h"
 
 const struct nt_err_code_struct nt_errs[] = {
 	{"NT_STATUS_OK", NT_STATUS_OK},
@@ -690,23 +685,3 @@ const struct nt_err_code_struct nt_errs[] = {
 	{"STATUS_SOME_UNMAPPED", STATUS_SOME_UNMAPPED},
 	{NULL, 0}
 };
-
-/*****************************************************************************
- Print an error message from the status code
- *****************************************************************************/
-/* void
-cifs_print_status(__u32 status_code)
-{
-	int idx = 0;
-
-	printk("\nStatus code returned: 0x%08x", status_code);
-
-	while (nt_errs[idx].nt_errstr != NULL) {
-		if (((nt_errs[idx].nt_errcode) & 0xFFFFFF) ==
-		    (status_code & 0xFFFFFF)) {
-			printk(nt_errs[idx].nt_errstr);
-		}
-		idx++;
-	}
-	return;
-} */

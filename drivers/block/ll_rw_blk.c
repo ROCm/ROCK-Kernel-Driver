@@ -27,6 +27,10 @@
 #include <linux/completion.h>
 #include <linux/slab.h>
 
+/*
+ * Disk stats 
+ */
+struct disk_stat dkstat;
 
 /*
  * For the allocated request tables
@@ -1432,13 +1436,13 @@ void drive_stat_acct(struct request *rq, int nr_sectors, int new_io)
 	if ((index >= DK_MAX_DISK) || (major >= DK_MAX_MAJOR))
 		return;
 
-	kstat.dk_drive[major][index] += new_io;
+	dkstat.drive[major][index] += new_io;
 	if (rw == READ) {
-		kstat.dk_drive_rio[major][index] += new_io;
-		kstat.dk_drive_rblk[major][index] += nr_sectors;
+		dkstat.drive_rio[major][index] += new_io;
+		dkstat.drive_rblk[major][index] += nr_sectors;
 	} else if (rw == WRITE) {
-		kstat.dk_drive_wio[major][index] += new_io;
-		kstat.dk_drive_wblk[major][index] += nr_sectors;
+		dkstat.drive_wio[major][index] += new_io;
+		dkstat.drive_wblk[major][index] += nr_sectors;
 	} else
 		printk(KERN_ERR "drive_stat_acct: cmd not R/W?\n");
 }

@@ -23,7 +23,7 @@
 rwlock_t vmlist_lock = RW_LOCK_UNLOCKED;
 struct vm_struct *vmlist;
 
-static inline void unmap_area_pte(pmd_t *pmd, unsigned long address,
+static void unmap_area_pte(pmd_t *pmd, unsigned long address,
 				  unsigned long size)
 {
 	unsigned long end;
@@ -56,7 +56,7 @@ static inline void unmap_area_pte(pmd_t *pmd, unsigned long address,
 	} while (address < end);
 }
 
-static inline void unmap_area_pmd(pgd_t *dir, unsigned long address,
+static void unmap_area_pmd(pgd_t *dir, unsigned long address,
 				  unsigned long size)
 {
 	unsigned long end;
@@ -83,7 +83,7 @@ static inline void unmap_area_pmd(pgd_t *dir, unsigned long address,
 	} while (address < end);
 }
 
-static inline int map_area_pte(pte_t *pte, unsigned long address,
+static int map_area_pte(pte_t *pte, unsigned long address,
 			       unsigned long size, pgprot_t prot,
 			       struct page ***pages)
 {
@@ -110,7 +110,7 @@ static inline int map_area_pte(pte_t *pte, unsigned long address,
 	return 0;
 }
 
-static inline int map_area_pmd(pmd_t *pmd, unsigned long address,
+static int map_area_pmd(pmd_t *pmd, unsigned long address,
 			       unsigned long size, pgprot_t prot,
 			       struct page ***pages)
 {

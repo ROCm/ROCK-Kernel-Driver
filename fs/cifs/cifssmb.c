@@ -487,7 +487,7 @@ CIFSSMBRead(const int xid, const struct cifsTconInfo *tcon,
 					 (tcon->ses->maxBuf -
 					  MAX_CIFS_HDR_SIZE) & 0xFFFFFF00));
 	pSMB->MaxCountHigh = 0;
-	pSMB->ByteCount = 0;	/* no need to do le conversion since it is 0 */
+	pSMB->ByteCount = 0;  /* no need to do le conversion since it is 0 */
 
 	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
 			 (struct smb_hdr *) pSMBr, &bytes_returned, 0);
@@ -497,15 +497,20 @@ CIFSSMBRead(const int xid, const struct cifsTconInfo *tcon,
 	} else {
 		pSMBr->DataLength = le16_to_cpu(pSMBr->DataLength);
 		*nbytes = pSMBr->DataLength;
-		/* BB check that DataLength would not go beyond end of SMB BB */
-		if (pSMBr->DataLength > CIFS_MAX_MSGSIZE + MAX_CIFS_HDR_SIZE) {
+		/*check that DataLength would not go beyond end of SMB */
+		if ((pSMBr->DataLength > CIFS_MAX_MSGSIZE) 
+				|| (pSMBr->DataLength > count)) {
 			rc = -EIO;
 			*nbytes = 0;
 		} else {
 			pReadData =
 			    (char *) (&pSMBr->hdr.Protocol) +
 			    le16_to_cpu(pSMBr->DataOffset);
-			copy_to_user(buf, pReadData, pSMBr->DataLength);
+/*			if(rc = copy_to_user(buf, pReadData, pSMBr->DataLength)) {
+				cERROR(1,("\nFaulting on read rc = %d",rc));
+				rc = -EFAULT;
+			}*/ /* can not use copy_to_user when using page cache*/
+			memcpy(buf,pReadData,pSMBr->DataLength);
 		}
 	}
 
@@ -544,7 +549,8 @@ CIFSSMBWrite(const int xid, const struct cifsTconInfo *tcon,
 	pSMB->DataLengthHigh = 0;
 	pSMB->DataOffset =
 	    cpu_to_le16(offsetof(struct smb_com_write_req,Data) - 4);
-	copy_from_user(pSMB->Data, buf, pSMB->DataLengthLow);
+
+	memcpy(pSMB->Data,buf,pSMB->DataLengthLow);
 
 	pSMB->ByteCount += pSMB->DataLengthLow + 1 /* pad */ ;
 	pSMB->DataLengthLow = cpu_to_le16(pSMB->DataLengthLow);

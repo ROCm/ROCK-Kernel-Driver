@@ -232,7 +232,7 @@ int show_interrupts(struct seq_file *p, void *v)
 #else
 		for (j = 0; j < smp_num_cpus; j++)
 		    seq_printf(p, "%10u ",
-			    kstat.irqs[cpu_logical_map(j)][irq_no]);
+			    kstat_cpu(cpu_logical_map(j)).irqs[irq_no]);
 #endif
 		seq_printf(p, " %14s",
 			    region->data.name ? region->data.name : "N/A");

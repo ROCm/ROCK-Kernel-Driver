@@ -350,7 +350,7 @@ void amiga_disable_irq(unsigned int irq)
 
 inline void amiga_do_irq(int irq, struct pt_regs *fp)
 {
-	kstat.irqs[0][SYS_IRQS + irq]++;
+	kstat_cpu(0).irqs[SYS_IRQS + irq]++;
 	ami_irq_list[irq]->handler(irq, ami_irq_list[irq]->dev_id, fp);
 }
 
@@ -358,7 +358,7 @@ void amiga_do_irq_list(int irq, struct pt_regs *fp)
 {
 	irq_node_t *node;
 
-	kstat.irqs[0][SYS_IRQS + irq]++;
+	kstat_cpu(0).irqs[SYS_IRQS + irq]++;
 
 	custom.intreq = amiga_intena_vals[irq];
 
@@ -479,7 +479,7 @@ int show_amiga_interrupts(struct seq_file *p, void *v)
 		if (!(node = ami_irq_list[i]))
 			continue;
 		seq_printf(p, "ami  %2d: %10u ", i,
-		               kstat.irqs[0][SYS_IRQS + i]);
+		               kstat_cpu(0).irqs[SYS_IRQS + i]);
 		do {
 			if (node->flags & SA_INTERRUPT)
 				seq_puts(p, "F ");

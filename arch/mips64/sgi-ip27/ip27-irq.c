@@ -146,7 +146,7 @@ int show_interrupts(struct seq_file *p, void *v)
 		action = irq_action[i];
 		if (!action) 
 			continue;
-		seq_printf(p, "%2d: %8d %c %s", i, kstat.irqs[0][i],
+		seq_printf(p, "%2d: %8d %c %s", i, kstat_cpu(0).irqs[i],
 		               (action->flags & SA_INTERRUPT) ? '+' : ' ',
 		               action->name);
 		for (action=action->next; action; action = action->next) {
@@ -170,7 +170,7 @@ static void do_IRQ(cpuid_t thiscpu, int irq, struct pt_regs * regs)
 	int do_random;
 
 	irq_enter(thiscpu, irq);
-	kstat.irqs[thiscpu][irq]++;
+	kstat_cpu(thiscpu).irqs[irq]++;
 
 	action = *(irq + irq_action);
 	if (action) {

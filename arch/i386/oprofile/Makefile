@@ -1,5 +1,3 @@
-vpath %.c = . $(TOPDIR)/drivers/oprofile
-
 obj-$(CONFIG_OPROFILE) += oprofile.o
  
 DRIVER_OBJS = $(addprefix ../../../drivers/oprofile/, \
@@ -9,8 +7,6 @@ DRIVER_OBJS = $(addprefix ../../../drivers/oprofile/, \
  
 oprofile-objs := $(DRIVER_OBJS) init.o timer_int.o
 
-ifdef CONFIG_X86_LOCAL_APIC
-oprofile-objs += nmi_int.o op_model_athlon.o op_model_ppro.o
-endif
+oprofile-$(CONFIG_X86_LOCAL_APIC) += nmi_int.o op_model_athlon.o op_model_ppro.o
  
 include $(TOPDIR)/Rules.make

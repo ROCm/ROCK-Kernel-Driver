@@ -44,7 +44,7 @@
 #include <linux/ctype.h>
 #include <linux/slab.h>
 #include <linux/limits.h>
-#include <linux/driverfs_fs.h>
+#include <linux/device.h>
 #include <linux/pci.h>
 #include <asm/edd.h>
 #include <linux/device.h>
@@ -63,20 +63,9 @@ MODULE_LICENSE("GPL");
 
 #define left (count - (p - buf) - 1)
 
-/*
- * bios_dir may go away completely,
- * and it definitely won't be at the root
- * of driverfs forever.
- */
-static struct driver_dir_entry bios_dir = {
-	.name = "bios",
-	.mode = (S_IFDIR | S_IRWXU | S_IRUGO | S_IXUGO),
-};
-
 struct edd_device {
-	char name[EDD_DEVICE_NAME_SIZE];
 	struct edd_info *info;
-	struct driver_dir_entry dir;
+	struct kobject kobj;
 };
 
 struct edd_attribute {
@@ -112,13 +101,13 @@ edd_dev_set_info(struct edd_device *edev, struct edd_info *info)
 }
 
 #define to_edd_attr(_attr) container_of(_attr,struct edd_attribute,attr)
-#define to_edd_device(_dir) container_of(_dir,struct edd_device,dir)
+#define to_edd_device(obj) container_of(obj,struct edd_device,kobj)
 
 static ssize_t
-edd_attr_show(struct driver_dir_entry *dir, struct attribute *attr,
+edd_attr_show(struct kobject * kobj, struct attribute *attr,
 	      char *buf, size_t count, loff_t off)
 {
-	struct edd_device *dev = to_edd_device(dir);
+	struct edd_device *dev = to_edd_device(kobj);
 	struct edd_attribute *edd_attr = to_edd_attr(attr);
 	ssize_t ret = 0;
 
@@ -127,7 +116,7 @@ edd_attr_show(struct driver_dir_entry *dir, struct attribute *attr,
 	return ret;
 }
 
-static struct driverfs_ops edd_attr_ops = {
+static struct sysfs_ops edd_attr_ops = {
 	.show = edd_attr_show,
 };
 
@@ -586,89 +575,26 @@ static EDD_DEVICE_ATTR(interface, 0444, edd_show_interface, edd_has_edd30);
 static EDD_DEVICE_ATTR(host_bus, 0444, edd_show_host_bus, edd_has_edd30);
 
 
-static struct edd_attribute * def_attrs[] = {
-	&edd_attr_raw_data,
-	&edd_attr_version,
-	&edd_attr_extensions,
-	&edd_attr_info_flags,
-	&edd_attr_sectors,
-	&edd_attr_default_cylinders,
-	&edd_attr_default_heads,
-	&edd_attr_default_sectors_per_track,
-	&edd_attr_interface,
-	&edd_attr_host_bus,
+static struct attribute * def_attrs[] = {
+	&edd_attr_raw_data.attr,
+	&edd_attr_version.attr,
+	&edd_attr_extensions.attr,
+	&edd_attr_info_flags.attr,
+	&edd_attr_sectors.attr,
+	&edd_attr_default_cylinders.attr,
+	&edd_attr_default_heads.attr,
+	&edd_attr_default_sectors_per_track.attr,
+	&edd_attr_interface.attr,
+	&edd_attr_host_bus.attr,
 	NULL,
 };
 
-/* edd_get_devpath_length(), edd_fill_devpath(), and edd_device_link()
-   were taken from linux/drivers/base/fs/device.c.  When these
-   or similar are exported to generic code, remove these.
-*/
+static struct subsystem edd_subsys = {
+	.kobj	= { .name = "edd" },
+	.sysfs_ops	= &edd_attr_ops,
+	.default_attrs	= def_attrs,
+};
 
-static int
-edd_get_devpath_length(struct device *dev)
-{
-	int length = 1;
-	struct device *parent = dev;
-
-	/* walk up the ancestors until we hit the root.
-	 * Add 1 to strlen for leading '/' of each level.
-	 */
-	do {
-		length += strlen(parent->bus_id) + 1;
-		parent = parent->parent;
-	} while (parent);
-	return length;
-}
-
-static void
-edd_fill_devpath(struct device *dev, char *path, int length)
-{
-	struct device *parent;
-	--length;
-	for (parent = dev; parent; parent = parent->parent) {
-		int cur = strlen(parent->bus_id);
-
-		/* back up enough to print this bus id with '/' */
-		length -= cur;
-		strncpy(path + length, parent->bus_id, cur);
-		*(path + --length) = '/';
-	}
-}
-
-static int
-edd_device_symlink(struct edd_device *edev, struct device *dev, char *name)
-{
-	char *path;
-	int length;
-	int error = 0;
-
-	if (!dev->bus || !name)
-		return 0;
-
-	length = edd_get_devpath_length(dev);
-
-	/* now add the path from the edd_device directory
-	 * It should be '../..' (one to get to the 'bios' directory,
-	 * and one to get to the root of the fs.)
-	 */
-	length += strlen("../../root");
-
-	if (length > PATH_MAX)
-		return -ENAMETOOLONG;
-
-	if (!(path = kmalloc(length, GFP_KERNEL)))
-		return -ENOMEM;
-	memset(path, 0, length);
-
-	/* our relative position */
-	strcpy(path, "../../root");
-
-	edd_fill_devpath(dev, path, length);
-	error = driverfs_create_symlink(&edev->dir, name, path);
-	kfree(path);
-	return error;
-}
 
 /**
  * edd_dev_is_type() - is this EDD device a 'type' device?
@@ -721,7 +647,7 @@ edd_create_symlink_to_pcidev(struct edd_device *edev)
 	struct pci_dev *pci_dev = edd_get_pci_dev(edev);
 	if (!pci_dev)
 		return 1;
-	return edd_device_symlink(edev, &pci_dev->dev, "pci_dev");
+	return sysfs_create_link(&edev->kobj,&pci_dev->dev.kobj,"pci_dev");
 }
 
 /**
@@ -833,61 +759,16 @@ edd_create_symlink_to_scsidev(struct edd_device *edev)
 		return 1;
 
 	get_device(&sdev->sdev_driverfs_dev);
-	rc = edd_device_symlink(edev, &sdev->sdev_driverfs_dev, "disc");
+	rc = sysfs_create_link(&edev->kobj,&sdev->sdev_driverfs_dev.kobj, "disc");
 	put_device(&sdev->sdev_driverfs_dev);
 
 	return rc;
 }
 
-static inline int
-edd_create_file(struct edd_device *edev, struct edd_attribute *attr)
-{
-	return driverfs_create_file(&attr->attr, &edev->dir);
-}
-
 static inline void
 edd_device_unregister(struct edd_device *edev)
 {
-	driverfs_remove_dir(&edev->dir);
-}
-
-static int
-edd_populate_dir(struct edd_device *edev)
-{
-	struct edd_attribute *attr;
-	int i;
-	int error = 0;
-
-	for (i = 0; (attr=def_attrs[i]); i++) {
-		if (!attr->test || (attr->test && !attr->test(edev))) {
-			if ((error = edd_create_file(edev, attr))) {
-				break;
-			}
-		}
-	}
-
-	if (error)
-		return error;
-
-	edd_create_symlink_to_pcidev(edev);
-	edd_create_symlink_to_scsidev(edev);
-
-	return 0;
-}
-
-static int
-edd_make_dir(struct edd_device *edev)
-{
-	int error;
-
-	edev->dir.name = edev->name;
-	edev->dir.mode = (S_IFDIR | S_IRWXU | S_IRUGO | S_IXUGO);
-	edev->dir.ops = &edd_attr_ops;
-
-	error = driverfs_create_dir(&edev->dir, &bios_dir);
-	if (!error)
-		error = edd_populate_dir(edev);
-	return error;
+	kobject_unregister(&edev->kobj);
 }
 
 static int
@@ -899,9 +780,15 @@ edd_device_register(struct edd_device *edev, int i)
 		return 1;
 	memset(edev, 0, sizeof (*edev));
 	edd_dev_set_info(edev, &edd[i]);
-	snprintf(edev->name, EDD_DEVICE_NAME_SIZE, "int13_dev%02x",
+	kobject_init(&edev->kobj);
+	snprintf(edev->kobj.name, EDD_DEVICE_NAME_SIZE, "int13_dev%02x",
 		 edd[i].device);
-	error = edd_make_dir(edev);
+	edev->kobj.subsys = &edd_subsys;
+	error = kobject_register(&edev->kobj);
+	if (!error) {
+		edd_create_symlink_to_pcidev(edev);
+		edd_create_symlink_to_scsidev(edev);
+	}
 	return error;
 }
 
@@ -926,7 +813,7 @@ edd_init(void)
 		return 1;
 	}
 
-	rc = driverfs_create_dir(&bios_dir, NULL);
+	rc = firmware_register(&edd_subsys);
 	if (rc)
 		return rc;
 
@@ -943,12 +830,9 @@ edd_init(void)
 		edd_devices[i] = edev;
 	}
 
-	if (rc) {
-		driverfs_remove_dir(&bios_dir);
-		return rc;
-	}
-
-	return 0;
+	if (rc)
+		firmware_unregister(&edd_subsys);
+	return rc;
 }
 
 static void __exit
@@ -963,8 +847,7 @@ edd_exit(void)
 			kfree(edev);
 		}
 	}
-
-	driverfs_remove_dir(&bios_dir);
+	firmware_unregister(&edd_subsys);
 }
 
 late_initcall(edd_init);

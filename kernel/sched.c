@@ -839,6 +839,8 @@ static inline void idle_tick(runqueue_t *rq)
 
 #endif
 
+DEFINE_PER_CPU(struct kernel_stat, kstat);
+
 /*
  * We place interactive tasks back into the active array, if possible.
  *
@@ -872,21 +874,21 @@ void scheduler_tick(int user_ticks, int sys_ticks)
 	if (p == rq->idle) {
 		/* note: this timer irq context must be accounted for as well */
 		if (irq_count() - HARDIRQ_OFFSET >= SOFTIRQ_OFFSET)
-			kstat.per_cpu_system[cpu] += sys_ticks;
+			kstat_cpu(cpu).cpustat.system += sys_ticks;
 		else if (atomic_read(&nr_iowait_tasks) > 0)
-			kstat.per_cpu_iowait[cpu] += sys_ticks;
+			kstat_cpu(cpu).cpustat.iowait += sys_ticks;
 		else
-			kstat.per_cpu_idle[cpu] += sys_ticks;
+			kstat_cpu(cpu).cpustat.idle += sys_ticks;
 #if CONFIG_SMP
 		idle_tick(rq);
 #endif
 		return;
 	}
 	if (TASK_NICE(p) > 0)
-		kstat.per_cpu_nice[cpu] += user_ticks;
+		kstat_cpu(cpu).cpustat.nice += user_ticks;
 	else
-		kstat.per_cpu_user[cpu] += user_ticks;
-	kstat.per_cpu_system[cpu] += sys_ticks;
+		kstat_cpu(cpu).cpustat.user += user_ticks;
+	kstat_cpu(cpu).cpustat.system += sys_ticks;
 
 	/* Task might have expired already, but not scheduled off yet */
 	if (p->array != rq->active) {
@@ -2112,11 +2114,44 @@ __init int migration_init(void)
 spinlock_t kernel_flag __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 #endif
 
+static void kstat_init_cpu(int cpu)
+{
+        /* Add any initialisation to kstat here */
+        /* Useful when cpu offlining logic is added.. */
+}
+
+static int __devinit kstat_cpu_notify(struct notifier_block *self,
+                                unsigned long action, void *hcpu)
+{
+	int cpu = (unsigned long)hcpu;
+	switch(action) {
+	case CPU_UP_PREPARE:
+		kstat_init_cpu(cpu);
+		break;
+	default:
+		break;
+	}
+	return NOTIFY_OK;
+}
+ 
+static struct notifier_block __devinitdata kstat_nb = {
+	.notifier_call  = kstat_cpu_notify,
+	.next           = NULL,
+};
+
+__init static void init_kstat(void) {
+	kstat_cpu_notify(&kstat_nb, (unsigned long)CPU_UP_PREPARE,
+			(void *)(long)smp_processor_id());
+	register_cpu_notifier(&kstat_nb);  
+}
+
 void __init sched_init(void)
 {
 	runqueue_t *rq;
 	int i, j, k;
 
+	/* Init the kstat counters */
+	init_kstat();
 	for (i = 0; i < NR_CPUS; i++) {
 		prio_array_t *array;
 

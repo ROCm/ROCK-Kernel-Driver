@@ -166,7 +166,7 @@ static int shrink_slab(long scanned,  unsigned int gfp_mask)
 }
 
 /* Must be called with page's pte_chain_lock held. */
-static inline int page_mapping_inuse(struct page * page)
+static inline int page_mapping_inuse(struct page *page)
 {
 	struct address_space *mapping = page->mapping;
 
@@ -178,8 +178,14 @@ static inline int page_mapping_inuse(struct page * page)
 	if (!mapping)
 		return 0;
 
+	/* Be more reluctant to reclaim swapcache than pagecache */
+	if (PageSwapCache(page))
+		return 1;
+
 	/* File is mmap'd by somebody. */
-	if (!list_empty(&mapping->i_mmap) || !list_empty(&mapping->i_mmap_shared))
+	if (!list_empty(&mapping->i_mmap))
+		return 1;
+	if (!list_empty(&mapping->i_mmap_shared))
 		return 1;
 
 	return 0;
@@ -193,7 +199,7 @@ static inline int is_page_cache_freeable(struct page *page)
 /*
  * shrink_list returns the number of reclaimed pages
  */
-static /* inline */ int
+static int
 shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 		int *max_scan, int *nr_mapped)
 {
@@ -417,7 +423,7 @@ keep:
  * For pagecache intensive workloads, the first loop here is the hottest spot
  * in the kernel (apart from the copy_*_user functions).
  */
-static /* inline */ int
+static int
 shrink_cache(const int nr_pages, struct zone *zone,
 		unsigned int gfp_mask, int max_scan, int *nr_mapped)
 {
@@ -521,7 +527,7 @@ done:
  * The downside is that we have to touch page->count against each page.
  * But we had to alter page->flags anyway.
  */
-static /* inline */ void
+static void
 refill_inactive_zone(struct zone *zone, const int nr_pages_in,
 			struct page_state *ps, int priority)
 {
@@ -667,7 +673,7 @@ refill_inactive_zone(struct zone *zone, const int nr_pages_in,
  * pages.  This is a basic per-zone page freer.  Used by both kswapd and
  * direct reclaim.
  */
-static /* inline */ int
+static int
 shrink_zone(struct zone *zone, int max_scan, unsigned int gfp_mask,
 	const int nr_pages, int *nr_mapped, struct page_state *ps, int priority)
 {

@@ -8,6 +8,8 @@
  *            Chris Evans, <chris@ferret.lmh.ox.ac.uk>
  * Nov 1999 - ipc helper functions, unified SMP locking
  *	      Manfred Spraul <manfreds@colorfullife.com>
+ * Oct 2002 - One lock per IPC id. RCU ipc_free for lock-free grow_ary().
+ *            Mingming Cao <cmm@us.ibm.com>
  */
 
 #include <linux/config.h>
@@ -20,6 +22,8 @@
 #include <linux/slab.h>
 #include <linux/highuid.h>
 #include <linux/security.h>
+#include <linux/rcupdate.h>
+#include <linux/workqueue.h>
 
 #if defined(CONFIG_SYSVIPC)
 
@@ -69,13 +73,12 @@ void __init ipc_init_ids(struct ipc_ids* ids, int size)
 		 	ids->seq_max = seq_limit;
 	}
 
-	ids->entries = ipc_alloc(sizeof(struct ipc_id)*size);
+	ids->entries = ipc_rcu_alloc(sizeof(struct ipc_id)*size);
 
 	if(ids->entries == NULL) {
 		printk(KERN_ERR "ipc_init_ids() failed, ipc service disabled.\n");
 		ids->size = 0;
 	}
-	ids->ary = SPIN_LOCK_UNLOCKED;
 	for(i=0;i<ids->size;i++)
 		ids->entries[i].p = NULL;
 }
@@ -84,7 +87,8 @@ void __init ipc_init_ids(struct ipc_ids* ids, int size)
  *	ipc_findkey	-	find a key in an ipc identifier set	
  *	@ids: Identifier set
  *	@key: The key to find
- *
+ *	
+ *	Requires ipc_ids.sem locked.
  *	Returns the identifier if found or -1 if not.
  */
  
@@ -92,8 +96,9 @@ int ipc_findkey(struct ipc_ids* ids, key_t key)
 {
 	int id;
 	struct kern_ipc_perm* p;
+	int max_id = ids->max_id;
 
-	for (id = 0; id <= ids->max_id; id++) {
+	for (id = 0; id <= max_id; id++) {
 		p = ids->entries[id].p;
 		if(p==NULL)
 			continue;
@@ -103,6 +108,9 @@ int ipc_findkey(struct ipc_ids* ids, key_t key)
 	return -1;
 }
 
+/*
+ * Requires ipc_ids.sem locked
+ */
 static int grow_ary(struct ipc_ids* ids, int newsize)
 {
 	struct ipc_id* new;
@@ -114,21 +122,21 @@ static int grow_ary(struct ipc_ids* ids, int newsize)
 	if(newsize <= ids->size)
 		return newsize;
 
-	new = ipc_alloc(sizeof(struct ipc_id)*newsize);
+	new = ipc_rcu_alloc(sizeof(struct ipc_id)*newsize);
 	if(new == NULL)
 		return ids->size;
 	memcpy(new, ids->entries, sizeof(struct ipc_id)*ids->size);
 	for(i=ids->size;i<newsize;i++) {
 		new[i].p = NULL;
 	}
-	spin_lock(&ids->ary);
-
 	old = ids->entries;
-	ids->entries = new;
 	i = ids->size;
+	
+	ids->entries = new;
+	wmb();
 	ids->size = newsize;
-	spin_unlock(&ids->ary);
-	ipc_free(old, sizeof(struct ipc_id)*i);
+
+	ipc_rcu_free(old, sizeof(struct ipc_id)*i);
 	return ids->size;
 }
 
@@ -166,7 +174,10 @@ found:
 	if(ids->seq > ids->seq_max)
 		ids->seq = 0;
 
-	spin_lock(&ids->ary);
+	new->lock = SPIN_LOCK_UNLOCKED;
+	new->deleted = 0;
+	rcu_read_lock();
+	spin_lock(&new->lock);
 	ids->entries[id].p = new;
 	return id;
 }
@@ -180,6 +191,8 @@ found:
  *	fed an invalid identifier. The entry is removed and internal
  *	variables recomputed. The object associated with the identifier
  *	is returned.
+ *	ipc_ids.sem and the spinlock for this ID is hold before this function
+ *	is called, and remain locked on the exit.
  */
  
 struct kern_ipc_perm* ipc_rmid(struct ipc_ids* ids, int id)
@@ -188,6 +201,7 @@ struct kern_ipc_perm* ipc_rmid(struct ipc_ids* ids, int id)
 	int lid = id % SEQ_MULTIPLIER;
 	if(lid >= ids->size)
 		BUG();
+	
 	p = ids->entries[lid].p;
 	ids->entries[lid].p = NULL;
 	if(p==NULL)
@@ -202,6 +216,7 @@ struct kern_ipc_perm* ipc_rmid(struct ipc_ids* ids, int id)
 		} while (ids->entries[lid].p == NULL);
 		ids->max_id = lid;
 	}
+	p->deleted = 1;
 	return p;
 }
 
@@ -224,20 +239,99 @@ void* ipc_alloc(int size)
 }
 
 /**
- *	ipc_free	-	free ipc space
+ *	ipc_free        -       free ipc space
  *	@ptr: pointer returned by ipc_alloc
  *	@size: size of block
  *
  *	Free a block created with ipc_alloc. The caller must know the size
  *	used in the allocation call.
  */
- 
+
 void ipc_free(void* ptr, int size)
 {
 	if(size > PAGE_SIZE)
 		vfree(ptr);
 	else
 		kfree(ptr);
+}
+
+struct ipc_rcu_kmalloc
+{
+	struct rcu_head rcu;
+	/* "void *" makes sure alignment of following data is sane. */
+	void *data[0];
+};
+
+struct ipc_rcu_vmalloc
+{
+	struct rcu_head rcu;
+	struct work_struct work;
+	/* "void *" makes sure alignment of following data is sane. */
+	void *data[0];
+};
+
+static inline int rcu_use_vmalloc(int size)
+{
+	/* Too big for a single page? */
+	if (sizeof(struct ipc_rcu_kmalloc) + size > PAGE_SIZE)
+		return 1;
+	return 0;
+}
+
+/**
+ *	ipc_rcu_alloc	-	allocate ipc and rcu space 
+ *	@size: size desired
+ *
+ *	Allocate memory for the rcu header structure +  the object.
+ *	Returns the pointer to the object.
+ *	NULL is returned if the allocation fails. 
+ */
+ 
+void* ipc_rcu_alloc(int size)
+{
+	void* out;
+	/* 
+	 * We prepend the allocation with the rcu struct, and
+	 * workqueue if necessary (for vmalloc). 
+	 */
+	if (rcu_use_vmalloc(size)) {
+		out = vmalloc(sizeof(struct ipc_rcu_vmalloc) + size);
+		if (out) out += sizeof(struct ipc_rcu_vmalloc);
+	} else {
+		out = kmalloc(sizeof(struct ipc_rcu_kmalloc)+size, GFP_KERNEL);
+		if (out) out += sizeof(struct ipc_rcu_kmalloc);
+	}
+
+	return out;
+}
+
+/**
+ *	ipc_schedule_free	- free ipc + rcu space
+ * 
+ * Since RCU callback function is called in bh,
+ * we need to defer the vfree to schedule_work
+ */
+static void ipc_schedule_free(void* arg)
+{
+	struct ipc_rcu_vmalloc *free = arg;
+
+	INIT_WORK(&free->work, vfree, free);
+	schedule_work(&free->work);
+}
+
+void ipc_rcu_free(void* ptr, int size)
+{
+	if (rcu_use_vmalloc(size)) {
+		struct ipc_rcu_vmalloc *free;
+		free = ptr - sizeof(*free);
+		call_rcu(&free->rcu, ipc_schedule_free, free);
+	} else {
+		struct ipc_rcu_kmalloc *free;
+		free = ptr - sizeof(*free);
+		/* kfree takes a "const void *" so gcc warns.  So we cast. */
+		call_rcu(&free->rcu, (void (*)(void *))kfree, free);
+	}
+
 }
 
 /**
@@ -311,6 +405,77 @@ void ipc64_perm_to_ipc_perm (struct ipc64_perm *in, struct ipc_perm *out)
 	out->cgid	= NEW_TO_OLD_GID(in->cgid);
 	out->mode	= in->mode;
 	out->seq	= in->seq;
+}
+
+/*
+ * ipc_get() requires ipc_ids.sem down, otherwise we need a rmb() here
+ * to sync with grow_ary();
+ *
+ * So far only shm_get_stat() uses ipc_get() via shm_get().  So ipc_get()
+ * is called with shm_ids.sem locked.  Thus a rmb() is not needed here,
+ * as grow_ary() also requires shm_ids.sem down(for shm).
+ *
+ * But if ipc_get() is used in the future without ipc_ids.sem down,
+ * we need to add a rmb() before accessing the entries array
+ */
+struct kern_ipc_perm* ipc_get(struct ipc_ids* ids, int id)
+{
+	struct kern_ipc_perm* out;
+	int lid = id % SEQ_MULTIPLIER;
+	if(lid >= ids->size)
+		return NULL;
+	rmb();
+	out = ids->entries[lid].p;
+	return out;
+}
+
+struct kern_ipc_perm* ipc_lock(struct ipc_ids* ids, int id)
+{
+	struct kern_ipc_perm* out;
+	int lid = id % SEQ_MULTIPLIER;
+
+	rcu_read_lock();
+	if(lid >= ids->size) {
+		rcu_read_unlock();
+		return NULL;
+	}
+
+	/* we need a barrier here to sync with grow_ary() */
+	rmb();
+	out = ids->entries[lid].p;
+	if(out == NULL) {
+		rcu_read_unlock();
+		return NULL;
+	}
+	spin_lock(&out->lock);
+	
+	/* ipc_rmid() may have already freed the ID while ipc_lock
+	 * was spinning: here verify that the structure is still valid
+	 */
+	if (out->deleted) {
+		spin_unlock(&out->lock);
+		rcu_read_unlock();
+		return NULL;
+	}
+	return out;
+}
+
+void ipc_unlock(struct kern_ipc_perm* perm)
+{
+	spin_unlock(&perm->lock);
+	rcu_read_unlock();
+}
+
+int ipc_buildid(struct ipc_ids* ids, int id, int seq)
+{
+	return SEQ_MULTIPLIER*seq + id;
+}
+
+int ipc_checkid(struct ipc_ids* ids, struct kern_ipc_perm* ipcp, int uid)
+{
+	if(uid/SEQ_MULTIPLIER != ipcp->seq)
+		return 1;
+	return 0;
 }
 
 #ifndef __ia64__

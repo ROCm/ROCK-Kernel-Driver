@@ -172,7 +172,7 @@ int show_interrupts(struct seq_file *p, void *v)
 #else
 		for (j = 0; j < NR_CPUS; j++)
 			if (cpu_online(j))
-				seq_printf(p, "%10u ", kstat.irqs[j][i]);
+				seq_printf(p, "%10u ", kstat_cpu(j).irqs[i]);
 #endif
 		seq_printf(p, " %14s", idesc->handler->typename);
 		seq_printf(p, "  %s", action->name);
@@ -346,7 +346,7 @@ unsigned int do_IRQ(unsigned long irq, struct pt_regs *regs)
 	unsigned int status;
 
 	irq_enter();
-	kstat.irqs[cpu][irq]++;
+	kstat_cpu(cpu).irqs[irq]++;
 
 	if (desc->status & IRQ_PER_CPU) {
 		/* no locking required for CPU-local interrupts: */

@@ -64,8 +64,10 @@ cifs_read_super(struct super_block *sb, void *data, char *devname, int silent)
 	struct cifs_sb_info *cifs_sb;
 	int rc = 0;
 
-    sb->s_fs_info = kmalloc(sizeof(struct cifs_sb_info),GFP_KERNEL);
+	sb->s_fs_info = kmalloc(sizeof(struct cifs_sb_info),GFP_KERNEL);
 	cifs_sb = CIFS_SB(sb);
+	if(cifs_sb == NULL)
+		return -ENOMEM;
 	cifs_sb->local_nls = load_nls_default();	/* needed for ASCII cp to Unicode converts */
 	rc = cifs_mount(sb, cifs_sb, data, devname);
 
@@ -97,13 +99,12 @@ out_no_root:
 	if (inode)
 		iput(inode);
 
-/*	rc = cifs_umount(sb);  BB is CIFS unmount routine needed? */
 	if (rc) {
-		cERROR(1, ("cifs_umount failed with return code %d\n", rc));
+		cERROR(1, ("cifs_mount failed with no root inode"));
 	}
 out_mount_failed:
-    if(cifs_sb)
-        kfree(cifs_sb);
+	if(cifs_sb)
+		kfree(cifs_sb);
 	return -EINVAL;
 }
 
@@ -115,14 +116,16 @@ cifs_put_super(struct super_block *sb)
 
 	cFYI(1, ("In cifs_put_super\n"));
 	cifs_sb = CIFS_SB(sb);
-	rc = cifs_umount(sb, cifs_sb);	
+	if(cifs_sb == NULL) {
+		cFYI(1,("\nEmpty cifs superblock info passed to unmount"));
+		return;
+	}
+	rc = cifs_umount(sb, cifs_sb); 
 	if (rc) {
 		cERROR(1, ("cifs_umount failed with return code %d\n", rc));
 	}
-    if(cifs_sb) {    
-        unload_nls(cifs_sb->local_nls);
-        kfree(cifs_sb);
-    }
+	unload_nls(cifs_sb->local_nls);
+	kfree(cifs_sb);
 	return;
 }
 
@@ -155,7 +158,7 @@ cifs_statfs(struct super_block *sb, struct statfs *buf)
 	   __fsid_t f_fsid;
 	   int f_namelen;  */
 	/* BB get from info put in tcon struct at mount time with call to QFSAttrInfo */
-
+	FreeXid(xid);
 	return 0;		/* always return success? what if volume is no longer available? */
 }
 
@@ -176,7 +179,7 @@ cifs_alloc_inode(struct super_block *sb)
 	atomic_set(&cifs_inode->inUse, 0);
 	cifs_inode->time = 0;
 	cifs_inode->clientCanCache = 0;
-    INIT_LIST_HEAD(&cifs_inode->openFileList);
+	INIT_LIST_HEAD(&cifs_inode->openFileList);
 	return &cifs_inode->vfs_inode;
 }
 
@@ -258,6 +261,7 @@ static struct file_system_type cifs_fs_type = {
 struct inode_operations cifs_dir_inode_ops = {
 	.create = cifs_create,
 	.lookup = cifs_lookup,
+	.getattr = cifs_getattr,
 	.unlink = cifs_unlink,
 	.link = cifs_hardlink,
 	.mkdir = cifs_mkdir,
@@ -271,6 +275,7 @@ struct inode_operations cifs_dir_inode_ops = {
 struct inode_operations cifs_file_inode_ops = {
 /*	revalidate:cifs_revalidate, */
 	.setattr = cifs_setattr,
+	.getattr = cifs_getattr,
 	.rename = cifs_rename,
 };
 
@@ -278,17 +283,18 @@ struct inode_operations cifs_symlink_inode_ops = {
 	.readlink = cifs_readlink,
 	.follow_link = cifs_follow_link,
 	/* BB add the following two eventually */
-	/* revalidate:     cifs_revalidate,
-   setattr:        cifs_notify_change, *//* BB do we need notify change */
+	/* revalidate: cifs_revalidate,
+	   setattr:    cifs_notify_change, *//* BB do we need notify change */
 };
 
 struct file_operations cifs_file_ops = {
-	.read = cifs_read,
-	.write = cifs_write,
+	.read = generic_file_read,
+	.write = generic_file_write,
 	.open = cifs_open,
 	.release = cifs_close,
 	.lock = cifs_lock,
 	.fsync = cifs_fsync,
+	.mmap  = cifs_file_mmap,
 };
 
 struct file_operations cifs_dir_ops = {
@@ -387,8 +393,11 @@ init_cifs(void)
 	atomic_set(&tconInfoAllocCount, 0);
 	atomic_set(&bufAllocCount, 0);
 	atomic_set(&midCount, 0);
+	GlobalCurrentXid = 0;
 	GlobalTotalActiveXid = 0;
 	GlobalMaxActiveXid = 0;
+	GlobalSMBSeslock = RW_LOCK_UNLOCKED;
+	GlobalMid_Lock = RW_LOCK_UNLOCKED;
 
 	rc = cifs_init_inodecache();
 	if (!rc) {
@@ -419,7 +428,7 @@ exit_cifs(void)
 #if CONFIG_PROC_FS
 	cifs_proc_clean();
 #endif
-    unregister_filesystem(&cifs_fs_type);
+    	unregister_filesystem(&cifs_fs_type);
 	cifs_destroy_inodecache();
 	cifs_destroy_mids();
 	cifs_destroy_request_bufs();

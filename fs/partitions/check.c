@@ -277,231 +277,146 @@ static void devfs_remove_partitions(struct gendisk *dev)
 #endif
 }
 
-static ssize_t part_dev_read(struct device *dev,
-			char *page, size_t count, loff_t off)
+
+/*
+ * sysfs bindings for partitions
+ */
+
+struct part_attribute {
+	struct attribute attr;
+	ssize_t (*show)(struct hd_struct *,char *,size_t,loff_t);
+};
+
+static ssize_t part_attr_show(struct kobject * kobj, struct attribute * attr,
+			      char * page, size_t count, loff_t off)
 {
-	struct gendisk *disk = dev->parent->driver_data;
-	struct hd_struct *p = dev->driver_data;
+	struct hd_struct * p = container_of(kobj,struct hd_struct,kobj);
+	struct part_attribute * part_attr = container_of(attr,struct part_attribute,attr);
+	ssize_t ret = 0;
+	if (part_attr->show)
+		part_attr->show(p,page,count,off);
+	return ret;
+}
+
+static struct sysfs_ops part_sysfs_ops = {
+	.show	part_attr_show,
+};
+
+static ssize_t part_dev_read(struct hd_struct * p,
+			     char *page, size_t count, loff_t off)
+{
+	struct gendisk *disk = container_of(p->kobj.parent,struct gendisk,kobj);
 	int part = p - disk->part + 1;
 	dev_t base = MKDEV(disk->major, disk->first_minor); 
 	return off ? 0 : sprintf(page, "%04x\n",base + part);
 }
-static ssize_t part_start_read(struct device *dev,
-			char *page, size_t count, loff_t off)
+static ssize_t part_start_read(struct hd_struct * p,
+			       char *page, size_t count, loff_t off)
 {
-	struct hd_struct *p = dev->driver_data;
 	return off ? 0 : sprintf(page, "%llu\n",(unsigned long long)p->start_sect);
 }
-static ssize_t part_size_read(struct device *dev,
-			char *page, size_t count, loff_t off)
+static ssize_t part_size_read(struct hd_struct * p,
+			      char *page, size_t count, loff_t off)
 {
-	struct hd_struct *p = dev->driver_data;
 	return off ? 0 : sprintf(page, "%llu\n",(unsigned long long)p->nr_sects);
 }
-static ssize_t part_stat_read(struct device *dev,
-			char *page, size_t count, loff_t off)
+static ssize_t part_stat_read(struct hd_struct * p,
+			      char *page, size_t count, loff_t off)
 {
-	struct hd_struct *p = dev->driver_data;
 	return off ? 0 : sprintf(page, "%8u %8llu %8u %8llu\n",
 				p->reads, (u64)p->read_sectors,
 				p->writes, (u64)p->write_sectors);
 }
-static struct device_attribute part_attr_dev = {
+static struct part_attribute part_attr_dev = {
 	.attr = {.name = "dev", .mode = S_IRUGO },
 	.show	= part_dev_read
 };
-static struct device_attribute part_attr_start = {
+static struct part_attribute part_attr_start = {
 	.attr = {.name = "start", .mode = S_IRUGO },
 	.show	= part_start_read
 };
-static struct device_attribute part_attr_size = {
+static struct part_attribute part_attr_size = {
 	.attr = {.name = "size", .mode = S_IRUGO },
 	.show	= part_size_read
 };
-static struct device_attribute part_attr_stat = {
+static struct part_attribute part_attr_stat = {
 	.attr = {.name = "stat", .mode = S_IRUGO },
 	.show	= part_stat_read
 };
 
+static struct attribute * default_attrs[] = {
+	&part_attr_dev.attr,
+	&part_attr_start.attr,
+	&part_attr_size.attr,
+	&part_attr_stat.attr,
+	NULL,
+};
+
+extern struct subsystem block_subsys;
+
+static struct subsystem part_subsys = {
+	.parent		= &block_subsys,
+	.default_attrs	= default_attrs,
+	.sysfs_ops	= &part_sysfs_ops,
+};
+
+static int __init part_subsys_init(void)
+{
+	return subsystem_register(&part_subsys);
+}
+
+__initcall(part_subsys_init);
+
 void delete_partition(struct gendisk *disk, int part)
 {
 	struct hd_struct *p = disk->part + part - 1;
-	struct device *dev;
 	if (!p->nr_sects)
 		return;
 	p->start_sect = 0;
 	p->nr_sects = 0;
 	p->reads = p->writes = p->read_sectors = p->write_sectors = 0;
 	devfs_unregister(p->de);
-	dev = p->hd_driverfs_dev;
-	p->hd_driverfs_dev = NULL;
-	if (dev) {
-		device_remove_file(dev, &part_attr_stat);
-		device_remove_file(dev, &part_attr_size);
-		device_remove_file(dev, &part_attr_start);
-		device_remove_file(dev, &part_attr_dev);
-		device_unregister(dev);	
-	}
-}
-
-static void part_release(struct device *dev)
-{
-	kfree(dev);
+	kobject_unregister(&p->kobj);
 }
 
 void add_partition(struct gendisk *disk, int part, sector_t start, sector_t len)
 {
 	struct hd_struct *p = disk->part + part - 1;
-	struct device *parent = &disk->disk_dev;
-	struct device *dev;
 
 	p->start_sect = start;
 	p->nr_sects = len;
 	devfs_register_partition(disk, part);
-	dev = kmalloc(sizeof(struct device), GFP_KERNEL);
-	if (!dev)
-		return;
-	memset(dev, 0, sizeof(struct device));
-	dev->parent = parent;
-	sprintf(dev->bus_id, "p%d", part);
-	dev->release = part_release;
-	dev->driver_data = p;
-	device_register(dev);
-	device_create_file(dev, &part_attr_dev);
-	device_create_file(dev, &part_attr_start);
-	device_create_file(dev, &part_attr_size);
-	device_create_file(dev, &part_attr_stat);
-	p->hd_driverfs_dev = dev;
+	kobject_init(&p->kobj);
+	snprintf(p->kobj.name,KOBJ_NAME_LEN,"%s%d",disk->disk_name,part);
+	p->kobj.parent = &disk->kobj;
+	p->kobj.subsys = &part_subsys;
+	kobject_register(&p->kobj);
 }
 
-static ssize_t disk_dev_read(struct device *dev,
-			char *page, size_t count, loff_t off)
+static void disk_sysfs_symlinks(struct gendisk *disk)
 {
-	struct gendisk *disk = dev->driver_data;
-	dev_t base = MKDEV(disk->major, disk->first_minor); 
-	return off ? 0 : sprintf(page, "%04x\n",base);
-}
-static ssize_t disk_range_read(struct device *dev,
-			char *page, size_t count, loff_t off)
-{
-	struct gendisk *disk = dev->driver_data;
-	return off ? 0 : sprintf(page, "%d\n",disk->minors);
-}
-static ssize_t disk_size_read(struct device *dev,
-			char *page, size_t count, loff_t off)
-{
-	struct gendisk *disk = dev->driver_data;
-	return off ? 0 : sprintf(page, "%llu\n",(unsigned long long)get_capacity(disk));
-}
-static inline unsigned MSEC(unsigned x)
-{
-	return x * 1000 / HZ;
-}
-static ssize_t disk_stat_read(struct device *dev,
-			char *page, size_t count, loff_t off)
-{
-	struct gendisk *disk = dev->driver_data;
-	disk_round_stats(disk);
-	return off ? 0 : sprintf(page,
-		"%8u %8u %8llu %8u "
-		"%8u %8u %8llu %8u "
-		"%8u %8u %8u"
-		"\n",
-		disk->reads, disk->read_merges, (u64)disk->read_sectors,
-		MSEC(disk->read_ticks),
-		disk->writes, disk->write_merges, (u64)disk->write_sectors,
-		MSEC(disk->write_ticks),
-		disk->in_flight, MSEC(disk->io_ticks),
-		MSEC(disk->time_in_queue));
-}
-static struct device_attribute disk_attr_dev = {
-	.attr = {.name = "dev", .mode = S_IRUGO },
-	.show	= disk_dev_read
-};
-static struct device_attribute disk_attr_range = {
-	.attr = {.name = "range", .mode = S_IRUGO },
-	.show	= disk_range_read
-};
-static struct device_attribute disk_attr_size = {
-	.attr = {.name = "size", .mode = S_IRUGO },
-	.show	= disk_size_read
-};
-static struct device_attribute disk_attr_stat = {
-	.attr = {.name = "stat", .mode = S_IRUGO },
-	.show	= disk_stat_read
-};
-
-static void disk_driverfs_symlinks(struct gendisk *disk)
-{
-	struct device *target = disk->driverfs_dev;
-	struct device *dev = &disk->disk_dev;
-	struct device *p;
-	char *path;
-	char *s;
-	int length;
-	int depth;
-
-	if (!target)
-		return;
-
-	get_device(target);
-
-	length = get_devpath_length(target);
-	length += strlen("..");
-
-	if (length > PATH_MAX)
-		return;
-
-	if (!(path = kmalloc(length,GFP_KERNEL)))
-		return;
-	memset(path,0,length);
-
-	/* our relative position */
-	strcpy(path,"..");
-
-	fill_devpath(target, path, length);
-	driverfs_create_symlink(&dev->dir, "device", path);
-	kfree(path);
-
-	for (p = target, depth = 0; p; p = p->parent, depth++)
-		;
-	length = get_devpath_length(dev);
-	length += 3 * depth - 1;
-
-	if (length > PATH_MAX)
-		return;
-
-	if (!(path = kmalloc(length,GFP_KERNEL)))
-		return;
-	memset(path,0,length);
-	for (s = path; depth--; s += 3)
-		strcpy(s, "../");
-
-	fill_devpath(dev, path, length);
-	driverfs_create_symlink(&target->dir, "block", path);
-	kfree(path);
+	struct device *target = get_device(disk->driverfs_dev);
+	if (target) {
+		sysfs_create_link(&disk->kobj,&target->kobj,"device");
+		sysfs_create_link(&target->kobj,&disk->kobj,"block");
+	}
 }
 
 /* Not exported, helper to add_disk(). */
 void register_disk(struct gendisk *disk)
 {
-	struct device *dev = &disk->disk_dev;
 	struct parsed_partitions *state;
 	struct block_device *bdev;
 	char *s;
 	int j;
 
-	strcpy(dev->bus_id, disk->disk_name);
+	strncpy(disk->kobj.name,disk->disk_name,KOBJ_NAME_LEN);
 	/* ewww... some of these buggers have / in name... */
-	s = strchr(dev->bus_id, '/');
+	s = strchr(disk->kobj.name, '/');
 	if (s)
 		*s = '!';
-	device_add(dev);
-	device_create_file(dev, &disk_attr_dev);
-	device_create_file(dev, &disk_attr_range);
-	device_create_file(dev, &disk_attr_size);
-	device_create_file(dev, &disk_attr_stat);
-	disk_driverfs_symlinks(disk);
+	kobject_register(&disk->kobj);
+	disk_sysfs_symlinks(disk);
 
 	if (disk->flags & GENHD_FL_CD)
 		devfs_create_cdrom(disk);
@@ -620,16 +535,12 @@ void del_gendisk(struct gendisk *disk)
 	disk->time_in_queue = 0;
 	disk->stamp = disk->stamp_idle = 0;
 	devfs_remove_partitions(disk);
-	device_remove_file(&disk->disk_dev, &disk_attr_dev);
-	device_remove_file(&disk->disk_dev, &disk_attr_range);
-	device_remove_file(&disk->disk_dev, &disk_attr_size);
-	device_remove_file(&disk->disk_dev, &disk_attr_stat);
-	driverfs_remove_file(&disk->disk_dev.dir, "device");
+	kobject_unregister(&disk->kobj);
+	sysfs_remove_link(&disk->kobj, "device");
 	if (disk->driverfs_dev) {
-		driverfs_remove_file(&disk->driverfs_dev->dir, "block");
+		sysfs_remove_link(&disk->driverfs_dev->kobj, "block");
 		put_device(disk->driverfs_dev);
 	}
-	device_del(&disk->disk_dev);
 }
 
 struct dev_name {
@@ -680,3 +591,4 @@ char *partition_name(dev_t dev)
 
 	return dname->name;
 }
+

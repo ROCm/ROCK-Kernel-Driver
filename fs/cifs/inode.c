@@ -52,9 +52,9 @@ cifs_get_inode_info_unix(struct inode **pinode,
 	if (rc) {
 		if (rc == -EREMOTE) {
 /* rc = *//* CIFSGetDFSRefer(xid, pTcon->ses, search_path,
-   &referrals,
-   &num_referrals,
-   cifs_sb->local_nls); */
+	&referrals,
+	&num_referrals,
+	cifs_sb->local_nls); */
 			tmp_path =
 			    kmalloc(strnlen
 				    (pTcon->treeName,
@@ -99,12 +99,12 @@ cifs_get_inode_info_unix(struct inode **pinode,
 		atomic_inc(&cifsInfo->inUse);	/* inc on every refresh of inode */
 
 		inode->i_atime =
-		    le64_to_cpu(cifs_NTtimeToUnix(findData.LastAccessTime));
+		    cifs_NTtimeToUnix(le64_to_cpu(findData.LastAccessTime));
 		inode->i_mtime =
-		    le64_to_cpu(cifs_NTtimeToUnix
+		    cifs_NTtimeToUnix(le64_to_cpu
 				(findData.LastModificationTime));
 		inode->i_ctime =
-		    le64_to_cpu(cifs_NTtimeToUnix(findData.LastStatusChange));
+		    cifs_NTtimeToUnix(le64_to_cpu(findData.LastStatusChange));
 		inode->i_mode = le64_to_cpu(findData.Permissions);
 		findData.Type = le32_to_cpu(findData.Type);
 		if (findData.Type == UNIX_FILE) {
@@ -140,6 +140,7 @@ cifs_get_inode_info_unix(struct inode **pinode,
 			cFYI(1, (" File inode "));
 			inode->i_op = &cifs_file_inode_ops;
 			inode->i_fop = &cifs_file_ops;
+			inode->i_data.a_ops = &cifs_addr_ops;
 		} else if (S_ISDIR(inode->i_mode)) {
 			cFYI(1, (" Directory inode"));
 			inode->i_op = &cifs_dir_inode_ops;
@@ -182,9 +183,9 @@ cifs_get_inode_info(struct inode **pinode,
 		if (rc == -EREMOTE) {
 			/* BB add call to new func rc = GetDFSReferral(); */
 /* rc = *//* CIFSGetDFSRefer(xid, pTcon->ses, search_path,
-   &referrals,
-   &num_referrals,
-   cifs_sb->local_nls); */
+	&referrals,
+	&num_referrals,
+	cifs_sb->local_nls); */
 			tmp_path =
 			    kmalloc(strnlen
 				    (pTcon->treeName,
@@ -265,6 +266,7 @@ cifs_get_inode_info(struct inode **pinode,
 			cFYI(1, (" File inode "));
 			inode->i_op = &cifs_file_inode_ops;
 			inode->i_fop = &cifs_file_ops;
+			inode->i_data.a_ops = &cifs_addr_ops;
 		} else if (S_ISDIR(inode->i_mode)) {
 			cFYI(1, (" Directory inode "));
 			inode->i_op = &cifs_dir_inode_ops;
@@ -441,9 +443,11 @@ cifs_rename(struct inode *source_inode, struct dentry *source_direntry,
 	cifs_sb_source = CIFS_SB(source_inode->i_sb);
 	pTcon = cifs_sb_source->tcon;
 
-	if (pTcon != cifs_sb_target->tcon)
+	if (pTcon != cifs_sb_target->tcon) {    
 		return -EXDEV;	/* BB actually could be allowed if same server, but
                      different share. Might eventually add support for this */
+        FreeXid(xid);
+    }
 
 	fromName = build_path_from_dentry(source_direntry);
 	toName = build_path_from_dentry(target_direntry);
@@ -455,6 +459,7 @@ cifs_rename(struct inode *source_inode, struct dentry *source_direntry,
 	if (toName)
 		kfree(toName);
 
+    FreeXid(xid);
 	return rc;
 }
 
@@ -479,7 +484,7 @@ cifs_revalidate(struct dentry *direntry)
 	      direntry->d_time, jiffies));
 
 	cifsInode = CIFS_I(direntry->d_inode);
-
+/* BB add check - do not need to revalidate oplocked files */
 	if ((time_before(jiffies, cifsInode->time + HZ))
 	    && (direntry->d_inode->i_nlink == 1)) {
 		cFYI(1, (" Do not need to revalidate "));
@@ -505,12 +510,20 @@ cifs_revalidate(struct dentry *direntry)
 	return rc;
 }
 
+int cifs_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat)
+{
+	int err = cifs_revalidate(dentry);
+	if (!err)
+		generic_fillattr(dentry->d_inode, stat);
+	return err;
+}
+
 void
 cifs_truncate_file(struct inode *inode)
 {				/* BB remove - may not need this function after all BB */
 	int xid;
 	int rc = 0;
-    struct cifsFileInfo *open_file = NULL;
+	struct cifsFileInfo *open_file = NULL;
 	struct cifs_sb_info *cifs_sb;
 	struct cifsTconInfo *pTcon;
 	struct cifsInodeInfo *cifsInode;
@@ -534,21 +547,19 @@ cifs_truncate_file(struct inode *inode)
 		full_path = build_path_from_dentry(dirent);
 		rc = CIFSSMBSetEOF(xid, pTcon, full_path, inode->i_size,FALSE,
 				   cifs_sb->local_nls);
-        cFYI(1,("\nSetEOF (truncate) rc = %d",rc));
-        if(rc == -ETXTBSY) {        
-            cifsInode = CIFS_I(inode);
-            if(!list_empty(&(cifsInode->openFileList))) {            
-	            open_file = list_entry(cifsInode->openFileList.next,
-                                       struct cifsFileInfo, flist);           
-                /* We could check if file is open for writing first and 
-                   also we could also override the smb pid with the pid 
-                   of the file opener when sending the CIFS request */
-                rc = CIFSSMBSetFileSize(xid, pTcon, inode->i_size,
-                                        open_file->netfid,open_file->pid,FALSE);
-            } else {
-                cFYI(1,("\nNo open files to get file handle from"));
-            }
-        }
+		cFYI(1,("\nSetEOF (truncate) rc = %d",rc));
+		if(rc == -ETXTBSY) {        
+			cifsInode = CIFS_I(inode);
+			if(!list_empty(&(cifsInode->openFileList))) {            
+				open_file = list_entry(cifsInode->openFileList.next,
+					struct cifsFileInfo, flist);           
+            /* We could check if file is open for writing first */
+				 rc = CIFSSMBSetFileSize(xid, pTcon, inode->i_size,
+					open_file->netfid,open_file->pid,FALSE);
+			} else {
+				  cFYI(1,("\nNo open files to get file handle from"));
+			}
+		}
 		if (!rc)
 			CIFSSMBSetEOF(xid,pTcon,full_path,inode->i_size,TRUE,cifs_sb->local_nls);
            /* allocation size setting seems optional so ignore return code */
@@ -567,7 +578,7 @@ cifs_setattr(struct dentry *direntry, struct iattr *attrs)
 	struct cifsTconInfo *pTcon;
 	char *full_path = NULL;
 	int rc = -EACCES;
-    struct cifsFileInfo *open_file = NULL;
+	struct cifsFileInfo *open_file = NULL;
 	FILE_BASIC_INFO time_buf;
 	int set_time = FALSE;
 	__u64 mode = 0xFFFFFFFFFFFFFFFF;
@@ -593,19 +604,19 @@ cifs_setattr(struct dentry *direntry, struct iattr *attrs)
 	if (attrs->ia_valid & ATTR_SIZE) {
 		rc = CIFSSMBSetEOF(xid, pTcon, full_path, attrs->ia_size,FALSE,
 				   cifs_sb->local_nls);
-        cFYI(1,("\nSetEOF (setattrs) rc = %d",rc));
+		cFYI(1,("\nSetEOF (setattrs) rc = %d",rc));
 
-        if(rc == -ETXTBSY) {
-            if(!list_empty(&(cifsInode->openFileList))) {            
-                open_file = list_entry(cifsInode->openFileList.next, 
-                               struct cifsFileInfo, flist);           
+		if(rc == -ETXTBSY) {
+			if(!list_empty(&(cifsInode->openFileList))) {            
+				open_file = list_entry(cifsInode->openFileList.next, 
+					   struct cifsFileInfo, flist);           
     /* We could check if file is open for writing first */
-                rc = CIFSSMBSetFileSize(xid, pTcon, attrs->ia_size,
-                                        open_file->netfid,open_file->pid,FALSE);           
-            } else {
-                cFYI(1,("\nNo open files to get file handle from"));
-            }
-        }
+				rc = CIFSSMBSetFileSize(xid, pTcon, attrs->ia_size,
+					   open_file->netfid,open_file->pid,FALSE);           
+			} else {
+				cFYI(1,("\nNo open files to get file handle from"));
+			}
+		}
         /*  Set Allocation Size of file - might not even need to call the
             following but might as well and it does not hurt if it fails */
 		CIFSSMBSetEOF(xid, pTcon, full_path, attrs->ia_size, TRUE, cifs_sb->local_nls);
@@ -684,5 +695,4 @@ cifs_delete_inode(struct inode *inode)
 	cFYI(1, ("In cifs_delete_inode, inode = 0x%p\n", inode));
 	/* may have to add back in when safe distributed caching of
              directories via e.g. FindNotify added */
-
 }

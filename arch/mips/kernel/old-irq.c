@@ -134,7 +134,7 @@ int show_interrupts(struct seq_file *p, void *v)
 		if (!action) 
 			continue;
 		seq_printf(p, "%2d: %8d %c %s",
-			i, kstat.irqs[0][i],
+			i, kstat_cpu(0).irqs[i],
 			(action->flags & SA_INTERRUPT) ? '+' : ' ',
 			action->name);
 		for (action=action->next; action; action = action->next) {
@@ -176,7 +176,7 @@ asmlinkage void i8259_do_irq(int irq, struct pt_regs *regs)
 
 	i8259_mask_and_ack_irq(irq);
 
-	kstat.irqs[cpu][irq]++;
+	kstat_cpu(cpu).irqs[irq]++;
 
 	action = *(irq + irq_action);
 	if (!action)
@@ -214,7 +214,7 @@ asmlinkage void do_IRQ(int irq, struct pt_regs * regs)
 
 	cpu = smp_processor_id();
 	irq_enter(cpu, irq);
-	kstat.irqs[cpu][irq]++;
+	kstat_cpu(cpu).irqs[irq]++;
 
 	action = *(irq + irq_action);
 	if (action) {

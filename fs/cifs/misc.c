@@ -28,7 +28,6 @@
 
 extern kmem_cache_t *cifs_req_cachep;
 
-static DECLARE_MUTEX(GlobalMid_Sem);	/* also protects XID globals */
 __u16 GlobalMid;		/* multiplex id - rotating counter */
 
 /* The xid serves as a useful identifier for each incoming vfs request, 
@@ -42,21 +41,21 @@ _GetXid(void)
 {
 	unsigned int xid;
 
-	down(&GlobalMid_Sem);
+	write_lock(&GlobalMid_Lock);
 	GlobalTotalActiveXid++;
 	if (GlobalTotalActiveXid > GlobalMaxActiveXid)
 		GlobalMaxActiveXid = GlobalTotalActiveXid;	/* keep high water mark for number of simultaneous vfs ops in our filesystem */
 	xid = GlobalCurrentXid++;
-	up(&GlobalMid_Sem);
+	write_unlock(&GlobalMid_Lock);
 	return xid;
 }
 
 void
 _FreeXid(unsigned int xid)
 {
-	down(&GlobalMid_Sem);
+	write_lock(&GlobalMid_Lock);
 	GlobalTotalActiveXid--;
-	up(&GlobalMid_Sem);
+	write_unlock(&GlobalMid_Lock);
 }
 
 struct cifsSesInfo *
@@ -69,9 +68,11 @@ sesInfoAlloc(void)
 					   GFP_KERNEL);
 	if (ret_buf) {
 		memset(ret_buf, 0, sizeof (struct cifsSesInfo));
+		write_lock(&GlobalSMBSeslock);
 		atomic_inc(&sesInfoAllocCount);
 		list_add(&ret_buf->cifsSessionList, &GlobalSMBSessionList);
 		init_MUTEX(&ret_buf->sesSem);
+		write_unlock(&GlobalSMBSeslock);
 	}
 	return ret_buf;
 }
@@ -84,8 +85,10 @@ sesInfoFree(struct cifsSesInfo *buf_to_free)
 		return;
 	}
 
+	write_lock(&GlobalSMBSeslock);
 	atomic_dec(&sesInfoAllocCount);
 	list_del(&buf_to_free->cifsSessionList);
+	write_unlock(&GlobalSMBSeslock);
 	if (buf_to_free->serverOS)
 		kfree(buf_to_free->serverOS);
 	if (buf_to_free->serverDomain)
@@ -104,11 +107,13 @@ tconInfoAlloc(void)
 					    GFP_KERNEL);
 	if (ret_buf) {
 		memset(ret_buf, 0, sizeof (struct cifsTconInfo));
+		write_lock(&GlobalSMBSeslock);
 		atomic_inc(&tconInfoAllocCount);
 		list_add(&ret_buf->cifsConnectionList,
 			 &GlobalTreeConnectionList);
-        INIT_LIST_HEAD(&ret_buf->openFileList);
+		INIT_LIST_HEAD(&ret_buf->openFileList);
 		init_MUTEX(&ret_buf->tconSem);
+		write_unlock(&GlobalSMBSeslock);
 	}
 	return ret_buf;
 }
@@ -120,9 +125,10 @@ tconInfoFree(struct cifsTconInfo *buf_to_free)
 		cFYI(1, ("\nNull buffer passed to tconInfoFree"));
 		return;
 	}
-
+	write_lock(&GlobalSMBSeslock);
 	atomic_dec(&tconInfoAllocCount);
 	list_del(&buf_to_free->cifsConnectionList);
+	write_unlock(&GlobalSMBSeslock);
 	if (buf_to_free->nativeFileSystem)
 		kfree(buf_to_free->nativeFileSystem);
 	kfree(buf_to_free);
@@ -203,9 +209,10 @@ header_assemble(struct smb_hdr *buffer, char smb_command /* command */ ,
 	buffer->Pid = tmp & 0xFFFF;
 	tmp >>= 16;
 	buffer->PidHigh = tmp & 0xFFFF;
-	down(&GlobalMid_Sem);
+	write_lock(&GlobalMid_Lock);
 	GlobalMid++;
 	buffer->Mid = GlobalMid;
+	write_unlock(&GlobalMid_Lock);
 	if (treeCon) {
 		buffer->Tid = treeCon->tid;
 		if (treeCon->ses) {
@@ -218,13 +225,11 @@ header_assemble(struct smb_hdr *buffer, char smb_command /* command */ ,
 		}
 		if (treeCon->Flags & SMB_SHARE_IS_IN_DFS)
 			buffer->Flags2 |= SMBFLG2_DFS;
-        if(treeCon->ses->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
-            buffer->Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
-
+		if(treeCon->ses->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
+			buffer->Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
 	}
 
 /*  endian conversion of flags is now done just before sending */
-	up(&GlobalMid_Sem);
 	buffer->WordCount = (char) word_count;
 	return;
 }
@@ -233,17 +238,18 @@ int
 checkSMBhdr(struct smb_hdr *smb, __u16 mid)
 {
 	/* Make sure that this really is an SMB, that it is a response, 
-        and that the message ids match */
-	if ((*(unsigned int *) smb->Protocol == cpu_to_le32(0x424d53ff)) && (mid == smb->Mid)) {    
-        if(smb->Flags & SMBFLG_RESPONSE)
-            return 0;                    
-        else {        
-    /* only one valid case where server sends us request */
-            if(smb->Command == SMB_COM_LOCKING_ANDX)
-                return 0;
-            else
-                cERROR(1, ("\n Rcvd Request not response "));         
-        }
+	   and that the message ids match */
+	if ((*(unsigned int *) smb->Protocol == cpu_to_le32(0x424d53ff)) && 
+		(mid == smb->Mid)) {    
+		if(smb->Flags & SMBFLG_RESPONSE)
+			return 0;                    
+		else {        
+		/* only one valid case where server sends us request */
+			if(smb->Command == SMB_COM_LOCKING_ANDX)
+				return 0;
+			else
+				cERROR(1, ("\n Rcvd Request not response "));         
+		}
 	} else { /* bad signature or mid */
 		if (*(unsigned int *) smb->Protocol != cpu_to_le32(0x424d53ff))
 			cERROR(1,
@@ -252,8 +258,8 @@ checkSMBhdr(struct smb_hdr *smb, __u16 mid)
 		if (mid != smb->Mid)
 			cERROR(1, ("\n Mids do not match \n"));
 	}
-    cERROR(1, ("\nCIFS: bad smb detected. The Mid=%d\n", smb->Mid));
-    return 1;
+	cERROR(1, ("\nCIFS: bad smb detected. The Mid=%d\n", smb->Mid));
+	return 1;
 }
 
 int
@@ -269,7 +275,7 @@ checkSMB(struct smb_hdr *smb, __u16 mid, int length)
 			cERROR(1, ("\n Length less than 2 + sizeof smb_hdr "));
 			if ((length >= sizeof (struct smb_hdr) - 1)
 			    && (smb->Status.CifsError != 0))
-				return 0;	/* this is ok - some error cases do not return wct and bcc */
+				return 0;	/* some error cases do not return wct and bcc */
 
 		}
 		if (4 + ntohl(smb->smb_buf_length) >
@@ -298,30 +304,42 @@ checkSMB(struct smb_hdr *smb, __u16 mid, int length)
 int
 is_valid_oplock_break(struct smb_hdr *buf)
 {    
-    struct smb_com_lock_req * pSMB = (struct smb_com_lock_req *)buf;
+       struct smb_com_lock_req * pSMB = (struct smb_com_lock_req *)buf;
+       struct list_head *tmp;
+       struct cifsTconInfo *tcon;
 
-    /* could add check for smb response flag 0x80 */
-    cFYI(1,("\nChecking for oplock break"));    
-    if(pSMB->hdr.Command != SMB_COM_LOCKING_ANDX)
-        return FALSE;
-    if(pSMB->hdr.Flags & SMBFLG_RESPONSE)
-        return FALSE; /* server sends us "request" here */
-    if(pSMB->hdr.WordCount != 8)
-        return FALSE;
+       /* could add check for smb response flag 0x80 */
+       cFYI(1,("\nChecking for oplock break"));    
+       if(pSMB->hdr.Command != SMB_COM_LOCKING_ANDX)
+               return FALSE;
+       if(pSMB->hdr.Flags & SMBFLG_RESPONSE)
+               return FALSE; /* server sends us "request" here */
+       if(pSMB->hdr.WordCount != 8)
+               return FALSE;
 
-    cFYI(1,(" oplock type 0x%d level 0x%d",pSMB->LockType,pSMB->OplockLevel));
-    if(!(pSMB->LockType & LOCKING_ANDX_OPLOCK_RELEASE))
-        return FALSE;    
+       cFYI(1,(" oplock type 0x%d level 0x%d",pSMB->LockType,pSMB->OplockLevel));
+       if(!(pSMB->LockType & LOCKING_ANDX_OPLOCK_RELEASE))
+               return FALSE;    
 
-    /* BB Add following logic: 
-       1) look up tcon based on tid & uid 
-       2) look up inode from tcon->openFileList->file->f_dentry->d_inode 
-       3) flush dirty pages and cached byte range locks and mark inode   
-       4) depending on break type change to r/o caching or no caching
-       5) send oplock break response to server */
-    cFYI(1,("\nNeed to process oplock break "));
-
-    return TRUE;
+       /* look up tcon based on tid & uid */
+       read_lock(&GlobalSMBSeslock);
+       list_for_each(tmp, &GlobalTreeConnectionList) {
+               tcon = list_entry(tmp, struct cifsTconInfo, cifsConnectionList);
+               if (tcon->tid == buf->Tid)
+                       if(tcon->ses->Suid == buf->Uid) {
+                       /* BB Add following logic: 
+                         2) look up inode from tcon->openFileList->file->f_dentry->d_inode
+                         3) flush dirty pages and cached byte range locks and mark inode
+                         4) depending on break type change to r/o caching or no caching
+                         5) send oplock break response to server */
+                               read_unlock(&GlobalSMBSeslock);
+                               cFYI(1,("\nFound matching connection, process oplock break"));
+                               return TRUE;
+                       }
+       }
+       read_unlock(&GlobalSMBSeslock);
+       cFYI(1,("\nProcessing oplock break for non-existent connection"));
+       return TRUE;
 }
 
 void
