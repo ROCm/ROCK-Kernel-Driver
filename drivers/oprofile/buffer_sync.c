@@ -308,8 +308,10 @@ static void add_us_sample(struct mm_struct * mm, struct op_sample * s)
  
  	cookie = lookup_dcookie(mm, s->eip, &offset);
  
-	if (!cookie)
+	if (!cookie) {
+		atomic_inc(&oprofile_stats.sample_lost_no_mapping);
 		return;
+	}
 
 	if (cookie != last_cookie) {
 		add_cookie_switch(cookie);
