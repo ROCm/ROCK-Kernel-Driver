@@ -217,24 +217,24 @@ struct ata_taskfile {
 	u8			command;	/* IO operation */
 };
 
-#define ata_id_is_ata(dev)	(((dev)->id[0] & (1 << 15)) == 0)
-#define ata_id_rahead_enabled(dev) ((dev)->id[85] & (1 << 6))
-#define ata_id_wcache_enabled(dev) ((dev)->id[85] & (1 << 5))
-#define ata_id_has_flush(dev) ((dev)->id[83] & (1 << 12))
-#define ata_id_has_flush_ext(dev) ((dev)->id[83] & (1 << 13))
-#define ata_id_has_lba48(dev)	((dev)->id[83] & (1 << 10))
-#define ata_id_has_wcache(dev)	((dev)->id[82] & (1 << 5))
-#define ata_id_has_pm(dev)	((dev)->id[82] & (1 << 3))
-#define ata_id_has_lba(dev)	((dev)->id[49] & (1 << 9))
-#define ata_id_has_dma(dev)	((dev)->id[49] & (1 << 8))
-#define ata_id_removeable(dev)	((dev)->id[0] & (1 << 7))
-#define ata_id_u32(dev,n)	\
-	(((u32) (dev)->id[(n) + 1] << 16) | ((u32) (dev)->id[(n)]))
-#define ata_id_u64(dev,n)	\
-	( ((u64) dev->id[(n) + 3] << 48) |	\
-	  ((u64) dev->id[(n) + 2] << 32) |	\
-	  ((u64) dev->id[(n) + 1] << 16) |	\
-	  ((u64) dev->id[(n) + 0]) )
+#define ata_id_is_ata(id)	(((id)[0] & (1 << 15)) == 0)
+#define ata_id_rahead_enabled(id) ((id)[85] & (1 << 6))
+#define ata_id_wcache_enabled(id) ((id)[85] & (1 << 5))
+#define ata_id_has_flush(id) ((id)[83] & (1 << 12))
+#define ata_id_has_flush_ext(id) ((id)[83] & (1 << 13))
+#define ata_id_has_lba48(id)	((id)[83] & (1 << 10))
+#define ata_id_has_wcache(id)	((id)[82] & (1 << 5))
+#define ata_id_has_pm(id)	((id)[82] & (1 << 3))
+#define ata_id_has_lba(id)	((id)[49] & (1 << 9))
+#define ata_id_has_dma(id)	((id)[49] & (1 << 8))
+#define ata_id_removeable(id)	((id)[0] & (1 << 7))
+#define ata_id_u32(id,n)	\
+	(((u32) (id)[(n) + 1] << 16) | ((u32) (id)[(n)]))
+#define ata_id_u64(id,n)	\
+	( ((u64) (id)[(n) + 3] << 48) |	\
+	  ((u64) (id)[(n) + 2] << 32) |	\
+	  ((u64) (id)[(n) + 1] << 16) |	\
+	  ((u64) (id)[(n) + 0]) )
 
 static inline int atapi_cdb_len(u16 *dev_id)
 {
