@@ -41,6 +41,7 @@
 #include <linux/config.h>
 #include <linux/slab.h>
 #include <linux/nfs_fs.h>
+#include <linux/workqueue.h>
 
 #define OPENOWNER_POOL_SIZE	8
 
@@ -54,6 +55,28 @@ nfs4_stateid one_stateid =
 #endif
 
 static LIST_HEAD(nfs4_clientid_list);
+
+extern void nfs4_renew_state(void *);
+
+void
+init_nfsv4_state(struct nfs_server *server)
+{
+	server->nfs4_state = NULL;
+	INIT_LIST_HEAD(&server->nfs4_siblings);
+}
+
+void
+destroy_nfsv4_state(struct nfs_server *server)
+{
+	if (server->mnt_path) {
+		kfree(server->mnt_path);
+		server->mnt_path = NULL;
+	}
+	if (server->nfs4_state) {
+		nfs4_put_client(server->nfs4_state);
+		server->nfs4_state = NULL;
+	}
+}
 
 /*
  * nfs4_get_client(): returns an empty client structure
@@ -75,6 +98,8 @@ nfs4_alloc_client(struct in_addr *addr)
 		INIT_LIST_HEAD(&clp->cl_unused);
 		spin_lock_init(&clp->cl_lock);
 		atomic_set(&clp->cl_count, 1);
+		INIT_WORK(&clp->cl_renewd, nfs4_renew_state, clp);
+		INIT_LIST_HEAD(&clp->cl_superblocks);
 		clp->cl_state = NFS4CLNT_NEW;
 	}
 	return clp;
@@ -130,6 +155,7 @@ nfs4_put_client(struct nfs4_client *clp)
 		return;
 	list_del(&clp->cl_servers);
 	spin_unlock(&state_spinlock);
+	nfs4_kill_renewd(clp);
 	nfs4_free_client(clp);
 }
 

@@ -163,6 +163,8 @@ nfs_put_super(struct super_block *sb)
 		nfs_idmap_delete(server);
 #endif /* CONFIG_NFS_V4 */
 
+	nfs4_renewd_prepare_shutdown(server);
+
 	if (server->client != NULL)
 		rpc_shutdown_client(server->client);
 	if (server->client_sys != NULL)
@@ -1281,6 +1283,8 @@ static struct super_block *nfs_get_sb(struct file_system_type *fs_type,
 	if (!server)
 		return ERR_PTR(-ENOMEM);
 	memset(server, 0, sizeof(struct nfs_server));
+	/* Zero out the NFS state stuff */
+	init_nfsv4_state(server);
 
 	root = &server->fh;
 	memcpy(root, &data->root, sizeof(*root));
@@ -1444,13 +1448,15 @@ static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data,
 		clp->cl_cred = rpcauth_lookupcred(clnt->cl_auth, 0);
 		memcpy(clp->cl_ipaddr, server->ip_addr, sizeof(clp->cl_ipaddr));
 	}
+	list_add_tail(&server->nfs4_siblings, &clp->cl_superblocks);
 	clnt = rpc_clone_client(clp->cl_rpcclient);
 	server->nfs4_state = clp;
 	up_write(&clp->cl_sem);
+	clp = NULL;
 
 	if (clnt == NULL) {
 		printk(KERN_WARNING "NFS: cannot create RPC client.\n");
-		goto out_fail;
+		goto out_remove_list;
 	}
 
 	clnt->cl_intr     = (server->flags & NFS4_MOUNT_INTR) ? 1 : 0;
@@ -1476,13 +1482,16 @@ static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data,
 	err = nfs_sb_init(sb, authflavour);
 	if (err == 0)
 		return 0;
-	clp = NULL;
 	rpciod_down();
-	destroy_nfsv4_state(server);
 	if (server->idmap != NULL)
 		nfs_idmap_delete(server);
 out_shutdown:
 	rpc_shutdown_client(server->client);
+out_remove_list:
+	down_write(&server->nfs4_state->cl_sem);
+	list_del_init(&server->nfs4_siblings);
+	up_write(&server->nfs4_state->cl_sem);
+	destroy_nfsv4_state(server);
 out_fail:
 	if (clp)
 		nfs4_put_client(clp);
@@ -1542,6 +1551,8 @@ static struct super_block *nfs4_get_sb(struct file_system_type *fs_type,
 	if (!server)
 		return ERR_PTR(-ENOMEM);
 	memset(server, 0, sizeof(struct nfs_server));
+	/* Zero out the NFS state stuff */
+	init_nfsv4_state(server);
 
 	if (data->version != NFS4_MOUNT_VERSION) {
 		printk("nfs warning: mount version %s than kernel\n",

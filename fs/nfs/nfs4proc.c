@@ -56,8 +56,6 @@ extern struct rpc_procinfo nfs4_procedures[];
 
 extern nfs4_stateid zero_stateid;
 
-static spinlock_t renew_lock = SPIN_LOCK_UNLOCKED;
-
 static void
 nfs4_setup_compound(struct nfs4_compound *cp, struct nfs4_op *ops,
 		    struct nfs_server *server, char *tag)
@@ -480,10 +478,11 @@ nfs4_setup_setclientid_confirm(struct nfs4_compound *cp)
 static void
 renew_lease(struct nfs_server *server, unsigned long timestamp)
 {
-	spin_lock(&renew_lock);
-	if (time_before(server->last_renewal,timestamp))
-		server->last_renewal = timestamp;
-	spin_unlock(&renew_lock);
+	struct nfs4_client *clp = server->nfs4_state;
+	spin_lock(&clp->cl_lock);
+	if (time_before(clp->cl_last_renewal,timestamp))
+		clp->cl_last_renewal = timestamp;
+	spin_unlock(&clp->cl_lock);
 }
 
 static inline void
@@ -748,6 +747,7 @@ nfs4_proc_get_root(struct nfs_server *server, struct nfs_fh *fhandle,
 	struct nfs_fsinfo	fsinfo;
 	unsigned char *		p;
 	struct qstr		q;
+	unsigned long		last_renewed;
 	int			status;
 
 	clp = server->nfs4_state;
@@ -773,6 +773,7 @@ nfs4_proc_get_root(struct nfs_server *server, struct nfs_fh *fhandle,
 	 */
 	nfs4_setup_compound(&compound, ops, server, "setclientid");
 	nfs4_setup_setclientid(&compound, 0, 0);
+	last_renewed = jiffies;
 	if ((status = nfs4_call_compound(&compound, NULL, 0)))
 		goto out_unlock;
 
@@ -786,20 +787,22 @@ nfs4_proc_get_root(struct nfs_server *server, struct nfs_fh *fhandle,
 	nfs4_setup_putrootfh(&compound);
 	nfs4_setup_getrootattr(&compound, fattr, &fsinfo);
 	nfs4_setup_getfh(&compound, fhandle);
+	last_renewed = jiffies;
 	if ((status = nfs4_call_compound(&compound, NULL, 0)))
 		goto out_unlock;
-	clp->cl_state = NFS4CLNT_OK;
 
-no_setclientid:
 	/*
 	 * Now that we have instantiated the clientid and determined
 	 * the lease time, we can initialize the renew daemon for this
 	 * server.
 	 * FIXME: we only need one renewd daemon per server.
 	 */
-	server->lease_time = fsinfo.lease_time * HZ;
-	if ((status = nfs4_init_renewd(server)))
-		goto out_unlock;
+	clp->cl_lease_time = fsinfo.lease_time * HZ;
+	clp->cl_last_renewal = last_renewed;
+	nfs4_schedule_state_renewal(clp);
+	clp->cl_state = NFS4CLNT_OK;
+
+no_setclientid:
 	up_write(&clp->cl_sem);
 	
 	/*
@@ -1642,22 +1645,24 @@ nfs4_proc_commit_setup(struct nfs_write_data *data, u64 start, u32 len, int how)
 static void
 renew_done(struct rpc_task *task)
 {
-	struct nfs_server *server = (struct nfs_server *)task->tk_msg.rpc_resp;
+	struct nfs4_client *clp = (struct nfs4_client *)task->tk_msg.rpc_argp;
 	unsigned long timestamp = (unsigned long)task->tk_calldata;
-	renew_lease(server, timestamp);
+	spin_lock(&clp->cl_lock);
+	if (time_before(clp->cl_last_renewal,timestamp))
+		clp->cl_last_renewal = timestamp;
+	spin_unlock(&clp->cl_lock);
 }
 
 int
-nfs4_proc_async_renew(struct nfs_server *server, struct rpc_cred *cred)
+nfs4_proc_async_renew(struct nfs4_client *clp)
 {
 	struct rpc_message msg = {
 		.rpc_proc	= &nfs4_procedures[NFSPROC4_CLNT_RENEW],
-		.rpc_argp	= server->nfs4_state,
-		.rpc_resp	= server,
-		.rpc_cred	= cred,
+		.rpc_argp	= clp,
+		.rpc_cred	= clp->cl_cred,
 	};
 
-	return rpc_call_async(server->client, &msg, 0, renew_done, (void *)jiffies);
+	return rpc_call_async(clp->cl_rpcclient, &msg, 0, renew_done, (void *)jiffies);
 }
 
 /*

@@ -28,6 +28,7 @@
 #include <linux/nfs3.h>
 #include <linux/nfs4.h>
 #include <linux/nfs_xdr.h>
+#include <linux/workqueue.h>
 
 /*
  * Enable debugging support for nfs client.
@@ -493,6 +494,12 @@ struct nfs4_client {
 	struct rpc_clnt *	cl_rpcclient;
 	struct rpc_cred *	cl_cred;
 
+	struct list_head	cl_superblocks;	/* List of nfs_server structs */
+
+	unsigned long		cl_lease_time;
+	unsigned long		cl_last_renewal;
+	struct work_struct	cl_renewd;
+
 	/* Our own IP address, as a null-terminated string.
 	 * This is used to generate the clientid, and the callback address.
 	 */
@@ -545,13 +552,17 @@ struct nfs4_state {
 
 
 /* nfs4proc.c */
-extern int nfs4_proc_async_renew(struct nfs_server *server, struct rpc_cred *);
+extern int nfs4_proc_async_renew(struct nfs4_client *);
 extern int nfs4_do_close(struct inode *, struct nfs4_state *);
 
 /* nfs4renewd.c */
-extern int nfs4_init_renewd(struct nfs_server *server);
+extern void nfs4_schedule_state_renewal(struct nfs4_client *);
+extern void nfs4_renewd_prepare_shutdown(struct nfs_server *);
+extern void nfs4_kill_renewd(struct nfs4_client *);
 
 /* nfs4state.c */
+extern void init_nfsv4_state(struct nfs_server *);
+extern void destroy_nfsv4_state(struct nfs_server *);
 extern struct nfs4_client *nfs4_get_client(struct in_addr *);
 extern void nfs4_put_client(struct nfs4_client *clp);
 extern struct nfs4_state_owner * nfs4_get_state_owner(struct nfs_server *, struct rpc_cred *);
@@ -560,29 +571,13 @@ extern struct nfs4_state * nfs4_get_open_state(struct inode *, struct nfs4_state
 extern void nfs4_put_open_state(struct nfs4_state *);
 extern void nfs4_increment_seqid(u32 status, struct nfs4_state_owner *sp);
 
-
-
-
-
-
 struct nfs4_mount_data;
-static inline void
-destroy_nfsv4_state(struct nfs_server *server)
-{
-	if (server->mnt_path) {
-		kfree(server->mnt_path);
-		server->mnt_path = NULL;
-	}
-	if (server->nfs4_state) {
-		nfs4_put_client(server->nfs4_state);
-		server->nfs4_state = NULL;
-	}
-}
 #else
-#define create_nfsv4_state(server, data)  0
+#define init_nfsv4_state(server)  do { } while (0)
 #define destroy_nfsv4_state(server)       do { } while (0)
 #define nfs4_put_state_owner(inode, owner) do { } while (0)
 #define nfs4_put_open_state(state) do { } while (0)
+#define nfs4_renewd_prepare_shutdown(server) do { } while (0)
 #endif
 
 #endif /* __KERNEL__ */
