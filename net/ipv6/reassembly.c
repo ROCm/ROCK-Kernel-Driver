@@ -24,6 +24,9 @@
  *	Alexey Kuznetsov	SMP races, threading, cleanup.
  *	Patrick McHardy		LRU queue of frag heads for evictor.
  *	Mitsuru KANDA @USAGI	Register inet6_protocol{}.
+ *	David Stevens and
+ *	YOSHIFUJI,H. @USAGI	Always remove fragment header to
+ *				calculate ICV correctly.
  */
 #include <linux/config.h>
 #include <linux/errno.h>
@@ -584,7 +587,6 @@ static int ip6_frag_reasm(struct frag_queue *fq, struct sk_buff **skb_in,
 			  struct net_device *dev)
 {
 	struct sk_buff *fp, *head = fq->fragments;
-	int    remove_fraghdr = 0;
 	int    payload_len;
 	unsigned int nhoff;
 
@@ -597,12 +599,8 @@ static int ip6_frag_reasm(struct frag_queue *fq, struct sk_buff **skb_in,
 	payload_len = (head->data - head->nh.raw) - sizeof(struct ipv6hdr) + fq->len;
 	nhoff = head->h.raw - head->nh.raw;
 
-	if (payload_len > 65535) {
-		payload_len -= 8;
-		if (payload_len > 65535)
-			goto out_oversize;
-		remove_fraghdr = 1;
-	}
+	if (payload_len > 65535 + 8) {
+		goto out_oversize;
 
 	/* Head of list must not be cloned. */
 	if (skb_cloned(head) && pskb_expand_head(head, 0, 0, GFP_ATOMIC))
@@ -631,18 +629,13 @@ static int ip6_frag_reasm(struct frag_queue *fq, struct sk_buff **skb_in,
 		atomic_add(clone->truesize, &ip6_frag_mem);
 	}
 
-	/* Normally we do not remove frag header from datagram, but
-	 * we have to do this and to relocate header, when payload
-	 * is > 65535-8. */
-	if (remove_fraghdr) {
-		nhoff = fq->nhoffset;
-		head->nh.raw[nhoff] = head->h.raw[0];
-		memmove(head->head+8, head->head, (head->data-head->head)-8);
-		head->mac.raw += 8;
-		head->nh.raw += 8;
-	} else {
-		((struct frag_hdr*)head->h.raw)->frag_off = 0;
-	}
+	/* We have to remove fragment header from datagram and to relocate
+	 * header in order to calculate ICV correctly. */
+	nhoff = fq->nhoffset;
+	head->nh.raw[nhoff] = head->h.raw[0];
+	memmove(head->head+8, head->head, (head->data-head->head)-8);
+	head->mac.raw += 8;
+	head->nh.raw += 8;
 
 	skb_shinfo(head)->frag_list = head->next;
 	head->h.raw = head->data;
