@@ -36,12 +36,7 @@
 /*
  * movsl can be slow when source and dest are not both 8-byte aligned
  */
-#if defined(CONFIG_M586MMX) || defined(CONFIG_M686) || \
-	defined(CONFIG_MPENTIUMIII) || defined(CONFIG_MPENTIUM4)
-#define INTEL_MOVSL
-#endif
-
-#ifdef INTEL_MOVSL
+#ifdef CONFIG_X86_INTEL_USERCOPY
 extern struct movsl_mask {
 	int mask;
 } ____cacheline_aligned_in_smp movsl_mask;
