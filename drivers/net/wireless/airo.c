@@ -4634,7 +4634,7 @@ static void __devexit airo_pci_remove(struct pci_dev *pdev)
 
 static int __init airo_init_module( void )
 {
-	int i, rc = 0, have_isa_dev = 0;
+	int i, have_isa_dev = 0;
 
 	airo_entry = create_proc_entry("aironet",
 				       S_IFDIR | airo_perm,
@@ -4652,7 +4652,7 @@ static int __init airo_init_module( void )
 
 #ifdef CONFIG_PCI
 	printk( KERN_INFO "airo:  Probing for PCI adapters\n" );
-	rc = pci_module_init(&airo_driver);
+	pci_module_init(&airo_driver);
 	printk( KERN_INFO "airo:  Finished probing for PCI adapters\n" );
 #endif
 
@@ -4675,8 +4675,11 @@ static void __exit airo_cleanup_module( void )
 	}
 	remove_proc_entry("aironet", proc_root_driver);
 
-	if (is_pci)
+	if (is_pci) {
+#ifdef CONFIG_PCI
 		pci_unregister_driver(&airo_driver);
+#endif
+	}
 }
 
 #ifdef WIRELESS_EXT
