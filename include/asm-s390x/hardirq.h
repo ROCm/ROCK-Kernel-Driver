@@ -16,6 +16,7 @@
 #include <linux/threads.h>
 #include <asm/lowcore.h>
 #include <linux/sched.h>
+#include <linux/cache.h>
 
 /* entry.S is sensitive to the offsets of these fields */
 typedef struct {

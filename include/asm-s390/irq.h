@@ -10,13 +10,11 @@
  */
 #define __MAX_SUBCHANNELS 65536
 #define NR_IRQS           __MAX_SUBCHANNELS
+#define NR_CHPIDS 256
 
 #define LPM_ANYPATH 0xff /* doesn't really belong here, Ingo? */
 
 #define INVALID_STORAGE_AREA ((void *)(-1 - 0x3FFF ))
-
-extern int disable_irq(unsigned int);
-extern int enable_irq(unsigned int);
 
 /*
  * path management control word
@@ -362,6 +360,92 @@ typedef struct {
   /* extended part */
       ciw_t    ciw[MAX_CIWS];      /* variable # of CIWs */
    }  __attribute__ ((packed,aligned(4))) senseid_t;
+/*
+ * where we put the ssd info
+ */
+typedef struct _ssd_info {
+	__u8   valid:1;
+	__u8   type:7;          /* subchannel type */
+	__u8   chpid[8];        /* chpids */
+	__u16  fla[8];          /* full link addresses */
+} __attribute__ ((packed)) ssd_info_t;
+
+/*
+ * area for store event information
+ */
+typedef struct chsc_area_t {
+	struct {
+		/* word 0 */
+		__u16 command_code1;
+		__u16 command_code2;
+		union {
+			struct {
+				/* word 1 */
+				__u32 reserved1;
+				/* word 2 */
+				__u32 reserved2;
+			} __attribute__ ((packed,aligned(8))) sei_req;
+			struct {
+				/* word 1 */
+				__u16 reserved1;
+				__u16 f_sch;     /* first subchannel */
+				/* word 2 */
+				__u16 reserved2;
+				__u16 l_sch;    /* last subchannel */
+			} __attribute__ ((packed,aligned(8))) ssd_req;
+		} request_block_data;
+		/* word 3 */
+		__u32 reserved3;
+	} __attribute__ ((packed,aligned(8))) request_block;
+	struct {
+		/* word 0 */
+		__u16 length;
+		__u16 response_code;
+		/* word 1 */
+		__u32 reserved1;
+		union {
+			struct {
+				/* word 2 */
+				__u8  flags;
+				__u8  vf;         /* validity flags */
+				__u8  rs;         /* reporting source */
+				__u8  cc;         /* content code */
+				/* word 3 */
+				__u16 fla;        /* full link address */
+				__u16 rsid;       /* reporting source id */
+				/* word 4 */
+				__u32 reserved2;
+				/* word 5 */
+				__u32 reserved3;
+				/* word 6 */
+				__u32 ccdf;       /* content-code dependent field */
+				/* word 7 */
+				__u32 reserved4;
+				/* word 8 */
+				__u32 reserved5;
+				/* word 9 */
+				__u32 reserved6;
+			} __attribute__ ((packed,aligned(8))) sei_res;
+			struct {
+				/* word 2 */
+				__u8 sch_valid : 1;
+				__u8 dev_valid : 1;
+				__u8 st        : 3; /* subchannel type */
+				__u8 zeroes    : 3;
+				__u8  unit_addr;  /* unit address */
+				__u16 devno;      /* device number */
+				/* word 3 */
+				__u8 path_mask;  
+				__u8 fla_valid_mask;
+				__u16 sch;        /* subchannel */
+				/* words 4-5 */
+				__u8 chpid[8];    /* chpids 0-7 */
+				/* words 6-9 */
+				__u16 fla[8];     /* full link addresses 0-7 */
+			} __attribute__ ((packed,aligned(8))) ssd_res;
+		} response_block_data;
+	} __attribute__ ((packed,aligned(8))) response_block;
+} __attribute__ ((packed,aligned(PAGE_SIZE))) chsc_area_t;
 
 #endif /* __KERNEL__ */
 /*
@@ -491,6 +575,7 @@ typedef struct {
                                         /* ... for suspended CCWs */
 #define DOIO_TIMEOUT             0x0080 /* 3 secs. timeout for sync. I/O */
 #define DOIO_DONT_CALL_INTHDLR   0x0100 /* don't call interrupt handler */
+#define DOIO_CANCEL_ON_TIMEOUT   0x0200 /* cancel I/O if it timed out */
 
 /*
  * do_IO()
@@ -513,11 +598,6 @@ int do_IO( int            irq,          /* IRQ aka. subchannel number */
            __u8           lpm,          /* logical path mask */
            unsigned long  flag);        /* flags : see above */
 
-int start_IO( int           irq,       /* IRQ aka. subchannel number */
-              ccw1_t       *cpa,       /* logical channel program address */
-              unsigned long  intparm,   /* interruption parameter */
-              __u8          lpm,       /* logical path mask */
-              unsigned int  flag);     /* flags : see above */
 
 void do_crw_pending( void  );	         /* CRW handler */
 
@@ -531,22 +611,12 @@ int clear_IO( int           irq,         /* IRQ aka. subchannel number */
               unsigned long intparm,     /* dummy intparm */
               unsigned long flag);       /* possible DOIO_WAIT_FOR_INTERRUPT */
 
-int process_IRQ( struct pt_regs regs,
-                 unsigned int   irq,
-                 unsigned int   intparm);
-
-
-int enable_cpu_sync_isc ( int irq );
-int disable_cpu_sync_isc( int irq );
-
 typedef struct {
      int          irq;                  /* irq, aka. subchannel */
      __u16        devno;                /* device number */
      unsigned int status;               /* device status */
      senseid_t    sid_data;             /* senseID data */
      } s390_dev_info_t;
-
-int get_dev_info( int irq, s390_dev_info_t *);   /* to be eliminated - don't use */
 
 int get_dev_info_by_irq  ( int irq, s390_dev_info_t *pdi);
 int get_dev_info_by_devno( __u16 devno, s390_dev_info_t *pdi);
@@ -560,8 +630,6 @@ int get_irq_next ( int irq );
 int read_dev_chars( int irq, void **buffer, int length );
 int read_conf_data( int irq, void **buffer, int *length, __u8 lpm );
 
-int  s390_DevicePathVerification( int irq, __u8 domask );
-
 int s390_request_irq_special( int                      irq,
                               io_handler_func_t        io_handler,
                               not_oper_handler_func_t  not_oper_handler,
@@ -570,7 +638,6 @@ int s390_request_irq_special( int                      irq,
                               void                    *dev_id);
 
 extern int set_cons_dev(int irq);
-extern int reset_cons_dev(int irq);
 extern int wait_cons_dev(int irq);
 extern schib_t *s390_get_schib( int irq );
 
@@ -630,11 +697,6 @@ extern __inline__ int msch_err(int irq, volatile schib_t *addr)
                 "   .align 8\n"
                 "   .quad 0b,2b\n"
                 ".previous"
-                "    lr   1,%1\n"
-                "    msch 0(%2)\n"
-                "0:  ipm  %0\n"
-                "    srl  %0,28\n"
-                "1:\n"
 #else
                 ".section .fixup,\"ax\"\n"
                 "2:  l    %0,%3\n"
@@ -743,6 +805,21 @@ extern __inline__ int hsch(int irq)
         return ccode;
 }
 
+extern __inline__ int xsch(int irq)
+{
+	int ccode;
+	
+	__asm__ __volatile__(
+                "   lr    1,%1\n"
+                "   .insn rre,0xb2760000,%1,0\n"
+                "   ipm   %0\n"
+                "   srl   %0,28"
+                : "=d" (ccode) 
+		: "d" (irq | 0x10000L)
+                : "cc", "1" );
+	return ccode;
+}
+
 extern __inline__ int iac( void)
 {
         int ccode;
@@ -805,6 +882,20 @@ extern __inline__ int diag210( diag210_t * addr)
                 : "cc" );
         return ccode;
 }
+extern __inline__ int chsc( chsc_area_t * chsc_area)
+{
+	int cc;
+	
+	__asm__ __volatile__ (
+	        ".insn	rre,0xb25f0000,%1,0	\n\t"
+		"ipm	%0	\n\t"
+		"srl	%0,28	\n\t"
+		: "=d" (cc) 
+		: "d" (chsc_area) 
+		: "cc" );
+	
+	return cc;
+}
 
 /*
  * Various low-level irq details needed by irq.c, process.c,
@@ -812,13 +903,6 @@ extern __inline__ int diag210( diag210_t * addr)
  *
  * Interrupt entry/exit code at both C and assembly level
  */
-
-void mask_irq(unsigned int irq);
-void unmask_irq(unsigned int irq);
-
-#define MAX_IRQ_SOURCES 128
-
-extern spinlock_t irq_controller_lock;
 
 #ifdef CONFIG_SMP
 
@@ -849,17 +933,10 @@ static inline void irq_exit(int cpu, unsigned int irq)
 #define __STR(x) #x
 #define STR(x) __STR(x)
 
-#ifdef CONFIG_SMP
-
-/*
- *      SMP has a few special interrupts for IPI messages
- */
-
-#endif /* CONFIG_SMP */
-
 /*
  * x86 profiling function, SMP safe. We might want to do this in
  * assembly totally?
+ * is this ever used anyway?
  */
 extern char _stext;
 static inline void s390_do_profile (unsigned long addr)
@@ -883,16 +960,19 @@ static inline void s390_do_profile (unsigned long addr)
 
 #include <asm/s390io.h>
 
+#define get_irq_lock(irq) &ioinfo[irq]->irq_lock
+
 #define s390irq_spin_lock(irq) \
-        spin_lock(&(ioinfo[irq]->irq_lock))
+        spin_lock(get_irq_lock(irq))
 
 #define s390irq_spin_unlock(irq) \
-        spin_unlock(&(ioinfo[irq]->irq_lock))
+        spin_unlock(get_irq_lock(irq))
 
 #define s390irq_spin_lock_irqsave(irq,flags) \
-        spin_lock_irqsave(&(ioinfo[irq]->irq_lock), flags)
+        spin_lock_irqsave(get_irq_lock(irq), flags)
+
 #define s390irq_spin_unlock_irqrestore(irq,flags) \
-        spin_unlock_irqrestore(&(ioinfo[irq]->irq_lock), flags)
+        spin_unlock_irqrestore(get_irq_lock(irq), flags)
 
 #define touch_nmi_watchdog() do { } while(0)
 

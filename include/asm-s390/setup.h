@@ -13,7 +13,7 @@
 #define RAMDISK_ORIGIN		0x800000
 #define RAMDISK_SIZE		0x800000
 
-#ifndef __ASSEMBLER__
+#ifndef __ASSEMBLY__
 
 #define IPL_DEVICE        (*(unsigned long *)  (0x10404))
 #define INITRD_START      (*(unsigned long *)  (0x1040C))

@@ -18,9 +18,12 @@
 typedef struct _ioinfo {
      unsigned int  irq;           /* aka. subchannel number */
      spinlock_t    irq_lock;      /* irq lock */
+     void          *private_data; /* pointer to private data */
 
      struct _ioinfo *prev;
      struct _ioinfo *next;
+
+     __u8          st;            /* subchannel type */	
 
      union {
         unsigned int info;
@@ -50,10 +53,9 @@ typedef struct _ioinfo {
            unsigned int  esid      : 1;  /* Ext. SenseID supported by HW */
            unsigned int  rcd       : 1;  /* RCD supported by HW */
            unsigned int  repnone   : 1;  /* don't call IRQ handler on interrupt */
-           unsigned int  newreq    : 1;  /* new register interface */
            unsigned int  dval      : 1;  /* device number valid */
            unsigned int  unknown   : 1;  /* unknown device - if SenseID failed */
-           unsigned int  unused    : (sizeof(unsigned int)*8 - 24); /* unused */
+           unsigned int  unused    : (sizeof(unsigned int)*8 - 23); /* unused */
               } __attribute__ ((packed)) flags;
         } ui;
 
@@ -75,6 +77,7 @@ typedef struct _ioinfo {
      unsigned long qintparm;      /* queued interruption parameter  */
      unsigned long qflag;         /* queued flags */
      __u8          qlpm;          /* queued logical path mask */
+     ssd_info_t    ssd_info;      /* subchannel description */
 
    } __attribute__ ((aligned(8))) ioinfo_t;
 
@@ -89,6 +92,12 @@ typedef struct _ioinfo {
 #define IOINFO_FLAGS_REPALL  0x00800000
 
 extern ioinfo_t *ioinfo[];
+int s390_set_private_data(int irq, void * data);
+void * s390_get_private_data(int irq);
+
+#define CHSC_SEI_ACC_CHPID        1
+#define CHSC_SEI_ACC_LINKADDR     2
+#define CHSC_SEI_ACC_FULLLINKADDR 3
 
 #endif  /* __s390io_h */
 

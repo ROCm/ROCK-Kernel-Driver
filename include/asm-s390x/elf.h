@@ -77,7 +77,13 @@ typedef s390_regs elf_gregset_t;
 #define ELF_PLATFORM (NULL)
 
 #ifdef __KERNEL__
-#define SET_PERSONALITY(ex, ibcs2) set_personality((ibcs2)?PER_SVR4:PER_LINUX)
+#define SET_PERSONALITY(ex, ibcs2)			\
+do {							\
+	if (ibcs2)					\
+		set_personality(PER_SVR4);		\
+	else if (current->personality != PER_LINUX32)	\
+		set_personality(PER_LINUX);		\
+} while (0)
 #endif
 
 #endif

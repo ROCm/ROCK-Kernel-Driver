@@ -16,6 +16,7 @@
 #include <asm/page.h>
 #include <asm/ptrace.h>
 
+#ifdef __KERNEL__
 /*
  * Default implementation of macro that returns current
  * instruction pointer ("program counter").
@@ -61,11 +62,8 @@ extern struct task_struct *last_task_used_math;
  */
 #define TASK_UNMAPPED_BASE      (TASK_SIZE / 2)
 
-#define THREAD_SIZE (2*PAGE_SIZE)
-
 typedef struct {
-        unsigned long seg;
-        unsigned long acc4;
+        __u32 ar4;
 } mm_segment_t;
 
 /* if you change the thread_struct structure, you must
@@ -74,8 +72,6 @@ typedef struct {
 
 struct thread_struct
  {
-
-        struct pt_regs *regs;         /* the user registers can be found on*/
 	s390_fp_regs fp_regs;
         __u32   ar2;                   /* kernel access register 2         */
         __u32   ar4;                   /* kernel access register 4         */
@@ -84,8 +80,6 @@ struct thread_struct
         __u32   error_code;            /* error-code of last prog-excep.   */
         __u32   prot_addr;             /* address of protection-excep.     */
         __u32   trap_no;
-        /* perform syscall argument validation (get/set_fs) */
-        mm_segment_t fs;
         per_struct per_info;/* Must be aligned on an 4 byte boundary*/
 	/* Used to give failing instruction back to user for ieee exceptions */
 	addr_t  ieee_instruction_pointer; 
@@ -95,14 +89,12 @@ struct thread_struct
 
 typedef struct thread_struct thread_struct;
 
-#define INIT_THREAD { (struct pt_regs *) 0,                       \
-                    { 0,{{0},{0},{0},{0},{0},{0},{0},{0},{0},{0}, \
+#define INIT_THREAD {{0,{{0},{0},{0},{0},{0},{0},{0},{0},{0},{0}, \
 			    {0},{0},{0},{0},{0},{0}}},            \
                      0, 0,                                        \
                     sizeof(init_stack) + (__u32) &init_stack,     \
               (__pa((__u32) &swapper_pg_dir[0]) + _SEGMENT_TABLE),\
                      0,0,0,                                       \
-                     (mm_segment_t) { 0,1},                       \
                      (per_struct) {{{{0,}}},0,0,0,0,{{0,}}},      \
                      0, 0                                         \
 }
@@ -115,6 +107,7 @@ typedef struct thread_struct thread_struct;
 } while (0)
 
 /* Forward declaration, a strange C thing */
+struct task_struct;
 struct mm_struct;
 
 /* Free all resources held by a thread. */
@@ -126,28 +119,20 @@ extern int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags);
 #define release_segments(mm)            do { } while (0)
 
 /*
- * Return saved PC of a blocked thread. used in kernel/sched
+ * Return saved PC of a blocked thread.
  */
-extern inline unsigned long thread_saved_pc(struct thread_struct *t)
-{
-        return (t->regs) ? ((unsigned long)t->regs->psw.addr) : 0;
-}
+extern unsigned long thread_saved_pc(struct task_struct *t);
+
+/*
+ * Print register of task into buffer. Used in fs/proc/array.c.
+ */
+extern char *task_show_regs(struct task_struct *task, char *buffer);
 
 unsigned long get_wchan(struct task_struct *p);
-#define KSTK_EIP(tsk)   ((tsk)->thread.regs->psw.addr)
-#define KSTK_ESP(tsk)   ((tsk)->thread.ksp)
-
-/* Allocation and freeing of basic task resources. */
-/*
- * NOTE! The task struct and the stack go together
- */
-#define alloc_task_struct() \
-        ((struct task_struct *) __get_free_pages(GFP_KERNEL,1))
-#define free_task_struct(p)     free_pages((unsigned long)(p),1)
-#define get_task_struct(tsk)      atomic_inc(&virt_to_page(tsk)->count)
-
-#define init_task       (init_task_union.task)
-#define init_stack      (init_task_union.stack)
+#define __KSTK_PTREGS(tsk) ((struct pt_regs *) \
+        (((addr_t) tsk->thread_info + THREAD_SIZE - sizeof(struct pt_regs)) & -8L))
+#define KSTK_EIP(tsk)	(__KSTK_PTREGS(tsk)->psw.addr)
+#define KSTK_ESP(tsk)	(__KSTK_PTREGS(tsk)->gprs[15])
 
 #define cpu_relax()	do { } while (0)
 
@@ -163,6 +148,46 @@ unsigned long get_wchan(struct task_struct *p);
 #define PSW_PER_MASK            0x40000000UL
 #define USER_STD_MASK           0x00000080UL
 #define PSW_PROBLEM_STATE       0x00010000UL
+
+/*
+ * Set PSW mask to specified value, while leaving the
+ * PSW addr pointing to the next instruction.
+ */
+
+static inline void __load_psw_mask (unsigned long mask)
+{
+	unsigned long addr;
+
+	psw_t psw;
+	psw.mask = mask;
+
+	asm volatile (
+		"    basr %0,0\n"
+		"0:  ahi  %0,1f-0b\n"
+		"    st   %0,4(%1)\n"
+		"    lpsw 0(%1)\n"
+		"1:"
+		: "=&d" (addr) : "a" (&psw) : "memory", "cc" );
+}
+ 
+/*
+ * Function to stop a processor until an interruption occured
+ */
+static inline void enabled_wait(void)
+{
+	unsigned long reg;
+	psw_t wait_psw;
+
+	wait_psw.mask = 0x070e0000;
+	asm volatile (
+		"    basr %0,0\n"
+		"0:  la   %0,1f-0b(%0)\n"
+		"    st   %0,4(%1)\n"
+		"    oi   4(%1),0x80\n"
+		"    lpsw 0(%1)\n"
+		"1:"
+		: "=&a" (reg) : "a" (&wait_psw) : "memory", "cc" );
+}
 
 /*
  * Function to drop a processor into disabled wait state
@@ -199,5 +224,7 @@ static inline void disabled_wait(unsigned long code)
                       "    lpsw 0(%0)"
                       : : "a" (dw_psw), "a" (&ctl_buf) : "cc" );
 }
+
+#endif
 
 #endif                                 /* __ASM_S390_PROCESSOR_H           */
