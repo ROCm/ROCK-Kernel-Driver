@@ -633,21 +633,21 @@ repeat:
 		 * disk then we cannot do copy-out here. */
 
 		if (jh->b_jlist == BJ_Shadow) {
-			wait_queue_head_t *wqh;
-			DEFINE_WAIT(wait);
+			DEFINE_WAIT_BIT(wait, &bh->b_state, BH_Lock);
+			wait_queue_head_t *wqh
+					= bit_waitqueue(&bh->b_state, BH_Lock);
 
 			JBUFFER_TRACE(jh, "on shadow: sleep");
 			jbd_unlock_bh_state(bh);
 			/* commit wakes up all shadow buffers after IO */
-			wqh = bh_waitq_head(bh);
 			for ( ; ; ) {
-				prepare_to_wait(wqh, &wait,
+				prepare_to_wait(wqh, &wait.wait,
 						TASK_UNINTERRUPTIBLE);
 				if (jh->b_jlist != BJ_Shadow)
 					break;
 				schedule();
 			}
-			finish_wait(wqh, &wait);
+			finish_wait(wqh, &wait.wait);
 			goto repeat;
 		}
 

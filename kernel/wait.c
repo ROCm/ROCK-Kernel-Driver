@@ -8,6 +8,7 @@
 #include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/wait.h>
+#include <linux/hash.h>
 
 void fastcall add_wait_queue(wait_queue_head_t *q, wait_queue_t *wait)
 {
@@ -187,3 +188,13 @@ void fastcall __wake_up_bit(wait_queue_head_t *wq, void *word, int bit)
 		__wake_up(wq, TASK_INTERRUPTIBLE|TASK_UNINTERRUPTIBLE, 1, &key);
 }
 EXPORT_SYMBOL(__wake_up_bit);
+
+fastcall wait_queue_head_t *bit_waitqueue(void *word, int bit)
+{
+	const int shift = BITS_PER_LONG == 32 ? 5 : 6;
+	const struct zone *zone = page_zone(virt_to_page(word));
+	unsigned long val = (unsigned long)word << shift | bit;
+
+	return &zone->wait_table[hash_long(val, zone->wait_table_bits)];
+}
+EXPORT_SYMBOL(bit_waitqueue);

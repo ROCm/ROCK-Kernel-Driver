@@ -24,6 +24,7 @@
 #include <linux/stddef.h>
 #include <linux/spinlock.h>
 #include <asm/system.h>
+#include <asm/current.h>
 
 typedef struct __wait_queue wait_queue_t;
 typedef int (*wait_queue_func_t)(wait_queue_t *wait, unsigned mode, int sync, void *key);
@@ -141,6 +142,22 @@ extern void FASTCALL(__wake_up_sync(wait_queue_head_t *q, unsigned int mode, int
 void FASTCALL(__wake_up_bit(wait_queue_head_t *, void *, int));
 int FASTCALL(__wait_on_bit(wait_queue_head_t *, struct wait_bit_queue *, void *, int, int (*)(void *), unsigned));
 int FASTCALL(__wait_on_bit_lock(wait_queue_head_t *, struct wait_bit_queue *, void *, int, int (*)(void *), unsigned));
+wait_queue_head_t *FASTCALL(bit_waitqueue(void *, int));
+
+/**
+ * wake_up_bit - wake up a waiter on a bit
+ * @word: the word being waited on, a kernel virtual address
+ * @bit: the bit of the word being waited on
+ *
+ * There is a standard hashed waitqueue table for generic use. This
+ * is the part of the hashtable's accessor API that wakes up waiters
+ * on a bit. For instance, if one were to have waiters on a bitflag,
+ * one would call wake_up_bit() after clearing the bit.
+ */
+static inline void wake_up_bit(void *word, int bit)
+{
+	__wake_up_bit(bit_waitqueue(word, bit), word, bit);
+}
 
 #define wake_up(x)			__wake_up(x, TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE, 1, NULL)
 #define wake_up_nr(x, nr)		__wake_up(x, TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE, nr, NULL)
@@ -344,6 +361,62 @@ int wake_bit_function(wait_queue_t *wait, unsigned mode, int sync, void *key);
 		wait->func = autoremove_wake_function;			\
 		INIT_LIST_HEAD(&wait->task_list);			\
 	} while (0)
+
+/**
+ * wait_on_bit - wait for a bit to be cleared
+ * @word: the word being waited on, a kernel virtual address
+ * @bit: the bit of the word being waited on
+ * @action: the function used to sleep, which may take special actions
+ * @mode: the task state to sleep in
+ *
+ * There is a standard hashed waitqueue table for generic use. This
+ * is the part of the hashtable's accessor API that waits on a bit.
+ * For instance, if one were to have waiters on a bitflag, one would
+ * call wait_on_bit() in threads waiting for the bit to clear.
+ * One uses wait_on_bit() where one is waiting for the bit to clear,
+ * but has no intention of setting it.
+ */
+static inline int wait_on_bit(void *word, int bit,
+				int (*action)(void *), unsigned mode)
+{
+	DEFINE_WAIT_BIT(q, word, bit);
+	wait_queue_head_t *wqh;
+
+	if (!test_and_set_bit(bit, word))
+		return 0;
+
+	wqh = bit_waitqueue(word, bit);
+	return __wait_on_bit(wqh, &q, word, bit, action, mode);
+}
+
+/**
+ * wait_on_bit_lock - wait for a bit to be cleared, when wanting to set it
+ * @word: the word being waited on, a kernel virtual address
+ * @bit: the bit of the word being waited on
+ * @action: the function used to sleep, which may take special actions
+ * @mode: the task state to sleep in
+ *
+ * There is a standard hashed waitqueue table for generic use. This
+ * is the part of the hashtable's accessor API that waits on a bit
+ * when one intends to set it, for instance, trying to lock bitflags.
+ * For instance, if one were to have waiters trying to set bitflag
+ * and waiting for it to clear before setting it, one would call
+ * wait_on_bit() in threads waiting to be able to set the bit.
+ * One uses wait_on_bit_lock() where one is waiting for the bit to
+ * clear with the intention of setting it, and when done, clearing it.
+ */
+static inline int wait_on_bit_lock(void *word, int bit,
+				int (*action)(void *), unsigned mode)
+{
+	DEFINE_WAIT_BIT(q, word, bit);
+	wait_queue_head_t *wqh;
+
+	if (!test_bit(bit, word))
+		return 0;
+
+	wqh = bit_waitqueue(word, bit);
+	return __wait_on_bit_lock(wqh, &q, word, bit, action, mode);
+}
 	
 #endif /* __KERNEL__ */
 
