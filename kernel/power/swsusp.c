@@ -467,22 +467,30 @@ static int save_highmem_zone(struct zone *zone)
 	}
 	return 0;
 }
+#endif /* CONFIG_HIGHMEM */
+
 
 static int save_highmem(void)
 {
+#ifdef CONFIG_HIGHMEM
 	struct zone *zone;
 	int res = 0;
+
+	pr_debug("swsusp: Saving Highmem\n");
 	for_each_zone(zone) {
 		if (is_highmem(zone))
 			res = save_highmem_zone(zone);
 		if (res)
 			return res;
 	}
+#endif
 	return 0;
 }
 
 static int restore_highmem(void)
 {
+#ifdef CONFIG_HIGHMEM
+	printk("swsusp: Restoring Highmem\n");
 	while (highmem_copy) {
 		struct highmem_page *save = highmem_copy;
 		void *kaddr;
@@ -494,9 +502,10 @@ static int restore_highmem(void)
 		free_page((long) save->data);
 		kfree(save);
 	}
+#endif
 	return 0;
 }
-#endif
+
 
 static int pfn_is_nosave(unsigned long pfn)
 {
@@ -780,15 +789,11 @@ int suspend_prepare_image(void)
 {
 	unsigned int nr_needed_pages = 0;
 
-	printk( "/critical section: ");
-#ifdef CONFIG_HIGHMEM
-	printk( "handling highmem" );
+	pr_debug("swsusp: critical section: \n");
 	if (save_highmem()) {
 		printk(KERN_CRIT "%sNot enough free pages for highmem\n", name_suspend);
 		return -ENOMEM;
 	}
-	printk(", ");
-#endif
 
 	drain_local_pages();
 	count_data_pages();
@@ -809,7 +814,7 @@ int suspend_prepare_image(void)
 	 * touch swap space! Except we must write out our image of course.
 	 */
 
-	printk( "critical section/: done (%d pages copied)\n", nr_copy_pages );
+	printk("swsusp: critical section/: done (%d pages copied)\n", nr_copy_pages );
 	return 0;
 }
 
@@ -876,6 +881,7 @@ int swsusp_resume(void)
 	save_processor_state();
 	error = swsusp_arch_resume();
 	restore_processor_state();
+	restore_highmem();
 	local_irq_enable();
 	return error;
 }
