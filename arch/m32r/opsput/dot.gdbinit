@@ -7,6 +7,39 @@ set radix 0d16
 set height 0
 debug_chaos
 
+# clk xin:cpu:bus=1:8:1
+define clock_init_on_181
+  set *(unsigned long *)0x00ef400c = 0x2
+  set *(unsigned long *)0x00ef4004 = 0x1
+  shell sleep 0.1
+  set *(unsigned long *)0x00ef4000 = 0x101
+end
+# clk xin:cpu:bus=1:8:2
+define clock_init_on_182
+  set *(unsigned long *)0x00ef400c = 0x1
+  set *(unsigned long *)0x00ef4004 = 0x1
+  shell sleep 0.1
+  set *(unsigned long *)0x00ef4000 = 0x101
+end
+
+# clk xin:cpu:bus=1:8:4
+define clock_init_on_184
+  set *(unsigned long *)0x00ef400c = 0x0
+  set *(unsigned long *)0x00ef4004 = 0x1
+  shell sleep 0.1
+  set *(unsigned long *)0x00ef4000 = 0x101
+end
+
+# clk xin:cpu:bus=1:1:1
+define clock_init_off
+  shell sleep 0.1
+  set *(unsigned long *)0x00ef4000 = 0x0
+  shell sleep 0.1
+  set *(unsigned long *)0x00ef4004 = 0x0
+  shell sleep 0.1
+  set *(unsigned long *)0x00ef400c = 0x0
+end
+
 define tlb_init
   set $tlbbase = 0xfe000000
   set *(unsigned long *)($tlbbase + 0x04) = 0x0
@@ -83,7 +116,7 @@ end
 
 # Set kernel parameters
 define set_kernel_parameters
-  set $param = (void*)0x88002000
+  set $param = (void*)0x88001000
   # INITRD_START
 #  set *(unsigned long *)($param + 0x0010) = 0x08300000
   # INITRD_SIZE
@@ -97,7 +130,7 @@ define set_kernel_parameters
   # M32R_TIMER_DIVIDE
   set *(unsigned long *)($param + 0x0020) = 0d128
 
-  set {char[0x200]}($param + 0x100) = "console=ttyD0,115200n8x\
+  set {char[0x200]}($param + 0x100) = "console=ttyS0,115200n8x console=tty1 \
   root=/dev/nfsroot \
   nfsroot=192.168.0.1:/project/m32r-linux/export/root.2.6 \
   nfsaddrs=192.168.0.101:192.168.0.1:192.168.0.1:255.255.255.0:mappi001 \
@@ -106,16 +139,11 @@ end
 
 define boot
   set_kernel_parameters
-  set $pc=0x88001000
+  set $pc=0x88002000
   set $fp=0
   set $evb=0x88000000
-  # I/D-Cache ON
-
-# IPI
-#  set *(long *)0x00eff2f8 = 0x2
-  set $fp=0
-#  set *(unsigned long *)0xa0ef4000 = 0x100
   si
+  c
 end
 
 # Show TLB entries
@@ -151,11 +179,29 @@ define show_regs
   printf "EVB[%08lx]\n",$evb
 end
 
+define restart
+  sdireset
+  sdireset
+  en 1
+  set $pc=0x0
+  c
+  tlb_init
+  setup
+  load_modules
+  boot
+end
+
 define setup
   debug_chaos
+# Clock
+#  shell sleep 0.1
+#  clock_init_off
+#  shell sleep 1
+#  clock_init_on_182
+#  shell sleep 0.1
+# SDRAM
   set *(unsigned long *)0xa0ef6004 = 0x0001053f
   set *(unsigned long *)0xa0ef6028 = 0x00031102
-#  set *(unsigned long *)0xa0ef400c = 0x2
 end
 
 sdireset
@@ -165,16 +211,8 @@ target m32rsdi
 set $pc=0x0
 b *0x30000
 c
+dis 1
 setup
 tlb_init
 load_modules
-#set *(long *)0xa0ef4000=0x101
-#set *(long *)0xa0ef400c=0x002
-
 boot
-#b tme_handler
-b *0x88000020
-
-
-
-
