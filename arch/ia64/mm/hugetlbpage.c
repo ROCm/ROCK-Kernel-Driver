@@ -392,8 +392,6 @@ int set_hugetlb_mem_size(int count)
 {
 	int  lcount;
 	struct page *page ;
-	extern long htlbzone_pages;
-	extern struct list_head htlbpage_freelist;
 
 	if (count < 0)
 		lcount = count;
