@@ -10830,115 +10830,58 @@ qeth_recover_store(struct device *dev, const char *buf, size_t count)
 
 static DEVICE_ATTR(recover, 0200, 0, qeth_recover_store);
 
+static ssize_t
+qeth_card_type_show(struct device *dev, char *buf)
+{
+	struct qeth_card *card = dev->driver_data;
+
+	if (!card)
+		return -EINVAL;
+
+	if (!atomic_read(&card->is_softsetup))
+		return sprintf(buf, "n/a\n");
+
+	return sprintf(buf, "%s\n",
+		       qeth_get_cardname_short(card->type, card->link_type,
+					       card->is_guest_lan));
+}
+
+static DEVICE_ATTR(card_type, 0444, qeth_card_type_show, NULL);
+
+static struct attribute * qeth_attrs[] = {
+	&dev_attr_bufcnt.attr,
+	&dev_attr_portname.attr,
+	&dev_attr_route4.attr,
+	&dev_attr_route6.attr,
+	&dev_attr_checksumming.attr,
+	&dev_attr_priority_queueing.attr,
+	&dev_attr_portno.attr,
+	&dev_attr_polltime.attr,
+	&dev_attr_add_hhlen.attr,
+	&dev_attr_enable_takeover.attr,
+	&dev_attr_canonical_macaddr.attr,
+	&dev_attr_fake_broadcast.attr,
+	&dev_attr_fake_ll.attr,
+	&dev_attr_broadcast_mode.attr,
+	&dev_attr_recover.attr,
+	&dev_attr_card_type.attr,
+	NULL,
+};
+
+static struct attribute_group qeth_attr_group = {
+	.attrs = qeth_attrs,
+};
+
 static inline int
 __qeth_create_attributes(struct device *dev)
 {
-	int ret;
+	return sysfs_create_group(&dev->kobj, &qeth_attr_group);
+}
 
-	ret = device_create_file(dev, &dev_attr_bufcnt);
-	if (ret != 0)
-		goto out_nobufcnt;
-
-	ret = device_create_file(dev, &dev_attr_portname);
-	if (ret != 0)
-		goto out_noportname;
-
-	ret = device_create_file(dev, &dev_attr_route4);
-	if (ret != 0)
-		goto out_noroute4;
-
-	ret = device_create_file(dev, &dev_attr_route6);
-	if (ret != 0)
-		goto out_noroute6;
-
-	ret = device_create_file(dev, &dev_attr_checksumming);
-	if (ret != 0)
-		goto out_nochecksum;
-
-	ret = device_create_file(dev, &dev_attr_priority_queueing);
-	if (ret != 0)
-		goto out_noprioq;
-
-	ret = device_create_file(dev, &dev_attr_portno);
-	if (ret != 0)
-		goto out_noportno;
-
-	ret = device_create_file(dev, &dev_attr_contig);
-	if (ret != 0)
-		goto out_nocontig;
-
-	ret = device_create_file(dev, &dev_attr_polltime);
-	if (ret != 0)
-		goto out_nopolltime;
-
-	ret = device_create_file(dev, &dev_attr_add_hhlen);
-	if (ret != 0)
-		goto out_nohhlen;
-
-	ret = device_create_file(dev, &dev_attr_enable_takeover);
-	if (ret != 0)
-		goto out_noipat;
-
-	ret = device_create_file(dev, &dev_attr_canonical_macaddr);
-	if (ret != 0)
-		goto out_nomac;
-	
-	ret = device_create_file(dev, &dev_attr_fake_broadcast);
-	if (ret != 0)
-		goto out_nofakebr;
-
-	ret = device_create_file(dev, &dev_attr_fake_ll);
-	if (ret != 0)
-		goto out_nofakell;
-
-	ret = device_create_file(dev, &dev_attr_async_hsi);
-	if (ret != 0)
-		goto out_nohsi;
-
-	ret = device_create_file(dev, &dev_attr_broadcast_mode);
-	if (ret != 0)
-		goto out_nobrmode;
-
-	ret = device_create_file(dev, &dev_attr_recover);
-	if (ret != 0)
-		goto out_norecover;
-
-	return 0;
-
-out_norecover:
-	device_remove_file(dev, &dev_attr_broadcast_mode);
-out_nobrmode:
-	device_remove_file(dev, &dev_attr_async_hsi);
-out_nohsi:
-	device_remove_file(dev, &dev_attr_fake_ll);
-out_nofakell:
-	device_remove_file(dev, &dev_attr_fake_broadcast);
-out_nofakebr:
-	device_remove_file(dev, &dev_attr_canonical_macaddr);
-out_nomac:
-	device_remove_file(dev, &dev_attr_enable_takeover);
-out_noipat:
-	device_remove_file(dev, &dev_attr_add_hhlen);
-out_nohhlen:
-	device_remove_file(dev, &dev_attr_polltime);
-out_nopolltime:
-	device_remove_file(dev, &dev_attr_contig);
-out_nocontig:
-	device_remove_file(dev, &dev_attr_portno);
-out_noportno:
-	device_remove_file(dev, &dev_attr_priority_queueing);
-out_noprioq:
-	device_remove_file(dev, &dev_attr_checksumming);
-out_nochecksum:
-	device_remove_file(dev, &dev_attr_route6);
-out_noroute6:
-	device_remove_file(dev, &dev_attr_route4);
-out_noroute4:
-	device_remove_file(dev, &dev_attr_portname);
-out_noportname:
-	device_remove_file(dev, &dev_attr_bufcnt);
-out_nobufcnt:
-	return ret;
+static inline void
+__qeth_remove_attributes(struct device *dev)
+{
+	sysfs_remove_group(&dev->kobj, &qeth_attr_group);
 }
 
 static int
@@ -11060,6 +11003,7 @@ qeth_remove_device(struct ccwgroup_device *gdev)
 {
 	struct qeth_card *card = gdev->dev.driver_data;
 
+	__qeth_remove_attributes(&gdev->dev);
 	gdev->dev.driver_data = NULL;
 	if (card)
 		kfree(card);

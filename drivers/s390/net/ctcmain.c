@@ -2786,18 +2786,25 @@ ctc_proto_store(struct device *dev, const char *buf, size_t count)
 
 static DEVICE_ATTR(protocol, 0644, ctc_proto_show, ctc_proto_store);
 
+static struct attribute *ctc_attr[] = {
+	&dev_attr_protocol.attr,
+	NULL,
+};
+
+static struct attribute_group ctc_attr_group = {
+	.attrs = ctc_attr,
+};
+
 static int
 ctc_add_files(struct device *dev)
 {
-	return device_create_file(dev, &dev_attr_protocol);
-
+	return sysfs_create_group(&dev->kobj, &ctc_attr_group);
 }
 
 static void
 ctc_remove_files(struct device *dev)
 {
-	device_remove_file(dev, &dev_attr_protocol);
-
+	sysfs_remove_group(&dev->kobj, &ctc_attr_group);
 }
 
 /**

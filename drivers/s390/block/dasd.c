@@ -1996,20 +1996,22 @@ dasd_discipline_show(struct device *dev, char *buf)
 
 static DEVICE_ATTR(discipline, 0444, dasd_discipline_show, NULL);
 
+static struct attribute * dasd_attrs[] = {
+	//&dev_attr_dasd.attr,
+	&dev_attr_readonly.attr,
+	&dev_attr_discipline.attr,
+	&dev_attr_use_diag.attr,
+	NULL,
+};
+
+static struct attribute_group dasd_attr_group = {
+	.attrs = dasd_attrs,
+};
+
 static int
 dasd_add_sysfs_files(struct ccw_device *cdev)
 {
-	int ret;
-
-	if (/* (ret = device_create_file(&cdev->dev, &dev_attr_dasd)) || */
-	    (ret = device_create_file(&cdev->dev, &dev_attr_readonly)) ||
-	    (ret = device_create_file(&cdev->dev, &dev_attr_discipline)) ||
-	    (ret = device_create_file(&cdev->dev, &dev_attr_use_diag))) {
-		device_remove_file(&cdev->dev, &dev_attr_discipline);
-		device_remove_file(&cdev->dev, &dev_attr_readonly);
-		/* device_remove_file(&cdev->dev, &dev_attr_dasd); */
-	}
-	return ret;
+	return sysfs_create_group(&cdev->dev.kobj, &dasd_attr_group);
 }
 
 static int __init

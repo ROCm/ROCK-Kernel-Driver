@@ -1675,6 +1675,15 @@ lcs_portno_store (struct device *dev, const char *buf, size_t count)
 
 static DEVICE_ATTR(portno, 0644, lcs_portno_show, lcs_portno_store);
 
+static struct attribute * lcs_attrs[] = {
+	&dev_attr_portno.attr,
+	NULL,
+};
+
+static struct attribute_group lcs_attr_group = {
+	.attrs = lcs_attrs,
+};
+
 /**
  * lcs_probe_device is called on establishing a new ccwgroup_device.
  */
@@ -1694,7 +1703,7 @@ lcs_probe_device(struct ccwgroup_device *ccwgdev)
 		put_device(&ccwgdev->dev);
                 return -ENOMEM;
         }
-	ret = device_create_file(&ccwgdev->dev, &dev_attr_portno);
+	ret = sysfs_create_group(&ccwgdev->dev.kobj, &lcs_attr_group);
 	if (ret) {
                 PRINT_ERR("Creating attributes failed");
 		lcs_free_card(card);
@@ -1826,6 +1835,7 @@ lcs_remove_device(struct ccwgroup_device *ccwgdev)
 	card = (struct lcs_card *)ccwgdev->dev.driver_data;
 	if (!card)
 		return 0;
+	sysfs_remove_group(&ccwgdev->dev.kobj, &lcs_attr_group);
 	lcs_cleanup_card(card);
 	lcs_free_card(card);
 	put_device(&ccwgdev->dev);

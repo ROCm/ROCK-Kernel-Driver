@@ -1435,30 +1435,51 @@ txtime_write (struct device *dev, const char *buf, size_t count)
 
 static DEVICE_ATTR(max_tx_io_time, 0644, txtime_show, txtime_write);
 
+static struct attribute *netiucv_attrs[] = {
+	&dev_attr_buffer.attr,
+	NULL,
+};
+
+static struct attribute_group netiucv_attr_group = {
+	.attrs = netiucv_attrs,
+};
+
+static struct attribute *netiucv_stat_attrs[] = {
+	&dev_attr_device_fsm_state.attr,
+	&dev_attr_connection_fsm_state.attr,
+	&dev_attr_max_tx_buffer_used.attr,
+	&dev_attr_max_chained_skbs.attr,
+	&dev_attr_tx_single_write_ops.attr,
+	&dev_attr_tx_multi_write_ops.attr,
+	&dev_attr_netto_bytes.attr,
+	&dev_attr_max_tx_io_time.attr,
+	NULL,
+};
+
+static struct attribute_group netiucv_stat_attr_group = {
+	.name  = "stats",
+	.attrs = netiucv_stat_attrs,
+};
+
 static inline int
 netiucv_add_files(struct device *dev)
 {
-	int ret = 0;
+	int ret;
 
-	if ((ret = device_create_file(dev, &dev_attr_buffer)) ||
-	    (ret = device_create_file(dev, &dev_attr_device_fsm_state)) ||
-	    (ret = device_create_file(dev, &dev_attr_connection_fsm_state)) ||
-	    (ret = device_create_file(dev, &dev_attr_max_tx_buffer_used)) ||
-	    (ret = device_create_file(dev, &dev_attr_max_chained_skbs)) ||
-	    (ret = device_create_file(dev, &dev_attr_tx_single_write_ops)) ||
-	    (ret = device_create_file(dev, &dev_attr_tx_multi_write_ops)) ||
-	    (ret = device_create_file(dev, &dev_attr_netto_bytes)) ||
-	    (ret = device_create_file(dev, &dev_attr_max_tx_io_time))) {
-		device_remove_file(dev, &dev_attr_netto_bytes);
-		device_remove_file(dev, &dev_attr_tx_multi_write_ops);
-		device_remove_file(dev, &dev_attr_tx_single_write_ops);
-		device_remove_file(dev, &dev_attr_max_chained_skbs);
-		device_remove_file(dev, &dev_attr_max_tx_buffer_used);
-		device_remove_file(dev, &dev_attr_connection_fsm_state);
-		device_remove_file(dev, &dev_attr_device_fsm_state);
-		device_remove_file(dev, &dev_attr_buffer);
-	}
+	ret = sysfs_create_group(&dev->kobj, &netiucv_attr_group);
+	if (ret)
+		return ret;
+	ret = sysfs_create_group(&dev->kobj, &netiucv_stat_attr_group);
+	if (ret)
+		sysfs_remove_group(&dev->kobj, &netiucv_stat_attr_group);
 	return ret;
+}
+
+static inline void
+netiucv_remove_files(struct device *dev)
+{
+	sysfs_remove_group(&dev->kobj, &netiucv_stat_attr_group);
+	sysfs_remove_group(&dev->kobj, &netiucv_stat_attr_group);
 }
 
 static int
@@ -1494,6 +1515,7 @@ netiucv_unregister_device(struct net_device *ndev)
 	struct netiucv_priv *priv = (struct netiucv_priv*)ndev->priv;
 	struct device *dev = &priv->dev;
 	
+	netiucv_remove_files(dev);
 	device_unregister(dev);
 }
 

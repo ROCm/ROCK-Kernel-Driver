@@ -373,30 +373,43 @@ ccw_device_unbox_recog(void *data)
 	spin_unlock_irq(cdev->ccwlock);
 }
 
+static struct attribute * subch_attrs[] = {
+	&dev_attr_chpids.attr,
+	&dev_attr_pimpampom.attr,
+	NULL,
+};
+
+static struct attribute_group subch_attr_group = {
+	.attrs = subch_attrs,
+};
+
 static inline int
 subchannel_add_files (struct device *dev)
 {
-	int ret;
-
-	if ((ret = device_create_file(dev, &dev_attr_chpids)) ||
-	    (ret = device_create_file(dev, &dev_attr_pimpampom))) {
-		device_remove_file(dev, &dev_attr_chpids);
-	}
-	return ret;
+	return sysfs_create_group(&dev->kobj, &subch_attr_group);
 }
+
+static struct attribute * ccwdev_attrs[] = {
+	&dev_attr_devtype.attr,
+	&dev_attr_cutype.attr,
+	&dev_attr_online.attr,
+	NULL,
+};
+
+static struct attribute_group ccwdev_attr_group = {
+	.attrs = ccwdev_attrs,
+};
 
 static inline int
 device_add_files (struct device *dev)
 {
-	int ret;
+	return sysfs_create_group(&dev->kobj, &ccwdev_attr_group);
+}
 
-	if ((ret = device_create_file(dev, &dev_attr_devtype)) ||
-	    (ret = device_create_file(dev, &dev_attr_cutype))  ||
-	    (ret = device_create_file(dev, &dev_attr_online))) {
-		device_remove_file(dev, &dev_attr_cutype);
-		device_remove_file(dev, &dev_attr_devtype);
-	}
-	return ret;
+static inline void
+device_remove_files(struct device *dev)
+{
+	sysfs_remove_group(&dev->kobj, &ccwdev_attr_group);
 }
 
 /*
@@ -437,7 +450,12 @@ ccw_device_register(struct ccw_device *cdev)
 void
 ccw_device_unregister(void *data)
 {
-	device_unregister((struct device *)data);
+	struct device *dev;
+
+	dev = (struct device *)data;
+
+	device_remove_files(dev);
+	device_unregister(dev);
 }
 	
 
