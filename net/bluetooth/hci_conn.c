@@ -69,7 +69,7 @@ void hci_acl_connect(struct hci_conn *conn)
 	bacpy(&cp.bdaddr, &conn->dst);
 	cp.pscan_rep_mode = 0x02;
 
-	if ((ie = inquiry_cache_lookup(hdev, &conn->dst)) &&
+	if ((ie = hci_inquiry_cache_lookup(hdev, &conn->dst)) &&
 			inquiry_entry_age(ie) <= INQUIRY_ENTRY_AGE_MAX) {
 		cp.pscan_rep_mode = ie->info.pscan_rep_mode;
 		cp.pscan_mode     = ie->info.pscan_mode;

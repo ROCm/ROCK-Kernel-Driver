@@ -287,7 +287,7 @@ struct hci_dev *hci_dev_get(int index)
 EXPORT_SYMBOL(hci_dev_get);
 
 /* ---- Inquiry support ---- */
-void inquiry_cache_flush(struct hci_dev *hdev)
+static void inquiry_cache_flush(struct hci_dev *hdev)
 {
 	struct inquiry_cache *cache = &hdev->inq_cache;
 	struct inquiry_entry *next  = cache->list, *e;
@@ -301,7 +301,7 @@ void inquiry_cache_flush(struct hci_dev *hdev)
 	}
 }
 
-struct inquiry_entry *inquiry_cache_lookup(struct hci_dev *hdev, bdaddr_t *bdaddr)
+struct inquiry_entry *hci_inquiry_cache_lookup(struct hci_dev *hdev, bdaddr_t *bdaddr)
 {
 	struct inquiry_cache *cache = &hdev->inq_cache;
 	struct inquiry_entry *e;
@@ -314,14 +314,14 @@ struct inquiry_entry *inquiry_cache_lookup(struct hci_dev *hdev, bdaddr_t *bdadd
 	return e;
 }
 
-void inquiry_cache_update(struct hci_dev *hdev, struct inquiry_info *info)
+void hci_inquiry_cache_update(struct hci_dev *hdev, struct inquiry_info *info)
 {
 	struct inquiry_cache *cache = &hdev->inq_cache;
 	struct inquiry_entry *e;
 
 	BT_DBG("cache %p, %s", cache, batostr(&info->bdaddr));
 
-	if (!(e = inquiry_cache_lookup(hdev, &info->bdaddr))) {
+	if (!(e = hci_inquiry_cache_lookup(hdev, &info->bdaddr))) {
 		/* Entry not in the cache. Add new one. */
 		if (!(e = kmalloc(sizeof(struct inquiry_entry), GFP_ATOMIC)))
 			return;
@@ -335,7 +335,7 @@ void inquiry_cache_update(struct hci_dev *hdev, struct inquiry_info *info)
 	cache->timestamp = jiffies;
 }
 
-int inquiry_cache_dump(struct hci_dev *hdev, int num, __u8 *buf)
+static int inquiry_cache_dump(struct hci_dev *hdev, int num, __u8 *buf)
 {
 	struct inquiry_cache *cache = &hdev->inq_cache;
 	struct inquiry_info *info = (struct inquiry_info *) buf;
