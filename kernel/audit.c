@@ -160,7 +160,7 @@ static void audit_panic(const char *message)
 		printk(KERN_ERR "audit: %s\n", message);
 		break;
 	case AUDIT_FAIL_PANIC:
-		panic(message);
+		panic("audit: %s\n", message);
 		break;
 	}
 }
@@ -663,10 +663,10 @@ struct audit_buffer *audit_log_start(struct audit_context *ctx)
 
 	if (!ab)
 		ab = kmalloc(sizeof(*ab), GFP_ATOMIC);
-	if (!ab)
-		audit_log_lost("audit: out of memory in audit_log_start");
-	if (!ab)
+	if (!ab) {
+		audit_log_lost("out of memory in audit_log_start");
 		return NULL;
+	}
 
 	atomic_inc(&audit_backlog);
 	skb_queue_head_init(&ab->sklist);
