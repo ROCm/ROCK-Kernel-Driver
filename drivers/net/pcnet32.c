@@ -1833,7 +1833,7 @@ pcnet32_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	    }
 
 	    delta = (lp->cur_tx - dirty_tx) & (TX_RING_MOD_MASK + TX_RING_SIZE);
-	    if (delta >= TX_RING_SIZE) {
+	    if (delta > TX_RING_SIZE) {
 		if (netif_msg_drv(lp))
 		    printk(KERN_ERR "%s: out-of-sync dirty pointer, %d vs. %d, full=%d.\n",
 			    dev->name, dirty_tx, lp->cur_tx, lp->tx_full);
