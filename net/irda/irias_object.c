@@ -28,7 +28,7 @@
 #include <net/irda/irda.h>
 #include <net/irda/irias_object.h>
 
-hashbin_t *objects = NULL;
+hashbin_t *irias_objects;
 
 /*
  *  Used when a missing value needs to be returned
@@ -42,7 +42,7 @@ struct ias_value missing = { IAS_MISSING, 0, 0, 0, {0}};
  *
  * Faster, check boundary... Jean II
  */
-char *strndup(char *str, int max)
+static char *strndup(char *str, int max)
 {
 	char *new_str;
 	int len;
@@ -151,7 +151,7 @@ int irias_delete_object(struct ias_object *obj)
 	ASSERT(obj != NULL, return -1;);
 	ASSERT(obj->magic == IAS_OBJECT_MAGIC, return -1;);
 
-	node = hashbin_remove_this(objects, (irda_queue_t *) obj);
+	node = hashbin_remove_this(irias_objects, (irda_queue_t *) obj);
 	if (!node)
 		return 0; /* Already removed */
 
@@ -202,7 +202,7 @@ void irias_insert_object(struct ias_object *obj)
 	ASSERT(obj != NULL, return;);
 	ASSERT(obj->magic == IAS_OBJECT_MAGIC, return;);
 
-	hashbin_insert(objects, (irda_queue_t *) obj, 0, obj->name);
+	hashbin_insert(irias_objects, (irda_queue_t *) obj, 0, obj->name);
 }
 
 /*
@@ -216,7 +216,7 @@ struct ias_object *irias_find_object(char *name)
 	ASSERT(name != NULL, return NULL;);
 
 	/* Unsafe (locking), object might change */
-	return hashbin_lock_find(objects, 0, name);
+	return hashbin_lock_find(irias_objects, 0, name);
 }
 
 /*
@@ -276,7 +276,7 @@ int irias_object_change_attribute(char *obj_name, char *attrib_name,
 	unsigned long flags;
 
 	/* Find object */
-	obj = hashbin_lock_find(objects, 0, obj_name);
+	obj = hashbin_lock_find(irias_objects, 0, obj_name);
 	if (obj == NULL) {
 		WARNING("%s: Unable to find object: %s\n", __FUNCTION__,
 			obj_name);
