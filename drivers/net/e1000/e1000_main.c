@@ -2131,26 +2131,10 @@ e1000_intr(int irq, void *data, struct pt_regs *regs)
 		__netif_rx_schedule(netdev);
 	}
 #else
-        /* Writing IMC and IMS is needed for 82547.
-	   Due to Hub Link bus being occupied, an interrupt 
-	   de-assertion message is not able to be sent. 
-	   When an interrupt assertion message is generated later,
-	   two messages are re-ordered and sent out.
-	   That causes APIC to think 82547 is in de-assertion
-	   state, while 82547 is in assertion state, resulting 
-	   in dead lock. Writing IMC forces 82547 into 
-	   de-assertion state.
-        */
-	if(hw->mac_type == e1000_82547 || hw->mac_type == e1000_82547_rev_2)
-		e1000_irq_disable(adapter);
-
 	for(i = 0; i < E1000_MAX_INTR; i++)
 		if(!e1000_clean_rx_irq(adapter) &
 		   !e1000_clean_tx_irq(adapter))
 			break;
-
-	if(hw->mac_type == e1000_82547 || hw->mac_type == e1000_82547_rev_2)
-		e1000_irq_enable(adapter);
 #endif
 
 	return IRQ_HANDLED;
