@@ -814,11 +814,149 @@ static int eligible_child(pid_t pid, int options, task_t *p)
 	return 1;
 }
 
+/*
+ * Handle sys_wait4 work for one task in state TASK_ZOMBIE.  We hold
+ * read_lock(&tasklist_lock) on entry.  If we return zero, we still hold
+ * the lock and this task is uninteresting.  If we return nonzero, we have
+ * released the lock and the system call should return.
+ */
+static int wait_task_zombie(task_t *p, unsigned int *stat_addr, struct rusage *ru)
+{
+	unsigned long state;
+	int retval;
+
+	/*
+	 * Try to move the task's state to DEAD
+	 * only one thread is allowed to do this:
+	 */
+	state = xchg(&p->state, TASK_DEAD);
+	if (state != TASK_ZOMBIE) {
+		BUG_ON(state != TASK_DEAD);
+		return 0;
+	}
+	if (unlikely(p->exit_signal == -1))
+		/*
+		 * This can only happen in a race with a ptraced thread
+		 * dying on another processor.
+		 */
+		return 0;
+
+	/*
+	 * Now we are sure this task is interesting, and no other
+	 * thread can reap it because we set its state to TASK_DEAD.
+	 */
+	read_unlock(&tasklist_lock);
+
+	retval = ru ? getrusage(p, RUSAGE_BOTH, ru) : 0;
+	if (!retval && stat_addr) {
+		if (p->sig->group_exit)
+			retval = put_user(p->sig->group_exit_code, stat_addr);
+		else
+			retval = put_user(p->exit_code, stat_addr);
+	}
+	if (retval) {
+		p->state = TASK_ZOMBIE;
+		return retval;
+	}
+	retval = p->pid;
+	if (p->real_parent != p->parent) {
+		write_lock_irq(&tasklist_lock);
+		/* Double-check with lock held.  */
+		if (p->real_parent != p->parent) {
+			__ptrace_unlink(p);
+			do_notify_parent(p, p->exit_signal);
+			p->state = TASK_ZOMBIE;
+			p = NULL;
+		}
+		write_unlock_irq(&tasklist_lock);
+	}
+	if (p != NULL)
+		release_task(p);
+	BUG_ON(!retval);
+	return retval;
+}
+
+/*
+ * Handle sys_wait4 work for one task in state TASK_STOPPED.  We hold
+ * read_lock(&tasklist_lock) on entry.  If we return zero, we still hold
+ * the lock and this task is uninteresting.  If we return nonzero, we have
+ * released the lock and the system call should return.
+ */
+static int wait_task_stopped(task_t *p, int delayed_group_leader,
+			     unsigned int *stat_addr, struct rusage *ru)
+{
+	int retval, exit_code;
+
+	if (!p->exit_code)
+		return 0;
+	if (delayed_group_leader && !(p->ptrace & PT_PTRACED) &&
+	    p->sig && p->sig->group_stop_count > 0)
+		/*
+		 * A group stop is in progress and this is the group leader.
+		 * We won't report until all threads have stopped.
+		 */
+		return 0;
+
+	/*
+	 * Now we are pretty sure this task is interesting.
+	 * Make sure it doesn't get reaped out from under us while we
+	 * give up the lock and then examine it below.  We don't want to
+	 * keep holding onto the tasklist_lock while we call getrusage and
+	 * possibly take page faults for user memory.
+	 */
+	get_task_struct(p);
+	read_unlock(&tasklist_lock);
+	write_lock_irq(&tasklist_lock);
+
+	/*
+	 * This uses xchg to be atomic with the thread resuming and setting
+	 * it.  It must also be done with the write lock held to prevent a
+	 * race with the TASK_ZOMBIE case.
+	 */
+	exit_code = xchg(&p->exit_code, 0);
+	if (unlikely(p->state > TASK_STOPPED)) {
+		/*
+		 * The task resumed and then died.  Let the next iteration
+		 * catch it in TASK_ZOMBIE.  Note that exit_code might
+		 * already be zero here if it resumed and did _exit(0).
+		 * The task itself is dead and won't touch exit_code again;
+		 * other processors in this function are locked out.
+		 */
+		p->exit_code = exit_code;
+		exit_code = 0;
+	}
+	if (unlikely(exit_code == 0)) {
+		/*
+		 * Another thread in this function got to it first, or it
+		 * resumed, or it resumed and then died.
+		 */
+		write_unlock_irq(&tasklist_lock);
+		put_task_struct(p);
+		read_lock(&tasklist_lock);
+		return 0;
+	}
+
+	/* move to end of parent's list to avoid starvation */
+	remove_parent(p);
+	add_parent(p, p->parent);
+
+	write_unlock_irq(&tasklist_lock);
+
+	retval = ru ? getrusage(p, RUSAGE_BOTH, ru) : 0;
+	if (!retval && stat_addr)
+		retval = put_user((exit_code << 8) | 0x7f, stat_addr);
+	if (!retval)
+		retval = p->pid;
+	put_task_struct(p);
+
+	BUG_ON(!retval);
+	return retval;
+}
+
 asmlinkage long sys_wait4(pid_t pid,unsigned int * stat_addr, int options, struct rusage * ru)
 {
 	DECLARE_WAITQUEUE(wait, current);
 	struct task_struct *tsk;
-	unsigned long state;
 	int flag, retval;
 
 	if (options & ~(WNOHANG|WUNTRACED|__WNOTHREAD|__WCLONE|__WALL))
@@ -836,8 +974,6 @@ repeat:
 		int ret;
 
 		list_for_each(_p,&tsk->children) {
-			int exit_code;
-
 			p = list_entry(_p,struct task_struct,sibling);
 
 			ret = eligible_child(pid, options, p);
@@ -847,125 +983,24 @@ repeat:
 
 			switch (p->state) {
 			case TASK_STOPPED:
-				if (!p->exit_code)
+				if (!(options & WUNTRACED) &&
+				    !(p->ptrace & PT_PTRACED))
 					continue;
-				if (!(options & WUNTRACED) && !(p->ptrace & PT_PTRACED))
-					continue;
-				if (ret == 2 && !(p->ptrace & PT_PTRACED) &&
-				    p->sig && p->sig->group_stop_count > 0)
-					/*
-					 * A group stop is in progress and
-					 * we are the group leader.  We won't
-					 * report until all threads have
-					 * stopped.
-					 */
-					continue;
-				read_unlock(&tasklist_lock);
-
-				/* move to end of parent's list to avoid starvation */
-				write_lock_irq(&tasklist_lock);
-				remove_parent(p);
-				add_parent(p, p->parent);
-
-				/*
-				 * This uses xchg to be atomic with
-				 * the thread resuming and setting it.
-				 * It must also be done with the write
-				 * lock held to prevent a race with the
-				 * TASK_ZOMBIE case (below).
-				 */
-				exit_code = xchg(&p->exit_code, 0);
-				if (unlikely(p->state > TASK_STOPPED)) {
-					/*
-					 * The task resumed and then died.
-					 * Let the next iteration catch it
-					 * in TASK_ZOMBIE.  Note that
-					 * exit_code might already be zero
-					 * here if it resumed and did
-					 * _exit(0).  The task itself is
-					 * dead and won't touch exit_code
-					 * again; other processors in
-					 * this function are locked out.
-					 */
-					p->exit_code = exit_code;
-					exit_code = 0;
-				}
-				if (unlikely(exit_code == 0)) {
-					/*
-					 * Another thread in this function
-					 * got to it first, or it resumed,
-					 * or it resumed and then died.
-					 */
-					write_unlock_irq(&tasklist_lock);
-					continue;
-				}
-				/*
-				 * Make sure this doesn't get reaped out from
-				 * under us while we are examining it below.
-				 * We don't want to keep holding onto the
-				 * tasklist_lock while we call getrusage and
-				 * possibly take page faults for user memory.
-				 */
-				get_task_struct(p);
-				write_unlock_irq(&tasklist_lock);
-				retval = ru ? getrusage(p, RUSAGE_BOTH, ru) : 0; 
-				if (!retval && stat_addr) 
-					retval = put_user((exit_code << 8) | 0x7f, stat_addr);
-				if (!retval)
-					retval = p->pid;
-				put_task_struct(p);
-				goto end_wait4;
+				retval = wait_task_stopped(p, ret == 2,
+							   stat_addr, ru);
+				if (retval != 0) /* He released the lock.  */
+					goto end_wait4;
+				break;
 			case TASK_ZOMBIE:
 				/*
 				 * Eligible but we cannot release it yet:
 				 */
 				if (ret == 2)
 					continue;
-				/*
-				 * Try to move the task's state to DEAD
-				 * only one thread is allowed to do this:
-				 */
-				state = xchg(&p->state, TASK_DEAD);
-				if (state != TASK_ZOMBIE)
-					continue;
-				if (unlikely(p->exit_signal == -1))
-					/*
-					 * This can only happen in a race with
-					 * a ptraced thread dying on another
-					 * processor.
-					 */
-					continue;
-				read_unlock(&tasklist_lock);
-
-				retval = ru ? getrusage(p, RUSAGE_BOTH, ru) : 0;
-				if (!retval && stat_addr) {
-					if (p->sig->group_exit)
-						retval = put_user(p->sig->group_exit_code, stat_addr);
-					else
-						retval = put_user(p->exit_code, stat_addr);
-				}
-				if (retval) {
-					p->state = TASK_ZOMBIE;
+				retval = wait_task_zombie(p, stat_addr, ru);
+				if (retval != 0) /* He released the lock.  */
 					goto end_wait4;
-				}
-				retval = p->pid;
-				if (p->real_parent != p->parent) {
-					write_lock_irq(&tasklist_lock);
-					/* Double-check with lock held.  */
-					if (p->real_parent != p->parent) {
-					__ptrace_unlink(p);
-						do_notify_parent(
-							p, p->exit_signal);
-					p->state = TASK_ZOMBIE;
-						p = NULL;
-					}
-					write_unlock_irq(&tasklist_lock);
-				}
-				if (p != NULL)
-					release_task(p);
-				goto end_wait4;
-			default:
-				continue;
+				break;
 			}
 		}
 		if (!flag) {
