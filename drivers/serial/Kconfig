@@ -326,6 +326,14 @@ config SERIAL_SUNZILOG
 	  This driver supports the Zilog8530 serial ports found on many Sparc
 	  systems.  Say Y or M if you want to be able to these serial ports.
 
+config SERIAL_SUNZILOG_CONSOLE
+	bool "Console on Sun Zilog8530 serial port"
+	depends on SERIAL_SUNZILOG=y
+	help
+	  If you would like to be able to use the Zilog8530 serial port
+	  on your Sparc system as the console, you can do so by answering
+	  Y to this option.
+
 config SERIAL_SUNSU
 	tristate "Sun SU serial support"
 	depends on (SPARC32 || SPARC64) && PCI
@@ -333,6 +341,14 @@ config SERIAL_SUNSU
 	  This driver supports the 8250 serial ports that run the keyboard and
 	  mouse on (PCI) UltraSPARC systems.  Say Y or M if you want to be able
 	  to these serial ports.
+
+config SERIAL_SUNSU_CONSOLE
+	bool "Console on Sun SU serial port"
+	depends on SERIAL_SUNSU=y
+	help
+	  If you would like to be able to use the SU serial port
+	  on your Sparc system as the console, you can do so by answering
+	  Y to this option.
 
 config SERIAL_MUX
 	tristate "Serial MUX support"
@@ -380,6 +396,14 @@ config SERIAL_SUNSAB
 	  (PCI) UltraSPARC systems.  Say Y or M if you want to be able to these
 	  serial ports.
 
+config SERIAL_SUNSAB_CONSOLE
+	bool "Console on Sun Siemens SAB82532 serial port"
+	depends on SERIAL_SUNSAB=y
+	help
+	  If you would like to be able to use the SAB82532 serial port
+	  on your Sparc system as the console, you can do so by answering
+	  Y to this option.
+
 config V850E_NB85E_UART
 	bool "NEC V850E on-chip UART support"
 	depends on V850E_NB85E || V850E2_ANNA || V850E_AS85EP1
@@ -407,7 +431,7 @@ config SERIAL_CORE
 
 config SERIAL_CORE_CONSOLE
 	bool
-	depends on SERIAL_AMBA_CONSOLE || SERIAL_CLPS711X_CONSOLE || SERIAL_21285_CONSOLE || SERIAL_SA1100_CONSOLE || SERIAL_ANAKIN_CONSOLE || SERIAL_UART00_CONSOLE || SERIAL_8250_CONSOLE || SERIAL_MUX_CONSOLE || SERIAL_SUNCORE || V850E_NB85E_UART_CONSOLE || SERIAL98_CONSOLE
+	depends on SERIAL_AMBA_CONSOLE || SERIAL_CLPS711X_CONSOLE || SERIAL_21285_CONSOLE || SERIAL_SA1100_CONSOLE || SERIAL_ANAKIN_CONSOLE || SERIAL_UART00_CONSOLE || SERIAL_8250_CONSOLE || SERIAL_MUX_CONSOLE || SERIAL_SUNZILOG_CONSOLE || SERIAL_SUNSU_CONSOLE || SERIAL_SUNSAB_CONSOLE || V850E_NB85E_UART_CONSOLE || SERIAL98_CONSOLE
 	default y
 
 config SERIAL_68328

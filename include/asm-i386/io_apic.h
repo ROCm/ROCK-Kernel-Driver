@@ -22,32 +22,44 @@
 /*
  * The structure of the IO-APIC:
  */
-struct IO_APIC_reg_00 {
-	__u32	__reserved_2	: 14,
-		LTS		:  1,
-		delivery_type	:  1,
-		__reserved_1	:  8,
-		ID		:  8;
-} __attribute__ ((packed));
+union IO_APIC_reg_00 {
+	u32	raw;
+	struct {
+		u32	__reserved_2	: 14,
+			LTS		:  1,
+			delivery_type	:  1,
+			__reserved_1	:  8,
+			ID		:  8;
+	} __attribute__ ((packed)) bits;
+};
 
-struct IO_APIC_reg_01 {
-	__u32	version		:  8,
-		__reserved_2	:  7,
-		PRQ		:  1,
-		entries		:  8,
-		__reserved_1	:  8;
-} __attribute__ ((packed));
+union IO_APIC_reg_01 {
+	u32	raw;
+	struct {
+		u32	version		:  8,
+			__reserved_2	:  7,
+			PRQ		:  1,
+			entries		:  8,
+			__reserved_1	:  8;
+	} __attribute__ ((packed)) bits;
+};
 
-struct IO_APIC_reg_02 {
-	__u32	__reserved_2	: 24,
-		arbitration	:  4,
-		__reserved_1	:  4;
-} __attribute__ ((packed));
+union IO_APIC_reg_02 {
+	u32	raw;
+	struct {
+		u32	__reserved_2	: 24,
+			arbitration	:  4,
+			__reserved_1	:  4;
+	} __attribute__ ((packed)) bits;
+};
 
-struct IO_APIC_reg_03 {
-	__u32	boot_DT		:  1,
-		__reserved_1	: 31;
-} __attribute__ ((packed));
+union IO_APIC_reg_03 {
+	u32	raw;
+	struct {
+		u32	boot_DT		:  1,
+			__reserved_1	: 31;
+	} __attribute__ ((packed)) bits;
+};
 
 /*
  * # of IO-APICs and # of IRQ routing registers
