@@ -1,6 +1,6 @@
 /*
  *
- * linux/drivers/s390/net/qeth_sys.c ($Revision: 1.19.2.3 $)
+ * linux/drivers/s390/net/qeth_sys.c ($Revision: 1.19.2.6 $)
  *
  * Linux on zSeries OSA Express and HiperSockets support
  * This file contains code related to sysfs.
@@ -19,6 +19,8 @@
 #include "qeth.h"
 #include "qeth_mpc.h"
 #include "qeth_fs.h"
+
+const char *VERSION_QETH_SYS_C = "$Revision: 1.19.2.6 $";
 
 /*****************************************************************************/
 /*                                                                           */
@@ -320,7 +322,8 @@ static DEVICE_ATTR(buffer_count, 0644, qeth_dev_bufcnt_show,
 		qeth_dev_bufcnt_store);
 
 static inline ssize_t
-qeth_dev_route_show(struct qeth_routing_info *route, char *buf)
+qeth_dev_route_show(struct qeth_card *card, struct qeth_routing_info *route,
+		    char *buf)
 {
 	switch (route->type) {
 	case PRIMARY_ROUTER:
@@ -328,11 +331,20 @@ qeth_dev_route_show(struct qeth_routing_info *route, char *buf)
 	case SECONDARY_ROUTER:
 		return sprintf(buf, "%s\n", "secondary router");
 	case MULTICAST_ROUTER:
-		return sprintf(buf, "%s\n", "multicast router");
+		if (card->info.broadcast_capable == QETH_BROADCAST_WITHOUT_ECHO)
+			return sprintf(buf, "%s\n", "multicast router+");
+		else
+			return sprintf(buf, "%s\n", "multicast router");
 	case PRIMARY_CONNECTOR:
-		return sprintf(buf, "%s\n", "primary connector");
+		if (card->info.broadcast_capable == QETH_BROADCAST_WITHOUT_ECHO)
+			return sprintf(buf, "%s\n", "primary connector+");
+		else
+			return sprintf(buf, "%s\n", "primary connector");
 	case SECONDARY_CONNECTOR:
-		return sprintf(buf, "%s\n", "secondary connector");
+		if (card->info.broadcast_capable == QETH_BROADCAST_WITHOUT_ECHO)
+			return sprintf(buf, "%s\n", "secondary connector+");
+		else
+			return sprintf(buf, "%s\n", "secondary connector");
 	default:
 		return sprintf(buf, "%s\n", "no");
 	}
@@ -346,7 +358,7 @@ qeth_dev_route4_show(struct device *dev, char *buf)
 	if (!card)
 		return -EINVAL;
 	
-	return qeth_dev_route_show(&card->options.route4, buf);
+	return qeth_dev_route_show(card, &card->options.route4, buf);
 }
 
 static inline ssize_t
@@ -414,7 +426,7 @@ qeth_dev_route6_show(struct device *dev, char *buf)
 	if (!qeth_is_supported(card, IPA_IPV6))
 		return sprintf(buf, "%s\n", "n/a");
 
-	return qeth_dev_route_show(&card->options.route6, buf);
+	return qeth_dev_route_show(card, &card->options.route6, buf);
 }
 
 static ssize_t
@@ -736,6 +748,10 @@ qeth_dev_ipato_enable_store(struct device *dev, const char *buf, size_t count)
 
 	if (!card)
 		return -EINVAL;
+
+	if ((card->state != CARD_STATE_DOWN) &&
+	    (card->state != CARD_STATE_RECOVER))
+		return -EPERM;
 
 	tmp = strsep((char **) &buf, "\n");
 	if (!strcmp(tmp, "toggle")){
