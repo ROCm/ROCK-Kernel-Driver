@@ -5,7 +5,7 @@
 #ifndef __M68K_SBUS_H
 #define __M68K_SBUS_H
 
-struct linux_sbus_device {
+struct sbus_dev {
 	struct {
 		unsigned int which_io;
 		unsigned int phys_addr;

@@ -25,15 +25,4 @@ void NCR53c7x0_intr(int irq, void *dev_id, struct pt_regs * regs);
 
 #include <scsi/scsicam.h>
 
-#define MVME16x_SCSI  {.name                = "MVME16x NCR53c710 SCSI", \
-		       .detect              = mvme16x_scsi_detect,    \
-		       .queuecommand        = NCR53c7xx_queue_command, \
-		       .abort               = NCR53c7xx_abort,   \
-		       .reset               = NCR53c7xx_reset,   \
-		       .can_queue           = 24,       \
-		       .this_id             = 7,               \
-		       .sg_tablesize        = 63,          \
-		       .cmd_per_lun	    = 3,     \
-		       .use_clustering      = DISABLE_CLUSTERING }
-
 #endif /* MVME16x_SCSI_H */

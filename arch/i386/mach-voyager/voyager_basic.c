@@ -21,6 +21,7 @@
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/reboot.h>
+#include <linux/sysrq.h>
 #include <asm/io.h>
 #include <asm/pgalloc.h>
 #include <asm/voyager.h>
@@ -40,6 +41,21 @@ int reboot_thru_bios;
 int voyager_level = 0;
 
 struct voyager_SUS *voyager_SUS = NULL;
+
+#ifdef CONFIG_SMP
+static void
+voyager_dump(int dummy1, struct pt_regs *dummy2, struct tty_struct *dummy3)
+{
+	/* get here via a sysrq */
+	voyager_smp_dump();
+}
+
+static struct sysrq_key_op sysrq_voyager_dump_op = {
+	.handler	= voyager_dump,
+	.help_msg	= "Voyager",
+	.action_msg	= "Dump Voyager Status\n",
+};
+#endif
 
 void
 voyager_detect(struct voyager_bios_info *bios)
@@ -62,6 +78,9 @@ voyager_detect(struct voyager_bios_info *bios)
 			printk("\n**WARNING**: Voyager HAL only supports Levels 4 and 5 Architectures at the moment\n\n");
 		/* install the power off handler */
 		pm_power_off = voyager_power_off;
+#ifdef CONFIG_SMP
+		register_sysrq_key('v', &sysrq_voyager_dump_op);
+#endif
 	} else {
 		printk("\n\n**WARNING**: No Voyager Subsystem Found\n");
 	}
@@ -141,15 +160,6 @@ voyager_memory_detect(int region, __u32 *start, __u32 *length)
 	pg0[0] = old;
 	local_flush_tlb();
 	return retval;
-}
-
-void
-voyager_dump()
-{
-	/* get here via a sysrq */
-#ifdef CONFIG_SMP
-	voyager_smp_dump();
-#endif
 }
 
 /* voyager specific handling code for timer interrupts.  Used to hand

@@ -88,34 +88,31 @@ static int bit_elv_getsda(void *data)
 
 static int bit_elv_init(void)
 {
-	if (check_region(base,(base == 0x3bc)? 3 : 8) < 0 ) {
-		return -ENODEV;	
-	} else {
-						/* test for ELV adap. 	*/
-		if (inb(base+1) & 0x80) {	/* BUSY should be high	*/
-			DEBINIT(printk(KERN_DEBUG "i2c-elv.o: Busy was low.\n"));
-			return -ENODEV;
-		} else {
-			outb(0x0c,base+2);	/* SLCT auf low		*/
-			udelay(400);
-			if ( !(inb(base+1) && 0x10) ) {
-				outb(0x04,base+2);
-				DEBINIT(printk(KERN_DEBUG "i2c-elv.o: Select was high.\n"));
-				return -ENODEV;
-			}
-		}
-		request_region(base,(base == 0x3bc)? 3 : 8,
-			"i2c (ELV adapter)");
-		PortData = 0;
-		bit_elv_setsda((void*)base,1);
-		bit_elv_setscl((void*)base,1);
-	}
-	return 0;
-}
+	if (!request_region(base, (base == 0x3bc) ? 3 : 8,
+				"i2c (ELV adapter)"))
+		return -ENODEV;
 
-static void __exit bit_elv_exit(void)
-{
-	release_region( base , (base == 0x3bc)? 3 : 8 );
+	if (inb(base+1) & 0x80) {	/* BUSY should be high	*/
+		DEBINIT(printk(KERN_DEBUG "i2c-elv.o: Busy was low.\n"));
+		goto fail;
+	} 
+
+	outb(0x0c,base+2);	/* SLCT auf low		*/
+	udelay(400);
+	if (!(inb(base+1) && 0x10)) {
+		outb(0x04,base+2);
+		DEBINIT(printk(KERN_DEBUG "i2c-elv.o: Select was high.\n"));
+		goto fail;
+	}
+
+	PortData = 0;
+	bit_elv_setsda((void*)base,1);
+	bit_elv_setscl((void*)base,1);
+	return 0;
+
+fail:
+	release_region(base , (base == 0x3bc) ? 3 : 8);
+	return -ENODEV;
 }
 
 static int bit_elv_reg(struct i2c_client *client)
@@ -166,7 +163,7 @@ static struct i2c_adapter bit_elv_ops = {
 	bit_elv_unreg,	
 };
 
-int __init i2c_bitelv_init(void)
+static int __init i2c_bitelv_init(void)
 {
 	printk(KERN_INFO "i2c-elv.o: i2c ELV parallel port adapter module version %s (%s)\n", I2C_VERSION, I2C_DATE);
 	if (base==0) {
@@ -192,24 +189,17 @@ int __init i2c_bitelv_init(void)
 	return 0;
 }
 
+static void __exit i2c_bitelv_exit(void)
+{
+	i2c_bit_del_bus(&bit_elv_ops);
+	release_region(base , (base == 0x3bc) ? 3 : 8);
+}
 
-#ifdef MODULE
 MODULE_AUTHOR("Simon G. Vogl <simon@tk.uni-linz.ac.at>");
 MODULE_DESCRIPTION("I2C-Bus adapter routines for ELV parallel port adapter");
 MODULE_LICENSE("GPL");
 
-
 MODULE_PARM(base, "i");
 
-int init_module(void)
-{
-	return i2c_bitelv_init();
-}
-
-void cleanup_module(void)
-{
-	i2c_bit_del_bus(&bit_elv_ops);
-	bit_elv_exit();
-}
-
-#endif
+module_init(i2c_bitelv_init);
+module_exit(i2c_bitelv_exit);

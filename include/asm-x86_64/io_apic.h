@@ -3,6 +3,7 @@
 
 #include <linux/config.h>
 #include <asm/types.h>
+#include <asm/mpspec.h>
 
 /*
  * Intel IO-APIC support for SMP and UP systems.

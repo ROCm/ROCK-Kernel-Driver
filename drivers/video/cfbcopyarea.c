@@ -38,7 +38,7 @@
 #define BYTES_PER_LONG 4
 #else
 #define FB_WRITEL fb_writeq
-#define FB_READL  fb_readq(x)
+#define FB_READL  fb_readq
 #define SHIFT_PER_LONG 6
 #define BYTES_PER_LONG 8
 #endif

@@ -672,6 +672,7 @@ source "drivers/usb/Kconfig"
 
 source "net/bluetooth/Kconfig"
 
+source "arch/x86_64/oprofile/Kconfig"
 
 menu "Kernel hacking"
 
@@ -728,7 +729,6 @@ config INIT_DEBUG
 
 config KALLSYMS
 	bool "Load all symbols for debugging/kksymoops"
-	depends on DEBUG_KERNEL
 	help
 	  Say Y here to let the kernel print out symbolic crash information and
 	  symbolic stack backtraces. This increases the size of the kernel

@@ -42,6 +42,8 @@ extern void exception_table_check(void);
 
 extern int acpi_boot_init(char *);
 
+extern int map_syscall32(struct mm_struct *mm, unsigned long address);
+
 #define round_up(x,y) (((x) + (y) - 1) & ~((y)-1))
 #define round_down(x,y) ((x) & ~((y)-1))
 

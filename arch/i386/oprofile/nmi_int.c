@@ -233,6 +233,7 @@ int __init nmi_init(struct oprofile_operations ** ops, enum oprofile_cpu * cpu)
 			*cpu = OPROFILE_CPU_ATHLON;
 			break;
  
+#ifndef CONFIG_X86_64
 		case X86_VENDOR_INTEL:
 			/* Less than a P6-class processor */
 			if (family != 6)
@@ -248,6 +249,7 @@ int __init nmi_init(struct oprofile_operations ** ops, enum oprofile_cpu * cpu)
  
 			model = &op_ppro_spec;
 			break;
+#endif
 
 		default:
 			return 0;

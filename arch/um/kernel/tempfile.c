@@ -11,7 +11,8 @@
 #include <sys/param.h>
 #include "init.h"
 
-char *tempdir = NULL;
+/* Modified from create_mem_file and start_debugger */
+static char *tempdir = NULL;
 
 static void __init find_tempdir(void)
 {

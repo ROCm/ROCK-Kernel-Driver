@@ -218,7 +218,7 @@ static int ubd_setup_common(char *str, int *index_out)
 			return(0);
 		}
 		major = simple_strtoul(str, &end, 0);
-		if(*end != '\0'){
+		if((*end != '\0') || (end == str)){
 			printk(KERN_ERR 
 			       "ubd_setup : didn't parse major number\n");
 			return(1);
@@ -520,7 +520,10 @@ static int ubd_add(int n)
 	struct ubd *dev = &ubd_dev[n];
 	int err;
 
-	if (!dev->file || dev->is_dir)
+	if(dev->is_dir)
+		return(-EISDIR);
+
+	if (!dev->file)
 		return(-ENODEV);
 
 	if (ubd_open_dev(dev))
@@ -574,6 +577,44 @@ static int ubd_config(char *str)
 	return(err);
 }
 
+static int ubd_get_config(char *dev, char *str, int size, char **error_out)
+{
+	struct ubd *ubd;
+	char *end;
+	int major, n = 0;
+
+	major = simple_strtoul(dev, &end, 0);
+	if((*end != '\0') || (end == dev)){
+		*error_out = "ubd_get_config : didn't parse major number";
+		return(-1);
+	}
+
+	if((major >= MAX_DEV) || (major < 0)){
+		*error_out = "ubd_get_config : major number out of range";
+		return(-1);
+	}
+
+	ubd = &ubd_dev[major];
+	spin_lock(&ubd_lock);
+
+	if(ubd->file == NULL){
+		CONFIG_CHUNK(str, size, n, "", 1);
+		goto out;
+	}
+
+	CONFIG_CHUNK(str, size, n, ubd->file, 0);
+
+	if(ubd->cow.file != NULL){
+		CONFIG_CHUNK(str, size, n, ",", 0);
+		CONFIG_CHUNK(str, size, n, ubd->cow.file, 1);
+	}
+	else CONFIG_CHUNK(str, size, n, "", 1);
+
+ out:
+	spin_unlock(&ubd_lock);
+	return(n);
+}
+
 static int ubd_remove(char *str)
 {
 	struct ubd *dev;
@@ -583,7 +624,7 @@ static int ubd_remove(char *str)
 		return(err);	/* it should be a number 0-7/a-h */
 
 	n = *str - '0';
-	if(n > MAX_DEV) 
+	if(n >= MAX_DEV) 
 		return(err);
 
 	dev = &ubd_dev[n];
@@ -620,6 +661,7 @@ static int ubd_remove(char *str)
 static struct mc_device ubd_mc = {
 	.name		= "ubd",
 	.config		= ubd_config,
+ 	.get_config	= ubd_get_config,
 	.remove		= ubd_remove,
 };
 

@@ -138,9 +138,13 @@ int __init fcal_detect(Scsi_Host_Template *tpnt)
 			continue;
 		}
 				
+		if (!try_module_get(fc->module)) {
+			kfree(ages);
+			scsi_unregister(host);
+			continue;
+		}
+	
 		nfcals++;
-				
-		if (fc->module) __MOD_INC_USE_COUNT(fc->module);
 				
 		fcal = (struct fcal *)host->hostdata;
 		
@@ -193,7 +197,7 @@ int fcal_release(struct Scsi_Host *host)
 	struct fcal *fcal = (struct fcal *)host->hostdata;
 	fc_channel *fc = fcal->fc;
 
-	if (fc->module) __MOD_DEC_USE_COUNT(fc->module);
+	module_put(fc->module);
 	
 	fc->fcp_register(fc, TYPE_SCSI_FCP, 1);
 	FCALND((" releasing fcal.\n"));

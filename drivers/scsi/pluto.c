@@ -232,9 +232,13 @@ int __init pluto_detect(Scsi_Host_Template *tpnt)
 					continue;
 				}
 				
+				if (!try_module_get(fc->module)) {
+					kfree(ages);
+					scsi_unregister(host);
+					continue;
+				}
+
 				nplutos++;
-				
-				if (fc->module) __MOD_INC_USE_COUNT(fc->module);
 				
 				pluto = (struct pluto *)host->hostdata;
 				

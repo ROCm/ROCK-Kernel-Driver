@@ -407,6 +407,7 @@ struct NCR_ESP {
    * cannot be assosciated with any specific command.
    */
   unchar resetting_bus;
+  wait_queue_head_t reset_queue;
 
   unchar do_pio_cmds;		/* Do command transfer with pio */
 
@@ -657,4 +658,11 @@ extern void esp_deallocate(struct NCR_ESP *);
 extern void esp_release(void);
 extern void esp_initialize(struct NCR_ESP *);
 extern void esp_intr(int, void *, struct pt_regs *);
+extern const char *esp_info(struct Scsi_Host *);
+extern int esp_queue(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
+extern int esp_command(Scsi_Cmnd *);
+extern int esp_abort(Scsi_Cmnd *);
+extern int esp_reset(Scsi_Cmnd *);
+extern int esp_proc_info(char *buffer, char **start, off_t offset, int length,
+			 int hostno, int inout);
 #endif /* !(NCR53C9X_H) */

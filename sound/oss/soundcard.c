@@ -222,9 +222,9 @@ static int sound_open(struct inode *inode, struct file *file)
 		}
 		if (dev && (dev >= num_mixers || mixer_devs[dev] == NULL))
 			return -ENXIO;
-
-		if (mixer_devs[dev]->owner)
-			__MOD_INC_USE_COUNT (mixer_devs[dev]->owner);
+	
+		if (!try_module_get(mixer_devs[dev]->owner))
+			return -ENXIO;
 		break;
 
 	case SND_DEV_SEQ:
@@ -261,9 +261,7 @@ static int sound_release(struct inode *inode, struct file *file)
 	DEB(printk("sound_release(dev=%d)\n", dev));
 	switch (dev & 0x0f) {
 	case SND_DEV_CTL:
-		dev >>= 4;
-		if (mixer_devs[dev]->owner)
-			__MOD_DEC_USE_COUNT (mixer_devs[dev]->owner);
+		module_put(mixer_devs[dev >> 4]->owner);
 		break;
 		
 	case SND_DEV_SEQ:

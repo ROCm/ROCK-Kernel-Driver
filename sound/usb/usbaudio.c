@@ -2323,7 +2323,7 @@ static int usb_audio_probe(struct usb_interface *intf,
 	void *chip;
 	chip = snd_usb_audio_probe(interface_to_usbdev(intf), intf, id);
 	if (chip) {
-		dev_set_drvdata(&intf->dev, chip);
+		usb_set_intfdata(intf, chip);
 		return 0;
 	} else
 		return -EIO;
@@ -2332,7 +2332,7 @@ static int usb_audio_probe(struct usb_interface *intf,
 static void usb_audio_disconnect(struct usb_interface *intf)
 {
 	snd_usb_audio_disconnect(interface_to_usbdev(intf),
-				 dev_get_drvdata(&intf->dev));
+				 usb_get_intfdata(intf));
 }
 #endif
 

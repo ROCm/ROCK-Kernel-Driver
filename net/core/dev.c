@@ -703,8 +703,7 @@ int dev_open(struct net_device *dev)
 			ret = dev->open(dev);
 			if (ret) {
 				clear_bit(__LINK_STATE_START, &dev->state);
-				if (dev->owner)
-					__MOD_DEC_USE_COUNT(dev->owner);
+				module_put(dev->owner);
 			}
 		}
 	} else {
@@ -829,16 +828,14 @@ int dev_close(struct net_device *dev)
 #endif
 
 	/*
-	 *	Tell people we are down
+	 * Tell people we are down
 	 */
 	notifier_call_chain(&netdev_chain, NETDEV_DOWN, dev);
 
 	/*
 	 * Drop the module refcount
 	 */
-	if (dev->owner)
-		__MOD_DEC_USE_COUNT(dev->owner);
-
+	module_put(dev->owner);
 	return 0;
 }
 

@@ -166,7 +166,7 @@ void inter_module_put(const char *im_name)
 		ime = list_entry(tmp, struct inter_module_entry, list);
 		if (strcmp(ime->im_name, im_name) == 0) {
 			if (ime->owner)
-				__MOD_DEC_USE_COUNT(ime->owner);
+				module_put(ime->owner);
 			spin_unlock(&ime_lock);
 			return;
 		}

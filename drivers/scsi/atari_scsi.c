@@ -508,12 +508,11 @@ static int falcon_dont_release = 0;
 static void
 falcon_release_lock_if_possible( struct NCR5380_hostdata * hostdata )
 {
-	unsigned long	oldflags;
+	unsigned long flags;
 		
 	if (IS_A_TT()) return;
 	
-	save_flags(oldflags);
-	cli();
+	local_irq_save(flags);
 
 	if (falcon_got_lock &&
 		!hostdata->disconnected_queue &&
@@ -524,7 +523,7 @@ falcon_release_lock_if_possible( struct NCR5380_hostdata * hostdata )
 #if 0
 			printk("WARNING: Lock release not allowed. Ignored\n");
 #endif
-			restore_flags(oldflags);
+			local_irq_restore(flags);
 			return;
 		}
 		falcon_got_lock = 0;
@@ -532,7 +531,7 @@ falcon_release_lock_if_possible( struct NCR5380_hostdata * hostdata )
 		wake_up( &falcon_fairness_wait );
 	}
 
-	restore_flags(oldflags);
+	local_irq_restore(flags);
 }
 
 /* This function manages the locking of the ST-DMA.
@@ -552,12 +551,11 @@ falcon_release_lock_if_possible( struct NCR5380_hostdata * hostdata )
 
 static void falcon_get_lock( void )
 {
-	unsigned long	oldflags;
+	unsigned long flags;
 
 	if (IS_A_TT()) return;
 
-	save_flags(oldflags);
-	cli();
+	local_irq_save(flags);
 
 	while( !in_interrupt() && falcon_got_lock && stdma_others_waiting() )
 		sleep_on( &falcon_fairness_wait );
@@ -577,7 +575,7 @@ static void falcon_get_lock( void )
 		}
 	}	
 
-	restore_flags(oldflags);
+	local_irq_restore(flags);
 	if (!falcon_got_lock)
 		panic("Falcon SCSI: someone stole the lock :-(\n");
 }
@@ -1141,7 +1139,23 @@ static void atari_scsi_falcon_reg_write( unsigned char reg, unsigned char value 
 
 #include "atari_NCR5380.c"
 
-static Scsi_Host_Template driver_template = ATARI_SCSI;
+static Scsi_Host_Template driver_template = {
+	.proc_info		= atari_scsi_proc_info,
+	.name			= "Atari native SCSI",
+	.detect			= atari_scsi_detect,
+	.release		= atari_scsi_release,
+	.info			= atari_scsi_info,
+	.queuecommand		= atari_scsi_queue_command,
+	.abort			= atari_scsi_abort,
+	.reset			= atari_scsi_reset,
+	.can_queue		= 0, /* initialized at run-time */
+	.this_id		= 0, /* initialized at run-time */
+	.sg_tablesize		= 0, /* initialized at run-time */
+	.cmd_per_lun		= 0, /* initialized at run-time */
+	.use_clustering		= DISABLE_CLUSTERING
+};
+
+
 #include "scsi_module.c"
 
 MODULE_LICENSE("GPL");

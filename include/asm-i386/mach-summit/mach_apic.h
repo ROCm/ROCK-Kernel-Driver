@@ -54,8 +54,7 @@ static inline unsigned long apicid_to_phys_cpu_present(int apicid)
 		return (1ul << apicid);
 }
 
-#define wakeup_secondary_cpu(apicid, start_eip) \
-	wakeup_secondary_via_INIT(apicid, start_eip)
+#define WAKE_SECONDARY_VIA_INIT
 
 static inline void setup_portio_remap(void)
 {

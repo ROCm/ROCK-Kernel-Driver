@@ -256,8 +256,7 @@ static int mace_set_address(struct net_device *dev, void *addr)
 	unsigned long flags;
 	u8 maccc;
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 
 	maccc = mb->maccc;
 
@@ -270,7 +269,7 @@ static int mace_set_address(struct net_device *dev, void *addr)
 	}
 
 	mb->maccc = maccc;
-	restore_flags(flags);
+	local_irq_restore(flags);
 
 	return 0;
 }

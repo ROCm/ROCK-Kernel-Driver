@@ -39,14 +39,13 @@ struct openpty_arg {
 	int err;
 };
 
-static int openpty_cb(void *arg)
+static void openpty_cb(void *arg)
 {
 	struct openpty_arg *info = arg;
 
 	info->err = 0;
 	if(openpty(&info->master, &info->slave, NULL, NULL, NULL))
 		info->err = errno;
-	return(0);
 }
 
 void __init check_one_sigio(void (*proc)(int, int))
@@ -54,13 +53,9 @@ void __init check_one_sigio(void (*proc)(int, int))
 	struct sigaction old, new;
 	struct termios tt;
 	struct openpty_arg pty = { master : -1, slave : -1 };
-	int master, slave, flags, err;
+	int master, slave, flags;
 
-	err = run_helper_thread(openpty_cb, &pty, CLONE_FILES, NULL, 2);
-	if(err < 0){
-		printk("run_helper_thread failed, errno = %d\n", -err);
-		return;
-	}
+	initial_thread_cb(openpty_cb, &pty);
 	if(pty.err){
 		printk("openpty failed, errno = %d\n", pty.err);
 		return;
@@ -387,7 +382,7 @@ void write_sigio_workaround(void)
 		goto out_close2;
 
 	write_sigio_pid = run_helper_thread(write_sigio_thread, NULL, 
-					    CLONE_FILES, &stack, 0);
+					    CLONE_FILES | CLONE_VM, &stack, 0);
 
 	if(write_sigio_pid < 0) goto out_close2;
 

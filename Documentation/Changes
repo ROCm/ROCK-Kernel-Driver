@@ -52,7 +52,7 @@ o  Gnu C                  2.95.3                  # gcc --version
 o  Gnu make               3.78                    # make --version
 o  binutils               2.9.5.0.25              # ld -v
 o  util-linux             2.10o                   # fdformat --version
-o  modutils               2.4.2                   # insmod -V
+o  module-init-tools      0.9                     # rmmod -V
 o  e2fsprogs              1.29                    # tune2fs
 o  jfsutils               1.0.14                  # fsck.jfs -V
 o  reiserfsprogs          3.6.3                   # reiserfsck -V 2>&1|grep reiserfsprogs
@@ -141,14 +141,11 @@ If the unthinkable happens and your kernel oopses, you'll need a 2.4
 version of ksymoops to decode the report; see REPORTING-BUGS in the
 root of the Linux source for more information.
 
-Modutils
+Module-Init-Tools
 --------
 
-Upgrade to recent modutils to fix various outstanding bugs which are
-seen more frequently under 2.4.x, and to enable auto-loading of USB
-modules.  In addition, the layout of modules under
-/lib/modules/`uname -r`/ has been made more sane.  This change also
-requires that you upgrade to a recent modutils.
+A new module loader is now in the kernel that requires module-init-tools
+to use.  It is backward compatible with the 2.4.x series kernels.
 
 Mkinitrd
 --------
@@ -306,7 +303,7 @@ o  <ftp://ftp.kernel.org/pub/linux/utils/kernel/ksymoops/v2.4/>
 
 Modutils
 --------
-o  <ftp://ftp.kernel.org/pub/linux/utils/kernel/modutils/v2.4/>
+o  <ftp://ftp.kernel.org/pub/linux/kernel/people/rusty/modules/>
 
 Mkinitrd
 --------

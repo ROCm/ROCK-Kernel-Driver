@@ -31,7 +31,6 @@
 #include "scsi.h"
 #include "hosts.h"
 #include "NCR53C9x.h"
-#include "dec_esp.h"
 
 #include <asm/irq.h>
 #include <asm/jazz.h>
@@ -45,6 +44,11 @@
 #include <asm/dec/ioasic_addrs.h>
 #include <asm/dec/ioasic_ints.h>
 #include <asm/dec/machtype.h>
+
+#define DEC_SCSI_SREG 0
+#define DEC_SCSI_DMAREG 0x40000
+#define DEC_SCSI_SRAM 0x80000
+#define DEC_SCSI_DIAG 0xC0000
 
 /*
  * Once upon a time the pmaz code used to be working but
@@ -103,7 +107,25 @@ volatile unsigned long *scsi_sdr1;
 
 static void scsi_dma_int(int, void *, struct pt_regs *);
 
-static Scsi_Host_Template driver_template = SCSI_DEC_ESP;
+int dec_esp_detect(Scsi_Host_Template * tpnt);
+
+static Scsi_Host_Template driver_template = {
+	.proc_name		= "esp",
+	.proc_info		= &esp_proc_info,
+	.name			= "NCR53C94",
+	.detect			= dec_esp_detect,
+	.info			= esp_info,
+	.command		= esp_command,
+	.queuecommand		= esp_queue,
+	.eh_abort_handler	= esp_abort,
+	.eh_bus_reset_handler	= esp_reset,
+	.can_queue		= 7,
+	.this_id		= 7,
+	.sg_tablesize		= SG_ALL,
+	.cmd_per_lun		= 1,
+	.use_clustering		= DISABLE_CLUSTERING,
+};
+
 
 #include "scsi_module.c"
 

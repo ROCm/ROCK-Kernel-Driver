@@ -15,6 +15,7 @@
 #include "user.h"
 #include "net_user.h"
 #include "slip.h"
+#include "slip_proto.h"
 #include "helper.h"
 #include "os.h"
 
@@ -66,7 +67,7 @@ static void slip_pre_exec(void *arg)
 
 	if(data->stdin != -1) dup2(data->stdin, 0);
 	dup2(data->stdout, 1);
-	close(data->close_me);
+	if(data->close_me != -1) close(data->close_me);
 }
 
 static int slip_tramp(char **argv, int fd)
@@ -156,7 +157,7 @@ static int slip_open(void *data)
 		}
 		sencap = 0;
 		if(ioctl(sfd, SIOCSIFENCAP, &sencap) < 0){
-			printk("Failed to sett slip encapsulation - "
+			printk("Failed to set slip encapsulation - "
 			       "errno = %d\n", errno);
 			return(-errno);
 		}
@@ -186,103 +187,48 @@ static void slip_close(int fd, void *data)
 	pri->slave = -1;
 }
 
-/* SLIP protocol characters. */
-#define END             0300		/* indicates end of frame	*/
-#define ESC             0333		/* indicates byte stuffing	*/
-#define ESC_END         0334		/* ESC ESC_END means END 'data'	*/
-#define ESC_ESC         0335		/* ESC ESC_ESC means ESC 'data'	*/
-
-static int slip_unesc(struct slip_data *sl, unsigned char c)
-{
-	int ret;
-
-	switch(c){
-	case END:
-		sl->esc = 0;
-		ret = sl->pos;
-		sl->pos = 0;
-		return(ret);
-	case ESC:
-		sl->esc = 1;
-		return(0);
-	case ESC_ESC:
-		if(sl->esc){
-			sl->esc = 0;
-			c = ESC;
-		}
-		break;
-	case ESC_END:
-		if(sl->esc){
-			sl->esc = 0;
-			c = END;
-		}
-		break;
-	}
-	sl->buf[sl->pos++] = c;
-	return(0);
-}
-
 int slip_user_read(int fd, void *buf, int len, struct slip_data *pri)
 {
 	int i, n, size, start;
 
-	n = net_read(fd, &pri->buf[pri->pos], sizeof(pri->buf) - pri->pos);
+	if(pri->more>0) {
+		i = 0;
+		while(i < pri->more) {
+			size = slip_unesc(pri->ibuf[i++],
+					pri->ibuf, &pri->pos, &pri->esc);
+			if(size){
+				memcpy(buf, pri->ibuf, size);
+				memmove(pri->ibuf, &pri->ibuf[i], pri->more-i);
+				pri->more=pri->more-i; 
+				return(size);
+			}
+		}
+		pri->more=0;
+	}
+
+	n = net_read(fd, &pri->ibuf[pri->pos], sizeof(pri->ibuf) - pri->pos);
 	if(n <= 0) return(n);
 
 	start = pri->pos;
 	for(i = 0; i < n; i++){
-		size = slip_unesc(pri, pri->buf[start + i]);
+		size = slip_unesc(pri->ibuf[start + i],
+				pri->ibuf, &pri->pos, &pri->esc);
 		if(size){
-			memcpy(buf, pri->buf, size);
+			memcpy(buf, pri->ibuf, size);
+			memmove(pri->ibuf, &pri->ibuf[start+i+1], n-(i+1));
+			pri->more=n-(i+1); 
 			return(size);
 		}
 	}
 	return(0);
 }
 
-static int slip_esc(unsigned char *s, unsigned char *d, int len)
-{
-	unsigned char *ptr = d;
-	unsigned char c;
-
-	/*
-	 * Send an initial END character to flush out any
-	 * data that may have accumulated in the receiver
-	 * due to line noise.
-	 */
-
-	*ptr++ = END;
-
-	/*
-	 * For each byte in the packet, send the appropriate
-	 * character sequence, according to the SLIP protocol.
-	 */
-
-	while (len-- > 0) {
-		switch(c = *s++) {
-		case END:
-			*ptr++ = ESC;
-			*ptr++ = ESC_END;
-			break;
-		case ESC:
-			*ptr++ = ESC;
-			*ptr++ = ESC_ESC;
-			break;
-		default:
-			*ptr++ = c;
-			break;
-		}
-	}
-	*ptr++ = END;
-	return (ptr - d);
-}
-
 int slip_user_write(int fd, void *buf, int len, struct slip_data *pri)
 {
 	int actual, n;
 
-	actual = slip_esc(buf, pri->buf, len);
-	n = net_write(fd, pri->buf, actual);
+	actual = slip_esc(buf, pri->obuf, len);
+	n = net_write(fd, pri->obuf, actual);
 	if(n < 0) return(n);
 	else return(len);
 }

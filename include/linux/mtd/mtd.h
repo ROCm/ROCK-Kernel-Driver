@@ -224,8 +224,7 @@ static inline struct mtd_info *get_mtd_device(struct mtd_info *mtd, int num)
 
 static inline void put_mtd_device(struct mtd_info *mtd)
 {
-       if (mtd->module)
-	       __MOD_DEC_USE_COUNT(mtd->module);
+	module_put(mtd->module);
 }
 
 

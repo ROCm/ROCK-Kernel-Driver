@@ -498,8 +498,10 @@ static int mpu401_open(int dev, int mode,
 
 	if ( (coprocessor = midi_devs[dev]->coproc) != NULL )
 	{
-		if (coprocessor->owner)
-			__MOD_INC_USE_COUNT(coprocessor->owner);
+		if (!try_module_get(coprocessor->owner)) {
+			mpu401_close(dev);
+			return err;
+		}
 
 		if ((err = coprocessor->open(coprocessor->devc, COPR_MIDI)) < 0)
 		{
@@ -537,9 +539,7 @@ static void mpu401_close(int dev)
 	coprocessor = midi_devs[dev]->coproc;
 	if (coprocessor) {
 		coprocessor->close(coprocessor->devc, COPR_MIDI);
-
-		if (coprocessor->owner)
-			__MOD_DEC_USE_COUNT(coprocessor->owner);
+		module_put(coprocessor->owner);
 	}
 	devc->opened = 0;
 }
@@ -838,8 +838,8 @@ static int mpu_synth_open(int dev, int mode)
 
 	coprocessor = midi_devs[midi_dev]->coproc;
 	if (coprocessor) {
-		if (coprocessor->owner)
-			__MOD_INC_USE_COUNT(coprocessor->owner);
+		if (!try_module_get(coprocessor->owner))
+			return err;
 
 		if ((err = coprocessor->open(coprocessor->devc, COPR_MIDI)) < 0)
 		{
@@ -876,9 +876,7 @@ static void mpu_synth_close(int dev)
 	coprocessor = midi_devs[midi_dev]->coproc;
 	if (coprocessor) {
 		coprocessor->close(coprocessor->devc, COPR_MIDI);
-
-		if (coprocessor->owner)
-			__MOD_DEC_USE_COUNT(coprocessor->owner);
+		module_put(coprocessor->owner);
 	}
 	devc->opened = 0;
 	devc->mode = 0;

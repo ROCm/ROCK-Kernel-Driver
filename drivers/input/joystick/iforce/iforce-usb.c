@@ -174,7 +174,7 @@ static int iforce_usb_probe(struct usb_interface *intf,
 
 	if (iforce_init_device(iforce)) goto fail;
 
-	dev_set_drvdata (&intf->dev, iforce);
+	usb_set_intfdata(intf, iforce);
 	return 0;
 
 fail:
@@ -203,10 +203,10 @@ void iforce_usb_delete(struct iforce* iforce)
 
 static void iforce_usb_disconnect(struct usb_interface *intf)
 {
-	struct iforce *iforce = dev_get_drvdata (&intf->dev);
+	struct iforce *iforce = usb_get_intfdata(intf);
 	int open = 0; /* FIXME! iforce->dev.handle->open; */
 
-	dev_set_drvdata (&intf->dev, NULL);
+	usb_set_intfdata(intf, NULL);
 	if (iforce) {
 		iforce->usbdev = NULL;
 		input_unregister_device(&iforce->dev);

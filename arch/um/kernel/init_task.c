@@ -47,7 +47,7 @@ struct task_struct *alloc_task_struct(void){
 
 void unprotect_stack(unsigned long stack)
 {
-	protect(stack, 4 * PAGE_SIZE, 1, 1, 0, 1);
+	protect_memory(stack, 4 * PAGE_SIZE, 1, 1, 0, 1);
 }
 
 void free_task_struct(struct task_struct *task)

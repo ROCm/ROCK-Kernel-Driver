@@ -1041,8 +1041,8 @@ int sequencer_open(int dev, struct file *file)
 		if (synth_devs[i]==NULL)
 			continue;
 
-		if (synth_devs[i]->owner)
-			__MOD_INC_USE_COUNT (synth_devs[i]->owner);
+		if (!try_module_get(synth_devs[i]->owner))
+			continue;
 
 		if ((tmp = synth_devs[i]->open(i, mode)) < 0)
 		{
@@ -1072,8 +1072,8 @@ int sequencer_open(int dev, struct file *file)
 		for (i = 0; i < max_mididev; i++)
 			if (!midi_opened[i] && midi_devs[i])
 			{
-				if (midi_devs[i]->owner)
-					__MOD_INC_USE_COUNT (midi_devs[i]->owner);
+				if (!try_module_get(midi_devs[i]->owner))
+					continue;
 	
 				if ((retval = midi_devs[i]->open(i, mode,
 					sequencer_midi_input, sequencer_midi_output)) >= 0)
@@ -1084,9 +1084,8 @@ int sequencer_open(int dev, struct file *file)
 	}
 
 	if (seq_mode == SEQ_2) {
-		if (tmr->owner)
-			__MOD_INC_USE_COUNT (tmr->owner);
-		tmr->open(tmr_no, seq_mode);
+		if (try_module_get(tmr->owner))
+			tmr->open(tmr_no, seq_mode);
 	}
 
  	init_waitqueue_head(&seq_sleeper);
@@ -1169,8 +1168,7 @@ void sequencer_release(int dev, struct file *file)
 			{
 				synth_devs[i]->close(i);
 
-				if (synth_devs[i]->owner)
-					__MOD_DEC_USE_COUNT (synth_devs[i]->owner);
+				module_put(synth_devs[i]->owner);
 
 				if (synth_devs[i]->midi_dev)
 					midi_opened[synth_devs[i]->midi_dev] = 0;
@@ -1181,15 +1179,13 @@ void sequencer_release(int dev, struct file *file)
 	{
 		if (midi_opened[i]) {
 			midi_devs[i]->close(i);
-			if (midi_devs[i]->owner)
-				__MOD_DEC_USE_COUNT (midi_devs[i]->owner);
+			module_put(midi_devs[i]->owner);
 		}
 	}
 
 	if (seq_mode == SEQ_2) {
 		tmr->close(tmr_no);
-		if (tmr->owner)
-			__MOD_DEC_USE_COUNT (tmr->owner);
+		module_put(tmr->owner);
 	}
 
 	if (obsolete_api_used)

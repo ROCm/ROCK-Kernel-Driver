@@ -136,12 +136,11 @@ static int kobil_startup (struct usb_serial *serial)
 	struct usb_host_interface *altsetting;
 	struct usb_host_endpoint *endpoint;
 
-	serial->port->private = kmalloc(sizeof(struct kobil_private), GFP_KERNEL);
-	if (!serial->port->private){
-		return -1;
+	priv = kmalloc(sizeof(struct kobil_private), GFP_KERNEL);
+	if (!priv){
+		return -ENOMEM;
 	}
 
-	priv = (struct kobil_private *) serial->port->private;
 	priv->filled = 0;
 	priv->cur_pos = 0;
 	priv->device_type = serial->product;
@@ -158,6 +157,7 @@ static int kobil_startup (struct usb_serial *serial)
 		printk(KERN_DEBUG "KOBIL USBTWIN detected\n");
 		break;
 	}
+	usb_set_serial_port_data(serial->port, priv);
 
 	// search for the neccessary endpoints
 	pdev = serial->dev;
@@ -192,9 +192,8 @@ static void kobil_shutdown (struct usb_serial *serial)
 		while (serial->port[i].open_count > 0) {
 			kobil_close (&serial->port[i], NULL);
 		}
-		if (serial->port[i].private) {
-			kfree(serial->port[i].private);
-		}
+		kfree(usb_get_serial_port_data(&serial->port[i]));
+		usb_set_serial_port_data(&serial->port[i], NULL);
 	}
 }
 
@@ -208,7 +207,7 @@ static int kobil_open (struct usb_serial_port *port, struct file *filp)
 	int write_urb_transfer_buffer_length = 8;
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
-	priv = (struct kobil_private *) port->private;
+	priv = usb_get_serial_port_data(port);
 	priv->line_state = 0;
 
 	if (port_paranoia_check (port, __FUNCTION__))
@@ -413,7 +412,7 @@ static int kobil_write (struct usb_serial_port *port, int from_user,
 		return 0;
 	}
 
-	priv = (struct kobil_private *) port->private;
+	priv = usb_get_serial_port_data(port);
 
 	if (count > (KOBIL_BUF_LENGTH - priv->filled)) {
 		dbg("%s - port %d Error: write request bigger than buffer size", __FUNCTION__, port->number);
@@ -513,7 +512,7 @@ static int  kobil_ioctl(struct usb_serial_port *port, struct file *file,
 	int transfer_buffer_length = 8;
 	char *settings;
 
-	priv = (struct kobil_private *) port->private;
+	priv = usb_get_serial_port_data(port);
 	if (priv->device_type == KOBIL_USBTWIN_PRODUCT_ID) {
 		// This device doesn't support ioctl calls
 		return 0;

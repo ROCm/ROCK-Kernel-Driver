@@ -91,8 +91,7 @@ capi_ctr_get(struct capi_ctr *card)
 static inline void
 capi_ctr_put(struct capi_ctr *card)
 {
-	if (card->owner)
-		__MOD_DEC_USE_COUNT(card->owner);
+	module_put(card->owner);
 	DBG("MOD_COUNT DEC");
 }
 

@@ -1,0 +1,43 @@
+#
+# Sensor device configuration
+# All depend on EXPERIMENTAL, I2C and I2C_PROC.
+#
+
+menu "I2C Hardware Sensors Mainboard support"
+
+config I2C_AMD756
+	tristate "  AMD 756/766"
+	depends on I2C && I2C_PROC
+	help
+	  If you say yes to this option, support will be included for the AMD
+	  756/766/768 mainboard I2C interfaces.
+
+	  This can also be built as a module which can be inserted and removed 
+	  while the kernel is running.  If you want to compile it as a module,
+	  say M here and read <file:Documentation/modules.txt>.
+
+	  The module will be called i2c-amd756.o.
+
+	  You will also need the latest user-space utilties: you can find them
+	  in the lm_sensors package, which you can download at 
+	  http://www.lm-sensors.nu
+
+config I2C_AMD8111
+	tristate "  AMD 8111"
+	depends on I2C && I2C_PROC
+	help
+	  If you say yes to this option, support will be included for the AMD
+	  8111 mainboard I2C interfaces.
+
+	  This can also be built as a module which can be inserted and removed 
+	  while the kernel is running.  If you want to compile it as a module,
+	  say M here and read <file:Documentation/modules.txt>.
+
+	  The module will be called i2c-amd8111.o.
+
+	  You will also need the latest user-space utilties: you can find them
+	  in the lm_sensors package, which you can download at 
+	  http://www.lm-sensors.nu
+
+endmenu
+

@@ -513,8 +513,9 @@ static int proc_pid_maps_get_line (char *buf, struct vm_area_struct *map)
 	return len;
 }
 
-ssize_t proc_pid_read_maps (struct task_struct *task, struct file * file, char * buf,
-			  size_t count, loff_t *ppos)
+#ifdef CONFIG_MMU
+ssize_t proc_pid_read_maps(struct task_struct *task, struct file *file,
+			   char *buf, size_t count, loff_t *ppos)
 {
 	struct mm_struct *mm;
 	struct vm_area_struct * map;
@@ -597,3 +598,4 @@ out_free1:
 out:
 	return retval;
 }
+#endif /* CONFIG_MMU */

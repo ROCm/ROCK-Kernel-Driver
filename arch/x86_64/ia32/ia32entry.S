@@ -2,8 +2,6 @@
  * Compatibility mode system call entry point for x86-64. 
  * 		
  * Copyright 2000-2002 Andi Kleen, SuSE Labs.
- * 
- * $Id: ia32entry.S,v 1.31 2002/03/24 13:01:45 ak Exp $ 		
  */		 
 
 #include <asm/calling.h>
@@ -15,19 +13,21 @@
 #include <asm/segment.h>
 #include <linux/linkage.h>
 
-	.macro IA32_ARG_FIXUP
+	.macro IA32_ARG_FIXUP noebp=0
 	movl	%edi,%r8d
+	.if \noebp
+	.else
 	movl	%ebp,%r9d
+	.endif
 	xchg	%ecx,%esi
 	movl	%ebx,%edi
 	movl	%edx,%edx	/* zero extension */
 	.endm 
 
 /*
- * 32bit SYSCALL instruction entry. This is called from the 32bit vsyscall page.
- *	
- * Register setup:
+ * 32bit SYSCALL instruction entry.
  *
+ * Arguments:
  * %eax	System call number.
  * %ebx Arg1
  * %ecx return EIP 
@@ -53,40 +53,51 @@ ENTRY(ia32_cstar_target)
 	movl 	%eax,%eax	/* zero extension */
 	movq	%rax,ORIG_RAX-ARGOFFSET(%rsp)
 	movq	%rcx,RIP-ARGOFFSET(%rsp)
+	movq	%rbp,RCX-ARGOFFSET(%rsp) /* this lies slightly to ptrace */
 	movl	%ebp,%ecx
 	movq	$__USER32_CS,CS-ARGOFFSET(%rsp)
 	movq	$__USER32_DS,SS-ARGOFFSET(%rsp)
 	movq	%r11,EFLAGS-ARGOFFSET(%rsp)
 	movq	%r8,RSP-ARGOFFSET(%rsp)	
-	/* no need to do an access_ok check here because the 32bit
-	   user space cannot set r8 to a value > 4GB and the kernel has no
-	   memory mapping in the first 4GB. */
+	/* no need to do an access_ok check here because r8 has been
+	   32bit zero extended */ 
 	/* hardware stack frame is complete now */	
-1:	movl	(%r8),%ebp
+1:	movl	(%r8),%r9d
 	.section __ex_table,"a"
 	.quad 1b,cstar_badarg
 	.previous	
+	movq	%r9,R9-ARGOFFSET(%rsp)		
 	GET_THREAD_INFO(%r10)
 	bt  $TIF_SYSCALL_TRACE,threadinfo_flags(%r10)
 	jc  ia32_tracesys
+cstar_do_call:	
 	cmpl $IA32_NR_syscalls,%eax
 	jae  ia32_badsys
-	IA32_ARG_FIXUP
+	IA32_ARG_FIXUP 1
 	call *ia32_sys_call_table(,%rax,8)
-	.globl ia32_sysret
+	.globl cstar_sysret
 cstar_sysret:	
 	movq %rax,RAX-ARGOFFSET(%rsp)
 	GET_THREAD_INFO(%r10)
 	cli
-	testl $_TIF_WORK_MASK,threadinfo_flags(%r10)
+	testl $_TIF_ALLWORK_MASK,threadinfo_flags(%r10)
 	jnz int_ret_from_sys_call
-	RESTORE_ARGS 1,0,1,1	/* could avoid the stack restore here */
-	movl RIP-SWFRAME(%rsp),%ecx
-	movl RSP-SWFRAME(%rsp),%esp
-	movl EFLAGS-SWFRAME(%rsp),%r11d
+	RESTORE_ARGS 1,-ARG_SKIP,1,1
+	movl RIP-ARGOFFSET(%rsp),%ecx
+	movl EFLAGS-ARGOFFSET(%rsp),%r11d	
+	movl RSP-ARGOFFSET(%rsp),%esp
 	swapgs
 	sysretl
 	
+cstar_tracesys:	
+	SAVE_REST
+	movq $-ENOSYS,RAX(%rsp)	/* really needed? */
+	movq %rsp,%rdi        /* &pt_regs -> arg1 */
+	call syscall_trace
+	LOAD_ARGS ARGOFFSET  /* reload args from stack in case ptrace changed it */
+	RESTORE_REST
+	jmp cstar_do_call
+				
 cstar_badarg:
 	movq $-EFAULT,%rax
 	jmp cstar_sysret
@@ -115,8 +126,11 @@ cstar_badarg:
 ENTRY(ia32_syscall)
 	swapgs	
 	sti
+	movl %eax,%eax
 	pushq %rax
 	cld
+	/* note the registers are not zero extended to the sf.
+	   this could be a problem */
 	SAVE_ARGS
 	GET_THREAD_INFO(%r10)
 	bt $TIF_SYSCALL_TRACE,threadinfo_flags(%r10)

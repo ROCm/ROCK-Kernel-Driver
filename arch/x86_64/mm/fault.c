@@ -29,6 +29,7 @@
 #include <asm/hardirq.h>
 #include <asm/smp.h>
 #include <asm/tlbflush.h>
+#include <asm/proto.h>
 
 extern void die(const char *,struct pt_regs *,long);
 
@@ -211,6 +212,15 @@ bad_area_nosemaphore:
 
 	/* User mode accesses just cause a SIGSEGV */
 	if (error_code & 4) {
+#ifdef CONFIG_IA32_EMULATION
+		/* 32bit vsyscall. map on demand. */
+		if (test_thread_flag(TIF_IA32) && 
+		    address >= 0xffffe000 && address < 0xffffefff-7) { 
+			if (map_syscall32(mm, address) < 0) 
+				goto out_of_memory2;
+			return;
+		} 			
+#endif
 		printk("%s[%d] segfault at rip:%lx rsp:%lx adr:%lx err:%lx\n",
 		       tsk->comm, tsk->pid, regs->rip, regs->rsp, address, 
 		       error_code);
@@ -263,6 +273,7 @@ no_context:
  */
 out_of_memory:
 	up_read(&mm->mmap_sem);
+out_of_memory2:
 	if (current->pid == 1) { 
 		yield();
 		goto again;
@@ -299,9 +310,6 @@ vmalloc_fault:
 		pgd_t *pgd;
 		pmd_t *pmd;
 		pte_t *pte; 
-
-		printk("vmalloc_fault err %lx addr %lx rip %lx\n", 
-		       error_code, address, regs->rip);
 
 		/*
 		 * x86-64 has the same kernel 3rd level pages for all CPUs.

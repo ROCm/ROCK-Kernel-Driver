@@ -388,16 +388,16 @@ static int powermate_probe(struct usb_interface *intf, const struct usb_device_i
 	pm->requires_update = UPDATE_PULSE_ASLEEP | UPDATE_PULSE_AWAKE | UPDATE_PULSE_MODE | UPDATE_STATIC_BRIGHTNESS;
 	powermate_pulse_led(pm, 0x80, 255, 0, 1, 0); // set default pulse parameters
   
-	dev_set_drvdata(&intf->dev, pm);
+	usb_set_intfdata(intf, pm);
 	return 0;
 }
 
 /* Called when a USB device we've accepted ownership of is removed */
 static void powermate_disconnect(struct usb_interface *intf)
 {
-	struct powermate_device *pm = dev_get_drvdata(&intf->dev);
+	struct powermate_device *pm = usb_get_intfdata (intf);
 
-	dev_set_drvdata(&intf->dev, NULL);
+	usb_set_intfdata(intf, NULL);
 	if (pm) {
 		down(&pm->lock);
 		pm->requires_update = 0;

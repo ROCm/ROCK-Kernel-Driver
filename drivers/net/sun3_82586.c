@@ -1078,12 +1078,11 @@ static int sun3_82586_send_packet(struct sk_buff *skb, struct net_device *dev)
 
 		{
 			unsigned long flags;
-			save_flags(flags);
-			cli();
+			local_irq_save(flags);
 			if(p->xmit_count != p->xmit_last)
 				netif_wake_queue(dev);
 			p->lock = 0;
-			restore_flags(flags);
+			local_irq_restore(flags);
 		}
 		dev_kfree_skb(skb);
 #endif

@@ -396,7 +396,7 @@ uart_get_divisor(struct uart_port *port, struct termios *termios,
 		baud = uart_get_baud_rate(port, termios);
 		quot = uart_calculate_quot(port, baud);
 		if (quot)
-			break;
+			return quot;
 
 		/*
 		 * Oops, the quotient was zero.  Try again with
@@ -1294,8 +1294,7 @@ static void uart_close(struct tty_struct *tty, struct file *filp)
 	wake_up_interruptible(&info->open_wait);
 
  done:
-	if (drv->owner)
-		__MOD_DEC_USE_COUNT(drv->owner);
+	module_put(drv->owner);
 }
 
 static void uart_wait_until_sent(struct tty_struct *tty, int timeout)
@@ -1665,8 +1664,7 @@ static int uart_open(struct tty_struct *tty, struct file *filp)
 	return retval;
 
  out:
-	if (drv->owner)
-		__MOD_DEC_USE_COUNT(drv->owner);
+	module_put(drv->owner);
  fail:
 	return retval;
 }

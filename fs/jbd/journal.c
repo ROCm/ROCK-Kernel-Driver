@@ -694,8 +694,6 @@ static journal_t * journal_init_common (void)
 	journal_t *journal;
 	int err;
 
-	MOD_INC_USE_COUNT;
-
 	journal = jbd_kmalloc(sizeof(*journal), GFP_KERNEL);
 	if (!journal)
 		goto fail;
@@ -724,7 +722,6 @@ static journal_t * journal_init_common (void)
 	}
 	return journal;
 fail:
-	MOD_DEC_USE_COUNT;
 	return NULL;
 }
 
@@ -1131,7 +1128,6 @@ void journal_destroy (journal_t *journal)
 
 	unlock_journal(journal);
 	kfree(journal);
-	MOD_DEC_USE_COUNT;
 }
 
 

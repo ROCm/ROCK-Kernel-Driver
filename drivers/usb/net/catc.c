@@ -928,15 +928,15 @@ static int catc_probe(struct usb_interface *intf, const struct usb_device_id *id
 	       usbdev->bus->bus_name, usbdev->devpath);
 	for (i = 0; i < 5; i++) printk("%2.2x:", netdev->dev_addr[i]);
 	printk("%2.2x.\n", netdev->dev_addr[i]);
-	dev_set_drvdata (&intf->dev, catc);
+	usb_set_intfdata(intf, catc);
 	return 0;
 }
 
 static void catc_disconnect(struct usb_interface *intf)
 {
-	struct catc *catc = dev_get_drvdata (&intf->dev);
+	struct catc *catc = usb_get_intfdata(intf);
 
-	dev_set_drvdata (&intf->dev, NULL);
+	usb_set_intfdata(intf, NULL);
 	if (catc) {
 		unregister_netdev(catc->netdev);
 		usb_free_urb(catc->ctrl_urb);

@@ -23,6 +23,12 @@
 #include <asm/uaccess.h>
 #include <asm/ia32.h>
 
+#define ELF_NAME "elf/i386"
+
+#define AT_SYSINFO 32
+
+#define ARCH_DLINFO NEW_AUX_ENT(AT_SYSINFO, 0xffffe000)
+
 struct file;
 struct elf_phdr; 
 

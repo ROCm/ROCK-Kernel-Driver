@@ -166,8 +166,6 @@ config I2C_IBM_OCP_ADAP
 	tristate "IBM on-chip I2C Adapter"
 	depends on I2C_IBM_OCP_ALGO
 
-# This is needed for automatic patch generation: sensors code starts here
-# This is needed for automatic patch generation: sensors code ends here
 config I2C_CHARDEV
 	tristate "I2C device interface"
 	depends on I2C
@@ -192,6 +190,9 @@ config I2C_PROC
 	  This code is also available as a module. If you want to compile
 	  it as a module, say M here and read <file:Documentation/modules.txt>.
 	  The module will be called i2c-proc.o.
+
+	source drivers/i2c/busses/Kconfig
+	source drivers/i2c/chips/Kconfig
 
 endmenu
 

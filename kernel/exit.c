@@ -664,9 +664,9 @@ fake_volatile:
 	if (current->leader)
 		disassociate_ctty(1);
 
-	put_exec_domain(tsk->thread_info->exec_domain);
-	if (tsk->binfmt && tsk->binfmt->module)
-		__MOD_DEC_USE_COUNT(tsk->binfmt->module);
+	module_put(tsk->thread_info->exec_domain->module);
+	if (tsk->binfmt)
+		module_put(tsk->binfmt->module);
 
 	tsk->exit_code = code;
 	exit_notify();

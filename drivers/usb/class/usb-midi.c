@@ -2056,14 +2056,14 @@ static int usb_midi_probe(struct usb_interface *intf,
 	MOD_INC_USE_COUNT;
 #endif
 
-	dev_set_drvdata (&intf->dev, s);
+	usb_set_intfdata (intf, s);
 	return 0;
 }
 
 
 static void usb_midi_disconnect(struct usb_interface *intf)
 {
-	struct usb_midi_state *s = dev_get_drvdata (&intf->dev);
+	struct usb_midi_state *s = usb_get_intfdata (intf);
 	struct list_head      *list;
 	struct usb_mididev    *m;
 
@@ -2080,7 +2080,7 @@ static void usb_midi_disconnect(struct usb_interface *intf)
 	list_del(&s->mididev);
 	INIT_LIST_HEAD(&s->mididev);
 	s->usbdev = NULL;
-	dev_set_drvdata (&intf->dev, NULL);
+	usb_set_intfdata (intf, NULL);
 
 	for ( list = s->midiDevList.next; list != &s->midiDevList; list = list->next ) {
 		m = list_entry(list, struct usb_mididev, list);
