@@ -144,17 +144,6 @@ int is_aligned_hugepage_range(unsigned long addr, unsigned long len)
 
 	return 0;
 }
-/* This function checks if the address and address+len falls out of HugeTLB region.  It
- * return -EINVAL if any part of address range falls in HugeTLB region.
- */
-int  check_valid_hugepage_range(unsigned long addr, unsigned long len)
-{
-	if (REGION_NUMBER(addr) == REGION_HPAGE)
-		return -EINVAL;
-	if (REGION_NUMBER(addr+len) == REGION_HPAGE)
-		return -EINVAL;
-	return 0;
-}
 
 int copy_hugetlb_page_range(struct mm_struct *dst, struct mm_struct *src,
 			struct vm_area_struct *vma)
@@ -270,6 +259,59 @@ void huge_page_release(struct page *page)
 		return;
 
 	free_huge_page(page);
+}
+
+/*
+ * Same as generic free_pgtables(), except constant PGDIR_* and pgd_offset
+ * are hugetlb region specific.
+ */
+void hugetlb_free_pgtables(struct mmu_gather *tlb, struct vm_area_struct *prev,
+	unsigned long start, unsigned long end)
+{
+	unsigned long first = start & HUGETLB_PGDIR_MASK;
+	unsigned long last = end + HUGETLB_PGDIR_SIZE - 1;
+	unsigned long start_index, end_index;
+	struct mm_struct *mm = tlb->mm;
+
+	if (!prev) {
+		prev = mm->mmap;
+		if (!prev)
+			goto no_mmaps;
+		if (prev->vm_end > start) {
+			if (last > prev->vm_start)
+				last = prev->vm_start;
+			goto no_mmaps;
+		}
+	}
+	for (;;) {
+		struct vm_area_struct *next = prev->vm_next;
+
+		if (next) {
+			if (next->vm_start < start) {
+				prev = next;
+				continue;
+			}
+			if (last > next->vm_start)
+				last = next->vm_start;
+		}
+		if (prev->vm_end > first)
+			first = prev->vm_end + HUGETLB_PGDIR_SIZE - 1;
+		break;
+	}
+no_mmaps:
+	if (last < first)	/* for arches with discontiguous pgd indices */
+		return;
+	/*
+	 * If the PGD bits are not consecutive in the virtual address, the
+	 * old method of shifting the VA >> by PGDIR_SHIFT doesn't work.
+	 */
+
+	start_index = pgd_index(htlbpage_to_page(first));
+	end_index = pgd_index(htlbpage_to_page(last));
+
+	if (end_index > start_index) {
+		clear_page_tables(tlb, start_index, end_index - start_index);
+	}
 }
 
 void unmap_hugepage_range(struct vm_area_struct *vma, unsigned long start, unsigned long end)
