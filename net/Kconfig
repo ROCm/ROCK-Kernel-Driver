@@ -96,14 +96,8 @@ config INET
 	  allows you to ping yourself (great fun, that!).
 
 	  For an excellent introduction to Linux networking, please read the
-	  NET-3-HOWTO, available from
+	  Linux Networking HOWTO, available from
 	  <http://www.tldp.org/docs.html#howto>.
-
-	  This option is also necessary if you want to use the full power of
-	  term (term is a program which gives you almost full Internet
-	  connectivity if you have a regular dial up shell account on some
-	  Internet connected Unix computer; for more information, read
-	  <http://www.bart.nl/~patrickr/term-howto/Term-HOWTO.html>).
 
 	  If you say Y here and also to "/proc file system support" and
 	  "Sysctl support" below, you can change various aspects of the
