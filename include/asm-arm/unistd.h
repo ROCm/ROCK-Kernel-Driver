@@ -308,14 +308,14 @@ type name(void) {							\
   __syscall_return(type,__res);						\
 }
 
-#define _syscall1(type,name,type1,arg1)					\
-type name(type1 arg1) {							\
+#define _syscall1(type,name,type1,arg1) 				\
+type name(type1 arg1) { 						\
   register long __r0 __asm__("r0") = (long)arg1;			\
   register long __res __asm__("r0");					\
   __asm__ __volatile__ (						\
   __syscall(name)							\
-        : "=r" (__res)							\
-        : "r" (__r0)							\
+	: "=r" (__res)							\
+	: "r" (__r0)							\
 	: "lr");							\
   __syscall_return(type,__res);						\
 }
@@ -327,8 +327,8 @@ type name(type1 arg1,type2 arg2) {					\
   register long __res __asm__("r0");					\
   __asm__ __volatile__ (						\
   __syscall(name)							\
-        : "=r" (__res)							\
-        : "r" (__r0),"r" (__r1)						\
+	: "=r" (__res)							\
+	: "r" (__r0),"r" (__r1) 					\
 	: "lr");							\
   __syscall_return(type,__res);						\
 }
@@ -342,8 +342,8 @@ type name(type1 arg1,type2 arg2,type3 arg3) {				\
   register long __res __asm__("r0");					\
   __asm__ __volatile__ (						\
   __syscall(name)							\
-        : "=r" (__res)							\
-  	: "r" (__r0),"r" (__r1),"r" (__r2)				\
+	: "=r" (__res)							\
+	: "r" (__r0),"r" (__r1),"r" (__r2)				\
 	: "lr");							\
   __syscall_return(type,__res);						\
 }
@@ -358,8 +358,8 @@ type name(type1 arg1, type2 arg2, type3 arg3, type4 arg4) {		\
   register long __res __asm__("r0");					\
   __asm__ __volatile__ (						\
   __syscall(name)							\
-  	: "=r" (__res)							\
-  	: "r" (__r0),"r" (__r1),"r" (__r2),"r" (__r3)			\
+	: "=r" (__res)							\
+	: "r" (__r0),"r" (__r1),"r" (__r2),"r" (__r3)			\
 	: "lr");							\
   __syscall_return(type,__res);						\
 }
@@ -375,8 +375,8 @@ type name(type1 arg1, type2 arg2, type3 arg3, type4 arg4, type5 arg5) {	\
   register long __res __asm__("r0");					\
   __asm__ __volatile__ (						\
   __syscall(name)							\
-  	: "=r" (__res)							\
-  	: "r" (__r0),"r" (__r1),"r" (__r2),"r" (__r3),"r" (__r4)	\
+	: "=r" (__res)							\
+	: "r" (__r0),"r" (__r1),"r" (__r2),"r" (__r3),"r" (__r4)	\
 	: "lr");							\
   __syscall_return(type,__res);						\
 }
@@ -392,7 +392,7 @@ type name(type1 arg1, type2 arg2, type3 arg3, type4 arg4, type5 arg5, type6 arg6
   register long __res __asm__("r0");					\
   __asm__ __volatile__ (						\
   __syscall(name)							\
-  	: "=r" (__res)							\
+	: "=r" (__res)							\
 	: "r" (__r0),"r" (__r1),"r" (__r2),"r" (__r3), "r" (__r4),"r" (__r5)		\
 	: "lr");							\
   __syscall_return(type,__res);						\
