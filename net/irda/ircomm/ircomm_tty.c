@@ -74,9 +74,30 @@ static void ircomm_tty_flow_indication(void *instance, void *sap,
 static int ircomm_tty_read_proc(char *buf, char **start, off_t offset, int len,
 				int *eof, void *unused);
 #endif /* CONFIG_PROC_FS */
-static struct tty_driver driver;
+static struct tty_driver *driver;
 
 hashbin_t *ircomm_tty = NULL;
+
+static struct tty_operations ops = {
+	.open            = ircomm_tty_open,
+	.close           = ircomm_tty_close,
+	.write           = ircomm_tty_write,
+	.write_room      = ircomm_tty_write_room,
+	.chars_in_buffer = ircomm_tty_chars_in_buffer,
+	.flush_buffer    = ircomm_tty_flush_buffer,
+	.ioctl           = ircomm_tty_ioctl,
+	.throttle        = ircomm_tty_throttle,
+	.unthrottle      = ircomm_tty_unthrottle,
+	.send_xchar      = ircomm_tty_send_xchar,
+	.set_termios     = ircomm_tty_set_termios,
+	.stop            = ircomm_tty_stop,
+	.start           = ircomm_tty_start,
+	.hangup          = ircomm_tty_hangup,
+	.wait_until_sent = ircomm_tty_wait_until_sent,
+#ifdef CONFIG_PROC_FS
+	.read_proc       = ircomm_tty_read_proc,
+#endif /* CONFIG_PROC_FS */
+};
 
 /*
  * Function ircomm_tty_init()
@@ -85,45 +106,30 @@ hashbin_t *ircomm_tty = NULL;
  *
  */
 int __init ircomm_tty_init(void)
-{	
+{
+	driver = alloc_tty_driver(IRCOMM_TTY_PORTS);
+	if (!driver)
+		return -ENOMEM;
 	ircomm_tty = hashbin_new(HB_LOCK); 
 	if (ircomm_tty == NULL) {
 		ERROR("%s(), can't allocate hashbin!\n", __FUNCTION__);
+		put_tty_driver(driver);
 		return -ENOMEM;
 	}
 
-	memset(&driver, 0, sizeof(struct tty_driver));
-	driver.magic           = TTY_DRIVER_MAGIC;
-	driver.driver_name     = "ircomm";
-	driver.name            = "ircomm";
-	driver.major           = IRCOMM_TTY_MAJOR;
-	driver.minor_start     = IRCOMM_TTY_MINOR;
-	driver.num             = IRCOMM_TTY_PORTS;
-	driver.type            = TTY_DRIVER_TYPE_SERIAL;
-	driver.subtype         = SERIAL_TYPE_NORMAL;
-	driver.init_termios    = tty_std_termios;
-	driver.init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-	driver.flags           = TTY_DRIVER_REAL_RAW;
-	driver.open            = ircomm_tty_open;
-	driver.close           = ircomm_tty_close;
-	driver.write           = ircomm_tty_write;
-	driver.write_room      = ircomm_tty_write_room;
-	driver.chars_in_buffer = ircomm_tty_chars_in_buffer;
-	driver.flush_buffer    = ircomm_tty_flush_buffer;
-	driver.ioctl           = ircomm_tty_ioctl;
-	driver.throttle        = ircomm_tty_throttle;
-	driver.unthrottle      = ircomm_tty_unthrottle;
-	driver.send_xchar      = ircomm_tty_send_xchar;
-	driver.set_termios     = ircomm_tty_set_termios;
-	driver.stop            = ircomm_tty_stop;
-	driver.start           = ircomm_tty_start;
-	driver.hangup          = ircomm_tty_hangup;
-	driver.wait_until_sent = ircomm_tty_wait_until_sent;
-#ifdef CONFIG_PROC_FS
-	driver.read_proc       = ircomm_tty_read_proc;
-#endif /* CONFIG_PROC_FS */
-	if (tty_register_driver(&driver)) {
+	driver->driver_name     = "ircomm";
+	driver->name            = "ircomm";
+	driver->major           = IRCOMM_TTY_MAJOR;
+	driver->minor_start     = IRCOMM_TTY_MINOR;
+	driver->type            = TTY_DRIVER_TYPE_SERIAL;
+	driver->subtype         = SERIAL_TYPE_NORMAL;
+	driver->init_termios    = tty_std_termios;
+	driver->init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
+	driver->flags           = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(driver, &ops);
+	if (tty_register_driver(driver)) {
 		ERROR("%s(): Couldn't register serial driver\n", __FUNCTION__);
+		put_tty_driver(driver);
 		return -1;
 	}
 	return 0;
@@ -154,13 +160,14 @@ void __exit ircomm_tty_cleanup(void)
 
 	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );	
 
-	ret = tty_unregister_driver(&driver);
+	ret = tty_unregister_driver(driver);
         if (ret) {
                 ERROR("%s(), failed to unregister driver\n", __FUNCTION__);
 		return;
 	}
 
 	hashbin_delete(ircomm_tty, (FREE_FUNC) __ircomm_tty_cleanup);
+	put_tty_driver(driver);
 }
 
 /*
