@@ -75,6 +75,9 @@ typedef void (*LpEventHandler)(struct HvLpEvent *, struct pt_regs *);
 extern int HvLpEvent_registerHandler( HvLpEvent_Type eventType, LpEventHandler hdlr);
 
 // Unregister a handler for an event type
+//  This call will sleep until the handler being removed is guaranteed to
+//  be no longer executing on any CPU. Do not call with locks held.
+//
 //  returns 0 on success
 //  Unregister will fail if there are any paths open for the type
 extern int HvLpEvent_unregisterHandler( HvLpEvent_Type eventType );
