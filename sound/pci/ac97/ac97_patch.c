@@ -897,7 +897,7 @@ static struct snd_ac97_build_ops patch_alc650_ops = {
 
 int patch_alc650(ac97_t * ac97)
 {
-	unsigned short val, reg;
+	unsigned short val;
 	int spdif = 0;
 
 	ac97->build_ops = &patch_alc650_ops;

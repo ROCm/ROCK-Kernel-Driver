@@ -1580,9 +1580,21 @@ static struct _ac97_rate_regs ali_ac97_rate_regs[] __devinitdata = {
 static struct ac97_quirk ac97_quirks[] __devinitdata = {
 	{
 		.vendor = 0x1028,
+		.device = 0x00d8,
+		.name = "Dell Precision 530",
+		.type = AC97_TUNE_HP_ONLY
+	},
+	{
+		.vendor = 0x1028,
 		.device = 0x0126,
 		.name = "Dell Optiplex GX260",
 		.type = AC97_TUNE_HP_ONLY
+	},
+	{
+		.vendor = 0x1028,
+		.device = 0x0157,
+		.name = "Dell Dimension 8300",
+		.type = AC97_TUNE_SWAP_SURROUND
 	},
 	{
 		.vendor = 0x1043,
@@ -1668,6 +1680,12 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 		.device = 0xa000,
 		.mask = 0xfff0,
 		.name = "Intel ICH5/AD1985 (discrete)",
+		.type = AC97_TUNE_HP_ONLY
+	},
+	{
+		.vendor = 0x103c,
+		.device = 0x00c3,
+		.name = "Hewlett-Packard onboard",
 		.type = AC97_TUNE_HP_ONLY
 	},
 	{ } /* terminator */

@@ -1968,6 +1968,7 @@ static int __devinit check_dxs_list(struct pci_dev *pci)
 {
 	static struct dxs_whitelist whitelist[] = {
 		{ .vendor = 0x1019, .device = 0x0996, .action = VIA_DXS_48K },
+		{ .vendor = 0x1297, .device = 0xc160, .action = VIA_DXS_ENABLE }, /* Shuttle SK41G */
 		{ } /* terminator */
 	};
 	struct dxs_whitelist *w;
