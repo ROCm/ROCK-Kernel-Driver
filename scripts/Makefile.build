@@ -64,7 +64,12 @@ endif
 
 # We keep a list of all modules in $(MODVERDIR)
 
-touch-module = @echo $(@:.o=.ko) > $(MODVERDIR)/$(@F:.o=.mod)
+define touch-module
+	@DIR=$(@D);							\
+	if test "$${DIR:0:1}" != / -o "$${DIR#$$PWD}" != "$$DIR"; then	\
+	    echo $(@:.o=.ko) > $(MODVERDIR)/$(@F:.o=.mod);		\
+	fi
+endef
 
 __build: $(if $(KBUILD_BUILTIN),$(builtin-target) $(lib-target) $(extra-y)) \
 	 $(if $(KBUILD_MODULES),$(obj-m)) \

@@ -592,12 +592,12 @@ prepare0: prepare1 include/linux/version.h include/asm include/config/MARKER
 ifdef KBUILD_MODULES
 ifeq ($(origin SUBDIRS),file)
 	$(Q)rm -rf $(MODVERDIR)
+	$(if $(CONFIG_MODULES),$(Q)mkdir -p $(MODVERDIR))
 else
 	@echo '*** Warning: Overriding SUBDIRS on the command line can cause'
 	@echo '***          inconsistencies'
 endif
 endif
-	$(if $(CONFIG_MODULES),$(Q)mkdir -p $(MODVERDIR))
 
 # All the preparing..
 prepare-all: prepare0 prepare
@@ -660,8 +660,34 @@ define filechk_version.h
 	)
 endef
 
+# Run version.h through the C pre-processor to determine which symbols
+# it defines: The simple version that filechk_version.h produces is not
+# byte-wise identical to our version for multiple configurations.
+# ---------------------------------------------------------------------------
+
 include/linux/version.h: Makefile
-	$(call filechk,version.h)
+	@echo '  CHK     $@';				\
+	if [ -e $@ ]; then				\
+	    CURRENT="$$(				\
+		( echo '#include "$@"';			\
+		  echo UTS_RELEASE;			\
+		  echo LINUX_VERSION_CODE		\
+		) | cpp | tail -n 2)";			\
+	    NEW="$$(					\
+		echo \"$(KERNELRELEASE)\";		\
+		expr $(VERSION) \* 65536 +		\
+		     $(PATCHLEVEL) \* 256 +		\
+		     $(SUBLEVEL)			\
+		)";					\
+	    test "$$CURRENT" = "$$NEW";			\
+	else						\
+	    false;					\
+	fi;						\
+	if test $$? -ne 0; then				\
+	    echo '  UPD     $@';			\
+	    $(call filechk_version.h) > $@;		\
+	fi
+
 
 # ---------------------------------------------------------------------------
 
@@ -1010,12 +1036,13 @@ define filechk
 	@set -e;				\
 	echo '  CHK     $@';			\
 	mkdir -p $(dir $@);			\
-	$(filechk_$(1)) < $< > $@.tmp;		\
-	if [ -r $@ ] && cmp -s $@ $@.tmp; then	\
-		rm -f $@.tmp;			\
+	tmp=$$(/bin/mktemp /tmp/kbuild.XXXXXX);	\
+	$(filechk_$(1)) < $< > $$tmp;		\
+	if [ -r $@ ] && cmp -s $@ $$tmp; then	\
+		rm -f $$tmp;			\
 	else					\
 		echo '  UPD     $@';		\
-		mv -f $@.tmp $@;		\
+		mv -f $$tmp $@;		\
 	fi
 endef
 
