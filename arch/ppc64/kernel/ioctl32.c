@@ -578,6 +578,17 @@ static int ethtool_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 		len += sizeof(struct ethtool_regs);
 		break;
 	}
+	case ETHTOOL_GEEPROM: 
+	case ETHTOOL_SEEPROM: { 
+		struct ethtool_eeprom *promaddr = (struct ethtool_eeprom *)A(data); 
+		/* darned variable size arguments */ 
+		if (get_user(len, (u32 *)&promaddr->len)) { 
+			err = -EFAULT; 
+			goto out; 
+		} 
+		len += sizeof(struct ethtool_eeprom); 
+		break; 
+	} 
 	case ETHTOOL_GSET:
 	case ETHTOOL_SSET:	len = sizeof(struct ethtool_cmd); break;
 	default:
