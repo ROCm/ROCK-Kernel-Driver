@@ -5,7 +5,6 @@
  * Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
  */
 
-#include <asm/cprefix.h>
 #include <asm/head.h>
 #include <asm/asi.h>
 #include <asm/contregs.h>
@@ -217,9 +216,9 @@ tsetup_patch6:
 	/* Call MMU-architecture dependent stack checking
 	 * routine.
 	 */
-	.globl	C_LABEL(tsetup_mmu_patchme)
-C_LABEL(tsetup_mmu_patchme):
-	b	C_LABEL(tsetup_sun4c_stackchk)
+	.globl	tsetup_mmu_patchme
+tsetup_mmu_patchme:
+	b	tsetup_sun4c_stackchk
 	 andcc	%sp, 0x7, %g0
 
 	/* Architecture specific stack checking routines.  When either
@@ -229,8 +228,8 @@ C_LABEL(tsetup_mmu_patchme):
 	 */
 #define glob_tmp     g1
 
-	.globl	C_LABEL(tsetup_sun4c_stackchk)
-C_LABEL(tsetup_sun4c_stackchk):
+	.globl	tsetup_sun4c_stackchk
+tsetup_sun4c_stackchk:
 	/* Done by caller: andcc %sp, 0x7, %g0 */
 	bne	trap_setup_user_stack_is_bolixed
 	 sra	%sp, 29, %glob_tmp
@@ -276,8 +275,8 @@ tsetup_sun4c_onepage:
 	jmpl	%t_retpc + 0x8, %g0
 	 mov	%t_kstack, %sp
 
-	.globl	C_LABEL(tsetup_srmmu_stackchk)
-C_LABEL(tsetup_srmmu_stackchk):
+	.globl	tsetup_srmmu_stackchk
+tsetup_srmmu_stackchk:
 	/* Check results of callers andcc %sp, 0x7, %g0 */
 	bne	trap_setup_user_stack_is_bolixed
 	 sethi   %hi(PAGE_OFFSET), %glob_tmp

@@ -3,7 +3,6 @@
  *  Copyright(C) 1996 David S. Miller
  */
 
-#include <asm/cprefix.h>
 #include <asm/ptrace.h>
 #include <asm/errno.h>
 
@@ -17,8 +16,8 @@
 	 * bytes copied		if we hit a null byte
 	 */
 
-	.globl	C_LABEL(__strncpy_from_user)
-C_LABEL(__strncpy_from_user):
+	.globl	__strncpy_from_user
+__strncpy_from_user:
 	/* %o0=dest, %o1=src, %o2=count */
 	mov	%o2, %o3
 1:

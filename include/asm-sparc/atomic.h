@@ -11,48 +11,15 @@
 #define __ARCH_SPARC_ATOMIC__
 
 #include <linux/config.h>
-#include <linux/spinlock.h>
 
 typedef struct { volatile int counter; } atomic_t;
 
 #ifdef __KERNEL__
 
-#ifdef CONFIG_SMP
-
-#define ATOMIC_HASH_SIZE	4
-#define ATOMIC_HASH(a)	(&__atomic_hash[(((unsigned long)a)>>8) & (ATOMIC_HASH_SIZE-1)])
-extern spinlock_t __atomic_hash[ATOMIC_HASH_SIZE];
-
-#else /* SMP */
-
-#define ATOMIC_HASH_SIZE	1
-#define ATOMIC_HASH(a)		0
-
-#endif /* SMP */
-
-static inline int __atomic_add_return(int i, atomic_t *v)
-{
-	int ret;
-	unsigned long flags;
-	spin_lock_irqsave(ATOMIC_HASH(v), flags);
-
-	ret = (v->counter += i);
-
-	spin_unlock_irqrestore(ATOMIC_HASH(v), flags);
-	return ret;
-}
-
-static inline void atomic_set(atomic_t *v, int i)
-{
-	unsigned long flags;
-	spin_lock_irqsave(ATOMIC_HASH(v), flags);
-
-	v->counter = i;
-
-	spin_unlock_irqrestore(ATOMIC_HASH(v), flags);
-}
-
 #define ATOMIC_INIT(i)  { (i) }
+
+extern int __atomic_add_return(int, atomic_t *);
+extern void atomic_set(atomic_t *, int);
 
 #define atomic_read(v)          ((v)->counter)
 
