@@ -1183,10 +1183,10 @@ nfsd4_decode_compound(struct nfsd4_compoundargs *argp)
 } while (0)
 #define WRITECINFO(c)		do {				\
 	*p++ = htonl(c.atomic);					\
-	*p++ = htonl(c.before_size);				\
-	*p++ = htonl(c.before_ctime);				\
-	*p++ = htonl(c.after_size);				\
-	*p++ = htonl(c.after_ctime);				\
+	*p++ = htonl(c.before_ctime_sec);				\
+	*p++ = htonl(c.before_ctime_nsec);				\
+	*p++ = htonl(c.after_ctime_sec);				\
+	*p++ = htonl(c.after_ctime_nsec);				\
 } while (0)
 
 #define RESERVE_SPACE(nbytes)	do {				\
@@ -1326,32 +1326,15 @@ nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 	}
 	if (bmval0 & FATTR4_WORD0_CHANGE) {
 		/*
-		 * XXX: We currently use the inode ctime as the nfsv4 "changeid"
-		 * attribute.  This violates the spec, which says
-		 *
-		 *    The server may return the object's time_modify attribute
-		 *    for this attribute, but only if the file system object
-		 *    can not be updated more frequently than the resolution
-		 *    of time_modify.
-		 *
-		 * Since we only have 1-second ctime resolution, this is a pretty
-		 * serious violation.  Indeed, 1-second ctime resolution is known
-		 * to be a problem in practice in the NFSv3 world.
-		 *
-		 * The real solution to this problem is probably to work on
-		 * adding high-resolution mtimes to the VFS layer.
-		 *
-		 * Note: Started using i_size for the high 32 bits of the changeid.
-		 *
-		 * Note 2: This _must_ be consistent with the scheme for writing
+		 * Note: This _must_ be consistent with the scheme for writing
 		 * change_info, so any changes made here must be reflected there
 		 * as well.  (See xdr4.h:set_change_info() and the WRITECINFO()
 		 * macro above.)
 		 */
 		if ((buflen -= 8) < 0)
 			goto out_resource;
-		WRITE32(stat.size);
-		WRITE32(stat.mtime.tv_sec); /* AK: nsec dropped? */
+		WRITE32(stat.ctime.tv_sec);
+		WRITE32(stat.ctime.tv_nsec);
 	}
 	if (bmval0 & FATTR4_WORD0_SIZE) {
 		if ((buflen -= 8) < 0)

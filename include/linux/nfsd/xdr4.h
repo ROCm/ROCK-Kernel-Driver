@@ -54,10 +54,10 @@ typedef struct {
 
 struct nfsd4_change_info {
 	u32		atomic;
-	u32		before_size;
-	u32		before_ctime;
-	u32		after_size;
-	u32		after_ctime;
+	u32		before_ctime_sec;
+	u32		before_ctime_nsec;
+	u32		after_ctime_sec;
+	u32		after_ctime_nsec;
 };
 
 struct nfsd4_access {
@@ -406,10 +406,10 @@ set_change_info(struct nfsd4_change_info *cinfo, struct svc_fh *fhp)
 {
 	BUG_ON(!fhp->fh_pre_saved || !fhp->fh_post_saved);
 	cinfo->atomic = 1;
-	cinfo->before_size = fhp->fh_pre_size;
-	cinfo->before_ctime = fhp->fh_pre_ctime.tv_sec;
-	cinfo->after_size = fhp->fh_post_size;
-	cinfo->after_ctime = fhp->fh_post_ctime.tv_sec;
+	cinfo->before_ctime_sec = fhp->fh_pre_ctime.tv_sec;
+	cinfo->before_ctime_nsec = fhp->fh_pre_ctime.tv_nsec;
+	cinfo->after_ctime_sec = fhp->fh_post_ctime.tv_sec;
+	cinfo->after_ctime_nsec = fhp->fh_post_ctime.tv_nsec;
 }
 
 int nfs4svc_encode_voidres(struct svc_rqst *, u32 *, void *);
