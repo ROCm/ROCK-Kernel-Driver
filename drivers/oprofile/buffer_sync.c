@@ -147,7 +147,7 @@ static unsigned long get_exec_dcookie(struct mm_struct * mm)
 	for (vma = mm->mmap; vma; vma = vma->vm_next) {
 		if (!vma->vm_file)
 			continue;
-		if (!vma->vm_flags & VM_EXECUTABLE)		
+		if (!(vma->vm_flags & VM_EXECUTABLE))
 			continue;
 		cookie = fast_get_dcookie(vma->vm_file->f_dentry,
 			vma->vm_file->f_vfsmnt);
