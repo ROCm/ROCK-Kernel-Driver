@@ -911,7 +911,7 @@ fb_cursor(struct fb_info *info, struct fb_cursor *sprite)
 			return -ENOMEM;
 		}
 		
-		if (copy_from_user(&cursor.image.data, sprite->image.data, size) ||
+		if (copy_from_user(cursor.image.data, sprite->image.data, size) ||
 		    copy_from_user(cursor.mask, sprite->mask, size)) { 
 			kfree(cursor.image.data);
 			kfree(cursor.mask);
