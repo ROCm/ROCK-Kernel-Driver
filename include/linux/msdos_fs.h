@@ -235,17 +235,6 @@ static inline void fatwchar_to16(__u8 *dst, const wchar_t *src, size_t len)
 #endif
 }
 
-/* fat/buffer.c */
-extern struct buffer_head *fat_bread(struct super_block *sb, int block);
-extern struct buffer_head *fat_getblk(struct super_block *sb, int block);
-extern void fat_brelse(struct super_block *sb, struct buffer_head *bh);
-extern void fat_mark_buffer_dirty(struct super_block *sb, struct buffer_head *bh);
-extern void fat_set_uptodate(struct super_block *sb, struct buffer_head *bh,
-			     int val);
-extern int fat_is_uptodate(struct super_block *sb, struct buffer_head *bh);
-extern void fat_ll_rw_block(struct super_block *sb, int opr, int nbreq,
-			    struct buffer_head *bh[32]);
-
 /* fat/cache.c */
 extern int fat_access(struct super_block *sb, int nr, int new_value);
 extern int __fat_access(struct super_block *sb, int nr, int new_value);
@@ -273,12 +262,8 @@ extern int fat_new_dir(struct inode *dir, struct inode *parent, int is_vfat);
 /* fat/file.c */
 extern struct file_operations fat_file_operations;
 extern struct inode_operations fat_file_inode_operations;
-extern ssize_t fat_file_read(struct file *filp, char *buf, size_t count,
-			     loff_t *ppos);
 extern int fat_get_block(struct inode *inode, sector_t iblock,
 			 struct buffer_head *bh_result, int create);
-extern ssize_t fat_file_write(struct file *filp, const char *buf, size_t count,
-			      loff_t *ppos);
 extern void fat_truncate(struct inode *inode);
 
 /* fat/inode.c */

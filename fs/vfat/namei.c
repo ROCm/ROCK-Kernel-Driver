@@ -319,9 +319,9 @@ static int vfat_find_form(struct inode *dir,char *name)
 	struct buffer_head *bh = NULL;
 	int ino,res;
 
-	res=fat_scan(dir,name,&bh,&de,&ino);
-	fat_brelse(dir->i_sb, bh);
-	if (res<0)
+	res = fat_scan(dir,name,&bh,&de,&ino);
+	brelse(bh);
+	if (res < 0)
 		return -ENOENT;
 	return 0;
 }
@@ -793,7 +793,6 @@ static int vfat_add_entry(struct inode *dir,struct qstr* qname,
 			  int is_dir, struct vfat_slot_info *sinfo_out,
 			  struct buffer_head **bh, struct msdos_dir_entry **de)
 {
-	struct super_block *sb = dir->i_sb;
 	struct msdos_dir_slot *dir_slots;
 	loff_t offset;
 	int slots, slot;
@@ -821,7 +820,7 @@ static int vfat_add_entry(struct inode *dir,struct qstr* qname,
 		res = offset;
 		goto cleanup;
 	}
-	fat_brelse(sb, dummy_bh);
+	brelse(dummy_bh);
 
 	/* Now create the new entry */
 	*bh = NULL;
@@ -831,7 +830,7 @@ static int vfat_add_entry(struct inode *dir,struct qstr* qname,
 			goto cleanup;
 		}
 		memcpy(*de, dir_slots + slot, sizeof(struct msdos_dir_slot));
-		fat_mark_buffer_dirty(sb, *bh);
+		mark_buffer_dirty(*bh);
 	}
 
 	res = 0;
@@ -843,7 +842,7 @@ static int vfat_add_entry(struct inode *dir,struct qstr* qname,
 	(*de)->ctime = (*de)->time;
 	(*de)->adate = (*de)->cdate = (*de)->date;
 
-	fat_mark_buffer_dirty(sb, *bh);
+	mark_buffer_dirty(*bh);
 
 	/* slots can't be less than 1 */
 	sinfo_out->long_slots = slots - 1;
@@ -902,7 +901,7 @@ struct dentry *vfat_lookup(struct inode *dir,struct dentry *dentry)
 		goto error;
 	}
 	inode = fat_build_inode(dir->i_sb, de, sinfo.ino, &res);
-	fat_brelse(dir->i_sb, bh);
+	brelse(bh);
 	if (res) {
 		unlock_kernel();
 		return ERR_PTR(res);
@@ -946,7 +945,7 @@ int vfat_create(struct inode *dir,struct dentry* dentry,int mode)
 		return res;
 	}
 	inode = fat_build_inode(sb, de, sinfo.ino, &res);
-	fat_brelse(sb, bh);
+	brelse(bh);
 	if (!inode) {
 		unlock_kernel();
 		return res;
@@ -964,7 +963,6 @@ int vfat_create(struct inode *dir,struct dentry* dentry,int mode)
 static void vfat_remove_entry(struct inode *dir,struct vfat_slot_info *sinfo,
      struct buffer_head *bh, struct msdos_dir_entry *de)
 {
-	struct super_block *sb = dir->i_sb;
 	loff_t offset;
 	int i,ino;
 
@@ -974,7 +972,7 @@ static void vfat_remove_entry(struct inode *dir,struct vfat_slot_info *sinfo,
 	dir->i_version++;
 	mark_inode_dirty(dir);
 	de->name[0] = DELETED_FLAG;
-	fat_mark_buffer_dirty(sb, bh);
+	mark_buffer_dirty(bh);
 	/* remove the longname */
 	offset = sinfo->longname_offset; de = NULL;
 	for (i = sinfo->long_slots; i > 0; --i) {
@@ -982,9 +980,9 @@ static void vfat_remove_entry(struct inode *dir,struct vfat_slot_info *sinfo,
 			continue;
 		de->name[0] = DELETED_FLAG;
 		de->attr = ATTR_NONE;
-		fat_mark_buffer_dirty(sb, bh);
+		mark_buffer_dirty(bh);
 	}
-	if (bh) fat_brelse(sb, bh);
+	brelse(bh);
 }
 
 int vfat_rmdir(struct inode *dir,struct dentry* dentry)
@@ -1075,7 +1073,7 @@ int vfat_mkdir(struct inode *dir,struct dentry* dentry,int mode)
 	dentry->d_time = dentry->d_parent->d_inode->i_version;
 	d_instantiate(dentry,inode);
 out:
-	fat_brelse(sb, bh);
+	brelse(bh);
 	unlock_kernel();
 	return res;
 
@@ -1096,7 +1094,6 @@ mkdir_failed:
 int vfat_rename(struct inode *old_dir,struct dentry *old_dentry,
 		struct inode *new_dir,struct dentry *new_dentry)
 {
-	struct super_block *sb = old_dir->i_sb;
 	struct buffer_head *old_bh,*new_bh,*dotdot_bh;
 	struct msdos_dir_entry *old_de,*new_de,*dotdot_de;
 	int dotdot_ino;
@@ -1160,7 +1157,7 @@ int vfat_rename(struct inode *old_dir,struct dentry *old_dentry,
 		int start = MSDOS_I(new_dir)->i_logstart;
 		dotdot_de->start = CT_LE_W(start);
 		dotdot_de->starthi = CT_LE_W(start>>16);
-		fat_mark_buffer_dirty(sb, dotdot_bh);
+		mark_buffer_dirty(dotdot_bh);
 		old_dir->i_nlink--;
 		if (new_inode) {
 			new_inode->i_nlink--;
@@ -1171,9 +1168,9 @@ int vfat_rename(struct inode *old_dir,struct dentry *old_dentry,
 	}
 
 rename_done:
-	fat_brelse(sb, dotdot_bh);
-	fat_brelse(sb, old_bh);
-	fat_brelse(sb, new_bh);
+	brelse(dotdot_bh);
+	brelse(old_bh);
+	brelse(new_bh);
 	unlock_kernel();
 	return res;
 

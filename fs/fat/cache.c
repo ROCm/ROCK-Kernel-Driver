@@ -10,30 +10,10 @@
 
 #include <linux/fs.h>
 #include <linux/msdos_fs.h>
-#include <linux/fat_cvf.h>
 #include <linux/buffer_head.h>
-
-#if 0
-#  define PRINTK(x) printk x
-#else
-#  define PRINTK(x)
-#endif
 
 static struct fat_cache *fat_cache,cache[FAT_CACHE];
 static spinlock_t fat_cache_lock = SPIN_LOCK_UNLOCKED;
-
-/* Returns the this'th FAT entry, -1 if it is an end-of-file entry. If
-   new_value is != -1, that FAT entry is replaced by it. */
-
-int fat_access(struct super_block *sb,int nr,int new_value)
-{
-	return MSDOS_SB(sb)->cvf_format->fat_access(sb,nr,new_value);
-}
-
-int fat_bmap(struct inode *inode,int sector)
-{
-	return MSDOS_SB(inode->i_sb)->cvf_format->cvf_bmap(inode,sector);
-}
 
 int __fat_access(struct super_block *sb, int nr, int new_value)
 {
@@ -51,17 +31,18 @@ int __fat_access(struct super_block *sb, int nr, int new_value)
 		last = first+1;
 	}
 	b = sbi->fat_start + (first >> sb->s_blocksize_bits);
-	if (!(bh = fat_bread(sb, b))) {
-		printk("FAT: bread(block %d) in fat_access failed\n", b);
+	if (!(bh = sb_bread(sb, b))) {
+		printk(KERN_ERR "FAT: bread(block %d) in"
+		       " fat_access failed\n", b);
 		return -EIO;
 	}
 	if ((first >> sb->s_blocksize_bits) == (last >> sb->s_blocksize_bits)) {
 		bh2 = bh;
 	} else {
-		if (!(bh2 = fat_bread(sb, b+1))) {
-			fat_brelse(sb, bh);
-			printk("FAT: bread(block %d) in fat_access failed\n",
-			       b + 1);
+		if (!(bh2 = sb_bread(sb, b + 1))) {
+			brelse(bh);
+			printk(KERN_ERR "FAT: bread(block %d) in"
+			       " fat_access failed\n", b + 1);
 			return -EIO;
 		}
 	}
@@ -99,35 +80,39 @@ int __fat_access(struct super_block *sb, int nr, int new_value)
 				*p_first = new_value & 0xff;
 				*p_last = (*p_last & 0xf0) | (new_value >> 8);
 			}
-			fat_mark_buffer_dirty(sb, bh2);
+			mark_buffer_dirty(bh2);
 		}
-		fat_mark_buffer_dirty(sb, bh);
+		mark_buffer_dirty(bh);
 		for (copy = 1; copy < sbi->fats; copy++) {
 			b = sbi->fat_start + (first >> sb->s_blocksize_bits)
 				+ sbi->fat_length * copy;
-			if (!(c_bh = fat_bread(sb, b)))
+			if (!(c_bh = sb_bread(sb, b)))
 				break;
 			if (bh != bh2) {
-				if (!(c_bh2 = fat_bread(sb, b+1))) {
-					fat_brelse(sb, c_bh);
+				if (!(c_bh2 = sb_bread(sb, b+1))) {
+					brelse(c_bh);
 					break;
 				}
 				memcpy(c_bh2->b_data, bh2->b_data, sb->s_blocksize);
-				fat_mark_buffer_dirty(sb, c_bh2);
-				fat_brelse(sb, c_bh2);
+				mark_buffer_dirty(c_bh2);
+				brelse(c_bh2);
 			}
 			memcpy(c_bh->b_data, bh->b_data, sb->s_blocksize);
-			fat_mark_buffer_dirty(sb, c_bh);
-			fat_brelse(sb, c_bh);
+			mark_buffer_dirty(c_bh);
+			brelse(c_bh);
 		}
 	}
-	fat_brelse(sb, bh);
+	brelse(bh);
 	if (bh != bh2)
-		fat_brelse(sb, bh2);
+		brelse(bh2);
 	return next;
 }
 
-int default_fat_access(struct super_block *sb, int nr, int new_value)
+/* 
+ * Returns the this'th FAT entry, -1 if it is an end-of-file entry. If
+ * new_value is != -1, that FAT entry is replaced by it.
+ */
+int fat_access(struct super_block *sb, int nr, int new_value)
 {
 	int next;
 
@@ -150,7 +135,7 @@ out:
 
 void fat_cache_init(void)
 {
-	static int initialized = 0;
+	static int initialized;
 	int count;
 
 	spin_lock(&fat_cache_lock);
@@ -227,8 +212,8 @@ void fat_cache_add(struct inode *inode,int f_clu,int d_clu)
 		    && walk->start_cluster == first
 		    && walk->file_cluster == f_clu) {
 			if (walk->disk_cluster != d_clu) {
-				printk("FAT: cache corruption inode=%lu\n",
-					inode->i_ino);
+				printk(KERN_ERR "FAT: cache corruption"
+				       " (ino %lu)\n", inode->i_ino);
 				spin_unlock(&fat_cache_lock);
 				fat_cache_inval_inode(inode);
 				return;
@@ -317,7 +302,7 @@ static int fat_get_cluster(struct inode *inode, int cluster)
 	return nr;
 }
 
-int default_fat_bmap(struct inode *inode,int sector)
+int fat_bmap(struct inode *inode, int sector)
 {
 	struct super_block *sb = inode->i_sb;
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
