@@ -6,6 +6,7 @@
 #include <linux/sunrpc/svcauth.h>
 #include <linux/err.h>
 #include <linux/seq_file.h>
+#include <linux/hash.h>
 
 #define RPCDBG_FACILITY	RPCDBG_AUTH
 
@@ -108,7 +109,8 @@ void ip_map_put(struct cache_head *item, struct cache_detail *cd)
 
 static inline int ip_map_hash(struct ip_map *item)
 {
-	return (name_hash(item->m_class, IP_HASHMAX) ^ item->m_addr.s_addr) & IP_HASHMASK;
+	return hash_str(item->m_class, IP_HASHBITS) ^ 
+		hash_long((unsigned long)item->m_addr.s_addr, IP_HASHBITS);
 }
 static inline int ip_map_match(struct ip_map *item, struct ip_map *tmp)
 {
