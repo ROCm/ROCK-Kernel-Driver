@@ -2143,9 +2143,7 @@ static int rtl8139_close (struct net_device *dev)
 
 	spin_unlock_irqrestore (&tp->lock, flags);
 
-	/* TODO: isn't this code racy? we synchronize the IRQ and then free it, */ 
-	/* but another IRQ could've happened in between the sync and free */ 
-	synchronize_irq (dev->irq);
+	synchronize_irq (dev->irq);	/* racy, but that's ok here */
 	free_irq (dev->irq, dev);
 
 	rtl8139_tx_clear (tp);
