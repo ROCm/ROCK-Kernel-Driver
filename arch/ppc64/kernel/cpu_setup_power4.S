@@ -156,6 +156,15 @@ _GLOBAL(__restore_cpu_setup)
 	cror	4*cr0+eq,4*cr0+eq,4*cr1+eq
 	bne	1f
 
+	/* Before accessing memory, we make sure rm_ci is clear */
+	li	r0,0
+	mfspr	r3,SPRN_HID4
+	rldimi	r3,r0,40,23	/* clear bit 23 (rm_ci) */
+	sync
+	mtspr	SPRN_HID4,r3
+	isync
+	sync
+
 	/* Clear interrupt prefix */
 	li	r0,0
 	sync

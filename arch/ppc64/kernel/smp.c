@@ -833,9 +833,6 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 
 	max_cpus = smp_ops->probe();
  
-	/* Backup CPU 0 state if necessary */
-	__save_cpu_setup();
-
 	smp_space_timers(max_cpus);
 
 	for_each_cpu(cpu)
