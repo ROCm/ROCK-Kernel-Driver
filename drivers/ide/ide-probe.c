@@ -652,6 +652,43 @@ static int wait_hwif_ready(ide_hwif_t *hwif)
 	return rc;
 }
 
+/**
+ *	ide_undecoded_slave	-	look for bad CF adapters
+ *	@hwif: interface
+ *
+ *	Analyse the drives on the interface and attempt to decide if we
+ *	have the same drive viewed twice. This occurs with crap CF adapters
+ *	and PCMCIA sometimes.
+ */
+
+void ide_undecoded_slave(ide_hwif_t *hwif)
+{
+	ide_drive_t *drive0 = &hwif->drives[0];
+	ide_drive_t *drive1 = &hwif->drives[1];
+
+	if (drive0->present == 0 || drive1->present == 0)
+		return;
+
+	/* If the models don't match they are not the same product */
+	if (strcmp(drive0->id->model, drive1->id->model))
+		return;
+
+	/* Serial numbers do not match */
+	if (strncmp(drive0->id->serial_no, drive1->id->serial_no, 20))
+		return;
+
+	/* No serial number, thankfully very rare for CF */
+	if (drive0->id->serial_no[0] == 0)
+		return;
+
+	/* Appears to be an IDE flash adapter with decode bugs */
+	printk(KERN_WARNING "ide-probe: ignoring undecoded slave\n");
+
+	drive1->present = 0;
+}
+
+EXPORT_SYMBOL_GPL(ide_undecoded_slave);
+
 /*
  * This routine only knows how to look for drive units 0 and 1
  * on an interface, so any setting of MAX_DRIVES > 2 won't work here.
@@ -723,20 +760,6 @@ static void probe_hwif(ide_hwif_t *hwif)
 		ide_drive_t *drive = &hwif->drives[unit];
 		drive->dn = (hwif->channel ? 2 : 0) + unit;
 		(void) probe_for_drive(drive);
-		if (drive->present && hwif->present && unit == 1) {
-			if (strcmp(hwif->drives[0].id->model, drive->id->model) == 0 &&
-			    /* Don't do this for noprobe or non ATA */
-			    strcmp(drive->id->model, "UNKNOWN") &&
-			    /* And beware of confused Maxtor drives that go "M0000000000"
-			      "The SN# is garbage in the ID block..." [Eric] */
-			    strncmp(drive->id->serial_no, "M0000000000000000000", 20) &&
-			    /* Same goes for another set of Maxtor drives that say "D3000000" */
-			    strncmp(drive->id->serial_no, "D3000000", 8) &&
-			    strncmp(hwif->drives[0].id->serial_no, drive->id->serial_no, 20) == 0) {
-				printk(KERN_WARNING "ide-probe: ignoring undecoded slave\n");
-				drive->present = 0;
-			}
-		}
 		if (drive->present && !hwif->present) {
 			hwif->present = 1;
 			if (hwif->chipset != ide_4drives ||
@@ -810,9 +833,14 @@ static void probe_hwif(ide_hwif_t *hwif)
 }
 
 static int hwif_init(ide_hwif_t *hwif);
-int probe_hwif_init (ide_hwif_t *hwif)
+
+int probe_hwif_init_with_fixup(ide_hwif_t *hwif, void (*fixup)(ide_hwif_t *hwif))
 {
 	probe_hwif(hwif);
+
+	if (fixup)
+		fixup(hwif);
+
 	hwif_init(hwif);
 
 	if (hwif->present) {
@@ -828,6 +856,11 @@ int probe_hwif_init (ide_hwif_t *hwif)
 		}
 	}
 	return 0;
+}
+
+int probe_hwif_init(ide_hwif_t *hwif)
+{
+	return probe_hwif_init_with_fixup(hwif, NULL);
 }
 
 EXPORT_SYMBOL(probe_hwif_init);

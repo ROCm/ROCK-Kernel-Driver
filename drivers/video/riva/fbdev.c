@@ -717,7 +717,7 @@ static void riva_load_video_mode(struct fb_info *info)
 		newmode.ext.interlace = 0xff; /* interlace off */
 
 	if (par->riva.Architecture >= NV_ARCH_10)
-		par->riva.CURSOR = (U032 *)(info->screen_base + par->riva.CursorStart);
+		par->riva.CURSOR = (U032 __iomem *)(info->screen_base + par->riva.CursorStart);
 
 	if (info->var.sync & FB_SYNC_HOR_HIGH_ACT)
 		newmode.misc_output &= ~0x40;
@@ -731,22 +731,27 @@ static void riva_load_video_mode(struct fb_info *info)
 	par->riva.CalcStateExt(&par->riva, &newmode.ext, bpp, width,
 				  hDisplaySize, height, dotClock);
 
-	newmode.ext.scale = par->riva.PRAMDAC[0x00000848/4] & 0xfff000ff;
+	newmode.ext.scale = NV_RD32(par->riva.PRAMDAC, 0x00000848) &
+		0xfff000ff;
 	if (par->FlatPanel == 1) {
 		newmode.ext.pixel |= (1 << 7);
 		newmode.ext.scale |= (1 << 8);
 	}
 	if (par->SecondCRTC) {
-		newmode.ext.head  = par->riva.PCRTC0[0x00000860/4] & ~0x00001000;
-		newmode.ext.head2 = par->riva.PCRTC0[0x00002860/4] | 0x00001000;
+		newmode.ext.head  = NV_RD32(par->riva.PCRTC0, 0x00000860) &
+			~0x00001000;
+		newmode.ext.head2 = NV_RD32(par->riva.PCRTC0, 0x00002860) |
+			0x00001000;
 		newmode.ext.crtcOwner = 3;
 		newmode.ext.pllsel |= 0x20000800;
 		newmode.ext.vpll2 = newmode.ext.vpll;
 	} else if (par->riva.twoHeads) {
-		newmode.ext.head  =  par->riva.PCRTC0[0x00000860/4] | 0x00001000;
-		newmode.ext.head2 =  par->riva.PCRTC0[0x00002860/4] & ~0x00001000;
+		newmode.ext.head  =  NV_RD32(par->riva.PCRTC0, 0x00000860) |
+			0x00001000;
+		newmode.ext.head2 =  NV_RD32(par->riva.PCRTC0, 0x00002860) &
+			~0x00001000;
 		newmode.ext.crtcOwner = 0;
-		newmode.ext.vpll2 = par->riva.PRAMDAC0[0x00000520/4];
+		newmode.ext.vpll2 = NV_RD32(par->riva.PRAMDAC0, 0x00000520);
 	}
 	if (par->FlatPanel == 1) {
 		newmode.ext.pixel |= (1 << 7);
@@ -887,10 +892,10 @@ static void
 riva_set_pattern(struct riva_par *par, int clr0, int clr1, int pat0, int pat1)
 {
 	RIVA_FIFO_FREE(par->riva, Patt, 4);
-	par->riva.Patt->Color0        = clr0;
-	par->riva.Patt->Color1        = clr1;
-	par->riva.Patt->Monochrome[0] = pat0;
-	par->riva.Patt->Monochrome[1] = pat1;
+	NV_WR32(&par->riva.Patt->Color0, 0, clr0);
+	NV_WR32(&par->riva.Patt->Color1, 0, clr1);
+	NV_WR32(par->riva.Patt->Monochrome, 0, pat0);
+	NV_WR32(par->riva.Patt->Monochrome, 4, pat1);
 }
 
 /* acceleration routines */
@@ -907,7 +912,7 @@ riva_set_rop_solid(struct riva_par *par, int rop)
 {
 	riva_set_pattern(par, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF);
         RIVA_FIFO_FREE(par->riva, Rop, 1);
-        par->riva.Rop->Rop3 = rop;
+        NV_WR32(&par->riva.Rop->Rop3, 0, rop);
 
 }
 
@@ -916,9 +921,10 @@ void riva_setup_accel(struct fb_info *info)
 	struct riva_par *par = (struct riva_par *) info->par;
 
 	RIVA_FIFO_FREE(par->riva, Clip, 2);
-	par->riva.Clip->TopLeft     = 0x0;
-	par->riva.Clip->WidthHeight = (info->var.xres_virtual & 0xffff) |
-		(info->var.yres_virtual << 16);
+	NV_WR32(&par->riva.Clip->TopLeft, 0, 0x0);
+	NV_WR32(&par->riva.Clip->WidthHeight, 0,
+		(info->var.xres_virtual & 0xffff) |
+		(info->var.yres_virtual << 16));
 	riva_set_rop_solid(par, 0xcc);
 	wait_for_idle(par);
 }
@@ -1405,14 +1411,14 @@ static void rivafb_fillrect(struct fb_info *info, const struct fb_fillrect *rect
 	riva_set_rop_solid(par, rop);
 
 	RIVA_FIFO_FREE(par->riva, Bitmap, 1);
-	par->riva.Bitmap->Color1A = color;
+	NV_WR32(&par->riva.Bitmap->Color1A, 0, color);
 
 	RIVA_FIFO_FREE(par->riva, Bitmap, 2);
-	par->riva.Bitmap->UnclippedRectangle[0].TopLeft =
-			(rect->dx << 16) | rect->dy;
+	NV_WR32(&par->riva.Bitmap->UnclippedRectangle[0].TopLeft, 0,
+		(rect->dx << 16) | rect->dy);
 	mb();
-	par->riva.Bitmap->UnclippedRectangle[0].WidthHeight =
-			(rect->width << 16) | rect->height;
+	NV_WR32(&par->riva.Bitmap->UnclippedRectangle[0].WidthHeight, 0,
+		(rect->width << 16) | rect->height);
 	mb();
 	riva_set_rop_solid(par, 0xcc);
 
@@ -1439,10 +1445,13 @@ static void rivafb_copyarea(struct fb_info *info, const struct fb_copyarea *regi
 	}
 
 	RIVA_FIFO_FREE(par->riva, Blt, 3);
-	par->riva.Blt->TopLeftSrc  = (region->sy << 16) | region->sx;
-	par->riva.Blt->TopLeftDst  = (region->dy << 16) | region->dx;
+	NV_WR32(&par->riva.Blt->TopLeftSrc, 0,
+		(region->sy << 16) | region->sx);
+	NV_WR32(&par->riva.Blt->TopLeftDst, 0,
+		(region->dy << 16) | region->dx);
 	mb();
-	par->riva.Blt->WidthHeight = (region->height << 16) | region->width;
+	NV_WR32(&par->riva.Blt->WidthHeight, 0,
+		(region->height << 16) | region->width);
 	mb();
 }
 
@@ -1477,7 +1486,7 @@ static void rivafb_imageblit(struct fb_info *info,
 	struct riva_par *par = (struct riva_par *) info->par;
 	u32 fgx = 0, bgx = 0, width, tmp;
 	u8 *cdat = (u8 *) image->data;
-	volatile u32 *d;
+	volatile u32 __iomem *d;
 	int i, size;
 
 	if ((info->flags & FBINFO_HWACCEL_DISABLED) || image->depth != 1) {
@@ -1505,19 +1514,19 @@ static void rivafb_imageblit(struct fb_info *info,
 	}
 
 	RIVA_FIFO_FREE(par->riva, Bitmap, 7);
-	par->riva.Bitmap->ClipE.TopLeft     = 
-		(image->dy << 16) | (image->dx & 0xFFFF);
-	par->riva.Bitmap->ClipE.BottomRight = 
+	NV_WR32(&par->riva.Bitmap->ClipE.TopLeft, 0,
+		(image->dy << 16) | (image->dx & 0xFFFF));
+	NV_WR32(&par->riva.Bitmap->ClipE.BottomRight, 0,
 		(((image->dy + image->height) << 16) |
-		 ((image->dx + image->width) & 0xffff));
-	par->riva.Bitmap->Color0E           = bgx;
-	par->riva.Bitmap->Color1E           = fgx;
-	par->riva.Bitmap->WidthHeightInE    = 
-		(image->height << 16) | ((image->width + 31) & ~31);
-	par->riva.Bitmap->WidthHeightOutE   = 
-		(image->height << 16) | ((image->width + 31) & ~31);
-	par->riva.Bitmap->PointE            = 
-		(image->dy << 16) | (image->dx & 0xFFFF);
+		 ((image->dx + image->width) & 0xffff)));
+	NV_WR32(&par->riva.Bitmap->Color0E, 0, bgx);
+	NV_WR32(&par->riva.Bitmap->Color1E, 0, fgx);
+	NV_WR32(&par->riva.Bitmap->WidthHeightInE, 0,
+		(image->height << 16) | ((image->width + 31) & ~31));
+	NV_WR32(&par->riva.Bitmap->WidthHeightOutE, 0,
+		(image->height << 16) | ((image->width + 31) & ~31));
+	NV_WR32(&par->riva.Bitmap->PointE, 0,
+		(image->dy << 16) | (image->dx & 0xFFFF));
 
 	d = &par->riva.Bitmap->MonochromeData01E;
 
@@ -1529,7 +1538,7 @@ static void rivafb_imageblit(struct fb_info *info,
 			tmp = *((u32 *)cdat);
 			cdat = (u8 *)((u32 *)cdat + 1);
 			reverse_order(&tmp);
-			d[i] = tmp;
+			NV_WR32(d, i*4, tmp);
 		}
 		size -= 16;
 	}
@@ -1539,7 +1548,7 @@ static void rivafb_imageblit(struct fb_info *info,
 			tmp = *((u32 *) cdat);
 			cdat = (u8 *)((u32 *)cdat + 1);
 			reverse_order(&tmp);
-			d[i] = tmp;
+			NV_WR32(d, i*4, tmp);
 		}
 	}
 }
@@ -1582,7 +1591,7 @@ static int rivafb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 		temp = xx & 0xFFFF;
 		temp |= yy << 16;
 
-		par->riva.PRAMDAC[0x0000300/4] = temp;
+		NV_WR32(par->riva.PRAMDAC, 0x0000300, temp);
 	}
 
 
@@ -1960,8 +1969,10 @@ static int __devinit rivafb_probe(struct pci_dev *pd,
 	case NV_ARCH_10:
 	case NV_ARCH_20:
 	case NV_ARCH_30:
-		default_par->riva.PCRTC0 = (unsigned *)(default_par->ctrl_base + 0x00600000);
-		default_par->riva.PRAMIN = (unsigned *)(default_par->ctrl_base + 0x00710000);
+		default_par->riva.PCRTC0 =
+			(u32 __iomem *)(default_par->ctrl_base + 0x00600000);
+		default_par->riva.PRAMIN =
+			(u32 __iomem *)(default_par->ctrl_base + 0x00710000);
 		break;
 	}
 	riva_common_setup(default_par);
@@ -2037,7 +2048,7 @@ err_out_iounmap_fb:
 	iounmap(info->screen_base);
 err_out_free_base1:
 	if (default_par->riva.Architecture == NV_ARCH_03) 
-		iounmap((caddr_t)default_par->riva.PRAMIN);
+		iounmap(default_par->riva.PRAMIN);
 err_out_free_nv3_pramin:
 	iounmap(default_par->ctrl_base);
 err_out_free_base0:
@@ -2077,7 +2088,7 @@ static void __exit rivafb_remove(struct pci_dev *pd)
 	iounmap(par->ctrl_base);
 	iounmap(info->screen_base);
 	if (par->riva.Architecture == NV_ARCH_03)
-		iounmap((caddr_t)par->riva.PRAMIN);
+		iounmap(par->riva.PRAMIN);
 	pci_release_regions(pd);
 	pci_disable_device(pd);
 	kfree(info->pixmap.addr);

@@ -1326,7 +1326,6 @@ static int __init acornfb_probe(struct device *dev)
 		}
 	}
 
-	fb_info.currcon	       = -1;
 	fb_info.screen_base    = (char *)SCREEN_BASE;
 	fb_info.fix.smem_start = SCREEN_START;
 	current_par.using_vram = 0;

@@ -42,6 +42,7 @@ static struct pt_regs jprobe_saved_regs;
 static long *jprobe_saved_esp;
 /* copy of the kernel stack at the probe fire time */
 static kprobe_opcode_t jprobes_stack[MAX_STACK_SIZE];
+void jprobe_return_end(void);
 
 /*
  * returns non-zero if opcode modifies the interrupt flag.
@@ -58,9 +59,14 @@ static inline int is_IF_modifier(kprobe_opcode_t opcode)
 	return 0;
 }
 
-void arch_prepare_kprobe(struct kprobe *p)
+int arch_prepare_kprobe(struct kprobe *p)
 {
-	memcpy(p->insn, p->addr, MAX_INSN_SIZE * sizeof(kprobe_opcode_t));
+	memcpy(p->ainsn.insn, p->addr, MAX_INSN_SIZE * sizeof(kprobe_opcode_t));
+	return 0;
+}
+
+void arch_remove_kprobe(struct kprobe *p)
+{
 }
 
 static inline void disarm_kprobe(struct kprobe *p, struct pt_regs *regs)
@@ -73,7 +79,7 @@ static inline void prepare_singlestep(struct kprobe *p, struct pt_regs *regs)
 {
 	regs->eflags |= TF_MASK;
 	regs->eflags &= ~IF_MASK;
-	regs->eip = (unsigned long)&p->insn;
+	regs->eip = (unsigned long)&p->ainsn.insn;
 }
 
 /*
@@ -153,7 +159,7 @@ static inline int kprobe_handler(struct pt_regs *regs)
  * instruction.  To avoid the SMP problems that can occur when we
  * temporarily put back the original opcode to single-step, we
  * single-stepped a copy of the instruction.  The address of this
- * copy is p->insn.
+ * copy is p->ainsn.insn.
  *
  * This function prepares to return from the post-single-step
  * interrupt.  We have to fix up the stack as follows:
@@ -173,10 +179,10 @@ static void resume_execution(struct kprobe *p, struct pt_regs *regs)
 {
 	unsigned long *tos = (unsigned long *)&regs->esp;
 	unsigned long next_eip = 0;
-	unsigned long copy_eip = (unsigned long)&p->insn;
+	unsigned long copy_eip = (unsigned long)&p->ainsn.insn;
 	unsigned long orig_eip = (unsigned long)p->addr;
 
-	switch (p->insn[0]) {
+	switch (p->ainsn.insn[0]) {
 	case 0x9c:		/* pushfl */
 		*tos &= ~(TF_MASK | IF_MASK);
 		*tos |= kprobe_old_eflags;
@@ -185,13 +191,13 @@ static void resume_execution(struct kprobe *p, struct pt_regs *regs)
 		*tos = orig_eip + (*tos - copy_eip);
 		break;
 	case 0xff:
-		if ((p->insn[1] & 0x30) == 0x10) {
+		if ((p->ainsn.insn[1] & 0x30) == 0x10) {
 			/* call absolute, indirect */
 			/* Fix return addr; eip is correct. */
 			next_eip = regs->eip;
 			*tos = orig_eip + (*tos - copy_eip);
-		} else if (((p->insn[1] & 0x31) == 0x20) ||	/* jmp near, absolute indirect */
-			   ((p->insn[1] & 0x31) == 0x21)) {	/* jmp far, absolute indirect */
+		} else if (((p->ainsn.insn[1] & 0x31) == 0x20) ||	/* jmp near, absolute indirect */
+			   ((p->ainsn.insn[1] & 0x31) == 0x21)) {	/* jmp far, absolute indirect */
 			/* eip is correct. */
 			next_eip = regs->eip;
 		}
@@ -315,12 +321,12 @@ void jprobe_return(void)
 {
 	preempt_enable_no_resched();
 	asm volatile ("       xchgl   %%ebx,%%esp     \n"
-		      "       int3			\n"::"b"
+		      "       int3			\n"
+		      "       .globl jprobe_return_end	\n"
+		      "       jprobe_return_end:	\n"
+		      "       nop			\n"::"b"
 		      (jprobe_saved_esp):"memory");
 }
-void jprobe_return_end(void)
-{
-};
 
 int longjmp_break_handler(struct kprobe *p, struct pt_regs *regs)
 {

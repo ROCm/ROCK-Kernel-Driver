@@ -819,8 +819,8 @@ config PROC_FS
 	  programs depend on this, so everyone should say Y here.
 
 config PROC_KCORE
-	bool
-	default y if !ARM
+	bool "/proc/kcore support" if !ARM
+	depends on PROC_FS
 
 config SYSFS
 	bool "sysfs file system support" if EMBEDDED

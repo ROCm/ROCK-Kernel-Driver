@@ -27,14 +27,26 @@ int generic_console_write(int fd, const char *buf, int n, void *unused)
 	int err;
 
 	if(isatty(fd)){
-		tcgetattr(fd, &save);
+		CATCH_EINTR(err = tcgetattr(fd, &save));
+		if (err)
+			goto error;
 		new = save;
+		/* The terminal becomes a bit less raw, to handle \n also as
+		 * "Carriage Return", not only as "New Line". Otherwise, the new
+		 * line won't start at the first column.*/
 		new.c_oflag |= OPOST;
-		tcsetattr(fd, TCSAFLUSH, &new);
+		CATCH_EINTR(err = tcsetattr(fd, TCSAFLUSH, &new));
+		if (err)
+			goto error;
 	}
 	err = generic_write(fd, buf, n, NULL);
-	if(isatty(fd)) tcsetattr(fd, TCSAFLUSH, &save);
+	/* Restore raw mode, in any case; we *must* ignore any error apart
+	 * EINTR, except for debug.*/
+	if(isatty(fd))
+		CATCH_EINTR(tcsetattr(fd, TCSAFLUSH, &save));
 	return(err);
+error:
+	return(-errno);
 }
 
 static void winch_handler(int sig)

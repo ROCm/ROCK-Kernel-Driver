@@ -1813,8 +1813,11 @@ sisfb_set_par(struct fb_info *info)
 		return err;
 	}
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,10)
 	sisfb_get_fix(&info->fix, info->currcon, info);
-
+#else
+	sisfb_get_fix(&info->fix, -1, info);
+#endif
 	return 0;
 }
 

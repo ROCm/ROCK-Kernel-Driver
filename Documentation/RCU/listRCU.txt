@@ -82,7 +82,7 @@ lock might be used as follows for deletion and insertion:
 		list_for_each_entry(e, list, list) {
 			if (!audit_compare_rule(rule, &e->rule)) {
 				list_del(&e->list);
-				call_rcu(&e->rcu, audit_free_rule, e);
+				write_unlock(&auditsc_lock);
 				return 0;
 			}
 		}

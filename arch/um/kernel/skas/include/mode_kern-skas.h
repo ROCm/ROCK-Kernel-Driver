@@ -1,4 +1,4 @@
-/* 
+/*
  * Copyright (C) 2002 Jeff Dike (jdike@karaya.com)
  * Licensed under the GPL
  */
@@ -12,20 +12,20 @@
 
 extern void flush_thread_skas(void);
 extern void *switch_to_skas(void *prev, void *next);
-extern void start_thread_skas(struct pt_regs *regs, unsigned long eip, 
+extern void start_thread_skas(struct pt_regs *regs, unsigned long eip,
 			      unsigned long esp);
-extern int copy_thread_skas(int nr, unsigned long clone_flags, 
-			    unsigned long sp, unsigned long stack_top, 
+extern int copy_thread_skas(int nr, unsigned long clone_flags,
+			    unsigned long sp, unsigned long stack_top,
 			    struct task_struct *p, struct pt_regs *regs);
 extern void release_thread_skas(struct task_struct *task);
 extern void exit_thread_skas(void);
 extern void initial_thread_cb_skas(void (*proc)(void *), void *arg);
 extern void init_idle_skas(void);
-extern void flush_tlb_kernel_range_skas(unsigned long start, 
+extern void flush_tlb_kernel_range_skas(unsigned long start,
 					unsigned long end);
 extern void flush_tlb_kernel_vm_skas(void);
 extern void __flush_tlb_one_skas(unsigned long addr);
-extern void flush_tlb_range_skas(struct vm_area_struct *vma, 
+extern void flush_tlb_range_skas(struct vm_area_struct *vma,
 				 unsigned long start, unsigned long end);
 extern void flush_tlb_mm_skas(struct mm_struct *mm);
 extern void force_flush_all_skas(void);

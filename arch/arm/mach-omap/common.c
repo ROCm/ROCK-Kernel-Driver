@@ -16,7 +16,8 @@
 #include <linux/console.h>
 #include <linux/serial.h>
 #include <linux/tty.h>
-#include <linux/serial_core.h>
+#include <linux/serial_8250.h>
+#include <linux/serial_reg.h>
 
 #include <asm/hardware.h>
 #include <asm/system.h>
@@ -306,41 +307,72 @@ void omap_map_io(void)
 		_omap_map_io();
 }
 
-static struct uart_port omap_serial_ports[] = {
+static inline unsigned int omap_serial_in(struct plat_serial8250_port *up, 
+					  int offset)
+{
+	offset <<= up->regshift;
+	return (unsigned int)__raw_readb(up->membase + offset);
+}
+
+static inline void omap_serial_outp(struct plat_serial8250_port *p, int offset, 
+				    int value)
+{
+	offset <<= p->regshift;
+	__raw_writeb(value, p->membase + offset);
+}
+
+/*
+ * Internal UARTs need to be initialized for the 8250 autoconfig to work
+ * properly.
+ */
+static void __init omap_serial_reset(struct plat_serial8250_port *p)
+{
+	omap_serial_outp(p, UART_OMAP_MDR1, 0x07); /* disable UART */
+	omap_serial_outp(p, UART_OMAP_MDR1, 0x00); /* enable UART */
+
+	if (!cpu_is_omap1510()) {
+		omap_serial_outp(p, UART_OMAP_SYSC, 0x01);
+		while (!(omap_serial_in(p, UART_OMAP_SYSC) & 0x01));
+	}
+}
+
+static struct plat_serial8250_port serial_platform_data[] = {
 	{
 		.membase	= (char*)IO_ADDRESS(OMAP_UART1_BASE),
 		.mapbase	= (unsigned long)OMAP_UART1_BASE,
 		.irq		= INT_UART1,
-		.flags		= UPF_SKIP_TEST,
+		.flags		= UPF_BOOT_AUTOCONF,
 		.iotype		= UPIO_MEM,
 		.regshift	= 2,
 		.uartclk	= OMAP16XX_BASE_BAUD * 16,
-		.line		= 0,
-		.type		= PORT_OMAP,
-		.fifosize	= 64
-	} , {
+	},
+	{
 		.membase	= (char*)IO_ADDRESS(OMAP_UART2_BASE),
 		.mapbase	= (unsigned long)OMAP_UART2_BASE,
 		.irq		= INT_UART2,
-		.flags		= UPF_SKIP_TEST,
+		.flags		= UPF_BOOT_AUTOCONF,
 		.iotype		= UPIO_MEM,
 		.regshift	= 2,
 		.uartclk	= OMAP16XX_BASE_BAUD * 16,
-		.line		= 1,
-		.type		= PORT_OMAP,
-		.fifosize	= 64
-	} , {
+	},
+	{
 		.membase	= (char*)IO_ADDRESS(OMAP_UART3_BASE),
 		.mapbase	= (unsigned long)OMAP_UART3_BASE,
 		.irq		= INT_UART3,
-		.flags		= UPF_SKIP_TEST,
+		.flags		= UPF_BOOT_AUTOCONF,
 		.iotype		= UPIO_MEM,
 		.regshift	= 2,
 		.uartclk	= OMAP16XX_BASE_BAUD * 16,
-		.line		= 2,
-		.type		= PORT_OMAP,
-		.fifosize	= 64
-	}
+	},
+	{ },
+};
+
+static struct platform_device serial_device = {
+	.name			= "serial8250",
+	.id			= 0,
+	.dev			= {
+		.platform_data	= serial_platform_data,
+	},
 };
 
 /*
@@ -353,25 +385,26 @@ void __init omap_serial_init(int ports[OMAP_MAX_NR_PORTS])
 	int i;
 
 	if (cpu_is_omap730()) {
-		omap_serial_ports[0].regshift = 0;
-		omap_serial_ports[1].regshift = 0;
-		omap_serial_ports[0].irq = INT_730_UART_MODEM_1;
-		omap_serial_ports[1].irq = INT_730_UART_MODEM_IRDA_2;
+		serial_platform_data[0].regshift = 0;
+		serial_platform_data[1].regshift = 0;
+		serial_platform_data[0].irq = INT_730_UART_MODEM_1;
+		serial_platform_data[1].irq = INT_730_UART_MODEM_IRDA_2;
 	}
 
 	if (cpu_is_omap1510()) {
-		omap_serial_ports[0].uartclk = OMAP1510_BASE_BAUD * 16;
-		omap_serial_ports[1].uartclk = OMAP1510_BASE_BAUD * 16;
-		omap_serial_ports[2].uartclk = OMAP1510_BASE_BAUD * 16;
+		serial_platform_data[0].uartclk = OMAP1510_BASE_BAUD * 16;
+		serial_platform_data[1].uartclk = OMAP1510_BASE_BAUD * 16;
+		serial_platform_data[2].uartclk = OMAP1510_BASE_BAUD * 16;
 	}
 
 	for (i = 0; i < OMAP_MAX_NR_PORTS; i++) {
-		unsigned long port;
-		unsigned char regshift;
 		unsigned char reg;
 
-		if (ports[i] != 1)
+		if (ports[i] == 0) {
+			serial_platform_data[i].membase = 0;
+			serial_platform_data[i].mapbase = 0;
 			continue;
+		}
 
 		switch (i) {
 		case 0:
@@ -382,7 +415,7 @@ void __init omap_serial_init(int ports[OMAP_MAX_NR_PORTS])
 					reg = fpga_read(OMAP1510_FPGA_POWER);
 					reg |= OMAP1510_FPGA_PCR_COM1_EN;
 					fpga_write(reg, OMAP1510_FPGA_POWER);
-					udelay(1);
+					udelay(10);
 				}
 			}
 			break;
@@ -394,7 +427,7 @@ void __init omap_serial_init(int ports[OMAP_MAX_NR_PORTS])
 					reg = fpga_read(OMAP1510_FPGA_POWER);
 					reg |= OMAP1510_FPGA_PCR_COM2_EN;
 					fpga_write(reg, OMAP1510_FPGA_POWER);
-					udelay(1);
+					udelay(10);
 				}
 			}
 			break;
@@ -405,18 +438,15 @@ void __init omap_serial_init(int ports[OMAP_MAX_NR_PORTS])
 			}
 			break;
 		}
-
-		/* Reset port */
-		if (!cpu_is_omap1510()) {
-			port = (unsigned long)omap_serial_ports[i].membase;
-			regshift = omap_serial_ports[i].regshift;
-			writeb(0x01, port + (UART_SYSC << regshift));
-			while (!(readb(port + (UART_SYSC << regshift)) & 0x01));
-		}
-
-		//early_serial_setup(&omap_serial_ports[i]);
+		omap_serial_reset(&serial_platform_data[i]);
 	}
 }
+
+static int __init omap_init(void)
+{
+	return platform_device_register(&serial_device);
+}
+arch_initcall(omap_init);
 
 #define NO_LENGTH_CHECK 0xffffffff
 

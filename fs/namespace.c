@@ -106,8 +106,6 @@ struct vfsmount *lookup_mnt(struct vfsmount *mnt, struct dentry *dentry)
 	return found;
 }
 
-EXPORT_SYMBOL(lookup_mnt);
-
 static inline int check_mnt(struct vfsmount *mnt)
 {
 	return mnt->mnt_namespace == current->namespace;

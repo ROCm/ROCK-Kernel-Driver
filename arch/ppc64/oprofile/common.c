@@ -112,10 +112,15 @@ static int op_ppc64_create_files(struct super_block *sb, struct dentry *root)
 
 	oprofilefs_create_ulong(sb, root, "enable_kernel", &sys.enable_kernel);
 	oprofilefs_create_ulong(sb, root, "enable_user", &sys.enable_user);
+	oprofilefs_create_ulong(sb, root, "backtrace_spinlocks",
+				&sys.backtrace_spinlocks);
 
 	/* Default to tracing both kernel and user */
 	sys.enable_kernel = 1;
 	sys.enable_user = 1;
+
+	/* Turn on backtracing through spinlocks by default */
+	sys.backtrace_spinlocks = 1;
 
 	return 0;
 }

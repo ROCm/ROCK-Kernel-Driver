@@ -4,7 +4,7 @@ Thu Feb 14 2002  Andrew Morton  <akpm@zip.com.au>
 	  waitfor_one_page() for IS_SYNC directories, so that we
 	  actually do sync the directory. (forward-port from 2.4).
 
-Thu Feb  7 2002  Alexander Viro  <viro@math.psu.edu>
+Thu Feb  7 2002  Alexander Viro  <viro@parcelfarce.linux.theplanet.co.uk>
 
 	* super.c: switched to ->get_sb()
 	* ChangeLog: fixed dates ;-)
@@ -13,7 +13,7 @@ Thu Feb  7 2002  Alexander Viro  <viro@math.psu.edu>
 
 	* inode.c: Include linux/init.h
 
-Mon Jan 21 2002  Alexander Viro  <viro@math.psu.edu>
+Mon Jan 21 2002  Alexander Viro  <viro@parcelfarce.linux.theplanet.co.uk>
 	* ialloc.c (sysv_new_inode): zero SYSV_I(inode)->i_data out.
 	* i_vnode renamed to vfs_inode.  Sorry, but let's keep that
 	  consistent.
@@ -43,7 +43,7 @@ Sat Jan 19 2002  Christoph Hellwig  <hch@infradead.org>
 	* symlink.c (sysv_readlink): Likewise.
 	(sysv_follow_link): Likewise.
 
-Fri Jan  4 2002  Alexander Viro  <viro@math.psu.edu>
+Fri Jan  4 2002  Alexander Viro  <viro@parcelfarce.linux.theplanet.co.uk>
 
 	* ialloc.c (sysv_free_inode): Use sb->s_id instead of bdevname().
 	* inode.c (sysv_read_inode): Likewise.
@@ -59,16 +59,16 @@ Sun Dec 30 2001  Manfred Spraul  <manfreds@colorfullife.com>
 	* dir.c (dir_commit_chunk): Do not set dir->i_version.
 	(sysv_readdir): Likewise.
 
-Thu Dec 27 2001  Alexander Viro  <viro@math.psu.edu>
+Thu Dec 27 2001  Alexander Viro  <viro@parcelfarce.linux.theplanet.co.uk>
 
 	* itree.c (get_block): Use map_bh() to fill out bh_result.
 
-Tue Dec 25 2001  Alexander Viro  <viro@math.psu.edu>
+Tue Dec 25 2001  Alexander Viro  <viro@parcelfarce.linux.theplanet.co.uk>
 
 	* super.c (sysv_read_super): Use sb_set_blocksize() to set blocksize.
 	  (v7_read_super): Likewise.
 
-Tue Nov 27 2001  Alexander Viro  <viro@math.psu.edu>
+Tue Nov 27 2001  Alexander Viro  <viro@parcelfarce.linux.theplanet.co.uk>
 
 	* itree.c (get_block): Change type for iblock argument to sector_t.
 	* super.c (sysv_read_super): Set s_blocksize early.

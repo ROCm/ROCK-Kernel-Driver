@@ -372,6 +372,7 @@ struct matrox_fb_info {
 	struct list_head	next_fb;
 
 	int			dead;
+	int                     initialized;
 	unsigned int		usecount;
 
 	unsigned int		userusecount;

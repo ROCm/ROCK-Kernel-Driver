@@ -43,6 +43,23 @@ struct parport_pc_private {
 	struct parport *port;
 };
 
+struct parport_pc_via_data
+{
+	/* ISA PnP IRQ routing register 1 */
+	u8 via_pci_parport_irq_reg;
+	/* ISA PnP DMA request routing register */
+	u8 via_pci_parport_dma_reg;
+	/* Register and value to enable SuperIO configuration access */
+	u8 via_pci_superio_config_reg;
+	u8 via_pci_superio_config_data;
+	/* SuperIO function register number */
+	u8 viacfg_function;
+	/* parallel port control register number */
+	u8 viacfg_parport_control;
+	/* Parallel port base address register */
+	u8 viacfg_parport_base;
+};
+
 static __inline__ void parport_pc_write_data(struct parport *p, unsigned char d)
 {
 #ifdef DEBUG_PARPORT

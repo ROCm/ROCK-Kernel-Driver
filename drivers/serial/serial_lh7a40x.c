@@ -45,8 +45,6 @@
 
 #include <linux/serial_core.h>
 
-#include <asm/arch/serial.h>
-
 #define DEV_MAJOR	204
 #define DEV_MINOR	16
 #define DEV_NR		3
@@ -59,6 +57,15 @@
 #define BIT_SET(p,o,m)	UR(p,o) = UR(p,o) | ( (unsigned int)m)
 
 #define UART_REG_SIZE	32
+
+#define UART_R_DATA	(0x00)
+#define UART_R_FCON	(0x04)
+#define UART_R_BRCON	(0x08)
+#define UART_R_CON	(0x0c)
+#define UART_R_STATUS	(0x10)
+#define UART_R_RAWISR	(0x14)
+#define UART_R_INTEN	(0x18)
+#define UART_R_ISR	(0x1c)
 
 #define UARTEN		(0x01)		/* UART enable */
 #define SIRDIS		(0x02)		/* Serial IR disable (UART1 only) */

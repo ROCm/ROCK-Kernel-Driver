@@ -222,9 +222,6 @@ extern void qdisc_reset(struct Qdisc *qdisc);
 extern void qdisc_destroy(struct Qdisc *qdisc);
 extern struct Qdisc * qdisc_create_dflt(struct net_device *dev,
 	struct Qdisc_ops *ops);
-extern int qdisc_new_estimator(struct tc_stats *stats, spinlock_t *stats_lock,
-	struct rtattr *opt);
-extern void qdisc_kill_estimator(struct tc_stats *stats);
 extern struct qdisc_rate_table *qdisc_get_rtab(struct tc_ratespec *r,
 		struct rtattr *tab);
 extern void qdisc_put_rtab(struct qdisc_rate_table *tab);

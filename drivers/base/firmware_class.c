@@ -94,19 +94,17 @@ firmware_class_hotplug(struct class_device *class_dev, char **envp,
 		       int num_envp, char *buffer, int buffer_size)
 {
 	struct firmware_priv *fw_priv = class_get_devdata(class_dev);
-	int i = 0;
-	char *scratch = buffer;
+	int i = 0, len = 0;
 
 	if (!test_bit(FW_STATUS_READY, &fw_priv->status))
 		return -ENODEV;
 
-	if (buffer_size < (FIRMWARE_NAME_MAX + 10))
-		return -ENOMEM;
-	if (num_envp < 1)
+	if (add_hotplug_env_var(envp, num_envp, &i, buffer, buffer_size, &len,
+			"FIRMWARE=%s", fw_priv->fw_id))
 		return -ENOMEM;
 
-	envp[i++] = scratch;
-	scratch += sprintf(scratch, "FIRMWARE=%s", fw_priv->fw_id) + 1;
+	envp[i++] = NULL;
+
 	return 0;
 }
 

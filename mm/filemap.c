@@ -408,9 +408,7 @@ void fastcall unlock_page(struct page *page)
 	smp_mb__after_clear_bit(); 
 	wake_up_page(page, PG_locked);
 }
-
 EXPORT_SYMBOL(unlock_page);
-EXPORT_SYMBOL(lock_page);
 
 /*
  * End writeback against a page.
@@ -424,7 +422,6 @@ void end_page_writeback(struct page *page)
 	smp_mb__after_clear_bit();
 	wake_up_page(page, PG_writeback);
 }
-
 EXPORT_SYMBOL(end_page_writeback);
 
 /*
