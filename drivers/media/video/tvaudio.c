@@ -16,6 +16,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/string.h>
@@ -1027,6 +1028,21 @@ static int tda9874a_initialize(struct CHIPSTATE *chip)
 #define TEA6300_S_SC       0x04  /* stereo C */
 #define TEA6300_S_GMU      0x80  /* general mute */
 
+#define TEA6320_V          0x00  /* volume (0-5)/loudness off (6)/zero crossing mute(7) */
+#define TEA6320_FFR        0x01  /* fader front right (0-5) */
+#define TEA6320_FFL        0x02  /* fader front left (0-5) */
+#define TEA6320_FRR        0x03  /* fader rear right (0-5) */
+#define TEA6320_FRL        0x04  /* fader rear left (0-5) */
+#define TEA6320_BA         0x05  /* bass (0-4) */
+#define TEA6320_TR         0x06  /* treble (0-4) */
+#define TEA6320_S          0x07  /* switch register */
+                                 /* values for those registers: */
+#define TEA6320_S_SA       0x07  /* stereo A input */
+#define TEA6320_S_SB       0x06  /* stereo B */
+#define TEA6320_S_SC       0x05  /* stereo C */
+#define TEA6320_S_SD       0x04  /* stereo D */
+#define TEA6320_S_GMU      0x80  /* general mute */
+
 #define TEA6420_S_SA       0x00  /* stereo A input */
 #define TEA6420_S_SB       0x01  /* stereo B */
 #define TEA6420_S_SC       0x02  /* stereo C */
@@ -1036,6 +1052,20 @@ static int tda9874a_initialize(struct CHIPSTATE *chip)
 
 static int tea6300_shift10(int val) { return val >> 10; }
 static int tea6300_shift12(int val) { return val >> 12; }
+
+/* Assumes 16bit input (values 0x3f to 0x0c are unique, values less than */
+/* 0x0c mirror those immediately higher) */
+static int tea6320_volume(int val) { return (val / (65535/(63-12)) + 12) & 0x3f; }
+static int tea6320_shift11(int val) { return val >> 11; }
+static int tea6320_initialize(struct CHIPSTATE * chip)
+{
+	chip_write(chip, TEA6320_FFR, 0x3f);
+	chip_write(chip, TEA6320_FFL, 0x3f);
+	chip_write(chip, TEA6320_FRR, 0x3f);
+	chip_write(chip, TEA6320_FRL, 0x3f);
+
+	return 0;
+}
 
 
 /* ---------------------------------------------------------------------- */
@@ -1214,6 +1244,7 @@ int tda9855  = 1;
 int tda9873  = 1;
 int tda9874a = 1;
 int tea6300  = 0;  // address clash with msp34xx
+int tea6320  = 0;  // address clash with msp34xx
 int tea6420  = 1;
 int pic16c54 = 1;
 int ta8874z  = 0;  // address clash with tda9840
@@ -1225,6 +1256,7 @@ module_param(tda9855, int, 0444);
 module_param(tda9873, int, 0444);
 module_param(tda9874a, int, 0444);
 module_param(tea6300, int, 0444);
+module_param(tea6320, int, 0444);
 module_param(tea6420, int, 0444);
 module_param(pic16c54, int, 0444);
 module_param(ta8874z, int, 0444);
@@ -1336,6 +1368,28 @@ static struct CHIPDESC chiplist[] = {
 
 		.inputreg   = TEA6300_S,
 		.inputmap   = { TEA6300_S_SA, TEA6300_S_SB, TEA6300_S_SC },
+		.inputmute  = TEA6300_S_GMU,
+	},
+	{
+		.name       = "tea6320",
+		.id         = I2C_DRIVERID_TEA6300,
+		.initialize = tea6320_initialize,
+		.insmodopt  = &tea6320,
+		.addr_lo    = I2C_TEA6300 >> 1,
+		.addr_hi    = I2C_TEA6300 >> 1,
+		.registers  = 8,
+		.flags      = CHIP_HAS_VOLUME | CHIP_HAS_BASSTREBLE | CHIP_HAS_INPUTSEL,
+
+		.leftreg    = TEA6320_V,
+		.rightreg   = TEA6320_V,
+		.bassreg    = TEA6320_BA,
+		.treblereg  = TEA6320_TR,
+		.volfunc    = tea6320_volume,
+		.bassfunc   = tea6320_shift11,
+		.treblefunc = tea6320_shift11,
+
+		.inputreg   = TEA6320_S,
+		.inputmap   = { TEA6320_S_SA, TEA6420_S_SB, TEA6300_S_SC, TEA6320_S_SD },
 		.inputmute  = TEA6300_S_GMU,
 	},
 	{
@@ -1571,8 +1625,11 @@ static int chip_command(struct i2c_client *client,
 		if (desc->flags & CHIP_HAS_VOLUME) {
 			va->flags  |= VIDEO_AUDIO_VOLUME;
 			va->volume  = max(chip->left,chip->right);
-			va->balance = (32768*min(chip->left,chip->right))/
-				(va->volume ? va->volume : 1);
+			if (va->volume)
+				va->balance = (32768*min(chip->left,chip->right))/
+					va->volume;
+			else
+				va->balance = 32768;
 		}
 		if (desc->flags & CHIP_HAS_BASSTREBLE) {
 			va->flags |= VIDEO_AUDIO_BASS | VIDEO_AUDIO_TREBLE;
