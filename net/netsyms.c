@@ -467,6 +467,8 @@ EXPORT_SYMBOL(sysctl_tcp_tw_recycle);
 EXPORT_SYMBOL(sysctl_max_syn_backlog);
 #endif
 
+EXPORT_SYMBOL(ip_generic_getfrag);
+
 #endif
 
 EXPORT_SYMBOL(tcp_read_sock);

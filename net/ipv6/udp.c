@@ -1007,7 +1007,7 @@ out:
 	fl6_sock_release(flowlabel);
 	if (saddr) kfree(saddr);
 	if (!err) {
-		UDP_INC_STATS_USER(UdpOutDatagrams);
+		UDP6_INC_STATS_USER(UdpOutDatagrams);
 		return len;
 	}
 	return err;
