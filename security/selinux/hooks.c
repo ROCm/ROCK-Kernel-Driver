@@ -1992,8 +1992,7 @@ static int selinux_file_ioctl(struct file *file, unsigned int cmd,
 
 	        case KDSKBENT:
 	        case KDSKBSENT:
-		  	if (!capable(CAP_SYS_TTY_CONFIG))
-				error = -EPERM;
+			error = task_has_capability(current,CAP_SYS_TTY_CONFIG);
 			break;
 
 		/* default case assumes that the command will go
