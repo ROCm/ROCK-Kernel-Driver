@@ -156,6 +156,9 @@ still_busy:
  * applies the mst fixups to the page before finally marking it uptodate and
  * unlocking it.
  *
+ * We only enforce allocated_size limit because i_size is checked for in
+ * generic_file_read().
+ *
  * Return 0 on success and -errno on error.
  *
  * Contains an adapted version of fs/buffer.c::block_read_full_page().
@@ -182,8 +185,10 @@ static int ntfs_read_block(struct page *page)
 	if (!page_has_buffers(page))
 		create_empty_buffers(page, blocksize, 0);
 	bh = head = page_buffers(page);
-	if (unlikely(!bh))
+	if (unlikely(!bh)) {
+		unlock_page(page);
 		return -ENOMEM;
+	}
 
 	iblock = page->index << (PAGE_CACHE_SHIFT - blocksize_bits);
 	lblock = (ni->allocated_size + blocksize - 1) >> blocksize_bits;
@@ -343,8 +348,16 @@ int ntfs_readpage(struct file *file, struct page *page)
 	u32 attr_len;
 	int err = 0;
 
-	if (unlikely(!PageLocked(page)))
-		PAGE_BUG(page);
+	BUG_ON(!PageLocked(page));
+
+	/*
+	 * This can potentially happen because we clear PageUptodate() during
+	 * ntfs_writepage() of MstProtected() attributes.
+	 */
+	if (PageUptodate(page)) {
+		unlock_page(page);
+		return 0;
+	}
 
 	ni = NTFS_I(page->mapping->host);
 
