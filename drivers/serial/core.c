@@ -2024,11 +2024,11 @@ static int uart_pm(struct pm_dev *dev, pm_request_t rqst, void *data)
 	switch (rqst) {
 	case PM_SUSPEND:
 	case PM_RESUME:
-		err = uart_pm_set_state(state, (int)data, dev->state);
+		err = uart_pm_set_state(state, (int)(long)data, dev->state);
 		break;
 
 	case PM_SET_WAKEUP:
-		err = uart_pm_set_wakeup(state, (int)data);
+		err = uart_pm_set_wakeup(state, (int)(long)data);
 		break;
 	}
 	return err;
