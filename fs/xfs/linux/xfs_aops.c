@@ -692,10 +692,11 @@ linvfs_direct_IO(
 					linvfs_get_blocks_direct);
 }
 
-STATIC int
+
+STATIC sector_t
 linvfs_bmap(
 	struct address_space	*mapping,
-	long			block)
+	sector_t		block)
 {
 	struct inode		*inode = (struct inode *)mapping->host;
 	vnode_t			*vp = LINVFS_GET_VP(inode);

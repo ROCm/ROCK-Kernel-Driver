@@ -2748,7 +2748,7 @@ ahc_linux_biosparam(Disk *disk, struct block_device *bdev, int geom[])
 	}
 	heads = 64;
 	sectors = 32;
-	cylinders = disk->capacity / (heads * sectors);
+	cylinders = (unsigned long)disk->capacity / (heads * sectors);
 
 	if (aic7xxx_extended != 0)
 		extended = 1;
@@ -2759,7 +2759,7 @@ ahc_linux_biosparam(Disk *disk, struct block_device *bdev, int geom[])
 	if (extended && cylinders >= 1024) {
 		heads = 255;
 		sectors = 63;
-		cylinders = disk->capacity / (heads * sectors);
+		cylinders = (unsigned long)disk->capacity / (heads * sectors);
 	}
 	geom[0] = heads;
 	geom[1] = sectors;

@@ -30,13 +30,15 @@
 
 #define NR_STRIPES		256
 #define STRIPE_SIZE		PAGE_SIZE
+#define STRIPE_SHIFT		(PAGE_SHIFT - 9)
 #define STRIPE_SECTORS		(STRIPE_SIZE>>9)
 #define	IO_THRESHOLD		1
 #define HASH_PAGES		1
 #define HASH_PAGES_ORDER	0
 #define NR_HASH			(HASH_PAGES * PAGE_SIZE / sizeof(struct stripe_head *))
 #define HASH_MASK		(NR_HASH - 1)
-#define stripe_hash(conf, sect)	((conf)->stripe_hashtbl[((sect) / STRIPE_SECTORS) & HASH_MASK])
+
+#define stripe_hash(conf, sect)	((conf)->stripe_hashtbl[((sect) >> STRIPE_SHIFT) & HASH_MASK])
 
 /*
  * The following can be used to debug the driver
@@ -96,7 +98,7 @@ static void release_stripe(struct stripe_head *sh)
 
 static void remove_hash(struct stripe_head *sh)
 {
-	PRINTK("remove_hash(), stripe %lu\n", sh->sector);
+	PRINTK("remove_hash(), stripe %llu\n", (unsigned long long)sh->sector);
 
 	if (sh->hash_pprev) {
 		if (sh->hash_next)
@@ -110,7 +112,7 @@ static __inline__ void insert_hash(raid5_conf_t *conf, struct stripe_head *sh)
 {
 	struct stripe_head **shp = &stripe_hash(conf, sh->sector);
 
-	PRINTK("insert_hash(), stripe %lu\n",sh->sector);
+	PRINTK("insert_hash(), stripe %llu\n", (unsigned long long)sh->sector);
 
 	CHECK_DEVLOCK();
 	if ((sh->hash_next = *shp) != NULL)
@@ -180,7 +182,7 @@ static inline void init_stripe(struct stripe_head *sh, unsigned long sector, int
 		BUG();
 	
 	CHECK_DEVLOCK();
-	PRINTK("init_stripe called, stripe %lu\n", sh->sector);
+	PRINTK("init_stripe called, stripe %llu\n", (unsigned long long)sh->sector);
 
 	remove_hash(sh);
 	
@@ -193,8 +195,8 @@ static inline void init_stripe(struct stripe_head *sh, unsigned long sector, int
 
 		if (dev->toread || dev->towrite || dev->written ||
 		    test_bit(R5_LOCKED, &dev->flags)) {
-			printk("sector=%lx i=%d %p %p %p %d\n",
-			       sh->sector, i, dev->toread,
+			printk("sector=%llx i=%d %p %p %p %d\n",
+			       (unsigned long long)sh->sector, i, dev->toread,
 			       dev->towrite, dev->written,
 			       test_bit(R5_LOCKED, &dev->flags));
 			BUG();
@@ -336,7 +338,7 @@ static int raid5_end_read_request (struct bio * bi, unsigned int bytes_done,
 		if (bi == &sh->dev[i].req)
 			break;
 
-	PRINTK("end_read_request %lu/%d, count: %d, uptodate %d.\n", sh->sector, i, atomic_read(&sh->count), uptodate);
+	PRINTK("end_read_request %llu/%d, count: %d, uptodate %d.\n", (unsigned long long)sh->sector, i, atomic_read(&sh->count), uptodate);
 	if (i == disks) {
 		BUG();
 		return 0;
@@ -407,7 +409,7 @@ static int raid5_end_write_request (struct bio *bi, unsigned int bytes_done,
 		if (bi == &sh->dev[i].req)
 			break;
 
-	PRINTK("end_write_request %lu/%d, count %d, uptodate: %d.\n", sh->sector, i, atomic_read(&sh->count), uptodate);
+	PRINTK("end_write_request %llu/%d, count %d, uptodate: %d.\n", (unsigned long long)sh->sector, i, atomic_read(&sh->count), uptodate);
 	if (i == disks) {
 		BUG();
 		return 0;
@@ -427,7 +429,7 @@ static int raid5_end_write_request (struct bio *bi, unsigned int bytes_done,
 }
 
 
-static unsigned long compute_blocknr(struct stripe_head *sh, int i);
+static sector_t compute_blocknr(struct stripe_head *sh, int i);
 	
 static void raid5_build_block (struct stripe_head *sh, int i)
 {
@@ -482,7 +484,7 @@ static unsigned long raid5_compute_sector(sector_t r_sector, unsigned int raid_d
 			unsigned int data_disks, unsigned int * dd_idx,
 			unsigned int * pd_idx, raid5_conf_t *conf)
 {
-	sector_t stripe;
+	long stripe;
 	unsigned long chunk_number;
 	unsigned int chunk_offset;
 	sector_t new_sector;
@@ -493,8 +495,9 @@ static unsigned long raid5_compute_sector(sector_t r_sector, unsigned int raid_d
 	/*
 	 * Compute the chunk number and the sector offset inside the chunk
 	 */
-	chunk_number = r_sector / sectors_per_chunk;
-	chunk_offset = r_sector % sectors_per_chunk;
+	chunk_offset = sector_div(r_sector, sectors_per_chunk);
+	chunk_number = r_sector;
+	BUG_ON(r_sector != chunk_number);
 
 	/*
 	 * Compute the stripe number
@@ -548,11 +551,16 @@ static sector_t compute_blocknr(struct stripe_head *sh, int i)
 	int raid_disks = conf->raid_disks, data_disks = raid_disks - 1;
 	sector_t new_sector = sh->sector, check;
 	int sectors_per_chunk = conf->chunk_size >> 9;
-	sector_t stripe = new_sector / sectors_per_chunk;
-	int chunk_offset = new_sector % sectors_per_chunk;
+	long stripe;
+	int chunk_offset;
 	int chunk_number, dummy1, dummy2, dd_idx = i;
 	sector_t r_sector;
 
+	chunk_offset = sector_div(new_sector, sectors_per_chunk);
+	stripe = new_sector;
+	BUG_ON(new_sector != stripe);
+
+	
 	switch (conf->algorithm) {
 		case ALGORITHM_LEFT_ASYMMETRIC:
 		case ALGORITHM_RIGHT_ASYMMETRIC:
@@ -570,7 +578,7 @@ static sector_t compute_blocknr(struct stripe_head *sh, int i)
 	}
 
 	chunk_number = stripe * data_disks + i;
-	r_sector = chunk_number * sectors_per_chunk + chunk_offset;
+	r_sector = (sector_t)chunk_number * sectors_per_chunk + chunk_offset;
 
 	check = raid5_compute_sector (r_sector, raid_disks, data_disks, &dummy1, &dummy2, conf);
 	if (check != sh->sector || dummy1 != dd_idx || dummy2 != sh->pd_idx) {
@@ -648,7 +656,7 @@ static void compute_block(struct stripe_head *sh, int dd_idx)
 	int i, count, disks = conf->raid_disks;
 	void *ptr[MAX_XOR_BLOCKS], *p;
 
-	PRINTK("compute_block, stripe %lu, idx %d\n", sh->sector, dd_idx);
+	PRINTK("compute_block, stripe %llu, idx %d\n", (unsigned long long)sh->sector, dd_idx);
 
 	ptr[0] = page_address(sh->dev[dd_idx].page);
 	memset(ptr[0], 0, STRIPE_SIZE);
@@ -660,7 +668,7 @@ static void compute_block(struct stripe_head *sh, int dd_idx)
 		if (test_bit(R5_UPTODATE, &sh->dev[i].flags))
 			ptr[count++] = p;
 		else
-			printk("compute_block() %d, stripe %lu, %d not present\n", dd_idx, sh->sector, i);
+			printk("compute_block() %d, stripe %llu, %d not present\n", dd_idx, (unsigned long long)sh->sector, i);
 
 		check_xor();
 	}
@@ -676,7 +684,7 @@ static void compute_parity(struct stripe_head *sh, int method)
 	void *ptr[MAX_XOR_BLOCKS];
 	struct bio *chosen[MD_SB_DISKS];
 
-	PRINTK("compute_parity, stripe %lu, method %d\n", sh->sector, method);
+	PRINTK("compute_parity, stripe %llu, method %d\n", (unsigned long long)sh->sector, method);
 	memset(chosen, 0, sizeof(chosen));
 
 	count = 1;
@@ -762,7 +770,7 @@ static void add_stripe_bio (struct stripe_head *sh, struct bio *bi, int dd_idx, 
 	struct bio **bip;
 	raid5_conf_t *conf = sh->raid_conf;
 
-	PRINTK("adding bh b#%lu to stripe s#%lu\n", bi->bi_sector, sh->sector);
+	PRINTK("adding bh b#%llu to stripe s#%llu\n", (unsigned long long)bi->bi_sector, (unsigned long long)sh->sector);
 
 
 	spin_lock(&sh->lock);
@@ -783,7 +791,7 @@ static void add_stripe_bio (struct stripe_head *sh, struct bio *bi, int dd_idx, 
 	spin_unlock_irq(&conf->device_lock);
 	spin_unlock(&sh->lock);
 
-	PRINTK("added bi b#%lu to stripe s#%lu, disk %d.\n", bi->bi_sector, sh->sector, dd_idx);
+	PRINTK("added bi b#%llu to stripe s#%llu, disk %d.\n", (unsigned long long)bi->bi_sector, (unsigned long long)sh->sector, dd_idx);
 
 	if (forwrite) {
 		/* check if page is coverred */
@@ -831,7 +839,7 @@ static void handle_stripe(struct stripe_head *sh)
 	int failed_num=0;
 	struct r5dev *dev;
 
-	PRINTK("handling stripe %ld, cnt=%d, pd_idx=%d\n", sh->sector, atomic_read(&sh->count), sh->pd_idx);
+	PRINTK("handling stripe %llu, cnt=%d, pd_idx=%d\n", (unsigned long long)sh->sector, atomic_read(&sh->count), sh->pd_idx);
 
 	spin_lock(&sh->lock);
 	clear_bit(STRIPE_HANDLE, &sh->state);
@@ -1035,7 +1043,7 @@ static void handle_stripe(struct stripe_head *sh)
 				else rcw += 2*disks;
 			}
 		}
-		PRINTK("for sector %ld, rmw=%d rcw=%d\n", sh->sector, rmw, rcw);
+		PRINTK("for sector %llu, rmw=%d rcw=%d\n", (unsigned long long)sh->sector, rmw, rcw);
 		set_bit(STRIPE_HANDLE, &sh->state);
 		if (rmw < rcw && rmw > 0)
 			/* prefer read-modify-write, but need to get some data */
@@ -1178,7 +1186,7 @@ static void handle_stripe(struct stripe_head *sh)
 					md_sync_acct(rdev, STRIPE_SECTORS);
 
 				bi->bi_bdev = rdev->bdev;
-				PRINTK("for %ld schedule op %ld on disc %d\n", sh->sector, bi->bi_rw, i);
+				PRINTK("for %llu schedule op %ld on disc %d\n", (unsigned long long)sh->sector, bi->bi_rw, i);
 				atomic_inc(&sh->count);
 				bi->bi_sector = sh->sector;
 				bi->bi_flags = 1 << BIO_UPTODATE;
@@ -1189,7 +1197,7 @@ static void handle_stripe(struct stripe_head *sh)
 				bi->bi_next = NULL;
 				generic_make_request(bi);
 			} else {
-				PRINTK("skip op %ld on disc %d for sector %ld\n", bi->bi_rw, i, sh->sector);
+				PRINTK("skip op %ld on disc %d for sector %llu\n", bi->bi_rw, i, (unsigned long long)sh->sector);
 				clear_bit(R5_LOCKED, &dev->flags);
 				set_bit(STRIPE_HANDLE, &sh->state);
 			}
@@ -1285,8 +1293,9 @@ static int sync_request (mddev_t *mddev, sector_t sector_nr, int go_faster)
 	raid5_conf_t *conf = (raid5_conf_t *) mddev->private;
 	struct stripe_head *sh;
 	int sectors_per_chunk = conf->chunk_size >> 9;
-	unsigned long stripe = sector_nr/sectors_per_chunk;
-	int chunk_offset = sector_nr % sectors_per_chunk;
+	sector_t x;
+	unsigned long stripe;
+	int chunk_offset;
 	int dd_idx, pd_idx;
 	unsigned long first_sector;
 	int raid_disks = conf->raid_disks;
@@ -1295,6 +1304,11 @@ static int sync_request (mddev_t *mddev, sector_t sector_nr, int go_faster)
 	if (sector_nr >= mddev->size <<1)
 		/* just being told to finish up .. nothing to do */
 		return 0;
+
+	x = sector_nr;
+	chunk_offset = sector_div(x, sectors_per_chunk);
+	stripe = x;
+	BUG_ON(x != stripe);
 
 	first_sector = raid5_compute_sector(stripe*data_disks*sectors_per_chunk
 		+ chunk_offset, raid_disks, data_disks, &dd_idx, &pd_idx, conf);
@@ -1510,9 +1524,9 @@ static void print_sh (struct stripe_head *sh)
 {
 	int i;
 
-	printk("sh %lu, pd_idx %d, state %ld.\n", sh->sector, sh->pd_idx, sh->state);
-	printk("sh %lu,  count %d.\n", sh->sector, atomic_read(&sh->count));
-	printk("sh %lu, ", sh->sector);
+	printk("sh %llu, pd_idx %d, state %ld.\n", (unsigned long long)sh->sector, sh->pd_idx, sh->state);
+	printk("sh %llu,  count %d.\n", (unsigned long long)sh->sector, atomic_read(&sh->count));
+	printk("sh %llu, ", (unsigned long long)sh->sector);
 	for (i = 0; i < sh->raid_conf->raid_disks; i++) {
 		printk("(cache%d: %p %ld) ", i, sh->dev[i].page, sh->dev[i].flags);
 	}

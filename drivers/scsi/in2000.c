@@ -2174,17 +2174,17 @@ int size;
    if (iinfo[2] > 1024) {
       iinfo[0] = 64;
       iinfo[1] = 63;
-      iinfo[2] = disk->capacity / (iinfo[0] * iinfo[1]);
+      iinfo[2] = (unsigned long)disk->capacity / (iinfo[0] * iinfo[1]);
       }
    if (iinfo[2] > 1024) {
       iinfo[0] = 128;
       iinfo[1] = 63;
-      iinfo[2] = disk->capacity / (iinfo[0] * iinfo[1]);
+      iinfo[2] = (unsigned long)disk->capacity / (iinfo[0] * iinfo[1]);
       }
    if (iinfo[2] > 1024) {
       iinfo[0] = 255;
       iinfo[1] = 63;
-      iinfo[2] = disk->capacity / (iinfo[0] * iinfo[1]);
+      iinfo[2] = (unsigned long)disk->capacity / (iinfo[0] * iinfo[1]);
       }
     return 0;
 }

@@ -72,10 +72,12 @@ static int linear_run (mddev_t *mddev)
 		goto out;
 	}
 
-	nb_zone = conf->nr_zones =
-		md_size[mdidx(mddev)] / conf->smallest->size +
-		((md_size[mdidx(mddev)] % conf->smallest->size) ? 1 : 0);
-  
+	{
+		sector_t sz = md_size[mdidx(mddev)];
+		unsigned round = sector_div(sz, conf->smallest->size);
+		nb_zone = conf->nr_zones = sz + (round ? 1 : 0);
+	}
+			
 	conf->hash_table = kmalloc (sizeof (struct linear_hash) * nb_zone,
 					GFP_KERNEL);
 	if (!conf->hash_table)

@@ -2509,16 +2509,16 @@ static void scsi_dump_status(int level)
 		for (SDpnt = shpnt->host_queue; SDpnt; SDpnt = SDpnt->next) {
 			for (SCpnt = SDpnt->device_queue; SCpnt; SCpnt = SCpnt->next) {
 				/*  (0) h:c:t:l (dev sect nsect cnumsec sg) (ret all flg) (to/cmd to ito) cmd snse result %d %x      */
-				printk(KERN_INFO "(%3d) %2d:%1d:%2d:%2d (%6s %4ld %4ld %4ld %4x %1d) (%1d %1d 0x%2x) (%4d %4d %4d) 0x%2.2x 0x%2.2x 0x%8.8x\n",
+				printk(KERN_INFO "(%3d) %2d:%1d:%2d:%2d (%6s %4llu %4ld %4ld %4x %1d) (%1d %1d 0x%2x) (%4d %4d %4d) 0x%2.2x 0x%2.2x 0x%8.8x\n",
 				       i++,
 
 				       SCpnt->host->host_no,
 				       SCpnt->channel,
-				       SCpnt->target,
-				       SCpnt->lun,
+                                       SCpnt->target,
+                                       SCpnt->lun,
 
-				       kdevname(SCpnt->request->rq_dev),
-				       SCpnt->request->sector,
+                                       kdevname(SCpnt->request->rq_dev),
+                                       (unsigned long long)SCpnt->request->sector,
 				       SCpnt->request->nr_sectors,
 				       (long)SCpnt->request->current_nr_sectors,
 				       SCpnt->request->rq_status,

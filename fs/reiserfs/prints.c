@@ -139,8 +139,8 @@ static void sprintf_block_head (char * buf, struct buffer_head * bh)
 
 static void sprintf_buffer_head (char * buf, struct buffer_head * bh) 
 {
-  sprintf (buf, "dev %s, size %d, blocknr %ld, count %d, state 0x%lx, page %p, (%s, %s, %s)",
-	   bdevname (bh->b_bdev), bh->b_size, bh->b_blocknr,
+  sprintf (buf, "dev %s, size %d, blocknr %llu, count %d, state 0x%lx, page %p, (%s, %s, %s)",
+	   bdevname (bh->b_bdev), bh->b_size, (unsigned long long)bh->b_blocknr,
 	   atomic_read (&(bh->b_count)),
 	   bh->b_state, bh->b_page,
 	   buffer_uptodate (bh) ? "UPTODATE" : "!UPTODATE",
@@ -367,7 +367,7 @@ void print_path (struct tree_balance * tb, struct path * path)
     if (tb) {
 	while (tb->insert_size[h]) {
 	    bh = PATH_H_PBUFFER (path, h);
-	    printk ("block %lu (level=%d), position %d\n", bh ? bh->b_blocknr : 0,
+	    printk ("block %llu (level=%d), position %d\n", bh ? (unsigned long long)bh->b_blocknr : 0LL,
 		    bh ? B_LEVEL (bh) : 0, PATH_H_POSITION (path, h));
 	    h ++;
 	}
@@ -377,8 +377,8 @@ void print_path (struct tree_balance * tb, struct path * path)
       printk ("Offset    Bh     (b_blocknr, b_count) Position Nr_item\n");
       while ( offset > ILLEGAL_PATH_ELEMENT_OFFSET ) {
 	  bh = PATH_OFFSET_PBUFFER (path, offset);
-	  printk ("%6d %10p (%9lu, %7d) %8d %7d\n", offset, 
-		  bh, bh ? bh->b_blocknr : 0, bh ? atomic_read (&(bh->b_count)) : 0,
+	  printk ("%6d %10p (%9llu, %7d) %8d %7d\n", offset, 
+		  bh, bh ? (unsigned long long)bh->b_blocknr : 0LL, bh ? atomic_read (&(bh->b_count)) : 0,
 		  PATH_OFFSET_POSITION (path, offset), bh ? B_NR_ITEMS (bh) : -1);
 	  
 	  offset --;
@@ -510,8 +510,8 @@ static int print_super_block (struct buffer_head * bh)
 	return 1;
     }
 
-    printk ("%s\'s super block is in block %ld\n", bdevname (bh->b_bdev), 
-            bh->b_blocknr);
+    printk ("%s\'s super block is in block %llu\n", bdevname (bh->b_bdev), 
+            (unsigned long long)bh->b_blocknr);
     printk ("Reiserfs version %s\n", version );
     printk ("Block count %u\n", sb_block_count(rs));
     printk ("Blocksize %d\n", sb_blocksize(rs));
@@ -547,8 +547,8 @@ static int print_desc_block (struct buffer_head * bh)
     if (memcmp(desc->j_magic, JOURNAL_DESC_MAGIC, 8))
 	return 1;
 
-    printk ("Desc block %lu (j_trans_id %d, j_mount_id %d, j_len %d)",
-	    bh->b_blocknr, desc->j_trans_id, desc->j_mount_id, desc->j_len);
+    printk ("Desc block %llu (j_trans_id %d, j_mount_id %d, j_len %d)",
+	    (unsigned long long)bh->b_blocknr, desc->j_trans_id, desc->j_mount_id, desc->j_len);
 
     return 0;
 }
@@ -573,7 +573,7 @@ void print_block (struct buffer_head * bh, ...)//int print_mode, int first, int 
 	if (print_internal (bh, first, last))
 	    if (print_super_block (bh))
 		if (print_desc_block (bh))
-		    printk ("Block %ld contains unformatted data\n", bh->b_blocknr);
+		    printk ("Block %llu contains unformatted data\n", (unsigned long long)bh->b_blocknr);
 }
 
 
@@ -608,19 +608,19 @@ void store_print_tb (struct tree_balance * tb)
 	    tbFh = 0;
 	}
 	sprintf (print_tb_buf + strlen (print_tb_buf),
-		 "* %d * %3ld(%2d) * %3ld(%2d) * %3ld(%2d) * %5ld * %5ld * %5ld * %5ld * %5ld *\n",
+		 "* %d * %3lld(%2d) * %3lld(%2d) * %3lld(%2d) * %5lld * %5lld * %5lld * %5lld * %5lld *\n",
 		 h, 
-		 (tbSh) ? (tbSh->b_blocknr):(-1),
+		 (tbSh) ? (long long)(tbSh->b_blocknr):(-1LL),
 		 (tbSh) ? atomic_read (&(tbSh->b_count)) : -1,
-		 (tb->L[h]) ? (tb->L[h]->b_blocknr):(-1),
+		 (tb->L[h]) ? (long long)(tb->L[h]->b_blocknr):(-1LL),
 		 (tb->L[h]) ? atomic_read (&(tb->L[h]->b_count)) : -1,
-		 (tb->R[h]) ? (tb->R[h]->b_blocknr):(-1),
+		 (tb->R[h]) ? (long long)(tb->R[h]->b_blocknr):(-1LL),
 		 (tb->R[h]) ? atomic_read (&(tb->R[h]->b_count)) : -1,
-		 (tbFh) ? (tbFh->b_blocknr):(-1),
-		 (tb->FL[h]) ? (tb->FL[h]->b_blocknr):(-1),
-		 (tb->FR[h]) ? (tb->FR[h]->b_blocknr):(-1),
-		 (tb->CFL[h]) ? (tb->CFL[h]->b_blocknr):(-1),
-		 (tb->CFR[h]) ? (tb->CFR[h]->b_blocknr):(-1));
+		 (tbFh) ? (long long)(tbFh->b_blocknr):(-1LL),
+		 (tb->FL[h]) ? (long long)(tb->FL[h]->b_blocknr):(-1LL),
+		 (tb->FR[h]) ? (long long)(tb->FR[h]->b_blocknr):(-1LL),
+		 (tb->CFL[h]) ? (long long)(tb->CFL[h]->b_blocknr):(-1LL),
+		 (tb->CFR[h]) ? (long long)(tb->CFR[h]->b_blocknr):(-1LL));
     }
 
     sprintf (print_tb_buf + strlen (print_tb_buf), 
@@ -647,7 +647,7 @@ void store_print_tb (struct tree_balance * tb)
     h = 0;
     for (i = 0; i < sizeof (tb->FEB) / sizeof (tb->FEB[0]); i ++)
 	sprintf (print_tb_buf + strlen (print_tb_buf),
-		 "%p (%lu %d)%s", tb->FEB[i], tb->FEB[i] ? tb->FEB[i]->b_blocknr : 0,
+		 "%p (%llu %d)%s", tb->FEB[i], tb->FEB[i] ? (unsigned long long)tb->FEB[i]->b_blocknr : 0ULL,
 		 tb->FEB[i] ? atomic_read (&(tb->FEB[i]->b_count)) : 0, 
 		 (i == sizeof (tb->FEB) / sizeof (tb->FEB[0]) - 1) ? "\n" : ", ");
 

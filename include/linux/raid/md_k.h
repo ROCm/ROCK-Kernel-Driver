@@ -144,7 +144,7 @@ struct mdk_rdev_s
 {
 	struct list_head same_set;	/* RAID devices within the same set */
 
-	unsigned long size;		/* Device size (in blocks) */
+	sector_t size;			/* Device size (in blocks) */
 	mddev_t *mddev;			/* RAID array if running */
 	unsigned long last_events;	/* IO event timestamp */
 
@@ -152,7 +152,7 @@ struct mdk_rdev_s
 
 	struct page	*sb_page;
 	mdp_super_t	*sb;
-	unsigned long	sb_offset;
+	sector_t	sb_offset;
 
 	/* A device can be in one of three states based on two flags:
 	 * Not working:   faulty==1 in_sync==0
@@ -350,5 +350,5 @@ do {									\
 	__wait_disk_event(wq, condition);				\
 } while (0)
 
-#endif 
+#endif
 

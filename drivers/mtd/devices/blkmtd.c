@@ -164,7 +164,7 @@ static int blkmtd_readpage(mtd_raw_dev_data_t *rawdevice, struct page *page)
   int err;
   int sectornr, sectors, i;
   struct kiobuf *iobuf;
-  unsigned long *blocks;
+  sector_t *blocks;
 
   if(!rawdevice) {
     printk("blkmtd: readpage: PANIC file->private_data == NULL\n");
@@ -223,7 +223,7 @@ static int blkmtd_readpage(mtd_raw_dev_data_t *rawdevice, struct page *page)
 
   /* Pre 2.4.4 doesn't have space for the block list in the kiobuf */ 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,4)
-  blocks = kmalloc(KIO_MAX_SECTORS * sizeof(unsigned long));
+  blocks = kmalloc(KIO_MAX_SECTORS * sizeof(*blocks));
   if(blocks == NULL) {
     printk("blkmtd: cant allocate iobuf blocks\n");
     free_kiovec(1, &iobuf);
@@ -298,7 +298,7 @@ static int write_queue_task(void *data)
   int err;
   struct task_struct *tsk = current;
   struct kiobuf *iobuf;
-  unsigned long *blocks;
+  sector_t *blocks;
 
   DECLARE_WAITQUEUE(wait, tsk);
   DEBUG(1, "blkmtd: writetask: starting (pid = %d)\n", tsk->pid);

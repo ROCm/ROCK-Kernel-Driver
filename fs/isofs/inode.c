@@ -934,21 +934,22 @@ static int isofs_statfs (struct super_block *sb, struct statfs *buf)
  * or getblk() if they are not.  Returns the number of blocks inserted
  * (0 == error.)
  */
-int isofs_get_blocks(struct inode *inode, sector_t iblock,
+int isofs_get_blocks(struct inode *inode, sector_t iblock_s,
 		     struct buffer_head **bh, unsigned long nblocks)
 {
 	unsigned long b_off;
 	unsigned offset, sect_size;
 	unsigned int firstext;
 	unsigned long nextino;
+	long iblock = (long)iblock_s;
 	int section, rv;
 	struct iso_inode_info *ei = ISOFS_I(inode);
 
 	lock_kernel();
 
 	rv = 0;
-	if (iblock < 0) {
-		printk("isofs_get_blocks: block < 0\n");
+	if (iblock < 0 || iblock != iblock_s) {
+		printk("isofs_get_blocks: block number too large\n");
 		goto abort;
 	}
 
@@ -1044,9 +1045,9 @@ static int isofs_bmap(struct inode *inode, int block)
 	return 0;
 }
 
-struct buffer_head *isofs_bread(struct inode *inode, unsigned int block)
+struct buffer_head *isofs_bread(struct inode *inode, sector_t block)
 {
-	unsigned int blknr = isofs_bmap(inode, block);
+	sector_t blknr = isofs_bmap(inode, block);
 	if (!blknr)
 		return NULL;
 	return sb_bread(inode->i_sb, blknr);
@@ -1057,7 +1058,7 @@ static int isofs_readpage(struct file *file, struct page *page)
 	return block_read_full_page(page,isofs_get_block);
 }
 
-static int _isofs_bmap(struct address_space *mapping, long block)
+static sector_t _isofs_bmap(struct address_space *mapping, sector_t block)
 {
 	return generic_block_bmap(mapping,block,isofs_get_block);
 }

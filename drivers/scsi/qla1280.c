@@ -1705,11 +1705,11 @@ qla1280_biosparam(Disk * disk, struct block_device *dev, int geom[])
 
 	heads = 64;
 	sectors = 32;
-	cylinders = disk->capacity / (heads * sectors);
+	cylinders = (unsigned long)disk->capacity / (heads * sectors);
 	if (cylinders > 1024) {
 		heads = 255;
 		sectors = 63;
-		cylinders = disk->capacity / (heads * sectors);
+		cylinders = (unsigned long)disk->capacity / (heads * sectors);
 		/* if (cylinders > 1023)
 		   cylinders = 1023; */
 	}

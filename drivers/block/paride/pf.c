@@ -685,7 +685,8 @@ static int pf_identify(struct pf_unit *pf)
 	else {
 		if (pf->media_status == PF_RO)
 			printk(", RO");
-		printk(", %ld blocks\n", get_capacity(pf->disk));
+		printk(", %llu blocks\n",
+			(unsigned long long)get_capacity(pf->disk));
 	}
 	return 0;
 }

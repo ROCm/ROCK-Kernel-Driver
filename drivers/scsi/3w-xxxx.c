@@ -2102,12 +2102,12 @@ int tw_scsi_biosparam(Disk *disk, struct block_device *dev, int geom[])
 
 	heads = 64;
 	sectors = 32;
-	cylinders = disk->capacity / (heads * sectors);
+	cylinders = (unsigned long)disk->capacity / (heads * sectors);
 
 	if (disk->capacity >= 0x200000) {
 		heads = 255;
 		sectors = 63;
-		cylinders = disk->capacity / (heads * sectors);
+		cylinders = (unsigned long)disk->capacity / (heads * sectors);
 	}
 
 	dprintk(KERN_NOTICE "3w-xxxx: tw_scsi_biosparam(): heads = %d, sectors = %d, cylinders = %d\n", heads, sectors, cylinders);

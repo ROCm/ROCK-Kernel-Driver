@@ -388,7 +388,7 @@ int journal_cancel_revoke(handle_t *handle, struct journal_head *jh)
 		record = find_revoke_record(journal, bh->b_blocknr);
 		if (record) {
 			jbd_debug(4, "cancelled existing revoke on "
-				  "blocknr %lu\n", bh->b_blocknr);
+				  "blocknr %llu\n", (u64)bh->b_blocknr);
 			list_del(&record->hash);
 			kmem_cache_free(revoke_record_cache, record);
 			did_revoke = 1;

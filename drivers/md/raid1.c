@@ -298,8 +298,8 @@ static int end_request(struct bio *bio, unsigned int bytes_done, int error)
 			/*
 			 * oops, read error:
 			 */
-			printk(KERN_ERR "raid1: %s: rescheduling sector %lu\n",
-			       bdev_partition_name(conf->mirrors[mirror].rdev->bdev), r1_bio->sector);
+			printk(KERN_ERR "raid1: %s: rescheduling sector %llu\n",
+			       bdev_partition_name(conf->mirrors[mirror].rdev->bdev), (unsigned long long)r1_bio->sector);
 			reschedule_retry(r1_bio);
 		}
 	} else {
@@ -747,10 +747,10 @@ abort:
 }
 
 #define IO_ERROR KERN_ALERT \
-"raid1: %s: unrecoverable I/O read error for block %lu\n"
+"raid1: %s: unrecoverable I/O read error for block %llu\n"
 
 #define REDIRECT_SECTOR KERN_ERR \
-"raid1: %s: redirecting sector %lu to another mirror\n"
+"raid1: %s: redirecting sector %llu to another mirror\n"
 
 static int end_sync_read(struct bio *bio, unsigned int bytes_done, int error)
 {
@@ -827,7 +827,7 @@ static void sync_request_write(mddev_t *mddev, r1bio_t *r1_bio)
 		 * There is no point trying a read-for-reconstruct as
 		 * reconstruct is about to be aborted
 		 */
-		printk(IO_ERROR, bdev_partition_name(bio->bi_bdev), r1_bio->sector);
+		printk(IO_ERROR, bdev_partition_name(bio->bi_bdev), (unsigned long long)r1_bio->sector);
 		md_done_sync(mddev, r1_bio->master_bio->bi_size >> 9, 0);
 		resume_device(conf);
 		put_buf(r1_bio);
@@ -878,7 +878,8 @@ static void sync_request_write(mddev_t *mddev, r1bio_t *r1_bio)
 		 * Nowhere to write this to... I guess we
 		 * must be done
 		 */
-		printk(KERN_ALERT "raid1: sync aborting as there is nowhere to write sector %lu\n", r1_bio->sector);
+		printk(KERN_ALERT "raid1: sync aborting as there is nowhere to write sector %llu\n", 
+			(unsigned long long)r1_bio->sector);
 		md_done_sync(mddev, r1_bio->master_bio->bi_size >> 9, 0);
 		resume_device(conf);
 		put_buf(r1_bio);
@@ -931,12 +932,12 @@ static void raid1d(void *data)
 		case READ:
 		case READA:
 			if (map(mddev, &rdev) == -1) {
-				printk(IO_ERROR, bdev_partition_name(bio->bi_bdev), r1_bio->sector);
+				printk(IO_ERROR, bdev_partition_name(bio->bi_bdev), (unsigned long long)r1_bio->sector);
 				raid_end_bio_io(r1_bio, 0);
 				break;
 			}
 			printk(REDIRECT_SECTOR,
-				bdev_partition_name(rdev->bdev), r1_bio->sector);
+				bdev_partition_name(rdev->bdev), (unsigned long long)r1_bio->sector);
 			bio->bi_bdev = rdev->bdev;
 			bio->bi_sector = r1_bio->sector;
 			bio->bi_rw = r1_bio->cmd;

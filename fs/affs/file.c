@@ -338,10 +338,11 @@ affs_get_block(struct inode *inode, sector_t block, struct buffer_head *bh_resul
 	struct buffer_head	*ext_bh;
 	u32			 ext;
 
-	pr_debug("AFFS: get_block(%u, %ld)\n", (u32)inode->i_ino, block);
+	pr_debug("AFFS: get_block(%u, %lu)\n", (u32)inode->i_ino, (unsigned long)block);
 
-	if (block < 0)
-		goto err_small;
+
+	if (block > (sector_t)0x7fffffffUL)
+		BUG();
 
 	if (block >= AFFS_I(inode)->i_blkcnt) {
 		if (block > AFFS_I(inode)->i_blkcnt || !create)
@@ -352,12 +353,12 @@ affs_get_block(struct inode *inode, sector_t block, struct buffer_head *bh_resul
 	//lock cache
 	affs_lock_ext(inode);
 
-	ext = block / AFFS_SB(sb)->s_hashsize;
+	ext = (u32)block / AFFS_SB(sb)->s_hashsize;
 	block -= ext * AFFS_SB(sb)->s_hashsize;
 	ext_bh = affs_get_extblock(inode, ext);
 	if (IS_ERR(ext_bh))
 		goto err_ext;
-	map_bh(bh_result, sb, be32_to_cpu(AFFS_BLOCK(sb, ext_bh, block)));
+	map_bh(bh_result, sb, (sector_t)be32_to_cpu(AFFS_BLOCK(sb, ext_bh, block)));
 
 	if (create) {
 		u32 blocknr = affs_alloc_block(inode, ext_bh->b_blocknr);
@@ -422,7 +423,7 @@ static int affs_prepare_write(struct file *file, struct page *page, unsigned fro
 	return cont_prepare_write(page, from, to, affs_get_block,
 		&AFFS_I(page->mapping->host)->mmu_private);
 }
-static int _affs_bmap(struct address_space *mapping, long block)
+static sector_t _affs_bmap(struct address_space *mapping, sector_t block)
 {
 	return generic_block_bmap(mapping,block,affs_get_block);
 }
