@@ -253,9 +253,9 @@ static struct region *__rh_alloc(struct region_hash *rh, region_t region)
 	else {
 		__rh_insert(rh, nreg);
 		if (nreg->state == RH_CLEAN) {
-			spin_lock_irq(&rh->region_lock);
+			spin_lock(&rh->region_lock);
 			list_add(&nreg->list, &rh->clean_regions);
-			spin_unlock_irq(&rh->region_lock);
+			spin_unlock(&rh->region_lock);
 		}
 		reg = nreg;
 	}

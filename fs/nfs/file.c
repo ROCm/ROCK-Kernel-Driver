@@ -303,10 +303,10 @@ static int do_getlk(struct file *filp, int cmd, struct file_lock *fl)
 		status = NFS_PROTO(inode)->lock(filp, cmd, fl);
 	else {
 		struct file_lock *cfl = posix_test_lock(filp, fl);
-		if (cfl != NULL) {
+
+		fl->fl_type = F_UNLCK;
+		if (cfl != NULL)
 			memcpy(fl, cfl, sizeof(*fl));
-			fl->fl_type = F_UNLCK;
-		}
 	}
 	unlock_kernel();
 	return status;
