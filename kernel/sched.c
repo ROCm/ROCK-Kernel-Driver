@@ -1470,6 +1470,7 @@ void scheduling_functions_start_here(void) { }
  */
 asmlinkage void schedule(void)
 {
+	long *switch_count;
 	task_t *prev, *next;
 	runqueue_t *rq;
 	prio_array_t *array;
@@ -1516,32 +1517,25 @@ need_resched:
 	 * if entering off of a kernel preemption go straight
 	 * to picking the next task.
 	 */
-	if (unlikely(preempt_count() & PREEMPT_ACTIVE))
-		goto pick_next_task;
-
-	switch (prev->state) {
-	case TASK_INTERRUPTIBLE:
-		if (unlikely(signal_pending(prev))) {
+	switch_count = &prev->nivcsw;
+	if (prev->state && !(preempt_count() & PREEMPT_ACTIVE)) {
+		switch_count = &prev->nvcsw;
+		if (unlikely((prev->state & TASK_INTERRUPTIBLE) &&
+				unlikely(signal_pending(prev))))
 			prev->state = TASK_RUNNING;
-			break;
-		}
-	default:
-		deactivate_task(prev, rq);
-		prev->nvcsw++;
-		break;
-	case TASK_RUNNING:
-		prev->nivcsw++;
+		else
+			deactivate_task(prev, rq);
 	}
-pick_next_task:
+
 	if (unlikely(!rq->nr_running)) {
 #ifdef CONFIG_SMP
 		load_balance(rq, 1, cpu_to_node_mask(smp_processor_id()));
-		if (rq->nr_running)
-			goto pick_next_task;
 #endif
-		next = rq->idle;
-		rq->expired_timestamp = 0;
-		goto switch_tasks;
+		if (!rq->nr_running) {
+			next = rq->idle;
+			rq->expired_timestamp = 0;
+			goto switch_tasks;
+		}
 	}
 
 	array = rq->active;
@@ -1588,6 +1582,7 @@ switch_tasks:
 		next->timestamp = now;
 		rq->nr_switches++;
 		rq->curr = next;
+		++*switch_count;
 
 		prepare_arch_switch(rq, next);
 		prev = context_switch(rq, prev, next);

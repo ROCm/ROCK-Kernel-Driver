@@ -870,6 +870,7 @@ struct input_handler {
 	char *name;
 
 	struct input_device_id *id_table;
+	struct input_device_id *blacklist;
 
 	struct list_head	h_list;
 	struct list_head	node;

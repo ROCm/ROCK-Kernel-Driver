@@ -12,35 +12,44 @@
 
 #include <linux/delay.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/input.h>
 #include <linux/serio.h>
 #include <linux/init.h>
-#include <linux/pm.h>
 #include "psmouse.h"
 #include "synaptics.h"
 #include "logips2pp.h"
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
 MODULE_DESCRIPTION("PS/2 mouse driver");
-MODULE_PARM(psmouse_noext, "1i");
-MODULE_PARM_DESC(psmouse_noext, "Disable any protocol extensions. Useful for KVM switches.");
-MODULE_PARM(psmouse_resolution, "i");
-MODULE_PARM_DESC(psmouse_resolution, "Resolution, in dpi.");
-MODULE_PARM(psmouse_rate, "i");
-MODULE_PARM_DESC(psmouse_rate, "Report rate, in reports per second.");
-MODULE_PARM(psmouse_smartscroll, "i");
-MODULE_PARM_DESC(psmouse_smartscroll, "Logitech Smartscroll autorepeat, 1 = enabled (default), 0 = disabled.");
-MODULE_PARM(psmouse_resetafter, "i");
-MODULE_PARM_DESC(psmouse_resetafter, "Reset Synaptics Touchpad after so many bad packets (0 = never).");
 MODULE_LICENSE("GPL");
 
 static int psmouse_noext;
+module_param(psmouse_noext, int, 0);
+MODULE_PARM_DESC(psmouse_noext, "[DEPRECATED] Disable any protocol extensions. Useful for KVM switches.");
+
+static char *psmouse_proto;
+static unsigned int psmouse_max_proto = -1UL;
+module_param(psmouse_proto, charp, 0);
+MODULE_PARM_DESC(psmouse_proto, "Highest protocol extension to probe (bare, imps, exps). Useful for KVM switches.");
+
 int psmouse_resolution = 200;
+module_param(psmouse_resolution, uint, 0);
+MODULE_PARM_DESC(psmouse_resolution, "Resolution, in dpi.");
+
 unsigned int psmouse_rate = 100;
+module_param(psmouse_rate, uint, 0);
+MODULE_PARM_DESC(psmouse_rate, "Report rate, in reports per second.");
+
 int psmouse_smartscroll = 1;
+module_param(psmouse_smartscroll, bool, 0);
+MODULE_PARM_DESC(psmouse_smartscroll, "Logitech Smartscroll autorepeat, 1 = enabled (default), 0 = disabled.");
+
 unsigned int psmouse_resetafter;
+module_param(psmouse_resetafter, uint, 0);
+MODULE_PARM_DESC(psmouse_resetafter, "Reset Synaptics Touchpad after so many bad packets (0 = never).");
 
 static char *psmouse_protocols[] = { "None", "PS/2", "PS2++", "PS2T++", "GenPS/2", "ImPS/2", "ImExPS/2", "SynPS/2"};
 
@@ -139,7 +148,8 @@ static irqreturn_t psmouse_interrupt(struct serio *serio,
 		goto out;
 	}
 
-	if (psmouse->pktcnt && time_after(jiffies, psmouse->last + HZ/2)) {
+	if (psmouse->state == PSMOUSE_ACTIVATED &&
+	    psmouse->pktcnt && time_after(jiffies, psmouse->last + HZ/2)) {
 		printk(KERN_WARNING "psmouse.c: %s at %s lost synchronization, throwing %d bytes away.\n",
 		       psmouse->name, psmouse->phys, psmouse->pktcnt);
 		psmouse->pktcnt = 0;
@@ -257,45 +267,11 @@ int psmouse_command(struct psmouse *psmouse, unsigned char *param, int command)
 }
 
 /*
- * psmouse_extensions() probes for any extensions to the basic PS/2 protocol
- * the mouse may have.
+ * Genius NetMouse magic init.
  */
-
-static int psmouse_extensions(struct psmouse *psmouse)
+static int genius_detect(struct psmouse *psmouse)
 {
 	unsigned char param[4];
-
-	param[0] = 0;
-	psmouse->vendor = "Generic";
-	psmouse->name = "Mouse";
-	psmouse->model = 0;
-
-	if (psmouse_noext)
-		return PSMOUSE_PS2;
-
-/*
- * Try Synaptics TouchPad magic ID
- */
-
-       param[0] = 0;
-       psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
-       psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
-       psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
-       psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
-       psmouse_command(psmouse, param, PSMOUSE_CMD_GETINFO);
-
-       if (param[1] == 0x47) {
-		psmouse->vendor = "Synaptics";
-		psmouse->name = "TouchPad";
-		if (!synaptics_init(psmouse))
-			return PSMOUSE_SYNAPTICS;
-		else
-			return PSMOUSE_PS2;
-       }
-
-/*
- * Try Genius NetMouse magic init.
- */
 
 	param[0] = 3;
 	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
@@ -304,8 +280,79 @@ static int psmouse_extensions(struct psmouse *psmouse)
 	psmouse_command(psmouse,  NULL, PSMOUSE_CMD_SETSCALE11);
 	psmouse_command(psmouse, param, PSMOUSE_CMD_GETINFO);
 
-	if (param[0] == 0x00 && param[1] == 0x33 && param[2] == 0x55) {
+	return param[0] == 0x00 && param[1] == 0x33 && param[2] == 0x55;
+}
 
+/*
+ * IntelliMouse magic init.
+ */
+static int intellimouse_detect(struct psmouse *psmouse)
+{
+	unsigned char param[2];
+
+	param[0] = 200;
+	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRATE);
+	param[0] = 100;
+	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRATE);
+	param[0] =  80;
+	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRATE);
+	psmouse_command(psmouse, param, PSMOUSE_CMD_GETID);
+
+	return param[0] == 3;
+}
+
+/*
+ * Try IntelliMouse/Explorer magic init.
+ */
+static int im_explorer_detect(struct psmouse *psmouse)
+{
+	unsigned char param[2];
+
+	param[0] = 200;
+	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRATE);
+	param[0] = 200;
+	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRATE);
+	param[0] =  80;
+	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRATE);
+	psmouse_command(psmouse, param, PSMOUSE_CMD_GETID);
+
+	return param[0] == 4;
+}
+
+/*
+ * psmouse_extensions() probes for any extensions to the basic PS/2 protocol
+ * the mouse may have.
+ */
+
+static int psmouse_extensions(struct psmouse *psmouse)
+{
+	int synaptics_hardware = 0;
+
+	psmouse->vendor = "Generic";
+	psmouse->name = "Mouse";
+	psmouse->model = 0;
+
+/*
+ * Try Synaptics TouchPad
+ */
+	if (psmouse_max_proto > PSMOUSE_PS2 && synaptics_detect(psmouse)) {
+		synaptics_hardware = 1;
+		psmouse->vendor = "Synaptics";
+		psmouse->name = "TouchPad";
+
+		if (psmouse_max_proto > PSMOUSE_IMEX) {
+			if (synaptics_init(psmouse) == 0)
+				return PSMOUSE_SYNAPTICS;
+/*
+ * Some Synaptics touchpads can emulate extended protocols (like IMPS/2).
+ * Unfortunately Logitech/Genius probes confuse some firmware versions so
+ * we'll have to skip them.
+ */
+			psmouse_max_proto = PSMOUSE_IMEX;
+		}
+	}
+
+	if (psmouse_max_proto > PSMOUSE_IMEX && genius_detect(psmouse)) {
 		set_bit(BTN_EXTRA, psmouse->dev.keybit);
 		set_bit(BTN_SIDE, psmouse->dev.keybit);
 		set_bit(REL_WHEEL, psmouse->dev.relbit);
@@ -315,54 +362,17 @@ static int psmouse_extensions(struct psmouse *psmouse)
 		return PSMOUSE_GENPS;
 	}
 
-/*
- * Try Logitech magic ID.
- */
-
-	param[0] = 0;
-	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
-	psmouse_command(psmouse,  NULL, PSMOUSE_CMD_SETSCALE11);
-	psmouse_command(psmouse,  NULL, PSMOUSE_CMD_SETSCALE11);
-	psmouse_command(psmouse,  NULL, PSMOUSE_CMD_SETSCALE11);
-	param[1] = 0;
-	psmouse_command(psmouse, param, PSMOUSE_CMD_GETINFO);
-
-	if (param[1]) {
-		int type = ps2pp_detect_model(psmouse, param);
+	if (psmouse_max_proto > PSMOUSE_IMEX) {
+		int type = ps2pp_detect(psmouse);
 		if (type)
 			return type;
 	}
 
-/*
- * Try IntelliMouse magic init.
- */
-
-	param[0] = 200;
-	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRATE);
-	param[0] = 100;
-	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRATE);
-	param[0] =  80;
-	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRATE);
-	psmouse_command(psmouse, param, PSMOUSE_CMD_GETID);
-	
-	if (param[0] == 3) {
-
+	if (psmouse_max_proto >= PSMOUSE_IMPS && intellimouse_detect(psmouse)) {
 		set_bit(REL_WHEEL, psmouse->dev.relbit);
 
-/*
- * Try IntelliMouse/Explorer magic init.
- */
-
-		param[0] = 200;
-		psmouse_command(psmouse, param, PSMOUSE_CMD_SETRATE);
-		param[0] = 200;
-		psmouse_command(psmouse, param, PSMOUSE_CMD_SETRATE);
-		param[0] =  80;
-		psmouse_command(psmouse, param, PSMOUSE_CMD_SETRATE);
-		psmouse_command(psmouse, param, PSMOUSE_CMD_GETID);
-
-		if (param[0] == 4) {
-
+		if (psmouse_max_proto >= PSMOUSE_IMEX &&
+					im_explorer_detect(psmouse)) {
 			set_bit(BTN_SIDE, psmouse->dev.keybit);
 			set_bit(BTN_EXTRA, psmouse->dev.keybit);
 
@@ -378,6 +388,15 @@ static int psmouse_extensions(struct psmouse *psmouse)
  * Okay, all failed, we have a standard mouse here. The number of the buttons
  * is still a question, though. We assume 3.
  */
+	if (synaptics_hardware) {
+/*
+ * We detected Synaptics hardware but it did not respond to IMPS/2 probes.
+ * We need to reset the touchpad because if there is a track point on the
+ * pass through port it could get disabled while probing for protocol
+ * extensions.
+ */
+		psmouse_command(psmouse, NULL, PSMOUSE_CMD_RESET_DIS);
+	}
 
 	return PSMOUSE_PS2;
 }
@@ -468,7 +487,7 @@ static void psmouse_initialize(struct psmouse *psmouse)
  * We set the mouse report rate, resolution and scaling.
  */
 
-	if (!psmouse_noext) {
+	if (psmouse_max_proto != PSMOUSE_PS2) {
 		psmouse_set_rate(psmouse);
 		psmouse_set_resolution(psmouse);
 		psmouse_command(psmouse,  NULL, PSMOUSE_CMD_SETSCALE11);
@@ -513,45 +532,30 @@ static void psmouse_disconnect(struct serio *serio)
 	struct psmouse *psmouse = serio->private;
 
 	psmouse->state = PSMOUSE_IGNORE;
-	synaptics_disconnect(psmouse);
+
+	if (psmouse->ptport) {
+		if (psmouse->ptport->deactivate)
+			psmouse->ptport->deactivate(psmouse);
+		__serio_unregister_port(&psmouse->ptport->serio); /* we have serio_sem */
+		kfree(psmouse->ptport);
+		psmouse->ptport = NULL;
+	}
+
+	if (psmouse->disconnect)
+		psmouse->disconnect(psmouse);
+
 	input_unregister_device(&psmouse->dev);
 	serio_close(serio);
 	kfree(psmouse);
 }
 
 /*
- * Reinitialize mouse hardware after software suspend.
- */
-
-static int psmouse_pm_callback(struct pm_dev *dev, pm_request_t request, void *data)
-{
-	struct psmouse *psmouse = dev->data;
-	struct serio_dev *ser_dev = psmouse->serio->dev;
-
-	synaptics_disconnect(psmouse);
-
-	/* We need to reopen the serio port to reinitialize the i8042 controller */
-	serio_close(psmouse->serio);
-	serio_open(psmouse->serio, ser_dev);
-
-	/* Probe and re-initialize the mouse */
-	psmouse_probe(psmouse);
-	psmouse_initialize(psmouse);
-	synaptics_pt_init(psmouse);
-	psmouse_activate(psmouse);
-
-	return 0;
-}
-
-/*
  * psmouse_connect() is a callback from the serio module when
  * an unhandled serio port is found.
  */
-
 static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
 {
 	struct psmouse *psmouse;
-	struct pm_dev *pmdev;
 	
 	if ((serio->type & SERIO_TYPE) != SERIO_8042 &&
 	    (serio->type & SERIO_TYPE) != SERIO_PS_PSTHRU)
@@ -572,7 +576,6 @@ static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
 	psmouse->dev.private = psmouse;
 
 	serio->private = psmouse;
-
 	if (serio_open(serio, dev)) {
 		kfree(psmouse);
 		return;
@@ -584,12 +587,6 @@ static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
 		return;
 	}
 	
-	pmdev = pm_register(PM_SYS_DEV, PM_SYS_UNKNOWN, psmouse_pm_callback);
-	if (pmdev) {
-		psmouse->dev.pm_dev = pmdev;
-		pmdev->data = psmouse;
-	}
-
 	sprintf(psmouse->devname, "%s %s %s",
 		psmouse_protocols[psmouse->type], psmouse->vendor, psmouse->name);
 	sprintf(psmouse->phys, "%s/input0",
@@ -608,59 +605,87 @@ static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
 
 	psmouse_initialize(psmouse);
 
-	synaptics_pt_init(psmouse);
+	if (psmouse->ptport) {
+		printk(KERN_INFO "serio: %s port at %s\n", psmouse->ptport->serio.name, psmouse->phys);
+		__serio_register_port(&psmouse->ptport->serio); /* we have serio_sem */
+		if (psmouse->ptport->activate)
+			psmouse->ptport->activate(psmouse);
+	}
 
 	psmouse_activate(psmouse);
 }
 
+
+static int psmouse_reconnect(struct serio *serio)
+{
+	struct psmouse *psmouse = serio->private;
+	struct serio_dev *dev = serio->dev;
+	int old_type = psmouse->type;
+
+	if (!dev) {
+		printk(KERN_DEBUG "psmouse: reconnect request, but serio is disconnected, ignoring...\n");
+		return -1;
+	}
+
+	psmouse->state = PSMOUSE_NEW_DEVICE;
+	psmouse->type = psmouse->acking = psmouse->cmdcnt = psmouse->pktcnt = 0;
+	if (psmouse->reconnect) {
+	       if (psmouse->reconnect(psmouse))
+			return -1;
+	} else if (psmouse_probe(psmouse) != old_type)
+		return -1;
+
+	/* ok, the device type (and capabilities) match the old one,
+	 * we can continue using it, complete intialization
+	 */
+	psmouse->type = old_type;
+	psmouse_initialize(psmouse);
+
+	if (psmouse->ptport) {
+       		if (psmouse_reconnect(&psmouse->ptport->serio)) {
+			__serio_unregister_port(&psmouse->ptport->serio);
+			__serio_register_port(&psmouse->ptport->serio);
+			if (psmouse->ptport->activate)
+				psmouse->ptport->activate(psmouse);
+		}
+	}
+
+	psmouse_activate(psmouse);
+	return 0;
+}
+
+
 static struct serio_dev psmouse_dev = {
 	.interrupt =	psmouse_interrupt,
 	.connect =	psmouse_connect,
+	.reconnect =	psmouse_reconnect,
 	.disconnect =	psmouse_disconnect,
 	.cleanup =	psmouse_cleanup,
 };
 
-#ifndef MODULE
-static int __init psmouse_noext_setup(char *str)
+static inline void psmouse_parse_proto(void)
 {
-	psmouse_noext = 1;
-	return 1;
+	if (psmouse_noext) {
+		printk(KERN_WARNING "psmouse: 'psmouse_noext' option is deprecated, please use 'psmouse_proto'\n");
+		psmouse_max_proto = PSMOUSE_PS2;
+	}
+
+	/* even is psmouse_noext is present psmouse_proto overrides it */
+	if (psmouse_proto) {
+		if (!strcmp(psmouse_proto, "bare"))
+			psmouse_max_proto = PSMOUSE_PS2;
+		else if (!strcmp(psmouse_proto, "imps"))
+			psmouse_max_proto = PSMOUSE_IMPS;
+		else if (!strcmp(psmouse_proto, "exps"))
+			psmouse_max_proto = PSMOUSE_IMEX;
+		else
+			printk(KERN_ERR "psmouse: unknown protocol type '%s'\n", psmouse_proto);
+	}
 }
-
-static int __init psmouse_resolution_setup(char *str)
-{
-	get_option(&str, &psmouse_resolution);
-	return 1;
-}
-
-static int __init psmouse_smartscroll_setup(char *str)
-{
-	get_option(&str, &psmouse_smartscroll);
-	return 1;
-}
-
-static int __init psmouse_resetafter_setup(char *str)
-{
-	get_option(&str, &psmouse_resetafter);
-	return 1;
-}
-
-static int __init psmouse_rate_setup(char *str)
-{
-	get_option(&str, &psmouse_rate);
-	return 1;
-}
-
-__setup("psmouse_noext", psmouse_noext_setup);
-__setup("psmouse_resolution=", psmouse_resolution_setup);
-__setup("psmouse_smartscroll=", psmouse_smartscroll_setup);
-__setup("psmouse_resetafter=", psmouse_resetafter_setup);
-__setup("psmouse_rate=", psmouse_rate_setup);
-
-#endif
 
 int __init psmouse_init(void)
 {
+	psmouse_parse_proto();
 	serio_register_device(&psmouse_dev);
 	return 0;
 }

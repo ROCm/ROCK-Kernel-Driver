@@ -12,11 +12,14 @@
 
 #include <linux/delay.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/interrupt.h>
 #include <linux/ioport.h>
 #include <linux/config.h>
 #include <linux/reboot.h>
 #include <linux/init.h>
+#include <linux/sysdev.h>
+#include <linux/pm.h>
 #include <linux/serio.h>
 
 #include <asm/io.h>
@@ -25,19 +28,23 @@ MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
 MODULE_DESCRIPTION("i8042 keyboard and mouse controller driver");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(i8042_noaux, "1i");
-MODULE_PARM(i8042_nomux, "1i");
-MODULE_PARM(i8042_unlock, "1i");
-MODULE_PARM(i8042_reset, "1i");
-MODULE_PARM(i8042_direct, "1i");
-MODULE_PARM(i8042_dumbkbd, "1i");
+static unsigned int i8042_noaux;
+module_param(i8042_noaux, bool, 0);
 
-static int i8042_reset;
-static int i8042_noaux;
-static int i8042_nomux;
-static int i8042_unlock;
-static int i8042_direct;
-static int i8042_dumbkbd;
+static unsigned int i8042_nomux;
+module_param(i8042_nomux, bool, 0);
+
+static unsigned int i8042_unlock;
+module_param(i8042_unlock, bool, 0);
+
+static unsigned int i8042_reset;
+module_param(i8042_reset, bool, 0);
+
+static unsigned int i8042_direct;
+module_param(i8042_direct, bool, 0);
+
+static unsigned int i8042_dumbkbd;
+module_param(i8042_dumbkbd, bool, 0);
 
 #undef DEBUG
 #include "i8042.h"
@@ -59,6 +66,9 @@ static struct serio i8042_aux_port;
 static unsigned char i8042_initial_ctr;
 static unsigned char i8042_ctr;
 static unsigned char i8042_mux_open;
+static unsigned char i8042_mux_present;
+static unsigned char i8042_sysdev_initialized;
+static struct pm_dev *i8042_pm_dev;
 struct timer_list i8042_timer;
 
 /*
@@ -214,15 +224,40 @@ static int i8042_aux_write(struct serio *port, unsigned char c)
 }
 
 /*
+ * i8042_activate_port() enables port on a chip.
+ */
+
+static int i8042_activate_port(struct serio *port)
+{
+	struct i8042_values *values = port->driver;
+
+	i8042_flush();
+
+	/*
+	 * Enable port again here because it is disabled if we are
+	 * resuming (normally it is enabled already).
+	 */
+	i8042_ctr &= ~values->disable;
+
+	i8042_ctr |= values->irqen;
+
+	if (i8042_command(&i8042_ctr, I8042_CMD_CTL_WCTR)) {
+		i8042_ctr &= ~values->irqen;
+		return -1;
+	}
+
+	return 0;
+}
+
+
+/*
  * i8042_open() is called when a port is open by the higher layer.
- * It allocates the interrupt and enables it in the chip.
+ * It allocates the interrupt and calls i8042_enable_port.
  */
 
 static int i8042_open(struct serio *port)
 {
 	struct i8042_values *values = port->driver;
-
-	i8042_flush();
 
 	if (values->mux != -1)
 		if (i8042_mux_open++)
@@ -231,21 +266,26 @@ static int i8042_open(struct serio *port)
 	if (request_irq(values->irq, i8042_interrupt,
 			SA_SHIRQ, "i8042", i8042_request_irq_cookie)) {
 		printk(KERN_ERR "i8042.c: Can't get irq %d for %s, unregistering the port.\n", values->irq, values->name);
-		values->exists = 0;
-		serio_unregister_port(port);
-		return -1;
+		goto irq_fail;
 	}
 
-	i8042_ctr |= values->irqen;
-
-	if (i8042_command(&i8042_ctr, I8042_CMD_CTL_WCTR)) {
-		printk(KERN_ERR "i8042.c: Can't write CTR while opening %s.\n", values->name);
-		return -1;
+	if (i8042_activate_port(port)) {
+		printk(KERN_ERR "i8042.c: Can't activate %s, unregistering the port\n", values->name);
+		goto activate_fail;
 	}
 
 	i8042_interrupt(0, NULL, NULL);
 
 	return 0;
+
+activate_fail:
+	free_irq(values->irq, i8042_request_irq_cookie);
+
+irq_fail:
+	values->exists = 0;
+	serio_unregister_port_delayed(port);
+
+	return -1;
 }
 
 /*
@@ -393,166 +433,15 @@ static irqreturn_t i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 }
 
 /*
- * i8042_controller init initializes the i8042 controller, and,
- * most importantly, sets it into non-xlated mode if that's
- * desired.
+ * i8042_enable_mux_mode checks whether the controller has an active
+ * multiplexor and puts the chip into Multiplexed (as opposed to
+ * Legacy) mode.
  */
-	
-static int __init i8042_controller_init(void)
+
+static int i8042_enable_mux_mode(struct i8042_values *values, unsigned char *mux_version)
 {
 
-/*
- * Test the i8042. We need to know if it thinks it's working correctly
- * before doing anything else.
- */
-
-	i8042_flush();
-
-	if (i8042_reset) {
-
-		unsigned char param;
-
-		if (i8042_command(&param, I8042_CMD_CTL_TEST)) {
-			printk(KERN_ERR "i8042.c: i8042 controller self test timeout.\n");
-			return -1;
-		}
-
-		if (param != I8042_RET_CTL_TEST) {
-			printk(KERN_ERR "i8042.c: i8042 controller selftest failed. (%#x != %#x)\n",
-				 param, I8042_RET_CTL_TEST);
-			return -1;
-		}
-	}
-
-/*
- * Save the CTR for restoral on unload / reboot.
- */
-
-	if (i8042_command(&i8042_ctr, I8042_CMD_CTL_RCTR)) {
-		printk(KERN_ERR "i8042.c: Can't read CTR while initializing i8042.\n");
-		return -1;
-	}
-
-	i8042_initial_ctr = i8042_ctr;
-
-/*
- * Disable the keyboard interface and interrupt. 
- */
-
-	i8042_ctr |= I8042_CTR_KBDDIS;
-	i8042_ctr &= ~I8042_CTR_KBDINT;
-
-/*
- * Handle keylock.
- */
-
-	if (~i8042_read_status() & I8042_STR_KEYLOCK) {
-		if (i8042_unlock)
-			i8042_ctr |= I8042_CTR_IGNKEYLOCK;
-		 else
-			printk(KERN_WARNING "i8042.c: Warning: Keylock active.\n");
-	}
-
-/*
- * If the chip is configured into nontranslated mode by the BIOS, don't
- * bother enabling translating and be happy.
- */
-
-	if (~i8042_ctr & I8042_CTR_XLATE)
-		i8042_direct = 1;
-
-/*
- * Set nontranslated mode for the kbd interface if requested by an option.
- * After this the kbd interface becomes a simple serial in/out, like the aux
- * interface is. We don't do this by default, since it can confuse notebook
- * BIOSes.
- */
-
-	if (i8042_direct) {
-		i8042_ctr &= ~I8042_CTR_XLATE;
-		i8042_kbd_port.type = SERIO_8042;
-	}
-
-/*
- * Write CTR back.
- */
-
-	if (i8042_command(&i8042_ctr, I8042_CMD_CTL_WCTR)) {
-		printk(KERN_ERR "i8042.c: Can't write CTR while initializing i8042.\n");
-		return -1;
-	}
-
-	return 0;
-}
-
-/*
- * Here we try to reset everything back to a state in which the BIOS will be
- * able to talk to the hardware when rebooting.
- */
-
-void i8042_controller_cleanup(void)
-{
-	int i;
-
-	i8042_flush();
-
-/*
- * Reset anything that is connected to the ports.
- */
-
-	if (i8042_kbd_values.exists)
-		serio_cleanup(&i8042_kbd_port);
-
-	if (i8042_aux_values.exists)
-		serio_cleanup(&i8042_aux_port);
-
-	for (i = 0; i < 4; i++)
-		if (i8042_mux_values[i].exists)
-			serio_cleanup(i8042_mux_port + i);
-
-/*
- * Reset the controller.
- */
-
-	if (i8042_reset) {
-		unsigned char param;
-
-		if (i8042_command(&param, I8042_CMD_CTL_TEST))
-			printk(KERN_ERR "i8042.c: i8042 controller reset timeout.\n");
-	}
-
-/*
- * Restore the original control register setting.
- */
-
-	i8042_ctr = i8042_initial_ctr;
-
-	if (i8042_command(&i8042_ctr, I8042_CMD_CTL_WCTR))
-		printk(KERN_WARNING "i8042.c: Can't restore CTR.\n");
-
-}
-
-/*
- * i8042_check_mux() checks whether the controller supports the PS/2 Active
- * Multiplexing specification by Synaptics, Phoenix, Insyde and
- * LCS/Telegraphics.
- */
-
-static int __init i8042_check_mux(struct i8042_values *values)
-{
 	unsigned char param;
-	static int i8042_check_mux_cookie;
-	int i;
-
-/*
- * Check if AUX irq is available.
- */
-
-	if (request_irq(values->irq, i8042_interrupt, SA_SHIRQ,
-				"i8042", &i8042_check_mux_cookie))
-                return -1;
-	free_irq(values->irq, &i8042_check_mux_cookie);
-
 /*
  * Get rid of bytes in the queue.
  */
@@ -575,9 +464,22 @@ static int __init i8042_check_mux(struct i8042_values *values)
 	if (i8042_command(&param, I8042_CMD_AUX_LOOP) || param == 0x5b)
 		return -1;
 
-	printk(KERN_INFO "i8042.c: Detected active multiplexing controller, rev %d.%d.\n",
-		(~param >> 4) & 0xf, ~param & 0xf);
+	if (mux_version)
+		*mux_version = ~param;
 
+	return 0;
+}
+
+
+/*
+ * i8042_enable_mux_ports enables 4 individual AUX ports after
+ * the controller has been switched into Multiplexed mode
+ */
+
+static int i8042_enable_mux_ports(struct i8042_values *values)
+{
+	unsigned char param;
+	int i;
 /*
  * Disable all muxed ports by disabling AUX.
  */
@@ -585,8 +487,10 @@ static int __init i8042_check_mux(struct i8042_values *values)
 	i8042_ctr |= I8042_CTR_AUXDIS;
 	i8042_ctr &= ~I8042_CTR_AUXINT;
 
-	if (i8042_command(&i8042_ctr, I8042_CMD_CTL_WCTR))
+	if (i8042_command(&i8042_ctr, I8042_CMD_CTL_WCTR)) {
+		printk(KERN_ERR "i8042.c: Failed to disable AUX port, can't use MUX.\n");
 		return -1;
+	}
 
 /*
  * Enable all muxed ports.
@@ -599,6 +503,40 @@ static int __init i8042_check_mux(struct i8042_values *values)
 
 	return 0;
 }
+
+
+/*
+ * i8042_check_mux() checks whether the controller supports the PS/2 Active
+ * Multiplexing specification by Synaptics, Phoenix, Insyde and
+ * LCS/Telegraphics.
+ */
+
+static int __init i8042_check_mux(struct i8042_values *values)
+{
+	static int i8042_check_mux_cookie;
+	unsigned char mux_version;
+
+/*
+ * Check if AUX irq is available.
+ */
+	if (request_irq(values->irq, i8042_interrupt, SA_SHIRQ,
+				"i8042", &i8042_check_mux_cookie))
+                return -1;
+	free_irq(values->irq, &i8042_check_mux_cookie);
+
+	if (i8042_enable_mux_mode(values, &mux_version))
+		return -1;
+
+	printk(KERN_INFO "i8042.c: Detected active multiplexing controller, rev %d.%d.\n",
+		(mux_version >> 4) & 0xf, mux_version & 0xf);
+
+	if (i8042_enable_mux_ports(values))
+		return -1;
+
+	i8042_mux_present = 1;
+	return 0;
+}
+
 
 /*
  * i8042_check_aux() applies as much paranoia as it can at detecting
@@ -675,6 +613,7 @@ static int __init i8042_check_aux(struct i8042_values *values)
 	return 0;
 }
 
+
 /*
  * i8042_port_register() marks the device as existing,
  * registers it, and reports to the user.
@@ -691,16 +630,17 @@ static int __init i8042_port_register(struct i8042_values *values, struct serio 
 		return -1; 
 	}
 
-	serio_register_port(port);
-
 	printk(KERN_INFO "serio: i8042 %s port at %#lx,%#lx irq %d\n",
 	       values->name,
 	       (unsigned long) I8042_DATA_REG,
 	       (unsigned long) I8042_COMMAND_REG,
 	       values->irq);
 
+	serio_register_port(port);
+
 	return 0;
 }
+
 
 static void i8042_timer_func(unsigned long data)
 {
@@ -708,46 +648,187 @@ static void i8042_timer_func(unsigned long data)
 	mod_timer(&i8042_timer, jiffies + I8042_POLL_PERIOD);
 }
 
-#ifndef MODULE
-static int __init i8042_setup_reset(char *str)
+
+/*
+ * i8042_controller init initializes the i8042 controller, and,
+ * most importantly, sets it into non-xlated mode if that's
+ * desired.
+ */
+
+static int i8042_controller_init(void)
 {
-	i8042_reset = 1;
-	return 1;
-}
-static int __init i8042_setup_noaux(char *str)
-{
-	i8042_noaux = 1;
-	i8042_nomux = 1;
-	return 1;
-}
-static int __init i8042_setup_nomux(char *str)
-{
-	i8042_nomux = 1;
-	return 1;
-}
-static int __init i8042_setup_unlock(char *str)
-{
-	i8042_unlock = 1;
-	return 1;
-}
-static int __init i8042_setup_direct(char *str)
-{
-	i8042_direct = 1;
-	return 1;
-}
-static int __init i8042_setup_dumbkbd(char *str)
-{
-	i8042_dumbkbd = 1;
-	return 1;
+
+	if (i8042_noaux)
+		i8042_nomux = 1;
+/*
+ * Test the i8042. We need to know if it thinks it's working correctly
+ * before doing anything else.
+ */
+
+	i8042_flush();
+
+	if (i8042_reset) {
+
+		unsigned char param;
+
+		if (i8042_command(&param, I8042_CMD_CTL_TEST)) {
+			printk(KERN_ERR "i8042.c: i8042 controller self test timeout.\n");
+			return -1;
+		}
+
+		if (param != I8042_RET_CTL_TEST) {
+			printk(KERN_ERR "i8042.c: i8042 controller selftest failed. (%#x != %#x)\n",
+				 param, I8042_RET_CTL_TEST);
+			return -1;
+		}
+	}
+
+/*
+ * Save the CTR for restoral on unload / reboot.
+ */
+
+	if (i8042_command(&i8042_ctr, I8042_CMD_CTL_RCTR)) {
+		printk(KERN_ERR "i8042.c: Can't read CTR while initializing i8042.\n");
+		return -1;
+	}
+
+	i8042_initial_ctr = i8042_ctr;
+
+/*
+ * Disable the keyboard interface and interrupt.
+ */
+
+	i8042_ctr |= I8042_CTR_KBDDIS;
+	i8042_ctr &= ~I8042_CTR_KBDINT;
+
+/*
+ * Handle keylock.
+ */
+
+	if (~i8042_read_status() & I8042_STR_KEYLOCK) {
+		if (i8042_unlock)
+			i8042_ctr |= I8042_CTR_IGNKEYLOCK;
+		 else
+			printk(KERN_WARNING "i8042.c: Warning: Keylock active.\n");
+	}
+
+/*
+ * If the chip is configured into nontranslated mode by the BIOS, don't
+ * bother enabling translating and be happy.
+ */
+
+	if (~i8042_ctr & I8042_CTR_XLATE)
+		i8042_direct = 1;
+
+/*
+ * Set nontranslated mode for the kbd interface if requested by an option.
+ * After this the kbd interface becomes a simple serial in/out, like the aux
+ * interface is. We don't do this by default, since it can confuse notebook
+ * BIOSes.
+ */
+
+	if (i8042_direct) {
+		i8042_ctr &= ~I8042_CTR_XLATE;
+		i8042_kbd_port.type = SERIO_8042;
+	}
+
+/*
+ * Write CTR back.
+ */
+
+	if (i8042_command(&i8042_ctr, I8042_CMD_CTL_WCTR)) {
+		printk(KERN_ERR "i8042.c: Can't write CTR while initializing i8042.\n");
+		return -1;
+	}
+
+	return 0;
 }
 
-__setup("i8042_reset", i8042_setup_reset);
-__setup("i8042_noaux", i8042_setup_noaux);
-__setup("i8042_nomux", i8042_setup_nomux);
-__setup("i8042_unlock", i8042_setup_unlock);
-__setup("i8042_direct", i8042_setup_direct);
-__setup("i8042_dumbkbd", i8042_setup_dumbkbd);
-#endif
+
+/*
+ * Here we try to reset everything back to a state in which the BIOS will be
+ * able to talk to the hardware when rebooting.
+ */
+
+void i8042_controller_cleanup(void)
+{
+	int i;
+
+	i8042_flush();
+
+/*
+ * Reset anything that is connected to the ports.
+ */
+
+	if (i8042_kbd_values.exists)
+		serio_cleanup(&i8042_kbd_port);
+
+	if (i8042_aux_values.exists)
+		serio_cleanup(&i8042_aux_port);
+
+	for (i = 0; i < 4; i++)
+		if (i8042_mux_values[i].exists)
+			serio_cleanup(i8042_mux_port + i);
+
+/*
+ * Reset the controller.
+ */
+
+	if (i8042_reset) {
+		unsigned char param;
+
+		if (i8042_command(&param, I8042_CMD_CTL_TEST))
+			printk(KERN_ERR "i8042.c: i8042 controller reset timeout.\n");
+	}
+
+/*
+ * Restore the original control register setting.
+ */
+
+	i8042_ctr = i8042_initial_ctr;
+
+	if (i8042_command(&i8042_ctr, I8042_CMD_CTL_WCTR))
+		printk(KERN_WARNING "i8042.c: Can't restore CTR.\n");
+
+}
+
+
+/*
+ * Here we try to reset everything back to a state in which suspended
+ */
+
+static int i8042_controller_resume(void)
+{
+	int i;
+
+	if (i8042_controller_init()) {
+		printk(KERN_ERR "i8042: resume failed\n");
+		return -1;
+	}
+
+	if (i8042_mux_present)
+		if (i8042_enable_mux_mode(&i8042_aux_values, NULL) ||
+		    i8042_enable_mux_ports(&i8042_aux_values)) {
+			printk(KERN_WARNING "i8042: failed to resume active multiplexor, mouse won't wotk.\n");
+		}
+
+/*
+ * Reconnect anything that was connected to the ports.
+ */
+
+	if (i8042_kbd_values.exists && i8042_activate_port(&i8042_kbd_port) == 0)
+		serio_reconnect(&i8042_kbd_port);
+
+	if (i8042_aux_values.exists && i8042_activate_port(&i8042_aux_port) == 0)
+		serio_reconnect(&i8042_aux_port);
+
+	for (i = 0; i < 4; i++)
+		if (i8042_mux_values[i].exists && i8042_activate_port(i8042_mux_port + i) == 0)
+			serio_reconnect(i8042_mux_port + i);
+
+	return 0;
+}
+
 
 /*
  * We need to reset the 8042 back to original mode on system shutdown,
@@ -768,6 +849,35 @@ static struct notifier_block i8042_notifier=
         NULL,
         0
 };
+
+/*
+ * Resume handler for the new PM scheme (driver model)
+ */
+static int i8042_resume(struct sys_device *dev)
+{
+	return i8042_controller_resume();
+}
+
+static struct sysdev_class kbc_sysclass = {
+       set_kset_name("i8042"),
+       .resume = i8042_resume,
+};
+
+static struct sys_device device_i8042 = {
+       .id     = 0,
+       .cls    = &kbc_sysclass,
+};
+
+/*
+ * Resume handler for the old PM scheme (APM)
+ */
+static int i8042_pm_callback(struct pm_dev *dev, pm_request_t request, void *dummy)
+{
+	if (request == PM_RESUME)
+		return i8042_controller_resume();
+
+	return 0;
+}
 
 static void __init i8042_init_mux_values(struct i8042_values *values, struct serio *port, int index)
 {
@@ -817,6 +927,15 @@ int __init i8042_init(void)
 	i8042_timer.function = i8042_timer_func;
 	mod_timer(&i8042_timer, jiffies + I8042_POLL_PERIOD);
 
+        if (sysdev_class_register(&kbc_sysclass) == 0) {
+                if (sys_device_register(&device_i8042) == 0)
+			i8042_sysdev_initialized = 1;
+		else
+			sysdev_class_unregister(&kbc_sysclass);
+        }
+
+	i8042_pm_dev = pm_register(PM_SYS_DEV, PM_SYS_UNKNOWN, i8042_pm_callback);
+
 	register_reboot_notifier(&i8042_notifier);
 
 	return 0;
@@ -827,6 +946,14 @@ void __exit i8042_exit(void)
 	int i;
 
 	unregister_reboot_notifier(&i8042_notifier);
+
+	if (i8042_pm_dev)
+		pm_unregister(i8042_pm_dev);
+
+	if (i8042_sysdev_initialized) {
+		sys_device_unregister(&device_i8042);
+		sysdev_class_unregister(&kbc_sysclass);
+	}
 
 	del_timer(&i8042_timer);
 
