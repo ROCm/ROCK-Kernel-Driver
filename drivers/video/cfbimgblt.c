@@ -275,8 +275,9 @@ static inline void fast_imageblit(const struct fb_image *image,
 	k = image->width/ppw;
 
 	for (i = image->height; i--; ) {
-		dst = (unsigned long *) dst1, shift = 8; src = s;
 		INIT_FASTPATH;
+
+		dst = (unsigned long *) dst1, shift = 8; src = s;
 	
 		for (j = k; j--; ) {
 			shift -= ppw;
