@@ -47,11 +47,13 @@
 #include "mem_pieces.h"
 #include "mmu_decl.h"
 
-#ifdef CONFIG_LOWMEM_SIZE_BOOL
+#if defined(CONFIG_KERNEL_START_BOOL) || defined(CONFIG_LOWMEM_SIZE_BOOL)
+/* The ammount of lowmem must be within 0xF0000000 - KERNELBASE. */
+#if (CONFIG_LOWMEM_SIZE > (0xF0000000 - KERNELBASE))
+#error "You must adjust CONFIG_LOWMEM_SIZE or CONFIG_START_KERNEL"
+#endif
+#endif
 #define MAX_LOW_MEM	CONFIG_LOWMEM_SIZE
-#else
-#define MAX_LOW_MEM	(0xF0000000UL - KERNELBASE)
-#endif /* CONFIG_LOWMEM_SIZE_BOOL */
 
 #ifdef CONFIG_PPC_ISERIES
 extern void create_virtual_bus_tce_table(void);

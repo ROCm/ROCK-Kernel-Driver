@@ -1209,6 +1209,9 @@ config ADVANCED_OPTIONS
 
 	  Unless you know what you are doing, say N here.
 
+comment "Default settings for advanced configuration options are used"
+	depends on !ADVANCED_OPTIONS
+
 config HIGHMEM_START_BOOL
 	bool "Set high memory pool address"
 	depends on ADVANCED_OPTIONS && HIGHMEM
@@ -1222,6 +1225,11 @@ config HIGHMEM_START_BOOL
 config HIGHMEM_START
 	hex "Virtual start address of high memory pool"
 	depends on HIGHMEM_START_BOOL
+	default "0xfe000000"
+
+config HIGHMEM_START
+	hex
+	depends on !HIGHMEM_START_BOOL
 	default "0xfe000000"
 
 config LOWMEM_SIZE_BOOL
@@ -1241,6 +1249,11 @@ config LOWMEM_SIZE
 	depends on LOWMEM_SIZE_BOOL
 	default "0x20000000"
 
+config LOWMEM_SIZE
+	hex
+	depends on !LOWMEM_SIZE_BOOL
+	default "0x20000000"
+
 config KERNEL_START_BOOL
 	bool "Set custom kernel base address"
 	depends on ADVANCED_OPTIONS
@@ -1257,6 +1270,11 @@ config KERNEL_START
 	depends on KERNEL_START_BOOL
 	default "0xc0000000"
 
+config KERNEL_START
+	hex
+	depends on !KERNEL_START_BOOL
+	default "0xc0000000"
+
 config TASK_SIZE_BOOL
 	bool "Set custom user task size"
 	depends on ADVANCED_OPTIONS
@@ -1270,6 +1288,11 @@ config TASK_SIZE_BOOL
 config TASK_SIZE
 	hex "Size of user task space"
 	depends on TASK_SIZE_BOOL
+	default "0x80000000"
+
+config TASK_SIZE
+	hex
+	depends on !TASK_SIZE_BOOL
 	default "0x80000000"
 
 config PIN_TLB

@@ -12,13 +12,10 @@
 # Rewritten by Cort Dougan and Paul Mackerras
 #
 
-# Be sure to change PAGE_OFFSET in include/asm-ppc/page.h to match
-ifdef CONFIG_KERNEL_START_BOOL
+# This must match PAGE_OFFSET in include/asm-ppc/page.h.
 KERNELLOAD	=$(CONFIG_KERNEL_START)
-else
-KERNELLOAD	=0xc0000000
-endif
 
+LDFLAGS_BLOB	:= --format binary --oformat elf32-powerpc
 LDFLAGS_vmlinux	= -Ttext $(KERNELLOAD) -Bstatic
 CPPFLAGS	:= $(CPPFLAGS) -I$(TOPDIR)/arch/$(ARCH)
 AFLAGS		:= $(AFLAGS) -I$(TOPDIR)/arch/$(ARCH)
