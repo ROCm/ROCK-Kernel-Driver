@@ -69,11 +69,6 @@ suspend_pagedir_t *pm_pagedir_nosave __nosavedata = NULL;
 static suspend_pagedir_t *pagedir_save;
 static int pagedir_order __nosavedata = 0;
 
-struct link {
-	char dummy[PAGE_SIZE - sizeof(swp_entry_t)];
-	swp_entry_t next;
-};
-
 
 struct pmdisk_info {
 	struct new_utsname	uts;
