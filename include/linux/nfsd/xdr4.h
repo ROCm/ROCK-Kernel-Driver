@@ -224,6 +224,12 @@ struct nfsd4_setclientid {
 	char *		se_callback_addr_val;   /* request */
 	u32		se_callback_ident;  /* request */
 	clientid_t	se_clientid;        /* response */
+	nfs4_verifier	se_confirm;         /* response */
+};
+
+struct nfsd4_setclientid_confirm {
+	clientid_t	sc_clientid;
+	nfs4_verifier	sc_confirm;
 };
 
 /* also used for NVERIFY */
@@ -267,7 +273,7 @@ struct nfsd4_op {
 		clientid_t			renew;
 		struct nfsd4_setattr		setattr;
 		struct nfsd4_setclientid	setclientid;
-		clientid_t			setclientid_confirm;
+		struct nfsd4_setclientid_confirm setclientid_confirm;
 		struct nfsd4_verify		verify;
 		struct nfsd4_write		write;
 	} u;

@@ -717,12 +717,13 @@ nfsd4_decode_setclientid(struct nfsd4_compoundargs *argp, struct nfsd4_setclient
 }
 
 static int
-nfsd4_decode_setclientid_confirm(struct nfsd4_compoundargs *argp, clientid_t *clientid)
+nfsd4_decode_setclientid_confirm(struct nfsd4_compoundargs *argp, struct nfsd4_setclientid_confirm *scd_c)
 {
 	DECODE_HEAD;
 
-	READ_BUF(8);
-	COPYMEM(clientid, 8);
+	READ_BUF(8 + sizeof(nfs4_verifier));
+	COPYMEM(&scd_c->sc_clientid, 8);
+	COPYMEM(&scd_c->sc_confirm, sizeof(nfs4_verifier));
 
 	DECODE_TAIL;
 }
@@ -1736,8 +1737,9 @@ nfsd4_encode_setclientid(struct nfsd4_compoundres *resp, int nfserr, struct nfsd
 	ENCODE_HEAD;
 
 	if (!nfserr) {
-		RESERVE_SPACE(8);
+		RESERVE_SPACE(8 + sizeof(nfs4_verifier));
 		WRITEMEM(&scd->se_clientid, 8);
+		WRITEMEM(&scd->se_confirm, sizeof(nfs4_verifier));
 		ADJUST_ARGS();
 	}
 	else if (nfserr == nfserr_clid_inuse) {
