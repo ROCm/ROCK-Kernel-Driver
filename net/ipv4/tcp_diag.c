@@ -776,9 +776,19 @@ static void tcpdiag_rcv(struct sock *sk, int len)
 	}
 }
 
-void __init tcpdiag_init(void)
+static int __init tcpdiag_init(void)
 {
 	tcpnl = netlink_kernel_create(NETLINK_TCPDIAG, tcpdiag_rcv);
 	if (tcpnl == NULL)
-		panic("tcpdiag_init: Cannot create netlink socket.");
+		return -ENOMEM;
+	return 0;
 }
+
+static void __exit tcpdiag_exit(void)
+{
+	sock_release(tcpnl->sk_socket);
+}
+
+module_init(tcpdiag_init);
+module_exit(tcpdiag_exit);
+MODULE_LICENSE("GPL");

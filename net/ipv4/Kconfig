@@ -349,5 +349,14 @@ config INET_TUNNEL
 	  
 	  If unsure, say Y.
 
+config IP_TCPDIAG
+	tristate "IP: TCP socket monitoring interface"
+	default y
+	---help---
+	  Support for TCP socket monitoring interface used by native Linux
+	  tools such as ss.
+	  
+	  If unsure, say Y.
+
 source "net/ipv4/ipvs/Kconfig"
 
