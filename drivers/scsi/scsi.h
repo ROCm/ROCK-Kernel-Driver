@@ -40,12 +40,6 @@
 #define FALSE 0
 #endif
 
-#ifdef DEBUG
-#define SCSI_TIMEOUT (5*HZ)
-#else
-#define SCSI_TIMEOUT (2*HZ)
-#endif
-
 struct Scsi_Host;
 struct scsi_cmnd;
 struct scsi_device;

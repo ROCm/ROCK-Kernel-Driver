@@ -31,20 +31,15 @@
 #include "scsi_priv.h"
 #include "scsi_logging.h"
 
-#ifdef DEBUG
-#define SENSE_TIMEOUT SCSI_TIMEOUT
-#else
-#define SENSE_TIMEOUT (10*HZ)
-#endif
-
-#define START_UNIT_TIMEOUT (30*HZ)
+#define SENSE_TIMEOUT		(10*HZ)
+#define START_UNIT_TIMEOUT	(30*HZ)
 
 /*
  * These should *probably* be handled by the host itself.
  * Since it is allowed to sleep, it probably should.
  */
-#define BUS_RESET_SETTLE_TIME   10*HZ
-#define HOST_RESET_SETTLE_TIME  10*HZ
+#define BUS_RESET_SETTLE_TIME   (10*HZ)
+#define HOST_RESET_SETTLE_TIME  (10*HZ)
 
 /* called with shost->host_lock held */
 void scsi_eh_wakeup(struct Scsi_Host *shost)
