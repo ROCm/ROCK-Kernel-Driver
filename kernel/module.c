@@ -156,7 +156,7 @@ static unsigned long __find_symbol(const char *name,
 	/* Now try modules. */ 
 	list_for_each_entry(mod, &modules, list) {
 		*owner = mod;
-		for (i = 0; i < mod->num_ksyms; i++)
+		for (i = 0; i < mod->num_syms; i++)
 			if (strcmp(mod->syms[i].name, name) == 0) {
 				*crc = symversion(mod->crcs, i);
 				return mod->syms[i].value;
@@ -839,12 +839,13 @@ static inline int check_modstruct_version(Elf_Shdr *sechdrs,
 					  unsigned int versindex,
 					  struct module *mod)
 {
-	unsigned int i;
-	struct kernel_symbol_group *ksg;
+	const unsigned long *crc;
+	struct module *owner;
 
-	if (!__find_symbol("struct_module", &ksg, &i, 1))
+	if (!__find_symbol("struct_module", &owner, &crc, 1))
 		BUG();
-	return check_version(sechdrs, versindex, "struct_module", mod, ksg, i);
+	return check_version(sechdrs, versindex, "struct_module", mod,
+			     crc);
 }
 
 /* First part is kernel version, which we ignore. */
@@ -1283,7 +1284,8 @@ static struct module *load_module(void *umod,
 		mod->gpl_crcs = (void *)sechdrs[gplcrcindex].sh_addr;
 
 #ifdef CONFIG_MODVERSIONS
-	if ((mod->num_ksyms&&!crcindex) || (mod->num_gpl_syms&&!gplcrcindex)) {
+	if ((mod->num_syms && !crcindex) || 
+	    (mod->num_gpl_syms && !gplcrcindex)) {
 		printk(KERN_WARNING "%s: No versions for exported symbols."
 		       " Tainting kernel.\n", mod->name);
 		tainted |= TAINT_FORCED_MODULE;
@@ -1309,7 +1311,7 @@ static struct module *load_module(void *umod,
 
 #ifdef CONFIG_KALLSYMS
 	mod->symtab = (void *)sechdrs[symindex].sh_addr;
-	mod->num_syms = sechdrs[symindex].sh_size / sizeof(Elf_Sym);
+	mod->num_symtab = sechdrs[symindex].sh_size / sizeof(Elf_Sym);
 	mod->strtab = (void *)sechdrs[strindex].sh_addr;
 #endif
 	err = module_finalize(hdr, sechdrs, mod);
@@ -1452,7 +1454,7 @@ static const char *get_ksymbol(struct module *mod,
 
 	/* Scan for closest preceeding symbol, and next symbol. (ELF
            starts real symbols at 1). */
-	for (i = 1; i < mod->num_syms; i++) {
+	for (i = 1; i < mod->num_symtab; i++) {
 		if (mod->symtab[i].st_shndx == SHN_UNDEF)
 			continue;
 
