@@ -3154,7 +3154,7 @@ static int tg3_halt(struct tg3 *tp)
 #define TG3_FW_BSS_ADDR		0x08000a70
 #define TG3_FW_BSS_LEN		0x10
 
-static u32 t3FwText[(TG3_FW_TEXT_LEN / sizeof(u32)) + 1] = {
+static u32 tg3FwText[(TG3_FW_TEXT_LEN / sizeof(u32)) + 1] = {
 	0x00000000, 0x10000003, 0x00000000, 0x0000000d, 0x0000000d, 0x3c1d0800,
 	0x37bd3ffc, 0x03a0f021, 0x3c100800, 0x26100000, 0x0e000018, 0x00000000,
 	0x0000000d, 0x3c1d0800, 0x37bd3ffc, 0x03a0f021, 0x3c100800, 0x26100034,
@@ -3248,7 +3248,7 @@ static u32 t3FwText[(TG3_FW_TEXT_LEN / sizeof(u32)) + 1] = {
 	0x27bd0008, 0x03e00008, 0x00000000, 0x00000000, 0x00000000
 };
 
-static u32 t3FwRodata[(TG3_FW_RODATA_LEN / sizeof(u32)) + 1] = {
+static u32 tg3FwRodata[(TG3_FW_RODATA_LEN / sizeof(u32)) + 1] = {
 	0x35373031, 0x726c7341, 0x00000000, 0x00000000, 0x53774576, 0x656e7430,
 	0x00000000, 0x726c7045, 0x76656e74, 0x31000000, 0x556e6b6e, 0x45766e74,
 	0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x66617461, 0x6c457272,
@@ -3257,7 +3257,7 @@ static u32 t3FwRodata[(TG3_FW_RODATA_LEN / sizeof(u32)) + 1] = {
 };
 
 #if 0 /* All zeros, dont eat up space with it. */
-u32 t3FwData[(TG3_FW_DATA_LEN / sizeof(u32)) + 1] = {
+u32 tg3FwData[(TG3_FW_DATA_LEN / sizeof(u32)) + 1] = {
 	0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
 	0x00000000, 0x00000000, 0x00000000, 0x00000000
 };
@@ -6554,7 +6554,7 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 	dev->vlan_rx_kill_vid = tg3_vlan_rx_kill_vid;
 #endif
 #ifdef NETIF_F_TSO
-	dev->features |= NETIF_F_TSO
+	dev->features |= NETIF_F_TSO;
 #endif
 
 	tp = dev->priv;
