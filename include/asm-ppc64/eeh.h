@@ -27,25 +27,26 @@
 
 struct pci_dev;
 
-#define IO_UNMAPPED_REGION_ID 0xaUL
+/* I/O addresses are converted to EEH "tokens" such that a driver will cause
+ * a bad page fault if the address is used directly (i.e. these addresses are
+ * never actually mapped.  Translation between IO <-> EEH region is 1 to 1.
+ */
+#define IO_TOKEN_TO_ADDR(token) (((unsigned long)(token) & ~(0xfUL << REGION_SHIFT)) | \
+				(IO_REGION_ID << REGION_SHIFT))
+#define IO_ADDR_TO_TOKEN(addr) (((unsigned long)(addr) & ~(0xfUL << REGION_SHIFT)) | \
+				(EEH_REGION_ID << REGION_SHIFT))
 
-#define IO_TOKEN_TO_ADDR(token) ((((unsigned long)(token)) & 0xFFFFFFFF) | (0xEUL << 60))
-/* Flag bits encoded in the 3 unused function bits of devfn */
-#define EEH_TOKEN_DISABLED (1UL << 34UL)	/* eeh is disabled for this token */
-#define IS_EEH_TOKEN_DISABLED(token) ((unsigned long)(token) & EEH_TOKEN_DISABLED)
-
-#define EEH_STATE_OVERRIDE 1   /* IOA does not require eeh traps */
-#define EEH_STATE_FAILURE  16  /* */
+/* Values for eeh_mode bits in device_node */
+#define EEH_MODE_SUPPORTED	(1<<0)
+#define EEH_MODE_NOCHECK	(1<<1)
 
 /* This is for profiling only */
 extern unsigned long eeh_total_mmio_ffs;
 
-extern int eeh_implemented;
-
 void eeh_init(void);
-static inline int is_eeh_implemented(void) { return eeh_implemented; }
 int eeh_get_state(unsigned long ea);
 unsigned long eeh_check_failure(void *token, unsigned long val);
+void *eeh_ioremap(unsigned long addr, void *vaddr);
 
 #define EEH_DISABLE		0
 #define EEH_ENABLE		1
@@ -58,15 +59,11 @@ int eeh_set_option(struct pci_dev *dev, int options);
  */
 int is_eeh_configured(struct pci_dev *dev);
 
-/* Generate an EEH token.
- * The high nibble of the offset is cleared, otherwise bounds checking is performed.
- * Use IO_TOKEN_TO_ADDR(token) to translate this token back to a mapped virtual addr.
- * Do NOT do this to perform IO -- use the read/write macros!
+/* Translate a (possible) eeh token to a physical addr.
+ * If "token" is not an eeh token it is simply returned under
+ * the assumption that it is already a physical addr.
  */
-unsigned long eeh_token(unsigned long phb,
-			unsigned long bus,
-			unsigned long devfn,
-			unsigned long offset);
+unsigned long eeh_token_to_phys(unsigned long token);
 
 extern void *memcpy(void *, const void *, unsigned long);
 extern void *memset(void *,int, unsigned long);
@@ -77,15 +74,16 @@ extern void *memset(void *,int, unsigned long);
  * If EEH is off for a device and it is a memory BAR, ioremap will
  * map it to the IOREGION.  In this case addr == vaddr and since these
  * should be in registers we compare them first.  Next we check for
- * all ones which is perhaps fastest as ~val.  Finally we weed out
- * EEH disabled IO BARs.
+ * ff's which indicates a (very) possible failure.
  *
  * If this macro yields TRUE, the caller relays to eeh_check_failure()
  * which does further tests out of line.
  */
-/* #define EEH_POSSIBLE_ERROR(addr, vaddr, val) ((vaddr) != (addr) && ~(val) == 0 && !IS_EEH_TOKEN_DISABLED(addr)) */
+/* #define EEH_POSSIBLE_IO_ERROR(val) (~(val) == 0) */
+/* #define EEH_POSSIBLE_ERROR(addr, vaddr, val) ((vaddr) != (addr) && EEH_POSSIBLE_IO_ERROR(val) */
 /* This version is rearranged to collect some profiling data */
-#define EEH_POSSIBLE_ERROR(addr, vaddr, val) (~(val) == 0 && (++eeh_total_mmio_ffs, (vaddr) != (addr) && !IS_EEH_TOKEN_DISABLED(addr)))
+#define EEH_POSSIBLE_IO_ERROR(val) (~(val) == 0 && ++eeh_total_mmio_ffs)
+#define EEH_POSSIBLE_ERROR(addr, vaddr, val) (EEH_POSSIBLE_IO_ERROR(val) && (vaddr) != (addr))
 
 /* 
  * MMIO read/write operations with EEH support.
@@ -149,38 +147,56 @@ static inline void eeh_memcpy_toio(void *dest, void *src, unsigned long n) {
 	memcpy(vdest, src, n);
 }
 
-static inline void eeh_insb(volatile u8 *addr, void *buf, int n) {
-	volatile u8 *vaddr = (volatile u8 *)IO_TOKEN_TO_ADDR(addr);
-	_insb(vaddr, buf, n);
-	/* ToDo: look for ff's in buf[n] */
+/* The I/O macros must handle ISA ports as well as PCI I/O bars.
+ * ISA does not implement EEH and ISA may not exist in the system.
+ * For PCI we check for EEH failures.
+ */
+#define _IO_IS_ISA(port) ((port) < 0x10000)
+#define _IO_HAS_ISA_BUS	(isa_io_base != 0)
+
+static inline u8 eeh_inb(unsigned long port) {
+	u8 val;
+	if (_IO_IS_ISA(port) && !_IO_HAS_ISA_BUS)
+		return ~0;
+	val = in_8((u8 *)(port+pci_io_base));
+	if (!_IO_IS_ISA(port) && EEH_POSSIBLE_IO_ERROR(val))
+		return eeh_check_failure((void*)(port+pci_io_base), val);
+	return val;
 }
 
-static inline void eeh_outsb(volatile u8 *addr, const void *buf, int n) {
-	volatile u8 *vaddr = (volatile u8 *)IO_TOKEN_TO_ADDR(addr);
-	_outsb(vaddr, buf, n);
+static inline void eeh_outb(u8 val, unsigned long port) {
+	if (!_IO_IS_ISA(port) || _IO_HAS_ISA_BUS)
+		return out_8((u8 *)(port+pci_io_base), val);
 }
 
-static inline void eeh_insw_ns(volatile u16 *addr, void *buf, int n) {
-	volatile u16 *vaddr = (volatile u16 *)IO_TOKEN_TO_ADDR(addr);
-	_insw_ns(vaddr, buf, n);
-	/* ToDo: look for ffff's in buf[n] */
+static inline u16 eeh_inw(unsigned long port) {
+	u16 val;
+	if (_IO_IS_ISA(port) && !_IO_HAS_ISA_BUS)
+		return ~0;
+	val = in_le16((u16 *)(port+pci_io_base));
+	if (!_IO_IS_ISA(port) && EEH_POSSIBLE_IO_ERROR(val))
+		return eeh_check_failure((void*)(port+pci_io_base), val);
+	return val;
 }
 
-static inline void eeh_outsw_ns(volatile u16 *addr, const void *buf, int n) {
-	volatile u16 *vaddr = (volatile u16 *)IO_TOKEN_TO_ADDR(addr);
-	_outsw_ns(vaddr, buf, n);
+static inline void eeh_outw(u16 val, unsigned long port) {
+	if (!_IO_IS_ISA(port) || _IO_HAS_ISA_BUS)
+		return out_le16((u16 *)(port+pci_io_base), val);
 }
 
-static inline void eeh_insl_ns(volatile u32 *addr, void *buf, int n) {
-	volatile u32 *vaddr = (volatile u32 *)IO_TOKEN_TO_ADDR(addr);
-	_insl_ns(vaddr, buf, n);
-	/* ToDo: look for ffffffff's in buf[n] */
+static inline u32 eeh_inl(unsigned long port) {
+	u32 val;
+	if (_IO_IS_ISA(port) && !_IO_HAS_ISA_BUS)
+		return ~0;
+	val = in_le32((u32 *)(port+pci_io_base));
+	if (!_IO_IS_ISA(port) && EEH_POSSIBLE_IO_ERROR(val))
+		return eeh_check_failure((void*)(port+pci_io_base), val);
+	return val;
 }
 
-static inline void eeh_outsl_ns(volatile u32 *addr, const void *buf, int n) {
-	volatile u32 *vaddr = (volatile u32 *)IO_TOKEN_TO_ADDR(addr);
-	_outsl_ns(vaddr, buf, n);
+static inline void eeh_outl(u32 val, unsigned long port) {
+	if (!_IO_IS_ISA(port) || _IO_HAS_ISA_BUS)
+		return out_le32((u32 *)(port+pci_io_base), val);
 }
-
 
 #endif /* _EEH_H */

@@ -237,29 +237,6 @@ is_devfn_sub_node(struct device_node *dn, void *data)
 	return (devfn == (dn->devfn & 0xf8) && busno == dn->busno) ? dn : NULL;
 }
 
-/* Given an existing EADs (pci bridge) device node create a fake one
- * that will simulate function zero.  Make it a sibling of other_eads.
- */
-static struct device_node *
-create_eads_node(struct device_node *other_eads)
-{
-	struct device_node *eads = (struct device_node *)kmalloc(sizeof(struct device_node), GFP_KERNEL);
-
-	if (!eads) return NULL;	/* huh? */
-	*eads = *other_eads;
-	eads->devfn &= ~7;	/* make it function zero */
-	eads->tce_table = NULL;
-	/*
-	 * NOTE: share properties.  We could copy but for now this should
-	 * suffice.  The full_name is also incorrect...but seems harmless.
-	 */
-	eads->child = NULL;
-	eads->next = NULL;
-	other_eads->allnext = eads;
-	other_eads->sibling = eads;
-	return eads;
-}
-
 /* This is the "slow" path for looking up a device_node from a
  * pci_dev.  It will hunt for the device under it's parent's
  * phb and then update sysdata for a future fastpath.
@@ -285,43 +262,6 @@ struct device_node *fetch_dev_dn(struct pci_dev *dev)
 	if (dn) {
 		dev->sysdata = dn;
 		/* ToDo: call some device init hook here */
-	} else {
-		/* Now it is very possible that we can't find the device
-		 * because it is not the zero'th device of a mutifunction
-		 * device and we don't have permission to read the zero'th
-		 * device.  If this is the case, Linux would ordinarily skip
-		 * all the other functions.
-		 */
-		if ((searchval & 0x7) == 0) {
-			struct device_node *thisdevdn;
-			/* Ok, we are looking for fn == 0.  Let's check for other functions. */
-			thisdevdn = (struct device_node *)traverse_pci_devices(phb_dn, is_devfn_sub_node, NULL, (void *)searchval);
-			if (thisdevdn) {
-				/* Ah ha!  There does exist a sub function.
-				 * Now this isn't an exact match for
-				 * searchval, but in order to get Linux to
-				 * believe the sub functions exist we will
-				 * need to manufacture a fake device_node for
-				 * this zero'th function.  To keept this
-				 * simple for now we only handle pci bridges
-				 * and we just hand back the found node which
-				 * isn't correct, but Linux won't care.
-				 */
-				char *device_type = (char *)get_property(thisdevdn, "device_type", 0);
-				if (device_type && strcmp(device_type, "pci") == 0) {
-					return create_eads_node(thisdevdn);
-				}
-			}
-		}
-		/* ToDo: device not found...probe for it anyway with a fake dn?
-		struct device_node fake_dn;
-		memset(&fake_dn, 0, sizeof(fake_dn));
-		fake_dn.phb = phb;
-		fake_dn.busno = dev->bus->number;
-		fake_dn.devfn = dev->devfn;
-		... now do ppc_md.pcibios_read_config_dword(&fake_dn.....)
-		 ... if ok, alloc a real device_node and dn = real_dn;
-		 */
 	}
 	return dn;
 }

@@ -31,7 +31,6 @@
 #include <asm/naca.h>
 #include <asm/pci_dma.h>
 #include <asm/machdep.h>
-#include <asm/eeh.h>
 
 #include "pci.h"
 
@@ -120,6 +119,43 @@ static void fixup_windbond_82c105(struct pci_dev* dev)
 	pci_write_config_dword(dev, 0x40, reg | (1<<11));
 }
 
+
+/* Given an mmio phys address, find a pci device that implements
+ * this address.  This is of course expensive, but only used
+ * for device initialization or error paths.
+ * For io BARs it is assumed the pci_io_base has already been added
+ * into addr.
+ *
+ * Bridges are ignored although they could be used to optimize the search.
+ */
+struct pci_dev *pci_find_dev_by_addr(unsigned long addr)
+{
+	struct pci_dev *dev;
+	int i;
+	unsigned long ioaddr;
+
+	ioaddr = (addr > _IO_BASE) ? addr - _IO_BASE : 0;
+
+	pci_for_each_dev(dev) {
+		if ((dev->class >> 8) == PCI_BASE_CLASS_BRIDGE)
+			continue;
+		for (i = 0; i < DEVICE_COUNT_RESOURCE; i++) {
+			unsigned long start = pci_resource_start(dev,i);
+			unsigned long end = pci_resource_end(dev,i);
+			unsigned int flags = pci_resource_flags(dev,i);
+			if (start == 0 || ~start == 0 ||
+			    end == 0 || ~end == 0)
+				continue;
+			if ((flags & IORESOURCE_IO) &&
+			    (ioaddr >= start && ioaddr <= end))
+				return dev;
+			else if ((flags & IORESOURCE_MEM) &&
+				 (addr >= start && addr <= end))
+				return dev;
+		}
+	}
+	return NULL;
+}
 
 void __devinit pcibios_fixup_pbus_ranges(struct pci_bus *pbus,
 					 struct pbus_set_ranges_data *pranges)
@@ -486,21 +522,15 @@ void __init pcibios_fixup_bus(struct pci_bus *bus)
 				/* Transparent resource -- don't try to "fix" it. */
 				continue;
 			}
-			if (is_eeh_implemented()) {
-				if (res->flags & (IORESOURCE_IO|IORESOURCE_MEM)) {
-					res->start = eeh_token(phb->global_number, bus->number, 0, 0);
-					res->end = eeh_token(phb->global_number, bus->number, 0xff, 0xffffffff);
-				}
-			} else {
-				if (res->flags & IORESOURCE_IO) {
-					res->start += (unsigned long)phb->io_base_virt;
-					res->end += (unsigned long)phb->io_base_virt;
-				} else if (phb->pci_mem_offset
-					   && (res->flags & IORESOURCE_MEM)) {
-					if (res->start < phb->pci_mem_offset) {
-						res->start += phb->pci_mem_offset;
-						res->end += phb->pci_mem_offset;
-					}
+			if (res->flags & IORESOURCE_IO) {
+				unsigned long offset = (unsigned long)phb->io_base_virt - pci_io_base;
+				res->start += offset;
+				res->end += offset;
+			} else if (phb->pci_mem_offset
+				   && (res->flags & IORESOURCE_MEM)) {
+				if (res->start < phb->pci_mem_offset) {
+					res->start += phb->pci_mem_offset;
+					res->end += phb->pci_mem_offset;
 				}
 			}
 		}
