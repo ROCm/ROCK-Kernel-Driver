@@ -354,9 +354,7 @@ unsigned int nat_packet(struct ip_conntrack *ct,
 	unsigned long statusbit;
 	enum ip_nat_manip_type mtype = HOOK2MANIP(hooknum);
 
-	/* FIXME: use a bit in status for this. */
-	if (ct->helper
-	    && ct->tuplehash[0].tuple.dst.protonum == IPPROTO_TCP
+	if (test_bit(IPS_SEQ_ADJUST_BIT, &ct->status)
 	    && (hooknum == NF_IP_POST_ROUTING || hooknum == NF_IP_LOCAL_IN)) {
 		DEBUGP("ip_nat_core: adjusting sequence number\n");
 		/* future: put this in a l4-proto specific function,

@@ -51,6 +51,10 @@ enum ip_conntrack_status {
 
 	/* Both together. */
 	IPS_NAT_MASK = (IPS_DST_NAT | IPS_SRC_NAT),
+
+	/* Connection needs TCP sequence adjusted. */
+	IPS_SEQ_ADJUST_BIT = 6,
+	IPS_SEQ_ADJUST = (1 << IPS_SEQ_ADJUST_BIT),
 };
 
 #ifdef __KERNEL__

@@ -192,11 +192,14 @@ ip_nat_mangle_tcp_packet(struct sk_buff **pskb,
 	tcph->check = tcp_v4_check(tcph, datalen, iph->saddr, iph->daddr,
 				   csum_partial((char *)tcph, datalen, 0));
 
-	adjust_tcp_sequence(ntohl(tcph->seq),
-			    (int)rep_len - (int)match_len,
-			    ct, ctinfo);
-	/* Tell connection tracking about seq change, to expand window */
-	ip_conntrack_tcp_update(*pskb, ct, CTINFO2DIR(ctinfo));
+	if (rep_len != match_len) {
+		set_bit(IPS_SEQ_ADJUST_BIT, &ct->status);
+		adjust_tcp_sequence(ntohl(tcph->seq),
+				    (int)rep_len - (int)match_len,
+				    ct, ctinfo);
+		/* Tell TCP window tracking about seq change */
+		ip_conntrack_tcp_update(*pskb, ct, CTINFO2DIR(ctinfo));
+	}
 	return 1;
 }
 			
@@ -362,11 +365,6 @@ ip_nat_seq_adjust(struct sk_buff **pskb,
 
 	this_way = &ct->nat.info.seq[dir];
 	other_way = &ct->nat.info.seq[!dir];
-
-	/* No adjustments to make?  Very common case. */
-	if (!this_way->offset_before && !this_way->offset_after
-	    && !other_way->offset_before && !other_way->offset_after)
-		return 1;
 
 	if (!skb_ip_make_writable(pskb, (*pskb)->nh.iph->ihl*4+sizeof(*tcph)))
 		return 0;
