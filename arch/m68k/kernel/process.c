@@ -53,19 +53,15 @@ asmlinkage void ret_from_fork(void);
 /*
  * The idle loop on an m68k..
  */
-static void default_idle(void)
+void default_idle(void)
 {
-	while(1) {
-		if (!need_resched())
+	if (!need_resched())
 #if defined(MACH_ATARI_ONLY) && !defined(CONFIG_HADES)
-			/* block out HSYNC on the atari (falcon) */
-			__asm__("stop #0x2200" : : : "cc");
+		/* block out HSYNC on the atari (falcon) */
+		__asm__("stop #0x2200" : : : "cc");
 #else
-			__asm__("stop #0x2000" : : : "cc");
+		__asm__("stop #0x2000" : : : "cc");
 #endif
-		schedule();
-		check_pgt_cache();
-	}
 }
 
 void (*idle)(void) = default_idle;
@@ -79,9 +75,11 @@ void (*idle)(void) = default_idle;
 void cpu_idle(void)
 {
 	/* endless idle loop with no priority at all */
-	init_idle();
-	current->nice = 20;
-	idle();
+	while (1) {
+		while (!need_resched())
+			idle();
+		schedule();
+	}
 }
 
 void machine_restart(char * __unused)
