@@ -48,7 +48,7 @@ match(const struct sk_buff *skb,
       unsigned int protoff,
       int *hotdrop)
 {
-       struct ip_auth_hdr *ah = NULL;
+       struct ip_auth_hdr *ah = NULL, _ah;
        const struct ip6t_ah *ahinfo = matchinfo;
        unsigned int temp;
        int len;
@@ -69,7 +69,7 @@ match(const struct sk_buff *skb,
        temp = 0;
 
         while (ip6t_ext_hdr(nexthdr)) {
-               struct ipv6_opt_hdr *hdr;
+               struct ipv6_opt_hdr _hdr, *hp;
 
               DEBUGP("ipv6_ah header iteration \n");
 
@@ -85,15 +85,16 @@ match(const struct sk_buff *skb,
                      break;
               }
 
-              hdr=(struct ipv6_opt_hdr *)skb->data+ptr;
+	      hp = skb_header_pointer(skb, ptr, sizeof(_hdr), &_hdr);
+	      BUG_ON(hp == NULL);
 
               /* Calculate the header length */
                 if (nexthdr == NEXTHDR_FRAGMENT) {
                         hdrlen = 8;
                 } else if (nexthdr == NEXTHDR_AUTH)
-                        hdrlen = (hdr->hdrlen+2)<<2;
+                        hdrlen = (hp->hdrlen+2)<<2;
                 else
-                        hdrlen = ipv6_optlen(hdr);
+                        hdrlen = ipv6_optlen(hp);
 
               /* AH -> evaluate */
                 if (nexthdr == NEXTHDR_AUTH) {
@@ -116,7 +117,7 @@ match(const struct sk_buff *skb,
                             break;
               }
 
-                nexthdr = hdr->nexthdr;
+                nexthdr = hp->nexthdr;
                 len -= hdrlen;
                 ptr += hdrlen;
 		if ( ptr > skb->len ) {
@@ -133,7 +134,8 @@ match(const struct sk_buff *skb,
        		return 0;
        }
 
-       ah = (struct ip_auth_hdr *) (skb->data + ptr);
+       ah = skb_header_pointer(skb, ptr, sizeof(_ah), &_ah);
+       BUG_ON(ah == NULL);
 
        DEBUGP("IPv6 AH LEN %u %u ", hdrlen, ah->hdrlen);
        DEBUGP("RES %04X ", ah->reserved);
