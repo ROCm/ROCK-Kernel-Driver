@@ -149,13 +149,11 @@ static spinlock_t sound_loader_lock = SPIN_LOCK_UNLOCKED;
  *	list. Acquires locks as needed
  */
 
-static devfs_handle_t devfs_handle;
- 
 static int sound_insert_unit(struct sound_unit **list, struct file_operations *fops, int index, int low, int top, const char *name, umode_t mode)
 {
 	int r;
 	struct sound_unit *s=(struct sound_unit *)kmalloc(sizeof(struct sound_unit), GFP_KERNEL);
-	char name_buf[16];
+	char name_buf[32];
 
 	if(s==NULL)
 		return -ENOMEM;
@@ -171,10 +169,10 @@ static int sound_insert_unit(struct sound_unit **list, struct file_operations *f
 	}
 	
 	if (r < SOUND_STEP)
-		sprintf (name_buf, "%s", name);
+		sprintf (name_buf, "sound/%s", name);
 	else
-		sprintf (name_buf, "%s%d", name, r / SOUND_STEP);
-	s->de = devfs_register (devfs_handle, name_buf,
+		sprintf (name_buf, "sound/%s%d", name, r / SOUND_STEP);
+	s->de = devfs_register (NULL, name_buf,
 				DEVFS_FL_NONE, SOUND_MAJOR, s->unit_minor,
 				S_IFCHR | mode, fops, NULL);
 	return r;
@@ -560,7 +558,7 @@ static void __exit cleanup_soundcore(void)
 	/* We have nothing to really do here - we know the lists must be
 	   empty */
 	unregister_chrdev(SOUND_MAJOR, "sound");
-	devfs_unregister (devfs_handle);
+	devfs_remove("sound");
 }
 
 static int __init init_soundcore(void)
@@ -569,7 +567,7 @@ static int __init init_soundcore(void)
 		printk(KERN_ERR "soundcore: sound device already in use.\n");
 		return -EBUSY;
 	}
-	devfs_handle = devfs_mk_dir (NULL, "sound", NULL);
+	devfs_mk_dir (NULL, "sound", NULL);
 
 	return 0;
 }
