@@ -35,7 +35,7 @@
  *		Jan Kara, <jack@suse.cz>, sponsored by SuSE CR, 10-11/99
  *
  *		Used struct list_head instead of own list struct
- *		Invalidation of dquots with dq_count > 0 no longer possible
+ *		Invalidation of referenced dquots is no longer possible
  *		Improved free_dquots list management
  *		Quota and i_blocks are now updated in one place to avoid races
  *		Warnings are now delayed so we won't block in critical section
@@ -135,6 +135,26 @@ static inline char is_enabled(struct quota_mount_options *dqopt, short type)
 static inline char sb_has_quota_enabled(struct super_block *sb, short type)
 {
 	return is_enabled(sb_dqopt(sb), type);
+}
+
+static inline void get_dquot_ref(struct dquot *dquot)
+{
+	dquot->dq_count++;
+}
+
+static inline void put_dquot_ref(struct dquot *dquot)
+{
+	dquot->dq_count--;
+}
+
+static inline void get_dquot_dup_ref(struct dquot *dquot)
+{
+	dquot->dq_dup_ref++;
+}
+
+static inline void put_dquot_dup_ref(struct dquot *dquot)
+{
+	dquot->dq_dup_ref--;
 }
 
 static inline int const hashfn(struct super_block *sb, unsigned int id, short type)
@@ -244,6 +264,7 @@ static inline void unlock_dquot(struct dquot *dquot)
 	wake_up(&dquot->dq_wait_lock);
 }
 
+/* Wait for dquot to be unused */
 static void __wait_dquot_unused(struct dquot *dquot)
 {
 	DECLARE_WAITQUEUE(wait, current);
@@ -252,6 +273,22 @@ static void __wait_dquot_unused(struct dquot *dquot)
 repeat:
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	if (dquot->dq_count) {
+		schedule();
+		goto repeat;
+	}
+	remove_wait_queue(&dquot->dq_wait_free, &wait);
+	current->state = TASK_RUNNING;
+}
+
+/* Wait for all duplicated dquot references to be dropped */
+static void __wait_dup_drop(struct dquot *dquot)
+{
+	DECLARE_WAITQUEUE(wait, current);
+
+	add_wait_queue(&dquot->dq_wait_free, &wait);
+repeat:
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	if (dquot->dq_dup_ref) {
 		schedule();
 		goto repeat;
 	}
@@ -377,8 +414,10 @@ restart:
 			continue;
 		if (!(dquot->dq_flags & (DQ_MOD | DQ_LOCKED)))
 			continue;
-		/* Raise use count so quota won't be invalidated. We can't use dqduplicate() as it does too many tests */
-		dquot->dq_count++;
+		/* Get reference to quota so it won't be invalidated. get_dquot_ref()
+		 * is enough since if dquot is locked/modified it can't be
+		 * on the free list */
+		get_dquot_ref(dquot);
 		if (dquot->dq_flags & DQ_LOCKED)
 			wait_on_dquot(dquot);
 		if (dquot->dq_flags & DQ_MOD)
@@ -433,11 +472,15 @@ int shrink_dqcache_memory(int priority, unsigned int gfp_mask)
 	return 0;
 }
 
-/* NOTE: If you change this function please check whether dqput_blocks() works right... */
+/*
+ * Put reference to dquot
+ * NOTE: If you change this function please check whether dqput_blocks() works right...
+ */
 static void dqput(struct dquot *dquot)
 {
 	if (!dquot)
 		return;
+#ifdef __DQUOT_PARANOIA
 	if (!dquot->dq_count) {
 		printk("VFS: dqput: trying to free free dquot\n");
 		printk("VFS: device %s, dquot of %s %d\n",
@@ -446,12 +489,17 @@ static void dqput(struct dquot *dquot)
 			dquot->dq_id);
 		return;
 	}
+#endif
 
 	dqstats.drops++;
 we_slept:
+	if (dquot->dq_dup_ref && dquot->dq_count - dquot->dq_dup_ref <= 1) {	/* Last unduplicated reference? */
+		__wait_dup_drop(dquot);
+		goto we_slept;
+	}
 	if (dquot->dq_count > 1) {
 		/* We have more than one user... We can simply decrement use count */
-		dquot->dq_count--;
+		put_dquot_ref(dquot);
 		return;
 	}
 	if (dquot->dq_flags & DQ_MOD) {
@@ -462,10 +510,10 @@ we_slept:
 	/* sanity check */
 	if (!list_empty(&dquot->dq_free)) {
 		printk(KERN_ERR "dqput: dquot already on free list??\n");
-		dquot->dq_count--;	/* J.K. Just decrementing use count seems safer... */
+		put_dquot_ref(dquot);
 		return;
 	}
-	dquot->dq_count--;
+	put_dquot_ref(dquot);
 	/* If dquot is going to be invalidated invalidate_dquots() is going to free it so */
 	if (!(dquot->dq_flags & DQ_INVAL))
 		put_dquot_last(dquot);	/* Place at end of LRU free queue */
@@ -520,8 +568,9 @@ we_slept:
 		insert_dquot_hash(dquot);
         	read_dquot(dquot);
 	} else {
-		if (!dquot->dq_count++)
+		if (!dquot->dq_count)
 			remove_free_dquot(dquot);
+		get_dquot_ref(dquot);
 		dqstats.cache_hits++;
 		wait_on_dquot(dquot);
 		if (empty)
@@ -539,21 +588,37 @@ we_slept:
 	return dquot;
 }
 
+/* Duplicate reference to dquot got from inode */
 static struct dquot *dqduplicate(struct dquot *dquot)
 {
 	if (dquot == NODQUOT)
 		return NODQUOT;
-	dquot->dq_count++;
+	get_dquot_ref(dquot);
 	if (!dquot->dq_sb) {
 		printk(KERN_ERR "VFS: dqduplicate(): Invalidated quota to be duplicated!\n");
-		dquot->dq_count--;
+		put_dquot_ref(dquot);
 		return NODQUOT;
 	}
 	if (dquot->dq_flags & DQ_LOCKED)
 		printk(KERN_ERR "VFS: dqduplicate(): Locked quota to be duplicated!\n");
+	get_dquot_dup_ref(dquot);
 	dquot->dq_referenced++;
 	dqstats.lookups++;
 	return dquot;
+}
+
+/* Put duplicated reference */
+static void dqputduplicate(struct dquot *dquot)
+{
+	if (!dquot->dq_dup_ref) {
+		printk(KERN_ERR "VFS: dqputduplicate(): Duplicated dquot put without duplicate reference.\n");
+		return;
+	}
+	put_dquot_dup_ref(dquot);
+	if (!dquot->dq_dup_ref)
+		wake_up(&dquot->dq_wait_free);
+	put_dquot_ref(dquot);
+	dqstats.drops++;
 }
 
 static int dqinit_needed(struct inode *inode, short type)
@@ -599,7 +664,9 @@ restart:
 /* Return 0 if dqput() won't block (note that 1 doesn't necessarily mean blocking) */
 static inline int dqput_blocks(struct dquot *dquot)
 {
-	if (dquot->dq_count == 1)
+	if (dquot->dq_dup_ref && dquot->dq_count - dquot->dq_dup_ref <= 1)
+		return 1;
+	if (dquot->dq_count <= 1 && dquot->dq_flags & DQ_MOD)
 		return 1;
 	return 0;
 }
@@ -1065,7 +1132,7 @@ warn_put_all:
 	flush_warnings(dquot, warntype);
 	for (cnt = 0; cnt < MAXQUOTAS; cnt++)
 		if (dquot[cnt] != NODQUOT)
-			dqput(dquot[cnt]);
+			dqputduplicate(dquot[cnt]);
 	unlock_kernel();
 	return ret;
 }
@@ -1104,7 +1171,7 @@ warn_put_all:
 	flush_warnings(dquot, warntype);
 	for (cnt = 0; cnt < MAXQUOTAS; cnt++)
 		if (dquot[cnt] != NODQUOT)
-			dqput(dquot[cnt]);
+			dqputduplicate(dquot[cnt]);
 	unlock_kernel();
 	return ret;
 }
@@ -1124,7 +1191,7 @@ void dquot_free_block(struct inode *inode, unsigned long number)
 		if (dquot == NODQUOT)
 			continue;
 		dquot_decr_blocks(dquot, number);
-		dqput(dquot);
+		dqputduplicate(dquot);
 	}
 	inode->i_blocks -= number << (BLOCK_SIZE_BITS - 9);
 	unlock_kernel();
@@ -1146,7 +1213,7 @@ void dquot_free_inode(const struct inode *inode, unsigned long number)
 		if (dquot == NODQUOT)
 			continue;
 		dquot_decr_inodes(dquot, number);
-		dqput(dquot);
+		dqputduplicate(dquot);
 	}
 	unlock_kernel();
 	/* NOBLOCK End */
@@ -1233,8 +1300,9 @@ int dquot_transfer(struct inode *inode, struct iattr *iattr)
 warn_put_all:
 	flush_warnings(transfer_to, warntype);
 	for (cnt = 0; cnt < MAXQUOTAS; cnt++) {
+		/* First we must put duplicate - otherwise we might deadlock */
 		if (transfer_to[cnt] != NODQUOT)
-			dqput(transfer_to[cnt]);
+			dqputduplicate(transfer_to[cnt]);
 		if (transfer_from[cnt] != NODQUOT)
 			dqput(transfer_from[cnt]);
 	}

@@ -41,6 +41,9 @@
 
 #include <linux/errno.h>
 
+#define __DQUOT_VERSION__	"dquot_6.5.1"
+#define __DQUOT_NUM_VERSION__	6*10000+5*100+1
+
 /*
  * Convert diskblocks to blocks and the other way around.
  */
@@ -161,7 +164,8 @@ struct dquot {
 	struct list_head dq_free;	/* Free list element */
 	wait_queue_head_t dq_wait_lock;	/* Pointer to waitqueue on dquot lock */
 	wait_queue_head_t dq_wait_free;	/* Pointer to waitqueue for quota to be unused */
-	int dq_count;			/* Reference count */
+	int dq_count;			/* Use count */
+	int dq_dup_ref;			/* Number of duplicated refences */
 
 	/* fields after this point are cleared when invalidating */
 	struct super_block *dq_sb;	/* superblock this applies to */
