@@ -21,7 +21,6 @@ extern void mem_init(void);
 extern void cpu_unenable(cpuid_t);
 extern nasid_t get_lowest_nasid(void);
 extern __psunsigned_t get_master_bridge_base(void);
-extern void set_master_bridge_base(void);
 extern int check_nasid_equiv(nasid_t, nasid_t);
 extern nasid_t get_console_nasid(void);
 extern char get_console_pcislot(void);

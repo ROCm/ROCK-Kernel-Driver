@@ -238,38 +238,6 @@ do_assignment:
 	xswitch_volunteer_delete(xswitch);
 }
 
-/*
- * Early iograph initialization.  Called by master CPU in mlreset().
- * Useful for including iograph.o in kernel.o.
- */
-void
-iograph_early_init(void)
-{
-/*
- * Need new way to get this information ..
- */
-	cnodeid_t cnode;
-	nasid_t nasid;
-	lboard_t *board;
-	
-	/*
-	 * Init. the board-to-hwgraph link early, so FRU analyzer
-	 * doesn't trip on leftover values if we panic early on.
-	 */
-	for(cnode = 0; cnode < numnodes; cnode++) {
-		nasid = COMPACT_TO_NASID_NODEID(cnode);
-		board = (lboard_t *)KL_CONFIG_INFO(nasid);
-		DBG("iograph_early_init: Found board 0x%p\n", board);
-
-		/* Check out all the board info stored on a node */
-		while(board) {
-			board->brd_graph_link = GRAPH_VERTEX_NONE;
-			board = KLCF_NEXT(board);
-			DBG("iograph_early_init: Found board 0x%p\n", board);
-		}
-	}
-}
-
 /* 
  * Probe to see if this hub's xtalk link is active.  If so,
  * return the Crosstalk Identification of the widget that we talk to.  
@@ -836,8 +804,6 @@ init_all_devices(void)
 #endif
 
 }
-
-#define toint(x) ((int)(x) - (int)('0'))
 
 static
 struct io_brick_map_s io_brick_tab[] = {

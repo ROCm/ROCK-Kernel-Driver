@@ -37,15 +37,6 @@ char master_baseio_wid;
 static char console_wid;
 static char console_pcislot;
 
-void
-set_master_bridge_base(void)
-{
-        console_wid = WIDGETID_GET(KL_CONFIG_CH_CONS_INFO(master_nasid)->memory_base);
-        console_pcislot = KL_CONFIG_CH_CONS_INFO(master_nasid)->npci;
-        master_bridge_base = (__psunsigned_t)NODE_SWIN_BASE(console_nasid, console_wid);
-	// FIXME("WARNING: set_master_bridge_base: NON NASID 0 DOES NOT WORK\n");
-}
-
 int
 check_nasid_equiv(nasid_t nasida, nasid_t nasidb)
 {

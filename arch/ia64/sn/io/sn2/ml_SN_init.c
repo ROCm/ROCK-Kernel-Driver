@@ -23,44 +23,8 @@ int		maxcpus;
 
 extern xwidgetnum_t hub_widget_id(nasid_t);
 
-extern void iograph_early_init(void);
-
 nasid_t master_nasid = INVALID_NASID;		/* This is the partition master nasid */
 nasid_t master_baseio_nasid = INVALID_NASID;	/* This is the master base I/O nasid */
-
-
-/*
- * mlreset(void)
- * 	very early machine reset - at this point NO interrupts have been
- * 	enabled; nor is memory, tlb, p0, etc setup.
- *
- * 	slave is zero when mlreset is called for the master processor and
- *	is nonzero thereafter.
- */
-
-
-void
-mlreset(int slave)
-{
-	/*
-	 * We are the master cpu and node.
-	 */ 
-	master_nasid = get_nasid();
-	set_master_bridge_base();
-
-	/* We're the master processor */
-	master_procid = smp_processor_id();
-	master_nasid = cpuid_to_nasid(master_procid);
-
-	/*
-	 * master_nasid we get back better be same as one from
-	 * get_nasid()
-	 */
-	ASSERT_ALWAYS(master_nasid == get_nasid());
-
-	/* early initialization of iograph */
-	iograph_early_init();
-}
 
 
 /* XXX - Move the meat of this to intr.c ? */

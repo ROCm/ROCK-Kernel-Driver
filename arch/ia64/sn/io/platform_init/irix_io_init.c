@@ -21,10 +21,10 @@ extern void init_all_devices(void);
 extern void klhwg_add_all_modules(vertex_hdl_t);
 extern void klhwg_add_all_nodes(vertex_hdl_t);
 
+extern int init_hcl(void);
 extern vertex_hdl_t hwgraph_root;
 extern void io_module_init(void);
 extern int pci_bus_to_hcl_cvlink(void);
-extern void mlreset(void);
 
 /* #define DEBUG_IO_INIT 1 */
 #ifdef DEBUG_IO_INIT
@@ -43,15 +43,15 @@ extern void mlreset(void);
  *
  */
 
-void
-irix_io_init(void)
+void __init
+sgi_master_io_infr_init(void)
 {
 	cnodeid_t cnode;
 
-	/*
-	 * This is the Master CPU.  Emulate mlsetup and main.c in Irix.
-	 */
-	mlreset();
+	if (init_hcl() < 0) { /* Sets up the hwgraph compatibility layer */
+		printk("sgi_master_io_infr_init: Cannot init hcl\n");
+		return;
+	}
 
         /*
          * Initialize platform-dependent vertices in the hwgraph:
@@ -73,8 +73,6 @@ irix_io_init(void)
 		extern void per_hub_init(cnodeid_t);
 		per_hub_init(cnode);
 	}
-
-	/* We can do headless hub cnodes here .. */
 
 	/*
 	 *
