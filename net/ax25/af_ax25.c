@@ -1982,29 +1982,29 @@ static int ax25_get_info(char *buffer, char **start, off_t offset, int length)
 }
 
 static struct net_proto_family ax25_family_ops = {
-	family:		PF_AX25,
-	create:		ax25_create,
+	.family		PF_AX25,
+	.create		ax25_create,
 };
 
 static struct proto_ops ax25_proto_ops = {
-	family:		PF_AX25,
+	.family		PF_AX25,
 
-	release:	ax25_release,
-	bind:		ax25_bind,
-	connect:	ax25_connect,
-	socketpair:	sock_no_socketpair,
-	accept:		ax25_accept,
-	getname:	ax25_getname,
-	poll:		datagram_poll,
-	ioctl:		ax25_ioctl,
-	listen:		ax25_listen,
-	shutdown:	ax25_shutdown,
-	setsockopt:	ax25_setsockopt,
-	getsockopt:	ax25_getsockopt,
-	sendmsg:	ax25_sendmsg,
-	recvmsg:	ax25_recvmsg,
-	mmap:		sock_no_mmap,
-	sendpage:	sock_no_sendpage,
+	.release	ax25_release,
+	.bind		ax25_bind,
+	.connect	ax25_connect,
+	.socketpair	sock_no_socketpair,
+	.accept		ax25_accept,
+	.getname	ax25_getname,
+	.poll		datagram_poll,
+	.ioctl		ax25_ioctl,
+	.listen		ax25_listen,
+	.shutdown	ax25_shutdown,
+	.setsockopt	ax25_setsockopt,
+	.getsockopt	ax25_getsockopt,
+	.sendmsg	ax25_sendmsg,
+	.recvmsg	ax25_recvmsg,
+	.mmap		sock_no_mmap,
+	.sendpage	sock_no_sendpage,
 };
 
 #include <linux/smp_lock.h>
@@ -2014,12 +2014,12 @@ SOCKOPS_WRAP(ax25_proto, PF_AX25);
  *	Called by socket.c on kernel start up
  */
 static struct packet_type ax25_packet_type = {
-	type:		__constant_htons(ETH_P_AX25),
-	func:		ax25_kiss_rcv,
+	.type		__constant_htons(ETH_P_AX25),
+	.func		ax25_kiss_rcv,
 };
 
 static struct notifier_block ax25_dev_notifier = {
-	notifier_call:	ax25_device_event,
+	.notifier_call	ax25_device_event,
 };
 
 EXPORT_SYMBOL(ax25_encapsulate);

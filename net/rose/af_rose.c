@@ -1430,36 +1430,36 @@ static int rose_get_info(char *buffer, char **start, off_t offset, int length)
 } 
 
 static struct net_proto_family rose_family_ops = {
-	family:		PF_ROSE,
-	create:		rose_create,
+	.family		PF_ROSE,
+	.create		rose_create,
 };
 
 static struct proto_ops SOCKOPS_WRAPPED(rose_proto_ops) = {
-	family:		PF_ROSE,
+	.family		PF_ROSE,
 
-	release:	rose_release,
-	bind:		rose_bind,
-	connect:	rose_connect,
-	socketpair:	sock_no_socketpair,
-	accept:		rose_accept,
-	getname:	rose_getname,
-	poll:		datagram_poll,
-	ioctl:		rose_ioctl,
-	listen:		rose_listen,
-	shutdown:	sock_no_shutdown,
-	setsockopt:	rose_setsockopt,
-	getsockopt:	rose_getsockopt,
-	sendmsg:	rose_sendmsg,
-	recvmsg:	rose_recvmsg,
-	mmap:		sock_no_mmap,
-	sendpage:	sock_no_sendpage,
+	.release	rose_release,
+	.bind		rose_bind,
+	.connect	rose_connect,
+	.socketpair	sock_no_socketpair,
+	.accept		rose_accept,
+	.getname	rose_getname,
+	.poll		datagram_poll,
+	.ioctl		rose_ioctl,
+	.listen		rose_listen,
+	.shutdown	sock_no_shutdown,
+	.setsockopt	rose_setsockopt,
+	.getsockopt	rose_getsockopt,
+	.sendmsg	rose_sendmsg,
+	.recvmsg	rose_recvmsg,
+	.mmap		sock_no_mmap,
+	.sendpage	sock_no_sendpage,
 };
 
 #include <linux/smp_lock.h>
 SOCKOPS_WRAP(rose_proto, PF_ROSE);
 
 static struct notifier_block rose_dev_notifier = {
-	notifier_call:	rose_device_event,
+	.notifier_call	rose_device_event,
 };
 
 static struct net_device *dev_rose;

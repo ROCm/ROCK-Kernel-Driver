@@ -1251,36 +1251,36 @@ static int nr_get_info(char *buffer, char **start, off_t offset, int length)
 } 
 
 static struct net_proto_family nr_family_ops = {
-	family:		PF_NETROM,
-	create:		nr_create,
+	.family		PF_NETROM,
+	.create		nr_create,
 };
 
 static struct proto_ops SOCKOPS_WRAPPED(nr_proto_ops) = {
-	family:		PF_NETROM,
+	.family		PF_NETROM,
 
-	release:	nr_release,
-	bind:		nr_bind,
-	connect:	nr_connect,
-	socketpair:	sock_no_socketpair,
-	accept:		nr_accept,
-	getname:	nr_getname,
-	poll:		datagram_poll,
-	ioctl:		nr_ioctl,
-	listen:		nr_listen,
-	shutdown:	sock_no_shutdown,
-	setsockopt:	nr_setsockopt,
-	getsockopt:	nr_getsockopt,
-	sendmsg:	nr_sendmsg,
-	recvmsg:	nr_recvmsg,
-	mmap:		sock_no_mmap,
-	sendpage:	sock_no_sendpage,
+	.release	nr_release,
+	.bind		nr_bind,
+	.connect	nr_connect,
+	.socketpair	sock_no_socketpair,
+	.accept		nr_accept,
+	.getname	nr_getname,
+	.poll		datagram_poll,
+	.ioctl		nr_ioctl,
+	.listen		nr_listen,
+	.shutdown	sock_no_shutdown,
+	.setsockopt	nr_setsockopt,
+	.getsockopt	nr_getsockopt,
+	.sendmsg	nr_sendmsg,
+	.recvmsg	nr_recvmsg,
+	.mmap		sock_no_mmap,
+	.sendpage	sock_no_sendpage,
 };
 
 #include <linux/smp_lock.h>
 SOCKOPS_WRAP(nr_proto, PF_NETROM);
 
 static struct notifier_block nr_dev_notifier = {
-	notifier_call:	nr_device_event,
+	.notifier_call	nr_device_event,
 };
 
 static struct net_device *dev_nr;
