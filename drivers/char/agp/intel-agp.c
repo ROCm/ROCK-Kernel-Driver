@@ -1314,17 +1314,14 @@ static int __init agp_intel_probe(struct pci_dev *pdev,
 	switch (pdev->device) {
 	case PCI_DEVICE_ID_INTEL_82443LX_0:
 		bridge = &intel_generic_bridge;
-		bridge->type = INTEL_GENERIC;
 		name = "440LX";
 		break;
 	case PCI_DEVICE_ID_INTEL_82443BX_0:
 		bridge = &intel_generic_bridge;
-		bridge->type = INTEL_GENERIC;
 		name = "440BX";
 		break;
 	case PCI_DEVICE_ID_INTEL_82443GX_0:
 		bridge = &intel_generic_bridge;
-		bridge->type = INTEL_GENERIC;
 		name = "440GX";
 		break;
 	case PCI_DEVICE_ID_INTEL_82810_MC1:
@@ -1382,7 +1379,6 @@ static int __init agp_intel_probe(struct pci_dev *pdev,
 			bridge = &intel_830_bridge;
 		} else {
 			bridge = &intel_845_bridge;
-			bridge->type = INTEL_GENERIC;
 		}
 		name = "845G";
 		break;
@@ -1396,7 +1392,6 @@ static int __init agp_intel_probe(struct pci_dev *pdev,
 			name = "855";
 		} else {
 			bridge = &intel_845_bridge;
-			bridge->type = INTEL_GENERIC;
 			name = "855PM";
 		}
 		break;
@@ -1409,7 +1404,6 @@ static int __init agp_intel_probe(struct pci_dev *pdev,
 			bridge = &intel_830_bridge;
 		} else {
 			bridge = &intel_845_bridge;
-			bridge->type = INTEL_GENERIC;
 		}
 		name = "865";
 		break;
