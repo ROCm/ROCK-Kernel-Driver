@@ -576,9 +576,12 @@ static int __init i8042_check_aux(struct i8042_values *values, struct serio *por
 
 /*
  * External connection test - filters out AT-soldered PS/2 i8042's
+ * 0x00 - no error, 0x01-0x03 - clock/data stuck, 0xff - general error
+ * We ignore general error, since some chips report it even under normal
+ * operation.
  */
 
-	if (i8042_command(&param, I8042_CMD_AUX_TEST) || param)
+	if (i8042_command(&param, I8042_CMD_AUX_TEST) || (param && param != 0xff))
 		return -1;
 
 /*
@@ -587,23 +590,11 @@ static int __init i8042_check_aux(struct i8042_values *values, struct serio *por
 	
 	if (i8042_command(&param, I8042_CMD_AUX_DISABLE))
 		return -1;
-
 	if (i8042_command(&param, I8042_CMD_CTL_RCTR) || (~param & I8042_CTR_AUXDIS))
 		return -1;	
 
-	if (i8042_command(&param, I8042_CMD_AUX_TEST) || param) {
-
-/*
- * We've got an old AMI i8042 with 'Bad Cache' commands.
- */
-
-		i8042_command(&param, I8042_CMD_AUX_ENABLE);
-		return -1;
-	}
-
 	if (i8042_command(&param, I8042_CMD_AUX_ENABLE))
 		return -1;
-
 	if (i8042_command(&param, I8042_CMD_CTL_RCTR) || (param & I8042_CTR_AUXDIS))
 		return -1;	
 
