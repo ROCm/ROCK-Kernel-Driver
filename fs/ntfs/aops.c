@@ -30,7 +30,7 @@
 #include "ntfs.h"
 
 /**
- * ntfs_end_buffer_read_async - async io completion for reading attributes
+ * ntfs_end_buffer_async_read - async io completion for reading attributes
  * @bh:		buffer head on which io is completed
  * @uptodate:	whether @bh is now uptodate or not
  *
@@ -45,25 +45,22 @@
  * record size, and index_block_size_bits, to the log(base 2) of the ntfs
  * record size.
  */
-static void ntfs_end_buffer_read_async(struct buffer_head *bh, int uptodate)
+static void ntfs_end_buffer_async_read(struct buffer_head *bh, int uptodate)
 {
 	static spinlock_t page_uptodate_lock = SPIN_LOCK_UNLOCKED;
 	unsigned long flags;
 	struct buffer_head *tmp;
 	struct page *page;
 	ntfs_inode *ni;
-
-	if (likely(uptodate))
-		set_buffer_uptodate(bh);
-	else
-		clear_buffer_uptodate(bh);
+	int page_uptodate = 1;
 
 	page = bh->b_page;
-
 	ni = NTFS_I(page->mapping->host);
 
 	if (likely(uptodate)) {
 		s64 file_ofs;
+
+		set_buffer_uptodate(bh);
 
 		file_ofs = (page->index << PAGE_CACHE_SHIFT) + bh_offset(bh);
 		/* Check for the current buffer head overflowing. */
@@ -78,22 +75,28 @@ static void ntfs_end_buffer_read_async(struct buffer_head *bh, int uptodate)
 			flush_dcache_page(page);
 			kunmap_atomic(addr, KM_BIO_SRC_IRQ);
 		}
-	} else
+	} else {
+		clear_buffer_uptodate(bh);
+		ntfs_error(ni->vol->sb, "Buffer I/O error, logical block %Lu.",
+				(unsigned long long)bh->b_blocknr);
 		SetPageError(page);
+	}
 
 	spin_lock_irqsave(&page_uptodate_lock, flags);
 	clear_buffer_async_read(bh);
 	unlock_buffer(bh);
-
-	tmp = bh->b_this_page;
-	while (tmp != bh) {
-		if (buffer_locked(tmp)) {
-			if (buffer_async_read(tmp))
+	tmp = bh;
+	do {
+		if (!buffer_uptodate(tmp))
+			page_uptodate = 0;
+		if (buffer_async_read(tmp)) {
+			if (likely(buffer_locked(tmp)))
 				goto still_busy;
-		} else if (!buffer_uptodate(tmp))
-			SetPageError(page);
+			/* Async buffers must be locked. */
+			BUG();
+		}
 		tmp = tmp->b_this_page;
-	}
+	} while (tmp != bh);
 	spin_unlock_irqrestore(&page_uptodate_lock, flags);
 	/*
 	 * If none of the buffers had errors then we can set the page uptodate,
@@ -101,7 +104,7 @@ static void ntfs_end_buffer_read_async(struct buffer_head *bh, int uptodate)
 	 * attribute is mst protected, i.e. if NInoMstProteced(ni) is true.
 	 */
 	if (!NInoMstProtected(ni)) {
-		if (likely(!PageError(page)))
+		if (likely(page_uptodate && !PageError(page)))
 			SetPageUptodate(page);
 		unlock_page(page);
 		return;
@@ -127,12 +130,15 @@ static void ntfs_end_buffer_read_async(struct buffer_head *bh, int uptodate)
 		}
 		flush_dcache_page(page);
 		kunmap_atomic(addr, KM_BIO_SRC_IRQ);
-		if (likely(!nr_err && recs))
-			SetPageUptodate(page);
-		else {
-			ntfs_error(ni->vol->sb, "Setting page error, index "
-					"0x%lx.", page->index);
-			SetPageError(page);
+		if (likely(!PageError(page))) {
+			if (likely(!nr_err && recs)) {
+				if (likely(page_uptodate))
+					SetPageUptodate(page);
+			} else {
+				ntfs_error(ni->vol->sb, "Setting page error, "
+						"index 0x%lx.", page->index);
+				SetPageError(page);
+			}
 		}
 	}
 	unlock_page(page);
@@ -282,16 +288,23 @@ handle_zblock:
 
 	/* Check we have at least one buffer ready for i/o. */
 	if (nr) {
+		struct buffer_head *tbh;
+
 		/* Lock the buffers. */
 		for (i = 0; i < nr; i++) {
-			struct buffer_head *tbh = arr[i];
+			tbh = arr[i];
 			lock_buffer(tbh);
-			tbh->b_end_io = ntfs_end_buffer_read_async;
+			tbh->b_end_io = ntfs_end_buffer_async_read;
 			set_buffer_async_read(tbh);
 		}
 		/* Finally, start i/o on the buffers. */
-		for (i = 0; i < nr; i++)
-			submit_bh(READ, arr[i]);
+		for (i = 0; i < nr; i++) {
+			tbh = arr[i];
+			if (likely(!buffer_uptodate(tbh)))
+				submit_bh(READ, tbh);
+			else
+				ntfs_end_buffer_async_read(tbh, 1);
+		}
 		return 0;
 	}
 	/* No i/o was scheduled on any of the buffers. */
@@ -349,7 +362,7 @@ int ntfs_readpage(struct file *file, struct page *page)
 			}
 			/* Compressed data streams are handled in compress.c. */
 			if (NInoCompressed(ni))
-				return ntfs_file_read_compressed_block(page);
+				return ntfs_read_compressed_block(page);
 		}
 		/* Normal data stream. */
 		return ntfs_read_block(page);

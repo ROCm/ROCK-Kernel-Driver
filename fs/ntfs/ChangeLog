@@ -9,12 +9,22 @@ ToDo:
 	  read() will fail when s_maxbytes is reached? -> Investigate this.
 	- Implement/allow non-resident index bitmaps in dir.c::ntfs_readdir()
 	  and then also consider initialized_size w.r.t. the bitmaps, etc.
-	- Consider if ntfs_file_read_compressed_block() shouldn't be coping
-	  with initialized_size < data_size. I don't think it can happen but
-	  it requires more careful consideration.
 	- Enable NFS exporting of NTFS.
-	- Apply block resolution optimization from aops.c::ntfs_read_block() to
-	  compress.c::ntfs_file_read_compressed_block() as well.
+
+2.0.19 - Fix race condition, improvements, and optimizations in i/o interface.
+
+	- Apply block optimization added to fs/ntfs/aops.c::ntfs_read_block()
+	  to fs/ntfs/compress.c::ntfs_file_read_compressed_block() as well.
+	- Drop the "file" from ntfs_file_read_compressed_block().
+	- Rename fs/ntfs/aops.c::ntfs_enb_buffer_read_async() to
+	  ntfs_end_buffer_async_read() (more like the fs/buffer.c counterpart).
+	- Update ntfs_end_buffer_async_read() with the improved logic from
+	  its updated counterpart fs/buffer.c::end_buffer_async_read(). Apply
+	  further logic improvements to better determine when we set PageError.
+	- Update submission of buffers in fs/ntfs/aops.c::ntfs_read_block() to
+	  check for the buffers being uptodate first in line with the updated
+	  fs/buffer.c::block_read_full_page(). This plugs a small race
+	  condition.
 
 2.0.18 - Fix race condition in reading of compressed files.
 

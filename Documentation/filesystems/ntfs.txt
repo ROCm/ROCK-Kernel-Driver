@@ -247,6 +247,9 @@ ChangeLog
 
 Note, a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 
+2.0.19:
+	- Fix race condition and improvements in block i/o interface.
+	- Optimization when reading compressed files.
 2.0.18:
 	- Fix race condition in reading of compressed files.
 2.0.17:

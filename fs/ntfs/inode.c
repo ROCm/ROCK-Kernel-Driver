@@ -1007,19 +1007,15 @@ skip_large_dir_stuff:
 				ni->_ICF(compressed_size) = sle64_to_cpu(
 					ctx->attr->_ANR(compressed_size));
 				if (vi->i_size != ni->initialized_size)
-					ntfs_warning(vi->i_sb, "Compressed "
-							"file with data_size "
-							"unequal to "
-							"initialized size "
-							"found. This will "
-							"probably cause "
-							"problems when trying "
-							"to access the file. "
-							"Please notify "
-							"linux-ntfs-dev@"
-							"lists.sf.net that you"
-							"saw this message."
-							"Thanks!");
+					ntfs_warning(vi->i_sb, "BUG: Found "
+						"compressed file with "
+						"data_size not equal to "
+						"initialized_size. This will "
+						"probably cause problems when "
+						"trying to access the file. "
+						"Please notify linux-ntfs-dev@"
+						"lists.sf.net that you saw "
+						"this message. Thanks!");
 			}
 		} else { /* Resident attribute. */
 			/*

@@ -386,7 +386,7 @@ return_overflow:
 }
 
 /**
- * ntfs_file_read_compressed_block - read a compressed block into the page cache
+ * ntfs_read_compressed_block - read a compressed block into the page cache
  * @page:	locked page in the compression block(s) we need to read
  *
  * When we are called the page has already been verified to be locked and the
@@ -418,14 +418,15 @@ return_overflow:
  * initialized_size is less than data_size. This should be safe because of the
  * nature of the compression algorithm used. Just in case we check and output
  * an error message in read inode if the two sizes are not equal for a
- * compressed file.
+ * compressed file. (AIA)
  */
-int ntfs_file_read_compressed_block(struct page *page)
+int ntfs_read_compressed_block(struct page *page)
 {
 	struct address_space *mapping = page->mapping;
 	ntfs_inode *ni = NTFS_I(mapping->host);
 	ntfs_volume *vol = ni->vol;
 	struct super_block *sb = vol->sb;
+	run_list_element *rl;
 	unsigned long block_size = sb->s_blocksize;
 	unsigned char block_size_bits = sb->s_blocksize_bits;
 	u8 *cb, *cb_pos, *cb_end;
@@ -532,14 +533,23 @@ do_next_cb:
 	nr_bhs = 0;
 
 	/* Read all cb buffer heads one cluster at a time. */
+	rl = NULL;
 	for (vcn = start_vcn, start_vcn += cb_clusters; vcn < start_vcn;
 			vcn++) {
 		BOOL is_retry = FALSE;
-retry_remap:
-		/* Find lcn of vcn and convert it into blocks. */
-		down_read(&ni->run_list.lock);
-		lcn = vcn_to_lcn(ni->run_list.rl, vcn);
-		up_read(&ni->run_list.lock);
+
+		if (!rl) {
+lock_retry_remap:
+			down_read(&ni->run_list.lock);
+			rl = ni->run_list.rl;
+		}
+		if (likely(rl != NULL)) {
+			/* Seek to element containing target vcn. */
+			while (rl->length && rl[1].vcn <= vcn)
+				rl++;
+			lcn = vcn_to_lcn(rl, vcn);
+		} else
+			lcn = (LCN)LCN_RL_NOT_MAPPED;
 		ntfs_debug("Reading vcn = 0x%Lx, lcn = 0x%Lx.",
 				(long long)vcn, (long long)lcn);
 		if (lcn < 0) {
@@ -552,9 +562,13 @@ retry_remap:
 			if (is_retry || lcn != LCN_RL_NOT_MAPPED)
 				goto rl_err;
 			is_retry = TRUE;
-			/* Map run list of current extent and retry. */
+			/*
+			 * Attempt to map run list, dropping lock for the
+			 * duration.
+			 */
+			up_read(&ni->run_list.lock);
 			if (!map_run_list(ni, vcn))
-				goto retry_remap;
+				goto lock_retry_remap;
 			goto map_rl_err;
 		}
 		block = lcn << vol->cluster_size_bits >> block_size_bits;
@@ -567,6 +581,10 @@ retry_remap:
 			nr_bhs++;
 		} while (++block < max_block);
 	}
+
+	/* Release the lock if we took it. */
+	if (rl)
+		up_read(&ni->run_list.lock);
 
 	/* Setup and initiate io on all buffer heads. */
 	for (i = 0; i < nr_bhs; i++) {
@@ -828,11 +846,13 @@ map_rl_err:
 	goto err_out;
 
 rl_err:
+	up_read(&ni->run_list.lock);
 	ntfs_error(vol->sb, "vcn_to_lcn() failed. Cannot read compression "
 			"block.");
 	goto err_out;
 
 getblk_err:
+	up_read(&ni->run_list.lock);
 	ntfs_error(vol->sb, "getblk() failed. Cannot read compression block.");
 
 err_out:

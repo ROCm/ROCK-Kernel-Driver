@@ -158,7 +158,7 @@ static inline struct page *ntfs_map_page(struct address_space *mapping,
 /* Declarations of functions and global variables. */
 
 /* From fs/ntfs/compress.c */
-extern int ntfs_file_read_compressed_block(struct page *page);
+extern int ntfs_read_compressed_block(struct page *page);
 
 /* From fs/ntfs/super.c */
 #define default_upcase_len 0x10000
