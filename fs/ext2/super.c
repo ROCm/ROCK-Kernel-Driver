@@ -146,6 +146,8 @@ void ext2_put_super (struct super_block * sb)
 		if (sbi->s_block_bitmap[i])
 			brelse (sbi->s_block_bitmap[i]);
 	brelse (sbi->s_sbh);
+	sb->u.generic_sbp = NULL;
+	kfree(sbi);
 
 	return;
 }
@@ -463,7 +465,11 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 	int db_count;
 	int i, j;
 
-	sbi = EXT2_SB(sb);
+	sbi = kmalloc(sizeof(struct ext2_super_block), GFP_KERNEL);
+	if (!sbi)
+		return -ENOMEM;
+	sb->u.generic_sbp = sbi;
+
 	/*
 	 * See what the current blocksize for the device is, and
 	 * use that as the blocksize.  Otherwise (or if the blocksize
@@ -475,12 +481,12 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 	sbi->s_mount_opt = 0;
 	if (!parse_options ((char *) data, &sb_block, &resuid, &resgid,
 	    &sbi->s_mount_opt))
-		return -EINVAL;
+		goto failed_sbi;
 
 	blocksize = sb_min_blocksize(sb, BLOCK_SIZE);
 	if (!blocksize) {
 		printk ("EXT2-fs: unable to set blocksize\n");
-		return -EINVAL;
+		goto failed_sbi;
 	}
 
 	/*
@@ -495,7 +501,7 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 
 	if (!(bh = sb_bread(sb, logic_sb_block))) {
 		printk ("EXT2-fs: unable to read superblock\n");
-		return -EINVAL;
+		goto failed_sbi;
 	}
 	/*
 	 * Note: s_es must be initialized as soon as possible because
@@ -541,7 +547,7 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 
 		if (!sb_set_blocksize(sb, blocksize)) {
 			printk(KERN_ERR "EXT2-fs: blocksize too small for device.\n");
-			return -EINVAL;
+			goto failed_sbi;
 		}
 
 		logic_sb_block = (sb_block*BLOCK_SIZE) / blocksize;
@@ -699,6 +705,9 @@ failed_mount2:
 	kfree(sbi->s_group_desc);
 failed_mount:
 	brelse(bh);
+failed_sbi:
+	sb->u.generic_sbp = NULL;
+	kfree(sbi);
 	return -EINVAL;
 }
 

@@ -17,6 +17,7 @@
 #define _LINUX_EXT2_FS_H
 
 #include <linux/types.h>
+#include <linux/ext2_fs_sb.h>
 
 /*
  * The second extended filesystem constants/structures
@@ -73,7 +74,7 @@
 #ifdef __KERNEL__
 static inline struct ext2_sb_info *EXT2_SB(struct super_block *sb)
 {
-	return &sb->u.ext2_sb;
+	return sb->u.generic_sbp;
 }
 #else
 /* Assume that user mode programs are passing in an ext2fs superblock, not
