@@ -66,7 +66,7 @@ extern struct net_device *elplus_probe(int unit);
 extern int ac3200_probe(struct net_device *);
 extern int es_probe(struct net_device *);
 extern int lne390_probe(struct net_device *);
-extern int e2100_probe(struct net_device *);
+extern struct net_device *e2100_probe(int unit);
 extern struct net_device *ni5010_probe(int unit);
 extern struct net_device *ni52_probe(int unit);
 extern struct net_device *ni65_probe(int unit);
@@ -219,13 +219,13 @@ static struct devprobe isa_probes[] __initdata = {
 #ifdef CONFIG_HPLAN_PLUS
 	{hp_plus_probe, 0},
 #endif
-#ifdef CONFIG_E2100		/* Cabletron E21xx series. */
-	{e2100_probe, 0},
-#endif
 	{NULL, 0},
 };
 
 static struct devprobe2 isa_probes2[] __initdata = {
+#ifdef CONFIG_E2100		/* Cabletron E21xx series. */
+	{e2100_probe, 0},
+#endif
 #if defined(CONFIG_NE2000) || defined(CONFIG_NE2K_CBUS)	/* ISA & PC-9800 CBUS (use ne2k-pci for PCI cards) */
 	{ne_probe, 0},
 #endif
