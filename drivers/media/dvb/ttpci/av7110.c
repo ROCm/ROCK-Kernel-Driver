@@ -30,6 +30,7 @@
  */
 
 
+#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kmod.h>
 #include <linux/delay.h>
@@ -77,7 +78,7 @@ int av7110_debug = 0;
 static int vidmode=CVBS_RGB_OUT;
 static int pids_off;
 static int adac=DVB_ADAC_TI;
-static int hw_sections = 1;
+static int hw_sections = 0;
 static int rgb_on = 0;
 
 int av7110_num = 0;
@@ -1241,10 +1242,6 @@ static int master_xfer(struct dvb_i2c_bus *i2c, const struct i2c_msg msgs[], int
  ****************************************************************************/
 
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0))
-#define CONFIG_DVB_AV7110_FIRMWARE_FILE
-#endif
-
 static int check_firmware(struct av7110* av7110)
 {
 	u32 crc = 0, len = 0;
@@ -1358,13 +1355,13 @@ static int av7110_attach(struct saa7146_dev* dev, struct saa7146_pci_extension_d
 		return ret;
 	}
 
-	dvb_register_adapter(&av7110->dvb_adapter, av7110->card_name);
+	dvb_register_adapter(&av7110->dvb_adapter, av7110->card_name, THIS_MODULE);
 
 	/* the Siemens DVB needs this if you want to have the i2c chips
 	   get recognized before the main driver is fully loaded */
 	saa7146_write(dev, GPIO_CTRL, 0x500000);
 
-	saa7146_i2c_adapter_prepare(dev, NULL, SAA7146_I2C_BUS_BIT_RATE_120); /* 275 kHz */
+	saa7146_i2c_adapter_prepare(dev, NULL, 0, SAA7146_I2C_BUS_BIT_RATE_120); /* 275 kHz */
 
 	av7110->i2c_bus = dvb_register_i2c_bus (master_xfer, dev,
 						av7110->dvb_adapter, 0);
@@ -1440,13 +1437,17 @@ static int av7110_attach(struct saa7146_dev* dev, struct saa7146_pci_extension_d
 		printk ("av7110: Warning, firmware version 0x%04x is too old. "
 			"System might be unstable!\n", FW_VERSION(av7110->arm_app));
 
-	kernel_thread(arm_thread, (void *) av7110, 0);
+	if (kernel_thread(arm_thread, (void *) av7110, 0) < 0) {
+		printk(KERN_ERR "av7110(%d): faile to start arm_mon kernel thread\n",
+		       av7110->dvb_adapter->num);
+		goto err2;
+	}
 
 	/* set internal volume control to maximum */
 	av7110->adac_type = DVB_ADAC_TI;
 	av7110_set_volume(av7110, 0xff, 0xff);
 
-	VidMode(av7110, vidmode);
+	av7710_set_video_mode(av7110, vidmode);
 
 	/* handle different card types */
 	/* remaining inits according to card and frontend type */
@@ -1498,31 +1499,34 @@ static int av7110_attach(struct saa7146_dev* dev, struct saa7146_pci_extension_d
 	ret = av7110_init_v4l(av7110);
 	
 	if (ret)
-		goto err;
+		goto err3;
 
 	printk(KERN_INFO "av7110: found av7110-%d.\n",av7110_num);
 	av7110->device_initialized = 1;
 	av7110_num++;
         return 0;
 
+err3:
+	av7110->arm_rmmod = 1;
+	wake_up_interruptible(&av7110->arm_wait);
+	while (av7110->arm_thread)
+		dvb_delay(1);
 err2:
 	av7110_ca_exit(av7110);
 	av7110_av_exit(av7110);
 err:
-	if (NULL != av7110 ) {
-		kfree(av7110);
-	}
-	if (NULL != av7110->debi_virt) {
-		pci_free_consistent(dev->pci, 8192, av7110->debi_virt, av7110->debi_bus);
-	}
-	if (NULL != av7110->iobuf) {
-		vfree(av7110->iobuf);
-	}
-
 	dvb_unregister_i2c_bus (master_xfer,av7110->i2c_bus->adapter,
 				av7110->i2c_bus->id);
 
 	dvb_unregister_adapter (av7110->dvb_adapter);
+
+	if (NULL != av7110->debi_virt)
+		pci_free_consistent(dev->pci, 8192, av7110->debi_virt, av7110->debi_bus);
+	if (NULL != av7110->iobuf)
+		vfree(av7110->iobuf);
+	if (NULL != av7110 ) {
+		kfree(av7110);
+	}
 
 	return ret;
 }
@@ -1648,6 +1652,7 @@ static int __init av7110_init(void)
 {
 	int retval;
 	retval = saa7146_register_extension(&av7110_extension);
+#if defined(CONFIG_INPUT_EVDEV) || defined(CONFIG_INPUT_EVDEV_MODULE)
 	if (retval)
 		goto failed_saa7146_register;
 	
@@ -1658,13 +1663,16 @@ static int __init av7110_init(void)
 failed_av7110_ir_init:
 	saa7146_unregister_extension(&av7110_extension);
 failed_saa7146_register:
+#endif
 	return retval;
 }
 
 
 static void __exit av7110_exit(void)
 {
+#if defined(CONFIG_INPUT_EVDEV) || defined(CONFIG_INPUT_EVDEV_MODULE)
 	av7110_ir_exit();
+#endif
 	saa7146_unregister_extension(&av7110_extension);
 }
 
