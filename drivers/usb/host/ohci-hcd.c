@@ -611,11 +611,13 @@ static irqreturn_t ohci_irq (struct usb_hcd *hcd, struct pt_regs *ptregs)
 		ohci_dump (ohci, 1);
 		hc_reset (ohci);
 	}
-  
+
 	if (ints & OHCI_INTR_WDH) {
 		if (HCD_IS_RUNNING(hcd->state))
 			writel (OHCI_INTR_WDH, &regs->intrdisable);	
-		dl_done_list (ohci, dl_reverse_done_list (ohci), ptregs);
+		spin_lock (&ohci->lock);
+		dl_done_list (ohci, ptregs);
+		spin_unlock (&ohci->lock);
 		if (HCD_IS_RUNNING(hcd->state))
 			writel (OHCI_INTR_WDH, &regs->intrenable); 
 	}

@@ -281,6 +281,11 @@ restart:
 
 		writel (OHCI_INTR_WDH, &ohci->regs->intrdisable);	
 		(void) readl (&ohci->regs->intrdisable);
+
+		/* Check for a pending done list */
+		if (ohci->hcca->done_head)
+			dl_done_list (ohci, NULL);
+
 		spin_unlock_irq (&ohci->lock);
 
 #ifdef CONFIG_PMAC_PBOOK
@@ -288,9 +293,6 @@ restart:
 			enable_irq (to_pci_dev(hcd->self.controller)->irq);
 #endif
 
-		/* Check for a pending done list */
-		if (ohci->hcca->done_head)
-			dl_done_list (ohci, dl_reverse_done_list (ohci), NULL);
 		writel (OHCI_INTR_WDH, &ohci->regs->intrenable); 
 
 		/* assume there are TDs on the bulk and control lists */
