@@ -478,7 +478,7 @@ static int serial_open (struct tty_struct *tty, struct file * filp)
 	struct usb_serial *serial;
 	struct usb_serial_port *port;
 	unsigned int portNumber;
-	int retval = 0;
+	int retval = -ENODEV;
 	
 	dbg("%s", __FUNCTION__);
 
@@ -487,10 +487,8 @@ static int serial_open (struct tty_struct *tty, struct file * filp)
 
 	/* get the serial object associated with this tty pointer */
 	serial = usb_serial_get_by_index(tty->index);
-	if (!serial) {
-		retval = -ENODEV;
+	if (!serial)
 		goto bailout;
-	}
 
 	/* set up our port structure making the tty driver remember our port object, and us it */
 	portNumber = tty->index - serial->minor;
@@ -502,10 +500,11 @@ static int serial_open (struct tty_struct *tty, struct file * filp)
 	/* lock this module before we call it,
 	   this may, which means we must bail out, safe because we are called with BKL held */
 	if (!try_module_get(serial->type->owner)) {
-		retval = -ENODEV;
+		kref_put(&serial->kref, destroy_serial);
 		goto bailout;
 	}
 
+	retval = 0;
 	++port->open_count;
 	if (port->open_count == 1) {
 		/* only call the device specific open if this 
