@@ -1283,13 +1283,13 @@ rescan:
 		if (urb->status != -EINPROGRESS)
 			continue;
 		usb_get_urb (urb);
-		spin_unlock (&hcd_data_lock);
+		spin_unlock_irqrestore (&hcd_data_lock, flags);
 
-		spin_lock (&urb->lock);
+		spin_lock_irqsave (&urb->lock, flags);
 		tmp = urb->status;
 		if (tmp == -EINPROGRESS)
 			urb->status = -ESHUTDOWN;
-		spin_unlock (&urb->lock);
+		spin_unlock_irqrestore (&urb->lock, flags);
 
 		/* kick hcd unless it's already returning this */
 		if (tmp == -EINPROGRESS) {
