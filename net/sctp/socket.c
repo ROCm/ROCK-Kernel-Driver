@@ -3346,9 +3346,19 @@ SCTP_STATIC int sctp_seqpacket_listen(struct sock *sk, int backlog)
 	if (!sctp_style(sk, UDP))
 		return -EINVAL;
 
+	/* If backlog is zero, disable listening. */
+	if (!backlog) {
+		if (sctp_sstate(sk, CLOSED))
+			return 0;
+		
+		sctp_unhash_endpoint(ep);
+		sk->sk_state = SCTP_SS_CLOSED;
+	}
+
+	/* Return if we are already listening. */
 	if (sctp_sstate(sk, LISTENING))
 		return 0;
-
+		
 	/*
 	 * If a bind() or sctp_bindx() is not called prior to a listen()
 	 * call that allows new associations to be accepted, the system
@@ -3378,6 +3388,15 @@ SCTP_STATIC int sctp_stream_listen(struct sock *sk, int backlog)
 {
 	struct sctp_opt *sp = sctp_sk(sk);
 	struct sctp_endpoint *ep = sp->ep;
+
+	/* If backlog is zero, disable listening. */
+	if (!backlog) {
+		if (sctp_sstate(sk, CLOSED))
+			return 0;
+		
+		sctp_unhash_endpoint(ep);
+		sk->sk_state = SCTP_SS_CLOSED;
+	}
 
 	if (sctp_sstate(sk, LISTENING))
 		return 0;
