@@ -119,7 +119,7 @@ static u64 pxamci_dmamask = 0xffffffffUL;
 
 static struct platform_device pxamci_device = {
 	.name		= "pxamci",
-	.id		= 0,
+	.id		= -1,
 	.dev		= {
 		.dma_mask = &pxamci_dmamask,
 		.coherent_dma_mask = 0xffffffff,
@@ -154,7 +154,7 @@ static u64 udc_dma_mask = ~(u32)0;
 
 static struct platform_device udc_device = {
 	.name		= "pxa2xx_udc",
-	.id		= 0,
+	.id		= -1,
 	.resource	= pxa2xx_udc_resources,
 	.num_resources	= ARRAY_SIZE(pxa2xx_udc_resources),
 	.dev		=  {
@@ -188,7 +188,7 @@ static u64 fb_dma_mask = ~(u64)0;
 
 static struct platform_device pxafb_device = {
 	.name		= "pxafb",
-	.id		= 0,
+	.id		= -1,
 	.dev		= {
  		.platform_data	= &pxa_fb_info,
 		.dma_mask	= &fb_dma_mask,
