@@ -368,8 +368,8 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 		priority,
 		nice,
 		0UL /* removed */,
-		task->it_real_value,
-		task->start_time,
+		jiffies_to_clock_t(task->it_real_value),
+		jiffies_to_clock_t(task->start_time),
 		vsize,
 		mm ? mm->rss : 0, /* you might want to shift this left 3 */
 		task->rlim[RLIMIT_RSS].rlim_cur,
@@ -693,15 +693,15 @@ int proc_pid_cpu(struct task_struct *task, char * buffer)
 
 	len = sprintf(buffer,
 		"cpu  %lu %lu\n",
-		task->utime,
-		task->stime);
+		jiffies_to_clock_t(task->utime),
+		jiffies_to_clock_t(task->stime));
 		
 	for (i = 0 ; i < NR_CPUS; i++) {
 		if (cpu_online(i))
 		len += sprintf(buffer + len, "cpu%d %lu %lu\n",
 			i,
-				       task->per_cpu_utime[i],
-				       task->per_cpu_stime[i]);
+			jiffies_to_clock_t(task->per_cpu_utime[i]),
+			jiffies_to_clock_t(task->per_cpu_stime[i]));
 
 	}
 	return len;
