@@ -1220,7 +1220,7 @@ static inline int irda_usb_parse_endpoints(struct irda_usb_cb *self, struct usb_
 		ep = endpoint[i].desc.bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
 		dir = endpoint[i].desc.bEndpointAddress & USB_ENDPOINT_DIR_MASK;
 		attr = endpoint[i].desc.bmAttributes;
-		psize = endpoint[i].desc.wMaxPacketSize;
+		psize = le16_to_cpu(endpoint[i].desc.wMaxPacketSize);
 
 		/* Is it a bulk endpoint ??? */
 		if(attr == USB_ENDPOINT_XFER_BULK) {

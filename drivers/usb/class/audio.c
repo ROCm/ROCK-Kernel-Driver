@@ -3717,7 +3717,7 @@ static struct usb_audio_state *usb_audio_parsecontrol(struct usb_device *dev, un
 		if (alt->desc.bNumEndpoints > 0) {
 			/* Check all endpoints; should they all have a bandwidth of 0 ? */
 			for (k = 0; k < alt->desc.bNumEndpoints; k++) {
-				if (alt->endpoint[k].desc.wMaxPacketSize > 0) {
+				if (le16_to_cpu(alt->endpoint[k].desc.wMaxPacketSize) > 0) {
 					printk(KERN_ERR "usbaudio: device %d audiocontrol interface %u endpoint %d does not have 0 bandwidth at alt[0]\n", dev->devnum, ctrlif, k);
 					break;
 				}

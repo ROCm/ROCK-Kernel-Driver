@@ -2450,7 +2450,7 @@ static int parse_audio_endpoints(snd_usb_audio_t *chip, int iface_no)
 		    (altsd->bInterfaceSubClass != USB_SUBCLASS_AUDIO_STREAMING &&
 		     altsd->bInterfaceSubClass != USB_SUBCLASS_VENDOR_SPEC) ||
 		    altsd->bNumEndpoints < 1 ||
-		    get_endpoint(alts, 0)->wMaxPacketSize == 0)
+		    le16_to_cpu(get_endpoint(alts, 0)->wMaxPacketSize) == 0)
 			continue;
 		/* must be isochronous */
 		if ((get_endpoint(alts, 0)->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) !=
@@ -2513,7 +2513,7 @@ static int parse_audio_endpoints(snd_usb_audio_t *chip, int iface_no)
 		fp->endpoint = get_endpoint(alts, 0)->bEndpointAddress;
 		fp->ep_attr = get_endpoint(alts, 0)->bmAttributes;
 		/* FIXME: decode wMaxPacketSize of high bandwith endpoints */
-		fp->maxpacksize = get_endpoint(alts, 0)->wMaxPacketSize;
+		fp->maxpacksize = le16_to_cpu(get_endpoint(alts, 0)->wMaxPacketSize);
 		fp->attributes = csep[3];
 
 		/* some quirks for attributes here */
@@ -2809,7 +2809,7 @@ static int create_ua700_ua25_quirk(snd_usb_audio_t *chip,
 	fp->iface = altsd->bInterfaceNumber;
 	fp->endpoint = get_endpoint(alts, 0)->bEndpointAddress;
 	fp->ep_attr = get_endpoint(alts, 0)->bmAttributes;
-	fp->maxpacksize = get_endpoint(alts, 0)->wMaxPacketSize;
+	fp->maxpacksize = le16_to_cpu(get_endpoint(alts, 0)->wMaxPacketSize);
 
 	switch (fp->maxpacksize) {
 	case 0x120:
@@ -2875,7 +2875,7 @@ static int create_ua1000_quirk(snd_usb_audio_t *chip, struct usb_interface *ifac
 	fp->iface = altsd->bInterfaceNumber;
 	fp->endpoint = get_endpoint(alts, 0)->bEndpointAddress;
 	fp->ep_attr = get_endpoint(alts, 0)->bmAttributes;
-	fp->maxpacksize = get_endpoint(alts, 0)->wMaxPacketSize;
+	fp->maxpacksize = le16_to_cpu(get_endpoint(alts, 0)->wMaxPacketSize);
 	fp->rate_max = fp->rate_min = combine_triple(&alts->extra[8]);
 
 	stream = (fp->endpoint & USB_DIR_IN)

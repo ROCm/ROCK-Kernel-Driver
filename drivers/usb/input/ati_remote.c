@@ -756,7 +756,7 @@ static int ati_remote_probe(struct usb_interface *interface, const struct usb_de
 		retval = -ENODEV;
 		goto error;
 	}
-	if (ati_remote->endpoint_in->wMaxPacketSize == 0) {
+	if (le16_to_cpu(ati_remote->endpoint_in->wMaxPacketSize) == 0) {
 		err("%s: endpoint_in message size==0? \n", __FUNCTION__);
 		retval = -ENODEV;
 		goto error;

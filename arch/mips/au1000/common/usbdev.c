@@ -1398,7 +1398,7 @@ usbdev_init(struct usb_device_descriptor* dev_desc,
 		epd->bEndpointAddress |= (u8)ep->address;
 		ep->direction = epd->bEndpointAddress & 0x80;
 		ep->type = epd->bmAttributes & 0x03;
-		ep->max_pkt_size = epd->wMaxPacketSize;
+		ep->max_pkt_size = le16_to_cpu(epd->wMaxPacketSize);
 		spin_lock_init(&ep->lock);
 		ep->desc = epd;
 		ep->reg = &ep_reg[ep->address];

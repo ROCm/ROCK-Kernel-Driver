@@ -669,7 +669,7 @@ static int st5481_setup_d_out(struct st5481_adapter *adapter)
 	endpoint = &altsetting->endpoint[EP_D_OUT-1];
 
 	DBG(2,"endpoint address=%02x,packet size=%d",
-	    endpoint->desc.bEndpointAddress, endpoint->desc.wMaxPacketSize);
+	    endpoint->desc.bEndpointAddress, le16_to_cpu(endpoint->desc.wMaxPacketSize));
 
 	return st5481_setup_isocpipes(d_out->urb, dev, 
 				      usb_sndisocpipe(dev, endpoint->desc.bEndpointAddress),

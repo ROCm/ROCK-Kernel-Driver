@@ -2119,17 +2119,17 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 	 */
 	switch (udev->speed) {
 	case USB_SPEED_HIGH:		/* fixed at 64 */
-		udev->ep0.desc.wMaxPacketSize = 64;
+		udev->ep0.desc.wMaxPacketSize = __constant_cpu_to_le16(64);
 		break;
 	case USB_SPEED_FULL:		/* 8, 16, 32, or 64 */
 		/* to determine the ep0 maxpacket size, try to read
 		 * the device descriptor to get bMaxPacketSize0 and
 		 * then correct our initial guess.
 		 */
-		udev->ep0.desc.wMaxPacketSize = 64;
+		udev->ep0.desc.wMaxPacketSize = __constant_cpu_to_le16(64);
 		break;
 	case USB_SPEED_LOW:		/* fixed at 8 */
-		udev->ep0.desc.wMaxPacketSize = 8;
+		udev->ep0.desc.wMaxPacketSize = __constant_cpu_to_le16(8);
 		break;
 	default:
 		goto fail;
@@ -2263,7 +2263,7 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 		goto fail;
 
 	i = udev->descriptor.bMaxPacketSize0;
-	if (udev->ep0.desc.wMaxPacketSize != i) {
+	if (le16_to_cpu(udev->ep0.desc.wMaxPacketSize) != i) {
 		if (udev->speed != USB_SPEED_FULL ||
 				!(i == 8 || i == 16 || i == 32 || i == 64)) {
 			dev_err(&udev->dev, "ep0 maxpacket = %d\n", i);
@@ -2271,7 +2271,7 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 			goto fail;
 		}
 		dev_dbg(&udev->dev, "ep0 maxpacket = %d\n", i);
-		udev->ep0.desc.wMaxPacketSize = i;
+		udev->ep0.desc.wMaxPacketSize = cpu_to_le16(i);
 		ep0_reinit(udev);
 	}
   

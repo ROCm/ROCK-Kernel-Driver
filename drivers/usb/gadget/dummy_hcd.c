@@ -247,7 +247,7 @@ dummy_enable (struct usb_ep *_ep, const struct usb_endpoint_descriptor *desc)
 	dum = ep_to_dummy (ep);
 	if (!dum->driver || !is_enabled (dum))
 		return -ESHUTDOWN;
-	max = desc->wMaxPacketSize & 0x3ff;
+	max = le16_to_cpu(desc->wMaxPacketSize) & 0x3ff;
 
 	/* drivers must not request bad settings, since lower levels
 	 * (hardware or its drivers) may not check.  some endpoints
@@ -1025,7 +1025,7 @@ static int periodic_bytes (struct dummy *dum, struct dummy_ep *ep)
 		int	tmp;
 
 		/* high bandwidth mode */
-		tmp = ep->desc->wMaxPacketSize;
+		tmp = le16_to_cpu(ep->desc->wMaxPacketSize);
 		tmp = le16_to_cpu (tmp);
 		tmp = (tmp >> 11) & 0x03;
 		tmp *= 8 /* applies to entire frame */;

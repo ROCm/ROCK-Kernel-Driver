@@ -208,7 +208,7 @@ static const u8 fs_rh_config_descriptor [] = {
 	0x05,       /*  __u8  ep_bDescriptorType; Endpoint */
 	0x81,       /*  __u8  ep_bEndpointAddress; IN Endpoint 1 */
  	0x03,       /*  __u8  ep_bmAttributes; Interrupt */
- 	0x02, 0x00, /*  __u16 ep_wMaxPacketSize; 1 + (MAX_ROOT_PORTS / 8) */
+ 	0x02, 0x00, /*  __le16 ep_wMaxPacketSize; 1 + (MAX_ROOT_PORTS / 8) */
 	0xff        /*  __u8  ep_bInterval; (255ms -- usb 2.0 spec) */
 };
 
@@ -255,7 +255,7 @@ static const u8 hs_rh_config_descriptor [] = {
 	0x05,       /*  __u8  ep_bDescriptorType; Endpoint */
 	0x81,       /*  __u8  ep_bEndpointAddress; IN Endpoint 1 */
  	0x03,       /*  __u8  ep_bmAttributes; Interrupt */
- 	0x02, 0x00, /*  __u16 ep_wMaxPacketSize; 1 + (MAX_ROOT_PORTS / 8) */
+ 	0x02, 0x00, /*  __le16 ep_wMaxPacketSize; 1 + (MAX_ROOT_PORTS / 8) */
 	0x0c        /*  __u8  ep_bInterval; (256ms -- usb 2.0 spec) */
 };
 
@@ -809,7 +809,7 @@ int usb_register_root_hub (struct usb_device *usb_dev, struct device *parent_dev
 	down (&usb_bus_list_lock);
 	usb_dev->bus->root_hub = usb_dev;
 
-	usb_dev->ep0.desc.wMaxPacketSize = 64;
+	usb_dev->ep0.desc.wMaxPacketSize = __constant_cpu_to_le16(64);
 	retval = usb_get_device_descriptor(usb_dev, USB_DT_DEVICE_SIZE);
 	if (retval != sizeof usb_dev->descriptor) {
 		usb_dev->bus->root_hub = NULL;

@@ -458,7 +458,7 @@ static int usX2Y_urbs_allocate(snd_usX2Y_substream_t *subs)
 		ep = dev->ep_out[subs->endpoint];
 		if (!ep)
 			return -EINVAL;
-		subs->maxpacksize = ep->desc.wMaxPacketSize;
+		subs->maxpacksize = le16_to_cpu(ep->desc.wMaxPacketSize);
 		if (NULL == subs->tmpbuf) {
 			subs->tmpbuf = kcalloc(NRPACKS, subs->maxpacksize, GFP_KERNEL);
 			if (NULL == subs->tmpbuf) {
@@ -471,7 +471,7 @@ static int usX2Y_urbs_allocate(snd_usX2Y_substream_t *subs)
 		ep = dev->ep_in[subs->endpoint];
 		if (!ep)
 			return -EINVAL;
-		subs->maxpacksize = ep->desc.wMaxPacketSize;
+		subs->maxpacksize = le16_to_cpu(ep->desc.wMaxPacketSize);
 	}
 
 	/* allocate and initialize data urbs */

@@ -1086,7 +1086,7 @@ static int usb_bluetooth_probe (struct usb_interface *intf,
 		err("No free urbs available");
 		goto probe_error;
 	}
-	bluetooth->bulk_in_buffer_size = buffer_size = endpoint->wMaxPacketSize;
+	bluetooth->bulk_in_buffer_size = buffer_size = le16_to_cpu(endpoint->wMaxPacketSize);
 	bluetooth->bulk_in_endpointAddress = endpoint->bEndpointAddress;
 	bluetooth->bulk_in_buffer = kmalloc (buffer_size, GFP_KERNEL);
 	if (!bluetooth->bulk_in_buffer) {
@@ -1098,7 +1098,7 @@ static int usb_bluetooth_probe (struct usb_interface *intf,
 
 	endpoint = bulk_out_endpoint[0];
 	bluetooth->bulk_out_endpointAddress = endpoint->bEndpointAddress;
-	bluetooth->bulk_out_buffer_size = endpoint->wMaxPacketSize * 2;
+	bluetooth->bulk_out_buffer_size = le16_to_cpu(endpoint->wMaxPacketSize) * 2;
 
 	endpoint = interrupt_in_endpoint[0];
 	bluetooth->interrupt_in_urb = usb_alloc_urb(0, GFP_KERNEL);
@@ -1106,7 +1106,7 @@ static int usb_bluetooth_probe (struct usb_interface *intf,
 		err("No free urbs available");
 		goto probe_error;
 	}
-	bluetooth->interrupt_in_buffer_size = buffer_size = endpoint->wMaxPacketSize;
+	bluetooth->interrupt_in_buffer_size = buffer_size = le16_to_cpu(endpoint->wMaxPacketSize);
 	bluetooth->interrupt_in_endpointAddress = endpoint->bEndpointAddress;
 	bluetooth->interrupt_in_interval = endpoint->bInterval;
 	bluetooth->interrupt_in_buffer = kmalloc (buffer_size, GFP_KERNEL);

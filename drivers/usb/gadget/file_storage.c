@@ -3132,7 +3132,7 @@ reset:
 	if ((rc = enable_endpoint(fsg, fsg->bulk_out, d)) != 0)
 		goto reset;
 	fsg->bulk_out_enabled = 1;
-	fsg->bulk_out_maxpacket = d->wMaxPacketSize;
+	fsg->bulk_out_maxpacket = le16_to_cpu(d->wMaxPacketSize);
 
 	if (transport_is_cbi()) {
 		d = ep_desc(fsg->gadget, &fs_intr_in_desc, &hs_intr_in_desc);

@@ -3743,7 +3743,7 @@ static int ibmcam_probe(struct usb_interface *intf, const struct usb_device_id *
 			err("Interface %d. has ISO OUT endpoint!", ifnum);
 			return -ENODEV;
 		}
-		if (endpoint->wMaxPacketSize == 0) {
+		if (le16_to_cpu(endpoint->wMaxPacketSize) == 0) {
 			if (inactInterface < 0)
 				inactInterface = i;
 			else {
@@ -3753,7 +3753,7 @@ static int ibmcam_probe(struct usb_interface *intf, const struct usb_device_id *
 		} else {
 			if (actInterface < 0) {
 				actInterface = i;
-				maxPS = endpoint->wMaxPacketSize;
+				maxPS = le16_to_cpu(endpoint->wMaxPacketSize);
 				if (debug > 0)
 					info("Active setting=%d. maxPS=%d.", i, maxPS);
 			} else

@@ -180,7 +180,7 @@ static char *usb_dump_endpoint_descriptor (
 	in = (desc->bEndpointAddress & USB_DIR_IN);
 	dir = in ? 'I' : 'O';
 	if (speed == USB_SPEED_HIGH) {
-		switch (desc->wMaxPacketSize & (0x03 << 11)) {
+		switch (le16_to_cpu(desc->wMaxPacketSize) & (0x03 << 11)) {
 		case 1 << 11:	bandwidth = 2; break;
 		case 2 << 11:	bandwidth = 3; break;
 		}
@@ -227,7 +227,7 @@ static char *usb_dump_endpoint_descriptor (
 
 	start += sprintf(start, format_endpt, desc->bEndpointAddress, dir,
 			 desc->bmAttributes, type,
-			 (desc->wMaxPacketSize & 0x07ff) * bandwidth,
+			 (le16_to_cpu(desc->wMaxPacketSize) & 0x07ff) * bandwidth,
 			 interval, unit);
 	return start;
 }

@@ -264,7 +264,7 @@ struct usb_endpoint_descriptor {
 
 	__u8  bEndpointAddress;
 	__u8  bmAttributes;
-	__u16 wMaxPacketSize;
+	__le16 wMaxPacketSize;
 	__u8  bInterval;
 
 	// NOTE:  these two are _only_ in audio endpoints.

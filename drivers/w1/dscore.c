@@ -676,7 +676,7 @@ int ds_probe(struct usb_interface *intf, const struct usb_device_id *udev_id)
 		ds_dev->ep[i+1] = endpoint->bEndpointAddress;
 		
 		printk("%d: addr=%x, size=%d, dir=%s, type=%x\n",
-			i, endpoint->bEndpointAddress, endpoint->wMaxPacketSize,
+			i, endpoint->bEndpointAddress, le16_to_cpu(endpoint->wMaxPacketSize),
 			(endpoint->bEndpointAddress & USB_DIR_IN)?"IN":"OUT",
 			endpoint->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK);
 	}

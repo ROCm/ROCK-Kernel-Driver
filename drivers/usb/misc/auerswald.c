@@ -1132,7 +1132,7 @@ static int auerswald_int_open (pauerswald_t cp)
 		ret = -EFAULT;
   		goto intoend;
     	}
-	irqsize = ep->desc.wMaxPacketSize;
+	irqsize = le16_to_cpu(ep->desc.wMaxPacketSize);
 	cp->irqsize = irqsize;
 
 	/* allocate the urb and data buffer */

@@ -390,7 +390,7 @@ static int konicawc_start_data(struct uvd *uvd)
 				spd_to_iface[cam->speed]);
 	if (!interface)
 		return -ENXIO;
-	pktsz = interface->endpoint[1].desc.wMaxPacketSize;
+	pktsz = le16_to_cpu(interface->endpoint[1].desc.wMaxPacketSize);
 	DEBUG(1, "pktsz = %d", pktsz);
 	if (!CAMERA_IS_OPERATIONAL(uvd)) {
 		err("Camera is not operational");
@@ -756,7 +756,7 @@ static int konicawc_probe(struct usb_interface *intf, const struct usb_device_id
 		}
 		endpoint = &interface->endpoint[1].desc;
 		DEBUG(1, "found endpoint: addr: 0x%2.2x maxps = 0x%4.4x",
-		    endpoint->bEndpointAddress, endpoint->wMaxPacketSize);
+		    endpoint->bEndpointAddress, le16_to_cpu(endpoint->wMaxPacketSize));
 		if (video_ep == 0)
 			video_ep = endpoint->bEndpointAddress;
 		else if (video_ep != endpoint->bEndpointAddress) {
@@ -773,7 +773,7 @@ static int konicawc_probe(struct usb_interface *intf, const struct usb_device_id
 			    interface->desc.bInterfaceNumber);
 			return -ENODEV;
 		}
-		if (endpoint->wMaxPacketSize == 0) {
+		if (le16_to_cpu(endpoint->wMaxPacketSize) == 0) {
 			if (inactInterface < 0)
 				inactInterface = i;
 			else {
@@ -786,8 +786,8 @@ static int konicawc_probe(struct usb_interface *intf, const struct usb_device_id
 				actInterface = i;
 			}
 		}
-		if(endpoint->wMaxPacketSize > maxPS)
-			maxPS = endpoint->wMaxPacketSize;
+		if (le16_to_cpu(endpoint->wMaxPacketSize) > maxPS)
+			maxPS = le16_to_cpu(endpoint->wMaxPacketSize);
 	}
 	if(actInterface == -1) {
 		err("Cant find required endpoint");

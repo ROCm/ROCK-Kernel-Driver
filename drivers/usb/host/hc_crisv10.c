@@ -160,7 +160,7 @@ static __u8 root_hub_config_des[] =
 	0x05,  /*  __u8  ep_bDescriptorType; Endpoint */
 	0x81,  /*  __u8  ep_bEndpointAddress; IN Endpoint 1 */
 	0x03,  /*  __u8  ep_bmAttributes; Interrupt */
-	0x08,  /*  __u16 ep_wMaxPacketSize; 8 Bytes */
+	0x08,  /*  __le16 ep_wMaxPacketSize; 8 Bytes */
 	0x00,
 	0xff   /*  __u8  ep_bInterval; 255 ms */
 };
@@ -4528,7 +4528,7 @@ static int __init etrax_usb_hc_init(void)
         usb_rh->speed = USB_SPEED_FULL;
         usb_rh->devnum = 1;
         hc->bus->devnum_next = 2;
-        usb_rh->ep0.desc.wMaxPacketSize = 64;
+        usb_rh->ep0.desc.wMaxPacketSize = __const_cpu_to_le16(64);
         usb_get_device_descriptor(usb_rh, USB_DT_DEVICE_SIZE);
 	usb_new_device(usb_rh);
 

@@ -1125,7 +1125,7 @@ usb_maxpacket(struct usb_device *udev, int pipe, int is_out)
 		return 0;
 
 	/* NOTE:  only 0x07ff bits are for packet size... */
-	return ep->desc.wMaxPacketSize;
+	return le16_to_cpu(ep->desc.wMaxPacketSize);
 }
 
 /* -------------------------------------------------------------------------- */

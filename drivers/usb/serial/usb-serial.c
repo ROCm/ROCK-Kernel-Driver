@@ -1060,7 +1060,7 @@ int usb_serial_probe(struct usb_interface *interface,
 			dev_err(&interface->dev, "No free urbs available\n");
 			goto probe_error;
 		}
-		buffer_size = endpoint->wMaxPacketSize;
+		buffer_size = le16_to_cpu(endpoint->wMaxPacketSize);
 		port->bulk_in_size = buffer_size;
 		port->bulk_in_endpointAddress = endpoint->bEndpointAddress;
 		port->bulk_in_buffer = kmalloc (buffer_size, GFP_KERNEL);
@@ -1084,7 +1084,7 @@ int usb_serial_probe(struct usb_interface *interface,
 			dev_err(&interface->dev, "No free urbs available\n");
 			goto probe_error;
 		}
-		buffer_size = endpoint->wMaxPacketSize;
+		buffer_size = le16_to_cpu(endpoint->wMaxPacketSize);
 		port->bulk_out_size = buffer_size;
 		port->bulk_out_endpointAddress = endpoint->bEndpointAddress;
 		port->bulk_out_buffer = kmalloc (buffer_size, GFP_KERNEL);
@@ -1109,7 +1109,7 @@ int usb_serial_probe(struct usb_interface *interface,
 				dev_err(&interface->dev, "No free urbs available\n");
 				goto probe_error;
 			}
-			buffer_size = endpoint->wMaxPacketSize;
+			buffer_size = le16_to_cpu(endpoint->wMaxPacketSize);
 			port->interrupt_in_endpointAddress = endpoint->bEndpointAddress;
 			port->interrupt_in_buffer = kmalloc (buffer_size, GFP_KERNEL);
 			if (!port->interrupt_in_buffer) {
@@ -1136,7 +1136,7 @@ int usb_serial_probe(struct usb_interface *interface,
 				dev_err(&interface->dev, "No free urbs available\n");
 				goto probe_error;
 			}
-			buffer_size = endpoint->wMaxPacketSize;
+			buffer_size = le16_to_cpu(endpoint->wMaxPacketSize);
 			port->interrupt_out_size = buffer_size;
 			port->interrupt_out_endpointAddress = endpoint->bEndpointAddress;
 			port->interrupt_out_buffer = kmalloc (buffer_size, GFP_KERNEL);

@@ -5596,7 +5596,7 @@ ov518_configure(struct usb_ov511 *ov)
 		if (ifp) {
 			alt = usb_altnum_to_altsetting(ifp, 7);
 			if (alt)
-				mxps = alt->endpoint[0].desc.wMaxPacketSize;
+				mxps = le16_to_cpu(alt->endpoint[0].desc.wMaxPacketSize);
 		}
 
 		/* Some OV518s have packet numbering by default, some don't */

@@ -405,7 +405,7 @@ static int tower_open (struct inode *inode, struct file *file)
 			  dev->udev,
 			  usb_rcvintpipe(dev->udev, dev->interrupt_in_endpoint->bEndpointAddress),
 			  dev->interrupt_in_buffer,
-			  dev->interrupt_in_endpoint->wMaxPacketSize,
+			  le16_to_cpu(dev->interrupt_in_endpoint->wMaxPacketSize),
 			  tower_interrupt_in_callback,
 			  dev,
 			  dev->interrupt_in_interval);
@@ -924,7 +924,7 @@ static int tower_probe (struct usb_interface *interface, const struct usb_device
 		err("Couldn't allocate read_buffer");
 		goto error;
 	}
-	dev->interrupt_in_buffer = kmalloc (dev->interrupt_in_endpoint->wMaxPacketSize, GFP_KERNEL);
+	dev->interrupt_in_buffer = kmalloc (le16_to_cpu(dev->interrupt_in_endpoint->wMaxPacketSize), GFP_KERNEL);
 	if (!dev->interrupt_in_buffer) {
 		err("Couldn't allocate interrupt_in_buffer");
 		goto error;

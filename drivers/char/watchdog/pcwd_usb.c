@@ -615,7 +615,7 @@ static int usb_pcwd_probe(struct usb_interface *interface, const struct usb_devi
 	usb_pcwd->udev = udev;
 	usb_pcwd->interface = interface;
 	usb_pcwd->interface_number = iface_desc->desc.bInterfaceNumber;
-	usb_pcwd->intr_size = (endpoint->wMaxPacketSize > 8 ? endpoint->wMaxPacketSize : 8);
+	usb_pcwd->intr_size = (le16_to_cpu(endpoint->wMaxPacketSize) > 8 ? le16_to_cpu(endpoint->wMaxPacketSize) : 8);
 
 	/* set up the memory buffer's */
 	if (!(usb_pcwd->intr_buffer = usb_buffer_alloc(udev, usb_pcwd->intr_size, SLAB_ATOMIC, &usb_pcwd->intr_dma))) {
