@@ -5,11 +5,11 @@
  * 'IA-64 Extensions to ACPI Specification' Revision 0.6
  *
  * Copyright (C) 1999 VA Linux Systems
- * Copyright (C) 1999, 2000 Walt Drummond <drummond@valinux.com>
- * Copyright (C) 2000, 2002 Hewlett-Packard Co.
- *	David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1999,2000 Walt Drummond <drummond@valinux.com>
+ * Copyright (C) 2000 Hewlett-Packard Co.
+ * Copyright (C) 2000 David Mosberger-Tang <davidm@hpl.hp.com>
  * Copyright (C) 2000 Intel Corp.
- * Copyright (C) 2000, 2001 J.I. Lee <jung-ik.lee@intel.com>
+ * Copyright (C) 2000,2001 J.I. Lee <jung-ik.lee@intel.com>
  *      ACPI based kernel configuration manager.
  *      ACPI 2.0 & IA64 ext 0.71
  */
@@ -23,7 +23,6 @@
 #include <linux/string.h>
 #include <linux/types.h>
 #include <linux/irq.h>
-#include <linux/acpi.h>
 #ifdef CONFIG_SERIAL_ACPI
 #include <linux/acpi_serial.h>
 #endif
@@ -45,8 +44,6 @@ int platform_irq_list[ACPI_MAX_PLATFORM_IRQS];
 int __initdata available_cpus;
 int __initdata total_cpus;
 
-int __initdata pcat_compat;
-
 void (*pm_idle) (void);
 void (*pm_power_off) (void);
 
@@ -59,34 +56,9 @@ asm (".weak iosapic_version");
 const char *
 acpi_get_sysname (void)
 {
+	/* the following should go away once we have an ACPI parser: */
 #ifdef CONFIG_IA64_GENERIC
-	if (efi.acpi20) {
-		acpi20_rsdp_t *rsdp20;
-		acpi_xsdt_t *xsdt;
-		acpi_desc_table_hdr_t *hdrp;
-
-		rsdp20 = efi.acpi20;
-		if (strncmp(rsdp20->signature,
-		            ACPI_RSDP_SIG, ACPI_RSDP_SIG_LEN)) {
-			printk("ACPI 2.0 RSDP signature incorrect, default to DIG compatible\n");
-			return "dig";
-		}
-
-		xsdt = __va(rsdp20->xsdt);
-		hdrp = &xsdt->header;
-		if (strncmp(hdrp->signature,
-		            ACPI_XSDT_SIG, ACPI_XSDT_SIG_LEN)) {
-			printk("ACPI 2.0 XSDT signature incorrect, default to DIG compatible\n");
-			return "dig";
-		}
-
-		if (!strcmp(hdrp->oem_id, "HP")) {
-			printk("Enabling Hewlett Packard zx1 chipset support\n");
-			return "hpzx1";
-		}
-	}
-
-	return "dig";
+	return "hpsim";
 #else
 # if defined (CONFIG_IA64_HP_SIM)
 	return "hpsim";
@@ -94,14 +66,13 @@ acpi_get_sysname (void)
 	return "sn1";
 # elif defined (CONFIG_IA64_SGI_SN2)
 	return "sn2";
-# elif defined (CONFIG_IA64_HP_ZX1)
-	return "hpzx1";
 # elif defined (CONFIG_IA64_DIG)
 	return "dig";
 # else
 #	error Unknown platform.  Fix acpi.c.
 # endif
 #endif
+
 }
 
 /*
@@ -322,16 +293,6 @@ acpi20_parse_madt (acpi_madt_t *madt)
 	} else
 		printk("Lapic address set to default 0x%lx\n", ipi_base_addr);
 
-	/*
-	 * The PCAT_COMPAT flag indicates that the system has a dual-8259 compatible
-	 * setup.
-	 */
-#ifdef CONFIG_ITANIUM
-	pcat_compat = 1; /* fw on some Itanium systems is broken... */
-#else
-	pcat_compat = (madt->flags & MADT_PCAT_COMPAT);
-#endif
-
 	p = (char *) (madt + 1);
 	end = p + (madt->header.length - sizeof(acpi_madt_t));
 
@@ -358,7 +319,17 @@ acpi20_parse_madt (acpi_madt_t *madt)
 		      case ACPI20_ENTRY_IO_SAPIC:
 			iosapic = (acpi_entry_iosapic_t *) p;
 			if (iosapic_init)
-				iosapic_init(iosapic->address, iosapic->irq_base, pcat_compat);
+				/*
+				 * The PCAT_COMPAT flag indicates that the system has a
+				 * dual-8259 compatible setup.
+				 */
+				iosapic_init(iosapic->address, iosapic->irq_base,
+#ifdef CONFIG_ITANIUM
+					     1 /* fw on some Itanium systems is broken... */
+#else
+					     (madt->flags & MADT_PCAT_COMPAT)
+#endif
+					);
 			break;
 
 		      case ACPI20_ENTRY_PLATFORM_INT_SOURCE:
@@ -430,7 +401,7 @@ acpi20_parse (acpi20_rsdp_t *rsdp20)
 # ifdef CONFIG_ACPI
 	acpi_xsdt_t *xsdt;
 	acpi_desc_table_hdr_t *hdrp;
-	acpi_madt_t *madt = NULL;
+	acpi_madt_t *madt;
 	int tables, i;
 
 	if (strncmp(rsdp20->signature, ACPI_RSDP_SIG, ACPI_RSDP_SIG_LEN)) {
@@ -706,74 +677,3 @@ acpi_parse (acpi_rsdp_t *rsdp)
 # endif /* CONFIG_ACPI */
 	return 1;
 }
-
-#ifdef CONFIG_ACPI
-
-#include "../drivers/acpi/include/platform/acgcc.h"
-#include "../drivers/acpi/include/actypes.h"
-#include "../drivers/acpi/include/acexcep.h"
-#include "../drivers/acpi/include/acpixf.h"
-#include "../drivers/acpi/include/actbl.h"
-#include "../drivers/acpi/include/acconfig.h"
-#include "../drivers/acpi/include/acmacros.h"
-#include "../drivers/acpi/include/aclocal.h"
-#include "../drivers/acpi/include/acobject.h"
-#include "../drivers/acpi/include/acstruct.h"
-#include "../drivers/acpi/include/acnamesp.h"
-#include "../drivers/acpi/include/acutils.h"
-
-/**
- * acpi_get_crs - Return the current resource settings for a device
- * obj: A handle for this device
- * buf: A buffer to be populated by this call.
- *
- * Pass a valid handle, typically obtained by walking the namespace and a
- * pointer to an allocated buffer, and this function will fill in the buffer
- * with a list of acpi_resource structures.
- */
-acpi_status acpi_get_crs(acpi_handle obj, acpi_buffer *buf)
-{
-	acpi_status result;
-	buf->length = 0;
-	buf->pointer = NULL;
-
-	result = acpi_get_current_resources(obj, buf);
-	if (result != AE_BUFFER_OVERFLOW)
-		return result;
-	buf->pointer = kmalloc(buf->length, GFP_KERNEL);
-	if (!buf->pointer)
-		return -ENOMEM;
-
-	result = acpi_get_current_resources(obj, buf);
-
-	return result;
-}
-
-acpi_resource *acpi_get_crs_next(acpi_buffer *buf, int *offset)
-{
-	acpi_resource *res;
-
-	if (*offset >= buf->length)
-		return NULL;
-
-	res = buf->pointer + *offset;
-	*offset += res->length;
-	return res;
-}
-
-acpi_resource_data *acpi_get_crs_type(acpi_buffer *buf, int *offset, int type)
-{
-	for (;;) {
-		acpi_resource *res = acpi_get_crs_next(buf, offset);
-		if (!res)
-			return NULL;
-		if (res->id == type)
-			return &res->data;
-	}
-}
-
-void acpi_dispose_crs(acpi_buffer *buf)
-{
-	kfree(buf->pointer);
-}
-#endif /* CONFIG_ACPI */

@@ -19,6 +19,7 @@
 #include <linux/config.h>
 #include <linux/init.h>
 
+#include <linux/acpi.h>
 #include <linux/bootmem.h>
 #include <linux/console.h>
 #include <linux/delay.h>
@@ -30,7 +31,6 @@
 #include <linux/threads.h>
 #include <linux/tty.h>
 
-#include <asm/acpi-ext.h>
 #include <asm/ia32.h>
 #include <asm/page.h>
 #include <asm/machvec.h>
@@ -317,13 +317,12 @@ setup_arch (char **cmdline_p)
 #endif
 
 	/*
-	 *  Set `iobase' to the appropriate address in region 6
-	 *    (uncached access range)
+	 *  Set `iobase' to the appropriate address in region 6 (uncached access range).
 	 *
-	 *  The EFI memory map is the "prefered" location to get the I/O port
-	 *  space base, rather the relying on AR.KR0. This should become more
-	 *  clear in future SAL specs. We'll fall back to getting it out of
-	 *  AR.KR0 if no appropriate entry is found in the memory map.
+	 *  The EFI memory map is the "preferred" location to get the I/O port space base,
+	 *  rather the relying on AR.KR0. This should become more clear in future SAL
+	 *  specs. We'll fall back to getting it out of AR.KR0 if no appropriate entry is
+	 *  found in the memory map.
 	 */
 	phys_iobase = efi_get_iobase();
 	if (phys_iobase)
@@ -342,14 +341,9 @@ setup_arch (char **cmdline_p)
 
 	cpu_init();	/* initialize the bootstrap CPU */
 
-	if (efi.acpi20) {
-		/* Parse the ACPI 2.0 tables */
-		acpi20_parse(efi.acpi20);
-	} else if (efi.acpi) {
-		/* Parse the ACPI tables */
-		acpi_parse(efi.acpi);
-	}
-
+#ifdef CONFIG_ACPI_BOOT
+	acpi_boot_init(*cmdline_p);
+#endif
 #ifdef CONFIG_VT
 # if defined(CONFIG_DUMMY_CONSOLE)
 	conswitchp = &dummy_con;
