@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: background.c,v 1.44 2003/10/08 13:29:55 dwmw2 Exp $
+ * $Id: background.c,v 1.49 2004/07/13 08:56:40 dwmw2 Exp $
  *
  */
 
@@ -20,12 +20,11 @@
 
 
 static int jffs2_garbage_collect_thread(void *);
-static int thread_should_wake(struct jffs2_sb_info *c);
 
 void jffs2_garbage_collect_trigger(struct jffs2_sb_info *c)
 {
 	spin_lock(&c->erase_completion_lock);
-        if (c->gc_task && thread_should_wake(c))
+        if (c->gc_task && jffs2_thread_should_wake(c))
                 send_sig(SIGHUP, c->gc_task, 1);
 	spin_unlock(&c->erase_completion_lock);
 }
@@ -84,11 +83,11 @@ static int jffs2_garbage_collect_thread(void *_c)
 	for (;;) {
 		allow_signal(SIGHUP);
 
-		if (!thread_should_wake(c)) {
+		if (!jffs2_thread_should_wake(c)) {
 			set_current_state (TASK_INTERRUPTIBLE);
 			D1(printk(KERN_DEBUG "jffs2_garbage_collect_thread sleeping...\n"));
-			/* Yes, there's a race here; we checked thread_should_wake() before
-			   setting current->state to TASK_INTERRUPTIBLE. But it doesn't
+			/* Yes, there's a race here; we checked jffs2_thread_should_wake()
+			   before setting current->state to TASK_INTERRUPTIBLE. But it doesn't
 			   matter - We don't care if we miss a wakeup, because the GC thread
 			   is only an optimisation anyway. */
 			schedule();
@@ -143,35 +142,4 @@ static int jffs2_garbage_collect_thread(void *_c)
 	c->gc_task = NULL;
 	spin_unlock(&c->erase_completion_lock);
 	complete_and_exit(&c->gc_thread_exit, 0);
-}
-
-static int thread_should_wake(struct jffs2_sb_info *c)
-{
-	int ret = 0;
-	uint32_t dirty;
-
-	if (c->unchecked_size) {
-		D1(printk(KERN_DEBUG "thread_should_wake(): unchecked_size %d, checked_ino #%d\n",
-			  c->unchecked_size, c->checked_ino));
-		return 1;
-	}
-
-	/* dirty_size contains blocks on erase_pending_list
-	 * those blocks are counted in c->nr_erasing_blocks.
-	 * If one block is actually erased, it is not longer counted as dirty_space
-	 * but it is counted in c->nr_erasing_blocks, so we add it and subtract it
-	 * with c->nr_erasing_blocks * c->sector_size again.
-	 * Blocks on erasable_list are counted as dirty_size, but not in c->nr_erasing_blocks
-	 * This helps us to force gc and pick eventually a clean block to spread the load.
-	 */
-	dirty = c->dirty_size + c->erasing_size - c->nr_erasing_blocks * c->sector_size;
-
-	if (c->nr_free_blocks + c->nr_erasing_blocks < c->resv_blocks_gctrigger && 
-			(dirty > c->nospc_dirty_size)) 
-		ret = 1;
-
-	D1(printk(KERN_DEBUG "thread_should_wake(): nr_free_blocks %d, nr_erasing_blocks %d, dirty_size 0x%x: %s\n", 
-		  c->nr_free_blocks, c->nr_erasing_blocks, c->dirty_size, ret?"yes":"no"));
-
-	return ret;
 }

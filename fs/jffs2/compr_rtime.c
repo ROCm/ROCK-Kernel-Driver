@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: compr_rtime.c,v 1.11 2003/10/04 08:33:06 dwmw2 Exp $
+ * $Id: compr_rtime.c,v 1.14 2004/06/23 16:34:40 havasi Exp $
  *
  *
  * Very simple lz77-ish encoder.
@@ -25,10 +25,12 @@
 #include <linux/types.h>
 #include <linux/errno.h>
 #include <linux/string.h> 
+#include <linux/jffs2.h> 
+#include "compr.h"
 
 /* _compress returns the compressed size, -1 if bigger */
 int jffs2_rtime_compress(unsigned char *data_in, unsigned char *cpage_out, 
-		   uint32_t *sourcelen, uint32_t *dstlen)
+		   uint32_t *sourcelen, uint32_t *dstlen, void *model)
 {
 	short positions[256];
 	int outpos = 0;
@@ -67,8 +69,8 @@ int jffs2_rtime_compress(unsigned char *data_in, unsigned char *cpage_out,
 }		   
 
 
-void jffs2_rtime_decompress(unsigned char *data_in, unsigned char *cpage_out,
-		      uint32_t srclen, uint32_t destlen)
+int jffs2_rtime_decompress(unsigned char *data_in, unsigned char *cpage_out,
+		      uint32_t srclen, uint32_t destlen, void *model)
 {
 	short positions[256];
 	int outpos = 0;
@@ -98,7 +100,29 @@ void jffs2_rtime_decompress(unsigned char *data_in, unsigned char *cpage_out,
 				outpos+=repeat;		
 			}
 		}
-	}		
+	}
+        return 0;
 }		   
 
+static struct jffs2_compressor jffs2_rtime_comp = {
+    .priority = JFFS2_RTIME_PRIORITY,
+    .name = "rtime",
+    .compr = JFFS2_COMPR_RTIME,
+    .compress = &jffs2_rtime_compress,
+    .decompress = &jffs2_rtime_decompress,
+#ifdef JFFS2_RTIME_DISABLED
+    .disabled = 1,
+#else
+    .disabled = 0,
+#endif
+};
 
+int jffs2_rtime_init(void)
+{
+    return jffs2_register_compressor(&jffs2_rtime_comp);
+}
+
+void jffs2_rtime_exit(void)
+{
+    jffs2_unregister_compressor(&jffs2_rtime_comp);
+}

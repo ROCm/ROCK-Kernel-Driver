@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: scan.c,v 1.104 2003/10/11 14:52:48 dwmw2 Exp $
+ * $Id: scan.c,v 1.110 2004/06/17 17:15:31 gleixner Exp $
  *
  */
 #include <linux/kernel.h>
@@ -285,8 +285,6 @@ static int jffs2_scan_eraseblock (struct jffs2_sb_info *c, struct jffs2_eraseblo
 	uint32_t hdr_crc, buf_ofs, buf_len;
 	int err;
 	int noise = 0;
-	int wasempty = 0;
-	uint32_t empty_start = 0;
 #ifdef CONFIG_JFFS2_FS_NAND
 	int cleanmarkerfound = 0;
 #endif
@@ -339,8 +337,6 @@ static int jffs2_scan_eraseblock (struct jffs2_sb_info *c, struct jffs2_eraseblo
 			switch (ret) {
 			case 0:		return cleanmarkerfound ? BLK_STATE_CLEANMARKER : BLK_STATE_ALLFF;
 			case 1: 	return BLK_STATE_ALLDIRTY;
-			case 2: 	return BLK_STATE_BADBLOCK; /* case 2/3 are paranoia checks */
-			case 3:		return BLK_STATE_ALLDIRTY; /* Block has failed to erase min. once */
 			default: 	return ret;
 			}
 		}
@@ -359,6 +355,7 @@ static int jffs2_scan_eraseblock (struct jffs2_sb_info *c, struct jffs2_eraseblo
 
 	noise = 10;
 
+scan_more:	
 	while(ofs < jeb->offset + c->sector_size) {
 
 		D1(ACCT_PARANOIA_CHECK(jeb));
@@ -398,42 +395,52 @@ static int jffs2_scan_eraseblock (struct jffs2_sb_info *c, struct jffs2_eraseblo
 		node = (struct jffs2_unknown_node *)&buf[ofs-buf_ofs];
 
 		if (*(uint32_t *)(&buf[ofs-buf_ofs]) == 0xffffffff) {
-			uint32_t inbuf_ofs = ofs - buf_ofs + 4;
-			uint32_t scanend;
+			uint32_t inbuf_ofs;
+			uint32_t empty_start;
 
 			empty_start = ofs;
 			ofs += 4;
 
-			/* If scanning empty space after only a cleanmarker, don't
-			   bother scanning the whole block */
-			if (unlikely(empty_start == jeb->offset + c->cleanmarker_size &&
-				     jeb->offset + EMPTY_SCAN_SIZE < buf_ofs + buf_len))
-				scanend = jeb->offset + EMPTY_SCAN_SIZE - buf_ofs;
-			else
-				scanend = buf_len;
-
 			D1(printk(KERN_DEBUG "Found empty flash at 0x%08x\n", ofs));
-			while (inbuf_ofs < scanend) {
-				if (*(uint32_t *)(&buf[inbuf_ofs]) != 0xffffffff)
-					goto emptyends;
+		more_empty:
+			inbuf_ofs = ofs - buf_ofs;
+			while (inbuf_ofs < buf_len) {
+				if (*(uint32_t *)(&buf[inbuf_ofs]) != 0xffffffff) {
+					printk(KERN_WARNING "Empty flash at 0x%08x ends at 0x%08x\n",
+					       empty_start, ofs);
+					DIRTY_SPACE(ofs-empty_start);
+					goto scan_more;
+				}
 
 				inbuf_ofs+=4;
 				ofs += 4;
 			}
 			/* Ran off end. */
-			D1(printk(KERN_DEBUG "Empty flash ends normally at 0x%08x\n", ofs));
+			D1(printk(KERN_DEBUG "Empty flash to end of buffer at 0x%08x\n", ofs));
 
-			if (buf_ofs == jeb->offset &&  jeb->used_size == PAD(c->cleanmarker_size) && 
-			    c->cleanmarker_size && !jeb->first_node->next_in_ino && !jeb->dirty_size)
+			/* If we're only checking the beginning of a block with a cleanmarker,
+			   bail now */
+			if (buf_ofs == jeb->offset && jeb->used_size == PAD(c->cleanmarker_size) && 
+			    c->cleanmarker_size && !jeb->dirty_size && !jeb->first_node->next_in_ino) {
+				D1(printk(KERN_DEBUG "%d bytes at start of block seems clean... assuming all clean\n", EMPTY_SCAN_SIZE));
 				return BLK_STATE_CLEANMARKER;
-			wasempty = 1;
-			continue;
-		} else if (wasempty) {
-		emptyends:
-			printk(KERN_WARNING "Empty flash at 0x%08x ends at 0x%08x\n", empty_start, ofs);
-			DIRTY_SPACE(ofs-empty_start);
-			wasempty = 0;
-			continue;
+			}
+
+			/* See how much more there is to read in this eraseblock... */
+			buf_len = min_t(uint32_t, buf_size, jeb->offset + c->sector_size - ofs);
+			if (!buf_len) {
+				/* No more to read. Break out of main loop without marking 
+				   this range of empty space as dirty (because it's not) */
+				D1(printk(KERN_DEBUG "Empty flash at %08x runs to end of block. Treating as free_space\n",
+					  empty_start));
+				break;
+			}
+			D1(printk(KERN_DEBUG "Reading another 0x%x at 0x%08x\n", buf_len, ofs));
+			err = jffs2_fill_scan_buf(c, buf, ofs, buf_len);
+			if (err)
+				return err;
+			buf_ofs = ofs;
+			goto more_empty;
 		}
 
 		if (ofs == jeb->offset && je16_to_cpu(node->magic) == KSAMTIB_CIGAM_2SFFJ) {
@@ -554,7 +561,7 @@ static int jffs2_scan_eraseblock (struct jffs2_sb_info *c, struct jffs2_eraseblo
 				marker_ref->next_in_ino = NULL;
 				marker_ref->next_phys = NULL;
 				marker_ref->flash_offset = ofs | REF_NORMAL;
-				marker_ref->totlen = c->cleanmarker_size;
+				marker_ref->__totlen = c->cleanmarker_size;
 				jeb->first_node = jeb->last_node = marker_ref;
 			     
 				USED_SPACE(PAD(c->cleanmarker_size));
@@ -610,7 +617,7 @@ static int jffs2_scan_eraseblock (struct jffs2_sb_info *c, struct jffs2_eraseblo
 	}
 
 	if ((jeb->used_size + jeb->unchecked_size) == PAD(c->cleanmarker_size) && !jeb->dirty_size 
-		&& (!jeb->first_node || jeb->first_node->next_in_ino) )
+		&& (!jeb->first_node || !jeb->first_node->next_in_ino) )
 		return BLK_STATE_CLEANMARKER;
 		
 	/* move blocks with max 4 byte dirty space to cleanlist */	
@@ -634,6 +641,9 @@ static struct jffs2_inode_cache *jffs2_scan_make_ino_cache(struct jffs2_sb_info 
 	if (ic)
 		return ic;
 
+	if (ino > c->highest_ino)
+		c->highest_ino = ino;
+
 	ic = jffs2_alloc_inode_cache();
 	if (!ic) {
 		printk(KERN_NOTICE "jffs2_scan_make_inode_cache(): allocation of inode cache failed\n");
@@ -645,7 +655,7 @@ static struct jffs2_inode_cache *jffs2_scan_make_ino_cache(struct jffs2_sb_info 
 	ic->nodes = (void *)ic;
 	jffs2_add_ino_cache(c, ic);
 	if (ino == 1)
-		ic->nlink=1;
+		ic->nlink = 1;
 	return ic;
 }
 
@@ -698,7 +708,7 @@ static int jffs2_scan_inode_node(struct jffs2_sb_info *c, struct jffs2_erasebloc
 	/* Wheee. It worked */
 
 	raw->flash_offset = ofs | REF_UNCHECKED;
-	raw->totlen = PAD(je32_to_cpu(ri->totlen));
+	raw->__totlen = PAD(je32_to_cpu(ri->totlen));
 	raw->next_phys = NULL;
 	raw->next_in_ino = ic->nodes;
 
@@ -775,7 +785,7 @@ static int jffs2_scan_dirent_node(struct jffs2_sb_info *c, struct jffs2_eraseblo
 		return -ENOMEM;
 	}
 	
-	raw->totlen = PAD(je32_to_cpu(rd->totlen));
+	raw->__totlen = PAD(je32_to_cpu(rd->totlen));
 	raw->flash_offset = ofs | REF_PRISTINE;
 	raw->next_phys = NULL;
 	raw->next_in_ino = ic->nodes;

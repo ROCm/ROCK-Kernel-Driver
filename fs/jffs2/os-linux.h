@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: os-linux.h,v 1.37 2003/10/11 11:47:23 dwmw2 Exp $
+ * $Id: os-linux.h,v 1.47 2004/07/14 13:20:23 dwmw2 Exp $
  *
  */
 
@@ -22,6 +22,9 @@
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,73)
 #define kstatfs statfs
 #endif
+
+struct kstatfs;
+struct kvec;
 
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,2)
 #define JFFS2_INODE_INFO(i) (list_entry(i, struct jffs2_inode_info, vfs_inode))
@@ -69,14 +72,6 @@
 #define JFFS2_F_I_ATIME(f) (OFNI_EDONI_2SFFJ(f)->i_atime)
 #endif
 
-/* Hmmm. P'raps generic code should only ever see versions of signal
-   functions which do the locking automatically? */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,40) && !defined(__rh_config_h__)
-#define current_sig_lock current->sigmask_lock
-#else
-#define current_sig_lock current->sighand->siglock
-#endif
-
 #define sleep_on_spinunlock(wq, s)				\
 	do {							\
 		DECLARE_WAITQUEUE(__wait, current);		\
@@ -113,8 +108,7 @@ static inline void jffs2_init_inode_info(struct jffs2_inode_info *f)
 #define jffs2_flash_read(c, ofs, len, retlen, buf) ((c)->mtd->read((c)->mtd, ofs, len, retlen, buf))
 #define jffs2_flush_wbuf_pad(c) ({ (void)(c), 0; })
 #define jffs2_flush_wbuf_gc(c, i) ({ (void)(c), (void) i, 0; })
-#define jffs2_nand_read_failcnt(c,jeb) do { ; } while(0)
-#define jffs2_write_nand_badblock(c,jeb) do { ; } while(0)
+#define jffs2_write_nand_badblock(c,jeb,bad_offset) (1)
 #define jffs2_nand_flash_setup(c) (0)
 #define jffs2_nand_flash_cleanup(c) do {} while(0)
 #define jffs2_wbuf_dirty(c) (0)
@@ -130,9 +124,7 @@ static inline void jffs2_init_inode_info(struct jffs2_inode_info *f)
 #define jffs2_flash_write_oob(c, ofs, len, retlen, buf) ((c)->mtd->write_oob((c)->mtd, ofs, len, retlen, buf))
 #define jffs2_flash_read_oob(c, ofs, len, retlen, buf) ((c)->mtd->read_oob((c)->mtd, ofs, len, retlen, buf))
 #define jffs2_wbuf_dirty(c) (!!(c)->wbuf_len)
-struct kstatfs;
 
-struct kvec;
 /* wbuf.c */
 int jffs2_flash_writev(struct jffs2_sb_info *c, const struct kvec *vecs, unsigned long count, loff_t to, size_t *retlen, uint32_t ino);
 int jffs2_flash_write(struct jffs2_sb_info *c, loff_t ofs, size_t len, size_t *retlen, const u_char *buf);
@@ -140,12 +132,18 @@ int jffs2_flash_read(struct jffs2_sb_info *c, loff_t ofs, size_t len, size_t *re
 int jffs2_check_oob_empty(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb,int mode);
 int jffs2_check_nand_cleanmarker(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb);
 int jffs2_write_nand_cleanmarker(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb);
-int jffs2_write_nand_badblock(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb);
+int jffs2_write_nand_badblock(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb, uint32_t bad_offset);
 void jffs2_wbuf_timeout(unsigned long data);
 void jffs2_wbuf_process(void *data);
 int jffs2_nand_flash_setup(struct jffs2_sb_info *c);
 void jffs2_nand_flash_cleanup(struct jffs2_sb_info *c);
 #endif /* NAND */
+
+/* erase.c */
+static inline void jffs2_erase_pending_trigger(struct jffs2_sb_info *c)
+{
+	OFNI_BS_2SFFJ(c)->s_dirt = 1;
+}
 
 /* background.c */
 int jffs2_start_garbage_collect_thread(struct jffs2_sb_info *c);
@@ -184,12 +182,25 @@ int jffs2_statfs (struct super_block *, struct kstatfs *);
 void jffs2_write_super (struct super_block *);
 int jffs2_remount_fs (struct super_block *, int *, char *);
 int jffs2_do_fill_super(struct super_block *sb, void *data, int silent);
+void jffs2_gc_release_inode(struct jffs2_sb_info *c,
+			    struct jffs2_inode_info *f);
+struct jffs2_inode_info *jffs2_gc_fetch_inode(struct jffs2_sb_info *c,
+					      int inum, int nlink);
+
+unsigned char *jffs2_gc_fetch_page(struct jffs2_sb_info *c, 
+				   struct jffs2_inode_info *f, 
+				   unsigned long offset,
+				   unsigned long *priv);
+void jffs2_gc_release_page(struct jffs2_sb_info *c,
+			   unsigned char *pg,
+			   unsigned long *priv);
+int jffs2_flash_setup(struct jffs2_sb_info *c);
+void jffs2_flash_cleanup(struct jffs2_sb_info *c);
+     
 
 /* writev.c */
 int jffs2_flash_direct_writev(struct jffs2_sb_info *c, const struct kvec *vecs, 
 		       unsigned long count, loff_t to, size_t *retlen);
-
-/* super.c */
 
 
 #endif /* __JFFS2_OS_LINUX_H__ */

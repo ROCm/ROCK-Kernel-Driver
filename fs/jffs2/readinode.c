@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: readinode.c,v 1.107 2003/10/04 08:33:06 dwmw2 Exp $
+ * $Id: readinode.c,v 1.113 2003/11/03 13:20:33 dwmw2 Exp $
  *
  */
 
@@ -55,6 +55,66 @@ void jffs2_print_frag_list(struct jffs2_inode_info *f)
 	if (f->metadata) {
 		printk(KERN_DEBUG "metadata at 0x%08x\n", ref_offset(f->metadata->raw));
 	}
+}
+
+static int jffs2_sanitycheck_fragtree(struct jffs2_inode_info *f)
+{
+	struct jffs2_node_frag *frag;
+	int bitched = 0;
+
+	for (frag = frag_first(&f->fragtree); frag; frag = frag_next(frag)) {
+
+		struct jffs2_full_dnode *fn = frag->node;
+		if (!fn || !fn->raw)
+			continue;
+
+		if (ref_flags(fn->raw) == REF_PRISTINE) {
+
+			if (fn->frags > 1) {
+				printk(KERN_WARNING "REF_PRISTINE node at 0x%08x had %d frags. Tell dwmw2\n", ref_offset(fn->raw), fn->frags);
+				bitched = 1;
+			}
+			/* A hole node which isn't multi-page should be garbage-collected
+			   and merged anyway, so we just check for the frag size here,
+			   rather than mucking around with actually reading the node
+			   and checking the compression type, which is the real way
+			   to tell a hole node. */
+			if (frag->ofs & (PAGE_CACHE_SIZE-1) && frag_prev(frag) && frag_prev(frag)->size < PAGE_CACHE_SIZE && frag_prev(frag)->node) {
+				printk(KERN_WARNING "REF_PRISTINE node at 0x%08x had a previous non-hole frag in the same page. Tell dwmw2\n",
+				       ref_offset(fn->raw));
+				bitched = 1;
+			}
+
+			if ((frag->ofs+frag->size) & (PAGE_CACHE_SIZE-1) && frag_next(frag) && frag_next(frag)->size < PAGE_CACHE_SIZE && frag_next(frag)->node) {
+				printk(KERN_WARNING "REF_PRISTINE node at 0x%08x (%08x-%08x) had a following non-hole frag in the same page. Tell dwmw2\n",
+				       ref_offset(fn->raw), frag->ofs, frag->ofs+frag->size);
+				bitched = 1;
+			}
+		}
+	}
+	
+	if (bitched) {
+		struct jffs2_node_frag *thisfrag;
+
+		printk(KERN_WARNING "Inode is #%u\n", f->inocache->ino);
+		thisfrag = frag_first(&f->fragtree);
+		while (thisfrag) {
+			if (!thisfrag->node) {
+				printk("Frag @0x%x-0x%x; node-less hole\n",
+				       thisfrag->ofs, thisfrag->size + thisfrag->ofs);
+			} else if (!thisfrag->node->raw) {
+				printk("Frag @0x%x-0x%x; raw-less hole\n",
+				       thisfrag->ofs, thisfrag->size + thisfrag->ofs);
+			} else {
+				printk("Frag @0x%x-0x%x; raw at 0x%08x(%d) (0x%x-0x%x)\n",
+				       thisfrag->ofs, thisfrag->size + thisfrag->ofs,
+				       ref_offset(thisfrag->node->raw), ref_flags(thisfrag->node->raw),
+				       thisfrag->node->ofs, thisfrag->node->ofs+thisfrag->node->size);
+			}
+			thisfrag = frag_next(thisfrag);
+		}
+	}
+	return bitched;
 }
 #endif /* D1 */
 
@@ -130,6 +190,11 @@ int jffs2_add_full_dnode_to_inode(struct jffs2_sb_info *c, struct jffs2_inode_in
 				mark_ref_normal(next->node->raw);
 		}
 	}
+	D2(if (jffs2_sanitycheck_fragtree(f)) {
+		   printk(KERN_WARNING "Just added node %04x-%04x @0x%08x on flash, newfrag *%p\n",
+			  fn->ofs, fn->ofs+fn->size, ref_offset(fn->raw), newfrag);
+		   return 0;
+	   })
 	D2(jffs2_print_frag_list(f));
 	return 0;
 }
@@ -384,6 +449,7 @@ int jffs2_do_read_inode(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
 		}
 	}
 	spin_unlock(&c->inocache_lock);
+
 	if (!f->inocache && ino == 1) {
 		/* Special case - no root inode on medium */
 		f->inocache = jffs2_alloc_inode_cache();
@@ -460,7 +526,7 @@ static int jffs2_do_read_inode_internal(struct jffs2_sb_info *c,
 		fn = tn->fn;
 
 		if (f->metadata) {
-			if (tn->version > mdata_ver) {
+			if (likely(tn->version >= mdata_ver)) {
 				D1(printk(KERN_DEBUG "Obsoleting old metadata at 0x%08x\n", ref_offset(f->metadata->raw)));
 				jffs2_mark_node_obsolete(c, f->metadata->raw);
 				jffs2_free_full_dnode(f->metadata);
@@ -468,10 +534,13 @@ static int jffs2_do_read_inode_internal(struct jffs2_sb_info *c,
 				
 				mdata_ver = 0;
 			} else {
-				D1(printk(KERN_DEBUG "Er. New metadata at 0x%08x with ver %d is actually older than previous %d\n",
-				       ref_offset(f->metadata->raw), tn->version, mdata_ver));
+				/* This should never happen. */
+				printk(KERN_WARNING "Er. New metadata at 0x%08x with ver %d is actually older than previous ver %d at 0x%08x\n",
+					  ref_offset(fn->raw), tn->version, mdata_ver, ref_offset(f->metadata->raw));
 				jffs2_mark_node_obsolete(c, fn->raw);
 				jffs2_free_full_dnode(fn);
+				/* Fill in latest_node from the metadata, not this one we're about to free... */
+				fn = f->metadata;
 				goto next_tn;
 			}
 		}
@@ -488,6 +557,8 @@ static int jffs2_do_read_inode_internal(struct jffs2_sb_info *c,
 		tn_list = tn->next;
 		jffs2_free_tmp_dnode_info(tn);
 	}
+	D1(jffs2_sanitycheck_fragtree(f));
+
 	if (!fn) {
 		/* No data nodes for this inode. */
 		if (f->inocache->ino != 1) {
@@ -594,24 +665,10 @@ static int jffs2_do_read_inode_internal(struct jffs2_sb_info *c,
 void jffs2_do_clear_inode(struct jffs2_sb_info *c, struct jffs2_inode_info *f)
 {
 	struct jffs2_full_dirent *fd, *fds;
-	/* I don't think we care about the potential race due to reading this
-	   without f->sem. It can never get undeleted. */
-	int deleted = f->inocache && !f->inocache->nlink;
-
-	/* If it's a deleted inode, grab the alloc_sem. This prevents
-	   jffs2_garbage_collect_pass() from deciding that it wants to
-	   garbage collect one of the nodes we're just about to mark 
-	   obsolete -- by the time we drop alloc_sem and return, all
-	   the nodes are marked obsolete, and jffs2_g_c_pass() won't
-	   call iget() for the inode in question.
-
-	   We also used to do this to keep the temporary BUG() in 
-	   jffs2_mark_node_obsolete() from triggering. 
-	*/
-	if(deleted)
-		down(&c->alloc_sem);
+	int deleted;
 
 	down(&f->sem);
+	deleted = f->inocache && !f->inocache->nlink;
 
 	if (f->metadata) {
 		if (deleted)
@@ -633,7 +690,4 @@ void jffs2_do_clear_inode(struct jffs2_sb_info *c, struct jffs2_inode_info *f)
 		jffs2_set_inocache_state(c, f->inocache, INO_STATE_CHECKEDABSENT);
 
 	up(&f->sem);
-
-	if(deleted)
-		up(&c->alloc_sem);
 }
