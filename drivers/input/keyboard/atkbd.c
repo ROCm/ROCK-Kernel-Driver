@@ -129,6 +129,7 @@ struct atkbd {
 	signed char ack;
 	unsigned char emul;
 	unsigned short id;
+	unsigned char write;
 };
 
 /*
@@ -146,7 +147,7 @@ static void atkbd_interrupt(struct serio *serio, unsigned char data, unsigned in
 #endif
 
 	/* Interface error.  Request that the keyboard resend. */
-	if (flags & (SERIO_FRAME | SERIO_PARITY)) {
+	if ((flags & (SERIO_FRAME | SERIO_PARITY)) && atkbd->write) {
 		printk("atkbd.c: frame/parity error: %02x\n", flags);
 		serio_write(serio, ATKBD_CMD_RESEND);
 		return;
@@ -265,7 +266,7 @@ static int atkbd_event(struct input_dev *dev, unsigned int type, unsigned int co
 	struct atkbd *atkbd = dev->private;
 	char param[2];
 
-	if (!atkbd->serio->write)
+	if (!atkbd->write)
 		return -1;
 
 	switch (type) {
@@ -449,15 +450,19 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 	struct atkbd *atkbd;
 	int i;
 
-	if ((serio->type & SERIO_TYPE) != SERIO_8042)
-		return;
+	if ((serio->type & SERIO_TYPE) != SERIO_8042 &&
+		(((serio->type & SERIO_TYPE) != SERIO_RS232) || (serio->type & SERIO_PROTO) != SERIO_PS2SER))
+		        return;
 
 	if (!(atkbd = kmalloc(sizeof(struct atkbd), GFP_KERNEL)))
 		return;
 
 	memset(atkbd, 0, sizeof(struct atkbd));
 
-	if (serio->write) {
+	if ((serio->type & SERIO_TYPE) == SERIO_8042 && serio->write)
+		atkbd->write = 1;
+
+	if (atkbd->write) {
 		atkbd->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_LED) | BIT(EV_REP);
 		atkbd->dev.ledbit[0] = BIT(LED_NUML) | BIT(LED_CAPSL) | BIT(LED_SCROLLL);
 	} else  atkbd->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_REP);
@@ -475,7 +480,7 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 		return;
 	}
 
-	if (serio->write) {
+	if (atkbd->write) {
 
 		if (atkbd_probe(atkbd)) {
 			serio_close(serio);
@@ -518,7 +523,7 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 
 	printk(KERN_INFO "input: %s on %s\n", atkbd->name, serio->phys);
 
-	if (serio->write)
+	if (atkbd->write)
 		atkbd_initialize(atkbd);
 }
 
