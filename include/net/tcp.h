@@ -361,8 +361,8 @@ extern void tcp_tw_deschedule(struct tcp_tw_bucket *tw);
 #define TCP_IPV6_MATCH(__sk, __saddr, __daddr, __ports, __dif)	   \
 	(((*((__u32 *)&(inet_sk(__sk)->dport)))== (__ports))   	&& \
 	 ((__sk)->sk_family		== AF_INET6)		&& \
-	 !ipv6_addr_cmp(&inet6_sk(__sk)->daddr, (__saddr))	&& \
-	 !ipv6_addr_cmp(&inet6_sk(__sk)->rcv_saddr, (__daddr))	&& \
+	 ipv6_addr_equal(&inet6_sk(__sk)->daddr, (__saddr))	&& \
+	 ipv6_addr_equal(&inet6_sk(__sk)->rcv_saddr, (__daddr))	&& \
 	 (!((__sk)->sk_bound_dev_if) || ((__sk)->sk_bound_dev_if == (__dif))))
 
 /* These can have wildcards, don't try too hard. */

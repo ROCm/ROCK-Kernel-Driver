@@ -342,8 +342,8 @@ static struct frag_queue *ip6_frag_intern(unsigned int hash,
 #ifdef CONFIG_SMP
 	for (fq = ip6_frag_hash[hash]; fq; fq = fq->next) {
 		if (fq->id == fq_in->id && 
-		    !ipv6_addr_cmp(&fq_in->saddr, &fq->saddr) &&
-		    !ipv6_addr_cmp(&fq_in->daddr, &fq->daddr)) {
+		    ipv6_addr_equal(&fq_in->saddr, &fq->saddr) &&
+		    ipv6_addr_equal(&fq_in->daddr, &fq->daddr)) {
 			atomic_inc(&fq->refcnt);
 			write_unlock(&ip6_frag_lock);
 			fq_in->last_in |= COMPLETE;
@@ -406,8 +406,8 @@ fq_find(u32 id, struct in6_addr *src, struct in6_addr *dst)
 	read_lock(&ip6_frag_lock);
 	for(fq = ip6_frag_hash[hash]; fq; fq = fq->next) {
 		if (fq->id == id && 
-		    !ipv6_addr_cmp(src, &fq->saddr) &&
-		    !ipv6_addr_cmp(dst, &fq->daddr)) {
+		    ipv6_addr_equal(src, &fq->saddr) &&
+		    ipv6_addr_equal(dst, &fq->daddr)) {
 			atomic_inc(&fq->refcnt);
 			read_unlock(&ip6_frag_lock);
 			return fq;

@@ -209,7 +209,7 @@ match(const struct sk_buff *skb,
 
 				BUG_ON(ap == NULL);
 
-				if (!ipv6_addr_cmp(ap, &rtinfo->addrs[i])) {
+				if (ipv6_addr_equal(ap, &rtinfo->addrs[i])) {
 					DEBUGP("i=%d temp=%d;\n",i,temp);
 					i++;
 				}
@@ -236,7 +236,7 @@ match(const struct sk_buff *skb,
 							&_addr);
 				BUG_ON(ap == NULL);
 
-				if (ipv6_addr_cmp(ap, &rtinfo->addrs[temp]))
+				if (!ipv6_addr_equal(ap, &rtinfo->addrs[temp]))
 					break;
 			}
 			DEBUGP("temp=%d #%d\n", temp, rtinfo->addrnr);
