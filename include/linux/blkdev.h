@@ -369,6 +369,7 @@ struct request_queue
 #define	QUEUE_FLAG_READFULL	3	/* write queue has been filled */
 #define QUEUE_FLAG_WRITEFULL	4	/* read queue has been filled */
 #define QUEUE_FLAG_DEAD		5	/* queue being torn down */
+#define QUEUE_FLAG_REENTER	6	/* Re-entrancy avoidance */
 
 #define blk_queue_plugged(q)	!list_empty(&(q)->plug_list)
 #define blk_queue_tagged(q)	test_bit(QUEUE_FLAG_QUEUED, &(q)->queue_flags)
