@@ -109,10 +109,10 @@ static const char udsl_driver_name [] = "speedtch";
 #define UDSL_MAX_SND_BUFS		8
 #define UDSL_MAX_RCV_BUF_SIZE		1024 /* ATM cells */
 #define UDSL_MAX_SND_BUF_SIZE		1024 /* ATM cells */
-#define UDSL_DEFAULT_RCV_URBS		1
-#define UDSL_DEFAULT_SND_URBS		1
-#define UDSL_DEFAULT_RCV_BUFS		2
-#define UDSL_DEFAULT_SND_BUFS		2
+#define UDSL_DEFAULT_RCV_URBS		2
+#define UDSL_DEFAULT_SND_URBS		2
+#define UDSL_DEFAULT_RCV_BUFS		4
+#define UDSL_DEFAULT_SND_BUFS		4
 #define UDSL_DEFAULT_RCV_BUF_SIZE	64 /* ATM cells */
 #define UDSL_DEFAULT_SND_BUF_SIZE	64 /* ATM cells */
 
