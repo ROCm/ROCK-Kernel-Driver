@@ -49,7 +49,7 @@ struct net_bridge_fdb_entry
 	union {
 		struct list_head	age_list;
 		struct rcu_head		rcu;
-	};
+	} u;
 	atomic_t			use_count;
 	unsigned long			ageing_timer;
 	mac_addr			addr;
