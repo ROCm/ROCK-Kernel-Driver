@@ -1,5 +1,5 @@
 /*
- *	Industrial Computer Source WDT500/501 driver for Linux 1.3.x
+ *	Industrial Computer Source WDT500/501 driver
  *
  *	(c) Copyright 1995	CymruNET Ltd
  *				Innovation Centre
@@ -40,52 +40,13 @@
 /* programmable outputs: */
 #define WDT_PROGOUT		(io+15)	/* wr=enable, rd=disable */
 
-#define WDC_SR_WCCR		1	/* Active low */
-#define WDC_SR_TGOOD		2
-#define WDC_SR_ISOI0		4
-#define WDC_SR_ISII1		8
-#define WDC_SR_FANGOOD		16
-#define WDC_SR_PSUOVER		32	/* Active low */
-#define WDC_SR_PSUUNDR		64	/* Active low */
-#define WDC_SR_IRQ		128	/* Active low */
+								/* FAN 501 500 */
+#define WDC_SR_WCCR		1	/* Active low */	/*  X   X   X  */
+#define WDC_SR_TGOOD		2				/*  X   X   -  */
+#define WDC_SR_ISOI0		4				/*  X   X   X  */
+#define WDC_SR_ISII1		8				/*  X   X   X  */
+#define WDC_SR_FANGOOD		16				/*  X   -   -  */
+#define WDC_SR_PSUOVER		32	/* Active low */	/*  X   X   -  */
+#define WDC_SR_PSUUNDR		64	/* Active low */	/*  X   X   -  */
+#define WDC_SR_IRQ		128	/* Active low */	/*  X   X   X  */
 
-#ifndef WDT_IS_PCI
-
-/*
- *	Feature Map 1 is the active high inputs not supported on your card.
- *	Feature Map 2 is the active low inputs not supported on your card.
- */
- 
-#ifdef CONFIG_WDT_501		/* Full board */
-
-#ifdef CONFIG_WDT501_FAN	/* Full board, Fan has no tachometer */
-#define FEATUREMAP1		0
-#define WDT_OPTION_MASK		(WDIOF_OVERHEAT|WDIOF_POWERUNDER|WDIOF_POWEROVER|WDIOF_EXTERN1|WDIOF_EXTERN2|WDIOF_FANFAULT)
-#else
-#define FEATUREMAP1		WDC_SR_FANGOOD
-#define WDT_OPTION_MASK		(WDIOF_OVERHEAT|WDIOF_POWERUNDER|WDIOF_POWEROVER|WDIOF_EXTERN1|WDIOF_EXTERN2)
-#endif
-
-#define FEATUREMAP2		0
-#endif
-
-#ifndef CONFIG_WDT_501
-#define CONFIG_WDT_500
-#endif
-
-#ifdef CONFIG_WDT_500		/* Minimal board */
-#define FEATUREMAP1		(WDC_SR_TGOOD|WDC_SR_FANGOOD)
-#define FEATUREMAP2		(WDC_SR_PSUOVER|WDC_SR_PSUUNDR)
-#define WDT_OPTION_MASK		(WDIOF_OVERHEAT)
-#endif
-
-#else
-
-#define FEATUREMAP1		(WDC_SR_TGOOD|WDC_SR_FANGOOD)
-#define FEATUREMAP2		(WDC_SR_PSUOVER|WDC_SR_PSUUNDR)
-#define WDT_OPTION_MASK		(WDIOF_OVERHEAT)
-#endif
-
-#ifndef FEATUREMAP1
-#error "Config option not set"
-#endif
