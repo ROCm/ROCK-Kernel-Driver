@@ -262,7 +262,7 @@ struct hci_conn *hci_connect(struct hci_dev *hdev, int type, bdaddr_t *src);
 int hci_conn_auth(struct hci_conn *conn);
 int hci_conn_encrypt(struct hci_conn *conn);
 
-static inline void hci_conn_set_timer(struct hci_conn *conn, long timeout)
+static inline void hci_conn_set_timer(struct hci_conn *conn, unsigned long timeout)
 {
 	mod_timer(&conn->timer, jiffies + timeout);
 }
@@ -280,8 +280,11 @@ static inline void hci_conn_hold(struct hci_conn *conn)
 
 static inline void hci_conn_put(struct hci_conn *conn)
 {
-	if (atomic_dec_and_test(&conn->refcnt) && conn->out)
-		hci_conn_set_timer(conn, HCI_DISCONN_TIMEOUT);
+	if (atomic_dec_and_test(&conn->refcnt) && conn->out) {
+		unsigned long timeo = (conn->type == ACL_LINK) ? 
+					HCI_DISCONN_TIMEOUT : HZ / 100;
+		hci_conn_set_timer(conn, timeo);
+	}
 }
 
 /* ----- HCI tasks ----- */
