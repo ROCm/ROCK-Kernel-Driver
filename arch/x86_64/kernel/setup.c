@@ -727,6 +727,8 @@ static int __init init_amd(struct cpuinfo_x86 *c)
 		cpu = c->x86_apicid;
 		if (acpi_numa <= 0 && c->x86_num_cores > 1) {
 			cpu_to_node[cpu] = cpu >> hweight32(c->x86_num_cores - 1);
+			if (!node_online(cpu_to_node[cpu]))
+				cpu_to_node[cpu] = first_node(node_online_map);
 		}
 		printk(KERN_INFO "CPU %d(%d) -> Node %d\n",
 				cpu, c->x86_num_cores, cpu_to_node[cpu]);
