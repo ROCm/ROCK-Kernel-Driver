@@ -31,6 +31,11 @@ static inline struct page *page_cache_alloc(struct address_space *x)
 	return alloc_pages(x->gfp_mask, 0);
 }
 
+static inline struct page *page_cache_alloc_cold(struct address_space *x)
+{
+	return alloc_pages(x->gfp_mask|__GFP_COLD, 0);
+}
+
 typedef int filler_t(void *, struct page *);
 
 extern struct page * find_get_page(struct address_space *mapping,

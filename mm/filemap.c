@@ -258,7 +258,7 @@ static int page_cache_read(struct file * file, unsigned long offset)
 	struct page *page; 
 	int error;
 
-	page = page_cache_alloc(mapping);
+	page = page_cache_alloc_cold(mapping);
 	if (!page)
 		return -ENOMEM;
 
@@ -705,7 +705,7 @@ no_cached_page:
 		 * page..
 		 */
 		if (!cached_page) {
-			cached_page = page_cache_alloc(mapping);
+			cached_page = page_cache_alloc_cold(mapping);
 			if (!cached_page) {
 				desc->error = -ENOMEM;
 				break;
@@ -1199,7 +1199,7 @@ repeat:
 	page = find_get_page(mapping, index);
 	if (!page) {
 		if (!cached_page) {
-			cached_page = page_cache_alloc(mapping);
+			cached_page = page_cache_alloc_cold(mapping);
 			if (!cached_page)
 				return ERR_PTR(-ENOMEM);
 		}

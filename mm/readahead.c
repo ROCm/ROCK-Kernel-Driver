@@ -176,7 +176,7 @@ int do_page_cache_readahead(struct address_space *mapping,
 			continue;
 
 		read_unlock(&mapping->page_lock);
-		page = page_cache_alloc(mapping);
+		page = page_cache_alloc_cold(mapping);
 		read_lock(&mapping->page_lock);
 		if (!page)
 			break;
