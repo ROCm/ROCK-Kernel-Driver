@@ -55,8 +55,8 @@
 #include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <linux/ioport.h>
+#include <linux/moduleparam.h>
 #include <sound/core.h>
-#define SNDRV_GET_ID
 #include <sound/initval.h>
 #include <sound/rawmidi.h>
 #include <linux/delay.h>
@@ -83,19 +83,19 @@ static long port = MTPAV_IOBASE;	/* 0x378, 0x278 */
 static int irq = MTPAV_IRQ;		/* 7, 5 */
 static int hwports = MTPAV_MAX_PORTS;	/* use hardware ports 1-8 */
 
-MODULE_PARM(index, "i");
+module_param(index, int, 0444);
 MODULE_PARM_DESC(index, "Index value for MotuMTPAV MIDI.");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-MODULE_PARM(id, "s");
+module_param(id, charp, 0444);
 MODULE_PARM_DESC(id, "ID string for MotuMTPAV MIDI.");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-MODULE_PARM(port, "l");
+module_param(port, long, 0444);
 MODULE_PARM_DESC(port, "Parallel port # for MotuMTPAV MIDI.");
 MODULE_PARM_SYNTAX(port, SNDRV_ENABLED ",allows:{{0x378},{0x278}},dialog:list");
-MODULE_PARM(irq, "i");
+module_param(irq, int, 0444);
 MODULE_PARM_DESC(irq, "Parallel IRQ # for MotuMTPAV MIDI.");
 MODULE_PARM_SYNTAX(irq,  SNDRV_ENABLED ",allows:{{7},{5}},dialog:list");
-MODULE_PARM(hwports, "i");
+module_param(hwports, int, 0444);
 MODULE_PARM_DESC(hwports, "Hardware ports # for MotuMTPAV MIDI.");
 MODULE_PARM_SYNTAX(hwports, SNDRV_ENABLED ",allows:{{1,8}},dialog:list");
 
@@ -800,25 +800,3 @@ static void __exit alsa_card_mtpav_exit(void)
 
 module_init(alsa_card_mtpav_init)
 module_exit(alsa_card_mtpav_exit)
-
-#ifndef MODULE
-
-/* format is: snd-mtpav=enable,index,id,
-			port,irq,hwports */
-
-static int __init alsa_card_mtpav_setup(char *str)
-{
-        int __attribute__ ((__unused__)) enable = 1;
-
-	(void)(get_option(&str,&enable) == 2 &&
-	       get_option(&str,&index) == 2 &&
-	       get_id(&str,&id) == 2 &&
-	       get_option_long(&str,&port) == 2 &&
-	       get_option(&str,&irq) == 2 &&
-	       get_option(&str,&hwports) == 2);
-	return 1;
-}
-
-__setup("snd-mtpav=", alsa_card_mtpav_setup);
-
-#endif /* ifndef MODULE */

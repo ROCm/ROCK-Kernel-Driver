@@ -18,8 +18,7 @@
  * Vortex PCM ALSA driver.
  *
  * Supports ADB and WT DMA. Unfortunately, WT channels do not run yet.
- * It remains stuck,and DMA transfers do not happen.
- *
+ * It remains stuck,and DMA transfers do not happen. 
  */
 
 #include <sound/driver.h>
@@ -124,7 +123,7 @@ static int snd_vortex_pcm_open(snd_pcm_substream_t * substream)
 	vortex_t *vortex = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	int err;
-
+	
 	/* Force equal size periods */
 	if ((err =
 	     snd_pcm_hw_constraint_integer(runtime,
@@ -232,12 +231,13 @@ snd_vortex_pcm_hw_params(snd_pcm_substream_t * substream,
 	}
 #ifndef CHIP_AU8810
 	else {
-		/*if (stream != NULL)
+		/* if (stream != NULL)
 		   vortex_wt_allocroute(chip, substream->number, 0); */
 		vortex_wt_allocroute(chip, substream->number,
 				     params_channels(hw_params));
 		stream = substream->runtime->private_data =
 		    &chip->dma_wt[substream->number];
+		stream->dma = substream->number;
 		stream->substream = substream;
 		vortex_wtdma_setbuffers(chip, substream->number, sgbuf,
 					params_period_bytes(hw_params),
@@ -325,7 +325,7 @@ static int snd_vortex_pcm_trigger(snd_pcm_substream_t * substream, int cmd)
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
 		// do something to stop the PCM engine
-		//printk(KERN_INFO "vortex: stop %d\n", dma)
+		//printk(KERN_INFO "vortex: stop %d\n", dma);
 		stream->fifo_enabled = 0;
 		if (VORTEX_PCM_TYPE(substream->pcm) != VORTEX_PCM_WT)
 			vortex_adbdma_pausefifo(chip, dma);
@@ -502,18 +502,13 @@ static int __devinit snd_vortex_new_pcm(vortex_t * chip, int idx, int nr)
 	if (idx == VORTEX_PCM_ADB)
 		snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE,
 				&snd_vortex_playback_ops);
-
+	
 	/* pre-allocation of Scatter-Gather buffers */
 	
 	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV_SG,
-										  snd_dma_pci_data(chip->pci_dev),
-										  0x10000, 0x10000);
-	
-	// The above should be used, as soon as ALSA gets updated.
-	/*
-	snd_pcm_lib_preallocate_sg_pages_for_all(chip->pci_dev, pcm,
-						 0x10000, 0x10000);
-	*/
+					      snd_dma_pci_data(chip->pci_dev),
+					      0x10000, 0x10000);
+
 	if (VORTEX_PCM_TYPE(pcm) == VORTEX_PCM_SPDIF) {
 		snd_kcontrol_t *kcontrol;
 

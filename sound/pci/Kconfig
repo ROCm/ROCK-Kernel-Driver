@@ -16,11 +16,11 @@ config SND_ALI5451
 	  Say 'Y' or 'M' to include support for ALI PCI Audio M5451 sound core.
 
 config SND_ATIIXP
-	tristate "ATI IXP 150/200/250"
+	tristate "ATI IXP 150/200/250/300"
 	depends on SND
 	select SND_AC97_CODEC
 	help
-	  Say 'Y' or 'M' to include support for ATI IXP 150/200/250 AC97 controller.
+	  Say 'Y' or 'M' to include support for ATI IXP 150/200/250/300 AC97 controller.
 
 config SND_AU8810
         tristate "Aureal Advantage"
@@ -29,6 +29,9 @@ config SND_AU8810
 	select SND_AC97_CODEC
         help
           Say 'Y' or 'M' to include support for Aureal Advantage soundcards.
+          Supported features: Hardware Mixer, SRC, EQ and SPDIF output.
+          3D support code is in place, but not yet useable. For more info, 
+          email the ALSA developer list, or mjander@users.sourceforge.net.
  
 config SND_AU8820
         tristate "Aureal Vortex"
@@ -37,6 +40,8 @@ config SND_AU8820
 	select SND_AC97_CODEC
         help
           Say 'Y' or 'M' to include support for Aureal Vortex soundcards.
+          Supported features: Hardware Mixer and SRC. For more info, email 
+          the ALSA developer list, or mjander@users.sourceforge.net.
  
 config SND_AU8830
         tristate "Aureal Vortex 2"
@@ -45,6 +50,9 @@ config SND_AU8830
 	select SND_AC97_CODEC
         help
           Say 'Y' or 'M' to include support for Aureal Vortex 2 soundcards.
+          Supported features: Hardware Mixer, SRC, EQ and SPDIF output.
+          3D support code is in place, but not yet useable. For more info, 
+          email the ALSA developer list, or mjander@users.sourceforge.net.
  
 config SND_AZT3328
 	tristate "Aztech AZF3328 / PCI168 (EXPERIMENTAL)"
@@ -262,15 +270,15 @@ config SND_ICE1712
 	  TerraTec - EWX 24/96, EWS 88MT, EWS 88D, DMX 6Fire.
 
 config SND_ICE1724
-	tristate "ICE/VT1724 (Envy24HT)"
+	tristate "ICE/VT1724/1720 (Envy24HT/PT)"
 	depends on SND
 	select SND_MPU401_UART
 	select SND_AC97_CODEC
 	help
-	  Say 'Y' or 'M' to include support for ICE/VT1724 (Envy24HT) based
+	  Say 'Y' or 'M' to include support for ICE/VT1724/1720 (Envy24HT/PT) based
 	  soundcards.
 	  Currently supported hardware is: MidiMan M Audio - Revolution 7.1,
-	  AMP Ltd AUDIO2000.
+	  AMP Ltd AUDIO2000, Terratec Aureon 5.1 Sky/7.1, AudioTrak Prodigy 7.1.
 
 config SND_INTEL8X0
 	tristate "Intel i8x0/MX440, SiS 7012; Ali 5455; NForce Audio; AMD768/8111"

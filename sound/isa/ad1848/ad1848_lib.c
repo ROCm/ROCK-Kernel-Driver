@@ -647,12 +647,12 @@ static void snd_ad1848_thinkpad_twiddle(ad1848_t *chip, int on) {
 }
 
 #ifdef CONFIG_PM
-static void snd_ad1848_suspend(ad1848_t *chip) {
-
-	snd_card_t *card = chip->card;
+static int snd_ad1848_suspend(snd_card_t *card, unsigned int state)
+{
+	ad1848_t *chip = snd_magic_cast(ad1848_t, card->pm_private_data, return -EINVAL);
 
 	if (card->power_state == SNDRV_CTL_POWER_D3hot)
-		return;
+		return 0;
 
 	snd_pcm_suspend_all(chip->pcm);
 	/* FIXME: save registers? */
@@ -661,14 +661,15 @@ static void snd_ad1848_suspend(ad1848_t *chip) {
 		snd_ad1848_thinkpad_twiddle(chip, 0);
 
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
+	return 0;
 }
 
-static void snd_ad1848_resume(ad1848_t *chip) {
-
-	snd_card_t *card = chip->card;
+static int snd_ad1848_resume(snd_card_t *card, unsigned int state)
+{
+	ad1848_t *chip = snd_magic_cast(ad1848_t, card->pm_private_data, return -EINVAL);
 
 	if (card->power_state == SNDRV_CTL_POWER_D0)
-		return;
+		return 0;
 
 	if (chip->thinkpad_flag)
 		snd_ad1848_thinkpad_twiddle(chip, 1);
@@ -676,43 +677,8 @@ static void snd_ad1848_resume(ad1848_t *chip) {
 	/* FIXME: restore registers? */
 
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
-}
-
-/* callback for control API */
-static int snd_ad1848_set_power_state(snd_card_t *card, unsigned int power_state)
-{
-	ad1848_t *chip = (ad1848_t *) card->power_state_private_data;
-	switch (power_state) {
-	case SNDRV_CTL_POWER_D0:
-	case SNDRV_CTL_POWER_D1:
-	case SNDRV_CTL_POWER_D2:
-		snd_ad1848_resume(chip);
-		break;
-	case SNDRV_CTL_POWER_D3hot:
-	case SNDRV_CTL_POWER_D3cold:
-		snd_ad1848_suspend(chip);
-		break;
-	default:
-		return -EINVAL;
-	}
 	return 0;
 }
-
-static int snd_ad1848_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
-{
-	ad1848_t *chip = snd_magic_cast(ad1848_t, dev->data, return 0);
-
-	switch (rqst) {
-	case PM_SUSPEND:
-		snd_ad1848_suspend(chip);
-		break;
-	case PM_RESUME:
-		snd_ad1848_resume(chip);
-		break;
-	}
-	return 0;
-}
-
 #endif /* CONFIG_PM */
 
 static int snd_ad1848_probe(ad1848_t * chip)
@@ -891,10 +857,6 @@ static int snd_ad1848_capture_close(snd_pcm_substream_t * substream)
 
 static int snd_ad1848_free(ad1848_t *chip)
 {
-#ifdef CONFIG_PM
-        if (chip->thinkpad_pmstate)
-                pm_unregister(chip->thinkpad_pmstate);
-#endif
 	if (chip->res_port) {
 		release_resource(chip->res_port);
 		kfree_nocheck(chip->res_port);
@@ -973,14 +935,7 @@ int snd_ad1848_create(snd_card_t * card,
 		chip->thinkpad_flag = 1;
 		chip->hardware = AD1848_HW_DETECT; /* reset */
 		snd_ad1848_thinkpad_twiddle(chip, 1);
-#ifdef CONFIG_PM
-		chip->thinkpad_pmstate = pm_register(PM_ISA_DEV, 0, snd_ad1848_pm_callback);
-		if (chip->thinkpad_pmstate) {
-			chip->thinkpad_pmstate->data = chip;
-			card->set_power_state = snd_ad1848_set_power_state; /* callback */
-			card->power_state_private_data = chip;
-		}
-#endif
+		snd_card_set_isa_pm_callback(card, snd_ad1848_suspend, snd_ad1848_resume, chip);
 	}
 
 	if (snd_ad1848_probe(chip) < 0) {

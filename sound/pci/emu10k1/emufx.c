@@ -120,8 +120,8 @@ static char *creative_outs[32] = {
 	/* 0x0a */ "PCM Capture Left",
 	/* 0x0b */ "PCM Capture Right",
 	/* 0x0c */ "MIC Capture",
-	/* 0x0d */ NULL,
-	/* 0x0e */ NULL,
+	/* 0x0d */ "AC97 Surround Left",
+	/* 0x0e */ "AC97 Surround Right",
 	/* 0x0f */ NULL,
 	/* 0x10 */ NULL,
 	/* 0x11 */ "Analog Center",
@@ -2113,22 +2113,26 @@ static int __devinit _snd_emu10k1_init_efx(emu10k1_t *emu)
 		for (z = 0; z < 2; z++)
 			OP(icode, &ptr, iACC3, EXTOUT(EXTOUT_REAR_L + z), GPR(playback + SND_EMU10K1_PLAYBACK_CHANNELS + 2 + z), C_00000000, C_00000000);
 
-	if (emu->fx8010.extout_mask & (1<<EXTOUT_CENTER)) {
+	if (emu->fx8010.extout_mask & ((1<<EXTOUT_AC97_REAR_L)|(1<<EXTOUT_AC97_REAR_R)))
+		for (z = 0; z < 2; z++)
+			OP(icode, &ptr, iACC3, EXTOUT(EXTOUT_AC97_REAR_L + z), GPR(playback + SND_EMU10K1_PLAYBACK_CHANNELS + 2 + z), C_00000000, C_00000000);
+
+	if (emu->fx8010.extout_mask & (1<<EXTOUT_AC97_CENTER)) {
 #ifndef EMU10K1_CENTER_LFE_FROM_FRONT
-		OP(icode, &ptr, iACC3, EXTOUT(EXTOUT_CENTER), GPR(playback + SND_EMU10K1_PLAYBACK_CHANNELS + 4), C_00000000, C_00000000);
+		OP(icode, &ptr, iACC3, EXTOUT(EXTOUT_AC97_CENTER), GPR(playback + SND_EMU10K1_PLAYBACK_CHANNELS + 4), C_00000000, C_00000000);
 		OP(icode, &ptr, iACC3, EXTOUT(EXTOUT_ACENTER), GPR(playback + SND_EMU10K1_PLAYBACK_CHANNELS + 4), C_00000000, C_00000000);
 #else
-		OP(icode, &ptr, iACC3, EXTOUT(EXTOUT_CENTER), GPR(playback + SND_EMU10K1_PLAYBACK_CHANNELS + 0), C_00000000, C_00000000);
+		OP(icode, &ptr, iACC3, EXTOUT(EXTOUT_AC97_CENTER), GPR(playback + SND_EMU10K1_PLAYBACK_CHANNELS + 0), C_00000000, C_00000000);
 		OP(icode, &ptr, iACC3, EXTOUT(EXTOUT_ACENTER), GPR(playback + SND_EMU10K1_PLAYBACK_CHANNELS + 0), C_00000000, C_00000000);
 #endif
 	}
 
-	if (emu->fx8010.extout_mask & (1<<EXTOUT_LFE)) {
+	if (emu->fx8010.extout_mask & (1<<EXTOUT_AC97_LFE)) {
 #ifndef EMU10K1_CENTER_LFE_FROM_FRONT
-		OP(icode, &ptr, iACC3, EXTOUT(EXTOUT_LFE), GPR(playback + SND_EMU10K1_PLAYBACK_CHANNELS + 5), C_00000000, C_00000000);
+		OP(icode, &ptr, iACC3, EXTOUT(EXTOUT_AC97_LFE), GPR(playback + SND_EMU10K1_PLAYBACK_CHANNELS + 5), C_00000000, C_00000000);
 		OP(icode, &ptr, iACC3, EXTOUT(EXTOUT_ALFE), GPR(playback + SND_EMU10K1_PLAYBACK_CHANNELS + 5), C_00000000, C_00000000);
 #else
-		OP(icode, &ptr, iACC3, EXTOUT(EXTOUT_LFE), GPR(playback + SND_EMU10K1_PLAYBACK_CHANNELS + 1), C_00000000, C_00000000);
+		OP(icode, &ptr, iACC3, EXTOUT(EXTOUT_AC97_LFE), GPR(playback + SND_EMU10K1_PLAYBACK_CHANNELS + 1), C_00000000, C_00000000);
 		OP(icode, &ptr, iACC3, EXTOUT(EXTOUT_ALFE), GPR(playback + SND_EMU10K1_PLAYBACK_CHANNELS + 1), C_00000000, C_00000000);
 #endif
 	}

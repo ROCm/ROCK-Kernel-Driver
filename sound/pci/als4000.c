@@ -64,13 +64,13 @@
 #include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/gameport.h>
+#include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/rawmidi.h>
 #include <sound/mpu401.h>
 #include <sound/opl3.h>
 #include <sound/sb.h>
-#define SNDRV_GET_ID
 #include <sound/initval.h>
 
 MODULE_AUTHOR("Bart Hartgers <bart@etpmod.phys.tue.nl>");
@@ -89,18 +89,19 @@ static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card *
 #ifdef SUPPORT_JOYSTICK
 static int joystick_port[SNDRV_CARDS];
 #endif
+static int boot_devs;
 
-MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for ALS4000 soundcard.");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for ALS4000 soundcard.");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable ALS4000 soundcard.");
 MODULE_PARM_SYNTAX(enable, SNDRV_INDEX_DESC);
 #ifdef SUPPORT_JOYSTICK
-MODULE_PARM(joystick_port, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(joystick_port, int, boot_devs, 0444);
 MODULE_PARM_DESC(joystick_port, "Joystick port address for ALS4000 soundcard. (0 = disabled)");
 MODULE_PARM_SYNTAX(joystick_port, SNDRV_ENABLED);
 #endif
@@ -755,15 +756,7 @@ static struct pci_driver driver = {
 
 static int __init alsa_card_als4000_init(void)
 {
-	int err;
-	
-	if ((err = pci_module_init(&driver)) < 0) {
-#ifdef MODULE
-		printk(KERN_ERR "no ALS4000 based soundcards found or device busy\n");
-#endif
-		return err;
-	}
-	return 0;
+	return pci_module_init(&driver);
 }
 
 static void __exit alsa_card_als4000_exit(void)
@@ -773,28 +766,3 @@ static void __exit alsa_card_als4000_exit(void)
 
 module_init(alsa_card_als4000_init)
 module_exit(alsa_card_als4000_exit)
-
-#ifndef MODULE
-
-/* format is: snd-als4000=enable,index,id,joystick_port */
-
-static int __init alsa_card_als4000_setup(char *str)
-{
-	static unsigned __initdata nr_dev = 0;
-
-	if (nr_dev >= SNDRV_CARDS)
-		return 0;
-	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
-	       get_option(&str,&index[nr_dev]) == 2 &&
-	       get_id(&str,&id[nr_dev]) == 2
-#ifdef SUPPORT_JOYSTICK
-	       && get_option(&str,&joystick_port[nr_dev]) == 2
-#endif
-	       );
-	nr_dev++;
-	return 1;
-}
-
-__setup("snd-als4000=", alsa_card_als4000_setup);
-
-#endif /* ifndef MODULE */

@@ -45,11 +45,11 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/usb.h>
+#include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/info.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
-#define SNDRV_GET_ID
 #include <sound/initval.h>
 
 #include "usbaudio.h"
@@ -69,26 +69,27 @@ static int vid[SNDRV_CARDS] = { [0 ... (SNDRV_CARDS-1)] = -1 }; /* Vendor ID for
 static int pid[SNDRV_CARDS] = { [0 ... (SNDRV_CARDS-1)] = -1 }; /* Product ID for this card */
 static int nrpacks = 4;		/* max. number of packets per urb */
 static int async_unlink = 1;
+static int boot_devs;
 
-MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for the USB audio adapter.");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for the USB audio adapter.");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable USB audio adapter.");
 MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(vid, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(vid, int, boot_devs, 0444);
 MODULE_PARM_DESC(vid, "Vendor ID for the USB audio device.");
 MODULE_PARM_SYNTAX(vid, SNDRV_ENABLED ",allows:{{-1,0xffff}},base:16");
-MODULE_PARM(pid, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(pid, int, boot_devs, 0444);
 MODULE_PARM_DESC(pid, "Product ID for the USB audio device.");
 MODULE_PARM_SYNTAX(pid, SNDRV_ENABLED ",allows:{{-1,0xffff}},base:16");
-MODULE_PARM(nrpacks, "i");
+module_param(nrpacks, int, 0444);
 MODULE_PARM_DESC(nrpacks, "Max. number of packets per URB.");
 MODULE_PARM_SYNTAX(nrpacks, SNDRV_ENABLED ",allows:{{1,10}}");
-MODULE_PARM(async_unlink, "i");
+module_param(async_unlink, bool, 0444);
 MODULE_PARM_DESC(async_unlink, "Use async unlink mode.");
 MODULE_PARM_SYNTAX(async_unlink, SNDRV_BOOLEAN_TRUE_DESC);
 
@@ -1146,7 +1147,7 @@ static int init_usb_pitch(struct usb_device *dev, int iface,
 	/* if endpoint has pitch control, enable it */
 	if (fmt->attributes & EP_CS_ATTR_PITCH_CONTROL) {
 		data[0] = 1;
-		if ((err = usb_control_msg(dev, usb_sndctrlpipe(dev, 0), SET_CUR,
+		if ((err = snd_usb_ctl_msg(dev, usb_sndctrlpipe(dev, 0), SET_CUR,
 					   USB_TYPE_CLASS|USB_RECIP_ENDPOINT|USB_DIR_OUT, 
 					   PITCH_CONTROL << 8, ep, data, 1, HZ)) < 0) {
 			snd_printk(KERN_ERR "%d:%d:%d: cannot set enable PITCH\n",
@@ -1172,14 +1173,14 @@ static int init_usb_sample_rate(struct usb_device *dev, int iface,
 		data[0] = rate;
 		data[1] = rate >> 8;
 		data[2] = rate >> 16;
-		if ((err = usb_control_msg(dev, usb_sndctrlpipe(dev, 0), SET_CUR,
+		if ((err = snd_usb_ctl_msg(dev, usb_sndctrlpipe(dev, 0), SET_CUR,
 					   USB_TYPE_CLASS|USB_RECIP_ENDPOINT|USB_DIR_OUT, 
 					   SAMPLING_FREQ_CONTROL << 8, ep, data, 3, HZ)) < 0) {
 			snd_printk(KERN_ERR "%d:%d:%d: cannot set freq %d to ep 0x%x\n",
 				   dev->devnum, iface, fmt->altsetting, rate, ep);
 			return err;
 		}
-		if ((err = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0), GET_CUR,
+		if ((err = snd_usb_ctl_msg(dev, usb_rcvctrlpipe(dev, 0), GET_CUR,
 					   USB_TYPE_CLASS|USB_RECIP_ENDPOINT|USB_DIR_IN,
 					   SAMPLING_FREQ_CONTROL << 8, ep, data, 3, HZ)) < 0) {
 			snd_printk(KERN_ERR "%d:%d:%d: cannot get freq at ep 0x%x\n",
@@ -1231,7 +1232,7 @@ static int set_format(snd_usb_substream_t *subs, struct audioformat *fmt)
 				   dev->devnum, fmt->iface, fmt->altsetting);
 			return -EIO;
 		}
-		snd_printdd(KERN_INFO "setting usb interface %d:%d\n", fmt->iface, fmt->altset_idx);
+		snd_printdd(KERN_INFO "setting usb interface %d:%d\n", fmt->iface, fmt->altsetting);
 		subs->interface = fmt->iface;
 		subs->format = fmt->altset_idx;
 	}
@@ -1884,6 +1885,32 @@ void *snd_usb_find_csint_desc(void *buffer, int buflen, void *after, u8 dsubtype
 	return NULL;
 }
 
+/*
+ * Wrapper for usb_control_msg().
+ * Allocates a temp buffer to prevent dmaing from/to the stack.
+ */
+int snd_usb_ctl_msg(struct usb_device *dev, unsigned int pipe, __u8 request,
+		    __u8 requesttype, __u16 value, __u16 index, void *data,
+		    __u16 size, int timeout)
+{
+	int err;
+	void *buf = NULL;
+
+	if (size > 0) {
+		buf = kmalloc(size, GFP_KERNEL);
+		if (!buf)
+			return -ENOMEM;
+		memcpy(buf, data, size);
+	}
+	err = usb_control_msg(dev, pipe, request, requesttype,
+			      value, index, buf, size, timeout);
+	if (size > 0) {
+		memcpy(data, buf, size);
+		kfree(buf);
+	}
+	return err;
+}
+
 
 /*
  * entry point for linux usb interface
@@ -1926,7 +1953,7 @@ static void proc_dump_substream_formats(snd_usb_substream_t *subs, snd_info_buff
 		struct audioformat *fp;
 		fp = list_entry(p, struct audioformat, list);
 		snd_iprintf(buffer, "  Interface %d\n", fp->iface);
-		snd_iprintf(buffer, "    Altset %d\n", fp->altset_idx);
+		snd_iprintf(buffer, "    Altset %d\n", fp->altsetting);
 		snd_iprintf(buffer, "    Format: %s\n", snd_pcm_format_name(fp->format));
 		snd_iprintf(buffer, "    Channels: %d\n", fp->channels);
 		snd_iprintf(buffer, "    Endpoint: %d %s (%s)\n",
@@ -2640,6 +2667,7 @@ static int create_fixed_stream_quirk(snd_usb_audio_t *chip,
 	struct audioformat *fp;
 	struct usb_host_interface *alts;
 	int stream, err;
+	int *rate_table = NULL;
 
 	fp = kmalloc(sizeof(*fp), GFP_KERNEL);
 	if (! fp) {
@@ -2647,16 +2675,30 @@ static int create_fixed_stream_quirk(snd_usb_audio_t *chip,
 		return -ENOMEM;
 	}
 	memcpy(fp, quirk->data, sizeof(*fp));
+	if (fp->nr_rates > 0) {
+		rate_table = kmalloc(sizeof(int) * fp->nr_rates, GFP_KERNEL);
+		if (!rate_table) {
+			kfree(fp);
+			return -ENOMEM;
+		}
+		memcpy(rate_table, fp->rate_table, sizeof(int) * fp->nr_rates);
+		fp->rate_table = rate_table;
+	}
+
 	stream = (fp->endpoint & USB_DIR_IN)
 		? SNDRV_PCM_STREAM_CAPTURE : SNDRV_PCM_STREAM_PLAYBACK;
 	err = add_audio_endpoint(chip, stream, fp);
 	if (err < 0) {
 		kfree(fp);
+		if (rate_table)
+			kfree(rate_table);
 		return err;
 	}
 	if (fp->iface != get_iface_desc(&iface->altsetting[0])->bInterfaceNumber ||
 	    fp->altset_idx >= iface->num_altsetting) {
 		kfree(fp);
+		if (rate_table)
+			kfree(rate_table);
 		return -EINVAL;
 	}
 	alts = &iface->altsetting[fp->altset_idx];
@@ -2697,6 +2739,83 @@ static int create_standard_interface_quirk(snd_usb_audio_t *chip,
 			   altsd->bInterfaceNumber, err);
 		return err;
 	}
+	return 0;
+}
+
+/*
+ * Create a stream for an Edirol UA-700 interface.  The only way
+ * to detect the sample rate is by looking at wMaxPacketSize.
+ */
+static int create_ua700_quirk(snd_usb_audio_t *chip, struct usb_interface *iface)
+{
+	static const struct audioformat ua700_format = {
+		.format = SNDRV_PCM_FORMAT_S24_3LE,
+		.channels = 2,
+		.fmt_type = USB_FORMAT_TYPE_I,
+		.altsetting = 1,
+		.altset_idx = 1,
+		.rates = SNDRV_PCM_RATE_CONTINUOUS,
+	};
+	struct usb_host_interface *alts;
+	struct usb_interface_descriptor *altsd;
+	struct audioformat *fp;
+	int stream, err;
+
+	/* both PCM and MIDI interfaces have 2 altsettings */
+	if (iface->num_altsetting != 2)
+		return -ENXIO;
+	alts = &iface->altsetting[1];
+	altsd = get_iface_desc(alts);
+
+	if (altsd->bNumEndpoints == 2) {
+		static const snd_usb_midi_endpoint_info_t ep = {
+			.out_cables = 0x0003,
+			.in_cables  = 0x0003
+		};
+		static const snd_usb_audio_quirk_t quirk = {
+			.type = QUIRK_MIDI_FIXED_ENDPOINT,
+			.data = &ep
+		};
+		return snd_usb_create_midi_interface(chip, iface, &quirk);
+	}
+
+	if (altsd->bNumEndpoints != 1)
+		return -ENXIO;
+
+	fp = kmalloc(sizeof(*fp), GFP_KERNEL);
+	if (!fp)
+		return -ENOMEM;
+	memcpy(fp, &ua700_format, sizeof(*fp));
+
+	fp->iface = altsd->bInterfaceNumber;
+	fp->endpoint = get_endpoint(alts, 0)->bEndpointAddress;
+	fp->ep_attr = get_endpoint(alts, 0)->bmAttributes;
+	fp->maxpacksize = get_endpoint(alts, 0)->wMaxPacketSize;
+
+	switch (fp->maxpacksize) {
+	case 0x120:
+		fp->rate_max = fp->rate_min = 44100;
+		break;
+	case 0x138:
+		fp->rate_max = fp->rate_min = 48000;
+		break;
+	case 0x258:
+		fp->rate_max = fp->rate_min = 96000;
+		break;
+	default:
+		snd_printk(KERN_ERR "unknown sample rate\n");
+		kfree(fp);
+		return -ENXIO;
+	}
+
+	stream = (fp->endpoint & USB_DIR_IN)
+		? SNDRV_PCM_STREAM_CAPTURE : SNDRV_PCM_STREAM_PLAYBACK;
+	err = add_audio_endpoint(chip, stream, fp);
+	if (err < 0) {
+		kfree(fp);
+		return err;
+	}
+	usb_set_interface(chip->dev, fp->iface, 0);
 	return 0;
 }
 
@@ -2747,7 +2866,7 @@ static int snd_usb_extigy_boot_quirk(struct usb_device *dev, struct usb_interfac
 	    get_cfg_desc(config)->wTotalLength == EXTIGY_FIRMWARE_SIZE_NEW) {
 		snd_printdd("sending Extigy boot sequence...\n");
 		/* Send message to force it to reconnect with full interface. */
-		err = usb_control_msg(dev, usb_sndctrlpipe(dev,0),
+		err = snd_usb_ctl_msg(dev, usb_sndctrlpipe(dev,0),
 				      0x10, 0x43, 0x0001, 0x000a, NULL, 0, HZ);
 		if (err < 0) snd_printdd("error sending boot message: %d\n", err);
 		err = usb_get_descriptor(dev, USB_DT_DEVICE, 0,
@@ -2787,6 +2906,8 @@ static int snd_usb_create_quirk(snd_usb_audio_t *chip,
 	case QUIRK_AUDIO_STANDARD_INTERFACE:
 	case QUIRK_MIDI_STANDARD_INTERFACE:
 		return create_standard_interface_quirk(chip, iface, quirk);
+	case QUIRK_AUDIO_EDIROL_UA700:
+		return create_ua700_quirk(chip, iface);
 	default:
 		snd_printd(KERN_ERR "invalid quirk type %d\n", quirk->type);
 		return -ENXIO;
@@ -3124,26 +3245,3 @@ static void __exit snd_usb_audio_cleanup(void)
 
 module_init(snd_usb_audio_init);
 module_exit(snd_usb_audio_cleanup);
-
-#ifndef MODULE
-/*
- * format is snd-usb-audio=enable,index,id,vid,pid
- */
-static int __init snd_usb_audio_module_setup(char* str)
-{
-	static unsigned __initdata nr_dev = 0;
-
-	if (nr_dev >= SNDRV_CARDS)
-		return 0;
-	(void)(get_option(&str, &enable[nr_dev]) == 2 &&
-	       get_option(&str, &index[nr_dev]) == 2 &&
-	       get_id(&str, &id[nr_dev]) == 2 &&
-	       get_option(&str, &vid[nr_dev]) == 2 &&
-	       get_option(&str, &pid[nr_dev]) == 2);
-	++nr_dev;
-	return 1;
-}
-
-__setup("snd-usb-audio=", snd_usb_audio_module_setup);
-
-#endif /* !MODULE */

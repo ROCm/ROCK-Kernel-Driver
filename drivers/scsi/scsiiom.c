@@ -15,7 +15,7 @@ dc390_freetag (PDCB pDCB, PSRB pSRB)
 };
 
 
-UCHAR
+static UCHAR
 dc390_StartSCSI( PACB pACB, PDCB pDCB, PSRB pSRB )
 {
     UCHAR cmd; UCHAR  disc_allowed, try_sync_nego;
@@ -227,7 +227,7 @@ DC390_Interrupt( int irq, void *dev_id, struct pt_regs *regs)
 #if DMA_INT
     UCHAR  dstatus;
 #endif
-    DC390_AFLAGS DC390_IFLAGS; //DC390_DFLAGS
+    DC390_IFLAGS;
 
     pACB = (PACB)dev_id;
     for (pACB2 = dc390_pACB_start; (pACB2 && pACB2 != pACB); pACB2 = pACB2->pNextACB);
@@ -237,26 +237,21 @@ DC390_Interrupt( int irq, void *dev_id, struct pt_regs *regs)
 	return IRQ_NONE;
     }
     
-    //DC390_LOCK_DRV;
-
     sstatus = DC390_read8 (Scsi_Status);
     if( !(sstatus & INTERRUPT) )
-	{ /*DC390_UNLOCK_DRV;*/ return IRQ_NONE; };
+	return IRQ_NONE;
 
     DEBUG1(printk (KERN_DEBUG "sstatus=%02x,", sstatus));
 
 #if DMA_INT
     DC390_LOCK_IO(pACB->pScsiHost);
-    DC390_LOCK_ACB;
     dstatus = dc390_dma_intr (pACB);
-    DC390_UNLOCK_ACB;
     DC390_UNLOCK_IO(pACB->pScsiHost);
 
     DEBUG1(printk (KERN_DEBUG "dstatus=%02x,", dstatus));
     if (! (dstatus & SCSI_INTERRUPT))
       {
 	DEBUG0(printk (KERN_WARNING "DC390 Int w/o SCSI actions (only DMA?)\n"));
-	//DC390_UNLOCK_DRV;
 	return IRQ_NONE;
       };
 #else
@@ -266,8 +261,6 @@ DC390_Interrupt( int irq, void *dev_id, struct pt_regs *regs)
 #endif
 
     DC390_LOCK_IO(pACB->pScsiHost);
-    DC390_LOCK_ACB;
-    //DC390_UNLOCK_DRV_NI; /* Allow _other_ CPUs to process IRQ (useful for shared IRQs) */
 
     istate = DC390_read8 (Intern_State);
     istatus = DC390_read8 (INT_Status); /* This clears Scsi_Status, Intern_State and INT_Status ! */
@@ -339,14 +332,11 @@ DC390_Interrupt( int irq, void *dev_id, struct pt_regs *regs)
     }
 
  unlock:
-    //DC390_LOCK_DRV_NI;
-    DC390_UNLOCK_ACB;
     DC390_UNLOCK_IO(pACB->pScsiHost);
-    //DC390_UNLOCK_DRV; /* Restore initial flags */
     return IRQ_HANDLED;
 }
 
-irqreturn_t do_DC390_Interrupt( int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t do_DC390_Interrupt( int irq, void *dev_id, struct pt_regs *regs)
 {
     irqreturn_t ret;
     DEBUG1(printk (KERN_INFO "DC390: Irq (%i) caught: ", irq));
@@ -356,7 +346,7 @@ irqreturn_t do_DC390_Interrupt( int irq, void *dev_id, struct pt_regs *regs)
     return ret;
 }
 
-void
+static void
 dc390_DataOut_0( PACB pACB, PSRB pSRB, PUCHAR psstatus)
 {
     UCHAR   sstatus;
@@ -410,7 +400,7 @@ dc390_DataOut_0( PACB pACB, PSRB pSRB, PUCHAR psstatus)
     }	    
 }
 
-void
+static void
 dc390_DataIn_0( PACB pACB, PSRB pSRB, PUCHAR psstatus)
 {
     UCHAR   sstatus, residual, bval;
@@ -521,7 +511,7 @@ din_1:
     {
 	    DC390_write8 (ScsiCmd, CLEAR_FIFO_CMD);
 	    DC390_write8 (DMA_Cmd, READ_DIRECTION+DMA_IDLE_CMD); /* | DMA_INT */
-    }	    
+    }
 }
 
 static void
@@ -740,9 +730,9 @@ dc390_restore_ptr (PACB pACB, PSRB pSRB)
 	psgl = pSRB->pSegmentList;
 	//dc390_pci_sync(pSRB);
 
-	while (pSRB->TotalXferredLen + (ULONG) psgl->length < pSRB->Saved_Ptr)
+	while (pSRB->TotalXferredLen + (ULONG) sg_dma_len(psgl) < pSRB->Saved_Ptr)
 	{
-	    pSRB->TotalXferredLen += (ULONG) psgl->length;
+	    pSRB->TotalXferredLen += (ULONG) sg_dma_len(psgl);
 	    pSRB->SGIndex++;
 	    if( pSRB->SGIndex < pSRB->SGcount )
 	    {
@@ -762,7 +752,7 @@ dc390_restore_ptr (PACB pACB, PSRB pSRB)
     } else if(pcmd->request_buffer) {
 	//dc390_pci_sync(pSRB);
 
-	pSRB->Segmentx.length = pcmd->request_bufflen - pSRB->Saved_Ptr;
+	sg_dma_len(&pSRB->Segmentx) = pcmd->request_bufflen - pSRB->Saved_Ptr;
 	pSRB->SGcount = 1;
 	pSRB->pSegmentList = (PSGL) &pSRB->Segmentx;
     } else {
@@ -873,7 +863,7 @@ dc390_MsgIn_0( PACB pACB, PSRB pSRB, PUCHAR psstatus)
 }
 
 
-void
+static void
 dc390_DataIO_Comm( PACB pACB, PSRB pSRB, UCHAR ioDir)
 {
     PSGL   psgl;
@@ -885,6 +875,8 @@ dc390_DataIO_Comm( PACB pACB, PSRB pSRB, UCHAR ioDir)
 	if (pDCB) printk (KERN_ERR "DC390: pSRB == pTmpSRB! (TagQ Error?) (%02i-%i)\n",
 			  pDCB->TargetID, pDCB->TargetLUN);
 	else printk (KERN_ERR "DC390: pSRB == pTmpSRB! (TagQ Error?) (DCB 0!)\n");
+
+	pSRB->pSRBDCB = pDCB;
 	dc390_EnableMsgOut_Abort (pACB, pSRB);
 	if (pDCB) pDCB->DCBFlag |= ABORT_DEV;
 	return;
@@ -1150,7 +1142,6 @@ dc390_Disconnect( PACB pACB )
 	    pSRB = psrb;
 	}
 	pDCB->pGoingSRB = 0;
-	dc390_Query_to_Waiting (pACB);
 	dc390_Waiting_process (pACB);
     }
     else
@@ -1466,7 +1457,7 @@ dc390_SRBdone( PACB pACB, PDCB pDCB, PSRB pSRB )
 		ptr2 = pSRB->pSegmentList;
 		for( i=pSRB->SGIndex; i < bval; i++)
 		{
-		    swlval += ptr2->length;
+		    swlval += sg_dma_len(ptr2);
 		    ptr2++;
 		}
 		REMOVABLEDEBUG(printk(KERN_INFO "XferredLen=%08x,NotXferLen=%08x\n",\
@@ -1619,20 +1610,15 @@ ckc_e:
 	  pACB->scan_devices = 0;
      };
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,3,30)
     pcmd->resid = pcmd->request_bufflen - pSRB->TotalXferredLen;
-#endif
 
     if (!DCB_removed) dc390_Going_remove (pDCB, pSRB);
     /* Add to free list */
     dc390_Free_insert (pACB, pSRB);
 
     DEBUG0(printk (KERN_DEBUG "DC390: SRBdone: done pid %li\n", pcmd->pid));
-    DC390_UNLOCK_ACB_NI;
     pcmd->scsi_done (pcmd);
-    DC390_LOCK_ACB_NI;
 
-    dc390_Query_to_Waiting (pACB);
     dc390_Waiting_process (pACB);
     return;
 }
@@ -1668,9 +1654,7 @@ dc390_DoingSRB_Done( PACB pACB, PSCSICMD cmd )
 /*	    ReleaseSRB( pDCB, pSRB ); */
 
 	    DEBUG0(printk (KERN_DEBUG "DC390: DoingSRB_Done: done pid %li\n", pcmd->pid));
-	    DC390_UNLOCK_ACB_NI;
 	    pcmd->scsi_done( pcmd );
-	    DC390_LOCK_ACB_NI;
 #endif	
 	    psrb  = psrb2;
 	}
@@ -1679,7 +1663,6 @@ dc390_DoingSRB_Done( PACB pACB, PSCSICMD cmd )
 	pdcb->TagMask = 0;
 	pdcb = pdcb->pNextDCB;
     } while( pdcb != pDCB );
-    dc390_Query_to_Waiting (pACB);
 }
 
 

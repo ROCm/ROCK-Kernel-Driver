@@ -19,7 +19,7 @@
 #endif
 
 #define DC390_BANNER "Tekram DC390/AM53C974"
-#define DC390_VERSION "2.0f 2000-12-20"
+#define DC390_VERSION "2.1b 2004-04-13"
 
 /* We don't have eh_abort_handler, eh_device_reset_handler, 
  * eh_bus_reset_handler, eh_host_reset_handler yet! 
@@ -33,11 +33,11 @@
 # define USE_NEW_EH
 #endif
 
-extern int DC390_detect(Scsi_Host_Template *psht);
-extern int DC390_queue_command(Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *));
-extern int DC390_abort(Scsi_Cmnd *cmd);
-extern int DC390_reset(Scsi_Cmnd *cmd);
-extern int DC390_bios_param(struct scsi_device *sdev, struct block_device *dev,
+static int DC390_detect(Scsi_Host_Template *psht);
+static int DC390_queue_command(Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *));
+static int DC390_abort(Scsi_Cmnd *cmd);
+static int DC390_reset(Scsi_Cmnd *cmd);
+static int DC390_bios_param(struct scsi_device *sdev, struct block_device *dev,
 		sector_t capacity, int geom[]);
 
 static int DC390_release(struct Scsi_Host *);

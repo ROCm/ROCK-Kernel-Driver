@@ -419,6 +419,11 @@ int aac_sa_init(struct aac_dev *dev, unsigned long devnum)
 	 *	Start any kernel threads needed
 	 */
 	dev->thread_pid = kernel_thread((int (*)(void *))aac_command_thread, dev, 0);
+	if (dev->thread_pid < 0) {
+		printk(KERN_ERR "aacraid: Unable to create command thread.\n");
+		return -1;
+	}
+
 	/*
 	 *	Tell the adapter that all is configure, and it can start 
 	 *	accepting requests

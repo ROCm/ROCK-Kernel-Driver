@@ -25,6 +25,7 @@
 #include <linux/time.h>
 #include <linux/threads.h>
 #include <linux/interrupt.h>
+#include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/timer.h>
 #include <sound/info.h>
@@ -177,21 +178,9 @@ static void __exit rtctimer_exit(void)
 module_init(rtctimer_init)
 module_exit(rtctimer_exit)
 
-MODULE_PARM(rtctimer_freq, "i");
+module_param(rtctimer_freq, int, 0444);
 MODULE_PARM_DESC(rtctimer_freq, "timer frequency in Hz");
 
 MODULE_LICENSE("GPL");
-
-#ifndef MODULE
-/* format is: snd-rtctimer=freq */
-
-static int __init rtctimer_setup(char *str)
-{
-	(void)(get_option(&str,&rtctimer_freq) == 2);
-	return 1;
-}
-
-__setup("snd-rtctimer=", rtctimer_setup);
-#endif /* ifndef MODULE */
 
 #endif /* CONFIG_RTC || CONFIG_RTC_MODULE */

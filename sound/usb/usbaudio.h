@@ -154,6 +154,7 @@ struct snd_usb_audio {
 #define QUIRK_AUDIO_FIXED_ENDPOINT	4
 #define QUIRK_AUDIO_STANDARD_INTERFACE	5
 #define QUIRK_MIDI_STANDARD_INTERFACE	6
+#define QUIRK_AUDIO_EDIROL_UA700	7
 
 typedef struct snd_usb_audio_quirk snd_usb_audio_quirk_t;
 typedef struct snd_usb_midi_endpoint_info snd_usb_midi_endpoint_info_t;
@@ -185,6 +186,8 @@ struct snd_usb_midi_endpoint_info {
 
 /* for QUIRK_AUDIO/MIDI_STANDARD_INTERFACE, data is NULL */
 
+/* for QUIRK_AUDIO_EDIROL_UA700, data is NULL */
+
 /*
  */
 
@@ -196,6 +199,8 @@ unsigned int snd_usb_combine_bytes(unsigned char *bytes, int size);
 
 void *snd_usb_find_desc(void *descstart, int desclen, void *after, u8 dtype);
 void *snd_usb_find_csint_desc(void *descstart, int desclen, void *after, u8 dsubtype);
+
+int snd_usb_ctl_msg(struct usb_device *dev, unsigned int pipe, __u8 request, __u8 requesttype, __u16 value, __u16 index, void *data, __u16 size, int timeout);
 
 int snd_usb_create_mixer(snd_usb_audio_t *chip, int ctrlif);
 

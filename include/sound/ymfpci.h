@@ -393,11 +393,6 @@ int snd_ymfpci_timer(ymfpci_t *chip, int device);
 int snd_ymfpci_voice_alloc(ymfpci_t *chip, ymfpci_voice_type_t type, int pair, ymfpci_voice_t **rvoice);
 int snd_ymfpci_voice_free(ymfpci_t *chip, ymfpci_voice_t *pvoice);
 
-#ifdef CONFIG_PM
-void snd_ymfpci_suspend(ymfpci_t *chip);
-void snd_ymfpci_resume(ymfpci_t *chip);
-#endif
-
 #if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
 #define SUPPORT_JOYSTICK
 #endif

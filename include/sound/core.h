@@ -163,8 +163,10 @@ struct _snd_card {
 	struct device *dev;
 
 #ifdef CONFIG_PM
-	int (*set_power_state) (snd_card_t *card, unsigned int state);
-	void *power_state_private_data;
+	int (*pm_suspend)(snd_card_t *card, unsigned int state);
+	int (*pm_resume)(snd_card_t *card, unsigned int state);
+	struct pm_dev *pm_dev;		/* for ISA */
+	void *pm_private_data;
 	unsigned int power_state;	/* power state */
 	struct semaphore power_lock;	/* power lock */
 	wait_queue_head_t power_sleep;
@@ -199,12 +201,32 @@ static inline void snd_power_change_state(snd_card_t *card, unsigned int state)
 	card->power_state = state;
 	wake_up(&card->power_sleep);
 }
+int snd_card_set_pm_callback(snd_card_t *card,
+			     int (*suspend)(snd_card_t *, unsigned int),
+			     int (*resume)(snd_card_t *, unsigned int),
+			     void *private_data);
+int snd_card_set_dev_pm_callback(snd_card_t *card, int type,
+				 int (*suspend)(snd_card_t *, unsigned int),
+				 int (*resume)(snd_card_t *, unsigned int),
+				 void *private_data);
+#define snd_card_set_isa_pm_callback(card,suspend,resume,data) \
+	snd_card_set_dev_pm_callback(card, PM_ISA_DEV, suspend, resume, data)
+#ifndef SND_PCI_PM_CALLBACKS
+int snd_card_pci_suspend(struct pci_dev *dev, u32 state);
+int snd_card_pci_resume(struct pci_dev *dev);
+#define SND_PCI_PM_CALLBACKS \
+	.suspend = snd_card_pci_suspend,  .resume = snd_card_pci_resume
+#endif
 #else
 #define snd_power_lock(card)		do { (void)(card); } while (0)
 #define snd_power_unlock(card)		do { (void)(card); } while (0)
 static inline int snd_power_wait(snd_card_t *card, unsigned int state, struct file *file) { return 0; }
 #define snd_power_get_state(card)	SNDRV_CTL_POWER_D0
 #define snd_power_change_state(card, state)	do { (void)(card); } while (0)
+#define snd_card_set_pm_callback(card,suspend,resume,data) -EINVAL
+#define snd_card_set_dev_pm_callback(card,suspend,resume,data) -EINVAL
+#define snd_card_set_isa_pm_callback(card,suspend,resume,data) -EINVAL
+#define SND_PCI_PM_CALLBACKS
 #endif
 
 /* device.c */

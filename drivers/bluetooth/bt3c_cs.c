@@ -491,6 +491,9 @@ static int bt3c_hci_ioctl(struct hci_dev *hdev, unsigned int cmd, unsigned long 
 
 static struct device bt3c_device = {
 	.bus_id = "pcmcia",
+	.kobj = {
+		.k_name = "bt3c"
+	}
 };
 
 
