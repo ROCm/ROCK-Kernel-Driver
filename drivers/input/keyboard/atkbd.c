@@ -366,7 +366,7 @@ static int atkbd_probe(struct atkbd *atkbd)
  */
 
 	if (atkbd_command(atkbd, NULL, ATKBD_CMD_RESET_DIS))
-		return -1;
+		printk(KERN_WARNING "atkbd.c: keyboard reset failed\n");
 
 /*
  * Next, we check if it's a keyboard. It should send 0xab83
