@@ -174,15 +174,6 @@ bkm_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	spin_unlock(&cs->lock);
 }
 
-void
-release_io_bkm(struct IsdnCardState *cs)
-{
-	if (cs->hw.ax.base) {
-		iounmap((void *) cs->hw.ax.base);
-		cs->hw.ax.base = 0;
-	}
-}
-
 static void
 enable_bkm_int(struct IsdnCardState *cs, unsigned bEnable)
 {
@@ -257,9 +248,8 @@ bkm_a4t_reset(struct IsdnCardState *cs)
 static void
 bkm_a4t_release(struct IsdnCardState *cs)
 {
-	enable_bkm_int(cs, 0);
 	reset_bkm(cs);
-	release_io_bkm(cs);
+	hisax_release_resources(cs);
 }
 
 static struct card_ops bkm_a4t_ops = {
@@ -317,18 +307,18 @@ setup_bkm_a4t(struct IsdnCard *card)
 		printk(KERN_WARNING "HiSax: %s: No IRQ\n", CardType[card->typ]);
 		return (0);
 	}
-	if (!pci_memaddr) {
+	cs->hw.ax.base = request_mmio(&cs->rs,pci_memaddr, 4096, "Telekom A4T");
+	if (!cs->hw.ax.base) {
 		printk(KERN_WARNING "HiSax: %s: No Memory base address\n", CardType[card->typ]);
 		return (0);
 	}
-	cs->hw.ax.base = (long) ioremap(pci_memaddr, 4096);
+	
 	/* Check suspecious address */
 	pI20_Regs = (I20_REGISTER_FILE *) (cs->hw.ax.base);
 	if ((pI20_Regs->i20IntStatus & 0x8EFFFFFF) != 0) {
 		printk(KERN_WARNING "HiSax: %s address %lx-%lx suspecious\n",
 		       CardType[card->typ], cs->hw.ax.base, cs->hw.ax.base + 4096);
-		iounmap((void *) cs->hw.ax.base);
-		cs->hw.ax.base = 0;
+		hisax_release_resources(cs);
 		return (0);
 	}
 	cs->hw.ax.isac_adr = cs->hw.ax.base + PO_OFFSET;

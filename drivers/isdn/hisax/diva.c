@@ -374,8 +374,7 @@ diva_ipac_pci_release(struct IsdnCardState *cs)
 {
 	writel(0, cs->hw.diva.pci_cfg); /* disable INT0/1 */ 
 	writel(2, cs->hw.diva.pci_cfg); /* reset pending INT0 */
-	iounmap((void *)cs->hw.diva.cfg_reg);
-	iounmap((void *)cs->hw.diva.pci_cfg);
+	hisax_release_resources(cs);
 }
 
 static int
@@ -726,10 +725,8 @@ setup_diva(struct IsdnCard *card)
 				return(0);
 			cs->subtyp = DIVA_IPAC_PCI;
 			cs->irq = dev_diva201->irq;
-			cs->hw.diva.pci_cfg =
-				(ulong) ioremap(pci_resource_start(dev_diva201, 0), 4096);
-			cs->hw.diva.cfg_reg =
-				(ulong) ioremap(pci_resource_start(dev_diva201, 1), 4096);
+			cs->hw.diva.pci_cfg = (unsigned long)request_mmio(&cs->rs, pci_resource_start(dev_diva201, 0), 4096, "diva");
+			cs->hw.diva.cfg_reg = (unsigned long)request_mmio(&cs->rs, pci_resource_start(dev_diva201, 1), 4096, "diva");
 		} else {
 			printk(KERN_WARNING "Diva: No PCI card found\n");
 			return(0);
@@ -737,12 +734,12 @@ setup_diva(struct IsdnCard *card)
 
 		if (!cs->irq) {
 			printk(KERN_WARNING "Diva: No IRQ for PCI card found\n");
-			return(0);
+			goto err;
 		}
 
 		if (!cs->hw.diva.cfg_reg) {
 			printk(KERN_WARNING "Diva: No IO-Adr for PCI card found\n");
-			return(0);
+			goto err;
 		}
 		cs->irq_flags |= SA_SHIRQ;
 #else
@@ -821,9 +818,12 @@ ready:
 		if (HscxVersion(cs, "Diva:")) {
 			printk(KERN_WARNING
 		       "Diva: wrong HSCX versions check IO address\n");
-			diva_release(cs);
-			return (0);
+			goto err;
 		}
 	}
-	return (1);
+	return 1;
+ err:
+	diva_release(cs);
+	return 0;
+
 }

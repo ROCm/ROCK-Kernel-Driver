@@ -83,8 +83,8 @@ hfcpci_release(struct IsdnCardState *cs)
 	Write_hfc(cs, HFCPCI_CIRM, 0);	/* Reset Off */
 	pci_disable_device(cs->hw.hfcpci.pdev);
 	del_timer(&cs->hw.hfcpci.timer);
-	iounmap(cs->hw.hfcpci.pci_io);
 	pci_free_consistent(cs->hw.hfcpci.pdev, 32768, cs->hw.hfcpci.fifos, cs->hw.hfcpci.fifos_dma);
+	hisax_release_resources(cs);
 }
 
 /********************************************************************************/
@@ -1441,14 +1441,9 @@ setup_hfcpci(struct IsdnCard *card)
 				printk(KERN_WARNING "HFC-PCI: No IRQ for PCI card found\n");
 				return (0);
 			}
-			cs->hw.hfcpci.pci_io = (char *) dev_hfcpci->resource[ 1].start;
 			printk(KERN_INFO "HiSax: HFC-PCI card manufacturer: %s card name: %s\n", id_list[i].vendor_name, id_list[i].card_name);
 		} else {
 			printk(KERN_WARNING "HFC-PCI: No PCI card found\n");
-			return (0);
-		}
-		if (!cs->hw.hfcpci.pci_io) {
-			printk(KERN_WARNING "HFC-PCI: No IO-Mem for PCI card found\n");
 			return (0);
 		}
 		/* Allocate memory for FIFOS */
@@ -1459,7 +1454,10 @@ setup_hfcpci(struct IsdnCard *card)
 		}
 		pci_write_config_dword(cs->hw.hfcpci.pdev, 0x80,
 				       (u_int)cs->hw.hfcpci.fifos_dma);
-		cs->hw.hfcpci.pci_io = ioremap((ulong) cs->hw.hfcpci.pci_io, 256);
+		cs->hw.hfcpci.pci_io = request_mmio(&cs->rs, dev_hfcpci->resource[ 1].start, 256, "hfc_pci");
+		if (!cs->hw.hfcpci.pci_io)
+			goto err;
+
 		printk(KERN_INFO
 		       "HFC-PCI: defined at mem %#x fifo %#x(%#x) IRQ %d HZ %d\n",
 		       (u_int) cs->hw.hfcpci.pci_io,
@@ -1487,7 +1485,10 @@ setup_hfcpci(struct IsdnCard *card)
 	cs->cardmsg = &hfcpci_card_msg;
 	cs->auxcmd = &hfcpci_auxcmd;
 	cs->card_ops = &hfcpci_ops;
-	return (1);
+	return 1;
+ err:
+	hisax_release_resources(cs);
+	return 0;
 #else
 	printk(KERN_WARNING "HFC-PCI: NO_PCI_BIOS\n");
 	return (0);

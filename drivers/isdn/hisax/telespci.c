@@ -225,12 +225,6 @@ telespci_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	spin_unlock(&cs->lock);
 }
 
-void
-telespci_release(struct IsdnCardState *cs)
-{
-	iounmap((void *)cs->hw.teles0.membase);
-}
-
 static int
 TelesPCI_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
@@ -239,7 +233,7 @@ TelesPCI_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 
 static struct card_ops telespci_ops = {
 	.init     = inithscxisac,
-	.release  = telespci_release,
+	.release  = hisax_release_resources,
 	.irq_func = telespci_interrupt,
 };
 
@@ -271,8 +265,9 @@ setup_telespci(struct IsdnCard *card)
 			printk(KERN_WARNING "Teles: No IRQ for PCI card found\n");
 			return(0);
 		}
-		cs->hw.teles0.membase = ioremap(pci_resource_start(dev_tel, 0),
-			PAGE_SIZE);
+		cs->hw.teles0.membase = request_mmio(&cs->rs, pci_resource_start(dev_tel, 0), 4096, "telespci");
+		if (!cs->hw.teles0.membase)
+			goto err;
 		printk(KERN_INFO "Found: Zoran, base-address: 0x%lx, irq: 0x%x\n",
 			pci_resource_start(dev_tel, 0), dev_tel->irq);
 	} else {
@@ -308,8 +303,10 @@ setup_telespci(struct IsdnCard *card)
 	if (HscxVersion(cs, "TelesPCI:")) {
 		printk(KERN_WARNING
 		 "TelesPCI: wrong HSCX versions check IO/MEM addresses\n");
-		telespci_release(cs);
-		return (0);
+		goto err;
 	}
-	return (1);
+	return 1;
+ err:
+	hisax_release_resources(cs);
+	return 0;
 }
