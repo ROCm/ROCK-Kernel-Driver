@@ -601,9 +601,12 @@ static inline int de_thread(struct task_struct *tsk)
 
 	if (thread_group_empty(current))
 		goto no_thread_group;
+
 	/*
-	 * Kill all other threads in the thread group:
+	 * Kill all other threads in the thread group.
+	 * We must hold tasklist_lock to call zap_other_threads.
 	 */
+	read_lock(&tasklist_lock);
 	spin_lock_irq(lock);
 	if (oldsig->group_exit) {
 		/*
@@ -611,6 +614,7 @@ static inline int de_thread(struct task_struct *tsk)
 		 * return so that the signal is processed.
 		 */
 		spin_unlock_irq(lock);
+		read_unlock(&tasklist_lock);
 		kmem_cache_free(sighand_cachep, newsighand);
 		if (newsig)
 			kmem_cache_free(signal_cachep, newsig);
@@ -618,6 +622,7 @@ static inline int de_thread(struct task_struct *tsk)
 	}
 	oldsig->group_exit = 1;
 	zap_other_threads(current);
+	read_unlock(&tasklist_lock);
 
 	/*
 	 * Account for the thread group leader hanging around:
