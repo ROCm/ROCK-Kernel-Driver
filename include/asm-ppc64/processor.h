@@ -128,14 +128,6 @@
 #define	SPRN_DAC1	0x3F6	/* Data Address Compare 1 */
 #define	SPRN_DAC2	0x3F7	/* Data Address Compare 2 */
 #define	SPRN_DAR	0x013	/* Data Address Register */
-#define	SPRN_DBAT0L	0x219	/* Data BAT 0 Lower Register */
-#define	SPRN_DBAT0U	0x218	/* Data BAT 0 Upper Register */
-#define	SPRN_DBAT1L	0x21B	/* Data BAT 1 Lower Register */
-#define	SPRN_DBAT1U	0x21A	/* Data BAT 1 Upper Register */
-#define	SPRN_DBAT2L	0x21D	/* Data BAT 2 Lower Register */
-#define	SPRN_DBAT2U	0x21C	/* Data BAT 2 Upper Register */
-#define	SPRN_DBAT3L	0x21F	/* Data BAT 3 Lower Register */
-#define	SPRN_DBAT3U	0x21E	/* Data BAT 3 Upper Register */
 #define	SPRN_DBCR	0x3F2	/* Debug Control Regsiter */
 #define	  DBCR_EDM	0x80000000
 #define	  DBCR_IDM	0x40000000
@@ -229,14 +221,6 @@
 #define	SPRN_TST 	0x3FC	/* Thread switch timeout */
 #define	SPRN_IAC1	0x3F4	/* Instruction Address Compare 1 */
 #define	SPRN_IAC2	0x3F5	/* Instruction Address Compare 2 */
-#define	SPRN_IBAT0L	0x211	/* Instruction BAT 0 Lower Register */
-#define	SPRN_IBAT0U	0x210	/* Instruction BAT 0 Upper Register */
-#define	SPRN_IBAT1L	0x213	/* Instruction BAT 1 Lower Register */
-#define	SPRN_IBAT1U	0x212	/* Instruction BAT 1 Upper Register */
-#define	SPRN_IBAT2L	0x215	/* Instruction BAT 2 Lower Register */
-#define	SPRN_IBAT2U	0x214	/* Instruction BAT 2 Upper Register */
-#define	SPRN_IBAT3L	0x217	/* Instruction BAT 3 Lower Register */
-#define	SPRN_IBAT3U	0x216	/* Instruction BAT 3 Upper Register */
 #define	SPRN_ICCR	0x3FB	/* Instruction Cache Cacheability Register */
 #define	  ICCR_NOCACHE		0	/* Noncacheable */
 #define	  ICCR_CACHE		1	/* Cacheable */
@@ -333,14 +317,6 @@
 #define	CTR	SPRN_CTR	/* Counter Register */
 #define	DAR	SPRN_DAR	/* Data Address Register */
 #define	DABR	SPRN_DABR	/* Data Address Breakpoint Register */
-#define	DBAT0L	SPRN_DBAT0L	/* Data BAT 0 Lower Register */
-#define	DBAT0U	SPRN_DBAT0U	/* Data BAT 0 Upper Register */
-#define	DBAT1L	SPRN_DBAT1L	/* Data BAT 1 Lower Register */
-#define	DBAT1U	SPRN_DBAT1U	/* Data BAT 1 Upper Register */
-#define	DBAT2L	SPRN_DBAT2L	/* Data BAT 2 Lower Register */
-#define	DBAT2U	SPRN_DBAT2U	/* Data BAT 2 Upper Register */
-#define	DBAT3L	SPRN_DBAT3L	/* Data BAT 3 Lower Register */
-#define	DBAT3U	SPRN_DBAT3U	/* Data BAT 3 Upper Register */
 #define	DCMP	SPRN_DCMP      	/* Data TLB Compare Register */
 #define	DEC	SPRN_DEC       	/* Decrement Register */
 #define	DMISS	SPRN_DMISS     	/* Data TLB Miss Register */
@@ -354,14 +330,6 @@
 #define	TSC    	SPRN_TSC 	/* Thread switch control */
 #define	TST    	SPRN_TST 	/* Thread switch timeout */
 #define	IABR	SPRN_IABR      	/* Instruction Address Breakpoint Register */
-#define	IBAT0L	SPRN_IBAT0L	/* Instruction BAT 0 Lower Register */
-#define	IBAT0U	SPRN_IBAT0U	/* Instruction BAT 0 Upper Register */
-#define	IBAT1L	SPRN_IBAT1L	/* Instruction BAT 1 Lower Register */
-#define	IBAT1U	SPRN_IBAT1U	/* Instruction BAT 1 Upper Register */
-#define	IBAT2L	SPRN_IBAT2L	/* Instruction BAT 2 Lower Register */
-#define	IBAT2U	SPRN_IBAT2U	/* Instruction BAT 2 Upper Register */
-#define	IBAT3L	SPRN_IBAT3L	/* Instruction BAT 3 Lower Register */
-#define	IBAT3U	SPRN_IBAT3U	/* Instruction BAT 3 Upper Register */
 #define	ICMP	SPRN_ICMP	/* Instruction TLB Compare Register */
 #define	IMISS	SPRN_IMISS	/* Instruction TLB Miss Register */
 #define	IMMR	SPRN_IMMR      	/* PPC 860/821 Internal Memory Map Register */
@@ -390,84 +358,6 @@
 #define	THRM2	SPRN_THRM2	/* Thermal Management Register 2 */
 #define	THRM3	SPRN_THRM3	/* Thermal Management Register 3 */
 #define	XER	SPRN_XER
-
-
-/* Device Control Registers */
-
-#define	DCRN_BEAR	0x090	/* Bus Error Address Register */
-#define	DCRN_BESR	0x091	/* Bus Error Syndrome Register */
-#define	  BESR_DSES    	0x80000000	/* Data-Side Error Status */
-#define	  BESR_DMES	0x40000000	/* DMA Error Status */
-#define	  BESR_RWS	0x20000000	/* Read/Write Status */
-#define	  BESR_ETMASK	0x1C000000	/* Error Type */
-#define	    ET_PROT	0
-#define	    ET_PARITY	1
-#define	    ET_NCFG	2
-#define	    ET_BUSERR	4
-#define	    ET_BUSTO	6
-#define	DCRN_DMACC0	0x0C4	/* DMA Chained Count Register 0 */
-#define	DCRN_DMACC1	0x0CC	/* DMA Chained Count Register 1 */
-#define	DCRN_DMACC2	0x0D4	/* DMA Chained Count Register 2 */
-#define	DCRN_DMACC3	0x0DC    /* DMA Chained Count Register 3 */
-#define	DCRN_DMACR0	0x0C0    /* DMA Channel Control Register 0 */
-#define	DCRN_DMACR1	0x0C8    /* DMA Channel Control Register 1 */
-#define	DCRN_DMACR2	0x0D0    /* DMA Channel Control Register 2 */
-#define	DCRN_DMACR3	0x0D8    /* DMA Channel Control Register 3 */
-#define	DCRN_DMACT0	0x0C1    /* DMA Count Register 0 */
-#define	DCRN_DMACT1	0x0C9    /* DMA Count Register 1 */
-#define	DCRN_DMACT2	0x0D1    /* DMA Count Register 2 */
-#define	DCRN_DMACT3	0x0D9    /* DMA Count Register 3 */
-#define	DCRN_DMADA0	0x0C2    /* DMA Destination Address Register 0 */
-#define	DCRN_DMADA1	0x0CA    /* DMA Destination Address Register 1 */
-#define	DCRN_DMADA2	0x0D2    /* DMA Destination Address Register 2 */
-#define	DCRN_DMADA3	0x0DA    /* DMA Destination Address Register 3 */
-#define	DCRN_DMASA0	0x0C3    /* DMA Source Address Register 0 */
-#define	DCRN_DMASA1	0x0CB    /* DMA Source Address Register 1 */
-#define	DCRN_DMASA2	0x0D3    /* DMA Source Address Register 2 */
-#define	DCRN_DMASA3	0x0DB    /* DMA Source Address Register 3 */
-#define	DCRN_DMASR	0x0E0    /* DMA Status Register */
-#define	DCRN_EXIER	0x042    /* External Interrupt Enable Register */
-#define	  EXIER_CIE	0x80000000	/* Critical Interrupt Enable */
-#define	  EXIER_SRIE	0x08000000	/* Serial Port Rx Int. Enable */
-#define	  EXIER_STIE	0x04000000	/* Serial Port Tx Int. Enable */
-#define	  EXIER_JRIE	0x02000000	/* JTAG Serial Port Rx Int. Enable */
-#define	  EXIER_JTIE	0x01000000	/* JTAG Serial Port Tx Int. Enable */
-#define	  EXIER_D0IE	0x00800000	/* DMA Channel 0 Interrupt Enable */
-#define	  EXIER_D1IE	0x00400000	/* DMA Channel 1 Interrupt Enable */
-#define	  EXIER_D2IE	0x00200000	/* DMA Channel 2 Interrupt Enable */
-#define	  EXIER_D3IE	0x00100000	/* DMA Channel 3 Interrupt Enable */
-#define	  EXIER_E0IE	0x00000010	/* External Interrupt 0 Enable */
-#define	  EXIER_E1IE	0x00000008	/* External Interrupt 1 Enable */
-#define	  EXIER_E2IE	0x00000004	/* External Interrupt 2 Enable */
-#define	  EXIER_E3IE	0x00000002	/* External Interrupt 3 Enable */
-#define	  EXIER_E4IE	0x00000001	/* External Interrupt 4 Enable */
-#define	DCRN_EXISR	0x040    /* External Interrupt Status Register */
-#define	DCRN_IOCR	0x0A0    /* Input/Output Configuration Register */
-#define	  IOCR_E0TE	0x80000000
-#define	  IOCR_E0LP	0x40000000
-#define	  IOCR_E1TE	0x20000000
-#define	  IOCR_E1LP	0x10000000
-#define	  IOCR_E2TE	0x08000000
-#define	  IOCR_E2LP	0x04000000
-#define	  IOCR_E3TE	0x02000000
-#define	  IOCR_E3LP	0x01000000
-#define	  IOCR_E4TE	0x00800000
-#define	  IOCR_E4LP	0x00400000
-#define	  IOCR_EDT     	0x00080000
-#define	  IOCR_SOR     	0x00040000
-#define	  IOCR_EDO	0x00008000
-#define	  IOCR_2XC	0x00004000
-#define	  IOCR_ATC	0x00002000
-#define	  IOCR_SPD	0x00001000
-#define	  IOCR_BEM	0x00000800
-#define	  IOCR_PTD	0x00000400
-#define	  IOCR_ARE	0x00000080
-#define	  IOCR_DRC	0x00000020
-#define	  IOCR_RDM(x)	(((x) & 0x3) << 3)
-#define	  IOCR_TCS	0x00000004
-#define	  IOCR_SCS	0x00000002
-#define	  IOCR_SPC	0x00000001
-
 
 /* Processor Version Register (PVR) field extraction */
 
@@ -499,26 +389,6 @@
 #define XGLUE(a,b) a##b
 #define GLUE(a,b) XGLUE(a,b)
 
-/*
- * Begining of traceback info work for asm functions.
- */
-#define TB_ASM		0x000C000000000000
-#define TB_GLOBALLINK	0x0000800000000000
-#define TB_IS_EPROL	0x0000400000000000
-#define TB_HAS_TBOFF	0x0000200000000000
-#define TB_INT_PROC	0x0000100000000000
-#define TB_HAS_CTL	0x0000080000000000
-#define TB_TOCLESS	0x0000040000000000
-#define TB_FP_PRESENT	0x0000020000000000
-#define TB_LOG_ABORT	0x0000010000000000
-#define TB_INT_HNDL	0x0000008000000000
-#define TB_NAME_PRESENT	0x0000004000000000
-#define TB_SAVES_CR	0x0000000200000000
-#define TB_SAVES_LR	0x0000000100000000
-#define TB_STORES_BC	0x0000000080000000
-#define TB_PARMINFO	0x000000000000FFFF
-#define TB_DEFAULT	TB_ASM | TB_HAS_TBOFF | TB_NAME_PRESENT
-
 #ifdef __ASSEMBLY__
 
 #define _GLOBAL(name) \
@@ -546,16 +416,6 @@ name: \
 	.previous; \
 	.type GLUE(.,name),@function; \
 GLUE(.,name):
-
-#define _TRACEBACK(NAME) \
-GLUE(.LT,NAME): ;\
-	.long 0 ;\
-	.llong TB_DEFAULT ;\
-	.long GLUE(.LT,NAME)-GLUE(.,NAME) ;\
-	.short GLUE(GLUE(.LT,NAME),_procname_end)-GLUE(GLUE(.LT,NAME),_procname_start) ;\
-GLUE(GLUE(.LT,NAME),_procname_start): ;\
-	.ascii __stringify(NAME) ;\
-GLUE(GLUE(.LT,NAME),_procname_end):
 
 #endif /* __ASSEMBLY__ */
 
