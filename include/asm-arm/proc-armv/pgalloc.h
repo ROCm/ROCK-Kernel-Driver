@@ -1,43 +1,72 @@
 /*
  *  linux/include/asm-arm/proc-armv/pgalloc.h
  *
- *  Copyright (C) 2001 Russell King
+ *  Copyright (C) 2001-2002 Russell King
  *
  * Page table allocation/freeing primitives for 32-bit ARM processors.
  */
-
-/* unfortunately, this includes linux/mm.h and the rest of the universe. */
-#include <linux/slab.h>
-
-extern kmem_cache_t *pte_cache;
+#include "pgtable.h"
 
 /*
  * Allocate one PTE table.
  *
- * Note that we keep the processor copy of the PTE entries separate
- * from the Linux copy.  The processor copies are offset by -PTRS_PER_PTE
- * words from the Linux copy.
+ * This actually allocates two hardware PTE tables, but we wrap this up
+ * into one table thus:
+ *
+ *  +------------+
+ *  |  h/w pt 0  |
+ *  +------------+
+ *  |  h/w pt 1  |
+ *  +------------+
+ *  | Linux pt 0 |
+ *  +------------+
+ *  | Linux pt 1 |
+ *  +------------+
  */
 static inline pte_t *
 pte_alloc_one_kernel(struct mm_struct *mm, unsigned long addr)
 {
+	int count = 0;
 	pte_t *pte;
 
-	pte = kmem_cache_alloc(pte_cache, GFP_KERNEL);
-	if (pte)
+	do {
+		pte = (pte_t *)__get_free_page(GFP_KERNEL);
+		if (!pte) {
+			current->state = TASK_UNINTERRUPTIBLE;
+			schedule_timeout(HZ);
+		}
+	} while (!pte && (count++ < 10));
+
+	if (pte) {
+		clear_page(pte);
+		clean_dcache_area(pte, sizeof(pte_t) * PTRS_PER_PTE);
 		pte += PTRS_PER_PTE;
+	}
+
 	return pte;
 }
 
 static inline struct page *
 pte_alloc_one(struct mm_struct *mm, unsigned long addr)
 {
-	pte_t *pte;
+	struct page *pte;
+	int count = 0;
 
-	pte = kmem_cache_alloc(pte_cache, GFP_KERNEL);
-	if (pte)
-		pte += PTRS_PER_PTE;
-	return (struct page *)pte;
+	do {
+		pte = alloc_pages(GFP_KERNEL, 0);
+		if (!pte) {
+			current->state = TASK_UNINTERRUPTIBLE;
+			schedule_timeout(HZ);
+		}
+	} while (!pte && (count++ < 10));
+
+	if (pte) {
+		void *page = page_address(pte);
+		clear_page(page);
+		clean_dcache_area(page, sizeof(pte_t) * PTRS_PER_PTE);
+	}
+
+	return pte;
 }
 
 /*
@@ -47,34 +76,49 @@ static inline void pte_free_kernel(pte_t *pte)
 {
 	if (pte) {
 		pte -= PTRS_PER_PTE;
-		kmem_cache_free(pte_cache, pte);
+		free_page((unsigned long)pte);
 	}
 }
 
 static inline void pte_free(struct page *pte)
 {
-	pte_t *_pte = (pte_t *)pte;
-	if (pte) {
-		_pte -= PTRS_PER_PTE;
-		kmem_cache_free(pte_cache, _pte);
-	}
+	__free_page(pte);
 }
 
 /*
  * Populate the pmdp entry with a pointer to the pte.  This pmd is part
  * of the mm address space.
  *
- * If 'mm' is the init tasks mm, then we are doing a vmalloc, and we
- * need to set stuff up correctly for it.
+ * Ensure that we always set both PMD entries.
  */
-#define pmd_populate_kernel(mm,pmdp,pte)			\
-	do {							\
-		BUG_ON(mm != &init_mm);				\
-		set_pmd(pmdp, __mk_pmd(pte, _PAGE_KERNEL_TABLE));\
-	} while (0)
+static inline void
+pmd_populate_kernel(struct mm_struct *mm, pmd_t *pmdp, pte_t *ptep)
+{
+	unsigned long pte_ptr = (unsigned long)ptep;
+	pmd_t pmd;
 
-#define pmd_populate(mm,pmdp,pte)				\
-	do {							\
-		BUG_ON(mm == &init_mm);				\
-		set_pmd(pmdp, __mk_pmd(pte, _PAGE_USER_TABLE));	\
-	} while (0)
+	BUG_ON(mm != &init_mm);
+
+	/*
+	 * The pmd must be loaded with the physical
+	 * address of the PTE table
+	 */
+	pte_ptr -= PTRS_PER_PTE * sizeof(void *);
+	pmd_val(pmd) = __pa(pte_ptr) | _PAGE_KERNEL_TABLE;
+	set_pmd(pmdp, pmd);
+	pmd_val(pmd) += 256 * sizeof(pte_t);
+	set_pmd(pmdp + 1, pmd);
+}
+
+static inline void
+pmd_populate(struct mm_struct *mm, pmd_t *pmdp, struct page *ptep)
+{
+	pmd_t pmd;
+
+	BUG_ON(mm == &init_mm);
+
+	pmd_val(pmd) = __pa(page_address(ptep)) | _PAGE_USER_TABLE;
+	set_pmd(pmdp, pmd);
+	pmd_val(pmd) += 256 * sizeof(pte_t);
+	set_pmd(pmdp + 1, pmd);
+}

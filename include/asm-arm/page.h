@@ -1,15 +1,10 @@
 #ifndef _ASMARM_PAGE_H
 #define _ASMARM_PAGE_H
 
-#include <asm/proc/page.h>
-
-#define PAGE_SIZE	(1UL << PAGE_SHIFT)
-#define PAGE_MASK	(~(PAGE_SIZE-1))
+#include <linux/config.h>
 
 #ifdef __KERNEL__
 #ifndef __ASSEMBLY__
-
-#define STRICT_MM_TYPECHECKS
 
 #define clear_page(page)	memzero((void *)(page), PAGE_SIZE)
 extern void copy_page(void *to, void *from);
@@ -28,23 +23,22 @@ extern void copy_page(void *to, void *from);
 		preempt_enable();			\
 	} while (0)
 
+#undef STRICT_MM_TYPECHECKS
+
 #ifdef STRICT_MM_TYPECHECKS
 /*
  * These are used to make use of C type-checking..
  */
 typedef struct { unsigned long pte; } pte_t;
 typedef struct { unsigned long pmd; } pmd_t;
-typedef struct { unsigned long pgd; } pgd_t;
 typedef struct { unsigned long pgprot; } pgprot_t;
 
 #define pte_val(x)      ((x).pte)
 #define pmd_val(x)      ((x).pmd)
-#define pgd_val(x)      ((x).pgd)
 #define pgprot_val(x)   ((x).pgprot)
 
 #define __pte(x)        ((pte_t) { (x) } )
 #define __pmd(x)        ((pmd_t) { (x) } )
-#define __pgd(x)        ((pgd_t) { (x) } )
 #define __pgprot(x)     ((pgprot_t) { (x) } )
 
 #else
@@ -53,25 +47,29 @@ typedef struct { unsigned long pgprot; } pgprot_t;
  */
 typedef unsigned long pte_t;
 typedef unsigned long pmd_t;
-typedef unsigned long pgd_t;
 typedef unsigned long pgprot_t;
 
 #define pte_val(x)      (x)
 #define pmd_val(x)      (x)
-#define pgd_val(x)      (x)
 #define pgprot_val(x)   (x)
 
 #define __pte(x)        (x)
 #define __pmd(x)        (x)
-#define __pgd(x)        (x)
 #define __pgprot(x)     (x)
 
-#endif
+#endif /* STRICT_MM_TYPECHECKS */
 #endif /* !__ASSEMBLY__ */
+#endif /* __KERNEL__ */
+
+#include <asm/proc/page.h>
+
+#define PAGE_SIZE		(1UL << PAGE_SHIFT)
+#define PAGE_MASK		(~(PAGE_SIZE-1))
 
 /* to align the pointer to the (next) page boundary */
 #define PAGE_ALIGN(addr)	(((addr)+PAGE_SIZE-1)&PAGE_MASK)
 
+#ifdef __KERNEL__
 #ifndef __ASSEMBLY__
 
 #ifdef CONFIG_DEBUG_BUGVERBOSE
@@ -105,7 +103,6 @@ static inline int get_order(unsigned long size)
 
 #endif /* !__ASSEMBLY__ */
 
-#include <linux/config.h>
 #include <asm/arch/memory.h>
 
 #define __pa(x)			__virt_to_phys((unsigned long)(x))
@@ -120,6 +117,6 @@ static inline int get_order(unsigned long size)
 #define VM_DATA_DEFAULT_FLAGS	(VM_READ | VM_WRITE | VM_EXEC | \
 				 VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC)
 
-#endif
+#endif /* __KERNEL__ */
 
 #endif

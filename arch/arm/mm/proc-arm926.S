@@ -443,7 +443,9 @@ ENTRY(cpu_arm926_set_pmd)
  */
 	.align	5
 ENTRY(cpu_arm926_set_pte)
-	str	r1, [r0], #-1024		@ linux version
+	tst	r0, #2048
+	streq	r0, [r0, -r0]			@ BUG_ON
+	str	r1, [r0], #-2048		@ linux version
 
 	eor	r1, r1, #LPTE_PRESENT | LPTE_YOUNG | LPTE_WRITE | LPTE_DIRTY
 

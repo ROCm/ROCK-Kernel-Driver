@@ -1,7 +1,7 @@
 /*
  *  linux/arch/arm/mm/proc-sa110.S
  *
- *  Copyright (C) 1997-2000 Russell King
+ *  Copyright (C) 1997-2002 Russell King
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -468,7 +468,9 @@ ENTRY(cpu_sa1100_set_pmd)
 	.align	5
 ENTRY(cpu_sa110_set_pte)
 ENTRY(cpu_sa1100_set_pte)
-	str	r1, [r0], #-1024		@ linux version
+	tst	r0, #2048
+	streq	r0, [r0, -r0]			@ BUG_ON
+	str	r1, [r0], #-2048		@ linux version
 
 	eor	r1, r1, #L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_WRITE | L_PTE_DIRTY
 
