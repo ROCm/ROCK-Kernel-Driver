@@ -3263,10 +3263,8 @@ static int
 e100_ethtool_set_settings(struct net_device *dev, struct ifreq *ifr)
 {
 	struct e100_private *bdp;
-	int current_duplex;
 	int e100_new_speed_duplex;
 	int ethtool_new_speed_duplex;
-	int speed_duplex_change_required;
 	struct ethtool_cmd ecmd;
 
 	if (!capable(CAP_NET_ADMIN)) {
@@ -3274,19 +3272,8 @@ e100_ethtool_set_settings(struct net_device *dev, struct ifreq *ifr)
 	}
 
 	bdp = dev->priv;
-	if (netif_running(dev)) {
-		return -EBUSY;
-	}
 	if (copy_from_user(&ecmd, ifr->ifr_data, sizeof (ecmd))) {
 		return -EFAULT;
-	}
-	current_duplex =
-		(bdp->cur_dplx_mode == HALF_DUPLEX) ? DUPLEX_HALF : DUPLEX_FULL;
-	speed_duplex_change_required = (ecmd.speed != bdp->cur_line_speed)
-		|| (ecmd.duplex != current_duplex);
-
-	if ((ecmd.autoneg == AUTONEG_ENABLE) && speed_duplex_change_required) {
-		return -EINVAL;
 	}
 
 	if ((ecmd.autoneg == AUTONEG_ENABLE)
@@ -3294,44 +3281,39 @@ e100_ethtool_set_settings(struct net_device *dev, struct ifreq *ifr)
 		bdp->params.e100_speed_duplex = E100_AUTONEG;
 		e100_set_speed_duplex(bdp);
 	} else {
-		if (speed_duplex_change_required) {
-			if (ecmd.speed == SPEED_10) {
-				if (ecmd.duplex == DUPLEX_HALF) {
-					e100_new_speed_duplex =
-						E100_SPEED_10_HALF;
-					ethtool_new_speed_duplex =
-						SUPPORTED_10baseT_Half;
-
-				} else {
-					e100_new_speed_duplex =
-						E100_SPEED_10_FULL;
-					ethtool_new_speed_duplex =
-						SUPPORTED_10baseT_Full;
-				}
-
-			} else {
-				if (ecmd.duplex == DUPLEX_HALF) {
-					e100_new_speed_duplex =
-						E100_SPEED_100_HALF;
-					ethtool_new_speed_duplex =
-						SUPPORTED_100baseT_Half;
-
-				} else {
-					e100_new_speed_duplex =
-						E100_SPEED_100_FULL;
-					ethtool_new_speed_duplex =
-						SUPPORTED_100baseT_Full;
-				}
-			}
-
-			if (bdp->speed_duplex_caps & ethtool_new_speed_duplex) {
-				bdp->params.e100_speed_duplex =
-					e100_new_speed_duplex;
-				e100_set_speed_duplex(bdp);
-			} else {
-				return -EOPNOTSUPP;
-			}
+		if (ecmd.speed == SPEED_10) {
+			if (ecmd.duplex == DUPLEX_HALF) {
+				e100_new_speed_duplex =
+					E100_SPEED_10_HALF;
+				ethtool_new_speed_duplex =
+					SUPPORTED_10baseT_Half;
+			} else { 
+				e100_new_speed_duplex =
+					E100_SPEED_10_FULL;
+				ethtool_new_speed_duplex =
+					SUPPORTED_10baseT_Full;
+			} 
+		} else { 
+			if (ecmd.duplex == DUPLEX_HALF) {
+				e100_new_speed_duplex =
+					E100_SPEED_100_HALF;
+				ethtool_new_speed_duplex =
+					SUPPORTED_100baseT_Half;
+			} else { 
+				e100_new_speed_duplex =
+					E100_SPEED_100_FULL;
+				ethtool_new_speed_duplex =
+					SUPPORTED_100baseT_Full;
+			} 
 		}
+
+		if (bdp->speed_duplex_caps & ethtool_new_speed_duplex) {
+			bdp->params.e100_speed_duplex =
+				e100_new_speed_duplex;
+			e100_set_speed_duplex(bdp);
+		} else {
+			return -EOPNOTSUPP;
+		} 
 	}
 
 	return 0;
@@ -3848,9 +3830,6 @@ e100_mii_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	case SIOCSMIIREG:
 		if (!capable(CAP_NET_ADMIN))
 			return -EPERM;
-		if (netif_running(dev)) {
-			return -EBUSY;
-		}
 		/* If reg = 0 && change speed/duplex */
 		if (data_ptr->reg_num == 0 && 
 			(data_ptr->val_in == (BMCR_ANENABLE | BMCR_ANRESTART) /* restart cmd */
@@ -3870,10 +3849,9 @@ e100_mii_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 					bdp->params.e100_speed_duplex = E100_SPEED_10_HALF;
 				e100_set_speed_duplex(bdp);
 		}
-		else {
-			e100_mdi_write(bdp, data_ptr->reg_num, bdp->phy_addr,
-			       data_ptr->val_in);
-		}
+		else 
+			/* Only allows changing speed/duplex */
+			return -EINVAL;
 		
 		break;
 
