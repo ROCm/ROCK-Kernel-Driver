@@ -192,7 +192,7 @@ xfs_cap_allow_set(
 		return EROFS;
 	if ((error = _MAC_VACCESS(vp, NULL, VWRITE)))
 		return error;
-	va.va_mask = AT_UID;
+	va.va_mask = XFS_AT_UID;
 	VOP_GETATTR(vp, &va, 0, NULL, error);
 	if (error)
 		return error;

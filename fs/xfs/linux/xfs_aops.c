@@ -135,17 +135,14 @@ probe_unmapped_page(
 	struct page		*page;
 	int			ret = 0;
 
-	page = find_get_page(mapping, index);
+	page = find_trylock_page(mapping, index);
 	if (!page)
 		return 0;
-	if (PageWriteback(page) || TestSetPageLocked(page)) {
-		page_cache_release(page);
-		return 0;
-	}
+	if (PageWriteback(page))
+		goto out;
+
 	if (page->mapping && PageDirty(page)) {
-		if (!page_has_buffers(page)) {
-			ret = PAGE_CACHE_SIZE;
-		} else {
+		if (page_has_buffers(page)) {
 			struct buffer_head	*bh, *head;
 			bh = head = page_buffers(page);
 			do {
@@ -156,11 +153,12 @@ probe_unmapped_page(
 				if (ret >= pg_offset)
 					break;
 			} while ((bh = bh->b_this_page) != head);
-		}
+		} else
+			ret = PAGE_CACHE_SIZE;
 	}
 
+out:
 	unlock_page(page);
-	page_cache_release(page);
 	return ret;
 }
 
@@ -214,13 +212,12 @@ probe_page(
 {
 	struct page		*page;
 
-	page = find_get_page(inode->i_mapping, index);
+	page = find_trylock_page(inode->i_mapping, index);
 	if (!page)
 		return NULL;
-	if (PageWriteback(page) || TestSetPageLocked(page)) {
-		page_cache_release(page);
-		return NULL;
-	}
+	if (PageWriteback(page))
+		goto out;
+
 	if (page->mapping && page_has_buffers(page)) {
 		struct buffer_head	*bh, *head;
 
@@ -230,8 +227,9 @@ probe_page(
 				return page;
 		} while ((bh = bh->b_this_page) != head);
 	}
+
+out:
 	unlock_page(page);
-	page_cache_release(page);
 	return NULL;
 }
 
@@ -319,8 +317,6 @@ convert_page(
 	} else {
 		unlock_page(page);
 	}
-
-	page_cache_release(page);
 }
 
 /*

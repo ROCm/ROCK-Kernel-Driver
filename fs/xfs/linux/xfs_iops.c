@@ -45,7 +45,7 @@ validate_fields(
 	vattr_t		va;
 	int		error;
 
-	va.va_mask = AT_NLINK|AT_SIZE;
+	va.va_mask = XFS_AT_NLINK|XFS_AT_SIZE;
 	VOP_GETATTR(vp, &va, ATTR_LAZY, NULL, error);
 	ip->i_nlink = va.va_nlink;
 	ip->i_size = va.va_size;
@@ -85,14 +85,14 @@ linvfs_mknod(
 		mode &= ~current->fs->umask;
 
 	memset(&va, 0, sizeof(va));
-	va.va_mask = AT_TYPE|AT_MODE;
+	va.va_mask = XFS_AT_TYPE|XFS_AT_MODE;
 	va.va_type = IFTOVT(mode);
 	va.va_mode = mode;
 
 	switch (mode & S_IFMT) {
 	case S_IFCHR: case S_IFBLK: case S_IFIFO: case S_IFSOCK:
 		va.va_rdev = XFS_MKDEV(MAJOR(rdev), MINOR(rdev));
-		va.va_mask |= AT_RDEV;
+		va.va_mask |= XFS_AT_RDEV;
 		/*FALLTHROUGH*/
 	case S_IFREG:
 		VOP_CREATE(dvp, dentry, &va, &vp, NULL, error);
@@ -255,7 +255,7 @@ linvfs_symlink(
 	memset(&va, 0, sizeof(va));
 	va.va_type = VLNK;
 	va.va_mode = irix_symlink_mode ? 0777 & ~current->fs->umask : S_IRWXUGO;
-	va.va_mask = AT_TYPE|AT_MODE;
+	va.va_mask = XFS_AT_TYPE|XFS_AT_MODE;
 
 	error = 0;
 	VOP_SYMLINK(dvp, dentry, &va, (char *)symname, &cvp, NULL, error);
@@ -462,31 +462,31 @@ linvfs_setattr(
 
 	memset(&vattr, 0, sizeof(vattr_t));
 	if (ia_valid & ATTR_UID) {
-		vattr.va_mask |= AT_UID;
+		vattr.va_mask |= XFS_AT_UID;
 		vattr.va_uid = attr->ia_uid;
 	}
 	if (ia_valid & ATTR_GID) {
-		vattr.va_mask |= AT_GID;
+		vattr.va_mask |= XFS_AT_GID;
 		vattr.va_gid = attr->ia_gid;
 	}
 	if (ia_valid & ATTR_SIZE) {
-		vattr.va_mask |= AT_SIZE;
+		vattr.va_mask |= XFS_AT_SIZE;
 		vattr.va_size = attr->ia_size;
 	}
 	if (ia_valid & ATTR_ATIME) {
-		vattr.va_mask |= AT_ATIME;
+		vattr.va_mask |= XFS_AT_ATIME;
 		vattr.va_atime = attr->ia_atime;
 	}
 	if (ia_valid & ATTR_MTIME) {
-		vattr.va_mask |= AT_MTIME;
+		vattr.va_mask |= XFS_AT_MTIME;
 		vattr.va_mtime = attr->ia_mtime;
 	}
 	if (ia_valid & ATTR_CTIME) {
-		vattr.va_mask |= AT_CTIME;
+		vattr.va_mask |= XFS_AT_CTIME;
 		vattr.va_ctime = attr->ia_ctime;
 	}
 	if (ia_valid & ATTR_MODE) {
-		vattr.va_mask |= AT_MODE;
+		vattr.va_mask |= XFS_AT_MODE;
 		vattr.va_mode = attr->ia_mode;
 		if (!in_group_p(inode->i_gid) && !capable(CAP_FSETID))
 			inode->i_mode &= ~S_ISGID;

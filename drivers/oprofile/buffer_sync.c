@@ -245,7 +245,7 @@ static void add_us_sample(struct mm_struct * mm, struct op_sample * s)
  
 static inline int is_kernel(unsigned long val)
 {
-	return val > __PAGE_OFFSET;
+	return val > PAGE_OFFSET;
 }
 
 

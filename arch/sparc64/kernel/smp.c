@@ -145,28 +145,28 @@ void __init smp_callin(void)
 	 * purposes.  Also workaround BB_ERRATA_1 by doing a dummy
 	 * read back of %tick after writing it.
 	 */
-	__asm__ __volatile__("
-	sethi	%%hi(0x80000000), %%g1
-	ba,pt	%%xcc, 1f
-	 sllx	%%g1, 32, %%g1
-	.align	64
-1:	rd	%%tick, %%g2
-	add	%%g2, 6, %%g2
-	andn	%%g2, %%g1, %%g2
-	wrpr	%%g2, 0, %%tick
-	rdpr	%%tick, %%g0"
+	__asm__ __volatile__(
+	"sethi	%%hi(0x80000000), %%g1\n\t"
+	"ba,pt	%%xcc, 1f\n\t"
+	" sllx	%%g1, 32, %%g1\n\t"
+	".align	64\n"
+"1:	rd	%%tick, %%g2\n\t"
+	"add	%%g2, 6, %%g2\n\t"
+	"andn	%%g2, %%g1, %%g2\n\t"
+	"wrpr	%%g2, 0, %%tick\n\t"
+	"rdpr	%%tick, %%g0"
 	: /* no outputs */
 	: /* no inputs */
 	: "g1", "g2");
 
 	if (SPARC64_USE_STICK) {
 		/* Let the user get at STICK too. */
-		__asm__ __volatile__("
-			sethi	%%hi(0x80000000), %%g1
-			sllx	%%g1, 32, %%g1
-			rd	%%asr24, %%g2
-			andn	%%g2, %%g1, %%g2
-			wr	%%g2, 0, %%asr24"
+		__asm__ __volatile__(
+			"sethi	%%hi(0x80000000), %%g1\n\t"
+			"sllx	%%g1, 32, %%g1\n\t"
+			"rd	%%asr24, %%g2\n\t"
+			"andn	%%g2, %%g1, %%g2\n\t"
+			"wr	%%g2, 0, %%asr24"
 		: /* no outputs */
 		: /* no inputs */
 		: "g1", "g2");
@@ -283,18 +283,18 @@ again:
 	 * ADDR 0x20) for the dummy read. -DaveM
 	 */
 	tmp = 0x40;
-	__asm__ __volatile__("
-	wrpr	%1, %2, %%pstate
-	stxa	%4, [%0] %3
-	stxa	%5, [%0+%8] %3
-	add	%0, %8, %0
-	stxa	%6, [%0+%8] %3
-	membar	#Sync
-	stxa	%%g0, [%7] %3
-	membar	#Sync
-	mov	0x20, %%g1
-	ldxa	[%%g1] 0x7f, %%g0
-	membar	#Sync"
+	__asm__ __volatile__(
+	"wrpr	%1, %2, %%pstate\n\t"
+	"stxa	%4, [%0] %3\n\t"
+	"stxa	%5, [%0+%8] %3\n\t"
+	"add	%0, %8, %0\n\t"
+	"stxa	%6, [%0+%8] %3\n\t"
+	"membar	#Sync\n\t"
+	"stxa	%%g0, [%7] %3\n\t"
+	"membar	#Sync\n\t"
+	"mov	0x20, %%g1\n\t"
+	"ldxa	[%%g1] 0x7f, %%g0\n\t"
+	"membar	#Sync"
 	: "=r" (tmp)
 	: "r" (pstate), "i" (PSTATE_IE), "i" (ASI_INTR_W),
 	  "r" (data0), "r" (data1), "r" (data2), "r" (target),
@@ -1054,21 +1054,21 @@ static void __init smp_setup_percpu_timer(void)
 	 * read back from %tick_cmpr right after writing to it. -DaveM
 	 */
 	if (!SPARC64_USE_STICK) {
-	__asm__ __volatile__("
-		rd	%%tick, %%g1
-		ba,pt	%%xcc, 1f
-		 add	%%g1, %0, %%g1
-		.align	64
-	1:	wr	%%g1, 0x0, %%tick_cmpr
-		rd	%%tick_cmpr, %%g0"
+	__asm__ __volatile__(
+		"rd	%%tick, %%g1\n\t"
+		"ba,pt	%%xcc, 1f\n\t"
+		" add	%%g1, %0, %%g1\n\t"
+		".align	64\n"
+	"1:	wr	%%g1, 0x0, %%tick_cmpr\n\t"
+		"rd	%%tick_cmpr, %%g0"
 	: /* no outputs */
 	: "r" (current_tick_offset)
 	: "g1");
 	} else {
-	__asm__ __volatile__("
-		rd	%%asr24, %%g1
-		add	%%g1, %0, %%g1
-		wr	%%g1, 0x0, %%asr25"
+	__asm__ __volatile__(
+		"rd	%%asr24, %%g1\n\t"
+		"add	%%g1, %0, %%g1\n\t"
+		"wr	%%g1, 0x0, %%asr25"
 	: /* no outputs */
 	: "r" (current_tick_offset)
 	: "g1");

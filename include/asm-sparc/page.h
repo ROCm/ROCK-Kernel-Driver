@@ -174,6 +174,9 @@ extern __inline__ int get_order(unsigned long size)
 #define __pa(x)                 ((unsigned long)(x) - PAGE_OFFSET)
 #define __va(x)                 ((void *)((unsigned long) (x) + PAGE_OFFSET))
 
+#define virt_to_phys(x)		__pa((unsigned long)(x))
+#define phys_to_virt(x)		__va((unsigned long)(x))
+
 #define pfn_to_page(pfn)        (mem_map + (pfn))
 #define page_to_pfn(page)       ((unsigned long)((page) - mem_map))
 #define virt_to_page(kaddr)	(mem_map + (__pa(kaddr) >> PAGE_SHIFT))

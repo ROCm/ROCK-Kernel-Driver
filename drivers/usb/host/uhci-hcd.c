@@ -1051,10 +1051,6 @@ status_phase:
 
 td_error:
 	ret = uhci_map_status(status, uhci_packetout(td_token(td)));
-	if (ret == -EPIPE)
-		/* endpoint has stalled - mark it halted */
-		usb_endpoint_halt(urb->dev, uhci_endpoint(td_token(td)),
-	    			uhci_packetout(td_token(td)));
 
 err:
 	if ((debug == 1 && ret != -EPIPE) || debug > 1) {

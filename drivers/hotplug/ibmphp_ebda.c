@@ -1240,11 +1240,11 @@ void ibmphp_free_ebda_pci_rsrc_queue (void)
 
 static struct pci_device_id id_table[] __devinitdata = {
 	{
-		vendor:		PCI_VENDOR_ID_IBM,
-		device:		HPC_DEVICE_ID,
-		subvendor:	PCI_VENDOR_ID_IBM,
-		subdevice:	HPC_SUBSYSTEM_ID,
-		class:		((PCI_CLASS_SYSTEM_PCI_HOTPLUG << 8) | 0x00),
+		.vendor		= PCI_VENDOR_ID_IBM,
+		.device		= HPC_DEVICE_ID,
+		.subvendor	= PCI_VENDOR_ID_IBM,
+		.subdevice	= HPC_SUBSYSTEM_ID,
+		.class		= ((PCI_CLASS_SYSTEM_PCI_HOTPLUG << 8) | 0x00),
 	}, {}
 };		
 
@@ -1252,9 +1252,9 @@ MODULE_DEVICE_TABLE(pci, id_table);
 
 static int ibmphp_probe (struct pci_dev *, const struct pci_device_id *);
 static struct pci_driver ibmphp_driver = {
-	name:		"ibmphp",
-	id_table:	id_table,
-	probe:		ibmphp_probe,
+	.name		= "ibmphp",
+	.id_table	= id_table,
+	.probe		= ibmphp_probe,
 };
 
 int ibmphp_register_pci (void)

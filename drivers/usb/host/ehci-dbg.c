@@ -18,6 +18,17 @@
 
 /* this file is part of ehci-hcd.c */
 
+#define ehci_dbg(ehci, fmt, args...) \
+	dev_dbg (*(ehci)->hcd.controller, fmt, ## args )
+
+#ifdef EHCI_VERBOSE_DEBUG
+#define ehci_vdbg(ehci, fmt, args...) \
+	dev_dbg (*(ehci)->hcd.controller, fmt, ## args )
+#else
+#define ehci_vdbg(ehci, fmt, args...) do { } while (0)
+#endif
+
+
 #ifdef EHCI_VERBOSE_DEBUG
 #	define vdbg dbg
 #else
@@ -34,7 +45,8 @@ static void dbg_hcs_params (struct ehci_hcd *ehci, char *label)
 {
 	u32	params = readl (&ehci->caps->hcs_params);
 
-	dbg ("%s hcs_params 0x%x dbg=%d%s cc=%d pcc=%d%s%s ports=%d",
+	ehci_dbg (ehci,
+		"%s hcs_params 0x%x dbg=%d%s cc=%d pcc=%d%s%s ports=%d\n",
 		label, params,
 		HCS_DEBUG_PORT (params),
 		HCS_INDICATOR (params) ? " ind" : "",
@@ -56,9 +68,8 @@ static void dbg_hcs_params (struct ehci_hcd *ehci, char *label)
 				((i & 0x1) ? ((byte)&0xf) : ((byte>>4)&0xf)));
 			strcat(buf, tmp);
 		}
-		dbg ("%s: %s portroute %s", 
-			hcd_to_bus (&ehci->hcd)->bus_name, label,
-			buf);
+		ehci_dbg (ehci, "%s portroute %s\n",
+				label, buf);
 	}
 }
 #else
@@ -77,19 +88,16 @@ static void dbg_hcc_params (struct ehci_hcd *ehci, char *label)
 {
 	u32	params = readl (&ehci->caps->hcc_params);
 
-	if (HCC_EXT_CAPS (params)) {
-		// EHCI 0.96 ... could interpret these (legacy?)
-		dbg ("%s extended capabilities at pci %2x",
-			label, HCC_EXT_CAPS (params));
-	}
 	if (HCC_ISOC_CACHE (params)) {
-		dbg ("%s hcc_params %04x caching frame %s%s%s",
+		ehci_dbg (ehci,
+		     "%s hcc_params %04x caching frame %s%s%s\n",
 		     label, params,
 		     HCC_PGM_FRAMELISTLEN (params) ? "256/512/1024" : "1024",
 		     HCC_CANPARK (params) ? " park" : "",
 		     HCC_64BIT_ADDR (params) ? " 64 bit addr" : "");
 	} else {
-		dbg ("%s hcc_params %04x caching %d uframes %s%s%s",
+		ehci_dbg (ehci,
+		     "%s hcc_params %04x thresh %d uframes %s%s%s\n",
 		     label,
 		     params,
 		     HCC_ISOC_THRES (params),
@@ -235,19 +243,19 @@ dbg_port_buf (char *buf, unsigned len, char *label, int port, u32 status)
 #define dbg_status(ehci, label, status) { \
 	char _buf [80]; \
 	dbg_status_buf (_buf, sizeof _buf, label, status); \
-	dbg ("%s", _buf); \
+	ehci_dbg (ehci, "%s\n", _buf); \
 }
 
 #define dbg_cmd(ehci, label, command) { \
 	char _buf [80]; \
 	dbg_command_buf (_buf, sizeof _buf, label, command); \
-	dbg ("%s", _buf); \
+	ehci_dbg (ehci, "%s\n", _buf); \
 }
 
-#define dbg_port(hcd, label, port, status) { \
+#define dbg_port(ehci, label, port, status) { \
 	char _buf [80]; \
 	dbg_port_buf (_buf, sizeof _buf, label, port, status); \
-	dbg ("%s", _buf); \
+	ehci_dbg (ehci, "%s\n", _buf); \
 }
 
 /*-------------------------------------------------------------------------*/
@@ -338,12 +346,8 @@ show_async (struct device *dev, char *buf, size_t count, loff_t off)
 	 * one QH per line, and TDs we know about
 	 */
 	spin_lock_irqsave (&ehci->lock, flags);
-	if (ehci->async) {
-		qh = ehci->async;
-		do {
-			qh_lines (qh, &next, &size);
-		} while ((qh = qh->qh_next.qh) != ehci->async);
-	}
+	for (qh = ehci->async->qh_next.qh; qh; qh = qh->qh_next.qh)
+		qh_lines (qh, &next, &size);
 	if (ehci->reclaim) {
 		temp = snprintf (next, size, "\nreclaim =\n");
 		size -= temp;

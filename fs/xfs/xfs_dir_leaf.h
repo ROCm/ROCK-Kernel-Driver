@@ -42,7 +42,6 @@
  * internal links in the Btree are logical block offsets into the file.
  */
 
-struct dirent;
 struct uio;
 struct xfs_bmap_free;
 struct xfs_dabuf;

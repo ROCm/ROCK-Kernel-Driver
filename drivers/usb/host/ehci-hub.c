@@ -40,18 +40,15 @@ static int check_reset_complete (
 
 	/* if reset finished and it's still not enabled -- handoff */
 	if (!(port_status & PORT_PE)) {
-		dbg ("%s port %d full speed, give to companion, 0x%x",
-			hcd_to_bus (&ehci->hcd)->bus_name,
-			index + 1, port_status);
+		ehci_dbg (ehci, "port %d full speed --> companion\n",
+			index + 1);
 
 		// what happens if HCS_N_CC(params) == 0 ?
 		port_status |= PORT_OWNER;
 		writel (port_status, &ehci->regs->port_status [index]);
 
 	} else
-		dbg ("%s port %d high speed",
-			hcd_to_bus (&ehci->hcd)->bus_name,
-			index + 1);
+		ehci_dbg (ehci, "port %d high speed\n", index + 1);
 
 	return port_status;
 }
@@ -277,7 +274,7 @@ static int ehci_hub_control (
 #ifndef	EHCI_VERBOSE_DEBUG
 	if (status & ~0xffff)	/* only if wPortChange is interesting */
 #endif
-		dbg_port (hcd, "GetStatus", wIndex + 1, temp);
+		dbg_port (ehci, "GetStatus", wIndex + 1, temp);
 		// we "know" this alignment is good, caller used kmalloc()...
 		*((u32 *) buf) = cpu_to_le32 (status);
 		break;
@@ -313,14 +310,12 @@ static int ehci_hub_control (
 			/* line status bits may report this as low speed */
 			if ((temp & (PORT_PE|PORT_CONNECT)) == PORT_CONNECT
 					&& PORT_USB11 (temp)) {
-				dbg ("%s port %d low speed, give to companion",
-					hcd_to_bus (&ehci->hcd)->bus_name,
+				ehci_dbg (ehci,
+					"port %d low speed --> companion\n",
 					wIndex + 1);
 				temp |= PORT_OWNER;
 			} else {
-				vdbg ("%s port %d reset",
-					hcd_to_bus (&ehci->hcd)->bus_name,
-					wIndex + 1);
+				ehci_vdbg (ehci, "port %d reset", wIndex + 1);
 				temp |= PORT_RESET;
 				temp &= ~PORT_PE;
 
