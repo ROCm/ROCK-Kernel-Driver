@@ -179,6 +179,8 @@ static int tcp_packet(struct ip6_conntrack *conntrack,
 
 	if (skb_copy_bits(skb, dataoff, &tcph, sizeof(tcph)) != 0)
 		return -1;
+	if (skb->len < skb->nh.iph->ihl * 4 + tcph.doff * 4)
+		return -1;
 
 	WRITE_LOCK(&tcp_lock);
 	oldtcpstate = conntrack->proto.tcp.state;
