@@ -26,7 +26,7 @@ config SWAP
 	bool
 	default y
 
-config RWSEM_GENERIC_SPINLOCK
+config RWSEM_XCHGADD_ALGORITHM
 	bool
 	default y
 
