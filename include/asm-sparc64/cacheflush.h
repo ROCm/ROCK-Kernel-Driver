@@ -38,9 +38,16 @@ extern void __flush_dcache_range(unsigned long start, unsigned long end);
 #define flush_icache_user_range(vma,pg,adr,len)	do { } while (0)
 
 #define copy_to_user_page(vma, page, vaddr, dst, src, len) \
-	memcpy(dst, src, len)
+	do {					\
+		flush_cache_page(vma, vaddr);	\
+		memcpy(dst, src, len);		\
+	} while (0)
+
 #define copy_from_user_page(vma, page, vaddr, dst, src, len) \
-	memcpy(dst, src, len)
+	do {					\
+		flush_cache_page(vma, vaddr);	\
+		memcpy(dst, src, len);		\
+	} while (0)
 
 extern void flush_dcache_page(struct page *page);
 #define flush_dcache_mmap_lock(mapping)		do { } while (0)

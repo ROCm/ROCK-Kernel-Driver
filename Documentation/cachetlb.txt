@@ -354,10 +354,6 @@ maps this page at its virtual address.
 	of arbitrary user pages (f.e. for ptrace()) it will use
 	these two routines.
 
-	The page has been kmap()'d, and flush_cache_page() has
-	just been called for the user mapping of this page (if
-	necessary).
-
 	Any necessary cache flushing or other coherency operations
 	that need to occur should happen here.  If the processor's
 	instruction cache does not snoop cpu stores, it is very

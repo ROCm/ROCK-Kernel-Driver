@@ -132,10 +132,18 @@ static inline void __flush_page_to_ram(void *vaddr)
 #define flush_dcache_mmap_unlock(mapping)	do { } while (0)
 #define flush_icache_page(vma, page)	__flush_page_to_ram(page_address(page))
 #define flush_icache_user_range(vma,pg,adr,len)	do { } while (0)
+
 #define copy_to_user_page(vma, page, vaddr, dst, src, len) \
-	memcpy(dst, src, len)
+	do {					\
+		flush_cache_page(vma, vaddr);	\
+		memcpy(dst, src, len);		\
+	} while (0)
+
 #define copy_from_user_page(vma, page, vaddr, dst, src, len) \
-	memcpy(dst, src, len)
+	do {					\
+		flush_cache_page(vma, vaddr);	\
+		memcpy(dst, src, len);		\
+	} while (0)
 
 extern void flush_icache_range(unsigned long address, unsigned long endaddr);
 
