@@ -706,12 +706,10 @@ static int netlink_recvmsg(struct kiocb *iocb, struct socket *sock,
 		netlink_dump(sk);
 
 out:
-	if (skb_queue_len(&sk->receive_queue) <= sk->rcvbuf/2) {
-		if (skb_queue_len(&sk->receive_queue) == 0)
-			clear_bit(0, &nlk->state);
-		if (!test_bit(0, &nlk->state))
-			wake_up_interruptible(&nlk->wait);
-	}
+	if (skb_queue_len(&sk->receive_queue) == 0)
+		clear_bit(0, &nlk->state);
+	if (!test_bit(0, &nlk->state))
+		wake_up_interruptible(&nlk->wait);
 	return err ? : copied;
 }
 
@@ -722,12 +720,10 @@ void netlink_data_ready(struct sock *sk, int len)
 	if (nlk->data_ready)
 		nlk->data_ready(sk, len);
 
-	if (skb_queue_len(&sk->receive_queue) <= sk->rcvbuf/2) {
-		if (skb_queue_len(&sk->receive_queue) == 0)
-			clear_bit(0, &nlk->state);
-		if (!test_bit(0, &nlk->state))
-			wake_up_interruptible(&nlk->wait);
-	}
+	if (skb_queue_len(&sk->receive_queue) == 0)
+		clear_bit(0, &nlk->state);
+	if (!test_bit(0, &nlk->state))
+		wake_up_interruptible(&nlk->wait);
 }
 
 /*
