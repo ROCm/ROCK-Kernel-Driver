@@ -238,8 +238,7 @@ typedef struct {
 /* Timer-delays and scheduling-flags */
 #define ISDN_TIMER_RES         4                         /* Main Timer-Resolution   */
 #define ISDN_TIMER_MODEMREAD   1
-#define ISDN_TIMER_MODEMXMIT   8
-#define ISDN_TIMER_FAST      (ISDN_TIMER_MODEMREAD | ISDN_TIMER_MODEMXMIT)
+#define ISDN_TIMER_FAST      (ISDN_TIMER_MODEMREAD)
 
 /* GLOBAL_FLAGS */
 #define ISDN_GLOBAL_STOPPED 1

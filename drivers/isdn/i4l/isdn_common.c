@@ -1160,8 +1160,6 @@ isdn_timer_funct(ulong dummy)
 	if (tf & ISDN_TIMER_FAST) {
 		if (tf & ISDN_TIMER_MODEMREAD)
 			isdn_tty_readmodem();
-		if (tf & ISDN_TIMER_MODEMXMIT)
-			isdn_tty_modem_xmit();
 	}
 	if (tf) 
 	{
