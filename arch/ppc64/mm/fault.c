@@ -208,7 +208,7 @@ bad_page_fault(struct pt_regs *regs, unsigned long address, int sig)
 
 	/* kernel has accessed a bad area */
 #ifdef CONFIG_DEBUG_KERNEL
-	if (debugger_kernel_faults)
+	if (debugger_kernel_faults && debugger)
 		debugger(regs);
 #endif
 	die("Kernel access of bad area", regs, sig);
