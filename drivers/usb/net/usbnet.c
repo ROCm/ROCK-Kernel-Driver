@@ -3249,6 +3249,10 @@ static const struct usb_device_id	products [] = {
 	USB_DEVICE (0x6189, 0x182d),
 	.driver_info =  (unsigned long) &ax8817x_info,
 }, {
+	// corega FEther USB2-TX
+	USB_DEVICE (0x07aa, 0x0017),
+	.driver_info =  (unsigned long) &ax8817x_info,
+}, {
 	// Surecom EP-1427X-2
 	USB_DEVICE (0x1189, 0x0893),
 	.driver_info = (unsigned long) &ax8817x_info,
