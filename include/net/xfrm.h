@@ -788,7 +788,6 @@ void xfrm4_policy_init(void);
 void xfrm6_policy_init(void);
 struct xfrm_policy *xfrm_policy_alloc(int gfp);
 extern int xfrm_policy_walk(int (*func)(struct xfrm_policy *, int, int, void*), void *);
-struct xfrm_policy *xfrm_policy_lookup(int dir, struct flowi *fl, unsigned short family);
 int xfrm_policy_insert(int dir, struct xfrm_policy *policy, int excl);
 struct xfrm_policy *xfrm_policy_delete(int dir, struct xfrm_selector *sel);
 struct xfrm_policy *xfrm_policy_byid(int dir, u32 id, int delete);

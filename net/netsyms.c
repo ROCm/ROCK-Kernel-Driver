@@ -292,7 +292,6 @@ EXPORT_SYMBOL(km_new_mapping);
 EXPORT_SYMBOL(xfrm_cfg_sem);
 EXPORT_SYMBOL(xfrm_policy_alloc);
 EXPORT_SYMBOL(__xfrm_policy_destroy);
-EXPORT_SYMBOL(xfrm_policy_lookup);
 EXPORT_SYMBOL(xfrm_lookup);
 EXPORT_SYMBOL(__xfrm_policy_check);
 EXPORT_SYMBOL(__xfrm_route_forward);
@@ -362,6 +361,9 @@ EXPORT_SYMBOL_GPL(skb_cow_data);
 EXPORT_SYMBOL_GPL(pskb_put);
 EXPORT_SYMBOL_GPL(skb_to_sgvec);
 #endif
+
+EXPORT_SYMBOL(flow_cache_lookup);
+EXPORT_SYMBOL(flow_cache_genid);
 
 #if defined (CONFIG_IPV6_MODULE) || defined (CONFIG_IP_SCTP_MODULE)
 /* inet functions common to v4 and v6 */
