@@ -2955,10 +2955,13 @@ static int __init parport_pc_find_ports (int autoirq, int autodma)
 	/* Onboard SuperIO chipsets that show themselves on the PCI bus. */
 	count += parport_pc_init_superio (autoirq, autodma);
 
-	r = pnp_register_driver (&parport_pc_pnp_driver);
-	if (r >= 0) {
-		pnp_registered_parport = 1;
-		count += r;
+	/* PnP ports, skip detection if SuperIO already found them */
+	if (!count) {
+		r = pnp_register_driver (&parport_pc_pnp_driver);
+		if (r >= 0) {
+			pnp_registered_parport = 1;
+			count += r;
+		}
 	}
 
 	/* ISA ports and whatever (see asm/parport.h). */

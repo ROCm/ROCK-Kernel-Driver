@@ -1095,9 +1095,15 @@ static int dvb_net_do_ioctl(struct inode *inode, struct file *file,
 		
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
+
+		if (!try_module_get(dvbdev->adapter->module))
+			return -EPERM;
+
 		result=dvb_net_add_if(dvbnet, dvbnetif->pid, dvbnetif->feedtype);
-		if (result<0)
+		if (result<0) {
+			module_put(dvbdev->adapter->module);
 			return result;
+		}
 		dvbnetif->if_num=result;
 		break;
 	}
@@ -1120,6 +1126,7 @@ static int dvb_net_do_ioctl(struct inode *inode, struct file *file,
 	case NET_REMOVE_IF:
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
+		module_put(dvbdev->adapter->module);
 		return dvb_net_remove_if(dvbnet, (int) (long) parg);
 
 	/* binary compatiblity cruft */
@@ -1130,9 +1137,15 @@ static int dvb_net_do_ioctl(struct inode *inode, struct file *file,
 
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
+
+		if (!try_module_get(dvbdev->adapter->module))
+			return -EPERM;
+
 		result=dvb_net_add_if(dvbnet, dvbnetif->pid, DVB_NET_FEEDTYPE_MPE);
-		if (result<0)
+		if (result<0) {
+			module_put(dvbdev->adapter->module);
 			return result;
+		}
 		dvbnetif->if_num=result;
 		break;
 	}

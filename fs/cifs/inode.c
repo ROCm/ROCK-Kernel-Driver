@@ -94,7 +94,7 @@ cifs_get_inode_info_unix(struct inode **pinode,
 		cFYI(1, (" Old time %ld ", cifsInfo->time));
 		cifsInfo->time = jiffies;
 		cFYI(1, (" New time %ld ", cifsInfo->time));
-		atomic_inc(&cifsInfo->inUse);	/* inc on every refresh of inode */
+		atomic_set(&cifsInfo->inUse,1);	/* ok to set on every refresh of inode */
 
 		inode->i_atime =
 		    cifs_NTtimeToUnix(le64_to_cpu(findData.LastAccessTime));
@@ -238,7 +238,6 @@ cifs_get_inode_info(struct inode **pinode, const unsigned char *search_path,
 		cFYI(1, (" Old time %ld ", cifsInfo->time));
 		cifsInfo->time = jiffies;
 		cFYI(1, (" New time %ld ", cifsInfo->time));
-		atomic_inc(&cifsInfo->inUse);	/* inc on every refresh of inode */
 
 /* blksize needs to be multiple of two. So safer to default to blksize
         and blkbits set in superblock so 2**blkbits and blksize will match */
@@ -256,7 +255,9 @@ cifs_get_inode_info(struct inode **pinode, const unsigned char *search_path,
 		     (" Attributes came in as 0x%x ", pfindData->Attributes));
 
 		/* set default mode. will override for dirs below */
-		inode->i_mode = cifs_sb->mnt_file_mode;
+		if(atomic_read(&cifsInfo->inUse) == 0)
+			/* new inode, can safely set these fields */
+			inode->i_mode = cifs_sb->mnt_file_mode;
 
 		if (pfindData->Attributes & ATTR_REPARSE) {
 	/* Can IFLNK be set as it basically is on windows with IFREG or IFDIR? */
@@ -281,8 +282,13 @@ cifs_get_inode_info(struct inode **pinode, const unsigned char *search_path,
 
 		/* BB fill in uid and gid here? with help from winbind? 
 			or retrieve from NTFS stream extended attribute */
-		inode->i_uid = cifs_sb->mnt_uid;
-		inode->i_gid = cifs_sb->mnt_gid;
+		if(atomic_read(&cifsInfo->inUse) == 0) {
+			inode->i_uid = cifs_sb->mnt_uid;
+			inode->i_gid = cifs_sb->mnt_gid;
+			/* set so we do not keep refreshing these fields with
+			bad data after user has changed them in memory */
+			atomic_set(&cifsInfo->inUse,1);
+		}
 		
 		if (S_ISREG(inode->i_mode)) {
 			cFYI(1, (" File inode "));

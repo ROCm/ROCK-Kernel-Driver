@@ -7,11 +7,9 @@
  *
  * Original (leds-footbridge.c) by Russell King
  *
- * See leds.h for bit definitions.  The first version defines D28 on the
- * Lubbock dev board as the heartbeat, and D27 as the Sys_busy led.
- * There's plenty more if you're interested in adding them :)
+ * Major surgery on April 2004 by Nicolas Pitre for less global
+ * namespace collision.  Mostly adapted the Mainstone version.
  */
-
 
 #include <linux/config.h>
 #include <linux/init.h>
@@ -22,6 +20,21 @@
 
 #include "leds.h"
 
+/*
+ * 8 discrete leds available for general use:
+ *
+ * Note: bits [15-8] are used to enable/blank the 8 7 segment hex displays
+ * so be sure to not monkey with them here.
+ */
+
+#define D28			(1 << 0)
+#define D27			(1 << 1)
+#define D26			(1 << 2)
+#define D25			(1 << 3)
+#define D24			(1 << 4)
+#define D23			(1 << 5)
+#define D22			(1 << 6)
+#define D21			(1 << 7)
 
 #define LED_STATE_ENABLED	1
 #define LED_STATE_CLAIMED	2
@@ -37,7 +50,7 @@ void lubbock_leds_event(led_event_t evt)
 
 	switch (evt) {
 	case led_start:
-		hw_led_state = HEARTBEAT_LED | SYS_BUSY_LED;
+		hw_led_state = 0;
 		led_state = LED_STATE_ENABLED;
 		break;
 
@@ -47,30 +60,27 @@ void lubbock_leds_event(led_event_t evt)
 
 	case led_claim:
 		led_state |= LED_STATE_CLAIMED;
-		hw_led_state = HEARTBEAT_LED | SYS_BUSY_LED;
+		hw_led_state = 0;
 		break;
 
 	case led_release:
 		led_state &= ~LED_STATE_CLAIMED;
-		hw_led_state = HEARTBEAT_LED | SYS_BUSY_LED;
+		hw_led_state = 0;
 		break;
 
 #ifdef CONFIG_LEDS_TIMER
 	case led_timer:
-		if (!(led_state & LED_STATE_CLAIMED))
-			hw_led_state ^= HEARTBEAT_LED;
+		hw_led_state ^= D26;
 		break;
 #endif
 
 #ifdef CONFIG_LEDS_CPU
 	case led_idle_start:
-		if (!(led_state & LED_STATE_CLAIMED))
-			hw_led_state |= SYS_BUSY_LED;
+		hw_led_state &= ~D27;
 		break;
 
 	case led_idle_end:
-		if (!(led_state & LED_STATE_CLAIMED))
-			hw_led_state &= ~SYS_BUSY_LED;
+		hw_led_state |= D27;
 		break;
 #endif
 
@@ -78,29 +88,27 @@ void lubbock_leds_event(led_event_t evt)
 		break;
 
 	case led_green_on:
-		if (led_state & LED_STATE_CLAIMED)
-			hw_led_state &= ~HEARTBEAT_LED;
+		hw_led_state |= D21;;
 		break;
 
 	case led_green_off:
-		if (led_state & LED_STATE_CLAIMED)
-			hw_led_state |= HEARTBEAT_LED;
+		hw_led_state &= ~D21;
 		break;
 
 	case led_amber_on:
+		hw_led_state |= D22;;
 		break;
 
 	case led_amber_off:
+		hw_led_state &= ~D22;
 		break;
 
 	case led_red_on:
-		if (led_state & LED_STATE_CLAIMED)
-			hw_led_state &= ~SYS_BUSY_LED;
+		hw_led_state |= D23;;
 		break;
 
 	case led_red_off:
-		if (led_state & LED_STATE_CLAIMED)
-			hw_led_state |= SYS_BUSY_LED;
+		hw_led_state &= ~D23;
 		break;
 
 	default:
@@ -108,27 +116,9 @@ void lubbock_leds_event(led_event_t evt)
 	}
 
 	if  (led_state & LED_STATE_ENABLED)
-	{
-		switch (hw_led_state) {
-		case 0: // all on
-			HEARTBEAT_LED_ON;
-			SYS_BUSY_LED_ON;
-			break;
-		case 1: // turn off heartbeat, status on:
-			HEARTBEAT_LED_OFF;
-			SYS_BUSY_LED_ON;
-			break;
-		case 2: // status off, heartbeat on:
-			HEARTBEAT_LED_ON;
-			SYS_BUSY_LED_OFF;
-			break;
-		case 3: // turn them both off...
-			HEARTBEAT_LED_OFF;
-			SYS_BUSY_LED_OFF;
-			break;
-		default:
-			break;
-		}
-	}
+		LUB_DISC_BLNK_LED = (LUB_DISC_BLNK_LED | 0xff) & ~hw_led_state;
+	else
+		LUB_DISC_BLNK_LED |= 0xff;
+
 	local_irq_restore(flags);
 }

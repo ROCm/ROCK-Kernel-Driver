@@ -328,7 +328,7 @@ ccw_device_done(struct ccw_device *cdev, int state)
 		cdev->private->flags.donotify = 0;
 		PREPARE_WORK(&cdev->private->kick_work, ccw_device_oper_notify,
 			     (void *)cdev);
-		queue_work(ccw_device_work, &cdev->private->kick_work);
+		queue_work(ccw_device_notify_work, &cdev->private->kick_work);
 	}
 	wake_up(&cdev->private->wait_q);
 
@@ -441,10 +441,13 @@ ccw_device_nopath_notify(void *data)
 		if (get_device(&sch->dev)) {
 			/* Driver doesn't want to keep device. */
 			cio_disable_subchannel(sch);
-			device_unregister(&sch->dev);
-			sch->schib.pmcw.intparm = 0;
-			cio_modify(sch);
-			put_device(&sch->dev);
+			if (get_device(&cdev->dev)) {
+				PREPARE_WORK(&cdev->private->kick_work,
+					     ccw_device_call_sch_unregister,
+					     (void *)cdev);
+				queue_work(ccw_device_work,
+					   &cdev->private->kick_work);
+			}
 		}
 	} else {
 		cio_disable_subchannel(sch);
@@ -464,7 +467,7 @@ device_call_nopath_notify(struct subchannel *sch)
 	cdev = sch->dev.driver_data;
 	PREPARE_WORK(&cdev->private->kick_work,
 		     ccw_device_nopath_notify, (void *)cdev);
-	queue_work(ccw_device_work, &cdev->private->kick_work);
+	queue_work(ccw_device_notify_work, &cdev->private->kick_work);
 }
 
 
@@ -482,7 +485,7 @@ ccw_device_verify_done(struct ccw_device *cdev, int err)
 	default:
 		PREPARE_WORK(&cdev->private->kick_work,
 			     ccw_device_nopath_notify, (void *)cdev);
-		queue_work(ccw_device_work, &cdev->private->kick_work);
+		queue_work(ccw_device_notify_work, &cdev->private->kick_work);
 		ccw_device_done(cdev, DEV_STATE_NOT_OPER);
 		break;
 	}
@@ -722,7 +725,8 @@ ccw_device_online_timeout(struct ccw_device *cdev, enum dev_event dev_event)
 		if (!sch->lpm) {
 			PREPARE_WORK(&cdev->private->kick_work,
 				     ccw_device_nopath_notify, (void *)cdev);
-			queue_work(ccw_device_work, &cdev->private->kick_work);
+			queue_work(ccw_device_notify_work,
+				   &cdev->private->kick_work);
 		} else
 			dev_fsm_event(cdev, DEV_EVENT_NOTOPER);
 	} else if (cdev->handler)
@@ -798,7 +802,7 @@ ccw_device_killing_irq(struct ccw_device *cdev, enum dev_event dev_event)
 	if (!sch->lpm) {
 		PREPARE_WORK(&cdev->private->kick_work,
 			     ccw_device_nopath_notify, (void *)cdev);
-		queue_work(ccw_device_work, &cdev->private->kick_work);
+		queue_work(ccw_device_notify_work, &cdev->private->kick_work);
 	} else if (cdev->private->flags.doverify)
 		/* Start delayed path verification. */
 		ccw_device_online_verify(cdev, 0);
@@ -821,7 +825,8 @@ ccw_device_killing_timeout(struct ccw_device *cdev, enum dev_event dev_event)
 		if (!sch->lpm) {
 			PREPARE_WORK(&cdev->private->kick_work,
 				     ccw_device_nopath_notify, (void *)cdev);
-			queue_work(ccw_device_work, &cdev->private->kick_work);
+			queue_work(ccw_device_notify_work,
+				   &cdev->private->kick_work);
 		} else
 			dev_fsm_event(cdev, DEV_EVENT_NOTOPER);
 		return;
@@ -871,7 +876,7 @@ call_handler:
 	if (!sch->lpm) {
 		PREPARE_WORK(&cdev->private->kick_work,
 			     ccw_device_nopath_notify, (void *)cdev);
-		queue_work(ccw_device_work, &cdev->private->kick_work);
+		queue_work(ccw_device_notify_work, &cdev->private->kick_work);
 	} else if (cdev->private->flags.doverify)
 		ccw_device_online_verify(cdev, 0);
 }
@@ -894,7 +899,8 @@ ccw_device_wait4io_timeout(struct ccw_device *cdev, enum dev_event dev_event)
 		if (!sch->lpm) {
 			PREPARE_WORK(&cdev->private->kick_work,
 				     ccw_device_nopath_notify, (void *)cdev);
-			queue_work(ccw_device_work, &cdev->private->kick_work);
+			queue_work(ccw_device_notify_work,
+				   &cdev->private->kick_work);
 		} else
 			dev_fsm_event(cdev, DEV_EVENT_NOTOPER);
 		return;
@@ -905,7 +911,7 @@ ccw_device_wait4io_timeout(struct ccw_device *cdev, enum dev_event dev_event)
 	if (!sch->lpm) {
 		PREPARE_WORK(&cdev->private->kick_work,
 			     ccw_device_nopath_notify, (void *)cdev);
-		queue_work(ccw_device_work, &cdev->private->kick_work);
+		queue_work(ccw_device_notify_work, &cdev->private->kick_work);
 	} else if (cdev->private->flags.doverify)
 		/* Start delayed path verification. */
 		ccw_device_online_verify(cdev, 0);

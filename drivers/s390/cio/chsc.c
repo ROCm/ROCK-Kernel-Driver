@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/chsc.c
  *   S/390 common I/O routines -- channel subsystem call
- *   $Revision: 1.107 $
+ *   $Revision: 1.110 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *			      IBM Corporation
@@ -148,7 +148,7 @@ chsc_get_sch_desc_irq(struct subchannel *sch, void *page)
 	 */
 	if (ssd_area->st > 3) { /* uhm, that looks strange... */
 		CIO_CRW_EVENT(0, "Strange subchannel type %d"
-			      " for sch %s\n", ssd_area->st, sch->dev.bus_id);
+			      " for sch %04x\n", ssd_area->st, sch->irq);
 		/*
 		 * There may have been a new subchannel type defined in the
 		 * time since this code was written; since we don't know which
@@ -157,8 +157,8 @@ chsc_get_sch_desc_irq(struct subchannel *sch, void *page)
 		return 0;
 	} else {
 		const char *type[4] = {"I/O", "chsc", "message", "ADM"};
-		CIO_CRW_EVENT(6, "ssd: sch %s is %s subchannel\n",
-			      sch->dev.bus_id, type[ssd_area->st]);
+		CIO_CRW_EVENT(6, "ssd: sch %04x is %s subchannel\n",
+			      sch->irq, type[ssd_area->st]);
 
 		sch->ssd_info.valid = 1;
 		sch->ssd_info.type = ssd_area->st;
@@ -818,6 +818,8 @@ s390_vary_chpid( __u8 chpid, int on)
 	for (irq = 0; irq < __MAX_SUBCHANNELS; irq++) {
 		struct schib schib;
 
+		if (need_rescan)
+			break;
 		sch = get_subchannel_by_schid(irq);
 		if (sch) {
 			put_device(&sch->dev);
@@ -826,15 +828,12 @@ s390_vary_chpid( __u8 chpid, int on)
 		if (stsch(irq, &schib))
 			/* We're through */
 			break;
-		if (need_rescan)
-			continue;
 		/* Put it on the slow path. */
 		ret = css_enqueue_subchannel_slow(irq);
 		if (ret) {
 			css_clear_subchannel_slow_list();
 			need_rescan = 1;
 		}
-		continue;
 	}
 	if (need_rescan || css_slow_subchannels_exist())
 		schedule_work(&varyonoff_work);

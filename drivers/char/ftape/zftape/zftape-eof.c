@@ -123,7 +123,7 @@ static __u8 * find_end_of_eof_list(__u8 * ptr, __u8 * limit)
 	while (ptr + 3 < limit) {
 
 		if (get_unaligned((__u32*)ptr)) {
-			++(__u32*)ptr;
+			ptr += sizeof(__u32);
 		} else {
 			return ptr;
 		}

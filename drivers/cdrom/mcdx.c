@@ -81,10 +81,6 @@ static const char *mcdx_c_version
 #define	mcdx_drive_map mcdx
 #include "mcdx.h"
 
-#if BITS_PER_LONG != 32
-#  error FIXME: this driver only works on 32-bit platforms
-#endif
-
 #ifndef HZ
 #error HZ not defined
 #endif
@@ -189,12 +185,12 @@ struct s_drive_stuff {
 #endif				/* AK2 */
 
 	/* adds and odds */
-	void *wreg_data;	/* w data */
-	void *wreg_reset;	/* w hardware reset */
-	void *wreg_hcon;	/* w hardware conf */
-	void *wreg_chn;		/* w channel */
-	void *rreg_data;	/* r data */
-	void *rreg_status;	/* r status */
+	unsigned wreg_data;	/* w data */
+	unsigned wreg_reset;	/* w hardware reset */
+	unsigned wreg_hcon;	/* w hardware conf */
+	unsigned wreg_chn;	/* w channel */
+	unsigned rreg_data;	/* r data */
+	unsigned rreg_status;	/* r status */
 
 	int irq;		/* irq used by this drive */
 	int present;		/* drive present and its capabilities */
@@ -274,7 +270,7 @@ static void log2msf(unsigned int, struct cdrom_msf0 *);
 static unsigned int msf2log(const struct cdrom_msf0 *);
 static unsigned int uint2bcd(unsigned int);
 static unsigned int bcd2uint(unsigned char);
-static char *port(int *);
+static unsigned port(int *);
 static int irq(int *);
 static void mcdx_delay(struct s_drive_stuff *, long jifs);
 static int mcdx_transfer(struct s_drive_stuff *, char *buf, int sector,
@@ -868,7 +864,7 @@ static irqreturn_t mcdx_intr(int irq, void *dev_id, struct pt_regs *regs)
 
 #endif				/* AK2 */
 	/* get the interrupt status */
-	b = inb((unsigned int) stuffp->rreg_status);
+	b = inb(stuffp->rreg_status);
 	stuffp->introk = ~b & MCDX_RBIT_DTEN;
 
 	/* NOTE: We only should get interrupts if the data we
@@ -882,7 +878,7 @@ static irqreturn_t mcdx_intr(int irq, void *dev_id, struct pt_regs *regs)
 		xtrace(IRQ, "intr() irq %d hw status 0x%02x\n", irq, b);
 		if (~b & MCDX_RBIT_STEN) {
 			xinfo("intr() irq %d    status 0x%02x\n",
-			      irq, inb((unsigned int) stuffp->rreg_data));
+			      irq, inb(stuffp->rreg_data));
 		} else {
 			xinfo("intr() irq %d ambiguous hw status\n", irq);
 		}
@@ -945,7 +941,7 @@ static int mcdx_talk(struct s_drive_stuff *stuffp,
 		char *bp = (char *) buffer;
 		size_t sz = size;
 
-		outsb((unsigned int) stuffp->wreg_data, cmd, cmdlen);
+		outsb(stuffp->wreg_data, cmd, cmdlen);
 		xtrace(TALK, "talk() command sent\n");
 
 		/* get the status byte */
@@ -1049,8 +1045,7 @@ void __exit mcdx_exit(void)
 			continue;
 		}
 		put_disk(stuffp->disk);
-		release_region((unsigned long) stuffp->wreg_data,
-			       MCDX_IO_SIZE);
+		release_region(stuffp->wreg_data, MCDX_IO_SIZE);
 		free_irq(stuffp->irq, NULL);
 		if (stuffp->toc) {
 			xtrace(MALLOC, "cleanup_module() free toc @ %p\n",
@@ -1116,8 +1111,7 @@ int __init mcdx_init_drive(int drive)
 
 	/* setup our irq and i/o addresses */
 	stuffp->irq = irq(mcdx_drive_map[drive]);
-	stuffp->wreg_data = stuffp->rreg_data =
-	    port(mcdx_drive_map[drive]);
+	stuffp->wreg_data = stuffp->rreg_data = port(mcdx_drive_map[drive]);
 	stuffp->wreg_reset = stuffp->rreg_status = stuffp->wreg_data + 1;
 	stuffp->wreg_hcon = stuffp->wreg_reset + 1;
 	stuffp->wreg_chn = stuffp->wreg_hcon + 1;
@@ -1127,10 +1121,9 @@ int __init mcdx_init_drive(int drive)
 	init_waitqueue_head(&stuffp->sleepq);
 
 	/* check if i/o addresses are available */
-	if (!request_region((unsigned int) stuffp->wreg_data, MCDX_IO_SIZE,
-			    "mcdx")) {
-		xwarn("0x%3p,%d: Init failed. "
-		      "I/O ports (0x%3p..0x%3p) already in use.\n",
+	if (!request_region(stuffp->wreg_data, MCDX_IO_SIZE, "mcdx")) {
+		xwarn("0x%03x,%d: Init failed. "
+		      "I/O ports (0x%03x..0x%03x) already in use.\n",
 		      stuffp->wreg_data, stuffp->irq,
 		      stuffp->wreg_data,
 		      stuffp->wreg_data + MCDX_IO_SIZE - 1);
@@ -1141,7 +1134,7 @@ int __init mcdx_init_drive(int drive)
 		return 0;	/* next drive */
 	}
 
-	xtrace(INIT, "init() i/o port is available at 0x%3p\n",
+	xtrace(INIT, "init() i/o port is available at 0x%03x\n"
 	       stuffp->wreg_data);
 	xtrace(INIT, "init() hardware reset\n");
 	mcdx_reset(stuffp, HARD, 1);
@@ -1149,9 +1142,8 @@ int __init mcdx_init_drive(int drive)
 	xtrace(INIT, "init() get version\n");
 	if (-1 == mcdx_requestversion(stuffp, &version, 4)) {
 		/* failed, next drive */
-		release_region((unsigned long) stuffp->wreg_data,
-			       MCDX_IO_SIZE);
-		xwarn("%s=0x%3p,%d: Init failed. Can't get version.\n",
+		release_region(stuffp->wreg_data, MCDX_IO_SIZE);
+		xwarn("%s=0x%03x,%d: Init failed. Can't get version.\n",
 		      MCDX, stuffp->wreg_data, stuffp->irq);
 		xtrace(MALLOC, "init() free stuffp @ %p\n", stuffp);
 		kfree(stuffp);
@@ -1181,9 +1173,8 @@ int __init mcdx_init_drive(int drive)
 	stuffp->playcmd = READ1X;
 
 	if (!stuffp->present) {
-		release_region((unsigned long) stuffp->wreg_data,
-			       MCDX_IO_SIZE);
-		xwarn("%s=0x%3p,%d: Init failed. No Mitsumi CD-ROM?.\n",
+		release_region(stuffp->wreg_data, MCDX_IO_SIZE);
+		xwarn("%s=0x%03x,%d: Init failed. No Mitsumi CD-ROM?.\n",
 		      MCDX, stuffp->wreg_data, stuffp->irq);
 		kfree(stuffp);
 		put_disk(disk);
@@ -1192,8 +1183,7 @@ int __init mcdx_init_drive(int drive)
 
 	xtrace(INIT, "init() register blkdev\n");
 	if (register_blkdev(MAJOR_NR, "mcdx")) {
-		release_region((unsigned long) stuffp->wreg_data,
-			       MCDX_IO_SIZE);
+		release_region(stuffp->wreg_data, MCDX_IO_SIZE);
 		kfree(stuffp);
 		put_disk(disk);
 		return 1;
@@ -1202,8 +1192,7 @@ int __init mcdx_init_drive(int drive)
 	mcdx_queue = blk_init_queue(do_mcdx_request, &mcdx_lock);
 	if (!mcdx_queue) {
 		unregister_blkdev(MAJOR_NR, "mcdx");
-		release_region((unsigned long) stuffp->wreg_data,
-			       MCDX_IO_SIZE);
+		release_region(stuffp->wreg_data, MCDX_IO_SIZE);
 		kfree(stuffp);
 		put_disk(disk);
 		return 1;
@@ -1212,9 +1201,8 @@ int __init mcdx_init_drive(int drive)
 	xtrace(INIT, "init() subscribe irq and i/o\n");
 	mcdx_irq_map[stuffp->irq] = stuffp;
 	if (request_irq(stuffp->irq, mcdx_intr, SA_INTERRUPT, "mcdx", NULL)) {
-		release_region((unsigned long) stuffp->wreg_data,
-			       MCDX_IO_SIZE);
-		xwarn("%s=0x%3p,%d: Init failed. Can't get irq (%d).\n",
+		release_region(stuffp->wreg_data, MCDX_IO_SIZE);
+		xwarn("%s=0x%03x,%d: Init failed. Can't get irq (%d).\n",
 		      MCDX, stuffp->wreg_data, stuffp->irq, stuffp->irq);
 		stuffp->irq = 0;
 		blk_cleanup_queue(mcdx_queue);
@@ -1228,13 +1216,13 @@ int __init mcdx_init_drive(int drive)
 		int i;
 		mcdx_delay(stuffp, HZ / 2);
 		for (i = 100; i; i--)
-			(void) inb((unsigned int) stuffp->rreg_status);
+			(void) inb(stuffp->rreg_status);
 	}
 
 
 #if WE_KNOW_WHY
 	/* irq 11 -> channel register */
-	outb(0x50, (unsigned int) stuffp->wreg_chn);
+	outb(0x50, stuffp->wreg_chn);
 #endif
 
 	xtrace(INIT, "init() set non dma but irq mode\n");
@@ -1252,15 +1240,14 @@ int __init mcdx_init_drive(int drive)
 	disk->flags = GENHD_FL_CD;
 	stuffp->disk = disk;
 
-	sprintf(msg, " mcdx: Mitsumi CD-ROM installed at 0x%3p, irq %d."
+	sprintf(msg, " mcdx: Mitsumi CD-ROM installed at 0x%03x, irq %d."
 		" (Firmware version %c %x)\n",
 		stuffp->wreg_data, stuffp->irq, version.code, version.ver);
 	mcdx_stuffp[drive] = stuffp;
 	xtrace(INIT, "init() mcdx_stuffp[%d] = %p\n", drive, stuffp);
 	if (register_cdrom(&stuffp->info) != 0) {
 		printk("Cannot register Mitsumi CD-ROM!\n");
-		release_region((unsigned long) stuffp->wreg_data,
-			       MCDX_IO_SIZE);
+		release_region(stuffp->wreg_data, MCDX_IO_SIZE);
 		free_irq(stuffp->irq, NULL);
 		kfree(stuffp);
 		put_disk(disk);
@@ -1413,19 +1400,17 @@ static int mcdx_xfer(struct s_drive_stuff *stuffp,
 				const int HEAD =
 				    CD_FRAMESIZE_RAW - CD_XA_TAIL -
 				    CD_FRAMESIZE;
-				insb((unsigned int) stuffp->rreg_data, p,
-				     HEAD);
+				insb(stuffp->rreg_data, p, HEAD);
 			}
 
 			/* now actually read the data */
-			insb((unsigned int) stuffp->rreg_data, p, 512);
+			insb(stuffp->rreg_data, p, 512);
 
 			/* test if it's the last sector of a block,
 			 * if so, we have to handle XA special */
 			if ((3 == (stuffp->pending & 3)) && stuffp->xa) {
 				char dummy[CD_XA_TAIL];
-				insb((unsigned int) stuffp->rreg_data,
-				     &dummy[0], CD_XA_TAIL);
+				insb(stuffp->rreg_data, &dummy[0], CD_XA_TAIL);
 			}
 
 			if (stuffp->pending == sector) {
@@ -1493,7 +1478,7 @@ static int mcdx_xfer(struct s_drive_stuff *stuffp,
 
 		stuffp->busy = 1;
 		/* Now really issue the request command */
-		outsb((unsigned int) stuffp->wreg_data, cmd, sizeof cmd);
+		outsb(stuffp->wreg_data, cmd, sizeof cmd);
 
 	}
 #ifdef AK2
@@ -1514,9 +1499,9 @@ static int mcdx_xfer(struct s_drive_stuff *stuffp,
 
 /*	Access to elements of the mcdx_drive_map members */
 
-static char *port(int *ip)
+static unsigned port(int *ip)
 {
-	return (char *) ip[0];
+	return ip[0];
 }
 static int irq(int *ip)
 {
@@ -1682,7 +1667,7 @@ mcdx_playmsf(struct s_drive_stuff *stuffp, const struct cdrom_msf *msf)
 	       "%02x:%02x:%02x -- %02x:%02x:%02x\n",
 	       cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], cmd[6]);
 
-	outsb((unsigned int) stuffp->wreg_data, cmd, sizeof cmd);
+	outsb(stuffp->wreg_data, cmd, sizeof cmd);
 
 	if (-1 == mcdx_getval(stuffp, 3 * HZ, 0, NULL)) {
 		xwarn("playmsf() timeout\n");
@@ -1910,8 +1895,8 @@ static int mcdx_requestversion(struct s_drive_stuff *stuffp, struct s_version *v
 static int mcdx_reset(struct s_drive_stuff *stuffp, enum resetmodes mode, int tries)
 {
 	if (mode == HARD) {
-		outb(0, (unsigned int) stuffp->wreg_chn);	/* no dma, no irq -> hardware */
-		outb(0, (unsigned int) stuffp->wreg_reset);	/* hw reset */
+		outb(0, stuffp->wreg_chn);	/* no dma, no irq -> hardware */
+		outb(0, stuffp->wreg_reset);	/* hw reset */
 		return 0;
 	} else
 		return mcdx_talk(stuffp, "\x60", 1, NULL, 1, 5 * HZ, tries);
@@ -1945,13 +1930,13 @@ mcdx_getval(struct s_drive_stuff *stuffp, int to, int delay, char *buf)
 	if (!buf)
 		buf = &c;
 
-	while (inb((unsigned int) stuffp->rreg_status) & MCDX_RBIT_STEN) {
+	while (inb(stuffp->rreg_status) & MCDX_RBIT_STEN) {
 		if (time_after(jiffies, timeout))
 			return -1;
 		mcdx_delay(stuffp, delay);
 	}
 
-	*buf = (unsigned char) inb((unsigned int) stuffp->rreg_data) & 0xff;
+	*buf = (unsigned char) inb(stuffp->rreg_data) & 0xff;
 
 	return 0;
 }

@@ -145,7 +145,7 @@ out:
 	return error;
 }
 
-static int move_page_tables(struct vm_area_struct *vma,
+static unsigned long move_page_tables(struct vm_area_struct *vma,
 	unsigned long new_addr, unsigned long old_addr, unsigned long len)
 {
 	unsigned long offset;

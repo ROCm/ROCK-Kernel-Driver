@@ -45,6 +45,8 @@ struct swap_list_t swap_list = {-1, -1};
 
 struct swap_info_struct swap_info[MAX_SWAPFILES];
 
+static DECLARE_MUTEX(swapon_sem);
+
 /*
  * Array of backing blockdevs, for swap_unplug_fn.  We need this because the
  * bdev->unplug_fn can sleep and we cannot hold swap_list_lock while calling
@@ -1158,6 +1160,7 @@ asmlinkage long sys_swapoff(const char __user * specialfile)
 		swap_list_unlock();
 		goto out_dput;
 	}
+	down(&swapon_sem);
 	down(&swap_bdevs_sem);
 	swap_list_lock();
 	swap_device_lock(p);
@@ -1172,6 +1175,7 @@ asmlinkage long sys_swapoff(const char __user * specialfile)
 	swap_list_unlock();
 	remove_swap_bdev(p->bdev);
 	up(&swap_bdevs_sem);
+	up(&swapon_sem);
 	vfree(swap_map);
 	if (S_ISBLK(mapping->host->i_mode)) {
 		struct block_device *bdev = I_BDEV(mapping->host);
@@ -1197,7 +1201,7 @@ static void *swap_start(struct seq_file *swap, loff_t *pos)
 	int i;
 	loff_t l = *pos;
 
-	swap_list_lock();
+	down(&swapon_sem);
 
 	for (i = 0; i < nr_swapfiles; i++, ptr++) {
 		if (!(ptr->flags & SWP_USED) || !ptr->swap_map)
@@ -1212,9 +1216,9 @@ static void *swap_start(struct seq_file *swap, loff_t *pos)
 static void *swap_next(struct seq_file *swap, void *v, loff_t *pos)
 {
 	struct swap_info_struct *ptr = v;
-	void *endptr = (void *) swap_info + nr_swapfiles * sizeof(struct swap_info_struct);
+	struct swap_info_struct *endptr = swap_info + nr_swapfiles;
 
-	for (++ptr; ptr < (struct swap_info_struct *) endptr; ptr++) {
+	for (++ptr; ptr < endptr; ptr++) {
 		if (!(ptr->flags & SWP_USED) || !ptr->swap_map)
 			continue;
 		++*pos;
@@ -1226,7 +1230,7 @@ static void *swap_next(struct seq_file *swap, void *v, loff_t *pos)
 
 static void swap_stop(struct seq_file *swap, void *v)
 {
-	swap_list_unlock();
+	up(&swapon_sem);
 }
 
 static int swap_show(struct seq_file *swap, void *v)
@@ -1513,6 +1517,7 @@ asmlinkage long sys_swapon(const char __user * specialfile, int swap_flags)
 	if (error)
 		goto bad_swap;
 
+	down(&swapon_sem);
 	down(&swap_bdevs_sem);
 	swap_list_lock();
 	swap_device_lock(p);
@@ -1541,6 +1546,7 @@ asmlinkage long sys_swapon(const char __user * specialfile, int swap_flags)
 	swap_list_unlock();
 	install_swap_bdev(p->bdev);
 	up(&swap_bdevs_sem);
+	up(&swapon_sem);
 	error = 0;
 	goto out;
 bad_swap:

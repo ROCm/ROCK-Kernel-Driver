@@ -170,17 +170,19 @@ __sync_single_inode(struct inode *inode, struct writeback_control *wbc)
 		if (!(inode->i_state & I_DIRTY) &&
 		    mapping_tagged(mapping, PAGECACHE_TAG_DIRTY)) {
 			/*
-			 * We didn't write back all the pages.  Redirty the
-			 * inode.  It is still on sb->s_dirty.
+			 * We didn't write back all the pages.  nfs_writepages()
+			 * sometimes bales out without doing anything. Redirty
+			 * the inode.  It is still on sb->s_io.
 			 */
 			if (wbc->for_kupdate) {
 				/*
 				 * For the kupdate function we leave the inode
-				 * where it is on sb_dirty so it will get more
+				 * at the head of sb_dirty so it will get more
 				 * writeout as soon as the queue becomes
 				 * uncongested.
 				 */
 				inode->i_state |= I_DIRTY_PAGES;
+				list_move_tail(&inode->i_list, &sb->s_dirty);
 			} else {
 				/*
 				 * Otherwise fully redirty the inode so that

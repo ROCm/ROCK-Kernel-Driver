@@ -42,8 +42,12 @@ struct rfc1002_session_packet {
 	__u16	length;
 	union {
 		struct {
-			__u8 called_name[16];
-			__u8 calling_name[16];
+			__u8 called_len;
+			__u8 called_name[32];
+			__u8 scope1; /* null */
+			__u8 calling_len;
+			__u8 calling_name[32];
+			__u8 scope2; /* null */
 		} session_req;
 		struct {
 			__u32 retarget_ip_addr;

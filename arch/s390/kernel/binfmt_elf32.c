@@ -40,8 +40,7 @@
    passed in R14. */
 #define ELF_PLAT_INIT(_r, load_addr) \
 	do { \
-	_r->gprs[14] = 0; \
-	set_thread_flag(TIF_31BIT); \
+		_r->gprs[14] = 0; \
 	} while(0)
 
 #define USE_ELF_CORE_DUMP
@@ -82,6 +81,7 @@ do {							\
 		set_personality(PER_SVR4);              \
 	else if (current->personality != PER_LINUX32)   \
 		set_personality(PER_LINUX);             \
+	set_thread_flag(TIF_31BIT);			\
 } while (0)
 
 #include "compat_linux.h"
@@ -194,10 +194,7 @@ elf_map32 (struct file *filep, unsigned long addr, struct elf_phdr *eppnt, int p
 	unsigned long map_addr;
 
 	if (!addr) 
-		addr = 0x40000000; 
-
-	if (prot & PROT_READ) 
-		prot |= PROT_EXEC; 
+		addr = TASK_UNMAPPED_BASE;
 
 	down_write(&current->mm->mmap_sem);
 	map_addr = do_mmap(filep, ELF_PAGESTART(addr),

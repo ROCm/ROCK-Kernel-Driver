@@ -205,7 +205,7 @@ struct buffer_head *fat_extend_dir(struct inode *inode)
 	if (inode->i_size & (sb->s_blocksize - 1)) {
 		fat_fs_panic(sb, "Odd directory size");
 		inode->i_size = (inode->i_size + sb->s_blocksize)
-			& ~(sb->s_blocksize - 1);
+			& ~((loff_t)sb->s_blocksize - 1);
 	}
 	inode->i_size += MSDOS_SB(sb)->cluster_size;
 	MSDOS_I(inode)->mmu_private += MSDOS_SB(sb)->cluster_size;

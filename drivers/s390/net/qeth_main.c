@@ -1,6 +1,6 @@
 /*
  *
- * linux/drivers/s390/net/qeth_main.c ($Revision: 1.82 $)
+ * linux/drivers/s390/net/qeth_main.c ($Revision: 1.89 $)
  *
  * Linux on zSeries OSA Express and HiperSockets support
  *
@@ -12,7 +12,7 @@
  *			  Frank Pavlic (pavlic@de.ibm.com) and
  *		 	  Thomas Spatzier <tspat@de.ibm.com>
  *
- *    $Revision: 1.82 $	 $Date: 2004/04/21 08:27:21 $
+ *    $Revision: 1.89 $	 $Date: 2004/04/27 16:27:26 $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -78,7 +78,7 @@ qeth_eyecatcher(void)
 #include "qeth_mpc.h"
 #include "qeth_fs.h"
 
-#define VERSION_QETH_C "$Revision: 1.82 $"
+#define VERSION_QETH_C "$Revision: 1.89 $"
 static const char *version = "qeth S/390 OSA-Express driver ("
 	VERSION_QETH_C "/" VERSION_QETH_H "/" VERSION_QETH_MPC_H
 	QETH_VERSION_IPV6 QETH_VERSION_VLAN ")";
@@ -457,8 +457,7 @@ qeth_set_offline(struct ccwgroup_device *cgdev)
 	ccw_device_set_offline(CARD_DDEV(card));
 	ccw_device_set_offline(CARD_WDEV(card));
 	ccw_device_set_offline(CARD_RDEV(card));
-	if ((recover_flag == CARD_STATE_UP_LAN_ONLINE) ||
-	    (recover_flag == CARD_STATE_UP_LAN_OFFLINE))
+	if (recover_flag == CARD_STATE_UP)
 		card->state = CARD_STATE_RECOVER;
 	return 0;
 }
@@ -485,7 +484,8 @@ qeth_remove_device(struct ccwgroup_device *cgdev)
 	write_lock_irqsave(&qeth_card_list.rwlock, flags);
 	list_del(&card->list);
 	write_unlock_irqrestore(&qeth_card_list.rwlock, flags);
-	unregister_netdev(card->dev);
+	if (card->dev)
+		unregister_netdev(card->dev);
 	qeth_remove_device_attributes(&cgdev->dev);
 	qeth_free_card(card);
 	cgdev->dev.driver_data = NULL;
@@ -1504,11 +1504,21 @@ qeth_cmd_timeout(unsigned long data)
 	spin_unlock_irqrestore(&reply->card->lock, flags);
 }
 
+static void
+qeth_reset_ip_addresses(struct qeth_card *card)
+{
+	QETH_DBF_TEXT(trace, 2, "rstipadd");
+
+	qeth_clear_ip_list(card, 0, 1);
+	qeth_set_thread_start_bit(card, QETH_SET_IP_THREAD);
+	qeth_set_thread_start_bit(card, QETH_SET_MC_THREAD);
+	schedule_work(&card->kernel_thread_starter);
+}
+
 static struct qeth_ipa_cmd *
 qeth_check_ipa_data(struct qeth_card *card, struct qeth_cmd_buffer *iob)
 {
 	struct qeth_ipa_cmd *cmd = NULL;
-	enum qeth_card_states old_state;
 
 	QETH_DBF_TEXT(trace,5,"chkipad");
 	if (IS_IPA(iob->data)){
@@ -1521,30 +1531,27 @@ qeth_check_ipa_data(struct qeth_card *card, struct qeth_cmd_buffer *iob)
 				PRINT_WARN("Link failure on %s (CHPID 0x%X) - "
 					   "there is a network problem or "
 					   "someone pulled the cable or "
-					   "disabled the port. Setting state "
-					   "of interface to DOWN.\n",
+					   "disabled the port.\n",
 					   card->info.if_name,
 					   card->info.chpid);
 				card->lan_online = 0;
-				old_state = card->state;
-				rtnl_lock();
-				dev_close(card->dev);
-				rtnl_unlock();
-				if ((old_state == CARD_STATE_UP_LAN_ONLINE) ||
-				    (old_state == CARD_STATE_UP_LAN_OFFLINE))
-					card->state = CARD_STATE_UP_LAN_OFFLINE;
+				if (netif_carrier_ok(card->dev)) {
+					netif_carrier_off(card->dev);
+					netif_stop_queue(card->dev);
+				}
 				return NULL;
 			case IPA_CMD_STARTLAN:
 				PRINT_INFO("Link reestablished on %s "
-					   "(CHPID 0x%X)\n",
+					   "(CHPID 0x%X). Scheduling "
+					   "IP address reset.\n",
 					   card->info.if_name,
 					   card->info.chpid);
 				card->lan_online = 1;
-				if (card->state == CARD_STATE_UP_LAN_OFFLINE){
-					rtnl_lock();
-					dev_open(card->dev);
-					rtnl_unlock();
+				if (!netif_carrier_ok(card->dev)) {
+					netif_carrier_on(card->dev);
+					netif_wake_queue(card->dev);
 				}
+				qeth_reset_ip_addresses(card);
 				return NULL;
 			case IPA_CMD_REGISTER_LOCAL_ADDR:
 				QETH_DBF_TEXT(trace,3, "irla");
@@ -2674,6 +2681,7 @@ qeth_alloc_buffer_pool(struct qeth_card *card)
 	void *ptr;
 	int i, j;
 
+	QETH_DBF_TEXT(trace,5,"clwkpool");
 	for (i = 0; i < card->qdio.init_pool.buf_count; ++i){
 	 	pool_entry = kmalloc(sizeof(*pool_entry), GFP_KERNEL);
 		if (!pool_entry){
@@ -2694,10 +2702,25 @@ qeth_alloc_buffer_pool(struct qeth_card *card)
 		}
 		list_add(&pool_entry->init_list,
 			 &card->qdio.init_pool.entry_list);
-		list_add(&pool_entry->list,
-			 &card->qdio.in_buf_pool.entry_list);
 	}
 	return 0;
+}
+
+int
+qeth_realloc_buffer_pool(struct qeth_card *card, int bufcnt)
+{
+	QETH_DBF_TEXT(trace, 2, "realcbp");
+
+	if ((card->state != CARD_STATE_DOWN) &&
+	    (card->state != CARD_STATE_RECOVER))
+		return -EPERM;
+
+	/* TODO: steel/add buffers from/to a running card's buffer pool (?) */
+	qeth_clear_working_pool_list(card);
+	qeth_free_buffer_pool(card);
+	card->qdio.in_buf_pool.buf_count = bufcnt;
+	card->qdio.init_pool.buf_count = bufcnt;
+	return qeth_alloc_buffer_pool(card);
 }
 
 static int
@@ -2707,10 +2730,9 @@ qeth_alloc_qdio_buffers(struct qeth_card *card)
 
 	QETH_DBF_TEXT(setup, 2, "allcqdbf");
 
-	if (card->qdio.state == QETH_QDIO_ALLOCATED) {
-		qeth_initialize_working_pool_list(card);
+	if (card->qdio.state == QETH_QDIO_ALLOCATED)
 		return 0;
-	}
+
 	card->qdio.in_q = kmalloc(sizeof(struct qeth_qdio_q), GFP_KERNEL);
 	if (!card->qdio.in_q)
 		return - ENOMEM;
@@ -2823,14 +2845,13 @@ qeth_init_qdio_queues(struct qeth_card *card)
 	/* inbound queue */
 	memset(card->qdio.in_q->qdio_bufs, 0,
 	       QDIO_MAX_BUFFERS_PER_Q * sizeof(struct qdio_buffer));
-	card->qdio.in_q->next_buf_to_process = 0;
-	card->qdio.in_q->next_buf_to_init = 0;
+	qeth_initialize_working_pool_list(card);
 	/*give only as many buffers to hardware as we have buffer pool entries*/
-	for (i = 0; i < card->qdio.in_buf_pool.buf_count; ++i)
+	for (i = 0; i < card->qdio.in_buf_pool.buf_count - 1; ++i)
 		qeth_init_input_buffer(card, &card->qdio.in_q->bufs[i]);
-	card->qdio.in_q->next_buf_to_init = card->qdio.in_buf_pool.buf_count;
+	card->qdio.in_q->next_buf_to_init = card->qdio.in_buf_pool.buf_count - 1;
 	rc = do_QDIO(CARD_DDEV(card), QDIO_FLAG_SYNC_INPUT, 0, 0,
-		     card->qdio.in_buf_pool.buf_count, NULL);
+		     card->qdio.in_buf_pool.buf_count - 1, NULL);
 	if (rc) {
 		QETH_DBF_TEXT_(setup, 2, "1err%d", rc);
 		return rc;
@@ -3168,7 +3189,7 @@ qeth_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		card->stats.tx_errors++;
 		return -EIO;
 	}
-	if (card->state != CARD_STATE_UP_LAN_ONLINE) {
+	if ((card->state != CARD_STATE_UP) || !netif_carrier_ok(dev)) {
 		card->stats.tx_dropped++;
 		card->stats.tx_errors++;
 		card->stats.tx_carrier_errors++;
@@ -3271,18 +3292,19 @@ qeth_open(struct net_device *dev)
 
 	card = (struct qeth_card *) dev->priv;
 
-	if ((card->state != CARD_STATE_SOFTSETUP) &&
-	    (card->state != CARD_STATE_UP_LAN_OFFLINE))
+	if (card->state != CARD_STATE_SOFTSETUP)
 		return -ENODEV;
-	if (!card->lan_online){
-		card->state = CARD_STATE_UP_LAN_OFFLINE;
-		return -EIO;
-	}
 
 	card->dev->flags |= IFF_UP;
 	netif_start_queue(dev);
 	card->data.state = CH_STATE_UP;
-	card->state = CARD_STATE_UP_LAN_ONLINE;
+	card->state = CARD_STATE_UP;
+
+	if (!card->lan_online){
+		if (netif_carrier_ok(dev))
+			netif_carrier_off(dev);
+		netif_stop_queue(dev);
+	}
 	return 0;
 }
 
@@ -3297,8 +3319,7 @@ qeth_stop(struct net_device *dev)
 
 	netif_stop_queue(dev);
 	card->dev->flags &= ~IFF_UP;
-	if ((card->state == CARD_STATE_UP_LAN_ONLINE) ||
-	    (card->state == CARD_STATE_UP_LAN_OFFLINE))
+	if (card->state == CARD_STATE_UP)
 		card->state = CARD_STATE_SOFTSETUP;
 	return 0;
 }
@@ -3925,13 +3946,17 @@ qeth_get_ipa_arp_cmd_buffer(struct qeth_card *card, u16 cmd_code,
 	iob = qeth_get_ipacmd_buffer(card, IPA_CMD_SETASSPARMS, proto);
 
 	memcpy(iob->data, IPA_PDU_HEADER, IPA_PDU_HEADER_SIZE);
-	/* adjust sizes in IPA_PDU_HEADER */
-	s1 = (u32) IPA_PDU_HEADER_SIZE + QETH_ARP_CMD_BASE_LEN + data_len;
-	s2 = (u32) QETH_ARP_CMD_BASE_LEN + data_len;
-	memcpy(QETH_IPA_PDU_LEN_TOTAL(iob->data), &s1, 2);
-	memcpy(QETH_IPA_PDU_LEN_PDU1(iob->data), &s2, 2);
-	memcpy(QETH_IPA_PDU_LEN_PDU2(iob->data), &s2, 2);
-	memcpy(QETH_IPA_PDU_LEN_PDU3(iob->data), &s2, 2);
+
+	if ((IPA_PDU_HEADER_SIZE + QETH_ARP_CMD_BASE_LEN + data_len) > 256) {
+		/* adjust sizes in IPA_PDU_HEADER */
+		s1 = (u32) IPA_PDU_HEADER_SIZE + QETH_ARP_CMD_BASE_LEN +
+			   data_len;
+		s2 = (u32) QETH_ARP_CMD_BASE_LEN + data_len;
+		memcpy(QETH_IPA_PDU_LEN_TOTAL(iob->data), &s1, 2);
+		memcpy(QETH_IPA_PDU_LEN_PDU1(iob->data), &s2, 2);
+		memcpy(QETH_IPA_PDU_LEN_PDU2(iob->data), &s2, 2);
+		memcpy(QETH_IPA_PDU_LEN_PDU3(iob->data), &s2, 2);
+	}
 
 	cmd = (struct qeth_ipa_arp_cmd *)(iob->data+IPA_PDU_HEADER_SIZE);
 	cmd->shdr.assist_no = IPA_ARP_PROCESSING;
@@ -3975,7 +4000,12 @@ qeth_arp_query(struct qeth_card *card, char *udata)
 
 	QETH_DBF_TEXT(trace,3,"arpquery");
 
-	/* TODO: really not supported by GuestLAN? */
+	/*
+	 * currently GuestLAN  does only deliver all zeros on query arp,
+	 * even though arp processing is supported (according to IPA supp.
+	 * funcs flags); since all zeros is no valueable information,
+	 * we say EOPNOTSUPP for all ARP functions
+	 */
 	if (card->info.guestlan)
 		return -EOPNOTSUPP;
 	if (!qeth_is_supported(card,IPA_ARP_PROCESSING)) {
@@ -3997,9 +4027,11 @@ qeth_arp_query(struct qeth_card *card, char *udata)
 		return -ENOMEM;
 	}
 	memset(qdata, 0, sizeof(struct qeth_arp_query_data));
+	/* do not give sizeof(struct qeth_arp_query_data) to next command;
+	 * this would cause the IPA PDU size to be set to a value of > 256
+	 * and this is to much for HiperSockets */
 	iob = qeth_get_ipa_arp_cmd_buffer(card, IPA_CMD_ASS_ARP_QUERY_INFO,
-					  sizeof(struct qeth_arp_query_data),
-					  QETH_PROT_IPV4);
+					  0, QETH_PROT_IPV4);
 	rc = qeth_send_ipa_arp_cmd(card, iob,
 				   (char *) qdata,
 				   sizeof(struct qeth_arp_query_data),
@@ -4043,7 +4075,12 @@ qeth_arp_add_entry(struct qeth_card *card, struct qeth_arp_cache_entry *entry)
 
 	QETH_DBF_TEXT(trace,3,"arpadent");
 
-	/* TODO: really not supported by GuestLAN? */
+	/*
+	 * currently GuestLAN  does only deliver all zeros on query arp,
+	 * even though arp processing is supported (according to IPA supp.
+	 * funcs flags); since all zeros is no valueable information,
+	 * we say EOPNOTSUPP for all ARP functions
+	 */
 	if (card->info.guestlan)
 		return -EOPNOTSUPP;
 	if (!qeth_is_supported(card,IPA_ARP_PROCESSING)) {
@@ -4081,7 +4118,12 @@ qeth_arp_remove_entry(struct qeth_card *card, struct qeth_arp_cache_entry *entry
 
 	QETH_DBF_TEXT(trace,3,"arprment");
 
-	/* TODO: really not supported by GuestLAN? */
+	/*
+	 * currently GuestLAN  does only deliver all zeros on query arp,
+	 * even though arp processing is supported (according to IPA supp.
+	 * funcs flags); since all zeros is no valueable information,
+	 * we say EOPNOTSUPP for all ARP functions
+	 */
 	if (card->info.guestlan)
 		return -EOPNOTSUPP;
 	if (!qeth_is_supported(card,IPA_ARP_PROCESSING)) {
@@ -4117,7 +4159,12 @@ qeth_arp_flush_cache(struct qeth_card *card)
 
 	QETH_DBF_TEXT(trace,3,"arpflush");
 
-	/* TODO: really not supported by GuestLAN? */
+	/*
+	 * currently GuestLAN  does only deliver all zeros on query arp,
+	 * even though arp processing is supported (according to IPA supp.
+	 * funcs flags); since all zeros is no valueable information,
+	 * we say EOPNOTSUPP for all ARP functions
+	 */
 	if (card->info.guestlan)
 		return -EOPNOTSUPP;
 	if (!qeth_is_supported(card,IPA_ARP_PROCESSING)) {
@@ -4147,8 +4194,7 @@ qeth_do_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	if (!card)
 		return -ENODEV;
 
-	if ((card->state != CARD_STATE_UP_LAN_ONLINE) &&
-	    (card->state != CARD_STATE_UP_LAN_OFFLINE))
+	if (card->state != CARD_STATE_UP)
 		return -ENODEV;
 
 	switch (cmd){
@@ -5551,6 +5597,47 @@ qeth_send_setrouting(struct qeth_card *card, enum qeth_routing_types type,
 
 }
 
+static void
+qeth_correct_routing_type(struct qeth_card *card, enum qeth_routing_types *type,
+			enum qeth_prot_versions prot)
+{
+	if (card->info.type == QETH_CARD_TYPE_IQD) {
+		switch (*type) {
+		case NO_ROUTER:
+		case PRIMARY_CONNECTOR:
+		case SECONDARY_CONNECTOR:
+		case MULTICAST_ROUTER:
+			return;
+		default:
+			goto out_inval;
+		}
+	} else {
+		switch (*type) {
+		case NO_ROUTER:
+		case PRIMARY_ROUTER:
+		case SECONDARY_ROUTER:
+			return;
+		case MULTICAST_ROUTER:
+			if (qeth_is_ipafunc_supported(card, prot,
+						      IPA_OSA_MC_ROUTER))
+				return;
+		default:
+			goto out_inval;
+		}
+	}
+out_inval:
+	PRINT_WARN("Routing type '%s' not supported for interface %s.\n"
+		   "Router status set to 'no router'.\n",
+		   ((*type == PRIMARY_ROUTER)? "primary router" :
+		    (*type == SECONDARY_ROUTER)? "secondary router" :
+		    (*type == PRIMARY_CONNECTOR)? "primary connector" :
+		    (*type == SECONDARY_CONNECTOR)? "secondary connector" :
+		    (*type == MULTICAST_ROUTER)? "multicast router" :
+		    "unknown"),
+		   card->dev->name);
+	*type = NO_ROUTER;
+}
+
 int
 qeth_setrouting_v4(struct qeth_card *card)
 {
@@ -5558,8 +5645,8 @@ qeth_setrouting_v4(struct qeth_card *card)
 
 	QETH_DBF_TEXT(trace,3,"setrtg4");
 
-	if (card->options.route4.type == NO_ROUTER)
-		return 0;
+	qeth_correct_routing_type(card, &card->options.route4.type,
+				  QETH_PROT_IPV4);
 
 	rc = qeth_send_setrouting(card, card->options.route4.type,
 				  QETH_PROT_IPV4);
@@ -5579,6 +5666,9 @@ qeth_setrouting_v6(struct qeth_card *card)
 
 	QETH_DBF_TEXT(trace,3,"setrtg6");
 #ifdef CONFIG_QETH_IPV6
+
+	qeth_correct_routing_type(card, &card->options.route6.type,
+				  QETH_PROT_IPV6);
 
 	if ((card->options.route6.type == NO_ROUTER) ||
 	    ((card->info.type == QETH_CARD_TYPE_OSAE) &&
@@ -5775,8 +5865,7 @@ qeth_stop_card(struct qeth_card *card)
 		return -ERESTARTSYS;
 	if (card->read.state == CH_STATE_UP &&
 	    card->write.state == CH_STATE_UP &&
-	    ((card->state == CARD_STATE_UP_LAN_ONLINE) ||
-	     (card->state == CARD_STATE_UP_LAN_OFFLINE))) {
+	    (card->state == CARD_STATE_UP)) {
 		recover_flag = 1;
 		rtnl_lock();
 		dev_close(card->dev);

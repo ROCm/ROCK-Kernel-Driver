@@ -67,12 +67,37 @@
  */
 #define NR_MONTYPES	6
 static struct fb_monspecs monspecs[NR_MONTYPES] __initdata = {
-	{ 15469, 15781, 49,  51, 0 },	/* TV		*/
-	{     0, 99999,  0, 199, 0 },	/* Multi Freq	*/
-	{ 58608, 58608, 64,  64, 0 },	/* Hi-res mono	*/
-	{ 30000, 70000, 60,  60, 0 },	/* VGA		*/
-	{ 30000, 70000, 56,  75, 0 },	/* SVGA		*/
-	{ 30000, 70000, 60,  60, 0 }
+	{	/* TV		*/
+		.hfmin	= 15469,
+		.hfmax	= 15781,
+		.vfmin	= 49,
+		.vfmax	= 51,
+	}, {	/* Multi Freq	*/
+		.hfmin	= 0,
+		.hfmax	= 99999,
+		.vfmin	= 0,
+		.vfmax	= 199,
+	}, {	/* Hi-res mono	*/
+		.hfmin	= 58608,
+		.hfmax	= 58608,
+		.vfmin	= 64,
+		.vfmax	= 64,
+	}, {	/* VGA		*/
+		.hfmin	= 30000,
+		.hfmax	= 70000,
+		.vfmin	= 60,
+		.vfmax	= 60,
+	}, {	/* SVGA		*/
+		.hfmin	= 30000,
+		.hfmax	= 70000,
+		.vfmin	= 56,
+		.vfmax	= 75,
+	}, {
+		.hfmin	= 30000,
+		.hfmax	= 70000,
+		.vfmin	= 60,
+		.vfmax	= 60,
+	}
 };
 
 static struct fb_info fb_info;

@@ -88,7 +88,7 @@ static inline int atomic_dec_and_test(atomic_t *v)
 "	strex	%1, %0, [%2]\n"
 "	teq	%1, #0\n"
 "	bne	1b"
-	: "=&r" (result), "=r" (tmp)
+	: "=&r" (result), "=&r" (tmp)
 	: "r" (&v->counter)
 	: "cc");
 
@@ -106,7 +106,7 @@ static inline int atomic_add_negative(int i, atomic_t *v)
 "	strex	%1, %0, [%2]\n"
 "	teq	%1, #0\n"
 "	bne	1b"
-	: "=&r" (result), "=r" (tmp)
+	: "=&r" (result), "=&r" (tmp)
 	: "r" (&v->counter), "Ir" (i)
 	: "cc");
 

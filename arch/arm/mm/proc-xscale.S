@@ -647,6 +647,16 @@ cpu_pxa210_name:
 	.asciz	"XScale-PXA210"
 	.size	cpu_pxa210_name, . - cpu_pxa210_name
 
+	.type	cpu_pxa255_name, #object
+cpu_pxa255_name:
+	.asciz	"XScale-PXA255"
+	.size	cpu_pxa255_name, . - cpu_pxa255_name
+
+	.type	cpu_pxa270_name, #object
+cpu_pxa270_name:
+	.asciz	"XScale-PXA270"
+	.size	cpu_pxa270_name, . - cpu_pxa270_name
+
 	.align
 
 	.section ".proc.info", #alloc, #execinstr
@@ -686,7 +696,7 @@ __80321_proc_info:
 	.type	__pxa250_proc_info,#object
 __pxa250_proc_info:
 	.long	0x69052100
-	.long	0xfffff3f0
+	.long	0xfffff7f0
 	.long	0x00000c0e
 	b	__xscale_setup
 	.long	cpu_arch_name
@@ -714,4 +724,36 @@ __pxa210_proc_info:
 	.long	xscale_mc_user_fns
 	.long	xscale_cache_fns
 	.size	__pxa210_proc_info, . - __pxa210_proc_info
+
+	.type	__pxa255_proc_info,#object
+__pxa255_proc_info:
+	.long	0x69052d00
+	.long	0xfffffff0
+	.long	0x00000c0e
+	b	__xscale_setup
+	.long	cpu_arch_name
+	.long	cpu_elf_name
+	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP
+	.long	cpu_pxa255_name
+	.long	xscale_processor_functions
+	.long	v4wbi_tlb_fns
+	.long	xscale_mc_user_fns
+	.long	xscale_cache_fns
+	.size	__pxa255_proc_info, . - __pxa255_proc_info
+
+	.type	__pxa270_proc_info,#object
+__pxa270_proc_info:
+	.long	0x69054110
+	.long	0xfffffff0
+	.long	0x00000c0e
+	b	__xscale_setup
+	.long	cpu_arch_name
+	.long	cpu_elf_name
+	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP
+	.long	cpu_pxa270_name
+	.long	xscale_processor_functions
+	.long	v4wbi_tlb_fns
+	.long	xscale_mc_user_fns
+	.long	xscale_cache_fns
+	.size	__pxa270_proc_info, . - __pxa270_proc_info
 

@@ -4,6 +4,7 @@
  *  S390 version
  *    Copyright (C) 1999,2000 IBM Deutschland Entwicklung GmbH, IBM Corporation
  *    Author(s): Martin Schwidefsky (schwidefsky@de.ibm.com),
+ *               Thomas Spatzier (tspat@de.ibm.com)
  *
  *  Derived from "arch/i386/kernel/sys_i386.c"
  *

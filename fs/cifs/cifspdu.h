@@ -641,6 +641,9 @@ typedef struct smb_com_open_req {	/* also handles create */
 #define OPLOCK_BATCH	 2
 #define OPLOCK_READ	 3  /* level 2 oplock */
 
+/* open response for CreateAction shifted left */
+#define CIFS_CREATE_ACTION 0x20000 /* file created */
+
 typedef struct smb_com_open_rsp {
 	struct smb_hdr hdr;	/* wct = 34 BB */
 	__u8 AndXCommand;

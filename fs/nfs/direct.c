@@ -455,6 +455,6 @@ nfs_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
 	}
 
 out:
-	dprintk("NFS: direct_IO result=%d\n", result);
+	dprintk("NFS: direct_IO result=%zd\n", result);
 	return result;
 }
