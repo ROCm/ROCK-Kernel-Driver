@@ -3155,8 +3155,8 @@ static int __init parport_parse_dma(const char *dmastr, int *val)
 }
 
 #ifdef CONFIG_PCI
-static int __init parport_init_mode_setup(const char *str) {
-
+static int __init parport_init_mode_setup(char *str)
+{
 	printk(KERN_DEBUG "parport_pc.c: Specified parameter parport_init_mode=%s\n", str);
 
 	if (!strcmp (str, "spp"))
@@ -3176,7 +3176,7 @@ static int __init parport_init_mode_setup(const char *str) {
 #ifdef MODULE
 static const char *irq[PARPORT_PC_MAX_PORTS];
 static const char *dma[PARPORT_PC_MAX_PORTS];
-static const char *init_mode;
+static char *init_mode;
 
 MODULE_PARM_DESC(io, "Base I/O address (SPP regs)");
 module_param_array(io, int, NULL, 0);
