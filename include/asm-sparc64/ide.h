@@ -17,8 +17,13 @@
 #include <asm/page.h>
 #include <asm/spitfire.h>
 
-#undef  MAX_HWIFS
+#ifndef MAX_HWIFS
+# ifdef CONFIG_BLK_DEV_IDEPCI
+#define MAX_HWIFS	10
+# else
 #define MAX_HWIFS	2
+# endif
+#endif
 
 static __inline__ int ide_default_irq(unsigned long base)
 {
