@@ -187,7 +187,22 @@ xfs_revalidate_inode(
 	inode->i_mtime.tv_nsec	= ip->i_d.di_mtime.t_nsec;
 	inode->i_ctime.tv_sec	= ip->i_d.di_ctime.t_sec;
 	inode->i_ctime.tv_nsec	= ip->i_d.di_ctime.t_nsec;
-
+	if (ip->i_d.di_flags & XFS_DIFLAG_IMMUTABLE)
+		inode->i_flags |= S_IMMUTABLE;
+	else
+		inode->i_flags &= ~S_IMMUTABLE;
+	if (ip->i_d.di_flags & XFS_DIFLAG_APPEND)
+		inode->i_flags |= S_APPEND;
+	else
+		inode->i_flags &= ~S_APPEND;
+	if (ip->i_d.di_flags & XFS_DIFLAG_SYNC)
+		inode->i_flags |= S_SYNC;
+	else
+		inode->i_flags &= ~S_SYNC;
+	if (ip->i_d.di_flags & XFS_DIFLAG_NOATIME)
+		inode->i_flags |= S_NOATIME;
+	else
+		inode->i_flags &= ~S_NOATIME;
 	vp->v_flag &= ~VMODIFIED;
 }
 

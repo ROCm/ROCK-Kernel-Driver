@@ -36,7 +36,7 @@
 #define CR_DT	(1 << 16)
 #define CR_IT	(1 << 18)
 #define CR_ST	(1 << 19)
-#define CR_FI	(1 << 21)
+#define CR_FI	(1 << 21)	/* Fast interrupt (lower latency mode)	*/
 #define CR_U	(1 << 22)	/* Unaligned access operation		*/
 #define CR_XP	(1 << 23)	/* Extended page tables			*/
 #define CR_VE	(1 << 24)	/* Vectored interrupts			*/

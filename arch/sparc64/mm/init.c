@@ -1706,10 +1706,6 @@ void __init mem_init(void)
 	unsigned long addr, last;
 	int i;
 
-#ifndef CONFIG_SMP
-	cpu_data(0).udelay_val = loops_per_jiffy;
-#endif
-
 	i = last_valid_pfn >> ((22 - PAGE_SHIFT) + 6);
 	i += 1;
 	sparc64_valid_addr_bitmap = (unsigned long *)

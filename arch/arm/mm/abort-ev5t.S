@@ -1,7 +1,7 @@
 #include <linux/linkage.h>
 #include <asm/assembler.h>
 /*
- * Function: v5tej_early_abort
+ * Function: v5t_early_abort
  *
  * Params  : r2 = address of aborted instruction
  *         : r3 = saved SPSR
@@ -18,19 +18,14 @@
  * picture.  Unfortunately, this does happen.  We live with it.
  */
 	.align	5
-ENTRY(v5tej_early_abort)
+ENTRY(v5t_early_abort)
 	mrc	p15, 0, r1, c5, c0, 0		@ get FSR
 	mrc	p15, 0, r0, c6, c0, 0		@ get FAR
-	bic	r1, r1, #1 << 11 | 1 << 10	@ clear bits 11 and 10 of FSR
-	tst	r3, #PSR_J_BIT
-	orrne	r1, r1, #1 << 11		@ always assume write
-	bne	1f
 	tst	r3, #PSR_T_BIT
 	ldrneh	r3, [r2]			@ read aborted thumb instruction
 	ldreq	r3, [r2]			@ read aborted ARM instruction
+	bic	r1, r1, #1 << 11		@ clear bits 11 of FSR
 	movne	r3, r3, lsl #(21 - 12)		@ move thumb bit 11 to ARM bit 20
-	tst	r3, #1 << 20			@ L = 1 -> write
-	orreq	r1, r1, #1 << 11		@ yes.
-1:	mov	pc, lr
-
-
+	tst	r3, #1 << 20			@ check write
+	orreq	r1, r1, #1 << 11
+	mov	pc, lr

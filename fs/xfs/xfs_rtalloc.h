@@ -77,7 +77,7 @@ struct xfs_trans;
 #define	XFS_RTLOBIT(w)	xfs_lowbit32(w)
 #define	XFS_RTHIBIT(w)	xfs_highbit32(w)
 
-#if XFS_BIG_FILESYSTEMS
+#if XFS_BIG_BLKNOS
 #define	XFS_RTBLOCKLOG(b)	xfs_highbit64(b)
 #else
 #define	XFS_RTBLOCKLOG(b)	xfs_highbit32(b)

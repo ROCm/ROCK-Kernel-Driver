@@ -1403,6 +1403,11 @@ as_insert_request(request_queue_t *q, struct request *rq, int where)
 	struct as_data *ad = q->elevator.elevator_data;
 	struct as_rq *arq = RQ_DATA(rq);
 
+	/* barriers must flush the reorder queue */
+	if (unlikely(rq->flags & (REQ_SOFTBARRIER | REQ_HARDBARRIER)
+			&& where == ELEVATOR_INSERT_SORT))
+		where = ELEVATOR_INSERT_BACK;
+
 	switch (where) {
 		case ELEVATOR_INSERT_BACK:
 			while (ad->next_arq[REQ_SYNC])

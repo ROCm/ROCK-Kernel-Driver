@@ -156,12 +156,12 @@ xfs_lowbit64(
 {
 	int n;
 	n = ffs((unsigned)v);
-	if (n == 0) {
+	if (n <= 0) {
 		n = ffs(v >> 32);
 		if (n >= 0)
 			n+=32;
 	}
-	return n-1;
+	return (n <= 0) ? n : n-1;
 }
 
 /*

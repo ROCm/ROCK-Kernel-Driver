@@ -236,6 +236,9 @@ ENTRY(xscale_flush_user_cache_range)
  *
  *	- start  - virtual start address
  *	- end	 - virtual end address
+ *
+ *	Note: single I-cache line invalidation isn't used here since
+ *	it also trashes the mini I-cache used by JTAG debuggers.
  */
 ENTRY(xscale_coherent_kern_range)
 	bic	r0, r0, #CACHELINESIZE - 1
@@ -568,22 +571,11 @@ ENTRY(cpu_xscale_set_pte)
 
 	.ltorg
 
-cpu_80200_name:
-	.asciz	"XScale-80200"
-
-cpu_80321_name:
-	.asciz	"XScale-IOP80321"
-
-cpu_pxa250_name:
-	.asciz	"XScale-PXA250"
-
-cpu_pxa210_name:
-	.asciz	"XScale-PXA210"
-
 	.align
 
 	__INIT
 
+	.type	__xscale_setup, #function
 __xscale_setup:
 	mov	r0, #PSR_F_BIT|PSR_I_BIT|SVC_MODE
 	msr	cpsr_c, r0
@@ -602,8 +594,9 @@ __xscale_setup:
 	orr	r0, r0, #0x0005			@ .... .... .... .C.M
 	orr	r0, r0, #0x3900			@ ..VI Z..S .... ....
 	mov	pc, lr
+	.size	__xscale_setup, . - __xscale_setup
 
-	.text
+	__INITDATA
 
 /*
  * Purpose : Function pointers used to access above functions - all calls
@@ -612,7 +605,7 @@ __xscale_setup:
 
 	.type	xscale_processor_functions, #object
 ENTRY(xscale_processor_functions)
-	.word	xscale_abort
+	.word	v5t_early_abort
 	.word	cpu_xscale_proc_init
 	.word	cpu_xscale_proc_fin
 	.word	cpu_xscale_reset
@@ -621,6 +614,8 @@ ENTRY(xscale_processor_functions)
 	.word	cpu_xscale_switch_mm
 	.word	cpu_xscale_set_pte
 	.size	xscale_processor_functions, . - xscale_processor_functions
+
+	.section ".rodata"
 
 	.type	cpu_arch_name, #object
 cpu_arch_name:
@@ -631,6 +626,27 @@ cpu_arch_name:
 cpu_elf_name:
 	.asciz	"v5"
 	.size	cpu_elf_name, . - cpu_elf_name
+
+	.type	cpu_80200_name, #object
+cpu_80200_name:
+	.asciz	"XScale-80200"
+	.size	cpu_80200_name, . - cpu_80200_name
+
+	.type	cpu_80321_name, #object
+cpu_80321_name:
+	.asciz	"XScale-IOP80321"
+	.size	cpu_80321_name, . - cpu_80321_name
+
+	.type	cpu_pxa250_name, #object
+cpu_pxa250_name:
+	.asciz	"XScale-PXA250"
+	.size	cpu_pxa250_name, . - cpu_pxa250_name
+
+	.type	cpu_pxa210_name, #object
+cpu_pxa210_name:
+	.asciz	"XScale-PXA210"
+	.size	cpu_pxa210_name, . - cpu_pxa210_name
+
 	.align
 
 	.section ".proc.info", #alloc, #execinstr

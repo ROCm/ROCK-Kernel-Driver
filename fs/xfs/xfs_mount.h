@@ -95,8 +95,8 @@ typedef int	(*xfs_send_data_t)(int, struct bhv_desc *,
 			xfs_off_t, size_t, int, vrwlock_t *);
 typedef int	(*xfs_send_mmap_t)(struct vm_area_struct *, uint);
 typedef int	(*xfs_send_destroy_t)(struct bhv_desc *, dm_right_t);
-typedef int	(*xfs_send_namesp_t)(dm_eventtype_t, struct bhv_desc *,
-			dm_right_t, struct bhv_desc *, dm_right_t,
+typedef int	(*xfs_send_namesp_t)(dm_eventtype_t, struct vnode *,
+			dm_right_t, struct vnode *, dm_right_t,
 			char *, char *, mode_t, int, int);
 typedef void	(*xfs_send_unmount_t)(struct vfs *, struct vnode *,
 			dm_right_t, mode_t, int, int);
@@ -354,7 +354,7 @@ typedef struct xfs_mount {
 	__uint64_t		m_maxioffset;	/* maximum inode offset */
 	__uint64_t		m_resblks;	/* total reserved blocks */
 	__uint64_t		m_resblks_avail;/* available reserved blocks */
-#if XFS_BIG_FILESYSTEMS
+#if XFS_BIG_INUMS
 	xfs_ino_t		m_inoadd;	/* add value for ino64_offset */
 #endif
 	int			m_dalign;	/* stripe unit */
@@ -392,9 +392,7 @@ typedef struct xfs_mount {
 #define	XFS_MOUNT_WSYNC		0x00000001	/* for nfs - all metadata ops
 						   must be synchronous except
 						   for space allocations */
-#if XFS_BIG_FILESYSTEMS
 #define	XFS_MOUNT_INO64		0x00000002
-#endif
 			     /* 0x00000004	-- currently unused */
 			     /* 0x00000008	-- currently unused */
 #define XFS_MOUNT_FS_SHUTDOWN	0x00000010	/* atomic stop of all filesystem
@@ -413,10 +411,11 @@ typedef struct xfs_mount {
 #define XFS_MOUNT_DFLT_IOSIZE	0x00001000	/* set default i/o size */
 #define XFS_MOUNT_OSYNCISOSYNC	0x00002000	/* o_sync is REALLY o_sync */
 						/* osyncisdsync is now default*/
-#define XFS_MOUNT_NOUUID	0x00004000	/* ignore uuid during mount */
-#define XFS_MOUNT_32BITINODES	0x00008000	/* do not create inodes above
+#define XFS_MOUNT_32BITINODES	0x00004000	/* do not create inodes above
 						 * 32 bits in size */
-#define XFS_MOUNT_NOLOGFLUSH	0x00010000
+#define XFS_MOUNT_32BITINOOPT	0x00008000	/* saved mount option state */
+#define XFS_MOUNT_NOUUID	0x00010000	/* ignore uuid during mount */
+#define XFS_MOUNT_NOLOGFLUSH	0x00020000
 
 /*
  * Default minimum read and write sizes.

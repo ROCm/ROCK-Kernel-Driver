@@ -1141,12 +1141,10 @@ xfs_da_node_lookup_int(xfs_da_state_t *state, int *result)
 	xfs_da_node_entry_t *btree;
 	xfs_dablk_t blkno;
 	int probe, span, max, error, retval;
-	xfs_daddr_t mappedbno;
 	xfs_dahash_t hashval;
 	xfs_da_args_t *args;
 
 	args = state->args;
-	mappedbno = state->holeok ? -2 : -1;
 
 	/*
 	 * Descend thru the B-tree searching each level for the right
@@ -1164,9 +1162,7 @@ xfs_da_node_lookup_int(xfs_da_state_t *state, int *result)
 		 */
 		blk->blkno = blkno;
 		error = xfs_da_read_buf(args->trans, args->dp, blkno,
-					mappedbno, &blk->bp, args->whichfork);
-		if (!error && unlikely(state->holeok && !blk->bp))
-			error = XFS_ERROR(ENOATTR);	/* always attr here */
+					-1, &blk->bp, args->whichfork);
 		if (error) {
 			blk->blkno = 0;
 			state->path.active--;
@@ -2170,9 +2166,9 @@ xfs_da_do_buf(
 			if (xfs_error_level >= XFS_ERRLEVEL_LOW) {
 				int	i;
 				cmn_err(CE_ALERT, "xfs_da_do_buf: bno %lld\n",
-					bno);
+					(long long)bno);
 				cmn_err(CE_ALERT, "dir: inode %lld\n",
-					dp->i_ino);
+					(long long)dp->i_ino);
 				for (i = 0; i < nmap; i++) {
 					cmn_err(CE_ALERT,
 						"[%02d] br_startoff %lld br_startblock %lld br_blockcount %lld br_state %d\n",

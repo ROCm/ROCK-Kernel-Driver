@@ -11,13 +11,6 @@
 #ifndef _ASM_IA64_SN_SN2_SHUB_H
 #define _ASM_IA64_SN_SN2_SHUB_H
 
-#include <asm/sn/sn2/shub_mmr.h>		/* shub mmr addresses and formats */
-#include <asm/sn/sn2/shub_md.h>	
-#include <asm/sn/sn2/shubio.h>	
-#ifndef __ASSEMBLY__
-#include <asm/sn/sn2/shub_mmr_t.h>		/* shub mmr struct defines */
-#endif
-
 /*
  * Junk Bus Address Space
  *   The junk bus is used to access the PROM, LED's, and UART. It's 

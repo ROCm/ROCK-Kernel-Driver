@@ -172,22 +172,6 @@ bp:;	$(Q)$(MAKE) $(build)=$(boot) $(boot)/bootpImage
 i:;	$(Q)$(MAKE) $(build)=$(boot) install
 zi:;	$(Q)$(MAKE) $(build)=$(boot) zinstall
 
-#
-# Configuration targets.  Use these to select a
-# configuration for your architecture
-%_config:
-	@( \
-	CFG=$(@:_config=); \
-	if [ -f arch/arm/def-configs/$$CFG ]; then \
-	  [ -f .config ] && mv -f .config .config.old; \
-	  cp arch/arm/def-configs/$$CFG .config; \
-	  echo "*** Default configuration for $$CFG installed"; \
-	  echo "*** Next, you may run 'make oldconfig'"; \
-	else \
-	  echo "$$CFG does not exist"; \
-	fi; \
-	)
-
 arch/$(ARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \
 				   include/asm-arm/.arch \
 				   include/config/MARKER

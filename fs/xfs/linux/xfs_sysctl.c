@@ -68,39 +68,54 @@ xfs_stats_clear_proc_handler(
 
 STATIC ctl_table xfs_table[] = {
 	{XFS_RESTRICT_CHOWN, "restrict_chown", &xfs_params.restrict_chown.val,
-	sizeof(ulong), 0644, NULL, &proc_doulongvec_minmax,
+	sizeof(int), 0644, NULL, &proc_dointvec_minmax,
 	&sysctl_intvec, NULL, 
 	&xfs_params.restrict_chown.min, &xfs_params.restrict_chown.max},
 
 	{XFS_SGID_INHERIT, "irix_sgid_inherit", &xfs_params.sgid_inherit.val,
-	sizeof(ulong), 0644, NULL, &proc_doulongvec_minmax,
+	sizeof(int), 0644, NULL, &proc_dointvec_minmax,
 	&sysctl_intvec, NULL,
 	&xfs_params.sgid_inherit.min, &xfs_params.sgid_inherit.max},
 
 	{XFS_SYMLINK_MODE, "irix_symlink_mode", &xfs_params.symlink_mode.val,
-	sizeof(ulong), 0644, NULL, &proc_doulongvec_minmax,
+	sizeof(int), 0644, NULL, &proc_dointvec_minmax,
 	&sysctl_intvec, NULL, 
 	&xfs_params.symlink_mode.min, &xfs_params.symlink_mode.max},
 
 	{XFS_PANIC_MASK, "panic_mask", &xfs_params.panic_mask.val,
-	sizeof(ulong), 0644, NULL, &proc_doulongvec_minmax,
+	sizeof(int), 0644, NULL, &proc_dointvec_minmax,
 	&sysctl_intvec, NULL, 
 	&xfs_params.panic_mask.min, &xfs_params.panic_mask.max},
 
 	{XFS_ERRLEVEL, "error_level", &xfs_params.error_level.val,
-	sizeof(ulong), 0644, NULL, &proc_doulongvec_minmax,
+	sizeof(int), 0644, NULL, &proc_dointvec_minmax,
 	&sysctl_intvec, NULL, 
 	&xfs_params.error_level.min, &xfs_params.error_level.max},
 
 	{XFS_SYNC_INTERVAL, "sync_interval", &xfs_params.sync_interval.val,
-	sizeof(ulong), 0644, NULL, &proc_doulongvec_minmax,
+	sizeof(int), 0644, NULL, &proc_dointvec_minmax,
 	&sysctl_intvec, NULL, 
 	&xfs_params.sync_interval.min, &xfs_params.sync_interval.max},
+
+	{XFS_INHERIT_SYNC, "inherit_sync", &xfs_params.inherit_sync.val,
+	sizeof(int), 0644, NULL, &proc_dointvec_minmax,
+	&sysctl_intvec, NULL,
+	&xfs_params.inherit_sync.min, &xfs_params.inherit_sync.max},
+
+	{XFS_INHERIT_NODUMP, "inherit_nodump", &xfs_params.inherit_nodump.val,
+	sizeof(int), 0644, NULL, &proc_dointvec_minmax,
+	&sysctl_intvec, NULL,
+	&xfs_params.inherit_nodump.min, &xfs_params.inherit_nodump.max},
+
+	{XFS_INHERIT_NOATIME, "inherit_noatime", &xfs_params.inherit_noatim.val,
+	sizeof(int), 0644, NULL, &proc_dointvec_minmax,
+	&sysctl_intvec, NULL,
+	&xfs_params.inherit_noatim.min, &xfs_params.inherit_noatim.max},
 
 	/* please keep this the last entry */
 #ifdef CONFIG_PROC_FS
 	{XFS_STATS_CLEAR, "stats_clear", &xfs_params.stats_clear.val,
-	sizeof(ulong), 0644, NULL, &xfs_stats_clear_proc_handler,
+	sizeof(int), 0644, NULL, &xfs_stats_clear_proc_handler,
 	&sysctl_intvec, NULL, 
 	&xfs_params.stats_clear.min, &xfs_params.stats_clear.max},
 #endif /* CONFIG_PROC_FS */

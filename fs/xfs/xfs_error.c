@@ -238,7 +238,7 @@ xfs_fs_cmn_err(int level, xfs_mount_t *mp, char *fmt, ...)
 }
 
 void
-xfs_cmn_err(uint64_t panic_tag, int level, xfs_mount_t *mp, char *fmt, ...)
+xfs_cmn_err(int panic_tag, int level, xfs_mount_t *mp, char *fmt, ...)
 {
 	va_list ap;
 

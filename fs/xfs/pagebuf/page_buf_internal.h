@@ -81,9 +81,9 @@ struct pagebuf_trace_buf {
  */
 
 typedef struct pb_sysctl_val {
-	ulong min;
-	ulong val;
-	ulong max;
+	int min;
+	int val;
+	int max;
 } pb_sysctl_val_t;
 
 typedef struct pagebuf_param {
