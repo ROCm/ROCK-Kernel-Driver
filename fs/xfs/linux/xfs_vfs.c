@@ -33,9 +33,13 @@
 #include <xfs.h>
 
 int
-vfs_mount(bhv_desc_t *bdp, struct xfs_mount_args *args, struct cred *cr)
+vfs_mount(
+	struct bhv_desc		*bdp,
+	struct xfs_mount_args	*args,
+	struct cred		*cr)
 {
-	bhv_desc_t *next = bdp;
+	struct bhv_desc		*next = bdp;
+
 	ASSERT(next);
 	while (! (bhvtovfsops(next))->vfs_mount)
 		next = BHV_NEXT(next);
@@ -43,9 +47,14 @@ vfs_mount(bhv_desc_t *bdp, struct xfs_mount_args *args, struct cred *cr)
 }
 
 int
-vfs_parseargs(bhv_desc_t *bdp, char *s, struct xfs_mount_args *args, int f)
+vfs_parseargs(
+	struct bhv_desc		*bdp,
+	char			*s,
+	struct xfs_mount_args	*args,
+	int			f)
 {
-	bhv_desc_t *next = bdp;
+	struct bhv_desc		*next = bdp;
+
 	ASSERT(next);
 	while (! (bhvtovfsops(next))->vfs_parseargs)
 		next = BHV_NEXT(next);
@@ -53,9 +62,12 @@ vfs_parseargs(bhv_desc_t *bdp, char *s, struct xfs_mount_args *args, int f)
 }
 
 int
-vfs_showargs(bhv_desc_t *bdp, struct seq_file *m)
+vfs_showargs(
+	struct bhv_desc		*bdp,
+	struct seq_file		*m)
 {
-	bhv_desc_t *next = bdp;
+	struct bhv_desc		*next = bdp;
+
 	ASSERT(next);
 	while (! (bhvtovfsops(next))->vfs_showargs)
 		next = BHV_NEXT(next);
@@ -63,9 +75,13 @@ vfs_showargs(bhv_desc_t *bdp, struct seq_file *m)
 }
 
 int
-vfs_unmount(bhv_desc_t *bdp, int fl, struct cred *cr)
+vfs_unmount(
+	struct bhv_desc		*bdp,
+	int			fl,
+	struct cred		*cr)
 {
-	bhv_desc_t *next = bdp;
+	struct bhv_desc		*next = bdp;
+
 	ASSERT(next);
 	while (! (bhvtovfsops(next))->vfs_unmount)
 		next = BHV_NEXT(next);
@@ -73,9 +89,12 @@ vfs_unmount(bhv_desc_t *bdp, int fl, struct cred *cr)
 }
 
 int
-vfs_root(bhv_desc_t *bdp, struct vnode **vpp)
+vfs_root(
+	struct bhv_desc		*bdp,
+	struct vnode		**vpp)
 {
-	bhv_desc_t *next = bdp;
+	struct bhv_desc		*next = bdp;
+
 	ASSERT(next);
 	while (! (bhvtovfsops(next))->vfs_root)
 		next = BHV_NEXT(next);
@@ -83,9 +102,13 @@ vfs_root(bhv_desc_t *bdp, struct vnode **vpp)
 }
 
 int
-vfs_statvfs(bhv_desc_t *bdp, struct statfs *sp, struct vnode *vp)
+vfs_statvfs(
+	struct bhv_desc		*bdp,
+	struct statfs		*sp,
+	struct vnode		*vp)
 {
-	bhv_desc_t *next = bdp;
+	struct bhv_desc		*next = bdp;
+
 	ASSERT(next);
 	while (! (bhvtovfsops(next))->vfs_statvfs)
 		next = BHV_NEXT(next);
@@ -93,9 +116,13 @@ vfs_statvfs(bhv_desc_t *bdp, struct statfs *sp, struct vnode *vp)
 }
 
 int
-vfs_sync(bhv_desc_t *bdp, int fl, struct cred *cr)
+vfs_sync(
+	struct bhv_desc		*bdp,
+	int			fl,
+	struct cred		*cr)
 {
-	bhv_desc_t *next = bdp;
+	struct bhv_desc		*next = bdp;
+
 	ASSERT(next);
 	while (! (bhvtovfsops(next))->vfs_sync)
 		next = BHV_NEXT(next);
@@ -103,9 +130,13 @@ vfs_sync(bhv_desc_t *bdp, int fl, struct cred *cr)
 }
 
 int
-vfs_vget(bhv_desc_t *bdp, struct vnode **vpp, struct fid *fidp)
+vfs_vget(
+	struct bhv_desc		*bdp,
+	struct vnode		**vpp,
+	struct fid		*fidp)
 {
-	bhv_desc_t *next = bdp;
+	struct bhv_desc		*next = bdp;
+
 	ASSERT(next);
 	while (! (bhvtovfsops(next))->vfs_vget)
 		next = BHV_NEXT(next);
@@ -113,9 +144,12 @@ vfs_vget(bhv_desc_t *bdp, struct vnode **vpp, struct fid *fidp)
 }
 
 int
-vfs_dmapiops(bhv_desc_t *bdp, caddr_t addr)
+vfs_dmapiops(
+	struct bhv_desc		*bdp,
+	caddr_t			addr)
 {
-	bhv_desc_t *next = bdp;
+	struct bhv_desc		*next = bdp;
+
 	ASSERT(next);
 	while (! (bhvtovfsops(next))->vfs_dmapiops)
 		next = BHV_NEXT(next);
@@ -123,9 +157,14 @@ vfs_dmapiops(bhv_desc_t *bdp, caddr_t addr)
 }
 
 int
-vfs_quotactl(bhv_desc_t *bdp, int cmd, int id, caddr_t addr)
+vfs_quotactl(
+	struct bhv_desc		*bdp,
+	int			cmd,
+	int			id,
+	caddr_t			addr)
 {
-	bhv_desc_t *next = bdp;
+	struct bhv_desc		*next = bdp;
+
 	ASSERT(next);
 	while (! (bhvtovfsops(next))->vfs_quotactl)
 		next = BHV_NEXT(next);
@@ -133,9 +172,14 @@ vfs_quotactl(bhv_desc_t *bdp, int cmd, int id, caddr_t addr)
 }
 
 void
-vfs_init_vnode(bhv_desc_t *bdp, struct vnode *vp, bhv_desc_t *bp, int unlock)
+vfs_init_vnode(
+	struct bhv_desc		*bdp,
+	struct vnode		*vp,
+	struct bhv_desc		*bp,
+	int			unlock)
 {
-	bhv_desc_t *next = bdp;
+	struct bhv_desc		*next = bdp;
+
 	ASSERT(next);
 	while (! (bhvtovfsops(next))->vfs_init_vnode)
 		next = BHV_NEXT(next);
@@ -143,9 +187,14 @@ vfs_init_vnode(bhv_desc_t *bdp, struct vnode *vp, bhv_desc_t *bp, int unlock)
 }
 
 void
-vfs_force_shutdown(bhv_desc_t *bdp, int fl, char *file, int line)
+vfs_force_shutdown(
+	struct bhv_desc		*bdp,
+	int			fl,
+	char			*file,
+	int			line)
 {
-	bhv_desc_t *next = bdp;
+	struct bhv_desc		*next = bdp;
+
 	ASSERT(next);
 	while (! (bhvtovfsops(next))->vfs_force_shutdown)
 		next = BHV_NEXT(next);
@@ -153,31 +202,84 @@ vfs_force_shutdown(bhv_desc_t *bdp, int fl, char *file, int line)
 }
 
 vfs_t *
-vfs_allocate(void)
+vfs_allocate( void )
 {
-	vfs_t *vfsp = kmem_zalloc(sizeof(vfs_t), KM_SLEEP);
+	struct vfs		*vfsp;
+
+	vfsp = kmem_zalloc(sizeof(vfs_t), KM_SLEEP);
 	bhv_head_init(VFS_BHVHEAD(vfsp), "vfs");
 	return vfsp;
 }
 
 void
-vfs_deallocate(vfs_t *vfsp)
+vfs_deallocate(
+	struct vfs		*vfsp)
 {
 	bhv_head_destroy(VFS_BHVHEAD(vfsp));
 	kmem_free(vfsp, sizeof(vfs_t));
 }
 
 void
-vfs_insertops(vfs_t *vfsp, vfsops_t *vfsops)
+vfs_insertops(
+	struct vfs		*vfsp,
+	struct vfsops		*vfsops)
 {
-	bhv_desc_t *bdp = kmem_alloc(sizeof(bhv_desc_t), KM_SLEEP);
+	struct bhv_desc		*bdp;
+
+	bdp = kmem_alloc(sizeof(struct bhv_desc), KM_SLEEP);
 	bhv_desc_init(bdp, NULL, vfsp, vfsops);
 	bhv_insert(&vfsp->vfs_bh, bdp);
 }
 
 void
-vfs_insertbhv(vfs_t *vfsp, bhv_desc_t *bdp, vfsops_t *vfsops, void *mount)
+vfs_insertbhv(
+	struct vfs		*vfsp,
+	struct bhv_desc		*bdp,
+	struct vfsops		*vfsops,
+	void			*mount)
 {
 	bhv_desc_init(bdp, mount, vfsp, vfsops);
 	bhv_insert_initial(&vfsp->vfs_bh, bdp);
+}
+
+void
+bhv_remove_vfsops(
+	struct vfs		*vfsp,
+	int			pos)
+{
+	struct bhv_desc		*bhv;
+
+	bhv = bhv_lookup_range(&vfsp->vfs_bh, pos, pos);
+	if (!bhv)
+		return;
+	bhv_remove(&vfsp->vfs_bh, bhv);
+	kmem_free(bhv, sizeof(*bhv));
+}
+
+void
+bhv_remove_all_vfsops(
+	struct vfs		*vfsp,
+	int			freebase)
+{
+	struct xfs_mount	*mp;
+
+	bhv_remove_vfsops(vfsp, VFS_POSITION_QM);
+	bhv_remove_vfsops(vfsp, VFS_POSITION_DM);
+	if (!freebase)
+		return;
+	mp = XFS_BHVTOM(bhv_lookup(VFS_BHVHEAD(vfsp), &xfs_vfsops));
+	VFS_REMOVEBHV(vfsp, &mp->m_bhv);
+	xfs_mount_free(mp, 0);
+}
+
+void
+bhv_insert_all_vfsops(
+	struct vfs		*vfsp)
+{
+	struct xfs_mount	*mp;
+
+	mp = xfs_mount_init();
+	vfs_insertbhv(vfsp, &mp->m_bhv, &xfs_vfsops, mp);
+	vfs_insertdmapi(vfsp);
+	vfs_insertquota(vfsp);
 }

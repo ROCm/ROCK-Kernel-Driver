@@ -40,6 +40,7 @@
 STATIC struct quotactl_ops linvfs_qops;
 STATIC struct super_operations linvfs_sops;
 STATIC struct export_operations linvfs_export_ops;
+STATIC kmem_cache_t * linvfs_inode_cachep;
 
 #define MNTOPT_LOGBUFS	"logbufs"	/* number of XFS log buffers */
 #define MNTOPT_LOGBSIZE	"logbsize"	/* size of XFS log buffers */
@@ -320,11 +321,11 @@ xfs_set_inodeops(
 
 STATIC __inline__ void
 xfs_revalidate_inode(
-	xfs_mount_t	*mp,
-	vnode_t		*vp,
-	xfs_inode_t	*ip)
+	xfs_mount_t		*mp,
+	vnode_t			*vp,
+	xfs_inode_t		*ip)
 {
-	struct inode	*inode = LINVFS_GET_IP(vp);
+	struct inode		*inode = LINVFS_GET_IP(vp);
 
 	inode->i_mode	= (ip->i_d.di_mode & MODEMASK) | VTTOIF(vp->v_type);
 	inode->i_nlink	= ip->i_d.di_nlink;
@@ -353,21 +354,22 @@ xfs_revalidate_inode(
 
 void
 xfs_initialize_vnode(
-	bhv_desc_t	*bdp,
-	vnode_t		*vp,
-	bhv_desc_t	*inode_bhv,
-	int		unlock)
+	bhv_desc_t		*bdp,
+	vnode_t			*vp,
+	bhv_desc_t		*inode_bhv,
+	int			unlock)
 {
-	xfs_inode_t	*ip = XFS_BHVTOI(inode_bhv);
-	struct inode	*inode = LINVFS_GET_IP(vp);
+	xfs_inode_t		*ip = XFS_BHVTOI(inode_bhv);
+	struct inode		*inode = LINVFS_GET_IP(vp);
 
-	if (inode_bhv->bd_vobj == NULL) {
+	if (!inode_bhv->bd_vobj) {
 		vp->v_vfsp = bhvtovfs(bdp);
 		bhv_desc_init(inode_bhv, ip, vp, &xfs_vnodeops);
 		bhv_insert(VN_BHV_HEAD(vp), inode_bhv);
 	}
 
 	vp->v_type = IFTOVT(ip->i_d.di_mode);
+
 	/* Have we been called during the new inode create process,
 	 * in which case we are too early to fill in the Linux inode.
 	 */
@@ -466,15 +468,12 @@ xfs_alloc_buftarg(
 	return btp;
 }
 
-STATIC kmem_cache_t * linvfs_inode_cachep;
-
 STATIC __inline__ unsigned int gfp_mask(void)
 {
 	/* If we're not in a transaction, FS activity is ok */
 	if (current->flags & PF_FSTRANS) return GFP_NOFS;
 	return GFP_KERNEL;
 }
-
 
 STATIC struct inode *
 linvfs_alloc_inode(
@@ -937,49 +936,6 @@ STATIC struct file_system_type xfs_fs_type = {
 };
 
 
-void
-bhv_remove_vfsops(
-	struct vfs		*vfsp,
-	int			pos)
-{
-	struct bhv_desc		*bhv;
-
-	bhv = bhv_lookup_range(&vfsp->vfs_bh, pos, pos);
-	if (!bhv)
-		return;
-	bhv_remove(&vfsp->vfs_bh, bhv);
-	kmem_free(bhv, sizeof(*bhv));
-}
-
-void
-bhv_remove_all_vfsops(
-	struct vfs		*vfsp,
-	int			freebase)
-{
-	struct xfs_mount	*mp;
-
-	bhv_remove_vfsops(vfsp, VFS_POSITION_QM);
-	bhv_remove_vfsops(vfsp, VFS_POSITION_DM);
-	if (!freebase)
-		return;
-	mp = XFS_BHVTOM(bhv_lookup(VFS_BHVHEAD(vfsp), &xfs_vfsops));
-	VFS_REMOVEBHV(vfsp, &mp->m_bhv);
-	xfs_mount_free(mp, 0);
-}
-
-void
-bhv_insert_all_vfsops(
-	struct vfs		*vfsp)
-{
-	struct xfs_mount	*mp;
-
-	mp = xfs_mount_init();
-	vfs_insertbhv(vfsp, &mp->m_bhv, &xfs_vfsops, mp);
-	vfs_insertdmapi(vfsp);
-	vfs_insertquota(vfsp);
-}
-
-
 STATIC int __init
 init_xfs_fs( void )
 {
@@ -1000,15 +956,16 @@ init_xfs_fs( void )
 	error = pagebuf_init();
 	if (error < 0)
 		goto undo_pagebuf;
+
+	vn_init();
+	xfs_init();
+
 	error = vfs_initdmapi();
 	if (error < 0)
 		goto undo_dmapi;
 	error = vfs_initquota();
 	if (error < 0)
 		goto undo_quota;
-
-	vn_init();
-	xfs_init();
 
 	error = register_filesystem(&xfs_fs_type);
 	if (error)
@@ -1030,8 +987,8 @@ undo_inodecache:
 STATIC void __exit
 exit_xfs_fs( void )
 {
-	xfs_cleanup();
 	unregister_filesystem(&xfs_fs_type);
+	xfs_cleanup();
 	vfs_exitquota();
 	vfs_exitdmapi();
 	pagebuf_terminate();

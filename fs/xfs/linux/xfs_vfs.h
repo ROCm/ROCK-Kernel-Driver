@@ -170,4 +170,8 @@ extern void vfs_deallocate(vfs_t *);
 extern void vfs_insertops(vfs_t *, vfsops_t *);
 extern void vfs_insertbhv(vfs_t *, bhv_desc_t *, vfsops_t *, void *);
 
+extern void bhv_insert_all_vfsops(struct vfs *);
+extern void bhv_remove_all_vfsops(struct vfs *, int);
+extern void bhv_remove_vfsops(struct vfs *, int);
+
 #endif	/* __XFS_VFS_H__ */

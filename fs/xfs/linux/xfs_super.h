@@ -111,8 +111,4 @@ extern void xfs_free_buftarg(struct pb_target *);
 extern void xfs_setsize_buftarg(struct pb_target *, unsigned int, unsigned int);
 extern unsigned int xfs_getsize_buftarg(struct pb_target *);
 
-extern void bhv_insert_all_vfsops(struct vfs *);
-extern void bhv_remove_all_vfsops(struct vfs *, int);
-extern void bhv_remove_vfsops(struct vfs *, int);
-
 #endif	/* __XFS_SUPER_H__ */
