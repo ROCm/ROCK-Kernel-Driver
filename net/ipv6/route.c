@@ -1036,6 +1036,7 @@ source_ok:
 	notify = __neigh_update(neigh, lladdr, NUD_STALE,
 				NEIGH_UPDATE_F_IP6REDIRECT|
 				(on_link ? 0 : (NEIGH_UPDATE_F_OVERRIDE_VALID_ISROUTER|
+						NEIGH_UPDATE_F_SETUP_ISROUTER|
 						NEIGH_UPDATE_F_ISROUTER)));
 #ifdef CONFIG_ARPD
 	if (notify > 0 && !neigh->parms->app_probes) {
