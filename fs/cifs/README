@@ -101,10 +101,11 @@ Linux:
 
 Note that ea support is required for supporting Linux xattrs. 
 Some administrators also change the "map archive" and the "create mask" 
-parameters from their default values.  Creating special devices (mknod) remotely 
-may require specifying a mkdev function to Samba.  For more information on these 
-see the manual pages ("man smb.conf") on the Samba server system.  Note that the 
-cifs vfs, unlike the smbfs vfs, does not read the smb.conf on the client system 
+parameters from their default values.  Creating special devices (mknod) 
+remotely may require specifying a mkdev function to Samba if you are not using 
+Samba 3.0.5 or later.  For more information on these see the manual pages
+("man smb.conf") on the Samba server system.  Note that the cifs vfs,
+unlike the smbfs vfs, does not read the smb.conf on the client system 
 (the few optional settings are passed in on mount via -o parameters instead).  
 Note that Samba 2.2.7 or later includes a fix that allows the CIFS VFS to delete
 open files (required for strict POSIX compliance).  Windows Servers already 

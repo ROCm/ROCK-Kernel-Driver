@@ -715,6 +715,8 @@ cifs_parse_mount_options(char *options, const char *devname, struct smb_vol *vol
 				if((i==15) && (value[i] != 0))
 					printk(KERN_WARNING "CIFS: netbiosname longer than 15 and was truncated.\n");
 			}
+		} else if (strnicmp(data, "credentials", 4) == 0) {
+			/* ignore */
 		} else if (strnicmp(data, "version", 3) == 0) {
 			/* ignore */
 		} else if (strnicmp(data, "rw", 2) == 0) {
