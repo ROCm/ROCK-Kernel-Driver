@@ -376,6 +376,7 @@ smp_send_stop (void)
 {
 	send_IPI_allbutself(IPI_CPU_STOP);
 }
+EXPORT_SYMBOL(smp_send_stop);
 
 int __init
 setup_profiling_timer (unsigned int multiplier)
