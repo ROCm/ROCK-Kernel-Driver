@@ -23,7 +23,7 @@
 #include <linux/i2o-dev.h>
 
 /* How many different OSM's are we allowing */
-#define I2O_MAX_DRIVERS		4
+#define I2O_MAX_DRIVERS		8
 
 #include <asm/io.h>
 #include <asm/semaphore.h>	/* Needed for MUTEX init macros */

@@ -877,10 +877,10 @@ static int i2o_block_transfer(struct request *req)
 		 (unsigned long)&msg->u.head[0]) >> 2) | SGL_OFFSET_8,
 	       &msg->u.head[0]);
 
-	i2o_msg_post(c, m);
-
 	list_add_tail(&ireq->queue, &dev->open_queue);
 	dev->open_queue_depth++;
+
+	i2o_msg_post(c, m);
 
 	return 0;
 

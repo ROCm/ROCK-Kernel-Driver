@@ -303,7 +303,7 @@ static irqreturn_t i2o_pci_interrupt(int irq, void *dev_id, struct pt_regs *r)
 		 *      Ensure this message is seen coherently but cachably by
 		 *      the processor
 		 */
-		dma_sync_single_for_cpu(dev, c->out_queue.phys, MSG_FRAME_SIZE,
+		dma_sync_single_for_cpu(dev, mv, MSG_FRAME_SIZE * 4,
 					PCI_DMA_FROMDEVICE);
 
 		/* dispatch it */
