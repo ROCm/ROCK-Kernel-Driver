@@ -2384,6 +2384,9 @@ static void sym2_set_offset(struct scsi_device *sdev, int offset)
 	struct sym_hcb *np = ((struct host_data *)sdev->host->hostdata)->ncb;
 	struct sym_tcb *tp = &np->target[sdev->id];
 
+	if (offset == 0)
+		tp->tinfo.goal.options = 0;
+
 	if (tp->tinfo.curr.options & PPR_OPT_DT) {
 		if (offset > np->maxoffs_dt)
 			offset = np->maxoffs_dt;
