@@ -193,6 +193,7 @@ static int sd_ioctl(struct inode * inode, struct file * filp,
 	Scsi_Device * sdp;
 	int diskinfo[4];
 	int dsk_nr = DEVICE_NR(dev);
+	int error;
     
 	SCSI_LOG_IOCTL(1, printk("sd_ioctl: dsk_nr=%d, cmd=0x%x\n",
 		       dsk_nr, cmd));
@@ -208,6 +209,10 @@ static int sd_ioctl(struct inode * inode, struct file * filp,
 
 	if( !scsi_block_when_processing_errors(sdp) )
 		return -ENODEV;
+
+	error = scsi_cmd_ioctl(inode->i_bdev, cmd, arg);
+	if (error != -ENOTTY)
+		return error;
 
 	switch (cmd) 
 	{
@@ -299,14 +304,43 @@ static struct gendisk **sd_disks;
  **/
 static int sd_init_command(Scsi_Cmnd * SCpnt)
 {
-	int dsk_nr, part_nr, this_count;
+	int dsk_nr, part_nr, this_count, timeout;
 	sector_t block;
-	Scsi_Device *sdp;
+	Scsi_Device *sdp = SCpnt->device;
 #if CONFIG_SCSI_LOGGING
 	char nbuff[6];
 #endif
+
+	timeout = SD_TIMEOUT;
+	if (SCpnt->device->type != TYPE_DISK)
+		timeout = SD_MOD_TIMEOUT;
+
 	/*
-	 * don't support specials for nwo
+	 * these are already setup, just copy cdb basically
+	 */
+	if (SCpnt->request->flags & REQ_BLOCK_PC) {
+		struct request *rq = SCpnt->request;
+
+		if (sizeof(rq->cmd) > sizeof(SCpnt->cmnd))
+			return 0;
+
+		memcpy(SCpnt->cmnd, rq->cmd, sizeof(SCpnt->cmnd));
+		if (rq_data_dir(rq) == WRITE)
+			SCpnt->sc_data_direction = SCSI_DATA_WRITE;
+		else if (rq->data_len)
+			SCpnt->sc_data_direction = SCSI_DATA_READ;
+		else
+			SCpnt->sc_data_direction = SCSI_DATA_NONE;
+
+		this_count = rq->data_len;
+		if (rq->timeout)
+			timeout = rq->timeout;
+
+		goto queue;
+	}
+
+	/*
+	 * we only do REQ_CMD and REQ_BLOCK_PC
 	 */
 	if (!(SCpnt->request->flags & REQ_CMD))
 		return 0;
@@ -320,7 +354,6 @@ static int sd_init_command(Scsi_Cmnd * SCpnt)
 	SCSI_LOG_HLQUEUE(1, printk("sd_command_init: dsk_nr=%d, block=%llu, "
 			    "count=%d\n", dsk_nr, (unsigned long long)block, this_count));
 
-	sdp = SCpnt->device;
 	/* >>>>> the "(part_nr & 0xf)" excludes 15th partition, why?? */
 	/* >>>>> this change is not in the lk 2.5 series */
 	if (part_nr >= (sd_template.dev_max << 4) || (part_nr & 0xf) ||
@@ -433,12 +466,12 @@ static int sd_init_command(Scsi_Cmnd * SCpnt)
 	 * host adapter, it's safe to assume that we can at least transfer
 	 * this many bytes between each connect / disconnect.
 	 */
+queue:
 	SCpnt->transfersize = sdp->sector_size;
 	SCpnt->underflow = this_count << 9;
 
 	SCpnt->allowed = MAX_RETRIES;
-	SCpnt->timeout_per_command = (SCpnt->device->type == TYPE_DISK ?
-				      SD_TIMEOUT : SD_MOD_TIMEOUT);
+	SCpnt->timeout_per_command = timeout;
 
 	/*
 	 * This is the completion routine we use.  This is matched in terms

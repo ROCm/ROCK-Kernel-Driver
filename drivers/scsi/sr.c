@@ -262,7 +262,7 @@ static request_queue_t *sr_find_queue(kdev_t dev)
 
 static int sr_init_command(Scsi_Cmnd * SCpnt)
 {
-	int dev, devm, block=0, this_count, s_size;
+	int dev, devm, block=0, this_count, s_size, timeout = SR_TIMEOUT;
 	Scsi_CD *cd;
 
 	devm = minor(SCpnt->request->rq_dev);
@@ -283,6 +283,30 @@ static int sr_init_command(Scsi_Cmnd * SCpnt)
 		 * changed bit has been reset
 		 */
 		return 0;
+	}
+
+	/*
+	 * these are already setup, just copy cdb basically
+	 */
+	if (SCpnt->request->flags & REQ_BLOCK_PC) {
+		struct request *rq = SCpnt->request;
+
+		if (sizeof(rq->cmd) > sizeof(SCpnt->cmnd))
+			return 0;
+
+		memcpy(SCpnt->cmnd, rq->cmd, sizeof(SCpnt->cmnd));
+		if (rq_data_dir(rq) == WRITE)
+			SCpnt->sc_data_direction = SCSI_DATA_WRITE;
+		else if (rq->data_len)
+			SCpnt->sc_data_direction = SCSI_DATA_READ;
+		else
+			SCpnt->sc_data_direction = SCSI_DATA_NONE;
+
+		this_count = rq->data_len;
+		if (rq->timeout)
+			timeout = rq->timeout;
+
+		goto queue;
 	}
 
 	if (!(SCpnt->request->flags & REQ_CMD)) {
@@ -357,11 +381,12 @@ static int sr_init_command(Scsi_Cmnd * SCpnt)
 	 * host adapter, it's safe to assume that we can at least transfer
 	 * this many bytes between each connect / disconnect.
 	 */
+queue:
 	SCpnt->transfersize = cd->device->sector_size;
 	SCpnt->underflow = this_count << 9;
 
 	SCpnt->allowed = MAX_RETRIES;
-	SCpnt->timeout_per_command = SR_TIMEOUT;
+	SCpnt->timeout_per_command = timeout;
 
 	/*
 	 * This is the completion routine we use.  This is matched in terms
