@@ -775,6 +775,14 @@ struct task_struct *copy_process(unsigned long clone_flags,
 		return ERR_PTR(-EINVAL);
 
 	/*
+	 * Shared signal handlers imply shared VM. By way of the above,
+	 * thread groups also imply shared VM. Blocking this case allows
+	 * for various simplifications in other code.
+	 */
+	if ((clone_flags & CLONE_SIGHAND) && !(clone_flags & CLONE_VM))
+		return ERR_PTR(-EINVAL);
+
+	/*
 	 * CLONE_DETACHED must match CLONE_THREAD: it's a historical
 	 * thing.
 	 */

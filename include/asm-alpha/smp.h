@@ -46,7 +46,7 @@ extern struct cpuinfo_alpha cpu_data[NR_CPUS];
 #define smp_processor_id()	(current_thread_info()->cpu)
 
 extern cpumask_t cpu_present_mask;
-extern cpumask_t long cpu_online_map;
+extern cpumask_t cpu_online_map;
 extern int smp_num_cpus;
 
 #define cpu_possible(cpu)	cpu_isset(cpu, cpu_present_mask)
