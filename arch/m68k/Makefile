@@ -58,79 +58,23 @@ else
 HEAD := arch/m68k/kernel/sun3-head.o
 endif 
 
-SUBDIRS += arch/m68k/kernel arch/m68k/mm arch/m68k/lib
-CORE_FILES := arch/m68k/kernel/kernel.o arch/m68k/mm/mm.o $(CORE_FILES)
-LIBS += arch/m68k/lib/lib.a
+core-y				+= arch/m68k/kernel/	arch/m68k/mm/
+libs-y				+= arch/m68k/lib/
 
-ifdef CONFIG_Q40
-CORE_FILES := $(CORE_FILES) arch/m68k/q40/q40.o
-SUBDIRS := $(SUBDIRS) arch/m68k/q40
-endif
-
-ifdef CONFIG_AMIGA
-CORE_FILES := $(CORE_FILES) arch/m68k/amiga/amiga.o
-SUBDIRS := $(SUBDIRS) arch/m68k/amiga
-endif
-
-ifdef CONFIG_ATARI
-CORE_FILES := $(CORE_FILES) arch/m68k/atari/atari.o
-SUBDIRS := $(SUBDIRS) arch/m68k/atari
-endif
-
-ifdef CONFIG_MAC
-CORE_FILES := $(CORE_FILES) arch/m68k/mac/mac.o
-SUBDIRS := $(SUBDIRS) arch/m68k/mac
-endif
-
-ifdef CONFIG_HP300
-CORE_FILES := $(CORE_FILES) arch/m68k/hp300/hp300.o
-SUBDIRS := $(SUBDIRS) arch/m68k/hp300
-endif
-
-ifdef CONFIG_APOLLO
-CORE_FILES := $(CORE_FILES) arch/m68k/apollo/apollo.o
-SUBDIRS := $(SUBDIRS) arch/m68k/apollo
-endif
-
-ifdef CONFIG_MVME147
-CORE_FILES := $(CORE_FILES) arch/m68k/mvme147/mvme147.o
-SUBDIRS := $(SUBDIRS) arch/m68k/mvme147
-endif
-
-ifdef CONFIG_MVME16x
-CORE_FILES := $(CORE_FILES) arch/m68k/mvme16x/mvme16x.o
-SUBDIRS := $(SUBDIRS) arch/m68k/mvme16x
-endif
-
-ifdef CONFIG_BVME6000
-CORE_FILES := $(CORE_FILES) arch/m68k/bvme6000/bvme6000.o
-SUBDIRS := $(SUBDIRS) arch/m68k/bvme6000
-endif
-
-ifdef CONFIG_SUN3X
-CORE_FILES := $(CORE_FILES) arch/m68k/sun3x/sun3x.o arch/m68k/sun3/sun3.o
-SUBDIRS := $(SUBDIRS) arch/m68k/sun3x arch/m68k/sun3
-endif
-
-ifdef CONFIG_SUN3
-CORE_FILES := $(CORE_FILES) arch/m68k/sun3/sun3.o arch/m68k/sun3/prom/promlib.a
-SUBDIRS := $(SUBDIRS) arch/m68k/sun3 arch/m68k/sun3/prom
-endif
-
-ifdef CONFIG_M68040
-CORE_FILES := $(CORE_FILES) arch/m68k/fpsp040/fpsp.o
-SUBDIRS := $(SUBDIRS) arch/m68k/fpsp040
-endif
-
-ifdef CONFIG_M68060
-CORE_FILES := $(CORE_FILES) arch/m68k/ifpsp060/ifpsp.o
-SUBDIRS := $(SUBDIRS) arch/m68k/ifpsp060
-endif
-
-ifdef CONFIG_M68KFPU_EMU
-CORE_FILES := $(CORE_FILES) arch/m68k/math-emu/mathemu.o
-SUBDIRS := $(SUBDIRS) arch/m68k/math-emu
-endif
+core-$(CONFIG_Q40)		+= arch/m68k/q40/
+core-$(CONFIG_AMIGA)		+= arch/m68k/amiga/
+core-$(CONFIG_ATARI)		+= arch/m68k/atari/
+core-$(CONFIG_MAC)		+= arch/m68k/mac/
+core-$(CONFIG_HP300)		+= arch/m68k/hp300/
+core-$(CONFIG_APOLLO)		+= arch/m68k/apollo/
+core-$(CONFIG_MVME147)		+= arch/m68k/mvme147/
+core-$(CONFIG_MVME16x)		+= arch/m68k/mvme16x/
+core-$(CONFIG_BVME6000)		+= arch/m68k/bvme6000/
+core-$(CONFIG_SUN3X)		+= arch/m68k/sun3x/	arch/m68k/sun3/
+core-$(CONFIG_SUN3)		+= arch/m68k/sun3/	arch/m68k/sun3/prom/
+core-$(CONFIG_M68040)		+= arch/m68k/fpsp040/
+core-$(CONFIG_M68060)		+= arch/m68k/ifpsp060/
+core-$(CONFIG_M68KFPU_EMU)	+= arch/m68k/math-emu/
 
 lilo:	vmlinux
 	if [ -f $(INSTALL_PATH)/vmlinux ]; then mv -f $(INSTALL_PATH)/vmlinux $(INSTALL_PATH)/vmlinux.old; fi

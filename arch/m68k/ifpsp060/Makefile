@@ -4,8 +4,6 @@
 # License.  See the file "README.legal" in the main directory of this archive
 # for more details.
 
-O_TARGET := ifpsp.o
-
 obj-y := fskeleton.o iskeleton.o os.o
 
 EXTRA_AFLAGS := -traditional

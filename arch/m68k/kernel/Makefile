@@ -2,8 +2,6 @@
 # Makefile for the linux kernel.
 #
 
-O_TARGET := kernel.o
-
 ifndef CONFIG_SUN3
   EXTRA_TARGETS := head.o
 else
