@@ -149,14 +149,10 @@ void journal_commit_transaction(journal_t *journal)
 
 	jbd_debug (3, "JBD: commit phase 1\n");
 
-	journal_write_revoke_records(journal, commit_transaction);
-
 	/*
-	 * Now that we have built the revoke records, we can start
-	 * reusing the revoke list for a new running transaction.  We
-	 * can now safely start committing the old transaction: time to
-	 * get a new running transaction for incoming filesystem updates
+	 * Switch to a new revoke table.
 	 */
+	journal_switch_revoke_table(journal);
 
 	spin_lock(&journal->j_state_lock);
 	commit_transaction->t_state = T_FLUSH;
@@ -282,6 +278,10 @@ write_out_data_locked:
 
 sync_datalist_empty:
 	spin_unlock(&journal->j_list_lock);
+
+	journal_write_revoke_records(journal, commit_transaction);
+
+	jbd_debug(3, "JBD: commit phase 2\n");
 
 	/*
 	 * If we found any dirty or locked buffers, then we should have

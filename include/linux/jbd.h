@@ -813,6 +813,7 @@ struct journal_s
 	 */
 	spinlock_t		j_revoke_lock;
 	struct jbd_revoke_table_s *j_revoke;
+	struct jbd_revoke_table_s *j_revoke_table[2];
 
 	/*
 	 * An opaque pointer to fs-private information.  ext3 puts its
@@ -995,10 +996,11 @@ extern int	   journal_cancel_revoke(handle_t *, struct journal_head *);
 extern void	   journal_write_revoke_records(journal_t *, transaction_t *);
 
 /* Recovery revoke support */
-extern int	   journal_set_revoke(journal_t *, unsigned long, tid_t);
-extern int	   journal_test_revoke(journal_t *, unsigned long, tid_t);
-extern void	   journal_clear_revoke(journal_t *);
-extern void	   journal_brelse_array(struct buffer_head *b[], int n);
+extern int	journal_set_revoke(journal_t *, unsigned long, tid_t);
+extern int	journal_test_revoke(journal_t *, unsigned long, tid_t);
+extern void	journal_clear_revoke(journal_t *);
+extern void	journal_brelse_array(struct buffer_head *b[], int n);
+extern void	journal_switch_revoke_table(journal_t *journal);
 
 /*
  * The log thread user interface:
