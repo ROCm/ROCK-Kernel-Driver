@@ -310,7 +310,7 @@ static void snd_mpu401_uart_input_trigger(snd_rawmidi_substream_t * substream, i
 		}
 		
 		/* read data in advance */
-		spin_trylock_irqsave(&mpu->input_lock, flags);
+		spin_lock_irqsave(&mpu->input_lock, flags);
 		snd_mpu401_uart_input_read(mpu);
 		spin_unlock_irqrestore(&mpu->input_lock, flags);
 	} else {

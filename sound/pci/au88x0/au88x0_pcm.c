@@ -488,7 +488,6 @@ static snd_kcontrol_new_t snd_vortex_mixer_spdif[] __devinitdata = {
 		.put =		snd_vortex_spdif_put,
 	},
 	{
-		.iface =	SNDRV_CTL_ELEM_IFACE_MIXER,
 		.access =	SNDRV_CTL_ELEM_ACCESS_READ,
 		.iface =	SNDRV_CTL_ELEM_IFACE_PCM,
 		.name =		SNDRV_CTL_NAME_IEC958("",PLAYBACK,CON_MASK),

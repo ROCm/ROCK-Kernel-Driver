@@ -122,9 +122,10 @@ static struct hda_input_mux alc880_capture_source = {
 };
 
 static struct hda_input_mux alc260_capture_source = {
-	.num_items = 3,
+	.num_items = 4,
 	.items = {
 		{ "Mic", 0x0 },
+		{ "Front Mic", 0x1 },
 		{ "Line", 0x2 },
 		{ "CD", 0x4 },
 	},
@@ -1126,6 +1127,8 @@ snd_kcontrol_new_t alc260_base_mixer[] = {
 	HDA_CODEC_MUTE("Line Playback Switch", 0x07, 0x02, HDA_INPUT),
 	HDA_CODEC_VOLUME("Mic Playback Volume", 0x07, 0x0, HDA_INPUT),
 	HDA_CODEC_MUTE("Mic Playback Switch", 0x07, 0x0, HDA_INPUT),
+	HDA_CODEC_VOLUME("Front Mic Playback Volume", 0x07, 0x01, HDA_INPUT),
+	HDA_CODEC_MUTE("Front Mic Playback Switch", 0x07, 0x01, HDA_INPUT),
 	HDA_CODEC_VOLUME("PC Speaker Playback Volume", 0x07, 0x05, HDA_INPUT),
 	HDA_CODEC_MUTE("PC Speaker Playback Switch", 0x07, 0x05, HDA_INPUT),
 	HDA_CODEC_VOLUME("Headphone Playback Volume", 0x09, 0x0, HDA_OUTPUT),
