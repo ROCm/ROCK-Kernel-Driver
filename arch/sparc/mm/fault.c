@@ -422,6 +422,12 @@ asmlinkage void do_sun4c_fault(struct pt_regs *regs, int text_fault, int write,
 		}
 	}
 
+	if (!mm) {
+		/* We are oopsing. */
+		do_sparc_fault(regs, text_fault, write, address);
+		BUG();	/* P3 Oops already, you bitch */
+	}
+
 	pgdp = pgd_offset(mm, address);
 	ptep = sun4c_pte_offset_kernel((pmd_t *) pgdp, address);
 
