@@ -141,8 +141,8 @@ Expressions are listed in decreasing order of precedence.
     otherwise 'y'.
 (4) Returns the value of the expression. Used to override precedence.
 (5) Returns the result of (2-/expr/).
-(6) Returns the result of max(/expr/, /expr/).
-(7) Returns the result of min(/expr/, /expr/).
+(6) Returns the result of min(/expr/, /expr/).
+(7) Returns the result of max(/expr/, /expr/).
 
 An expression can have a value of 'n', 'm' or 'y' (or 0, 1, 2
 respectively for calculations). A menu entry becomes visible when it's
