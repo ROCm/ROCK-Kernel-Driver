@@ -237,24 +237,8 @@ extern void usb_serial_port_softint(void *private);
 extern int usb_serial_probe(struct usb_interface *iface, const struct usb_device_id *id);
 extern void usb_serial_disconnect(struct usb_interface *iface);
 
-/* determine if we should include the EzUSB loader functions */
-#undef USES_EZUSB_FUNCTIONS
-#if defined(CONFIG_USB_SERIAL_KEYSPAN_PDA) || defined(CONFIG_USB_SERIAL_KEYSPAN_PDA_MODULE)
-	#define USES_EZUSB_FUNCTIONS
-#endif
-#if defined(CONFIG_USB_SERIAL_XIRCOM) || defined(CONFIG_USB_SERIAL_XIRCOM_MODULE)
-	#define USES_EZUSB_FUNCTIONS
-#endif
-#if defined(CONFIG_USB_SERIAL_KEYSPAN) || defined(CONFIG_USB_SERIAL_KEYSPAN_MODULE)
-	#define USES_EZUSB_FUNCTIONS
-#endif
-#if defined(CONFIG_USB_SERIAL_WHITEHEAT) || defined(CONFIG_USB_SERIAL_WHITEHEAT_MODULE)
-	#define USES_EZUSB_FUNCTIONS
-#endif
-#ifdef USES_EZUSB_FUNCTIONS
 extern int ezusb_writememory (struct usb_serial *serial, int address, unsigned char *data, int length, __u8 bRequest);
 extern int ezusb_set_reset (struct usb_serial *serial, unsigned char reset_bit);
-#endif
 
 /* USB Serial console functions */
 #ifdef CONFIG_USB_SERIAL_CONSOLE

@@ -488,45 +488,6 @@ static void return_serial (struct usb_serial *serial)
 	return;
 }
 
-#ifdef USES_EZUSB_FUNCTIONS
-/* EZ-USB Control and Status Register.  Bit 0 controls 8051 reset */
-#define CPUCS_REG    0x7F92
-
-int ezusb_writememory (struct usb_serial *serial, int address, unsigned char *data, int length, __u8 bRequest)
-{
-	int result;
-	unsigned char *transfer_buffer;
-
-	/* dbg("ezusb_writememory %x, %d", address, length); */
-	if (!serial->dev) {
-		dbg("%s - no physical device present, failing.", __FUNCTION__);
-		return -ENODEV;
-	}
-
-	transfer_buffer =  kmalloc (length, GFP_KERNEL);
-	if (!transfer_buffer) {
-		err("%s - kmalloc(%d) failed.", __FUNCTION__, length);
-		return -ENOMEM;
-	}
-	memcpy (transfer_buffer, data, length);
-	result = usb_control_msg (serial->dev, usb_sndctrlpipe(serial->dev, 0), bRequest, 0x40, address, 0, transfer_buffer, length, 3*HZ);
-	kfree (transfer_buffer);
-	return result;
-}
-
-int ezusb_set_reset (struct usb_serial *serial, unsigned char reset_bit)
-{
-	int	response;
-	dbg("%s - %d", __FUNCTION__, reset_bit);
-	response = ezusb_writememory (serial, CPUCS_REG, &reset_bit, 1, 0xa0);
-	if (response < 0) {
-		err("%s- %d failed", __FUNCTION__, reset_bit);
-	}
-	return response;
-}
-
-#endif	/* USES_EZUSB_FUNCTIONS */
-
 /*****************************************************************************
  * Driver tty interface functions
  *****************************************************************************/
@@ -1699,12 +1660,6 @@ EXPORT_SYMBOL(usb_serial_deregister);
 EXPORT_SYMBOL(usb_serial_probe);
 EXPORT_SYMBOL(usb_serial_disconnect);
 EXPORT_SYMBOL(usb_serial_port_softint);
-#ifdef USES_EZUSB_FUNCTIONS
-	EXPORT_SYMBOL(ezusb_writememory);
-	EXPORT_SYMBOL(ezusb_set_reset);
-#endif
-
-
 
 
 /* Module information */

@@ -7,6 +7,7 @@
 obj-$(CONFIG_USB_SERIAL)			+= usbserial.o
 
 usbserial-obj-$(CONFIG_USB_SERIAL_CONSOLE)	+= console.o
+usbserial-obj-$(CONFIG_USB_EZUSB)		+= ezusb.o
 
 obj-$(CONFIG_USB_SERIAL_VISOR)			+= visor.o
 obj-$(CONFIG_USB_SERIAL_IPAQ)			+= ipaq.o
@@ -29,7 +30,7 @@ obj-$(CONFIG_USB_SERIAL_KLSI)			+= kl5kusb105.o
 obj-$(CONFIG_USB_SERIAL_SAFE)			+= safe_serial.o
 
 # Objects that export symbols.
-export-objs	:= usb-serial.o
+export-objs	:= usb-serial.o ezusb.o
 
 usbserial-objs	:= usb-serial.o $(usbserial-obj-y)
 
