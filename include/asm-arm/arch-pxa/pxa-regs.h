@@ -1307,6 +1307,8 @@
 #define GPIO_MD_MASK_NR		0x07f
 #define GPIO_MD_MASK_DIR	0x080
 #define GPIO_MD_MASK_FN		0x300
+#define GPIO_DFLT_LOW		0x400
+#define GPIO_DFLT_HIGH		0x800
 
 #define GPIO1_RTS_MD		( 1 | GPIO_ALT_FN_1_IN)
 #define GPIO6_MMCCLK_MD		( 6 | GPIO_ALT_FN_1_OUT)
