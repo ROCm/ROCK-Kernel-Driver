@@ -122,19 +122,27 @@ extern int dump_elf_task_fp(elf_fpreg_t *dest, struct task_struct *task);
    instruction set this CPU supports.  This is trivial on Alpha, 
    but not so on other machines. */
 
-#define ELF_HWCAP  (~amask(-1))
+#define ELF_HWCAP							\
+({									\
+	/* Sadly, most folks don't yet have assemblers that know about	\
+	   amask.  This is "amask v0, v0" */				\
+	register long _v0 __asm("$0") = -1;				\
+	__asm(".long 0x47e00c20" : "=r"(_v0) : "0"(_v0));		\
+	~_v0;								\
+})
 
 /* This yields a string that ld.so will use to load implementation
    specific libraries for optimization.  This is more specific in
-   intent than poking at uname or /proc/cpuinfo.  */
+   intent than poking at uname or /proc/cpuinfo.  
+
+   This might do with checking bwx simultaneously...  */
 
 #define ELF_PLATFORM				\
 ({						\
-	enum implver_enum i_ = implver();	\
-	( i_ == IMPLVER_EV4 ? "ev4"		\
-	: i_ == IMPLVER_EV5			\
-	  ? (amask(AMASK_BWX) ? "ev5" : "ev56")	\
-	: amask (AMASK_CIX) ? "ev6" : "ev67");	\
+	/* Or "implver v0" ... */		\
+	register long _v0 __asm("$0");		\
+	__asm(".long 0x47e03d80" : "=r"(_v0));	\
+	_v0 == 0 ? "ev4" : "ev5";		\
 })
 
 #ifdef __KERNEL__

@@ -2023,8 +2023,7 @@ out:
 		security_bprm_free(&bprm);
 
 out_mm:
-	if (bprm.mm)
-		mmdrop(bprm.mm);
+	mmdrop(bprm.mm);
 
 out_file:
 	if (bprm.file) {
