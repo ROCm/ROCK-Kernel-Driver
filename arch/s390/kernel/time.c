@@ -128,14 +128,27 @@ void do_settimeofday(struct timeval *tv)
 	write_sequnlock_irq(&xtime_lock);
 }
 
-static inline __u32 div64_32(__u64 dividend, __u32 divisor)
+#ifndef CONFIG_ARCH_S390X
+
+static inline __u32
+__calculate_ticks(__u64 elapsed)
 {
 	register_pair rp;
 
-	rp.pair = dividend;
-	asm ("dr %0,%1" : "+d" (rp) : "d" (divisor));
+	rp.pair = elapsed >> 1;
+	asm ("dr %0,%1" : "+d" (rp) : "d" (CLK_TICKS_PER_JIFFY >> 1));
 	return rp.subreg.odd;
 }
+
+#else /* CONFIG_ARCH_S390X */
+
+static inline __u32
+__calculate_ticks(__u64 elapsed)
+{
+	return elapsed / CLK_TICKS_PER_JIFFY;
+}
+
+#endif /* CONFIG_ARCH_S390X */
 
 /*
  * timer_interrupt() needs to keep up the real-time clock,
@@ -150,7 +163,7 @@ static void do_comparator_interrupt(struct pt_regs *regs, __u16 error_code)
 	asm volatile ("STCK 0(%0)" : : "a" (&tmp) : "memory", "cc");
 	tmp = tmp - S390_lowcore.jiffy_timer;
 	if (tmp >= 2*CLK_TICKS_PER_JIFFY) {  /* more than one tick ? */
-		ticks = div64_32(tmp >> 1, CLK_TICKS_PER_JIFFY >> 1);
+		ticks = __calculate_ticks(tmp);
 		S390_lowcore.jiffy_timer +=
 			CLK_TICKS_PER_JIFFY * (__u64) ticks;
 	} else {
@@ -175,7 +188,7 @@ static void do_comparator_interrupt(struct pt_regs *regs, __u16 error_code)
 
 		tmp = S390_lowcore.jiffy_timer - xtime_cc;
 		if (tmp >= 2*CLK_TICKS_PER_JIFFY) {
-			xticks = div64_32(tmp >> 1, CLK_TICKS_PER_JIFFY >> 1);
+			xticks = __calculate_ticks(tmp);
 			xtime_cc += (__u64) xticks * CLK_TICKS_PER_JIFFY;
 		} else {
 			xticks = 1;
@@ -208,9 +221,9 @@ void init_cpu_timer(void)
 	timer += CLK_TICKS_PER_JIFFY + CPU_DEVIATION;
 	asm volatile ("SCKC %0" : : "m" (timer));
         /* allow clock comparator timer interrupt */
-        asm volatile ("STCTL 0,0,%0" : "=m" (cr0) : : "memory");
+	__ctl_store(cr0, 0, 0);
         cr0 |= 0x800;
-        asm volatile ("LCTL 0,0,%0" : : "m" (cr0) : "memory");
+	__ctl_load(cr0, 0, 0);
 }
 
 /*

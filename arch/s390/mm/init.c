@@ -79,13 +79,12 @@ extern unsigned long __init_begin;
 extern unsigned long __init_end;
 
 /*
- * paging_init() sets up the page tables - note that the first 4MB are
- * already mapped by head.S.
- * paging_init will erase this initial mapping
+ * paging_init() sets up the page tables
  */
 
 unsigned long last_valid_pfn;
 
+#ifndef CONFIG_ARCH_S390X
 void __init paging_init(void)
 {
         pgd_t * pg_dir;
@@ -98,12 +97,12 @@ void __init paging_init(void)
         static const int ssm_mask = 0x04000000L;
 
 	/* unmap whole virtual address space */
-
+	
         pg_dir = swapper_pg_dir;
 
 	for (i=0;i<KERNEL_PGD_PTRS;i++) 
 	        pmd_clear((pmd_t*)pg_dir++);
-
+		
 	/*
 	 * map whole physical memory to virtual memory (identity mapping) 
 	 */
@@ -146,13 +145,92 @@ void __init paging_init(void)
 		zones_size[ZONE_DMA] = max_low_pfn;
 		free_area_init(zones_size);
 	}
-
         return;
 }
 
+#else /* CONFIG_ARCH_S390X */
+void __init paging_init(void)
+{
+        pgd_t * pg_dir;
+	pmd_t * pm_dir;
+        pte_t * pt_dir;
+        pte_t   pte;
+	int     i,j,k;
+        unsigned long pfn = 0;
+        unsigned long pgdir_k = (__pa(swapper_pg_dir) & PAGE_MASK) |
+          _KERN_REGION_TABLE;
+	static const int ssm_mask = 0x04000000L;
+
+	unsigned long zones_size[MAX_NR_ZONES] = {0, 0, 0};
+	unsigned long dma_pfn, high_pfn;
+
+	dma_pfn = MAX_DMA_ADDRESS >> PAGE_SHIFT;
+	high_pfn = max_low_pfn;
+
+	if (dma_pfn > high_pfn)
+		zones_size[ZONE_DMA] = high_pfn;
+	else {
+		zones_size[ZONE_DMA] = dma_pfn;
+		zones_size[ZONE_NORMAL] = high_pfn - dma_pfn;
+	}
+
+	/* Initialize mem_map[].  */
+	free_area_init(zones_size);
+
+
+	/*
+	 * map whole physical memory to virtual memory (identity mapping) 
+	 */
+
+        pg_dir = swapper_pg_dir;
+	
+        for (i = 0 ; i < PTRS_PER_PGD ; i++,pg_dir++) {
+	
+                if (pfn >= max_low_pfn) {
+                        pgd_clear(pg_dir);
+                        continue;
+                }          
+        
+	        pm_dir = (pmd_t *) alloc_bootmem_low_pages(PAGE_SIZE*4);
+                pgd_populate(&init_mm, pg_dir, pm_dir);
+
+                for (j = 0 ; j < PTRS_PER_PMD ; j++,pm_dir++) {
+                        if (pfn >= max_low_pfn) {
+                                pmd_clear(pm_dir);
+                                continue; 
+                        }          
+                        
+                        pt_dir = (pte_t *) alloc_bootmem_low_pages(PAGE_SIZE);
+                        pmd_populate_kernel(&init_mm, pm_dir, pt_dir);
+	
+                        for (k = 0 ; k < PTRS_PER_PTE ; k++,pt_dir++) {
+                                pte = pfn_pte(pfn, PAGE_KERNEL);
+                                if (pfn >= max_low_pfn) {
+                                        pte_clear(&pte); 
+                                        continue;
+                                }
+                                set_pte(pt_dir, pte);
+                                pfn++;
+                        }
+                }
+        }
+
+        /* enable virtual mapping in kernel mode */
+        __asm__ __volatile__("lctlg 1,1,%0\n\t"
+                             "lctlg 7,7,%0\n\t"
+                             "lctlg 13,13,%0\n\t"
+                             "ssm   %1"
+			     : :"m" (pgdir_k), "m" (ssm_mask));
+
+        local_flush_tlb();
+
+        return;
+}
+#endif /* CONFIG_ARCH_S390X */
+
 void __init mem_init(void)
 {
-	int codesize, reservedpages, datasize, initsize;
+	unsigned long codesize, reservedpages, datasize, initsize;
 
         max_mapnr = num_physpages = max_low_pfn;
         high_memory = (void *) __va(max_low_pfn * PAGE_SIZE);
@@ -168,7 +246,7 @@ void __init mem_init(void)
 	codesize =  (unsigned long) &_etext - (unsigned long) &_text;
 	datasize =  (unsigned long) &_edata - (unsigned long) &_etext;
 	initsize =  (unsigned long) &__init_end - (unsigned long) &__init_begin;
-        printk("Memory: %luk/%luk available (%dk kernel code, %dk reserved, %dk data, %dk init)\n",
+        printk("Memory: %luk/%luk available (%ldk kernel code, %ldk reserved, %ldk data, %ldk init)\n",
                 (unsigned long) nr_free_pages() << (PAGE_SHIFT-10),
                 max_mapnr << (PAGE_SHIFT-10),
                 codesize >> 10,

@@ -27,6 +27,7 @@
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/module.h>
+#include <linux/kallsyms.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -53,6 +54,7 @@ int sysctl_userprocess_debug = 0;
 
 extern pgm_check_handler_t do_protection_exception;
 extern pgm_check_handler_t do_segment_exception;
+extern pgm_check_handler_t do_region_exception;
 extern pgm_check_handler_t do_page_exception;
 extern pgm_check_handler_t do_pseudo_page_fault;
 #ifdef CONFIG_PFAULT
@@ -62,31 +64,37 @@ extern void pfault_interrupt(struct pt_regs *regs, __u16 error_code);
 static ext_int_info_t ext_int_pfault;
 #endif
 
+#define stack_pointer ({ void **sp; asm("la %0,0(15)" : "=&d" (sp)); sp; })
+
+#ifndef CONFIG_ARCH_S390X
+#define RET_ADDR 56
+#define FOURLONG "%08lx %08lx %08lx %08lx\n"
 static int kstack_depth_to_print = 12;
+
+#else /* CONFIG_ARCH_S390X */
+#define RET_ADDR 112
+#define FOURLONG "%016lx %016lx %016lx %016lx\n"
+static int kstack_depth_to_print = 20;
+
+#endif /* CONFIG_ARCH_S390X */
 
 void show_trace(unsigned long * stack)
 {
 	unsigned long backchain, low_addr, high_addr, ret_addr;
-	int i;
 
 	if (!stack)
-		stack = (unsigned long*)&stack;
+		stack = *stack_pointer;
 
-	printk("Call Trace: ");
+	printk("Call Trace:\n");
 	low_addr = ((unsigned long) stack) & PSW_ADDR_INSN;
 	high_addr = (low_addr & (-THREAD_SIZE)) + THREAD_SIZE;
 	/* Skip the first frame (biased stack) */
 	backchain = *((unsigned long *) low_addr) & PSW_ADDR_INSN;
 	/* Print up to 8 lines */
-	for (i = 0; i < 8; i++) {
-		if (backchain < low_addr || backchain >= high_addr)
-			break;
-		ret_addr = *((unsigned long *) (backchain+56)) & PSW_ADDR_INSN;
-		if (!kernel_text_address(ret_addr))
-			break;
-		if (i && ((i % 6) == 0))
-			printk("\n   ");
-		printk("[<%08lx>] ", ret_addr);
+	while  (backchain > low_addr && backchain <= high_addr) {
+		ret_addr = *((unsigned long *) (backchain+RET_ADDR)) & PSW_ADDR_INSN;
+		printk(" [<%016lx>] ", ret_addr);
+		print_symbol("%s\n", ret_addr);
 		low_addr = backchain;
 		backchain = *((unsigned long *) backchain) & PSW_ADDR_INSN;
 	}
@@ -113,15 +121,15 @@ void show_stack(unsigned long *sp)
 	// back trace for this cpu.
 
 	if(sp == NULL)
-		sp = (unsigned long*) &sp;
+		sp = *stack_pointer;
 
 	stack = sp;
 	for (i = 0; i < kstack_depth_to_print; i++) {
 		if (((addr_t) stack & (THREAD_SIZE-1)) == 0)
 			break;
-		if (i && ((i % 8) == 0))
+		if (i && ((i * sizeof (long) % 32) == 0))
 			printk("\n       ");
-		printk("%08lx ", *stack++);
+		printk("%p ", (void *)*stack++);
 	}
 	printk("\n");
 	show_trace(sp);
@@ -142,17 +150,18 @@ void show_registers(struct pt_regs *regs)
 	int i;
 
 	mode = (regs->psw.mask & PSW_MASK_PSTATE) ? "User" : "Krnl";
-	printk("%s PSW : %08lx %08lx\n",
-	       mode, (unsigned long) regs->psw.mask,
-	       (unsigned long) regs->psw.addr);
-	printk("%s GPRS: %08x %08x %08x %08x\n", mode,
+	printk("%s PSW : %p %p\n",
+	       mode, (void *) regs->psw.mask,
+	       (void *) regs->psw.addr);
+	printk("%s GPRS: " FOURLONG, mode,
 	       regs->gprs[0], regs->gprs[1], regs->gprs[2], regs->gprs[3]);
-	printk("           %08x %08x %08x %08x\n",
+	printk("           " FOURLONG,
 	       regs->gprs[4], regs->gprs[5], regs->gprs[6], regs->gprs[7]);
-	printk("           %08x %08x %08x %08x\n",
+	printk("           " FOURLONG,
 	       regs->gprs[8], regs->gprs[9], regs->gprs[10], regs->gprs[11]);
-	printk("           %08x %08x %08x %08x\n",
+	printk("           " FOURLONG,
 	       regs->gprs[12], regs->gprs[13], regs->gprs[14], regs->gprs[15]);
+
 	printk("%s ACRS: %08x %08x %08x %08x\n", mode,
 	       regs->acrs[0], regs->acrs[1], regs->acrs[2], regs->acrs[3]);
 	printk("           %08x %08x %08x %08x\n",
@@ -191,21 +200,21 @@ char *task_show_regs(struct task_struct *task, char *buffer)
 	struct pt_regs *regs;
 
 	regs = __KSTK_PTREGS(task);
-	buffer += sprintf(buffer, "task: %08lx, ksp: %08x\n",
-			  (unsigned long) task, task->thread.ksp);
-	buffer += sprintf(buffer, "User PSW : %08lx %08lx\n",
-			  (unsigned long) regs->psw.mask, 
-			  (unsigned long) regs->psw.addr);
-	buffer += sprintf(buffer, "User GPRS: %08x %08x %08x %08x\n",
+	buffer += sprintf(buffer, "task: %p, ksp: %p\n",
+		       task, (void *)task->thread.ksp);
+	buffer += sprintf(buffer, "User PSW : %p %p\n",
+		       (void *) regs->psw.mask, (void *)regs->psw.addr);
+
+	buffer += sprintf(buffer, "User GPRS: " FOURLONG,
 			  regs->gprs[0], regs->gprs[1],
 			  regs->gprs[2], regs->gprs[3]);
-	buffer += sprintf(buffer, "           %08x %08x %08x %08x\n",
+	buffer += sprintf(buffer, "           " FOURLONG,
 			  regs->gprs[4], regs->gprs[5],
 			  regs->gprs[6], regs->gprs[7]);
-	buffer += sprintf(buffer, "           %08x %08x %08x %08x\n",
+	buffer += sprintf(buffer, "           " FOURLONG,
 			  regs->gprs[8], regs->gprs[9],
 			  regs->gprs[10], regs->gprs[11]);
-	buffer += sprintf(buffer, "           %08x %08x %08x %08x\n",
+	buffer += sprintf(buffer, "           " FOURLONG,
 			  regs->gprs[12], regs->gprs[13],
 			  regs->gprs[14], regs->gprs[15]);
 	buffer += sprintf(buffer, "User ACRS: %08x %08x %08x %08x\n",
@@ -271,9 +280,9 @@ static void inline do_trap(long interruption_code, int signr, char *str,
 #endif
         } else {
                 const struct exception_table_entry *fixup;
-                fixup = search_exception_tables(regs->psw.addr & 0x7fffffff);
+                fixup = search_exception_tables(regs->psw.addr & PSW_ADDR_INSN);
                 if (fixup)
-                        regs->psw.addr = fixup->fixup | PSW_ADDR_AMODE31;
+                        regs->psw.addr = fixup->fixup | ~PSW_ADDR_INSN;
                 else
                         die(str, regs, interruption_code);
         }
@@ -376,7 +385,7 @@ asmlinkage void illegal_op(struct pt_regs * regs, long interruption_code)
 	__u16 *location;
 	int signal = 0;
 
-	location = (__u16 *)(regs->psw.addr-S390_lowcore.pgm_ilc);
+	location = (__u16 *) get_check_address(regs);
 
 	/*
 	 * We got all needed information from the lowcore and can
@@ -426,7 +435,6 @@ asmlinkage void illegal_op(struct pt_regs * regs, long interruption_code)
 		do_trap(interruption_code, signal,
 			"illegal operation", regs, NULL);
 }
-
 
 
 #ifdef CONFIG_MATHEMU
@@ -606,33 +614,40 @@ void __init trap_init(void)
         pgm_check_table[9] = &divide_exception;
         pgm_check_table[0x10] = &do_segment_exception;
         pgm_check_table[0x11] = &do_page_exception;
+        pgm_check_table[0x10] = &do_segment_exception;
+        pgm_check_table[0x11] = &do_page_exception;
         pgm_check_table[0x12] = &translation_exception;
         pgm_check_table[0x13] = &special_op_exception;
+#ifndef CONFIG_ARCH_S390X
  	pgm_check_table[0x14] = &do_pseudo_page_fault;
+#else /* CONFIG_ARCH_S390X */
+        pgm_check_table[0x38] = &addressing_exception;
+        pgm_check_table[0x3B] = &do_region_exception;
+#endif /* CONFIG_ARCH_S390X */
         pgm_check_table[0x15] = &operand_exception;
         pgm_check_table[0x1C] = &privileged_op;
-#ifdef CONFIG_PFAULT
 	if (MACHINE_IS_VM) {
-		/* request the 0x2603 external interrupt */
-		if (register_early_external_interrupt(0x2603, pfault_interrupt,
-						      &ext_int_pfault) != 0)
-			panic("Couldn't request external interrupt 0x2603");
 		/*
 		 * First try to get pfault pseudo page faults going.
 		 * If this isn't available turn on pagex page faults.
 		 */
-		if (pfault_init() != 0) {
-			/* Tough luck, no pfault. */
-			unregister_early_external_interrupt(0x2603,
-							    pfault_interrupt,
-							    &ext_int_pfault);
-			cpcmd("SET PAGEX ON", NULL, 0);
-		}
-	}
-#else
-	if (MACHINE_IS_VM)
+#ifdef CONFIG_PFAULT
+		/* request the 0x2603 external interrupt */
+		if (register_early_external_interrupt(0x2603, pfault_interrupt,
+						      &ext_int_pfault) != 0)
+			panic("Couldn't request external interrupt 0x2603");
+
+		if (pfault_init() == 0) 
+			return;
+		
+		/* Tough luck, no pfault. */
+		unregister_early_external_interrupt(0x2603, pfault_interrupt,
+						    &ext_int_pfault);
+#endif
+#ifndef CONFIG_ARCH_S390X
 		cpcmd("SET PAGEX ON", NULL, 0);
 #endif
+	}
 }
 
 

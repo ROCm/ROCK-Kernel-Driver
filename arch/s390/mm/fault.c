@@ -31,6 +31,18 @@
 #include <asm/pgtable.h>
 #include <asm/hardirq.h>
 
+#ifndef CONFIG_ARCH_S390X
+#define __FAIL_ADDR_MASK 0x7ffff000
+#define __FIXUP_MASK 0x7fffffff
+#define __SUBCODE_MASK 0x0200
+#define __PF_RES_FIELD 0ULL
+#else /* CONFIG_ARCH_S390X */
+#define __FAIL_ADDR_MASK -4096L
+#define __FIXUP_MASK ~0L
+#define __SUBCODE_MASK 0x0600
+#define __PF_RES_FIELD 0x8000000000000000ULL
+#endif /* CONFIG_ARCH_S390X */
+
 #ifdef CONFIG_SYSCTL
 extern int sysctl_userprocess_debug;
 #endif
@@ -143,6 +155,7 @@ static void force_sigsegv(struct pt_regs *regs, unsigned long error_code,
  *   04       Protection           ->  Write-Protection  (suprression)
  *   10       Segment translation  ->  Not present       (nullification)
  *   11       Page translation     ->  Not present       (nullification)
+ *   3b       Region third trans.  ->  Not present       (nullification)
  */
 extern inline void do_exception(struct pt_regs *regs, unsigned long error_code)
 {
@@ -182,7 +195,7 @@ extern inline void do_exception(struct pt_regs *regs, unsigned long error_code)
          * more specific the segment and page table portion of 
          * the address 
          */
-        address = S390_lowcore.trans_exc_code&0x7ffff000;
+        address = S390_lowcore.trans_exc_code & __FAIL_ADDR_MASK;
 	user_address = check_user_space(regs, error_code);
 
 	/*
@@ -267,9 +280,9 @@ bad_area:
 
 no_context:
         /* Are we prepared to handle this kernel fault?  */
-	fixup = search_exception_tables(regs->psw.addr & 0x7fffffff);
+	fixup = search_exception_tables(regs->psw.addr & __FIXUP_MASK);
 	if (fixup) {
-		regs->psw.addr = fixup->fixup | PSW_ADDR_AMODE31;
+		regs->psw.addr = fixup->fixup | PSW_ADDR_AMODE;
                 return;
         }
 
@@ -279,10 +292,10 @@ no_context:
  */
         if (user_address == 0)
                 printk(KERN_ALERT "Unable to handle kernel pointer dereference"
-        	       " at virtual kernel address %08lx\n", address);
+        	       " at virtual kernel address %p\n", (void *)address);
         else
                 printk(KERN_ALERT "Unable to handle kernel paging request"
-		       " at virtual user address %08lx\n", address);
+		       " at virtual user address %p\n", (void *)address);
 
         die("Oops", regs, error_code);
         do_exit(SIGKILL);
@@ -334,6 +347,16 @@ void do_page_exception(struct pt_regs *regs, unsigned long error_code)
 {
 	do_exception(regs, 0x11);
 }
+
+#ifdef CONFIG_ARCH_S390X
+
+void
+do_region_exception(struct pt_regs *regs, unsigned long error_code)
+{
+	do_exception(regs, 0x3b);
+}
+
+#else /* CONFIG_ARCH_S390X */
 
 typedef struct _pseudo_wait_t {
        struct _pseudo_wait_t *next;
@@ -435,6 +458,7 @@ do_pseudo_page_fault(struct pt_regs *regs, unsigned long error_code)
                 wait_event(wait_struct.queue, wait_struct.resolved);
         }
 }
+#endif /* CONFIG_ARCH_S390X */
 
 #ifdef CONFIG_PFAULT 
 /*
@@ -464,7 +488,8 @@ typedef struct {
 int pfault_init(void)
 {
 	pfault_refbk_t refbk =
-	{ 0x258, 0, 5, 2, __LC_KERNEL_STACK, 1ULL << 48, 1ULL << 48, 0ULL };
+		{ 0x258, 0, 5, 2, __LC_KERNEL_STACK, 1ULL << 48, 1ULL << 48,
+		  __PF_RES_FIELD };
         int rc;
 
 	if (pfault_disable)
@@ -476,7 +501,11 @@ int pfault_init(void)
 		"2:\n"
 		".section __ex_table,\"a\"\n"
 		"   .align 4\n"
+#ifndef CONFIG_ARCH_S390X
 		"   .long  0b,1b\n"
+#else /* CONFIG_ARCH_S390X */
+		"   .quad  0b,1b\n"
+#endif /* CONFIG_ARCH_S390X */
 		".previous"
                 : "=d" (rc) : "a" (&refbk) : "cc" );
         __ctl_set_bit(0, 9);
@@ -496,7 +525,11 @@ void pfault_fini(void)
 		"0:\n"
 		".section __ex_table,\"a\"\n"
 		"   .align 4\n"
+#ifndef CONFIG_ARCH_S390X
 		"   .long  0b,0b\n"
+#else /* CONFIG_ARCH_S390X */
+		"   .quad  0b,0b\n"
+#endif /* CONFIG_ARCH_S390X */
 		".previous"
 		: : "a" (&refbk) : "cc" );
 }
@@ -516,7 +549,7 @@ pfault_interrupt(struct pt_regs *regs, __u16 error_code)
          * external interrupt. 
 	 */
 	subcode = S390_lowcore.cpu_addr;
-	if ((subcode & 0xff00) != 0x0200)
+	if ((subcode & 0xff00) != __SUBCODE_MASK)
 		return;
 
 	/*
@@ -524,7 +557,7 @@ pfault_interrupt(struct pt_regs *regs, __u16 error_code)
 	 */
 	tsk = (struct task_struct *)
 		(*((unsigned long *) __LC_PFAULT_INTPARM) - THREAD_SIZE);
-	
+
 	/*
 	 * We got all needed information from the lowcore and can
 	 * now safely switch on interrupts.

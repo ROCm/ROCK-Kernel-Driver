@@ -3,11 +3,20 @@
  */
 
 #include <asm-generic/vmlinux.lds.h>
+#include <linux/config.h>
 
+#ifndef CONFIG_ARCH_S390X
 OUTPUT_FORMAT("elf32-s390", "elf32-s390", "elf32-s390")
 OUTPUT_ARCH(s390)
 ENTRY(_start)
 jiffies = jiffies_64 + 4;
+#else
+OUTPUT_FORMAT("elf64-s390", "elf64-s390", "elf64-s390")
+OUTPUT_ARCH(s390)
+ENTRY(_start)
+jiffies = jiffies_64;
+#endif
+
 SECTIONS
 {
   . = 0x00000000;
