@@ -25,10 +25,10 @@
 
 /*================ Forward declarations ================*/
 
-static hfs_rwret_t hfs_file_read(struct file *, char *, hfs_rwarg_t,
+static hfs_rwret_t hfs_file_read(struct file *, char __user *, hfs_rwarg_t,
 				 loff_t *);
-static hfs_rwret_t hfs_file_write(struct file *, const char *, hfs_rwarg_t,
-				  loff_t *);
+static hfs_rwret_t hfs_file_write(struct file *, const char __user *,
+				  hfs_rwarg_t, loff_t *);
 static void hfs_file_truncate(struct inode *);
 
 /*================ Global variables ================*/
@@ -139,7 +139,7 @@ int hfs_get_block(struct inode *inode, sector_t iblock, struct buffer_head *bh_r
  * user-space at the address 'buf'.  Returns the number of bytes
  * successfully transferred.  This function checks the arguments, does
  * some setup and then calls hfs_do_read() to do the actual transfer.  */
-static hfs_rwret_t hfs_file_read(struct file * filp, char * buf, 
+static hfs_rwret_t hfs_file_read(struct file *filp, char __user *buf, 
 				 hfs_rwarg_t count, loff_t *ppos)
 {
         struct inode *inode = filp->f_dentry->d_inode;
@@ -181,7 +181,7 @@ static hfs_rwret_t hfs_file_read(struct file * filp, char * buf,
  * 'file->f_pos' from user-space at the address 'buf'.  The return
  * value is the number of bytes actually transferred.
  */
-static hfs_rwret_t hfs_file_write(struct file * filp, const char * buf,
+static hfs_rwret_t hfs_file_write(struct file *filp, const char __user *buf,
 				  hfs_rwarg_t count, loff_t *ppos)
 {
         struct inode    *inode = filp->f_dentry->d_inode;
@@ -242,7 +242,7 @@ static void hfs_file_truncate(struct inode * inode)
  *
  * Like copy_to_user() while translating CR->NL.
  */
-static inline void xlate_to_user(char *buf, const char *data, int count)
+static inline void xlate_to_user(char __user *buf, const char *data, int count)
 {
 	char ch;
 
@@ -257,7 +257,8 @@ static inline void xlate_to_user(char *buf, const char *data, int count)
  *
  * Like copy_from_user() while translating NL->CR;
  */
-static inline int xlate_from_user(char *data, const char *buf, int count)
+static inline
+int xlate_from_user(char *data, const char __user *buf, int count)
 {
 	int i;
 
@@ -290,8 +291,8 @@ static inline int xlate_from_user(char *data, const char *buf, int count)
  * This is based on Linus's minix_file_read().
  * It has been changed to take into account that HFS files have no holes.
  */
-hfs_s32 hfs_do_read(struct inode *inode, struct hfs_fork * fork, hfs_u32 pos,
-		    char * buf, hfs_u32 count)
+hfs_s32 hfs_do_read(struct inode *inode, struct hfs_fork *fork, hfs_u32 pos,
+		    char __user *buf, hfs_u32 count)
 {
 	hfs_s32 size, chars, offset, block, blocks, read = 0;
 	int bhrequest, uptodate;
@@ -436,8 +437,8 @@ hfs_s32 hfs_do_read(struct inode *inode, struct hfs_fork * fork, hfs_u32 pos,
  * 
  * This is just a minor edit of Linus's minix_file_write().
  */
-hfs_s32 hfs_do_write(struct inode *inode, struct hfs_fork * fork, hfs_u32 pos,
-		     const char * buf, hfs_u32 count)
+hfs_s32 hfs_do_write(struct inode *inode, struct hfs_fork *fork, hfs_u32 pos,
+		     const char __user *buf, hfs_u32 count)
 {
 	hfs_s32 written, c;
 	struct buffer_head * bh;
