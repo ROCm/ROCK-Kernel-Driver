@@ -46,7 +46,6 @@
  * SMP-threaded pagemap-LRU 1999, Andrea Arcangeli <andrea@suse.de>
  */
 
-atomic_t page_cache_size = ATOMIC_INIT(0);
 
 /*
  * Lock ordering:
@@ -74,7 +73,7 @@ void __remove_inode_page(struct page *page)
 	page->mapping = NULL;
 
 	mapping->nrpages--;
-	atomic_dec(&page_cache_size);
+	dec_page_state(nr_pagecache);
 }
 
 void remove_inode_page(struct page *page)
@@ -103,7 +102,7 @@ static inline int sync_page(struct page *page)
  */
 void set_page_dirty(struct page *page)
 {
-	if (!test_and_set_bit(PG_dirty, &page->flags)) {
+	if (!TestSetPageDirty(page)) {
 		struct address_space *mapping = page->mapping;
 
 		if (mapping) {
@@ -583,13 +582,13 @@ int filemap_fdatawait(struct address_space * mapping)
 static int __add_to_page_cache(struct page *page,
 		struct address_space *mapping, unsigned long offset)
 {
-	unsigned long flags;
-
 	page_cache_get(page);
 	if (radix_tree_insert(&mapping->page_tree, offset, page) < 0)
 		goto nomem;
-	flags = page->flags & ~(1 << PG_uptodate | 1 << PG_error | 1 << PG_dirty | 1 << PG_referenced | 1 << PG_arch_1 | 1 << PG_checked);
-	page->flags = flags | (1 << PG_locked);
+	page->flags &= ~(1 << PG_uptodate | 1 << PG_error |
+			1 << PG_referenced | 1 << PG_arch_1 | 1 << PG_checked);
+	SetPageLocked(page);
+	ClearPageDirty(page);
 	___add_to_page_cache(page, mapping, offset);
 	return 0;
  nomem:
@@ -714,7 +713,7 @@ void unlock_page(struct page *page)
 	wait_queue_head_t *waitqueue = page_waitqueue(page);
 	clear_bit(PG_launder, &(page)->flags);
 	smp_mb__before_clear_bit();
-	if (!test_and_clear_bit(PG_locked, &(page)->flags))
+	if (!TestClearPageLocked(page))
 		BUG();
 	smp_mb__after_clear_bit(); 
 	if (waitqueue_active(waitqueue))

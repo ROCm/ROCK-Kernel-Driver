@@ -432,7 +432,7 @@ static int shrink_cache(int nr_pages, zone_t * classzone, unsigned int gfp_mask,
 			/*
 			 * It is not critical here to write it only if
 			 * the page is unmapped beause any direct writer
-			 * like O_DIRECT would set the PG_dirty bitflag
+			 * like O_DIRECT would set the page's dirty bitflag
 			 * on the phisical page after having successfully
 			 * pinned it and after the I/O to the page is finished,
 			 * so the direct writes to the page cannot get lost.

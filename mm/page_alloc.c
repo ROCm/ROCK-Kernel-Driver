@@ -111,7 +111,8 @@ static void __free_pages_ok (struct page *page, unsigned int order)
 		BUG();
 	if (PageActive(page))
 		BUG();
-	page->flags &= ~((1<<PG_referenced) | (1<<PG_dirty));
+	ClearPageDirty(page);
+	page->flags &= ~(1<<PG_referenced);
 
 	if (current->flags & PF_FREE_PAGES)
 		goto local_freelist;
@@ -537,6 +538,40 @@ unsigned int nr_free_highpages (void)
 	return pages;
 }
 #endif
+
+/*
+ * Accumulate the page_state information across all CPUs.
+ * The result is unavoidably approximate - it can change
+ * during and after execution of this function.
+ */
+struct page_state page_states[NR_CPUS] __cacheline_aligned;
+EXPORT_SYMBOL(page_states);
+
+void get_page_state(struct page_state *ret)
+{
+	int pcpu;
+
+	ret->nr_dirty = 0;
+	ret->nr_locked = 0;
+	ret->nr_pagecache = 0;
+
+	for (pcpu = 0; pcpu < smp_num_cpus; pcpu++) {
+		struct page_state *ps;
+
+		ps = &page_states[cpu_logical_map(pcpu)];
+		ret->nr_dirty += ps->nr_dirty;
+		ret->nr_locked += ps->nr_locked;
+		ret->nr_pagecache += ps->nr_pagecache;
+	}
+}
+
+unsigned long get_page_cache_size(void)
+{
+	struct page_state ps;
+
+	get_page_state(&ps);
+	return ps.nr_pagecache;
+}
 
 #define K(x) ((x) << (PAGE_SHIFT-10))
 

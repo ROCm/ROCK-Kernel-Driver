@@ -159,10 +159,11 @@ int move_to_swap_cache(struct page *page, swp_entry_t entry)
 
 		/* Add it to the swap cache */
 		*pslot = page;
-		page->flags = ((page->flags & ~(1 << PG_uptodate | 1 << PG_error
-						| 1 << PG_dirty  | 1 << PG_referenced
-						| 1 << PG_arch_1 | 1 << PG_checked))
-			       | (1 << PG_locked));
+		page->flags &= ~(1 << PG_uptodate | 1 << PG_error
+				| 1 << PG_referenced | 1 << PG_arch_1
+				| 1 << PG_checked);
+		SetPageLocked(page);
+		ClearPageDirty(page);
 		___add_to_page_cache(page, &swapper_space, entry.val);
 	}
 
@@ -207,7 +208,7 @@ int move_from_swap_cache(struct page *page, unsigned long index,
 		page->flags &= ~(1 << PG_uptodate | 1 << PG_error |
 				 1 << PG_referenced | 1 << PG_arch_1 |
 				 1 << PG_checked);
-		page->flags |= (1 << PG_dirty);
+		SetPageDirty(page);
 		___add_to_page_cache(page, mapping, index);
 	}
 

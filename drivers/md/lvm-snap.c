@@ -34,6 +34,7 @@
  *                 o pv number is returned in new uint * arg
  *                 o -1 returned on error
  *                 lvm_snapshot_fill_COW_table has a return value too.
+ *    25/02/2002 - s/LockPage/SetPageLocked/ - akpm@zip.com.au
  *
  */
 
@@ -451,7 +452,7 @@ int lvm_snapshot_alloc_iobuf_pages(struct kiobuf * iobuf, int sectors)
 			goto out;
 
 		iobuf->maplist[i] = page;
-		LockPage(page);
+		SetPageLocked(page);
 		iobuf->nr_pages++;
 	}
 	iobuf->offset = 0;

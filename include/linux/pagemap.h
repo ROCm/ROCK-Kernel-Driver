@@ -41,8 +41,6 @@ static inline struct page *page_cache_alloc(struct address_space *x)
  */
 #define page_cache_entry(x)	virt_to_page(x)
 
-extern atomic_t page_cache_size; /* # of pages currently in the page cache */
-
 extern struct page * find_get_page(struct address_space *mapping,
 				unsigned long index);
 extern struct page * find_lock_page(struct address_space *mapping,
@@ -61,6 +59,7 @@ extern int add_to_page_cache(struct page *page,
 		struct address_space *mapping, unsigned long index);
 extern int add_to_page_cache_unique(struct page *page,
 		struct address_space *mapping, unsigned long index);
+
 static inline void ___add_to_page_cache(struct page *page,
 		struct address_space *mapping, unsigned long index)
 {
@@ -69,7 +68,7 @@ static inline void ___add_to_page_cache(struct page *page,
 	page->index = index;
 
 	mapping->nrpages++;
-	atomic_inc(&page_cache_size);
+	inc_page_state(nr_pagecache);
 }
 
 extern void FASTCALL(lock_page(struct page *page));

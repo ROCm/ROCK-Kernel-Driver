@@ -770,7 +770,7 @@ static unsigned long agp_generic_alloc_page(void)
 		return 0;
 
 	get_page(page);
-	LockPage(page);
+	SetPageLocked(page);
 	atomic_inc(&agp_bridge.current_memory_agp);
 	return (unsigned long)page_address(page);
 }
@@ -2744,7 +2744,7 @@ static unsigned long ali_alloc_page(void)
 		return 0;
 
 	get_page(page);
-	LockPage(page);
+	SetPageLocked(page);
 	atomic_inc(&agp_bridge.current_memory_agp);
 
 	global_cache_flush();
