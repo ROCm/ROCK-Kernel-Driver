@@ -261,6 +261,9 @@ scripts/mkdep scripts/split-include : FORCE
 # Generate dependencies
 # ---------------------------------------------------------------------------
 
+# 	In the same pass, generate module versions, that's why it's
+#	all mixed up here.
+
 .PHONY: depend dep $(patsubst %,_sfdep_%,$(SUBDIRS))
 
 depend dep: .hdepend
@@ -276,16 +279,17 @@ depend dep: .hdepend
 	  $(if $(filter dep depend,$(MAKECMDGOALS)),FORCE)
 	scripts/mkdep -- `find $(FINDHPATH) -name SCCS -prune -o -follow -name \*.h ! -name modversions.h -print` > $@
 	@$(MAKE) $(patsubst %,_sfdep_%,$(SUBDIRS))
-ifdef CONFIG_MODVERSIONS
-	@$(MAKE) update-modverfile
-endif
+	@$(MAKE) include/linux/modversions.h
 	@$(MAKE) archdep
 
 $(patsubst %,_sfdep_%,$(SUBDIRS)): FORCE
 	@$(MAKE) -C $(patsubst _sfdep_%, %, $@) fastdep
 
-# update modversions.h, but only if it would change
-update-modverfile:
+ifdef CONFIG_MODVERSIONS
+
+# 	Update modversions.h, but only if it would change.
+
+include/linux/modversions.h: FORCE
 	@(echo "#ifndef _LINUX_MODVERSIONS_H";\
 	  echo "#define _LINUX_MODVERSIONS_H"; \
 	  echo "#include <linux/modsetver.h>"; \
@@ -294,14 +298,21 @@ update-modverfile:
 	    if [ -f $$f ]; then echo "#include <linux/modules/$${f}>"; fi; \
 	  done; \
 	  echo "#endif"; \
-	) > $(TOPDIR)/include/linux/modversions.h.tmp
-	@if [ -r $(TOPDIR)/include/linux/modversions.h ] && cmp -s $(TOPDIR)/include/linux/modversions.h $(TOPDIR)/include/linux/modversions.h.tmp; then \
-		echo $(TOPDIR)/include/linux/modversions.h was not updated; \
-		rm -f $(TOPDIR)/include/linux/modversions.h.tmp; \
+	) > $@.tmp
+	@if [ -r $@ ] && cmp -s $@ $@.tmp; then \
+		echo $@ was not updated; \
+		rm -f $@.tmp; \
 	else \
-		echo $(TOPDIR)/include/linux/modversions.h was updated; \
-		mv -f $(TOPDIR)/include/linux/modversions.h.tmp $(TOPDIR)/include/linux/modversions.h; \
+		echo $@ was updated; \
+		mv -f $@.tmp $@; \
 	fi
+
+else # CONFIG_MODVERSIONS
+
+include/linux/modversions.h:
+	@echo "#include <linux/modsetver.h>" > $@
+
+endif # CONFIG_MODVERSIONS
 
 # ---------------------------------------------------------------------------
 # Modules

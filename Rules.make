@@ -330,11 +330,6 @@ endif # export-objs
 
 $(active-objs): $(TOPDIR)/include/linux/modversions.h
 
-else
-
-$(TOPDIR)/include/linux/modversions.h:
-	@echo "#include <linux/modsetver.h>" > $@
-
 endif # CONFIG_MODVERSIONS
 
 ifneq "$(strip $(export-objs))" ""
@@ -400,4 +395,3 @@ if_changed = $(if $(strip $? \
 		          $(filter-out $($(1)),$(cmd_$(@F)))\
 			  $(filter-out $(cmd_$(@F)),$($(1)))),\
 	       @echo '$($(1))' && $($(1)) && echo 'cmd_$@ := $($(1))' > $(@D)/.$(@F).cmd)
-
