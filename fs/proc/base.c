@@ -1003,8 +1003,7 @@ struct dentry *proc_pid_lookup(struct inode *dir, struct dentry * dentry)
 		ei = PROC_I(inode);
 		inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
 		inode->i_ino = fake_ino(0, PROC_PID_INO);
-		ei->file = NULL;
-		ei->task = NULL;
+		ei->pde = NULL;
 		inode->i_mode = S_IFLNK|S_IRWXUGO;
 		inode->i_uid = inode->i_gid = 0;
 		inode->i_size = 64;
