@@ -454,7 +454,7 @@ extern void init_cpu_timer(void);
 extern int pfault_init(void);
 extern int pfault_token(void);
 
-int __init start_secondary(void *cpuvoid)
+int __devinit start_secondary(void *cpuvoid)
 {
         /* Setup the cpu */
         cpu_init();
@@ -474,7 +474,7 @@ int __init start_secondary(void *cpuvoid)
         return cpu_idle(NULL);
 }
 
-static struct task_struct *__init fork_by_hand(void)
+static struct task_struct *__devinit fork_by_hand(void)
 {
        struct pt_regs regs;
        /* don't care about the psw and regs settings since we'll never

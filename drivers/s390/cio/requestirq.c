@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/requestirq.c
  *   S/390 common I/O routines -- 
- *   $Revision: 1.7 $
+ *   $Revision: 1.12 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *                            IBM Corporation
@@ -122,6 +122,34 @@ s390_request_irq (unsigned int irq,
 					 NULL, irqflags, devname, dev_id);
 }
 
+int
+s390_request_console_irq (int irq,
+			  void (*handler) (int, void *, struct pt_regs *),
+			  unsigned long irqflags,
+			  const char *devname,
+			  void *dev_id)
+{
+	int ret;
+	unsigned long flags;
+
+	s390_device_recognition_irq (irq);
+
+	ret = s390_request_irq_special (irq, (io_handler_func_t) handler,
+					NULL, irqflags, devname, dev_id);
+
+	if (ret)
+		goto out;
+
+	s390irq_spin_lock_irqsave(irq, flags);
+	ret = set_cons_dev(irq);
+	s390irq_spin_unlock_irqrestore(irq, flags);
+
+	if (ret)
+		free_irq(irq, dev_id);
+out:
+	return ret;
+}
+
 /*
  * request_irq wrapper
  */
@@ -151,7 +179,7 @@ s390_free_irq (unsigned int irq, void *dev_id)
 
 	s390irq_spin_lock_irqsave (irq, flags);
 
-	CIO_DEBUG_NOCONS(irq,KERN_DEBUG, printk, 2, 
+	CIO_DEBUG_NOCONS(irq,KERN_DEBUG, DBG, 2, 
 			 "Trying to free IRQ %d\n", 
 			 irq);
 

@@ -637,6 +637,12 @@ int s390_request_irq_special( int                      irq,
                               const char              *devname,
                               void                    *dev_id);
 
+extern int s390_request_console_irq (int irq,
+			  void (*handler) (int, void *, struct pt_regs *),
+			  unsigned long irqflags,
+			  const char *devname,
+			  void *dev_id);
+
 extern int set_cons_dev(int irq);
 extern int wait_cons_dev(int irq);
 extern schib_t *s390_get_schib( int irq );
@@ -860,28 +866,8 @@ typedef struct {
      __u32 vrdccrft : 8;    /* real device feature (output) */
      } __attribute__ ((packed,aligned(4))) diag210_t;
 
-void VM_virtual_device_info( __u16      devno,   /* device number */
-                             senseid_t *ps );    /* ptr to senseID data */
+extern int diag210( diag210_t * addr);
 
-extern __inline__ int diag210( diag210_t * addr)
-{
-        int ccode;
-
-        __asm__ __volatile__(
-#ifdef CONFIG_ARCH_S390X
-                "   sam31\n"
-                "   diag  %1,0,0x210\n"
-                "   sam64\n"
-#else
-                "   diag  %1,0,0x210\n"
-#endif
-                "   ipm   %0\n"
-                "   srl   %0,28"
-                : "=d" (ccode) 
-		: "a" (addr)
-                : "cc" );
-        return ccode;
-}
 extern __inline__ int chsc( chsc_area_t * chsc_area)
 {
 	int cc;

@@ -693,13 +693,12 @@ static int raw3215_startup(raw3215_info *raw)
 
 	if (raw->flags & RAW3215_ACTIVE)
 		return 0;
-	if (request_irq(raw->irq, raw3215_irq, SA_INTERRUPT,
-			"3215 terminal driver", &raw->devstat) != 0)
+	if (s390_request_console_irq(raw->irq, raw3215_irq, SA_INTERRUPT,
+				"3215 terminal driver", &raw->devstat) != 0)
 		return -1;
 	raw->line_pos = 0;
 	raw->flags |= RAW3215_ACTIVE;
 	s390irq_spin_lock_irqsave(raw->irq, flags);
-        set_cons_dev(raw->irq);
 	raw3215_try_io(raw);
 	s390irq_spin_unlock_irqrestore(raw->irq, flags);
 
@@ -1064,12 +1063,27 @@ void __init con3215_init(void)
 	/* Check if 3215 is to be the console */
 	if (!CONSOLE_IS_3215)
 		return;
-	irq = raw3215_find_dev(0);
 
 	/* Set the console mode for VM */
 	if (MACHINE_IS_VM) {
 		cpcmd("TERM CONMODE 3215", NULL, 0);
 		cpcmd("TERM AUTOCR OFF", NULL, 0);
+	}
+
+	if (console_device != -1) {
+		/* use the device number that was specified on the
+		 * command line */
+		irq = raw3215_find_dev(0);
+	} else if (MACHINE_IS_VM) {
+		/* under VM, the console is at device number 0009
+		 * by default, so try that */
+		irq = get_irq_by_devno(0x0009);
+	} else {
+		/* unlike in 2.4, we cannot autoprobe here, since
+		 * the channel subsystem is not fully initialized.
+		 * With some luck, the HWC console can take over */
+		printk(KERN_WARNING "3215 console not found\n");
+		return;
 	}
 
 	/* allocate 3215 request structures */

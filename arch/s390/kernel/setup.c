@@ -78,7 +78,7 @@ static struct resource data_resource = { "Kernel data", 0, 0 };
 /*
  * cpu_init() initializes state that is per-CPU.
  */
-void __init cpu_init (void)
+void __devinit cpu_init (void)
 {
         int nr = smp_processor_id();
         int addr = hard_smp_processor_id();

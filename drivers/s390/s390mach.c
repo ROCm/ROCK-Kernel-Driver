@@ -11,6 +11,7 @@
 #include <linux/spinlock.h>
 #include <linux/init.h>
 #include <linux/slab.h>
+#include <linux/completion.h>
 #ifdef CONFIG_SMP
 #include <linux/smp.h>
 #endif
@@ -51,6 +52,7 @@ static spinlock_t mchchk_queue_lock = SPIN_LOCK_UNLOCKED;
 static spinlock_t crw_queue_lock = SPIN_LOCK_UNLOCKED;
 
 static struct semaphore s_sem;
+static DECLARE_COMPLETION(mchchk_thread_active);
 
 #ifdef CONFIG_MACHCHK_WARNING
 static int mchchk_wng_posted = 0;
@@ -103,14 +105,15 @@ s390_init_machine_check(void)
 	kernel_thread(s390_machine_check_handler, &s_sem,
 		      CLONE_FS | CLONE_FILES);
 
+	wait_for_completion(&mchchk_thread_active);
+
 	ctl_clear_bit(14, 25);	/* disable damage MCH */
 
 	ctl_set_bit(14, 26);	/* enable degradation MCH */
 	ctl_set_bit(14, 27);	/* enable system recovery MCH */
 
-	ctl_set_bit(14, 28);	/* enable channel report MCH */
 
-#ifdef CONFIG_MACHCK_WARNING
+#ifdef CONFIG_MACHCHK_WARNING
 	ctl_set_bit(14, 24);	/* enable warning MCH */
 #endif
 
@@ -126,6 +129,30 @@ s390_init_machine_check(void)
 
 	return;
 }
+
+/*
+ * initialize the machine check handler really early to be able to
+ * catch all machine checks that happen during boot
+ */
+static int __init
+machine_check_init (void)
+{
+	s390_init_machine_check();
+	return 0;
+}
+arch_initcall(machine_check_init);
+
+/*
+ * Machine checks for the channel subsystem must be enabled
+ * after the channel subsystem is initialized
+ */
+static int __init
+machine_check_crw_init (void)
+{
+	ctl_set_bit(14, 28);	/* enable channel report MCH */
+	return 0;
+}
+device_initcall (machine_check_crw_init);
 
 static void
 s390_handle_damage(char *msg)
@@ -243,6 +270,8 @@ s390_machine_check_handler(void *parm)
 	sigfillset(&current->blocked);
 
 	DBG(KERN_NOTICE "mach_handler : ready\n");
+
+	complete(&mchchk_thread_active);
 
 	do {
 
