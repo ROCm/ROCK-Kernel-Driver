@@ -38,7 +38,7 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/i2c.h>
-#include <linux/i2c-proc.h>
+#include <linux/i2c-sensor.h>
 #include <linux/i2c-vid.h>
 #include <asm/io.h>
 
@@ -332,8 +332,7 @@ struct w83781d_data {
 };
 
 static int w83781d_attach_adapter(struct i2c_adapter *adapter);
-static int w83781d_detect(struct i2c_adapter *adapter, int address,
-			  unsigned short flags, int kind);
+static int w83781d_detect(struct i2c_adapter *adapter, int address, int kind);
 static int w83781d_detach_client(struct i2c_client *client);
 
 static int w83781d_read_value(struct i2c_client *client, u16 register);
@@ -1031,8 +1030,7 @@ w83781d_attach_adapter(struct i2c_adapter *adapter)
 }
 
 static int
-w83781d_detect(struct i2c_adapter *adapter, int address,
-	       unsigned short flags, int kind)
+w83781d_detect(struct i2c_adapter *adapter, int address, int kind)
 {
 	int i = 0, val1 = 0, val2, id;
 	struct i2c_client *new_client;

@@ -37,20 +37,6 @@ config SENSORS_LM75
 	  in the lm_sensors package, which you can download at 
 	  http://www.lm-sensors.nu
 	  
-config SENSORS_W83781D
-	tristate "  Winbond W83781D, W83782D, W83783S, W83627HF, Asus AS99127F"
-	depends on I2C && I2C_PROC
-	help
-	  If you say yes here you get support for the Winbond W8378x series
-	  of sensor chips: the W83781D, W83782D, W83783S and W83682HF,
-	  and the similar Asus AS99127F. This
-	  can also be built as a module which can be inserted and removed
-	  while the kernel is running.
-	  
-	  You will also need the latest user-space utilties: you can find them
-	  in the lm_sensors package, which you can download at
-	  http://www.lm-sensors.nu
-
 config SENSORS_VIA686A
 	tristate "  VIA686A"
 	depends on I2C && EXPERIMENTAL
@@ -64,9 +50,23 @@ config SENSORS_VIA686A
 	  in the lm_sensors package, which you can download at
 	  http://www.lm-sensors.nu
 
+config SENSORS_W83781D
+	tristate "  Winbond W83781D, W83782D, W83783S, W83627HF, Asus AS99127F"
+	depends on I2C && EXPERIMENTAL
+	help
+	  If you say yes here you get support for the Winbond W8378x series
+	  of sensor chips: the W83781D, W83782D, W83783S and W83682HF,
+	  and the similar Asus AS99127F. This
+	  can also be built as a module which can be inserted and removed
+	  while the kernel is running.
+	  
+	  You will also need the latest user-space utilties: you can find them
+	  in the lm_sensors package, which you can download at
+	  http://www.lm-sensors.nu
+
 config I2C_SENSOR
 	tristate
-	depends on SENSORS_ADM1021 || SENSORS_LM75 || SENSORS_VIA686A
+	depends on SENSORS_ADM1021 || SENSORS_LM75 || SENSORS_VIA686A || SENSORS_W83781D
 	default m
 
 endmenu

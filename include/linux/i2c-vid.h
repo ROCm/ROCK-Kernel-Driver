@@ -1,6 +1,6 @@
 /*
-    vrm.c - Part of lm_sensors, Linux kernel modules for hardware
-               monitoring
+    i2c-vid.h - Part of lm_sensors, Linux kernel modules for hardware
+                monitoring
     Copyright (c) 2002 Mark D. Studebaker <mdsxyz123@yahoo.com>
     With assistance from Trent Piepho <xyzzy@speakeasy.org>
 
