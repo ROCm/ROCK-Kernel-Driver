@@ -474,11 +474,12 @@ int hidinput_connect(struct hid_device *hid)
 	struct list_head *list;
 	int i, j, k;
 
-	for (i = 0; i < hid->maxapplication; i++)
-		if (IS_INPUT_APPLICATION(hid->application[i]))
+	for (i = 0; i < hid->maxcollection; i++)
+		if (hid->collection[i].type == HID_COLLECTION_APPLICATION &&
+		    IS_INPUT_APPLICATION(hid->collection[i].usage))
 			break;
 
-	if (i == hid->maxapplication)
+	if (i == hid->maxcollection)
 		return -1;
 
 	hid->input.private = hid;

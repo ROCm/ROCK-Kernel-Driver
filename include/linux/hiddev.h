@@ -49,6 +49,13 @@ struct hiddev_devinfo {
 	unsigned num_applications;
 };
 
+struct hiddev_collection_info {
+	unsigned index;
+	unsigned type;
+	unsigned usage;
+	unsigned level;
+};
+
 #define HID_STRING_SIZE 256
 struct hiddev_string_descriptor {
 	int index;
@@ -64,9 +71,9 @@ struct hiddev_report_info {
 /* To do a GUSAGE/SUSAGE, fill in at least usage_code,  report_type and 
  * report_id.  Set report_id to REPORT_ID_UNKNOWN if the rest of the fields 
  * are unknown.  Otherwise use a usage_ref struct filled in from a previous 
- * successful GUSAGE/SUSAGE call to save time.  To actually send a value
- * to the device, perform a SUSAGE first, followed by a SREPORT.  If an
- * INITREPORT is done, a GREPORT isn't necessary before a GUSAGE.
+ * successful GUSAGE call to save time.  To actually send a value to the
+ * device, perform a SUSAGE first, followed by a SREPORT.  An INITREPORT or a
+ * GREPORT isn't necessary for a GUSAGE to return valid data.
  */
 #define HID_REPORT_ID_UNKNOWN 0xffffffff
 #define HID_REPORT_ID_FIRST   0x00000100
@@ -129,7 +136,7 @@ struct hiddev_usage_ref {
  * Protocol version.
  */
 
-#define HID_VERSION		0x010003
+#define HID_VERSION		0x010004
 
 /*
  * IOCTLs (0x00 - 0x7f)
@@ -150,6 +157,8 @@ struct hiddev_usage_ref {
 #define HIDIOCGUCODE		_IOWR('H', 0x0D, struct hiddev_usage_ref)
 #define HIDIOCGFLAG		_IOR('H', 0x0E, int)
 #define HIDIOCSFLAG		_IOW('H', 0x0F, int)
+#define HIDIOCGCOLLECTIONINDEX	_IOW('H', 0x10, struct hiddev_usage_ref)
+#define HIDIOCGCOLLECTIONINFO	_IOWR('H', 0x11, struct hiddev_collection_info)
 
 /* 
  * Flags to be used in HIDIOCSFLAG
@@ -197,7 +206,7 @@ void hiddev_hid_event(struct hid_device *, struct hiddev_usage_ref *ref);
 int __init hiddev_init(void);
 void __exit hiddev_exit(void);
 #else
-static inline void *hiddev_connect(struct hid_device *hid) { return NULL; }
+static inline int hiddev_connect(struct hid_device *hid) { return -1; }
 static inline void hiddev_disconnect(struct hid_device *hid) { }
 static inline void hiddev_event(struct hid_device *hid, unsigned int usage, int value) { }
 static inline int hiddev_init(void) { return 0; }
