@@ -55,6 +55,7 @@ time_t boot_time;
 static u32 current_clientid = 1;
 static u32 current_ownerid = 0;
 static u32 current_fileid = 0;
+static u32 nfs4_init = 0;
 
 /* debug counters */
 u32 list_add_perfile = 0; 
@@ -1158,6 +1159,8 @@ nfs4_state_init(void)
 {
 	int i;
 
+	if (nfs4_init)
+		return;
 	for (i = 0; i < CLIENT_HASH_SIZE; i++) {
 		INIT_LIST_HEAD(&conf_id_hashtbl[i]);
 		INIT_LIST_HEAD(&conf_str_hashtbl[i]);
@@ -1175,6 +1178,7 @@ nfs4_state_init(void)
 	boot_time = get_seconds();
 	INIT_WORK(&laundromat_work,laundromat_main, NULL);
 	schedule_delayed_work(&laundromat_work, NFSD_LEASE_TIME*HZ);
+	nfs4_init = 1;
 
 }
 
@@ -1197,6 +1201,7 @@ __nfs4_state_shutdown(void)
 	release_all_files();
 	cancel_delayed_work(&laundromat_work);
 	flush_scheduled_work();
+	nfs4_init = 0;
 	dprintk("NFSD: list_add_perfile %d list_del_perfile %d\n",
 			list_add_perfile, list_del_perfile);
 	dprintk("NFSD: add_perclient %d del_perclient %d\n",
