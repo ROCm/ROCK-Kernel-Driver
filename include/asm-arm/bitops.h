@@ -277,6 +277,8 @@ extern int _find_next_zero_bit_be(void * p, int size, int offset);
 
 #endif
 
+#if __LINUX_ARM_ARCH__ < 5
+
 /*
  * ffz = Find First Zero in word. Undefined if no zero exists,
  * so code should check against ~0UL first..
@@ -325,6 +327,23 @@ static inline unsigned long __ffs(unsigned long word)
  */
 
 #define ffs(x) generic_ffs(x)
+
+#else
+
+/*
+ * On ARMv5 and above those functions can be implemented around
+ * the clz instruction for much better code efficiency.
+ */
+
+extern __inline__ int generic_fls(int x);
+#define fls(x) \
+	( __builtin_constant_p(x) ? generic_fls(x) : \
+	  ({ int __r; asm("clz%?\t%0, %1" : "=r"(__r) : "r"(x)); 32-__r; }) )
+#define ffs(x) ({ unsigned long __t = (x); fls(__t & -__t); })
+#define __ffs(x) (ffs(x) - 1)
+#define ffz(x) __ffs( ~(x) )
+
+#endif
 
 /*
  * Find first bit set in a 168-bit bitmap, where the first
