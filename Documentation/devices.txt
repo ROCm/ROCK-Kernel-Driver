@@ -86,6 +86,7 @@ Your cooperation is appreciated.
 
   0		Unnamed devices (e.g. non-device mounts)
 		  0 = reserved as null device number
+		See block major 144, 145, 146 for expansion areas.
 
   1 char	Memory devices
 		  1 = /dev/mem		Physical memory access
@@ -226,6 +227,12 @@ Your cooperation is appreciated.
 		number for BSD PTY devices.  As of Linux 2.1.115, this
 		is no longer supported.	 Use major numbers 2 and 3.
 
+  4 block	Aliases for dynamically allocated major devices to be used
+		when its not possible to create the real device nodes
+		because the root filesystem is mounted read-only.
+
+                  0 = /dev/root
+
   5 char	Alternate TTY devices
 		  0 = /dev/tty		Current TTY device
 		  1 = /dev/console	System console
@@ -356,6 +363,7 @@ Your cooperation is appreciated.
 		149 = /dev/input/mouse	Linux/SGI Irix emulation mouse
 		150 = /dev/input/keyboard Linux/SGI Irix emulation keyboard
 		151 = /dev/led		Front panel LEDs
+		152 = /dev/kpoll	Kernel Poll Driver
 		153 = /dev/mergemem	Memory merge device
 		154 = /dev/pmu		Macintosh PowerBook power manager
 		155 = /dev/isictl	MultiTech ISICom serial control
@@ -373,7 +381,7 @@ Your cooperation is appreciated.
 		167 = /dev/specialix_sxctl Specialix serial control
 		168 = /dev/tcldrv	Technology Concepts serial control
 		169 = /dev/specialix_rioctl Specialix RIO serial control
-		170 = /dev/smapi	IBM Thinkpad SMAPI
+		170 = /dev/thinkpad/thinkpad	IBM Thinkpad devices
 		171 = /dev/srripc	QNX4 API IPC manager
 		172 = /dev/usemaclone	Semaphore clone device
 		173 = /dev/ipmikcs	Intelligent Platform Management
@@ -386,7 +394,7 @@ Your cooperation is appreciated.
 		180 = /dev/vrbuttons	Vr41xx button input device
 		181 = /dev/toshiba	Toshiba laptop SMM support
 		182 = /dev/perfctr	Performance-monitoring counters
-		183 = /dev/intel_rng	Intel i8x0 random number generator
+		183 = /dev/hwrng	Generic random number generator
 		184 = /dev/cpu/microcode CPU microcode update interface
 		186 = /dev/atomicps	Atomic shapshot of process state data
 		187 = /dev/irnet	IrNET device
@@ -422,12 +430,20 @@ Your cooperation is appreciated.
 		221 = /dev/mvista/hssdsi	Montavista PICMG hot swap system driver
 		222 = /dev/mvista/hasi		Montavista PICMG high availability
 		223 = /dev/input/uinput		User level driver support for input
-		240-255			Reserved for local use
+		224 = /dev/tpm		TCPA TPM driver
+		225 = /dev/pps		Pulse Per Second driver
+		226 = /dev/systrace	Systrace device
+		227 = /dev/mcelog	X86_64 Machine Check Exception driver
+		240-254			Reserved for local use
+		255			Reserved for MISC_DYNAMIC_MINOR
 
- 11 char	Raw keyboard device
+ 11 char	Raw keyboard device	(Linux/SPARC only)
 		  0 = /dev/kbd		Raw keyboard device
 
-		The raw keyboard device is used on Linux/SPARC only.
+ 11 char	Serial Mux device	(Linux/PA-RISC only)
+		  0 = /dev/ttyB0	First mux port
+		  1 = /dev/ttyB1	Second mux port
+		    ...
 
  11 block	SCSI CD-ROM devices
 		  0 = /dev/scd0		First SCSI CD-ROM
@@ -1143,6 +1159,21 @@ Your cooperation is appreciated.
  64 char	ENskip kernel encryption package
 		  0 = /dev/enskip	Communication with ENskip kernel module
 
+ 64 block	Scramdisk/DriveCrypt encrypted devices
+		  0 = /dev/scramdisk/master    Master node for ioctls
+		  1 = /dev/scramdisk/1         First encrypted device
+		  2 = /dev/scramdisk/2         Second encrypted device
+		  ...
+		255 = /dev/scramdisk/255       255th encrypted device
+
+		The filename of the encrypted container and the passwords
+		are sent via ioctls (using the sdmount tool) to the master
+		node which then activates them via one of the
+		/dev/scramdisk/x nodes for loopback mounting (all handled
+		through the sdmount tool).
+
+		Requested by: andy@scramdisklinux.org
+
  65 char	Sundance "plink" Transputer boards
 		  0 = /dev/plink0	First plink device
 		  1 = /dev/plink1	Second plink device
@@ -1650,6 +1681,12 @@ Your cooperation is appreciated.
 		  1 = /dev/dcxx1	Second capture card
 		    ...
 
+ 94 block	Inverse NAND Flash Translation Layer
+		  0 = /dev/inftla	First INFTL layer
+		 16 = /dev/inftlb	Second INFTL layer
+		    ...
+		240 = /dev/inftlp	16th INTFL layer
+
  95 char	IP filter
 		  0 = /dev/ipl		Filter control device/log file
 		  1 = /dev/ipnat	NAT control device/log file
@@ -1925,7 +1962,68 @@ Your cooperation is appreciated.
 		I/O access to the board, the /dev/isex0 nodes command
 		nodes used to control the board.
 
+114 block       IDE BIOS powered software RAID interfaces such as the
+                Promise Fastrak
+
+                  0 = /dev/ataraid/d0
+                  1 = /dev/ataraid/d0p1
+                  2 = /dev/ataraid/d0p2
+                  ...
+                 16 = /dev/ataraid/d1
+                 17 = /dev/ataraid/d1p1
+                 18 = /dev/ataraid/d1p2
+                  ...
+                255 = /dev/ataraid/d15p15
+
+		Partitions are handled in the same way as for IDE
+		disks (see major number 3) except that the limit on
+		partitions is 15.
+
+115 char	TI link cable devices (115 was formerly the console driver speaker)
+		  0 = /dev/tipar0    Parallel cable on first parallel port
+		  ...
+		  7 = /dev/tipar7    Parallel cable on seventh parallel port
+
+		  8 = /dev/tiser0    Serial cable on first serial port
+		  ...
+		 15 = /dev/tiser7    Serial cable on seventh serial port
+
+		 16 = /dev/tiusb0    First USB cable
+		  ...
+		 47 = /dev/tiusb31   32nd USB cable
+
+115 block       NetWare (NWFS) Devices (0-255)
+
+                The NWFS (NetWare) devices are used to present a
+                collection of NetWare Mirror Groups or NetWare
+                Partitions as a logical storage segment for
+                use in mounting NetWare volumes.  A maximum of
+                256 NetWare volumes can be supported in a single
+                machine.
+
+                http://www.kernel.org/pub/linux/kernel/people/jmerkey/nwfs
+
+                0 = /dev/nwfs/v0    First NetWare (NWFS) Logical Volume
+                1 = /dev/nwfs/v1    Second NetWare (NWFS) Logical Volume
+                2 = /dev/nwfs/v2    Third NetWare (NWFS) Logical Volume
+                      ...
+                255 = /dev/nwfs/v255    Last NetWare (NWFS) Logical Volume
+
 116 char	Advanced Linux Sound Driver (ALSA)
+
+116 block       MicroMemory battery backed RAM adapter (NVRAM)
+                Supports 16 boards, 15 paritions each.
+                Requested by neilb at cse.unsw.edu.au.
+
+		 0 = /dev/umem/d0      Whole of first board
+		 1 = /dev/umem/d0p1    First partition of first board
+		 2 = /dev/umem/d0p2    Second partition of first board
+		15 = /dev/umem/d0p15   15th partition of first board
+
+		16 = /dev/umem/d1      Whole of second board
+		17 = /dev/umem/d1p1    First partition of second board
+		    ...
+		255= /dev/umem/d15p15  15th partition of 16th board.
 
 117 char	COSA/SRP synchronous serial card
 		  0 = /dev/cosa0c0	1st board, 1st channel
@@ -1934,6 +2032,32 @@ Your cooperation is appreciated.
 		 16 = /dev/cosa1c0	2nd board, 1st channel
 		 17 = /dev/cosa1c1	2nd board, 2nd channel
 		    ...
+
+117 block       Enterprise Volume Management System (EVMS)
+
+                The EVMS driver uses a layered, plug-in model to provide
+                unparalleled flexibility and extensibility in managing
+                storage.  This allows for easy expansion or customization
+                of various levels of volume management.  Requested by
+                Mark Peloquin (peloquin at us.ibm.com).
+
+                Note: EVMS populates and manages all the devnodes in
+                /dev/evms.
+
+                http://sf.net/projects/evms
+
+                  0 = /dev/evms/block_device   EVMS block device
+                  1 = /dev/evms/legacyname1    First EVMS legacy device
+                  2 = /dev/evms/legacyname2    Second EVMS legacy device
+                    ...
+                    Both ranges can grow (down or up) until they meet.
+                    ...
+                254 = /dev/evms/EVMSname2      Second EVMS native device
+                255 = /dev/evms/EVMSname1      First EVMS native device
+
+                Note: legacyname(s) are derived from the normal legacy
+                device names.  For example, /dev/hda5 would become
+                /dev/evms/hda5.
 
 118 char	Solidum ???
 		  0 = /dev/solnp0
@@ -1960,6 +2084,102 @@ Your cooperation is appreciated.
 		nodes; instead they should be accessed through the
 		/dev/ptmx cloning interface.
 
+
+128 block       SCSI disk devices (128-143)
+                  0 = /dev/sddy         129th SCSI disk whole disk
+                 16 = /dev/sddz         130th SCSI disk whole disk
+                 32 = /dev/sdea         131th SCSI disk whole disk
+                    ...
+                240 = /dev/sden         144th SCSI disk whole disk
+
+		Partitions are handled in the same way as for IDE
+		disks (see major number 3) except that the limit on
+		partitions is 15.
+
+
+129 block       SCSI disk devices (144-159)
+                  0 = /dev/sdeo         145th SCSI disk whole disk
+                 16 = /dev/sdep         146th SCSI disk whole disk
+                 32 = /dev/sdeq         147th SCSI disk whole disk
+                    ...
+                240 = /dev/sdfd         160th SCSI disk whole disk
+
+		Partitions are handled in the same way as for IDE
+		disks (see major number 3) except that the limit on
+		partitions is 15.
+
+
+130 block       SCSI disk devices (160-175)
+                  0 = /dev/sdfe         161st SCSI disk whole disk
+                 16 = /dev/sdff         162nd SCSI disk whole disk
+                 32 = /dev/sdfg         163rd SCSI disk whole disk
+                    ...
+                240 = /dev/sdft         176th SCSI disk whole disk
+
+		Partitions are handled in the same way as for IDE
+		disks (see major number 3) except that the limit on
+		partitions is 15.
+
+131 block       SCSI disk devices (176-191)
+                  0 = /dev/sdfu         177th SCSI disk whole disk
+                 16 = /dev/sdfv         178th SCSI disk whole disk
+                 32 = /dev/sdfw         179th SCSI disk whole disk
+                    ...
+                240 = /dev/sdgj         192nd SCSI disk whole disk
+
+		Partitions are handled in the same way as for IDE
+		disks (see major number 3) except that the limit on
+		partitions is 15.
+
+
+132 block       SCSI disk devices (192-207)
+                  0 = /dev/sdgk         193rd SCSI disk whole disk
+                 16 = /dev/sdgl         194th SCSI disk whole disk
+                 32 = /dev/sdgm         195th SCSI disk whole disk
+                    ...
+                240 = /dev/sdgz         208th SCSI disk whole disk
+
+		Partitions are handled in the same way as for IDE
+		disks (see major number 3) except that the limit on
+		partitions is 15.
+
+
+133 block       SCSI disk devices (208-223)
+                  0 = /dev/sdha         209th SCSI disk whole disk
+                 16 = /dev/sdhb         210th SCSI disk whole disk
+                 32 = /dev/sdhc         211th SCSI disk whole disk
+                    ...
+                240 = /dev/sdhp         224th SCSI disk whole disk
+
+		Partitions are handled in the same way as for IDE
+		disks (see major number 3) except that the limit on
+		partitions is 15.
+
+
+134 block       SCSI disk devices (224-239)
+                  0 = /dev/sdhq         225th SCSI disk whole disk
+                 16 = /dev/sdhr         226th SCSI disk whole disk
+                 32 = /dev/sdhs         227th SCSI disk whole disk
+                    ...
+                240 = /dev/sdif         240th SCSI disk whole disk
+
+		Partitions are handled in the same way as for IDE
+		disks (see major number 3) except that the limit on
+		partitions is 15.
+
+
+135 block       SCSI disk devices (240-255)
+                  0 = /dev/sdig         241st SCSI disk whole disk
+                 16 = /dev/sdih         242nd SCSI disk whole disk
+                 32 = /dev/sdih         243rd SCSI disk whole disk
+                    ...
+                240 = /dev/sdiv         256th SCSI disk whole disk
+
+		Partitions are handled in the same way as for IDE
+		disks (see major number 3) except that the limit on
+		partitions is 15.
+
+
 136-143 char	Unix98 PTY slaves
 		  0 = /dev/pts/0	First Unix98 pseudo-TTY
 		  1 = /dev/pts/1	Second Unix98 pesudo-TTY
@@ -1972,6 +2192,70 @@ Your cooperation is appreciated.
 		*most* distributions the appropriate options are
 		"mode=0620,gid=<gid of the "tty" group>".)
 
+136 block	Mylex DAC960 PCI RAID controller; ninth controller
+		  0 = /dev/rd/c8d0	First disk, whole disk
+		  8 = /dev/rd/c8d1	Second disk, whole disk
+		    ...
+		248 = /dev/rd/c8d31	32nd disk, whole disk
+
+		Partitions are handled as for major 48.
+
+137 block	Mylex DAC960 PCI RAID controller; tenth controller
+		  0 = /dev/rd/c9d0	First disk, whole disk
+		  8 = /dev/rd/c9d1	Second disk, whole disk
+		    ...
+		248 = /dev/rd/c9d31	32nd disk, whole disk
+
+		Partitions are handled as for major 48.
+
+138 block	Mylex DAC960 PCI RAID controller; eleventh controller
+		  0 = /dev/rd/c10d0	First disk, whole disk
+		  8 = /dev/rd/c10d1	Second disk, whole disk
+		    ...
+		248 = /dev/rd/c10d31	32nd disk, whole disk
+
+		Partitions are handled as for major 48.
+
+139 block	Mylex DAC960 PCI RAID controller; twelfth controller
+		  0 = /dev/rd/c11d0	First disk, whole disk
+		  8 = /dev/rd/c11d1	Second disk, whole disk
+		    ...
+		248 = /dev/rd/c11d31	32nd disk, whole disk
+
+		Partitions are handled as for major 48.
+
+140 block	Mylex DAC960 PCI RAID controller; thirteenth controller
+		  0 = /dev/rd/c12d0	First disk, whole disk
+		  8 = /dev/rd/c12d1	Second disk, whole disk
+		    ...
+		248 = /dev/rd/c12d31	32nd disk, whole disk
+
+		Partitions are handled as for major 48.
+
+141 block	Mylex DAC960 PCI RAID controller; fourteenth controller
+		  0 = /dev/rd/c13d0	First disk, whole disk
+		  8 = /dev/rd/c13d1	Second disk, whole disk
+		    ...
+		248 = /dev/rd/c13d31	32nd disk, whole disk
+
+		Partitions are handled as for major 48.
+
+142 block	Mylex DAC960 PCI RAID controller; fifteenth controller
+		  0 = /dev/rd/c14d0	First disk, whole disk
+		  8 = /dev/rd/c14d1	Second disk, whole disk
+		    ...
+		248 = /dev/rd/c14d31	32nd disk, whole disk
+
+		Partitions are handled as for major 48.
+
+143 block	Mylex DAC960 PCI RAID controller; sixteenth controller
+		  0 = /dev/rd/c15d0	First disk, whole disk
+		  8 = /dev/rd/c15d1	Second disk, whole disk
+		    ...
+		248 = /dev/rd/c15d31	32nd disk, whole disk
+
+		Partitions are handled as for major 48.
+
 144 char	Encapsulated PPP
 		  0 = /dev/pppox0	First PPP over Ethernet
 		    ...
@@ -1981,6 +2265,10 @@ Your cooperation is appreciated.
 
 		The SST 5136-DN DeviceNet interface driver has been
 		relocated to major 183 due to an unfortunate conflict.
+
+144 block	Expansion Area #1 for more non-device (e.g. NFS) mounts
+		  0 = mounted device 256
+		255 = mounted device 511
 
 145 char	SAM9407-based soundcard
 		  0 = /dev/sam0_mixer
@@ -2003,10 +2291,18 @@ Your cooperation is appreciated.
 		addons, which are sam9407 specific.  OSS can be
 		operated simultaneously, taking care of the codec.
 
+145 block	Expansion Area #2 for more non-device (e.g. NFS) mounts
+		  0 = mounted device 512
+		255 = mounted device 767
+
 146 char	SYSTRAM SCRAMNet mirrored-memory network
 		  0 = /dev/scramnet0	First SCRAMNet device
 		  1 = /dev/scramnet1	Second SCRAMNet device
 		    ...
+
+146 block	Expansion Area #3 for more non-device (e.g. NFS) mounts
+		  0 = mounted device 768
+		255 = mounted device 1023
 
 147 char	Aureal Semiconductor Vortex Audio device
 		  0 = /dev/aureal0	First Aureal Vortex
@@ -2032,6 +2328,22 @@ Your cooperation is appreciated.
 		  0 = /dev/dpti0	First DPT I2O adapter
 		  1 = /dev/dpti1	Second DPT I2O adapter
 		    ...
+
+152 char	EtherDrive Control Device
+		  0 = /dev/etherd/ctl	Connect/Disconnect an EtherDrive
+		  1 = /dev/etherd/err	Monitor errors
+		  2 = /dev/etherd/raw	Raw AoE packet monitor
+
+152 block	EtherDrive Block Devices
+		  0 = /dev/etherd/0	EtherDrive 0
+		    ...
+		255 = /dev/etherd/255	EtherDrive 255
+
+153 char	SPI Bus Interface (sometimes referred to as MicroWire)
+		  0 = /dev/spi0		First SPI device on the bus
+		  1 = /dev/spi1		Second SPI device on the bus
+		    ...
+		 15 = /dev/spi15	Sixteenth SPI device on the bus
 
 154 char	Specialix RIO serial card
 		  0 = /dev/ttySR0	First RIO port
@@ -2221,6 +2533,9 @@ Your cooperation is appreciated.
 		    ...
 		 63 = /dev/usb/scanner15 16th USB scanner
 		 64 = /dev/usb/rio500	Diamond Rio 500
+		 65 = /dev/usb/usblcd	USBLCD Interface (info@usblcd.de)
+		 66 = /dev/usb/cpad0	Synaptics cPad (mouse/LCD)
+
 
 181 char	Conrad Electronic parallel port radio clocks
 		  0 = /dev/pcfclock0	First Conrad radio clock
@@ -2341,6 +2656,7 @@ Your cooperation is appreciated.
 		  0 = /dev/vx/rdsk/*/*		First volume
 		  1 = /dev/vx/rdsk/*/*		Second volume
 		    ...
+
 199 block	Veritas volume manager (VxVM) volumes
 		  0 = /dev/vx/dsk/*/*		First volume
 		  1 = /dev/vx/dsk/*/*		Second volume
@@ -2514,6 +2830,26 @@ Your cooperation is appreciated.
 		  0 = /dev/addinum/cpci1500/0	First CPCI1500 card
 		  1 = /dev/addinum/cpci1500/1	Second CPCI1500 card
 		    ...
+
+212 char	LinuxTV.org DVB driver subsystem
+
+		  0 = /dev/dvb/adapter0/video0    first video decoder of first card
+		  1 = /dev/dvb/adapter0/audio0    first audio decoder of first card
+		  2 = /dev/dvb/adapter0/sec0      (obsolete/unused)
+		  3 = /dev/dvb/adapter0/frontend0 first frontend device of first card
+		  4 = /dev/dvb/adapter0/demux0    first demux device of first card
+		  5 = /dev/dvb/adapter0/dvr0      first digital video recoder device of first card
+		  6 = /dev/dvb/adapter0/ca0       first common access port of first card
+		  7 = /dev/dvb/adapter0/net0      first network device of first card
+		  8 = /dev/dvb/adapter0/osd0      first on-screen-display device of first card
+		  9 = /dev/dvb/adapter0/video1    second video decoder of first card
+		    ...
+		 64 = /dev/dvb/adapter1/video0    first video decoder of second card
+		    ...
+		128 = /dev/dvb/adapter2/video0    first video decoder of third card
+		    ...
+		196 = /dev/dvb/adapter3/video0    first video decoder of fourth card
+
 
 216 char	USB BlueTooth devices
 		  0 = /dev/ttyUB0		First USB BlueTooth device
