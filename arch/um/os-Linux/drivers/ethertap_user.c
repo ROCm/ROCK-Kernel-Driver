@@ -216,14 +216,14 @@ static void etap_del_addr(unsigned char *addr, unsigned char *netmask,
 }
 
 struct net_user_info ethertap_user_info = {
-	init:		etap_user_init,
-	open:		etap_open,
-	close:	 	etap_close,
-	remove:	 	NULL,
-	set_mtu:	etap_set_mtu,
-	add_address:	etap_add_addr,
-	delete_address: etap_del_addr,
-	max_packet:	MAX_PACKET - ETH_HEADER_ETHERTAP
+	.init		= etap_user_init,
+	.open		= etap_open,
+	.close	 	= etap_close,
+	.remove	 	= NULL,
+	.set_mtu	= etap_set_mtu,
+	.add_address	= etap_add_addr,
+	.delete_address = etap_del_addr,
+	.max_packet	= MAX_PACKET - ETH_HEADER_ETHERTAP
 };
 
 /*
