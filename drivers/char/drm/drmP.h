@@ -931,7 +931,6 @@ extern void          drm_vbl_send_signals( drm_device_t *dev );
 
 				/* AGP/GART support (drm_agpsupport.h) */
 extern drm_agp_head_t *drm_agp_init(void);
-extern void           drm_agp_uninit(void);
 extern int            drm_agp_acquire(struct inode *inode, struct file *filp,
 				       unsigned int cmd, unsigned long arg);
 extern void           drm_agp_do_release(void);

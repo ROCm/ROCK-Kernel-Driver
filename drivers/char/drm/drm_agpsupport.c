@@ -36,14 +36,6 @@
 
 #if __OS_HAS_AGP
 
-#define DRM_AGP_GET (drm_agp_t *)inter_module_get("drm_agp")
-#define DRM_AGP_PUT inter_module_put("drm_agp")
-
-/**
- * Pointer to the drm_agp_t structure made available by the agpgart module.
- */
-static const drm_agp_t *drm_agp = NULL;
-
 /**
  * AGP information ioctl.
  *
@@ -64,7 +56,7 @@ int drm_agp_info(struct inode *inode, struct file *filp,
 	DRM_AGP_KERN     *kern;
 	drm_agp_info_t   info;
 
-	if (!dev->agp || !dev->agp->acquired || !drm_agp->copy_info)
+	if (!dev->agp || !dev->agp->acquired)
 		return -EINVAL;
 
 	kern                   = &dev->agp->agp_info;
@@ -93,7 +85,7 @@ int drm_agp_info(struct inode *inode, struct file *filp,
  * \return zero on success or a negative number on failure. 
  *
  * Verifies the AGP device hasn't been acquired before and calls
- * drm_agp->acquire().
+ * agp_acquire().
  */
 int drm_agp_acquire(struct inode *inode, struct file *filp,
 		     unsigned int cmd, unsigned long arg)
@@ -106,9 +98,7 @@ int drm_agp_acquire(struct inode *inode, struct file *filp,
 		return -ENODEV;
 	if (dev->agp->acquired)
 		return -EBUSY;
-	if (!drm_agp->acquire)
-		return -EINVAL;
-	if ((retcode = drm_agp->acquire()))
+	if ((retcode = agp_backend_acquire()))
 		return retcode;
 	dev->agp->acquired = 1;
 	return 0;
@@ -123,7 +113,7 @@ int drm_agp_acquire(struct inode *inode, struct file *filp,
  * \param arg user argument.
  * \return zero on success or a negative number on failure.
  *
- * Verifies the AGP device has been acquired and calls drm_agp->release().
+ * Verifies the AGP device has been acquired and calls agp_backend_release().
  */
 int drm_agp_release(struct inode *inode, struct file *filp,
 		     unsigned int cmd, unsigned long arg)
@@ -131,9 +121,9 @@ int drm_agp_release(struct inode *inode, struct file *filp,
 	drm_file_t	 *priv	 = filp->private_data;
 	drm_device_t	 *dev	 = priv->dev;
 
-	if (!dev->agp || !dev->agp->acquired || !drm_agp->release)
+	if (!dev->agp || !dev->agp->acquired)
 		return -EINVAL;
-	drm_agp->release();
+	agp_backend_release();
 	dev->agp->acquired = 0;
 	return 0;
 
@@ -142,12 +132,11 @@ int drm_agp_release(struct inode *inode, struct file *filp,
 /**
  * Release the AGP device.
  *
- * Calls drm_agp->release().
+ * Calls agp_backend_release().
  */
 void drm_agp_do_release(void)
 {
-	if (drm_agp->release)
-		drm_agp->release();
+  agp_backend_release();
 }
 
 /**
@@ -160,7 +149,7 @@ void drm_agp_do_release(void)
  * \return zero on success or a negative number on failure.
  *
  * Verifies the AGP device has been acquired but not enabled, and calls
- * drm_agp->enable().
+ * agp_enable().
  */
 int drm_agp_enable(struct inode *inode, struct file *filp,
 		    unsigned int cmd, unsigned long arg)
@@ -169,14 +158,14 @@ int drm_agp_enable(struct inode *inode, struct file *filp,
 	drm_device_t	 *dev	 = priv->dev;
 	drm_agp_mode_t   mode;
 
-	if (!dev->agp || !dev->agp->acquired || !drm_agp->enable)
+	if (!dev->agp || !dev->agp->acquired)
 		return -EINVAL;
 
 	if (copy_from_user(&mode, (drm_agp_mode_t __user *)arg, sizeof(mode)))
 		return -EFAULT;
 
 	dev->agp->mode    = mode.mode;
-	drm_agp->enable(mode.mode);
+	agp_enable(mode.mode);
 	dev->agp->base    = dev->agp->agp_info.aper_base;
 	dev->agp->enabled = 1;
 	return 0;
@@ -325,7 +314,7 @@ int drm_agp_bind(struct inode *inode, struct file *filp,
 	int               retcode;
 	int               page;
 
-	if (!dev->agp || !dev->agp->acquired || !drm_agp->bind_memory)
+	if (!dev->agp || !dev->agp->acquired)
 		return -EINVAL;
 	if (copy_from_user(&request, (drm_agp_binding_t __user *)arg, sizeof(request)))
 		return -EFAULT;
@@ -391,78 +380,60 @@ int drm_agp_free(struct inode *inode, struct file *filp,
  *
  * \return pointer to a drm_agp_head structure.
  *
- * Gets the drm_agp_t structure which is made available by the agpgart module
- * via the inter_module_* functions. Creates and initializes a drm_agp_head
- * structure.
  */
 drm_agp_head_t *drm_agp_init(void)
 {
 	drm_agp_head_t *head         = NULL;
 
-	drm_agp = DRM_AGP_GET;
-	if (drm_agp) {
-		if (!(head = drm_alloc(sizeof(*head), DRM_MEM_AGPLISTS)))
-			return NULL;
-		memset((void *)head, 0, sizeof(*head));
-		drm_agp->copy_info(&head->agp_info);
-		if (head->agp_info.chipset == NOT_SUPPORTED) {
-			drm_free(head, sizeof(*head), DRM_MEM_AGPLISTS);
-			return NULL;
-		}
-		head->memory = NULL;
-#if LINUX_VERSION_CODE <= 0x020408
-		head->cant_use_aperture = 0;
-		head->page_mask = ~(0xfff);
-#else
-		head->cant_use_aperture = head->agp_info.cant_use_aperture;
-		head->page_mask = head->agp_info.page_mask;
-#endif
+	if (!(head = drm_alloc(sizeof(*head), DRM_MEM_AGPLISTS)))
+		return NULL;
+	memset((void *)head, 0, sizeof(*head));
+	agp_copy_info(&head->agp_info);
+	if (head->agp_info.chipset == NOT_SUPPORTED) {
+		drm_free(head, sizeof(*head), DRM_MEM_AGPLISTS);
+		return NULL;
 	}
+	head->memory = NULL;
+#if LINUX_VERSION_CODE <= 0x020408
+	head->cant_use_aperture = 0;
+	head->page_mask = ~(0xfff);
+#else
+	head->cant_use_aperture = head->agp_info.cant_use_aperture;
+	head->page_mask = head->agp_info.page_mask;
+#endif
+
 	return head;
 }
 
-/**
- * Free the AGP resources.
- *
- * Releases the pointer in ::drm_agp.
- */
-void drm_agp_uninit(void)
-{
-	DRM_AGP_PUT;
-	drm_agp = NULL;
-}
-
-/** Calls drm_agp->allocate_memory() */
+/** Calls agp_allocate_memory() */
 DRM_AGP_MEM *drm_agp_allocate_memory(size_t pages, u32 type)
 {
-	if (!drm_agp->allocate_memory)
-		return NULL;
-	return drm_agp->allocate_memory(pages, type);
+	return agp_allocate_memory(pages, type);
 }
 
-/** Calls drm_agp->free_memory() */
+/** Calls agp_free_memory() */
 int drm_agp_free_memory(DRM_AGP_MEM *handle)
 {
-	if (!handle || !drm_agp->free_memory)
+	if (!handle)
 		return 0;
-	drm_agp->free_memory(handle);
+	agp_free_memory(handle);
 	return 1;
 }
 
-/** Calls drm_agp->bind_memory() */
+/** Calls agp_bind_memory() */
 int drm_agp_bind_memory(DRM_AGP_MEM *handle, off_t start)
 {
-	if (!handle || !drm_agp->bind_memory)
+	if (!handle)
 		return -EINVAL;
-	return drm_agp->bind_memory(handle, start);
+	return agp_bind_memory(handle, start);
 }
 
-/** Calls drm_agp->unbind_memory() */
+/** Calls agp_unbind_memory() */
 int drm_agp_unbind_memory(DRM_AGP_MEM *handle)
 {
-	if (!handle || !drm_agp->unbind_memory)
+	if (!handle)
 		return -EINVAL;
-	return drm_agp->unbind_memory(handle);
+	return agp_unbind_memory(handle);
 }
 
 #endif /* __OS_HAS_AGP */

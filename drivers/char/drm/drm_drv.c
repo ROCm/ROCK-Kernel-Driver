@@ -344,7 +344,6 @@ static void drm_cleanup( drm_device_t *dev )
 	}
 	
 	if (drm_core_has_AGP(dev) && dev->agp ) {
-		drm_agp_uninit();
 		drm_free( dev->agp, sizeof(*dev->agp), DRM_MEM_AGPLISTS );
 		dev->agp = NULL;
 	}
