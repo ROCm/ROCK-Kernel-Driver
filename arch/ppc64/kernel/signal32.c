@@ -421,7 +421,6 @@ badframe:
  *        siginfo32to64
  */
 
-
 /*
  * This code executes after the rt signal handler in 32 bit mode has
  * completed and returned  
@@ -438,6 +437,7 @@ long sys32_rt_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 	sigset_t set; 
 	stack_t st;
 	int i;
+	mm_segment_t old_fs;
 
 	/* Adjust the inputted reg1 to point to the first rt signal frame */
 	rt_sf = (struct rt_sigframe_32 *)(regs->gpr[1] + __SIGNAL_FRAMESIZE32);
@@ -509,10 +509,15 @@ long sys32_rt_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 	regs->dar = 0; 
 	regs->dsisr = 0;
 	regs->result = (u64)(saved_regs[PT_RESULT]) & 0xFFFFFFFF;
-
 	if (copy_from_user(current->thread.fpr, &sr->fp_regs,
 			   sizeof(sr->fp_regs)))
 		goto badframe;
+	/* This function sets back the stack flags into
+	   the current task structure.  */
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	do_sigaltstack(&st, NULL, regs->gpr[1]);
+	set_fs(old_fs);
 
 	ret = regs->result;
 	return ret;
@@ -1040,7 +1045,7 @@ badframe:
  */
 
 int sys32_sigaltstack(u32 newstack, u32 oldstack, int p3,
-		int p4, int p6, int p7, struct pt_regs *regs)
+		      int p4, int p6, int p7, struct pt_regs *regs)
 {
 	stack_t uss, uoss;
 	int ret;
