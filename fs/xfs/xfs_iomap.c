@@ -591,10 +591,11 @@ retry:
 	firstblock = NULLFSBLOCK;
 
 	/*
-	 * roundup the allocation request to m_dalign boundary if file size
-	 * is greater that 512K and we are allocating past the allocation eof
+	 * Roundup the allocation request to a stripe unit (m_dalign) boundary
+	 * if the file size is >= stripe unit size, and we are allocating past
+	 * the allocation eof.
 	 */
-	if (mp->m_dalign && (isize >= mp->m_dalign) && aeof) {
+	if (mp->m_dalign && (isize >= XFS_FSB_TO_B(mp, mp->m_dalign)) && aeof) {
 		int eof;
 		xfs_fileoff_t new_last_fsb;
 		new_last_fsb = roundup_64(last_fsb, mp->m_dalign);
