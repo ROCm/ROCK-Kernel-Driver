@@ -307,10 +307,6 @@ EXPORT_SYMBOL(task_no_data_intr);
 /*
  * Handler for command with PIO data-in phase, READ
  */
-/*
- * FIXME before 2.4 enable ...
- *	DATA integrity issue upon error. <andre@linux-ide.org>
- */
 ide_startstop_t task_in_intr (ide_drive_t *drive)
 {
 	struct request *rq	= HWGROUP(drive)->rq;
@@ -321,18 +317,6 @@ ide_startstop_t task_in_intr (ide_drive_t *drive)
 
 	if (!OK_STAT(stat = hwif->INB(IDE_STATUS_REG),DATA_READY,BAD_R_STAT)) {
 		if (stat & (ERR_STAT|DRQ_STAT)) {
-#if 0
-			DTF("%s: attempting to recover last " \
-				"sector counter status=0x%02x\n",
-				drive->name, stat);
-			/*
-			 * Expect a BUG BOMB if we attempt to rewind the
-			 * offset in the BH aka PAGE in the current BLOCK
-			 * segment.  This is different than the HOST segment.
-			 */
-#endif
-			if (!rq->bio)
-				rq->current_nr_sectors++;
 			return DRIVER(drive)->error(drive, "task_in_intr", stat);
 		}
 		if (!(stat & BUSY_STAT)) {
@@ -348,12 +332,8 @@ ide_startstop_t task_in_intr (ide_drive_t *drive)
 		pBuf, (int) rq->current_nr_sectors, stat);
 	taskfile_input_data(drive, pBuf, SECTOR_WORDS);
 	task_unmap_rq(rq, pBuf, &flags);
-	/*
-	 * FIXME :: We really can not legally get a new page/bh
-	 * regardless, if this is the end of our segment.
-	 * BH walking or segment can only be updated after we have a good
-	 * hwif->INB(IDE_STATUS_REG); return.
-	 */
+
+	/* FIXME: check drive status */
 	if (--rq->current_nr_sectors <= 0)
 		if (!DRIVER(drive)->end_request(drive, 1, 0))
 			return ide_stopped;
@@ -383,16 +363,6 @@ ide_startstop_t task_mulin_intr (ide_drive_t *drive)
 
 	if (!OK_STAT(stat = hwif->INB(IDE_STATUS_REG),DATA_READY,BAD_R_STAT)) {
 		if (stat & (ERR_STAT|DRQ_STAT)) {
-			if (!rq->bio) {
-				rq->current_nr_sectors += drive->mult_count;
-				/*
-				 * NOTE: could rewind beyond beginning :-/
-				 */
-			} else {
-				printk(KERN_ERR "%s: MULTI-READ assume all data " \
-					"transfered is bad status=0x%02x\n",
-					drive->name, stat);
-			}
 			return DRIVER(drive)->error(drive, "task_mulin_intr", stat);
 		}
 		/* no data yet, so wait for another interrupt */
@@ -414,12 +384,8 @@ ide_startstop_t task_mulin_intr (ide_drive_t *drive)
 		rq->errors = 0;
 		rq->current_nr_sectors -= nsect;
 		msect -= nsect;
-		/*
-		 * FIXME :: We really can not legally get a new page/bh
-		 * regardless, if this is the end of our segment.
-		 * BH walking or segment can only be updated after we have a
-		 * good hwif->INB(IDE_STATUS_REG); return.
-		 */
+
+		/* FIXME: check drive status */
 		if (!rq->current_nr_sectors) {
 			if (!DRIVER(drive)->end_request(drive, 1, 0))
 				return ide_stopped;
@@ -473,10 +439,6 @@ ide_startstop_t task_out_intr (ide_drive_t *drive)
 	u8 stat;
 
 	if (!OK_STAT(stat = hwif->INB(IDE_STATUS_REG), DRIVE_READY, drive->bad_wstat)) {
-		DTF("%s: WRITE attempting to recover last " \
-			"sector counter status=0x%02x\n",
-			drive->name, stat);
-		rq->current_nr_sectors++;
 		return DRIVER(drive)->error(drive, "task_out_intr", stat);
 	}
 	/*
@@ -533,9 +495,6 @@ ide_startstop_t pre_task_mulout_intr (ide_drive_t *drive, struct request *rq)
 EXPORT_SYMBOL(pre_task_mulout_intr);
 
 /*
- * FIXME before enabling in 2.4 ... DATA integrity issue upon error.
- */
-/*
  * Handler for command write multiple
  * Called directly from execute_drive_cmd for the first bunch of sectors,
  * afterwards only by the ISR
@@ -557,16 +516,6 @@ ide_startstop_t task_mulout_intr (ide_drive_t *drive)
 	 */
 	if (rq->current_nr_sectors == 0) {
 		if (stat & (ERR_STAT|DRQ_STAT)) {
-			if (!rq->bio) {
-                                rq->current_nr_sectors += drive->mult_count;
-				/*
-				 * NOTE: could rewind beyond beginning :-/
-				 */
-			} else {
-				printk(KERN_ERR "%s: MULTI-WRITE assume all data " \
-					"transfered is bad status=0x%02x\n",
-					drive->name, stat);
-			}
 			return DRIVER(drive)->error(drive, "task_mulout_intr", stat);
 		}
 		if (!rq->bio)
@@ -578,16 +527,6 @@ ide_startstop_t task_mulout_intr (ide_drive_t *drive)
 	 */
 	if (!OK_STAT(stat,DATA_READY,BAD_R_STAT)) {
 		if (stat & (ERR_STAT|DRQ_STAT)) {
-			if (!rq->bio) {
-				rq->current_nr_sectors += drive->mult_count;
-				/*
-				 * NOTE: could rewind beyond beginning :-/
-				 */
-			} else {
-				printk("%s: MULTI-WRITE assume all data " \
-					"transfered is bad status=0x%02x\n",
-					drive->name, stat);
-			}
 			return DRIVER(drive)->error(drive, "task_mulout_intr", stat);
 		}
 		/* no data yet, so wait for another interrupt */
@@ -616,12 +555,8 @@ ide_startstop_t task_mulout_intr (ide_drive_t *drive)
 		taskfile_output_data(drive, pBuf, nsect * SECTOR_WORDS);
 		task_unmap_rq(rq, pBuf, &flags);
 		rq->current_nr_sectors -= nsect;
-		/*
-		 * FIXME :: We really can not legally get a new page/bh
-		 * regardless, if this is the end of our segment.
-		 * BH walking or segment can only be updated after we
-		 * have a good  hwif->INB(IDE_STATUS_REG); return.
-		 */
+
+		/* FIXME: check drive status */
 		if (!rq->current_nr_sectors) {
 			if (!DRIVER(drive)->end_request(drive, 1, 0))
 				if (!rq->bio)
