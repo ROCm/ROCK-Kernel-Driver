@@ -264,8 +264,7 @@ read_kcore(struct file *file, char __user *buffer, size_t buflen, loff_t *fpos)
 	unsigned long start;
 
 	read_lock(&kclist_lock);
-	tsz =  get_kcore_size(&nphdr, &elf_buflen);
-	proc_root_kcore->size = size = tsz + elf_buflen;
+	proc_root_kcore->size = size = get_kcore_size(&nphdr, &elf_buflen);
 	if (buflen == 0 || *fpos >= size) {
 		read_unlock(&kclist_lock);
 		return 0;
