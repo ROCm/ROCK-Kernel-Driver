@@ -152,6 +152,7 @@ struct skb_shared_info {
  *	@sk: Socket we are owned by
  *	@stamp: Time we arrived
  *	@dev: Device we arrived on/are leaving by
+ *      @real_dev: The real device we are using
  *	@h: Transport layer header
  *	@nh: Network layer header
  *	@mac: Link layer header
@@ -179,6 +180,7 @@ struct skb_shared_info {
  *	@nfct: Associated connection, if any
  *	@nf_debug: Netfilter debugging
  *	@nf_bridge: Saved data about a bridged frame - see br_netfilter.c
+ *      @private: Data which is private to the HIPPI implementation
  *	@tc_index: Traffic control index
  */
 

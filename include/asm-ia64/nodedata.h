@@ -8,12 +8,10 @@
  * Copyright (c) 2002 Erich Focht <efocht@ess.nec.de>
  * Copyright (c) 2002 Kimio Suganuma <k-suganuma@da.jp.nec.com>
  */
-
-
 #ifndef _ASM_IA64_NODEDATA_H
 #define _ASM_IA64_NODEDATA_H
 
-
+#include <linux/numa.h>
 #include <asm/mmzone.h>
 
 /*
@@ -24,9 +22,9 @@ struct pglist_data;
 struct ia64_node_data {
 	short			active_cpu_count;
 	short			node;
-        struct pglist_data	*pg_data_ptrs[NR_NODES];
+	struct pglist_data	*pg_data_ptrs[MAX_NUMNODES];
 	struct page		*bank_mem_map_base[NR_BANKS];
-	struct ia64_node_data	*node_data_ptrs[NR_NODES];
+	struct ia64_node_data	*node_data_ptrs[MAX_NUMNODES];
 	short			node_id_map[NR_BANKS];
 };
 

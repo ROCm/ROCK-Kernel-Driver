@@ -14,7 +14,6 @@
 #include <linux/mm.h>
 #include <linux/swap.h>
 #include <linux/bootmem.h>
-#include <linux/mmzone.h>
 #include <linux/acpi.h>
 #include <linux/efi.h>
 #include <asm/pgalloc.h>
@@ -26,10 +25,10 @@
  */
 #define GRANULEROUNDUP(n) (((n)+IA64_GRANULE_SIZE-1) & ~(IA64_GRANULE_SIZE-1))
 
-static struct ia64_node_data	*node_data[NR_NODES];
-static long			boot_pg_data[8*NR_NODES+sizeof(pg_data_t)]  __initdata;
-static pg_data_t		*pg_data_ptr[NR_NODES] __initdata;
-static bootmem_data_t		bdata[NR_NODES][NR_BANKS_PER_NODE+1] __initdata;
+static struct ia64_node_data	*node_data[MAX_NUMNODES];
+static long			boot_pg_data[8*MAX_NUMNODES+sizeof(pg_data_t)]  __initdata;
+static pg_data_t		*pg_data_ptr[MAX_NUMNODES] __initdata;
+static bootmem_data_t		bdata[MAX_NUMNODES][NR_BANKS_PER_NODE+1] __initdata;
 /*
  * Return the compact node number of this cpu. Used prior to
  * setting up the cpu_data area.

@@ -707,8 +707,8 @@ sys32_settimeofday (struct compat_timeval *tv, struct timezone *tz)
 }
 
 struct getdents32_callback {
-	struct linux32_dirent * current_dir;
-	struct linux32_dirent * previous;
+	struct compat_dirent * current_dir;
+	struct compat_dirent * previous;
 	int count;
 	int error;
 };
@@ -722,7 +722,7 @@ static int
 filldir32 (void *__buf, const char *name, int namlen, loff_t offset, ino_t ino,
 	   unsigned int d_type)
 {
-	struct linux32_dirent * dirent;
+	struct compat_dirent * dirent;
 	struct getdents32_callback * buf = (struct getdents32_callback *) __buf;
 	int reclen = ROUND_UP(NAME_OFFSET(dirent) + namlen + 1, 4);
 
@@ -748,10 +748,10 @@ filldir32 (void *__buf, const char *name, int namlen, loff_t offset, ino_t ino,
 }
 
 asmlinkage long
-sys32_getdents (unsigned int fd, struct linux32_dirent *dirent, unsigned int count)
+sys32_getdents (unsigned int fd, struct compat_dirent *dirent, unsigned int count)
 {
 	struct file * file;
-	struct linux32_dirent * lastdirent;
+	struct compat_dirent * lastdirent;
 	struct getdents32_callback buf;
 	int error;
 

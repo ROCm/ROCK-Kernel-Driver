@@ -915,6 +915,8 @@ int unregister_netdevice_notifier(struct notifier_block *nb)
 
 /**
  *	call_netdevice_notifiers - call all network notifier blocks
+ *      @val: value passed unmodified to notifier function
+ *      @v:   pointer passed unmodified to notifier function
  *
  *	Call all network notifier blocks.  Parameters and return value
  *	are as for notifier_call_chain().

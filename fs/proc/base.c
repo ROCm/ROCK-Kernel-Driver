@@ -53,6 +53,7 @@ enum pid_directory_inos {
 	PROC_TGID_EXE,
 	PROC_TGID_FD,
 	PROC_TGID_ENVIRON,
+	PROC_TGID_AUXV,
 	PROC_TGID_CMDLINE,
 	PROC_TGID_STAT,
 	PROC_TGID_STATM,
@@ -75,6 +76,7 @@ enum pid_directory_inos {
 	PROC_TID_EXE,
 	PROC_TID_FD,
 	PROC_TID_ENVIRON,
+	PROC_TID_AUXV,
 	PROC_TID_CMDLINE,
 	PROC_TID_STAT,
 	PROC_TID_STATM,
@@ -104,6 +106,7 @@ static struct pid_entry tgid_base_stuff[] = {
 	E(PROC_TGID_TASK,      "task",    S_IFDIR|S_IRUGO|S_IXUGO),
 	E(PROC_TGID_FD,        "fd",      S_IFDIR|S_IRUSR|S_IXUSR),
 	E(PROC_TGID_ENVIRON,   "environ", S_IFREG|S_IRUSR),
+	E(PROC_TGID_AUXV,      "auxv",	  S_IFREG|S_IRUSR),
 	E(PROC_TGID_STATUS,    "status",  S_IFREG|S_IRUGO),
 	E(PROC_TGID_CMDLINE,   "cmdline", S_IFREG|S_IRUGO),
 	E(PROC_TGID_STAT,      "stat",    S_IFREG|S_IRUGO),
@@ -125,6 +128,7 @@ static struct pid_entry tgid_base_stuff[] = {
 static struct pid_entry tid_base_stuff[] = {
 	E(PROC_TID_FD,         "fd",      S_IFDIR|S_IRUSR|S_IXUSR),
 	E(PROC_TID_ENVIRON,    "environ", S_IFREG|S_IRUSR),
+	E(PROC_TID_AUXV,       "auxv",	  S_IFREG|S_IRUSR),
 	E(PROC_TID_STATUS,     "status",  S_IFREG|S_IRUGO),
 	E(PROC_TID_CMDLINE,    "cmdline", S_IFREG|S_IRUGO),
 	E(PROC_TID_STAT,       "stat",    S_IFREG|S_IRUGO),
@@ -321,6 +325,25 @@ static int proc_pid_cmdline(struct task_struct *task, char * buffer)
 out:
 	return res;
 }
+
+static int proc_pid_auxv(struct task_struct *task, char *buffer)
+{
+	int res = 0;
+	struct mm_struct *mm = get_task_mm(task);
+	if (mm) {
+		unsigned int nwords = 0;
+		do
+			nwords += 2;
+		while (mm->saved_auxv[nwords - 2] != 0); /* AT_NULL */
+		res = nwords * sizeof(mm->saved_auxv[0]);
+		if (res > PAGE_SIZE)
+			res = PAGE_SIZE;
+		memcpy(buffer, mm->saved_auxv, res);
+		mmput(mm);
+	}
+	return res;
+}
+
 
 #ifdef CONFIG_KALLSYMS
 /*
@@ -1270,6 +1293,11 @@ static struct dentry *proc_pident_lookup(struct inode *dir,
 		case PROC_TGID_ENVIRON:
 			inode->i_fop = &proc_info_file_operations;
 			ei->op.proc_read = proc_pid_environ;
+			break;
+		case PROC_TID_AUXV:
+		case PROC_TGID_AUXV:
+			inode->i_fop = &proc_info_file_operations;
+			ei->op.proc_read = proc_pid_auxv;
 			break;
 		case PROC_TID_STATUS:
 		case PROC_TGID_STATUS:

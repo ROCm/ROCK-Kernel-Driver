@@ -138,8 +138,8 @@ void deactivate_super(struct super_block *s)
 EXPORT_SYMBOL(deactivate_super);
 
 /**
- *	grab_super	- acquire an active reference
- *	@s	- reference we are trying to make active
+ *	grab_super - acquire an active reference
+ *	@s: reference we are trying to make active
  *
  *	Tries to acquire an active reference.  grab_super() is used when we
  * 	had just found a superblock in super_blocks or fs_type->fs_supers
@@ -368,8 +368,8 @@ restart:
 }
 
 /**
- *	get_super	-	get the superblock of a device
- *	@dev: device to get the superblock for
+ *	get_super - get the superblock of a device
+ *	@bdev: device to get the superblock for
  *	
  *	Scans the superblock list and finds the superblock of the file system
  *	mounted on the device given. %NULL is returned if no match is found.
@@ -461,10 +461,11 @@ static void mark_files_ro(struct super_block *sb)
 }
 
 /**
- *	do_remount_sb	-	asks filesystem to change mount options.
+ *	do_remount_sb - asks filesystem to change mount options.
  *	@sb:	superblock in question
  *	@flags:	numeric part of options
  *	@data:	the rest of options
+ *      @force: whether or not to force the change
  *
  *	Alters the mount options of a mounted file system.
  */
