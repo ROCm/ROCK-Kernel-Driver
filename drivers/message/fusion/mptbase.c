@@ -223,6 +223,7 @@ static void	mpt_get_fw_exp_ver(char *buf, MPT_ADAPTER *ioc);
 
 //int		mpt_HardResetHandler(MPT_ADAPTER *ioc, int sleepFlag);
 static int	ProcessEventNotification(MPT_ADAPTER *ioc, EventNotificationReply_t *evReply, int *evHandlers);
+static void	mpt_sp_ioc_info(MPT_ADAPTER *ioc, u32 ioc_status, MPT_FRAME_HDR *mf);
 static void	mpt_fc_log_info(MPT_ADAPTER *ioc, u32 log_info);
 static void	mpt_sp_log_info(MPT_ADAPTER *ioc, u32 log_info);
 
@@ -263,6 +264,8 @@ struct _mpt_ioc_proc_list {
  */
 
 static struct pci_device_id mptbase_pci_table[] = {
+	{ PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_LSI_FC909,
+		PCI_ANY_ID, PCI_ANY_ID },
 	{ PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_LSI_FC929,
 		PCI_ANY_ID, PCI_ANY_ID },
 	{ PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_LSI_FC919,
@@ -388,6 +391,12 @@ mpt_interrupt(int irq, void *bus_id, struct pt_regs *r)
 					mpt_fc_log_info(ioc, log_info);
 				else
 					mpt_sp_log_info(ioc, log_info);
+			}
+			if (ioc_stat & MPI_IOCSTATUS_MASK) {
+				if ((int)ioc->chip_type <= (int)FC929)
+						;
+				else
+					mpt_sp_ioc_info(ioc, (u32)ioc_stat, mf);
 			}
 		} else {
 			/*
@@ -1350,6 +1359,10 @@ mptbase_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	}
 
 	ioc->chip_type = FCUNK;
+	if (pdev->device == MPI_MANUFACTPAGE_DEVICEID_FC909) {
+		ioc->chip_type = FC909;
+		ioc->prod_name = "LSIFC909";
+	}
 	if (pdev->device == MPI_MANUFACTPAGE_DEVICEID_FC929) {
 		ioc->chip_type = FC929;
 		ioc->prod_name = "LSIFC929";
@@ -6086,9 +6099,153 @@ mpt_sp_log_info(MPT_ADAPTER *ioc, u32 log_info)
 	case 0x00080000:
 		desc = "Outbound DMA Overrun";
 		break;
+	
+	case 0x00090000:
+		desc = "Task Management";
+		break;
+
+	case 0x000A0000:
+		desc = "Device Problem";
+		break;
+
+	case 0x000B0000:
+		desc = "Invalid Phase Change";
+		break;
+
+	case 0x000C0000:
+		desc = "Untagged Table Size";
+		break;
+	
 	}
 
 	printk(MYIOC_s_INFO_FMT "LogInfo(0x%08x): F/W: %s\n", ioc->name, log_info, desc);
+}
+
+/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+/*
+ *	mpt_sp_ioc_info - IOC information returned from SCSI Parallel IOC.
+ *	@ioc: Pointer to MPT_ADAPTER structure
+ *	@ioc_status: U32 IOCStatus word from IOC
+ *	@mf: Pointer to MPT request frame
+ *
+ *	Refer to lsi/mpi.h.
+ */
+static void
+mpt_sp_ioc_info(MPT_ADAPTER *ioc, u32 ioc_status, MPT_FRAME_HDR *mf)
+{
+	u32 status = ioc_status & MPI_IOCSTATUS_MASK;
+	char *desc = "";
+
+	switch (status) {
+	case MPI_IOCSTATUS_INVALID_FUNCTION: /* 0x0001 */
+		desc = "Invalid Function";
+		break;
+
+	case MPI_IOCSTATUS_BUSY: /* 0x0002 */
+		desc = "Busy";
+		break;
+
+	case MPI_IOCSTATUS_INVALID_SGL: /* 0x0003 */
+		desc = "Invalid SGL";
+		break;
+
+	case MPI_IOCSTATUS_INTERNAL_ERROR: /* 0x0004 */
+		desc = "Internal Error";
+		break;
+
+	case MPI_IOCSTATUS_RESERVED: /* 0x0005 */
+		desc = "Reserved";
+		break;
+
+	case MPI_IOCSTATUS_INSUFFICIENT_RESOURCES: /* 0x0006 */
+		desc = "Insufficient Resources";
+		break;
+
+	case MPI_IOCSTATUS_INVALID_FIELD: /* 0x0007 */
+		desc = "Invalid Field";
+		break;
+
+	case MPI_IOCSTATUS_INVALID_STATE: /* 0x0008 */
+		desc = "Invalid State";
+		break;
+
+	case MPI_IOCSTATUS_CONFIG_INVALID_ACTION: /* 0x0020 */
+	case MPI_IOCSTATUS_CONFIG_INVALID_TYPE:   /* 0x0021 */
+	case MPI_IOCSTATUS_CONFIG_INVALID_PAGE:   /* 0x0022 */
+	case MPI_IOCSTATUS_CONFIG_INVALID_DATA:   /* 0x0023 */
+	case MPI_IOCSTATUS_CONFIG_NO_DEFAULTS:    /* 0x0024 */
+	case MPI_IOCSTATUS_CONFIG_CANT_COMMIT:    /* 0x0025 */
+		/* No message for Config IOCStatus values */
+		break;
+
+	case MPI_IOCSTATUS_SCSI_RECOVERED_ERROR: /* 0x0040 */
+		/* No message for recovered error
+		desc = "SCSI Recovered Error";
+		*/
+		break;
+
+	case MPI_IOCSTATUS_SCSI_INVALID_BUS: /* 0x0041 */
+		desc = "SCSI Invalid Bus";
+		break;
+
+	case MPI_IOCSTATUS_SCSI_INVALID_TARGETID: /* 0x0042 */
+		desc = "SCSI Invalid TargetID";
+		break;
+
+	case MPI_IOCSTATUS_SCSI_DEVICE_NOT_THERE: /* 0x0043 */
+	  {
+		SCSIIORequest_t *pScsiReq = (SCSIIORequest_t *) mf;
+		U8 cdb = pScsiReq->CDB[0];
+		if (cdb != 0x12) { /* Inquiry is issued for device scanning */
+			desc = "SCSI Device Not There";
+		}
+		break;
+	  }
+
+	case MPI_IOCSTATUS_SCSI_DATA_OVERRUN: /* 0x0044 */
+		desc = "SCSI Data Overrun";
+		break;
+
+	case MPI_IOCSTATUS_SCSI_DATA_UNDERRUN: /* 0x0045 */
+		/* This error is checked in scsi_io_done(). Skip. 
+		desc = "SCSI Data Underrun";
+		*/
+		break;
+
+	case MPI_IOCSTATUS_SCSI_IO_DATA_ERROR: /* 0x0046 */
+		desc = "SCSI I/O Data Error";
+		break;
+
+	case MPI_IOCSTATUS_SCSI_PROTOCOL_ERROR: /* 0x0047 */
+		desc = "SCSI Protocol Error";
+		break;
+
+	case MPI_IOCSTATUS_SCSI_TASK_TERMINATED: /* 0x0048 */
+		desc = "SCSI Task Terminated";
+		break;
+
+	case MPI_IOCSTATUS_SCSI_RESIDUAL_MISMATCH: /* 0x0049 */
+		desc = "SCSI Residual Mismatch";
+		break;
+
+	case MPI_IOCSTATUS_SCSI_TASK_MGMT_FAILED: /* 0x004A */
+		desc = "SCSI Task Management Failed";
+		break;
+
+	case MPI_IOCSTATUS_SCSI_IOC_TERMINATED: /* 0x004B */
+		desc = "SCSI IOC Terminated";
+		break;
+
+	case MPI_IOCSTATUS_SCSI_EXT_TERMINATED: /* 0x004C */
+		desc = "SCSI Ext Terminated";
+		break;
+
+	default:
+		desc = "Others";
+		break;
+	}
+	if (desc != "")
+		printk(MYIOC_s_INFO_FMT "IOCStatus(0x%04x): %s\n", ioc->name, status, desc);
 }
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
