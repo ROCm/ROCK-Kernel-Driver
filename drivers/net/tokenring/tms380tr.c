@@ -95,6 +95,7 @@ static const char version[] = "tms380tr.c: v1.10 30/12/2002 by Christoph Goos, A
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <linux/trdevice.h>
+#include <linux/firmware.h>
 
 #include <asm/system.h>
 #include <asm/bitops.h>
@@ -104,7 +105,6 @@ static const char version[] = "tms380tr.c: v1.10 30/12/2002 by Christoph Goos, A
 #include <asm/uaccess.h>
 
 #include "tms380tr.h"		/* Our Stuff */
-#include "tms380tr_microcode.h"	/* TI microcode for COMMprocessor */
 
 /* Use 0 for production, 1 for verification, 2 for debug, and
  * 3 for very verbose debug.
@@ -113,6 +113,8 @@ static const char version[] = "tms380tr.c: v1.10 30/12/2002 by Christoph Goos, A
 #define TMS380TR_DEBUG 0
 #endif
 static unsigned int tms380tr_debug = TMS380TR_DEBUG;
+
+static struct device tms_device;
 
 /* Index to functions, as function prototypes.
  * Alphabetical by function name.
@@ -1274,8 +1276,20 @@ static void tms380tr_exec_sifcmd(struct net_device *dev, unsigned int WriteValue
 static int tms380tr_reset_adapter(struct net_device *dev)
 {
 	struct net_local *tp = (struct net_local *)dev->priv;
-	unsigned short *fw_ptr = (unsigned short *)&tms380tr_code;
-	unsigned short count, c;
+	unsigned short *fw_ptr;
+	unsigned short count, c, count2;
+	const struct firmware *fw_entry = NULL;
+
+	strncpy(tms_device.bus_id,dev->name, BUS_ID_SIZE);
+
+	if (request_firmware(&fw_entry, "tms380tr.bin", &tms_device) != 0) {
+		printk(KERN_ALERT "%s: firmware %s is missing, cannot start.\n",
+			dev->name, "tms380tr.bin");
+		return (-1);
+	}
+
+	fw_ptr = (unsigned short *)fw_entry->data;
+	count2 = fw_entry->size / 2;
 
 	/* Hardware adapter reset */
 	SIFWRITEW(ACL_ARESET, SIFACL);
@@ -1302,23 +1316,31 @@ static int tms380tr_reset_adapter(struct net_device *dev)
 	SIFWRITEW(c, SIFACL);
 	tms380tr_wait(40);
 
+	count = 0;
 	/* Download firmware via DIO interface: */
 	do {
+		if (count2 < 3) continue;
+
 		/* Download first address part */
 		SIFWRITEW(*fw_ptr, SIFADX);
 		fw_ptr++;
-
+		count2--;
 		/* Download second address part */
 		SIFWRITEW(*fw_ptr, SIFADD);
 		fw_ptr++;
+		count2--;
 
 		if((count = *fw_ptr) != 0)	/* Load loop counter */
 		{
 			fw_ptr++;	/* Download block data */
+			count2--;
+			if (count > count2) continue;
+
 			for(; count > 0; count--)
 			{
 				SIFWRITEW(*fw_ptr, SIFINC);
 				fw_ptr++;
+				count2--;
 			}
 		}
 		else	/* Stop, if last block downloaded */
@@ -1328,10 +1350,14 @@ static int tms380tr_reset_adapter(struct net_device *dev)
 
 			/* Clear CPHALT and start BUD */
 			SIFWRITEW(c, SIFACL);
+			if (fw_entry)
+				release_firmware(fw_entry);
 			return (1);
 		}
 	} while(count == 0);
 
+	if (fw_entry)
+		release_firmware(fw_entry);
 	printk(KERN_INFO "%s: Adapter Download Failed\n", dev->name);
 	return (-1);
 }
