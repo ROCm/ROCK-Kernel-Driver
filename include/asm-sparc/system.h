@@ -123,7 +123,7 @@ extern void fpsave(unsigned long *fpregs, unsigned long *fsr,
 	"save %sp, -0x40, %sp\n\t" \
 	"restore; restore; restore; restore; restore; restore; restore"); \
 } while(0)
-#define finish_arch_switch(rq, next)	do{ }while(0)
+#define finish_arch_switch(rq, next)	spin_unlock_irq(&(rq)->lock)
 #define task_running(rq, p)		((rq)->curr == (p))
 
 	/* Much care has gone into this code, do not touch it.
@@ -195,21 +195,6 @@ extern __inline__ void setipl(unsigned long __orig_psr)
 		: "memory", "cc");
 }
 
-extern __inline__ void local_irq_disable(void)
-{
-	unsigned long tmp;
-
-	__asm__ __volatile__(
-		"rd	%%psr, %0\n\t"
-		"nop; nop; nop;\n\t"	/* Sun4m + Cypress + SMP bug */
-		"or	%0, %1, %0\n\t"
-		"wr	%0, 0x0, %%psr\n\t"
-		"nop; nop; nop\n"
-		: "=r" (tmp)
-		: "i" (PSR_PIL)
-		: "memory");
-}
-
 extern __inline__ void local_irq_enable(void)
 {
 	unsigned long tmp;
@@ -233,6 +218,7 @@ extern __inline__ unsigned long getipl(void)
 	return retval;
 }
 
+#if 0 /* not used */
 extern __inline__ unsigned long swap_pil(unsigned long __new_psr)
 {
 	unsigned long retval;
@@ -254,6 +240,7 @@ extern __inline__ unsigned long swap_pil(unsigned long __new_psr)
 
 	return retval;
 }
+#endif
 
 extern __inline__ unsigned long read_psr_and_cli(void)
 {
@@ -275,15 +262,9 @@ extern __inline__ unsigned long read_psr_and_cli(void)
 #define local_save_flags(flags)	((flags) = getipl())
 #define local_irq_save(flags)	((flags) = read_psr_and_cli())
 #define local_irq_restore(flags)	setipl((flags))
+#define local_irq_disable()	((void) read_psr_and_cli())
 
-/* On sparc32 IRQ flags are the PSR register in the PSR_PIL
- * field.
- */
-#define irqs_disabled()		\
-({	unsigned long flags;	\
-	local_save_flags(flags);\
-	(flags & PSR_PIL) != 0;	\
-})
+#define irqs_disabled()		((getipl() & PSR_PIL) != 0)
 
 #ifdef CONFIG_SMP
 
