@@ -354,6 +354,19 @@ static void cdrom_sysctl_register(void);
 #endif /* CONFIG_SYSCTL */ 
 static struct cdrom_device_info *topCdromPtr;
 
+static int cdrom_dummy_generic_packet(struct cdrom_device_info *cdi,
+				      struct packet_command *cgc)
+{
+	if (cgc->sense) {
+		cgc->sense->sense_key = 0x05;
+		cgc->sense->asc = 0x20;
+		cgc->sense->ascq = 0x00;
+	}
+
+	cgc->stat = -EIO;
+	return -EIO;
+}
+
 /* This macro makes sure we don't have to check on cdrom_device_ops
  * existence in the run-time routines below. Change_capability is a
  * hack to have the capability flags defined const, while we can still
@@ -410,6 +423,9 @@ int register_cdrom(struct cdrom_device_info *cdi)
 		cdi->cdda_method = CDDA_BPC_FULL;
 	else
 		cdi->cdda_method = CDDA_OLD;
+
+	if (!cdo->generic_packet)
+		cdo->generic_packet = cdrom_dummy_generic_packet;
 
 	cdinfo(CD_REG_UNREG, "drive \"/dev/%s\" registered\n", cdi->name);
 	spin_lock(&cdrom_lock);

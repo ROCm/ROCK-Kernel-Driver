@@ -215,7 +215,7 @@ config MSCHUNKS
 
 config PPC_RTAS
 	bool "Proc interface to RTAS"
-	depends on !PPC_ISERIES
+	depends on PPC_PSERIES
 
 config RTAS_FLASH
 	tristate "Firmware flash interface"
@@ -227,6 +227,7 @@ config SCANLOG
 
 config LPARCFG
 	tristate "LPAR Configuration Data"
+	depends on PPC_PSERIES || PPC_ISERIES
 	help
 	Provide system capacity information via human readable
 	<key word>=<value> pairs through a /proc/ppc64/lparcfg interface.
@@ -273,7 +274,7 @@ source "drivers/pci/Kconfig"
 
 config HOTPLUG_CPU
 	bool "Support for hot-pluggable CPUs"
-	depends on SMP && HOTPLUG && EXPERIMENTAL
+	depends on SMP && HOTPLUG && EXPERIMENTAL && PPC_PSERIES
 	---help---
 	  Say Y here to be able to turn CPUs off and on.
 
