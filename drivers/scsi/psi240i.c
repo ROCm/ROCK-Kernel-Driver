@@ -367,7 +367,7 @@ irqerror:;
 	SCpnt->result = DecodeError (shost, status);
 	SCpnt->scsi_done (SCpnt);
 	}
-static void do_Irq_Handler (int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t do_Irq_Handler (int irq, void *dev_id, struct pt_regs *regs)
 	{
 	unsigned long flags;
 	struct Scsi_Host *dev = dev_id;
@@ -375,6 +375,8 @@ static void do_Irq_Handler (int irq, void *dev_id, struct pt_regs *regs)
 	spin_lock_irqsave(dev->host_lock, flags);
 	Irq_Handler(irq, dev_id, regs);
 	spin_unlock_irqrestore(dev->host_lock, flags);
+	/* FIXME: we should check to see if this is true */
+	return IRQ_HANDLED;
 	}
 /****************************************************************
  *	Name:	Psi240i_QueueCommand
