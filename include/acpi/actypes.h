@@ -880,7 +880,8 @@ struct acpi_device_info
 {
 	ACPI_COMMON_OBJ_INFO;
 
-	u32                                 valid;              /* Indicates which fields are valid */
+	u8                                  highest_dstates[4]; /* _sx_d values 0xFF indicates not valid */
+	u32                                 valid;              /* Indicates which fields below are valid */
 	u32                                 current_status;     /* _STA value */
 	acpi_integer                        address;            /* _ADR value if any */
 	struct acpi_device_id               hardware_id;        /* _HID value if any */
