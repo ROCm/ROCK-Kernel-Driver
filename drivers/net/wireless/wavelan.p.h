@@ -351,6 +351,12 @@
  *		o got rid of wavelan_ioctl()
  *		o use a bunch of iw_handler instead
  *
+ * Changes made for release in 2.5.35 :
+ * ----------------------------------
+ *	- Set dev->trans_start to avoid filling the logs
+ *	- Handle better spurious/bogus interrupt
+ *	- Avoid deadlocks in mmc_out()/mmc_in()
+ *
  * Wishes & dreams:
  * ----------------
  *	- roaming (see Pcmcia driver)
