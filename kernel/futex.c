@@ -31,6 +31,7 @@
 #include <linux/init.h>
 #include <linux/fs.h>
 #include <linux/futex.h>
+#include <linux/vcache.h>
 #include <linux/highmem.h>
 #include <linux/time.h>
 #include <linux/pagemap.h>
@@ -38,7 +39,6 @@
 #include <linux/poll.h>
 #include <linux/file.h>
 #include <linux/dcache.h>
-#include <asm/uaccess.h>
 
 /* Simple "sleep if unchanged" interface. */
 
@@ -55,9 +55,14 @@ static struct vfsmount *futex_mnt;
 struct futex_q {
 	struct list_head list;
 	wait_queue_head_t waiters;
+
 	/* Page struct and offset within it. */
 	struct page *page;
 	unsigned int offset;
+
+	/* the virtual => physical cache */
+	vcache_t vcache;
+
 	/* For fd, sigio sent using these. */
 	int fd;
 	struct file *filp;
@@ -85,21 +90,43 @@ static inline void tell_waiter(struct futex_q *q)
 		send_sigio(&q->filp->f_owner, q->fd, POLL_IN);
 }
 
+/* Get kernel address of the user page and pin it. */
+static struct page *pin_page(unsigned long page_start)
+{
+	struct mm_struct *mm = current->mm;
+	struct page *page = NULL;
+	int err;
+
+	down_read(&mm->mmap_sem);
+
+	err = get_user_pages(current, mm, page_start,
+			     1 /* one page */,
+			     0 /* not writable */,
+			     0 /* don't force */,
+			     &page,
+			     NULL /* don't return vmas */);
+	up_read(&mm->mmap_sem);
+	if (err < 0)
+		return ERR_PTR(err);
+	return page;
+}
+
 static inline void unpin_page(struct page *page)
 {
-	/* Avoid releasing the page which is on the LRU list.  I don't
-           know if this is correct, but it stops the BUG() in
-           __free_pages_ok(). */
 	page_cache_release(page);
 }
 
-static int futex_wake(struct list_head *head,
-		      struct page *page,
-		      unsigned int offset,
-		      int num)
+static int futex_wake(unsigned long uaddr, unsigned int offset, int num)
 {
-	struct list_head *i, *next;
-	int num_woken = 0;
+	struct list_head *i, *next, *head;
+	struct page *page;
+	int ret;
+
+	page = pin_page(uaddr - offset);
+	ret = IS_ERR(page);
+	if (ret)
+		goto out;
+	head = hash_futex(page, offset);
 
 	spin_lock(&futex_lock);
 	list_for_each_safe(i, next, head) {
@@ -108,36 +135,81 @@ static int futex_wake(struct list_head *head,
 		if (this->page == page && this->offset == offset) {
 			list_del_init(i);
 			tell_waiter(this);
-			num_woken++;
-			if (num_woken >= num) break;
+			ret++;
+			if (ret >= num)
+				break;
 		}
 	}
 	spin_unlock(&futex_lock);
-	return num_woken;
+	unpin_page(page);
+out:
+	return ret;
+}
+
+static void futex_vcache_callback(vcache_t *vcache, struct page *new_page)
+{
+	struct futex_q *q = container_of(vcache, struct futex_q, vcache);
+	struct list_head *head = hash_futex(new_page, q->offset);
+
+	BUG_ON(list_empty(&q->list));
+
+	spin_lock(&futex_lock);
+
+	q->page = new_page;
+	list_del_init(&q->list);
+	list_add_tail(&q->list, head);
+
+	spin_unlock(&futex_lock);
 }
 
 /* Add at end to avoid starvation */
-static inline void queue_me(struct list_head *head,
+static inline int queue_me(struct list_head *head,
 			    struct futex_q *q,
 			    struct page *page,
 			    unsigned int offset,
 			    int fd,
-			    struct file *filp)
+			    struct file *filp,
+			    unsigned long uaddr)
 {
-	q->page = page;
+	struct page *tmp;
+	int ret = 0;
+
 	q->offset = offset;
 	q->fd = fd;
 	q->filp = filp;
 
+	spin_lock(&vcache_lock);
 	spin_lock(&futex_lock);
-	list_add_tail(&q->list, head);
+	spin_lock(&current->mm->page_table_lock);
+
+	/*
+	 * Has the mapping changed meanwhile?
+	 */
+	tmp = follow_page(current->mm, uaddr, 0);
+
+	if (tmp == page) {
+		q->page = page;
+		list_add_tail(&q->list, head);
+		/*
+		 * We register a futex callback to this virtual address,
+		 * to make sure a COW properly rehashes the futex-queue.
+		 */
+		__attach_vcache(&q->vcache, uaddr, current->mm, futex_vcache_callback);
+	} else
+		ret = 1;
+
+	spin_unlock(&current->mm->page_table_lock);
 	spin_unlock(&futex_lock);
+	spin_unlock(&vcache_lock);
+
+	return ret;
 }
 
 /* Return 1 if we were still queued (ie. 0 means we were woken) */
 static inline int unqueue_me(struct futex_q *q)
 {
 	int ret = 0;
+
 	spin_lock(&futex_lock);
 	if (!list_empty(&q->list)) {
 		list_del(&q->list);
@@ -147,46 +219,34 @@ static inline int unqueue_me(struct futex_q *q)
 	return ret;
 }
 
-/* Get kernel address of the user page and pin it. */
-static struct page *pin_page(unsigned long page_start)
-{
-	struct mm_struct *mm = current->mm;
-	struct page *page;
-	int err;
-
-	down_read(&mm->mmap_sem);
-	err = get_user_pages(current, mm, page_start,
-			     1 /* one page */,
-			     0 /* writable not important */,
-			     0 /* don't force */,
-			     &page,
-			     NULL /* don't return vmas */);
-	up_read(&mm->mmap_sem);
-
-	if (err < 0)
-		return ERR_PTR(err);
-	return page;
-}
-
-static int futex_wait(struct list_head *head,
-		      struct page *page,
+static int futex_wait(unsigned long uaddr,
 		      int offset,
 		      int val,
-		      int *uaddr,
 		      unsigned long time)
 {
-	int curval;
-	struct futex_q q;
 	DECLARE_WAITQUEUE(wait, current);
-	int ret = 0;
+	struct list_head *head;
+	int ret = 0, curval;
+	struct page *page;
+	struct futex_q q;
+
+repeat_lookup:
+	page = pin_page(uaddr - offset);
+	ret = IS_ERR(page);
+	if (ret)
+		goto out;
+	head = hash_futex(page, offset);
 
 	set_current_state(TASK_INTERRUPTIBLE);
 	init_waitqueue_head(&q.waiters);
 	add_wait_queue(&q.waiters, &wait);
-	queue_me(head, &q, page, offset, -1, NULL);
+	if (queue_me(head, &q, page, offset, -1, NULL, uaddr)) {
+		unpin_page(page);
+		goto repeat_lookup;
+	}
 
 	/* Page is pinned, but may no longer be in this address space. */
-	if (get_user(curval, uaddr) != 0) {
+	if (get_user(curval, (int *)uaddr) != 0) {
 		ret = -EFAULT;
 		goto out;
 	}
@@ -204,11 +264,15 @@ static int futex_wait(struct list_head *head,
 		ret = -EINTR;
 		goto out;
 	}
- out:
+out:
+	detach_vcache(&q.vcache);
 	set_current_state(TASK_RUNNING);
 	/* Were we woken up anyway? */
 	if (!unqueue_me(&q))
-		return 0;
+		ret = 0;
+	if (page)
+		unpin_page(page);
+
 	return ret;
 }
 
@@ -251,25 +315,26 @@ static struct file_operations futex_fops = {
 
 /* Signal allows caller to avoid the race which would occur if they
    set the sigio stuff up afterwards. */
-static int futex_fd(struct list_head *head,
-		    struct page *page,
-		    int offset,
-		    int signal)
+static int futex_fd(unsigned long uaddr, int offset, int signal)
 {
-	int fd;
+	struct page *page = NULL;
+	struct list_head *head;
 	struct futex_q *q;
 	struct file *filp;
+	int ret;
 
+	ret = -EINVAL;
 	if (signal < 0 || signal > _NSIG)
-		return -EINVAL;
+		goto out;
 
-	fd = get_unused_fd();
-	if (fd < 0)
-		return fd;
+	ret = get_unused_fd();
+	if (ret < 0)
+		goto out;
 	filp = get_empty_filp();
 	if (!filp) {
-		put_unused_fd(fd);
-		return -ENFILE;
+		put_unused_fd(ret);
+		ret = -ENFILE;
+		goto out;
 	}
 	filp->f_op = &futex_fops;
 	filp->f_vfsmnt = mntget(futex_mnt);
@@ -280,37 +345,55 @@ static int futex_fd(struct list_head *head,
 		
 		ret = f_setown(filp, current->tgid, 1);
 		if (ret) {
-			put_unused_fd(fd);
+			put_unused_fd(ret);
 			put_filp(filp);
-			return ret;
+			goto out;
 		}
 		filp->f_owner.signum = signal;
 	}
 
 	q = kmalloc(sizeof(*q), GFP_KERNEL);
 	if (!q) {
-		put_unused_fd(fd);
+		put_unused_fd(ret);
 		put_filp(filp);
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto out;
 	}
+
+repeat_lookup:
+	page = pin_page(uaddr - offset);
+	ret = IS_ERR(page);
+	if (ret) {
+		put_unused_fd(ret);
+		put_filp(filp);
+		kfree(q);
+		page = NULL;
+		goto out;
+	}
+	head = hash_futex(page, offset);
 
 	/* Initialize queue structure, and add to hash table. */
 	filp->private_data = q;
 	init_waitqueue_head(&q->waiters);
-	queue_me(head, q, page, offset, fd, filp);
+	if (queue_me(head, q, page, offset, ret, filp, uaddr)) {
+		unpin_page(page);
+		goto repeat_lookup;
+	}
 
 	/* Now we map fd to filp, so userspace can access it */
-	fd_install(fd, filp);
-	return fd;
+	fd_install(ret, filp);
+	page = NULL;
+out:
+	if (page)
+		unpin_page(page);
+	return ret;
 }
 
-asmlinkage int sys_futex(void *uaddr, int op, int val, struct timespec *utime)
+asmlinkage int sys_futex(unsigned long uaddr, int op, int val, struct timespec *utime)
 {
-	int ret;
-	unsigned long pos_in_page;
-	struct list_head *head;
-	struct page *page;
 	unsigned long time = MAX_SCHEDULE_TIMEOUT;
+	unsigned long pos_in_page;
+	int ret;
 
 	if (utime) {
 		struct timespec t;
@@ -319,38 +402,27 @@ asmlinkage int sys_futex(void *uaddr, int op, int val, struct timespec *utime)
 		time = timespec_to_jiffies(&t) + 1;
 	}
 
-	pos_in_page = ((unsigned long)uaddr) % PAGE_SIZE;
+	pos_in_page = uaddr % PAGE_SIZE;
 
 	/* Must be "naturally" aligned, and not on page boundary. */
 	if ((pos_in_page % __alignof__(int)) != 0
 	    || pos_in_page + sizeof(int) > PAGE_SIZE)
 		return -EINVAL;
 
-	/* Simpler if it doesn't vanish underneath us. */
-	page = pin_page((unsigned long)uaddr - pos_in_page);
-	if (IS_ERR(page))
-		return PTR_ERR(page);
-
-	head = hash_futex(page, pos_in_page);
 	switch (op) {
 	case FUTEX_WAIT:
-		ret = futex_wait(head, page, pos_in_page, val, uaddr, time);
+		ret = futex_wait(uaddr, pos_in_page, val, time);
 		break;
 	case FUTEX_WAKE:
-		ret = futex_wake(head, page, pos_in_page, val);
+		ret = futex_wake(uaddr, pos_in_page, val);
 		break;
 	case FUTEX_FD:
 		/* non-zero val means F_SETOWN(getpid()) & F_SETSIG(val) */
-		ret = futex_fd(head, page, pos_in_page, val);
-		if (ret >= 0)
-			/* Leave page pinned (attached to fd). */
-			return ret;
+		ret = futex_fd(uaddr, pos_in_page, val);
 		break;
 	default:
 		ret = -EINVAL;
 	}
-	unpin_page(page);
-
 	return ret;
 }
 

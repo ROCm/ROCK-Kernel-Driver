@@ -381,7 +381,7 @@ void mm_release(void)
 		 * not set up a proper pointer then tough luck.
 		 */
 		put_user(0, tsk->user_tid);
-		sys_futex(tsk->user_tid, FUTEX_WAKE, 1, NULL);
+		sys_futex((unsigned long)tsk->user_tid, FUTEX_WAKE, 1, NULL);
 	}
 }
 
