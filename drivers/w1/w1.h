@@ -74,6 +74,8 @@ struct w1_slave
 	struct device_attribute	attr_name, attr_val;
 };
 
+typedef void (* w1_slave_found_callback)(unsigned long, u64);
+
 struct w1_bus_master
 {
 	unsigned long		data;
@@ -90,6 +92,8 @@ struct w1_bus_master
   	u8			(*touch_bit)(unsigned long, u8);
   
   	u8			(*reset_bus)(unsigned long);
+
+	void			(*search)(unsigned long, w1_slave_found_callback);
 };
 
 struct w1_master
@@ -127,6 +131,7 @@ struct w1_master
 
 int w1_create_master_attributes(struct w1_master *);
 void w1_destroy_master_attributes(struct w1_master *);
+void w1_search(struct w1_master *dev);
 
 #endif /* __KERNEL__ */
 
