@@ -2014,6 +2014,8 @@ zoran_do_ioctl (struct inode *inode,
 {
 	struct zoran_fh *fh = file->private_data;
 	struct zoran *zr = fh->zr;
+	/* CAREFUL: used in multiple places here */
+	struct zoran_jpg_settings settings;
 
 	/* we might have older buffers lying around... We don't want
 	 * to wait, but we do want to try cleaning them up ASAP. So
@@ -2462,7 +2464,6 @@ zoran_do_ioctl (struct inode *inode,
 	case BUZIOC_S_PARAMS:
 	{
 		struct zoran_params *bparams = arg;
-		struct zoran_jpg_settings settings;
 		int res = 0;
 
 		dprintk(3, KERN_DEBUG "%s: BUZIOC_S_PARAMS\n", ZR_DEVNAME(zr));
@@ -2919,8 +2920,6 @@ zoran_do_ioctl (struct inode *inode,
 			}
 
 			if (fmt->fmt.pix.pixelformat == V4L2_PIX_FMT_MJPEG) {
-				struct zoran_jpg_settings settings;
-
 				down(&zr->resource_lock);
 
 				settings = fh->jpg_settings;
@@ -3983,7 +3982,8 @@ zoran_do_ioctl (struct inode *inode,
 	{
 		struct v4l2_crop *crop = arg;
 		int res = 0;
-		struct zoran_jpg_settings settings = fh->jpg_settings;
+
+		settings = fh->jpg_settings;
 
 		dprintk(3,
 			KERN_ERR
@@ -4065,8 +4065,9 @@ zoran_do_ioctl (struct inode *inode,
 	case VIDIOC_S_JPEGCOMP:
 	{
 		struct v4l2_jpegcompression *params = arg;
-		struct zoran_jpg_settings settings = fh->jpg_settings;
 		int res = 0;
+
+		settings = fh->jpg_settings;
 
 		dprintk(3,
 			KERN_DEBUG
@@ -4151,8 +4152,7 @@ zoran_do_ioctl (struct inode *inode,
 			down(&zr->resource_lock);
 
 			if (fmt->fmt.pix.pixelformat == V4L2_PIX_FMT_MJPEG) {
-				struct zoran_jpg_settings settings =
-				    fh->jpg_settings;
+				settings = fh->jpg_settings;
 
 				/* we actually need to set 'real' parameters now */
 				if ((fmt->fmt.pix.height * 2) >
