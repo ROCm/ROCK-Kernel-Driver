@@ -81,7 +81,7 @@ static int x86_64_insert_memory(agp_memory * mem, off_t pg_start, int type)
 	}
 
 	for (i = 0, j = pg_start; i < mem->page_count; i++, j++) {
-		addr = mem->memory[i];
+		addr = agp_bridge.mask_memory(mem->memory[i], mem->type);
 
 		tmp = addr;
 		BUG_ON(tmp & 0xffffff0000000ffc);
@@ -446,7 +446,6 @@ static void agp_x86_64_agp_enable(u32 mode)
 static int __init amd_8151_setup (struct pci_dev *pdev)
 {
 	agp_bridge.masks = amd_8151_masks;
-	agp_bridge.num_of_masks = 1;
 	agp_bridge.aperture_sizes = (void *) amd_8151_sizes;
 	agp_bridge.size_type = U32_APER_SIZE;
 	agp_bridge.num_aperture_sizes = 7;
@@ -512,6 +511,7 @@ static struct __initdata pci_driver agp_amdk8_pci_driver = {
 	.probe		= agp_amdk8_probe,
 };
 
+/* Not static due to IOMMU code calling it early. */
 int __init agp_amdk8_init(void)
 {
 	int ret_val;

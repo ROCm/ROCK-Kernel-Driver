@@ -87,50 +87,6 @@ asmlinkage void machine_check(void);
 
 static int kstack_depth_to_print = 24;
 
-
-/*
- * If the address is either in the .text section of the
- * kernel, or in the vmalloc'ed module regions, it *may* 
- * be the address of a calling routine
- */
-
-#ifdef CONFIG_MODULES
-
-/* FIXME: Accessed without a lock --RR */
-extern struct list_head modules;
-
-static inline int kernel_text_address(unsigned long addr)
-{
-	int retval = 0;
-	struct module *mod;
-
-	if (addr >= (unsigned long) &_stext &&
-	    addr <= (unsigned long) &_etext)
-		return 1;
-
-	list_for_each_entry(mod, &modules, list) {
-		/* mod_bound tests for addr being inside the vmalloc'ed
-		 * module area. Of course it'd be better to test only
-		 * for the .text subset... */
-		if (mod_bound((void *)addr, 0, mod)) {
-			retval = 1;
-			break;
-		}
-	}
-
-	return retval;
-}
-
-#else
-
-static inline int kernel_text_address(unsigned long addr)
-{
-	return (addr >= (unsigned long) &_stext &&
-		addr <= (unsigned long) &_etext);
-}
-
-#endif
-
 void show_trace(unsigned long * stack)
 {
 	int i;

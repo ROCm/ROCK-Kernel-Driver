@@ -54,9 +54,9 @@
 /* Protects extables and symbols lists */
 static spinlock_t modlist_lock = SPIN_LOCK_UNLOCKED;
 
-/* List of modules, protected by module_mutex */
+/* List of modules, protected by module_mutex AND modlist_lock */
 static DECLARE_MUTEX(module_mutex);
-LIST_HEAD(modules);  /* FIXME: Accessed w/o lock on oops by some archs */
+static LIST_HEAD(modules);
 static LIST_HEAD(symbols);
 static LIST_HEAD(extables);
 
@@ -754,8 +754,8 @@ unsigned long find_symbol_internal(Elf_Shdr *sechdrs,
 static void free_module(struct module *mod)
 {
 	/* Delete from various lists */
-	list_del(&mod->list);
 	spin_lock_irq(&modlist_lock);
+	list_del(&mod->list);
 	list_del(&mod->symbols.list);
 	list_del(&mod->gpl_symbols.list);
 	list_del(&mod->extable.list);
@@ -1290,8 +1290,8 @@ sys_init_module(void *umod,
 	list_add(&mod->extable.list, &extables);
 	list_add_tail(&mod->symbols.list, &symbols);
 	list_add_tail(&mod->gpl_symbols.list, &symbols);
-	spin_unlock_irq(&modlist_lock);
 	list_add(&mod->list, &modules);
+	spin_unlock_irq(&modlist_lock);
 
 	/* Drop lock so they can recurse */
 	up(&module_mutex);
@@ -1318,28 +1318,17 @@ sys_init_module(void *umod,
 	mod->state = MODULE_STATE_LIVE;
 	module_free(mod, mod->module_init);
 	mod->module_init = NULL;
+	mod->init_size = 0;
 
 	return 0;
+}
+
+static inline int within(unsigned long addr, void *start, unsigned long size)
+{
+	return ((void *)addr >= start && (void *)addr < start + size);
 }
 
 #ifdef CONFIG_KALLSYMS
-static inline int inside_init(struct module *mod, unsigned long addr)
-{
-	if (mod->module_init
-	    && (unsigned long)mod->module_init <= addr
-	    && (unsigned long)mod->module_init + mod->init_size > addr)
-		return 1;
-	return 0;
-}
-
-static inline int inside_core(struct module *mod, unsigned long addr)
-{
-	if ((unsigned long)mod->module_core <= addr
-	    && (unsigned long)mod->module_core + mod->core_size > addr)
-		return 1;
-	return 0;
-}
-
 static const char *get_ksymbol(struct module *mod,
 			       unsigned long addr,
 			       unsigned long *size,
@@ -1349,7 +1338,7 @@ static const char *get_ksymbol(struct module *mod,
 	unsigned long nextval;
 
 	/* At worse, next value is at end of module */
-	if (inside_core(mod, addr))
+	if (within(addr, mod->module_init, mod->init_size))
 		nextval = (unsigned long)mod->module_core+mod->core_size;
 	else 
 		nextval = (unsigned long)mod->module_init+mod->init_size;
@@ -1387,7 +1376,8 @@ const char *module_address_lookup(unsigned long addr,
 	struct module *mod;
 
 	list_for_each_entry(mod, &modules, list) {
-		if (inside_core(mod, addr) || inside_init(mod, addr)) {
+		if (within(addr, mod->module_init, mod->init_size)
+		    || within(addr, mod->module_core, mod->core_size)) {
 			*modname = mod->name;
 			return get_ksymbol(mod, addr, size, offset);
 		}
@@ -1469,6 +1459,18 @@ const struct exception_table_entry *search_module_extables(unsigned long addr)
 	/* Now, if we found one, we are running inside it now, hence
            we cannot unload the module, hence no refcnt needed. */
 	return e;
+}
+
+/* Is this a valid kernel address?  We don't grab the lock: we are oopsing. */
+int module_text_address(unsigned long addr)
+{
+	struct module *mod;
+
+	list_for_each_entry(mod, &modules, list)
+		if (within(addr, mod->module_init, mod->init_size)
+		    || within(addr, mod->module_core, mod->core_size))
+			return 1;
+	return 0;
 }
 
 /* Provided by the linker */

@@ -286,7 +286,7 @@ static void do_kernel_fault(struct pt_regs *regs, int si_code, int fault_code,
 	
 		/* Look in asi.h: All _S asis have LS bit set */
 		if ((asi & 0x1) &&
-		    (fizup = search_extables_range(regs->tpc, &g2))) {
+		    (fixup = search_extables_range(regs->tpc, &g2))) {
 			regs->tpc = fixup;
 			regs->tnpc = regs->tpc + 4;
 			regs->u_regs[UREG_G2] = g2;
