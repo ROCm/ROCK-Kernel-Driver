@@ -17,7 +17,7 @@
  * 2002-05-12   Tomas Kasparek  another code cleanup
  */
 
-/* $Id: uda1341.c,v 1.9 2003/04/19 13:34:33 perex Exp $ */
+/* $Id: uda1341.c,v 1.10 2003/10/23 14:34:52 perex Exp $ */
 
 #include <sound/driver.h>
 #include <linux/module.h>
@@ -421,9 +421,9 @@ static void __devinit snd_uda1341_proc_init(snd_card_t *card, struct l3_client *
 	snd_info_entry_t *entry;
 
 	if (! snd_card_proc_new(card, "uda1341", &entry))
-		snd_info_set_text_ops(entry, clnt, snd_uda1341_proc_read);
+		snd_info_set_text_ops(entry, clnt, 1024, snd_uda1341_proc_read);
 	if (! snd_card_proc_new(card, "uda1341-regs", &entry))
-		snd_info_set_text_ops(entry, clnt, snd_uda1341_proc_regs_read);
+		snd_info_set_text_ops(entry, clnt, 1024, snd_uda1341_proc_regs_read);
 }
 
 /* }}} */

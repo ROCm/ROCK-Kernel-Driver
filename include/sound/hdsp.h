@@ -25,17 +25,20 @@ typedef enum {
 	Digiface,
 	Multiface,
 	H9652,
+	H9632,
 	Undefined,
 } HDSP_IO_Type;
 
 typedef struct _snd_hdsp_peak_rms hdsp_peak_rms_t;
 
 struct _snd_hdsp_peak_rms {
-	unsigned int playback_peaks[26];
 	unsigned int input_peaks[26];
+	unsigned int playback_peaks[26];
 	unsigned int output_peaks[28];
-	unsigned long long playback_rms[26];
 	unsigned long long input_rms[26];
+	unsigned long long playback_rms[26];
+	/* These are only used for H96xx cards */
+	unsigned long long output_rms[26];
 };
 
 #define SNDRV_HDSP_IOCTL_GET_PEAK_RMS _IOR('H', 0x40, hdsp_peak_rms_t)
@@ -61,6 +64,11 @@ struct _snd_hdsp_config_info {
 	unsigned char autosync_ref;
 	unsigned char line_out;
 	unsigned char passthru; 
+	unsigned char da_gain;
+	unsigned char ad_gain;
+	unsigned char phone_gain;
+	unsigned char xlr_breakout_cable;
+	unsigned char analog_extension_board;
 };
 
 #define SNDRV_HDSP_IOCTL_GET_CONFIG_INFO _IOR('H', 0x41, hdsp_config_info_t)
@@ -89,5 +97,14 @@ struct _snd_hdsp_mixer {
 };
 
 #define SNDRV_HDSP_IOCTL_GET_MIXER _IOR('H', 0x44, hdsp_mixer_t)
+
+typedef struct _snd_hdsp_9632_aeb hdsp_9632_aeb_t;
+
+struct _snd_hdsp_9632_aeb {
+	int aebi;
+	int aebo;
+};
+
+#define SNDRV_HDSP_IOCTL_GET_9632_AEB _IOR('H', 0x45, hdsp_9632_aeb_t)
 
 #endif /* __SOUND_HDSP_H */

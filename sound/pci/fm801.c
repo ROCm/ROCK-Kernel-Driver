@@ -147,6 +147,7 @@ struct _snd_fm801 {
 	unsigned int cap_size;
 	unsigned int cap_pos;
 
+	ac97_bus_t *ac97_bus;
 	ac97_t *ac97;
 	ac97_t *ac97_sec;
 
@@ -844,6 +845,12 @@ FM801_SINGLE("IEC958 Raw Data Capture Switch", FM801_I2S_MODE, 10, 1, 0),
 FM801_SINGLE("IEC958 Playback Switch", FM801_GEN_CTRL, 2, 1, 0),
 };
 
+static void snd_fm801_mixer_free_ac97_bus(ac97_bus_t *bus)
+{
+	fm801_t *chip = snd_magic_cast(fm801_t, bus->private_data, return);
+	chip->ac97_bus = NULL;
+}
+
 static void snd_fm801_mixer_free_ac97(ac97_t *ac97)
 {
 	fm801_t *chip = snd_magic_cast(fm801_t, ac97->private_data, return);
@@ -856,21 +863,28 @@ static void snd_fm801_mixer_free_ac97(ac97_t *ac97)
 
 static int __devinit snd_fm801_mixer(fm801_t *chip)
 {
+	ac97_bus_t bus;
 	ac97_t ac97;
 	unsigned int i;
 	int err;
 
+	memset(&bus, 0, sizeof(bus));
+	bus.write = snd_fm801_codec_write;
+	bus.read = snd_fm801_codec_read;
+	bus.private_data = chip;
+	bus.private_free = snd_fm801_mixer_free_ac97_bus;
+	if ((err = snd_ac97_bus(chip->card, &bus, &chip->ac97_bus)) < 0)
+		return err;
+
 	memset(&ac97, 0, sizeof(ac97));
-	ac97.write = snd_fm801_codec_write;
-	ac97.read = snd_fm801_codec_read;
 	ac97.private_data = chip;
 	ac97.private_free = snd_fm801_mixer_free_ac97;
-	if ((err = snd_ac97_mixer(chip->card, &ac97, &chip->ac97)) < 0)
+	if ((err = snd_ac97_mixer(chip->ac97_bus, &ac97, &chip->ac97)) < 0)
 		return err;
 	if (chip->secondary) {
 		ac97.num = 1;
 		ac97.addr = chip->secondary_addr;
-		if ((err = snd_ac97_mixer(chip->card, &ac97, &chip->ac97_sec)) < 0)
+		if ((err = snd_ac97_mixer(chip->ac97_bus, &ac97, &chip->ac97_sec)) < 0)
 			return err;
 	}
 	for (i = 0; i < FM801_CONTROLS; i++)

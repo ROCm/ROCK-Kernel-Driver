@@ -1044,8 +1044,10 @@ snd_emu8000_create_mixer(snd_card_t *card, emu8000_t *emu)
 
 __error:
 	for (i = 0; i < EMU8000_NUM_CONTROLS; i++) {
+		down_write(&card->controls_rwsem);
 		if (emu->controls[i])
 			snd_ctl_remove(card, emu->controls[i]);
+		up_write(&card->controls_rwsem);
 	}
 	return err;
 }

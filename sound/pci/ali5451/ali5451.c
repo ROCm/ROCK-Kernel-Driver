@@ -265,6 +265,7 @@ struct snd_stru_ali {
 	unsigned int spurious_irq_count;
 	unsigned int spurious_irq_max_delta;
 
+	ac97_bus_t *ac97_bus;
 	ac97_t *ac97;
 	unsigned short	ac97_ext_id;
 	unsigned short	ac97_ext_status;
@@ -1860,6 +1861,12 @@ static snd_kcontrol_new_t snd_ali5451_mixer_spdif[] __devinitdata = {
 	ALI5451_SPDIF(SNDRV_CTL_NAME_IEC958("",CAPTURE,SWITCH), 0, 2)
 };
 
+static void snd_ali_mixer_free_ac97_bus(ac97_bus_t *bus)
+{
+	ali_t *codec = snd_magic_cast(ali_t, bus->private_data, return);
+	codec->ac97_bus = NULL;
+}
+
 static void snd_ali_mixer_free_ac97(ac97_t *ac97)
 {
 	ali_t *codec = snd_magic_cast(ali_t, ac97->private_data, return);
@@ -1868,16 +1875,23 @@ static void snd_ali_mixer_free_ac97(ac97_t *ac97)
 
 static int __devinit snd_ali_mixer(ali_t * codec)
 {
+	ac97_bus_t bus;
 	ac97_t ac97;
 	unsigned int idx;
 	int err;
 
+	memset(&bus, 0, sizeof(bus));
+	bus.write = snd_ali_codec_write;
+	bus.read = snd_ali_codec_read;
+	bus.private_data = codec;
+	bus.private_free = snd_ali_mixer_free_ac97_bus;
+	if ((err = snd_ac97_bus(codec->card, &bus, &codec->ac97_bus)) < 0)
+		return err;
+
 	memset(&ac97, 0, sizeof(ac97));
-	ac97.write = snd_ali_codec_write;
-	ac97.read = snd_ali_codec_read;
 	ac97.private_data = codec;
 	ac97.private_free = snd_ali_mixer_free_ac97;
-	if ((err = snd_ac97_mixer(codec->card, &ac97, &codec->ac97)) < 0) {
+	if ((err = snd_ac97_mixer(codec->ac97_bus, &ac97, &codec->ac97)) < 0) {
 		snd_printk("ali mixer creating error.\n");
 		return err;
 	}
@@ -2096,7 +2110,7 @@ static int __devinit snd_ali_create(snd_card_t * card,
 		snd_printk("architecture does not support 31bit PCI busmaster DMA\n");
 		return -ENXIO;
 	}
-	pci_set_dma_mask(pci, 0x7fffffff);
+	pci_set_consistent_dma_mask(pci, 0x7fffffff);
 
 	if ((codec = snd_magic_kcalloc(ali_t, 0, GFP_KERNEL)) == NULL)
 		return -ENOMEM;
