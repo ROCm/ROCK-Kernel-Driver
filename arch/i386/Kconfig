@@ -1132,6 +1132,8 @@ config PCI_MMCONFIG
 	select ACPI_BOOT
 	default y
 
+source "drivers/pci/pcie/Kconfig"
+
 source "drivers/pci/Kconfig"
 
 config ISA
