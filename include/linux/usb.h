@@ -765,6 +765,7 @@ static inline void usb_fill_int_urb (struct urb *urb,
 	urb->start_frame = -1;
 }
 
+extern void usb_init_urb(struct urb *urb);
 extern struct urb *usb_alloc_urb(int iso_packets, int mem_flags);
 extern void usb_free_urb(struct urb *urb);
 #define usb_put_urb usb_free_urb
