@@ -923,7 +923,7 @@ static int __init asus_hotk_add(struct acpi_device *device)
 
 
 
-static int __exit asus_hotk_remove(struct acpi_device *device, int type)
+static int asus_hotk_remove(struct acpi_device *device, int type)
 {
 	acpi_status status = 0;
 	struct asus_hotk *hotk = NULL;
