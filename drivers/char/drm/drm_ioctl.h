@@ -32,6 +32,7 @@
 #define __NO_VERSION__
 #include "drmP.h"
 
+
 int DRM(irq_busid)(struct inode *inode, struct file *filp,
 		   unsigned int cmd, unsigned long arg)
 {
@@ -41,8 +42,20 @@ int DRM(irq_busid)(struct inode *inode, struct file *filp,
 	if (copy_from_user(&p, (drm_irq_busid_t *)arg, sizeof(p)))
 		return -EFAULT;
 	dev = pci_find_slot(p.busnum, PCI_DEVFN(p.devnum, p.funcnum));
-	if (dev) p.irq = dev->irq;
-	else	 p.irq = 0;
+	if (!dev) {
+		DRM_ERROR("pci_find_slot failed for %d:%d:%d\n",
+			  p.busnum, p.devnum, p.funcnum);
+		p.irq = 0;
+		goto out;
+	}			
+	if (pci_enable_device(dev) != 0) {
+		DRM_ERROR("pci_enable_device failed for %d:%d:%d\n",
+			  p.busnum, p.devnum, p.funcnum);
+		p.irq = 0;
+		goto out;
+	}		
+	p.irq = dev->irq;
+ out:
 	DRM_DEBUG("%d:%d:%d => IRQ %d\n",
 		  p.busnum, p.devnum, p.funcnum, p.irq);
 	if (copy_to_user((drm_irq_busid_t *)arg, &p, sizeof(p)))
