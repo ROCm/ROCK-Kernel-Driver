@@ -79,6 +79,7 @@ EXPORT_SYMBOL(__verify_write);
 EXPORT_SYMBOL(dump_thread);
 EXPORT_SYMBOL(dump_fpu);
 EXPORT_SYMBOL(dump_extended_fpu);
+EXPORT_SYMBOL_GPL(kernel_fpu_begin);
 EXPORT_SYMBOL(__ioremap);
 EXPORT_SYMBOL(ioremap_nocache);
 EXPORT_SYMBOL(iounmap);
