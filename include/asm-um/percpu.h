@@ -1,5 +1,5 @@
-#ifndef __UM_CACHEFLUSH_H
-#define __UM_CACHEFLUSH_H
+#ifndef __UM_PERCPU_H
+#define __UM_PERCPU_H
 
 #include "asm/arch/percpu.h"
 

@@ -48,7 +48,7 @@ struct task_struct *get_task(int pid, int require)
 
         ret = NULL;
         read_lock(&tasklist_lock);
-        for_each_task(task){
+        for_each_process(task){
                 if(task->pid == pid){
                         ret = task;
                         break;
@@ -64,7 +64,7 @@ int is_valid_pid(int pid)
 	struct task_struct *task;
 
         read_lock(&tasklist_lock);
-        for_each_task(task){
+        for_each_process(task){
                 if(task->thread.extern_pid == pid){
 			read_unlock(&tasklist_lock);
 			return(1);
