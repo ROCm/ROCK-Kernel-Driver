@@ -239,6 +239,7 @@ config LASAT
 	bool "Support for LASAT Networks platforms"
 	select DMA_NONCOHERENT
 	select HW_HAS_PCI
+	select MIPS_GT64120
 	select R5000_CPU_SCACHE
 
 config PICVUE
