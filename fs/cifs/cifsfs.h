@@ -93,5 +93,5 @@ extern int 	cifs_setxattr(struct dentry *, const char *, const void *,
 			 size_t, int);
 extern ssize_t	cifs_getxattr(struct dentry *, const char *, void *, size_t);
 extern ssize_t	cifs_listxattr(struct dentry *, char *, size_t);
-#define CIFS_VERSION   "1.13"
+#define CIFS_VERSION   "1.15"
 #endif				/* _CIFSFS_H */

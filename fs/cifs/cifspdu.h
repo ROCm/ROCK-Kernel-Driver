@@ -34,9 +34,10 @@
 #define SMB_COM_DELETE                0x06
 #define SMB_COM_RENAME                0x07
 #define SMB_COM_LOCKING_ANDX          0x24
+#define SMB_COM_COPY                  0x29
 #define SMB_COM_READ_ANDX             0x2E
 #define SMB_COM_WRITE_ANDX            0x2F
-#define SMB_COM_TRANSACTION2	      0x32
+#define SMB_COM_TRANSACTION2          0x32
 #define SMB_COM_TRANSACTION2_SECONDARY 0x33
 #define SMB_COM_FIND_CLOSE2           0x34
 #define SMB_COM_TREE_DISCONNECT       0x71
@@ -775,6 +776,34 @@ typedef struct smb_com_rename_req {
 	/* followed by NewFileName */
 } RENAME_REQ;
 
+	/* copy request flags */
+#define COPY_MUST_BE_FILE      0x0001
+#define COPY_MUST_BE_DIR       0x0002
+#define COPY_TARGET_MODE_ASCII 0x0004 /* if not set, binary */
+#define COPY_SOURCE_MODE_ASCII 0x0008 /* if not set, binary */
+#define COPY_VERIFY_WRITES     0x0010
+#define COPY_TREE              0x0020 
+
+typedef struct smb_com_copy_req {
+	struct smb_hdr hdr;	/* wct = 3 */
+	__u16 Tid2;
+	__u16 OpenFunction;
+	__u16 Flags;
+	__u16 ByteCount;
+	__u8 BufferFormat;	/* 4 = ASCII or Unicode */ 
+	unsigned char OldFileName[1];
+	/* followed by __u8 BufferFormat2 */
+	/* followed by NewFileName string */
+} COPY_REQ;
+
+typedef struct smb_com_copy_rsp {
+	struct smb_hdr hdr;     /* wct = 1 */
+	__u16 CopyCount;    /* number of files copied */
+	__u16 ByteCount;    /* may be zero */
+	__u8 BufferFormat;  /* 0x04 - only present if errored file follows */
+	unsigned char ErrorFileName[1]; /* only present if error in copy */
+} COPY_RSP;
+
 #define CREATE_HARD_LINK		0x103
 #define MOVEFILE_COPY_ALLOWED		0x0002
 #define MOVEFILE_REPLACE_EXISTING	0x0001
@@ -912,6 +941,15 @@ typedef struct smb_com_transaction_change_notify_req {
 #define FILE_NOTIFY_CHANGE_STREAM_SIZE  0x00000400
 #define FILE_NOTIFY_CHANGE_STREAM_WRITE 0x00000800
 
+#define FILE_ACTION_ADDED		0x00000001
+#define FILE_ACTION_REMOVED		0x00000002
+#define FILE_ACTION_MODIFIED		0x00000003
+#define FILE_ACTION_RENAMED_OLD_NAME	0x00000004
+#define FILE_ACTION_RENAMED_NEW_NAME	0x00000005
+#define FILE_ACTION_ADDED_STREAM	0x00000006
+#define FILE_ACTION_REMOVED_STREAM	0x00000007
+#define FILE_ACTION_MODIFIED_STREAM	0x00000008
+
 /* response contains array of the following structures */
 struct file_notify_information {
 	__u32 NextEntryOffset;
@@ -1010,8 +1048,13 @@ typedef union smb_com_transaction2 {
 #define SMB_SET_FILE_UNIX_HLINK         0x203
 #define SMB_SET_FILE_BASIC_INFO2        0x3ec
 #define SMB_SET_FILE_RENAME_INFORMATION 0x3f2
+#define SMB_FILE_ALL_INFO2              0x3fa
 #define SMB_SET_FILE_ALLOCATION_INFO2   0x3fb
 #define SMB_SET_FILE_END_OF_FILE_INFO2  0x3fc
+#define SMB_FILE_MOVE_CLUSTER_INFO      0x407
+#define SMB_FILE_QUOTA_INFO             0x408
+#define SMB_FILE_REPARSEPOINT_INFO      0x409
+#define SMB_FILE_MAXIMUM_INFO           0x40d
 
 /* Find File infolevels */
 #define SMB_FIND_FILE_DIRECTORY_INFO      0x101
@@ -1273,6 +1316,7 @@ typedef struct smb_com_transaction2_fnext_rsp_parms {
 	__u16 LastNameOffset;
 } T2_FNEXT_RSP_PARMS;
 
+/* QFSInfo Levels */
 #define SMB_INFO_ALLOCATION         1
 #define SMB_INFO_VOLUME             2
 #define SMB_QUERY_FS_VOLUME_INFO    0x102
@@ -1280,6 +1324,8 @@ typedef struct smb_com_transaction2_fnext_rsp_parms {
 #define SMB_QUERY_FS_DEVICE_INFO    0x104
 #define SMB_QUERY_FS_ATTRIBUTE_INFO 0x105
 #define SMB_QUERY_CIFS_UNIX_INFO    0x200
+#define SMB_QUERY_LABEL_INFO        0x3ea
+#define SMB_QUERY_FS_QUOTA_INFO     0x3ee
 
 typedef struct smb_com_transaction2_qfsi_req {
 	struct smb_hdr hdr;	/* wct = 14+ */
