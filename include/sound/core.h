@@ -312,7 +312,6 @@ int copy_from_user_toio(void __iomem *dst, const void __user *src, size_t count)
 
 /* init.c */
 
-extern int snd_cards_count;
 extern unsigned int snd_cards_lock;
 extern snd_card_t *snd_cards[SNDRV_CARDS];
 extern rwlock_t snd_card_rwlock;

@@ -37,7 +37,6 @@ struct snd_shutdown_f_ops {
 	struct snd_shutdown_f_ops *next;
 };
 
-int snd_cards_count = 0;
 unsigned int snd_cards_lock = 0;	/* locked for registering/using */
 snd_card_t *snd_cards[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)] = NULL};
 rwlock_t snd_card_rwlock = RW_LOCK_UNLOCKED;
@@ -251,7 +250,6 @@ int snd_card_free(snd_card_t * card)
 		return -EINVAL;
 	write_lock(&snd_card_rwlock);
 	snd_cards[card->number] = NULL;
-	snd_cards_count--;
 	write_unlock(&snd_card_rwlock);
 
 #ifdef CONFIG_PM
@@ -441,7 +439,6 @@ int snd_card_register(snd_card_t * card)
 	if (card->id[0] == '\0')
 		choose_default_id(card);
 	snd_cards[card->number] = card;
-	snd_cards_count++;
 	write_unlock(&snd_card_rwlock);
 	if ((err = snd_info_card_register(card)) < 0) {
 		snd_printd("unable to create card info\n");
