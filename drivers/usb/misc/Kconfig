@@ -121,6 +121,16 @@ config USB_CYTHERM
 	  To compile this driver as a module, choose M here: the
 	  module will be called cytherm.
 
+config USB_PHIDGETKIT
+	tristate "USB PhidgetKit support"
+	depends on USB
+	help
+	  Say Y here if you want to connect a PhidgetKit USB device from
+	  Phidgets Inc.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called phidgetkit.
+
 config USB_PHIDGETSERVO
 	tristate "USB PhidgetServo support"
 	depends on USB

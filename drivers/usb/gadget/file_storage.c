@@ -3736,7 +3736,7 @@ static int __init check_parameters(struct fsg_dev *fsg)
 		else if (gadget_is_lh7a40x(fsg->gadget))
 			mod_data.release = __constant_cpu_to_le16 (0x0309);
 		else if (gadget_is_n9604(fsg->gadget))
-			mod_data.release = __constant_cpu_to_le16 (0x030a);
+			mod_data.release = __constant_cpu_to_le16 (0x0310);
 		else {
 			WARN(fsg, "controller '%s' not recognized\n",
 				fsg->gadget->name);

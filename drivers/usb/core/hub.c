@@ -78,9 +78,17 @@ static inline struct device *hubdev (struct usb_device *hdev)
 /* USB 2.0 spec Section 11.24.4.5 */
 static int get_hub_descriptor(struct usb_device *hdev, void *data, int size)
 {
-	return usb_control_msg(hdev, usb_rcvctrlpipe(hdev, 0),
-		USB_REQ_GET_DESCRIPTOR, USB_DIR_IN | USB_RT_HUB,
-		USB_DT_HUB << 8, 0, data, size, HZ * USB_CTRL_GET_TIMEOUT);
+	int i, ret;
+
+	for (i = 0; i < 3; i++) {
+		ret = usb_control_msg(hdev, usb_rcvctrlpipe(hdev, 0),
+			USB_REQ_GET_DESCRIPTOR, USB_DIR_IN | USB_RT_HUB,
+			USB_DT_HUB << 8, 0, data, size,
+			HZ * USB_CTRL_GET_TIMEOUT);
+		if (ret >= (USB_DT_HUB_NONVAR_SIZE + 2))
+			return ret;
+	}
+	return -EINVAL;
 }
 
 /*

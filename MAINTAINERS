@@ -2371,7 +2371,7 @@ USB SN9C10x DRIVER
 P:	Luca Risolia
 M:	luca.risolia@studio.unibo.it
 L:	linux-usb-devel@lists.sourceforge.net
-W:	http://go.lamarinapunto.com
+W:	http://www.linux-projects.org
 S:	Maintained
 
 USB SUBSYSTEM
@@ -2399,7 +2399,7 @@ USB W996[87]CF DRIVER
 P:	Luca Risolia
 M:	luca.risolia@studio.unibo.it
 L:	linux-usb-devel@lists.sourceforge.net
-W:	http://go.lamarinapunto.com
+W:	http://www.linux-projects.org
 S:	Maintained
 
 USER-MODE LINUX

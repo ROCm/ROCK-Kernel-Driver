@@ -222,6 +222,7 @@ static int usblp_cache_device_id_string(struct usblp *usblp);
 
 /* forward reference to make our lives easier */
 static struct usb_driver usblp_driver;
+static DECLARE_MUTEX(usblp_sem);	/* locks the existence of usblp's */
 
 /*
  * Functions for usblp control messages.
@@ -343,7 +344,7 @@ static int usblp_open(struct inode *inode, struct file *file)
 	if (minor < 0)
 		return -ENODEV;
 
-	lock_kernel();
+	down (&usblp_sem);
 
 	retval = -ENODEV;
 	intf = usb_find_interface(&usblp_driver, minor);
@@ -389,7 +390,7 @@ static int usblp_open(struct inode *inode, struct file *file)
 		}
 	}
 out:
-	unlock_kernel();
+	up (&usblp_sem);
 	return retval;
 }
 
@@ -415,13 +416,13 @@ static int usblp_release(struct inode *inode, struct file *file)
 {
 	struct usblp *usblp = file->private_data;
 
-	down (&usblp->sem);
+	down (&usblp_sem);
 	usblp->used = 0;
 	if (usblp->present) {
 		usblp_unlink_urbs(usblp);
-		up(&usblp->sem);
 	} else 		/* finish cleanup from disconnect */
 		usblp_cleanup (usblp);
+	up (&usblp_sem);
 	return 0;
 }
 
@@ -1149,8 +1150,8 @@ static void usblp_disconnect(struct usb_interface *intf)
 		BUG ();
 	}
 
+	down (&usblp_sem);
 	down (&usblp->sem);
-	lock_kernel();
 	usblp->present = 0;
 	usb_set_intfdata (intf, NULL);
 
@@ -1159,12 +1160,11 @@ static void usblp_disconnect(struct usb_interface *intf)
 			usblp->writebuf, usblp->writeurb->transfer_dma);
 	usb_buffer_free (usblp->dev, USBLP_BUF_SIZE,
 			usblp->readbuf, usblp->readurb->transfer_dma);
+	up (&usblp->sem);
 
 	if (!usblp->used)
 		usblp_cleanup (usblp);
-	else 	/* cleanup later, on release */
-		up (&usblp->sem);
-	unlock_kernel();
+	up (&usblp_sem);
 }
 
 static struct usb_device_id usblp_ids [] = {
