@@ -559,9 +559,6 @@ struct notifier_block rtnetlink_dev_notifier = {
 
 void __init rtnetlink_init(void)
 {
-#ifdef RTNL_DEBUG
-	printk("Initializing RT netlink socket\n");
-#endif
 	rtnl = netlink_kernel_create(NETLINK_ROUTE, rtnetlink_rcv);
 	if (rtnl == NULL)
 		panic("rtnetlink_init: cannot initialize rtnetlink\n");
