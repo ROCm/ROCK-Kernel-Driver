@@ -268,7 +268,7 @@ int usb_submit_urb(struct urb *urb, int mem_flags)
 		/* "high bandwidth" mode, 1-3 packets/uframe? */
 		if (dev->speed == USB_SPEED_HIGH) {
 			int	mult = 1 + ((max >> 11) & 0x03);
-			max &= 0x03ff;
+			max &= 0x07ff;
 			max *= mult;
 		}
 
