@@ -30,6 +30,8 @@ static int smb_rmdir(struct inode *, struct dentry *);
 static int smb_unlink(struct inode *, struct dentry *);
 static int smb_rename(struct inode *, struct dentry *,
 		      struct inode *, struct dentry *);
+static int smb_make_node(struct inode *,struct dentry *,int,int);
+static int smb_link(struct dentry *, struct inode *, struct dentry *);
 
 struct file_operations smb_dir_operations =
 {
@@ -49,6 +51,21 @@ struct inode_operations smb_dir_inode_operations =
 	.rename		= smb_rename,
 	.getattr	= smb_getattr,
 	.setattr	= smb_notify_change,
+};
+
+struct inode_operations smb_dir_inode_operations_unix =
+{
+	.create		= smb_create,
+	.lookup		= smb_lookup,
+	.unlink		= smb_unlink,
+	.mkdir		= smb_mkdir,
+	.rmdir		= smb_rmdir,
+	.rename		= smb_rename,
+	.getattr	= smb_getattr,
+	.setattr	= smb_notify_change,
+	.symlink	= smb_symlink,
+	.mknod		= smb_make_node,
+	.link		= smb_link,
 };
 
 /*
@@ -485,8 +502,10 @@ out_close:
 static int
 smb_create(struct inode *dir, struct dentry *dentry, int mode)
 {
+	struct smb_sb_info *server = server_from_dentry(dentry);
 	__u16 fileid;
 	int error;
+	struct iattr attr;
 
 	VERBOSE("creating %s/%s, mode=%d\n", DENTRY_PATH(dentry), mode);
 
@@ -494,6 +513,12 @@ smb_create(struct inode *dir, struct dentry *dentry, int mode)
 	smb_invalid_dir_cache(dir);
 	error = smb_proc_create(dentry, 0, CURRENT_TIME, &fileid);
 	if (!error) {
+		if (server->opt.capabilities & SMB_CAP_UNIX) {
+			/* Set attributes for new file */
+			attr.ia_valid = ATTR_MODE;
+			attr.ia_mode = mode;
+			error = smb_proc_setattr_unix(dentry, &attr, 0, 0);
+		}
 		error = smb_instantiate(dentry, fileid, 1);
 	} else {
 		PARANOIA("%s/%s failed, error=%d\n",
@@ -507,12 +532,20 @@ smb_create(struct inode *dir, struct dentry *dentry, int mode)
 static int
 smb_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 {
+	struct smb_sb_info *server = server_from_dentry(dentry);
 	int error;
+	struct iattr attr;
 
 	lock_kernel();
 	smb_invalid_dir_cache(dir);
 	error = smb_proc_mkdir(dentry);
 	if (!error) {
+		if (server->opt.capabilities & SMB_CAP_UNIX) {
+			/* Set attributes for new directory */
+			attr.ia_valid = ATTR_MODE;
+			attr.ia_mode = mode;
+			error = smb_proc_setattr_unix(dentry, &attr, 0, 0);
+		}
 		error = smb_instantiate(dentry, 0, 0);
 	}
 	unlock_kernel();
@@ -599,5 +632,48 @@ smb_rename(struct inode *old_dir, struct dentry *old_dentry,
 	}
 out:
 	unlock_kernel();
+	return error;
+}
+
+/*
+ * FIXME: samba servers won't let you create device nodes unless uid/gid
+ * matches the connection credentials (and we don't know which those are ...)
+ */
+static int
+smb_make_node(struct inode *dir, struct dentry *dentry, int mode, int dev)
+{
+	int error;
+	struct iattr attr;
+
+	attr.ia_valid = ATTR_MODE | ATTR_UID | ATTR_GID;
+	attr.ia_mode = mode;
+	attr.ia_uid = current->euid;
+	attr.ia_gid = current->egid;
+
+	smb_invalid_dir_cache(dir);
+	error = smb_proc_setattr_unix(dentry, &attr, MAJOR(dev), MINOR(dev));
+	if (!error) {
+		error = smb_instantiate(dentry, 0, 0);
+	}
+	return error;
+}
+
+/*
+ * dentry = existing file
+ * new_dentry = new file
+ */
+static int
+smb_link(struct dentry *dentry, struct inode *dir, struct dentry *new_dentry)
+{
+	int error;
+
+	DEBUG1("smb_link old=%s/%s new=%s/%s\n",
+	       DENTRY_PATH(dentry), DENTRY_PATH(new_dentry));
+	smb_invalid_dir_cache(dir);
+	error = smb_proc_link(server_from_dentry(dentry), dentry, new_dentry);
+	if (!error) {
+		smb_renew_times(dentry);
+		error = smb_instantiate(new_dentry, 0, 0);
+	}
 	return error;
 }

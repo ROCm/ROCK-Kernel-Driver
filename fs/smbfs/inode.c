@@ -106,6 +106,7 @@ static struct super_operations smb_sops =
 struct inode *
 smb_iget(struct super_block *sb, struct smb_fattr *fattr)
 {
+	struct smb_sb_info *server = SMB_SB(sb);
 	struct inode *result;
 
 	DEBUG1("smb_iget: %p\n", fattr);
@@ -126,8 +127,15 @@ smb_iget(struct super_block *sb, struct smb_fattr *fattr)
 		result->i_fop = &smb_file_operations;
 		result->i_data.a_ops = &smb_file_aops;
 	} else if (S_ISDIR(result->i_mode)) {
-		result->i_op = &smb_dir_inode_operations;
+		if (server->opt.capabilities & SMB_CAP_UNIX)
+			result->i_op = &smb_dir_inode_operations_unix;
+		else
+			result->i_op = &smb_dir_inode_operations;
 		result->i_fop = &smb_dir_operations;
+	} else if (S_ISLNK(result->i_mode)) {
+		result->i_op = &smb_link_inode_operations;
+	} else {
+		init_special_inode(result, result->i_mode, fattr->f_rdev);
 	}
 	insert_inode_hash(result);
 	return result;
@@ -235,7 +243,14 @@ smb_refresh_inode(struct dentry *dentry)
 		/*
 		 * Check whether the type part of the mode changed,
 		 * and don't update the attributes if it did.
+		 *
+		 * And don't dick with the root inode
 		 */
+		if (inode->i_ino == 2)
+			return error;
+		if (S_ISLNK(inode->i_mode))
+			return error;	/* VFS will deal with it */
+
 		if ((inode->i_mode & S_IFMT) == (fattr.f_mode & S_IFMT)) {
 			smb_set_inode_attr(inode, &fattr);
 		} else {
@@ -663,6 +678,17 @@ smb_notify_change(struct dentry *dentry, struct iattr *attr)
 		if (error)
 			goto out;
 		refresh = 1;
+	}
+
+	if (server->opt.capabilities & SMB_CAP_UNIX) {
+		/* For now we don't want to set the size with setattr_unix */
+		attr->ia_valid &= ~ATTR_SIZE;
+		/* FIXME: only call if we actually want to set something? */
+		error = smb_proc_setattr_unix(dentry, attr, 0, 0);
+		if (!error)
+			refresh = 1;
+
+		goto out;
 	}
 
 	/*
