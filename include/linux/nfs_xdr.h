@@ -89,6 +89,12 @@ struct nfs_pathconf {
 	__u32			max_namelen; /* max name length */
 };
 
+struct nfs4_change_info {
+	u32			atomic;
+	u64			before;
+	u64			after;
+};
+
 /*
  * Arguments to the open call.
  */
@@ -104,20 +110,18 @@ struct nfs_openargs {
 		struct iattr *  attrs;    /* UNCHECKED, GUARDED */
 		nfs4_verifier   verifier; /* EXCLUSIVE */
 	} u;
-	struct qstr *           name;
-	struct nfs4_getattr *   f_getattr;
-	struct nfs4_getattr *   d_getattr;
-	struct nfs_server *     server;	 /* Needed for ID mapping */
+	const struct qstr *	name;
+	const struct nfs_server *server;	 /* Needed for ID mapping */
+	const u32 *		bitmask;
 };
 
 struct nfs_openres {
 	nfs4_stateid            stateid;
 	struct nfs_fh           fh;
-	struct nfs4_change_info * cinfo;
+	struct nfs4_change_info	cinfo;
 	__u32                   rflags;
-	struct nfs4_getattr *   f_getattr;
-	struct nfs4_getattr *   d_getattr;
-	struct nfs_server *     server;
+	struct nfs_fattr *      f_attr;
+	const struct nfs_server *server;
 };
 
 /*
@@ -143,7 +147,7 @@ struct nfs_open_reclaimargs {
 	__u32			id;
 	__u32			share_access;
 	__u32			claim;
-	struct nfs4_getattr *   f_getattr;
+	const __u32 *		bitmask;
 };
 
 /*
@@ -217,7 +221,7 @@ struct nfs_lockres {
 		nfs4_stateid            stateid;/* LOCK success, LOCKU */
 		struct nfs_lock_denied  denied; /* LOCK failed, LOCKT success */
 	} u;
-	struct nfs_server *     server;
+	const struct nfs_server *	server;
 };
 
 /*
@@ -323,13 +327,13 @@ struct nfs_setattrargs {
 	struct nfs_fh *                 fh;
 	nfs4_stateid                    stateid;
 	struct iattr *                  iap;
-	struct nfs4_getattr *           attr;
-	struct nfs_server *             server; /* Needed for name mapping */
+	const struct nfs_server *	server; /* Needed for name mapping */
+	const u32 *			bitmask;
 };
 
 struct nfs_setattrres {
-	struct nfs4_getattr *           attr;
-	struct nfs_server *             server;
+	struct nfs_fattr *              fattr;
+	const struct nfs_server *	server;
 };
 
 struct nfs_linkargs {
@@ -480,12 +484,6 @@ struct nfs3_readdirres {
 
 typedef u64 clientid4;
 
-struct nfs4_change_info {
-	u32				atomic;
-	u64				before;
-	u64				after;
-};
-
 struct nfs4_accessargs {
 	const struct nfs_fh *		fh;
 	u32				access;
@@ -517,12 +515,6 @@ struct nfs4_create_res {
 	struct nfs_fh *			fh;
 	struct nfs_fattr *		fattr;
 	struct nfs4_change_info		dir_cinfo;
-};
-
-struct nfs4_getattr {
-        u32 *				gt_bmval;          /* request */
-        struct nfs_fattr *		gt_attrs;          /* response */
-	struct nfs_fsstat *		gt_fsstat;         /* response */
 };
 
 struct nfs4_getattr_arg {

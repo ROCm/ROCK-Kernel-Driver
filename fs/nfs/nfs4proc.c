@@ -169,19 +169,6 @@ renew_lease(struct nfs_server *server, unsigned long timestamp)
 	spin_unlock(&clp->cl_lock);
 }
 
-static inline void
-process_cinfo(struct nfs4_change_info *info, struct nfs_fattr *fattr)
-{
-	BUG_ON((fattr->valid & NFS_ATTR_FATTR) == 0);
-	BUG_ON((fattr->valid & NFS_ATTR_FATTR_V4) == 0);
-	
-	if (fattr->change_attr == info->after) {
-		fattr->pre_change_attr = info->before;
-		fattr->valid |= NFS_ATTR_PRE_CHANGE;
-		fattr->timestamp = jiffies;
-	}
-}
-
 static void update_changeattr(struct inode *inode, struct nfs4_change_info *cinfo)
 {
 	struct nfs_inode *nfsi = NFS_I(inode);
@@ -203,12 +190,6 @@ nfs4_open_reclaim(struct nfs4_state_owner *sp, struct nfs4_state *state)
 	struct nfs_fattr fattr = {
 		.valid = 0,
 	};
-	struct nfs4_change_info d_cinfo;
-	struct nfs4_getattr     f_getattr = {
-		.gt_bmval       = nfs4_fattr_bitmap,
-		.gt_attrs       = &fattr,
-	};
-
 	struct nfs_open_reclaimargs o_arg = {
 		.fh = NFS_FH(inode),
 		.seqid = sp->so_seqid,
@@ -216,11 +197,10 @@ nfs4_open_reclaim(struct nfs4_state_owner *sp, struct nfs4_state *state)
 		.share_access = state->state,
 		.clientid = server->nfs4_state->cl_clientid,
 		.claim = NFS4_OPEN_CLAIM_PREVIOUS,
-		.f_getattr = &f_getattr,
+		.bitmask = nfs4_fattr_bitmap,
 	};
 	struct nfs_openres o_res = {
-		.cinfo = &d_cinfo,
-		.f_getattr = &f_getattr,
+		.f_attr = &fattr,
 		.server = server,	/* Grrr */
 	};
 	struct rpc_message msg = {
@@ -250,21 +230,9 @@ nfs4_do_open(struct inode *dir, struct qstr *name, int flags, struct iattr *satt
 	struct nfs4_state     *state = NULL;
 	struct nfs_server       *server = NFS_SERVER(dir);
 	struct inode *inode = NULL;
-	struct nfs4_change_info d_cinfo;
 	int                     status;
-	struct nfs_fattr        d_attr = {
-		.valid          = 0,
-	};
 	struct nfs_fattr        f_attr = {
 		.valid          = 0,
-	};
-	struct nfs4_getattr     f_getattr = {
-		.gt_bmval       = nfs4_fattr_bitmap,
-		.gt_attrs       = &f_attr,
-	};
-	struct nfs4_getattr     d_getattr = {
-		.gt_bmval       = nfs4_fattr_bitmap,
-		.gt_attrs       = &d_attr,
 	};
 	struct nfs_openargs o_arg = {
 		.fh             = NFS_FH(dir),
@@ -272,14 +240,11 @@ nfs4_do_open(struct inode *dir, struct qstr *name, int flags, struct iattr *satt
 		.opentype       = (flags & O_CREAT) ? NFS4_OPEN_CREATE : NFS4_OPEN_NOCREATE,
 		.createmode     = (flags & O_EXCL) ? NFS4_CREATE_EXCLUSIVE : NFS4_CREATE_UNCHECKED,
 		.name           = name,
-		.f_getattr      = &f_getattr,
-		.d_getattr      = &d_getattr,
 		.server         = server,
+		.bitmask = nfs4_fattr_bitmap,
 	};
 	struct nfs_openres o_res = {
-		.cinfo          = &d_cinfo,
-		.f_getattr      = &f_getattr,
-		.d_getattr      = &d_getattr,
+		.f_attr         = &f_attr,
 		.server         = server,
 	};
 	struct rpc_message msg = {
@@ -312,8 +277,7 @@ retry:
 	nfs4_increment_seqid(status, sp);
 	if (status)
 		goto out_up;
-	process_cinfo(&d_cinfo, &d_attr);
-	nfs_refresh_inode(dir, &d_attr);
+	update_changeattr(dir, &o_res.cinfo);
 
 	status = -ENOMEM;
 	inode = nfs_fhget(dir->i_sb, &o_res.fh, &f_attr);
@@ -395,18 +359,14 @@ nfs4_do_setattr(struct nfs_server *server, struct nfs_fattr *fattr,
                 struct nfs_fh *fhandle, struct iattr *sattr,
                 struct nfs4_state *state)
 {
-        struct nfs4_getattr     getattr = {
-                .gt_bmval       = nfs4_fattr_bitmap,
-                .gt_attrs       = fattr,
-        };
         struct nfs_setattrargs  arg = {
                 .fh             = fhandle,
                 .iap            = sattr,
-                .attr           = &getattr,
 		.server		= server,
+		.bitmask = nfs4_fattr_bitmap,
         };
         struct nfs_setattrres  res = {
-                .attr           = &getattr,
+		.fattr		= fattr,
 		.server		= server,
         };
         struct rpc_message msg = {
