@@ -53,7 +53,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#140 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#142 $
  *
  */
 #ifndef _AIC7XXX_LINUX_H_
@@ -737,7 +737,8 @@ ahc_midlayer_entrypoint_lock(struct ahc_softc *ahc, unsigned long *flags)
 	 * trade the io_request_lock for our per-softc lock.
 	 */
 #if AHC_SCSI_HAS_HOST_LOCK == 0
-	ahc_lock(ahc, flags);
+	spin_unlock(&io_request_lock);
+	spin_lock(&ahc->platform_data->spin_lock);
 #endif
 }
 
@@ -745,7 +746,8 @@ static __inline void
 ahc_midlayer_entrypoint_unlock(struct ahc_softc *ahc, unsigned long *flags)
 {
 #if AHC_SCSI_HAS_HOST_LOCK == 0
-	ahc_unlock(ahc, flags);
+	spin_unlock(&ahc->platform_data->spin_lock);
+	spin_lock(&io_request_lock);
 #endif
 }
 
