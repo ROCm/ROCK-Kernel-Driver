@@ -55,6 +55,8 @@ struct serio_driver {
 	void *private;
 	char *description;
 
+	int manual_bind;
+
 	void (*write_wakeup)(struct serio *);
 	irqreturn_t (*interrupt)(struct serio *, unsigned char,
 			unsigned int, struct pt_regs *);

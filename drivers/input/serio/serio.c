@@ -92,8 +92,9 @@ static void serio_find_driver(struct serio *serio)
 	struct serio_driver *drv;
 
 	list_for_each_entry(drv, &serio_driver_list, node)
-		if (serio_bind_driver(serio, drv))
-			break;
+		if (!drv->manual_bind)
+			if (serio_bind_driver(serio, drv))
+				break;
 }
 
 /*
@@ -494,6 +495,9 @@ void serio_register_driver(struct serio_driver *drv)
 	driver_register(&drv->driver);
 	driver_create_file(&drv->driver, &driver_attr_description);
 
+	if (drv->manual_bind)
+		goto out;
+
 start_over:
 	list_for_each_entry(serio, &serio_list, node) {
 		if (!serio->drv) {
@@ -507,6 +511,7 @@ start_over:
 		}
 	}
 
+out:
 	up(&serio_sem);
 }
 
