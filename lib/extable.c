@@ -60,16 +60,18 @@ search_extable(const struct exception_table_entry *first,
 {
 	while (first <= last) {
 		const struct exception_table_entry *mid;
-		long diff;
 
 		mid = (last - first) / 2 + first;
-		diff = mid->insn - value;
-		if (diff == 0)
-			return mid;
-		if (diff < 0)
-			first = mid+1;
+		/*
+		 * careful, the distance between entries can be
+		 * larger than 2GB:
+		 */
+		if (mid->insn < value)
+			first = mid + 1;
+		else if (mid->insn > value)
+			last = mid - 1;
 		else
-			last = mid-1;
+			return mid;
         }
         return NULL;
 }
