@@ -51,7 +51,7 @@ if [ "$CONFIG_ARM" = "y" ]; then
    dep_bool '  Console on SA1100 serial port' CONFIG_SERIAL_SA1100_CONSOLE $CONFIG_SERIAL_SA1100
 fi
 
-if [ "$CONFIG_SPARC" = "y" -o "$CONFIG_SPARC64" = "y" ]; then
+if [ "$CONFIG_SPARC32" = "y" -o "$CONFIG_SPARC64" = "y" ]; then
    define_bool CONFIG_SERIAL_SUNCORE y
    define_bool CONFIG_SERIAL_CORE_CONSOLE y
    tristate 'Sun Zilog8530 serial support' CONFIG_SERIAL_SUNZILOG

@@ -33,16 +33,10 @@ dtlb_load:
 sparc64_cpu_startup:
 	flushw
 
-	rdpr		%ver, %g1
-	sethi		%hi(CHEETAH_ID), %g5
-	srlx		%g1, 32, %g1
-	or		%g5, %lo(CHEETAH_ID), %g5
-	cmp		%g1, %g5
-	be,pn		%icc, cheetah_startup
-	 sethi		%hi(CHEETAH_PLUS_ID), %g5
-	or		%g5, %lo(CHEETAH_PLUS_ID), %g5
-	cmp		%g1, %g5
-	bne,pt		%icc, spitfire_startup
+	BRANCH_IF_CHEETAH_BASE(g1,g5,cheetah_startup)
+	BRANCH_IF_CHEETAH_PLUS_OR_FOLLOWON(g1,g5,cheetah_plus_startup)
+
+	ba,pt	%xcc, spitfire_startup
 	 nop
 
 cheetah_plus_startup:
@@ -51,15 +45,15 @@ cheetah_plus_startup:
 	 nop
 
 cheetah_startup:
-	mov		DCR_BPE | DCR_RPE | DCR_SI | DCR_IFPOE | DCR_MS, %g1
-	wr		%g1, %asr18
+	mov	DCR_BPE | DCR_RPE | DCR_SI | DCR_IFPOE | DCR_MS, %g1
+	wr	%g1, %asr18
 
-	sethi		%uhi(DCU_ME | DCU_RE | /*DCU_PE |*/ DCU_HPE | DCU_SPE | DCU_SL | DCU_WE), %g5
-	or		%g5, %ulo(DCU_ME | DCU_RE | /*DCU_PE |*/ DCU_HPE | DCU_SPE | DCU_SL | DCU_WE), %g5
-	sllx		%g5, 32, %g5
-	or		%g5, DCU_DM | DCU_IM | DCU_DC | DCU_IC, %g5
-	stxa		%g5, [%g0] ASI_DCU_CONTROL_REG
-	membar		#Sync
+	sethi	%uhi(DCU_ME|DCU_RE|DCU_HPE|DCU_SPE|DCU_SL|DCU_WE), %g5
+	or	%g5, %ulo(DCU_ME|DCU_RE|DCU_HPE|DCU_SPE|DCU_SL|DCU_WE), %g5
+	sllx	%g5, 32, %g5
+	or	%g5, DCU_DM | DCU_IM | DCU_DC | DCU_IC, %g5
+	stxa	%g5, [%g0] ASI_DCU_CONTROL_REG
+	membar	#Sync
 
 cheetah_generic_startup:
 	mov	TSB_EXTENSION_P, %g3
@@ -127,19 +121,10 @@ startup_continue:
 	ldx		[%g2 + %lo(kern_locked_tte_data)], %g2
 	stx		%g2, [%sp + 2047 + 128 + 0x30]
 
-	rdpr		%ver, %g1
-	sethi		%hi(CHEETAH_ID), %g5
-	srlx		%g1, 32, %g1
-	or		%g5, %lo(CHEETAH_ID), %g5
-	cmp		%g1, %g5
-	be,a,pn		%icc, 1f
-	 mov		15, %g2
-	sethi		%hi(CHEETAH_PLUS_ID), %g5
-	or		%g5, %lo(CHEETAH_PLUS_ID), %g5
-	cmp		%g1, %g5
-	bne,a,pt	%icc, 1f
-	 mov		63, %g2
 	mov		15, %g2
+	BRANCH_IF_ANY_CHEETAH(g1,g5,1f)
+
+	mov		63, %g2
 1:
 	stx		%g2, [%sp + 2047 + 128 + 0x38]
 	sethi		%hi(p1275buf), %g2
@@ -167,19 +152,10 @@ startup_continue:
 	ldx		[%g2 + %lo(kern_locked_tte_data)], %g2
 	stx		%g2, [%sp + 2047 + 128 + 0x30]
 
-	rdpr		%ver, %g1
-	sethi		%hi(CHEETAH_ID), %g5
-	srlx		%g1, 32, %g1
-	or		%g5, %lo(CHEETAH_ID), %g5
-	cmp		%g1, %g5
-	be,a,pn		%icc, 1f
-	 mov		15, %g2
-	sethi		%hi(CHEETAH_PLUS_ID), %g5
-	or		%g5, %lo(CHEETAH_PLUS_ID), %g5
-	cmp		%g1, %g5
-	bne,a,pt	%icc, 1f
-	 mov		63, %g2
 	mov		15, %g2
+	BRANCH_IF_ANY_CHEETAH(g1,g5,1f)
+
+	mov		63, %g2
 1:
 
 	stx		%g2, [%sp + 2047 + 128 + 0x38]
@@ -244,16 +220,9 @@ startup_continue:
 	sllx		%g2, 32, %g2
 	or		%g2, KERN_LOWBITS, %g2
 
-	rdpr		%ver, %g3
-	sethi		%hi(CHEETAH_ID), %g7
-	srlx		%g3, 32, %g3
-	or		%g7, %lo(CHEETAH_ID), %g7
-	cmp		%g3, %g7
-	be,pn		%icc, 9f
-	 sethi		%hi(CHEETAH_PLUS_ID), %g7
-	or		%g7, %lo(CHEETAH_PLUS_ID), %g7
-	cmp		%g3, %g7
-	bne,pt		%icc, 1f
+	BRANCH_IF_ANY_CHEETAH(g3,g7,9f)
+
+	ba,pt		%xcc, 1f
 	 nop
 
 9:

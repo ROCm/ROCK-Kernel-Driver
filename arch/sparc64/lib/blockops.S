@@ -106,13 +106,8 @@ cheetah_patch_1:
 	bne,pn		%xcc, copy_page_using_blkcommit
 	 nop
 
-	rdpr		%ver, %g3
-	sllx		%g3, 16, %g3
-	srlx		%g3, 32 + 16, %g3
-	cmp		%g3, 0x14			! CHEETAH_ID
-	be,pn		%icc, cheetah_copy_user_page
-	 cmp		%g3, 0x15			! CHEETAH_PLUS_ID
-	bne,pt		%icc, spitfire_copy_user_page
+	BRANCH_IF_ANY_CHEETAH(g3,o2,cheetah_copy_user_page)
+	ba,pt		%xcc, spitfire_copy_user_page
 	 nop
 
 cheetah_copy_user_page:
