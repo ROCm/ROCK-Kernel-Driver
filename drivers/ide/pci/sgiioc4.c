@@ -702,6 +702,10 @@ sgiioc4_ide_setup_pci_device(struct pci_dev *dev, ide_pci_device_t * d)
 		       hwif->name, d->name);
 
 	probe_hwif_init(hwif);
+
+	/* Create /proc/ide entries */
+	create_proc_ide_interfaces(); 
+
 	return 0;
 }
 
