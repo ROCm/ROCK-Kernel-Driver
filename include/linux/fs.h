@@ -1306,9 +1306,10 @@ extern void inode_update_time(struct inode *inode, int ctime_too);
 static inline ino_t parent_ino(struct dentry *dentry)
 {
 	ino_t res;
-	read_lock(&dparent_lock);
+
+	spin_lock(&dentry->d_lock);
 	res = dentry->d_parent->d_inode->i_ino;
-	read_unlock(&dparent_lock);
+	spin_unlock(&dentry->d_lock);
 	return res;
 }
 

@@ -545,9 +545,8 @@ exp_parent(svc_client *clp, struct vfsmount *mnt, struct dentry *dentry,
 
 	while (exp == NULL && !IS_ROOT(dentry)) {
 		struct dentry *parent;
-		read_lock(&dparent_lock);
-		parent = dget(dentry->d_parent);
-		read_unlock(&dparent_lock);
+
+		parent = dget_parent(dentry);
 		dput(dentry);
 		dentry = parent;
 		exp = exp_get_by_name(clp, mnt, dentry, reqp);

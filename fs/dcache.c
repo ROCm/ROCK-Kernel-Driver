@@ -33,7 +33,6 @@
 /* #define DCACHE_DEBUG 1 */
 
 spinlock_t dcache_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
-rwlock_t dparent_lock __cacheline_aligned_in_smp = RW_LOCK_UNLOCKED;
 seqlock_t rename_lock __cacheline_aligned_in_smp = SEQLOCK_UNLOCKED;
 
 static kmem_cache_t *dentry_cache; 
@@ -1205,7 +1204,16 @@ void d_move(struct dentry * dentry, struct dentry * target)
 
 	spin_lock(&dcache_lock);
 	write_seqlock(&rename_lock);
-	spin_lock(&dentry->d_lock);
+	/*
+	 * XXXX: do we really need to take target->d_lock?
+	 */
+	if (target < dentry) {
+		spin_lock(&target->d_lock);
+		spin_lock(&dentry->d_lock);
+	} else {
+		spin_lock(&dentry->d_lock);
+		spin_lock(&target->d_lock);
+	}
 
 	/* Move the dentry to the target hash queue, if on different bucket */
 	if (dentry->d_bucket != target->d_bucket) {
@@ -1225,8 +1233,8 @@ void d_move(struct dentry * dentry, struct dentry * target)
 	smp_wmb();
 	do_switch(dentry->d_name.len, target->d_name.len);
 	do_switch(dentry->d_name.hash, target->d_name.hash);
+
 	/* ... and switch the parents */
-	write_lock(&dparent_lock);
 	if (IS_ROOT(dentry)) {
 		dentry->d_parent = target->d_parent;
 		target->d_parent = target;
@@ -1237,10 +1245,10 @@ void d_move(struct dentry * dentry, struct dentry * target)
 		/* And add them back to the (new) parent lists */
 		list_add(&target->d_child, &target->d_parent->d_subdirs);
 	}
-	write_unlock(&dparent_lock);
 
 	list_add(&dentry->d_child, &dentry->d_parent->d_subdirs);
 	dentry->d_move_count++;
+	spin_unlock(&target->d_lock);
 	spin_unlock(&dentry->d_lock);
 	write_sequnlock(&rename_lock);
 	spin_unlock(&dcache_lock);

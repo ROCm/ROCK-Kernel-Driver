@@ -48,19 +48,24 @@ extern struct dentry_stat_t dentry_stat;
 #define init_name_hash()		0
 
 /* partial hash update function. Assume roughly 4 bits per character */
-static __inline__ unsigned long partial_name_hash(unsigned long c, unsigned long prevhash)
+static inline unsigned long
+partial_name_hash(unsigned long c, unsigned long prevhash)
 {
 	return (prevhash + (c << 4) + (c >> 4)) * 11;
 }
 
-/* Finally: cut down the number of bits to a int value (and try to avoid losing bits) */
-static __inline__ unsigned long end_name_hash(unsigned long hash)
+/*
+ * Finally: cut down the number of bits to a int value (and try to avoid
+ * losing bits)
+ */
+static inline unsigned long end_name_hash(unsigned long hash)
 {
 	return (unsigned int) hash;
 }
 
 /* Compute the hash for a name string. */
-static __inline__ unsigned int full_name_hash(const unsigned char * name, unsigned int len)
+static inline unsigned int
+full_name_hash(const unsigned char *name, unsigned int len)
 {
 	unsigned long hash = init_name_hash();
 	while (len--)
@@ -149,7 +154,6 @@ d_iput:		no		no		yes
 #define DCACHE_UNHASHED		0x0010	
 
 extern spinlock_t dcache_lock;
-extern rwlock_t dparent_lock;
 
 /**
  * d_drop - drop a dentry
@@ -168,20 +172,20 @@ extern rwlock_t dparent_lock;
  * timeouts or autofs deletes).
  */
 
-static __inline__ void __d_drop(struct dentry * dentry)
+static inline void __d_drop(struct dentry *dentry)
 {
 	dentry->d_vfs_flags |= DCACHE_UNHASHED;
 	hlist_del_rcu(&dentry->d_hash);
 }
 
-static __inline__ void d_drop(struct dentry * dentry)
+static inline void d_drop(struct dentry *dentry)
 {
 	spin_lock(&dcache_lock);
  	__d_drop(dentry);
 	spin_unlock(&dcache_lock);
 }
 
-static __inline__ int dname_external(struct dentry *d)
+static inline int dname_external(struct dentry *d)
 {
 	return d->d_name.name != d->d_iname; 
 }
@@ -227,7 +231,7 @@ extern void d_rehash(struct dentry *);
  * The entry was actually filled in earlier during d_alloc().
  */
  
-static __inline__ void d_add(struct dentry * entry, struct inode * inode)
+static inline void d_add(struct dentry *entry, struct inode *inode)
 {
 	d_instantiate(entry, inode);
 	d_rehash(entry);
@@ -260,7 +264,7 @@ extern char * d_path(struct dentry *, struct vfsmount *, char *, int);
  *	and call dget_locked() instead of dget().
  */
  
-static __inline__ struct dentry * dget(struct dentry *dentry)
+static inline struct dentry *dget(struct dentry *dentry)
 {
 	if (dentry) {
 		if (!atomic_read(&dentry->d_count))
@@ -280,14 +284,24 @@ extern struct dentry * dget_locked(struct dentry *);
  *	Returns true if the dentry passed is not currently hashed.
  */
  
-static __inline__ int d_unhashed(struct dentry *dentry)
+static inline int d_unhashed(struct dentry *dentry)
 {
 	return (dentry->d_vfs_flags & DCACHE_UNHASHED);
 }
 
+static inline struct dentry *dget_parent(struct dentry *dentry)
+{
+	struct dentry *ret;
+
+	spin_lock(&dentry->d_lock);
+	ret = dget(dentry->d_parent);
+	spin_unlock(&dentry->d_lock);
+	return ret;
+}
+
 extern void dput(struct dentry *);
 
-static __inline__ int d_mountpoint(struct dentry *dentry)
+static inline int d_mountpoint(struct dentry *dentry)
 {
 	return dentry->d_mounted;
 }
