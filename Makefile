@@ -963,7 +963,13 @@ help:
 	@echo  '  rpm		  - Build a kernel as an RPM package'
 	@echo  '  tags/TAGS	  - Generate tags file for editors'
 	@echo  '  cscope	  - Generate cscope index'
+	@echo  ''
+	@echo  'Static analysers'
+	@echo  '  buildcheck      - List dangling references to vmlinux discarded sections'
+	@echo  '                    and init sections from non-init sections'
 	@echo  '  checkstack      - Generate a list of stack hogs'
+	@echo  '  namespacecheck  - Name space analysis on compiled kernel'
+	@echo  ''
 	@echo  'Kernel packaging:'
 	@$(MAKE) -f $(package-dir)/Makefile help
 	@echo  ''
@@ -1123,11 +1129,11 @@ versioncheck:
 		| xargs $(PERL) -w scripts/checkversion.pl
 
 buildcheck:
-	$(PERL) $(src)/scripts/reference_discarded.pl
-	$(PERL) $(src)/scripts/reference_init.pl
+	$(PERL) $(srctree)/scripts/reference_discarded.pl
+	$(PERL) $(srctree)/scripts/reference_init.pl
 
 namespacecheck:
-	$(PERL) $(src)/scripts/namespace.pl
+	$(PERL) $(srctree)/scripts/namespace.pl
 
 endif #ifeq ($(config-targets),1)
 endif #ifeq ($(mixed-targets),1)
