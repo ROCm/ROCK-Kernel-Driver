@@ -3871,3 +3871,11 @@ asmlinkage int sys32_sched_getaffinity(__kernel_pid_t32 pid, unsigned int len,
 
 	return ret;
 }
+
+extern int sys_lookup_dcookie(u64 cookie64, char *buf, size_t len);
+
+int sys32_lookup_dcookie(u32 cookie_high, u32 cookie_low, char *buf, size_t len)
+{
+	return sys_lookup_dcookie((u64)cookie_high << 32 | cookie_low,
+				  buf, len);
+}
