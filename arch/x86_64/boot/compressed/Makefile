@@ -1,43 +1,38 @@
 #
-# linux/arch/i386/boot/compressed/Makefile
+# linux/arch/x86_64/boot/compressed/Makefile
 #
 # create a compressed vmlinux image from the original vmlinux
 #
-
-HEAD = head.o
-SYSTEM = $(TOPDIR)/vmlinux
-
-OBJECTS = $(HEAD) misc.o
-
-IA32_CFLAGS := -O2 -DSTDC_HEADERS
-
+# Note all the files here are compiled/linked as 32bit executables.
 #
-# ZIMAGE_OFFSET is the load offset of the compression loader
-# BZIMAGE_OFFSET is the load offset of the high loaded compression loader
-#
-BZIMAGE_OFFSET = 0x100000
 
-BZLINKFLAGS = -Ttext $(BZIMAGE_OFFSET) $(ZLDFLAGS)
+EXTRA_TARGETS	:= vmlinux vmlinux.bin vmlinux.bin.gz head.o misc.o piggy.o
+EXTRA_AFLAGS	:= -traditional -m32
 
-all: vmlinux
+# cannot use EXTRA_CFLAGS because base CFLAGS contains -mkernel which conflicts with
+# -m32
+CFLAGS := -m32 -D__KERNEL__ -I$(TOPDIR)/include -O2  
+LDFLAGS := -m elf_i386
 
-bvmlinux: piggy.o $(OBJECTS)
-	$(IA32_LD) $(BZLINKFLAGS) -o bvmlinux $(OBJECTS) piggy.o
+include $(TOPDIR)/Rules.make
 
-head.o: head.S
-	$(IA32_AS) -c head.S
+LDFLAGS_vmlinux := -Ttext $(IMAGE_OFFSET) -e startup_32 -m elf_i386
 
-misc.o: misc.c
-	$(IA32_CC) $(IA32_CFLAGS) -c misc.c
+$(obj)/vmlinux: $(obj)/head.o $(obj)/misc.o $(obj)/piggy.o FORCE
+	$(call if_changed,ld)
 
-piggy.o:	$(SYSTEM)
-	tmppiggy=_tmp_$$$$piggy; \
-	rm -f $$tmppiggy $$tmppiggy.gz $$tmppiggy.lnk; \
-	$(OBJCOPY) $(OBJCOPYFLAGS) $< $$tmppiggy; \
-	gzip -f -9 < $$tmppiggy > $$tmppiggy.gz; \
-	echo "SECTIONS { .data : { input_len = .; LONG(input_data_end - input_data) input_data = .; *(.data) input_data_end = .; }}" > $$tmppiggy.lnk; \
-	$(IA32_LD) -r -o piggy.o -b binary $$tmppiggy.gz -b elf32-i386 -T $$tmppiggy.lnk; \
-	rm -f $$tmppiggy $$tmppiggy.gz $$tmppiggy.lnk
+$(obj)/vmlinux.bin: vmlinux FORCE
+	strip vmlinux
+	$(call if_changed,objcopy)
+
+$(obj)/vmlinux.bin.gz: $(obj)/vmlinux.bin FORCE
+	$(call if_changed,gzip)
+
+LDFLAGS_piggy.o := -r --format binary --oformat elf32-i386 -T
+
+$(obj)/piggy.o: $(obj)/vmlinux.scr $(obj)/vmlinux.bin.gz FORCE
+	$(call if_changed,ld)
 
 clean:
-	rm -f vmlinux bvmlinux _tmp_*
+	@echo 'Cleaning up (boot/compressed)'
+	@rm -f $(EXTRA_TARGETS)
