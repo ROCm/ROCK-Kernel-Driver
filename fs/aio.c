@@ -234,6 +234,7 @@ static struct kioctx *ioctx_alloc(unsigned nr_events)
 	init_waitqueue_head(&ctx->wait);
 
 	INIT_LIST_HEAD(&ctx->active_reqs);
+	INIT_LIST_HEAD(&ctx->run_list);
 	INIT_WORK(&ctx->wq, aio_kick_handler, ctx);
 
 	if (aio_setup_ring(ctx) < 0)
