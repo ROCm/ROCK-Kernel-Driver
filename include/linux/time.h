@@ -348,6 +348,7 @@ extern long do_utimes(char __user * filename, struct timeval * times);
 struct itimerval;
 extern int do_setitimer(int which, struct itimerval *value, struct itimerval *ovalue);
 extern int do_getitimer(int which, struct itimerval *value);
+extern void getnstimeofday (struct timespec *tv);
 
 static inline void
 set_normalized_timespec (struct timespec *ts, time_t sec, long nsec)

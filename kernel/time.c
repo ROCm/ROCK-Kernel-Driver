@@ -22,6 +22,9 @@
  *	"A Kernel Model for Precision Timekeeping" by Dave Mills
  *	Allow time_constant larger than MAXTC(6) for NTP v4 (MAXTC == 10)
  *	(Even though the technical memorandum forbids it)
+ * 2004-07-14	 Christoph Lameter
+ *	Added getnstimeofday to allow the posix timer functions to return
+ *	with nanosecond accuracy
  */
 
 #include <linux/module.h>
@@ -420,6 +423,41 @@ struct timespec current_kernel_time(void)
 }
 
 EXPORT_SYMBOL(current_kernel_time);
+
+#ifdef CONFIG_TIME_INTERPOLATION
+void getnstimeofday (struct timespec *tv)
+{
+	unsigned long seq,sec,nsec;
+
+	do {
+		seq = read_seqbegin(&xtime_lock);
+		sec = xtime.tv_sec;
+		nsec = xtime.tv_nsec+time_interpolator_get_offset();
+	} while (unlikely(read_seqretry(&xtime_lock, seq)));
+
+	while (unlikely(nsec >= NSEC_PER_SEC)) {
+		nsec -= NSEC_PER_SEC;
+		++sec;
+	}
+	tv->tv_sec = sec;
+	tv->tv_nsec = nsec;
+}
+#else
+/*
+ * Simulate gettimeofday using do_gettimeofday which only allows a timeval
+ * and therefore only yields usec accuracy
+ */
+void getnstimeofday(struct timespec *tv)
+{
+	struct timeval x;
+
+	do_gettimeofday(&x);
+	tv->tv_sec = x.tv_sec;
+	tv->tv_nsec = x.tv_usec * NSEC_PER_USEC;
+}
+#endif
+
+EXPORT_SYMBOL(getnstimeofday);
 
 #if (BITS_PER_LONG < 64)
 u64 get_jiffies_64(void)
