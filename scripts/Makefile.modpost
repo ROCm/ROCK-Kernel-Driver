@@ -50,7 +50,7 @@ _modpost: $(modules)
 # Step 2), invoke modpost
 #  Includes step 3,4
 quiet_cmd_modpost = MODPOST
-      cmd_modpost = scripts/modpost \
+      cmd_modpost = scripts/mod/modpost \
 	$(if $(KBUILD_EXTMOD),-i,-o) $(symverfile) \
 	$(filter-out FORCE,$^)
 
