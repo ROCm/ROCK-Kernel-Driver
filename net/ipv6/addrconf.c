@@ -1111,7 +1111,7 @@ regen:
 	if (time_before(idev->regen_timer.expires, jiffies)) {
 		idev->regen_timer.expires = 0;
 		printk(KERN_WARNING
-			"__ipv6_regen_rndid(): too short regeneration interval; timer diabled for %s.\n",
+			"__ipv6_regen_rndid(): too short regeneration interval; timer disabled for %s.\n",
 			idev->dev->name);
 		in6_dev_put(idev);
 		return -1;
