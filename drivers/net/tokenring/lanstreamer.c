@@ -332,6 +332,7 @@ static int __devinit streamer_init_one(struct pci_dev *pdev,
 	dev->set_mac_address = &streamer_set_mac_address;
 	dev->irq = pdev->irq;
 	dev->base_addr=pio_start;
+	SET_NETDEV_DEV(dev, &pdev->dev);
 
 	streamer_priv->streamer_card_name = (char *)pdev->resource[0].name;
 	streamer_priv->pci_dev = pdev;

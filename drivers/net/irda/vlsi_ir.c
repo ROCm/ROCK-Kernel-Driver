@@ -1622,6 +1622,8 @@ static int vlsi_irda_init(struct net_device *ndev)
 	ndev->tx_timeout      = vlsi_tx_timeout;
 	ndev->watchdog_timeo  = 500*HZ/1000;	/* max. allowed turn time for IrLAP */
 
+	SET_NETDEV_DEV(ndev, &pdev->dev);
+
 	return 0;
 }	
 

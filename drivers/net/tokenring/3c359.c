@@ -345,6 +345,7 @@ int __devinit xl_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	dev->get_stats=&xl_get_stats ;
 	dev->set_mac_address=&xl_set_mac_address ; 
 	SET_MODULE_OWNER(dev); 
+	SET_NETDEV_DEV(dev, &pdev->dev);
 
 	pci_set_drvdata(pdev,dev) ; 
 	if ((i = register_netdev(dev))) { 

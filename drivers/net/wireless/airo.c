@@ -2732,6 +2732,11 @@ struct net_device *_init_airo_card( unsigned short irq, int port,
 	dev->irq = irq;
 	dev->base_addr = port;
 
+	/* what is with PCMCIA ??? */
+	if (pci) {
+		SET_NETDEV_DEV(dev, &pci->dev);
+	}
+
 	if (test_bit(FLAG_MPI,&ai->flags))
 		reset_mpi_card (dev, 1);
 
