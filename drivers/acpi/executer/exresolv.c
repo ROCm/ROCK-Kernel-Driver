@@ -48,6 +48,7 @@
 #include <acpi/acdispat.h>
 #include <acpi/acinterp.h>
 #include <acpi/acnamesp.h>
+#include <acpi/acparser.h>
 
 
 #define _COMPONENT          ACPI_EXECUTER
@@ -248,6 +249,7 @@ acpi_ex_resolve_object_to_value (
 
 		case AML_REF_OF_OP:
 		case AML_DEBUG_OP:
+		case AML_LOAD_OP:
 
 			/* Just leave the object as-is */
 
@@ -256,8 +258,8 @@ acpi_ex_resolve_object_to_value (
 
 		default:
 
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown Reference opcode %X in %p\n",
-				opcode, stack_desc));
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown Reference opcode %X (%s) in %p\n",
+				opcode, acpi_ps_get_opcode_name (opcode), stack_desc));
 			status = AE_AML_INTERNAL;
 			break;
 		}

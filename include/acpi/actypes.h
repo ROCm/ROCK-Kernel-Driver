@@ -207,6 +207,7 @@ typedef u32                                     acpi_size;
 /*
  * Miscellaneous common types
  */
+typedef u16                                     UINT16_BIT;
 typedef u32                                     UINT32_BIT;
 typedef acpi_native_uint                        ACPI_PTRDIFF;
 

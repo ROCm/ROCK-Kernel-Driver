@@ -65,16 +65,6 @@
 
 #define GL_OWNED                0x02        /* Ownership of global lock is bit 1 */
 
-/* values of Mapic.Model */
-
-#define DUAL_PIC                0
-#define MULTIPLE_APIC           1
-
-/* values of Type in struct apic_header */
-
-#define APIC_PROC               0
-#define APIC_IO                 1
-
 
 /*
  * Common table types.  The base code can remain
@@ -89,8 +79,10 @@
 #pragma pack(1)
 
 /*
- * Architecture-independent tables
- * The architecture dependent tables are in separate files
+ * ACPI Version-independent tables
+ *
+ * NOTE: The tables that are specific to ACPI versions (1.0, 2.0, etc.)
+ * are in separate files.
  */
 struct rsdp_descriptor         /* Root System Descriptor Pointer */
 {
@@ -106,20 +98,6 @@ struct rsdp_descriptor         /* Root System Descriptor Pointer */
 };
 
 
-struct acpi_table_header         /* ACPI common table header */
-{
-	char                            signature [4];          /* ACPI signature (4 ASCII characters) */
-	u32                             length;                 /* Length of table, in bytes, including header */
-	u8                              revision;               /* ACPI Specification minor version # */
-	u8                              checksum;               /* To make sum of entire table == 0 */
-	char                            oem_id [6];             /* OEM identification */
-	char                            oem_table_id [8];       /* OEM table identification */
-	u32                             oem_revision;           /* OEM revision number */
-	char                            asl_compiler_id [4];    /* ASL compiler vendor ID */
-	u32                             asl_compiler_revision;  /* ASL compiler revision number */
-};
-
-
 struct acpi_common_facs          /* Common FACS for internal use */
 {
 	u32                             *global_lock;
@@ -128,68 +106,196 @@ struct acpi_common_facs          /* Common FACS for internal use */
 };
 
 
-struct apic_table
+#define ACPI_TABLE_HEADER_DEF   /* ACPI common table header */ \
+	char                            signature [4];          /* ACPI signature (4 ASCII characters) */\
+	u32                             length;                 /* Length of table, in bytes, including header */\
+	u8                              revision;               /* ACPI Specification minor version # */\
+	u8                              checksum;               /* To make sum of entire table == 0 */\
+	char                            oem_id [6];             /* OEM identification */\
+	char                            oem_table_id [8];       /* OEM table identification */\
+	u32                             oem_revision;           /* OEM revision number */\
+	char                            asl_compiler_id [4];    /* ASL compiler vendor ID */\
+	u32                             asl_compiler_revision;  /* ASL compiler revision number */
+
+
+struct acpi_table_header         /* ACPI common table header */
 {
-	struct acpi_table_header        header;                 /* ACPI table header */
-	u32                             local_apic_address;     /* Physical address for accessing local APICs */
-	u32                             PCATcompat      : 1;    /* a one indicates system also has dual 8259s */
+	ACPI_TABLE_HEADER_DEF
+};
+
+
+/*
+ * MADT values and structures
+ */
+
+/* Values for MADT PCATCompat */
+
+#define DUAL_PIC                0
+#define MULTIPLE_APIC           1
+
+
+/* Master MADT */
+
+struct multiple_apic_table
+{
+	ACPI_TABLE_HEADER_DEF                           /* ACPI common table header */
+	u32                             local_apic_address;     /* Physical address of local APIC */
+	u32                             PCATcompat      : 1;    /* A one indicates system also has dual 8259s */
 	u32                             reserved1       : 31;
 };
 
 
-struct apic_header
-{
-	u8                              type;                   /* APIC type.  Either APIC_PROC or APIC_IO */
-	u8                              length;                 /* Length of APIC structure */
-};
+/* Values for Type in APIC_HEADER_DEF */
 
+#define APIC_PROCESSOR          0
+#define APIC_IO                 1
+#define APIC_XRUPT_OVERRIDE     2
+#define APIC_NMI                3
+#define APIC_LOCAL_NMI          4
+#define APIC_ADDRESS_OVERRIDE   5
+#define APIC_IO_SAPIC           6
+#define APIC_LOCAL_SAPIC        7
+#define APIC_XRUPT_SOURCE       8
+#define APIC_RESERVED           9           /* 9 and greater are reserved */
 
-struct processor_apic
+/*
+ * MADT sub-structures (Follow MULTIPLE_APIC_DESCRIPTION_TABLE)
+ */
+#define APIC_HEADER_DEF                     /* Common APIC sub-structure header */\
+	u8                              type; \
+	u8                              length;
+
+/* Values for MPS INTI flags */
+
+#define POLARITY_CONFORMS       0
+#define POLARITY_ACTIVE_HIGH    1
+#define POLARITY_RESERVED       2
+#define POLARITY_ACTIVE_LOW     3
+
+#define TRIGGER_CONFORMS        0
+#define TRIGGER_EDGE            1
+#define TRIGGER_RESERVED        2
+#define TRIGGER_LEVEL           3
+
+/* Common flag definitions */
+
+#define MPS_INTI_FLAGS \
+	u16                             polarity        : 2;    /* Polarity of APIC I/O input signals */\
+	u16                             trigger_mode    : 2;    /* Trigger mode of APIC input signals */\
+	u16                             reserved1       : 12;   /* Reserved, must be zero */
+
+#define LOCAL_APIC_FLAGS \
+	u32                             processor_enabled: 1;   /* Processor is usable if set */\
+	u32                             reserved2       : 31;   /* Reserved, must be zero */
+
+/* Sub-structures for MADT */
+
+struct madt_processor_apic
 {
-	struct apic_header              header;
-	u8                              processor_apic_id;      /* ACPI processor id */
+	APIC_HEADER_DEF
+	u8                              processor_id;           /* ACPI processor id */
 	u8                              local_apic_id;          /* Processor's local APIC id */
-	u32                             processor_enabled: 1;   /* Processor is usable if set */
-	u32                             reserved1       : 31;
+	LOCAL_APIC_FLAGS
 };
 
-
-struct io_apic
+struct madt_io_apic
 {
-	struct apic_header              header;
+	APIC_HEADER_DEF
 	u8                              io_apic_id;             /* I/O APIC ID */
 	u8                              reserved;               /* Reserved - must be zero */
-	u32                             io_apic_address;        /* APIC's physical address */
-	u32                             vector;                 /* Interrupt vector index where INTI
+	u32                             address;                /* APIC physical address */
+	u32                             interrupt;              /* Global system interrupt where INTI
 			  * lines start */
 };
 
-
-/*
- *  IA64 TBD:  Add SAPIC Tables
- */
-
-/*
- *  IA64 TBD:   Modify Smart Battery Description to comply with ACPI IA64
- *              extensions.
- */
-struct smart_battery_description_table
+struct madt_interrupt_override
 {
-	struct acpi_table_header        header;
+	APIC_HEADER_DEF
+	u8                              bus;                    /* 0 - ISA */
+	u8                              source;                 /* Interrupt source (IRQ) */
+	u32                             interrupt;              /* Global system interrupt */
+	MPS_INTI_FLAGS
+};
+
+struct madt_nmi_source
+{
+	APIC_HEADER_DEF
+	MPS_INTI_FLAGS
+	u32                             interrupt;              /* Global system interrupt */
+};
+
+struct madt_local_apic_nmi
+{
+	APIC_HEADER_DEF
+	u8                              processor_id;           /* ACPI processor id */
+	MPS_INTI_FLAGS
+	u8                              lint;                   /* LINTn to which NMI is connected */
+};
+
+struct madt_address_override
+{
+	APIC_HEADER_DEF
+	u16                             reserved;               /* Reserved - must be zero */
+	u32                             address;                /* APIC physical address */
+};
+
+struct madt_io_sapic
+{
+	APIC_HEADER_DEF
+	u8                              io_sapic_id;            /* I/O SAPIC ID */
+	u8                              reserved;               /* Reserved - must be zero */
+	u32                             interrupt_base;         /* Glocal interrupt for SAPIC start */
+	u64                             address;                /* SAPIC physical address */
+};
+
+struct madt_local_sapic
+{
+	APIC_HEADER_DEF
+	u8                              processor_id;           /* ACPI processor id */
+	u8                              local_sapic_id;         /* SAPIC ID */
+	u8                              local_sapic_eid;        /* SAPIC EID */
+	u8                              reserved [3];           /* Reserved - must be zero */
+	LOCAL_APIC_FLAGS
+};
+
+struct madt_interrupt_source
+{
+	APIC_HEADER_DEF
+	MPS_INTI_FLAGS
+	u8                              interrupt_type;         /* 1=PMI, 2=INIT, 3=corrected */
+	u8                              processor_id;           /* Processor ID */
+	u8                              processor_eid;          /* Processor EID */
+	u8                              io_sapic_vector;        /* Vector value for PMI interrupts */
+	u32                             interrupt;              /* Global system interrupt */
+	u32                             reserved;               /* Reserved - must be zero */
+};
+
+
+/*
+ * Smart Battery
+ */
+struct smart_battery_table
+{
+	ACPI_TABLE_HEADER_DEF
 	u32                             warning_level;
 	u32                             low_level;
 	u32                             critical_level;
 };
 
-struct hpet_description_table
+
+/*
+ * High performance timer
+ */
+struct hpet_table
 {
-	struct acpi_table_header        header;
+	ACPI_TABLE_HEADER_DEF
 	u32                             hardware_id;
-	u32                             base_address[3];
+	u32                             base_address [3];
 	u8                              hpet_number;
 	u16                             clock_tick;
 	u8                              attributes;
 };
+
 #pragma pack()
 
 
@@ -227,9 +333,10 @@ struct acpi_table_support
 
 
 /*
- * Get the architecture-specific tables
+ * Get the ACPI version-specific tables
  */
 #include "actbl1.h"   /* Acpi 1.0 table definitions */
 #include "actbl2.h"   /* Acpi 2.0 table definitions */
+
 
 #endif /* __ACTBL_H__ */

@@ -47,6 +47,8 @@
 #include <acpi/acdispat.h>
 #include <acpi/acinterp.h>
 #include <acpi/acnamesp.h>
+#include <acpi/acparser.h>
+#include <acpi/amlcode.h>
 
 
 #define _COMPONENT          ACPI_EXECUTER
@@ -243,12 +245,26 @@ acpi_ex_resolve_node_to_value (
 
 	case ACPI_TYPE_LOCAL_REFERENCE:
 
-		/* No named references are allowed here */
+		switch (source_desc->reference.opcode) {
+		case AML_LOAD_OP:
 
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unsupported Reference opcode %X\n",
-			source_desc->reference.opcode));
+			/* This is a ddb_handle */
+			/* Return an additional reference to the object */
 
-		return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
+			obj_desc = source_desc;
+			acpi_ut_add_reference (obj_desc);
+			break;
+
+		default:
+			/* No named references are allowed here */
+
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unsupported Reference opcode %X (%s)\n",
+				source_desc->reference.opcode,
+				acpi_ps_get_opcode_name (source_desc->reference.opcode)));
+
+			return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
+		}
+		break;
 
 
 	/* Default case is for unknown types */

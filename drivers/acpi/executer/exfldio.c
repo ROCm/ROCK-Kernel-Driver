@@ -64,7 +64,8 @@
  * RETURN:      Status
  *
  * DESCRIPTION: Common processing for acpi_ex_extract_from_field and
- *              acpi_ex_insert_into_field. Initialize the
+ *              acpi_ex_insert_into_field. Initialize the Region if necessary and
+ *              validate the request.
  *
  ******************************************************************************/
 
@@ -96,7 +97,7 @@ acpi_ex_setup_region (
 	 * If the Region Address and Length have not been previously evaluated,
 	 * evaluate them now and save the results.
 	 */
-	if (!(rgn_desc->region.flags & AOPOBJ_DATA_VALID)) {
+	if (!(rgn_desc->common.flags & AOPOBJ_DATA_VALID)) {
 		status = acpi_ds_get_region_arguments (rgn_desc);
 		if (ACPI_FAILURE (status)) {
 			return_ACPI_STATUS (status);
@@ -108,6 +109,18 @@ acpi_ex_setup_region (
 
 		return_ACPI_STATUS (AE_OK);
 	}
+
+#ifdef ACPI_UNDER_DEVELOPMENT
+	/*
+	 * If the Field access is any_acc, we can now compute the optimal
+	 * access (because we know know the length of the parent region)
+	 */
+	if (!(obj_desc->common.flags & AOPOBJ_DATA_VALID)) {
+		if (ACPI_FAILURE (status)) {
+			return_ACPI_STATUS (status);
+		}
+	}
+#endif
 
 	/*
 	 * Validate the request.  The entire request from the byte offset for a
@@ -242,7 +255,7 @@ acpi_ex_access_region (
 	}
 
 	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_BFIELD,
-		" Region[%s-%X] Access %X Base:Off %X:%X at %8.8X%8.8X\n",
+		" Region [%s:%X], Width %X, byte_base %X, Offset %X at %8.8X%8.8X\n",
 		acpi_ut_get_region_name (rgn_desc->region.space_id),
 		rgn_desc->region.space_id,
 		obj_desc->common_field.access_byte_width,
@@ -365,10 +378,10 @@ acpi_ex_field_datum_io (
 	/*
 	 * The four types of fields are:
 	 *
-	 * buffer_fields - Read/write from/to a Buffer
-	 * region_fields - Read/write from/to a Operation Region.
-	 * bank_fields  - Write to a Bank Register, then read/write from/to an op_region
-	 * index_fields - Write to an Index Register, then read/write from/to a Data Register
+	 * buffer_field - Read/write from/to a Buffer
+	 * region_field - Read/write from/to a Operation Region.
+	 * bank_field  - Write to a Bank Register, then read/write from/to an op_region
+	 * index_field - Write to an Index Register, then read/write from/to a Data Register
 	 */
 	switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
 	case ACPI_TYPE_BUFFER_FIELD:
@@ -458,24 +471,34 @@ acpi_ex_field_datum_io (
 
 		/* Write the index value to the index_register (itself a region_field) */
 
+		field_datum_byte_offset += obj_desc->index_field.value;
+
+		ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
+				"Write to Index Register: Value %8.8X\n",
+				field_datum_byte_offset));
+
 		status = acpi_ex_insert_into_field (obj_desc->index_field.index_obj,
-				 &obj_desc->index_field.value,
-				 sizeof (obj_desc->index_field.value));
+				 &field_datum_byte_offset,
+				 sizeof (field_datum_byte_offset));
 		if (ACPI_FAILURE (status)) {
 			return_ACPI_STATUS (status);
 		}
+
+		ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
+				"I/O to Data Register: value_ptr %p\n",
+				value));
 
 		if (read_write == ACPI_READ) {
 			/* Read the datum from the data_register */
 
 			status = acpi_ex_extract_from_field (obj_desc->index_field.data_obj,
-					  value, obj_desc->common_field.access_byte_width);
+					  value, sizeof (acpi_integer));
 		}
 		else {
-			/* Write the datum to the Data register */
+			/* Write the datum to the data_register */
 
 			status = acpi_ex_insert_into_field (obj_desc->index_field.data_obj,
-					  value, obj_desc->common_field.access_byte_width);
+					  value, sizeof (acpi_integer));
 		}
 		break;
 
@@ -490,12 +513,14 @@ acpi_ex_field_datum_io (
 
 	if (ACPI_SUCCESS (status)) {
 		if (read_write == ACPI_READ) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD, "Value Read=%8.8X%8.8X\n",
-					   ACPI_HIDWORD (*value), ACPI_LODWORD (*value)));
+			ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD, "Value Read %8.8X%8.8X, Width %d\n",
+					   ACPI_HIDWORD (*value), ACPI_LODWORD (*value),
+					   obj_desc->common_field.access_byte_width));
 		}
 		else {
-			ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD, "Value Written=%8.8X%8.8X\n",
-					   ACPI_HIDWORD (*value), ACPI_LODWORD (*value)));
+			ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD, "Value Written %8.8X%8.8X, Width %d\n",
+					   ACPI_HIDWORD (*value), ACPI_LODWORD (*value),
+					   obj_desc->common_field.access_byte_width));
 		}
 	}
 
@@ -554,6 +579,10 @@ acpi_ex_write_with_update_rule (
 				 */
 				status = acpi_ex_field_datum_io (obj_desc, field_datum_byte_offset,
 						  &current_value, ACPI_READ);
+				if (ACPI_FAILURE (status)) {
+					return_ACPI_STATUS (status);
+				}
+
 				merged_value |= (current_value & ~mask);
 			}
 			break;
@@ -573,6 +602,7 @@ acpi_ex_write_with_update_rule (
 			break;
 
 		default:
+
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 				"write_with_update_rule: Unknown update_rule setting: %X\n",
 				(obj_desc->common_field.field_flags & AML_FIELD_UPDATE_RULE_MASK)));
@@ -580,17 +610,18 @@ acpi_ex_write_with_update_rule (
 		}
 	}
 
+	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
+		"Mask %8.8X%8.8X, datum_offset %X, Width %X, Value %8.8X%8.8X, merged_value %8.8X%8.8X\n",
+		ACPI_HIDWORD (mask), ACPI_LODWORD (mask),
+		field_datum_byte_offset,
+		obj_desc->common_field.access_byte_width,
+		ACPI_HIDWORD (field_value), ACPI_LODWORD (field_value),
+		ACPI_HIDWORD (merged_value),ACPI_LODWORD (merged_value)));
+
 	/* Write the merged value */
 
 	status = acpi_ex_field_datum_io (obj_desc, field_datum_byte_offset,
 			  &merged_value, ACPI_WRITE);
-
-	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
-		"Mask %8.8X%8.8X datum_offset %X Value %8.8X%8.8X, merged_value %8.8X%8.8X\n",
-		ACPI_HIDWORD (mask), ACPI_LODWORD (mask),
-		field_datum_byte_offset,
-		ACPI_HIDWORD (field_value), ACPI_LODWORD (field_value),
-		ACPI_HIDWORD (merged_value),ACPI_LODWORD (merged_value)));
 
 	return_ACPI_STATUS (status);
 }
@@ -625,7 +656,7 @@ acpi_ex_get_buffer_datum (
 	u32                             index;
 
 
-	ACPI_FUNCTION_ENTRY ();
+	ACPI_FUNCTION_TRACE_U32 ("ex_get_buffer_datum", byte_granularity);
 
 
 	/* Get proper index into buffer (handles big/little endian) */
@@ -659,6 +690,8 @@ acpi_ex_get_buffer_datum (
 		/* Should not get here */
 		break;
 	}
+
+	return_VOID;
 }
 
 
@@ -690,7 +723,8 @@ acpi_ex_set_buffer_datum (
 {
 	u32                             index;
 
-	ACPI_FUNCTION_ENTRY ();
+
+	ACPI_FUNCTION_TRACE_U32 ("ex_set_buffer_datum", byte_granularity);
 
 
 	/* Get proper index into buffer (handles big/little endian) */
@@ -724,6 +758,8 @@ acpi_ex_set_buffer_datum (
 		/* Should not get here */
 		break;
 	}
+
+	return_VOID;
 }
 
 
@@ -777,7 +813,7 @@ acpi_ex_extract_from_field (
 			   obj_desc->common_field.access_byte_width);
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
-		"byte_len=%X, datum_len=%X, byte_gran=%X\n",
+		"byte_len %X, datum_len %X, byte_gran %X\n",
 		byte_field_length, datum_count,obj_desc->common_field.access_byte_width));
 
 	/*
@@ -942,20 +978,27 @@ acpi_ex_insert_into_field (
 	 * larger than the field, this typically happens when an integer is
 	 * written to a field that is actually smaller than an integer.
 	 */
-	byte_field_length = ACPI_ROUND_BITS_UP_TO_BYTES (obj_desc->common_field.bit_length);
+	byte_field_length = ACPI_ROUND_BITS_UP_TO_BYTES (
+			 obj_desc->common_field.bit_length);
 	if (buffer_length < byte_field_length) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD, "Buffer length %X too small for field %X\n",
+		ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
+			"Buffer length %X too small for field %X\n",
 			buffer_length, byte_field_length));
 
 		return_ACPI_STATUS (AE_BUFFER_OVERFLOW);
 	}
 
+	byte_field_length = ACPI_ROUND_BITS_UP_TO_BYTES (
+			 obj_desc->common_field.start_field_bit_offset +
+			 obj_desc->common_field.bit_length);
+
 	/* Convert byte count to datum count, round up if necessary */
 
-	datum_count = ACPI_ROUND_UP_TO (byte_field_length, obj_desc->common_field.access_byte_width);
+	datum_count = ACPI_ROUND_UP_TO (byte_field_length,
+			  obj_desc->common_field.access_byte_width);
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
-		"byte_len=%X, datum_len=%X, byte_gran=%X\n",
+		"Bytes %X, Datums %X, byte_gran %X\n",
 		byte_field_length, datum_count, obj_desc->common_field.access_byte_width));
 
 	/*
@@ -1006,6 +1049,10 @@ acpi_ex_insert_into_field (
 		return_ACPI_STATUS (status);
 	}
 
+	/* We just wrote the first datum */
+
+	datum_offset++;
+
 	/* If the entire field fits within one datum, we are done. */
 
 	if ((datum_count == 1) &&
@@ -1025,7 +1072,6 @@ acpi_ex_insert_into_field (
 	 * applied in Part3 below.
 	 */
 	while (datum_offset < datum_count) {
-		datum_offset++;
 		field_datum_byte_offset += obj_desc->common_field.access_byte_width;
 
 		/*
@@ -1057,33 +1103,34 @@ acpi_ex_insert_into_field (
 		 * a datum boundary.  Update Rule must be applied to the bits outside
 		 * the field.
 		 */
-		if (datum_offset == datum_count) {
+		datum_offset++;
+		if ((datum_offset == datum_count) &&
+			(obj_desc->common_field.end_field_valid_bits)) {
 			/*
 			 * If there are dangling non-aligned bits, perform one more merged write
 			 * Else - field is aligned at the end, no need for any more writes
 			 */
-			if (obj_desc->common_field.end_field_valid_bits) {
-				/*
-				 * Part3:
-				 * This is the last datum and the field does not end on a datum boundary.
-				 * Build the partial datum and write with the update rule.
-				 *
-				 * Mask off the unused bits above (after) the end-of-field
-				 */
-				mask = ACPI_MASK_BITS_ABOVE (obj_desc->common_field.end_field_valid_bits);
-				merged_datum &= mask;
 
-				/* Write the last datum with the update rule */
+			/*
+			 * Part3:
+			 * This is the last datum and the field does not end on a datum boundary.
+			 * Build the partial datum and write with the update rule.
+			 *
+			 * Mask off the unused bits above (after) the end-of-field
+			 */
+			mask = ACPI_MASK_BITS_ABOVE (obj_desc->common_field.end_field_valid_bits);
+			merged_datum &= mask;
 
-				status = acpi_ex_write_with_update_rule (obj_desc, mask, merged_datum,
-						   field_datum_byte_offset);
-				if (ACPI_FAILURE (status)) {
-					return_ACPI_STATUS (status);
-				}
+			/* Write the last datum with the update rule */
+
+			status = acpi_ex_write_with_update_rule (obj_desc, mask, merged_datum,
+					   field_datum_byte_offset);
+			if (ACPI_FAILURE (status)) {
+				return_ACPI_STATUS (status);
 			}
 		}
 		else {
-			/* Normal case -- write the completed datum */
+			/* Normal (aligned) case -- write the completed datum */
 
 			status = acpi_ex_field_datum_io (obj_desc, field_datum_byte_offset,
 					  &merged_datum, ACPI_WRITE);

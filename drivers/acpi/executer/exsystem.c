@@ -129,18 +129,13 @@ acpi_ex_system_do_stall (
 	ACPI_FUNCTION_ENTRY ();
 
 
-	if (how_long > 1000) /* 1 millisecond */ {
-		/* Since this thread will sleep, we must release the interpreter */
-
-		acpi_ex_exit_interpreter ();
-
-		acpi_os_sleep (0, (how_long / 1000) + 1);
-
-		/* And now we must get the interpreter again */
-
-		status = acpi_ex_enter_interpreter ();
+	if (how_long > 100) /* 100 microseconds */ {
+		/*
+		 * Longer than 100 usec, use sleep instead
+		 * (according to ACPI specification)
+		 */
+		status = acpi_ex_system_do_suspend ((how_long / 1000) + 1);
 	}
-
 	else {
 		acpi_os_stall (how_long);
 	}
