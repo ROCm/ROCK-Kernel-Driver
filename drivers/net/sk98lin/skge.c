@@ -2142,7 +2142,7 @@ struct sk_buff	*pMessage)	/* pointer to send-message              */
 	*/
 	PhysAddr = (SK_U64) pci_map_page(pAC->PciDev,
 					virt_to_page(pMessage->data),
-					((unsigned long) pMessage->data & ~PAGE_MASK),
+					offset_in_page(pMessage->data),
 					pMessage->len,
 					PCI_DMA_TODEVICE);
 	pTxd->VDataLow  = (SK_U32) (PhysAddr & 0xffffffff);
@@ -2259,7 +2259,7 @@ struct sk_buff	*pMessage)	/* pointer to send-message              */
 	*/
 	PhysAddr = (SK_U64) pci_map_page(pAC->PciDev,
 			virt_to_page(pMessage->data),
-			((unsigned long) pMessage->data & ~PAGE_MASK),
+			offset_in_page(pMessage->data),
 			skb_headlen(pMessage),
 			PCI_DMA_TODEVICE);
 
@@ -2518,8 +2518,7 @@ SK_U64		PhysAddr;	/* physical address of a rx buffer */
 	Length = pAC->RxBufSize;
 	PhysAddr = (SK_U64) pci_map_page(pAC->PciDev,
 		virt_to_page(pMsgBlock->data),
-		((unsigned long) pMsgBlock->data &
-		~PAGE_MASK),
+		offset_in_page(pMsgBlock->data),
 		pAC->RxBufSize - 2,
 		PCI_DMA_FROMDEVICE);
 

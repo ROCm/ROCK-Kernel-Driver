@@ -971,7 +971,7 @@ pmac_ide_raw_build_sglist(ide_drive_t *drive, struct request *rq)
 	if (sector_count > 127) {
 		memset(&sg[nents], 0, sizeof(*sg));
 		sg[nents].page = virt_to_page(virt_addr);
-		sg[nents].offset = (unsigned long) virt_addr & ~PAGE_MASK;
+		sg[nents].offset = offset_in_page(virt_addr);
 		sg[nents].length = 127  * SECTOR_SIZE;
 		nents++;
 		virt_addr = virt_addr + (127 * SECTOR_SIZE);
@@ -979,7 +979,7 @@ pmac_ide_raw_build_sglist(ide_drive_t *drive, struct request *rq)
 	}
 	memset(&sg[nents], 0, sizeof(*sg));
 	sg[nents].page = virt_to_page(virt_addr);
-	sg[nents].offset = (unsigned long) virt_addr & ~PAGE_MASK;
+	sg[nents].offset = offset_in_page(virt_addr);
 	sg[nents].length =  sector_count  * SECTOR_SIZE;
 	nents++;
    

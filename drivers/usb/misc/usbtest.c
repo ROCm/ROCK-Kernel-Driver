@@ -271,7 +271,7 @@ alloc_sglist (int nents, int max, int vary)
 
 		/* kmalloc pages are always physically contiguous! */
 		sg [i].page = virt_to_page (buf);
-		sg [i].offset = ((unsigned) buf) & ~PAGE_MASK;
+		sg [i].offset = offset_in_page (buf);
 		sg [i].length = size;
 
 		if (vary) {

@@ -233,7 +233,7 @@ static void ide_build_sglist(ide_drive_t *drive, struct request *rq)
 
 		memset(sg, 0, sizeof(*sg));
 		sg->page   = virt_to_page(rq->buffer);
-		sg->offset = ((unsigned long)rq->buffer) & ~PAGE_MASK;
+		sg->offset = offset_in_page(rq->buffer);
 		sg->length = rq->nr_sectors * SECTOR_SIZE;
 		nents = 1;
 	} else {

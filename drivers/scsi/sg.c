@@ -1814,7 +1814,7 @@ sg_build_indirect(Sg_scatter_hold * schp, Sg_fd * sfp, int buff_size)
 					break;
 			}
 			sclp->page = virt_to_page(p);
-			sclp->offset = (unsigned long) p & ~PAGE_MASK;
+			sclp->offset = offset_in_page(p);
 			sclp->length = ret_sz;
 
 			SCSI_LOG_TIMEOUT(5, printk("sg_build_build: k=%d, a=0x%p, len=%d\n",

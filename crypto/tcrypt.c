@@ -96,7 +96,7 @@ test_md5(void)
 
 		p = md5_tv[i].plaintext;
 		sg[0].page = virt_to_page(p);
-		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].offset = offset_in_page(p);
 		sg[0].length = strlen(md5_tv[i].plaintext);
 
 		crypto_digest_init(tfm);
@@ -119,12 +119,12 @@ test_md5(void)
 
 	p = &xbuf[IDX1];
 	sg[0].page = virt_to_page(p);
-	sg[0].offset = ((long) p & ~PAGE_MASK);
+	sg[0].offset = offset_in_page(p);
 	sg[0].length = 13;
 
 	p = &xbuf[IDX2];
 	sg[1].page = virt_to_page(p);
-	sg[1].offset = ((long) p & ~PAGE_MASK);
+	sg[1].offset = offset_in_page(p);
 	sg[1].length = 13;
 
 	memset(result, 0, sizeof (result));
@@ -173,7 +173,7 @@ test_hmac_md5(void)
 
 		p = hmac_md5_tv[i].plaintext;
 		sg[0].page = virt_to_page(p);
-		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].offset = offset_in_page(p);
 		sg[0].length = strlen(hmac_md5_tv[i].plaintext);
 
 		klen = strlen(hmac_md5_tv[i].key);
@@ -195,12 +195,12 @@ test_hmac_md5(void)
 
 	p = &xbuf[IDX1];
 	sg[0].page = virt_to_page(p);
-	sg[0].offset = ((long) p & ~PAGE_MASK);
+	sg[0].offset = offset_in_page(p);
 	sg[0].length = 16;
 
 	p = &xbuf[IDX2];
 	sg[1].page = virt_to_page(p);
-	sg[1].offset = ((long) p & ~PAGE_MASK);
+	sg[1].offset = offset_in_page(p);
 	sg[1].length = 12;
 
 	memset(result, 0, sizeof (result));
@@ -250,7 +250,7 @@ test_hmac_sha1(void)
 
 		p = hmac_sha1_tv[i].plaintext;
 		sg[0].page = virt_to_page(p);
-		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].offset = offset_in_page(p);
 		sg[0].length = strlen(hmac_sha1_tv[i].plaintext);
 
 		klen = strlen(hmac_sha1_tv[i].key);
@@ -274,12 +274,12 @@ test_hmac_sha1(void)
 
 	p = &xbuf[IDX1];
 	sg[0].page = virt_to_page(p);
-	sg[0].offset = ((long) p & ~PAGE_MASK);
+	sg[0].offset = offset_in_page(p);
 	sg[0].length = 16;
 
 	p = &xbuf[IDX2];
 	sg[1].page = virt_to_page(p);
-	sg[1].offset = ((long) p & ~PAGE_MASK);
+	sg[1].offset = offset_in_page(p);
 	sg[1].length = 12;
 
 	memset(result, 0, sizeof (result));
@@ -329,7 +329,7 @@ test_hmac_sha256(void)
 
 		p = hmac_sha256_tv[i].plaintext;
 		sg[0].page = virt_to_page(p);
-		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].offset = offset_in_page(p);
 		sg[0].length = strlen(hmac_sha256_tv[i].plaintext);
 
 		klen = strlen(hmac_sha256_tv[i].key);
@@ -383,7 +383,7 @@ test_md4(void)
 
 		p = md4_tv[i].plaintext;
 		sg[0].page = virt_to_page(p);
-		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].offset = offset_in_page(p);
 		sg[0].length = strlen(md4_tv[i].plaintext);
 
 		crypto_digest_digest(tfm, sg, 1, result);
@@ -433,7 +433,7 @@ test_sha1(void)
 
 		p = sha1_tv[i].plaintext;
 		sg[0].page = virt_to_page(p);
-		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].offset = offset_in_page(p);
 		sg[0].length = strlen(sha1_tv[i].plaintext);
 
 		crypto_digest_init(tfm);
@@ -456,12 +456,12 @@ test_sha1(void)
 
 	p = &xbuf[IDX1];
 	sg[0].page = virt_to_page(p);
-	sg[0].offset = ((long) p & ~PAGE_MASK);
+	sg[0].offset = offset_in_page(p);
 	sg[0].length = 28;
 
 	p = &xbuf[IDX2];
 	sg[1].page = virt_to_page(p);
-	sg[1].offset = ((long) p & ~PAGE_MASK);
+	sg[1].offset = offset_in_page(p);
 	sg[1].length = 28;
 
 	memset(result, 0, sizeof (result));
@@ -508,7 +508,7 @@ test_sha256(void)
 
 		p = sha256_tv[i].plaintext;
 		sg[0].page = virt_to_page(p);
-		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].offset = offset_in_page(p);
 		sg[0].length = strlen(sha256_tv[i].plaintext);
 
 		crypto_digest_init(tfm);
@@ -531,12 +531,12 @@ test_sha256(void)
 
 	p = &xbuf[IDX1];
 	sg[0].page = virt_to_page(p);
-	sg[0].offset = ((long) p & ~PAGE_MASK);
+	sg[0].offset = offset_in_page(p);
 	sg[0].length = 28;
 
 	p = &xbuf[IDX2];
 	sg[1].page = virt_to_page(p);
-	sg[1].offset = ((long) p & ~PAGE_MASK);
+	sg[1].offset = offset_in_page(p);
 	sg[1].length = 28;
 
 	memset(result, 0, sizeof (result));
@@ -584,7 +584,7 @@ test_sha384(void)
 
 		p = sha384_tv[i].plaintext;
 		sg[0].page = virt_to_page(p);
-		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].offset = offset_in_page(p);
 		sg[0].length = strlen(sha384_tv[i].plaintext);
 
 		crypto_digest_init(tfm);
@@ -636,7 +636,7 @@ test_sha512(void)
 
 		p = sha512_tv[i].plaintext;
 		sg[0].page = virt_to_page(p);
-		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].offset = offset_in_page(p);
 		sg[0].length = strlen(sha512_tv[i].plaintext);
 
 		crypto_digest_init(tfm);
@@ -701,7 +701,7 @@ test_des(void)
 
 		p = des_tv[i].plaintext;
 		sg[0].page = virt_to_page(p);
-		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].offset = offset_in_page(p);
 		sg[0].length = len;
 		ret = crypto_cipher_encrypt(tfm, sg, sg, len);
 		if (ret) {
@@ -738,12 +738,12 @@ test_des(void)
 
 	p = &xbuf[IDX1];
 	sg[0].page = virt_to_page(p);
-	sg[0].offset = ((long) p & ~PAGE_MASK);
+	sg[0].offset = offset_in_page(p);
 	sg[0].length = 8;
 
 	p = &xbuf[IDX2];
 	sg[1].page = virt_to_page(p);
-	sg[1].offset = ((long) p & ~PAGE_MASK);
+	sg[1].offset = offset_in_page(p);
 	sg[1].length = 8;
 
 	ret = crypto_cipher_encrypt(tfm, sg, sg, 16);
@@ -801,17 +801,17 @@ test_des(void)
 
 	p = &xbuf[IDX3];
 	sg[0].page = virt_to_page(p);
-	sg[0].offset = ((long) p & ~PAGE_MASK);
+	sg[0].offset = offset_in_page(p);
 	sg[0].length = 14;
 
 	p = &xbuf[IDX4];
 	sg[1].page = virt_to_page(p);
-	sg[1].offset = ((long) p & ~PAGE_MASK);
+	sg[1].offset = offset_in_page(p);
 	sg[1].length = 10;
 
 	p = &xbuf[IDX5];
 	sg[2].page = virt_to_page(p);
-	sg[2].offset = ((long) p & ~PAGE_MASK);
+	sg[2].offset = offset_in_page(p);
 	sg[2].length = 8;
 
 	ret = crypto_cipher_encrypt(tfm, sg, sg, 32);
@@ -872,22 +872,22 @@ test_des(void)
 
 	p = &xbuf[IDX3];
 	sg[0].page = virt_to_page(p);
-	sg[0].offset = ((long) p & ~PAGE_MASK);
+	sg[0].offset = offset_in_page(p);
 	sg[0].length = 2;
 
 	p = &xbuf[IDX4];
 	sg[1].page = virt_to_page(p);
-	sg[1].offset = ((long) p & ~PAGE_MASK);
+	sg[1].offset = offset_in_page(p);
 	sg[1].length = 1;
 
 	p = &xbuf[IDX5];
 	sg[2].page = virt_to_page(p);
-	sg[2].offset = ((long) p & ~PAGE_MASK);
+	sg[2].offset = offset_in_page(p);
 	sg[2].length = 3;
 
 	p = &xbuf[IDX6];
 	sg[3].page = virt_to_page(p);
-	sg[3].offset = ((long) p & ~PAGE_MASK);
+	sg[3].offset = offset_in_page(p);
 	sg[3].length = 18;
 
 	ret = crypto_cipher_encrypt(tfm, sg, sg, 24);
@@ -956,27 +956,27 @@ test_des(void)
 
 	p = &xbuf[IDX3];
 	sg[0].page = virt_to_page(p);
-	sg[0].offset = ((long) p & ~PAGE_MASK);
+	sg[0].offset = offset_in_page(p);
 	sg[0].length = 2;
 
 	p = &xbuf[IDX4];
 	sg[1].page = virt_to_page(p);
-	sg[1].offset = ((long) p & ~PAGE_MASK);
+	sg[1].offset = offset_in_page(p);
 	sg[1].length = 2;
 
 	p = &xbuf[IDX5];
 	sg[2].page = virt_to_page(p);
-	sg[2].offset = ((long) p & ~PAGE_MASK);
+	sg[2].offset = offset_in_page(p);
 	sg[2].length = 2;
 
 	p = &xbuf[IDX6];
 	sg[3].page = virt_to_page(p);
-	sg[3].offset = ((long) p & ~PAGE_MASK);
+	sg[3].offset = offset_in_page(p);
 	sg[3].length = 2;
 
 	p = &xbuf[IDX7];
 	sg[4].page = virt_to_page(p);
-	sg[4].offset = ((long) p & ~PAGE_MASK);
+	sg[4].offset = offset_in_page(p);
 	sg[4].length = 8;
 
 	ret = crypto_cipher_encrypt(tfm, sg, sg, 16);
@@ -1040,42 +1040,42 @@ test_des(void)
 
 	p = &xbuf[IDX1];
 	sg[0].page = virt_to_page(p);
-	sg[0].offset = ((long) p & ~PAGE_MASK);
+	sg[0].offset = offset_in_page(p);
 	sg[0].length = 1;
 
 	p = &xbuf[IDX2];
 	sg[1].page = virt_to_page(p);
-	sg[1].offset = ((long) p & ~PAGE_MASK);
+	sg[1].offset = offset_in_page(p);
 	sg[1].length = 1;
 
 	p = &xbuf[IDX3];
 	sg[2].page = virt_to_page(p);
-	sg[2].offset = ((long) p & ~PAGE_MASK);
+	sg[2].offset = offset_in_page(p);
 	sg[2].length = 1;
 
 	p = &xbuf[IDX4];
 	sg[3].page = virt_to_page(p);
-	sg[3].offset = ((long) p & ~PAGE_MASK);
+	sg[3].offset = offset_in_page(p);
 	sg[3].length = 1;
 
 	p = &xbuf[IDX5];
 	sg[4].page = virt_to_page(p);
-	sg[4].offset = ((long) p & ~PAGE_MASK);
+	sg[4].offset = offset_in_page(p);
 	sg[4].length = 1;
 
 	p = &xbuf[IDX6];
 	sg[5].page = virt_to_page(p);
-	sg[5].offset = ((long) p & ~PAGE_MASK);
+	sg[5].offset = offset_in_page(p);
 	sg[5].length = 1;
 
 	p = &xbuf[IDX7];
 	sg[6].page = virt_to_page(p);
-	sg[6].offset = ((long) p & ~PAGE_MASK);
+	sg[6].offset = offset_in_page(p);
 	sg[6].length = 1;
 
 	p = &xbuf[IDX8];
 	sg[7].page = virt_to_page(p);
-	sg[7].offset = ((long) p & ~PAGE_MASK);
+	sg[7].offset = offset_in_page(p);
 	sg[7].length = 1;
 
 	ret = crypto_cipher_encrypt(tfm, sg, sg, 8);
@@ -1117,7 +1117,7 @@ test_des(void)
 
 		p = des_tv[i].plaintext;
 		sg[0].page = virt_to_page(p);
-		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].offset = offset_in_page(p);
 		sg[0].length = len;
 
 		ret = crypto_cipher_decrypt(tfm, sg, sg, sg[0].length);
@@ -1155,12 +1155,12 @@ test_des(void)
 
 	p = &xbuf[IDX1];
 	sg[0].page = virt_to_page(p);
-	sg[0].offset = ((long) p & ~PAGE_MASK);
+	sg[0].offset = offset_in_page(p);
 	sg[0].length = 8;
 
 	p = &xbuf[IDX2];
 	sg[1].page = virt_to_page(p);
-	sg[1].offset = ((long) p & ~PAGE_MASK);
+	sg[1].offset = offset_in_page(p);
 	sg[1].length = 8;
 
 	ret = crypto_cipher_decrypt(tfm, sg, sg, 16);
@@ -1207,17 +1207,17 @@ test_des(void)
 
 	p = &xbuf[IDX1];
 	sg[0].page = virt_to_page(p);
-	sg[0].offset = ((long) p & ~PAGE_MASK);
+	sg[0].offset = offset_in_page(p);
 	sg[0].length = 3;
 
 	p = &xbuf[IDX2];
 	sg[1].page = virt_to_page(p);
-	sg[1].offset = ((long) p & ~PAGE_MASK);
+	sg[1].offset = offset_in_page(p);
 	sg[1].length = 12;
 
 	p = &xbuf[IDX3];
 	sg[2].page = virt_to_page(p);
-	sg[2].offset = ((long) p & ~PAGE_MASK);
+	sg[2].offset = offset_in_page(p);
 	sg[2].length = 1;
 
 	ret = crypto_cipher_decrypt(tfm, sg, sg, 16);
@@ -1284,7 +1284,7 @@ test_des(void)
 		p = des_tv[i].plaintext;
 
 		sg[0].page = virt_to_page(p);
-		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].offset = offset_in_page(p);
 		sg[0].length = len;
 
 		crypto_cipher_set_iv(tfm, des_tv[i].iv,
@@ -1339,12 +1339,12 @@ test_des(void)
 
 	p = &xbuf[IDX1];
 	sg[0].page = virt_to_page(p);
-	sg[0].offset = ((long) p & ~PAGE_MASK);
+	sg[0].offset = offset_in_page(p);
 	sg[0].length = 13;
 
 	p = &xbuf[IDX2];
 	sg[1].page = virt_to_page(p);
-	sg[1].offset = ((long) p & ~PAGE_MASK);
+	sg[1].offset = offset_in_page(p);
 	sg[1].length = 11;
 
 	crypto_cipher_set_iv(tfm, des_tv[i].iv, crypto_tfm_alg_ivsize(tfm));
@@ -1392,7 +1392,7 @@ test_des(void)
 		p = des_tv[i].plaintext;
 
 		sg[0].page = virt_to_page(p);
-		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].offset = offset_in_page(p);
 		sg[0].length = len;
 
 		crypto_cipher_set_iv(tfm, des_tv[i].iv,
@@ -1440,12 +1440,12 @@ test_des(void)
 
 	p = &xbuf[IDX1];
 	sg[0].page = virt_to_page(p);
-	sg[0].offset = ((long) p & ~PAGE_MASK);
+	sg[0].offset = offset_in_page(p);
 	sg[0].length = 4;
 
 	p = &xbuf[IDX2];
 	sg[1].page = virt_to_page(p);
-	sg[1].offset = ((long) p & ~PAGE_MASK);
+	sg[1].offset = offset_in_page(p);
 	sg[1].length = 4;
 
 	crypto_cipher_set_iv(tfm, des_tv[i].iv, crypto_tfm_alg_ivsize(tfm));
@@ -1516,7 +1516,7 @@ test_des3_ede(void)
 
 		p = des_tv[i].plaintext;
 		sg[0].page = virt_to_page(p);
-		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].offset = offset_in_page(p);
 		sg[0].length = len;
 		ret = crypto_cipher_encrypt(tfm, sg, sg, len);
 		if (ret) {
@@ -1559,7 +1559,7 @@ test_des3_ede(void)
 
 		p = des_tv[i].plaintext;
 		sg[0].page = virt_to_page(p);
-		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].offset = offset_in_page(p);
 		sg[0].length = len;
 		ret = crypto_cipher_decrypt(tfm, sg, sg, len);
 		if (ret) {
@@ -1622,7 +1622,7 @@ test_blowfish(void)
 
 		p = bf_tv[i].plaintext;
 		sg[0].page = virt_to_page(p);
-		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].offset = offset_in_page(p);
 		sg[0].length = bf_tv[i].plen;
 		ret = crypto_cipher_encrypt(tfm, sg, sg, sg[0].length);
 		if (ret) {
@@ -1664,7 +1664,7 @@ test_blowfish(void)
 
 		p = bf_tv[i].plaintext;
 		sg[0].page = virt_to_page(p);
-		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].offset = offset_in_page(p);
 		sg[0].length = bf_tv[i].plen;
 		ret = crypto_cipher_decrypt(tfm, sg, sg, sg[0].length);
 		if (ret) {
@@ -1713,7 +1713,7 @@ test_blowfish(void)
 		p = bf_tv[i].plaintext;
 
 		sg[0].page = virt_to_page(p);
-		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].offset = offset_in_page(p);
 		sg[0].length =  bf_tv[i].plen;
 
 		crypto_cipher_set_iv(tfm, bf_tv[i].iv,
@@ -1758,7 +1758,7 @@ test_blowfish(void)
 		p = bf_tv[i].plaintext;
 
 		sg[0].page = virt_to_page(p);
-		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].offset = offset_in_page(p);
 		sg[0].length =  bf_tv[i].plen;
 
 		crypto_cipher_set_iv(tfm, bf_tv[i].iv,
@@ -1827,7 +1827,7 @@ test_twofish(void)
 
 		p = tf_tv[i].plaintext;
 		sg[0].page = virt_to_page(p);
-		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].offset = offset_in_page(p);
 		sg[0].length = tf_tv[i].plen;
 		ret = crypto_cipher_encrypt(tfm, sg, sg, sg[0].length);
 		if (ret) {
@@ -1869,7 +1869,7 @@ test_twofish(void)
 
 		p = tf_tv[i].plaintext;
 		sg[0].page = virt_to_page(p);
-		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].offset = offset_in_page(p);
 		sg[0].length = tf_tv[i].plen;
 		ret = crypto_cipher_decrypt(tfm, sg, sg, sg[0].length);
 		if (ret) {
@@ -1918,7 +1918,7 @@ test_twofish(void)
 		p = tf_tv[i].plaintext;
 
 		sg[0].page = virt_to_page(p);
-		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].offset = offset_in_page(p);
 		sg[0].length =  tf_tv[i].plen;
 
 		crypto_cipher_set_iv(tfm, tf_tv[i].iv,
@@ -1964,7 +1964,7 @@ test_twofish(void)
 		p = tf_tv[i].plaintext;
 
 		sg[0].page = virt_to_page(p);
-		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].offset = offset_in_page(p);
 		sg[0].length =  tf_tv[i].plen;
 
 		crypto_cipher_set_iv(tfm, tf_tv[i].iv,
@@ -2028,7 +2028,7 @@ test_serpent(void)
 
 		p = serp_tv[i].plaintext;
 		sg[0].page = virt_to_page(p);
-		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].offset = offset_in_page(p);
 		sg[0].length = sizeof(serp_tv[i].plaintext);
 		ret = crypto_cipher_encrypt(tfm, sg, sg, sg[0].length);
 		if (ret) {
@@ -2068,7 +2068,7 @@ test_serpent(void)
 
 		p = serp_tv[i].plaintext;
 		sg[0].page = virt_to_page(p);
-		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].offset = offset_in_page(p);
 		sg[0].length = sizeof(serp_tv[i].plaintext);
 		ret = crypto_cipher_decrypt(tfm, sg, sg, sg[0].length);
 		if (ret) {
@@ -2131,7 +2131,7 @@ test_aes(void)
 
 		p = aes_tv[i].plaintext;
 		sg[0].page = virt_to_page(p);
-		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].offset = offset_in_page(p);
 		sg[0].length = aes_tv[i].plen;
 		ret = crypto_cipher_encrypt(tfm, sg, sg, sg[0].length);
 		if (ret) {
@@ -2173,7 +2173,7 @@ test_aes(void)
 
 		p = aes_tv[i].plaintext;
 		sg[0].page = virt_to_page(p);
-		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].offset = offset_in_page(p);
 		sg[0].length = aes_tv[i].plen;
 		ret = crypto_cipher_decrypt(tfm, sg, sg, sg[0].length);
 		if (ret) {

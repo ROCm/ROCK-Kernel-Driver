@@ -1110,10 +1110,10 @@ static int __ipv6_regen_rndid(struct inet6_dev *idev)
 	struct scatterlist sg[2];
 
 	sg[0].page = virt_to_page(idev->entropy);
-	sg[0].offset = ((long) idev->entropy & ~PAGE_MASK);
+	sg[0].offset = offset_in_page(idev->entropy);
 	sg[0].length = 8;
 	sg[1].page = virt_to_page(eui64);
-	sg[1].offset = ((long) eui64 & ~PAGE_MASK);
+	sg[1].offset = offset_in_page(eui64);
 	sg[1].length = 8;
 
 	dev = idev->dev;

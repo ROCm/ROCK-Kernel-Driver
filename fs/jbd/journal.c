@@ -278,9 +278,6 @@ static void journal_kill_thread(journal_t *journal)
  * Bit 1 set == buffer copy-out performed (kfree the data after IO)
  */
 
-static inline unsigned long virt_to_offset(void *p) 
-{return ((unsigned long) p) & ~PAGE_MASK;}
-					       
 int journal_write_metadata_buffer(transaction_t *transaction,
 				  struct journal_head  *jh_in,
 				  struct journal_head **jh_out,
@@ -318,10 +315,10 @@ repeat:
 	if (jh_in->b_frozen_data) {
 		done_copy_out = 1;
 		new_page = virt_to_page(jh_in->b_frozen_data);
-		new_offset = virt_to_offset(jh_in->b_frozen_data);
+		new_offset = offset_in_page(jh_in->b_frozen_data);
 	} else {
 		new_page = jh2bh(jh_in)->b_page;
-		new_offset = virt_to_offset(jh2bh(jh_in)->b_data);
+		new_offset = offset_in_page(jh2bh(jh_in)->b_data);
 	}
 
 	mapped_data = kmap_atomic(new_page, KM_USER0);
@@ -358,7 +355,7 @@ repeat:
 		   address kmapped so that we can clear the escaped
 		   magic number below. */
 		new_page = virt_to_page(tmp);
-		new_offset = virt_to_offset(tmp);
+		new_offset = offset_in_page(tmp);
 		done_copy_out = 1;
 	}
 

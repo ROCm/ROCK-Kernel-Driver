@@ -1162,8 +1162,7 @@ static dma_addr_t __map_scsi_single_data(pcidev_t pdev, Scsi_Cmnd *cmd)
 
 	mapping = pci_map_page(pdev,
 			       virt_to_page(cmd->request_buffer),
-			       ((unsigned long)cmd->request_buffer &
-				~PAGE_MASK),
+			       offset_in_page(cmd->request_buffer),
 			       cmd->request_bufflen, dma_dir);
 	__data_mapped(cmd) = 1;
 	__data_mapping(cmd) = mapping;
