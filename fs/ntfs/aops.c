@@ -560,7 +560,8 @@ static int ntfs_write_block(struct page *page)
 			continue;
 
 		/* Make sure we have enough initialized size. */
-		if (unlikely((block >= iblock) && (iblock < dblock))) {
+		if (unlikely((block >= iblock) &&
+				(ni->initialized_size < vi->i_size))) {
 			/*
 			 * If this page is fully outside initialized size, zero
 			 * out all pages between the current initialized size
