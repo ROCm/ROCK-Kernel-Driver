@@ -556,8 +556,6 @@ setup_diva(struct IsdnCard *card)
 
 	strcpy(tmp, Diva_revision);
 	printk(KERN_INFO "HiSax: Eicon.Diehl Diva driver Rev. %s\n", HiSax_getrev(tmp));
-	if (cs->typ != ISDN_CTYPE_DIEHLDIVA)
-		return(0);
 	if (card->para[1]) {
 		cs->hw.diva.ctrl_reg = 0;
 		cs->hw.diva.cfg_reg = card->para[1];

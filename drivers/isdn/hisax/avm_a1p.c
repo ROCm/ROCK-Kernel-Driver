@@ -226,9 +226,6 @@ setup_avm_a1_pcmcia(struct IsdnCard *card)
 	strcpy(tmp, avm_revision);
 	printk(KERN_INFO "HiSax: AVM A1 PCMCIA driver Rev. %s\n",
 						 HiSax_getrev(tmp));
-	if (cs->typ != ISDN_CTYPE_A1_PCMCIA)
-		return (0);
-
 	cs->hw.avm.cfg_reg = card->para[1];
 	cs->irq = card->para[0];
 

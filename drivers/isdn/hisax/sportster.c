@@ -198,8 +198,6 @@ setup_sportster(struct IsdnCard *card)
 
 	strcpy(tmp, sportster_revision);
 	printk(KERN_INFO "HiSax: USR Sportster driver Rev. %s\n", HiSax_getrev(tmp));
-	if (cs->typ != ISDN_CTYPE_SPORTSTER)
-		return (0);
 
 	cs->hw.spt.cfg_reg = card->para[1];
 	cs->irq = card->para[0];

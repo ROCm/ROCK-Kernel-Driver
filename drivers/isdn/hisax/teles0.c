@@ -174,9 +174,6 @@ setup_teles0(struct IsdnCard *card)
 
 	strcpy(tmp, teles0_revision);
 	printk(KERN_INFO "HiSax: Teles 8.0/16.0 driver Rev. %s\n", HiSax_getrev(tmp));
-	if ((cs->typ != ISDN_CTYPE_16_0) && (cs->typ != ISDN_CTYPE_8_0))
-		return (0);
-
 	if (cs->typ == ISDN_CTYPE_16_0)
 		cs->hw.teles0.cfg_reg = card->para[2];
 	else			/* 8.0 */

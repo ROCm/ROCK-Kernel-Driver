@@ -177,48 +177,44 @@ bkm_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 static void
 enable_bkm_int(struct IsdnCardState *cs, unsigned bEnable)
 {
-	if (cs->typ == ISDN_CTYPE_BKM_A4T) {
-		I20_REGISTER_FILE *pI20_Regs = (I20_REGISTER_FILE *) (cs->hw.ax.base);
-		if (bEnable)
-			pI20_Regs->i20IntCtrl |= (intISDN | intPCI);
-		else
-			/* CAUTION: This disables the video capture driver too */
-			pI20_Regs->i20IntCtrl &= ~(intISDN | intPCI);
-	}
+	I20_REGISTER_FILE *pI20_Regs = (I20_REGISTER_FILE *) (cs->hw.ax.base);
+	if (bEnable)
+		pI20_Regs->i20IntCtrl |= (intISDN | intPCI);
+	else
+		/* CAUTION: This disables the video capture driver too */
+		pI20_Regs->i20IntCtrl &= ~(intISDN | intPCI);
 }
 
 static void
 reset_bkm(struct IsdnCardState *cs)
 {
-	if (cs->typ == ISDN_CTYPE_BKM_A4T) {
-		I20_REGISTER_FILE *pI20_Regs = (I20_REGISTER_FILE *) (cs->hw.ax.base);
-		/* Issue the I20 soft reset     */
-		pI20_Regs->i20SysControl = 0xFF;	/* all in */
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout((10 * HZ) / 1000);
-		/* Remove the soft reset */
-		pI20_Regs->i20SysControl = sysRESET | 0xFF;
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout((10 * HZ) / 1000);
-		/* Set our configuration */
-		pI20_Regs->i20SysControl = sysRESET | sysCFG;
-		/* Issue ISDN reset     */
-		pI20_Regs->i20GuestControl = guestWAIT_CFG |
-		    g_A4T_JADE_RES |
-		    g_A4T_ISAR_RES |
-		    g_A4T_ISAC_RES |
-		    g_A4T_JADE_BOOTR |
-		    g_A4T_ISAR_BOOTR;
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout((10 * HZ) / 1000);
+	I20_REGISTER_FILE *pI20_Regs = (I20_REGISTER_FILE *) (cs->hw.ax.base);
+	/* Issue the I20 soft reset     */
+	pI20_Regs->i20SysControl = 0xFF;	/* all in */
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout((10 * HZ) / 1000);
+	/* Remove the soft reset */
+	pI20_Regs->i20SysControl = sysRESET | 0xFF;
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout((10 * HZ) / 1000);
+	/* Set our configuration */
+	pI20_Regs->i20SysControl = sysRESET | sysCFG;
+	/* Issue ISDN reset     */
+	pI20_Regs->i20GuestControl = guestWAIT_CFG |
+		g_A4T_JADE_RES |
+		g_A4T_ISAR_RES |
+		g_A4T_ISAC_RES |
+		g_A4T_JADE_BOOTR |
+		g_A4T_ISAR_BOOTR;
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout((10 * HZ) / 1000);
 
-		/* Remove RESET state from ISDN */
-		pI20_Regs->i20GuestControl &= ~(g_A4T_ISAC_RES |
-						g_A4T_JADE_RES |
-						g_A4T_ISAR_RES);
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout((10 * HZ) / 1000);
-	}
+	/* Remove RESET state from ISDN */
+	pI20_Regs->i20GuestControl &= ~(g_A4T_ISAC_RES |
+					g_A4T_JADE_RES |
+					g_A4T_ISAR_RES);
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout((10 * HZ) / 1000);
 }
 
 static void
@@ -265,11 +261,6 @@ setup_bkm_a4t(struct IsdnCard *card)
 
 	strcpy(tmp, bkm_a4t_revision);
 	printk(KERN_INFO "HiSax: T-Berkom driver Rev. %s\n", HiSax_getrev(tmp));
-	if (cs->typ == ISDN_CTYPE_BKM_A4T) {
-		cs->subtyp = BKM_A4T;
-	} else
-		return (0);
-
 	while ((dev_a4t = pci_find_device(PCI_VENDOR_ID_ZORAN,
 		PCI_DEVICE_ID_ZORAN_36120, dev_a4t))) {
 		u16 sub_sys;

@@ -180,9 +180,6 @@ setup_s0box(struct IsdnCard *card)
 
 	strcpy(tmp, s0box_revision);
 	printk(KERN_INFO "HiSax: S0Box IO driver Rev. %s\n", HiSax_getrev(tmp));
-	if (cs->typ != ISDN_CTYPE_S0BOX)
-		return (0);
-
 	cs->hw.teles3.cfg_reg = card->para[1];
 	cs->hw.teles3.hscx[0] = -0x20;
 	cs->hw.teles3.hscx[1] = 0x0;

@@ -262,8 +262,6 @@ setup_asuscom(struct IsdnCard *card)
 
 	strcpy(tmp, Asuscom_revision);
 	printk(KERN_INFO "HiSax: Asuscom ISDNLink driver Rev. %s\n", HiSax_getrev(tmp));
-	if (cs->typ != ISDN_CTYPE_ASUSCOM)
-		return (0);
 #ifdef __ISAPNP__
 	if (!card->para[1] && isapnp_present()) {
 		struct pci_bus *pb;

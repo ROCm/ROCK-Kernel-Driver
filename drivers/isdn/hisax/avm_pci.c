@@ -611,8 +611,6 @@ setup_avm_pcipnp(struct IsdnCard *card)
 
 	strcpy(tmp, avm_pci_rev);
 	printk(KERN_INFO "HiSax: AVM PCI driver Rev. %s\n", HiSax_getrev(tmp));
-	if (cs->typ != ISDN_CTYPE_FRITZPCI)
-		return (0);
 	if (card->para[1]) {
 		/* old manual method */
 		cs->hw.avm.cfg_reg = card->para[1];

@@ -99,12 +99,10 @@ set_ipac_active(struct IsdnCardState *cs, u_int active)
 static void
 enable_bkm_int(struct IsdnCardState *cs, unsigned bEnable)
 {
-	if (cs->typ == ISDN_CTYPE_SCT_QUADRO) {
-		if (bEnable)
-			wordout(cs->hw.ax.plx_adr + 0x4C, (wordin(cs->hw.ax.plx_adr + 0x4C) | 0x41));
-		else
-			wordout(cs->hw.ax.plx_adr + 0x4C, (wordin(cs->hw.ax.plx_adr + 0x4C) & ~0x41));
-	}
+	if (bEnable)
+		wordout(cs->hw.ax.plx_adr + 0x4C, (wordin(cs->hw.ax.plx_adr + 0x4C) | 0x41));
+	else
+		wordout(cs->hw.ax.plx_adr + 0x4C, (wordin(cs->hw.ax.plx_adr + 0x4C) & ~0x41));
 }
 
 static void
@@ -172,11 +170,6 @@ setup_sct_quadro(struct IsdnCard *card)
 
 	strcpy(tmp, sct_quadro_revision);
 	printk(KERN_INFO "HiSax: T-Berkom driver Rev. %s\n", HiSax_getrev(tmp));
-	if (cs->typ == ISDN_CTYPE_SCT_QUADRO) {
-		cs->subtyp = SCT_1;	/* Preset */
-	} else
-		return (0);
-
 	/* Identify subtype by para[0] */
 	if (card->para[0] >= SCT_1 && card->para[0] <= SCT_4)
 		cs->subtyp = card->para[0];

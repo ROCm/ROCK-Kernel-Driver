@@ -707,8 +707,6 @@ setup_amd7930(struct IsdnCard *card)
 
 	strcpy(tmp, amd7930_revision);
 	printk(KERN_INFO "HiSax: AMD7930 driver Rev. %s\n", HiSax_getrev(tmp));
-	if (cs->typ != ISDN_CTYPE_AMD7930)
-		return 0;
 
         cs->irq = amd7930_get_irqnum(0);
         if (cs->irq == 0)

@@ -119,8 +119,6 @@ setup_netjet_s(struct IsdnCard *card)
 #endif
 	strcpy(tmp, NETjet_S_revision);
 	printk(KERN_INFO "HiSax: Traverse Tech. NETjet-S driver Rev. %s\n", HiSax_getrev(tmp));
-	if (cs->typ != ISDN_CTYPE_NETJET_S)
-		return(0);
 
 	for ( ;; ) {
 		if ((dev_netjet = pci_find_device(PCI_VENDOR_ID_TIGERJET,

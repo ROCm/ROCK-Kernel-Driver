@@ -276,8 +276,6 @@ setup_enternow_pci(struct IsdnCard *card)
 #endif
         strcpy(tmp, enternow_pci_rev);
 	printk(KERN_INFO "HiSax: Formula-n Europe AG enter:now ISDN PCI driver Rev. %s\n", HiSax_getrev(tmp));
-	if (cs->typ != ISDN_CTYPE_ENTERNOW)
-		return(0);
 
 	for ( ;; ) {
 		if ((dev_netjet = pci_find_device(PCI_VENDOR_ID_TIGERJET,

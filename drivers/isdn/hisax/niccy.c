@@ -212,8 +212,6 @@ setup_niccy(struct IsdnCard *card)
 
 	strcpy(tmp, niccy_revision);
 	printk(KERN_INFO "HiSax: Niccy driver Rev. %s\n", HiSax_getrev(tmp));
-	if (cs->typ != ISDN_CTYPE_NICCY)
-		return (0);
 #ifdef __ISAPNP__
 	if (!card->para[1] && isapnp_present()) {
 		struct pci_bus *pb;

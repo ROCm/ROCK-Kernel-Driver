@@ -1398,66 +1398,63 @@ setup_hfcpci(struct IsdnCard *card)
 	cs->hw.hfcpci.int_s1 = 0;
 	cs->dc.hfcpci.ph_state = 0;
 	cs->hw.hfcpci.fifo = 255;
-	if (cs->typ == ISDN_CTYPE_HFC_PCI) {
-		i = 0;
-		while (id_list[i].vendor_id) {
-			tmp_hfcpci = pci_find_device(id_list[i].vendor_id,
-						     id_list[i].device_id,
-						     dev_hfcpci);
-			i++;
-			if (tmp_hfcpci) {
-				if (pci_enable_device(tmp_hfcpci))
-					continue;
-				pci_set_master(tmp_hfcpci);
-				if ((card->para[0]) && (card->para[0] != (tmp_hfcpci->resource[ 0].start & PCI_BASE_ADDRESS_IO_MASK)))
-					continue;
-				else
-					break;
-			}
-		}
 
+	i = 0;
+	while (id_list[i].vendor_id) {
+		tmp_hfcpci = pci_find_device(id_list[i].vendor_id,
+					     id_list[i].device_id,
+					     dev_hfcpci);
+		i++;
 		if (tmp_hfcpci) {
-			i--;
-			dev_hfcpci = tmp_hfcpci;	/* old device */
-			cs->irq = dev_hfcpci->irq;
-			cs->hw.hfcpci.pdev = tmp_hfcpci;
-			if (!cs->irq) {
-				printk(KERN_WARNING "HFC-PCI: No IRQ for PCI card found\n");
-				return (0);
-			}
-			printk(KERN_INFO "HiSax: HFC-PCI card manufacturer: %s card name: %s\n", id_list[i].vendor_name, id_list[i].card_name);
-		} else {
-			printk(KERN_WARNING "HFC-PCI: No PCI card found\n");
+			if (pci_enable_device(tmp_hfcpci))
+				continue;
+			pci_set_master(tmp_hfcpci);
+			if ((card->para[0]) && (card->para[0] != (tmp_hfcpci->resource[ 0].start & PCI_BASE_ADDRESS_IO_MASK)))
+				continue;
+			else
+				break;
+		}
+	}
+	
+	if (tmp_hfcpci) {
+		i--;
+		dev_hfcpci = tmp_hfcpci;	/* old device */
+		cs->irq = dev_hfcpci->irq;
+		cs->hw.hfcpci.pdev = tmp_hfcpci;
+		if (!cs->irq) {
+			printk(KERN_WARNING "HFC-PCI: No IRQ for PCI card found\n");
 			return (0);
 		}
-		/* Allocate memory for FIFOS */
-		cs->hw.hfcpci.fifos = pci_alloc_consistent(tmp_hfcpci, 32768, &cs->hw.hfcpci.fifos_dma);
-		if (!cs->hw.hfcpci.fifos) {
-			printk(KERN_WARNING "HFC-PCI: Error allocating memory for FIFO!\n");
-			return 0;
-		}
-		pci_write_config_dword(cs->hw.hfcpci.pdev, 0x80,
-				       (u_int)cs->hw.hfcpci.fifos_dma);
-		cs->hw.hfcpci.pci_io = request_mmio(&cs->rs, dev_hfcpci->resource[ 1].start, 256, "hfc_pci");
-		if (!cs->hw.hfcpci.pci_io)
-			goto err;
-
-		printk(KERN_INFO
-		       "HFC-PCI: defined at mem %#x fifo %#x(%#x) IRQ %d HZ %d\n",
-		       (u_int) cs->hw.hfcpci.pci_io,
-		       (u_int) cs->hw.hfcpci.fifos,
-		       (u_int) cs->hw.hfcpci.fifos_dma,
-		       cs->irq, HZ);
-		printk("ChipID: %x\n", Read_hfc(cs, HFCPCI_CHIP_ID));
-		cs->hw.hfcpci.int_m2 = 0;	/* disable alle interrupts */
-		cs->hw.hfcpci.int_m1 = 0;
-		Write_hfc(cs, HFCPCI_INT_M1, cs->hw.hfcpci.int_m1);
-		Write_hfc(cs, HFCPCI_INT_M2, cs->hw.hfcpci.int_m2);
-		/* At this point the needed PCI config is done */
-		/* fifos are still not enabled */
-	} else
-		return (0);	/* no valid card type */
-
+		printk(KERN_INFO "HiSax: HFC-PCI card manufacturer: %s card name: %s\n", id_list[i].vendor_name, id_list[i].card_name);
+	} else {
+		printk(KERN_WARNING "HFC-PCI: No PCI card found\n");
+		return (0);
+	}
+	/* Allocate memory for FIFOS */
+	cs->hw.hfcpci.fifos = pci_alloc_consistent(tmp_hfcpci, 32768, &cs->hw.hfcpci.fifos_dma);
+	if (!cs->hw.hfcpci.fifos) {
+		printk(KERN_WARNING "HFC-PCI: Error allocating memory for FIFO!\n");
+		return 0;
+	}
+	pci_write_config_dword(cs->hw.hfcpci.pdev, 0x80,
+			       (u_int)cs->hw.hfcpci.fifos_dma);
+	cs->hw.hfcpci.pci_io = request_mmio(&cs->rs, dev_hfcpci->resource[ 1].start, 256, "hfc_pci");
+	if (!cs->hw.hfcpci.pci_io)
+		goto err;
+	
+	printk(KERN_INFO
+	       "HFC-PCI: defined at mem %#x fifo %#x(%#x) IRQ %d HZ %d\n",
+	       (u_int) cs->hw.hfcpci.pci_io,
+	       (u_int) cs->hw.hfcpci.fifos,
+	       (u_int) cs->hw.hfcpci.fifos_dma,
+	       cs->irq, HZ);
+	printk("ChipID: %x\n", Read_hfc(cs, HFCPCI_CHIP_ID));
+	cs->hw.hfcpci.int_m2 = 0;	/* disable alle interrupts */
+	cs->hw.hfcpci.int_m1 = 0;
+	Write_hfc(cs, HFCPCI_INT_M1, cs->hw.hfcpci.int_m1);
+	Write_hfc(cs, HFCPCI_INT_M2, cs->hw.hfcpci.int_m2);
+	/* At this point the needed PCI config is done */
+	/* fifos are still not enabled */
 
 	cs->irq_flags |= SA_SHIRQ;
 

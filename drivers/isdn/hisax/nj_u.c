@@ -122,8 +122,6 @@ setup_netjet_u(struct IsdnCard *card)
 #endif
 	strcpy(tmp, NETjet_U_revision);
 	printk(KERN_INFO "HiSax: Traverse Tech. NETspider-U driver Rev. %s\n", HiSax_getrev(tmp));
-	if (cs->typ != ISDN_CTYPE_NETJET_U)
-		return(0);
 
 	for ( ;; ) {
 		if ((dev_netjet = pci_find_device(PCI_VENDOR_ID_TIGERJET,

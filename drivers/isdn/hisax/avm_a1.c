@@ -169,8 +169,6 @@ setup_avm_a1(struct IsdnCard *card)
 
 	strcpy(tmp, avm_revision);
 	printk(KERN_INFO "HiSax: AVM driver Rev. %s\n", HiSax_getrev(tmp));
-	if (cs->typ != ISDN_CTYPE_A1)
-		return (0);
 
 	cs->hw.avm.cfg_reg     = request_io(&cs->rs, card->para[1] + 0x1800,  8, "avm cfg");
 	if (!cs->hw.avm.cfg_reg) goto err;

@@ -197,8 +197,6 @@ setup_isurf(struct IsdnCard *card)
 	strcpy(tmp, ISurf_revision);
 	printk(KERN_INFO "HiSax: ISurf driver Rev. %s\n", HiSax_getrev(tmp));
 	
- 	if (cs->typ != ISDN_CTYPE_ISURF)
- 		return(0);
 	if (card->para[1] && card->para[2]) {
 		cs->hw.isurf.reset = card->para[1];
 		cs->irq = card->para[0];

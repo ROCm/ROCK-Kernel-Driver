@@ -264,8 +264,6 @@ setup_TeleInt(struct IsdnCard *card)
 
 	strcpy(tmp, TeleInt_revision);
 	printk(KERN_INFO "HiSax: TeleInt driver Rev. %s\n", HiSax_getrev(tmp));
-	if (cs->typ != ISDN_CTYPE_TELEINT)
-		return (0);
 
 	cs->hw.hfc.addr = card->para[1] & 0x3fe;
 	cs->irq = card->para[0];
