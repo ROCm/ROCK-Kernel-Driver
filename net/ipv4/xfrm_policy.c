@@ -347,6 +347,7 @@ static void xfrm_policy_timer(unsigned long data)
 	struct xfrm_policy *xp = (struct xfrm_policy*)data;
 	unsigned long now = (unsigned long)xtime.tv_sec;
 	long next = LONG_MAX;
+	u32 index;
 
 	if (xp->dead)
 		goto out;
@@ -368,10 +369,11 @@ out:
 	return;
 
 expired:
+	index = xp->index;
 	xfrm_pol_put(xp);
 
 	/* Not 100% correct. id can be recycled in theory */
-	xp = xfrm_policy_byid(0, xp->index, 1);
+	xp = xfrm_policy_byid(0, index, 1);
 	if (xp) {
 		xfrm_policy_kill(xp);
 		xfrm_pol_put(xp);
@@ -1082,6 +1084,17 @@ int xfrm_lookup(struct dst_entry **dst_p, struct flowi *fl,
 	u32 genid;
 	u16 family = (*dst_p)->ops->family;
 
+	switch (family) {
+	case AF_INET:
+		if (!fl->fl4_src)
+			fl->fl4_src = rt->rt_src;
+		if (!fl->fl4_dst)
+			fl->fl4_dst = rt->rt_dst;
+	case AF_INET6:
+		/* Still not clear... */
+	default:
+	}
+
 restart:
 	genid = xfrm_policy_genid;
 	policy = NULL;
@@ -1120,8 +1133,6 @@ restart:
 		 * is required only for output policy.
 		 */
 		if (family == AF_INET) {
-			fl->oif = rt->u.dst.dev->ifindex;
-			fl->fl4_src = rt->rt_src;
 			read_lock_bh(&policy->lock);
 			for (dst = policy->bundles; dst; dst = dst->next) {
 				struct xfrm_dst *xdst = (struct xfrm_dst*)dst;
@@ -1451,10 +1462,11 @@ int __xfrm_policy_check(struct sock *sk, int dir, struct sk_buff *skb,
 	if (pol->action == XFRM_POLICY_ALLOW) {
 		if (pol->xfrm_nr != 0) {
 			struct sec_path *sp;
+			static struct sec_path dummy;
 			int i, k;
 
 			if ((sp = skb->sp) == NULL)
-				goto reject;
+				sp = &dummy;
 
 			/* For each tmpl search corresponding xfrm.
 			 * Order is _important_. Later we will implement
@@ -1462,6 +1474,8 @@ int __xfrm_policy_check(struct sock *sk, int dir, struct sk_buff *skb,
 			 * are implied between each two transformations.
 			 */
 			for (i = pol->xfrm_nr-1, k = 0; i >= 0; i--) {
+				if (pol->xfrm_vec[i].optional)
+					continue;
 				switch (family) {
 				case AF_INET:
 					k = xfrm_policy_ok(pol->xfrm_vec+i, sp, k);

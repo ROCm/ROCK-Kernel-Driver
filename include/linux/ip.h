@@ -18,8 +18,6 @@
 #define _LINUX_IP_H
 #include <asm/byteorder.h>
 
-/* SOL_IP socket options */
-
 #define IPTOS_TOS_MASK		0x1E
 #define IPTOS_TOS(tos)		((tos)&IPTOS_TOS_MASK)
 #define	IPTOS_LOWDELAY		0x10
@@ -66,14 +64,6 @@
 #define IPVERSION	4
 #define MAXTTL		255
 #define IPDEFTTL	64
-
-/* struct timestamp, struct route and MAX_ROUTES are removed.
-
-   REASONS: it is clear that nobody used them because:
-   - MAX_ROUTES value was wrong.
-   - "struct route" was wrong.
-   - "struct timestamp" had fatally misaligned bitfields and was completely unusable.
- */
 
 #define IPOPT_OPTVAL 0
 #define IPOPT_OLEN   1

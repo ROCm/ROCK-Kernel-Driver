@@ -867,6 +867,7 @@ int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	inet->id = tp->write_seq ^ jiffies;
 
 	err = tcp_connect(sk);
+	rt = NULL;
 	if (err)
 		goto failure;
 
