@@ -2428,7 +2428,7 @@ static inline void ace_tx_int(struct net_device *dev,
 }
 
 
-static void ace_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
+static irqreturn_t ace_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 {
 	struct ace_private *ap;
 	struct ace_regs *regs;
@@ -2446,7 +2446,7 @@ static void ace_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 	 * spending any time in here.
 	 */
 	if (!(readl(&regs->HostCtrl) & IN_INT))
-		return;
+		return IRQ_NONE;
 
 	/*
 	 * ACK intr now. Otherwise we will lose updates to rx_ret_prd,
@@ -2552,6 +2552,8 @@ static void ace_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 			tasklet_schedule(&ap->ace_tasklet);
 		}
 	}
+
+	return IRQ_HANDLED;
 }
 
 
