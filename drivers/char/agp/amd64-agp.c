@@ -31,6 +31,13 @@
 #define INVGART		(1<<0)
 #define GARTPTEERR	(1<<1)
 
+/* K8 On-cpu GART registers */
+#define AMD64_GARTAPERTURECTL	0x90
+#define AMD64_GARTAPERTUREBASE	0x94
+#define AMD64_GARTTABLEBASE	0x98
+#define AMD64_GARTCACHECTL	0x9c
+#define AMD64_GARTEN		(1<<0)
+
 /* NVIDIA K8 registers */
 #define NVIDIA_X86_64_0_APBASE		0x10
 #define NVIDIA_X86_64_1_APBASE1		0x50

@@ -8,6 +8,23 @@
 #include <linux/agp_backend.h>
 #include "agp.h"
 
+#define SVWRKS_COMMAND		0x04
+#define SVWRKS_APSIZE		0x10
+#define SVWRKS_MMBASE		0x14
+#define SVWRKS_CACHING		0x4b
+#define SVWRKS_AGP_ENABLE	0x60
+#define SVWRKS_FEATURE		0x68
+
+#define SVWRKS_SIZE_MASK	0xfe000000
+
+/* Memory mapped registers */
+#define SVWRKS_GART_CACHE	0x02
+#define SVWRKS_GATTBASE		0x04
+#define SVWRKS_TLBFLUSH		0x10
+#define SVWRKS_POSTFLUSH	0x14
+#define SVWRKS_DIRFLUSH		0x0c
+
+
 struct serverworks_page_map {
 	unsigned long *real;
 	unsigned long *remapped;

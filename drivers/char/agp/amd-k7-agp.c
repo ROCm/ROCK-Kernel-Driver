@@ -11,6 +11,15 @@
 #include <linux/mm.h>
 #include "agp.h"
 
+#define AMD_MMBASE	0x14
+#define AMD_APSIZE	0xac
+#define AMD_MODECNTL	0xb0
+#define AMD_MODECNTL2	0xb2
+#define AMD_GARTENABLE	0x02	/* In mmio region (16-bit register) */
+#define AMD_ATTBASE	0x04	/* In mmio region (32-bit register) */
+#define AMD_TLBFLUSH	0x0c	/* In mmio region (32-bit register) */
+#define AMD_CACHEENTRY	0x10	/* In mmio region (32-bit register) */
+
 struct amd_page_map {
 	unsigned long *real;
 	unsigned long *remapped;

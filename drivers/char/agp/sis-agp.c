@@ -8,6 +8,12 @@
 #include <linux/agp_backend.h>
 #include "agp.h"
 
+#define SIS_ATTBASE	0x90
+#define SIS_APSIZE	0x94
+#define SIS_TLBCNTRL	0x97
+#define SIS_TLBFLUSH	0x98
+
+
 static int sis_fetch_size(void)
 {
 	u8 temp_size;

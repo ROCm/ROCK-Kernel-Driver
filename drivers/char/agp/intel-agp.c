@@ -13,6 +13,31 @@
 #include <linux/agp_backend.h>
 #include "agp.h"
 
+/* Intel 815 register */
+#define INTEL_815_APCONT	0x51
+#define INTEL_815_ATTBASE_MASK	~0x1FFFFFFF
+
+/* Intel i820 registers */
+#define INTEL_I820_RDCR		0x51
+#define INTEL_I820_ERRSTS	0xc8
+
+/* Intel i840 registers */
+#define INTEL_I840_MCHCFG	0x50
+#define INTEL_I840_ERRSTS	0xc8
+
+/* Intel i850 registers */
+#define INTEL_I850_MCHCFG	0x50
+#define INTEL_I850_ERRSTS	0xc8
+
+/* Intel 7505 registers */
+#define INTEL_I7505_APSIZE	0x74
+#define INTEL_I7505_NCAPID	0x60
+#define INTEL_I7505_NISTAT	0x6c
+#define INTEL_I7505_ATTBASE	0x78
+#define INTEL_I7505_ERRSTS	0x42
+#define INTEL_I7505_AGPCTRL	0x70
+#define INTEL_I7505_MCHCFG	0x50
+
 static struct aper_size_info_fixed intel_i810_sizes[] =
 {
 	{64, 16384, 4},

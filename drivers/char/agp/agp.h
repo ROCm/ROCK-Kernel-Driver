@@ -177,14 +177,6 @@ struct agp_bridge_data {
 #define INTEL_NBXCFG	0x50
 #define INTEL_ERRSTS	0x91
 
-/* Intel 460GX Registers */
-#define INTEL_I460_BAPBASE		0x98
-#define INTEL_I460_GXBCTL		0xa0
-#define INTEL_I460_AGPSIZ		0xa2
-#define INTEL_I460_ATTBASE		0xfe200000
-#define INTEL_I460_GATT_VALID		(1UL << 24)
-#define INTEL_I460_GATT_COHERENT	(1UL << 25)
-
 /* Intel i830 registers */
 #define I830_GMCH_CTRL			0x52
 #define I830_GMCH_ENABLED		0x4
@@ -219,25 +211,9 @@ struct agp_bridge_data {
 #define I852_GME			0x2
 #define I852_GM				0x5
 
-/* Intel 815 register */
-#define INTEL_815_APCONT	0x51
-#define INTEL_815_ATTBASE_MASK	~0x1FFFFFFF
-
-/* Intel i820 registers */
-#define INTEL_I820_RDCR		0x51
-#define INTEL_I820_ERRSTS	0xc8
-
-/* Intel i840 registers */
-#define INTEL_I840_MCHCFG	0x50
-#define INTEL_I840_ERRSTS	0xc8
- 
 /* Intel i845 registers */
 #define INTEL_I845_AGPM		0x51
 #define INTEL_I845_ERRSTS	0xc8
-
-/* Intel i850 registers */
-#define INTEL_I850_MCHCFG	0x50
-#define INTEL_I850_ERRSTS	0xc8
 
 /* Intel i860 registers */
 #define INTEL_I860_MCHCFG	0x50
@@ -260,101 +236,6 @@ struct agp_bridge_data {
 #define I810_DRAM_CTL		0x3000
 #define I810_DRAM_ROW_0		0x00000001
 #define I810_DRAM_ROW_0_SDRAM	0x00000001
-
-/* Intel 7505 registers */
-#define INTEL_I7505_APSIZE	0x74
-#define INTEL_I7505_NCAPID	0x60
-#define INTEL_I7505_NISTAT	0x6c
-#define INTEL_I7505_ATTBASE	0x78
-#define INTEL_I7505_ERRSTS	0x42
-#define INTEL_I7505_AGPCTRL	0x70
-#define INTEL_I7505_MCHCFG	0x50
-
-/* VIA register */
-#define VIA_GARTCTRL	0x80
-#define VIA_APSIZE	0x84
-#define VIA_ATTBASE	0x88
-
-/* VIA KT400 */
-#define VIA_AGP3_GARTCTRL	0x90
-#define VIA_AGP3_APSIZE		0x94
-#define VIA_AGP3_ATTBASE	0x98
-#define VIA_AGPSEL		0xfd
-
-/* SiS registers */
-#define SIS_ATTBASE	0x90
-#define SIS_APSIZE	0x94
-#define SIS_TLBCNTRL	0x97
-#define SIS_TLBFLUSH	0x98
-
-/* AMD registers */
-#define AMD_MMBASE	0x14
-#define AMD_APSIZE	0xac
-#define AMD_MODECNTL	0xb0
-#define AMD_MODECNTL2	0xb2
-#define AMD_GARTENABLE	0x02	/* In mmio region (16-bit register) */
-#define AMD_ATTBASE	0x04	/* In mmio region (32-bit register) */
-#define AMD_TLBFLUSH	0x0c	/* In mmio region (32-bit register) */
-#define AMD_CACHEENTRY	0x10	/* In mmio region (32-bit register) */
-
-/* AMD64 registers */
-#define AMD64_GARTAPERTURECTL	0x90
-#define AMD64_GARTAPERTUREBASE	0x94
-#define AMD64_GARTTABLEBASE	0x98
-#define AMD64_GARTCACHECTL		0x9c
-#define AMD64_GARTEN		(1<<0)
-
-/* ALi registers */
-#define ALI_AGPCTRL			0xb8
-#define ALI_ATTBASE			0xbc
-#define ALI_TLBCTRL			0xc0
-#define ALI_TAGCTRL			0xc4
-#define ALI_CACHE_FLUSH_CTRL		0xD0
-#define ALI_CACHE_FLUSH_ADDR_MASK	0xFFFFF000
-#define ALI_CACHE_FLUSH_EN		0x100
-
-/* ATI register */
-#define ATI_GART_MMBASE_ADDR	0x14
-#define ATI_RS100_APSIZE	0xac
-#define ATI_RS300_APSIZE	0xf8
-#define ATI_RS100_IG_AGPMODE	0xb0
-#define ATI_RS300_IG_AGPMODE	0xfc
-
-#define ATI_GART_FEATURE_ID		0x00
-#define ATI_GART_BASE			0x04
-#define ATI_GART_CACHE_SZBASE		0x08
-#define ATI_GART_CACHE_CNTRL		0x0c
-#define ATI_GART_CACHE_ENTRY_CNTRL	0x10
-
-/* Serverworks Registers */
-#define SVWRKS_APSIZE		0x10
-#define SVWRKS_SIZE_MASK	0xfe000000
-
-#define SVWRKS_MMBASE		0x14
-#define SVWRKS_CACHING		0x4b
-#define SVWRKS_FEATURE		0x68
-
-/* func 1 registers */
-#define SVWRKS_AGP_ENABLE	0x60
-#define SVWRKS_COMMAND		0x04
-
-/* Memory mapped registers */
-#define SVWRKS_GART_CACHE	0x02
-#define SVWRKS_GATTBASE		0x04
-#define SVWRKS_TLBFLUSH		0x10
-#define SVWRKS_POSTFLUSH	0x14
-#define SVWRKS_DIRFLUSH		0x0c
-
-/* NVIDIA registers */
-#define NVIDIA_0_APSIZE		0x80
-#define NVIDIA_1_WBC		0xf0
-#define NVIDIA_2_GARTCTRL	0xd0
-#define NVIDIA_2_APBASE		0xd8
-#define NVIDIA_2_APLIMIT	0xdc
-#define NVIDIA_2_ATTBASE(i)	(0xe0 + (i) * 4)
-#define NVIDIA_3_APBASE		0x50
-#define NVIDIA_3_APLIMIT	0x54
-
 
 struct agp_device_ids {
 	unsigned short device_id; /* first, to make table easier to read */
