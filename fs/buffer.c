@@ -2610,7 +2610,7 @@ int block_write_full_page(struct page *page, get_block_t *get_block,
 		 */
 		block_invalidatepage(page, 0);
 		unlock_page(page);
-		return -EIO;
+		return 0; /* don't care */
 	}
 
 	/*

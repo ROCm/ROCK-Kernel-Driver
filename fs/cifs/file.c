@@ -500,10 +500,17 @@ cifs_partialpagewrite(struct page *page,unsigned from, unsigned to)
 	write_data = kmap(page);
 	write_data += from;
 
-	if((to > PAGE_CACHE_SIZE) || (from > to) || (offset > mapping->host->i_size)) {
+	if((to > PAGE_CACHE_SIZE) || (from > to)) {
 		kunmap(page);
 		FreeXid(xid);
 		return -EIO;
+	}
+
+	/* racing with truncate? */
+	if(offset > mapping->host->i_size) {
+		kunmap(page);
+		FreeXid(xid);
+		return 0; /* don't care */
 	}
 
 	/* check to make sure that we are not extending the file */

@@ -193,7 +193,7 @@ smb_writepage(struct page *page, struct writeback_control *wbc)
 	offset = inode->i_size & (PAGE_CACHE_SIZE-1);
 	/* OK, are we completely out? */
 	if (page->index >= end_index+1 || !offset)
-		return -EIO;
+		return 0; /* truncated - don't care */
 do_it:
 	page_cache_get(page);
 	err = smb_writepage_sync(inode, page, 0, offset);
