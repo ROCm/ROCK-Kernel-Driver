@@ -16,18 +16,10 @@ static ide_pci_device_t sc1200_chipsets[] __devinitdata = {
 		.device		= PCI_DEVICE_ID_NS_SCx200_IDE,
 		.name		= "SC1200",
 		.init_chipset	= init_chipset_sc1200,
-		.init_iops	= NULL,
 		.init_hwif	= init_hwif_sc1200,
 		.channels	= 2,
 		.autodma	= AUTODMA,
-		.enablebits	= {{0x00,0x00,0x00}, {0x00,0x00,0x00}},
 		.bootable	= ON_BOARD,
-		.extra		= 0,
-	},{
-		.vendor		= 0,
-		.device		= 0,
-		.channels	= 0,
-		.bootable	= EOL,
 	}
 };
 

@@ -1546,7 +1546,6 @@ int ide_replace_subdriver(ide_drive_t *drive, const char *driver);
 #define NODMA 0
 #define NOAUTODMA 1
 #define AUTODMA 2
-#define EOL 255
 
 typedef struct ide_pci_enablebit_s {
 	u8	reg;	/* byte pci reg holding the enable-bit */

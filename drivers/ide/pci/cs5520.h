@@ -18,13 +18,11 @@ static ide_pci_device_t cyrix_chipsets[] __devinitdata = {
 		.name		= "Cyrix 5510",
 		.init_chipset	= init_chipset_cs5520,
 		.init_setup_dma = cs5520_init_setup_dma,
-		.init_iops	= NULL,
 		.init_hwif	= init_hwif_cs5520,
 		.isa_ports	= 1,
 		.channels	= 2,
 		.autodma	= AUTODMA,
 		.bootable	= ON_BOARD,
-		.extra		= 0,
 	},
 	{
 		.vendor		= PCI_VENDOR_ID_CYRIX,
@@ -32,13 +30,11 @@ static ide_pci_device_t cyrix_chipsets[] __devinitdata = {
 		.name		= "Cyrix 5520",
 		.init_chipset	= init_chipset_cs5520,
 		.init_setup_dma = cs5520_init_setup_dma,
-		.init_iops	= NULL,
 		.init_hwif	= init_hwif_cs5520,
 		.isa_ports	= 1,
 		.channels	= 2,
 		.autodma	= AUTODMA,
 		.bootable	= ON_BOARD,
-		.extra		= 0,
 	}
 };
 

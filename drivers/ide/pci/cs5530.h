@@ -16,18 +16,10 @@ static ide_pci_device_t cs5530_chipsets[] __devinitdata = {
 		.device		= PCI_DEVICE_ID_CYRIX_5530_IDE,
 		.name		= "CS5530",
 		.init_chipset	= init_chipset_cs5530,
-		.init_iops	= NULL,
 		.init_hwif	= init_hwif_cs5530,
 		.channels	= 2,
 		.autodma	= AUTODMA,
-		.enablebits	= {{0x00,0x00,0x00}, {0x00,0x00,0x00}},
 		.bootable	= ON_BOARD,
-		.extra		= 0,
-	},{
-		.vendor		= 0,
-		.device		= 0,
-		.channels	= 0,
-		.bootable	= EOL,
 	}
 };
 
