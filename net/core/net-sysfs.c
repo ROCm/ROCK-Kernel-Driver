@@ -16,16 +16,6 @@
 #include <net/sock.h>
 #include <linux/rtnetlink.h>
 
-const char *if_port_text[] = {
-   [IF_PORT_UNKNOWN] = "unknown",
-   [IF_PORT_10BASE2] = "BNC",
-   [IF_PORT_10BASET] = "10baseT",
-   [IF_PORT_AUI]     = "AUI",
-   [IF_PORT_100BASET] = "100baseT",
-   [IF_PORT_100BASETX] = "100baseTX",
-   [IF_PORT_100BASEFX] = "100baseFX"
-};
-
 #define to_net_dev(class) container_of((class), struct net_device, class_dev)
 
 /* generate a show function for  simple field */
@@ -65,20 +55,6 @@ NETDEVICE_ATTR(iflink, "%d\n");
 NETDEVICE_ATTR(ifindex, "%d\n");
 NETDEVICE_ATTR(features, "%#x\n");
 NETDEVICE_ATTR(type, "%d\n");
-
-/* TODO: only a few devices set this now should fix others. */
-static ssize_t show_port(struct class_device *dev, char *buf)
-{
-	unsigned char port = to_net_dev(dev)->if_port;
-	char *cp = buf;
-
-	cp += sprintf(cp, "%d", port);
-	if (port < ARRAY_SIZE(if_port_text))
-		cp += sprintf(cp, " (%s)", if_port_text[port]);
-	*cp++ ='\n';
-	return cp - buf;
-}
-static CLASS_DEVICE_ATTR(if_port, S_IRUGO, show_port, NULL);
 
 static ssize_t format_addr(char *buf, const unsigned char *addr, int len)
 {
@@ -175,7 +151,6 @@ static struct class_device_attribute *net_class_attributes[] = {
 	&class_device_attr_features,
 	&class_device_attr_mtu,
 	&class_device_attr_flags,
-	&class_device_attr_if_port,
 	&class_device_attr_type,
 	&class_device_attr_address,
 	&class_device_attr_broadcast,
