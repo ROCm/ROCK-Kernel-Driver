@@ -513,8 +513,10 @@ alloc_phb(struct device_node *dev, char *model, unsigned int addr_size_words)
 
 	/***************************************************************
 	* Speedwagon
+	*   include Winnipeg as well for the time being.
 	***************************************************************/
-	} else if (strstr(model, "Speedwagon")) {
+	} else if ((strstr(model, "Speedwagon")) || 
+		   (strstr(model, "Winnipeg"))) {
 		PPCDBG(PPCDBG_PHBINIT, "\tCreate speedwagon\n");
 	        phb = pci_alloc_pci_controller("PHB SW",phb_type_speedwagon);
 		if (phb == NULL) return NULL;

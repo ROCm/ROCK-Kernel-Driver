@@ -902,11 +902,13 @@ prom_initialize_tce_table(void)
 		/* Keep the old logic in tack to avoid regression. */
 		if (compatible[0] != 0) {
 			if((strstr(compatible, RELOC("python")) == NULL) &&
-			   (strstr(compatible, RELOC("Speedwagon")) == NULL))
+			   (strstr(compatible, RELOC("Speedwagon")) == NULL) &&
+			   (strstr(compatible, RELOC("Winnipeg")) == NULL))
 				continue;
 		} else if (model[0] != 0) {
 			if ((strstr(model, RELOC("ython")) == NULL) &&
-			    (strstr(model, RELOC("peedwagon")) == NULL))
+			    (strstr(model, RELOC("peedwagon")) == NULL) &&
+			    (strstr(model, RELOC("innipeg")) == NULL))
 				continue;
 		}
 
