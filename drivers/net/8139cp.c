@@ -26,7 +26,8 @@
 			
 	TODO:
 	* Test Tx checksumming thoroughly
-	* dev->tx_timeout
+	* Implement dev->tx_timeout
+	* Implement __cp_get_stats
 
 	Low priority TODO:
 	* Complete reset on PciErr
@@ -84,7 +85,7 @@
 #endif
 
 /* These identify the driver base version and may not be removed. */
-static char version[] __devinitdata =
+static char version[] =
 KERN_INFO DRV_NAME ": 10/100 PCI Ethernet driver v" DRV_VERSION " (" DRV_RELDATE ")\n";
 
 MODULE_AUTHOR("Jeff Garzik <jgarzik@pobox.com>");
@@ -403,7 +404,7 @@ enum board_type {
 
 static struct cp_board_info {
 	const char *name;
-} cp_board_tbl[] __devinitdata = {
+} cp_board_tbl[] = {
 	/* RTL8139Cp */
 	{ "RTL-8139C+" },
 };
@@ -434,6 +435,29 @@ static struct {
 	{ "rx_frags" },
 };
 
+
+#if CP_VLAN_TAG_USED
+static void cp_vlan_rx_register(struct net_device *dev, struct vlan_group *grp)
+{
+	struct cp_private *cp = dev->priv;
+
+	spin_lock_irq(&cp->lock);
+	cp->vlgrp = grp;
+	cpw16(CpCmd, cpr16(CpCmd) | RxVlanOn);
+	spin_unlock_irq(&cp->lock);
+}
+
+static void cp_vlan_rx_kill_vid(struct net_device *dev, unsigned short vid)
+{
+	struct cp_private *cp = dev->priv;
+
+	spin_lock_irq(&cp->lock);
+	cpw16(CpCmd, cpr16(CpCmd) & ~RxVlanOn);
+	if (cp->vlgrp)
+		cp->vlgrp->vlan_devices[vid] = NULL;
+	spin_unlock_irq(&cp->lock);
+}
+#endif /* CP_VLAN_TAG_USED */
 
 static inline void cp_set_rxbufsize (struct cp_private *cp)
 {
@@ -708,7 +732,7 @@ static void cp_tx (struct cp_private *cp)
 
 	cp->tx_tail = tx_tail;
 
-	if (netif_queue_stopped(cp->dev) && (TX_BUFFS_AVAIL(cp) > (MAX_SKB_FRAGS + 1)))
+	if (TX_BUFFS_AVAIL(cp) > (MAX_SKB_FRAGS + 1))
 		netif_wake_queue(cp->dev);
 }
 
@@ -1527,29 +1551,6 @@ static int cp_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 	return rc;
 }
 
-#if CP_VLAN_TAG_USED
-static void cp_vlan_rx_register(struct net_device *dev, struct vlan_group *grp)
-{
-	struct cp_private *cp = dev->priv;
-
-	spin_lock_irq(&cp->lock);
-	cp->vlgrp = grp;
-	cpw16(CpCmd, cpr16(CpCmd) | RxVlanOn);
-	spin_unlock_irq(&cp->lock);
-}
-
-static void cp_vlan_rx_kill_vid(struct net_device *dev, unsigned short vid)
-{
-	struct cp_private *cp = dev->priv;
-
-	spin_lock_irq(&cp->lock);
-	cpw16(CpCmd, cpr16(CpCmd) & ~RxVlanOn);
-	if (cp->vlgrp)
-		cp->vlgrp->vlan_devices[vid] = NULL;
-	spin_unlock_irq(&cp->lock);
-}
-#endif
-
 /* Serial EEPROM section. */
 
 /*  EEPROM_Ctrl bits. */
@@ -1572,7 +1573,7 @@ static void cp_vlan_rx_kill_vid(struct net_device *dev, unsigned short vid)
 #define EE_READ_CMD		(6)
 #define EE_ERASE_CMD	(7)
 
-static int __devinit read_eeprom (void *ioaddr, int location, int addr_len)
+static int read_eeprom (void *ioaddr, int location, int addr_len)
 {
 	int i;
 	unsigned retval = 0;
@@ -1618,8 +1619,7 @@ static void cp_set_d3_state (struct cp_private *cp)
 	pci_set_power_state (cp->pdev, 3);
 }
 
-static int __devinit cp_init_one (struct pci_dev *pdev,
-				  const struct pci_device_id *ent)
+static int cp_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	struct net_device *dev;
 	struct cp_private *cp;
@@ -1695,10 +1695,10 @@ static int __devinit cp_init_one (struct pci_dev *pdev,
 	}
 
 	/* Configure DMA attributes. */
-	if (!pci_set_dma_mask(pdev, (u64) 0xffffffffffffffffULL)) {
+	if (!pci_set_dma_mask(pdev, 0xffffffffffffffffULL)) {
 		cp->pci_using_dac = 1;
 	} else {
-		rc = pci_set_dma_mask(pdev, (u64) 0xffffffff);
+		rc = pci_set_dma_mask(pdev, 0xffffffffULL);
 		if (rc) {
 			printk(KERN_ERR PFX "No usable DMA configuration, "
 			       "aborting.\n");
@@ -1806,7 +1806,7 @@ err_out_free:
 	return rc;
 }
 
-static void __devexit cp_remove_one (struct pci_dev *pdev)
+static void cp_remove_one (struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
 	struct cp_private *cp = dev->priv;
@@ -1879,7 +1879,7 @@ static struct pci_driver cp_driver = {
 	.name         = DRV_NAME,
 	.id_table     = cp_pci_tbl,
 	.probe        =	cp_init_one,
-	.remove       = __devexit_p(cp_remove_one),
+	.remove       = cp_remove_one,
 #ifdef CONFIG_PM
 	.resume       = cp_resume,
 	.suspend      = cp_suspend,
