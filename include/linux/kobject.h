@@ -16,6 +16,7 @@ struct kobject {
 	atomic_t		refcount;
 	struct list_head	entry;
 	struct kobject		* parent;
+	struct sysfs_dir	dir;
 };
 
 extern void kobject_init(struct kobject *);
