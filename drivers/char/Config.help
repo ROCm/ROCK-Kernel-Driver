@@ -1153,3 +1153,7 @@ CONFIG_977_WATCHDOG
 
   Not sure? It's safe to say N.
 
+CONFIG_HVC_CONSOLE
+  pSeries machines when partitioned support a hypervisor virtual
+  console. This driver allows each pSeries partition to have a console
+  which is accessed via the HMC.
