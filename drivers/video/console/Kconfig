@@ -66,25 +66,25 @@ config SGI_NEWPORT_CONSOLE
 
 #  bool 'IODC console' CONFIG_IODC_CONSOLE
 config STI_CONSOLE
-        bool "STI text console"
+        tristate "STI text console" 
         depends on PARISC
         default y
-	help
+        help
           The STI console is the builtin display/keyboard on HP-PARISC
           machines.  Say Y here to build support for it into your kernel.
           The alternative is to use your primary serial port as a console.
 
 config DUMMY_CONSOLE_COLUMNS
-        int "Initial number of STI console screen columns" if STI_CONSOLE
-        depends on STI_CONSOLE || FB_STI
+        int "Initial number of console screen columns" if STI_CONSOLE
+        depends on PARISC
         default "160"
         help
           The default value is 160, which should fit a 1280x1024 monitor.
           Select 80 if you use a 640x480 resolution by default.
 
 config DUMMY_CONSOLE_ROWS
-        int "Initial number of STI console screen rows" if STI_CONSOLE
-        depends on STI_CONSOLE || FB_STI
+        int "Initial number of console screen rows" if STI_CONSOLE
+        depends on PARISC
         default "64"
         help
           The default value is 64, which should fit a 1280x1024 monitor.
@@ -99,7 +99,7 @@ config PROM_CONSOLE
 
 config DUMMY_CONSOLE
 	bool
-	depends on !PROM_CONSOLE=y || VGA_CONSOLE!=y || SGI_NEWPORT_CONSOLE!=y || !IODC_CONSOLE && GSC_PS2
+	depends on PROM_CONSOLE!=y || VGA_CONSOLE!=y || SGI_NEWPORT_CONSOLE!=y
 	default y
 
 config FRAMEBUFFER_CONSOLE
