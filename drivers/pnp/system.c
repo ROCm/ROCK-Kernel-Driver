@@ -120,4 +120,4 @@ static int __init pnp_system_init(void)
 	return pnp_register_driver(&system_pnp_driver);
 }
 
-core_initcall(pnp_system_init);
+subsys_initcall(pnp_system_init);
