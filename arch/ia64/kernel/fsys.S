@@ -180,7 +180,7 @@ ENTRY(fsys_gettimeofday)
 
 	ldf8 f7=[r10]			// f7 now contains itm_delta
 	setf.sig f11 = r2
-	nop 0
+	adds r10=8, r32
 
 	adds r20=IA64_TIMESPEC_TV_NSEC_OFFSET, r19	// r20 = &xtime->tv_nsec
 	movl r26=jiffies
@@ -191,6 +191,16 @@ ENTRY(fsys_gettimeofday)
 	and r9=TIF_ALLWORK_MASK,r9
 	movl r25=last_nsec_offset
 	;;
+
+	/*
+	 * Verify that we have permission to write to struct timeval.  Note:
+	 * Another thread might unmap the mapping before we actually get
+	 * to store the result.  That's OK as long as the stores are also
+	 * protect by EX().
+	 */
+EX(.fail, probe.w.fault r32, 3)		// this must come _after_ NaT-check
+EX(.fail, probe.w.fault r10, 3)		// this must come _after_ NaT-check
+	nop 0
 
 	ldf8 f10=[r8]			// f10 <- local_cpu_data->nsec_per_cyc value
 	cmp.ne p8, p0=0, r9
