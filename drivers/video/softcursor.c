@@ -63,6 +63,8 @@ int soft_cursor(struct fb_info *info, struct fb_cursor *cursor)
 		if (info->cursor.mask)
 			kfree(info->cursor.mask);
 		info->cursor.mask = kmalloc(dsize, GFP_ATOMIC);
+		if (!info->cursor.mask)
+			return -ENOMEM;
 		memcpy(info->cursor.mask, cursor->mask, dsize);			
 	}
 	

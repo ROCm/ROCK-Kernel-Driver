@@ -581,9 +581,6 @@ static const char *fbcon_startup(void)
 		return NULL;
 	}
 
-	/* Initialize the work queue */
-	INIT_WORK(&info->queue, fb_flashcursor, info);
-	
 	/* Setup default font */
 	vc->vc_font.data = font->data;
 	vc->vc_font.width = font->width;
@@ -664,8 +661,12 @@ static const char *fbcon_startup(void)
 	irqres = request_irq(IRQ_VSYNCPULSE, fb_vbl_handler, SA_SHIRQ,
 			     "framebuffer vbl", info);
 #endif
-	if (irqres) {
-		cursor_blink_rate = DEFAULT_CURSOR_BLINK_RATE;
+	/* Initialize the work queue. If the driver provides its
+	 * own work queue this means it will use something besides 
+	 * default timer to flash the cursor. */
+	if (!info->queue.func) {
+		INIT_WORK(&info->queue, fb_flashcursor, info);
+		
 		cursor_timer.expires = jiffies + HZ / 50;
 		cursor_timer.data = (unsigned long ) info;
 		add_timer(&cursor_timer);
