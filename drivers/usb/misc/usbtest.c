@@ -87,7 +87,7 @@ get_endpoints (struct usbtest_dev *dev, struct usb_interface *intf)
 	struct usb_host_endpoint	*in, *out;
 	struct usb_device		*udev;
 
-	for (tmp = 0; tmp < intf->max_altsetting; tmp++) {
+	for (tmp = 0; tmp < intf->num_altsetting; tmp++) {
 		unsigned	ep;
 
 		in = out = 0;
