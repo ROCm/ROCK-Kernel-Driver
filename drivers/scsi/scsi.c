@@ -1649,7 +1649,7 @@ void scsi_adjust_queue_depth(Scsi_Device *SDpnt, int tagged, int tags)
 			printk(KERN_WARNING "(scsi%d:%d:%d:%d) "
 				"scsi_adjust_queue_depth, bad queue type, "
 				"disabled\n", SDpnt->host->host_no,
-				SDpnt->channel, SDpnt->id, SDpnt->lun, tagged); 
+				SDpnt->channel, SDpnt->id, SDpnt->lun); 
 		case 0:
 			SDpnt->ordered_tags = SDpnt->simple_tags = 0;
 			if(SDpnt->host->cmd_per_lun)
