@@ -222,7 +222,7 @@ static void set_ioapic_affinity (unsigned int irq, unsigned long mask)
 # endif
 
 extern unsigned long irq_affinity [NR_IRQS];
-unsigned long __cacheline_aligned irq_balance_mask [NR_IRQS];
+int __cacheline_aligned pending_irq_balance_apicid [NR_IRQS];
 static int irqbalance_disabled __initdata = 0;
 static int physical_balance = 0;
 
@@ -441,7 +441,7 @@ tryanotherirq:
 		Dprintk("irq = %d moved to cpu = %d\n", selected_irq, min_loaded);
 		/* mark for change destination */
 		spin_lock(&desc->lock);
-		irq_balance_mask[selected_irq] = target_cpu_mask;
+		pending_irq_balance_apicid[selected_irq] = cpu_to_logical_apicid(min_loaded);
 		spin_unlock(&desc->lock);
 		/* Since we made a change, come back sooner to 
 		 * check for more variation.
@@ -500,7 +500,7 @@ static inline void balance_irq (int cpu, int irq)
 	if (cpu != new_cpu) {
 		irq_desc_t *desc = irq_desc + irq;
 		spin_lock(&desc->lock);
-		irq_balance_mask[irq] = cpu_to_logical_apicid(new_cpu);
+		pending_irq_balance_apicid[irq] = cpu_to_logical_apicid(new_cpu);
 		spin_unlock(&desc->lock);
 	}
 }
@@ -515,7 +515,7 @@ int balanced_irq(void *unused)
 	
 	/* push everything to CPU 0 to give us a starting point.  */
 	for (i = 0 ; i < NR_IRQS ; i++)
-		irq_balance_mask[i] = 1 << 0;
+		pending_irq_balance_apicid[i] = cpu_to_logical_apicid(0);
 	for (;;) {
 		set_current_state(TASK_INTERRUPTIBLE);
 		time_remaining = schedule_timeout(time_remaining);
@@ -580,9 +580,9 @@ static void set_ioapic_affinity (unsigned int irq, unsigned long mask);
 static inline void move_irq(int irq)
 {
 	/* note - we hold the desc->lock */
-	if (unlikely(irq_balance_mask[irq])) {
-		set_ioapic_affinity(irq, irq_balance_mask[irq]);
-		irq_balance_mask[irq] = 0;
+	if (unlikely(pending_irq_balance_apicid[irq])) {
+		set_ioapic_affinity(irq, pending_irq_balance_apicid[irq]);
+		pending_irq_balance_apicid[irq] = 0;
 	}
 }
 
