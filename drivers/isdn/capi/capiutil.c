@@ -20,10 +20,6 @@
 #include <linux/config.h>
 #include <linux/isdn/capiutil.h>
 
-MODULE_DESCRIPTION("CAPI4Linux: CAPI message conversion support");
-MODULE_AUTHOR("Carsten Paeth");
-MODULE_LICENSE("GPL");
-
 /* from CAPI2.0 DDK AVM Berlin GmbH */
 
 #ifndef CONFIG_ISDN_DRV_AVMB1_VERBOSE_REASON
@@ -923,15 +919,3 @@ EXPORT_SYMBOL(capi_cmd2str);
 EXPORT_SYMBOL(capi_cmsg2str);
 EXPORT_SYMBOL(capi_message2str);
 EXPORT_SYMBOL(capi_info2str);
-
-static int __init capiutil_init(void)
-{ 
-	return 0; 
-}
-
-static void __exit capiutil_exit(void)
-{
-}
-
-module_init(capiutil_init);
-module_exit(capiutil_exit);
