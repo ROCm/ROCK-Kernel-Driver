@@ -78,26 +78,11 @@ extern void oss_init(void);
 extern void psc_init(void);
 extern void baboon_init(void);
 
-extern void mac_mksound(unsigned int, unsigned int);
-
 extern void nubus_sweep_video(void);
 
 /* Mac specific debug functions (in debug.c) */
 extern void mac_debug_init(void);
 extern void mac_debugging_long(int, long);
-
-extern int mackbd_init_hw(void);
-extern void mackbd_leds(unsigned int leds);
-extern int mackbd_translate(unsigned char keycode, unsigned char *keycodep, char raw_mode);
-
-extern void mac_hid_init_hw(void);
-extern int mac_hid_kbd_translate(unsigned char scancode, unsigned char *keycode, char raw_mode);
-
-#ifdef CONFIG_MAGIC_SYSRQ
-extern unsigned char mac_hid_kbd_sysrq_xlate[128];
-extern unsigned char pckbd_sysrq_xlate[128];
-extern unsigned char mackbd_sysrq_xlate[128];
-#endif /* CONFIG_MAGIC_SYSRQ */
 
 static void mac_get_model(char *str);
 
@@ -207,33 +192,6 @@ void __init config_mac(void)
 	  printk("ERROR: no Mac, but config_mac() called!! \n");
 	}
 
-#ifdef CONFIG_VT
-#ifdef CONFIG_INPUT_ADBHID
-	mach_keyb_init       = mac_hid_init_hw;
-	mach_kbd_translate   = mac_hid_kbd_translate;
-#ifdef CONFIG_MAGIC_SYSRQ
-#ifdef CONFIG_MAC_ADBKEYCODES
-	if (!keyboard_sends_linux_keycodes) {
-		mach_sysrq_xlate = mac_hid_kbd_sysrq_xlate;
-		SYSRQ_KEY = 0x69;
-	} else
-#endif /* CONFIG_MAC_ADBKEYCODES */
-	{
-		mach_sysrq_xlate = pckbd_sysrq_xlate;
-		SYSRQ_KEY = 0x54;
-	}
-#endif /* CONFIG_MAGIC_SYSRQ */
-#elif defined(CONFIG_ADB_KEYBOARD)
-	mach_keyb_init       = mackbd_init_hw;
-	mach_kbd_leds        = mackbd_leds;
-	mach_kbd_translate   = mackbd_translate;
-#ifdef CONFIG_MAGIC_SYSRQ
-	mach_sysrq_xlate     = mackbd_sysrq_xlate;
-	SYSRQ_KEY = 0x69;
-#endif /* CONFIG_MAGIC_SYSRQ */
-#endif /* CONFIG_INPUT_ADBHID */
-#endif /* CONFIG_VT */
-
 	mach_sched_init      = mac_sched_init;
 	mach_init_IRQ        = mac_init_IRQ;
 	mach_request_irq     = mac_request_irq;
@@ -249,9 +207,6 @@ void __init config_mac(void)
 	mach_hwclk           = mac_hwclk;
 #endif
 	mach_set_clock_mmss	 = mac_set_clock_mmss;
-#if 0
-	mach_mksound         = mac_mksound;
-#endif
 	mach_reset           = mac_reset;
 	mach_halt            = mac_poweroff;
 	mach_power_off       = mac_poweroff;
@@ -262,8 +217,8 @@ void __init config_mac(void)
 #if 0
 	mach_debug_init	 = mac_debug_init;
 #endif
-#ifdef CONFIG_VT
-	kd_mksound		 = mac_mksound;
+#ifdef CONFIG_INPUT_M68K_BEEP
+        mach_beep            = mac_mksound;
 #endif
 #ifdef CONFIG_HEARTBEAT
 #if 0
@@ -287,10 +242,6 @@ void __init config_mac(void)
 	    || macintosh_config->ident == MAC_MODEL_IIFX) {
 		mach_l2_flush = mac_cache_card_flush;
 	}
-#ifdef MAC_DEBUG_SOUND
-	/* goes on forever if timers broken */
-	mac_mksound(1000,10);
-#endif
 
 	/*
 	 * Check for machine specific fixups.

@@ -33,7 +33,6 @@
 #include <asm/amigaints.h>
 #include <asm/irq.h>
 #include <asm/rtc.h>
-#include <asm/keyboard.h>
 #include <asm/machdep.h>
 #include <asm/io.h>
 
@@ -71,11 +70,6 @@ static char amiga_model_name[13] = "Amiga ";
 extern char m68k_debug_device[];
 
 static void amiga_sched_init(void (*handler)(int, void *, struct pt_regs *));
-/* amiga specific keyboard functions */
-extern int amiga_keyb_init(void);
-extern int amiga_kbdrate (struct kbd_repeat *);
-extern int amiga_kbd_translate(unsigned char keycode, unsigned char *keycodep,
-			       char raw_mode);
 /* amiga specific irq functions */
 extern void amiga_init_IRQ (void);
 extern void (*amiga_default_handler[]) (int, void *, struct pt_regs *);
@@ -94,7 +88,6 @@ static unsigned long amiga_gettimeoffset (void);
 static int a3000_hwclk (int, struct rtc_time *);
 static int a2000_hwclk (int, struct rtc_time *);
 static int amiga_set_clock_mmss (unsigned long);
-extern void amiga_mksound( unsigned int count, unsigned int ticks );
 #ifdef CONFIG_AMIGA_FLOPPY
 extern void amiga_floppy_setup(char *, int *);
 #endif
@@ -115,18 +108,6 @@ static struct console amiga_console_driver = {
 	.flags =	CON_PRINTBUFFER,
 	.index =	-1,
 };
-
-#ifdef CONFIG_MAGIC_SYSRQ
-static char amiga_sysrq_xlate[128] =
-	"\0001234567890-=\\\000\000"					/* 0x00 - 0x0f */
-	"qwertyuiop[]\000123"							/* 0x10 - 0x1f */
-	"asdfghjkl;'\000\000456"						/* 0x20 - 0x2f */
-	"\000zxcvbnm,./\000+789"						/* 0x30 - 0x3f */
-	" \177\t\r\r\000\177\000\000\000-\000\000\000\000\000"	/* 0x40 - 0x4f */
-	"\000\201\202\203\204\205\206\207\210\211()/*+\000"	/* 0x50 - 0x5f */
-	"\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000"	/* 0x60 - 0x6f */
-	"\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000";	/* 0x70 - 0x7f */
-#endif
 
 
     /*
@@ -388,11 +369,6 @@ void __init config_amiga(void)
     request_resource(&iomem_resource, &((struct resource *)&mb_resources)[i]);
 
   mach_sched_init      = amiga_sched_init;
-#ifdef CONFIG_VT
-  mach_keyb_init       = amiga_keyb_init;
-  mach_kbdrate         = amiga_kbdrate;
-  mach_kbd_translate   = amiga_kbd_translate;
-#endif
   mach_init_IRQ        = amiga_init_IRQ;
   mach_default_handler = &amiga_default_handler;
   mach_request_irq     = amiga_request_irq;
@@ -432,16 +408,10 @@ void __init config_amiga(void)
 #ifdef CONFIG_DUMMY_CONSOLE
   conswitchp           = &dummy_con;
 #endif
-#ifdef CONFIG_VT
-  kd_mksound           = amiga_mksound;
+#ifdef CONFIG_INPUT_M68K_BEEP
+  mach_beep            = amiga_mksound;
 #endif
-#ifdef CONFIG_MAGIC_SYSRQ
-  SYSRQ_KEY            = 0xff;
-  mach_sysrq_key = 0x5f;	     /* HELP */
-  mach_sysrq_shift_state = 0x03; /* SHIFT+ALTGR */
-  mach_sysrq_shift_mask = 0xff;  /* all modifiers except CapsLock */
-  mach_sysrq_xlate = amiga_sysrq_xlate;
-#endif
+
 #ifdef CONFIG_HEARTBEAT
   mach_heartbeat = amiga_heartbeat;
 #endif
@@ -709,7 +679,7 @@ static void amiga_reset (void)
   unsigned long jmp_addr040 = virt_to_phys(&&jmp_addr_label040);
   unsigned long jmp_addr = virt_to_phys(&&jmp_addr_label);
 
-  cli();
+  local_irq_disable();
   if (CPU_IS_040_OR_060)
     /* Setup transparent translation registers for mapping
      * of 16 MB kernel segment before disabling translation

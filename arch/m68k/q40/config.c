@@ -36,12 +36,9 @@
 #include <asm/rtc.h>
 #include <asm/machdep.h>
 #include <asm/q40_master.h>
-#include <asm/keyboard.h>
 
 extern void floppy_setup(char *str, int *ints);
 
-extern int q40kbd_translate(unsigned char scancode, unsigned char *keycode,
-			    char raw_mode);
 extern void q40_process_int (int level, struct pt_regs *regs);
 extern void (*q40_sys_default_handler[]) (int, void *, struct pt_regs *);  /* added just for debugging */
 extern void q40_init_IRQ (void);
@@ -62,8 +59,6 @@ void q40_halt(void);
 extern void q40_waitbut(void);
 void q40_set_vectors (void);
 
-void q40_mksound(unsigned int /*freq*/, unsigned int /*ticks*/ );
-
 extern char *saved_command_line;
 extern char m68k_debug_device[];
 static void q40_mem_console_write(struct console *co, const char *b,
@@ -81,14 +76,6 @@ static struct console q40_console_driver = {
 /* early debugging function:*/
 extern char *q40_mem_cptr; /*=(char *)0xff020000;*/
 static int _cpleft;
-
-#if 0
-int q40_kbd_translate(unsigned char keycode, unsigned char *keycodep, char raw_mode)
-{
-        *keycodep = keycode;
-        return 1;
-}
-#endif
 
 static void q40_mem_console_write(struct console *co, const char *s,
 				  unsigned int count)
@@ -114,13 +101,6 @@ void printq40(char *str)
       p+=4;
     }
   q40_mem_cptr=p;
-}
-#endif
-
-#if 0
-int q40_kbdrate (struct kbd_repeat *k)
-{
-	return 0;
 }
 #endif
 
@@ -185,10 +165,6 @@ void __init config_q40(void)
 {
     mach_sched_init      = q40_sched_init;
 
-#ifdef CONFIG_VT
-    mach_keyb_init       = q40kbd_init_hw;
-    mach_kbd_translate   = q40kbd_translate;
-#endif
     mach_init_IRQ        = q40_init_IRQ;   
     mach_gettimeoffset   = q40_gettimeoffset; 
     mach_hwclk           = q40_hwclk; 
@@ -204,12 +180,9 @@ void __init config_q40(void)
     mach_default_handler = &q40_sys_default_handler;
     mach_get_model       = q40_get_model;
     mach_get_hardware_list = q40_get_hardware_list;
-#ifdef CONFIG_VT
-    kd_mksound             = q40_mksound;
-#endif
 
-#ifdef CONFIG_MAGIC_SYSRQ
-    mach_sysrq_key       = 0x54;
+#ifdef CONFIG_INPUT_M68K_BEEP
+    mach_beep            = q40_mksound;
 #endif
 #ifdef CONFIG_HEARTBEAT
     mach_heartbeat = q40_heartbeat;
