@@ -454,27 +454,12 @@ repeat:
 }
 #endif
 
-/*
- * kick_if_running - kick the remote CPU if the task is running currently.
- *
- * This code is used by the signal code to signal tasks
- * which are in user-mode, as quickly as possible.
- *
- * (Note that we do this lockless - if the task does anything
- * while the message is in flight then it will notice the
- * sigpending condition anyway.)
- */
-void kick_if_running(task_t * p)
-{
-	if ((task_running(task_rq(p), p)) && (task_cpu(p) != smp_processor_id()))
-		resched_task(p);
-}
-
 /***
  * try_to_wake_up - wake up a thread
  * @p: the to-be-woken-up thread
  * @state: the mask of task states that can be woken
  * @sync: do a synchronous wakeup?
+ * @kick: kick the CPU if the task is already running?
  *
  * Put it on the run-queue if it's not already there. The "current"
  * thread is always on the run-queue (except when the actual
@@ -484,7 +469,7 @@ void kick_if_running(task_t * p)
  *
  * returns failure only if the task is already active.
  */
-static int try_to_wake_up(task_t * p, unsigned int state, int sync)
+static int try_to_wake_up(task_t * p, unsigned int state, int sync, int kick)
 {
 	int success = 0, requeue_waker = 0;
 	unsigned long flags;
@@ -518,7 +503,9 @@ repeat_lock_task:
 					resched_task(rq->curr);
 			}
 			success = 1;
-		}
+		} else
+			if (unlikely(kick) && task_running(rq, p))
+				resched_task(rq->curr);
 		p->state = TASK_RUNNING;
 	}
 	task_rq_unlock(rq, &flags);
@@ -543,12 +530,17 @@ repeat_lock_task:
 
 int wake_up_process(task_t * p)
 {
-	return try_to_wake_up(p, TASK_STOPPED | TASK_INTERRUPTIBLE | TASK_UNINTERRUPTIBLE, 0);
+	return try_to_wake_up(p, TASK_STOPPED | TASK_INTERRUPTIBLE | TASK_UNINTERRUPTIBLE, 0, 0);
+}
+
+int wake_up_process_kick(task_t * p)
+{
+	return try_to_wake_up(p, TASK_STOPPED | TASK_INTERRUPTIBLE | TASK_UNINTERRUPTIBLE, 0, 1);
 }
 
 int wake_up_state(task_t *p, unsigned int state)
 {
-	return try_to_wake_up(p, state, 0);
+	return try_to_wake_up(p, state, 0, 0);
 }
 
 /*
@@ -1389,7 +1381,7 @@ need_resched:
 int default_wake_function(wait_queue_t *curr, unsigned mode, int sync)
 {
 	task_t *p = curr->task;
-	return try_to_wake_up(p, mode, sync);
+	return try_to_wake_up(p, mode, sync, 0);
 }
 
 /*
