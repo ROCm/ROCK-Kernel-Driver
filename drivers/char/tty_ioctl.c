@@ -145,6 +145,13 @@ static void change_termios(struct tty_struct * tty, struct termios * new_termios
 			wake_up_interruptible(&tty->link->read_wait);
 		}
 	}
+
+	/*
+	 * Fixme! We should really try to protect the driver and ldisc
+	 * termios usage too. But they need to be able to sleep, so
+	 * the global termios spinlock is not the right thing.
+	 */
+	spin_unlock_irqrestore(&tty_termios_lock, flags);
 	   
 	if (tty->driver->set_termios)
 		(*tty->driver->set_termios)(tty, &old_termios);
@@ -155,7 +162,6 @@ static void change_termios(struct tty_struct * tty, struct termios * new_termios
 			(ld->set_termios)(tty, &old_termios);
 		tty_ldisc_deref(ld);
 	}
-	spin_unlock_irqrestore(&tty_termios_lock, flags);
 }
 
 static int set_termios(struct tty_struct * tty, void __user *arg, int opt)
