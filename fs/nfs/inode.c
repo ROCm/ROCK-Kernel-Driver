@@ -37,7 +37,6 @@
 #include <asm/system.h>
 #include <asm/uaccess.h>
 
-#define CONFIG_NFS_SNAPSHOT 1
 #define NFSDBG_FACILITY		NFSDBG_VFS
 #define NFS_PARANOIA 1
 
