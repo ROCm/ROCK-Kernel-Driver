@@ -313,7 +313,7 @@ static int sp8870_init (struct dvb_frontend* fe)
 
 
 	/* request the firmware, this will block until someone uploads it */
-	printk("sp8870: waiting for firmware upload...\n");
+	printk("sp8870: waiting for firmware upload (%s)...\n", SP8870_DEFAULT_FIRMWARE);
 	if (state->config->request_firmware(fe, &fw, SP8870_DEFAULT_FIRMWARE)) {
 		printk("sp8870: no firmware upload (timeout or file not found?)\n");
 		release_firmware(fw);
@@ -325,6 +325,7 @@ static int sp8870_init (struct dvb_frontend* fe)
 		release_firmware(fw);
 		return -EIO;
 	}
+	printk("sp8870: firmware upload complete\n");
 
 	/* enable TS output and interface pins */
 	sp8870_writereg(state, 0xc18, 0x00d);
