@@ -22,9 +22,15 @@
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
 MODULE_DESCRIPTION("AT and PS/2 keyboard driver");
 MODULE_PARM(atkbd_set, "1i");
+MODULE_PARM(atkbd_reset, "1i");
 MODULE_LICENSE("GPL");
 
 static int atkbd_set = 2;
+#if defined(__i386__) || defined (__x86_64__)
+static int atkbd_reset;
+#else
+static int atkbd_reset = 1;
+#endif
 
 /*
  * Scancode to keycode tables. These are just the default setting, and
@@ -89,6 +95,7 @@ static unsigned char atkbd_set3_keycode[512] = {
 #define ATKBD_CMD_RESEND	0x00fe
 #define ATKBD_CMD_EX_ENABLE	0x10ea
 #define ATKBD_CMD_EX_SETLEDS	0x20eb
+#define ATKBD_CMD_OK_GETID	0x02e8
 
 #define ATKBD_RET_ACK		0xfa
 #define ATKBD_RET_NAK		0xfe
@@ -113,6 +120,7 @@ struct atkbd {
 	unsigned char cmdbuf[4];
 	unsigned char cmdcnt;
 	unsigned char set;
+	unsigned char oldset;
 	unsigned char release;
 	signed char ack;
 	unsigned char emul;
@@ -134,7 +142,6 @@ static void atkbd_interrupt(struct serio *serio, unsigned char data, unsigned in
 	printk(KERN_DEBUG "atkbd.c: Received %02x flags %02x\n", data, flags);
 #endif
 
-	/* Interface error.  Request that the keyboard resend. */
 	if ((flags & (SERIO_FRAME | SERIO_PARITY)) && (~flags & SERIO_TIMEOUT) && atkbd->write) {
 		printk("atkbd.c: frame/parity error: %02x\n", flags);
 		serio_write(serio, ATKBD_CMD_RESEND);
@@ -205,7 +212,9 @@ static int atkbd_sendbyte(struct atkbd *atkbd, unsigned char byte)
 #ifdef ATKBD_DEBUG
 	printk(KERN_DEBUG "atkbd.c: Sent: %02x\n", byte);
 #endif
-	serio_write(atkbd->serio, byte);
+	if (serio_write(atkbd->serio, byte))
+		return -1;
+
 	while (!atkbd->ack && timeout--) udelay(10);
 
 	return -(atkbd->ack <= 0);
@@ -289,34 +298,41 @@ static int atkbd_event(struct input_dev *dev, unsigned int type, unsigned int co
 
 static int atkbd_set_3(struct atkbd *atkbd)
 {
-	unsigned char param;
+	unsigned char param[2];
+
+/*
+ * Remember original scancode set value, so that we can restore it on exit.
+ */
+
+	if (atkbd_command(atkbd, &atkbd->oldset, ATKBD_CMD_GSCANSET))
+		atkbd->oldset = 2;
 
 /*
  * For known special keyboards we can go ahead and set the correct set.
+ * We check for NCD PS/2 Sun, NorthGate OmniKey 101 and IBM RapidAccess
+ * keyboards.
  */
 
 	if (atkbd->id == 0xaca1) {
-		param = 3;
-		atkbd_command(atkbd, &param, ATKBD_CMD_SSCANSET);
+		param[0] = 3;
+		atkbd_command(atkbd, param, ATKBD_CMD_SSCANSET);
 		return 3;
 	}
 
-/*
- * We check for the extra keys on an some keyboards that need extra
- * command to get enabled. This shouldn't harm any keyboards not
- * knowing the command.
- */
+	if (!atkbd_command(atkbd, param, ATKBD_CMD_OK_GETID)) {
+		atkbd->id = param[0] << 8 | param[1];
+		return 2;
+	}
 
-	param = 0x71;
-	if (!atkbd_command(atkbd, &param, ATKBD_CMD_EX_ENABLE))
+	param[0] = 0x71;
+	if (!atkbd_command(atkbd, param, ATKBD_CMD_EX_ENABLE))
 		return 4;
 
 /*
  * Try to set the set we want.
  */
 
-	param = atkbd_set;
-	if (atkbd_command(atkbd, &param, ATKBD_CMD_SSCANSET))
+	if (atkbd_command(atkbd, &atkbd_set, ATKBD_CMD_SSCANSET))
 		return 2;
 
 /*
@@ -327,8 +343,8 @@ static int atkbd_set_3(struct atkbd *atkbd)
  * In that case we time out, and return 2.
  */
 
-	param = 0;
-	if (atkbd_command(atkbd, &param, ATKBD_CMD_GSCANSET))
+	param[0] = 0;
+	if (atkbd_command(atkbd, param, ATKBD_CMD_GSCANSET))
 		return 2;
 
 /*
@@ -336,7 +352,7 @@ static int atkbd_set_3(struct atkbd *atkbd)
  * itself.
  */
 
-	return (param == 3) ? 3 : 2;
+	return (param[0] == 3) ? 3 : 2;
 }
 
 /*
@@ -353,10 +369,9 @@ static int atkbd_probe(struct atkbd *atkbd)
  * these systems the BIOS also usually doesn't do it for us.
  */
 
-#ifdef CONFIG_KEYBOARD_ATKBD_RESET
-	if (atkbd_command(atkbd, NULL, ATKBD_CMD_RESET_BAT))
-		printk(KERN_WARNING "atkbd.c: keyboard reset failed\n");
-#endif
+	if (atkbd_reset)
+		if (atkbd_command(atkbd, NULL, ATKBD_CMD_RESET_BAT))
+			printk(KERN_WARNING "atkbd.c: keyboard reset failed\n");
 
 /*
  * Next we check we can set LEDs on the keyboard. This should work on every
@@ -405,7 +420,18 @@ static int atkbd_probe(struct atkbd *atkbd)
 }
 
 /*
- * atkbd_disconnect() cleans up behind us ...
+ * atkbd_cleanup() restores the keyboard state so that BIOS is happy after a
+ * reboot.
+ */
+
+static void atkbd_cleanup(struct serio *serio)
+{
+	struct atkbd *atkbd = serio->private;
+	atkbd_command(atkbd, &atkbd->oldset, ATKBD_CMD_SSCANSET);
+}
+
+/*
+ * atkbd_disconnect() closes and frees.
  */
 
 static void atkbd_disconnect(struct serio *serio)
@@ -508,18 +534,28 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 static struct serio_dev atkbd_dev = {
 	.interrupt =	atkbd_interrupt,
 	.connect =	atkbd_connect,
-	.disconnect =	atkbd_disconnect
+	.disconnect =	atkbd_disconnect,
+	.cleanup =	atkbd_cleanup,
 };
 
 #ifndef MODULE
-static int __init atkbd_setup(char *str)
+static int __init atkbd_setup_set(char *str)
 {
         int ints[4];
         str = get_options(str, ARRAY_SIZE(ints), ints);
         if (ints[0] > 0) atkbd_set = ints[1];
         return 1;
 }
-__setup("atkbd_set=", atkbd_setup);
+static int __init atkbd_setup_reset(char *str)
+{
+        int ints[4];
+        str = get_options(str, ARRAY_SIZE(ints), ints);
+        if (ints[0] > 0) atkbd_reset = ints[1];
+        return 1;
+}
+
+__setup("atkbd_set=", atkbd_setup_set);
+__setup("atkbd_reset", atkbd_setup_reset);
 #endif
 
 int __init atkbd_init(void)

@@ -21,7 +21,10 @@
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
 MODULE_DESCRIPTION("PS/2 mouse driver");
+MODULE_PARM(psmouse_noext, "1i");
 MODULE_LICENSE("GPL");
+
+static int psmouse_noext;
 
 #define PSMOUSE_CMD_SETSCALE11	0x00e6
 #define PSMOUSE_CMD_SETRES	0x10e8
@@ -33,6 +36,7 @@ MODULE_LICENSE("GPL");
 #define PSMOUSE_CMD_SETRATE	0x10f3
 #define PSMOUSE_CMD_ENABLE	0x00f4
 #define PSMOUSE_CMD_RESET_DIS	0x00f6
+#define PSMOUSE_CMD_RESET_BAT	0x02ff
 
 #define PSMOUSE_RET_BAT		0xaa
 #define PSMOUSE_RET_ACK		0xfa
@@ -222,7 +226,11 @@ static int psmouse_sendbyte(struct psmouse *psmouse, unsigned char byte)
 	psmouse->ack = 0;
 	psmouse->acking = 1;
 
-	serio_write(psmouse->serio, byte);
+	if (serio_write(psmouse->serio, byte)) {
+		psmouse->acking = 0;
+		return -1;
+	}
+
 	while (!psmouse->ack && timeout--) udelay(10);
 
 	return -(psmouse->ack <= 0);
@@ -301,6 +309,9 @@ static int psmouse_extensions(struct psmouse *psmouse)
 	psmouse->vendor = "Generic";
 	psmouse->name = "Mouse";
 	psmouse->model = 0;
+
+	if (psmouse_noext)
+		return PSMOUSE_PS2;
 
 /*
  * Try Genius NetMouse magic init.
@@ -529,15 +540,24 @@ static void psmouse_initialize(struct psmouse *psmouse)
  * Last, we enable the mouse so that we get reports from it.
  */
 
-	if (psmouse_command(psmouse, NULL, PSMOUSE_CMD_ENABLE)) {
+	if (psmouse_command(psmouse, NULL, PSMOUSE_CMD_ENABLE))
 		printk(KERN_WARNING "psmouse.c: Failed to enable mouse on %s\n", psmouse->serio->phys);
-	}
 
 }
 
 /*
- * psmouse_disconnect() cleans up after we don't want talk
- * to the mouse anymore.
+ * psmouse_cleanup() resets the mouse into power-on state.
+ */
+
+static void psmouse_cleanup(struct serio *serio)
+{
+	struct psmouse *psmouse = serio->private;
+	unsigned char param[2];
+	psmouse_command(psmouse, param, PSMOUSE_CMD_RESET_BAT);
+}
+
+/*
+ * psmouse_disconnect() closes and frees.
  */
 
 static void psmouse_disconnect(struct serio *serio)
@@ -607,8 +627,18 @@ static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
 static struct serio_dev psmouse_dev = {
 	.interrupt =	psmouse_interrupt,
 	.connect =	psmouse_connect,
-	.disconnect =	psmouse_disconnect
+	.disconnect =	psmouse_disconnect,
+	.cleanup =	psmouse_cleanup,
 };
+
+#ifndef MODULE
+static int __init psmouse_setup(char *str)
+{
+	psmouse_noext = 1;
+	return 1;
+}
+__setup("psmouse_noext", psmouse_setup);
+#endif
 
 int __init psmouse_init(void)
 {

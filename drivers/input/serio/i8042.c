@@ -19,7 +19,9 @@
 #include <linux/reboot.h>
 #include <linux/init.h>
 #include <linux/serio.h>
-#include <linux/sched.h>	/* request/free_irq */
+#include <linux/sched.h>
+
+#undef DEBUG
 
 #include "i8042.h"
 
@@ -31,13 +33,13 @@ MODULE_PARM(i8042_noaux, "1i");
 MODULE_PARM(i8042_unlock, "1i");
 MODULE_PARM(i8042_reset, "1i");
 MODULE_PARM(i8042_direct, "1i");
-MODULE_PARM(i8042_restore_ctr, "1i");
+MODULE_PARM(i8042_dumbkbd, "1i");
 
 static int i8042_noaux;
 static int i8042_unlock;
 static int i8042_reset;
 static int i8042_direct;
-static int i8042_restore_ctr;
+static int i8042_dumbkbd;
 
 spinlock_t i8042_lock = SPIN_LOCK_UNLOCKED;
 
@@ -46,6 +48,7 @@ struct i8042_values {
 	unsigned char disable;
 	unsigned char irqen;
 	unsigned char exists;
+	signed char mux;
 	unsigned char *name;
 	unsigned char *phys;
 };
@@ -55,11 +58,8 @@ static struct serio i8042_aux_port;
 static unsigned char i8042_initial_ctr;
 static unsigned char i8042_ctr;
 static unsigned char i8042_last_e0;
+static unsigned char i8042_mux_open;
 struct timer_list i8042_timer;
-
-#ifdef I8042_DEBUG_IO
-static unsigned long i8042_start;
-#endif
 
 extern struct pt_regs *kbd_pt_regs;
 
@@ -110,18 +110,16 @@ static int i8042_wait_write(void)
 static int i8042_flush(void)
 {
 	unsigned long flags;
+	unsigned char data;
 	int i = 0;
 
 	spin_lock_irqsave(&i8042_lock, flags);
 
-	while ((i8042_read_status() & I8042_STR_OBF) && (i++ < I8042_BUFFER_SIZE))
-#ifdef I8042_DEBUG_IO
-		printk(KERN_DEBUG "i8042.c: %02x <- i8042 (flush, %s) [%d]\n",
-			i8042_read_data(), i8042_read_status() & I8042_STR_AUXDATA ? "aux" : "kbd",
-			(int) (jiffies - i8042_start));
-#else
-		i8042_read_data();
-#endif
+	while ((i8042_read_status() & I8042_STR_OBF) && (i++ < I8042_BUFFER_SIZE)) {
+		data = i8042_read_data();
+		dbg("%02x <- i8042 (flush, %s)", data,
+			i8042_read_status() & I8042_STR_AUXDATA ? "aux" : "kbd");
+	}
 
 	spin_unlock_irqrestore(&i8042_lock, flags);
 
@@ -145,20 +143,14 @@ static int i8042_command(unsigned char *param, int command)
 
 	retval = i8042_wait_write();
 	if (!retval) {
-#ifdef I8042_DEBUG_IO
-		printk(KERN_DEBUG "i8042.c: %02x -> i8042 (command) [%d]\n",
-			command & 0xff, (int) (jiffies - i8042_start));
-#endif
+		dbg("%02x -> i8042 (command)", command & 0xff);
 		i8042_write_command(command & 0xff);
 	}
 	
 	if (!retval)
 		for (i = 0; i < ((command >> 12) & 0xf); i++) {
 			if ((retval = i8042_wait_write())) break;
-#ifdef I8042_DEBUG_IO
-			printk(KERN_DEBUG "i8042.c: %02x -> i8042 (parameter) [%d]\n",
-				param[i], (int) (jiffies - i8042_start));
-#endif
+			dbg("%02x -> i8042 (parameter)", param[i]);
 			i8042_write_data(param[i]);
 		}
 
@@ -169,19 +161,13 @@ static int i8042_command(unsigned char *param, int command)
 				param[i] = ~i8042_read_data();
 			else
 				param[i] = i8042_read_data();
-#ifdef I8042_DEBUG_IO
-			printk(KERN_DEBUG "i8042.c: %02x <- i8042 (return) [%d]\n",
-				param[i], (int) (jiffies - i8042_start));
-#endif
+			dbg("%02x <- i8042 (return)\n", param[i]);
 		}
 
 	spin_unlock_irqrestore(&i8042_lock, flags);
 
-#ifdef I8042_DEBUG_IO
 	if (retval)
-		printk(KERN_DEBUG "i8042.c:      -- i8042 (timeout) [%d]\n",
-			(int) (jiffies - i8042_start));
-#endif
+		dbg("     -- i8042 (timeout)");
 
 	return retval;
 }
@@ -198,10 +184,7 @@ static int i8042_kbd_write(struct serio *port, unsigned char c)
 	spin_lock_irqsave(&i8042_lock, flags);
 
 	if(!(retval = i8042_wait_write())) {
-#ifdef I8042_DEBUG_IO
-		printk(KERN_DEBUG "i8042.c: %02x -> i8042 (kbd-data) [%d]\n",
-			c, (int) (jiffies - i8042_start));
-#endif
+		dbg("%02x -> i8042 (kbd-data)", c);
 		i8042_write_data(c);
 	}
 
@@ -216,21 +199,17 @@ static int i8042_kbd_write(struct serio *port, unsigned char c)
 
 static int i8042_aux_write(struct serio *port, unsigned char c)
 {
+	struct i8042_values *values = port->driver;
 	int retval;
 
 /*
  * Send the byte out.
  */
 
-	retval  = i8042_command(&c, I8042_CMD_AUX_SEND);
-
-/*
- * Here we restore the CTR value if requested. I don't know why, but i8042's in
- * half-AT mode tend to trash their CTR when doing the AUX_SEND command. 
- */
-
-	if (i8042_restore_ctr)
-		retval |= i8042_command(&i8042_ctr, I8042_CMD_CTL_WCTR);
+	if (values->mux == -1)
+		retval = i8042_command(&c, I8042_CMD_AUX_SEND);
+	else
+		retval = i8042_command(&c, I8042_CMD_MUX_SEND + values->mux);
 
 /*
  * Make sure the interrupt happens and the character is received even
@@ -242,6 +221,7 @@ static int i8042_aux_write(struct serio *port, unsigned char c)
 	return retval;
 }
 
+
 /*
  * i8042_open() is called when a port is open by the higher layer.
  * It allocates the interrupt and enables in in the chip.
@@ -252,6 +232,10 @@ static int i8042_open(struct serio *port)
 	struct i8042_values *values = port->driver;
 
 	i8042_flush();
+
+	if (values->mux != -1)
+		if (i8042_mux_open++)
+			return 0;
 
 	if (request_irq(values->irq, i8042_interrupt, 0, "i8042", NULL)) {
 		printk(KERN_ERR "i8042.c: Can't get irq %d for %s, unregistering the port.\n", values->irq, values->name);
@@ -282,6 +266,10 @@ static void i8042_close(struct serio *port)
 {
 	struct i8042_values *values = port->driver;
 
+	if (values->mux != -1)
+		if (--i8042_mux_open)
+			return;
+
 	i8042_ctr &= ~values->irqen;
 
 	if (i8042_command(&i8042_ctr, I8042_CMD_CTL_WCTR)) {
@@ -299,11 +287,11 @@ static void i8042_close(struct serio *port)
  */
 
 static struct i8042_values i8042_kbd_values = {
-	.irq =		0,
+	.irq =		I8042_KBD_IRQ,
 	.irqen =	I8042_CTR_KBDINT,
 	.disable =	I8042_CTR_KBDDIS,
 	.name =		"KBD",
-	.exists =	0,
+	.mux =		-1,
 };
 
 static struct serio i8042_kbd_port =
@@ -318,11 +306,11 @@ static struct serio i8042_kbd_port =
 };
 
 static struct i8042_values i8042_aux_values = {
-	.irq =		0,
+	.irq =		I8042_AUX_IRQ,
 	.irqen =	I8042_CTR_AUXINT,
 	.disable =	I8042_CTR_AUXDIS,
 	.name =		"AUX",
-	.exists =	0,
+	.mux =		-1,
 };
 
 static struct serio i8042_aux_port =
@@ -335,6 +323,12 @@ static struct serio i8042_aux_port =
 	.name =		"i8042 Aux Port",
 	.phys =		I8042_AUX_PHYS_DESC,
 };
+
+static struct i8042_values i8042_mux_values[4];
+static struct serio i8042_mux_port[4];
+static char i8042_mux_names[4][16];
+static char i8042_mux_short[4][8];
+static char i8042_mux_phys[4][32];
 
 /*
  * i8042_interrupt() is the most important function in this driver -
@@ -373,34 +367,60 @@ static void i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		dfl = ((str & I8042_STR_PARITY) ? SERIO_PARITY : 0) |
 		      ((str & I8042_STR_TIMEOUT) ? SERIO_TIMEOUT : 0);
 
-#ifdef I8042_DEBUG_IO
-		printk(KERN_DEBUG "i8042.c: %02x <- i8042 (interrupt, %s, %d%s%s) [%d]\n",
+		if (i8042_mux_values[0].exists && (buffer[i].str & I8042_STR_AUXDATA)) {
+
+			if (buffer[i].str & I8042_STR_MUXERR) {
+				switch (buffer[i].data) {
+					case 0xfd:
+					case 0xfe: dfl = SERIO_TIMEOUT; break;
+					case 0xff: dfl = SERIO_PARITY; break;
+				}
+				buffer[i].data = 0xfe;
+			} else dfl = 0;
+
+			dbg("%02x <- i8042 (interrupt, aux%d, %d%s%s)",
+				data, (str >> 6), irq, 
+				dfl & SERIO_PARITY ? ", bad parity" : "",
+				dfl & SERIO_TIMEOUT ? ", timeout" : "");
+
+			if (i8042_mux_values[(str >> 6)].exists)
+				serio_interrupt(i8042_mux_port + (str >> 6), buffer[i].data, dfl);
+			continue;
+		}
+
+		dbg("%02x <- i8042 (interrupt, %s, %d%s%s)",
 			data, (str & I8042_STR_AUXDATA) ? "aux" : "kbd", irq, 
 			dfl & SERIO_PARITY ? ", bad parity" : "",
-			dfl & SERIO_TIMEOUT ? ", timeout" : "",
-			(int) (jiffies - i8042_start));
-#endif
+			dfl & SERIO_TIMEOUT ? ", timeout" : "");
 
 		if (i8042_aux_values.exists && (buffer[i].str & I8042_STR_AUXDATA)) {
 			serio_interrupt(&i8042_aux_port, buffer[i].data, dfl);
-		} else 
-			if (i8042_kbd_values.exists) {
-				if (!i8042_direct) {
-					if (data > 0x7f) {
-						if (test_and_clear_bit(data & 0x7f, i8042_unxlate_seen)) {
-							serio_interrupt(&i8042_kbd_port, 0xf0, dfl);
-							if (i8042_last_e0 && (data == 0xaa || data == 0xb6))
-								set_bit(data & 0x7f, i8042_unxlate_seen);
-							data = i8042_unxlate_table[data & 0x7f];
-						}
-					} else {
-						set_bit(data, i8042_unxlate_seen);
-						data = i8042_unxlate_table[data];
-					}
-					i8042_last_e0 = (data == 0xe0);
-				}
-				serio_interrupt(&i8042_kbd_port, data, dfl);
+			continue;
+		}
+
+		if (!i8042_kbd_values.exists)
+			continue;
+
+		if (i8042_direct) {
+			serio_interrupt(&i8042_kbd_port, data, dfl);
+			continue;
+		}
+
+		if (data > 0x7f) {
+			if (test_and_clear_bit(data & 0x7f, i8042_unxlate_seen)) {
+				serio_interrupt(&i8042_kbd_port, 0xf0, dfl);
+				if (i8042_last_e0 && (data == 0xaa || data == 0xb6))
+					set_bit(data & 0x7f, i8042_unxlate_seen);
+				data = i8042_unxlate_table[data & 0x7f];
 			}
+		} else {
+			set_bit(data, i8042_unxlate_seen);
+			data = i8042_unxlate_table[data];
+		}
+
+		i8042_last_e0 = (data == 0xe0);
+
+		serio_interrupt(&i8042_kbd_port, data, dfl);
 	}
 
 }
@@ -460,17 +480,15 @@ static int __init i8042_controller_init(void)
  */
 
 	if (~i8042_read_status() & I8042_STR_KEYLOCK) {
-
-		if (i8042_unlock) {
+		if (i8042_unlock)
 			i8042_ctr |= I8042_CTR_IGNKEYLOCK;
-		} else {
+		 else
 			printk(KERN_WARNING "i8042.c: Warning: Keylock active.\n");
-		}
 	}
 
 /*
  * If the chip is configured into nontranslated mode by the BIOS, don't
- * bother enabling translating and just use that happily.
+ * bother enabling translating and be happy.
  */
 
 	if (~i8042_ctr & I8042_CTR_XLATE)
@@ -478,10 +496,9 @@ static int __init i8042_controller_init(void)
 
 /*
  * Set nontranslated mode for the kbd interface if requested by an option.
- * This is vital for a working scancode set 3 support. After this the kbd
- * interface becomes a simple serial in/out, like the aux interface is. If
- * the user doesn't wish this, the driver tries to untranslate the values
- * after the i8042 translates them.
+ * After this the kbd interface becomes a simple serial in/out, like the aux
+ * interface is. We don't do this by default, since it can confuse notebook
+ * BIOSes.
  */
 
 	if (i8042_direct)
@@ -506,8 +523,23 @@ static int __init i8042_controller_init(void)
 
 void i8042_controller_cleanup(void)
 {
+	int i;
 
 	i8042_flush();
+
+/*
+ * Reset anything that is connected to the ports.
+ */
+
+	if (i8042_kbd_values.exists)
+		serio_cleanup(&i8042_kbd_port);
+
+	if (i8042_aux_values.exists)
+		serio_cleanup(&i8042_aux_port);
+
+	for (i = 0; i < 4; i++)
+		if (i8042_mux_values[i].exists)
+			serio_cleanup(i8042_mux_port + i);
 
 /*
  * Reset the controller.
@@ -529,16 +561,72 @@ void i8042_controller_cleanup(void)
 	if (i8042_command(&i8042_ctr, I8042_CMD_CTL_WCTR))
 		printk(KERN_WARNING "i8042.c: Can't restore CTR.\n");
 
+}
+
 /*
- * Reset anything that is connected to the ports if the ports
- * are enabled in the original config.
+ * i8042_check_mux() checks whether the controller supports the PS/2 Active
+ * Multiplexing specification by Synaptics, Phoenix, Insyde and
+ * LCS/Telegraphics.
  */
 
-	if (i8042_kbd_values.exists)
-		i8042_kbd_write(&i8042_kbd_port, 0xff);
+static int __init i8042_check_mux(struct i8042_values *values)
+{
+	unsigned char param;
+	int i;
 
-	if (i8042_aux_values.exists)
-		i8042_aux_write(&i8042_aux_port, 0xff);
+/*
+ * Check if AUX irq is available.
+ */
+
+	if (request_irq(values->irq, i8042_interrupt, 0, "i8042", NULL))
+                return -1;
+	free_irq(values->irq, NULL);
+
+/*
+ * Get rid of bytes in the queue.
+ */
+
+	i8042_flush();
+
+/*
+ * Internal loopback test - send three bytes, they should come back from the
+ * mouse interface, the last should be version. Note that we negate mouseport
+ * command responses for the i8042_check_aux() routine.
+ */
+
+	param = 0xf0;
+	if (i8042_command(&param, I8042_CMD_AUX_LOOP) || param != 0x0f)
+		return -1;
+	param = 0x56;
+	if (i8042_command(&param, I8042_CMD_AUX_LOOP) || param != 0xa9)
+		return -1;
+	param = 0xa4;
+	if (i8042_command(&param, I8042_CMD_AUX_LOOP) || param == 0x5b)
+		return -1;
+
+	printk(KERN_INFO "i8042.c: Detected active multiplexing controller, rev%d.%d.\n",
+		~param >> 4, ~param & 0xf);
+
+/*
+ * Disable all muxed ports by disabling AUX.
+ */
+
+	i8042_ctr &= I8042_CTR_AUXDIS;
+	i8042_ctr &= ~I8042_CTR_AUXINT;
+
+	if (i8042_command(&i8042_ctr, I8042_CMD_CTL_WCTR))
+		return -1;
+
+/*
+ * Enable all muxed ports.
+ */
+
+	for (i = 0; i < 4; i++) {
+		i8042_command(&param, I8042_CMD_MUX_PFX + i);
+		i8042_command(&param, I8042_CMD_AUX_ENABLE);
+	}
+
+	return 0;
 }
 
 /*
@@ -546,7 +634,7 @@ void i8042_controller_cleanup(void)
  * the presence of an AUX interface.
  */
 
-static int __init i8042_check_aux(struct i8042_values *values, struct serio *port)
+static int __init i8042_check_aux(struct i8042_values *values)
 {
 	unsigned char param;
 
@@ -570,7 +658,6 @@ static int __init i8042_check_aux(struct i8042_values *values, struct serio *por
  */
 
 	param = 0x5a;
-
 	if (i8042_command(&param, I8042_CMD_AUX_LOOP) || param != 0xa5)
 		return -1;
 
@@ -665,9 +752,9 @@ static int __init i8042_setup_direct(char *str)
 	i8042_direct = 1;
 	return 1;
 }
-static int __init i8042_setup_restore_ctr(char *str)
+static int __init i8042_setup_dumbkbd(char *str)
 {
-	i8042_restore_ctr = 1;
+	i8042_dumbkbd = 1;
 	return 1;
 }
 
@@ -675,7 +762,7 @@ __setup("i8042_reset", i8042_setup_reset);
 __setup("i8042_noaux", i8042_setup_noaux);
 __setup("i8042_unlock", i8042_setup_unlock);
 __setup("i8042_direct", i8042_setup_direct);
-__setup("i8042_restore_ctr", i8042_setup_restore_ctr);
+__setup("i8042_dumbkbd", i8042_setup_dumbkbd);
 #endif
 
 /*
@@ -698,27 +785,43 @@ static struct notifier_block i8042_notifier=
         0
 };
 
+static void __init i8042_init_mux_values(struct i8042_values *values, struct serio *port, int index)
+{
+	memcpy(port, &i8042_aux_port, sizeof(struct serio));
+	memcpy(values, &i8042_aux_values, sizeof(struct i8042_values));
+	sprintf(i8042_mux_names[index], "i8042 Aux-%d Port", index);
+	sprintf(i8042_mux_phys[index], I8042_MUX_PHYS_DESC, index + 1);
+	sprintf(i8042_mux_short[index], "AUX%d", index);
+	port->name = i8042_mux_names[index];
+	port->phys = i8042_mux_phys[index];
+	values->name = i8042_mux_short[index];
+	values->mux = index;
+}
+
 int __init i8042_init(void)
 {
-#ifdef I8042_DEBUG_IO
-	i8042_start = jiffies;
-#endif
+	int i;
 
-#if !defined(__i386__) && !defined(__x86_64__)
-	i8042_reset = 1;
-#endif
+	dbg_init();
 
-	if (!i8042_platform_init())
+	if (i8042_platform_init())
 		return -EBUSY;
-
-	i8042_kbd_values.irq = I8042_KBD_IRQ;
-	i8042_aux_values.irq = I8042_AUX_IRQ;
 
 	if (i8042_controller_init())
 		return -ENODEV;
-		
-	if (!i8042_noaux && !i8042_check_aux(&i8042_aux_values, &i8042_aux_port))
-		i8042_port_register(&i8042_aux_values, &i8042_aux_port);
+
+	if (i8042_dumbkbd)
+		i8042_kbd_port.write = NULL;
+
+	for (i = 0; i < 4; i++)
+		i8042_init_mux_values(i8042_mux_values + i, i8042_mux_port + i, i);
+
+	if (!i8042_noaux && !i8042_check_mux(&i8042_aux_values))
+		for (i = 0; i < 4; i++)
+			i8042_port_register(i8042_mux_values + i, i8042_mux_port + i);
+	else 
+		if (!i8042_noaux && !i8042_check_aux(&i8042_aux_values))
+			i8042_port_register(&i8042_aux_values, &i8042_aux_port);
 
 	i8042_port_register(&i8042_kbd_values, &i8042_kbd_port);
 
@@ -732,22 +835,26 @@ int __init i8042_init(void)
 
 void __exit i8042_exit(void)
 {
+	int i;
+
 	unregister_reboot_notifier(&i8042_notifier);
 
 	del_timer(&i8042_timer);
+
+	i8042_controller_cleanup();
 	
 	if (i8042_kbd_values.exists)
 		serio_unregister_port(&i8042_kbd_port);
 
 	if (i8042_aux_values.exists)
 		serio_unregister_port(&i8042_aux_port);
-
-	i8042_controller_cleanup();
+	
+	for (i = 0; i < 4; i++)
+		if (i8042_mux_values[i].exists)
+			serio_unregister_port(i8042_mux_port + i);
 
 	i8042_platform_exit();
 }
 
 module_init(i8042_init);
 module_exit(i8042_exit);
-
-

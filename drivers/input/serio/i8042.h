@@ -22,13 +22,6 @@
 #endif
 
 /*
- * If you want to trace all the i/o the i8042 module does for
- * debugging purposes, define this.
- */
-
-#undef I8042_DEBUG_IO
-
-/*
  * This is in 50us units, the time we wait for the i8042 to react. This
  * has to be long enough for the i8042 itself to timeout on sending a byte
  * to a non-existent mouse.
@@ -54,6 +47,7 @@
 #define I8042_STR_AUXDATA	0x20
 #define I8042_STR_KEYLOCK	0x10
 #define I8042_STR_CMDDAT	0x08
+#define I8042_STR_MUXERR	0x04
 #define I8042_STR_IBF		0x02
 #define	I8042_STR_OBF		0x01
 
@@ -87,6 +81,9 @@
 #define I8042_CMD_AUX_SEND	0x10d4
 #define I8042_CMD_AUX_LOOP	0x11d3
 
+#define I8042_CMD_MUX_PFX	0x0090
+#define I8042_CMD_MUX_SEND	0x1090
+
 /*
  * Return codes.
  */
@@ -99,5 +96,19 @@
  */
 
 #define I8042_BUFFER_SIZE	32
+
+/*
+ * Debug.
+ */
+
+#ifdef DEBUG
+static unsigned long i8042_start;
+#define dbg_init() do { i8042_start = jiffies; } while (0);
+#define dbg(format, arg...) printk(KERN_DEBUG __FILE__ ": " format "[%d]\n" ,\
+	 ## arg, (int) (jiffies - i8042_start))
+#else
+#define dbg_init() do { } while (0);
+#define dbg(format, arg...) do {} while (0)
+#endif
 
 #endif /* _I8042_H */

@@ -69,6 +69,7 @@ struct serio_dev {
 	void (*interrupt)(struct serio *, unsigned char, unsigned int);
 	void (*connect)(struct serio *, struct serio_dev *dev);
 	void (*disconnect)(struct serio *);
+	void (*cleanup)(struct serio *);
 
 	struct serio_dev *next;
 };
@@ -85,13 +86,22 @@ void serio_unregister_device(struct serio_dev *dev);
 
 static __inline__ int serio_write(struct serio *serio, unsigned char data)
 {
-	return serio->write(serio, data);
+	if (serio->write)
+		return serio->write(serio, data);
+	else
+		return -1;
 }
 
 static __inline__ void serio_dev_write_wakeup(struct serio *serio)
 {
 	if (serio->dev && serio->dev->write_wakeup)
 		serio->dev->write_wakeup(serio);
+}
+
+static __inline__ void serio_cleanup(struct serio *serio)
+{
+	if (serio->dev && serio->dev->cleanup)
+		serio->dev->cleanup(serio);
 }
 
 /*
