@@ -1961,13 +1961,10 @@ extern void trap_init_f00f_bug(void);
 
 static void __init init_intel(struct cpuinfo_x86 *c)
 {
-#ifndef CONFIG_M686
-	static int f00f_workaround_enabled = 0;
-#endif
 	char *p = NULL;
 	unsigned int l1i = 0, l1d = 0, l2 = 0, l3 = 0; /* Cache sizes */
 
-#ifndef CONFIG_M686
+#ifdef CONFIG_X86_F00F_BUG
 	/*
 	 * All current models of Pentium and Pentium with MMX technology CPUs
 	 * have the F0 0F bug, which lets nonpriviledged users lock up the system.
@@ -1975,6 +1972,8 @@ static void __init init_intel(struct cpuinfo_x86 *c)
 	 */
 	c->f00f_bug = 0;
 	if ( c->x86 == 5 ) {
+		static int f00f_workaround_enabled = 0;
+
 		c->f00f_bug = 1;
 		if ( !f00f_workaround_enabled ) {
 			trap_init_f00f_bug();
