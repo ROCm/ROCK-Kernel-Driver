@@ -1072,7 +1072,7 @@ static int __init bigmac_ether_init(struct sbus_dev *qec_sdev)
 	int i;
 
 	/* Get a new device struct for this interface. */
-	dev = init_etherdev(NULL, sizeof(struct bigmac));
+	dev = alloc_etherdev(sizeof(struct bigmac));
 	if (!dev)
 		return -ENOMEM;
 	SET_MODULE_OWNER(dev);
@@ -1080,13 +1080,9 @@ static int __init bigmac_ether_init(struct sbus_dev *qec_sdev)
 	if (version_printed++ == 0)
 		printk(KERN_INFO "%s", version);
 
-	/* Report what we have found to the user. */
-	printk(KERN_INFO "%s: BigMAC 100baseT Ethernet ", dev->name);
 	dev->base_addr = (long) qec_sdev;
 	for (i = 0; i < 6; i++)
-		printk("%2.2x%c", dev->dev_addr[i] = idprom->id_ethaddr[i],
-		       i == 5 ? ' ' : ':');
-	printk("\n");
+		dev->dev_addr[i] = idprom->id_ethaddr[i];
 
 	/* Setup softc, with backpointers to QEC and BigMAC SBUS device structs. */
 	bp = dev->priv;
@@ -1210,11 +1206,22 @@ static int __init bigmac_ether_init(struct sbus_dev *qec_sdev)
 	dev->irq = bp->bigmac_sdev->irqs[0];
 	dev->dma = 0;
 
+	if (register_netdev(dev)) {
+		printk(KERN_ERR "BIGMAC: Cannot register device.\n");
+		goto fail_and_cleanup;
+	}
+
 	/* Put us into the list of instances attached for later driver
 	 * exit.
 	 */
 	bp->next_module = root_bigmac_dev;
 	root_bigmac_dev = bp;
+
+	printk(KERN_INFO "%s: BigMAC 100baseT Ethernet ", dev->name);
+	for (i = 0; i < 6; i++)
+		printk("%2.2x%c", dev->dev_addr[i],
+		       i == 5 ? ' ' : ':');
+	printk("\n");
 
 	return 0;
 
@@ -1236,9 +1243,8 @@ fail_and_cleanup:
 				     bp->bmac_block,
 				     bp->bblock_dvma);
 
-	unregister_netdev(dev);
 	/* This also frees the co-located 'dev->priv' */
-	kfree(dev);
+	free_netdev(dev);
 	return -ENODEV;
 }
 

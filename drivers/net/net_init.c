@@ -197,9 +197,13 @@ static struct net_device *init_netdev(struct net_device *dev, int sizeof_priv,
  *
  * If an empty string area is passed as dev->name, or a new structure is made,
  * a new name string is constructed.
+ *
+ * Deprecated because of exposed window between device registration 
+ * and interfaces pointers that need to be set by driver.
+ * Use alloc_etherdev and register_netdev instead.
  */
 
-struct net_device *init_etherdev(struct net_device *dev, int sizeof_priv)
+struct net_device *__init_etherdev(struct net_device *dev, int sizeof_priv)
 {
 	return init_netdev(dev, sizeof_priv, "eth%d", ether_setup);
 }
@@ -222,7 +226,7 @@ struct net_device *alloc_etherdev(int sizeof_priv)
 	return alloc_netdev(sizeof_priv, "eth%d", ether_setup);
 }
 
-EXPORT_SYMBOL(init_etherdev);
+EXPORT_SYMBOL(__init_etherdev);
 EXPORT_SYMBOL(alloc_etherdev);
 
 static int eth_mac_addr(struct net_device *dev, void *p)

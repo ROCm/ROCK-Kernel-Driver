@@ -157,7 +157,7 @@ static short nvpibits = -1;
 static short nvcibits = -1;
 static short rx_skb_reserve = 16;
 static short irq_coalesce = 1;
-static short sdh = 1;
+static short sdh = 0;
 
 static struct atmdev_ops he_ops =
 {
@@ -1547,11 +1547,10 @@ he_start(struct atm_dev *dev)
 
 	if (sdh) {
 		/* this really should be in suni.c but for now... */
-
 		int val;
 
 		val = he_phy_get(he_dev->atm_dev, SUNI_TPOP_APM);
-		val = (val & ~SUNI_TPOP_APM_S) | ( 0x2 << SUNI_TPOP_APM_S_SHIFT);
+		val = (val & ~SUNI_TPOP_APM_S) | (SUNI_TPOP_S_SDH << SUNI_TPOP_APM_S_SHIFT);
 		he_phy_put(he_dev->atm_dev, val, SUNI_TPOP_APM);
 	}
 

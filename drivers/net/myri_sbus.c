@@ -888,23 +888,22 @@ static void dump_eeprom(struct myri_eth *mp)
 }
 #endif
 
-static int __init myri_ether_init(struct net_device *dev, struct sbus_dev *sdev, int num)
+static int __init myri_ether_init(struct sbus_dev *sdev, int num)
 {
 	static unsigned version_printed;
+	struct net_device *dev;
 	struct myri_eth *mp;
 	unsigned char prop_buf[32];
 	int i;
 
-	DET(("myri_ether_init(%p,%p,%d):\n", dev, sdev, num));
-	dev = init_etherdev(0, sizeof(struct myri_eth));
+	DET(("myri_ether_init(%p,%d):\n", sdev, num));
+	dev = alloc_etherdev(sizeof(struct myri_eth));
 
 	if (!dev)
 		return -ENOMEM;
 
 	if (version_printed++ == 0)
 		printk(version);
-
-	printk("%s: MyriCOM MyriNET Ethernet ", dev->name);
 
 	mp = (struct myri_eth *) dev->priv;
 	spin_lock_init(&mp->irq_lock);
@@ -974,10 +973,7 @@ static int __init myri_ether_init(struct net_device *dev, struct sbus_dev *sdev,
 #endif
 
 	for (i = 0; i < 6; i++)
-		printk("%2.2x%c",
-		       dev->dev_addr[i] = mp->eeprom.id[i],
-		       i == 5 ? ' ' : ':');
-	printk("\n");
+		dev->dev_addr[i] = mp->eeprom.id[i];
 
 	determine_reg_space_size(mp);
 
@@ -1072,9 +1068,6 @@ static int __init myri_ether_init(struct net_device *dev, struct sbus_dev *sdev,
 		goto err;
 	}
 
-	DET(("ether_setup()\n"));
-	ether_setup(dev);
-
 	dev->mtu		= MYRINET_MTU;
 	dev->change_mtu		= myri_change_mtu;
 	dev->hard_header	= myri_header;
@@ -1087,15 +1080,30 @@ static int __init myri_ether_init(struct net_device *dev, struct sbus_dev *sdev,
 	DET(("Loading LANAI firmware\n"));
 	myri_load_lanai(mp);
 
+	if (register_netdev(dev)) {
+		printk("MyriCOM: Cannot register device.\n");
+		goto err_free_irq;
+	}
+
 #ifdef MODULE
-	dev->ifindex = dev_new_index();
 	mp->next_module = root_myri_dev;
 	root_myri_dev = mp;
 #endif
+
+	printk("%s: MyriCOM MyriNET Ethernet ", dev->name);
+
+	for (i = 0; i < 6; i++)
+		printk("%2.2x%c", dev->dev_addr[i],
+		       i == 5 ? ' ' : ':');
+	printk("\n");
+
 	return 0;
-err:	unregister_netdev(dev);
+
+err_free_irq:
+	free_irq(dev->irq, dev);
+err:
 	/* This will also free the co-allocated 'dev->priv' */
-	kfree(dev);
+	free_netdev(dev);
 	return -ENODEV;
 }
 
@@ -1112,7 +1120,6 @@ static int __init myri_sbus_match(struct sbus_dev *sdev)
 
 static int __init myri_sbus_probe(void)
 {
-	struct net_device *dev = NULL;
 	struct sbus_bus *bus;
 	struct sbus_dev *sdev = 0;
 	static int called;
@@ -1128,12 +1135,10 @@ static int __init myri_sbus_probe(void)
 
 	for_each_sbus(bus) {
 		for_each_sbusdev(sdev, bus) {
-			if (cards)
-				dev = NULL;
 			if (myri_sbus_match(sdev)) {
 				cards++;
 				DET(("Found myricom myrinet as %s\n", sdev->prom_name));
-				if ((v = myri_ether_init(dev, sdev, (cards - 1))))
+				if ((v = myri_ether_init(sdev, (cards - 1))))
 					return v;
 			}
 		}

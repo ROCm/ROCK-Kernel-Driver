@@ -653,14 +653,8 @@ static int __init skge_probe (void)
 			continue;
 
 
-		if ((dev = init_etherdev(dev, sizeof(DEV_NET))) == NULL) {
+		if ((dev = alloc_etherdev(sizeof(DEV_NET))) == NULL) {
 			printk(KERN_ERR "Unable to allocate etherdev "
-			       "structure!\n");
-			break;
-		}
-
-		if (dev->priv == NULL) {
-			printk(KERN_ERR "Unable to allocate adapter "
 			       "structure!\n");
 			break;
 		}
@@ -668,9 +662,7 @@ static int __init skge_probe (void)
 		pNet = dev->priv;
 		pNet->pAC = kmalloc(sizeof(SK_AC), GFP_KERNEL);
 		if (pNet->pAC == NULL){
-			dev->get_stats = NULL;
-			unregister_netdev(dev);
-			kfree(dev->priv);
+			free_netdev(dev);
 			printk(KERN_ERR "Unable to allocate adapter "
 			       "structure!\n");
 			break;
@@ -699,9 +691,7 @@ static int __init skge_probe (void)
 		retval = SkGeInitPCI(pAC);
 		if (retval) {
 			printk("SKGE: PCI setup failed: %i\n", retval);
-			dev->get_stats = NULL;
-			unregister_netdev(dev);
-			kfree(dev);
+			free_netdev(dev);
 			continue;
 		}
 
@@ -730,12 +720,19 @@ static int __init skge_probe (void)
 		pAC->Index = boards_found;
 		if (SkGeBoardInit(dev, pAC)) {
 			FreeResources(dev);
-			kfree(dev);
+			free_netdev(dev);
 			continue;
 		}
 
 		memcpy((caddr_t) &dev->dev_addr,
 			(caddr_t) &pAC->Addr.Net[0].CurrentMacAddress, 6);
+
+		if (register_netdev(dev)) {
+			printk(KERN_ERR "SKGE: Could not register device.\n");
+			FreeResources(dev);
+			free_netdev(dev);
+			continue;
+		}
 
 		/* First adapter... Create proc and print message */
 #ifdef CONFIG_PROC_FS
@@ -767,21 +764,11 @@ static int __init skge_probe (void)
 		pNet->PortNr = 0;
 		pNet->NetNr = 0;
 
-
-#ifdef SK_ZEROCOPY
-#ifdef USE_SK_TX_CHECKSUM
-			if (pAC->ChipsetType) {
-				/* SG and ZEROCOPY - fly baby... */
-				dev->features |= NETIF_F_SG | NETIF_F_IP_CSUM;
-			}
-#endif
-#endif
-
 		boards_found++;
 
 		/* More then one port found */
 		if ((pAC->GIni.GIMacsFound == 2 ) && (pAC->RlmtNets == 2)) {
-			if ((dev = init_etherdev(NULL, sizeof(DEV_NET))) == 0) {
+			if ((dev = alloc_etherdev(sizeof(DEV_NET))) == 0) {
 				printk(KERN_ERR "Unable to allocate etherdev "
 					"structure!\n");
 				break;
@@ -814,22 +801,28 @@ static int __init skge_probe (void)
 #endif
 #endif
 
+			if (register_netdev(dev)) {
+				printk(KERN_ERR "SKGE: Could not register "
+				       "second port.\n");
+				free_netdev(dev);
+				pAC->dev[1] = pAC->dev[0];
+			} else {
 #ifdef CONFIG_PROC_FS
-			if (pSkRootDir 
-			    && (pProcFile = create_proc_entry(dev->name, 
-							      S_IRUGO,
-							      pSkRootDir))) {
-				pProcFile->proc_fops = &sk_proc_fops;
-				pProcFile->data = dev;
-			}
+				if (pSkRootDir 
+				    && (pProcFile = create_proc_entry(dev->name, 
+								      S_IRUGO,
+								      pSkRootDir))) {
+					pProcFile->proc_fops = &sk_proc_fops;
+					pProcFile->data = dev;
+				}
 #endif
 
-			memcpy((caddr_t) &dev->dev_addr,
-			(caddr_t) &pAC->Addr.Net[1].CurrentMacAddress, 6);
+				memcpy((caddr_t) &dev->dev_addr,
+				       (caddr_t) &pAC->Addr.Net[1].CurrentMacAddress, 6);
 	
-			printk("%s: %s\n", dev->name, pAC->DeviceStr);
-			printk("      PrefPort:B  RlmtMode:Dual Check Link State\n");
-
+				printk("%s: %s\n", dev->name, pAC->DeviceStr);
+				printk("      PrefPort:B  RlmtMode:Dual Check Link State\n");
+			}
 		}
 
 

@@ -451,8 +451,6 @@ SiS190_init_board(struct pci_dev *pdev, struct net_device **dev_out,
 	*ioaddr_out = NULL;
 	*dev_out = NULL;
 
-	// dev zeroed in init_etherdev 
-
 	dev = alloc_etherdev(sizeof (*tp));
 	if (dev == NULL) {
 		printk(KERN_ERR PFX "unable to alloc new ethernet\n");

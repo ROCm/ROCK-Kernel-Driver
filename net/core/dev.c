@@ -713,6 +713,19 @@ static int default_rebuild_header(struct sk_buff *skb)
 	return 1;
 }
 
+
+/*
+ * Some old buggy device drivers change get_stats after registering
+ * the device.  Try and trap them here.
+ * This can be elimnated when all devices are known fixed.
+ */
+static inline int get_stats_changed(struct net_device *dev)
+{
+	int changed = dev->last_stats != dev->get_stats;
+	dev->last_stats = dev->get_stats;
+	return changed;
+}
+
 /**
  *	dev_open	- prepare an interface for use.
  *	@dev:	device to open
@@ -737,6 +750,14 @@ int dev_open(struct net_device *dev)
 		return 0;
 
 	/*
+	 *	 Check for broken device drivers.
+	 */
+	if (get_stats_changed(dev) && net_ratelimit()) {
+		printk(KERN_ERR "%s: driver changed get_stats after register\n",
+		       dev->name);
+	}
+
+	/*
 	 *	Is it even present?
 	 */
 	if (!netif_device_present(dev))
@@ -753,6 +774,14 @@ int dev_open(struct net_device *dev)
 	}
 
 	/*
+	 * 	Check for more broken device drivers.
+	 */
+	if (get_stats_changed(dev) && net_ratelimit()) {
+		printk(KERN_ERR "%s: driver changed get_stats in open\n",
+		       dev->name);
+	}
+
+ 	/*
 	 *	If it went open OK then:
 	 */
 
@@ -943,7 +972,8 @@ void dev_queue_xmit_nit(struct sk_buff *skb, struct net_device *dev)
 		 * they originated from - MvS (miquels@drinkel.ow.org)
 		 */
 		if ((ptype->dev == dev || !ptype->dev) &&
-		    (struct sock *)ptype->af_packet_priv != skb->sk) {
+		    (ptype->af_packet_priv == NULL ||
+		     (struct sock *)ptype->af_packet_priv != skb->sk)) {
 			struct sk_buff *skb2= skb_clone(skb, GFP_ATOMIC);
 			if (!skb2)
 				break;

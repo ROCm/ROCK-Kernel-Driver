@@ -1071,7 +1071,6 @@ fore200e_find_vcc(struct fore200e* fore200e, struct rpd* rpd)
     struct sock *s;
     struct atm_vcc* vcc;
     struct hlist_node *node;
-    int i;
 
     read_lock(&vcc_sklist_lock);
 
