@@ -57,7 +57,7 @@ extern struct module *module_list;
 	/*
 	 * Kernel debugger state flags
 	 */
-volatile int kdb_flags;
+volatile int kdb_flags =( 0 /*KDB_DEBUG_FLAG_BP */<< KDB_DEBUG_FLAG_SHIFT); 
 
 	/*
 	 * kdb_lock protects updates to kdb_initial_cpu.  Used to
@@ -872,9 +872,11 @@ kdb_parse(const char *cmdstr, struct pt_regs *regs)
 			return KDB_NOTFOUND;
 		}
 
-		kdb_printf("%s = ", argv[0]);
-		kdb_symbol_print(value, NULL, KDB_SP_DEFAULT);
-		kdb_printf("\n");
+		if (argv[0]) {
+			kdb_printf("%s = ", argv[0]);
+			kdb_symbol_print(value, NULL, KDB_SP_DEFAULT);
+			kdb_printf("\n");
+		}
 		return 0;
 	}
 }
@@ -1365,7 +1367,7 @@ kdb(kdb_reason_t reason, int error, struct pt_regs *regs)
 	int		result = 1;	/* Default is kdb handled it */
 	int		ss_event;
 	kdb_dbtrap_t 	db_result=KDB_DB_NOBPT;
-
+	unsigned long flags; /* local irq save/restore flags */
 	if (!kdb_on)
 		return 0;
 
@@ -1578,7 +1580,10 @@ kdb(kdb_reason_t reason, int error, struct pt_regs *regs)
 		KDB_DEBUG_STATE("kdb 12", result);
 		kdba_enable_lbr();
 		kdb_bp_install_local(regs);
-		local_bh_enable();
+		local_irq_save(flags); 
+		local_irq_enable();
+		local_bh_enable();  /* wms ..  badness message during boot */
+		local_irq_restore(flags); 
 		KDB_STATE_CLEAR(NO_BP_DELAY);
 		KDB_STATE_CLEAR(KDB_CONTROL);
 	}
@@ -2793,11 +2798,11 @@ kdb_sections_callback(void *token, const char *modname, const char *secname,
 int
 kdb_sections(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 {
+#if 0
 	char *prev_mod = NULL;
 	if (argc != 0) {
 		return KDB_ARGCOUNT;
 	}
-#if 0
 	kallsyms_sections(&prev_mod, kdb_sections_callback);
 #endif
 	kdb_printf("\n");	/* End last module */

@@ -851,6 +851,18 @@ receive_chars(struct uart_8250_port *up, int *status, struct pt_regs *regs)
 		*tty->flip.flag_buf_ptr = TTY_NORMAL;
 		up->port.icount.rx++;
 
+#ifdef	CONFIG_KDB
+				if (ch == *kdb_serial_ptr) {
+					if (!(*++kdb_serial_ptr)) {
+						kdb(KDB_REASON_KEYBOARD, 0,(kdb_eframe_t)0);
+						kdb_serial_ptr = kdb_serial_str;
+						break;
+					}
+				} else
+						kdb_serial_ptr = kdb_serial_str;
+#endif	/* CONFIG_KDB */
+
+
 		if (unlikely(*status & (UART_LSR_BI | UART_LSR_PE |
 				       UART_LSR_FE | UART_LSR_OE))) {
 			/*

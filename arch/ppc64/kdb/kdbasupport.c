@@ -1717,74 +1717,6 @@ kdba_kernelversion(int argc, const char **argv, const char **envp, struct pt_reg
     return 0;
 }
 
-/* this function obsoleted with newer kdb-common patch */
-int
-kdba_dmesg(int argc, const char **argv, const char **envp, struct pt_regs *regs){
-    kdb_symtab_t   symtab;
-    long log_buf_addr=0;
-    long log_start_addr=0;
-    int nr;                 
-    unsigned long default_lines;   /* number of lines to read */
-    long index_into_log_buf; /* pointer into log_buf */
-    long saved_index;  /* saved pointer into log_buf */
-    char current_char; /* temp char value */
-    int line_count=0;  /* temp counter for # lines*/
-    long log_size;  /* size of log_buf */
-    int wrapped; 
-
-    if (argc == 0)
-	default_lines=25; 
-    else 
-	kdbgetularg(argv[1], &default_lines);
-
-    log_buf_addr = kdbgetsymval("log_buf", &symtab);
-    if (log_buf_addr) {
-	log_buf_addr = symtab.sym_start;
-    } else {
-	kdb_printf("log_buf symbol not found! Can't do dmesg.\n");
-	return 0;
-    }
-    log_start_addr = kdbgetsymval("log_start", &symtab);
-    if (log_start_addr) {
-	log_start_addr = symtab.sym_start;
-    } else {
-	kdb_printf("log_start symbol not found! Can't do dmesg.\n");
-	return 0;
-    }
-
-    log_size = log_start_addr - log_buf_addr;
-
-    nr = kdba_readarea_size(log_start_addr,&index_into_log_buf,8);
-
-    saved_index=index_into_log_buf;
-    if (index_into_log_buf > log_size ) {
-	wrapped=1;
-    } else {
-	wrapped=0;
-    }
-
-    while ((index_into_log_buf > 0 ) && (line_count <= default_lines)) {
-	nr = kdba_readarea_size(log_buf_addr+(index_into_log_buf%log_size),&current_char,1);
-	if (current_char == 0x0a ) {
-	    line_count++;
-	}	
-	index_into_log_buf--;
-    }
-
-    if (line_count < default_lines ) {
-	kdb_printf("Something went wrong trying to count %ld lines\n",default_lines);
-    }
-
-    while ((index_into_log_buf < saved_index+1) && line_count >= 0 ) {
-	nr = kdba_readarea_size(log_buf_addr+index_into_log_buf%log_size,&current_char,1);
-	kdb_printf("%c",current_char);
-	if (current_char == 0x0a) line_count--;
-	index_into_log_buf++;
-    }
-
-    return 0; 
-}
-
 
 static void * 
 kdba_dump_pci(struct device_node *dn, void *data)
@@ -2110,7 +2042,6 @@ kdba_init(void)
 	kdb_register("halt", kdba_halt, "halt", "halt machine", 0);
 	kdb_register("tce_table", kdba_dump_tce_table, "tce_table <addr> [full]", "dump the tce table located at <addr>", 0);
 	kdb_register("kernel", kdba_kernelversion, "version", "display running kernel version", 0);
-	kdb_register("_dmesg", kdba_dmesg, "dmesg <lines>", "display lines from dmesg (log_buf) buffer", 0);
 	kdb_register("pci_info", kdba_dump_pci_info, "dump_pci_info", "dump pci device info", 0);
 	kdb_register("dump", kdba_dump, "dump (all|basic)", "dump all info", 0); 
 	kdb_register("state", kdba_state, "state ", "dump state of all processors", 0); 

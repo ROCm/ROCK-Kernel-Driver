@@ -124,7 +124,7 @@ config HOTPLUG_PCI_CPCI_GENERIC
 
 config HOTPLUG_PCI_RPA
 	tristate "RPA PCI Hotplug driver"
-	depends on HOTPLUG_PCI && PPC64
+	depends on HOTPLUG_PCI
 	help
 	  Say Y here if you have a a RPA system that supports PCI Hotplug.
 

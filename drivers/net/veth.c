@@ -111,7 +111,6 @@
 
 #include "veth.h"
 #include <asm/iSeries/HvLpConfig.h>
-#include <asm/iSeries/veth-proc.h>
 #include <asm/iSeries/HvTypes.h>
 #include <asm/iSeries/iSeries_proc.h>
 #include <asm/iSeries/iSeries_dma.h>
@@ -417,7 +416,7 @@ veth_module_cleanup(void)
 
 module_exit(veth_module_cleanup);
 
-void
+static void
 veth_proc_init(struct proc_dir_entry *iSeries_proc)
 {
 	long i = 0;

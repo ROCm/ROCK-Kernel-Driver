@@ -1014,11 +1014,6 @@ static void vioHandleData(struct HvLpEvent *event)
 	int len;
 	u8 port = cevent->virtual_device;
 
-#if 1 
-if (xmon_rcv_chars(cevent->data, cevent->len))
-	return;
-#endif
-
 	if (port >= VTTY_PORTS) {
 		printk(KERN_WARNING_VIO
 		       "console data on invalid virtual device %d\n", port);

@@ -102,17 +102,22 @@ kdba_bt_stack_ppc(struct pt_regs *regs, kdb_machreg_t *addr, int argcount,
 {
 
 	kdb_machreg_t	esp,eip,ebp,old_esp;
-	kdb_symtab_t	symtab, *sym;
+/*	kdb_symtab_t	symtab, *sym; */
 	kdbtbtable_t	tbtab;
 	/* declare these as raw ptrs so we don't get func descriptors */
 	extern void *ret_from_except, *ret_from_syscall_1;
 /*	int do_bottom_half_ret=0; */
 
-if (!regs && !addr)
-{
-    kdb_printf(" invalid regs pointer \n");
-    return 0;
-}
+	const char *name;
+	char namebuf[128];
+	unsigned long symsize,symoffset;
+	char *symmodname;
+
+	if (!regs && !addr)
+	{
+		kdb_printf(" invalid regs pointer \n");
+		return 0;
+	}
 
 	/*
 	 * The caller may have supplied an address at which the
@@ -164,74 +169,65 @@ if (!regs && !addr)
 	 */
 	while (1) {
 		kdb_printf("0x%016lx  0x%016lx  ", esp, eip);
-		kdbnearsym(eip, &symtab);
-		kdba_find_tb_table(eip, &tbtab);
-		sym = symtab.sym_name ? &symtab : &tbtab.symtab; /* use fake symtab if necessary */
+		/*		kdbnearsym(eip, &symtab); */
+		kdba_find_tb_table(eip, &tbtab); 
+
+		/*		sym = symtab.sym_name ? &symtab : &tbtab.symtab; *//* use fake symtab if necessary */
+		name = NULL;
 		if (esp >= PAGE_OFFSET) { 
-		    if ((sym) && sym->sym_name) {
-			{
-
-/* if this fails, eip is outside of kernel space, dont trust it. */
-			    if (eip > PAGE_OFFSET) { 
-				    kdb_printf("%s", sym->sym_name);
-			    } else {
-				    kdb_printf("NO_SYMBOL");
-			    }
+			/*if ((sym) )*/ 
+			/* if this fails, eip is outside of kernel space, dont trust it. */
+			if (eip > PAGE_OFFSET) {
+				name = kallsyms_lookup(eip, &symsize, &symoffset, &symmodname,
+						       namebuf);
 			}
-/* if this fails, eip is outside of kernel space, dont trust data. */
-			if (eip > PAGE_OFFSET) { 
-			    if (eip - sym->sym_start > 0) {
-				kdb_printf(" +0x%lx", eip - sym->sym_start);
-			    }
+			if (name) { 
+				kdb_printf("%s", name);
+			} else {
+				kdb_printf("NO_SYMBOL or Userspace"); 
 			}
-		    } else
-			kdb_printf("NO_SYMBOL");
-		}
-		else  /* userspace... */ {
-		    kdb_printf("UserSpace function");
-		    /* more code here to look up userspace function names..*/
 		}
 
+		/* if this fails, eip is outside of kernel space, dont trust data. */
+		if (eip > PAGE_OFFSET) { 
+			if (eip - symoffset > 0) {
+				kdb_printf(" +0x%lx", /*eip -*/ symoffset);
+			}
+		}
 		kdb_printf("\n");
+
 		/* ret_from_except=0xa5e0 ret_from_syscall_1=a378 do_bottom_half_ret=a5e0 */
 		if (esp < PAGE_OFFSET) { /* below kernelspace..   */
-                            kdb_printf("<Stack contents outside of kernel space.  %.16lx>\n", esp );
-			    break;
+			kdb_printf("<Stack contents outside of kernel space.  %.16lx>\n", esp );
+			break;
 		} else {
-		    if (eip == (kdb_machreg_t)ret_from_except ||
-			eip == (kdb_machreg_t)ret_from_syscall_1 /* ||
-			eip == (kdb_machreg_t)do_bottom_half_ret */) {
-			/* pull exception regs from the stack */
-			struct pt_regs eregs;
-			kdba_getmem(esp+STACK_FRAME_OVERHEAD, &eregs, sizeof(eregs));
-			kdb_printf("  [exception: %lx:%s regs 0x%lx] nip:[0x%x] gpr[1]:[0x%x]\n", eregs.trap,getvecname(eregs.trap), esp+STACK_FRAME_OVERHEAD,(unsigned int)eregs.nip,(unsigned int)eregs.gpr[1]);
-			old_esp = esp;
-			esp = kdba_getword(esp, 8);
-			if (!esp)
-			    break;
-			eip = kdba_getword(esp+16, 8);	/* saved lr */
-			if (esp < PAGE_OFFSET) {  /* userspace... */
-			    if (old_esp > PAGE_OFFSET) {
-				kdb_printf("<Stack drops into userspace here %.16lx>\n",esp);
-				break;
-			    }
+			if (eip == (kdb_machreg_t)ret_from_except ||
+			    eip == (kdb_machreg_t)ret_from_syscall_1 /* ||
+								      eip == (kdb_machreg_t)do_bottom_half_ret */) {
+				/* pull exception regs from the stack */
+				struct pt_regs eregs;
+				kdba_getmem(esp+STACK_FRAME_OVERHEAD, &eregs, sizeof(eregs));
+				kdb_printf("  [exception: %lx:%s regs 0x%lx] nip:[0x%lx] gpr[1]:[0x%x]\n", eregs.trap,getvecname(eregs.trap), esp+STACK_FRAME_OVERHEAD,(unsigned int)eregs.nip,(unsigned int)eregs.gpr[1]);
+				old_esp = esp;
+				esp = kdba_getword(esp, 8);
+				if (!esp)
+					break;
+				eip = kdba_getword(esp+16, 8);	/* saved lr */
+				if (esp < PAGE_OFFSET) {  /* userspace... */
+					if (old_esp > PAGE_OFFSET) {
+						kdb_printf("<Stack drops into userspace here %.16lx>\n",esp);
+						break;
+					}
+				}
+				/* we want to follow exception registers, not into user stack.  ...   */
+				esp = eregs.gpr[1];
+				eip = eregs.nip;
+			} else {
+				esp = kdba_getword(esp, 8);
+				if (!esp)
+					break;
+				eip = kdba_getword(esp+16, 8);	/* saved lr */
 			}
-/* we want to follow exception registers, not into user stack.  ...   */
-			esp = eregs.gpr[1];
-			eip = eregs.nip;
-		    } else {
-			esp = kdba_getword(esp, 8);
-			if (!esp)
-			    break;
-			eip = kdba_getword(esp+16, 8);	/* saved lr */
-
-#if 0
-			if (esp < p) {
-			    kdb_printf("<Stack drops into userspace %.16lx  %.16lx >\n", esp,p );
-			    break;
-			}
-#endif
-		    }
 		}
 	}
 	return 0;
@@ -276,6 +272,5 @@ kdba_bt_stack(struct pt_regs *regs, kdb_machreg_t *addr, int argcount,
 int
 kdba_bt_process(struct task_struct *p, int argcount)
 {
-	return(kdba_bt_stack_ppc(p->thread.regs, (kdb_machreg_t *) p->thread.ksp, argcount, p, 0));
+	return (kdba_bt_stack_ppc(p->thread.regs, (kdb_machreg_t *) p->thread.ksp, argcount, p, 0));
 }
-

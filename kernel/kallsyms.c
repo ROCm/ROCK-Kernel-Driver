@@ -86,6 +86,33 @@ const char *kallsyms_lookup(unsigned long addr,
 	return module_address_lookup(addr, symbolsize, offset, modname);
 }
 
+/* given a name, return the address and size of the symbol. */
+unsigned long kallsyms_get_addr(char * symname, unsigned long symsize)
+{
+	char namebuf[128];
+	int j;
+	char *name;
+	name = kallsyms_names;
+	for (j = 0; j <= kallsyms_num_syms; j++) {
+		namebuf[127]=0;
+		unsigned prefix = *name++;
+		strncpy(namebuf + prefix, name, 127 - prefix);
+		name += strlen(name) + 1;
+
+		if (strcmp(namebuf,symname)==0) {
+			if (j+1 < kallsyms_num_syms) {
+				symsize = kallsyms_addresses[j+1]-kallsyms_addresses[j];
+			} else {
+				symsize = 1;  /* should do something smarter here.. */
+			}
+			return kallsyms_addresses[j];
+		}
+	}
+	/* symbol not found... */
+	symsize=0;
+	return 0;
+}
+
 /* Replace "%s" in format with address, or returns -errno. */
 void __print_symbol(const char *fmt, unsigned long address)
 {

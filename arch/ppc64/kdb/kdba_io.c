@@ -86,6 +86,8 @@ kdba_read(char *buffer, size_t bufsize)
 			*cp++ = '\n';
 			*cp++ = '\0';
 			return buffer;
+		case '\x00': /* check for NULL from udbg_getc */
+		        break;
 		default:
 			if (cp < bufend)
 			ppc_md.udbg_putc(key);

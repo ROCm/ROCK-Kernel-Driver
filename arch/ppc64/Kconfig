@@ -361,27 +361,32 @@ config MAGIC_SYSRQ
 	  keys are documented in <file:Documentation/sysrq.txt>. Don't say Y
 	  unless you really know what this hack does.
 
+choice
+	prompt "Kernel Debugger"
+
 config XMON
-	bool "Include xmon kernel debugger"
-	depends on DEBUG_KERNEL && !KDB
+	bool "XMON"
 	help
 	  Include in-kernel hooks for the xmon kernel monitor/debugger.
 	  Unless you are intending to debug the kernel, say N here.
+
+config KDB
+	bool "KDB"
+	help
+	  Include in-kernel hooks for the kdb kernel monitor/debugger.
+	  Unless you are intending to debug the kernel, say N here.
+
+endchoice
+
 
 config XMON_DEFAULT
 	bool "Enable xmon by default"
 	depends on XMON
 
-config KDB
-	bool "Include kdb kernel debugger"
-	depends on DEBUG_KERNEL && !XMON
-	help
-	  Include in-kernel hooks for the kdb kernel monitor/debugger.
-	  Unless you are intending to debug the kernel, say N here.
-
 config KDB_OFF
 	bool "Turn KDB off as default."
 	depends on KDB
+
 	help
  	   KDB will remain built into the kernel, but will be turned off. 
 	   "cat 1 > /proc/sys/kernel/kdb" to turn it on. 

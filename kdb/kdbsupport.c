@@ -69,22 +69,19 @@
 int
 kdbgetsymval(const char *symname, kdb_symtab_t *symtab)
 {
+	unsigned long symsize;
 	memset(symtab, 0, sizeof(*symtab));
-	return 0;
-#if 0
-	return(kallsyms_symbol_to_address(
-		symname,
-		NULL,
-		&symtab->mod_name,
-		&symtab->mod_start,
-		&symtab->mod_end,
-		&symtab->sec_name,
-		&symtab->sec_start,
-		&symtab->sec_end,
-		&symtab->sym_name,
-		&symtab->sym_start,
-		&symtab->sym_end));
-#endif
+
+	symtab->sym_name = symname;
+	symtab->sym_start = kallsyms_get_addr((char *)symname,&symsize);
+	symtab->sym_end=symtab->sym_start+symsize;
+	if (symtab->sym_start) {
+		symtab->mod_name = "kernel";
+		return 1;
+	} else {
+		symtab->mod_name = "unknown";
+		return 0;
+	}
 }
 
 /*
@@ -108,27 +105,17 @@ kdbgetsymval(const char *symname, kdb_symtab_t *symtab)
 int
 kdbnearsym(unsigned long addr, kdb_symtab_t *symtab)
 {
-	int ret;
-	int symsize;
+	unsigned long symsize;
+	unsigned long symoffset;
+	char namebuf[128];
 	memset(symtab, 0, sizeof(*symtab));
-#if 0
-	ret = kallsyms_address_to_symbol(
-		addr,
-		&symtab->mod_name,
-		&symtab->mod_start,
-		&symtab->mod_end,
-		&symtab->sec_name,
-		&symtab->sec_start,
-		&symtab->sec_end,
-		&symtab->sym_name,
-		&symtab->sym_start,
-		&symtab->sym_end);
-#endif
-	ret = kallsyms_lookup(addr,&symsize,&symtab->sym_start,&symtab->mod_name,&symtab->sym_name);
+	symtab->sym_name = kallsyms_lookup(addr,&symsize,&symoffset,(char **) &symtab->mod_name,namebuf);
+	
+	symtab->sym_start=addr-symoffset;
 	symtab->sym_end=symtab->sym_start+symsize;
 	if (symtab->mod_name && *symtab->mod_name == '\0')
 		symtab->mod_name = "kernel";
-	return ret;
+	return 1;
 }
 
 #if defined(CONFIG_SMP)
@@ -326,7 +313,7 @@ kdb_get_next_ar(kdb_machreg_t arend, kdb_machreg_t func,
 
 	memset(ar, 0, sizeof(*ar));
 	if (!kdbnearsym(pc, symtab)) {
-		symtab->sym_name = symtab->sec_name = "<unknown>";
+		symtab->sym_name = "<unknown>";
 		symtab->mod_name = "kernel";
 		if (KDB_DEBUG(AR)) {
 			kdb_printf("kdb_get_next_ar: callee not in kernel\n");
@@ -448,9 +435,10 @@ kdb_symbol_print(kdb_machreg_t addr, const kdb_symtab_t *symtab_p, unsigned int 
 	if (punc & KDB_SP_PAREN) {
 		kdb_printf("(");
 	}
-	if (strcmp(symtab_p2->mod_name, "kernel")) {
-		kdb_printf("[%s]", symtab_p2->mod_name);
-	}
+	if (symtab_p2->mod_name)
+		if (strcmp(symtab_p2->mod_name, "kernel")) {
+			kdb_printf("[%s]", symtab_p2->mod_name);
+		}
 	kdb_printf("%s", symtab_p2->sym_name);
 	if (addr != symtab_p2->sym_start) {
 		kdb_printf("+0x%lx", addr - symtab_p2->sym_start);
