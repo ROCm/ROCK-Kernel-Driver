@@ -416,7 +416,7 @@ acpi_ut_update_object_reference (
 	u32                             i;
 	union acpi_generic_state         *state_list = NULL;
 	union acpi_generic_state         *state;
-
+	union acpi_operand_object        *tmp;
 
 	ACPI_FUNCTION_TRACE_PTR ("ut_update_object_reference", object);
 
@@ -448,8 +448,16 @@ acpi_ut_update_object_reference (
 		switch (ACPI_GET_OBJECT_TYPE (object)) {
 		case ACPI_TYPE_DEVICE:
 
-			acpi_ut_update_ref_count (object->device.system_notify, action);
-			acpi_ut_update_ref_count (object->device.device_notify, action);
+			tmp = object->device.system_notify;
+			if (tmp && (tmp->common.reference_count <= 1) && action == REF_DECREMENT)
+				object->device.system_notify = NULL;
+			acpi_ut_update_ref_count (tmp, action);
+
+			tmp = object->device.device_notify;
+			if (tmp && (tmp->common.reference_count <= 1) && action == REF_DECREMENT)
+				object->device.device_notify = NULL;
+			acpi_ut_update_ref_count (tmp, action);
+
 			break;
 
 
@@ -470,6 +478,10 @@ acpi_ut_update_object_reference (
 				if (ACPI_FAILURE (status)) {
 					goto error_exit;
 				}
+
+				tmp = object->package.elements[i];
+				if (tmp && (tmp->common.reference_count <= 1)  && action == REF_DECREMENT)
+					object->package.elements[i] = NULL;
 			}
 			break;
 
@@ -481,6 +493,10 @@ acpi_ut_update_object_reference (
 			if (ACPI_FAILURE (status)) {
 				goto error_exit;
 			}
+
+			tmp = object->buffer_field.buffer_obj;
+			if ( tmp && (tmp->common.reference_count <= 1)  && action == REF_DECREMENT)
+				object->buffer_field.buffer_obj = NULL;
 			break;
 
 
@@ -491,6 +507,10 @@ acpi_ut_update_object_reference (
 			if (ACPI_FAILURE (status)) {
 				goto error_exit;
 			}
+
+			tmp = object->field.region_obj;
+			if ( tmp && (tmp->common.reference_count <= 1)  && action == REF_DECREMENT)
+				object->field.region_obj = NULL;
 		   break;
 
 
@@ -502,11 +522,19 @@ acpi_ut_update_object_reference (
 				goto error_exit;
 			}
 
+			tmp = object->bank_field.bank_obj;
+			if ( tmp && (tmp->common.reference_count <= 1)  && action == REF_DECREMENT)
+				object->bank_field.bank_obj = NULL;
+
 			status = acpi_ut_create_update_state_and_push (
 					 object->bank_field.region_obj, action, &state_list);
 			if (ACPI_FAILURE (status)) {
 				goto error_exit;
 			}
+
+			tmp = object->bank_field.region_obj;
+			if ( tmp && (tmp->common.reference_count <= 1)  && action == REF_DECREMENT)
+				object->bank_field.region_obj = NULL;
 			break;
 
 
@@ -518,11 +546,19 @@ acpi_ut_update_object_reference (
 				goto error_exit;
 			}
 
+			tmp = object->index_field.index_obj;
+			if ( tmp && (tmp->common.reference_count <= 1)  && action == REF_DECREMENT)
+				object->index_field.index_obj = NULL;
+
 			status = acpi_ut_create_update_state_and_push (
 					 object->index_field.data_obj, action, &state_list);
 			if (ACPI_FAILURE (status)) {
 				goto error_exit;
 			}
+
+			tmp = object->index_field.data_obj;
+			if ( tmp && (tmp->common.reference_count <= 1)  && action == REF_DECREMENT)
+				object->index_field.data_obj = NULL;
 			break;
 
 
