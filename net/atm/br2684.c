@@ -419,7 +419,7 @@ static void br2684_push(struct atm_vcc *atmvcc, struct sk_buff *skb)
 			list_del(&brdev->br2684_devs);
 			read_unlock(&devs_lock);
 			unregister_netdev(net_dev);
-			kfree(net_dev);
+			free_netdev(net_dev);
 		}
 		return;
 	}
@@ -617,7 +617,7 @@ static int br2684_create(unsigned long arg)
 	err = register_netdev(netdev);
 	if (err < 0) {
 		printk(KERN_ERR "br2684_create: register_netdev failed\n");
-		kfree(netdev);
+		free_netdev(netdev);
 		return err;
 	}
 
@@ -791,7 +791,7 @@ static void __exit br2684_exit(void)
 
 		list_del(&brdev->br2684_devs);
 		unregister_netdev(net_dev);
-		kfree(net_dev);
+		free_netdev(net_dev);
 	}
 }
 

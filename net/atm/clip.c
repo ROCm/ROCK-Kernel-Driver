@@ -786,7 +786,7 @@ static void __exit atm_clip_exit(void)
 	while (dev) {
 		next = PRIV(dev)->next;
 		unregister_netdev(dev);
-		kfree(dev);
+		free_netdev(dev);
 		dev = next;
 	}
 	if (start_timer == 0) del_timer(&idle_timer);

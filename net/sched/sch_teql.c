@@ -498,7 +498,7 @@ static void __exit teql_exit(void)
 
 		unregister_qdisc(&master->qops);
 		unregister_netdev(master->dev);
-		kfree(master->dev);
+		free_netdev(master->dev);
 	}
 	spin_unlock(&master_dev_lock);
 }
