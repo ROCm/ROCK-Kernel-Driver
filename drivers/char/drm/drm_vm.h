@@ -152,9 +152,6 @@ struct page *DRM(vm_shm_nopage)(struct vm_area_struct *vma,
 #endif
 	unsigned long	 offset;
 	unsigned long	 i;
-	pgd_t		 *pgd;
-	pmd_t		 *pmd;
-	pte_t		 *pte, entry;
 	struct page	 *page;
 
 	if (address > vma->vm_end) return NOPAGE_SIGBUS; /* Disallow mremap */
@@ -162,26 +159,9 @@ struct page *DRM(vm_shm_nopage)(struct vm_area_struct *vma,
 
 	offset	 = address - vma->vm_start;
 	i = (unsigned long)map->handle + offset;
-	/* We have to walk page tables here because we need large SAREA's, and
-	 * they need to be virtually contiguous in kernel space.
-	 */
-	pgd = pgd_offset_k( i );
-	if (!pgd_present(*pgd))
-		goto oom;
-	pmd = pmd_offset( pgd, i );
-	if (!pmd_present(*pmd))
-		goto oom;
-
-	preempt_disable();
-	pte = pte_offset_map(pmd, i);
-	entry = *pte;
-	pte_unmap(pte);
-	preempt_enable();
-
-	if (!pte_present(entry))
-		goto oom;
-
-	page = pte_page(entry);
+	page = vmalloc_to_page((void *)i);
+	if (!page)
+		return NOPAGE_OOM;
 	get_page(page);
 
 	DRM_DEBUG("shm_nopage 0x%lx\n", address);
@@ -190,8 +170,6 @@ struct page *DRM(vm_shm_nopage)(struct vm_area_struct *vma,
 #else
 	return page;
 #endif
-oom:
-	return NOPAGE_OOM;
 }
 
 /* Special close routine which deletes map information if we are the last

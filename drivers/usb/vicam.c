@@ -93,83 +93,25 @@ static int vicam_parameters(struct usb_vicam *vicam);
  *
  ******************************************************************************/
 
-/* [DaveM] I've recoded most of this so that:
- * 1) It's easier to tell what is happening
- * 2) It's more portable, especially for translating things
- *    out of vmalloc mapped areas in the kernel.
- * 3) Less unnecessary translations happen.
- *
- * The code used to assume that the kernel vmalloc mappings
- * existed in the page tables of every process, this is simply
- * not guarenteed.  We now use pgd_offset_k which is the
- * defined way to get at the kernel page tables.
- */
-
-/* Given PGD from the address space's page table, return the kernel
- * virtual mapping of the physical memory mapped at ADR.
- */
-static inline unsigned long uvirt_to_kva(pgd_t *pgd, unsigned long adr)
-{
-	unsigned long ret = 0UL;
-	pmd_t *pmd;
-	pte_t *ptep, pte;
-
-	if (!pgd_none(*pgd)) {
-		pmd = pmd_offset(pgd, adr);
-		if (!pmd_none(*pmd)) {
-			preempt_disable();
-			ptep = pte_offset_map(pmd, adr);
-			pte = *ptep;
-			pte_unmap(pte);
-			preempt_enable();
-			if(pte_present(pte)) {
-				ret  = (unsigned long) page_address(pte_page(pte));
-				ret |= (adr & (PAGE_SIZE - 1));
-
-			}
-		}
-	}
-	return ret;
-}
-
-static inline unsigned long uvirt_to_bus(unsigned long adr)
-{
-	unsigned long kva, ret;
-
-	kva = uvirt_to_kva(pgd_offset(current->mm, adr), adr);
-	ret = virt_to_bus((void *)kva);
-	return ret;
-}
-
-static inline unsigned long kvirt_to_bus(unsigned long adr)
-{
-	unsigned long va, kva, ret;
-
-	va = VMALLOC_VMADDR(adr);
-	kva = uvirt_to_kva(pgd_offset_k(va), va);
-	ret = virt_to_bus((void *)kva);
-	return ret;
-}
-
 /* Here we want the physical address of the memory.
- * This is used when initializing the contents of the
- * area and marking the pages as reserved.
+ * This is used when initializing the contents of the area.
  */
 static inline unsigned long kvirt_to_pa(unsigned long adr)
 {
-	unsigned long va, kva, ret;
+	unsigned long kva, ret;
 
-	va = VMALLOC_VMADDR(adr);
-	kva = uvirt_to_kva(pgd_offset_k(va), va);
+	kva = (unsigned long) page_address(vmalloc_to_page((void *)adr));
+	kva |= adr & (PAGE_SIZE-1); /* restore the offset */
 	ret = __pa(kva);
 	return ret;
 }
 
-static void * rvmalloc(signed long size)
+static void * rvmalloc(unsigned long size)
 {
 	void * mem;
-	unsigned long adr, page;
+	unsigned long adr;
 
+	size=PAGE_ALIGN(size);
 	mem=vmalloc_32(size);
 	if (mem)
 	{
@@ -177,8 +119,7 @@ static void * rvmalloc(signed long size)
 		adr=(unsigned long) mem;
 		while (size > 0)
 		{
-			page = kvirt_to_pa(adr);
-			mem_map_reserve(virt_to_page(__va(page)));
+			mem_map_reserve(vmalloc_to_page((void *)adr));
 			adr+=PAGE_SIZE;
 			size-=PAGE_SIZE;
 		}
@@ -186,17 +127,16 @@ static void * rvmalloc(signed long size)
 	return mem;
 }
 
-static void rvfree(void * mem, signed long size)
+static void rvfree(void * mem, unsigned long size)
 {
-	unsigned long adr, page;
+	unsigned long adr;
 
 	if (mem)
 	{
 		adr=(unsigned long) mem;
-		while (size > 0)
+		while ((long) size > 0)
 		{
-			page = kvirt_to_pa(adr);
-			mem_map_unreserve(virt_to_page(__va(page)));
+			mem_map_unreserve(vmalloc_to_page((void *)adr));
 			adr+=PAGE_SIZE;
 			size-=PAGE_SIZE;
 		}

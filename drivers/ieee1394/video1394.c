@@ -159,49 +159,35 @@ static struct hpsb_highlevel *hl_handle = NULL;
 /* Memory management functions */
 /*******************************/
 
-#define MDEBUG(x)	do { } while(0)		/* Debug memory management */
-
-/* [DaveM] I've recoded most of this so that:
- * 1) It's easier to tell what is happening
- * 2) It's more portable, especially for translating things
- *    out of vmalloc mapped areas in the kernel.
- * 3) Less unnecessary translations happen.
- *
- * The code used to assume that the kernel vmalloc mappings
- * existed in the page tables of every process, this is simply
- * not guaranteed.  We now use pgd_offset_k which is the
- * defined way to get at the kernel page tables.
- */
-
 static inline unsigned long kvirt_to_bus(unsigned long adr) 
 {
         unsigned long kva, ret;
 
-	kva = page_address(vmalloc_to_page((void *)adr));
+	kva = (unsigned long) page_address(vmalloc_to_page((void *)adr));
+	kva |= adr & (PAGE_SIZE-1); /* restore the offset */
 	ret = virt_to_bus((void *)kva);
-        MDEBUG(printk("kv2b(%lx-->%lx)", adr, ret));
         return ret;
 }
 
 /* Here we want the physical address of the memory.
- * This is used when initializing the contents of the
- * area and marking the pages as reserved.
+ * This is used when initializing the contents of the area.
  */
 static inline unsigned long kvirt_to_pa(unsigned long adr) 
 {
         unsigned long kva, ret;
 
-	kva = page_address(vmalloc_to_page((void *)adr));
+	kva = (unsigned long) page_address(vmalloc_to_page((void *)adr));
+	kva |= adr & (PAGE_SIZE-1); /* restore the offset */
 	ret = __pa(kva);
-        MDEBUG(printk("kv2pa(%lx-->%lx)", adr, ret));
         return ret;
 }
 
 static void * rvmalloc(unsigned long size)
 {
 	void * mem;
-	unsigned long adr, page;
-        
+	unsigned long adr;
+ 
+	size=PAGE_ALIGN(size);
 	mem=vmalloc_32(size);
 	if (mem) 
 	{
@@ -210,8 +196,7 @@ static void * rvmalloc(unsigned long size)
 	        adr=(unsigned long) mem;
 		while (size > 0) 
                 {
-	                page = kvirt_to_pa(adr);
-			mem_map_reserve(virt_to_page(__va(page)));
+			mem_map_reserve(vmalloc_to_page((void *)adr));
 			adr+=PAGE_SIZE;
 			size-=PAGE_SIZE;
 		}
@@ -221,15 +206,14 @@ static void * rvmalloc(unsigned long size)
 
 static void rvfree(void * mem, unsigned long size)
 {
-        unsigned long adr, page;
-        
+        unsigned long adr;
+
 	if (mem) 
 	{
 	        adr=(unsigned long) mem;
-		while (size > 0) 
+		while ((long) size > 0) 
                 {
-	                page = kvirt_to_pa(adr);
-			mem_map_unreserve(virt_to_page(__va(page)));
+			mem_map_unreserve(vmalloc_to_page((void *)adr));
 			adr+=PAGE_SIZE;
 			size-=PAGE_SIZE;
 		}
@@ -1369,7 +1353,7 @@ int video1394_mmap(struct file *file, struct vm_area_struct *vma)
 	if (video->current_ctx == NULL) {
 		PRINT(KERN_ERR, ohci->id, "Current iso context not set");
 	} else
-		res = do_iso_mmap(ohci, video->current_ctx, 
+		res = do_iso_mmap(vma, ohci, video->current_ctx, 
 			   (char *)vma->vm_start, 
 			   (unsigned long)(vma->vm_end-vma->vm_start));
 	unlock_kernel();
