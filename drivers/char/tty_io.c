@@ -2242,6 +2242,7 @@ void tty_unregister_device(struct tty_driver *driver, unsigned index)
 EXPORT_SYMBOL(tty_register_device);
 EXPORT_SYMBOL(tty_unregister_device);
 
+static struct kobject tty_kobj = {.name = "tty"};
 /*
  * Called by a tty driver to register itself.
  */
@@ -2250,13 +2251,14 @@ int tty_register_driver(struct tty_driver *driver)
 	int error;
         int i;
 	dev_t dev;
+	char *s;
 
 	if (driver->flags & TTY_DRIVER_INSTALLED)
 		return 0;
 
 	if (!driver->major) {
 		error = alloc_chrdev_region(&dev, driver->num,
-						(char*)driver->name, &tty_fops);
+						(char*)driver->name);
 		if (!error) {
 			driver->major = MAJOR(dev);
 			driver->minor_start = MINOR(dev);
@@ -2264,10 +2266,23 @@ int tty_register_driver(struct tty_driver *driver)
 	} else {
 		dev = MKDEV(driver->major, driver->minor_start);
 		error = register_chrdev_region(dev, driver->num,
-						(char*)driver->name, &tty_fops);
+						(char*)driver->name);
 	}
 	if (error < 0)
 		return error;
+
+	driver->cdev.kobj.parent = &tty_kobj;
+	strcpy(driver->cdev.kobj.name, driver->name);
+	for (s = strchr(driver->cdev.kobj.name, '/'); s; s = strchr(s, '/'))
+		*s = '!';
+	cdev_init(&driver->cdev, &tty_fops);
+	driver->cdev.owner = driver->owner;
+	error = cdev_add(&driver->cdev, dev, driver->num);
+	if (error) {
+		cdev_put(&driver->cdev);
+		unregister_chrdev_region(dev, driver->num);
+		return error;
+	}
 
 	if (!driver->put_char)
 		driver->put_char = tty_default_put_char;
@@ -2279,7 +2294,7 @@ int tty_register_driver(struct tty_driver *driver)
 		    tty_register_device(driver, i, NULL);
 	}
 	proc_tty_register_driver(driver);
-	return error;
+	return 0;
 }
 
 /*
@@ -2293,6 +2308,7 @@ int tty_unregister_driver(struct tty_driver *driver)
 	if (*driver->refcount)
 		return -EBUSY;
 
+	cdev_unmap(MKDEV(driver->major, driver->minor_start), driver->num);
 	unregister_chrdev_region(MKDEV(driver->major, driver->minor_start),
 				driver->num);
 
@@ -2318,6 +2334,7 @@ int tty_unregister_driver(struct tty_driver *driver)
 			tty_unregister_device(driver, i);
 	}
 	proc_tty_unregister_driver(driver);
+	cdev_del(&driver->cdev);
 	return 0;
 }
 
@@ -2364,6 +2381,14 @@ static int __init tty_class_init(void)
 }
 
 postcore_initcall(tty_class_init);
+ 
+static struct cdev tty_cdev, console_cdev;
+#ifdef CONFIG_UNIX98_PTYS
+static struct cdev ptmx_cdev;
+#endif
+#ifdef CONFIG_VT
+static struct cdev vc0_cdev;
+#endif
 
 /*
  * Ok, now we can initialize the rest of the tty devices and can count
@@ -2371,29 +2396,40 @@ postcore_initcall(tty_class_init);
  */
 void __init tty_init(void)
 {
-	if (register_chrdev_region(MKDEV(TTYAUX_MAJOR, 0), 1,
-				   "/dev/tty", &tty_fops) < 0)
+	strcpy(tty_cdev.kobj.name, "dev.tty");
+	cdev_init(&tty_cdev, &tty_fops);
+	if (cdev_add(&tty_cdev, MKDEV(TTYAUX_MAJOR, 0), 1) ||
+	    register_chrdev_region(MKDEV(TTYAUX_MAJOR, 0), 1, "/dev/tty") < 0)
 		panic("Couldn't register /dev/tty driver\n");
 	devfs_mk_cdev(MKDEV(TTYAUX_MAJOR, 0), S_IFCHR|S_IRUGO|S_IWUGO, "tty");
 	tty_add_class_device ("tty", MKDEV(TTYAUX_MAJOR, 0), NULL);
 
-	if (register_chrdev_region(MKDEV(TTYAUX_MAJOR, 1), 1,
-				   "/dev/console", &tty_fops) < 0)
+	strcpy(console_cdev.kobj.name, "dev.console");
+	cdev_init(&console_cdev, &tty_fops);
+	if (cdev_add(&console_cdev, MKDEV(TTYAUX_MAJOR, 1), 1) ||
+	    register_chrdev_region(MKDEV(TTYAUX_MAJOR, 1), 1, "/dev/console") < 0)
 		panic("Couldn't register /dev/console driver\n");
 	devfs_mk_cdev(MKDEV(TTYAUX_MAJOR, 1), S_IFCHR|S_IRUSR|S_IWUSR, "console");
 	tty_add_class_device ("console", MKDEV(TTYAUX_MAJOR, 1), NULL);
 
+	tty_kobj.kset = tty_cdev.kobj.kset;
+	kobject_register(&tty_kobj);
+
 #ifdef CONFIG_UNIX98_PTYS
-	if (register_chrdev_region(MKDEV(TTYAUX_MAJOR, 2), 1,
-				   "/dev/ptmx", &tty_fops) < 0)
+	strcpy(ptmx_cdev.kobj.name, "dev.ptmx");
+	cdev_init(&ptmx_cdev, &tty_fops);
+	if (cdev_add(&ptmx_cdev, MKDEV(TTYAUX_MAJOR, 2), 1) ||
+	    register_chrdev_region(MKDEV(TTYAUX_MAJOR, 2), 1, "/dev/ptmx") < 0)
 		panic("Couldn't register /dev/ptmx driver\n");
 	devfs_mk_cdev(MKDEV(TTYAUX_MAJOR, 2), S_IFCHR|S_IRUGO|S_IWUGO, "ptmx");
 	tty_add_class_device ("ptmx", MKDEV(TTYAUX_MAJOR, 2), NULL);
 #endif
 	
 #ifdef CONFIG_VT
-	if (register_chrdev_region(MKDEV(TTY_MAJOR, 0), 1,
-				   "/dev/vc/0", &tty_fops) < 0)
+	strcpy(vc0_cdev.kobj.name, "dev.vc0");
+	cdev_init(&vc0_cdev, &tty_fops);
+	if (cdev_add(&vc0_cdev, MKDEV(TTY_MAJOR, 0), 1) ||
+	    register_chrdev_region(MKDEV(TTY_MAJOR, 0), 1, "/dev/vc/0") < 0)
 		panic("Couldn't register /dev/tty0 driver\n");
 	devfs_mk_cdev(MKDEV(TTY_MAJOR, 0), S_IFCHR|S_IRUSR|S_IWUSR, "vc/0");
 	tty_add_class_device ("tty0", MKDEV(TTY_MAJOR, 0), NULL);

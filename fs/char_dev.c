@@ -17,9 +17,15 @@
 #include <linux/smp_lock.h>
 #include <linux/devfs_fs_kernel.h>
 
+#include <linux/kobject.h>
+#include <linux/kobj_map.h>
+#include <linux/cdev.h>
+
 #ifdef CONFIG_KMOD
 #include <linux/kmod.h>
 #endif
+
+static struct kobj_map *cdev_map;
 
 #define MAX_PROBE_HASH 255	/* random */
 
@@ -32,6 +38,7 @@ static struct char_device_struct {
 	int minorct;
 	const char *name;
 	struct file_operations *fops;
+	struct cdev *cdev;		/* will die */
 } *chrdevs[MAX_PROBE_HASH];
 
 /* index in the above */
@@ -61,54 +68,22 @@ int get_chrdev_list(char *page)
 
 /*
  * Return the function table of a device, if present.
- * Increment the reference count of module in question.
- */
-static struct file_operations *
-lookup_chrfops(unsigned int major, unsigned int minor)
-{
-	struct char_device_struct *cd;
-	struct file_operations *ret = NULL;
-	int i;
-
-	i = major_to_index(major);
-
-	read_lock(&chrdevs_lock);
-	for (cd = chrdevs[i]; cd; cd = cd->next) {
-		if (major == cd->major &&
-		    minor - cd->baseminor < cd->minorct) {
-			ret = fops_get(cd->fops);
-			break;
-		}
-	}
-	read_unlock(&chrdevs_lock);
-
-	return ret;
-}
-
-/*
- * Return the function table of a device, if present.
  * Load the driver if needed.
  * Increment the reference count of module in question.
  */
-static struct file_operations *
-get_chrfops(unsigned int major, unsigned int minor)
+static struct file_operations *get_chrfops(dev_t dev)
 {
 	struct file_operations *ret = NULL;
+	int index;
+	struct kobject *kobj = kobj_lookup(cdev_map, dev, &index);
 
-	if (!major)
-		return NULL;
-
-	ret = lookup_chrfops(major, minor);
-
-#ifdef CONFIG_KMOD
-	if (!ret) {
-		request_module("char-major-%d", major);
-
-		read_lock(&chrdevs_lock);
-		ret = lookup_chrfops(major, minor);
-		read_unlock(&chrdevs_lock);
+	if (kobj) {
+		struct cdev *p = container_of(kobj, struct cdev, kobj);
+		struct module *owner = p->owner;
+		ret = fops_get(p->ops);
+		cdev_put(p);
+		module_put(owner);
 	}
-#endif
 	return ret;
 }
 
@@ -125,8 +100,7 @@ get_chrfops(unsigned int major, unsigned int minor)
  */
 static struct char_device_struct *
 __register_chrdev_region(unsigned int major, unsigned int baseminor,
-			   int minorct, const char *name,
-			   struct file_operations *fops)
+			   int minorct, const char *name)
 {
 	struct char_device_struct *cd, **cp;
 	int ret = 0;
@@ -157,7 +131,6 @@ __register_chrdev_region(unsigned int major, unsigned int baseminor,
 	cd->baseminor = baseminor;
 	cd->minorct = minorct;
 	cd->name = name;
-	cd->fops = fops;
 
 	i = major_to_index(major);
 
@@ -200,8 +173,7 @@ __unregister_chrdev_region(unsigned major, unsigned baseminor, int minorct)
 	return cd;
 }
 
-int register_chrdev_region(dev_t from, unsigned count, char *name,
-			   struct file_operations *fops)
+int register_chrdev_region(dev_t from, unsigned count, char *name)
 {
 	struct char_device_struct *cd;
 	dev_t to = from + count;
@@ -212,7 +184,7 @@ int register_chrdev_region(dev_t from, unsigned count, char *name,
 		if (next > to)
 			next = to;
 		cd = __register_chrdev_region(MAJOR(n), MINOR(n),
-			       next - n, name, fops);
+			       next - n, name);
 		if (IS_ERR(cd))
 			goto fail;
 	}
@@ -226,11 +198,10 @@ fail:
 	return PTR_ERR(cd);
 }
 
-int alloc_chrdev_region(dev_t *dev, unsigned count, char *name,
-			   struct file_operations *fops)
+int alloc_chrdev_region(dev_t *dev, unsigned count, char *name)
 {
 	struct char_device_struct *cd;
-	cd = __register_chrdev_region(0, 0, count, name, fops);
+	cd = __register_chrdev_region(0, 0, count, name);
 	if (IS_ERR(cd))
 		return PTR_ERR(cd);
 	*dev = MKDEV(cd->major, cd->baseminor);
@@ -241,11 +212,36 @@ int register_chrdev(unsigned int major, const char *name,
 		    struct file_operations *fops)
 {
 	struct char_device_struct *cd;
+	struct cdev *cdev;
+	char *s;
+	int err = -ENOMEM;
 
-	cd = __register_chrdev_region(major, 0, 256, name, fops);
+	cd = __register_chrdev_region(major, 0, 256, name);
 	if (IS_ERR(cd))
 		return PTR_ERR(cd);
-	return cd->major;
+	
+	cdev = cdev_alloc();
+	if (!cdev)
+		goto out2;
+
+	cdev->owner = fops->owner;
+	cdev->ops = fops;
+	strcpy(cdev->kobj.name, name);
+	for (s = strchr(cdev->kobj.name, '/'); s; s = strchr(s, '/'))
+		*s = '!';
+		
+	err = cdev_add(cdev, MKDEV(cd->major, 0), 256);
+	if (err)
+		goto out;
+
+	cd->cdev = cdev;
+
+	return major ? 0 : cd->major;
+out:
+	cdev_put(cdev);
+out2:
+	__unregister_chrdev_region(cd->major, 0, 256);
+	return err;
 }
 
 void unregister_chrdev_region(dev_t from, unsigned count)
@@ -263,7 +259,12 @@ void unregister_chrdev_region(dev_t from, unsigned count)
 
 int unregister_chrdev(unsigned int major, const char *name)
 {
-	kfree(__unregister_chrdev_region(major, 0, 256));
+	struct char_device_struct *cd;
+	cdev_unmap(MKDEV(major, 0), 256);
+	cd = __unregister_chrdev_region(major, 0, 256);
+	if (cd && cd->cdev)
+		cdev_del(cd->cdev);
+	kfree(cd);
 	return 0;
 }
 
@@ -274,7 +275,7 @@ int chrdev_open(struct inode * inode, struct file * filp)
 {
 	int ret = -ENODEV;
 
-	filp->f_op = get_chrfops(major(inode->i_rdev), minor(inode->i_rdev));
+	filp->f_op = get_chrfops(kdev_t_to_nr(inode->i_rdev));
 	if (filp->f_op) {
 		ret = 0;
 		if (filp->f_op->open != NULL) {
@@ -315,3 +316,100 @@ const char *cdevname(kdev_t dev)
 
 	return buffer;
 }
+
+static struct kobject *exact_match(dev_t dev, int *part, void *data)
+{
+	struct cdev *p = data;
+	return &p->kobj;
+}
+
+static int exact_lock(dev_t dev, void *data)
+{
+	struct cdev *p = data;
+	return cdev_get(p) ? 0 : -1;
+}
+
+int cdev_add(struct cdev *p, dev_t dev, unsigned count)
+{
+	int err = kobject_add(&p->kobj);
+	if (err)
+		return err;
+	return kobj_map(cdev_map, dev, count, NULL, exact_match, exact_lock, p);
+}
+
+void cdev_unmap(dev_t dev, unsigned count)
+{
+	kobj_unmap(cdev_map, dev, count);
+}
+
+void cdev_del(struct cdev *p)
+{
+	kobject_del(&p->kobj);
+	cdev_put(p);
+}
+
+struct kobject *cdev_get(struct cdev *p)
+{
+	struct module *owner = p->owner;
+	struct kobject *kobj;
+
+	if (owner && !try_module_get(owner))
+		return NULL;
+	kobj = kobject_get(&p->kobj);
+	if (!kobj)
+		module_put(owner);
+	return kobj;
+}
+
+static decl_subsys(cdev, NULL, NULL);
+
+static void cdev_dynamic_release(struct kobject *kobj)
+{
+	struct cdev *p = container_of(kobj, struct cdev, kobj);
+	kfree(p);
+}
+
+static struct kobj_type ktype_cdev_dynamic = {
+	.release	= cdev_dynamic_release,
+};
+
+static struct kset kset_dynamic = {
+	.subsys = &cdev_subsys,
+	.kobj = {.name = "major",},
+	.ktype = &ktype_cdev_dynamic,
+};
+
+struct cdev *cdev_alloc(void)
+{
+	struct cdev *p = kmalloc(sizeof(struct cdev), GFP_KERNEL);
+	if (p) {
+		memset(p, 0, sizeof(struct cdev));
+		p->kobj.kset = &kset_dynamic;
+		kobject_init(&p->kobj);
+	}
+	return p;
+}
+
+void cdev_init(struct cdev *cdev, struct file_operations *fops)
+{
+	kobj_set_kset_s(cdev, cdev_subsys);
+	kobject_init(&cdev->kobj);
+	cdev->ops = fops;
+}
+
+static struct kobject *base_probe(dev_t dev, int *part, void *data)
+{
+	char name[30];
+	sprintf(name, "char-major-%d", MAJOR(dev));
+	request_module(name);
+	return NULL;
+}
+
+static int __init chrdev_init(void)
+{
+	subsystem_register(&cdev_subsys);
+	kset_register(&kset_dynamic);
+	cdev_map = kobj_map_init(base_probe, &cdev_subsys);
+	return 0;
+}
+subsys_initcall(chrdev_init);
