@@ -10,6 +10,7 @@ struct nfs_server {
 	struct rpc_clnt *	client;		/* RPC client handle */
 	struct nfs_rpc_ops *	rpc_ops;	/* NFS protocol vector */
 	int			flags;		/* various flags */
+	unsigned int		caps;		/* server capabilities */
 	unsigned int		rsize;		/* read size */
 	unsigned int		rpages;		/* read size (in pages) */
 	unsigned int		wsize;		/* write size */
@@ -30,5 +31,8 @@ struct nfs_server {
 	struct nfs_fh		fh;
 	struct sockaddr_in	addr;
 };
+
+/* Server capabilities */
+#define NFS_CAP_READDIRPLUS	(1)
 
 #endif

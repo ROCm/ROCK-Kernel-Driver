@@ -107,14 +107,16 @@ int nfs_readdir_filler(nfs_readdir_descriptor_t *desc, struct page *page)
  again:
 	error = NFS_PROTO(inode)->readdir(inode, cred, desc->entry->cookie, page,
 					  NFS_SERVER(inode)->dtsize, desc->plus);
-	/* We requested READDIRPLUS, but the server doesn't grok it */
-	if (desc->plus && error == -ENOTSUPP) {
-		NFS_FLAGS(inode) &= ~NFS_INO_ADVISE_RDPLUS;
-		desc->plus = 0;
-		goto again;
-	}
-	if (error < 0)
+	if (error < 0) {
+		/* We requested READDIRPLUS, but the server doesn't grok it */
+		if (error == -ENOTSUPP && desc->plus) {
+			NFS_SERVER(inode)->caps &= ~NFS_CAP_READDIRPLUS;
+			NFS_FLAGS(inode) &= ~NFS_INO_ADVISE_RDPLUS;
+			desc->plus = 0;
+			goto again;
+		}
 		goto error;
+	}
 	SetPageUptodate(page);
 	/* Ensure consistent page alignment of the data.
 	 * Note: assumes we have exclusive access to this mapping either
@@ -194,7 +196,6 @@ int find_dirent_page(nfs_readdir_descriptor_t *desc)
 
 	dfprintk(VFS, "NFS: find_dirent_page() searching directory page %ld\n", desc->page_index);
 
-	desc->plus = NFS_USE_READDIRPLUS(inode);
 	page = read_cache_page(&inode->i_data, desc->page_index,
 			       (filler_t *)nfs_readdir_filler, desc);
 	if (IS_ERR(page)) {
@@ -376,6 +377,7 @@ static int nfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	desc->file = filp;
 	desc->target = filp->f_pos;
 	desc->decode = NFS_PROTO(inode)->decode_dirent;
+	desc->plus = NFS_USE_READDIRPLUS(inode);
 
 	my_entry.cookie = my_entry.prev_cookie = 0;
 	my_entry.eof = 0;

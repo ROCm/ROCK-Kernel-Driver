@@ -283,12 +283,14 @@ int nfs_fill_super(struct super_block *sb, struct nfs_mount_data *data, int sile
 	INIT_LIST_HEAD(&server->lru_busy);
 
  nfsv3_try_again:
+	server->caps = 0;
 	/* Check NFS protocol revision and initialize RPC op vector
 	 * and file handle pool. */
 	if (data->flags & NFS_MOUNT_VER3) {
 #ifdef CONFIG_NFS_V3
 		server->rpc_ops = &nfs_v3_clientops;
 		version = 3;
+		server->caps |= NFS_CAP_READDIRPLUS;
 		if (data->version < 4) {
 			printk(KERN_NOTICE "NFS: NFSv3 not supported by mount program.\n");
 			goto out_unlock;
