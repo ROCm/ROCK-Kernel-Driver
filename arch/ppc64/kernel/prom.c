@@ -792,8 +792,8 @@ void prom_initialize_dart_table(void)
 	if (lmb_end_of_DRAM() <= 0x80000000ull && !RELOC(iommu_force_on))
 		return;
 
-	/* 512 pages is max DART tablesize. */
-	RELOC(dart_tablesize) = 1UL << 19;
+	/* 512 pages (2MB) is max DART tablesize. */
+	RELOC(dart_tablesize) = 1UL << 21;
 	/* 16MB (1 << 24) alignment. We allocate a full 16Mb chuck since we
 	 * will blow up an entire large page anyway in the kernel mapping
 	 */
