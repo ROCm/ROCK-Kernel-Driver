@@ -66,6 +66,14 @@ struct list_head nfsd_list = LIST_HEAD_INIT(nfsd_list);
  */
 #define	NFSD_MAXSERVS		8192
 
+int nfsd_nrthreads(void)
+{
+	if (nfsd_serv == NULL)
+		return 0;
+	else
+		return nfsd_serv->sv_nrthreads;
+}
+
 int
 nfsd_svc(unsigned short port, int nrservs)
 {

@@ -47,6 +47,7 @@ enum {
 	NFSD_Getfs,
 	NFSD_List,
 	NFSD_Fh,
+	NFSD_Threads,
 	NFSD_END
 };
 
@@ -61,6 +62,7 @@ static ssize_t write_unexport(struct file *file, char *buf, size_t size);
 static ssize_t write_getfd(struct file *file, char *buf, size_t size);
 static ssize_t write_getfs(struct file *file, char *buf, size_t size);
 static ssize_t write_filehandle(struct file *file, char *buf, size_t size);
+static ssize_t write_threads(struct file *file, char *buf, size_t size);
 
 static ssize_t (*write_op[])(struct file *, char *, size_t) = {
 	[NFSD_Svc] = write_svc,
@@ -71,6 +73,7 @@ static ssize_t (*write_op[])(struct file *, char *, size_t) = {
 	[NFSD_Getfd] = write_getfd,
 	[NFSD_Getfs] = write_getfs,
 	[NFSD_Fh] = write_filehandle,
+	[NFSD_Threads] = write_threads,
 };
 
 /* an argresp is stored in an allocated page and holds the 
@@ -214,6 +217,7 @@ static struct { char *name; struct file_operations *ops; int mode; } files[] = {
 	[NFSD_Getfs] = {".getfs", &transaction_ops, S_IWUSR|S_IRUSR},
 	[NFSD_List] = {"exports", &exports_operations, S_IRUGO},
 	[NFSD_Fh] = {"filehandle", &transaction_ops, S_IWUSR|S_IRUSR},
+	[NFSD_Threads] = {"threads", &transaction_ops, S_IWUSR|S_IRUSR},
 };
 
 /*----------------------------------------------------------------------------*/
@@ -396,6 +400,30 @@ static ssize_t write_filehandle(struct file *file, char *buf, size_t size)
 	qword_addhex(&mesg, &len, (char*)&fh.fh_base, fh.fh_size);
 	mesg[-1] = '\n';
 	return mesg - buf;	
+}
+
+extern int nfsd_nrthreads(void);
+
+static ssize_t write_threads(struct file *file, char *buf, size_t size)
+{
+	/* if size > 0, look for a number of threads and call nfsd_svc
+	 * then write out number of threads as reply
+	 */
+	char *mesg = buf;
+	int rv;
+	if (size > 0) {
+		int newthreads;
+		rv = get_int(&mesg, &newthreads);
+		if (rv)
+			return rv;
+		if (newthreads <0)
+			return -EINVAL;
+		rv = nfsd_svc(2049, newthreads);
+		if (rv)
+			return rv;
+	}
+	sprintf(buf, "%d\n", nfsd_nrthreads());
+	return strlen(buf);
 }
 
 /*----------------------------------------------------------------------------*/
