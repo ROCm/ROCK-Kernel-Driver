@@ -106,7 +106,7 @@ void __exit act200l_cleanup(void)
 
 static void act200l_open(dongle_t *self, struct qos_info *qos)
 {
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 
 	/* Power on the dongle */
 	self->set_dtr_rts(self->dev, TRUE, TRUE);
@@ -120,7 +120,7 @@ static void act200l_open(dongle_t *self, struct qos_info *qos)
 
 static void act200l_close(dongle_t *self)
 {
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 
 	/* Power off the dongle */
 	self->set_dtr_rts(self->dev, FALSE, FALSE);
@@ -141,7 +141,7 @@ static int act200l_change_speed(struct irda_task *task)
 	__u8 control[3];
 	int ret = 0;
 
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 
 	self->speed_task = task;
 
@@ -233,7 +233,7 @@ static int act200l_reset(struct irda_task *task)
 	};
 	int ret = 0;
 
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 
 	self->reset_task = task;
 

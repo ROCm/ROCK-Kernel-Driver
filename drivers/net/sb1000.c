@@ -275,7 +275,7 @@ sb1000_probe(struct net_device *dev)
  * SB1000 hardware routines to be used during open/configuration phases
  */
 
-const int TimeOutJiffies = (int)(8.75 * HZ);
+const int TimeOutJiffies = (875 * HZ) / 100;
 
 static inline void nicedelay(unsigned long usecs)
 {
@@ -295,10 +295,10 @@ card_wait_for_busy_clear(const int ioaddr[], const char* name)
 	timeout = jiffies + TimeOutJiffies;
 	while (a & 0x80 || a & 0x40) {
 		/* a little sleep */
-		current->state = TASK_INTERRUPTIBLE;
-		schedule_timeout(0);
+		yield();
+
 		a = inb(ioaddr[0] + 7);
-		if (jiffies >= timeout) {
+		if (time_after_eq(jiffies, timeout)) {
 			printk(KERN_WARNING "%s: card_wait_for_busy_clear timeout\n",
 				name);
 			return -ETIME;
@@ -319,10 +319,10 @@ card_wait_for_ready(const int ioaddr[], const char* name, unsigned char in[])
 	timeout = jiffies + TimeOutJiffies;
 	while (a & 0x80 || !(a & 0x40)) {
 		/* a little sleep */
-		current->state = TASK_INTERRUPTIBLE;
-		schedule_timeout(0);
+		yield();
+
 		a = inb(ioaddr[1] + 6);
-		if (jiffies >= timeout) {
+		if (time_after_eq(jiffies, timeout)) {
 			printk(KERN_WARNING "%s: card_wait_for_ready timeout\n",
 				name);
 			return -ETIME;
@@ -396,7 +396,7 @@ sb1000_wait_for_ready(const int ioaddr[], const char* name)
 
 	timeout = jiffies + Sb1000TimeOutJiffies;
 	while (inb(ioaddr[1] + 6) & 0x80) {
-		if (jiffies >= timeout) {
+		if (time_after_eq(jiffies, timeout)) {
 			printk(KERN_WARNING "%s: sb1000_wait_for_ready timeout\n",
 				name);
 			return -ETIME;

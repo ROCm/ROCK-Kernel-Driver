@@ -25,7 +25,7 @@
  * front fifo request expires.
  */
 static int read_expire = HZ / 2;	/* 500ms start timeout */
-static int fifo_batch = 64;		/* 4 seeks, or 64 contig */
+static int fifo_batch = 32;		/* 4 seeks, or 64 contig */
 static int seek_cost = 16;		/* seek is 16 times more expensive */
 
 /*
@@ -162,9 +162,8 @@ deadline_merge(request_queue_t *q, struct request **req, struct bio *bio)
 
 		if (elv_rq_merge_ok(__rq, bio)) {
 			*req = __rq;
-			q->last_merge = &__rq->queuelist;
 			ret = ELEVATOR_BACK_MERGE;
-			goto out_ret;
+			goto out;
 		}
 	}
 
@@ -191,21 +190,24 @@ deadline_merge(request_queue_t *q, struct request **req, struct bio *bio)
 			ret = elv_try_merge(__rq, bio);
 			if (ret != ELEVATOR_NO_MERGE) {
 				*req = __rq;
-				q->last_merge = &__rq->queuelist;
 				break;
 			}
 		}
 	}
 
 out:
-	if (ret != ELEVATOR_NO_MERGE) {
-		struct deadline_rq *drq = RQ_DATA(*req);
-
-		deadline_del_rq_hash(drq);
-		deadline_add_rq_hash(dd, drq);
-	}
-out_ret:
 	return ret;
+}
+
+static void deadline_merged_request(request_queue_t *q, struct request *req)
+{
+	struct deadline_data *dd = q->elevator.elevator_data;
+	struct deadline_rq *drq = RQ_DATA(req);
+
+	deadline_del_rq_hash(drq);
+	deadline_add_rq_hash(dd, drq);
+
+	q->last_merge = &req->queuelist;
 }
 
 static void
@@ -255,8 +257,18 @@ static void deadline_move_requests(struct deadline_data *dd, struct request *rq)
 	sector_t last_sec = dd->last_sector;
 	int batch_count = dd->fifo_batch;
 
+	/*
+	 * if dispatch is non-empty, disregard last_sector and check last one
+	 */
+	if (!list_empty(dd->dispatch)) {
+		struct request *__rq = list_entry_rq(dd->dispatch->prev);
+
+		last_sec = __rq->sector + __rq->nr_sectors;
+	}
+
 	do {
 		struct list_head *nxt = rq->queuelist.next;
+		int this_rq_cost;
 
 		/*
 		 * take it off the sort and fifo list, move
@@ -264,17 +276,23 @@ static void deadline_move_requests(struct deadline_data *dd, struct request *rq)
 		 */
 		deadline_move_to_dispatch(dd, rq);
 
-		if (rq->sector == last_sec)
-			batch_count--;
-		else
-			batch_count -= dd->seek_cost;
-
+		/*
+		 * if this is the last entry, don't bother doing accounting
+		 */
 		if (nxt == sort_head)
+			break;
+
+		this_rq_cost = dd->seek_cost;
+		if (rq->sector == last_sec)
+			this_rq_cost = (rq->nr_sectors + 255) >> 8;
+
+		batch_count -= this_rq_cost;
+		if (batch_count <= 0)
 			break;
 
 		last_sec = rq->sector + rq->nr_sectors;
 		rq = list_entry_rq(nxt);
-	} while (batch_count > 0);
+	} while (1);
 }
 
 /*
@@ -283,16 +301,17 @@ static void deadline_move_requests(struct deadline_data *dd, struct request *rq)
 #define list_entry_fifo(ptr)	list_entry((ptr), struct deadline_rq, fifo)
 static inline int deadline_check_fifo(struct deadline_data *dd)
 {
-	struct deadline_rq *drq;
+	if (!list_empty(&dd->read_fifo)) {
+		struct deadline_rq *drq = list_entry_fifo(dd->read_fifo.next);
 
-	if (list_empty(&dd->read_fifo))
-		return 0;
+		/*
+		 * drq is expired!
+		 */
+		if (time_after(jiffies, drq->expires))
+			return 1;
+	}
 
-	drq = list_entry_fifo(dd->read_fifo.next);
-	if (time_before(jiffies, drq->expires))
-		return 0;
-
-	return 1;
+	return 0;
 }
 
 static struct request *deadline_next_request(request_queue_t *q)
@@ -411,8 +430,9 @@ static int deadline_queue_empty(request_queue_t *q)
 {
 	struct deadline_data *dd = q->elevator.elevator_data;
 
-	if (!list_empty(&q->queue_head) || !list_empty(&dd->sort_list[READ])
-	    || !list_empty(&dd->sort_list[WRITE]))
+	if (!list_empty(&dd->sort_list[WRITE]) ||
+	    !list_empty(&dd->sort_list[READ]) ||
+	    !list_empty(&q->queue_head))
 		return 0;
 
 	BUG_ON(!list_empty(&dd->read_fifo));
@@ -544,6 +564,7 @@ module_init(deadline_slab_setup);
 
 elevator_t iosched_deadline = {
 	.elevator_merge_fn = 		deadline_merge,
+	.elevator_merged_fn =		deadline_merged_request,
 	.elevator_merge_req_fn =	deadline_merge_request,
 	.elevator_next_req_fn =		deadline_next_request,
 	.elevator_add_req_fn =		deadline_add_request,
