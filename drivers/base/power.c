@@ -35,7 +35,7 @@ int device_suspend(u32 state, u32 level)
 
 	spin_lock(&device_lock);
 	list_for_each(node,&device_root.g_list) {
-		struct device * dev = get_device_locked(dev);
+		struct device * dev = get_device_locked(to_dev(node));
 		if (dev) {
 			spin_unlock(&device_lock);
 			if (dev->driver && dev->driver->suspend)
