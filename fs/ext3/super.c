@@ -141,8 +141,11 @@ static void ext3_handle_error(struct super_block *sb)
 		printk (KERN_CRIT "Remounting filesystem read-only\n");
 		sb->s_flags |= MS_RDONLY;
 	} else {
+		journal_t *journal = EXT3_SB(sb)->s_journal;
+
 		EXT3_SB(sb)->s_mount_opt |= EXT3_MOUNT_ABORT;
-		journal_abort(EXT3_SB(sb)->s_journal, -EIO);
+		if (journal)
+			journal_abort(journal, -EIO);
 	}
 	ext3_commit_super(sb, es, 1);
 }
@@ -1622,11 +1625,15 @@ static void ext3_commit_super (struct super_block * sb,
 			       struct ext3_super_block * es,
 			       int sync)
 {
+	struct buffer_head *sbh = EXT3_SB(sb)->s_sbh;
+
+	if (!sbh)
+		return;
 	es->s_wtime = cpu_to_le32(get_seconds());
-	BUFFER_TRACE(EXT3_SB(sb)->s_sbh, "marking dirty");
-	mark_buffer_dirty(EXT3_SB(sb)->s_sbh);
+	BUFFER_TRACE(sbh, "marking dirty");
+	mark_buffer_dirty(sbh);
 	if (sync)
-		sync_dirty_buffer(EXT3_SB(sb)->s_sbh);
+		sync_dirty_buffer(sbh);
 }
 
 

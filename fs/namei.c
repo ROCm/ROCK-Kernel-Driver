@@ -398,10 +398,7 @@ static inline int do_follow_link(struct dentry *dentry, struct nameidata *nd)
 		goto loop;
 	if (current->total_link_count >= 40)
 		goto loop;
-	if (need_resched()) {
-		current->state = TASK_RUNNING;
-		schedule();
-	}
+	cond_resched();
 	err = security_inode_follow_link(dentry, nd);
 	if (err)
 		goto loop;
