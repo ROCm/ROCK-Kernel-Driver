@@ -641,10 +641,8 @@ static void nv3UpdateArbitrationSettings
     {
         int  b = fifo_data.graphics_burst_size >> 4;
         *burst = 0;
-        while (b) {
+        while (b >>= 1)
 	    (*burst)++;
-	    b >>= 1;
-	}
         *lwm   = fifo_data.graphics_lwm >> 3;
     }
     else
@@ -834,10 +832,8 @@ static void nv4UpdateArbitrationSettings
     {
         int  b = fifo_data.graphics_burst_size >> 4;
         *burst = 0;
-        while (b) {
+        while (b >>= 1)
 	    (*burst)++;
-	    b >>= 1;
-	}
         *lwm   = fifo_data.graphics_lwm >> 3;
     }
 }
@@ -1101,10 +1097,8 @@ static void nv10UpdateArbitrationSettings
     {
         int  b = fifo_data.graphics_burst_size >> 4;
         *burst = 0;
-        while (b) {
+        while (b >>= 1)
 	    (*burst)++;
-	    b >>= 1;
-	}
         *lwm   = fifo_data.graphics_lwm >> 3;
     }
 }
@@ -1155,10 +1149,8 @@ static void nForceUpdateArbitrationSettings
     {
         int  b = fifo_data.graphics_burst_size >> 4;
         *burst = 0;
-        while (b) {
+        while (b >>= 1)
 	    (*burst)++;
-	    b >>= 1;
-	}
         *lwm   = fifo_data.graphics_lwm >> 3;
     }
 }
