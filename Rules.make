@@ -127,22 +127,32 @@ else
 	genksyms_smp_prefix := 
 endif
 
-# We don't track dependencies for .ver files, so we FORCE to check
-# them always (i.e. always at "make dep" time).
+$(MODVERDIR)/$(real-objs-y:.o=.ver): modkern_cflags := $(CFLAGS_KERNEL)
+$(MODVERDIR)/$(real-objs-m:.o=.ver): modkern_cflags := $(CFLAGS_MODULE)
+$(MODVERDIR)/$(export-objs:.o=.ver): export_flags   := -D__GENKSYMS__
 
-quiet_cmd_create_ver = Creating include/linux/modules/$(RELDIR)/$*.ver
-cmd_create_ver = $(CC) $(CFLAGS) $(EXTRA_CFLAGS) -E -D__GENKSYMS__ $< | \
-		 $(GENKSYMS) $(genksyms_smp_prefix) -k $(VERSION).$(PATCHLEVEL).$(SUBLEVEL) > $@.tmp
+c_flags = -Wp,-MD,$(@D)/.$(@F).d $(CFLAGS) $(NOSTDINC_FLAGS) \
+	  $(modkern_cflags) $(EXTRA_CFLAGS) $(CFLAGS_$(*F).o) \
+	  -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) \
+	  $(export_flags) 
+
+# Our objects only depend on modversions.h, not on the individual .ver
+# files (fix-dep filters them), so touch modversions.h if any of the .ver
+# files changes
+
+quiet_cmd_cc_ver_c = MKVER  include/linux/modules/$(RELDIR)/$*.ver
+define cmd_cc_ver_c
+	mkdir -p $(dir $@); \
+	$(CPP) $(c_flags) $< | $(GENKSYMS) $(genksyms_smp_prefix) \
+	  -k $(VERSION).$(PATCHLEVEL).$(SUBLEVEL) > $@.tmp; \
+	if [ ! -r $@ ] || cmp -s $@ $@.tmp; then \
+	  touch $(TOPDIR)/include/linux/modversions.h; \
+	fi; \
+	mv -f $@.tmp $@
+endef
 
 $(MODVERDIR)/%.ver: %.c FORCE
-	@mkdir -p $(dir $@)
-	@$(call cmd,cmd_create_ver)
-	@if [ -r $@ ] && cmp -s $@ $@.tmp; then \
-	  rm -f $@.tmp; \
-	else \
-	  touch $(TOPDIR)/include/linux/modversions.h; \
-	  mv -f $@.tmp $@; \
-	fi
+	@$(call if_changed_dep,cc_ver_c)
 
 targets := $(addprefix $(MODVERDIR)/,$(export-objs:.o=.ver))
 
@@ -194,8 +204,7 @@ first_rule: $(if $(KBUILD_BUILTIN),$(O_TARGET) $(L_TARGET) $(EXTRA_TARGETS)) \
 # Compile C sources (.c)
 # ---------------------------------------------------------------------------
 
-# If we don't know if built-in or modular, assume built-in.
-# Only happens in Makefiles which override the default first_rule:
+# Default is built-in, unless we know otherwise
 modkern_cflags := $(CFLAGS_KERNEL)
 
 $(real-objs-m)        : modkern_cflags := $(CFLAGS_MODULE)
@@ -239,7 +248,6 @@ cmd_cc_lst_c     = $(CC) $(c_flags) -g -c -o $*.o $< && $(TOPDIR)/scripts/makels
 # Compile assembler sources (.S)
 # ---------------------------------------------------------------------------
 
-# FIXME (s.a.)
 modkern_aflags := $(AFLAGS_KERNEL)
 
 $(real-objs-m)      : modkern_aflags := $(AFLAGS_MODULE)
