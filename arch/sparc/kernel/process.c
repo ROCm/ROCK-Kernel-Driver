@@ -56,6 +56,12 @@ void (*pm_idle)(void);
  */
 void (*pm_power_off)(void);
 
+/*
+ * sysctl - toggle power-off restriction for serial console 
+ * systems in machine_power_off()
+ */
+int scons_pwroff = 1;
+
 extern void fpsave(unsigned long *, unsigned long *, void *, unsigned long *);
 
 struct task_struct *last_task_used_math = NULL;
@@ -187,7 +193,7 @@ EXPORT_SYMBOL(machine_restart);
 void machine_power_off(void)
 {
 #ifdef CONFIG_SUN_AUXIO
-	if (auxio_power_register && !serial_console)
+	if (auxio_power_register && (!serial_console || scons_pwroff))
 		*auxio_power_register |= AUXIO_POWER_OFF;
 #endif
 	machine_halt();

@@ -131,6 +131,7 @@ enum
 	KERN_PRINTK_RATELIMIT_BURST=61,	/* int: tune printk ratelimiting */
 	KERN_PTY=62,		/* dir: pty driver */
 	KERN_NGROUPS_MAX=63,	/* int: NGROUPS_MAX */
+	KERN_SPARC_SCONS_PWROFF=64, /* int: serial console power-off halt */
 };
 
 
