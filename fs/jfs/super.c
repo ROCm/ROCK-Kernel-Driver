@@ -105,10 +105,14 @@ static void jfs_destroy_inode(struct inode *inode)
 	}
 
 #ifdef CONFIG_JFS_POSIX_ACL
-	if (ji->i_acl && (ji->i_acl != JFS_ACL_NOT_CACHED))
+	if (ji->i_acl != JFS_ACL_NOT_CACHED) {
 		posix_acl_release(ji->i_acl);
-	if (ji->i_default_acl && (ji->i_default_acl != JFS_ACL_NOT_CACHED))
+		ji->i_acl = JFS_ACL_NOT_CACHED;
+	}
+	if (ji->i_default_acl != JFS_ACL_NOT_CACHED) {
 		posix_acl_release(ji->i_default_acl);
+		ji->i_default_acl = JFS_ACL_NOT_CACHED;
+	}
 #endif
 
 	kmem_cache_free(jfs_inode_cachep, ji);
