@@ -1,14 +1,12 @@
 #ifndef _ASM_M32R_ATOMIC_H
 #define _ASM_M32R_ATOMIC_H
 
-/* $Id$ */
-
 /*
  *  linux/include/asm-m32r/atomic.h
- *    orig : i386 2.4.10
  *
  *  M32R version:
  *    Copyright (C) 2001, 2002  Hitoshi Yamamoto
+ *    Copyright (C) 2004  Hirokazu Takata <takata at linux-m32r.org>
  */
 
 #include <linux/config.h>
@@ -42,8 +40,7 @@ typedef struct { volatile int counter; } atomic_t;
  * atomic_read - read atomic variable
  * @v: pointer of type atomic_t
  *
- * Atomically reads the value of @v.  Note that the guaranteed
- * useful range of an atomic_t is only 24 bits.
+ * Atomically reads the value of @v.
  */
 #define atomic_read(v)	((v)->counter)
 
@@ -52,8 +49,7 @@ typedef struct { volatile int counter; } atomic_t;
  * @v: pointer of type atomic_t
  * @i: required value
  *
- * Atomically sets the value of @v to @i.  Note that the guaranteed
- * useful range of an atomic_t is only 24 bits.
+ * Atomically sets the value of @v to @i.
  */
 #define atomic_set(v,i)	(((v)->counter) = (i))
 
@@ -62,10 +58,9 @@ typedef struct { volatile int counter; } atomic_t;
  * @i: integer value to add
  * @v: pointer of type atomic_t
  *
- * Atomically adds @i to @v.  Note that the guaranteed useful range
- * of an atomic_t is only 24 bits.
+ * Atomically adds @i to @v.
  */
-static __inline__ void atomic_add(int i, atomic_t *v)
+static inline void atomic_add(int i, atomic_t *v)
 {
 	unsigned long flags;
 
@@ -91,10 +86,9 @@ static __inline__ void atomic_add(int i, atomic_t *v)
  * @i: integer value to subtract
  * @v: pointer of type atomic_t
  *
- * Atomically subtracts @i from @v.  Note that the guaranteed
- * useful range of an atomic_t is only 24 bits.
+ * Atomically subtracts @i from @v.
  */
-static __inline__ void atomic_sub(int i, atomic_t *v)
+static inline void atomic_sub(int i, atomic_t *v)
 {
 	unsigned long flags;
 
@@ -116,23 +110,51 @@ static __inline__ void atomic_sub(int i, atomic_t *v)
 }
 
 /**
- * atomic_sub_and_test - subtract value from variable and test result
- * @i: integer value to subtract
+ * atomic_add_return - add integer to atomic variable and return
+ * @i: integer value to add
  * @v: pointer of type atomic_t
  *
- * Atomically subtracts @i from @v and returns
- * true if the result is zero, or false for all
- * other cases.  Note that the guaranteed
- * useful range of an atomic_t is only 24 bits.
+ * Atomically adds @i to @v and return (@i + @v).
  */
-static __inline__ int atomic_sub_and_test(int i, atomic_t *v)
+static inline int atomic_add_return(int i, atomic_t *v)
 {
 	unsigned long flags;
 	int result;
 
 	local_irq_save(flags);
 	__asm__ __volatile__ (
-		"# atomic_sub_and_test		\n\t"
+		"# atomic_add			\n\t"
+		DCACHE_CLEAR("%0", "r4", "%1")
+		LOAD"	%0, @%1;		\n\t"
+		"add	%0, %2;			\n\t"
+		STORE"	%0, @%1;		\n\t"
+		: "=&r" (result)
+		: "r" (&v->counter), "r" (i)
+		: "memory"
+#ifdef CONFIG_CHIP_M32700_TS1
+		, "r4"
+#endif	/* CONFIG_CHIP_M32700_TS1 */
+	);
+	local_irq_restore(flags);
+
+	return result;
+}
+
+/**
+ * atomic_sub_return - subtract the atomic variable and return
+ * @i: integer value to subtract
+ * @v: pointer of type atomic_t
+ *
+ * Atomically subtracts @i from @v and return (@v - @i).
+ */
+static inline int atomic_sub_return(int i, atomic_t *v)
+{
+	unsigned long flags;
+	int result;
+
+	local_irq_save(flags);
+	__asm__ __volatile__ (
+		"# atomic_sub			\n\t"
 		DCACHE_CLEAR("%0", "r4", "%1")
 		LOAD"	%0, @%1;		\n\t"
 		"sub	%0, %2;			\n\t"
@@ -146,17 +168,27 @@ static __inline__ int atomic_sub_and_test(int i, atomic_t *v)
 	);
 	local_irq_restore(flags);
 
-	return (result == 0);
+	return result;
 }
+
+/**
+ * atomic_sub_and_test - subtract value from variable and test result
+ * @i: integer value to subtract
+ * @v: pointer of type atomic_t
+ *
+ * Atomically subtracts @i from @v and returns
+ * true if the result is zero, or false for all
+ * other cases.
+ */
+#define atomic_sub_and_test(i,v) (atomic_sub_return((i), (v)) == 0)
 
 /**
  * atomic_inc - increment atomic variable
  * @v: pointer of type atomic_t
  *
- * Atomically increments @v by 1.  Note that the guaranteed
- * useful range of an atomic_t is only 24 bits.
+ * Atomically increments @v by 1.
  */
-static __inline__ void atomic_inc(atomic_t *v)
+static inline void atomic_inc(atomic_t *v)
 {
 	unsigned long flags;
 
@@ -181,10 +213,9 @@ static __inline__ void atomic_inc(atomic_t *v)
  * atomic_dec - decrement atomic variable
  * @v: pointer of type atomic_t
  *
- * Atomically decrements @v by 1.  Note that the guaranteed
- * useful range of an atomic_t is only 24 bits.
+ * Atomically decrements @v by 1.
  */
-static __inline__ void atomic_dec(atomic_t *v)
+static inline void atomic_dec(atomic_t *v)
 {
 	unsigned long flags;
 
@@ -206,48 +237,12 @@ static __inline__ void atomic_dec(atomic_t *v)
 }
 
 /**
- * atomic_dec_and_test - decrement and test
+ * atomic_inc_return - increment atomic variable and return
  * @v: pointer of type atomic_t
  *
- * Atomically decrements @v by 1 and
- * returns true if the result is 0, or false for all other
- * cases.  Note that the guaranteed
- * useful range of an atomic_t is only 24 bits.
+ * Atomically increments @v by 1 and returns the result.
  */
-static __inline__ int atomic_dec_and_test(atomic_t *v)
-{
-	unsigned long flags;
-	int result;
-
-	local_irq_save(flags);
-	__asm__ __volatile__ (
-		"# atomic_dec_and_test		\n\t"
-		DCACHE_CLEAR("%0", "r4", "%1")
-		LOAD"	%0, @%1;		\n\t"
-		"addi	%0, #-1;		\n\t"
-		STORE"	%0, @%1;		\n\t"
-		: "=&r" (result)
-		: "r" (&v->counter)
-		: "memory"
-#ifdef CONFIG_CHIP_M32700_TS1
-		, "r4"
-#endif	/* CONFIG_CHIP_M32700_TS1 */
-	);
-	local_irq_restore(flags);
-
-	return (result == 0);
-}
-
-/**
- * atomic_inc_and_test - increment and test
- * @v: pointer of type atomic_t
- *
- * Atomically increments @v by 1
- * and returns true if the result is zero, or false for all
- * other cases.  Note that the guaranteed
- * useful range of an atomic_t is only 24 bits.
- */
-static __inline__ int atomic_inc_and_test(atomic_t *v)
+static inline int atomic_inc_return(atomic_t *v)
 {
 	unsigned long flags;
 	int result;
@@ -268,8 +263,58 @@ static __inline__ int atomic_inc_and_test(atomic_t *v)
 	);
 	local_irq_restore(flags);
 
-	return (result == 0);
+	return result;
 }
+
+/**
+ * atomic_dec_return - decrement atomic variable and return
+ * @v: pointer of type atomic_t
+ *
+ * Atomically decrements @v by 1 and returns the result.
+ */
+static inline int atomic_dec_return(atomic_t *v)
+{
+	unsigned long flags;
+	int result;
+
+	local_irq_save(flags);
+	__asm__ __volatile__ (
+		"# atomic_dec_and_test		\n\t"
+		DCACHE_CLEAR("%0", "r4", "%1")
+		LOAD"	%0, @%1;		\n\t"
+		"addi	%0, #-1;		\n\t"
+		STORE"	%0, @%1;		\n\t"
+		: "=&r" (result)
+		: "r" (&v->counter)
+		: "memory"
+#ifdef CONFIG_CHIP_M32700_TS1
+		, "r4"
+#endif	/* CONFIG_CHIP_M32700_TS1 */
+	);
+	local_irq_restore(flags);
+
+	return result;
+}
+
+/**
+ * atomic_inc_and_test - increment and test
+ * @v: pointer of type atomic_t
+ *
+ * Atomically increments @v by 1
+ * and returns true if the result is zero, or false for all
+ * other cases.
+ */
+#define atomic_inc_and_test(v) (atomic_inc_return(v) == 0)
+
+/**
+ * atomic_dec_and_test - decrement and test
+ * @v: pointer of type atomic_t
+ *
+ * Atomically decrements @v by 1 and
+ * returns true if the result is 0, or false for all
+ * other cases.
+ */
+#define atomic_dec_and_test(v) (atomic_dec_return(v) == 0)
 
 /**
  * atomic_add_negative - add and test if negative
@@ -278,35 +323,32 @@ static __inline__ int atomic_inc_and_test(atomic_t *v)
  *
  * Atomically adds @i to @v and returns true
  * if the result is negative, or false when
- * result is greater than or equal to zero.  Note that the guaranteed
- * useful range of an atomic_t is only 24 bits.
+ * result is greater than or equal to zero.
  */
-static __inline__ int atomic_add_negative(int i, atomic_t *v)
+#define atomic_add_negative(i,v) (atomic_add_return((i), (v)) < 0)
+
+static inline void atomic_clear_mask(unsigned long  mask, atomic_t *addr)
 {
 	unsigned long flags;
-	int result;
 
 	local_irq_save(flags);
 	__asm__ __volatile__ (
-		"# atomic_add_negative		\n\t"
-		DCACHE_CLEAR("%0", "r4", "%1")
-		LOAD"	%0, @%1;		\n\t"
-		"add	%0, %2;			\n\t"
-		STORE"	%0, @%1;		\n\t"
-		: "=&r" (result)
-		: "r" (&v->counter), "r" (i)
-		: "memory"
+		"# atomic_set_mask		\n\t"
+		DCACHE_CLEAR("r4", "r5", "%0")
+		LOAD"	r4, @%0;		\n\t"
+		"and	r4, %1;			\n\t"
+		STORE"	r4, @%0;		\n\t"
+		: /* no outputs */
+		: "r" (addr), "r" (~mask)
+		: "memory", "r4"
 #ifdef CONFIG_CHIP_M32700_TS1
-		, "r4"
+		, "r5"
 #endif	/* CONFIG_CHIP_M32700_TS1 */
 	);
 	local_irq_restore(flags);
-
-	return (result < 0);
 }
 
-/* These are x86-specific, used by some header files */
-static __inline__ void atomic_set_mask(unsigned long  mask, atomic_t *addr)
+static inline void atomic_set_mask(unsigned long  mask, atomic_t *addr)
 {
 	unsigned long flags;
 
@@ -327,7 +369,7 @@ static __inline__ void atomic_set_mask(unsigned long  mask, atomic_t *addr)
 	local_irq_restore(flags);
 }
 
-/* Atomic operations are already serializing on x86 */
+/* Atomic operations are already serializing on m32r */
 #define smp_mb__before_atomic_dec()	barrier()
 #define smp_mb__after_atomic_dec()	barrier()
 #define smp_mb__before_atomic_inc()	barrier()
