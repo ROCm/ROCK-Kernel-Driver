@@ -44,7 +44,7 @@ struct sx_board {
   int poll;
   int ta_type;
   struct timer_list       timer;
-  int                     locks;
+  long                    locks;
 };
 
 struct vpd_prom {

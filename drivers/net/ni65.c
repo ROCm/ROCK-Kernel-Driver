@@ -184,11 +184,41 @@ static struct card {
 	short addr_offset;
 	unsigned char *vendor_id;
 	char *cardname;
-	unsigned char config;
+	long config;
 } cards[] = {
-	{ NI65_ID0,NI65_ID1,0x0e,0x10,0x0,0x8,ni_vendor,"ni6510", 0x1 } ,
-	{ NI65_EB_ID0,NI65_EB_ID1,0x0e,0x18,0x10,0x0,ni_vendor,"ni6510 EtherBlaster", 0x2 } ,
-	{ NE2100_ID0,NE2100_ID1,0x0e,0x18,0x10,0x0,NULL,"generic NE2100", 0x0 }
+	{
+		.id0	     = NI65_ID0,
+		.id1	     = NI65_ID1,
+		.id_offset   = 0x0e,
+		.total_size  = 0x10,
+		.cmd_offset  = 0x0,
+		.addr_offset = 0x8,
+		.vendor_id   = ni_vendor,
+		.cardname    = "ni6510",
+		.config	     = 0x1,
+       	},
+	{
+		.id0	     = NI65_EB_ID0,
+		.id1	     = NI65_EB_ID1,
+		.id_offset   = 0x0e,
+		.total_size  = 0x18,
+		.cmd_offset  = 0x10,
+		.addr_offset = 0x0,
+		.vendor_id   = ni_vendor,
+		.cardname    = "ni6510 EtherBlaster",
+		.config	     = 0x2,
+       	},
+	{
+		.id0	     = NE2100_ID0,
+		.id1	     = NE2100_ID1,
+		.id_offset   = 0x0e,
+		.total_size  = 0x18,
+		.cmd_offset  = 0x10,
+		.addr_offset = 0x0,
+		.vendor_id   = NULL,
+		.cardname    = "generic NE2100",
+		.config	     = 0x0,
+	},
 };
 #define NUM_CARDS 3
 
@@ -415,7 +445,8 @@ static int __init ni65_probe1(struct net_device *dev,int ioaddr)
 	else {
 		if(dev->dma == 0) {
 		/* 'stuck test' from lance.c */
-			int dma_channels = ((inb(DMA1_STAT_REG) >> 4) & 0x0f) | (inb(DMA2_STAT_REG) & 0xf0);
+			long dma_channels = ((inb(DMA1_STAT_REG) >> 4) & 0x0f) |
+					    (inb(DMA2_STAT_REG) & 0xf0);
 			for(i=1;i<5;i++) {
 				int dma = dmatab[i];
 				if(test_bit(dma,&dma_channels) || request_dma(dma,"ni6510"))
