@@ -56,8 +56,6 @@ extern volatile unsigned long cpu_callin_map[NR_CPUS];
 
 #define smp_processor_id() (get_paca()->xPacaIndex)
 
-extern int boot_cpuid;
-
 /* Since OpenPIC has only 4 IPIs, we use slightly different message numbers.
  *
  * Make sure this matches openpic_request_IPIs in open_pic.c, or what shows up

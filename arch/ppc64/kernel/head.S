@@ -1565,7 +1565,6 @@ _GLOBAL(__secondary_start)
 	mtspr	SRR0,r3
 	mtspr	SRR1,r4
 	rfid
-#endif /* CONFIG_SMP */
 
 /* 
  * Running with relocation on at this point.  All we want to do is
@@ -1575,6 +1574,7 @@ _GLOBAL(start_secondary_prolog)
 	li	r3,0
 	std	r3,0(r1)                /* Zero the stack frame pointer     */
 	bl	.start_secondary
+#endif
 
 /*
  * This subroutine clobbers r11, r12 and the LR

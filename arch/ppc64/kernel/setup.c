@@ -262,7 +262,6 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	unsigned short maj;
 	unsigned short min;
 
-#ifdef CONFIG_SMP
 	if (cpu_id == NR_CPUS) {
 
 		if (ppc_md.get_cpuinfo != NULL)
@@ -273,16 +272,17 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 
 	if (!(cpu_online_map & (1<<cpu_id)))
 		return 0;
-#endif
 
+#ifdef CONFIG_SMP
 	pvr = paca[cpu_id].pvr;
+#else
+	pvr = _get_PVR();
+#endif
 	maj = (pvr >> 8) & 0xFF;
 	min = pvr & 0xFF;
 
 	seq_printf(m, "processor\t: %lu\n", cpu_id);
 	seq_printf(m, "cpu\t\t: ");
-
-	pvr = paca[cpu_id].pvr;
 
 	switch (PVR_VER(pvr)) {
 	case PV_NORTHSTAR:

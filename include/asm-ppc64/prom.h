@@ -172,6 +172,8 @@ struct prom_t {
 
 extern struct prom_t prom;
 
+extern int boot_cpuid;
+
 /* Prototypes */
 extern void abort(void);
 extern unsigned long prom_init(unsigned long, unsigned long, unsigned long,
