@@ -771,47 +771,35 @@ static struct pccard_operations yenta_socket_operations = {
 #include "ti113x.h"
 #include "ricoh.h"
 
+enum {
+	CARDBUS_TYPE_DEFAULT = -1,
+	CARDBUS_TYPE_TI,
+	CARDBUS_TYPE_TI113X,
+	CARDBUS_TYPE_TI12XX,
+	CARDBUS_TYPE_TI1250,
+	CARDBUS_TYPE_RICOH
+};
+
 /*
  * Different cardbus controllers have slightly different
  * initialization sequences etc details. List them here..
  */
-#define PD(x,y) PCI_VENDOR_ID_##x, PCI_DEVICE_ID_##x##_##y
-struct cardbus_override_struct {
-	unsigned short vendor;
-	unsigned short device;
-	int (*override) (struct yenta_socket *socket);
-} cardbus_override[] = {
-	{ PD(TI,1031),	&ti_override },
-
-	/* TBD: Check if these TI variants can use more
-	 * advanced overrides instead */
-	{ PD(TI,1210),	&ti_override },
-	{ PD(TI,1211),	&ti_override },
-	{ PD(TI,1251A),	&ti_override },
-	{ PD(TI,1251B),	&ti_override },
-	{ PD(TI,1420),	&ti_override },
-	{ PD(TI,1450),	&ti_override },
-	{ PD(TI,4410),	&ti_override },
-	{ PD(TI,4451),	&ti_override },
-
-	{ PD(TI,1130),	&ti113x_override },
-	{ PD(TI,1131),	&ti113x_override },
-
-	{ PD(TI,1220),	&ti12xx_override },
-	{ PD(TI,1221),	&ti12xx_override },
-	{ PD(TI,1225),	&ti12xx_override },
-	{ PD(TI,1520),  &ti12xx_override },
-
-	{ PD(TI,1250),	&ti1250_override },
-	{ PD(TI,1410),	&ti1250_override },
-
-	{ PD(RICOH,RL5C465), &ricoh_override },
-	{ PD(RICOH,RL5C466), &ricoh_override },
-	{ PD(RICOH,RL5C475), &ricoh_override },
-	{ PD(RICOH,RL5C476), &ricoh_override },
-	{ PD(RICOH,RL5C478), &ricoh_override },
-
-	{ }, /* all zeroes */
+struct cardbus_type cardbus_type[] = {
+	[CARDBUS_TYPE_TI]	= {
+		.override	= ti_override,
+	},
+	[CARDBUS_TYPE_TI113X]	= {
+		.override	= ti113x_override,
+	},
+	[CARDBUS_TYPE_TI12XX]	= {
+		.override	= ti12xx_override,
+	},
+	[CARDBUS_TYPE_TI1250]	= {
+		.override	= ti1250_override,
+	},
+	[CARDBUS_TYPE_RICOH]	= {
+		.override	= ricoh_override,
+	},
 };
 
 
@@ -823,7 +811,6 @@ struct cardbus_override_struct {
 static int __devinit yenta_probe (struct pci_dev *dev, const struct pci_device_id *id)
 {
 	struct yenta_socket *socket;
-	struct cardbus_override_struct *d;
 	int ret;
 	
 	socket = kmalloc(sizeof(struct yenta_socket), GFP_KERNEL);
@@ -887,14 +874,13 @@ static int __devinit yenta_probe (struct pci_dev *dev, const struct pci_device_i
 	socket->cb_irq = dev->irq;
 
 	/* Do we have special options for the device? */
-	d = cardbus_override;
-	while (d->override) {
-		if ((dev->vendor == d->vendor) && (dev->device == d->device)) {
-			ret = d->override(socket);
-			if (ret < 0)
-				goto unmap;
-		}
-		d++;
+	if (id->driver_data != CARDBUS_TYPE_DEFAULT &&
+	    id->driver_data < ARRAY_SIZE(cardbus_type)) {
+		socket->type = &cardbus_type[id->driver_data];
+
+		ret = socket->type->override(socket);
+		if (ret < 0)
+			goto unmap;
 	}
 
 	/* We must finish initialization here */
@@ -943,15 +929,53 @@ static int yenta_dev_resume (struct pci_dev *dev)
 }
 
 
-static struct pci_device_id yenta_table [] = { {
-	.class		= PCI_CLASS_BRIDGE_CARDBUS << 8,
-	.class_mask	= ~0,
+#define CB_ID(vend,dev,type)				\
+	{						\
+		.vendor		= vend,			\
+		.device		= dev,			\
+		.subvendor	= PCI_ANY_ID,		\
+		.subdevice	= PCI_ANY_ID,		\
+		.class		= PCI_CLASS_BRIDGE_CARDBUS << 8, \
+		.class_mask	= ~0,			\
+		.driver_data	= CARDBUS_TYPE_##type,	\
+	}
 
-	.vendor		= PCI_ANY_ID,
-	.device		= PCI_ANY_ID,
-	.subvendor	= PCI_ANY_ID,
-	.subdevice	= PCI_ANY_ID,
-}, { /* all zeroes */ }
+static struct pci_device_id yenta_table [] = {
+	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_1031, TI),
+
+	/*
+	 * TBD: Check if these TI variants can use more
+	 * advanced overrides instead.
+	 */
+	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_1210, TI),
+	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_1211, TI),
+	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_1251A, TI),
+	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_1251B, TI),
+	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_1420, TI),
+	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_1450, TI),
+	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_4410, TI),
+	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_4451, TI),
+
+	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_1130, TI113X),
+	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_1131, TI113X),
+
+	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_1220, TI12XX),
+	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_1221, TI12XX),
+	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_1225, TI12XX),
+	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_1520, TI12XX),
+
+	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_1250, TI1250),
+	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_1410, TI1250),
+
+	CB_ID(PCI_VENDOR_ID_RICOH, PCI_DEVICE_ID_RICOH_RL5C465, RICOH),
+	CB_ID(PCI_VENDOR_ID_RICOH, PCI_DEVICE_ID_RICOH_RL5C466, RICOH),
+	CB_ID(PCI_VENDOR_ID_RICOH, PCI_DEVICE_ID_RICOH_RL5C475, RICOH),
+	CB_ID(PCI_VENDOR_ID_RICOH, PCI_DEVICE_ID_RICOH_RL5C476, RICOH),
+	CB_ID(PCI_VENDOR_ID_RICOH, PCI_DEVICE_ID_RICOH_RL5C478, RICOH),
+
+	/* match any cardbus bridge */
+	CB_ID(PCI_ANY_ID, PCI_ANY_ID, DEFAULT),
+	{ /* all zeroes */ }
 };
 MODULE_DEVICE_TABLE(pci, yenta_table);
 
