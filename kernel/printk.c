@@ -29,7 +29,7 @@
 
 #include <asm/uaccess.h>
 
-#ifdef CONFIG_MULTIQUAD
+#if defined(CONFIG_MULTIQUAD) || defined(CONFIG_IA64)
 #define LOG_BUF_LEN	(65536)
 #elif defined(CONFIG_SMP)
 #define LOG_BUF_LEN	(32768)
