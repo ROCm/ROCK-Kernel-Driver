@@ -25,7 +25,7 @@ extern unsigned long __per_cpu_offset[NR_CPUS];
     __typeof__(type) name##__per_cpu
 #endif
 
-#define per_cpu(var, cpu)			var##__per_cpu
+#define per_cpu(var, cpu)			((void)cpu, var##__per_cpu)
 #define __get_cpu_var(var)			var##__per_cpu
 #endif
 
