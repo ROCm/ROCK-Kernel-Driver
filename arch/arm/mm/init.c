@@ -33,12 +33,6 @@
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
 
-#ifndef CONFIG_DISCONTIGMEM
-#define NR_NODES	1
-#else
-#define NR_NODES	4
-#endif
-
 #ifdef CONFIG_CPU_32
 #define TABLE_OFFSET	(PTRS_PER_PTE)
 #else
@@ -178,7 +172,7 @@ find_memend_and_nodes(struct meminfo *mi, struct node_info *np)
 {
 	unsigned int i, bootmem_pages = 0, memend_pfn = 0;
 
-	for (i = 0; i < NR_NODES; i++) {
+	for (i = 0; i < MAX_NUMNODES; i++) {
 		np[i].start = -1U;
 		np[i].end = 0;
 		np[i].bootmap_pages = 0;
@@ -207,7 +201,7 @@ find_memend_and_nodes(struct meminfo *mi, struct node_info *np)
 			 * we have, we're in trouble.  (maybe we ought to
 			 * limit, instead of bugging?)
 			 */
-			if (numnodes > NR_NODES)
+			if (numnodes > MAX_NUMNODES)
 				BUG();
 		}
 
@@ -365,7 +359,7 @@ static inline void free_bootmem_node_bank(int node, struct meminfo *mi)
  */
 void __init bootmem_init(struct meminfo *mi)
 {
-	struct node_info node_info[NR_NODES], *np = node_info;
+	struct node_info node_info[MAX_NUMNODES], *np = node_info;
 	unsigned int bootmap_pages, bootmap_pfn, map_pg;
 	int node, initrd_node;
 

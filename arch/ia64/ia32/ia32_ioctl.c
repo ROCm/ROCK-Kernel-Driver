@@ -26,42 +26,10 @@
 	_ret;						\
 })
 
-#define P(i)	((void *)(unsigned long)(i))
-
 asmlinkage long sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg);
 
 #define CODE
 #include "compat_ioctl.c"
-
-#define	VFAT_IOCTL_READDIR_BOTH32	_IOR('r', 1, struct linux32_dirent[2])
-#define	VFAT_IOCTL_READDIR_SHORT32	_IOR('r', 2, struct linux32_dirent[2])
-
-static long
-put_dirent32 (struct dirent *d, struct linux32_dirent *d32)
-{
-	size_t namelen = strlen(d->d_name);
-
-	return (put_user(d->d_ino, &d32->d_ino)
-		|| put_user(d->d_off, &d32->d_off)
-		|| put_user(d->d_reclen, &d32->d_reclen)
-		|| copy_to_user(d32->d_name, d->d_name, namelen + 1));
-}
-
-static int vfat_ioctl32(unsigned fd, unsigned cmd,  void *ptr) 
-{
-	int ret;
-	mm_segment_t oldfs = get_fs();
-	struct dirent d[2]; 
-
-	set_fs(KERNEL_DS);
-	ret = sys_ioctl(fd,cmd,(unsigned long)&d); 
-	set_fs(oldfs); 
-	if (!ret) { 
-		ret |= put_dirent32(&d[0], (struct linux32_dirent *)ptr); 
-		ret |= put_dirent32(&d[1], ((struct linux32_dirent *)ptr) + 1); 
-	}
-	return ret; 
-} 
 
 typedef int (* ioctl32_handler_t)(unsigned int, unsigned int, unsigned long, struct file *);
 
@@ -73,8 +41,6 @@ typedef int (* ioctl32_handler_t)(unsigned int, unsigned int, unsigned long, str
 	};
 
 IOCTL_TABLE_START
-HANDLE_IOCTL(VFAT_IOCTL_READDIR_BOTH32, vfat_ioctl32)
-HANDLE_IOCTL(VFAT_IOCTL_READDIR_SHORT32, vfat_ioctl32)
 #define DECLARES
 #include "compat_ioctl.c"
 #include <linux/compat_ioctl.h>

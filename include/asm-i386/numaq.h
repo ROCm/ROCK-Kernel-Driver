@@ -28,7 +28,6 @@
 
 #ifdef CONFIG_X86_NUMAQ
 
-#define MAX_NUMNODES		16
 extern int get_memcfg_numaq(void);
 
 /*

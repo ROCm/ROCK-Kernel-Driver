@@ -263,9 +263,9 @@ static void uart_shutdown(struct uart_state *state)
 
 /**
  *	uart_update_timeout - update per-port FIFO timeout.
- *	@port: uart_port structure describing the port.
+ *	@port:  uart_port structure describing the port
  *	@cflag: termios cflag value
- *	@quot: uart clock divisor quotient
+ *	@baud:  speed of the port
  *
  *	Set the port FIFO timeout value.  The @cflag value should
  *	reflect the actual hardware settings.

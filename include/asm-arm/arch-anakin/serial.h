@@ -20,7 +20,6 @@
 /*
  * UART3 and UART4 are not supported yet
  */
-#define RS_TABLE_SIZE		3
 #define STD_SERIAL_PORT_DEFNS	\
 	{ 0, 0, IO_BASE + UART0, IRQ_UART0, 0 }, \
 	{ 0, 0, IO_BASE + UART1, IRQ_UART1, 0 }, \

@@ -78,7 +78,7 @@ config CRYPTO_BLOWFISH
 	  designed for use on "large microprocessors".
 	  
 	  See also:
-	  http://www.counterpane.com/blowfish.html
+	  http://www.schneier.com/blowfish.html
 
 config CRYPTO_TWOFISH
 	tristate "Twofish cipher algorithm"
@@ -92,7 +92,7 @@ config CRYPTO_TWOFISH
 	  bits.
 	  
 	  See also:
-	  http://www.counterpane.com/twofish.html
+	  http://www.schneier.com/twofish.html
 
 config CRYPTO_SERPENT
 	tristate "Serpent cipher algorithm"
@@ -124,7 +124,7 @@ config CRYPTO_AES
 
 	  The AES specifies three key sizes: 128, 192 and 256 bits	  
 
-	  See http://csrc.nist.gov/encryption/aes/ for more information.
+	  See http://csrc.nist.gov/CryptoToolkit/aes/ for more information.
 
 config CRYPTO_CAST5
 	tristate "CAST5 (CAST-128) cipher algorithm"

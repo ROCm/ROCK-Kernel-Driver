@@ -82,12 +82,14 @@ static int __init pcbit_init(void)
 
 static void __exit pcbit_exit(void)
 {
+#ifdef MODULE
 	int board;
 
 	for (board = 0; board < num_boards; board++)
 		pcbit_terminate(board);
 	printk(KERN_NOTICE 
 	       "PCBIT-D module unloaded\n");
+#endif
 }
 
 #ifndef MODULE

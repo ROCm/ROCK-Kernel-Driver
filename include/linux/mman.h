@@ -28,8 +28,13 @@ static inline void vm_unacct_memory(long pages)
 	vm_acct_memory(-pages);
 }
 
-/* Optimisation macro. */
-#define _calc_vm_trans(x,bit1,bit2) \
+/*
+ * Optimisation macro.  It is equivalent to:
+ *      (x & bit1) ? bit2 : 0
+ * but this version is faster.
+ * ("bit1" and "bit2" must be single bits)
+ */
+#define _calc_vm_trans(x, bit1, bit2) \
   ((bit1) <= (bit2) ? ((x) & (bit1)) * ((bit2) / (bit1)) \
    : ((x) & (bit1)) / ((bit1) / (bit2)))
 

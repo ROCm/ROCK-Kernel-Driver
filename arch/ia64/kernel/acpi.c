@@ -41,6 +41,7 @@
 #include <linux/irq.h>
 #include <linux/acpi.h>
 #include <linux/efi.h>
+#include <linux/mmzone.h>
 #include <asm/io.h>
 #include <asm/iosapic.h>
 #include <asm/machvec.h>
@@ -341,7 +342,7 @@ static u32 __initdata pxm_flag[PXM_FLAG_LEN];
 #define pxm_bit_test(bit)	(test_bit(bit,(void *)pxm_flag))
 /* maps to convert between proximity domain and logical node ID */
 int __initdata pxm_to_nid_map[MAX_PXM_DOMAINS];
-int __initdata nid_to_pxm_map[NR_NODES];
+int __initdata nid_to_pxm_map[MAX_NUMNODES];
 static struct acpi_table_slit __initdata *slit_table;
 
 /*

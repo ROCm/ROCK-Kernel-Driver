@@ -106,7 +106,7 @@ struct ext3_inode_info {
 	 * during recovery.  Hence we must fix the get_block-vs-truncate race
 	 * by other means, so we have truncate_sem.
 	 */
-	struct rw_semaphore truncate_sem;
+	struct semaphore truncate_sem;
 	struct inode vfs_inode;
 };
 

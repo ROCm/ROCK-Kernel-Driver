@@ -250,7 +250,7 @@ static int show_partition(struct seq_file *part, void *v)
 {
 	struct gendisk *sgp = v;
 	int n;
-	char buf[64];
+	char buf[BDEVNAME_SIZE];
 
 	if (&sgp->kobj.entry == block_subsys.kset.list.next)
 		seq_puts(part, "major minor  #blocks  name\n\n");
@@ -472,7 +472,7 @@ static void diskstats_stop(struct seq_file *part, void *v)
 static int diskstats_show(struct seq_file *s, void *v)
 {
 	struct gendisk *gp = v;
-	char buf[64];
+	char buf[BDEVNAME_SIZE];
 	int n = 0;
 
 	/*

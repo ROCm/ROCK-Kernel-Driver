@@ -530,8 +530,10 @@ __SYSCALL(__NR_epoll_ctl, sys_epoll_ctl)
 __SYSCALL(__NR_tgkill, sys_tgkill)
 #define __NR_utimes		235
 __SYSCALL(__NR_utimes, sys_utimes)
+#define __NR_vserver		236
+__SYSCALL(__NR_vserver, sys_ni_syscall)
 
-#define __NR_syscall_max __NR_utimes
+#define __NR_syscall_max __NR_vserver
 #ifndef __NO_STUBS
 
 /* user-visible error numbers are in the range -1 - -4095 */

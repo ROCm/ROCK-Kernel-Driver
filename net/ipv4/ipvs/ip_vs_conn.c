@@ -670,8 +670,8 @@ static void ip_vs_conn_seq_stop(struct seq_file *seq, void *v)
 {
 	struct list_head *l = seq->private;
 
-	if (l) 
-		ct_read_unlock(l - ip_vs_conn_tab);
+	if (l)
+		ct_read_unlock_bh(l - ip_vs_conn_tab);
 }
 
 static int ip_vs_conn_seq_show(struct seq_file *seq, void *v)

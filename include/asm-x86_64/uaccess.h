@@ -241,9 +241,9 @@ extern unsigned long copy_in_user(void *to, const void *from, unsigned len);
 
 static inline int __copy_from_user(void *dst, const void *src, unsigned size) 
 { 
+       int ret = 0;
 	if (!__builtin_constant_p(size))
 		return copy_user_generic(dst,src,size);
-	int ret = 0; 
 	switch (size) { 
 	case 1:__get_user_asm(*(u8*)dst,(u8 *)src,ret,"b","b","=q",1); 
 		return ret;
@@ -270,9 +270,9 @@ static inline int __copy_from_user(void *dst, const void *src, unsigned size)
 
 static inline int __copy_to_user(void *dst, const void *src, unsigned size) 
 { 
+       int ret = 0;
 	if (!__builtin_constant_p(size))
 		return copy_user_generic(dst,src,size);
-	int ret = 0; 
 	switch (size) { 
 	case 1:__put_user_asm(*(u8*)src,(u8 *)dst,ret,"b","b","iq",1); 
 		return ret;
@@ -302,9 +302,9 @@ static inline int __copy_to_user(void *dst, const void *src, unsigned size)
 
 static inline int __copy_in_user(void *dst, const void *src, unsigned size) 
 { 
+       int ret = 0;
 	if (!__builtin_constant_p(size))
 		return copy_user_generic(dst,src,size);
-	int ret = 0; 
 	switch (size) { 
 	case 1: { 
 		u8 tmp;

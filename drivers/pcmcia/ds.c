@@ -64,7 +64,7 @@
 /* Module parameters */
 
 MODULE_AUTHOR("David Hinds <dahinds@users.sourceforge.net>");
-MODULE_DESCRIPTION("PCMCIA Driver Services " CS_RELEASE);
+MODULE_DESCRIPTION("PCMCIA Driver Services");
 MODULE_LICENSE("Dual MPL/GPL");
 
 #define INT_MODULE_PARM(n, v) static int n = v; MODULE_PARM(n, "i")
