@@ -127,7 +127,7 @@ static unsigned int pentiumM_get_frequency(void)
 	msr_tmp = (msr_lo >> 22) & 0x1f;
 	dprintk(KERN_DEBUG "speedstep-lib: bits 22-26 are 0x%x\n", msr_tmp);
 
-	return (msr_tmp * 100 * 10000);
+	return (msr_tmp * 100 * 1000);
 }
 
 
