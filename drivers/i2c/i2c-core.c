@@ -21,8 +21,6 @@
    All SMBus-related things are written by Frodo Looijaard <frodol@dds.nl>
    SMBus 2.0 support by Mark Studebaker <mdsxyz123@yahoo.com>                */
 
-/* $Id: i2c-core.c,v 1.95 2003/01/22 05:25:08 kmalkki Exp $ */
-
 #include <linux/config.h>
 #ifdef CONFIG_I2C_DEBUG_CORE
 #define DEBUG	1

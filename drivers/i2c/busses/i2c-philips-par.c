@@ -21,8 +21,6 @@
 /* With some changes from Kyösti Mälkki <kmalkki@cc.hut.fi> and even
    Frodo Looijaard <frodol@dds.nl> */
 
-/* $Id: i2c-philips-par.c,v 1.29 2003/01/21 08:08:16 kmalkki Exp $ */
-
 #include <linux/config.h>
 #ifdef CONFIG_I2C_DEBUG_BUS
 #define DEBUG	1

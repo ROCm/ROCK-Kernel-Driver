@@ -18,8 +18,6 @@
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.		     */
 /* ------------------------------------------------------------------------- */
 
-/* $Id: i2c-velleman.c,v 1.29 2003/01/21 08:08:16 kmalkki Exp $ */
-
 #include <linux/config.h>
 #ifdef CONFIG_I2C_DEBUG_BUS
 #define DEBUG	1
