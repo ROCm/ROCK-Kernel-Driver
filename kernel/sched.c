@@ -365,12 +365,10 @@ void wake_up_forked_process(task_t * p)
 		p->sleep_avg = p->sleep_avg * CHILD_PENALTY / 100;
 		p->prio = effective_prio(p);
 	}
-	INIT_LIST_HEAD(&p->migration_list);
 	p->thread_info->cpu = smp_processor_id();
 	activate_task(p, rq);
 
 	spin_unlock_irq(&rq->lock);
-	init_MUTEX(&p->migration_sem);
 	preempt_enable();
 }
 
@@ -974,65 +972,6 @@ long sleep_on_timeout(wait_queue_head_t *q, long timeout)
 
 void scheduling_functions_end_here(void) { }
 
-#if CONFIG_SMP
-
-/*
- * Change a given task's CPU affinity. Migrate the process to a
- * proper CPU and schedule it away if the current CPU is removed
- * from the allowed bitmask.
- */
-void set_cpus_allowed(task_t *p, unsigned long new_mask)
-{
-	unsigned long flags;
-	runqueue_t *rq;
-	int dest_cpu;
-
-	down(&p->migration_sem);
-	if (!list_empty(&p->migration_list))
-		BUG();
-
-	new_mask &= cpu_online_map;
-	if (!new_mask)
-		BUG();
-
-	rq = task_rq_lock(p, &flags);
-	p->cpus_allowed = new_mask;
-	/*
-	 * Can the task run on the task's current CPU? If not then
-	 * migrate the process off to a proper CPU.
-	 */
-	if (new_mask & (1UL << p->thread_info->cpu)) {
-		task_rq_unlock(rq, &flags);
-		goto out;
-	}
-	/*
-	 * We mark the process as nonrunnable, and kick it to
-	 * schedule away from its current CPU. We also add
-	 * the task to the migration queue and wake up the
-	 * target CPU's migration thread, so that it can pick
-	 * up this task and insert it into the local runqueue.
-	 */
-	p->state = TASK_UNINTERRUPTIBLE;
-	kick_if_running(p);
-	task_rq_unlock(rq, &flags);
-
-	dest_cpu = __ffs(new_mask);
-	rq = cpu_rq(dest_cpu);
-
-	spin_lock_irq(&rq->lock);
-	list_add(&p->migration_list, &rq->migration_queue);
-	spin_unlock_irq(&rq->lock);
-	wake_up_process(rq->migration_thread);
-
-	while (!((1UL << p->thread_info->cpu) & p->cpus_allowed) &&
-			(p->state != TASK_ZOMBIE))
-		yield();
-out:
-	up(&p->migration_sem);
-}
-
-#endif
-
 void set_user_nice(task_t *p, long nice)
 {
 	unsigned long flags;
@@ -1198,7 +1137,7 @@ static int setscheduler(pid_t pid, int policy, struct sched_param *param)
 	retval = 0;
 	p->policy = policy;
 	p->rt_priority = lp.sched_priority;
-	if (rt_task(p))
+	if (policy != SCHED_OTHER)
 		p->prio = 99 - p->rt_priority;
 	else
 		p->prio = p->static_prio;
@@ -1556,15 +1495,78 @@ void __init sched_init(void)
 
 #if CONFIG_SMP
 
+/*
+ * This is how migration works:
+ *
+ * 1) we queue a migration_req_t structure in the source CPU's
+ *    runqueue and wake up that CPU's migration thread.
+ * 2) we down() the locked semaphore => thread blocks.
+ * 3) migration thread wakes up (implicitly it forces the migrated
+ *    thread off the CPU)
+ * 4) it gets the migration request and checks whether the migrated
+ *    task is still in the wrong runqueue.
+ * 5) if it's in the wrong runqueue then the migration thread removes
+ *    it and puts it into the right queue.
+ * 6) migration thread up()s the semaphore.
+ * 7) we wake up and the migration is done.
+ */
+
+typedef struct {
+	list_t list;
+	task_t *task;
+	struct semaphore sem;
+} migration_req_t;
+
+/*
+ * Change a given task's CPU affinity. Migrate the process to a
+ * proper CPU and schedule it away if the CPU it's executing on
+ * is removed from the allowed bitmask.
+ *
+ * NOTE: the caller must have a valid reference to the task, the
+ * task must not exit() & deallocate itself prematurely.
+ */
+void set_cpus_allowed(task_t *p, unsigned long new_mask)
+{
+	unsigned long flags;
+	migration_req_t req;
+	runqueue_t *rq;
+
+	new_mask &= cpu_online_map;
+	if (!new_mask)
+		BUG();
+
+	rq = task_rq_lock(p, &flags);
+	p->cpus_allowed = new_mask;
+	/*
+	 * Can the task run on the task's current CPU? If not then
+	 * migrate the process off to a proper CPU.
+	 */
+	if (new_mask & (1UL << p->thread_info->cpu)) {
+		task_rq_unlock(rq, &flags);
+		return;
+	}
+
+	init_MUTEX_LOCKED(&req.sem);
+	req.task = p;
+	list_add(&req.list, &rq->migration_queue);
+	task_rq_unlock(rq, &flags);
+	wake_up_process(rq->migration_thread);
+
+	down(&req.sem);
+}
+
 static volatile unsigned long migration_mask;
 
 static int migration_thread(void * unused)
 {
+	struct sched_param param = { sched_priority: 99 };
 	runqueue_t *rq;
+	int ret;
 
 	daemonize();
 	sigfillset(&current->blocked);
-	set_user_nice(current, -20);
+	set_fs(KERNEL_DS);
+	ret = setscheduler(0, SCHED_FIFO, &param);
 
 	/*
 	 * We have to migrate manually - there is no migration thread
@@ -1598,41 +1600,47 @@ static int migration_thread(void * unused)
 	sprintf(current->comm, "migration_CPU%d", smp_processor_id());
 
 	for (;;) {
+		runqueue_t *rq_src, *rq_dest;
 		struct list_head *head;
+		int cpu_src, cpu_dest;
+		migration_req_t *req;
 		unsigned long flags;
-		task_t *p = NULL;
+		task_t *p;
 
 		spin_lock_irqsave(&rq->lock, flags);
 		head = &rq->migration_queue;
+		current->state = TASK_UNINTERRUPTIBLE;
 		if (list_empty(head)) {
-			current->state = TASK_UNINTERRUPTIBLE;
 			spin_unlock_irqrestore(&rq->lock, flags);
 			schedule();
 			continue;
 		}
-		p = list_entry(head->next, task_t, migration_list);
+		req = list_entry(head->next, migration_req_t, list);
 		list_del_init(head->next);
 		spin_unlock_irqrestore(&rq->lock, flags);
 
-		for (;;) {
-			runqueue_t *rq2 = task_rq_lock(p, &flags);
+		p = req->task;
+		cpu_dest = __ffs(p->cpus_allowed);
+		rq_dest = cpu_rq(cpu_dest);
+repeat:
+		cpu_src = p->thread_info->cpu;
+		rq_src = cpu_rq(cpu_src);
 
-			if (!p->array) {
-				p->thread_info->cpu = smp_processor_id();
-				task_rq_unlock(rq2, &flags);
-				wake_up_process(p);
-				break;
-			}
-			if (p->state != TASK_UNINTERRUPTIBLE) {
-				p->state = TASK_UNINTERRUPTIBLE;
-				kick_if_running(p);
-			}
-			task_rq_unlock(rq2, &flags);
-			while ((p->state == TASK_UNINTERRUPTIBLE) && p->array) {
-				cpu_relax();
-				barrier();
+		double_rq_lock(rq_src, rq_dest);
+		if (p->thread_info->cpu != cpu_src) {
+			double_rq_unlock(rq_src, rq_dest);
+			goto repeat;
+		}
+		if (rq_src == rq) {
+			p->thread_info->cpu = cpu_dest;
+			if (p->array) {
+				deactivate_task(p, rq_src);
+				activate_task(p, rq_dest);
 			}
 		}
+		double_rq_unlock(rq_src, rq_dest);
+
+		up(&req->sem);
 	}
 }
 
@@ -1645,11 +1653,11 @@ void __init migration_init(void)
 				CLONE_FS | CLONE_FILES | CLONE_SIGNAL) < 0)
 			BUG();
 
-	migration_mask = (1 << smp_num_cpus) -1;
+	migration_mask = (1 << smp_num_cpus) - 1;
 
 	for (cpu = 0; cpu < smp_num_cpus; cpu++)
 		while (!cpu_rq(cpu)->migration_thread)
-			yield();
+			schedule_timeout(2);
 	if (migration_mask)
 		BUG();
 }
