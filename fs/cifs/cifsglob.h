@@ -274,6 +274,7 @@ struct oplock_q_entry {
 #define   MID_REQUEST_ALLOCATED 1
 #define   MID_REQUEST_SUBMITTED 2
 #define   MID_RESPONSE_RECEIVED 4
+#define   MID_RETRY_NEEDED      8 /* session closed while this request out */
 
 struct servers_not_supported { /* @z4a */
 	struct servers_not_supported *next1;  /* @z4a */

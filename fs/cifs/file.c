@@ -222,6 +222,9 @@ static int cifs_reopen_file(struct inode *inode, struct file *file)
         __u16 netfid;
         FILE_ALL_INFO * buf = NULL;
 
+        if(inode == NULL)
+            return -EBADF;
+
         xid = GetXid();
 
         cifs_sb = CIFS_SB(inode->i_sb);
@@ -339,10 +342,10 @@ int reopen_files(struct cifsTconInfo * pTcon, struct nls_table * nlsinfo)
 				rc = cifs_reopen_file(file->f_dentry->d_inode,file);
 				write_lock(&GlobalSMBSeslock);
 				if(file->private_data == NULL) {
-                                        tmp = invalid_file_list.next;
-                                        tmp1 = tmp->next;
-                                        continue;
-                                }
+					tmp = invalid_file_list.next;
+					tmp1 = tmp->next;
+					continue;
+				}
 
 				list_move(&open_file->tlist,&pTcon->openFileList);
 				if(rc) {

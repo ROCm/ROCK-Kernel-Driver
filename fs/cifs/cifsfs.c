@@ -583,7 +583,7 @@ static int cifs_oplock_thread(void * dummyarg)
 	do {
 		set_current_state(TASK_INTERRUPTIBLE);
 		
-		schedule_timeout(39*HZ);
+		schedule_timeout(1);  
 		spin_lock(&GlobalMid_Lock);
 		if(list_empty(&GlobalOplock_Q)) {
 			spin_unlock(&GlobalMid_Lock);
