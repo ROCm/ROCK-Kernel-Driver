@@ -254,7 +254,7 @@ extern syscall_handler_t um_stime;
 #endif
 
 syscall_handler_t *sys_call_table[] = {
-	[ 0 ] = sys_ni_syscall,
+	[ __NR_restart_syscall ] = sys_restart_syscall,
 	[ __NR_exit ] = sys_exit,
 	[ __NR_fork ] = sys_fork,
 	[ __NR_read ] = (syscall_handler_t *) sys_read,

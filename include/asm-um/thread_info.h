@@ -20,13 +20,8 @@ struct thread_info {
 	mm_segment_t		addr_limit;	/* thread address space:
 					 	   0-0xBFFFFFFF for user
 						   0-0xFFFFFFFF for kernel */
+	struct restart_block    restart_block;
 };
-
-/*
- * macros/functions for gaining access to the thread information structure
- *
- * preempt_count needs to be 1 initially, until the scheduler is functional.
- */
 
 #define INIT_THREAD_INFO(tsk)			\
 {						\
@@ -36,6 +31,9 @@ struct thread_info {
 	cpu:		0,			\
 	preempt_count:	1,			\
 	addr_limit:	KERNEL_DS,		\
+	restart_block:  {			\
+		fn:  do_no_restart_syscall,	\
+	},					\
 }
 
 #define init_thread_info	(init_thread_union.thread_info)
