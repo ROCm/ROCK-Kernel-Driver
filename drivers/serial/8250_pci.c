@@ -283,7 +283,7 @@ static int __devinit pci_plx9050_init(struct pci_dev *dev)
 
 static void __devexit pci_plx9050_exit(struct pci_dev *dev)
 {
-	u8 *p;
+	u8 __iomem *p;
 
 	if ((pci_resource_flags(dev, 0) & IORESOURCE_MEM) == 0)
 		return;
@@ -336,7 +336,7 @@ sbs_setup(struct pci_dev *dev, struct pci_board *board,
 
 static int __devinit sbs_init(struct pci_dev *dev)
 {
-	u8 * p;
+	u8 __iomem *p;
 
 	p = ioremap(pci_resource_start(dev, 0),pci_resource_len(dev,0));
 
@@ -360,7 +360,7 @@ static int __devinit sbs_init(struct pci_dev *dev)
 
 static void __devexit sbs_exit(struct pci_dev *dev)
 {
-	u8 * p;
+	u8 __iomem *p;
 
 	p = ioremap(pci_resource_start(dev, 0),pci_resource_len(dev,0));
 	if (p != NULL) {

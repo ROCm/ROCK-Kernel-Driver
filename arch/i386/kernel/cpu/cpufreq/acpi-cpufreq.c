@@ -1,5 +1,5 @@
 /*
- * acpi-cpufreq-io.c - ACPI Processor P-States Driver ($Revision: 1.3 $)
+ * acpi-cpufreq.c - ACPI Processor P-States Driver ($Revision: 1.3 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -38,16 +38,10 @@
 #include <linux/acpi.h>
 #include <acpi/processor.h>
 
-#define ACPI_PROCESSOR_COMPONENT	0x01000000
-#define ACPI_PROCESSOR_CLASS		"processor"
-#define ACPI_PROCESSOR_DRIVER_NAME	"ACPI Processor P-States Driver"
-#define ACPI_PROCESSOR_DEVICE_NAME	"Processor"
-
-#define _COMPONENT		ACPI_PROCESSOR_COMPONENT
-ACPI_MODULE_NAME		("acpi_processor_perf")
+#define dprintk(msg...) cpufreq_debug_printk(CPUFREQ_DEBUG_DRIVER, "acpi-cpufreq", msg)
 
 MODULE_AUTHOR("Paul Diefenbaugh, Dominik Brodowski");
-MODULE_DESCRIPTION(ACPI_PROCESSOR_DRIVER_NAME);
+MODULE_DESCRIPTION("ACPI Processor P-States Driver");
 MODULE_LICENSE("GPL");
 
 
@@ -111,7 +105,7 @@ acpi_processor_set_performance (
 	cpumask_t		saved_mask;
 	int			retval;
 
-	ACPI_FUNCTION_TRACE("acpi_processor_set_performance");
+	dprintk("acpi_processor_set_performance\n");
 
 	/*
 	 * TBD: Use something other than set_cpus_allowed.
@@ -121,18 +115,17 @@ acpi_processor_set_performance (
 	saved_mask = current->cpus_allowed;
 	set_cpus_allowed(current, cpumask_of_cpu(cpu));
 	if (smp_processor_id() != cpu) {
-		return_VALUE(-EAGAIN);
+		return (-EAGAIN);
 	}
 	
 	if (state == data->acpi_data.state) {
-		ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
-			"Already at target state (P%d)\n", state));
+		dprintk("Already at target state (P%d)\n", state);
 		retval = 0;
 		goto migrate_end;
 	}
 
-	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Transitioning from P%d to P%d\n",
-		data->acpi_data.state, state));
+	dprintk("Transitioning from P%d to P%d\n",
+		data->acpi_data.state, state);
 
 	/* cpufreq frequency struct */
 	cpufreq_freqs.cpu = cpu;
@@ -151,13 +144,11 @@ acpi_processor_set_performance (
 	bit_width = data->acpi_data.control_register.bit_width;
 	value = (u32) data->acpi_data.states[state].control;
 
-	ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
-		"Writing 0x%08x to port 0x%04x\n", value, port));
+	dprintk("Writing 0x%08x to port 0x%04x\n", value, port);
 
 	ret = acpi_processor_write_port(port, bit_width, value);
 	if (ret) {
-		ACPI_DEBUG_PRINT((ACPI_DB_WARN,
-			"Invalid port width 0x%04x\n", bit_width));
+		dprintk("Invalid port width 0x%04x\n", bit_width);
 		retval = ret;
 		goto migrate_end;
 	}
@@ -172,15 +163,13 @@ acpi_processor_set_performance (
 	port = data->acpi_data.status_register.address;
 	bit_width = data->acpi_data.status_register.bit_width;
 
-	ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
-		"Looking for 0x%08x from port 0x%04x\n",
-		(u32) data->acpi_data.states[state].status, port));
+	dprintk("Looking for 0x%08x from port 0x%04x\n",
+		(u32) data->acpi_data.states[state].status, port);
 
 	for (i=0; i<100; i++) {
 		ret = acpi_processor_read_port(port, bit_width, &value);
 		if (ret) {	
-			ACPI_DEBUG_PRINT((ACPI_DB_WARN,
-				"Invalid port width 0x%04x\n", bit_width));
+			dprintk("Invalid port width 0x%04x\n", bit_width);
 			retval = ret;
 			goto migrate_end;
 		}
@@ -198,21 +187,19 @@ acpi_processor_set_performance (
 		cpufreq_freqs.old = tmp;
 		cpufreq_notify_transition(&cpufreq_freqs, CPUFREQ_PRECHANGE);
 		cpufreq_notify_transition(&cpufreq_freqs, CPUFREQ_POSTCHANGE);
-		ACPI_DEBUG_PRINT((ACPI_DB_WARN, "Transition failed\n"));
+		printk(KERN_WARNING "acpi-cpufreq: Transition failed\n");
 		retval = -ENODEV;
 		goto migrate_end;
 	}
 
-	ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
-		"Transition successful after %d microseconds\n",
-		i * 10));
+	dprintk("Transition successful after %d microseconds\n", i * 10);
 
 	data->acpi_data.state = state;
 
 	retval = 0;
 migrate_end:
 	set_cpus_allowed(current, saved_mask);
-	return_VALUE(retval);
+	return (retval);
 }
 
 
@@ -226,7 +213,7 @@ acpi_cpufreq_target (
 	unsigned int next_state = 0;
 	unsigned int result = 0;
 
-	ACPI_FUNCTION_TRACE("acpi_cpufreq_setpolicy");
+	dprintk("acpi_cpufreq_setpolicy\n");
 
 	result = cpufreq_frequency_table_target(policy,
 			data->freq_table,
@@ -234,11 +221,11 @@ acpi_cpufreq_target (
 			relation,
 			&next_state);
 	if (result)
-		return_VALUE(result);
+		return (result);
 
 	result = acpi_processor_set_performance (data, policy->cpu, next_state);
 
-	return_VALUE(result);
+	return (result);
 }
 
 
@@ -249,12 +236,12 @@ acpi_cpufreq_verify (
 	unsigned int result = 0;
 	struct cpufreq_acpi_io *data = acpi_io_data[policy->cpu];
 
-	ACPI_FUNCTION_TRACE("acpi_cpufreq_verify");
+	dprintk("acpi_cpufreq_verify\n");
 
 	result = cpufreq_frequency_table_verify(policy, 
 			data->freq_table);
 
-	return_VALUE(result);
+	return (result);
 }
 
 
@@ -308,17 +295,17 @@ acpi_processor_cpu_init_pdc_est(
 	union acpi_object *obj;
 	u32 *buf;
 	struct cpuinfo_x86 *c = cpu_data + cpu;
-	ACPI_FUNCTION_TRACE("acpi_processor_cpu_init_pdc_est");
+	dprintk("acpi_processor_cpu_init_pdc_est\n");
 
 	if (!cpu_has(c, X86_FEATURE_EST))
-		return_VOID;
+		return;
 
 	/* Initialize pdc. It will be used later. */
 	if (!obj_list)
-		return_VOID;
+		return;
 		
 	if (!(obj_list->count && obj_list->pointer))
-		return_VOID;
+		return;
 
 	obj = obj_list->pointer;
 	if ((obj->buffer.length == 12) && obj->buffer.pointer) {
@@ -328,7 +315,7 @@ acpi_processor_cpu_init_pdc_est(
        		buf[2] = ACPI_PDC_EST_CAPABILITY_SMP;
 		perf->pdc = obj_list;
 	}
-	return_VOID;
+	return;
 }
  
 
@@ -341,11 +328,11 @@ acpi_processor_cpu_init_pdc(
 		)
 {
 	struct cpuinfo_x86 *c = cpu_data + cpu;
-	ACPI_FUNCTION_TRACE("acpi_processor_cpu_init_pdc");
+	dprintk("acpi_processor_cpu_init_pdc\n");
 	perf->pdc = NULL;
 	if (cpu_has(c, X86_FEATURE_EST))
 		acpi_processor_cpu_init_pdc_est(perf, cpu, obj_list);
-	return_VOID;
+	return;
 }
 
 
@@ -362,14 +349,14 @@ acpi_cpufreq_cpu_init (
 	u32				arg0_buf[3];
 	struct acpi_object_list 	arg_list = {1, &arg0};
 
-	ACPI_FUNCTION_TRACE("acpi_cpufreq_cpu_init");
+	dprintk("acpi_cpufreq_cpu_init\n");
 	/* setup arg_list for _PDC settings */
         arg0.buffer.length = 12;
         arg0.buffer.pointer = (u8 *) arg0_buf;
 
 	data = kmalloc(sizeof(struct cpufreq_acpi_io), GFP_KERNEL);
 	if (!data)
-		return_VALUE(-ENOMEM);
+		return (-ENOMEM);
 	memset(data, 0, sizeof(struct cpufreq_acpi_io));
 
 	acpi_io_data[cpu] = data;
@@ -383,15 +370,15 @@ acpi_cpufreq_cpu_init (
 
 	/* capability check */
 	if (data->acpi_data.state_count <= 1) {
-		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "No P-States\n"));
+		dprintk("No P-States\n");
 		result = -ENODEV;
 		goto err_unreg;
 	}
 	if ((data->acpi_data.control_register.space_id != ACPI_ADR_SPACE_SYSTEM_IO) ||
 	    (data->acpi_data.status_register.space_id != ACPI_ADR_SPACE_SYSTEM_IO)) {
-		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Unsupported address space [%d, %d]\n",
-				  (u32) (data->acpi_data.control_register.space_id),
-				  (u32) (data->acpi_data.status_register.space_id)));
+		dprintk("Unsupported address space [%d, %d]\n",
+			(u32) (data->acpi_data.control_register.space_id),
+			(u32) (data->acpi_data.status_register.space_id));
 		result = -ENODEV;
 		goto err_unreg;
 	}
@@ -432,17 +419,17 @@ acpi_cpufreq_cpu_init (
 	/* notify BIOS that we exist */
 	acpi_processor_notify_smm(THIS_MODULE);
 
-	printk(KERN_INFO "cpufreq: CPU%u - ACPI performance management activated.\n",
+	printk(KERN_INFO "acpi-cpufreq: CPU%u - ACPI performance management activated.\n",
 	       cpu);
 	for (i = 0; i < data->acpi_data.state_count; i++)
-		printk(KERN_INFO "cpufreq: %cP%d: %d MHz, %d mW, %d uS\n",
+		dprintk("     %cP%d: %d MHz, %d mW, %d uS\n",
 			(i == data->acpi_data.state?'*':' '), i,
 			(u32) data->acpi_data.states[i].core_frequency,
 			(u32) data->acpi_data.states[i].power,
 			(u32) data->acpi_data.states[i].transition_latency);
 
 	cpufreq_frequency_table_get_attr(data->freq_table, policy->cpu);
-	return_VALUE(result);
+	return (result);
 
  err_freqfree:
 	kfree(data->freq_table);
@@ -452,7 +439,7 @@ acpi_cpufreq_cpu_init (
 	kfree(data);
 	acpi_io_data[cpu] = NULL;
 
-	return_VALUE(result);
+	return (result);
 }
 
 
@@ -463,7 +450,7 @@ acpi_cpufreq_cpu_exit (
 	struct cpufreq_acpi_io *data = acpi_io_data[policy->cpu];
 
 
-	ACPI_FUNCTION_TRACE("acpi_cpufreq_cpu_exit");
+	dprintk("acpi_cpufreq_cpu_exit\n");
 
 	if (data) {
 		cpufreq_frequency_table_put_attr(policy->cpu);
@@ -472,7 +459,7 @@ acpi_cpufreq_cpu_exit (
 		kfree(data);
 	}
 
-	return_VALUE(0);
+	return (0);
 }
 
 
@@ -497,24 +484,26 @@ acpi_cpufreq_init (void)
 {
 	int                     result = 0;
 
-	ACPI_FUNCTION_TRACE("acpi_cpufreq_init");
+	dprintk("acpi_cpufreq_init\n");
 
  	result = cpufreq_register_driver(&acpi_cpufreq_driver);
 	
-	return_VALUE(result);
+	return (result);
 }
 
 
 static void __exit
 acpi_cpufreq_exit (void)
 {
-	ACPI_FUNCTION_TRACE("acpi_cpufreq_exit");
+	dprintk("acpi_cpufreq_exit\n");
 
 	cpufreq_unregister_driver(&acpi_cpufreq_driver);
 
-	return_VOID;
+	return;
 }
 
 
 late_initcall(acpi_cpufreq_init);
 module_exit(acpi_cpufreq_exit);
+
+MODULE_ALIAS("acpi");

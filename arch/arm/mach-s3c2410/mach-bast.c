@@ -19,6 +19,7 @@
  *     06-Jan-2003 BJD  Updates for <arch/map.h>
  *     18-Jan-2003 BJD  Added serial port configuration
  *     05-Oct-2004 BJD  Power management code
+ *     04-Nov-2004 BJD  Updated serial port clocks
 */
 
 #include <linux/kernel.h>
@@ -47,6 +48,7 @@
 #include <asm/arch/regs-mem.h>
 
 #include "s3c2410.h"
+#include "clock.h"
 #include "devs.h"
 #include "cpu.h"
 #include "usb-simtec.h"
@@ -153,35 +155,50 @@ static struct map_desc bast_iodesc[] __initdata = {
 #define ULCON S3C2410_LCON_CS8 | S3C2410_LCON_PNONE | S3C2410_LCON_STOPB
 #define UFCON S3C2410_UFCON_RXTRIG8 | S3C2410_UFCON_FIFOMODE
 
-/* base baud rate for all our UARTs */
-static unsigned long bast_serial_clock = 24*1000*1000;
+static struct s3c24xx_uart_clksrc bast_serial_clocks[] = {
+	[0] = {
+		.name		= "uclk",
+		.divisor	= 1,
+		.min_baud	= 0,
+		.max_baud	= 0,
+	},
+	[1] = {
+		.name		= "pclk",
+		.divisor	= 1,
+		.min_baud	= 0,
+		.max_baud	= 0.
+	}
+};
+
 
 static struct s3c2410_uartcfg bast_uartcfgs[] = {
 	[0] = {
 		.hwport	     = 0,
 		.flags	     = 0,
-		.clock	     = &bast_serial_clock,
 		.ucon	     = UCON,
 		.ulcon	     = ULCON,
 		.ufcon	     = UFCON,
+		.clocks	     = bast_serial_clocks,
+		.clocks_size = ARRAY_SIZE(bast_serial_clocks)
 	},
 	[1] = {
 		.hwport	     = 1,
 		.flags	     = 0,
-
-		.clock	     = &bast_serial_clock,
 		.ucon	     = UCON,
 		.ulcon	     = ULCON,
 		.ufcon	     = UFCON,
+		.clocks	     = bast_serial_clocks,
+		.clocks_size = ARRAY_SIZE(bast_serial_clocks)
 	},
 	/* port 2 is not actually used */
 	[2] = {
 		.hwport	     = 2,
 		.flags	     = 0,
-		.clock	     = &bast_serial_clock,
 		.ucon	     = UCON,
 		.ulcon	     = ULCON,
 		.ufcon	     = UFCON,
+		.clocks	     = bast_serial_clocks,
+		.clocks_size = ARRAY_SIZE(bast_serial_clocks)
 	}
 };
 
@@ -214,13 +231,36 @@ static struct platform_device *bast_devices[] __initdata = {
 	&bast_device_nor
 };
 
+static struct clk *bast_clocks[] = {
+	&s3c24xx_dclk0,
+	&s3c24xx_dclk1,
+	&s3c24xx_clkout0,
+	&s3c24xx_clkout1,
+	&s3c24xx_uclk,
+};
+
 static struct s3c24xx_board bast_board __initdata = {
 	.devices       = bast_devices,
-	.devices_count = ARRAY_SIZE(bast_devices)
+	.devices_count = ARRAY_SIZE(bast_devices),
+	.clocks	       = bast_clocks,
+	.clocks_count  = ARRAY_SIZE(bast_clocks)
 };
 
 void __init bast_map_io(void)
 {
+	/* initialise the clocks */
+
+	s3c24xx_dclk0.parent = NULL;
+	s3c24xx_dclk0.rate   = 12*1000*1000;
+
+	s3c24xx_dclk1.parent = NULL;
+	s3c24xx_dclk1.rate   = 24*1000*1000;
+
+	s3c24xx_clkout0.parent  = &s3c24xx_dclk0;
+	s3c24xx_clkout1.parent  = &s3c24xx_dclk1;
+
+	s3c24xx_uclk.parent  = &s3c24xx_clkout1;
+
 	s3c24xx_init_io(bast_iodesc, ARRAY_SIZE(bast_iodesc));
 	s3c2410_init_uarts(bast_uartcfgs, ARRAY_SIZE(bast_uartcfgs));
 	s3c24xx_set_board(&bast_board);

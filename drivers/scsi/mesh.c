@@ -66,15 +66,15 @@ static int resel_targets = 0xff;
 static int debug_targets = 0;	/* print debug for these targets */
 static int init_reset_delay = CONFIG_SCSI_MESH_RESET_DELAY_MS;
 
-MODULE_PARM(sync_rate, int, 0);
+module_param(sync_rate, int, 0);
 MODULE_PARM_DESC(sync_rate, "Synchronous rate (0..10, 0=async)");
-MODULE_PARM(sync_targets, int, 0);
+module_param(sync_targets, int, 0);
 MODULE_PARM_DESC(sync_targets, "Bitmask of targets allowed to set synchronous");
-MODULE_PARM(resel_targets, int, 0);
+module_param(resel_targets, int, 0);
 MODULE_PARM_DESC(resel_targets, "Bitmask of targets allowed to set disconnect");
-MODULE_PARM(debug_targets, int, 0644);
+module_param(debug_targets, int, 0644);
 MODULE_PARM_DESC(debug_targets, "Bitmask of debugged targets");
-MODULE_PARM(init_reset_delay, int, 0);
+module_param(init_reset_delay, int, 0);
 MODULE_PARM_DESC(init_reset_delay, "Initial bus reset delay (0=no reset)");
 
 static int mesh_sync_period = 100;

@@ -309,14 +309,15 @@ static int crd_infd, crd_outfd;
 #define Tracecv(c,x)
 
 #define STATIC static
+#define INIT __init
 
-static int  fill_inbuf(void);
-static void flush_window(void);
-static void *malloc(size_t size);
-static void free(void *where);
-static void error(char *m);
-static void gzip_mark(void **);
-static void gzip_release(void **);
+static int  __init fill_inbuf(void);
+static void __init flush_window(void);
+static void __init *malloc(size_t size);
+static void __init free(void *where);
+static void __init error(char *m);
+static void __init gzip_mark(void **);
+static void __init gzip_release(void **);
 
 #include "../lib/inflate.c"
 

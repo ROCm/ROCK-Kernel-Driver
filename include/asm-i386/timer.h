@@ -1,5 +1,6 @@
 #ifndef _ASMi386_TIMER_H
 #define _ASMi386_TIMER_H
+#include <linux/init.h>
 
 /**
  * struct timer_ops - used to define a timer source
@@ -15,18 +16,22 @@
  *                   timer.
  * @delay: delays this many clock cycles.
  */
-struct timer_opts{
+struct timer_opts {
 	char* name;
-	int (*init)(char *override);
 	void (*mark_offset)(void);
 	unsigned long (*get_offset)(void);
 	unsigned long long (*monotonic_clock)(void);
 	void (*delay)(unsigned long);
 };
 
+struct init_timer_opts {
+	int (*init)(char *override);
+	struct timer_opts *opts;
+};
+
 #define TICK_SIZE (tick_nsec / 1000)
 
-extern struct timer_opts* select_timer(void);
+extern struct timer_opts* __init select_timer(void);
 extern void clock_fallback(void);
 void setup_pit_timer(void);
 
@@ -40,19 +45,20 @@ extern int timer_ack;
 /* list of externed timers */
 extern struct timer_opts timer_none;
 extern struct timer_opts timer_pit;
-extern struct timer_opts timer_tsc;
+extern struct init_timer_opts timer_pit_init;
+extern struct init_timer_opts timer_tsc_init;
 #ifdef CONFIG_X86_CYCLONE_TIMER
-extern struct timer_opts timer_cyclone;
+extern struct init_timer_opts timer_cyclone_init;
 #endif
 
 extern unsigned long calibrate_tsc(void);
 extern void init_cpu_khz(void);
 #ifdef CONFIG_HPET_TIMER
-extern struct timer_opts timer_hpet;
+extern struct init_timer_opts timer_hpet_init;
 extern unsigned long calibrate_tsc_hpet(unsigned long *tsc_hpet_quotient_ptr);
 #endif
 
 #ifdef CONFIG_X86_PM_TIMER
-extern struct timer_opts timer_pmtmr;
+extern struct init_timer_opts timer_pmtmr_init;
 #endif
 #endif

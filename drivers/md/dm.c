@@ -138,23 +138,20 @@ static void local_exit(void)
 	DMINFO("cleaned up");
 }
 
-/*
- * We have a lot of init/exit functions, so it seems easier to
- * store them in an array.  The disposable macro 'xx'
- * expands a prefix into a pair of function names.
- */
-static struct {
-	int (*init) (void);
-	void (*exit) (void);
+int (*_inits[])(void) __initdata = {
+	local_init,
+	dm_target_init,
+	dm_linear_init,
+	dm_stripe_init,
+	dm_interface_init,
+};
 
-} _inits[] = {
-#define xx(n) {n ## _init, n ## _exit},
-	xx(local)
-	xx(dm_target)
-	xx(dm_linear)
-	xx(dm_stripe)
-	xx(dm_interface)
-#undef xx
+void (*_exits[])(void) __exitdata = {
+	local_exit,
+	dm_target_exit,
+	dm_linear_exit,
+	dm_stripe_exit,
+	dm_interface_exit,
 };
 
 static int __init dm_init(void)
@@ -164,7 +161,7 @@ static int __init dm_init(void)
 	int r, i;
 
 	for (i = 0; i < count; i++) {
-		r = _inits[i].init();
+		r = _inits[i]();
 		if (r)
 			goto bad;
 	}
@@ -173,17 +170,17 @@ static int __init dm_init(void)
 
       bad:
 	while (i--)
-		_inits[i].exit();
+		_exits[i]();
 
 	return r;
 }
 
 static void __exit dm_exit(void)
 {
-	int i = ARRAY_SIZE(_inits);
+	int i = ARRAY_SIZE(_exits);
 
 	while (i--)
-		_inits[i].exit();
+		_exits[i]();
 }
 
 /*

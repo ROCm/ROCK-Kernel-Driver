@@ -14,6 +14,7 @@ struct clk {
 	struct module        *owner;
 	struct clk           *parent;
 	const char           *name;
+	int		      id;
 	atomic_t              used;
 	unsigned long         rate;
 	unsigned long         ctrlbit;

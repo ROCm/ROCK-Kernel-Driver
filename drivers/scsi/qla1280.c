@@ -549,7 +549,7 @@ static void qla1280_get_target_parameters(struct scsi_qla_host *,
 static int qla1280_set_target_parameters(struct scsi_qla_host *, int, int);
 
 
-static struct qla_driver_setup driver_setup __initdata;
+static struct qla_driver_setup driver_setup;
 
 /*
  * convert scsi data direction to request_t control flags

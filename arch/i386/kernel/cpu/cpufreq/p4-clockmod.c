@@ -36,6 +36,7 @@
 #include "speedstep-lib.h"
 
 #define PFX	"p4-clockmod: "
+#define dprintk(msg...) cpufreq_debug_printk(CPUFREQ_DEBUG_DRIVER, "p4-clockmod", msg)
 
 /*
  * Duty Cycle (3bits), note DC_DISABLE is not specified in
@@ -62,20 +63,20 @@ static int cpufreq_p4_setdc(unsigned int cpu, unsigned int newstate)
 		return -EINVAL;
 
 	rdmsr(MSR_IA32_THERM_STATUS, l, h);
-#if 0
+
 	if (l & 0x01)
-		printk(KERN_DEBUG PFX "CPU#%d currently thermal throttled\n", cpu);
-#endif
+		dprintk("CPU#%d currently thermal throttled\n", cpu);
+
 	if (has_N44_O17_errata[cpu] && (newstate == DC_25PT || newstate == DC_DFLT))
 		newstate = DC_38PT;
 
 	rdmsr(MSR_IA32_THERM_CONTROL, l, h);
 	if (newstate == DC_DISABLE) {
-		/* printk(KERN_INFO PFX "CPU#%d disabling modulation\n", cpu); */
+		dprintk("CPU#%d disabling modulation\n", cpu);
 		wrmsr(MSR_IA32_THERM_CONTROL, l & ~(1<<4), h);
 	} else {
-		/* printk(KERN_INFO PFX "CPU#%d setting duty cycle to %d%%\n",
-			cpu, ((125 * newstate) / 10)); */
+		dprintk("CPU#%d setting duty cycle to %d%%\n",
+			cpu, ((125 * newstate) / 10));
 		/* bits 63 - 5	: reserved 
 		 * bit  4	: enable/disable
 		 * bits 3-1	: duty cycle
@@ -223,6 +224,7 @@ static int cpufreq_p4_cpu_init(struct cpufreq_policy *policy)
 	case 0x0f11:
 	case 0x0f12:
 		has_N44_O17_errata[policy->cpu] = 1;
+		dprintk("has errata -- disabling low frequencies\n");
 	}
 	
 	/* get max frequency */
@@ -300,6 +302,7 @@ static struct cpufreq_driver p4clockmod_driver = {
 static int __init cpufreq_p4_init(void)
 {	
 	struct cpuinfo_x86 *c = cpu_data;
+	int ret;
 
 	/*
 	 * THERM_CONTROL is architectural for IA32 now, so 
@@ -312,9 +315,11 @@ static int __init cpufreq_p4_init(void)
 		!test_bit(X86_FEATURE_ACC, c->x86_capability))
 		return -ENODEV;
 
-	printk(KERN_INFO PFX "P4/Xeon(TM) CPU On-Demand Clock Modulation available\n");
+	ret = cpufreq_register_driver(&p4clockmod_driver);
+	if (!ret)
+		printk(KERN_INFO PFX "P4/Xeon(TM) CPU On-Demand Clock Modulation available\n");
 
-	return cpufreq_register_driver(&p4clockmod_driver);
+	return (ret);
 }
 
 

@@ -12,6 +12,12 @@
 
 #ifdef __KERNEL__
 
+/*
+ * Size of kernel stack for each process. This must be a power of 2...
+ */
+#define THREAD_SIZE		8192	/* 2 pages */
+
+
 #ifndef __ASSEMBLY__
 
 /*
@@ -43,12 +49,6 @@ struct thread_info {
 
 #define init_thread_info	(init_thread_union.thread_info)
 #define init_stack		(init_thread_union.stack)
-
-
-/*
- * Size of kernel stack for each process. This must be a power of 2...
- */
-#define THREAD_SIZE		8192	/* 2 pages */
 
 
 /* how to get the thread information struct from C */

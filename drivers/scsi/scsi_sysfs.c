@@ -775,7 +775,7 @@ int scsi_sysfs_target_initialize(struct scsi_device *sdev)
 		memset(starget, 0, size);
 		dev = &starget->dev;
 		device_initialize(dev);
-		dev->parent = &shost->shost_gendev;
+		dev->parent = get_device(&shost->shost_gendev);
 		dev->release = scsi_target_dev_release;
 		sprintf(dev->bus_id, "target%d:%d:%d",
 			shost->host_no, sdev->channel, sdev->id);

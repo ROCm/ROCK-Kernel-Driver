@@ -37,12 +37,11 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-#define SYM_GLUE_C
-
 #include <linux/ctype.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/spinlock.h>
 #include <scsi/scsi.h>
 #include <scsi/scsi_tcq.h>
@@ -55,6 +54,77 @@
 
 #define NAME53C		"sym53c"
 #define NAME53C8XX	"sym53c8xx"
+
+struct sym_driver_setup sym_driver_setup = SYM_LINUX_DRIVER_SETUP;
+unsigned int sym_debug_flags = 0;
+
+static char *excl_string;
+static char *safe_string;
+module_param_named(cmd_per_lun, sym_driver_setup.max_tag, ushort, 0);
+module_param_string(tag_ctrl, sym_driver_setup.tag_ctrl, 100, 0);
+module_param_named(burst, sym_driver_setup.burst_order, byte, 0);
+module_param_named(led, sym_driver_setup.scsi_led, byte, 0);
+module_param_named(diff, sym_driver_setup.scsi_diff, byte, 0);
+module_param_named(irqm, sym_driver_setup.irq_mode, byte, 0);
+module_param_named(buschk, sym_driver_setup.scsi_bus_check, byte, 0);
+module_param_named(hostid, sym_driver_setup.host_id, byte, 0);
+module_param_named(verb, sym_driver_setup.verbose, byte, 0);
+module_param_named(debug, sym_debug_flags, uint, 0);
+module_param_named(settle, sym_driver_setup.settle_delay, byte, 0);
+module_param_named(nvram, sym_driver_setup.use_nvram, byte, 0);
+module_param_named(excl, excl_string, charp, 0);
+module_param_named(safe, safe_string, charp, 0);
+
+MODULE_PARM_DESC(cmd_per_lun, "The maximum number of tags to use by default");
+MODULE_PARM_DESC(tag_ctrl, "More detailed control over tags per LUN");
+MODULE_PARM_DESC(burst, "Maximum burst.  0 to disable, 255 to read from registers");
+MODULE_PARM_DESC(led, "Set to 1 to enable LED support");
+MODULE_PARM_DESC(diff, "0 for no differential mode, 1 for BIOS, 2 for always, 3 for not GPIO3");
+MODULE_PARM_DESC(irqm, "0 for open drain, 1 to leave alone, 2 for totem pole");
+MODULE_PARM_DESC(buschk, "0 to not check, 1 for detach on error, 2 for warn on error");
+MODULE_PARM_DESC(hostid, "The SCSI ID to use for the host adapters");
+MODULE_PARM_DESC(verb, "0 for minimal verbosity, 1 for normal, 2 for excessive");
+MODULE_PARM_DESC(debug, "Set bits to enable debugging");
+MODULE_PARM_DESC(settle, "Settle delay in seconds.  Default 3");
+MODULE_PARM_DESC(nvram, "Option currently not used");
+MODULE_PARM_DESC(excl, "List ioport addresses here to prevent controllers from being attached");
+MODULE_PARM_DESC(safe, "Set other settings to a \"safe mode\"");
+
+MODULE_LICENSE("GPL");
+MODULE_VERSION(SYM_VERSION);
+MODULE_AUTHOR("Matthew Wilcox <matthew@wil.cx>");
+MODULE_DESCRIPTION("NCR, Symbios and LSI 8xx and 1010 PCI SCSI adapters");
+
+static void sym2_setup_params(void)
+{
+	char *p = excl_string;
+	int xi = 0;
+
+	while (p && (xi < 8)) {
+		char *next_p;
+		int val = (int) simple_strtoul(p, &next_p, 0);
+		sym_driver_setup.excludes[xi++] = val;
+		p = next_p;
+	}
+
+	if (safe_string) {
+		if (*safe_string == 'y') {
+			sym_driver_setup.max_tag = 0;
+			sym_driver_setup.burst_order = 0;
+			sym_driver_setup.scsi_led = 0;
+			sym_driver_setup.scsi_diff = 1;
+			sym_driver_setup.irq_mode = 0;
+			sym_driver_setup.scsi_bus_check = 2;
+			sym_driver_setup.host_id = 7;
+			sym_driver_setup.verbose = 2;
+			sym_driver_setup.settle_delay = 10;
+			sym_driver_setup.use_nvram = 1;
+		} else if (*safe_string != 'n') {
+			printk(KERN_WARNING NAME53C8XX "Ignoring parameter %s"
+					" passed to safe option", safe_string);
+		}
+	}
+}
 
 static int __devinit
 pci_get_base_address(struct pci_dev *pdev, int index, u_long *base)
@@ -135,7 +205,7 @@ m_addr_t __vtobus(m_pool_ident_t dev_dmat, void *m)
  *  It is allocated on the eh thread stack.
  */
 struct sym_eh_wait {
-	struct semaphore sem;
+	struct completion done;
 	struct timer_list timer;
 	void (*old_done)(struct scsi_cmnd *);
 	int to_do;
@@ -146,7 +216,6 @@ struct sym_eh_wait {
  *  Driver private area in the SCSI command structure.
  */
 struct sym_ucmd {		/* Override the SCSI pointer structure */
-	SYM_QUEHEAD link_cmdq;	/* Must stay at offset ZERO */
 	dma_addr_t data_mapping;
 	u_char	data_mapped;
 	struct sym_eh_wait *eh_wait;
@@ -212,7 +281,6 @@ static int __map_scsi_sg_data(struct pci_dev *pdev, struct scsi_cmnd *cmd)
  */
 void sym_xpt_done(struct sym_hcb *np, struct scsi_cmnd *ccb)
 {
-	sym_remque(&SYM_UCMD_PTR(ccb)->link_cmdq);
 	unmap_scsi_data(np, ccb);
 	ccb->scsi_done(ccb);
 }
@@ -648,31 +716,6 @@ void sym_log_bus_error(struct sym_hcb *np)
 	}
 }
 
-
-/*
- *  Requeue awaiting commands.
- */
-static void sym_requeue_awaiting_cmds(struct sym_hcb *np)
-{
-	struct sym_ucmd *ucp;
-	SYM_QUEHEAD tmp_cmdq;
-	int sts;
-
-	sym_que_move(&np->s.wait_cmdq, &tmp_cmdq);
-
-	while ((ucp = (struct sym_ucmd *) sym_remque_head(&tmp_cmdq)) != 0) {
-		struct scsi_cmnd *cmd;
-
-		sym_insque_tail(&ucp->link_cmdq, &np->s.busy_cmdq);
-		cmd = SYM_SCMD_PTR(ucp);
-		sts = sym_queue_command(np, cmd);
-		if (sts) {
-			sym_remque(&ucp->link_cmdq);
-			sym_insque_head(&ucp->link_cmdq, &np->s.wait_cmdq);
-		}
-	}
-}
-
 /*
  * queuecommand method.  Entered with the host adapter lock held and
  * interrupts disabled.
@@ -700,18 +743,12 @@ static int sym53c8xx_queue_command(struct scsi_cmnd *cmd,
 		}
 	}
 
-	if (np->s.settle_time_valid || !sym_que_empty(&np->s.wait_cmdq)) {
-		sym_insque_tail(&ucp->link_cmdq, &np->s.wait_cmdq);
-		goto out;
-	}
+	if (np->s.settle_time_valid)
+		return SCSI_MLQUEUE_HOST_BUSY;
 
-	sym_insque_tail(&ucp->link_cmdq, &np->s.busy_cmdq);
 	sts = sym_queue_command(np, cmd);
-	if (sts) {
-		sym_remque(&ucp->link_cmdq);
-		sym_insque_tail(&ucp->link_cmdq, &np->s.wait_cmdq);
-	}
-out:
+	if (sts)
+		return SCSI_MLQUEUE_HOST_BUSY;
 	return 0;
 }
 
@@ -726,15 +763,7 @@ static irqreturn_t sym53c8xx_intr(int irq, void *dev_id, struct pt_regs * regs)
 	if (DEBUG_FLAGS & DEBUG_TINY) printf_debug ("[");
 
 	spin_lock_irqsave(np->s.host->host_lock, flags);
-
 	sym_interrupt(np);
-
-	/*
-	 * push queue walk-through to tasklet
-	 */
-	if (!sym_que_empty(&np->s.wait_cmdq) && !np->s.settle_time_valid)
-		sym_requeue_awaiting_cmds(np);
-
 	spin_unlock_irqrestore(np->s.host->host_lock, flags);
 
 	if (DEBUG_FLAGS & DEBUG_TINY) printf_debug ("]\n");
@@ -751,12 +780,7 @@ static void sym53c8xx_timer(unsigned long npref)
 	unsigned long flags;
 
 	spin_lock_irqsave(np->s.host->host_lock, flags);
-
 	sym_timer(np);
-
-	if (!sym_que_empty(&np->s.wait_cmdq) && !np->s.settle_time_valid)
-		sym_requeue_awaiting_cmds(np);
-
 	spin_unlock_irqrestore(np->s.host->host_lock, flags);
 }
 
@@ -798,7 +822,7 @@ static void __sym_eh_done(struct scsi_cmnd *cmd, int timed_out)
 
 	/* Wake up the eh thread if it wants to sleep */
 	if (ep->to_do == SYM_EH_DO_WAIT)
-		up(&ep->sem);
+		complete(&ep->done);
 }
 
 /*
@@ -834,14 +858,6 @@ static int sym_eh_handler(int op, char *opname, struct scsi_cmnd *cmd)
 		goto prepare;
 #endif
 
-	/* This one is not queued to the core driver -> to complete here */ 
-	FOR_EACH_QUEUED_ELEMENT(&np->s.wait_cmdq, qp) {
-		if (SYM_SCMD_PTR(qp) == cmd) {
-			to_do = SYM_EH_DO_COMPLETE;
-			goto prepare;
-		}
-	}
-
 	/* This one is queued in some place -> to wait for completion */
 	FOR_EACH_QUEUED_ELEMENT(&np->busy_ccbq, qp) {
 		struct sym_ccb *cp = sym_que_entry(qp, struct sym_ccb, link_ccbq);
@@ -858,7 +874,7 @@ prepare:
 	case SYM_EH_DO_IGNORE:
 		break;
 	case SYM_EH_DO_WAIT:
-		init_MUTEX_LOCKED(&ep->sem);
+		init_completion(&ep->done);
 		/* fall through */
 	case SYM_EH_DO_COMPLETE:
 		ep->old_done = cmd->scsi_done;
@@ -909,7 +925,7 @@ prepare:
 		ep->timed_out = 1;	/* Be pessimistic for once :) */
 		add_timer(&ep->timer);
 		spin_unlock_irq(np->s.host->host_lock);
-		down(&ep->sem);
+		wait_for_completion(&ep->done);
 		spin_lock_irq(np->s.host->host_lock);
 		if (ep->timed_out)
 			sts = -2;
@@ -973,7 +989,6 @@ static void sym_tune_dev_queuing(struct sym_hcb *np, int target, int lun, u_shor
 	}
 }
 
-#ifdef	SYM_LINUX_BOOT_COMMAND_LINE_SUPPORT
 /*
  *  Linux select queue depths function
  */
@@ -1026,9 +1041,6 @@ static int device_queue_depth(struct sym_hcb *np, int target, int lun)
 	}
 	return DEF_DEPTH;
 }
-#else
-#define device_queue_depth(np, t, l)	(sym_driver_setup.max_tag)
-#endif	/* SYM_LINUX_BOOT_COMMAND_LINE_SUPPORT */
 
 /*
  * Linux entry point for device queue sizing.
@@ -1164,7 +1176,7 @@ static void sym_exec_user_command (struct sym_hcb *np, struct sym_usrcmd *uc)
 				if (uc->data <= 9 && np->minsync_dt) {
 					if (uc->data < np->minsync_dt)
 						uc->data = np->minsync_dt;
-					tp->tinfo.goal.options = PPR_OPT_DT;
+					tp->tinfo.goal.options = PPR_OPT_MASK;
 					tp->tinfo.goal.width   = 1;
 					tp->tinfo.goal.period = uc->data;
 					tp->tinfo.goal.offset = np->maxoffs_dt;
@@ -1732,12 +1744,6 @@ static struct Scsi_Host * __devinit sym_attach(struct scsi_host_template *tpnt,
 		goto reset_failed;
 
 	/*
-	 *  Initialize some queue headers.
-	 */
-	sym_que_init(&np->s.wait_cmdq);
-	sym_que_init(&np->s.busy_cmdq);
-
-	/*
 	 *  Start the SCRIPTS.
 	 */
 	sym_start_up (np, 1);
@@ -1828,145 +1834,6 @@ static inline void sym_get_nvram(struct sym_device *devp, struct sym_nvram *nvp)
 }
 #endif	/* SYM_CONF_NVRAM_SUPPORT */
 
-/*
- *  Driver setup from the boot command line
- */
-#ifdef	SYM_LINUX_BOOT_COMMAND_LINE_SUPPORT
-
-static struct sym_driver_setup
-	sym_driver_safe_setup __initdata = SYM_LINUX_DRIVER_SAFE_SETUP;
-#ifdef	MODULE
-char *sym53c8xx;	/* command line passed by insmod */
-MODULE_PARM(sym53c8xx, "s");
-#endif
-
-#define OPT_MAX_TAG		1
-#define OPT_BURST_ORDER		2
-#define OPT_SCSI_LED		3
-#define OPT_SCSI_DIFF		4
-#define OPT_IRQ_MODE		5
-#define OPT_SCSI_BUS_CHECK	6
-#define	OPT_HOST_ID		7
-#define OPT_REVERSE_PROBE	8
-#define OPT_VERBOSE		9
-#define OPT_DEBUG		10
-#define OPT_SETTLE_DELAY	11
-#define OPT_USE_NVRAM		12
-#define OPT_EXCLUDE		13
-#define OPT_SAFE_SETUP		14
-
-static char setup_token[] __initdata =
-	"tags:"		"burst:"
-	"led:"		"diff:"
-	"irqm:"		"buschk:"
-	"hostid:"	"revprob:"
-	"verb:"		"debug:"
-	"settle:"	"nvram:"
-	"excl:"		"safe:"
-	;
-
-#ifdef MODULE
-#define	ARG_SEP	' '
-#else
-#define	ARG_SEP	','
-#endif
-
-static int __init get_setup_token(char *p)
-{
-	char *cur = setup_token;
-	char *pc;
-	int i = 0;
-
-	while (cur != NULL && (pc = strchr(cur, ':')) != NULL) {
-		++pc;
-		++i;
-		if (!strncmp(p, cur, pc - cur))
-			return i;
-		cur = pc;
-	}
-	return 0;
-}
-#endif	/* SYM_LINUX_BOOT_COMMAND_LINE_SUPPORT */
-
-int __init sym53c8xx_setup(char *str)
-{
-#ifdef	SYM_LINUX_BOOT_COMMAND_LINE_SUPPORT
-	char *cur = str;
-	char *pc, *pv;
-	unsigned long val;
-	unsigned int i,  c;
-	int xi = 0;
-
-	while (cur != NULL && (pc = strchr(cur, ':')) != NULL) {
-		char *pe;
-
-		val = 0;
-		pv = pc;
-		c = *++pv;
-
-		if	(c == 'n')
-			val = 0;
-		else if	(c == 'y')
-			val = 1;
-		else
-			val = (int) simple_strtoul(pv, &pe, 0);
-
-		switch (get_setup_token(cur)) {
-		case OPT_MAX_TAG:
-			sym_driver_setup.max_tag = val;
-			if (!(pe && *pe == '/'))
-				break;
-			i = 0;
-			while (*pe && *pe != ARG_SEP && 
-				i < sizeof(sym_driver_setup.tag_ctrl)-1) {
-				sym_driver_setup.tag_ctrl[i++] = *pe++;
-			}
-			sym_driver_setup.tag_ctrl[i] = '\0';
-			break;
-		case OPT_SAFE_SETUP:
-			memcpy(&sym_driver_setup, &sym_driver_safe_setup,
-				sizeof(sym_driver_setup));
-			break;
-		case OPT_EXCLUDE:
-			if (xi < 8)
-				sym_driver_setup.excludes[xi++] = val;
-			break;
-
-#define __SIMPLE_OPTION(NAME, name) \
-		case OPT_ ## NAME :		\
-			sym_driver_setup.name = val;\
-			break;
-
-		__SIMPLE_OPTION(BURST_ORDER, burst_order)
-		__SIMPLE_OPTION(SCSI_LED, scsi_led)
-		__SIMPLE_OPTION(SCSI_DIFF, scsi_diff)
-		__SIMPLE_OPTION(IRQ_MODE, irq_mode)
-		__SIMPLE_OPTION(SCSI_BUS_CHECK, scsi_bus_check)
-		__SIMPLE_OPTION(HOST_ID, host_id)
-		__SIMPLE_OPTION(REVERSE_PROBE, reverse_probe)
-		__SIMPLE_OPTION(VERBOSE, verbose)
-		__SIMPLE_OPTION(DEBUG, debug)
-		__SIMPLE_OPTION(SETTLE_DELAY, settle_delay)
-		__SIMPLE_OPTION(USE_NVRAM, use_nvram)
-
-#undef __SIMPLE_OPTION
-
-		default:
-			printk("sym53c8xx_setup: unexpected boot option '%.*s' ignored\n", (int)(pc-cur+1), cur);
-			break;
-		}
-
-		if ((cur = strchr(cur, ARG_SEP)) != NULL)
-			++cur;
-	}
-#endif	/* SYM_LINUX_BOOT_COMMAND_LINE_SUPPORT */
-	return 1;
-}
-
-#ifndef MODULE
-__setup("sym53c8xx=", sym53c8xx_setup);
-#endif
-
 static int __devinit sym_check_supported(struct sym_device *device)
 {
 	struct sym_pci_chip *chip;
@@ -2029,7 +1896,7 @@ static int __devinit sym_check_raid(struct sym_device *device)
 {
 	unsigned long base_2_c = device->s.base_2_c;
 	unsigned int ram_size, ram_val;
-	void *ram_ptr;
+	void __iomem *ram_ptr;
 
 	if (!base_2_c)
 		return 0;
@@ -2111,6 +1978,7 @@ sym_init_device(struct pci_dev *pdev, struct sym_device *device)
 	unsigned long base, base_2; 
 	int i;
 
+	device->host_id = SYM_SETUP_HOST_ID;
 	device->pdev = pdev;
 	device->s.irq = pdev->irq;
 
@@ -2145,9 +2013,9 @@ sym_init_device(struct pci_dev *pdev, struct sym_device *device)
 void sym_config_pqs(struct pci_dev *pdev, struct sym_device *sym_dev)
 {
 	int slot;
+	u8 tmp;
 
 	for (slot = 0; slot < 256; slot++) {
-		u8 tmp;
 		struct pci_dev *memc = pci_get_slot(pdev->bus, slot);
 
 		if (!memc || memc->vendor != 0x101a || memc->device == 0x0009) {
@@ -2155,28 +2023,26 @@ void sym_config_pqs(struct pci_dev *pdev, struct sym_device *sym_dev)
 			continue;
 		}
 
-		/*
-		 * We set these bits in the memory controller once per 875.
-		 * This isn't a problem in practice.
-		 */
-
 		/* bit 1: allow individual 875 configuration */
 		pci_read_config_byte(memc, 0x44, &tmp);
-		tmp |= 0x2;
-		pci_write_config_byte(memc, 0x44, tmp);
+		if ((tmp & 0x2) == 0) {
+			tmp |= 0x2;
+			pci_write_config_byte(memc, 0x44, tmp);
+		}
 
 		/* bit 2: drive individual 875 interrupts to the bus */
 		pci_read_config_byte(memc, 0x45, &tmp);
-		tmp |= 0x4;
-		pci_write_config_byte(memc, 0x45, tmp);
-
-		pci_read_config_byte(pdev, 0x84, &tmp);
-		sym_dev->host_id = tmp;
+		if ((tmp & 0x4) == 0) {
+			tmp |= 0x4;
+			pci_write_config_byte(memc, 0x45, tmp);
+		}
 
 		pci_dev_put(memc);
-
 		break;
 	}
+
+	pci_read_config_byte(pdev, 0x84, &tmp);
+	sym_dev->host_id = tmp;
 }
 
 /*
@@ -2204,9 +2070,6 @@ static int sym_detach(struct sym_hcb *np)
 
 	return 1;
 }
-
-MODULE_LICENSE("GPL");
-MODULE_VERSION(SYM_VERSION);
 
 /*
  * Driver host template.
@@ -2248,8 +2111,6 @@ static int __devinit sym2_probe(struct pci_dev *pdev,
 
 	if (pci_request_regions(pdev, NAME53C8XX))
 		goto disable;
-
-	sym_dev.host_id = SYM_SETUP_HOST_ID;
 
 	sym_init_device(pdev, &sym_dev);
 	if (sym_check_supported(&sym_dev))
@@ -2381,9 +2242,10 @@ static void sym2_set_width(struct scsi_target *starget, int width)
 	struct sym_hcb *np = ((struct host_data *)shost->hostdata)->ncb;
 	struct sym_tcb *tp = &np->target[starget->id];
 
-	/* It is illegal to have DT set on narrow transfers */
+	/* It is illegal to have DT set on narrow transfers.  If DT is
+	 * clear, we must also clear IU and QAS.  */
 	if (width == 0)
-		tp->tinfo.goal.options &= ~PPR_OPT_DT;
+		tp->tinfo.goal.options &= ~PPR_OPT_MASK;
 
 	tp->tinfo.goal.width = width;
 }
@@ -2403,12 +2265,55 @@ static void sym2_set_dt(struct scsi_target *starget, int dt)
 	struct sym_hcb *np = ((struct host_data *)shost->hostdata)->ncb;
 	struct sym_tcb *tp = &np->target[starget->id];
 
+	/* We must clear QAS and IU if DT is clear */
 	if (dt)
 		tp->tinfo.goal.options |= PPR_OPT_DT;
 	else
-		tp->tinfo.goal.options &= ~PPR_OPT_DT;
+		tp->tinfo.goal.options &= ~PPR_OPT_MASK;
 }
-	
+
+static void sym2_get_iu(struct scsi_target *starget)
+{
+	struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);
+	struct sym_hcb *np = ((struct host_data *)shost->hostdata)->ncb;
+	struct sym_tcb *tp = &np->target[starget->id];
+
+	spi_iu(starget) = (tp->tinfo.curr.options & PPR_OPT_IU) ? 1 : 0;
+}
+
+static void sym2_set_iu(struct scsi_target *starget, int iu)
+{
+	struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);
+	struct sym_hcb *np = ((struct host_data *)shost->hostdata)->ncb;
+	struct sym_tcb *tp = &np->target[starget->id];
+
+	if (iu)
+		tp->tinfo.goal.options |= PPR_OPT_IU | PPR_OPT_DT;
+	else
+		tp->tinfo.goal.options &= ~PPR_OPT_IU;
+}
+
+static void sym2_get_qas(struct scsi_target *starget)
+{
+	struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);
+	struct sym_hcb *np = ((struct host_data *)shost->hostdata)->ncb;
+	struct sym_tcb *tp = &np->target[starget->id];
+
+	spi_qas(starget) = (tp->tinfo.curr.options & PPR_OPT_QAS) ? 1 : 0;
+}
+
+static void sym2_set_qas(struct scsi_target *starget, int qas)
+{
+	struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);
+	struct sym_hcb *np = ((struct host_data *)shost->hostdata)->ncb;
+	struct sym_tcb *tp = &np->target[starget->id];
+
+	if (qas)
+		tp->tinfo.goal.options |= PPR_OPT_QAS | PPR_OPT_DT;
+	else
+		tp->tinfo.goal.options &= ~PPR_OPT_QAS;
+}
+
 
 static struct spi_function_template sym2_transport_functions = {
 	.set_offset	= sym2_set_offset,
@@ -2423,6 +2328,12 @@ static struct spi_function_template sym2_transport_functions = {
 	.get_dt		= sym2_get_dt,
 	.set_dt		= sym2_set_dt,
 	.show_dt	= 1,
+	.get_iu		= sym2_get_iu,
+	.set_iu		= sym2_set_iu,
+	.show_iu	= 1,
+	.get_qas	= sym2_get_qas,
+	.set_qas	= sym2_set_qas,
+	.show_qas	= 1,
 	.get_signalling	= sym2_get_signalling,
 };
 
@@ -2475,12 +2386,17 @@ static struct pci_driver sym2_driver = {
 
 static int __init sym2_init(void)
 {
+	int error;
+
+	sym2_setup_params();
 	sym2_transport_template = spi_attach_transport(&sym2_transport_functions);
 	if (!sym2_transport_template)
 		return -ENODEV;
 
-	pci_register_driver(&sym2_driver);
-	return 0;
+	error = pci_module_init(&sym2_driver);
+	if (error)
+		spi_release_transport(sym2_transport_template);
+	return error;
 }
 
 static void __exit sym2_exit(void)

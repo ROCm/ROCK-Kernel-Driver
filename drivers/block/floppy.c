@@ -4124,7 +4124,7 @@ static struct param_table {
 	int *var;
 	int def_param;
 	int param2;
-} config_params[] = {
+} config_params[] __initdata = {
 	{"allowed_drive_mask", NULL, &allowed_drive_mask, 0xff, 0}, /* obsolete */
 	{"all_drives", NULL, &allowed_drive_mask, 0xff, 0},	/* obsolete */
 	{"asus_pci", NULL, &allowed_drive_mask, 0x33, 0},
