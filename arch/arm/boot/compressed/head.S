@@ -86,6 +86,20 @@
 		.macro	writeb, rb
 		strb	\rb, [r3, #0]
 		.endm
+#elif defined(CONFIG_ARCH_OMAP)
+		.macro  loadsp, rb
+		mov	\rb, #0xff000000	@ physical base address
+		add	\rb, \rb, #0x00fb0000
+#if defined(CONFIG_OMAP_LL_DEBUG_UART2) || defined(CONFIG_OMAP_LL_DEBUG_UART3)
+		add	\rb, \rb, #0x00000800
+#endif
+#ifdef CONFIG_OMAP_LL_DEBUG_UART3
+		add	\rb, \rb, #0x00009000
+#endif
+		.endm
+		.macro	writeb, rb
+		strb	\rb, [r3]
+		.endm
 #else
 #error no serial architecture defined
 #endif
