@@ -56,6 +56,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/types.h>
@@ -1409,7 +1410,7 @@ module_exit(cleanup);
 MODULE_AUTHOR("Robert Olsson <robert.olsson@its.uu.se");
 MODULE_DESCRIPTION("Packet Generator tool");
 MODULE_LICENSE("GPL");
-MODULE_PARM(count_d, "i");
-MODULE_PARM(ipg_d, "i");
-MODULE_PARM(cpu_speed, "i");
-MODULE_PARM(clone_skb_d, "i");
+module_param(count_d, int, 0);
+module_param(ipg_d, int, 0);
+module_param(cpu_speed, int, 0);
+module_param(clone_skb_d, int, 0);
