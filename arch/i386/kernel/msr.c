@@ -120,8 +120,6 @@ static inline int do_wrmsr(int cpu, u32 reg, u32 eax, u32 edx)
   preempt_disable();
   if ( cpu == smp_processor_id() ) {
     ret = wrmsr_eio(reg, eax, edx);
-    preempt_enable();
-    return ret;
   } else {
     cmd.cpu = cpu;
     cmd.reg = reg;
@@ -129,17 +127,20 @@ static inline int do_wrmsr(int cpu, u32 reg, u32 eax, u32 edx)
     cmd.data[1] = edx;
     
     smp_call_function(msr_smp_wrmsr, &cmd, 1, 1);
-    preempt_enable();
-    return cmd.err;
+    ret = cmd.err;
   }
+  preempt_enable();
+  return ret;
 }
 
 static inline int do_rdmsr(int cpu, u32 reg, u32 *eax, u32 *edx)
 {
   struct msr_command cmd;
+  int ret;
 
+  preempt_disable();
   if ( cpu == smp_processor_id() ) {
-    return rdmsr_eio(reg, eax, edx);
+    ret = rdmsr_eio(reg, eax, edx);
   } else {
     cmd.cpu = cpu;
     cmd.reg = reg;
@@ -149,8 +150,10 @@ static inline int do_rdmsr(int cpu, u32 reg, u32 *eax, u32 *edx)
     *eax = cmd.data[0];
     *edx = cmd.data[1];
 
-    return cmd.err;
+    ret = cmd.err;
   }
+  preempt_enable();
+  return ret;
 }
 
 #else /* ! CONFIG_SMP */
