@@ -1,9 +1,9 @@
 /*
  *  linux/arch/arm/mach-integrator/cpu.c
  *
- *  Copyright (C) 2001 Deep Blue Solutions Ltd.
+ *  Copyright (C) 2001-2002 Deep Blue Solutions Ltd.
  *
- *  $Id: cpu.c,v 1.5 2002/07/06 16:53:17 rmk Exp $
+ *  $Id: cpu.c,v 1.6 2002/07/18 13:58:51 rmk Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -15,6 +15,9 @@
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/cpufreq.h>
+#include <linux/slab.h>
+#include <linux/sched.h>
+#include <linux/smp.h>
 #include <linux/init.h>
 
 #include <asm/hardware.h>
@@ -42,7 +45,7 @@ static unsigned int vco_to_freq(struct vco vco, int factor)
 
 #ifdef CONFIG_CPU_FREQ
 /*
- * Divisor indexes for in ascending divisor order
+ * Divisor indexes in ascending divisor order
  */
 static unsigned char s2od[] = { 1, 3, 4, 7, 5, 2, 6, 0 };
 
@@ -70,7 +73,8 @@ static struct vco freq_to_vco(unsigned int freq_khz, int factor)
  * Validate the speed in khz.  If it is outside our
  * range, then return the lowest.
  */
-unsigned int integrator_validatespeed(unsigned int freq_khz)
+static unsigned int
+integrator_validatespeed(unsigned int cpu, unsigned int freq_khz)
 {
 	struct vco vco;
 
@@ -87,10 +91,20 @@ unsigned int integrator_validatespeed(unsigned int freq_khz)
 	return vco_to_freq(vco, 1);
 }
 
-void integrator_setspeed(unsigned int freq_khz)
+static void integrator_setspeed(unsigned int cpu, unsigned int freq_khz)
 {
 	struct vco vco = freq_to_vco(freq_khz, 1);
+	unsigned long cpus_allowed;
 	u_int cm_osc;
+
+	/*
+	 * Save this threads cpus_allowed mask, and bind to the
+	 * specified CPU.  When this call returns, we should be
+	 * running on the right CPU.
+	 */
+	cpus_allowed = current->cpus_allowed;
+	set_cpus_allowed(current, 1 << cpu);
+	BUG_ON(cpu != smp_processor_id());
 
 	cm_osc = __raw_readl(CM_OSC);
 	cm_osc &= 0xfffff800;
@@ -99,44 +113,72 @@ void integrator_setspeed(unsigned int freq_khz)
 	__raw_writel(0xa05f, CM_LOCK);
 	__raw_writel(cm_osc, CM_OSC);
 	__raw_writel(0, CM_LOCK);
+
+	/*
+	 * Restore the CPUs allowed mask.
+	 */
+	set_cpus_allowed(current, cpus_allowed);
 }
+
+static struct cpufreq_driver integrator_driver = {
+	.validate	= integrator_validatespeed,
+	.setspeed	= integrator_setspeed,
+	.sync		= 1,
+};
 #endif
 
-static int __init cpu_init(void)
+static int __init integrator_cpu_init(void)
 {
-	u_int cm_osc, cm_stat, cpu_freq_khz, mem_freq_khz;
-	struct vco vco;
+	struct cpufreq_freqs *freqs;
+	unsigned long cpus_allowed;
+	int cpu;
 
-	cm_osc = __raw_readl(CM_OSC);
+	freqs = kmalloc(sizeof(struct cpufreq_freqs) * NR_CPUS,
+			GFP_KERNEL);
+	if (!freqs) {
+		printk(KERN_ERR "CPU: unable to allocate cpufreqs structure\n");
+		return -ENOMEM;
+	}
 
-	vco.od  = (cm_osc >> 20) & 7;
-	vco.vdw = (cm_osc >> 12) & 255;
-	mem_freq_khz = vco_to_freq(vco, 2);
+	cpus_allowed = current->cpus_allowed;
+	for (cpu = 0; cpu < NR_CPUS; cpu++) {
+		u_int cm_osc, cm_stat, mem_freq_khz;
+		struct vco vco;
 
-	printk(KERN_INFO "Memory clock = %d.%03d MHz\n",
-		mem_freq_khz / 1000, mem_freq_khz % 1000);
+		if (!cpu_online(cpu))
+			continue;
 
-	vco.od = (cm_osc >> 8) & 7;
-	vco.vdw = cm_osc & 255;
-	cpu_freq_khz = vco_to_freq(vco, 1);
+		set_cpus_allowed(current, 1 << cpu);
+		BUG_ON(cpu != smp_processor_id());
+
+		cm_stat = __raw_readl(CM_STAT);
+		cm_osc = __raw_readl(CM_OSC);
+		vco.od  = (cm_osc >> 20) & 7;
+		vco.vdw = (cm_osc >> 12) & 255;
+		mem_freq_khz = vco_to_freq(vco, 2);
+
+		printk(KERN_INFO "CPU%d: Module id: %d\n", cpu, cm_stat & 255);
+		printk(KERN_INFO "CPU%d: Memory clock = %d.%03d MHz\n",
+			cpu, mem_freq_khz / 1000, mem_freq_khz % 1000);
+
+		vco.od = (cm_osc >> 8) & 7;
+		vco.vdw = cm_osc & 255;
+
+		freqs[cpu].min = 12000;
+		freqs[cpu].max = 160000;
+		freqs[cpu].cur = vco_to_freq(vco, 1);
+	}
+
+	set_cpus_allowed(current, cpus_allowed);
 
 #ifdef CONFIG_CPU_FREQ
-	{
-		struct cpufreq_driver cpufreq_driver;
-
-		cpufreq_driver.freq.min = 12000;
-		cpufreq_driver.freq.max = 160000;
-		cpufreq_driver.freq.cur = cpu_freq_khz;
-		cpufreq_driver.validate = &integrator_validatespeed;
-		cpufreq_driver.setspeed = &integrator_setspeed;
-		cpufreq_register(cpufreq_driver);
-	}
+	integrator_driver.freq = freqs;
+	cpufreq_register(&integrator_driver);
+#else
+	kfree(freqs);
 #endif
-
-	cm_stat = __raw_readl(CM_STAT);
-	printk("Module id: %d\n", cm_stat & 255);
 
 	return 0;
 }
 
-__initcall(cpu_init);
+__initcall(integrator_cpu_init);

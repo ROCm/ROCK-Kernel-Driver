@@ -933,8 +933,7 @@ void __exit exit_gscd(void)
 {
 	CLEAR_TIMER;
 
-	devfs_unregister(devfs_find_handle
-			 (NULL, "gscd", 0, 0, DEVFS_SPECIAL_BLK, 0));
+	devfs_find_and_unregister(NULL, "gscd", 0, 0, DEVFS_SPECIAL_BLK, 0);
 	if ((devfs_unregister_blkdev(MAJOR_NR, "gscd") == -EINVAL)) {
 		printk("What's that: can't unregister GoldStar-module\n");
 		return;

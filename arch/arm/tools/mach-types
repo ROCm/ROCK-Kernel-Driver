@@ -6,7 +6,7 @@
 # To add an entry into this database, please see Documentation/arm/README,
 # or contact rmk@arm.linux.org.uk
 #
-# Last update: Fri Jul 5 21:32:20 2002
+# Last update: Sat Jul 27 09:56:53 2002
 #
 # machine_is_xxx	CONFIG_xxxx		MACH_TYPE_xxx		number
 #
@@ -175,7 +175,7 @@ amico			ARCH_AMICO		AMICO			163
 iam			SA1100_IAM		IAM			164
 tt530			SA1100_TT530		TT530			165
 sam2400			ARCH_SAM2400		SAM2400			166
-jornada56x		ARCH_JORNADA56X		JORNADA56X		167
+jornada56x		SA1100_JORNADA56X	JORNADA56X		167
 active			SA1100_ACTIVE		ACTIVE			168
 iq80321			ARCH_IQ80321		IQ80321			169
 wid			SA1100_WID		WID			170
@@ -207,3 +207,10 @@ nexio			SA1100_NEXIO		NEXIO			195
 bitbox			SA1100_BITBOX		BITBOX			196
 g200			SA1100_G200		G200			197
 gill			SA1100_GILL		GILL			198
+pxa_mercury		ARCH_PXA_MERCURY	PXA_MERCURY		199
+ceiva			ARCH_CEIVA		CEIVA			200
+fret			SA1100_FRET		FRET			201
+emailphone		SA1100_EMAILPHONE	EMAILPHONE		202
+h3900			ARCH_H3900		H3900			203
+pxa1			ARCH_PXA1		PXA1			204
+koan369			SA1100_KOAN369		KOAN369			205

@@ -17,6 +17,7 @@
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
 #include <asm/page.h>
+#include <asm/rmap.h>
 #include <asm/io.h>
 #include <asm/setup.h>
 
@@ -149,6 +150,7 @@ void free_pgd_slow(pgd_t *pgd)
 
 	pte = pmd_page(*pmd);
 	pmd_clear(pmd);
+	pgtable_remove_rmap(pte);
 	pte_free(pte);
 	pmd_free(pmd);
 free:

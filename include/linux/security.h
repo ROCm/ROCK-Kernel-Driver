@@ -407,7 +407,6 @@ struct swap_info_struct;
  *	@file contains the file structure.
  *	@cmd contains the posix-translated lock operation to perform
  *	(e.g. F_RDLCK, F_WRLCK).
- *	@blocking indicates if the request is for a blocking lock.
  *	Return 0 if permission is granted.
  * @file_fcntl:
  *	Check permission before allowing the file operation specified by @cmd
@@ -753,7 +752,7 @@ struct security_operations {
 	int (*file_mmap) (struct file * file,
 			  unsigned long prot, unsigned long flags);
 	int (*file_mprotect) (struct vm_area_struct * vma, unsigned long prot);
-	int (*file_lock) (struct file * file, unsigned int cmd, int blocking);
+	int (*file_lock) (struct file * file, unsigned int cmd);
 	int (*file_fcntl) (struct file * file, unsigned int cmd,
 			   unsigned long arg);
 	int (*file_set_fowner) (struct file * file);

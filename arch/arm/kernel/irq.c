@@ -217,14 +217,14 @@ do_simple_IRQ(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 
 	desc->triggered = 1;
 
-	irq_enter(cpu, irq);
+	irq_enter();
 	kstat.irqs[cpu][irq]++;
 
 	action = desc->action;
 	if (action)
 		__do_irq(irq, desc->action, regs);
 
-	irq_exit(cpu, irq);
+	irq_exit();
 }
 
 /*
@@ -256,7 +256,7 @@ do_edge_IRQ(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 	 */
 	desc->running = 1;
 
-	irq_enter(cpu, irq);
+	irq_enter();
 	kstat.irqs[cpu][irq]++;
 
 	do {
@@ -274,7 +274,7 @@ do_edge_IRQ(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 		__do_irq(irq, action, regs);
 	} while (desc->pending);
 
-	irq_exit(cpu, irq);
+	irq_exit();
 
 	desc->running = 0;
 
@@ -311,7 +311,7 @@ do_level_IRQ(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 	desc->chip->ack(irq);
 
 	if (likely(desc->enabled)) {
-		irq_enter(cpu, irq);
+		irq_enter();
 		kstat.irqs[cpu][irq]++;
 
 		/*
@@ -325,7 +325,7 @@ do_level_IRQ(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 				   !check_irq_lock(desc, irq, regs)))
 				desc->chip->unmask(irq);
 		}
-		irq_exit(cpu, irq);
+		irq_exit();
 	}
 }
 

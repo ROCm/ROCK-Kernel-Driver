@@ -480,10 +480,10 @@ void vcs_make_devfs (unsigned int index, int unregister)
     sprintf (name, "a%u", index + 1);
     if (unregister)
     {
-	devfs_unregister ( devfs_find_handle (devfs_handle, name + 1, 0, 0,
-					      DEVFS_SPECIAL_CHR, 0) );
-	devfs_unregister ( devfs_find_handle (devfs_handle, name, 0, 0,
-					      DEVFS_SPECIAL_CHR, 0) );
+	devfs_find_and_unregister(devfs_handle, name + 1, 0, 0,
+				  DEVFS_SPECIAL_CHR, 0);
+	devfs_find_and_unregister(devfs_handle, name, 0, 0,
+				  DEVFS_SPECIAL_CHR, 0);
     }
     else
     {

@@ -1802,8 +1802,7 @@ static int sjcd_cleanup(void)
 
 void __exit sjcd_exit(void)
 {
-	devfs_unregister(devfs_find_handle
-			 (NULL, "sjcd", 0, 0, DEVFS_SPECIAL_BLK, 0));
+	devfs_find_and_unregister(NULL, "sjcd", 0, 0, DEVFS_SPECIAL_BLK, 0);
 	if (sjcd_cleanup())
 		printk("SJCD: module: cannot be removed.\n");
 	else

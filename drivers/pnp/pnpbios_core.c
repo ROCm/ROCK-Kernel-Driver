@@ -124,13 +124,13 @@ __asm__(
 	".previous		\n"
 );
 
-#define Q_SET_SEL(selname, address, size) \
-set_base (gdt [(selname) >> 3], __va((u32)(address))); \
-set_limit (gdt [(selname) >> 3], size)
+#define Q_SET_SEL(cpu, selname, address, size) \
+set_base(cpu_gdt_table[cpu][(selname) >> 3], __va((u32)(address))); \
+_set_limit(&cpu_gdt_table[cpu][(selname) >> 3], size)
 
-#define Q2_SET_SEL(selname, address, size) \
-set_base (gdt [(selname) >> 3], (u32)(address)); \
-set_limit (gdt [(selname) >> 3], size)
+#define Q2_SET_SEL(cpu, selname, address, size) \
+set_base(cpu_gdt_table[cpu][(selname) >> 3], (u32)(address)); \
+_set_limit((char *)&cpu_gdt_table[cpu][(selname) >> 3], size)
 
 /*
  * At some point we want to use this stack frame pointer to unwind
@@ -161,10 +161,11 @@ static inline u16 call_pnp_bios(u16 func, u16 arg1, u16 arg2, u16 arg3,
 	/* On some boxes IRQ's during PnP BIOS calls are deadly.  */
 	spin_lock_irqsave(&pnp_bios_lock, flags);
 
+	/* The lock prevents us bouncing CPU here */
 	if (ts1_size)
-		Q2_SET_SEL(PNP_TS1, ts1_base, ts1_size);
+		Q2_SET_SEL(smp_processor_id(), PNP_TS1, ts1_base, ts1_size);
 	if (ts2_size)
-		Q2_SET_SEL(PNP_TS2, ts2_base, ts2_size);
+		Q2_SET_SEL(smp_processor_id(), PNP_TS2, ts2_base, ts2_size);
 
 	__asm__ __volatile__(
 	        "pushl %%ebp\n\t"
@@ -1265,12 +1266,16 @@ int __init pnpbios_init(void)
                        check->fields.version >> 4, check->fields.version & 15,
 		       check->fields.pm16cseg, check->fields.pm16offset,
 		       check->fields.pm16dseg);
-		Q2_SET_SEL(PNP_CS32, &pnp_bios_callfunc, 64 * 1024);
-		Q_SET_SEL(PNP_CS16, check->fields.pm16cseg, 64 * 1024);
-		Q_SET_SEL(PNP_DS, check->fields.pm16dseg, 64 * 1024);
 		pnp_bios_callpoint.offset = check->fields.pm16offset;
 		pnp_bios_callpoint.segment = PNP_CS16;
 		pnp_bios_hdr = check;
+
+		for(i=0; i < NR_CPUS; i++)
+		{
+			Q2_SET_SEL(i, PNP_CS32, &pnp_bios_callfunc, 64 * 1024);
+			Q_SET_SEL(i, PNP_CS16, check->fields.pm16cseg, 64 * 1024);
+			Q_SET_SEL(i, PNP_DS, check->fields.pm16dseg, 64 * 1024);
+		}
 		break;
 	}
 	if (!pnp_bios_present())
