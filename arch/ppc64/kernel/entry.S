@@ -486,7 +486,7 @@ _GLOBAL(enter_rtas)
 	mflr	r0
 	std	r0,16(r1)
         stdu	r1,-RTAS_FRAME_SIZE(r1)	/* Save SP and create stack space. */
-	
+
 	/* Because RTAS is running in 32b mode, it clobbers the high order half
 	 * of all registers that it saves.  We therefore save those registers
 	 * RTAS might touch to the stack.  (r0, r3-r13 are caller saved)

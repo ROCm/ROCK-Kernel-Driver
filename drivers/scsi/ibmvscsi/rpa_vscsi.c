@@ -34,9 +34,6 @@
 #include <linux/interrupt.h>
 #include "ibmvscsi.h"
 
-/* We don't need one workqueue per host, one is enough for all of them */
-static struct workqueue_struct *vscsi_wq = NULL;
-
 /* ------------------------------------------------------------
  * Routines for managing the command/response queue
  */
@@ -56,7 +53,7 @@ static irqreturn_t ibmvscsi_handle_event(int irq,
 	struct ibmvscsi_host_data *hostdata =
 	    (struct ibmvscsi_host_data *)dev_instance;
 	vio_disable_interrupts(to_vio_dev(hostdata->dev));
-	queue_work(vscsi_wq, &hostdata->srp_task);
+	tasklet_schedule(&hostdata->srp_task);
 	return IRQ_HANDLED;
 }
 
@@ -75,13 +72,14 @@ void ibmvscsi_release_crq_queue(struct crq_queue *queue,
 	long rc;
 	struct vio_dev *vdev = to_vio_dev(hostdata->dev);
 	free_irq(vdev->irq, (void *)hostdata);
+	tasklet_kill(&hostdata->srp_task);
 	do {
 		rc = plpar_hcall_norets(H_FREE_CRQ, vdev->unit_address);
 	} while (H_isLongBusy(rc));
 	dma_unmap_single(hostdata->dev,
 			 queue->msg_token,
 			 queue->size * sizeof(*queue->msgs),
-			 PCI_DMA_BIDIRECTIONAL);
+			 DMA_BIDIRECTIONAL);
 	free_page((unsigned long)queue->msgs);
 }
 
@@ -175,9 +173,9 @@ int ibmvscsi_init_crq_queue(struct crq_queue *queue,
 
 	queue->msg_token = dma_map_single(hostdata->dev, queue->msgs,
 					  queue->size * sizeof(*queue->msgs),
-					  PCI_DMA_BIDIRECTIONAL);
+					  DMA_BIDIRECTIONAL);
 
-	if (pci_dma_mapping_error(queue->msg_token))
+	if (dma_mapping_error(queue->msg_token))
 		goto map_failed;
 
 	rc = plpar_hcall_norets(H_REG_CRQ,
@@ -210,7 +208,8 @@ int ibmvscsi_init_crq_queue(struct crq_queue *queue,
 	queue->cur = 0;
 	queue->lock = SPIN_LOCK_UNLOCKED;
 
-	INIT_WORK(&hostdata->srp_task, (void *)ibmvscsi_task, hostdata);
+	tasklet_init(&hostdata->srp_task, (void *) ibmvscsi_task,
+		     (unsigned long) hostdata);
 
 	return 0;
 
@@ -220,7 +219,7 @@ int ibmvscsi_init_crq_queue(struct crq_queue *queue,
 	dma_unmap_single(hostdata->dev,
 			 queue->msg_token,
 			 queue->size * sizeof(*queue->msgs),
-			 PCI_DMA_BIDIRECTIONAL);
+			 DMA_BIDIRECTIONAL);
       map_failed:
 	free_page((unsigned long)queue->msgs);
       malloc_failed:
@@ -276,16 +275,12 @@ static struct vio_driver ibmvscsi_driver = {
 
 int __init ibmvscsi_module_init(void)
 {
-	vscsi_wq = create_workqueue("vscsi-ev");
-	if (!vscsi_wq)
-		return -ENOMEM;
 	return vio_register_driver(&ibmvscsi_driver);
 }
 
 void __exit ibmvscsi_module_exit(void)
 {
 	vio_unregister_driver(&ibmvscsi_driver);
-	destroy_workqueue(vscsi_wq);
 }
 
 module_init(ibmvscsi_module_init);

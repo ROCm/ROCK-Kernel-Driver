@@ -66,7 +66,6 @@
  * layer.
  */
 
-#include <linux/pci.h>		/* needed only for pci_dma_mapping_error */
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/dma-mapping.h>
@@ -84,12 +83,12 @@
 static int max_id = 64;
 static int max_channel = 3;
 static int init_timeout = 5;
-static int cmd_per_lun = 8;
 static int max_requests = 50;
 
 MODULE_DESCRIPTION("IBM Virtual SCSI");
 MODULE_AUTHOR("Dave Boutcher");
 MODULE_LICENSE("GPL");
+MODULE_VERSION("1.0");
 
 module_param_named(max_id, max_id, int, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(max_id, "Largest ID value for each channel");
@@ -97,8 +96,6 @@ module_param_named(max_channel, max_channel, int, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(max_channel, "Largest channel value");
 module_param_named(init_timeout, init_timeout, int, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(init_timeout, "Initialization timeout in seconds");
-module_param_named(cmd_per_lun, cmd_per_lun, int, S_IRUGO | S_IWUSR);
-MODULE_PARM_DESC(cd_per_lun, "Commands per lun");
 module_param_named(max_requests, max_requests, int, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(max_requests, "Maximum requests for this adapter");
 
@@ -341,9 +338,10 @@ static int map_sg_data(struct scsi_cmnd *cmd,
 	    (struct memory_descriptor *)srp_cmd->additional_data;
 	struct indirect_descriptor *indirect =
 	    (struct indirect_descriptor *)data;
+
 	sg_mapped = dma_map_sg(dev, sg, cmd->use_sg, DMA_BIDIRECTIONAL);
 
-	if (pci_dma_mapping_error(sg_dma_address(&sg[0])))
+	if (sg_mapped == 0)
 		return 0;
 
 	/* special case; we can use a single direct descriptor */
@@ -407,7 +405,7 @@ static int map_single_data(struct scsi_cmnd *cmd,
 	    (u64) (unsigned long)dma_map_single(dev, cmd->request_buffer,
 						cmd->request_bufflen,
 						DMA_BIDIRECTIONAL);
-	if (pci_dma_mapping_error(data->virtual_address)) {
+	if (dma_mapping_error(data->virtual_address)) {
 		printk(KERN_ERR
 		       "ibmvscsi: Unable to map request_buffer for command!\n");
 		return 0;
@@ -604,9 +602,8 @@ static struct srp_event_struct *scsi_cmd_to_event_struct(struct scsi_cmnd *cmd,
 	evt_struct = evt_struct_for(&hostdata->pool,
 				    (union VIOSRP_IU *)&srp_cmd,
 				    (void *)cmd, handle_cmd_rsp);
-	if (!evt_struct) {
+	if (!evt_struct)
 		return NULL;
-	}
 
 	evt_struct->cmd = srp_cmd;
 	evt_struct->cmnd_done = done;
@@ -628,9 +625,8 @@ int ibmvscsi_queuecommand(struct scsi_cmnd *cmd,
 	struct srp_event_struct *evt_struct =
 	    scsi_cmd_to_event_struct(cmd, done, hostdata);
 
-	if (!evt_struct) {
+	if (!evt_struct)
 		return SCSI_MLQUEUE_HOST_BUSY;
-	}
 
 	evt_struct->crq.format = VIOSRP_SRP_FORMAT;
 
@@ -690,7 +686,7 @@ static void send_mad_adapter_info(struct ibmvscsi_host_data *hostdata)
 				    &hostdata->madapter_info,
 				    sizeof(hostdata->madapter_info),
 				    DMA_BIDIRECTIONAL);
-	if (pci_dma_mapping_error(req.buffer)) {
+	if (dma_mapping_error(req.buffer)) {
 		printk(KERN_ERR
 		       "ibmvscsi: Unable to map request_buffer "
 		       "for adapter_info!\n");
@@ -710,9 +706,8 @@ static void send_mad_adapter_info(struct ibmvscsi_host_data *hostdata)
 		return;
 	}
 
-	if (ibmvscsi_send_srp_event(evt_struct, hostdata)) {
+	if (ibmvscsi_send_srp_event(evt_struct, hostdata))
 		printk(KERN_ERR "ibmvscsi: couldn't send ADAPTER_INFO_REQ!\n");
-	}
 };
 
 /**
@@ -937,12 +932,8 @@ static int ibmvscsi_eh_device_reset_handler(struct scsi_cmnd *cmd)
 			unmap_cmd_data(&tmp_evt->cmd, tmp_evt->hostdata->dev);
 			ibmvscsi_free_event_struct(&tmp_evt->hostdata->pool,
 						   tmp_evt);
-			if (tmp_evt->cmnd_done) {
-				spin_unlock_irq(hostdata->host->host_lock);
+			if (tmp_evt->cmnd_done)
 				tmp_evt->cmnd_done(tmp_evt->cmnd);
-				spin_lock_irq(hostdata->host->host_lock);
-			}
-
 		}
 	}
 	return SUCCESS;
@@ -963,12 +954,8 @@ static void purge_requests(struct ibmvscsi_host_data *hostdata)
 		list_del(&tmp_evt->list);
 		unmap_cmd_data(&tmp_evt->cmd, tmp_evt->hostdata->dev);
 		ibmvscsi_free_event_struct(&tmp_evt->hostdata->pool, tmp_evt);
-		if (tmp_evt->cmnd_done) {
-			spin_unlock_irqrestore(hostdata->host->host_lock,
-					       flags);
+		if (tmp_evt->cmnd_done)
 			tmp_evt->cmnd_done(tmp_evt->cmnd);
-			spin_lock_irqsave(hostdata->host->host_lock, flags);
-		}
 	}
 	spin_unlock_irqrestore(hostdata->host->host_lock, flags);
 }
@@ -1075,10 +1062,10 @@ static int ibmvscsi_do_host_config(struct ibmvscsi_host_data *hostdata,
 	host_config.buffer = dma_map_single(hostdata->dev, buffer, length,
 					    DMA_BIDIRECTIONAL);
 
-	if (pci_dma_mapping_error(host_config.buffer)) {
+	if (dma_mapping_error(host_config.buffer)) {
 		printk(KERN_ERR
 		       "ibmvscsi: dma_mapping error " "getting host config\n");
-		rc = -1;
+		return -1;
 	}
 
 	evt_struct = evt_struct_for(&hostdata->pool,
@@ -1252,11 +1239,11 @@ static struct scsi_host_template driver_template = {
 	.queuecommand = ibmvscsi_queuecommand,
 	.eh_abort_handler = ibmvscsi_eh_abort_handler,
 	.eh_device_reset_handler = ibmvscsi_eh_device_reset_handler,
+	.cmd_per_lun = 16,
 	.can_queue = 1,		/* Updated after SRP_LOGIN */
 	.this_id = -1,
 	.sg_tablesize = MAX_INDIRECT_BUFS,
 	.use_clustering = ENABLE_CLUSTERING,
-	.emulated = 1,
 	.shost_attrs = ibmvscsi_attrs,
 };
 
@@ -1269,8 +1256,7 @@ struct ibmvscsi_host_data *ibmvscsi_probe(struct device *dev)
 	struct Scsi_Host *host;
 	unsigned long wait_switch = 0;
 
-	driver_template.cmd_per_lun = cmd_per_lun,
-	    host = scsi_host_alloc(&driver_template, sizeof(*hostdata));
+	host = scsi_host_alloc(&driver_template, sizeof(*hostdata));
 	if (!host) {
 		printk(KERN_ERR "ibmvscsi: couldn't allocate host data\n");
 		goto scsi_host_alloc_failed;
@@ -1316,8 +1302,8 @@ struct ibmvscsi_host_data *ibmvscsi_probe(struct device *dev)
 		     time_before(jiffies, wait_switch) &&
 		     atomic_read(&hostdata->request_limit) < 0;) {
 
-			set_current_state(TASK_INTERRUPTIBLE);
-			schedule_timeout(5);
+			set_current_state(TASK_UNINTERRUPTIBLE);
+			schedule_timeout(HZ/100);
 		}
 
 		/* if we now have a valid request_limit, initiate a scan */

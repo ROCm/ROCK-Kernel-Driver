@@ -47,8 +47,6 @@ int force_printk_to_btext = 0;
 
 boot_infos_t disp_bi;
 
-extern char *klimit;
-
 /* This function will enable the early boot text when doing OF booting. This
  * way, xmon output should work too
  */

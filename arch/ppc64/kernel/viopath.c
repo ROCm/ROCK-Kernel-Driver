@@ -108,7 +108,7 @@ static vio_event_handler_t *vio_handler[VIO_MAX_SUBTYPES];
 #define VIOPATH_KERN_WARN	KERN_WARNING "viopath: "
 #define VIOPATH_KERN_INFO	KERN_INFO "viopath: "
 
-static unsigned char e2a(unsigned char x)
+unsigned char e2a(unsigned char x)
 {
 	switch (x) {
 	case 0xF0:
@@ -186,6 +186,7 @@ static unsigned char e2a(unsigned char x)
 	}
 	return ' ';
 }
+EXPORT_SYMBOL(e2a);
 
 static int proc_viopath_show(struct seq_file *m, void *v)
 {

@@ -46,7 +46,6 @@
 #include <asm/iSeries/iSeries_irq.h>
 #include <asm/iSeries/iSeries_pci.h>
 #include <asm/iSeries/mf.h>
-#include <asm/iSeries/vio.h>
 
 #include "iSeries_IoMmTable.h"
 #include "pci.h"
@@ -243,11 +242,6 @@ void __init iSeries_pci_final_fixup(void)
 	iSeries_IoMmTable_Status();
 	iSeries_activate_IRQs();
 	mf_displaySrc(0xC9000200);
-
-	/* Now set up virtual bus device information */
-	if (device_register(iSeries_vio_dev)) {
-	    printk("pcibios error registering iSeries_vio_dev\n");
-	}
 }
 
 void pcibios_fixup_bus(struct pci_bus *PciBus)

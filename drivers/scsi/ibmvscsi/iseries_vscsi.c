@@ -32,17 +32,16 @@
 #include <asm/iSeries/HvLpEvent.h>
 #include <asm/iSeries/HvTypes.h>
 #include <asm/iSeries/HvLpConfig.h>
-#include <linux/pci.h>
+#include <asm/vio.h>
 #include <linux/device.h>
 #include "ibmvscsi.h"
 
 static void noop_release(struct device *dev) {};
 
 /* global variables */
-extern struct device *iSeries_vio_dev;
 static struct ibmvscsi_host_data *single_host_data;
-static struct pci_dev iseries_vscsi_dev = {
-	.dev.bus = &pci_bus_type,
+static struct vio_dev iseries_vscsi_dev = {
+	.dev.bus = &vio_bus_type,
 	.dev.bus_id = "vscsi",
 	.dev.release = noop_release
 };
@@ -142,7 +141,7 @@ int ibmvscsi_send_crq(struct ibmvscsi_host_data *hostdata, u64 word1, u64 word2)
 
 int __init ibmvscsi_module_init(void)
 {
-	iseries_vscsi_dev.sysdata = to_pci_dev(iSeries_vio_dev)->sysdata;
+	iseries_vscsi_dev.archdata = to_vio_dev(iSeries_vio_dev)->archdata;
 	if (device_register(&iseries_vscsi_dev.dev)) {
 		printk(KERN_ERR "ibmvscsi: failed to register device\n");
 		return 1;

@@ -42,6 +42,7 @@
 #include <asm/cacheflush.h>
 #ifdef CONFIG_PPC_ISERIES
 #include <asm/iSeries/HvCallSc.h>
+#include <asm/iSeries/LparData.h>
 #endif
 
 extern int do_signal(sigset_t *, struct pt_regs *);
@@ -71,6 +72,9 @@ EXPORT_SYMBOL(__down_interruptible);
 EXPORT_SYMBOL(__up);
 EXPORT_SYMBOL(naca);
 EXPORT_SYMBOL(__down);
+#ifdef CONFIG_PPC_ISERIES
+EXPORT_SYMBOL(itLpNaca);
+#endif
 
 EXPORT_SYMBOL(csum_partial);
 EXPORT_SYMBOL(csum_partial_copy_generic);

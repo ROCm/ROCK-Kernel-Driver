@@ -14,9 +14,9 @@
 struct VethFramesData {
 	u32 addr[VETH_MAX_FRAMES_PER_MSG];
 	u16 len[VETH_MAX_FRAMES_PER_MSG];
-	u32 eof:VETH_MAX_FRAMES_PER_MSG;
-	u32 mReserved:(32-VETH_MAX_FRAMES_PER_MSG);
+	u32 eofmask;
 };
+#define VETH_EOF_SHIFT		(32-VETH_MAX_FRAMES_PER_MSG)
 
 struct VethFramesAckData {
 	u16 token[VETH_MAX_ACKS_PER_MSG];

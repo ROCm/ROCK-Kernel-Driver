@@ -97,7 +97,7 @@ static int __init init_ras_IRQ(void)
 				       " number for %s\n", np->full_name);
 				break;
 			}
-			request_irq(irq_offset_up(virq), 
+			request_irq(irq_offset_up(virq),
 				    ras_epow_interrupt, 0, 
 				    "RAS_EPOW", NULL);
 			ireg++;

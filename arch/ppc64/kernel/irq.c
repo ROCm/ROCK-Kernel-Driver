@@ -726,9 +726,11 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 	 */
 	cpus_and(new_value, new_value, allcpus);
 
-	/* Grab lock here so cpu_online_map can't change, and also
-	 * protect irq_affinity[]. */
-        spin_lock(&desc->lock);
+	/*
+	 * Grab lock here so cpu_online_map can't change, and also
+	 * protect irq_affinity[].
+	 */
+	spin_lock(&desc->lock);
 
 	/*
 	 * Do not allow disabling IRQs completely - it's a too easy

@@ -14,8 +14,6 @@
  *      2 of the License, or (at your option) any later version.
  */
 
-#define PURR 309
-
 DECLARE_PER_CPU(struct cpu_util_store, cpu_util_sampler);
 
 struct cpu_util_store {

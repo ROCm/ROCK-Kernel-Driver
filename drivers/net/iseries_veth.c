@@ -14,7 +14,7 @@
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * General Public License for more details.
- *                                                                      
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
@@ -22,7 +22,7 @@
  *
  *
  * This module implements the virtual ethernet device for iSeries LPAR
- * Linux.  It uses hypervisor message passing to enable an
+ * Linux.  It uses hypervisor message passing to implement an
  * ethernet-like network device communicating between partitions on
  * the iSeries.
  *
@@ -61,7 +61,6 @@
 #include <linux/types.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
-#include <linux/pci.h>
 #include <linux/kernel.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
@@ -71,35 +70,37 @@
 #include <linux/mm.h>
 #include <linux/ethtool.h>
 #include <asm/iSeries/mf.h>
+#include <asm/iSeries/iSeries_pci.h>
 #include <asm/uaccess.h>
 
 #include <asm/iSeries/HvLpConfig.h>
 #include <asm/iSeries/HvTypes.h>
 #include <asm/iSeries/HvLpEvent.h>
 #include <asm/iommu.h>
+#include <asm/vio.h>
 
 #include "iseries_veth.h"
 
-extern struct pci_dev *iSeries_veth_dev;
+extern struct vio_dev *iSeries_veth_dev;
 
 MODULE_AUTHOR("Kyle Lucke <klucke@us.ibm.com>");
 MODULE_DESCRIPTION("iSeries Virtual ethernet driver");
 MODULE_LICENSE("GPL");
 
-#define VETH_NUMBUFFERS		120
+#define VETH_NUMBUFFERS		(120)
 #define VETH_ACKTIMEOUT 	(1000000) /* microseconds */
 #define VETH_MAX_MCAST		(12)
 
-#define VETH_MAX_MTU		9000
+#define VETH_MAX_MTU		(9000)
 
 #if VETH_NUMBUFFERS < 10
-#define ACK_THRESHOLD 1
+#define ACK_THRESHOLD 		(1)
 #elif VETH_NUMBUFFERS < 20
-#define ACK_THRESHOLD 4
+#define ACK_THRESHOLD 		(4)
 #elif VETH_NUMBUFFERS < 40
-#define ACK_THRESHOLD 10
+#define ACK_THRESHOLD 		(10)
 #else
-#define ACK_THRESHOLD 20
+#define ACK_THRESHOLD 		(20)
 #endif
 
 #define	VETH_STATE_SHUTDOWN	(0x0001)
@@ -111,35 +112,6 @@ MODULE_LICENSE("GPL");
 #define VETH_STATE_GOTCAPS	(0x0040)
 #define VETH_STATE_SENTCAPACK	(0x0080)
 #define VETH_STATE_READY	(0x0100)
-
-static inline u64 veth_dma_addr(void *p)
-{
-	return 0x8000000000000000LL | virt_to_abs((unsigned long) p);
-}
-
-#define VETHSTACK(T) \
-	struct VethStack##T { \
-		struct T *head; \
-		spinlock_t lock; \
-	}
-#define VETHSTACKPUSH(s, p) \
-	do { \
-		unsigned long flags; \
-		spin_lock_irqsave(&(s)->lock,flags); \
-		(p)->next = (s)->head; \
-		(s)->head = (p); \
-		spin_unlock_irqrestore(&(s)->lock, flags); \
-	} while (0)
-
-#define VETHSTACKPOP(s,p) \
-	do { \
-		unsigned long flags; \
-		spin_lock_irqsave(&(s)->lock,flags); \
-		(p) = (s)->head; \
-		if ((s)->head) \
-			(s)->head = (s)->head->next; \
-		spin_unlock_irqrestore(&(s)->lock, flags); \
-	} while (0)
 
 struct veth_msg {
 	struct veth_msg *next;
@@ -153,8 +125,7 @@ struct veth_lpar_connection {
 	HvLpIndex remote_lp;
 	struct work_struct statemachine_wq;
 	struct veth_msg *msgs;
-	int mNumberAllocated;
-	int mNumberRcvMsgs;
+	int num_events;
 	struct VethCapData local_caps;
 
 	struct timer_list ack_timer;
@@ -167,11 +138,12 @@ struct veth_lpar_connection {
 	u16 pending_acks[VETH_MAX_ACKS_PER_MSG];
 	u32 num_pending_acks;
 
-	int mNumberLpAcksAlloced;
+	int num_ack_events;
 	struct VethCapData remote_caps;
 	u32 ack_timeout;
 
-	VETHSTACK(veth_msg) msg_stack;
+	spinlock_t msg_stack_lock;
+	struct veth_msg *msg_stack_head;
 };
 
 struct veth_port {
@@ -190,15 +162,9 @@ struct veth_port {
 	u64 mcast_addr[VETH_MAX_MCAST];
 };
 
-struct VethFabricMgr {
-	HvLpIndex this_lp;
-	struct veth_lpar_connection connection[HVMAXARCHITECTEDLPS];
-	struct net_device *netdev[HVMAXARCHITECTEDVIRTUALLANS];
-};
-
-static struct VethFabricMgr *mFabricMgr; /* = NULL */
-static struct net_device *veth_devices[HVMAXARCHITECTEDVIRTUALLANS];
-static int veth_num_devices; /* = 0 */
+static HvLpIndex this_lp;
+static struct veth_lpar_connection *veth_cnx[HVMAXARCHITECTEDLPS]; /* = 0 */
+static struct net_device *veth_dev[HVMAXARCHITECTEDVIRTUALLANS]; /* = 0 */
 
 static int veth_start_xmit(struct sk_buff *skb, struct net_device *dev);
 static void veth_recycle_msg(struct veth_lpar_connection *, struct veth_msg *);
@@ -216,9 +182,32 @@ static void veth_timed_ack(unsigned long connectionPtr);
 #define veth_error(fmt, args...) \
 	printk(KERN_ERR "(%s:%3.3d) ERROR: " fmt, __FILE__, __LINE__ , ## args)
 
+static inline void veth_stack_push(struct veth_lpar_connection *cnx,
+				   struct veth_msg *msg)
+{
+	unsigned long flags;
 
-static inline HvLpEvent_Rc 
-veth_signalevent(struct veth_lpar_connection *cnx, u16 subtype, 
+	spin_lock_irqsave(&cnx->msg_stack_lock, flags);
+	msg->next = cnx->msg_stack_head;
+	cnx->msg_stack_head = msg;
+	spin_unlock_irqrestore(&cnx->msg_stack_lock, flags);
+}
+
+static inline struct veth_msg *veth_stack_pop(struct veth_lpar_connection *cnx)
+{
+	unsigned long flags;
+	struct veth_msg *msg;
+
+	spin_lock_irqsave(&cnx->msg_stack_lock, flags);
+	msg = cnx->msg_stack_head;
+	if (msg)
+		cnx->msg_stack_head = cnx->msg_stack_head->next;
+	spin_unlock_irqrestore(&cnx->msg_stack_lock, flags);
+	return msg;
+}
+
+static inline HvLpEvent_Rc
+veth_signalevent(struct veth_lpar_connection *cnx, u16 subtype,
 		 HvLpEvent_AckInd ackind, HvLpEvent_AckType acktype,
 		 u64 token,
 		 u64 data1, u64 data2, u64 data3, u64 data4, u64 data5)
@@ -335,7 +324,9 @@ static void veth_take_monitor_ack(struct veth_lpar_connection *cnx,
 static void veth_handle_ack(struct VethLpEvent *event)
 {
 	HvLpIndex rlp = event->base_event.xTargetLp;
-	struct veth_lpar_connection *cnx = &mFabricMgr->connection[rlp];
+	struct veth_lpar_connection *cnx = veth_cnx[rlp];
+
+	BUG_ON(! cnx);
 
 	switch (event->base_event.xSubtype) {
 	case VethEventTypeCap:
@@ -353,9 +344,11 @@ static void veth_handle_ack(struct VethLpEvent *event)
 static void veth_handle_int(struct VethLpEvent *event)
 {
 	HvLpIndex rlp = event->base_event.xSourceLp;
-	struct veth_lpar_connection *cnx = &mFabricMgr->connection[rlp];
+	struct veth_lpar_connection *cnx = veth_cnx[rlp];
 	unsigned long flags;
 	int i;
+
+	BUG_ON(! cnx);
 
 	switch (event->base_event.xSubtype) {
 	case VethEventTypeCap:
@@ -405,7 +398,7 @@ static int veth_process_caps(struct veth_lpar_connection *cnx)
 
 	if ( (remote_caps->num_buffers == 0)
 	     || (remote_caps->ack_threshold > VETH_MAX_ACKS_PER_MSG)
-	     || (remote_caps->ack_threshold == 0) 
+	     || (remote_caps->ack_threshold == 0)
 	     || (cnx->ack_timeout == 0) ) {
 		veth_error("Received incompatible capabilities from lpar %d\n",
 			   cnx->remote_lp);
@@ -415,23 +408,23 @@ static int veth_process_caps(struct veth_lpar_connection *cnx)
 	num_acks_needed = (remote_caps->num_buffers
 			   / remote_caps->ack_threshold) + 1;
 
-	/* FIXME: locking on mNumberLpAcksAlloced */
-	if (cnx->mNumberLpAcksAlloced < num_acks_needed) {
+	/* FIXME: locking on num_ack_events? */
+	if (cnx->num_ack_events < num_acks_needed) {
 		int num;
-		
-		num_acks_needed = num_acks_needed - cnx->mNumberLpAcksAlloced;
-		
-		num = veth_allocate_events(cnx->remote_lp, num_acks_needed);
-		if (num > 0)
-			cnx->mNumberLpAcksAlloced += num;
-	}
-	
-	if (cnx->mNumberLpAcksAlloced < num_acks_needed) {
-		veth_error("Couldn't allocate all the frames ack events for lpar %d\n",
-			   cnx->remote_lp);
 
-		return HvLpEvent_Rc_BufferNotAvailable;
+		num = veth_allocate_events(cnx->remote_lp,
+					   num_acks_needed-cnx->num_ack_events);
+		if (num > 0)
+			cnx->num_ack_events += num;
+
+		if (cnx->num_ack_events < num_acks_needed) {
+			veth_error("Couldn't allocate enough ack events for lpar %d\n",
+				   cnx->remote_lp);
+
+			return HvLpEvent_Rc_BufferNotAvailable;
+		}
 	}
+
 
 	return HvLpEvent_Rc_Good;
 }
@@ -463,7 +456,7 @@ static void veth_statemachine(void *p)
 				| VETH_STATE_OPEN | VETH_STATE_SENTCAPS
 				| VETH_STATE_GOTCAPACK | VETH_STATE_GOTCAPS
 				| VETH_STATE_SENTCAPACK | VETH_STATE_READY);
-		
+
 		/* Clean up any leftover messages */
 		if (cnx->msgs)
 			for (i = 0; i < VETH_NUMBUFFERS; ++i)
@@ -475,12 +468,11 @@ static void veth_statemachine(void *p)
 		goto out;
 
 	if ( !(cnx->state & VETH_STATE_OPEN) ) {
-		if (! cnx->msgs || (cnx->mNumberAllocated < 2)
-		    || ! cnx->mNumberRcvMsgs)
+		if (! cnx->msgs || (cnx->num_events < (2 + VETH_NUMBUFFERS)) )
 			goto cant_cope;
 
 		HvCallEvent_openLpEventPath(rlp, HvLpEvent_Type_VirtualLan);
-		cnx->src_inst = 
+		cnx->src_inst =
 			HvCallEvent_getSourceLpInstanceId(rlp,
 							  HvLpEvent_Type_VirtualLan);
 		cnx->dst_inst =
@@ -495,7 +487,7 @@ static void veth_statemachine(void *p)
 				      HvLpEvent_AckInd_DoAck,
 				      HvLpEvent_AckType_DeferredAck,
 				      0, 0, 0, 0, 0, 0);
-		
+
 		if (rc == HvLpEvent_Rc_Good) {
 			cnx->state |= VETH_STATE_SENTMON;
 		} else {
@@ -590,13 +582,20 @@ static void veth_statemachine(void *p)
 	spin_unlock_irq(&cnx->lock);
 }
 
-static void veth_init_connection(struct veth_lpar_connection *cnx, u8 rlp)
+static int veth_init_connection(u8 rlp)
 {
+	struct veth_lpar_connection *cnx;
 	struct veth_msg *msgs;
-	HvLpIndex this_lp = mFabricMgr->this_lp;
 	int i;
 
-	cnx->state = 0;
+	if ( (rlp == this_lp)
+	     || ! HvLpConfig_doLpsCommunicateOnVirtualLan(this_lp, rlp) )
+		return 0;
+
+	cnx = kmalloc(sizeof(*cnx), GFP_KERNEL);
+	if (! cnx)
+		return -ENOMEM;
+	memset(cnx, 0, sizeof(*cnx));
 
 	cnx->remote_lp = rlp;
 	spin_lock_init(&cnx->lock);
@@ -605,45 +604,45 @@ static void veth_init_connection(struct veth_lpar_connection *cnx, u8 rlp)
 	cnx->ack_timer.function = veth_timed_ack;
 	cnx->ack_timer.data = (unsigned long) cnx;
 	memset(&cnx->pending_acks, 0xff, sizeof (cnx->pending_acks));
-	cnx->num_pending_acks = 0;
 
-	if ( (rlp == this_lp) 
-	     || ! HvLpConfig_doLpsCommunicateOnVirtualLan(this_lp, rlp) )
-		return;
+	veth_cnx[rlp] = cnx;
 
 	msgs = kmalloc(VETH_NUMBUFFERS * sizeof(struct veth_msg), GFP_KERNEL);
-	if (! msgs)
-		return;
+	if (! msgs) {
+		veth_error("Can't allocate buffers for lpar %d\n", rlp);
+		return -ENOMEM;
+	}
 
 	cnx->msgs = msgs;
 	memset(msgs, 0, VETH_NUMBUFFERS * sizeof(struct veth_msg));
-	spin_lock_init(&cnx->msg_stack.lock);
+	spin_lock_init(&cnx->msg_stack_lock);
 
 	for (i = 0; i < VETH_NUMBUFFERS; i++) {
 		msgs[i].token = i;
-		VETHSTACKPUSH(&cnx->msg_stack, msgs + i);
+		veth_stack_push(cnx, msgs + i);
 	}
 
-	cnx->mNumberAllocated = veth_allocate_events(rlp, 2);
+	cnx->num_events = veth_allocate_events(rlp, 2 + VETH_NUMBUFFERS);
 
-	if (cnx->mNumberAllocated < 2) {
-		veth_error("Couldn't allocate base msgs for lpar %d, only got %d\n",
-			   cnx->remote_lp, cnx->mNumberAllocated);
-		/* FIXME: break, somehow */
-		return;
+	if (cnx->num_events < (2 + VETH_NUMBUFFERS)) {
+		veth_error("Can't allocate events for lpar %d, only got %d\n",
+			   rlp, cnx->num_events);
+		return -ENOMEM;
 	}
-
-	cnx->mNumberRcvMsgs = veth_allocate_events(cnx->remote_lp,
-						   VETH_NUMBUFFERS);
 
 	cnx->local_caps.num_buffers = VETH_NUMBUFFERS;
 	cnx->local_caps.ack_threshold = ACK_THRESHOLD;
 	cnx->local_caps.ack_timeout = VETH_ACKTIMEOUT;
+
+	return 0;
 }
 
-static void veth_close_connection(u8 rlp)
+static void veth_destroy_connection(u8 rlp)
 {
-	struct veth_lpar_connection *cnx = &mFabricMgr->connection[rlp];
+	struct veth_lpar_connection *cnx = veth_cnx[rlp];
+
+	if (! cnx)
+		return;
 
 	spin_lock_irq(&cnx->lock);
 	cnx->state |= VETH_STATE_RESET | VETH_STATE_SHUTDOWN;
@@ -656,6 +655,20 @@ static void veth_close_connection(u8 rlp)
 	 * been deleted by the state machine, just want to make sure
 	 * its not running any more */
 	del_timer_sync(&cnx->ack_timer);
+
+	if (cnx->num_events > 0)
+		mf_deallocateLpEvents(cnx->remote_lp,
+				      HvLpEvent_Type_VirtualLan,
+				      cnx->num_events,
+				      NULL, NULL);
+	if (cnx->num_ack_events > 0)
+		mf_deallocateLpEvents(cnx->remote_lp,
+				      HvLpEvent_Type_VirtualLan,
+				      cnx->num_ack_events,
+				      NULL, NULL);
+
+	if (cnx->msgs)
+		kfree(cnx->msgs);
 }
 
 /*
@@ -712,7 +725,7 @@ static void veth_set_multicast_list(struct net_device *dev)
 
 		/* Update table */
 		port->num_mcast = 0;
-		
+
 		for (i = 0; i < dev->mc_count; i++) {
 			u8 *addr = dmi->dmi_addr;
 			u64 xaddr = 0;
@@ -803,7 +816,7 @@ struct net_device * __init veth_probe_one(int vlan)
 	for (i = 0; i < HVMAXARCHITECTEDLPS; i++) {
 		HvLpVirtualLanIndexMap map;
 
-		if (i == mFabricMgr->this_lp)
+		if (i == this_lp)
 			continue;
 		map = HvLpConfig_getVirtualLanIndexMapForLp(i);
 		if (map & (0x8000 >> vlan))
@@ -815,7 +828,7 @@ struct net_device * __init veth_probe_one(int vlan)
 	dev->dev_addr[2] = 0xff;
 	dev->dev_addr[3] = vlan;
 	dev->dev_addr[4] = 0xff;
-	dev->dev_addr[5] = HvLpConfig_getLpIndex_outline();
+	dev->dev_addr[5] = this_lp;
 
 	dev->mtu = VETH_MAX_MTU;
 
@@ -833,7 +846,7 @@ struct net_device * __init veth_probe_one(int vlan)
 	rc = register_netdev(dev);
 	if (rc != 0) {
 		veth_printk(KERN_ERR,
-			    "Failed to register an ethernet device for vlan %d\n",
+			    "Failed to register ethernet device for vlan %d\n",
 			    vlan);
 		free_netdev(dev);
 		return NULL;
@@ -845,34 +858,6 @@ struct net_device * __init veth_probe_one(int vlan)
 	return dev;
 }
 
-int __init veth_probe(void)
-{
-	HvLpIndexMap vlan_map = HvLpConfig_getVirtualLanIndexMap();
-	int i;
-
-	memset(veth_devices, 0, sizeof(veth_devices));
-
-	for (i = 0; vlan_map != 0; vlan_map <<= 1, i++) {
-		struct net_device *dev = NULL;
-
-		if (! (vlan_map & 0x8000))
-			continue;
-
-		dev = veth_probe_one(i);
-
-		if (dev) {
-			mFabricMgr->netdev[i] = dev;
-			veth_devices[veth_num_devices] = dev;
-			veth_num_devices++;
-		}
-	}
-
-	if (veth_num_devices == 0)
-		return -ENODEV;
-
-	return 0;
-}
-
 /*
  * Tx path
  */
@@ -880,59 +865,66 @@ int __init veth_probe(void)
 static int veth_transmit_to_one(struct sk_buff *skb, HvLpIndex rlp,
 				struct net_device *dev)
 {
-	struct veth_lpar_connection *cnx = mFabricMgr->connection + rlp;
+	struct veth_lpar_connection *cnx = veth_cnx[rlp];
+	struct veth_port *port = (struct veth_port *) dev->priv;
 	HvLpEvent_Rc rc;
 	u32 dma_address, dma_length;
 	struct veth_msg *msg = NULL;
-	int err = 2;
+	int err = 0;
 	unsigned long flags;
+
+	if (! cnx) {
+		port->stats.tx_errors++;
+		dev_kfree_skb(skb);
+		return 0;
+	}
 
 	spin_lock_irqsave(&cnx->lock, flags);
 
 	if (! cnx->state & VETH_STATE_READY)
-		goto out;
+		goto drop;
 
 	if ((skb->len - 14) > VETH_MAX_MTU)
-		goto out;
+		goto drop;
 
-	VETHSTACKPOP(&cnx->msg_stack, msg);
+	msg = veth_stack_pop(cnx);
 
 	if (! msg) {
 		err = 1;
-		goto out;
+		goto drop;
 	}
 
 	dma_length = skb->len;
-	dma_address = pci_map_single(iSeries_veth_dev, skb->data,
-				     dma_length, PCI_DMA_TODEVICE);
-	
+	dma_address = vio_map_single(iSeries_veth_dev, skb->data,
+				     dma_length, DMA_TO_DEVICE);
+
+	if (dma_mapping_error(dma_address))
+		goto recycle_and_drop;
+
 	/* Is it really necessary to check the length and address
 	 * fields of the first entry here? */
-	if (!pci_dma_mapping_error(dma_address)) {
-		msg->skb = skb;
-		msg->data.addr[0] = dma_address;
-		msg->data.len[0] = dma_length;
-		msg->data.eof = 1;
-		set_bit(0, &(msg->in_use));
-		rc = veth_signaldata(cnx, VethEventTypeFrames,
-				     msg->token, &msg->data);
-	} else {
-		struct veth_port *port = (struct veth_port *) dev->priv;
-		rc = -1;	/* Bad return code */
-		port->stats.tx_errors++;
-	}
+	msg->skb = skb;
+	msg->data.addr[0] = dma_address;
+	msg->data.len[0] = dma_length;
+	msg->data.eofmask = 1 << VETH_EOF_SHIFT;
+	set_bit(0, &(msg->in_use));
+	rc = veth_signaldata(cnx, VethEventTypeFrames, msg->token, &msg->data);
 
-	if (rc != HvLpEvent_Rc_Good) {
-		msg->skb = NULL;
-		/* need to set in use to make veth_recycle_msg in case
-		 * this was a mapping failure */
-		set_bit(0, &msg->in_use);
-		veth_recycle_msg(cnx, msg);
-	} else {
-		err = 0;
-	}
+	if (rc != HvLpEvent_Rc_Good)
+		goto recycle_and_drop;
 
- out:
+	spin_unlock_irqrestore(&cnx->lock, flags);
+	return 0;
+
+ recycle_and_drop:
+	msg->skb = NULL;
+	/* need to set in use to make veth_recycle_msg in case this
+	 * was a mapping failure */
+	set_bit(0, &msg->in_use);
+	veth_recycle_msg(cnx, msg);
+ drop:
+	port->stats.tx_errors++;
+	dev_kfree_skb(skb);
 	spin_unlock_irqrestore(&cnx->lock, flags);
 	return err;
 }
@@ -950,23 +942,16 @@ static HvLpIndexMap veth_transmit_to_many(struct sk_buff *skb,
 
 		if (! lpmask & (1<<i))
 			continue;
-		
+
 		clone = skb_clone(skb, GFP_ATOMIC);
 		if (! clone) {
 			veth_error("%s: skb_clone failed %p\n",
 				   dev->name, skb);
 			continue;
 		}
-		/* the ack handles deleting the skb */
+
 		rc = veth_transmit_to_one(clone, i, dev);
-		
-		/* tx failed, we need to free the skb */
-		if (rc != 0)
-			dev_kfree_skb(clone);
-			
-		/* if we didn't fail from lack of buffers, the tx as a
-		 * whole is successful */
-		if (rc != 1)
+		if (! rc)
 			lpmask &= ~(1<<i);
 	}
 
@@ -984,8 +969,6 @@ static int veth_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	struct veth_port *port = (struct veth_port *) dev->priv;
 	unsigned long flags;
 	HvLpIndexMap lpmask;
-
-	BUG_ON(! mFabricMgr);
 
 	if (! (frame[0] & 0x01)) {
 		/* unicast packet */
@@ -1008,7 +991,8 @@ static int veth_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	} else {
 		spin_lock_irqsave(&port->pending_gate, flags);
 		if (port->pending_skb) {
-			veth_error("%s: Tx while skb was pending!\n", dev->name);
+			veth_error("%s: Tx while skb was pending!\n",
+				   dev->name);
 			dev_kfree_skb(skb);
 			return 1;
 		}
@@ -1024,37 +1008,42 @@ static int veth_start_xmit(struct sk_buff *skb, struct net_device *dev)
 }
 
 static void veth_recycle_msg(struct veth_lpar_connection *cnx,
-			     struct veth_msg *myMsg)
+			     struct veth_msg *msg)
 {
 	u32 dma_address, dma_length;
 
-	if (test_and_clear_bit(0, &myMsg->in_use)) {
-		dma_address = myMsg->data.addr[0];
-		dma_length = myMsg->data.len[0];
+	if (test_and_clear_bit(0, &msg->in_use)) {
+		dma_address = msg->data.addr[0];
+		dma_length = msg->data.len[0];
 
-		pci_unmap_single(iSeries_veth_dev, dma_address, dma_length,
-				 PCI_DMA_TODEVICE);
+		vio_unmap_single(iSeries_veth_dev, dma_address, dma_length,
+				 DMA_TO_DEVICE);
 
-		if (myMsg->skb) {
-			dev_kfree_skb_any(myMsg->skb);
-			myMsg->skb = NULL;
+		if (msg->skb) {
+			dev_kfree_skb_any(msg->skb);
+			msg->skb = NULL;
 		}
 
-		memset(&myMsg->data, 0, sizeof(myMsg->data));
-		VETHSTACKPUSH(&cnx->msg_stack, myMsg);
+		memset(&msg->data, 0, sizeof(msg->data));
+		veth_stack_push(cnx, msg);
 	} else
 		if (cnx->state & VETH_STATE_OPEN)
 			veth_error("Bogus frames ack from lpar %d (#%d)\n",
-				   cnx->remote_lp, myMsg->token);
+				   cnx->remote_lp, msg->token);
 }
 
 static void veth_flush_pending(struct veth_lpar_connection *cnx)
 {
 	int i;
-	for (i = 0; i < veth_num_devices; i++) {
-		struct net_device *dev = veth_devices[i];
-		struct veth_port *port = (struct veth_port *)dev->priv;
+	for (i = 0; i < HVMAXARCHITECTEDVIRTUALLANS; i++) {
+		struct net_device *dev = veth_dev[i];
+		struct veth_port *port;
 		unsigned long flags;
+
+		if (! dev)
+			continue;
+
+		port = (struct veth_port *)dev->priv;
 
 		if (! (port->lpar_map & (1<<cnx->remote_lp)))
 			continue;
@@ -1085,17 +1074,15 @@ static inline int veth_frame_wanted(struct veth_port *port, u64 mac_addr)
 	int i;
 	unsigned long flags;
 
-	if ( (mac_addr == port->mac_addr)
-	     || (mac_addr == 0xffffffffffff0000)
-	     || port->promiscuous )
+	if ( (mac_addr == port->mac_addr) || (mac_addr == 0xffffffffffff0000) )
 		return 1;
-	
+
 	if (! (((char *) &mac_addr)[0] & 0x01))
 		return 0;
 
 	read_lock_irqsave(&port->mcast_gate, flags);
 
-	if (port->all_mcast) {
+	if (port->promiscuous || port->all_mcast) {
 		wanted = 1;
 		goto out;
 	}
@@ -1120,8 +1107,8 @@ struct dma_chunk {
 
 #define VETH_MAX_PAGES_PER_FRAME ( (VETH_MAX_MTU+PAGE_SIZE-2)/PAGE_SIZE + 1 )
 
-static inline void veth_build_dma_list(struct dma_chunk *list, unsigned char *p,
-				      unsigned long length)
+static inline void veth_build_dma_list(struct dma_chunk *list,
+				       unsigned char *p, unsigned long length)
 {
 	unsigned long done;
 	int i = 1;
@@ -1129,21 +1116,38 @@ static inline void veth_build_dma_list(struct dma_chunk *list, unsigned char *p,
 	/* FIXME: skbs are continguous in real addresses.  Do we
 	 * really need to break it into PAGE_SIZE chunks, or can we do
 	 * it just at the granularity of iSeries real->absolute
-	 * mapping? */
-	list[0].addr = veth_dma_addr(p);
+	 * mapping?  Indeed, given the way the allocator works, can we
+	 * count on them being absolutely contiguous? */
+	list[0].addr = ISERIES_HV_ADDR(p);
 	list[0].size = min(length,
 			   PAGE_SIZE - ((unsigned long)p & ~PAGE_MASK));
 
 	done = list[0].size;
 	while (done < length) {
-		list[i].addr = veth_dma_addr(p + done);
+		list[i].addr = ISERIES_HV_ADDR(p + done);
 		list[i].size = min(length-done, PAGE_SIZE);
 		done += list[i].size;
 		i++;
 	}
 }
 
-static void veth_receive(struct veth_lpar_connection *cnx, struct VethLpEvent *event)
+static void veth_flush_acks(struct veth_lpar_connection *cnx)
+{
+	HvLpEvent_Rc rc;
+
+	rc = veth_signaldata(cnx, VethEventTypeFramesAck,
+			     0, &cnx->pending_acks);
+
+	if (rc != HvLpEvent_Rc_Good)
+		veth_error("Error 0x%x acking frames from lpar %d!\n",
+			   (unsigned)rc, cnx->remote_lp);
+
+	cnx->num_pending_acks = 0;
+	memset(&cnx->pending_acks, 0xff, sizeof(cnx->pending_acks));
+}
+
+static void veth_receive(struct veth_lpar_connection *cnx,
+			 struct VethLpEvent *event)
 {
 	struct VethFramesData *senddata = &event->u.frames_data;
 	int startchunk = 0;
@@ -1165,34 +1169,38 @@ static void veth_receive(struct veth_lpar_connection *cnx, struct VethLpEvent *e
 		memset(local_list, 0, sizeof(local_list));
 		memset(remote_list, 0, sizeof(VETH_MAX_FRAMES_PER_MSG));
 
-		nchunks = 0;
-
 		/* a 0 address marks the end of the valid entries */
 		if (senddata->addr[startchunk] == 0)
 			break;
 
 		/* make sure that we have at least 1 EOF entry in the
 		 * remaining entries */
-		if (! (senddata->eof >> startchunk)) {
-			veth_error("missing EOF frag in event: 0x%x startchunk=%d\n",
-				   (unsigned) senddata->eof, startchunk);
+		if (! (senddata->eofmask >> (startchunk + VETH_EOF_SHIFT))) {
+			veth_error("missing EOF frag in event "
+				   "eofmask=0x%x startchunk=%d\n",
+				   (unsigned) senddata->eofmask, startchunk);
 			break;
 		}
-		
+
 		/* build list of chunks in this frame */
+		nchunks = 0;
 		do {
 			remote_list[nchunks].addr =
-				(u64) senddata->addr[startchunk + nchunks] << 32;
+				(u64) senddata->addr[startchunk+nchunks] << 32;
 			remote_list[nchunks].size =
-				senddata->len[startchunk + nchunks];
+				senddata->len[startchunk+nchunks];
 			length += remote_list[nchunks].size;
-		} while (! (senddata->eof & (1 << (startchunk + nchunks++))));
+		} while (! (senddata->eofmask &
+			    (1 << (VETH_EOF_SHIFT + startchunk + nchunks++))));
 
 		/* length == total length of all chunks */
 		/* nchunks == # of chunks in this frame */
 
-		if ((length - ETH_HLEN) > VETH_MAX_MTU)
+		if ((length - ETH_HLEN) > VETH_MAX_MTU) {
+			veth_error("Received oversize frame from lpar %d "
+				   "(length=%d)\n", cnx->remote_lp, length);
 			continue;
+		}
 
 		skb = alloc_skb(length, GFP_ATOMIC);
 		if (!skb)
@@ -1207,16 +1215,16 @@ static void veth_receive(struct veth_lpar_connection *cnx, struct VethLpEvent *e
 					    cnx->dst_inst,
 					    HvLpDma_AddressType_RealAddress,
 					    HvLpDma_AddressType_TceIndex,
-					    veth_dma_addr(&local_list),
-					    veth_dma_addr(&remote_list),
+					    ISERIES_HV_ADDR(&local_list),
+					    ISERIES_HV_ADDR(&remote_list),
 					    length);
 		if (rc != HvLpDma_Rc_Good) {
 			dev_kfree_skb_irq(skb);
 			continue;
 		}
-		
+
 		vlan = skb->data[9];
-		dev = mFabricMgr->netdev[vlan];
+		dev = veth_dev[vlan];
 		if (! dev)
 			/* Some earlier versions of the driver sent
 			   broadcasts down all connections, even to
@@ -1236,7 +1244,7 @@ static void veth_receive(struct veth_lpar_connection *cnx, struct VethLpEvent *e
 			dev_kfree_skb_irq(skb);
 			continue;
 		}
-			
+
 		skb_put(skb, length);
 		skb->dev = dev;
 		skb->protocol = eth_type_trans(skb, dev);
@@ -1248,54 +1256,32 @@ static void veth_receive(struct veth_lpar_connection *cnx, struct VethLpEvent *e
 
 	/* Ack it */
 	spin_lock_irqsave(&cnx->lock, flags);
-	
-	if (cnx->num_pending_acks < VETH_MAX_ACKS_PER_MSG) {
-		cnx->pending_acks[cnx->num_pending_acks] =
-			event->base_event.xCorrelationToken;
-		++cnx->num_pending_acks;
-		
-		if (cnx->num_pending_acks == cnx->remote_caps.ack_threshold) {
-			rc = veth_signaldata(cnx, VethEventTypeFramesAck,
-					     0, &cnx->pending_acks);
-			
-			if (rc != HvLpEvent_Rc_Good)
-				veth_error("Error 0x%x acking frames from lpar %d!\n",
-					   (unsigned)rc, cnx->remote_lp);
-			
-			cnx->num_pending_acks = 0;
-			memset(&cnx->pending_acks, 0xff, sizeof(cnx->pending_acks));
-		}
-		
-	}
-	
+	BUG_ON(cnx->num_pending_acks > VETH_MAX_ACKS_PER_MSG);
+
+	cnx->pending_acks[cnx->num_pending_acks++] =
+		event->base_event.xCorrelationToken;
+
+	if ( (cnx->num_pending_acks >= cnx->remote_caps.ack_threshold)
+	     || (cnx->num_pending_acks >= VETH_MAX_ACKS_PER_MSG) )
+		veth_flush_acks(cnx);
+
 	spin_unlock_irqrestore(&cnx->lock, flags);
 }
 
 static void veth_timed_ack(unsigned long ptr)
 {
-	unsigned long flags;
-	HvLpEvent_Rc rc;
 	struct veth_lpar_connection *cnx = (struct veth_lpar_connection *) ptr;
+	unsigned long flags;
 
 	/* Ack all the events */
 	spin_lock_irqsave(&cnx->lock, flags);
-
-	if (cnx->num_pending_acks > 0) {
-		rc = veth_signaldata(cnx, VethEventTypeFramesAck,
-				     0, &cnx->pending_acks);
-		if (rc != HvLpEvent_Rc_Good)
-			veth_error("Error 0x%x acking frames from lpar %d!\n", 
-				   (unsigned) rc, cnx->remote_lp);
-
-		cnx->num_pending_acks = 0;
-		memset(&cnx->pending_acks, 0xff, sizeof(cnx->pending_acks));
-	}
-
-	spin_unlock_irqrestore(&cnx->lock, flags);
+	if (cnx->num_pending_acks > 0)
+		veth_flush_acks(cnx);
 
 	/* Reschedule the timer */
 	cnx->ack_timer.expires = jiffies + cnx->ack_timeout;
 	add_timer(&cnx->ack_timer);
+	spin_unlock_irqrestore(&cnx->lock, flags);
 }
 
 /*
@@ -1305,99 +1291,65 @@ static void veth_timed_ack(unsigned long ptr)
 void __exit veth_module_cleanup(void)
 {
 	int i;
-	struct VethFabricMgr *fm = mFabricMgr;
-
-	if (! mFabricMgr)
-		return;
 
 	for (i = 0; i < HVMAXARCHITECTEDLPS; ++i)
-		veth_close_connection(i);
-	
+		veth_destroy_connection(i);
+
 	HvLpEvent_unregisterHandler(HvLpEvent_Type_VirtualLan);
-	
-	mb();
-	mFabricMgr = NULL;
-	mb();
-	
-	for (i = 0; i < HVMAXARCHITECTEDLPS; ++i) {
-		struct veth_lpar_connection *cnx = &fm->connection[i];
 
-		if (cnx->mNumberAllocated + cnx->mNumberRcvMsgs > 0) {
-			mf_deallocateLpEvents(cnx->remote_lp,
-					      HvLpEvent_Type_VirtualLan,
-					      cnx->mNumberAllocated
-					      + cnx->mNumberRcvMsgs,
-					      NULL, NULL);
-		}
-		
-		if (cnx->msgs)
-			kfree(cnx->msgs);
-	}
-	
 	for (i = 0; i < HVMAXARCHITECTEDVIRTUALLANS; ++i) {
-		struct net_device *dev;
+		struct net_device *dev = veth_dev[i];
 
-		if (! fm->netdev[i])
+		if (! dev)
 			continue;
 
-		dev = fm->netdev[i];
-		fm->netdev[i] = NULL;
-
-		mb();
-			
-		if (dev) {
-			unregister_netdev(dev);
-			free_netdev(dev);
-		}
+		veth_dev[i] = NULL;
+		unregister_netdev(dev);
+		free_netdev(dev);
 	}
-	
-	kfree(fm);
 }
 module_exit(veth_module_cleanup);
 
 int __init veth_module_init(void)
 {
+	HvLpIndexMap vlan_map = HvLpConfig_getVirtualLanIndexMap();
 	int i;
-	int this_lp;
 	int rc;
 
-	mFabricMgr = kmalloc(sizeof (struct VethFabricMgr), GFP_KERNEL);
-	if (! mFabricMgr) {
-		veth_error("Unable to allocate fabric manager\n");
-		return -ENOMEM;
-	}
-
-	memset(mFabricMgr, 0, sizeof (*mFabricMgr));
-
 	this_lp = HvLpConfig_getLpIndex_outline();
-	mFabricMgr->this_lp = this_lp;
 
 	for (i = 0; i < HVMAXARCHITECTEDLPS; ++i) {
-		struct veth_lpar_connection *cnx = &mFabricMgr->connection[i];
-
-		veth_init_connection(cnx, i);
+		rc = veth_init_connection(i);
+		if (rc != 0) {
+			veth_module_cleanup();
+			return rc;
+		}
 	}
 
-	rc = veth_probe();
-	if (rc != 0) {
-		veth_module_cleanup();
-		return rc;
-	}
+	for (i = 0; i < HVMAXARCHITECTEDVIRTUALLANS; ++i) {
+		struct net_device *dev;
 
-	HvLpEvent_registerHandler(HvLpEvent_Type_VirtualLan, &veth_handle_event);
-
-	/* Run through the active lps and open connections to the ones
-	 * we need to */
-	/* FIXME: is there any reason to do this backwards? */
-	for (i = HVMAXARCHITECTEDLPS - 1; i >= 0; --i) {
-		struct veth_lpar_connection *cnx = &mFabricMgr->connection[i];
-
-		if ( (i == this_lp) 
-		     || ! HvLpConfig_doLpsCommunicateOnVirtualLan(this_lp, i) )
+		if (! (vlan_map & (0x8000 >> i)))
 			continue;
 
-		veth_kick_statemachine(cnx);
+		dev = veth_probe_one(i);
+
+		if (! dev) {
+			veth_module_cleanup();
+			return rc;
+		}
+
+		veth_dev[i] = dev;
 	}
+
+	HvLpEvent_registerHandler(HvLpEvent_Type_VirtualLan,
+				  &veth_handle_event);
+
+	/* Start the state machine on each connection, to commence
+	 * link negotiation */
+	for (i = 0; i < HVMAXARCHITECTEDLPS; i++)
+		if (veth_cnx[i])
+			veth_kick_statemachine(veth_cnx[i]);
 
 	return 0;
 }

@@ -38,12 +38,15 @@
 #define TIMEOUT		((HZ + 99) / 100)
 
 static struct tty_driver *hvc_driver;
-static int count;
+static int hvc_count;
+static int hvc_kicked;
+static wait_queue_head_t hvc_wait_queue;
 #ifdef CONFIG_MAGIC_SYSRQ
 static int sysrq_pressed;
 #endif
 
 #define N_OUTBUF	16
+#define N_INBUF		16
 
 #define __ALIGNED__	__attribute__((__aligned__(8)))
 
@@ -59,15 +62,34 @@ struct hvc_struct {
 	int do_wakeup;
 	char outbuf[N_OUTBUF] __ALIGNED__;
 	int n_outbuf;
+	int irq_requested;
 };
 
 struct hvc_struct hvc_struct[MAX_NR_HVC_CONSOLES];
+
+static void hvc_kick(void)
+{
+	hvc_kicked = 1;
+	wake_up_interruptible(&hvc_wait_queue);
+}
+
+static irqreturn_t hvc_handle_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
+{
+	hvc_kick();
+	return IRQ_HANDLED;
+}
+
+static void hvc_unthrottle(struct tty_struct *tty)
+{
+	hvc_kick();
+}
 
 static int hvc_open(struct tty_struct *tty, struct file * filp)
 {
 	int line = tty->index;
 	struct hvc_struct *hp;
 	unsigned long flags;
+	int irq = NO_IRQ;
 
 	if (line < 0 || line >= MAX_NR_HVC_CONSOLES)
 		return -ENODEV;
@@ -77,7 +99,18 @@ static int hvc_open(struct tty_struct *tty, struct file * filp)
 	spin_lock_irqsave(&hp->lock, flags);
 	hp->tty = tty;
 	hp->count++;
+	if (hp->count == 1) {
+		irq = hvc_interrupt(hp->index);
+		if (irq != NO_IRQ)
+			hp->irq_requested = 1;
+	}
 	spin_unlock_irqrestore(&hp->lock, flags);
+	/* XX check error, fallback to non-irq ? */
+	if (irq != NO_IRQ)
+		request_irq(irq, hvc_handle_interrupt, SA_INTERRUPT, "hvc_console", hp);
+
+	/* Force wakeup of the polling thread */
+	hvc_kick();
 
 	return 0;
 }
@@ -86,24 +119,41 @@ static void hvc_close(struct tty_struct *tty, struct file * filp)
 {
 	struct hvc_struct *hp = tty->driver_data;
 	unsigned long flags;
+	int irq = NO_IRQ;
 
-	if (tty_hung_up_p(filp))
-		return;
 	spin_lock_irqsave(&hp->lock, flags);
-	if (--hp->count == 0)
+	if (tty_hung_up_p(filp))
+		goto bail;
+
+	if (--hp->count == 0) {
 		hp->tty = NULL;
-	else if (hp->count < 0)
+		if (hp->irq_requested)
+			irq = hvc_interrupt(hp->index);
+		hp->irq_requested = 0;
+	} else if (hp->count < 0)
 		printk(KERN_ERR "hvc_close %lu: oops, count is %d\n",
 		       hp - hvc_struct, hp->count);
+ bail:
 	spin_unlock_irqrestore(&hp->lock, flags);
+	if (irq != NO_IRQ)
+		free_irq(irq, hp);
 }
 
 static void hvc_hangup(struct tty_struct *tty)
 {
 	struct hvc_struct *hp = tty->driver_data;
+	unsigned long flags;
+	int irq = NO_IRQ;
 
+	spin_lock_irqsave(&hp->lock, flags);
 	hp->count = 0;
 	hp->tty = NULL;
+	if (hp->irq_requested)
+		irq = hvc_interrupt(hp->index);
+	hp->irq_requested = 0;
+	spin_unlock_irqrestore(&hp->lock, flags);
+	if (irq != NO_IRQ)
+		free_irq(irq, hp);
 }
 
 /* called with hp->lock held */
@@ -126,69 +176,103 @@ static void hvc_push(struct hvc_struct *hp)
 		hp->do_wakeup = 1;
 }
 
-static int hvc_write(struct tty_struct *tty, int from_user,
-		     const unsigned char *buf, int count)
+static inline int __hvc_write_user(struct hvc_struct *hp,
+				   const unsigned char *buf, int count)
 {
-	struct hvc_struct *hp = tty->driver_data;
 	char *tbuf, *p;
 	int tbsize, rsize, written = 0;
 	unsigned long flags;
 
-	if (from_user) {
-		tbsize = min(count, (int)PAGE_SIZE);
-		if (!(tbuf = kmalloc(tbsize, GFP_KERNEL)))
-			return -ENOMEM;
+	tbsize = min(count, (int)PAGE_SIZE);
+	if (!(tbuf = kmalloc(tbsize, GFP_KERNEL)))
+		return -ENOMEM;
 
-		while ((rsize = count - written) > 0) {
-			int wsize;
-			if (rsize > tbsize)
-				rsize = tbsize;
+	while ((rsize = count - written) > 0) {
+		int wsize;
+		if (rsize > tbsize)
+			rsize = tbsize;
 
-			p = tbuf;
-			rsize -= copy_from_user(p, buf, rsize);
-			if (!rsize) {
-				if (written == 0)
-					written = -EFAULT;
-				break;
-			}
-			buf += rsize;
-			written += rsize;
-
-			spin_lock_irqsave(&hp->lock, flags);
-			for (wsize = N_OUTBUF - hp->n_outbuf; rsize && wsize;
-					wsize = N_OUTBUF - hp->n_outbuf) {
-				if (wsize > rsize)
-					wsize = rsize;
-				memcpy(hp->outbuf + hp->n_outbuf, p, wsize);
-				hp->n_outbuf += wsize;
-				hvc_push(hp);
-				rsize -= wsize;
-				p += wsize;
-			}
-			spin_unlock_irqrestore(&hp->lock, flags);
-
-			if (rsize)
-				break;
-
-			if (count < tbsize)
-				tbsize = count;
+		p = tbuf;
+		rsize -= copy_from_user(p, buf, rsize);
+		if (!rsize) {
+			if (written == 0)
+				written = -EFAULT;
+			break;
 		}
+		buf += rsize;
 
-		kfree(tbuf);
-	} else {
 		spin_lock_irqsave(&hp->lock, flags);
-		while (count > 0 && (rsize = N_OUTBUF - hp->n_outbuf) > 0) {
-			if (rsize > count)
-				rsize = count;
-			memcpy(hp->outbuf + hp->n_outbuf, buf, rsize);
-			count -= rsize;
-			buf += rsize;
-			hp->n_outbuf += rsize;
-			written += rsize;
+
+		/* Push pending writes: make some room in buffer */
+		if (hp->n_outbuf > 0)
 			hvc_push(hp);
+
+		for (wsize = N_OUTBUF - hp->n_outbuf; rsize && wsize;
+		     wsize = N_OUTBUF - hp->n_outbuf) {
+			if (wsize > rsize)
+				wsize = rsize;
+			memcpy(hp->outbuf + hp->n_outbuf, p, wsize);
+			hp->n_outbuf += wsize;
+			hvc_push(hp);
+			rsize -= wsize;
+			p += wsize;
+			written += wsize;
 		}
 		spin_unlock_irqrestore(&hp->lock, flags);
+
+		if (rsize)
+			break;
+
+		if (count < tbsize)
+			tbsize = count;
 	}
+
+	kfree(tbuf);
+
+	return written;
+}
+
+static inline int __hvc_write_kernel(struct hvc_struct *hp,
+				   const unsigned char *buf, int count)
+{
+	unsigned long flags;
+	int rsize, written = 0;
+
+	spin_lock_irqsave(&hp->lock, flags);
+
+	/* Push pending writes */
+	if (hp->n_outbuf > 0)
+		hvc_push(hp);
+
+	while (count > 0 && (rsize = N_OUTBUF - hp->n_outbuf) > 0) {
+		if (rsize > count)
+			rsize = count;
+		memcpy(hp->outbuf + hp->n_outbuf, buf, rsize);
+		count -= rsize;
+		buf += rsize;
+		hp->n_outbuf += rsize;
+		written += rsize;
+		hvc_push(hp);
+	}
+	spin_unlock_irqrestore(&hp->lock, flags);
+
+	return written;
+}
+
+static int hvc_write(struct tty_struct *tty, int from_user,
+		     const unsigned char *buf, int count)
+{
+	struct hvc_struct *hp = tty->driver_data;
+	int written;
+
+	if (from_user)
+		written = __hvc_write_user(hp, buf, count);
+	else
+		written = __hvc_write_kernel(hp, buf, count);
+
+	/* Racy, but harmless, kick thread if there are still pending data */
+	if (hp->n_outbuf)
+		hvc_kick();
 
 	return written;
 }
@@ -207,59 +291,106 @@ static int hvc_chars_in_buffer(struct tty_struct *tty)
 	return hp->n_outbuf;
 }
 
-static void hvc_poll(int index)
+#define HVC_POLL_READ	0x00000001
+#define HVC_POLL_WRITE	0x00000002
+#define HVC_POLL_QUICK	0x00000004
+
+static int hvc_poll(int index)
 {
 	struct hvc_struct *hp = &hvc_struct[index];
 	struct tty_struct *tty;
-	int i, n;
-	char buf[16] __ALIGNED__;
+	int i, n, poll_mask = 0;
+	char buf[N_INBUF] __ALIGNED__;
 	unsigned long flags;
+	int read_total = 0;
 
 	spin_lock_irqsave(&hp->lock, flags);
 
+	/* Push pending writes */
 	if (hp->n_outbuf > 0)
 		hvc_push(hp);
+	/* Reschedule us if still some write pending */
+	if (hp->n_outbuf > 0)
+		poll_mask |= HVC_POLL_WRITE;
 
+	/* No tty attached, just skip */
 	tty = hp->tty;
-	if (tty) {
-		for (;;) {
-			if (TTY_FLIPBUF_SIZE - tty->flip.count < sizeof(buf))
-				break;
-			n = hvc_arch_get_chars(index, buf, sizeof(buf));
-			if (n <= 0) {
-				if (n == -EPIPE) {
-					printk("tty_hangup\n");
-					tty_hangup(tty);
-				}
-				break;
-			}
-			for (i = 0; i < n; ++i) {
-#ifdef CONFIG_MAGIC_SYSRQ		/* Handle the SysRq Hack */
-				if (buf[i] == '\x0f') {	/* ^O -- should support a sequence */
-					sysrq_pressed = 1;
-					continue;
-				} else if (sysrq_pressed) {
-					handle_sysrq(buf[i], NULL, tty);
-					sysrq_pressed = 0;
-					continue;
-				}
-#endif
-				tty_insert_flip_char(tty, buf[i], 0);
-			}
+	if (tty == NULL)
+		goto bail;
+
+	/* Now check if we can get data (are we throttled ?) */
+	if (test_bit(TTY_THROTTLED, &tty->flags))
+		goto throttled;
+
+	/* If we aren't interrupt driven and aren't throttled, we always
+	 * request a reschedule
+	 */
+	if (hvc_interrupt(index) == NO_IRQ)
+		poll_mask |= HVC_POLL_READ;
+
+	/* Read data if any */
+	for (;;) {
+		int count = N_INBUF;
+		if (count > (TTY_FLIPBUF_SIZE - tty->flip.count))
+			count = TTY_FLIPBUF_SIZE - tty->flip.count;
+
+		/* If flip is full, just reschedule a later read */
+		if (count == 0) {
+			poll_mask |= HVC_POLL_READ;
+			break;
 		}
+		
+		n = hvc_arch_get_chars(index, buf, count);
+		if (n <= 0) {
+			/* Hangup the tty when disconnected from host */
+			if (n == -EPIPE) {
+				spin_unlock_irqrestore(&hp->lock, flags);
+				tty_hangup(tty);
+				spin_lock_irqsave(&hp->lock, flags);
+			}
+			break;
+		}
+		for (i = 0; i < n; ++i) {
+#ifdef CONFIG_MAGIC_SYSRQ
+			/* Handle the SysRq Hack */
+			if (buf[i] == '\x0f') {	/* ^O -- should support a sequence */
+				sysrq_pressed = 1;
+				continue;
+			} else if (sysrq_pressed) {
+				handle_sysrq(buf[i], NULL, tty);
+				sysrq_pressed = 0;
+				continue;
+			}
+#endif /* CONFIG_MAGIC_SYSRQ */
+			tty_insert_flip_char(tty, buf[i], 0);
+		}
+
 		if (tty->flip.count)
 			tty_schedule_flip(tty);
 
-		if (hp->do_wakeup) {
-			hp->do_wakeup = 0;
-			if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP))
-			    && tty->ldisc.write_wakeup)
-				(tty->ldisc.write_wakeup)(tty);
-			wake_up_interruptible(&tty->write_wait);
+		/* Account the total amount read in one loop, and if above 64 bytes,
+		 * we do a quick schedule loop to let the tty grok the data and
+		 * eventually throttle us
+		 */
+		read_total += n;
+		if (read_total >= 64) {
+			poll_mask |= HVC_POLL_QUICK;
+			break;
 		}
 	}
-
+ throttled:
+	/* Wakeup write queue if necessary */
+	if (hp->do_wakeup) {
+		hp->do_wakeup = 0;
+		if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP))
+		    && tty->ldisc.write_wakeup)
+			(tty->ldisc.write_wakeup)(tty);
+		wake_up_interruptible(&tty->write_wait);
+	}
+ bail:
 	spin_unlock_irqrestore(&hp->lock, flags);
+
+	return poll_mask;
 }
 
 #if defined(CONFIG_XMON) && defined(CONFIG_SMP)
@@ -271,17 +402,37 @@ static const cpumask_t cpus_in_xmon = CPU_MASK_NONE;
 
 int khvcd(void *unused)
 {
-	int i;
+	int i, poll_mask;
 
 	daemonize("khvcd");
 
 	for (;;) {
+		wait_queue_t wait = __WAITQUEUE_INITIALIZER(wait,current);
+
+		poll_mask = 0;
+		hvc_kicked = 0;
+		wmb();
 		if (cpus_empty(cpus_in_xmon)) {
 			for (i = 0; i < MAX_NR_HVC_CONSOLES; ++i)
-				hvc_poll(i);
+				poll_mask |= hvc_poll(i);
+		} else
+			poll_mask |= HVC_POLL_READ;
+		if (hvc_kicked)
+			continue;
+		if (poll_mask & HVC_POLL_QUICK) {
+			yield();
+			continue;
 		}
+		add_wait_queue(&hvc_wait_queue, &wait);
 		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(TIMEOUT);
+		if (!hvc_kicked) {
+			if (poll_mask == 0)
+				schedule();
+			else
+				schedule_timeout(TIMEOUT);
+		}
+		set_current_state(TASK_RUNNING);
+		remove_wait_queue(&hvc_wait_queue, &wait);
 	}
 }
 
@@ -314,6 +465,7 @@ static struct tty_operations hvc_ops = {
 	.close = hvc_close,
 	.write = hvc_write,
 	.hangup = hvc_hangup,
+	.unthrottle = hvc_unthrottle,
 	.write_room = hvc_write_room,
 	.chars_in_buffer = hvc_chars_in_buffer,
 	.tiocmget = hvc_tiocmget,
@@ -322,7 +474,9 @@ static struct tty_operations hvc_ops = {
 
 int __init hvc_init(void)
 {
-	hvc_driver = alloc_tty_driver(count);
+	init_waitqueue_head(&hvc_wait_queue);
+
+	hvc_driver = alloc_tty_driver(hvc_count);
 	if (!hvc_driver)
 		return -ENOMEM;
 
@@ -340,7 +494,7 @@ int __init hvc_init(void)
 	if (tty_register_driver(hvc_driver))
 		panic("Couldn't register hvc console driver\n");
 
-	if (count > 0)
+	if (hvc_count > 0)
 		kernel_thread(khvcd, NULL, CLONE_KERNEL);
 	else
 		printk(KERN_WARNING "no virtual consoles found\n");
@@ -391,7 +545,7 @@ static struct tty_driver *hvc_console_device(struct console *c, int *index)
 static int __init hvc_console_setup(struct console *co, char *options)
 {
 	if (co->index < 0 || co->index >= MAX_NR_HVC_CONSOLES
-	    || co->index >= count)
+	    || co->index >= hvc_count)
 		return -1;
 	return 0;
 }
@@ -410,14 +564,14 @@ int hvc_instantiate(void)
 {
 	struct hvc_struct *hvc;
 
-	if (count >= MAX_NR_HVC_CONSOLES)
+	if (hvc_count >= MAX_NR_HVC_CONSOLES)
 		return -1;
 
-	hvc = &hvc_struct[count];
+	hvc = &hvc_struct[hvc_count];
 	hvc->lock = SPIN_LOCK_UNLOCKED;
-	hvc->index = count;
+	hvc->index = hvc_count;
 
-	count++;
+	hvc_count++;
 
 	return 0;
 }

@@ -33,6 +33,7 @@
 #include <linux/spinlock.h>
 #include <linux/string.h>
 #include <linux/pci.h>
+#include <linux/dma-mapping.h>
 #include <asm/io.h>
 #include <asm/prom.h>
 #include <asm/rtas.h>
@@ -46,7 +47,7 @@
 
 static void tce_build_pSeries(struct iommu_table *tbl, long index, 
 			      long npages, unsigned long uaddr, 
-			      int direction)
+			      enum dma_data_direction direction)
 {
 	union tce_entry t;
 	union tce_entry *tp;
@@ -54,7 +55,7 @@ static void tce_build_pSeries(struct iommu_table *tbl, long index,
 	t.te_word = 0;
 	t.te_rdwr = 1; // Read allowed 
 
-	if (direction != PCI_DMA_TODEVICE)
+	if (direction != DMA_TO_DEVICE)
 		t.te_pciwr = 1;
 
 	tp = ((union tce_entry *)tbl->it_base) + index;
@@ -210,6 +211,7 @@ static void iommu_table_setparms(struct pci_controller *phb,
 	tbl->it_index = 0;
 	tbl->it_entrysize = sizeof(union tce_entry);
 	tbl->it_blocksize = 16;
+	tbl->it_type = TCE_PCI;
 }
 
 /*
@@ -245,6 +247,7 @@ static void iommu_table_setparms_lpar(struct pci_controller *phb,
 	tbl->it_index  = dma_window[0];
 	tbl->it_entrysize = sizeof(union tce_entry);
 	tbl->it_blocksize  = 16;
+	tbl->it_type = TCE_PCI;
 }
 
 

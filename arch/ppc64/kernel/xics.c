@@ -190,7 +190,7 @@ static void pSeriesLP_xirr_info_set(int n_cpu, int value)
 		      val64); 
 }
 
-static void pSeriesLP_cppr_info(int n_cpu, u8 value)
+void pSeriesLP_cppr_info(int n_cpu, u8 value)
 {
 	unsigned long lpar_rc;
 
@@ -236,13 +236,14 @@ static unsigned int real_irq_to_virt(unsigned int real_irq)
 	return ptr - virt_irq_to_real_map;
 }
 
+#ifdef CONFIG_SMP
 static int get_irq_server(unsigned int irq)
 {
 	cpumask_t cpumask = irq_affinity[irq];
 	cpumask_t allcpus = CPU_MASK_ALL;
 	cpumask_t tmp = CPU_MASK_NONE;
 	unsigned int server;
-	
+
 #ifdef CONFIG_IRQ_ALL_CPUS
 	/* For the moment only implement delivery to all cpus or one cpu */
 	if (smp_threads_ready) {
@@ -265,6 +266,12 @@ static int get_irq_server(unsigned int irq)
 	return server;
 
 }
+#else
+static int get_irq_server(unsigned int irq)
+{
+	return default_server;
+}
+#endif
 
 static void xics_enable_irq(unsigned int virq)
 {
@@ -396,10 +403,8 @@ irqreturn_t xics_ipi_action(int irq, void *dev_id, struct pt_regs *regs)
 	int cpu = smp_processor_id();
 
 	ops->qirr_info(cpu, 0xff);
-	if (cpu_is_offline(cpu))
-		printk("xics_ipi_action %08lx on %i\n",
-		       xics_ipi_message[cpu].value,
-		       cpu);
+
+	WARN_ON(cpu_is_offline(cpu));
 
 	while (xics_ipi_message[cpu].value) {
 		if (test_and_clear_bit(PPC_MSG_CALL_FUNCTION,
@@ -699,7 +704,7 @@ void xics_migrate_irqs_away(void)
 			goto unlock;
 		}
 
-		/* 
+		/*
 		 * We only support delivery to all cpus or to one cpu.
 		 * The irq has to be migrated only in the single cpu
 		 * case.

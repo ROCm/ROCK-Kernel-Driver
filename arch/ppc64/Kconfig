@@ -226,14 +226,8 @@ config LPARCFG
 	help
 	Provide system capacity information via human readable 
 	<key word>=<value> pairs through a /proc/ppc64/lparcfg interface.
-
-config VIOCFG
-	tristate "Virtual I/O Configuration Data"
-	depends on PPC_PSERIES && SCSI_IBMVSCSI
-	help
-	Provide configuration information from a virtual I/O host.
-	Data is in the form
-	<key word>=<value> pairs in /proc/vioconfig.
+	LPARCFG uses the "Virtual Processor Utilization Values" framework for PURR 
+	support. 
 
 config PPC_VPURR
 	bool "Virtual Processor Utilization Values"
@@ -241,7 +235,8 @@ config PPC_VPURR
 	depends on PPC_PSERIES
 	help
 	Provide framework to collect virtual processor utilization
-	periodically. If unsure say NO.
+	periodically.  This function is used by "LPAR Configuration Data" for PURR support.  
+	If unsure say NO.
 
 endmenu
 
@@ -284,10 +279,10 @@ source "fs/Kconfig.binfmt"
 source "drivers/pci/Kconfig"
 
 config HOTPLUG_CPU
-	bool "Support for hot-pluggable CPUs (EXPERIMENTAL)"
+	bool "Support for hot-pluggable CPUs"
 	depends on SMP && HOTPLUG && EXPERIMENTAL
 	---help---
-	  Say Y here to experiment with turning CPUs off and on.
+	  Say Y here to be able to turn CPUs off and on.
 
 	  Say N if you are unsure.
 

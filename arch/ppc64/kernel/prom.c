@@ -32,6 +32,7 @@
 #include <linux/proc_fs.h>
 #include <linux/stringify.h>
 #include <linux/delay.h>
+#include <linux/initrd.h>
 #include <asm/prom.h>
 #include <asm/rtas.h>
 #include <asm/lmb.h>
@@ -123,12 +124,7 @@ struct pci_intr_map {
 
 
 typedef unsigned long interpret_func(struct device_node *, unsigned long,
-				     int, int);
-static interpret_func interpret_pci_props;
-static interpret_func interpret_isa_props;
-static interpret_func interpret_root_props;
-static interpret_func interpret_dbdma_props;
-static interpret_func interpret_macio_props;
+				     int, int, int);
 
 #ifndef FB_MAX			/* avoid pulling in all of the fb stuff */
 #define FB_MAX	8
@@ -141,6 +137,9 @@ char *prom_display_paths[FB_MAX] __initdata = { 0, };
 phandle prom_display_nodes[FB_MAX] __initdata;
 unsigned int prom_num_displays = 0;
 char *of_stdout_device = 0;
+
+static int iommu_force_on;
+int ppc64_iommu_off;
 
 extern struct rtas_t rtas;
 extern unsigned long klimit;
@@ -160,29 +159,6 @@ struct device_node *allnodes = 0;
  * or parent members of struct device_node.
  */
 static rwlock_t devtree_lock = RW_LOCK_UNLOCKED;
-
-static unsigned long call_prom(const char *service, int nargs, int nret, ...);
-static void prom_panic(const char *reason);
-static unsigned long copy_device_tree(unsigned long);
-static unsigned long inspect_node(phandle, struct device_node *, unsigned long,
-				  unsigned long, struct device_node ***);
-static unsigned long finish_node(struct device_node *, unsigned long,
-				 interpret_func *, int, int);
-static unsigned long finish_node_interrupts(struct device_node *, unsigned long);
-static unsigned long check_display(unsigned long);
-static int prom_next_node(phandle *);
-static struct bi_record * prom_bi_rec_verify(struct bi_record *);
-static unsigned long prom_bi_rec_reserve(unsigned long);
-static struct device_node *find_phandle(phandle);
-static void of_node_cleanup(struct device_node *);
-static struct device_node *derive_parent(const char *);
-static void add_node_proc_entries(struct device_node *);
-static void remove_node_proc_entries(struct device_node *);
-static int of_finish_dynamic_node(struct device_node *);
-
-#ifdef DEBUG_PROM
-void prom_dump_lmb(void);
-#endif
 
 extern unsigned long reloc_offset(void);
 
@@ -208,8 +184,9 @@ char testString[] = "LINUX\n";
  * mode when we do.  We switch back to 64b mode upon return.
  */
 
-static unsigned long __init
-call_prom(const char *service, int nargs, int nret, ...)
+#define PROM_ERROR	(0x00000000fffffffful)
+
+static unsigned long __init call_prom(const char *service, int nargs, int nret, ...)
 {
 	int i;
 	unsigned long offset = reloc_offset();
@@ -235,30 +212,7 @@ call_prom(const char *service, int nargs, int nret, ...)
 }
 
 
-static void __init
-prom_panic(const char *reason)
-{
-	unsigned long offset = reloc_offset();
-
-	prom_print(reason);
-	/* ToDo: should put up an SRC here */
-	call_prom(RELOC("exit"), 0, 0);
-
-	for (;;)			/* should never get here */
-		;
-}
-
-void __init
-prom_enter(void)
-{
-	unsigned long offset = reloc_offset();
-
-	call_prom(RELOC("enter"), 0, 0);
-}
-
-
-void __init
-prom_print(const char *msg)
+static void __init prom_print(const char *msg)
 {
 	const char *p, *q;
 	unsigned long offset = reloc_offset();
@@ -281,8 +235,8 @@ prom_print(const char *msg)
 	}
 }
 
-void
-prom_print_hex(unsigned long val)
+
+static void __init prom_print_hex(unsigned long val)
 {
         int i, nibbles = sizeof(val)*2;
         char buf[sizeof(val)*2+1];
@@ -297,16 +251,47 @@ prom_print_hex(unsigned long val)
 	prom_print(buf);
 }
 
-void
-prom_print_nl(void)
+
+static void __init prom_print_nl(void)
 {
 	unsigned long offset = reloc_offset();
 	prom_print(RELOC("\n"));
 }
 
 
-static unsigned long
-prom_initialize_naca(unsigned long mem)
+static void __init prom_panic(const char *reason)
+{
+	unsigned long offset = reloc_offset();
+
+	prom_print(reason);
+	/* ToDo: should put up an SRC here */
+	call_prom(RELOC("exit"), 0, 0);
+
+	for (;;)			/* should never get here */
+		;
+}
+
+
+static int __init prom_next_node(phandle *nodep)
+{
+	phandle node;
+	unsigned long offset = reloc_offset();
+
+	if ((node = *nodep) != 0
+	    && (*nodep = call_prom(RELOC("child"), 1, 1, node)) != 0)
+		return 1;
+	if ((*nodep = call_prom(RELOC("peer"), 1, 1, node)) != 0)
+		return 1;
+	for (;;) {
+		if ((node = call_prom(RELOC("parent"), 1, 1, node)) == 0)
+			return 0;
+		if ((*nodep = call_prom(RELOC("peer"), 1, 1, node)) != 0)
+			return 1;
+	}
+}
+
+
+static void __init prom_initialize_naca(void)
 {
 	phandle node;
 	char type[64];
@@ -521,14 +506,10 @@ prom_initialize_naca(unsigned long mem)
 
 	prom_print(RELOC("prom_initialize_naca: end...\n"));
 #endif
-
-	return mem;
 }
 
-static int iommu_force_on;
-int ppc64_iommu_off;
 
-static void early_cmdline_parse(void)
+static void __init early_cmdline_parse(void)
 {
 	unsigned long offset = reloc_offset();
 	char *opt;
@@ -558,8 +539,58 @@ static void early_cmdline_parse(void)
 #endif
 }
 
-static unsigned long __init
-prom_initialize_lmb(unsigned long mem)
+#ifdef DEBUG_PROM
+void prom_dump_lmb(void)
+{
+        unsigned long i;
+        unsigned long offset = reloc_offset();
+	struct lmb *_lmb  = PTRRELOC(&lmb);
+
+        prom_print(RELOC("\nprom_dump_lmb:\n"));
+        prom_print(RELOC("    memory.cnt                  = 0x"));
+        prom_print_hex(_lmb->memory.cnt);
+	prom_print_nl();
+        prom_print(RELOC("    memory.size                 = 0x"));
+        prom_print_hex(_lmb->memory.size);
+	prom_print_nl();
+        for (i=0; i < _lmb->memory.cnt ;i++) {
+                prom_print(RELOC("    memory.region[0x"));
+		prom_print_hex(i);
+		prom_print(RELOC("].base       = 0x"));
+                prom_print_hex(_lmb->memory.region[i].base);
+		prom_print_nl();
+                prom_print(RELOC("                      .physbase = 0x"));
+                prom_print_hex(_lmb->memory.region[i].physbase);
+		prom_print_nl();
+                prom_print(RELOC("                      .size     = 0x"));
+                prom_print_hex(_lmb->memory.region[i].size);
+		prom_print_nl();
+        }
+
+	prom_print_nl();
+        prom_print(RELOC("    reserved.cnt                  = 0x"));
+        prom_print_hex(_lmb->reserved.cnt);
+	prom_print_nl();
+        prom_print(RELOC("    reserved.size                 = 0x"));
+        prom_print_hex(_lmb->reserved.size);
+	prom_print_nl();
+        for (i=0; i < _lmb->reserved.cnt ;i++) {
+                prom_print(RELOC("    reserved.region[0x"));
+		prom_print_hex(i);
+		prom_print(RELOC("].base       = 0x"));
+                prom_print_hex(_lmb->reserved.region[i].base);
+		prom_print_nl();
+                prom_print(RELOC("                      .physbase = 0x"));
+                prom_print_hex(_lmb->reserved.region[i].physbase);
+		prom_print_nl();
+                prom_print(RELOC("                      .size     = 0x"));
+                prom_print_hex(_lmb->reserved.region[i].size);
+		prom_print_nl();
+        }
+}
+#endif /* DEBUG_PROM */
+
+static void __init prom_initialize_lmb(void)
 {
 	phandle node;
 	char type[64];
@@ -621,8 +652,6 @@ prom_initialize_lmb(unsigned long mem)
 #ifdef DEBUG_PROM
 	prom_dump_lmb();
 #endif /* DEBUG_PROM */
-
-	return mem;
 }
 
 static char hypertas_funcs[1024];
@@ -642,13 +671,15 @@ prom_instantiate_rtas(void)
 #endif
 	prom_rtas = (ihandle)call_prom(RELOC("finddevice"), 1, 1, RELOC("/rtas"));
 	if (prom_rtas != (ihandle) -1) {
-		int  rc; 
-		
-		if ((rc = call_prom(RELOC("getprop"), 
+		unsigned long x;
+		x = call_prom(RELOC("getprop"), 
 				  4, 1, prom_rtas,
 				  RELOC("ibm,hypertas-functions"), 
 				  hypertas_funcs, 
-				  sizeof(hypertas_funcs))) > 0) {
+			      sizeof(hypertas_funcs));
+
+		if (x != PROM_ERROR) {
+			prom_print(RELOC("Hypertas detected, assuming LPAR !\n"));
 			_systemcfg->platform = PLATFORM_PSERIES_LPAR;
 		}
 
@@ -670,6 +701,7 @@ prom_instantiate_rtas(void)
 				struct lmb *_lmb  = PTRRELOC(&lmb);
 				rtas_region = min(_lmb->rmo_size, RTAS_INSTANTIATE_MAX);
 			}
+
 			_rtas->base = lmb_alloc_base(_rtas->size, PAGE_SIZE, rtas_region);
 
 			prom_print(RELOC(" at 0x"));
@@ -679,10 +711,10 @@ prom_instantiate_rtas(void)
 					      	1, 1, RELOC("/rtas"));
 			prom_print(RELOC("..."));
 
-			if ((long)call_prom(RELOC("call-method"), 3, 2,
+			if (call_prom(RELOC("call-method"), 3, 2,
 						      RELOC("instantiate-rtas"),
 						      prom_rtas,
-						      _rtas->base) >= 0) {
+						      _rtas->base) != PROM_ERROR) {
 				_rtas->entry = (long)_prom->args.rets[1];
 			}
 			RELOC(rtas_rmo_buf)
@@ -713,74 +745,9 @@ prom_instantiate_rtas(void)
 #endif
 }
 
-unsigned long prom_strtoul(const char *cp)
-{
-	unsigned long result = 0,value;
-
-	while (*cp) {
-		value = *cp-'0';
-		result = result*10 + value;
-		cp++;
-	} 
-
-	return result;
-}
-
-#ifdef DEBUG_PROM
-void
-prom_dump_lmb(void)
-{
-        unsigned long i;
-        unsigned long offset = reloc_offset();
-	struct lmb *_lmb  = PTRRELOC(&lmb);
-
-        prom_print(RELOC("\nprom_dump_lmb:\n"));
-        prom_print(RELOC("    memory.cnt                  = 0x"));
-        prom_print_hex(_lmb->memory.cnt);
-	prom_print_nl();
-        prom_print(RELOC("    memory.size                 = 0x"));
-        prom_print_hex(_lmb->memory.size);
-	prom_print_nl();
-        for (i=0; i < _lmb->memory.cnt ;i++) {
-                prom_print(RELOC("    memory.region[0x"));
-		prom_print_hex(i);
-		prom_print(RELOC("].base       = 0x"));
-                prom_print_hex(_lmb->memory.region[i].base);
-		prom_print_nl();
-                prom_print(RELOC("                      .physbase = 0x"));
-                prom_print_hex(_lmb->memory.region[i].physbase);
-		prom_print_nl();
-                prom_print(RELOC("                      .size     = 0x"));
-                prom_print_hex(_lmb->memory.region[i].size);
-		prom_print_nl();
-        }
-
-	prom_print_nl();
-        prom_print(RELOC("    reserved.cnt                  = 0x"));
-        prom_print_hex(_lmb->reserved.cnt);
-	prom_print_nl();
-        prom_print(RELOC("    reserved.size                 = 0x"));
-        prom_print_hex(_lmb->reserved.size);
-	prom_print_nl();
-        for (i=0; i < _lmb->reserved.cnt ;i++) {
-                prom_print(RELOC("    reserved.region[0x"));
-		prom_print_hex(i);
-		prom_print(RELOC("].base       = 0x"));
-                prom_print_hex(_lmb->reserved.region[i].base);
-		prom_print_nl();
-                prom_print(RELOC("                      .physbase = 0x"));
-                prom_print_hex(_lmb->reserved.region[i].physbase);
-		prom_print_nl();
-                prom_print(RELOC("                      .size     = 0x"));
-                prom_print_hex(_lmb->reserved.region[i].size);
-		prom_print_nl();
-        }
-}
-#endif /* DEBUG_PROM */
-
 
 #ifdef CONFIG_PMAC_DART
-void prom_initialize_dart_table(void)
+static void __init prom_initialize_dart_table(void)
 {
 	unsigned long offset = reloc_offset();
 	extern unsigned long dart_tablebase;
@@ -797,7 +764,7 @@ void prom_initialize_dart_table(void)
 	/* 16MB (1 << 24) alignment. We allocate a full 16Mb chuck since we
 	 * will blow up an entire large page anyway in the kernel mapping
 	 */
-	RELOC(dart_tablebase) =
+	RELOC(dart_tablebase) = (unsigned long)
 		abs_to_virt(lmb_alloc_base(1UL<<24, 1UL<<24, 0x80000000L));
 
 	prom_print(RELOC("Dart at: "));
@@ -806,9 +773,7 @@ void prom_initialize_dart_table(void)
 }
 #endif /* CONFIG_PMAC_DART */
 
-
-void
-prom_initialize_tce_table(void)
+static void __init prom_initialize_tce_table(void)
 {
 	phandle node;
 	ihandle phb_node;
@@ -864,13 +829,13 @@ prom_initialize_tce_table(void)
 
 		if (call_prom(RELOC("getprop"), 4, 1, node, 
 			     RELOC("tce-table-minalign"), &minalign, 
-			     sizeof(minalign)) < 0) {
+			     sizeof(minalign)) == PROM_ERROR) {
 			minalign = 0;
 		}
 
 		if (call_prom(RELOC("getprop"), 4, 1, node, 
 			     RELOC("tce-table-minsize"), &minsize, 
-			     sizeof(minsize)) < 0) {
+			     sizeof(minsize)) == PROM_ERROR) {
 			minsize = 4UL << 20;
 		}
 
@@ -939,7 +904,7 @@ prom_initialize_tce_table(void)
 		memset(path, 0, sizeof(path));
 		/* Call OF to setup the TCE hardware */
 		if (call_prom(RELOC("package-to-path"), 3, 1, node,
-                             path, sizeof(path)-1) <= 0) {
+                             path, sizeof(path)-1) == PROM_ERROR) {
                         prom_print(RELOC("package-to-path failed\n"));
                 } else {
                         prom_print(RELOC("opening PHB "));
@@ -992,8 +957,7 @@ prom_initialize_tce_table(void)
  *
  * -- Cort
  */
-static void
-prom_hold_cpus(unsigned long mem)
+static void __init prom_hold_cpus(unsigned long mem)
 {
 	unsigned long i;
 	unsigned int reg;
@@ -1103,7 +1067,7 @@ prom_hold_cpus(unsigned long mem)
 		path = (char *) mem;
 		memset(path, 0, 256);
 		if ((long) call_prom(RELOC("package-to-path"), 3, 1,
-				     node, path, 255) < 0)
+				     node, path, 255) == PROM_ERROR)
 			continue;
 
 #ifdef DEBUG_PROM
@@ -1249,12 +1213,10 @@ next:
 #endif
 }
 
-static void
-smt_setup(void)
+static void __init smt_setup(void)
 {
 	char *p, *q;
 	char my_smt_enabled = SMT_DYNAMIC;
-	unsigned long my_smt_snooze_delay; 
 	ihandle prom_options = NULL;
 	char option[9];
 	unsigned long offset = reloc_offset();
@@ -1301,51 +1263,6 @@ smt_setup(void)
 	if (!found )
 		my_smt_enabled = SMT_DYNAMIC; /* default to on */
 
-	found = 0;
-	if (my_smt_enabled) {
-		if (strstr(RELOC(cmd_line), RELOC("smt-snooze-delay="))) {
-			for (q = RELOC(cmd_line); (p = strstr(q, RELOC("smt-snooze-delay="))) != 0; ) {
-				q = p + 17;
-				if (p > RELOC(cmd_line) && p[-1] != ' ')
-					continue;
-				found = 1;
-				/* Don't use simple_strtoul() because _ctype & others aren't RELOC'd */
-				my_smt_snooze_delay = 0;
-				while (*q >= '0' && *q <= '9') {
-					my_smt_snooze_delay = my_smt_snooze_delay * 10 + *q - '0';
-					q++;
-				}
-			}
-		}
-
-		if (!found) {
-			prom_options = (ihandle)call_prom(RELOC("finddevice"), 1, 1, RELOC("/options"));
-			if (prom_options != (ihandle) -1) {
-				call_prom(RELOC("getprop"), 
-					4, 1, prom_options,
-					RELOC("ibm,smt-snooze-delay"), 
-					option, 
-					sizeof(option));
-				if (option[0] != 0) {
-					found = 1;
-					/* Don't use simple_strtoul() because _ctype & others aren't RELOC'd */
-					my_smt_snooze_delay = 0;
-					q = option;
-					while (*q >= '0' && *q <= '9') {
-						my_smt_snooze_delay = my_smt_snooze_delay * 10 + *q - '0';
-						q++;
-					}
-				}
-			}
-		}
-
-		if (!found) {
-			my_smt_snooze_delay = 0; /* default value */
-		}
-	} else {
-		my_smt_snooze_delay = 0; /* default value */
-	}
-	_naca->smt_snooze_delay = my_smt_snooze_delay;
 	_naca->smt_state = my_smt_enabled;
 }
 
@@ -1487,172 +1404,7 @@ static int __init prom_find_machine_type(void)
 	return PLATFORM_PSERIES;
 }
 
-/*
- * We enter here early on, when the Open Firmware prom is still
- * handling exceptions and the MMU hash table for us.
- */
-
-unsigned long __init
-prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
-	  unsigned long r6, unsigned long r7)
-{
-	unsigned long mem;
-	ihandle prom_cpu;
-	phandle cpu_pkg;
-	unsigned long offset = reloc_offset();
-	long l;
-	char *p, *d;
-	unsigned long phys;
-	u32 getprop_rval;
-	struct systemcfg *_systemcfg;
-	struct paca_struct *_xPaca = PTRRELOC(&paca[0]);
-	struct prom_t *_prom = PTRRELOC(&prom);
-
-	/* First zero the BSS -- use memset, some arches don't have
-	 * caches on yet */
-	memset(PTRRELOC(&__bss_start), 0, __bss_stop - __bss_start);
-
-	/* Setup systemcfg and NACA pointers now */
-	RELOC(systemcfg) = _systemcfg = (struct systemcfg *)(SYSTEMCFG_VIRT_ADDR - offset);
-	RELOC(naca) = (struct naca_struct *)(NACA_VIRT_ADDR - offset);
-
-	/* Init interface to Open Firmware and pickup bi-recs */
-	prom_init_client_services(pp);
-
-	/* Init prom stdout device */
-	prom_init_stdout();
-
-	/* check out if we have bi_recs */
-	_prom->bi_recs = prom_bi_rec_verify((struct bi_record *)r6);
-	if ( _prom->bi_recs != NULL )
-		RELOC(klimit) = PTRUNRELOC((unsigned long)_prom->bi_recs +
-					   _prom->bi_recs->data[1]);
-
-	/* Default machine type. */
-	_systemcfg->platform = prom_find_machine_type();
-
-	/* On pSeries, copy the CPU hold code */
-	if (_systemcfg->platform == PLATFORM_PSERIES)
-		copy_and_flush(0, KERNELBASE - offset, 0x100, 0);
-
-	/* Start storing things at klimit */
-      	mem = RELOC(klimit) - offset; 
-
-	/* Get the full OF pathname of the stdout device */
-	p = (char *) mem;
-	memset(p, 0, 256);
-	call_prom(RELOC("instance-to-path"), 3, 1, _prom->stdout, p, 255);
-	RELOC(of_stdout_device) = PTRUNRELOC(p);
-	mem += strlen(p) + 1;
-
-	getprop_rval = 1;
-	call_prom(RELOC("getprop"), 4, 1,
-		  _prom->root, RELOC("#size-cells"),
-		  &getprop_rval, sizeof(getprop_rval));
-	_prom->encode_phys_size = (getprop_rval == 1) ? 32 : 64;
-
-	/* Determine which cpu is actually running right _now_ */
-        if ((long)call_prom(RELOC("getprop"), 4, 1, _prom->chosen,
-			    RELOC("cpu"), &getprop_rval,
-			    sizeof(getprop_rval)) <= 0)
-                prom_panic(RELOC("cannot find boot cpu"));
-
-	prom_cpu = (ihandle)(unsigned long)getprop_rval;
-	cpu_pkg = call_prom(RELOC("instance-to-package"), 1, 1, prom_cpu);
-	call_prom(RELOC("getprop"), 4, 1,
-		cpu_pkg, RELOC("reg"),
-		&getprop_rval, sizeof(getprop_rval));
-	_prom->cpu = (int)(unsigned long)getprop_rval;
-	_xPaca[0].xHwProcNum = _prom->cpu;
-
-	RELOC(boot_cpuid) = 0;
-
-#ifdef DEBUG_PROM
-  	prom_print(RELOC("Booting CPU hw index = 0x"));
-  	prom_print_hex(_prom->cpu);
-  	prom_print_nl();
-#endif
-
-	/* Get the boot device and translate it to a full OF pathname. */
-	p = (char *) mem;
-	l = (long) call_prom(RELOC("getprop"), 4, 1, _prom->chosen,
-			    RELOC("bootpath"), p, 1<<20);
-	if (l > 0) {
-		p[l] = 0;	/* should already be null-terminated */
-		RELOC(bootpath) = PTRUNRELOC(p);
-		mem += l + 1;
-		d = (char *) mem;
-		*d = 0;
-		call_prom(RELOC("canon"), 3, 1, p, d, 1<<20);
-		RELOC(bootdevice) = PTRUNRELOC(d);
-		mem = DOUBLEWORD_ALIGN(mem + strlen(d) + 1);
-	}
-
-	RELOC(cmd_line[0]) = 0;
-	if ((long)_prom->chosen > 0) {
-		call_prom(RELOC("getprop"), 4, 1, _prom->chosen, 
-			  RELOC("bootargs"), p, sizeof(cmd_line));
-		if (p != NULL && p[0] != 0)
-			strlcpy(RELOC(cmd_line), p, sizeof(cmd_line));
-	}
-
-	early_cmdline_parse();
-
-	mem = prom_initialize_lmb(mem);
-
-	mem = prom_bi_rec_reserve(mem);
-
-	mem = check_display(mem);
-
-	if (_systemcfg->platform != PLATFORM_POWERMAC)
-		prom_instantiate_rtas();
-        
-        /* Initialize some system info into the Naca early... */
-        mem = prom_initialize_naca(mem);
-
-	smt_setup();
-	
-        /* If we are on an SMP machine, then we *MUST* do the
-         * following, regardless of whether we have an SMP
-         * kernel or not.
-         */
-	prom_hold_cpus(mem);
-
-#ifdef DEBUG_PROM
-	prom_print(RELOC("copying OF device tree...\n"));
-#endif
-	mem = copy_device_tree(mem);
-
-	RELOC(klimit) = mem + offset;
-
-	lmb_reserve(0, __pa(RELOC(klimit)));
-
-	if (_systemcfg->platform == PLATFORM_PSERIES)
-		prom_initialize_tce_table();
-
-#ifdef CONFIG_PMAC_DART
-	if (_systemcfg->platform == PLATFORM_POWERMAC)
-		prom_initialize_dart_table();
-#endif
-
-#ifdef CONFIG_BOOTX_TEXT
-	if(_prom->disp_node) {
-		prom_print(RELOC("Setting up bi display...\n"));
-		setup_disp_fake_bi(_prom->disp_node);
-	}
-#endif /* CONFIG_BOOTX_TEXT */
-
-	prom_print(RELOC("Calling quiesce ...\n"));
-	call_prom(RELOC("quiesce"), 0, 0);
-	phys = KERNELBASE - offset;
-
-	prom_print(RELOC("returning from prom_init\n"));
-	return phys;
-}
-
-
-static int
-prom_set_color(ihandle ih, int i, int r, int g, int b)
+static int __init prom_set_color(ihandle ih, int i, int r, int g, int b)
 {
 	unsigned long offset = reloc_offset();
 
@@ -1673,8 +1425,7 @@ prom_set_color(ihandle ih, int i, int r, int g, int b)
  * So we check whether we will need to open the display,
  * and if so, open it now.
  */
-static unsigned long __init
-check_display(unsigned long mem)
+static unsigned long __init check_display(unsigned long mem)
 {
 	phandle node;
 	ihandle ih;
@@ -1788,52 +1539,44 @@ check_display(unsigned long mem)
 	return DOUBLEWORD_ALIGN(mem);
 }
 
-
-static int __init
-prom_next_node(phandle *nodep)
+/* Return (relocated) pointer to this much memory: moves initrd if reqd. */
+static void __init *__make_room(unsigned long *mem_start, unsigned long *mem_end,
+				unsigned long needed, unsigned long align)
 {
-	phandle node;
+	void *ret;
 	unsigned long offset = reloc_offset();
 
-	if ((node = *nodep) != 0
-	    && (*nodep = call_prom(RELOC("child"), 1, 1, node)) != 0)
-		return 1;
-	if ((*nodep = call_prom(RELOC("peer"), 1, 1, node)) != 0)
-		return 1;
-	for (;;) {
-		if ((node = call_prom(RELOC("parent"), 1, 1, node)) == 0)
-			return 0;
-		if ((*nodep = call_prom(RELOC("peer"), 1, 1, node)) != 0)
-			return 1;
+	*mem_start = ALIGN(*mem_start, align);
+	if (*mem_start + needed > *mem_end) {
+		/* FIXME: Apple OF doesn't map unclaimed mem.  If this
+		 * ever happened on G5, we'd need to fix. */
+		unsigned long initrd_len;
+
+		if (*mem_end != RELOC(initrd_start))
+			prom_panic(RELOC("No memory for copy_device_tree"));
+
+		prom_print("Huge device_tree: moving initrd\n");
+		/* Move by 4M. */
+		initrd_len = RELOC(initrd_end) - RELOC(initrd_start);
+		*mem_end = RELOC(initrd_start) + 4 * 1024 * 1024;
+		memmove((void *)*mem_end, (void *)RELOC(initrd_start),
+			initrd_len);
+		RELOC(initrd_start) = *mem_end;
+		RELOC(initrd_end) = RELOC(initrd_start) + initrd_len;
 	}
+
+	ret = (void *)*mem_start;
+	*mem_start += needed;
+
+	return ret;
 }
 
-/*
- * Make a copy of the device tree from the PROM.
- */
-static unsigned long __init
-copy_device_tree(unsigned long mem_start)
-{
-	phandle root;
-	unsigned long new_start;
-	struct device_node **allnextp;
-	unsigned long offset = reloc_offset();
-	unsigned long mem_end = mem_start + (8<<20);
+#define make_room(startp, endp, type) \
+	__make_room(startp, endp, sizeof(type), __alignof__(type))
 
-	root = call_prom(RELOC("peer"), 1, 1, (phandle)0);
-	if (root == (phandle)0) {
-		prom_panic(RELOC("couldn't get device tree root\n"));
-	}
-	allnextp = &RELOC(allnodes);
-	mem_start = DOUBLEWORD_ALIGN(mem_start);
-	new_start = inspect_node(root, 0, mem_start, mem_end, &allnextp);
-	*allnextp = 0;
-	return new_start;
-}
-
-static unsigned long __init
+static void __init
 inspect_node(phandle node, struct device_node *dad,
-	     unsigned long mem_start, unsigned long mem_end,
+	     unsigned long *mem_start, unsigned long *mem_end,
 	     struct device_node ***allnextpp)
 {
 	int l;
@@ -1844,9 +1587,9 @@ inspect_node(phandle node, struct device_node *dad,
 	unsigned char *valp;
 	unsigned long offset = reloc_offset();
 
-	np = (struct device_node *) mem_start;
-	mem_start += sizeof(struct device_node);
+	np = make_room(mem_start, mem_end, struct device_node);
 	memset(np, 0, sizeof(*np));
+	
 	np->node = node;
 	**allnextpp = PTRUNRELOC(np);
 	*allnextpp = &np->allnext;
@@ -1864,19 +1607,22 @@ inspect_node(phandle node, struct device_node *dad,
 	prev_propp = &np->properties;
 	prev_name = RELOC("");
 	for (;;) {
-		pp = (struct property *) mem_start;
-		namep = (char *) (pp + 1);
-		pp->name = PTRUNRELOC(namep);
+		/* 32 is max len of name including nul. */
+		namep = make_room(mem_start, mem_end, char[32]);
 		if ((long) call_prom(RELOC("nextprop"), 3, 1, node, prev_name,
-				    namep) <= 0)
+				     namep) <= 0) {
+			/* No more nodes: unwind alloc */
+			*mem_start = (unsigned long)namep;
 			break;
-		mem_start = DOUBLEWORD_ALIGN((unsigned long)namep + strlen(namep) + 1);
+		}
+		/* Trim off some if we can */
+		*mem_start = DOUBLEWORD_ALIGN((unsigned long)namep
+					     + strlen(namep) + 1);
+		pp = make_room(mem_start, mem_end, struct property);
+		pp->name = PTRUNRELOC(namep);
 		prev_name = namep;
-		valp = (unsigned char *) mem_start;
-		pp->value = PTRUNRELOC(valp);
-		pp->length = (int)(long)
-			call_prom(RELOC("getprop"), 4, 1, node, namep,
-				  valp, mem_end - mem_start);
+
+		pp->length = call_prom(RELOC("getproplen"), 2, 1, node, namep);
 		if (pp->length < 0)
 			continue;
 		if (pp->length > MAX_PROPERTY_LENGTH) {
@@ -1895,7 +1641,9 @@ inspect_node(phandle node, struct device_node *dad,
 
 			continue;
 		}
-		mem_start = DOUBLEWORD_ALIGN(mem_start + pp->length);
+		valp = __make_room(mem_start, mem_end, pp->length, 1);
+		pp->value = PTRUNRELOC(valp);
+		call_prom(RELOC("getprop"), 4, 1, node, namep,valp,pp->length);
 		*prev_propp = PTRUNRELOC(pp);
 		prev_propp = &pp->next;
 	}
@@ -1919,109 +1667,387 @@ inspect_node(phandle node, struct device_node *dad,
 	*prev_propp = 0;
 
 	/* get the node's full name */
+	namep = (char *)*mem_start;
 	l = (long) call_prom(RELOC("package-to-path"), 3, 1, node,
-			    (char *) mem_start, mem_end - mem_start);
+			     namep, *mem_end - *mem_start);
 	if (l >= 0) {
-		np->full_name = PTRUNRELOC((char *) mem_start);
-		*(char *)(mem_start + l) = 0;
-		mem_start = DOUBLEWORD_ALIGN(mem_start + l + 1);
+		/* Didn't fit?  Get more room. */
+		if (l+1 > *mem_end - *mem_start) {
+			namep = __make_room(mem_start, mem_end, l+1, 1);
+			call_prom(RELOC("package-to-path"),3,1,node,namep,l);
+		}
+		np->full_name = PTRUNRELOC(namep);
+		namep[l] = '\0';
+		*mem_start = DOUBLEWORD_ALIGN(*mem_start + l + 1);
 	}
 
 	/* do all our children */
 	child = call_prom(RELOC("child"), 1, 1, node);
 	while (child != (phandle)0) {
-		mem_start = inspect_node(child, np, mem_start, mem_end,
+		inspect_node(child, np, mem_start, mem_end,
 					 allnextpp);
 		child = call_prom(RELOC("peer"), 1, 1, child);
 	}
-
-	return mem_start;
 }
 
 /*
- * finish_device_tree is called once things are running normally
- * (i.e. with text and data mapped to the address they were linked at).
- * It traverses the device tree and fills in the name, type,
- * {n_}addrs and {n_}intrs fields of each node.
+ * Make a copy of the device tree from the PROM.
  */
-void __init
-finish_device_tree(void)
+static unsigned long __init
+copy_device_tree(unsigned long mem_start)
 {
-	unsigned long mem = klimit;
+	phandle root;
+	struct device_node **allnextp;
+	unsigned long offset = reloc_offset();
+	unsigned long mem_end = RELOC(initrd_start);
 
-	virt_irq_init();
+	/* We pass mem_end-mem_start to OF: keep it well under 32-bit */
+	if (!mem_end)
+		mem_end = mem_start + 1024*1024*1024;
 
-	mem = finish_node(allnodes, mem, NULL, 0, 0);
-	dev_tree_size = mem - (unsigned long) allnodes;
-
-	mem = _ALIGN(mem, PAGE_SIZE);
-	lmb_reserve(__pa(klimit), mem-klimit);
-
-	klimit = mem;
-
-	rtas.dev = of_find_node_by_name(NULL, "rtas");
+	root = call_prom(RELOC("peer"), 1, 1, (phandle)0);
+	if (root == (phandle)0) {
+		prom_panic(RELOC("couldn't get device tree root\n"));
+	}
+	allnextp = &RELOC(allnodes);
+	inspect_node(root, 0, &mem_start, &mem_end, &allnextp);
+	*allnextp = 0;
+	return mem_start;
 }
 
-static unsigned long __init
-finish_node(struct device_node *np, unsigned long mem_start,
-	    interpret_func *ifunc, int naddrc, int nsizec)
+/* Verify bi_recs are good */
+static struct bi_record * __init prom_bi_rec_verify(struct bi_record *bi_recs)
 {
-	struct device_node *child;
-	int *ip;
+	struct bi_record *first, *last;
+#ifdef DEBUG_PROM
+	unsigned long offset = reloc_offset();
 
-	np->name = get_property(np, "name", 0);
-	np->type = get_property(np, "device_type", 0);
+  	prom_print(RELOC("birec_verify: r6=0x"));
+  	prom_print_hex((unsigned long)bi_recs);
+  	prom_print_nl();
+	if (bi_recs != NULL) {
+		prom_print(RELOC("  tag=0x"));
+		prom_print_hex(bi_recs->tag);
+		prom_print_nl();
+	}
+#endif /* DEBUG_PROM */
 
-	if (!np->name)
-		np->name = "<NULL>";
-	if (!np->type)
-		np->type = "<NULL>";
+	if ( bi_recs == NULL || bi_recs->tag != BI_FIRST )
+		return NULL;
 
-	/* get the device addresses and interrupts */
-	if (ifunc != NULL)
-		mem_start = ifunc(np, mem_start, naddrc, nsizec);
+	last = (struct bi_record *)(long)bi_recs->data[0];
 
-	mem_start = finish_node_interrupts(np, mem_start);
+#ifdef DEBUG_PROM
+  	prom_print(RELOC("  last=0x"));
+  	prom_print_hex((unsigned long)last);
+  	prom_print_nl();
+	if (last != NULL) {
+		prom_print(RELOC("  last_tag=0x"));
+		prom_print_hex(last->tag);
+		prom_print_nl();
+	}
+#endif /* DEBUG_PROM */
 
-	/* Look for #address-cells and #size-cells properties. */
-	ip = (int *) get_property(np, "#address-cells", 0);
-	if (ip != NULL)
-		naddrc = *ip;
-	ip = (int *) get_property(np, "#size-cells", 0);
-	if (ip != NULL)
-		nsizec = *ip;
+	if ( last == NULL || last->tag != BI_LAST )
+		return NULL;
 
-	/* the f50 sets the name to 'display' and 'compatible' to what we
-	 * expect for the name -- Cort
+	first = (struct bi_record *)(long)last->data[0];
+#ifdef DEBUG_PROM
+  	prom_print(RELOC("  first=0x"));
+  	prom_print_hex((unsigned long)first);
+  	prom_print_nl();
+#endif /* DEBUG_PROM */
+
+	if ( first == NULL || first != bi_recs )
+		return NULL;
+
+	return bi_recs;
+}
+
+static void __init prom_bi_rec_reserve(void)
+{
+	unsigned long offset = reloc_offset();
+	struct prom_t *_prom = PTRRELOC(&prom);
+	struct bi_record *rec;
+
+	if ( _prom->bi_recs != NULL) {
+
+		for ( rec=_prom->bi_recs;
+		      rec->tag != BI_LAST;
+		      rec=bi_rec_next(rec) ) {
+#ifdef DEBUG_PROM
+			prom_print(RELOC("bi: 0x"));
+			prom_print_hex(rec->tag);
+			prom_print_nl();
+#endif /* DEBUG_PROM */
+			switch (rec->tag) {
+#ifdef CONFIG_BLK_DEV_INITRD
+			case BI_INITRD:
+				RELOC(initrd_start) = (unsigned long)(rec->data[0]);
+				RELOC(initrd_end) = RELOC(initrd_start) + rec->data[1];
+				break;
+#endif /* CONFIG_BLK_DEV_INITRD */
+			}
+		}
+		/* The next use of this field will be after relocation
+	 	 * is enabled, so convert this physical address into a
+	 	 * virtual address.
+	 	 */
+		_prom->bi_recs = PTRUNRELOC(_prom->bi_recs);
+	}
+}
+
+/*
+ * We enter here early on, when the Open Firmware prom is still
+ * handling exceptions and the MMU hash table for us.
+ */
+
+unsigned long __init
+prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
+	  unsigned long r6, unsigned long r7)
+{
+	unsigned long mem;
+	ihandle prom_cpu;
+	phandle cpu_pkg;
+	unsigned long offset = reloc_offset();
+	long l;
+	char *p, *d;
+	unsigned long phys;
+	u32 getprop_rval;
+	struct systemcfg *_systemcfg;
+	struct paca_struct *_xPaca = PTRRELOC(&paca[0]);
+	struct prom_t *_prom = PTRRELOC(&prom);
+
+	/* First zero the BSS -- use memset, some arches don't have
+	 * caches on yet */
+	memset(PTRRELOC(&__bss_start), 0, __bss_stop - __bss_start);
+
+	/* Setup systemcfg and NACA pointers now */
+	RELOC(systemcfg) = _systemcfg = (struct systemcfg *)(SYSTEMCFG_VIRT_ADDR - offset);
+	RELOC(naca) = (struct naca_struct *)(NACA_VIRT_ADDR - offset);
+
+	/* Init interface to Open Firmware and pickup bi-recs */
+	prom_init_client_services(pp);
+
+	/* Init prom stdout device */
+	prom_init_stdout();
+
+#ifdef DEBUG_PROM
+  	prom_print(RELOC("klimit=0x"));
+  	prom_print_hex(RELOC(klimit));
+  	prom_print_nl();
+  	prom_print(RELOC("offset=0x"));
+  	prom_print_hex(offset);
+  	prom_print_nl();
+  	prom_print(RELOC("->mem=0x"));
+  	prom_print_hex(RELOC(klimit) - offset);
+  	prom_print_nl();
+#endif /* DEBUG_PROM */
+
+	/* check out if we have bi_recs */
+	_prom->bi_recs = prom_bi_rec_verify((struct bi_record *)r6);
+	if ( _prom->bi_recs != NULL ) {
+		RELOC(klimit) = PTRUNRELOC((unsigned long)_prom->bi_recs +
+					   _prom->bi_recs->data[1]);
+#ifdef DEBUG_PROM
+		prom_print(RELOC("bi_recs=0x"));
+		prom_print_hex((unsigned long)_prom->bi_recs);
+		prom_print_nl();
+		prom_print(RELOC("new mem=0x"));
+		prom_print_hex(RELOC(klimit) - offset);
+		prom_print_nl();
+#endif /* DEBUG_PROM */
+	}
+
+	/* If we don't have birec's or didn't find them, check for an initrd
+	 * using the "yaboot" way
 	 */
-	if (!strcmp(np->name, "display"))
-		np->name = get_property(np, "compatible", 0);
+#ifdef CONFIG_BLK_DEV_INITRD
+	if ( _prom->bi_recs == NULL && r3 && r4 && r4 != 0xdeadbeef) {
+		RELOC(initrd_start) = (r3 >= KERNELBASE) ? __pa(r3) : r3;
+		RELOC(initrd_end) = RELOC(initrd_start) + r4;
+		RELOC(initrd_below_start_ok) = 1;
+	}
+#endif /* CONFIG_BLK_DEV_INITRD */
 
-	if (!strcmp(np->name, "device-tree") || np->parent == NULL)
-		ifunc = interpret_root_props;
-	else if (np->type == 0)
-		ifunc = NULL;
-	else if (!strcmp(np->type, "pci") || !strcmp(np->type, "vci"))
-		ifunc = interpret_pci_props;
-	else if (!strcmp(np->type, "dbdma"))
-		ifunc = interpret_dbdma_props;
-	else if (!strcmp(np->type, "mac-io") || ifunc == interpret_macio_props)
-		ifunc = interpret_macio_props;
-	else if (!strcmp(np->type, "isa"))
-		ifunc = interpret_isa_props;
-	else if (!strcmp(np->name, "uni-n") || !strcmp(np->name, "u3"))
-		ifunc = interpret_root_props;
-	else if (!((ifunc == interpret_dbdma_props
-		    || ifunc == interpret_macio_props)
-		   && (!strcmp(np->type, "escc")
-		       || !strcmp(np->type, "media-bay"))))
-		ifunc = NULL;
+	/* Default machine type. */
+	_systemcfg->platform = prom_find_machine_type();
 
-	for (child = np->child; child != NULL; child = child->sibling)
-		mem_start = finish_node(child, mem_start, ifunc,
-					naddrc, nsizec);
+	/* On pSeries, copy the CPU hold code */
+	if (_systemcfg->platform == PLATFORM_PSERIES)
+		copy_and_flush(0, KERNELBASE - offset, 0x100, 0);
 
-	return mem_start;
+	/* Start storing things at klimit */
+      	mem = RELOC(klimit) - offset; 
+
+	/* Get the full OF pathname of the stdout device */
+	p = (char *) mem;
+	memset(p, 0, 256);
+	call_prom(RELOC("instance-to-path"), 3, 1, _prom->stdout, p, 255);
+	RELOC(of_stdout_device) = PTRUNRELOC(p);
+	mem += strlen(p) + 1;
+
+	getprop_rval = 1;
+	call_prom(RELOC("getprop"), 4, 1,
+		  _prom->root, RELOC("#size-cells"),
+		  &getprop_rval, sizeof(getprop_rval));
+	_prom->encode_phys_size = (getprop_rval == 1) ? 32 : 64;
+
+	/* Determine which cpu is actually running right _now_ */
+        if ((long)call_prom(RELOC("getprop"), 4, 1, _prom->chosen,
+			    RELOC("cpu"), &getprop_rval,
+			    sizeof(getprop_rval)) <= 0)
+                prom_panic(RELOC("cannot find boot cpu"));
+
+	prom_cpu = (ihandle)(unsigned long)getprop_rval;
+	cpu_pkg = call_prom(RELOC("instance-to-package"), 1, 1, prom_cpu);
+	call_prom(RELOC("getprop"), 4, 1,
+		cpu_pkg, RELOC("reg"),
+		&getprop_rval, sizeof(getprop_rval));
+	_prom->cpu = (int)(unsigned long)getprop_rval;
+	_xPaca[0].xHwProcNum = _prom->cpu;
+
+	RELOC(boot_cpuid) = 0;
+
+#ifdef DEBUG_PROM
+  	prom_print(RELOC("Booting CPU hw index = 0x"));
+  	prom_print_hex(_prom->cpu);
+  	prom_print_nl();
+#endif
+
+	/* Get the boot device and translate it to a full OF pathname. */
+	p = (char *) mem;
+	l = (long) call_prom(RELOC("getprop"), 4, 1, _prom->chosen,
+			    RELOC("bootpath"), p, 1<<20);
+	if (l > 0) {
+		p[l] = 0;	/* should already be null-terminated */
+		RELOC(bootpath) = PTRUNRELOC(p);
+		mem += l + 1;
+		d = (char *) mem;
+		*d = 0;
+		call_prom(RELOC("canon"), 3, 1, p, d, 1<<20);
+		RELOC(bootdevice) = PTRUNRELOC(d);
+		mem = DOUBLEWORD_ALIGN(mem + strlen(d) + 1);
+	}
+
+	RELOC(cmd_line[0]) = 0;
+	if ((long)_prom->chosen > 0) {
+		call_prom(RELOC("getprop"), 4, 1, _prom->chosen, 
+			  RELOC("bootargs"), p, sizeof(cmd_line));
+		if (p != NULL && p[0] != 0)
+			strlcpy(RELOC(cmd_line), p, sizeof(cmd_line));
+	}
+
+	early_cmdline_parse();
+
+	prom_initialize_lmb();
+
+	prom_bi_rec_reserve();
+
+	mem = check_display(mem);
+
+	if (_systemcfg->platform != PLATFORM_POWERMAC)
+		prom_instantiate_rtas();
+        
+        /* Initialize some system info into the Naca early... */
+        prom_initialize_naca();
+
+	smt_setup();
+	
+        /* If we are on an SMP machine, then we *MUST* do the
+         * following, regardless of whether we have an SMP
+         * kernel or not.
+         */
+	prom_hold_cpus(mem);
+
+#ifdef DEBUG_PROM
+  	prom_print(RELOC("after basic inits, mem=0x"));
+  	prom_print_hex(mem);
+  	prom_print_nl();
+	prom_print(RELOC("initrd_start=0x"));
+	prom_print_hex(RELOC(initrd_start));
+	prom_print_nl();
+	prom_print(RELOC("initrd_end=0x"));
+	prom_print_hex(RELOC(initrd_end));
+	prom_print_nl();
+	prom_print(RELOC("copying OF device tree...\n"));
+#endif /* DEBUG_PROM */
+	mem = copy_device_tree(mem);
+
+	RELOC(klimit) = mem + offset;
+
+#ifdef DEBUG_PROM
+	prom_print(RELOC("new klimit is\n"));
+  	prom_print(RELOC("klimit=0x"));
+  	prom_print_hex(RELOC(klimit));
+	prom_print(RELOC(" ->mem=0x\n"));
+  	prom_print(RELOC("klimit=0x"));
+  	prom_print_hex(mem);
+  	prom_print_nl();
+#endif /* DEBUG_PROM */
+
+	lmb_reserve(0, __pa(RELOC(klimit)));
+
+#ifdef CONFIG_BLK_DEV_INITRD
+	if (RELOC(initrd_start)) {
+		unsigned long initrd_len;
+		initrd_len = RELOC(initrd_end) - RELOC(initrd_start);
+
+		/* Move initrd if it's where we're going to copy kernel. */
+		if (RELOC(initrd_start) < __pa(RELOC(klimit))) {
+			memmove((void *)mem, (void *)RELOC(initrd_start),
+				initrd_len);
+			RELOC(initrd_start) = mem;
+			RELOC(initrd_end) = mem + initrd_len;
+		}
+
+		lmb_reserve(RELOC(initrd_start), initrd_len);
+	}
+#endif /* CONFIG_BLK_DEV_INITRD */
+
+	if (_systemcfg->platform == PLATFORM_PSERIES)
+		prom_initialize_tce_table();
+
+#ifdef CONFIG_PMAC_DART
+	if (_systemcfg->platform == PLATFORM_POWERMAC)
+		prom_initialize_dart_table();
+#endif
+
+#ifdef CONFIG_BOOTX_TEXT
+	if(_prom->disp_node) {
+		prom_print(RELOC("Setting up bi display...\n"));
+		setup_disp_fake_bi(_prom->disp_node);
+	}
+#endif /* CONFIG_BOOTX_TEXT */
+
+	prom_print(RELOC("Calling quiesce ...\n"));
+	call_prom(RELOC("quiesce"), 0, 0);
+	phys = KERNELBASE - offset;
+
+#ifdef CONFIG_BLK_DEV_INITRD
+	/* If we had an initrd, we convert its address to virtual */
+	if (RELOC(initrd_start)) {
+		RELOC(initrd_start) = (unsigned long)__va(RELOC(initrd_start));
+		RELOC(initrd_end) = (unsigned long)__va(RELOC(initrd_end));
+	}
+#endif /* CONFIG_BLK_DEV_INITRD */
+
+	prom_print(RELOC("returning from prom_init\n"));
+	return phys;
+}
+
+/*
+ * Find the device_node with a given phandle.
+ */
+static struct device_node * __devinit
+find_phandle(phandle ph)
+{
+	struct device_node *np;
+
+	for (np = allnodes; np != 0; np = np->allnext)
+		if (np->linux_phandle == ph)
+			return np;
+	return NULL;
 }
 
 /*
@@ -2164,11 +2190,9 @@ map_interrupt(unsigned int **irq, struct device_node **ictrler,
 	return nintrc;
 }
 
-/*
- * New version of finish_node_interrupts.
- */
 static unsigned long __init
-finish_node_interrupts(struct device_node *np, unsigned long mem_start)
+finish_node_interrupts(struct device_node *np, unsigned long mem_start,
+		       int measure_only)
 {
 	unsigned int *ints;
 	int intlen, intrcells;
@@ -2184,6 +2208,9 @@ finish_node_interrupts(struct device_node *np, unsigned long mem_start)
 	np->n_intrs = intlen;
 	np->intrs = (struct interrupt_info *) mem_start;
 	mem_start += intlen * sizeof(struct interrupt_info);
+
+	if (measure_only)
+		return mem_start;
 
 	for (i = 0; i < intlen; ++i) {
 		np->intrs[i].line = 0;
@@ -2219,6 +2246,255 @@ finish_node_interrupts(struct device_node *np, unsigned long mem_start)
 	return mem_start;
 }
 
+static unsigned long __init
+interpret_pci_props(struct device_node *np, unsigned long mem_start,
+		    int naddrc, int nsizec, int measure_only)
+{
+	struct address_range *adr;
+	struct pci_reg_property *pci_addrs;
+	int i, l;
+
+	pci_addrs = (struct pci_reg_property *)
+		get_property(np, "assigned-addresses", &l);
+	if (pci_addrs != 0 && l >= sizeof(struct pci_reg_property)) {
+		i = 0;
+		adr = (struct address_range *) mem_start;
+		while ((l -= sizeof(struct pci_reg_property)) >= 0) {
+ 			if (!measure_only) {
+				adr[i].space = pci_addrs[i].addr.a_hi;
+				adr[i].address = pci_addrs[i].addr.a_lo;
+				adr[i].size = pci_addrs[i].size_lo;
+			}
+			++i;
+		}
+		np->addrs = adr;
+		np->n_addrs = i;
+		mem_start += i * sizeof(struct address_range);
+	}
+	return mem_start;
+}
+
+static unsigned long __init
+interpret_dbdma_props(struct device_node *np, unsigned long mem_start,
+		      int naddrc, int nsizec, int measure_only)
+{
+	struct reg_property32 *rp;
+	struct address_range *adr;
+	unsigned long base_address;
+	int i, l;
+	struct device_node *db;
+
+	base_address = 0;
+	if (!measure_only) {
+		for (db = np->parent; db != NULL; db = db->parent) {
+			if (!strcmp(db->type, "dbdma") && db->n_addrs != 0) {
+				base_address = db->addrs[0].address;
+				break;
+			}
+		}
+	}
+
+	rp = (struct reg_property32 *) get_property(np, "reg", &l);
+	if (rp != 0 && l >= sizeof(struct reg_property32)) {
+		i = 0;
+		adr = (struct address_range *) mem_start;
+		while ((l -= sizeof(struct reg_property32)) >= 0) {
+ 			if (!measure_only) {
+				adr[i].space = 2;
+				adr[i].address = rp[i].address + base_address;
+				adr[i].size = rp[i].size;
+			}
+			++i;
+		}
+		np->addrs = adr;
+		np->n_addrs = i;
+		mem_start += i * sizeof(struct address_range);
+	}
+
+	return mem_start;
+}
+
+static unsigned long __init
+interpret_macio_props(struct device_node *np, unsigned long mem_start,
+		      int naddrc, int nsizec, int measure_only)
+{
+	struct reg_property32 *rp;
+	struct address_range *adr;
+	unsigned long base_address;
+	int i, l;
+	struct device_node *db;
+
+	base_address = 0;
+	if (!measure_only) {
+		for (db = np->parent; db != NULL; db = db->parent) {
+			if (!strcmp(db->type, "mac-io") && db->n_addrs != 0) {
+				base_address = db->addrs[0].address;
+				break;
+			}
+		}
+	}
+
+	rp = (struct reg_property32 *) get_property(np, "reg", &l);
+	if (rp != 0 && l >= sizeof(struct reg_property32)) {
+		i = 0;
+		adr = (struct address_range *) mem_start;
+		while ((l -= sizeof(struct reg_property32)) >= 0) {
+ 			if (!measure_only) {
+				adr[i].space = 2;
+				adr[i].address = rp[i].address + base_address;
+				adr[i].size = rp[i].size;
+			}
+			++i;
+		}
+		np->addrs = adr;
+		np->n_addrs = i;
+		mem_start += i * sizeof(struct address_range);
+	}
+
+	return mem_start;
+}
+
+static unsigned long __init
+interpret_isa_props(struct device_node *np, unsigned long mem_start,
+		    int naddrc, int nsizec, int measure_only)
+{
+	struct isa_reg_property *rp;
+	struct address_range *adr;
+	int i, l;
+
+	rp = (struct isa_reg_property *) get_property(np, "reg", &l);
+	if (rp != 0 && l >= sizeof(struct isa_reg_property)) {
+		i = 0;
+		adr = (struct address_range *) mem_start;
+		while ((l -= sizeof(struct reg_property)) >= 0) {
+ 			if (!measure_only) {
+				adr[i].space = rp[i].space;
+				adr[i].address = rp[i].address;
+				adr[i].size = rp[i].size;
+			}
+			++i;
+		}
+		np->addrs = adr;
+		np->n_addrs = i;
+		mem_start += i * sizeof(struct address_range);
+	}
+
+	return mem_start;
+}
+
+static unsigned long __init
+interpret_root_props(struct device_node *np, unsigned long mem_start,
+		     int naddrc, int nsizec, int measure_only)
+{
+	struct address_range *adr;
+	int i, l;
+	unsigned int *rp;
+	int rpsize = (naddrc + nsizec) * sizeof(unsigned int);
+
+	rp = (unsigned int *) get_property(np, "reg", &l);
+	if (rp != 0 && l >= rpsize) {
+		i = 0;
+		adr = (struct address_range *) mem_start;
+		while ((l -= rpsize) >= 0) {
+ 			if (!measure_only) {
+				adr[i].space = 0;
+				adr[i].address = rp[naddrc - 1];
+				adr[i].size = rp[naddrc + nsizec - 1];
+			}
+			++i;
+			rp += naddrc + nsizec;
+		}
+		np->addrs = adr;
+		np->n_addrs = i;
+		mem_start += i * sizeof(struct address_range);
+	}
+
+	return mem_start;
+}
+
+static unsigned long __init
+finish_node(struct device_node *np, unsigned long mem_start,
+	    interpret_func *ifunc, int naddrc, int nsizec, int measure_only)
+{
+	struct device_node *child;
+	int *ip;
+
+	np->name = get_property(np, "name", 0);
+	np->type = get_property(np, "device_type", 0);
+
+	if (!np->name)
+		np->name = "<NULL>";
+	if (!np->type)
+		np->type = "<NULL>";
+
+	/* get the device addresses and interrupts */
+	if (ifunc != NULL)
+		mem_start = ifunc(np, mem_start, naddrc, nsizec, measure_only);
+
+	mem_start = finish_node_interrupts(np, mem_start, measure_only);
+
+	/* Look for #address-cells and #size-cells properties. */
+	ip = (int *) get_property(np, "#address-cells", 0);
+	if (ip != NULL)
+		naddrc = *ip;
+	ip = (int *) get_property(np, "#size-cells", 0);
+	if (ip != NULL)
+		nsizec = *ip;
+
+	/* the f50 sets the name to 'display' and 'compatible' to what we
+	 * expect for the name -- Cort
+	 */
+	if (!strcmp(np->name, "display"))
+		np->name = get_property(np, "compatible", 0);
+
+	if (!strcmp(np->name, "device-tree") || np->parent == NULL)
+		ifunc = interpret_root_props;
+	else if (np->type == 0)
+		ifunc = NULL;
+	else if (!strcmp(np->type, "pci") || !strcmp(np->type, "vci"))
+		ifunc = interpret_pci_props;
+	else if (!strcmp(np->type, "dbdma"))
+		ifunc = interpret_dbdma_props;
+	else if (!strcmp(np->type, "mac-io") || ifunc == interpret_macio_props)
+		ifunc = interpret_macio_props;
+	else if (!strcmp(np->type, "isa"))
+		ifunc = interpret_isa_props;
+	else if (!strcmp(np->name, "uni-n") || !strcmp(np->name, "u3"))
+		ifunc = interpret_root_props;
+	else if (!((ifunc == interpret_dbdma_props
+		    || ifunc == interpret_macio_props)
+		   && (!strcmp(np->type, "escc")
+		       || !strcmp(np->type, "media-bay"))))
+		ifunc = NULL;
+
+	for (child = np->child; child != NULL; child = child->sibling)
+		mem_start = finish_node(child, mem_start, ifunc,
+					naddrc, nsizec, measure_only);
+
+	return mem_start;
+}
+
+/*
+ * finish_device_tree is called once things are running normally
+ * (i.e. with text and data mapped to the address they were linked at).
+ * It traverses the device tree and fills in the name, type,
+ * {n_}addrs and {n_}intrs fields of each node.
+ */
+void __init
+finish_device_tree(void)
+{
+	unsigned long mem = klimit;
+
+	virt_irq_init();
+
+	dev_tree_size = finish_node(allnodes, 0, NULL, 0, 0, 1);
+	mem = (long)abs_to_virt(lmb_alloc(dev_tree_size,
+					  __alignof__(struct device_node)));
+	if (finish_node(allnodes, mem, NULL, 0, 0, 0) != mem + dev_tree_size)
+		BUG();
+	rtas.dev = of_find_node_by_name(NULL, "rtas");
+}
+
 int
 prom_n_addr_cells(struct device_node* np)
 {
@@ -2247,158 +2523,6 @@ prom_n_size_cells(struct device_node* np)
 	} while (np->parent);
 	/* No #size-cells property for the root node, default to 1 */
 	return 1;
-}
-
-static unsigned long __init
-interpret_pci_props(struct device_node *np, unsigned long mem_start,
-		    int naddrc, int nsizec)
-{
-	struct address_range *adr;
-	struct pci_reg_property *pci_addrs;
-	int i, l;
-
-	pci_addrs = (struct pci_reg_property *)
-		get_property(np, "assigned-addresses", &l);
-	if (pci_addrs != 0 && l >= sizeof(struct pci_reg_property)) {
-		i = 0;
-		adr = (struct address_range *) mem_start;
-		while ((l -= sizeof(struct pci_reg_property)) >= 0) {
-			adr[i].space = pci_addrs[i].addr.a_hi;
-			adr[i].address = pci_addrs[i].addr.a_lo;
-			adr[i].size = pci_addrs[i].size_lo;
-			++i;
-		}
-		np->addrs = adr;
-		np->n_addrs = i;
-		mem_start += i * sizeof(struct address_range);
-	}
-	return mem_start;
-}
-
-static unsigned long __init
-interpret_dbdma_props(struct device_node *np, unsigned long mem_start,
-		      int naddrc, int nsizec)
-{
-	struct reg_property32 *rp;
-	struct address_range *adr;
-	unsigned long base_address;
-	int i, l;
-	struct device_node *db;
-
-	base_address = 0;
-	for (db = np->parent; db != NULL; db = db->parent) {
-		if (!strcmp(db->type, "dbdma") && db->n_addrs != 0) {
-			base_address = db->addrs[0].address;
-			break;
-		}
-	}
-
-	rp = (struct reg_property32 *) get_property(np, "reg", &l);
-	if (rp != 0 && l >= sizeof(struct reg_property32)) {
-		i = 0;
-		adr = (struct address_range *) mem_start;
-		while ((l -= sizeof(struct reg_property32)) >= 0) {
-			adr[i].space = 2;
-			adr[i].address = rp[i].address + base_address;
-			adr[i].size = rp[i].size;
-			++i;
-		}
-		np->addrs = adr;
-		np->n_addrs = i;
-		mem_start += i * sizeof(struct address_range);
-	}
-
-	return mem_start;
-}
-
-static unsigned long __init
-interpret_macio_props(struct device_node *np, unsigned long mem_start,
-		      int naddrc, int nsizec)
-{
-	struct reg_property32 *rp;
-	struct address_range *adr;
-	unsigned long base_address;
-	int i, l;
-	struct device_node *db;
-
-	base_address = 0;
-	for (db = np->parent; db != NULL; db = db->parent) {
-		if (!strcmp(db->type, "mac-io") && db->n_addrs != 0) {
-			base_address = db->addrs[0].address;
-			break;
-		}
-	}
-
-	rp = (struct reg_property32 *) get_property(np, "reg", &l);
-	if (rp != 0 && l >= sizeof(struct reg_property32)) {
-		i = 0;
-		adr = (struct address_range *) mem_start;
-		while ((l -= sizeof(struct reg_property32)) >= 0) {
-			adr[i].space = 2;
-			adr[i].address = rp[i].address + base_address;
-			adr[i].size = rp[i].size;
-			++i;
-		}
-		np->addrs = adr;
-		np->n_addrs = i;
-		mem_start += i * sizeof(struct address_range);
-	}
-
-	return mem_start;
-}
-
-static unsigned long __init
-interpret_isa_props(struct device_node *np, unsigned long mem_start,
-		    int naddrc, int nsizec)
-{
-	struct isa_reg_property *rp;
-	struct address_range *adr;
-	int i, l;
-
-	rp = (struct isa_reg_property *) get_property(np, "reg", &l);
-	if (rp != 0 && l >= sizeof(struct isa_reg_property)) {
-		i = 0;
-		adr = (struct address_range *) mem_start;
-		while ((l -= sizeof(struct reg_property)) >= 0) {
-			adr[i].space = rp[i].space;
-			adr[i].address = rp[i].address;
-			adr[i].size = rp[i].size;
-			++i;
-		}
-		np->addrs = adr;
-		np->n_addrs = i;
-		mem_start += i * sizeof(struct address_range);
-	}
-
-	return mem_start;
-}
-
-static unsigned long __init
-interpret_root_props(struct device_node *np, unsigned long mem_start,
-		     int naddrc, int nsizec)
-{
-	struct address_range *adr;
-	int i, l;
-	unsigned int *rp;
-	int rpsize = (naddrc + nsizec) * sizeof(unsigned int);
-
-	rp = (unsigned int *) get_property(np, "reg", &l);
-	if (rp != 0 && l >= rpsize) {
-		i = 0;
-		adr = (struct address_range *) mem_start;
-		while ((l -= rpsize) >= 0) {
-			adr[i].space = 0;
-			adr[i].address = rp[naddrc - 1];
-			adr[i].size = rp[naddrc + nsizec - 1];
-			++i;
-			rp += naddrc + nsizec;
-		}
-		np->addrs = adr;
-		np->n_addrs = i;
-		mem_start += i * sizeof(struct address_range);
-	}
-
-	return mem_start;
 }
 
 /*
@@ -2770,6 +2894,29 @@ struct device_node *of_node_get(struct device_node *node)
 EXPORT_SYMBOL(of_node_get);
 
 /**
+ *	of_node_cleanup - release a dynamically allocated node
+ *	@arg:  Node to be released
+ */
+static void of_node_cleanup(struct device_node *node)
+{
+	struct property *prop = node->properties;
+
+	if (!OF_IS_DYNAMIC(node))
+		return;
+	while (prop) {
+		struct property *next = prop->next;
+		kfree(prop->name);
+		kfree(prop->value);
+		kfree(prop);
+		prop = next;
+	}
+	kfree(node->intrs);
+	kfree(node->addrs);
+	kfree(node->full_name);
+	kfree(node);
+}
+
+/**
  *	of_node_put - Decrement refcount of a node
  *	@node:	Node to dec refcount, NULL is supported to
  *		simplify writing of callers
@@ -2792,29 +2939,6 @@ void of_node_put(struct device_node *node)
 		atomic_dec(&node->_users);
 }
 EXPORT_SYMBOL(of_node_put);
-
-/**
- *	of_node_cleanup - release a dynamically allocated node
- *	@arg:  Node to be released
- */
-static void of_node_cleanup(struct device_node *node)
-{
-	struct property *prop = node->properties;
-
-	if (!OF_IS_DYNAMIC(node))
-		return;
-	while (prop) {
-		struct property *next = prop->next;
-		kfree(prop->name);
-		kfree(prop->value);
-		kfree(prop);
-		prop = next;
-	}
-	kfree(node->intrs);
-	kfree(node->addrs);
-	kfree(node->full_name);
-	kfree(node);
-}
 
 /**
  *	derive_parent - basically like dirname(1)
@@ -2849,104 +2973,6 @@ static struct device_node *derive_parent(const char *path)
 /*
  * Routines for "runtime" addition and removal of device tree nodes.
  */
-
-/*
- * Given a path and a property list, construct an OF device node, add
- * it to the device tree and global list, and place it in
- * /proc/device-tree.  This function may sleep.
- */
-int of_add_node(const char *path, struct property *proplist)
-{
-	struct device_node *np;
-	int err = 0;
-
-	np = kmalloc(sizeof(struct device_node), GFP_KERNEL);
-	if (!np)
-		return -ENOMEM;
-
-	memset(np, 0, sizeof(*np));
-
-	np->full_name = kmalloc(strlen(path) + 1, GFP_KERNEL);
-	if (!np->full_name) {
-		kfree(np);
-		return -ENOMEM;
-	}
-	strcpy(np->full_name, path);
-
-	np->properties = proplist;
-	OF_MARK_DYNAMIC(np);
-	of_node_get(np);
-	np->parent = derive_parent(path);
-	if (!np->parent) {
-		kfree(np);
-		return -EINVAL; /* could also be ENOMEM, though */
-	}
-
-	if (0 != (err = of_finish_dynamic_node(np))) {
-		kfree(np);
-		return err;
-	}
-
-	write_lock(&devtree_lock);
-	np->sibling = np->parent->child;
-	np->allnext = allnodes;
-	np->parent->child = np;
-	allnodes = np;
-	write_unlock(&devtree_lock);
-
-	add_node_proc_entries(np);
-
-	of_node_put(np->parent);
-	of_node_put(np);
-	return 0;
-}
-
-/*
- * Remove an OF device node from the system.
- * Caller should have already "gotten" np.
- */
-int of_remove_node(struct device_node *np)
-{
-	struct device_node *parent, *child;
-
-	parent = of_get_parent(np);
-	if (!parent)
-		return -EINVAL;
-
-	if ((child = of_get_next_child(np, NULL))) {
-		of_node_put(child);
-		return -EBUSY;
-	}
-
-	write_lock(&devtree_lock);
-	OF_MARK_STALE(np);
-	remove_node_proc_entries(np);
-	if (allnodes == np)
-		allnodes = np->allnext;
-	else {
-		struct device_node *prev;
-		for (prev = allnodes;
-		     prev->allnext != np;
-		     prev = prev->allnext)
-			;
-		prev->allnext = np->allnext;
-	}
-
-	if (parent->child == np)
-		parent->child = np->sibling;
-	else {
-		struct device_node *prevsib;
-		for (prevsib = np->parent->child;
-		     prevsib->sibling != np;
-		     prevsib = prevsib->sibling)
-			;
-		prevsib->sibling = np->sibling;
-	}
-	write_unlock(&devtree_lock);
-	of_node_put(parent);
-	return 0;
-}
-
 #ifdef CONFIG_PROC_DEVICETREE
 /*
  * Add a node to /proc/device-tree.
@@ -2992,7 +3018,7 @@ static void remove_node_proc_entries(struct device_node *np)
 }
 #endif /* CONFIG_PROC_DEVICETREE */
 
-/* 
+/*
  * Fix up n_intrs and intrs fields in a new device node
  *
  */
@@ -3008,7 +3034,7 @@ static int of_finish_dynamic_node_interrupts(struct device_node *node)
 	node->n_intrs = intlen;
 	node->intrs = kmalloc(sizeof(struct interrupt_info) * intlen,
 			      GFP_KERNEL);
-	if (!node->intrs) 
+	if (!node->intrs)
 		return -ENOMEM;
 
 	for (i = 0; i < intlen; ++i) {
@@ -3138,17 +3164,100 @@ out:
 }
 
 /*
- * Find the device_node with a given phandle.
+ * Given a path and a property list, construct an OF device node, add
+ * it to the device tree and global list, and place it in
+ * /proc/device-tree.  This function may sleep.
  */
-static struct device_node * __devinit
-find_phandle(phandle ph)
+int of_add_node(const char *path, struct property *proplist)
 {
 	struct device_node *np;
+	int err = 0;
 
-	for (np = allnodes; np != 0; np = np->allnext)
-		if (np->linux_phandle == ph)
-			return np;
-	return NULL;
+	np = kmalloc(sizeof(struct device_node), GFP_KERNEL);
+	if (!np)
+		return -ENOMEM;
+
+	memset(np, 0, sizeof(*np));
+
+	np->full_name = kmalloc(strlen(path) + 1, GFP_KERNEL);
+	if (!np->full_name) {
+		kfree(np);
+		return -ENOMEM;
+	}
+	strcpy(np->full_name, path);
+
+	np->properties = proplist;
+	OF_MARK_DYNAMIC(np);
+	of_node_get(np);
+	np->parent = derive_parent(path);
+	if (!np->parent) {
+		kfree(np);
+		return -EINVAL; /* could also be ENOMEM, though */
+	}
+
+	if (0 != (err = of_finish_dynamic_node(np))) {
+		kfree(np);
+		return err;
+	}
+
+	write_lock(&devtree_lock);
+	np->sibling = np->parent->child;
+	np->allnext = allnodes;
+	np->parent->child = np;
+	allnodes = np;
+	write_unlock(&devtree_lock);
+
+	add_node_proc_entries(np);
+
+	of_node_put(np->parent);
+	of_node_put(np);
+	return 0;
+}
+
+/*
+ * Remove an OF device node from the system.
+ * Caller should have already "gotten" np.
+ */
+int of_remove_node(struct device_node *np)
+{
+	struct device_node *parent, *child;
+
+	parent = of_get_parent(np);
+	if (!parent)
+		return -EINVAL;
+
+	if ((child = of_get_next_child(np, NULL))) {
+		of_node_put(child);
+		return -EBUSY;
+	}
+
+	write_lock(&devtree_lock);
+	OF_MARK_STALE(np);
+	remove_node_proc_entries(np);
+	if (allnodes == np)
+		allnodes = np->allnext;
+	else {
+		struct device_node *prev;
+		for (prev = allnodes;
+		     prev->allnext != np;
+		     prev = prev->allnext)
+			;
+		prev->allnext = np->allnext;
+	}
+
+	if (parent->child == np)
+		parent->child = np->sibling;
+	else {
+		struct device_node *prevsib;
+		for (prevsib = np->parent->child;
+		     prevsib->sibling != np;
+		     prevsib = prevsib->sibling)
+			;
+		prevsib->sibling = np->sibling;
+	}
+	write_unlock(&devtree_lock);
+	of_node_put(parent);
+	return 0;
 }
 
 /*
@@ -3234,55 +3343,3 @@ print_properties(struct device_node *np)
 	}
 }
 #endif
-
-
-/* Verify bi_recs are good */
-static struct bi_record *
-prom_bi_rec_verify(struct bi_record *bi_recs)
-{
-	struct bi_record *first, *last;
-
-	if ( bi_recs == NULL || bi_recs->tag != BI_FIRST )
-		return NULL;
-
-	last = (struct bi_record *)(long)bi_recs->data[0];
-	if ( last == NULL || last->tag != BI_LAST )
-		return NULL;
-
-	first = (struct bi_record *)(long)last->data[0];
-	if ( first == NULL || first != bi_recs )
-		return NULL;
-
-	return bi_recs;
-}
-
-static unsigned long
-prom_bi_rec_reserve(unsigned long mem)
-{
-	unsigned long offset = reloc_offset();
-	struct prom_t *_prom = PTRRELOC(&prom);
-	struct bi_record *rec;
-
-	if ( _prom->bi_recs != NULL) {
-
-		for ( rec=_prom->bi_recs;
-		      rec->tag != BI_LAST;
-		      rec=bi_rec_next(rec) ) {
-			switch (rec->tag) {
-#ifdef CONFIG_BLK_DEV_INITRD
-			case BI_INITRD:
-				lmb_reserve(rec->data[0], rec->data[1]);
-				break;
-#endif /* CONFIG_BLK_DEV_INITRD */
-			}
-		}
-		/* The next use of this field will be after relocation
-	 	 * is enabled, so convert this physical address into a
-	 	 * virtual address.
-	 	 */
-		_prom->bi_recs = PTRUNRELOC(_prom->bi_recs);
-	}
-
-	return mem;
-}
-

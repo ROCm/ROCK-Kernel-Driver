@@ -96,7 +96,7 @@ long sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize, int p3, int p4,
 	regs->gpr[3] = EINTR;
 	regs->ccr |= 0x10000000;
 	while (1) {
-		set_current_state(TASK_INTERRUPTIBLE);
+		current->state = TASK_INTERRUPTIBLE;
 		schedule();
 		if (do_signal(&saveset, regs))
 			return regs->gpr[3];

@@ -30,6 +30,7 @@
 #include <linux/list.h>
 #include <linux/time.h>
 #include <linux/ctype.h>
+#include <linux/interrupt.h>
 #include <asm/delay.h>
 #include <asm/hvcall.h>
 #include <asm/prom.h>
@@ -50,6 +51,7 @@ struct vtty_struct {
 	int (*tiocmset)(struct vtty_struct *vtty, uint16_t set, uint16_t clear);
 	uint16_t seqno; /* HVSI packet sequence number */
 	uint16_t mctrl;
+	int irq;
 };
 static struct vtty_struct vttys[MAX_NR_HVC_CONSOLES];
 
@@ -718,6 +720,7 @@ int hvc_arch_find_vterms(void)
 {
 	struct device_node *vty;
 	int count = 0;
+	unsigned int *irq_p;
 
 	for (vty = of_find_node_by_name(NULL, "vty"); vty != NULL;
 			vty = of_find_node_by_name(vty, "vty")) {
@@ -732,12 +735,19 @@ int hvc_arch_find_vterms(void)
 			break;
 
 		vtty = &vttys[count];
+		vtty->irq = NO_IRQ;
 		if (device_is_compatible(vty, "hvterm1")) {
 			vtty->vtermno = *vtermno;
 			vtty->get_chars = hvc_hvterm_get_chars;
 			vtty->put_chars = hvc_hvterm_put_chars;
 			vtty->tiocmget = NULL;
 			vtty->tiocmset = NULL;
+			irq_p = (unsigned int *)get_property(vty, "interrupts", 0);
+			if (irq_p) {
+				int virq = virt_irq_create_mapping(*irq_p);
+				if (virq != NO_IRQ)
+					vtty->irq = irq_offset_up(virq);
+			}
 			hvc_instantiate();
 			count++;
 		} else if (device_is_compatible(vty, "hvterm-protocol")) {
@@ -758,6 +768,14 @@ int hvc_arch_find_vterms(void)
 
 	return count;
 }
+
+int hvc_interrupt(int index)
+{
+	struct vtty_struct *vtty = &vttys[index];
+
+	/* If not interruptible then it'll return NO_IRQ */
+	return vtty->irq;
+} 
 
 /* Convert arch specific return codes into relevant errnos.  The hvcs
  * functions aren't performance sensitive, so this conversion isn't an

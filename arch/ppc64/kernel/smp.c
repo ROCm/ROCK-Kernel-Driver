@@ -292,7 +292,7 @@ int __cpu_disable(void)
 
 	/* FIXME: abstract this to not be platform specific later on */
 	xics_migrate_irqs_away();
-	return 0; 
+	return 0;
 }
 
 void __cpu_die(unsigned int cpu)
@@ -329,121 +329,58 @@ void __cpu_die(unsigned int cpu)
 void cpu_die(void)
 {
 	local_irq_disable();
+	pSeriesLP_cppr_info(0, 0);
 	rtas_stop_self();
 	/* Should never get here... */
 	BUG();
 	for(;;);
 }
 
-/* RPA 7.3.7.5 defines the state return values.
- * 7.3.7.5 and 17.4.3.3 define the status return values. */
-static int check_dr_state(int drc_index)
-{
-	const int sensor = 9003;	/* DR-entity-sense */
-	/* Don't spend forever waiting for RTAS to give us an answer. */
-	unsigned long max_wait_tb = __get_tb() + 5 * tb_ticks_per_sec;
-
-	do {
-		unsigned long state;
-		int status = rtas_call(rtas_token("get-sensor-state"),
-				       2, 2, &state, sensor, drc_index);
-
-		switch (status) {
-		    case -1:	/* Hardware error */
-		    case -3:	/* No such sensor implemented */
-			return -ENOSYS;
-		    case -9000:	/* Need DR entity to be powered & unisolated */
-		    case -9001:	/* Need DR entity to be powered up */
-		    case -9002:	/* Legacy.  Treat as state == 2 (unusable) */
-			return -EBADSLT;
-		    case 0:
-			switch (state) {
-			    case 1:	/* DR entity present */
-				return 0;
-			    case 0:	/* DR connector empty */
-			    case 2:	/* DR entity unusable */
-			    case 3:	/* DR entity available for exchange */
-				return -EBADSLT;
-			    default:	/* shouldn't happen */
-				return -ENOMSG;
-			}
-		    case 9000 ... 9005: {
-			unsigned int wait_time;
-
-			wait_time = rtas_extended_busy_delay_time(status);
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout(wait_time);
-		    }
-		    default:	/* shouldn't happen */
-			return -ENOMSG;
-		}
-	} while (__get_tb() < max_wait_tb);
-
-	return -ETIMEDOUT;
-}
-
-/* Search all cpu DR entities, looking for one which is present.  If
- * the same hw index as before is available, grab that in preference.a
- * Match the dr-index to a cpu node in the device tree.  Use the reg
- * (hw index) from the node to query rtas if the cpu is in a stopped
- * state.
+/* Search all cpu device nodes for an offline logical cpu.  If a
+ * device node has a "ibm,my-drc-index" property (meaning this is an
+ * LPAR), paranoid-check whether we own the cpu.  For each "thread"
+ * of a cpu, if it is offline and has the same hw index as before,
+ * grab that in preference.
  */
 static unsigned int find_physical_cpu_to_start(unsigned int old_hwindex)
 {
-	int i, idx;
-	int count = 0;
-	int num_addr_cell, num_size_cell, len;
-	struct device_node *np;
-	unsigned int *ireg, *indexes;
-	int status;
-	int dr_state ;
+	struct device_node *np = NULL;
 	unsigned int best = -1U;
 
-	if ((np = find_path_device("/cpus")) == NULL) {
-		printk(KERN_ERR "Could not find /cpus in device tree!");
-		goto out;
-	}
-	num_addr_cell = prom_n_addr_cells(np); 
-	num_size_cell = prom_n_size_cells(np); 
+	while ((np = of_find_node_by_type(np, "cpu"))) {
+		int nr_threads, len;
+		u32 *index = (u32 *)get_property(np, "ibm,my-drc-index", NULL);
+		u32 *tid = (u32 *)
+			get_property(np, "ibm,ppc-interrupt-server#s", &len);
 
-	indexes = (unsigned int *)get_property(np, "ibm,drc-indexes", &len);
-	if (indexes == NULL) {
-		printk(KERN_INFO "Couldn't find ibm,drc-indexes in /cpus\n");
-		goto out;
-	}
+		if (!tid)
+			tid = (u32 *)get_property(np, "reg", &len);
 
-	count = indexes[0];
-	for (i = 0; i < count; i++) {
-		idx = indexes[i+1];
-
-		/* Returns 0 for candidate processor slots */
-		dr_state = check_dr_state(idx); 
-		if (dr_state)
+		if (!tid)
 			continue;
 
-		for (np = of_find_node_by_type(NULL, "cpu");
-		     np; np = of_find_node_by_type(np, "cpu")) {
-			ireg = (unsigned int *)
-				get_property(np, "ibm,my-drc-index", &len);
-
-			if (!ireg || ireg[0] != idx)
+		/* If there is a drc-index, make sure that we own
+		 * the cpu.
+		 */
+		if (index) {
+			int state;
+			int rc = rtas_get_sensor(9003, *index, &state);
+			if (rc != 0 || state != 1)
 				continue;
-			ireg = (unsigned int *)get_property(np, "reg", &len);
+		}
 
-			if (!ireg)
-				continue;
+		nr_threads = len / sizeof(u32);
 
-			status = query_cpu_stopped(*ireg);
-			if (status == 0) {
-				best = *ireg;
-				if (best == old_hwindex) {
-					of_node_put(np);
+		while (nr_threads--) {
+			if (0 == query_cpu_stopped(tid[nr_threads])) {
+				best = tid[nr_threads];
+				if (best == old_hwindex)
 					goto out;
-				}
 			}
 		}
 	}
- out:
+out:
+	of_node_put(np);
 	return best;
 }
 
@@ -506,12 +443,11 @@ static inline void look_for_more_cpus(void)
 		printk(KERN_ERR "Could not find /rtas in device tree!");
 		return;
 	}
-	num_addr_cell = prom_n_addr_cells(np); 
-	num_size_cell = prom_n_size_cells(np); 
+	num_addr_cell = prom_n_addr_cells(np);
+	num_size_cell = prom_n_size_cells(np);
 
 	ireg = (unsigned int *)get_property(np, "ibm,lrdr-capacity", &len);
 	if (ireg == NULL) {
-		printk(KERN_INFO "Couldn't find ibm,lrdr-capacity in /rtas\n");
 		/* FIXME: make sure not marked as lrdr_capable() */
 		return;
 	}
@@ -1061,7 +997,7 @@ int __devinit start_secondary(void *unused)
 	}
 
 #ifdef CONFIG_IRQ_ALL_CPUS
-	/* Put the calling processor into the GIQ.  This is really only 
+	/* Put the calling processor into the GIQ.  This is really only
 	 * necessary from a secondary thread as the OF start-cpu interface
 	 * performs this function for us on primary threads.
 	 */
@@ -1099,74 +1035,6 @@ void __init smp_cpus_done(unsigned int max_cpus)
 	set_cpus_allowed(current, old_mask);
 }
 
-#ifdef CONFIG_NUMA
-static struct node node_devices[MAX_NUMNODES];
-
-static void register_nodes(void)
-{
-	int i;
-	int ret;
-
-	for (i = 0; i < MAX_NUMNODES; i++) {
-		if (node_online(i)) {
-			int p_node = parent_node(i);
-			struct node *parent = NULL;
-
-			if (p_node != i)
-				parent = &node_devices[p_node];
-
-			ret = register_node(&node_devices[i], i, parent);
-			if (ret)
-				printk(KERN_WARNING "register_nodes: "
-				       "register_node %d failed (%d)", i, ret);
-		}
-	}
-}
-#else
-static void register_nodes(void)
-{
-	return;
-}
-#endif
-
-/* Only valid if CPU is online. */
-static ssize_t show_physical_id(struct sys_device *dev, char *buf)
-{
-	struct cpu *cpu = container_of(dev, struct cpu, sysdev);
-
-	return sprintf(buf, "%u\n", get_hard_smp_processor_id(cpu->sysdev.id));
-}
-static SYSDEV_ATTR(physical_id, 0444, show_physical_id, NULL);
-
-static DEFINE_PER_CPU(struct cpu, cpu_devices);
-
-static int __init topology_init(void)
-{
-	int cpu;
-	struct node *parent = NULL;
-	int ret;
-
-	register_nodes();
-
-	for_each_cpu(cpu) {
-#ifdef CONFIG_NUMA
-		parent = &node_devices[cpu_to_node(cpu)];
-#endif
-		ret = register_cpu(&per_cpu(cpu_devices, cpu), cpu, parent);
-		if (ret)
-			printk(KERN_WARNING "topology_init: register_cpu %d "
-			       "failed (%d)\n", cpu, ret);
-
-		ret = sysdev_create_file(&per_cpu(cpu_devices, cpu).sysdev,
-					 &attr_physical_id);
-		if (ret)
-			printk(KERN_WARNING "toplogy_init: sysdev_create_file "
-			       "%d failed (%d)\n", cpu, ret);
-	}
-	return 0;
-}
-__initcall(topology_init);
-
 #ifdef CONFIG_SCHED_SMT
 #ifdef CONFIG_NUMA
 static struct sched_group sched_group_cpus[NR_CPUS];
@@ -1178,7 +1046,7 @@ static DEFINE_PER_CPU(struct sched_domain, node_domains);
 __init void arch_init_sched_domains(void)
 {
 	int i;
-	struct sched_group *first = NULL, *last = NULL;
+	struct sched_group *first_cpu = NULL, *last_cpu = NULL;
 
 	/* Set up domains */
 	for_each_cpu(i) {
@@ -1186,28 +1054,27 @@ __init void arch_init_sched_domains(void)
 		struct sched_domain *phys_domain = &per_cpu(phys_domains, i);
 		struct sched_domain *node_domain = &per_cpu(node_domains, i);
 		int node = cpu_to_node(i);
-		cpumask_t node_cpumask = node_to_cpumask(node);
-		cpumask_t nodemask;
+		cpumask_t nodemask = node_to_cpumask(node);
 		cpumask_t my_cpumask = cpumask_of_cpu(i);
 		cpumask_t sibling_cpumask = cpumask_of_cpu(i ^ 0x1);
 
-		cpus_and(nodemask, node_cpumask, cpu_possible_map);
-
 		*cpu_domain = SD_SIBLING_INIT;
-		if (cur_cpu_spec->cpu_features & CPU_FTR_SMT)
+		if (__is_processor(PV_POWER5))
 			cpus_or(cpu_domain->span, my_cpumask, sibling_cpumask);
 		else
 			cpu_domain->span = my_cpumask;
-		cpu_domain->parent = phys_domain;
 		cpu_domain->groups = &sched_group_cpus[i];
+		cpu_domain->parent = phys_domain;
 
 		*phys_domain = SD_CPU_INIT;
 		phys_domain->span = nodemask;
-		phys_domain->parent = node_domain;
+		// phys_domain->cache_hot_time = XXX;
 		phys_domain->groups = &sched_group_phys[first_cpu(cpu_domain->span)];
+		phys_domain->parent = node_domain;
 
 		*node_domain = SD_NODE_INIT;
 		node_domain->span = cpu_possible_map;
+		// node_domain->cache_hot_time = XXX;
 		node_domain->groups = &sched_group_nodes[node];
 	}
 
@@ -1215,10 +1082,14 @@ __init void arch_init_sched_domains(void)
 	for_each_cpu(i) {
 		struct sched_domain *cpu_domain = &per_cpu(cpu_domains, i);
 		int j;
-		first = last = NULL;
+		first_cpu = last_cpu = NULL;
 
-		if (i != first_cpu(cpu_domain->span))
+		if (i != first_cpu(cpu_domain->span)) {
+			(&per_cpu(cpu_domains, i))->flags |= SD_SHARE_CPUPOWER;
+			(&per_cpu(cpu_domains, first_cpu(cpu_domain->span)))->flags |=
+				SD_SHARE_CPUPOWER;
 			continue;
+		}
 
 		for_each_cpu_mask(j, cpu_domain->span) {
 			struct sched_group *cpu = &sched_group_cpus[j];
@@ -1227,13 +1098,13 @@ __init void arch_init_sched_domains(void)
 			cpu_set(j, cpu->cpumask);
 			cpu->cpu_power = SCHED_LOAD_SCALE;
 
-			if (!first)
-				first = cpu;
-			if (last)
-				last->next = cpu;
-			last = cpu;
+			if (!first_cpu)
+				first_cpu = cpu;
+			if (last_cpu)
+				last_cpu->next = cpu;
+			last_cpu = cpu;
 		}
-		last->next = first;
+		last_cpu->next = first_cpu;
 	}
 
 	for (i = 0; i < MAX_NUMNODES; i++) {
@@ -1241,12 +1112,12 @@ __init void arch_init_sched_domains(void)
 		cpumask_t nodemask;
 		struct sched_group *node = &sched_group_nodes[i];
 		cpumask_t node_cpumask = node_to_cpumask(i);
-		cpus_and(nodemask, node_cpumask, cpu_possible_map);
+		cpus_and(nodemask, node_cpumask, cpu_online_map);
 
 		if (cpus_empty(nodemask))
 			continue;
 
-		first = last = NULL;
+		first_cpu = last_cpu = NULL;
 		/* Set up physical groups */
 		for_each_cpu_mask(j, nodemask) {
 			struct sched_domain *cpu_domain = &per_cpu(cpu_domains, j);
@@ -1263,17 +1134,17 @@ __init void arch_init_sched_domains(void)
 			cpu->cpu_power = SCHED_LOAD_SCALE + SCHED_LOAD_SCALE*(cpus_weight(cpu->cpumask)-1) / 10;
 			node->cpu_power += cpu->cpu_power;
 
-			if (!first)
-				first = cpu;
-			if (last)
-				last->next = cpu;
-			last = cpu;
+			if (!first_cpu)
+				first_cpu = cpu;
+			if (last_cpu)
+				last_cpu->next = cpu;
+			last_cpu = cpu;
 		}
-		last->next = first;
+		last_cpu->next = first_cpu;
 	}
 
 	/* Set up nodes */
-	first = last = NULL;
+	first_cpu = last_cpu = NULL;
 	for (i = 0; i < MAX_NUMNODES; i++) {
 		struct sched_group *cpu = &sched_group_nodes[i];
 		cpumask_t nodemask;
@@ -1286,16 +1157,17 @@ __init void arch_init_sched_domains(void)
 		cpu->cpumask = nodemask;
 		/* ->cpu_power already setup */
 
-		if (!first)
-			first = cpu;
-		if (last)
-			last->next = cpu;
-		last = cpu;
+		if (!first_cpu)
+			first_cpu = cpu;
+		if (last_cpu)
+			last_cpu->next = cpu;
+		last_cpu = cpu;
 	}
-	last->next = first;
+	last_cpu->next = first_cpu;
 
 	mb();
 	for_each_cpu(i) {
+		int node = cpu_to_node(i);
 		struct sched_domain *cpu_domain = &per_cpu(cpu_domains, i);
 		cpu_attach_domain(cpu_domain, i);
 	}
@@ -1308,7 +1180,7 @@ static DEFINE_PER_CPU(struct sched_domain, phys_domains);
 __init void arch_init_sched_domains(void)
 {
 	int i;
-	struct sched_group *first = NULL, *last = NULL;
+	struct sched_group *first_cpu = NULL, *last_cpu = NULL;
 
 	/* Set up domains */
 	for_each_cpu(i) {
@@ -1318,15 +1190,16 @@ __init void arch_init_sched_domains(void)
 		cpumask_t sibling_cpumask = cpumask_of_cpu(i ^ 0x1);
 
 		*cpu_domain = SD_SIBLING_INIT;
-		if (cur_cpu_spec->cpu_features & CPU_FTR_SMT)
+		if (__is_processor(PV_POWER5))
 			cpus_or(cpu_domain->span, my_cpumask, sibling_cpumask);
 		else
 			cpu_domain->span = my_cpumask;
-		cpu_domain->parent = phys_domain;
 		cpu_domain->groups = &sched_group_cpus[i];
+		cpu_domain->parent = phys_domain;
 
 		*phys_domain = SD_CPU_INIT;
 		phys_domain->span = cpu_possible_map;
+		// phys_domain->cache_hot_time = XXX;
 		phys_domain->groups = &sched_group_phys[first_cpu(cpu_domain->span)];
 	}
 
@@ -1334,10 +1207,14 @@ __init void arch_init_sched_domains(void)
 	for_each_cpu(i) {
 		struct sched_domain *cpu_domain = &per_cpu(cpu_domains, i);
 		int j;
-		first = last = NULL;
+		first_cpu = last_cpu = NULL;
 
-		if (i != first_cpu(cpu_domain->span))
+		if (i != first_cpu(cpu_domain->span)) {
+			per_cpu(cpu_domains, i).flags |= SD_SHARE_CPUPOWER;
+			per_cpu(cpu_domains, first_cpu(cpu_domain->span)).flags |=
+				SD_SHARE_CPUPOWER;
 			continue;
+		}
 
 		for_each_cpu_mask(j, cpu_domain->span) {
 			struct sched_group *cpu = &sched_group_cpus[j];
@@ -1346,16 +1223,16 @@ __init void arch_init_sched_domains(void)
 			cpu_set(j, cpu->cpumask);
 			cpu->cpu_power = SCHED_LOAD_SCALE;
 
-			if (!first)
-				first = cpu;
-			if (last)
-				last->next = cpu;
-			last = cpu;
+			if (!first_cpu)
+				first_cpu = cpu;
+			if (last_cpu)
+				last_cpu->next = cpu;
+			last_cpu = cpu;
 		}
-		last->next = first;
+		last_cpu->next = first_cpu;
 	}
 
-	first = last = NULL;
+	first_cpu = last_cpu = NULL;
 	/* Set up physical groups */
 	for_each_cpu(i) {
 		struct sched_domain *cpu_domain = &per_cpu(cpu_domains, i);
@@ -1368,19 +1245,67 @@ __init void arch_init_sched_domains(void)
 		/* See SMT+NUMA setup for comment */
 		cpu->cpu_power = SCHED_LOAD_SCALE + SCHED_LOAD_SCALE*(cpus_weight(cpu->cpumask)-1) / 10;
 
-		if (!first)
-			first = cpu;
-		if (last)
-			last->next = cpu;
-		last = cpu;
+		if (!first_cpu)
+			first_cpu = cpu;
+		if (last_cpu)
+			last_cpu->next = cpu;
+		last_cpu = cpu;
 	}
-	last->next = first;
+	last_cpu->next = first_cpu;
 
 	mb();
 	for_each_cpu(i) {
-		struct sched_domain *cpu_domain = &per_cpu(cpu_domains, i);
-		cpu_attach_domain(cpu_domain, i);
+		struct sched_domain *cpu_sd = &per_cpu(cpu_domains, i);
+		cpu_attach_domain(cpu_sd, i);
 	}
 }
 #endif /* CONFIG_NUMA */
-#endif /* CONFIG_SCHED_SMT */
+#else /* !CONFIG_SCHED_SMT */
+
+#ifdef CONFIG_NUMA
+#error ppc64 has no NUMA scheduler defined without CONFIG_SCHED_SMT.	\
+       Please enable CONFIG_SCHED_SMT or bug Anton.
+#endif
+
+static struct sched_group sched_group_cpus[NR_CPUS];
+static DEFINE_PER_CPU(struct sched_domain, cpu_domains);
+
+__init void arch_init_sched_domains(void)
+{
+	int i;
+	struct sched_group *first_cpu = NULL, *last_cpu = NULL;
+
+	/* Set up domains */
+	for_each_cpu(i) {
+		struct sched_domain *cpu_sd = &per_cpu(cpu_domains, i);
+
+		*cpu_sd = SD_CPU_INIT;
+		cpu_sd->span = cpu_possible_map;
+		// cpu_sd->cache_hot_time = XXX;
+		cpu_sd->groups = &sched_group_cpus[i];
+	}
+
+	/* Set up CPU groups */
+	for_each_cpu_mask(i, cpu_possible_map) {
+		struct sched_group *cpu = &sched_group_cpus[i];
+
+		cpus_clear(cpu->cpumask);
+		cpu_set(i, cpu->cpumask);
+		cpu->cpu_power = SCHED_LOAD_SCALE;
+
+		if (!first_cpu)
+			first_cpu = cpu;
+		if (last_cpu)
+			last_cpu->next = cpu;
+		last_cpu = cpu;
+	}
+	last_cpu->next = first_cpu;
+
+	mb();
+	for_each_cpu(i) {
+		struct sched_domain *cpu_sd = &per_cpu(cpu_domains, i);
+		cpu_attach_domain(cpu_sd, i);
+	}
+}
+
+#endif

@@ -46,7 +46,7 @@
 
 /* legal IO pages under MAX_ISA_PORT.  This is to ensure we don't touch
    devices we don't have access to. */
-unsigned long io_page_mask; 
+unsigned long io_page_mask;
 
 EXPORT_SYMBOL(io_page_mask);
 
@@ -532,19 +532,19 @@ void __devinit pcibios_fixup_device_resources(struct pci_dev *dev,
 		if (dev->resource[i].flags & IORESOURCE_IO) {
 			unsigned long offset = (unsigned long)hose->io_base_virt - pci_io_base;
                         unsigned long start, end, mask;
- 
+
                         start = dev->resource[i].start += offset;
                         end = dev->resource[i].end += offset;
- 
+
                         /* Need to allow IO access to pages that are in the
                            ISA range */
                         if (start < MAX_ISA_PORT) {
                                 if (end > MAX_ISA_PORT)
                                         end = MAX_ISA_PORT;
-				
+
                                 start >>= PAGE_SHIFT;
                                 end >>= PAGE_SHIFT;
- 
+
                                 /* get the range of pages for the map */
                                 mask = ((1 << (end+1))-1) ^ ((1 << start)-1);
                                 io_page_mask |= mask;

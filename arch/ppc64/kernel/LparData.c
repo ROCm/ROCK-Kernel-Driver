@@ -10,6 +10,7 @@
 #include <asm/page.h>
 #include <stddef.h>
 #include <linux/threads.h>
+#include <linux/module.h>
 #include <asm/processor.h>
 #include <asm/ptrace.h>
 #include <asm/naca.h>
@@ -123,12 +124,14 @@ struct ItLpNaca itLpNaca = {
 		(u64)InstructionAccessSLB_Iseries /* 0x480 I-SLB */
 	}
 };
+EXPORT_SYMBOL(itLpNaca);
 
 /* May be filled in by the hypervisor so cannot end up in the BSS */
 struct ItIplParmsReal xItIplParmsReal __attribute__((__section__(".data"))); 
 
 /* May be filled in by the hypervisor so cannot end up in the BSS */
 struct ItExtVpdPanel xItExtVpdPanel __attribute__((__section__(".data")));
+EXPORT_SYMBOL(xItExtVpdPanel);
 
 #define maxPhysicalProcessors 32
 

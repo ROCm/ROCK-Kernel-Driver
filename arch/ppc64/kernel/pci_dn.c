@@ -57,10 +57,10 @@ update_dn_pci_info(struct device_node *dn, void *data)
 		/* special case for PHB's.  Sigh. */
 		regs = (u32 *)get_property(dn, "bus-range", 0);
 		dn->busno = regs[0];
-		
+
 		model = (char *)get_property(dn, "model", NULL);
 
-		if (strstr(model, "U3")) 
+		if (strstr(model, "U3"))
 			dn->devfn = -1;
 		else
 			dn->devfn = 0;	/* assumption */

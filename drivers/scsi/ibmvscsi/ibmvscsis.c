@@ -39,7 +39,6 @@
 #include <linux/proc_fs.h>
 #include <linux/pagemap.h>
 #include <linux/sched.h>
-#include <linux/pci.h>
 #include <linux/blkdev.h>
 #include <linux/fs.h>
 #include <linux/bio.h>
@@ -1861,9 +1860,9 @@ static int initialize_crq_queue(struct crq_queue *queue, struct server_adapter *
 
 	queue->msg_token = vio_map_single(adapter->dma_dev, queue->msgs,
 					  queue->size * sizeof(*queue->msgs),
-					  PCI_DMA_BIDIRECTIONAL);
+					  DMA_BIDIRECTIONAL);
 
-	if (pci_dma_mapping_error(queue->msg_token))
+	if (dma_mapping_error(queue->msg_token))
 		goto map_failed;
 
 	rc = plpar_hcall_norets(H_REG_CRQ, adapter->dma_dev->unit_address, queue->msg_token, PAGE_SIZE);
@@ -1891,7 +1890,7 @@ static int initialize_crq_queue(struct crq_queue *queue, struct server_adapter *
  req_irq_failed:
 	plpar_hcall_norets(H_FREE_CRQ, adapter->dma_dev->unit_address);
  reg_crq_failed:
-	vio_unmap_single(adapter->dma_dev, queue->msg_token, queue->size * sizeof(*queue->msgs), PCI_DMA_BIDIRECTIONAL);
+	vio_unmap_single(adapter->dma_dev, queue->msg_token, queue->size * sizeof(*queue->msgs), DMA_BIDIRECTIONAL);
  map_failed:
 	free_page((unsigned long)queue->msgs);
  malloc_failed:
@@ -1906,7 +1905,7 @@ static void release_crq_queue(struct crq_queue *queue, struct server_adapter *ad
 	info("releasing crq\n");
 	free_irq(adapter->dma_dev->irq, adapter);
 	plpar_hcall_norets(H_FREE_CRQ, adapter->dma_dev->unit_address);
-	vio_unmap_single(adapter->dma_dev, queue->msg_token, queue->size * sizeof(*queue->msgs), PCI_DMA_BIDIRECTIONAL);
+	vio_unmap_single(adapter->dma_dev, queue->msg_token, queue->size * sizeof(*queue->msgs), DMA_BIDIRECTIONAL);
 	free_page((unsigned long)queue->msgs);
 }
 

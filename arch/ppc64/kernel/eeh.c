@@ -49,6 +49,7 @@ static int eeh_subsystem_enabled;
 #define EEH_MAX_OPTS 4096
 static char *eeh_opts;
 static int eeh_opts_last;
+static int eeh_error_buf_size;
 
 /* Buffer for reporting slot-error-detail rtas calls */
 static unsigned char slot_errbuf[RTAS_ERROR_LOG_MAX];
@@ -412,7 +413,7 @@ static void eeh_event_handler(void *dummy)
 
 	spin_lock(&eeh_eventlist_lock);
 
-	memset(slot_errbuf, 0, RTAS_ERROR_LOG_MAX);
+	memset(slot_errbuf, 0, eeh_error_buf_size);
 
 	list_for_each_safe(tmp, n, &eeh_eventlist) {
 		event = list_entry(tmp, struct eeh_event, list);
@@ -422,7 +423,7 @@ static void eeh_event_handler(void *dummy)
 				      event->dn->eeh_config_addr,
 				      BUID_HI(event->dn->phb->buid),
 				      BUID_LO(event->dn->phb->buid), NULL, 0,
-				      virt_to_phys(slot_errbuf), RTAS_ERROR_LOG_MAX,
+				      virt_to_phys(slot_errbuf), eeh_error_buf_size,
 				      2 /* Permanent Error */);
 		if (log_event)
 			log_error(slot_errbuf, ERR_TYPE_RTAS_LOG, 0);
@@ -645,9 +646,27 @@ static void *early_enable_eeh(struct device_node *dn, void *data)
  */
 void __init eeh_init(void)
 {
-	struct device_node *phb;
+	struct device_node *phb, *np;
 	struct eeh_early_enable_info info;
+	u32 *prop;
 	char *eeh_force_off = strstr(saved_command_line, "eeh-force-off");
+
+	np = of_find_node_by_path("/rtas");
+	if (np == NULL) {
+		printk(KERN_WARNING "EEH: RTAS not found !\n");
+		return;
+	}
+	prop = (u32 *)get_property(np, "rtas-error-log-max", NULL);
+	if (prop == NULL) {
+		printk(KERN_WARNING "EEH: Can't fint rtas-error-log-max !\n");
+		eeh_error_buf_size = 1024;
+	} else
+		eeh_error_buf_size = (int)*prop;
+	if (eeh_error_buf_size > RTAS_ERROR_LOG_MAX) {
+		printk(KERN_WARNING "EEH: rtas-error-log-max is bigger than allocated "
+		       "buffer ! (%d vs %d)", eeh_error_buf_size, RTAS_ERROR_LOG_MAX);
+		eeh_error_buf_size = RTAS_ERROR_LOG_MAX;
+	}
 
 	ibm_set_eeh_option = rtas_token("ibm,set-eeh-option");
 	ibm_set_slot_reset = rtas_token("ibm,set-slot-reset");

@@ -260,7 +260,6 @@ extern int of_remove_node(struct device_node *np);
 /* Other Prototypes */
 extern unsigned long prom_init(unsigned long, unsigned long, unsigned long,
 	unsigned long, unsigned long);
-extern void prom_print(const char *msg);
 extern void relocate_nodes(void);
 extern void finish_device_tree(void);
 extern int device_is_compatible(struct device_node *device, const char *);

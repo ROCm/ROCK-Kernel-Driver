@@ -57,6 +57,7 @@ extern int hvcs_free_partner_info(struct list_head *head);
 extern int hvcs_get_partner_info(unsigned int unit_address, struct list_head *head);
 extern int hvcs_register_connection(unsigned int unit_address, unsigned int p_partition_ID, unsigned int p_unit_address);
 extern int hvcs_free_connection(unsigned int unit_address);
+extern int hvc_interrupt(int index);
 
 #endif /* _PPC64_HVCONSOLE_H */
 

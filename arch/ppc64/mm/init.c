@@ -621,8 +621,6 @@ module_init(setup_kcore);
 void __init mem_init(void)
 {
 #ifndef CONFIG_DISCONTIGMEM
-	extern char *sysmap; 
-	extern unsigned long sysmap_size;
 	unsigned long addr;
 #endif
 	int codepages = 0;
@@ -656,12 +654,6 @@ void __init mem_init(void)
 
 	totalram_pages += free_all_bootmem();
 
-	if ( sysmap_size )
-		for (addr = (unsigned long)sysmap;
-		     addr < PAGE_ALIGN((unsigned long)sysmap+sysmap_size) ;
-		     addr += PAGE_SIZE)
-			SetPageReserved(virt_to_page(addr));
-	
 	for (addr = KERNELBASE; addr <= (unsigned long)__va(lmb_end_of_DRAM());
 	     addr += PAGE_SIZE) {
 		if (!PageReserved(virt_to_page(addr)))
@@ -696,6 +688,8 @@ void __init mem_init(void)
  */
 void flush_dcache_page(struct page *page)
 {
+	if (cur_cpu_spec->cpu_features & CPU_FTR_COHERENT_ICACHE)
+		return;
 	/* avoid an atomic op if possible */
 	if (test_bit(PG_arch_1, &page->flags))
 		clear_bit(PG_arch_1, &page->flags);
@@ -705,6 +699,8 @@ void clear_user_page(void *page, unsigned long vaddr, struct page *pg)
 {
 	clear_page(page);
 
+	if (cur_cpu_spec->cpu_features & CPU_FTR_COHERENT_ICACHE)
+		return;
 	/*
 	 * We shouldnt have to do this, but some versions of glibc
 	 * require it (ld.so assumes zero filled pages are icache clean)
@@ -735,6 +731,9 @@ void copy_user_page(void *vto, void *vfrom, unsigned long vaddr,
 	if (!vma->vm_file && ((vma->vm_flags & VM_EXEC) == 0))
 		return;
 #endif
+
+	if (cur_cpu_spec->cpu_features & CPU_FTR_COHERENT_ICACHE)
+		return;
 
 	/* avoid an atomic op if possible */
 	if (test_bit(PG_arch_1, &pg->flags))
@@ -768,7 +767,8 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long ea,
 	cpumask_t tmp;
 
 	/* handle i-cache coherency */
-	if (!(cur_cpu_spec->cpu_features & CPU_FTR_NOEXECUTE)) {
+	if (!(cur_cpu_spec->cpu_features & CPU_FTR_COHERENT_ICACHE) &&
+	    !(cur_cpu_spec->cpu_features & CPU_FTR_NOEXECUTE)) {
 		unsigned long pfn = pte_pfn(pte);
 		if (pfn_valid(pfn)) {
 			struct page *page = pfn_to_page(pfn);
