@@ -16,6 +16,11 @@
  *   You should have received a copy of the GNU General Public License
  *   along with this program; if not, write to the Free Software
  *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+ *
+ *   Rene Rebe <rene.rebe@gmx.net>:
+ *     * update from shadow registers on wakeup and headphone plug
+ *     * automatically toggle DRC on headphone plug
+ *	
  */
 
 
@@ -757,12 +762,6 @@ static snd_kcontrol_new_t tumbler_mixers[] __initdata = {
 	DEFINE_MONO("Tone Control - Treble", treble),
 	DEFINE_MONO("PCM Playback Volume", pcm),
 	{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER,
-	  .name = "DRC Switch",
-	  .info = snd_pmac_boolean_mono_info,
-	  .get = tumbler_get_drc_switch,
-	  .put = tumbler_put_drc_switch
-	},
-	{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 	  .name = "DRC Range",
 	  .info = tumbler_info_drc_value,
 	  .get = tumbler_get_drc_value,
@@ -788,12 +787,6 @@ static snd_kcontrol_new_t snapper_mixers[] __initdata = {
 	DEFINE_SNAPPER_MIX("Monitor Mix Volume", 0, VOL_IDX_ADC),
 	DEFINE_SNAPPER_MONO("Tone Control - Bass", bass),
 	DEFINE_SNAPPER_MONO("Tone Control - Treble", treble),
-	{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER,
-	  .name = "DRC Switch",
-	  .info = snd_pmac_boolean_mono_info,
-	  .get = tumbler_get_drc_switch,
-	  .put = tumbler_put_drc_switch
-	},
 	{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 	  .name = "DRC Range",
 	  .info = tumbler_info_drc_value,
@@ -824,6 +817,14 @@ static snd_kcontrol_new_t tumbler_speaker_sw __initdata = {
 	.put = tumbler_put_mute_switch,
 	.private_value = TUMBLER_MUTE_AMP,
 };
+static snd_kcontrol_new_t tumbler_drc_sw __initdata = {
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "DRC Switch",
+	.info = snd_pmac_boolean_mono_info,
+	.get = tumbler_get_drc_switch,
+	.put = tumbler_put_drc_switch
+};
+
 
 #ifdef PMAC_SUPPORT_AUTOMUTE
 /*
@@ -845,6 +846,29 @@ static void check_mute(pmac_t *chip, pmac_gpio_t *gp, int val, int do_notify, sn
 	}
 }
 
+static struct work_struct device_change;
+
+static void
+device_change_handler(void *self)
+{
+	pmac_t *chip = (pmac_t*) self;
+	pmac_tumbler_t *mix;
+
+	if (!chip)
+		return;
+
+	mix = chip->mixer_data;
+
+	/* first set the DRC so the speaker do not explode -ReneR */
+	if (chip->model == PMAC_TUMBLER)
+		tumbler_set_drc(mix);
+	else
+		snapper_set_drc(mix);
+
+	/* reset the master volume so the correct amplification is applied */
+	tumbler_set_master_volume(mix);
+}
+
 static void tumbler_update_automute(pmac_t *chip, int do_notify)
 {
 	if (chip->auto_mute) {
@@ -854,14 +878,25 @@ static void tumbler_update_automute(pmac_t *chip, int do_notify)
 			/* mute speaker */
 			check_mute(chip, &mix->amp_mute, 1, do_notify, chip->speaker_sw_ctl);
 			check_mute(chip, &mix->hp_mute, 0, do_notify, chip->master_sw_ctl);
+			mix->drc_enable = 0;
+
 		} else {
 			/* unmute speaker */
 			check_mute(chip, &mix->amp_mute, 0, do_notify, chip->speaker_sw_ctl);
 			check_mute(chip, &mix->hp_mute, 1, do_notify, chip->master_sw_ctl);
+			mix->drc_enable = 1;
 		}
-		if (do_notify)
+		if (do_notify) {
 			snd_ctl_notify(chip->card, SNDRV_CTL_EVENT_MASK_VALUE,
 				       &chip->hp_detect_ctl->id);
+			snd_ctl_notify(chip->card, SNDRV_CTL_EVENT_MASK_VALUE,
+			               &chip->drc_sw_ctl->id);
+		}
+
+		/* finally we need to schedule an update of the mixer values
+		   (master and DRC are enough for now) -ReneR */
+		schedule_work(&device_change);
+
 	}
 }
 #endif /* PMAC_SUPPORT_AUTOMUTE */
@@ -1112,10 +1147,16 @@ int __init snd_pmac_tumbler_init(pmac_t *chip)
 	chip->speaker_sw_ctl = snd_ctl_new1(&tumbler_speaker_sw, chip);
 	if ((err = snd_ctl_add(chip->card, chip->speaker_sw_ctl)) < 0)
 		return err;
+	chip->drc_sw_ctl = snd_ctl_new1(&tumbler_drc_sw, chip);
+	if ((err = snd_ctl_add(chip->card, chip->drc_sw_ctl)) < 0)
+		return err;
+
 
 #ifdef CONFIG_PMAC_PBOOK
 	chip->resume = tumbler_resume;
 #endif
+
+	INIT_WORK(&device_change, device_change_handler, (void *)chip);
 
 #ifdef PMAC_SUPPORT_AUTOMUTE
 	if (mix->headphone_irq >=0 && (err = snd_pmac_add_automute(chip)) < 0)
