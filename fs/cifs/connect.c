@@ -695,7 +695,12 @@ cifs_parse_mount_options(char *options, const char *devname,struct smb_vol *vol)
 				vol->file_mode =
 					simple_strtoul(value, &value, 0);
 			}
-		} else if (strnicmp(data, "dir_mode", 3) == 0) {
+		} else if (strnicmp(data, "dir_mode", 4) == 0) {
+			if (value && *value) {
+				vol->dir_mode =
+					simple_strtoul(value, &value, 0);
+			}
+		} else if (strnicmp(data, "dirmode", 4) == 0) {
 			if (value && *value) {
 				vol->dir_mode =
 					simple_strtoul(value, &value, 0);
@@ -1413,7 +1418,7 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 		if(volume_info.server_ino)
 			cifs_sb->mnt_cifs_flags |= CIFS_MOUNT_SERVER_INUM;
 		if(volume_info.direct_io) {
-			cFYI(1,("mounting share using direct i/o"));
+			cERROR(1,("mounting share using direct i/o"));
 			cifs_sb->mnt_cifs_flags |= CIFS_MOUNT_DIRECT_IO;
 		}
 

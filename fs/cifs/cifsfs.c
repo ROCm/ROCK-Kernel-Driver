@@ -436,7 +436,7 @@ cifs_read_wrapper(struct file * file, char __user *read_data, size_t read_size,
 
 	cFYI(1,("In read_wrapper size %zd at %lld",read_size,*poffset));
 
-#ifdef CIFS_EXPERIMENTAL    /* BB fixme - fix user char * to kernel char * mapping here BB */
+#ifdef CONFIG_CIFS_EXPERIMENTAL    /* BB fixme - fix user char * to kernel char * mapping here BB */
 	/* check whether we can cache writes locally */
 	if(file->f_dentry->d_sb) {
 		struct cifs_sb_info *cifs_sb;
@@ -481,15 +481,16 @@ cifs_write_wrapper(struct file * file, const char __user *write_data,
 
 	cFYI(1,("In write_wrapper size %zd at %lld",write_size,*poffset));
 
-#ifdef CIFS_EXPERIMENTAL    /* BB fixme - fix user char * to kernel char * mapping here BB */
+#ifdef CONFIG_CIFS_EXPERIMENTAL    /* BB fixme - fix user char * to kernel char * mapping here BB */
 	/* check whether we can cache writes locally */
 	if(file->f_dentry->d_sb) {
 		struct cifs_sb_info *cifs_sb;
 		cifs_sb = CIFS_SB(file->f_dentry->d_sb);
 		if(cifs_sb != NULL) {
-			if(cifs_sb->mnt_cifs_flags & CIFS_MOUNT_DIRECT_IO)
+			if(cifs_sb->mnt_cifs_flags & CIFS_MOUNT_DIRECT_IO) {
 				return cifs_write(file,write_data,
 							write_size,poffset);
+			}
 		}
 	}
 #endif /* CIFS_EXPERIMENTAL */
