@@ -553,7 +553,7 @@ static int fill_powernow_table(struct powernow_k8_data *data, struct pst_s *pst,
 		printk(KERN_ERR PFX "no p states to transition\n");
 		return -ENODEV;
 	}
-                                                                                                    
+
 	if (check_pst_table(data, pst, maxvid))
 		return -EINVAL;
 
@@ -738,7 +738,7 @@ static int powernow_k8_cpu_init_acpi(struct powernow_k8_data *data)
 			printk(KERN_ERR PFX "Too many lo freq table entries\n");
 			goto err_out;
 		}
-                                                                                                            
+
 		if (powernow_table[i].frequency != (data->acpi_data.states[i].core_frequency * 1000)) {
 			printk(KERN_INFO PFX "invalid freq entries %u kHz vs. %u kHz\n",
 				powernow_table[i].frequency,
@@ -762,7 +762,7 @@ err_out:
 
 	/* data->acpi_data.state_count informs us at ->exit() whether ACPI was used */
 	data->acpi_data.state_count = 0;
-                                                                                                            
+
 	return -ENODEV;
 }
 
@@ -1047,7 +1047,7 @@ static unsigned int powernowk8_get (unsigned int cpu)
 	if (query_current_values_with_pending_wait(data))
 		goto out;
 
-	khz = find_khz_freq_from_fid(data->currfid);	
+	khz = find_khz_freq_from_fid(data->currfid);
 
  out:
 	preempt_enable_no_resched();
