@@ -1048,6 +1048,11 @@ CONFIG_DEBUG_OBSOLETE
   Say Y here if you want to reduce the chances of the tree compiling,
   and are prepared to dig into driver internals to fix compile errors.
 
+Profiling support
+CONFIG_PROFILING
+  Say Y here to enable the extended profiling support mechanisms used
+  by profilers such as OProfile.
+ 
 Software Suspend
 CONFIG_SOFTWARE_SUSPEND
   Enable the possibilty of suspendig machine. It doesn't need APM.
