@@ -688,7 +688,6 @@ u8 ide_dump_status(struct ata_device *drive, struct request * rq, const char *ms
 {
 	unsigned long flags;
 	byte err = 0;
-	int i;
 
 	__save_flags (flags);	/* local CPU only */
 	ide__sti();		/* local CPU only */
