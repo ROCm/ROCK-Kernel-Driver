@@ -240,6 +240,7 @@ static void spaceball_connect(struct serio *serio, struct serio_dev *dev)
 
 	sprintf(spaceball->phys, "%s/input0", serio->phys);
 
+	init_input_dev(&spaceball->dev);
 	spaceball->dev.name = spaceball_names[id];
 	spaceball->dev.phys = spaceball->phys;
 	spaceball->dev.id.bustype = BUS_RS232;

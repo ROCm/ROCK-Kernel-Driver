@@ -479,6 +479,8 @@ adbhid_input_register(int id, int default_id, int original_handler_id,
 	memset(adbhid[id], 0, sizeof(struct adbhid));
 	sprintf(adbhid[id]->phys, "adb%d:%d.%02x/input", id, default_id, original_handler_id);
 
+	init_input_dev(&adbhid[id]);
+
 	adbhid[id]->id = default_id;
 	adbhid[id]->original_handler_id = original_handler_id;
 	adbhid[id]->current_handler_id = current_handler_id;

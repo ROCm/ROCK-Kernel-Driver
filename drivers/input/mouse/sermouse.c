@@ -247,6 +247,7 @@ static void sermouse_connect(struct serio *serio, struct serio_dev *dev)
 
 	memset(sermouse, 0, sizeof(struct sermouse));
 
+	init_input_dev(&sermouse->dev);
 	sermouse->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_REL);
 	sermouse->dev.keybit[LONG(BTN_MOUSE)] = BIT(BTN_LEFT) | BIT(BTN_RIGHT);
 	sermouse->dev.relbit[0] = BIT(REL_X) | BIT(REL_Y);

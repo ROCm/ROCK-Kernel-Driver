@@ -431,8 +431,9 @@ static void analog_init_device(struct analog_port *port, struct analog *analog, 
 
 	analog_name(analog);
 	sprintf(analog->phys, "%s/input%d", port->gameport->phys, index);
-
 	analog->buttons = (analog->mask & ANALOG_GAMEPAD) ? analog_pad_btn : analog_joy_btn;
+
+	init_input_dev(&analog->dev);
 
 	analog->dev.name = analog->name;
 	analog->dev.phys = analog->phys;

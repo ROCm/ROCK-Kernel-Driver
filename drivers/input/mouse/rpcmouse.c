@@ -41,6 +41,12 @@ static struct input_dev rpcmouse_dev = {
 	.relbit	= { BIT(REL_X) | BIT(REL_Y) },
 	.name	= "Acorn RiscPC Mouse",
 	.phys	= "rpcmouse/input0",
+	.id	= {
+		.bustype = BUS_HOST,
+		.vendor  = 0x0005,
+		.product = 0x0001,
+		.version = 0x0100,
+	},
 };
 
 static void rpcmouse_irq(int irq, void *dev_id, struct pt_regs *regs)
@@ -69,6 +75,8 @@ static void rpcmouse_irq(int irq, void *dev_id, struct pt_regs *regs)
 
 static int __init rpcmouse_init(void)
 {
+	init_input_dev(&rpcmouse_dev);
+
 	rpcmouse_lastx = (short) iomd_readl(IOMD_MOUSEX);
 	rpcmouse_lasty = (short) iomd_readl(IOMD_MOUSEY);
 
@@ -78,10 +86,6 @@ static int __init rpcmouse_init(void)
 	}
 
 	input_register_device(&rpcmouse_dev);
-	rpcmouse.id.bustype	=BUS_HOST,
-	rpcmouse.id.vendor	=0x0005,
-	rpcmouse.id.product	=0x0001,
-	rpcmouse.id.version	=0x0100,
 
 	printk(KERN_INFO "input: Acorn RiscPC mouse irq %d", IRQ_VSYNCPULSE);
 

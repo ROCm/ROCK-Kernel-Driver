@@ -583,6 +583,7 @@ static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
 
 	memset(psmouse, 0, sizeof(struct psmouse));
 
+	init_input_dev(&psmouse->dev);
 	psmouse->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_REL);
 	psmouse->dev.keybit[LONG(BTN_MOUSE)] = BIT(BTN_LEFT) | BIT(BTN_MIDDLE) | BIT(BTN_RIGHT);
 	psmouse->dev.relbit[0] = BIT(REL_X) | BIT(REL_Y);

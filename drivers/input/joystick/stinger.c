@@ -152,6 +152,7 @@ static void stinger_connect(struct serio *serio, struct serio_dev *dev)
 
 	sprintf(stinger->phys, "%s/serio0", serio->phys);
 
+	init_input_dev(&stinger->dev);
 	stinger->dev.name = stinger_name;
 	stinger->dev.phys = stinger->phys;
 	stinger->dev.id.bustype = BUS_RS232;
@@ -166,7 +167,6 @@ static void stinger_connect(struct serio *serio, struct serio_dev *dev)
 	}
 
 	stinger->dev.private = stinger;
-	
 	serio->private = stinger;
 
 	if (serio_open(serio, dev)) {
@@ -177,6 +177,7 @@ static void stinger_connect(struct serio *serio, struct serio_dev *dev)
 	input_register_device(&stinger->dev);
 
 	printk(KERN_INFO "input: %s on %s\n",  stinger_name, serio->phys);
+
 }
 
 /*

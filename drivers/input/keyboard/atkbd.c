@@ -474,6 +474,8 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 
 	atkbd->serio = serio;
 
+	init_input_dev(&atkbd->dev);
+
 	atkbd->dev.keycode = atkbd->keycode;
 	atkbd->dev.keycodesize = sizeof(unsigned char);
 	atkbd->dev.keycodemax = ARRAY_SIZE(atkbd_set2_keycode);

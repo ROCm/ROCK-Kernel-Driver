@@ -744,6 +744,8 @@ struct ff_effect {
 #define INPUT_KEYCODE(dev, scancode) ((dev->keycodesize == 1) ? ((u8*)dev->keycode)[scancode] : \
 	((dev->keycodesize == 1) ? ((u16*)dev->keycode)[scancode] : (((u32*)dev->keycode)[scancode])))
 
+#define init_input_dev(dev)	do { INIT_LIST_HEAD(&((dev)->h_list)); INIT_LIST_HEAD(&((dev)->node)); } while (0)
+
 struct input_dev {
 
 	void *private;

@@ -371,6 +371,8 @@ static void h3600ts_connect(struct serio *serio, struct serio_dev *dev)
 
 	memset(ts, 0, sizeof(struct h3600_dev));
 
+	init_input_dev(&ts->dev);
+
 	/* Device specific stuff */
         set_GPIO_IRQ_edge( GPIO_BITSY_ACTION_BUTTON, GPIO_BOTH_EDGES );
         set_GPIO_IRQ_edge( GPIO_BITSY_NPOWER_BUTTON, GPIO_RISING_EDGE );
