@@ -147,8 +147,8 @@ static int enable_surveillance(void)
 {
 	int error;
 
-	error = rtas_call(rtas_token("set-indicator"), 3, 1, NULL, SURVEILLANCE_TOKEN,
-			0, SURVEILLANCE_TIMEOUT);
+	error = rtas_call(rtas_token("set-indicator"), 3, 1, NULL,
+			  SURVEILLANCE_TOKEN, 0, SURVEILLANCE_TIMEOUT);
 
 	if (error) {
 		printk(KERN_ERR "rtasd: could not enable surveillance\n");
@@ -211,9 +211,7 @@ static int rtasd(void *unused)
 
 	DEBUG("will sleep for %d jiffies\n", (HZ*60/rtas_event_scan_rate) / 2);
 
-	daemonize();
-	sigfillset(&current->blocked);
-	sprintf(current->comm, "rtasd");
+	daemonize("rtasd");
 
 #if 0
 	/* Rusty unreal time task */
@@ -245,11 +243,13 @@ repeat:
 
 		} while(error == 0);
 
-		/* Check all cpus for pending events before sleeping*/
-		if (!first_pass) {
-			set_current_state(TASK_INTERRUPTIBLE);
-			schedule_timeout((HZ*60/rtas_event_scan_rate) / 2);
-		}
+		/*
+		 * Check all cpus for pending events quickly, sleeping for
+		 * at least one second since some machines have problems
+		 * if we call event-scan too quickly
+		 */
+		set_current_state(TASK_INTERRUPTIBLE);
+		schedule_timeout(first_pass ? HZ : (HZ*60/rtas_event_scan_rate) / 2);
 	}
 
 	if (first_pass && surveillance_requested) {
@@ -257,10 +257,9 @@ repeat:
 		if (enable_surveillance())
 			goto error_vfree;
 		DEBUG("surveillance enabled\n");
-	} else {
-		first_pass = 0;
 	}
 
+	first_pass = 0;
 	goto repeat;
 
 error_vfree:

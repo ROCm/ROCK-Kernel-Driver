@@ -90,11 +90,13 @@ static int ppro_check_ctrs(unsigned int const cpu,
 {
 	unsigned int low, high;
 	int i;
+	unsigned long eip = instruction_pointer(regs);
+	int is_kernel = !user_mode(regs);
  
 	for (i = 0 ; i < NUM_COUNTERS; ++i) {
 		CTR_READ(low, high, msrs, i);
 		if (CTR_OVERFLOWED(low)) {
-			oprofile_add_sample(instruction_pointer(regs), i, cpu);
+			oprofile_add_sample(eip, is_kernel, i, cpu);
 			CTR_WRITE(reset_value[i], msrs, i);
 			return 1;
 		}

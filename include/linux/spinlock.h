@@ -179,6 +179,7 @@ typedef struct {
 #define _raw_read_unlock(lock)	do { (void)(lock); } while(0)
 #define _raw_write_lock(lock)	do { (void)(lock); } while(0)
 #define _raw_write_unlock(lock)	do { (void)(lock); } while(0)
+#define _raw_write_trylock(lock) ({ (void)(lock); (1); })
 
 #endif /* !SMP */
 

@@ -209,15 +209,12 @@ static void ad1848_tmr_reprogram(int dev);
 
 static int ad_read(ad1848_info * devc, int reg)
 {
-	unsigned long flags;
 	int x;
 	int timeout = 900000;
 
 	while (timeout > 0 && inb(devc->base) == 0x80)	/*Are we initializing */
 		timeout--;
 
-	spin_lock_irqsave(&devc->lock,flags);
-	
 	if(reg < 32)
 	{
 		outb(((unsigned char) (reg & 0xff) | devc->MCE_bit), io_Index_Addr(devc));
@@ -233,21 +230,17 @@ static int ad_read(ad1848_info * devc, int reg)
 		outb(((unsigned char) (xra & 0xff)), io_Indexed_Data(devc));
 		x = inb(io_Indexed_Data(devc));
 	}
-	spin_unlock_irqrestore(&devc->lock,flags);
 
 	return x;
 }
 
 static void ad_write(ad1848_info * devc, int reg, int data)
 {
-	unsigned long flags;
 	int timeout = 900000;
 
 	while (timeout > 0 && inb(devc->base) == 0x80)	/* Are we initializing */
 		timeout--;
 
-	spin_lock_irqsave(&devc->lock,flags);
-	
 	if(reg < 32)
 	{
 		outb(((unsigned char) (reg & 0xff) | devc->MCE_bit), io_Index_Addr(devc));
@@ -263,7 +256,6 @@ static void ad_write(ad1848_info * devc, int reg, int data)
 		outb(((unsigned char) (xra & 0xff)), io_Indexed_Data(devc));
 		outb((unsigned char) (data & 0xff), io_Indexed_Data(devc));
 	}
-	spin_unlock_irqrestore(&devc->lock,flags);
 }
 
 static void wait_for_calibration(ad1848_info * devc)
@@ -319,36 +311,28 @@ static void ad_unmute(ad1848_info * devc)
 
 static void ad_enter_MCE(ad1848_info * devc)
 {
-	unsigned long flags;
 	int timeout = 1000;
 	unsigned short prev;
 
 	while (timeout > 0 && inb(devc->base) == 0x80)	/*Are we initializing */
 		timeout--;
 
-	spin_lock_irqsave(&devc->lock,flags);
-
 	devc->MCE_bit = 0x40;
 	prev = inb(io_Index_Addr(devc));
 	if (prev & 0x40)
 	{
-		spin_unlock_irqrestore(&devc->lock,flags);
 		return;
 	}
 	outb((devc->MCE_bit), io_Index_Addr(devc));
-	spin_unlock_irqrestore(&devc->lock,flags);
 }
 
 static void ad_leave_MCE(ad1848_info * devc)
 {
-	unsigned long flags;
 	unsigned char prev, acal;
 	int timeout = 1000;
 
 	while (timeout > 0 && inb(devc->base) == 0x80)	/*Are we initializing */
 		timeout--;
-
-	spin_lock_irqsave(&devc->lock,flags);
 
 	acal = ad_read(devc, 9);
 
@@ -358,19 +342,18 @@ static void ad_leave_MCE(ad1848_info * devc)
 
 	if ((prev & 0x40) == 0)	/* Not in MCE mode */
 	{
-		spin_unlock_irqrestore(&devc->lock,flags);
 		return;
 	}
 	outb((0x00), io_Index_Addr(devc));	/* Clear the MCE bit */
 	if (acal & 0x08)	/* Auto calibration is enabled */
 		wait_for_calibration(devc);
-	spin_unlock_irqrestore(&devc->lock,flags);
 }
 
 static int ad1848_set_recmask(ad1848_info * devc, int mask)
 {
 	unsigned char   recdev;
 	int             i, n;
+	unsigned long flags;
 
 	mask &= devc->supported_rec_devices;
 
@@ -392,6 +375,7 @@ static int ad1848_set_recmask(ad1848_info * devc, int mask)
 		if (mask & (1 << i))
 			n++;
 
+	spin_lock_irqsave(&devc->lock,flags);
 	if (!soundpro) {
 		if (n == 0)
 			mask = SOUND_MASK_MIC;
@@ -460,6 +444,7 @@ static int ad1848_set_recmask(ad1848_info * devc, int mask)
 			}
 		}
 	}
+	spin_unlock_irqrestore(&devc->lock,flags);
 
 	/* Rename the mixer bits back if necessary */
 	for (i = 0; i < 32; i++)
@@ -527,6 +512,7 @@ static void ad1848_mixer_set_channel(ad1848_info *devc, int dev, int value, int 
 {
 	int regoffs, muteregoffs;
 	unsigned char val, muteval;
+	unsigned long flags;
 
 	regoffs = devc->mix_devices[dev][channel].regno;
 	muteregoffs = devc->mix_devices[dev][channel].mutereg;
@@ -539,12 +525,14 @@ static void ad1848_mixer_set_channel(ad1848_info *devc, int dev, int value, int 
 	else
 		change_bits(devc, &val, &val, dev, channel, value);
 
+	spin_lock_irqsave(&devc->lock,flags);
 	ad_write(devc, regoffs, val);
 	devc->saved_regs[regoffs] = val;
 	if (muteregoffs != regoffs) {
 		ad_write(devc, muteregoffs, muteval);
 		devc->saved_regs[muteregoffs] = muteval;
 	}
+	spin_unlock_irqrestore(&devc->lock,flags);
 }
 
 static int ad1848_mixer_set(ad1848_info * devc, int dev, int value)
@@ -600,6 +588,7 @@ static void ad1848_mixer_reset(ad1848_info * devc)
 {
 	int i;
 	char name[32];
+	unsigned long flags;
 
 	devc->mix_devices = &(ad1848_mix_devices[0]);
 
@@ -666,6 +655,7 @@ static void ad1848_mixer_reset(ad1848_info * devc)
 	
 	devc->mixer_output_port = devc->levels[31] | AUDIO_HEADPHONE | AUDIO_LINE_OUT;
 
+	spin_lock_irqsave(&devc->lock,flags);
 	if (!soundpro) {
 		if (devc->mixer_output_port & AUDIO_SPEAKER)
 			ad_write(devc, 26, ad_read(devc, 26) & ~0x40);	/* Unmute mono out */
@@ -679,6 +669,7 @@ static void ad1848_mixer_reset(ad1848_info * devc)
 		/* Enable surround mode and SB16 mixer */
 		ad_write(devc, 16, 0x60);
 	}
+	spin_unlock_irqrestore(&devc->lock,flags);
 }
 
 static int ad1848_mixer_ioctl(int dev, unsigned int cmd, caddr_t arg)
@@ -693,14 +684,17 @@ static int ad1848_mixer_ioctl(int dev, unsigned int cmd, caddr_t arg)
 
 		if (val != 0xffff) 
 		{
+			unsigned long flags;
 			val &= (AUDIO_SPEAKER | AUDIO_HEADPHONE | AUDIO_LINE_OUT);
 			devc->mixer_output_port = val;
 			val |= AUDIO_HEADPHONE | AUDIO_LINE_OUT;	/* Always on */
 			devc->mixer_output_port = val;
+			spin_lock_irqsave(&devc->lock,flags);
 			if (val & AUDIO_SPEAKER)
 				ad_write(devc, 26, ad_read(devc, 26) & ~0x40);	/* Unmute mono out */
 			else
 				ad_write(devc, 26, ad_read(devc, 26) | 0x40);		/* Mute mono out */
+			spin_unlock_irqrestore(&devc->lock,flags);
 		}
 		val = devc->mixer_output_port;
 		return put_user(val, (int *)arg);
@@ -985,10 +979,11 @@ static int ad1848_open(int dev, int mode)
 	devc = (ad1848_info *) audio_devs[dev]->devc;
 	portc = (ad1848_port_info *) audio_devs[dev]->portc;
 
-	spin_lock_irqsave(&devc->lock,flags);
+	/* here we don't have to protect against intr */
+	spin_lock(&devc->lock);
 	if (portc->open_mode || (devc->open_mode & mode))
 	{
-		spin_unlock_irqrestore(&devc->lock,flags);
+		spin_unlock(&devc->lock);
 		return -EBUSY;
 	}
 	devc->dual_dma = 0;
@@ -1001,17 +996,19 @@ static int ad1848_open(int dev, int mode)
 	devc->audio_mode = 0;
 	devc->open_mode |= mode;
 	portc->open_mode = mode;
+	spin_unlock(&devc->lock);
 	ad1848_trigger(dev, 0);
 
 	if (mode & OPEN_READ)
 		devc->record_dev = dev;
 	if (mode & OPEN_WRITE)
 		devc->playback_dev = dev;
-	spin_unlock_irqrestore(&devc->lock,flags);
 /*
  * Mute output until the playback really starts. This decreases clicking (hope so).
  */
+	spin_lock_irqsave(&devc->lock,flags);
 	ad_mute(devc);
+	spin_unlock_irqrestore(&devc->lock,flags);
 
 	return 0;
 }
@@ -1024,10 +1021,10 @@ static void ad1848_close(int dev)
 
 	DEB(printk("ad1848_close(void)\n"));
 
-	spin_lock_irqsave(&devc->lock,flags);
-
 	devc->intr_active = 0;
 	ad1848_halt(dev);
+
+	spin_lock_irqsave(&devc->lock,flags);
 
 	devc->audio_mode = 0;
 	devc->open_mode &= ~portc->open_mode;
@@ -1585,6 +1582,7 @@ int ad1848_detect(int io_base, int *ad_flags, int *osp)
 		printk(KERN_ERR "ad1848.c: Port %x not free.\n", io_base);
 		return 0;
 	}
+	spin_lock_init(&devc->lock);
 	devc->base = io_base;
 	devc->irq_ok = 0;
 	devc->timer_running = 0;
@@ -1969,7 +1967,6 @@ int ad1848_init (char *name, int io_base, int irq, int dma_playback,
 
 	ad1848_port_info *portc = NULL;
 
-	spin_lock_init(&devc->lock);
 	devc->irq = (irq > 0) ? irq : 0;
 	devc->open_mode = 0;
 	devc->timer_ticks = 0;
@@ -2112,6 +2109,7 @@ int ad1848_init (char *name, int io_base, int irq, int dma_playback,
 int ad1848_control(int cmd, int arg)
 {
 	ad1848_info *devc;
+	unsigned long flags;
 
 	if (nr_ad1848_devs < 1)
 		return -ENODEV;
@@ -2123,9 +2121,11 @@ int ad1848_control(int cmd, int arg)
 		case AD1848_SET_XTAL:	/* Change clock frequency of AD1845 (only ) */
 			if (devc->model != MD_1845 || devc->model != MD_1845_SSCAPE)
 				return -EINVAL;
+			spin_lock_irqsave(&devc->lock,flags);
 			ad_enter_MCE(devc);
 			ad_write(devc, 29, (ad_read(devc, 29) & 0x1f) | (arg << 5));
 			ad_leave_MCE(devc);
+			spin_unlock_irqrestore(&devc->lock,flags);
 			break;
 
 		case AD1848_MIXER_REROUTE:
@@ -2253,8 +2253,10 @@ interrupt_again:		/* Jump back here if int status doesn't reset */
 		}
 		else if (devc->model != MD_1848)
 		{
+			spin_lock(&devc->lock);
 			alt_stat = ad_read(devc, 24);
 			ad_write(devc, 24, ad_read(devc, 24) & ~alt_stat);	/* Selective ack */
+			spin_unlock(&devc->lock);
 		}
 
 		if ((devc->open_mode & OPEN_READ) && (devc->audio_mode & PCM_ENABLE_INPUT) && (alt_stat & 0x20))
@@ -2831,11 +2833,8 @@ static int ad1848_suspend(ad1848_info *devc)
 
 static int ad1848_resume(ad1848_info *devc)
 {
-	unsigned long flags;
 	int mixer_levels[32], i;
 
-	spin_lock_irqsave(&devc->lock,flags);
-	
 	/* Thinkpad is a bit more of PITA than normal. The BIOS tends to
 	   restore it in a different config to the one we use.  Need to
 	   fix this somehow */
@@ -2851,7 +2850,7 @@ static int ad1848_resume(ad1848_info *devc)
 	if (!devc->subtype) {
 		static signed char interrupt_bits[12] = { -1, -1, -1, -1, -1, 0x00, -1, 0x08, -1, 0x10, 0x18, 0x20 };
 		static char dma_bits[4] = { 1, 2, 0, 3 };
-
+		unsigned long flags;
 		signed char bits;
 		char dma2_bit = 0;
 
@@ -2860,10 +2859,11 @@ static int ad1848_resume(ad1848_info *devc)
 		bits = interrupt_bits[devc->irq];
 		if (bits == -1) {
 			printk(KERN_ERR "MSS: Bad IRQ %d\n", devc->irq);
-			spin_unlock_irqrestore(&devc->lock,flags);
 			return -1;
 		}
 
+		spin_lock_irqsave(&devc->lock,flags);
+	
 		outb((bits | 0x40), config_port); 
 
 		if (devc->dma2 != -1 && devc->dma2 != devc->dma1)
@@ -2873,9 +2873,9 @@ static int ad1848_resume(ad1848_info *devc)
 				dma2_bit = 0x04;
 
 		outb((bits | dma_bits[devc->dma1] | dma2_bit), config_port);
+		spin_unlock_irqrestore(&devc->lock,flags);
 	}
 
-	spin_unlock_irqrestore(&devc->lock,flags);
 	return 0;
 }
 

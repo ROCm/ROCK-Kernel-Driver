@@ -44,6 +44,9 @@
 #include <asm/pgalloc.h>
 #include <asm/io_apic.h>
 #include <asm/proto.h>
+#include <asm/desc.h>
+#include <asm/system.h>
+#include <asm/segment.h>
 
 extern int acpi_disabled;
 
@@ -70,7 +73,6 @@ __acpi_map_table (
 	if (phys_addr < (end_pfn_map << PAGE_SHIFT)) 
 		return __va(phys_addr); 
 
-	printk("acpi mapping beyond end_pfn: %lx > %lx\n", phys_addr, end_pfn<<PAGE_SHIFT);
 	return NULL; 
 } 	      
 
@@ -292,8 +294,7 @@ acpi_find_rsdp (void)
 
 
 int __init
-acpi_boot_init (
-	char			*cmdline)
+acpi_boot_init (void)
 {
 	int			result = 0;
 
@@ -306,7 +307,7 @@ acpi_boot_init (
 	/* 
 	 * Initialize the ACPI boot-time table parser.
 	 */
-	result = acpi_table_init(cmdline);
+	result = acpi_table_init();
 	if (result)
 		return result;
 
@@ -441,95 +442,41 @@ acpi_boot_init (
 
 #ifdef CONFIG_ACPI_SLEEP
 
-#error not ported to x86-64 yet
-
-#ifdef DEBUG
-#include <linux/serial.h>
-#endif
+extern void acpi_prepare_wakeup(void);
+extern unsigned char acpi_wakeup[], acpi_wakeup_end[], s3_prot16[];
 
 /* address in low memory of the wakeup routine. */
-unsigned long acpi_wakeup_address = 0;
-
-/* new page directory that we will be using */
-static pmd_t *pmd;
-
-/* saved page directory */
-static pmd_t saved_pmd;
-
-/* page which we'll use for the new page directory */
-static pte_t *ptep;
-
-extern unsigned long FASTCALL(acpi_copy_wakeup_routine(unsigned long));
-
-/*
- * acpi_create_identity_pmd
- *
- * Create a new, identity mapped pmd.
- *
- * Do this by creating new page directory, and marking all the pages as R/W
- * Then set it as the new Page Middle Directory.
- * And, of course, flush the TLB so it takes effect.
- *
- * We save the address of the old one, for later restoration.
- */
-static void acpi_create_identity_pmd (void)
-{
-	pgd_t *pgd;
-	int i;
-
-	ptep = (pte_t*)__get_free_page(GFP_KERNEL);
-
-	/* fill page with low mapping */
-	for (i = 0; i < PTRS_PER_PTE; i++)
-		set_pte(ptep + i, mk_pte_phys(i << PAGE_SHIFT, PAGE_SHARED));
-
-	pgd = pgd_offset(current->active_mm, 0);
-	pmd = pmd_alloc(current->mm,pgd, 0);
-
-	/* save the old pmd */
-	saved_pmd = *pmd;
-
-	/* set the new one */
-	set_pmd(pmd, __pmd(_PAGE_TABLE + __pa(ptep)));
-
-	/* flush the TLB */
-	local_flush_tlb();
-}
-
-/*
- * acpi_restore_pmd
- *
- * Restore the old pmd saved by acpi_create_identity_pmd and
- * free the page that said function alloc'd
- */
-static void acpi_restore_pmd (void)
-{
-	set_pmd(pmd, saved_pmd);
-	local_flush_tlb();
-	free_page((unsigned long)ptep);
-}
+unsigned long acpi_wakeup_address;
 
 /**
  * acpi_save_state_mem - save kernel state
- *
- * Create an identity mapped page table and copy the wakeup routine to
- * low memory.
  */
 int acpi_save_state_mem (void)
 {
-	acpi_create_identity_pmd();
-	acpi_copy_wakeup_routine(acpi_wakeup_address);
+	if (!acpi_wakeup_address)
+		return -1;
 
+	memcpy((void*)acpi_wakeup_address, acpi_wakeup, acpi_wakeup_end - acpi_wakeup); 
 	return 0;
 }
 
 /**
  * acpi_save_state_disk - save kernel state to disk
  *
+ * Assume preemption/interrupts are already turned off and that we're running
+ * on the BP (note this doesn't imply SMP is handled correctly)
  */
 int acpi_save_state_disk (void)
 {
+	unsigned long pbase = read_cr3() & PAGE_MASK; 
+	if (pbase >= 0xffffffffUL) {
+		printk(KERN_ERR "ACPI: High page table. Suspend disabled.\n");
 	return 1;
+	} 
+	set_seg_base(smp_processor_id(), GDT_ENTRY_KERNELCS16, s3_prot16); 
+	swap_low_mappings();
+	acpi_prepare_wakeup();
+	return 0;
 }
 
 /*
@@ -537,13 +484,13 @@ int acpi_save_state_disk (void)
  */
 void acpi_restore_state_mem (void)
 {
-	acpi_restore_pmd();
+	swap_low_mappings();
 }
 
 /**
  * acpi_reserve_bootmem - do _very_ early ACPI initialisation
  *
- * We allocate a page in low memory for the wakeup
+ * We allocate a page in 1MB low memory for the real-mode wakeup
  * routine for when we come back from a sleep state. The
  * runtime allocator allows specification of <16M pages, but not
  * <1M pages.
@@ -551,7 +498,10 @@ void acpi_restore_state_mem (void)
 void __init acpi_reserve_bootmem(void)
 {
 	acpi_wakeup_address = (unsigned long)alloc_bootmem_low(PAGE_SIZE);
-	printk(KERN_DEBUG "ACPI: have wakeup address 0x%8.8lx\n", acpi_wakeup_address);
+	if (!acpi_wakeup_address) { 
+		printk(KERN_ERR "ACPI: Cannot allocate lowmem. S3 disabled.\n");
+		return;
+	} 
 }
 
 #endif /*CONFIG_ACPI_SLEEP*/

@@ -104,7 +104,7 @@ static inline void hscx_cmd(struct net_device *dev, int cmd)
 	unsigned delay = 0;
 
 	while ((cec = (rd_hscx(dev, HSCX_STAR) & HSCX_CEC) != 0) && 
-	    (jiffs + HZ > jiffies)) {
+	    time_before(jiffies, jiffs + HZ)) {
 		udelay(1);
 		if (++delay > (100000 / HZ)) break;
 	}

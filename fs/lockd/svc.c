@@ -97,14 +97,10 @@ lockd(struct svc_rqst *rqstp)
 	nlmsvc_pid = current->pid;
 	up(&lockd_start);
 
-	daemonize();
-	sprintf(current->comm, "lockd");
+	daemonize("lockd");
 
-	/* Process request with signals blocked.  */
-	spin_lock_irq(&current->sighand->siglock);
-	siginitsetinv(&current->blocked, sigmask(SIGKILL));
-	recalc_sigpending();
-	spin_unlock_irq(&current->sighand->siglock);
+	/* Process request with signals blocked, but allow SIGKILL.  */
+	allow_signal(SIGKILL);
 
 	/* kick rpciod */
 	rpciod_up();
@@ -126,9 +122,7 @@ lockd(struct svc_rqst *rqstp)
 	{
 		long timeout = MAX_SCHEDULE_TIMEOUT;
 		if (signalled()) {
-			spin_lock_irq(&current->sighand->siglock);
 			flush_signals(current);
-			spin_unlock_irq(&current->sighand->siglock);
 			if (nlmsvc_ops) {
 				nlmsvc_invalidate_all();
 				grace_period_expire = set_grace_period();

@@ -616,7 +616,8 @@ extern void __exit_sighand(struct task_struct *);
 extern NORET_TYPE void do_group_exit(int);
 
 extern void reparent_to_init(void);
-extern void daemonize(void);
+extern void daemonize(const char *, ...);
+extern int allow_signal(int);
 extern task_t *child_reaper;
 
 extern int do_execve(char *, char **, char **, struct pt_regs *);

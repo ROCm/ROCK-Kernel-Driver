@@ -1578,15 +1578,8 @@ pagebuf_daemon(
 		TIMER_INITIALIZER((timeout_fn)pagebuf_daemon_wakeup, 0, 0);
 
 	/*  Set up the thread  */
-	daemonize();
+	daemonize("pagebufd");
 
-	/* Avoid signals */
-	spin_lock_irq(&current->sighand->siglock);
-	sigfillset(&current->blocked);
-	recalc_sigpending();
-	spin_unlock_irq(&current->sighand->siglock);
-
-	strcpy(current->comm, "pagebufd");
 	current->flags |= PF_MEMALLOC;
 
 	INIT_LIST_HEAD(&tmp);

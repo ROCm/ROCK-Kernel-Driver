@@ -1579,24 +1579,14 @@ void scsi_error_handler(void *data)
 	int rtn;
 	DECLARE_MUTEX_LOCKED(sem);
 
-	spin_lock_irq(&current->sighand->siglock);
-	sigfillset(&current->blocked);
-	recalc_sigpending();
-	spin_unlock_irq(&current->sighand->siglock);
-
 	lock_kernel();
 
 	/*
 	 *    Flush resources
 	 */
 
-	daemonize();
+	daemonize("scsi_eh_%d", shost->host_no);
 
-	/*
-	 * Set the name of this process.
-	 */
-
-	sprintf(current->comm, "scsi_eh_%d", shost->host_no);
 	current->flags |= PF_IOTHREAD;
 
 	shost->eh_wait = &sem;

@@ -577,17 +577,11 @@ static int loop_thread(void *data)
 	struct loop_device *lo = data;
 	struct bio *bio;
 
-	daemonize();
+	daemonize("loop%d", lo->lo_number);
 
-	sprintf(current->comm, "loop%d", lo->lo_number);
 	current->flags |= PF_IOTHREAD;	/* loop can be used in an encrypted device
 					   hence, it mustn't be stopped at all because it could
 					   be indirectly used during suspension */
-
-	spin_lock_irq(&current->sighand->siglock);
-	sigfillset(&current->blocked);
-	flush_signals(current);
-	spin_unlock_irq(&current->sighand->siglock);
 
 	set_user_nice(current, -20);
 

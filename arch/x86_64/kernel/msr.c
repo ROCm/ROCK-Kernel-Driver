@@ -22,6 +22,9 @@
  *
  * This driver uses /dev/cpu/%d/msr where %d is the minor number, and on
  * an SMP box will direct the access to CPU %d.
+
+RED-PEN: need to get power management for S3 restore
+
  */
 
 #include <linux/module.h>

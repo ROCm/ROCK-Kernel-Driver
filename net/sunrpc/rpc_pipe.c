@@ -488,14 +488,15 @@ rpc_depopulate(struct dentry *dir)
 		dentry = list_entry(pos, struct dentry, d_child);
 		if (!d_unhashed(dentry)) {
 			dget_locked(dentry);
-			list_del(&dentry->d_hash);
+			__d_drop(dentry);
 			list_add(&dentry->d_hash, &head);
 		}
 	}
 	spin_unlock(&dcache_lock);
 	while (!list_empty(&head)) {
 		dentry = list_entry(head.next, struct dentry, d_hash);
-		list_del_init(&dentry->d_hash);
+		/* Private list, so no dcache_lock needed and use __d_drop */
+		__d_drop(dentry);
 		if (dentry->d_inode) {
 			rpc_inode_setowner(dentry->d_inode, NULL);
 			simple_unlink(dir->d_inode, dentry);

@@ -70,17 +70,10 @@ static int krxtimod(void *arg)
 	rxrpc_timer_t *timer;
 
 	printk("Started krxtimod %d\n",current->pid);
-	strcpy(current->comm,"krxtimod");
 
-	daemonize();
+	daemonize("krxtimod");
 
 	complete(&krxtimod_alive);
-
-	/* only certain signals are of interest */
-	spin_lock_irq(&current->sighand->siglock);
-	siginitsetinv(&current->blocked,0);
-	recalc_sigpending();
-	spin_unlock_irq(&current->sighand->siglock);
 
 	/* loop around looking for things to attend to */
  loop:

@@ -110,10 +110,10 @@ int exec_usermodehelper(char *program_path, char *argv[], char *envp[])
 	   as the super user right after the execve fails if you time
 	   the signal just right.
 	*/
-	spin_lock_irq(&curtask->sighand->siglock);
-	sigemptyset(&curtask->blocked);
 	flush_signals(curtask);
 	flush_signal_handlers(curtask);
+	spin_lock_irq(&curtask->sighand->siglock);
+	sigemptyset(&curtask->blocked);
 	recalc_sigpending();
 	spin_unlock_irq(&curtask->sighand->siglock);
 

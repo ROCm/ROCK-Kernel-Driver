@@ -297,7 +297,7 @@ static ssize_t part_dev_read(struct hd_struct * p, char *page)
 	struct gendisk *disk = container_of(p->kobj.parent,struct gendisk,kobj);
 	int part = p - disk->part + 1;
 	dev_t base = MKDEV(disk->major, disk->first_minor); 
-	return sprintf(page, "%04x\n",base + part);
+	return sprintf(page, "%04x\n", (unsigned)(base + part));
 }
 static ssize_t part_start_read(struct hd_struct * p, char *page)
 {

@@ -77,6 +77,12 @@ extern int exception_trace;
 
 struct notifier_block *die_chain;
 
+static inline void conditional_sti(struct pt_regs *regs)
+{
+	if (regs->eflags & X86_EFLAGS_IF)
+		local_irq_enable();
+}
+
 static int kstack_depth_to_print = 10;
 
 #ifdef CONFIG_KALLSYMS
@@ -128,8 +134,7 @@ void show_trace(unsigned long *stack)
 {
 	unsigned long addr;
 	unsigned long *irqstack, *irqstack_end, *estack_end;
-	/* FIXME: should read the cpuid from the APIC; to still work with bogus %gs */
-	const int cpu = smp_processor_id();
+	const int cpu = safe_smp_processor_id();
 	int i;
 
 	printk("\nCall Trace:");
@@ -210,7 +215,7 @@ void show_stack(unsigned long * rsp)
 {
 	unsigned long *stack;
 	int i;
-	const int cpu = smp_processor_id();
+	const int cpu = safe_smp_processor_id();
 	unsigned long *irqstack_end = (unsigned long *) (cpu_pda[cpu].irqstackptr);
 	unsigned long *irqstack = (unsigned long *) (cpu_pda[cpu].irqstackptr - IRQSTACKSIZE);    
 
@@ -252,12 +257,7 @@ void show_registers(struct pt_regs *regs)
 	int i;
 	int in_kernel = (regs->cs & 3) == 0;
 	unsigned long rsp;
-#ifdef CONFIG_SMP
-	/* For SMP should get the APIC id here, just to protect against corrupted GS */ 
-	const int cpu = smp_processor_id(); 
-#else
-	const int cpu = 0;
-#endif	
+	const int cpu = safe_smp_processor_id(); 
 	struct task_struct *cur = cpu_pda[cpu].pcurrent; 
 
 		rsp = regs->rsp;
@@ -330,7 +330,7 @@ void die(const char * str, struct pt_regs * regs, long err)
 	bust_spinlocks(1);
 	handle_BUG(regs); 
 	printk("%s: %04lx\n", str, err & 0xffff);
-	cpu = smp_processor_id(); 
+	cpu = safe_smp_processor_id(); 
 	/* racy, but better than risking deadlock. */ 
 	local_irq_disable();
 	if (!spin_trylock(&die_lock)) { 
@@ -365,10 +365,12 @@ static inline unsigned long get_cr2(void)
 static void do_trap(int trapnr, int signr, char *str, 
 			   struct pt_regs * regs, long error_code, siginfo_t *info)
 {
+	conditional_sti(regs);
+
 #ifdef CONFIG_CHECKING
        { 
                unsigned long gs; 
-               struct x8664_pda *pda = cpu_pda + stack_smp_processor_id(); 
+               struct x8664_pda *pda = cpu_pda + safe_smp_processor_id(); 
                rdmsrl(MSR_GS_BASE, gs); 
                if (gs != (unsigned long)pda) { 
                        wrmsrl(MSR_GS_BASE, pda); 
@@ -454,10 +456,12 @@ extern void dump_pagetable(unsigned long);
 
 asmlinkage void do_general_protection(struct pt_regs * regs, long error_code)
 {
+	conditional_sti(regs);
+
 #ifdef CONFIG_CHECKING
        { 
                unsigned long gs; 
-               struct x8664_pda *pda = cpu_pda + hard_smp_processor_id(); 
+               struct x8664_pda *pda = cpu_pda + safe_smp_processor_id(); 
                rdmsrl(MSR_GS_BASE, gs); 
                if (gs != (unsigned long)pda) { 
                        wrmsrl(MSR_GS_BASE, pda); 
@@ -565,7 +569,7 @@ asmlinkage void do_debug(struct pt_regs * regs, long error_code)
 #ifdef CONFIG_CHECKING
        { 
                unsigned long gs; 
-               struct x8664_pda *pda = cpu_pda + stack_smp_processor_id(); 
+               struct x8664_pda *pda = cpu_pda + safe_smp_processor_id(); 
                rdmsrl(MSR_GS_BASE, gs); 
                if (gs != (unsigned long)pda) { 
                        wrmsrl(MSR_GS_BASE, pda); 
@@ -575,6 +579,8 @@ asmlinkage void do_debug(struct pt_regs * regs, long error_code)
 #endif
 
 	asm("movq %%db6,%0" : "=r" (condition));
+
+	conditional_sti(regs);
 
 	if (notify_die(DIE_DEBUG, "debug", regs, error_code) == NOTIFY_BAD)
 		return; 
@@ -636,7 +642,6 @@ void math_error(void *rip)
 	struct task_struct * task;
 	siginfo_t info;
 	unsigned short cwd, swd;
-
 	/*
 	 * Save the info for the exception handler and clear the error.
 	 */
@@ -688,6 +693,7 @@ void math_error(void *rip)
 
 asmlinkage void do_coprocessor_error(struct pt_regs * regs, long error_code)
 {
+	conditional_sti(regs);
 	math_error((void *)regs->rip);
 }
 
@@ -747,6 +753,7 @@ static inline void simd_math_error(void *rip)
 asmlinkage void do_simd_coprocessor_error(struct pt_regs * regs,
 					  long error_code)
 {
+	conditional_sti(regs);
 		simd_math_error((void *)regs->rip);
 }
 

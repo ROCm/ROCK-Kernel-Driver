@@ -175,6 +175,8 @@ struct sigaction {
 #define sa_handler      _u._sa_handler
 #define sa_sigaction    _u._sa_sigaction
 
+#define ptrace_signal_deliver(regs, cookie) do { } while (0)
+
 #endif /* __KERNEL__ */
 
 typedef struct sigaltstack {

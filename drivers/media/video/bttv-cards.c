@@ -2172,8 +2172,9 @@ static void __devinit hauppauge_eeprom(struct bttv *btv)
 	tuner = eeprom_data[9];
 	radio = eeprom_data[blk2-1] & 0x01;
 	
-        if (tuner < sizeof(hauppauge_tuner)/sizeof(struct HAUPPAUGE_TUNER))
-                btv->tuner_type = hauppauge_tuner[tuner].id;
+        if (tuner >= ARRAY_SIZE(hauppauge_tuner))
+		tuner = 0;
+	btv->tuner_type = hauppauge_tuner[tuner].id;
 	if (radio)
 		btv->has_radio = 1;
 	

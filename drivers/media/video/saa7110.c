@@ -381,20 +381,18 @@ int saa7110_command(struct i2c_client *client, unsigned int cmd, void *arg)
 
 static struct i2c_driver i2c_driver_saa7110 =
 {
-	IF_NAME,			/* name */
-	I2C_DRIVERID_SAA7110,	/* in i2c.h */
-	I2C_DF_NOTIFY,	/* Addr range */
-	saa7110_probe,
-	saa7110_detach,
-	saa7110_command
+	.owner 		= THIS_MODULE,
+	.name 		= IF_NAME,			/* name */
+	.id  		= I2C_DRIVERID_SAA7110,	/* in i2c.h */
+	.flags 		= I2C_DF_NOTIFY,	/* Addr range */
+	.attach_adapter = saa7110_probe,
+	.detach_client 	= saa7110_detach,
+	.command 	= saa7110_command
 };
 static struct i2c_client client_template = {
-	"saa7110_client",
-	-1,
-	0,
-	0,
-	NULL,
-	&i2c_driver_saa7110
+	.name 		= "saa7110_client",
+	.id 		= -1,
+	.driver 	= &i2c_driver_saa7110
 };
 
 static int saa7110_init(void)

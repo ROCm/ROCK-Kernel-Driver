@@ -31,7 +31,7 @@ wakeup_code:
 	movw	%cs, %ax
 	movw	%ax, %ds					# Make ds:0 point to wakeup_start
 	movw	%ax, %ss
-	mov	wakeup_stack - wakeup_code, %sp			# Private stack is needed for ASUS board
+	mov	$(wakeup_stack - wakeup_code), %sp		# Private stack is needed for ASUS board
 	movw	$0x0e00 + 'S', %fs:(0x12)
 
 	pushl	$0						# Kill any dangerous flags
@@ -159,12 +159,14 @@ _setbad: jmp setbad
 	.code32
 	ALIGN
 
+.org	0x800
+wakeup_stack_begin:	# Stack grows down
 
-.org	0x2000
+.org	0xff0		# Just below end of page
 wakeup_stack:
-.org	0x3000
 ENTRY(wakeup_end)
-.org	0x4000
+	
+.org	0x1000
 
 wakeup_pmode_return:
 	movl	$__KERNEL_DS, %eax
@@ -274,7 +276,7 @@ ENTRY(saved_magic)	.long	0
 
 ENTRY(do_suspend_lowlevel)
 	cmpl $0,4(%esp)
-	jne .L1432
+	jne ret_point
 	call save_processor_state
 
 	movl %esp, saved_context_esp
@@ -287,7 +289,7 @@ ENTRY(do_suspend_lowlevel)
 	movl %edi, saved_context_edi
 	pushfl ; popl saved_context_eflags
 
-	movl $.L1432,saved_eip
+	movl $ret_point,saved_eip
 	movl %esp,saved_esp
 	movl %ebp,saved_ebp
 	movl %ebx,saved_ebx
@@ -299,7 +301,7 @@ ENTRY(do_suspend_lowlevel)
 	addl $4,%esp
 	ret
 	.p2align 4,,7
-.L1432:
+ret_point:
 	movl $__KERNEL_DS,%eax
 	movw %ax, %ds
 	movl saved_context_esp, %esp

@@ -31,8 +31,14 @@
 
 #define clear_page(page)	 memset((void *)(page), 0, PAGE_SIZE)
 #define copy_page(to,from) 	memcpy((void *)(to), (void *)(from), PAGE_SIZE)
-#define clear_user_page(addr, vaddr, page)	clear_page(addr)
-#define copy_user_page(to, from, vaddr, page)	copy_page(to, from)
+#define clear_user_page(addr, vaddr, page)	\
+	do { 	clear_page(addr);		\
+		sparc_flush_page_to_ram(page);	\
+	} while (0)
+#define copy_user_page(to, from, vaddr, page)	\
+	do {	copy_page(to, from);		\
+		sparc_flush_page_to_ram(page);	\
+	} while (0)
 
 /* The following structure is used to hold the physical
  * memory configuration of the machine.  This is filled in

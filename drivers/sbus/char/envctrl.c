@@ -1016,8 +1016,9 @@ static int kenvctrld(void *__unused)
 
 	poll_interval = 5 * HZ; /* TODO env_mon_interval */
 
-	daemonize();
-	strcpy(current->comm, "kenvctrld");
+	daemonize("kenvctrld");
+	allow_signal(SIGKILL);
+
 	kenvctrld_task = current;
 
 	printk(KERN_INFO "envctrl: %s starting...\n", current->comm);

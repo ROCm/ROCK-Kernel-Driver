@@ -22,6 +22,7 @@
 #include <linux/unistd.h>
 #include <linux/stddef.h>
 #include <linux/personality.h>
+#include <linux/compat.h>
 #include <asm/ucontext.h>
 #include <asm/uaccess.h>
 #include <asm/i387.h>
@@ -134,7 +135,7 @@ struct sigframe
 	int sig;
 	struct sigcontext_ia32 sc;
 	struct _fpstate_ia32 fpstate;
-	unsigned int extramask[_IA32_NSIG_WORDS-1];
+	unsigned int extramask[_COMPAT_NSIG_WORDS-1];
 	char retcode[8];
 };
 
@@ -237,7 +238,7 @@ asmlinkage long sys32_sigreturn(struct pt_regs regs)
 	if (verify_area(VERIFY_READ, frame, sizeof(*frame)))
 		goto badframe;
 	if (__get_user(set.sig[0], &frame->sc.oldmask)
-	    || (_IA32_NSIG_WORDS > 1
+	    || (_COMPAT_NSIG_WORDS > 1
 		&& __copy_from_user((((char *) &set.sig) + 4), &frame->extramask,
 				    sizeof(frame->extramask))))
 		goto badframe;
@@ -373,7 +374,7 @@ get_sigframe(struct k_sigaction *ka, struct pt_regs * regs, size_t frame_size)
 }
 
 void ia32_setup_frame(int sig, struct k_sigaction *ka,
-			sigset32_t *set, struct pt_regs * regs)
+			compat_sigset_t *set, struct pt_regs * regs)
 {
 	struct sigframe *frame;
 	int err = 0;
@@ -399,7 +400,7 @@ void ia32_setup_frame(int sig, struct k_sigaction *ka,
 	if (err)
 		goto give_sigsegv;
 
-	if (_IA32_NSIG_WORDS > 1) {
+	if (_COMPAT_NSIG_WORDS > 1) {
 		err |= __copy_to_user(frame->extramask, &set->sig[1],
 				      sizeof(frame->extramask));
 	}
@@ -460,7 +461,7 @@ give_sigsegv:
 }
 
 void ia32_setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
-			   sigset32_t *set, struct pt_regs * regs)
+			   compat_sigset_t *set, struct pt_regs * regs)
 {
 	struct rt_sigframe *frame;
 	int err = 0;

@@ -512,8 +512,7 @@ ENTRY(spurious_interrupt)
  * Exception entry point. This expects an error code/orig_rax on the stack
  * and the exception handler in %rax.	
  */ 		  				
- 	ALIGN
-error_entry:
+ENTRY(error_entry)
 	/* rdi slot contains rax, oldrax contains error code */
 	pushq %rsi
 	movq  8(%rsp),%rsi	/* load rax */
@@ -532,10 +531,7 @@ error_swapgs:
 	xorl %ebx,%ebx	
 	swapgs
 error_sti:	
-	bt $9,EFLAGS(%rsp)
-	jnc 1f
-	sti
-1:	movq %rdi,RDI(%rsp) 	
+	movq %rdi,RDI(%rsp) 	
 	movq %rsp,%rdi
 	movq ORIG_RAX(%rsp),%rsi	/* get error code */ 
 	movq $-1,ORIG_RAX(%rsp)
@@ -573,7 +569,8 @@ ENTRY(load_gs_index)
         swapgs
 gs_change:     
         movl %edi,%gs   
-2:      swapgs
+2:	sfence		/* workaround */
+	swapgs
         popf
         ret
        

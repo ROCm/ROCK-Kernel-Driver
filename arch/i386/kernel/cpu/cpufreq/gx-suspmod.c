@@ -431,11 +431,15 @@ static int __init cpufreq_gx_init(void)
 	driver = kmalloc(sizeof(struct cpufreq_driver) + NR_CPUS * sizeof(struct cpufreq_policy), GFP_KERNEL);
 	if (driver == NULL) 
 		return -ENOMEM;
+	memset(driver, 0, sizeof(struct cpufreq_driver) +
+			NR_CPUS * sizeof(struct cpufreq_policy));
+
 	params = kmalloc(sizeof(struct gxfreq_params), GFP_KERNEL);
 	if (params == NULL) {
 		kfree(driver);
 		return -ENOMEM;
 	}
+	memset(params, 0, sizeof(struct gxfreq_params));
 
 	driver->policy = (struct cpufreq_policy *)(driver + 1);
 	params->cs55x0 = gx_pci;

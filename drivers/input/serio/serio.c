@@ -105,8 +105,8 @@ void serio_handle_events(void)
 static int serio_thread(void *nothing)
 {
 	lock_kernel();
-	daemonize();
-	strcpy(current->comm, "kseriod");
+	daemonize("kseriod");
+	allow_signal(SIGTERM);
 
 	do {
 		serio_handle_events();

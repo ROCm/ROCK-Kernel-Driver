@@ -500,8 +500,10 @@ __SYSCALL(__NR_set_tid_address, sys_set_tid_address)
 __SYSCALL(__NR_restart_syscall, sys_restart_syscall)
 #define __NR_semtimedop		220
 __SYSCALL(__NR_semtimedop, sys_semtimedop)
+#define __NR_fadvise64		221
+__SYSCALL(__NR_fadvise64, sys_fadvise64)
 
-#define __NR_syscall_max __NR_semtimedop
+#define __NR_syscall_max __NR_fadvise64
 #ifndef __NO_STUBS
 
 /* user-visible error numbers are in the range -1 - -4095 */

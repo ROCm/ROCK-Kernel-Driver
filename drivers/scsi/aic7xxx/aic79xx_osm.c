@@ -1560,7 +1560,7 @@ ahd_linux_dev_reset(Scsi_Cmnd *cmd)
 	hscb = scb->hscb;
 	hscb->control = 0;
 	hscb->scsiid = BUILD_SCSIID(ahd, cmd);
-	hscb->lun = cmd->lun;
+	hscb->lun = cmd->device->lun;
 	hscb->cdb_len = 0;
 	hscb->task_management = SIU_TASKMGMT_LUN_RESET;
 	scb->flags |= SCB_DEVICE_RESET|SCB_RECOVERY_SCB|SCB_ACTIVE;
@@ -2854,8 +2854,7 @@ ahd_linux_dv_thread(void *data)
 	 * Complete thread creation.
 	 */
 	lock_kernel();
-	daemonize();
-	sprintf(current->comm, "ahd_dv_%d", ahd->unit);
+	daemonize("ahd_dv_%d", ahd->unit);
 	unlock_kernel();
 
 	while (1) {

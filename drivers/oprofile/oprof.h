@@ -24,7 +24,6 @@ struct oprofile_operations;
 extern unsigned long fs_buffer_size;
 extern unsigned long fs_cpu_buffer_size;
 extern unsigned long fs_buffer_watershed;
-extern enum oprofile_cpu oprofile_cpu_type;
 extern struct oprofile_operations * oprofile_ops;
 extern unsigned long oprofile_started;
  

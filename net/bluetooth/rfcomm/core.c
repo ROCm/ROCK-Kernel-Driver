@@ -1705,13 +1705,9 @@ static int rfcomm_run(void *unused)
 
 	atomic_inc(&running);
 
-	daemonize();
+	daemonize("krfcommd");
 	set_user_nice(current, -10);
 	current->flags |= PF_IOTHREAD;
-	sigfillset(&current->blocked);
-	flush_signals(current);
-
-	sprintf(current->comm, "krfcommd");
 
 	set_fs(KERNEL_DS);
 

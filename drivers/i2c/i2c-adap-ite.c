@@ -78,7 +78,7 @@ static void iic_ite_setiic(void *data, int ctl, short val)
         unsigned long j = jiffies + 10;
 
 	DEB3(printk(" Write 0x%02x to 0x%x\n",(unsigned short)val, ctl&0xff));
-	DEB3({while (jiffies < j) schedule();}) 
+	DEB3({while (time_before(jiffies, j)) schedule();})
 	outw(val,ctl);
 }
 

@@ -19,13 +19,15 @@
 #define __USER_DS     0x2b   /* 5*8+3 */ 
 #define __USER_CS     0x33   /* 6*8+3 */ 
 #define __USER32_DS	__USER_DS 
+#define __KERNEL16_CS	(GDT_ENTRY_KERNELCS16 * 8)
 
 #define GDT_ENTRY_TLS 1
 #define GDT_ENTRY_TSS 8	/* needs two entries */
 #define GDT_ENTRY_LDT 10
 #define GDT_ENTRY_TLS_MIN 11
 #define GDT_ENTRY_TLS_MAX 13
-#define GDT_ENTRY_LONGBASE 14
+/* 14 free */
+#define GDT_ENTRY_KERNELCS16 15
 
 #define GDT_ENTRY_TLS_ENTRIES 3
 

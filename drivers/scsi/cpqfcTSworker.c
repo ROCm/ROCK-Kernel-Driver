@@ -165,14 +165,9 @@ void cpqfcTSWorkerThread( void *host)
   ENTER("WorkerThread");
 
   lock_kernel();
-  daemonize();
+  daemonize("cpqfcTS_wt_%d", HostAdapter->host_no);
   siginitsetinv(&current->blocked, SHUTDOWN_SIGS);
 
-
-  /*
-   * Set the name of this process.
-   */
-  sprintf(current->comm, "cpqfcTS_wt_%d", HostAdapter->host_no);
 
   cpqfcHBAdata->fcQueReady = &fcQueReady;  // primary wait point
   cpqfcHBAdata->TYOBcomplete = &fcTYOBcomplete;
@@ -448,7 +443,7 @@ void cpqfcTS_WorkTask( struct Scsi_Host *HostAdapter)
       LONG x_ID = fcLQ->Qitem[QconsumerNdx].ulBuff[0];
       BOOLEAN FrozeTach = FALSE;   
      
-      if( x_ID > TACH_SEST_LEN )  // (in)sanity check
+      if ( x_ID >= TACH_SEST_LEN )  // (in)sanity check
       {
 //	printk( " cpqfcTS ERROR! BOGUS x_ID %Xh", x_ID);
 	break;

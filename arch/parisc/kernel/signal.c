@@ -25,6 +25,7 @@
 #include <linux/ptrace.h>
 #include <linux/unistd.h>
 #include <linux/stddef.h>
+#include <linux/compat.h>
 #include <asm/ucontext.h>
 #include <asm/rt_sigframe.h>
 #include <asm/uaccess.h>
@@ -97,13 +98,13 @@ sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize, struct pt_regs *regs)
 	sigset_t saveset, newset;
 #ifdef __LP64__
 	/* XXX FIXME -- assumes 32-bit user app! */
-	sigset_t32 newset32;
+	compat_sigset_t newset32;
 
 	/* XXX: Don't preclude handling different sized sigset_t's.  */
-	if (sigsetsize != sizeof(sigset_t32))
+	if (sigsetsize != sizeof(compat_sigset_t))
 		return -EINVAL;
 
-	if (copy_from_user(&newset32, (sigset_t32 *)unewset, sizeof(newset32)))
+	if (copy_from_user(&newset32, (compat_sigset_t *)unewset, sizeof(newset32)))
 		return -EFAULT;
 
 	newset.sig[0] = newset32.sig[0] | ((unsigned long)newset32.sig[1] << 32);

@@ -447,7 +447,7 @@ busy_loop(u_long len)
 	u_long flags;
 	save_flags(flags);
 	sti();
-	while (timeout >= jiffies)
+	while (time_before_eq(jiffies, timeout))
 	    ;
 	restore_flags(flags);
     } else {
