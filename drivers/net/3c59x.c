@@ -181,7 +181,7 @@
     - See http://www.zip.com.au/~akpm/linux/#3c59x-2.3 for more details.
     - Also see Documentation/networking/vortex.txt
 
-   LK1.1.19 10Nov09 Marc Zyngier <maz@wild-wind.fr.eu.org>
+   LK1.1.19 10Nov02 Marc Zyngier <maz@wild-wind.fr.eu.org>
     - EISA sysfs integration.
 */
 
@@ -817,7 +817,11 @@ struct vortex_private {
 	u32 power_state[16];
 };
 
+#ifdef CONFIG_PCI
 #define DEVICE_PCI(dev) (((dev)->bus == &pci_bus_type) ? to_pci_dev((dev)) : NULL)
+#else
+#define DEVICE_PCI(dev) NULL
+#endif
 
 #define VORTEX_PCI(vp) (((vp)->gendev) ? DEVICE_PCI((vp)->gendev) : NULL)
 

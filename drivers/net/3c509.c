@@ -338,16 +338,6 @@ static int __init el3_common_init (struct net_device *dev)
 	dev->watchdog_timeo = TX_TIMEOUT;
 	dev->do_ioctl = netdev_ioctl;
 
-#ifdef CONFIG_PM
-	/* register power management */
-	lp->pmdev = pm_register(PM_ISA_DEV, card_idx, el3_pm_callback);
-	if (lp->pmdev) {
-		struct pm_dev *p;
-		p = lp->pmdev;
-		p->data = (struct net_device *)dev;
-	}
-#endif
-
 	return 0;
 }
 
@@ -417,6 +407,13 @@ static int __init el3_probe(int card_idx)
 					phys_addr[j] =
 						htons(read_eeprom(ioaddr, j));
 			if_port = read_eeprom(ioaddr, 8) >> 14;
+			if (!(dev = init_etherdev(NULL, sizeof(struct el3_private)))) {
+					release_region(ioaddr, EL3_IO_EXTENT);
+					pnp_device_detach(idev);
+					return -ENOMEM;
+			}
+
+			SET_MODULE_OWNER(dev);
 			pnp_cards++;
 			goto found;
 		}
@@ -497,24 +494,29 @@ no_pnp:
 	}
 	irq = id_read_eeprom(9) >> 12;
 
-#if 0							/* Huh ?
-								   Can someone explain what is this for ? */
-	if (dev) {					/* Set passed-in IRQ or I/O Addr. */
-		if (dev->irq > 1  &&  dev->irq < 16)
+	if (!(dev = init_etherdev(NULL, sizeof(struct el3_private))))
+			return -ENOMEM;
+
+	SET_MODULE_OWNER(dev);
+	
+	/* Set passed-in IRQ or I/O Addr. */
+	if (dev->irq > 1  &&  dev->irq < 16)
 			irq = dev->irq;
 
-		if (dev->base_addr) {
+	if (dev->base_addr) {
 			if (dev->mem_end == 0x3c509 			/* Magic key */
 				&& dev->base_addr >= 0x200  &&  dev->base_addr <= 0x3e0)
-				ioaddr = dev->base_addr & 0x3f0;
-			else if (dev->base_addr != ioaddr)
-				return -ENODEV;
-		}
+					ioaddr = dev->base_addr & 0x3f0;
+			else if (dev->base_addr != ioaddr) {
+					unregister_netdev (dev);
+					return -ENODEV;
+			}
 	}
-#endif
 
-	if (!request_region(ioaddr, EL3_IO_EXTENT, "3c509"))
-		return -EBUSY;
+	if (!request_region(ioaddr, EL3_IO_EXTENT, "3c509")) {
+			unregister_netdev (dev);
+			return -EBUSY;
+	}
 
 	/* Set the adaptor tag so that the next card can be found. */
 	outb(0xd0 + ++current_tag, id_port);
@@ -524,6 +526,7 @@ no_pnp:
 
 	EL3WINDOW(0);
 	if (inw(ioaddr) != 0x6d50) {
+		unregister_netdev (dev);
 		release_region(ioaddr, EL3_IO_EXTENT);
 		return -ENODEV;
 	}
@@ -531,12 +534,9 @@ no_pnp:
 	/* Free the interrupt so that some other card can use it. */
 	outw(0x0f00, ioaddr + WN0_IRQ);
 
-	dev = init_etherdev(NULL, sizeof(struct el3_private));
-	if (dev == NULL) {
-	    release_region(ioaddr, EL3_IO_EXTENT);
-		return -ENOMEM;
-	}
-	SET_MODULE_OWNER(dev);
+#ifdef __ISAPNP__	
+ found:							/* PNP jumps here... */
+#endif /* __ISAPNP__ */
 
 	memcpy(dev->dev_addr, phys_addr, sizeof(phys_addr));
 	dev->base_addr = ioaddr;
@@ -545,6 +545,16 @@ no_pnp:
 	lp = dev->priv;
 #ifdef __ISAPNP__
 	lp->dev = &idev->dev;
+#endif
+
+#ifdef CONFIG_PM
+	/* register power management */
+	lp->pmdev = pm_register(PM_ISA_DEV, card_idx, el3_pm_callback);
+	if (lp->pmdev) {
+		struct pm_dev *p;
+		p = lp->pmdev;
+		p->data = (struct net_device *)dev;
+	}
 #endif
 
 	return el3_common_init (dev);
@@ -667,6 +677,7 @@ static int __init el3_eisa_probe (struct device *device)
 }
 #endif
 
+#if defined(CONFIG_EISA) || defined(CONFIG_MCA)
 /* This remove works for all device types.
  *
  * The net dev must be stored in the driver_data field */
@@ -679,6 +690,7 @@ static int __devexit el3_device_remove (struct device *device)
 		el3_common_remove (dev);
 		return 0;
 }
+#endif
 
 /* Read a word from the EEPROM using the regular EEPROM access register.
    Assume that we are in register window zero.

@@ -1343,9 +1343,7 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 	 * superblock lock.
 	 */
 	EXT3_SB(sb)->s_mount_state |= EXT3_ORPHAN_FS;
-	unlock_super(sb);	/* akpm: sigh */
 	ext3_orphan_cleanup(sb, es);
-	lock_super(sb);
 	EXT3_SB(sb)->s_mount_state &= ~EXT3_ORPHAN_FS;
 	if (needs_recovery)
 		printk (KERN_INFO "EXT3-fs: recovery complete.\n");

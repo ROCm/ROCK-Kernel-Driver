@@ -1402,7 +1402,7 @@ static int adpt_i2o_parse_lct(adpt_hba* pHba)
 				printk(KERN_WARNING"%s: Channel number %d out of range \n", pHba->name, bus_no);
 				continue;
 			}
-			if(scsi_id > MAX_ID){
+			if (scsi_id >= MAX_ID){
 				printk(KERN_WARNING"%s: SCSI ID %d out of range \n", pHba->name, bus_no);
 				continue;
 			}
@@ -1476,7 +1476,7 @@ static int adpt_i2o_parse_lct(adpt_hba* pHba)
 				if(bus_no >= MAX_CHANNEL) {	// Something wrong skip it
 					continue;
 				}
-				if(scsi_id > MAX_ID){
+				if (scsi_id >= MAX_ID) {
 					continue;
 				}
 				if( pHba->channel[bus_no].device[scsi_id] == NULL){

@@ -490,6 +490,9 @@ EXPORT_SYMBOL(xtime);
 EXPORT_SYMBOL(xtime_lock);
 EXPORT_SYMBOL(do_gettimeofday);
 EXPORT_SYMBOL(do_settimeofday);
+#if (BITS_PER_LONG < 64)
+EXPORT_SYMBOL(get_jiffies_64);
+#endif
 #ifdef CONFIG_DEBUG_SPINLOCK_SLEEP
 EXPORT_SYMBOL(__might_sleep);
 #endif

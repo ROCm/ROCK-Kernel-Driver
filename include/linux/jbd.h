@@ -726,7 +726,6 @@ static inline handle_t *journal_current_handle(void)
  */
 
 extern handle_t *journal_start(journal_t *, int nblocks);
-extern handle_t *journal_try_start(journal_t *, int nblocks);
 extern int	 journal_restart (handle_t *, int nblocks);
 extern int	 journal_extend (handle_t *, int nblocks);
 extern int	 journal_get_write_access (handle_t *, struct buffer_head *);
