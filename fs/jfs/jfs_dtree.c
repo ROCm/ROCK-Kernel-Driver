@@ -490,11 +490,11 @@ static void modify_index(tid_t tid, struct inode *ip, u32 index, s64 bn,
 }
 
 /*
- *	get_index()
+ *	read_index()
  *
  *	reads a directory table slot
  */
-static int get_index(struct inode *ip, u32 index,
+static int read_index(struct inode *ip, u32 index,
 		     struct dir_table_slot * dirtab_slot)
 {
 	struct metapage *mp = 0;
@@ -2978,7 +2978,7 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 				return 0;
 			}
 		      repeat:
-			rc = get_index(ip, dir_index, &dirtab_slot);
+			rc = read_index(ip, dir_index, &dirtab_slot);
 			if (rc) {
 				filp->f_pos = DIREND;
 				return rc;
