@@ -196,13 +196,11 @@ int hdlc_x25_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
 		if(dev->flags & IFF_UP)
 			return -EBUSY;
 
-		hdlc_detach(hdlc);
-
 		result=hdlc->attach(hdlc, ENCODING_NRZ,PARITY_CRC16_PR1_CCITT);
-		if (result) {
-			hdlc->proto = -1;
+		if (result)
 			return result;
-		}
+
+		hdlc_proto_detach(hdlc);
 
 		hdlc->open = x25_open;
 		hdlc->stop = x25_close;

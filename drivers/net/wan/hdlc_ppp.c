@@ -96,13 +96,11 @@ int hdlc_ppp_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
 
 		/* no settable parameters */
 
-		hdlc_detach(hdlc);
-
 		result=hdlc->attach(hdlc, ENCODING_NRZ,PARITY_CRC16_PR1_CCITT);
-		if (result) {
-			hdlc->proto = -1;
+		if (result)
 			return result;
-		}
+
+		hdlc_proto_detach(hdlc);
 
 		hdlc->open = ppp_open;
 		hdlc->stop = ppp_close;

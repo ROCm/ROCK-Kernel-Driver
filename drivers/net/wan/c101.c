@@ -1,7 +1,7 @@
 /*
  * Moxa C101 synchronous serial card driver for Linux
  *
- * Copyright (C) 2000-2001 Krzysztof Halasa <khc@pm.waw.pl>
+ * Copyright (C) 2000-2002 Krzysztof Halasa <khc@pm.waw.pl>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -31,7 +31,7 @@
 #include "hd64570.h"
 
 
-static const char* version = "Moxa C101 driver version: 1.09";
+static const char* version = "Moxa C101 driver version: 1.10";
 static const char* devname = "C101";
 
 #define C101_PAGE 0x1D00
@@ -107,18 +107,13 @@ static inline void openwin(card_t *card, u8 page)
 #include "hd6457x.c"
 
 
-static int c101_set_iface(port_t *port)
+static void c101_set_iface(port_t *port)
 {
 	u8 msci = get_msci(port);
 	u8 rxs = port->rxs & CLK_BRG_MASK;
 	u8 txs = port->txs & CLK_BRG_MASK;
 
 	switch(port->settings.clock_type) {
-	case CLOCK_EXT:
-		rxs |= CLK_LINE_RX; /* RXC input */
-		txs |= CLK_LINE_TX; /* TXC input */
-		break;
-
 	case CLOCK_INT:
 		rxs |= CLK_BRG_RX; /* TX clock */
 		txs |= CLK_RXCLK_TX; /* BRG output */
@@ -134,8 +129,9 @@ static int c101_set_iface(port_t *port)
 		txs |= CLK_RXCLK_TX; /* RX clock */
 		break;
 
-	default:
-		return -EINVAL;
+	default:	/* EXTernal clock */
+		rxs |= CLK_LINE_RX; /* RXC input */
+		txs |= CLK_LINE_TX; /* TXC input */
 	}
 
 	port->rxs = rxs;
@@ -143,7 +139,6 @@ static int c101_set_iface(port_t *port)
 	sca_out(rxs, msci + RXS, port);
 	sca_out(txs, msci + TXS, port);
 	sca_set_port(port);
-	return 0;
 }
 
 
@@ -159,7 +154,8 @@ static int c101_open(struct net_device *dev)
 	writeb(1, port->win0base + C101_DTR);
 	sca_out(0, MSCI1_OFFSET + CTL, port); /* RTS uses ch#2 output */
 	sca_open(hdlc);
-	return c101_set_iface(port);
+	c101_set_iface(port);
+	return 0;
 }
 
 
@@ -181,6 +177,7 @@ static int c101_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
 	union line_settings *line = &ifr->ifr_settings->ifs_line;
 	const size_t size = sizeof(sync_serial_settings);
+	sync_serial_settings new_line;
 	hdlc_device *hdlc = dev_to_hdlc(dev);
 	port_t *port = hdlc_to_port(hdlc);
 
@@ -204,10 +201,21 @@ static int c101_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		if(!capable(CAP_NET_ADMIN))
 			return -EPERM;
 
-		if (copy_from_user(&port->settings, &line->sync, size))
+		if (copy_from_user(&new_line, &line->sync, size))
 			return -EFAULT;
-		/* FIXME - put sanity checks here */
-		return c101_set_iface(port);
+
+		if (new_line.clock_type != CLOCK_EXT &&
+		    new_line.clock_type != CLOCK_TXFROMRX &&
+		    new_line.clock_type != CLOCK_INT &&
+		    new_line.clock_type != CLOCK_TXINT)
+		return -EINVAL;	/* No such clock setting */
+
+		if (new_line.loopback != 0 && new_line.loopback != 1)
+			return -EINVAL;
+
+		memcpy(&port->settings, &new_line, size); /* Update settings */
+		c101_set_iface(port);
+		return 0;
 
 	default:
 		return hdlc_ioctl(dev, ifr, cmd);

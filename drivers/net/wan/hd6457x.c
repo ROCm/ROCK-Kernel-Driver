@@ -291,9 +291,9 @@ static inline void sca_rx(card_t *card, port_t *port, pkt_desc *desc, u8 rxin)
 #endif
 	port->hdlc.stats.rx_packets++;
 	port->hdlc.stats.rx_bytes += skb->len;
-	skb->dev->last_rx = jiffies;
 	skb->mac.raw = skb->data;
 	skb->dev = hdlc_to_dev(&port->hdlc);
+	skb->dev->last_rx = jiffies;
 	skb->protocol = htons(ETH_P_HDLC);
 	netif_rx(skb);
 }

@@ -12,14 +12,16 @@
 #ifndef __HDLC_H
 #define __HDLC_H
 
-#define CLOCK_DEFAULT   0	/* Default (current) setting */
+#define GENERIC_HDLC_VERSION 3	/* For synchronization with sethdlc utility */
+
+#define CLOCK_DEFAULT   0	/* Default setting */
 #define CLOCK_EXT	1	/* External TX and RX clock - DTE */
 #define CLOCK_INT	2	/* Internal TX and RX clock - DCE */
 #define CLOCK_TXINT	3	/* Internal TX and external RX clock */
 #define CLOCK_TXFROMRX	4	/* TX clock derived from external RX clock */
 
 
-#define ENCODING_DEFAULT	0 /* Default (current) setting */
+#define ENCODING_DEFAULT	0 /* Default setting */
 #define ENCODING_NRZ		1
 #define ENCODING_NRZI		2
 #define ENCODING_FM_MARK	3
@@ -27,7 +29,7 @@
 #define ENCODING_MANCHESTER	5
 
 
-#define PARITY_DEFAULT		0 /* Default (current) setting */
+#define PARITY_DEFAULT		0 /* Default setting */
 #define PARITY_NONE		1 /* No parity */
 #define PARITY_CRC16_PR0	2 /* CRC16, initial value 0x0000 */
 #define PARITY_CRC16_PR1	3 /* CRC16, initial value 0xFFFF */
@@ -36,12 +38,10 @@
 #define PARITY_CRC32_PR0_CCITT	6 /* CRC32, initial value 0x00000000 */
 #define PARITY_CRC32_PR1_CCITT	7 /* CRC32, initial value 0xFFFFFFFF */
 
-#define LMI_DEFAULT		0 /* Default (current) setting */
+#define LMI_DEFAULT		0 /* Default setting */
 #define LMI_NONE		1 /* No LMI, all PVCs are static */
 #define LMI_ANSI		2 /* ANSI Annex D */
 #define LMI_CCITT		3 /* ITU-T Annex A */
-
-/* PPP doesn't need any info now - supply length = 0 to ioctl */
 
 
 #ifdef __KERNEL__
@@ -178,7 +178,7 @@ typedef struct hdlc_device_struct {
 	int (*ioctl)(struct net_device *dev, struct ifreq *ifr, int cmd);
 	int (*open)(struct hdlc_device_struct *hdlc);
 	void (*stop)(struct hdlc_device_struct *hdlc);
-	void (*detach)(struct hdlc_device_struct *hdlc);
+	void (*proto_detach)(struct hdlc_device_struct *hdlc);
 	void (*netif_rx)(struct sk_buff *skb);
 	int proto;		/* IF_PROTO_HDLC/CISCO/FR/etc. */
 
@@ -337,11 +337,11 @@ static __inline__ void hdlc_close(hdlc_device *hdlc)
 
 
 /* May be used by hardware driver to gain control over HDLC device */
-static __inline__ void hdlc_detach(hdlc_device *hdlc)
+static __inline__ void hdlc_proto_detach(hdlc_device *hdlc)
 {
-	if (hdlc->detach)
-		hdlc->detach(hdlc);
-	hdlc->detach = NULL;
+	if (hdlc->proto_detach)
+		hdlc->proto_detach(hdlc);
+	hdlc->proto_detach = NULL;
 }
 
 

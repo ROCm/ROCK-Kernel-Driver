@@ -249,6 +249,7 @@ int hdlc_cisco_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
 {
 	cisco_proto *cisco_s = &ifr->ifr_settings->ifs_hdlc.cisco;
 	const size_t size = sizeof(cisco_proto);
+	cisco_proto new_settings;
 	struct net_device *dev = hdlc_to_dev(hdlc);
 	int result;
 
@@ -266,17 +267,20 @@ int hdlc_cisco_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
 		if(dev->flags & IFF_UP)
 			return -EBUSY;
 
-		if (copy_from_user(&hdlc->state.cisco.settings, cisco_s, size))
+		if (copy_from_user(&new_settings, cisco_s, size))
 			return -EFAULT;
 
-		/* FIXME - put sanity checks here */
-		hdlc_detach(hdlc);
+		if (new_settings.interval < 1 ||
+		    new_settings.timeout < 2)
+			return -EINVAL;
 
 		result=hdlc->attach(hdlc, ENCODING_NRZ,PARITY_CRC16_PR1_CCITT);
-		if (result) {
-			hdlc->proto = -1;
+
+		if (result)
 			return result;
-		}
+
+		hdlc_proto_detach(hdlc);
+		memcpy(&hdlc->state.cisco.settings, &new_settings, size);
 
 		hdlc->open = cisco_open;
 		hdlc->stop = cisco_close;
