@@ -234,7 +234,7 @@ put_gate_page (struct page *page, unsigned long address)
 	pte_t *pte;
 
 	if (!PageReserved(page))
-		printk("put_gate_page: gate page at 0x%p not in reserved memory\n",
+		printk(KERN_ERR "put_gate_page: gate page at 0x%p not in reserved memory\n",
 		       page_address(page));
 
 	pgd = pgd_offset_k(address);		/* note: this is NOT pgd_offset()! */
@@ -431,10 +431,10 @@ mem_init (void)
 	datasize =  (unsigned long) &_edata - (unsigned long) &_etext;
 	initsize =  (unsigned long) &__init_end - (unsigned long) &__init_begin;
 
-	printk("Memory: %luk/%luk available (%luk code, %luk reserved, %luk data, %luk init)\n",
-	       (unsigned long) nr_free_pages() << (PAGE_SHIFT - 10),
-	       num_physpages << (PAGE_SHIFT - 10), codesize >> 10, reserved_pages << (PAGE_SHIFT - 10),
-	       datasize >> 10, initsize >> 10);
+	printk(KERN_INFO "Memory: %luk/%luk available (%luk code, %luk reserved, "
+	       "%luk data, %luk init)\n", (unsigned long) nr_free_pages() << (PAGE_SHIFT - 10),
+	       num_physpages << (PAGE_SHIFT - 10), codesize >> 10,
+	       reserved_pages << (PAGE_SHIFT - 10), datasize >> 10, initsize >> 10);
 
 	/*
 	 * Allow for enough (cached) page table pages so that we can map the entire memory

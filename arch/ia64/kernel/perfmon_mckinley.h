@@ -163,12 +163,12 @@ pfm_mck_pmc_check(struct task_struct *task, unsigned int cnum, unsigned long *va
 	 * i-side events in L1D and L2 caches
 	 */
 	if (check_case1) {
-		ret =   ((val13 >> 45) & 0xf) == 0 
+		ret =   ((val13 >> 45) & 0xf) == 0
 		   && ((val8 & 0x1) == 0)
 		   && ((((val14>>1) & 0x3) == 0x2 || ((val14>>1) & 0x3) == 0x0)
 		       ||(((val14>>4) & 0x3) == 0x2 || ((val14>>4) & 0x3) == 0x0));
 
-		if (ret) printk("perfmon: failure check_case1\n");
+		if (ret) printk(KERN_DEBUG "perfmon: failure check_case1\n");
 	}
 
 	return ret ? -EINVAL : 0;

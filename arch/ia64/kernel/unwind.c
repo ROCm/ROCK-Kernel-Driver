@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 1999-2002 Hewlett-Packard Co
+ * Copyright (C) 1999-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 /*
@@ -532,7 +532,7 @@ push (struct unw_state_record *sr)
 
 	rs = alloc_reg_state();
 	if (!rs) {
-		printk("unwind: cannot stack reg state!\n");
+		printk(KERN_ERR "unwind: cannot stack reg state!\n");
 		return;
 	}
 	memcpy(rs, &sr->curr, sizeof(*rs));
@@ -545,7 +545,7 @@ pop (struct unw_state_record *sr)
 	struct unw_reg_state *rs = sr->curr.next;
 
 	if (!rs) {
-		printk("unwind: stack underflow!\n");
+		printk(KERN_ERR "unwind: stack underflow!\n");
 		return;
 	}
 	memcpy(&sr->curr, rs, sizeof(*rs));
@@ -561,7 +561,7 @@ dup_state_stack (struct unw_reg_state *rs)
 	while (rs) {
 		copy = alloc_reg_state();
 		if (!copy) {
-			printk ("unwind.dup_state_stack: out of memory\n");
+			printk(KERN_ERR "unwind.dup_state_stack: out of memory\n");
 			return NULL;
 		}
 		memcpy(copy, rs, sizeof(*copy));
@@ -951,7 +951,7 @@ desc_copy_state (unw_word label, struct unw_state_record *sr)
 			return;
 		}
 	}
-	printk("unwind: failed to find state labeled 0x%lx\n", label);
+	printk(KERN_ERR "unwind: failed to find state labeled 0x%lx\n", label);
 }
 
 static inline void
@@ -961,7 +961,7 @@ desc_label_state (unw_word label, struct unw_state_record *sr)
 
 	ls = alloc_labeled_state();
 	if (!ls) {
-		printk("unwind.desc_label_state(): out of memory\n");
+		printk(KERN_ERR "unwind.desc_label_state(): out of memory\n");
 		return;
 	}
 	ls->label = label;
@@ -1055,7 +1055,8 @@ desc_spill_sprel_p (unsigned char qp, unw_word t, unsigned char abreg, unw_word 
 	r->val = 4*spoff;
 }
 
-#define UNW_DEC_BAD_CODE(code)			printk("unwind: unknown code 0x%02x\n", code);
+#define UNW_DEC_BAD_CODE(code)			printk(KERN_ERR "unwind: unknown code 0x%02x\n", \
+						       code);
 
 /*
  * region headers:
@@ -2015,7 +2016,7 @@ unw_create_gate_table (void)
 	unw.gate_table = alloc_bootmem(size);
 	if (!unw.gate_table) {
 		unw.gate_table_size = 0;
-		printk("unwind: unable to create unwind data for gate page!\n");
+		printk(KERN_ERR "unwind: unable to create unwind data for gate page!\n");
 		return;
 	}
 	unw.gate_table_size = size;

@@ -585,7 +585,7 @@ pfm_vm_close(struct vm_area_struct *vma)
 	pfm_smpl_buffer_desc_t *psb = (pfm_smpl_buffer_desc_t *)vma->vm_private_data;
 
 	if (psb == NULL) {
-		printk("perfmon: psb is null in [%d]\n", current->pid);
+		printk(KERN_DEBUG "perfmon: psb is null in [%d]\n", current->pid);
 		return;
 	}
 	/*
@@ -650,7 +650,7 @@ pfm_remove_smpl_mapping(struct task_struct *task)
 	 * some sanity checks first
 	 */
 	if (ctx == NULL || task->mm == NULL || ctx->ctx_smpl_vaddr == 0 || ctx->ctx_psb == NULL) {
-		printk("perfmon: invalid context mm=%p\n", task->mm);
+		printk(KERN_DEBUG "perfmon: invalid context mm=%p\n", task->mm);
 		return -1;
 	}
 	psb = ctx->ctx_psb;
@@ -661,11 +661,11 @@ pfm_remove_smpl_mapping(struct task_struct *task)
 
 	up_write(&task->mm->mmap_sem);
 	if (r !=0) {
-		printk("perfmon: pid %d unable to unmap sampling buffer @0x%lx size=%ld\n", 
-				task->pid, ctx->ctx_smpl_vaddr, psb->psb_size);
+		printk(KERN_DEBUG "perfmon: pid %d unable to unmap sampling buffer "
+		       "@0x%lx size=%ld\n", task->pid, ctx->ctx_smpl_vaddr, psb->psb_size);
 	}
 
-	DBprintk(("[%d] do_unmap(0x%lx, %ld)=%d refcnt=%lu psb_flags=0x%x\n", 
+	DBprintk(("[%d] do_unmap(0x%lx, %ld)=%d refcnt=%lu psb_flags=0x%x\n",
 		task->pid, ctx->ctx_smpl_vaddr, psb->psb_size, r, psb->psb_refcnt, psb->psb_flags));
 
 	return 0;
@@ -700,7 +700,7 @@ pfm_remap_buffer(struct vm_area_struct *vma, unsigned long buf, unsigned long ad
 		page = pfm_kvirt_to_pa(buf);
 
 		if (remap_page_range(vma, addr, page, PAGE_SIZE, PAGE_READONLY)) return -ENOMEM;
-		
+
 		addr  += PAGE_SIZE;
 		buf   += PAGE_SIZE;
 		size  -= PAGE_SIZE;
@@ -857,7 +857,7 @@ pfm_smpl_buffer_alloc(pfm_context_t *ctx, unsigned long *which_pmds, unsigned lo
 	vma->vm_end = vma->vm_start + size;
 
 	DBprintk(("entries=%ld aligned size=%ld, unmapped @0x%lx\n", entries, size, vma->vm_start));
-		
+
 	/* can only be applied to current, need to have the mm semaphore held when called */
 	if (pfm_remap_buffer(vma, (unsigned long)smpl_buf, vma->vm_start, size)) {
 		DBprintk(("Can't remap buffer\n"));
@@ -978,7 +978,7 @@ pfm_unreserve_session(struct task_struct *task, int is_syswide, unsigned long cp
 		pfm_sessions.pfs_sys_use_dbregs,
 		is_syswide,
 		cpu_mask));
-		
+
 
 	if (is_syswide) {
 		m = cpu_mask; n = 0;
@@ -992,7 +992,8 @@ pfm_unreserve_session(struct task_struct *task, int is_syswide, unsigned long cp
 		 */
 		if (ctx && ctx->ctx_fl_using_dbreg) {
 			if (pfm_sessions.pfs_sys_use_dbregs == 0) {
-				printk("perfmon: invalid release for [%d] sys_use_dbregs=0\n", task->pid);
+				printk(KERN_DEBUG "perfmon: invalid release for [%d] "
+				       "sys_use_dbregs=0\n", task->pid);
 			} else {
 				pfm_sessions.pfs_sys_use_dbregs--;
 			}
@@ -1798,7 +1799,8 @@ pfm_release_debug_registers(struct task_struct *task)
 
 	LOCK_PFS();
 	if (pfm_sessions.pfs_ptrace_use_dbregs == 0) {
-		printk("perfmon: invalid release for [%d] ptrace_use_dbregs=0\n", task->pid);
+		printk(KERN_DEBUG "perfmon: invalid release for [%d] ptrace_use_dbregs=0\n",
+		       task->pid);
 		ret = -1;
 	}  else {
 		pfm_sessions.pfs_ptrace_use_dbregs--;
@@ -2060,7 +2062,7 @@ pfm_debug(struct task_struct *task, pfm_context_t *ctx, void *arg, int count,
 
 	pfm_sysctl.debug = mode == 0 ? 0 : 1;
 
-	printk("perfmon debugging %s\n", pfm_sysctl.debug ? "on" : "off");
+	printk(KERN_INFO "perfmon debugging %s\n", pfm_sysctl.debug ? "on" : "off");
 
 	return 0;
 }
@@ -2324,7 +2326,7 @@ pfm_start(struct task_struct *task, pfm_context_t *ctx, void *arg, int count,
 				current));
 
 	if (PMU_OWNER() != task) {
-		printk("perfmon: pfm_start task [%d] not pmu owner\n", task->pid);
+		printk(KERN_DEBUG "perfmon: pfm_start task [%d] not pmu owner\n", task->pid);
 		return -EINVAL;
 	}
 
@@ -2345,7 +2347,8 @@ pfm_start(struct task_struct *task, pfm_context_t *ctx, void *arg, int count,
 
 	} else {
 		if ((task->thread.flags & IA64_THREAD_PM_VALID) == 0) {
-			printk("perfmon: pfm_start task flag not set for [%d]\n", task->pid);
+			printk(KERN_DEBUG "perfmon: pfm_start task flag not set for [%d]\n",
+			       task->pid);
 			return -EINVAL;
 		}
 		/* set user level psr.up */
@@ -2620,7 +2623,7 @@ pfm_ovfl_block_reset(void)
 	 * do some sanity checks first
 	 */
 	if (!ctx) {
-		printk("perfmon: [%d] has no PFM context\n", current->pid);
+		printk(KERN_DEBUG "perfmon: [%d] has no PFM context\n", current->pid);
 		return;
 	}
 
@@ -2792,16 +2795,16 @@ pfm_overflow_handler(struct task_struct *task, pfm_context_t *ctx, u64 pmc0, str
 	 * Don't think this could happen given upfront tests
 	 */
 	if ((t->flags & IA64_THREAD_PM_VALID) == 0 && ctx->ctx_fl_system == 0) {
-		printk("perfmon: Spurious overflow interrupt: process %d not using perfmon\n", 
-			task->pid);
+		printk(KERN_DEBUG "perfmon: Spurious overflow interrupt: process %d not "
+		       "using perfmon\n", task->pid);
 		return 0x1;
 	}
 	/*
 	 * sanity test. Should never happen
 	 */
 	if ((pmc0 & 0x1) == 0) {
-		printk("perfmon: pid %d pmc0=0x%lx assumption error for freeze bit\n", 
-			task->pid, pmc0);
+		printk(KERN_DEBUG "perfmon: pid %d pmc0=0x%lx assumption error for freeze bit\n",
+		       task->pid, pmc0);
 		return 0x0;
 	}
 
@@ -2966,8 +2969,8 @@ pfm_overflow_handler(struct task_struct *task, pfm_context_t *ctx, u64 pmc0, str
 		 * this call is safe in an interrupt handler, so does read_lock() on tasklist_lock
 		 */
 		ret = send_sig_info(SIGPROF, &si, ctx->ctx_notify_task);
-		if (ret != 0) 
-			printk("send_sig_info(process %d, SIGPROF)=%d\n",  
+		if (ret != 0)
+			printk(KERN_DEBUG "send_sig_info(process %d, SIGPROF)=%d\n",
 			       ctx->ctx_notify_task->pid, ret);
 		/*
 		 * now undo the protections in order
@@ -3066,8 +3069,8 @@ pfm_interrupt_handler(int irq, void *arg, struct pt_regs *regs)
 
 		/* sanity check */
 		if (!ctx) {
-			printk("perfmon: Spurious overflow interrupt: process %d has no PFM context\n", 
-				task->pid);
+			printk(KERN_DEBUG "perfmon: Spurious overflow interrupt: process %d has "
+			       "no PFM context\n", task->pid);
 			return;
 		}
 #ifdef CONFIG_SMP
@@ -3424,7 +3427,8 @@ must_wait_saving:
 
 	/* will send IPI to other CPU and wait for completion of remote call */
 	if ((ret=smp_call_function_single(cpu, pfm_handle_fetch_regs, &arg, 0, 1))) {
-		printk("perfmon: remote CPU call from %d to %d error %d\n", smp_processor_id(), cpu, ret);
+		printk(KERN_ERR "perfmon: remote CPU call from %d to %d error %d\n",
+		       smp_processor_id(), cpu, ret);
 		return;
 	}
 	/*
@@ -3763,8 +3767,9 @@ pfm_flush_regs (struct task_struct *task)
 	 *
 	 */
 
-	if (atomic_read(&ctx->ctx_last_cpu) != smp_processor_id()) 
-		printk("perfmon: [%d] last_cpu=%d\n", task->pid, atomic_read(&ctx->ctx_last_cpu));
+	if (atomic_read(&ctx->ctx_last_cpu) != smp_processor_id())
+		printk(KERN_DEBUG "perfmon: [%d] last_cpu=%d\n",
+		       task->pid, atomic_read(&ctx->ctx_last_cpu));
 
 	/*
 	 * we save all the used pmds
@@ -4138,7 +4143,7 @@ pfm_cleanup_smpl_buf(struct task_struct *task)
 	pfm_smpl_buffer_desc_t *tmp, *psb = task->thread.pfm_smpl_buf_list;
 
 	if (psb == NULL) {
-		printk("perfmon: psb is null in [%d]\n", current->pid);
+		printk(KERN_DEBUG "perfmon: psb is null in [%d]\n", current->pid);
 		return -1;
 	}
 	/*
@@ -4298,7 +4303,8 @@ pfm_install_alternate_syswide_subsystem(pfm_intr_handler_desc_t *hdl)
 	if (ret) return ret;
 
 	if (pfm_alternate_intr_handler) {
-		printk("perfmon: install_alternate, intr_handler not NULL after reserve\n");
+		printk(KERN_DEBUG "perfmon: install_alternate, intr_handler not NULL "
+		       "after reserve\n");
 		return -EINVAL;
 	}
 
@@ -4335,10 +4341,8 @@ pfm_init(void)
 
 	pmu_conf.disabled = 1;
 
-	printk("perfmon: version %u.%u IRQ %u\n", 
-		PFM_VERSION_MAJ, 
-		PFM_VERSION_MIN, 
-		IA64_PERFMON_VECTOR);
+	printk(KERN_INFO "perfmon: version %u.%u IRQ %u\n", PFM_VERSION_MAJ, PFM_VERSION_MIN,
+	       IA64_PERFMON_VECTOR);
 
 	/*
 	 * compute the number of implemented PMD/PMC from the
@@ -4362,8 +4366,8 @@ pfm_init(void)
 	pmu_conf.num_pmds      = n;
 	pmu_conf.num_counters  = n_counters;
 
-	printk("perfmon: %u PMCs, %u PMDs, %u counters (%lu bits)\n", 
-	       pmu_conf.num_pmcs, 
+	printk(KERN_INFO "perfmon: %u PMCs, %u PMDs, %u counters (%lu bits)\n",
+	       pmu_conf.num_pmcs,
 	       pmu_conf.num_pmds,
 	       pmu_conf.num_counters,
 	       ffz(pmu_conf.ovfl_val));
@@ -4380,7 +4384,7 @@ pfm_init(void)
 	perfmon_dir = create_proc_read_entry ("perfmon", 0, 0, perfmon_read_entry, NULL);
 	if (perfmon_dir == NULL) {
 		printk(KERN_ERR "perfmon: cannot create /proc entry, perfmon disabled\n");
-		return -1; 
+		return -1;
 	}
 
 	/*

@@ -5,7 +5,7 @@
  *
  * Copyright (C) 1999 VA Linux Systems
  * Copyright (C) 1999 Walt Drummond <drummond@valinux.com>
- * Copyright (C) 1999-2002 Hewlett-Packard Co.
+ * Copyright (C) 1999-2003 Hewlett-Packard Co.
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *	Stephane Eranian <eranian@hpl.hp.com>
  *
@@ -365,7 +365,7 @@ efi_memmap_walk (efi_freemem_callback_t callback, void *arg)
 				prev_valid = 1;
 			} else {
 				if (curr.start < prev.start)
-					printk("Oops: EFI memory table not ordered!\n");
+					printk(KERN_ERR "Oops: EFI memory table not ordered!\n");
 
 				if (prev.end == curr.start) {
 					/* merge two consecutive memory ranges */
@@ -437,7 +437,8 @@ efi_map_pal_code (void)
 		 * dedicated ITR for the PAL code.
 		 */
 		if ((vaddr & mask) == (KERNEL_START & mask)) {
-			printk("%s: no need to install ITR for PAL code\n", __FUNCTION__);
+			printk(KERN_INFO "%s: no need to install ITR for PAL code\n",
+			       __FUNCTION__);
 			continue;
 		}
 
@@ -445,7 +446,7 @@ efi_map_pal_code (void)
 			panic("Woah!  PAL code size bigger than a granule!");
 
 		mask  = ~((1 << IA64_GRANULE_SHIFT) - 1);
-		printk("CPU %d: mapping PAL code [0x%lx-0x%lx) into [0x%lx-0x%lx)\n",
+		printk(KERN_INFO "CPU %d: mapping PAL code [0x%lx-0x%lx) into [0x%lx-0x%lx)\n",
 		       smp_processor_id(), md->phys_addr,
 		       md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT),
 		       vaddr & mask, (vaddr & mask) + IA64_GRANULE_SIZE);
@@ -489,7 +490,7 @@ efi_init (void)
 		}
 	}
 	if (mem_limit != ~0UL)
-		printk("Ignoring memory above %luMB\n", mem_limit >> 20);
+		printk(KERN_INFO "Ignoring memory above %luMB\n", mem_limit >> 20);
 
 	efi.systab = __va(ia64_boot_param->efi_systab);
 
@@ -501,7 +502,7 @@ efi_init (void)
 	if (efi.systab->hdr.signature != EFI_SYSTEM_TABLE_SIGNATURE)
 		panic("Woah! EFI system table signature incorrect\n");
 	if ((efi.systab->hdr.revision ^ EFI_SYSTEM_TABLE_REVISION) >> 16 != 0)
-		printk("Warning: EFI system table major version mismatch: "
+		printk(KERN_WARNING "Warning: EFI system table major version mismatch: "
 		       "got %d.%02d, expected %d.%02d\n",
 		       efi.systab->hdr.revision >> 16, efi.systab->hdr.revision & 0xffff,
 		       EFI_SYSTEM_TABLE_REVISION >> 16, EFI_SYSTEM_TABLE_REVISION & 0xffff);
@@ -516,7 +517,7 @@ efi_init (void)
 		vendor[i] = '\0';
 	}
 
-	printk("EFI v%u.%.02u by %s:",
+	printk(KERN_INFO "EFI v%u.%.02u by %s:",
 	       efi.systab->hdr.revision >> 16, efi.systab->hdr.revision & 0xffff, vendor);
 
 	for (i = 0; i < efi.systab->nr_tables; i++) {
@@ -608,7 +609,7 @@ efi_enter_virtual_mode (void)
 									   | _PAGE_PL_0
 									   | _PAGE_AR_RW));
 #else
-				printk("EFI_MEMORY_WC mapping\n");
+				printk(KERN_INFO "EFI_MEMORY_WC mapping\n");
 				md->virt_addr = (u64) ioremap(md->phys_addr, 0);
 #endif
 			} else if (md->attribute & EFI_MEMORY_WT) {
@@ -618,7 +619,7 @@ efi_enter_virtual_mode (void)
 									   | _PAGE_PL_0
 									   | _PAGE_AR_RW));
 #else
-				printk("EFI_MEMORY_WT mapping\n");
+				printk(KERN_INFO "EFI_MEMORY_WT mapping\n");
 				md->virt_addr = (u64) ioremap(md->phys_addr, 0);
 #endif
 			}
@@ -630,7 +631,8 @@ efi_enter_virtual_mode (void)
 			       efi_desc_size, ia64_boot_param->efi_memdesc_version,
 			       ia64_boot_param->efi_memmap);
 	if (status != EFI_SUCCESS) {
-		printk("Warning: unable to switch EFI into virtual mode (status=%lu)\n", status);
+		printk(KERN_WARNING "warning: unable to switch EFI into virtual mode "
+		       "(status=%lu)\n", status);
 		return;
 	}
 

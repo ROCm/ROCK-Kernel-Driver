@@ -7,7 +7,7 @@
  * case means sys_sim.c console (goes via the simulator). The code hereafter
  * is completely leveraged from the serial.c driver.
  *
- * Copyright (C) 1999-2000, 2002 Hewlett-Packard Co
+ * Copyright (C) 1999-2000, 2002-2003 Hewlett-Packard Co
  *	Stephane Eranian <eranian@hpl.hp.com>
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *
@@ -195,7 +195,7 @@ static void rs_interrupt_single(int irq, void *dev_id, struct pt_regs * regs)
 	 */
 	info = IRQ_ports[irq];
 	if (!info || !info->tty) {
-		printk("simrs_interrupt_single: info|tty=0 info=%p problem\n", info);
+		printk(KERN_INFO "simrs_interrupt_single: info|tty=0 info=%p problem\n", info);
 		return;
 	}
 	/*
@@ -219,13 +219,13 @@ static DECLARE_TASK_QUEUE(tq_serial); /* used to be at the top of the file */
 static void do_serial_bh(void)
 {
 	run_task_queue(&tq_serial);
-	printk("do_serial_bh: called\n");
+	printk(KERN_ERR "do_serial_bh: called\n");
 }
 #endif
 
 static void do_softint(void *private_)
 {
-	printk("simserial: do_softint called\n");
+	printk(KERN_ERR "simserial: do_softint called\n");
 }
 
 static void rs_put_char(struct tty_struct *tty, unsigned char ch)
@@ -439,7 +439,7 @@ static void rs_throttle(struct tty_struct * tty)
 {
 	if (I_IXOFF(tty)) rs_send_xchar(tty, STOP_CHAR(tty));
 
-	printk("simrs_throttle called\n");
+	printk(KERN_INFO "simrs_throttle called\n");
 }
 
 static void rs_unthrottle(struct tty_struct * tty)
@@ -452,7 +452,7 @@ static void rs_unthrottle(struct tty_struct * tty)
 		else
 			rs_send_xchar(tty, START_CHAR(tty));
 	}
-	printk("simrs_unthrottle called\n");
+	printk(KERN_INFO "simrs_unthrottle called\n");
 }
 
 /*
@@ -474,29 +474,29 @@ static int rs_ioctl(struct tty_struct *tty, struct file * file,
 
 	switch (cmd) {
 		case TIOCMGET:
-			printk("rs_ioctl: TIOCMGET called\n");
+			printk(KERN_INFO "rs_ioctl: TIOCMGET called\n");
 			return -EINVAL;
 		case TIOCMBIS:
 		case TIOCMBIC:
 		case TIOCMSET:
-			printk("rs_ioctl: TIOCMBIS/BIC/SET called\n");
+			printk(KERN_INFO "rs_ioctl: TIOCMBIS/BIC/SET called\n");
 			return -EINVAL;
 		case TIOCGSERIAL:
-			printk("simrs_ioctl TIOCGSERIAL called\n");
+			printk(KERN_INFO "simrs_ioctl TIOCGSERIAL called\n");
 			return 0;
 		case TIOCSSERIAL:
-			printk("simrs_ioctl TIOCSSERIAL called\n");
+			printk(KERN_INFO "simrs_ioctl TIOCSSERIAL called\n");
 			return 0;
 		case TIOCSERCONFIG:
-			printk("rs_ioctl: TIOCSERCONFIG called\n");
+			printk(KERN_INFO "rs_ioctl: TIOCSERCONFIG called\n");
 			return -EINVAL;
 
 		case TIOCSERGETLSR: /* Get line status register */
-			printk("rs_ioctl: TIOCSERGETLSR called\n");
+			printk(KERN_INFO "rs_ioctl: TIOCSERGETLSR called\n");
 			return  -EINVAL;
 
 		case TIOCSERGSTRUCT:
-			printk("rs_ioctl: TIOCSERGSTRUCT called\n");
+			printk(KERN_INFO "rs_ioctl: TIOCSERGSTRUCT called\n");
 #if 0
 			if (copy_to_user((struct async_struct *) arg,
 					 info, sizeof(struct async_struct)))
@@ -511,7 +511,7 @@ static int rs_ioctl(struct tty_struct *tty, struct file * file,
 		 * Caller should use TIOCGICOUNT to see which one it was
 		 */
 		case TIOCMIWAIT:
-			printk("rs_ioctl: TIOCMIWAIT: called\n");
+			printk(KERN_INFO "rs_ioctl: TIOCMIWAIT: called\n");
 			return 0;
 		/*
 		 * Get counter of input serial line interrupts (DCD,RI,DSR,CTS)
@@ -520,13 +520,13 @@ static int rs_ioctl(struct tty_struct *tty, struct file * file,
 		 *     RI where only 0->1 is counted.
 		 */
 		case TIOCGICOUNT:
-			printk("rs_ioctl: TIOCGICOUNT called\n");
+			printk(KERN_INFO "rs_ioctl: TIOCGICOUNT called\n");
 			return 0;
 
 		case TIOCSERGWILD:
 		case TIOCSERSWILD:
 			/* "setserial -W" is called in Debian boot */
-			printk ("TIOCSER?WILD ioctl obsolete, ignored.\n");
+			printk (KERN_INFO "TIOCSER?WILD ioctl obsolete, ignored.\n");
 			return 0;
 
 		default:
@@ -596,7 +596,7 @@ static void shutdown(struct async_struct * info)
 						     IRQ_T(info), "serial", NULL);
 
 				if (retval)
-					printk("serial shutdown: request_irq: error %d"
+					printk(KERN_ERR "serial shutdown: request_irq: error %d"
 					       "  Couldn't reacquire IRQ.\n", retval);
 			} else
 				free_irq(state->irq, NULL);
@@ -654,12 +654,12 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 		 * one, we've got real problems, since it means the
 		 * serial port won't be shutdown.
 		 */
-		printk("rs_close: bad serial port count; tty->count is 1, "
+		printk(KERN_ERR "rs_close: bad serial port count; tty->count is 1, "
 		       "state->count is %d\n", state->count);
 		state->count = 1;
 	}
 	if (--state->count < 0) {
-		printk("rs_close: bad serial port count for ttys%d: %d\n",
+		printk(KERN_ERR "rs_close: bad serial port count for ttys%d: %d\n",
 		       info->line, state->count);
 		state->count = 0;
 	}
@@ -1013,7 +1013,7 @@ done:
 static inline void show_serial_version(void)
 {
 	printk(KERN_INFO "%s version %s with", serial_name, serial_version);
-	printk(" no serial options enabled\n");
+	printk(KERN_INFO " no serial options enabled\n");
 }
 
 /*

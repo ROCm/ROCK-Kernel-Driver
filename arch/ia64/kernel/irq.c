@@ -108,7 +108,7 @@ static void ack_none(unsigned int irq)
  * a generic callback i think.
  */
 #if CONFIG_X86
-	printk("unexpected IRQ trap at vector %02x\n", irq);
+	printk(KERN_ERR "unexpected IRQ trap at vector %02x\n", irq);
 #ifdef CONFIG_X86_LOCAL_APIC
 	/*
 	 * Currently unexpected vectors happen only on SMP and APIC.
@@ -122,7 +122,7 @@ static void ack_none(unsigned int irq)
 #endif
 #endif
 #if CONFIG_IA64
-	printk("Unexpected irq vector 0x%x on CPU %u!\n", irq, smp_processor_id());
+	printk(KERN_ERR "Unexpected irq vector 0x%x on CPU %u!\n", irq, smp_processor_id());
 #endif
 }
 
@@ -317,7 +317,7 @@ void enable_irq(unsigned int irq)
 		desc->depth--;
 		break;
 	case 0:
-		printk("enable_irq(%u) unbalanced from %p\n",
+		printk(KERN_ERR "enable_irq(%u) unbalanced from %p\n",
 		       irq, (void *) __builtin_return_address(0));
 	}
 	spin_unlock_irqrestore(&desc->lock, flags);
@@ -466,7 +466,7 @@ int request_irq(unsigned int irq,
 	 */
 	if (irqflags & SA_SHIRQ) {
 		if (!dev_id)
-			printk("Bad boy: %s called us without a dev_id!\n", devname);
+			printk(KERN_ERR "Bad boy: %s called us without a dev_id!\n", devname);
 	}
 #endif
 
@@ -547,7 +547,7 @@ void free_irq(unsigned int irq, void *dev_id)
 			kfree(action);
 			return;
 		}
-		printk("Trying to free free IRQ%d\n",irq);
+		printk(KERN_ERR "Trying to free free IRQ%d\n",irq);
 		spin_unlock_irqrestore(&desc->lock,flags);
 		return;
 	}

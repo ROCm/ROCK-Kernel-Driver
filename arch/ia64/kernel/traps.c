@@ -57,7 +57,8 @@ trap_init (void)
 		major = fpswa_interface->revision >> 16;
 		minor = fpswa_interface->revision & 0xffff;
 	}
-	printk("fpswa interface at %lx (rev %d.%d)\n", ia64_boot_param->fpswa, major, minor);
+	printk(KERN_INFO "fpswa interface at %lx (rev %d.%d)\n",
+	       ia64_boot_param->fpswa, major, minor);
 }
 
 /*
@@ -222,7 +223,7 @@ ia64_ni_syscall (unsigned long arg0, unsigned long arg1, unsigned long arg2, uns
 {
 	struct pt_regs *regs = (struct pt_regs *) &stack;
 
-	printk("%s(%d): <sc%ld(%lx,%lx,%lx,%lx)>\n", current->comm, current->pid,
+	printk(KERN_DEBUG "%s(%d): <sc%ld(%lx,%lx,%lx,%lx)>\n", current->comm, current->pid,
 	       regs->r15, arg0, arg1, arg2, arg3);
 	return -ENOSYS;
 }
@@ -346,7 +347,7 @@ handle_fpu_swa (int fp_fault, struct pt_regs *regs, unsigned long isr)
 			/* emulation was successful */
 			ia64_increment_ip(regs);
 		} else if (exception == -1) {
-			printk("handle_fpu_swa: fp_emulate() returned -1\n");
+			printk(KERN_ERR "handle_fpu_swa: fp_emulate() returned -1\n");
 			return -1;
 		} else {
 			/* is next instruction a trap? */
@@ -369,7 +370,7 @@ handle_fpu_swa (int fp_fault, struct pt_regs *regs, unsigned long isr)
 		}
 	} else {
 		if (exception == -1) {
-			printk("handle_fpu_swa: fp_emulate() returned -1\n");
+			printk(KERN_ERR "handle_fpu_swa: fp_emulate() returned -1\n");
 			return -1;
 		} else if (exception != 0) {
 			/* raise exception */
@@ -467,7 +468,9 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 				       ? " (RSE access)" : " (data access)") : "");
 		if (code == 8) {
 # ifdef CONFIG_IA64_PRINT_HAZARDS
-			printk("%016lx:possible hazard, pr = %016lx\n", regs->cr_iip, regs->pr);
+			printk("%s[%d]: possible hazard @ ip=%016lx (pr = %016lx)\n",
+			       current->comm, current->pid, regs->cr_iip + ia64_psr(regs)->ri,
+			       regs->pr);
 # endif
 			return;
 		}
@@ -614,8 +617,9 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 		if (ia32_exception(regs, isr) == 0)
 			return;
 #endif
-		printk("Unexpected IA-32 exception (Trap 45)\n");
-		printk("  iip - 0x%lx, ifa - 0x%lx, isr - 0x%lx\n", regs->cr_iip, ifa, isr);
+		printk(KERN_ERR "Unexpected IA-32 exception (Trap 45)\n");
+		printk(KERN_ERR "  iip - 0x%lx, ifa - 0x%lx, isr - 0x%lx\n",
+		       regs->cr_iip, ifa, isr);
 		force_sig(SIGSEGV, current);
 		break;
 
@@ -624,8 +628,8 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 		if (ia32_intercept(regs, isr) == 0)
 			return;
 #endif
-		printk("Unexpected IA-32 intercept trap (Trap 46)\n");
-		printk("  iip - 0x%lx, ifa - 0x%lx, isr - 0x%lx, iim - 0x%lx\n",
+		printk(KERN_ERR "Unexpected IA-32 intercept trap (Trap 46)\n");
+		printk(KERN_ERR "  iip - 0x%lx, ifa - 0x%lx, isr - 0x%lx, iim - 0x%lx\n",
 		       regs->cr_iip, ifa, isr, iim);
 		force_sig(SIGSEGV, current);
 		return;
