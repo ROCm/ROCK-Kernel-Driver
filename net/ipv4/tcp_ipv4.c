@@ -2144,7 +2144,7 @@ static inline struct tcp_tw_bucket *tw_next(struct tcp_tw_bucket *tw)
 		hlist_entry(tw->tw_node.next, typeof(*tw), tw_node) : NULL;
 }
 
-static void *listening_get_next(struct seq_file *seq, void *cur)
+static void *listening_get_next(struct seq_file *seq, void *cur, int noopenreq)
 {
 	struct tcp_opt *tp;
 	struct hlist_node *node;
@@ -2190,7 +2190,7 @@ get_sk:
 		}
 	       	tp = tcp_sk(sk);
 		read_lock_bh(&tp->syn_wait_lock);
-		if (tp->listen_opt && tp->listen_opt->qlen) {
+		if (!noopenreq && tp->listen_opt && tp->listen_opt->qlen) {
 			st->uid		= sock_i_uid(sk);
 			st->syn_wait_sk = sk;
 			st->state	= TCP_SEQ_STATE_OPENREQ;
@@ -2208,12 +2208,12 @@ out:
 	return cur;
 }
 
-static void *listening_get_idx(struct seq_file *seq, loff_t *pos)
+static void *listening_get_idx(struct seq_file *seq, loff_t *pos, int noopenreq)
 {
-	void *rc = listening_get_next(seq, NULL);
+	void *rc = listening_get_next(seq, NULL, noopenreq);
 
 	while (rc && *pos) {
-		rc = listening_get_next(seq, rc);
+		rc = listening_get_next(seq, rc, noopenreq);
 		--*pos;
 	}
 	return rc;
@@ -2229,6 +2229,10 @@ static void *established_get_first(struct seq_file *seq)
 		struct hlist_node *node;
 		struct tcp_tw_bucket *tw;
 	       
+		if (hlist_empty(&tcp_ehash[st->bucket].chain) &&
+		    hlist_empty(&tcp_ehash[st->bucket+tcp_ehash_size].chain)
+		)
+			continue;
 		read_lock(&tcp_ehash[st->bucket].lock);
 		sk_for_each(sk, node, &tcp_ehash[st->bucket].chain) {
 			if (sk->sk_family != st->family) {
@@ -2275,13 +2279,18 @@ get_tw:
 		}
 		read_unlock(&tcp_ehash[st->bucket].lock);
 		st->state = TCP_SEQ_STATE_ESTABLISHED;
-		if (++st->bucket < tcp_ehash_size) {
-			read_lock(&tcp_ehash[st->bucket].lock);
-			sk = sk_head(&tcp_ehash[st->bucket].chain);
-		} else {
+
+		while ((++st->bucket < tcp_ehash_size) &&
+			hlist_empty(&tcp_ehash[st->bucket].chain) &&
+		        hlist_empty(&tcp_ehash[st->bucket+tcp_ehash_size].chain)
+		)	
+			/*empty*/;
+		if (st->bucket >= tcp_ehash_size) {
 			cur = NULL;
 			goto out;
 		}
+		read_lock(&tcp_ehash[st->bucket].lock);
+		sk = sk_head(&tcp_ehash[st->bucket].chain);
 	} else
 		sk = sk_next(sk);
 
@@ -2310,40 +2319,54 @@ static void *established_get_idx(struct seq_file *seq, loff_t pos)
 	return rc;
 }
 
-static void *tcp_get_idx(struct seq_file *seq, loff_t pos)
+static void *tcp_get_idx(struct seq_file *seq, loff_t pos, int listenonly)
 {
 	void *rc;
 	struct tcp_iter_state* st = seq->private;
 
 	tcp_listen_lock();
 	st->state = TCP_SEQ_STATE_LISTENING;
-	rc	  = listening_get_idx(seq, &pos);
+	rc	  = listening_get_idx(seq, &pos, listenonly);
 
 	if (!rc) {
-		tcp_listen_unlock();
-		local_bh_disable();
-		st->state = TCP_SEQ_STATE_ESTABLISHED;
-		rc	  = established_get_idx(seq, pos);
+		if (!listenonly) { 
+			tcp_listen_unlock();
+			local_bh_disable();
+			st->state = TCP_SEQ_STATE_ESTABLISHED;
+			rc	  = established_get_idx(seq, pos);
+		}
 	}
 
 	return rc;
 }
 
-static void *tcp_seq_start(struct seq_file *seq, loff_t *pos)
+void *tcp_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	struct tcp_iter_state* st = seq->private;
 	st->state = TCP_SEQ_STATE_LISTENING;
 	st->num = 0;
-	return *pos ? tcp_get_idx(seq, *pos - 1) : SEQ_START_TOKEN;
+	return *pos ? tcp_get_idx(seq, *pos - 1, 0) : SEQ_START_TOKEN;
 }
 
-static void *tcp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+EXPORT_SYMBOL(tcp_seq_start);
+
+void *tcp_listen_seq_start(struct seq_file *seq, loff_t *pos)
+{
+	struct tcp_iter_state* st = seq->private;
+	st->state = TCP_SEQ_STATE_LISTENING;
+	st->num = 0;
+	return *pos ? tcp_get_idx(seq, *pos - 1, 1) : SEQ_START_TOKEN;
+}
+
+EXPORT_SYMBOL(tcp_listen_seq_start);
+
+void *tcp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
 	void *rc = NULL;
 	struct tcp_iter_state* st;
 
 	if (v == SEQ_START_TOKEN) {
-		rc = tcp_get_idx(seq, 0);
+		rc = tcp_get_idx(seq, 0, 0);
 		goto out;
 	}
 	st = seq->private;
@@ -2351,7 +2374,7 @@ static void *tcp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 	switch (st->state) {
 	case TCP_SEQ_STATE_OPENREQ:
 	case TCP_SEQ_STATE_LISTENING:
-		rc = listening_get_next(seq, v);
+		rc = listening_get_next(seq, v, 0);
 		if (!rc) {
 			tcp_listen_unlock();
 			local_bh_disable();
@@ -2368,6 +2391,27 @@ out:
 	++*pos;
 	return rc;
 }
+
+EXPORT_SYMBOL(tcp_seq_next);
+
+void *tcp_listen_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	void *rc = NULL;
+	struct tcp_iter_state* st;
+
+	if (v == SEQ_START_TOKEN) {
+		rc = tcp_get_idx(seq, 0, 1);
+		goto out;
+	}
+	st = seq->private;
+	rc = listening_get_next(seq, v, 1);
+
+out:
+	++*pos;
+	return rc;
+}
+
+EXPORT_SYMBOL(tcp_listen_seq_next);
 
 static void tcp_seq_stop(struct seq_file *seq, void *v)
 {
@@ -2407,8 +2451,8 @@ static int tcp_seq_open(struct inode *inode, struct file *file)
 		return -ENOMEM;
 	memset(s, 0, sizeof(*s));
 	s->family		= afinfo->family;
-	s->seq_ops.start	= tcp_seq_start;
-	s->seq_ops.next		= tcp_seq_next;
+	s->seq_ops.start	= afinfo->seq_start;
+	s->seq_ops.next		= afinfo->seq_next;
 	s->seq_ops.show		= afinfo->seq_show;
 	s->seq_ops.stop		= tcp_seq_stop;
 
@@ -2577,20 +2621,80 @@ static struct tcp_seq_afinfo tcp4_seq_afinfo = {
 	.owner		= THIS_MODULE,
 	.name		= "tcp",
 	.family		= AF_INET,
+	.seq_start	= tcp_seq_start, 
 	.seq_show	= tcp4_seq_show,
+	.seq_next	= tcp_seq_next,
 	.seq_fops	= &tcp4_seq_fops,
 };
 
+static struct file_operations tcp4_listen_seq_fops;
+static struct tcp_seq_afinfo tcp4_listen_seq_afinfo = {
+	.owner		= THIS_MODULE,
+	.name		= "tcp_listen",
+	.family		= AF_INET,
+	.seq_start	= tcp_listen_seq_start, 
+	.seq_show	= tcp4_seq_show,
+	.seq_next	= tcp_listen_seq_next,
+	.seq_fops	= &tcp4_listen_seq_fops,
+};
+
+
 int __init tcp4_proc_init(void)
 {
-	return tcp_proc_register(&tcp4_seq_afinfo);
+	int err = tcp_proc_register(&tcp4_seq_afinfo);
+	if (err) 
+		return err;
+	return tcp_proc_register(&tcp4_listen_seq_afinfo);
 }
 
 void tcp4_proc_exit(void)
 {
 	tcp_proc_unregister(&tcp4_seq_afinfo);
+	tcp_proc_unregister(&tcp4_listen_seq_afinfo);
 }
 #endif /* CONFIG_PROC_FS */
+
+static void tcpv4_zap_addr(__u32 addr) 
+{ 
+	int i;
+
+	for (i = 0; i < tcp_ehash_size; i++) { 
+		struct tcp_ehash_bucket *head = &tcp_ehash[i];
+		struct sock *sk;
+		struct hlist_node *node;
+		
+		/* O(n^2) on number of zapped sockets. hopefully there
+		   is only a small number of them. */
+	again:
+		read_lock(&head->lock); 
+		sk_for_each(sk, node, &head->chain) {
+			struct inet_opt *inet = inet_sk(sk);
+
+			if (sock_flag(sk, SOCK_DEAD))
+				continue;
+			if (sk->sk_err || sk->sk_zapped)
+				continue;
+			if (sk->sk_state == TCP_SYN_RECV)
+				continue;
+			if (sk->sk_state == TCP_SYN_SENT && sysctl_ip_dynaddr)
+				continue;
+			if (inet->rcv_saddr != addr)
+				continue;
+			printk(KERN_INFO 
+      "TCP: zapping lost address %d.%d.%d.%d:%d -> %d.%d.%d.%d:%d\n", 
+			       NIPQUAD(addr), ntohs(inet->sport), 
+			       NIPQUAD(inet->daddr), ntohs(inet->dport)); 
+			sock_hold(sk); 
+			read_unlock(&head->lock); 
+			lock_sock(sk);
+			tcp_reset(sk); 
+			release_sock(sk);
+			sock_put(sk); 
+			goto again; 
+		}		
+		read_unlock(&head->lock); 
+	}      
+} 
 
 struct proto tcp_prot = {
 	.name			= "TCP",
@@ -2621,6 +2725,50 @@ struct proto tcp_prot = {
 };
 
 
+/* 
+ * Gets told when a dynamic IP address vanishes.
+ * Runs under the RTNL semaphore.
+ */ 
+static int tcpv4_inetaddr_event(struct notifier_block *this, 
+				unsigned long event, 
+				void *ptr)
+{
+	struct in_ifaddr *ifa = (struct in_ifaddr *)ptr; 
+	struct in_device *idev; 
+	struct net_device *dev;
+
+	if (!(idev = ifa->ifa_dev) || !idev->dev || 
+	    !(idev->dev->flags & IFF_DYNAMIC))
+		return NOTIFY_DONE;
+
+	/* 
+	 * Don't do anything when the address still exists on another
+	 * interface.  Depends on running after the IP notifier.  
+	 */
+	if ((dev = ip_dev_find(ifa->ifa_local)) != NULL) { 
+		dev_put(dev);
+		return NOTIFY_DONE; 
+	} 
+
+	switch (event) { 
+	case NETDEV_REBOOT: 
+		if (!(idev->dev->flags & IFF_UP)) { 
+			printk(KERN_DEBUG "tcp_inetaddr_event: netdev_reboot: interface not up\n");
+			break; 
+		}
+		/*FALL THROUGH*/
+	case NETDEV_DOWN:
+		tcpv4_zap_addr(ifa->ifa_local);
+		break; 
+	}
+
+	return NOTIFY_DONE; 
+}
+
+static struct notifier_block tcpv4_inetaddr_notifier = {
+	.notifier_call	= tcpv4_inetaddr_event,
+	.priority	= -1,
+};
 
 void __init tcp_v4_init(struct net_proto_family *ops)
 {
@@ -2635,6 +2783,7 @@ void __init tcp_v4_init(struct net_proto_family *ops)
 	 * packets.
 	 */
 	tcp_socket->sk->sk_prot->unhash(tcp_socket->sk);
+	register_inetaddr_notifier(&tcpv4_inetaddr_notifier);
 }
 
 EXPORT_SYMBOL(ipv4_specific);

@@ -863,6 +863,8 @@ isdn_net_hangup(struct net_device *d)
 		isdn_all_eaz(lp->isdn_device, lp->isdn_channel);
 	}
 	isdn_net_unbind_channel(lp);
+	if (!lp->master) /* never send this event to an slave device */
+		netdev_event(d, NETDEV_REBOOT);
 }
 
 typedef struct {

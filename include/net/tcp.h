@@ -867,6 +867,8 @@ extern void			tcp_enter_loss(struct sock *sk, int how);
 extern void			tcp_clear_retrans(struct tcp_opt *tp);
 extern void			tcp_update_metrics(struct sock *sk);
 
+extern void			tcp_reset(struct sock *sk); 
+
 extern void			tcp_close(struct sock *sk, 
 					  long timeout);
 extern struct sock *		tcp_accept(struct sock *sk, int flags, int *err);
@@ -1979,7 +1981,10 @@ struct tcp_seq_afinfo {
 	struct module		*owner;
 	char			*name;
 	sa_family_t		family;
+	void *			(*seq_start)(struct seq_file *seq, loff_t *pos);
 	int			(*seq_show) (struct seq_file *m, void *v);
+	void *			(*seq_next)(struct seq_file *seq, void *v, loff_t *pos);
+
 	struct file_operations	*seq_fops;
 };
 
@@ -1993,6 +1998,11 @@ struct tcp_iter_state {
 
 extern int tcp_proc_register(struct tcp_seq_afinfo *afinfo);
 extern void tcp_proc_unregister(struct tcp_seq_afinfo *afinfo);
+
+extern void *tcp_seq_start(struct seq_file *seq, loff_t *pos);
+extern void *tcp_listen_seq_start(struct seq_file *seq, loff_t *pos);
+extern void *tcp_seq_next(struct seq_file *seq, void *v, loff_t *pos);
+extern void *tcp_listen_seq_next(struct seq_file *seq, void *v, loff_t *pos);
 
 /* TCP Westwood functions and constants */
 

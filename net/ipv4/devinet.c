@@ -1007,6 +1007,13 @@ static int inetdev_event(struct notifier_block *this, unsigned long event,
 		devinet_sysctl_register(in_dev, &in_dev->cnf);
 #endif
 		break;
+	case NETDEV_REBOOT:
+		if (dev->flags & IFF_DYNAMIC ) { 
+			for_primary_ifa(in_dev) {
+				notifier_call_chain(&inetaddr_chain, NETDEV_REBOOT, ifa); 
+			} endfor_ifa(in_dev); 
+		}
+		break;
 	}
 out:
 	return NOTIFY_DONE;

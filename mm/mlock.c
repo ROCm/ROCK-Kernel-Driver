@@ -47,6 +47,13 @@ static int mlock_fixup(struct vm_area_struct * vma,
 	if (newflags & VM_LOCKED) {
 		pages = -pages;
 		ret = make_pages_present(start, end);
+		/* Ran into a hole. This should be an error, but 
+		   some users specify too long lengths e.g. for 
+		   file maps. Ignore it for now.
+		   RED-PEN can locked_vm become negative when this happens? 
+		   Hopefully not. */
+		if (ret == -1) 
+			ret = 0;
 	}
 
 	vma->vm_mm->locked_vm -= pages;

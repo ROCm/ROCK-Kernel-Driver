@@ -116,7 +116,8 @@ __linvfs_write(
 	ssize_t		rval;
 
 	BUG_ON(iocb->ki_pos != pos);
-	if (unlikely(file->f_flags & O_DIRECT)) {
+	/* Kludge for now - unlocked O_DIRECT is still unsafe */
+	if (0 && unlikely(file->f_flags & O_DIRECT)) {
 		ioflags |= IO_ISDIRECT;
 		VOP_WRITE(vp, iocb, &iov, 1, &iocb->ki_pos,
 				ioflags, NULL, rval);
@@ -214,7 +215,8 @@ __linvfs_writev(
 
 	init_sync_kiocb(&kiocb, file);
 	kiocb.ki_pos = *ppos;
-	if (unlikely(file->f_flags & O_DIRECT)) {
+	/* kludge for now - unlocked O_DIRECT is still unsafe */
+	if (0 && unlikely(file->f_flags & O_DIRECT)) {
 		ioflags |= IO_ISDIRECT;
 		VOP_WRITE(vp, &kiocb, iov, nr_segs, &kiocb.ki_pos,
 				ioflags, NULL, rval);

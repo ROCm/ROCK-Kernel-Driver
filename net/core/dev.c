@@ -815,6 +815,78 @@ int dev_change_name(struct net_device *dev, char *newname)
 	return err;
 }
 
+struct dev_tq { 
+	struct work_struct	work;
+	struct net_device	*dev;
+	int			event;
+};
+
+static char *NetEvtStr[16] = {
+	"0000",
+	"up",
+	"down",
+	"reboot",
+	"change",
+	"register",
+	"unregister",
+	"change mtu",
+	"change addr",
+	"going down",
+	"change name",
+	"000B",
+	"000C",
+	"000D",
+	"000E",
+	"000F"
+};
+
+static void netdev_event_callback(void *data)
+{ 
+	struct dev_tq *tq = (struct dev_tq *) data;
+
+	if (0 == rtnl_shlock_nowait()) {
+		notifier_call_chain(&netdev_chain, tq->event, tq->dev);
+		rtnl_shunlock();
+	} else {
+		if (tq->dev->reg_state == NETREG_UNREGISTERED) {
+			printk(KERN_WARNING "%s: task for event %s canceled for device unregister\n",
+				__FUNCTION__, NetEvtStr[0xf & tq->event]);
+		} else {
+			schedule_delayed_work(&tq->work, 1);
+			return; 
+		}
+	}
+	dev_put(tq->dev);
+	kfree(tq);
+} 
+
+/**
+ *	netdev_event - send an event for a network device
+ *	@dev:	pointer to net device
+ *	@event:	event type
+ *
+ *	Send an event about a network device to clients in the stack.
+ *	Can be called from interrupt context.
+ *	Currently useful events:
+ *	NETDEV_REBOOT - A dial-on-demand device hung up.
+ */
+void netdev_event(struct net_device *dev, int event)
+{      
+	struct dev_tq *tq;
+	
+	if (dev->reg_state == NETREG_UNREGISTERED)
+		return;
+	tq = kmalloc(sizeof(*tq), GFP_ATOMIC);
+	if (!tq)
+		return;
+	memset(tq, 0, sizeof(*tq));
+	dev_hold(dev);
+	tq->dev = dev;
+	tq->event = event;
+	INIT_WORK(&tq->work, netdev_event_callback, tq);
+	schedule_work(&tq->work);
+}
+
 /**
  *	netdev_state_change - device changes state
  *	@dev: device to cause notification
@@ -3442,6 +3514,7 @@ EXPORT_SYMBOL(netif_rx);
 EXPORT_SYMBOL(register_gifconf);
 EXPORT_SYMBOL(register_netdevice);
 EXPORT_SYMBOL(register_netdevice_notifier);
+EXPORT_SYMBOL(netdev_event);
 EXPORT_SYMBOL(skb_checksum_help);
 EXPORT_SYMBOL(synchronize_net);
 EXPORT_SYMBOL(unregister_netdevice);
