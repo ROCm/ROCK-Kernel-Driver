@@ -75,11 +75,13 @@ DEFINE_PER_CPU(struct pda_s, pda_percpu);
 
 #define pxm_to_nasid(pxm) ((pxm)<<1)
 
+#define MAX_PHYS_MEMORY		(1UL << 49)     /* 1 TB */
+
 extern void bte_init_node (nodepda_t *, cnodeid_t);
 extern void bte_init_cpu (void);
-extern void sn_timer_init (void);
+extern void sn_timer_init(void);
 extern void (*ia64_mark_idle)(int);
-void snidle(int);
+extern void snidle(int);
 
 unsigned long sn_rtc_cycles_per_second;   
 
@@ -296,12 +298,13 @@ sn_setup(char **cmdline_p)
 	 */
 	sn_check_for_wars();
 
+	ia64_mark_idle = &snidle;
+
 	/* 
 	 * For the bootcpu, we do this here. All other cpus will make the
 	 * call as part of cpu_init in slave cpu initialization.
 	 */
 	sn_cpu_init();
-
 
 #ifdef CONFIG_SMP
 	init_smp_config();
@@ -309,8 +312,6 @@ sn_setup(char **cmdline_p)
 	screen_info = sn_screen_info;
 
 	sn_timer_init();
-
-	ia64_mark_idle = &snidle;
 }
 
 /**
@@ -437,20 +438,4 @@ sn_cpu_init(void)
 	}
 
 	bte_init_cpu();
-}
-
-void snidle(int idleness)
-{
-	if (!idleness) {
-		if (pda->idle_flag == 0) {
-			set_led_bits(0, LED_CPU_ACTIVITY);
-		}
-
-		pda->idle_flag = 1;
-	}
-	else {
-		set_led_bits(LED_CPU_ACTIVITY, LED_CPU_ACTIVITY);
-
-		pda->idle_flag = 0;
-	}
 }

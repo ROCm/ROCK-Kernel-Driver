@@ -382,7 +382,7 @@ iosapic_startup_edge_irq (unsigned int irq)
 static void
 iosapic_ack_edge_irq (unsigned int irq)
 {
-	irq_desc_t *idesc = irq_desc(irq);
+	irq_desc_t *idesc = irq_descp(irq);
 	/*
 	 * Once we have recorded IRQ_PENDING already, we can mask the
 	 * interrupt for real. This prevents IRQ storms from unhandled
@@ -478,7 +478,7 @@ register_intr (unsigned int gsi, int vector, unsigned char delivery,
 	else
 		irq_type = &irq_type_iosapic_level;
 
-	idesc = irq_desc(vector);
+	idesc = irq_descp(vector);
 	if (idesc->handler != irq_type) {
 		if (idesc->handler != &no_irq_type)
 			printk(KERN_WARNING "%s: changing vector %d from %s to %s\n",
@@ -724,7 +724,7 @@ iosapic_parse_prt (void)
 		 * If vector was previously initialized to a different
 		 * handler, re-initialize.
 		 */
-		idesc = irq_desc(vector);
+		idesc = irq_descp(vector);
 		if (idesc->handler != irq_type)
 			register_intr(gsi, vector, IOSAPIC_LOWEST_PRIORITY, IOSAPIC_POL_LOW,
 				      IOSAPIC_LEVEL);

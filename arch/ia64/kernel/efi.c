@@ -46,7 +46,7 @@ static efi_runtime_services_t *runtime;
  * prior to creating their own entries under /proc/efi.
  */
 #ifdef CONFIG_PROC_FS
-struct proc_dir_entry *efi_dir = NULL;
+struct proc_dir_entry *efi_dir;
 #endif
 
 static unsigned long mem_limit = ~0UL;
