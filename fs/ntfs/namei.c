@@ -390,7 +390,7 @@ try_next:
 		goto try_next;
 	fn = (FILE_NAME_ATTR *)((u8 *)attr +
 			le16_to_cpu(attr->data.resident.value_offset));
-	if (unlikely((u8 *)fn + le32_to_cpu(attr->data.resident.value_length) >=
+	if (unlikely((u8 *)fn + le32_to_cpu(attr->data.resident.value_length) >
 			(u8*)attr + le32_to_cpu(attr->length)))
 		goto try_next;
 	/* Get the inode number of the parent directory. */
