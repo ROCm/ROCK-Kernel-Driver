@@ -121,9 +121,10 @@
 /*
  * sctp_protocol.c
  */
-extern sctp_protocol_t sctp_proto;
+extern struct sctp_protocol sctp_proto;
 extern struct sock *sctp_get_ctl_sock(void);
-extern int sctp_copy_local_addr_list(sctp_protocol_t *, sctp_bind_addr_t *,
+extern int sctp_copy_local_addr_list(struct sctp_protocol  *, 
+				     struct sctp_bind_addr *,
 				     sctp_scope_t, int priority, int flags);
 extern struct sctp_pf *sctp_get_pf_specific(sa_family_t family);
 extern int sctp_register_pf(struct sctp_pf *, sa_family_t);
@@ -312,30 +313,21 @@ static inline void sctp_sysctl_unregister(void) { return; }
 #endif
 
 
+/* Size of Supported Address Parameter for 'x' address types. */
+#define SCTP_SAT_LEN(x) (sizeof(struct sctp_paramhdr) + (x) * sizeof(__u16))
+
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 
 extern int sctp_v6_init(void);
 extern void sctp_v6_exit(void);
-
 static inline int sctp_ipv6_addr_type(const struct in6_addr *addr)
 {
 	return ipv6_addr_type((struct in6_addr*) addr);
 }
 
-#define SCTP_SAT_LEN (sizeof(sctp_paramhdr_t) + 2 * sizeof(__u16))
-
-/* Note: These V6 macros are obsolescent.  */
-/* Use this macro to enclose code fragments which are V6-dependent. */
-#define SCTP_V6(m...)	m
-#define SCTP_V6_SUPPORT 1
-
 #else /* #ifdef defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE) */
 
 #define sctp_ipv6_addr_type(a) 0
-#define SCTP_SAT_LEN (sizeof(sctp_paramhdr_t) + 1 * sizeof(__u16))
-#define SCTP_V6(m...) /* Do nothing. */
-#undef SCTP_V6_SUPPORT
-
 static inline int sctp_v6_init(void) { return 0; }
 static inline void sctp_v6_exit(void) { return; }
 
@@ -348,25 +340,10 @@ static inline sctp_assoc_t sctp_assoc2id(const sctp_association_t *asoc)
 	return (sctp_assoc_t) asoc;
 }
 
+
 /* Look up the association by its id.  */
-static inline sctp_association_t *sctp_id2assoc(const struct sock *sk, sctp_assoc_t id)
-{
-	sctp_association_t *asoc = NULL;
+sctp_association_t *sctp_id2assoc(struct sock *sk, sctp_assoc_t id);
 
-	/* First, verify that this is a kernel address. */
-	if (sctp_is_valid_kaddr((unsigned long) id)) {
-		sctp_association_t *temp = (sctp_association_t *) id;
-
-		/* Verify that this _is_ an sctp_association_t
-		 * data structure and if so, that the socket matches.
-		 */
-		if ((SCTP_ASSOC_EYECATCHER == temp->eyecatcher) &&
-		    (temp->base.sk == sk))
-			asoc = temp;
-	}
-
-	return asoc;
-}
 
 /* A macro to walk a list of skbs.  */
 #define sctp_skb_for_each(pos, head, tmp) \
@@ -494,7 +471,7 @@ extern void sctp_put_port(struct sock *sk);
 /* Static inline functions. */
 
 /* Return the SCTP protocol structure. */
-static inline sctp_protocol_t *sctp_get_protocol(void)
+static inline struct sctp_protocol *sctp_get_protocol(void)
 {
 	return &sctp_proto;
 }
@@ -523,21 +500,21 @@ static inline int ipver2af(__u8 ipver)
 /* This is the hash function for the SCTP port hash table. */
 static inline int sctp_phashfn(__u16 lport)
 {
-	sctp_protocol_t *sctp_proto = sctp_get_protocol();
+	struct sctp_protocol *sctp_proto = sctp_get_protocol();
 	return (lport & (sctp_proto->port_hashsize - 1));
 }
 
 /* This is the hash function for the endpoint hash table. */
 static inline int sctp_ep_hashfn(__u16 lport)
 {
-	sctp_protocol_t *sctp_proto = sctp_get_protocol();
+	struct sctp_protocol *sctp_proto = sctp_get_protocol();
 	return (lport & (sctp_proto->ep_hashsize - 1));
 }
 
 /* This is the hash function for the association hash table. */
 static inline int sctp_assoc_hashfn(__u16 lport, __u16 rport)
 {
-	sctp_protocol_t *sctp_proto = sctp_get_protocol();
+	struct sctp_protocol *sctp_proto = sctp_get_protocol();
 	int h = (lport << 16) + rport;
 	h ^= h>>8;
 	return (h & (sctp_proto->assoc_hashsize - 1));
@@ -549,7 +526,7 @@ static inline int sctp_assoc_hashfn(__u16 lport, __u16 rport)
  */
 static inline int sctp_vtag_hashfn(__u16 lport, __u16 rport, __u32 vtag)
 {
-	sctp_protocol_t *sctp_proto = sctp_get_protocol();
+	struct sctp_protocol *sctp_proto = sctp_get_protocol();
 	int h = (lport << 16) + rport;
 	h ^= vtag;
 	return (h & (sctp_proto->assoc_hashsize-1));

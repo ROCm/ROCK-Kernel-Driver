@@ -65,7 +65,7 @@ static void sctp_endpoint_bh_rcv(sctp_endpoint_t *ep);
 /* Create a sctp_endpoint_t with all that boring stuff initialized.
  * Returns NULL if there isn't enough memory.
  */
-sctp_endpoint_t *sctp_endpoint_new(sctp_protocol_t *proto,
+sctp_endpoint_t *sctp_endpoint_new(struct sctp_protocol *proto,
 				   struct sock *sk, int priority)
 {
 	sctp_endpoint_t *ep;
@@ -89,7 +89,8 @@ fail:
 /*
  * Initialize the base fields of the endpoint structure.
  */
-sctp_endpoint_t *sctp_endpoint_init(sctp_endpoint_t *ep, sctp_protocol_t *proto,
+sctp_endpoint_t *sctp_endpoint_init(sctp_endpoint_t *ep, 
+				    struct sctp_protocol *proto,
 				    struct sock *sk, int priority)
 {
 	struct sctp_opt *sp = sctp_sk(sk);
@@ -193,6 +194,8 @@ void sctp_endpoint_free(sctp_endpoint_t *ep)
 void sctp_endpoint_destroy(sctp_endpoint_t *ep)
 {
 	SCTP_ASSERT(ep->base.dead, "Endpoint is not dead", return);
+
+	ep->base.sk->state = SCTP_SS_CLOSED;
 
 	/* Unlink this endpoint, so we can't find it again! */
 	sctp_unhash_endpoint(ep);
