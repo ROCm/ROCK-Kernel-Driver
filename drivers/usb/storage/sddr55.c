@@ -740,8 +740,9 @@ int sddr55_transport(Scsi_Cmnd *srb, struct us_data *us)
 	static unsigned char inquiry_response[8] = {
 		0x00, 0x80, 0x00, 0x02, 0x1F, 0x00, 0x00, 0x00
 	};
-	static unsigned char mode_page_01[16] = { // write-protected for now
-		0x03, 0x00, 0x80, 0x00,
+ 	// write-protected for now, no block descriptor support
+	static unsigned char mode_page_01[20] = {
+		0x0, 0x12, 0x00, 0x80, 0x0, 0x0, 0x0, 0x0,
 		0x01, 0x0A,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 	};
@@ -826,7 +827,8 @@ int sddr55_transport(Scsi_Cmnd *srb, struct us_data *us)
 		 * the fact that only 250 out of every 256 are used */
 		info->max_log_blks = ((info->capacity >> (info->pageshift + info->blockshift)) / 256) * 250;
 
-		/* Last page in the card, adjust as we only use 250 out of every 256 pages */
+		/* Last page in the card, adjust as we only use 250 out of
+		 * every 256 pages */
 		capacity = (capacity / 256) * 250;
 
 		capacity /= PAGESIZE;
@@ -841,28 +843,24 @@ int sddr55_transport(Scsi_Cmnd *srb, struct us_data *us)
 		return USB_STOR_TRANSPORT_GOOD;
 	}
 
-	if (srb->cmnd[0] == MODE_SENSE) {
+	if (srb->cmnd[0] == MODE_SENSE_10) {
 
 		memcpy(ptr, mode_page_01, sizeof mode_page_01);
-		ptr[2] = (info->read_only || info->force_read_only) ? 0x80 : 0;
+		ptr[3] = (info->read_only || info->force_read_only) ? 0x80 : 0;
+		usb_stor_set_xfer_buf(ptr, sizeof(mode_page_01), srb);
 
 		if ( (srb->cmnd[2] & 0x3F) == 0x01 ) {
-
 			US_DEBUGP(
 			  "SDDR55: Dummy up request for mode page 1\n");
-
 			return USB_STOR_TRANSPORT_GOOD;
 
 		} else if ( (srb->cmnd[2] & 0x3F) == 0x3F ) {
-
 			US_DEBUGP(
 			  "SDDR55: Dummy up request for all mode pages\n");
-
 			return USB_STOR_TRANSPORT_GOOD;
 		}
 
 		set_sense_info (5, 0x24, 0);	/* invalid field in command */
-
 		return USB_STOR_TRANSPORT_FAILED;
 	}
 

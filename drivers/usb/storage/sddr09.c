@@ -1387,8 +1387,9 @@ int sddr09_transport(Scsi_Cmnd *srb, struct us_data *us)
 		0x00, 0x80, 0x00, 0x02, 0x1F, 0x00, 0x00, 0x00
 	};
 
-	static unsigned char mode_page_01[16] = {
-		0x0F, 0x00, 0, 0x00,
+	/* note: no block descriptor support */
+	static unsigned char mode_page_01[19] = {
+		0x00, 0x0F, 0x00, 0x0, 0x0, 0x0, 0x00,
 		0x01, 0x0A,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 	};
@@ -1466,7 +1467,7 @@ int sddr09_transport(Scsi_Cmnd *srb, struct us_data *us)
 		return USB_STOR_TRANSPORT_GOOD;
 	}
 
-	if (srb->cmnd[0] == MODE_SENSE) {
+	if (srb->cmnd[0] == MODE_SENSE_10) {
 		int modepage = (srb->cmnd[2] & 0x3F);
 
 		/* They ask for the Read/Write error recovery page,
@@ -1477,8 +1478,8 @@ int sddr09_transport(Scsi_Cmnd *srb, struct us_data *us)
 				  "mode page 0x%x\n", modepage);
 
 			memcpy(ptr, mode_page_01, sizeof(mode_page_01));
-			ptr[0] = sizeof(mode_page_01) - 1;
-			ptr[2] = (info->flags & SDDR09_WP) ? 0x80 : 0;
+			((u16*)ptr)[0] = sizeof(mode_page_01) - 2;
+			ptr[3] = (info->flags & SDDR09_WP) ? 0x80 : 0;
 			usb_stor_set_xfer_buf(ptr, sizeof(mode_page_01), srb);
 			return USB_STOR_TRANSPORT_GOOD;
 		}
@@ -1519,8 +1520,9 @@ int sddr09_transport(Scsi_Cmnd *srb, struct us_data *us)
 		return sddr09_write_data(us, page, pages);
 	}
 
-	// Pass TEST_UNIT_READY and REQUEST_SENSE through
-
+	/* catch-all for all other commands, except
+	 * pass TEST_UNIT_READY and REQUEST_SENSE through
+	 */
 	if (srb->cmnd[0] != TEST_UNIT_READY &&
 	    srb->cmnd[0] != REQUEST_SENSE) {
 		sensekey = 0x05;	/* illegal request */
