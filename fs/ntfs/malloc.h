@@ -26,20 +26,6 @@
 #include <linux/slab.h>
 
 /**
- * vmalloc_nofs - allocate any pages but don't allow calls into fs layer
- * @size:	number of bytes to allocate
- *
- * Allocate any pages but don't allow calls into fs layer. Return allocated
- * memory or NULL if insufficient memory.
- */
-static inline void *vmalloc_nofs(unsigned long size)
-{
-	if (likely(size >> PAGE_SHIFT < num_physpages))
-		return __vmalloc(size, GFP_NOFS | __GFP_HIGHMEM, PAGE_KERNEL);
-	return NULL;
-}
-
-/**
  * ntfs_malloc_nofs - allocate memory in multiples of pages
  * @size	number of bytes to allocate
  *
@@ -66,7 +52,8 @@ static inline void *ntfs_malloc_nofs(unsigned long size)
 
 static inline void ntfs_free(void *addr)
 {
-	if (likely((unsigned long)addr < VMALLOC_START)) {
+	if (likely(((unsigned long)addr < VMALLOC_START) ||
+			((unsigned long)addr >= VMALLOC_END ))) {
 		return kfree(addr);
 		/* return free_page((unsigned long)addr); */
 	}

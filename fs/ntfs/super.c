@@ -852,7 +852,7 @@ volume_failed:
 		ntfs_error(sb, "Failed to load $Volume.");
 		goto iput_lcnbmp_err_out;
 	}
-	m = map_mft_record(READ, NTFS_I(vol->vol_ino));
+	m = map_mft_record(NTFS_I(vol->vol_ino));
 	if (IS_ERR(m)) {
 iput_volume_failed:
 		iput(vol->vol_ino);
@@ -867,7 +867,7 @@ iput_volume_failed:
 err_put_vol:
 		put_attr_search_ctx(ctx);
 get_ctx_vol_failed:
-		unmap_mft_record(READ, NTFS_I(vol->vol_ino));
+		unmap_mft_record(NTFS_I(vol->vol_ino));
 		goto iput_volume_failed;
 	}
 	vi = (VOLUME_INFORMATION*)((char*)ctx->attr +
@@ -882,7 +882,7 @@ get_ctx_vol_failed:
 	vol->major_ver = vi->major_ver;
 	vol->minor_ver = vi->minor_ver;
 	put_attr_search_ctx(ctx);
-	unmap_mft_record(READ, NTFS_I(vol->vol_ino));
+	unmap_mft_record(NTFS_I(vol->vol_ino));
 	printk(KERN_INFO "NTFS volume version %i.%i.\n", vol->major_ver,
 			vol->minor_ver);
 	/*

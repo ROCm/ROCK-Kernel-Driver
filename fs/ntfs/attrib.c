@@ -948,7 +948,7 @@ int map_run_list(ntfs_inode *ni, VCN vcn)
 	else
 		base_ni = ni->_INE(base_ntfs_ino);
 
-	mrec = map_mft_record(READ, base_ni);
+	mrec = map_mft_record(base_ni);
 	if (IS_ERR(mrec))
 		return PTR_ERR(mrec);
 	ctx = get_attr_search_ctx(base_ni, mrec);
@@ -979,7 +979,7 @@ int map_run_list(ntfs_inode *ni, VCN vcn)
 	
 	put_attr_search_ctx(ctx);
 err_out:
-	unmap_mft_record(READ, base_ni);
+	unmap_mft_record(base_ni);
 	return err;
 }
 
@@ -1671,7 +1671,7 @@ void reinit_attr_search_ctx(attr_search_context *ctx)
 		return;
 	} /* Attribute list. */
 	if (ctx->ntfs_ino != ctx->base_ntfs_ino)
-		unmap_mft_record(READ, ctx->ntfs_ino);
+		unmap_mft_record(ctx->ntfs_ino);
 	init_attr_search_ctx(ctx, ctx->base_ntfs_ino, ctx->base_mrec);
 	return;
 }
@@ -1704,7 +1704,7 @@ attr_search_context *get_attr_search_ctx(ntfs_inode *ni, MFT_RECORD *mrec)
 void put_attr_search_ctx(attr_search_context *ctx)
 {
 	if (ctx->base_ntfs_ino && ctx->ntfs_ino != ctx->base_ntfs_ino)
-		unmap_mft_record(READ, ctx->ntfs_ino);
+		unmap_mft_record(ctx->ntfs_ino);
 	kmem_cache_free(ntfs_attr_ctx_cache, ctx);
 	return;
 }
