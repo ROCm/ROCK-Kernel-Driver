@@ -51,7 +51,7 @@ dma_map_page(struct device *dev, struct page *page, unsigned long offset,
 	     size_t size, enum dma_data_direction direction)
 {
 	BUG_ON(direction == DMA_NONE);
-	return (dma_addr_t)(page_to_pfn(page)) * PAGE_SIZE + offset;
+	return page_to_phys(page) + offset;
 }
 
 static inline void
