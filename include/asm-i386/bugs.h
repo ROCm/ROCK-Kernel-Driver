@@ -200,6 +200,8 @@ static void __init check_config(void)
 #endif
 }
 
+extern void alternative_instructions(void);
+
 static void __init check_bugs(void)
 {
 	identify_cpu(&boot_cpu_data);
@@ -212,4 +214,5 @@ static void __init check_bugs(void)
 	check_hlt();
 	check_popad();
 	system_utsname.machine[1] = '0' + (boot_cpu_data.x86 > 6 ? 6 : boot_cpu_data.x86);
+	alternative_instructions(); 
 }
