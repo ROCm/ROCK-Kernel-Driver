@@ -807,7 +807,7 @@ void apply_alternatives(void *start, void *end)
 	struct alt_instr *a; 
 	int diff, i, k;
 
-	for (a = start; a < end; 
+	for (a = start; a < (struct alt_instr *)end; 
 	     a = (void *)ALIGN((unsigned long)(a + 1) + a->instrlen, 4)) { 
 		if (!boot_cpu_has(a->cpuid))
 			continue;
