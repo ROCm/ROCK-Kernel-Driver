@@ -36,8 +36,8 @@
 /* these magic numbers must appear in the symlink file -- this makes it a bit
    more resilient against the magic attributes being set on random files. */
 
-#define NCP_SYMLINK_MAGIC0	le32_to_cpu(0x6c6d7973)     /* "symlnk->" */
-#define NCP_SYMLINK_MAGIC1	le32_to_cpu(0x3e2d6b6e)
+#define NCP_SYMLINK_MAGIC0	cpu_to_le32(0x6c6d7973)     /* "symlnk->" */
+#define NCP_SYMLINK_MAGIC1	cpu_to_le32(0x3e2d6b6e)
 
 /* ----- read a symbolic link ------------------------------------------ */
 

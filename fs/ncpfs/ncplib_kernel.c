@@ -414,7 +414,7 @@ int ncp_obtain_info(struct ncp_server *server, struct inode *dir, char *path,
 	ncp_add_byte(server, 6);	/* subfunction */
 	ncp_add_byte(server, server->name_space[volnum]);
 	ncp_add_byte(server, server->name_space[volnum]); /* N.B. twice ?? */
-	ncp_add_word(server, htons(0x0680));	/* get all */
+	ncp_add_word(server, cpu_to_le16(0x8006));	/* get all */
 	ncp_add_dword(server, RIM_ALL);
 	ncp_add_handle_path(server, volnum, dirent, 1, path);
 
@@ -444,7 +444,7 @@ ncp_obtain_DOS_dir_base(struct ncp_server *server,
 	ncp_add_byte(server, 6); /* subfunction */
 	ncp_add_byte(server, server->name_space[volnum]);
 	ncp_add_byte(server, server->name_space[volnum]);
-	ncp_add_word(server, htons(0x0680)); /* get all */
+	ncp_add_word(server, cpu_to_le16(0x8006)); /* get all */
 	ncp_add_dword(server, RIM_DIRECTORY);
 	ncp_add_handle_path(server, volnum, dirent, 1, path);
 
@@ -517,7 +517,7 @@ ncp_ObtainSpecificDirBase(struct ncp_server *server,
 	ncp_add_byte(server, 6); /* subfunction */
 	ncp_add_byte(server, nsSrc);
 	ncp_add_byte(server, nsDst);
-	ncp_add_word(server, htons(0x0680)); /* get all */
+	ncp_add_word(server, cpu_to_le16(0x8006)); /* get all */
 	ncp_add_dword(server, RIM_ALL);
 	ncp_add_handle_path(server, vol_num, dir_base, 1, path);
 
@@ -631,7 +631,7 @@ int ncp_modify_file_or_subdir_dos_info_path(struct ncp_server *server,
 	ncp_add_byte(server, 7);	/* subfunction */
 	ncp_add_byte(server, server->name_space[volnum]);
 	ncp_add_byte(server, 0);	/* reserved */
-	ncp_add_word(server, htons(0x0680));	/* search attribs: all */
+	ncp_add_word(server, cpu_to_le16(0x8006));	/* search attribs: all */
 
 	ncp_add_dword(server, info_mask);
 	ncp_add_mem(server, info, sizeof(*info));
@@ -714,7 +714,7 @@ ncp_del_file_or_subdir2(struct ncp_server *server,
 	}
 	volnum = NCP_FINFO(inode)->volNumber;
 	dirent = NCP_FINFO(inode)->DosDirNum;
-	return ncp_DeleteNSEntry(server, 1, volnum, dirent, NULL, NW_NS_DOS, htons(0x0680));
+	return ncp_DeleteNSEntry(server, 1, volnum, dirent, NULL, NW_NS_DOS, cpu_to_le16(0x8006));
 }
 
 int
@@ -731,11 +731,11 @@ ncp_del_file_or_subdir(struct ncp_server *server,
  
  		result=ncp_obtain_DOS_dir_base(server, volnum, dirent, name, &dirent);
  		if (result) return result;
- 		return ncp_DeleteNSEntry(server, 1, volnum, dirent, NULL, NW_NS_DOS, htons(0x0680));
+ 		return ncp_DeleteNSEntry(server, 1, volnum, dirent, NULL, NW_NS_DOS, cpu_to_le16(0x8006));
  	}
  	else
 #endif	/* CONFIG_NCPFS_NFS_NS */
- 		return ncp_DeleteNSEntry(server, 1, volnum, dirent, name, server->name_space[volnum], htons(0x0680));
+ 		return ncp_DeleteNSEntry(server, 1, volnum, dirent, name, server->name_space[volnum], cpu_to_le16(0x8006));
 }
 
 static inline void ConvertToNWfromDWORD(__u32 sfd, __u8 ret[6])
@@ -755,7 +755,7 @@ int ncp_open_create_file_or_subdir(struct ncp_server *server,
 				   int desired_acc_rights,
 				   struct ncp_entry_info *target)
 {
-	__u16 search_attribs = ntohs(0x0600);
+	__u16 search_attribs = cpu_to_le16(0x0006);
 	__u8  volnum;
 	__u32 dirent;
 	int result;
@@ -764,7 +764,7 @@ int ncp_open_create_file_or_subdir(struct ncp_server *server,
 	dirent = NCP_FINFO(dir)->dirEntNum;
 
 	if ((create_attributes & aDIR) != 0) {
-		search_attribs |= ntohs(0x0080);
+		search_attribs |= cpu_to_le16(0x8000);
 	}
 	ncp_init_request(server);
 	ncp_add_byte(server, 1);	/* subfunction */
@@ -833,7 +833,7 @@ int ncp_search_for_file_or_subdir(struct ncp_server *server,
 	ncp_add_byte(server, 3);	/* subfunction */
 	ncp_add_byte(server, server->name_space[seq->volNumber]);
 	ncp_add_byte(server, 0);	/* data stream (???) */
-	ncp_add_word(server, htons(0x0680));	/* Search attribs */
+	ncp_add_word(server, cpu_to_le16(0x8006));	/* Search attribs */
 	ncp_add_dword(server, RIM_ALL);		/* return info mask */
 	ncp_add_mem(server, seq, 9);
 #ifdef CONFIG_NCPFS_NFS_NS
@@ -877,7 +877,7 @@ int ncp_search_for_fileset(struct ncp_server *server,
 	ncp_add_byte(server, 20);
 	ncp_add_byte(server, server->name_space[seq->volNumber]);
 	ncp_add_byte(server, 0);		/* datastream */
-	ncp_add_word(server, htons(0x0680));
+	ncp_add_word(server, cpu_to_le16(0x8006));
 	ncp_add_dword(server, RIM_ALL);
 	ncp_add_word(server, 32767);		/* max returned items */
 	ncp_add_mem(server, seq, 9);
@@ -955,14 +955,14 @@ int ncp_ren_or_mov_file_or_subdir(struct ncp_server *server,
 				struct inode *new_dir, char *new_name)
 {
         int result;
-        int old_type = htons(0x0600);
+        int old_type = cpu_to_le16(0x06);
 
 /* If somebody can do it atomic, call me... vandrove@vc.cvut.cz */
 	result = ncp_RenameNSEntry(server, old_dir, old_name, old_type,
 	                                   new_dir, new_name);
         if (result == 0xFF)	/* File Not Found, try directory */
 	{
-		old_type = htons(0x1600);
+		old_type = cpu_to_le16(0x16);
 		result = ncp_RenameNSEntry(server, old_dir, old_name, old_type,
 						   new_dir, new_name);
 	}
