@@ -84,17 +84,16 @@ extern int ia64_pfn_valid (unsigned long pfn);
 #endif
 
 #ifndef CONFIG_DISCONTIGMEM
-# ifdef CONFIG_VIRTUAL_MEM_MAP
+# define pfn_valid(pfn)		(((pfn) < max_mapnr) && ia64_pfn_valid(pfn))
+# define page_to_pfn(page)	((unsigned long) (page - mem_map))
+# define pfn_to_page(pfn)	(mem_map + (pfn))
+#else
 extern struct page *vmem_map;
-#  define pfn_valid(pfn)	(((pfn) < max_mapnr) && ia64_pfn_valid(pfn))
-#  define page_to_pfn(page)	((unsigned long) (page - vmem_map))
-#  define pfn_to_page(pfn)	(vmem_map + (pfn))
-# else
-#  define pfn_valid(pfn)	(((pfn) < max_mapnr) && ia64_pfn_valid(pfn))
-#  define page_to_pfn(page)	((unsigned long) (page - mem_map))
-#  define pfn_to_page(pfn)	(mem_map + (pfn))
-# endif
-#endif /* CONFIG_DISCONTIGMEM */
+extern unsigned long max_low_pfn;
+# define pfn_valid(pfn)		(((pfn) < max_low_pfn) && ia64_pfn_valid(pfn))
+# define page_to_pfn(page)	((unsigned long) (page - vmem_map))
+# define pfn_to_page(pfn)	(vmem_map + (pfn))
+#endif
 
 #define page_to_phys(page)	(page_to_pfn(page) << PAGE_SHIFT)
 #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
