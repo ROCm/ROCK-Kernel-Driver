@@ -973,6 +973,8 @@ direct_io_worker(int rw, struct kiocb *iocb, struct inode *inode,
 	isize = i_size_read(inode);
 	if (bytes_todo > (isize - offset))
 		bytes_todo = isize - offset;
+	if (!bytes_todo)
+		return 0;
 
 	for (seg = 0; seg < nr_segs && bytes_todo; seg++) {
 		user_addr = (unsigned long)iov[seg].iov_base;
