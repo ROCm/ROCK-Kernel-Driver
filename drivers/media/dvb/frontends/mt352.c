@@ -63,14 +63,6 @@ static int mt352_single_write(struct dvb_frontend *fe, u8 reg, u8 val)
 	u8 buf[2] = { reg, val };
 	struct i2c_msg msg = { .addr = state->config->demod_address, .flags = 0,
 			       .buf = buf, .len = 2 };
-	if (debug) {
-		int i;
-		printk("%s:",__FUNCTION__);
-		for (i = 0; i < ilen; i++)
-			printk(" %02x",ibuf[i]);
-		printk("\n");
-	}
-	
 	int err = i2c_transfer(state->i2c, &msg, 1);
 	if (err != 1) {
 		printk(KERN_WARNING
@@ -84,6 +76,14 @@ static int mt352_single_write(struct dvb_frontend *fe, u8 reg, u8 val)
 int mt352_write(struct dvb_frontend* fe, u8* ibuf, int ilen)
 {
 	int err,i;
+
+	if (debug) {
+		printk("%s:",__FUNCTION__);
+		for (i = 0; i < ilen; i++)
+			printk(" %02x",ibuf[i]);
+		printk("\n");
+	}
+	
 	for (i=0; i < ilen-1; i++)
 		if ((err = mt352_single_write(fe,ibuf[0]+i,ibuf[i+1]))) 
 			return err;
