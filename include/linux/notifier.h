@@ -58,5 +58,7 @@ extern int notifier_call_chain(struct notifier_block **n, unsigned long val, voi
 #define SYS_HALT	0x0002	/* Notify of system halt */
 #define SYS_POWER_OFF	0x0003	/* Notify of system power off */
 
+#define NETLINK_URELEASE	0x0001	/* Unicast netlink socket released */
+
 #endif /* __KERNEL__ */
 #endif /* _LINUX_NOTIFIER_H */

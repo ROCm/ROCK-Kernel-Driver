@@ -226,7 +226,7 @@ static ssize_t partition_device_kdev_read(struct device *driverfs_dev,
 			char *page, size_t count, loff_t off)
 {
 	kdev_t kdev; 
-	kdev.value=(int)driverfs_dev->driver_data;
+	kdev.value=(int)(long)driverfs_dev->driver_data;
 	return off ? 0 : sprintf (page, "%x\n",kdev.value);
 }
 static struct driver_file_entry partition_device_kdev_file = {
@@ -285,7 +285,7 @@ void driverfs_create_partitions(struct gendisk *hd, int minor)
 			current_driverfs_dev->parent = parent;
 			/* handle disc case */
 			current_driverfs_dev->driver_data =
-					(void *)__mkdev(hd->major, minor+part);
+					(void *)(long)__mkdev(hd->major, minor+part);
 			if (part == 0) {
 				if (parent)  {
 					sprintf(current_driverfs_dev->name,
