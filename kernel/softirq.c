@@ -410,11 +410,9 @@ static int __devinit cpu_callback(struct notifier_block *nfb,
 
 static struct notifier_block cpu_nfb = { &cpu_callback, NULL, 0 };
 
-static __init int spawn_ksoftirqd(void)
+__init int spawn_ksoftirqd(void)
 {
 	cpu_callback(&cpu_nfb, CPU_ONLINE, (void *)smp_processor_id());
 	register_cpu_notifier(&cpu_nfb);
 	return 0;
 }
-
-__initcall(spawn_ksoftirqd);

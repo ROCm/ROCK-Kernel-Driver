@@ -1894,6 +1894,8 @@ static int migration_call(struct notifier_block *nfb,
 		       (long)hcpu);
 		kernel_thread(migration_thread, hcpu,
 			      CLONE_FS | CLONE_FILES | CLONE_SIGNAL);
+		while (!cpu_rq((long)hcpu)->migration_thread)
+			yield();
 		break;
 	}
 	return NOTIFY_OK;
@@ -1901,7 +1903,7 @@ static int migration_call(struct notifier_block *nfb,
 
 static struct notifier_block migration_notifier = { &migration_call, NULL, 0 };
 
-int __init migration_init(void)
+__init int migration_init(void)
 {
 	/* Start one for boot CPU. */
 	migration_call(&migration_notifier, CPU_ONLINE,
@@ -1910,7 +1912,6 @@ int __init migration_init(void)
 	return 0;
 }
 
-__initcall(migration_init);
 #endif
 
 extern void init_timervecs(void);

@@ -524,6 +524,15 @@ static void __init do_basic_setup(void)
 	do_initcalls();
 }
 
+static void do_pre_smp_initcalls(void)
+{
+	extern int migration_init(void);
+	extern int spawn_ksoftirqd(void);
+
+	migration_init();
+	spawn_ksoftirqd();
+}
+
 extern void prepare_namespace(void);
 
 static int init(void * unused)
@@ -533,6 +542,9 @@ static int init(void * unused)
 	lock_kernel();
 	/* Sets up cpus_possible() */
 	smp_prepare_cpus(max_cpus);
+
+	do_pre_smp_initcalls();
+
 	smp_init();
 	do_basic_setup();
 
