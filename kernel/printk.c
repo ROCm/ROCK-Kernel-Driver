@@ -28,6 +28,7 @@
 #include <linux/config.h>
 #include <linux/delay.h>
 #include <linux/smp.h>
+#include <linux/security.h>
 
 #include <asm/uaccess.h>
 
@@ -161,6 +162,10 @@ int do_syslog(int type, char * buf, int len)
 	char c;
 	int error = 0;
 
+	error = security_syslog(type);
+	if (error)
+		return error;
+
 	switch (type) {
 	case 0:		/* Close log */
 		break;
@@ -273,8 +278,6 @@ out:
 
 asmlinkage long sys_syslog(int type, char * buf, int len)
 {
-	if ((type != 3) && !capable(CAP_SYS_ADMIN))
-		return -EPERM;
 	return do_syslog(type, buf, len);
 }
 
