@@ -46,7 +46,7 @@ void cfb_imageblit(struct fb_info *p, struct fb_image *image)
 	int pad, ppw, shift, shift_right, shift_left, x2, y2, n, i, j, k, l = 7;
 	unsigned long tmp = ~0 << (BITS_PER_LONG - p->var.bits_per_pixel);
 	unsigned long fgx, bgx, fgcolor, bgcolor, eorx;	
-	unsigned long end_index, end_mask, mask;
+	unsigned long end_index, end_mask;
 	unsigned long *dst = NULL;
 	u8 *dst1, *src;
 
@@ -89,24 +89,45 @@ void cfb_imageblit(struct fb_info *p, struct fb_image *image)
 		eorx = fgx ^ bgx;
 		n = ((image->width + 7) >> 3);
 		pad = (n << 3) - image->width;
+		n = image->width % ppw;
 
 		for (i = 0; i < image->height; i++) {
 			dst = (unsigned long *) dst1;
 		
 			for (j = image->width/ppw; j > 0; j--) {
-				mask = 0;
+				end_mask = 0;
 		
 				for (k = ppw; k > 0; k--) {	
 					if (test_bit(l, src))
-						mask |= (tmp >> (p->var.bits_per_pixel*(k-1)));
+						end_mask |= (tmp >> (p->var.bits_per_pixel*(k-1)));
 					l--;
 					if (l < 0) { l = 7; src++; }
 				}
-				fb_writel((mask & eorx)^bgx, dst);
+				fb_writel((end_mask & eorx)^bgx, dst);
 				dst++;
 			}
-			l =- pad;		
+		
+			if (n) {	
+				for (j = n; j > 0; j--) {
+					end_mask = 0;
+	
+					if (test_bit(l, src))
+						end_mask |= (tmp >> (p->var.bits_per_pixel*(k-1)));
+					l--;
+					if (l < 0) { l = 7; src++; }
+				}
+				fb_writel((end_mask & eorx)^bgx, dst);
+				dst++;
+			}
+			l -= pad;		
 			dst1 += p->fix.line_length;	
 		}	
+	} else {
+		/* Draw the penguin */
+		n = ((image->width * p->var.bits_per_pixel) >> 3);
+		//shift = ((unsigned long) dst1 & (bpl -1));		
+		end_mask = 0;
+	
+	//	n = n/bpl;
 	}
 }
