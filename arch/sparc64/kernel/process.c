@@ -579,26 +579,26 @@ barf:
 	do_exit(SIGILL);
 }
 
-asmlinkage int sparc_do_fork(unsigned long clone_flags,
-			     unsigned long stack_start,
-			     struct pt_regs *regs,
-			     unsigned long stack_size)
+asmlinkage long sparc_do_fork(unsigned long clone_flags,
+			      unsigned long stack_start,
+			      struct pt_regs *regs,
+			      unsigned long stack_size)
 {
-	unsigned long parent_tid_ptr, child_tid_ptr;
+	int __user *parent_tid_ptr, *child_tid_ptr;
 
 	clone_flags &= ~CLONE_IDLETASK;
 
-	parent_tid_ptr = regs->u_regs[UREG_I2];
-	child_tid_ptr = regs->u_regs[UREG_I4];
 	if (test_thread_flag(TIF_32BIT)) {
-		parent_tid_ptr &= 0xffffffff;
-		child_tid_ptr &= 0xffffffff;
+		parent_tid_ptr = compat_ptr(regs->u_regs[UREG_I2]);
+		child_tid_ptr = compat_ptr(regs->u_regs[UREG_I4]);
+	} else {
+		parent_tid_ptr = (int __user *) regs->u_regs[UREG_I2];
+		child_tid_ptr = (int __user *) regs->u_regs[UREG_I4];
 	}
 
 	return do_fork(clone_flags, stack_start,
 		       regs, stack_size,
-		       (int __user *) parent_tid_ptr,
-		       (int __user *) child_tid_ptr);
+		       parent_tid_ptr, child_tid_ptr);
 }
 
 /* Copy a Sparc thread.  The fork() return value conventions

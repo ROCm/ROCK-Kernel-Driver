@@ -59,8 +59,6 @@
 #define dma_unmap_single(d,h,s,dir) sbus_unmap_single(d,h,s,dir)
 #define dma_map_sg(d,s,n,dir) sbus_map_sg(d,s,n,dir)
 #define dma_unmap_sg(d,s,n,dir) sbus_unmap_sg(d,s,n,dir)
-#define scsi_to_fc_dma_dir(dir)	scsi_to_sbus_dma_dir(dir)
-#define FC_DMA_BIDIRECTIONAL	SBUS_DMA_BIDIRECTIONAL
 #else
 #define dma_alloc_consistent(d,s,p) pci_alloc_consistent(d,s,p)
 #define dma_free_consistent(d,s,v,h) pci_free_consistent(d,s,v,h)
@@ -68,8 +66,6 @@
 #define dma_unmap_single(d,h,s,dir) pci_unmap_single(d,h,s,dir)
 #define dma_map_sg(d,s,n,dir) pci_map_sg(d,s,n,dir)
 #define dma_unmap_sg(d,s,n,dir) pci_unmap_sg(d,s,n,dir)
-#define scsi_to_fc_dma_dir(dir)	scsi_to_pci_dma_dir(dir)
-#define FC_DMA_BIDIRECTIONAL	PCI_DMA_BIDIRECTIONAL
 #endif							       
 
 #define FCP_CMND(SCpnt) ((fcp_cmnd *)&(SCpnt->SCp))
@@ -167,7 +163,7 @@ static void fcp_login_done(fc_channel *fc, int i, int status)
 			fcmd = l->fcmds + i;
 			plogi = l->logi + 3 * i;
 			dma_unmap_single (fc->dev, fcmd->cmd, 3 * sizeof(logi),
-					  FC_DMA_BIDIRECTIONAL);
+					  DMA_BIDIRECTIONAL);
 			plogi->code = LS_PLOGI;
 			memcpy (&plogi->nport_wwn, &fc->wwn_nport, sizeof(fc_wwn));
 			memcpy (&plogi->node_wwn, &fc->wwn_node, sizeof(fc_wwn));
@@ -188,7 +184,7 @@ static void fcp_login_done(fc_channel *fc, int i, int status)
 			}
 #endif			
 			fcmd->cmd = dma_map_single (fc->dev, plogi, 3 * sizeof(logi),
-						    FC_DMA_BIDIRECTIONAL);
+						    DMA_BIDIRECTIONAL);
 			fcmd->rsp = fcmd->cmd + 2 * sizeof(logi);
 			if (fc->hw_enque (fc, fcmd))
 				printk ("FC: Cannot enque PLOGI packet on %s\n", fc->name);
@@ -212,7 +208,7 @@ static void fcp_login_done(fc_channel *fc, int i, int status)
 		case FC_STATUS_OK:
 			plogi = l->logi + 3 * i;
 			dma_unmap_single (fc->dev, l->fcmds[i].cmd, 3 * sizeof(logi),
-					  FC_DMA_BIDIRECTIONAL);
+					  DMA_BIDIRECTIONAL);
 			if (!fc->wwn_dest.lo && !fc->wwn_dest.hi) {
 				memcpy (&fc->wwn_dest, &plogi[1].node_wwn, sizeof(fc_wwn)); 
 				FCD(("Dest WWN %08x%08x\n", *(u32 *)&fc->wwn_dest, fc->wwn_dest.lo))
@@ -231,7 +227,7 @@ static void fcp_login_done(fc_channel *fc, int i, int status)
 		case FC_STATUS_ERR_OFFLINE:
 			fc->state = FC_STATE_OFFLINE;
 			dma_unmap_single (fc->dev, l->fcmds[i].cmd, 3 * sizeof(logi),
-					  FC_DMA_BIDIRECTIONAL);
+					  DMA_BIDIRECTIONAL);
 			printk ("%s: FC is offline\n", fc->name);
 			if (atomic_dec_and_test (&l->todo))
 				up(&l->sem);
@@ -256,7 +252,7 @@ static void fcp_report_map_done(fc_channel *fc, int i, int status)
 	switch (status) {
 	case FC_STATUS_OK: /* Ok, let's have a fun on a loop */
 		dma_unmap_single (fc->dev, l->fcmds[i].cmd, 3 * sizeof(logi),
-				  FC_DMA_BIDIRECTIONAL);
+				  DMA_BIDIRECTIONAL);
 		p = (fc_al_posmap *)(l->logi + 3 * i);
 #ifdef FCDEBUG
 		{
@@ -306,7 +302,7 @@ static void fcp_report_map_done(fc_channel *fc, int i, int status)
 		FCD(("SID %d DID %d\n", fc->sid, fc->did))
 		fcmd = l->fcmds + i;
 		dma_unmap_single(fc->dev, fcmd->cmd, 3 * sizeof(logi),
-				 FC_DMA_BIDIRECTIONAL);
+				 DMA_BIDIRECTIONAL);
 		fch = &fcmd->fch;
 		memset(l->logi + 3 * i, 0, 3 * sizeof(logi));
 		FILL_FCHDR_RCTL_DID(fch, R_CTL_ELS_REQ, FS_FABRIC_F_PORT);
@@ -317,7 +313,7 @@ static void fcp_report_map_done(fc_channel *fc, int i, int status)
 		fch->param = 0;
 		l->logi [3 * i].code = LS_FLOGI;
 		fcmd->cmd = dma_map_single (fc->dev, l->logi + 3 * i, 3 * sizeof(logi),
-					    FC_DMA_BIDIRECTIONAL);
+					    DMA_BIDIRECTIONAL);
 		fcmd->rsp = fcmd->cmd + sizeof(logi);
 		fcmd->cmdlen = sizeof(logi);
 		fcmd->rsplen = sizeof(logi);
@@ -434,11 +430,12 @@ static inline void fcp_scsi_receive(fc_channel *fc, int token, int status, fc_hd
 		
 		if (fcmd->data) {
 			if (SCpnt->use_sg)
-				dma_unmap_sg(fc->dev, (struct scatterlist *)SCpnt->buffer, SCpnt->use_sg,
-					     scsi_to_fc_dma_dir(SCpnt->sc_data_direction));
+				dma_unmap_sg(fc->dev, (struct scatterlist *)SCpnt->buffer,
+						SCpnt->use_sg,
+						SCpnt->sc_data_direction);
 			else
 				dma_unmap_single(fc->dev, fcmd->data, SCpnt->request_bufflen,
-						 scsi_to_fc_dma_dir(SCpnt->sc_data_direction));
+						 SCpnt->sc_data_direction);
 		}
 		break;
 	default:
@@ -579,7 +576,7 @@ int fcp_initialize(fc_channel *fcchain, int count)
 		fc->ls = (void *)l;
 		/* Assumes sizeof(fc_al_posmap) < 3 * sizeof(logi), which is true */
 		fcmd->cmd = dma_map_single (fc->dev, l->logi + 3 * i, 3 * sizeof(logi),
-					    FC_DMA_BIDIRECTIONAL);
+					    DMA_BIDIRECTIONAL);
 		fcmd->proto = PROTO_REPORT_AL_MAP;
 		fcmd->token = i;
 		fcmd->fc = fc;
@@ -598,7 +595,7 @@ int fcp_initialize(fc_channel *fcchain, int count)
 				} else {
 					fc->state = FC_STATE_OFFLINE;
 					enable_irq(fc->irq);
-					dma_unmap_single (fc->dev, l->fcmds[i].cmd, 3 * sizeof(logi), FC_DMA_BIDIRECTIONAL);
+					dma_unmap_single (fc->dev, l->fcmds[i].cmd, 3 * sizeof(logi), DMA_BIDIRECTIONAL);
 					if (atomic_dec_and_test (&l->todo))
 						goto all_done;
 				}
@@ -615,7 +612,7 @@ int fcp_initialize(fc_channel *fcchain, int count)
 
 				FCD(("SID %d DID %d\n", fc->sid, fc->did))
 				fcmd = l->fcmds + i;
-				dma_unmap_single(fc->dev, fcmd->cmd, 3 * sizeof(logi), FC_DMA_BIDIRECTIONAL);
+				dma_unmap_single(fc->dev, fcmd->cmd, 3 * sizeof(logi), DMA_BIDIRECTIONAL);
 				fch = &fcmd->fch;
 				FILL_FCHDR_RCTL_DID(fch, R_CTL_ELS_REQ, FS_FABRIC_F_PORT);
 				FILL_FCHDR_SID(fch, 0);
@@ -624,7 +621,7 @@ int fcp_initialize(fc_channel *fcchain, int count)
 				FILL_FCHDR_OXRX(fch, 0xffff, 0xffff);
 				fch->param = 0;
 				l->logi [3 * i].code = LS_FLOGI;
-				fcmd->cmd = dma_map_single (fc->dev, l->logi + 3 * i, 3 * sizeof(logi), FC_DMA_BIDIRECTIONAL);
+				fcmd->cmd = dma_map_single (fc->dev, l->logi + 3 * i, 3 * sizeof(logi), DMA_BIDIRECTIONAL);
 				fcmd->rsp = fcmd->cmd + sizeof(logi);
 				fcmd->cmdlen = sizeof(logi);
 				fcmd->rsplen = sizeof(logi);
@@ -652,7 +649,7 @@ all_done:
 		switch (fc->state) {
 		case FC_STATE_ONLINE: break;
 		case FC_STATE_OFFLINE: break;
-		default: dma_unmap_single (fc->dev, l->fcmds[i].cmd, 3 * sizeof(logi), FC_DMA_BIDIRECTIONAL);
+		default: dma_unmap_single (fc->dev, l->fcmds[i].cmd, 3 * sizeof(logi), DMA_BIDIRECTIONAL);
 			break;
 		}
 	}
@@ -821,14 +818,14 @@ static int fcp_scsi_queue_it(fc_channel *fc, Scsi_Cmnd *SCpnt, fcp_cmnd *fcmd, i
 				cmd->fcp_data_len = SCpnt->request_bufflen;
 				fcmd->data = dma_map_single (fc->dev, (char *)SCpnt->request_buffer,
 							     SCpnt->request_bufflen,
-							     scsi_to_fc_dma_dir(SCpnt->sc_data_direction));
+							     SCpnt->sc_data_direction);
 			} else {
 				struct scatterlist *sg = (struct scatterlist *)SCpnt->buffer;
 				int nents;
 
 				FCD(("XXX: Use_sg %d %d\n", SCpnt->use_sg, sg->length))
 				nents = dma_map_sg (fc->dev, sg, SCpnt->use_sg,
-						    scsi_to_fc_dma_dir(SCpnt->sc_data_direction));
+						    SCpnt->sc_data_direction);
 				if (nents > 1) printk ("%s: SG for nents %d (use_sg %d) not handled yet\n", fc->name, nents, SCpnt->use_sg);
 				fcmd->data = sg_dma_address(sg);
 				cmd->fcp_data_len = sg_dma_len(sg);
@@ -1065,7 +1062,7 @@ static int fc_do_els(fc_channel *fc, unsigned int alpa, void *data, int len)
 	FILL_FCHDR_SEQ_DF_SEQ(fch, 0, 0, 0);
 	FILL_FCHDR_OXRX(fch, 0xffff, 0xffff);
 	fch->param = 0;
-	fcmd->cmd = dma_map_single (fc->dev, data, 2 * len, FC_DMA_BIDIRECTIONAL);
+	fcmd->cmd = dma_map_single (fc->dev, data, 2 * len, DMA_BIDIRECTIONAL);
 	fcmd->rsp = fcmd->cmd + len;
 	fcmd->cmdlen = len;
 	fcmd->rsplen = len;
@@ -1100,7 +1097,7 @@ static int fc_do_els(fc_channel *fc, unsigned int alpa, void *data, int len)
 	
 	clear_bit(fcmd->token, fc->scsi_bitmap);
 	fc->scsi_free++;
-	dma_unmap_single (fc->dev, fcmd->cmd, 2 * len, FC_DMA_BIDIRECTIONAL);
+	dma_unmap_single (fc->dev, fcmd->cmd, 2 * len, DMA_BIDIRECTIONAL);
 	return l.status;
 }
 

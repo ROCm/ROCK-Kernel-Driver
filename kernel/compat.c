@@ -399,8 +399,8 @@ asmlinkage long compat_sys_sched_setaffinity(compat_pid_t pid,
 	return ret;
 }
 
-asmlinkage int compat_sys_sched_getaffinity(compat_pid_t pid, unsigned int len,
-					   compat_ulong_t __user *user_mask_ptr)
+asmlinkage long compat_sys_sched_getaffinity(compat_pid_t pid, unsigned int len,
+					     compat_ulong_t __user *user_mask_ptr)
 {
 	unsigned long kernel_mask;
 	mm_segment_t old_fs;

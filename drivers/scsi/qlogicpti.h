@@ -8,6 +8,17 @@
 
 #include <linux/config.h>
 
+/* #include "scsi.h" */
+#include <scsi/scsi_cmnd.h>
+#include <scsi/scsi_device.h>
+#include <scsi/scsi_eh.h>
+#include <scsi/scsi_request.h>
+#include <scsi/scsi_tcq.h>
+#include <scsi/scsi.h>
+#include <scsi/scsi_host.h>
+
+#define scsi_to_sbus_dma_dir(scsi_dir)	((int)(scsi_dir))
+
 /* Qlogic/SBUS controller registers. */
 #define SBUS_CFG1	0x006UL
 #define SBUS_CTRL	0x008UL
@@ -352,7 +363,7 @@ struct qlogicpti {
 	 * Ex000 sparc64 machines with >4GB of ram we just keep track of the
 	 * scsi command pointers here.  This is essentially what Matt Jacob does. -DaveM
 	 */
-	Scsi_Cmnd                *cmd_slots[QLOGICPTI_REQ_QUEUE_LEN + 1];
+	struct scsi_cmnd         *cmd_slots[QLOGICPTI_REQ_QUEUE_LEN + 1];
 
 	/* The rest of the elements are unimportant for performance. */
 	struct qlogicpti         *next;

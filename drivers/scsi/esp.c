@@ -26,8 +26,6 @@
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>
 
-#include "scsi.h"
-#include "hosts.h"
 #include "esp.h"
 
 #include <asm/sbus.h>
@@ -366,7 +364,7 @@ static char *phase_string(int phase)
 }
 
 #ifdef DEBUG_STATE_MACHINE
-static inline void esp_advance_phase(Scsi_Cmnd *s, int newphase)
+static inline void esp_advance_phase(struct scsi_cmnd *s, int newphase)
 {
 	ESPLOG(("<%s>", phase_string(newphase)));
 	s->SCp.sent_command = s->SCp.phase;
@@ -419,48 +417,48 @@ static inline void esp_cmd(struct esp *esp, u8 cmd)
  * Note that these are per-ESP queues, not global queues like
  * the aha152x driver uses.
  */
-static inline void append_SC(Scsi_Cmnd **SC, Scsi_Cmnd *new_SC)
+static inline void append_SC(struct scsi_cmnd **SC, struct scsi_cmnd *new_SC)
 {
-	Scsi_Cmnd *end;
+	struct scsi_cmnd *end;
 
 	new_SC->host_scribble = (unsigned char *) NULL;
 	if (!*SC)
 		*SC = new_SC;
 	else {
-		for (end=*SC;end->host_scribble;end=(Scsi_Cmnd *)end->host_scribble)
+		for (end=*SC;end->host_scribble;end=(struct scsi_cmnd *)end->host_scribble)
 			;
 		end->host_scribble = (unsigned char *) new_SC;
 	}
 }
 
-static inline void prepend_SC(Scsi_Cmnd **SC, Scsi_Cmnd *new_SC)
+static inline void prepend_SC(struct scsi_cmnd **SC, struct scsi_cmnd *new_SC)
 {
 	new_SC->host_scribble = (unsigned char *) *SC;
 	*SC = new_SC;
 }
 
-static inline Scsi_Cmnd *remove_first_SC(Scsi_Cmnd **SC)
+static inline struct scsi_cmnd *remove_first_SC(struct scsi_cmnd **SC)
 {
-	Scsi_Cmnd *ptr;
+	struct scsi_cmnd *ptr;
 	ptr = *SC;
 	if (ptr)
-		*SC = (Scsi_Cmnd *) (*SC)->host_scribble;
+		*SC = (struct scsi_cmnd *) (*SC)->host_scribble;
 	return ptr;
 }
 
-static inline Scsi_Cmnd *remove_SC(Scsi_Cmnd **SC, int target, int lun)
+static inline struct scsi_cmnd *remove_SC(struct scsi_cmnd **SC, int target, int lun)
 {
-	Scsi_Cmnd *ptr, *prev;
+	struct scsi_cmnd *ptr, *prev;
 
 	for (ptr = *SC, prev = NULL;
 	     ptr && ((ptr->device->id != target) || (ptr->device->lun != lun));
-	     prev = ptr, ptr = (Scsi_Cmnd *) ptr->host_scribble)
+	     prev = ptr, ptr = (struct scsi_cmnd *) ptr->host_scribble)
 		;
 	if (ptr) {
 		if (prev)
 			prev->host_scribble=ptr->host_scribble;
 		else
-			*SC=(Scsi_Cmnd *)ptr->host_scribble;
+			*SC=(struct scsi_cmnd *)ptr->host_scribble;
 	}
 	return ptr;
 }
@@ -1062,7 +1060,7 @@ static void __init esp_init_swstate(struct esp *esp)
 	esp->prev_hme_dmacsr = 0xffffffff;
 }
 
-static int __init detect_one_esp(Scsi_Host_Template *tpnt, struct sbus_dev *esp_dev,
+static int __init detect_one_esp(struct scsi_host_template *tpnt, struct sbus_dev *esp_dev,
 				 struct sbus_dev *espdma, struct sbus_bus *sbus,
 				 int id, int hme)
 {
@@ -1137,7 +1135,7 @@ fail_unlink:
 
 #include <asm/sun4paddr.h>
 
-static int __init esp_detect(Scsi_Host_Template *tpnt)
+static int __init esp_detect(struct scsi_host_template *tpnt)
 {
 	static struct sbus_dev esp_dev;
 	int esps_in_use = 0;
@@ -1162,7 +1160,7 @@ static int __init esp_detect(Scsi_Host_Template *tpnt)
 
 #else /* !CONFIG_SUN4 */
 
-static int __init esp_detect(Scsi_Host_Template *tpnt)
+static int __init esp_detect(struct scsi_host_template *tpnt)
 {
 	struct sbus_bus *sbus;
 	struct sbus_dev *esp_dev, *sbdev_iter;
@@ -1428,7 +1426,7 @@ static int esp_proc_info(struct Scsi_Host *host, char *buffer, char **start, off
 	return esp_host_info(esp, buffer, offset, length);
 }
 
-static void esp_get_dmabufs(struct esp *esp, Scsi_Cmnd *sp)
+static void esp_get_dmabufs(struct esp *esp, struct scsi_cmnd *sp)
 {
 	if (sp->use_sg == 0) {
 		sp->SCp.this_residual = sp->request_bufflen;
@@ -1437,7 +1435,7 @@ static void esp_get_dmabufs(struct esp *esp, Scsi_Cmnd *sp)
 		if (sp->request_bufflen) {
 			sp->SCp.have_data_in = sbus_map_single(esp->sdev, sp->SCp.buffer,
 							       sp->SCp.this_residual,
-							       scsi_to_sbus_dma_dir(sp->sc_data_direction));
+							       sp->sc_data_direction);
 			sp->SCp.ptr = (char *) ((unsigned long)sp->SCp.have_data_in);
 		} else {
 			sp->SCp.ptr = NULL;
@@ -1447,26 +1445,26 @@ static void esp_get_dmabufs(struct esp *esp, Scsi_Cmnd *sp)
 		sp->SCp.buffers_residual = sbus_map_sg(esp->sdev,
 						       sp->SCp.buffer,
 						       sp->use_sg,
-						       scsi_to_sbus_dma_dir(sp->sc_data_direction));
+						       sp->sc_data_direction);
 		sp->SCp.this_residual = sg_dma_len(sp->SCp.buffer);
 		sp->SCp.ptr = (char *) ((unsigned long)sg_dma_address(sp->SCp.buffer));
 	}
 }
 
-static void esp_release_dmabufs(struct esp *esp, Scsi_Cmnd *sp)
+static void esp_release_dmabufs(struct esp *esp, struct scsi_cmnd *sp)
 {
 	if (sp->use_sg) {
 		sbus_unmap_sg(esp->sdev, sp->buffer, sp->use_sg,
-			      scsi_to_sbus_dma_dir(sp->sc_data_direction));
+			      sp->sc_data_direction);
 	} else if (sp->request_bufflen) {
 		sbus_unmap_single(esp->sdev,
 				  sp->SCp.have_data_in,
 				  sp->request_bufflen,
-				  scsi_to_sbus_dma_dir(sp->sc_data_direction));
+				  sp->sc_data_direction);
 	}
 }
 
-static void esp_restore_pointers(struct esp *esp, Scsi_Cmnd *sp)
+static void esp_restore_pointers(struct esp *esp, struct scsi_cmnd *sp)
 {
 	struct esp_pointers *ep = &esp->data_pointers[sp->device->id];
 
@@ -1476,7 +1474,7 @@ static void esp_restore_pointers(struct esp *esp, Scsi_Cmnd *sp)
 	sp->SCp.buffers_residual = ep->saved_buffers_residual;
 }
 
-static void esp_save_pointers(struct esp *esp, Scsi_Cmnd *sp)
+static void esp_save_pointers(struct esp *esp, struct scsi_cmnd *sp)
 {
 	struct esp_pointers *ep = &esp->data_pointers[sp->device->id];
 
@@ -1506,7 +1504,7 @@ static void esp_save_pointers(struct esp *esp, Scsi_Cmnd *sp)
  * case where we could see an interrupt is where we have disconnected
  * commands active and they are trying to reselect us.
  */
-static inline void esp_check_cmd(struct esp *esp, Scsi_Cmnd *sp)
+static inline void esp_check_cmd(struct esp *esp, struct scsi_cmnd *sp)
 {
 	switch (sp->cmd_len) {
 	case 6:
@@ -1557,8 +1555,8 @@ static inline void build_wide_nego_msg(struct esp *esp, int size)
 
 static void esp_exec_cmd(struct esp *esp)
 {
-	Scsi_Cmnd *SCptr;
-	Scsi_Device *SDptr;
+	struct scsi_cmnd *SCptr;
+	struct scsi_device *SDptr;
 	struct esp_device *esp_dev;
 	volatile u8 *cmdp = esp->esp_command;
 	u8 the_esp_command;
@@ -1834,7 +1832,7 @@ after_nego_msg_built:
 }
 
 /* Queue a SCSI command delivered from the mid-level Linux SCSI code. */
-static int esp_queue(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
+static int esp_queue(struct scsi_cmnd *SCpnt, void (*done)(struct scsi_cmnd *))
 {
 	struct esp *esp;
 
@@ -1871,7 +1869,7 @@ static int esp_queue(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 }
 
 /* Dump driver state. */
-static void esp_dump_cmd(Scsi_Cmnd *SCptr)
+static void esp_dump_cmd(struct scsi_cmnd *SCptr)
 {
 	ESPLOG(("[tgt<%02x> lun<%02x> "
 		"pphase<%s> cphase<%s>]",
@@ -1882,7 +1880,7 @@ static void esp_dump_cmd(Scsi_Cmnd *SCptr)
 
 static void esp_dump_state(struct esp *esp)
 {
-	Scsi_Cmnd *SCptr = esp->current_SC;
+	struct scsi_cmnd *SCptr = esp->current_SC;
 #ifdef DEBUG_ESP_CMDS
 	int i;
 #endif
@@ -1921,13 +1919,13 @@ static void esp_dump_state(struct esp *esp)
 	ESPLOG(("esp%d: disconnected ", esp->esp_id));
 	while (SCptr) {
 		esp_dump_cmd(SCptr);
-		SCptr = (Scsi_Cmnd *) SCptr->host_scribble;
+		SCptr = (struct scsi_cmnd *) SCptr->host_scribble;
 	}
 	ESPLOG(("\n"));
 }
 
 /* Abort a command.  The host_lock is acquired by caller. */
-static int esp_abort(Scsi_Cmnd *SCptr)
+static int esp_abort(struct scsi_cmnd *SCptr)
 {
 	struct esp *esp = (struct esp *) SCptr->device->host->hostdata;
 	int don;
@@ -1957,14 +1955,14 @@ static int esp_abort(Scsi_Cmnd *SCptr)
 		ESP_INTSOFF(esp->dregs);
 	}
 	if (esp->issue_SC) {
-		Scsi_Cmnd **prev, *this;
+		struct scsi_cmnd **prev, *this;
 		for (prev = (&esp->issue_SC), this = esp->issue_SC;
 		     this != NULL;
-		     prev = (Scsi_Cmnd **) &(this->host_scribble),
-			     this = (Scsi_Cmnd *) this->host_scribble) {
+		     prev = (struct scsi_cmnd **) &(this->host_scribble),
+			     this = (struct scsi_cmnd *) this->host_scribble) {
 
 			if (this == SCptr) {
-				*prev = (Scsi_Cmnd *) this->host_scribble;
+				*prev = (struct scsi_cmnd *) this->host_scribble;
 				this->host_scribble = NULL;
 
 				esp_release_dmabufs(esp, this);
@@ -2010,7 +2008,7 @@ static int esp_abort(Scsi_Cmnd *SCptr)
  */
 static int esp_finish_reset(struct esp *esp)
 {
-	Scsi_Cmnd *sp = esp->current_SC;
+	struct scsi_cmnd *sp = esp->current_SC;
 
 	/* Clean up currently executing command, if any. */
 	if (sp != NULL) {
@@ -2059,7 +2057,7 @@ static int esp_do_resetbus(struct esp *esp)
  *
  * The host_lock is acquired by caller.
  */
-static int esp_reset(Scsi_Cmnd *SCptr)
+static int esp_reset(struct scsi_cmnd *SCptr)
 {
 	struct esp *esp = (struct esp *) SCptr->device->host->hostdata;
 
@@ -2077,7 +2075,7 @@ static int esp_reset(Scsi_Cmnd *SCptr)
 /* Internal ESP done function. */
 static void esp_done(struct esp *esp, int error)
 {
-	Scsi_Cmnd *done_SC = esp->current_SC;
+	struct scsi_cmnd *done_SC = esp->current_SC;
 
 	esp->current_SC = NULL;
 
@@ -2168,7 +2166,7 @@ static inline void hme_fifo_push(struct esp *esp, u8 *bytes, u8 count)
 /* We try to avoid some interrupts by jumping ahead and see if the ESP
  * has gotten far enough yet.  Hence the following.
  */
-static inline int skipahead1(struct esp *esp, Scsi_Cmnd *scp,
+static inline int skipahead1(struct esp *esp, struct scsi_cmnd *scp,
 			     int prev_phase, int new_phase)
 {
 	if (scp->SCp.sent_command != prev_phase)
@@ -2202,7 +2200,7 @@ static inline int skipahead1(struct esp *esp, Scsi_Cmnd *scp,
 	return do_intr_end;
 }
 
-static inline int skipahead2(struct esp *esp, Scsi_Cmnd *scp,
+static inline int skipahead2(struct esp *esp, struct scsi_cmnd *scp,
 			     int prev_phase1, int prev_phase2, int new_phase)
 {
 	if (scp->SCp.sent_command != prev_phase1 &&
@@ -2318,7 +2316,7 @@ static inline void dma_flashclear(struct esp *esp)
 	dma_invalidate(esp);
 }
 
-static int dma_can_transfer(struct esp *esp, Scsi_Cmnd *sp)
+static int dma_can_transfer(struct esp *esp, struct scsi_cmnd *sp)
 {
 	__u32 base, end, sz;
 
@@ -2379,7 +2377,7 @@ static int dma_can_transfer(struct esp *esp, Scsi_Cmnd *sp)
  * tell the ESP to eat the extraneous byte so that we can proceed
  * to the next phase.
  */
-static int esp100_sync_hwbug(struct esp *esp, Scsi_Cmnd *sp, int fifocnt)
+static int esp100_sync_hwbug(struct esp *esp, struct scsi_cmnd *sp, int fifocnt)
 {
 	/* Do not touch this piece of code. */
 	if ((!(esp->erev == esp100)) ||
@@ -2479,7 +2477,7 @@ static inline int reconnect_lun(struct esp *esp)
 /* This puts the driver in a state where it can revitalize a command that
  * is being continued due to reselection.
  */
-static inline void esp_connect(struct esp *esp, Scsi_Cmnd *sp)
+static inline void esp_connect(struct esp *esp, struct scsi_cmnd *sp)
 {
 	struct esp_device *esp_dev = sp->device->hostdata;
 
@@ -2502,7 +2500,7 @@ static inline void esp_connect(struct esp *esp, Scsi_Cmnd *sp)
 /* This will place the current working command back into the issue queue
  * if we are to receive a reselection amidst a selection attempt.
  */
-static inline void esp_reconnect(struct esp *esp, Scsi_Cmnd *sp)
+static inline void esp_reconnect(struct esp *esp, struct scsi_cmnd *sp)
 {
 	if (!esp->disconnected_SC)
 		ESPLOG(("esp%d: Weird, being reselected but disconnected "
@@ -2540,7 +2538,7 @@ static inline int esp_bytes_sent(struct esp *esp, int fifo_count)
 	return rval - fifo_count;
 }
 
-static inline void advance_sg(Scsi_Cmnd *sp)
+static inline void advance_sg(struct scsi_cmnd *sp)
 {
 	++sp->SCp.buffer;
 	--sp->SCp.buffers_residual;
@@ -2568,7 +2566,7 @@ static inline void advance_sg(Scsi_Cmnd *sp)
  */
 static int esp_do_data(struct esp *esp)
 {
-	Scsi_Cmnd *SCptr = esp->current_SC;
+	struct scsi_cmnd *SCptr = esp->current_SC;
 	int thisphase, hmuch;
 
 	ESPDATA(("esp_do_data: "));
@@ -2619,7 +2617,7 @@ static int esp_do_data(struct esp *esp)
 /* See how successful the data transfer was. */
 static int esp_do_data_finale(struct esp *esp)
 {
-	Scsi_Cmnd *SCptr = esp->current_SC;
+	struct scsi_cmnd *SCptr = esp->current_SC;
 	struct esp_device *esp_dev = SCptr->device->hostdata;
 	int bogus_data = 0, bytes_sent = 0, fifocnt, ecount = 0;
 
@@ -2800,7 +2798,7 @@ static int esp_do_data_finale(struct esp *esp)
  * a tape, we don't want to go into a loop re-negotiating
  * synchronous capabilities over and over.
  */
-static int esp_should_clear_sync(Scsi_Cmnd *sp)
+static int esp_should_clear_sync(struct scsi_cmnd *sp)
 {
 	u8 cmd1 = sp->cmnd[0];
 	u8 cmd2 = sp->data_cmnd[0];
@@ -2834,7 +2832,7 @@ static int esp_should_clear_sync(Scsi_Cmnd *sp)
  */
 static int esp_do_freebus(struct esp *esp)
 {
-	Scsi_Cmnd *SCptr = esp->current_SC;
+	struct scsi_cmnd *SCptr = esp->current_SC;
 	struct esp_device *esp_dev = SCptr->device->hostdata;
 	int rval;
 
@@ -2905,7 +2903,7 @@ static int esp_do_freebus(struct esp *esp)
  */
 static int esp_bad_reconnect(struct esp *esp)
 {
-	Scsi_Cmnd *sp;
+	struct scsi_cmnd *sp;
 
 	ESPLOG(("esp%d: Eieeee, reconnecting unknown command!\n",
 		esp->esp_id));
@@ -2914,7 +2912,7 @@ static int esp_bad_reconnect(struct esp *esp)
 	ESPLOG(("esp%d: issue_SC[", esp->esp_id));
 	while (sp) {
 		ESPLOG(("<%02x,%02x>", sp->device->id, sp->device->lun));
-		sp = (Scsi_Cmnd *) sp->host_scribble;
+		sp = (struct scsi_cmnd *) sp->host_scribble;
 	}
 	ESPLOG(("]\n"));
 	sp = esp->current_SC;
@@ -2928,7 +2926,7 @@ static int esp_bad_reconnect(struct esp *esp)
 	ESPLOG(("esp%d: disconnected_SC[", esp->esp_id));
 	while (sp) {
 		ESPLOG(("<%02x,%02x>", sp->device->id, sp->device->lun));
-		sp = (Scsi_Cmnd *) sp->host_scribble;
+		sp = (struct scsi_cmnd *) sp->host_scribble;
 	}
 	ESPLOG(("]\n"));
 	return do_reset_bus;
@@ -2938,7 +2936,7 @@ static int esp_bad_reconnect(struct esp *esp)
 static int esp_do_reconnect(struct esp *esp)
 {
 	int lun, target;
-	Scsi_Cmnd *SCptr;
+	struct scsi_cmnd *SCptr;
 
 	/* Check for all bogus conditions first. */
 	target = reconnect_target(esp);
@@ -2988,7 +2986,7 @@ static int esp_do_reconnect(struct esp *esp)
  */
 static int esp_do_status(struct esp *esp)
 {
-	Scsi_Cmnd *SCptr = esp->current_SC;
+	struct scsi_cmnd *SCptr = esp->current_SC;
 	int intr, rval;
 
 	rval = skipahead1(esp, SCptr, in_the_dark, in_status);
@@ -3133,7 +3131,7 @@ static int esp_enter_status(struct esp *esp)
 
 static int esp_disconnect_amidst_phases(struct esp *esp)
 {
-	Scsi_Cmnd *sp = esp->current_SC;
+	struct scsi_cmnd *sp = esp->current_SC;
 	struct esp_device *esp_dev = sp->device->hostdata;
 
 	/* This means real problems if we see this
@@ -3226,7 +3224,7 @@ static int esp_do_phase_determine(struct esp *esp)
 /* First interrupt after exec'ing a cmd comes here. */
 static int esp_select_complete(struct esp *esp)
 {
-	Scsi_Cmnd *SCptr = esp->current_SC;
+	struct scsi_cmnd *SCptr = esp->current_SC;
 	struct esp_device *esp_dev = SCptr->device->hostdata;
 	int cmd_bytes_sent, fcnt;
 
@@ -3582,7 +3580,7 @@ static int check_singlebyte_msg(struct esp *esp)
  * this because so many initiators cannot cope with this occurring.
  */
 static int target_with_ants_in_pants(struct esp *esp,
-				     Scsi_Cmnd *SCptr,
+				     struct scsi_cmnd *SCptr,
 				     struct esp_device *esp_dev)
 {
 	if (esp_dev->sync || SCptr->device->borken) {
@@ -3641,7 +3639,7 @@ static void sync_report(struct esp *esp)
 
 static int check_multibyte_msg(struct esp *esp)
 {
-	Scsi_Cmnd *SCptr = esp->current_SC;
+	struct scsi_cmnd *SCptr = esp->current_SC;
 	struct esp_device *esp_dev = SCptr->device->hostdata;
 	u8 regval = 0;
 	int message_out = 0;
@@ -3822,7 +3820,7 @@ finish:
 
 static int esp_do_msgindone(struct esp *esp)
 {
-	Scsi_Cmnd *SCptr = esp->current_SC;
+	struct scsi_cmnd *SCptr = esp->current_SC;
 	int message_out = 0, it = 0, rval;
 
 	rval = skipahead1(esp, SCptr, in_msgin, in_msgindone);
@@ -3904,7 +3902,7 @@ static int esp_do_msgindone(struct esp *esp)
 
 static int esp_do_cmdbegin(struct esp *esp)
 {
-	Scsi_Cmnd *SCptr = esp->current_SC;
+	struct scsi_cmnd *SCptr = esp->current_SC;
 
 	esp_advance_phase(SCptr, in_cmdend);
 	if (esp->erev == fashme) {
@@ -4125,7 +4123,7 @@ static espfunc_t bus_vector[] = {
 /* This is the second tier in our dual-level SCSI state machine. */
 static int esp_work_bus(struct esp *esp)
 {
-	Scsi_Cmnd *SCptr = esp->current_SC;
+	struct scsi_cmnd *SCptr = esp->current_SC;
 	unsigned int phase;
 
 	ESPBUS(("esp_work_bus: "));
@@ -4153,7 +4151,7 @@ static espfunc_t isvc_vector[] = {
 /* Main interrupt handler for an esp adapter. */
 static void esp_handle(struct esp *esp)
 {
-	Scsi_Cmnd *SCptr;
+	struct scsi_cmnd *SCptr;
 	int what_next = do_intr_end;
 
 	SCptr = esp->current_SC;
@@ -4353,7 +4351,7 @@ static irqreturn_t esp_intr(int irq, void *dev_id, struct pt_regs *pregs)
 	return IRQ_HANDLED;
 }
 
-static int esp_slave_alloc(Scsi_Device *SDptr)
+static int esp_slave_alloc(struct scsi_device *SDptr)
 {
 	struct esp_device *esp_dev =
 		kmalloc(sizeof(struct esp_device), GFP_ATOMIC);
@@ -4365,7 +4363,7 @@ static int esp_slave_alloc(Scsi_Device *SDptr)
 	return 0;
 }
 
-static void esp_slave_destroy(Scsi_Device *SDptr)
+static void esp_slave_destroy(struct scsi_device *SDptr)
 {
 	struct esp *esp = (struct esp *) SDptr->host->hostdata;
 
@@ -4374,7 +4372,7 @@ static void esp_slave_destroy(Scsi_Device *SDptr)
 	SDptr->hostdata = NULL;
 }
 
-static Scsi_Host_Template driver_template = {
+static struct scsi_host_template driver_template = {
 	.proc_name		= "esp",
 	.proc_info		= esp_proc_info,
 	.name			= "Sun ESP 100/100a/200",
