@@ -43,15 +43,16 @@ static struct tt_internal *get_target_type(const char *name)
 	struct tt_internal *ti;
 
 	read_lock(&_lock);
-	ti = __find_target_type(name);
-	if (ti && ti->use == 0) {
-		if (try_module_get(ti->tt.module))
-			ti->use++;
-		else
-			ti = NULL;
-	}
-	read_unlock(&_lock);
 
+	ti = __find_target_type(name);
+	if (ti) {
+		if ((ti->use == 0) && !try_module_get(ti->tt.module))
+			ti = NULL;
+		else
+			ti->use++;
+	}
+
+	read_unlock(&_lock);
 	return ti;
 }
 
