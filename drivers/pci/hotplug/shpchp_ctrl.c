@@ -396,7 +396,7 @@ static struct pci_resource *do_pre_bridge_resource_split (struct pci_resource **
 		/* This one isn't an aligned length, so we'll make a new entry
 		 * and split it up.
 		 */
-		split_node = (struct pci_resource*) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
+		split_node = kmalloc(sizeof(*split_node), GFP_KERNEL);
 
 		if (!split_node)
 			return(NULL);
@@ -530,7 +530,7 @@ static struct pci_resource *get_io_resource (struct pci_resource **head, u32 siz
 			if ((node->length - (temp_dword - node->base)) < size)
 				continue;
 
-			split_node = (struct pci_resource*) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
+			split_node = kmalloc(sizeof(*split_node), GFP_KERNEL);
 
 			if (!split_node)
 				return(NULL);
@@ -549,7 +549,7 @@ static struct pci_resource *get_io_resource (struct pci_resource **head, u32 siz
 		if (node->length > size) {
 			/* This one is longer than we need
 			   so we'll make a new entry and split it up */
-			split_node = (struct pci_resource*) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
+			split_node = kmalloc(sizeof(*split_node), GFP_KERNEL);
 
 			if (!split_node)
 				return(NULL);
@@ -630,7 +630,7 @@ static struct pci_resource *get_max_resource (struct pci_resource **head, u32 si
 			if ((max->length - (temp_dword - max->base)) < size)
 				continue;
 
-			split_node = (struct pci_resource*) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
+			split_node = kmalloc(sizeof(*split_node), GFP_KERNEL);
 
 			if (!split_node)
 				return(NULL);
@@ -648,7 +648,7 @@ static struct pci_resource *get_max_resource (struct pci_resource **head, u32 si
 		if ((max->base + max->length) & (size - 1)) {
 			/* This one isn't end aligned properly at the top
 			   so we'll make a new entry and split it up */
-			split_node = (struct pci_resource*) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
+			split_node = kmalloc(sizeof(*split_node), GFP_KERNEL);
 
 			if (!split_node)
 				return(NULL);
@@ -669,7 +669,8 @@ static struct pci_resource *get_max_resource (struct pci_resource **head, u32 si
 
 		for ( i = 0; max_size[i] > size; i++) {
 			if (max->length > max_size[i]) {
-				split_node = (struct pci_resource *) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
+				split_node = kmalloc(sizeof(*split_node),
+							GFP_KERNEL);
 				if (!split_node)
 					break;	/* return (NULL); */
 				split_node->base = max->base + max_size[i];
@@ -744,7 +745,7 @@ static struct pci_resource *get_resource (struct pci_resource **head, u32 size)
 			if ((node->length - (temp_dword - node->base)) < size)
 				continue;
 
-			split_node = (struct pci_resource*) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
+			split_node = kmalloc(sizeof(*split_node), GFP_KERNEL);
 
 			if (!split_node)
 				return(NULL);
@@ -764,7 +765,7 @@ static struct pci_resource *get_resource (struct pci_resource **head, u32 size)
 			dbg("%s: too big\n", __FUNCTION__);
 			/* this one is longer than we need
 			   so we'll make a new entry and split it up */
-			split_node = (struct pci_resource*) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
+			split_node = kmalloc(sizeof(*split_node), GFP_KERNEL);
 
 			if (!split_node)
 				return(NULL);
@@ -882,7 +883,7 @@ struct pci_func *shpchp_slot_create(u8 busnumber)
 	struct pci_func *new_slot;
 	struct pci_func *next;
 
-	new_slot = (struct pci_func *) kmalloc(sizeof(struct pci_func), GFP_KERNEL);
+	new_slot = kmalloc(sizeof(*new_slot), GFP_KERNEL);
 
 	if (new_slot == NULL) {
 		return(new_slot);
@@ -1856,7 +1857,7 @@ static int update_slot_info (struct slot *slot)
 	struct hotplug_slot_info *info;
 	int result;
 
-	info = kmalloc (sizeof (struct hotplug_slot_info), GFP_KERNEL);
+	info = kmalloc(sizeof(*info), GFP_KERNEL);
 	if (!info)
 		return -ENOMEM;
 
@@ -2504,20 +2505,16 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 		/* Make copies of the nodes we are going to pass down so that
 		 * if there is a problem,we can just use these to free resources
 		 */
-		hold_bus_node = (struct pci_resource *) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
-		hold_IO_node = (struct pci_resource *) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
-		hold_mem_node = (struct pci_resource *) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
-		hold_p_mem_node = (struct pci_resource *) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
+		hold_bus_node = kmalloc(sizeof(*hold_bus_node), GFP_KERNEL);
+		hold_IO_node = kmalloc(sizeof(*hold_IO_node), GFP_KERNEL);
+		hold_mem_node = kmalloc(sizeof(*hold_mem_node), GFP_KERNEL);
+		hold_p_mem_node = kmalloc(sizeof(*hold_p_mem_node), GFP_KERNEL);
 
 		if (!hold_bus_node || !hold_IO_node || !hold_mem_node || !hold_p_mem_node) {
-			if (hold_bus_node)
-				kfree(hold_bus_node);
-			if (hold_IO_node)
-				kfree(hold_IO_node);
-			if (hold_mem_node)
-				kfree(hold_mem_node);
-			if (hold_p_mem_node)
-				kfree(hold_p_mem_node);
+			kfree(hold_bus_node);
+			kfree(hold_IO_node);
+			kfree(hold_mem_node);
+			kfree(hold_p_mem_node);
 
 			return(1);
 		}
