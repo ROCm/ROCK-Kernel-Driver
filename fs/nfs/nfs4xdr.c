@@ -321,7 +321,7 @@ encode_attrs(struct xdr_stream *xdr, struct iattr *iap)
 	 * Now we backfill the bitmap and the attribute buffer length.
 	 */
 	if (len != ((char *)p - (char *)q) + 4) {
-		printk ("encode_attr: Attr length calculation error! %u != %u\n",
+		printk ("encode_attr: Attr length calculation error! %u != %Zu\n",
 				len, ((char *)p - (char *)q) + 4);
 		BUG();
 	}
