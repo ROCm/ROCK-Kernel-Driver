@@ -48,6 +48,7 @@ const unsigned char scsi_command_size[8] =
 static int blk_do_rq(request_queue_t *q, struct block_device *bdev, 
 		     struct request *rq)
 {
+	char sense[SCSI_SENSE_BUFFERSIZE];
 	DECLARE_COMPLETION(wait);
 	int err = 0;
 
@@ -58,6 +59,12 @@ static int blk_do_rq(request_queue_t *q, struct block_device *bdev,
 	 * it after io completion
 	 */
 	rq->ref_count++;
+
+	if (!rq->sense) {
+		memset(sense, 0, sizeof(sense));
+		rq->sense = sense;
+		rq->sense_len = 0;
+	}
 
 	rq->flags |= REQ_NOMERGE;
 	rq->waiting = &wait;
