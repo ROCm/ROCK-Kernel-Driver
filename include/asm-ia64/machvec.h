@@ -69,7 +69,11 @@ typedef unsigned short ia64_mv_readw_relaxed_t (void *);
 typedef unsigned int ia64_mv_readl_relaxed_t (void *);
 typedef unsigned long ia64_mv_readq_relaxed_t (void *);
 
-extern void machvec_noop (void);
+static inline void
+machvec_noop (void)
+{
+}
+
 extern void machvec_setup (char **);
 extern void machvec_timer_interrupt (int, void *, struct pt_regs *);
 extern void machvec_dma_sync_single (struct device *, dma_addr_t, size_t, int);

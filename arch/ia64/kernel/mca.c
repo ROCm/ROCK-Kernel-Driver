@@ -247,7 +247,9 @@ ia64_mca_log_sal_error_record(int sal_info_type)
 	u8 *buffer;
 	u64 size;
 	int irq_safe = sal_info_type != SAL_INFO_TYPE_MCA && sal_info_type != SAL_INFO_TYPE_INIT;
+#ifdef IA64_MCA_DEBUG_INFO
 	static const char * const rec_name[] = { "MCA", "INIT", "CMC", "CPE" };
+#endif
 
 	size = ia64_log_get(sal_info_type, &buffer, irq_safe);
 	if (!size)
@@ -596,7 +598,7 @@ ia64_mca_cmc_vector_disable (void *dummy)
 	cmcv = (cmcv_reg_t)ia64_getreg(_IA64_REG_CR_CMCV);
 
 	cmcv.cmcv_mask = 1; /* Mask/disable interrupt */
-	ia64_setreg(_IA64_REG_CR_CMCV, cmcv.cmcv_regval)
+	ia64_setreg(_IA64_REG_CR_CMCV, cmcv.cmcv_regval);
 
 	IA64_MCA_DEBUG("%s: CPU %d corrected "
 		       "machine check vector %#x disabled.\n",
@@ -623,7 +625,7 @@ ia64_mca_cmc_vector_enable (void *dummy)
 	cmcv = (cmcv_reg_t)ia64_getreg(_IA64_REG_CR_CMCV);
 
 	cmcv.cmcv_mask = 0; /* Unmask/enable interrupt */
-	ia64_setreg(_IA64_REG_CR_CMCV, cmcv.cmcv_regval)
+	ia64_setreg(_IA64_REG_CR_CMCV, cmcv.cmcv_regval);
 
 	IA64_MCA_DEBUG("%s: CPU %d corrected "
 		       "machine check vector %#x enabled.\n",
