@@ -270,6 +270,27 @@ acpi_scan_rsdp (
 	return 0;
 }
 
+#ifdef CONFIG_HPET_TIMER
+extern unsigned long hpet_address;
+
+static int __init acpi_parse_hpet(unsigned long phys, unsigned long size)
+{
+	struct acpi_table_hpet *hpet_tbl;
+
+	hpet_tbl = __va(phys);
+
+	if (hpet_tbl->addr.space_id != ACPI_SPACE_MEM) {
+		printk(KERN_WARNING PREFIX "HPET timers must be located in "
+		       "memory.\n");
+		return -1;
+	}
+
+	hpet_address = hpet_tbl->addr.addrl;
+	printk(KERN_INFO PREFIX "HPET id: %#x base: %#lx\n", hpet_tbl->id,
+	       hpet_address);
+	return 0;
+}
+#endif
 
 unsigned long __init
 acpi_find_rsdp (void)
@@ -458,6 +479,9 @@ acpi_boot_init (void)
 		smp_found_config = 1;
 		clustered_apic_check();
 	}
+#endif
+#ifdef CONFIG_HPET_TIMER
+	acpi_table_parse(ACPI_HPET, acpi_parse_hpet);
 #endif
 
 	return 0;
