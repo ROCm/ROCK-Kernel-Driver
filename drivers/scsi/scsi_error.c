@@ -431,8 +431,6 @@ static int scsi_send_eh_cmnd(struct scsi_cmnd *scmd, int timeout)
 	unsigned long flags;
 	int rtn = SUCCESS;
 
-	ASSERT_LOCK(host->host_lock, 0);
-
 	/*
 	 * we will use a queued command if possible, otherwise we will
 	 * emulate the queuing and calling of completion function ourselves.
@@ -1405,8 +1403,6 @@ static void scsi_restart_operations(struct Scsi_Host *shost)
 	struct scsi_device *sdev;
 	unsigned long flags;
 
-	ASSERT_LOCK(shost->host_lock, 0);
-
 	/*
 	 * If the door was locked, we need to insert a door lock request
 	 * onto the head of the SCSI request queue for the device.  There
@@ -1434,18 +1430,11 @@ static void scsi_restart_operations(struct Scsi_Host *shost)
 	 * now that error recovery is done, we will need to ensure that these
 	 * requests are started.
 	 */
-	spin_lock_irqsave(shost->host_lock, flags);
 	list_for_each_entry(sdev, &shost->my_devices, siblings) {
-		if ((shost->can_queue > 0 &&
-		     (shost->host_busy >= shost->can_queue))
-		    || (shost->host_blocked)
-		    || (shost->host_self_blocked)) {
-			break;
-		}
-
+		spin_lock_irqsave(sdev->request_queue->queue_lock, flags);
 		__blk_run_queue(sdev->request_queue);
+		spin_unlock_irqrestore(sdev->request_queue->queue_lock, flags);
 	}
-	spin_unlock_irqrestore(shost->host_lock, flags);
 }
 
 /**

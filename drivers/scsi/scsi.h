@@ -418,7 +418,7 @@ extern void scsi_io_completion(Scsi_Cmnd * SCpnt, int good_sectors,
 			       int block_sectors);
 extern int scsi_queue_insert(struct scsi_cmnd *cmd, int reason);
 extern void scsi_queue_next_request(request_queue_t *q, struct scsi_cmnd *cmd);
-extern request_queue_t *scsi_alloc_queue(struct Scsi_Host *shost);
+extern request_queue_t *scsi_alloc_queue(struct scsi_device *sdev);
 extern void scsi_free_queue(request_queue_t *q);
 extern int scsi_init_queue(void);
 extern void scsi_exit_queue(void);
@@ -554,6 +554,7 @@ struct scsi_device {
 	struct Scsi_Host *host;
 	request_queue_t *request_queue;
 	volatile unsigned short device_busy;	/* commands actually active on low-level */
+	spinlock_t sdev_lock;           /* also the request queue_lock */
 	spinlock_t list_lock;
 	struct list_head cmd_list;	/* queue of in use SCSI Command structures */
 	struct list_head starved_entry;

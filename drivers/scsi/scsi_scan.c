@@ -415,7 +415,8 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 	 */
 	sdev->borken = 1;
 
-	sdev->request_queue = scsi_alloc_queue(shost);
+	spin_lock_init(&sdev->sdev_lock);
+	sdev->request_queue = scsi_alloc_queue(sdev);
 	if (!sdev->request_queue)
 		goto out_free_dev;
 

@@ -620,7 +620,6 @@ void scsi_host_busy_dec_and_test(struct Scsi_Host *shost, Scsi_Device *sdev)
 
 	spin_lock_irqsave(shost->host_lock, flags);
 	shost->host_busy--;
-	sdev->device_busy--;
 	if (shost->in_recovery && shost->host_failed &&
 	    (shost->host_busy == shost->host_failed))
 	{
