@@ -1533,7 +1533,6 @@ void unregister_serial(int line)
 }
 	
 module_init(rs68328_init);
-/* DAVIDM module_exit(rs68328_fini); */
 
 
 

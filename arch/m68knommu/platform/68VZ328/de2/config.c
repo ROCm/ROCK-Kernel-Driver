@@ -36,7 +36,7 @@
 #define TICKS_PER_JIFFY 41450
 
 static void
-dragen2_sched_init(void (*timer_routine) (int, void *, struct pt_regs *))
+dragen2_sched_init(irqreturn_t (*timer_routine) (int, void *, struct pt_regs *))
 {
 	/* disable timer 1 */
 	TCTL = 0;
@@ -183,14 +183,20 @@ static void init_hardware(void)
 #endif
 }
 
-void config_BSP(char *command, int len)
+void config_BSP(char *command, int size)
 {
 	printk("68VZ328 DragonBallVZ support (c) 2001 Lineo, Inc.\n");
-	command[0] = '\0';			/* no specific boot option */
+
+#if defined(CONFIG_BOOTPARAM)
+	strncpy(command, CONFIG_BOOTPARAM_STRING, size);
+	command[size-1] = 0;
+#else
+	memset(command, 0, size);
+#endif
 
 	init_hardware();
 
-	mach_sched_init = dragen2_sched_init;
+	mach_sched_init = (void *)dragen2_sched_init;
 	mach_tick = dragen2_tick;
 	mach_gettimeoffset = dragen2_gettimeoffset;
 	mach_reset = dragen2_reset;
