@@ -24,7 +24,6 @@
 #include <linux/init.h>
 #include <linux/types.h>
 #include <linux/time.h>
-#include <linux/proc_fs.h>
 #include <linux/efi.h>
 
 #include <asm/io.h>
@@ -40,19 +39,6 @@ extern efi_status_t efi_call_phys (void *, ...);
 struct efi efi;
 EXPORT_SYMBOL(efi);
 static efi_runtime_services_t *runtime;
-
-/*
- * efi_dir is allocated here, but the directory isn't created
- * here, as proc_mkdir() doesn't work this early in the bootup
- * process.  Therefore, each module, like efivars, must test for
- *    if (!efi_dir)  efi_dir = proc_mkdir("efi", NULL);
- * prior to creating their own entries under /proc/efi.
- */
-#ifdef CONFIG_PROC_FS
-struct proc_dir_entry *efi_dir;
-EXPORT_SYMBOL(efi_dir);
-#endif
-
 static unsigned long mem_limit = ~0UL;
 
 #define efi_call_virt(f, args...)	(*(f))(args)
@@ -747,10 +733,3 @@ valid_phys_addr_range (unsigned long phys_addr, unsigned long *size)
 	return 0;
 }
 
-static void __exit
-efivars_exit (void)
-{
-#ifdef CONFIG_PROC_FS
- 	remove_proc_entry(efi_dir->name, NULL);
-#endif
-}

@@ -18,6 +18,7 @@
 #include <linux/reboot.h>
 #include <linux/slab.h>
 #include <linux/swap.h>
+#include <linux/proc_fs.h>
 
 #include <asm/a.out.h>
 #include <asm/bitops.h>

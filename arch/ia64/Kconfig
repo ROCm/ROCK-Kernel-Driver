@@ -294,16 +294,6 @@ config IA64_PALINFO
 	  To use this option, you have to ensure that the "/proc file system
 	  support" (CONFIG_PROC_FS) is enabled, too.
 
-config EFI_VARS
-	tristate "/proc/efi/vars support"
-	help
-	  If you say Y here, you are able to get EFI (Extensible Firmware
-	  Interface) variable information in /proc/efi/vars.  You may read,
-	  write, create, and destroy EFI variables through this interface.
-
-	  To use this option, you have to check that the "/proc file system
-	  support" (CONFIG_PROC_FS) is enabled, too.
-
 source "fs/Kconfig.binfmt"
 
 endmenu
