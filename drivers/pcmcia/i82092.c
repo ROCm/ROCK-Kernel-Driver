@@ -15,6 +15,7 @@
 #include <linux/pci.h>
 #include <linux/init.h>
 #include <linux/workqueue.h>
+#include <linux/interrupt.h>
 
 #include <pcmcia/cs_types.h>
 #include <pcmcia/ss.h>

@@ -47,6 +47,7 @@
 #include <linux/delay.h>
 #include <linux/proc_fs.h>
 #include <linux/workqueue.h>
+#include <linux/interrupt.h>
 #include <asm/irq.h>
 #include <asm/io.h>
 #include <asm/bitops.h>
@@ -76,12 +77,12 @@ static const char *version =
 #define DEBUG(n, args...) do { } while (0)
 #endif
 
-static void irq_count(int, void *, struct pt_regs *);
+static void i365_count_irq(int, void *, struct pt_regs *);
 static inline int _check_irq(int irq, int flags)
 {
-    if (request_irq(irq, irq_count, flags, "x", irq_count) != 0)
+    if (request_irq(irq, i365_count_irq, flags, "x", i365_count_irq) != 0)
 	return -1;
-    free_irq(irq, irq_count);
+    free_irq(irq, i365_count_irq);
     return 0;
 }
 
@@ -533,7 +534,7 @@ static u_int __init set_bridge_opts(u_short s, u_short ns)
 static volatile u_int irq_hits;
 static u_short irq_sock;
 
-static void irq_count(int irq, void *dev, struct pt_regs *regs)
+static void i365_count_irq(int irq, void *dev, struct pt_regs *regs)
 {
     i365_get(irq_sock, I365_CSC);
     irq_hits++;
@@ -543,13 +544,13 @@ static void irq_count(int irq, void *dev, struct pt_regs *regs)
 static u_int __init test_irq(u_short sock, int irq)
 {
     DEBUG(2, "  testing ISA irq %d\n", irq);
-    if (request_irq(irq, irq_count, 0, "scan", irq_count) != 0)
+    if (request_irq(irq, i365_count_irq, 0, "scan", i365_count_irq) != 0)
 	return 1;
     irq_hits = 0; irq_sock = sock;
     __set_current_state(TASK_UNINTERRUPTIBLE);
     schedule_timeout(HZ/100);
     if (irq_hits) {
-	free_irq(irq, irq_count);
+	free_irq(irq, i365_count_irq);
 	DEBUG(2, "    spurious hit!\n");
 	return 1;
     }
@@ -559,7 +560,7 @@ static u_int __init test_irq(u_short sock, int irq)
     i365_bset(sock, I365_GENCTL, I365_CTL_SW_IRQ);
     udelay(1000);
 
-    free_irq(irq, irq_count);
+    free_irq(irq, i365_count_irq);
 
     /* mask all interrupts */
     i365_set(sock, I365_CSCINT, 0);
