@@ -338,9 +338,9 @@ asmlinkage unsigned int do_IRQ(struct pt_regs regs)
 
 		__asm__ __volatile__("andl %%esp,%0" :
 					"=r" (esp) : "0" (8191));
-		if (unlikely(esp < (sizeof(struct task_struct) + 1024))) {
+		if (unlikely(esp < (sizeof(struct thread_info) + 1024))) {
 			printk("do_IRQ: stack overflow: %ld\n",
-				esp - sizeof(struct task_struct));
+				esp - sizeof(struct thread_info));
 			dump_stack();
 		}
 	}
