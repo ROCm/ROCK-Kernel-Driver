@@ -101,6 +101,7 @@
 #include <linux/stat.h>
 
 MODULE_LICENSE("Dual BSD/GPL");
+MODULE_AUTHOR("Rusty Russell <rusty@rustcorp.com.au>");
 MODULE_DESCRIPTION("ipchains backwards compatibility layer");
 
 /* Understanding locking in this code: (thanks to Alan Cox for using
