@@ -146,7 +146,7 @@ srmcons_write(struct tty_struct *tty, int from_user,
 			if (c > sizeof(tmp))
 				c = sizeof(tmp);
 			
-			c -= copy_from_user(tmp, buf, c);
+			c -= copy_from_user(tmp, (const char __user *) buf, c);
 
 			if (!c) { 
 				printk("%s: EFAULT (count %d)\n",

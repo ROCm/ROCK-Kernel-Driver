@@ -98,7 +98,7 @@ do_page_fault(unsigned long address, unsigned long mmcsr,
 	   by ignoring such an instruction.  */
 	if (cause == 0) {
 		unsigned int insn;
-		__get_user(insn, (unsigned int *)regs->pc);
+		__get_user(insn, (unsigned int __user *)regs->pc);
 		if ((insn >> 21 & 0x1f) == 0x1f &&
 		    /* ldq ldl ldt lds ldg ldf ldwu ldbu */
 		    (1ul << (insn >> 26) & 0x30f00001400ul)) {
