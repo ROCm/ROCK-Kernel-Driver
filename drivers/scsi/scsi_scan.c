@@ -254,7 +254,7 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 			 "%d:%d:%d:%d", sdev->host->host_no,
 			 sdev->channel, sdev->id, sdev->lun);
 	} else
-		goto out_free_queue;
+		goto out_cleanup_slave;
 
 	/*
 	 * If there are any same target siblings, add this to the
@@ -283,6 +283,9 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 	spin_unlock_irqrestore(shost->host_lock, flags);
 	return sdev;
 
+out_cleanup_slave:
+	if (shost->hostt->slave_destroy)
+		shost->hostt->slave_destroy(sdev);
 out_free_queue:
 	scsi_free_queue(sdev->request_queue);
 out_free_dev:
