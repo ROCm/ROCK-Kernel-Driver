@@ -399,6 +399,7 @@ struct Qdisc * qdisc_create_dflt(struct net_device *dev, struct Qdisc_ops *ops)
 	sch->enqueue = ops->enqueue;
 	sch->dequeue = ops->dequeue;
 	sch->dev = dev;
+	dev_hold(dev);
 	sch->stats_lock = &dev->queue_lock;
 	atomic_set(&sch->refcnt, 1);
 	/* enqueue is accessed locklessly - make sure it's visible
@@ -440,6 +441,8 @@ static void __qdisc_destroy(struct rcu_head *head)
 	write_unlock(&qdisc_tree_lock);
 	module_put(ops->owner);
 
+	if (qdisc->dev)
+		dev_put(qdisc->dev);
 	if (!(qdisc->flags&TCQ_F_BUILTIN))
 		kfree(qdisc);
 }

@@ -430,6 +430,7 @@ qdisc_create(struct net_device *dev, u32 handle, struct rtattr **tca, int *errp)
 	sch->enqueue = ops->enqueue;
 	sch->dequeue = ops->dequeue;
 	sch->dev = dev;
+	dev_hold(dev);
 	atomic_set(&sch->refcnt, 1);
 	sch->stats_lock = &dev->queue_lock;
 	if (handle == 0) {
