@@ -15,17 +15,18 @@
 #define __V850_BYTEORDER_H__
 
 #include <asm/types.h>
+#include <linux/compiler.h>
 
 #ifdef __GNUC__
 
-static __inline__ __const__ __u32 ___arch__swab32 (__u32 word)
+static __inline__ __attribute_const__ __u32 ___arch__swab32 (__u32 word)
 {
 	__u32 res;
 	__asm__ ("bsw %1, %0" : "=r" (res) : "r" (word));
 	return res;
 }
 
-static __inline__ __const__ __u16 ___arch__swab16 (__u16 half_word)
+static __inline__ __attribute_const__ __u16 ___arch__swab16 (__u16 half_word)
 {
 	__u16 res;
 	__asm__ ("bsh %1, %0" : "=r" (res) : "r" (half_word));

@@ -1,4 +1,4 @@
-/* $Id: head.S,v 1.6 2003/05/04 19:29:53 lethal Exp $
+/* $Id: head.S,v 1.7 2003/09/01 17:58:19 lethal Exp $
  *
  *  arch/sh/kernel/head.S
  *
@@ -50,7 +50,7 @@ ENTRY(_stext)
 	sub	r1, r0		!
 	ldc	r0, r7_bank	! ... and initial thread_info
 	!
-	!			Enable cache
+	!			Additional CPU initialization
 	mov.l	6f, r0
 	jsr	@r0
 	 nop
@@ -73,4 +73,4 @@ ENTRY(_stext)
 3:	.long	__bss_start
 4:	.long	_end
 5:	.long	start_kernel
-6:	.long	sh_cache_init
+6:	.long	sh_cpu_init

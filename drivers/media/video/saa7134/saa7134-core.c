@@ -599,12 +599,10 @@ static irqreturn_t saa7134_irq(int irq, void *dev_id, struct pt_regs *regs)
 		if ((report & SAA7134_IRQ_REPORT_DONE_RA3))
 			saa7134_irq_oss_done(dev,status);
 
-#ifdef CONFIG_VIDEO_IR
 		if ((report & (SAA7134_IRQ_REPORT_GPIO16 |
 			       SAA7134_IRQ_REPORT_GPIO18)) &&
 		    dev->remote)
 			saa7134_input_irq(dev);
-#endif
 
 	};
 	if (10 == loop) {
@@ -636,9 +634,7 @@ static int saa7134_hwinit1(struct saa7134_dev *dev)
 	saa7134_vbi_init1(dev);
 	if (card_has_ts(dev))
 		saa7134_ts_init1(dev);
-#ifdef CONFIG_VIDEO_IR
 	saa7134_input_init1(dev);
-#endif
 
 	switch (dev->pci->device) {
 	case PCI_DEVICE_ID_PHILIPS_SAA7134:
@@ -714,9 +710,7 @@ static int saa7134_hwfini(struct saa7134_dev *dev)
 	}
 	if (card_has_ts(dev))
 		saa7134_ts_fini(dev);
-#ifdef CONFIG_VIDEO_IR
 	saa7134_input_fini(dev);
-#endif
 	saa7134_vbi_fini(dev);
 	saa7134_video_fini(dev);
 	saa7134_tvaudio_fini(dev);
@@ -907,7 +901,7 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 	}
 
 	/* wait a bit, register i2c bus */
-	current->state = TASK_INTERRUPTIBLE;
+	set_current_state(TASK_INTERRUPTIBLE);
 	schedule_timeout(HZ/10);
 	saa7134_i2c_register(dev);
 
@@ -921,6 +915,10 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 		request_module("tda9887");
   	if (card_has_ts(dev))
 		request_module("saa6752hs");
+
+#ifdef VIDIOC_G_PRIORITY
+	v4l2_prio_init(&dev->prio);
+#endif
 
 	/* register v4l devices */
 	dev->video_dev = vdev_init(dev,&saa7134_video_template,"video");
@@ -1041,18 +1039,7 @@ static void __devexit saa7134_finidev(struct pci_dev *pci_dev)
 	saa_writel(SAA7134_MAIN_CTRL,0);
 
 	/* shutdown subsystems */
-	switch (dev->pci->device) {
-	case PCI_DEVICE_ID_PHILIPS_SAA7134:
-	case PCI_DEVICE_ID_PHILIPS_SAA7133:
-	case PCI_DEVICE_ID_PHILIPS_SAA7135:
-		saa7134_oss_fini(dev);
-		break;
-	}
-	if (card_has_ts(dev))
-		saa7134_ts_fini(dev);
-	saa7134_vbi_fini(dev);
-	saa7134_video_fini(dev);
-	saa7134_tvaudio_fini(dev);
+	saa7134_hwfini(dev);
 
 	/* unregister */
 	saa7134_i2c_unregister(dev);
@@ -1099,6 +1086,10 @@ static int saa7134_init(void)
 	       (SAA7134_VERSION_CODE >> 16) & 0xff,
 	       (SAA7134_VERSION_CODE >>  8) & 0xff,
 	       SAA7134_VERSION_CODE & 0xff);
+#ifdef SNAPSHOT
+	printk(KERN_INFO "saa7130/34: snapshot date %04d-%02d-%02d\n",
+	       SNAPSHOT/10000, (SNAPSHOT/100)%100, SNAPSHOT%100);
+#endif
 	return pci_module_init(&saa7134_pci_driver);
 }
 

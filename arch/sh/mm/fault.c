@@ -1,7 +1,8 @@
-/* $Id: fault.c,v 1.10 2003/05/04 19:29:54 lethal Exp $
+/* $Id: fault.c,v 1.13 2003/08/11 11:44:50 lethal Exp $
  *
  *  linux/arch/sh/mm/fault.c
  *  Copyright (C) 1999  Niibe Yutaka
+ *  Copyright (C) 2003  Paul Mundt
  *
  *  Based on linux/arch/i386/mm/fault.c:
  *   Copyright (C) 1995  Linus Torvalds
@@ -28,10 +29,7 @@
 #include <asm/hardirq.h>
 #include <asm/mmu_context.h>
 #include <asm/cacheflush.h>
-
-#if defined(CONFIG_SH_KGDB)
 #include <asm/kgdb.h>
-#endif
 
 extern void die(const char *,struct pt_regs *,long);
 
@@ -47,11 +45,10 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long writeaccess,
 	struct mm_struct *mm;
 	struct vm_area_struct * vma;
 	unsigned long page;
-	const struct exception_table_entry *fixup;
 
-#if defined(CONFIG_SH_KGDB)
+#ifdef CONFIG_SH_KGDB
 	if (kgdb_nofault && kgdb_bus_err_hook)
-	  kgdb_bus_err_hook();
+		kgdb_bus_err_hook();
 #endif
 
 	tsk = current;
@@ -61,7 +58,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long writeaccess,
 	 * If we're in an interrupt or have no user
 	 * context, we must not take the fault..
 	 */
-	if (in_interrupt() || !mm)
+	if (in_atomic() || !mm)
 		goto no_context;
 
 	down_read(&mm->mmap_sem);
@@ -95,16 +92,18 @@ good_area:
 	 */
 survive:
 	switch (handle_mm_fault(mm, vma, address, writeaccess)) {
-	case 1:
-		tsk->min_flt++;
-		break;
-	case 2:
-		tsk->maj_flt++;
-		break;
-	case 0:
-		goto do_sigbus;
-	default:
-		goto out_of_memory;
+		case VM_FAULT_MINOR:
+			tsk->min_flt++;
+			break;
+		case VM_FAULT_MAJOR:
+			tsk->maj_flt++;
+			break;
+		case VM_FAULT_SIGBUS:
+			goto do_sigbus;
+		case VM_FAULT_OOM:
+			goto out_of_memory;
+		default:
+			BUG();
 	}
 
 	up_read(&mm->mmap_sem);
@@ -126,11 +125,8 @@ bad_area:
 
 no_context:
 	/* Are we prepared to handle this kernel fault?  */
-	fixup = search_exception_tables(regs->pc);
-	if (fixup) {
-		regs->pc = fixup->fixup;
+	if (fixup_exception(regs))
 		return;
-	}
 
 /*
  * Oops. The kernel tried to access some bad page. We'll have to
@@ -198,16 +194,22 @@ do_sigbus:
 asmlinkage int __do_page_fault(struct pt_regs *regs, unsigned long writeaccess,
 			       unsigned long address)
 {
+	unsigned long addrmax = P4SEG;
 	pgd_t *dir;
 	pmd_t *pmd;
 	pte_t *pte;
 	pte_t entry;
 
-#if defined(CONFIG_SH_KGDB)
+#ifdef CONFIG_SH_KGDB
 	if (kgdb_nofault && kgdb_bus_err_hook)
-	  kgdb_bus_err_hook();
+		kgdb_bus_err_hook();
 #endif
-	if (address >= P3SEG && address < P4SEG)
+
+#ifdef CONFIG_SH_STORE_QUEUES
+	addrmax = P4SEG_STORE_QUE + 0x04000000;
+#endif
+
+	if (address >= P3SEG && address < addrmax)
 		dir = pgd_offset_k(address);
 	else if (address >= TASK_SIZE)
 		return 1;
@@ -233,15 +235,19 @@ asmlinkage int __do_page_fault(struct pt_regs *regs, unsigned long writeaccess,
 	if (writeaccess)
 		entry = pte_mkdirty(entry);
 	entry = pte_mkyoung(entry);
-#if defined(CONFIG_CPU_SH4)
+
+#ifdef CONFIG_CPU_SH4
 	/*
 	 * ITLB is not affected by "ldtlb" instruction.
 	 * So, we need to flush the entry by ourselves.
 	 */
+
 	__flush_tlb_page(get_asid(), address&PAGE_MASK);
 #endif
+
 	set_pte(pte, entry);
 	update_mmu_cache(NULL, address, entry);
+
 	return 0;
 }
 

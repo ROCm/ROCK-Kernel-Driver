@@ -56,7 +56,7 @@
 #include "ioasm.h"
 #include "chsc.h"
 
-#define VERSION_QDIO_C "$Revision: 1.62 $"
+#define VERSION_QDIO_C "$Revision: 1.67 $"
 
 /****************** MODULE PARAMETER VARIABLES ********************/
 MODULE_AUTHOR("Utz Bacher <utz.bacher@de.ibm.com>");
@@ -80,6 +80,7 @@ static int hydra_thinints;
 static int indicator_used[INDICATORS_PER_CACHELINE];
 static __u32 * volatile indicators;
 static __u32 volatile spare_indicator;
+static atomic_t spare_indicator_usecount;
 
 static debug_info_t *qdio_dbf_setup;
 static debug_info_t *qdio_dbf_sbal;
@@ -238,7 +239,7 @@ qdio_get_indicator(void)
 			indicator_used[i]=1;
 			return indicators+i;
 		}
-
+	atomic_inc(&spare_indicator_usecount);
 	return (__u32 * volatile) &spare_indicator;
 }
 
@@ -252,6 +253,8 @@ qdio_put_indicator(__u32 *addr)
 		i=addr-indicators;
 		indicator_used[i]=0;
 	}
+	if (addr == &spare_indicator)
+		atomic_dec(&spare_indicator_usecount);
 }
 
 static inline volatile void 
@@ -622,7 +625,8 @@ qdio_outbound_processing(struct qdio_q *q)
 	if (q->is_iqdio_q) {
 		/* 
 		 * for asynchronous queues, we better check, if the fill
-		 * level is too high 
+		 * level is too high. for synchronous queues, the fill
+		 * level will never be that high. 
 		 */
 		if (atomic_read(&q->number_of_buffers_used)>
 		    IQDIO_FILL_LEVEL_TO_POLL)
@@ -920,7 +924,7 @@ qdio_kick_inbound_handler(struct qdio_q *q)
 }
 
 static inline void
-tiqdio_inbound_processing(struct qdio_q *q)
+__tiqdio_inbound_processing(struct qdio_q *q, int spare_ind_was_set)
 {
 	struct qdio_irq *irq_ptr;
 	struct qdio_q *oq;
@@ -954,10 +958,21 @@ tiqdio_inbound_processing(struct qdio_q *q)
 		goto out;
 	}
 
-	if (!(*(q->dev_st_chg_ind)))
-		goto out;
+	/* 
+	 * we reset spare_ind_was_set, when the queue does not use the
+	 * spare indicator
+	 */
+	if (spare_ind_was_set)
+		spare_ind_was_set = (q->dev_st_chg_ind == &spare_indicator);
 
-	tiqdio_clear_summary_bit((__u32*)q->dev_st_chg_ind);
+	if (!(*(q->dev_st_chg_ind)) && !spare_ind_was_set)
+		goto out;
+	/*
+	 * q->dev_st_chg_ind is the indicator, be it shared or not.
+	 * only clear it, if indicator is non-shared
+	 */
+	if (!spare_ind_was_set)
+		tiqdio_clear_summary_bit((__u32*)q->dev_st_chg_ind);
 
 	if (q->hydra_gives_outbound_pcis) {
 		if (!q->siga_sync_done_on_thinints) {
@@ -1001,6 +1016,12 @@ tiqdio_inbound_processing(struct qdio_q *q)
 		}
 out:
 	qdio_release_q(q);
+}
+
+static void
+tiqdio_inbound_processing(struct qdio_q *q)
+{
+	__tiqdio_inbound_processing(q, atomic_read(&spare_indicator_usecount));
 }
 
 static void
@@ -1106,6 +1127,7 @@ static inline void
 tiqdio_inbound_checks(void)
 {
 	struct qdio_q *q;
+	int spare_ind_was_set=0;
 #ifdef QDIO_USE_PROCESSING_STATE
 	int q_laps=0;
 #endif /* QDIO_USE_PROCESSING_STATE */
@@ -1117,11 +1139,17 @@ tiqdio_inbound_checks(void)
 again:
 #endif /* QDIO_USE_PROCESSING_STATE */
 
+	/* when the spare indicator is used and set, save that and clear it */
+	if ((atomic_read(&spare_indicator_usecount)) && spare_indicator) {
+		spare_ind_was_set = 1;
+		tiqdio_clear_summary_bit((__u32*)&spare_indicator);
+	}
+
 	q=(struct qdio_q*)tiq_list;
 	do {
 		if (!q)
 			break;
-		tiqdio_inbound_processing(q);
+		__tiqdio_inbound_processing(q, spare_ind_was_set);
 		q=(struct qdio_q*)q->list_next;
 	} while (q!=(struct qdio_q*)tiq_list);
 
@@ -1583,6 +1611,16 @@ omit_handler_call:
 }
 
 static void
+qdio_call_shutdown(void *data)
+{
+	struct ccw_device *cdev;
+
+	cdev = (struct ccw_device *)data;
+	qdio_shutdown(cdev, QDIO_FLAG_CLEANUP_USING_CLEAR);
+	put_device(&cdev->dev);
+}
+
+static void
 qdio_timeout_handler(struct ccw_device *cdev)
 {
 	struct qdio_irq *irq_ptr;
@@ -1607,6 +1645,20 @@ qdio_timeout_handler(struct ccw_device *cdev)
 		QDIO_PRINT_INFO("Did not get interrupt on cleanup, irq=0x%x.\n",
 				irq_ptr->irq);
 		qdio_set_state(irq_ptr, QDIO_IRQ_STATE_ERR);
+		break;
+	case QDIO_IRQ_STATE_ESTABLISHED:
+	case QDIO_IRQ_STATE_ACTIVE:
+		/* I/O has been terminated by common I/O layer. */
+		QDIO_PRINT_INFO("Queues on irq %04x killed by cio.\n",
+				irq_ptr->irq);
+		QDIO_DBF_TEXT2(1, trace, "cio:term");
+		qdio_set_state(irq_ptr, QDIO_IRQ_STATE_STOPPED);
+		if (get_device(&cdev->dev)) {
+			/* Can't call shutdown from interrupt context. */
+			PREPARE_WORK(&cdev->private->kick_work,
+				     qdio_call_shutdown, (void *)cdev);
+			queue_work(ccw_device_work, &cdev->private->kick_work);
+		}
 		break;
 	default:
 		BUG();
@@ -2098,7 +2150,7 @@ qdio_shutdown(struct ccw_device *cdev, int how)
 						 !atomic_read(&irq_ptr->
 							      input_qs[i]->
 							      use_count),
-						 QDIO_NO_USE_COUNT_TIMEOUT*HZ);
+						 QDIO_NO_USE_COUNT_TIMEOUT);
 		if (atomic_read(&irq_ptr->input_qs[i]->use_count))
 			/*
 			 * FIXME:
@@ -2116,7 +2168,7 @@ qdio_shutdown(struct ccw_device *cdev, int how)
 						 !atomic_read(&irq_ptr->
 							      output_qs[i]->
 							      use_count),
-						 QDIO_NO_USE_COUNT_TIMEOUT*HZ);
+						 QDIO_NO_USE_COUNT_TIMEOUT);
 		if (atomic_read(&irq_ptr->output_qs[i]->use_count))
 			/*
 			 * FIXME:
@@ -2134,23 +2186,34 @@ qdio_shutdown(struct ccw_device *cdev, int how)
 	/* cleanup subchannel */
 	spin_lock_irqsave(get_ccwdev_lock(cdev),flags);
 	if (how&QDIO_FLAG_CLEANUP_USING_CLEAR) {
-		ccw_device_clear(cdev, QDIO_DOING_CLEANUP);
+		result = ccw_device_clear(cdev, QDIO_DOING_CLEANUP);
 		timeout=QDIO_CLEANUP_CLEAR_TIMEOUT;
 	} else if (how&QDIO_FLAG_CLEANUP_USING_HALT) {
-		ccw_device_halt(cdev, QDIO_DOING_CLEANUP);
+		result = ccw_device_halt(cdev, QDIO_DOING_CLEANUP);
 		timeout=QDIO_CLEANUP_HALT_TIMEOUT;
 	} else { /* default behaviour */
-		ccw_device_halt(cdev, QDIO_DOING_CLEANUP);
+		result = ccw_device_halt(cdev, QDIO_DOING_CLEANUP);
 		timeout=QDIO_CLEANUP_HALT_TIMEOUT;
 	}
-	qdio_set_state(irq_ptr, QDIO_IRQ_STATE_CLEANUP);
-	ccw_device_set_timeout(cdev, timeout);
-	spin_unlock_irqrestore(get_ccwdev_lock(cdev),flags);
+	if (result == -ENODEV) {
+		/* No need to wait for device no longer present. */
+		qdio_set_state(irq_ptr, QDIO_IRQ_STATE_INACTIVE);
+		result = 0; /* No error. */
+		spin_unlock_irqrestore(get_ccwdev_lock(cdev), flags);
+	} else if (result == 0) {
+		qdio_set_state(irq_ptr, QDIO_IRQ_STATE_CLEANUP);
+		ccw_device_set_timeout(cdev, timeout);
+		spin_unlock_irqrestore(get_ccwdev_lock(cdev),flags);
 
-	wait_event(cdev->private->wait_q,
-		   irq_ptr->state == QDIO_IRQ_STATE_INACTIVE ||
-		   irq_ptr->state == QDIO_IRQ_STATE_ERR);
-
+		wait_event(cdev->private->wait_q,
+			   irq_ptr->state == QDIO_IRQ_STATE_INACTIVE ||
+			   irq_ptr->state == QDIO_IRQ_STATE_ERR);
+	} else {
+		QDIO_PRINT_INFO("ccw_device_{halt,clear} returned %d for "
+				"device %s\n", result, cdev->dev.bus_id);
+		spin_unlock_irqrestore(get_ccwdev_lock(cdev), flags);
+		goto out;
+	}
 	if (irq_ptr->is_thinint_irq) {
 		qdio_put_indicator((__u32*)irq_ptr->dev_st_chg_ind);
 		tiqdio_set_subchannel_ind(irq_ptr,1); 
@@ -2796,7 +2859,7 @@ qdio_activate(struct ccw_device *cdev, int flags)
 					  QDIO_IRQ_STATE_STOPPED) ||
 					  (irq_ptr->state ==
 					   QDIO_IRQ_STATE_ERR)),
-					 (QDIO_ACTIVATE_TIMEOUT>>10)*HZ);
+					 QDIO_ACTIVATE_TIMEOUT);
 
 	switch (irq_ptr->state) {
 	case QDIO_IRQ_STATE_STOPPED:

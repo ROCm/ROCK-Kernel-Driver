@@ -10,7 +10,7 @@
 #ifndef __ASM_CPU_SH2_CACHE_H
 #define __ASM_CPU_SH2_CACHE_H
 
-#define	L1_CACHE_BYTES	16
+#define L1_CACHE_SHIFT	4
 
 #define CCR		0xfffffe92	/* Address of Cache Control Register */
 

@@ -8,8 +8,9 @@
 
 #include <asm/types.h>
 #include <asm/intrinsics.h>
+#include <linux/compiler.h>
 
-static __inline__ __const__ __u64
+static __inline__ __attribute_const__ __u64
 __ia64_swab64 (__u64 x)
 {
 	__u64 result;
@@ -18,13 +19,13 @@ __ia64_swab64 (__u64 x)
 	return result;
 }
 
-static __inline__ __const__ __u32
+static __inline__ __attribute_const__ __u32
 __ia64_swab32 (__u32 x)
 {
 	return __ia64_swab64(x) >> 32;
 }
 
-static __inline__ __const__ __u16
+static __inline__ __attribute_const__ __u16
 __ia64_swab16(__u16 x)
 {
 	return __ia64_swab64(x) >> 48;

@@ -2703,11 +2703,8 @@ static int ip_rt_acct_read(char *buffer, char **start, off_t offset,
 		memcpy(dst, src, length);
 
 		/* Add the other cpus in, one int at a time */
-		for (i = 1; i < NR_CPUS; i++) {
+		for_each_cpu(i) {
 			unsigned int j;
-
-			if (!cpu_online(i))
-				continue;
 
 			src = ((u32 *) IP_RT_ACCT_CPU(i)) + offset;
 

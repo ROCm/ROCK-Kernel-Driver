@@ -16,6 +16,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
+#ifndef _HVCALLSM_H
+#define _HVCALLSM_H
 
 //============================================================================
 //
@@ -27,19 +29,12 @@
 //-------------------------------------------------------------------
 // Standard Includes
 //-------------------------------------------------------------------
-#ifndef  _HVCALLSC_H
-#include "HvCallSc.h"
-#endif
-
-#ifndef  _HVTYPES_H
+#include <asm/iSeries/HvCallSc.h>
 #include <asm/iSeries/HvTypes.h>
-#endif
 
 //-----------------------------------------------------------------------------
 // Constants
 //-----------------------------------------------------------------------------
-#ifndef _HVCALLSM_H
-#define _HVCALLSM_H
 
 #define HvCallSmGet64BitsOfAccessMap	HvCallSm  + 11
 
@@ -54,5 +49,4 @@ static inline u64		HvCallSm_get64BitsOfAccessMap(
 	return retval;
 }
 //============================================================================
-#endif // _HVCALLSM_H
-
+#endif /* _HVCALLSM_H */

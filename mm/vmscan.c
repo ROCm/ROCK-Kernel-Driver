@@ -803,16 +803,15 @@ shrink_zone(struct zone *zone, int max_scan, unsigned int gfp_mask,
  * scan then give up on it.
  */
 static int
-shrink_caches(struct zone *classzone, int priority, int *total_scanned,
+shrink_caches(struct zone **zones, int priority, int *total_scanned,
 		int gfp_mask, int nr_pages, struct page_state *ps)
 {
-	struct zone *first_classzone;
-	struct zone *zone;
 	int ret = 0;
+	int i;
 
-	first_classzone = classzone->zone_pgdat->node_zones;
-	for (zone = classzone; zone >= first_classzone; zone--) {
+	for (i = 0; zones[i] != NULL; i++) {
 		int to_reclaim = max(nr_pages, SWAP_CLUSTER_MAX);
+		struct zone *zone = zones[i];
 		int nr_mapped = 0;
 		int max_scan;
 
@@ -855,27 +854,27 @@ shrink_caches(struct zone *classzone, int priority, int *total_scanned,
  * excessive rotation of the inactive list, which is _supposed_ to be an LRU,
  * yes?
  */
-int try_to_free_pages(struct zone *cz,
+int try_to_free_pages(struct zone **zones,
 		unsigned int gfp_mask, unsigned int order)
 {
 	int priority;
 	int ret = 0;
 	const int nr_pages = SWAP_CLUSTER_MAX;
 	int nr_reclaimed = 0;
-	struct zone *zone;
 	struct reclaim_state *reclaim_state = current->reclaim_state;
+	int i;
 
 	inc_page_state(allocstall);
 
-	for (zone = cz; zone >= cz->zone_pgdat->node_zones; --zone)
-		zone->temp_priority = DEF_PRIORITY;
+	for (i = 0; zones[i] != 0; i++)
+		zones[i]->temp_priority = DEF_PRIORITY;
 
 	for (priority = DEF_PRIORITY; priority >= 0; priority--) {
 		int total_scanned = 0;
 		struct page_state ps;
 
 		get_page_state(&ps);
-		nr_reclaimed += shrink_caches(cz, priority, &total_scanned,
+		nr_reclaimed += shrink_caches(zones, priority, &total_scanned,
 						gfp_mask, nr_pages, &ps);
 		if (nr_reclaimed >= nr_pages) {
 			ret = 1;
@@ -892,7 +891,7 @@ int try_to_free_pages(struct zone *cz,
 
 		/* Take a nap, wait for some writeback to complete */
 		blk_congestion_wait(WRITE, HZ/10);
-		if (cz - cz->zone_pgdat->node_zones < ZONE_HIGHMEM) {
+		if (zones[0] - zones[0]->zone_pgdat->node_zones < ZONE_HIGHMEM) {
 			shrink_slab(total_scanned, gfp_mask);
 			if (reclaim_state) {
 				nr_reclaimed += reclaim_state->reclaimed_slab;
@@ -903,8 +902,8 @@ int try_to_free_pages(struct zone *cz,
 	if ((gfp_mask & __GFP_FS) && !(gfp_mask & __GFP_NORETRY))
 		out_of_memory();
 out:
-	for (zone = cz; zone >= cz->zone_pgdat->node_zones; --zone)
-		zone->prev_priority = zone->temp_priority;
+	for (i = 0; zones[i] != 0; i++)
+		zones[i]->prev_priority = zones[i]->temp_priority;
 	return ret;
 }
 

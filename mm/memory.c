@@ -651,14 +651,19 @@ follow_page(struct mm_struct *mm, unsigned long address, int write)
 	pte = *ptep;
 	pte_unmap(ptep);
 	if (pte_present(pte)) {
-		if (!write || (pte_write(pte) && pte_dirty(pte))) {
-			pfn = pte_pfn(pte);
-			if (pfn_valid(pfn)) {
-				struct page *page = pfn_to_page(pfn);
-
-				mark_page_accessed(page);
-				return page;
-			}
+		if (write && !pte_write(pte))
+			goto out;
+		if (write && !pte_dirty(pte)) {
+			struct page *page = pte_page(pte);
+			if (!PageDirty(page))
+				set_page_dirty(page);
+		}
+		pfn = pte_pfn(pte);
+		if (pfn_valid(pfn)) {
+			struct page *page = pfn_to_page(pfn);
+			
+			mark_page_accessed(page);
+			return page;
 		}
 	}
 
@@ -863,6 +868,9 @@ int zeromap_page_range(struct vm_area_struct *vma, unsigned long address, unsign
 		address = (address + PGDIR_SIZE) & PGDIR_MASK;
 		dir++;
 	} while (address && (address < end));
+	/*
+	 * Why flush? zeromap_pte_range has a BUG_ON for !pte_none()
+	 */
 	flush_tlb_range(vma, beg, end);
 	spin_unlock(&mm->page_table_lock);
 	return error;
@@ -944,6 +952,9 @@ int remap_page_range(struct vm_area_struct *vma, unsigned long from, unsigned lo
 		from = (from + PGDIR_SIZE) & PGDIR_MASK;
 		dir++;
 	} while (from && (from < end));
+	/*
+	 * Why flush? remap_pte_range has a BUG_ON for !pte_none()
+	 */
 	flush_tlb_range(vma, beg, end);
 	spin_unlock(&mm->page_table_lock);
 	return error;
@@ -952,28 +963,17 @@ int remap_page_range(struct vm_area_struct *vma, unsigned long from, unsigned lo
 EXPORT_SYMBOL(remap_page_range);
 
 /*
- * Establish a new mapping:
- *  - flush the old one
- *  - update the page tables
- *  - inform the TLB about the new one
- *
- * We hold the mm semaphore for reading and vma->vm_mm->page_table_lock
- */
-static inline void establish_pte(struct vm_area_struct * vma, unsigned long address, pte_t *page_table, pte_t entry)
-{
-	set_pte(page_table, entry);
-	flush_tlb_page(vma, address);
-	update_mmu_cache(vma, address, entry);
-}
-
-/*
  * We hold the mm semaphore for reading and vma->vm_mm->page_table_lock
  */
 static inline void break_cow(struct vm_area_struct * vma, struct page * new_page, unsigned long address, 
 		pte_t *page_table)
 {
+	pte_t entry;
+
 	flush_cache_page(vma, address);
-	establish_pte(vma, address, page_table, pte_mkwrite(pte_mkdirty(mk_pte(new_page, vma->vm_page_prot))));
+	entry = pte_mkwrite(pte_mkdirty(mk_pte(new_page, vma->vm_page_prot)));
+	ptep_establish(vma, address, page_table, entry);
+	update_mmu_cache(vma, address, entry);
 }
 
 /*
@@ -1002,6 +1002,7 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 	struct page *old_page, *new_page;
 	unsigned long pfn = pte_pfn(pte);
 	struct pte_chain *pte_chain;
+	pte_t entry;
 
 	if (unlikely(!pfn_valid(pfn))) {
 		/*
@@ -1022,8 +1023,9 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 		unlock_page(old_page);
 		if (reuse) {
 			flush_cache_page(vma, address);
-			establish_pte(vma, address, page_table,
-				pte_mkyoung(pte_mkdirty(pte_mkwrite(pte))));
+			entry = pte_mkyoung(pte_mkdirty(pte_mkwrite(pte)));
+			ptep_establish(vma, address, page_table, entry);
+			update_mmu_cache(vma, address, entry);
 			pte_unmap(page_table);
 			spin_unlock(&mm->page_table_lock);
 			return VM_FAULT_MINOR;
@@ -1409,7 +1411,7 @@ do_no_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	spin_unlock(&mm->page_table_lock);
 
 	if (vma->vm_file) {
-		mapping = vma->vm_file->f_dentry->d_inode->i_mapping;
+		mapping = vma->vm_file->f_mapping;
 		sequence = atomic_read(&mapping->truncate_count);
 	}
 	smp_rmb();  /* Prevent CPU from reordering lock-free ->nopage() */
@@ -1580,7 +1582,8 @@ static inline int handle_pte_fault(struct mm_struct *mm,
 		entry = pte_mkdirty(entry);
 	}
 	entry = pte_mkyoung(entry);
-	establish_pte(vma, address, pte, entry);
+	ptep_establish(vma, address, pte, entry);
+	update_mmu_cache(vma, address, entry);
 	pte_unmap(pte);
 	spin_unlock(&mm->page_table_lock);
 	return VM_FAULT_MINOR;

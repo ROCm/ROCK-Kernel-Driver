@@ -60,6 +60,8 @@ extern int cad_pid;
 extern int pid_max;
 extern int sysctl_lower_zone_protection;
 extern int min_free_kbytes;
+extern int printk_ratelimit_jiffies;
+extern int printk_ratelimit_burst;
 
 /* this is needed for the proc_dointvec_minmax for [fs_]overflow UID and GID */
 static int maxolduid = 65535;
@@ -578,6 +580,24 @@ static ctl_table kern_table[] = {
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= KERN_PRINTK_RATELIMIT,
+		.procname	= "printk_ratelimit",
+		.data		= &printk_ratelimit_jiffies,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec_jiffies,
+		.strategy	= &sysctl_jiffies,
+	},
+	{
+		.ctl_name	= KERN_PRINTK_RATELIMIT_BURST,
+		.procname	= "printk_ratelimit_burst",
+		.data		= &printk_ratelimit_burst,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+		.strategy	= &sysctl_jiffies,
 	},
 	{ .ctl_name = 0 }
 };

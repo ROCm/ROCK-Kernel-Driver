@@ -13,7 +13,9 @@
 #include <linux/interrupt.h>
 
 #include <asm/io.h>
+#include <asm/machvec.h>
 #include <asm/mpc1211/mpc1211.h>
+#include <asm/mpc1211/pci.h>
 #include <asm/mpc1211/m1543c.h>
 
 
@@ -52,10 +54,6 @@
 const char *get_system_type(void)
 {
 	return "Interface MPC-1211(CTP/PCI/MPC-SH02)";
-}
-
-void platform_setup(void)
-{
 }
 
 static void __init pci_write_config(unsigned long busNo,
@@ -265,15 +263,16 @@ void __init init_mpc1211_IRQ(void)
 
 static void delay (void)
 {
-  volatile unsigned short tmp;
-  tmp = *(volatile unsigned short *) 0xa0000000;
+	volatile unsigned short tmp;
+	tmp = *(volatile unsigned short *) 0xa0000000;
 }
 
 static void delay1000 (void)
 {
-  int i;
-  for (i=0; i<1000; i++)
-    delay ();
+	int i;
+
+	for (i=0; i<1000; i++)
+		delay ();
 }
 
 static int put_smb_blk(unsigned char *p, int address, int command, int no)
@@ -316,21 +315,46 @@ static int put_smb_blk(unsigned char *p, int address, int command, int no)
 	return 0;
 }
 
-void __init setup_mpc1211(void)
-{
-  unsigned char spd_buf[128];
-  pci_write_config(0,0,0,0x54, 0xb0b00000);
+/*
+ * The Machine Vector
+ */
 
-retry:
-  outb(ALI15X3_ABORT, SMBHSTCNT);
-  spd_buf[0] = 0x0c;
-  spd_buf[1] = 0x43;
-  spd_buf[2] = 0x7f;
-  spd_buf[3] = 0x03;
-  spd_buf[4] = 0x00;
-  spd_buf[5] = 0x03;
-  spd_buf[6] = 0x00;
-  if (put_smb_blk(spd_buf, 0x69, 0, 7) < 0) {
-    goto retry;
-  }
+struct sh_machine_vector mv_mpc1211 __initmv = {
+	.mv_nr_irqs		= 48,
+	.mv_irq_demux		= mpc1211_irq_demux,
+	.mv_init_irq		= init_mpc1211_IRQ,
+
+#ifdef CONFIG_HEARTBEAT
+	.mv_heartbeat		= heartbeat_mpc1211,
+#endif
+};
+
+ALIAS_MV(mpc1211)
+
+/* arch/sh/boards/mpc1211/rtc.c */
+void mpc1211_time_init(void);
+
+int __init platform_setup(void)
+{
+	unsigned char spd_buf[128];
+
+	__set_io_port_base(PA_PCI_IO);
+
+	pci_write_config(0,0,0,0x54, 0xb0b00000);
+
+	do {
+		outb(ALI15X3_ABORT, SMBHSTCNT);
+		spd_buf[0] = 0x0c;
+		spd_buf[1] = 0x43;
+		spd_buf[2] = 0x7f;
+		spd_buf[3] = 0x03;
+		spd_buf[4] = 0x00;
+		spd_buf[5] = 0x03;
+		spd_buf[6] = 0x00;
+	} while (put_smb_blk(spd_buf, 0x69, 0, 7) < 0);
+
+	board_time_init = mpc1211_time_init;
+
+	return 0;
 }
+

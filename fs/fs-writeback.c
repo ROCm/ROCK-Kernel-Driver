@@ -514,7 +514,7 @@ EXPORT_SYMBOL(write_inode_now);
  *    OSYNC_INODE:    the inode itself
  */
 
-int generic_osync_inode(struct inode *inode, int what)
+int generic_osync_inode(struct inode *inode, struct address_space *mapping, int what)
 {
 	int err = 0;
 	int need_write_inode_now = 0;
@@ -522,14 +522,14 @@ int generic_osync_inode(struct inode *inode, int what)
 
 	current->flags |= PF_SYNCWRITE;
 	if (what & OSYNC_DATA)
-		err = filemap_fdatawrite(inode->i_mapping);
+		err = filemap_fdatawrite(mapping);
 	if (what & (OSYNC_METADATA|OSYNC_DATA)) {
-		err2 = sync_mapping_buffers(inode->i_mapping);
+		err2 = sync_mapping_buffers(mapping);
 		if (!err)
 			err = err2;
 	}
 	if (what & OSYNC_DATA) {
-		err2 = filemap_fdatawait(inode->i_mapping);
+		err2 = filemap_fdatawait(mapping);
 		if (!err)
 			err = err2;
 	}

@@ -57,28 +57,31 @@ static int raw_open(struct inode *inode, struct file *filp)
 	 */
 	bdev = raw_devices[minor].binding;
 	err = -ENODEV;
-	if (bdev) {
-		err = blkdev_get(bdev, filp->f_mode, 0, BDEV_RAW);
-		if (err)
-			goto out;
-		igrab(bdev->bd_inode);
-		err = bd_claim(bdev, raw_open);
-		if (err) {
-			blkdev_put(bdev, BDEV_RAW);
-			goto out;
-		}
-		err = set_blocksize(bdev, bdev_hardsect_size(bdev));
-		if (err) {
-			bd_release(bdev);
-			blkdev_put(bdev, BDEV_RAW);
-			goto out;
-		}
-		filp->f_flags |= O_DIRECT;
-		if (++raw_devices[minor].inuse == 1)
-			filp->f_dentry->d_inode->i_mapping =
-				bdev->bd_inode->i_mapping;
-	}
+	if (!bdev)
+		goto out;
+	igrab(bdev->bd_inode);
+	err = blkdev_get(bdev, filp->f_mode, 0, BDEV_RAW);
+	if (err)
+		goto out;
+	err = bd_claim(bdev, raw_open);
+	if (err)
+		goto out1;
+	err = set_blocksize(bdev, bdev_hardsect_size(bdev));
+	if (err)
+		goto out2;
+	filp->f_flags |= O_DIRECT;
+	filp->f_mapping = bdev->bd_inode->i_mapping;
+	if (++raw_devices[minor].inuse == 1)
+		filp->f_dentry->d_inode->i_mapping =
+			bdev->bd_inode->i_mapping;
 	filp->private_data = bdev;
+	up(&raw_mutex);
+	return 0;
+
+out2:
+	bd_release(bdev);
+out1:
+	blkdev_put(bdev, BDEV_RAW);
 out:
 	up(&raw_mutex);
 	return err;

@@ -40,7 +40,7 @@ MODULE_PARM(oss_rate,"i");
 MODULE_PARM_DESC(oss_rate,"sample rate (valid are: 32000,48000)");
 
 #define dprintk(fmt, arg...)	if (oss_debug) \
-	printk(KERN_DEBUG "%s/oss: " fmt, dev->name, ## arg)
+	printk(KERN_DEBUG "%s/oss: " fmt, dev->name , ## arg)
 
 /* ------------------------------------------------------------------ */
 
@@ -295,8 +295,10 @@ static ssize_t dsp_read(struct file *file, char *buffer,
 				break;
 			}
 			up(&dev->oss.lock);
-			current->state = TASK_INTERRUPTIBLE;
-			schedule();
+			set_current_state(TASK_INTERRUPTIBLE);
+			if (0 == dev->oss.read_count)
+				schedule();
+			set_current_state(TASK_RUNNING);
 			down(&dev->oss.lock);
 			if (signal_pending(current)) {
 				if (0 == ret)
@@ -328,7 +330,6 @@ static ssize_t dsp_read(struct file *file, char *buffer,
 	}
 	up(&dev->oss.lock);
 	remove_wait_queue(&dev->oss.wq, &wait);
-	current->state = TASK_RUNNING;
 	return ret;
 }
 
@@ -777,7 +778,7 @@ void saa7134_irq_oss_done(struct saa7134_dev *dev, unsigned long status)
 
 	spin_lock(&dev->slock);
 	if (UNSET == dev->oss.dma_blk) {
-		dprintk("irq: recording stopped%s\n","");
+		dprintk("irq: recording stopped\n");
 		goto done;
 	}
 	if (0 != (status & 0x0f000000))

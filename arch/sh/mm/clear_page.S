@@ -1,4 +1,4 @@
-/* $Id: clear_page.S,v 1.12 2003/05/10 03:22:05 sugioka Exp $
+/* $Id: clear_page.S,v 1.13 2003/08/25 17:03:10 lethal Exp $
  *
  * __clear_user_page, __clear_user, clear_page implementation of SuperH
  *
@@ -10,10 +10,10 @@
 #include <linux/linkage.h>
 
 /*
- * clear_page
+ * clear_page_slow
  * @to: P1 address
  *
- * void clear_page(void *to)
+ * void clear_page_slow(void *to)
  */
 
 /*
@@ -21,7 +21,7 @@
  * r4 --- to
  * r5 --- to + 4096
  */
-ENTRY(clear_page)
+ENTRY(clear_page_slow)
 	mov	r4,r5
 	mov.w	.Llimit,r0
 	add	r0,r5

@@ -1,4 +1,4 @@
-/* $Id: ioremap.c,v 1.6 2003/05/04 19:29:55 lethal Exp $
+/* $Id: ioremap.c,v 1.8 2003/10/09 15:25:42 lethal Exp $
  *
  * arch/sh/mm/ioremap.c
  *
@@ -140,7 +140,7 @@ void * p3_ioremap(unsigned long phys_addr, unsigned long size, unsigned long fla
 	 */
 	offset = phys_addr & ~PAGE_MASK;
 	phys_addr &= PAGE_MASK;
-	size = PAGE_ALIGN(last_addr) - phys_addr;
+	size = PAGE_ALIGN(last_addr+1) - phys_addr;
 
 	/*
 	 * Ok, go for it..
@@ -148,9 +148,10 @@ void * p3_ioremap(unsigned long phys_addr, unsigned long size, unsigned long fla
 	area = get_vm_area(size, VM_IOREMAP);
 	if (!area)
 		return NULL;
+	area->phys_addr = phys_addr;
 	addr = area->addr;
 	if (remap_area_pages((unsigned long) addr, phys_addr, size, flags)) {
-		vfree(addr);
+		vunmap(addr);
 		return NULL;
 	}
 	return (void *) (offset + (char *)addr);

@@ -259,8 +259,9 @@
 /*
  * Number 263 is reserved for vserver
  */
+#define __NR_fadvise64_64	264
 
-#define NR_syscalls 264
+#define NR_syscalls 265
 
 /* 
  * There are some system calls that are not present on 64 bit, some
@@ -322,6 +323,7 @@
 #undef  __NR_getdents64
 #undef  __NR_fcntl64
 #undef  __NR_sendfile64
+#undef  __NR_fadvise64_64
 
 #define __NR_select		142
 #define __NR_getrlimit		191	/* SuS compliant getrlimit */

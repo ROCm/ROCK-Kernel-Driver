@@ -539,7 +539,7 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 {
 	const int wait = gfp_mask & __GFP_WAIT;
 	unsigned long min;
-	struct zone **zones, *classzone;
+	struct zone **zones;
 	struct page *page;
 	struct reclaim_state reclaim_state;
 	struct task_struct *p = current;
@@ -554,8 +554,7 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 		cold = 1;
 
 	zones = zonelist->zones;  /* the list of zones suitable for gfp_mask */
-	classzone = zones[0]; 
-	if (classzone == NULL)    /* no zones in the zonelist */
+	if (zones[0] == NULL)     /* no zones in the zonelist */
 		return NULL;
 
 	/* Go through the zonelist once, looking for a zone with enough free */
@@ -630,7 +629,7 @@ rebalance:
 	reclaim_state.reclaimed_slab = 0;
 	p->reclaim_state = &reclaim_state;
 
-	try_to_free_pages(classzone, gfp_mask, order);
+	try_to_free_pages(zones, gfp_mask, order);
 
 	p->reclaim_state = NULL;
 	p->flags &= ~PF_MEMALLOC;
@@ -670,10 +669,11 @@ rebalance:
 	}
 
 nopage:
-	if (!(gfp_mask & __GFP_NOWARN)) {
-		printk("%s: page allocation failure."
+	if (!(gfp_mask & __GFP_NOWARN) && printk_ratelimit()) {
+		printk(KERN_WARNING "%s: page allocation failure."
 			" order:%d, mode:0x%x\n",
 			p->comm, order, gfp_mask);
+		dump_stack();
 	}
 	return NULL;
 got_pg:
@@ -869,14 +869,14 @@ void __get_page_state(struct page_state *ret, int nr)
 	while (cpu < NR_CPUS) {
 		unsigned long *in, *out, off;
 
-		if (!cpu_online(cpu)) {
+		if (!cpu_possible(cpu)) {
 			cpu++;
 			continue;
 		}
 
 		in = (unsigned long *)&per_cpu(page_states, cpu);
 		cpu++;
-		if (cpu < NR_CPUS && cpu_online(cpu))
+		if (cpu < NR_CPUS && cpu_possible(cpu))
 			prefetch(&per_cpu(page_states, cpu));
 		out = (unsigned long *)ret;
 		for (off = 0; off < nr; off++)

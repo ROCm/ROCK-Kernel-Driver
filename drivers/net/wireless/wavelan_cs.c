@@ -3802,7 +3802,7 @@ wv_pcmcia_reset(device *	dev)
   printk(KERN_DEBUG "%s: ->wv_pcmcia_reset()\n", dev->name);
 #endif
 
-  i = CardServices(AccessConfigurationRegister, link->handle, &reg);
+  i = pcmcia_access_configuration_register(link->handle, &reg);
   if(i != CS_SUCCESS)
     {
       cs_error(link->handle, AccessConfigurationRegister, i);
@@ -3816,7 +3816,7 @@ wv_pcmcia_reset(device *	dev)
 
   reg.Action = CS_WRITE;
   reg.Value = reg.Value | COR_SW_RESET;
-  i = CardServices(AccessConfigurationRegister, link->handle, &reg);
+  i = pcmcia_access_configuration_register(link->handle, &reg);
   if(i != CS_SUCCESS)
     {
       cs_error(link->handle, AccessConfigurationRegister, i);
@@ -3825,7 +3825,7 @@ wv_pcmcia_reset(device *	dev)
       
   reg.Action = CS_WRITE;
   reg.Value = COR_LEVEL_IRQ | COR_CONFIG;
-  i = CardServices(AccessConfigurationRegister, link->handle, &reg);
+  i = pcmcia_access_configuration_register(link->handle, &reg);
   if(i != CS_SUCCESS)
     {
       cs_error(link->handle, AccessConfigurationRegister, i);
@@ -4018,16 +4018,16 @@ wv_pcmcia_config(dev_link_t *	link)
     {
       tuple.Attributes = 0;
       tuple.DesiredTuple = CISTPL_CONFIG;
-      i = CardServices(GetFirstTuple, handle, &tuple);
+      i = pcmcia_get_first_tuple(handle, &tuple);
       if(i != CS_SUCCESS)
 	break;
       tuple.TupleData = (cisdata_t *)buf;
       tuple.TupleDataMax = 64;
       tuple.TupleOffset = 0;
-      i = CardServices(GetTupleData, handle, &tuple);
+      i = pcmcia_get_tuple_data(handle, &tuple);
       if(i != CS_SUCCESS)
 	break;
-      i = CardServices(ParseTuple, handle, &tuple, &parse);
+      i = pcmcia_parse_tuple(handle, &tuple, &parse);
       if(i != CS_SUCCESS)
 	break;
       link->conf.ConfigBase = parse.config.base;
@@ -4045,7 +4045,7 @@ wv_pcmcia_config(dev_link_t *	link)
   link->state |= DEV_CONFIG;
   do
     {
-      i = CardServices(RequestIO, link->handle, &link->io);
+      i = pcmcia_request_io(link->handle, &link->io);
       if(i != CS_SUCCESS)
 	{
 	  cs_error(link->handle, RequestIO, i);
@@ -4056,7 +4056,7 @@ wv_pcmcia_config(dev_link_t *	link)
        * Now allocate an interrupt line.  Note that this does not
        * actually assign a handler to the interrupt.
        */
-      i = CardServices(RequestIRQ, link->handle, &link->irq);
+      i = pcmcia_request_irq(link->handle, &link->irq);
       if(i != CS_SUCCESS)
 	{
 	  cs_error(link->handle, RequestIRQ, i);
@@ -4068,7 +4068,7 @@ wv_pcmcia_config(dev_link_t *	link)
        * the I/O windows and the interrupt mapping.
        */
       link->conf.ConfigIndex = 1;
-      i = CardServices(RequestConfiguration, link->handle, &link->conf);
+      i = pcmcia_request_configuration(link->handle, &link->conf);
       if(i != CS_SUCCESS)
 	{
 	  cs_error(link->handle, RequestConfiguration, i);
@@ -4084,8 +4084,7 @@ wv_pcmcia_config(dev_link_t *	link)
       req.Attributes = WIN_DATA_WIDTH_8|WIN_MEMORY_TYPE_AM|WIN_ENABLE;
       req.Base = req.Size = 0;
       req.AccessSpeed = mem_speed;
-      link->win = (window_handle_t)link->handle;
-      i = CardServices(RequestWindow, &link->win, &req);
+      i = pcmcia_request_window(&link->handle, &req, &link->win);
       if(i != CS_SUCCESS)
 	{
 	  cs_error(link->handle, RequestWindow, i);
@@ -4096,7 +4095,7 @@ wv_pcmcia_config(dev_link_t *	link)
       dev->mem_end = dev->mem_start + req.Size;
 
       mem.CardOffset = 0; mem.Page = 0;
-      i = CardServices(MapMemPage, link->win, &mem);
+      i = pcmcia_map_mem_page(link->win, &mem);
       if(i != CS_SUCCESS)
 	{
 	  cs_error(link->handle, MapMemPage, i);
@@ -4170,10 +4169,10 @@ wv_pcmcia_release(dev_link_t *link)
 
   /* Don't bother checking to see if these succeed or not */
   iounmap((u_char *)dev->mem_start);
-  CardServices(ReleaseWindow, link->win);
-  CardServices(ReleaseConfiguration, link->handle);
-  CardServices(ReleaseIO, link->handle, &link->io);
-  CardServices(ReleaseIRQ, link->handle, &link->irq);
+  pcmcia_release_window(link->win);
+  pcmcia_release_configuration(link->handle);
+  pcmcia_release_io(link->handle, &link->io);
+  pcmcia_release_irq(link->handle, &link->irq);
 
   link->state &= ~DEV_CONFIG;
 
@@ -4772,10 +4771,10 @@ wavelan_attach(void)
   client_reg.event_callback_args.client_data = link;
 
 #ifdef DEBUG_CONFIG_INFO
-  printk(KERN_DEBUG "wavelan_attach(): almost done, calling CardServices\n");
+  printk(KERN_DEBUG "wavelan_attach(): almost done, calling pcmcia_register_client\n");
 #endif
 
-  ret = CardServices(RegisterClient, &link->handle, &client_reg);
+  ret = pcmcia_register_client(&link->handle, &client_reg);
   if(ret != 0)
     {
       cs_error(link->handle, RegisterClient, ret);
@@ -4826,7 +4825,7 @@ wavelan_detach(dev_link_t *	link)
 
   /* Break the link with Card Services */
   if(link->handle)
-    CardServices(DeregisterClient, link->handle);
+    pcmcia_deregister_client(link->handle);
     
   /* Remove the interface data from the linked list */
   if(dev_list == link)
@@ -4955,7 +4954,7 @@ wavelan_event(event_t		event,		/* The event received */
 	  {
       	    if(link->open)
 	      netif_device_detach(dev);
-      	    CardServices(ReleaseConfiguration, link->handle);
+      	    pcmcia_release_configuration(link->handle);
 	  }
 	break;
 
@@ -4965,7 +4964,7 @@ wavelan_event(event_t		event,		/* The event received */
       case CS_EVENT_CARD_RESET:
 	if(link->state & DEV_CONFIG)
 	  {
-      	    CardServices(RequestConfiguration, link->handle, &link->conf);
+      	    pcmcia_request_configuration(link->handle, &link->conf);
       	    if(link->open)	/* If RESET -> True, If RESUME -> False ? */
 	      {
 		wv_hw_reset(dev);

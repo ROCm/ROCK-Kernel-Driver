@@ -1,5 +1,4 @@
-/* $Id$
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -13,57 +12,15 @@
 #include <asm/sn/sgi.h>
 #include <asm/sn/io.h>
 #include <asm/sn/iograph.h>
-#include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/labelcl.h>
 #include <asm/sn/sn_private.h>
 #include <asm/sn/klconfig.h>
 #include <asm/sn/sn_cpuid.h>
 
-extern cpuid_t master_procid;
 int		maxcpus;
 
 extern xwidgetnum_t hub_widget_id(nasid_t);
-
-extern void iograph_early_init(void);
-
-nasid_t master_nasid = INVALID_NASID;		/* This is the partition master nasid */
-nasid_t master_baseio_nasid = INVALID_NASID;	/* This is the master base I/O nasid */
-
-
-/*
- * mlreset(void)
- * 	very early machine reset - at this point NO interrupts have been
- * 	enabled; nor is memory, tlb, p0, etc setup.
- *
- * 	slave is zero when mlreset is called for the master processor and
- *	is nonzero thereafter.
- */
-
-
-void
-mlreset(int slave)
-{
-	/*
-	 * We are the master cpu and node.
-	 */ 
-	master_nasid = get_nasid();
-	set_master_bridge_base();
-
-	/* We're the master processor */
-	master_procid = smp_processor_id();
-	master_nasid = cpuid_to_nasid(master_procid);
-
-	/*
-	 * master_nasid we get back better be same as one from
-	 * get_nasid()
-	 */
-	ASSERT_ALWAYS(master_nasid == get_nasid());
-
-	/* early initialization of iograph */
-	iograph_early_init();
-}
-
 
 /* XXX - Move the meat of this to intr.c ? */
 /*
@@ -72,22 +29,26 @@ mlreset(int slave)
 void init_platform_nodepda(nodepda_t *npda, cnodeid_t node)
 {
 	hubinfo_t hubinfo;
+	nasid_t nasid;
 
 	extern void router_map_init(nodepda_t *);
 	extern void router_queue_init(nodepda_t *,cnodeid_t);
 	extern void intr_init_vecblk(nodepda_t *, cnodeid_t, int);
 
 	/* Allocate per-node platform-dependent data */
-	hubinfo = (hubinfo_t)alloc_bootmem_node(NODE_DATA(node), sizeof(struct hubinfo_s));
+	
+	nasid = COMPACT_TO_NASID_NODEID(node);
+	if (node >= numnodes) /* Headless/memless IO nodes */
+		hubinfo = (hubinfo_t)alloc_bootmem_node(NODE_DATA(0), sizeof(struct hubinfo_s));
+	else
+		hubinfo = (hubinfo_t)alloc_bootmem_node(NODE_DATA(node), sizeof(struct hubinfo_s));
 
 	npda->pdinfo = (void *)hubinfo;
 	hubinfo->h_nodepda = npda;
 	hubinfo->h_cnodeid = node;
-	hubinfo->h_nasid = COMPACT_TO_NASID_NODEID(node);
 
 	spin_lock_init(&hubinfo->h_crblock);
 
-	hubinfo->h_widgetid = hub_widget_id(hubinfo->h_nasid);
 	npda->xbow_peer = INVALID_NASID;
 
 	/* 
@@ -104,7 +65,22 @@ void init_platform_nodepda(nodepda_t *npda, cnodeid_t node)
 	npda->npda_rip_last = &npda->npda_rip_first;
 	npda->geoid.any.type = GEO_TYPE_INVALID;
 
-	mutex_init_locked(&npda->xbow_sema); /* init it locked? */
+	init_MUTEX_LOCKED(&npda->xbow_sema); /* init it locked? */
+}
+
+void
+init_platform_hubinfo(nodepda_t **nodepdaindr) {
+	cnodeid_t       cnode;
+	hubinfo_t hubinfo;
+	nodepda_t *npda;
+	extern int numionodes;
+
+	for (cnode = 0; cnode < numionodes; cnode++) {
+		npda = nodepdaindr[cnode];
+		hubinfo = (hubinfo_t)npda->pdinfo;
+		hubinfo->h_nasid = COMPACT_TO_NASID_NODEID(cnode);
+		hubinfo->h_widgetid = hub_widget_id(hubinfo->h_nasid);
+	}
 }
 
 void

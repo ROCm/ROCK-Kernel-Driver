@@ -32,6 +32,9 @@ cutype:	    The control unit type / model.
 devtype:    The device type / model, if applicable.
 
 online:     An interface to set the device online and offline.
+	    In the special case of the device being disconnected (see the
+	    notify function under 1.2), piping 0 to online will focibly delete
+	    the device.
 
 The device drivers can add entries to export per-device data and interfaces.
 
@@ -82,6 +85,7 @@ struct ccw_driver {
 	int (*remove) (struct ccw_device *);
 	int (*set_online) (struct ccw_device *);
 	int (*set_offline) (struct ccw_device *);
+	int (*notify) (struct ccw_device *, int);
 	struct device_driver driver;
 	char *name;
 };
@@ -142,6 +146,28 @@ int (*set_offline) (struct ccw_device *);
 Parameters:   cdev       - the device to be deactivated. The common layer has
 			   verified that the device is online.
 
+
+notify: This function is called by the common I/O layer for some state changes
+	of the device.
+	Signalled to the driver are:
+	* In online state, device detached (CIO_GONE) or last path gone
+	  (CIO_NO_PATH). The driver must return !0 to keep the device; for
+	  return code 0, the device will be deleted as usual (also when no
+	  notify function is registerd). If the driver wants to keep the
+	  device, it is moved into disconnected state.
+	* In disconnected state, device operational again (CIO_OPER). The
+	  common I/O layer performs some sanity checks on device number and
+	  Device / CU to be reasonably sure if it is still the same device.
+	  If not, the old device is removed and a new one registered. By the
+	  return code of the notify function the device driver signals if it
+	  wants the device back: !0 for keeping, 0 to make the device being
+	  removed and re-registered.
+	
+int (*notify) (struct ccw_device *, int);
+
+Parameters:   cdev    - the device whose state changed.
+	      event   - the event that happened. This can be one of CIO_GONE,
+		        CIO_NO_PATH or CIO_OPER.
 
 The handler field of the struct ccw_device is meant to be set to the interrupt
 handler for the device. In order to accommodate drivers which use several 

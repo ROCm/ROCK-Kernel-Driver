@@ -9,27 +9,8 @@
  * a description of how these routines should be used.
  */
 
-#include <linux/config.h>
-#include <linux/types.h>
-#include <linux/mm.h>
-#include <linux/string.h>
-#include <linux/pci.h>
-#include <linux/slab.h>
 #include <linux/module.h>
-
-#include <asm/delay.h>
-#include <asm/io.h>
-#include <asm/sn/sgi.h>
-#include <asm/sn/io.h>
-#include <asm/sn/invent.h>
-#include <asm/sn/hcl.h>
-#include <asm/sn/pci/pcibr.h>
-#include <asm/sn/pci/pcibr_private.h>
-#include <asm/sn/driver.h>
-#include <asm/sn/types.h>
-#include <asm/sn/alenlist.h>
 #include <asm/sn/pci/pci_bus_cvlink.h>
-#include <asm/sn/nag.h>
 
 /*
  * For ATE allocations
@@ -130,10 +111,7 @@ find_sn_dma_map(dma_addr_t dma_addr, unsigned char busnum)
  *
  * This interface is usually used for "command" streams (e.g. the command
  * queue for a SCSI controller).  See Documentation/DMA-mapping.txt for
- * more information.  Note that this routine will always put a 32 bit
- * DMA address into @dma_handle.  This is because most devices
- * that are capable of 64 bit PCI DMA transactions can't do 64 bit _coherent_
- * DMAs, and unfortunately this interface has to cater to the LCD.  Oh well.
+ * more information.
  *
  * Also known as platform_pci_alloc_consistent() by the IA64 machvec code.
  */
@@ -146,11 +124,6 @@ sn_pci_alloc_consistent(struct pci_dev *hwdev, size_t size, dma_addr_t *dma_hand
 	unsigned long phys_addr;
 	pcibr_dmamap_t dma_map = 0;
 
-	*dma_handle = 0;
-
-	if (hwdev->dma_mask < 0xffffffffUL)
-		return NULL;
-
 	/*
 	 * Get hwgraph vertex for the device
 	 */
@@ -158,54 +131,48 @@ sn_pci_alloc_consistent(struct pci_dev *hwdev, size_t size, dma_addr_t *dma_hand
 	vhdl = device_sysdata->vhdl;
 
 	/*
-	 * Allocate the memory.  FIXME: if we're allocating for
-	 * two devices on the same bus, we should at least try to
-	 * allocate memory in the same 2 GB window to avoid using
-	 * ATEs for the translation.  See the comment above about the
-	 * 32 bit requirement for this function.
+	 * Allocate the memory.
+	 * FIXME: We should be doing alloc_pages_node for the node closest
+	 *        to the PCI device.
 	 */
-	if(!(cpuaddr = (void *)__get_free_pages(GFP_ATOMIC, get_order(size))))
+	if (!(cpuaddr = (void *)__get_free_pages(GFP_ATOMIC, get_order(size))))
 		return NULL;
 
 	/* physical addr. of the memory we just got */
 	phys_addr = __pa(cpuaddr);
 
 	/*
-	 * This will try to use a Direct Map register to do the
-	 * 32 bit DMA mapping, but it may not succeed if another
-	 * device on the same bus is already mapped with different
-	 * attributes or to a different memory region.
+	 * 64 bit address translations should never fail.
+	 * 32 bit translations can fail if there are insufficient mapping
+	 *   resources and the direct map is already wired to a different
+	 *   2GB range.
+	 * 32 bit translations can also return a > 32 bit address, because
+	 *   pcibr_dmatrans_addr ignores a missing PCIIO_DMA_A64 flag on
+	 *   PCI-X buses.
 	 */
-	*dma_handle = pcibr_dmatrans_addr(vhdl, NULL, phys_addr, size,
-			((IS_PIC_DEVICE(hwdev)) ? 0 : PCIIO_BYTE_STREAM) |
-					  PCIIO_DMA_CMD);
-
-        /*
-	 * If this device is in PCI-X mode, the system would have
-	 * automatically allocated a 64Bits DMA Address.  Error out if the 
-	 * device cannot support DAC.
-	 */
-	if (*dma_handle > hwdev->consistent_dma_mask) {
-		free_pages((unsigned long) cpuaddr, get_order(size));
-		return NULL;
+	if (hwdev->consistent_dma_mask == ~0UL)
+		*dma_handle = pcibr_dmatrans_addr(vhdl, NULL, phys_addr, size,
+					  PCIIO_DMA_CMD | PCIIO_DMA_A64);
+	else {
+		dma_map = pcibr_dmamap_alloc(vhdl, NULL, size, PCIIO_DMA_CMD);
+		if (dma_map) {
+			*dma_handle = (dma_addr_t)
+				pcibr_dmamap_addr(dma_map, phys_addr, size);
+			dma_map->bd_dma_addr = *dma_handle;
+		}
+		else {
+			*dma_handle = pcibr_dmatrans_addr(vhdl, NULL, phys_addr, size,
+						  PCIIO_DMA_CMD);
+		}
 	}
 
-	/*
-	 * It is a 32 bit card and we cannot do direct mapping,
-	 * so we try to use an ATE.
-	 */
-	if (!(*dma_handle)) {
-		dma_map = pcibr_dmamap_alloc(vhdl, NULL, size,
-				((IS_PIC_DEVICE(hwdev)) ? 0 : PCIIO_BYTE_STREAM) |
-					     PCIIO_DMA_CMD);
-		if (!dma_map) {
-			printk(KERN_ERR "sn_pci_alloc_consistent: Unable to "
-			       "allocate anymore 32 bit page map entries.\n");
-			return 0;
+	if (!*dma_handle || *dma_handle > hwdev->consistent_dma_mask) {
+		if (dma_map) {
+			pcibr_dmamap_done(dma_map);
+			pcibr_dmamap_free(dma_map);
 		}
-		*dma_handle = (dma_addr_t) pcibr_dmamap_addr(dma_map,phys_addr,
-							     size);
-		dma_map->bd_dma_addr = *dma_handle;
+		free_pages((unsigned long) cpuaddr, get_order(size));
+		return NULL;
 	}
 
         return cpuaddr;
@@ -238,7 +205,6 @@ sn_pci_free_consistent(struct pci_dev *hwdev, size_t size, void *vaddr, dma_addr
 	if (dma_map) {
 		pcibr_dmamap_done(dma_map);
 		pcibr_dmamap_free(dma_map);
-		dma_map->bd_dma_addr = 0;
 	}
 	free_pages((unsigned long) vaddr, get_order(size));
 }
@@ -288,9 +254,7 @@ sn_pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nents, int dire
 		if (IS_PCIA64(hwdev)) {
 			sg->dma_address = pcibr_dmatrans_addr(vhdl, NULL, phys_addr,
 						       sg->length,
-			       ((IS_PIC_DEVICE(hwdev)) ? 0 : PCIIO_BYTE_STREAM) |
-						       PCIIO_DMA_DATA |
-						       PCIIO_DMA_A64);
+						       PCIIO_DMA_DATA | PCIIO_DMA_A64);
 			sg->dma_length = sg->length;
 			continue;
 		}
@@ -300,9 +264,7 @@ sn_pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nents, int dire
 		 */
 		if (IS_PCI32G(hwdev)) {
 			sg->dma_address = pcibr_dmatrans_addr(vhdl, NULL, phys_addr,
-						       sg->length,
-					((IS_PIC_DEVICE(hwdev)) ? 0 : PCIIO_BYTE_STREAM) |
-						       PCIIO_DMA_DATA);
+						       sg->length, PCIIO_DMA_DATA);
 			sg->dma_length = sg->length;
 			/*
 			 * See if we got a direct map entry
@@ -317,9 +279,7 @@ sn_pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nents, int dire
 		 * It is a 32 bit card and we cannot do direct mapping,
 		 * so we use an ATE.
 		 */
-		dma_map = pcibr_dmamap_alloc(vhdl, NULL, sg->length,
-				((IS_PIC_DEVICE(hwdev)) ? 0 : PCIIO_BYTE_STREAM) |
-					     PCIIO_DMA_DATA);
+		dma_map = pcibr_dmamap_alloc(vhdl, NULL, sg->length, PCIIO_DMA_DATA);
 		if (!dma_map) {
 			printk(KERN_ERR "sn_pci_map_sg: Unable to allocate "
 			       "anymore 32 bit page map entries.\n");
@@ -369,7 +329,6 @@ sn_pci_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nents, int di
         		if (dma_map) {
                 		pcibr_dmamap_done(dma_map);
                 		pcibr_dmamap_free(dma_map);
-                		dma_map->bd_dma_addr = 0;
 			}
         	}
 
@@ -390,7 +349,7 @@ sn_pci_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nents, int di
  * the IA64 machvec code.
  *
  * We map this to the one step pcibr_dmamap_trans interface rather than
- * the two step pciio_dmamap_alloc/pciio_dmamap_addr because we have
+ * the two step pcibr_dmamap_alloc/pcibr_dmamap_addr because we have
  * no way of saving the dmamap handle from the alloc to later free
  * (which is pretty much unacceptable).
  *
@@ -429,9 +388,7 @@ sn_pci_map_single(struct pci_dev *hwdev, void *ptr, size_t size, int direction)
 	if (IS_PCIA64(hwdev)) {
 		/* This device supports 64 bit DMA addresses. */
 		dma_addr = pcibr_dmatrans_addr(vhdl, NULL, phys_addr, size,
-		       ((IS_PIC_DEVICE(hwdev)) ? 0 : PCIIO_BYTE_STREAM) |
-					       PCIIO_DMA_DATA |
-					       PCIIO_DMA_A64);
+					       PCIIO_DMA_DATA | PCIIO_DMA_A64);
 		return dma_addr;
 	}
 
@@ -443,7 +400,6 @@ sn_pci_map_single(struct pci_dev *hwdev, void *ptr, size_t size, int direction)
 	 */
 	if (IS_PCI32G(hwdev)) {
 		dma_addr = pcibr_dmatrans_addr(vhdl, NULL, phys_addr, size,
-			((IS_PIC_DEVICE(hwdev)) ? 0 : PCIIO_BYTE_STREAM) |
 					       PCIIO_DMA_DATA);
 		if (dma_addr)
 			return dma_addr;
@@ -454,9 +410,7 @@ sn_pci_map_single(struct pci_dev *hwdev, void *ptr, size_t size, int direction)
 	 * let's use the PMU instead.
 	 */
 	dma_map = NULL;
-	dma_map = pcibr_dmamap_alloc(vhdl, NULL, size, 
-			((IS_PIC_DEVICE(hwdev)) ? 0 : PCIIO_BYTE_STREAM) |
-			PCIIO_DMA_DATA);
+	dma_map = pcibr_dmamap_alloc(vhdl, NULL, size, PCIIO_DMA_DATA);
 
 	if (!dma_map) {
 		printk(KERN_ERR "pci_map_single: Unable to allocate anymore "
@@ -500,7 +454,6 @@ sn_pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr, size_t size, int
 	if (dma_map) {
 		pcibr_dmamap_done(dma_map);
 		pcibr_dmamap_free(dma_map);
-		dma_map->bd_dma_addr = 0;
 	}
 }
 

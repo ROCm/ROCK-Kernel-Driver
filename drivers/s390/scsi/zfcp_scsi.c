@@ -30,7 +30,7 @@
 #define ZFCP_LOG_AREA			ZFCP_LOG_AREA_SCSI
 #define ZFCP_LOG_AREA_PREFIX		ZFCP_LOG_AREA_PREFIX_SCSI
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_SCSI_REVISION "$Revision: 1.38 $"
+#define ZFCP_SCSI_REVISION "$Revision: 1.42 $"
 
 #include <linux/blkdev.h>
 
@@ -225,99 +225,6 @@ zfcp_scsi_slave_destroy(struct scsi_device *sdpnt)
 	}
 }
 
-/*
- * function:    zfcp_scsi_insert_into_fake_queue
- *
- * purpose:
- *		
- *
- * returns:
- *
- * FIXME:	Is the following scenario possible and - even more interesting -
- *		a problem? It reminds me of the famous 'no retry for tape' fix
- *		(no problem for disks, but what is about tapes...)
- *
- *		device is unaccessable,
- *		command A is put into the fake queue,
- *		device becomes accessable again,
- *		command B is queued to the device,
- *		fake queue timer expires
- *		command A is returned to the mid-layer
- *		command A is queued to the device
- */
-void
-zfcp_scsi_insert_into_fake_queue(struct zfcp_adapter *adapter,
-				 Scsi_Cmnd * new_cmnd)
-{
-	unsigned long flags;
-	Scsi_Cmnd *current_cmnd;
-
-	ZFCP_LOG_DEBUG("Faking SCSI command:\n");
-	ZFCP_HEX_DUMP(ZFCP_LOG_LEVEL_DEBUG,
-		      (char *) new_cmnd->cmnd, new_cmnd->cmd_len);
-
-	new_cmnd->host_scribble = NULL;
-
-	write_lock_irqsave(&adapter->fake_list_lock, flags);
-	if (adapter->first_fake_cmnd == NULL) {
-		adapter->first_fake_cmnd = new_cmnd;
-		adapter->fake_scsi_timer.function =
-		    zfcp_scsi_process_and_clear_fake_queue;
-		adapter->fake_scsi_timer.data = (unsigned long) adapter;
-		adapter->fake_scsi_timer.expires =
-		    jiffies + ZFCP_FAKE_SCSI_COMPLETION_TIME;
-		add_timer(&adapter->fake_scsi_timer);
-	} else {
-		for (current_cmnd = adapter->first_fake_cmnd;
-		     current_cmnd->host_scribble != NULL;
-		     current_cmnd =
-		     (Scsi_Cmnd *) (current_cmnd->host_scribble)) ;
-		current_cmnd->host_scribble = (char *) new_cmnd;
-	}
-	write_unlock_irqrestore(&adapter->fake_list_lock, flags);
-}
-
-/*
- * function:    zfcp_scsi_process_and_clear_fake_queue
- *
- * purpose:
- *		
- *
- * returns:
- */
-void
-zfcp_scsi_process_and_clear_fake_queue(unsigned long data)
-{
-	unsigned long flags;
-	struct zfcp_adapter *adapter = (struct zfcp_adapter *) data;
-	Scsi_Cmnd *cur = adapter->first_fake_cmnd;
-	Scsi_Cmnd *next;
-
-	/*
-	 * We need a common lock for scsi_req on command completion
-	 * as well as on command abort to avoid race conditions
-	 * during completions and aborts taking place at the same time.
-	 * It needs to be the outer lock as in the eh_abort_handler.
-	 */
-	read_lock_irqsave(&adapter->abort_lock, flags);
-	write_lock(&adapter->fake_list_lock);
-	while (cur) {
-		next = (Scsi_Cmnd *) cur->host_scribble;
-		cur->host_scribble = NULL;
-		zfcp_cmd_dbf_event_scsi("clrfake", cur);
-		cur->scsi_done(cur);
-		cur = next;
-#ifdef ZFCP_DEBUG_REQUESTS
-		debug_text_event(adapter->req_dbf, 2, "fk_done:");
-		debug_event(adapter->req_dbf, 2, &cur, sizeof (unsigned long));
-#endif
-	}
-	adapter->first_fake_cmnd = NULL;
-	write_unlock(&adapter->fake_list_lock);
-	read_unlock_irqrestore(&adapter->abort_lock, flags);
-	return;
-}
-
 void
 zfcp_scsi_block_requests(struct Scsi_Host *shpnt)
 {
@@ -383,25 +290,6 @@ zfcp_scsi_slave_configure(struct scsi_device *sdp)
 	return 0;
 }
 
-/* Sends command on a round-trip using SCSI stack */
-static void
-zfcp_scsi_queuecommand_fake(Scsi_Cmnd * scpnt, struct zfcp_adapter *adapter)
-{
-	ZFCP_LOG_DEBUG("Looping SCSI IO on the adapter %s.\n",
-		       zfcp_get_busid_by_adapter(adapter));
-	/* 
-	 * Reset everything for devices with retries, allow at least one retry
-	 * for others, e.g. tape.
-	 */
-	scpnt->retries = 0;
-	if (scpnt->allowed == 1) {
-		scpnt->allowed = 2;
-	}
-	set_host_byte(&scpnt->result, DID_SOFT_ERROR);
-	set_driver_byte(&scpnt->result, SUGGEST_RETRY);
-	zfcp_scsi_insert_into_fake_queue(adapter, scpnt);
-}
-
 /* Complete a command immediately handing back DID_ERROR */
 static void
 zfcp_scsi_queuecommand_stop(Scsi_Cmnd * scpnt,
@@ -460,10 +348,12 @@ zfcp_scsi_queuecommand_stop(Scsi_Cmnd * scpnt,
 int
 zfcp_scsi_queuecommand(Scsi_Cmnd * scpnt, void (*done) (Scsi_Cmnd *))
 {
+	int retval;
 	int temp_ret;
 	struct zfcp_unit *unit;
 	struct zfcp_adapter *adapter;
 
+	retval = 0;
 	/* reset the status for this request */
 	scpnt->result = 0;
 	/* save address of mid layer call back function */
@@ -475,47 +365,38 @@ zfcp_scsi_queuecommand(Scsi_Cmnd * scpnt, void (*done) (Scsi_Cmnd *))
 	 */
 	adapter = (struct zfcp_adapter *) scpnt->device->host->hostdata[0];
 	/* NULL when the adapter was removed from the zfcp list */
-	if (adapter == NULL) {
+	if (unlikely(adapter == NULL)) {
 		zfcp_scsi_queuecommand_stop(scpnt, NULL, NULL);
 		goto out;
 	}
 
-	/* set when we have a unit/port list modification */
-	if (atomic_test_mask(ZFCP_STATUS_ADAPTER_QUEUECOMMAND_BLOCK,
-			     &adapter->status)) {
-		zfcp_scsi_queuecommand_fake(scpnt, adapter);
-		goto out;
-	}
-
 	unit = zfcp_scsi_determine_unit(adapter, scpnt);
-	if (unit == NULL)
+	if (unlikely(unit == NULL))
 		goto out;
 
-	if (atomic_test_mask(ZFCP_STATUS_COMMON_ERP_FAILED, &unit->status)
-	    || !atomic_test_mask(ZFCP_STATUS_COMMON_RUNNING, &unit->status)) {
+	if (unlikely(
+	      atomic_test_mask(ZFCP_STATUS_COMMON_ERP_FAILED, &unit->status) ||
+	     !atomic_test_mask(ZFCP_STATUS_COMMON_RUNNING, &unit->status))) {
 		zfcp_scsi_queuecommand_stop(scpnt, adapter, unit);
 		goto out;
 	}
-	if (!atomic_test_mask(ZFCP_STATUS_COMMON_UNBLOCKED, &unit->status)) {
+	if (unlikely(
+	     !atomic_test_mask(ZFCP_STATUS_COMMON_UNBLOCKED, &unit->status))) {
 		ZFCP_LOG_DEBUG("adapter %s not ready or unit with LUN 0x%Lx "
 			       "on the port with WWPN 0x%Lx in recovery.\n",
 			       zfcp_get_busid_by_adapter(adapter),
 			       unit->fcp_lun, unit->port->wwpn);
-		zfcp_scsi_queuecommand_fake(scpnt, adapter);
+		retval = SCSI_MLQUEUE_DEVICE_BUSY;
 		goto out;
 	}
-
-	atomic_inc(&adapter->scsi_reqs_active);
 
 	temp_ret = zfcp_fsf_send_fcp_command_task(adapter,
 						  unit,
 						  scpnt, ZFCP_REQ_AUTO_CLEANUP);
 
-	if (temp_ret < 0) {
+	if (unlikely(temp_ret < 0)) {
 		ZFCP_LOG_DEBUG("error: Could not send a Send FCP Command\n");
-		atomic_dec(&adapter->scsi_reqs_active);
-		wake_up(&adapter->scsi_reqs_active_wq);
-		zfcp_scsi_queuecommand_fake(scpnt, adapter);
+		retval = SCSI_MLQUEUE_HOST_BUSY;
 	} else {
 #ifdef ZFCP_DEBUG_REQUESTS
 		debug_text_event(adapter->req_dbf, 3, "q_scpnt");
@@ -524,7 +405,7 @@ zfcp_scsi_queuecommand(Scsi_Cmnd * scpnt, void (*done) (Scsi_Cmnd *))
 #endif				/* ZFCP_DEBUG_REQUESTS */
 	}
  out:
-	return 0;
+	return retval;
 }
 
 /*
@@ -553,45 +434,6 @@ zfcp_unit_lookup(struct zfcp_adapter *adapter, int channel, int id, int lun)
 		}
 	}
  out:
-	return retval;
-}
-
-/*
- * function:    zfcp_scsi_potential_abort_on_fake
- *
- * purpose:
- *
- * returns:     0 - no fake request aborted
- *              1 - fake request was aborted
- *
- * context:	both the adapter->abort_lock and the 
- *              adapter->fake_list_lock are assumed to be held write lock
- *              irqsave
- */
-int
-zfcp_scsi_potential_abort_on_fake(struct zfcp_adapter *adapter,
-				  Scsi_Cmnd * cmnd)
-{
-	Scsi_Cmnd *cur = adapter->first_fake_cmnd;
-	Scsi_Cmnd *pre = NULL;
-	int retval = 0;
-
-	while (cur) {
-		if (cur == cmnd) {
-			if (pre)
-				pre->host_scribble = cur->host_scribble;
-			else
-				adapter->first_fake_cmnd =
-				    (Scsi_Cmnd *) cur->host_scribble;
-			cur->host_scribble = NULL;
-			if (!adapter->first_fake_cmnd)
-				del_timer(&adapter->fake_scsi_timer);
-			retval = 1;
-			break;
-		}
-		pre = cur;
-		cur = (Scsi_Cmnd *) cur->host_scribble;
-	}
 	return retval;
 }
 
@@ -663,32 +505,10 @@ zfcp_scsi_eh_abort_handler(Scsi_Cmnd * scpnt)
 	 * Race condition between normal (late) completion and abort has
 	 * to be avoided.
 	 * The entirity of all accesses to scsi_req have to be atomic.
-	 * scsi_req is usually part of the fsf_req (for requests which
-	 * are not faked) and thus we block the release of fsf_req
-	 * as long as we need to access scsi_req.
-	 * For faked commands we use the same lock even if they are not
-	 * put into the fsf_req queue. This makes implementation
-	 * easier. 
+	 * scsi_req is usually part of the fsf_req and thus we block the
+	 * release of fsf_req as long as we need to access scsi_req.
 	 */
 	write_lock_irqsave(&adapter->abort_lock, flags);
-
-	/*
-	 * Check if we deal with a faked command, which we may just forget
-	 * about from now on
-	 */
-	write_lock(&adapter->fake_list_lock);
-	/* only need to go through list if there are faked requests */
-	if (adapter->first_fake_cmnd != NULL) {
-		if (zfcp_scsi_potential_abort_on_fake(adapter, scpnt)) {
-			write_unlock(&adapter->fake_list_lock);
-			write_unlock_irqrestore(&adapter->abort_lock, flags);
-			ZFCP_LOG_INFO("A faked command was aborted\n");
-			retval = SUCCESS;
-			strncpy(dbf_result, "##faked", ZFCP_ABORT_DBF_LENGTH);
-			goto out;
-		}
-	}
-	write_unlock(&adapter->fake_list_lock);
 
 	/*
 	 * Check whether command has just completed and can not be aborted.
@@ -845,11 +665,6 @@ zfcp_scsi_eh_device_reset_handler(Scsi_Cmnd * scpnt)
 
 	spin_unlock_irq(scsi_host->host_lock);
 
-	/*
-	 * We should not be called to reset a target which we 'sent' faked SCSI
-	 * commands since the abort of faked SCSI commands should always
-	 * succeed (simply delete timer). 
-	 */
 	if (!unit) {
 		ZFCP_LOG_NORMAL("bug: Tried to reset a non existant unit.\n");
 		retval = SUCCESS;
@@ -1023,7 +838,6 @@ zfcp_adapter_scsi_register(struct zfcp_adapter *adapter)
 		retval = -EIO;
 		goto out;
 	}
-	atomic_set_mask(ZFCP_STATUS_ADAPTER_REGISTERED, &adapter->status);
 	ZFCP_LOG_DEBUG("host registered, scsi_host at 0x%lx\n",
 		       (unsigned long) adapter->scsi_host);
 
@@ -1039,7 +853,12 @@ zfcp_adapter_scsi_register(struct zfcp_adapter *adapter)
 	 */
 	adapter->scsi_host->hostdata[0] = (unsigned long) adapter;
 
-	scsi_add_host(adapter->scsi_host, &adapter->ccw_device->dev);
+	if (scsi_add_host(adapter->scsi_host, &adapter->ccw_device->dev)) {
+		scsi_host_put(adapter->scsi_host);
+		retval = -EIO;
+		goto out;
+	}
+	atomic_set_mask(ZFCP_STATUS_ADAPTER_REGISTERED, &adapter->status);
  out:
 	return retval;
 }
@@ -1061,8 +880,9 @@ zfcp_adapter_scsi_unregister(struct zfcp_adapter *adapter)
 		return;
 	scsi_remove_host(shost);
 	scsi_host_put(shost);
-
 	adapter->scsi_host = NULL;
+	atomic_clear_mask(ZFCP_STATUS_ADAPTER_REGISTERED, &adapter->status);
+
 	return;
 }
 

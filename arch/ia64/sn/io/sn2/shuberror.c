@@ -1,5 +1,4 @@
-/* $Id: shuberror.c,v 1.1 2002/02/28 17:31:25 marcelo Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -17,7 +16,6 @@
 #include <asm/sn/sgi.h>
 #include <asm/sn/io.h>
 #include <asm/sn/iograph.h>
-#include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/labelcl.h>
 #include <asm/sn/sn_private.h>
@@ -31,6 +29,7 @@
 #include <asm/sn/ioerror_handling.h>
 #include <asm/sn/ioerror.h>
 #include <asm/sn/sn2/shubio.h>
+#include <asm/sn/sn2/shub_mmr.h>
 #include <asm/sn/bte.h>
 
 extern void hubni_eint_init(cnodeid_t cnode);
@@ -173,7 +172,6 @@ hubii_eint_handler (int irq, void *arg, struct pt_regs *ep)
     hubinfo_t		hinfo; 
     ii_wstat_u_t	wstat;
     hubreg_t		idsr;
-    ii_ilcsr_u_t	ilcsr;
 
 
     /* two levels of casting avoids compiler warning.!! */
@@ -228,11 +226,9 @@ hubii_eint_handler (int irq, void *arg, struct pt_regs *ep)
 	
 	}
 	/*
-	 * Note: we may never be able to print this, if the II talking
-	 * to Xbow which hosts the console is dead. 
+	 * Only print the II_ECRAZY message if there is an attached xbow.
 	 */
-	ilcsr.ii_ilcsr_regval = REMOTE_HUB_L(hinfo->h_nasid, IIO_ILCSR);
-	if (ilcsr.ii_ilcsr_fld_s.i_llp_en == 1) {	/* Link is enabled */
+	if (NODEPDA(hinfo->h_cnodeid)->xbow_vhdl != 0) {
 	    printk("Hub %d, cnode %d to Xtalk Link failed (II_ECRAZY) Reason: %s", 
 		hinfo->h_nasid, hinfo->h_cnodeid, reason);
 	}
@@ -299,7 +295,7 @@ hubiio_crb_free(hubinfo_t hinfo, int crbnum)
 	* Wait till hub indicates it's done.
 	*/
 	while (REMOTE_HUB_L(hinfo->h_nasid, IIO_ICDR) & IIO_ICDR_PND)
-		us_delay(1);
+		udelay(1);
 
 }
 

@@ -235,7 +235,7 @@ static dev_link_t *elsa_cs_attach(void)
     client_reg.event_handler = &elsa_cs_event;
     client_reg.Version = 0x0210;
     client_reg.event_callback_args.client_data = link;
-    ret = CardServices(RegisterClient, &link->handle, &client_reg);
+    ret = pcmcia_register_client(&link->handle, &client_reg);
     if (ret != CS_SUCCESS) {
         cs_error(link->handle, RegisterClient, ret);
         elsa_cs_detach(link);
@@ -286,7 +286,7 @@ static void elsa_cs_detach(dev_link_t *link)
 
     /* Break the link with Card Services */
     if (link->handle) {
-        ret = CardServices(DeregisterClient, link->handle);
+        ret = pcmcia_deregister_client(link->handle);
 	if (ret != CS_SUCCESS)
 	    cs_error(link->handle, DeregisterClient, ret);
     }
@@ -304,19 +304,29 @@ static void elsa_cs_detach(dev_link_t *link)
     device available to the system.
 
 ======================================================================*/
-static int get_tuple(int fn, client_handle_t handle, tuple_t *tuple,
+static int get_tuple(client_handle_t handle, tuple_t *tuple,
                      cisparse_t *parse)
 {
-    int i;
-    i = CardServices(fn, handle, tuple);
+    int i = pcmcia_get_tuple_data(handle, tuple);
     if (i != CS_SUCCESS) return i;
-    i = CardServices(GetTupleData, handle, tuple);
-    if (i != CS_SUCCESS) return i;
-    return CardServices(ParseTuple, handle, tuple, parse);
+    return pcmcia_parse_tuple(handle, tuple, parse);
 }
 
-#define first_tuple(a, b, c) get_tuple(GetFirstTuple, a, b, c)
-#define next_tuple(a, b, c) get_tuple(GetNextTuple, a, b, c)
+static int first_tuple(client_handle_t handle, tuple_t *tuple,
+                     cisparse_t *parse)
+{
+    int i = pcmcia_get_first_tuple(handle, tuple);
+    if (i != CS_SUCCESS) return i;
+    return get_tuple(handle, tuple, parse);
+}
+
+static int next_tuple(client_handle_t handle, tuple_t *tuple,
+                     cisparse_t *parse)
+{
+    int i = pcmcia_get_next_tuple(handle, tuple);
+    if (i != CS_SUCCESS) return i;
+    return get_tuple(handle, tuple, parse);
+}
 
 static void elsa_cs_config(dev_link_t *link)
 {
@@ -362,14 +372,14 @@ static void elsa_cs_config(dev_link_t *link)
             printk(KERN_INFO "(elsa_cs: looks like the 96 model)\n");
             link->conf.ConfigIndex = cf->index;
             link->io.BasePort1 = cf->io.win[0].base;
-            i = CardServices(RequestIO, link->handle, &link->io);
+            i = pcmcia_request_io(link->handle, &link->io);
             if (i == CS_SUCCESS) break;
         } else {
           printk(KERN_INFO "(elsa_cs: looks like the 97 model)\n");
           link->conf.ConfigIndex = cf->index;
           for (i = 0, j = 0x2f0; j > 0x100; j -= 0x10) {
             link->io.BasePort1 = j;
-            i = CardServices(RequestIO, link->handle, &link->io);
+            i = pcmcia_request_io(link->handle, &link->io);
             if (i == CS_SUCCESS) break;
           }
           break;
@@ -382,14 +392,14 @@ static void elsa_cs_config(dev_link_t *link)
 	goto cs_failed;
     }
 
-    i = CardServices(RequestIRQ, link->handle, &link->irq);
+    i = pcmcia_request_irq(link->handle, &link->irq);
     if (i != CS_SUCCESS) {
         link->irq.AssignedIRQ = 0;
 	last_fn = RequestIRQ;
         goto cs_failed;
     }
 
-    i = CardServices(RequestConfiguration, link->handle, &link->conf);
+    i = pcmcia_request_configuration(link->handle, &link->conf);
     if (i != CS_SUCCESS) {
       last_fn = RequestConfiguration;
       goto cs_failed;
@@ -447,10 +457,10 @@ static void elsa_cs_release(dev_link_t *link)
 
     /* Don't bother checking to see if these succeed or not */
     if (link->win)
-        CardServices(ReleaseWindow, link->win);
-    CardServices(ReleaseConfiguration, link->handle);
-    CardServices(ReleaseIO, link->handle, &link->io);
-    CardServices(ReleaseIRQ, link->handle, &link->irq);
+        pcmcia_release_window(link->win);
+    pcmcia_release_configuration(link->handle);
+    pcmcia_release_io(link->handle, &link->io);
+    pcmcia_release_irq(link->handle, &link->irq);
     link->state &= ~DEV_CONFIG;
 
     if (link->state & DEV_STALE_LINK)
@@ -499,14 +509,14 @@ static int elsa_cs_event(event_t event, int priority,
         /* Mark the device as stopped, to block IO until later */
         dev->busy = 1;
         if (link->state & DEV_CONFIG)
-            CardServices(ReleaseConfiguration, link->handle);
+            pcmcia_release_configuration(link->handle);
         break;
     case CS_EVENT_PM_RESUME:
         link->state &= ~DEV_SUSPEND;
         /* Fall through... */
     case CS_EVENT_CARD_RESET:
         if (link->state & DEV_CONFIG)
-            CardServices(RequestConfiguration, link->handle, &link->conf);
+            pcmcia_request_configuration(link->handle, &link->conf);
         dev->busy = 0;
         break;
     }

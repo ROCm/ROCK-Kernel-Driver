@@ -1,5 +1,4 @@
 /*
- *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -7,31 +6,18 @@
  * Copyright (C) 2001-2003 Silicon Graphics, Inc. All rights reserved.
  */
 
-#include <linux/types.h>
-#include <linux/slab.h>
 #include <linux/module.h>
 #include <linux/string.h>
 #include <linux/interrupt.h>
-#include <linux/ioport.h>
 #include <asm/sn/sgi.h>
 #include <asm/sn/sn_sal.h>
-#include <asm/sn/sn_cpuid.h>
-#include <asm/sn/addrs.h>
-#include <asm/sn/arch.h>
 #include <asm/sn/iograph.h>
-#include <asm/sn/invent.h>
-#include <asm/sn/hcl.h>
-#include <asm/sn/labelcl.h>
-#include <asm/sn/klconfig.h>
-#include <asm/sn/xtalk/xwidget.h>
-#include <asm/sn/pci/bridge.h>
 #include <asm/sn/pci/pciio.h>
 #include <asm/sn/pci/pcibr.h>
 #include <asm/sn/pci/pcibr_private.h>
 #include <asm/sn/pci/pci_defs.h>
-#include <asm/sn/prio.h>
-#include <asm/sn/xtalk/xbow.h>
-#include <asm/sn/io.h>
+
+#include <asm/sn/prio.h> 
 #include <asm/sn/sn_private.h>
 
 /*
@@ -39,36 +25,15 @@
  *   -pcibr_debug_mask is the mask of the different types of debugging
  *    you want to enable.  See sys/PCI/pcibr_private.h 
  *   -pcibr_debug_module is the module you want to trace.  By default
- *    all modules are trace.  For IP35 this value has the format of
- *    something like "001c10".  For IP27 this value is a node number,
- *    i.e. "1", "2"...  For IP30 this is undefined and should be set to
- *    'all'.
- *   -pcibr_debug_widget is the widget you want to trace.  For IP27
- *    the widget isn't exposed in the hwpath so use the xio slot num.
- *    i.e. for 'io2' set pcibr_debug_widget to "2".
+ *    all modules are trace.  The format is something like "001c10".
+ *   -pcibr_debug_widget is the widget you want to trace.  For TIO 
+ *    based bricks use the corelet id.
  *   -pcibr_debug_slot is the pci slot you want to trace.
  */
 uint32_t pcibr_debug_mask = 0x0;	/* 0x00000000 to disable */
-char      *pcibr_debug_module = "all";		/* 'all' for all modules */
-int	   pcibr_debug_widget = -1;		/* '-1' for all widgets  */
-int	   pcibr_debug_slot = -1;		/* '-1' for all slots    */
-
-/*
- * Macros related to the Lucent USS 302/312 usb timeout workaround.  It
- * appears that if the lucent part can get into a retry loop if it sees a
- * DAC on the bus during a pio read retry.  The loop is broken after about
- * 1ms, so we need to set up bridges holding this part to allow at least
- * 1ms for pio.
- */
-
-#define USS302_TIMEOUT_WAR
-
-#ifdef USS302_TIMEOUT_WAR
-#define LUCENT_USBHC_VENDOR_ID_NUM	0x11c1
-#define LUCENT_USBHC302_DEVICE_ID_NUM	0x5801
-#define LUCENT_USBHC312_DEVICE_ID_NUM	0x5802
-#define USS302_BRIDGE_TIMEOUT_HLD	4
-#endif
+static char      *pcibr_debug_module = "all";		/* 'all' for all modules */
+static int	   pcibr_debug_widget = -1;		/* '-1' for all widgets  */
+static int	   pcibr_debug_slot = -1;		/* '-1' for all slots    */
 
 /* kbrick widgetnum-to-bus layout */
 int p_busnum[MAX_PORT_NUM] = {                  /* widget#      */
@@ -81,6 +46,24 @@ int p_busnum[MAX_PORT_NUM] = {                  /* widget#      */
         4,                                      /* 0xe          */
         3,                                      /* 0xf          */
 };
+
+char *pci_space[] = {"NONE",
+                     "ROM",
+                     "IO",
+                     "",
+                     "MEM",
+                     "MEM32",
+                     "MEM64",
+                     "CFG",
+                     "WIN0",
+                     "WIN1",
+                     "WIN2",
+                     "WIN3",
+                     "WIN4",
+                     "WIN5",
+                     "",
+                     "BAD"};
+
 
 #if PCIBR_SOFT_LIST
 pcibr_list_p            pcibr_list = 0;
@@ -289,12 +272,10 @@ pcibr_try_set_device(pcibr_soft_t pcibr_soft,
     bridgereg_t             xmask;
 
     xmask = mask;
-    if (IS_XBRIDGE_OR_PIC_SOFT(pcibr_soft)) {
-    	if (mask == BRIDGE_DEV_PMU_BITS)
-		xmask = XBRIDGE_DEV_PMU_BITS;
-	if (mask == BRIDGE_DEV_D64_BITS)
-		xmask = XBRIDGE_DEV_D64_BITS;
-    }
+    if (mask == BRIDGE_DEV_PMU_BITS)
+	xmask = XBRIDGE_DEV_PMU_BITS;
+    if (mask == BRIDGE_DEV_D64_BITS)
+	xmask = XBRIDGE_DEV_D64_BITS;
 
     slotp = &pcibr_soft->bs_slot[slot];
 
@@ -376,11 +357,9 @@ pcibr_try_set_device(pcibr_soft_t pcibr_soft,
 	new &= ~BRIDGE_DEV_WRGA_BITS;
 
     if (flags & PCIIO_BYTE_STREAM)
-	new |= (IS_XBRIDGE_OR_PIC_SOFT(pcibr_soft)) ? 
-			BRIDGE_DEV_SWAP_DIR : BRIDGE_DEV_SWAP_BITS;
+	new |= BRIDGE_DEV_SWAP_DIR;
     if (flags & PCIIO_WORD_VALUES)
-	new &= (IS_XBRIDGE_OR_PIC_SOFT(pcibr_soft)) ? 
-			~BRIDGE_DEV_SWAP_DIR : ~BRIDGE_DEV_SWAP_BITS;
+	new &= ~BRIDGE_DEV_SWAP_DIR;
 
     /* Provider-specific flags
      */
@@ -410,7 +389,7 @@ pcibr_try_set_device(pcibr_soft_t pcibr_soft,
      * device.  The bit is only intended for 64-bit devices and, on
      * PIC, can cause problems for 32-bit devices.
      */
-    if (IS_PIC_SOFT(pcibr_soft) && mask == BRIDGE_DEV_D64_BITS &&
+    if (mask == BRIDGE_DEV_D64_BITS &&
                                 PCIBR_WAR_ENABLED(PV855271, pcibr_soft)) {
         if (flags & PCIBR_VCHAN1) {
                 new |= BRIDGE_DEV_VIRTUAL_EN;
@@ -418,6 +397,11 @@ pcibr_try_set_device(pcibr_soft_t pcibr_soft,
         }
     }
 
+    /* PIC BRINGUP WAR (PV# 878674):   Don't allow 64bit PIO accesses */
+    if (IS_PIC_SOFT(pcibr_soft) && (flags & PCIBR_64BIT) &&
+				PCIBR_WAR_ENABLED(PV878674, pcibr_soft)) {
+	new &= ~(1ull << 22);
+    }
 
     chg = old ^ new;				/* what are we changing, */
     chg &= xmask;				/* of the interesting bits */
@@ -425,13 +409,8 @@ pcibr_try_set_device(pcibr_soft_t pcibr_soft,
     if (chg) {
 
 	badd32 = slotp->bss_d32_uctr ? (BRIDGE_DEV_D32_BITS & chg) : 0;
-	if (IS_XBRIDGE_OR_PIC_SOFT(pcibr_soft)) {
-		badpmu = slotp->bss_pmu_uctr ? (XBRIDGE_DEV_PMU_BITS & chg) : 0;
-		badd64 = slotp->bss_d64_uctr ? (XBRIDGE_DEV_D64_BITS & chg) : 0;
-	} else {
-		badpmu = slotp->bss_pmu_uctr ? (BRIDGE_DEV_PMU_BITS & chg) : 0;
-		badd64 = slotp->bss_d64_uctr ? (BRIDGE_DEV_D64_BITS & chg) : 0;
-	}
+	badpmu = slotp->bss_pmu_uctr ? (XBRIDGE_DEV_PMU_BITS & chg) : 0;
+	badd64 = slotp->bss_d64_uctr ? (XBRIDGE_DEV_D64_BITS & chg) : 0;
 	bad = badpmu | badd32 | badd64;
 
 	if (bad) {
@@ -473,6 +452,8 @@ pcibr_try_set_device(pcibr_soft_t pcibr_soft,
 	     */
 	    if (bad) {
 		pcibr_unlock(pcibr_soft, s);
+		PCIBR_DEBUG((PCIBR_DEBUG_DEVREG, pcibr_soft->bs_vhdl,
+			    "pcibr_try_set_device: mod blocked by 0x%x\n", bad));
 		return bad;
 	    }
 	}
@@ -495,25 +476,13 @@ pcibr_try_set_device(pcibr_soft_t pcibr_soft,
 	pcibr_unlock(pcibr_soft, s);
 	return 0;
     }
-    if ( IS_PIC_SOFT(pcibr_soft) ) {
-	bridge->b_device[slot].reg = new;
-	slotp->bss_device = new;
-	bridge->b_wid_tflush;		/* wait until Bridge PIO complete */
-    }
-    else {
-	if (io_get_sh_swapper(NASID_GET(bridge))) {
-		BRIDGE_REG_SET32((&bridge->b_device[slot].reg)) = __swab32(new);
-		slotp->bss_device = new;
-		BRIDGE_REG_GET32((&bridge->b_wid_tflush));  /* wait until Bridge PIO complete */
-	} else {
-		bridge->b_device[slot].reg = new;
-		slotp->bss_device = new;
-		bridge->b_wid_tflush;               /* wait until Bridge PIO complete */
-	}
-    }
+    bridge->b_device[slot].reg = new;
+    slotp->bss_device = new;
+    bridge->b_wid_tflush;		/* wait until Bridge PIO complete */
     pcibr_unlock(pcibr_soft, s);
 
-    printk("pcibr_try_set_device: Device(%d): %x\n", slot, new);
+    PCIBR_DEBUG((PCIBR_DEBUG_DEVREG, pcibr_soft->bs_vhdl,
+		"pcibr_try_set_device: Device(%d): 0x%x\n", slot, new));
     return 0;
 }
 
@@ -548,22 +517,13 @@ pcibr_device_write_gather_flush(pcibr_soft_t pcibr_soft,
 {
     bridge_t               *bridge;
     unsigned long          s;
-    volatile uint32_t     wrf;
+    volatile uint32_t     wrf; 
     s = pcibr_lock(pcibr_soft);
     bridge = pcibr_soft->bs_base;
-
-    if ( IS_PIC_SOFT(pcibr_soft) ) {
-	wrf = bridge->b_wr_req_buf[slot].reg;
-    }
-    else {
-	if (io_get_sh_swapper(NASID_GET(bridge))) {
-		wrf = BRIDGE_REG_GET32((&bridge->b_wr_req_buf[slot].reg));
-	} else {
-		wrf = bridge->b_wr_req_buf[slot].reg;
-	}
-    }
+    
+    wrf = bridge->b_wr_req_buf[slot].reg;
     pcibr_unlock(pcibr_soft, s);
-}
+}   
 
 /* =====================================================================
  *    Bridge (pcibr) "Device Driver" entry points
@@ -662,7 +622,12 @@ pcibr_device_info_new(
      * passed into us, into its external representation.  See comment
      * for the PCIBR_DEVICE_TO_SLOT macro for more information.
      */
-    NEW(pcibr_info);
+    pcibr_info = kmalloc(sizeof (*(pcibr_info)), GFP_KERNEL);
+    if ( !pcibr_info ) {
+	return NULL;
+    }
+    memset(pcibr_info, 0, sizeof (*(pcibr_info)));
+
     pciio_device_info_new(&pcibr_info->f_c, pcibr_soft->bs_vhdl,
 			  PCIBR_DEVICE_TO_SLOT(pcibr_soft, slot),
 			  rfunc, vendor, device);
@@ -720,7 +685,7 @@ pcibr_device_unregister(vertex_hdl_t pconn_vhdl)
     pcibr_soft_t	 pcibr_soft;
     bridge_t		*bridge;
     int                  count_vchan0, count_vchan1;
-    unsigned             s;
+    unsigned long	 s;
     int			 error_call;
     int			 error = 0;
 
@@ -746,9 +711,6 @@ pcibr_device_unregister(vertex_hdl_t pconn_vhdl)
 
         s = pcibr_lock(pcibr_soft);
 
-	/* PIC NOTE: If this is a BRIDGE, VCHAN2 & VCHAN3 will be zero so
-	 * no need to conditionalize this (ie. "if (IS_PIC_SOFT())" ).
-	 */
         pcibr_soft->bs_rrb_res[slot] = pcibr_soft->bs_rrb_res[slot] +
                                        pcibr_soft->bs_rrb_valid[slot][VCHAN0] +
                                        pcibr_soft->bs_rrb_valid[slot][VCHAN1] +
@@ -983,18 +945,15 @@ pcibr_attach2(vertex_hdl_t xconn_vhdl, bridge_t *bridge,
     char                    devnm[MAXDEVNAME], *s;
     pcibr_hints_t           pcibr_hints;
     uint64_t              int_enable;
-    bridgereg_t             int_enable_32;
     picreg_t                int_enable_64;
     unsigned                rrb_fixed = 0;
-
-    int                     spl_level;
 
 #if PCI_FBBE
     int                     fast_back_to_back_enable;
 #endif
     nasid_t		    nasid;
     int	                    iobrick_type_get_nasid(nasid_t nasid);
-    int                     iobrick_module_get_nasid(nasid_t nasid);
+    int                     iomoduleid_get(nasid_t nasid);
 
     PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_ATTACH, pcibr_vhdl,
 	        "pcibr_attach2: bridge=0x%p, busnum=%d\n", bridge, busnum));
@@ -1025,10 +984,13 @@ pcibr_attach2(vertex_hdl_t xconn_vhdl, bridge_t *bridge,
      * allocate soft state structure, fill in some
      * fields, and hook it up to our vertex.
      */
-    NEW(pcibr_soft);
+    pcibr_soft = kmalloc(sizeof(*(pcibr_soft)), GFP_KERNEL);
     if (ret_softp)
 	*ret_softp = pcibr_soft;
-    BZERO(pcibr_soft, sizeof *pcibr_soft);
+    if (!pcibr_soft)
+	return -1;
+
+    memset(pcibr_soft, 0, sizeof *pcibr_soft);
     pcibr_soft_set(pcibr_vhdl, pcibr_soft);
     pcibr_soft->bs_conn = xconn_vhdl;
     pcibr_soft->bs_vhdl = pcibr_vhdl;
@@ -1094,7 +1056,10 @@ pcibr_attach2(vertex_hdl_t xconn_vhdl, bridge_t *bridge,
     {
 	pcibr_list_p            self;
 
-	NEW(self);
+	self = kmalloc(sizeof(*(self)), GFP_KERNEL);
+	if (!self)
+		return -1;
+	memset(self, 0, sizeof(*(self)));
 	self->bl_soft = pcibr_soft;
 	self->bl_vhdl = pcibr_vhdl;
 	self->bl_next = pcibr_list;
@@ -1112,8 +1077,7 @@ pcibr_attach2(vertex_hdl_t xconn_vhdl, bridge_t *bridge,
 
     PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_ATTACH, pcibr_vhdl,
 		"pcibr_attach2: %s ASIC: rev %s (code=0x%x)\n",
-		IS_XBRIDGE_SOFT(pcibr_soft) ? "XBridge" :
-			IS_PIC_SOFT(pcibr_soft) ? "PIC" : "Bridge", 
+		"PIC",
 		(rev == BRIDGE_PART_REV_A) ? "A" : 
                 (rev == BRIDGE_PART_REV_B) ? "B" :
                 (rev == BRIDGE_PART_REV_C) ? "C" :
@@ -1143,7 +1107,7 @@ pcibr_attach2(vertex_hdl_t xconn_vhdl, bridge_t *bridge,
 	printk(KERN_WARNING "0x%p: Unknown bricktype : 0x%x\n", (void *)xconn_vhdl,
 				(unsigned int)pcibr_soft->bs_bricktype);
 
-    pcibr_soft->bs_moduleid = iobrick_module_get_nasid(nasid);
+    pcibr_soft->bs_moduleid = iomoduleid_get(nasid);
 
     if (pcibr_soft->bs_bricktype > 0) {
 	switch (pcibr_soft->bs_bricktype) {
@@ -1268,12 +1232,8 @@ pcibr_attach2(vertex_hdl_t xconn_vhdl, bridge_t *bridge,
      * is a wrapper routine we register that will call the real error handler
      * pcibr_error_handler() with the correct pcibr_soft struct.
      */
-    if (IS_PIC_SOFT(pcibr_soft)) {
-	if (busnum == 0) {
-	    xwidget_error_register(xconn_vhdl, pcibr_error_handler_wrapper, pcibr_soft);
-	}
-    } else {
-	xwidget_error_register(xconn_vhdl, pcibr_error_handler, pcibr_soft);
+    if (busnum == 0) {
+    	xwidget_error_register(xconn_vhdl, pcibr_error_handler_wrapper, pcibr_soft);
     }
 
     /*
@@ -1293,7 +1253,7 @@ pcibr_attach2(vertex_hdl_t xconn_vhdl, bridge_t *bridge,
     bridge->b_int_rst_stat = (BRIDGE_IRR_ALL_CLR);
 
     /* Initialize some PIC specific registers. */
-    if (IS_PIC_SOFT(pcibr_soft)) {
+    {
 	picreg_t pic_ctrl_reg = bridge->p_wid_control_64;
 
 	/* Bridges Requester ID: bus = busnum, dev = 0, func = 0 */
@@ -1317,19 +1277,7 @@ pcibr_attach2(vertex_hdl_t xconn_vhdl, bridge_t *bridge,
 
 	bridge->p_wid_control_64 = pic_ctrl_reg;
     }
-
-    /*
-     * Until otherwise set up,
-     * assume all interrupts are
-     * from slot 7(Bridge/Xbridge) or 3(PIC).
-     * XXX. Not sure why we're doing this, made change for PIC
-     * just to avoid setting reserved bits.
-     */
-    if (IS_PIC_SOFT(pcibr_soft))
-	bridge->b_int_device = (uint32_t) 0x006db6db;
-    else
-	bridge->b_int_device = (uint32_t) 0xffffffff;
-
+    bridge->b_int_device = (uint32_t) 0x006db6db;
     {
 	bridgereg_t             dirmap;
 	paddr_t                 paddr;
@@ -1367,7 +1315,7 @@ pcibr_attach2(vertex_hdl_t xconn_vhdl, bridge_t *bridge,
 	 * for the lowest hunk of memory.
 	 */
 	xbase = xtalk_dmatrans_addr(xconn_vhdl, 0,
-				    paddr, _PAGESZ, 0);
+				    paddr, PAGE_SIZE, 0);
 
 	if (xbase != XIO_NOWHERE) {
 	    if (XIO_PACKED(xbase)) {
@@ -1397,24 +1345,14 @@ pcibr_attach2(vertex_hdl_t xconn_vhdl, bridge_t *bridge,
 	 * ensure that we write and read without any interruption.
 	 * The read following the write is required for the Bridge war
 	 */
-	spl_level = splhi();
 #if IOPGSIZE == 4096
-        if (IS_PIC_SOFT(pcibr_soft)) {
-            bridge->p_wid_control_64 &= ~BRIDGE_CTRL_PAGE_SIZE;
-        } else {
-            bridge->b_wid_control &= ~BRIDGE_CTRL_PAGE_SIZE;
-        }
+        bridge->p_wid_control_64 &= ~BRIDGE_CTRL_PAGE_SIZE;
 #elif IOPGSIZE == 16384
-        if (IS_PIC_SOFT(pcibr_soft)) {
-            bridge->p_wid_control_64 |= BRIDGE_CTRL_PAGE_SIZE;
-        } else {
-            bridge->b_wid_control |= BRIDGE_CTRL_PAGE_SIZE;
-        }
+        bridge->p_wid_control_64 |= BRIDGE_CTRL_PAGE_SIZE;
 #else
 	<<<Unable to deal with IOPGSIZE >>>;
 #endif
 	bridge->b_wid_control;		/* inval addr bug war */
-	splx(spl_level);
 
 	/* Initialize internal mapping entries */
 	for (entry = 0; entry < pcibr_soft->bs_int_ate_size; entry++) {
@@ -1441,10 +1379,7 @@ pcibr_attach2(vertex_hdl_t xconn_vhdl, bridge_t *bridge,
 	 * time.
 	 */
 
-	if (IS_XBRIDGE_OR_PIC_SOFT(pcibr_soft))
-		num_entries = 0;
-	else
-		num_entries = pcibr_init_ext_ate_ram(bridge);
+	num_entries = 0;
 
 	/* we always have 128 ATEs (512 for Xbridge) inside the chip
 	 * even if disabled for debugging.
@@ -1552,24 +1487,8 @@ pcibr_attach2(vertex_hdl_t xconn_vhdl, bridge_t *bridge,
      * enable all of them.
      * NOTE: some PCI ints may already be enabled.
      */
-    /* We read the INT_ENABLE register as a 64bit picreg_t for PIC and a
-     * 32bit bridgereg_t for BRIDGE, but always process the result as a
-     * 64bit value so the code can be "common" for both PIC and BRIDGE...
-     */
-    if (IS_PIC_SOFT(pcibr_soft)) {
-	int_enable_64 = bridge->p_int_enable_64 | BRIDGE_ISR_ERRORS;
-        int_enable = (uint64_t)int_enable_64;
-#ifdef PFG_TEST
-	int_enable = (uint64_t)0x7ffffeff7ffffeff;
-#endif
-    } else {
-	int_enable_32 = bridge->b_int_enable | (BRIDGE_ISR_ERRORS & 0xffffffff);
-	int_enable = ((uint64_t)int_enable_32 & 0xffffffff);
-#ifdef PFG_TEST
-	int_enable = (uint64_t)0x7ffffeff;
-#endif
-    }
-
+    int_enable_64 = bridge->p_int_enable_64 | BRIDGE_ISR_ERRORS;
+    int_enable = (uint64_t)int_enable_64;
 
 #if BRIDGE_ERROR_INTR_WAR
     if (pcibr_soft->bs_rev_num == BRIDGE_PART_REV_A) {
@@ -1609,7 +1528,7 @@ pcibr_attach2(vertex_hdl_t xconn_vhdl, bridge_t *bridge,
      * locked out to be freed up sooner (by timing out) so that the
      * read tnums are never completely used up.
      */
-    if (IS_PIC_SOFT(pcibr_soft) && PCIBR_WAR_ENABLED(PV856864, pcibr_soft)) {
+    if (PCIBR_WAR_ENABLED(PV856864, pcibr_soft)) {
         int_enable &= ~PIC_ISR_PCIX_REQ_TOUT;
         int_enable &= ~BRIDGE_ISR_XREAD_REQ_TIMEOUT;
 
@@ -1621,16 +1540,12 @@ pcibr_attach2(vertex_hdl_t xconn_vhdl, bridge_t *bridge,
      * RRB0, RRB8, RRB1, and RRB9.  Assign them to DEVICE[2|3]--VCHAN3
      * so they are not used
      */
-    if (IS_PIC_SOFT(pcibr_soft) && PCIBR_WAR_ENABLED(PV856866, pcibr_soft)) {
+    if (PCIBR_WAR_ENABLED(PV856866, pcibr_soft)) {
         bridge->b_even_resp |= 0x000f000f;
         bridge->b_odd_resp |= 0x000f000f;
     }
 
-    if (IS_PIC_SOFT(pcibr_soft)) {
-        bridge->p_int_enable_64 = (picreg_t)int_enable;
-    } else {
-        bridge->b_int_enable = (bridgereg_t)int_enable;
-    }
+    bridge->p_int_enable_64 = (picreg_t)int_enable;
     bridge->b_int_mode = 0;		/* do not send "clear interrupt" packets */
 
     bridge->b_wid_tflush;		/* wait until Bridge PIO complete */
@@ -1690,7 +1605,7 @@ pcibr_attach2(vertex_hdl_t xconn_vhdl, bridge_t *bridge,
     /* Setup the Bus's PCI IO Root Resource. */
     pcibr_soft->bs_io_win_root_resource.start = PCIBR_BUS_IO_BASE;
     pcibr_soft->bs_io_win_root_resource.end = 0xffffffff;
-    res = (struct resource *) kmalloc( sizeof(struct resource), KM_NOSLEEP);
+    res = (struct resource *) kmalloc( sizeof(struct resource), GFP_KERNEL);
     if (!res)
 	panic("PCIBR:Unable to allocate resource structure\n");
 
@@ -1702,13 +1617,13 @@ pcibr_attach2(vertex_hdl_t xconn_vhdl, bridge_t *bridge,
 	panic("PCIBR:Unable to request_resource()\n");
 
     /* Setup the Small Window Root Resource */
-    pcibr_soft->bs_swin_root_resource.start = _PAGESZ;
+    pcibr_soft->bs_swin_root_resource.start = PAGE_SIZE;
     pcibr_soft->bs_swin_root_resource.end = 0x000FFFFF;
 
     /* Setup the Bus's PCI Memory Root Resource */
     pcibr_soft->bs_mem_win_root_resource.start = 0x200000;
     pcibr_soft->bs_mem_win_root_resource.end = 0xffffffff;
-    res = (struct resource *) kmalloc( sizeof(struct resource), KM_NOSLEEP);
+    res = (struct resource *) kmalloc( sizeof(struct resource), GFP_KERNEL);
     if (!res)
         panic("PCIBR:Unable to allocate resource structure\n");
 
@@ -1776,8 +1691,7 @@ pcibr_attach2(vertex_hdl_t xconn_vhdl, bridge_t *bridge,
     }
 
     /* Set up convenience links */
-    if (IS_XBRIDGE_OR_PIC_SOFT(pcibr_soft))
-	pcibr_bus_cnvlink(pcibr_soft->bs_vhdl);
+    pcibr_bus_cnvlink(pcibr_soft->bs_vhdl);
 
     for (slot = pcibr_soft->bs_min_slot; 
 				slot < PCIBR_NUM_SLOTS(pcibr_soft); ++slot)
@@ -1881,11 +1795,7 @@ pcibr_detach(vertex_hdl_t xconn)
 
     s = pcibr_lock(pcibr_soft);
     /* Disable the interrupts from the bridge */
-    if (IS_PIC_SOFT(pcibr_soft)) {
-	bridge->p_int_enable_64 = 0;
-    } else {
-	bridge->b_int_enable = 0;
-    }
+    bridge->p_int_enable_64 = 0;
     pcibr_unlock(pcibr_soft, s);
 
     /* Detach all the PCI devices talking to this bridge */
@@ -1898,7 +1808,6 @@ pcibr_detach(vertex_hdl_t xconn)
     pciio_device_info_unregister(pcibr_vhdl,
 				 &(pcibr_soft->bs_noslot_info->f_c));
 
-    spin_lock_destroy(&pcibr_soft->bs_lock);
     kfree(pcibr_soft->bs_name);
     
     /* Disconnect the error interrupt and free the xtalk resources 
@@ -1910,13 +1819,14 @@ pcibr_detach(vertex_hdl_t xconn)
     /* Clear the software state maintained by the bridge driver for this
      * bridge.
      */
-    DEL(pcibr_soft);
+    kfree(pcibr_soft);
+
     /* Remove the Bridge revision labelled info */
     (void)hwgraph_info_remove_LBL(pcibr_vhdl, INFO_LBL_PCIBR_ASIC_REV, NULL);
     /* Remove the character device associated with this bridge */
-    (void)hwgraph_edge_remove(pcibr_vhdl, EDGE_LBL_CONTROLLER, NULL);
+    hwgraph_edge_remove(pcibr_vhdl, EDGE_LBL_CONTROLLER, NULL);
     /* Remove the PCI bridge vertex */
-    (void)hwgraph_edge_remove(xconn, EDGE_LBL_PCI, NULL);
+    hwgraph_edge_remove(xconn, EDGE_LBL_PCI, NULL);
 
     return(0);
 }
@@ -1994,7 +1904,6 @@ pcibr_addr_pci_to_xio(vertex_hdl_t pconn_vhdl,
     iopaddr_t               mbase;	/* base of devio(x) mapped area on PCI */
     size_t                  msize;	/* size of devio(x) mapped area on PCI */
     size_t                  mmask;	/* addr bits stored in Device(x) */
-    char		    tmp_str[512];
 
     unsigned long           s;
 
@@ -2171,27 +2080,13 @@ pcibr_addr_pci_to_xio(vertex_hdl_t pconn_vhdl,
 		devreg &= ~BRIDGE_DEV_DEV_SWAP;
 
 	    if (pcibr_soft->bs_slot[win].bss_device != devreg) {
-		if ( IS_PIC_SOFT(pcibr_soft) ) {
-			bridge->b_device[win].reg = devreg;
-			pcibr_soft->bs_slot[win].bss_device = devreg;
-			bridge->b_wid_tflush;   /* wait until Bridge PIO complete */
-		}
-		else {
-			if (io_get_sh_swapper(NASID_GET(bridge))) {
-				BRIDGE_REG_SET32((&bridge->b_device[win].reg)) = __swab32(devreg);
-				pcibr_soft->bs_slot[win].bss_device = devreg;
-				BRIDGE_REG_GET32((&bridge->b_wid_tflush)); /* wait until Bridge PIO complete */
-			} else {
-				bridge->b_device[win].reg = devreg;
-				pcibr_soft->bs_slot[win].bss_device = devreg;
-				bridge->b_wid_tflush;   /* wait until Bridge PIO complete */
-			}
-		}
-
+		bridge->b_device[win].reg = devreg;
+		pcibr_soft->bs_slot[win].bss_device = devreg;
+		bridge->b_wid_tflush;   /* wait until Bridge PIO complete */
 #ifdef PCI_LATER
 		PCIBR_DEBUG((PCIBR_DEBUG_DEVREG, pconn_vhdl, 
-			    "pcibr_addr_pci_to_xio: Device(%d): %x\n",
-			    win, devreg, device_bits));
+			    "pcibr_addr_pci_to_xio: Device(%d): 0x%x\n",
+			    win, devreg));
 #endif
 	    }
 	    pcibr_soft->bs_slot[win].bss_devio.bssd_space = space;
@@ -2205,18 +2100,12 @@ pcibr_addr_pci_to_xio(vertex_hdl_t pconn_vhdl,
             if (bar != -1)
                 pcibr_info->f_window[bar].w_devio_index = win;
 
-	    /*
-	     * The kernel only allows functions to have so many variable args,
-	     * attempting to call PCIBR_DEBUG_ALWAYS() with more than 5 printk
-	     * arguments fails so sprintf() it into a temporary string.
-	     */
-	    if (pcibr_debug_mask & PCIBR_DEBUG_PIOMAP) {
-	        sprintf(tmp_str, "pcibr_addr_pci_to_xio: map to [%lx..%lx] for "
-		        "slot %d allocates DevIO(%d) Device(%d) set to %lx\n",
-		        (unsigned long)pci_addr, (unsigned long)(pci_addr + req_size - 1),
-		        (unsigned int)slot, win, win, (unsigned long)devreg);
-	        PCIBR_DEBUG((PCIBR_DEBUG_PIOMAP, pconn_vhdl, "%s", tmp_str));
-	    }
+	    PCIBR_DEBUG((PCIBR_DEBUG_PIOMAP, pconn_vhdl,
+		    "pcibr_addr_pci_to_xio: map to space %s [0x%lx..0x%lx] "
+		    "for slot %d allocates DevIO(%d) Device(%d) set to %lx\n",
+		    pci_space[space], pci_addr, pci_addr + req_size - 1,
+		    slot, win, win, devreg));
+
 	    goto done;
 	}				/* endif DevIO(x) not pointed */
 	mbase = pcibr_soft->bs_slot[win].bss_devio.bssd_base;
@@ -2244,9 +2133,10 @@ pcibr_addr_pci_to_xio(vertex_hdl_t pconn_vhdl,
         if (bar != -1)
             pcibr_info->f_window[bar].w_devio_index = win;
 
-	if (pcibr_debug_mask & PCIBR_DEBUG_PIOMAP) {
-	    PCIBR_DEBUG((PCIBR_DEBUG_PIOMAP, pconn_vhdl, "%s", tmp_str));
-	}
+	PCIBR_DEBUG((PCIBR_DEBUG_PIOMAP, pconn_vhdl,
+		"pcibr_addr_pci_to_xio: map to space %s [0x%lx..0x%lx] "
+		"for slot %d uses DevIO(%d)\n", pci_space[space],
+		pci_addr, pci_addr + req_size - 1, slot, win));
 	goto done;
     }
 
@@ -2271,9 +2161,9 @@ pcibr_addr_pci_to_xio(vertex_hdl_t pconn_vhdl,
 	} else if (IS_PIC_BUSNUM_SOFT(pcibr_soft, 1)) {	/* PIC bus 1 */
 		base = PICBRIDGE1_PCI_MEM32_BASE;
 		limit = PICBRIDGE1_PCI_MEM32_LIMIT;
-	} else {					/* Bridge/Xbridge */
-		base = BRIDGE_PCI_MEM32_BASE;
-		limit = BRIDGE_PCI_MEM32_LIMIT;
+	} else {
+		printk("pcibr_addr_pci_to_xio(): unknown bridge type");
+		return (iopaddr_t)0;
 	}
 
 	if ((pci_addr + base + req_size - 1) <= limit)
@@ -2287,9 +2177,9 @@ pcibr_addr_pci_to_xio(vertex_hdl_t pconn_vhdl,
 	} else if (IS_PIC_BUSNUM_SOFT(pcibr_soft, 1)) {	/* PIC bus 1 */
 		base = PICBRIDGE1_PCI_MEM64_BASE;
 		limit = PICBRIDGE1_PCI_MEM64_LIMIT;
-	} else {					/* Bridge/Xbridge */
-		base = BRIDGE_PCI_MEM64_BASE;
-		limit = BRIDGE_PCI_MEM64_LIMIT;
+	} else {
+		printk("pcibr_addr_pci_to_xio(): unknown bridge type");
+		return (iopaddr_t)0;
 	}
 
 	if ((pci_addr + base + req_size - 1) <= limit)
@@ -2300,20 +2190,7 @@ pcibr_addr_pci_to_xio(vertex_hdl_t pconn_vhdl,
 	/*
 	 * PIC bridges do not support big-window aliases into PCI I/O space
 	 */
-	if (IS_PIC_SOFT(pcibr_soft)) {
-		xio_addr = XIO_NOWHERE;
-		break;
-	}
-
-	/* Bridge Hardware Bug WAR #482741:
-	 * The 4G area that maps directly from
-	 * XIO space to PCI I/O space is busted
-	 * until Bridge Rev D.
-	 */
-	if ((pcibr_soft->bs_rev_num > BRIDGE_PART_REV_C) &&
-	    ((pci_addr + BRIDGE_PCI_IO_BASE + req_size - 1) <=
-	     BRIDGE_PCI_IO_LIMIT))
-	    xio_addr = pci_addr + BRIDGE_PCI_IO_BASE;
+	xio_addr = XIO_NOWHERE;
 	break;
     }
 
@@ -2340,41 +2217,29 @@ pcibr_addr_pci_to_xio(vertex_hdl_t pconn_vhdl,
 	if (bfn == bfo) {		/* we already match. */
 	    ;
 	} else if (bfo != 0) {		/* we have a conflict. */
-	    if (pcibr_debug_mask & PCIBR_DEBUG_PIOMAP) {
-	        PCIBR_DEBUG((PCIBR_DEBUG_PIOMAP, pconn_vhdl, "%s", tmp_str));
-	    }
+	    PCIBR_DEBUG((PCIBR_DEBUG_PIOMAP, pconn_vhdl,
+		    "pcibr_addr_pci_to_xio: swap conflict in %s, "
+		    "was%s%s, want%s%s\n", pci_space[space],
+		    bfo & PCIIO_BYTE_STREAM ? " BYTE_STREAM" : "",
+		    bfo & PCIIO_WORD_VALUES ? " WORD_VALUES" : "",
+		    bfn & PCIIO_BYTE_STREAM ? " BYTE_STREAM" : "",
+		    bfn & PCIIO_WORD_VALUES ? " WORD_VALUES" : ""));
 	    xio_addr = XIO_NOWHERE;
 	} else {			/* OK to make the change. */
+    	    picreg_t             octl, nctl;
 	    swb = (space == PCIIO_SPACE_IO) ? BRIDGE_CTRL_IO_SWAP : BRIDGE_CTRL_MEM_SWAP;
-	    if ( IS_PIC_SOFT(pcibr_soft) ) {
-	    	picreg_t             octl, nctl;
-		octl = bridge->p_wid_control_64;
-		nctl = bst ? octl | (uint64_t)swb : octl & ((uint64_t)~swb);
+	    octl = bridge->p_wid_control_64;
+	    nctl = bst ? octl | (uint64_t)swb : octl & ((uint64_t)~swb);
 
-		if (octl != nctl)		/* make the change if any */
-			bridge->b_wid_control = nctl;
-	    }
-	    else {
-	    	picreg_t             octl, nctl;
-		if (io_get_sh_swapper(NASID_GET(bridge))) {
-			octl = BRIDGE_REG_GET32((&bridge->b_wid_control));
-			nctl = bst ? octl | swb : octl & ~swb;
-
-			if (octl != nctl)           /* make the change if any */
-				BRIDGE_REG_SET32((&bridge->b_wid_control)) = __swab32(nctl);
-		} else {
-			octl = bridge->b_wid_control;
-			nctl = bst ? octl | swb : octl & ~swb;
-
-			if (octl != nctl)           /* make the change if any */
-				bridge->b_wid_control = nctl;
-		}
-	    }
+	    if (octl != nctl)		/* make the change if any */
+		bridge->b_wid_control = nctl;
 	    *bfp = bfn;			/* record the assignment */
 
-	    if (pcibr_debug_mask & PCIBR_DEBUG_PIOMAP) {
-	        PCIBR_DEBUG((PCIBR_DEBUG_PIOMAP, pconn_vhdl, "%s", tmp_str));
-	    }
+	    PCIBR_DEBUG((PCIBR_DEBUG_PIOMAP, pconn_vhdl,
+		    "pcibr_addr_pci_to_xio: swap for %s set to%s%s\n",
+		    pci_space[space],
+		    bfn & PCIIO_BYTE_STREAM ? " BYTE_STREAM" : "",
+		    bfn & PCIIO_WORD_VALUES ? " WORD_VALUES" : ""));
 	}
     }
   done:
@@ -2443,7 +2308,13 @@ pcibr_piomap_alloc(vertex_hdl_t pconn_vhdl,
 	mapptr = NULL;
     else {
 	pcibr_unlock(pcibr_soft, s);
-	NEW(pcibr_piomap);
+	pcibr_piomap = kmalloc(sizeof (*(pcibr_piomap)), GFP_KERNEL);
+	if ( !pcibr_piomap ) {
+		PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_PIOMAP, pconn_vhdl,
+		    	"pcibr_piomap_alloc: malloc fails\n"));
+		return NULL;
+	}
+	memset(pcibr_piomap, 0, sizeof (*(pcibr_piomap)));
     }
 
     pcibr_piomap->bp_dev = pconn_vhdl;
@@ -2480,7 +2351,7 @@ pcibr_piomap_alloc(vertex_hdl_t pconn_vhdl,
     }
     
     PCIBR_DEBUG((PCIBR_DEBUG_PIOMAP, pconn_vhdl,
-		"pcibr_piomap_alloc: map=0x%x\n", pcibr_piomap));
+		"pcibr_piomap_alloc: map=0x%lx\n", pcibr_piomap));
 
     return pcibr_piomap;
 }
@@ -2490,7 +2361,7 @@ void
 pcibr_piomap_free(pcibr_piomap_t pcibr_piomap)
 {
     PCIBR_DEBUG((PCIBR_DEBUG_PIOMAP, pcibr_piomap->bp_dev,
-		"pcibr_piomap_free: map=0x%x\n", pcibr_piomap));
+		"pcibr_piomap_free: map=0x%lx\n", pcibr_piomap));
 
     xtalk_piomap_free(pcibr_piomap->bp_xtalk_pio);
     pcibr_piomap->bp_xtalk_pio = 0;
@@ -2509,7 +2380,7 @@ pcibr_piomap_addr(pcibr_piomap_t pcibr_piomap,
 			     pci_addr - pcibr_piomap->bp_pciaddr,
 			     req_size);
     PCIBR_DEBUG((PCIBR_DEBUG_PIOMAP, pcibr_piomap->bp_dev,
-                "pcibr_piomap_free: map=0x%x, addr=0x%x\n", 
+                "pcibr_piomap_addr: map=0x%lx, addr=0x%lx\n", 
 		pcibr_piomap, addr));
 
     return(addr);
@@ -2520,7 +2391,7 @@ void
 pcibr_piomap_done(pcibr_piomap_t pcibr_piomap)
 {
     PCIBR_DEBUG((PCIBR_DEBUG_PIOMAP, pcibr_piomap->bp_dev,
-		"pcibr_piomap_done: map=0x%x\n", pcibr_piomap));
+		"pcibr_piomap_done: map=0x%lx\n", pcibr_piomap));
     xtalk_piomap_done(pcibr_piomap->bp_xtalk_pio);
 }
 
@@ -2551,7 +2422,7 @@ pcibr_piotrans_addr(vertex_hdl_t pconn_vhdl,
 
     addr = xtalk_piotrans_addr(xconn_vhdl, 0, xio_addr, req_size, flags & PIOMAP_FLAGS);
     PCIBR_DEBUG((PCIBR_DEBUG_PIODIR, pconn_vhdl,
-		"pcibr_piotrans_addr: xio_addr=0x%x, addr=0x%x\n",
+		"pcibr_piotrans_addr: xio_addr=0x%lx, addr=0x%lx\n",
 		xio_addr, addr));
     return(addr);
 }
@@ -2586,7 +2457,7 @@ pcibr_piospace_alloc(vertex_hdl_t pconn_vhdl,
     /*
      * Check for proper alignment
      */
-    ASSERT(alignment >= NBPP);
+    ASSERT(alignment >= PAGE_SIZE);
     ASSERT((alignment & (alignment - 1)) == 0);
 
     align_mask = alignment - 1;
@@ -2595,7 +2466,8 @@ pcibr_piospace_alloc(vertex_hdl_t pconn_vhdl,
     /*
      * First look if a previously allocated chunk exists.
      */
-    if ((piosp = pcibr_info->f_piospace)) {
+    piosp = pcibr_info->f_piospace;
+    if (piosp) {
 	/*
 	 * Look through the list for a right sized free chunk.
 	 */
@@ -2647,11 +2519,18 @@ pcibr_piospace_alloc(vertex_hdl_t pconn_vhdl,
     if (!start_addr) {
 	pcibr_unlock(pcibr_soft, s);
 	PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_PIOMAP, pconn_vhdl,
-		    "pcibr_piospace_alloc: request 0x%x to big\n", req_size));
+		    "pcibr_piospace_alloc: request 0x%lx to big\n", req_size));
 	return 0;
     }
 
-    NEW(piosp);
+    piosp = kmalloc(sizeof (*(piosp)), GFP_KERNEL);
+    if ( !piosp ) {
+	PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_PIOMAP, pconn_vhdl,
+		    "pcibr_piospace_alloc: malloc fails\n"));
+	return 0;
+    }
+    memset(piosp, 0, sizeof (*(piosp)));
+
     piosp->free = 0;
     piosp->space = space;
     piosp->start = start_addr;
@@ -2662,7 +2541,7 @@ pcibr_piospace_alloc(vertex_hdl_t pconn_vhdl,
     pcibr_unlock(pcibr_soft, s);
 
     PCIBR_DEBUG((PCIBR_DEBUG_PIOMAP, pconn_vhdl,
-		"pcibr_piospace_alloc: piosp=0x%x\n", piosp));
+		"pcibr_piospace_alloc: piosp=0x%lx\n", piosp));
 
     return start_addr;
 }
@@ -2675,6 +2554,7 @@ pcibr_piospace_free(vertex_hdl_t pconn_vhdl,
 		    size_t req_size)
 {
     pcibr_info_t            pcibr_info = pcibr_info_get(pconn_vhdl);
+    pcibr_soft_t            pcibr_soft = (pcibr_soft_t) pcibr_info->f_mfast;
     pciio_piospace_t        piosp;
     unsigned long           s;
     char                    name[1024];
@@ -2718,7 +2598,7 @@ pcibr_piospace_free(vertex_hdl_t pconn_vhdl,
     pcibr_unlock(pcibr_soft, s);
 
     PCIBR_DEBUG((PCIBR_DEBUG_PIOMAP, pconn_vhdl,
-		"pcibr_piospace_free: piosp=0x%x\n", piosp));
+		"pcibr_piospace_free: piosp=0x%lx\n", piosp));
     return;
 }
 
@@ -2777,12 +2657,10 @@ pcibr_flags_to_d64(unsigned flags, pcibr_soft_t pcibr_soft)
 	attributes &= ~PCI64_ATTR_PREF;
 
     /* the swap bit is in the address attributes for xbridge */
-    if (IS_XBRIDGE_OR_PIC_SOFT(pcibr_soft)) {
-    	if (flags & PCIIO_BYTE_STREAM)
-        	attributes |= PCI64_ATTR_SWAP;
-    	if (flags & PCIIO_WORD_VALUES)
-        	attributes &= ~PCI64_ATTR_SWAP;
-    }
+    if (flags & PCIIO_BYTE_STREAM)
+       	attributes |= PCI64_ATTR_SWAP;
+    if (flags & PCIIO_WORD_VALUES)
+       	attributes &= ~PCI64_ATTR_SWAP;
 
     /* Provider-specific flags
      */
@@ -2832,6 +2710,7 @@ pcibr_dmamap_alloc(vertex_hdl_t pconn_vhdl,
     int                     ate_count;
     int                     ate_index;
     int			    vchan = VCHAN0;
+    unsigned long	    s;
 
     /* merge in forced flags */
     flags |= pcibr_soft->bs_dma_flags;
@@ -2840,7 +2719,9 @@ pcibr_dmamap_alloc(vertex_hdl_t pconn_vhdl,
      * On SNIA64, these maps are pre-allocated because pcibr_dmamap_alloc()
      * can be called within an interrupt thread.
      */
+    s = pcibr_lock(pcibr_soft);
     pcibr_dmamap = (pcibr_dmamap_t)get_free_pciio_dmamap(pcibr_soft->bs_vhdl);
+    pcibr_unlock(pcibr_soft, s);
 
     if (!pcibr_dmamap)
 	return 0;
@@ -2899,16 +2780,19 @@ pcibr_dmamap_alloc(vertex_hdl_t pconn_vhdl,
 		}
 	    }
 	    PCIBR_DEBUG((PCIBR_DEBUG_DMAMAP | PCIBR_DEBUG_DMADIR, pconn_vhdl,
-		 	"pcibr_dmamap_alloc: using direct64, map=0x%x\n",
+		 	"pcibr_dmamap_alloc: using direct64, map=0x%lx\n",
 			pcibr_dmamap));
 	    return pcibr_dmamap;
 	}
 	PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_DMAMAP | PCIBR_DEBUG_DMADIR, pconn_vhdl,
 		    "pcibr_dmamap_alloc: unable to use direct64\n"));
 
-	/* PIC only supports 64-bit direct mapping in PCI-X mode. */
+	/* PIC in PCI-X mode only supports 64-bit direct mapping so
+	 * don't fall thru and try 32-bit direct mapping or 32-bit
+	 * page mapping
+	 */
 	if (IS_PCIX(pcibr_soft)) {
-	    DEL(pcibr_dmamap);
+	    kfree(pcibr_dmamap);
 	    return 0;
 	}
 
@@ -2927,7 +2811,7 @@ pcibr_dmamap_alloc(vertex_hdl_t pconn_vhdl,
 	     * is outside the direct32 range.
 	     */
 	    PCIBR_DEBUG((PCIBR_DEBUG_DMAMAP | PCIBR_DEBUG_DMADIR, pconn_vhdl,
-			"pcibr_dmamap_alloc: using direct32, map=0x%x\n", 
+			"pcibr_dmamap_alloc: using direct32, map=0x%lx\n", 
 			pcibr_dmamap));
 	    pcibr_dmamap->bd_flags = flags;
 	    pcibr_dmamap->bd_xio_addr = pcibr_soft->bs_dir_xbase;
@@ -2971,29 +2855,25 @@ pcibr_dmamap_alloc(vertex_hdl_t pconn_vhdl,
 
 	    PCIBR_DEBUG((PCIBR_DEBUG_DMAMAP, pconn_vhdl,
 			"pcibr_dmamap_alloc: using PMU, ate_index=%d, "
-			"pcibr_dmamap=0x%x\n", ate_index, pcibr_dmamap));
+			"pcibr_dmamap=0x%lx\n", ate_index, pcibr_dmamap));
 
 	    ate_proto = pcibr_flags_to_ate(flags);
 
 	    pcibr_dmamap->bd_flags = flags;
 	    pcibr_dmamap->bd_pci_addr =
 		PCI32_MAPPED_BASE + IOPGSIZE * ate_index;
+
+	    if (flags & PCIIO_BYTE_STREAM)
+		    ATE_SWAP_ON(pcibr_dmamap->bd_pci_addr);
 	    /*
-	     * for xbridge the byte-swap bit == bit 29 of PCI address
+	     * If swap was set in bss_device in pcibr_endian_set()
+	     * we need to change the address bit.
 	     */
-	    if (IS_XBRIDGE_OR_PIC_SOFT(pcibr_soft)) {
-		    if (flags & PCIIO_BYTE_STREAM)
-			    ATE_SWAP_ON(pcibr_dmamap->bd_pci_addr);
-		    /*
-		     * If swap was set in bss_device in pcibr_endian_set()
-		     * we need to change the address bit.
-		     */
-		    if (pcibr_soft->bs_slot[slot].bss_device & 
-							BRIDGE_DEV_SWAP_PMU)
-			    ATE_SWAP_ON(pcibr_dmamap->bd_pci_addr);
-		    if (flags & PCIIO_WORD_VALUES)
-			    ATE_SWAP_OFF(pcibr_dmamap->bd_pci_addr);
-	    }
+	    if (pcibr_soft->bs_slot[slot].bss_device & 
+						BRIDGE_DEV_SWAP_PMU)
+		    ATE_SWAP_ON(pcibr_dmamap->bd_pci_addr);
+	    if (flags & PCIIO_WORD_VALUES)
+		    ATE_SWAP_OFF(pcibr_dmamap->bd_pci_addr);
 	    pcibr_dmamap->bd_xio_addr = 0;
 	    pcibr_dmamap->bd_ate_ptr = pcibr_ate_addr(pcibr_soft, ate_index);
 	    pcibr_dmamap->bd_ate_index = ate_index;
@@ -3013,32 +2893,6 @@ pcibr_dmamap_alloc(vertex_hdl_t pconn_vhdl,
 			do_pcibr_rrb_autoalloc(pcibr_soft, slot, vchan,
 					       min_rrbs - have_rrbs);
 		}
-	    }
-	    if (ate_index >= pcibr_soft->bs_int_ate_size && 
-				!IS_XBRIDGE_OR_PIC_SOFT(pcibr_soft)) {
-		bridge_t               *bridge = pcibr_soft->bs_base;
-		volatile unsigned      *cmd_regp;
-		unsigned                cmd_reg;
-		unsigned long           s;
-
-		pcibr_dmamap->bd_flags |= PCIBR_DMAMAP_SSRAM;
-
-		s = pcibr_lock(pcibr_soft);
-		cmd_regp = pcibr_slot_config_addr(bridge, slot, 
-						PCI_CFG_COMMAND/4);
-		if ( IS_PIC_SOFT(pcibr_soft) ) {
-			cmd_reg = pcibr_slot_config_get(bridge, slot, PCI_CFG_COMMAND/4);
-		}
-		else {
-			if (io_get_sh_swapper(NASID_GET(bridge))) {
-				BRIDGE_REG_SET32((&cmd_reg)) = __swab32(*cmd_regp);
-			} else {
-				cmd_reg = pcibr_slot_config_get(bridge, slot, PCI_CFG_COMMAND/4);
-			}
-		}
-		pcibr_soft->bs_slot[slot].bss_cmd_pointer = cmd_regp;
-		pcibr_soft->bs_slot[slot].bss_cmd_shadow = cmd_reg;
-		pcibr_unlock(pcibr_soft, s);
 	    }
 	    return pcibr_dmamap;
 	}
@@ -3089,7 +2943,7 @@ pcibr_dmamap_free(pcibr_dmamap_t pcibr_dmamap)
     }
 
     PCIBR_DEBUG((PCIBR_DEBUG_DMAMAP, pcibr_dmamap->bd_dev,
-		"pcibr_dmamap_free: pcibr_dmamap=0x%x\n", pcibr_dmamap));
+		"pcibr_dmamap_free: pcibr_dmamap=0x%lx\n", pcibr_dmamap));
 
     free_pciio_dmamap(pcibr_dmamap);
 }
@@ -3132,16 +2986,8 @@ pcibr_addr_xio_to_pci(pcibr_soft_t soft,
 	    return pci_addr;
     	}
     } else {
-    if ((xio_addr >= BRIDGE_PCI_MEM32_BASE) &&
-	(xio_lim <= BRIDGE_PCI_MEM32_LIMIT)) {
-	pci_addr = xio_addr - BRIDGE_PCI_MEM32_BASE;
-	return pci_addr;
-    }
-    if ((xio_addr >= BRIDGE_PCI_MEM64_BASE) &&
-	(xio_lim <= BRIDGE_PCI_MEM64_LIMIT)) {
-	pci_addr = xio_addr - BRIDGE_PCI_MEM64_BASE;
-	return pci_addr;
-    }
+	printk("pcibr_addr_xio_to_pci(): unknown bridge type");
+	return (iopaddr_t)0;
     }
     for (slot = soft->bs_min_slot; slot < PCIBR_NUM_SLOTS(soft); ++slot)
 	if ((xio_addr >= PCIBR_BRIDGE_DEVIO(soft, slot)) &&
@@ -3215,8 +3061,8 @@ pcibr_dmamap_addr(pcibr_dmamap_t pcibr_dmamap,
 
 	PCIBR_DEBUG((PCIBR_DEBUG_DMAMAP | PCIBR_DEBUG_DMADIR, 
 		    pcibr_dmamap->bd_dev,
-		    "pcibr_dmamap_addr: (direct64): wanted paddr [0x%x..0x%x] "
-		    "XIO port 0x%x offset 0x%x, returning PCI 0x%x\n",
+		    "pcibr_dmamap_addr: (direct64): wanted paddr [0x%lx..0x%lx] "
+		    "XIO port 0x%x offset 0x%lx, returning PCI 0x%lx\n",
 		    paddr, paddr + req_size - 1, xio_port, xio_addr, pci_addr));
 
     } else if (flags & PCIIO_FIXED) {
@@ -3240,8 +3086,8 @@ pcibr_dmamap_addr(pcibr_dmamap_t pcibr_dmamap,
 
 	PCIBR_DEBUG((PCIBR_DEBUG_DMAMAP | PCIBR_DEBUG_DMADIR, 
 		    pcibr_dmamap->bd_dev,
-		    "pcibr_dmamap_addr (direct32): wanted paddr [0x%x..0x%x] "
-		    "XIO port 0x%x offset 0x%x, returning PCI 0x%x\n",
+		    "pcibr_dmamap_addr (direct32): wanted paddr [0x%lx..0x%lx] "
+		    "XIO port 0x%x offset 0x%lx, returning PCI 0x%lx\n",
 		    paddr, paddr + req_size - 1, xio_port, xio_addr, pci_addr));
 
     } else {
@@ -3285,19 +3131,10 @@ pcibr_dmamap_addr(pcibr_dmamap_t pcibr_dmamap,
 		ATE_FREEZE();
 		ATE_WRITE();
 		ATE_THAW();
-		if ( IS_PIC_SOFT(pcibr_soft) ) {
-			bridge->b_wid_tflush;	/* wait until Bridge PIO complete */
-		}
-		else {
-			if (io_get_sh_swapper(NASID_GET(bridge))) {
-				BRIDGE_REG_GET32((&bridge->b_wid_tflush));
-			} else {
-				bridge->b_wid_tflush;
-			}
-		}
+		bridge->b_wid_tflush;	/* wait until Bridge PIO complete */
 		PCIBR_DEBUG((PCIBR_DEBUG_DMAMAP, pcibr_dmamap->bd_dev,
 			    "pcibr_dmamap_addr (PMU) : wanted paddr "
-			    "[0x%x..0x%x] returning PCI 0x%x\n", 
+			    "[0x%lx..0x%lx] returning PCI 0x%lx\n", 
 			    paddr, paddr + req_size - 1, pci_addr));
 
 	} else {
@@ -3311,7 +3148,7 @@ pcibr_dmamap_addr(pcibr_dmamap_t pcibr_dmamap,
 		 */
 		PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_DMAMAP, pcibr_dmamap->bd_dev, 
 		            "pcibr_dmamap_addr (PMU) : wanted paddr "
-			    "[0x%x..0x%x] ate_count 0x%x bd_ate_count 0x%x "
+			    "[0x%lx..0x%lx] ate_count 0x%x bd_ate_count 0x%x "
 			    "ATE's required > number allocated\n",
 			     paddr, paddr + req_size - 1,
 			     ate_count, pcibr_dmamap->bd_ate_count));
@@ -3342,7 +3179,7 @@ pcibr_dmamap_done(pcibr_dmamap_t pcibr_dmamap)
     xtalk_dmamap_done(pcibr_dmamap->bd_xtalk);
 
     PCIBR_DEBUG((PCIBR_DEBUG_DMAMAP, pcibr_dmamap->bd_dev,
-		"pcibr_dmamap_done: pcibr_dmamap=0x%x\n", pcibr_dmamap));
+		"pcibr_dmamap_done: pcibr_dmamap=0x%lx\n", pcibr_dmamap));
 }
 
 
@@ -3393,8 +3230,8 @@ pcibr_dmatrans_addr(vertex_hdl_t pconn_vhdl,
 				   flags & DMAMAP_FLAGS);
     if (!xio_addr) {
 	PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_DMADIR, pconn_vhdl,
-		    "pcibr_dmatrans_addr: wanted paddr [0x%x..0x%x], "
-		    "xtalk_dmatrans_addr failed with 0x%x\n",
+		    "pcibr_dmatrans_addr: wanted paddr [0x%lx..0x%lx], "
+		    "xtalk_dmatrans_addr failed with 0x%lx\n",
 		    paddr, paddr + req_size - 1, xio_addr));
 	return 0;
     }
@@ -3404,7 +3241,7 @@ pcibr_dmatrans_addr(vertex_hdl_t pconn_vhdl,
     if (XIO_PACKED(xio_addr)) {
 	if (xio_addr == XIO_NOWHERE) {
 	    PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_DMADIR, pconn_vhdl,
-		        "pcibr_dmatrans_addr: wanted paddr [0x%x..0x%x], "
+		        "pcibr_dmatrans_addr: wanted paddr [0x%lx..0x%lx], "
 		        "xtalk_dmatrans_addr failed with XIO_NOWHERE\n",
 		        paddr, paddr + req_size - 1));
 	    return 0;
@@ -3425,8 +3262,8 @@ pcibr_dmatrans_addr(vertex_hdl_t pconn_vhdl,
     if (xio_port == pcibr_soft->bs_xid) {
 	pci_addr = pcibr_addr_xio_to_pci(pcibr_soft, xio_addr, req_size);
         PCIBR_DEBUG((PCIBR_DEBUG_DMADIR, pconn_vhdl,
-		    "pcibr_dmatrans_addr:  wanted paddr [0x%x..0x%x], "
-		    "xio_port=0x%x, pci_addr=0x%x\n",
+		    "pcibr_dmatrans_addr:  wanted paddr [0x%lx..0x%lx], "
+		    "xio_port=0x%x, pci_addr=0x%lx\n",
 		    paddr, paddr + req_size - 1, xio_port, pci_addr));
 	return pci_addr;
     }
@@ -3480,19 +3317,16 @@ pcibr_dmatrans_addr(vertex_hdl_t pconn_vhdl,
 					       min_rrbs - have_rrbs);
 		}
 	    }
-#if HWG_PERF_CHECK
-	    if (xio_addr != 0x20000000)
-#endif
-		PCIBR_DEBUG((PCIBR_DEBUG_DMADIR, pconn_vhdl,
-			    "pcibr_dmatrans_addr:  wanted paddr [0x%x..0x%x], "
-			    "xio_port=0x%x, direct64: pci_addr=0x%x, "
-			    "new flags: 0x%x\n", paddr, paddr + req_size - 1,
-			    xio_addr, pci_addr, (uint64_t) flags));
+	    PCIBR_DEBUG((PCIBR_DEBUG_DMADIR, pconn_vhdl,
+			"pcibr_dmatrans_addr:  wanted paddr [0x%lx..0x%lx], "
+			"xio_port=0x%x, direct64: pci_addr=0x%lx, "
+			"new flags: 0x%x\n", paddr, paddr + req_size - 1,
+			xio_addr, pci_addr, (uint64_t) flags));
 	    return (pci_addr);
 	}
 
 	PCIBR_DEBUG((PCIBR_DEBUG_DMADIR, pconn_vhdl,
-		    "pcibr_dmatrans_addr:  wanted paddr [0x%x..0x%x], "
+		    "pcibr_dmatrans_addr:  wanted paddr [0x%lx..0x%lx], "
 		    "xio_port=0x%x, Unable to set direct64 Device(x) bits\n",
 		    paddr, paddr + req_size - 1, xio_addr));
 
@@ -3503,6 +3337,11 @@ pcibr_dmatrans_addr(vertex_hdl_t pconn_vhdl,
 
 	/* our flags conflict with Device(x). try direct32*/
 	flags = flags & ~(PCIIO_DMA_A64 | PCIBR_VCHAN0);
+    } else {
+	/* BUS in PCI-X mode only supports 64-bit direct mapping */
+	if (IS_PCIX(pcibr_soft)) {
+	    return 0;
+	}
     }
     /* Try to satisfy the request with the 32-bit direct
      * map. This can fail if the configuration bits in
@@ -3521,7 +3360,7 @@ pcibr_dmatrans_addr(vertex_hdl_t pconn_vhdl,
 	    (endoff > map_size)) {
 
 	    PCIBR_DEBUG((PCIBR_DEBUG_DMADIR, pconn_vhdl,
-			"pcibr_dmatrans_addr:  wanted paddr [0x%x..0x%x], "
+			"pcibr_dmatrans_addr:  wanted paddr [0x%lx..0x%lx], "
 			"xio_port=0x%x, xio region outside direct32 target\n",
 			paddr, paddr + req_size - 1, xio_addr));
 	} else {
@@ -3532,8 +3371,8 @@ pcibr_dmatrans_addr(vertex_hdl_t pconn_vhdl,
 		pci_addr |= offset;
 
 		PCIBR_DEBUG((PCIBR_DEBUG_DMADIR, pconn_vhdl,
-                            "pcibr_dmatrans_addr:  wanted paddr [0x%x..0x%x], "
-                            "xio_port=0x%x, direct32: pci_addr=0x%x\n",
+                            "pcibr_dmatrans_addr:  wanted paddr [0x%lx..0x%lx],"
+                            " xio_port=0x%x, direct32: pci_addr=0x%lx\n",
                             paddr, paddr + req_size - 1, xio_addr, pci_addr));
 
 		return (pci_addr);
@@ -3559,12 +3398,9 @@ pcibr_dmatrans_addr(vertex_hdl_t pconn_vhdl,
 						   vchan, min_rrbs - have_rrbs);
 		    }
 		}
-#if HWG_PERF_CHECK
-		if (xio_addr != 0x20000000)
-#endif
-                    PCIBR_DEBUG((PCIBR_DEBUG_DMADIR, pconn_vhdl,
-                            "pcibr_dmatrans_addr:  wanted paddr [0x%x..0x%x], "
-                            "xio_port=0x%x, direct32: pci_addr=0x%x, "
+		PCIBR_DEBUG((PCIBR_DEBUG_DMADIR, pconn_vhdl,
+                            "pcibr_dmatrans_addr:  wanted paddr [0x%lx..0x%lx],"
+                            " xio_port=0x%x, direct32: pci_addr=0x%lx, "
 			    "new flags: 0x%x\n", paddr, paddr + req_size - 1,
 			    xio_addr, pci_addr, (uint64_t) flags));
 
@@ -3573,14 +3409,14 @@ pcibr_dmatrans_addr(vertex_hdl_t pconn_vhdl,
 	    /* our flags conflict with Device(x).
 	     */
 	    PCIBR_DEBUG((PCIBR_DEBUG_DMADIR, pconn_vhdl,
-                    "pcibr_dmatrans_addr:  wanted paddr [0x%x..0x%x], "
+                    "pcibr_dmatrans_addr:  wanted paddr [0x%lx..0x%lx], "
                     "xio_port=0x%x, Unable to set direct32 Device(x) bits\n",
                     paddr, paddr + req_size - 1, xio_port));
 	}
     }
 
     PCIBR_DEBUG((PCIBR_DEBUG_DMADIR, pconn_vhdl,
-		"pcibr_dmatrans_addr:  wanted paddr [0x%x..0x%x], "
+		"pcibr_dmatrans_addr:  wanted paddr [0x%lx..0x%lx], "
 		"xio_port=0x%x, No acceptable PCI address found\n",
 		paddr, paddr + req_size - 1, xio_port));
 
@@ -3680,22 +3516,9 @@ pcibr_endian_set(vertex_hdl_t pconn_vhdl,
     if (pcibr_soft->bs_slot[pciio_slot].bss_device != devreg) {
 	bridge_t               *bridge = pcibr_soft->bs_base;
 
-	if ( IS_PIC_SOFT(pcibr_soft) ) {
-		bridge->b_device[pciio_slot].reg = devreg;
-		pcibr_soft->bs_slot[pciio_slot].bss_device = devreg;
-		bridge->b_wid_tflush;		/* wait until Bridge PIO complete */
-	}
-	else {
-		if (io_get_sh_swapper(NASID_GET(bridge))) {
-			BRIDGE_REG_SET32((&bridge->b_device[pciio_slot].reg)) = __swab32(devreg);
-			pcibr_soft->bs_slot[pciio_slot].bss_device = devreg;
-			BRIDGE_REG_GET32((&bridge->b_wid_tflush));/* wait until Bridge PIO complete */
-		} else {
-			bridge->b_device[pciio_slot].reg = devreg;
-			pcibr_soft->bs_slot[pciio_slot].bss_device = devreg;
-			bridge->b_wid_tflush;           /* wait until Bridge PIO complete */
-		}
-	}
+	bridge->b_device[pciio_slot].reg = devreg;
+	pcibr_soft->bs_slot[pciio_slot].bss_device = devreg;
+	bridge->b_wid_tflush;		/* wait until Bridge PIO complete */
     }
     pcibr_unlock(pcibr_soft, s);
 
@@ -3767,22 +3590,9 @@ pcibr_priority_bits_set(pcibr_soft_t pcibr_soft,
     if (pcibr_soft->bs_slot[pciio_slot].bss_device != devreg) {
 	bridge_t               *bridge = pcibr_soft->bs_base;
 
-	if ( IS_PIC_SOFT(pcibr_soft) ) {
-		bridge->b_device[pciio_slot].reg = devreg;
-		pcibr_soft->bs_slot[pciio_slot].bss_device = devreg;
-		bridge->b_wid_tflush;		/* wait until Bridge PIO complete */
-	}
-	else {
-		if (io_get_sh_swapper(NASID_GET(bridge))) {
-			BRIDGE_REG_SET32((&bridge->b_device[pciio_slot].reg)) = __swab32(devreg);
-			pcibr_soft->bs_slot[pciio_slot].bss_device = devreg;
-			BRIDGE_REG_GET32((&bridge->b_wid_tflush));/* wait until Bridge PIO complete */
-		} else {
-			bridge->b_device[pciio_slot].reg = devreg;
-			pcibr_soft->bs_slot[pciio_slot].bss_device = devreg;
-			bridge->b_wid_tflush;           /* wait until Bridge PIO complete */
-		}
-	}
+	bridge->b_device[pciio_slot].reg = devreg;
+	pcibr_soft->bs_slot[pciio_slot].bss_device = devreg;
+	bridge->b_wid_tflush;		/* wait until Bridge PIO complete */
     }
     pcibr_unlock(pcibr_soft, s);
 
@@ -3865,25 +3675,15 @@ pcibr_device_flags_set(vertex_hdl_t pconn_vhdl,
 	if (pcibr_soft->bs_slot[pciio_slot].bss_device != devreg) {
 	    bridge_t               *bridge = pcibr_soft->bs_base;
 
-	    if ( IS_PIC_SOFT(pcibr_soft) ) {
-		bridge->b_device[pciio_slot].reg = devreg;
-		pcibr_soft->bs_slot[pciio_slot].bss_device = devreg;
-		bridge->b_wid_tflush;	/* wait until Bridge PIO complete */
-	    }
-	    else {
-		if (io_get_sh_swapper(NASID_GET(bridge))) {
-			BRIDGE_REG_SET32((&bridge->b_device[pciio_slot].reg)) = __swab32(devreg);
-			pcibr_soft->bs_slot[pciio_slot].bss_device = devreg;
-			BRIDGE_REG_GET32((&bridge->b_wid_tflush));/* wait until Bridge PIO complete */
-		} else {
-			bridge->b_device[pciio_slot].reg = devreg;
-			pcibr_soft->bs_slot[pciio_slot].bss_device = devreg;
-			bridge->b_wid_tflush;       /* wait until Bridge PIO complete */
-		}
-	    }
+	    bridge->b_device[pciio_slot].reg = devreg;
+	    pcibr_soft->bs_slot[pciio_slot].bss_device = devreg;
+	    bridge->b_wid_tflush;	/* wait until Bridge PIO complete */
 	}
 	pcibr_unlock(pcibr_soft, s);
-	printk("pcibr_device_flags_set: Device(%d): %x\n", pciio_slot, devreg);
+
+	PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_DEVREG, pconn_vhdl,
+		    "pcibr_device_flags_set: Device(%d): 0x%x\n",
+		    pciio_slot, devreg));
     }
     return (1);
 }
@@ -3967,24 +3767,11 @@ pciio_provider_t        pcibr_provider =
     (pciio_priority_set_f *) pcibr_priority_set,
     (pciio_config_get_f *) pcibr_config_get,
     (pciio_config_set_f *) pcibr_config_set,
-    (pciio_error_devenable_f *) 0,
     (pciio_error_extract_f *) 0,
     (pciio_driver_reg_callback_f *) 0,
     (pciio_driver_unreg_callback_f *) 0,
     (pciio_device_unregister_f 	*) pcibr_device_unregister,
-    (pciio_dma_enabled_f		*) pcibr_dma_enabled,
 };
-
-int
-pcibr_dma_enabled(vertex_hdl_t pconn_vhdl)
-{
-    pciio_info_t            pciio_info = pciio_info_get(pconn_vhdl);
-    pcibr_soft_t            pcibr_soft = (pcibr_soft_t) pciio_info_mfast_get(pciio_info);
-	
-
-    return xtalk_dma_enabled(pcibr_soft->bs_conn);
-}
-
 
 /*
  * pcibr_debug() is used to print pcibr debug messages to the console.  A
@@ -4020,23 +3807,26 @@ pcibr_debug(uint32_t type, vertex_hdl_t vhdl, char *format, ...)
                 if (strcmp(module, pcibr_debug_module)) {
 		    /* use a copy */
                     (void)strcpy(copy_of_hwpath, hwpath);
-                    cp = strstr(copy_of_hwpath, "/module/");
+		    cp = strstr(copy_of_hwpath, "/" EDGE_LBL_MODULE "/");
                     if (cp) {
-                        cp += strlen("/module");
-                        module = strsep(&cp, "/");
+                        cp += strlen("/" EDGE_LBL_MODULE "/");
+			module = strsep(&cp, "/");
                     }
                 }
                 if (pcibr_debug_widget != -1) {
-                    cp = strstr(hwpath, "/xtalk/");
+		    cp = strstr(hwpath, "/" EDGE_LBL_XTALK "/");
                     if (cp) {
-                        cp += strlen("/xtalk/");
+			cp += strlen("/" EDGE_LBL_XTALK "/");
                         widget = simple_strtoul(cp, NULL, 0);
                     }
                 }
                 if (pcibr_debug_slot != -1) {
-                    cp = strstr(hwpath, "/pci/");
+		    cp = strstr(hwpath, "/" EDGE_LBL_PCIX_0 "/");
+		    if (!cp) {
+			cp = strstr(hwpath, "/" EDGE_LBL_PCIX_1 "/");
+		    }
                     if (cp) {
-                        cp += strlen("/pci/");
+                        cp += strlen("/" EDGE_LBL_PCIX_0 "/");
                         slot = simple_strtoul(cp, NULL, 0);
                     }
                 }

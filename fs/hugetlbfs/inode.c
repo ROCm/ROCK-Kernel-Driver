@@ -788,6 +788,7 @@ struct file *hugetlb_zero_setup(size_t size)
 	inode->i_nlink = 0;
 	file->f_vfsmnt = mntget(hugetlbfs_vfsmount);
 	file->f_dentry = dentry;
+	file->f_mapping = inode->i_mapping;
 	file->f_op = &hugetlbfs_file_operations;
 	file->f_mode = FMODE_WRITE | FMODE_READ;
 	return file;

@@ -22,7 +22,7 @@ static int file_ioctl(struct file *filp,unsigned int cmd,unsigned long arg)
 	switch (cmd) {
 		case FIBMAP:
 		{
-			struct address_space *mapping = inode->i_mapping;
+			struct address_space *mapping = filp->f_mapping;
 			int res;
 			/* do we support this mess? */
 			if (!mapping->a_ops->bmap)

@@ -70,9 +70,10 @@ typedef struct {
 	atomic_t counter;
 } rwlock_t;
 
-#define RW_LOCK_UNLOCKED	(rwlock_t) { { 0 } }
+#define RW_LOCK_BIAS		0x01000000
+#define RW_LOCK_UNLOCKED	(rwlock_t) { { 0 }, { RW_LOCK_BIAS } }
 #define rwlock_init(x)		do { *(x) = RW_LOCK_UNLOCKED; } while (0)
-#define rwlock_is_locked(x)	(*(volatile int *)(x) != 0)
+#define rwlock_is_locked(x)	(atomic_read(&(x)->counter) != RW_LOCK_BIAS)
 
 static inline void _raw_read_lock(rwlock_t *rw)
 {
@@ -102,6 +103,16 @@ static inline void _raw_write_unlock(rwlock_t *rw)
 {
 	atomic_set(&rw->counter, 0);
 	_raw_spin_unlock(&rw->lock);
+}
+
+static inline int _raw_write_trylock(rwlock_t *rw)
+{
+	if (atomic_sub_and_test(RW_LOCK_BIAS, &rw->counter))
+		return 1;
+	
+	atomic_add(RW_LOCK_BIAS, &rw->counter);
+
+	return 0;
 }
 
 #endif /* __ASM_SH_SPINLOCK_H */

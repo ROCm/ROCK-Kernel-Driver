@@ -87,7 +87,7 @@ static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end
 	flush_tlb_all();
 }
 
-extern inline void flush_tlb_pgtables(struct mm_struct *mm,
+static inline void flush_tlb_pgtables(struct mm_struct *mm,
 				      unsigned long start, unsigned long end)
 {
 }
@@ -214,7 +214,7 @@ static inline void flush_tlb_kernel_page (unsigned long addr)
 	sun3_put_segmap (addr & ~(SUN3_PMEG_SIZE - 1), SUN3_INVALID_PMEG);
 }
 
-extern inline void flush_tlb_pgtables(struct mm_struct *mm,
+static inline void flush_tlb_pgtables(struct mm_struct *mm,
 				      unsigned long start, unsigned long end)
 {
 }

@@ -1052,7 +1052,7 @@ ssize_t reiserfs_file_write( struct file *file, /* the file we are going to writ
     /* Check if we can write to specified region of file, file
        is not overly big and this kind of stuff. Adjust pos and
        count, if needed */
-    res = generic_write_checks(inode, file, &pos, &count, 0);
+    res = generic_write_checks(file, &pos, &count, 0);
     if (res)
 	goto out;
 
@@ -1179,7 +1179,7 @@ ssize_t reiserfs_file_write( struct file *file, /* the file we are going to writ
     }
 
     if ((file->f_flags & O_SYNC) || IS_SYNC(inode))
-	res = generic_osync_inode(inode, OSYNC_METADATA|OSYNC_DATA);
+	res = generic_osync_inode(inode, file->f_mapping, OSYNC_METADATA|OSYNC_DATA);
 
     up(&inode->i_sem);
     return (already_written != 0)?already_written:res;

@@ -33,21 +33,10 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/bitops.h>
-
+#include <asm/machvec.h>
 #include <asm/bigsur/io.h>
 #include <asm/hd64465/hd64465.h>
 #include <asm/bigsur/bigsur.h>
-
-//#define BIGSUR_DEBUG 3
-#undef BIGSUR_DEBUG
-
-#ifdef BIGSUR_DEBUG
-#define DPRINTK(args...)	printk(args)
-#define DIPRINTK(n, args...)	if (BIGSUR_DEBUG>(n)) printk(args)
-#else
-#define DPRINTK(args...)
-#define DIPRINTK(n, args...)
-#endif /* BIGSUR_DEBUG */
 
 /*===========================================================*/
 //		Big Sur Init Routines	
@@ -58,13 +47,27 @@ const char *get_system_type(void)
 	return "Big Sur";
 }
 
+/*
+ * The Machine Vector
+ */
+extern void heartbeat_bigsur(void);
+extern void init_bigsur_IRQ(void);
+
+struct sh_machine_vector mv_bigsur __initmv = {
+	.mv_nr_irqs		= NR_IRQS,     // Defined in <asm/irq.h>
+
+	.mv_isa_port2addr	= bigsur_isa_port2addr,
+	.mv_irq_demux       	= bigsur_irq_demux,
+
+	.mv_init_irq		= init_bigsur_IRQ,
+#ifdef CONFIG_HEARTBEAT
+	.mv_heartbeat		= heartbeat_bigsur,
+#endif
+};
+ALIAS_MV(bigsur)
+
 int __init platform_setup(void)
 {
-	static int done = 0; /* run this only once */
-
-	if (!MACH_BIGSUR || done) return 0;
-	done = 1;
-
 	/* Mask all 2nd level IRQ's */
 	outb(-1,BIGSUR_IMR0);
 	outb(-1,BIGSUR_IMR1);
@@ -88,7 +91,6 @@ int __init platform_setup(void)
 	/* set the IO port to BIGSUR_ETHER_IOPORT */
 	outw(BIGSUR_ETHER_IOPORT<<3, BIGSUR_ETHR+0x2);
 
-    return 0;
+	return 0;
 }
 
-module_init(setup_bigsur);

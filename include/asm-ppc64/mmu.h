@@ -13,6 +13,8 @@
 #ifndef _PPC64_MMU_H_
 #define _PPC64_MMU_H_
 
+#include <asm/page.h>
+
 #ifndef __ASSEMBLY__
 
 /* Default "unsigned long" context */
@@ -202,28 +204,58 @@ static inline unsigned long hpt_hash(unsigned long vpn, int large)
 	return (vsid & 0x7fffffffff) ^ page;
 }
 
-static inline void _tlbie(unsigned long va, int large)
+static inline void __tlbie(unsigned long va, int large)
+{
+	/* clear top 16 bits, non SLS segment */
+	va &= ~(0xffffULL << 48);
+
+	if (large)
+		asm volatile("tlbie %0,1" : : "r"(va) : "memory");
+	else
+		asm volatile("tlbie %0,0" : : "r"(va) : "memory");
+}
+
+static inline void tlbie(unsigned long va, int large)
 {
 	asm volatile("ptesync": : :"memory");
-
-	if (large) {
-		asm volatile("clrldi	%0,%0,16\n\
-			      tlbie	%0,1" : : "r"(va) : "memory");
-	} else {
-		asm volatile("clrldi	%0,%0,16\n\
-			      tlbie	%0,0" : : "r"(va) : "memory");
-	}
-
+	__tlbie(va, large);
 	asm volatile("eieio; tlbsync; ptesync": : :"memory");
 }
 
-static inline void _tlbiel(unsigned long va)
+static inline void __tlbiel(unsigned long va)
+{
+	/* clear top 16 bits, non SLS segment */
+	va &= ~(0xffffULL << 48);
+
+	/* 
+	 * Thanks to Alan Modra we are now able to use machine specific 
+	 * assembly instructions (like tlbiel) by using the gas -many flag.
+	 * However we have to support older toolchains so for the moment 
+	 * we hardwire it.
+	 */
+#if 0
+	asm volatile("tlbiel %0" : : "r"(va) : "memory");
+#else
+	asm volatile(".long 0x7c000224 | (%0 << 11)" : : "r"(va) : "memory");
+#endif
+}
+
+static inline void tlbiel(unsigned long va)
 {
 	asm volatile("ptesync": : :"memory");
-	asm volatile("clrldi	%0,%0,16\n\
-		      tlbiel	%0" : : "r"(va) : "memory");
+	__tlbiel(va);
 	asm volatile("ptesync": : :"memory");
 }
+
+/*
+ * Handle a fault by adding an HPTE. If the address can't be determined
+ * to be valid via Linux page tables, return 1. If handled return 0
+ */
+extern int __hash_page(unsigned long ea, unsigned long access,
+		       unsigned long vsid, pte_t *ptep, unsigned long trap,
+		       int local);
+
+extern void htab_finish_init(void);
 
 #endif /* __ASSEMBLY__ */
 

@@ -44,6 +44,7 @@
 #include <linux/ext2_fs.h>
 #include <linux/proc_fs.h>
 #include <linux/kd.h>
+#include <linux/netfilter_ipv4.h>
 #include <net/icmp.h>
 #include <net/ip.h>		/* for sysctl_local_port_range[] */
 #include <net/tcp.h>		/* struct or_callable used in sock_rcv_skb */
@@ -55,12 +56,14 @@
 #include <linux/netdevice.h>	/* for network interface checks */
 #include <linux/netlink.h>
 #include <linux/tcp.h>
+#include <linux/udp.h>
 #include <linux/quota.h>
 #include <linux/un.h>		/* for Unix socket types */
 #include <net/af_unix.h>	/* for Unix socket types */
 
 #include "avc.h"
 #include "objsec.h"
+#include "netif.h"
 
 #ifdef CONFIG_SECURITY_SELINUX_DEVELOP
 int selinux_enforcing = 0;
@@ -241,6 +244,39 @@ static void superblock_free_security(struct super_block *sb)
 	sb->s_security = NULL;
 	kfree(sbsec);
 }
+
+#ifdef CONFIG_SECURITY_NETWORK
+static int sk_alloc_security(struct sock *sk, int family, int priority)
+{
+	struct sk_security_struct *ssec;
+
+	if (family != PF_UNIX)
+		return 0;
+
+	ssec = kmalloc(sizeof(*ssec), priority);
+	if (!ssec)
+		return -ENOMEM;
+
+	memset(ssec, 0, sizeof(*ssec));
+	ssec->magic = SELINUX_MAGIC;
+	ssec->sk = sk;
+	ssec->peer_sid = SECINITSID_UNLABELED;
+	sk->sk_security = ssec;
+
+	return 0;
+}
+
+static void sk_free_security(struct sock *sk)
+{
+	struct task_security_struct *ssec = sk->sk_security;
+
+	if (sk->sk_family != PF_UNIX || ssec->magic != SELINUX_MAGIC)
+		return;
+
+	sk->sk_security = NULL;
+	kfree(ssec);
+}
+#endif	/* CONFIG_SECURITY_NETWORK */
 
 /* The security server must be initialized before
    any labeling or access decisions can be provided. */
@@ -1516,6 +1552,7 @@ static void selinux_bprm_compute_creds(struct linux_binprm *bprm)
 	u32 sid;
 	struct av_decision avd;
 	struct itimerval itimer;
+	struct rlimit *rlim, *initrlim;
 	int rc, i;
 
 	secondary_ops->bprm_compute_creds(bprm);
@@ -1584,6 +1621,26 @@ static void selinux_bprm_compute_creds(struct linux_binprm *bprm)
 			sigemptyset(&current->blocked);
 			recalc_sigpending();
 			spin_unlock_irq(&current->sighand->siglock);
+		}
+
+		/* Check whether the new SID can inherit resource limits
+		   from the old SID.  If not, reset all soft limits to
+		   the lower of the current task's hard limit and the init
+		   task's soft limit.  Note that the setting of hard limits 
+		   (even to lower them) can be controlled by the setrlimit 
+		   check. The inclusion of the init task's soft limit into
+	           the computation is to avoid resetting soft limits higher
+		   than the default soft limit for cases where the default
+		   is lower than the hard limit, e.g. RLIMIT_CORE or 
+		   RLIMIT_STACK.*/
+		rc = avc_has_perm(tsec->osid, tsec->sid, SECCLASS_PROCESS,
+				  PROCESS__RLIMITINH, NULL, NULL);
+		if (rc) {
+			for (i = 0; i < RLIM_NLIMITS; i++) {
+				rlim = current->rlim + i;
+				initrlim = init_task.rlim+i;
+				rlim->rlim_cur = min(rlim->rlim_max,initrlim->rlim_cur);
+			}
 		}
 
 		/* Wake up the parent if it is waiting so that it can
@@ -2222,10 +2279,15 @@ static int selinux_task_setnice(struct task_struct *p, int nice)
 
 static int selinux_task_setrlimit(unsigned int resource, struct rlimit *new_rlim)
 {
-	/* SELinux does not currently provide a process
-	   resource limit policy based on security contexts.
-	   It does control the use of the CAP_SYS_RESOURCE capability
-	   using the capable hook. */
+	struct rlimit *old_rlim = current->rlim + resource;
+
+	/* Control the ability to change the hard limit (whether
+	   lowering or raising it), so that the hard limit can
+	   later be used as a safe reset point for the soft limit
+	   upon context transitions. See selinux_bprm_compute_creds. */
+	if (old_rlim->rlim_max != new_rlim->rlim_max)
+		return task_has_perm(current, current, PROCESS__SETRLIMIT);
+
 	return 0;
 }
 
@@ -2311,6 +2373,69 @@ static void selinux_task_to_inode(struct task_struct *p,
 
 #ifdef CONFIG_SECURITY_NETWORK
 
+static void selinux_parse_skb_ipv4(struct sk_buff *skb, struct avc_audit_data *ad)
+{
+	int dlen, ihlen;
+	struct iphdr *iph;
+
+	if (skb->len < sizeof(struct iphdr))
+		goto out;
+	
+	iph = skb->nh.iph;
+	ihlen = iph->ihl * 4;
+	if (ihlen < sizeof(struct iphdr))
+		goto out;
+
+	dlen = skb->len - ihlen;
+	ad->u.net.saddr = iph->saddr;
+	ad->u.net.daddr = iph->daddr;
+
+	switch (iph->protocol) {
+        case IPPROTO_TCP: {
+        	int offset;
+        	struct tcphdr tcph;
+
+        	if (ntohs(iph->frag_off) & IP_OFFSET)
+        		break;
+        		
+		if (dlen < sizeof(tcph))
+			break;
+
+		offset = skb->nh.raw - skb->data + ihlen;
+		if (skb_copy_bits(skb, offset, &tcph, sizeof(tcph)) < 0)
+			break;
+
+		ad->u.net.sport = tcph.source;
+		ad->u.net.dport = tcph.dest;
+		break;
+        }
+        
+        case IPPROTO_UDP: {
+        	int offset;
+        	struct udphdr udph;
+        	
+        	if (ntohs(iph->frag_off) & IP_OFFSET)
+        		break;
+        		
+        	if (dlen < sizeof(udph))
+        		break;
+
+		offset = skb->nh.raw - skb->data + ihlen;
+        	if (skb_copy_bits(skb, offset, &udph, sizeof(udph)) < 0)
+        		break;	
+
+        	ad->u.net.sport = udph.source;
+        	ad->u.net.dport = udph.dest;
+        	break;
+        }
+
+        default:
+        	break;
+        }
+out:
+	return;
+}
+
 /* socket security operations */
 static int socket_has_perm(struct task_struct *task, struct socket *sock,
 			   u32 perms)
@@ -2375,7 +2500,7 @@ static int selinux_socket_bind(struct socket *sock, struct sockaddr *address, in
 
 	err = socket_has_perm(current, sock, SOCKET__BIND);
 	if (err)
-		return err;
+		goto out;
 
 	/*
 	 * If PF_INET, check name_bind permission for the port.
@@ -2387,7 +2512,7 @@ static int selinux_socket_bind(struct socket *sock, struct sockaddr *address, in
 		struct sockaddr_in *addr = (struct sockaddr_in *)address;
 		unsigned short snum = ntohs(addr->sin_port);
 		struct sock *sk = sock->sk;
-		u32 sid;
+		u32 sid, node_perm;
 
 		tsec = current->security;
 		isec = SOCK_INODE(sock)->i_security;
@@ -2397,81 +2522,64 @@ static int selinux_socket_bind(struct socket *sock, struct sockaddr *address, in
 			err = security_port_sid(sk->sk_family, sk->sk_type,
 						sk->sk_protocol, snum, &sid);
 			if (err)
-				return err;
+				goto out;
 			AVC_AUDIT_DATA_INIT(&ad,NET);
-			ad.u.net.port = snum;
+			ad.u.net.sport = htons(snum);
 			err = avc_has_perm(isec->sid, sid,
 					   isec->sclass,
 					   SOCKET__NAME_BIND, NULL, &ad);
 			if (err)
-				return err;
+				goto out;
 		}
+		
+		switch(sk->sk_protocol) {
+		case IPPROTO_TCP:
+			node_perm = TCP_SOCKET__NODE_BIND;
+			break;
+			
+		case IPPROTO_UDP:
+			node_perm = UDP_SOCKET__NODE_BIND;
+			break;
+			
+		default:
+			node_perm = RAWIP_SOCKET__NODE_BIND;
+			break;
+		}
+		
+		err = security_node_sid(PF_INET, &addr->sin_addr.s_addr,
+		                        sizeof(addr->sin_addr.s_addr), &sid);
+		if (err)
+			goto out;
+		
+		AVC_AUDIT_DATA_INIT(&ad,NET);
+		ad.u.net.sport = htons(snum);
+		ad.u.net.saddr = addr->sin_addr.s_addr;
+		err = avc_has_perm(isec->sid, sid,
+		                   isec->sclass, node_perm, NULL, &ad);
+		if (err)
+			goto out;
 	}
-
-	return 0;
+out:
+	return err;
 }
 
 static int selinux_socket_connect(struct socket *sock, struct sockaddr *address, int addrlen)
 {
-	int err;
-	struct sock *sk = sock->sk;
-	struct avc_audit_data ad;
-	struct task_security_struct *tsec;
-	struct inode_security_struct *isec;
-
-	isec = SOCK_INODE(sock)->i_security;
-
-	tsec = current->security;
-
-	AVC_AUDIT_DATA_INIT(&ad, NET);
-	ad.u.net.sk = sk;
-	err = avc_has_perm(tsec->sid, isec->sid, isec->sclass,
-			   SOCKET__CONNECT, &isec->avcr, &ad);
-	if (err)
-		return err;
-
-	return 0;
+	return socket_has_perm(current, sock, SOCKET__CONNECT);
 }
 
 static int selinux_socket_listen(struct socket *sock, int backlog)
 {
-	int err;
-	struct task_security_struct *tsec;
-	struct inode_security_struct *isec;
-	struct avc_audit_data ad;
-
-	tsec = current->security;
-
-	isec = SOCK_INODE(sock)->i_security;
-
-	AVC_AUDIT_DATA_INIT(&ad, NET);
-	ad.u.net.sk = sock->sk;
-
-	err = avc_has_perm(tsec->sid, isec->sid, isec->sclass,
-			   SOCKET__LISTEN, &isec->avcr, &ad);
-	if (err)
-		return err;
-
-	return 0;
+	return socket_has_perm(current, sock, SOCKET__LISTEN);
 }
 
 static int selinux_socket_accept(struct socket *sock, struct socket *newsock)
 {
 	int err;
-	struct task_security_struct *tsec;
 	struct inode_security_struct *isec;
 	struct inode_security_struct *newisec;
-	struct avc_audit_data ad;
 
-	tsec = current->security;
-
-	isec = SOCK_INODE(sock)->i_security;
-
-	AVC_AUDIT_DATA_INIT(&ad, NET);
-	ad.u.net.sk = sock->sk;
-
-	err = avc_has_perm(tsec->sid, isec->sid, isec->sclass,
-			   SOCKET__ACCEPT, &isec->avcr, &ad);
+	err = socket_has_perm(current, sock, SOCKET__ACCEPT);
 	if (err)
 		return err;
 
@@ -2480,6 +2588,7 @@ static int selinux_socket_accept(struct socket *sock, struct socket *newsock)
 		return err;
 	newisec = SOCK_INODE(newsock)->i_security;
 
+	isec = SOCK_INODE(sock)->i_security;
 	newisec->sclass = isec->sclass;
 	newisec->sid = isec->sid;
 
@@ -2489,87 +2598,23 @@ static int selinux_socket_accept(struct socket *sock, struct socket *newsock)
 static int selinux_socket_sendmsg(struct socket *sock, struct msghdr *msg,
  				  int size)
 {
-	struct task_security_struct *tsec;
-	struct inode_security_struct *isec;
-	struct avc_audit_data ad;
-	struct sock *sk;
-	int err;
-
-	isec = SOCK_INODE(sock)->i_security;
-
-	tsec = current->security;
-
-	sk = sock->sk;
-
-	AVC_AUDIT_DATA_INIT(&ad, NET);
-	ad.u.net.sk = sk;
-	err = avc_has_perm(tsec->sid, isec->sid, isec->sclass,
-			   SOCKET__WRITE, &isec->avcr, &ad);
-	if (err)
-		return err;
-
-	return 0;
+	return socket_has_perm(current, sock, SOCKET__WRITE);
 }
 
 static int selinux_socket_recvmsg(struct socket *sock, struct msghdr *msg,
 				  int size, int flags)
 {
-	struct inode_security_struct *isec;
-	struct task_security_struct *tsec;
-	struct avc_audit_data ad;
-	int err;
-
-	isec = SOCK_INODE(sock)->i_security;
-	tsec = current->security;
-
-	AVC_AUDIT_DATA_INIT(&ad,NET);
-	ad.u.net.sk = sock->sk;
-	err = avc_has_perm(tsec->sid, isec->sid, isec->sclass,
-			   SOCKET__READ, &isec->avcr, &ad);
-	if (err)
-		return err;
-
-	return 0;
+	return socket_has_perm(current, sock, SOCKET__READ);
 }
 
 static int selinux_socket_getsockname(struct socket *sock)
 {
-	struct inode_security_struct *isec;
-	struct task_security_struct *tsec;
-	struct avc_audit_data ad;
-	int err;
-
-	tsec = current->security;
-	isec = SOCK_INODE(sock)->i_security;
-
-	AVC_AUDIT_DATA_INIT(&ad,NET);
-	ad.u.net.sk = sock->sk;
-	err = avc_has_perm(tsec->sid, isec->sid, isec->sclass,
-			   SOCKET__GETATTR, &isec->avcr, &ad);
-	if (err)
-		return err;
-
-	return 0;
+	return socket_has_perm(current, sock, SOCKET__GETATTR);
 }
 
 static int selinux_socket_getpeername(struct socket *sock)
 {
-	struct inode_security_struct *isec;
-	struct task_security_struct *tsec;
-	struct avc_audit_data ad;
-	int err;
-
-	tsec = current->security;
-	isec = SOCK_INODE(sock)->i_security;
-
-	AVC_AUDIT_DATA_INIT(&ad,NET);
-	ad.u.net.sk = sock->sk;
-	err = avc_has_perm(tsec->sid, isec->sid, isec->sclass,
-			   SOCKET__GETATTR, &isec->avcr, &ad);
-	if (err)
-		return err;
-
-	return 0;
+	return socket_has_perm(current, sock, SOCKET__GETATTR);
 }
 
 static int selinux_socket_setsockopt(struct socket *sock,int level,int optname)
@@ -2592,6 +2637,7 @@ static int selinux_socket_unix_stream_connect(struct socket *sock,
 					      struct socket *other,
 					      struct sock *newsk)
 {
+	struct sk_security_struct *ssec;
 	struct inode_security_struct *isec;
 	struct inode_security_struct *other_isec;
 	struct avc_audit_data ad;
@@ -2610,6 +2656,14 @@ static int selinux_socket_unix_stream_connect(struct socket *sock,
 	if (err)
 		return err;
 
+	/* connecting socket */
+	ssec = sock->sk->sk_security;
+	ssec->peer_sid = other_isec->sid;
+	
+	/* server child socket */
+	ssec = newsk->sk_security;
+	ssec->peer_sid = isec->sid;
+	
 	return 0;
 }
 
@@ -2637,7 +2691,253 @@ static int selinux_socket_unix_may_send(struct socket *sock,
 	return 0;
 }
 
-#endif
+static int selinux_socket_sock_rcv_skb(struct sock *sk, struct sk_buff *skb)
+{
+	int err = 0;
+	u32 netif_perm, node_perm, node_sid, recv_perm = 0;
+	struct socket *sock;
+	struct inode *inode;
+	struct net_device *dev;
+	struct iphdr *iph;
+	struct sel_netif *netif;
+	struct netif_security_struct *nsec;
+	struct inode_security_struct *isec;
+	struct avc_audit_data ad;
+
+	/* Only IPv4 is supported here at this stage */
+	if (sk->sk_family != PF_INET)
+		goto out;
+
+	sock = sk->sk_socket;
+	
+	/* TCP control messages don't always have a socket. */
+	if (!sock)
+		goto out;
+
+	inode = SOCK_INODE(sock);
+	if (!inode)
+		goto out;
+
+	dev = skb->dev;
+	if (!dev)
+		goto out;
+
+	netif = sel_netif_lookup(dev);
+	if (IS_ERR(netif)) {
+		err = PTR_ERR(netif);
+		goto out;
+	}
+	
+	nsec = &netif->nsec;
+	isec = inode->i_security;
+
+	switch (isec->sclass) {
+	case SECCLASS_UDP_SOCKET:
+		netif_perm = NETIF__UDP_RECV;
+		node_perm = NODE__UDP_RECV;
+		recv_perm = UDP_SOCKET__RECV_MSG;
+		break;
+	
+	case SECCLASS_TCP_SOCKET:
+		netif_perm = NETIF__TCP_RECV;
+		node_perm = NODE__TCP_RECV;
+		recv_perm = TCP_SOCKET__RECV_MSG;
+		break;
+	
+	default:
+		netif_perm = NETIF__RAWIP_RECV;
+		node_perm = NODE__RAWIP_RECV;
+		break;
+	}
+
+	AVC_AUDIT_DATA_INIT(&ad, NET);
+	ad.u.net.netif = dev->name;
+	selinux_parse_skb_ipv4(skb, &ad);
+
+	err = avc_has_perm(isec->sid, nsec->if_sid, SECCLASS_NETIF,
+	                   netif_perm, &nsec->avcr, &ad);
+	sel_netif_put(netif);
+	if (err)
+		goto out;
+	
+	/* Fixme: this lookup is inefficient */
+	iph = skb->nh.iph;
+	err = security_node_sid(PF_INET, &iph->saddr, sizeof(iph->saddr), &node_sid);
+	if (err)
+		goto out;
+	
+	err = avc_has_perm(isec->sid, node_sid, SECCLASS_NODE, node_perm, NULL, &ad);
+
+	if (recv_perm) {
+		u32 port_sid;
+
+		/* Fixme: make this more efficient */
+		err = security_port_sid(sk->sk_family, sk->sk_type,
+		                        sk->sk_protocol, ntohs(ad.u.net.sport),
+		                        &port_sid);
+		if (err)
+			goto out;
+
+		err = avc_has_perm(isec->sid, port_sid, isec->sclass,
+		                   recv_perm, NULL, &ad);
+	}
+
+out:	
+	return err;
+}
+
+static int selinux_socket_getpeersec(struct socket *sock, char __user *optval,
+				     int __user *optlen, unsigned len)
+{
+	int err = 0;
+	char *scontext;
+	u32 scontext_len;
+	struct sk_security_struct *ssec;
+	struct inode_security_struct *isec;
+
+	isec = SOCK_INODE(sock)->i_security;
+	if (isec->sclass != SECCLASS_UNIX_STREAM_SOCKET) {
+		err = -ENOPROTOOPT;
+		goto out;
+	}
+
+	ssec = sock->sk->sk_security;
+	
+	err = security_sid_to_context(ssec->peer_sid, &scontext, &scontext_len);
+	if (err)
+		goto out;
+
+	if (scontext_len > len) {
+		err = -ERANGE;
+		goto out_len;
+	}
+
+	if (copy_to_user(optval, scontext, scontext_len))
+		err = -EFAULT;
+
+out_len:
+	if (put_user(scontext_len, optlen))
+		err = -EFAULT;
+
+	kfree(scontext);
+out:	
+	return err;
+}
+
+static int selinux_sk_alloc_security(struct sock *sk, int family, int priority)
+{
+	return sk_alloc_security(sk, family, priority);
+}
+
+static void selinux_sk_free_security(struct sock *sk)
+{
+	sk_free_security(sk);
+}
+
+#ifdef CONFIG_NETFILTER
+static unsigned int selinux_ip_postroute_last(unsigned int hooknum,
+                                              struct sk_buff **pskb,
+                                              const struct net_device *in,
+                                              const struct net_device *out,
+                                              int (*okfn)(struct sk_buff *))
+{
+	int err = NF_ACCEPT;
+	u32 netif_perm, node_perm, node_sid, send_perm = 0;
+	struct sock *sk;
+	struct socket *sock;
+	struct inode *inode;
+	struct iphdr *iph;
+	struct sel_netif *netif;
+	struct sk_buff *skb = *pskb;
+	struct netif_security_struct *nsec;
+	struct inode_security_struct *isec;
+	struct avc_audit_data ad;
+	struct net_device *dev = (struct net_device *)out;
+	
+	sk = skb->sk;
+	if (!sk)
+		goto out;
+		
+	sock = sk->sk_socket;
+	if (!sock)
+		goto out;
+		
+	inode = SOCK_INODE(sock);
+	if (!inode)
+		goto out;
+
+	netif = sel_netif_lookup(dev);
+	if (IS_ERR(netif)) {
+		err = NF_DROP;
+		goto out;
+	}
+	
+	nsec = &netif->nsec;
+	isec = inode->i_security;
+	
+	switch (isec->sclass) {
+	case SECCLASS_UDP_SOCKET:
+		netif_perm = NETIF__UDP_SEND;
+		node_perm = NODE__UDP_SEND;
+		send_perm = UDP_SOCKET__SEND_MSG;
+		break;
+	
+	case SECCLASS_TCP_SOCKET:
+		netif_perm = NETIF__TCP_SEND;
+		node_perm = NODE__TCP_SEND;
+		send_perm = TCP_SOCKET__SEND_MSG;
+		break;
+	
+	default:
+		netif_perm = NETIF__RAWIP_SEND;
+		node_perm = NODE__RAWIP_SEND;
+		break;
+	}
+
+	AVC_AUDIT_DATA_INIT(&ad, NET);
+	ad.u.net.netif = dev->name;
+	selinux_parse_skb_ipv4(skb, &ad);
+
+	err = avc_has_perm(isec->sid, nsec->if_sid, SECCLASS_NETIF,
+	                   netif_perm, &nsec->avcr, &ad) ? NF_DROP : NF_ACCEPT;
+	sel_netif_put(netif);
+	if (err != NF_ACCEPT)
+		goto out;
+		
+	/* Fixme: this lookup is inefficient */
+	iph = skb->nh.iph;
+	err = security_node_sid(PF_INET, &iph->daddr, sizeof(iph->daddr), &node_sid);
+	if (err)
+		goto out;
+	
+	err = avc_has_perm(isec->sid, node_sid, SECCLASS_NODE,
+	                   node_perm, NULL, &ad) ? NF_DROP : NF_ACCEPT;
+	if (err != NF_ACCEPT)
+		goto out;
+
+	if (send_perm) {
+		u32 port_sid;
+		
+		/* Fixme: make this more efficient */
+		err = security_port_sid(sk->sk_family,
+		                        sk->sk_type,
+		                        sk->sk_protocol,
+		                        ntohs(ad.u.net.dport),
+		                        &port_sid) ? NF_DROP : NF_ACCEPT;
+		if (err != NF_ACCEPT)
+			goto out;
+
+		err = avc_has_perm(isec->sid, port_sid, isec->sclass,
+		                   send_perm, NULL, &ad) ? NF_DROP : NF_ACCEPT;
+	}
+
+out:
+	return err;
+}
+
+#endif	/* CONFIG_NETFILTER */
+
+#endif	/* CONFIG_SECURITY_NETWORK */
 
 static int ipc_alloc_security(struct task_struct *task,
 			      struct kern_ipc_perm *perm,
@@ -3372,6 +3672,10 @@ struct security_operations selinux_ops = {
 	.socket_getsockopt =		selinux_socket_getsockopt,
 	.socket_setsockopt =		selinux_socket_setsockopt,
 	.socket_shutdown =		selinux_socket_shutdown,
+	.socket_sock_rcv_skb =		selinux_socket_sock_rcv_skb,
+	.socket_getpeersec =		selinux_socket_getpeersec,
+	.sk_alloc_security =		selinux_sk_alloc_security,
+	.sk_free_security =		selinux_sk_free_security,
 #endif
 };
 
@@ -3441,3 +3745,33 @@ next_sb:
    all processes and objects when they are created. */
 security_initcall(selinux_init);
 
+#if defined(CONFIG_SECURITY_NETWORK) && defined(CONFIG_NETFILTER)
+
+static struct nf_hook_ops selinux_ip_ops[] = {
+	{ .hook =	selinux_ip_postroute_last,
+	  .owner =	THIS_MODULE,
+	  .pf =		PF_INET, 
+	  .hooknum =	NF_IP_POST_ROUTING, 
+	  .priority =	NF_IP_PRI_SELINUX_LAST, },
+};
+
+static int __init selinux_nf_ip_init(void)
+{
+	int err = 0;
+
+	if (!selinux_enabled)
+		goto out;
+		
+	printk(KERN_INFO "SELinux:  Registering netfilter hooks\n");
+	
+	err = nf_register_hook(&selinux_ip_ops[0]);
+	if (err)
+		panic("SELinux: nf_register_hook 0 error %d\n", err);
+
+out:
+	return err;
+}
+
+__initcall(selinux_nf_ip_init);
+
+#endif /* CONFIG_SECURITY_NETWORK && CONFIG_NETFILTER */

@@ -44,7 +44,7 @@ static unsigned long clock_constant;
 
 void __init amiga_init_sound(void)
 {
-	static struct resource beep_res = { "Beep" };
+	static struct resource beep_res = { .name = "Beep" };
 
 	snd_data = amiga_chip_alloc_res(sizeof(sine_data), &beep_res);
 	if (!snd_data) {

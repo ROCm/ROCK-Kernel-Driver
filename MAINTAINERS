@@ -1511,8 +1511,8 @@ L:	linux-sound@vger.kernel.org
 S:	Maintained
 
 OPROFILE
-P:	John Levon
-M:	levon@movementarian.org
+P:	Philippe Elie
+M:	phil.el@wanadoo.fr
 L:	oprofile-list@lists.sf.net
 S:	Maintained
 

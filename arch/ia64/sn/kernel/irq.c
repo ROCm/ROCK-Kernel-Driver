@@ -1,35 +1,11 @@
 /*
  * Platform dependent support for SGI SN
  *
+ * This file is subject to the terms and conditions of the GNU General Public
+ * License.  See the file "COPYING" in the main directory of this archive
+ * for more details.
+ *
  * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
- * 
- * This program is free software; you can redistribute it and/or modify it 
- * under the terms of version 2 of the GNU General Public License 
- * as published by the Free Software Foundation.
- * 
- * This program is distributed in the hope that it would be useful, but 
- * WITHOUT ANY WARRANTY; without even the implied warranty of 
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
- * 
- * Further, this software is distributed without any warranty that it is 
- * free of the rightful claim of any third person regarding infringement 
- * or the like.  Any license provided herein, whether implied or 
- * otherwise, applies only to this software file.  Patent licenses, if 
- * any, provided herein do not apply to combinations of this program with 
- * other software, or any other product whatsoever.
- * 
- * You should have received a copy of the GNU General Public 
- * License along with this program; if not, write the Free Software 
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
- * Contact information:  Silicon Graphics, Inc., 1600 Amphitheatre Pkwy, 
- * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
- * http://oss.sgi.com/projects/GenInfo/NoticeExplan
  */
 
 #include <linux/init.h>
@@ -42,10 +18,8 @@
 #include <asm/pgtable.h>
 #include <asm/sn/sgi.h>
 #include <asm/sn/iograph.h>
-#include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/types.h>
-#include <asm/sn/pci/bridge.h>
 #include <asm/sn/pci/pciio.h>
 #include <asm/sn/pci/pciio_private.h>
 #include <asm/sn/pci/pcibr.h>
@@ -62,10 +36,11 @@
 #include <asm/bitops.h>
 #include <asm/sn/sn2/shub_mmr.h>
 
-int irq_to_bit_pos(int irq);
 static void force_interrupt(int irq);
 extern void pcibr_force_interrupt(pcibr_intr_t intr);
 extern int sn_force_interrupt_flag;
+
+static pcibr_intr_list_t *pcibr_intr_list;
 
 
 
@@ -139,8 +114,32 @@ sn_end_irq(unsigned int irq)
 }
 
 static void
-sn_set_affinity_irq(unsigned int irq, unsigned long mask)
+sn_set_affinity_irq(unsigned int irq, cpumask_t mask)
 {
+#if CONFIG_SMP  
+        int redir = 0;
+        pcibr_intr_list_t p = pcibr_intr_list[irq];
+        pcibr_intr_t intr; 
+	int	cpu;
+        extern void sn_shub_redirect_intr(pcibr_intr_t intr, unsigned long cpu);
+        extern void sn_tio_redirect_intr(pcibr_intr_t intr, unsigned long cpu);
+                
+	if (p == NULL)
+		return; 
+        
+	intr = p->il_intr;
+
+	if (intr == NULL)
+		return; 
+
+	cpu = first_cpu(mask);
+	if (IS_PIC_SOFT(intr->bi_soft) ) {
+		sn_shub_redirect_intr(intr, cpu);
+	} else { 
+		return; 
+	}
+	(void) set_irq_affinity_info(irq, cpu_physical_id(intr->bi_cpu), redir);
+#endif /* CONFIG_SMP */
 }
 
 
@@ -187,41 +186,18 @@ sn_irq_init (void)
 	}
 }
 
-int
-bit_pos_to_irq(int bit) {
-#define BIT_TO_IRQ 64
-	if (bit > 118) bit = 118;
-
-        return bit + BIT_TO_IRQ;
-}
-
-int
-irq_to_bit_pos(int irq) {
-#define IRQ_TO_BIT 64
-	int bit = irq - IRQ_TO_BIT;
-
-        return bit;
-}
-
-struct pcibr_intr_list_t {
-	struct pcibr_intr_list_t *next;
-	pcibr_intr_t intr;
-};
-
-static struct pcibr_intr_list_t **pcibr_intr_list;
-
 void
 register_pcibr_intr(int irq, pcibr_intr_t intr) {
-	struct pcibr_intr_list_t *p = kmalloc(sizeof(struct pcibr_intr_list_t), GFP_KERNEL);
-	struct pcibr_intr_list_t *list;
+	pcibr_intr_list_t p = kmalloc(sizeof(struct pcibr_intr_list_s), GFP_KERNEL);
+	pcibr_intr_list_t list;
 	int cpu = SN_CPU_FROM_IRQ(irq);
 
 	if (pcibr_intr_list == NULL) {
-		pcibr_intr_list = kmalloc(sizeof(struct pcibr_intr_list_t *) * NR_IRQS, GFP_KERNEL);
+		pcibr_intr_list = kmalloc(sizeof(pcibr_intr_list_t) * NR_IRQS, GFP_KERNEL);
 		if (pcibr_intr_list == NULL) 
-			pcibr_intr_list = vmalloc(sizeof(struct pcibr_intr_list_t *) * NR_IRQS);
+			pcibr_intr_list = vmalloc(sizeof(pcibr_intr_list_t) * NR_IRQS);
 		if (pcibr_intr_list == NULL) panic("Could not allocate memory for pcibr_intr_list\n");
-		memset( (void *)pcibr_intr_list, 0, sizeof(struct pcibr_intr_list_t *) * NR_IRQS);
+		memset( (void *)pcibr_intr_list, 0, sizeof(pcibr_intr_list_t) * NR_IRQS);
 	}
 	if (pdacpu(cpu)->sn_last_irq < irq) {
 		pdacpu(cpu)->sn_last_irq = irq;
@@ -229,42 +205,42 @@ register_pcibr_intr(int irq, pcibr_intr_t intr) {
 	if (pdacpu(cpu)->sn_first_irq > irq) pdacpu(cpu)->sn_first_irq = irq;
 	if (!p) panic("Could not allocate memory for pcibr_intr_list_t\n");
 	if ((list = pcibr_intr_list[irq])) {
-		while (list->next) list = list->next;
-		list->next = p;
-		p->next = NULL;
-		p->intr = intr;
+		while (list->il_next) list = list->il_next;
+		list->il_next = p;
+		p->il_next = NULL;
+		p->il_intr = intr;
 	} else {
 		pcibr_intr_list[irq] = p;
-		p->next = NULL;
-		p->intr = intr;
+		p->il_next = NULL;
+		p->il_intr = intr;
 	}
 }
 
 void
 force_polled_int(void) {
 	int i;
-	struct pcibr_intr_list_t *p;
+	pcibr_intr_list_t p;
 
 	for (i=0; i<NR_IRQS;i++) {
 		p = pcibr_intr_list[i];
 		while (p) {
-			if (p->intr){
-				pcibr_force_interrupt(p->intr);
+			if (p->il_intr){
+				pcibr_force_interrupt(p->il_intr);
 			}
-			p = p->next;
+			p = p->il_next;
 		}
 	}
 }
 
 static void
 force_interrupt(int irq) {
-	struct pcibr_intr_list_t *p = pcibr_intr_list[irq];
+	pcibr_intr_list_t p = pcibr_intr_list[irq];
 
 	while (p) {
-		if (p->intr) {
-			pcibr_force_interrupt(p->intr);
+		if (p->il_intr) {
+			pcibr_force_interrupt(p->il_intr);
 		}
-		p = p->next;
+		p = p->il_next;
 	}
 }
 
@@ -286,7 +262,7 @@ sn_check_intr(int irq, pcibr_intr_t intr) {
 	unsigned long irr_reg;
 
 
-	regval = intr->bi_soft->bs_base->p_int_status_64;
+	regval = pcireg_intr_status_get(intr->bi_soft->bs_base);
 	irr_reg_num = irq_to_vector(irq) / 64;
 	irr_bit = irq_to_vector(irq) % 64;
 	switch (irr_reg_num) {
@@ -324,13 +300,13 @@ sn_lb_int_war_check(void) {
 	if (pda->sn_first_irq == 0) return;
 	for (i=pda->sn_first_irq;
 		i <= pda->sn_last_irq; i++) {
-			struct pcibr_intr_list_t *p = pcibr_intr_list[i];
+			pcibr_intr_list_t p = pcibr_intr_list[i];
 			if (p == NULL) {
 				continue;
 			}
 			while (p) {
-				sn_check_intr(i, p->intr);
-				p = p->next;
+				sn_check_intr(i, p->il_intr);
+				p = p->il_next;
 			}
 	}
 }

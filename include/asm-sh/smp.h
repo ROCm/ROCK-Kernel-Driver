@@ -1,11 +1,18 @@
 /*
- * Copyright (C) 2002 Paul Mundt
+ * include/asm-sh/smp.h
+ *
+ * Copyright (C) 2002, 2003  Paul Mundt
+ *
+ * This file is subject to the terms and conditions of the GNU General Public
+ * License.  See the file "COPYING" in the main directory of this archive for
+ * more details.
  */
 #ifndef __ASM_SH_SMP_H
 #define __ASM_SH_SMP_H
 
 #include <linux/config.h>
 #include <linux/bitops.h>
+#include <linux/cpumask.h>
 
 #ifdef CONFIG_SMP
 
@@ -13,17 +20,12 @@
 #include <asm/atomic.h>
 #include <asm/current.h>
 
-extern unsigned long cpu_online_map;
+extern cpumask_t cpu_online_map;
+extern cpumask_t cpu_possible_map;
 
-#define cpu_online(cpu)		(cpu_online_map & (1 << (cpu)))
-#define cpu_possible(cpu)	(cpu_online(cpu))
+#define cpu_online(cpu)		cpu_isset(cpu, cpu_online_map)
 
 #define smp_processor_id()	(current_thread_info()->cpu)
-
-extern inline unsigned int num_online_cpus(void)
-{
-	return hweight32(cpu_online_map);
-}
 
 /* I've no idea what the real meaning of this is */
 #define PROC_CHANGE_PENALTY	20

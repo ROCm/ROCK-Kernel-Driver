@@ -65,7 +65,7 @@ static long madvise_willneed(struct vm_area_struct * vma,
 		end = vma->vm_end;
 	end = ((end - vma->vm_start) >> PAGE_SHIFT) + vma->vm_pgoff;
 
-	force_page_cache_readahead(file->f_dentry->d_inode->i_mapping,
+	force_page_cache_readahead(file->f_mapping,
 			file, start, max_sane_readahead(end - start));
 	return 0;
 }

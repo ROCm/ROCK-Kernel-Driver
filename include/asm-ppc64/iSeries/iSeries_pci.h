@@ -1,10 +1,11 @@
 #ifndef _ISERIES_64_PCI_H
 #define _ISERIES_64_PCI_H
+
 /************************************************************************/
 /* File iSeries_pci.h created by Allan Trautman on Tue Feb 20, 2001.    */
 /************************************************************************/
 /* Define some useful macros for the iSeries pci routines.              */
-/* Copyright (C) 20yy  Allan H Trautman, IBM Corporation                */
+/* Copyright (C) 2001  Allan H Trautman, IBM Corporation                */
 /*                                                                      */
 /* This program is free software; you can redistribute it and/or modify */
 /* it under the terms of the GNU General Public License as published by */
@@ -28,77 +29,81 @@
 /*   Ported to ppc64, May 25, 2001                                      */
 /* End Change Activity                                                  */
 /************************************************************************/
+
 #include <asm/iSeries/HvCallPci.h>
 
 struct pci_dev;				/* For Forward Reference        */
 struct iSeries_Device_Node;
+
 /************************************************************************/
-/* Gets iSeries Bus, SubBus, of DevFn using pci_dev* structure          */
+/* Gets iSeries Bus, SubBus, DevFn using iSeries_Device_Node structure */
 /************************************************************************/
-#define ISERIES_BUS(DevPtr)    DevPtr->DsaAddr.busNumber
-#define ISERIES_SUBBUS(DevPtr) DevPtr->DsaAddr.subBusNumber
-#define ISERIES_DEVICE(DevPtr) DevPtr->DsaAddr.deviceId
-#define ISERIES_DEVFUN(DevPtr) DevPtr->DevFn
-#define ISERIES_DSA(DevPtr)   (*(u64*)&DevPtr->DsaAddr)
+
+#define ISERIES_BUS(DevPtr)	DevPtr->DsaAddr.Dsa.busNumber
+#define ISERIES_SUBBUS(DevPtr)	DevPtr->DsaAddr.Dsa.subBusNumber
+#define ISERIES_DEVICE(DevPtr)	DevPtr->DsaAddr.Dsa.deviceId
+#define ISERIES_DSA(DevPtr)	DevPtr->DsaAddr.DsaAddr
+#define ISERIES_DEVFUN(DevPtr)	DevPtr->DevFn
 #define ISERIES_DEVNODE(PciDev) ((struct iSeries_Device_Node*)PciDev->sysdata)
 
 #define EADsMaxAgents 7
-/************************************************************************************/
-/* Decodes Linux DevFn to iSeries DevFn, bridge device, or function.                */
-/* For Linux, see PCI_SLOT and PCI_FUNC in include/linux/pci.h                      */
-/************************************************************************************/
-#define ISERIES_DECODE_DEVFN(linuxdevfn)  (((linuxdevfn & 0x71) << 1) | (linuxdevfn & 0x07))
-#define ISERIES_DECODE_DEVICE(linuxdevfn) (((linuxdevfn & 0x38) >> 3) |(((linuxdevfn & 0x40) >> 2) + 0x10))
-#define ISERIES_DECODE_FUNCTION(linuxdevfn) (linuxdevfn & 0x07)
+
+/************************************************************************/
+/* Decodes Linux DevFn to iSeries DevFn, bridge device, or function.    */
+/* For Linux, see PCI_SLOT and PCI_FUNC in include/linux/pci.h          */
+/************************************************************************/
+
 #define ISERIES_PCI_AGENTID(idsel,func)	((idsel & 0x0F) << 4) | (func  & 0x07)
+#define ISERIES_ENCODE_DEVICE(agentid)	((0x10) | ((agentid&0x20)>>2) | (agentid&07))
 
 #define ISERIES_GET_DEVICE_FROM_SUBBUS(subbus)   ((subbus >> 5) & 0x7)
 #define ISERIES_GET_FUNCTION_FROM_SUBBUS(subbus) ((subbus >> 2) & 0x7)
 
-#define ISERIES_ENCODE_DEVICE(agentid)	((0x10) | ((agentid&0x20)>>2) | (agentid&07))
-/************************************************************************************/
-/* Converts Virtual Address to Real Address for Hypervisor calls                    */
-/************************************************************************************/
-#define REALADDR(virtaddr)  (0x8000000000000000 | (virt_to_absolute((u64)virtaddr) ))
+/*
+ * N.B. the ISERIES_DECODE_* macros are not used anywhere, and I think
+ * the 0x71 (at least) must be wrong - 0x78 maybe?  -- paulus.
+ */
+#define ISERIES_DECODE_DEVFN(linuxdevfn)  (((linuxdevfn & 0x71) << 1) | (linuxdevfn & 0x07))
+#define ISERIES_DECODE_DEVICE(linuxdevfn) (((linuxdevfn & 0x38) >> 3) |(((linuxdevfn & 0x40) >> 2) + 0x10))
+#define ISERIES_DECODE_FUNCTION(linuxdevfn) (linuxdevfn & 0x07)
 
-/************************************************************************************/
-/* Define TRUE and FALSE Values for Al                                              */
-/************************************************************************************/
-#ifndef TRUE
-#define TRUE 1
-#endif
-#ifndef FALSE
-#define FALSE 0
-#endif
+/************************************************************************/
+/* Converts Virtual Address to Real Address for Hypervisor calls        */
+/************************************************************************/
+
+#define REALADDR(virtaddr)  (0x8000000000000000 | (virt_to_absolute((u64)virtaddr) ))
 
 /************************************************************************/
 /* iSeries Device Information                                           */
 /************************************************************************/
+
 struct iSeries_Device_Node {
-	struct list_head Device_List;    /* Must be first for cast to wo*/
-	struct pci_dev*  PciDev;         /* Pointer to pci_dev structure*/
-        struct HvCallPci_DsaAddr DsaAddr;/* Direct Select Address       */
-                                         /* busNumber,subBusNumber,     */ 
-	                                 /* deviceId, barNumber         */
-	HvAgentId        AgentId;	 /* Hypervisor DevFn            */
-	int              DevFn;          /* Linux devfn                 */
-	int              BarOffset;
-	int              Irq;            /* Assigned IRQ                */
-	int              ReturnCode;	 /* Return Code Holder          */
-	int              IoRetry;        /* Current Retry Count         */
-	int              Flags;          /* Possible flags(disable/bist)*/
-	u16              Vendor;         /* Vendor ID                   */
-	u8               LogicalSlot;    /* Hv Slot Index for Tces      */
-	struct TceTable* DevTceTable;    /* Device TCE Table            */ 
-	u8               PhbId;          /* Phb Card is on.             */
-	u16              Board;          /* Board Number                */
-	u8               FrameId;	 /* iSeries spcn Frame Id       */
-	char             CardLocation[4];/* Char format of planar vpd   */
-	char             Location[20];   /* Frame  1, Card C10          */
+	struct list_head Device_List;
+	struct pci_dev* PciDev;         /* Pointer to pci_dev structure*/
+        union HvDsaMap	DsaAddr;	/* Direct Select Address       */
+                                        /* busNumber,subBusNumber,     */ 
+	                                /* deviceId, barNumber         */
+	HvAgentId       AgentId;	/* Hypervisor DevFn            */
+	int             DevFn;          /* Linux devfn                 */
+	int             BarOffset;
+	int             Irq;            /* Assigned IRQ                */
+	int             ReturnCode;	/* Return Code Holder          */
+	int             IoRetry;        /* Current Retry Count         */
+	int             Flags;          /* Possible flags(disable/bist)*/
+	u16             Vendor;         /* Vendor ID                   */
+	u8              LogicalSlot;    /* Hv Slot Index for Tces      */
+	struct TceTable* DevTceTable;   /* Device TCE Table            */ 
+	u8              PhbId;          /* Phb Card is on.             */
+	u16             Board;          /* Board Number                */
+	u8              FrameId;	/* iSeries spcn Frame Id       */
+	char            CardLocation[4];/* Char format of planar vpd   */
+	char            Location[20];   /* Frame  1, Card C10          */
 };
+
 /************************************************************************/
 /* Location Data extracted from the VPD list and device info.           */
 /************************************************************************/
+
 struct LocationDataStruct { 	/* Location data structure for device  */
 	u16  Bus;               /* iSeries Bus Number              0x00*/
 	u16  Board;             /* iSeries Board                   0x02*/
@@ -108,17 +113,14 @@ struct LocationDataStruct { 	/* Location data structure for device  */
 	u8   Card;
 	char CardLocation[4];      
 };
+
 typedef struct LocationDataStruct  LocationData;
 #define LOCATION_DATA_SIZE      48
-/************************************************************************/
-/* Flight Recorder tracing                                              */
-/************************************************************************/
-extern int  iSeries_Set_PciTraceFlag(int TraceFlag);
-extern int  iSeries_Get_PciTraceFlag(void);
 
 /************************************************************************/
 /* Functions                                                            */
 /************************************************************************/
+
 extern LocationData* iSeries_GetLocationData(struct pci_dev* PciDev);
 extern int           iSeries_Device_Information(struct pci_dev*,char*, int);
 extern void          iSeries_Get_Location_Code(struct iSeries_Device_Node*);

@@ -39,6 +39,7 @@
 #include <asm/hw_irq.h>
 #include <asm/abs_addr.h>
 #include <asm/cacheflush.h>
+#include <asm/proc_fs.h>
 #ifdef CONFIG_PPC_ISERIES
 #include <asm/iSeries/iSeries_pci.h>
 #include <asm/iSeries/iSeries_proc.h>
@@ -163,21 +164,23 @@ EXPORT_SYMBOL(kernel_thread);
 EXPORT_SYMBOL(flush_instruction_cache);
 EXPORT_SYMBOL(_get_PVR);
 EXPORT_SYMBOL(giveup_fpu);
-EXPORT_SYMBOL(enable_kernel_fp);
+#ifdef CONFIG_ALTIVEC
+EXPORT_SYMBOL(giveup_altivec);
+#endif
 EXPORT_SYMBOL(flush_icache_range);
 EXPORT_SYMBOL(flush_icache_user_range);
 EXPORT_SYMBOL(flush_dcache_page);
 #ifdef CONFIG_SMP
 #ifdef CONFIG_PPC_ISERIES
-EXPORT_SYMBOL(__no_use_restore_flags);
-EXPORT_SYMBOL(__no_use_save_flags);
-EXPORT_SYMBOL(__no_use_sti);
-EXPORT_SYMBOL(__no_use_cli);
+EXPORT_SYMBOL(local_get_flags);
+EXPORT_SYMBOL(local_irq_disable);
+EXPORT_SYMBOL(local_irq_restore);
 #endif
 #endif
 
 EXPORT_SYMBOL(ppc_md);
 
+#ifdef CONFIG_PPC_PSERIES
 EXPORT_SYMBOL(find_devices);
 EXPORT_SYMBOL(find_type_devices);
 EXPORT_SYMBOL(find_compatible_devices);
@@ -186,6 +189,7 @@ EXPORT_SYMBOL(device_is_compatible);
 EXPORT_SYMBOL(machine_is_compatible);
 EXPORT_SYMBOL(find_all_nodes);
 EXPORT_SYMBOL(get_property);
+#endif
 
 
 EXPORT_SYMBOL_NOVERS(memcpy);
@@ -222,3 +226,4 @@ EXPORT_SYMBOL(debugger_fault_handler);
 
 EXPORT_SYMBOL(tb_ticks_per_usec);
 EXPORT_SYMBOL(paca);
+EXPORT_SYMBOL(proc_ppc64);

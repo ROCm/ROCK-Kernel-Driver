@@ -812,7 +812,7 @@ __generic_file_aio_read(struct kiocb *iocb, const struct iovec *iov,
 		struct address_space *mapping;
 		struct inode *inode;
 
-		mapping = filp->f_dentry->d_inode->i_mapping;
+		mapping = filp->f_mapping;
 		inode = mapping->host;
 		retval = 0;
 		if (!count)
@@ -944,7 +944,7 @@ asmlinkage ssize_t sys_readahead(int fd, loff_t offset, size_t count)
 	file = fget(fd);
 	if (file) {
 		if (file->f_mode & FMODE_READ) {
-			struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
+			struct address_space *mapping = file->f_mapping;
 			unsigned long start = offset >> PAGE_CACHE_SHIFT;
 			unsigned long end = (offset + count - 1) >> PAGE_CACHE_SHIFT;
 			unsigned long len = end - start + 1;
@@ -963,7 +963,7 @@ asmlinkage ssize_t sys_readahead(int fd, loff_t offset, size_t count)
 static int FASTCALL(page_cache_read(struct file * file, unsigned long offset));
 static int page_cache_read(struct file * file, unsigned long offset)
 {
-	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
+	struct address_space *mapping = file->f_mapping;
 	struct page *page; 
 	int error;
 
@@ -1002,7 +1002,7 @@ struct page * filemap_nopage(struct vm_area_struct * area, unsigned long address
 {
 	int error;
 	struct file *file = area->vm_file;
-	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
+	struct address_space *mapping = file->f_mapping;
 	struct file_ra_state *ra = &file->f_ra;
 	struct inode *inode = mapping->host;
 	struct page *page;
@@ -1187,7 +1187,7 @@ EXPORT_SYMBOL(filemap_nopage);
 static struct page * filemap_getpage(struct file *file, unsigned long pgoff,
 					int nonblock)
 {
-	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
+	struct address_space *mapping = file->f_mapping;
 	struct page *page;
 	int error;
 
@@ -1299,7 +1299,7 @@ static int filemap_populate(struct vm_area_struct *vma,
 			int nonblock)
 {
 	struct file *file = vma->vm_file;
-	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
+	struct address_space *mapping = file->f_mapping;
 	struct inode *inode = mapping->host;
 	unsigned long size;
 	struct mm_struct *mm = vma->vm_mm;
@@ -1358,7 +1358,7 @@ static struct vm_operations_struct generic_file_vm_ops = {
 
 int generic_file_mmap(struct file * file, struct vm_area_struct * vma)
 {
-	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
+	struct address_space *mapping = file->f_mapping;
 	struct inode *inode = mapping->host;
 
 	if (!mapping->a_ops->readpage)
@@ -1626,9 +1626,9 @@ filemap_set_next_iovec(const struct iovec **iovp, size_t *basep, size_t bytes)
  * Returns appropriate error code that caller should return or
  * zero in case that write should be allowed.
  */
-inline int generic_write_checks(struct inode *inode,
-		struct file *file, loff_t *pos, size_t *count, int isblk)
+inline int generic_write_checks(struct file *file, loff_t *pos, size_t *count, int isblk)
 {
+	struct inode *inode = file->f_mapping->host;
 	unsigned long limit = current->rlim[RLIMIT_FSIZE].rlim_cur;
 
         if (unlikely(*pos < 0))
@@ -1690,7 +1690,7 @@ inline int generic_write_checks(struct inode *inode,
 			*count = inode->i_sb->s_maxbytes - *pos;
 	} else {
 		loff_t isize;
-		if (bdev_read_only(inode->i_bdev))
+		if (bdev_read_only(I_BDEV(inode)))
 			return -EPERM;
 		isize = i_size_read(inode);
 		if (*pos >= isize) {
@@ -1720,7 +1720,7 @@ generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 				unsigned long nr_segs, loff_t *ppos)
 {
 	struct file *file = iocb->ki_filp;
-	struct address_space * mapping = file->f_dentry->d_inode->i_mapping;
+	struct address_space * mapping = file->f_mapping;
 	struct address_space_operations *a_ops = mapping->a_ops;
 	size_t ocount;		/* original count */
 	size_t count;		/* after file limit checks */
@@ -1767,7 +1767,7 @@ generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 	current->backing_dev_info = mapping->backing_dev_info;
 	written = 0;
 
-	err = generic_write_checks(inode, file, &pos, &count, isblk);
+	err = generic_write_checks(file, &pos, &count, isblk);
 	if (err)
 		goto out;
 
@@ -1798,7 +1798,7 @@ generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 		 * of course not the data as we did direct DMA for the IO.
 		 */
 		if (written >= 0 && file->f_flags & O_SYNC)
-			status = generic_osync_inode(inode, OSYNC_METADATA);
+			status = generic_osync_inode(inode, mapping, OSYNC_METADATA);
 		if (written >= 0 && !is_sync_kiocb(iocb))
 			written = -EIOCBQUEUED;
 		goto out_status;
@@ -1886,7 +1886,7 @@ generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 	 */
 	if (status >= 0) {
 		if ((file->f_flags & O_SYNC) || IS_SYNC(inode))
-			status = generic_osync_inode(inode,
+			status = generic_osync_inode(inode, mapping,
 					OSYNC_METADATA|OSYNC_DATA);
 	}
 	
@@ -1920,7 +1920,7 @@ ssize_t generic_file_aio_write(struct kiocb *iocb, const char __user *buf,
 			       size_t count, loff_t pos)
 {
 	struct file *file = iocb->ki_filp;
-	struct inode *inode = file->f_dentry->d_inode->i_mapping->host;
+	struct inode *inode = file->f_mapping->host;
 	ssize_t err;
 	struct iovec local_iov = { .iov_base = (void __user *)buf, .iov_len = count };
 
@@ -1939,7 +1939,7 @@ EXPORT_SYMBOL(generic_file_aio_write);
 ssize_t generic_file_write(struct file *file, const char __user *buf,
 			   size_t count, loff_t *ppos)
 {
-	struct inode	*inode = file->f_dentry->d_inode->i_mapping->host;
+	struct inode	*inode = file->f_mapping->host;
 	ssize_t		err;
 	struct iovec local_iov = { .iov_base = (void __user *)buf, .iov_len = count };
 
@@ -1970,7 +1970,7 @@ EXPORT_SYMBOL(generic_file_readv);
 ssize_t generic_file_writev(struct file *file, const struct iovec *iov,
 			unsigned long nr_segs, loff_t * ppos) 
 {
-	struct inode *inode = file->f_dentry->d_inode;
+	struct inode *inode = file->f_mapping->host;
 	ssize_t ret;
 
 	down(&inode->i_sem);
@@ -1986,7 +1986,7 @@ generic_file_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
 	loff_t offset, unsigned long nr_segs)
 {
 	struct file *file = iocb->ki_filp;
-	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
+	struct address_space *mapping = file->f_mapping;
 	ssize_t retval;
 
 	if (mapping->nrpages) {

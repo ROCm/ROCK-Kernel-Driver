@@ -311,6 +311,7 @@
 #define	SPRN_USIA	0x3AB	/* User Sampled Instruction Address Register */
 #define	SPRN_XER	0x001	/* Fixed Point Exception Register */
 #define	SPRN_ZPR	0x3B0	/* Zone Protection Register */
+#define SPRN_VRSAVE     0x100   /* Vector save */
 
 /* Short-hand versions for a number of the above SPRNs */
 
@@ -371,6 +372,7 @@
 #define	PV_ICESTAR	0x0036
 #define	PV_SSTAR	0x0037
 #define	PV_POWER4p	0x0038
+#define	PV_POWER5	0x003A
 #define	PV_630        	0x0040
 #define	PV_630p	        0x0041
 
@@ -378,6 +380,7 @@
 #define PLATFORM_PSERIES      0x0100
 #define PLATFORM_PSERIES_LPAR 0x0101
 #define PLATFORM_ISERIES_LPAR 0x0201
+#define PLATFORM_LPAR         0x0001
 	
 /*
  * List of interrupt controllers.
@@ -462,11 +465,9 @@ void start_thread(struct pt_regs *regs, unsigned long fdptr, unsigned long sp);
 void release_thread(struct task_struct *);
 
 /* Prepare to copy thread state - unlazy all lazy status */
-#define prepare_to_copy(tsk)	do { } while (0)
+extern void prepare_to_copy(struct task_struct *tsk);
 
-/*
- * Create a new kernel thread.
- */
+/* Create a new kernel thread. */
 extern long kernel_thread(int (*fn)(void *), void *arg, unsigned long flags);
 
 /*
@@ -477,6 +478,7 @@ extern long kernel_thread(int (*fn)(void *), void *arg, unsigned long flags);
 
 /* Lazy FPU handling on uni-processor */
 extern struct task_struct *last_task_used_math;
+extern struct task_struct *last_task_used_altivec;
 
 
 #ifdef __KERNEL__
@@ -516,6 +518,14 @@ struct thread_struct {
 	unsigned long	fpexc_mode;	/* Floating-point exception mode */
 	unsigned long	saved_msr;	/* Save MSR across signal handlers */
 	unsigned long	saved_softe;	/* Ditto for Soft Enable/Disable */
+#ifdef CONFIG_ALTIVEC
+	/* Complete AltiVec register set */
+	vector128	vr[32] __attribute((aligned(16)));
+	/* AltiVec status */
+	vector128	vscr __attribute((aligned(16)));
+	unsigned long	vrsave;
+	int		used_vr;	/* set if process has used altivec */
+#endif /* CONFIG_ALTIVEC */
 };
 
 #define INIT_SP		(sizeof(init_stack) + (unsigned long) &init_stack)

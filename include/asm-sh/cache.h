@@ -1,4 +1,4 @@
-/* $Id: cache.h,v 1.4 2003/05/06 23:28:50 lethal Exp $
+/* $Id: cache.h,v 1.5 2003/07/16 04:08:29 lethal Exp $
  *
  * include/asm-sh/cache.h
  *
@@ -16,7 +16,8 @@
 #define SH_CACHE_COMBINED	4
 #define SH_CACHE_ASSOC		8
 
-#define SMP_CACHE_BYTES L1_CACHE_BYTES
+#define L1_CACHE_BYTES		(1 << L1_CACHE_SHIFT)
+#define SMP_CACHE_BYTES		L1_CACHE_BYTES
 
 #define L1_CACHE_ALIGN(x)	(((x)+(L1_CACHE_BYTES-1))&~(L1_CACHE_BYTES-1))
 
@@ -28,7 +29,7 @@
 		 __section__(".data.cacheline_aligned")))
 #endif
 
-#define L1_CACHE_SHIFT_MAX 5	/* largest L1 which this arch supports */
+#define L1_CACHE_SHIFT_MAX 	5	/* largest L1 which this arch supports */
 
 struct cache_info {
 	unsigned int ways;

@@ -18,7 +18,7 @@
 
 #include "tape.h"
 
-#define PRINTK_HEADER "T390:"
+#define PRINTK_HEADER "TAPE_PROC: "
 
 static const char *tape_med_st_verbose[MS_SIZE] =
 {
@@ -42,19 +42,19 @@ static int tape_proc_show(struct seq_file *m, void *v)
 
 	n = (unsigned long) v - 1;
 	if (!n) {
-		seq_printf(m, "TapeNo\tDevNo\tCuType\tCuModel\tDevType\t"
-			   "DevMod\tBlkSize\tState\tOp\tMedState\n");
+		seq_printf(m, "TapeNo\tBusID      CuType/Model\t"
+			"DevType/Model\tBlkSize\tState\tOp\tMedState\n");
 	}
 	device = tape_get_device(n);
 	if (IS_ERR(device))
 		return 0;
 	spin_lock_irq(get_ccwdev_lock(device->cdev));
 	seq_printf(m, "%d\t", (int) n);
-	seq_printf(m, "%s\t", device->cdev->dev.bus_id);
-	seq_printf(m, "%04X\t", device->cdev->id.cu_type);
+	seq_printf(m, "%-10.10s ", device->cdev->dev.bus_id);
+	seq_printf(m, "%04X/", device->cdev->id.cu_type);
 	seq_printf(m, "%02X\t", device->cdev->id.cu_model);
-	seq_printf(m, "%04X\t", device->cdev->id.dev_type);
-	seq_printf(m, "%02X\t", device->cdev->id.dev_model);
+	seq_printf(m, "%04X/", device->cdev->id.dev_type);
+	seq_printf(m, "%02X\t\t", device->cdev->id.dev_model);
 	if (device->char_data.block_size == 0)
 		seq_printf(m, "auto\t");
 	else

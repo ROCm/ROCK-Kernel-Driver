@@ -99,17 +99,21 @@ static inline void global_flush_tlb(void)
 static inline void __flush_tlb_mm(struct mm_struct * mm)
 {
 	cpumask_t local_cpumask;
+
+	if (unlikely(cpus_empty(mm->cpu_vm_mask)))
+		return;
+	if (MACHINE_HAS_IDTE) {
+		asm volatile (".insn rrf,0xb98e0000,0,%0,%1,0"
+			      : : "a" (2048),
+			      "a" (__pa(mm->pgd)&PAGE_MASK) : "cc" );
+		return;
+	}
 	preempt_disable();
 	local_cpumask = cpumask_of_cpu(smp_processor_id());
-	if (cpus_equal(mm->cpu_vm_mask, local_cpumask)) {
-		/* mm was active on more than one cpu. */
-		if (mm == current->active_mm &&
-		    atomic_read(&mm->mm_users) == 1)
-			/* this cpu is the only one using the mm. */
-			mm->cpu_vm_mask = local_cpumask;
-		global_flush_tlb();
-	} else
+	if (cpus_equal(mm->cpu_vm_mask, local_cpumask))
 		local_flush_tlb();
+	else
+		global_flush_tlb();
 	preempt_enable();
 }
 
@@ -136,8 +140,7 @@ static inline void flush_tlb_range(struct vm_area_struct *vma,
 	__flush_tlb_mm(vma->vm_mm); 
 }
 
-#define flush_tlb_kernel_range(start, end) \
-	__flush_tlb_mm(&init_mm)
+#define flush_tlb_kernel_range(start, end) global_flush_tlb()
 
 #endif
 

@@ -577,6 +577,7 @@ static int futex_fd(unsigned long uaddr, int signal)
 	filp->f_op = &futex_fops;
 	filp->f_vfsmnt = mntget(futex_mnt);
 	filp->f_dentry = dget(futex_mnt->mnt_root);
+	filp->f_mapping = filp->f_dentry->d_inode->i_mapping;
 
 	if (signal) {
 		int err;

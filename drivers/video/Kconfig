@@ -406,14 +406,6 @@ config FB_PVR2
 	  (<file:drivers/video/pvr2fb.c>). Please see the file
 	  <file:Documentation/fb/pvr2fb.txt>.
 
-config FB_PVR2_DEBUG
-	bool "Debug pvr2fb"
-	depends on FB_PVR2=y
-	help
-	  Say Y here if you wish for the pvr2fb driver to print out debugging
-	  messages. Most people will want to say N here. If unsure, you will
-	  also want to say N.
-
 config FB_E1355
 	bool "Epson 1355 framebuffer support"
 	depends on FB && SUPERH
@@ -733,6 +725,16 @@ config FB_NEOMAGIC
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called neofb.
+
+config FB_KYRO
+	tristate "IMG Kyro support"
+	depends on FB && PCI
+	help
+	  Say Y here if you have a STG4000 / Kyro / PowerVR 3 based
+	  graphics board.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called kyrofb.
 
 config FB_3DFX
 	tristate "3Dfx Banshee/Voodoo3 display support"

@@ -4,11 +4,11 @@
 #include <asm/machvec.h>
 #include <asm/cpu/rtc.h>
 
-#define rtc_gettimeofday sh_mv.mv_rtc_gettimeofday
-#define rtc_settimeofday sh_mv.mv_rtc_settimeofday
-
 extern void sh_rtc_gettimeofday(struct timespec *ts);
 extern int sh_rtc_settimeofday(const time_t secs);
+extern void (*board_time_init)(void);
+extern void (*rtc_get_time)(struct timespec *);
+extern int (*rtc_set_time)(const time_t);
 
 /* RCR1 Bits */
 #define RCR1_CF		0x80	/* Carry Flag             */

@@ -1,35 +1,9 @@
 /*
- *
+ * This file is subject to the terms and conditions of the GNU General Public
+ * License.  See the file "COPYING" in the main directory of this archive
+ * for more details.
  *
  * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
- * 
- * This program is free software; you can redistribute it and/or modify it 
- * under the terms of version 2 of the GNU General Public License 
- * as published by the Free Software Foundation.
- * 
- * This program is distributed in the hope that it would be useful, but 
- * WITHOUT ANY WARRANTY; without even the implied warranty of 
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
- * 
- * Further, this software is distributed without any warranty that it is 
- * free of the rightful claim of any third person regarding infringement 
- * or the like.  Any license provided herein, whether implied or 
- * otherwise, applies only to this software file.  Patent licenses, if 
- * any, provided herein do not apply to combinations of this program with 
- * other software, or any other product whatsoever.
- * 
- * You should have received a copy of the GNU General Public 
- * License along with this program; if not, write the Free Software 
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
- * Contact information:  Silicon Graphics, Inc., 1600 Amphitheatre Pkwy, 
- * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
- * http://oss.sgi.com/projects/GenInfo/NoticeExplan
  */
 
 
@@ -107,16 +81,25 @@
 
 
 /* Possible results from bte_copy and bte_unaligned_copy */
+/* The following error codes map into the BTE hardware codes
+ * IIO_ICRB_ECODE_* (in shubio.h). The hardware uses
+ * an error code of 0 (IIO_ICRB_ECODE_DERR), but we want zero
+ * to mean BTE_SUCCESS, so add one (BTEFAIL_OFFSET) to the error
+ * codes to give the following error codes.
+ */
+#define BTEFAIL_OFFSET	1
+
 typedef enum {
 	BTE_SUCCESS,		/* 0 is success */
+	BTEFAIL_DIR,		/* Directory error due to IIO access*/
+	BTEFAIL_POISON,		/* poison error on IO access (write to poison page) */
+	BTEFAIL_WERR,		/* Write error (ie WINV to a Read only line) */
+	BTEFAIL_ACCESS,		/* access error (protection violation) */
+	BTEFAIL_PWERR,		/* Partial Write Error */
+	BTEFAIL_PRERR,		/* Partial Read Error */
+	BTEFAIL_TOUT,		/* CRB Time out */
+	BTEFAIL_XTERR,		/* Incoming xtalk pkt had error bit */
 	BTEFAIL_NOTAVAIL,	/* BTE not available */
-	BTEFAIL_POISON,		/* poison page */
-	BTEFAIL_PROT,		/* Protection violation */
-	BTEFAIL_ACCESS,		/* access error */
-	BTEFAIL_TOUT,		/* Time out */
-	BTEFAIL_XTERR,		/* Diretory error */
-	BTEFAIL_DIR,		/* Diretory error */
-	BTEFAIL_ERROR,		/* Generic error */
 } bte_result_t;
 
 

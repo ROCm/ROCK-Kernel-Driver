@@ -7,6 +7,7 @@
  */
 
 #ifndef __ASSEMBLY__
+#include <linux/stddef.h>
 #include <asm/processor.h>		/* For TASK_SIZE */
 #include <asm/mmu.h>
 #include <asm/page.h>
@@ -51,10 +52,11 @@
  * Define the address range of the imalloc VM area.
  * (used for ioremap)
  */
-#define IMALLOC_START (ioremap_bot)
+#define IMALLOC_START     (ioremap_bot)
 #define IMALLOC_VMADDR(x) ((unsigned long)(x))
-#define IMALLOC_BASE  (0xE000000000000000)
-#define IMALLOC_END   (IMALLOC_BASE + VALID_EA_BITS)
+#define PHBS_IO_BASE  	  (0xE000000000000000)	/* Reserve 2 gigs for PHBs */
+#define IMALLOC_BASE      (0xE000000080000000)  
+#define IMALLOC_END       (IMALLOC_BASE + VALID_EA_BITS)
 
 /*
  * Define the address range mapped virt <-> physical
@@ -73,22 +75,23 @@
  * Bits in a linux-style PTE.  These match the bits in the
  * (hardware-defined) PowerPC PTE as closely as possible.
  */
-#define _PAGE_PRESENT	0x001UL	/* software: pte contains a translation */
-#define _PAGE_USER	0x002UL	/* matches one of the PP bits */
-#define _PAGE_RW	0x004UL	/* software: user write access allowed */
-#define _PAGE_GUARDED	0x008UL
-#define _PAGE_COHERENT	0x010UL	/* M: enforce memory coherence (SMP systems) */
-#define _PAGE_NO_CACHE	0x020UL	/* I: cache inhibit */
-#define _PAGE_WRITETHRU	0x040UL	/* W: cache write-through */
-#define _PAGE_DIRTY	0x080UL	/* C: page changed */
-#define _PAGE_ACCESSED	0x100UL	/* R: page referenced */
-#define _PAGE_FILE	0x200UL /* software: pte holds file offset */
-#define _PAGE_HASHPTE	0x400UL	/* software: pte has an associated HPTE */
-#define _PAGE_EXEC	0x800UL	/* software: i-cache coherence required */
-#define _PAGE_SECONDARY 0x8000UL /* software: HPTE is in secondary group */
-#define _PAGE_GROUP_IX  0x7000UL /* software: HPTE index within group */
+#define _PAGE_PRESENT	0x0001 /* software: pte contains a translation */
+#define _PAGE_USER	0x0002 /* matches one of the PP bits */
+#define _PAGE_FILE	0x0002 /* (!present only) software: pte holds file offset */
+#define _PAGE_RW	0x0004 /* software: user write access allowed */
+#define _PAGE_GUARDED	0x0008
+#define _PAGE_COHERENT	0x0010 /* M: enforce memory coherence (SMP systems) */
+#define _PAGE_NO_CACHE	0x0020 /* I: cache inhibit */
+#define _PAGE_WRITETHRU	0x0040 /* W: cache write-through */
+#define _PAGE_DIRTY	0x0080 /* C: page changed */
+#define _PAGE_ACCESSED	0x0100 /* R: page referenced */
+#define _PAGE_EXEC	0x0200 /* software: i-cache coherence required */
+#define _PAGE_HASHPTE	0x0400 /* software: pte has an associated HPTE */
+#define _PAGE_BUSY	0x0800 /* software: PTE & hash are busy */ 
+#define _PAGE_SECONDARY 0x8000 /* software: HPTE is in secondary group */
+#define _PAGE_GROUP_IX  0x7000 /* software: HPTE index within group */
 /* Bits 0x7000 identify the index within an HPT Group */
-#define _PAGE_HPTEFLAGS (_PAGE_HASHPTE | _PAGE_SECONDARY | _PAGE_GROUP_IX)
+#define _PAGE_HPTEFLAGS (_PAGE_BUSY | _PAGE_HASHPTE | _PAGE_SECONDARY | _PAGE_GROUP_IX)
 /* PAGE_MASK gives the right answer below, but only by accident */
 /* It should be preserving the high 48 bits and then specifically */
 /* preserving _PAGE_SECONDARY | _PAGE_GROUP_IX */
@@ -156,8 +159,10 @@ extern unsigned long empty_zero_page[PAGE_SIZE/sizeof(unsigned long)];
 #define _PMD_HUGEPAGE	0x00000001U
 #define HUGEPTE_BATCH_SIZE (1<<(HPAGE_SHIFT-PMD_SHIFT))
 
+#ifndef __ASSEMBLY__
 int hash_huge_page(struct mm_struct *mm, unsigned long access,
 		   unsigned long ea, unsigned long vsid, int local);
+#endif /* __ASSEMBLY__ */
 
 #define HAVE_ARCH_UNMAPPED_AREA
 #else
@@ -287,15 +292,17 @@ static inline unsigned long pte_update( pte_t *p, unsigned long clr,
 					unsigned long set )
 {
 	unsigned long old, tmp;
-
+	
 	__asm__ __volatile__(
 	"1:	ldarx	%0,0,%3		# pte_update\n\
+	andi.	%1,%0,%7\n\
+	bne-	1b \n\
 	andc	%1,%0,%4 \n\
 	or	%1,%1,%5 \n\
 	stdcx.	%1,0,%3 \n\
 	bne-	1b"
 	: "=&r" (old), "=&r" (tmp), "=m" (*p)
-	: "r" (p), "r" (clr), "r" (set), "m" (*p)
+	: "r" (p), "r" (clr), "r" (set), "m" (*p), "i" (_PAGE_BUSY)
 	: "cc" );
 	return old;
 }
@@ -399,6 +406,17 @@ void pgtable_cache_init(void);
 extern void hpte_init_pSeries(void);
 extern void hpte_init_iSeries(void);
 
+/* imalloc region types */
+#define IM_REGION_UNUSED	0x1
+#define IM_REGION_SUBSET	0x2
+#define IM_REGION_EXISTS	0x4
+#define IM_REGION_OVERLAP	0x8
+
+extern struct vm_struct * im_get_free_area(unsigned long size);
+extern struct vm_struct * im_get_area(unsigned long v_addr, unsigned long size,
+			int region_type);
+unsigned long im_free(void *addr);
+
 typedef pte_t *pte_addr_t;
 
 long pSeries_lpar_hpte_insert(unsigned long hpte_group,
@@ -410,5 +428,40 @@ long pSeries_hpte_insert(unsigned long hpte_group, unsigned long va,
 			 unsigned long prpn, int secondary,
 			 unsigned long hpteflags, int bolted, int large);
 
+/*
+ * find_linux_pte returns the address of a linux pte for a given 
+ * effective address and directory.  If not found, it returns zero.
+ */
+static inline pte_t *find_linux_pte(pgd_t *pgdir, unsigned long ea)
+{
+	pgd_t *pg;
+	pmd_t *pm;
+	pte_t *pt = NULL;
+	pte_t pte;
+
+	pg = pgdir + pgd_index(ea);
+	if (!pgd_none(*pg)) {
+
+		pm = pmd_offset(pg, ea);
+		if (pmd_present(*pm)) { 
+			pt = pte_offset_kernel(pm, ea);
+			pte = *pt;
+			if (!pte_present(pte))
+				pt = NULL;
+		}
+	}
+
+	return pt;
+}
+
 #endif /* __ASSEMBLY__ */
+
+#define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_YOUNG
+#define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_DIRTY
+#define __HAVE_ARCH_PTEP_GET_AND_CLEAR
+#define __HAVE_ARCH_PTEP_SET_WRPROTECT
+#define __HAVE_ARCH_PTEP_MKDIRTY
+#define __HAVE_ARCH_PTE_SAME
+#include <asm-generic/pgtable.h>
+
 #endif /* _PPC64_PGTABLE_H */

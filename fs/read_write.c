@@ -28,7 +28,7 @@ EXPORT_SYMBOL(generic_ro_fops);
 loff_t generic_file_llseek(struct file *file, loff_t offset, int origin)
 {
 	long long retval;
-	struct inode *inode = file->f_dentry->d_inode->i_mapping->host;
+	struct inode *inode = file->f_mapping->host;
 
 	down(&inode->i_sem);
 	switch (origin) {

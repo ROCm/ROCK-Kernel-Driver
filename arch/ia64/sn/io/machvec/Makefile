@@ -7,6 +7,4 @@
 #
 # Makefile for the sn2 io routines.
 
-EXTRA_CFLAGS    := -DLITTLE_ENDIAN
-
 obj-y				+= pci.o pci_dma.o pci_bus_cvlink.o iomv.o

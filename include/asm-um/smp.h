@@ -20,7 +20,7 @@ extern int hard_smp_processor_id(void);
 #define cpu_online(cpu) cpu_isset(cpu, cpu_online_map)
 
 extern int ncpus;
-#define cpu_possible(cpu) (cpu < ncpus)
+
 
 extern inline void smp_cpus_done(unsigned int maxcpus)
 {

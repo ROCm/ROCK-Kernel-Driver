@@ -1,13 +1,12 @@
-/* $Id$
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
  * Copyright (C) 1992-1997,2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  */
-#ifndef _ASM_SN_XTALK_XSWITCH_H
-#define _ASM_SN_XTALK_XSWITCH_H
+#ifndef _ASM_IA64_SN_XTALK_XSWITCH_H
+#define _ASM_IA64_SN_XTALK_XSWITCH_H
 
 /*
  * xswitch.h - controls the format of the data
@@ -54,4 +53,4 @@ extern vertex_hdl_t     xswitch_info_master_assignment_get(xswitch_info_t xswitc
 
 #endif				/* __ASSEMBLY__ */
 
-#endif				/* _ASM_SN_XTALK_XSWITCH_H */
+#endif				/* _ASM_IA64_SN_XTALK_XSWITCH_H */

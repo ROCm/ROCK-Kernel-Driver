@@ -114,19 +114,49 @@ long sys_sigaltstack(const stack_t *uss, stack_t *uoss, unsigned long r5,
  * Set up the sigcontext for the signal frame.
  */
 
-static int
-setup_sigcontext(struct sigcontext *sc, struct pt_regs *regs,
+static int setup_sigcontext(struct sigcontext *sc, struct pt_regs *regs,
 		 int signr, sigset_t *set, unsigned long handler)
 {
+	/* When CONFIG_ALTIVEC is set, we _always_ setup v_regs even if the
+	 * process never used altivec yet (MSR_VEC is zero in pt_regs of
+	 * the context). This is very important because we must ensure we
+	 * don't lose the VRSAVE content that may have been set prior to
+	 * the process doing its first vector operation
+	 * Userland shall check AT_HWCAP to know wether it can rely on the
+	 * v_regs pointer or not
+	 */
+#ifdef CONFIG_ALTIVEC
+	elf_vrreg_t *v_regs = (elf_vrreg_t *)(((unsigned long)sc->vmx_reserve) & ~0xful);
+#endif
 	int err = 0;
 
 	if (regs->msr & MSR_FP)
 		giveup_fpu(current);
 
-	current->thread.saved_msr = regs->msr & ~(MSR_FP | MSR_FE0 | MSR_FE1);
-	regs->msr = current->thread.saved_msr | current->thread.fpexc_mode;
-	current->thread.saved_softe = regs->softe;
+	/* Make sure signal doesn't get spurrious FP exceptions */
+	current->thread.fpscr = 0;
 
+#ifdef CONFIG_ALTIVEC
+	err |= __put_user(v_regs, &sc->v_regs);
+
+	/* save altivec registers */
+	if (current->thread.used_vr) {		
+		if (regs->msr & MSR_VEC)
+			giveup_altivec(current);
+		/* Copy 33 vec registers (vr0..31 and vscr) to the stack */
+		err |= __copy_to_user(v_regs, current->thread.vr, 33 * sizeof(vector128));
+		/* set MSR_VEC in the MSR value in the frame to indicate that sc->v_reg)
+		 * contains valid data.
+		 */
+		regs->msr |= MSR_VEC;
+	}
+	/* We always copy to/from vrsave, it's 0 if we don't have or don't
+	 * use altivec.
+	 */
+	err |= __put_user(current->thread.vrsave, (u32 *)&v_regs[33]);
+#else /* CONFIG_ALTIVEC */
+	err |= __put_user(0, &sc->v_regs);
+#endif /* CONFIG_ALTIVEC */
 	err |= __put_user(&sc->gp_regs, &sc->regs);
 	err |= __copy_to_user(&sc->gp_regs, regs, GP_REGS_SIZE);
 	err |= __copy_to_user(&sc->fp_regs, &current->thread.fpr, FP_REGS_SIZE);
@@ -135,9 +165,6 @@ setup_sigcontext(struct sigcontext *sc, struct pt_regs *regs,
 	if (set != NULL)
 		err |=  __put_user(set->sig[0], &sc->oldmask);
 
-	regs->msr &= ~(MSR_FP | MSR_FE0 | MSR_FE1);
-	current->thread.fpscr = 0;
-
 	return err;
 }
 
@@ -145,23 +172,42 @@ setup_sigcontext(struct sigcontext *sc, struct pt_regs *regs,
  * Restore the sigcontext from the signal frame.
  */
 
-static int
-restore_sigcontext(struct pt_regs *regs, sigset_t *set, struct sigcontext *sc)
+static int restore_sigcontext(struct pt_regs *regs, sigset_t *set, int sig, struct sigcontext *sc)
 {
+#ifdef CONFIG_ALTIVEC
+	elf_vrreg_t *v_regs;
+#endif
 	unsigned int err = 0;
+	unsigned long save_r13;
 
-	if (regs->msr & MSR_FP)
-		giveup_fpu(current);
-
+	/* If this is not a signal return, we preserve the TLS in r13 */
+	if (!sig)
+		save_r13 = regs->gpr[13];
 	err |= __copy_from_user(regs, &sc->gp_regs, GP_REGS_SIZE);
+	if (!sig)
+		regs->gpr[13] = save_r13;
 	err |= __copy_from_user(&current->thread.fpr, &sc->fp_regs, FP_REGS_SIZE);
-	current->thread.fpexc_mode = regs->msr & (MSR_FE0 | MSR_FE1);
 	if (set != NULL)
 		err |=  __get_user(set->sig[0], &sc->oldmask);
 
-	/* Don't allow the signal handler to change these modulo FE{0,1} */
-	regs->msr = current->thread.saved_msr & ~(MSR_FP | MSR_FE0 | MSR_FE1);
-	regs->softe = current->thread.saved_softe;
+#ifdef CONFIG_ALTIVEC
+	err |= __get_user(v_regs, &sc->v_regs);
+	if (err)
+		return err;
+	/* Copy 33 vec registers (vr0..31 and vscr) from the stack */
+	if (v_regs != 0 && (regs->msr & MSR_VEC) != 0)
+		err |= __copy_from_user(current->thread.vr, v_regs, 33 * sizeof(vector128));
+	else if (current->thread.used_vr)
+		memset(&current->thread.vr, 0, 33);
+	/* Always get VRSAVE back */
+	if (v_regs != 0)
+		err |= __get_user(current->thread.vrsave, (u32 *)&v_regs[33]);
+	else
+		current->thread.vrsave = 0;
+#endif /* CONFIG_ALTIVEC */
+
+	/* Force reload of FP/VEC */
+	regs->msr &= ~(MSR_FP | MSR_FE0 | MSR_FE1 | MSR_VEC);
 
 	return err;
 }
@@ -169,8 +215,8 @@ restore_sigcontext(struct pt_regs *regs, sigset_t *set, struct sigcontext *sc)
 /*
  * Allocate space for the signal frame
  */
-static inline void *
-get_sigframe(struct k_sigaction *ka, struct pt_regs *regs, size_t frame_size)
+static inline void * get_sigframe(struct k_sigaction *ka, struct pt_regs *regs,
+				  size_t frame_size)
 {
         unsigned long newsp;
 
@@ -185,8 +231,10 @@ get_sigframe(struct k_sigaction *ka, struct pt_regs *regs, size_t frame_size)
         return (void *)((newsp - frame_size) & -8ul);
 }
 
-static int
-setup_trampoline(unsigned int syscall, unsigned int *tramp)
+/*
+ * Setup the trampoline code on the stack
+ */
+static int setup_trampoline(unsigned int syscall, unsigned int *tramp)
 {
 	int i, err = 0;
 
@@ -209,6 +257,72 @@ setup_trampoline(unsigned int syscall, unsigned int *tramp)
 }
 
 /*
+ * Restore the user process's signal mask (also used by signal32.c)
+ */
+void restore_sigmask(sigset_t *set)
+{
+	sigdelsetmask(set, ~_BLOCKABLE);
+	spin_lock_irq(&current->sighand->siglock);
+	current->blocked = *set;
+	recalc_sigpending();
+	spin_unlock_irq(&current->sighand->siglock);
+}
+
+
+/*
+ * Handle {get,set,swap}_context operations
+ */
+int sys_swapcontext(struct ucontext __user *old_ctx,
+		    struct ucontext __user *new_ctx,
+		    long ctx_size, long r6, long r7, long r8, struct pt_regs *regs)
+{
+	unsigned char tmp;
+	sigset_t set;
+
+	/* Context size is for future use. Right now, we only make sure
+	 * we are passed something we understand
+	 */
+	if (ctx_size < sizeof(struct ucontext))
+		return -EINVAL;
+
+	if (old_ctx != NULL) {
+		if (verify_area(VERIFY_WRITE, old_ctx, sizeof(*old_ctx))
+		    || setup_sigcontext(&old_ctx->uc_mcontext, regs, 0, NULL, 0)
+		    || __copy_to_user(&old_ctx->uc_sigmask,
+				      &current->blocked, sizeof(sigset_t)))
+			return -EFAULT;
+	}
+	if (new_ctx == NULL)
+		return 0;
+	if (verify_area(VERIFY_READ, new_ctx, sizeof(*new_ctx))
+	    || __get_user(tmp, (u8 *) new_ctx)
+	    || __get_user(tmp, (u8 *) (new_ctx + 1) - 1))
+		return -EFAULT;
+
+	/*
+	 * If we get a fault copying the context into the kernel's
+	 * image of the user's registers, we can't just return -EFAULT
+	 * because the user's registers will be corrupted.  For instance
+	 * the NIP value may have been updated but not some of the
+	 * other registers.  Given that we have done the verify_area
+	 * and successfully read the first and last bytes of the region
+	 * above, this should only happen in an out-of-memory situation
+	 * or if another thread unmaps the region containing the context.
+	 * We kill the task with a SIGSEGV in this situation.
+	 */
+
+	if (__copy_from_user(&set, &new_ctx->uc_sigmask, sizeof(set)))
+		do_exit(SIGSEGV);
+	restore_sigmask(&set);
+	if (restore_sigcontext(regs, NULL, 0, &new_ctx->uc_mcontext))
+		do_exit(SIGSEGV);
+
+	/* This returns like rt_sigreturn */
+	return 0;
+}
+
+
+/*
  * Do a signal return; undo the signal stack.
  */
 
@@ -218,7 +332,6 @@ int sys_rt_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 {
 	struct ucontext *uc = (struct ucontext *)regs->gpr[1];
 	sigset_t set;
-	stack_t st;
 
 	/* Always make any pending restarted system calls return -EINTR */
 	current_thread_info()->restart_block.fn = do_no_restart_syscall;
@@ -228,20 +341,14 @@ int sys_rt_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 
 	if (__copy_from_user(&set, &uc->uc_sigmask, sizeof(set)))
 		goto badframe;
-	sigdelsetmask(&set, ~_BLOCKABLE);
-	spin_lock_irq(&current->sighand->siglock);
-	current->blocked = set;
-	recalc_sigpending();
-	spin_unlock_irq(&current->sighand->siglock);
-
-	if (restore_sigcontext(regs, NULL, &uc->uc_mcontext))
+	restore_sigmask(&set);
+	if (restore_sigcontext(regs, NULL, 1, &uc->uc_mcontext))
 		goto badframe;
 
-	if (__copy_from_user(&st, &uc->uc_stack, sizeof(st)))
-		goto badframe;
-	/* This function sets back the stack flags into
-	   the current task structure.  */
-	sys_sigaltstack(&st, NULL, 0, 0, 0, 0, regs);
+	/* do_sigaltstack expects a __user pointer and won't modify
+	 * what's in there anyway
+	 */
+	do_sigaltstack(&uc->uc_stack, NULL, regs->gpr[1]);
 
 	return regs->result;
 
@@ -253,8 +360,7 @@ badframe:
 	do_exit(SIGSEGV);
 }
 
-static void
-setup_rt_frame(int signr, struct k_sigaction *ka, siginfo_t *info,
+static void setup_rt_frame(int signr, struct k_sigaction *ka, siginfo_t *info,
 		sigset_t *set, struct pt_regs *regs)
 {
 	/* Handler is *really* a pointer to the function descriptor for
@@ -332,9 +438,8 @@ badframe:
 /*
  * OK, we're invoking a handler
  */
-static void
-handle_signal(unsigned long sig, struct k_sigaction *ka,
-	      siginfo_t *info, sigset_t *oldset, struct pt_regs *regs)
+static void handle_signal(unsigned long sig, struct k_sigaction *ka,
+			  siginfo_t *info, sigset_t *oldset, struct pt_regs *regs)
 {
 	/* Set up Signal Frame */
 	setup_rt_frame(sig, ka, info, oldset, regs);
@@ -352,8 +457,7 @@ handle_signal(unsigned long sig, struct k_sigaction *ka,
 	return;
 }
 
-static inline void
-syscall_restart(struct pt_regs *regs, struct k_sigaction *ka)
+static inline void syscall_restart(struct pt_regs *regs, struct k_sigaction *ka)
 {
 	switch ((int)regs->result) {
 	case -ERESTART_RESTARTBLOCK:

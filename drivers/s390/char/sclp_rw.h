@@ -89,7 +89,7 @@ int sclp_rw_init(void);
 struct sclp_buffer *sclp_make_buffer(void *, unsigned short, unsigned short);
 void *sclp_unmake_buffer(struct sclp_buffer *);
 int sclp_buffer_space(struct sclp_buffer *);
-int sclp_write(struct sclp_buffer *buffer, const unsigned char *, int, int);
+int sclp_write(struct sclp_buffer *buffer, const unsigned char *, int);
 void sclp_emit_buffer(struct sclp_buffer *,void (*)(struct sclp_buffer *,int));
 void sclp_set_columns(struct sclp_buffer *, unsigned short);
 void sclp_set_htab(struct sclp_buffer *, unsigned short);

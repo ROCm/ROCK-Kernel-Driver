@@ -1,5 +1,5 @@
 /*
- * $Id: netiucv.c,v 1.26 2003/09/23 16:48:17 mschwide Exp $
+ * $Id: netiucv.c,v 1.30 2003/12/02 12:29:32 braunu Exp $
  *
  * IUCV network driver
  *
@@ -30,7 +30,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: IUCV network driver $Revision: 1.26 $
+ * RELEASE-TAG: IUCV network driver $Revision: 1.30 $
  *
  */
 
@@ -1177,12 +1177,10 @@ static int netiucv_tx(struct sk_buff *skb, struct net_device *dev)
 
 	/**
 	 * If connection is not running, try to restart it
-	 * notify anybody about a link failure and throw
-	 * away packet. 
+	 * and throw away packet. 
 	 */
 	if (fsm_getstate(privptr->fsm) != DEV_STATE_RUNNING) {
 		fsm_event(privptr->fsm, DEV_EVENT_START, dev);
-		dst_link_failure(skb);
 		dev_kfree_skb(skb);
 		privptr->stats.tx_dropped++;
 		privptr->stats.tx_errors++;
@@ -1464,7 +1462,7 @@ netiucv_add_files(struct device *dev)
 		return ret;
 	ret = sysfs_create_group(&dev->kobj, &netiucv_stat_attr_group);
 	if (ret)
-		sysfs_remove_group(&dev->kobj, &netiucv_stat_attr_group);
+		sysfs_remove_group(&dev->kobj, &netiucv_attr_group);
 	return ret;
 }
 
@@ -1472,7 +1470,7 @@ static inline void
 netiucv_remove_files(struct device *dev)
 {
 	sysfs_remove_group(&dev->kobj, &netiucv_stat_attr_group);
-	sysfs_remove_group(&dev->kobj, &netiucv_stat_attr_group);
+	sysfs_remove_group(&dev->kobj, &netiucv_attr_group);
 }
 
 static int
@@ -1485,7 +1483,7 @@ netiucv_register_device(struct net_device *ndev, int ifno)
 
 	snprintf(dev->bus_id, BUS_ID_SIZE, "%s%x", str, ifno);
 	dev->bus = &iucv_bus;
-	dev->parent = &iucv_root;
+	dev->parent = iucv_root;
 
 	ret = device_register(dev);
 
@@ -1731,7 +1729,7 @@ static struct device_driver netiucv_driver = {
 static void
 netiucv_banner(void)
 {
-	char vbuf[] = "$Revision: 1.26 $";
+	char vbuf[] = "$Revision: 1.30 $";
 	char *version = vbuf;
 
 	if ((version = strchr(version, ':'))) {

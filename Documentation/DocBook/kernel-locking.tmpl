@@ -66,6 +66,7 @@
      fundamentals of concurrency and locking for
      <firstterm linkend="gloss-smp"><acronym>SMP</acronym></firstterm>.
    </para>
+  </chapter>
 
    <chapter id="races">
     <title>The Problem With Concurrency</title>
@@ -193,6 +194,7 @@
       And then there are the unfriendly primitives, but I'll pretend
       they don't exist.
     </para>
+    </sect1>
   </chapter>
 
   <chapter id="locks">
@@ -657,6 +659,7 @@
 </TBODY>
 </TGROUP>
 </TABLE>
+</sect1>
 </chapter>
 
   <chapter id="Examples">
@@ -1110,6 +1113,7 @@ used to protect the reference count itself.
          return obj;
  }
 </programlisting>
+</sect2>
 </sect1>
 
    <sect1 id="examples-lock-per-obj">
@@ -1229,6 +1233,7 @@ which locks.  This is extremely important, as it describes the runtime
 behavior of the code, and can be hard to gain from just reading.  And
 as Alan Cox says, <quote>Lock data, not code</quote>.
 </para>
+</sect1>
 </chapter>
 
    <chapter id="common-problems">
@@ -1317,6 +1322,7 @@ as Alan Cox says, <quote>Lock data, not code</quote>.
       The two CPUs will spin forever, waiting for the other to give up
       their lock.  It will look, smell, and feel like a crash.
     </para>
+    </sect1>
 
     <sect1 id="techs-deadlock-prevent">
      <title>Preventing Deadlock</title>
@@ -1886,6 +1892,7 @@ machines due to caching.
       </para>
      </listitem>
     </itemizedlist>
+   </sect1>
 
    <sect1 id="dont-sleep">
     <title>Some Functions Which Don't Sleep</title>

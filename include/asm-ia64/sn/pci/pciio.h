@@ -1,29 +1,38 @@
-/* $Id$
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
  * Copyright (C) 1992 - 1997, 2000-2003 Silicon Graphics, Inc. All rights reserved.
  */
-#ifndef _ASM_SN_PCI_PCIIO_H
-#define _ASM_SN_PCI_PCIIO_H
+#ifndef _ASM_IA64_SN_PCI_PCIIO_H
+#define _ASM_IA64_SN_PCI_PCIIO_H
 
 /*
  * pciio.h -- platform-independent PCI interface
  */
 
-#include <linux/config.h>
+#ifdef __KERNEL__
 #include <linux/ioport.h>
 #include <asm/sn/ioerror.h>
 #include <asm/sn/driver.h>
 #include <asm/sn/hcl.h>
-
+#else
+#include <linux/ioport.h>
+#include <ioerror.h>
+#include <driver.h>
+#include <hcl.h>
+#endif
 
 #ifndef __ASSEMBLY__
 
+#ifdef __KERNEL__
 #include <asm/sn/dmamap.h>
 #include <asm/sn/alenlist.h>
+#else
+#include <dmamap.h>
+#include <alenlist.h>
+#endif
 
 typedef int pciio_vendor_id_t;
 
@@ -188,6 +197,31 @@ typedef enum pciio_endian_e {
 } pciio_endian_t;
 
 /*
+ * Generic PCI bus information
+ */
+typedef enum pciio_asic_type_e {
+    PCIIO_ASIC_TYPE_UNKNOWN, 
+    PCIIO_ASIC_TYPE_MACE,
+    PCIIO_ASIC_TYPE_BRIDGE, 
+    PCIIO_ASIC_TYPE_XBRIDGE,
+    PCIIO_ASIC_TYPE_PIC,
+} pciio_asic_type_t;
+
+typedef enum pciio_bus_type_e {
+    PCIIO_BUS_TYPE_UNKNOWN,
+    PCIIO_BUS_TYPE_PCI,
+    PCIIO_BUS_TYPE_PCIX 
+} pciio_bus_type_t; 
+
+typedef enum pciio_bus_speed_e {
+    PCIIO_BUS_SPEED_UNKNOWN,
+    PCIIO_BUS_SPEED_33,
+    PCIIO_BUS_SPEED_66,
+    PCIIO_BUS_SPEED_100,
+    PCIIO_BUS_SPEED_133
+} pciio_bus_speed_t;
+
+/*
  * Interface to set PCI arbitration priority for devices that require
  * realtime characteristics.  pciio_priority_set is used to switch a
  * device between the PCI high-priority arbitration ring and the low
@@ -212,6 +246,9 @@ typedef struct pciio_piospace_s *pciio_piospace_t;
 typedef struct pciio_win_info_s *pciio_win_info_t;
 typedef struct pciio_win_map_s *pciio_win_map_t;
 typedef struct pciio_win_alloc_s *pciio_win_alloc_t;
+typedef struct pciio_bus_map_s *pciio_bus_map_t;
+typedef struct pciio_businfo_s *pciio_businfo_t;
+
 
 /* PIO MANAGEMENT */
 
@@ -419,9 +456,6 @@ pciio_config_set_f	(vertex_hdl_t conn,	/* pci connection point */
 			 unsigned size,		/* width in bytes (1..4) */
 			 uint64_t value);	/* value to store */
 
-typedef int
-pciio_error_devenable_f (vertex_hdl_t pconn_vhdl, int error_code);
-
 typedef pciio_slot_t
 pciio_error_extract_f	(vertex_hdl_t vhdl,
 			 pciio_space_t *spacep,
@@ -442,8 +476,8 @@ pciio_driver_unreg_callback_f	(vertex_hdl_t conn, /* pci connection point */
 typedef int
 pciio_device_unregister_f	(vertex_hdl_t conn);
 
-typedef int
-pciio_dma_enabled_f		(vertex_hdl_t conn);
+typedef pciio_businfo_t
+pciio_businfo_get_f		(vertex_hdl_t conn);
 
 /*
  * Adapters that provide a PCI interface adhere to this software interface.
@@ -486,14 +520,15 @@ typedef struct pciio_provider_s {
     pciio_config_set_f	   *config_set;
 
     /* Error handling interface */
-    pciio_error_devenable_f *error_devenable;
     pciio_error_extract_f *error_extract;
 
     /* Callback support */
     pciio_driver_reg_callback_f *driver_reg_callback;
     pciio_driver_unreg_callback_f *driver_unreg_callback;
     pciio_device_unregister_f 	*device_unregister;
-    pciio_dma_enabled_f		*dma_enabled;
+
+    /* GENERIC BUS INFO */
+    pciio_businfo_get_f *businfo_get;
 } pciio_provider_t;
 
 /* PCI devices use these standard PCI provider interfaces */
@@ -526,7 +561,6 @@ extern pciio_endian_set_f pciio_endian_set;
 extern pciio_priority_set_f pciio_priority_set;
 extern pciio_config_get_f pciio_config_get;
 extern pciio_config_set_f pciio_config_set;
-extern pciio_error_devenable_f pciio_error_devenable;
 extern pciio_error_extract_f pciio_error_extract;
 
 /* Widgetdev in the IOERROR structure is encoded as follows.
@@ -693,7 +727,6 @@ extern iopaddr_t	pciio_info_rom_base_get(pciio_info_t);
 extern size_t		pciio_info_rom_size_get(pciio_info_t);
 extern int		pciio_info_type1_get(pciio_info_t);
 extern int              pciio_error_handler(vertex_hdl_t, int, ioerror_mode_t, ioerror_t *);
-extern int		pciio_dma_enabled(vertex_hdl_t);
 
 /**
  * sn_pci_set_vchan - Set the requested Virtual Channel bits into the mapped DMA
@@ -730,4 +763,13 @@ sn_pci_set_vchan(struct pci_dev *pci_dev,
 }
 
 #endif				/* C or C++ */
-#endif				/* _ASM_SN_PCI_PCIIO_H */
+
+
+/*
+ * Prototypes
+ */
+
+int snia_badaddr_val(volatile void *addr, int len, volatile void *ptr);
+nasid_t snia_get_console_nasid(void);
+nasid_t snia_get_master_baseio_nasid(void);
+#endif				/* _ASM_IA64_SN_PCI_PCIIO_H */

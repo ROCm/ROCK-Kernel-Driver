@@ -51,18 +51,6 @@ struct sh_machine_vector mv_od __initmv = {
 	.mv_outsw		= od_outsw,
 	.mv_outsl		= od_outsl,
 
-	.mv_readb		= generic_readb,
-	.mv_readw		= generic_readw,
-	.mv_readl		= generic_readl,
-	.mv_writeb		= generic_writeb,
-	.mv_writew		= generic_writew,
-	.mv_writel		= generic_writel,
-
-	.mv_ioremap		= generic_ioremap,
-	.mv_iounmap		= generic_iounmap,
-
-	.mv_isa_port2addr	= generic_isa_port2addr,
-
 #ifdef CONFIG_PCI
 	.mv_init_irq		= init_overdrive_irq,
 #endif

@@ -2526,15 +2526,15 @@ Your cooperation is appreciated.
 		  1 = /dev/dri/card1		Second graphics card
 		    ...
 
-227 char	IBM 3270 terminal block-mode access
+227 char	IBM 3270 terminal Unix tty access
+		  1 = /dev/3270/tty1		First 3270 terminal
+		  2 = /dev/3270/tty2		Seconds 3270 terminal
+		    ...
+
+228 char	IBM 3270 terminal block-mode access
 		  0 = /dev/3270/tub		Controlling interface
 		  1 = /dev/3270/tub1		First 3270 terminal
 		  2 = /dev/3270/tub2		Second 3270 terminal
-		    ...
-
-228 char	IBM 3270 terminal Unix tty access
-		  1 = /dev/3270/tty1		First 3270 terminal
-		  2 = /dev/3270/tty2		Seconds 3270 terminal
 		    ...
 
 229 char	IBM iSeries virtual console

@@ -165,6 +165,7 @@ void __elv_add_request(request_queue_t *q, struct request *rq, int where,
 	if (plug)
 		blk_plug_device(q);
 
+	rq->q = q;
 	q->elevator.elevator_add_req_fn(q, rq, where);
 }
 

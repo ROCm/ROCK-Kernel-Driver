@@ -42,22 +42,8 @@ struct sh_machine_vector mv_7751se __initmv = {
 	.mv_outw_p		= sh7751se_outw,
 	.mv_outl_p		= sh7751se_outl,
 
-	.mv_insb		= sh7751se_insb,
-	.mv_insw		= sh7751se_insw,
 	.mv_insl		= sh7751se_insl,
-	.mv_outsb		= sh7751se_outsb,
-	.mv_outsw		= sh7751se_outsw,
 	.mv_outsl		= sh7751se_outsl,
-
-	.mv_readb		= sh7751se_readb,
-	.mv_readw		= sh7751se_readw,
-	.mv_readl		= sh7751se_readl,
-	.mv_writeb		= sh7751se_writeb,
-	.mv_writew		= sh7751se_writew,
-	.mv_writel		= sh7751se_writel,
-
-	.mv_ioremap		= generic_ioremap,
-	.mv_iounmap		= generic_iounmap,
 
 	.mv_isa_port2addr	= sh7751se_isa_port2addr,
 

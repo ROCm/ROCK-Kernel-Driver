@@ -1,4 +1,4 @@
-/* $Id: io.c,v 1.1.2.2 2002/01/20 05:03:25 mrbrown Exp $
+/* $Id: io.c,v 1.4 2003/08/03 03:05:10 lethal Exp $
  *
  * linux/arch/sh/kernel/io_se.c
  *
@@ -189,36 +189,6 @@ void se_outsl(unsigned long port, const void *addr, unsigned long count)
 	maybebadio(outsw, port);
 }
 
-unsigned char se_readb(unsigned long addr)
-{
-	return *(volatile unsigned char*)addr;
-}
-
-unsigned short se_readw(unsigned long addr)
-{
-	return *(volatile unsigned short*)addr;
-}
-
-unsigned int se_readl(unsigned long addr)
-{
-	return *(volatile unsigned long*)addr;
-}
-
-void se_writeb(unsigned char b, unsigned long addr)
-{
-	*(volatile unsigned char*)addr = b;
-}
-
-void se_writew(unsigned short b, unsigned long addr)
-{
-	*(volatile unsigned short*)addr = b;
-}
-
-void se_writel(unsigned int b, unsigned long addr)
-{
-        *(volatile unsigned long*)addr = b;
-}
-
 /* Map ISA bus address to the real address. Only for PCMCIA.  */
 
 /* ISA page descriptor.  */

@@ -1834,8 +1834,6 @@ void __blk_put_request(request_queue_t *q, struct request *req)
 	if (unlikely(--req->ref_count))
 		return;
 
-	elv_completed_request(req->q, req);
-
 	req->rq_status = RQ_INACTIVE;
 	req->q = NULL;
 	req->rl = NULL;
@@ -1847,6 +1845,8 @@ void __blk_put_request(request_queue_t *q, struct request *req)
 	if (rl) {
 		int rw = rq_data_dir(req);
 
+		elv_completed_request(q, req);
+
 		BUG_ON(!list_empty(&req->queuelist));
 
 		blk_free_request(q, req);
@@ -1856,14 +1856,13 @@ void __blk_put_request(request_queue_t *q, struct request *req)
 
 void blk_put_request(struct request *req)
 {
-	request_queue_t *q = req->q;
-	
 	/*
-	 * if req->q isn't set, this request didnt originate from the
+	 * if req->rl isn't set, this request didnt originate from the
 	 * block layer, so it's safe to just disregard it
 	 */
-	if (q) {
+	if (req->rl) {
 		unsigned long flags;
+		request_queue_t *q = req->q;
 
 		spin_lock_irqsave(q->queue_lock, flags);
 		__blk_put_request(q, req);
@@ -2897,7 +2896,7 @@ int blk_register_queue(struct gendisk *disk)
 
 	request_queue_t *q = disk->queue;
 
-	if (!q)
+	if (!q || !q->request_fn)
 		return -ENXIO;
 
 	q->kobj.parent = kobject_get(&disk->kobj);
@@ -2924,7 +2923,7 @@ void blk_unregister_queue(struct gendisk *disk)
 {
 	request_queue_t *q = disk->queue;
 
-	if (q) {
+	if (q && q->request_fn) {
 		elv_unregister_queue(q);
 
 		kobject_unregister(&q->kobj);

@@ -16,9 +16,9 @@ endif
 #
 # IMAGE_OFFSET is the load offset of the compression loader
 #
-IMAGE_OFFSET = $(shell printf "0x%8x" $$[0x80000000+0x$(CONFIG_MEMORY_START)+0x200000+0x10000])
+IMAGE_OFFSET := $(shell printf "0x%8x" $$[0x80000000+$(CONFIG_MEMORY_START)+$(CONFIG_BOOT_LINK_OFFSET)])
 
-LDFLAGS_vmlinux := -Ttext $(IMAGE_OFFSET) -e startup -T $(obj)/../../vmlinux.lds.s
+LDFLAGS_vmlinux := -Ttext $(IMAGE_OFFSET) -e startup -T $(obj)/../../kernel/vmlinux.lds.s
 
 $(obj)/vmlinux: $(OBJECTS) $(obj)/piggy.o FORCE
 	$(call if_changed,ld)

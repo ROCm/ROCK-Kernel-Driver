@@ -6,6 +6,7 @@
 #include <linux/mm.h>	
 #include <asm/mmu.h>	
 #include <asm/ppcdebug.h>	
+#include <asm/cputable.h>
 
 /*
  * Copyright (C) 2001 PPC 64 Team, IBM Corp
@@ -139,10 +140,16 @@ extern void flush_stab(struct task_struct *tsk, struct mm_struct *mm);
  * switch_mm is the entry point called from the architecture independent
  * code in kernel/sched.c
  */
-static inline void
-switch_mm(struct mm_struct *prev, struct mm_struct *next,
-	  struct task_struct *tsk)
+static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
+			     struct task_struct *tsk)
 {
+#ifdef CONFIG_ALTIVEC
+	asm volatile (
+ BEGIN_FTR_SECTION
+	"dssall;\n"
+ END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
+	 : : );
+#endif /* CONFIG_ALTIVEC */
 	flush_stab(tsk, next);
 	cpu_set(smp_processor_id(), next->cpu_vm_mask);
 }

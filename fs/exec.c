@@ -121,7 +121,7 @@ asmlinkage long sys_uselib(const char __user * library)
 	struct nameidata nd;
 	int error;
 
-	nd.intent.open.flags = O_RDONLY;
+	nd.intent.open.flags = FMODE_READ;
 	error = __user_walk(library, LOOKUP_FOLLOW|LOOKUP_OPEN, &nd);
 	if (error)
 		goto out;
@@ -471,8 +471,12 @@ static inline void free_arg_pages(struct linux_binprm *bprm)
 struct file *open_exec(const char *name)
 {
 	struct nameidata nd;
-	int err = path_lookup(name, LOOKUP_FOLLOW, &nd);
-	struct file *file = ERR_PTR(err);
+	int err;
+	struct file *file;
+
+	nd.intent.open.flags = FMODE_READ;
+	err = path_lookup(name, LOOKUP_FOLLOW|LOOKUP_OPEN, &nd);
+	file = ERR_PTR(err);
 
 	if (!err) {
 		struct inode *inode = nd.dentry->d_inode;

@@ -1,87 +1,103 @@
+/*
+ * include/asm-sh/dma.h
+ *
+ * Copyright (C) 2003  Paul Mundt
+ *
+ * This file is subject to the terms and conditions of the GNU General Public
+ * License.  See the file "COPYING" in the main directory of this archive
+ * for more details.
+ */
 #ifndef __ASM_SH_DMA_H
 #define __ASM_SH_DMA_H
 
-#ifdef CONFIG_SH_MPC1211
-#include <asm/mpc1211/dma.h>
-#else
-
 #include <linux/config.h>
+#include <linux/spinlock.h>
 #include <asm/cpu/dma.h>
-#include <asm/io.h>		/* need byte IO */
-
-#define MAX_DMA_CHANNELS 8
-#define SH_MAX_DMA_CHANNELS 4
+#include <asm/semaphore.h>
 
 /* The maximum address that we can perform a DMA transfer to on this platform */
 /* Don't define MAX_DMA_ADDRESS; it's useless on the SuperH and any
    occurrence should be flagged as an error.  */
 /* But... */
 /* XXX: This is not applicable to SuperH, just needed for alloc_bootmem */
-#define MAX_DMA_ADDRESS      (PAGE_OFFSET+0x10000000)
+#define MAX_DMA_ADDRESS		(PAGE_OFFSET+0x10000000)
 
-#define DMTE_IRQ ((int[]){DMTE0_IRQ,DMTE1_IRQ,DMTE2_IRQ,DMTE3_IRQ})
+#ifdef CONFIG_NR_DMA_CHANNELS
+#  define MAX_DMA_CHANNELS	(CONFIG_NR_DMA_CHANNELS)
+#else
+#  define MAX_DMA_CHANNELS	(CONFIG_NR_ONCHIP_DMA_CHANNELS)
+#endif
 
-#define DMA_MODE_READ	0x00	/* I/O to memory, no autoinit, increment, single mode */
-#define DMA_MODE_WRITE	0x01	/* memory to I/O, no autoinit, increment, single mode */
-#define DMA_AUTOINIT	0x10
+/* 
+ * Read and write modes can mean drastically different things depending on the
+ * channel configuration. Consult your DMAC documentation and module
+ * implementation for further clues.
+ */
+#define DMA_MODE_READ		0x00
+#define DMA_MODE_WRITE		0x01
+#define DMA_MODE_MASK		0x01
 
-#define REQ_L	0x00000000
-#define REQ_E	0x00080000
-#define RACK_H	0x00000000
-#define RACK_L	0x00040000
-#define ACK_R	0x00000000
-#define ACK_W	0x00020000
-#define ACK_H	0x00000000
-#define ACK_L	0x00010000
-#define DM_INC	0x00004000
-#define DM_DEC	0x00008000
-#define SM_INC	0x00001000
-#define SM_DEC	0x00002000
-#define RS_DUAL	0x00000000
-#define RS_IN	0x00000200
-#define RS_OUT	0x00000300
-#define TM_BURST 0x0000080
-#define TS_8	0x00000010
-#define TS_16	0x00000020
-#define TS_32	0x00000030
-#define TS_64	0x00000000
-#define TS_BLK	0x00000040
-#define CHCR_DE 0x00000001
-#define CHCR_TE 0x00000002
-#define CHCR_IE 0x00000004
+extern spinlock_t dma_spin_lock;
 
-#define DMAOR_COD	0x00000008
-#define DMAOR_AE	0x00000004
-#define DMAOR_NMIF	0x00000002
-#define DMAOR_DME	0x00000001
+struct dma_info;
 
-struct dma_info_t {
-	unsigned int chan;
-	unsigned long dev_addr;
-	unsigned int mode;
-	unsigned long mem_addr;
-	unsigned int count;
+struct dma_ops {
+	const char *name;
+
+	int (*request)(struct dma_info *info);
+	void (*free)(struct dma_info *info);
+
+	int (*get_residue)(struct dma_info *info);
+	int (*xfer)(struct dma_info *info);
+	void (*configure)(struct dma_info *info, unsigned long flags);
 };
 
-static __inline__ void clear_dma_ff(unsigned int dmanr){}
+struct dma_info {
+	const char *dev_id;
 
-/* These are in arch/sh/kernel/dma.c: */
-extern unsigned long claim_dma_lock(void);
-extern void release_dma_lock(unsigned long flags);
-extern void setup_dma(unsigned int dmanr, struct dma_info_t *info);
-extern void enable_dma(unsigned int dmanr);
-extern void disable_dma(unsigned int dmanr);
-extern void set_dma_mode(unsigned int dmanr, char mode);
-extern void set_dma_addr(unsigned int dmanr, unsigned int a);
-extern void set_dma_count(unsigned int dmanr, unsigned int count);
-extern int get_dma_residue(unsigned int dmanr);
+	unsigned int chan;
+	unsigned int mode;
+	unsigned int count;
+	
+	unsigned long sar;
+	unsigned long dar;
+
+	unsigned int configured:1;
+	atomic_t busy;
+
+	struct semaphore sem;
+	struct dma_ops *ops;
+} __attribute__ ((packed));
+
+/* arch/sh/drivers/dma/dma-api.c */
+extern int dma_xfer(unsigned int chan, unsigned long from,
+		    unsigned long to, size_t size, unsigned int mode);
+
+#define dma_write(chan, from, to, size)	\
+	dma_xfer(chan, from, to, size, DMA_MODE_WRITE)
+#define dma_write_page(chan, from, to)	\
+	dma_write(chan, from, to, PAGE_SIZE)
+
+#define dma_read(chan, from, to, size)	\
+	dma_xfer(chan, from, to, size, DMA_MODE_READ)
+#define dma_read_page(chan, from, to)	\
+	dma_read(chan, from, to, PAGE_SIZE)
+
+extern int request_dma(unsigned int chan, const char *dev_id);
+extern void free_dma(unsigned int chan);
+extern int get_dma_residue(unsigned int chan);
+extern struct dma_info *get_dma_info(unsigned int chan);
+extern void dma_wait_for_completion(unsigned int chan);
+extern void dma_configure_channel(unsigned int chan, unsigned long flags);
+
+extern int register_dmac(struct dma_ops *ops);
+
+extern struct dma_info dma_info[];
 
 #ifdef CONFIG_PCI
 extern int isa_dma_bridge_buggy;
 #else
 #define isa_dma_bridge_buggy 	(0)
 #endif
-
-#endif /* CONFIG_SH_MPC1211 */
 
 #endif /* __ASM_SH_DMA_H */

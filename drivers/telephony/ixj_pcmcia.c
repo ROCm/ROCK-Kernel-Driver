@@ -77,7 +77,7 @@ static dev_link_t *ixj_attach(void)
 	client_reg.event_handler = &ixj_event;
 	client_reg.Version = 0x0210;
 	client_reg.event_callback_args.client_data = link;
-	ret = CardServices(RegisterClient, &link->handle, &client_reg);
+	ret = pcmcia_register_client(&link->handle, &client_reg);
 	if (ret != CS_SUCCESS) {
 		cs_error(link->handle, RegisterClient, ret);
 		ixj_detach(link);
@@ -100,7 +100,7 @@ static void ixj_detach(dev_link_t * link)
 	if (link->state & DEV_CONFIG)
 		ixj_cs_release(link);
 	if (link->handle) {
-		ret = CardServices(DeregisterClient, link->handle);
+		ret = pcmcia_deregister_client(link->handle);
 		if (ret != CS_SUCCESS)
 			cs_error(link->handle, DeregisterClient, ret);
 	}
@@ -110,11 +110,8 @@ static void ixj_detach(dev_link_t * link)
         kfree(link);
 }
 
-#define CS_CHECK(fn, args...) \
-while ((last_ret=CardServices(last_fn=(fn), args))!=0) goto cs_failed
-
-#define CFG_CHECK(fn, args...) \
-if (CardServices(fn, args) != 0) goto next_entry
+#define CS_CHECK(fn, ret) \
+do { last_fn = (fn); if ((last_ret = (ret)) != 0) goto cs_failed; } while (0)
 
 static void ixj_get_serial(dev_link_t * link, IXJ * j)
 {
@@ -130,8 +127,8 @@ static void ixj_get_serial(dev_link_t * link, IXJ * j)
 	tuple.TupleDataMax = 80;
 	tuple.Attributes = 0;
 	tuple.DesiredTuple = CISTPL_VERS_1;
-	CS_CHECK(GetFirstTuple, handle, &tuple);
-	CS_CHECK(GetTupleData, handle, &tuple);
+	CS_CHECK(GetFirstTuple, pcmcia_get_first_tuple(handle, &tuple));
+	CS_CHECK(GetTupleData, pcmcia_get_tuple_data(handle, &tuple));
 	str = (char *) buf;
 	printk("PCMCIA Version %d.%d\n", str[0], str[1]);
 	str += 2;
@@ -202,19 +199,20 @@ static void ixj_config(dev_link_t * link)
 	tuple.TupleDataMax = 255;
 	tuple.Attributes = 0;
 	tuple.DesiredTuple = CISTPL_CONFIG;
-	CS_CHECK(GetFirstTuple, handle, &tuple);
-	CS_CHECK(GetTupleData, handle, &tuple);
-	CS_CHECK(ParseTuple, handle, &tuple, &parse);
+	CS_CHECK(GetFirstTuple, pcmcia_get_first_tuple(handle, &tuple));
+	CS_CHECK(GetTupleData, pcmcia_get_tuple_data(handle, &tuple));
+	CS_CHECK(ParseTuple, pcmcia_parse_tuple(handle, &tuple, &parse));
 	link->conf.ConfigBase = parse.config.base;
 	link->conf.Present = parse.config.rmask[0];
 	link->state |= DEV_CONFIG;
-	CS_CHECK(GetConfigurationInfo, handle, &conf);
+	CS_CHECK(GetConfigurationInfo, pcmcia_get_configuration_info(handle, &conf));
 	tuple.DesiredTuple = CISTPL_CFTABLE_ENTRY;
 	tuple.Attributes = 0;
-	CS_CHECK(GetFirstTuple, handle, &tuple);
+	CS_CHECK(GetFirstTuple, pcmcia_get_first_tuple(handle, &tuple));
 	while (1) {
-		CFG_CHECK(GetTupleData, handle, &tuple);
-		CFG_CHECK(ParseTuple, handle, &tuple, &parse);
+		if (pcmcia_get_tuple_data(handle, &tuple) != 0 ||
+				pcmcia_parse_tuple(handle, &tuple, &parse) != 0)
+			goto next_entry;
 		if ((cfg->io.nwin > 0) || (dflt.io.nwin > 0)) {
 			cistpl_io_t *io = (cfg->io.nwin) ? &cfg->io : &dflt.io;
 			link->conf.ConfigIndex = cfg->index;
@@ -224,17 +222,18 @@ static void ixj_config(dev_link_t * link)
 				link->io.BasePort2 = io->win[1].base;
 				link->io.NumPorts2 = io->win[1].len;
 			}
-			CFG_CHECK(RequestIO, link->handle, &link->io);
+			if (pcmcia_request_io(link->handle, &link->io) != 0)
+				goto next_entry;
 			/* If we've got this far, we're done */
 			break;
 		}
 	      next_entry:
 		if (cfg->flags & CISTPL_CFTABLE_DEFAULT)
 			dflt = *cfg;
-		CS_CHECK(GetNextTuple, handle, &tuple);
+		CS_CHECK(GetNextTuple, pcmcia_get_next_tuple(handle, &tuple));
 	}
 
-	CS_CHECK(RequestConfiguration, handle, &link->conf);
+	CS_CHECK(RequestConfiguration, pcmcia_request_configuration(handle, &link->conf));
 
 	/*
  	 *	Register the card with the core.
@@ -258,8 +257,8 @@ static void ixj_cs_release(dev_link_t *link)
 	DEBUG(0, "ixj_cs_release(0x%p)\n", link);
 	info->ndev = 0;
 	link->dev = NULL;
-	CardServices(ReleaseConfiguration, link->handle);
-	CardServices(ReleaseIO, link->handle, &link->io);
+	pcmcia_release_configuration(link->handle);
+	pcmcia_release_io(link->handle, &link->io);
 	link->state &= ~DEV_CONFIG;
 }
 
@@ -284,14 +283,14 @@ static int ixj_event(event_t event, int priority, event_callback_args_t * args)
 		/* Fall through... */
 	case CS_EVENT_RESET_PHYSICAL:
 		if (link->state & DEV_CONFIG)
-			CardServices(ReleaseConfiguration, link->handle);
+			pcmcia_release_configuration(link->handle);
 		break;
 	case CS_EVENT_PM_RESUME:
 		link->state &= ~DEV_SUSPEND;
 		/* Fall through... */
 	case CS_EVENT_CARD_RESET:
 		if (DEV_OK(link))
-			CardServices(RequestConfiguration, link->handle, &link->conf);
+			pcmcia_request_configuration(link->handle, &link->conf);
 		break;
 	}
 	return 0;

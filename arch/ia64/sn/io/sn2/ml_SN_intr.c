@@ -14,7 +14,6 @@
 #include <asm/hw_irq.h>
 #include <asm/sn/sgi.h>
 #include <asm/sn/iograph.h>
-#include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/labelcl.h>
 #include <asm/sn/io.h>
@@ -82,7 +81,7 @@ void intr_init_vecblk(cnodeid_t node)
 	/* Config and enable UART interrupt, all nodes. */
 	local5_config.sh_local_int5_config_regval = 0;
 	local5_config.sh_local_int5_config_s.idx = SGI_UART_VECTOR;
-	local5_config.sh_local_int5_config_s.pid = cpu0;
+	local5_config.sh_local_int5_config_s.pid = cpu;
 	HUB_S((unsigned long *)GLOBAL_MMR_ADDR(nasid, SH_LOCAL_INT5_CONFIG),
 		local5_config.sh_local_int5_config_regval);
 
@@ -223,7 +222,7 @@ static cpuid_t intr_cpu_choose_from_node(cnodeid_t cnode)
 		int intrs;
 
 		cpu = cnode_slice_to_cpuid(cnode, slice);
-		if (cpu == num_online_cpus())
+		if (cpu == NR_CPUS)
 			continue;
 		if (!cpu_online(cpu))
 			continue;

@@ -9,6 +9,4 @@
 # Makefile for the sn ia64 subplatform
 #
 
-EXTRA_CFLAGS := -DLITTLE_ENDIAN
-
 obj-y += kernel/ io/

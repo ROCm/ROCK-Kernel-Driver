@@ -144,7 +144,7 @@ struct pci_dev *pci_find_dev_by_addr(unsigned long addr)
 	return NULL;
 }
 
-void __devinit
+void 
 pcibios_resource_to_bus(struct pci_dev *dev, struct pci_bus_region *region,
 			struct resource *res)
 {
@@ -224,7 +224,11 @@ pci_alloc_pci_controller(enum phb_types controller_type)
         struct pci_controller *hose;
 	char *model;
 
+#ifdef CONFIG_PPC_ISERIES
+        hose = (struct pci_controller *)kmalloc(sizeof(struct pci_controller), GFP_KERNEL);
+#else
         hose = (struct pci_controller *)alloc_bootmem(sizeof(struct pci_controller));
+#endif
         if(hose == NULL) {
                 printk(KERN_ERR "PCI: Allocate pci_controller failed.\n");
                 return NULL;
@@ -232,6 +236,11 @@ pci_alloc_pci_controller(enum phb_types controller_type)
         memset(hose, 0, sizeof(struct pci_controller));
 
 	switch(controller_type) {
+#ifdef CONFIG_PPC_ISERIES
+	case phb_type_hypervisor:
+		model = "PHB HV";
+		break;
+#endif
 	case phb_type_python:
 		model = "PHB PY";
 		break;
@@ -280,6 +289,7 @@ static void __init pcibios_claim_one_bus(struct pci_bus *b)
 		pcibios_claim_one_bus(child_bus);
 }
 
+#ifndef CONFIG_PPC_ISERIES
 static void __init pcibios_claim_of_setup(void)
 {
 	struct list_head *lb;
@@ -289,6 +299,7 @@ static void __init pcibios_claim_of_setup(void)
 		pcibios_claim_one_bus(b);
 	}
 }
+#endif
 
 static int __init pcibios_init(void)
 {
@@ -311,6 +322,7 @@ static int __init pcibios_init(void)
 		hose->last_busno = bus->subordinate;
 	}
 
+#ifndef CONFIG_PPC_ISERIES
 	if (pci_probe_only)
 		pcibios_claim_of_setup();
 	else
@@ -318,6 +330,7 @@ static int __init pcibios_init(void)
 		   pci_assign_unassigned_resources() is able to work
 		   correctly with [partially] allocated PCI tree. */
 		pci_assign_unassigned_resources();
+#endif
 
 	/* Call machine dependent fixup */
 	pcibios_final_fixup();
@@ -375,19 +388,27 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
  */
 int pci_domain_nr(struct pci_bus *bus)
 {
+#ifdef CONFIG_PPC_ISERIES
+	return 0;
+#else
 	struct pci_controller *hose = PCI_GET_PHB_PTR(bus);
 
 	return hose->global_number;
+#endif
 }
+
+EXPORT_SYMBOL(pci_domain_nr);
 
 /* Set the name of the bus as it appears in /proc/bus/pci */
 int pci_name_bus(char *name, struct pci_bus *bus)
 {
+#ifndef CONFIG_PPC_ISERIES
 	struct pci_controller *hose = PCI_GET_PHB_PTR(bus);
 
 	if (hose->buid)
 		sprintf(name, "%04x:%02x", pci_domain_nr(bus), bus->number);
 	else
+#endif
 		sprintf(name, "%02x", bus->number);
 
 	return 0;

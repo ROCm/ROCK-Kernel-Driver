@@ -13,29 +13,25 @@
 
 #define pcibios_assign_all_busses()	1
 
-#if defined(CONFIG_CPU_SUBTYPE_ST40STB1)
-/* These are currently the correct values for the STM overdrive board. 
- * We need some way of setting this on a board specific way, it will 
- * not be the same on other boards I think
+/*
+ * A board can define one or more PCI channels that represent built-in (or
+ * external) PCI controllers.
  */
-#define PCIBIOS_MIN_IO		0x2000
-#define PCIBIOS_MIN_MEM		0x10000000
+struct pci_channel {
+	struct pci_ops *pci_ops;
+	struct resource *io_resource;
+	struct resource *mem_resource;
+	int first_devfn;
+	int last_devfn;
+};
 
-#elif defined(CONFIG_SH_DREAMCAST)
-#define PCIBIOS_MIN_IO		0x2000
-#define PCIBIOS_MIN_MEM		0x10000000
-#elif defined(CONFIG_SH_BIGSUR) && defined(CONFIG_CPU_SUBTYPE_SH7751)
-#define PCIBIOS_MIN_IO		0x2000
-#define PCIBIOS_MIN_MEM		0xFD000000
+/*
+ * Each board initializes this array and terminates it with a NULL entry.
+ */
+extern struct pci_channel board_pci_channels[];
 
-#elif defined(CONFIG_SH_7751_SOLUTION_ENGINE)
-#define PCIBIOS_MIN_IO          0x4000
-#define PCIBIOS_MIN_MEM         0xFD000000
-
-#elif defined(CONFIG_SH_MPC1211)
-#define PCIBIOS_MIN_IO          0x2000
-#define PCIBIOS_MIN_MEM         0xb0000000
-#endif
+#define PCIBIOS_MIN_IO		board_pci_channels->io_resource->start
+#define PCIBIOS_MIN_MEM		board_pci_channels->mem_resource->start
 
 struct pci_dev;
 
@@ -250,23 +246,6 @@ static inline int pci_dma_supported(struct pci_dev *hwdev, u64 mask)
  */
 #define sg_dma_address(sg)	(virt_to_bus((sg)->dma_address))
 #define sg_dma_len(sg)		((sg)->length)
-
-/*
- * A board can define one or more PCI channels that represent built-in (or
- * external) PCI controllers.
- */
-struct pci_channel {
-	struct pci_ops *pci_ops;
-	struct resource *io_resource;
-	struct resource *mem_resource;
-	int first_devfn;
-	int last_devfn;
-};
-
-/*
- * Each board initializes this array and terminates it with a NULL entry.
- */
-extern struct pci_channel board_pci_channels[];
 
 /* Board-specific fixup routines. */
 extern void pcibios_fixup(void);

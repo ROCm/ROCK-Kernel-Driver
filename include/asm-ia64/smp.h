@@ -48,7 +48,7 @@ extern volatile int ia64_cpu_to_sapicid[];
 
 extern unsigned long ap_wakeup_vector;
 
-#define cpu_possible(cpu)	cpu_isset(cpu, phys_cpu_present_map)
+#define cpu_possible_map phys_cpu_present_map
 
 /*
  * Function to map hard smp processor id to logical id.  Slow, so don't use this in

@@ -10,8 +10,15 @@
  */
 
 #ifndef _TAPE_STD_H
-
 #define _TAPE_STD_H
+
+#include <asm/tape390.h>
+
+/*
+ * Biggest block size to handle. Currently 64K because we only build
+ * channel programs without data chaining.
+ */
+#define MAX_BLOCKSIZE   65535
 
 /*
  * The CCW commands for the Tape type of command.
@@ -105,7 +112,8 @@ struct tape_request *tape_std_bwrite(struct request *,
 int tape_std_assign(struct tape_device *);
 int tape_std_unassign(struct tape_device *);
 int tape_std_read_block_id(struct tape_device *device, __u64 *id);
-int tape_std_display(struct tape_device *, int, unsigned long);
+int tape_std_display(struct tape_device *, struct display_struct *disp);
+int tape_std_terminate_write(struct tape_device *);
 
 /* Standard magnetic tape commands. */
 int tape_std_mtbsf(struct tape_device *, int);

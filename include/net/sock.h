@@ -246,6 +246,7 @@ struct sock {
 	struct socket		*sk_socket;
 	void			*sk_user_data;
 	struct module		*sk_owner;
+	void			*sk_security;
 	void			(*sk_state_change)(struct sock *sk);
 	void			(*sk_data_ready)(struct sock *sk, int bytes);
 	void			(*sk_write_space)(struct sock *sk);

@@ -205,7 +205,7 @@ rpc_exit(struct rpc_task *task, int status)
 static __inline__ char *
 rpc_qname(struct rpc_wait_queue *q)
 {
-	return q->name? q->name : "unknown";
+	return ((q && q->name) ? q->name : "unknown");
 }
 #endif
 

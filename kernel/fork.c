@@ -60,10 +60,9 @@ int nr_processes(void)
 	int cpu;
 	int total = 0;
 
-	for (cpu = 0; cpu < NR_CPUS; cpu++) {
-		if (cpu_online(cpu))
-			total += per_cpu(process_counts, cpu);
-	}
+	for_each_cpu(cpu)
+		total += per_cpu(process_counts, cpu);
+
 	return total;
 }
 
@@ -316,9 +315,9 @@ static inline int dup_mmap(struct mm_struct * mm, struct mm_struct * oldmm)
 				atomic_dec(&inode->i_writecount);
       
 			/* insert tmp into the share list, just after mpnt */
-			down(&inode->i_mapping->i_shared_sem);
+			down(&file->f_mapping->i_shared_sem);
 			list_add_tail(&tmp->shared, &mpnt->shared);
-			up(&inode->i_mapping->i_shared_sem);
+			up(&file->f_mapping->i_shared_sem);
 		}
 
 		/*
@@ -910,23 +909,7 @@ struct task_struct *copy_process(unsigned long clone_flags,
 	if (p->binfmt && !try_module_get(p->binfmt->module))
 		goto bad_fork_cleanup_put_domain;
 
-#ifdef CONFIG_PREEMPT
-	/*
-	 * schedule_tail drops this_rq()->lock so we compensate with a count
-	 * of 1.  Also, we want to start with kernel preemption disabled.
-	 */
-	p->thread_info->preempt_count = 1;
-#endif
 	p->did_exec = 0;
-
-	/*
-	 * We mark the process as running here, but have not actually
-	 * inserted it onto the runqueue yet. This guarantees that
-	 * nobody will actually run it, and a signal or other external
-	 * event cannot wake it up and insert it on the runqueue either.
-	 */
-	p->state = TASK_RUNNING;
-
 	copy_flags(clone_flags, p);
 	if (clone_flags & CLONE_IDLETASK)
 		p->pid = 0;
@@ -942,15 +925,12 @@ struct task_struct *copy_process(unsigned long clone_flags,
 
 	p->proc_dentry = NULL;
 
-	INIT_LIST_HEAD(&p->run_list);
-
 	INIT_LIST_HEAD(&p->children);
 	INIT_LIST_HEAD(&p->sibling);
 	INIT_LIST_HEAD(&p->posix_timers);
 	init_waitqueue_head(&p->wait_chldexit);
 	p->vfork_done = NULL;
 	spin_lock_init(&p->alloc_lock);
-	spin_lock_init(&p->switch_lock);
 	spin_lock_init(&p->proc_lock);
 
 	clear_tsk_thread_flag(p, TIF_SIGPENDING);
@@ -965,7 +945,6 @@ struct task_struct *copy_process(unsigned long clone_flags,
 	p->tty_old_pgrp = 0;
 	p->utime = p->stime = 0;
 	p->cutime = p->cstime = 0;
-	p->array = NULL;
 	p->lock_depth = -1;		/* -1 = no lock */
 	p->start_time = get_jiffies_64();
 	p->security = NULL;
@@ -1014,38 +993,12 @@ struct task_struct *copy_process(unsigned long clone_flags,
 	p->exit_signal = (clone_flags & CLONE_THREAD) ? -1 : (clone_flags & CSIGNAL);
 	p->pdeath_signal = 0;
 
+	/* Perform scheduler related setup */
+	sched_fork(p);
+
 	/*
-	 * Share the timeslice between parent and child, thus the
-	 * total amount of pending timeslices in the system doesn't change,
-	 * resulting in more scheduling fairness.
-	 */
-	local_irq_disable();
-        p->time_slice = (current->time_slice + 1) >> 1;
-	/*
-	 * The remainder of the first timeslice might be recovered by
-	 * the parent if the child exits early enough.
-	 */
-	p->first_time_slice = 1;
-	current->time_slice >>= 1;
-	p->timestamp = sched_clock();
-	if (!current->time_slice) {
-		/*
-	 	 * This case is rare, it happens when the parent has only
-	 	 * a single jiffy left from its timeslice. Taking the
-		 * runqueue lock is not a problem.
-		 */
-		current->time_slice = 1;
-		preempt_disable();
-		scheduler_tick(0, 0);
-		local_irq_enable();
-		preempt_enable();
-	} else
-		local_irq_enable();
-	/*
-	 * Ok, add it to the run-queues and make it
-	 * visible to the rest of the system.
-	 *
-	 * Let it rip!
+	 * Ok, make it visible to the rest of the system.
+	 * We dont wake it up yet.
 	 */
 	p->tgid = p->pid;
 	p->group_leader = p;

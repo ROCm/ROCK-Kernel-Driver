@@ -791,12 +791,19 @@ out_no_inode:
 	goto out;
 }
 
+#define NFS_VALID_ATTRS (ATTR_MODE|ATTR_UID|ATTR_GID|ATTR_SIZE|ATTR_ATIME|ATTR_ATIME_SET|ATTR_MTIME|ATTR_MTIME_SET)
+
 int
 nfs_setattr(struct dentry *dentry, struct iattr *attr)
 {
 	struct inode *inode = dentry->d_inode;
 	struct nfs_fattr fattr;
 	int error;
+
+	/* Optimization: if the end result is no change, don't RPC */
+	attr->ia_valid &= NFS_VALID_ATTRS;
+	if (attr->ia_valid == 0)
+		return 0;
 
 	lock_kernel();
 
@@ -813,6 +820,8 @@ printk("nfs_setattr: revalidate failed, error=%d\n", error);
 
 	if (!S_ISREG(inode->i_mode)) {
 		attr->ia_valid &= ~ATTR_SIZE;
+		if (attr->ia_valid == 0)
+			goto out;
 	} else {
 		filemap_fdatawrite(inode->i_mapping);
 		error = nfs_wb_all(inode);

@@ -592,7 +592,7 @@ static dev_link_t *mgslpc_attach(void)
     client_reg.Version = 0x0210;
     client_reg.event_callback_args.client_data = link;
 
-    ret = CardServices(RegisterClient, &link->handle, &client_reg);
+    ret = pcmcia_register_client(&link->handle, &client_reg);
     if (ret != CS_SUCCESS) {
 	    cs_error(link->handle, RegisterClient, ret);
 	    mgslpc_detach(link);
@@ -607,8 +607,8 @@ static dev_link_t *mgslpc_attach(void)
 /* Card has been inserted.
  */
 
-#define CS_CHECK(fn, args...) \
-while ((last_ret=CardServices(last_fn=(fn),args))!=0) goto cs_failed
+#define CS_CHECK(fn, ret) \
+do { last_fn = (fn); if ((last_ret = (ret)) != 0) goto cs_failed; } while (0)
 
 static void mgslpc_config(dev_link_t *link)
 {
@@ -631,9 +631,9 @@ static void mgslpc_config(dev_link_t *link)
     tuple.TupleData = buf;
     tuple.TupleDataMax = sizeof(buf);
     tuple.TupleOffset = 0;
-    CS_CHECK(GetFirstTuple, handle, &tuple);
-    CS_CHECK(GetTupleData, handle, &tuple);
-    CS_CHECK(ParseTuple, handle, &tuple, &parse);
+    CS_CHECK(GetFirstTuple, pcmcia_get_first_tuple(handle, &tuple));
+    CS_CHECK(GetTupleData, pcmcia_get_tuple_data(handle, &tuple));
+    CS_CHECK(ParseTuple, pcmcia_parse_tuple(handle, &tuple, &parse));
     link->conf.ConfigBase = parse.config.base;
     link->conf.Present = parse.config.rmask[0];
     
@@ -641,17 +641,17 @@ static void mgslpc_config(dev_link_t *link)
     link->state |= DEV_CONFIG;
 
     /* Look up the current Vcc */
-    CS_CHECK(GetConfigurationInfo, handle, &conf);
+    CS_CHECK(GetConfigurationInfo, pcmcia_get_configuration_info(handle, &conf));
     link->conf.Vcc = conf.Vcc;
 
     /* get CIS configuration entry */
 
     tuple.DesiredTuple = CISTPL_CFTABLE_ENTRY;
-    CS_CHECK(GetFirstTuple, handle, &tuple);
+    CS_CHECK(GetFirstTuple, pcmcia_get_first_tuple(handle, &tuple));
 
     cfg = &(parse.cftable_entry);
-    CS_CHECK(GetTupleData, handle, &tuple);
-    CS_CHECK(ParseTuple, handle, &tuple, &parse);
+    CS_CHECK(GetTupleData, pcmcia_get_tuple_data(handle, &tuple));
+    CS_CHECK(ParseTuple, pcmcia_parse_tuple(handle, &tuple, &parse));
 
     if (cfg->flags & CISTPL_CFTABLE_DEFAULT) dflt = *cfg;
     if (cfg->index == 0)
@@ -672,7 +672,7 @@ static void mgslpc_config(dev_link_t *link)
 	    link->io.IOAddrLines = io->flags & CISTPL_IO_LINES_MASK;
 	    link->io.BasePort1 = io->win[0].base;
 	    link->io.NumPorts1 = io->win[0].len;
-	    CS_CHECK(RequestIO, link->handle, &link->io);
+	    CS_CHECK(RequestIO, pcmcia_request_io(link->handle, &link->io));
     }
 
     link->conf.Attributes = CONF_ENABLE_IRQ;
@@ -684,9 +684,9 @@ static void mgslpc_config(dev_link_t *link)
     link->irq.Attributes |= IRQ_HANDLE_PRESENT;
     link->irq.Handler     = mgslpc_isr;
     link->irq.Instance    = info;
-    CS_CHECK(RequestIRQ, link->handle, &link->irq);
+    CS_CHECK(RequestIRQ, pcmcia_request_irq(link->handle, &link->irq));
 
-    CS_CHECK(RequestConfiguration, link->handle, &link->conf);
+    CS_CHECK(RequestConfiguration, pcmcia_request_configuration(link->handle, &link->conf));
 
     info->io_base = link->io.BasePort1;
     info->irq_level = link->irq.AssignedIRQ;
@@ -728,11 +728,11 @@ static void mgslpc_release(u_long arg)
     link->dev = NULL;
     link->state &= ~DEV_CONFIG;
 
-    CardServices(ReleaseConfiguration, link->handle);
+    pcmcia_release_configuration(link->handle);
     if (link->io.NumPorts1)
-	    CardServices(ReleaseIO, link->handle, &link->io);
+	    pcmcia_release_io(link->handle, &link->io);
     if (link->irq.AssignedIRQ)
-	    CardServices(ReleaseIRQ, link->handle, &link->irq);
+	    pcmcia_release_irq(link->handle, &link->irq);
     if (link->state & DEV_STALE_LINK)
 	    mgslpc_detach(link);
 }
@@ -763,7 +763,7 @@ static void mgslpc_detach(dev_link_t *link)
 
     /* Break the link with Card Services */
     if (link->handle)
-	    CardServices(DeregisterClient, link->handle);
+	    pcmcia_deregister_client(link->handle);
     
     /* Unlink device structure, and free it */
     *linkp = link->next;
@@ -798,14 +798,14 @@ static int mgslpc_event(event_t event, int priority,
 	    /* Mark the device as stopped, to block IO until later */
 	    info->stop = 1;
 	    if (link->state & DEV_CONFIG)
-		    CardServices(ReleaseConfiguration, link->handle);
+		    pcmcia_release_configuration(link->handle);
 	    break;
     case CS_EVENT_PM_RESUME:
 	    link->state &= ~DEV_SUSPEND;
 	    /* Fall through... */
     case CS_EVENT_CARD_RESET:
 	    if (link->state & DEV_CONFIG)
-		    CardServices(RequestConfiguration, link->handle, &link->conf);
+		    pcmcia_request_configuration(link->handle, &link->conf);
 	    info->stop = 0;
 	    break;
     }

@@ -80,8 +80,8 @@ static inline pte_t *alloc_one_pte_map(struct mm_struct *mm, unsigned long addr)
 }
 
 static int
-copy_one_pte(struct mm_struct *mm, pte_t *src, pte_t *dst,
-		struct pte_chain **pte_chainp)
+copy_one_pte(struct vm_area_struct *vma, unsigned long old_addr,
+	     pte_t *src, pte_t *dst, struct pte_chain **pte_chainp)
 {
 	int error = 0;
 	pte_t pte;
@@ -93,7 +93,7 @@ copy_one_pte(struct mm_struct *mm, pte_t *src, pte_t *dst,
 	if (!pte_none(*src)) {
 		if (page)
 			page_remove_rmap(page, src);
-		pte = ptep_get_and_clear(src);
+		pte = ptep_clear_flush(vma, old_addr, src);
 		if (!dst) {
 			/* No dest?  We must put it back. */
 			dst = src;
@@ -135,11 +135,15 @@ move_one_page(struct vm_area_struct *vma, unsigned long old_addr,
 		dst = alloc_one_pte_map(mm, new_addr);
 		if (src == NULL)
 			src = get_one_pte_map_nested(mm, old_addr);
-		error = copy_one_pte(mm, src, dst, &pte_chain);
+		error = copy_one_pte(vma, old_addr, src, dst, &pte_chain);
 		pte_unmap_nested(src);
 		pte_unmap(dst);
-	}
-	flush_tlb_page(vma, old_addr);
+	} else
+		/*
+		 * Why do we need this flush ? If there is no pte for
+		 * old_addr, then there must not be a pte for it as well.
+		 */
+		flush_tlb_page(vma, old_addr);
 	spin_unlock(&mm->page_table_lock);
 	pte_chain_free(pte_chain);
 out:

@@ -1,11 +1,11 @@
 /*	
- * unsigned long long __div64_32(unsigned long long n, unsigned long d); 
+ * unsigned long long __xdiv64_32(unsigned long long n, unsigned long d); 
  */
 
 #include <linux/linkage.h>
 
 .text
-ENTRY(__div64_32)
+ENTRY(__xdiv64_32)
 #ifdef  __LITTLE_ENDIAN__
 	mov	r4, r0
 	mov	r5, r1

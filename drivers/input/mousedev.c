@@ -15,6 +15,7 @@
 #include <linux/slab.h>
 #include <linux/poll.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/input.h>
 #include <linux/config.h>
@@ -38,6 +39,14 @@ MODULE_LICENSE("GPL");
 #define CONFIG_INPUT_MOUSEDEV_SCREEN_Y	768
 #endif
 
+static int xres = CONFIG_INPUT_MOUSEDEV_SCREEN_X;
+module_param(xres, uint, 0);
+MODULE_PARM_DESC(xres, "Horizontal screen resolution");
+
+static int yres = CONFIG_INPUT_MOUSEDEV_SCREEN_Y;
+module_param(yres, uint, 0);
+MODULE_PARM_DESC(yres, "Vertical screen resolution");
+
 struct mousedev {
 	int exist;
 	int open;
@@ -53,12 +62,14 @@ struct mousedev_list {
 	struct fasync_struct *fasync;
 	struct mousedev *mousedev;
 	struct list_head node;
-	int dx, dy, dz, oldx, oldy;
-	signed char ps2[6];
+	int dx, dy, dz;
+	int old_x[4], old_y[4];
 	unsigned long buttons;
+	signed char ps2[6];
 	unsigned char ready, buffer, bufsiz;
 	unsigned char mode, imexseq, impsseq;
-	int finger;
+	unsigned int pkt_count;
+	unsigned char touch;
 };
 
 #define MOUSEDEV_SEQ_LEN	6
@@ -71,52 +82,49 @@ static struct input_handler mousedev_handler;
 static struct mousedev *mousedev_table[MOUSEDEV_MINORS];
 static struct mousedev mousedev_mix;
 
-static int xres = CONFIG_INPUT_MOUSEDEV_SCREEN_X;
-static int yres = CONFIG_INPUT_MOUSEDEV_SCREEN_Y;
+#define fx(i)  (list->old_x[(list->pkt_count - (i)) & 03])
+#define fy(i)  (list->old_y[(list->pkt_count - (i)) & 03])
 
 static void mousedev_abs_event(struct input_handle *handle, struct mousedev_list *list, unsigned int code, int value)
 {
 	int size;
+	int touchpad;
 
 	/* Ignore joysticks */
 	if (test_bit(BTN_TRIGGER, handle->dev->keybit))
 		return;
 
-	/* Handle touchpad data */
-	if (test_bit(BTN_TOOL_FINGER, handle->dev->keybit)) {
+	touchpad = test_bit(BTN_TOOL_FINGER, handle->dev->keybit);
 
-		if (list->finger && list->finger < 3)
-			list->finger++;
-
-		switch (code) {
-			case ABS_X:
-				if (list->finger == 3)
-					list->dx += (value - list->oldx) / 8;
-				list->oldx = value;
-				return;
-			case ABS_Y:
-				if (list->finger == 3)
-					list->dy -= (value - list->oldy) / 8;
-				list->oldy = value;
-				return;
-		}
-		return;
-	}
-
-	/* Handle tablet data */
 	switch (code) {
 		case ABS_X:
-			size = handle->dev->absmax[ABS_X] - handle->dev->absmin[ABS_X];
-			if (size == 0) size = xres;
-			list->dx += (value * xres - list->oldx) / size;
-			list->oldx += list->dx * size;
-			return;
+			if (touchpad) {
+				if (list->touch) {
+					fx(0) = value;
+					if (list->pkt_count >= 2)
+						list->dx = ((fx(0) - fx(1)) / 2 + (fx(1) - fx(2)) / 2) / 8;
+				}
+			} else {
+				size = handle->dev->absmax[ABS_X] - handle->dev->absmin[ABS_X];
+				if (size == 0) size = xres;
+				list->dx += (value * xres - list->old_x[0]) / size;
+				list->old_x[0] += list->dx * size;
+			}
+			break;
 		case ABS_Y:
-			size = handle->dev->absmax[ABS_Y] - handle->dev->absmin[ABS_Y];
-			if (size == 0) size = yres;
-			list->dy -= (value * yres - list->oldy) / size;
-			list->oldy -= list->dy * size;
-			return;
+			if (touchpad) {
+				if (list->touch) {
+					fy(0) = value;
+					if (list->pkt_count >= 2)
+						list->dy = -((fy(0) - fy(1)) / 2 + (fy(1) - fy(2)) / 2) / 8;
+				}
+			} else {
+				size = handle->dev->absmax[ABS_Y] - handle->dev->absmin[ABS_Y];
+				if (size == 0) size = yres;
+				list->dy -= (value * yres - list->old_y[0]) / size;
+				list->old_y[0] -= list->dy * size;
+			}
+			break;
 	}
 }
 
@@ -146,12 +154,16 @@ static void mousedev_event(struct input_handle *handle, unsigned int type, unsig
 					break;
 
 				case EV_KEY:
+					if (code == BTN_TOUCH && test_bit(BTN_TOOL_FINGER, handle->dev->keybit)) {
+						/* Handle touchpad data */
+						list->touch = value;
+						if (!list->touch)
+							list->pkt_count = 0;
+						break;
+					}
+
 					switch (code) {
-						case BTN_TOUCH: /* Handle touchpad data */
-							if (test_bit(BTN_TOOL_FINGER, handle->dev->keybit)) {
-								list->finger = value;
-								return;
-							}
+						case BTN_TOUCH:
 						case BTN_0:
 						case BTN_FORWARD:
 						case BTN_LEFT:   index = 0; break;
@@ -178,6 +190,16 @@ static void mousedev_event(struct input_handle *handle, unsigned int type, unsig
 				case EV_SYN:
 					switch (code) {
 						case SYN_REPORT:
+							if (list->touch) {
+								list->pkt_count++;
+								/* Input system eats duplicate events,
+								 * but we need all of them to do correct
+								 * averaging so apply present one forward
+								 */
+								fx(0) = fx(1);
+								fy(0) = fy(1);
+							}
+
 							list->ready = 1;
 							kill_fasync(&list->fasync, SIGIO, POLL_IN);
 							wake = 1;
@@ -566,8 +588,3 @@ static void __exit mousedev_exit(void)
 
 module_init(mousedev_init);
 module_exit(mousedev_exit);
-
-MODULE_PARM(xres, "i");
-MODULE_PARM_DESC(xres, "Horizontal screen resolution");
-MODULE_PARM(yres, "i");
-MODULE_PARM_DESC(yres, "Vertical screen resolution");

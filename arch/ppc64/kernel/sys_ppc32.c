@@ -746,30 +746,31 @@ int ppc32_select(u32 n, u32* inp, u32* outp, u32* exp, u32 tvp_x)
 
 int cp_compat_stat(struct kstat *stat, struct compat_stat *statbuf)
 {
-	int err;
+	long err;
 
 	if (stat->size > MAX_NON_LFS || !new_valid_dev(stat->dev) ||
 	    !new_valid_dev(stat->rdev))
 		return -EOVERFLOW;
 
-	err  = put_user(new_encode_dev(stat->dev), &statbuf->st_dev);
-	err |= put_user(stat->ino, &statbuf->st_ino);
-	err |= put_user(stat->mode, &statbuf->st_mode);
-	err |= put_user(stat->nlink, &statbuf->st_nlink);
-	err |= put_user(stat->uid, &statbuf->st_uid);
-	err |= put_user(stat->gid, &statbuf->st_gid);
-	err |= put_user(new_encode_dev(stat->rdev), &statbuf->st_rdev);
-	err |= put_user(stat->size, &statbuf->st_size);
-	err |= put_user(stat->atime.tv_sec, &statbuf->st_atime);
-	err |= put_user(0, &statbuf->__unused1);
-	err |= put_user(stat->mtime.tv_sec, &statbuf->st_mtime);
-	err |= put_user(0, &statbuf->__unused2);
-	err |= put_user(stat->ctime.tv_sec, &statbuf->st_ctime);
-	err |= put_user(0, &statbuf->__unused3);
-	err |= put_user(stat->blksize, &statbuf->st_blksize);
-	err |= put_user(stat->blocks, &statbuf->st_blocks);
-	err |= put_user(0, &statbuf->__unused4[0]);
-	err |= put_user(0, &statbuf->__unused4[1]);
+	err  = verify_area(VERIFY_WRITE, statbuf, sizeof(*statbuf));
+	err |= __put_user(new_encode_dev(stat->dev), &statbuf->st_dev);
+	err |= __put_user(stat->ino, &statbuf->st_ino);
+	err |= __put_user(stat->mode, &statbuf->st_mode);
+	err |= __put_user(stat->nlink, &statbuf->st_nlink);
+	err |= __put_user(stat->uid, &statbuf->st_uid);
+	err |= __put_user(stat->gid, &statbuf->st_gid);
+	err |= __put_user(new_encode_dev(stat->rdev), &statbuf->st_rdev);
+	err |= __put_user(stat->size, &statbuf->st_size);
+	err |= __put_user(stat->atime.tv_sec, &statbuf->st_atime);
+	err |= __put_user(stat->atime.tv_nsec, &statbuf->st_atime_nsec);
+	err |= __put_user(stat->mtime.tv_sec, &statbuf->st_mtime);
+	err |= __put_user(stat->mtime.tv_nsec, &statbuf->st_mtime_nsec);
+	err |= __put_user(stat->ctime.tv_sec, &statbuf->st_ctime);
+	err |= __put_user(stat->ctime.tv_nsec, &statbuf->st_ctime_nsec);
+	err |= __put_user(stat->blksize, &statbuf->st_blksize);
+	err |= __put_user(stat->blocks, &statbuf->st_blocks);
+	err |= __put_user(0, &statbuf->__unused4[0]);
+	err |= __put_user(0, &statbuf->__unused4[1]);
 
 	return err;
 }
@@ -2106,6 +2107,10 @@ long sys32_execve(unsigned long a0, unsigned long a1, unsigned long a2,
 		goto out;
 	if (regs->msr & MSR_FP)
 		giveup_fpu(current);
+#ifdef CONFIG_ALTIVEC
+	if (regs->msr & MSR_VEC)
+		giveup_altivec(current);
+#endif /* CONFIG_ALTIVEC */
 
 	error = do_execve32(filename, (u32*) a1, (u32*) a2, regs);
 
@@ -2126,9 +2131,25 @@ void start_thread32(struct pt_regs* regs, unsigned long nip, unsigned long sp)
 	regs->nip = nip;
 	regs->gpr[1] = sp;
 	regs->msr = MSR_USER32;
+#ifndef CONFIG_SMP
 	if (last_task_used_math == current)
 		last_task_used_math = 0;
+#endif /* CONFIG_SMP */
 	current->thread.fpscr = 0;
+	memset(current->thread.fpr, 0, sizeof(current->thread.fpr));
+#ifdef CONFIG_ALTIVEC
+#ifndef CONFIG_SMP
+	if (last_task_used_altivec == current)
+		last_task_used_altivec = 0;
+#endif /* CONFIG_SMP */
+	memset(current->thread.vr, 0, sizeof(current->thread.vr));
+	current->thread.vscr.u[0] = 0;
+	current->thread.vscr.u[1] = 0;
+	current->thread.vscr.u[2] = 0;
+	current->thread.vscr.u[3] = 0x00010000; /* Java mode disabled */
+	current->thread.vrsave = 0;
+	current->thread.used_vr = 0;
+#endif /* CONFIG_ALTIVEC */
 }
 
 extern asmlinkage int sys_prctl(int option, unsigned long arg2, unsigned long arg3,
@@ -2683,98 +2704,6 @@ unsigned long sys32_mmap2(unsigned long addr, size_t len,
 	return sys_mmap(addr, len, prot, flags, fd, pgoff << 12);
 }
 
-extern long sys_io_setup(unsigned nr_reqs, aio_context_t *ctx);
-
-long sys32_io_setup(unsigned nr_reqs, u32 *ctx32p)
-{
-	long ret;
-	aio_context_t ctx64;
-	mm_segment_t oldfs = get_fs();
-
-	if (get_user((u32)ctx64, ctx32p))
-		return -EFAULT;
-
-	set_fs(KERNEL_DS);
-	ret = sys_io_setup(nr_reqs, &ctx64);
-	set_fs(oldfs);
-
-	/* truncating is ok because it's a user address */
-	if (!ret)
-		ret = put_user((u32)ctx64, ctx32p);
-
-	return ret;
-}
-
-long sys_io_getevents(aio_context_t ctx_id, long min_nr, long nr,
-		      struct io_event *events, struct timespec *timeout);
-
-long sys32_io_getevents(aio_context_t ctx_id, u32 min_nr, u32 nr,
-			struct io_event *events, struct compat_timespec *t32)
-{
-	struct timespec t;
-	long ret;
-	mm_segment_t oldfs = get_fs();
-
-	if (t32) {
-		if (get_user(t.tv_sec, &t32->tv_sec) ||
-		    __get_user(t.tv_nsec, &t32->tv_nsec))
-			return -EFAULT;
-	}
-
-	if (verify_area(VERIFY_WRITE, events, nr * sizeof(*events)))
-		return -EFAULT;
-
-	set_fs(KERNEL_DS);
-	/* sign extend min_nr and nr */
-	ret = sys_io_getevents(ctx_id, (int)min_nr, (int)nr, events,
-			       t32 ? &t : NULL);
-	set_fs(oldfs);
-
-	return ret;
-}
-
-long sys32_io_submit(aio_context_t ctx_id, u32 number, u32 *iocbpp)
-{
-	struct kioctx *ctx;
-	long ret = 0;
-	int i;
-	int nr = (int)number;	/* sign extend */
-
-	if (unlikely(nr < 0))
-		return -EINVAL;
-
-	if (unlikely(!access_ok(VERIFY_READ, iocbpp, (nr*sizeof(u32)))))
-		return -EFAULT;
-
-	ctx = lookup_ioctx(ctx_id);
-	if (unlikely(!ctx)) {
-		pr_debug("EINVAL: io_submit: invalid context id\n");
-		return -EINVAL;
-	}
-
-	for (i=0; i<nr; i++) {
-		struct iocb tmp;
-		u32 *user_iocb;
-
-		if (unlikely(__get_user((u32)(long)user_iocb, iocbpp + i))) {
-			ret = -EFAULT;
-			break;
-		}
-
-		if (unlikely(copy_from_user(&tmp, user_iocb, sizeof(tmp)))) {
-			ret = -EFAULT;
-			break;
-		}
-
-		ret = io_submit_one(ctx, (struct iocb *)user_iocb, &tmp);
-		if (ret)
-			break;
-	}
-
-	put_ioctx(ctx);
-	return i ? i : ret;
-}
-
 int get_compat_timeval(struct timeval *tv, struct compat_timeval *ctv)
 {
 	return (verify_area(VERIFY_READ, ctv, sizeof(*ctv)) ||
@@ -2878,3 +2807,46 @@ long ppc32_fadvise64(int fd, u32 unused, u32 offset_high, u32 offset_low,
 			     advice);
 }
 
+long ppc32_fadvise64_64(int fd, int advice, u32 offset_high, u32 offset_low,
+			u32 len_high, u32 len_low)
+{
+	return sys_fadvise64(fd, (u64)offset_high << 32 | offset_low,
+			     (u64)len_high << 32 | len_low, advice);
+}
+
+extern long sys_timer_create(clockid_t, sigevent_t *, timer_t *);
+
+long ppc32_timer_create(clockid_t clock,
+			struct compat_sigevent __user *ev32,
+			timer_t __user *timer_id)
+{
+	sigevent_t event;
+	timer_t t;
+	long err;
+	mm_segment_t savefs;
+
+	if (ev32 == NULL)
+		return sys_timer_create(clock, NULL, timer_id);
+
+	memset(&event, 0, sizeof(event));
+	if (!access_ok(VERIFY_READ, ev32, sizeof(struct compat_sigevent))
+	    || __get_user(event.sigev_value.sival_int,
+			  &ev32->sigev_value.sival_int)
+	    || __get_user(event.sigev_signo, &ev32->sigev_signo)
+	    || __get_user(event.sigev_notify, &ev32->sigev_notify)
+	    || __get_user(event.sigev_notify_thread_id,
+			  &ev32->sigev_notify_thread_id))
+		return -EFAULT;
+
+	if (!access_ok(VERIFY_WRITE, timer_id, sizeof(timer_t)))
+		return -EFAULT;
+
+	savefs = get_fs();
+	err = sys_timer_create(clock, &event, &t);
+	set_fs(savefs);
+
+	if (err == 0)
+		err = __put_user(t, timer_id);
+
+	return err;
+}

@@ -564,6 +564,9 @@ int sock_getsockopt(struct socket *sock, int level, int optname,
 			v.val = sk->sk_state == TCP_LISTEN;
 			break;
 
+		case SO_PEERSEC:
+			return security_socket_getpeersec(sock, optval, optlen, len);
+
 		default:
 			return(-ENOPROTOOPT);
 	}
@@ -606,6 +609,11 @@ struct sock *sk_alloc(int family, int priority, int zero_it, kmem_cache_t *slab)
 			sock_lock_init(sk);
 		}
 		sk->sk_slab = slab;
+		
+		if (security_sk_alloc(sk, family, priority)) {
+			kmem_cache_free(slab, sk);
+			sk = NULL;
+		}
 	}
 	return sk;
 }
@@ -628,6 +636,7 @@ void sk_free(struct sock *sk)
 		printk(KERN_DEBUG "%s: optmem leakage (%d bytes) detected.\n",
 		       __FUNCTION__, atomic_read(&sk->sk_omem_alloc));
 
+	security_sk_free(sk);
 	kmem_cache_free(sk->sk_slab, sk);
 	module_put(owner);
 }

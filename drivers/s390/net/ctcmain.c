@@ -1,5 +1,5 @@
 /*
- * $Id: ctcmain.c,v 1.47 2003/09/22 13:40:51 cohuck Exp $
+ * $Id: ctcmain.c,v 1.50 2003/12/02 15:18:50 cohuck Exp $
  *
  * CTC / ESCON network driver
  *
@@ -36,7 +36,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: CTC/ESCON network driver $Revision: 1.47 $
+ * RELEASE-TAG: CTC/ESCON network driver $Revision: 1.50 $
  *
  */
 
@@ -272,7 +272,7 @@ static void
 print_banner(void)
 {
 	static int printed = 0;
-	char vbuf[] = "$Revision: 1.47 $";
+	char vbuf[] = "$Revision: 1.50 $";
 	char *version = vbuf;
 
 	if (printed)
@@ -2441,14 +2441,12 @@ ctc_tx(struct sk_buff *skb, struct net_device * dev)
 
 	/**
 	 * If channels are not running, try to restart them
-	 * notify anybody about a link failure and throw
-	 * away packet. 
+	 * and throw away packet. 
 	 */
 	if (fsm_getstate(privptr->fsm) != DEV_STATE_RUNNING) {
 		fsm_event(privptr->fsm, DEV_EVENT_START, dev);
 		if (privptr->protocol == CTC_PROTO_LINUX_TTY)
 			return -EBUSY;
-		dst_link_failure(skb);
 		dev_kfree_skb(skb);
 		privptr->stats.tx_dropped++;
 		privptr->stats.tx_errors++;
@@ -2994,20 +2992,20 @@ ctc_shutdown_device(struct ccwgroup_device *cgdev)
 
 }
 
-static int
+static void
 ctc_remove_device(struct ccwgroup_device *cgdev)
 {
 	struct ctc_priv *priv;
 
 	priv = cgdev->dev.driver_data;
 	if (!priv)
-		return 0;
-
+		return;
+	if (cgdev->state == CCWGROUP_ONLINE)
+		ctc_shutdown_device(cgdev);
 	ctc_remove_files(&cgdev->dev);
 	cgdev->dev.driver_data = NULL;
 	kfree(priv);
 	put_device(&cgdev->dev);
-	return 0;
 }
 
 static struct ccwgroup_driver ctc_group_driver = {

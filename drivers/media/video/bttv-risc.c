@@ -5,7 +5,7 @@
 	- memory management
 	- generation
 
-    (c) 2000 Gerd Knorr <kraxel@bytesex.org>
+    (c) 2000-2003 Gerd Knorr <kraxel@bytesex.org>
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -53,7 +53,7 @@ bttv_risc_packed(struct bttv *btv, struct btcx_riscmem *risc,
 	   one write per scan line + sync + jump (all 2 dwords) */
 	instructions  = (bpl * lines) / PAGE_SIZE + lines;
 	instructions += 2;
-	if ((rc = btcx_riscmem_alloc(btv->dev,risc,instructions*8)) < 0)
+	if ((rc = btcx_riscmem_alloc(btv->c.pci,risc,instructions*8)) < 0)
 		return rc;
 
 	/* sync instruction */
@@ -67,7 +67,7 @@ bttv_risc_packed(struct bttv *btv, struct btcx_riscmem *risc,
 		if ((btv->opt_vcr_hack) &&
 		    (line >= (lines - VCR_HACK_LINES)))
 			continue;
-		while (offset >= sg_dma_len(sg)) {
+		while (offset && offset >= sg_dma_len(sg)) {
 			offset -= sg_dma_len(sg);
 			sg++;
 		}
@@ -100,7 +100,7 @@ bttv_risc_packed(struct bttv *btv, struct btcx_riscmem *risc,
 		}
 		offset += padding;
 	}
-	dprintk("bttv%d: risc planar: %d sglist elems\n", btv->nr, (int)(sg-sglist));
+	dprintk("bttv%d: risc planar: %d sglist elems\n", btv->c.nr, (int)(sg-sglist));
 
 	/* save pointer to jmp instruction address */
 	risc->jmp = rp;
@@ -128,7 +128,7 @@ bttv_risc_planar(struct bttv *btv, struct btcx_riscmem *risc,
 	   plus sync + jump (2 dwords) */
 	instructions  = (ybpl * ylines * 2) / PAGE_SIZE + ylines;
 	instructions += 2;
-	if ((rc = btcx_riscmem_alloc(btv->dev,risc,instructions*4*5)) < 0)
+	if ((rc = btcx_riscmem_alloc(btv->c.pci,risc,instructions*4*5)) < 0)
 		return rc;
 
 	/* sync instruction */
@@ -152,15 +152,15 @@ bttv_risc_planar(struct bttv *btv, struct btcx_riscmem *risc,
 		}
 		for (todo = ybpl; todo > 0; todo -= ylen) {
 			/* go to next sg entry if needed */
-			while (yoffset >= sg_dma_len(ysg)) {
+			while (yoffset && yoffset >= sg_dma_len(ysg)) {
 				yoffset -= sg_dma_len(ysg);
 				ysg++;
 			}
-			while (uoffset >= sg_dma_len(usg)) {
+			while (uoffset && uoffset >= sg_dma_len(usg)) {
 				uoffset -= sg_dma_len(usg);
 				usg++;
 			}
-			while (voffset >= sg_dma_len(vsg)) {
+			while (voffset && voffset >= sg_dma_len(vsg)) {
 				voffset -= sg_dma_len(vsg);
 				vsg++;
 			}
@@ -227,7 +227,7 @@ bttv_risc_overlay(struct bttv *btv, struct btcx_riscmem *risc,
 	instructions  = (ov->nclips + 1) *
 		((skip_even || skip_odd) ? ov->w.height>>1 :  ov->w.height);
 	instructions += 2;
-	if ((rc = btcx_riscmem_alloc(btv->dev,risc,instructions*8)) < 0) {
+	if ((rc = btcx_riscmem_alloc(btv->c.pci,risc,instructions*8)) < 0) {
 		kfree(skips);
 		return rc;
 	}
@@ -247,9 +247,6 @@ bttv_risc_overlay(struct bttv *btv, struct btcx_riscmem *risc,
 		if ((btv->opt_vcr_hack) &&
 		     (line >= (ov->w.height - VCR_HACK_LINES)))
 			continue;
- 		if ((line%2) == 0  &&  skip_even)
- 			continue;
- 		if ((line%2) == 1  &&  skip_odd)
 		if ((line%2) == 0  &&  skip_even)
 			continue;
 		if ((line%2) == 1  &&  skip_odd)
@@ -310,7 +307,7 @@ bttv_calc_geo(struct bttv *btv, struct bttv_geometry *geo,
 	int totalwidth   = tvnorm->totalwidth;
 	int scaledtwidth = tvnorm->scaledtwidth;
 
-	if (bttv_tvcards[btv->type].muxsel[btv->input] < 0) {
+	if (bttv_tvcards[btv->c.type].muxsel[btv->input] < 0) {
 		swidth       = 720;
 		totalwidth   = 858;
 		scaledtwidth = 858;
@@ -391,7 +388,7 @@ bttv_set_dma(struct bttv *btv, int override, int irqflags)
 
 	d2printk(KERN_DEBUG
 		 "bttv%d: capctl=%x irq=%d top=%08Lx/%08Lx even=%08Lx/%08Lx\n",
-		 btv->nr,capctl,irqflags,
+		 btv->c.nr,capctl,irqflags,
 		 btv->curr.vbi     ? (unsigned long long)btv->curr.vbi->top.dma        : 0,
 		 btv->curr.top     ? (unsigned long long)btv->curr.top->top.dma        : 0,
 		 btv->curr.vbi     ? (unsigned long long)btv->curr.vbi->bottom.dma     : 0,
@@ -429,10 +426,10 @@ bttv_risc_init_main(struct bttv *btv)
 {
 	int rc;
 	
-	if ((rc = btcx_riscmem_alloc(btv->dev,&btv->main,PAGE_SIZE)) < 0)
+	if ((rc = btcx_riscmem_alloc(btv->c.pci,&btv->main,PAGE_SIZE)) < 0)
 		return rc;
 	dprintk(KERN_DEBUG "bttv%d: risc main @ %08Lx\n",
-		btv->nr,(unsigned long long)btv->main.dma);
+		btv->c.nr,(unsigned long long)btv->main.dma);
 
 	btv->main.cpu[0] = cpu_to_le32(BT848_RISC_SYNC | BT848_RISC_RESYNC |
 				       BT848_FIFO_STATUS_VRE);
@@ -472,11 +469,11 @@ bttv_risc_hook(struct bttv *btv, int slot, struct btcx_riscmem *risc,
 
 	if (NULL == risc) {
 		d2printk(KERN_DEBUG "bttv%d: risc=%p slot[%d]=NULL\n",
-			 btv->nr,risc,slot);
+			 btv->c.nr,risc,slot);
 		btv->main.cpu[slot+1] = cpu_to_le32(next);
 	} else {
 		d2printk(KERN_DEBUG "bttv%d: risc=%p slot[%d]=%08Lx irq=%d\n",
-			 btv->nr,risc,slot,(unsigned long long)risc->dma,irqflags);
+			 btv->c.nr,risc,slot,(unsigned long long)risc->dma,irqflags);
 		cmd = BT848_RISC_JUMP;
 		if (irqflags) {
 			cmd |= BT848_RISC_IRQ;
@@ -496,10 +493,10 @@ bttv_dma_free(struct bttv *btv, struct bttv_buffer *buf)
 	if (in_interrupt())
 		BUG();
 	videobuf_waiton(&buf->vb,0,0);
-	videobuf_dma_pci_unmap(btv->dev, &buf->vb.dma);
+	videobuf_dma_pci_unmap(btv->c.pci, &buf->vb.dma);
 	videobuf_dma_free(&buf->vb.dma);
-	btcx_riscmem_free(btv->dev,&buf->bottom);
-	btcx_riscmem_free(btv->dev,&buf->top);
+	btcx_riscmem_free(btv->c.pci,&buf->bottom);
+	btcx_riscmem_free(btv->c.pci,&buf->top);
 	buf->vb.state = STATE_NEEDS_INIT;
 }
 
@@ -577,7 +574,7 @@ bttv_buffer_risc(struct bttv *btv, struct bttv_buffer *buf)
 
 	dprintk(KERN_DEBUG
 		"bttv%d: buffer field: %s  format: %s  size: %dx%d\n",
-		btv->nr, v4l2_field_names[buf->vb.field],
+		btv->c.nr, v4l2_field_names[buf->vb.field],
 		buf->fmt->name, buf->vb.width, buf->vb.height);
 
 	/* packed pixel modes */
@@ -731,7 +728,7 @@ bttv_overlay_risc(struct bttv *btv,
 	/* check interleave, bottom+top fields */
 	dprintk(KERN_DEBUG
 		"bttv%d: overlay fields: %s format: %s  size: %dx%d\n",
-		btv->nr, v4l2_field_names[buf->vb.field],
+		btv->c.nr, v4l2_field_names[buf->vb.field],
 		fmt->name,ov->w.width,ov->w.height);
 
 	/* calculate geometry */

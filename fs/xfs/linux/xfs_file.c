@@ -112,7 +112,7 @@ __linvfs_write(
 {
 	struct iovec	iov = {(void *)buf, count};
 	struct file	*file = iocb->ki_filp;
-	struct inode	*inode = file->f_dentry->d_inode->i_mapping->host;
+	struct inode	*inode = file->f_mapping->host;
 	vnode_t		*vp = LINVFS_GET_VP(inode);
 	int		error;
 
@@ -160,7 +160,7 @@ __linvfs_readv(
 	unsigned long		nr_segs,
 	loff_t			*ppos)
 {
-	struct inode	*inode = file->f_dentry->d_inode->i_mapping->host;
+	struct inode	*inode = file->f_mapping->host;
 	vnode_t		*vp = LINVFS_GET_VP(inode);
 	struct		kiocb kiocb;
 	int		error;
@@ -207,7 +207,7 @@ __linvfs_writev(
 	unsigned long		nr_segs,
 	loff_t			*ppos)
 {
-	struct inode	*inode = file->f_dentry->d_inode->i_mapping->host;
+	struct inode	*inode = file->f_mapping->host;
 	vnode_t		*vp = LINVFS_GET_VP(inode);
 	struct		kiocb kiocb;
 	int		error;

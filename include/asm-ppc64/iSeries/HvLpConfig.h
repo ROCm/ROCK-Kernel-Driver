@@ -16,6 +16,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
+#ifndef _HVLPCONFIG_H
+#define _HVLPCONFIG_H
 
 //===========================================================================
 //
@@ -24,24 +26,10 @@
 //
 //===========================================================================
 
-#ifndef  _HVCALLCFG_H
-#include "HvCallCfg.h"
-#endif
-
-#ifndef  _HVTYPES_H
+#include <asm/iSeries/HvCallCfg.h>
 #include <asm/iSeries/HvTypes.h>
-#endif
-
-#ifndef  _ITLPNACA_H
 #include <asm/iSeries/ItLpNaca.h>
-#endif
-
-#ifndef  _LPARDATA_H
 #include <asm/iSeries/LparData.h>
-#endif
-
-#ifndef _HVLPCONFIG_H
-#define _HVLPCONFIG_H
 
 //-------------------------------------------------------------------
 // Constants
@@ -289,4 +277,4 @@ static inline HvLpIndex		HvLpConfig_getHostingLpIndex(HvLpIndex lp)
 }
 //================================================================
 
-#endif // _HVLPCONFIG_H
+#endif /* _HVLPCONFIG_H */
