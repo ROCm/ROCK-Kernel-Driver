@@ -1932,6 +1932,8 @@ static ide_startstop_t cdrom_start_write(ide_drive_t *drive, struct request *rq)
 	info->dma = drive->using_dma ? 1 : 0;
 	info->cmd = WRITE;
 
+	info->devinfo.media_written = 1;
+
 	/* Start sending the write request to the drive. */
 	return cdrom_start_packet_command(drive, 32768, cdrom_start_write_cont);
 }

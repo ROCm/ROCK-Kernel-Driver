@@ -947,6 +947,8 @@ struct cdrom_device_info {
         __u8 reserved		: 6;	/* not used yet */
 	int cdda_method;		/* see flags */
 	__u8 last_sense;
+	__u8 media_written;		/* dirty flag, DVD+RW bookkeeping */
+	unsigned short mmc3_profile;	/* current MMC3 profile */
 	int for_data;
 	int (*exit)(struct cdrom_device_info *);
 	int mrw_mode_page;
