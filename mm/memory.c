@@ -491,9 +491,9 @@ void unmap_page_range(struct mmu_gather *tlb, struct vm_area_struct *vma,
 #define ZAP_BLOCK_SIZE	(256 * PAGE_SIZE)
 #endif
 
-/* No preempt: go for the best straight-line efficiency */
+/* No preempt: go for improved straight-line efficiency */
 #if !defined(CONFIG_PREEMPT)
-#define ZAP_BLOCK_SIZE	(~(0UL))
+#define ZAP_BLOCK_SIZE	(1024 * PAGE_SIZE)
 #endif
 
 /**
