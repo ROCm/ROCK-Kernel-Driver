@@ -16,7 +16,6 @@
 unsigned long dmi_broken;
 EXPORT_SYMBOL(dmi_broken);
 
-int is_unsafe_smbus;
 int es7000_plat = 0;
 
 struct dmi_header
@@ -296,19 +295,6 @@ static int __init local_apic_kills_bios(struct dmi_blacklist *d)
 		       d->ident);
 	}
 #endif
-	return 0;
-}
-
-/* 
- * Don't access SMBus on IBM systems which get corrupted eeproms 
- */
-
-static __init int disable_smbus(struct dmi_blacklist *d)
-{   
-	if (is_unsafe_smbus == 0) {
-		is_unsafe_smbus = 1;
-		printk(KERN_INFO "%s machine detected. Disabling SMBus accesses.\n", d->ident);
-	}
 	return 0;
 }
 
@@ -762,15 +748,6 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			} },
 
 	/*
-	 *	SMBus / sensors settings
-	 */
-	 
-	{ disable_smbus, "IBM", {
-			MATCH(DMI_SYS_VENDOR, "IBM"),
-			NO_MATCH, NO_MATCH, NO_MATCH
-			} },
-
-	/*
 	 * Some Athlon laptops have really fucked PST tables.
 	 * A BIOS update is all that can save them.
 	 * Mention this, and disable cpufreq.
@@ -1046,8 +1023,6 @@ void __init dmi_scan_machine(void)
 	else
 		printk(KERN_INFO "DMI not present.\n");
 }
-
-EXPORT_SYMBOL(is_unsafe_smbus);
 
 
 /**
