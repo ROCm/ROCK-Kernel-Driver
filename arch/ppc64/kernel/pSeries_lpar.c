@@ -377,7 +377,7 @@ long pSeries_lpar_hpte_insert(unsigned long hpte_group,
 	lpar_rc = plpar_hcall(H_ENTER, flags, hpte_group, lhpte.dw0.dword0,
 			      lhpte.dw1.dword1, &slot, &dummy0, &dummy1);
 
-	if (lpar_rc == H_PTEG_Full)
+	if (unlikely(lpar_rc == H_PTEG_Full))
 		return -1;
 
 	/*
@@ -385,7 +385,7 @@ long pSeries_lpar_hpte_insert(unsigned long hpte_group,
 	 * will fail. However we must catch the failure in hash_page
 	 * or we will loop forever, so return -2 in this case.
 	 */
-	if (lpar_rc != H_Success)
+	if (unlikely(lpar_rc != H_Success))
 		return -2;
 
 	/* Because of iSeries, we have to pass down the secondary
@@ -415,9 +415,7 @@ static long pSeries_lpar_hpte_remove(unsigned long hpte_group)
 		if (lpar_rc == H_Success)
 			return i;
 
-		if (lpar_rc != H_Not_Found)
-			panic("Bad return code from pte remove rc = %lx\n",
-			      lpar_rc);
+		BUG_ON(lpar_rc != H_Not_Found);
 
 		slot_offset++;
 		slot_offset &= 0x7;
@@ -447,8 +445,7 @@ static long pSeries_lpar_hpte_updatepp(unsigned long slot, unsigned long newpp,
 	if (lpar_rc == H_Not_Found)
 		return -1;
 
-	if (lpar_rc != H_Success)
-		panic("bad return code from pte protect rc = %lx\n", lpar_rc);
+	BUG_ON(lpar_rc != H_Success);
 
 	return 0;
 }
@@ -467,8 +464,7 @@ static unsigned long pSeries_lpar_hpte_getword0(unsigned long slot)
 	
 	lpar_rc = plpar_pte_read(flags, slot, &dword0, &dummy_word1);
 
-	if (lpar_rc != H_Success)
-		panic("Error on pte read in get_hpte0 rc = %lx\n", lpar_rc);
+	BUG_ON(lpar_rc != H_Success);
 
 	return dword0;
 }
@@ -519,15 +515,12 @@ static void pSeries_lpar_hpte_updateboltedpp(unsigned long newpp,
 	vpn = va >> PAGE_SHIFT;
 
 	slot = pSeries_lpar_hpte_find(vpn);
-	if (slot == -1)
-		panic("updateboltedpp: Could not find page to bolt\n");
+	BUG_ON(slot == -1);
 
 	flags = newpp & 3;
 	lpar_rc = plpar_pte_protect(flags, slot, 0);
 
-	if (lpar_rc != H_Success)
-		panic("Bad return code from pte bolted protect rc = %lx\n",
-		      lpar_rc); 
+	BUG_ON(lpar_rc != H_Success);
 }
 
 static void pSeries_lpar_hpte_invalidate(unsigned long slot, unsigned long va,
@@ -546,8 +539,7 @@ static void pSeries_lpar_hpte_invalidate(unsigned long slot, unsigned long va,
 	if (lpar_rc == H_Not_Found)
 		return;
 
-	if (lpar_rc != H_Success)
-		panic("Bad return code from invalidate rc = %lx\n", lpar_rc);
+	BUG_ON(lpar_rc != H_Success);
 }
 
 /*

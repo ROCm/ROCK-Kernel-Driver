@@ -92,7 +92,7 @@ enum dl2x_offsets {
 	EepromCtrl = 0x4a,
 	ExpromAddr = 0x4c,
 	Exprodata = 0x50,
-	WakeEvent0x51,
+	WakeEvent = 0x51,
 	CountDown = 0x54,
 	IntStatusAck = 0x5a,
 	IntEnable = 0x5c,
