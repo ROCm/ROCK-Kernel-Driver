@@ -384,7 +384,6 @@ extern "C" {
 /* VPD Region */
 /*	PCI_VPD_ADR_REG		16 bit	VPD Address Register */
 #define	PCI_VPD_FLAG	(1L<<15)	/* Bit 15:	starts VPD rd/wd cycle*/
-#define PCI_VPD_ADDR	(0x3fffL<<0)	/* Bit 14..0:	VPD address */
 
 /*
  *	Control Register File:
