@@ -73,14 +73,11 @@ static const char* host_info(struct Scsi_Host *host)
 static int slave_alloc (struct scsi_device *sdev)
 {
 	/*
-	 * Set default bflags. These can be overridden for individual
-	 * models and vendors via the scsi devinfo mechanism.  The only
-	 * flag we need is to force 36-byte INQUIRYs; we don't use any
-	 * of the extra data and many devices choke if asked for more or
+	 * Set the INQUIRY transfer length to 36.  We don't use any of
+	 * the extra data and many devices choke if asked for more or
 	 * less than 36 bytes.
 	 */
-	sdev->sdev_bflags = BLIST_INQUIRY_36;
-
+	sdev->inquiry_len = 36;
 	return 0;
 }
 
