@@ -1100,7 +1100,16 @@ static int idescsi_attach(ide_drive_t *drive)
 		return 1;
 
 	host->max_id = 1;
-	host->max_lun = 1;
+
+#if IDESCSI_DEBUG_LOG
+	if (drive->id->last_lun)
+		printk(KERN_NOTICE "%s: id->last_lun=%u\n", drive->name, drive->id->last_lun);
+#endif
+	if ((drive->id->last_lun & 0x7) != 7)
+		host->max_lun = (drive->id->last_lun & 0x7) + 1;
+	else
+		host->max_lun = 1;
+
 	drive->driver_data = host;
 	idescsi = scsihost_to_idescsi(host);
 	idescsi->drive = drive;
