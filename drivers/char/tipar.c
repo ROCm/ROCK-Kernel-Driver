@@ -67,7 +67,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "1.17"
+#define DRIVER_VERSION "1.19"
 #define DRIVER_AUTHOR  "Romain Lievin <roms@lpg.ticalc.org>"
 #define DRIVER_DESC    "Device driver for TI/PC parallel link cables"
 #define DRIVER_LICENSE "GPL"
@@ -361,10 +361,13 @@ tipar_ioctl(struct inode *inode, struct file *file,
 
 	switch (cmd) {
 	case IOCTL_TIPAR_DELAY:
-	  delay = (int)arg;    //get_user(delay, &arg);
-	  break;
+		delay = (int)arg;    //get_user(delay, &arg);
+		break;
 	case IOCTL_TIPAR_TIMEOUT:
-	  timeout = (int)arg;  //get_user(timeout, &arg);
+		if (arg != 0)
+                        timeout = (int)arg;
+                else
+                        retval = -EINVAL;
 	  break;
 	default:
 		retval = -ENOTTY;
@@ -399,7 +402,10 @@ tipar_setup(char *str)
 	str = get_options(str, ARRAY_SIZE(ints), ints);
 
 	if (ints[0] > 0) {
-		timeout = ints[1];
+		if (ints[1] != 0)
+                        timeout = ints[1];
+                else
+                        printk("tipar: wrong timeout value (0), using default value instead.");
 		if (ints[0] > 1) {
 			delay = ints[2];
 		}
