@@ -5,10 +5,11 @@
 # License.  See the file "COPYING" in the main directory of this archive
 # for more details.
 #
-# Copyright (C) 1998-2003 by David Mosberger-Tang <davidm@hpl.hp.com>
+# Copyright (C) 1998-2004 by David Mosberger-Tang <davidm@hpl.hp.com>
 #
 
 NM := $(CROSS_COMPILE)nm -B
+READELF := $(CROSS_COMPILE)readelf
 
 export AWK
 
@@ -25,9 +26,8 @@ CFLAGS_KERNEL	:= -mconstant-gp
 GCC_VERSION=$(shell $(CC) -v 2>&1 | fgrep 'gcc version' | cut -f3 -d' ' | cut -f1 -d'.')
 GCC_MINOR_VERSION=$(shell $(CC) -v 2>&1 | fgrep 'gcc version' | cut -f3 -d' ' | cut -f2 -d'.')
 
-GAS_STATUS=$(shell $(srctree)/arch/ia64/scripts/check-gas $(CC) $(OBJDUMP))
-
-CPPFLAGS	+= $(shell $(srctree)/arch/ia64/scripts/toolchain-flags $(CC) $(OBJDUMP))
+GAS_STATUS	= $(shell $(srctree)/arch/ia64/scripts/check-gas $(CC) $(OBJDUMP))
+CPPFLAGS += $(shell $(srctree)/arch/ia64/scripts/toolchain-flags $(CC) $(OBJDUMP) $(READELF))
 
 ifeq ($(GAS_STATUS),buggy)
 $(error Sorry, you need a newer version of the assember, one that is built from	\
@@ -71,15 +71,15 @@ boot := arch/ia64/hp/sim/boot
 
 .PHONY: boot compressed check
 
-all: compressed
+all: compressed unwcheck
 
 compressed: vmlinux.gz
 
 vmlinux.gz: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $@
 
-check: vmlinux
-	arch/ia64/scripts/unwcheck.sh $<
+unwcheck: vmlinux
+	-$(Q)READELF=$(READELF) $(srctree)/arch/ia64/scripts/unwcheck.py $<
 
 archclean:
 	$(Q)$(MAKE) $(clean)=$(boot)
@@ -88,7 +88,7 @@ CLEAN_FILES += include/asm-ia64/.offsets.h.stamp include/asm-ia64/offsets.h vmli
 
 prepare: include/asm-ia64/offsets.h
 
-arch/ia64/kernel/asm-offsets.s: include/asm include/linux/version.h
+arch/ia64/kernel/asm-offsets.s: include/asm include/linux/version.h include/config/MARKER
 
 include/asm-ia64/offsets.h: arch/ia64/kernel/asm-offsets.s
 	$(call filechk,gen-asm-offsets)
@@ -108,4 +108,5 @@ boot:	lib/lib.a vmlinux
 define archhelp
   echo '* compressed	- Build compressed kernel image'
   echo '  boot		- Build vmlinux and bootloader for Ski simulator'
+  echo '* unwcheck	- Check vmlinux for invalid unwind info'
 endef

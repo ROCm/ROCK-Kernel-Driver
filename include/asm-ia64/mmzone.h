@@ -33,5 +33,7 @@ extern unsigned long max_low_pfn;
 #define page_to_pfn(page)	((unsigned long) (page - vmem_map))
 #define pfn_to_page(pfn)	(vmem_map + (pfn))
 
+#else /* CONFIG_DISCONTIGMEM */
+# define NR_MEMBLKS		1
 #endif /* CONFIG_DISCONTIGMEM */
 #endif /* _ASM_IA64_MMZONE_H */

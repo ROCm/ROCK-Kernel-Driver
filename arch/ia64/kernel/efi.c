@@ -19,6 +19,7 @@
  *	Skip non-WB memory and ignore empty memory ranges.
  */
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/types.h>
@@ -37,6 +38,7 @@
 extern efi_status_t efi_call_phys (void *, ...);
 
 struct efi efi;
+EXPORT_SYMBOL(efi);
 static efi_runtime_services_t *runtime;
 
 /*
@@ -48,6 +50,7 @@ static efi_runtime_services_t *runtime;
  */
 #ifdef CONFIG_PROC_FS
 struct proc_dir_entry *efi_dir;
+EXPORT_SYMBOL(efi_dir);
 #endif
 
 static unsigned long mem_limit = ~0UL;

@@ -1,9 +1,9 @@
 /******************************************************************************
  *
  * Name:	sktimer.h
- * Project:	Gigabit Ethernet Adapters, Schedule-Modul
- * Version:	$Revision: 1.10 $
- * Date:	$Date: 2003/05/13 17:56:44 $
+ * Project:	Gigabit Ethernet Adapters, Event Scheduler Module
+ * Version:	$Revision: 1.11 $
+ * Date:	$Date: 2003/09/16 12:58:18 $
  * Purpose:	Defines for the timer functions
  *
  ******************************************************************************/
@@ -27,6 +27,9 @@
  * History:
  *
  *	$Log: sktimer.h,v $
+ *	Revision 1.11  2003/09/16 12:58:18  rschmidt
+ *	Editorial changes
+ *	
  *	Revision 1.10  2003/05/13 17:56:44  mkarl
  *	Editorial changes.
  *	
@@ -40,7 +43,7 @@
  *	fix: SK_TIMCTRL needs to be defined
  *	
  *	Revision 1.6  1998/08/19 09:51:00  gklug
- *	fix: remove struct keyword from c-code (see CCC) add typedefs
+ *	fix: remove struct keyword from C-code (see CCC) add typedefs
  *	
  *	Revision 1.5  1998/08/17 13:43:21  gklug
  *	chg: Parameter will be union of 64bit para, 2 times SK_U32 or SK_PTR
@@ -78,25 +81,25 @@
 typedef	struct s_Timer SK_TIMER;
 
 struct s_Timer {
-	SK_TIMER	*TmNext ;	/* linked list */
-	SK_U32		TmClass ;	/* Timer Event class */
-	SK_U32		TmEvent ;	/* Timer Event value */
-	SK_EVPARA	TmPara ;	/* Timer Event parameter */
-	SK_U32		TmDelta ;	/* delta time */
-	int		TmActive ;	/* flag : active/inactive */
-} ;
+	SK_TIMER	*TmNext;	/* linked list */
+	SK_U32		TmClass;	/* Timer Event class */
+	SK_U32		TmEvent;	/* Timer Event value */
+	SK_EVPARA	TmPara;		/* Timer Event parameter */
+	SK_U32		TmDelta;	/* delta time */
+	int			TmActive;	/* flag: active/inactive */
+};
 
 /*
  * Timer control struct.
  * - use in Adapters context name pAC->Tim
  */
 typedef	struct s_TimCtrl {
-	SK_TIMER	*StQueue ;	/* Head of Timer queue */
-} SK_TIMCTRL ;
+	SK_TIMER	*StQueue;	/* Head of Timer queue */
+} SK_TIMCTRL;
 
-extern void SkTimerInit(SK_AC *pAC,SK_IOC Ioc, int Level);
-extern void SkTimerStop(SK_AC *pAC,SK_IOC Ioc,SK_TIMER *pTimer);
-extern void SkTimerStart(SK_AC *pAC,SK_IOC Ioc,SK_TIMER *pTimer,
-	SK_U32 Time,SK_U32 Class,SK_U32 Event,SK_EVPARA Para);
-extern void SkTimerDone(SK_AC *pAC,SK_IOC Ioc);
+extern void SkTimerInit(SK_AC *pAC, SK_IOC Ioc, int Level);
+extern void SkTimerStop(SK_AC *pAC, SK_IOC Ioc, SK_TIMER *pTimer);
+extern void SkTimerStart(SK_AC *pAC, SK_IOC Ioc, SK_TIMER *pTimer,
+	SK_U32 Time, SK_U32 Class, SK_U32 Event, SK_EVPARA Para);
+extern void SkTimerDone(SK_AC *pAC, SK_IOC Ioc);
 #endif	/* _SKTIMER_H_ */

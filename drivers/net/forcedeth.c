@@ -85,6 +85,7 @@
 #include <linux/random.h>
 #include <linux/init.h>
 
+#include <asm/irq.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>

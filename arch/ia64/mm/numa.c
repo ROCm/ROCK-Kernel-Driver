@@ -18,6 +18,7 @@
 #include <linux/node.h>
 #include <linux/init.h>
 #include <linux/bootmem.h>
+#include <asm/mmzone.h>
 #include <asm/numa.h>
 
 static struct memblk *sysfs_memblks;
@@ -28,7 +29,7 @@ static struct cpu *sysfs_cpus;
  * The following structures are usually initialized by ACPI or
  * similar mechanisms and describe the NUMA characteristics of the machine.
  */
-int num_memblks = 0;
+int num_memblks;
 struct node_memblk_s node_memblk[NR_MEMBLKS];
 struct node_cpuid_s node_cpuid[NR_CPUS];
 /*

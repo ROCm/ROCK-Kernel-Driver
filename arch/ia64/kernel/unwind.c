@@ -26,6 +26,7 @@
  *	o if both the unw.lock spinlock and a script's read-write lock must be
  *	  acquired, then the read-write lock must be acquired first.
  */
+#include <linux/module.h>
 #include <linux/bootmem.h>
 #include <linux/elf.h>
 #include <linux/kernel.h>
@@ -392,6 +393,7 @@ unw_access_gr (struct unw_frame_info *info, int regnum, unsigned long *val, char
 	}
 	return 0;
 }
+EXPORT_SYMBOL(unw_access_gr);
 
 int
 unw_access_br (struct unw_frame_info *info, int regnum, unsigned long *val, int write)
@@ -423,6 +425,7 @@ unw_access_br (struct unw_frame_info *info, int regnum, unsigned long *val, int 
 		*val = *addr;
 	return 0;
 }
+EXPORT_SYMBOL(unw_access_br);
 
 int
 unw_access_fr (struct unw_frame_info *info, int regnum, struct ia64_fpreg *val, int write)
@@ -467,6 +470,7 @@ unw_access_fr (struct unw_frame_info *info, int regnum, struct ia64_fpreg *val, 
 		*val = *addr;
 	return 0;
 }
+EXPORT_SYMBOL(unw_access_fr);
 
 int
 unw_access_ar (struct unw_frame_info *info, int regnum, unsigned long *val, int write)
@@ -559,6 +563,7 @@ unw_access_ar (struct unw_frame_info *info, int regnum, unsigned long *val, int 
 		*val = *addr;
 	return 0;
 }
+EXPORT_SYMBOL(unw_access_ar);
 
 int
 unw_access_pr (struct unw_frame_info *info, unsigned long *val, int write)
@@ -575,6 +580,7 @@ unw_access_pr (struct unw_frame_info *info, unsigned long *val, int write)
 		*val = *addr;
 	return 0;
 }
+EXPORT_SYMBOL(unw_access_pr);
 
 
 /* Routines to manipulate the state stack.  */
@@ -1897,6 +1903,7 @@ unw_unwind (struct unw_frame_info *info)
 	STAT(unw.stat.api.unwind_time += ia64_get_itc() - start; local_irq_restore(flags));
 	return retval;
 }
+EXPORT_SYMBOL(unw_unwind);
 
 int
 unw_unwind_to_user (struct unw_frame_info *info)
@@ -1917,6 +1924,7 @@ unw_unwind_to_user (struct unw_frame_info *info)
 	UNW_DPRINT(0, "unwind.%s: failed to unwind to user-level (ip=0x%lx)\n", __FUNCTION__, ip);
 	return -1;
 }
+EXPORT_SYMBOL(unw_unwind_to_user);
 
 static void
 init_frame_info (struct unw_frame_info *info, struct task_struct *t,
@@ -2014,6 +2022,7 @@ unw_init_from_blocked_task (struct unw_frame_info *info, struct task_struct *t)
 	UNW_DPRINT(1, "unwind.%s\n", __FUNCTION__);
 	unw_init_frame_info(info, t, sw);
 }
+EXPORT_SYMBOL(unw_init_from_blocked_task);
 
 static void
 init_unwind_table (struct unw_table *table, const char *name, unsigned long segment_base,
