@@ -1,0 +1,76 @@
+CONFIG_USB_AUERSWALD
+  Say Y here if you want to connect an Auerswald USB ISDN Device
+  to your computer's USB port.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called auerswald.o. If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_EMI26
+  This driver loads firmware to Emagic EMI 2|6 low latency USB
+  Audio interface.
+
+  After firmware load the device is handled with standard linux
+  USB Audio driver.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called audio.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_RIO500
+  Say Y here if you want to connect a USB Rio500 mp3 player to your
+  computer's USB port. Please read <file:Documentation/usb/rio.txt>
+  for more information.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called rio500.o. If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_TIGL
+  If you own a Texas Instruments graphing calculator and use a 
+  TI-GRAPH LINK USB cable (aka SilverLink), then you might be 
+  interested in this driver.
+
+  If you enable this driver, you will be able to communicate with
+  your calculator through a set of device nodes under /dev.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called tiglusb.o. If you want to compile it as a
+  module, say M here and read Documentation/modules.txt.
+
+  If you don't know what the SilverLink cable is or what a Texas
+  Instruments graphing calculator is, then you probably don't need this
+  driver.
+
+  If unsure, say N.
+
+CONFIG_USB_USS720
+  This driver is for USB parallel port adapters that use the Lucent
+  Technologies USS-720 chip. These cables are plugged into your USB
+  port and provide USB compatibility to peripherals designed with
+  parallel port interfaces.
+
+  The chip has two modes: automatic mode and manual mode. In automatic
+  mode, it looks to the computer like a standard USB printer. Only
+  printers may be connected to the USS-720 in this mode. The generic
+  USB printer driver ("USB Printer support", above) may be used in
+  that mode, and you can say N here if you want to use the chip only
+  in this mode.
+
+  Manual mode is not limited to printers, any parallel port
+  device should work. This driver utilizes manual mode.
+  Note however that some operations are three orders of magnitude
+  slower than on a PCI/ISA Parallel Port, so timing critical
+  applications might not work.
+
+  Say Y here if you own an USS-720 USB->Parport cable and intend to
+  connect anything other than a printer to it.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called uss720.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
