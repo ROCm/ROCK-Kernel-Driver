@@ -279,12 +279,6 @@ EXPORT_SYMBOL(cap_task_reparent_to_init);
 
 #ifdef CONFIG_SECURITY
 
-static int cap_sys_security (unsigned int id, unsigned int call,
-			     unsigned long *args)
-{
-	return -ENOSYS;
-}
-
 static int cap_quotactl (int cmds, int type, int id, struct super_block *sb)
 {
 	return 0;
@@ -732,7 +726,6 @@ static struct security_operations capability_ops = {
 	.capset_set =			cap_capset_set,
 	.acct =				cap_acct,
 	.capable =			cap_capable,
-	.sys_security =			cap_sys_security,
 	.quotactl =			cap_quotactl,
 	.quota_on =			cap_quota_on,
 

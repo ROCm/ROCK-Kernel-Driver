@@ -204,7 +204,6 @@ cond_syscall(sys_nfsservctl)
 cond_syscall(sys_quotactl)
 cond_syscall(sys_acct)
 cond_syscall(sys_lookup_dcookie)
-cond_syscall(sys_security)
 
 static int set_one_prio(struct task_struct *p, int niceval, int error)
 {
