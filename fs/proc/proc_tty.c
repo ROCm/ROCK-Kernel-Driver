@@ -12,13 +12,12 @@
 #include <linux/proc_fs.h>
 #include <linux/stat.h>
 #include <linux/tty.h>
+#include <linux/seq_file.h>
 #include <asm/bitops.h>
 
 extern struct tty_ldisc ldiscs[];
 
 
-static int tty_drivers_read_proc(char *page, char **start, off_t off,
-				 int count, int *eof, void *data);
 static int tty_ldiscs_read_proc(char *page, char **start, off_t off,
 				int count, int *eof, void *data);
 
@@ -30,71 +29,94 @@ static struct proc_dir_entry *proc_tty_ldisc, *proc_tty_driver;
 /*
  * This is the handler for /proc/tty/drivers
  */
-static int tty_drivers_read_proc(char *page, char **start, off_t off,
-				 int count, int *eof, void *data)
+static int show_tty_driver(struct seq_file *m, void *v)
 {
-	int	len = 0;
-	off_t	begin = 0;
-	struct tty_driver *p;
-	char	range[20], deftype[20];
-	char	*type;
+	struct tty_driver *p = v;
 
-	list_for_each_entry(p, &tty_drivers, tty_drivers) {
-		if (p->num > 1)
-			sprintf(range, "%d-%d", p->minor_start,
-				p->minor_start + p->num - 1);
-		else
-			sprintf(range, "%d", p->minor_start);
-		switch (p->type) {
-		case TTY_DRIVER_TYPE_SYSTEM:
-			if (p->subtype == SYSTEM_TYPE_TTY)
-				type = "system:/dev/tty";
-			else if (p->subtype == SYSTEM_TYPE_SYSCONS)
-				type = "system:console";
-			else if (p->subtype == SYSTEM_TYPE_CONSOLE)
-				type = "system:vtmaster";
-			else
-				type = "system";
-			break;
-		case TTY_DRIVER_TYPE_CONSOLE:
-			type = "console";
-			break;
-		case TTY_DRIVER_TYPE_SERIAL:
-			if (p->subtype == 2)
-				type = "serial:callout";
-			else
-				type = "serial";
-			break;
-		case TTY_DRIVER_TYPE_PTY:
-			if (p->subtype == PTY_TYPE_MASTER)
-				type = "pty:master";
-			else if (p->subtype == PTY_TYPE_SLAVE)
-				type = "pty:slave";
-			else
-				type = "pty";
-			break;
-		default:
-			sprintf(deftype, "type:%d.%d", p->type, p->subtype);
-			type = deftype;
-			break;
-		}
-		len += sprintf(page+len, "%-20s /dev/%-8s %3d %7s %s\n",
-			       p->driver_name ? p->driver_name : "unknown",
-			       p->name, p->major, range, type);
-		if (len+begin > off+count)
-			break;
-		if (len+begin < off) {
-			begin += len;
-			len = 0;
-		}
+	seq_printf(m, "%-20s ", p->driver_name ? p->driver_name : "unknown");
+	seq_printf(m, "/dev/%-8s ", p->name);
+	if (p->num > 1) {
+		char	range[20];
+		sprintf(range, "%d-%d", p->minor_start,
+			p->minor_start + p->num - 1);
+		seq_printf(m, "%3d %7s ", p->major, range);
+	} else {
+		seq_printf(m, "%3d %7d ", p->major, p->minor_start);
 	}
-	if (!p)
-		*eof = 1;
-	if (off >= len+begin)
-		return 0;
-	*start = page + (off-begin);
-	return ((count < begin+len-off) ? count : begin+len-off);
+	switch (p->type) {
+	case TTY_DRIVER_TYPE_SYSTEM:
+		seq_printf(m, "system");
+		if (p->subtype == SYSTEM_TYPE_TTY)
+			seq_printf(m, ":/dev/tty");
+		else if (p->subtype == SYSTEM_TYPE_SYSCONS)
+			seq_printf(m, ":console");
+		else if (p->subtype == SYSTEM_TYPE_CONSOLE)
+			seq_printf(m, ":vtmaster");
+		break;
+	case TTY_DRIVER_TYPE_CONSOLE:
+		seq_printf(m, "console");
+		break;
+	case TTY_DRIVER_TYPE_SERIAL:
+		seq_printf(m, "serial");
+		if (p->subtype == 2)
+			seq_printf(m, ":callout");
+		break;
+	case TTY_DRIVER_TYPE_PTY:
+		if (p->subtype == PTY_TYPE_MASTER)
+			seq_printf(m, "pty:master");
+		else if (p->subtype == PTY_TYPE_SLAVE)
+			seq_printf(m, "pty:slave");
+		else
+			seq_printf(m, "pty");
+		break;
+	default:
+		seq_printf(m, "type:%d.%d", p->type, p->subtype);
+	}
+	seq_putc(m, '\n');
+	return 0;
 }
+
+/* iterator */
+static void *t_start(struct seq_file *m, loff_t *pos)
+{
+	struct list_head *p;
+	loff_t l = *pos;
+	list_for_each(p, &tty_drivers)
+		if (!l--)
+			return list_entry(p, struct tty_driver, tty_drivers);
+	return NULL;
+}
+
+static void *t_next(struct seq_file *m, void *v, loff_t *pos)
+{
+	struct list_head *p = ((struct tty_driver *)v)->tty_drivers.next;
+	(*pos)++;
+	return p==&tty_drivers ? NULL :
+			list_entry(p, struct tty_driver, tty_drivers);
+}
+
+static void t_stop(struct seq_file *m, void *v)
+{
+}
+
+static struct seq_operations tty_drivers_op = {
+	.start	= t_start,
+	.next	= t_next,
+	.stop	= t_stop,
+	.show	= show_tty_driver
+};
+
+static int tty_drivers_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &tty_drivers_op);
+}
+
+static struct file_operations proc_tty_drivers_operations = {
+	.open		= tty_drivers_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
+};
 
 /*
  * This is the handler for /proc/tty/ldiscs
@@ -170,11 +192,14 @@ void proc_tty_unregister_driver(struct tty_driver *driver)
  */
 void __init proc_tty_init(void)
 {
+	struct proc_dir_entry *entry;
 	if (!proc_mkdir("tty", 0))
 		return;
 	proc_tty_ldisc = proc_mkdir("tty/ldisc", 0);
 	proc_tty_driver = proc_mkdir("tty/driver", 0);
 
 	create_proc_read_entry("tty/ldiscs", 0, 0, tty_ldiscs_read_proc,NULL);
-	create_proc_read_entry("tty/drivers", 0, 0, tty_drivers_read_proc,NULL);
+	entry = create_proc_entry("tty/drivers", 0, NULL);
+	if (entry)
+		entry->proc_fops = &proc_tty_drivers_operations;
 }
