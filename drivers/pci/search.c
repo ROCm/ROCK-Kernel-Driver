@@ -1,10 +1,10 @@
 /*
  * 	PCI searching functions.
  *
- *	Copyright 1993 -- 1997 Drew Eckhardt, Frederic Potter,
- *				David Mosberger-Tang
- *	Copyright 1997 -- 2000 Martin Mares <mj@ucw.cz>
- *	Copyright 2003 -- Greg Kroah-Hartman <greg@kroah.com>
+ *	Copyright (C) 1993 -- 1997 Drew Eckhardt, Frederic Potter,
+ *					David Mosberger-Tang
+ *	Copyright (C) 1997 -- 2000 Martin Mares <mj@ucw.cz>
+ *	Copyright (C) 2003 -- 2004 Greg Kroah-Hartman <greg@kroah.com>
  */
 
 #include <linux/init.h>
@@ -258,12 +258,6 @@ exit:
  * @from: Previous PCI device found in search, or %NULL for new search.
  *
  * Iterates through the list of known PCI devices.  If a PCI device is
- * found with a matching @vendor and @device, a pointer to its device structure is
- * returned.  Otherwise, %NULL is returned.
- * A new search is initiated by passing %NULL to the @from argument.
- * Otherwise if @from is not %NULL, searches continue from next device on the global list.
- *
- * Iterates through the list of known PCI devices.  If a PCI device is
  * found with a matching @vendor and @device, the reference count to the
  * device is incremented and a pointer to its device structure is returned.
  * Otherwise, %NULL is returned.  A new search is initiated by passing %NULL
@@ -325,6 +319,10 @@ exit:
  * A new search is initiated by passing %NULL to the @from argument.
  * Otherwise if @from is not %NULL, searches continue from next device
  * on the global list.
+ *
+ * NOTE: Do not use this function anymore, use pci_get_class() instead, as
+ * the pci device returned by this function can disappear at any moment in
+ * time.
  */
 struct pci_dev *
 pci_find_class(unsigned int class, const struct pci_dev *from)
