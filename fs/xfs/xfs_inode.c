@@ -602,9 +602,12 @@ xfs_iformat_extents(
 	int		whichfork)
 {
 	xfs_ifork_t	*ifp;
-	int		nex, i;
+	int		nex;
 	int		real_size;
 	int		size;
+#if ARCH_CONVERT != ARCH_NOCONVERT
+	int		i;
+#endif
 	xfs_bmbt_rec_t	*ep, *dp;
 
 	ifp = XFS_IFORK_PTR(ip, whichfork);
