@@ -117,7 +117,8 @@ e1000_ethtool_sset(struct e1000_adapter *adapter, struct ethtool_cmd *ecmd)
 
 	if(ecmd->autoneg == AUTONEG_ENABLE) {
 		hw->autoneg = 1;
-		hw->autoneg_advertised = (ecmd->advertising & 0x002F);
+		hw->autoneg_advertised = 0x002F;
+		ecmd->advertising = 0x002F;
 	} else {
 		hw->autoneg = 0;
 		switch(ecmd->speed + ecmd->duplex) {
@@ -210,7 +211,7 @@ e1000_ethtool_geeprom(struct e1000_adapter *adapter,
 	struct e1000_hw *hw = &adapter->hw;
 	int i, max_len, first_word, last_word;
 
-	if(eeprom->len == 0) 
+	if(eeprom->len == 0)
 		return -EINVAL;
 
 	eeprom->magic = hw->vendor_id | (hw->device_id << 16);
@@ -228,6 +229,7 @@ e1000_ethtool_geeprom(struct e1000_adapter *adapter,
 
 	for(i = 0; i <= (last_word - first_word); i++)
 		e1000_read_eeprom(hw, first_word + i, &eeprom_buff[i]);
+
 	return 0;
 }
 
@@ -290,7 +292,6 @@ e1000_ethtool_gwol(struct e1000_adapter *adapter, struct ethtool_wolinfo *wol)
 	case E1000_DEV_ID_82543GC_FIBER:
 	case E1000_DEV_ID_82543GC_COPPER:
 	case E1000_DEV_ID_82544EI_FIBER:
-	default:
 		wol->supported = 0;
 		wol->wolopts   = 0;
 		return;
@@ -304,14 +305,7 @@ e1000_ethtool_gwol(struct e1000_adapter *adapter, struct ethtool_wolinfo *wol)
 		}
 		/* Fall Through */
 
-	case E1000_DEV_ID_82544EI_COPPER:
-	case E1000_DEV_ID_82544GC_COPPER:
-	case E1000_DEV_ID_82544GC_LOM:
-	case E1000_DEV_ID_82540EM:
-	case E1000_DEV_ID_82540EM_LOM:
-	case E1000_DEV_ID_82545EM_COPPER:
-	case E1000_DEV_ID_82545EM_FIBER:
-	case E1000_DEV_ID_82546EB_COPPER:
+	default:
 		wol->supported = WAKE_PHY | WAKE_UCAST | 
 				 WAKE_MCAST | WAKE_BCAST | WAKE_MAGIC;
 		
@@ -340,7 +334,6 @@ e1000_ethtool_swol(struct e1000_adapter *adapter, struct ethtool_wolinfo *wol)
 	case E1000_DEV_ID_82543GC_FIBER:
 	case E1000_DEV_ID_82543GC_COPPER:
 	case E1000_DEV_ID_82544EI_FIBER:
-	default:
 		return wol->wolopts ? -EOPNOTSUPP : 0;
 
 	case E1000_DEV_ID_82546EB_FIBER:
@@ -349,14 +342,7 @@ e1000_ethtool_swol(struct e1000_adapter *adapter, struct ethtool_wolinfo *wol)
 			return wol->wolopts ? -EOPNOTSUPP : 0;
 		/* Fall Through */
 
-	case E1000_DEV_ID_82544EI_COPPER:
-	case E1000_DEV_ID_82544GC_COPPER:
-	case E1000_DEV_ID_82544GC_LOM:
-	case E1000_DEV_ID_82540EM:
-	case E1000_DEV_ID_82540EM_LOM:
-	case E1000_DEV_ID_82545EM_COPPER:
-	case E1000_DEV_ID_82545EM_FIBER:
-	case E1000_DEV_ID_82546EB_COPPER:
+	default:
 		if(wol->wolopts & (WAKE_ARP | WAKE_MAGICSECURE))
 			return -EOPNOTSUPP;
 
@@ -518,7 +504,8 @@ e1000_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
 		if(copy_from_user(&eeprom, addr, sizeof(eeprom)))
 			return -EFAULT;
 
-		if((err = e1000_ethtool_geeprom(adapter, &eeprom, eeprom_buff))<0)
+		if((err = e1000_ethtool_geeprom(adapter, 
+			&eeprom, eeprom_buff)))
 			return err;
 
 		if(copy_to_user(addr, &eeprom, sizeof(eeprom)))
