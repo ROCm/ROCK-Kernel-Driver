@@ -21,34 +21,24 @@
 /*
  * debug tracing
  */
-#define kenter(FMT,...)	printk("==> %s("FMT")\n",__FUNCTION__,##__VA_ARGS__)
-#define kleave(FMT,...)	printk("<== %s()"FMT"\n",__FUNCTION__,##__VA_ARGS__)
-#define kdebug(FMT,...)	printk(FMT"\n",##__VA_ARGS__)
-#define kproto(FMT,...)	printk("### "FMT"\n",##__VA_ARGS__)
-#define knet(FMT,...)	printk(FMT"\n",##__VA_ARGS__)
+#define kenter(FMT, a...)	printk("==> %s("FMT")\n",__FUNCTION__ , ## a)
+#define kleave(FMT, a...)	printk("<== %s()"FMT"\n",__FUNCTION__ , ## a)
+#define kdebug(FMT, a...)	printk(FMT"\n" , ## a)
+#define kproto(FMT, a...)	printk("### "FMT"\n" , ## a)
+#define knet(FMT, a...)		printk(FMT"\n" , ## a)
 
 #if 0
-#define _enter(FMT,...)	kenter(FMT,##__VA_ARGS__)
-#define _leave(FMT,...)	kleave(FMT,##__VA_ARGS__)
-#define _debug(FMT,...)	kdebug(FMT,##__VA_ARGS__)
-#define _proto(FMT,...)	kproto(FMT,##__VA_ARGS__)
-#define _net(FMT,...)	knet(FMT,##__VA_ARGS__)
+#define _enter(FMT, a...)	kenter(FMT , ## a)
+#define _leave(FMT, a...)	kleave(FMT , ## a)
+#define _debug(FMT, a...)	kdebug(FMT , ## a)
+#define _proto(FMT, a...)	kproto(FMT , ## a)
+#define _net(FMT, a...)		knet(FMT , ## a)
 #else
-#define _enter(FMT,...)	do { } while(0)
-#define _leave(FMT,...)	do { } while(0)
-#define _debug(FMT,...)	do { } while(0)
-#define _proto(FMT,...)	do { } while(0)
-#define _net(FMT,...)	do { } while(0)
-#endif
-
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,5,0)
-#define wait_on_page_locked wait_on_page
-#define PageUptodate Page_Uptodate
-
-static inline struct proc_dir_entry *PDE(const struct inode *inode)
-{
-	return (struct proc_dir_entry *)inode->u.generic_ip;
-}
+#define _enter(FMT, a...)	do { } while(0)
+#define _leave(FMT, a...)	do { } while(0)
+#define _debug(FMT, a...)	do { } while(0)
+#define _proto(FMT, a...)	do { } while(0)
+#define _net(FMT, a...)		do { } while(0)
 #endif
 
 static inline void afs_discard_my_signals(void)
@@ -85,12 +75,7 @@ extern struct file_operations afs_file_file_operations;
  * inode.c
  */
 extern int afs_iget(struct super_block *sb, afs_fid_t *fid, struct inode **_inode);
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
 extern int afs_inode_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat);
-#else
-extern void afs_read_inode2(struct inode *inode, void *opaque);
-extern int afs_inode_revalidate(struct dentry *dentry);
-#endif
 extern void afs_clear_inode(struct inode *inode);
 
 /*
@@ -113,7 +98,7 @@ extern struct list_head afs_cb_hash_tbl[];
 extern spinlock_t afs_cb_hash_lock;
 
 #define afs_cb_hash(SRV,FID) \
-	afs_cb_hash_tbl[((unsigned)(SRV) + (FID)->vid + (FID)->vnode + (FID)->unique) % \
+	afs_cb_hash_tbl[((unsigned long)(SRV) + (FID)->vid + (FID)->vnode + (FID)->unique) % \
 			AFS_CB_HASH_COUNT]
 
 /*
