@@ -89,13 +89,8 @@
 /* brick type response codes */
 #define L1_BRICKTYPE_IP45       0x34            /* 4 */
 #define L1_BRICKTYPE_C          0x43            /* C */
-#define L1_BRICKTYPE_I          0x49            /* I */
-#define L1_BRICKTYPE_P          0x50            /* P */
 #define L1_BRICKTYPE_R          0x52            /* R */
-#define L1_BRICKTYPE_X          0x58            /* X */
-#define L1_BRICKTYPE_X2         0x59            /* Y */
 #define L1_BRICKTYPE_N          0x4e            /* N */
-#define L1_BRICKTYPE_PE		0x25		/* % */
 #define L1_BRICKTYPE_PX		0x23		/* # */
 #define L1_BRICKTYPE_IX		0x3d		/* = */
 

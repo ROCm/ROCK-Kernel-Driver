@@ -111,12 +111,6 @@ int iobrick_module_get(nasid_t nasid)
 	brick_type = MODULE_IXBRICK; break;
       case L1_BRICKTYPE_PX: 
 	brick_type = MODULE_PXBRICK; break;
-      case L1_BRICKTYPE_I: 
-	brick_type = MODULE_IBRICK; break;
-      case L1_BRICKTYPE_P:
-	brick_type = MODULE_PBRICK; break;
-      case L1_BRICKTYPE_X:
-	brick_type = MODULE_XBRICK; break;
     }
 
     ret = RBT_TO_MODULE(rack, bay, brick_type);
@@ -176,15 +170,6 @@ iobrick_L1bricktype_to_name(int type)
     default:
         return("Unknown");
 
-    case L1_BRICKTYPE_X:
-        return("Xbrick");
-
-    case L1_BRICKTYPE_I:
-        return("Ibrick");
-
-    case L1_BRICKTYPE_P:
-        return("Pbrick");
-
     case L1_BRICKTYPE_PX:
         return("PXbrick");
 
@@ -196,6 +181,9 @@ iobrick_L1bricktype_to_name(int type)
 
     case L1_BRICKTYPE_R:
         return("Rbrick");
+
+    case L1_BRICKTYPE_CHI_CG:
+        return(EDGE_LBL_CGBRICK);
     }
 }
 

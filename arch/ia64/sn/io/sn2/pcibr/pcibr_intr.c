@@ -281,9 +281,7 @@ pcibr_force_interrupt(pcibr_intr_t intr)
 			PCIBR_DEBUG((PCIBR_DEBUG_INTR, pcibr_soft->bs_vhdl,
 		    		"pcibr_force_interrupt: bit=0x%x\n", bit));
 
-			if (IS_XBRIDGE_OR_PIC_SOFT(pcibr_soft)) {
-	    			bridge->b_force_pin[bit].intr = 1;
-			}
+    			bridge->b_force_pin[bit].intr = 1;
 		}
 	}
 }
@@ -651,10 +649,7 @@ pcibr_intr_connect(pcibr_intr_t pcibr_intr, intr_func_t intr_func, intr_arg_t in
 	     * Use the pcibr wrapper function to handle all Bridge interrupts
 	     * regardless of whether the interrupt line is shared or not.
 	     */
-	    if (IS_PIC_SOFT(pcibr_soft)) 
-		int_addr = (void *)&(bridge->p_int_addr_64[pcibr_int_bit]);
-	    else
-		int_addr = (void *)&(bridge->b_int_addr[pcibr_int_bit].addr);
+	    int_addr = (void *)&(bridge->p_int_addr_64[pcibr_int_bit]);
 
 	    xtalk_intr_connect(xtalk_intr, pcibr_intr_func, (intr_arg_t) intr_wrap,
 					(xtalk_intr_setfunc_t) pcibr_setpciint,
@@ -673,8 +668,7 @@ pcibr_intr_connect(pcibr_intr_t pcibr_intr, intr_func_t intr_func, intr_arg_t in
 	 * On PIC we must write 64-bit MMRs with 64-bit stores
 	 */
 	s = pcibr_lock(pcibr_soft);
-	if (IS_PIC_SOFT(pcibr_soft) &&
-			PCIBR_WAR_ENABLED(PV854697, pcibr_soft)) {
+	if (PCIBR_WAR_ENABLED(PV854697, pcibr_soft)) {
 	    int_enable = bridge->p_int_enable_64;
 	    int_enable |= pcibr_int_bits;
 	    bridge->p_int_enable_64 = int_enable;
@@ -728,7 +722,7 @@ pcibr_intr_disconnect(pcibr_intr_t pcibr_intr)
      * On PIC we must write 64-bit MMRs with 64-bit stores
      */
     s = pcibr_lock(pcibr_soft);
-    if (IS_PIC_SOFT(pcibr_soft) && PCIBR_WAR_ENABLED(PV854697, pcibr_soft)) {
+    if (PCIBR_WAR_ENABLED(PV854697, pcibr_soft)) {
 	int_enable = bridge->p_int_enable_64;
 	int_enable &= ~pcibr_int_bits;
 	bridge->p_int_enable_64 = int_enable;
@@ -773,10 +767,7 @@ pcibr_intr_disconnect(pcibr_intr_t pcibr_intr)
             if (!pcibr_soft->bs_intr[pcibr_int_bit].bsi_pcibr_intr_wrap.iw_shared)
                 continue;
 
-            if (IS_PIC_SOFT(pcibr_soft))
-                int_addr = (void *)&(bridge->p_int_addr_64[pcibr_int_bit]);
-            else
-                int_addr = (void *)&(bridge->b_int_addr[pcibr_int_bit].addr);
+            int_addr = (void *)&(bridge->p_int_addr_64[pcibr_int_bit]);
 
 	    xtalk_intr_connect(pcibr_soft->bs_intr[pcibr_int_bit].bsi_xtalk_intr,
 				pcibr_intr_func, (intr_arg_t) intr_wrap,
@@ -948,8 +939,7 @@ pcibr_intr_func(intr_arg_t arg)
 	 * interrupt problem.   Briefly disable the enable bit for
 	 * this device.
 	 */
-	if (IS_PIC_SOFT(pcibr_soft) &&
-			PCIBR_WAR_ENABLED(PV855272, pcibr_soft)) {
+	if (PCIBR_WAR_ENABLED(PV855272, pcibr_soft)) {
 		unsigned s;
 
 		/* disable-enable interrupts for this bridge pin */
@@ -1059,8 +1049,7 @@ pcibr_intr_func(intr_arg_t arg)
 	     * On PIC we must write 64-bit MMRs with 64-bit stores
 	     */
 	    s = pcibr_lock(pcibr_soft);
-	    if (IS_PIC_SOFT(pcibr_soft) &&
-				PCIBR_WAR_ENABLED(PV854697, pcibr_soft)) {
+	    if (PCIBR_WAR_ENABLED(PV854697, pcibr_soft)) {
 		int_enable = bridge->p_int_enable_64;
 		int_enable &= ~mask;
 		bridge->p_int_enable_64 = int_enable;

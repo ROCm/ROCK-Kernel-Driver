@@ -401,18 +401,8 @@ pcibr_wrb_flush(vertex_hdl_t pconn_vhdl)
     volatile bridgereg_t   *wrb_flush;
 
     wrb_flush = &(bridge->b_wr_req_buf[pciio_slot].reg);
-    if ( IS_PIC_SOFT(pcibr_soft) ) {
-	while (*wrb_flush)
-		;
-    }
-    else {
-	if (io_get_sh_swapper(NASID_GET(bridge))) {
-		while (BRIDGE_REG_GET32((wrb_flush)));
-	} else {
-		while (*wrb_flush)
-			;
-	}
-    }
+    while (*wrb_flush)
+	;
     return(0);
 }
 
@@ -710,24 +700,17 @@ pcibr_slot_initial_rrb_alloc(vertex_hdl_t pcibr_vhdl,
     for (vchan = 0; vchan < vchan_total; vchan++) 
         chan[vchan] = do_pcibr_rrb_count_valid(bridge, slot, vchan);
 
-    if (IS_PIC_SOFT(pcibr_soft)) {
- 	PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_RRB, pcibr_vhdl,
+    PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_RRB, pcibr_vhdl,
 	    "pcibr_slot_initial_rrb_alloc: slot %d started with %d+%d+%d+%d\n",
 	    PCIBR_DEVICE_TO_SLOT(pcibr_soft, slot), 
 	    chan[VCHAN0], chan[VCHAN1], chan[VCHAN2], chan[VCHAN3]));
-    } else {
-	PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_RRB, pcibr_vhdl,
-	    "pcibr_slot_initial_rrb_alloc: slot %d started with %d+%d\n",
-	    PCIBR_DEVICE_TO_SLOT(pcibr_soft, slot), 
-	    chan[VCHAN0], chan[VCHAN1]));
-    }
 
     /* Do we really need any?
      */
     pcibr_infoh = pcibr_soft->bs_slot[slot].bss_infos;
     pcibr_info = pcibr_infoh[0];
 
-    if (PCIBR_WAR_ENABLED(PV856866, pcibr_soft) && IS_PIC_SOFT(pcibr_soft) &&
+    if (PCIBR_WAR_ENABLED(PV856866, pcibr_soft) &&
                         (slot == 2 || slot == 3) &&
                         (pcibr_info->f_vendor == PCIIO_VENDOR_ID_NONE) &&
                         !pcibr_soft->bs_slot[slot].has_host) {
@@ -867,13 +850,8 @@ pcibr_rrb_debug(char *calling_func, pcibr_soft_t pcibr_soft)
                     "%s: rrbs available, even=%d, odd=%d\n", calling_func,
                     pcibr_soft->bs_rrb_avail[0], pcibr_soft->bs_rrb_avail[1]));
 
-        if (IS_PIC_SOFT(pcibr_soft)) {
-            PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_RRB, pcibr_soft->bs_vhdl,
+        PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_RRB, pcibr_soft->bs_vhdl,
                         "\tslot\tvchan0\tvchan1\tvchan2\tvchan3\treserved\n"));
-        } else {
-	    PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_RRB, pcibr_soft->bs_vhdl,
-		        "\tslot\tvchan0\tvchan1\treserved\n"));
-        }
 
         for (slot=0; slot < PCIBR_NUM_SLOTS(pcibr_soft); slot++) {
 	    /*
@@ -881,22 +859,13 @@ pcibr_rrb_debug(char *calling_func, pcibr_soft_t pcibr_soft)
              * attempting to call PCIBR_DEBUG_ALWAYS() with more than 5 printf
              * arguments fails so sprintf() it into a temporary string.
              */
-	    if (IS_PIC_SOFT(pcibr_soft)) {
-                sprintf(tmp_str, "\t %d\t  %d\t  %d\t  %d\t  %d\t  %d\n", 
+            sprintf(tmp_str, "\t %d\t  %d\t  %d\t  %d\t  %d\t  %d\n", 
 		        PCIBR_DEVICE_TO_SLOT(pcibr_soft, slot),
                         0xFFF & pcibr_soft->bs_rrb_valid[slot][VCHAN0],
                         0xFFF & pcibr_soft->bs_rrb_valid[slot][VCHAN1],
                         0xFFF & pcibr_soft->bs_rrb_valid[slot][VCHAN2],
                         0xFFF & pcibr_soft->bs_rrb_valid[slot][VCHAN3],
                         pcibr_soft->bs_rrb_res[slot]);
-	    } else {
-	        sprintf(tmp_str, "\t %d\t  %d\t  %d\t  %d\n", 
-		        PCIBR_DEVICE_TO_SLOT(pcibr_soft, slot),
-		        0xFFF & pcibr_soft->bs_rrb_valid[slot][VCHAN0],
-		        0xFFF & pcibr_soft->bs_rrb_valid[slot][VCHAN1],
-		        pcibr_soft->bs_rrb_res[slot]);
-	    }
-    
             PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_RRB, pcibr_soft->bs_vhdl,
                         "%s", tmp_str));
         }

@@ -31,11 +31,8 @@ is_specified(char *s)
 /*
  * Routines provided by ml/SN/promif.c.
  */
-static __psunsigned_t master_bridge_base;
 nasid_t console_nasid = (nasid_t)-1;
 char master_baseio_wid;
-static char console_wid;
-static char console_pcislot;
 
 int
 check_nasid_equiv(nasid_t nasida, nasid_t nasidb)

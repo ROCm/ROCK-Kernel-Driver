@@ -199,14 +199,10 @@ struct pcibr_intr_s {
 #define PCIBR_INFO_SLOT_GET_INT(info)	    (((pcibr_info_t)info)->f_dev)
 
 #define PCIBR_DEVICE_TO_SLOT(pcibr_soft, dev_num) \
-	(((dev_num) != PCIIO_SLOT_NONE) ? \
-	    (IS_PIC_SOFT((pcibr_soft)) ? ((dev_num) + 1) : (dev_num)) : \
-	    PCIIO_SLOT_NONE)
+	(((dev_num) != PCIIO_SLOT_NONE) ? ((dev_num) + 1) : PCIIO_SLOT_NONE)
 
 #define PCIBR_SLOT_TO_DEVICE(pcibr_soft, slot) \
-        (((slot) != PCIIO_SLOT_NONE) ? \
-            (IS_PIC_SOFT((pcibr_soft)) ? ((slot) - 1) : (slot)) : \
-            PCIIO_SLOT_NONE)
+        (((slot) != PCIIO_SLOT_NONE) ? ((slot) - 1) : PCIIO_SLOT_NONE)
 
 /*
  * per-connect point pcibr data, including standard pciio data in-line:
@@ -287,12 +283,7 @@ struct pcibr_intr_wrap_s {
 #define PCIBR_BRIDGETYPE_BRIDGE		0
 #define PCIBR_BRIDGETYPE_XBRIDGE	1
 #define PCIBR_BRIDGETYPE_PIC		2
-#define IS_XBRIDGE_SOFT(ps) (ps->bs_bridge_type == PCIBR_BRIDGETYPE_XBRIDGE)
-#define IS_PIC_SOFT(ps)     (ps->bs_bridge_type == PCIBR_BRIDGETYPE_PIC)
-#define IS_PIC_BUSNUM_SOFT(ps, bus)	\
-		(IS_PIC_SOFT(ps) && ((ps)->bs_busnum == (bus)))
-#define IS_BRIDGE_SOFT(ps)  (ps->bs_bridge_type == PCIBR_BRIDGETYPE_BRIDGE)
-#define IS_XBRIDGE_OR_PIC_SOFT(ps) (IS_XBRIDGE_SOFT(ps) || IS_PIC_SOFT(ps))
+#define IS_PIC_BUSNUM_SOFT(ps, bus)	((ps)->bs_busnum == (bus))
 
 /*
  * Runtime checks for workarounds.

@@ -55,18 +55,6 @@ void sn_dma_flush_init(unsigned long start, unsigned long end, int idx, int pin,
 
 
 /*
- * For the given device, initialize whether it is a PIC device.
- */
-static void
-set_isPIC(struct sn_device_sysdata *device_sysdata)
-{
-	pciio_info_t pciio_info = pciio_info_get(device_sysdata->vhdl);
-	pcibr_soft_t pcibr_soft = (pcibr_soft_t) pciio_info_mfast_get(pciio_info);
-
-	device_sysdata->isPIC = IS_PIC_SOFT(pcibr_soft);;
-}
-
-/*
  * pci_bus_cvlink_init() - To be called once during initialization before 
  *	SGI IO Infrastructure init is called.
  */
@@ -188,23 +176,11 @@ set_flush_addresses(struct pci_dev *device_dev,
 	 * Get the nasid from the bridge.
 	 */
 	nasid = NASID_GET(device_sysdata->dma_buf_sync);
-	if (IS_PIC_DEVICE(device_dev)) {
-		device_sysdata->dma_buf_sync = (volatile unsigned int *)
-			&bridge->b_wr_req_buf[pciio_slot].reg;
-		device_sysdata->xbow_buf_sync = (volatile unsigned int *)
-			XBOW_PRIO_LINKREGS_PTR(NODE_SWIN_BASE(nasid, 0),
-			pcibr_soft->bs_xid);
-	} else {
-		/*
-		 * Accessing Xbridge and Xbow register when SHUB swapoper is on!.
-		 */
-		device_sysdata->dma_buf_sync = (volatile unsigned int *)
-			((uint64_t)&(bridge->b_wr_req_buf[pciio_slot].reg)^4);
-		device_sysdata->xbow_buf_sync = (volatile unsigned int *)
-			((uint64_t)(XBOW_PRIO_LINKREGS_PTR(
-			NODE_SWIN_BASE(nasid, 0), pcibr_soft->bs_xid)) ^ 4);
-	}
-
+	device_sysdata->dma_buf_sync = (volatile unsigned int *)
+		&bridge->b_wr_req_buf[pciio_slot].reg;
+	device_sysdata->xbow_buf_sync = (volatile unsigned int *)
+		XBOW_PRIO_LINKREGS_PTR(NODE_SWIN_BASE(nasid, 0),
+		pcibr_soft->bs_xid);
 #ifdef DEBUG
 	printk("set_flush_addresses: dma_buf_sync %p xbow_buf_sync %p\n", 
 		device_sysdata->dma_buf_sync, device_sysdata->xbow_buf_sync);
@@ -501,7 +477,6 @@ sn_pci_fixup(int arg)
 		device_vertex = device_sysdata->vhdl;
 
 		device_dev->sysdata = (void *) device_sysdata;
-		set_isPIC(device_sysdata);
 
 		/*
 		 * Set the xbridge Device(X) Write Buffer Flush and Xbow Flush 
@@ -521,7 +496,7 @@ sn_pci_fixup(int arg)
 			size = device_dev->resource[idx].end -
 				device_dev->resource[idx].start;
 			if (size) {
-				device_dev->resource[idx].start = (unsigned long)pciio_pio_addr(device_vertex, 0, PCIIO_SPACE_WIN(idx), 0, size, 0, (IS_PIC_DEVICE(device_dev)) ? 0 : PCIIO_BYTE_STREAM);
+				device_dev->resource[idx].start = (unsigned long)pciio_pio_addr(device_vertex, 0, PCIIO_SPACE_WIN(idx), 0, size, 0, 0);
 				device_dev->resource[idx].start |= __IA64_UNCACHED_OFFSET;
 			}
 			else
@@ -824,10 +799,8 @@ pci_bus_to_hcl_cvlink(void)
 				
 	devfs_hdl = hwgraph_path_to_vertex("hw/module");
 	for (i = 0; i < nummodules ; i++) {
-	    for ( j = 0; j < 3; j++ ) {
+	    for ( j = 0; j < 2; j++ ) {
 		if ( j == 0 )
-			brick_name = EDGE_LBL_PBRICK;
-		else if ( j == 1 )
 			brick_name = EDGE_LBL_PXBRICK;
 		else
 			brick_name = EDGE_LBL_IXBRICK;

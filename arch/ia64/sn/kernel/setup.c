@@ -216,7 +216,6 @@ sn_setup(char **cmdline_p)
 	long status, ticks_per_sec, drift;
 	int pxm;
 	int major = sn_sal_rev_major(), minor = sn_sal_rev_minor();
-	extern void io_sh_swapper(int, int);
 	extern nasid_t get_master_baseio_nasid(void);
 	extern void sn_cpu_init(void);
 
@@ -238,8 +237,6 @@ sn_setup(char **cmdline_p)
 		       "%x.%02x\n", SN_SAL_MIN_MAJOR, SN_SAL_MIN_MINOR);
 		panic("PROM version too old\n");
 	}
-
-	io_sh_swapper(get_nasid(), 0);
 
 	master_nasid = get_nasid();
 	(void)get_console_nasid();

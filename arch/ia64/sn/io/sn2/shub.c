@@ -6,8 +6,6 @@
  * Copyright (C) 1992-1997, 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  */
 
-#ident  "$Revision: 1.167 $"
-
 #include <linux/types.h>
 #include <linux/slab.h>
 #include <linux/interrupt.h>
@@ -34,43 +32,6 @@
 #include <asm/sn/sndrv.h>
 #include <asm/sn/sn2/shubio.h>
 #include <asm/sn/sn2/shub_mmr.h>
-
-/*
- * Shub WAR for Xbridge Little Endian problem:
- *	Xbridge has to run in BIG ENDIAN even with Shub.
- */
-
-
-/*
- * io_sh_swapper: Turn on Shub byte swapping.
- *	All data destined to and from Shub to XIO are byte-swapped.
- */
-void
-io_sh_swapper(nasid_t nasid, int onoff)
-{
-    ii_iwc_u_t      ii_iwc;
-
-    ii_iwc.ii_iwc_regval = REMOTE_HUB_L(nasid, IIO_IWC);
-
-    ii_iwc.ii_iwc_fld_s.i_dma_byte_swap = onoff;
-    REMOTE_HUB_S(nasid, IIO_IWC, ii_iwc.ii_iwc_regval);
-    ii_iwc.ii_iwc_regval = REMOTE_HUB_L(nasid, IIO_IWC);
-
-}
-
-/*
- * io_get_sh_swapper: Return current Swap mode.
- *	1 = Swap on, 0 = Swap off.
- */
-int
-io_get_sh_swapper(nasid_t nasid)
-{
-    ii_iwc_u_t      ii_iwc;
-
-    ii_iwc.ii_iwc_regval = REMOTE_HUB_L(nasid, IIO_IWC);
-    return(ii_iwc.ii_iwc_fld_s.i_dma_byte_swap);
-
-}
 
 #define SHUB_NUM_ECF_REGISTERS 8
 

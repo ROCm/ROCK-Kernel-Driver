@@ -380,13 +380,8 @@ pcibr_slot_info_return(pcibr_soft_t             pcibr_soft,
 
     slotp->resp_b_int_device = bridge->b_int_device;
 
-    if (IS_PIC_SOFT(pcibr_soft)) {
-	slotp->resp_p_int_enable = bridge->p_int_enable_64;
-	slotp->resp_p_int_host = bridge->p_int_addr_64[slot];
-    } else {
-	slotp->resp_b_int_enable = bridge->b_int_enable;
-	slotp->resp_b_int_host = bridge->b_int_addr[slot].addr;
-    }
+    slotp->resp_p_int_enable = bridge->p_int_enable_64;
+    slotp->resp_p_int_host = bridge->p_int_addr_64[slot];
 
     if (COPYOUT(slotp, respp, sizeof(*respp))) {
         return(EFAULT);
@@ -1364,7 +1359,7 @@ pcibr_slot_device_init(vertex_hdl_t pcibr_vhdl,
      * for 64-bit devices).  We set the bit in pcibr_try_set_device()
      * if we're 64-bit and requesting virtual channels.
      */
-    if (IS_PIC_SOFT(pcibr_soft) && PCIBR_WAR_ENABLED(PV855271, pcibr_soft))
+    if (PCIBR_WAR_ENABLED(PV855271, pcibr_soft))
 	devreg |= BRIDGE_DEV_COH;
     else
 	devreg |= BRIDGE_DEV_COH | BRIDGE_DEV_VIRTUAL_EN;

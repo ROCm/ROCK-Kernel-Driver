@@ -394,11 +394,8 @@ io_xswitch_widget_init(vertex_hdl_t  	xswitchv,
 		sprintf(pathname, EDGE_LBL_MODULE "/%s/" EDGE_LBL_SLAB "/%d" "/%s" "/%s/%d",
 			buffer,
 			geo_slab(board->brd_geoid),
-			(board->brd_type == KLTYPE_IBRICK) ? EDGE_LBL_IBRICK :
-			(board->brd_type == KLTYPE_PBRICK) ? EDGE_LBL_PBRICK :
 			(board->brd_type == KLTYPE_PXBRICK) ? EDGE_LBL_PXBRICK :
-			(board->brd_type == KLTYPE_IXBRICK) ? EDGE_LBL_IXBRICK :
-			(board->brd_type == KLTYPE_XBRICK) ? EDGE_LBL_XBRICK : "?brick",
+			(board->brd_type == KLTYPE_IXBRICK) ? EDGE_LBL_IXBRICK : "?brick",
 			EDGE_LBL_XTALK, widgetnum);
 		
 		DBG("io_xswitch_widget_init: path= %s\n", pathname);
@@ -587,7 +584,6 @@ io_init_node(cnodeid_t cnodeid)
 	nodepda_t	*npdap;
 	struct semaphore *peer_sema = 0;
 	uint32_t	widget_partnum;
-	cpu_cookie_t	c = 0;
 
 	npdap = NODEPDA(cnodeid);
 
@@ -808,34 +804,6 @@ init_all_devices(void)
 static
 struct io_brick_map_s io_brick_tab[] = {
 
-/* Ibrick widget number to PCI bus number map */
- {      MODULE_IBRICK,                          /* Ibrick type    */ 
-    /*  PCI Bus #                                  Widget #       */
-    {   0, 0, 0, 0, 0, 0, 0, 0,                 /* 0x0 - 0x7      */
-        0,                                      /* 0x8            */
-        0,                                      /* 0x9            */
-        0, 0,                                   /* 0xa - 0xb      */
-        0,                                      /* 0xc            */
-        0,                                      /* 0xd            */
-        2,                                      /* 0xe            */
-        1                                       /* 0xf            */
-     }
- },
-
-/* Pbrick widget number to PCI bus number map */
- {      MODULE_PBRICK,                          /* Pbrick type    */ 
-    /*  PCI Bus #                                  Widget #       */
-    {   0, 0, 0, 0, 0, 0, 0, 0,                 /* 0x0 - 0x7      */
-        2,                                      /* 0x8            */
-        1,                                      /* 0x9            */
-        0, 0,                                   /* 0xa - 0xb      */
-        4,                                      /* 0xc            */
-        6,                                      /* 0xd            */
-        3,                                      /* 0xe            */
-        5                                       /* 0xf            */
-    }
- },
-
 /* PXbrick widget number to PCI bus number map */
  {      MODULE_PXBRICK,                         /* PXbrick type   */ 
     /*  PCI Bus #                                  Widget #       */
@@ -863,20 +831,6 @@ struct io_brick_map_s io_brick_tab[] = {
         3                                       /* 0xf            */
     }
  },
-
-/* Xbrick widget to XIO slot map */
- {      MODULE_XBRICK,                          /* Xbrick type    */ 
-    /*  XIO Slot #                                 Widget #       */
-    {   0, 0, 0, 0, 0, 0, 0, 0,                 /* 0x0 - 0x7      */
-        1,                                      /* 0x8            */
-        3,                                      /* 0x9            */
-        0, 0,                                   /* 0xa - 0xb      */
-        2,                                      /* 0xc            */
-        4,                                      /* 0xd            */
-        0,                                      /* 0xe            */
-        0                                       /* 0xf            */
-    }
- }
 };
 
 /*

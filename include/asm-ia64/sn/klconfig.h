@@ -72,10 +72,8 @@ typedef s32 klconf_off_t;
 #define DUPLICATE_BOARD 	0x04    /* Boards like midplanes/routers which
                                    	   are discovered twice. Use one of them */
 #define VISITED_BOARD		0x08	/* Used for compact hub numbering. */
-#define LOCAL_MASTER_IO6	0x10 	/* master io6 for that node */
-#define GLOBAL_MASTER_IO6	0x20
-#define GLOBAL_MASTER_EXT 	0x40  	/* extend master io6 to other bus on ibrick */
-#define SECOND_NIC_PRESENT 	0x80 	/* addons like MIO are present */
+#define LOCAL_MASTER_IO6	0x10    /* master io6 for that node */
+#define KLTYPE_IOBRICK_XBOW	(KLCLASS_MIDPLANE | 0x2)
 
 /* klinfo->flags fields */
 
@@ -347,47 +345,18 @@ typedef struct kl_config_hdr {
 
 #define KLTYPE_WEIRDIO	(KLCLASS_IOBRICK  | 0x0)
 #define KLTYPE_BASEIO	(KLCLASS_IO  | 0x1) /* IOC3, SuperIO, Bridge, SCSI */
-#define KLTYPE_IO6	KLTYPE_BASEIO       /* Additional name */
-#define KLTYPE_4CHSCSI	(KLCLASS_IO  | 0x2)
-#define KLTYPE_MSCSI	KLTYPE_4CHSCSI      /* Additional name */
 #define KLTYPE_ETHERNET	(KLCLASS_IO  | 0x3)
-#define KLTYPE_MENET	KLTYPE_ETHERNET     /* Additional name */
 #define KLTYPE_FDDI  	(KLCLASS_IO  | 0x4)
-#define KLTYPE_UNUSED	(KLCLASS_IO  | 0x5) /* XXX UNUSED */
-#define KLTYPE_HAROLD   (KLCLASS_IO  | 0x6) /* PCI SHOE BOX */
-#define KLTYPE_PCI	KLTYPE_HAROLD
-#define KLTYPE_VME      (KLCLASS_IO  | 0x7) /* Any 3rd party VME card */
-#define KLTYPE_MIO   	(KLCLASS_IO  | 0x8)
 #define KLTYPE_FC    	(KLCLASS_IO  | 0x9)
-#define KLTYPE_LINC    	(KLCLASS_IO  | 0xA)
-#define KLTYPE_TPU    	(KLCLASS_IO  | 0xB) /* Tensor Processing Unit */
 #define KLTYPE_GSN_A   	(KLCLASS_IO  | 0xC) /* Main GSN board */
 #define KLTYPE_GSN_B   	(KLCLASS_IO  | 0xD) /* Auxiliary GSN board */
-#define KLTYPE_SHOEHORN (KLCLASS_IO  | 0xE)
-#define KLTYPE_SERIAL_HIPPI (KLCLASS_IO  | 0xF)
 
-#define KLTYPE_GFX	(KLCLASS_GFX | 0x0) /* unknown graphics type */
-#define KLTYPE_GFX_KONA (KLCLASS_GFX | 0x1) /* KONA graphics on IP27 */
-#define KLTYPE_GFX_MGRA (KLCLASS_GFX | 0x3) /* MGRAS graphics on IP27 */
-
-#define KLTYPE_WEIRDROUTER (KLCLASS_ROUTER | 0x0)
 #define KLTYPE_ROUTER     (KLCLASS_ROUTER | 0x1)
-#define KLTYPE_ROUTER2    KLTYPE_ROUTER		/* Obsolete! */
-#define KLTYPE_NULL_ROUTER (KLCLASS_ROUTER | 0x2)
 #define KLTYPE_META_ROUTER (KLCLASS_ROUTER | 0x3)
 #define KLTYPE_REPEATER_ROUTER (KLCLASS_ROUTER | 0x4)
 
-#define KLTYPE_WEIRDMIDPLANE (KLCLASS_MIDPLANE | 0x0)
-#define KLTYPE_MIDPLANE8  (KLCLASS_MIDPLANE | 0x1) /* 8 slot backplane */
-#define KLTYPE_MIDPLANE    KLTYPE_MIDPLANE8
-#define KLTYPE_IOBRICK_XBOW	(KLCLASS_MIDPLANE | 0x2)
-
 #define KLTYPE_IOBRICK		(KLCLASS_IOBRICK | 0x0)
-#define KLTYPE_IBRICK		(KLCLASS_IOBRICK | 0x1)
-#define KLTYPE_PBRICK		(KLCLASS_IOBRICK | 0x2)
-#define KLTYPE_XBRICK		(KLCLASS_IOBRICK | 0x3)
 #define KLTYPE_NBRICK		(KLCLASS_IOBRICK | 0x4)
-#define KLTYPE_PEBRICK		(KLCLASS_IOBRICK | 0x5)
 #define KLTYPE_PXBRICK		(KLCLASS_IOBRICK | 0x6)
 #define KLTYPE_IXBRICK		(KLCLASS_IOBRICK | 0x7)
 #define KLTYPE_CGBRICK		(KLCLASS_IOBRICK | 0x8)
@@ -406,9 +375,6 @@ typedef struct kl_config_hdr {
 #define KLTYPE_UNKNOWN	(KLCLASS_UNKNOWN | 0xf)
 
 #define KLTYPE(_x) 	((_x) & KLTYPE_MASK)
-#define IS_MIO_PRESENT(l)	((l->brd_type == KLTYPE_BASEIO) && \
-				 (l->brd_flags & SECOND_NIC_PRESENT))
-#define IS_MIO_IOC3(l,n)	(IS_MIO_PRESENT(l) && (n > 2))
 
 /* 
  * board structures

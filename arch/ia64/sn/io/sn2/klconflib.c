@@ -268,14 +268,6 @@ board_to_path(lboard_t *brd, char *path)
 				board_name = EDGE_LBL_PXBRICK;
 			else if (brd->brd_type == KLTYPE_IXBRICK)
 				board_name = EDGE_LBL_IXBRICK;
-			else if (brd->brd_type == KLTYPE_PBRICK)
-				board_name = EDGE_LBL_PBRICK;
-			else if (brd->brd_type == KLTYPE_IBRICK)
-				board_name = EDGE_LBL_IBRICK;
-			else if (brd->brd_type == KLTYPE_XBRICK)
-				board_name = EDGE_LBL_XBRICK;
-			else if (brd->brd_type == KLTYPE_PEBRICK)
-				board_name = EDGE_LBL_PEBRICK;
 			else if (brd->brd_type == KLTYPE_CGBRICK)
 				board_name = EDGE_LBL_CGBRICK;
 			else
@@ -438,71 +430,24 @@ board_serial_number_get(lboard_t *board,char *serial_number)
 		break;
 	}
 	case KLCLASS_IO: {	/* IO board */
-		if (KLTYPE(board->brd_type) == KLTYPE_TPU) {
-		/* Special case for TPU boards */
-			kltpu_t *tpu;	
+	     	klbri_t	*bridge;
 		
-			/* Get the tpu component information */
-			tpu = (kltpu_t *)find_first_component(board,
-						      KLSTRUCT_TPU);
-			/* If we don't have a tpu component on a tpu board
-			 * then we have a weird klconfig.
-			 */
-			if (!tpu)
-				return(1);
-			/* Get the serial number information from
-			 * the tpu's manufacturing nic info
-			 */
-			if (component_serial_number_get(board,
-						tpu->tpu_mfg_nic,
-						serial_number,
-						""))
-				return(1);
-			break;
-		} else  if ((KLTYPE(board->brd_type) == KLTYPE_GSN_A) ||
-		            (KLTYPE(board->brd_type) == KLTYPE_GSN_B)) {
-		/* Special case for GSN boards */
-			klgsn_t *gsn;	
-		
-			/* Get the gsn component information */
-			gsn = (klgsn_t *)find_first_component(board,
-			      ((KLTYPE(board->brd_type) == KLTYPE_GSN_A) ?
-					KLSTRUCT_GSN_A : KLSTRUCT_GSN_B));
-			/* If we don't have a gsn component on a gsn board
-			 * then we have a weird klconfig.
-			 */
-			if (!gsn)
-				return(1);
-			/* Get the serial number information from
-			 * the gsn's manufacturing nic info
-			 */
-			if (component_serial_number_get(board,
-						gsn->gsn_mfg_nic,
-						serial_number,
-						""))
-				return(1);
-			break;
-		} else {
-		     	klbri_t	*bridge;
-		
-			/* Get the bridge component information */
-			bridge = (klbri_t *)find_first_component(board,
+		/* Get the bridge component information */
+		bridge = (klbri_t *)find_first_component(board,
 							 KLSTRUCT_BRI);
-			/* If we don't have a bridge component on an IO board
-			 * then we have a weird klconfig.
-			 */
-			if (!bridge)
-				return(1);
-			/* Get the serial number information from
-		 	 * the bridge's manufacturing nic info
-			 */
-			if (component_serial_number_get(board,
-						bridge->bri_mfg_nic,
-						serial_number,
-						""))
-				return(1);
-			break;
-		}
+		/* If we don't have a bridge component on an IO board
+		 * then we have a weird klconfig.
+		 */
+		if (!bridge)
+			return(1);
+		/* Get the serial number information from
+	 	 * the bridge's manufacturing nic info
+		 */
+		if (component_serial_number_get(board,
+					bridge->bri_mfg_nic,
+					serial_number, ""))
+			return(1);
+		break;
 	}
 	case KLCLASS_ROUTER: {	/* Router board */
 		klrou_t *router;	
