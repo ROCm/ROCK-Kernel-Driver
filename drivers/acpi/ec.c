@@ -731,7 +731,7 @@ acpi_ec_stop (
 }
 
 
-static int __init
+int __init
 acpi_ec_ecdt_probe (void)
 {
 	acpi_status		status;
@@ -798,17 +798,8 @@ static int __init acpi_ec_init (void)
 	if (acpi_disabled)
 		return_VALUE(0);
 
-	/*
-	 * ACPI 2.0 requires the EC driver to be loaded and work before
-	 * the EC device is found in the namespace. This is accomplished
-	 * by looking for the ECDT table, and getting the EC parameters out
-	 * of that.
-	 */
-	result = acpi_ec_ecdt_probe();
-
 	/* Now register the driver for the EC */
-	if (!result) 
-		result = acpi_bus_register_driver(&acpi_ec_driver);
+	result = acpi_bus_register_driver(&acpi_ec_driver);
 	return_VALUE(result);
 }
 
