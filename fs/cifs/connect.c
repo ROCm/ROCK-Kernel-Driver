@@ -64,6 +64,8 @@ struct smb_vol {
 	int rw:1;
 	int retry:1;
 	int intr:1;
+	int setuids:1;
+	int noperm:1;
 	unsigned int rsize;
 	unsigned int wsize;
 	unsigned int sockopt;
@@ -740,6 +742,14 @@ cifs_parse_mount_options(char *options, const char *devname, struct smb_vol *vol
 			vol->retry = 1;
 		} else if (strnicmp(data, "soft", 4) == 0) {
 			vol->retry = 0;
+		} else if (strnicmp(data, "perm", 4) == 0) {
+			vol->noperm = 0;
+		} else if (strnicmp(data, "noperm", 6) == 0) {
+			vol->noperm = 1;
+		} else if (strnicmp(data, "setuids", 7) == 0) {
+			vol->setuids = 1;
+		} else if (strnicmp(data, "nosetuids", 9) == 0) {
+			vol->setuids = 0;
 		} else if (strnicmp(data, "nohard", 6) == 0) {
 			vol->retry = 0;
 		} else if (strnicmp(data, "nosoft", 6) == 0) {
@@ -1314,6 +1324,12 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 		cifs_sb->mnt_file_mode = volume_info.file_mode;
 		cifs_sb->mnt_dir_mode = volume_info.dir_mode;
 		cFYI(1,("file mode: 0x%x  dir mode: 0x%x",cifs_sb->mnt_file_mode,cifs_sb->mnt_dir_mode));
+
+		if(volume_info.noperm)
+			cifs_sb->mnt_cifs_flags |= CIFS_MOUNT_NO_PERM;
+		if(volume_info.setuids)
+			cifs_sb->mnt_cifs_flags |= CIFS_MOUNT_SET_UID;
+
 		tcon =
 		    find_unc(sin_server.sin_addr.s_addr, volume_info.UNC,
 			     volume_info.username);
