@@ -911,7 +911,8 @@ static void ndisc_recv_na(struct sk_buff *skb)
 
 		neigh_update(neigh, lladdr,
 			     msg->icmph.icmp6_solicited ? NUD_REACHABLE : NUD_STALE,
-			     msg->icmph.icmp6_override ? NEIGH_UPDATE_F_OVERRIDE : 0);
+			     NEIGH_UPDATE_F_SUSPECT_CONNECTED|
+			     (msg->icmph.icmp6_override ? NEIGH_UPDATE_F_OVERRIDE : 0));
 		neigh_release(neigh);
 	}
 }

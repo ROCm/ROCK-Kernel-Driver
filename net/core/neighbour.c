@@ -803,6 +803,9 @@ static __inline__ void neigh_update_hhs(struct neighbour *neigh)
    -- flags
 	NEIGH_UPDATE_F_OVERRIDE allows to override existing lladdr,
 				if it is different.
+	NEIGH_UPDATE_F_SUSPECT_CONNECTED will suspect existing "connected"
+				lladdr instead of overriding it 
+				if it is different.
 	NEIGH_UPDATE_F_ADMIN	means that the change is administrative.
 
    Caller MUST hold reference count on the entry.
@@ -850,12 +853,9 @@ int neigh_update(struct neighbour *neigh, const u8 *lladdr, u8 new,
 		   - compare new & old
 		   - if they are different, check override flag
 		 */
-		if (old & NUD_VALID) {
-			if (!memcmp(lladdr, neigh->ha, dev->addr_len))
-				lladdr = neigh->ha;
-			else if (!(flags & NEIGH_UPDATE_F_OVERRIDE))
-				goto out;
-		}
+		if ((old & NUD_VALID) && 
+		    !memcmp(lladdr, neigh->ha, dev->addr_len))
+			lladdr = neigh->ha;
 	} else {
 		/* No address is supplied; if we know something,
 		   use it, otherwise discard the request.
@@ -876,9 +876,20 @@ int neigh_update(struct neighbour *neigh, const u8 *lladdr, u8 new,
 	   do not change entry state, if new one is STALE.
 	 */
 	err = 0;
-	if ((old & NUD_VALID) && lladdr == neigh->ha &&
-	    (new == old || (new == NUD_STALE && (old & NUD_CONNECTED))))
-		goto out;
+	if (old & NUD_VALID) {
+		if (lladdr != neigh->ha && !(flags & NEIGH_UPDATE_F_OVERRIDE)) {
+			if ((flags & NEIGH_UPDATE_F_SUSPECT_CONNECTED) &&
+			    (old & NUD_CONNECTED)) {
+				lladdr = neigh->ha;
+				new = NUD_STALE;
+			} else
+				goto out;
+		} else {
+			if (lladdr == neigh->ha && 
+			    new == NUD_STALE && (old & NUD_CONNECTED))
+				new = old;
+		}
+	}
 
 	neigh_del_timer(neigh);
 	neigh->nud_state = new;
