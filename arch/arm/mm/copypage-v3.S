@@ -10,6 +10,7 @@
  *  ASM optimised string functions
  */
 #include <linux/linkage.h>
+#include <linux/init.h>
 #include <asm/assembler.h>
 #include <asm/constants.h>
 
@@ -57,7 +58,7 @@ ENTRY(v3_clear_user_page)
 	bne	1b				@ 1
 	ldr	pc, [sp], #4
 
-	.section ".text.init", #alloc, #execinstr
+	__INIT
 
 ENTRY(v3_user_fns)
 	.long	v3_clear_user_page

@@ -11,6 +11,7 @@
 #include <stdarg.h>
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
@@ -158,6 +159,8 @@ void show_regs(struct pt_regs * regs)
 
 	flags = condition_codes(regs);
 
+	print_symbol("PC is at %s\n", instruction_pointer(regs));
+	print_symbol("LR is at %s\n", regs->ARM_lr);
 	printk("pc : [<%08lx>]    lr : [<%08lx>]    %s\n"
 	       "sp : %08lx  ip : %08lx  fp : %08lx\n",
 		instruction_pointer(regs),

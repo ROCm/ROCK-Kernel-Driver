@@ -10,6 +10,7 @@
  *  ASM optimised string functions
  */
 #include <linux/linkage.h>
+#include <linux/init.h>
 #include <asm/constants.h>
 
 	.text
@@ -69,7 +70,7 @@ ENTRY(v4wb_clear_user_page)
 	mcr	p15, 0, r1, c7, c10, 4		@ 1   drain WB
 	ldr	pc, [sp], #4
 
-	.section ".text.init", #alloc, #execinstr
+	__INIT
 
 ENTRY(v4wb_user_fns)
 	.long	v4wb_clear_user_page
