@@ -259,7 +259,8 @@ acpi_walk_resources (
 	/* Setup pointers */
 
 	resource  = (struct acpi_resource *) buffer.pointer;
-	buffer_end = (struct acpi_resource *) ((u8 *) buffer.pointer + buffer.length);
+	buffer_end = ACPI_CAST_PTR (struct acpi_resource,
+			  ((u8 *) buffer.pointer + buffer.length));
 
 	/* Walk the resource list */
 

@@ -437,8 +437,7 @@ acpi_ds_init_aml_walk (
 	struct acpi_namespace_node      *method_node,
 	u8                              *aml_start,
 	u32                             aml_length,
-	union acpi_operand_object       **params,
-	union acpi_operand_object       **return_obj_desc,
+	struct acpi_parameter_info      *info,
 	u32                             pass_number);
 
 acpi_status
