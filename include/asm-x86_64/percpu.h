@@ -42,4 +42,7 @@ extern unsigned long __per_cpu_offset[NR_CPUS];
 
 extern void setup_per_cpu_areas(void);
 
+#define EXPORT_PER_CPU_SYMBOL(var) EXPORT_SYMBOL(var##__per_cpu)
+#define EXPORT_PER_CPU_SYMBOL_GPL(var) EXPORT_SYMBOL_GPL(var##__per_cpu)
+
 #endif /* _ASM_X8664_PERCPU_H_ */

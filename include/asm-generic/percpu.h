@@ -27,8 +27,12 @@ extern unsigned long __per_cpu_offset[NR_CPUS];
 
 #define per_cpu(var, cpu)			((void)cpu, var##__per_cpu)
 #define __get_cpu_var(var)			var##__per_cpu
-#endif
+
+#endif	/* SMP */
 
 #define DECLARE_PER_CPU(type, name) extern __typeof__(type) name##__per_cpu
+
+#define EXPORT_PER_CPU_SYMBOL(var) EXPORT_SYMBOL(var##__per_cpu)
+#define EXPORT_PER_CPU_SYMBOL_GPL(var) EXPORT_SYMBOL_GPL(var##__per_cpu)
 
 #endif /* _ASM_GENERIC_PERCPU_H_ */
