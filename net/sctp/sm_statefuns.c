@@ -1,7 +1,7 @@
 /* SCTP kernel reference Implementation
+ * (C) Copyright IBM Corp. 2001, 2003
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001-2002 International Business Machines, Corp.
  * Copyright (c) 2001-2002 Intel Corp.
  * Copyright (c) 2002      Nokia Corp.
  *
@@ -2864,6 +2864,9 @@ sctp_disposition_t sctp_sf_operr_notify(const struct sctp_endpoint *ep,
 			sctp_ulpevent_free(ev);
 			goto nomem;
 		}
+
+		sctp_add_cmd_sf(commands, SCTP_CMD_PROCESS_OPERR,
+				SCTP_CHUNK(chunk));	
 	}
 	return SCTP_DISPOSITION_CONSUME;
 

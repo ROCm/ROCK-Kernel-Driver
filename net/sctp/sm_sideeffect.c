@@ -1,7 +1,7 @@
 /* SCTP kernel reference Implementation
+ * (C) Copyright IBM Corp. 2001, 2003
  * Copyright (c) 1999 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001-2002 International Business Machines Corp.
  *
  * This file is part of the SCTP kernel reference Implementation
  *
@@ -690,6 +690,44 @@ static void sctp_cmd_setup_t4(sctp_cmd_seq_t *cmds,
 	chunk->transport = t;
 }
 
+/* Process an incoming Operation Error Chunk. */ 
+static void sctp_cmd_process_operr(sctp_cmd_seq_t *cmds,
+				   struct sctp_association *asoc,
+				   struct sctp_chunk *chunk)
+{
+	struct sctp_operr_chunk *operr_chunk;
+	struct sctp_errhdr *err_hdr;
+
+	operr_chunk = (struct sctp_operr_chunk *)chunk->chunk_hdr;
+	err_hdr = &operr_chunk->err_hdr;
+
+	switch (err_hdr->cause) {
+	case SCTP_ERROR_UNKNOWN_CHUNK:
+	{
+		struct sctp_chunkhdr *unk_chunk_hdr;
+
+		unk_chunk_hdr = (struct sctp_chunkhdr *)err_hdr->variable;
+		switch (unk_chunk_hdr->type) {
+		/* ADDIP 4.1 A9) If the peer responds to an ASCONF with an
+		 * ERROR chunk reporting that it did not recognized the ASCONF
+		 * chunk type, the sender of the ASCONF MUST NOT send any
+		 * further ASCONF chunks and MUST stop its T-4 timer.
+		 */
+		case SCTP_CID_ASCONF:
+			asoc->peer.asconf_capable = 0;
+			sctp_add_cmd_sf(cmds, SCTP_CMD_TIMER_STOP,
+					SCTP_TO(SCTP_EVENT_TIMEOUT_T4_RTO));
+			break;
+		default:
+			break;
+		}
+		break;
+	}
+	default:
+		break;
+	}
+}
+
 /* These three macros allow us to pull the debugging code out of the
  * main flow of sctp_do_sm() to keep attention focused on the real
  * functionality there.
@@ -1205,6 +1243,9 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 			sctp_cmd_setup_t4(commands, asoc, cmd->obj.ptr);
 			break;
 
+		case SCTP_CMD_PROCESS_OPERR:
+			sctp_cmd_process_operr(commands, asoc, chunk);
+			break;
 		default:
 			printk(KERN_WARNING "Impossible command: %u, %p\n",
 			       cmd->verb, cmd->obj.ptr);

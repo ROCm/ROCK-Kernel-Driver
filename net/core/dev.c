@@ -1488,6 +1488,18 @@ static void net_tx_action(struct softirq_action *h)
 	}
 }
 
+static __inline__ int deliver_skb(struct sk_buff *skb,
+				  struct packet_type *pt_prev, int last)
+{
+	if (unlikely(!pt_prev->data))
+		return deliver_to_old_ones(pt_prev, skb, last);
+	else {
+		atomic_inc(&skb->users);
+		return pt_prev->func(skb, skb->dev, pt_prev);
+	}
+}
+
+
 #if defined(CONFIG_BRIDGE) || defined (CONFIG_BRIDGE_MODULE)
 int (*br_handle_frame_hook)(struct sk_buff *skb);
 
@@ -1495,15 +1507,8 @@ static __inline__ int handle_bridge(struct sk_buff *skb,
 				     struct packet_type *pt_prev)
 {
 	int ret = NET_RX_DROP;
-
-	if (pt_prev) {
-		if (!pt_prev->data)
-			ret = deliver_to_old_ones(pt_prev, skb, 0);
-		else {
-			atomic_inc(&skb->users);
-			ret = pt_prev->func(skb, skb->dev, pt_prev);
-		}
-	}
+	if (pt_prev)
+		ret = deliver_skb(skb, pt_prev, 0);
 
 	return ret;
 }
@@ -1551,16 +1556,8 @@ int netif_receive_skb(struct sk_buff *skb)
 	rcu_read_lock();
 	list_for_each_entry_rcu(ptype, &ptype_all, list) {
 		if (!ptype->dev || ptype->dev == skb->dev) {
-			if (pt_prev) {
-				if (!pt_prev->data) {
-					ret = deliver_to_old_ones(pt_prev,
-								  skb, 0);
-				} else {
-					atomic_inc(&skb->users);
-					ret = pt_prev->func(skb, skb->dev,
-							    pt_prev);
-				}
-			}
+			if (pt_prev) 
+				ret = deliver_skb(skb, pt_prev, 0);
 			pt_prev = ptype;
 		}
 	}
@@ -1573,27 +1570,15 @@ int netif_receive_skb(struct sk_buff *skb)
 	list_for_each_entry_rcu(ptype, &ptype_base[ntohs(type)&15], list) {
 		if (ptype->type == type &&
 		    (!ptype->dev || ptype->dev == skb->dev)) {
-			if (pt_prev) {
-				if (!pt_prev->data) {
-					ret = deliver_to_old_ones(pt_prev,
-								  skb, 0);
-				} else {
-					atomic_inc(&skb->users);
-					ret = pt_prev->func(skb, skb->dev,
-							    pt_prev);
-				}
-			}
+			if (pt_prev) 
+				ret = deliver_skb(skb, pt_prev, 0);
 			pt_prev = ptype;
 		}
 	}
 
-	if (pt_prev) {
-		if (!pt_prev->data) {
-			ret = deliver_to_old_ones(pt_prev, skb, 1);
-		} else {
-			ret = pt_prev->func(skb, skb->dev, pt_prev);
-		}
-	} else {
+	if (pt_prev)
+		ret = deliver_skb(skb, pt_prev, 1);
+	else {
 		kfree_skb(skb);
 		/* Jamal, now you will not able to escape explaining
 		 * me how you were going to use this. :-)
