@@ -550,7 +550,8 @@ static int ea_get(struct inode *inode, struct ea_buffer *ea_buf, int min_size)
 	}
 	ea_buf->flag = EA_EXTENT;
 	ea_buf->mp = read_metapage(inode, addressDXD(&ji->ea),
-				   lengthDXD(&ji->ea), 1);
+				   lengthDXD(&ji->ea) << sb->s_blocksize_bits,
+				   1);
 	if (ea_buf->mp == NULL)
 		return -EIO;
 	ea_buf->xattr = ea_buf->mp->data;
