@@ -51,6 +51,7 @@
 #include <linux/init.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/buffer_head.h>		/* for invalidate_bdev() */
+#include <linux/backing-dev.h>
 #include <asm/uaccess.h>
 
 /*
@@ -351,6 +352,10 @@ static struct file_operations initrd_fops = {
 
 #endif
 
+static struct backing_dev_info rd_backing_dev_info = {
+	.ra_pages	= 0,	/* No readahead */
+	.memory_backed	= 1,	/* Does not contribute to dirty memory */
+};
 
 static int rd_open(struct inode * inode, struct file * filp)
 {
@@ -379,6 +384,7 @@ static int rd_open(struct inode * inode, struct file * filp)
 		rd_bdev[unit]->bd_openers++;
 		rd_bdev[unit]->bd_block_size = rd_blocksize;
 		rd_bdev[unit]->bd_inode->i_mapping->a_ops = &ramdisk_aops;
+		rd_bdev[unit]->bd_inode->i_mapping->backing_dev_info = &rd_backing_dev_info;
 		rd_bdev[unit]->bd_inode->i_size = rd_length[unit];
 		rd_bdev[unit]->bd_queue = &blk_dev[MAJOR_NR].request_queue;
 		rd_bdev[unit]->bd_disk = get_disk(rd_disks[unit]);
