@@ -109,7 +109,6 @@ static void smp_setup_percpu_timer(void);
 static volatile unsigned long callin_flag = 0;
 
 extern void inherit_locked_prom_mappings(int save_p);
-extern void cpu_probe(void);
 
 void __init smp_callin(void)
 {
@@ -128,8 +127,6 @@ void __init smp_callin(void)
 
 	__flush_cache_all();
 	__flush_tlb_all();
-
-	cpu_probe();
 
 	smp_setup_percpu_timer();
 

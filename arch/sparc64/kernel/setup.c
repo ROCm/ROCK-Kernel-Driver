@@ -586,8 +586,8 @@ asmlinkage int sys_ioperm(unsigned long from, unsigned long num, int on)
 
 /* BUFFER is PAGE_SIZE bytes long. */
 
-extern char *sparc_cpu_type[];
-extern char *sparc_fpu_type[];
+extern char *sparc_cpu_type;
+extern char *sparc_fpu_type;
 
 extern void smp_info(struct seq_file *);
 extern void smp_bogo(struct seq_file *);
@@ -599,8 +599,6 @@ unsigned long up_clock_tick;
 
 static int show_cpuinfo(struct seq_file *m, void *__unused)
 {
-	int cpuid = smp_processor_id();
-
 	seq_printf(m, 
 		   "cpu\t\t: %s\n"
 		   "fpu\t\t: %s\n"
@@ -614,8 +612,8 @@ static int show_cpuinfo(struct seq_file *m, void *__unused)
 		   "Cpu0ClkTck\t: %016lx\n"
 #endif
 		   ,
-		   sparc_cpu_type[cpuid],
-		   sparc_fpu_type[cpuid],
+		   sparc_cpu_type,
+		   sparc_fpu_type,
 		   prom_rev,
 		   prom_prev >> 16,
 		   (prom_prev >> 8) & 0xff,
