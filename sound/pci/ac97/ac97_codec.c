@@ -999,6 +999,8 @@ AD18XX_PCM_BITS("LFE Playback Volume", 2, 0, 0, 31)
  *
  */
 
+static void snd_ac97_powerdown(ac97_t *ac97);
+
 static int snd_ac97_bus_free(ac97_bus_t *bus)
 {
 	if (bus) {
@@ -1034,6 +1036,7 @@ static int snd_ac97_free(ac97_t *ac97)
 static int snd_ac97_dev_free(snd_device_t *device)
 {
 	ac97_t *ac97 = snd_magic_cast(ac97_t, device->device_data, return -ENXIO);
+	snd_ac97_powerdown(ac97); /* for avoiding click noises during shut down */
 	return snd_ac97_free(ac97);
 }
 
@@ -1995,18 +1998,16 @@ int snd_ac97_mixer(ac97_bus_t * bus, ac97_t * _ac97, ac97_t ** rac97)
 	return 0;
 }
 
-#ifdef CONFIG_PM
-/**
- * snd_ac97_suspend - General suspend function for AC97 codec
- * @ac97: the ac97 instance
+
+/*
+ * Power down the chip.
  *
- * Suspends the codec, power down the chip.
  * MASTER and HEADPHONE registers are muted but the register cache values
  * are not changed, so that the values can be restored in snd_ac97_resume().
  */
-void snd_ac97_suspend(ac97_t *ac97)
+static void snd_ac97_powerdown(ac97_t *ac97)
 {
-	unsigned short power = (ac97->regs[AC97_POWERDOWN] ^ 0x8000) & ~0x8000;	/* invert EAPD */
+	unsigned short power;
 
 	if (ac97_is_audio(ac97)) {
 		/* some codecs have stereo mute bits */
@@ -2014,6 +2015,7 @@ void snd_ac97_suspend(ac97_t *ac97)
 		snd_ac97_write(ac97, AC97_HEADPHONE, 0x9f9f);
 	}
 
+	power = ac97->regs[AC97_POWERDOWN] | 0x8000;	/* EAPD */
 	power |= 0x4000;	/* Headphone amplifier powerdown */
 	power |= 0x0300;	/* ADC & DAC powerdown */
 	snd_ac97_write(ac97, AC97_POWERDOWN, power);
@@ -2021,8 +2023,24 @@ void snd_ac97_suspend(ac97_t *ac97)
 	power |= 0x0400;	/* Analog Mixer powerdown (Vref on) */
 	snd_ac97_write(ac97, AC97_POWERDOWN, power);
 	udelay(100);
+#if 0
+	/* FIXME: this causes click noises on some boards at resume */
 	power |= 0x3800;	/* AC-link powerdown, internal Clk disable */
 	snd_ac97_write(ac97, AC97_POWERDOWN, power);
+#endif
+}
+
+
+#ifdef CONFIG_PM
+/**
+ * snd_ac97_suspend - General suspend function for AC97 codec
+ * @ac97: the ac97 instance
+ *
+ * Suspends the codec, power down the chip.
+ */
+void snd_ac97_suspend(ac97_t *ac97)
+{
+	snd_ac97_powerdown(ac97);
 }
 
 /**
