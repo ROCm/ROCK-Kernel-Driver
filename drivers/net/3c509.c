@@ -1668,7 +1668,7 @@ static void __exit el3_cleanup_module(void)
 	struct net_device *next_dev;
 
 	while (el3_root_dev) {
-		struct el3_private *lp = (struct el3_private *)el3_root_dev->priv;
+		struct el3_private *lp = el3_root_dev->priv;
 
 		next_dev = lp->next_dev;
 		el3_common_remove (el3_root_dev);
