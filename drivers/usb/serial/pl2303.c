@@ -213,6 +213,9 @@ static int pl2303_write (struct usb_serial_port *port, int from_user,  const uns
 
 	dbg("%s - port %d, %d bytes", __FUNCTION__, port->number, count);
 
+	if (!count)
+		return count;
+
 	if (port->write_urb->status == -EINPROGRESS) {
 		dbg("%s - already writing", __FUNCTION__);
 		return 0;
