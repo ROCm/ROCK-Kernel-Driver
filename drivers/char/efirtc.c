@@ -155,7 +155,7 @@ efi_rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	efi_time_t	eft;
 	efi_time_cap_t	cap;
 	struct rtc_time	wtime;
-	struct rtc_wkalrm *ewp;
+	struct rtc_wkalrm __user *ewp;
 	unsigned char	enabled, pending;
 
 	switch (cmd) {
@@ -189,13 +189,15 @@ efi_rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 			convert_from_efi_time(&eft, &wtime);
 
- 			return copy_to_user((void *)arg, &wtime, sizeof (struct rtc_time)) ? - EFAULT : 0;
+ 			return copy_to_user((void __user *)arg, &wtime,
+					    sizeof (struct rtc_time)) ? - EFAULT : 0;
 
 		case RTC_SET_TIME:
 
 			if (!capable(CAP_SYS_TIME)) return -EACCES;
 
-			if (copy_from_user(&wtime, (struct rtc_time *)arg, sizeof(struct rtc_time)) )
+			if (copy_from_user(&wtime, (struct rtc_time __user *)arg,
+					   sizeof(struct rtc_time)) )
 				return -EFAULT;
 
 			convert_to_efi_time(&wtime, &eft);
@@ -212,19 +214,19 @@ efi_rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 			if (!capable(CAP_SYS_TIME)) return -EACCES;
 
-			ewp = (struct rtc_wkalrm *)arg;
+			ewp = (struct rtc_wkalrm __user *)arg;
 
 			if (  get_user(enabled, &ewp->enabled)
 			   || copy_from_user(&wtime, &ewp->time, sizeof(struct rtc_time)) )
 				return -EFAULT;
 
 			convert_to_efi_time(&wtime, &eft);
-			
+
 			spin_lock_irqsave(&efi_rtc_lock, flags);
 			/*
 			 * XXX Fixme:
 			 * As of EFI 0.92 with the firmware I have on my
-			 * machine this call does not seem to work quite 
+			 * machine this call does not seem to work quite
 			 * right
 			 */
 			status = efi.set_wakeup_time((efi_bool_t)enabled, &eft);
@@ -243,14 +245,15 @@ efi_rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 			if (status != EFI_SUCCESS) return -EINVAL;
 
-			ewp = (struct rtc_wkalrm *)arg;
+			ewp = (struct rtc_wkalrm __user *)arg;
 
 			if (  put_user(enabled, &ewp->enabled)
 			   || put_user(pending, &ewp->pending)) return -EFAULT;
 
 			convert_from_efi_time(&eft, &wtime);
 
-			return copy_to_user((void *)&ewp->time, &wtime, sizeof(struct rtc_time)) ? -EFAULT : 0;
+			return copy_to_user(&ewp->time, &wtime,
+					    sizeof(struct rtc_time)) ? -EFAULT : 0;
 	}
 	return -EINVAL;
 }
