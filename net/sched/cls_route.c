@@ -125,20 +125,20 @@ static __inline__ int route4_hash_wild(void)
 	return 32;
 }
 
-#define ROUTE4_APPLY_RESULT()						\
-	do {								\
-		*res = f->res;						\
-		if (tcf_exts_is_available(&f->exts)) {			\
-			int r = tcf_exts_exec(skb, &f->exts, res);	\
-			if (r < 0) {					\
-				dont_cache = 1;				\
-				continue;				\
-			}						\
-			return r;					\
-		} else if (!dont_cache)					\
-			route4_set_fastmap(head, id, iif, f);		\
-		return 0;						\
-	} while(0)
+#define ROUTE4_APPLY_RESULT()					\
+{								\
+	*res = f->res;						\
+	if (tcf_exts_is_available(&f->exts)) {			\
+		int r = tcf_exts_exec(skb, &f->exts, res);	\
+		if (r < 0) {					\
+			dont_cache = 1;				\
+			continue;				\
+		}						\
+		return r;					\
+	} else if (!dont_cache)					\
+		route4_set_fastmap(head, id, iif, f);		\
+	return 0;						\
+}
 
 static int route4_classify(struct sk_buff *skb, struct tcf_proto *tp,
 			   struct tcf_result *res)
