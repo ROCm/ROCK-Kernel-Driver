@@ -17,15 +17,6 @@
 
 const char *NETjet_S_revision = "$Revision: 2.7.6.6 $";
 
-static u_char dummyrr(struct IsdnCardState *cs, int chan, u_char off)
-{
-	return(5);
-}
-
-static void dummywr(struct IsdnCardState *cs, int chan, u_char off, u_char value)
-{
-}
-
 static void
 netjet_s_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
@@ -239,8 +230,6 @@ setup_netjet_s(struct IsdnCard *card)
 	cs->writeisac = &NETjet_WriteIC;
 	cs->readisacfifo  = &NETjet_ReadICfifo;
 	cs->writeisacfifo = &NETjet_WriteICfifo;
-	cs->BC_Read_Reg  = &dummyrr;
-	cs->BC_Write_Reg = &dummywr;
 	cs->BC_Send_Data = &netjet_fill_dma;
 	cs->cardmsg = &NETjet_S_card_msg;
 	cs->irq_func = &netjet_s_interrupt;

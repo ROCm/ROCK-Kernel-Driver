@@ -168,18 +168,6 @@ WriteHDLCPnP(struct IsdnCardState *cs, int chan, u_char offset, u_char value)
 	spin_unlock_irqrestore(&avm_pci_lock, flags);
 }
 
-static u_char
-ReadHDLC_s(struct IsdnCardState *cs, int chan, u_char offset)
-{
-	return(0xff & ReadHDLCPCI(cs, chan, offset));
-}
-
-static void
-WriteHDLC_s(struct IsdnCardState *cs, int chan, u_char offset, u_char value)
-{
-	WriteHDLCPCI(cs, chan, offset, value);
-}
-
 static inline
 struct BCState *Sel_BCS(struct IsdnCardState *cs, int channel)
 {
@@ -764,20 +752,13 @@ ready:
 		printk(KERN_INFO "AVM PCI: stat %#x\n", val);
 		printk(KERN_INFO "AVM PCI: Class %X Rev %d\n",
 			val & 0xff, (val>>8) & 0xff);
-		cs->BC_Read_Reg = &ReadHDLC_s;
-		cs->BC_Write_Reg = &WriteHDLC_s;
 		break;
 	  case AVM_FRITZ_PNP:
 		val = inb(cs->hw.avm.cfg_reg);
 		ver = inb(cs->hw.avm.cfg_reg + 1);
 		printk(KERN_INFO "AVM PnP: Class %X Rev %d\n", val, ver);
 		reset_avmpcipnp(cs);
-		cs->BC_Read_Reg = &ReadHDLCPnP;
-		cs->BC_Write_Reg = &WriteHDLCPnP;
 		break;
-	  default:
-	  	printk(KERN_WARNING "AVM unknown subtype %d\n", cs->subtyp);
-	  	return(0);
 	}
 	printk(KERN_INFO "HiSax: %s config irq:%d base:0x%X\n",
 		(cs->subtyp == AVM_FRITZ_PCI) ? "AVM Fritz!PCI" : "AVM Fritz!PnP",

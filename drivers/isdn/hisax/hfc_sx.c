@@ -1289,8 +1289,6 @@ setup_hfcsx(struct IsdnCard *card)
 	cs->writeisac = NULL;
 	cs->readisacfifo = NULL;
 	cs->writeisacfifo = NULL;
-	cs->BC_Read_Reg = NULL;
-	cs->BC_Write_Reg = NULL;
 	cs->irq_func = &hfcsx_interrupt;
 
 	cs->hw.hfcsx.timer.function = (void *) hfcsx_Timer;

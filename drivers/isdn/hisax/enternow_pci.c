@@ -119,17 +119,6 @@ enpci_setIrqMask(struct IsdnCardState *cs, BYTE val) {
 }
 
 
-static BYTE dummyrr(struct IsdnCardState *cs, int chan, BYTE off)
-{
-        return(5);
-}
-
-static void dummywr(struct IsdnCardState *cs, int chan, BYTE off, BYTE value)
-{
-
-}
-
-
 /* ******************************************************************************** */
 
 
@@ -381,8 +370,6 @@ setup_enternow_pci(struct IsdnCard *card)
         cs->writeisac = &WriteByteAmd7930;
         cs->dc.amd7930.setIrqMask = &enpci_setIrqMask;
 
-        cs->BC_Read_Reg  = &dummyrr;
-	cs->BC_Write_Reg = &dummywr;
 	cs->BC_Send_Data = &netjet_fill_dma;
 	cs->cardmsg = &enpci_card_msg;
 	cs->irq_func = &enpci_interrupt;

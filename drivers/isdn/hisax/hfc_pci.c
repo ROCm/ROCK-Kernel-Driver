@@ -1477,8 +1477,6 @@ setup_hfcpci(struct IsdnCard *card)
 	cs->writeisac = NULL;
 	cs->readisacfifo = NULL;
 	cs->writeisacfifo = NULL;
-	cs->BC_Read_Reg = NULL;
-	cs->BC_Write_Reg = NULL;
 	cs->irq_func = &hfcpci_interrupt;
 	cs->irq_flags |= SA_SHIRQ;
 
