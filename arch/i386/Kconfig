@@ -283,6 +283,11 @@ config X86_OOSTORE
 	depends on MWINCHIP3D || MWINCHIP2 || MWINCHIPC6
 	default y
 
+config X86_PREFETCH
+	bool
+	depends on MPENTIUMIII || MP4
+	default y
+
 config HUGETLB_PAGE
 	bool "Huge TLB Page Support"
 	help
