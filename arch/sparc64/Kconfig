@@ -556,7 +556,7 @@ config DRM
 
 config DRM_FFB
 	tristate "Creator/Creator3D"
-	depends on DRM
+	depends on DRM && BROKEN
 	help
 	  Choose this option if you have one of Sun's Creator3D-based graphics
 	  and frame buffer cards.  Product page at
