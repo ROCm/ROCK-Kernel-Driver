@@ -231,12 +231,6 @@ static void dst_ifdown(struct dst_entry *dst, int unregister)
 		if (unregister) {
 			dst->dev = &loopback_dev;
 			dev_hold(&loopback_dev);
-
-			/* Wait for at least one quiescent state after
-			 * detaching the stale device from dst.
-			 */
-			synchronize_kernel();
-
 			dev_put(dev);
 			if (dst->neighbour && dst->neighbour->dev == dev) {
 				dst->neighbour->dev = &loopback_dev;
