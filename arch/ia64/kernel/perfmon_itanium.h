@@ -48,12 +48,6 @@ static pfm_reg_desc_t pfm_ita_pmd_desc[PMU_MAX_PMDS]={
 };
 
 static int
-pfm_ita_probe(void)
-{
-	return local_cpu_data->family == 0x7 && !ia64_platform_is("hpsim") ? 0 : -1;
-}
-
-static int
 pfm_ita_pmc_check(struct task_struct *task, pfm_context_t *ctx, unsigned int cnum, unsigned long *val, struct pt_regs *regs)
 {
 	int ret;
@@ -116,7 +110,6 @@ static pmu_config_t pmu_conf_ita={
 	.num_ibrs      = 8,
 	.num_dbrs      = 8,
 	.use_rr_dbregs = 1, /* debug register are use for range retrictions */
-	.probe         = pfm_ita_probe
 };
 
 

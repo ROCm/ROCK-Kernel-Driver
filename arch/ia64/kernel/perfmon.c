@@ -633,7 +633,6 @@ static void pfm_lazy_save_regs (struct task_struct *ta);
 void dump_pmu_state(const char *);
 static int pfm_write_ibr_dbr(int mode, pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs);
 
-#include "perfmon_hpsim.h"
 #include "perfmon_itanium.h"
 #include "perfmon_mckinley.h"
 #include "perfmon_generic.h"
@@ -641,7 +640,6 @@ static int pfm_write_ibr_dbr(int mode, pfm_context_t *ctx, void *arg, int count,
 static pmu_config_t *pmu_confs[]={
 	&pmu_conf_mck,
 	&pmu_conf_ita,
-	&pmu_conf_hpsim,
 	&pmu_conf_gen, /* must be last */
 	NULL
 };
