@@ -99,6 +99,7 @@
 #ifdef __KERNEL__
 
 #include <linux/config.h>
+#include <linux/errno.h>        /* for -ENODEV */
 #include <linux/delay.h>	/* for mdelay() */
 #include <linux/interrupt.h>	/* for in_interrupt() */
 #include <linux/list.h>		/* for struct list_head */
