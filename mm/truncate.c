@@ -89,7 +89,7 @@ invalidate_complete_page(struct address_space *mapping, struct page *page)
 
 	BUG_ON(PagePrivate(page));
 	if (page_count(page) != 2) {
-		spin_unlock_irq(&mapping->tree_lock);
+		write_unlock_irq(&mapping->tree_lock);
 		return 0;
 	}
 	__remove_from_page_cache(page);
