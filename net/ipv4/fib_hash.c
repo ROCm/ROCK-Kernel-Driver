@@ -536,7 +536,7 @@ fn_hash_insert(struct fib_table *tb, struct rtmsg *r, struct kern_rta *rta,
 		 * information.
 		 */
 		fa_orig = fa;
-		list_for_each_entry(fa, fa->fa_list.prev, fa_list) {
+		list_for_each_entry(fa, fa_orig->fa_list.prev, fa_list) {
 			if (fa->fa_info->fib_priority != fi->fib_priority)
 				break;
 			if (fa->fa_type == type &&
