@@ -72,7 +72,7 @@ static int autofs_write(struct file *file, const void *addr, int bytes)
 	if (wr == -EPIPE && !sigpipe) {
 		spin_lock_irqsave(&current->sigmask_lock, flags);
 		sigdelset(&current->pending.signal, SIGPIPE);
-		recalc_sigpending(current);
+		recalc_sigpending();
 		spin_unlock_irqrestore(&current->sigmask_lock, flags);
 	}
 
@@ -164,14 +164,14 @@ int autofs_wait(struct autofs_sb_info *sbi, struct qstr *name)
 		spin_lock_irqsave(&current->sigmask_lock, irqflags);
 		oldset = current->blocked;
 		siginitsetinv(&current->blocked, SHUTDOWN_SIGS & ~oldset.sig[0]);
-		recalc_sigpending(current);
+		recalc_sigpending();
 		spin_unlock_irqrestore(&current->sigmask_lock, irqflags);
 
 		interruptible_sleep_on(&wq->queue);
 
 		spin_lock_irqsave(&current->sigmask_lock, irqflags);
 		current->blocked = oldset;
-		recalc_sigpending(current);
+		recalc_sigpending();
 		spin_unlock_irqrestore(&current->sigmask_lock, irqflags);
 	} else {
 		DPRINTK(("autofs_wait: skipped sleeping\n"));

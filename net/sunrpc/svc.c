@@ -201,7 +201,7 @@ svc_register(struct svc_serv *serv, int proto, unsigned short port)
 
 	if (!port) {
 		spin_lock_irqsave(&current->sigmask_lock, flags);
-		recalc_sigpending(current);
+		recalc_sigpending();
 		spin_unlock_irqrestore(&current->sigmask_lock, flags);
 	}
 

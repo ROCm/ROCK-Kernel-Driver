@@ -3352,7 +3352,7 @@ jffs_garbage_collect_thread(void *ptr)
 	init_completion(&c->gc_thread_comp); /* barrier */ 
 	spin_lock_irq(&current->sigmask_lock);
 	siginitsetinv (&current->blocked, sigmask(SIGHUP) | sigmask(SIGKILL) | sigmask(SIGSTOP) | sigmask(SIGCONT));
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 	strcpy(current->comm, "jffs_gcd");
 

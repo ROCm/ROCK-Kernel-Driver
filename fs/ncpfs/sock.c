@@ -472,7 +472,7 @@ static int ncp_do_request(struct ncp_server *server, int size,
 				mask |= sigmask(SIGQUIT);
 		}
 		siginitsetinv(&current->blocked, mask);
-		recalc_sigpending(current);
+		recalc_sigpending();
 		spin_unlock_irqrestore(&current->sigmask_lock, flags);
 		
 		fs = get_fs();
@@ -487,7 +487,7 @@ static int ncp_do_request(struct ncp_server *server, int size,
 
 		spin_lock_irqsave(&current->sigmask_lock, flags);
 		current->blocked = old_set;
-		recalc_sigpending(current);
+		recalc_sigpending();
 		spin_unlock_irqrestore(&current->sigmask_lock, flags);
 	}
 

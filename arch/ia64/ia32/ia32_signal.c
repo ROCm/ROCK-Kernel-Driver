@@ -174,7 +174,7 @@ ia32_rt_sigsuspend (sigset32_t *uset, unsigned int sigsetsize, struct sigscratch
 	{
 		oldset = current->blocked;
 		current->blocked = set;
-		recalc_sigpending(current);
+		recalc_sigpending();
 	}
 	spin_unlock_irq(&current->sigmask_lock);
 
@@ -694,7 +694,7 @@ sys32_sigreturn (int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int
 	sigdelsetmask(&set, ~_BLOCKABLE);
 	spin_lock_irq(&current->sigmask_lock);
 	current->blocked = (sigset_t) set;
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 
 	if (restore_sigcontext_ia32(regs, &frame->sc, &eax))
@@ -725,7 +725,7 @@ sys32_rt_sigreturn (int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, 
 	sigdelsetmask(&set, ~_BLOCKABLE);
 	spin_lock_irq(&current->sigmask_lock);
 	current->blocked =  set;
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 
 	if (restore_sigcontext_ia32(regs, &frame->uc.uc_mcontext, &eax))

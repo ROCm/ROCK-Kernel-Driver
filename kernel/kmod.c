@@ -113,7 +113,7 @@ int exec_usermodehelper(char *program_path, char *argv[], char *envp[])
 	sigemptyset(&curtask->blocked);
 	flush_signals(curtask);
 	flush_signal_handlers(curtask);
-	recalc_sigpending(curtask);
+	recalc_sigpending();
 	spin_unlock_irq(&curtask->sigmask_lock);
 
 	for (i = 0; i < curtask->files->max_fds; i++ ) {
@@ -228,7 +228,7 @@ int request_module(const char * module_name)
 	spin_lock_irq(&current->sigmask_lock);
 	tmpsig = current->blocked;
 	siginitsetinv(&current->blocked, sigmask(SIGKILL) | sigmask(SIGSTOP));
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 
 	waitpid_result = waitpid(pid, NULL, __WCLONE);
@@ -237,7 +237,7 @@ int request_module(const char * module_name)
 	/* Allow signals again.. */
 	spin_lock_irq(&current->sigmask_lock);
 	current->blocked = tmpsig;
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 
 	if (waitpid_result != pid) {
