@@ -447,7 +447,12 @@ label:
 	EXC_XFER_EE(0x600, AlignmentException)
 
 /* 0x0700 - Program Exception */
-	EXCEPTION(0x700, ProgramCheck, ProgramCheckException, EXC_XFER_EE)
+	START_EXCEPTION(0x0700, ProgramCheck)
+	NORMAL_EXCEPTION_PROLOG
+	mfspr	r4,SPRN_ESR		/* Grab the ESR and save it */
+	stw	r4,_ESR(r11)
+	addi	r3,r1,STACK_FRAME_OVERHEAD
+	EXC_XFER_EE(0x700, ProgramCheckException)
 
 	EXCEPTION(0x0800, Trap_08, UnknownException, EXC_XFER_EE)
 	EXCEPTION(0x0900, Trap_09, UnknownException, EXC_XFER_EE)
@@ -469,7 +474,7 @@ label:
 	lis	r0,TSR_PIS@h
 	mtspr	SPRN_TSR,r0		/* Clear the PIT exception */
 	addi	r3,r1,STACK_FRAME_OVERHEAD
-	EXC_XFER_EE(0x1000, timer_interrupt)
+	EXC_XFER_LITE(0x1000, timer_interrupt)
 
 #if 0
 /* NOTE:
