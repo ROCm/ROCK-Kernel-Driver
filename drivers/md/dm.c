@@ -146,7 +146,7 @@ int (*_inits[])(void) __initdata = {
 	dm_interface_init,
 };
 
-void (*_exits[])(void) __exitdata = {
+void (*_exits[])(void) = {
 	local_exit,
 	dm_target_exit,
 	dm_linear_exit,
