@@ -27,6 +27,11 @@ typedef s32		compat_daddr_t;
 typedef u32		compat_caddr_t;
 typedef __kernel_fsid_t	compat_fsid_t;
 
+typedef s32		compat_int_t;
+typedef s32		compat_long_t;
+typedef u32		compat_uint_t;
+typedef u32		compat_ulong_t;
+
 struct compat_timespec {
 	compat_time_t	tv_sec;
 	s32		tv_nsec;
@@ -68,6 +73,22 @@ struct compat_flock {
 	compat_pid_t	l_pid;
 };
 
+#define F_GETLK64	12
+#define F_SETLK64	13
+#define F_SETLKW64	14
+
+/*
+ * IA32 uses 4 byte alignment for 64 bit quantities,
+ * so we need to pack this structure.
+ */
+struct compat_flock64 {
+	short		l_type;
+	short		l_whence;
+	compat_loff_t	l_start;
+	compat_loff_t	l_len;
+	compat_pid_t	l_pid;
+} __attribute__((packed));
+
 struct compat_statfs {
 	int		f_type;
 	int		f_bsize;
@@ -87,5 +108,21 @@ typedef u32		compat_old_sigset_t;	/* at least 32 bits */
 #define _COMPAT_NSIG_BPW	32
 
 typedef u32		compat_sigset_word;
+
+#define COMPAT_OFF_T_MAX	0x7fffffff
+#define COMPAT_LOFF_T_MAX	0x7fffffffffffffffL
+
+/*
+ * A pointer passed in from user mode. This should not be used for syscall parameters,
+ * just declare them as pointers because the syscall entry code will have appropriately
+ * comverted them already.
+ */
+typedef	u32		compat_uptr_t;
+
+static inline void *
+compat_ptr (compat_uptr_t uptr)
+{
+	return (void *) (unsigned long) uptr;
+}
 
 #endif /* _ASM_IA64_COMPAT_H */

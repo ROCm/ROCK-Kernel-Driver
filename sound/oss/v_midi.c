@@ -133,30 +133,30 @@ static inline int v_midi_ioctl (int dev, unsigned cmd, caddr_t arg)
 
 static struct midi_operations v_midi_operations =
 {
-	owner:		THIS_MODULE,
-	info:		{"Loopback MIDI Port 1", 0, 0, SNDCARD_VMIDI},
-	converter:	&std_midi_synth,
-	in_info:	{0},
-	open:		v_midi_open,
-	close:		v_midi_close,
-	ioctl:		v_midi_ioctl,
-	outputc:	v_midi_out,
-	start_read:	v_midi_start_read,
-	end_read:	v_midi_end_read,
+	.owner		= THIS_MODULE,
+	.info		= {"Loopback MIDI Port 1", 0, 0, SNDCARD_VMIDI},
+	.converter	= &std_midi_synth,
+	.in_info	= {0},
+	.open		= v_midi_open,
+	.close		= v_midi_close,
+	.ioctl		= v_midi_ioctl,
+	.outputc	= v_midi_out,
+	.start_read	= v_midi_start_read,
+	.end_read	= v_midi_end_read,
 };
 
 static struct midi_operations v_midi_operations2 =
 {
-	owner:		THIS_MODULE,
-	info:		{"Loopback MIDI Port 2", 0, 0, SNDCARD_VMIDI},
-	converter:	&std_midi_synth,
-	in_info:	{0},
-	open:		v_midi_open,
-	close:		v_midi_close,
-	ioctl:		v_midi_ioctl,
-	outputc:	v_midi_out,
-	start_read:	v_midi_start_read,
-	end_read:	v_midi_end_read,
+	.owner		= THIS_MODULE,
+	.info		= {"Loopback MIDI Port 2", 0, 0, SNDCARD_VMIDI},
+	.converter	= &std_midi_synth,
+	.in_info	= {0},
+	.open		= v_midi_open,
+	.close		= v_midi_close,
+	.ioctl		= v_midi_ioctl,
+	.outputc	= v_midi_out,
+	.start_read	= v_midi_start_read,
+	.end_read	= v_midi_end_read,
 };
 
 /*

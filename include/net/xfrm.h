@@ -84,6 +84,7 @@ extern struct semaphore xfrm_cfg_sem;
 /* Full description of state of transformer. */
 struct xfrm_state
 {
+	/* Note: bydst is re-used during gc */
 	struct list_head	bydst;
 	struct list_head	byspi;
 

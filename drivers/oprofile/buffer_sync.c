@@ -68,8 +68,12 @@ static int mm_notify(struct notifier_block * self, unsigned long val, void * dat
 }
 
  
+/* We need to be told about new modules so we don't attribute to a previously
+ * loaded module, or drop the samples on the floor.
+ */
 static int module_load_notify(struct notifier_block * self, unsigned long val, void * data)
 {
+#ifdef CONFIG_MODULES
 	if (val != MODULE_STATE_COMING)
 		return 0;
 
@@ -78,9 +82,11 @@ static int module_load_notify(struct notifier_block * self, unsigned long val, v
 	add_event_entry(ESCAPE_CODE);
 	add_event_entry(MODULE_LOADED_CODE);
 	up(&buffer_sem);
+#endif
 	return 0;
 }
 
+ 
 static struct notifier_block exit_task_nb = {
 	.notifier_call	= exit_task_notify,
 };
@@ -92,7 +98,7 @@ static struct notifier_block exec_unmap_nb = {
 static struct notifier_block exit_mmap_nb = {
 	.notifier_call	= mm_notify,
 };
- 
+
 static struct notifier_block module_load_nb = {
 	.notifier_call = module_load_notify,
 };

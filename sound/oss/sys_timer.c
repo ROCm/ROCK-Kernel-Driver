@@ -275,14 +275,14 @@ def_tmr_arm(int dev, long time)
 
 struct sound_timer_operations default_sound_timer =
 {
-	owner:		THIS_MODULE,
-	info:		{"System clock", 0},
-	priority:	0,	/* Priority */
-	devlink:	0,	/* Local device link */
-	open:		def_tmr_open,
-	close:		def_tmr_close,
-	event:		def_tmr_event,
-	get_time:	def_tmr_get_time,
-	ioctl:		def_tmr_ioctl,
-	arm_timer:	def_tmr_arm
+	.owner		= THIS_MODULE,
+	.info		= {"System clock", 0},
+	.priority	= 0,	/* Priority */
+	.devlink	= 0,	/* Local device link */
+	.open		= def_tmr_open,
+	.close		= def_tmr_close,
+	.event		= def_tmr_event,
+	.get_time	= def_tmr_get_time,
+	.ioctl		= def_tmr_ioctl,
+	.arm_timer	= def_tmr_arm
 };

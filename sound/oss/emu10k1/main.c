@@ -86,7 +86,6 @@
  *********************************************************************/
 
 /* These are only included once per module */
-#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/init.h>
@@ -1144,10 +1143,10 @@ MODULE_DESCRIPTION("Creative EMU10K1 PCI Audio Driver v" DRIVER_VERSION "\nCopyr
 MODULE_LICENSE("GPL");
 
 static struct pci_driver emu10k1_pci_driver = {
-	name:		"emu10k1",
-	id_table:	emu10k1_pci_tbl,
-	probe:		emu10k1_probe,
-	remove:		__devexit_p(emu10k1_remove),
+	.name		= "emu10k1",
+	.id_table	= emu10k1_pci_tbl,
+	.probe		= emu10k1_probe,
+	.remove		= __devexit_p(emu10k1_remove),
 };
 
 static int __init emu10k1_init_module(void)

@@ -976,8 +976,9 @@ static int refcnt = 0;
 
 static void do_stram_request(request_queue_t *q)
 {
-	while (!blk_queue_empty(q)) {
-		struct request *req = elv_next_request(q);
+	struct request *req;
+
+	while ((req = elv_next_request(q)) != NULL) {
 		void *start = swap_start + (req->sector << 9);
 		unsigned long len = req->current_nr_sectors << 9;
 		if ((start + len) > swap_end) {

@@ -47,8 +47,15 @@ typedef enum {
 typedef enum {
         AUDIO_STEREO,
         AUDIO_MONO_LEFT, 
-	AUDIO_MONO_RIGHT, 
+	AUDIO_MONO_RIGHT 
 } audio_channel_select_t;
+
+
+typedef struct audio_mixer { 
+        unsigned int volume_left;
+        unsigned int volume_right;
+  // what else do we need? bass, pass-through, ...
+} audio_mixer_t;
 
 
 typedef struct audio_status { 
@@ -58,14 +65,8 @@ typedef struct audio_status {
         audio_stream_source_t  stream_source;  /* current stream source */
         audio_channel_select_t channel_select; /* currently selected channel */
         int                    bypass_mode;    /* pass on audio data to */
+	audio_mixer_t	       mixer_state;    /* current mixer state */
 } audio_status_t;                              /* separate decoder hardware */
-
-
-typedef struct audio_mixer { 
-        unsigned int volume_left;
-        unsigned int volume_right;
-  // what else do we need? bass, pass-through, ...
-} audio_mixer_t;
 
 
 typedef

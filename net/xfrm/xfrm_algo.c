@@ -445,7 +445,7 @@ int xfrm_count_enc_supported(void)
 void skb_icv_walk(const struct sk_buff *skb, struct crypto_tfm *tfm,
 		  int offset, int len, icv_update_fn_t icv_update)
 {
-	int start = skb->len - skb->data_len;
+	int start = skb_headlen(skb);
 	int i, copy = start - offset;
 	struct scatterlist sg;
 
@@ -521,7 +521,7 @@ void skb_icv_walk(const struct sk_buff *skb, struct crypto_tfm *tfm,
 int
 skb_to_sgvec(struct sk_buff *skb, struct scatterlist *sg, int offset, int len)
 {
-	int start = skb->len - skb->data_len;
+	int start = skb_headlen(skb);
 	int i, copy = start - offset;
 	int elt = 0;
 

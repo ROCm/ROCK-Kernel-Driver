@@ -167,7 +167,7 @@ config NET_SCH_DSMARK
 	tristate "Diffserv field marker"
 	depends on NET_SCHED
 	help
-	  Say Y if you want to schedule packets avccording to the
+	  Say Y if you want to schedule packets according to the
 	  Differentiated Services architecture proposed in RFC 2475.
 	  Technical information on this method, with pointers to associated
 	  RFCs, is available at <http://www.gta.ufrj.br/diffserv/>.
@@ -202,7 +202,7 @@ config NET_QOS
 	  Differentiated Services (diffserv) and Resource Reservation Protocol
 	  (RSVP) on your Linux router if you also say Y to "Packet classifier
 	  API" and to some classifiers below. Documentation and software is at
-	  <http://icawww1.epfl.ch/linux-diffserv/>.
+	  <http://diffserv.sourceforge.net/>.
 
 	  Note that the answer to this question won't directly affect the
 	  kernel: saying N will just cause the configurator to skip all
@@ -229,7 +229,7 @@ config NET_CLS
 	  This will enable you to use Differentiated Services (diffserv) and
 	  Resource Reservation Protocol (RSVP) on your Linux router.
 	  Documentation and software is at
-	  <http://icawww1.epfl.ch/linux-diffserv/>.
+	  <http://diffserv.sourceforge.net/>.
 
 config NET_CLS_TCINDEX
 	tristate "TC index classifier"

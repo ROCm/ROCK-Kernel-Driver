@@ -17,6 +17,7 @@
  */
  
 extern int nmi_init(struct oprofile_operations ** ops);
+extern void nmi_exit(void);
 extern void timer_init(struct oprofile_operations ** ops);
 
 int __init oprofile_arch_init(struct oprofile_operations ** ops)
@@ -26,4 +27,12 @@ int __init oprofile_arch_init(struct oprofile_operations ** ops)
 #endif
 		timer_init(ops);
 	return 0;
+}
+
+
+void __exit oprofile_arch_exit(void)
+{
+#ifdef CONFIG_X86_LOCAL_APIC
+	nmi_exit();
+#endif
 }

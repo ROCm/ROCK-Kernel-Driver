@@ -2162,6 +2162,16 @@ static void smp_flush_page_for_dma(unsigned long page)
 
 #endif
 
+static pte_t srmmu_pgoff_to_pte(unsigned long pgoff)
+{
+	return __pte((pgoff << SRMMU_PTE_FILE_SHIFT) | SRMMU_FILE);
+}
+
+static unsigned long srmmu_pte_to_pgoff(pte_t pte)
+{
+	return pte_val(pte) >> SRMMU_PTE_FILE_SHIFT;
+}
+
 /* Load up routines and constants for sun4m and sun4d mmu */
 void __init ld_mmu_srmmu(void)
 {
@@ -2188,7 +2198,9 @@ void __init ld_mmu_srmmu(void)
 	BTFIXUPSET_INT(page_kernel, pgprot_val(SRMMU_PAGE_KERNEL));
 	page_kernel = pgprot_val(SRMMU_PAGE_KERNEL);
 	pg_iobits = SRMMU_VALID | SRMMU_WRITE | SRMMU_REF;
-	
+
+	BTFIXUPSET_SIMM13(pte_file_max_bits, SRMMU_PTE_FILE_MAX_BITS);
+
 	/* Functions */
 #ifndef CONFIG_SMP	
 	BTFIXUPSET_CALL(___xchg32, ___xchg32_sun4md, BTFIXUPCALL_SWAPG1G2);
@@ -2239,6 +2251,7 @@ void __init ld_mmu_srmmu(void)
 	BTFIXUPSET_HALF(pte_writei, SRMMU_WRITE);
 	BTFIXUPSET_HALF(pte_dirtyi, SRMMU_DIRTY);
 	BTFIXUPSET_HALF(pte_youngi, SRMMU_REF);
+	BTFIXUPSET_HALF(pte_filei, SRMMU_FILE);
 	BTFIXUPSET_HALF(pte_wrprotecti, SRMMU_WRITE);
 	BTFIXUPSET_HALF(pte_mkcleani, SRMMU_DIRTY);
 	BTFIXUPSET_HALF(pte_mkoldi, SRMMU_REF);
@@ -2252,6 +2265,9 @@ void __init ld_mmu_srmmu(void)
 
 	BTFIXUPSET_CALL(alloc_thread_info, srmmu_alloc_thread_info, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(free_thread_info, srmmu_free_thread_info, BTFIXUPCALL_NORM);
+
+	BTFIXUPSET_CALL(pte_to_pgoff, srmmu_pte_to_pgoff, BTFIXUPCALL_NORM);
+	BTFIXUPSET_CALL(pgoff_to_pte, srmmu_pgoff_to_pte, BTFIXUPCALL_NORM);
 
 	get_srmmu_type();
 	patch_window_trap_handlers();

@@ -2,12 +2,11 @@
  * Generic HDLC support routines for Linux
  * HDLC support
  *
- * Copyright (C) 1999 - 2001 Krzysztof Halasa <khc@pm.waw.pl>
+ * Copyright (C) 1999 - 2003 Krzysztof Halasa <khc@pm.waw.pl>
  *
  * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * under the terms of version 2 of the GNU General Public License
+ * as published by the Free Software Foundation.
  */
 
 #include <linux/config.h>
@@ -26,10 +25,10 @@
 #include <linux/hdlc.h>
 
 
-static void raw_rx(struct sk_buff *skb)
+static unsigned short raw_type_trans(struct sk_buff *skb,
+				     struct net_device *dev)
 {
-	skb->protocol = htons(ETH_P_IP);
-	netif_rx(skb);
+	return __constant_htons(ETH_P_IP);
 }
 
 
@@ -67,7 +66,7 @@ int hdlc_raw_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
 			new_settings.encoding = ENCODING_NRZ;
 
 		if (new_settings.parity == PARITY_DEFAULT)
-			new_settings.parity = PARITY_NONE;
+			new_settings.parity = PARITY_CRC16_PR1_CCITT;
 
 		result = hdlc->attach(hdlc, new_settings.encoding,
 				      new_settings.parity);
@@ -79,11 +78,13 @@ int hdlc_raw_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
 
 		hdlc->open = NULL;
 		hdlc->stop = NULL;
-		hdlc->netif_rx = raw_rx;
+		hdlc->netif_rx = NULL;
+		hdlc->type_trans = raw_type_trans;
 		hdlc->proto = IF_PROTO_HDLC;
 		dev->hard_start_xmit = hdlc->xmit;
 		dev->hard_header = NULL;
 		dev->type = ARPHRD_RAWHDLC;
+		dev->flags = IFF_POINTOPOINT | IFF_NOARP;
 		dev->addr_len = 0;
 		return 0;
 	}

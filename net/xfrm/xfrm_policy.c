@@ -963,6 +963,8 @@ int __xfrm_policy_check(struct sock *sk, int dir, struct sk_buff *skb,
 			 * are implied between each two transformations.
 			 */
 			for (i = pol->xfrm_nr-1, k = 0; i >= 0; i--) {
+				if (pol->xfrm_vec[i].optional)
+					continue;
 				k = xfrm_policy_ok(pol->xfrm_vec+i, sp, k, family);
 				if (k < 0)
 					goto reject;

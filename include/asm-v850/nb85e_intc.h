@@ -1,8 +1,8 @@
 /*
  * include/asm-v850/nb85e_intc.h -- NB85E cpu core interrupt controller (INTC)
  *
- *  Copyright (C) 2001,02  NEC Corporation
- *  Copyright (C) 2001,02  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2001,02,03  NEC Electronics Corporation
+ *  Copyright (C) 2001,02,03  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -26,7 +26,7 @@
    address.  */
 #define NB85E_INTC_IC_BASE_ADDR	  0xFFFFF110
 #define NB85E_INTC_IC_ADDR(irq)	  (NB85E_INTC_IC_BASE_ADDR + ((irq) << 1))
-#define NB85E_INTC_IC(irq)	  (*(char *)NB85E_INTC_IC_ADDR(irq))
+#define NB85E_INTC_IC(irq)	  (*(volatile u8 *)NB85E_INTC_IC_ADDR(irq))
 /* Encode priority PR for storing in an interrupt control register.  */
 #define NB85E_INTC_IC_PR(pr)	  (pr)
 /* Interrupt disable bit in an interrupt control register.  */
@@ -35,6 +35,13 @@
 /* Interrupt pending flag in an interrupt control register.  */
 #define NB85E_INTC_IC_IF_BIT	  7
 #define NB85E_INTC_IC_IF	  (1 << NB85E_INTC_IC_IF_BIT)
+
+/* The ISPR (In-service priority register) contains one bit for each interrupt
+   priority level, which is set to one when that level is currently being
+   serviced (and thus blocking any interrupts of equal or lesser level).  */
+#define NB85E_INTC_ISPR_ADDR	  0xFFFFF1FA
+#define NB85E_INTC_ISPR		  (*(volatile u8 *)NB85E_INTC_ISPR_ADDR)
+
 
 #ifndef __ASSEMBLY__
 

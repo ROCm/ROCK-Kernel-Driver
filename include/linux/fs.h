@@ -313,7 +313,7 @@ struct backing_dev_info;
 struct address_space {
 	struct inode		*host;		/* owner: inode, block_device */
 	struct radix_tree_root	page_tree;	/* radix tree of all pages */
-	rwlock_t		page_lock;	/* and rwlock protecting it */
+	spinlock_t		page_lock;	/* and rwlock protecting it */
 	struct list_head	clean_pages;	/* list of clean pages */
 	struct list_head	dirty_pages;	/* list of dirty pages */
 	struct list_head	locked_pages;	/* list of locked pages */
@@ -321,8 +321,8 @@ struct address_space {
 	unsigned long		nrpages;	/* number of total pages */
 	struct address_space_operations *a_ops;	/* methods */
 	struct list_head	i_mmap;		/* list of private mappings */
-	struct list_head	i_mmap_shared;	/* list of private mappings */
-	struct semaphore	i_shared_sem;	/* and sem protecting it */
+	struct list_head	i_mmap_shared;	/* list of shared mappings */
+	struct semaphore	i_shared_sem;	/* protect both above lists */
 	unsigned long		dirtied_when;	/* jiffies of first page dirtying */
 	int			gfp_mask;	/* how to allocate the pages */
 	struct backing_dev_info *backing_dev_info; /* device readahead, etc */
@@ -1024,7 +1024,7 @@ extern int do_truncate(struct dentry *, loff_t start);
 extern struct file *filp_open(const char *, int, int);
 extern struct file * dentry_open(struct dentry *, struct vfsmount *, int);
 extern int filp_close(struct file *, fl_owner_t id);
-extern char * getname(const char *);
+extern char * getname(const char __user *);
 
 /* fs/dcache.c */
 extern void vfs_caches_init(unsigned long);

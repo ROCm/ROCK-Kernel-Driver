@@ -1,8 +1,8 @@
 /*
  * arch/v850/kernel/rte_ma1_cb.c -- Midas labs RTE-V850E/MA1-CB board
  *
- *  Copyright (C) 2001,02  NEC Corporation
- *  Copyright (C) 2001,02  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2001,02,03  NEC Corporation
+ *  Copyright (C) 2001,02,03  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -30,6 +30,11 @@
 #define RAM_START 	SRAM_ADDR
 #define RAM_END		(SDRAM_ADDR + SDRAM_SIZE)
 
+
+void __init mach_early_init (void)
+{
+	rte_cb_early_init ();
+}
 
 void __init mach_get_physical_ram (unsigned long *ram_start,
 				   unsigned long *ram_len)
@@ -67,7 +72,7 @@ void rte_ma1_cb_uart_pre_configure (unsigned chan,
 	if (chan == 0) {
 		/* Put P42 & P43 in I/O port mode.  */
 		MA_PORT4_PMC &= ~0xC;
-		/* Make P42 and output, and P43 an input.  */
+		/* Make P42 an output, and P43 an input.  */
 		MA_PORT4_PM = (MA_PORT4_PM & ~0xC) | 0x8;
 	}
 

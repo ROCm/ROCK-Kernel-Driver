@@ -32,5 +32,24 @@ source "drivers/media/radio/Kconfig"
 
 source "drivers/media/dvb/Kconfig"
 
+source "drivers/media/common/Kconfig"
+
+config VIDEO_TUNER
+	tristate
+	default y if VIDEO_BT848=y || VIDEO_SAA7134=y || VIDEO_MXB=y
+	default m if VIDEO_BT848=m || VIDEO_SAA7134=m || VIDEO_MXB=m
+	depends on VIDEO_DEV
+
+config VIDEO_BUF
+	tristate
+	default y if VIDEO_BT848=y || VIDEO_SAA7134=y || VIDEO_SAA7146=y
+	default m if VIDEO_BT848=m || VIDEO_SAA7134=m || VIDEO_SAA7146=m
+	depends on VIDEO_DEV
+
+config VIDEO_BTCX
+	tristate
+	default VIDEO_BT848
+	depends on VIDEO_DEV
+
 endmenu
 

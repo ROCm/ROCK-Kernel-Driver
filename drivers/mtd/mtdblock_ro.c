@@ -93,8 +93,9 @@ static release_t mtdblock_release(struct inode *inode, struct file *file)
 
 static void mtdblock_request(request_queue_t *q)
 {
-	while (!blk_queue_empty(q)) {
-		struct request *req = elv_next_request(q);
+	struct request *req;
+	
+	while ((req = elv_next_request(q)) != NULL) {
 		struct mtdro_dev *mdev = req->rq_disk->private_data;
 		struct mtd_info *mtd = mdev->mtd;
 		unsigned int res;

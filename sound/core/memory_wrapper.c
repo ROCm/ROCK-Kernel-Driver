@@ -19,7 +19,6 @@
  */
 
 #include <linux/config.h>
-#include <linux/version.h>
 #include <linux/pci.h>
 #include <sound/memalloc.h>
 

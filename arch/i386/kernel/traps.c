@@ -257,6 +257,15 @@ void die(const char * str, struct pt_regs * regs, long err)
 	show_registers(regs);
 	bust_spinlocks(0);
 	spin_unlock_irq(&die_lock);
+	if (in_interrupt())
+		panic("Fatal exception in interrupt");
+
+	if (panic_on_oops) {
+		printk(KERN_EMERG "Fatal exception: panic in 5 seconds\n");
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(5 * HZ);
+		panic("Fatal exception");
+	}
 	do_exit(SIGSEGV);
 }
 

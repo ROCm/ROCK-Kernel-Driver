@@ -537,7 +537,7 @@ static int __init probe_mad16(struct address_info *hw_config)
 
 	for (i = 0xf8d; i <= 0xf93; i++) {
 		if (!c924pnp)
-			DDB(printk("port %03x = %02x\n", i, mad_read(i)))
+			DDB(printk("port %03x = %02x\n", i, mad_read(i)));
 		else
 			DDB(printk("port %03x = %02x\n", i-0x80, mad_read(i)));
 	}
@@ -600,7 +600,7 @@ static int __init probe_mad16(struct address_info *hw_config)
 
 	for (i = 0xf8d; i <= 0xf93; i++) {
 		if (!c924pnp)
-			DDB(printk("port %03x after init = %02x\n", i, mad_read(i)))
+			DDB(printk("port %03x after init = %02x\n", i, mad_read(i)));
 		else
 			DDB(printk("port %03x after init = %02x\n", i-0x80, mad_read(i)));
 	}

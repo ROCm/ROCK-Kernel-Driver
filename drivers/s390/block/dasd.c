@@ -1217,7 +1217,7 @@ __dasd_process_blk_queue(dasd_device_t * device)
 			nr_queued++;
 	}
 	while (!blk_queue_plugged(queue) &&
-	       !blk_queue_empty(queue) &&
+	       elv_next_request(queue) &&
 		nr_queued < DASD_CHANQ_MAX_SIZE) {
 		req = elv_next_request(queue);
 		if (device->ro_flag && rq_data_dir(req) == WRITE) {

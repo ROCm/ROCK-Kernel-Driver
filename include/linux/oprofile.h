@@ -46,6 +46,11 @@ struct oprofile_operations {
 int oprofile_arch_init(struct oprofile_operations ** ops);
  
 /**
+ * One-time exit/cleanup for the arch.
+ */
+void oprofile_arch_exit(void);
+
+/**
  * Add a sample. This may be called from any context. Pass
  * smp_processor_id() as cpu.
  */

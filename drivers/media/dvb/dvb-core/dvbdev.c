@@ -35,10 +35,12 @@
 #include <asm/system.h>
 #include <linux/kmod.h>
 #include <linux/slab.h>
-#include <linux/videodev.h>
 
-#include "compat.h"
 #include "dvbdev.h"
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,51)
+	#include "compat.h"
+#endif
 
 static int dvbdev_debug = 0;
 #define dprintk if (dvbdev_debug) printk
@@ -56,7 +58,6 @@ static char *dnames[] = {
 
 #define DVB_MAX_IDS              4
 #define nums2minor(num,type,id)  ((num << 6) | (id << 4) | type)
-
 
 static
 struct dvb_device* dvbdev_find_device (int minor)
@@ -160,7 +161,7 @@ int dvb_generic_ioctl(struct inode *inode, struct file *file,
 	if (!dvbdev->kernel_ioctl)
 		return -EINVAL;
 
-	return video_usercopy (inode, file, cmd, arg, dvbdev->kernel_ioctl);
+	return dvb_usercopy (inode, file, cmd, arg, dvbdev->kernel_ioctl);
 }
 
 
@@ -267,7 +268,7 @@ skip:
 }
 
 
-int dvb_register_adapter(struct dvb_adapter **padap, char *name)
+int dvb_register_adapter(struct dvb_adapter **padap, const char *name)
 {
 	struct dvb_adapter *adap;
 	int num;
@@ -288,12 +289,14 @@ int dvb_register_adapter(struct dvb_adapter **padap, char *name)
 	memset (adap, 0, sizeof(struct dvb_adapter));
 	INIT_LIST_HEAD (&adap->device_list);
 
-	MOD_INC_USE_COUNT;
+ 	/* fixme: is this correct? */
+	try_module_get(THIS_MODULE);
 
 	printk ("DVB: registering new adapter (%s).\n", name);
 	
 	adap->devfs_handle = devfs_mk_dir("dvb/adapter%d", num);
 	adap->num = num;
+	adap->name = name;
 
 	list_add_tail (&adap->list_head, &dvb_adapter_list);
 
@@ -311,7 +314,8 @@ int dvb_unregister_adapter(struct dvb_adapter *adap)
 	list_del (&adap->list_head);
 	up (&dvbdev_register_lock);
 	kfree (adap);
-	MOD_DEC_USE_COUNT;
+	/* fixme: is this correct? */
+	module_put(THIS_MODULE);
 	return 0;
 }
 

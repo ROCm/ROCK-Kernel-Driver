@@ -377,7 +377,7 @@ out_unlock:
  *
  * reboot doesn't sync: do that yourself before calling this.
  */
-asmlinkage long sys_reboot(int magic1, int magic2, unsigned int cmd, void * arg)
+asmlinkage long sys_reboot(int magic1, int magic2, unsigned int cmd, void __user * arg)
 {
 	char buffer[256];
 
@@ -430,7 +430,7 @@ asmlinkage long sys_reboot(int magic1, int magic2, unsigned int cmd, void * arg)
 		break;
 
 	case LINUX_REBOOT_CMD_RESTART2:
-		if (strncpy_from_user(&buffer[0], (char *)arg, sizeof(buffer) - 1) < 0) {
+		if (strncpy_from_user(&buffer[0], arg, sizeof(buffer) - 1) < 0) {
 			unlock_kernel();
 			return -EFAULT;
 		}
@@ -877,7 +877,7 @@ asmlinkage long sys_setfsgid(gid_t gid)
 	return old_fsgid;
 }
 
-asmlinkage long sys_times(struct tms * tbuf)
+asmlinkage long sys_times(struct tms __user * tbuf)
 {
 	/*
 	 *	In the SMP world we might just be unlucky and have one of
@@ -1058,7 +1058,7 @@ out:
 /*
  * Supplementary group IDs
  */
-asmlinkage long sys_getgroups(int gidsetsize, gid_t *grouplist)
+asmlinkage long sys_getgroups(int gidsetsize, gid_t __user *grouplist)
 {
 	int i;
 	
@@ -1084,7 +1084,7 @@ asmlinkage long sys_getgroups(int gidsetsize, gid_t *grouplist)
  *	without another task interfering.
  */
  
-asmlinkage long sys_setgroups(int gidsetsize, gid_t *grouplist)
+asmlinkage long sys_setgroups(int gidsetsize, gid_t __user *grouplist)
 {
 	gid_t groups[NGROUPS];
 	int retval;
@@ -1093,7 +1093,7 @@ asmlinkage long sys_setgroups(int gidsetsize, gid_t *grouplist)
 		return -EPERM;
 	if ((unsigned) gidsetsize > NGROUPS)
 		return -EINVAL;
-	if(copy_from_user(groups, grouplist, gidsetsize * sizeof(gid_t)))
+	if (copy_from_user(groups, grouplist, gidsetsize * sizeof(gid_t)))
 		return -EFAULT;
 	retval = security_task_setgroups(gidsetsize, groups);
 	if (retval)
@@ -1140,7 +1140,7 @@ int in_egroup_p(gid_t grp)
 
 DECLARE_RWSEM(uts_sem);
 
-asmlinkage long sys_newuname(struct new_utsname * name)
+asmlinkage long sys_newuname(struct new_utsname __user * name)
 {
 	int errno = 0;
 
@@ -1151,7 +1151,7 @@ asmlinkage long sys_newuname(struct new_utsname * name)
 	return errno;
 }
 
-asmlinkage long sys_sethostname(char *name, int len)
+asmlinkage long sys_sethostname(char __user *name, int len)
 {
 	int errno;
 
@@ -1169,7 +1169,7 @@ asmlinkage long sys_sethostname(char *name, int len)
 	return errno;
 }
 
-asmlinkage long sys_gethostname(char *name, int len)
+asmlinkage long sys_gethostname(char __user *name, int len)
 {
 	int i, errno;
 
@@ -1190,7 +1190,7 @@ asmlinkage long sys_gethostname(char *name, int len)
  * Only setdomainname; getdomainname can be implemented by calling
  * uname()
  */
-asmlinkage long sys_setdomainname(char *name, int len)
+asmlinkage long sys_setdomainname(char __user *name, int len)
 {
 	int errno;
 
@@ -1209,7 +1209,7 @@ asmlinkage long sys_setdomainname(char *name, int len)
 	return errno;
 }
 
-asmlinkage long sys_getrlimit(unsigned int resource, struct rlimit *rlim)
+asmlinkage long sys_getrlimit(unsigned int resource, struct rlimit __user *rlim)
 {
 	if (resource >= RLIM_NLIMITS)
 		return -EINVAL;
@@ -1224,7 +1224,7 @@ asmlinkage long sys_getrlimit(unsigned int resource, struct rlimit *rlim)
  *	Back compatibility for getrlimit. Needed for some apps.
  */
  
-asmlinkage long sys_old_getrlimit(unsigned int resource, struct rlimit *rlim)
+asmlinkage long sys_old_getrlimit(unsigned int resource, struct rlimit __user *rlim)
 {
 	struct rlimit x;
 	if (resource >= RLIM_NLIMITS)
@@ -1240,7 +1240,7 @@ asmlinkage long sys_old_getrlimit(unsigned int resource, struct rlimit *rlim)
 
 #endif
 
-asmlinkage long sys_setrlimit(unsigned int resource, struct rlimit *rlim)
+asmlinkage long sys_setrlimit(unsigned int resource, struct rlimit __user *rlim)
 {
 	struct rlimit new_rlim, *old_rlim;
 	int retval;
@@ -1286,7 +1286,7 @@ asmlinkage long sys_setrlimit(unsigned int resource, struct rlimit *rlim)
  *
  * FIXME! Get the fault counts properly!
  */
-int getrusage(struct task_struct *p, int who, struct rusage *ru)
+int getrusage(struct task_struct *p, int who, struct rusage __user *ru)
 {
 	struct rusage r;
 
@@ -1317,7 +1317,7 @@ int getrusage(struct task_struct *p, int who, struct rusage *ru)
 	return copy_to_user(ru, &r, sizeof(r)) ? -EFAULT : 0;
 }
 
-asmlinkage long sys_getrusage(int who, struct rusage *ru)
+asmlinkage long sys_getrusage(int who, struct rusage __user *ru)
 {
 	if (who != RUSAGE_SELF && who != RUSAGE_CHILDREN)
 		return -EINVAL;
@@ -1350,7 +1350,7 @@ asmlinkage long sys_prctl(int option, unsigned long arg2, unsigned long arg3,
 			current->pdeath_signal = sig;
 			break;
 		case PR_GET_PDEATHSIG:
-			error = put_user(current->pdeath_signal, (int *)arg2);
+			error = put_user(current->pdeath_signal, (int __user *)arg2);
 			break;
 		case PR_GET_DUMPABLE:
 			if (current->mm->dumpable)

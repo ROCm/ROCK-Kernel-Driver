@@ -84,7 +84,7 @@ core-y					+= arch/i386/kernel/ \
 					   arch/i386/$(mcore-y)/
 drivers-$(CONFIG_MATH_EMULATION)	+= arch/i386/math-emu/
 drivers-$(CONFIG_PCI)			+= arch/i386/pci/
-# FIXME: is drivers- right ?
+# must be linked after kernel/
 drivers-$(CONFIG_OPROFILE)		+= arch/i386/oprofile/
 
 CFLAGS += $(mflags-y)

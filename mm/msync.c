@@ -125,11 +125,13 @@ static int filemap_sync(struct vm_area_struct * vma, unsigned long address,
 /*
  * MS_SYNC syncs the entire file - including mappings.
  *
- * MS_ASYNC initiates writeout of just the dirty mapped data.
- * This provides no guarantee of file integrity - things like indirect
- * blocks may not have started writeout.  MS_ASYNC is primarily useful
- * where the application knows that it has finished with the data and
- * wishes to intelligently schedule its own I/O traffic.
+ * MS_ASYNC does not start I/O (it used to, up to 2.5.67).  Instead, it just
+ * marks the relevant pages dirty.  The application may now run fsync() to
+ * write out the dirty pages and wait on the writeout and check the result.
+ * Or the application may run fadvise(FADV_DONTNEED) against the fd to start
+ * async writeout immediately.
+ * So my _not_ starting I/O in MS_ASYNC we provide complete flexibility to
+ * applications.
  */
 static int msync_interval(struct vm_area_struct * vma,
 	unsigned long start, unsigned long end, int flags)
@@ -143,22 +145,20 @@ static int msync_interval(struct vm_area_struct * vma,
 	if (file && (vma->vm_flags & VM_SHARED)) {
 		ret = filemap_sync(vma, start, end-start, flags);
 
-		if (!ret && (flags & (MS_SYNC|MS_ASYNC))) {
-			struct inode * inode = file->f_dentry->d_inode;
+		if (!ret && (flags & MS_SYNC)) {
+			struct inode *inode = file->f_dentry->d_inode;
 			int err;
 
 			down(&inode->i_sem);
 			ret = filemap_fdatawrite(inode->i_mapping);
-			if (flags & MS_SYNC) {
-				if (file->f_op && file->f_op->fsync) {
-					err = file->f_op->fsync(file, file->f_dentry, 1);
-					if (err && !ret)
-						ret = err;
-				}
-				err = filemap_fdatawait(inode->i_mapping);
-				if (!ret)
+			if (file->f_op && file->f_op->fsync) {
+				err = file->f_op->fsync(file,file->f_dentry,1);
+				if (err && !ret)
 					ret = err;
 			}
+			err = filemap_fdatawait(inode->i_mapping);
+			if (!ret)
+				ret = err;
 			up(&inode->i_sem);
 		}
 	}

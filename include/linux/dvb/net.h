@@ -39,6 +39,7 @@ struct dvb_net_if {
 
 #define NET_ADD_IF                 _IOWR('o', 52, struct dvb_net_if)
 #define NET_REMOVE_IF              _IO('o', 53)
+#define NET_GET_IF                 _IOWR('o', 54, struct dvb_net_if)
 
 #endif /*_DVBNET_H_*/
 

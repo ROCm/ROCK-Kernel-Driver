@@ -39,11 +39,6 @@
 #include <linux/pagemap.h>
 
 
-extern int xfs_change_file_space(bhv_desc_t *, int,
-			xfs_flock64_t *, xfs_off_t, cred_t *, int);
-extern int xfs_set_dmattrs(bhv_desc_t *, u_int, u_int16_t, cred_t *);
-
-
 /*
  * xfs_find_handle maps from userspace xfs_fsop_handlereq structure to
  * a file or fs handle.

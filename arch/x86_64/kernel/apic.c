@@ -376,7 +376,7 @@ void __init setup_local_APIC (void)
 	 * Set up LVT0, LVT1:
 	 *
 	 * set up through-local-APIC on the BP's LINT0. This is not
-	 * strictly necessery in pure symmetric-IO mode, but sometimes
+	 * strictly necessary in pure symmetric-IO mode, but sometimes
 	 * we delegate interrupts to the 8259A.
 	 */
 	/*
@@ -935,7 +935,7 @@ void smp_local_timer_interrupt(struct pt_regs *regs)
 
 	/*
 	 * We take the 'long' return path, and there every subsystem
-	 * grabs the apropriate locks (kernel lock/ irq lock).
+	 * grabs the appropriate locks (kernel lock/ irq lock).
 	 *
 	 * we might want to decouple profiling from the 'long path',
 	 * and do the profiling totally in assembly.

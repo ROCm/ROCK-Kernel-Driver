@@ -136,7 +136,7 @@ extern void disable_early_printk(void);
  * redirect is the pseudo-tty that console output
  * is redirected to if asked by TIOCCONS.
  */
-struct tty_struct * redirect;
+static struct tty_struct *redirect;
 
 static void initialize_tty_struct(struct tty_struct *tty);
 
@@ -506,8 +506,8 @@ void do_tty_hangup(void *data)
 				p->tty = NULL;
 			if (!p->leader)
 				continue;
-			send_sig(SIGHUP, p, 1);
-			send_sig(SIGCONT, p, 1);
+			send_group_sig_info(SIGHUP, SEND_SIG_PRIV, p);
+			send_group_sig_info(SIGCONT, SEND_SIG_PRIV, p);
 			if (tty->pgrp > 0)
 				p->tty_old_pgrp = tty->pgrp;
 		}

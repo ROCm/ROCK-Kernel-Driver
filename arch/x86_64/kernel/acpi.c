@@ -300,7 +300,7 @@ acpi_boot_init (void)
 
 	/*
 	 * The default interrupt routing model is PIC (8259).  This gets
-	 * overriden if IOAPICs are enumerated (below).
+	 * overridden if IOAPICs are enumerated (below).
 	 */
 	acpi_irq_model = ACPI_IRQ_MODEL_PIC;
 
@@ -318,6 +318,9 @@ acpi_boot_init (void)
 	} else
                printk(KERN_NOTICE PREFIX "BIOS passes blacklist\n");
 
+	extern int disable_apic;
+	if (disable_apic)
+		return 0;
 
 #ifdef CONFIG_X86_LOCAL_APIC
 
@@ -345,7 +348,7 @@ acpi_boot_init (void)
 	 * Local APIC
 	 * ----------
 	 * Note that the LAPIC address is obtained from the MADT (32-bit value)
-	 * and (optionally) overriden by a LAPIC_ADDR_OVR entry (64-bit value).
+	 * and (optionally) overridden by a LAPIC_ADDR_OVR entry (64-bit value).
 	 */
 
 	result = acpi_table_parse_madt(ACPI_MADT_LAPIC_ADDR_OVR, acpi_parse_lapic_addr_ovr);

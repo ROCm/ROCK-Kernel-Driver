@@ -49,7 +49,7 @@ void __init fpu_init(void)
 /*
  * The _current_ task is using the FPU for the first time
  * so initialize it and set the mxcsr to its default.
- * remeber the current task has used the FPU.
+ * remember the current task has used the FPU.
  */
 void init_fpu(struct task_struct *child)
 {

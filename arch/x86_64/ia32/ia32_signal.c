@@ -247,6 +247,8 @@ asmlinkage long sys32_sigreturn(struct pt_regs regs)
 	sigset_t set;
 	unsigned int eax;
 
+	set_thread_flag(TIF_IRET);
+	
 	if (verify_area(VERIFY_READ, frame, sizeof(*frame)))
 		goto badframe;
 	if (__get_user(set.sig[0], &frame->sc.oldmask)
@@ -276,6 +278,8 @@ asmlinkage long sys32_rt_sigreturn(struct pt_regs regs)
 	sigset_t set;
 	stack_t st;
 	unsigned int eax;
+
+	set_thread_flag(TIF_IRET);
 
 	if (verify_area(VERIFY_READ, frame, sizeof(*frame)))
 		goto badframe;

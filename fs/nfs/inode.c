@@ -33,6 +33,7 @@
 #include <linux/smp_lock.h>
 #include <linux/seq_file.h>
 #include <linux/mount.h>
+#include <linux/nfs_idmap.h>
 #include <linux/vfs.h>
 
 #include <asm/system.h>
@@ -140,6 +141,10 @@ nfs_clear_inode(struct inode *inode)
 	cred = nfsi->cache_access.cred;
 	if (cred)
 		put_rpccred(cred);
+	/* Clean up the V4 state */
+	nfs4_put_shareowner(inode, nfsi->wo_owner);
+	nfs4_put_shareowner(inode, nfsi->ro_owner);
+	nfs4_put_shareowner(inode, nfsi->rw_owner);
 }
 
 void
@@ -147,6 +152,11 @@ nfs_put_super(struct super_block *sb)
 {
 	struct nfs_server *server = NFS_SB(sb);
 	struct rpc_clnt	*rpc;
+
+#ifdef CONFIG_NFS_V4
+	if (server->idmap != NULL)
+		nfs_idmap_delete(server);
+#endif /* CONFIG_NFS_V4 */
 
 	if ((rpc = server->client) != NULL)
 		rpc_shutdown_client(rpc);
@@ -156,6 +166,7 @@ nfs_put_super(struct super_block *sb)
 	rpciod_down();		/* release rpciod */
 
 	destroy_nfsv4_state(server);
+
 	kfree(server->hostname);
 }
 
@@ -855,23 +866,13 @@ int nfs_open(struct inode *inode, struct file *filp)
 {
 	struct rpc_auth *auth;
 	struct rpc_cred *cred;
-	int err = 0;
 
-	lock_kernel();
-	/* Ensure that we revalidate the data cache */
-	if (NFS_SERVER(inode)->flags & NFS_MOUNT_NOCTO) {
-		err = __nfs_revalidate_inode(NFS_SERVER(inode),inode);
-		if (err)
-			goto out;
-	}
 	auth = NFS_CLIENT(inode)->cl_auth;
 	cred = rpcauth_lookupcred(auth, 0);
 	filp->private_data = cred;
 	if (filp->f_mode & FMODE_WRITE)
 		nfs_set_mmcred(inode, cred);
-out:
-	unlock_kernel();
-	return err;
+	return 0;
 }
 
 int nfs_release(struct inode *inode, struct file *filp)
@@ -1368,11 +1369,16 @@ static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data,
 	if (create_nfsv4_state(server, data))
 		goto out_shutdown;
 
+	if ((server->idmap = nfs_idmap_new(server)) == NULL)
+		printk(KERN_WARNING "NFS: couldn't start IDmap\n");
+
 	err = nfs_sb_init(sb);
 	if (err == 0)
 		return 0;
 	rpciod_down();
 	destroy_nfsv4_state(server);
+	if (server->idmap != NULL)
+		nfs_idmap_delete(server);
 out_shutdown:
 	rpc_shutdown_client(server->client);
 out_fail:
@@ -1502,9 +1508,18 @@ static struct file_system_type nfs4_fs_type = {
 	.kill_sb	= nfs_kill_super,
 	.fs_flags	= FS_ODD_RENAME,
 };
+
+#define nfs4_zero_state(nfsi) \
+	do { \
+		(nfsi)->wo_owner = NULL; \
+		(nfsi)->ro_owner = NULL; \
+		(nfsi)->rw_owner = NULL; \
+	} while(0)
 #define register_nfs4fs() register_filesystem(&nfs4_fs_type)
 #define unregister_nfs4fs() unregister_filesystem(&nfs4_fs_type)
 #else
+#define nfs4_zero_state(nfsi) \
+	do { } while (0)
 #define register_nfs4fs() (0)
 #define unregister_nfs4fs()
 #endif
@@ -1526,6 +1541,7 @@ static struct inode *nfs_alloc_inode(struct super_block *sb)
 		return NULL;
 	nfsi->flags = 0;
 	nfsi->mm_cred = NULL;
+	nfs4_zero_state(nfsi);
 	return &nfsi->vfs_inode;
 }
 

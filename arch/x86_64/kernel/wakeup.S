@@ -7,7 +7,7 @@
  *			
  * Copyright 2003 by Andi Kleen, SuSE Labs.
  *	
- * Long mode entry losely based on example code in chapter 14 of the x86-64 system 
+ * Long mode entry loosely based on example code in chapter 14 of the x86-64 system 
  * programmer's manual.
  * 
  * Notebook:	

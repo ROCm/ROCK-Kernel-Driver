@@ -194,7 +194,7 @@ void __init hd_setup(char *str, int *ints)
 static void dump_status (const char *msg, unsigned int stat)
 {
 	char *name = "hd?";
-	if (!blk_queue_empty(QUEUE))
+	if (CURRENT)
 		name = CURRENT->rq_disk->disk_name;
 
 #ifdef VERBOSE_ERRORS
@@ -223,7 +223,7 @@ static void dump_status (const char *msg, unsigned int stat)
 		if (hd_error & (BBD_ERR|ECC_ERR|ID_ERR|MARK_ERR)) {
 			printk(", CHS=%d/%d/%d", (inb(HD_HCYL)<<8) + inb(HD_LCYL),
 				inb(HD_CURRENT) & 0xf, inb(HD_SECTOR));
-			if (!blk_queue_empty(QUEUE))
+			if (CURRENT)
 				printk(", sector=%ld", CURRENT->sector);
 		}
 		printk("\n");
@@ -403,8 +403,8 @@ void unexpected_hd_interrupt(void)
  */
 static void bad_rw_intr(void)
 {
-	if (!blk_queue_empty(QUEUE)) {
-		struct request *req = CURRENT;
+	struct request *req = CURRENT;
+	if (req != NULL) {
 		struct hd_i_struct *disk = req->rq_disk->private_data;
 		if (++req->errors >= MAX_ERRORS || (hd_error & BBD_ERR)) {
 			end_request(req, 0);
@@ -469,7 +469,7 @@ ok_to_read:
 #if (HD_DELAY > 0)
 	last_req = read_timer();
 #endif
-	if (!blk_queue_empty(QUEUE))
+	if (elv_next_request(QUEUE))
 		hd_request();
 	return;
 }
@@ -532,7 +532,7 @@ static void hd_times_out(unsigned long dummy)
 
 	do_hd = NULL;
 
-	if (blk_queue_empty(QUEUE))
+	if (!CURRENT)
 		return;
 
 	disable_irq(HD_IRQ);
@@ -588,11 +588,11 @@ repeat:
 	del_timer(&device_timer);
 	local_irq_enable();
 
-	if (blk_queue_empty(QUEUE)) {
+	req = CURRENT;
+	if (!req) {
 		do_hd = NULL;
 		return;
 	}
-	req = CURRENT;
 
 	if (reset) {
 		local_irq_disable();

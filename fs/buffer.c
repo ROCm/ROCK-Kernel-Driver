@@ -123,7 +123,8 @@ void __wait_on_buffer(struct buffer_head * bh)
 	wait_queue_head_t *wqh = bh_waitq_head(bh);
 	DEFINE_WAIT(wait);
 
-	if (atomic_read(&bh->b_count) == 0)
+	if (atomic_read(&bh->b_count) == 0 &&
+			(!bh->b_page || !PageLocked(bh->b_page)))
 		buffer_error();
 
 	do {

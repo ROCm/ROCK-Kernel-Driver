@@ -601,10 +601,10 @@ static int pss_mixer_ioctl (int dev, unsigned int cmd, caddr_t arg)
 
 static struct mixer_operations pss_mixer_operations =
 {
-	owner:	THIS_MODULE,
-	id:	"SOUNDPORT",
-	name:	"PSS-AD1848",
-	ioctl:	pss_mixer_ioctl
+	.owner	= THIS_MODULE,
+	.id	= "SOUNDPORT",
+	.name	= "PSS-AD1848",
+	.ioctl	= pss_mixer_ioctl
 };
 
 void disable_all_emulations(void)

@@ -54,7 +54,7 @@ static struct console early_vga_console = {
 	.index =	-1,
 };
 
-/* Serial functions losely based on a similar package from Klaus P. Gerlicher */ 
+/* Serial functions loosely based on a similar package from Klaus P. Gerlicher */ 
 
 int early_serial_base = 0x3f8;  /* ttyS0 */ 
 

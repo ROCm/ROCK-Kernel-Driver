@@ -1342,6 +1342,13 @@ static int ep_collect_ready_items(struct eventpoll *ep, struct list_head *txlist
 			ep_use_epitem(epi);
 
 			/*
+			 * We need to increase the usage count of the "struct file" because
+			 * another thread might call close() on this target and make the file
+			 * to vanish before we will be able to call f_op->poll().
+			 */
+			get_file(epi->file);
+
+			/*
 			 * This is initialized in this way so that the default
 			 * behaviour of the reinjecting code will be to push back
 			 * the item inside the ready list.
@@ -1386,6 +1393,14 @@ static int ep_send_events(struct eventpoll *ep, struct list_head *txlist,
 		revents = epi->file->f_op->poll(epi->file, NULL);
 
 		/*
+		 * Release the file usage before checking the event mask.
+		 * In case this call will lead to the file removal, its
+		 * ->event.events member has been already set to zero and
+		 * this will make the event to be dropped.
+		 */
+		fput(epi->file);
+
+		/*
 		 * Set the return event set for the current file descriptor.
 		 * Note that only the task task was successfully able to link
 		 * the item to its "txlist" will write this field.
@@ -1398,8 +1413,17 @@ static int ep_send_events(struct eventpoll *ep, struct list_head *txlist,
 			eventbuf++;
 			if (eventbuf == EP_MAX_BUF_EVENTS) {
 				if (__copy_to_user(&events[eventcnt], event,
-						   eventbuf * sizeof(struct epoll_event)))
+						   eventbuf * sizeof(struct epoll_event))) {
+					/*
+					 * We need to complete the loop to decrement the file
+					 * usage before returning from this function.
+					 */
+					for (lnk = lnk->next; lnk != txlist; lnk = lnk->next) {
+						epi = list_entry(lnk, struct epitem, txlink);
+						fput(epi->file);
+					}
 					return -EFAULT;
+				}
 				eventcnt += eventbuf;
 				eventbuf = 0;
 			}

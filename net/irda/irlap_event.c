@@ -1038,7 +1038,7 @@ static int irlap_state_xmit_p(struct irlap_cb *self, IRLAP_EVENT event,
 				 * we send 2000B packets, we may wait another
 				 * 1000B until our turnaround expire. That's
 				 * why we need to be proactive in avoiding
-				 * comming here. - Jean II
+				 * coming here. - Jean II
 				 */
 				return -EPROTO;
 			}

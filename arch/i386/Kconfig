@@ -142,7 +142,7 @@ config M386
 config M486
 	bool "486"
 	help
-	  Select this for a x486 processor, ether Intel or one of the
+	  Select this for a 486 series processor, either Intel or one of the
 	  compatible processors from AMD, Cyrix, IBM, or Intel.  Includes DX,
 	  DX2, and DX4 variants; also SL/SLC/SLC2/SLC3/SX/SX2 and UMC U5D or
 	  U5S.
@@ -150,8 +150,8 @@ config M486
 config M586
 	bool "586/K5/5x86/6x86/6x86MX"
 	help
-	  Select this for an x586 or x686 processor such as the AMD K5, the
-	  Intel 5x86 or 6x86, or the Intel 6x86MX.  This choice does not
+	  Select this for an 586 or 686 series processor such as the AMD K5,
+	  the Intel 5x86 or 6x86, or the Intel 6x86MX.  This choice does not
 	  assume the RDTSC (Read Time Stamp Counter) instruction.
 
 config M586TSC
@@ -226,28 +226,28 @@ config MELAN
 config MCRUSOE
 	bool "Crusoe"
 	help
-	  Select this for Transmeta Crusoe processor.  Treats the processor
+	  Select this for a Transmeta Crusoe processor.  Treats the processor
 	  like a 586 with TSC, and sets some GCC optimization flags (like a
 	  Pentium Pro with no alignment requirements).
 
 config MWINCHIPC6
 	bool "Winchip-C6"
 	help
-	  Select this for a IDT Winchip C6 chip.  Linux and GCC
+	  Select this for an IDT Winchip C6 chip.  Linux and GCC
 	  treat this chip as a 586TSC with some extended instructions
 	  and alignment requirements.
 
 config MWINCHIP2
 	bool "Winchip-2"
 	help
-	  Select this for a IDT Winchip-2.  Linux and GCC
+	  Select this for an IDT Winchip-2.  Linux and GCC
 	  treat this chip as a 586TSC with some extended instructions
 	  and alignment requirements.
 
 config MWINCHIP3D
 	bool "Winchip-2A/Winchip-3"
 	help
-	  Select this for a IDT Winchip-2A or 3.  Linux and GCC
+	  Select this for an IDT Winchip-2A or 3.  Linux and GCC
 	  treat this chip as a 586TSC with some extended instructions
 	  and alignment reqirements.  Development kernels also enable
 	  out of order memory stores for this CPU, which can increase
@@ -260,15 +260,15 @@ config MCYRIXIII
 	  treat this chip as a generic 586. Whilst the CPU is 686 class,
 	  it lacks the cmov extension which gcc assumes is present when
 	  generating 686 code.
-	  Note, that Nehemiah (Model 9) and above will not boot with this
-	  kernel due to them lacking the 3dnow instructions used in earlier
+	  Note that Nehemiah (Model 9) and above will not boot with this
+	  kernel due to them lacking the 3DNow! instructions used in earlier
 	  incarnations of the CPU.
 
 config MVIAC3_2
 	bool "VIA C3-2 (Nehemiah)"
 	help
-	  Select this for a VIA C3 "Nehemiah". Selecting this enables usage of SSE
-	  and tells gcc to treat the CPU as a 686.
+	  Select this for a VIA C3 "Nehemiah". Selecting this enables usage
+	  of SSE and tells gcc to treat the CPU as a 686.
 	  Note, this kernel will not boot on older (pre model 9) C3s.
 
 endchoice
@@ -435,7 +435,8 @@ config X86_UP_APIC
 	  enable and use it. If you say Y here even though your machine doesn't
 	  have a local APIC, then the kernel will still run with no slowdown at
 	  all. The local APIC supports CPU-generated self-interrupts (timer,
-	  performance counters), and the NMI watchdog which detects hard lockups.
+	  performance counters), and the NMI watchdog which detects hard
+	  lockups.
 
 	  If you have a system with several CPUs, you do not need to say Y
 	  here: the local APIC will be used automatically.
@@ -522,7 +523,7 @@ config TOSHIBA
 	---help---
 	  This adds a driver to safely access the System Management Mode of
 	  the CPU on Toshiba portables with a genuine Toshiba BIOS. It does
-	  not work on models with a Pheonix BIOS. The System Management Mode
+	  not work on models with a Phoenix BIOS. The System Management Mode
 	  is used to set the BIOS and power saving options on Toshiba portables.
 
 	  For information on utilities to make use of this driver see the

@@ -126,7 +126,7 @@ enum {
 	rng_hw_via,
 };
 
-static struct rng_operations rng_vendor_ops[] __initdata = {
+static struct rng_operations rng_vendor_ops[] = {
 	/* rng_hw_none */
 	{ },
 

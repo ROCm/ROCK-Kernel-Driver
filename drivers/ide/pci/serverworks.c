@@ -419,7 +419,13 @@ static void config_chipset_for_pio (ide_drive_t *drive)
 
 static void svwks_tune_drive (ide_drive_t *drive, u8 pio)
 {
-	(void) svwks_tune_chipset(drive, (XFER_PIO_0 + pio));
+	/* Tune to desired value or to "best". We must not adjust
+	   "best" when we adjust from pio numbers to rate values! */
+	   
+	if(pio != 255)
+		(void) svwks_tune_chipset(drive, (XFER_PIO_0 + pio));
+	else
+		(void) svwks_tune_chipset(drive, 255);
 }
 
 static int config_chipset_for_dma (ide_drive_t *drive)

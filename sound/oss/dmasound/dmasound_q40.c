@@ -584,39 +584,39 @@ static int Q40SetVolume(int volume)
 /*** Machine definitions *****************************************************/
 
 static SETTINGS def_hard = {
-	format: AFMT_U8,
-	stereo: 0,
-	size: 8,
-	speed: 10000
+	.format	= AFMT_U8,
+	.stereo	= 0,
+	.size	= 8,
+	.speed	= 10000
 } ;
 
 static SETTINGS def_soft = {
-	format: AFMT_U8,
-	stereo: 0,
-	size: 8,
-	speed: 8000
+	.format	= AFMT_U8,
+	.stereo	= 0,
+	.size	= 8,
+	.speed	= 8000
 } ;
 
 static MACHINE machQ40 = {
-	name:		"Q40",
-	name2:		"Q40",
-	open:		Q40Open,
-	release:	Q40Release,
-	dma_alloc:	Q40Alloc,
-	dma_free:	Q40Free,
-	irqinit:	Q40IrqInit,
+	.name		= "Q40",
+	.name2		= "Q40",
+	.open		= Q40Open,
+	.release	= Q40Release,
+	.dma_alloc	= Q40Alloc,
+	.dma_free	= Q40Free,
+	.irqinit	= Q40IrqInit,
 #ifdef MODULE
-	irqcleanup:	Q40IrqCleanUp,
+	.irqcleanup	= Q40IrqCleanUp,
 #endif /* MODULE */
-	init:		Q40Init,
-	silence:	Q40Silence,
-	setFormat:	Q40SetFormat,
-	setVolume:	Q40SetVolume,
-	play:		Q40Play,
- 	min_dsp_speed:	10000,
-	version:	((DMASOUND_Q40_REVISION<<8) | DMASOUND_Q40_EDITION),
-	hardware_afmts:	AFMT_U8, /* h'ware-supported formats *only* here */
-        capabilities:	DSP_CAP_BATCH  /* As per SNDCTL_DSP_GETCAPS */
+	.init		= Q40Init,
+	.silence	= Q40Silence,
+	.setFormat	= Q40SetFormat,
+	.setVolume	= Q40SetVolume,
+	.play		= Q40Play,
+ 	.min_dsp_speed	= 10000,
+	.version	= ((DMASOUND_Q40_REVISION<<8) | DMASOUND_Q40_EDITION),
+	.hardware_afmts	= AFMT_U8, /* h'ware-supported formats *only* here */
+	.capabilities	= DSP_CAP_BATCH  /* As per SNDCTL_DSP_GETCAPS */
 };
 
 

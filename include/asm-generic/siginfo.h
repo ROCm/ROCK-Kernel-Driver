@@ -106,7 +106,7 @@ typedef struct siginfo {
 #define si_fd		_sifields._sigpoll._fd
 
 #ifdef __KERNEL__
-#define __SI_MASK	0xffff0000
+#define __SI_MASK	0xffff0000u
 #define __SI_KILL	(0 << 16)
 #define __SI_TIMER	(1 << 16)
 #define __SI_POLL	(2 << 16)
@@ -275,7 +275,7 @@ static inline void copy_siginfo(struct siginfo *to, struct siginfo *from)
 
 #endif
 
-extern int copy_siginfo_to_user(struct siginfo *to, struct siginfo *from);
+extern int copy_siginfo_to_user(struct siginfo __user *to, struct siginfo *from);
 
 #endif /* __KERNEL__ */
 

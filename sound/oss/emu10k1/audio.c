@@ -33,7 +33,6 @@
 #include <linux/module.h>
 #include <linux/poll.h>
 #include <linux/slab.h>
-#include <linux/version.h>
 #include <linux/bitops.h>
 #include <asm/io.h>
 #include <linux/sched.h>
@@ -1020,7 +1019,7 @@ static struct page *emu10k1_mm_nopage (struct vm_area_struct * vma, unsigned lon
 }
 
 struct vm_operations_struct emu10k1_mm_ops = {
-	nopage:         emu10k1_mm_nopage,
+	.nopage         = emu10k1_mm_nopage,
 };
 
 static int emu10k1_audio_mmap(struct file *file, struct vm_area_struct *vma)
@@ -1558,13 +1557,13 @@ void emu10k1_waveout_bh(unsigned long refdata)
 }
 
 struct file_operations emu10k1_audio_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	read:		emu10k1_audio_read,
-	write:		emu10k1_audio_write,
-	poll:		emu10k1_audio_poll,
-	ioctl:		emu10k1_audio_ioctl,
-	mmap:		emu10k1_audio_mmap,
-	open:		emu10k1_audio_open,
-	release:	emu10k1_audio_release,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.read		= emu10k1_audio_read,
+	.write		= emu10k1_audio_write,
+	.poll		= emu10k1_audio_poll,
+	.ioctl		= emu10k1_audio_ioctl,
+	.mmap		= emu10k1_audio_mmap,
+	.open		= emu10k1_audio_open,
+	.release	= emu10k1_audio_release,
 };

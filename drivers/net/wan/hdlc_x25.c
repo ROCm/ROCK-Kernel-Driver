@@ -2,12 +2,11 @@
  * Generic HDLC support routines for Linux
  * X.25 support
  *
- * Copyright (C) 1999 - 2001 Krzysztof Halasa <khc@pm.waw.pl>
+ * Copyright (C) 1999 - 2003 Krzysztof Halasa <khc@pm.waw.pl>
  *
  * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * under the terms of version 2 of the GNU General Public License
+ * as published by the Free Software Foundation.
  */
 
 #include <linux/config.h>
@@ -204,6 +203,7 @@ int hdlc_x25_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
 		hdlc->open = x25_open;
 		hdlc->stop = x25_close;
 		hdlc->netif_rx = x25_rx;
+		hdlc->type_trans = NULL;
 		hdlc->proto = IF_PROTO_X25;
 		dev->hard_start_xmit = x25_xmit;
 		dev->hard_header = NULL;

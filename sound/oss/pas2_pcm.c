@@ -372,16 +372,16 @@ static int pas_audio_prepare_for_output(int dev, int bsize, int bcount)
 
 static struct audio_driver pas_audio_driver =
 {
-	owner:		THIS_MODULE,
-	open:		pas_audio_open,
-	close:		pas_audio_close,
-	output_block:	pas_audio_output_block,
-	start_input:	pas_audio_start_input,
-	ioctl:		pas_audio_ioctl,
-	prepare_for_input:	pas_audio_prepare_for_input,
-	prepare_for_output:	pas_audio_prepare_for_output,
-	halt_io:		pas_audio_reset,
-	trigger:	pas_audio_trigger
+	.owner			= THIS_MODULE,
+	.open			= pas_audio_open,
+	.close			= pas_audio_close,
+	.output_block		= pas_audio_output_block,
+	.start_input		= pas_audio_start_input,
+	.ioctl			= pas_audio_ioctl,
+	.prepare_for_input	= pas_audio_prepare_for_input,
+	.prepare_for_output	= pas_audio_prepare_for_output,
+	.halt_io		= pas_audio_reset,
+	.trigger		= pas_audio_trigger
 };
 
 void __init pas_pcm_init(struct address_info *hw_config)

@@ -294,7 +294,7 @@ done_d:
 	 *	  the appropriate signal to the translated program.
 	 *
 	 * In addition, properly track the exception state in software
-	 * as described in the Alpha Architectre Handbook section 4.7.7.3.
+	 * as described in the Alpha Architecture Handbook section 4.7.7.3.
 	 */
 done:
 	if (_fex) {

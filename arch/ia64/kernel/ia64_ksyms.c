@@ -57,9 +57,7 @@ EXPORT_SYMBOL_NOVERS(__up);
 EXPORT_SYMBOL(clear_page);
 
 #include <asm/processor.h>
-# ifndef CONFIG_NUMA
 EXPORT_SYMBOL(cpu_info__per_cpu);
-# endif
 EXPORT_SYMBOL(kernel_thread);
 
 #include <asm/system.h>
@@ -147,3 +145,19 @@ EXPORT_SYMBOL(machvec_noop);
 EXPORT_SYMBOL(pfm_install_alternate_syswide_subsystem);
 EXPORT_SYMBOL(pfm_remove_alternate_syswide_subsystem);
 #endif
+
+#ifdef CONFIG_NUMA
+#include <asm/numa.h>
+EXPORT_SYMBOL(cpu_to_node_map);
+#endif
+
+#include <asm/unwind.h>
+EXPORT_SYMBOL(unw_init_from_blocked_task);
+EXPORT_SYMBOL(unw_init_running);
+EXPORT_SYMBOL(unw_unwind);
+EXPORT_SYMBOL(unw_unwind_to_user);
+EXPORT_SYMBOL(unw_access_gr);
+EXPORT_SYMBOL(unw_access_br);
+EXPORT_SYMBOL(unw_access_fr);
+EXPORT_SYMBOL(unw_access_ar);
+EXPORT_SYMBOL(unw_access_pr);

@@ -23,7 +23,6 @@
 #include <linux/init.h>
 #include <linux/module.h>
 
-#include "compat.h"
 #include "dvb_frontend.h"
 
 
@@ -33,15 +32,22 @@ static int debug = 0;
 
 static
 struct dvb_frontend_info tdmb7_info = {
-	.name			= "Alps TDMB7",
-	.type			= FE_OFDM,
-	.frequency_min		= 470000000,
-	.frequency_max		= 860000000,
-	.frequency_stepsize	= 166667,
-	.caps			= FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 |
-				  FE_CAN_FEC_3_4 | FE_CAN_FEC_5_6 |
-				  FE_CAN_FEC_7_8 | FE_CAN_FEC_AUTO |
-				  FE_CAN_QPSK | FE_CAN_QAM_16 | FE_CAN_QAM_64
+	name: "Alps TDMB7",
+	type: FE_OFDM,
+	frequency_min: 470000000,
+	frequency_max: 860000000,
+	frequency_stepsize: 166667,
+#if 0
+    	frequency_tolerance: ???,
+	symbol_rate_min: ???,
+	symbol_rate_max: ???,
+	symbol_rate_tolerance: 500,  /* ppm */
+	notifier_delay: 0,
+#endif
+	caps: FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 | FE_CAN_FEC_3_4 |
+	      FE_CAN_FEC_5_6 | FE_CAN_FEC_7_8 | FE_CAN_FEC_AUTO |
+	      FE_CAN_QPSK | FE_CAN_QAM_16 | FE_CAN_QAM_64 | 
+	      FE_CAN_CLEAN_SETUP | FE_CAN_RECOVER
 };
 
 
@@ -81,7 +87,7 @@ int cx22700_writereg (struct dvb_i2c_bus *i2c, u8 reg, u8 data)
 {
 	int ret;
 	u8 buf [] = { reg, data };
-	struct i2c_msg msg = { .addr = 0x43, .flags = 0, .buf = buf, .len = 2 };
+	struct i2c_msg msg = { addr: 0x43, flags: 0, buf: buf, len: 2 };
 
 	dprintk ("%s\n", __FUNCTION__);
 
@@ -101,8 +107,8 @@ u8 cx22700_readreg (struct dvb_i2c_bus *i2c, u8 reg)
 	int ret;
 	u8 b0 [] = { reg };
 	u8 b1 [] = { 0 };
-	struct i2c_msg msg [] = { { .addr = 0x43, .flags = 0, .buf = b0, .len = 1 },
-			   { .addr = 0x43, .flags = I2C_M_RD, .buf = b1, .len = 1 } };
+	struct i2c_msg msg [] = { { addr: 0x43, flags: 0, buf: b0, len: 1 },
+			   { addr: 0x43, flags: I2C_M_RD, buf: b1, len: 1 } };
         
 	dprintk ("%s\n", __FUNCTION__);
 
@@ -118,7 +124,7 @@ u8 cx22700_readreg (struct dvb_i2c_bus *i2c, u8 reg)
 static
 int pll_write (struct dvb_i2c_bus *i2c, u8 data [4])
 {
-	struct i2c_msg msg = { .addr = 0x61, .flags = 0, .buf = data, .len = 4 };
+	struct i2c_msg msg = { addr: 0x61, flags: 0, buf: data, len: 4 };
 	int ret;
 
 	cx22700_writereg (i2c, 0x0a, 0x00);  /* open i2c bus switch */
@@ -350,6 +356,7 @@ int tdmb7_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 
         case FE_READ_BER:
 		*((uint32_t*) arg) = cx22700_readreg (i2c, 0x0c) & 0x7f;
+		cx22700_writereg (i2c, 0x0c, 0x00);
 		break;
 
 	case FE_READ_SIGNAL_STRENGTH:
@@ -368,6 +375,7 @@ int tdmb7_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 	}
 	case FE_READ_UNCORRECTED_BLOCKS: 
 		*((uint32_t*) arg) = cx22700_readreg (i2c, 0x0f);
+		cx22700_writereg (i2c, 0x0f, 0x00);
 		break;
 
         case FE_SET_FRONTEND:
@@ -412,7 +420,7 @@ int tdmb7_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 static
 int tdmb7_attach (struct dvb_i2c_bus *i2c)
 {
-	struct i2c_msg msg = { .addr = 0x43, .flags = 0, .buf = NULL, .len = 0 };
+	struct i2c_msg msg = { addr: 0x43, flags: 0, buf: NULL, len: 0 };
 
 	dprintk ("%s\n", __FUNCTION__);
 

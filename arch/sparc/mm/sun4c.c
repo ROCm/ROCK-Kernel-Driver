@@ -1798,8 +1798,19 @@ static pte_t sun4c_mk_pte_io(unsigned long page, pgprot_t pgprot, int space)
 
 static unsigned long sun4c_pte_pfn(pte_t pte)
 {
-	return (unsigned long)(pte_val(pte) & SUN4C_PFN_MASK);
+	return pte_val(pte) & SUN4C_PFN_MASK;
 }
+
+static pte_t sun4c_pgoff_to_pte(unsigned long pgoff)
+{
+	return __pte(pgoff | _SUN4C_PAGE_FILE);
+}
+
+static unsigned long sun4c_pte_to_pgoff(pte_t pte)
+{
+	return pte_val(pte) & ((1UL << SUN4C_PTE_FILE_MAX_BITS) - 1);
+}
+
 
 static __inline__ unsigned long sun4c_pmd_page_v(pmd_t pmd)
 {
@@ -2115,7 +2126,9 @@ void __init ld_mmu_sun4c(void)
 	page_kernel = pgprot_val(SUN4C_PAGE_KERNEL);
 	pg_iobits = _SUN4C_PAGE_PRESENT | _SUN4C_READABLE | _SUN4C_WRITEABLE |
 		    _SUN4C_PAGE_IO | _SUN4C_PAGE_NOCACHE;
-	
+
+	BTFIXUPSET_SIMM13(pte_file_max_bits, SUN4C_PTE_FILE_MAX_BITS);
+
 	/* Functions */
 	BTFIXUPSET_CALL(___xchg32, ___xchg32_sun4c, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(do_check_pgt_cache, sun4c_check_pgt_cache, BTFIXUPCALL_NORM);
@@ -2190,6 +2203,7 @@ void __init ld_mmu_sun4c(void)
 	BTFIXUPSET_HALF(pte_writei, _SUN4C_PAGE_WRITE);
 	BTFIXUPSET_HALF(pte_dirtyi, _SUN4C_PAGE_MODIFIED);
 	BTFIXUPSET_HALF(pte_youngi, _SUN4C_PAGE_ACCESSED);
+	BTFIXUPSET_HALF(pte_filei, _SUN4C_PAGE_FILE);
 	BTFIXUPSET_HALF(pte_wrprotecti, _SUN4C_PAGE_WRITE|_SUN4C_PAGE_SILENT_WRITE);
 	BTFIXUPSET_HALF(pte_mkcleani, _SUN4C_PAGE_MODIFIED|_SUN4C_PAGE_SILENT_WRITE);
 	BTFIXUPSET_HALF(pte_mkoldi, _SUN4C_PAGE_ACCESSED|_SUN4C_PAGE_SILENT_READ);
@@ -2197,6 +2211,9 @@ void __init ld_mmu_sun4c(void)
 	BTFIXUPSET_CALL(pte_mkdirty, sun4c_pte_mkdirty, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(pte_mkyoung, sun4c_pte_mkyoung, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(update_mmu_cache, sun4c_update_mmu_cache, BTFIXUPCALL_NORM);
+
+	BTFIXUPSET_CALL(pte_to_pgoff, sun4c_pte_to_pgoff, BTFIXUPCALL_NORM);
+	BTFIXUPSET_CALL(pgoff_to_pte, sun4c_pgoff_to_pte, BTFIXUPCALL_NORM);
 
 	BTFIXUPSET_CALL(mmu_lockarea, sun4c_lockarea, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(mmu_unlockarea, sun4c_unlockarea, BTFIXUPCALL_NORM);

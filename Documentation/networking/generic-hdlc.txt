@@ -1,11 +1,13 @@
-Generic HDLC layer for Linux kernel 2.4/2.5
+Generic HDLC layer
 Krzysztof Halasa <khc@pm.waw.pl>
-May, 2001
+January, 2003
 
 
 Generic HDLC layer currently supports:
-- Frame Relay (ANSI, CCITT and no LMI), with ARP support (no InARP),
-- raw HDLC (IPv4 only),
+- Frame Relay (ANSI, CCITT and no LMI), with ARP support (no InARP).
+  Normal (routed) and Ethernet-bridged (Ethernet device emulation)
+  interfaces can share a single PVC.
+- raw HDLC - either IP (IPv4) interface or Ethernet device emulation.
 - Cisco HDLC,
 - PPP (uses syncppp.c),
 - X.25 (uses X.25 routines).
@@ -14,6 +16,10 @@ There are hardware drivers for the following cards:
 - C101 by Moxa Technologies Co., Ltd.
 - RISCom/N2 by SDL Communications Inc.
 - and others, some not in the official kernel.
+
+Ethernet device emulation (using HDLC or Frame-Relay PVC) is compatible
+with IEEE 802.1Q (VLANs) and 802.1D (Ethernet bridging).
+
 
 Make sure the hdlc.o and the hardware driver are loaded. It should
 create a number of "hdlc" (hdlc0 etc) network devices, one for each
@@ -58,6 +64,9 @@ Setting protocol:
   no-parity / crc16 / crc16-pr0 (CRC16 with preset zeros) / crc32-itu
   crc16-itu (CRC16 with ITU-T polynomial) / crc16-itu-pr0 - sets parity
 
+* hdlc-eth - Ethernet device emulation using HDLC. Parity and encoding
+  as above.
+
 * cisco - sets Cisco HDLC mode (IP, IPv6 and IPX supported)
   interval - time in seconds between keepalive packets
   timeout - time in seconds after last received keepalive packet before
@@ -77,7 +86,12 @@ Setting protocol:
   n392 - error threshold - both user and network
   n393 - monitored events count - both user and network
 
-* create | delete n - FR only - adds / deletes PVC interface with DLCI #n.
+Frame-Relay only:
+* create n | delete n - adds / deletes PVC interface with DLCI #n.
+  Newly created interface will be named pvc0, pvc1 etc.
+
+* create ether n | delete ether n - adds a device for Ethernet-bridged
+  frames. The device will be named pvceth0, pvceth1 etc.
 
 
 
@@ -85,30 +99,30 @@ Setting protocol:
 Board-specific issues
 ---------------------
 
-n2.o and c101.o need parameters to work (note double quotes):
+n2.o and c101.o need parameters to work:
 
-	insmod n2 hw='"io,irq,ram,ports[:io,irq,...]"'
+	insmod n2 hw=io,irq,ram,ports[:io,irq,...]
 example:
-	insmod n2 hw='"0x300,10,0xD0000,01"'
+	insmod n2 hw=0x300,10,0xD0000,01
 
 or
-	insmod c101 hw='"irq,ram[:irq,...]"
+	insmod c101 hw=irq,ram[:irq,...]
 example:
-	insmod c101 hw='"9,0xdc000"'
+	insmod c101 hw=9,0xdc000
 
 If built into the kernel, these drivers need kernel (command line) parameters:
-	n2=io,irq,ram,ports:...
+	n2.hw=io,irq,ram,ports:...
 or
-	c101=irq,ram:...
+	c101.hw=irq,ram:...
 
 
 
 If you have a problem with N2 or C101 card, you can issue the "private"
-command to see port's packet descriptor rings:
+command to see port's packet descriptor rings (in kernel logs):
 
 	sethdlc hdlc0 private
 
-The hardware driver have to be build with CONFIG_HDLC_DEBUG_RINGS.
+The hardware driver has to be build with CONFIG_HDLC_DEBUG_RINGS.
 Attaching this info to bug reports would be helpful. Anyway, let me know
 if you have problems using this.
 

@@ -66,10 +66,7 @@ do_show_stack (struct unw_frame_info *info, void *arg)
 void
 show_trace_task (struct task_struct *task)
 {
-	struct unw_frame_info info;
-
-	unw_init_from_blocked_task(&info, task);
-	do_show_stack(&info, 0);
+	show_stack(task);
 }
 
 void
@@ -169,7 +166,10 @@ do_notify_resume_user (sigset_t *oldset, struct sigscratch *scr, long in_syscall
 void
 default_idle (void)
 {
-	/* may want to do PAL_LIGHT_HALT here... */
+#ifdef CONFIG_IA64_PAL_IDLE
+	if (!need_resched())
+		safe_halt();
+#endif
 }
 
 void __attribute__((noreturn))
@@ -177,6 +177,10 @@ cpu_idle (void *unused)
 {
 	/* endless idle loop with no priority at all */
 	while (1) {
+		void (*idle)(void) = pm_idle;
+		if (!idle)
+			idle = default_idle;
+
 #ifdef CONFIG_SMP
 		if (!need_resched())
 			min_xtp();
@@ -186,10 +190,7 @@ cpu_idle (void *unused)
 #ifdef CONFIG_IA64_SGI_SN
 			snidle();
 #endif
-			if (pm_idle)
-				(*pm_idle)();
-			else
-				default_idle();
+			(*idle)();
 		}
 
 #ifdef CONFIG_IA64_SGI_SN
@@ -581,6 +582,15 @@ kernel_thread (int (*fn)(void *), void *arg, unsigned long flags)
 
 	tid = clone(flags | CLONE_VM | CLONE_UNTRACED, 0);
 	if (parent != current) {
+#ifdef CONFIG_IA32_SUPPORT
+		if (IS_IA32_PROCESS(ia64_task_regs(current))) {
+			/* A kernel thread is always a 64-bit process. */
+			current->thread.map_base  = DEFAULT_MAP_BASE;
+			current->thread.task_size = DEFAULT_TASK_SIZE;
+			ia64_set_kr(IA64_KR_IO_BASE, current->thread.old_iob);
+			ia64_set_kr(IA64_KR_TSSD, current->thread.old_k1);
+		}
+#endif
 		result = (*fn)(arg);
 		_exit(result);
 	}
@@ -751,7 +761,7 @@ dup_task_struct(struct task_struct *orig)
 }
 
 void
-__put_task_struct (struct task_struct *tsk)
+free_task_struct (struct task_struct *tsk)
 {
 	free_pages((unsigned long) tsk, KERNEL_STACK_SIZE_ORDER);
 }

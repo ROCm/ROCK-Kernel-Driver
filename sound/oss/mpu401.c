@@ -888,45 +888,45 @@ static void mpu_synth_close(int dev)
 
 static struct synth_operations mpu401_synth_proto =
 {
-	owner:		THIS_MODULE,
-	id:		"MPU401",
-	info:		NULL,
-	midi_dev:	0,
-	synth_type:	SYNTH_TYPE_MIDI,
-	synth_subtype:	0,
-	open:		mpu_synth_open,
-	close:		mpu_synth_close,
-	ioctl:		mpu_synth_ioctl,
-	kill_note:	midi_synth_kill_note,
-	start_note:	midi_synth_start_note,
-	set_instr:	midi_synth_set_instr,
-	reset:		midi_synth_reset,
-	hw_control:	midi_synth_hw_control,
-	load_patch:	midi_synth_load_patch,
-	aftertouch:	midi_synth_aftertouch,
-	controller:	midi_synth_controller,
-	panning:	midi_synth_panning,
-	bender:		midi_synth_bender,
-	setup_voice:	midi_synth_setup_voice,
-	send_sysex:	midi_synth_send_sysex
+	.owner		= THIS_MODULE,
+	.id		= "MPU401",
+	.info		= NULL,
+	.midi_dev	= 0,
+	.synth_type	= SYNTH_TYPE_MIDI,
+	.synth_subtype	= 0,
+	.open		= mpu_synth_open,
+	.close		= mpu_synth_close,
+	.ioctl		= mpu_synth_ioctl,
+	.kill_note	= midi_synth_kill_note,
+	.start_note	= midi_synth_start_note,
+	.set_instr	= midi_synth_set_instr,
+	.reset		= midi_synth_reset,
+	.hw_control	= midi_synth_hw_control,
+	.load_patch	= midi_synth_load_patch,
+	.aftertouch	= midi_synth_aftertouch,
+	.controller	= midi_synth_controller,
+	.panning	= midi_synth_panning,
+	.bender		= midi_synth_bender,
+	.setup_voice	= midi_synth_setup_voice,
+	.send_sysex	= midi_synth_send_sysex
 };
 
 static struct synth_operations *mpu401_synth_operations[MAX_MIDI_DEV];
 
 static struct midi_operations mpu401_midi_proto =
 {
-	owner:		THIS_MODULE,
-	info:		{"MPU-401 Midi", 0, MIDI_CAP_MPU401, SNDCARD_MPU401},
-	in_info:	{0},
-	open:		mpu401_open,
-	close:		mpu401_close,
-	ioctl:		mpu401_ioctl,
-	outputc:	mpu401_out,
-	start_read:	mpu401_start_read,
-	end_read:	mpu401_end_read,
-	kick:		mpu401_kick,
-	buffer_status:	mpu401_buffer_status,
-	prefix_cmd:	mpu401_prefix_cmd
+	.owner		= THIS_MODULE,
+	.info		= {"MPU-401 Midi", 0, MIDI_CAP_MPU401, SNDCARD_MPU401},
+	.in_info	= {0},
+	.open		= mpu401_open,
+	.close		= mpu401_close,
+	.ioctl		= mpu401_ioctl,
+	.outputc	= mpu401_out,
+	.start_read	= mpu401_start_read,
+	.end_read	= mpu401_end_read,
+	.kick		= mpu401_kick,
+	.buffer_status	= mpu401_buffer_status,
+	.prefix_cmd	= mpu401_prefix_cmd
 };
 
 static struct midi_operations mpu401_midi_operations[MAX_MIDI_DEV];
@@ -1619,16 +1619,16 @@ static void mpu_timer_arm(int dev, long time)
 
 static struct sound_timer_operations mpu_timer =
 {
-	owner:		THIS_MODULE,
-	info:		{"MPU-401 Timer", 0},
-	priority:	10,	/* Priority */
-	devlink:	0,	/* Local device link */
-	open:		mpu_timer_open,
-	close:		mpu_timer_close,
-	event:		mpu_timer_event,
-	get_time:	mpu_timer_get_time,
-	ioctl:		mpu_timer_ioctl,
-	arm_timer:	mpu_timer_arm
+	.owner		= THIS_MODULE,
+	.info		= {"MPU-401 Timer", 0},
+	.priority	= 10,	/* Priority */
+	.devlink	= 0,	/* Local device link */
+	.open		= mpu_timer_open,
+	.close		= mpu_timer_close,
+	.event		= mpu_timer_event,
+	.get_time	= mpu_timer_get_time,
+	.ioctl		= mpu_timer_ioctl,
+	.arm_timer	= mpu_timer_arm
 };
 
 static void mpu_timer_interrupt(void)

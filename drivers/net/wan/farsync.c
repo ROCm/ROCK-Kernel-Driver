@@ -761,7 +761,7 @@ fst_intr_rx ( struct fst_card_info *card, struct fst_port_info *port )
         /* Push upstream */
         skb->mac.raw = skb->data;
         skb->dev = hdlc_to_dev ( &port->hdlc );
-        skb->protocol = htons ( ETH_P_HDLC );
+        skb->protocol = hdlc_type_trans(skb, skb->dev);
         netif_rx ( skb );
 
         port_to_dev ( port )->last_rx = jiffies;

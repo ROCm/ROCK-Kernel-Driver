@@ -477,12 +477,9 @@ static void do_ps2esdi_request(request_queue_t * q)
 	/* since, this routine is called with interrupts cleared - they 
 	   must be before it finishes  */
 
-	/* standard procedure to ensure that requests are really on the
-	   list + sanity checks.                     */
-	if (blk_queue_empty(q))
-		return;
-
 	req = elv_next_request(q);
+	if (!req)
+		return;
 
 #if 0
 	printk("%s:got request. device : %s command : %d  sector : %ld count : %ld, buffer: %p\n",

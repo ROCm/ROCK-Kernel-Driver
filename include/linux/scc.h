@@ -244,6 +244,9 @@ struct scc_channel {
 	/* Timer */
 	struct timer_list tx_t;		/* tx timer for this channel */
 	struct timer_list tx_wdog;	/* tx watchdogs */
+	
+	/* Channel lock */
+	spinlock_t	lock;		/* Channel guard lock */
 };
 
 #endif /* defined(__KERNEL__) */

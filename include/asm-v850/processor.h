@@ -1,8 +1,8 @@
 /*
  * include/asm-v850/processor.h
  *
- *  Copyright (C) 2001,02  NEC Corporation
- *  Copyright (C) 2001,02  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2001,02,03  NEC Corporation
+ *  Copyright (C) 2001,02,03  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -91,15 +91,17 @@ static inline void exit_thread (void)
 {
 }
 
-/* Return saved (kernel) PC of a blocked thread.  */
-extern inline unsigned long thread_saved_pc (struct thread_struct *t)
-{
-	struct pt_regs *r = (struct pt_regs *)(t->ksp + STATE_SAVE_PT_OFFSET);
-	/* Actually, we return the LP register, because the thread is
-	   actually blocked in switch_thread, and we're interested in
-	   the PC it will _return_ to.  */
-	return r->gpr[GPR_LP];
-}
+
+/* Return the registers saved during context-switch by the currently
+   not-running thread T.  Note that this only includes some registers!
+   See entry.S for details.  */
+#define thread_saved_regs(t) \
+   ((struct pt_regs*)((t)->thread.ksp + STATE_SAVE_PT_OFFSET))
+/* Return saved (kernel) PC of a blocked thread.  Actually, we return the
+   LP register, because the thread is actually blocked in switch_thread,
+   and we're interested in the PC it will _return_ to.  */
+#define thread_saved_pc(t)   (thread_saved_regs(t)->gpr[GPR_LP])
+
 
 unsigned long get_wchan (struct task_struct *p);
 

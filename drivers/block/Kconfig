@@ -28,6 +28,13 @@ config ATARI_FLOPPY
 	tristate "Atari floppy support"
 	depends on ATARI
 
+config BLK_DEV_FD98
+	tristate "NEC PC-9800 floppy disk support"
+	depends on X86_PC9800
+	---help---
+	  If you want to use the floppy disk drive(s) of NEC PC-9801/PC-9821,
+	  say Y.
+
 config BLK_DEV_SWIM_IOP
 	bool "Macintosh IIfx/Quadra 900/Quadra 950 floppy support (EXPERIMENTAL)"
 	depends on MAC && EXPERIMENTAL

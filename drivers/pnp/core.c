@@ -170,7 +170,7 @@ void pnp_remove_device(struct pnp_dev *dev)
 
 static int __init pnp_init(void)
 {
-	printk(KERN_INFO "Linux Plug and Play Support v0.95 (c) Adam Belay\n");
+	printk(KERN_INFO "Linux Plug and Play Support v0.96 (c) Adam Belay\n");
 	return bus_register(&pnp_bus_type);
 }
 
