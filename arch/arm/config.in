@@ -66,7 +66,7 @@ if [ "$CONFIG_SA1100_CERF" = "y" ]; then
    choice 'Cerf Flash available'  \
         "8MB    CONFIG_SA1100_CERF_FLASH_8MB \
          16MB   CONFIG_SA1100_CERF_FLASH_16MB \
-         32MB   CONFIG_SA1100_CERF_FLASH_32MB" CerfFlash
+         32MB   CONFIG_SA1100_CERF_FLASH_32MB" 8MB
    bool 'Cerf w/CPLD support (CerfPDA)' CONFIG_SA1100_CERF_CPLD
 fi
 dep_bool '  Compaq iPAQ H3100' CONFIG_SA1100_H3100 $CONFIG_ARCH_SA1100
