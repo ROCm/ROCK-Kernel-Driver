@@ -2,7 +2,7 @@
 # 5 Aug 1999, James Simmons, <mailto:jsimmons@edgeglobal.com>
 # Rewritten to use lists instead of if-statements.
 
-O_TARGET := matrox.o
+O_TARGET := built-in.o
 
 # All of the (potential) objects that export symbols.
 # This list comes from 'grep -l EXPORT_SYMBOL *.[hc]'.

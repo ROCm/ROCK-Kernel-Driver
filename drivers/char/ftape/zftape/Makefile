@@ -27,17 +27,17 @@
 # ZFT_OBSOLETE - enable the MTIOC_ZFTAPE_GETBLKSZ ioctl. You should
 #                leave this enabled for compatibility with taper.
 
-EXTRA_CFLAGS := -DZFT_OBSOLETE
-
-O_TARGET := zftape.o
+O_TARGET := built-in.o
 
 export-objs := zftape_syms.o
 
-obj-y    := zftape-rw.o zftape-ctl.o zftape-read.o \
-	    zftape-write.o zftape-vtbl.o zftape-eof.o \
-	    zftape-init.o zftape-buffers.o zftape_syms.o
+obj-$(CONFIG_ZFTAPE) += zftape.o
 
-obj-m    := $(O_TARGET)
+zftape-objs := zftape-rw.o zftape-ctl.o zftape-read.o \
+	       zftape-write.o zftape-vtbl.o zftape-eof.o \
+	       zftape-init.o zftape-buffers.o zftape_syms.o
+
+EXTRA_CFLAGS := -DZFT_OBSOLETE
 
 include $(TOPDIR)/Rules.make
 

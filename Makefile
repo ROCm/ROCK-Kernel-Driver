@@ -37,14 +37,21 @@ OBJDUMP		= $(CROSS_COMPILE)objdump
 MAKEFILES	= $(TOPDIR)/.config
 GENKSYMS	= /sbin/genksyms
 DEPMOD		= /sbin/depmod
+PERL		= perl
 MODFLAGS	= -DMODULE
+CFLAGS_MODULE   = $(MODFLAGS)
+AFLAGS_MODULE   =
 CFLAGS_KERNEL	=
 AFLAGS_KERNEL	=
-PERL		= perl
+EXPORT_FLAGS    =
 
 export	VERSION PATCHLEVEL SUBLEVEL EXTRAVERSION KERNELRELEASE ARCH \
 	CONFIG_SHELL TOPDIR HPATH HOSTCC HOSTCFLAGS CROSS_COMPILE AS LD CC \
-	CPP AR NM STRIP OBJCOPY OBJDUMP MAKE MAKEFILES GENKSYMS MODFLAGS PERL
+	CPP AR NM STRIP OBJCOPY OBJDUMP MAKE MAKEFILES GENKSYMS PERL
+
+export CPPFLAGS EXPORT_FLAGS
+export CFLAGS CFLAGS_KERNEL CFLAGS_MODULE 
+export AFLAGS AFLAGS_KERNEL AFLAGS_MODULE
 
 all:	do-it-all
 
@@ -91,6 +98,10 @@ CPPFLAGS := -D__KERNEL__ -I$(HPATH)
 CFLAGS := $(CPPFLAGS) -Wall -Wstrict-prototypes -Wno-trigraphs -O2 \
 	  -fomit-frame-pointer -fno-strict-aliasing -fno-common
 AFLAGS := -D__ASSEMBLY__ $(CPPFLAGS)
+
+ifdef CONFIG_MODULES
+EXPORT_FLAGS := -DEXPORT_SYMTAB
+endif
 
 INIT		=init/init.o
 CORE_FILES	=kernel/kernel.o mm/mm.o fs/fs.o ipc/ipc.o
@@ -154,8 +165,6 @@ DRIVERS := $(DRIVERS-y)
 
 
 include arch/$(ARCH)/Makefile
-
-export	CPPFLAGS CFLAGS CFLAGS_KERNEL AFLAGS AFLAGS_KERNEL
 
 export	NETWORKS DRIVERS LIBS HEAD LDFLAGS LINKFLAGS MAKEBOOT ASFLAGS
 
@@ -287,7 +296,7 @@ modules: $(patsubst %, _mod_%, $(SUBDIRS))
 
 .PHONY: $(patsubst %, _mod_%, $(SUBDIRS))
 $(patsubst %, _mod_%, $(SUBDIRS)) : include/linux/version.h include/config/MARKER
-	@$(MAKE) -C $(patsubst _mod_%, %, $@) CFLAGS="$(CFLAGS) $(MODFLAGS)" MAKING_MODULES=1 modules
+	@$(MAKE) -C $(patsubst _mod_%, %, $@) CFLAGS="$(CFLAGS) $(CFLAGS_MODULE)" AFLAGS="$(AFLAGS) $(AFLAGS_MODULE)" modules
 
 #	Install modules
 

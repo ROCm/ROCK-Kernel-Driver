@@ -88,26 +88,10 @@ obj-$(CONFIG_FB_PMAGB_B)          += pmagb-b-fb.o
 obj-$(CONFIG_FB_MAXINE)           += maxinefb.o
 obj-$(CONFIG_FB_TX3912)           += tx3912fb.o
 
-
-subdir-$(CONFIG_FB_MATROX)	  += matrox
-ifeq ($(CONFIG_FB_MATROX),y)
-obj-y				  += matrox/matrox.o
-endif
-
-subdir-$(CONFIG_FB_RIVA)	  += riva
-ifeq ($(CONFIG_FB_RIVA),y)
-obj-y				  += riva/rivafb.o
-endif
-
-subdir-$(CONFIG_FB_SIS)		  += sis
-ifeq ($(CONFIG_FB_SIS),y)
-obj-y				  += sis/sisfb.o
-endif
-
-subdir-$(CONFIG_FB_ATY)		  += aty
-ifeq ($(CONFIG_FB_ATY),y)
-obj-y				  += aty/atyfb.o
-endif
+obj-$(CONFIG_FB_MATROX)		  += matrox/
+obj-$(CONFIG_FB_RIVA)		  += riva/
+obj-$(CONFIG_FB_SIS)		  += sis/
+obj-$(CONFIG_FB_ATY)		  += aty/
 
 obj-$(CONFIG_FB_SUN3)             += sun3fb.o
 obj-$(CONFIG_FB_BWTWO)            += bwtwofb.o

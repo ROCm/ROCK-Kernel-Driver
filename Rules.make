@@ -29,19 +29,17 @@ unexport subdir-y
 unexport subdir-m
 unexport subdir-n
 unexport subdir-
+unexport mod-subdirs
 
 comma	:= ,
 
-#
+# Figure out what we need to build from the various variables
+# ===========================================================================
+
 # When an object is listed to be built compiled-in and modular,
 # only build the compiled-in version
-#
-obj-m := $(filter-out $(obj-y),$(obj-m))
 
-#
-# Get things started.
-#
-first_rule: all_targets
+obj-m := $(filter-out $(obj-y),$(obj-m))
 
 # Handle objects in subdirs
 # ---------------------------------------------------------------------------
@@ -69,6 +67,42 @@ SUB_DIRS	:= $(subdir-y)
 MOD_SUB_DIRS	:= $(sort $(subdir-m) $(both-m))
 ALL_SUB_DIRS	:= $(sort $(subdir-y) $(subdir-m) $(subdir-n) $(subdir-))
 
+# export.o is never a composite object, since $(export-objs) has a
+# fixed meaning (== objects which EXPORT_SYMBOL())
+__obj-y = $(filter-out export.o,$(obj-y))
+__obj-m = $(filter-out export.o,$(obj-m))
+
+# if $(foo-objs) exists, foo.o is a composite object 
+__multi-used-y := $(sort $(foreach m,$(__obj-y), $(if $($(m:.o=-objs)), $(m))))
+__multi-used-m := $(sort $(foreach m,$(__obj-m), $(if $($(m:.o=-objs)), $(m))))
+
+# FIXME: Rip this out later
+# Backwards compatibility: if a composite object is listed in
+# $(list-multi), skip it here, since the Makefile will have an explicit
+# link rule for it
+
+multi-used-y := $(filter-out $(list-multi),$(__multi-used-y))
+multi-used-m := $(filter-out $(list-multi),$(__multi-used-m))
+
+# Build list of the parts of our composite objects, our composite
+# objects depend on those (obviously)
+multi-objs-y := $(foreach m, $(multi-used-y), $($(m:.o=-objs)))
+multi-objs-m := $(foreach m, $(multi-used-m), $($(m:.o=-objs)))
+
+# $(subdir-obj-y) is the list of objects in $(obj-y) which do not live
+# in the local directory
+subdir-obj-y := $(foreach o,$(obj-y),$(if $(filter-out $(o),$(notdir $(o))),$(o)))
+
+# Replace multi-part objects by their individual parts, look at local dir only
+real-objs-y := $(foreach m, $(filter-out $(subdir-obj-y), $(obj-y)), $(if $($(m:.o=-objs)),$($(m:.o=-objs)),$(m)))
+real-objs-m := $(foreach m, $(obj-m), $(if $($(m:.o=-objs)),$($(m:.o=-objs)),$(m)))
+
+# ==========================================================================
+#
+# Get things started.
+#
+first_rule: all_targets
+
 #
 # Common rules
 #
@@ -76,7 +110,7 @@ ALL_SUB_DIRS	:= $(sort $(subdir-y) $(subdir-m) $(subdir-n) $(subdir-))
 # Compile C sources (.c)
 # ---------------------------------------------------------------------------
 
-# export_flags will be set to -DEXPORT_SYMBOL for objects in $(export-objs)
+$(export-objs): export_flags := $(EXPORT_FLAGS)
 
 c_flags = $(CFLAGS) $(EXTRA_CFLAGS) $(CFLAGS_$(*F).o) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) $(export_flags)
 
@@ -94,7 +128,6 @@ cmd_cc_o_c = $(CC) $(c_flags) -c -o $@ $<
 
 %.o: %.c dummy
 	$(call if_changed,cmd_cc_o_c)
-
 
 # Compile assembler sources (.S)
 # ---------------------------------------------------------------------------
@@ -121,10 +154,7 @@ cmd_as_o_S = $(CC) $(a_flags) -c -o $@ $<
 #
 all_targets: $(O_TARGET) $(L_TARGET) sub_dirs
 
-# $(subdir-obj-y) is the list of objects in $(obj-y) which do not live
-# in the local directory
-subdir-obj-y := $(foreach o,$(obj-y),$(if $(filter-out $(o),$(notdir $(o))),$(o)))
-# Do build these objects, we need to descend into the directories
+# To build objects in subdirs, we need to descend into the directories
 $(subdir-obj-y): sub_dirs
 
 #
@@ -154,26 +184,6 @@ endif
 # Rule to link composite objects
 #
 
-# export.o is never a composite object, since $(export-objs) has a
-# fixed meaning (== objects which EXPORT_SYMBOL())
-__obj-y = $(filter-out export.o,$(obj-y))
-__obj-m = $(filter-out export.o,$(obj-m))
-
-# if $(foo-objs) exists, foo.o is a composite object 
-__multi-used-y := $(sort $(foreach m,$(__obj-y), $(if $($(basename $(m))-objs), $(m))))
-__multi-used-m := $(sort $(foreach m,$(__obj-m), $(if $($(basename $(m))-objs), $(m))))
-
-# Backwards compatibility: if a composite object is listed in
-# $(list-multi), skip it here, since the Makefile will have an explicit
-# link rule for it
-
-multi-used-y := $(filter-out $(list-multi),$(__multi-used-y))
-multi-used-m := $(filter-out $(list-multi),$(__multi-used-m))
-
-# Build list of the parts of our composite objects, our composite
-# objects depend on those (obviously)
-multi-objs-y := $(foreach m, $(multi-used-y), $($(basename $(m))-objs))
-multi-objs-m := $(foreach m, $(multi-used-m), $($(basename $(m))-objs))
 
 cmd_link_multi = $(LD) $(EXTRA_LDFLAGS) -r -o $@ $(filter $($(basename $@)-objs),$^)
 
@@ -337,7 +347,6 @@ endif # CONFIG_MODVERSIONS
 ifneq "$(strip $(export-objs))" ""
 
 $(export-objs): $(TOPDIR)/include/linux/modversions.h
-$(export-objs): export_flags := -DEXPORT_SYMTAB
 
 endif
 

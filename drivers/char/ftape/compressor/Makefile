@@ -24,11 +24,11 @@
 #      Linux.
 #
 
-O_TARGET := zft-compressor.o
+O_TARGET := built-in.o
 
-obj-y    = zftape-compress.o lzrw3.o
+obj-$(CONFIG_ZFT_COMPRESSOR) += zft-compressor.o
 
-obj-m    = $(O_TARGET)
+zft-compressor-objs := zftape-compress.o lzrw3.o
 
 CFLAGS_lzrw3.o	:= -O6 -funroll-all-loops
 

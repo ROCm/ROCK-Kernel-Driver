@@ -23,28 +23,28 @@
 #      driver for Linux.
 #
 
-O_TARGET := ftape.o
+O_TARGET := built-in.o
 
 export-objs := ftape_syms.o
 
-obj-y     = ftape-init.o fdc-io.o fdc-isr.o \
-	    ftape-bsm.o ftape-ctl.o ftape-read.o ftape-rw.o \
-	    ftape-write.o ftape-io.o ftape-calibr.o ftape-ecc.o fc-10.o \
-	    ftape-buffer.o ftape-format.o ftape_syms.o
+obj-$(CONFIG_FTAPE) += ftape.o
 
-obj-$(CONFIG_FTAPE) += ftape-setup.o
+ftape-objs := ftape-init.o fdc-io.o fdc-isr.o \
+	      ftape-bsm.o ftape-ctl.o ftape-read.o ftape-rw.o \
+	      ftape-write.o ftape-io.o ftape-calibr.o ftape-ecc.o fc-10.o \
+	      ftape-buffer.o ftape-format.o ftape_syms.o
+
+ifeq ($(CONFIG_FTAPE),y)
+ftape-objs += ftape-setup.o
+endif
 
 ifndef CONFIG_FT_NO_TRACE_AT_ALL
-obj-y   += ftape-tracing.o
+ftape-objs += ftape-tracing.o
 endif
 
-ifeq ($(CONFIG_PROC_FS),y)
 ifeq ($(CONFIG_FT_PROC_FS),y)
-obj-y += ftape-proc.o
+ftape-objs += ftape-proc.o
 endif
-endif
-
-obj-m  = $(O_TARGET)
 
 include $(TOPDIR)/Rules.make
 
