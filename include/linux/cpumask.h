@@ -2,6 +2,7 @@
 #define __LINUX_CPUMASK_H
 
 #include <linux/threads.h>
+#include <linux/bitmap.h>
 #include <asm/cpumask.h>
 #include <asm/bug.h>
 
@@ -31,16 +32,10 @@ extern cpumask_t cpu_possible_map;
 #define for_each_online_cpu(cpu) for (cpu = 0; cpu < 1; cpu++)
 #endif
 
-extern int __mask_snprintf_len(char *buf, unsigned int buflen,
-		const unsigned long *maskp, unsigned int maskbytes);
-
 #define cpumask_snprintf(buf, buflen, map)				\
-	__mask_snprintf_len(buf, buflen, cpus_addr(map), sizeof(map))
-
-extern int __mask_parse_len(const char __user *ubuf, unsigned int ubuflen,
-	unsigned long *maskp, unsigned int maskbytes);
+	bitmap_snprintf(buf, buflen, cpus_addr(map), NR_CPUS)
 
 #define cpumask_parse(buf, buflen, map)					\
-	__mask_parse_len(buf, buflen, cpus_addr(map), sizeof(map))
+	bitmap_parse(buf, buflen, cpus_addr(map), NR_CPUS)
 
 #endif /* __LINUX_CPUMASK_H */
