@@ -336,7 +336,7 @@ static void __attribute__((unused))
 ohci_dump_ed (const struct ohci_hcd *ohci, const char *label,
 		const struct ed *ed, int verbose)
 {
-	__le32	tmp = ed->hwINFO;
+	u32	tmp = le32_to_cpu (ed->hwINFO);
 	char	*type = "";
 
 	ohci_dbg (ohci, "%s, ed %p state 0x%x type %s; next ed %08x\n",
@@ -349,19 +349,20 @@ ohci_dump_ed (const struct ohci_hcd *ohci, const char *label,
 	/* else from TDs ... control */
 	}
 	ohci_dbg (ohci,
-		"  info %08x MAX=%d%s%s%s%s EP=%d%s DEV=%d\n", le32_to_cpu (tmp),
-		0x03ff & (le32_to_cpu (tmp) >> 16),
+		"  info %08x MAX=%d%s%s%s%s EP=%d%s DEV=%d\n", tmp,
+		0x03ff & (tmp >> 16),
 		(tmp & ED_DEQUEUE) ? " DQ" : "",
 		(tmp & ED_ISO) ? " ISO" : "",
 		(tmp & ED_SKIP) ? " SKIP" : "",
 		(tmp & ED_LOWSPEED) ? " LOW" : "",
-		0x000f & (le32_to_cpu (tmp) >> 7),
+		0x000f & (tmp >> 7),
 		type,
-		0x007f & le32_to_cpu (tmp));
+		0x007f & tmp);
+	tmp = le32_to_cpup (&ed->hwHeadP);
 	ohci_dbg (ohci, "  tds: head %08x %s%s tail %08x%s\n",
-		le32_to_cpup (&ed->hwHeadP),
-		(ed->hwHeadP & ED_C) ? data1 : data0,
-		(ed->hwHeadP & ED_H) ? " HALT" : "",
+		tmp,
+		(tmp & ED_C) ? data1 : data0,
+		(tmp & ED_H) ? " HALT" : "",
 		le32_to_cpup (&ed->hwTailP),
 		verbose ? "" : " (not listing)");
 	if (verbose) {
@@ -408,8 +409,8 @@ show_list (struct ohci_hcd *ohci, char *buf, size_t count, struct ed *ed)
 
 	/* dump a snapshot of the bulk or control schedule */
 	while (ed) {
-		__le32			info = ed->hwINFO;
-		u32			scratch = le32_to_cpup (&ed->hwINFO);
+		u32			info = le32_to_cpu (ed->hwINFO);
+		u32			headp = le32_to_cpu (ed->hwHeadP);
 		struct list_head	*entry;
 		struct td		*td;
 
@@ -417,14 +418,14 @@ show_list (struct ohci_hcd *ohci, char *buf, size_t count, struct ed *ed)
 			"ed/%p %cs dev%d ep%d%s max %d %08x%s%s %s",
 			ed,
 			(info & ED_LOWSPEED) ? 'l' : 'f',
-			scratch & 0x7f,
-			(scratch >> 7) & 0xf,
+			info & 0x7f,
+			(info >> 7) & 0xf,
 			(info & ED_IN) ? "in" : "out",
-			0x03ff & (scratch >> 16),
-			scratch,
+			0x03ff & (info >> 16),
+			info,
 			(info & ED_SKIP) ? " s" : "",
-			(ed->hwHeadP & ED_H) ? " H" : "",
-			(ed->hwHeadP & ED_C) ? data1 : data0);
+			(headp & ED_H) ? " H" : "",
+			(headp & ED_C) ? data1 : data0);
 		size -= temp;
 		buf += temp;
 
@@ -432,21 +433,21 @@ show_list (struct ohci_hcd *ohci, char *buf, size_t count, struct ed *ed)
 			u32		cbp, be;
 
 			td = list_entry (entry, struct td, td_list);
-			scratch = le32_to_cpup (&td->hwINFO);
+			info = le32_to_cpup (&td->hwINFO);
 			cbp = le32_to_cpup (&td->hwCBP);
 			be = le32_to_cpup (&td->hwBE);
 			temp = scnprintf (buf, size,
 					"\n\ttd %p %s %d cc=%x urb %p (%08x)",
 					td,
 					({ char *pid;
-					switch (scratch & TD_DP) {
+					switch (info & TD_DP) {
 					case TD_DP_SETUP: pid = "setup"; break;
 					case TD_DP_IN: pid = "in"; break;
 					case TD_DP_OUT: pid = "out"; break;
 					default: pid = "(?)"; break;
 					 } pid;}),
 					cbp ? (be + 1 - cbp) : 0,
-					TD_CC_GET (scratch), td->urb, scratch);
+					TD_CC_GET (info), td->urb, info);
 			size -= temp;
 			buf += temp;
 		}
@@ -534,8 +535,7 @@ show_periodic (struct class_device *class_dev, char *buf)
 
 			/* show more info the first time around */
 			if (temp == seen_count) {
-				__le32	info = ed->hwINFO;
-				u32	scratch = le32_to_cpup (&ed->hwINFO);
+				u32	info = le32_to_cpu (ed->hwINFO);
 				struct list_head	*entry;
 				unsigned		qlen = 0;
 
@@ -547,15 +547,16 @@ show_periodic (struct class_device *class_dev, char *buf)
 					" (%cs dev%d ep%d%s-%s qlen %u"
 					" max %d %08x%s%s)",
 					(info & ED_LOWSPEED) ? 'l' : 'f',
-					scratch & 0x7f,
-					(scratch >> 7) & 0xf,
+					info & 0x7f,
+					(info >> 7) & 0xf,
 					(info & ED_IN) ? "in" : "out",
 					(info & ED_ISO) ? "iso" : "int",
 					qlen,
-					0x03ff & (scratch >> 16),
-					scratch,
+					0x03ff & (info >> 16),
+					info,
 					(info & ED_SKIP) ? " K" : "",
-					(ed->hwHeadP & ED_H) ? " H" : "");
+					(ed->hwHeadP & cpu_to_le32(ED_H)) ?
+						" H" : "");
 				size -= temp;
 				next += temp;
 

@@ -815,7 +815,7 @@ static int ohci_restart (struct ohci_hcd *ohci)
 		switch (ed->state) {
 		case ED_OPER:
 			ed->state = ED_UNLINK;
-			ed->hwINFO |= ED_DEQUEUE;
+			ed->hwINFO |= cpu_to_le32(ED_DEQUEUE);
 			ed_deschedule (ohci, ed);
 
 			ed->ed_next = ohci->ed_rm_list;

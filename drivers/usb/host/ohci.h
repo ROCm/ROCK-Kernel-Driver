@@ -18,17 +18,17 @@ struct ed {
 	/* first fields are hardware-specified, le32 */
 	__le32			hwINFO;       	/* endpoint config bitmap */
 	/* info bits defined by hcd */
-#define ED_DEQUEUE	__constant_cpu_to_le32(1 << 27)
+#define ED_DEQUEUE	(1 << 27)
 	/* info bits defined by the hardware */
-#define ED_ISO		__constant_cpu_to_le32(1 << 15)
-#define ED_SKIP		__constant_cpu_to_le32(1 << 14)
-#define ED_LOWSPEED	__constant_cpu_to_le32(1 << 13)
-#define ED_OUT		__constant_cpu_to_le32(0x01 << 11)
-#define ED_IN		__constant_cpu_to_le32(0x02 << 11)
+#define ED_ISO		(1 << 15)
+#define ED_SKIP		(1 << 14)
+#define ED_LOWSPEED	(1 << 13)
+#define ED_OUT		(0x01 << 11)
+#define ED_IN		(0x02 << 11)
 	__le32			hwTailP;	/* tail of TD list */
 	__le32			hwHeadP;	/* head of TD list (hc r/w) */
-#define ED_C		__constant_cpu_to_le32(0x02)	/* toggle carry */
-#define ED_H		__constant_cpu_to_le32(0x01)	/* halted */
+#define ED_C		(0x02)			/* toggle carry */
+#define ED_H		(0x01)			/* halted */
 	__le32			hwNextED;	/* next ED in list */
 
 	/* rest are purely for the driver's use */

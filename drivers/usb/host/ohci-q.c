@@ -131,7 +131,7 @@ static void periodic_link (struct ohci_hcd *ohci, struct ed *ed)
 	unsigned	i;
 
 	ohci_vdbg (ohci, "link %sed %p branch %d [%dus.], interval %d\n",
-		(ed->hwINFO & ED_ISO) ? "iso " : "",
+		(ed->hwINFO & cpu_to_le32 (ED_ISO)) ? "iso " : "",
 		ed, ed->branch, ed->load, ed->interval);
 
 	for (i = ed->branch; i < NUM_INTS; i += ed->interval) {
@@ -272,7 +272,7 @@ static void periodic_unlink (struct ohci_hcd *ohci, struct ed *ed)
 	hcd_to_bus (&ohci->hcd)->bandwidth_allocated -= ed->load / ed->interval;
 
 	ohci_vdbg (ohci, "unlink %sed %p branch %d [%dus.], interval %d\n",
-		(ed->hwINFO & ED_ISO) ? "iso " : "",
+		(ed->hwINFO & cpu_to_le32 (ED_ISO)) ? "iso " : "",
 		ed, ed->branch, ed->load, ed->interval);
 }
 
@@ -300,7 +300,7 @@ static void periodic_unlink (struct ohci_hcd *ohci, struct ed *ed)
  */
 static void ed_deschedule (struct ohci_hcd *ohci, struct ed *ed) 
 {
-	ed->hwINFO |= ED_SKIP;
+	ed->hwINFO |= cpu_to_le32 (ED_SKIP);
 	wmb ();
 	ed->state = ED_UNLINK;
 
@@ -427,21 +427,19 @@ static struct ed *ed_get (
 	 */
   	if (ed->state == ED_IDLE) {
 		u32	info;
-		__le32	hw_info;
 
 		info = usb_pipedevice (pipe);
 		info |= (ep >> 1) << 7;
 		info |= usb_maxpacket (udev, pipe, is_out) << 16;
-		hw_info = cpu_to_le32 (info);
 		if (udev->speed == USB_SPEED_LOW)
-			hw_info |= ED_LOWSPEED;
+			info |= ED_LOWSPEED;
 		/* only control transfers store pids in tds */
 		if (type != PIPE_CONTROL) {
-			hw_info |= is_out ? ED_OUT : ED_IN;
+			info |= is_out ? ED_OUT : ED_IN;
 			if (type != PIPE_BULK) {
 				/* periodic transfers... */
 				if (type == PIPE_ISOCHRONOUS)
-					hw_info |= ED_ISO;
+					info |= ED_ISO;
 				else if (interval > 32)	/* iso can be bigger */
 					interval = 32;
 				ed->interval = interval;
@@ -452,7 +450,7 @@ static struct ed *ed_get (
 						/ 1000;
 			}
 		}
-		ed->hwINFO = hw_info;
+		ed->hwINFO = cpu_to_le32(info);
 	}
 
 done:
@@ -470,7 +468,7 @@ done:
  */
 static void start_ed_unlink (struct ohci_hcd *ohci, struct ed *ed)
 {    
-	ed->hwINFO |= ED_DEQUEUE;
+	ed->hwINFO |= cpu_to_le32 (ED_DEQUEUE);
 	ed_deschedule (ohci, ed);
 
 	/* rm_list is just singly linked, for simplicity */
@@ -594,7 +592,7 @@ static void td_submit_urb (
   	if (!usb_gettoggle (urb->dev, usb_pipeendpoint (urb->pipe), is_out)) {
 		usb_settoggle (urb->dev, usb_pipeendpoint (urb->pipe),
 			is_out, 1);
-		urb_priv->ed->hwHeadP &= ~ED_C;
+		urb_priv->ed->hwHeadP &= ~cpu_to_le32 (ED_C);
 	}
 
 	urb_priv->td_cnt = 0;
@@ -790,14 +788,14 @@ ed_halted (struct ohci_hcd *ohci, struct td *td, int cc, struct td *rev)
   	struct urb		*urb = td->urb;
 	struct ed		*ed = td->ed;
 	struct list_head	*tmp = td->td_list.next;
-	__le32			toggle = ed->hwHeadP & ED_C;
+	__le32			toggle = ed->hwHeadP & cpu_to_le32 (ED_C);
 
 	/* clear ed halt; this is the td that caused it, but keep it inactive
 	 * until its urb->complete() has a chance to clean up.
 	 */
-	ed->hwINFO |= ED_SKIP;
+	ed->hwINFO |= cpu_to_le32 (ED_SKIP);
 	wmb ();
-	ed->hwHeadP &= ~ED_H; 
+	ed->hwHeadP &= ~cpu_to_le32 (ED_H); 
 
 	/* put any later tds from this urb onto the donelist, after 'td',
 	 * order won't matter here: no errors, and nothing was transferred.
@@ -889,7 +887,8 @@ static struct td *dl_reverse_done_list (struct ohci_hcd *ohci)
 		 * and dequeue any other TDs from this urb.
 		 * No other TD could have caused the halt.
 		 */
-		if (cc != TD_CC_NOERROR && (td->ed->hwHeadP & ED_H))
+		if (cc != TD_CC_NOERROR
+				&& (td->ed->hwHeadP & cpu_to_le32 (ED_H)))
 			td_rev = ed_halted (ohci, td, cc, td_rev);
 
 		td->next_dl_td = td_rev;	
@@ -990,10 +989,10 @@ rescan_this:
 
 		/* ED's now officially unlinked, hc doesn't see */
 		ed->state = ED_IDLE;
-		ed->hwHeadP &= ~ED_H;
+		ed->hwHeadP &= ~cpu_to_le32(ED_H);
 		ed->hwNextED = 0;
 		wmb ();
-		ed->hwINFO &= ~(ED_SKIP | ED_DEQUEUE);
+		ed->hwINFO &= ~cpu_to_le32 (ED_SKIP | ED_DEQUEUE);
 
 		/* but if there's work queued, reschedule */
 		if (!list_empty (&ed->td_list)) {
@@ -1072,10 +1071,11 @@ dl_done_list (struct ohci_hcd *ohci, struct pt_regs *regs)
 				start_ed_unlink (ohci, ed);
 
 		/* ... reenabling halted EDs only after fault cleanup */
-		} else if ((ed->hwINFO & (ED_SKIP | ED_DEQUEUE)) == ED_SKIP) {
+		} else if ((ed->hwINFO & cpu_to_le32 (ED_SKIP | ED_DEQUEUE))
+					== cpu_to_le32 (ED_SKIP)) {
 			td = list_entry (ed->td_list.next, struct td, td_list);
-			if (!(td->hwINFO & TD_DONE)) {
-				ed->hwINFO &= ~ED_SKIP;
+ 			if (!(td->hwINFO & cpu_to_le32 (TD_DONE))) {
+				ed->hwINFO &= ~cpu_to_le32 (ED_SKIP);
 				/* ... hc may need waking-up */
 				switch (ed->type) {
 				case PIPE_CONTROL:
