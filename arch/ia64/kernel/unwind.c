@@ -403,12 +403,11 @@ unw_access_br (struct unw_frame_info *info, int regnum, unsigned long *val, int 
 	unsigned long *addr;
 	struct pt_regs *pt;
 
-	pt = get_scratch_regs(info);
 	switch (regnum) {
 		/* scratch: */
-	      case 0: addr = &pt->b0; break;
-	      case 6: addr = &pt->b6; break;
-	      case 7: addr = &pt->b7; break;
+	      case 0: pt = get_scratch_regs(info); addr = &pt->b0; break;
+	      case 6: pt = get_scratch_regs(info); addr = &pt->b6; break;
+	      case 7: pt = get_scratch_regs(info); addr = &pt->b7; break;
 
 		/* preserved: */
 	      case 1: case 2: case 3: case 4: case 5:
@@ -441,15 +440,15 @@ unw_access_fr (struct unw_frame_info *info, int regnum, struct ia64_fpreg *val, 
 		return -1;
 	}
 
-	pt = get_scratch_regs(info);
-
 	if (regnum <= 5) {
 		addr = *(&info->f2_loc + (regnum - 2));
 		if (!addr)
 			addr = &info->sw->f2 + (regnum - 2);
 	} else if (regnum <= 15) {
-		if (regnum <= 11)
+		if (regnum <= 11) {
+			pt = get_scratch_regs(info);
 			addr = &pt->f6  + (regnum - 6);
+		}
 		else
 			addr = &info->sw->f12 + (regnum - 12);
 	} else if (regnum <= 31) {
@@ -479,7 +478,6 @@ unw_access_ar (struct unw_frame_info *info, int regnum, unsigned long *val, int 
 	unsigned long *addr;
 	struct pt_regs *pt;
 
-	pt = get_scratch_regs(info);
 	switch (regnum) {
 	      case UNW_AR_BSP:
 		addr = info->bsp_loc;
@@ -534,18 +532,22 @@ unw_access_ar (struct unw_frame_info *info, int regnum, unsigned long *val, int 
 		break;
 
 	      case UNW_AR_RSC:
+		pt = get_scratch_regs(info);
 		addr = &pt->ar_rsc;
 		break;
 
 	      case UNW_AR_CCV:
+		pt = get_scratch_regs(info);
 		addr = &pt->ar_ccv;
 		break;
 
 	      case UNW_AR_CSD:
+		pt = get_scratch_regs(info);
 		addr = &pt->ar_csd;
 		break;
 
 	      case UNW_AR_SSD:
+		pt = get_scratch_regs(info);
 		addr = &pt->ar_ssd;
 		break;
 
