@@ -203,6 +203,7 @@ _decode_session6(struct sk_buff *skb, struct flowi *fl)
 		/* XXX Why are there these headers? */
 		case IPPROTO_AH:
 		case IPPROTO_ESP:
+		case IPPROTO_COMP:
 		default:
 			fl->uli_u.spi = 0;
 			return;
