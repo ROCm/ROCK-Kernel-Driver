@@ -15,7 +15,7 @@ choice 'Machine type'						\
 if [ "$CONFIG_SGI_IP27" = "y" ]; then
    bool '  IP27 N-Mode' CONFIG_SGI_SN0_N_MODE
    bool '  Discontiguous Memory Support' CONFIG_DISCONTIGMEM
-   bool '  NUMA support' CONFIG_NUMA
+   bool '  NUMA Support' CONFIG_NUMA
    bool '  Mapped kernel support' CONFIG_MAPPED_KERNEL
    bool '  Kernel text replication support' CONFIG_REPLICATE_KTEXT
    bool '  Exception handler replication support' CONFIG_REPLICATE_EXHANDLERS
