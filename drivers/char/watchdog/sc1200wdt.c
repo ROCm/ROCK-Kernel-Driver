@@ -486,5 +486,3 @@ module_exit(sc1200wdt_exit);
 MODULE_AUTHOR("Zwane Mwaikambo <zwane@commfireservices.com>");
 MODULE_DESCRIPTION("Driver for National Semiconductor PC87307/PC97307 watchdog component");
 MODULE_LICENSE("GPL");
-EXPORT_NO_SYMBOLS;
-
