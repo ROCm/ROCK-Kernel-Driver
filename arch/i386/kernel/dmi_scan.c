@@ -577,12 +577,12 @@ static __init int hp_ht_bigsmp(struct dmi_blacklist *d)
 { 
 #ifdef CONFIG_X86_GENERICARCH
 	extern int dmi_bigsmp;
-	printk(KERN_NOTICE "%s detected: force use of apic=bigsmp pci=noacpi\n", d->ident);
+	printk(KERN_NOTICE "%s detected: force use of apic=bigsmp\n", d->ident);
 	dmi_bigsmp = 1;
 #else
-	printk(KERN_NOTICE "%s detected: force use of pci=noacpi\n", d->ident);
+	/* printk(KERN_NOTICE "%s detected: force use of pci=noacpi\n", d->ident); */
 #endif
-	acpi_noirq_set();
+	/* acpi_noirq_set(); */
 	return 0;
 } 
 #endif
