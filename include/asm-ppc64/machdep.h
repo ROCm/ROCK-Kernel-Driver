@@ -14,6 +14,8 @@
 #include <linux/init.h>
 #include <linux/dma-mapping.h>
 
+#include <asm/setup.h>
+
 struct pt_regs;
 struct pci_bus;	
 struct device_node;
