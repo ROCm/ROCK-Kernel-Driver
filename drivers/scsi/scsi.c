@@ -847,6 +847,7 @@ void scsi_finish_command(struct scsi_cmnd *cmd)
 
 	cmd->done(cmd);
 }
+EXPORT_SYMBOL(scsi_finish_command);
 
 /*
  * Function:	scsi_adjust_queue_depth()
