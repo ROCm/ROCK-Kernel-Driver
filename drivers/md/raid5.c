@@ -918,7 +918,7 @@ static void handle_stripe(struct stripe_head *sh)
 	/* check if the array has lost two devices and, if so, some requests might
 	 * need to be failed
 	 */
-	if (failed > 1 && to_read+to_write) {
+	if (failed > 1 && to_read+to_write+written) {
 		spin_lock_irq(&conf->device_lock);
 		for (i=disks; i--; ) {
 			/* fail all writes first */
@@ -936,6 +936,20 @@ static void handle_stripe(struct stripe_head *sh)
 				}
 				bi = nextbi;
 			}
+			/* and fail all 'written' */
+			bi = sh->dev[i].written;
+			sh->dev[i].written = NULL;
+			while (bi && bi->bi_sector < dev->sector + STRIPE_SECTORS) {
+				struct bio *bi2 = bi->bi_next;
+				clear_bit(BIO_UPTODATE, &bi->bi_flags);
+				if (--bi->bi_phys_segments == 0) {
+					md_write_end(conf->mddev);
+					bi->bi_next = return_bi;
+					return_bi = bi;
+				}
+				bi = bi2;
+			}
+
 			/* fail any reads if this device is non-operational */
 			if (!test_bit(R5_Insync, &sh->dev[i].flags)) {
 				bi = sh->dev[i].toread;
