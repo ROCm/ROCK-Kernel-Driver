@@ -31,6 +31,7 @@
 
 #include "ntfs.h"
 #include "sysctl.h"
+#include "logfile.h"
 
 /* Number of mounted file systems which have compression enabled. */
 static unsigned long ntfs_nr_compression_users;
@@ -318,7 +319,7 @@ static int ntfs_remount(struct super_block *sb, int *flags, char *opt)
 	 */
 	if ((sb->s_flags & MS_RDONLY) && !(*flags & MS_RDONLY)) {
 		if (NVolErrors(vol)) {
-			ntfs_error(sb, "Volume has errors and is read-only."
+			ntfs_error(sb, "Volume has errors and is read-only. "
 					"Cannot remount read-write.");
 			return -EROFS;
 		}
@@ -728,7 +729,7 @@ static BOOL load_and_init_mft_mirror(ntfs_volume *vol)
 	if (IS_ERR(tmp_ino) || is_bad_inode(tmp_ino)) {
 		if (!IS_ERR(tmp_ino))
 			iput(tmp_ino);
-		ntfs_error(vol->sb, "Failed to load $MFTMirr.");
+		/* Caller will display error message. */
 		return FALSE;
 	}
 	/*
@@ -773,6 +774,7 @@ static BOOL check_mft_mirror(ntfs_volume *vol)
 	run_list_element *rl, rl2[2];
 	int mrecs_per_page, i;
 
+	ntfs_debug("Entering.");
 	/* Compare contents of $MFT and $MFTMirr. */
 	mrecs_per_page = PAGE_CACHE_SIZE / vol->mft_record_size;
 	BUG_ON(!mrecs_per_page);
@@ -808,7 +810,7 @@ static BOOL check_mft_mirror(ntfs_volume *vol)
 			++index;
 		}
 		/* Make sure the record is ok. */
-		if (is_baad_recordp(kmft)) {
+		if (ntfs_is_baad_recordp(kmft)) {
 			ntfs_error(sb, "Incomplete multi sector transfer "
 					"detected in mft record %i.", i);
 mm_unmap_out:
@@ -817,7 +819,7 @@ mft_unmap_out:
 			ntfs_unmap_page(mft_page);
 			return FALSE;
 		}
-		if (is_baad_recordp(kmirr)) {
+		if (ntfs_is_baad_recordp(kmirr)) {
 			ntfs_error(sb, "Incomplete multi sector transfer "
 					"detected in mft mirror record %i.", i);
 			goto mm_unmap_out;
@@ -832,7 +834,7 @@ mft_unmap_out:
 		/* Compare the two records. */
 		if (memcmp(kmft, kmirr, bytes)) {
 			ntfs_error(sb, "$MFT and $MFTMirr (record %i) do not "
-					"match. Run ntfsfix or chkdsk.", i);
+					"match.  Run ntfsfix or chkdsk.", i);
 			goto mm_unmap_out;
 		}
 		kmft += vol->mft_record_size;
@@ -862,13 +864,42 @@ mft_unmap_out:
 	do {
 		if (rl2[i].vcn != rl[i].vcn || rl2[i].lcn != rl[i].lcn ||
 				rl2[i].length != rl[i].length) {
-			ntfs_error(sb, "$MFTMirr location mismatch. "
+			ntfs_error(sb, "$MFTMirr location mismatch.  "
 					"Run chkdsk.");
 			up_read(&mirr_ni->run_list.lock);
 			return FALSE;
 		}
 	} while (rl2[i++].length);
 	up_read(&mirr_ni->run_list.lock);
+	ntfs_debug("Done.");
+	return TRUE;
+}
+
+/**
+ * load_and_check_logfile - load and check the logfile inode for a volume
+ * @vol:	ntfs super block describing device whose logfile to load
+ *
+ * Return TRUE on success or FALSE on error.
+ */
+static BOOL load_and_check_logfile(ntfs_volume *vol)
+{
+	struct inode *tmp_ino;
+
+	ntfs_debug("Entering.");
+	tmp_ino = ntfs_iget(vol->sb, FILE_LogFile);
+	if (IS_ERR(tmp_ino) || is_bad_inode(tmp_ino)) {
+		if (!IS_ERR(tmp_ino))
+			iput(tmp_ino);
+		/* Caller will display error message. */
+		return FALSE;
+	}
+	if (!ntfs_check_logfile(tmp_ino)) {
+		iput(tmp_ino);
+		/* ntfs_check_logfile() will have displayed error output. */
+		return FALSE;
+	}
+	vol->logfile_ino = tmp_ino;
+	ntfs_debug("Done.");
 	return TRUE;
 }
 
@@ -926,7 +957,7 @@ read_partial_upcase_page:
 			goto read_partial_upcase_page;
 	}
 	vol->upcase_len = ino->i_size >> UCHAR_T_SIZE_BITS;
-	ntfs_debug("Read %lu bytes from $UpCase (expected %u bytes).",
+	ntfs_debug("Read %llu bytes from $UpCase (expected %u bytes).",
 			ino->i_size, 64 * 1024 * sizeof(uchar_t));
 	iput(ino);
 	down(&ntfs_lock);
@@ -1094,25 +1125,42 @@ get_ctx_vol_failed:
 	unmap_mft_record(NTFS_I(vol->vol_ino));
 	printk(KERN_INFO "NTFS volume version %i.%i.\n", vol->major_ver,
 			vol->minor_ver);
+#ifdef NTFS_RW
 	/*
-	 * Get the inode for the logfile and empty it if this is a read-write
-	 * mount.
+	 * Get the inode for the logfile, check it and determine if the volume
+	 * was shutdown cleanly.
 	 */
-	// TODO: vol->logfile_ino = ;
-	// TODO: Cleanup for error case at end of function.
-	tmp_ino = ntfs_iget(sb, FILE_LogFile);
-	if (IS_ERR(tmp_ino) || is_bad_inode(tmp_ino)) {
-		if (!IS_ERR(tmp_ino))
-			iput(tmp_ino);
-		ntfs_error(sb, "Failed to load $LogFile.");
-		// FIMXE: We only want to empty the thing so pointless bailing
-		// out. Can recover/ignore.
-		goto iput_vol_err_out;
+	if (!load_and_check_logfile(vol) ||
+			!ntfs_is_logfile_clean(vol->logfile_ino)) {
+		static const char *es1 = "Failed to load $LogFile";
+		static const char *es2 = "$LogFile is not clean";
+		static const char *es3 = ".  Mount in Windows.";
+
+		/* If a read-write mount, convert it to a read-only mount. */
+		if (!(sb->s_flags & MS_RDONLY)) {
+			if (!(vol->on_errors & (ON_ERRORS_REMOUNT_RO |
+					ON_ERRORS_CONTINUE))) {
+				ntfs_error(sb, "%s and neither on_errors="
+						"continue nor on_errors="
+						"remount-ro was specified%s",
+						!vol->logfile_ino ? es1 : es2,
+						es3);
+				goto iput_logfile_err_out;
+			}
+			sb->s_flags |= MS_RDONLY | MS_NOATIME | MS_NODIRATIME;
+			ntfs_error(sb, "%s.  Mounting read-only%s",
+					!vol->logfile_ino ? es1 : es2, es3);
+		} else
+			ntfs_warning(sb, "%s.  Will not be able to remount "
+					"read-write%s",
+					!vol->logfile_ino ? es1 : es2, es3);
+		/* This will prevent a read-write remount. */
+		NVolSetErrors(vol);
 	}
 	// FIXME: Empty the logfile, but only if not read-only.
 	// FIXME: What happens if someone remounts rw? We need to empty the file
 	// then. We need a flag to tell us whether we have done it already.
-	iput(tmp_ino);
+#endif
 	/*
 	 * Get the inode for the attribute definitions file and parse the
 	 * attribute definitions.
@@ -1122,7 +1170,7 @@ get_ctx_vol_failed:
 		if (!IS_ERR(tmp_ino))
 			iput(tmp_ino);
 		ntfs_error(sb, "Failed to load $AttrDef.");
-		goto iput_vol_err_out;
+		goto iput_logfile_err_out;
 	}
 	// FIXME: Parse the attribute definitions.
 	iput(tmp_ino);
@@ -1132,7 +1180,7 @@ get_ctx_vol_failed:
 		if (!IS_ERR(vol->root_ino))
 			iput(vol->root_ino);
 		ntfs_error(sb, "Failed to load root directory.");
-		goto iput_vol_err_out;
+		goto iput_logfile_err_out;
 	}
 	/* If on NTFS versions before 3.0, we are done. */
 	if (vol->major_ver < 3)
@@ -1166,7 +1214,11 @@ iput_sec_err_out:
 	iput(vol->secure_ino);
 iput_root_err_out:
 	iput(vol->root_ino);
-iput_vol_err_out:
+iput_logfile_err_out:
+#ifdef NTFS_RW
+	if (vol->logfile_ino)
+		iput(vol->logfile_ino);
+#endif /* NTFS_RW */
 	iput(vol->vol_ino);
 iput_lcnbmp_err_out:
 	iput(vol->lcnbmp_ino);

@@ -10,13 +10,13 @@
  * by the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
- * This program/include file is distributed in the hope that it will be 
- * useful, but WITHOUT ANY WARRANTY; without even the implied warranty 
+ * This program/include file is distributed in the hope that it will be
+ * useful, but WITHOUT ANY WARRANTY; without even the implied warranty
  * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program (in the main directory of the Linux-NTFS 
+ * along with this program (in the main directory of the Linux-NTFS
  * distribution in the file COPYING); if not, write to the Free Software
  * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
@@ -47,13 +47,13 @@
 
 /*
  * Location of bootsector on partition:
- * 	The standard NTFS_BOOT_SECTOR is on sector 0 of the partition.
- * 	On NT4 and above there is one backup copy of the boot sector to
- * 	be found on the last sector of the partition (not normally accessible
- * 	from within Windows as the bootsector contained number of sectors
+ *	The standard NTFS_BOOT_SECTOR is on sector 0 of the partition.
+ *	On NT4 and above there is one backup copy of the boot sector to
+ *	be found on the last sector of the partition (not normally accessible
+ *	from within Windows as the bootsector contained number of sectors
  *	value is one less than the actual value!).
- * 	On versions of NT 3.51 and earlier, the backup copy was located at 
- * 	number of sectors/2 (integer divide), i.e. in the middle of the volume.
+ *	On versions of NT 3.51 and earlier, the backup copy was located at
+ *	number of sectors/2 (integer divide), i.e. in the middle of the volume.
  */
 
 /*
@@ -113,36 +113,64 @@ typedef struct {
  * records (like mft records for example).
  */
 typedef enum {
-	magic_BAAD = const_cpu_to_le32(0x44414142), /* BAAD == corrupt record */
-	magic_CHKD = const_cpu_to_le32(0x424b4843), /* CHKD == chkdsk ??? */
-        magic_FILE = const_cpu_to_le32(0x454c4946), /* FILE == mft entry */
-	magic_HOLE = const_cpu_to_le32(0x454c4f48), /* HOLE == ? (NTFS 3.0+?) */
-        magic_INDX = const_cpu_to_le32(0x58444e49), /* INDX == index buffer */
+	/* Found in $MFT/$DATA. */
+	magic_FILE = const_cpu_to_le32(0x454c4946), /* Mft entry. */
+	magic_INDX = const_cpu_to_le32(0x58444e49), /* Index buffer. */
+	magic_HOLE = const_cpu_to_le32(0x454c4f48), /* ? (NTFS 3.0+?) */
+
+	/* Found in $LogFile/$DATA. */
+	magic_RSTR = const_cpu_to_le32(0x52545352), /* Restart page. */
+	magic_RCRD = const_cpu_to_le32(0x44524352), /* Log record page. */
+
+	/* Found in $LogFile/$DATA.  (May be found in $MFT/$DATA, also?) */
+	magic_CHKD = const_cpu_to_le32(0x424b4843), /* Modified by chkdsk. */
+
+	/* Found in all ntfs record containing records. */
+	magic_BAAD = const_cpu_to_le32(0x44414142), /* Failed multi sector
+						       transfer was detected. */
+
+	/*
+	 * Found in $LogFile/$DATA when a page is full or 0xff bytes and is
+	 * thus not initialized.  User has to initialize the page before using
+	 * it.
+	 */
+	magic_empty = const_cpu_to_le32(0xffffffff),/* Record is empty and has
+						       to be initialized before
+						       it can be used. */
 } NTFS_RECORD_TYPES;
 
 /*
  * Generic magic comparison macros. Finally found a use for the ## preprocessor
  * operator! (-8
  */
-#define is_magic(x, m)		(   (u32)(x) == magic_##m )
-#define is_magicp(p, m) 	( *(u32*)(p) == magic_##m )
+#define ntfs_is_magic(x, m)	(   (u32)(x) == magic_##m )
+#define ntfs_is_magicp(p, m)	( *(u32*)(p) == magic_##m )
 
 /*
- * Specialised magic comparison macros.
+ * Specialised magic comparison macros for the NTFS_RECORD_TYPES defined above.
  */
-#define is_baad_record(x)	( is_magic (x, BAAD) )
-#define is_baad_recordp(p)	( is_magicp(p, BAAD) )
-#define is_chkd_record(x)       ( is_magic (x, CHKD) )
-#define is_chkd_recordp(p)      ( is_magicp(p, CHKD) )
-#define is_file_record(x)	( is_magic (x, FILE) )
-#define is_file_recordp(p)	( is_magicp(p, FILE) )
-#define is_hole_record(x)       ( is_magic (x, HOLE) )
-#define is_hole_recordp(p)      ( is_magicp(p, HOLE) )
-#define is_indx_record(x)       ( is_magic (x, INDX) )
-#define is_indx_recordp(p)      ( is_magicp(p, INDX) )
+#define ntfs_is_file_record(x)	( ntfs_is_magic (x, FILE) )
+#define ntfs_is_file_recordp(p)	( ntfs_is_magicp(p, FILE) )
+#define ntfs_is_mft_record(x)	( ntfs_is_file_record(x) )
+#define ntfs_is_mft_recordp(p)	( ntfs_is_file_recordp(p) )
+#define ntfs_is_indx_record(x)	( ntfs_is_magic (x, INDX) )
+#define ntfs_is_indx_recordp(p)	( ntfs_is_magicp(p, INDX) )
+#define ntfs_is_hole_record(x)	( ntfs_is_magic (x, HOLE) )
+#define ntfs_is_hole_recordp(p)	( ntfs_is_magicp(p, HOLE) )
 
-#define is_mft_record(x)	( is_file_record(x) )
-#define is_mft_recordp(p)	( is_file_recordp(p) )
+#define ntfs_is_rstr_record(x)	( ntfs_is_magic (x, RSTR) )
+#define ntfs_is_rstr_recordp(p)	( ntfs_is_magicp(p, RSTR) )
+#define ntfs_is_rcrd_record(x)	( ntfs_is_magic (x, RCRD) )
+#define ntfs_is_rcrd_recordp(p)	( ntfs_is_magicp(p, RCRD) )
+
+#define ntfs_is_chkd_record(x)	( ntfs_is_magic (x, CHKD) )
+#define ntfs_is_chkd_recordp(p)	( ntfs_is_magicp(p, CHKD) )
+
+#define ntfs_is_baad_record(x)	( ntfs_is_magic (x, BAAD) )
+#define ntfs_is_baad_recordp(p)	( ntfs_is_magicp(p, BAAD) )
+
+#define ntfs_is_empty_record(x)		( ntfs_is_magic (x, empty) )
+#define ntfs_is_empty_recordp(p)	( ntfs_is_magicp(p, empty) )
 
 /*
  * The Update Sequence Array (usa) is an array of the u16 values which belong
@@ -154,7 +182,7 @@ typedef enum {
  * are set to it (during writing). If they are not, an incomplete multi sector
  * transfer has occurred when the data was written.
  * The maximum size for the update sequence array is fixed to:
- * 	maximum size = usa_ofs + (usa_count * 2) = 510 bytes
+ *	maximum size = usa_ofs + (usa_count * 2) = 510 bytes
  * The 510 bytes comes from the fact that the last u16 in the array has to
  * (obviously) finish before the last u16 of the first 512-byte sector.
  * This formula can be used as a consistency check in that usa_ofs +
@@ -218,7 +246,7 @@ typedef enum {
 } NTFS_SYSTEM_FILES;
 
 /*
- * These are the so far known MFT_RECORD_* flags (16-bit) which contain 
+ * These are the so far known MFT_RECORD_* flags (16-bit) which contain
  * information about the mft record in which they are present.
  */
 typedef enum {
@@ -230,7 +258,7 @@ typedef enum {
 /*
  * mft references (aka file references or file record segment references) are
  * used whenever a structure needs to refer to a record in the mft.
- * 
+ *
  * A reference consists of a 48-bit index into the mft and a 16-bit sequence
  * number used to detect stale references.
  *
@@ -256,7 +284,7 @@ typedef enum {
  * Do I hear screams "we want 64-bit inodes!" ?!? (-;
  *
  * FIXME: The mft zone is defined as the first 12% of the volume. This space is
- * reserved so that the mft can grow contiguously and hence doesn't become 
+ * reserved so that the mft can grow contiguously and hence doesn't become
  * fragmented. Volume free space includes the empty part of the mft zone and
  * when the volume's free 88% are used up, the mft zone is shrunk by a factor
  * of 2, thus making more space available for more files/data. This process is
@@ -304,11 +332,11 @@ typedef struct {
 /*  8*/	u64 lsn;		/* $LogFile sequence number for this record.
 				   Changed every time the record is modified. */
 /* 16*/	u16 sequence_number;	/* Number of times this mft record has been
-		   		   reused. (See description for MFT_REF
+				   reused. (See description for MFT_REF
 				   above.) NOTE: The increment (skipping zero)
 				   is done when the file is deleted. NOTE: If
 				   this is zero it is left zero. */
-/* 18*/	u16 link_count; 	/* Number of hard links, i.e. the number of 
+/* 18*/	u16 link_count;		/* Number of hard links, i.e. the number of
 				   directory entries referencing this record.
 				   NOTE: Only used in mft base records.
 				   NOTE: When deleting a directory entry we
@@ -373,7 +401,7 @@ typedef struct {
  * revealing choice of symbol... (-;
  */
 typedef enum {
-	AT_UNUSED			= const_cpu_to_le32(         0),
+	AT_UNUSED			= const_cpu_to_le32(	     0),
 	AT_STANDARD_INFORMATION		= const_cpu_to_le32(      0x10),
 	AT_ATTRIBUTE_LIST		= const_cpu_to_le32(      0x20),
 	AT_FILE_NAME			= const_cpu_to_le32(      0x30),
@@ -408,13 +436,13 @@ typedef enum {
  *	for what I mean but COLLATION_UNICODE_STRING would not give any special
  *	treatment to any characters at all, but this is speculation.
  * COLLATION_NTOFS_ULONG - Sorting is done according to ascending u32 key
- * 	values. E.g. used for $SII index in FILE_Secure, which sorts by
- * 	security_id (u32).
+ *	values. E.g. used for $SII index in FILE_Secure, which sorts by
+ *	security_id (u32).
  * COLLATION_NTOFS_SID - Sorting is done according to ascending SID values.
- * 	E.g. used for $O index in FILE_Extend/$Quota.
+ *	E.g. used for $O index in FILE_Extend/$Quota.
  * COLLATION_NTOFS_SECURITY_HASH - Sorting is done first by ascending hash
- * 	values and second by ascending security_id values. E.g. used for $SDH
- * 	index in FILE_Secure.
+ *	values and second by ascending security_id values. E.g. used for $SDH
+ *	index in FILE_Secure.
  * COLLATION_NTOFS_ULONGS - Sorting is done according to a sequence of ascending
  *	u32 key values. E.g. used for $O index in FILE_Extend/$ObjId, which
  *	sorts by object_id (16-byte), by splitting up the object_id in four
@@ -489,7 +517,7 @@ typedef struct {
 } __attribute__ ((__packed__)) ATTR_DEF;
 
 /*
- * Attribute flags (16-bit). 
+ * Attribute flags (16-bit).
  */
 typedef enum {
 	ATTR_IS_COMPRESSED	= const_cpu_to_le16(0x0001),
@@ -600,7 +628,7 @@ typedef struct {
 				   boundary. */
 /* 12*/	ATTR_FLAGS flags;	/* Flags describing the attribute. */
 /* 14*/	u16 instance;		/* The instance of this attribute record. This
-				   number is unique within this mft record (see 
+				   number is unique within this mft record (see
 				   MFT_RECORD/next_attribute_instance notes in
 				   in mft.h for more details). */
 /* 16*/	union {
@@ -610,7 +638,7 @@ typedef struct {
 /* 20 */		u16 value_offset; /* Byte offset of the attribute
 					     value from the start of the
 					     attribute record. When creating,
-					     align to 8-byte boundary if we 
+					     align to 8-byte boundary if we
 					     have a name present as this might
 					     not have a length of a multiple
 					     of 8-bytes. */
@@ -703,7 +731,7 @@ typedef enum {
 	FILE_ATTR_ENCRYPTED		= const_cpu_to_le32(0x00004000),
 
 	FILE_ATTR_VALID_FLAGS		= const_cpu_to_le32(0x00007fb7),
-	/* FILE_ATTR_VALID_FLAGS masks out the old DOS VolId and the 
+	/* FILE_ATTR_VALID_FLAGS masks out the old DOS VolId and the
 	   FILE_ATTR_DEVICE and preserves everything else. This mask
 	   is used to obtain all flags that are valid for reading. */
 	FILE_ATTR_VALID_SET_FLAGS	= const_cpu_to_le32(0x000031a7),
@@ -740,9 +768,9 @@ typedef enum {
  * NOTE: Always resident.
  * NOTE: Present in all base file records on a volume.
  * NOTE: There is conflicting information about the meaning of each of the time
- * 	 fields but the meaning as defined below has been verified to be
- * 	 correct by practical experimentation on Windows NT4 SP6a and is hence
- * 	 assumed to be the one and only correct interpretation.
+ *	 fields but the meaning as defined below has been verified to be
+ *	 correct by practical experimentation on Windows NT4 SP6a and is hence
+ *	 assumed to be the one and only correct interpretation.
  */
 typedef struct {
 /*Ofs*/
@@ -776,14 +804,14 @@ typedef struct {
  * Recognize the difference by comparing the length of the resident attribute
  * value. If it is 48, then the following fields are missing. If it is 72 then
  * the fields are present. Maybe just check like this:
- * 	if (resident.ValueLength < sizeof(STANDARD_INFORMATION)) {
- * 		Assume NTFS 1.2- format.
- * 		If (volume version is 3.x)
- * 			Upgrade attribute to NTFS 3.x format.
- * 		else
- * 			Use NTFS 1.2- format for access.
- * 	} else
- * 		Use NTFS 3.x format for access.
+ *	if (resident.ValueLength < sizeof(STANDARD_INFORMATION)) {
+ *		Assume NTFS 1.2- format.
+ *		If (volume version is 3.x)
+ *			Upgrade attribute to NTFS 3.x format.
+ *		else
+ *			Use NTFS 1.2- format for access.
+ *	} else
+ *		Use NTFS 3.x format for access.
  * Only problem is that it might be legal to set the length of the value to
  * arbitrarily large values thus spoiling this check. - But chkdsk probably
  * views that as a corruption, assuming that it behaves like this for all
@@ -838,23 +866,23 @@ typedef struct {
  * itself. The list is sorted: first by attribute type, second by attribute
  * name (if present), third by instance number. The extents of one
  * non-resident attribute (if present) immediately follow after the initial
- * extent. They are ordered by lowest_vcn and have their instace set to zero. 
+ * extent. They are ordered by lowest_vcn and have their instace set to zero.
  * It is not allowed to have two attributes with all sorting keys equal.
- * - Further restrictions: 
- * 	- If not resident, the vcn to lcn mapping array has to fit inside the
- * 	  base mft record.
- * 	- The attribute list attribute value has a maximum size of 256kb. This
- * 	  is imposed by the Windows cache manager.
+ * - Further restrictions:
+ *	- If not resident, the vcn to lcn mapping array has to fit inside the
+ *	  base mft record.
+ *	- The attribute list attribute value has a maximum size of 256kb. This
+ *	  is imposed by the Windows cache manager.
  * - Attribute lists are only used when the attributes of mft record do not
  * fit inside the mft record despite all attributes (that can be made
  * non-resident) having been made non-resident. This can happen e.g. when:
- *  	- File has a large number of hard links (lots of file name
- *  	  attributes present).
- *  	- The mapping pairs array of some non-resident attribute becomes so
+ *	- File has a large number of hard links (lots of file name
+ *	  attributes present).
+ *	- The mapping pairs array of some non-resident attribute becomes so
  *	  large due to fragmentation that it overflows the mft record.
- *  	- The security descriptor is very complex (not applicable to
- *  	  NTFS 3.0 volumes).
- *  	- There are many named streams.
+ *	- The security descriptor is very complex (not applicable to
+ *	  NTFS 3.0 volumes).
+ *	- There are many named streams.
  */
 typedef struct {
 /*Ofs*/
@@ -898,7 +926,7 @@ typedef struct {
  */
 typedef enum {
 	FILE_NAME_POSIX			= 0x00,
-		/* This is the largest namespace. It is case sensitive and 
+		/* This is the largest namespace. It is case sensitive and
 		   allows all Unicode characters except for: '\0' and '/'.
 		   Beware that in WinNT/2k files which eg have the same name
 		   except for their case will not be distinguished by the
@@ -906,14 +934,14 @@ typedef enum {
 		   both "filename" and "fileName" without warning. */
 	FILE_NAME_WIN32			= 0x01,
 		/* The standard WinNT/2k NTFS long filenames. Case insensitive.
-		   All Unicode chars except: '\0', '"', '*', '/', ':', '<', 
+		   All Unicode chars except: '\0', '"', '*', '/', ':', '<',
 		   '>', '?', '\' and '|'. Further, names cannot end with a '.'
 		   or a space. */
 	FILE_NAME_DOS			= 0x02,
 		/* The standard DOS filenames (8.3 format). Uppercase only.
 		   All 8-bit characters greater space, except: '"', '*', '+',
 		   ',', '/', ':', ';', '<', '=', '>', '?' and '\'. */
-	FILE_NAME_WIN32_AND_DOS		= 0x03, 
+	FILE_NAME_WIN32_AND_DOS		= 0x03,
 		/* 3 means that both the Win32 and the DOS filenames are
 		   identical and hence have been saved in this single filename
 		   record. */
@@ -928,9 +956,9 @@ typedef enum {
  *	 reality and the more up to date values are present in the standard
  *	 information attribute.
  * NOTE: There is conflicting information about the meaning of each of the time
- * 	 fields but the meaning as defined below has been verified to be
- * 	 correct by practical experimentation on Windows NT4 SP6a and is hence
- * 	 assumed to be the one and only correct interpretation.
+ *	 fields but the meaning as defined below has been verified to be
+ *	 correct by practical experimentation on Windows NT4 SP6a and is hence
+ *	 assumed to be the one and only correct interpretation.
  */
 typedef struct {
 /*hex ofs*/
@@ -970,13 +998,13 @@ typedef struct {
 } __attribute__ ((__packed__)) FILE_NAME_ATTR;
 
 /*
- * GUID structures store globally unique identifiers (GUID). A GUID is a 
+ * GUID structures store globally unique identifiers (GUID). A GUID is a
  * 128-bit value consisting of one group of eight hexadecimal digits, followed
  * by three groups of four hexadecimal digits each, followed by one group of
  * twelve hexadecimal digits. GUIDs are Microsoft's implementation of the
  * distributed computing environment (DCE) universally unique identifier (UUID).
  * Example of a GUID:
- * 	1F010768-5A73-BC91-0010A52216A7
+ *	1F010768-5A73-BC91-0010A52216A7
  */
 typedef struct {
 	u32 data1;	/* The first eight hexadecimal digits of the GUID. */
@@ -1042,7 +1070,7 @@ typedef struct {
 //typedef enum {					/* SID string prefix. */
 //	SECURITY_NULL_SID_AUTHORITY	= {0, 0, 0, 0, 0, 0},	/* S-1-0 */
 //	SECURITY_WORLD_SID_AUTHORITY	= {0, 0, 0, 0, 0, 1},	/* S-1-1 */
-//	SECURITY_LOCAL_SID_AUTHORITY 	= {0, 0, 0, 0, 0, 2},	/* S-1-2 */
+//	SECURITY_LOCAL_SID_AUTHORITY	= {0, 0, 0, 0, 0, 2},	/* S-1-2 */
 //	SECURITY_CREATOR_SID_AUTHORITY	= {0, 0, 0, 0, 0, 3},	/* S-1-3 */
 //	SECURITY_NON_UNIQUE_AUTHORITY	= {0, 0, 0, 0, 0, 4},	/* S-1-4 */
 //	SECURITY_NT_SID_AUTHORITY	= {0, 0, 0, 0, 0, 5},	/* S-1-5 */
@@ -1051,7 +1079,7 @@ typedef struct {
 /*
  * These relative identifiers (RIDs) are used with the above identifier
  * authorities to make up universal well-known SIDs.
- * 	
+ *
  * Note: The relative identifier (RID) refers to the portion of a SID, which
  * identifies a user or group in relation to the authority that issued the SID.
  * For example, the universal well-known SID Creator Owner ID (S-1-3-0) is
@@ -1131,38 +1159,38 @@ typedef enum {					/* Identifier authority. */
 /*
  * The universal well-known SIDs:
  *
- * 	NULL_SID			S-1-0-0
- * 	WORLD_SID			S-1-1-0
- * 	LOCAL_SID			S-1-2-0
- * 	CREATOR_OWNER_SID		S-1-3-0
- * 	CREATOR_GROUP_SID		S-1-3-1
- * 	CREATOR_OWNER_SERVER_SID	S-1-3-2
- * 	CREATOR_GROUP_SERVER_SID	S-1-3-3
+ *	NULL_SID			S-1-0-0
+ *	WORLD_SID			S-1-1-0
+ *	LOCAL_SID			S-1-2-0
+ *	CREATOR_OWNER_SID		S-1-3-0
+ *	CREATOR_GROUP_SID		S-1-3-1
+ *	CREATOR_OWNER_SERVER_SID	S-1-3-2
+ *	CREATOR_GROUP_SERVER_SID	S-1-3-3
  *
- * 	(Non-unique IDs)		S-1-4
+ *	(Non-unique IDs)		S-1-4
  *
  * NT well-known SIDs:
- * 
- * 	NT_AUTHORITY_SID	S-1-5
- * 	DIALUP_SID		S-1-5-1
  *
- * 	NETWORD_SID		S-1-5-2
- * 	BATCH_SID		S-1-5-3
- * 	INTERACTIVE_SID		S-1-5-4
- * 	SERVICE_SID		S-1-5-6
- * 	ANONYMOUS_LOGON_SID	S-1-5-7		(aka null logon session)
- * 	PROXY_SID		S-1-5-8
- * 	SERVER_LOGON_SID	S-1-5-9		(aka domain controller account)
- * 	SELF_SID		S-1-5-10	(self RID)
- * 	AUTHENTICATED_USER_SID	S-1-5-11
- * 	RESTRICTED_CODE_SID	S-1-5-12	(running restricted code)
- * 	TERMINAL_SERVER_SID	S-1-5-13	(running on terminal server)
+ *	NT_AUTHORITY_SID	S-1-5
+ *	DIALUP_SID		S-1-5-1
  *
- * 	(Logon IDs)		S-1-5-5-X-Y
+ *	NETWORD_SID		S-1-5-2
+ *	BATCH_SID		S-1-5-3
+ *	INTERACTIVE_SID		S-1-5-4
+ *	SERVICE_SID		S-1-5-6
+ *	ANONYMOUS_LOGON_SID	S-1-5-7		(aka null logon session)
+ *	PROXY_SID		S-1-5-8
+ *	SERVER_LOGON_SID	S-1-5-9		(aka domain controller account)
+ *	SELF_SID		S-1-5-10	(self RID)
+ *	AUTHENTICATED_USER_SID	S-1-5-11
+ *	RESTRICTED_CODE_SID	S-1-5-12	(running restricted code)
+ *	TERMINAL_SERVER_SID	S-1-5-13	(running on terminal server)
  *
- * 	(NT non-unique IDs)	S-1-5-0x15-...
+ *	(Logon IDs)		S-1-5-5-X-Y
  *
- * 	(Built-in domain)	S-1-5-0x20
+ *	(NT non-unique IDs)	S-1-5-0x15-...
+ *
+ *	(Built-in domain)	S-1-5-0x20
  */
 
 /*
@@ -1170,8 +1198,8 @@ typedef enum {					/* Identifier authority. */
  */
 typedef union {
 	struct {
-		u32 low;         /* Low 32-bits. */
-		u16 high;        /* High 16-bits. */
+		u32 low;	/* Low 32-bits. */
+		u16 high;	/* High 16-bits. */
 	} __attribute__ ((__packed__)) parts;
 	u8 value[6];			/* Value as individual bytes. */
 } __attribute__ ((__packed__)) SID_IDENTIFIER_AUTHORITY;
@@ -1179,26 +1207,26 @@ typedef union {
 /*
  * The SID structure is a variable-length structure used to uniquely identify
  * users or groups. SID stands for security identifier.
- * 
+ *
  * The standard textual representation of the SID is of the form:
- * 	S-R-I-S-S...
+ *	S-R-I-S-S...
  * Where:
  *    - The first "S" is the literal character 'S' identifying the following
- * 	digits as a SID.
+ *	digits as a SID.
  *    - R is the revision level of the SID expressed as a sequence of digits
  *	either in decimal or hexadecimal (if the later, prefixed by "0x").
  *    - I is the 48-bit identifier_authority, expressed as digits as R above.
  *    - S... is one or more sub_authority values, expressed as digits as above.
- *    
+ *
  * Example SID; the domain-relative SID of the local Administrators group on
  * Windows NT/2k:
- * 	S-1-5-32-544
+ *	S-1-5-32-544
  * This translates to a SID with:
- * 	revision = 1,
- * 	sub_authority_count = 2,
- * 	identifier_authority = {0,0,0,0,0,5},	// SECURITY_NT_AUTHORITY
- * 	sub_authority[0] = 32,			// SECURITY_BUILTIN_DOMAIN_RID
- * 	sub_authority[1] = 544			// DOMAIN_ALIAS_RID_ADMINS
+ *	revision = 1,
+ *	sub_authority_count = 2,
+ *	identifier_authority = {0,0,0,0,0,5},	// SECURITY_NT_AUTHORITY
+ *	sub_authority[0] = 32,			// SECURITY_BUILTIN_DOMAIN_RID
+ *	sub_authority[1] = 544			// DOMAIN_ALIAS_RID_ADMINS
  */
 typedef struct {
 	u8 revision;
@@ -1423,7 +1451,7 @@ typedef enum {
 /*
  * The generic mapping array. Used to denote the mapping of each generic
  * access right to a specific access mask.
- * 
+ *
  * FIXME: What exactly is this and what is it for? (AIA)
  */
 typedef struct {
@@ -1513,49 +1541,46 @@ typedef enum {
 /*
  * The security descriptor control flags (16-bit).
  *
- * SE_OWNER_DEFAULTED - This boolean flag, when set, indicates that the
- *          SID pointed to by the Owner field was provided by a
- *          defaulting mechanism rather than explicitly provided by the
- *          original provider of the security descriptor.  This may
- *          affect the treatment of the SID with respect to inheritence
- *          of an owner.
+ * SE_OWNER_DEFAULTED - This boolean flag, when set, indicates that the SID
+ *	pointed to by the Owner field was provided by a defaulting mechanism
+ *	rather than explicitly provided by the original provider of the
+ *	security descriptor.  This may affect the treatment of the SID with
+ *	respect to inheritence of an owner.
  *
- * SE_GROUP_DEFAULTED - This boolean flag, when set, indicates that the
- *          SID in the Group field was provided by a defaulting mechanism
- *          rather than explicitly provided by the original provider of
- *          the security descriptor.  This may affect the treatment of
- *          the SID with respect to inheritence of a primary group.
+ * SE_GROUP_DEFAULTED - This boolean flag, when set, indicates that the SID in
+ *	the Group field was provided by a defaulting mechanism rather than
+ *	explicitly provided by the original provider of the security
+ *	descriptor.  This may affect the treatment of the SID with respect to
+ *	inheritence of a primary group.
  *
- * SE_DACL_PRESENT - This boolean flag, when set, indicates that the
- *          security descriptor contains a discretionary ACL.  If this
- *          flag is set and the Dacl field of the SECURITY_DESCRIPTOR is
- *          null, then a null ACL is explicitly being specified.
+ * SE_DACL_PRESENT - This boolean flag, when set, indicates that the security
+ *	descriptor contains a discretionary ACL.  If this flag is set and the
+ *	Dacl field of the SECURITY_DESCRIPTOR is null, then a null ACL is
+ *	explicitly being specified.
  *
- * SE_DACL_DEFAULTED - This boolean flag, when set, indicates that the
- *          ACL pointed to by the Dacl field was provided by a defaulting
- *          mechanism rather than explicitly provided by the original
- *          provider of the security descriptor.  This may affect the
- *          treatment of the ACL with respect to inheritence of an ACL.
- *          This flag is ignored if the DaclPresent flag is not set.
+ * SE_DACL_DEFAULTED - This boolean flag, when set, indicates that the ACL
+ *	pointed to by the Dacl field was provided by a defaulting mechanism
+ *	rather than explicitly provided by the original provider of the
+ *	security descriptor.  This may affect the treatment of the ACL with
+ *	respect to inheritence of an ACL.  This flag is ignored if the
+ *	DaclPresent flag is not set.
  *
- * SE_SACL_PRESENT - This boolean flag, when set,  indicates that the
- *          security descriptor contains a system ACL pointed to by the
- *          Sacl field.  If this flag is set and the Sacl field of the
- *          SECURITY_DESCRIPTOR is null, then an empty (but present)
- *          ACL is being specified.
+ * SE_SACL_PRESENT - This boolean flag, when set,  indicates that the security
+ *	descriptor contains a system ACL pointed to by the Sacl field.  If this
+ *	flag is set and the Sacl field of the SECURITY_DESCRIPTOR is null, then
+ *	an empty (but present) ACL is being specified.
  *
- * SE_SACL_DEFAULTED - This boolean flag, when set, indicates that the
- *          ACL pointed to by the Sacl field was provided by a defaulting
- *          mechanism rather than explicitly provided by the original
- *          provider of the security descriptor.  This may affect the
- *          treatment of the ACL with respect to inheritence of an ACL.
- *          This flag is ignored if the SaclPresent flag is not set.
+ * SE_SACL_DEFAULTED - This boolean flag, when set, indicates that the ACL
+ *	pointed to by the Sacl field was provided by a defaulting mechanism
+ *	rather than explicitly provided by the original provider of the
+ *	security descriptor.  This may affect the treatment of the ACL with
+ *	respect to inheritence of an ACL.  This flag is ignored if the
+ *	SaclPresent flag is not set.
  *
- * SE_SELF_RELATIVE - This boolean flag, when set, indicates that the
- *          security descriptor is in self-relative form.  In this form,
- *          all fields of the security descriptor are contiguous in memory
- *          and all pointer fields are expressed as offsets from the
- *          beginning of the security descriptor.
+ * SE_SELF_RELATIVE - This boolean flag, when set, indicates that the security
+ *	descriptor is in self-relative form.  In this form, all fields of the
+ *	security descriptor are contiguous in memory and all pointer fields are
+ *	expressed as offsets from the beginning of the security descriptor.
  */
 typedef enum {
 	SE_OWNER_DEFAULTED		= const_cpu_to_le16(0x0001),
@@ -1593,7 +1618,7 @@ typedef struct {
 			   SE_SACL_PRESENT is set in the control field. If
 			   SE_SACL_PRESENT is set but sacl is NULL, a NULL ACL
 			   is specified. */
-	u32 dacl;	/* Byte offset to a discretionary ACL. Only valid, if 
+	u32 dacl;	/* Byte offset to a discretionary ACL. Only valid, if
 			   SE_DACL_PRESENT is set in the control field. If
 			   SE_DACL_PRESENT is set but dacl is NULL, a NULL ACL
 			   (unconditionally granting access) is specified. */
@@ -1610,7 +1635,7 @@ typedef struct {
 typedef struct {
 	u8 revision;	/* Revision level of the security descriptor. */
 	u8 alignment;
-	SECURITY_DESCRIPTOR_CONTROL control;	/* Flags qualifying the type of 
+	SECURITY_DESCRIPTOR_CONTROL control;	/* Flags qualifying the type of
 			   the descriptor as well as the following fields. */
 	SID *owner;	/* Points to a SID representing an object's owner. If
 			   this is NULL, no owner SID is present in the
@@ -1622,7 +1647,7 @@ typedef struct {
 			   SE_SACL_PRESENT is set in the control field. If
 			   SE_SACL_PRESENT is set but sacl is NULL, a NULL ACL
 			   is specified. */
-	ACL *dacl;	/* Points to a discretionary ACL. Only valid, if 
+	ACL *dacl;	/* Points to a discretionary ACL. Only valid, if
 			   SE_DACL_PRESENT is set in the control field. If
 			   SE_DACL_PRESENT is set but dacl is NULL, a NULL ACL
 			   (unconditionally granting access) is specified. */
@@ -1655,11 +1680,11 @@ typedef SECURITY_DESCRIPTOR_RELATIVE SECURITY_DESCRIPTOR_ATTR;
 /*
  * On NTFS 3.0+, all security descriptors are stored in FILE_Secure. Only one
  * referenced instance of each unique security descriptor is stored.
- * 
+ *
  * FILE_Secure contains no unnamed data attribute, i.e. it has zero length. It
  * does, however, contain two indexes ($SDH and $SII) as well as a named data
  * stream ($SDS).
- * 
+ *
  * Every unique security descriptor is assigned a unique security identifier
  * (security_id, not to be confused with a SID). The security_id is unique for
  * the NTFS volume and is used as an index into the $SII index, which maps
@@ -1674,12 +1699,12 @@ typedef SECURITY_DESCRIPTOR_RELATIVE SECURITY_DESCRIPTOR_ATTR;
  * new security descriptor is already present in the $SDS data stream), if a
  * matching hash is found, but the security descriptors do not match, the
  * search in the $SDH index is continued, searching for a next matching hash.
- * 
+ *
  * When a precise match is found, the security_id coresponding to the security
  * descriptor in the $SDS attribute is read from the found $SDH index entry and
  * is stored in the $STANDARD_INFORMATION attribute of the file/directory to
  * which the security descriptor is being applied. The $STANDARD_INFORMATION
- * attribute is present in all base mft records (i.e. in all files and 
+ * attribute is present in all base mft records (i.e. in all files and
  * directories).
  *
  * If a match is not found, the security descriptor is assigned a new unique
@@ -1690,7 +1715,7 @@ typedef SECURITY_DESCRIPTOR_RELATIVE SECURITY_DESCRIPTOR_ATTR;
  * Note: Entries are never deleted from FILE_Secure, even if nothing
  * references an entry any more.
  */
- 
+
 /*
  * This header precedes each security descriptor in the $SDS data stream.
  * This is also the index entry data part of both the $SII and $SDH indexes.
@@ -1727,7 +1752,7 @@ typedef struct {
 
 /*
  * The index entry key used in the $SII index. The collation type is
- * COLLATION_NTOFS_ULONG. 
+ * COLLATION_NTOFS_ULONG.
  */
 typedef struct {
 	u32 security_id; /* The security_id assigned to the descriptor. */
@@ -1745,7 +1770,7 @@ typedef struct {
 
 /*
  * Attribute: Volume name (0x60).
- * 
+ *
  * NOTE: Always resident.
  * NOTE: Present only in FILE_Volume.
  */
@@ -1759,7 +1784,7 @@ typedef struct {
 typedef enum {
 	VOLUME_IS_DIRTY			= const_cpu_to_le16(0x0001),
 	VOLUME_RESIZE_LOG_FILE		= const_cpu_to_le16(0x0002),
-	VOLUME_UPGRADE_ON_MOUNT 	= const_cpu_to_le16(0x0004),
+	VOLUME_UPGRADE_ON_MOUNT		= const_cpu_to_le16(0x0004),
 	VOLUME_MOUNTED_ON_NT4		= const_cpu_to_le16(0x0008),
 	VOLUME_DELETE_USN_UNDERWAY	= const_cpu_to_le16(0x0010),
 	VOLUME_REPAIR_OBJECT_ID		= const_cpu_to_le16(0x0020),
@@ -1773,7 +1798,7 @@ typedef enum {
  * NOTE: Always resident.
  * NOTE: Present only in FILE_Volume.
  * NOTE: Windows 2000 uses NTFS 3.0 while Windows NT4 service pack 6a uses
- * 	 NTFS 1.2. I haven't personally seen other values yet.
+ *	 NTFS 1.2. I haven't personally seen other values yet.
  */
 typedef struct {
 	u64 reserved;		/* Not used (yet?). */
@@ -1809,7 +1834,7 @@ typedef enum {
 	 * allocation attribute:
 	 */
 	LEAF_NODE	= 0, /* This is a leaf node, i.e. there are no more
-			        nodes branching off it. */
+				nodes branching off it. */
 	INDEX_NODE	= 1, /* This node indexes other nodes, i.e. is not a
 				leaf node. */
 	NODE_MASK	= 1, /* Mask for accessing the *_NODE bits. */
@@ -1876,7 +1901,7 @@ typedef struct {
 					   the index allocation attribute), when
 					   an index block is >= than a cluster,
 					   otherwise this will be the log of
-					   the size (like how the encoding of 
+					   the size (like how the encoding of
 					   the mft record size and the index
 					   record size found in the boot sector
 					   work). Has to be a power of 2. */
@@ -1889,7 +1914,7 @@ typedef struct {
  * Attribute: Index allocation (0xa0).
  *
  * NOTE: Always non-resident (doesn't make sense to be resident anyway!).
- * 
+ *
  * This is an array of index blocks. Each index block starts with an
  * INDEX_BLOCK structure containing an index header, followed by a sequence of
  * index entries (INDEX_ENTRY structures), as described by the INDEX_HEADER.
@@ -1967,7 +1992,7 @@ typedef enum {
  *
  * The $Q index contains one entry for each existing user_id on the volume. The
  * index key is the user_id of the user/group owning this quota control entry,
- * i.e. the key is the owner_id. The user_id of the owner of a file, i.e. the 
+ * i.e. the key is the owner_id. The user_id of the owner of a file, i.e. the
  * owner_id, is found in the standard information attribute. The collation rule
  * for $Q is COLLATION_NTOFS_ULONG.
  *
@@ -2143,9 +2168,9 @@ typedef struct {
  *    They are defined as follows:
  *	bit 29: Name surrogate bit. If set, the filename is an alias for
  *		another object in the system.
- * 	bit 30: High-latency bit. If set, accessing the first byte of data will
+ *	bit 30: High-latency bit. If set, accessing the first byte of data will
  *		be slow. (E.g. the data is stored on a tape drive.)
- * 	bit 31: Microsoft bit. If set, the tag is owned by Microsoft. User
+ *	bit 31: Microsoft bit. If set, the tag is owned by Microsoft. User
  *		defined tags have to use zero here.
  */
 typedef enum {
@@ -2211,8 +2236,8 @@ typedef enum {
  * Attribute: Extended attribute (EA) (0xe0).
  *
  * NOTE: Always non-resident. (Is this true?)
- * 
- * Like the attribute list and the index buffer list, the EA attribute value is 
+ *
+ * Like the attribute list and the index buffer list, the EA attribute value is
  * a sequence of EA_ATTR variable length records.
  *
  * FIXME: It appears weird that the EA name is not unicode. Is it true?

@@ -116,6 +116,7 @@ typedef enum {
 				      create filenames in the POSIX namespace.
 				      Otherwise be case insensitive and create
 				      file names in WIN32 namespace. */
+	NV_LogFileEmpty,	/* 1: $LogFile journal is empty. */
 } ntfs_volume_flags;
 
 /*
@@ -140,5 +141,6 @@ static inline void NVolClear##flag(ntfs_volume *vol)	\
 NVOL_FNS(Errors)
 NVOL_FNS(ShowSystemFiles)
 NVOL_FNS(CaseSensitive)
+NVOL_FNS(LogFileEmpty)
 
 #endif /* _LINUX_NTFS_VOLUME_H */
