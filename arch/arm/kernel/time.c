@@ -178,7 +178,7 @@ static int __init leds_init(void)
 	int ret;
 	ret = sysdev_class_register(&leds_sysclass);
 	if (ret == 0)
-		ret = sys_device_register(&leds_device);
+		ret = sysdev_register(&leds_device);
 	return ret;
 }
 
