@@ -2574,6 +2574,13 @@ static int bond_xmit_xor(struct sk_buff *skb, struct net_device *dev)
 		return 0;
 	}
 
+	if (bond->slave_cnt == 0) {
+		/* no slaves in the bond, frame not sent */
+		dev_kfree_skb(skb);
+		read_unlock_irqrestore(&bond->lock, flags);
+		return 0;
+	}
+	
 	slave_no = (data->h_dest[5]^slave->dev->dev_addr[5]) % bond->slave_cnt;
 
 	while ( (slave_no > 0) && (slave != (slave_t *)bond) ) {
