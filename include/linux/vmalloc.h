@@ -1,7 +1,6 @@
 #ifndef __LINUX_VMALLOC_H
 #define __LINUX_VMALLOC_H
 
-#include <linux/mm.h>
 #include <linux/spinlock.h>
 
 #include <asm/pgtable.h>

@@ -7,6 +7,8 @@
 #include <linux/thread_info.h>
 #include <linux/kernel.h>
 
+#include <asm/system.h>
+
 /*
  * These are the generic versions of the spinlocks and read-write
  * locks..
