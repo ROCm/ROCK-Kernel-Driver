@@ -444,6 +444,12 @@ static int psmouse_extensions(struct psmouse *psmouse,
 			return type;
 	}
 
+/*
+ * Reset to defaults in case the device got confused by extended
+ * protocol probes.
+ */
+	ps2_command(&psmouse->ps2dev, NULL, PSMOUSE_CMD_RESET_DIS);
+
 	if (max_proto >= PSMOUSE_IMEX && im_explorer_detect(psmouse)) {
 
 		if (set_properties) {
@@ -552,7 +558,11 @@ static void psmouse_set_rate(struct psmouse *psmouse, unsigned int rate)
 
 static void psmouse_initialize(struct psmouse *psmouse)
 {
-	unsigned char param[2];
+/*
+ * We set the mouse into streaming mode.
+ */
+
+	ps2_command(&psmouse->ps2dev, NULL, PSMOUSE_CMD_SETSTREAM);
 
 /*
  * We set the mouse report rate, resolution and scaling.
@@ -563,12 +573,6 @@ static void psmouse_initialize(struct psmouse *psmouse)
 		psmouse->set_resolution(psmouse, psmouse->resolution);
 		ps2_command(&psmouse->ps2dev, NULL, PSMOUSE_CMD_SETSCALE11);
 	}
-
-/*
- * We set the mouse into streaming mode.
- */
-
-	ps2_command(&psmouse->ps2dev, param, PSMOUSE_CMD_SETSTREAM);
 }
 
 /*
