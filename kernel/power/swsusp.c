@@ -869,6 +869,30 @@ static void suspend_power_down(void)
 	/* NOTREACHED */
 }
 
+
+static void suspend_finish(void)
+{
+	spin_lock_irq(&suspend_pagedir_lock);	/* Done to disable interrupts */ 
+
+	free_pages((unsigned long) pagedir_nosave, pagedir_order);
+	spin_unlock_irq(&suspend_pagedir_lock);
+
+#ifdef CONFIG_HIGHMEM
+	printk( "Restoring highmem\n" );
+	restore_highmem();
+#endif
+	device_resume();
+	PRINTK( "Fixing swap signatures... " );
+	mark_swapfiles(((swp_entry_t) {0}), MARK_SWAP_RESUME);
+	PRINTK( "ok\n" );
+
+#ifdef SUSPEND_CONSOLE
+	acquire_console_sem();
+	update_screen(fg_console);
+	release_console_sem();
+#endif
+}
+
 /*
  * Magic happens here
  */
@@ -892,30 +916,8 @@ asmlinkage void do_magic_resume_2(void)
 	BUG_ON (pagedir_order_check != pagedir_order);
 
 	__flush_tlb_global();		/* Even mappings of "global" things (vmalloc) need to be fixed */
-
-	PRINTK( "Freeing prev allocated pagedir\n" );
-	free_suspend_pagedir((unsigned long) pagedir_save);
-
-#ifdef CONFIG_HIGHMEM
-	printk( "Restoring highmem\n" );
-	restore_highmem();
-#endif
-	printk("done, devices\n");
-
 	device_power_up();
 	spin_unlock_irq(&suspend_pagedir_lock);
-	device_resume();
-
-	/* Fixme: this is too late; we should do this ASAP to avoid "infinite reboots" problem */
-	PRINTK( "Fixing swap signatures... " );
-	mark_swapfiles(((swp_entry_t) {0}), MARK_SWAP_RESUME);
-	PRINTK( "ok\n" );
-
-#ifdef SUSPEND_CONSOLE
-	acquire_console_sem();
-	update_screen(fg_console);
-	release_console_sem();
-#endif
 }
 
 /* do_magic() is implemented in arch/?/kernel/suspend_asm.S, and basically does:
@@ -964,15 +966,6 @@ asmlinkage void do_magic_suspend_2(void)
 
 	barrier();
 	mb();
-	spin_lock_irq(&suspend_pagedir_lock);	/* Done to disable interrupts */ 
-
-	free_pages((unsigned long) pagedir_nosave, pagedir_order);
-	spin_unlock_irq(&suspend_pagedir_lock);
-
-	device_resume();
-	PRINTK( "Fixing swap signatures... " );
-	mark_swapfiles(((swp_entry_t) {0}), MARK_SWAP_RESUME);
-	PRINTK( "ok\n" );
 }
 
 /*
@@ -1015,6 +1008,7 @@ int software_suspend(void)
 			 * using normal kernel mechanism.
 			 */
 			do_magic(0);
+			suspend_finish();
 		}
 		thaw_processes();
 		enable_nonboot_cpus();
