@@ -280,13 +280,13 @@ static struct rfcomm_dlc *rfcomm_dlc_get(struct rfcomm_session *s, u8 dlci)
 static int __rfcomm_dlc_open(struct rfcomm_dlc *d, bdaddr_t *src, bdaddr_t *dst, u8 channel)
 {
 	struct rfcomm_session *s;
-	u8 dlci = __dlci(0, channel);
 	int err = 0;
+	u8 dlci;
 
-	BT_DBG("dlc %p state %ld %s %s channel %d dlci %d", 
-			d, d->state, batostr(src), batostr(dst), channel, dlci);
+	BT_DBG("dlc %p state %ld %s %s channel %d", 
+			d, d->state, batostr(src), batostr(dst), channel);
 
-	if (dlci < 1 || dlci > 62)
+	if (channel < 1 || channel > 30)
 		return -EINVAL;
 
 	if (d->state != BT_OPEN && d->state != BT_CLOSED)
@@ -298,6 +298,8 @@ static int __rfcomm_dlc_open(struct rfcomm_dlc *d, bdaddr_t *src, bdaddr_t *dst,
 		if (!s)
 			return err;
 	}
+
+	dlci = __dlci(!s->initiator, channel);
 
 	/* Check if DLCI already exists */
 	if (rfcomm_dlc_get(s, dlci))
@@ -715,7 +717,7 @@ static int rfcomm_send_nsc(struct rfcomm_session *s, int cr, u8 type)
 	hdr->len  = __len8(sizeof(*mcc) + 1);
 
 	mcc = (void *) ptr; ptr += sizeof(*mcc);
-	mcc->type = __mcc_type(s->initiator, RFCOMM_NSC);
+	mcc->type = __mcc_type(cr, RFCOMM_NSC);
 	mcc->len  = __len8(1);
 
 	/* Type that we didn't like */
@@ -741,7 +743,7 @@ static int rfcomm_send_pn(struct rfcomm_session *s, int cr, struct rfcomm_dlc *d
 	hdr->len  = __len8(sizeof(*mcc) + sizeof(*pn));
 
 	mcc = (void *) ptr; ptr += sizeof(*mcc);
-	mcc->type = __mcc_type(s->initiator, RFCOMM_PN);
+	mcc->type = __mcc_type(cr, RFCOMM_PN);
 	mcc->len  = __len8(sizeof(*pn));
 
 	pn = (void *) ptr; ptr += sizeof(*pn);
