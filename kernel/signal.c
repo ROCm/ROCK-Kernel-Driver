@@ -752,7 +752,7 @@ out_set:
 static int
 specific_send_sig_info(int sig, struct siginfo *info, struct task_struct *t)
 {
-	int ret;
+	int ret = 0;
 
 	if (!irqs_disabled())
 		BUG();
@@ -1346,7 +1346,6 @@ do_notify_parent_cldstop(struct task_struct *tsk, struct task_struct *parent)
 static void
 finish_stop(int stop_count)
 {
-	int ret;
 	/*
 	 * If there are no other threads in the group, or if there is
 	 * a group stop in progress and we are the last to stop,
