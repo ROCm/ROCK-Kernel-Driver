@@ -101,15 +101,14 @@ static int newque (key_t key, int msgflg)
 	msq->q_perm.key = key;
 
 	msq->q_perm.security = NULL;
-	retval = security_ops->msg_queue_alloc_security(msq);
-	if (retval) {
+	if ((retval = security_msg_queue_alloc(msq))) {
 		ipc_rcu_free(msq, sizeof(*msq));
 		return retval;
 	}
 
 	id = ipc_addid(&msg_ids, &msq->q_perm, msg_ctlmni);
 	if(id == -1) {
-		security_ops->msg_queue_free_security(msq);
+		security_msg_queue_free(msq);
 		ipc_rcu_free(msq, sizeof(*msq));
 		return -ENOSPC;
 	}
@@ -281,7 +280,7 @@ static void freeque (int id)
 		free_msg(msg);
 	}
 	atomic_sub(msq->q_cbytes, &msg_bytes);
-	security_ops->msg_queue_free_security(msq);
+	security_msg_queue_free(msq);
 	ipc_rcu_free(msq, sizeof(struct msg_queue));
 }
 

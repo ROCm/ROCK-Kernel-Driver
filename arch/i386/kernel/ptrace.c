@@ -160,8 +160,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		/* are we already being traced? */
 		if (current->ptrace & PT_PTRACED)
 			goto out;
-		ret = security_ops->ptrace(current->parent, current);
-		if (ret)
+		if ((ret = security_ptrace(current->parent, current)))
 			goto out;
 		/* set the ptrace bit in the process flags. */
 		current->ptrace |= PT_PTRACED;

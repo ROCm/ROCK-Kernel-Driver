@@ -38,8 +38,7 @@ int vfs_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat)
 	struct inode *inode = dentry->d_inode;
 	int retval;
 
-	retval = security_ops->inode_getattr(mnt, dentry);
-	if (retval)
+	if ((retval = security_inode_getattr(mnt, dentry)))
 		return retval;
 
 	if (inode->i_op->getattr)
@@ -242,8 +241,7 @@ asmlinkage long sys_readlink(const char * path, char * buf, int bufsiz)
 
 		error = -EINVAL;
 		if (inode->i_op && inode->i_op->readlink) {
-			error = security_ops->inode_readlink(nd.dentry);
-			if (!error) {
+			if (!(error = security_inode_readlink(nd.dentry))) {
 				UPDATE_ATIME(inode);
 				error = inode->i_op->readlink(nd.dentry, buf, bufsiz);
 			}

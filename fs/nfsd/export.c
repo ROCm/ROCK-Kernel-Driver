@@ -21,6 +21,7 @@
 #include <linux/in.h>
 #include <linux/seq_file.h>
 #include <linux/rwsem.h>
+#include <linux/dcache.h>
 #include <linux/namei.h>
 #include <linux/mount.h>
 

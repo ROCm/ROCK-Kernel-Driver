@@ -617,7 +617,7 @@ sys_call_table:
 	.long  SYSCALL(sys_futex,sys32_futex_wrapper)
 	.long  SYSCALL(sys_sched_setaffinity,sys32_sched_setaffinity_wrapper)
 	.long  SYSCALL(sys_sched_getaffinity,sys32_sched_getaffinity_wrapper) /* 240 */
-	.long  SYSCALL(sys_security,sys_ni_syscall)
+	.long  SYSCALL(sys_ni_syscall,sys_ni_syscall)
 	.long  SYSCALL(sys_ni_syscall,sys_ni_syscall) /* reserved for TUX */
 	.long  SYSCALL(sys_io_setup,sys_ni_syscall)
 	.long  SYSCALL(sys_io_destroy,sys_ni_syscall)

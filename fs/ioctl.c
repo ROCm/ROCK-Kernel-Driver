@@ -59,8 +59,7 @@ asmlinkage long sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 		goto out;
 	error = 0;
 
-	error = security_ops->file_ioctl(filp, cmd, arg);
-        if (error) {
+	if ((error = security_file_ioctl(filp, cmd, arg))) {
                 fput(filp);
                 goto out;
         }
