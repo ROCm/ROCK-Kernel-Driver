@@ -136,6 +136,10 @@ enum arq_state {
 				   scheduler */
 	AS_RQ_DISPATCHED,	/* On the dispatch list. It belongs to the
 				   driver now */
+	AS_RQ_PRESCHED,		/* Debug poisoning for requests being used */
+	AS_RQ_REMOVED,
+	AS_RQ_MERGED,
+	AS_RQ_POSTSCHED,	/* when they shouldn't be */
 };
 
 struct as_rq {
@@ -893,12 +897,22 @@ static void as_completed_request(request_queue_t *q, struct request *rq)
 {
 	struct as_data *ad = q->elevator.elevator_data;
 	struct as_rq *arq = RQ_DATA(rq);
-	struct as_io_context *aic;
 
 	WARN_ON(!list_empty(&rq->queuelist));
 
-	if (unlikely(arq->state != AS_RQ_DISPATCHED))
-		return;
+	if (arq->state == AS_RQ_PRESCHED) {
+		WARN_ON(arq->io_context);
+		goto out;
+	}
+
+	if (arq->state == AS_RQ_MERGED)
+		goto out_ioc;
+
+	if (arq->state != AS_RQ_REMOVED) {
+		printk("arq->state %d\n", arq->state);
+		WARN_ON(1);
+		goto out;
+	}
 
 	if (!blk_fs_request(rq))
 		return;
@@ -925,10 +939,7 @@ static void as_completed_request(request_queue_t *q, struct request *rq)
 		ad->new_batch = 0;
 	}
 
-	if (!arq->io_context)
-		return;
-
-	if (ad->io_context == arq->io_context) {
+	if (ad->io_context == arq->io_context && ad->io_context) {
 		ad->antic_start = jiffies;
 		ad->ioc_finished = 1;
 		if (ad->antic_status == ANTIC_WAIT_REQ) {
@@ -940,18 +951,23 @@ static void as_completed_request(request_queue_t *q, struct request *rq)
 		}
 	}
 
-	aic = arq->io_context->aic;
-	if (!aic)
-		return;
+out_ioc:
+	if (!arq->io_context)
+		goto out;
 
-	spin_lock(&aic->lock);
 	if (arq->is_sync == REQ_SYNC) {
-		set_bit(AS_TASK_IORUNNING, &aic->state);
-		aic->last_end_request = jiffies;
+		struct as_io_context *aic = arq->io_context->aic;
+		if (aic) {
+			spin_lock(&aic->lock);
+			set_bit(AS_TASK_IORUNNING, &aic->state);
+			aic->last_end_request = jiffies;
+			spin_unlock(&aic->lock);
+		}
 	}
-	spin_unlock(&aic->lock);
 
 	put_io_context(arq->io_context);
+out:
+	arq->state = AS_RQ_POSTSCHED;
 }
 
 /*
@@ -1020,14 +1036,14 @@ static void as_remove_request(request_queue_t *q, struct request *rq)
 	struct as_rq *arq = RQ_DATA(rq);
 
 	if (unlikely(arq->state == AS_RQ_NEW))
-		return;
-
-	if (!arq) {
-		WARN_ON(1);
-		return;
-	}
+		goto out;
 
 	if (ON_RB(&arq->rb_node)) {
+		if (arq->state != AS_RQ_QUEUED) {
+			printk("arq->state %d\n", arq->state);
+			WARN_ON(1);
+			goto out;
+		}
 		/*
 		 * We'll lose the aliased request(s) here. I don't think this
 		 * will ever happen, but if it does, hopefully someone will
@@ -1035,8 +1051,16 @@ static void as_remove_request(request_queue_t *q, struct request *rq)
 		 */
 		WARN_ON(!list_empty(&rq->queuelist));
 		as_remove_queued_request(q, rq);
-	} else
+	} else {
+		if (arq->state != AS_RQ_DISPATCHED) {
+			printk("arq->state %d\n", arq->state);
+			WARN_ON(1);
+			goto out;
+		}
 		as_remove_dispatched_request(q, rq);
+	}
+out:
+	arq->state = AS_RQ_REMOVED;
 }
 
 /*
@@ -1214,9 +1238,9 @@ static int as_dispatch_request(struct as_data *ad)
 			 */
 			goto dispatch_writes;
 
- 		if (ad->batch_data_dir == REQ_ASYNC) {
+		if (ad->batch_data_dir == REQ_ASYNC) {
 			WARN_ON(ad->new_batch);
- 			ad->changed_batch = 1;
+			ad->changed_batch = 1;
 		}
 		ad->batch_data_dir = REQ_SYNC;
 		arq = list_entry_fifo(ad->fifo_list[ad->batch_data_dir].next);
@@ -1232,8 +1256,8 @@ static int as_dispatch_request(struct as_data *ad)
 dispatch_writes:
 		BUG_ON(RB_EMPTY(&ad->sort_list[REQ_ASYNC]));
 
- 		if (ad->batch_data_dir == REQ_SYNC) {
- 			ad->changed_batch = 1;
+		if (ad->batch_data_dir == REQ_SYNC) {
+			ad->changed_batch = 1;
 
 			/*
 			 * new_batch might be 1 when the queue runs out of
@@ -1276,8 +1300,6 @@ fifo_expired:
 			ad->new_batch = 1;
 
 		ad->changed_batch = 0;
-
-//		arq->request->flags |= REQ_SOFTBARRIER;
 	}
 
 	/*
@@ -1402,6 +1424,11 @@ static void as_requeue_request(request_queue_t *q, struct request *rq)
 	struct as_rq *arq = RQ_DATA(rq);
 
 	if (arq) {
+		if (arq->state != AS_RQ_REMOVED) {
+			printk("arq->state %d\n", arq->state);
+			WARN_ON(1);
+		}
+
 		arq->state = AS_RQ_DISPATCHED;
 		if (arq->io_context && arq->io_context->aic)
 			atomic_inc(&arq->io_context->aic->nr_dispatched);
@@ -1421,12 +1448,18 @@ as_insert_request(request_queue_t *q, struct request *rq, int where)
 	struct as_data *ad = q->elevator.elevator_data;
 	struct as_rq *arq = RQ_DATA(rq);
 
-#if 0
+	if (arq) {
+		if (arq->state != AS_RQ_PRESCHED) {
+			printk("arq->state: %d\n", arq->state);
+			WARN_ON(1);
+		}
+		arq->state = AS_RQ_NEW;
+	}
+
 	/* barriers must flush the reorder queue */
 	if (unlikely(rq->flags & (REQ_SOFTBARRIER | REQ_HARDBARRIER)
 			&& where == ELEVATOR_INSERT_SORT))
 		where = ELEVATOR_INSERT_BACK;
-#endif
 
 	switch (where) {
 		case ELEVATOR_INSERT_BACK:
@@ -1661,7 +1694,8 @@ as_merged_requests(request_queue_t *q, struct request *req,
 	 * kill knowledge of next, this one is a goner
 	 */
 	as_remove_queued_request(q, next);
-	put_io_context(anext->io_context);
+
+	anext->state = AS_RQ_MERGED;
 }
 
 /*
@@ -1694,6 +1728,11 @@ static void as_put_request(request_queue_t *q, struct request *rq)
 		return;
 	}
 
+	if (arq->state != AS_RQ_POSTSCHED) {
+		printk("arq->state %d\n", arq->state);
+		WARN_ON(1);
+	}
+
 	mempool_free(arq, ad->arq_pool);
 	rq->elevator_private = NULL;
 }
@@ -1707,7 +1746,7 @@ static int as_set_request(request_queue_t *q, struct request *rq, int gfp_mask)
 		memset(arq, 0, sizeof(*arq));
 		RB_CLEAR(&arq->rb_node);
 		arq->request = rq;
-		arq->state = AS_RQ_NEW;
+		arq->state = AS_RQ_PRESCHED;
 		arq->io_context = NULL;
 		INIT_LIST_HEAD(&arq->hash);
 		arq->on_hash = 0;
