@@ -121,7 +121,7 @@ MODULE_PARM(memsize,     "1-4i");
 MODULE_PARM(altpin,      "1-4i");
 MODULE_PARM(numports,    "1-4i");
 
-#endif MODULE
+#endif /* MODULE */
 
 static int numcards = 1;
 static int nbdevs = 0;
