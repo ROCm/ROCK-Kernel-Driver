@@ -9,12 +9,8 @@
 #ifdef __KERNEL__
 #include <linux/config.h>
 
-/* Be sure to change arch/ppc/Makefile to match */
-#ifdef CONFIG_KERNEL_START_BOOL
+/* This must match what is in arch/ppc/Makefile */
 #define PAGE_OFFSET	CONFIG_KERNEL_START
-#else
-#define PAGE_OFFSET	0xc0000000
-#endif /* CONFIG_KERNEL_START_BOOL */
 #define KERNELBASE	PAGE_OFFSET
 
 #ifndef __ASSEMBLY__
