@@ -511,7 +511,9 @@ xfs_dir2_leafn_lookup_int(
 				/*
 				 * If it has room, return it.
 				 */
-				if (INT_GET(free->bests[fi], ARCH_CONVERT) == NULLDATAOFF) {
+				if (unlikely(INT_GET(free->bests[fi], ARCH_CONVERT) == NULLDATAOFF)) {
+					XFS_ERROR_REPORT("xfs_dir2_leafn_lookup_int",
+							 XFS_ERRLEVEL_LOW, mp);
 					return XFS_ERROR(EFSCORRUPTED);
 				}
 				if (INT_GET(free->bests[fi], ARCH_CONVERT) >= length) {

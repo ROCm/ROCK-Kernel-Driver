@@ -98,7 +98,10 @@ xfs_dir2_block_addname(
 	/*
 	 * Check the magic number, corrupted if wrong.
 	 */
-	if (INT_GET(block->hdr.magic, ARCH_CONVERT) != XFS_DIR2_BLOCK_MAGIC) {
+	if (unlikely(INT_GET(block->hdr.magic, ARCH_CONVERT)
+						!= XFS_DIR2_BLOCK_MAGIC)) {
+		XFS_CORRUPTION_ERROR("xfs_dir2_block_addname",
+				     XFS_ERRLEVEL_LOW, mp, block);
 		xfs_da_brelse(tp, bp);
 		return XFS_ERROR(EFSCORRUPTED);
 	}

@@ -35,8 +35,8 @@
 #include <linux/proc_fs.h>
 
 
-STATIC ulong xfs_min[XFS_PARAM] = { 0, 0, 0, 0, 0 };
-STATIC ulong xfs_max[XFS_PARAM] = { 1, 1, 1, 1, 127 };
+STATIC ulong xfs_min[XFS_PARAM] = { 0, 0, 0, 0, 0,   0 };
+STATIC ulong xfs_max[XFS_PARAM] = { 1, 1, 1, 1, 127, 3 };
 
 static struct ctl_table_header *xfs_table_header;
 
@@ -86,6 +86,10 @@ STATIC ctl_table xfs_table[] = {
 	{XFS_PANIC_MASK, "panic_mask", &xfs_params.panic_mask,
 	sizeof(ulong), 0644, NULL, &proc_doulongvec_minmax,
 	&sysctl_intvec, NULL, &xfs_min[6], &xfs_max[6]},
+
+	{XFS_ERRLEVEL, "error_level", &xfs_params.error_level,
+	sizeof(ulong), 0644, NULL, &proc_doulongvec_minmax,
+	&sysctl_intvec, NULL, &xfs_min[7], &xfs_max[7]},
 
 	{0}
 };

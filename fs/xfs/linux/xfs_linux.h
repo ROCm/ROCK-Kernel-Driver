@@ -73,6 +73,7 @@
 #define irix_sgid_inherit	xfs_params.sgid_inherit
 #define irix_symlink_mode	xfs_params.symlink_mode
 #define xfs_panic_mask		xfs_params.panic_mask
+#define xfs_error_level		xfs_params.error_level
 
 typedef struct xfs_dirent {		/* data from readdir() */
 	xfs_ino_t	d_ino;		/* inode number of entry */

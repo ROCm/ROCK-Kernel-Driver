@@ -455,9 +455,13 @@ xfs_attr_shortform_list(xfs_attr_list_context_t *context)
 	nsbuf = 0;
 	for (i = 0, sfe = &sf->list[0];
 			i < INT_GET(sf->hdr.count, ARCH_CONVERT); i++) {
-		if (((char *)sfe < (char *)sf) ||
+		if (unlikely(
+		    ((char *)sfe < (char *)sf) ||
 		    ((char *)sfe >= ((char *)sf + dp->i_afp->if_bytes)) ||
-		    (sfe->namelen >= MAXNAMELEN)) {
+		    (sfe->namelen >= MAXNAMELEN))) {
+			XFS_CORRUPTION_ERROR("xfs_attr_shortform_list",
+					     XFS_ERRLEVEL_LOW,
+					     context->dp->i_mount, sfe);
 			xfs_attr_trace_l_c("sf corrupted", context);
 			kmem_free(sbuf, sbsize);
 			return XFS_ERROR(EFSCORRUPTED);

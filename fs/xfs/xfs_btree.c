@@ -190,15 +190,12 @@ xfs_btree_check_lblock(
 		!INT_ISZERO(block->bb_rightsib, ARCH_CONVERT) &&
 		(INT_GET(block->bb_rightsib, ARCH_CONVERT) == NULLDFSBNO ||
 		 XFS_FSB_SANITY_CHECK(mp, INT_GET(block->bb_rightsib, ARCH_CONVERT)));
-	if (XFS_TEST_ERROR(!lblock_ok, mp, XFS_ERRTAG_BTREE_CHECK_LBLOCK,
-			XFS_RANDOM_BTREE_CHECK_LBLOCK)) {
+	if (unlikely(XFS_TEST_ERROR(!lblock_ok, mp, XFS_ERRTAG_BTREE_CHECK_LBLOCK,
+			XFS_RANDOM_BTREE_CHECK_LBLOCK))) {
 		if (bp)
 			xfs_buftrace("LBTREE ERROR", bp);
-#ifdef __KERNEL__	/* additional, temporary, debugging code */
-		cmn_err(CE_NOTE,
-			"EFSCORRUPTED returned from file %s line %d",
-			__FILE__, __LINE__);
-#endif
+		XFS_ERROR_REPORT("xfs_btree_check_lblock", XFS_ERRLEVEL_LOW,
+				 mp);
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 	return 0;
@@ -312,22 +309,13 @@ xfs_btree_check_sblock(
 		(INT_GET(block->bb_rightsib, ARCH_CONVERT) == NULLAGBLOCK ||
 		 INT_GET(block->bb_rightsib, ARCH_CONVERT) < agflen) &&
 		!INT_ISZERO(block->bb_rightsib, ARCH_CONVERT);
-	if (XFS_TEST_ERROR(!sblock_ok, cur->bc_mp,
+	if (unlikely(XFS_TEST_ERROR(!sblock_ok, cur->bc_mp,
 			XFS_ERRTAG_BTREE_CHECK_SBLOCK,
-			XFS_RANDOM_BTREE_CHECK_SBLOCK)) {
+			XFS_RANDOM_BTREE_CHECK_SBLOCK))) {
 		if (bp)
 			xfs_buftrace("SBTREE ERROR", bp);
-#ifdef __KERNEL__	/* additional, temporary, debugging code */
-		cmn_err(CE_NOTE,
-			"xfs_btree_check_sblock: Not OK:");
-		cmn_err(CE_NOTE,
-			"magic 0x%x level %d numrecs %d leftsib %d rightsib %d",
-			INT_GET(block->bb_magic, ARCH_CONVERT),
-			INT_GET(block->bb_level, ARCH_CONVERT),
-			INT_GET(block->bb_numrecs, ARCH_CONVERT),
-			INT_GET(block->bb_leftsib, ARCH_CONVERT),
-			INT_GET(block->bb_rightsib, ARCH_CONVERT));
-#endif
+		XFS_ERROR_REPORT("xfs_btree_check_sblock", XFS_ERRLEVEL_LOW,
+				 cur->bc_mp);
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 	return 0;

@@ -4390,12 +4390,14 @@ xfs_bmap_read_extents(
 
 
 		num_recs = INT_GET(block->bb_numrecs, ARCH_CONVERT);
-		if (i + num_recs > room) {
+		if (unlikely(i + num_recs > room)) {
 			ASSERT(i + num_recs <= room);
 			xfs_fs_cmn_err(CE_WARN, ip->i_mount,
-				"corrupt dinode %Lu, (btree extents).  "
-				"Unmount and run xfs_repair.",
+				"corrupt dinode %Lu, (btree extents).  Unmount and run xfs_repair.",
 				(unsigned long long) ip->i_ino);
+			XFS_ERROR_REPORT("xfs_bmap_read_extents(1)",
+					 XFS_ERRLEVEL_LOW,
+					ip->i_mount);
 			goto error0;
 		}
 		XFS_WANT_CORRUPTED_GOTO(
@@ -4423,7 +4425,10 @@ xfs_bmap_read_extents(
 			 * any "older" data bmap btree records for a
 			 * set bit in the "extent flag" position.
 			 */
-			if (xfs_check_nostate_extents(temp, num_recs)) {
+			if (unlikely(xfs_check_nostate_extents(temp, num_recs))) {
+				XFS_ERROR_REPORT("xfs_bmap_read_extents(2)",
+						 XFS_ERRLEVEL_LOW,
+						 ip->i_mount);
 				goto error0;
 			}
 		}
@@ -4600,12 +4605,15 @@ xfs_bmapi(
 	ASSERT(*nmap <= XFS_BMAP_MAX_NMAP || !(flags & XFS_BMAPI_WRITE));
 	whichfork = (flags & XFS_BMAPI_ATTRFORK) ?
 		XFS_ATTR_FORK : XFS_DATA_FORK;
-	if (XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_EXTENTS &&
-	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE &&
-	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_LOCAL) {
+	mp = ip->i_mount;
+	if (unlikely(XFS_TEST_ERROR(
+	    (XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_EXTENTS &&
+	     XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE &&
+	     XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_LOCAL),
+	     mp, XFS_ERRTAG_BMAPIFORMAT, XFS_RANDOM_BMAPIFORMAT))) {
+		XFS_ERROR_REPORT("xfs_bmapi", XFS_ERRLEVEL_LOW, mp);
 		return XFS_ERROR(EFSCORRUPTED);
 	}
-	mp = ip->i_mount;
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
 	ifp = XFS_IFORK_PTR(ip, whichfork);
@@ -5096,8 +5104,11 @@ xfs_bmapi_single(
 	xfs_bmbt_irec_t prev;		/* previous extent list record */
 
 	ifp = XFS_IFORK_PTR(ip, whichfork);
-	if (XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE &&
-	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_EXTENTS) {
+	if (unlikely(
+	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE &&
+	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_EXTENTS)) {
+	       XFS_ERROR_REPORT("xfs_bmapi_single", XFS_ERRLEVEL_LOW,
+				ip->i_mount);
 	       return XFS_ERROR(EFSCORRUPTED);
 	}
 	if (XFS_FORCED_SHUTDOWN(ip->i_mount))
@@ -5168,8 +5179,11 @@ xfs_bunmapi(
 	whichfork = (flags & XFS_BMAPI_ATTRFORK) ?
 		XFS_ATTR_FORK : XFS_DATA_FORK;
 	ifp = XFS_IFORK_PTR(ip, whichfork);
-	if (XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_EXTENTS &&
-	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE) {
+	if (unlikely(
+	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_EXTENTS &&
+	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE)) {
+		XFS_ERROR_REPORT("xfs_bunmapi", XFS_ERRLEVEL_LOW,
+				 ip->i_mount);
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 	mp = ip->i_mount;
@@ -5554,11 +5568,11 @@ xfs_getbmap(
 			    ip->i_d.di_aformat != XFS_DINODE_FMT_BTREE &&
 			    ip->i_d.di_aformat != XFS_DINODE_FMT_LOCAL)
 				return XFS_ERROR(EINVAL);
-		} else if (ip->i_d.di_aformat != 0 &&
-			   ip->i_d.di_aformat != XFS_DINODE_FMT_EXTENTS) {
-			cmn_err(CE_NOTE,
-				"EFSCORRUPTED returned from file %s line %d",
-				__FILE__, __LINE__);
+		} else if (unlikely(
+		           ip->i_d.di_aformat != 0 &&
+			   ip->i_d.di_aformat != XFS_DINODE_FMT_EXTENTS)) {
+			XFS_ERROR_REPORT("xfs_getbmap", XFS_ERRLEVEL_LOW,
+					 ip->i_mount);
 			return XFS_ERROR(EFSCORRUPTED);
 		}
 	} else if (ip->i_d.di_format != XFS_DINODE_FMT_EXTENTS &&
@@ -6106,12 +6120,11 @@ xfs_bmap_count_blocks(
 	mp = ip->i_mount;
 	ifp = XFS_IFORK_PTR(ip, whichfork);
 	if ( XFS_IFORK_FORMAT(ip, whichfork) == XFS_DINODE_FMT_EXTENTS ) {
-		if (xfs_bmap_count_leaves(ifp->if_u1.if_extents,
+		if (unlikely(xfs_bmap_count_leaves(ifp->if_u1.if_extents,
 			ifp->if_bytes / (uint)sizeof(xfs_bmbt_rec_t),
-			count) < 0) {
-				cmn_err(CE_NOTE,
-					"EFSCORRUPTED returned from file %s line %d",
-					__FILE__, __LINE__);
+			count) < 0)) {
+			XFS_ERROR_REPORT("xfs_bmap_count_blocks(1)",
+					 XFS_ERRLEVEL_LOW, mp);
 			return XFS_ERROR(EFSCORRUPTED);
 		}
 		return 0;
@@ -6129,10 +6142,9 @@ xfs_bmap_count_blocks(
 	ASSERT(XFS_FSB_TO_AGBNO(mp, INT_GET(*pp, ARCH_CONVERT)) < mp->m_sb.sb_agblocks);
 	bno = INT_GET(*pp, ARCH_CONVERT);
 
-	if (xfs_bmap_count_tree(mp, tp, bno, level, count) < 0) {
-		cmn_err(CE_NOTE,
-			"EFSCORRUPTED returned from file %s line %d",
-			__FILE__, __LINE__);
+	if (unlikely(xfs_bmap_count_tree(mp, tp, bno, level, count) < 0)) {
+		XFS_ERROR_REPORT("xfs_bmap_count_blocks(2)", XFS_ERRLEVEL_LOW,
+				 mp);
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 
@@ -6183,12 +6195,11 @@ xfs_bmap_count_tree(
 		pp = XFS_BTREE_PTR_ADDR(mp->m_sb.sb_blocksize,
 			xfs_bmbt, block, 1, mp->m_bmap_dmxr[1]);
 		bno = INT_GET(*pp, ARCH_CONVERT);
-		if ((error =
-		     xfs_bmap_count_tree(mp, tp, bno, level, count)) < 0) {
+		if (unlikely((error =
+		     xfs_bmap_count_tree(mp, tp, bno, level, count)) < 0)) {
 			xfs_trans_brelse(tp, bp);
-			cmn_err(CE_NOTE,
-				"EFSCORRUPTED returned from file %s line %d",
-				__FILE__, __LINE__);
+			XFS_ERROR_REPORT("xfs_bmap_count_tree(1)",
+					 XFS_ERRLEVEL_LOW, mp);
 			return XFS_ERROR(EFSCORRUPTED);
 		}
 		xfs_trans_brelse(tp, bp);
@@ -6199,11 +6210,10 @@ xfs_bmap_count_tree(
 			numrecs = INT_GET(block->bb_numrecs, ARCH_CONVERT);
 			frp = XFS_BTREE_REC_ADDR(mp->m_sb.sb_blocksize,
 				xfs_bmbt, block, 1, mp->m_bmap_dmxr[0]);
-			if (xfs_bmap_count_leaves(frp, numrecs, count) < 0) {
+			if (unlikely(xfs_bmap_count_leaves(frp, numrecs, count) < 0)) {
 				xfs_trans_brelse(tp, bp);
-				cmn_err(CE_NOTE,
-					"EFSCORRUPTED returned from file %s line %d",
-					__FILE__, __LINE__);
+				XFS_ERROR_REPORT("xfs_bmap_count_tree(2)",
+						 XFS_ERRLEVEL_LOW, mp);
 				return XFS_ERROR(EFSCORRUPTED);
 			}
 			xfs_trans_brelse(tp, bp);
