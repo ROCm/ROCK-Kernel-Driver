@@ -13,6 +13,8 @@
  * on code by Martin von Loewis <martin@mira.isdn.cs.tu-berlin.de>.
  */
 
+#include <linux/sched.h>
+#include <linux/locks.h>
 #include <linux/fs.h>
 #include <linux/ufs_fs.h>
 
@@ -26,6 +28,21 @@
 #else
 #define UFSD(x)
 #endif
+
+/*
+ * NOTE! unlike strncmp, ufs_match returns 1 for success, 0 for failure.
+ *
+ * len <= UFS_MAXNAMLEN and de != NULL are guaranteed by caller.
+ */
+static inline int ufs_match (int len, const char * const name,
+	struct ufs_dir_entry * de, unsigned flags, unsigned swab)
+{
+	if (len != ufs_get_de_namlen(de))
+		return 0;
+	if (!de->d_ino)
+		return 0;
+	return !memcmp(name, de->d_name, len);
+}
 
 /*
  * This is blatantly stolen from ext2fs
@@ -145,6 +162,130 @@ revalidate:
 	return 0;
 }
 
+/*
+ * define how far ahead to read directories while searching them.
+ */
+#define NAMEI_RA_CHUNKS  2
+#define NAMEI_RA_BLOCKS  4
+#define NAMEI_RA_SIZE        (NAMEI_RA_CHUNKS * NAMEI_RA_BLOCKS)
+#define NAMEI_RA_INDEX(c,b)  (((c) * NAMEI_RA_BLOCKS) + (b))
+
+/*
+ *	ufs_find_entry()
+ *
+ * finds an entry in the specified directory with the wanted name. It
+ * returns the cache buffer in which the entry was found, and the entry
+ * itself (as a parameter - res_bh). It does NOT read the inode of the
+ * entry - you'll have to do that yourself if you want to.
+ */
+struct ufs_dir_entry * ufs_find_entry (struct dentry *dentry,
+	struct buffer_head ** res_bh)
+{
+	struct super_block * sb;
+	struct buffer_head * bh_use[NAMEI_RA_SIZE];
+	struct buffer_head * bh_read[NAMEI_RA_SIZE];
+	unsigned long offset;
+	int block, toread, i, err;
+	unsigned flags, swab;
+	struct inode *dir = dentry->d_parent->d_inode;
+	const char *name = dentry->d_name.name;
+	int namelen = dentry->d_name.len;
+
+	UFSD(("ENTER, dir_ino %lu, name %s, namlen %u\n", dir->i_ino, name, namelen))
+	
+	*res_bh = NULL;
+	
+	sb = dir->i_sb;
+	flags = sb->u.ufs_sb.s_flags;
+	swab = sb->u.ufs_sb.s_swab;
+	
+	if (namelen > UFS_MAXNAMLEN)
+		return NULL;
+
+	memset (bh_use, 0, sizeof (bh_use));
+	toread = 0;
+	for (block = 0; block < NAMEI_RA_SIZE; ++block) {
+		struct buffer_head * bh;
+
+		if ((block << sb->s_blocksize_bits) >= dir->i_size)
+			break;
+		bh = ufs_getfrag (dir, block, 0, &err);
+		bh_use[block] = bh;
+		if (bh && !buffer_uptodate(bh))
+			bh_read[toread++] = bh;
+	}
+
+	for (block = 0, offset = 0; offset < dir->i_size; block++) {
+		struct buffer_head * bh;
+		struct ufs_dir_entry * de;
+		char * dlimit;
+
+		if ((block % NAMEI_RA_BLOCKS) == 0 && toread) {
+			ll_rw_block (READ, toread, bh_read);
+			toread = 0;
+		}
+		bh = bh_use[block % NAMEI_RA_SIZE];
+		if (!bh) {
+			ufs_error (sb, "ufs_find_entry", 
+				"directory #%lu contains a hole at offset %lu",
+				dir->i_ino, offset);
+			offset += sb->s_blocksize;
+			continue;
+		}
+		wait_on_buffer (bh);
+		if (!buffer_uptodate(bh)) {
+			/*
+			 * read error: all bets are off
+			 */
+			break;
+		}
+
+		de = (struct ufs_dir_entry *) bh->b_data;
+		dlimit = bh->b_data + sb->s_blocksize;
+		while ((char *) de < dlimit && offset < dir->i_size) {
+			/* this code is executed quadratically often */
+			/* do minimal checking by hand */
+			int de_len;
+
+			if ((char *) de + namelen <= dlimit &&
+			    ufs_match (namelen, name, de, flags, swab)) {
+				/* found a match -
+				just to be sure, do a full check */
+				if (!ufs_check_dir_entry("ufs_find_entry",
+				    dir, de, bh, offset))
+					goto failed;
+				for (i = 0; i < NAMEI_RA_SIZE; ++i) {
+					if (bh_use[i] != bh)
+						brelse (bh_use[i]);
+				}
+				*res_bh = bh;
+				return de;
+			}
+                        /* prevent looping on a bad block */
+			de_len = SWAB16(de->d_reclen);
+			if (de_len <= 0)
+				goto failed;
+			offset += de_len;
+			de = (struct ufs_dir_entry *) ((char *) de + de_len);
+		}
+
+		brelse (bh);
+		if (((block + NAMEI_RA_SIZE) << sb->s_blocksize_bits ) >=
+		    dir->i_size)
+			bh = NULL;
+		else
+			bh = ufs_getfrag (dir, block + NAMEI_RA_SIZE, 0, &err);
+		bh_use[block % NAMEI_RA_SIZE] = bh;
+		if (bh && !buffer_uptodate(bh))
+			bh_read[toread++] = bh;
+	}
+
+failed:
+	for (i = 0; i < NAMEI_RA_SIZE; ++i) brelse (bh_use[i]);
+	UFSD(("EXIT\n"))
+	return NULL;
+}
+
 int ufs_check_dir_entry (const char * function,	struct inode * dir,
 	struct ufs_dir_entry * de, struct buffer_head * bh, 
 	unsigned long offset)
@@ -178,6 +319,312 @@ int ufs_check_dir_entry (const char * function,	struct inode * dir,
 			    SWAB16(de->d_reclen), ufs_get_de_namlen(de));
 	
 	return (error_msg == NULL ? 1 : 0);
+}
+
+struct ufs_dir_entry *ufs_dotdot(struct inode *dir, struct buffer_head **p)
+{
+	int err;
+	struct buffer_head *bh = ufs_bread (dir, 0, 0, &err);
+	struct ufs_dir_entry *res = NULL;
+
+	if (bh) {
+		unsigned swab = dir->i_sb->u.ufs_sb.s_swab;
+
+		res = (struct ufs_dir_entry *) bh->b_data;
+		res = (struct ufs_dir_entry *)((char *)res +
+			SWAB16(res->d_reclen));
+	}
+	*p = bh;
+	return res;
+}
+ino_t ufs_inode_by_name(struct inode * dir, struct dentry *dentry)
+{
+	unsigned swab = dir->i_sb->u.ufs_sb.s_swab;
+	ino_t res = 0;
+	struct ufs_dir_entry * de;
+	struct buffer_head *bh;
+
+	de = ufs_find_entry (dentry, &bh);
+	if (de) {
+		res = SWAB32(de->d_ino);
+		brelse(bh);
+	}
+	return res;
+}
+
+void ufs_set_link(struct inode *dir, struct ufs_dir_entry *de,
+		struct buffer_head *bh, struct inode *inode)
+{
+	unsigned swab = dir->i_sb->u.ufs_sb.s_swab;
+	dir->i_version = ++event;
+	de->d_ino = SWAB32(inode->i_ino);
+	mark_buffer_dirty(bh);
+	if (IS_SYNC(dir)) {
+		ll_rw_block (WRITE, 1, &bh);
+		wait_on_buffer(bh);
+	}
+	brelse (bh);
+}
+
+/*
+ *	ufs_add_entry()
+ *
+ * adds a file entry to the specified directory, using the same
+ * semantics as ufs_find_entry(). It returns NULL if it failed.
+ */
+int ufs_add_link(struct dentry *dentry, struct inode *inode)
+{
+	struct super_block * sb;
+	struct ufs_sb_private_info * uspi;
+	unsigned long offset;
+	unsigned fragoff;
+	unsigned short rec_len;
+	struct buffer_head * bh;
+	struct ufs_dir_entry * de, * de1;
+	unsigned flags, swab;
+	struct inode *dir = dentry->d_parent->d_inode;
+	const char *name = dentry->d_name.name;
+	int namelen = dentry->d_name.len;
+	int err;
+
+	UFSD(("ENTER, name %s, namelen %u\n", name, namelen))
+	
+	sb = dir->i_sb;
+	flags = sb->u.ufs_sb.s_flags;
+	swab = sb->u.ufs_sb.s_swab;
+	uspi = sb->u.ufs_sb.s_uspi;
+
+	if (!namelen)
+		return -EINVAL;
+	bh = ufs_bread (dir, 0, 0, &err);
+	if (!bh)
+		return err;
+	rec_len = UFS_DIR_REC_LEN(namelen);
+	offset = 0;
+	de = (struct ufs_dir_entry *) bh->b_data;
+	while (1) {
+		if ((char *)de >= UFS_SECTOR_SIZE + bh->b_data) {
+			fragoff = offset & ~uspi->s_fmask;
+			if (fragoff != 0 && fragoff != UFS_SECTOR_SIZE)
+				ufs_error (sb, "ufs_add_entry", "internal error"
+					" fragoff %u", fragoff);
+			if (!fragoff) {
+				brelse (bh);
+				bh = ufs_bread (dir, offset >> sb->s_blocksize_bits, 1, &err);
+				if (!bh)
+					return err;
+			}
+			if (dir->i_size <= offset) {
+				if (dir->i_size == 0) {
+					brelse(bh);
+					return -ENOENT;
+				}
+				de = (struct ufs_dir_entry *) (bh->b_data + fragoff);
+				de->d_ino = SWAB32(0);
+				de->d_reclen = SWAB16(UFS_SECTOR_SIZE);
+				ufs_set_de_namlen(de,0);
+				dir->i_size = offset + UFS_SECTOR_SIZE;
+				mark_inode_dirty(dir);
+			} else {
+				de = (struct ufs_dir_entry *) bh->b_data;
+			}
+		}
+		if (!ufs_check_dir_entry ("ufs_add_entry", dir, de, bh, offset)) {
+			brelse (bh);
+			return -ENOENT;
+		}
+		if (ufs_match (namelen, name, de, flags, swab)) {
+			brelse (bh);
+			return -EEXIST;
+		}
+		if (SWAB32(de->d_ino) == 0 && SWAB16(de->d_reclen) >= rec_len)
+			break;
+			
+		if (SWAB16(de->d_reclen) >= UFS_DIR_REC_LEN(ufs_get_de_namlen(de)) + rec_len)
+			break;
+		offset += SWAB16(de->d_reclen);
+		de = (struct ufs_dir_entry *) ((char *) de + SWAB16(de->d_reclen));
+	}
+
+	if (SWAB32(de->d_ino)) {
+		de1 = (struct ufs_dir_entry *) ((char *) de +
+			UFS_DIR_REC_LEN(ufs_get_de_namlen(de)));
+		de1->d_reclen = SWAB16(SWAB16(de->d_reclen) -
+			UFS_DIR_REC_LEN(ufs_get_de_namlen(de)));
+		de->d_reclen = SWAB16(UFS_DIR_REC_LEN(ufs_get_de_namlen(de)));
+		de = de1;
+	}
+	de->d_ino = SWAB32(0);
+	ufs_set_de_namlen(de, namelen);
+	memcpy (de->d_name, name, namelen + 1);
+	de->d_ino = SWAB32(inode->i_ino);
+	ufs_set_de_type (de, inode->i_mode);
+	mark_buffer_dirty(bh);
+	if (IS_SYNC(dir)) {
+		ll_rw_block (WRITE, 1, &bh);
+		wait_on_buffer (bh);
+	}
+	brelse (bh);
+	dir->i_mtime = dir->i_ctime = CURRENT_TIME;
+	dir->i_version = ++event;
+	mark_inode_dirty(dir);
+
+	UFSD(("EXIT\n"))
+	return 0;
+}
+
+/*
+ * ufs_delete_entry deletes a directory entry by merging it with the
+ * previous entry.
+ */
+int ufs_delete_entry (struct inode * inode, struct ufs_dir_entry * dir,
+	struct buffer_head * bh )
+	
+{
+	struct super_block * sb;
+	struct ufs_dir_entry * de, * pde;
+	unsigned i;
+	unsigned flags, swab;
+	
+	UFSD(("ENTER\n"))
+
+	sb = inode->i_sb;
+	flags = sb->u.ufs_sb.s_flags;
+	swab = sb->u.ufs_sb.s_swab;
+	i = 0;
+	pde = NULL;
+	de = (struct ufs_dir_entry *) bh->b_data;
+	
+	UFSD(("ino %u, reclen %u, namlen %u, name %s\n", SWAB32(de->d_ino),
+		SWAB16(de->d_reclen), ufs_get_de_namlen(de), de->d_name))
+
+	while (i < bh->b_size) {
+		if (!ufs_check_dir_entry ("ufs_delete_entry", inode, de, bh, i)) {
+			brelse(bh);
+			return -EIO;
+		}
+		if (de == dir)  {
+			if (pde)
+				pde->d_reclen =
+				    SWAB16(SWAB16(pde->d_reclen) +
+				    SWAB16(dir->d_reclen));
+			dir->d_ino = SWAB32(0);
+			inode->i_version = ++event;
+			inode->i_ctime = inode->i_mtime = CURRENT_TIME;
+			mark_inode_dirty(inode);
+			mark_buffer_dirty(bh);
+			if (IS_SYNC(inode)) {
+				ll_rw_block(WRITE, 1, &bh);
+				wait_on_buffer(bh);
+			}
+			brelse(bh);
+			UFSD(("EXIT\n"))
+			return 0;
+		}
+		i += SWAB16(de->d_reclen);
+		if (i == UFS_SECTOR_SIZE) pde = NULL;
+		else pde = de;
+		de = (struct ufs_dir_entry *)
+		    ((char *) de + SWAB16(de->d_reclen));
+		if (i == UFS_SECTOR_SIZE && SWAB16(de->d_reclen) == 0)
+			break;
+	}
+	UFSD(("EXIT\n"))
+	brelse(bh);
+	return -ENOENT;
+}
+
+int ufs_make_empty(struct inode * inode, struct inode *dir)
+{
+	struct super_block * sb = dir->i_sb;
+	unsigned flags = sb->u.ufs_sb.s_flags;
+	unsigned swab = sb->u.ufs_sb.s_swab;
+	struct buffer_head * dir_block;
+	struct ufs_dir_entry * de;
+	int err;
+
+	dir_block = ufs_bread (inode, 0, 1, &err);
+	if (!dir_block)
+		return err;
+
+	inode->i_blocks = sb->s_blocksize / UFS_SECTOR_SIZE;
+	de = (struct ufs_dir_entry *) dir_block->b_data;
+	de->d_ino = SWAB32(inode->i_ino);
+	ufs_set_de_type (de, inode->i_mode);
+	ufs_set_de_namlen(de,1);
+	de->d_reclen = SWAB16(UFS_DIR_REC_LEN(1));
+	strcpy (de->d_name, ".");
+	de = (struct ufs_dir_entry *) ((char *) de + SWAB16(de->d_reclen));
+	de->d_ino = SWAB32(dir->i_ino);
+	ufs_set_de_type (de, dir->i_mode);
+	de->d_reclen = SWAB16(UFS_SECTOR_SIZE - UFS_DIR_REC_LEN(1));
+	ufs_set_de_namlen(de,2);
+	strcpy (de->d_name, "..");
+	mark_buffer_dirty(dir_block);
+	brelse (dir_block);
+	mark_inode_dirty(inode);
+	return 0;
+}
+
+/*
+ * routine to check that the specified directory is empty (for rmdir)
+ */
+int ufs_empty_dir (struct inode * inode)
+{
+	struct super_block * sb;
+	unsigned long offset;
+	struct buffer_head * bh;
+	struct ufs_dir_entry * de, * de1;
+	int err;
+	unsigned swab;	
+	
+	sb = inode->i_sb;
+	swab = sb->u.ufs_sb.s_swab;
+
+	if (inode->i_size < UFS_DIR_REC_LEN(1) + UFS_DIR_REC_LEN(2) ||
+	    !(bh = ufs_bread (inode, 0, 0, &err))) {
+	    	ufs_warning (inode->i_sb, "empty_dir",
+			      "bad directory (dir #%lu) - no data block",
+			      inode->i_ino);
+		return 1;
+	}
+	de = (struct ufs_dir_entry *) bh->b_data;
+	de1 = (struct ufs_dir_entry *) ((char *) de + SWAB16(de->d_reclen));
+	if (SWAB32(de->d_ino) != inode->i_ino || !SWAB32(de1->d_ino) || 
+	    strcmp (".", de->d_name) || strcmp ("..", de1->d_name)) {
+	    	ufs_warning (inode->i_sb, "empty_dir",
+			      "bad directory (dir #%lu) - no `.' or `..'",
+			      inode->i_ino);
+		return 1;
+	}
+	offset = SWAB16(de->d_reclen) + SWAB16(de1->d_reclen);
+	de = (struct ufs_dir_entry *) ((char *) de1 + SWAB16(de1->d_reclen));
+	while (offset < inode->i_size ) {
+		if (!bh || (void *) de >= (void *) (bh->b_data + sb->s_blocksize)) {
+			brelse (bh);
+			bh = ufs_bread (inode, offset >> sb->s_blocksize_bits, 1, &err);
+	 		if (!bh) {
+				ufs_error (sb, "empty_dir",
+					    "directory #%lu contains a hole at offset %lu",
+					    inode->i_ino, offset);
+				offset += sb->s_blocksize;
+				continue;
+			}
+			de = (struct ufs_dir_entry *) bh->b_data;
+		}
+		if (!ufs_check_dir_entry ("empty_dir", inode, de, bh, offset)) {
+			brelse (bh);
+			return 1;
+		}
+		if (SWAB32(de->d_ino)) {
+			brelse (bh);
+			return 0;
+		}
+		offset += SWAB16(de->d_reclen);
+		de = (struct ufs_dir_entry *) ((char *) de + SWAB16(de->d_reclen));
+	}
+	brelse (bh);
+	return 1;
 }
 
 struct file_operations ufs_dir_operations = {

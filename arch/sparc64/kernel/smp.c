@@ -582,6 +582,68 @@ extern unsigned long xcall_tlbcachesync;
 extern unsigned long xcall_flush_cache_all;
 extern unsigned long xcall_report_regs;
 extern unsigned long xcall_receive_signal;
+extern unsigned long xcall_flush_dcache_page_cheetah;
+extern unsigned long xcall_flush_dcache_page_spitfire;
+
+static spinlock_t dcache_xcall_lock = SPIN_LOCK_UNLOCKED;
+static struct page *dcache_page;
+#ifdef DCFLUSH_DEBUG
+extern atomic_t dcpage_flushes;
+extern atomic_t dcpage_flushes_xcall;
+#endif
+
+static __inline__ void __smp_flush_dcache_page_client(struct page *page)
+{
+#if (L1DCACHE_SIZE > PAGE_SIZE)
+	__flush_dcache_page(page->virtual,
+			    ((tlb_type == spitfire) &&
+			     page->mapping != NULL));
+#else
+	if (page->mapping != NULL &&
+	    tlb_type == spitfire)
+		__flush_icache_page(__pa(page->virtual));
+#endif
+}
+
+void smp_flush_dcache_page_client(void)
+{
+	__smp_flush_dcache_page_client(dcache_page);
+	spin_unlock(&dcache_xcall_lock);
+}
+
+void smp_flush_dcache_page_impl(struct page *page)
+{
+	if (smp_processors_ready) {
+		int cpu = dcache_dirty_cpu(page);
+		unsigned long mask = 1UL << cpu;
+
+#ifdef DCFLUSH_DEBUG
+		atomic_inc(&dcpage_flushes);
+#endif
+		if (cpu == smp_processor_id()) {
+			__smp_flush_dcache_page_client(page);
+		} else if ((cpu_present_map & mask) != 0) {
+			u64 data0;
+
+			if (tlb_type == spitfire) {
+				spin_lock(&dcache_xcall_lock);
+				dcache_page = page;
+				data0 = ((u64)&xcall_flush_dcache_page_spitfire);
+				spitfire_xcall_deliver(data0, 0, 0, mask);
+				/* Target cpu drops dcache_xcall_lock. */
+			} else {
+				/* Look mom, no locks... */
+				data0 = ((u64)&xcall_flush_dcache_page_cheetah);
+				cheetah_xcall_deliver(data0,
+						      (u64) page->virtual,
+						      0, mask);
+			}
+#ifdef DCFLUSH_DEBUG
+			atomic_inc(&dcpage_flushes_xcall);
+#endif
+		}
+	}
+}
 
 void smp_receive_signal(int cpu)
 {

@@ -1,4 +1,4 @@
-/* $Id: pgtable.h,v 1.146 2001/09/11 02:20:23 kanoj Exp $
+/* $Id: pgtable.h,v 1.147 2001/10/17 18:26:58 davem Exp $
  * pgtable.h: SpitFire page table operations.
  *
  * Copyright 1996,1997 David S. Miller (davem@caip.rutgers.edu)
@@ -47,6 +47,29 @@
 #ifndef __ASSEMBLY__
 
 #define PG_dcache_dirty		PG_arch_1
+
+#define dcache_dirty_cpu(page) \
+	(((page)->flags >> 24) & (NR_CPUS - 1UL))
+
+#define set_dcache_dirty(PAGE) \
+do {	unsigned long mask = smp_processor_id(); \
+	unsigned long non_cpu_bits = (1UL << 24UL) - 1UL; \
+	mask = (mask << 24) | (1UL << PG_dcache_dirty); \
+	__asm__ __volatile__("1:\n\t" \
+			     "ldx	[%2], %%g7\n\t" \
+			     "and	%%g7, %1, %%g5\n\t" \
+			     "or	%%g5, %0, %%g5\n\t" \
+			     "casx	[%2], %%g7, %%g5\n\t" \
+			     "cmp	%%g7, %%g5\n\t" \
+			     "bne,pn	%%xcc, 1b\n\t" \
+			     " nop" \
+			     : /* no outputs */ \
+			     : "r" (mask), "r" (non_cpu_bits), "r" (&(PAGE)->flags) \
+			     : "g5", "g7"); \
+} while (0)
+
+#define clear_dcache_dirty(PAGE) \
+	clear_bit(PG_dcache_dirty, &(PAGE)->flags)
 
 /* Certain architectures need to do special things when pte's
  * within a page table are directly modified.  Thus, the following

@@ -1,9 +1,11 @@
-Copyright (C) 1999, 2000 David E. Nelson
+Copyright (C) 1999, 2000 David E. Nelson <dnelson@jump.net>
 
 April 26, 2000
 
 CHANGES
 
+- Amended for linux-2.4.12
+- Updated devfs support
 - Amended for linux-2.3.99-pre6-3
 - Appended hp_scan.c to end of this README
 - Removed most references to HP
@@ -35,11 +37,9 @@ A host with a USB port.  Ideally, either a UHCI (Intel) or OHCI
 (Compaq and others) hardware port should work.  At the time of this
 writing, there are two UHCI drivers and one OHCI.
 
-A Linux development kernel (2.3.x) with USB support enabled or a
-backported version to linux-2.2.x.  See http://www.linux-usb.org for
-more information on accomplishing this.
-
-A Linux kernel with USB Scanner support enabled.
+A Linux kernel with USB support enabled or a backported version to
+linux-2.2.x.  See http://www.linux-usb.org for more information on
+accomplishing this.
 
 'lspci' which is only needed to determine the type of USB hardware
 available/installed in your machine.
@@ -75,15 +75,15 @@ kernel, a reboot is necessary. NOTE: Updating the boot disk with
 YMMV.
 
 Beginning with version 0.4 of the driver, up to 16 scanners can be
-connected/used simultaneously.  If you intend to use more than
-one scanner at a time:
+connected/used simultaneously.  For devfs support, see next section.
+If you intend to use more than one scanner at a time w/o devfs support:
 
    Add a device for the USB scanner:
 	`mknod /dev/usbscanner0 c 180 48`
 	`mknod /dev/usbscanner1 c 180 49`
                       . 
                       .
-	`mknod /dev/usb/scanner15 180 63`
+	`mknod /dev/usbscanner15 180 63`
 
 
 If you foresee using only one scanner it is best to:
@@ -106,6 +106,32 @@ Load the appropriate modules (if compiled as modules):
     modprobe usb-uhci
     modprobe scanner
 
+DEVFS
+
+The later versions of the Linux kernel (2.4.8'ish) included a dynamic
+device filesystem call 'devfs'.  With devfs, there is no need to
+create the device files as explained above; instead, they are
+dynamically created for you.  For USB Scanner, the device is created
+in /dev/usb/scannerX where X can range from 0 to 15 depending on the
+number of scanners connected to the system.
+
+To see if you have devfs, issue the command `cat /proc/filesytems`.
+If devfs is listed you should be ready to go.  You sould also have a
+process running called 'devfsd'.  In order to make sure, issue the
+command `ps aux | grep '[d]evfsd'`.
+
+If you would like to maintain /dev/usbscanner0 in order to maintain
+compatibility with applications, then add the following to
+/etc/devfsd.conf:
+
+REGISTER ^usb/scanner0$ CFUNCTION GLOBAL symlink usb/scanner0 usbscanner0
+UNREGISTER ^usb/scanner0$ CFUNCTION GLOBAL unlink usbscanner0
+
+Then reset the scanner (reseat the USB connector or power cycle). This
+will create the necessary symlinks in /dev to /dev/usb.
+
+CONCLUSION
+
 That's it.  SANE should now be able to access the device.  
 
 There is a small test program (hp_scan.c -- appended below) that can
@@ -121,15 +147,34 @@ data in the file is raw data so it's not very useful for imaging.
 
 MESSAGES
 
-On occasions the message 'usb_control/bulk_msg: timeout' or something
-similar will appear in '/var/adm/messages' or on the console or both,
-depending on how your system is configured.  This is a side effect
-that scanners are sometimes very slow at warming up and/or
-initializing.  In most cases, however, only several of these messages
-should appear and is generally considered to be normal.  If you see
-a message of the type 'excessive NAK's received' then this should
-be considered abnormal and generally indicates that the USB system is
-unable to communicate with the scanner for some particular reason.
+usb_control/bulk_msg: timeout -- On occasions this message will appear
+in '/var/adm/messages', on the console, or both depending on how
+your system is configured.  This is a side effect that scanners are
+sometimes very slow at warming up and/or initializing.  In most cases,
+however, only several of these messages should appear and is generally
+considered to be normal.  
+
+excessive NAK's received -- This message should be considered abnormal
+and generally indicates that the USB system is unable to communicate
+with the scanner for some particular reason.
+
+probe_scanner: Undetected endpoint -- The USB Scanner driver is fairly
+general when it comes to communicating to scanners.  Unfortunately,
+some vendors have designed their scanners in one way or another that
+this driver doesn't account for.
+
+probe_scanner: Endpoint determination failed -- This means that the
+driver is unable to detect a supported configuration for means to
+communicate with the scanner.  See also 'probe_scanner: Undetected
+endpoint'.
+
+funky result -- Most of the time the data flow between the computer
+and the scanner goes smoothly.  However, due to whatever reason,
+whether it be solar flares or stray neutrons, sometimes the
+communications don't work as expected.  The driver tries to handle
+most types of errors but not all.  When this message is seen,
+something weird happened.  Please contact the maintaner listed at the
+top of this file.
 
 SUPPORTED SCANNERS
 

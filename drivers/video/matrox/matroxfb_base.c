@@ -2355,7 +2355,7 @@ int __init matroxfb_setup(char *options) {
 	if (!options || !*options)
 		return 0;
 
-	for(this_opt=strtok(options,","); this_opt; this_opt=strtok(NULL,",")) {
+	while (this_opt = strsep(&options, ",")) {
 		if (!*this_opt) continue;
 
 		dprintk("matroxfb_setup: option %s\n", this_opt);

@@ -53,7 +53,13 @@ static unsigned int pcnet32_portlist[] __initdata = {0x300, 0x320, 0x340, 0x360,
 static struct pci_device_id pcnet32_pci_tbl[] __devinitdata = {
     { PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_LANCE_HOME, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
     { PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_LANCE, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
+/* this id is never reached as the match above occurs first.
+ * However it clearly has significance, so let's not remove it
+ * until we know what that significance is.  -jgarzik
+ */
+#if 0
     { PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_LANCE, 0x1014, 0x2000, 0, 0, 0 },
+#endif
     { 0, }
 };
 

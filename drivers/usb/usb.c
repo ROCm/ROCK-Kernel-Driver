@@ -60,7 +60,7 @@ static void usb_check_support(struct usb_device *);
  */
 LIST_HEAD(usb_driver_list);
 LIST_HEAD(usb_bus_list);
-rwlock_t usb_bus_list_lock = RW_LOCK_UNLOCKED;
+struct semaphore usb_bus_list_lock;
 
 devfs_handle_t usb_devfs_handle;	/* /dev/usb dir. */
 
@@ -112,7 +112,7 @@ void usb_scan_devices(void)
 {
 	struct list_head *tmp;
 
-	read_lock_irq (&usb_bus_list_lock);
+	down (&usb_bus_list_lock);
 	tmp = usb_bus_list.next;
 	while (tmp != &usb_bus_list) {
 		struct usb_bus *bus = list_entry(tmp,struct usb_bus, bus_list);
@@ -120,7 +120,7 @@ void usb_scan_devices(void)
 		tmp = tmp->next;
 		usb_check_support(bus->root_hub);
 	}
-	read_unlock_irq (&usb_bus_list_lock);
+	up (&usb_bus_list_lock);
 }
 
 /*
@@ -182,7 +182,7 @@ void usb_deregister(struct usb_driver *driver)
 	 */
 	list_del(&driver->driver_list);
 
-	read_lock_irq (&usb_bus_list_lock);
+	down (&usb_bus_list_lock);
 	tmp = usb_bus_list.next;
 	while (tmp != &usb_bus_list) {
 		struct usb_bus *bus = list_entry(tmp,struct usb_bus,bus_list);
@@ -190,7 +190,7 @@ void usb_deregister(struct usb_driver *driver)
 		tmp = tmp->next;
 		usb_drivers_purge(driver, bus->root_hub);
 	}
-	read_unlock_irq (&usb_bus_list_lock);
+	up (&usb_bus_list_lock);
 }
 
 struct usb_interface *usb_ifnum_to_if(struct usb_device *dev, unsigned ifnum)
@@ -421,7 +421,7 @@ void usb_register_bus(struct usb_bus *bus)
 {
 	int busnum;
 
-	write_lock_irq (&usb_bus_list_lock);
+	down (&usb_bus_list_lock);
 	busnum = find_next_zero_bit(busmap.busmap, USB_MAXBUS, 1);
 	if (busnum < USB_MAXBUS) {
 		set_bit(busnum, busmap.busmap);
@@ -433,7 +433,7 @@ void usb_register_bus(struct usb_bus *bus)
 
 	/* Add it to the list of buses */
 	list_add(&bus->bus_list, &usb_bus_list);
-	write_unlock_irq (&usb_bus_list_lock);
+	up (&usb_bus_list_lock);
 
 	usbdevfs_add_bus(bus);
 
@@ -455,9 +455,9 @@ void usb_deregister_bus(struct usb_bus *bus)
 	 * controller code, as well as having it call this when cleaning
 	 * itself up
 	 */
-	write_lock_irq (&usb_bus_list_lock);
+	down (&usb_bus_list_lock);
 	list_del(&bus->bus_list);
-	write_unlock_irq (&usb_bus_list_lock);
+	up (&usb_bus_list_lock);
 
 	usbdevfs_remove_bus(bus);
 
@@ -2332,6 +2332,7 @@ struct list_head *usb_bus_get_list(void)
  */
 static int __init usb_init(void)
 {
+	init_MUTEX(&usb_bus_list_lock);
 	usb_major_init();
 	usbdevfs_init();
 	usb_hub_init();

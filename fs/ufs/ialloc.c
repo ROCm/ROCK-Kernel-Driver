@@ -143,7 +143,7 @@ void ufs_free_inode (struct inode * inode)
  * For other inodes, search forward from the parent directory's block
  * group to find a free inode.
  */
-struct inode * ufs_new_inode (const struct inode * dir,	int mode, int * err )
+struct inode * ufs_new_inode (const struct inode * dir,	int mode)
 {
 	struct super_block * sb;
 	struct ufs_sb_private_info * uspi;
@@ -157,23 +157,17 @@ struct inode * ufs_new_inode (const struct inode * dir,	int mode, int * err )
 	UFSD(("ENTER\n"))
 	
 	/* Cannot create files in a deleted directory */
-	if (!dir || !dir->i_nlink) {
-		*err = -EPERM;
-		return NULL;
-	}
+	if (!dir || !dir->i_nlink)
+		return ERR_PTR(-EPERM);
 	sb = dir->i_sb;
 	inode = new_inode(sb);
-	if (!inode) {
-		*err = -ENOMEM;
-		return NULL;
-	}
+	if (!inode)
+		return ERR_PTR(-ENOMEM);
 	swab = sb->u.ufs_sb.s_swab;
 	uspi = sb->u.ufs_sb.s_uspi;
 	usb1 = ubh_get_usb_first(USPI_UBH);
 
 	lock_super (sb);
-
-	*err = -ENOSPC;
 
 	/*
 	 * Try to place the inode in its parent directory
@@ -262,7 +256,7 @@ cg_found:
 	if (dir->i_mode & S_ISGID) {
 		inode->i_gid = dir->i_gid;
 		if (S_ISDIR(mode))
-			mode |= S_ISGID;
+			inode->i_mode |= S_ISGID;
 	} else
 		inode->i_gid = current->fsgid;
 
@@ -283,12 +277,10 @@ cg_found:
 		inode->i_flags |= S_NOQUOTA;
 		inode->i_nlink = 0;
 		iput(inode);
-		*err = -EDQUOT;
-		return NULL;
+		return ERR_PTR(-EDQUOT);
 	}
 
 	UFSD(("allocating inode %lu\n", inode->i_ino))
-	*err = 0;
 	UFSD(("EXIT\n"))
 	return inode;
 
@@ -297,5 +289,5 @@ failed:
 	make_bad_inode(inode);
 	iput (inode);
 	UFSD(("EXIT (FAILED)\n"))
-	return NULL;
+	return ERR_PTR(-ENOSPC);
 }

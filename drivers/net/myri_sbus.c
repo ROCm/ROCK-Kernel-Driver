@@ -1153,3 +1153,4 @@ static void __exit myri_sbus_cleanup(void)
 
 module_init(myri_sbus_probe);
 module_exit(myri_sbus_cleanup);
+MODULE_LICENSE("GPL");

@@ -199,7 +199,7 @@ nfsd_proc_create(struct svc_rqst *rqstp, struct nfsd_createargs *argp,
 	int		nfserr, type, mode;
 	dev_t		rdev = NODEV;
 
-	dprintk("nfsd: CREATE   %s %*.s\n",
+	dprintk("nfsd: CREATE   %s %.*s\n",
 		SVCFH_fmt(dirfhp), argp->len, argp->name);
 
 	/* First verify the parent file handle */

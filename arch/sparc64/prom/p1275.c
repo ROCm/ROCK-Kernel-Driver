@@ -1,4 +1,4 @@
-/* $Id: p1275.c,v 1.21 2001/04/24 01:09:12 davem Exp $
+/* $Id: p1275.c,v 1.22 2001/10/18 09:40:00 davem Exp $
  * p1275.c: Sun IEEE 1275 PROM low level interface routines
  *
  * Copyright (C) 1996,1997 Jakub Jelinek (jj@sunsite.mff.cuni.cz)
@@ -247,38 +247,11 @@ void prom_cif_callback(void)
 "	" : : "r" (&p1275buf), "i" (PSTATE_PRIV));
 }
 
-/* We need some SMP protection here.  But be careful as
- * prom callback code can call into here too, this is why
- * the counter is needed.  -DaveM
+/*
+ * This provides SMP safety on the p1275buf. prom_callback() drops this lock
+ * to allow recursuve acquisition.
  */
-static int prom_entry_depth = 0;
 spinlock_t prom_entry_lock = SPIN_LOCK_UNLOCKED;
-
-static __inline__ unsigned long prom_get_lock(void)
-{
-	unsigned long flags;
-
-	__save_and_cli(flags);
-	if (prom_entry_depth == 0) {
-		spin_lock(&prom_entry_lock);
-
-#if 1 /* DEBUGGING */
-		if (prom_entry_depth != 0)
-			panic("prom_get_lock");
-#endif
-	}
-	prom_entry_depth++;
-
-	return flags;
-}
-
-static __inline__ void prom_release_lock(unsigned long flags)
-{
-	if (--prom_entry_depth == 0)
-		spin_unlock(&prom_entry_lock);
-
-	__restore_flags(flags);
-}
 
 long p1275_cmd (char *service, long fmt, ...)
 {
@@ -296,7 +269,7 @@ long p1275_cmd (char *service, long fmt, ...)
 		spitfire_set_primary_context (0);
 	}
 
-	flags = prom_get_lock();
+	spin_lock_irqsave(&prom_entry_lock, flags);
 
 	p1275buf.prom_args[0] = (unsigned long)p;		/* service */
 	strcpy (p, service);
@@ -388,7 +361,7 @@ long p1275_cmd (char *service, long fmt, ...)
 	va_end(list);
 	x = p1275buf.prom_args [nargs + 3];
 
-	prom_release_lock(flags);
+	spin_unlock_irqrestore(&prom_entry_lock, flags);
 
 	if (ctx)
 		spitfire_set_primary_context (ctx);

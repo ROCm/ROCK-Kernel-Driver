@@ -7700,15 +7700,6 @@ CONFIG_PLX_HERMES
   Support for these adaptors is so far still incomplete and buggy.
   You have been warned.
 
-Hermes PCMCIA card support
-CONFIG_PCMCIA_HERMES
-  Enable support for PCMCIA 802.11b cards using the Hermes or Intersil
-  HFA384x (Prism 2) chipset.  To use your PC-cards, you will need
-  supporting software from David Hinds' pcmcia-cs package (see the
-  file Documentation/Changes for location). You also want to check out
-  the PCMCIA-HOWTO, available from
-  http://www.linuxdoc.org/docs.html#howto .
-
 Hermes support (Orinoco/WavelanIEEE/PrismII/Symbol 802.11b cards)
 CONFIG_PCMCIA_HERMES
   A driver for "Hermes" chipset based PCMCIA wireless adaptors, such
@@ -8874,6 +8865,18 @@ CONFIG_NI65
   The module will be called ni65.o. If you want to compile it as a
   module, say M here and read Documentation/modules.txt as well as
   Documentation/networking/net-modules.txt.
+
+RealTek RTL-8139C+ 10/100 PCI Fast Ethernet Adapter support
+CONFIG_8139CP
+  This is a driver for the Fast Ethernet PCI network cards based on
+  the RTL8139C+ chips. If you have one of those, say Y and read
+  the Ethernet-HOWTO, available from
+  http://www.linuxdoc.org/docs.html#howto .
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read Documentation/modules.txt. This is recommended.
+  The module will be called 8139cp.o.
 
 RealTek RTL-8139 PCI Fast Ethernet Adapter support
 CONFIG_8139TOO
@@ -11050,7 +11053,29 @@ CONFIG_USB_DEBUG
   of debug messages to the system log. Select this if you are having a
   problem with USB support and want to see more of what is going on.
 
-UHCI (intel PIIX4, VIA, ...) support?
+USB fetch large config
+CONFIG_USB_LARGE_CONFIG
+  This option changes the initial request for a config descriptor so
+  that some poorly designed devices will still work.  Some APC UPSes
+  need it.  Basically, the usb subsystem sends a request for a short
+  (8 byte) config, just to find out how large the real config is.
+  Incorrectly implemented devices may choke on this small config
+  request.  This option make the initial request for a quite large
+  config (1009 bytes), and things just work.
+
+  If you have an APC UPS, say Y; otherwise say N.
+
+USB long timeout
+CONFIG_USB_LONG_TIMEOUT
+  This option makes the standard time out a bit longer.  Basically,
+  some devices are just slow to respond, so this makes usb more 
+  patient.  There should be no harm in selecting this, but it is
+  needed for some MGE Ellipse UPSes.
+
+  If you have an MGE Ellipse UPS, or you see timeouts in HID
+  transactions, say Y; otherwise say N.
+
+UHCI (intel PIIX4, VIA, ...) support
 CONFIG_USB_UHCI
   The Universal Host Controller Interface is a standard by Intel for
   accessing the USB hardware in the PC (which is also called the USB
@@ -11125,6 +11150,20 @@ CONFIG_USB_HID
   inserted in and removed from the running kernel whenever you want).
   The module will be called hid.o. If you want to compile it as a
   module, say M here and read Documentation/modules.txt.
+
+/dev/usb/hiddev raw HID device support
+CONFIG_USB_HIDDEV
+  Say Y here if you want to support HID devices (from the USB
+  specification standpoint) that aren't strictly user interface
+  devices, like monitor controls and Uninterruptable Power Supplies.
+  It is also used for "consumer keys" on multimedia keyboards and
+  USB speakers.
+
+  This module supports these devices separately using a separate
+  event interface on /dev/usb/hiddevX (char 180:96 to 180:111).
+  This driver requires CONFIG_USB_HID.
+
+  If unsure, say N.
 
 USB HIDBP Keyboard (basic) support
 CONFIG_USB_KBD
@@ -11384,8 +11423,7 @@ CONFIG_USB_SERIAL_KEYSPAN
   and was developed with their support.  You must also include
   firmware to support your particular device(s). 
 
-  See http://www.linuxcare.com.au/hugh/keyspan.html for 
-  more information.
+  See http://misc.nu/hugh/keyspan.html for more information.
  
   This code is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
@@ -11399,6 +11437,20 @@ CONFIG_USB_SERIAL_KEYSPAN_USA28
 USB Keyspan USA-28X Firmware
 CONFIG_USB_SERIAL_KEYSPAN_USA28X
   Say Y here to include firmware for the USA-28X converter.
+  Be sure you have a USA-28X, there are also 28XA and 28XB
+  models, the label underneath has the actual part number.
+
+USB Keyspan USA-28XA Firmware
+CONFIG_USB_SERIAL_KEYSPAN_USA28XA
+  Say Y here to include firmware for the USA-28XA converter.
+  Be sure you have a USA-28XA, there are also 28X and 28XB
+  models, the label underneath has the actual part number.
+
+USB Keyspan USA-28XB Firmware
+CONFIG_USB_SERIAL_KEYSPAN_USA28XB
+  Say Y here to include firmware for the USA-28XB converter.
+  Be sure you have a USA-28XB, there are also 28X and 28XA
+  models, the label underneath has the actual part number.
 
 USB Keyspan USA-19 Firmware
 CONFIG_USB_SERIAL_KEYSPAN_USA19
@@ -11698,6 +11750,10 @@ CONFIG_USB_CDCETHER
   The module will be called CDCEther.o.  If you want to compile it as
   a module, say M here and read <file:Documentation/modules.txt>.
 
+NetChip 1080-based USB Host-to-Host Link
+CONFIG_USB_NET1080
+  The NetChip 1080 is a USB 1.1 host controller.  NetChip has a web
+  site with technical information at http://www.netchip.com/ .
 
 USB Kodak DC-2xx Camera support
 CONFIG_USB_DC2XX
@@ -11881,6 +11937,12 @@ CONFIG_USB_MICROTEK
   of the system. Scsi support is required for this driver to compile
   and work. SANE 1.0.4 or newer is needed to make use of your scanner.
   This driver can be compiled as a module.
+
+HP 53xx and Minolta Dual Scanner support
+CONFIG_USB_HPUSBSCSI
+  Say Y here if you want support for the HP 53xx series of scanners
+  and the Minolta Scan Dual. This driver is experimental.
+  The scanner will be accessible as a SCSI device.
 
 USB Bluetooth support
 CONFIG_USB_BLUETOOTH
@@ -18327,6 +18389,11 @@ CONFIG_DS1620
   It is also possible to say M here to build it as a module (ds1620.o)
   It is recommended to be used on a NetWinder, but it is not a
   necessity.
+
+Debug high memory support
+CONFIG_DEBUG_HIGHMEM
+  This options enables addition error checking for high memory systems.
+  Disable for production systems.
 
 Verbose kernel error messages
 CONFIG_DEBUG_ERRORS

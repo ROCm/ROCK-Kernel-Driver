@@ -323,6 +323,7 @@ out:
 
 MODULE_AUTHOR("Olaf Kirch <okir@monad.swb.de>");
 MODULE_DESCRIPTION("NFS file locking service version " LOCKD_VERSION ".");
+MODULE_LICENSE("GPL");
 MODULE_PARM(nlm_grace_period, "10-240l");
 MODULE_PARM(nlm_timeout, "3-20l");
 MODULE_PARM(nlm_udpport, "0-65535l");

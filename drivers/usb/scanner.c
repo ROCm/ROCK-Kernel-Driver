@@ -1,9 +1,9 @@
 /* -*- linux-c -*- */
 
 /* 
- * Driver for USB Scanners (linux-2.4.0)
+ * Driver for USB Scanners (linux-2.4.12)
  *
- * Copyright (C) 1999, 2000 David E. Nelson
+ * Copyright (C) 1999, 2000, 2001 David E. Nelson
  *
  * Portions may be copyright Brad Keryan and Michael Gee.
  *
@@ -226,13 +226,59 @@
  *      read_timeout.  Thanks to Mark W. Webb <markwebb@adelphia.net> for
  *      reporting this bug.
  *    - Added Epson Perfection 1640SU and 1640SU Photo.  Thanks to
- *      Jean-Luc <f5ibh@db0bm.ampr.org>.
+ *      Jean-Luc <f5ibh@db0bm.ampr.org> and Manuel
+ *      Pelayo <Manuel.Pelayo@sesips.org>. Reported to work fine by Manuel.
  *
- * 0.4.6 08/16/2001 Yves Duret <yduret@mandrakesoft.com>
- *    - added devfs support (from printer.c)
+ * 0.4.6  9/27/2001
+ *    - Added IOCTL's to report back scanner USB ID's.  Thanks to
+ *      Karl Heinz <khk@lynx.phpwebhosting.com>
+ *    - Added Umax Astra 2100U ID's.  Thanks to Ron
+ *      Wellsted <ron@wellsted.org.uk>.
+ *      and Manuel Pelayo <Manuel.Pelayo@sesips.org>.
+ *    - Added HP 3400 ID's. Thanks to Harald Hannelius <harald@iki.fi>
+ *      and Bertrik Sikken <bertrik@zonnet.nl>.  Reported to work at
+ *      htpp://home.zonnet.nl/bertrik/hp3300c/hp3300c.htm.
+ *    - Added Minolta Dimage Scan Dual II ID's.  Thanks to Jose Paulo
+ *      Moitinho de Almeida <moitinho@civil.ist.utl.pt>
+ *    - Confirmed addition for SnapScan E20.  Thanks to Steffen Hübner
+ *      <hueb_s@gmx.de>.
+ *    - Added Lifetec LT9385 ID's.  Thanks to Van Bruwaene Kris
+ *      <krvbr@yahoo.co.uk>
+ *    - Added Agfa SnapScan e26 ID's.  Reported to work with SANE
+ *      1.0.5.  Thanks to Falk Sauer <falk@mgnkatze.franken.de>.
+ *    - Added HP 4300 ID's.  Thanks to Stefan Schlosser
+ *      <castla@grmmbl.org>.
+ *    - Added Relisis Episode ID's.  Thanks to Manfred
+ *      Morgner <odb-devel@gmx.net>.
+ *    - Added many Acer ID's. Thanks to Oliver
+ *      Schwartz <Oliver.Schwartz@gmx.de>.
+ *    - Added Snapscan e40 ID's.  Thanks to Oliver
+ *      Schwartz <Oliver.Schwartz@gmx.de>.
+ *    - Thanks to Oliver Neukum <Oliver.Neukum@lrz.uni-muenchen.de>
+ *      for helping with races.
+ *    - Added Epson Perfection 1650 ID's. Thanks to Karl Heinz
+ *      Kremer <khk@khk.net>.
+ *    - Added Epson Perfection 2450 ID's (aka GT-9700 for the Japanese
+ *      market).  Thanks to Karl Heinz Kremer <khk@khk.net>.
+ *    - Added Mustek 600 USB ID's.  Thanks to Marcus
+ *      Alanen <maalanen@ra.abo.fi>.
+ *    - Added Acer ScanPrisa 1240UT ID's.  Thanks to Morgan
+ *      Collins <sirmorcant@morcant.org>.
+ *    - Incorporated devfs patches!! Thanks to Tom Rini
+ *      <trini@kernel.crashing.org>, Pavel Roskin <proski@gnu.org>,
+ *      Greg KH <greg@kroah.com>, Yves Duret <yduret@mandrakesoft.com>,
+ *      Flavio Stanchina <flavio.stanchina@tin.it>.
+ *    - Removed Minolta ScanImage II.  This scanner uses USB SCSI.  Thanks
+ *      to Oliver Neukum <Oliver.Neukum@lrz.uni-muenchen.de> for pointing
+ *      this out.
+ *    - Added additional SMP locking.  Thanks to David Brownell and 
+ *      Oliver Neukum for their help.
+ *    - Added version reporting - reports for both module load and modinfo
+ *    - Started path to hopefully straighten/clean out ioctl()'s.
+ *    - Users are now notified to consult the Documentation/usb/scanner.txt
+ *      for common error messages rather than the maintainer.
  *
- *  TODO
- *
+ * TODO
  *    - Performance
  *    - Select/poll methods
  *    - More testing
@@ -266,7 +312,6 @@
  */ 
 #include "scanner.h"
 
-
 static void
 irq_scanner(struct urb *urb)
 {
@@ -276,18 +321,22 @@ irq_scanner(struct urb *urb)
  * all I want to do with it -- or somebody else for that matter.
  */
 
-	struct scn_usb_data *scn = urb->context;
-	unsigned char *data = &scn->button;
+	struct scn_usb_data *scn;
+	unsigned char *data;
+	scn = urb->context;
+	down(&(scn->sem));
+	data = &scn->button;
 	data += 0;		/* Keep gcc from complaining about unused var */
 
 	if (urb->status) {
+		up(&(scn->sem));
 		return;
 	}
 
 	dbg("irq_scanner(%d): data:%x", scn->scn_minor, *data);
+	up(&(scn->sem));
 	return;
 }
-
 
 static int
 open_scanner(struct inode * inode, struct file * file)
@@ -299,21 +348,27 @@ open_scanner(struct inode * inode, struct file * file)
 
 	int err=0;
 
-	lock_kernel();
+	MOD_INC_USE_COUNT;
+
+	down(&scn_mutex);
 
 	scn_minor = USB_SCN_MINOR(inode);
 
 	dbg("open_scanner: scn_minor:%d", scn_minor);
 
 	if (!p_scn_table[scn_minor]) {
+		up(&scn_mutex);
 		err("open_scanner(%d): Unable to access minor data", scn_minor);
-		err = -ENODEV;
-		goto out_error;
+		return -ENODEV;
 	}
 
 	scn = p_scn_table[scn_minor];
 
 	dev = scn->scn_dev;
+
+	down(&(scn->sem));	/* Now protect the scn_usb_data structure */ 
+
+	up(&scn_mutex); /* Now handled by the above */
 
 	if (!dev) {
 		err("open_scanner(%d): Scanner device not present", scn_minor);
@@ -337,13 +392,15 @@ open_scanner(struct inode * inode, struct file * file)
 
 	scn->isopen = 1;
 
-	file->private_data = scn; /* Used by the read and write metheds */
+	file->private_data = scn; /* Used by the read and write methods */
 
-	MOD_INC_USE_COUNT;
 
 out_error:
 
-	unlock_kernel();
+	up(&(scn->sem)); /* Wake up any possible contending processes */
+
+	if (err)
+		MOD_DEC_USE_COUNT;
 
 	return err;
 }
@@ -364,11 +421,16 @@ close_scanner(struct inode * inode, struct file * file)
 		return -ENODEV;
 	}
 
-	scn = p_scn_table[scn_minor];
+	down(&scn_mutex);
 
+	scn = p_scn_table[scn_minor];
+	down(&(scn->sem));
 	scn->isopen = 0;
 
 	file->private_data = NULL;
+
+	up(&scn_mutex);
+	up(&(scn->sem));
 
 	MOD_DEC_USE_COUNT;
 
@@ -395,6 +457,8 @@ write_scanner(struct file * file, const char * buffer,
 
 	scn = file->private_data;
 
+	down(&(scn->sem));
+
 	scn_minor = scn->scn_minor;
 
 	obuf = scn->obuf;
@@ -403,12 +467,10 @@ write_scanner(struct file * file, const char * buffer,
 
 	file->f_dentry->d_inode->i_atime = CURRENT_TIME;
 
-	down(&(scn->gen_lock));
-
 	while (count > 0) {
 
 		if (signal_pending(current)) {
-			ret = -EINTR;
+			ret = -ERESTARTSYS;
 			break;
 		}
 
@@ -427,7 +489,7 @@ write_scanner(struct file * file, const char * buffer,
 			ret = result;
 			break;
 		} else if (result < 0) { /* We should not get any I/O errors */
-			warn("write_scanner(%d): funky result: %d. Please notify the maintainer.", scn_minor, result);
+			warn("write_scanner(%d): funky result: %d. Consult Documentataion/usb/scanner.txt.", scn_minor, result);
 			ret = -EIO;
 			break;
 		}
@@ -457,7 +519,7 @@ write_scanner(struct file * file, const char * buffer,
 			break;
 		}
 	}
-	up(&(scn->gen_lock));
+	up(&(scn->sem));
 	mdelay(5);		/* This seems to help with SANE queries */
 	return ret ? ret : bytes_written;
 }
@@ -483,6 +545,8 @@ read_scanner(struct file * file, char * buffer,
 
 	scn = file->private_data;
 
+	down(&(scn->sem));
+
 	scn_minor = scn->scn_minor;
 
 	ibuf = scn->ibuf;
@@ -496,11 +560,9 @@ read_scanner(struct file * file, char * buffer,
                                                             atime of
                                                             the device
                                                             node */
-	down(&(scn->gen_lock));
-
 	while (count > 0) {
 		if (signal_pending(current)) {
-			ret = -EINTR;
+			ret = -ERESTARTSYS;
 			break;
 		}
 
@@ -545,7 +607,7 @@ read_scanner(struct file * file, char * buffer,
 			ret = result;
 			break;
 		} else if ((result < 0) && (result != USB_ST_DATAUNDERRUN)) {
-			warn("read_scanner(%d): funky result:%d. Please notify the maintainer.", scn_minor, (int)result);
+			warn("read_scanner(%d): funky result:%d. Consult Documentation/usb/scanner.txt.", scn_minor, (int)result);
 			ret = -EIO;
 			break;
 		}
@@ -577,19 +639,15 @@ read_scanner(struct file * file, char * buffer,
 			break;
 		}
 	}
-	up(&(scn->gen_lock));
-
+	up(&(scn->sem));
 	return ret ? ret : bytes_read;
 }
 
-#ifdef SCN_IOCTL
 static int
 ioctl_scanner(struct inode *inode, struct file *file,
 	      unsigned int cmd, unsigned long arg)
 {
 	struct usb_device *dev;
-
-	int result;
 
 	kdev_t scn_minor;
 
@@ -604,12 +662,15 @@ ioctl_scanner(struct inode *inode, struct file *file,
 
 	switch (cmd)
 	{
-	case IOCTL_SCANNER_VENDOR :
+	case SCANNER_IOCTL_VENDOR :
 		return (put_user(dev->descriptor.idVendor, (unsigned int *) arg));
-	case IOCTL_SCANNER_PRODUCT :
+	case SCANNER_IOCTL_PRODUCT :
 		return (put_user(dev->descriptor.idProduct, (unsigned int *) arg));
+#ifdef PV8630
 	case PV8630_IOCTL_INREQUEST :
 	{
+		int result;
+
 		struct {
 			__u8  data;
 			__u8  request;
@@ -637,6 +698,8 @@ ioctl_scanner(struct inode *inode, struct file *file,
 	}
 	case PV8630_IOCTL_OUTREQUEST :
 	{
+		int result;
+
 		struct {
 			__u8  request;
 			__u16 value;
@@ -658,20 +721,59 @@ ioctl_scanner(struct inode *inode, struct file *file,
 
 		return result;
 	}
+#endif /* PV8630 */
+ 	case SCANNER_IOCTL_CTRLMSG:
+ 	{
+ 		struct ctrlmsg_ioctl {
+ 			devrequest	req;
+ 			void		*data;
+ 		} cmsg;
+ 		int pipe, nb, ret;
+ 		unsigned char buf[64];
+ 
+ 		if (copy_from_user(&cmsg, (void *)arg, sizeof(cmsg)))
+ 			return -EFAULT;
+
+ 		nb = le16_to_cpup(&cmsg.req.length);
+
+ 		if (nb > sizeof(buf))
+ 			return -EINVAL;
+
+ 		if ((cmsg.req.requesttype & 0x80) == 0) {
+ 			pipe = usb_sndctrlpipe(dev, 0);
+ 			if (nb > 0 && copy_from_user(buf, cmsg.data, nb))
+ 				return -EFAULT;
+ 		} else {
+ 			pipe = usb_rcvctrlpipe(dev, 0);
+		}
+
+ 		ret = usb_control_msg(dev, pipe, cmsg.req.request,
+ 				      cmsg.req.requesttype,
+ 				      le16_to_cpup(&cmsg.req.value),
+ 				      le16_to_cpup(&cmsg.req.index),
+ 				      buf, nb, HZ);
+
+ 		if (ret < 0) {
+ 			err("ioctl_scanner(%d): control_msg returned %d\n", scn_minor, ret);
+ 			return -EIO;
+ 		}
+
+ 		if (nb > 0 && (cmsg.req.requesttype & 0x80) && copy_to_user(cmsg.data, buf, nb))
+ 			return -EFAULT;
+
+ 		return 0;
+ 	}
 	default:
 		return -ENOTTY;
 	}
 	return 0;
 }
-#endif /* SCN_IOCTL */
 
 static struct
 file_operations usb_scanner_fops = {
 	read:		read_scanner,
 	write:		write_scanner,
-#ifdef SCN_IOCTL
 	ioctl:		ioctl_scanner,
-#endif /* SCN_IOCTL */
 	open:		open_scanner,
 	release:	close_scanner,
 };
@@ -691,6 +793,7 @@ probe_scanner(struct usb_device *dev, unsigned int ifnum,
 
 	char valid_device = 0;
 	char have_bulk_in, have_bulk_out, have_intr;
+	char name[10];
 
 	if (vendor != -1 && product != -1) {
 		info("probe_scanner: User specified USB scanner -- Vendor:Product - %x:%x", vendor, product);
@@ -791,7 +894,7 @@ probe_scanner(struct usb_device *dev, unsigned int ifnum,
 			dbg("probe_scanner: intr_ep:%d", have_intr);
 			continue;
 		}
-		info("probe_scanner: Undetected endpoint. Notify the maintainer.");
+		info("probe_scanner: Undetected endpoint -- consult Documentation/usb/scanner.txt.");
 		return NULL;	/* Shouldn't ever get here unless we have something weird */
 	}
 
@@ -815,7 +918,7 @@ probe_scanner(struct usb_device *dev, unsigned int ifnum,
 		}
 		break;
 	default:
-		info("probe_scanner: Endpoint determination failed.  Notify the maintainer.");
+		info("probe_scanner: Endpoint determination failed --  consult Documentation/usb/scanner.txt");
 		return NULL;
 	}
 
@@ -825,6 +928,8 @@ probe_scanner(struct usb_device *dev, unsigned int ifnum,
  * with it.  The problem with this is that we are counting on the fact
  * that the user will sequentially add device nodes for the scanner
  * devices.  */
+	
+	down(&scn_mutex);
 
 	for (scn_minor = 0; scn_minor < SCN_MAX_MNR; scn_minor++) {
 		if (!p_scn_table[scn_minor])
@@ -844,8 +949,10 @@ probe_scanner(struct usb_device *dev, unsigned int ifnum,
 		return NULL;
 	}
 	memset (scn, 0, sizeof(struct scn_usb_data));
-	dbg ("probe_scanner(%d): Address of scn:%p", scn_minor, scn);
 
+	init_MUTEX(&(scn->sem)); /* Initializes to unlocked */
+
+	dbg ("probe_scanner(%d): Address of scn:%p", scn_minor, scn);
 
 /* Ok, if we detected an interrupt EP, setup a handler for it */
 	if (have_intr) {
@@ -859,6 +966,7 @@ probe_scanner(struct usb_device *dev, unsigned int ifnum,
 	        if (usb_submit_urb(&scn->scn_irq)) {
 			err("probe_scanner(%d): Unable to allocate INT URB.", scn_minor);
                 	kfree(scn);
+			up(&scn_mutex);
                 	return NULL;
         	}
 	}
@@ -868,6 +976,7 @@ probe_scanner(struct usb_device *dev, unsigned int ifnum,
 	if (!(scn->obuf = (char *)kmalloc(OBUF_SIZE, GFP_KERNEL))) {
 		err("probe_scanner(%d): Not enough memory for the output buffer.", scn_minor);
 		kfree(scn);
+		up(&scn_mutex);
 		return NULL;
 	}
 	dbg("probe_scanner(%d): obuf address:%p", scn_minor, scn->obuf);
@@ -876,6 +985,7 @@ probe_scanner(struct usb_device *dev, unsigned int ifnum,
 		err("probe_scanner(%d): Not enough memory for the input buffer.", scn_minor);
 		kfree(scn->obuf);
 		kfree(scn);
+		up(&scn_mutex);
 		return NULL;
 	}
 	dbg("probe_scanner(%d): ibuf address:%p", scn_minor, scn->ibuf);
@@ -908,15 +1018,17 @@ probe_scanner(struct usb_device *dev, unsigned int ifnum,
 	scn->scn_minor = scn_minor;
 	scn->isopen = 0;
 
-	init_MUTEX(&(scn->gen_lock));
+	sprintf(name, "scanner%d", scn->scn_minor);
+	
+	scn->devfs = devfs_register(usb_devfs_handle, name,
+				    DEVFS_FL_DEFAULT, USB_MAJOR,
+				    SCN_BASE_MNR + scn->scn_minor,
+				    S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP |
+				    S_IWGRP | S_IROTH | S_IWOTH, &usb_scanner_fops, NULL);
+	if (scn->devfs == NULL)
+		dbg("scanner%d: device node registration failed", scn_minor);
 
-	/* if we have devfs, create with perms=660 */
-	scn->devfs = devfs_register(usb_devfs_handle, "scanner",
-				      DEVFS_FL_DEFAULT, USB_MAJOR,
-				      SCN_BASE_MNR + scn_minor,
-				      S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP |
-				      S_IWGRP, &usb_scanner_fops, NULL);
-
+	up(&scn_mutex);
 
 	return p_scn_table[scn_minor] = scn;
 }
@@ -926,6 +1038,9 @@ disconnect_scanner(struct usb_device *dev, void *ptr)
 {
 	struct scn_usb_data *scn = (struct scn_usb_data *) ptr;
 
+	down (&scn_mutex);
+	down (&(scn->sem));
+
 	if(scn->intr_ep) {
 		dbg("disconnect_scanner(%d): Unlinking IRQ URB", scn->scn_minor);
 		usb_unlink_urb(&scn->scn_irq);
@@ -933,16 +1048,16 @@ disconnect_scanner(struct usb_device *dev, void *ptr)
         usb_driver_release_interface(&scanner_driver,
                 &scn->scn_dev->actconfig->interface[scn->ifnum]);
 
-	devfs_unregister (scn->devfs);
-
 	kfree(scn->ibuf);
 	kfree(scn->obuf);
 
 	dbg("disconnect_scanner: De-allocating minor:%d", scn->scn_minor);
+	devfs_unregister(scn->devfs);
 	p_scn_table[scn->scn_minor] = NULL;
+	up (&(scn->sem));
 	kfree (scn);
+	up (&scn_mutex);
 }
-
 
 static struct
 usb_driver scanner_driver = {
@@ -968,7 +1083,7 @@ usb_scanner_init (void)
         if (usb_register(&scanner_driver) < 0)
                 return -1;
 
-	info("USB Scanner support registered.");
+	info(DRIVER_VERSION ":" DRIVER_DESC);
 	return 0;
 }
 

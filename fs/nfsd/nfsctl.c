@@ -309,6 +309,7 @@ done:
 /* New-style module support since 2.1.18 */
 EXPORT_NO_SYMBOLS;
 MODULE_AUTHOR("Olaf Kirch <okir@monad.swb.de>");
+MODULE_LICENSE("GPL");
 
 struct nfsd_linkage nfsd_linkage_s = {
 	do_nfsservctl: handle_sys_nfsservctl,

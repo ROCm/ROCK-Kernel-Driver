@@ -38,10 +38,13 @@
 	* Fix three endian-ness bugs
 	* Support dual function SYM53C885E ethernet chip
 	
+	LK1.1.5 (val@nmt.edu):
+	* Fix forced full-duplex bug I introduced
+	
 */
 
 #define DRV_NAME	"yellowfin"
-#define DRV_VERSION	"1.05+LK1.1.3"
+#define DRV_VERSION	"1.05+LK1.1.5"
 #define DRV_RELDATE	"May 10, 2001"
 
 #define PFX DRV_NAME ": "
@@ -256,7 +259,7 @@ enum pci_id_flags_bits {
 };
 enum capability_flags {
 	HasMII=1, FullTxStatus=2, IsGigabit=4, HasMulticastBug=8, FullRxStatus=16,
-	HasMACAddrBug=32,			/* Only on early revs.  */
+	HasMACAddrBug=32, DontUseEeprom=64, /* Only on early revs.  */
 };
 /* The PCI I/O space extent. */
 #define YELLOWFIN_SIZE 0x100
@@ -282,7 +285,7 @@ static struct pci_id_info pci_id_tbl[] = {
 	 PCI_IOTYPE, YELLOWFIN_SIZE,
 	 FullTxStatus | IsGigabit | HasMulticastBug | HasMACAddrBug},
 	{"Symbios SYM83C885", { 0x07011000, 0xffffffff},
-	 PCI_IOTYPE, YELLOWFIN_SIZE, HasMII | IsGigabit | FullTxStatus },
+	 PCI_IOTYPE, YELLOWFIN_SIZE, HasMII | DontUseEeprom },
 	{0,},
 };
 
@@ -453,7 +456,7 @@ static int __devinit yellowfin_init_one(struct pci_dev *pdev,
 #endif
 	irq = pdev->irq;
 
-	if (drv_flags & IsGigabit)
+	if (drv_flags & DontUseEeprom)
 		for (i = 0; i < 6; i++)
 			dev->dev_addr[i] = inb(ioaddr + StnAddr + i);
 	else {

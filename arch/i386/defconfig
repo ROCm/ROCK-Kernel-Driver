@@ -411,6 +411,7 @@ CONFIG_EEPRO100=y
 # CONFIG_NE2K_PCI is not set
 # CONFIG_NE3210 is not set
 # CONFIG_ES3210 is not set
+# CONFIG_8139CP is not set
 # CONFIG_8139TOO is not set
 # CONFIG_8139TOO_PIO is not set
 # CONFIG_8139TOO_TUNE_TWISTER is not set

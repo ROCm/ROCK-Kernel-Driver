@@ -1684,8 +1684,8 @@ static void uhci_unlink_generic(struct uhci *uhci, struct urb *urb)
 		/* Control and Isochronous ignore the toggle, so this */
 		/* is safe for all types */
 		if (!(td->status & TD_CTRL_ACTIVE) &&
-		    uhci_actual_length(td->status) < uhci_expected_length(td->info) ||
-		    tmp == head) {
+		    (uhci_actual_length(td->status) < uhci_expected_length(td->info) ||
+		    tmp == head)) {
 			usb_settoggle(urb->dev, uhci_endpoint(td->info),
 				uhci_packetout(td->info),
 				uhci_toggle(td->info) ^ 1);

@@ -159,7 +159,7 @@ static int change_mode(struct parport *pp, int m)
 				if (time_after_eq (jiffies, expire))
 					/* The FIFO is stuck. */
 					return -EBUSY;
-				current->state = TASK_INTERRUPTIBLE;
+				set_current_state(TASK_INTERRUPTIBLE);
 				schedule_timeout((HZ + 99) / 100);
 				if (signal_pending (current))
 					break;

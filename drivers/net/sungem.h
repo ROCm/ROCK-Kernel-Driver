@@ -1,4 +1,4 @@
-/* $Id: sungem.h,v 1.7 2001/04/04 14:49:40 davem Exp $
+/* $Id: sungem.h,v 1.8 2001/10/17 05:55:39 davem Exp $
  * sungem.h: Definitions for Sun GEM ethernet driver.
  *
  * Copyright (C) 2000 David S. Miller (davem@redhat.com)
@@ -756,9 +756,12 @@
 /* MII phy registers */
 #define PHY_CTRL	0x00
 #define PHY_STAT	0x01
+#define PHY_ID0		0x02
+#define PHY_ID1		0x03
 #define PHY_ADV		0x04
 #define PHY_LPA		0x05
 
+#define PHY_CTRL_SPD2	0x0040		/* Gigabit enable? (bcm5411)	*/
 #define PHY_CTRL_FDPLX	0x0100		/* Full duplex			*/
 #define PHY_CTRL_ISO	0x0400		/* Isloate MII from PHY		*/
 #define PHY_CTRL_ANRES	0x0200		/* Auto-negotiation restart	*/
@@ -778,7 +781,36 @@
 #define PHY_LPA_10FULL	0x0040
 #define PHY_LPA_100HALF	0x0080
 #define PHY_LPA_100FULL	0x0100
+#define PHY_LPA_PAUSE	0x0400
 #define PHY_LPA_FAULT	0x2000
+
+/* More PHY registers (specific to Broadcom models) */
+
+/* MII BCM5201 MULTIPHY interrupt register */
+#define PHY_BCM5201_INTERRUPT			0x1A
+#define PHY_BCM5201_INTERRUPT_INTENABLE		0x4000
+
+#define PHY_BCM5201_AUXMODE2			0x1B
+#define PHY_BCM5201_AUXMODE2_LOWPOWER		0x0008
+
+#define PHY_BCM5201_MULTIPHY                    0x1E
+
+/* MII BCM5201 MULTIPHY register bits */
+#define PHY_BCM5201_MULTIPHY_SERIALMODE         0x0002
+#define PHY_BCM5201_MULTIPHY_SUPERISOLATE       0x0008
+
+/* MII BCM5400 1000-BASET Control register */
+#define PHY_BCM5400_GB_CONTROL			0x09
+#define PHY_BCM5400_GB_CONTROL_FULLDUPLEXCAP	0x0200
+
+/* MII BCM5400 AUXCONTROL register */
+#define PHY_BCM5400_AUXCONTROL                  0x18
+#define PHY_BCM5400_AUXCONTROL_PWR10BASET       0x0004
+
+/* MII BCM5400 AUXSTATUS register */
+#define PHY_BCM5400_AUXSTATUS                   0x19
+#define PHY_BCM5400_AUXSTATUS_LINKMODE_MASK     0x0700
+#define PHY_BCM5400_AUXSTATUS_LINKMODE_SHIFT    8  
 
 /* When it can, GEM internally caches 4 aligned TX descriptors
  * at a time, so that it can use full cacheline DMA reads.
@@ -916,9 +948,19 @@ enum gem_phy_type {
 	phy_serdes,
 };
 
+enum gem_phy_model {
+	phymod_generic,
+	phymod_bcm5201,
+	phymod_bcm5221,
+	phymod_bcm5400,
+	phymod_bcm5401,
+	phymod_bcm5411,
+};
+
 enum link_state {
 	aneg_wait,
 	force_wait,
+	aneg_up,
 };
 
 struct gem {
@@ -926,6 +968,11 @@ struct gem {
 	unsigned long regs;
 	int rx_new, rx_old;
 	int tx_new, tx_old;
+
+	/* Set when chip is actually in operational state
+	 * (ie. not power managed)
+	 */
+	int hw_running;
 
 	struct gem_init_block *init_block;
 
@@ -935,6 +982,7 @@ struct gem {
 	struct net_device_stats net_stats;
 
 	enum gem_phy_type	phy_type;
+	enum gem_phy_model	phy_mod;
 	int			tx_fifo_sz;
 	int			rx_fifo_sz;
 	int			rx_pause_off;
@@ -952,6 +1000,9 @@ struct gem {
 	dma_addr_t gblock_dvma;
 	struct pci_dev *pdev;
 	struct net_device *dev;
+#ifdef CONFIG_ALL_PPC
+	struct device_node	*of_node;
+#endif
 };
 
 #define ALIGNED_RX_SKB_ADDR(addr) \

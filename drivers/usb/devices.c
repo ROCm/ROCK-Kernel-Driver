@@ -488,7 +488,7 @@ static ssize_t usb_device_read(struct file *file, char *buf, size_t nbytes, loff
 		return -EFAULT;
 
 	/* enumerate busses */
-	read_lock_irq (&usb_bus_list_lock);
+	down (&usb_bus_list_lock);
 	for (buslist = usb_bus_list.next; buslist != &usb_bus_list; buslist = buslist->next) {
 		/* print devices for this bus */
 		bus = list_entry(buslist, struct usb_bus, bus_list);
@@ -498,7 +498,7 @@ static ssize_t usb_device_read(struct file *file, char *buf, size_t nbytes, loff
 			return ret;
 		total_written += ret;
 	}
-	read_unlock_irq (&usb_bus_list_lock);
+	up (&usb_bus_list_lock);
 	return total_written;
 }
 

@@ -1,4 +1,4 @@
-/*  $Id: init.c,v 1.193 2001/09/25 22:47:35 davem Exp $
+/*  $Id: init.c,v 1.194 2001/10/17 18:26:58 davem Exp $
  *  arch/sparc64/mm/init.c
  *
  *  Copyright (C) 1996-1999 David S. Miller (davem@caip.rutgers.edu)
@@ -108,21 +108,71 @@ int do_check_pgt_cache(int low, int high)
 
 extern void __update_mmu_cache(struct vm_area_struct *, unsigned long, pte_t);
 
+#ifdef DCFLUSH_DEBUG
+atomic_t dcpage_flushes = ATOMIC_INIT(0);
+#ifdef CONFIG_SMP
+atomic_t dcpage_flushes_xcall = ATOMIC_INIT(0);
+#endif
+#endif
+
+__inline__ void flush_dcache_page_impl(struct page *page)
+{
+#ifdef DCFLUSH_DEBUG
+	atomic_inc(&dcpage_flushes);
+#endif
+
+#if (L1DCACHE_SIZE > PAGE_SIZE)
+	__flush_dcache_page(page->virtual,
+			    ((tlb_type == spitfire) &&
+			     page->mapping != NULL));
+#else
+	if (page->mapping != NULL &&
+	    tlb_type == spitfire)
+		__flush_icache_page(__pa(page->virtual));
+#endif
+}
+
 void update_mmu_cache(struct vm_area_struct *vma, unsigned long address, pte_t pte)
 {
 	struct page *page = pte_page(pte);
 
 	if (VALID_PAGE(page) && page->mapping &&
 	    test_bit(PG_dcache_dirty, &page->flags)) {
-#if (L1DCACHE_SIZE > PAGE_SIZE)			/* is there D$ aliasing problem */
-		__flush_dcache_page(page->virtual, (tlb_type == spitfire));
-#else
-		if (tlb_type == spitfire)	/* fix local I$ coherency */
-			__flush_icache_page(__get_phys((unsigned long)(page->virtual)));
-#endif
-		clear_bit(PG_dcache_dirty, &page->flags);
+		/* This is just to optimize away some function calls
+		 * in the SMP case.
+		 */
+		if (dcache_dirty_cpu(page) == smp_processor_id())
+			flush_dcache_page_impl(page);
+		else
+			smp_flush_dcache_page_impl(page);
+
+		clear_dcache_dirty(page);
 	}
 	__update_mmu_cache(vma, address, pte);
+}
+
+void flush_dcache_page(struct page *page)
+{
+	int dirty = test_bit(PG_dcache_dirty, &page->flags);
+	int dirty_cpu = dcache_dirty_cpu(page);
+
+	if (page->mapping &&
+	    page->mapping->i_mmap == NULL &&
+	    page->mapping->i_mmap_shared == NULL) {
+		if (dirty) {
+			if (dirty_cpu == smp_processor_id())
+				return;
+			smp_flush_dcache_page_impl(page);
+		}
+		set_dcache_dirty(page);
+	} else {
+		/* We could delay the flush for the !page->mapping
+		 * case too.  But that case is for exec env/arg
+		 * pages and those are %99 certainly going to get
+		 * faulted into the tlb (and thus flushed) anyways.
+		 */
+		flush_dcache_page_impl(page);
+	}
 }
 
 void flush_icache_range(unsigned long start, unsigned long end)
@@ -153,12 +203,25 @@ void show_mem(void)
 
 int mmu_info(char *buf)
 {
+	int len;
+
 	if (tlb_type == cheetah)
-		return sprintf(buf, "MMU Type\t: Cheetah\n");
+		len = sprintf(buf, "MMU Type\t: Cheetah\n");
 	else if (tlb_type == spitfire)
-		return sprintf(buf, "MMU Type\t: Spitfire\n");
+		len = sprintf(buf, "MMU Type\t: Spitfire\n");
 	else
-		return sprintf(buf, "MMU Type\t: ???\n");
+		len = sprintf(buf, "MMU Type\t: ???\n");
+
+#ifdef DCFLUSH_DEBUG
+	len += sprintf(buf + len, "DCPageFlushes\t: %d\n",
+		       atomic_read(&dcpage_flushes));
+#ifdef CONFIG_SMP
+	len += sprintf(buf + len, "DCPageFlushesXC\t: %d\n",
+		       atomic_read(&dcpage_flushes_xcall));
+#endif /* CONFIG_SMP */
+#endif /* DCFLUSH_DEBUG */
+
+	return len;
 }
 
 struct linux_prom_translation {

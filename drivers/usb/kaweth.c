@@ -969,14 +969,14 @@ static int usb_start_wait_urb(urb_t *urb, int timeout, int* actual_length)
         init_waitqueue_head(&awd.wqh);
         awd.done = 0;
         
-        current->state = TASK_INTERRUPTIBLE;
+        set_current_state(TASK_INTERRUPTIBLE);
         add_wait_queue(&awd.wqh, &wait);
         urb->context = &awd;
         status = usb_submit_urb(urb);
         if (status) {
                 // something went wrong
                 usb_free_urb(urb);
-                current->state = TASK_RUNNING;
+                set_current_state(TASK_RUNNING);
                 remove_wait_queue(&awd.wqh, &wait);
                 return status;
         }
@@ -984,7 +984,7 @@ static int usb_start_wait_urb(urb_t *urb, int timeout, int* actual_length)
 	while (timeout && !awd.done)
 		timeout = schedule_timeout(timeout);
 
-        current->state = TASK_RUNNING;
+        set_current_state(TASK_RUNNING);
         remove_wait_queue(&awd.wqh, &wait);
 
         if (!timeout) {

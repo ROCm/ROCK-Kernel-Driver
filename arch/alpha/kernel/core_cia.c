@@ -637,10 +637,11 @@ do_init_arch(int is_pyxis)
 	*(vip)CIA_IOC_HAE_IO = 0;
 
 	/* For PYXIS, we always use BWX bus and i/o accesses.  To that end,
-	   make sure they're enabled on the controller.  */
+	   make sure they're enabled on the controller.  At the same time,
+	   enable the monster window.  */
 	if (is_pyxis) {
 		temp = *(vip)CIA_IOC_CIA_CNFG;
-		temp |= CIA_CNFG_IOA_BWEN;
+		temp |= CIA_CNFG_IOA_BWEN | CIA_CNFG_PCI_MWEN;
 		*(vip)CIA_IOC_CIA_CNFG = temp;
 	}
 

@@ -79,35 +79,30 @@ quirk_ali_ide_ports(struct pci_dev *dev)
 static void __init
 quirk_cypress(struct pci_dev *dev)
 {
-/*
- * Notorious Cy82C693 chip. One of its numerous bugs: although
- * Cypress IDE controller doesn't support native mode, it has
- * programmable addresses of IDE command/control registers.
- * This violates PCI specifications, confuses IDE subsystem
- * and causes resource conflict between primary HD_CMD register
- * and floppy controller. Ugh.
- * Fix that.
- */
+	/* The Notorious Cy82C693 chip.  */
+
+	/* The Cypress IDE controller doesn't support native mode, but it
+	   has programmable addresses of IDE command/control registers.
+	   This violates PCI specifications, confuses the IDE subsystem and
+	   causes resource conflicts between the primary HD_CMD register and
+	   the floppy controller.  Ugh.  Fix that.  */
 	if (dev->class >> 8 == PCI_CLASS_STORAGE_IDE) {
 		dev->resource[0].flags = 0;
 		dev->resource[1].flags = 0;
-		return;
 	}
-/*
- * Another "feature": Cypress bridge responds on the PCI bus
- * in the address range 0xffff0000-0xffffffff (conventional
- * x86 BIOS ROM). No way to turn this off, so if we use
- * large SG window, we must avoid these addresses.
- */
-	if (dev->class >> 8 == PCI_CLASS_BRIDGE_ISA) {
-		struct pci_controller *hose = dev->sysdata;
-		long overlap;
 
-		if (hose->sg_pci) {
-			overlap = hose->sg_pci->dma_base + hose->sg_pci->size;
-			overlap -= 0xffff0000;
-			if (overlap > 0)
-				hose->sg_pci->size -= overlap;
+	/* The Cypress bridge responds on the PCI bus in the address range
+	   0xffff0000-0xffffffff (conventional x86 BIOS ROM).  There is no
+	   way to turn this off, so if we use a large direct-map window, or
+	   a large SG window, we must avoid this region.  */
+	else if (dev->class >> 8 == PCI_CLASS_BRIDGE_ISA) {
+		if (__direct_map_base + __direct_map_size >= 0xffff0000)
+			__direct_map_size = 0xffff0000 - __direct_map_base;
+		else {
+			struct pci_controller *hose = dev->sysdata;
+			struct pci_iommu_arena *pci = hose->sg_pci;
+			if (pci && pci->dma_base + pci->size >= 0xffff0000)
+				pci->size = 0xffff0000 - pci->dma_base;
 		}
 	}
 }

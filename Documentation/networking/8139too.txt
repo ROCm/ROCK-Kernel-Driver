@@ -183,6 +183,12 @@ suggestions welcome)  (WIP)
 Change History
 --------------
 
+Version 0.9.20 - October 18, 2001
+
+* Print out notice when 8139C+ chip is detected
+* Add id for D-Link DFE690TXD pcmcia cardbus card (Gert Dewit)
+
+
 Version 0.9.19 - October 9, 2001
 
 * Eliminate buffer copy for unaligned Tx's (manfred)

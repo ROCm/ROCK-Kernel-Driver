@@ -2299,8 +2299,7 @@ int __init sa1100fb_setup(char *options)
 	if (!options || !*options)
 		return 0;
 
-	for (this_opt = strtok(options, ","); this_opt;
-	     this_opt = strtok(NULL, ",")) {
+	while (this_opt = strsep(&options, ",")) {
 
 		if (!strncmp(this_opt, "bpp:", 4))
 			current_par.max_bpp =

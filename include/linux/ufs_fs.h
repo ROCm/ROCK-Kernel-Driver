@@ -532,6 +532,14 @@ extern void ufs_put_cylinder (struct super_block *, unsigned);
 /* dir.c */
 extern struct inode_operations ufs_dir_inode_operations;
 extern int ufs_check_dir_entry (const char *, struct inode *, struct ufs_dir_entry *, struct buffer_head *, unsigned long);
+extern int ufs_add_link (struct dentry *, struct inode *);
+extern ino_t ufs_inode_by_name(struct inode *, struct dentry *);
+extern int ufs_make_empty(struct inode *, struct inode *);
+extern struct ufs_dir_entry * ufs_find_entry (struct dentry *, struct buffer_head **);
+extern int ufs_delete_entry (struct inode *, struct ufs_dir_entry *, struct buffer_head *);
+extern int ufs_empty_dir (struct inode *);
+extern struct ufs_dir_entry * ufs_dotdot (struct inode *, struct buffer_head **);
+extern void ufs_set_link(struct inode *, struct ufs_dir_entry *, struct buffer_head *, struct inode *);
 
 /* file.c */
 extern struct inode_operations ufs_file_inode_operations;
@@ -541,7 +549,7 @@ extern struct address_space_operations ufs_aops;
 
 /* ialloc.c */
 extern void ufs_free_inode (struct inode *inode);
-extern struct inode * ufs_new_inode (const struct inode *, int, int *);
+extern struct inode * ufs_new_inode (const struct inode *, int);
 
 /* inode.c */
 extern int ufs_frag_map (struct inode *, int);

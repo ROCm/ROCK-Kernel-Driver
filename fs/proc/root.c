@@ -44,6 +44,10 @@ void __init proc_root_init(void)
 #ifdef CONFIG_SYSCTL
 	proc_sys_root = proc_mkdir("sys", 0);
 #endif
+#if defined(CONFIG_BINFMT_MISC) || defined(CONFIG_BINFMT_MISC_MODULE)
+	proc_mkdir("sys/fs", 0);
+	proc_mkdir("sys/fs/binfmt_misc", 0);
+#endif
 	proc_root_fs = proc_mkdir("fs", 0);
 	proc_root_driver = proc_mkdir("driver", 0);
 #if defined(CONFIG_SUN_OPENPROMFS) || defined(CONFIG_SUN_OPENPROMFS_MODULE)

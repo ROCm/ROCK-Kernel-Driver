@@ -72,7 +72,7 @@
 		features of the 8139 chips
 
 		Jean-Jacques Michel - bug fix
-		
+
 		Tobias Ringström - Rx interrupt status checking suggestion
 
 		Andrew Morton - Clear blocked signals, avoid
@@ -139,7 +139,7 @@ an MMIO register read.
 */
 
 #define DRV_NAME	"8139too"
-#define DRV_VERSION	"0.9.19"
+#define DRV_VERSION	"0.9.20"
 
 
 #include <linux/config.h>
@@ -258,6 +258,7 @@ typedef enum {
 	DELTA8139,
 	ADDTRON8139,
 	DFE538TX,
+	DFE690TXD,
 	RTL8129,
 } board_t;
 
@@ -274,6 +275,7 @@ static struct {
 	{ "Delta Electronics 8139 10/100BaseTX", RTL8139_CAPS },
 	{ "Addtron Technolgy 8139 10/100BaseTX", RTL8139_CAPS },
 	{ "D-Link DFE-538TX (RealTek RTL8139)", RTL8139_CAPS },
+	{ "D-Link DFE-690TXD (RealTek RTL8139)", RTL8139_CAPS },
 	{ "RealTek RTL8129", RTL8129_CAPS },
 };
 
@@ -286,6 +288,7 @@ static struct pci_device_id rtl8139_pci_tbl[] __devinitdata = {
 	{0x1500, 0x1360, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DELTA8139 },
 	{0x4033, 0x1360, PCI_ANY_ID, PCI_ANY_ID, 0, 0, ADDTRON8139 },
 	{0x1186, 0x1300, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DFE538TX },
+	{0x1186, 0x1340, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DFE690TXD },
 
 #ifdef CONFIG_8139TOO_8129
 	{0x10ec, 0x8129, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RTL8129 },
@@ -942,6 +945,7 @@ static int __devinit rtl8139_init_one (struct pci_dev *pdev,
 	int i, addr_len, option;
 	void *ioaddr;
 	static int board_idx = -1;
+	u8 pci_rev;
 
 	DPRINTK ("ENTER\n");
 
@@ -960,6 +964,15 @@ static int __devinit rtl8139_init_one (struct pci_dev *pdev,
 			printk (KERN_INFO RTL8139_DRIVER_NAME "\n");
 	}
 #endif
+
+	pci_read_config_byte(pdev, PCI_REVISION_ID, &pci_rev);
+
+	if (pdev->vendor == PCI_VENDOR_ID_REALTEK &&
+	    pdev->device == PCI_DEVICE_ID_REALTEK_8139 && pci_rev >= 0x20) {
+		printk(KERN_INFO PFX "pci dev %s (id %04x:%04x rev %02x) is an enhanced 8139C+ chip\n",
+		       pdev->slot_name, pdev->vendor, pdev->device, pci_rev);
+		printk(KERN_INFO PFX "Use the \"8139cp\" driver for improved performance and stability.\n");
+	}
 
 	i = rtl8139_init_board (pdev, &dev);
 	if (i < 0) {
@@ -1372,7 +1385,7 @@ static void rtl_check_media (struct net_device *dev)
 	struct rtl8139_private *tp = dev->priv;
 
 	DPRINTK("ENTER\n");
-	
+
 	if (tp->phys[0] >= 0) {
 		u16 mii_reg5 = mdio_read(dev, tp->phys[0], 5);
 		if (mii_reg5 == 0xffff)
@@ -1421,7 +1434,7 @@ static void rtl8139_hw_start (struct net_device *dev)
 	RTL_W32 (TxConfig, (TX_DMA_BURST << TxDMAShift));
 
 	tp->cur_rx = 0;
-	
+
 	rtl_check_media (dev);
 
 	if (tp->chipset >= CH_8139B) {
@@ -1879,7 +1892,7 @@ static void rtl8139_rx_err (u32 rx_status, struct net_device *dev,
 {
 	u8 tmp8;
 	int tmp_work;
-    
+
 	DPRINTK ("%s: Ethernet frame had errors, status %8.8x.\n",
 	         dev->name, rx_status);
 	if (rx_status & RxTooLong) {
@@ -1967,7 +1980,7 @@ static void rtl8139_rx_interrupt (struct net_device *dev,
 		struct sk_buff *skb;
 
 		rmb();
-		
+
 		/* read size+status of next frame from DMA ring buffer */
 		rx_status = le32_to_cpu (*(u32 *) (rx_ring + ring_offset));
 		rx_size = rx_status >> 16;
@@ -2376,7 +2389,7 @@ static int netdev_ethtool_ioctl (struct net_device *dev, void *useraddr)
 		}
 
 	/* TODO: ETHTOOL_SSET */
-		
+
 	case ETHTOOL_GDRVINFO:
 		{
 			struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };

@@ -1,4 +1,4 @@
-/* $Id: ffb_drv.c,v 1.15 2001/08/09 17:47:51 davem Exp $
+/* $Id: ffb_drv.c,v 1.16 2001/10/18 16:00:24 davem Exp $
  * ffb_drv.c: Creator/Creator3D direct rendering driver.
  *
  * Copyright (C) 2000 David S. Miller (davem@redhat.com)
@@ -45,16 +45,16 @@ static struct file_operations	DRM(fops) = {			\
 #define DRIVER_PRESETUP()	do {		\
 	int _ret;				\
 	_ret = ffb_presetup(dev);		\
-	if(_ret != 0) return _ret;		\
+	if (_ret != 0) return _ret;		\
 } while(0)
 
 /* Free private structure */
 #define DRIVER_PRETAKEDOWN()	do {				\
-	if(dev->dev_private) kfree(dev->dev_private);		\
+	if (dev->dev_private) kfree(dev->dev_private);		\
 } while(0)
 
 #define DRIVER_POSTCLEANUP()	do {				\
-	if(ffb_position != NULL) kfree(ffb_position);		\
+	if (ffb_position != NULL) kfree(ffb_position);		\
 } while(0)
 
 /* We have to free up the rogue hw context state holding error or 
@@ -66,7 +66,9 @@ static struct file_operations	DRM(fops) = {			\
 	int idx;							\
 									\
 	idx = context - 1;						\
-	if (fpriv && fpriv->hw_state[idx] != NULL) {			\
+	if (fpriv &&							\
+	    context != DRM_KERNEL_CONTEXT &&				\
+	    fpriv->hw_state[idx] != NULL) {				\
 		kfree(fpriv->hw_state[idx]);				\
 		fpriv->hw_state[idx] = NULL;				\
 	}								\

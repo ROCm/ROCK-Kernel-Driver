@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.types.h 1.8 07/07/01 13:37:26 paulus
+ * BK Id: SCCS/s.types.h 1.10 10/15/01 22:51:33 paulus
  */
 #ifndef _PPC_TYPES_H
 #define _PPC_TYPES_H
@@ -46,6 +46,7 @@ typedef __vector128 vector128;
 
 /* DMA addresses are 32-bits wide */
 typedef u32 dma_addr_t;
+typedef u64 dma64_addr_t;
 
 #endif /* __KERNEL__ */
 

@@ -1,4 +1,4 @@
-/* $Id: unistd.h,v 1.48 2001/10/09 10:54:39 davem Exp $ */
+/* $Id: unistd.h,v 1.49 2001/10/18 08:27:05 davem Exp $ */
 #ifndef _SPARC64_UNISTD_H
 #define _SPARC64_UNISTD_H
 
@@ -220,7 +220,7 @@
 #define __NR_oldlstat           202 /* Linux Specific                              */
 #define __NR_uselib             203 /* Linux Specific                              */
 #define __NR_readdir            204 /* Linux Specific                              */
-/* #define __NR_ioperm          205    Linux Specific - i386 specific, unused      */
+#define __NR_readahead          205 /* Linux Specific                              */
 #define __NR_socketcall         206 /* Linux Specific                              */
 #define __NR_syslog             207 /* Linux Specific                              */
 /* #define __NR_olduname        208    Linux Specific                              */

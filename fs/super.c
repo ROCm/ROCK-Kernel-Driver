@@ -866,13 +866,21 @@ struct vfsmount *kern_mount(struct file_system_type *type)
 	return do_kern_mount((char *)type->name, 0, (char *)type->name, NULL);
 }
 
+static char * __initdata root_mount_data;
+static int __init root_data_setup(char *str)
+{
+	root_mount_data = str;
+	return 1;
+}
+
 static char * __initdata root_fs_names;
 static int __init fs_names_setup(char *str)
 {
 	root_fs_names = str;
-	return 0;
+	return 1;
 }
 
+__setup("rootflags=", root_data_setup);
 __setup("rootfstype=", fs_names_setup);
 
 static void __init get_fs_names(char *page)
@@ -1023,7 +1031,8 @@ retry:
 		struct file_system_type * fs_type = get_fs_type(p);
 		if (!fs_type)
   			continue;
-  		sb = read_super(ROOT_DEV,bdev,fs_type,root_mountflags,NULL);
+  		sb = read_super(ROOT_DEV, bdev, fs_type,
+				root_mountflags, root_mount_data);
 		if (sb) 
 			goto mount_it;
 		put_filesystem(fs_type);

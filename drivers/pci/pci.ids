@@ -106,9 +106,16 @@
 	0012  53c895a
 	0020  53c1010 Ultra3 SCSI Adapter
 	0021  53c1010 66MHz  Ultra3 SCSI Adapter
+	0030  53c1030
+	0040  53c1035
 	008f  53c875J
 		1092 8000  FirePort 40 SCSI Controller
 		1092 8760  FirePort 40 Dual SCSI Host Adapter
+	0621  FC909
+	0622  FC929
+	0623  FC929 LAN
+	0624  FC919
+	0625  FC919 LAN
 	0701  83C885
 	0702  Yellowfin G-NIC gigabit ethernet
 		1318 0000  PEI100X
@@ -2085,6 +2092,7 @@
 110a  Siemens Nixdorf AG
 	0002  Pirahna 2-port
 	0005  Tulip controller, power management, switch extender
+	2102  DSCC4 WAN adapter
 	4942  FPGA I-Bus Tracer for MBD
 	6120  SZB6120
 110b  Chromatic Research Inc.
@@ -2310,7 +2318,7 @@
 		1148 5841  FDDI SK-5841 (SK-NET FDDI-FP64)
 		1148 5843  FDDI SK-5843 (SK-NET FDDI-LP64)
 		1148 5844  FDDI SK-5844 (SK-NET FDDI-LP64 DAS)
-	4200  Token ring adaptor
+	4200  Token Ring adapter
 	4300  Gigabit Ethernet
 		1148 9821  SK-9821 (1000Base-T single link)
 		1148 9822  SK-9822 (1000Base-T dual link)
@@ -4080,6 +4088,7 @@
 		14e4 0007  NetXtreme BCM5701 1000BaseSX
 		14e4 0008  NetXtreme BCM5701 1000BaseTX
 		14e4 8008  NetXtreme BCM5701 1000BaseTX
+	5820  BCM5820 Crypto Accelerator
 14e5  Pixelfusion Ltd
 14e6  SHINING Technology Inc
 14e7  3CX
@@ -4823,7 +4832,7 @@
 		0e11 b0c6  Embedded NC3120 with Wake on LAN
 		0e11 b0c7  Embedded NC3121
 		0e11 b0d7  NC3121 with Wake on LAN
-		0e11 b0dd  NC3131
+		0e11 b0dd  NC3131 (82558B)
 		0e11 b0de  NC3132
 		0e11 b0e1  NC3133
 		0e11 b144  NC3123 (82559)
@@ -4891,6 +4900,8 @@
 	1a21  82840 840 (Carmel) Chipset Host Bridge (Hub A)
 	1a23  82840 840 (Carmel) Chipset AGP Bridge
 	1a24  82840 840 (Carmel) Chipset PCI Bridge (Hub B)
+	1a30  82845 845 (Brookdale) Chipset Host Bridge
+	1a31  82845 845 (Brookdale) Chipset AGP Bridge
 	2410  82801AA ISA Bridge (LPC)
 	2411  82801AA IDE
 	2412  82801AA USB

@@ -848,7 +848,7 @@ void __init macfb_setup(char *options, int *ints)
 	if (!options || !*options)
 		return;
 	
-	for(this_opt=strtok(options,","); this_opt; this_opt=strtok(NULL,",")) {
+	while (this_opt = strsep(&options, ",")) {
 		if (!*this_opt) continue;
 		
 		if (! strcmp(this_opt, "inverse"))

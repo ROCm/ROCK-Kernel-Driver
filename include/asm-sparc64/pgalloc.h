@@ -1,4 +1,4 @@
-/* $Id: pgalloc.h,v 1.23 2001/09/25 20:21:48 kanoj Exp $ */
+/* $Id: pgalloc.h,v 1.26 2001/10/18 09:06:37 davem Exp $ */
 #ifndef _SPARC64_PGALLOC_H
 #define _SPARC64_PGALLOC_H
 
@@ -32,29 +32,14 @@ extern void flush_icache_range(unsigned long start, unsigned long end);
 
 extern void __flush_dcache_page(void *addr, int flush_icache);
 extern void __flush_icache_page(unsigned long);
-#if (L1DCACHE_SIZE > PAGE_SIZE)		/* is there D$ aliasing problem */
-#define flush_dcache_page(page) \
-do {	if ((page)->mapping && \
-	    !((page)->mapping->i_mmap) && \
-	    !((page)->mapping->i_mmap_shared)) \
-		set_bit(PG_dcache_dirty, &(page)->flags); \
-	else \
-		__flush_dcache_page((page)->virtual, \
-				    ((tlb_type == spitfire) && \
-				     (page)->mapping != NULL)); \
-} while(0)
-#else /* L1DCACHE_SIZE > PAGE_SIZE */
-#define flush_dcache_page(page) \
-do {	if ((page)->mapping && \
-	    !((page)->mapping->i_mmap) && \
-	    !((page)->mapping->i_mmap_shared)) \
-		set_bit(PG_dcache_dirty, &(page)->flags); \
-	else \
-		if ((tlb_type == spitfire) && \
-		    (page)->mapping != NULL) \
-			__flush_icache_page(__get_phys((unsigned long)((page)->virtual))); \
-} while(0)
-#endif /* L1DCACHE_SIZE > PAGE_SIZE */
+extern void flush_dcache_page_impl(struct page *page);
+#ifdef CONFIG_SMP
+extern void smp_flush_dcache_page_impl(struct page *page);
+#else
+#define smp_flush_dcache_page_impl flush_dcache_page_impl
+#endif
+
+extern void flush_dcache_page(struct page *page);
 
 extern void __flush_dcache_range(unsigned long start, unsigned long end);
 

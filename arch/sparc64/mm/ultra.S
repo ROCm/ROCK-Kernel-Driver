@@ -1,4 +1,4 @@
-/* $Id: ultra.S,v 1.61 2001/09/25 18:04:51 kanoj Exp $
+/* $Id: ultra.S,v 1.63 2001/10/17 19:30:21 davem Exp $
  * ultra.S: Don't expand these all over the place...
  *
  * Copyright (C) 1997, 2000 David S. Miller (davem@redhat.com)
@@ -500,6 +500,32 @@ xcall_report_regs:
 109:	 or		%g7, %lo(109b), %g7
 	call		__show_regs
 	 add		%sp, STACK_BIAS + REGWIN_SZ, %o0
+	b,pt		%xcc, rtrap
+	 clr		%l6
+
+	.align		32
+	.globl		xcall_flush_dcache_page_cheetah
+xcall_flush_dcache_page_cheetah:
+	sethi		%hi(PAGE_SIZE), %g3
+1:	subcc		%g3, (1 << 5), %g3
+	stxa		%g0, [%g1 + %g3] ASI_DCACHE_INVALIDATE
+	membar		#Sync
+	bne,pt		%icc, 1b
+	 nop
+	retry
+	nop
+
+	.globl		xcall_flush_dcache_page_spitfire
+xcall_flush_dcache_page_spitfire:
+	rdpr		%pstate, %g2
+	wrpr		%g2, PSTATE_IG | PSTATE_AG, %pstate
+	rdpr		%pil, %g2
+	wrpr		%g0, 15, %pil
+	sethi		%hi(109f), %g7
+	b,pt		%xcc, etrap_irq
+109:	 or		%g7, %lo(109b), %g7
+	call		smp_flush_dcache_page_client
+	 nop
 	b,pt		%xcc, rtrap
 	 clr		%l6
 

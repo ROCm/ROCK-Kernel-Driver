@@ -25,10 +25,9 @@
 
 /* The user-configurable values.
    These may be modified when a driver module is loaded.*/
-
 static int debug = 1;			/* 1 normal messages, 0 quiet .. 7 verbose. */
 /* Maximum events (Rx packets, etc.) to handle at each interrupt. */
-static int max_interrupt_work = 20;
+static int max_interrupt_work = 30;
 static int mtu;
 /* Maximum number of multicast addresses to filter (vs. rx-all-multicast).
    Typical is a 64 element hash table based on the Ethernet CRC.  */
@@ -40,15 +39,20 @@ static int multicast_filter_limit = 32;
    need a copy-align. */
 static int rx_copybreak;
 
-/* Used to pass the media type, etc.
-   Both 'options[]' and 'full_duplex[]' should exist for driver
-   interoperability.
-   The media type is usually passed in 'options[]'.
+/* media[] specifies the media type the NIC operates at.
+		 autosense	Autosensing active media.
+		 10mbps_hd 	10Mbps half duplex.
+		 10mbps_fd 	10Mbps full duplex.
+		 100mbps_hd 	100Mbps half duplex.
+		 100mbps_fd 	100Mbps full duplex.
+		 0		Autosensing active media.
+		 1	 	10Mbps half duplex.
+		 2	 	10Mbps full duplex.
+		 3	 	100Mbps half duplex.
+		 4	 	100Mbps full duplex.
 */
-#define MAX_UNITS 8		/* More are supported, limit only on options */
-static int options[MAX_UNITS] = {-1, -1, -1, -1, -1, -1, -1, -1};
-static int full_duplex[MAX_UNITS] = {-1, -1, -1, -1, -1, -1, -1, -1};
-
+#define MAX_UNITS 8	
+static char *media[MAX_UNITS];
 /* Operational parameters that are set at compile time. */
 
 /* Keep the ring sizes a power of two for compile efficiency.
@@ -65,7 +69,7 @@ static int full_duplex[MAX_UNITS] = {-1, -1, -1, -1, -1, -1, -1, -1};
 
 /* Operational parameters that usually are not changed. */
 /* Time in jiffies before concluding the transmitter is hung. */
-#define TX_TIMEOUT  (2*HZ)
+#define TX_TIMEOUT  (4*HZ)
 
 #define PKT_BUF_SZ		1536			/* Size of each temporary Rx buffer.*/
 
@@ -98,7 +102,7 @@ static int full_duplex[MAX_UNITS] = {-1, -1, -1, -1, -1, -1, -1, -1};
 #include <asm/processor.h>		/* Processor type for cache alignment. */
 #include <asm/bitops.h>
 #include <asm/io.h>
-
+#include <linux/delay.h>
 #include <linux/spinlock.h>
 
 /* These identify the driver base version and may not be removed. */
@@ -114,15 +118,11 @@ MODULE_PARM(max_interrupt_work, "i");
 MODULE_PARM(mtu, "i");
 MODULE_PARM(debug, "i");
 MODULE_PARM(rx_copybreak, "i");
-MODULE_PARM(options, "1-" __MODULE_STRING(MAX_UNITS) "i");
-MODULE_PARM(full_duplex, "1-" __MODULE_STRING(MAX_UNITS) "i");
+MODULE_PARM(media, "1-" __MODULE_STRING(MAX_UNITS) "s");
 MODULE_PARM_DESC(max_interrupt_work, "Sundance Alta maximum events handled per interrupt");
 MODULE_PARM_DESC(mtu, "Sundance Alta MTU (all boards)");
 MODULE_PARM_DESC(debug, "Sundance Alta debug level (0-5)");
 MODULE_PARM_DESC(rx_copybreak, "Sundance Alta copy breakpoint for copy-only-tiny-frames");
-MODULE_PARM_DESC(options, "Sundance Alta: Bits 0-3: media type, bit 17: full duplex");
-MODULE_PARM_DESC(full_duplex, "Sundance Alta full duplex setting(s) (1)");
-
 /*
 				Theory of Operation
 
@@ -214,9 +214,12 @@ enum chip_capability_flags {CanHaveMII=1, };
 #endif
 
 static struct pci_device_id sundance_pci_tbl[] __devinitdata = {
-	{ 0x1186, 0x1002, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
-	{ 0x13F0, 0x0201, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1 },
-	{ 0, }
+	{0x1186, 0x1002, 0x1186, 0x1002, 0, 0, 0},
+	{0x1186, 0x1002, 0x1186, 0x1003, 0, 0, 1},
+	{0x1186, 0x1002, 0x1186, 0x1012, 0, 0, 2},
+	{0x1186, 0x1002, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 3},
+	{0x13F0, 0x0201, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 4},
+	{0,}
 };
 MODULE_DEVICE_TABLE(pci, sundance_pci_tbl);
 
@@ -231,11 +234,19 @@ struct pci_id_info {
         int drv_flags;                          /* Driver use, intended as capability flags. */
 };
 static struct pci_id_info pci_id_tbl[] = {
-	{"OEM Sundance Technology ST201", {0x10021186, 0xffffffff, },
+	{"D-Link DFE-550TX FAST Ethernet Adapter", {0x10021186, 0xffffffff,},
 	 PCI_IOTYPE, 128, CanHaveMII},
-	{"Sundance Technology Alta", {0x020113F0, 0xffffffff, },
+	{"D-Link DFE-550FX 100Mbps Fiber-optics Adapter",
+	 {0x10031186, 0xffffffff,},
 	 PCI_IOTYPE, 128, CanHaveMII},
-	{0,},						/* 0 terminated list. */
+	{"D-Link DFE-580TX 4 port Server Adapter", {0x10121186, 0xffffffff,},
+	 PCI_IOTYPE, 128, CanHaveMII},
+	{"D-Link DL10050-based FAST Ethernet Adapter",
+	 {0x10021186, 0xffffffff,},
+	 PCI_IOTYPE, 128, CanHaveMII},
+	{"Sundance Technology Alta", {0x020113F0, 0xffffffff,},
+	 PCI_IOTYPE, 128, CanHaveMII},
+	{0,},			/* 0 terminated list. */
 };
 
 /* This driver was written to use PCI memory space, however x86-oriented
@@ -384,9 +395,10 @@ struct netdev_private {
 	unsigned int tx_full:1;				/* The Tx queue is full. */
 	/* These values are keep track of the transceiver/media in use. */
 	unsigned int full_duplex:1;			/* Full-duplex operation requested. */
-	unsigned int duplex_lock:1;
 	unsigned int medialock:1;			/* Do not sense media. */
 	unsigned int default_port:4;		/* Last dev->if_port value. */
+	unsigned int an_enable:1;
+	unsigned int speed;
 	/* Multicast and receive mode. */
 	spinlock_t mcastlock;				/* SMP lock multicast updates. */
 	u16 mcast_filter[4];
@@ -428,8 +440,9 @@ static int __devinit sundance_probe1 (struct pci_dev *pdev,
 	static int card_idx;
 	int chip_idx = ent->driver_data;
 	int irq;
-	int i, option = card_idx < MAX_UNITS ? options[card_idx] : 0;
+	int i;
 	long ioaddr;
+	u16 mii_reg0;
 	void *ring_space;
 	dma_addr_t ring_dma;
 
@@ -489,23 +502,6 @@ static int __devinit sundance_probe1 (struct pci_dev *pdev,
 	np->rx_ring = (struct netdev_desc *)ring_space;
 	np->rx_ring_dma = ring_dma;
 
-	if (dev->mem_start)
-		option = dev->mem_start;
-
-	/* The lower four bits are the media type. */
-	if (option > 0) {
-		if (option & 0x200)
-			np->full_duplex = 1;
-		np->default_port = option & 15;
-		if (np->default_port)
-			np->medialock = 1;
-	}
-	if (card_idx < MAX_UNITS  &&  full_duplex[card_idx] > 0)
-		np->full_duplex = 1;
-
-	if (np->full_duplex)
-		np->duplex_lock = 1;
-
 	/* The chip-specific entries in the device structure. */
 	dev->open = &netdev_open;
 	dev->hard_start_xmit = &start_tx;
@@ -547,6 +543,56 @@ static int __devinit sundance_probe1 (struct pci_dev *pdev,
 		if (phy_idx == 0)
 			printk(KERN_INFO "%s: No MII transceiver found!, ASIC status %x\n",
 				   dev->name, readl(ioaddr + ASICCtrl));
+	}
+	/* Parse override configuration */
+	np->an_enable = 1;
+	if (card_idx < MAX_UNITS) {
+		if (media[card_idx] != NULL) {
+			np->an_enable = 0;
+			if (strcmp (media[card_idx], "100mbps_fd") == 0 ||
+			    strcmp (media[card_idx], "4") == 0) {
+				np->speed = 100;
+				np->full_duplex = 1;
+			} else if (strcmp (media[card_idx], "100mbps_hd") == 0
+				   || strcmp (media[card_idx], "3") == 0) {
+				np->speed = 100;
+				np->full_duplex = 0;
+			} else if (strcmp (media[card_idx], "10mbps_fd") == 0 ||
+				   strcmp (media[card_idx], "2") == 0) {
+				np->speed = 10;
+				np->full_duplex = 1;
+			} else if (strcmp (media[card_idx], "10mbps_hd") == 0 ||
+				   strcmp (media[card_idx], "1") == 0) {
+				np->speed = 10;
+				np->full_duplex = 0;
+			} else {
+				np->an_enable = 1;
+			}
+		}
+	}
+
+	/* Fibre PHY? */
+	if (readl (ioaddr + ASICCtrl) & 0x80) {
+		/* Default 100Mbps Full */
+		if (np->an_enable) {
+			np->speed = 100;
+			np->full_duplex = 1;
+			np->an_enable = 0;
+		}
+	}
+	/* Reset PHY */
+	mdio_write (dev, np->phys[0], 0, 0x8000);
+	mdelay (300);
+	mdio_write (dev, np->phys[0], 0, 0x1200);
+	/* Force media type */
+	if (!np->an_enable) {
+		mii_reg0 = 0;
+		mii_reg0 |= (np->speed == 100) ? 0x2000 : 0;
+		mii_reg0 |= (np->full_duplex) ? 0x0100 : 0;
+		mdio_write (dev, np->phys[0], 0, mii_reg0);
+		printk (KERN_INFO "Override speed=%d, %s duplex\n",
+			np->speed, np->full_duplex ? "Full" : "Half");
+
 	}
 
 	/* Perhaps move the reset here? */
@@ -714,7 +760,6 @@ static int netdev_open(struct net_device *dev)
 	if (dev->if_port == 0)
 		dev->if_port = np->default_port;
 
-	np->full_duplex = np->duplex_lock;
 	np->mcastlock = (spinlock_t) SPIN_LOCK_UNLOCKED;
 
 	set_rx_mode(dev);
@@ -755,9 +800,15 @@ static void check_duplex(struct net_device *dev)
 	int mii_reg5 = mdio_read(dev, np->phys[0], 5);
 	int negotiated = mii_reg5 & np->advertising;
 	int duplex;
-
-	if (np->duplex_lock  ||  mii_reg5 == 0xffff)
+	
+	/* Force media */
+	if (!np->an_enable || mii_reg5 == 0xffff) {
+		if (np->full_duplex)
+			writew (readw (ioaddr + MACCtrl0) | EnbFullDuplex,
+				ioaddr + MACCtrl0);
 		return;
+	}
+	/* Autonegotiation */
 	duplex = (negotiated & 0x0100) || (negotiated & 0x01C0) == 0x0040;
 	if (np->full_duplex != duplex) {
 		np->full_duplex = duplex;
@@ -1003,10 +1054,10 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 		/* Abnormal error summary/uncommon events handlers. */
 		if (intr_status & (IntrDrvRqst | IntrPCIErr | LinkChange | StatsMax))
 			netdev_error(dev, intr_status);
-
 		if (--boguscnt < 0) {
 			get_stats(dev);
-			printk(KERN_WARNING "%s: Too much work at interrupt, "
+			if (debug > 1) 
+				printk(KERN_WARNING "%s: Too much work at interrupt, "
 				   "status=0x%4.4x / 0x%4.4x.\n",
 				   dev->name, intr_status, readw(ioaddr + IntrClear));
 			/* Re-enable us in 3.2msec. */
@@ -1132,21 +1183,46 @@ static void netdev_error(struct net_device *dev, int intr_status)
 {
 	long ioaddr = dev->base_addr;
 	struct netdev_private *np = dev->priv;
+	u16 mii_reg0, mii_reg4, mii_reg5;
+	int speed;
 
 	if (intr_status & IntrDrvRqst) {
 		/* Stop the down counter and turn interrupts back on. */
-		printk("%s: Turning interrupts back on.\n", dev->name);
+		if (debug > 1)
+			printk("%s: Turning interrupts back on.\n", dev->name);
 		writew(0, ioaddr + IntrEnable);
 		writew(0, ioaddr + DownCounter);
 		writew(IntrRxDone | IntrRxDMADone | IntrPCIErr | IntrDrvRqst |
 			   IntrTxDone | StatsMax | LinkChange, ioaddr + IntrEnable);
+		/* Ack buggy InRequest */
+		writew (IntrDrvRqst, ioaddr + IntrStatus);
 	}
 	if (intr_status & LinkChange) {
-		printk(KERN_ERR "%s: Link changed: Autonegotiation advertising"
-			   " %4.4x  partner %4.4x.\n", dev->name,
-			   mdio_read(dev, np->phys[0], 4),
-			   mdio_read(dev, np->phys[0], 5));
-		check_duplex(dev);
+		if (np->an_enable) {
+			mii_reg4 = mdio_read (dev, np->phys[0], 4);
+			mii_reg5= mdio_read (dev, np->phys[0], 5);
+			mii_reg4 &= mii_reg5;
+			printk (KERN_INFO "%s: Link changed: ", dev->name);
+			if (mii_reg4 & 0x0100)
+				printk ("100Mbps, full duplex\n");
+			else if (mii_reg4 & 0x0080)
+				printk ("100Mbps, half duplex\n");
+			else if (mii_reg4 & 0x0040)
+				printk ("10Mbps, full duplex\n");
+			else if (mii_reg4 & 0x0020)
+				printk ("10Mbps, half duplex\n");
+			else
+				printk ("\n");
+
+		} else {
+			mii_reg0 = mdio_read (dev, np->phys[0], 0);
+			speed = (mii_reg0 & 0x2000) ? 100 : 10;
+			printk (KERN_INFO "%s: Link changed: %dMbps ,",
+				dev->name, speed);
+			printk ("%s duplex.\n", (mii_reg0 & 0x0100) ?
+				"full" : "half");
+		}
+		check_duplex (dev);
 	}
 	if (intr_status & StatsMax) {
 		get_stats(dev);

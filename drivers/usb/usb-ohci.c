@@ -779,7 +779,7 @@ static int sohci_unlink_urb (urb_t * urb)
 				set_current_state(TASK_UNINTERRUPTIBLE);
 				while (timeout && (urb->status == USB_ST_URB_PENDING))
 					timeout = schedule_timeout (timeout);
-				current->state = TASK_RUNNING;
+				set_current_state(TASK_RUNNING);
 				remove_wait_queue (&unlink_wakeup, &wait); 
 				if (urb->status == USB_ST_URB_PENDING) {
 					err ("unlink URB timeout");
@@ -884,7 +884,7 @@ static int sohci_free_dev (struct usb_device * usb_dev)
 				set_current_state(TASK_UNINTERRUPTIBLE);
 				while (timeout && dev->ed_cnt)
 					timeout = schedule_timeout (timeout);
-				current->state = TASK_RUNNING;
+				set_current_state(TASK_RUNNING);
 				remove_wait_queue (&freedev_wakeup, &wait);
 				if (dev->ed_cnt) {
 					err ("free device %d timeout", usb_dev->devnum);

@@ -889,7 +889,7 @@ int __init tgafb_setup(char *options) {
     int i;
     
     if (options && *options) {
-    	for(this_opt=strtok(options,","); this_opt; this_opt=strtok(NULL,",")) {
+    	while (this_opt = strsep(&options, ",")) {
        	    if (!*this_opt) { continue; }
         
 	    if (!strncmp(this_opt, "font:", 5)) {

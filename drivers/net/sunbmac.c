@@ -1301,3 +1301,4 @@ static void __exit bigmac_cleanup(void)
 
 module_init(bigmac_probe);
 module_exit(bigmac_cleanup);
+MODULE_LICENSE("GPL");

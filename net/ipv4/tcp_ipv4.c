@@ -5,7 +5,7 @@
  *
  *		Implementation of the Transmission Control Protocol(TCP).
  *
- * Version:	$Id: tcp_ipv4.c,v 1.232 2001/10/15 12:34:50 davem Exp $
+ * Version:	$Id: tcp_ipv4.c,v 1.234 2001/10/18 09:49:08 davem Exp $
  *
  *		IPv4 specific functions
  *
@@ -162,6 +162,37 @@ __inline__ void tcp_inherit_port(struct sock *sk, struct sock *child)
 	local_bh_enable();
 }
 
+static inline void tcp_bind_hash(struct sock *sk, struct tcp_bind_bucket *tb, unsigned short snum) 
+{ 
+	sk->num = snum; 
+	if ((sk->bind_next = tb->owners) != NULL)
+		tb->owners->bind_pprev = &sk->bind_next;
+	tb->owners = sk;
+	sk->bind_pprev = &tb->owners;
+	sk->prev = (struct sock *) tb;
+} 
+
+static inline int tcp_bind_conflict(struct sock *sk, struct tcp_bind_bucket *tb)
+{ 
+	struct sock *sk2 = tb->owners;
+	int sk_reuse = sk->reuse;
+	
+	for( ; sk2 != NULL; sk2 = sk2->bind_next) {
+		if (sk != sk2 &&
+		    sk->bound_dev_if == sk2->bound_dev_if) {
+			if (!sk_reuse	||
+			    !sk2->reuse	||
+			    sk2->state == TCP_LISTEN) {
+				if (!sk2->rcv_saddr	||
+				    !sk->rcv_saddr	||
+				    (sk2->rcv_saddr == sk->rcv_saddr))
+					break;
+			}
+		}
+	}
+	return sk2 != NULL; 
+} 
+
 /* Obtain a reference to a local port for the given sock,
  * if snum is zero it means select any available local port.
  */
@@ -216,26 +247,9 @@ static int tcp_v4_get_port(struct sock *sk, unsigned short snum)
 		if (tb->fastreuse != 0 && sk->reuse != 0 && sk->state != TCP_LISTEN) {
 			goto success;
 		} else {
-			struct sock *sk2 = tb->owners;
-			int sk_reuse = sk->reuse;
-
-			for( ; sk2 != NULL; sk2 = sk2->bind_next) {
-				if (sk != sk2 &&
-				    sk->bound_dev_if == sk2->bound_dev_if) {
-					if (!sk_reuse	||
-					    !sk2->reuse	||
-					    sk2->state == TCP_LISTEN) {
-						if (!sk2->rcv_saddr	||
-						    !sk->rcv_saddr	||
-						    (sk2->rcv_saddr == sk->rcv_saddr))
-							break;
-					}
-				}
-			}
-			/* If we found a conflict, fail. */
-			ret = 1;
-			if (sk2 != NULL)
-				goto fail_unlock;
+			ret = 1; 
+			if (tcp_bind_conflict(sk, tb))
+				goto fail_unlock; 
 		}
 	}
 	ret = 1;
@@ -251,17 +265,10 @@ static int tcp_v4_get_port(struct sock *sk, unsigned short snum)
 		   ((sk->reuse == 0) || (sk->state == TCP_LISTEN)))
 		tb->fastreuse = 0;
 success:
-	sk->num = snum;
-	if (sk->prev == NULL) {
-		if ((sk->bind_next = tb->owners) != NULL)
-			tb->owners->bind_pprev = &sk->bind_next;
-		tb->owners = sk;
-		sk->bind_pprev = &tb->owners;
-		sk->prev = (struct sock *) tb;
-	} else {
-		BUG_TRAP(sk->prev == (struct sock *) tb);
-	}
-	ret = 0;
+	if (sk->prev == NULL)
+		tcp_bind_hash(sk, tb, snum); 
+	BUG_TRAP(sk->prev == (struct sock *) tb);
+ 	ret = 0;
 
 fail_unlock:
 	spin_unlock(&head->lock);

@@ -368,7 +368,7 @@ titan_init_one_pachip_port(titan_pachip_port *port, int index)
 
 	port->wsba[2].csr = 0x80000000 | 1;
 	port->wsm[2].csr  = (0x80000000 - 1) & 0xfff00000;
-	port->tba[2].csr  = 0x80000000;
+	port->tba[2].csr  = 0;
 
 	port->wsba[3].csr = 0;
 

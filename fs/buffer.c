@@ -1429,10 +1429,7 @@ static void unmap_underlying_metadata(struct buffer_head * bh)
 		mark_buffer_clean(old_bh);
 		wait_on_buffer(old_bh);
 		clear_bit(BH_Req, &old_bh->b_state);
-		/* Here we could run brelse or bforget. We use
-		   bforget because it will try to put the buffer
-		   in the freelist. */
-		__bforget(old_bh);
+		__brelse(old_bh);
 	}
 }
 

@@ -176,6 +176,7 @@ if [ "$CONFIG_NET_ETHERNET" = "y" ]; then
       dep_tristate '    PCI NE2000 and clones support (see help)' CONFIG_NE2K_PCI $CONFIG_PCI
       dep_tristate '    Novell/Eagle/Microdyne NE3210 EISA support (EXPERIMENTAL)' CONFIG_NE3210 $CONFIG_EISA $CONFIG_EXPERIMENTAL
       dep_tristate '    Racal-Interlan EISA ES3210 support (EXPERIMENTAL)' CONFIG_ES3210 $CONFIG_EISA $CONFIG_EXPERIMENTAL
+      dep_tristate '    RealTek RTL-8139 C+ PCI Fast Ethernet Adapter support (EXPERIMENTAL)' CONFIG_8139CP $CONFIG_PCI $CONFIG_EXPERIMENTAL
       dep_tristate '    RealTek RTL-8139 PCI Fast Ethernet Adapter support' CONFIG_8139TOO $CONFIG_PCI
       dep_mbool '      Use PIO instead of MMIO' CONFIG_8139TOO_PIO $CONFIG_8139TOO
       dep_mbool '      Support for automatic channel equalization (EXPERIMENTAL)' CONFIG_8139TOO_TUNE_TWISTER $CONFIG_8139TOO $CONFIG_EXPERIMENTAL

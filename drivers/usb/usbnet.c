@@ -1056,7 +1056,7 @@ static int usbnet_stop (struct net_device *net)
 	while (skb_queue_len (&dev->rxq)
 			&& skb_queue_len (&dev->txq)
 			&& skb_queue_len (&dev->done)) {
-		current->state = TASK_UNINTERRUPTIBLE;
+		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout (UNLINK_TIMEOUT_JIFFIES);
 		dbg ("waited for %d urb completions", temp);
 	}

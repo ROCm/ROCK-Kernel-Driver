@@ -2,11 +2,11 @@
  * srm_env.c - Access to SRC environment variables through
  *             the linux procfs
  *
- * (C)2001, Jan-Benedict Glaw <jbgaw@lug-owl.de>
+ * (C)2001, Jan-Benedict Glaw <jbglaw@lug-owl.de>
  *
  * This driver is at all a modified version of Erik Mouw's
  * ./linux/Documentation/DocBook/procfs_example.c, so: thanky
- * you, erik! He can be reached via email at
+ * you, Erik! He can be reached via email at
  * <J.A.K.Mouw@its.tudelft.nl>. It is based on an idea
  * provided by DEC^WCompaq's "Jumpstart" CD. They included
  * a patch like this as well. Thanks for idea!
@@ -45,12 +45,13 @@
 #include <asm/uaccess.h>
 
 #define DIRNAME		"srm_environment"	/* Subdir in /proc/	*/
-#define VERSION		"0.0.1"			/* Module version	*/
+#define VERSION		"0.0.2"			/* Module version	*/
 #define NAME		"srm_env"		/* Module name		*/
 #define DEBUG
 
 MODULE_AUTHOR("Jan-Benedict Glaw <jbglaw@lug-owl.de>");
 MODULE_DESCRIPTION("Accessing Alpha SRM environment through procfs interface");
+MODULE_LICENSE("GPL");
 EXPORT_NO_SYMBOLS;
 
 typedef struct _srm_env {

@@ -38,6 +38,7 @@
  * Jan 2000, Version 1.12
  * Feb 2000, Version 1.13
  * Nov 2000, Version 1.14
+ * Oct 2001, Version 1.15
  *
  * History:
  *    0.6b: first version in official kernel, Linux 1.3.46
@@ -157,7 +158,14 @@
  *         Work around byte swap bug in one of the Vaio's BIOS's
  *         (Marc Boucher <marc@mbsi.ca>).
  *         Exposed the disable flag to dmi so that we can handle known
- *	   broken APM (Alan Cox <alan@redhat.com>).
+ *         broken APM (Alan Cox <alan@redhat.com>).
+ *   1.14ac: If the BIOS says "I slowed the CPU down" then don't spin
+ *         calling it - instead idle. (Alan Cox <alan@redhat.com>)
+ *         If an APM idle fails log it and idle sensibly
+ *   1.15: Don't queue events to clients who open the device O_WRONLY.
+ *         Don't expect replies from clients who open the device O_RDONLY.
+ *         (Idea from Thomas Hood <jdthood at yahoo.co.uk>)
+ *         Minor waitqueue cleanups.(John Fremlin <chief@bandits.org>)
  *
  * APM 1.1 Reference:
  *
@@ -222,8 +230,14 @@ extern int (*console_blank_hook)(int);
  * Various options can be changed at boot time as follows:
  * (We allow underscores for compatibility with the modules code)
  *	apm=on/off			enable/disable APM
+ *	    [no-]allow[-_]ints		allow interrupts during BIOS calls
+ *	    [no-]broken[-_]psr		BIOS has a broken GetPowerStatus call
+ *	    [no-]realmode[-_]power[-_]off	switch to real mode before
+ *	    					powering off
  *	    [no-]debug			log some debugging messages
  *	    [no-]power[-_]off		power off on shutdown
+ *	    bounce[-_]interval=<n>	number of ticks to ignore suspend
+ *	    				bounces
  */
 
 /* KNOWN PROBLEM MACHINES:
@@ -308,6 +322,8 @@ struct apm_user {
 	int		magic;
 	struct apm_user *	next;
 	int		suser: 1;
+	int		writer: 1;
+	int		reader: 1;
 	int		suspend_wait: 1;
 	int		suspend_result;
 	int		suspends_pending;
@@ -372,8 +388,12 @@ static DECLARE_WAIT_QUEUE_HEAD(apm_waitqueue);
 static DECLARE_WAIT_QUEUE_HEAD(apm_suspend_waitqueue);
 static struct apm_user *	user_list;
 
-static char			driver_version[] = "1.14";	/* no spaces */
+static char			driver_version[] = "1.15";	/* no spaces */
 
+/*
+ *	APM event names taken from the APM 1.2 specification. These are
+ *	the message codes that the BIOS uses to tell us about events
+ */
 static char *	apm_event_name[] = {
 	"system standby",
 	"system suspend",
@@ -396,6 +416,11 @@ typedef struct lookup_t {
 	char *	msg;
 } lookup_t;
 
+/*
+ *	The BIOS returns a set of standard error codes in AX when the
+ *	carry flag is set.
+ */
+ 
 static const lookup_t error_table[] = {
 /* N/A	{ APM_SUCCESS,		"Operation succeeded" }, */
 	{ APM_DISABLED,		"Power management disabled" },
@@ -419,7 +444,7 @@ static const lookup_t error_table[] = {
 
 /*
  * These are the actual BIOS calls.  Depending on APM_ZERO_SEGS and
- * CONFIG_APM_ALLOW_INTS, we are being really paranoid here!  Not only
+ * apm_info.allow_ints, we are being really paranoid here!  Not only
  * are interrupts disabled, but all the segment registers (except SS)
  * are saved and zeroed this means that if the BIOS tries to reference
  * any data without explicitly loading the segment registers, the kernel
@@ -465,6 +490,26 @@ static const lookup_t error_table[] = {
 #	define APM_DO_RESTORE_SEGS
 #endif
 
+/**
+ *	apm_bios_call	-	Make an APM BIOS 32bit call
+ *	@func: APM function to execute
+ *	@ebx_in: EBX register for call entry
+ *	@ecx_in: ECX register for call entry
+ *	@eax: EAX register return
+ *	@ebx: EBX register return
+ *	@ecx: ECX register return
+ *	@edx: EDX register return
+ *	@esi: ESI register return
+ *
+ *	Make an APM call using the 32bit protected mode interface. The
+ *	caller is responsible for knowing if APM BIOS is configured and
+ *	enabled. This call can disable interrupts for a long period of
+ *	time on some laptops.  The return value is in AH and the carry
+ *	flag is loaded into AL.  If there is an error, then the error
+ *	code is returned in AH (bits 8-15 of eax) and this function
+ *	returns non-zero.
+ */
+ 
 static u8 apm_bios_call(u32 func, u32 ebx_in, u32 ecx_in,
 	u32 *eax, u32 *ebx, u32 *ecx, u32 *edx, u32 *esi)
 {
@@ -495,8 +540,18 @@ static u8 apm_bios_call(u32 func, u32 ebx_in, u32 ecx_in,
 	return *eax & 0xff;
 }
 
-/*
- * This version only returns one value (usually an error code)
+/**
+ *	apm_bios_call_simple	-	make a simple APM BIOS 32bit call
+ *	@func: APM function to invoke
+ *	@ebx_in: EBX register value for BIOS call
+ *	@ecx_in: ECX register value for BIOS call
+ *	@eax: EAX register on return from the BIOS call
+ *
+ *	Make a BIOS call that does only returns one value, or just status.
+ *	If there is an error, then the error code is returned in AH
+ *	(bits 8-15 of eax) and this function returns non-zero. This is
+ *	used for simpler BIOS operations. This call may hold interrupts
+ *	off for a long time on some laptops.
  */
 
 static u8 apm_bios_call_simple(u32 func, u32 ebx_in, u32 ecx_in, u32 *eax)
@@ -533,6 +588,22 @@ static u8 apm_bios_call_simple(u32 func, u32 ebx_in, u32 ecx_in, u32 *eax)
 	return error;
 }
 
+/**
+ *	apm_driver_version	-	APM driver version
+ *	@val:	loaded with the APM version on return
+ *
+ *	Retrieve the APM version supported by the BIOS. This is only
+ *	supported for APM 1.1 or higher. An error indicates APM 1.0 is
+ *	probably present.
+ *
+ *	On entry val should point to a value indicating the APM driver
+ *	version with the high byte being the major and the low byte the
+ *	minor number both in BCD
+ *
+ *	On return it will hold the BIOS revision supported in the
+ *	same format.
+ */
+
 static int __init apm_driver_version(u_short *val)
 {
 	u32	eax;
@@ -543,6 +614,23 @@ static int __init apm_driver_version(u_short *val)
 	return APM_SUCCESS;
 }
 
+/**
+ *	apm_get_event	-	get an APM event from the BIOS
+ *	@event: pointer to the event
+ *	@info: point to the event information
+ *
+ *	The APM BIOS provides a polled information for event
+ *	reporting. The BIOS expects to be polled at least every second
+ *	when events are pending. When a message is found the caller should
+ *	poll until no more messages are present.  However, this causes
+ *	problems on some laptops where a suspend event notification is
+ *	not cleared until it is acknowledged.
+ *
+ *	Additional information is returned in the info pointer, providing
+ *	that APM 1.2 is in use. If no messges are pending the value 0x80
+ *	is returned (No power management events pending).
+ */
+ 
 static int apm_get_event(apm_event_t *event, apm_eventinfo_t *info)
 {
 	u32	eax;
@@ -561,6 +649,20 @@ static int apm_get_event(apm_event_t *event, apm_eventinfo_t *info)
 	return APM_SUCCESS;
 }
 
+/**
+ *	set_power_state	-	set the power management state
+ *	@what: which items to transition
+ *	@state: state to transition to
+ *
+ *	Request an APM change of state for one or more system devices. The
+ *	processor state must be transitioned last of all. what holds the
+ *	class of device in the upper byte and the device number (0xFF for
+ *	all) for the object to be transitioned.
+ *
+ *	The state holds the state to transition to, which may in fact
+ *	be an acceptance of a BIOS requested state change.
+ */
+ 
 static int set_power_state(u_short what, u_short state)
 {
 	u32	eax;
@@ -570,27 +672,59 @@ static int set_power_state(u_short what, u_short state)
 	return APM_SUCCESS;
 }
 
+/**
+ *	apm_set_power_state - set system wide power state
+ *	@state: which state to enter
+ *
+ *	Transition the entire system into a new APM power state.
+ */
+ 
 static int apm_set_power_state(u_short state)
 {
 	return set_power_state(APM_DEVICE_ALL, state);
 }
 
 #ifdef CONFIG_APM_CPU_IDLE
+
+/**
+ *	apm_do_idle	-	perform power saving
+ *
+ *	This function notifies the BIOS that the processor is (in the view
+ *	of the OS) idle. It returns -1 in the event that the BIOS refuses
+ *	to handle the idle request. On a success the function returns 1
+ *	if the BIOS did clock slowing or 0 otherwise.
+ */
+ 
 static int apm_do_idle(void)
 {
-	u32	dummy;
+	u32	eax;
+	int	slowed;
 
-	if (apm_bios_call_simple(APM_FUNC_IDLE, 0, 0, &dummy))
-		return 0;
+	if (apm_bios_call_simple(APM_FUNC_IDLE, 0, 0, &eax)) {
+		static unsigned long t;
 
+		if (time_after(jiffies, t + 10 * HZ)) {
+			printk(KERN_DEBUG "apm_do_idle failed (%d)\n",
+					(eax >> 8) & 0xff);
+			t = jiffies;
+		}
+		return -1;
+	}
+	slowed = (apm_info.bios.flags & APM_IDLE_SLOWS_CLOCK) != 0;
 #ifdef ALWAYS_CALL_BUSY
 	clock_slowed = 1;
 #else
-	clock_slowed = (apm_info.bios.flags & APM_IDLE_SLOWS_CLOCK) != 0;
+	clock_slowed = slowed;
 #endif
-	return 1;
+	return slowed;
 }
 
+/**
+ *	apm_do_busy	-	inform the BIOS the CPU is busy
+ *
+ *	Request that the BIOS brings the CPU back to full performance. 
+ */
+ 
 static void apm_do_busy(void)
 {
 	u32	dummy;
@@ -615,9 +749,16 @@ extern int hlt_counter;
 /* This should wake up kapmd and ask it to slow the CPU */
 #define powermanagement_idle()  do { } while (0)
 
-/*
- * This is the idle thing.
+/**
+ * apm_cpu_idle		-	cpu idling for APM capable Linux
+ *
+ * This is the idling function the kernel executes when APM is available. It 
+ * tries to save processor time directly by using hlt instructions. A
+ * separate apm thread tries to do the BIOS power management.
+ *
+ * N.B. This is curently not used for kernels 2.4.x.
  */
+
 static void apm_cpu_idle(void)
 {
 	unsigned int start_idle;
@@ -660,6 +801,16 @@ static int apm_magic(void * unused)
 }
 #endif
 
+/**
+ *	apm_power_off	-	ask the BIOS to power off
+ *
+ *	Handle the power off sequence. This is the one piece of code we
+ *	will execute even on SMP machines. In order to deal with BIOS
+ *	bugs we support real mode APM BIOS power off calls. We also make
+ *	the SMP call on CPU0 as some systems will only honour this call
+ *	on their first cpu.
+ */
+ 
 static void apm_power_off(void)
 {
 	unsigned char	po_bios_call[] = {
@@ -689,15 +840,23 @@ static void apm_power_off(void)
 		(void) apm_set_power_state(APM_STATE_OFF);
 }
 
-/*
- * Magic sysrq key and handler for the power off function
+/**
+ * handle_poweroff	-	sysrq callback for power down
+ * @key: key pressed (unused)
+ * @pt_regs: register state (unused)
+ * @kbd: keyboard state (unused)
+ * @tty: tty involved (unused)
+ *
+ * When the user hits Sys-Rq o to power down the machine this is the
+ * callback we use.
  */
 
 void handle_poweroff (int key, struct pt_regs *pt_regs,
-		                        struct kbd_struct *kbd, struct tty_struct *tty) {
-	        apm_power_off();
+		struct kbd_struct *kbd, struct tty_struct *tty) {
+        apm_power_off();
 }
-struct sysrq_key_op sysrq_poweroff_op = {
+
+struct sysrq_key_op	sysrq_poweroff_op = {
 	handler:        handle_poweroff,
 	help_msg:       "Off",
 	action_msg:     "Power Off\n"
@@ -705,6 +864,14 @@ struct sysrq_key_op sysrq_poweroff_op = {
 
 
 #ifdef CONFIG_APM_DO_ENABLE
+
+/**
+ *	apm_enable_power_management - enable BIOS APM power management
+ *	@enable: enable yes/no
+ *
+ *	Enable or disable the APM BIOS power services. 
+ */
+ 
 static int apm_enable_power_management(int enable)
 {
 	u32	eax;
@@ -722,6 +889,20 @@ static int apm_enable_power_management(int enable)
 }
 #endif
 
+/**
+ *	apm_get_power_status	-	get current power state
+ *	@status: returned status
+ *	@bat: battery info
+ *	@life: estimated life
+ *
+ *	Obtain the current power status from the APM BIOS. We return a
+ *	status which gives the rough battery status, and current power
+ *	source. The bat value returned give an estimate as a percentage
+ *	of life and a status value for the battery. The estimated life
+ *	if reported is a lifetime in secodnds/minutes at current powwer
+ *	consumption.
+ */
+ 
 static int apm_get_power_status(u_short *status, u_short *bat, u_short *life)
 {
 	u32	eax;
@@ -774,6 +955,15 @@ static int apm_get_battery_status(u_short which, u_short *status,
 }
 #endif
 
+/**
+ *	apm_engage_power_management	-	enable PM on a device
+ *	@device: identity of device
+ *	@enable: on/off
+ *
+ *	Activate or deactive power management on either a specific device
+ *	or the entire system (%APM_DEVICE_ALL).
+ */
+ 
 static int apm_engage_power_management(u_short device, int enable)
 {
 	u32	eax;
@@ -792,6 +982,15 @@ static int apm_engage_power_management(u_short device, int enable)
 	return APM_SUCCESS;
 }
 
+/**
+ *	apm_error	-	display an APM error
+ *	@str: information string
+ *	@err: APM BIOS return code
+ *
+ *	Write a meaningful log entry to the kernel log in the event of
+ *	an APM error.
+ */
+ 
 static void apm_error(char *str, int err)
 {
 	int	i;
@@ -806,6 +1005,17 @@ static void apm_error(char *str, int err)
 }
 
 #if defined(CONFIG_APM_DISPLAY_BLANK) && defined(CONFIG_VT)
+
+/**
+ *	apm_console_blank	-	blank the display
+ *	@blank: on/off
+ *
+ *	Attempt to blank the console, firstly by blanking just video device
+ *	zero, and if that fails (some BIOSes dont support it) then it blanks
+ *	all video devices. Typically the BIOS will do laptop backlight and
+ *	monitor powerdown for us.
+ */
+ 
 static int apm_console_blank(int blank)
 {
 	int	error;
@@ -846,7 +1056,7 @@ static void queue_event(apm_event_t event, struct apm_user *sender)
 	if (user_list == NULL)
 		return;
 	for (as = user_list; as != NULL; as = as->next) {
-		if (as == sender)
+		if ((as == sender) || (!as->reader))
 			continue;
 		as->event_head = (as->event_head + 1) % APM_MAX_EVENTS;
 		if (as->event_head == as->event_tail) {
@@ -857,7 +1067,7 @@ static void queue_event(apm_event_t event, struct apm_user *sender)
 			as->event_tail = (as->event_tail + 1) % APM_MAX_EVENTS;
 		}
 		as->events[as->event_head] = event;
-		if (!as->suser)
+		if ((!as->suser) || (!as->writer))
 			continue;
 		switch (event) {
 		case APM_SYS_SUSPEND:
@@ -932,7 +1142,9 @@ static int send_event(apm_event_t event)
 		/* map all suspends to ACPI D3 */
 		if (pm_send_all(PM_SUSPEND, (void *)3)) {
 			if (event == APM_CRITICAL_SUSPEND) {
-				printk(KERN_CRIT "apm: Critical suspend was vetoed, expect armageddon\n" );
+				printk(KERN_CRIT
+					"apm: Critical suspend was vetoed, "
+					"expect armageddon\n" );
 				return 0;
 			}
 			if (apm_info.connection_version > 0x100)
@@ -1109,7 +1321,8 @@ static void apm_event_handler(void)
 	int		err;
 
 	if ((standbys_pending > 0) || (suspends_pending > 0)) {
-		if ((apm_info.connection_version > 0x100) && (pending_count-- <= 0)) {
+		if ((apm_info.connection_version > 0x100) &&
+				(pending_count-- <= 0)) {
 			pending_count = 4;
 			if (debug)
 				printk(KERN_DEBUG "apm: setting state busy\n");
@@ -1140,7 +1353,7 @@ static void apm_mainloop(void)
 	set_current_state(TASK_INTERRUPTIBLE);
 	for (;;) {
 		/* Nothing to do, just sleep for the timeout */
-		timeout = 2*timeout;
+		timeout = 2 * timeout;
 		if (timeout > APM_CHECK_TIMEOUT)
 			timeout = APM_CHECK_TIMEOUT;
 		schedule_timeout(timeout);
@@ -1156,10 +1369,21 @@ static void apm_mainloop(void)
 #ifdef CONFIG_APM_CPU_IDLE
 		if (!system_idle())
 			continue;
-		if (apm_do_idle()) {
+		
+		/*
+		 *	If we can idle...
+		 */
+		if (apm_do_idle() != -1) {
 			unsigned long start = jiffies;
 			while ((!exit_kapmd) && system_idle()) {
-				apm_do_idle();
+				if (apm_do_idle()) {
+					set_current_state(TASK_INTERRUPTIBLE);
+					/* APM needs us to snooze .. either
+					   the BIOS call failed (-1) or it
+					   slowed the clock (1). We sleep
+					   until it talks to us again */
+					schedule_timeout(1);
+				}
 				if ((jiffies - start) > APM_CHECK_TIMEOUT) {
 					apm_event_handler();
 					start = jiffies;
@@ -1188,26 +1412,15 @@ static ssize_t do_read(struct file *fp, char *buf, size_t count, loff_t *ppos)
 	struct apm_user *	as;
 	int			i;
 	apm_event_t		event;
-	DECLARE_WAITQUEUE(wait, current);
 
 	as = fp->private_data;
 	if (check_apm_user(as, "read"))
 		return -EIO;
 	if (count < sizeof(apm_event_t))
 		return -EINVAL;
-	if (queue_empty(as)) {
-		if (fp->f_flags & O_NONBLOCK)
-			return -EAGAIN;
-		add_wait_queue(&apm_waitqueue, &wait);
-repeat:
-		set_current_state(TASK_INTERRUPTIBLE);
-		if (queue_empty(as) && !signal_pending(current)) {
-			schedule();
-			goto repeat;
-		}
-		set_current_state(TASK_RUNNING);
-		remove_wait_queue(&apm_waitqueue, &wait);
-	}
+	if ((queue_empty(as)) && (fp->f_flags & O_NONBLOCK))
+		return -EAGAIN;
+	wait_event_interruptible(apm_waitqueue, !queue_empty(as));
 	i = count;
 	while ((i >= sizeof(event)) && !queue_empty(as)) {
 		event = get_queued_event(as);
@@ -1254,7 +1467,6 @@ static int do_ioctl(struct inode * inode, struct file *filp,
 		    u_int cmd, u_long arg)
 {
 	struct apm_user *	as;
-	DECLARE_WAITQUEUE(wait, current);
 
 	as = filp->private_data;
 	if (check_apm_user(as, "ioctl"))
@@ -1288,16 +1500,8 @@ static int do_ioctl(struct inode * inode, struct file *filp,
 				return -EIO;
 		} else {
 			as->suspend_wait = 1;
-			add_wait_queue(&apm_suspend_waitqueue, &wait);
-			while (1) {
-				set_current_state(TASK_INTERRUPTIBLE);
-				if ((as->suspend_wait == 0)
-				    || signal_pending(current))
-					break;
-				schedule();
-			}
-			set_current_state(TASK_RUNNING);
-			remove_wait_queue(&apm_suspend_waitqueue, &wait);
+			wait_event_interruptible(apm_suspend_waitqueue,
+					as->suspend_wait == 0);
 			return as->suspend_result;
 		}
 		break;
@@ -1367,6 +1571,8 @@ static int do_open(struct inode * inode, struct file * filp)
 	 * privileged operation -- cevans
 	 */
 	as->suser = capable(CAP_SYS_ADMIN);
+	as->writer = (filp->f_mode & FMODE_WRITE) == FMODE_WRITE;
+	as->reader = (filp->f_mode & FMODE_READ) == FMODE_READ;
 	as->next = user_list;
 	user_list = as;
 	filp->private_data = as;
@@ -1562,7 +1768,7 @@ static int apm(void *unused)
 	/* Install our power off handler.. */
 	if (power_off)
 		pm_power_off = apm_power_off;
-	register_sysrq_key('o',&sysrq_poweroff_op);
+	register_sysrq_key('o', &sysrq_poweroff_op);
 
 	if (smp_num_cpus == 1) {
 #if defined(CONFIG_APM_DISPLAY_BLANK) && defined(CONFIG_VT)
@@ -1588,15 +1794,9 @@ static int __init apm_setup(char *str)
 			apm_disabled = 1;
 		if (strncmp(str, "on", 2) == 0)
 			apm_disabled = 0;
-		if ((strncmp(str, "allow-ints", 10) == 0) ||
-		    (strncmp(str, "allow_ints", 10) == 0))
- 			apm_info.allow_ints = 1;
-		if ((strncmp(str, "broken-psr", 10) == 0) ||
-		    (strncmp(str, "broken_psr", 10) == 0))
-			apm_info.get_power_status_broken = 1;
-		if ((strncmp(str, "realmode-power-off", 18) == 0) ||
-		    (strncmp(str, "realmode_power_off", 18) == 0))
-			apm_info.realmode_power_off = 1;
+		if ((strncmp(str, "bounce-interval=", 16) == 0) ||
+		    (strncmp(str, "bounce_interval=", 16) == 0))
+			bounce_interval = simple_strtol(str + 16, NULL, 0);
 		invert = (strncmp(str, "no-", 3) == 0);
 		if (invert)
 			str += 3;
@@ -1605,9 +1805,15 @@ static int __init apm_setup(char *str)
 		if ((strncmp(str, "power-off", 9) == 0) ||
 		    (strncmp(str, "power_off", 9) == 0))
 			power_off = !invert;
-		if ((strncmp(str, "bounce-interval=", 16) == 0) ||
-		    (strncmp(str, "bounce_interval=", 16) == 0))
-			bounce_interval = simple_strtol(str + 16, NULL, 0);
+		if ((strncmp(str, "allow-ints", 10) == 0) ||
+		    (strncmp(str, "allow_ints", 10) == 0))
+ 			apm_info.allow_ints = !invert;
+		if ((strncmp(str, "broken-psr", 10) == 0) ||
+		    (strncmp(str, "broken_psr", 10) == 0))
+			apm_info.get_power_status_broken = !invert;
+		if ((strncmp(str, "realmode-power-off", 18) == 0) ||
+		    (strncmp(str, "realmode_power_off", 18) == 0))
+			apm_info.realmode_power_off = !invert;
 		str = strchr(str, ',');
 		if (str != NULL)
 			str += strspn(str, ", \t");
@@ -1791,15 +1997,20 @@ module_exit(apm_exit);
 
 MODULE_AUTHOR("Stephen Rothwell");
 MODULE_DESCRIPTION("Advanced Power Management");
+MODULE_LICENSE("GPL");
 MODULE_PARM(debug, "i");
 MODULE_PARM_DESC(debug, "Enable debug mode");
 MODULE_PARM(power_off, "i");
 MODULE_PARM_DESC(power_off, "Enable power off");
 MODULE_PARM(bounce_interval, "i");
-MODULE_PARM_DESC(bounce_interval, "Set the number of ticks to ignore suspend bounces");
+MODULE_PARM_DESC(bounce_interval,
+		"Set the number of ticks to ignore suspend bounces");
 MODULE_PARM(allow_ints, "i");
 MODULE_PARM_DESC(allow_ints, "Allow interrupts during BIOS calls");
 MODULE_PARM(broken_psr, "i");
 MODULE_PARM_DESC(broken_psr, "BIOS has a broken GetPowerStatus call");
+MODULE_PARM(realmode_power_off, "i");
+MODULE_PARM_DESC(realmode_power_off,
+		"Switch to real mode before powering off");
 
 EXPORT_NO_SYMBOLS;

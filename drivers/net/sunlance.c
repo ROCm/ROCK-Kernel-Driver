@@ -1603,3 +1603,4 @@ static void __exit sparc_lance_cleanup(void)
 
 module_init(sparc_lance_probe);
 module_exit(sparc_lance_cleanup);
+MODULE_LICENSE("GPL");

@@ -48,9 +48,9 @@
 #include <linux/blk.h>
 #include <linux/version.h>
 #include <linux/i2o.h>
-#include "../scsi/scsi.h"
-#include "../scsi/hosts.h"
-#include "../scsi/sd.h"
+#include "../../scsi/scsi.h"
+#include "../../scsi/hosts.h"
+#include "../../scsi/sd.h"
 #include "i2o_scsi.h"
 
 #define VERSION_STRING        "Version 0.0.1"
@@ -909,4 +909,4 @@ MODULE_AUTHOR("Red Hat Software");
 
 static Scsi_Host_Template driver_template = I2OSCSI;
 
-#include "../scsi/scsi_module.c"
+#include "../../scsi/scsi_module.c"

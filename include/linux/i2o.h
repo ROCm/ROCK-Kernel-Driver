@@ -31,6 +31,7 @@
 #include <asm/semaphore.h>	/* Needed for MUTEX init macros */
 #include <linux/config.h>
 #include <linux/notifier.h>
+#include <linux/ioport.h>	/* Needed for struct resource */
 #include <asm/atomic.h>
 
 /*

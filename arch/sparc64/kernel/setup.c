@@ -1,4 +1,4 @@
-/*  $Id: setup.c,v 1.68 2001/10/13 00:14:34 kanoj Exp $
+/*  $Id: setup.c,v 1.69 2001/10/18 09:40:00 davem Exp $
  *  linux/arch/sparc64/kernel/setup.c
  *
  *  Copyright (C) 1995,1996  David S. Miller (davem@caip.rutgers.edu)
@@ -90,6 +90,7 @@ int prom_callback(long *args)
 	struct console *cons, *saved_console = NULL;
 	unsigned long flags;
 	char *cmd;
+	extern spinlock_t prom_entry_lock;
 
 	if (!args)
 		return -1;
@@ -105,6 +106,7 @@ int prom_callback(long *args)
 	 */
 	irq_exit(smp_processor_id(), 0);
 	save_and_cli(flags);
+	spin_unlock(&prom_entry_lock);
 	cons = console_drivers;
 	while (cons) {
 		unregister_console(cons);
@@ -279,6 +281,7 @@ int prom_callback(long *args)
 		saved_console = cons->next;
 		register_console(cons);
 	}
+	spin_lock(&prom_entry_lock);
 	restore_flags(flags);
 	/*
 	 * Restore in-interrupt status for a resume from obp.

@@ -1924,12 +1924,12 @@ static int i2o_systab_send(struct i2o_controller *iop)
 		if(iop->status_block->current_mem_size < iop->status_block->desired_mem_size)
 		{
 			struct resource *res = &iop->mem_resource;
-			res->name = iop->bus.pci.pdev->bus->name;
+			res->name = iop->pdev->bus->name;
 			res->flags = IORESOURCE_MEM;
 			res->start = 0;
 			res->end = 0;
 			printk("%s: requires private memory resources.\n", iop->name);
-			root = pci_find_parent_resource(iop->bus.pci.pdev, res);
+			root = pci_find_parent_resource(iop->pdev, res);
 			if(root==NULL)
 				printk("Can't find parent resource!\n");
 			if(root && allocate_resource(root, res, 
@@ -1950,12 +1950,12 @@ static int i2o_systab_send(struct i2o_controller *iop)
 		if(iop->status_block->current_io_size < iop->status_block->desired_io_size)
 		{
 			struct resource *res = &iop->io_resource;
-			res->name = iop->bus.pci.pdev->bus->name;
+			res->name = iop->pdev->bus->name;
 			res->flags = IORESOURCE_IO;
 			res->start = 0;
 			res->end = 0;
 			printk("%s: requires private memory resources.\n", iop->name);
-			root = pci_find_parent_resource(iop->bus.pci.pdev, res);
+			root = pci_find_parent_resource(iop->pdev, res);
 			if(root==NULL)
 				printk("Can't find parent resource!\n");
 			if(root &&  allocate_resource(root, res, 

@@ -270,6 +270,8 @@ static unsigned long load_elf_interp(struct elfhdr * interp_elf_ex,
 	 */
 	if (interp_elf_ex->e_phentsize != sizeof(struct elf_phdr))
 		goto out;
+	if (interp_elf_ex->e_phnum > 65536U / sizeof(struct elf_phdr))
+		goto out;
 
 	/* Now read in all of the header information */
 
@@ -757,8 +759,7 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	printk("(brk) %lx\n" , (long) current->mm->brk);
 #endif
 
-	if ( current->personality == PER_SVR4 )
-	{
+	if (current->personality & MMAP_PAGE_ZERO) {
 		/* Why this, you ask???  Well SVr4 maps page 0 as read-only,
 		   and some applications "depend" upon this behavior.
 		   Since we do not have the power to recompile these, we
