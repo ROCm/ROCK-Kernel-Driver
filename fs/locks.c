@@ -173,7 +173,12 @@ static inline void locks_free_lock(struct file_lock *fl)
 			fl->fl_ops->fl_release_private(fl);
 		fl->fl_ops = NULL;
 	}
-	fl->fl_lmops = NULL;
+
+	if (fl->fl_lmops) {
+		if (fl->fl_lmops->fl_release_private)
+			fl->fl_lmops->fl_release_private(fl);
+		fl->fl_lmops = NULL;
+	}
 
 	kmem_cache_free(filelock_cache, fl);
 }
