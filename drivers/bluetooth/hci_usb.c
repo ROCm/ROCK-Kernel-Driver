@@ -80,6 +80,9 @@ static struct usb_device_id bluetooth_ids[] = {
 	/* Ericsson with non-standard id */
 	{ USB_DEVICE(0x0bdb, 0x1002) },
 
+	/* Bluetooth Ultraport Module from IBM */
+	{ USB_DEVICE(0x04bf, 0x030a) },
+
 	{ }	/* Terminating entry */
 };
 
