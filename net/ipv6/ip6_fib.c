@@ -40,7 +40,6 @@
 #include <net/ip6_route.h>
 
 #define RT6_DEBUG 2
-#undef CONFIG_IPV6_SUBTREES
 
 #if RT6_DEBUG >= 3
 #define RT6_TRACE(x...) printk(KERN_DEBUG x)
@@ -594,8 +593,8 @@ out:
 	   is orphan. If it is, shoot it.
 	 */
 st_failure:
-	if (fn && !(fn->fn_flags&RTN_RTINFO|RTN_ROOT))
-		fib_repair_tree(fn);
+	if (fn && !(fn->fn_flags & (RTN_RTINFO|RTN_ROOT)))
+		fib6_repair_tree(fn);
 	dst_free(&rt->u.dst);
 	return err;
 #endif
