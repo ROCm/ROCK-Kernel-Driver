@@ -46,8 +46,7 @@ struct isdn_slot {
 	unsigned long     obytes;              /* Statistics outgoing bytes  */
 	struct isdn_v110  iv110;               /* For V.110                  */
 	int               m_idx;               /* Index for mdm....          */
-	isdn_net_dev      *rx_netdev;          /* rx netdev-pointers         */
-	isdn_net_dev      *st_netdev;          /* stat netdev-pointers       */
+	isdn_net_dev      *idev;               /* pointer to isdn_net_dev    */
 };
 
 static struct isdn_slot slot[ISDN_MAX_CHANNELS]; 
@@ -2067,35 +2066,19 @@ isdn_slot_num(int sl)
 }
 
 void
-isdn_slot_set_rx_netdev(int sl, isdn_net_dev *nd)
+isdn_slot_set_idev(int sl, isdn_net_dev *idev)
 {
 	BUG_ON(sl < 0);
 
-	slot[sl].rx_netdev = nd;
+	slot[sl].idev = idev;
 }
 
 isdn_net_dev *
-isdn_slot_rx_netdev(int sl)
+isdn_slot_idev(int sl)
 {
 	BUG_ON(sl < 0);
 
-	return slot[sl].rx_netdev;
-}
-
-void
-isdn_slot_set_st_netdev(int sl, isdn_net_dev *nd)
-{
-	BUG_ON(sl < 0);
-
-	slot[sl].st_netdev = nd;
-}
-
-isdn_net_dev *
-isdn_slot_st_netdev(int sl)
-{
-	BUG_ON(sl < 0);
-
-	return slot[sl].st_netdev;
+	return slot[sl].idev;
 }
 
 int

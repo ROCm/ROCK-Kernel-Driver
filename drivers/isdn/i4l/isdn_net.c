@@ -216,8 +216,7 @@ isdn_net_unbind_channel(isdn_net_dev *idev)
 
 	idev->dialstate = ST_NULL;
 
-	isdn_slot_set_rx_netdev(idev->isdn_slot, NULL);
-	isdn_slot_set_st_netdev(idev->isdn_slot, NULL);
+	isdn_slot_set_idev(idev->isdn_slot, NULL);
 	isdn_slot_free(idev->isdn_slot, ISDN_USAGE_NET);
 
 	idev->isdn_slot = -1;
@@ -239,8 +238,7 @@ isdn_net_bind_channel(isdn_net_dev *idev, int idx)
 	cli();
 
 	idev->isdn_slot = idx;
-	isdn_slot_set_rx_netdev(idev->isdn_slot, idev);
-	isdn_slot_set_st_netdev(idev->isdn_slot, idev);
+	isdn_slot_set_idev(idev->isdn_slot, idev);
 
 	if (mlp->ops->bind)
 		retval = mlp->ops->bind(idev);
@@ -296,7 +294,7 @@ static void isdn_net_connected(isdn_net_dev *idev)
 int
 isdn_net_stat_callback(int idx, isdn_ctrl *c)
 {
-	isdn_net_dev *idev = isdn_slot_st_netdev(idx);
+	isdn_net_dev *idev = isdn_slot_idev(idx);
 
 	if (!idev) {
 		HERE;
@@ -547,7 +545,6 @@ isdn_net_event_in_wait_bconn(isdn_net_dev *idev, int pr, void *arg)
 		break;
 	case ISDN_STAT_BCONN:
 		del_timer(&idev->dial_timer);
-		isdn_slot_set_rx_netdev(idev->isdn_slot, idev);
 		isdn_net_connected(idev);
 		return 1;
 	case ISDN_STAT_DHUP:
@@ -939,11 +936,12 @@ isdn_net_receive(isdn_net_dev *idev, struct sk_buff *skb)
 int
 isdn_net_rcv_skb(int idx, struct sk_buff *skb)
 {
-	isdn_net_dev *idev = isdn_slot_rx_netdev(idx);
+	isdn_net_dev *idev = isdn_slot_idev(idx);
 
-	if (!idev)
+	if (!idev) {
+		HERE;
 		return 0;
-
+	}
 	if (!isdn_net_online(idev))
 		return 0;
 
