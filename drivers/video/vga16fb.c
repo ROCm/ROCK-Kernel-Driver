@@ -1372,8 +1372,6 @@ int __init vga16fb_init(void)
 	vga16fb.par = &vga16_par;
 	vga16fb.flags = FBINFO_FLAG_DEFAULT;
 
-	vga16fb.fix.smem_start	= VGA_MAP_MEM(vga16fb.fix.smem_start);
-
 	i = (vga16fb_defined.bits_per_pixel == 8) ? 256 : 16;
 	ret = fb_alloc_cmap(&vga16fb.cmap, i, 0);
 	if (ret) {
