@@ -251,7 +251,6 @@ int hash_page(unsigned long ea, unsigned long access, unsigned long trap)
 	struct mm_struct *mm;
 	pte_t *ptep;
 	int ret;
-	int cpu;
 	int user_region = 0;
 	int local = 0;
 	cpumask_t tmp;
@@ -303,8 +302,7 @@ int hash_page(unsigned long ea, unsigned long access, unsigned long trap)
 	if (pgdir == NULL)
 		return 1;
 
-	cpu = get_cpu();
-	tmp = cpumask_of_cpu(cpu);
+	tmp = cpumask_of_cpu(smp_processor_id());
 	if (user_region && cpus_equal(mm->cpu_vm_mask, tmp))
 		local = 1;
 
@@ -313,13 +311,10 @@ int hash_page(unsigned long ea, unsigned long access, unsigned long trap)
 		ret = hash_huge_page(mm, access, ea, vsid, local);
 	else {
 		ptep = find_linux_pte(pgdir, ea);
-		if (ptep == NULL) {
-			put_cpu();
+		if (ptep == NULL)
 			return 1;
-		}
 		ret = __hash_page(ea, access, vsid, ptep, trap, local);
 	}
-	put_cpu();
 
 	return ret;
 }
