@@ -3164,7 +3164,7 @@ deinit_card(struct idt77252_dev *card)
 
 	for (i = 0; i < 4; i++) {
 		if (card->fbq[i])
-			iounmap((void *) card->fbq[i]);
+			iounmap(card->fbq[i]);
 	}
 
 	if (card->membase)
@@ -3722,7 +3722,7 @@ idt77252_init_one(struct pci_dev *pcidev, const struct pci_device_id *id)
 	card->tst_timer.function = tst_timer;
 
 	/* Do the I/O remapping... */
-	card->membase = (unsigned long) ioremap(membase, 1024);
+	card->membase = ioremap(membase, 1024);
 	if (!card->membase) {
 		printk("%s: can't ioremap() membase\n", card->name);
 		err = -EIO;
@@ -3756,8 +3756,7 @@ idt77252_init_one(struct pci_dev *pcidev, const struct pci_device_id *id)
 	card->sramsize = probe_sram(card);
 
 	for (i = 0; i < 4; i++) {
-		card->fbq[i] = (unsigned long)
-			    ioremap(srambase | 0x200000 | (i << 18), 4);
+		card->fbq[i] = ioremap(srambase | 0x200000 | (i << 18), 4);
 		if (!card->fbq[i]) {
 			printk("%s: can't ioremap() FBQ%d\n", card->name, i);
 			err = -EIO;

@@ -355,9 +355,9 @@ struct idt77252_dev
 	struct pci_dev		*pcidev;	/* PCI handle (desriptor) */
 	struct atm_dev		*atmdev;	/* ATM device desriptor */
 
-	unsigned long		membase;	/* SAR's memory base address */
+	void			*membase;	/* SAR's memory base address */
 	unsigned long		srambase;	/* SAR's sram  base address */
-	unsigned long		fbq[4];		/* FBQ fill addresses */
+	void 			*fbq[4];	/* FBQ fill addresses */
 
 	struct semaphore	mutex;
 	spinlock_t		cmd_lock;	/* for r/w utility/sram */
