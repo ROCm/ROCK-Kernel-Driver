@@ -28,11 +28,6 @@
  */
 #define node_to_cpumask(node) (node_to_cpu_mask[node])
 
-#else
-#define cpu_to_node(cpu) (0)
-#define node_to_cpumask(node) (phys_cpu_present_map)
-#endif
-
 /*
  * Returns the number of the node containing MemBlk 'memblk'
  */
@@ -64,5 +59,9 @@
 #define NODE_BALANCE_RATE 10
 
 void build_cpu_to_node_map(void);
+
+#endif /* CONFIG_NUMA */
+
+#include <asm-generic/topology.h>
 
 #endif /* _ASM_IA64_TOPOLOGY_H */

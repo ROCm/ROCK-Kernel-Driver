@@ -37,7 +37,6 @@ struct thread_info {
 	struct restart_block restart_block;
 };
 
-#define INIT_THREAD_SIZE		/* tell sched.h not to declare the thread_union */
 #define THREAD_SIZE			KERNEL_STACK_SIZE
 
 #define INIT_THREAD_INFO(tsk)			\

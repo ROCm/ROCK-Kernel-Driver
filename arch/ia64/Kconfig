@@ -818,7 +818,7 @@ config IA64_EARLY_PRINTK_VGA
 
 config IA64_EARLY_PRINTK_SGI_SN
 	bool "Early printk on SGI SN serial console"
-	depends on IA64_EARLY_PRINTK
+	depends on IA64_EARLY_PRINTK && (IA64_GENERIC || IA64_SGI_SN2)
 
 config DEBUG_SLAB
 	bool "Debug memory allocations"
