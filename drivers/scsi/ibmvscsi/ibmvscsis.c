@@ -50,10 +50,12 @@
 #include "../scsi.h"
 #include "viosrp.h"
 
+#define IBMVSCSIS_VERSION "1.2"
+
 MODULE_DESCRIPTION("IBM Virtual SCSI Target");
 MODULE_AUTHOR("Dave Boutcher");
 MODULE_LICENSE("GPL");
-MODULE_VERSION("1.1");
+MODULE_VERSION(IBMVSCSIS_VERSION);
 
 static int ibmvscsis_debug = 0;
 
@@ -966,6 +968,7 @@ static int ibmvscsis_end_io(struct bio *bio, unsigned int nbytes, int error)
 		adapter->bio_donetail = bio;
 	} else
 		adapter->bio_done = adapter->bio_donetail = bio;
+	bio->bi_next = NULL;
 	spin_unlock_irqrestore(&adapter->lock, flags);
 
 	/* Schedule the task */
@@ -1045,6 +1048,12 @@ static void endio_task(unsigned long data)
 		if (bio) {
 			/* Remove this iue from the in-flight list */
 			iue = (struct iu_entry *)bio->bi_private;
+			if (!iue->req.in_use) {
+				err("Internal error! freed iue in bio!!!\n");
+				spin_unlock_irqrestore(&adapter->lock, flags);
+				return;
+			}
+				
 			list_del(&iue->next);
 		}
 
@@ -1759,7 +1768,7 @@ static void process_login(struct iu_entry *iue)
 	iu->srp.login_rsp.tag = tag;
 	iu->srp.login_rsp.max_initiator_to_target_iulen = sizeof(union SRP_IU);
 	iu->srp.login_rsp.max_target_to_initiator_iulen = sizeof(union SRP_IU);
-	iu->srp.login_rsp.supported_buffer_formats = 0x0002;	/* direct and indirect */
+	iu->srp.login_rsp.supported_buffer_formats = 0x0006;	/* direct and indirect */
 	iu->srp.login_rsp.multi_channel_result = 0x00;	/* TODO fix if we were already logged in */
 
 	send_srp(iue, sizeof(iu->srp.login_rsp));
@@ -2787,7 +2796,7 @@ static int mod_init(void)
 			partition_number = *p_number_ptr;
 	}
 
-	info("initialized\n");
+	info("initialized version "IBMVSCSIS_VERSION"\n");
 
 	rc = vio_register_driver(&ibmvscsis_driver);
 
