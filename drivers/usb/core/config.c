@@ -15,19 +15,12 @@
 
 static int usb_parse_endpoint(struct usb_host_endpoint *endpoint, unsigned char *buffer, int size)
 {
+	unsigned char *buffer0 = buffer;
 	struct usb_descriptor_header *header;
 	unsigned char *begin;
-	int parsed = 0, len, numskipped;
+	int len, numskipped;
 
 	header = (struct usb_descriptor_header *)buffer;
-
-	/* Everything should be fine being passed into here, but we sanity */
-	/*  check JIC */
-	if (header->bLength > size) {
-		err("ran out of descriptors parsing");
-		return -EINVAL;
-	}
-
 	if (header->bDescriptorType != USB_DT_ENDPOINT) {
 		warn("unexpected descriptor 0x%X, expecting endpoint, 0x%X",
 			header->bDescriptorType, USB_DT_ENDPOINT);
@@ -43,7 +36,6 @@ static int usb_parse_endpoint(struct usb_host_endpoint *endpoint, unsigned char 
 
 	buffer += header->bLength;
 	size -= header->bLength;
-	parsed += header->bLength;
 
 	/* Skip over the rest of the Class Specific or Vendor Specific */
 	/*  descriptors */
@@ -64,38 +56,30 @@ static int usb_parse_endpoint(struct usb_host_endpoint *endpoint, unsigned char 
 		    (header->bDescriptorType == USB_DT_DEVICE))
 			break;
 
-		dbg("skipping descriptor 0x%X",
-			header->bDescriptorType);
+		dbg("skipping descriptor 0x%X", header->bDescriptorType);
 		numskipped++;
 
 		buffer += header->bLength;
 		size -= header->bLength;
-		parsed += header->bLength;
 	}
-	if (numskipped)
+	if (numskipped) {
 		dbg("skipped %d class/vendor specific endpoint descriptors", numskipped);
 
-	/* Copy any unknown descriptors into a storage area for drivers */
-	/*  to later parse */
-	len = (int)(buffer - begin);
-	if (!len) {
-		endpoint->extra = NULL;
-		endpoint->extralen = 0;
-		return parsed;
+		/* Copy any unknown descriptors into a storage area for drivers */
+		/*  to later parse */
+		len = buffer - begin;
+
+		endpoint->extra = kmalloc(len, GFP_KERNEL);
+		if (!endpoint->extra) {
+			err("couldn't allocate memory for endpoint extra descriptors");
+			return -ENOMEM;
+		}
+
+		memcpy(endpoint->extra, begin, len);
+		endpoint->extralen = len;
 	}
 
-	endpoint->extra = kmalloc(len, GFP_KERNEL);
-
-	if (!endpoint->extra) {
-		err("couldn't allocate memory for endpoint extra descriptors");
-		endpoint->extralen = 0;
-		return parsed;
-	}
-
-	memcpy(endpoint->extra, begin, len);
-	endpoint->extralen = len;
-
-	return parsed;
+	return buffer - buffer0;
 }
 
 static void usb_release_intf(struct device *dev)
@@ -126,17 +110,15 @@ static void usb_release_intf(struct device *dev)
 
 static int usb_parse_interface(struct usb_interface *interface, unsigned char *buffer, int size)
 {
-	int i, len, numskipped, retval, parsed = 0;
+	unsigned char *buffer0 = buffer;
+	int i, len, numskipped, retval;
 	struct usb_descriptor_header *header;
 	struct usb_host_interface *ifp;
 	unsigned char *begin;
 
-	interface->act_altsetting = 0;
-	interface->num_altsetting = 0;
 	interface->max_altsetting = USB_ALTSETTINGALLOC;
 	interface->altsetting = kmalloc(sizeof(*interface->altsetting) * interface->max_altsetting,
 					GFP_KERNEL);
-
 	if (!interface->altsetting) {
 		err("couldn't kmalloc interface->altsetting");
 		return -ENOMEM;
@@ -168,16 +150,13 @@ static int usb_parse_interface(struct usb_interface *interface, unsigned char *b
 		}
 
 		ifp = interface->altsetting + interface->num_altsetting;
-		ifp->endpoint = NULL;
-		ifp->extra = NULL;
-		ifp->extralen = 0;
+		memset(ifp, 0, sizeof(*ifp));
 		interface->num_altsetting++;
 
-		memcpy(ifp, buffer, USB_DT_INTERFACE_SIZE);
+		memcpy(&ifp->desc, buffer, USB_DT_INTERFACE_SIZE);
 
 		/* Skip over the interface */
 		buffer += ifp->desc.bLength;
-		parsed += ifp->desc.bLength;
 		size -= ifp->desc.bLength;
 
 		begin = buffer;
@@ -199,25 +178,23 @@ static int usb_parse_interface(struct usb_interface *interface, unsigned char *b
 			    (header->bDescriptorType == USB_DT_DEVICE))
 				break;
 
+			dbg("skipping descriptor 0x%X", header->bDescriptorType);
 			numskipped++;
 
 			buffer += header->bLength;
-			parsed += header->bLength;
 			size -= header->bLength;
 		}
 
-		if (numskipped)
+		if (numskipped) {
 			dbg("skipped %d class/vendor specific interface descriptors", numskipped);
 
-		/* Copy any unknown descriptors into a storage area for */
-		/*  drivers to later parse */
-		len = (int)(buffer - begin);
-		if (len) {
+			/* Copy any unknown descriptors into a storage area for */
+			/*  drivers to later parse */
+			len = buffer - begin;
 			ifp->extra = kmalloc(len, GFP_KERNEL);
 
 			if (!ifp->extra) {
 				err("couldn't allocate memory for interface extra descriptors");
-				ifp->extralen = 0;
 				return -ENOMEM;
 			}
 			memcpy(ifp->extra, begin, len);
@@ -229,28 +206,23 @@ static int usb_parse_interface(struct usb_interface *interface, unsigned char *b
 		if ((size >= sizeof(struct usb_descriptor_header)) &&
 		    ((header->bDescriptorType == USB_DT_CONFIG) ||
 		     (header->bDescriptorType == USB_DT_DEVICE)))
-			return parsed;
+			break;
 
 		if (ifp->desc.bNumEndpoints > USB_MAXENDPOINTS) {
 			warn("too many endpoints");
 			return -EINVAL;
 		}
 
-		ifp->endpoint = (struct usb_host_endpoint *)
-			kmalloc(ifp->desc.bNumEndpoints *
-			sizeof(struct usb_host_endpoint), GFP_KERNEL);
+		len = ifp->desc.bNumEndpoints * sizeof(struct usb_host_endpoint);
+		ifp->endpoint = kmalloc(len, GFP_KERNEL);
 		if (!ifp->endpoint) {
 			err("out of memory");
 			return -ENOMEM;
 		}
-
-		memset(ifp->endpoint, 0, ifp->desc.bNumEndpoints *
-			sizeof(struct usb_host_endpoint));
+		memset(ifp->endpoint, 0, len);
 
 		for (i = 0; i < ifp->desc.bNumEndpoints; i++) {
-			header = (struct usb_descriptor_header *)buffer;
-
-			if (header->bLength > size) {
+			if (size < USB_DT_ENDPOINT_SIZE) {
 				err("ran out of descriptors parsing");
 				return -EINVAL;
 			}
@@ -260,7 +232,6 @@ static int usb_parse_interface(struct usb_interface *interface, unsigned char *b
 				return retval;
 
 			buffer += retval;
-			parsed += retval;
 			size -= retval;
 		}
 
@@ -269,32 +240,32 @@ static int usb_parse_interface(struct usb_interface *interface, unsigned char *b
 		if (size < USB_DT_INTERFACE_SIZE
 				|| d->bDescriptorType != USB_DT_INTERFACE
 				|| !d->bAlternateSetting)
-			return parsed;
+			break;
 	}
 
-	return parsed;
+	return buffer - buffer0;
 }
 
 int usb_parse_configuration(struct usb_host_config *config, char *buffer)
 {
+	int nintf;
 	int i, size;
 	struct usb_interface *interface;
-	int retval = -EINVAL;
+	int retval;
 	struct usb_descriptor_header *header;
 
 	memcpy(&config->desc, buffer, USB_DT_CONFIG_SIZE);
 	le16_to_cpus(&config->desc.wTotalLength);
 	size = config->desc.wTotalLength;
 
-	for (i = 0; i < USB_MAXINTERFACES; ++i)
-		config->interface[i] = NULL;
-
-	if (config->desc.bNumInterfaces > USB_MAXINTERFACES) {
-		warn("too many interfaces");
-		return -EINVAL;
+	nintf = config->desc.bNumInterfaces;
+	if (nintf > USB_MAXINTERFACES) {
+		warn("too many interfaces (%d max %d)",
+		    nintf, USB_MAXINTERFACES);
+		config->desc.bNumInterfaces = nintf = USB_MAXINTERFACES;
 	}
 
-	for (i = 0; i < config->desc.bNumInterfaces; ++i) {
+	for (i = 0; i < nintf; ++i) {
 		interface = config->interface[i] =
 		    kmalloc(sizeof(struct usb_interface), GFP_KERNEL);
 		dbg("kmalloc IF %p, numif %i", interface, i);
@@ -313,10 +284,7 @@ int usb_parse_configuration(struct usb_host_config *config, char *buffer)
 	buffer += config->desc.bLength;
 	size -= config->desc.bLength;
 
-	config->extra = NULL;
-	config->extralen = 0;
-
-	for (i = 0; i < config->desc.bNumInterfaces; i++) {
+	for (i = 0; i < nintf; i++) {
 		int numskipped, len;
 		char *begin;
 
@@ -345,20 +313,18 @@ int usb_parse_configuration(struct usb_host_config *config, char *buffer)
 			buffer += header->bLength;
 			size -= header->bLength;
 		}
-		if (numskipped)
-			dbg("skipped %d class/vendor specific endpoint descriptors", numskipped);
+		if (numskipped) {
+			dbg("skipped %d class/vendor specific configuration descriptors", numskipped);
 
-		/* Copy any unknown descriptors into a storage area for */
-		/*  drivers to later parse */
-		len = (int)(buffer - begin);
-		if (len) {
+			/* Copy any unknown descriptors into a storage area for */
+			/*  drivers to later parse */
+			len = buffer - begin;
 			if (config->extralen) {
 				warn("extra config descriptor");
 			} else {
 				config->extra = kmalloc(len, GFP_KERNEL);
 				if (!config->extra) {
 					err("couldn't allocate memory for config extra descriptors");
-					config->extralen = 0;
 					return -ENOMEM;
 				}
 
@@ -413,39 +379,39 @@ void usb_destroy_configuration(struct usb_device *dev)
 // (used by real hubs and virtual root hubs)
 int usb_get_configuration(struct usb_device *dev)
 {
+	int ncfg = dev->descriptor.bNumConfigurations;
 	int result;
 	unsigned int cfgno, length;
 	unsigned char *buffer;
 	unsigned char *bigbuffer;
  	struct usb_config_descriptor *desc;
 
-	if (dev->descriptor.bNumConfigurations > USB_MAXCONFIG) {
-		warn("too many configurations");
+	if (ncfg > USB_MAXCONFIG) {
+		warn("too many configurations (%d max %d)",
+		    ncfg, USB_MAXCONFIG);
+		dev->descriptor.bNumConfigurations = ncfg = USB_MAXCONFIG;
+	}
+
+	if (ncfg < 1) {
+		warn("no configurations");
 		return -EINVAL;
 	}
 
-	if (dev->descriptor.bNumConfigurations < 1) {
-		warn("not enough configurations");
-		return -EINVAL;
-	}
-
-	dev->config = (struct usb_host_config *)
-		kmalloc(dev->descriptor.bNumConfigurations *
-		sizeof(struct usb_host_config), GFP_KERNEL);
+	length = ncfg * sizeof(struct usb_host_config);
+	dev->config = kmalloc(length, GFP_KERNEL);
 	if (!dev->config) {
 		err("out of memory");
 		return -ENOMEM;
 	}
-	memset(dev->config, 0, dev->descriptor.bNumConfigurations *
-		sizeof(struct usb_host_config));
+	memset(dev->config, 0, length);
 
-	dev->rawdescriptors = (char **)kmalloc(sizeof(char *) *
-		dev->descriptor.bNumConfigurations, GFP_KERNEL);
+	length = ncfg * sizeof(char *);
+	dev->rawdescriptors = kmalloc(length, GFP_KERNEL);
 	if (!dev->rawdescriptors) {
 		err("out of memory");
 		return -ENOMEM;
 	}
-	memset(dev->rawdescriptors, 0, sizeof(char *) * dev->descriptor.bNumConfigurations);
+	memset(dev->rawdescriptors, 0, length);
 
 	buffer = kmalloc(8, GFP_KERNEL);
 	if (!buffer) {
@@ -454,7 +420,7 @@ int usb_get_configuration(struct usb_device *dev)
 	}
 	desc = (struct usb_config_descriptor *)buffer;
 
-	for (cfgno = 0; cfgno < dev->descriptor.bNumConfigurations; cfgno++) {
+	for (cfgno = 0; cfgno < ncfg; cfgno++) {
 		/* We grab the first 8 bytes so we know how long the whole */
 		/*  configuration is */
 		result = usb_get_descriptor(dev, USB_DT_CONFIG, cfgno, buffer, 8);
