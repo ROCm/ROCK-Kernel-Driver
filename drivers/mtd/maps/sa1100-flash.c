@@ -1267,13 +1267,25 @@ static int __init sa1100_locate_flash(struct sa_info *info)
 	return nr;
 }
 
-const char *part_probes[] = { "cmdlinepart", "RedBoot", NULL };
+static const char *part_probes[] = { "cmdlinepart", "RedBoot", NULL };
 
-static void __init sa1100_locate_partitions(struct sa_info *info)
+static struct sa_info sa_info;
+
+static int __init sa1100_mtd_probe(struct device *dev)
 {
 	struct mtd_partition *parts;
 	const char *part_type = NULL;
-	int nr_parts = 0;
+	struct sa_info *info = &sa_info;
+	int err, nr_parts = 0;
+	int nr;
+
+	nr = sa1100_locate_flash(info);
+	if (nr < 0)
+		return nr;
+
+	err = sa1100_setup_mtd(info, nr);
+	if (err != 0)
+		goto out;
 
 	/*
 	 * Partition selection stuff.
@@ -1300,40 +1312,39 @@ static void __init sa1100_locate_partitions(struct sa_info *info)
 		add_mtd_partitions(info->mtd, parts, nr_parts);
 	}
 
-	/* Always succeeds. */
-}
+	dev_set_drvdata(dev, info);
+	err = 0;
 
-static struct sa_info sa_info;
-
-static int __init sa1100_mtd_probe(struct device *dev)
-{
-	int err;
-	int nr;
-
-	nr = sa1100_locate_flash(&sa_info);
-	if (nr < 0)
-		return nr;
-
-	err = sa1100_setup_mtd(&sa_info, nr);
-	if (err == 0)
-		sa1100_locate_partitions(&sa_info);
-
+ out:
 	return err;
 }
 
 static int __exit sa1100_mtd_remove(struct device *dev)
 {
-	sa1100_destroy(&sa_info);
+	struct sa_info *info = dev_get_drvdata(dev);
+	dev_set_drvdata(dev, NULL);
+	sa1100_destroy(info);
 	return 0;
 }
 
 #ifdef CONFIG_PM
 static int sa1100_mtd_suspend(struct device *dev, u32 state, u32 level)
 {
+	struct sa_info *info = dev_get_drvdata(dev);
+	int ret = 0;
+
+	if (info && level == SUSPEND_SAVE_STATE)
+		ret = info->mtd->suspend(info->mtd);
+
+	return ret;
 }
 
 static int sa1100_mtd_resume(struct device *dev, u32 level)
 {
+	struct sa_info *info = dev_get_drvdata(dev);
+	if (info && level == RESUME_RESTORE_STATE)
+		info->mtd->resume(info->mtd);
+	return 0;
 }
 #else
 #define sa1100_mtd_suspend NULL
