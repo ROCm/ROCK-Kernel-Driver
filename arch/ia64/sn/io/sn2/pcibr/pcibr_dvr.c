@@ -948,7 +948,7 @@ pcibr_attach2(vertex_hdl_t xconn_vhdl, bridge_t *bridge,
 #endif
     nasid_t		    nasid;
     int	                    iobrick_type_get_nasid(nasid_t nasid);
-    int                     iobrick_module_get_nasid(nasid_t nasid);
+    int                     iomoduleid_get(nasid_t nasid);
 
     PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_ATTACH, pcibr_vhdl,
 	        "pcibr_attach2: bridge=0x%p, busnum=%d\n", bridge, busnum));
@@ -1102,7 +1102,7 @@ pcibr_attach2(vertex_hdl_t xconn_vhdl, bridge_t *bridge,
 	printk(KERN_WARNING "0x%p: Unknown bricktype : 0x%x\n", (void *)xconn_vhdl,
 				(unsigned int)pcibr_soft->bs_bricktype);
 
-    pcibr_soft->bs_moduleid = iobrick_module_get_nasid(nasid);
+    pcibr_soft->bs_moduleid = iomoduleid_get(nasid);
 
     if (pcibr_soft->bs_bricktype > 0) {
 	switch (pcibr_soft->bs_bricktype) {

@@ -160,6 +160,8 @@ pic_attach(vertex_hdl_t conn_v)
 	vertex_hdl_t	pcibr_vhdl0, pcibr_vhdl1 = (vertex_hdl_t)0;
 	pcibr_soft_t	bus0_soft, bus1_soft = (pcibr_soft_t)0;
 	vertex_hdl_t  conn_v0, conn_v1, peer_conn_v;
+	int		bricktype;
+	int		iobrick_type_get_nasid(nasid_t nasid);
 
 	PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_ATTACH, conn_v, "pic_attach()\n"));
 
@@ -188,11 +190,18 @@ pic_attach(vertex_hdl_t conn_v)
 	 * Opening this vertex will provide access to
 	 * the Bridge registers themselves.
 	 */
-	/* FIXME: what should the hwgraph path look like ? */
-	rc = hwgraph_path_add(conn_v0, EDGE_LBL_PCIX_0, &pcibr_vhdl0);
-	ASSERT(rc == GRAPH_SUCCESS);
-	rc = hwgraph_path_add(conn_v1, EDGE_LBL_PCIX_1, &pcibr_vhdl1);
-	ASSERT(rc == GRAPH_SUCCESS);
+	bricktype = iobrick_type_get_nasid(NASID_GET(bridge0));
+	if ( bricktype == MODULE_CGBRICK ) {
+		rc = hwgraph_path_add(conn_v0, EDGE_LBL_AGP_0, &pcibr_vhdl0);
+		ASSERT(rc == GRAPH_SUCCESS);
+		rc = hwgraph_path_add(conn_v1, EDGE_LBL_AGP_1, &pcibr_vhdl1);
+		ASSERT(rc == GRAPH_SUCCESS);
+	} else {
+		rc = hwgraph_path_add(conn_v0, EDGE_LBL_PCIX_0, &pcibr_vhdl0);
+		ASSERT(rc == GRAPH_SUCCESS);
+		rc = hwgraph_path_add(conn_v1, EDGE_LBL_PCIX_1, &pcibr_vhdl1);
+		ASSERT(rc == GRAPH_SUCCESS);
+	}
 
 	PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_ATTACH, conn_v,
 		    "pic_attach: pcibr_vhdl0=%v, pcibr_vhdl1=%v\n",

@@ -90,10 +90,11 @@
 #define L1_BRICKTYPE_IP45       0x34            /* 4 */
 #define L1_BRICKTYPE_C          0x43            /* C */
 #define L1_BRICKTYPE_R          0x52            /* R */
-#define L1_BRICKTYPE_CHI_CG	0x76		/* v */
+#define L1_BRICKTYPE_CHI_CG     0x76            /* v */
 #define L1_BRICKTYPE_N          0x4e            /* N */
 #define L1_BRICKTYPE_PX		0x23		/* # */
 #define L1_BRICKTYPE_IX		0x3d		/* = */
+#define L1_BRICKTYPE_OPUS       0x6f		/* o */
 
 /* EEPROM codes (for the "read EEPROM" request) */
 /* c brick */
@@ -125,7 +126,7 @@
 int	elsc_display_line(nasid_t nasid, char *line, int lnum);
 int	iobrick_rack_bay_type_get( nasid_t nasid, unsigned int *rack,
 				   unsigned int *bay, unsigned int *brick_type );
-int	iobrick_module_get( nasid_t nasid );
+int	iomoduleid_get( nasid_t nasid );
 
 
 #endif /* _ASM_IA64_SN_KSYS_L1_H */

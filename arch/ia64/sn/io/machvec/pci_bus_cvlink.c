@@ -28,6 +28,8 @@ extern void register_pcibr_intr(int irq, pcibr_intr_t intr);
 
 void sn_dma_flush_init(unsigned long start, unsigned long end, int idx, int pin, int slot);
 
+#define IS_OPUS(nasid) (cbrick_type_get_nasid(nasid) == MODULE_OPUSBRICK)
+#define IS_ALTIX(nasid) (cbrick_type_get_nasid(nasid) == MODULE_CBRICK)
 
 /*
  * pci_bus_cvlink_init() - To be called once during initialization before 

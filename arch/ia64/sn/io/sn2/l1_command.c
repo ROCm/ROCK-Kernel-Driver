@@ -58,8 +58,6 @@ int iobrick_rack_bay_type_get( nasid_t nasid, uint *rack,
 	*rack = (result & MODULE_RACK_MASK) >> MODULE_RACK_SHFT;
 	*bay = (result & MODULE_BPOS_MASK) >> MODULE_BPOS_SHFT;
 	*brick_type = (result & MODULE_BTYPE_MASK) >> MODULE_BTYPE_SHFT;
-	*brick_type = toupper(*brick_type);
-
 	return 0;
 }
 
@@ -74,57 +72,6 @@ int iomoduleid_get(nasid_t nasid)
 	return result;
 }
 
-int iobrick_module_get(nasid_t nasid)
-{
-    uint rnum, rack, bay, brick_type, t;
-    int ret;
-
-    /* construct module ID from rack and slot info */
-
-    if ((ret = iobrick_rack_bay_type_get(nasid, &rnum, &bay, &brick_type)) < 0)
-        return ret;
-
-    if (bay > MODULE_BPOS_MASK >> MODULE_BPOS_SHFT)
-        return ELSC_ERROR_MODULE;
-
-    /* Build a moduleid_t-compatible rack number */
-
-    rack = 0;           
-    t = rnum / 100;             /* rack class (CPU/IO) */
-    if (t > RACK_CLASS_MASK(rack) >> RACK_CLASS_SHFT(rack))
-        return ELSC_ERROR_MODULE;
-    RACK_ADD_CLASS(rack, t);
-    rnum %= 100;
-
-    t = rnum / 10;              /* rack group */
-    if (t > RACK_GROUP_MASK(rack) >> RACK_GROUP_SHFT(rack))
-        return ELSC_ERROR_MODULE;
-    RACK_ADD_GROUP(rack, t);
-
-    t = rnum % 10;              /* rack number (one-based) */
-    if (t-1 > RACK_NUM_MASK(rack) >> RACK_NUM_SHFT(rack))
-        return ELSC_ERROR_MODULE;
-    RACK_ADD_NUM(rack, t);
-
-    switch( brick_type ) {
-      case L1_BRICKTYPE_IX: 
-	brick_type = MODULE_IXBRICK; break;
-      case L1_BRICKTYPE_PX: 
-	brick_type = MODULE_PXBRICK; break;
-    }
-
-    ret = RBT_TO_MODULE(rack, bay, brick_type);
-
-    return ret;
-}
-
-/*
- * iobrick_module_get_nasid() returns a module_id which has the brick
- * type encoded in bits 15-12, but this is not the true brick type...
- * The module_id returned by iobrick_module_get_nasid() is modified
- * to make a PEBRICKs & PXBRICKs look like a PBRICK.  So this routine
- * iobrick_type_get_nasid() returns the true unmodified brick type.
- */
 int
 iobrick_type_get_nasid(nasid_t nasid)
 {
@@ -150,14 +97,6 @@ iobrick_type_get_nasid(nasid_t nasid)
     return -1;    /* unknown brick */
 }
 
-int iobrick_module_get_nasid(nasid_t nasid)
-{
-    int io_moduleid;
-
-    io_moduleid = iobrick_module_get(nasid);
-    return io_moduleid;
-}
-
 /*
  * given a L1 bricktype, return a bricktype string.  This string is the
  * string that will be used in the hwpath for I/O bricks
@@ -171,10 +110,13 @@ iobrick_L1bricktype_to_name(int type)
         return("Unknown");
 
     case L1_BRICKTYPE_PX:
-        return("PXbrick");
+        return(EDGE_LBL_PXBRICK);
+
+    case L1_BRICKTYPE_OPUS:
+        return(EDGE_LBL_OPUSBRICK);
 
     case L1_BRICKTYPE_IX:
-        return("IXbrick");
+        return(EDGE_LBL_IXBRICK);
 
     case L1_BRICKTYPE_C:
         return("Cbrick");

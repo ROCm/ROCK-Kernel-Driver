@@ -52,6 +52,9 @@
 #define EDGE_LBL_PCIX			"pci-x"
 #define EDGE_LBL_PCIX_0			EDGE_LBL_PCIX "/0"
 #define EDGE_LBL_PCIX_1			EDGE_LBL_PCIX "/1"
+#define EDGE_LBL_AGP			"agp"
+#define EDGE_LBL_AGP_0			EDGE_LBL_AGP "/0"
+#define EDGE_LBL_AGP_1			EDGE_LBL_AGP "/1"
 #define EDGE_LBL_PORT			"port"
 #define EDGE_LBL_PROM			"prom"
 #define EDGE_LBL_RACK			"rack"
@@ -79,6 +82,7 @@
 #define	EDGE_LBL_XPLINK_ADMIN		"admin"	   	/* Partition admin */
 #define EDGE_LBL_IOBRICK		"iobrick"
 #define EDGE_LBL_PXBRICK		"PXbrick"
+#define EDGE_LBL_OPUSBRICK		"onboardio"
 #define EDGE_LBL_IXBRICK		"IXbrick"
 #define EDGE_LBL_CGBRICK		"CGbrick"
 #define EDGE_LBL_CPUBUS			"cpubus"	/* CPU Interfaces (SysAd) */
@@ -90,9 +94,7 @@
 #define INFO_LBL_CPUID			"_cpuid"
 #define INFO_LBL_CPU_INFO		"_cpu"
 #define INFO_LBL_DETAIL_INVENT		"_detail_invent" /* inventory data*/
-#define INFO_LBL_DEVICE_DESC		"_device_desc"
-#define INFO_LBL_DIAGVAL                "_diag_reason"   /* Reason disabled */
-#define INFO_LBL_DKIOTIME		"_dkiotime"
+#define INFO_LBL_DIAGVAL		"_diag_reason"   /* Reason disabled */
 #define INFO_LBL_DRIVER			"_driver"	/* points to attached device_driver_t */
 #define INFO_LBL_ELSC			"_elsc"
 #define	INFO_LBL_SUBCH			"_subch"	/* system controller subchannel */
@@ -135,12 +137,6 @@
 							 * thread priority
 							 * default class
 							 */
-/* Special reserved info labels (also hwgfs attributes) */
-#define _DEVNAME_ATTR		"_devname"	/* device name */
-#define _DRIVERNAME_ATTR	"_drivername"	/* driver name */
-#define _INVENT_ATTR		"_inventory"	/* device inventory data */
-#define _MASTERNODE_ATTR	"_masternode"	/* node that "controls" device */
-
 /* Info labels that begin with '_' cannot be overwritten by an attr_set call */
 #define INFO_LBL_RESERVED(name) ((name)[0] == '_')
 

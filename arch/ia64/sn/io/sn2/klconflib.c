@@ -23,9 +23,6 @@
 #include <asm/sn/xtalk/xbow.h>
 
 
-#define LDEBUG 0
-#define NIC_UNKNOWN ((nic_t) -1)
-
 #undef DEBUG_KLGRAPH
 #ifdef DEBUG_KLGRAPH
 #define DBG(x...) printk(x)
@@ -37,7 +34,7 @@ u64 klgraph_addr[MAX_COMPACT_NODES];
 static int hasmetarouter;
 
 
-char brick_types[MAX_BRICK_TYPES + 1] = "crikxdpn%#=012345";
+char brick_types[MAX_BRICK_TYPES + 1] = "crikxdpn%#=vo^34567890123456789...";
 
 lboard_t *
 find_lboard(lboard_t *start, unsigned char brd_type)
@@ -268,9 +265,11 @@ board_to_path(lboard_t *brd, char *path)
 				board_name = EDGE_LBL_PXBRICK;
 			else if (brd->brd_type == KLTYPE_IXBRICK)
 				board_name = EDGE_LBL_IXBRICK;
+			else if (brd->brd_type == KLTYPE_OPUSBRICK)
+				board_name = EDGE_LBL_OPUSBRICK;
 			else if (brd->brd_type == KLTYPE_CGBRICK)
 				board_name = EDGE_LBL_CGBRICK;
-			else
+			else 
 				board_name = EDGE_LBL_IOBRICK;
 			break;
 		default:
@@ -282,23 +281,6 @@ board_to_path(lboard_t *brd, char *path)
 	format_module_id(buffer, modnum, MODULE_FORMAT_BRIEF);
 	sprintf(path, EDGE_LBL_MODULE "/%s/" EDGE_LBL_SLAB "/%d/%s", buffer, geo_slab(brd->brd_geoid), board_name);
 }
-
-/*
- * Get the module number for a NASID.
- */
-moduleid_t
-get_module_id(nasid_t nasid)
-{
-	lboard_t *brd;
-
-	brd = find_lboard((lboard_t *)KL_CONFIG_INFO(nasid), KLTYPE_SNIA);
-
-	if (!brd)
-		return INVALID_MODULE;
-	else
-		return geo_module(brd->brd_geoid);
-}
-
 
 #define MHZ	1000000
 

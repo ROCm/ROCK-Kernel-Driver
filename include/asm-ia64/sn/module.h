@@ -138,6 +138,8 @@ extern char brick_types[];
 #define MODULE_PEBRICK          8
 #define MODULE_PXBRICK          9
 #define MODULE_IXBRICK          10
+#define MODULE_CGBRICK		11
+#define MODULE_OPUSBRICK        12
 
 /*
  * Moduleid_t comparison macros

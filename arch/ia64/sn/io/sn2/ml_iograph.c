@@ -24,8 +24,6 @@
 #define DBG(x...)
 #endif /* IOGRAPH_DEBUG */
 
-/* #define PROBE_TEST */
-
 /* At most 2 hubs can be connected to an xswitch */
 #define NUM_XSWITCH_VOLUNTEER 2
 
@@ -69,7 +67,6 @@ xswitch_volunteer_delete(vertex_hdl_t xswitch)
 {
 	xswitch_vol_t xvolinfo;
 	int rc;
-	extern void snia_kmem_free(void *ptr, size_t size);
 
 	rc = hwgraph_info_remove_LBL(xswitch, 
 				INFO_LBL_XSWITCH_VOL,
@@ -92,10 +89,12 @@ volunteer_for_widgets(vertex_hdl_t xswitch, vertex_hdl_t master)
 				INFO_LBL_XSWITCH_VOL, 
 				(arbitrary_info_t *)&xvolinfo);
 	if (xvolinfo == NULL) {
-	    if (!is_headless_node_vertex(master))
+	    if (!is_headless_node_vertex(master)) {
+		    char name[MAXDEVNAME];
 		    printk(KERN_WARNING
-			"volunteer for widgets: vertex 0x%p has no info label",
-			(void *)xswitch);
+			"volunteer for widgets: vertex %s has no info label",
+			vertex_to_name(xswitch, name, MAXDEVNAME));
+	    }
 	    return;
 	}
 
@@ -149,11 +148,13 @@ assign_widgets_to_volunteers(vertex_hdl_t xswitch, vertex_hdl_t hubv)
 				INFO_LBL_XSWITCH_VOL, 
 				(arbitrary_info_t *)&xvolinfo);
 	if (xvolinfo == NULL) {
-	    if (!is_headless_node_vertex(hubv))
+	    if (!is_headless_node_vertex(hubv)) {
+		    char name[MAXDEVNAME];
 		    printk(KERN_WARNING
-			"assign_widgets_to_volunteers:vertex 0x%p has "
+			"assign_widgets_to_volunteers:vertex %s has "
 			" no info label",
-			(void *)xswitch);
+			vertex_to_name(xswitch, name, MAXDEVNAME));
+	    }
 	    return;
 	}
 
@@ -173,9 +174,6 @@ assign_widgets_to_volunteers(vertex_hdl_t xswitch, vertex_hdl_t hubv)
 	for (widgetnum=HUB_WIDGET_ID_MIN; widgetnum <= HUB_WIDGET_ID_MAX; widgetnum++) {
 		int i;
 
-		/*
-		 * Ignore disabled/empty ports.
-		 */
 		if (!xbow_port_io_enabled(nasid, widgetnum)) 
 		    continue;
 
@@ -192,8 +190,9 @@ assign_widgets_to_volunteers(vertex_hdl_t xswitch, vertex_hdl_t hubv)
 				if (nasid == get_master_baseio_nasid())
 					goto do_assignment;
 			}
-			panic("Nasid == %d, console nasid == %d",
+			printk("Nasid == %d, console nasid == %d",
 				nasid, get_master_baseio_nasid());
+			nasid = 0;
 		}
 
 		/*
@@ -384,7 +383,9 @@ io_xswitch_widget_init(vertex_hdl_t  	xswitchv,
 			buffer,
 			geo_slab(board->brd_geoid),
 			(board->brd_type == KLTYPE_PXBRICK) ? EDGE_LBL_PXBRICK :
-			(board->brd_type == KLTYPE_IXBRICK) ? EDGE_LBL_IXBRICK : "?brick",
+			(board->brd_type == KLTYPE_IXBRICK) ? EDGE_LBL_IXBRICK :
+			(board->brd_type == KLTYPE_CGBRICK) ? EDGE_LBL_CGBRICK :
+			(board->brd_type == KLTYPE_OPUSBRICK) ? EDGE_LBL_OPUSBRICK : "?brick",
 			EDGE_LBL_XTALK, widgetnum);
 		
 		DBG("io_xswitch_widget_init: path= %s\n", pathname);
@@ -421,8 +422,7 @@ io_xswitch_widget_init(vertex_hdl_t  	xswitchv,
 		(void)xwidget_register(&hwid, widgetv, widgetnum,
 				       hubv, hub_widgetid);
 
-		ia64_sn_sysctl_iobrick_module_get(nasid, &io_module);
-
+		io_module = iomoduleid_get(nasid);
 		if (io_module >= 0) {
 			char			buffer[16];
 			vertex_hdl_t		to, from;
@@ -433,8 +433,8 @@ io_xswitch_widget_init(vertex_hdl_t  	xswitchv,
 			memset(buffer, 0, 16);
 			format_module_id(buffer, geo_module(board->brd_geoid), MODULE_FORMAT_BRIEF);
 
-			if ( islower(MODULE_GET_BTCHAR(io_module)) ) {
-				bt = toupper(MODULE_GET_BTCHAR(io_module));
+			if ( isupper(MODULE_GET_BTCHAR(io_module)) ) {
+				bt = tolower(MODULE_GET_BTCHAR(io_module));
 			}
 			else {
 				bt = MODULE_GET_BTCHAR(io_module);
@@ -464,18 +464,12 @@ io_xswitch_widget_init(vertex_hdl_t  	xswitchv,
 			ASSERT_ALWAYS(to);
 			rc = hwgraph_edge_add(from, to,
 				EDGE_LBL_INTERCONNECT);
-			if (rc == -EEXIST)
-				goto link_done;
-			if (rc != GRAPH_SUCCESS) {
+			if (rc != -EEXIST && rc != GRAPH_SUCCESS) {
 				printk("%s: Unable to establish link"
 					" for xbmon.", pathname);
 			}
-link_done:
 		}
 
-#ifdef	SN0_USE_BTE
-		bte_bpush_war(cnode, (void *)board);
-#endif
 	}
 }
 
@@ -588,23 +582,11 @@ io_init_node(cnodeid_t cnodeid)
 
 	ASSERT(hubv != GRAPH_VERTEX_NONE);
 
-	/*
-	 * Read mfg info on this hub
-	 */
-
 	/* 
 	 * If nothing connected to this hub's xtalk port, we're done.
 	 */
 	early_probe_for_widget(hubv, &hwid);
 	if (hwid.part_num == XWIDGET_PART_NUM_NONE) {
-#ifdef PROBE_TEST
-		if ((cnodeid == 1) || (cnodeid == 2)) {
-			int index;
-
-			for (index = 0; index < 600; index++)
-				DBG("Interfering with device probing!!!\n");
-		}
-#endif
 		DBG("**** io_init_node: Node's 0x%p hub widget has XWIDGET_PART_NUM_NONE ****\n", hubv);
 		return;
 		/* NOTREACHED */
@@ -740,14 +722,6 @@ io_init_node(cnodeid_t cnodeid)
 	    down(&npdap->xbow_sema);
 	}
 
-#ifdef PROBE_TEST
-	if ((cnodeid == 1) || (cnodeid == 2)) {
-		int index;
-
-		for (index = 0; index < 500; index++)
-			DBG("Interfering with device probing!!!\n");
-	}
-#endif
 	/* Now both nodes can safely inititialize widgets */
 	io_init_xswitch_widgets(switchv, cnodeid);
 	io_link_xswitch_widgets(switchv, cnodeid);
@@ -756,7 +730,6 @@ io_init_node(cnodeid_t cnodeid)
 }
 
 #include <asm/sn/ioerror_handling.h>
-/* #endif */
 
 /*
  * Initialize all I/O devices.  Starting closest to nodes, probe and
@@ -765,9 +738,6 @@ io_init_node(cnodeid_t cnodeid)
 void
 init_all_devices(void)
 {
-	/* Governor on init threads..bump up when safe 
-	 * (beware many devfs races) 
-	 */
 	cnodeid_t cnodeid, active;
 
 	active = 0;
@@ -778,16 +748,12 @@ init_all_devices(void)
 		DBG("init_all_devices: Done io_init_node() for cnode %d\n", cnodeid);
 	}
 
-	for (cnodeid = 0; cnodeid < numnodes; cnodeid++)
+	for (cnodeid = 0; cnodeid < numnodes; cnodeid++) {
 		/*
 	 	 * Update information generated by IO init.
 		 */
 		update_node_information(cnodeid);
-
-#if HWG_PRINT
-	hwgraph_print();
-#endif
-
+	}
 }
 
 static
@@ -807,6 +773,20 @@ struct io_brick_map_s io_brick_tab[] = {
     }
  },
 
+/* OPUSbrick widget number to PCI bus number map */
+ {      MODULE_OPUSBRICK,                       /* OPUSbrick type */ 
+    /*  PCI Bus #                                  Widget #       */
+    {   0, 0, 0, 0, 0, 0, 0, 0,                 /* 0x0 - 0x7      */
+        0,                                      /* 0x8            */
+        0,                                      /* 0x9            */
+        0, 0,                                   /* 0xa - 0xb      */
+        0,                                      /* 0xc            */
+        0,                                      /* 0xd            */
+        0,                                      /* 0xe            */
+        1                                       /* 0xf            */
+    }
+ },
+
 /* IXbrick widget number to PCI bus number map */
  {      MODULE_IXBRICK,                         /* IXbrick type   */ 
     /*  PCI Bus #                                  Widget #       */
@@ -819,6 +799,20 @@ struct io_brick_map_s io_brick_tab[] = {
         0,                                      /* 0xe            */
         3                                       /* 0xf            */
     }
+ },
+
+/* CG brick widget number to PCI bus number map */
+ {      MODULE_CGBRICK,				/* CG brick       */
+    /*  PCI Bus #                                  Widget #       */
+    {   0, 0, 0, 0, 0, 0, 0, 0,                 /* 0x0 - 0x7      */
+        0,                                      /* 0x8            */
+        0,                                      /* 0x9            */
+        0, 1,                                   /* 0xa - 0xb      */
+        0,                                      /* 0xc            */
+        0,                                      /* 0xd            */
+        0,                                      /* 0xe            */
+        0                                       /* 0xf            */
+     }
  },
 };
 
