@@ -913,6 +913,7 @@ do_udp_sendmsg:
 	if (msg->msg_controllen) {
 		opt = &opt_space;
 		memset(opt, 0, sizeof(struct ipv6_txoptions));
+		opt->tot_len = sizeof(*opt);
 
 		err = datagram_send_ctl(msg, fl, opt, &hlimit);
 		if (err < 0) {
