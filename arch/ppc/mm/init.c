@@ -28,9 +28,7 @@
 #include <linux/init.h>
 #include <linux/bootmem.h>
 #include <linux/highmem.h>
-#ifdef CONFIG_BLK_DEV_INITRD
-#include <linux/blk.h>		/* for initrd_* */
-#endif
+#include <linux/initrd.h>
 
 #include <asm/pgalloc.h>
 #include <asm/prom.h>

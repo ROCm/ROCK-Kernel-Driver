@@ -29,9 +29,7 @@
 #include <linux/ioport.h>
 #include <linux/acpi.h>
 #include <linux/apm_bios.h>
-#ifdef CONFIG_BLK_DEV_RAM
-#include <linux/blk.h>
-#endif
+#include <linux/initrd.h>
 #include <linux/bootmem.h>
 #include <linux/seq_file.h>
 #include <linux/console.h>

@@ -50,9 +50,13 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/devfs_fs_kernel.h>
+#include <linux/pagemap.h>
+#include <linux/blkdev.h>
+#include <linux/genhd.h>
+#include <linux/bio.h>
 #include <linux/buffer_head.h>		/* for invalidate_bdev() */
 #include <linux/backing-dev.h>
-#include <linux/blk.h>
+#include <linux/initrd.h>
 #include <linux/blkpg.h>
 #include <asm/uaccess.h>
 

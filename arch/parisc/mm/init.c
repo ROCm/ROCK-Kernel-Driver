@@ -15,7 +15,7 @@
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/pci.h>		/* for hppa_dma_ops and pcxl_dma_ops */
-#include <linux/blk.h>          /* for initrd_start and initrd_end */
+#include <linux/initrd.h>
 #include <linux/swap.h>
 #include <linux/unistd.h>
 

@@ -18,7 +18,7 @@
 #include <linux/threads.h>
 #include <linux/param.h>
 #include <linux/string.h>
-#include <linux/blk.h>
+#include <linux/initrd.h>
 #include <linux/irq.h>
 #include <linux/seq_file.h>
 
