@@ -528,16 +528,18 @@ static int dscc4_do_action(struct net_device *dev, char *msg)
 static inline int dscc4_xpr_ack(struct dscc4_dev_priv *dpriv)
 {
 	int cur = dpriv->iqtx_current%IRQ_RING_SIZE;
-	s16 i = 0;
+	s8 i = 0;
 
 	do {
 		if (!(dpriv->flags & (NeedIDR | NeedIDT)) ||
 		    (dpriv->iqtx[cur] & Xpr))
 			break;
 		smp_rmb();
-	} while (i++ >= 0);
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(10);
+	} while (++i > 0);
 
-	return i;
+	return (i >= 0 ) ? i : -EAGAIN;
 }
 
 static inline void dscc4_rx_skb(struct dscc4_dev_priv *dpriv, int cur,
@@ -620,8 +622,8 @@ static int __init dscc4_init_one (struct pci_dev *pdev,
 	        pci_resource_start(pdev, 0),
 	        pci_resource_start(pdev, 1), pdev->irq);
 
-	/* No need for High PCI latency. Cf app. note. */
-	pci_write_config_byte(pdev, PCI_LATENCY_TIMER, 0x10);
+	/* Cf errata DS5 p.2 */
+	pci_write_config_byte(pdev, PCI_LATENCY_TIMER, 0xf8);
 	pci_set_master(pdev);
 
 	if (dscc4_found1(pdev, ioaddr))
@@ -865,6 +867,8 @@ static void dscc4_timer(unsigned long data)
 			printk(KERN_DEBUG "%s: re-enabled\n", dev->name);	
 		}
 	}
+	goto done;
+done:
         dpriv->timer.expires = jiffies + TX_TIMEOUT;
         add_timer(&dpriv->timer);
 }
@@ -920,10 +924,11 @@ static int dscc4_open(struct net_device *dev)
 	 * power-down mode or..." and CCR2.RAC = 1 are two different
 	 * situations.
 	 */
-	if (readl(ioaddr + STAR) & SccBusy) {
+	if (scc_readl_star(dpriv, dev) & SccBusy) {
 		printk(KERN_ERR "%s busy. Try later\n", dev->name);
 		goto err_free_ring;
-	}
+	} else
+		printk(KERN_INFO "%s: available. Good\n", dev->name);
 
 	/* Posted write is flushed in the busy-waiting loop */
 	scc_writel(TxSccRes | RxSccRes, dpriv, dev, CMDR);
@@ -1056,6 +1061,7 @@ static inline int dscc4_check_clock_ability(int port)
 static int dscc4_set_clock(struct net_device *dev, u32 *bps, u32 *state)
 {
 	struct dscc4_dev_priv *dpriv = dscc4_priv(dev);
+	int ret = -1;
 	u32 brr;
 
 	*state &= ~Ccr0ClockMask;
@@ -1065,9 +1071,9 @@ static int dscc4_set_clock(struct net_device *dev, u32 *bps, u32 *state)
 
 		xtal = dpriv->pci_priv->xtal_hz;
 		if (!xtal)
-			return -1;
+			goto done;
 		if (dscc4_check_clock_ability(dpriv->dev_id) < 0)
-			return -1;
+			goto done;
 		divider = xtal / *bps;
 		if (divider > BRR_DIVIDER_MAX) {
 			divider >>= 4;
@@ -1100,8 +1106,9 @@ static int dscc4_set_clock(struct net_device *dev, u32 *bps, u32 *state)
 		brr = 0;
 	}
 	scc_writel(brr, dpriv, dev, BRR);
-
-	return 0;
+	ret = 0;
+done:
+	return ret;
 }
 
 static int dscc4_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
