@@ -183,12 +183,12 @@ find_exported_dentry(struct super_block *sb, void *obj, void *parent,
 			err = CALL(nops,get_name)(ppd, nbuf, pd);
 			if (err) {
 				dput(ppd);
+				dput(pd);
 				if (err == -ENOENT)
 					/* some race between get_parent and
 					 * get_name?  just try again
 					 */
 					continue;
-				dput(pd);
 				break;
 			}
 			dprintk("find_exported_dentry: found name: %s\n", nbuf);
@@ -254,6 +254,7 @@ find_exported_dentry(struct super_block *sb, void *obj, void *parent,
 		return result;
 	/* one last try of the aliases.. */
 	spin_lock(&dcache_lock);
+	toput = NULL;
 	head = &result->d_inode->i_dentry;
 	list_for_each(le, head) {
 		struct dentry *dentry = list_entry(le, struct dentry, d_alias);
