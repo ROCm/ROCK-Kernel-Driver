@@ -237,6 +237,7 @@ static void __call_usermodehelper(void *data)
  * Must be called from process context.  Returns a negative error code
  * if program was not execed successfully, or 0.
  */
+#ifdef CONFIG_KMOD
 int call_usermodehelper(char *path, char **argv, char **envp, int wait)
 {
 	DECLARE_COMPLETION(done);
@@ -269,3 +270,10 @@ static __init int usermodehelper_init(void)
 	return 0;
 }
 __initcall(usermodehelper_init);
+#else
+int call_usermodehelper(char *path, char **argv, char **envp, int wait)
+{
+	return -EBUSY;
+}
+EXPORT_SYMBOL(call_usermodehelper);
+#endif
