@@ -1085,7 +1085,7 @@ static int acpi_find_bmc(unsigned long *physaddr, int *port)
 		*port = spmi->addr.address;
 		printk("ipmi_kcs_intf: Found ACPI-specified state machine"
 		       " at I/O address 0x%lx\n",
-		       (int) spmi->addr.address);
+		       (unsigned long) spmi->addr.address);
 	} else
 		goto not_found; /* Not an address type we recognise. */
 
