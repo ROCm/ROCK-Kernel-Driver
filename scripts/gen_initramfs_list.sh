@@ -2,24 +2,25 @@
 # Copyright (C) Martin Schlemmer <azarah@nosferatu.za.org>
 # Released under the terms of the GNU GPL
 #
-# A script to generate newline separated entries (to stdout) from a directory's
-# contents suitable for use as a cpio_list for gen_init_cpio.
+# Generate a newline separated list of entries from the file/directory pointed
+# out by the environment variable: CONFIG_INITRAMFS_SOURCE
 #
-# Arguements: $1 -- the source directory
+# If CONFIG_INITRAMFS_SOURCE is non-existing then generate a small dummy file.
+#
+# The output is suitable for gen_init_cpio as found in usr/Makefile.
 #
 # TODO:  Add support for symlinks, sockets and pipes when gen_init_cpio
 #        supports them.
 
-usage() {
-	echo "Usage: $0 initramfs-source-dir"
-	exit 1
+simple_initramfs() {
+	cat <<-EOF
+		# This is a very simple initramfs
+
+		dir /dev 0755 0 0
+		nod /dev/console 0600 0 0 c 5 1
+		dir /root 0700 0 0
+	EOF
 }
-
-srcdir=$(echo "$1" | sed -e 's://*:/:g')
-
-if [ "$#" -gt 1 -o ! -d "${srcdir}" ]; then
-	usage
-fi
 
 filetype() {
 	local argv1="$1"
@@ -76,9 +77,27 @@ parse() {
 	return 0
 }
 
-find "${srcdir}" -printf "%p %m %U %G\n" | \
-while read x; do
-	parse ${x}
-done
+if [ -z $1 ]; then
+	simple_initramfs
+elif [ -f $1 ]; then
+	cat $1
+elif [ -d $1 ]; then
+	srcdir=$(echo "$1" | sed -e 's://*:/:g')
+	dirlist=$(find "${srcdir}" -printf "%p %m %U %G\n" 2>/dev/null)
+
+	# If $dirlist is only one line, then the directory is empty
+	if [  "$(echo "${dirlist}" | wc -l)" -gt 1 ]; then
+		echo "${dirlist}" | \
+		while read x; do
+			parse ${x}
+		done
+	else
+		# Failsafe in case directory is empty
+		simple_initramfs
+	fi
+else
+	echo "  $0: Cannot open '$1' (CONFIG_INITRAMFS_SOURCE)" >&2
+	exit 1
+fi
 
 exit 0
