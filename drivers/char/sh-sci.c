@@ -839,11 +839,6 @@ static int sci_open(struct tty_struct * tty, struct file * filp)
 		goto failed_3;
 	}
 
-	if ((port->gs.count == 1) && (port->gs.flags & ASYNC_SPLIT_TERMIOS)) {
-		*tty->termios = port->gs.normal_termios;
-		sci_set_real_termios(port);
-	}
-
 #ifdef CONFIG_SERIAL_CONSOLE
 	if (sercons.cflag && sercons.index == line) {
 		tty->termios->c_cflag = sercons.cflag;
@@ -1028,7 +1023,6 @@ static int sci_init_drivers(void)
 	}
 
 	for (port = &sci_ports[0]; port < &sci_ports[SCI_NPORTS]; port++) {
-		port->gs.normal_termios	= sci_driver.init_termios;
 		port->gs.magic = SCI_MAGIC;
 		port->gs.close_delay = HZ/2;
 		port->gs.closing_wait = 30 * HZ;

@@ -542,14 +542,6 @@ static void pc_close(struct tty_struct * tty, struct file * filp)
 
 		ch->asyncflags |= ASYNC_CLOSING;
 	
-		/* -------------------------------------------------------------
-			Save the termios structure, since this port may have
-			separate termios for callout and dialin.
-		--------------------------------------------------------------- */
-
-		if (ch->asyncflags & ASYNC_NORMAL_ACTIVE)
-			ch->normal_termios = *tty->termios;
-
 		tty->closing = 1;
 
 		if (ch->asyncflags & ASYNC_INITIALIZED) 
@@ -1398,12 +1390,6 @@ static int pc_open(struct tty_struct *tty, struct file * filp)
 		the tty->termios struct otherwise let pc_close handle it.
 	-------------------------------------------------------------------- */
 
-	/* Should this be here except for SPLIT termios ? */
-	if (ch->count == 1) 
-	{
-		*tty->termios = ch->normal_termios;
-	}
-
 	save_flags(flags);
 	cli();
 
@@ -2081,7 +2067,6 @@ static void post_fep_init(unsigned int crd)
 		ch->close_delay = 50;
 		ch->count = 0;
 		ch->blocked_open = 0;
-		ch->normal_termios = pc_driver.init_termios;
 		init_waitqueue_head(&ch->open_wait);
 		init_waitqueue_head(&ch->close_wait);
 		ch->tmp_buf = kmalloc(ch->txbufsize,GFP_KERNEL);

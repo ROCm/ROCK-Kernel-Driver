@@ -50,7 +50,6 @@ struct cyclades_port {
         int                     default_threshold;
         int                     default_timeout;
 	struct work_struct	tqueue;
-	struct termios		normal_termios;
 	wait_queue_head_t	open_wait;
 	wait_queue_head_t	close_wait;
         struct cyclades_monitor mon;

@@ -100,7 +100,6 @@ typedef struct stlport {
 	wait_queue_head_t	open_wait;
 	wait_queue_head_t	close_wait;
 #endif
-	struct termios		normaltermios;
 	struct work_struct	tqueue;
 	comstats_t		stats;
 	stlrq_t			tx;

@@ -258,7 +258,7 @@ struct mxser_struct {
 	int xmit_tail;
 	int xmit_cnt;
 	struct work_struct tqueue;
-	struct termios normal_termios;
+	int cflag;
 	wait_queue_head_t open_wait;
 	wait_queue_head_t close_wait;
 	wait_queue_head_t delta_msr_wait;
@@ -416,7 +416,7 @@ int mxser_initbrd(int board, struct mxser_hwconf *hwconf)
 		info->close_delay = 5 * HZ / 10;
 		info->closing_wait = 30 * HZ;
 		INIT_WORK(&info->tqueue, mxser_do_softint, info);
-		info->normal_termios = mxvar_sdriver.init_termios;
+		info->cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 		init_waitqueue_head(&info->open_wait);
 		init_waitqueue_head(&info->close_wait);
 		init_waitqueue_head(&info->delta_msr_wait);
@@ -714,15 +714,7 @@ static int mxser_open(struct tty_struct *tty, struct file *filp)
 	if (retval)
 		return (retval);
 
-	retval = mxser_block_til_ready(tty, filp, info);
-	if (retval)
-		return (retval);
-
-	if ((info->count == 1) && (info->flags & ASYNC_SPLIT_TERMIOS)) {
-		*tty->termios = info->normal_termios;
-		mxser_change_speed(info, 0);
-	}
-	return (0);
+	return mxser_block_til_ready(tty, filp, info);
 }
 
 /*
@@ -772,12 +764,7 @@ static void mxser_close(struct tty_struct *tty, struct file *filp)
 		return;
 	}
 	info->flags |= ASYNC_CLOSING;
-	/*
-	 * Save the termios structure, since this port may have
-	 * separate termios for callout and dialin.
-	 */
-	if (info->flags & ASYNC_NORMAL_ACTIVE)
-		info->normal_termios = *tty->termios;
+	info->cflag = tty->termios->c_cflag;
 	/*
 	 * Now we wait for the transmit buffer to clear; and we notify
 	 * the line discipline to only process XON/XOFF characters.
@@ -1132,7 +1119,7 @@ static int mxser_ioctl_special(unsigned int cmd, unsigned long arg)
 				continue;
 			}
 			if (!mxvar_table[i].tty || !mxvar_table[i].tty->termios)
-				GMStatus[i].cflag = mxvar_table[i].normal_termios.c_cflag;
+				GMStatus[i].cflag = mxvar_table[i].cflag;
 			else
 				GMStatus[i].cflag = mxvar_table[i].tty->termios->c_cflag;
 

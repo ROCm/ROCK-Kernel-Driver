@@ -61,7 +61,6 @@ typedef struct {
   struct sk_buff_head   tx_queue;        /* transmit queue                 */
   struct sk_buff_head   rx_queue;        /* receive queue                  */
   struct tty_struct 	*tty;            /* Pointer to corresponding tty   */
-  struct termios	normal_termios;  /* For saving termios structs     */
   wait_queue_head_t	open_wait;
   wait_queue_head_t	close_wait;
   struct semaphore      write_sem;
@@ -994,10 +993,6 @@ ctc_tty_open(struct tty_struct *tty, struct file *filp)
 #endif
 		return retval;
 	}
-	if ((info->count == 1) && (info->flags & CTC_ASYNC_SPLIT_TERMIOS)) {
-		*tty->termios = info->normal_termios;
-		ctc_tty_change_speed(info);
-	}
 #ifdef CTC_DEBUG_MODEM_OPEN
 	printk(KERN_DEBUG "ctc_tty_open %s successful...\n", tty->name);
 #endif
@@ -1046,13 +1041,6 @@ ctc_tty_close(struct tty_struct *tty, struct file *filp)
 		return;
 	}
 	info->flags |= CTC_ASYNC_CLOSING;
-	/*
-	 * Save the termios structure, since this port may have
-	 * separate termios for callout and dialin.
-	 */
-	if (info->flags & CTC_ASYNC_NORMAL_ACTIVE)
-		info->normal_termios = *tty->termios;
-
 	tty->closing = 1;
 	/*
 	 * At this point we stop accepting input.  To do this, we
@@ -1200,7 +1188,6 @@ ctc_tty_init(void)
 		info->tty = 0;
 		info->count = 0;
 		info->blocked_open = 0;
-		info->normal_termios = device->init_termios;
 		init_waitqueue_head(&info->open_wait);
 		init_waitqueue_head(&info->close_wait);
 		skb_queue_head_init(&info->tx_queue);

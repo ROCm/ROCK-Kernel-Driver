@@ -1229,8 +1229,6 @@ struct r_port {
 	int ignore_status_mask;
 	int read_status_mask;
 	int cps;
-	struct termios normal_termios;
-	struct termios callout_termios;
 
 #ifdef DECLARE_WAITQUEUE
 	wait_queue_head_t open_wait;

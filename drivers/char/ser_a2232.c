@@ -466,11 +466,6 @@ static int  a2232_open(struct tty_struct * tty, struct file * filp)
 		return retval;
 	}
 
-	if ((port->gs.count == 1) && (port->gs.flags & ASYNC_SPLIT_TERMIOS)){
-		*tty->termios = port->gs.normal_termios;
-		a2232_set_real_termios (port);
-	}
-
 	a2232_enable_rx_interrupts(port);
 	
 	return 0;
@@ -668,7 +663,6 @@ static void a2232_init_portstructs(void)
 		port->which_a2232 = i/NUMLINES;
 		port->which_port_on_a2232 = i%NUMLINES;
 		port->disable_rx = port->throttle_input = port->cd_status = 0;
-		port->gs.normal_termios = tty_std_termios;
 		port->gs.magic = A2232_MAGIC;
 		port->gs.close_delay = HZ/2;
 		port->gs.closing_wait = 30 * HZ;

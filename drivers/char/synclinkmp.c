@@ -166,8 +166,6 @@ typedef struct _synclinkmp_info {
 
 	struct mgsl_icount	icount;
 
-	struct termios		normal_termios;
-
 	struct tty_struct 	*tty;
 	int			timeout;
 	int			x_char;		/* xon/xoff character */
@@ -797,12 +795,6 @@ static int open(struct tty_struct *tty, struct file *filp)
 		goto cleanup;
 	}
 
-	if ((info->count == 1) &&
-	    info->flags & ASYNC_SPLIT_TERMIOS) {
-		*tty->termios = info->normal_termios;
-		change_params(info);
-	}
-
 	if (debug_level >= DEBUG_LEVEL_INFO)
 		printk("%s(%d):%s open() success\n",
 			 __FILE__,__LINE__, info->device_name);
@@ -853,12 +845,6 @@ static void close(struct tty_struct *tty, struct file *filp)
 		goto cleanup;
 
 	info->flags |= ASYNC_CLOSING;
-
-	/* Save the termios structure, since this port may have
-	 * separate termios for callout and dialin.
-	 */
-	if (info->flags & ASYNC_NORMAL_ACTIVE)
-		info->normal_termios = *tty->termios;
 
 	/* set tty->closing to notify line discipline to
 	 * only process XON/XOFF characters. Only the N_TTY
@@ -3828,14 +3814,6 @@ static int __init synclinkmp_init(void)
  	printk("%s %s, tty major#%d\n",
 		driver_name, driver_version,
 		serial_driver.major);
-
-	/* Propagate these values to all device instances */
-
-	info = synclinkmp_device_list;
-	while(info){
-		info->normal_termios  = serial_driver.init_termios;
-		info = info->next_device;
-	}
 
 	return 0;
 }

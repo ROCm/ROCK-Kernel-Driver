@@ -1027,14 +1027,7 @@ static int isicom_open(struct tty_struct * tty, struct file * filp)
 #endif	
 	if ((error = block_til_ready(tty, filp, port))!=0)
 		return error;
-		
-	if ((port->count == 1) && (port->flags & ASYNC_SPLIT_TERMIOS)) {
-		*tty->termios = port->normal_termios;
-		save_flags(flags); cli();
-		isicom_config_port(port);
-		restore_flags(flags);		
-	}	
-	
+
 #ifdef ISICOM_DEBUG	
 	printk(KERN_DEBUG "ISICOM: open end!!!.\n");
 #endif	
@@ -1128,13 +1121,6 @@ static void isicom_close(struct tty_struct * tty, struct file * filp)
 		return;
 	} 	
 	port->flags |= ASYNC_CLOSING;
-	/* 
-	 * save termios struct since callout and dialin termios may be 
-	 * different.
-	 */	
-	if (port->flags & ASYNC_NORMAL_ACTIVE)
-		port->normal_termios = *tty->termios;
-	
 	tty->closing = 1;
 	if (port->closing_wait != ASYNC_CLOSING_WAIT_NONE)
 		tty_wait_until_sent(tty, port->closing_wait);
@@ -1827,7 +1813,6 @@ static int isicom_init(void)
 			port->magic = ISICOM_MAGIC;
 			port->card = &isi_card[card];
 			port->channel = channel;		
-			port->normal_termios = isicom_normal.init_termios;
 		 	port->close_delay = 50 * HZ/100;
 		 	port->closing_wait = 3000 * HZ/100;
 			port->hangup_tq.routine = do_isicom_hangup;

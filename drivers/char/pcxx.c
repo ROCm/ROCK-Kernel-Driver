@@ -471,16 +471,6 @@ int pcxe_open(struct tty_struct *tty, struct file * filp)
 	}
 	ch->asyncflags |= ASYNC_NORMAL_ACTIVE;
  	
-	save_flags(flags);
-	cli();
-	if((ch->count == 1) && (ch->asyncflags & ASYNC_SPLIT_TERMIOS)) {
-		*tty->termios = ch->normal_termios;
-		globalwinon(ch);
-		pcxxparam(tty,ch);
-		memoff(ch);
-	}
-
-	restore_flags(flags);
 	return 0;
 } 
 
@@ -553,12 +543,6 @@ static void pcxe_close(struct tty_struct * tty, struct file * filp)
 
 		info->asyncflags |= ASYNC_CLOSING;
 	
-		/*
-		* Save the termios structure, since this port may have
-		* separate termios for callout and dialin.
-		*/
-		if(info->asyncflags & ASYNC_NORMAL_ACTIVE)
-			info->normal_termios = *tty->termios;
 		tty->closing = 1;
 		if(info->asyncflags & ASYNC_INITIALIZED) {
 			setup_empty_event(tty,info);		
@@ -1538,7 +1522,6 @@ load_fep:
 			ch->close_delay = 50;
 			ch->count = 0;
 			ch->blocked_open = 0;
-			ch->normal_termios = pcxe_driver.init_termios;
 			init_waitqueue_head(&ch->open_wait);
 			init_waitqueue_head(&ch->close_wait);
 			ch->asyncflags = 0;

@@ -1954,12 +1954,6 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 	}
 	info->flags |= ZILOG_CLOSING;
 	/*
-	 * Save the termios structure, since this port may have
-	 * separate termios for callout and dialin.
-	 */
-	if (info->flags & ZILOG_NORMAL_ACTIVE)
-		info->normal_termios = *tty->termios;
-	/*
 	 * Now we wait for the transmit buffer to clear; and we notify 
 	 * the line discipline to only process XON/XOFF characters.
 	 */
@@ -2253,10 +2247,6 @@ static int rs_open(struct tty_struct *tty, struct file * filp)
 		return retval;
 	}
 
-	if ((info->count == 1) && (info->flags & ZILOG_SPLIT_TERMIOS)) {
-		*tty->termios = info->normal_termios;
-		change_speed(info, 0);
-	}
 #ifdef CONFIG_SERIAL_CONSOLE
 	if (sercons.cflag && sercons.index == line) {
 		tty->termios->c_cflag = sercons.cflag;
@@ -2646,7 +2636,6 @@ no_dma:
 		info->blocked_open = 0;
 		INIT_WORK(&info->tqueue, do_softint, info);
 		spin_lock_init(&info->lock);
-		info->normal_termios = serial_driver.init_termios;
 		init_waitqueue_head(&info->open_wait);
 		init_waitqueue_head(&info->close_wait);
 		info->timeout = HZ;

@@ -1109,11 +1109,6 @@ static int stli_open(struct tty_struct *tty, struct file *filp)
 			return(rc);
 	}
 	portp->flags |= ASYNC_NORMAL_ACTIVE;
-
-	if ((portp->refcount == 1) && (portp->flags & ASYNC_SPLIT_TERMIOS)) {
-		*tty->termios = portp->normaltermios;
-		stli_setport(portp);
-	}
 	return(0);
 }
 
@@ -1147,9 +1142,6 @@ static void stli_close(struct tty_struct *tty, struct file *filp)
 	}
 
 	portp->flags |= ASYNC_CLOSING;
-
-	if (portp->flags & ASYNC_NORMAL_ACTIVE)
-		portp->normaltermios = *tty->termios;
 
 /*
  *	May want to wait for data to drain before closing. The BUSY flag
@@ -3321,7 +3313,6 @@ static inline int stli_initports(stlibrd_t *brdp)
 		init_waitqueue_head(&portp->open_wait);
 		init_waitqueue_head(&portp->close_wait);
 		init_waitqueue_head(&portp->raw_wait);
-		portp->normaltermios = stli_deftermios;
 		panelport++;
 		if (panelport >= brdp->panels[panelnr]) {
 			panelport = 0;

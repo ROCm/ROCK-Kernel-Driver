@@ -265,7 +265,6 @@ struct SICC_state {
     unsigned int        closing_wait;
     unsigned int        custom_divisor;
     unsigned int        flags;
-    struct termios      normal_termios;
     int         count;
     struct SICC_info    *info;
 };
@@ -1469,12 +1468,6 @@ static void siccuart_close(struct tty_struct *tty, struct file *filp)
     info->flags |= ASYNC_CLOSING;
     restore_flags(flags);
     /*
-     * Save the termios structure, since this port may have
-     * separate termios for callout and dialin.
-     */
-    if (info->flags & ASYNC_NORMAL_ACTIVE)
-        info->state->normal_termios = *tty->termios;
-    /*
      * Now we wait for the transmit buffer to clear; and we notify
      * the line discipline to only process XON/XOFF characters.
      */
@@ -1757,10 +1750,6 @@ static int siccuart_open(struct tty_struct *tty, struct file *filp)
         return retval;
     }
 
-    if ((info->state->count == 1) &&
-        (info->flags & ASYNC_SPLIT_TERMIOS)) {
-	*tty->termios = info->state->normal_termios;
-    }
 #ifdef CONFIG_SERIAL_SICC_CONSOLE
     if (siccuart_cons.cflag && siccuart_cons.index == line) {
         tty->termios->c_cflag = siccuart_cons.cflag;
@@ -1815,7 +1804,6 @@ int __init siccuart_init(void)
         state->line     = i;
         state->close_delay  = 5 * HZ / 10;
         state->closing_wait = 30 * HZ;
-        state->normal_termios   = siccnormal_driver.init_termios;
     }
 
 

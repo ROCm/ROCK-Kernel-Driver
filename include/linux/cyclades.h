@@ -596,7 +596,6 @@ struct cyclades_port {
         int                     default_timeout;
 	unsigned long		jiffies[3];
 	unsigned long		rflush_count;
-	struct termios		normal_termios;
 	struct cyclades_monitor	mon;
 	struct cyclades_idle_stats	idle_stats;
 	struct cyclades_icount	icount;

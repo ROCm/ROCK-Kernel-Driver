@@ -135,7 +135,6 @@ struct channel
 	volatile struct board_chan  *brdchan;
 	struct digi_struct          digiext;
 	struct tty_struct           *tty;
-	struct termios              normal_termios;
 	wait_queue_head_t           open_wait;
 	wait_queue_head_t           close_wait;
 	struct work_struct            tqueue;

@@ -1481,11 +1481,6 @@ static int sx_open  (struct tty_struct * tty, struct file * filp)
 	}
 	/* tty->low_latency = 1; */
 
-	if ((port->gs.count == 1) && (port->gs.flags & ASYNC_SPLIT_TERMIOS)) {
-		*tty->termios = port->gs.normal_termios;
-		sx_set_real_termios (port);
-	}
-
 	port->c_dcd = sx_get_CD (port);
 	sx_dprintk (SX_DEBUG_OPEN, "at open: cd=%d\n", port->c_dcd);
 	func_exit();
@@ -2296,7 +2291,6 @@ static int sx_init_portstructs (int nboards, int nports)
 		board->ports = port;
 		for (j=0; j < boards[i].nports;j++) {
 			sx_dprintk (SX_DEBUG_INIT, "initing port %d\n", j);
-			port->gs.normal_termios	= tty_std_termios;
 			port->gs.magic = SX_MAGIC;
 			port->gs.close_delay = HZ/2;
 			port->gs.closing_wait = 30 * HZ;

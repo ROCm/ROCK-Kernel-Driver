@@ -1185,13 +1185,6 @@ static void mcfrs_close(struct tty_struct *tty, struct file * filp)
 	info->flags |= ASYNC_CLOSING;
 
 	/*
-	 * Save the termios structure, since this port may have
-	 * separate termios for callout and dialin.
-	 */
-	if (info->flags & ASYNC_NORMAL_ACTIVE)
-		info->normal_termios = *tty->termios;
-
-	/*
 	 * Now we wait for the transmit buffer to clear; and we notify 
 	 * the line discipline to only process XON/XOFF characters.
 	 */
@@ -1401,11 +1394,6 @@ int mcfrs_open(struct tty_struct *tty, struct file * filp)
 		       retval);
 #endif
 		return retval;
-	}
-
-	if ((info->count == 1) && (info->flags & ASYNC_SPLIT_TERMIOS)) {
-		*tty->termios = info->normal_termios;
-		mcfrs_change_speed(info);
 	}
 
 #ifdef SERIAL_DEBUG_OPEN
@@ -1632,7 +1620,6 @@ mcfrs_init(void)
 		info->blocked_open = 0;
 		INIT_WORK(&info->tqueue, mcfrs_offintr, info);
 		INIT_WORK(&info->tqueue_hangup, do_serial_hangup, info);
-		info->normal_termios = mcfrs_serial_driver.init_termios;
 		init_waitqueue_head(&info->open_wait);
 		init_waitqueue_head(&info->close_wait);
 

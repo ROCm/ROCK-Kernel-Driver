@@ -176,7 +176,6 @@ static void scc_init_portstructs(void)
 
 	for (i = 0; i < 2; i++) {
 		port = scc_ports + i;
-		port->gs.normal_termios = tty_std_termios;
 		port->gs.magic = SCC_MAGIC;
 		port->gs.close_delay = HZ/2;
 		port->gs.closing_wait = 30 * HZ;
@@ -912,11 +911,6 @@ static int scc_open (struct tty_struct * tty, struct file * filp)
 	if (retval) {
 		port->gs.count--;
 		return retval;
-	}
-
-	if ((port->gs.count == 1) && (port->gs.flags & ASYNC_SPLIT_TERMIOS)) {
-		*tty->termios = port->gs.normal_termios;
-		scc_set_real_termios (port);
 	}
 
 	port->c_dcd = scc_get_CD (port);

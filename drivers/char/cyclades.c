@@ -2640,10 +2640,6 @@ cy_open(struct tty_struct *tty, struct file * filp)
         return retval;
     }
 
-    if ((info->count == 1) && (info->flags & ASYNC_SPLIT_TERMIOS)) {
-	*tty->termios = info->normal_termios;
-    }
-
 #ifdef CY_DEBUG_OPEN
     printk(" cyc:cy_open done\n");/**/
 #endif
@@ -2788,12 +2784,6 @@ cy_close(struct tty_struct *tty, struct file *filp)
         return;
     }
     info->flags |= ASYNC_CLOSING;
-    /*
-     * Save the termios structure, since this port may have
-     * separate termios for callout and dialin.
-     */
-    if (info->flags & ASYNC_NORMAL_ACTIVE)
-        info->normal_termios = *tty->termios;
 
     /*
     * Now we wait for the transmit buffer to clear; and we notify
@@ -5563,8 +5553,6 @@ cy_init(void)
                     info->default_threshold = 0;
                     info->default_timeout = 0;
 		    INIT_WORK(&info->tqueue, do_softint, info);
-                    info->normal_termios =
-		                cy_serial_driver.init_termios;
 		    init_waitqueue_head(&info->open_wait);
 		    init_waitqueue_head(&info->close_wait);
 		    init_waitqueue_head(&info->shutdown_wait);
@@ -5640,8 +5628,6 @@ cy_init(void)
                     info->default_threshold = 0;
                     info->default_timeout = 0;
 		    INIT_WORK(&info->tqueue, do_softint, info);
-                    info->normal_termios =
-		               cy_serial_driver.init_termios;
 		    init_waitqueue_head(&info->open_wait);
 		    init_waitqueue_head(&info->close_wait);
 		    init_waitqueue_head(&info->shutdown_wait);

@@ -1895,12 +1895,6 @@ cy_close(struct tty_struct * tty, struct file * filp)
     if (info->count)
 	return;
     info->flags |= ASYNC_CLOSING;
-    /*
-     * Save the termios structure, since this port may have
-     * separate termios for callout and dialin.
-     */
-    if (info->flags & ASYNC_NORMAL_ACTIVE)
-	info->normal_termios = *tty->termios;
     if (info->flags & ASYNC_INITIALIZED)
 	tty_wait_until_sent(tty, 3000); /* 30 seconds timeout */
     shutdown(info);
@@ -2126,9 +2120,6 @@ cy_open(struct tty_struct *tty, struct file * filp)
         }
     }
 
-    if ((info->count == 1) && (info->flags & ASYNC_SPLIT_TERMIOS)) {
-	*tty->termios = info->normal_termios;
-    }
     /*
      * Start up serial port
      */
@@ -2426,7 +2417,6 @@ scrn[1] = '\0';
 		info->default_timeout = 0;
 		info->tqueue.routine = do_softint;
 		info->tqueue.data = info;
-		info->normal_termios = cy_serial_driver.init_termios;
 		init_waitqueue_head(&info->open_wait);
 		init_waitqueue_head(&info->close_wait);
 		/* info->session */

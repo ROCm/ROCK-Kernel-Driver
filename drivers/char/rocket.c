@@ -712,7 +712,6 @@ static void init_r_port(int board, int aiop, int chan, struct pci_dev *pci_dev)
 	info->chan = chan;
 	info->closing_wait = 3000;
 	info->close_delay = 50;
-	info->normal_termios = rocket_driver.init_termios;
 	init_waitqueue_head(&info->open_wait);
 	init_waitqueue_head(&info->close_wait);
 	info->flags &= ~ROCKET_MODE_MASK;
@@ -1144,11 +1143,6 @@ static int rp_open(struct tty_struct *tty, struct file *filp)
 #endif
 		return retval;
 	}
-
-	if ((info->count == 1) && (info->flags & ROCKET_SPLIT_TERMIOS)) {
-		*tty->termios = info->normal_termios;
-		configure_r_port(info, NULL);
-	}
 	return 0;
 }
 
@@ -1197,7 +1191,6 @@ static void rp_close(struct tty_struct *tty, struct file *filp)
 	info->flags |= ROCKET_CLOSING;
 	spin_unlock_irqrestore(&info->slock, flags);
 
-	info->normal_termios = *tty->termios;
 	cp = &info->channel;
 
 	/*

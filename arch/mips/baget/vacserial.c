@@ -1680,12 +1680,6 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 	}
 	info->flags |= ASYNC_CLOSING;
 	/*
-	 * Save the termios structure, since this port may have
-	 * separate termios for callout and dialin.
-	 */
-	if (info->flags & ASYNC_NORMAL_ACTIVE)
-		info->state->normal_termios = *tty->termios;
-	/*
 	 * Now we wait for the transmit buffer to clear; and we notify 
 	 * the line discipline to only process XON/XOFF characters.
 	 */
@@ -2033,11 +2027,6 @@ static int rs_open(struct tty_struct *tty, struct file * filp)
 		 return retval;
 	}
 
-	if ((info->state->count == 1) &&
-	    (info->flags & ASYNC_SPLIT_TERMIOS)) {
-		*tty->termios = info->state->normal_termios;
-		change_speed(info);
-	}
 #ifdef CONFIG_SERIAL_CONSOLE
 	if (sercons.cflag && sercons.index == line) {
 		tty->termios->c_cflag = sercons.cflag;
@@ -2359,7 +2348,6 @@ int __init rs_init(void)
 		state->custom_divisor = 0;
 		state->close_delay = 5*HZ/10;
 		state->closing_wait = 30*HZ;
-		state->normal_termios = serial_driver.init_termios;
 		state->icount.cts = state->icount.dsr = 
 			state->icount.rng = state->icount.dcd = 0;
 		state->icount.rx = state->icount.tx = 0;

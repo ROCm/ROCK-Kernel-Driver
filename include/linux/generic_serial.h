@@ -36,7 +36,6 @@ struct gs_port {
   int                     xmit_cnt;
   /*  struct semaphore        port_write_sem; */
   int                     flags;
-  struct termios          normal_termios;
   wait_queue_head_t       open_wait;
   wait_queue_head_t       close_wait;
   int                     count;

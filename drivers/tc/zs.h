@@ -150,7 +150,6 @@ struct dec_serial {
 	int			xmit_cnt;
 	struct tq_struct	tqueue;
 	struct tq_struct	tqueue_hangup;
-	struct termios		normal_termios;
 	wait_queue_head_t	open_wait;
 	wait_queue_head_t	close_wait;
 };

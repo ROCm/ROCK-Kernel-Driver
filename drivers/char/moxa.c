@@ -153,7 +153,7 @@ struct moxa_str {
 	int asyncflags;
 	unsigned long statusflags;
 	struct tty_struct *tty;
-	struct termios normal_termios;
+	int cflag;
 	wait_queue_head_t open_wait;
 	wait_queue_head_t close_wait;
 	struct work_struct tqueue;
@@ -368,7 +368,7 @@ int moxa_init(void)
 		ch->closing_wait = 30 * HZ;
 		ch->count = 0;
 		ch->blocked_open = 0;
-		ch->normal_termios = moxaDriver.init_termios;
+		ch->cflag = B9600 | CS8 | CREAD | CLOCAL | HUPCL;
 		init_waitqueue_head(&ch->open_wait);
 		init_waitqueue_head(&ch->close_wait);
 	}
@@ -551,9 +551,6 @@ static int moxa_open(struct tty_struct *tty, struct file *filp)
 	ch->count++;
 	tty->driver_data = ch;
 	ch->tty = tty;
-	if (ch->count == 1 && (ch->asyncflags & ASYNC_SPLIT_TERMIOS)) {
-		*tty->termios = ch->normal_termios;
-	}
 	if (!(ch->asyncflags & ASYNC_INITIALIZED)) {
 		ch->statusflags = 0;
 		set_tty_param(tty);
@@ -613,12 +610,7 @@ static void moxa_close(struct tty_struct *tty, struct file *filp)
 	}
 	ch->asyncflags |= ASYNC_CLOSING;
 
-	/*
-	 * Save the termios structure, since this port may have
-	 * separate termios for callout and dialin.
-	 */
-	if (ch->asyncflags & ASYNC_NORMAL_ACTIVE)
-		ch->normal_termios = *tty->termios;
+	ch->cflag = *tty->termios->c_cflag;
 	if (ch->asyncflags & ASYNC_INITIALIZED) {
 		setup_empty_event(tty);
 		tty_wait_until_sent(tty, 30 * HZ);	/* 30 seconds timeout */
@@ -1680,7 +1672,7 @@ int MoxaDriverIoctl(unsigned int cmd, unsigned long arg, int port)
 			}
 
 			if (!moxaChannels[i].tty || !moxaChannels[i].tty->termios)
-				GMStatus[i].cflag = moxaChannels[i].normal_termios.c_cflag;
+				GMStatus[i].cflag = moxaChannels[i].cflag;
 			else
 				GMStatus[i].cflag = moxaChannels[i].tty->termios->c_cflag;
 		}

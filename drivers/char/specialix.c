@@ -1438,12 +1438,6 @@ static int sx_open(struct tty_struct * tty, struct file * filp)
 	if ((error = block_til_ready(tty, filp, port)))
 		return error;
 
-	if ((port->count == 1) && (port->flags & ASYNC_SPLIT_TERMIOS)) {
-		*tty->termios = port->normal_termios;
-		save_flags(flags); cli();
-		sx_change_speed(bp, port);
-		restore_flags(flags);
-	}
 	return 0;
 }
 
@@ -1481,12 +1475,6 @@ static void sx_close(struct tty_struct * tty, struct file * filp)
 		return;
 	}
 	port->flags |= ASYNC_CLOSING;
-	/*
-	 * Save the termios structure, since this port may have
-	 * separate termios for callout and dialin.
-	 */
-	if (port->flags & ASYNC_NORMAL_ACTIVE)
-		port->normal_termios = *tty->termios;
 	/*
 	 * Now we wait for the transmit buffer to clear; and we notify 
 	 * the line discipline to only process XON/XOFF characters.
@@ -2212,7 +2200,6 @@ static int sx_init_drivers(void)
 	}
 	memset(sx_port, 0, sizeof(sx_port));
 	for (i = 0; i < SX_NPORT * SX_NBOARD; i++) {
-		sx_port[i].normal_termios  = specialix_driver.init_termios;
 		sx_port[i].magic = SPECIALIX_MAGIC;
 		sx_port[i].tqueue.routine = do_softint;
 		sx_port[i].tqueue.data = &sx_port[i];

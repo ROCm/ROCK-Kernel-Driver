@@ -1762,10 +1762,6 @@ isdn_tty_open(struct tty_struct *tty, struct file *filp)
 #endif
 		return retval;
 	}
-	if ((info->count == 1) && (info->flags & ISDN_ASYNC_SPLIT_TERMIOS)) {
-		*tty->termios = info->normal_termios;
-		isdn_tty_change_speed(info);
-	}
 #ifdef ISDN_DEBUG_MODEM_OPEN
 	printk(KERN_DEBUG "isdn_tty_open ttyi%d successful...\n", info->line);
 #endif
@@ -1820,13 +1816,6 @@ isdn_tty_close(struct tty_struct *tty, struct file *filp)
 		goto out;
 	}
 	info->flags |= ISDN_ASYNC_CLOSING;
-	/*
-	 * Save the termios structure, since this port may have
-	 * separate termios for callout and dialin.
-	 */
-	if (info->flags & ISDN_ASYNC_NORMAL_ACTIVE)
-		info->normal_termios = *tty->termios;
-
 	tty->closing = 1;
 	/*
 	 * At this point we stop accepting input.  To do this, we
@@ -2062,7 +2051,6 @@ isdn_tty_init(void)
 		info->x_char = 0;
 		info->count = 0;
 		info->blocked_open = 0;
-		info->normal_termios = m->tty_modem.init_termios;
 		init_waitqueue_head(&info->open_wait);
 		init_waitqueue_head(&info->close_wait);
 		info->isdn_slot = NULL;

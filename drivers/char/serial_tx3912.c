@@ -589,11 +589,6 @@ static int rs_open  (struct tty_struct * tty, struct file * filp)
 	}
 	/* tty->low_latency = 1; */
 
-	if ((port->gs.count == 1) && (port->gs.flags & ASYNC_SPLIT_TERMIOS)) {
-		*tty->termios = port->gs.normal_termios;
-		rs_set_real_termios (port);
-	}
-
 	func_exit();
 
 	/* Jim */
@@ -747,7 +742,6 @@ static int rs_init_portstructs(void)
 	port = rs_ports;
 	for (i=0; i < TX3912_UART_NPORTS;i++) {
 		rs_dprintk (TX3912_UART_DEBUG_INIT, "initing port %d\n", i);
-		port->gs.normal_termios	= tty_std_termios;
 		port->gs.magic = SERIAL_MAGIC;
 		port->gs.close_delay = HZ/2;
 		port->gs.closing_wait = 30 * HZ;

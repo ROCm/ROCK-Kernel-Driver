@@ -1167,12 +1167,6 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 	}
 	info->flags |= S_CLOSING;
 	/*
-	 * Save the termios structure, since this port may have
-	 * separate termios for callout and dialin.
-	 */
-	if (info->flags & S_NORMAL_ACTIVE)
-		info->normal_termios = *tty->termios;
-	/*
 	 * Now we wait for the transmit buffer to clear; and we notify 
 	 * the line discipline to only process XON/XOFF characters.
 	 */
@@ -1358,17 +1352,7 @@ int rs_open(struct tty_struct *tty, struct file * filp)
 	if (retval)
 		return retval;
 
-	retval = block_til_ready(tty, filp, info);
-	if (retval) {
-		return retval;
-	}
-
-	if ((info->count == 1) && (info->flags & S_SPLIT_TERMIOS)) {
-		*tty->termios = info->normal_termios;
-		change_speed(info);
-	}
-
-	return 0;
+	return block_til_ready(tty, filp, info);
 }
 
 /* Finally, routines used to initialize the serial driver. */
@@ -1493,7 +1477,6 @@ rs68328_init(void)
 	    info->blocked_open = 0;
 	    INIT_WORK(&info->tqueue, do_softint, info);
 	    INIT_WORK(&info->tqueue_hangup, do_serial_hangup, info);
-	    info->normal_termios = serial_driver.init_termios;
 	    init_waitqueue_head(&info->open_wait);
 	    init_waitqueue_head(&info->close_wait);
 	    info->line = i;

@@ -101,8 +101,6 @@ typedef struct _i2ChanStr
 	struct timer_list  BookmarkTimer;   // Used by i2DrainOutput
 	wait_queue_head_t pBookmarkWait;   // Used by i2DrainOutput
 
-	struct termios NormalTermios;
-
 	int      BaudBase;
 	int      BaudDivisor;
 

@@ -1616,9 +1616,6 @@ noblock:
 	/* first open - Assign termios structure to port */
 	if ( tty->count == 1 ) {
 		i2QueueCommands(PTYPE_INLINE, pCh, 0, 2, CMD_CTSFL_DSAB, CMD_RTSFL_DSAB);
-		if ( pCh->flags & ASYNC_SPLIT_TERMIOS ) {
-			*tty->termios = pCh->NormalTermios;
-		}
 		/* Now we must send the termios settings to the loadware */
 		set_params( pCh, NULL );
 	}
@@ -1677,13 +1674,6 @@ ip2_close( PTTY tty, struct file *pFile )
 		return;
 	}
 	pCh->flags |= ASYNC_CLOSING;	// last close actually
-
-	/*
-	 * Save the termios structure, since this port may have separate termios
-	 * for callout and dialin.
-	 */
-	if (pCh->flags & ASYNC_NORMAL_ACTIVE)
-		pCh->NormalTermios = *tty->termios;
 
 	tty->closing = 1;
 

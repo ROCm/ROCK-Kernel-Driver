@@ -154,8 +154,6 @@ typedef struct _mgslpc_info {
 	
 	struct mgsl_icount	icount;
 	
-	struct termios		normal_termios;
-	
 	struct tty_struct 	*tty;
 	int			timeout;
 	int			x_char;		/* xon/xoff character */
@@ -605,8 +603,6 @@ static dev_link_t *mgslpc_attach(void)
     }
 
     mgslpc_add_device(info);
-
-    info->normal_termios  = serial_driver.init_termios;
 
     return link;
 }
@@ -2571,12 +2567,6 @@ static void mgslpc_close(struct tty_struct *tty, struct file * filp)
 	
 	info->flags |= ASYNC_CLOSING;
 	
-	/* Save the termios structure, since this port may have
-	 * separate termios for callout and dialin.
-	 */
-	if (info->flags & ASYNC_NORMAL_ACTIVE)
-		info->normal_termios = *tty->termios;
-
 	/* set tty->closing to notify line discipline to 
 	 * only process XON/XOFF characters. Only the N_TTY
 	 * discipline appears to use this (ppp does not).
@@ -2882,12 +2872,6 @@ static int mgslpc_open(struct tty_struct *tty, struct file * filp)
 		goto cleanup;
 	}
 
-	if ((info->count == 1) &&
-	    info->flags & ASYNC_SPLIT_TERMIOS) {
-		*tty->termios = info->normal_termios;
-		mgslpc_change_params(info);
-	}
-	
 	if (debug_level >= DEBUG_LEVEL_INFO)
 		printk("%s(%d):mgslpc_open(%s) success\n",
 			 __FILE__,__LINE__, info->device_name);

@@ -343,7 +343,6 @@ typedef struct modem_info {
   struct timer_list     ring_timer;      /* for writing 'RING' responses   */
   struct timer_list     connect_timer;   /* waiting for CONNECT            */
   struct timer_list     read_timer;      /* read incoming data             */
-  struct termios	normal_termios;  /* For saving termios structs     */
   wait_queue_head_t	open_wait, close_wait;
   struct semaphore      write_sem;
 } modem_info;

@@ -84,7 +84,6 @@ struct e100_serial {
 
 	struct tq_struct	tqueue;
 	struct async_icount	icount;   /* error-statistics etc.*/
-	struct termios		normal_termios;
 #ifdef DECLARE_WAITQUEUE
 	wait_queue_head_t	open_wait;
 	wait_queue_head_t	close_wait;

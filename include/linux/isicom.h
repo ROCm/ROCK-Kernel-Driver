@@ -158,7 +158,6 @@ struct	isi_port {
 	int			xmit_head;
 	int			xmit_tail;
 	int			xmit_cnt;
-	struct termios 		normal_termios;
 };
 
 

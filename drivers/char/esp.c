@@ -2065,12 +2065,6 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 	}
 	info->flags |= ASYNC_CLOSING;
 	/*
-	 * Save the termios structure, since this port may have
-	 * separate termios for callout and dialin.
-	 */
-	if (info->flags & ASYNC_NORMAL_ACTIVE)
-		info->normal_termios = *tty->termios;
-	/*
 	 * Now we wait for the transmit buffer to clear; and we notify 
 	 * the line discipline to only process XON/XOFF characters.
 	 */
@@ -2360,11 +2354,6 @@ static int esp_open(struct tty_struct *tty, struct file * filp)
 		return retval;
 	}
 
-	if ((info->count == 1) && (info->flags & ASYNC_SPLIT_TERMIOS)) {
-		*tty->termios = info->normal_termios;
-		change_speed(info);
-	}
-
 #ifdef SERIAL_DEBUG_OPEN
 	printk("esp_open %s successful...", tty->name);
 #endif
@@ -2578,7 +2567,6 @@ int __init espserial_init(void)
 		info->tqueue.data = info;
 		info->tqueue_hangup.routine = do_serial_hangup;
 		info->tqueue_hangup.data = info;
-		info->normal_termios = esp_driver.init_termios;
 		info->config.rx_timeout = rx_timeout;
 		info->config.flow_on = flow_on;
 		info->config.flow_off = flow_off;

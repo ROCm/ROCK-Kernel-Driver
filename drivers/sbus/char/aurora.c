@@ -1440,13 +1440,6 @@ static int aurora_open(struct tty_struct * tty, struct file * filp)
 		return error;
 	}
 	
-	if ((port->count == 1) && (port->flags & ASYNC_SPLIT_TERMIOS)) {
-		*tty->termios = port->normal_termios;
-		save_flags(flags); cli();
-		aurora_change_speed(bp, port);
-		restore_flags(flags);
-	}
-
 #ifdef AURORA_DEBUG
 	printk("aurora_open: end\n");
 #endif
@@ -1494,12 +1487,6 @@ static void aurora_close(struct tty_struct * tty, struct file * filp)
 		return;
 	}
 	port->flags |= ASYNC_CLOSING;
-
-	/* Save the termios structure, since this port may have
-	 * separate termios for callout and dialin.
-	 */
-	if (port->flags & ASYNC_NORMAL_ACTIVE)
-		port->normal_termios = *tty->termios;
 
 	/* Now we wait for the transmit buffer to clear; and we notify 
 	 * the line discipline to only process XON/XOFF characters.
@@ -2319,7 +2306,6 @@ static int aurora_init_drivers(void)
 	
 	memset(aurora_port, 0, sizeof(aurora_port));
 	for (i = 0; i < AURORA_TNPORTS; i++)  {
-		aurora_port[i].normal_termios  = aurora_driver.init_termios;
 		aurora_port[i].magic = AURORA_MAGIC;
 		aurora_port[i].tqueue.routine = do_softint;
 		aurora_port[i].tqueue.data = &aurora_port[i];

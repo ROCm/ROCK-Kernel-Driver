@@ -930,11 +930,6 @@ static int rs_open(struct tty_struct *tty, struct file * filp)
 		return retval;
 	}
 
-	if ((info->state->count == 1) &&
-	    (info->flags & ASYNC_SPLIT_TERMIOS)) {
-		*tty->termios = info->state->normal_termios;
-	}
-
 	/*
 	 * figure out which console to use (should be one already)
 	 */

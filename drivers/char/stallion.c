@@ -1077,10 +1077,6 @@ static int stl_open(struct tty_struct *tty, struct file *filp)
 	}
 	portp->flags |= ASYNC_NORMAL_ACTIVE;
 
-	if ((portp->refcount == 1) && (portp->flags & ASYNC_SPLIT_TERMIOS)) {
-		*tty->termios = portp->normaltermios;
-		stl_setport(portp, tty->termios);
-	}
 	return(0);
 }
 
@@ -1171,9 +1167,6 @@ static void stl_close(struct tty_struct *tty, struct file *filp)
 
 	portp->refcount = 0;
 	portp->flags |= ASYNC_CLOSING;
-
-	if (portp->flags & ASYNC_NORMAL_ACTIVE)
-		portp->normaltermios = *tty->termios;
 
 /*
  *	May want to wait for any data to drain before closing. The BUSY
@@ -2286,7 +2279,6 @@ static int __init stl_initports(stlbrd_t *brdp, stlpanel_t *panelp)
 		portp->baud_base = STL_BAUDBASE;
 		portp->close_delay = STL_CLOSEDELAY;
 		portp->closing_wait = 30 * HZ;
-		portp->normaltermios = stl_deftermios;
 		INIT_WORK(&portp->tqueue, stl_offintr, portp);
 		init_waitqueue_head(&portp->open_wait);
 		init_waitqueue_head(&portp->close_wait);

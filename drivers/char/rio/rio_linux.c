@@ -967,7 +967,6 @@ static int rio_init_datastructures (void)
     }
     rio_dprintk (RIO_DEBUG_INIT, "initing port %d (%d)\n", i, port->Mapped);
     port->PortNum = i;
-    port->gs.normal_termios  = tty_std_termios;
     port->gs.magic = RIO_MAGIC;
     port->gs.close_delay = HZ/2;
     port->gs.closing_wait = 30 * HZ;

@@ -4466,7 +4466,6 @@ int wanpipe_tty_init(sdla_t *card)
 	state->custom_divisor = 0;
 	state->close_delay = 5*HZ/10;
 	state->closing_wait = 30*HZ;
-	state->normal_termios = serial_driver.init_termios;
 	state->icount.cts = state->icount.dsr = 
 		state->icount.rng = state->icount.dcd = 0;
 	state->icount.rx = state->icount.tx = 0;

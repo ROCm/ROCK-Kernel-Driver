@@ -1071,12 +1071,6 @@ static int rc_open(struct tty_struct * tty, struct file * filp)
 	if ((error = block_til_ready(tty, filp, port)))
 		return error;
 	
-	if ((port->count == 1) && (port->flags & ASYNC_SPLIT_TERMIOS)) {
-		*tty->termios = port->normal_termios;
-		save_flags(flags); cli();
-		rc_change_speed(bp, port);
-		restore_flags(flags);
-	}
 	return 0;
 }
 
@@ -1110,12 +1104,6 @@ static void rc_close(struct tty_struct * tty, struct file * filp)
 	if (port->count)
 		goto out;
 	port->flags |= ASYNC_CLOSING;
-	/*
-	 * Save the termios structure, since this port may have
-	 * separate termios for callout and dialin.
-	 */
-	if (port->flags & ASYNC_NORMAL_ACTIVE)
-		port->normal_termios = *tty->termios;
 	/*
 	 * Now we wait for the transmit buffer to clear; and we notify 
 	 * the line discipline to only process XON/XOFF characters.
@@ -1741,7 +1729,6 @@ static inline int rc_init_drivers(void)
 
 	memset(rc_port, 0, sizeof(rc_port));
 	for (i = 0; i < RC_NPORT * RC_NBOARD; i++)  {
-		rc_port[i].normal_termios  = riscom_driver.init_termios;
 		rc_port[i].magic = RISCOM8_MAGIC;
 		rc_port[i].tqueue.routine = do_softint;
 		rc_port[i].tqueue.data = &rc_port[i];
