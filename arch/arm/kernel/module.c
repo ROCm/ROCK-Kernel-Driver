@@ -159,3 +159,8 @@ module_finalize(const Elf32_Ehdr *hdr, const Elf_Shdr *sechdrs,
 {
 	return 0;
 }
+
+void
+module_arch_cleanup(struct module *mod)
+{
+}
