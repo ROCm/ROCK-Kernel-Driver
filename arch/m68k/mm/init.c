@@ -82,7 +82,9 @@ void __init mem_init(void)
 	int datapages = 0;
 	int initpages = 0;
 	unsigned long tmp;
+#ifndef CONFIG_SUN3
 	int i;
+#endif
 
 	max_mapnr = num_physpages = (((unsigned long)high_memory - PAGE_OFFSET) >> PAGE_SHIFT);
 
