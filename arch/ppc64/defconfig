@@ -154,7 +154,14 @@ CONFIG_SCSI_SYM53C8XX_MAX_TAGS=64
 #
 # Multi-device support (RAID and LVM)
 #
-# CONFIG_MD is not set
+CONFIG_MD=y
+CONFIG_BLK_DEV_MD=y
+CONFIG_MD_LINEAR=y
+CONFIG_MD_RAID0=y
+CONFIG_MD_RAID1=y
+CONFIG_MD_RAID5=y
+# CONFIG_MD_MULTIPATH is not set
+# CONFIG_BLK_DEV_DM is not set
 
 #
 # Fusion MPT device support
