@@ -200,9 +200,7 @@ struct atm_cirange {
     "SESSION",	"HASSAP",	"BOUND",	"CLOSE"
 
 
-#ifndef __KERNEL__
-#undef __AAL_STAT_ITEMS
-#else
+#ifdef __KERNEL__
 
 #include <linux/wait.h> /* wait_queue_head_t */
 #include <linux/time.h> /* struct timeval */

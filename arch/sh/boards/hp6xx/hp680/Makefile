@@ -6,5 +6,5 @@
 # unless it's something special (ie not a .c file).
 #
 
-obj-y	 := mach.o
+obj-y	 := mach.o setup.o
 

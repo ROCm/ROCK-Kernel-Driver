@@ -23,6 +23,15 @@ extern void hd64461_outl(unsigned int value, unsigned long port);
 extern unsigned char hd64461_inb_p(unsigned long port);
 extern void hd64461_outb_p(unsigned char value, unsigned long port);
 
+extern void hd64461_insb(unsigned long port, const void *buffer, unsigned long count);
+extern void hd64461_insw(unsigned long port, const void *buffer, unsigned long count);
+extern void hd64461_insl(unsigned long port, const void *buffer, unsigned long count);
+
+extern void hd64461_outsb(unsigned long port, const void *buffer, unsigned long count);
+extern void hd64461_outsw(unsigned long port, const void *buffer, unsigned long count);
+extern void hd64461_outsl(unsigned long port, const void *buffer, unsigned long count);
+
+
 extern int hd64461_irq_demux(int irq);
 
 #endif /* _ASM_SH_IO_HD64461_H */

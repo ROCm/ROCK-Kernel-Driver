@@ -1662,7 +1662,7 @@ int radeonfb_set_par(struct fb_info *info)
 		radeon_write_mode (rinfo, &newmode);
 		/* (re)initialize the engine */
 		if (!radeon_accel_disabled())
-			radeon_engine_init (rinfo);
+			radeonfb_engine_init (rinfo);
 	
 	}
 	/* Update fix */
@@ -2291,7 +2291,7 @@ static void __devexit radeonfb_pci_unregister (struct pci_dev *pdev)
 #ifdef CONFIG_FB_RADEON_I2C
 	radeon_delete_i2c_busses(rinfo);
 #endif        
-        kfree (rinfo);
+        framebuffer_release(info);
 }
 
 

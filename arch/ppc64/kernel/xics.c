@@ -353,11 +353,11 @@ irqreturn_t xics_ipi_action(int irq, void *dev_id, struct pt_regs *regs)
 			smp_message_recv(PPC_MSG_MIGRATE_TASK, regs);
 		}
 #endif
-#ifdef CONFIG_XMON
-		if (test_and_clear_bit(PPC_MSG_XMON_BREAK,
+#ifdef CONFIG_DEBUGGER
+		if (test_and_clear_bit(PPC_MSG_DEBUGGER_BREAK,
 				       &xics_ipi_message[cpu].value)) {
 			mb();
-			smp_message_recv(PPC_MSG_XMON_BREAK, regs);
+			smp_message_recv(PPC_MSG_DEBUGGER_BREAK, regs);
 		}
 #endif
 	}

@@ -1,4 +1,4 @@
-/* $Id: fpu.c,v 1.3 2003/09/23 23:15:44 lethal Exp $
+/* $Id: fpu.c,v 1.4 2004/01/13 05:52:11 kkojima Exp $
  *
  * linux/arch/sh/kernel/fpu.c
  *
@@ -31,60 +31,67 @@
  * Assume called with FPU enabled (SR.FD=0).
  */
 void
-save_fpu(struct task_struct *tsk)
+save_fpu(struct task_struct *tsk, struct pt_regs *regs)
 {
+	unsigned long dummy;
+
+	clear_tsk_thread_flag(tsk, TIF_USEDFPU);
+	enable_fpu();
 	asm volatile("sts.l	fpul, @-%0\n\t"
 		     "sts.l	fpscr, @-%0\n\t"
-		     "lds	%1, fpscr\n\t"
-		     "frchg\n\t"
-		     "fmov.s	fr15, @-%0\n\t"
-		     "fmov.s	fr14, @-%0\n\t"
-		     "fmov.s	fr13, @-%0\n\t"
-		     "fmov.s	fr12, @-%0\n\t"
-		     "fmov.s	fr11, @-%0\n\t"
-		     "fmov.s	fr10, @-%0\n\t"
-		     "fmov.s	fr9, @-%0\n\t"
-		     "fmov.s	fr8, @-%0\n\t"
-		     "fmov.s	fr7, @-%0\n\t"
-		     "fmov.s	fr6, @-%0\n\t"
-		     "fmov.s	fr5, @-%0\n\t"
-		     "fmov.s	fr4, @-%0\n\t"
-		     "fmov.s	fr3, @-%0\n\t"
-		     "fmov.s	fr2, @-%0\n\t"
-		     "fmov.s	fr1, @-%0\n\t"
-		     "fmov.s	fr0, @-%0\n\t"
-		     "frchg\n\t"
-		     "fmov.s	fr15, @-%0\n\t"
-		     "fmov.s	fr14, @-%0\n\t"
-		     "fmov.s	fr13, @-%0\n\t"
-		     "fmov.s	fr12, @-%0\n\t"
-		     "fmov.s	fr11, @-%0\n\t"
-		     "fmov.s	fr10, @-%0\n\t"
-		     "fmov.s	fr9, @-%0\n\t"
-		     "fmov.s	fr8, @-%0\n\t"
-		     "fmov.s	fr7, @-%0\n\t"
-		     "fmov.s	fr6, @-%0\n\t"
-		     "fmov.s	fr5, @-%0\n\t"
-		     "fmov.s	fr4, @-%0\n\t"
-		     "fmov.s	fr3, @-%0\n\t"
-		     "fmov.s	fr2, @-%0\n\t"
-		     "fmov.s	fr1, @-%0\n\t"
-		     "fmov.s	fr0, @-%0\n\t"
 		     "lds	%2, fpscr\n\t"
-		     : /* no output */
-		     : "r" ((char *)(&tsk->thread.fpu.hard.status)),
+		     "frchg\n\t"
+		     "fmov.s	fr15, @-%0\n\t"
+		     "fmov.s	fr14, @-%0\n\t"
+		     "fmov.s	fr13, @-%0\n\t"
+		     "fmov.s	fr12, @-%0\n\t"
+		     "fmov.s	fr11, @-%0\n\t"
+		     "fmov.s	fr10, @-%0\n\t"
+		     "fmov.s	fr9, @-%0\n\t"
+		     "fmov.s	fr8, @-%0\n\t"
+		     "fmov.s	fr7, @-%0\n\t"
+		     "fmov.s	fr6, @-%0\n\t"
+		     "fmov.s	fr5, @-%0\n\t"
+		     "fmov.s	fr4, @-%0\n\t"
+		     "fmov.s	fr3, @-%0\n\t"
+		     "fmov.s	fr2, @-%0\n\t"
+		     "fmov.s	fr1, @-%0\n\t"
+		     "fmov.s	fr0, @-%0\n\t"
+		     "frchg\n\t"
+		     "fmov.s	fr15, @-%0\n\t"
+		     "fmov.s	fr14, @-%0\n\t"
+		     "fmov.s	fr13, @-%0\n\t"
+		     "fmov.s	fr12, @-%0\n\t"
+		     "fmov.s	fr11, @-%0\n\t"
+		     "fmov.s	fr10, @-%0\n\t"
+		     "fmov.s	fr9, @-%0\n\t"
+		     "fmov.s	fr8, @-%0\n\t"
+		     "fmov.s	fr7, @-%0\n\t"
+		     "fmov.s	fr6, @-%0\n\t"
+		     "fmov.s	fr5, @-%0\n\t"
+		     "fmov.s	fr4, @-%0\n\t"
+		     "fmov.s	fr3, @-%0\n\t"
+		     "fmov.s	fr2, @-%0\n\t"
+		     "fmov.s	fr1, @-%0\n\t"
+		     "fmov.s	fr0, @-%0\n\t"
+		     "lds	%3, fpscr\n\t"
+		     : "=r" (dummy)
+		     : "0" ((char *)(&tsk->thread.fpu.hard.status)),
 		       "r" (FPSCR_RCHG),
 		       "r" (FPSCR_INIT)
 		     : "memory");
 
-	clear_tsk_thread_flag(tsk, TIF_USEDFPU);
-	release_fpu();
+ 	disable_fpu();
+ 	release_fpu(regs);
 }
 
 static void
 restore_fpu(struct task_struct *tsk)
 {
-	asm volatile("lds	%1, fpscr\n\t"
+	unsigned long dummy;
+
+ 	enable_fpu();
+	asm volatile("lds	%2, fpscr\n\t"
 		     "fmov.s	@%0+, fr0\n\t"
 		     "fmov.s	@%0+, fr1\n\t"
 		     "fmov.s	@%0+, fr2\n\t"
@@ -121,9 +128,10 @@ restore_fpu(struct task_struct *tsk)
 		     "frchg\n\t"
 		     "lds.l	@%0+, fpscr\n\t"
 		     "lds.l	@%0+, fpul\n\t"
-		     : /* no output */
-		     : "r" (&tsk->thread.fpu), "r" (FPSCR_RCHG)
+		     : "=r" (dummy)
+		     : "0" (&tsk->thread.fpu), "r" (FPSCR_RCHG)
 		     : "memory");
+	disable_fpu();
 }
 
 /*
@@ -135,6 +143,7 @@ restore_fpu(struct task_struct *tsk)
 static void
 fpu_init(void)
 {
+	enable_fpu();
 	asm volatile("lds	%0, fpul\n\t"
 		     "lds	%1, fpscr\n\t"
 		     "fsts	fpul, fr0\n\t"
@@ -174,6 +183,7 @@ fpu_init(void)
 		     "lds	%2, fpscr\n\t"
 		     : /* no output */
 		     : "r" (0), "r" (FPSCR_RCHG), "r" (FPSCR_INIT));
+ 	disable_fpu();
 }
 
 /**
@@ -262,14 +272,14 @@ ieee_fpe_handler (struct pt_regs *regs)
 	if ((finsn & 0xf1ff) == 0xf0ad) { /* fcnvsd */
 		struct task_struct *tsk = current;
 
-		save_fpu(tsk);
+		save_fpu(tsk, regs);
 		if ((tsk->thread.fpu.hard.fpscr & (1 << 17))) {
 			/* FPU error */
 			denormal_to_double (&tsk->thread.fpu.hard,
 					    (finsn >> 8) & 0xf);
 			tsk->thread.fpu.hard.fpscr &=
 				~(FPSCR_CAUSE_MASK | FPSCR_FLAG_MASK);
-			grab_fpu();
+			grab_fpu(regs);
 			restore_fpu(tsk);
 			set_tsk_thread_flag(tsk, TIF_USEDFPU);
 		} else {
@@ -295,7 +305,7 @@ do_fpu_error(unsigned long r4, unsigned long r5, unsigned long r6, unsigned long
 		return;
 
 	regs.pc += 2;
-	save_fpu(tsk);
+	save_fpu(tsk, &regs);
 	tsk->thread.trap_no = 11;
 	tsk->thread.error_code = 0;
 	force_sig(SIGFPE, tsk);
@@ -307,7 +317,7 @@ do_fpu_state_restore(unsigned long r4, unsigned long r5, unsigned long r6,
 {
 	struct task_struct *tsk = current;
 
-	grab_fpu();
+	grab_fpu(&regs);
 	if (!user_mode(&regs)) {
 		printk(KERN_ERR "BUG: FPU is used in kernel mode.\n");
 		return;

@@ -49,6 +49,7 @@
 #include <asm/machdep.h>
 #include <asm/xics.h>
 #include <asm/cputable.h>
+#include <asm/system.h>
 
 int smp_threads_ready;
 unsigned long cache_decay_ticks;
@@ -394,7 +395,7 @@ void smp_local_timer_interrupt(struct pt_regs * regs)
 
 void smp_message_recv(int msg, struct pt_regs *regs)
 {
-	switch( msg ) {
+	switch(msg) {
 	case PPC_MSG_CALL_FUNCTION:
 		smp_call_function_interrupt();
 		break;
@@ -407,11 +408,11 @@ void smp_message_recv(int msg, struct pt_regs *regs)
 		/* spare */
 		break;
 #endif
-#ifdef CONFIG_XMON
-	case PPC_MSG_XMON_BREAK:
-		xmon(regs);
+#ifdef CONFIG_DEBUGGER
+	case PPC_MSG_DEBUGGER_BREAK:
+		debugger(regs);
 		break;
-#endif /* CONFIG_XMON */
+#endif
 	default:
 		printk("SMP %d: smp_message_recv(): unknown msg %d\n",
 		       smp_processor_id(), msg);
@@ -424,12 +425,12 @@ void smp_send_reschedule(int cpu)
 	smp_message_pass(cpu, PPC_MSG_RESCHEDULE, 0, 0);
 }
 
-#ifdef CONFIG_XMON
-void smp_send_xmon_break(int cpu)
+#ifdef CONFIG_DEBUGGER
+void smp_send_debugger_break(int cpu)
 {
-	smp_message_pass(cpu, PPC_MSG_XMON_BREAK, 0, 0);
+	smp_message_pass(cpu, PPC_MSG_DEBUGGER_BREAK, 0, 0);
 }
-#endif /* CONFIG_XMON */
+#endif
 
 static void stop_this_cpu(void *dummy)
 {
@@ -507,10 +508,7 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 			printk("smp_call_function on cpu %d: other cpus not "
 			       "responding (%d)\n", smp_processor_id(),
 			       atomic_read(&data.started));
-#ifdef CONFIG_DEBUG_KERNEL
-			if (debugger)
-				debugger(0);
-#endif
+			debugger(0);
 			goto out;
 		}
 	}
@@ -525,10 +523,7 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 				       smp_processor_id(),
 				       atomic_read(&data.finished),
 				       atomic_read(&data.started));
-#ifdef CONFIG_DEBUG_KERNEL
-				if (debugger)
-					debugger(0);
-#endif
+				debugger(0);
 				goto out;
 			}
 		}

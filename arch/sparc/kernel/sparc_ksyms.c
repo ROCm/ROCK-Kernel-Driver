@@ -86,8 +86,8 @@ extern int __divdi3(int, int);
 extern void dump_thread(struct pt_regs *, struct user *);
 
 /* Private functions with odd calling conventions. */
-extern void ___atomic_add(void);
-extern void ___atomic_sub(void);
+extern void ___atomic24_add(void);
+extern void ___atomic24_sub(void);
 extern void ___set_bit(void);
 extern void ___clear_bit(void);
 extern void ___change_bit(void);
@@ -147,8 +147,8 @@ EXPORT_SYMBOL(sparc_valid_addr_bitmap);
 EXPORT_SYMBOL(phys_base);
 
 /* Atomic operations. */
-EXPORT_SYMBOL(___atomic_add);
-EXPORT_SYMBOL(___atomic_sub);
+EXPORT_SYMBOL(___atomic24_add);
+EXPORT_SYMBOL(___atomic24_sub);
 
 /* Bit operations. */
 EXPORT_SYMBOL(___set_bit);
@@ -159,10 +159,6 @@ EXPORT_SYMBOL(___change_bit);
 /* IRQ implementation. */
 EXPORT_SYMBOL(global_irq_holder);
 EXPORT_SYMBOL(synchronize_irq);
-EXPORT_SYMBOL(__global_cli);
-EXPORT_SYMBOL(__global_sti);
-EXPORT_SYMBOL(__global_save_flags);
-EXPORT_SYMBOL(__global_restore_flags);
 
 /* Misc SMP information */
 EXPORT_SYMBOL(__cpu_number_map);

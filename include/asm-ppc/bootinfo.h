@@ -10,6 +10,7 @@
 #define _PPC_BOOTINFO_H
 
 #include <linux/config.h>
+#include <asm/page.h>
 
 #if defined(CONFIG_APUS) && !defined(__BOOTER__)
 #include <asm-m68k/bootinfo.h>
@@ -29,11 +30,21 @@ struct bi_record {
 #define BI_SYSMAP		0x1015
 #define BI_MACHTYPE		0x1016
 #define BI_MEMSIZE		0x1017
+#define BI_BOARD_INFO		0x1018
 
 extern struct bi_record *find_bootinfo(void);
+extern void bootinfo_init(struct bi_record *rec);
+extern void bootinfo_append(unsigned long tag, unsigned long size, void * data);
 extern void parse_bootinfo(struct bi_record *rec);
 extern unsigned long boot_mem_size;
 
+static inline struct bi_record *
+bootinfo_addr(unsigned long offset)
+{
+
+	return (struct bi_record *)_ALIGN((offset) + (1 << 20) - 1,
+					  (1 << 20));
+}
 #endif /* CONFIG_APUS */
 
 
