@@ -1155,7 +1155,7 @@ static void print_sb(mdp_super_t *sb)
 
 static void print_rdev(mdk_rdev_t *rdev)
 {
-	printk(KERN_INFO "md: rdev %s, SZ:%08llu F:%d S:%d DN:%d ",
+	printk(KERN_INFO "md: rdev %s, SZ:%08llu F:%d S:%d DN:%u\n",
 		bdev_partition_name(rdev->bdev), (unsigned long long)rdev->size,
 	       	rdev->faulty, rdev->in_sync, rdev->desc_nr);
 	if (rdev->sb_loaded) {
@@ -1180,6 +1180,7 @@ void md_print_devices(void)
 
 		ITERATE_RDEV(mddev,rdev,tmp2)
 			printk("<%s>", bdev_partition_name(rdev->bdev));
+		printk("\n");
 
 		ITERATE_RDEV(mddev,rdev,tmp2)
 			print_rdev(rdev);
