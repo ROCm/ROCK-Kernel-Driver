@@ -262,10 +262,14 @@ unsigned int mii_check_media (struct mii_if_info *mii,
 }
 
 int generic_mii_ioctl(struct mii_if_info *mii_if,
-		      struct mii_ioctl_data *mii_data, int cmd)
+		      struct mii_ioctl_data *mii_data, int cmd,
+		      unsigned int *duplex_chg_out)
 {
 	int rc = 0;
 	unsigned int duplex_changed = 0;
+
+	if (duplex_chg_out)
+		*duplex_chg_out = 0;
 
 	mii_data->phy_id &= mii_if->phy_id_mask;
 	mii_data->reg_num &= mii_if->reg_num_mask;
@@ -323,8 +327,9 @@ int generic_mii_ioctl(struct mii_if_info *mii_if,
 		break;
 	}
 
-	if ((rc == 0) && (duplex_changed))
-		rc = 1;
+	if ((rc == 0) && (duplex_chg_out) && (duplex_changed))
+		*duplex_chg_out = 1;
+
 	return rc;
 }
 

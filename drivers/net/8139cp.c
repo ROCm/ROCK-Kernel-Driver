@@ -1664,9 +1664,9 @@ static int cp_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 	if (cmd == SIOCETHTOOL)
 		return cp_ethtool_ioctl(cp, (void *) rq->ifr_data);
 
-	rc = generic_mii_ioctl(&cp->mii_if, mii, cmd);
-	if (rc == 1)	/* we don't care about duplex change, fixup rc */
-		rc = 0;
+	spin_lock_irq(&cp->lock);
+	rc = generic_mii_ioctl(&cp->mii_if, mii, cmd, NULL);
+	spin_unlock_irq(&cp->lock);
 	return rc;
 }
 

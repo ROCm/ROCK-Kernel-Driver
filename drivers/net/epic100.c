@@ -1446,10 +1446,8 @@ static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	/* all other ioctls (the SIOC[GS]MIIxxx ioctls) */
 	else {
 		spin_lock_irq(&np->lock);
-		rc = generic_mii_ioctl(&np->mii, data, cmd);
+		rc = generic_mii_ioctl(&np->mii, data, cmd, NULL);
 		spin_unlock_irq(&np->lock);
-		if (rc == 1)	/* don't care about duplex change, fixup rc */
-			rc = 0;
 	}
 
 	/* power-down, if interface is down */

@@ -130,7 +130,8 @@ extern unsigned int mii_check_media (struct mii_if_info *mii,
 				     unsigned int ok_to_print,
 				     unsigned int init_media);
 extern int generic_mii_ioctl(struct mii_if_info *mii_if,
-                      	     struct mii_ioctl_data *mii_data, int cmd);
+                      	     struct mii_ioctl_data *mii_data, int cmd,
+			     unsigned int *duplex_changed);
 
 
 
