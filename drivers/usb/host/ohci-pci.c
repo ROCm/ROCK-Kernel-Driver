@@ -125,7 +125,7 @@ static int ohci_pci_suspend (struct usb_hcd *hcd, u32 state)
 		msleep (100);
 
 #ifdef	CONFIG_USB_SUSPEND
-	(void) usb_suspend_device (hcd->self.root_hub);
+	(void) usb_suspend_device (hcd->self.root_hub, state);
 #else
 	down (&hcd->self.root_hub->serialize);
 	(void) ohci_hub_suspend (hcd);
@@ -238,6 +238,10 @@ static const struct hc_driver ohci_pci_hc_driver = {
 	 */
 	.hub_status_data =	ohci_hub_status_data,
 	.hub_control =		ohci_hub_control,
+#ifdef	CONFIG_USB_SUSPEND
+	.hub_suspend =		ohci_hub_suspend,
+	.hub_resume =		ohci_hub_resume,
+#endif
 };
 
 /*-------------------------------------------------------------------------*/

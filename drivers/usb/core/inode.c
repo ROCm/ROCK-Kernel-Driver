@@ -48,6 +48,7 @@ static struct vfsmount *usbdevfs_mount;
 static struct vfsmount *usbfs_mount;
 static int usbdevfs_mount_count;	/* = 0 */
 static int usbfs_mount_count;	/* = 0 */
+static int ignore_mount = 0;
 
 static struct dentry *devices_usbdevfs_dentry;
 static struct dentry *devices_usbfs_dentry;
@@ -87,6 +88,17 @@ static int parse_options(struct super_block *s, char *data)
 {
 	char *p;
 	int option;
+
+	/* (re)set to defaults. */
+	devuid = 0;
+	busuid = 0;
+	listuid = 0;
+	devgid = 0;
+	busgid = 0;
+	listgid = 0;
+	devmode = S_IWUSR | S_IRUGO;
+	busmode = S_IXUGO | S_IRUGO;
+	listmode = S_IRUGO;
 
 	while ((p = strsep(&data, ",")) != NULL) {
 		substring_t args[MAX_OPT_ARGS];
@@ -147,6 +159,89 @@ static int parse_options(struct super_block *s, char *data)
 			return -EINVAL;
 		}
 	}
+
+	return 0;
+}
+
+static void update_special(struct dentry *special)
+{
+	special->d_inode->i_uid = listuid;
+	special->d_inode->i_gid = listgid;
+	special->d_inode->i_mode = S_IFREG | listmode;
+}
+
+static void update_dev(struct dentry *dev)
+{
+	dev->d_inode->i_uid = devuid;
+	dev->d_inode->i_gid = devgid;
+	dev->d_inode->i_mode = S_IFREG | devmode;
+}
+
+static void update_bus(struct dentry *bus)
+{
+	struct dentry *dev = NULL;
+
+	bus->d_inode->i_uid = busuid;
+	bus->d_inode->i_gid = busgid;
+	bus->d_inode->i_mode = S_IFDIR | busmode;
+
+	down(&bus->d_inode->i_sem);
+
+	list_for_each_entry(dev, &bus->d_subdirs, d_child)
+		if (dev->d_inode)
+			update_dev(dev);
+
+	up(&bus->d_inode->i_sem);
+}
+
+static void update_sb(struct super_block *sb)
+{
+	struct dentry *root = sb->s_root;
+	struct dentry *bus = NULL;
+
+	if (!root)
+		return;
+
+	down(&root->d_inode->i_sem);
+
+	list_for_each_entry(bus, &root->d_subdirs, d_child) {
+		if (bus->d_inode) {
+			switch (S_IFMT & bus->d_inode->i_mode) {
+			case S_IFDIR:
+				update_bus(bus);
+				break;
+			case S_IFREG:
+				update_special(bus);
+				break;
+			default:
+				warn("Unknown node %s mode %x found on remount!\n",bus->d_name.name,bus->d_inode->i_mode);
+				break;
+			}
+		}
+	}
+
+	up(&root->d_inode->i_sem);
+}
+
+static int remount(struct super_block *sb, int *flags, char *data)
+{
+	/* If this is not a real mount,
+	 * i.e. it's a simple_pin_fs from create_special_files,
+	 * then ignore it.
+	 */
+	if (ignore_mount)
+		return 0;
+
+	if (parse_options(sb, data)) {
+		warn("usbfs: mount parameter error:");
+		return -EINVAL;
+	}
+
+	if (usbfs_mount && usbfs_mount->mnt_sb)
+		update_sb(usbfs_mount->mnt_sb);
+
+	if (usbdevfs_mount && usbdevfs_mount->mnt_sb)
+		update_sb(usbdevfs_mount->mnt_sb);
 
 	return 0;
 }
@@ -349,17 +444,13 @@ static struct inode_operations usbfs_dir_inode_operations = {
 static struct super_operations usbfs_ops = {
 	.statfs =	simple_statfs,
 	.drop_inode =	generic_delete_inode,
+	.remount_fs =	remount,
 };
 
 static int usbfs_fill_super(struct super_block *sb, void *data, int silent)
 {
 	struct inode *inode;
 	struct dentry *root;
-
-	if (parse_options(sb, data)) {
-		warn("usbfs: mount parameter error:");
-		return -EINVAL;
-	}
 
 	sb->s_blocksize = PAGE_CACHE_SIZE;
 	sb->s_blocksize_bits = PAGE_CACHE_SHIFT;
@@ -523,6 +614,11 @@ static int create_special_files (void)
 	struct dentry *parent;
 	int retval;
 
+	/* the simple_pin_fs calls will call remount with no options
+	 * without this flag that would overwrite the real mount options (if any)
+	 */
+	ignore_mount = 1;
+
 	/* create the devices special file */
 	retval = simple_pin_fs("usbdevfs", &usbdevfs_mount, &usbdevfs_mount_count);
 	if (retval) {
@@ -535,6 +631,8 @@ static int create_special_files (void)
 		err ("Unable to get usbfs mount");
 		goto error_clean_usbdevfs_mount;
 	}
+
+	ignore_mount = 0;
 
 	parent = usbfs_mount->mnt_sb->s_root;
 	devices_usbfs_dentry = fs_create_file ("devices",

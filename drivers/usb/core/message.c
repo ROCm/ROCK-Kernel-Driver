@@ -605,12 +605,128 @@ int usb_get_descriptor(struct usb_device *dev, unsigned char type, unsigned char
  * Returns the number of bytes received on success, or else the status code
  * returned by the underlying usb_control_msg() call.
  */
-int usb_get_string(struct usb_device *dev, unsigned short langid, unsigned char index, void *buf, int size)
+int usb_get_string(struct usb_device *dev, unsigned short langid,
+		unsigned char index, void *buf, int size)
 {
-	return usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
-		USB_REQ_GET_DESCRIPTOR, USB_DIR_IN,
-		(USB_DT_STRING << 8) + index, langid, buf, size,
-		HZ * USB_CTRL_GET_TIMEOUT);
+	int i;
+	int result;
+
+	for (i = 0; i < 3; ++i) {
+		/* retry on length 0 or stall; some devices are flakey */
+		result = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
+			USB_REQ_GET_DESCRIPTOR, USB_DIR_IN,
+			(USB_DT_STRING << 8) + index, langid, buf, size,
+			HZ * USB_CTRL_GET_TIMEOUT);
+		if (!(result == 0 || result == -EPIPE))
+			break;
+	}
+	return result;
+}
+
+static int usb_string_sub(struct usb_device *dev, unsigned int langid,
+		unsigned int index, unsigned char *buf)
+{
+	int rc;
+
+	/* Try to read the string descriptor by asking for the maximum
+	 * possible number of bytes */
+	rc = usb_get_string(dev, langid, index, buf, 255);
+
+	/* If that failed try to read the descriptor length, then
+	 * ask for just that many bytes */
+	if (rc < 0) {
+		rc = usb_get_string(dev, langid, index, buf, 2);
+		if (rc == 2)
+			rc = usb_get_string(dev, langid, index, buf, buf[0]);
+	}
+
+	if (rc >= 0) {
+		/* There might be extra junk at the end of the descriptor */
+		if (buf[0] < rc)
+			rc = buf[0];
+		if (rc < 2)
+			rc = -EINVAL;
+	}
+	return rc;
+}
+
+/**
+ * usb_string - returns ISO 8859-1 version of a string descriptor
+ * @dev: the device whose string descriptor is being retrieved
+ * @index: the number of the descriptor
+ * @buf: where to put the string
+ * @size: how big is "buf"?
+ * Context: !in_interrupt ()
+ * 
+ * This converts the UTF-16LE encoded strings returned by devices, from
+ * usb_get_string_descriptor(), to null-terminated ISO-8859-1 encoded ones
+ * that are more usable in most kernel contexts.  Note that all characters
+ * in the chosen descriptor that can't be encoded using ISO-8859-1
+ * are converted to the question mark ("?") character, and this function
+ * chooses strings in the first language supported by the device.
+ *
+ * The ASCII (or, redundantly, "US-ASCII") character set is the seven-bit
+ * subset of ISO 8859-1. ISO-8859-1 is the eight-bit subset of Unicode,
+ * and is appropriate for use many uses of English and several other
+ * Western European languages.  (But it doesn't include the "Euro" symbol.)
+ *
+ * This call is synchronous, and may not be used in an interrupt context.
+ *
+ * Returns length of the string (>= 0) or usb_control_msg status (< 0).
+ */
+int usb_string(struct usb_device *dev, int index, char *buf, size_t size)
+{
+	unsigned char *tbuf;
+	int err;
+	unsigned int u, idx;
+
+	if (size <= 0 || !buf || !index)
+		return -EINVAL;
+	buf[0] = 0;
+	tbuf = kmalloc(256, GFP_KERNEL);
+	if (!tbuf)
+		return -ENOMEM;
+
+	/* get langid for strings if it's not yet known */
+	if (!dev->have_langid) {
+		err = usb_string_sub(dev, 0, 0, tbuf);
+		if (err < 0) {
+			dev_err (&dev->dev,
+				"string descriptor 0 read error: %d\n",
+				err);
+			goto errout;
+		} else if (err < 4) {
+			dev_err (&dev->dev, "string descriptor 0 too short\n");
+			err = -EINVAL;
+			goto errout;
+		} else {
+			dev->have_langid = -1;
+			dev->string_langid = tbuf[2] | (tbuf[3]<< 8);
+				/* always use the first langid listed */
+			dev_dbg (&dev->dev, "default language 0x%04x\n",
+				dev->string_langid);
+		}
+	}
+	
+	err = usb_string_sub(dev, dev->string_langid, index, tbuf);
+	if (err < 0)
+		goto errout;
+
+	size--;		/* leave room for trailing NULL char in output buffer */
+	for (idx = 0, u = 2; u < err; u += 2) {
+		if (idx >= size)
+			break;
+		if (tbuf[u+1])			/* high byte */
+			buf[idx++] = '?';  /* non ISO-8859-1 character */
+		else
+			buf[idx++] = tbuf[u];
+	}
+	buf[idx] = 0;
+	err = idx;
+
+ errout:
+	kfree(tbuf);
+	return err;
 }
 
 /**
@@ -1255,102 +1371,6 @@ free_interfaces:
 	}
 
 	return ret;
-}
-
-/**
- * usb_string - returns ISO 8859-1 version of a string descriptor
- * @dev: the device whose string descriptor is being retrieved
- * @index: the number of the descriptor
- * @buf: where to put the string
- * @size: how big is "buf"?
- * Context: !in_interrupt ()
- * 
- * This converts the UTF-16LE encoded strings returned by devices, from
- * usb_get_string_descriptor(), to null-terminated ISO-8859-1 encoded ones
- * that are more usable in most kernel contexts.  Note that all characters
- * in the chosen descriptor that can't be encoded using ISO-8859-1
- * are converted to the question mark ("?") character, and this function
- * chooses strings in the first language supported by the device.
- *
- * The ASCII (or, redundantly, "US-ASCII") character set is the seven-bit
- * subset of ISO 8859-1. ISO-8859-1 is the eight-bit subset of Unicode,
- * and is appropriate for use many uses of English and several other
- * Western European languages.  (But it doesn't include the "Euro" symbol.)
- *
- * This call is synchronous, and may not be used in an interrupt context.
- *
- * Returns length of the string (>= 0) or usb_control_msg status (< 0).
- */
-int usb_string(struct usb_device *dev, int index, char *buf, size_t size)
-{
-	unsigned char *tbuf;
-	int err, len;
-	unsigned int u, idx;
-
-	if (size <= 0 || !buf || !index)
-		return -EINVAL;
-	buf[0] = 0;
-	tbuf = kmalloc(256, GFP_KERNEL);
-	if (!tbuf)
-		return -ENOMEM;
-
-	/* get langid for strings if it's not yet known */
-	if (!dev->have_langid) {
-		err = usb_get_descriptor(dev, USB_DT_STRING, 0, tbuf, 4);
-		if (err < 0) {
-			dev_err (&dev->dev,
-				"string descriptor 0 read error: %d\n",
-				err);
-			goto errout;
-		} else if (err < 4 || tbuf[0] < 4) {
-			dev_err (&dev->dev, "string descriptor 0 too short\n");
-			err = -EINVAL;
-			goto errout;
-		} else {
-			dev->have_langid = -1;
-			dev->string_langid = tbuf[2] | (tbuf[3]<< 8);
-				/* always use the first langid listed */
-			dev_dbg (&dev->dev, "default language 0x%04x\n",
-				dev->string_langid);
-		}
-	}
-
-	/*
-	 * ask for the length of the string 
-	 */
-
-	err = usb_get_string(dev, dev->string_langid, index, tbuf, 2);
-	if (err == -EPIPE || err == 0) {
-		dev_dbg(&dev->dev, "RETRY string %d read/%d\n", index, 2);
-		err = usb_get_string(dev, dev->string_langid, index, tbuf, 2);
-	}
-	if(err<2)
-		goto errout;
-	len=tbuf[0];	
-	
-	err = usb_get_string(dev, dev->string_langid, index, tbuf, len);
-	if (err == -EPIPE || err == 0) {
-		dev_dbg(&dev->dev, "RETRY string %d read/%d\n", index, len);
-		err = usb_get_string(dev, dev->string_langid, index, tbuf, len);
-	}
-	if (err < 0)
-		goto errout;
-
-	size--;		/* leave room for trailing NULL char in output buffer */
-	for (idx = 0, u = 2; u < err; u += 2) {
-		if (idx >= size)
-			break;
-		if (tbuf[u+1])			/* high byte */
-			buf[idx++] = '?';  /* non ISO-8859-1 character */
-		else
-			buf[idx++] = tbuf[u];
-	}
-	buf[idx] = 0;
-	err = idx;
-
- errout:
-	kfree(tbuf);
-	return err;
 }
 
 // synchronous request completion model

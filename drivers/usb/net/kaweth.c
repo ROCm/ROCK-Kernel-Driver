@@ -1293,7 +1293,7 @@ static int kaweth_internal_control_msg(struct usb_device *usb_dev,
                 return -ENOMEM;
 
         usb_fill_control_urb(urb, usb_dev, pipe, (unsigned char*)cmd, data,
-			 len, usb_api_blocking_completion,NULL);
+			 len, usb_api_blocking_completion, NULL);
 
         retv = usb_start_wait_urb(urb, timeout, &length);
         if (retv < 0) {

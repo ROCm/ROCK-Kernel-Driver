@@ -259,15 +259,7 @@
 #include <linux/ioctl.h>
 #include <asm/uaccess.h>
 #include <linux/usb.h>
-
-#ifdef CONFIG_USB_SERIAL_DEBUG
-	static int debug = 1;
-#else
-	static int debug;
-#endif
-
 #include "usb-serial.h"
-
 #include "io_edgeport.h"
 #include "io_ionsp.h"		/* info for the iosp messages */
 #include "io_16654.h"		/* 16654 UART defines */
@@ -299,19 +291,13 @@
 #define IMAGE_VERSION_NAME	OperationalCodeImageVersion_GEN2
 #include "io_fw_down2.h"	/* Define array OperationalCodeImage[] */
 
-
 #define MAX_NAME_LEN		64
-
 
 #define CHASE_TIMEOUT		(5*HZ)		/* 5 seconds */
 #define OPEN_TIMEOUT		(5*HZ)		/* 5 seconds */
 #define COMMAND_TIMEOUT		(5*HZ)		/* 5 seconds */
 
-#ifndef SERIAL_MAGIC
-	#define SERIAL_MAGIC	0x6702
-#endif
-#define PORT_MAGIC		0x7301
-
+static int debug;
 
 /* receive port state */
 enum RXSTATE {
@@ -793,7 +779,7 @@ static void edge_interrupt_callback (struct urb *urb, struct pt_regs *regs)
 
 	// process this interrupt-read even if there are no ports open
 	if (length) {
-		usb_serial_debug_data (__FILE__, __FUNCTION__, length, data);
+		usb_serial_debug_data(debug, &edge_serial->serial->dev->dev, __FUNCTION__, length, data);
 
 		if (length > 1) {
 			bytes_avail = data[0] | (data[1] << 8);
@@ -869,7 +855,7 @@ static void edge_bulk_in_callback (struct urb *urb, struct pt_regs *regs)
 	if (urb->actual_length) {
 		raw_data_length = urb->actual_length;
 
-		usb_serial_debug_data (__FILE__, __FUNCTION__, raw_data_length, data);
+		usb_serial_debug_data(debug, &edge_serial->serial->dev->dev, __FUNCTION__, raw_data_length, data);
 
 		/* decrement our rxBytes available by the number that we just got */
 		edge_serial->rxBytesAvail -= raw_data_length;
@@ -1327,7 +1313,7 @@ static int edge_write (struct usb_serial_port *port, int from_user, const unsign
 	} else {
 		memcpy(&fifo->fifo[fifo->head], data, firsthalf);
 	}  
-	usb_serial_debug_data (__FILE__, __FUNCTION__, firsthalf, &fifo->fifo[fifo->head]);
+	usb_serial_debug_data(debug, &port->dev, __FUNCTION__, firsthalf, &fifo->fifo[fifo->head]);
 
 	// update the index and size
 	fifo->head  += firsthalf;
@@ -1348,7 +1334,7 @@ static int edge_write (struct usb_serial_port *port, int from_user, const unsign
 		} else {
 			memcpy(&fifo->fifo[fifo->head], &data[firsthalf], secondhalf);
 		}
-		usb_serial_debug_data (__FILE__, __FUNCTION__, secondhalf, &fifo->fifo[fifo->head]);
+		usb_serial_debug_data(debug, &port->dev, __FUNCTION__, secondhalf, &fifo->fifo[fifo->head]);
 		// update the index and size
 		fifo->count += secondhalf;
 		fifo->head  += secondhalf;
@@ -1424,7 +1410,7 @@ static void send_more_port_data(struct edgeport_serial *edge_serial, struct edge
 	count = fifo->count;
 	buffer = kmalloc (count+2, GFP_ATOMIC);
 	if (buffer == NULL) {
-		dev_err(&edge_serial->serial->dev->dev, "%s - no more kernel memory...\n", __FUNCTION__);
+		dev_err(&edge_port->port->dev, "%s - no more kernel memory...\n", __FUNCTION__);
 		edge_port->write_in_progress = FALSE;
 		return;
 	}
@@ -1448,9 +1434,8 @@ static void send_more_port_data(struct edgeport_serial *edge_serial, struct edge
 		fifo->count -= secondhalf;
 	}
 
-	if (count) {
-		usb_serial_debug_data (__FILE__, __FUNCTION__, count, &buffer[2]);
-	}
+	if (count)
+		usb_serial_debug_data(debug, &edge_port->port->dev, __FUNCTION__, count, &buffer[2]);
 
 	/* fill up the urb with all of our data and submit it */
 	usb_fill_bulk_urb (urb, edge_serial->serial->dev, 
@@ -2443,7 +2428,7 @@ static int write_cmd_usb (struct edgeport_port *edge_port, unsigned char *buffer
 	struct urb *urb;
 	int timeout;
 
-	usb_serial_debug_data (__FILE__, __FUNCTION__, length, buffer);
+	usb_serial_debug_data(debug, &edge_port->port->dev, __FUNCTION__, length, buffer);
 
 	/* Allocate our next urb */
 	urb = usb_alloc_urb (0, GFP_ATOMIC);
@@ -3074,6 +3059,5 @@ MODULE_AUTHOR( DRIVER_AUTHOR );
 MODULE_DESCRIPTION( DRIVER_DESC );
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(debug, "i");
+module_param(debug, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(debug, "Debug enabled or not");
-

@@ -2,7 +2,7 @@
 /*
  *      auerswald.c  --  Auerswald PBX/System Telephone usb driver.
  *
- *      Copyright (C) 2001  Wolfgang Mües (wolfgang@iksw-muees.de)
+ *      Copyright (C) 2001  Wolfgang MÃ¼es (wolfgang@iksw-muees.de)
  *
  *      Very much code of this driver is borrowed from dabusb.c (Deti Fliegl)
  *      and from the USB Skeleton driver (Greg Kroah-Hartman). Thank you.
@@ -50,7 +50,7 @@ do {			\
 /*-------------------------------------------------------------------*/
 /* Version Information */
 #define DRIVER_VERSION "0.9.11"
-#define DRIVER_AUTHOR  "Wolfgang Mües <wolfgang@iksw-muees.de>"
+#define DRIVER_AUTHOR  "Wolfgang MÃ¼es <wolfgang@iksw-muees.de>"
 #define DRIVER_DESC    "Auerswald PBX/System Telephone usb driver"
 
 /*-------------------------------------------------------------------*/
@@ -699,7 +699,7 @@ static int auerchain_control_msg (pauerchain_t acp, struct usb_device *dev, unsi
 	dr->wLength = cpu_to_le16 (size);
 
 	usb_fill_control_urb (urb, dev, pipe, (unsigned char*)dr, data, size,    /* build urb */
-		          auerchain_blocking_completion,NULL);
+		          auerchain_blocking_completion, NULL);
 	ret = auerchain_start_wait_urb (acp, urb, timeout, &length);
 
 	usb_free_urb (urb);

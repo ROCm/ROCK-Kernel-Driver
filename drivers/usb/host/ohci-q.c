@@ -924,7 +924,7 @@ rescan_all:
 		/* only take off EDs that the HC isn't using, accounting for
 		 * frame counter wraps and EDs with partially retired TDs
 		 */
-		if (likely (HCD_IS_RUNNING(ohci->hcd.state))) {
+		if (likely (regs && HCD_IS_RUNNING(ohci->hcd.state))) {
 			if (tick_before (tick, ed->tick)) {
 skip_ed:
 				last = &ed->ed_next;

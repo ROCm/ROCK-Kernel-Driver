@@ -189,7 +189,7 @@ static int hci_submit_urb (struct urb * urb, int mem_flags)
  *
  * Return: 0 if success or error code 
  **************************************************************************/
-static int hci_unlink_urb (struct urb * urb)
+static int hci_unlink_urb (struct urb * urb, int status)
 {
 	unsigned long flags;
 	hci_t *hci;
@@ -219,45 +219,21 @@ static int hci_unlink_urb (struct urb * urb)
 	if (!list_empty (&urb->urb_list) && urb->status == -EINPROGRESS) {
 		/* URB active? */
 
-		if (urb->transfer_flags & URB_ASYNC_UNLINK) {
-			/* asynchronous with callback */
-			/* relink the urb to the del list */
-			list_move (&urb->urb_list, &hci->del_list);
-			spin_unlock_irqrestore (&usb_urb_lock, flags);
-		} else {
-			/* synchronous without callback */
-
-			add_wait_queue (&hci->waitq, &wait);
-
-			set_current_state (TASK_UNINTERRUPTIBLE);
-			comp = urb->complete;
-			urb->complete = NULL;
-
-			/* relink the urb to the del list */
-			list_move(&urb->urb_list, &hci->del_list);
-
-			spin_unlock_irqrestore (&usb_urb_lock, flags);
-
-			schedule_timeout (HZ / 50);
-
-			if (!list_empty (&urb->urb_list))
-				list_del (&urb->urb_list);
-
-			urb->complete = comp;
-			urb->hcpriv = NULL;
-			remove_wait_queue (&hci->waitq, &wait);
-		}
+		/* asynchronous with callback */
+		/* relink the urb to the del list */
+		list_move (&urb->urb_list, &hci->del_list);
+		urb->status = status;
+		spin_unlock_irqrestore (&usb_urb_lock, flags);
 	} else {
 		/* hcd does not own URB but we keep the driver happy anyway */
 		spin_unlock_irqrestore (&usb_urb_lock, flags);
 
-		if (urb->complete && (urb->transfer_flags & URB_ASYNC_UNLINK)) {
-			urb->status = -ENOENT;
+		if (urb->complete) {
+			urb->status = status;
 			urb->actual_length = 0;
 			urb->complete (urb, NULL);
-			urb->status = 0;
-		} else {
-			urb->status = -ENOENT;
+			if (urb->reject)
+				wake_up (&usb_kill_urb_queue);
 		}
 	}
 

@@ -340,6 +340,7 @@ rescan:
 		goto done;
 
 	if (!HCD_IS_RUNNING (ohci->hcd.state)) {
+sanitize:
 		ed->state = ED_IDLE;
 		finish_unlinks (ohci, 0, NULL);
 	}
@@ -347,7 +348,10 @@ rescan:
 	switch (ed->state) {
 	case ED_UNLINK:		/* wait for hw to finish? */
 		/* major IRQ delivery trouble loses INTR_SF too... */
-		WARN_ON (limit-- == 0);
+		if (limit-- == 0) {
+			ohci_warn (ohci, "IRQ INTR_SF lossage\n");
+			goto sanitize;
+		}
 		spin_unlock_irqrestore (&ohci->lock, flags);
 		set_current_state (TASK_UNINTERRUPTIBLE);
 		schedule_timeout (1);
@@ -671,6 +675,8 @@ static void ohci_stop (struct usb_hcd *hcd)
 	flush_scheduled_work();
 	if (HCD_IS_RUNNING(ohci->hcd.state))
 		hc_reset (ohci);
+	else
+		writel (OHCI_INTR_MIE, &ohci->regs->intrdisable);
 	
 	remove_debug_files (ohci);
 	ohci_mem_cleanup (ohci);

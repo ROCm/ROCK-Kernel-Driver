@@ -19,16 +19,10 @@
 #include <linux/moduleparam.h>
 #include <linux/usb.h>
 #include <asm/uaccess.h>
-
-#ifdef CONFIG_USB_SERIAL_DEBUG
-	static int debug = 1;
-#else
-	static int debug;
-#endif
-
 #include "usb-serial.h"
 
-	
+static int debug;
+
 #ifdef CONFIG_USB_SERIAL_GENERIC
 static __u16 vendor  = 0x05f9;
 static __u16 product = 0xffff;
@@ -169,6 +163,7 @@ int usb_serial_generic_write (struct usb_serial_port *port, int from_user, const
 {
 	struct usb_serial *serial = port->serial;
 	int result;
+	unsigned char *data;
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
@@ -193,8 +188,8 @@ int usb_serial_generic_write (struct usb_serial_port *port, int from_user, const
 		else {
 			memcpy (port->write_urb->transfer_buffer, buf, count);
 		}
-
-		usb_serial_debug_data (__FILE__, __FUNCTION__, count, port->write_urb->transfer_buffer);
+		data = port->write_urb->transfer_buffer;
+		usb_serial_debug_data(debug, &port->dev, __FUNCTION__, count, data);
 
 		/* set up our urb */
 		usb_fill_bulk_urb (port->write_urb, serial->dev,
@@ -267,7 +262,7 @@ void usb_serial_generic_read_bulk_callback (struct urb *urb, struct pt_regs *reg
 		return;
 	}
 
-	usb_serial_debug_data (__FILE__, __FUNCTION__, urb->actual_length, data);
+	usb_serial_debug_data(debug, &port->dev, __FUNCTION__, urb->actual_length, data);
 
 	tty = port->tty;
 	if (tty && urb->actual_length) {

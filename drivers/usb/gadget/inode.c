@@ -253,6 +253,10 @@ static void put_ep (struct ep_data *data)
 #define CHIP			"goku_udc"
 #endif
 
+#ifdef	CONFIG_USB_GADGET_OMAP
+#define CHIP			"omap_udc"
+#endif
+
 #ifdef	CONFIG_USB_GADGET_SA1100
 #define CHIP			"sa1100"
 #endif
