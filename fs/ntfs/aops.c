@@ -2170,29 +2170,43 @@ struct address_space_operations ntfs_mst_aops = {
  * @page:	page containing the ntfs record to mark dirty
  * @ofs:	byte offset within @page at which the ntfs record begins
  *
- * If the ntfs record is the same size as the page cache page @page, set all
- * buffers in the page dirty.  Otherwise, set only the buffers in which the
- * ntfs record is located dirty.
+ * Set the buffers and the page in which the ntfs record is located dirty.
  *
- * Also, set the page containing the ntfs record dirty, which also marks the
- * vfs inode the ntfs record belongs to dirty (I_DIRTY_PAGES).
+ * The latter also marks the vfs inode the ntfs record belongs to dirty
+ * (I_DIRTY_PAGES only).
+ *
+ * If the page does not have buffers, we create them and set them uptodate.
+ * The page may not be locked which is why we need to handle the buffers under
+ * the mapping->private_lock.  Once the buffers are marked dirty we no longer
+ * need the lock since try_to_free_buffers() does not free dirty buffers.
  */
 void mark_ntfs_record_dirty(struct page *page, const unsigned int ofs) {
-	ntfs_inode *ni;
-	struct buffer_head *bh, *head;
+	struct address_space *mapping = page->mapping;
+	ntfs_inode *ni = NTFS_I(mapping->host);
+	struct buffer_head *bh, *head, *buffers_to_free = NULL;
 	unsigned int end, bh_size, bh_ofs;
 
-	BUG_ON(!page);
-	BUG_ON(!page_has_buffers(page));
-	ni = NTFS_I(page->mapping->host);
-	BUG_ON(!ni);
-	if (ni->itype.index.block_size == PAGE_CACHE_SIZE) {
-		__set_page_dirty_buffers(page);
-		return;
-	}
+	BUG_ON(!PageUptodate(page));
 	end = ofs + ni->itype.index.block_size;
-	bh_size = ni->vol->sb->s_blocksize;
-	spin_lock(&page->mapping->private_lock);
+	bh_size = 1 << VFS_I(ni)->i_blkbits;
+	spin_lock(&mapping->private_lock);
+	if (unlikely(!page_has_buffers(page))) {
+		spin_unlock(&mapping->private_lock);
+		bh = head = alloc_page_buffers(page, bh_size, 1);
+		spin_lock(&mapping->private_lock);
+		if (likely(!page_has_buffers(page))) {
+			struct buffer_head *tail;
+
+			do {
+				set_buffer_uptodate(bh);
+				tail = bh;
+				bh = bh->b_this_page;
+			} while (bh);
+			tail->b_this_page = head;
+			attach_page_buffers(page, head);
+		} else
+			buffers_to_free = bh;
+	}
 	bh = head = page_buffers(page);
 	do {
 		bh_ofs = bh_offset(bh);
@@ -2202,8 +2216,15 @@ void mark_ntfs_record_dirty(struct page *page, const unsigned int ofs) {
 			break;
 		set_buffer_dirty(bh);
 	} while ((bh = bh->b_this_page) != head);
-	spin_unlock(&page->mapping->private_lock);
+	spin_unlock(&mapping->private_lock);
 	__set_page_dirty_nobuffers(page);
+	if (unlikely(buffers_to_free)) {
+		do {
+			bh = buffers_to_free->b_this_page;
+			free_buffer_head(buffers_to_free);
+			buffers_to_free = bh;
+		} while (buffers_to_free);
+	}
 }
 
 #endif /* NTFS_RW */

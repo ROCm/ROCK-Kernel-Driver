@@ -61,6 +61,11 @@ ToDo/Notes:
 	  attribute was found.  (Thanks to Domen Puncer for the bug report.)
 	- Add MODULE_VERSION() to fs/ntfs/super.c.
 	- Make several functions and variables static.  (Adrian Bunk)
+	- Modify fs/ntfs/aops.c::mark_ntfs_record_dirty() so it allocates
+	  buffers for the page if they are not present and then marks the
+	  buffers belonging to the ntfs record dirty.  This causes the buffers
+	  to become busy and hence they are safe from removal until the page
+	  has been written out.
 
 2.1.21 - Fix some races and bugs, rewrite mft write code, add mft allocator.
 
