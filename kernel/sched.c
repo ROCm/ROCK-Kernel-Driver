@@ -1638,6 +1638,8 @@ typedef struct {
  *
  * NOTE: the caller must have a valid reference to the task, the
  * task must not exit() & deallocate itself prematurely.
+ *
+ * NOTE2: this function is not atomic.
  */
 void set_cpus_allowed(task_t *p, unsigned long new_mask)
 {
