@@ -2425,7 +2425,7 @@ static int dev_boot_phase = 1;
  *	will not get the same name.
  */
 
-int net_dev_init(void);
+static int net_dev_init(void);
 
 int register_netdevice(struct net_device *dev)
 {
@@ -2691,7 +2691,7 @@ extern void dv_init(void);
  *       Callers must hold the rtnl semaphore.  See the comment at the
  *       end of Space.c for details about the locking.
  */
-int __init net_dev_init(void)
+static int __init net_dev_init(void)
 {
 	struct net_device *dev, **dp;
 	int i;
@@ -2831,6 +2831,8 @@ int __init net_dev_init(void)
 
 	return 0;
 }
+
+__initcall(net_dev_init);
 
 #ifdef CONFIG_HOTPLUG
 
