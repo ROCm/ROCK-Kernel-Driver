@@ -223,6 +223,7 @@ void clip_push(struct atm_vcc *vcc,struct sk_buff *skb)
 	clip_vcc->last_use = jiffies;
 	PRIV(skb->dev)->stats.rx_packets++;
 	PRIV(skb->dev)->stats.rx_bytes += skb->len;
+	memset(ATM_SKB(skb), 0, sizeof(struct atm_skb_data));
 	netif_rx(skb);
 }
 

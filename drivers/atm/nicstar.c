@@ -882,9 +882,14 @@ static int __init ns_init_card(int i, struct pci_dev *pcidev)
       return error;
    }
       
-   if (ns_parse_mac(mac[i], card->atmdev->esi))
+   if (ns_parse_mac(mac[i], card->atmdev->esi)) {
       nicstar_read_eprom(card->membase, NICSTAR_EPROM_MAC_ADDR_OFFSET,
                          card->atmdev->esi, 6);
+      if (memcmp(card->atmdev->esi, "\x00\x00\x00\x00\x00\x00", 6) == 0) {
+         nicstar_read_eprom(card->membase, NICSTAR_EPROM_MAC_ADDR_OFFSET_ALT,
+                         card->atmdev->esi, 6);
+      }
+   }
 
    printk("nicstar%d: MAC address %02X:%02X:%02X:%02X:%02X:%02X\n", i,
           card->atmdev->esi[0], card->atmdev->esi[1], card->atmdev->esi[2],

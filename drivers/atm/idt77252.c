@@ -2023,7 +2023,7 @@ idt77252_send_oam(struct atm_vcc *vcc, void *cell, int flags)
 		atomic_inc(&vcc->stats->tx_err);
 		return -ENOMEM;
 	}
-	atomic_add(skb->truesize + ATM_PDU_OVHD, &vcc->sk->wmem_alloc);
+	atomic_add(skb->truesize, &vcc->sk->wmem_alloc);
 	ATM_SKB(skb)->iovcnt = 0;
 
 	memcpy(skb_put(skb, 52), cell, 52);

@@ -715,6 +715,7 @@ lec_push(struct atm_vcc *vcc, struct sk_buff *skb)
                 skb->protocol = eth_type_trans(skb, dev);
                 priv->stats.rx_packets++;
                 priv->stats.rx_bytes += skb->len;
+                memset(ATM_SKB(skb), 0, sizeof(struct atm_skb_data));
                 netif_rx(skb);
         }
 }

@@ -30,9 +30,6 @@
 #define ATM_DS3_PCR	(8000*12)
 			/* DS3: 12 cells in a 125 usec time slot */
 
-#define ATM_PDU_OVHD	0	/* number of bytes to charge against buffer
-				   quota per PDU */
-
 #define atm_sk(__sk) ((struct atm_vcc *)(__sk)->protinfo)
 #define ATM_SD(s)	(atm_sk((s)->sk))
 
@@ -289,10 +286,6 @@ struct atm_vcc {
 	struct atm_sap	sap;		/* SAP */
 	void (*push)(struct atm_vcc *vcc,struct sk_buff *skb);
 	void (*pop)(struct atm_vcc *vcc,struct sk_buff *skb); /* optional */
-	struct sk_buff *(*alloc_tx)(struct atm_vcc *vcc,unsigned int size);
-					/* TX allocation routine - can be */
-					/* modified by protocol or by driver.*/
-					/* NOTE: this interface will change */
 	int (*push_oam)(struct atm_vcc *vcc,void *cell);
 	int (*send)(struct atm_vcc *vcc,struct sk_buff *skb);
 	void		*dev_data;	/* per-device data */
@@ -378,8 +371,6 @@ struct atmdev_ops { /* only send is required */
 	void (*feedback)(struct atm_vcc *vcc,struct sk_buff *skb,
 	    unsigned long start,unsigned long dest,int len);
 	int (*change_qos)(struct atm_vcc *vcc,struct atm_qos *qos,int flags);
-	void (*free_rx_skb)(struct atm_vcc *vcc, struct sk_buff *skb);
-		/* @@@ temporary hack */
 	int (*proc_read)(struct atm_dev *dev,loff_t *pos,char *page);
 	struct module *owner;
 };
@@ -421,19 +412,19 @@ static __inline__ int atm_guess_pdu2truesize(int pdu_size)
 
 static __inline__ void atm_force_charge(struct atm_vcc *vcc,int truesize)
 {
-	atomic_add(truesize+ATM_PDU_OVHD,&vcc->sk->rmem_alloc);
+	atomic_add(truesize, &vcc->sk->rmem_alloc);
 }
 
 
 static __inline__ void atm_return(struct atm_vcc *vcc,int truesize)
 {
-	atomic_sub(truesize+ATM_PDU_OVHD,&vcc->sk->rmem_alloc);
+	atomic_sub(truesize, &vcc->sk->rmem_alloc);
 }
 
 
 static __inline__ int atm_may_send(struct atm_vcc *vcc,unsigned int size)
 {
-	return size+atomic_read(&vcc->sk->wmem_alloc)+ATM_PDU_OVHD < vcc->sk->sndbuf;
+	return (size + atomic_read(&vcc->sk->wmem_alloc)) < vcc->sk->sndbuf;
 }
 
 

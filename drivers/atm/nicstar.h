@@ -96,6 +96,7 @@
 /* ESI stuff ******************************************************************/
 
 #define NICSTAR_EPROM_MAC_ADDR_OFFSET 0x6C
+#define NICSTAR_EPROM_MAC_ADDR_OFFSET_ALT 0xF6
 
 
 /* #defines *******************************************************************/

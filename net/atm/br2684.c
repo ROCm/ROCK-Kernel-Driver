@@ -481,6 +481,7 @@ static void br2684_push(struct atm_vcc *atmvcc, struct sk_buff *skb)
 	}
 	brdev->stats.rx_packets++;
 	brdev->stats.rx_bytes += skb->len;
+	memset(ATM_SKB(skb), 0, sizeof(struct atm_skb_data));
 	netif_rx(skb);
 }
 

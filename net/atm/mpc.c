@@ -732,6 +732,7 @@ static void mpc_push(struct atm_vcc *vcc, struct sk_buff *skb)
 	eg->packets_rcvd++;
 	mpc->eg_ops->put(eg);
 
+	memset(ATM_SKB(skb), 0, sizeof(struct atm_skb_data));
 	netif_rx(new_skb);
 
 	return;
@@ -863,7 +864,7 @@ static int msg_from_mpoad(struct atm_vcc *vcc, struct sk_buff *skb)
 	
 	struct mpoa_client *mpc = find_mpc_by_vcc(vcc);
 	struct k_message *mesg = (struct k_message*)skb->data;
-	atomic_sub(skb->truesize+ATM_PDU_OVHD, &vcc->sk->wmem_alloc);
+	atomic_sub(skb->truesize, &vcc->sk->wmem_alloc);
 	
 	if (mpc == NULL) {
 		printk("mpoa: msg_from_mpoad: no mpc found\n");
