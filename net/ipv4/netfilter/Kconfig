@@ -120,8 +120,8 @@ config IP_NF_MATCH_PKTTYPE
 	tristate "Packet type match support"
 	depends on IP_NF_IPTABLES
 	help
-	  This patch allows you to match packet in accrodance
-	  to its "class", eg. BROADCAST, MULTICAST, ...
+         Packet type matching allows you to match a packet by
+         its "class", eg. BROADCAST, MULTICAST, ...
 
 	  Typical usage:
 	  iptables -A INPUT -m pkttype --pkt-type broadcast -j LOG
