@@ -341,36 +341,32 @@ struct tc_action *tcf_action_init(struct rtattr *rta, struct rtattr *est,
                                   char *name, int ovr, int bind, int *err)
 {
 	struct rtattr *tb[TCA_ACT_MAX_PRIO+1];
-	struct tc_action *a = NULL, *act, *act_prev = NULL;
+	struct tc_action *head = NULL, *act, *act_prev = NULL;
 	int i;
 
 	if (rtattr_parse(tb, TCA_ACT_MAX_PRIO, RTA_DATA(rta),
 	                 RTA_PAYLOAD(rta)) < 0) {
 		*err = -EINVAL;
-		return a;
+		return head;
 	}
 
-	for (i=0; i < TCA_ACT_MAX_PRIO; i++) {
-		if (tb[i]) {
-			act = tcf_action_init_1(tb[i], est, name, ovr, bind,
-			                        err);
-			if (act == NULL)
-				goto bad_ret;
+	for (i=0; i < TCA_ACT_MAX_PRIO && tb[i]; i++) {
+		act = tcf_action_init_1(tb[i], est, name, ovr, bind, err);
+		if (act == NULL)
+			goto err;
+		act->order = i+1;
 
-			act->order = i+1;
-			if (a == NULL)
-				a = act;
-			else
-				act_prev->next = act;
-			act_prev = act;
-		}
-
+		if (head == NULL)
+			head = act;
+		else
+			act_prev->next = act;
+		act_prev = act;
 	}
-	return a;
+	return head;
 
-bad_ret:
-	if (a != NULL)
-		tcf_action_destroy(a, bind);
+err:
+	if (head != NULL)
+		tcf_action_destroy(head, bind);
 	return NULL;
 }
 
@@ -600,71 +596,59 @@ static int
 tca_action_gd(struct rtattr *rta, struct nlmsghdr *n, u32 pid, int event)
 {
 	int i, ret = 0;
-	struct tc_action *act;
 	struct rtattr *tb[TCA_ACT_MAX_PRIO+1];
-	struct tc_action *a = NULL, *a_s = NULL;
-
-	if (event != RTM_GETACTION && event != RTM_DELACTION)
-		ret = -EINVAL;
+	struct tc_action *head = NULL, *act, *act_prev = NULL;
 
 	if (rtattr_parse(tb, TCA_ACT_MAX_PRIO, RTA_DATA(rta),
-	                 RTA_PAYLOAD(rta)) < 0) {
-		ret = -EINVAL;
-		goto nlmsg_failure;
-	}
+	                 RTA_PAYLOAD(rta)) < 0)
+		return -EINVAL;
 
 	if (event == RTM_DELACTION && n->nlmsg_flags&NLM_F_ROOT) {
 		if (tb[0] != NULL && tb[1] == NULL)
 			return tca_action_flush(tb[0], n, pid);
 	}
 
-	for (i=0; i < TCA_ACT_MAX_PRIO; i++) {
-		if (tb[i] == NULL)
-			break;
+	for (i=0; i < TCA_ACT_MAX_PRIO && tb[i]; i++) {
 		act = tcf_action_get_1(tb[i], n, pid, &ret);
 		if (act == NULL)
-			goto rtattr_failure;
+			goto err;
 		act->order = i+1;
 
-		if (a != NULL) {
-			a->next = act;
-			a = act;
-		} else
-			a = act;
-
-		if (a_s == NULL)
-			a_s = a;
+		if (head == NULL)
+			head = act;
+		else
+			act_prev->next = act;
+		act_prev = act;
 	}
 
 	if (event == RTM_GETACTION)
-		ret = act_get_notify(pid, n, a_s, event);
+		ret = act_get_notify(pid, n, head, event);
 	else { /* delete */
 		struct sk_buff *skb;
 
 		skb = alloc_skb(NLMSG_GOODSIZE, GFP_KERNEL);
 		if (!skb) {
 			ret = -ENOBUFS;
-			goto nlmsg_failure;
+			goto err;
 		}
 
-		if (tca_get_fill(skb, a_s, pid, n->nlmsg_seq, 0, event,
+		if (tca_get_fill(skb, head, pid, n->nlmsg_seq, 0, event,
 		                 0, 1) <= 0) {
 			kfree_skb(skb);
 			ret = -EINVAL;
-			goto nlmsg_failure;
+			goto err;
 		}
 
 		/* now do the delete */
-		tcf_action_destroy(a_s, 0);
+		tcf_action_destroy(head, 0);
 		ret = rtnetlink_send(skb, pid, RTMGRP_TC,
 		                     n->nlmsg_flags&NLM_F_ECHO);
 		if (ret > 0)
 			return 0;
 		return ret;
 	}
-rtattr_failure:
-nlmsg_failure:
-	cleanup_a(a_s);
+err:
+	cleanup_a(head);
 	return ret;
 }
 
