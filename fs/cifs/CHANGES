@@ -1,3 +1,10 @@
+Version 1.08
+------------
+Allow file_mode and dir_mode (specified at mount time) to be enforced
+locally (the server already enforced its own ACLs too) for servers
+that do not report the correct mode (do not support the 
+CIFS Unix Extensions).
+
 Version 1.07
 ------------
 Fix some small memory leaks in some unmount error paths. Fix major leak

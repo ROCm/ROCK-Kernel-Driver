@@ -1009,7 +1009,9 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 			return -EINVAL;
 		}
 
-		cFYI(1, ("UNC: %s ip: %s  ", volume_info.UNC, volume_info.UNCip));
+		cFYI(1, ("UNC: %s ip: %s", volume_info.UNC, volume_info.UNCip));
+		/* success */
+		rc = 0;
 	} else if (volume_info.UNCip){
 		/* BB using ip addr as server name connect to the DFS root below */
 		cERROR(1,("Connecting to DFS root not implemented yet"));
