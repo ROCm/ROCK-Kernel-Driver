@@ -14,11 +14,13 @@ build-targets := $(host-progs) empty.o
 
 modpost-objs  := modpost.o file2alias.o
 
+subdir-$(CONFIG_MODVERSIONS)	+= genksyms
+
 # Let clean descend into subdirs
-subdir-	:= lxdialog kconfig
+subdir-	+= lxdialog kconfig
 
 # fixdep is needed to compile other host programs
-$(addprefix $(obj)/,$(filter-out fixdep,$(build-targets))): $(obj)/fixdep
+$(addprefix $(obj)/,$(filter-out fixdep,$(build-targets)) $(subdir-y)): $(obj)/fixdep
 
 # dependencies on generated files need to be listed explicitly
 
