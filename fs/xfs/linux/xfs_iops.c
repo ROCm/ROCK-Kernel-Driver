@@ -428,6 +428,7 @@ linvfs_follow_link(
 	return error;
 }
 
+#ifdef CONFIG_XFS_POSIX_ACL
 STATIC int
 linvfs_permission(
 	struct inode	*inode,
@@ -441,6 +442,9 @@ linvfs_permission(
 	VOP_ACCESS(vp, mode, NULL, error);
 	return -error;
 }
+#else
+#define linvfs_permission NULL
+#endif
 
 STATIC int
 linvfs_getattr(
