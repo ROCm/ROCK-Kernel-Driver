@@ -292,10 +292,12 @@ static void sctp_v4_to_sk(union sctp_addr *addr, struct sock *sk)
 
 
 /* Initialize a sctp_addr from a dst_entry. */
-static void sctp_v4_dst_saddr(union sctp_addr *saddr, struct dst_entry *dst)
+static void sctp_v4_dst_saddr(union sctp_addr *saddr, struct dst_entry *dst,
+			      unsigned short port)
 {
 	struct rtable *rt = (struct rtable *)dst;
 	saddr->v4.sin_family = AF_INET;
+	saddr->v4.sin_port = port;
 	saddr->v4.sin_addr.s_addr = rt->rt_src;
 }
 

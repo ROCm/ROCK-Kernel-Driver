@@ -256,10 +256,12 @@ static void sctp_v6_to_sk(union sctp_addr *addr, struct sock *sk)
 }
 
 /* Initialize a sctp_addr from a dst_entry. */
-static void sctp_v6_dst_saddr(union sctp_addr *addr, struct dst_entry *dst)
+static void sctp_v6_dst_saddr(union sctp_addr *addr, struct dst_entry *dst,
+			      unsigned short port)
 {
 	struct rt6_info *rt = (struct rt6_info *)dst;
 	addr->sa.sa_family = AF_INET6;
+	addr->v6.sin6_port = port;
 	ipv6_addr_copy(&addr->v6.sin6_addr, &rt->rt6i_src.addr);
 }
 

@@ -242,7 +242,7 @@ void sctp_transport_route(struct sctp_transport *transport,
 		list_for_each(pos, &bp->address_list) {
 			laddr = list_entry(pos, struct sockaddr_storage_list,
 					   list);
-			af->dst_saddr(&dst_saddr, dst);
+			af->dst_saddr(&dst_saddr, dst, bp->port);
 	                if (opt->pf->cmp_addr(&dst_saddr, &laddr->a, opt))
 				goto out_unlock;
 		}
