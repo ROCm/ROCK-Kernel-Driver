@@ -18,9 +18,8 @@ ippp_vj_free(struct slcompress *slcomp);
 int
 ippp_vj_set_maxcid(isdn_net_dev *idev, int val);
 
-struct sk_buff *
-ippp_vj_decompress(struct slcompress *slcomp, struct sk_buff *skb_old, 
-		   u16 proto);
+void
+ippp_vj_decompress(isdn_net_dev *idev, struct sk_buff *skb_old, u16 proto);
 
 struct sk_buff *
 ippp_vj_compress(isdn_net_dev *idev, struct sk_buff *skb_old, u16 *proto);

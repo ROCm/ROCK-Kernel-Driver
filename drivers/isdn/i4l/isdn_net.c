@@ -52,10 +52,11 @@ static void
 isdn_iptyp_receive(isdn_net_local *lp, isdn_net_dev *idev, 
 		   struct sk_buff *skb)
 {
-	idev->huptimer = 0;
-	get_u16(skb->data, &skb->protocol);
+	u16 protocol;
+
+	get_u16(skb->data, &protocol);
 	skb_pull(skb, 2);
-	netif_rx(skb);
+	isdn_netif_rx(idev, skb, protocol);
 }
 
 static struct isdn_netif_ops iptyp_ops = {
@@ -84,10 +85,8 @@ static void
 isdn_uihdlc_receive(isdn_net_local *lp, isdn_net_dev *idev, 
 		    struct sk_buff *skb)
 {
-	idev->huptimer = 0;
 	skb_pull(skb, 2);
-	skb->protocol = htons(ETH_P_IP);
-	netif_rx(skb);
+	isdn_netif_rx(idev, skb, htons(ETH_P_IP));
 }
 
 static struct isdn_netif_ops uihdlc_ops = {
@@ -127,9 +126,7 @@ static void
 isdn_ether_receive(isdn_net_local *lp, isdn_net_dev *idev, 
 		   struct sk_buff *skb)
 {
-	idev->huptimer = 0;
-	skb->protocol = eth_type_trans(skb, skb->dev);
-	netif_rx(skb);
+	isdn_netif_rx(idev, skb, eth_type_trans(skb, &lp->dev));
 }
 
 static int

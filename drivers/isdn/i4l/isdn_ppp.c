@@ -960,27 +960,27 @@ static void
 isdn_ppp_push_higher(isdn_net_local *lp, isdn_net_dev *idev,
 		     struct sk_buff *skb, u16 proto)
 {
-	struct net_device *dev = &lp->dev;
  	struct ipppd *is = idev->ipppd;
 
 	if (is->debug & 0x10) {
 		printk(KERN_DEBUG "push, skb %d %04x\n", (int) skb->len, proto);
 		isdn_ppp_frame_log("rpush", skb->data, skb->len, 32,is->unit, -1);
 	}
+	/* all packets need to passed through the compressor */
 	skb = ippp_ccp_decompress(lp->ccp, skb, &proto);
-	if (!skb) // decompression error
-		goto out;
+	if (!skb) /* decompression error */
+		goto error;
 
 	switch (proto) {
 		case PPP_IPX:  /* untested */
 			if (is->debug & 0x20)
 				printk(KERN_DEBUG "isdn_ppp: IPX\n");
-			skb->protocol = htons(ETH_P_IPX);
+			isdn_netif_rx(idev, skb, htons(ETH_P_IPX));
 			break;
 		case PPP_IP:
 			if (is->debug & 0x20)
 				printk(KERN_DEBUG "isdn_ppp: IP\n");
-			skb->protocol = htons(ETH_P_IP);
+			isdn_netif_rx(idev, skb, htons(ETH_P_IP));
 			break;
 		case PPP_COMP:
 		case PPP_COMPFRAG:
@@ -988,11 +988,7 @@ isdn_ppp_push_higher(isdn_net_local *lp, isdn_net_dev *idev,
 			goto drop;
 		case PPP_VJC_UNCOMP:
 		case PPP_VJC_COMP:
-			skb = ippp_vj_decompress(lp->slcomp, skb, proto);
-			if (!skb) {
-				lp->stats.rx_dropped++;
-				goto out;
-			}
+			ippp_vj_decompress(idev, skb, proto);
 			break;
 		case PPP_CCPFRAG:
 			ippp_ccp_receive_ccp(idev->ccp, skb);
@@ -1011,20 +1007,16 @@ isdn_ppp_push_higher(isdn_net_local *lp, isdn_net_dev *idev,
 			ipppd_queue_read(is, proto, skb->data, skb->len);
 			goto free;
 	}
-
- 	/* Reset hangup-timer */
- 	idev->huptimer = 0;
-
-	skb->dev = dev;
-	netif_rx(skb);
-	/* net_dev->local->stats.rx_packets++; done in isdn_net.c */
- out:
 	return;
 
  drop:
 	lp->stats.rx_dropped++;
  free:
 	kfree_skb(skb);
+	return;
+
+ error:
+	lp->stats.rx_dropped++;
 }
 
 /*

@@ -2297,6 +2297,20 @@ isdn_net_rcv_skb(int idx, struct sk_buff *skb)
 	return 1;
 }
 
+/*
+ * After handling connection-type specific stuff, the receiver function
+ * can use this function to pass the skb on to the network layer.
+ */
+void
+isdn_netif_rx(isdn_net_dev *idev, struct sk_buff *skb, u16 protocol)
+{
+	idev->huptimer = 0;
+
+	skb->protocol = protocol;
+	skb->dev = &idev->mlp->dev;
+	netif_rx(skb);
+}
+
 /* ====================================================================== */
 /* init / exit                                                            */
 /* ====================================================================== */

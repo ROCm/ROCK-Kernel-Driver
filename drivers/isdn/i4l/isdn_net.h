@@ -37,6 +37,7 @@ void isdn_net_writebuf_skb(isdn_net_dev *, struct sk_buff *skb);
 void isdn_net_write_super(isdn_net_dev *, struct sk_buff *skb);
 int  isdn_net_autodial(struct sk_buff *skb, struct net_device *ndev);
 isdn_net_dev *isdn_net_get_xmit_dev(isdn_net_local *mlp);
+void isdn_netif_rx(isdn_net_dev *idev, struct sk_buff *skb, u16 protocol);
 
 static inline int
 put_u8(unsigned char *p, u8 x)

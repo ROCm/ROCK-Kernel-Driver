@@ -36,10 +36,10 @@ ippp_vj_set_maxcid(isdn_net_dev *idev, int val)
 	return 0;
 }
 
-struct sk_buff *
-ippp_vj_decompress(struct slcompress *slcomp, struct sk_buff *skb_old, 
-		   u16 proto)
+void
+ippp_vj_decompress(isdn_net_dev *idev, struct sk_buff *skb_old, u16 proto)
 {
+	struct slcompress *slcomp = idev->mlp->slcomp;
 	struct sk_buff *skb;
 	int len;
 
@@ -67,14 +67,14 @@ ippp_vj_decompress(struct slcompress *slcomp, struct sk_buff *skb_old,
 		isdn_BUG();
 		goto drop;
 	}
-	skb->protocol = htons(ETH_P_IP);
-	return skb;
+	isdn_netif_rx(idev, skb, htons(ETH_P_IP));
+	return;
 
  drop_both:
 	kfree_skb(skb);
  drop:
 	kfree_skb(skb_old);
-	return NULL;
+	idev->mlp->stats.rx_dropped++;
 }
 
 struct sk_buff *
