@@ -51,7 +51,7 @@ static struct kmi_info integrator_mouse __initdata = {
 #endif
 
 static void __init
-integrator_fixup(struct machine_desc *desc, struct param_struct *unused,
+integrator_fixup(struct machine_desc *desc, struct tag *tags,
 		 char **cmdline, struct meminfo *mi)
 {
 #ifdef CONFIG_KMI_KEYB

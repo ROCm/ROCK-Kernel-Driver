@@ -64,43 +64,9 @@ static int adfs_checkdiscrecord(struct adfs_discrecord *dr)
 	if (dr->disc_size_high >> dr->log2secsize)
 		return 1;
 
-	/*
-	 * The following checks are not required for F+
-	 * stage 1.
-	 */
-#if 0
-	/* idlen must be smaller be no greater than 15 */
-	if (dr->idlen > 15)
-		return 1;
-
-	/* nzones must be less than 128 for the root
-	 * directory to be addressable
-	 */
-	if (dr->nzones >= 128 && dr->nzones_high == 0)
-		return 1;
-
-	/* root must be of the form 0x2.. */
-	if ((le32_to_cpu(dr->root) & 0xffffff00) != 0x00000200)
-		return 1;
-#else
-	/*
-	 * Stage 2 F+ does not require the following check
-	 */
-#if 0
-	/* idlen must be no greater than 16 v2 [1.0] */
-	if (dr->idlen > 16)
-		return 1;
-
-	/* we can't handle F+ discs yet */
-	if (dr->format_version || dr->root_size)
-		return 1;
-
-#else
 	/* idlen must be no greater than 19 v2 [1.0] */
 	if (dr->idlen > 19)
 		return 1;
-#endif
-#endif
 
 	/* reserved bytes should be zero */
 	for (i = 0; i < sizeof(dr->unused52); i++)

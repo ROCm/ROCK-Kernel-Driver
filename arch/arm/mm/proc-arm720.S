@@ -261,5 +261,5 @@ __arm720_proc_info:
 		.long	cpu_arm720_info				@ info
 		.long	arm720_processor_functions
 		.long	v4_tlb_fns
-		.long	v4_user_fns
+		.long	v4wt_user_fns
 		.size	__arm720_proc_info, . - __arm720_proc_info

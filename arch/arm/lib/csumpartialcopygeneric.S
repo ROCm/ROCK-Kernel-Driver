@@ -137,19 +137,19 @@ FN_ENTRY
 
 4:		ands	len, len, #3
 		beq	.done
-		load1l	r5
+		load1l	r4
 		tst	len, #2
-		mov	r4, r5, lsr #byte(0)
+		mov	r5, r4, lsr #byte(0)
 		beq	.exit
-		adcs	sum, sum, r5, push #16
-		strb	r4, [dst], #1
-		mov	r4, r5, lsr #byte(1)
-		strb	r4, [dst], #1
-		mov	r4, r5, lsr #byte(2)
+		adcs	sum, sum, r4, push #16
+		strb	r5, [dst], #1
+		mov	r5, r4, lsr #byte(1)
+		strb	r5, [dst], #1
+		mov	r5, r4, lsr #byte(2)
 .exit:		tst	len, #1
-		strneb	r4, [dst], #1
-		andne	r4, r4, #255
-		adcnes	sum, sum, r4, lsl #byte(0)
+		strneb	r5, [dst], #1
+		andne	r5, r5, #255
+		adcnes	sum, sum, r5, lsl #byte(0)
 
 		/*
 		 * If the dst pointer was not 16-bit aligned, we
@@ -210,17 +210,17 @@ FN_ENTRY
 		orr	r4, r4, r5, push #24
 		str	r4, [dst], #4
 		adcs	sum, sum, r4
+		mov	r4, r5, pull #8
 4:		ands	len, len, #3
 		beq	.done
-		mov	r4, r5, lsr #byte(1)
+		mov	r5, r4, lsr #byte(0)
 		tst	len, #2
 		beq	.exit
-		bic	r5, r5, #0xff << byte(0)
-		adcs	sum, sum, r5, push #8
-		strb	r4, [dst], #1
-		mov	r4, r5, lsr #byte(2)
-		strb	r4, [dst], #1
-		mov	r4, r5, lsr #byte(3)
+		adcs	sum, sum, r4, push #16
+		strb	r5, [dst], #1
+		mov	r5, r4, lsr #byte(1)
+		strb	r5, [dst], #1
+		mov	r5, r4, lsr #byte(2)
 		b	.exit
 
 .src2_aligned:	mov	r4, r5, pull #16
@@ -262,18 +262,19 @@ FN_ENTRY
 		orr	r4, r4, r5, push #16
 		str	r4, [dst], #4
 		adcs	sum, sum, r4
+		mov	r4, r5, pull #16
 4:		ands	len, len, #3
 		beq	.done
-		mov	r4, r5, lsr #byte(2)
+		mov	r5, r4, lsr #byte(0)
 		tst	len, #2
 		beq	.exit
-		adcs	sum, sum, r5, pull #16
-		strb	r4, [dst], #1
-		mov	r4, r5, lsr #byte(3)
-		strb	r4, [dst], #1
+		adcs	sum, sum, r4
+		strb	r5, [dst], #1
+		mov	r5, r4, lsr #byte(1)
+		strb	r5, [dst], #1
 		tst	len, #1
 		beq	.done
-		load1b	r4
+		load1b	r5
 		b	.exit
 
 .src3_aligned:	mov	r4, r5, pull #24
@@ -315,16 +316,17 @@ FN_ENTRY
 		orr	r4, r4, r5, push #8
 		str	r4, [dst], #4
 		adcs	sum, sum, r4
+		mov	r4, r5, pull #24
 4:		ands	len, len, #3
 		beq	.done
-		mov	r4, r5, lsr #byte(3)
+		mov	r5, r4, lsr #byte(0)
 		tst	len, #2
 		beq	.exit
-		adcs	sum, sum, r5, pull #24
-		strb	r4, [dst], #1
-		load1l	r5
-		mov	r4, r5, lsr #byte(0)
-		strb	r4, [dst], #1
+		strb	r5, [dst], #1
+		adcs	sum, sum, r4
+		load1l	r4
+		mov	r5, r4, lsr #byte(0)
+		strb	r5, [dst], #1
 		adcs	sum, sum, r4, push #24
-		mov	r4, r5, lsr #byte(1)
+		mov	r5, r4, lsr #byte(1)
 		b	.exit

@@ -102,8 +102,8 @@ data:		.word	initrd_start
 		.word	kernel_len
 
 		.word	0x54410001		@ r4 = ATAG_CORE
-		.word	0x54410005		@ r5 = ATAG_INITRD
-		.word	initrd_virt		@ r6
+		.word	0x54420005		@ r5 = ATAG_INITRD
+		.word	initrd_addr		@ r6
 		.word	initrd_len		@ r7
 		.word	params			@ r8
 

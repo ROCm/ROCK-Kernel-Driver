@@ -41,7 +41,7 @@ void clear_cs3_bit(int value)
 }
 
 static void __init
-fixup_simpad(struct machine_desc *desc, struct param_struct *params,
+fixup_simpad(struct machine_desc *desc, struct tag *tags,
 		   char **cmdline, struct meminfo *mi)
 {
 #ifdef CONFIG_SA1100_SIMPAD_DRAM_64MB /* DRAM */

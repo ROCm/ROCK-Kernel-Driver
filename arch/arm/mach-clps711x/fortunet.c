@@ -53,7 +53,7 @@ typedef struct tag_IMAGE_PARAMS
 #define IMAGE_PARAMS_PHYS	0xC01F0000
 
 static void __init
-fortunet_fixup(struct machine_desc *desc, struct param_struct *params,
+fortunet_fixup(struct machine_desc *desc, struct tag *tags,
 		 char **cmdline, struct meminfo *mi)
 {
 	IMAGE_PARAMS *ip;
