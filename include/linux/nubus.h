@@ -12,6 +12,10 @@
 #ifndef LINUX_NUBUS_H
 #define LINUX_NUBUS_H
 
+#ifdef __KERNEL__
+#include <asm/nubus.h>
+#endif
+
 enum nubus_category {
 	NUBUS_CAT_BOARD          = 0x0001,
 	NUBUS_CAT_DISPLAY        = 0x0003,
@@ -262,7 +266,6 @@ extern struct nubus_dev* nubus_devices;
 extern struct nubus_board* nubus_boards;
 
 /* Generic NuBus interface functions, modelled after the PCI interface */
-extern void nubus_init(void);
 void nubus_scan_bus(void);
 extern void nubus_proc_init(void);
 int get_nubus_list(char *buf);

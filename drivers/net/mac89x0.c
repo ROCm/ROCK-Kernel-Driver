@@ -144,28 +144,28 @@ static int set_mac_address(struct net_device *dev, void *addr);
 static int inline
 readreg_io(struct net_device *dev, int portno)
 {
-	writew(swab16(portno), dev->base_addr + ADD_PORT);
-	return swab16(readw(dev->base_addr + DATA_PORT));
+	nubus_writew(swab16(portno), dev->base_addr + ADD_PORT);
+	return swab16(nubus_readw(dev->base_addr + DATA_PORT));
 }
 
 static void inline
 writereg_io(struct net_device *dev, int portno, int value)
 {
-	writew(swab16(portno), dev->base_addr + ADD_PORT);
-	writew(swab16(value), dev->base_addr + DATA_PORT);
+	nubus_writew(swab16(portno), dev->base_addr + ADD_PORT);
+	nubus_writew(swab16(value), dev->base_addr + DATA_PORT);
 }
 
 /* These are for reading/writing registers in shared memory */
 static int inline
 readreg(struct net_device *dev, int portno)
 {
-	return swab16(readw(dev->mem_start + portno));
+	return swab16(nubus_readw(dev->mem_start + portno));
 }
 
 static void inline
 writereg(struct net_device *dev, int portno, int value)
 {
-	writew(swab16(value), dev->mem_start + portno);
+	nubus_writew(swab16(value), dev->mem_start + portno);
 }
 
 /* Probe for the CS8900 card in slot E.  We won't bother looking
@@ -210,8 +210,8 @@ int __init mac89x0_probe(struct net_device *dev)
 			return -ENODEV;
 	}
 
-	writew(0, ioaddr + ADD_PORT);
-	sig = readw(ioaddr + DATA_PORT);
+	nubus_writew(0, ioaddr + ADD_PORT);
+	sig = nubus_readw(ioaddr + DATA_PORT);
 	if (sig != swab16(CHIP_EISA_ID_SIG))
 		return -ENODEV;
 
@@ -450,7 +450,7 @@ static void net_interrupt(int irq, void *dev_id, struct pt_regs * regs)
            course, if you're on a slow machine, and packets are arriving
            faster than you can read them off, you're screwed.  Hasta la
            vista, baby!  */
-	while ((status = swab16(readw(dev->base_addr + ISQ_PORT)))) {
+	while ((status = swab16(nubus_readw(dev->base_addr + ISQ_PORT)))) {
 		if (net_debug > 4)printk("%s: event=%04x\n", dev->name, status);
 		switch(status & ISQ_EVENT_MASK) {
 		case ISQ_RECEIVER_EVENT:
@@ -653,7 +653,7 @@ cleanup_module(void)
 
 #endif
 #ifdef MODULE
-	writew(0, dev_cs89x0.base_addr + ADD_PORT);
+	nubus_writew(0, dev_cs89x0.base_addr + ADD_PORT);
 #endif
 #ifdef MODULE
 
