@@ -56,7 +56,7 @@ struct hw_interrupt_type xics_8259_pic = {
 };
 
 /* This is used to map real irq numbers to virtual */
-static struct radix_tree_root irq_map = RADIX_TREE_INIT(GFP_KERNEL);
+static struct radix_tree_root irq_map = RADIX_TREE_INIT(GFP_ATOMIC);
 
 #define XICS_IPI		2
 #define XICS_IRQ_SPURIOUS	0
