@@ -472,7 +472,7 @@ config SANDPOINT
 	bool "Motorola-Sandpoint"
 	help
 	  Select SANDPOINT if configuring for a Motorola Sandpoint X3
-	  or X3(b).
+	  (any flavor).
 
 config ADIR
 	bool "SBS-Adirondack"
