@@ -191,6 +191,19 @@ config USB_MTOUCH
 	  To compile this driver as a module, choose M here: the
 	  module will be called mtouchusb.
 
+config USB_EGALAX
+	tristate "eGalax TouchKit USB Touchscreen Driver"
+	depends on USB && INPUT
+	---help---
+	  Say Y here if you want to use a eGalax TouchKit USB
+	  Touchscreen controller.
+
+	  The driver has been tested on a Xenarc 700TSV monitor
+	  with eGalax touchscreen.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called touchkitusb.
+
 config USB_XPAD
 	tristate "X-Box gamepad support"
 	depends on USB && INPUT
