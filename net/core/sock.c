@@ -768,8 +768,13 @@ struct sk_buff *sock_alloc_send_pskb(struct sock *sk, unsigned long header_len,
 				     unsigned long data_len, int noblock, int *errcode)
 {
 	struct sk_buff *skb;
+	unsigned int gfp_mask;
 	long timeo;
 	int err;
+
+	gfp_mask = sk->allocation;
+	if (gfp_mask & __GFP_WAIT)
+		gfp_mask |= __GFP_REPEAT;
 
 	timeo = sock_sndtimeo(sk, noblock);
 	while (1) {
