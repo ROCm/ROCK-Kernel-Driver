@@ -19,7 +19,7 @@
 int  ippp_mp_bind(isdn_net_dev *idev);
 void ippp_mp_disconnected(isdn_net_dev *idev);
 int  ippp_mp_bundle(isdn_net_dev *idev, int val);
-void ippp_mp_xmit(isdn_net_dev *idev, struct sk_buff *skb, u16 proto);
+void ippp_mp_xmit(isdn_net_dev *idev, struct sk_buff *skb);
 void ippp_mp_receive(isdn_net_dev *idev, struct sk_buff *skb, u16 proto);
 
 #else
@@ -42,9 +42,9 @@ ippp_mp_bundle(isdn_net_dev *idev, int val)
 }
 
 static inline void
-ippp_mp_xmit(isdn_net_dev *idev, struct sk_buff *skb, u16 proto)
+ippp_mp_xmit(isdn_net_dev *idev, struct sk_buff *skb)
 {
-	ippp_xmit(idev, skb, proto);
+	ippp_xmit(idev, skb);
 }
 
 static inline void 
