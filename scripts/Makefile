@@ -15,4 +15,4 @@ build-targets := $(host-progs)
 subdir-	:= lxdialog kconfig
 
 # fixdep is needed to compile other host programs
-$(obj)/split-include $(obj)/docproc $(obj)/conmakehash: $(obj)/fixdep
+$(addprefix $(obj)/,$(filter-out fixdep,$(host-progs))): $(obj)/fixdep
