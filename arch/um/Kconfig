@@ -145,6 +145,25 @@ config MCONSOLE
 
         It is safe to say 'Y' here.
 
+config MAGIC_SYSRQ
+	bool "Magic SysRq key"
+	depends on MCONSOLE
+	---help---
+	If you say Y here, you will have some control over the system even
+	if the system crashes for example during kernel debugging (e.g., you
+	will be able to flush the buffer cache to disk, reboot the system
+	immediately or dump some status information). A key for each of the
+	possible requests is provided.
+
+	This is the feature normally accomplished by pressing a key
+	while holding SysRq (Alt+PrintScreen).
+
+	On UML, this is accomplished by sending a "sysrq" command with
+	mconsole, followed by the letter for the requested command.
+
+	The keys are documented in <file:Documentation/sysrq.txt>. Don't say Y
+	unless you really know what this hack does.
+
 config HOST_2G_2G
 	bool "2G/2G host address space split"
 	default n

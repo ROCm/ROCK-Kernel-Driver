@@ -23,7 +23,6 @@ config MAGIC_SYSRQ
 config MAGIC_SYSRQ
 	bool "Magic SysRq key"
 	depends on DEBUG_KERNEL && (H8300 || M68KNOMMU || V850)
-	depends (USERMODE && MCONSOLE)
 	help
 	  Enables console device to interpret special characters as
 	  commands to dump state information.
