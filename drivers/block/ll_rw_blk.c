@@ -173,9 +173,11 @@ EXPORT_SYMBOL(blk_queue_prep_rq);
  * are dynamic, and thus we have to query the queue whether it is ok to
  * add a new bio_vec to a bio at a given offset or not. If the block device
  * has such limitations, it needs to register a merge_bvec_fn to control
- * the size of bio's sent to it. Per default now merge_bvec_fn is defined for
- * a queue, and only the fixed limits are honored.
- *
+ * the size of bio's sent to it. Note that a block device *must* allow a
+ * single page to be added to an empty bio. The block device driver may want
+ * to use the bio_split() function to deal with these bio's. By default
+ * no merge_bvec_fn is defined for a queue, and only the fixed limits are
+ * honored.
  */
 void blk_queue_merge_bvec(request_queue_t *q, merge_bvec_fn *mbfn)
 {
