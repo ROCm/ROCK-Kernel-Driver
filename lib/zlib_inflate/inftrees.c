@@ -22,7 +22,7 @@ struct internal_state;
 #define bits word.what.Bits
 
 
-local int huft_build (
+static int huft_build (
     uInt *,             /* code lengths in bits */
     uInt,               /* number of codes */
     uInt,               /* number of "simple" codes */
@@ -35,18 +35,18 @@ local int huft_build (
     uInt * );           /* space for values */
 
 /* Tables for deflate from PKZIP's appnote.txt. */
-local const uInt cplens[31] = { /* Copy lengths for literal codes 257..285 */
+static const uInt cplens[31] = { /* Copy lengths for literal codes 257..285 */
         3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31,
         35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258, 0, 0};
         /* see note #13 above about 258 */
-local const uInt cplext[31] = { /* Extra bits for literal codes 257..285 */
+static const uInt cplext[31] = { /* Extra bits for literal codes 257..285 */
         0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2,
         3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0, 112, 112}; /* 112==invalid */
-local const uInt cpdist[30] = { /* Copy offsets for distance codes 0..29 */
+static const uInt cpdist[30] = { /* Copy offsets for distance codes 0..29 */
         1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193,
         257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145,
         8193, 12289, 16385, 24577};
-local const uInt cpdext[30] = { /* Extra bits for distance codes */
+static const uInt cpdext[30] = { /* Extra bits for distance codes */
         0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6,
         7, 7, 8, 8, 9, 9, 10, 10, 11, 11,
         12, 12, 13, 13};
@@ -87,7 +87,7 @@ local const uInt cpdext[30] = { /* Extra bits for distance codes */
 /* If BMAX needs to be larger than 16, then h and x[] should be uLong. */
 #define BMAX 15         /* maximum bit length of any code */
 
-local int huft_build(
+static int huft_build(
 	uInt *b,               /* code lengths in bits (all assumed <= BMAX) */
 	uInt n,                /* number of codes (assumed <= 288) */
 	uInt s,                /* number of simple-valued codes (0..s-1) */
@@ -139,7 +139,7 @@ local int huft_build(
   } while (--i);
   if (c[0] == n)                /* null input--all zero length codes */
   {
-    *t = (inflate_huft *)Z_NULL;
+    *t = NULL;
     *m = 0;
     return Z_OK;
   }
@@ -193,8 +193,8 @@ local int huft_build(
   p = v;                        /* grab values in bit order */
   h = -1;                       /* no tables yet--level -1 */
   w = -l;                       /* bits decoded == (l * h) */
-  u[0] = (inflate_huft *)Z_NULL;        /* just to keep compilers happy */
-  q = (inflate_huft *)Z_NULL;   /* ditto */
+  u[0] = NULL;                  /* just to keep compilers happy */
+  q = NULL;                     /* ditto */
   z = 0;                        /* ditto */
 
   /* go through the bit lengths (k already is bits in shortest code) */
@@ -229,7 +229,7 @@ local int huft_build(
 
         /* allocate new table */
         if (*hn + z > MANY)     /* (note: doesn't matter for fixed) */
-          return Z_MEM_ERROR;   /* not enough memory */
+          return Z_DATA_ERROR;  /* overflow of MANY */
         u[h] = q = hp + *hn;
         *hn += z;
 
@@ -302,8 +302,7 @@ int zlib_inflate_trees_bits(
   uInt *v;              /* work area for huft_build */
   
   v = WS(z)->tree_work_area_1;
-  r = huft_build(c, 19, 19, (uInt*)Z_NULL, (uInt*)Z_NULL,
-                 tb, bb, hp, &hn, v);
+  r = huft_build(c, 19, 19, NULL, NULL, tb, bb, hp, &hn, v);
   if (r == Z_DATA_ERROR)
     z->msg = (char*)"oversubscribed dynamic bit lengths tree";
   else if (r == Z_BUF_ERROR || *bb == 0)

@@ -442,6 +442,7 @@ sys_call_table:
 	.quad sys_clock_gettime			/* 420 */
 	.quad sys_clock_getres
 	.quad sys_clock_nanosleep
+	.quad sys_semtimedop
 
 	.size sys_call_table, . - sys_call_table
 	.type sys_call_table, @object

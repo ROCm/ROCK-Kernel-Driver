@@ -477,8 +477,10 @@ EXPORT_SYMBOL(sysctl_tcp_tw_recycle);
 EXPORT_SYMBOL(sysctl_max_syn_backlog);
 #endif
 
-EXPORT_SYMBOL(ip_generic_getfrag);
+#endif
 
+#if defined (CONFIG_IPV6_MODULE) || defined (CONFIG_IP_SCTP_MODULE) || defined (CONFIG_IPV6_TUNNEL_MODULE)
+EXPORT_SYMBOL(ip_generic_getfrag);
 #endif
 
 EXPORT_SYMBOL(tcp_read_sock);

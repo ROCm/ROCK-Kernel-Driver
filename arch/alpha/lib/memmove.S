@@ -12,6 +12,15 @@
 	.text
 
 	.align 4
+	.globl bcopy
+	.ent bcopy
+bcopy:
+	mov $16,$0
+	mov $17,$16
+	mov $0,$17
+	.end bcopy
+
+	.align 4
 	.globl memmove
 	.ent memmove
 memmove:

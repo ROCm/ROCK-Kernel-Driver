@@ -154,6 +154,7 @@ use strict;
 # '%CONST' - name of a constant.
 
 my $errors = 0;
+my $warnings = 0;
 
 # match expressions used to find embedded type information
 my $type_constant = '\%([-_\w]+)';
@@ -1352,7 +1353,9 @@ sub create_parameterlist($$$) {
 		    "or member '$param' not " .
 		    "described in '$declaration_name'\n";
 	    }
-	    ++$errors;
+	    print STDERR "Warning(${file}:$.):".
+	                 " No description found for parameter '$param'\n";
+	    ++$warnings;
         }
 
 	push @parameterlist, $param;
@@ -1455,6 +1458,12 @@ if ($filelist) {
 foreach (@ARGV) {
     chomp;
     process_file($_);
+}
+if ($verbose && $errors) {
+  print STDERR "$errors errors\n";
+}
+if ($verbose && $warnings) {
+  print STDERR "$warnings warnings\n";
 }
 
 exit($errors);
@@ -1580,7 +1589,7 @@ sub process_file($) {
 	    } else {
 		print STDERR "Warning(${file}:$.): Cannot understand $_ on line $.",
 		" - I thought it was a doc line\n";
-		++$errors;
+		++$warnings;
 		$state = 0;
 	    }
 	} elsif ($state == 2) {	# look for head: lines, and include content
@@ -1633,7 +1642,7 @@ sub process_file($) {
 	    } else {
 		# i dont know - bad line?  ignore.
 		print STDERR "Warning(${file}:$.): bad line: $_"; 
-		++$errors;
+		++$warnings;
 	    }
 	} elsif ($state == 3) {	# scanning for function { (end of prototype)
 	    if ($decl_type eq 'function') {

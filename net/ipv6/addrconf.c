@@ -400,38 +400,6 @@ static struct inet6_dev * ipv6_find_idev(struct net_device *dev)
 	return idev;
 }
 
-void ipv6_addr_prefix(struct in6_addr *prefix,
-	struct in6_addr *addr, int prefix_len)
-{
-	unsigned long mask;
-	int ncopy, nbits;
-
-	memset(prefix, 0, sizeof(*prefix));
-
-	if (prefix_len <= 0)
-		return;
-	if (prefix_len > 128)
-		prefix_len = 128;
-
-	ncopy = prefix_len / 32;
-	switch (ncopy) {
-	case 4:	prefix->s6_addr32[3] = addr->s6_addr32[3];
-	case 3:	prefix->s6_addr32[2] = addr->s6_addr32[2];
-	case 2:	prefix->s6_addr32[1] = addr->s6_addr32[1];
-	case 1:	prefix->s6_addr32[0] = addr->s6_addr32[0];
-	case 0:	break;
-	}
-	nbits = prefix_len % 32;
-	if (nbits == 0)
-		return;
-
-	mask = ~((1 << (32 - nbits)) - 1);
-	mask = htonl(mask);
-
-	prefix->s6_addr32[ncopy] = addr->s6_addr32[ncopy] & mask;
-}
-
-
 static void dev_forward_change(struct inet6_dev *idev)
 {
 	struct net_device *dev;

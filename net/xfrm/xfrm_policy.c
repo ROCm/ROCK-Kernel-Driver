@@ -16,6 +16,9 @@
 #include <linux/config.h>
 #include <linux/slab.h>
 #include <linux/kmod.h>
+#include <linux/list.h>
+#include <linux/spinlock.h>
+#include <linux/workqueue.h>
 #include <net/xfrm.h>
 #include <net/ip.h>
 
@@ -29,6 +32,11 @@ static rwlock_t xfrm_policy_afinfo_lock = RW_LOCK_UNLOCKED;
 static struct xfrm_policy_afinfo *xfrm_policy_afinfo[NPROTO];
 
 kmem_cache_t *xfrm_dst_cache;
+
+static struct work_struct xfrm_policy_gc_work;
+static struct list_head xfrm_policy_gc_list =
+	LIST_HEAD_INIT(xfrm_policy_gc_list);
+static spinlock_t xfrm_policy_gc_lock = SPIN_LOCK_UNLOCKED;
 
 int xfrm_register_type(struct xfrm_type *type, unsigned short family)
 {
@@ -162,7 +170,6 @@ expired:
 	xp = xfrm_policy_byid(0, index, 1);
 	if (xp) {
 		xfrm_policy_kill(xp);
-		xfrm_pol_put(xp);
 	}
 }
 
@@ -204,19 +211,9 @@ void __xfrm_policy_destroy(struct xfrm_policy *policy)
 	kfree(policy);
 }
 
-/* Rule must be locked. Release descentant resources, announce
- * entry dead. The rule must be unlinked from lists to the moment.
- */
-
-void xfrm_policy_kill(struct xfrm_policy *policy)
+static void xfrm_policy_gc_kill(struct xfrm_policy *policy)
 {
 	struct dst_entry *dst;
-
-	write_lock_bh(&policy->lock);
-	if (policy->dead)
-		goto out;
-
-	policy->dead = 1;
 
 	while ((dst = policy->bundles) != NULL) {
 		policy->bundles = dst->next;
@@ -225,6 +222,45 @@ void xfrm_policy_kill(struct xfrm_policy *policy)
 
 	if (del_timer(&policy->timer))
 		atomic_dec(&policy->refcnt);
+
+	if (atomic_read(&policy->refcnt) > 1)
+		flow_cache_flush(policy);
+
+	xfrm_pol_put(policy);
+}
+
+static void xfrm_policy_gc_task(void *data)
+{
+	struct xfrm_policy *policy;
+	struct list_head *entry, *tmp;
+	struct list_head gc_list = LIST_HEAD_INIT(gc_list);
+
+	spin_lock_bh(&xfrm_policy_gc_lock);
+	list_splice_init(&xfrm_policy_gc_list, &gc_list);
+	spin_unlock_bh(&xfrm_policy_gc_lock);
+
+	list_for_each_safe(entry, tmp, &gc_list) {
+		policy = list_entry(entry, struct xfrm_policy, list);
+		xfrm_policy_gc_kill(policy);
+	}
+}
+
+/* Rule must be locked. Release descentant resources, announce
+ * entry dead. The rule must be unlinked from lists to the moment.
+ */
+
+void xfrm_policy_kill(struct xfrm_policy *policy)
+{
+	write_lock_bh(&policy->lock);
+	if (policy->dead)
+		goto out;
+
+	policy->dead = 1;
+
+	spin_lock(&xfrm_policy_gc_lock);
+	list_add(&policy->list, &xfrm_policy_gc_list);
+	spin_unlock(&xfrm_policy_gc_lock);
+	schedule_work(&xfrm_policy_gc_work);
 
 out:
 	write_unlock_bh(&policy->lock);
@@ -292,7 +328,6 @@ int xfrm_policy_insert(int dir, struct xfrm_policy *policy, int excl)
 
 	if (delpol) {
 		xfrm_policy_kill(delpol);
-		xfrm_pol_put(delpol);
 	}
 	return 0;
 }
@@ -354,7 +389,6 @@ void xfrm_policy_flush(void)
 			write_unlock_bh(&xfrm_policy_lock);
 
 			xfrm_policy_kill(xp);
-			xfrm_pol_put(xp);
 
 			write_lock_bh(&xfrm_policy_lock);
 		}
@@ -398,8 +432,8 @@ out:
 
 /* Find policy to apply to this flow. */
 
-void xfrm_policy_lookup(struct flowi *fl, u16 family, u8 dir,
-			void **objp, atomic_t **obj_refp)
+static void xfrm_policy_lookup(struct flowi *fl, u16 family, u8 dir,
+			       void **objp, atomic_t **obj_refp)
 {
 	struct xfrm_policy *pol;
 
@@ -478,7 +512,6 @@ int xfrm_sk_policy_insert(struct sock *sk, int dir, struct xfrm_policy *pol)
 
 	if (old_pol) {
 		xfrm_policy_kill(old_pol);
-		xfrm_pol_put(old_pol);
 	}
 	return 0;
 }
@@ -524,7 +557,6 @@ void __xfrm_sk_free_policy(struct xfrm_policy *pol, int dir)
 	write_unlock_bh(&xfrm_policy_lock);
 
 	xfrm_policy_kill(pol);
-	xfrm_pol_put(pol);
 }
 
 /* Resolve list of templates for the flow, given policy. */
@@ -1143,6 +1175,8 @@ void __init xfrm_policy_init(void)
 					   NULL, NULL);
 	if (!xfrm_dst_cache)
 		panic("XFRM: failed to allocate xfrm_dst_cache\n");
+
+	INIT_WORK(&xfrm_policy_gc_work, xfrm_policy_gc_task, NULL);
 }
 
 void __init xfrm_init(void)

@@ -93,7 +93,7 @@ void exec_kernel_doc(char **svec)
 			waitpid(pid, &ret ,0);
 	}
 	if (WIFEXITED(ret))
-		exitstatus = WEXITSTATUS(ret);
+		exitstatus |= WEXITSTATUS(ret);
 	else
 		exitstatus = 0xff;
 }
