@@ -2254,7 +2254,8 @@ static int uhci_start(struct usb_hcd *hcd)
 			irq = 7;
 
 		/* Only place we don't use the frame list routines */
-		uhci->fl->frame[i] = cpu_to_le32(uhci->skelqh[irq]->dma_handle);
+		uhci->fl->frame[i] = UHCI_PTR_QH |
+				cpu_to_le32(uhci->skelqh[irq]->dma_handle);
 	}
 
 	/*
