@@ -1226,17 +1226,15 @@ static int sched_best_cpu(struct task_struct *p, struct sched_domain *sd)
 void sched_balance_exec(void)
 {
 	struct sched_domain *sd, *best_sd = NULL;
-	int new_cpu;
-	int this_cpu = get_cpu();
+	int new_cpu, this_cpu = get_cpu();
 
 	/* Prefer the current CPU if there's only this task running */
 	if (this_rq()->nr_running <= 1)
 		goto out;
 
-	for_each_domain(this_cpu, sd) {
+	for_each_domain(this_cpu, sd)
 		if (sd->flags & SD_BALANCE_EXEC)
 			best_sd = sd;
-	}
 
 	if (best_sd) {
 		new_cpu = sched_best_cpu(current, best_sd);
@@ -1272,7 +1270,7 @@ static void double_lock_balance(runqueue_t *this_rq, runqueue_t *busiest)
  */
 static inline
 void pull_task(runqueue_t *src_rq, prio_array_t *src_array, task_t *p,
-		runqueue_t *this_rq, prio_array_t *this_array, int this_cpu)
+	       runqueue_t *this_rq, prio_array_t *this_array, int this_cpu)
 {
 	dequeue_task(p, src_array);
 	src_rq->nr_running--;
@@ -1294,7 +1292,7 @@ void pull_task(runqueue_t *src_rq, prio_array_t *src_array, task_t *p,
  */
 static inline
 int can_migrate_task(task_t *p, runqueue_t *rq, int this_cpu,
-		struct sched_domain *sd, enum idle_type idle)
+		     struct sched_domain *sd, enum idle_type idle)
 {
 	/*
 	 * We do not migrate tasks that are:
@@ -1325,8 +1323,8 @@ int can_migrate_task(task_t *p, runqueue_t *rq, int this_cpu,
  * Called with both runqueues locked.
  */
 static int move_tasks(runqueue_t *this_rq, int this_cpu, runqueue_t *busiest,
-			unsigned long max_nr_move, struct sched_domain *sd,
-			enum idle_type idle)
+		      unsigned long max_nr_move, struct sched_domain *sd,
+		      enum idle_type idle)
 {
 	prio_array_t *array, *dst_array;
 	struct list_head *head, *curr;
@@ -1401,7 +1399,7 @@ out:
  */
 static struct sched_group *
 find_busiest_group(struct sched_domain *sd, int this_cpu,
-		unsigned long *imbalance, enum idle_type idle)
+		   unsigned long *imbalance, enum idle_type idle)
 {
 	struct sched_group *busiest = NULL, *this = NULL, *group = sd->groups;
 	unsigned long max_load, avg_load, total_load, this_load, total_pwr;
@@ -1706,10 +1704,9 @@ static void active_load_balance(runqueue_t *busiest, int busiest_cpu)
 	if (busiest->nr_running <= 1)
 		return;
 
-	for_each_domain(busiest_cpu, sd) {
+	for_each_domain(busiest_cpu, sd)
 		if (cpu_isset(busiest->push_cpu, sd->span))
 			break;
-	}
 	if (!sd) {
 		WARN_ON(1);
 		return;
@@ -1724,13 +1721,13 @@ static void active_load_balance(runqueue_t *busiest, int busiest_cpu)
  	do {
 		cpumask_t tmp;
 		runqueue_t *rq;
- 		int push_cpu = 0;
+		int push_cpu = 0;
 
  		if (group == busy_group)
  			goto next_group;
 
 		cpus_and(tmp, group->cpumask, cpu_online_map);
-		if (cpus_weight(tmp) == 0)
+		if (!cpus_weight(tmp))
 			goto next_group;
 
  		for_each_cpu_mask(i, tmp) {
@@ -1761,7 +1758,7 @@ next_group:
 #define CPU_OFFSET(cpu) (HZ * cpu / NR_CPUS)
 
 static void rebalance_tick(int this_cpu, runqueue_t *this_rq,
-						enum idle_type idle)
+			   enum idle_type idle)
 {
 	unsigned long old_load, this_load;
 	unsigned long j = jiffies + CPU_OFFSET(this_cpu);
@@ -1783,7 +1780,7 @@ static void rebalance_tick(int this_cpu, runqueue_t *this_rq,
 
 		/* scale ms to jiffies */
 		interval = MSEC_TO_JIFFIES(interval);
-		if (unlikely(interval == 0))
+		if (unlikely(!interval))
 			interval = 1;
 
 		if (j - sd->last_balance >= interval) {
@@ -3640,12 +3637,12 @@ void sched_domain_debug(void)
 				printk(" ");
 			printk("groups:");
 			do {
-				if (group == NULL) {
+				if (!group) {
 					printk(" ERROR: NULL");
 					break;
 				}
 
-				if (cpus_weight(group->cpumask) == 0)
+				if (!cpus_weight(group->cpumask))
 					printk(" ERROR empty group:");
 
 				cpus_and(tmp, groupmask, group->cpumask);
