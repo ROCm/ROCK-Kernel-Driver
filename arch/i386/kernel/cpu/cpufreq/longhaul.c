@@ -456,8 +456,10 @@ static int __init longhaul_get_ranges (void)
 	}
 
 	longhaul_table[k].frequency = CPUFREQ_TABLE_END;
-	if (!k)
+	if (!k) {
+		kfree (longhaul_table);
 		return -EINVAL;
+	}
 	
 	return 0;
 }
