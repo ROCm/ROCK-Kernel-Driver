@@ -47,7 +47,7 @@
 #include <asm/errno.h>
 #include <asm/segment.h>
 #include <asm/smp.h>
-#include <asm/irq_vectors.h>
+#include "irq_vectors.h"
 
 EBX		= 0x00
 ECX		= 0x04
