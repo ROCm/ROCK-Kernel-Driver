@@ -223,7 +223,7 @@ RTN *FNAME ARGS										\
 	else read_unlock(&(DETAIL)->hash_lock);						\
 	if (new && set)									\
 		cache_fresh(DETAIL, &new->MEMBER, item->MEMBER.expiry_time);		\
-	if (new)				       					\
+	if (new || !set)			       					\
 		return new;								\
 	new = kmalloc(sizeof(*new), GFP_KERNEL);					\
 	if (new) {									\
