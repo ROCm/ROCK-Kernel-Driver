@@ -13,6 +13,7 @@
 #include <linux/timer.h>
 #include <linux/vmalloc.h>
 #include <asm/hardirq.h>
+#include <linux/bitops.h>
 
 #include <linux/firmware.h>
 #include "base.h"
@@ -21,6 +22,11 @@ MODULE_AUTHOR("Manuel Estrada Sainz <ranty@debian.org>");
 MODULE_DESCRIPTION("Multi purpose firmware loading support");
 MODULE_LICENSE("GPL");
 
+enum {
+	FW_STATUS_LOADING,
+	FW_STATUS_ABORT,
+};
+
 static int loading_timeout = 10;	/* In seconds */
 
 struct firmware_priv {
@@ -28,8 +34,7 @@ struct firmware_priv {
 	struct completion completion;
 	struct bin_attribute attr_data;
 	struct firmware *fw;
-	int loading;
-	int abort;
+	unsigned long status;
 	int alloc_size;
 	struct timer_list timeout;
 };
@@ -37,7 +42,7 @@ struct firmware_priv {
 static inline void
 fw_load_abort(struct firmware_priv *fw_priv)
 {
-	fw_priv->abort = 1;
+	set_bit(FW_STATUS_ABORT, &fw_priv->status);
 	wmb();
 	complete(&fw_priv->completion);
 }
@@ -99,7 +104,8 @@ static ssize_t
 firmware_loading_show(struct class_device *class_dev, char *buf)
 {
 	struct firmware_priv *fw_priv = class_get_devdata(class_dev);
-	return sprintf(buf, "%d\n", fw_priv->loading);
+	int loading = test_bit(FW_STATUS_LOADING, &fw_priv->status);
+	return sprintf(buf, "%d\n", loading);
 }
 
 /**
@@ -116,26 +122,26 @@ firmware_loading_store(struct class_device *class_dev,
 		       const char *buf, size_t count)
 {
 	struct firmware_priv *fw_priv = class_get_devdata(class_dev);
-	int prev_loading = fw_priv->loading;
+	int loading = simple_strtol(buf, NULL, 10);
 
-	fw_priv->loading = simple_strtol(buf, NULL, 10);
-
-	switch (fw_priv->loading) {
+	switch (loading) {
 	case 1:
 		vfree(fw_priv->fw->data);
 		fw_priv->fw->data = NULL;
 		fw_priv->fw->size = 0;
 		fw_priv->alloc_size = 0;
+		set_bit(FW_STATUS_LOADING, &fw_priv->status);
 		break;
 	case 0:
-		if (prev_loading == 1) {
+		if (test_bit(FW_STATUS_LOADING, &fw_priv->status)) {
 			complete(&fw_priv->completion);
+			clear_bit(FW_STATUS_LOADING, &fw_priv->status);
 			break;
 		}
 		/* fallthrough */
 	default:
 		printk(KERN_ERR "%s: unexpected value (%d)\n", __FUNCTION__,
-		       fw_priv->loading);
+		       loading);
 		/* fallthrough */
 	case -1:
 		fw_load_abort(fw_priv);
@@ -370,7 +376,7 @@ request_firmware(const struct firmware **firmware, const char *name,
 	del_timer_sync(&fw_priv->timeout);
 	fw_remove_class_device(class_dev);
 
-	if (fw_priv->fw->size && !fw_priv->abort) {
+	if (fw_priv->fw->size && !test_bit(FW_STATUS_ABORT, &fw_priv->status)) {
 		*firmware = fw_priv->fw;
 	} else {
 		retval = -ENOENT;
