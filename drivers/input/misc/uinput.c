@@ -226,7 +226,7 @@ exit:
 	return retval;
 }
 
-static int uinput_write(struct file *file, const char *buffer, size_t count, loff_t *ppos)
+static ssize_t uinput_write(struct file *file, const char *buffer, size_t count, loff_t *ppos)
 {
 	struct uinput_device	*udev = file->private_data;
 	
