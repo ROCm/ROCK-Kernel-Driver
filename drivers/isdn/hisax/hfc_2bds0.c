@@ -264,8 +264,9 @@ static void
 hfc_fill_fifo(struct BCState *bcs)
 {
 	struct IsdnCardState *cs = bcs->cs;
-	int idx, fcnt;
-	int count;
+	u_int idx;
+	int fcnt;
+	u_int count;
 	u8 cip;
 
 	if (!bcs->tx_skb)
@@ -636,8 +637,8 @@ int receive_dmsg(struct IsdnCardState *cs)
 static void
 hfc_fill_dfifo(struct IsdnCardState *cs)
 {
-	int idx, fcnt;
-	int count;
+	int fcnt;
+	u_int idx, count;
 	u8 cip;
 
 	if (!cs->tx_skb)

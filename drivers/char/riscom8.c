@@ -1036,7 +1036,6 @@ static int rc_open(struct tty_struct * tty, struct file * filp)
 	int error;
 	struct riscom_port * port;
 	struct riscom_board * bp;
-	unsigned long flags;
 	
 	board = RC_BOARD(tty->index);
 	if (board >= RC_NBOARD || !(rc_board[board].flags & RC_BOARD_PRESENT))

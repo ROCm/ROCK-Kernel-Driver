@@ -1,5 +1,5 @@
 /*
- *  linux/include/asm-arm/proc-armv/domain.h
+ *  linux/include/asm-arm/domain.h
  *
  *  Copyright (C) 1999 Russell King.
  *

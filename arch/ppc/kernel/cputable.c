@@ -433,7 +433,7 @@ struct cpu_spec	cpu_specs[] = {
      },
 
 #endif /* CONFIG_40x */
-#ifdef CONFIG_440
+#ifdef CONFIG_44x
     { /* 440GP Rev. B */
         0xf0000fff, 0x40000440, "440GP Rev. B",
         CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB,
@@ -448,7 +448,14 @@ struct cpu_spec	cpu_specs[] = {
         32, 32,
         0, /*__setup_cpu_440 */
     },
-#endif /* CONFIG_440 */
+    { /* 440GX Rev. A */
+        0xf0000fff, 0x50000850, "440GX Rev. A",
+        CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB,
+        PPC_FEATURE_32 | PPC_FEATURE_HAS_MMU,
+        32, 32,
+        0, /*__setup_cpu_440 */
+    },
+#endif /* CONFIG_44x */
 #if !CLASSIC_PPC
     {	/* default match */
     	0x00000000, 0x00000000, "(generic PPC)",

@@ -7,7 +7,6 @@
 
 #include <asm/ptrace.h>
 #include <asm/user.h>
-#include <asm/proc/elf.h>
 #include <asm/procinfo.h>
 
 typedef unsigned long elf_greg_t;
@@ -42,6 +41,7 @@ typedef struct user_fp elf_fpregset_t;
 #define ELF_ARCH	EM_ARM
 
 #define USE_ELF_CORE_DUMP
+#define ELF_EXEC_PAGESIZE	4096
 
 /* This is the location that an ET_DYN program is loaded if exec'ed.  Typical
    use of this is to invoke "./ld.so someprog" to test out a new version of
@@ -75,5 +75,30 @@ typedef struct user_fp elf_fpregset_t;
 #define ELF_PLATFORM_SIZE 8
 extern char elf_platform[];
 #define ELF_PLATFORM	(elf_platform)
+
+#ifdef __KERNEL__
+
+/*
+ * 32-bit code is always OK.  Some cpus can do 26-bit, some can't.
+ */
+#define ELF_PROC_OK(x)	(ELF_THUMB_OK(x) && ELF_26BIT_OK(x))
+
+#define ELF_THUMB_OK(x) \
+	(( (elf_hwcap & HWCAP_THUMB) && ((x)->e_entry & 1) == 1) || \
+	 ((x)->e_entry & 3) == 0)
+
+#define ELF_26BIT_OK(x) \
+	(( (elf_hwcap & HWCAP_26BIT) && (x)->e_flags & EF_ARM_APCS26) || \
+	  ((x)->e_flags & EF_ARM_APCS26) == 0)
+
+/* Old NetWinder binaries were compiled in such a way that the iBCS
+   heuristic always trips on them.  Until these binaries become uncommon
+   enough not to care, don't trust the `ibcs' flag here.  In any case
+   there is no other ELF system currently supported by iBCS.
+   @@ Could print a warning message to encourage users to upgrade.  */
+#define SET_PERSONALITY(ex,ibcs2) \
+	set_personality(((ex).e_flags&EF_ARM_APCS26 ?PER_LINUX :PER_LINUX_32BIT))
+
+#endif
 
 #endif

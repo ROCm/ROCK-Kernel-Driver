@@ -75,7 +75,6 @@ struct disk_stats {
 	unsigned read_merges, write_merges;
 	unsigned read_ticks, write_ticks;
 	unsigned io_ticks;
-	int in_flight;
 	unsigned time_in_queue;
 };
 	
@@ -101,6 +100,7 @@ struct gendisk {
 
 	unsigned sync_io;		/* RAID */
 	unsigned long stamp, stamp_idle;
+	int in_flight;
 #ifdef	CONFIG_SMP
 	struct disk_stats *dkstats;
 #else

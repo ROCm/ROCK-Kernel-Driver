@@ -302,12 +302,14 @@ typedef struct hermes_response {
 #define hermes_read_reg(hw, off) ((hw)->io_space ? \
 	inw((hw)->iobase + ( (off) << (hw)->reg_spacing )) : \
 	readw((hw)->iobase + ( (off) << (hw)->reg_spacing )))
-#define hermes_write_reg(hw, off, val) ((hw)->io_space ? \
-	outw_p((val), (hw)->iobase + ( (off) << (hw)->reg_spacing )) : \
-	writew((val), (hw)->iobase + ( (off) << (hw)->reg_spacing )))
-
-#define hermes_read_regn(hw, name) (hermes_read_reg((hw), HERMES_##name))
-#define hermes_write_regn(hw, name, val) (hermes_write_reg((hw), HERMES_##name, (val)))
+#define hermes_write_reg(hw, off, val) do { \
+	if ((hw)->io_space) \
+		outw_p((val), (hw)->iobase + ((off) << (hw)->reg_spacing)); \
+	else \
+		writew((val), (hw)->iobase + ((off) << (hw)->reg_spacing)); \
+	} while (0)
+#define hermes_read_regn(hw, name) hermes_read_reg((hw), HERMES_##name)
+#define hermes_write_regn(hw, name, val) hermes_write_reg((hw), HERMES_##name, (val))
 
 /* Function prototypes */
 void hermes_struct_init(hermes_t *hw, ulong address, int io_space, int reg_spacing);

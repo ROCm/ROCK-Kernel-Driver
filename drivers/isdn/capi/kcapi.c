@@ -72,7 +72,7 @@ static struct sk_buff_head recv_queue;
 static struct work_struct tq_state_notify;
 static struct work_struct tq_recv_notify;
 
-/* -------- ref counting -------------------------------------- */
+/* -------- controller ref counting -------------------------------------- */
 
 static inline struct capi_ctr *
 capi_ctr_get(struct capi_ctr *card)
@@ -87,6 +87,21 @@ capi_ctr_put(struct capi_ctr *card)
 {
 	module_put(card->owner);
 	DBG("MOD_COUNT DEC");
+}
+
+/* -------- own ref counting -------------------------------------- */
+
+static inline void
+kcapi_get_ref(void)
+{
+	if (!try_module_get(THIS_MODULE))
+		printk(KERN_WARNING "%s: cannot reserve module\n", __FUNCTION__);
+}
+
+static inline void
+kcapi_put_ref(void)
+{
+	module_put(THIS_MODULE);
 }
 
 /* ------------------------------------------------------------- */
@@ -209,10 +224,10 @@ static int notify_push(unsigned int cmd, u32 controller,
 {
 	struct capi_notifier *np;
 
-	MOD_INC_USE_COUNT;
+	kcapi_get_ref();
 	np = (struct capi_notifier *)kmalloc(sizeof(struct capi_notifier), GFP_ATOMIC);
 	if (!np) {
-		MOD_DEC_USE_COUNT;
+		kcapi_put_ref();
 		return -1;
 	}
 	memset(np, 0, sizeof(struct capi_notifier));
@@ -226,9 +241,9 @@ static int notify_push(unsigned int cmd, u32 controller,
 	 * of devices. Devices can only removed in
 	 * user process, not in bh.
 	 */
-	MOD_INC_USE_COUNT;
+	kcapi_get_ref();
 	if (schedule_work(&tq_state_notify) == 0)
-		MOD_DEC_USE_COUNT;
+		kcapi_put_ref();
 	return 0;
 }
 
@@ -286,9 +301,9 @@ static void notify_handler(void *dummy)
 	while ((np = notify_dequeue()) != 0) {
 		notify_doit(np);
 		kfree(np);
-		MOD_DEC_USE_COUNT;
+		kcapi_put_ref();
 	}
-	MOD_DEC_USE_COUNT;
+	kcapi_put_ref();
 }
 	
 /* -------- Receiver ------------------------------------------ */
@@ -626,19 +641,18 @@ u16 capi20_put_message(struct capi20_appl *ap, struct sk_buff *skb)
 
 EXPORT_SYMBOL(capi20_put_message);
 
-u16 capi20_get_manufacturer(u32 contr, u8 buf[CAPI_MANUFACTURER_LEN])
+u16 capi20_get_manufacturer(u32 contr, u8 *buf)
 {
 	struct capi_ctr *card;
 
 	if (contr == 0) {
-		strlcpy(buf, capi_manufakturer, sizeof(buf));
+		strlcpy(buf, capi_manufakturer, CAPI_MANUFACTURER_LEN);
 		return CAPI_NOERROR;
 	}
 	card = get_capi_ctr_by_nr(contr);
 	if (!card || card->cardstate != CARD_RUNNING) 
 		return CAPI_REGNOTINSTALLED;
-
-	strlcpy(buf, card->manu, sizeof(buf));
+	strlcpy(buf, card->manu, CAPI_MANUFACTURER_LEN);
 	return CAPI_NOERROR;
 }
 
@@ -662,19 +676,19 @@ u16 capi20_get_version(u32 contr, struct capi_version *verp)
 
 EXPORT_SYMBOL(capi20_get_version);
 
-u16 capi20_get_serial(u32 contr, u8 serial[CAPI_SERIAL_LEN])
+u16 capi20_get_serial(u32 contr, u8 *serial)
 {
 	struct capi_ctr *card;
 
 	if (contr == 0) {
-		strlcpy(serial, driver_serial, sizeof(serial));
+		strlcpy(serial, driver_serial, CAPI_SERIAL_LEN);
 		return CAPI_NOERROR;
 	}
 	card = get_capi_ctr_by_nr(contr);
 	if (!card || card->cardstate != CARD_RUNNING) 
 		return CAPI_REGNOTINSTALLED;
 
-	strlcpy((void *) serial, card->serial, sizeof(serial));
+	strlcpy((void *) serial, card->serial, CAPI_SERIAL_LEN);
 	return CAPI_NOERROR;
 }
 

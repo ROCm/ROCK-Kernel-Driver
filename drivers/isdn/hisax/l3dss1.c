@@ -736,7 +736,7 @@ check_infoelements(struct l3_process *pc, struct sk_buff *skb, int *checklist)
 	p += l;
 	mt = *p++;
 	oldpos = 0;
-	while ((p - skb->data) < skb->len) {
+	while ((p - skb->data) < (int)skb->len) {
 		if ((*p & 0xf0) == 0x90) { /* shift codeset */
 			old_codeset = codeset;
 			codeset = *p & 7;
@@ -2923,7 +2923,7 @@ global_handler(struct PStack *st, int mt, struct sk_buff *skb)
 	u8 tmp[16];
 	u8 *p = tmp;
 	int l;
-	int i;
+	u_int i;
 	struct l3_process *proc = st->l3.global;
 
 	proc->callref = skb->data[2]; /* cr flag */
@@ -2961,7 +2961,8 @@ global_handler(struct PStack *st, int mt, struct sk_buff *skb)
 static void
 dss1up(struct PStack *st, int pr, void *arg)
 {
-	int i, mt, cr, cause, callState;
+	u_int i;
+	int mt, cr, cause, callState;
 	char *ptr;
 	u8 *p;
 	struct sk_buff *skb = arg;
@@ -2998,7 +2999,7 @@ dss1up(struct PStack *st, int pr, void *arg)
 		return;
 	}
 	cr = getcallref(skb->data);
-	if (skb->len < ((skb->data[1] & 0x0f) + 3)) {
+	if (skb->len < (u_int)((skb->data[1] & 0x0f) + 3)) {
 		l3_debug(st, "dss1up frame too short(%d)", skb->len);
 		dev_kfree_skb(skb);
 		return;
@@ -3135,7 +3136,8 @@ dss1up(struct PStack *st, int pr, void *arg)
 static void
 dss1down(struct PStack *st, int pr, void *arg)
 {
-	int i, cr;
+	u_int i;
+	int cr;
 	struct l3_process *proc;
 	struct Channel *chan;
 
@@ -3186,29 +3188,29 @@ dss1down(struct PStack *st, int pr, void *arg)
 static void
 dss1man(struct PStack *st, int pr, void *arg)
 {
-        int i;
-        struct l3_process *proc = arg;
- 
-        if (!proc) {
-                printk(KERN_ERR "HiSax dss1man without proc pr=%04x\n", pr);
-                return;
-        }
-        for (i = 0; i < MANSLLEN; i++)
+	u_int i;
+	struct l3_process *proc = arg;
+
+	if (!proc) {
+		printk(KERN_ERR "HiSax dss1man without proc pr=%04x\n", pr);
+		return;
+	}
+	for (i = 0; i < MANSLLEN; i++)
                 if ((pr == manstatelist[i].primitive) &&
-                    ((1 << proc->state) & manstatelist[i].state))
-                        break;
-        if (i == MANSLLEN) {
-                if (st->l3.debug & L3_DEB_STATE) {
-                        l3_debug(st, "cr %d dss1man state %d prim %#x unhandled",
-                                proc->callref & 0x7f, proc->state, pr);
-                }
-        } else {
-                if (st->l3.debug & L3_DEB_STATE) {
-                        l3_debug(st, "cr %d dss1man state %d prim %#x",
-                                proc->callref & 0x7f, proc->state, pr);
-                }
-                manstatelist[i].rout(proc, pr, arg);
-        }
+			((1 << proc->state) & manstatelist[i].state))
+			break;
+	if (i == MANSLLEN) {
+		if (st->l3.debug & L3_DEB_STATE) {
+			l3_debug(st, "cr %d dss1man state %d prim %#x unhandled",
+				proc->callref & 0x7f, proc->state, pr);
+		}
+	} else {
+		if (st->l3.debug & L3_DEB_STATE) {
+			l3_debug(st, "cr %d dss1man state %d prim %#x",
+				proc->callref & 0x7f, proc->state, pr);
+		}
+		manstatelist[i].rout(proc, pr, arg);
+	}
 }
  
 void

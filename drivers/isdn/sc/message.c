@@ -55,8 +55,7 @@ int receivemessage(int card, RspMessage *rspmsg)
 		/*
 		 * Map in the DPM to the base page and copy the message
 		 */
-		save_flags(flags);
-		cli();
+		spin_lock_irqsave(&adapter[card]->lock, flags);
 		outb((adapter[card]->shmem_magic >> 14) | 0x80,
 			adapter[card]->ioport[adapter[card]->shmem_pgport]); 
 		dpm = (DualPortMemory *) adapter[card]->rambase;
@@ -64,8 +63,7 @@ int receivemessage(int card, RspMessage *rspmsg)
 			MSG_LEN);
 		dpm->rsp_tail = (dpm->rsp_tail+1) % MAX_MESSAGES;
 		inb(adapter[card]->ioport[FIFO_READ]);
-		restore_flags(flags);
-		
+		spin_unlock_irqrestore(&adapter[card]->lock, flags);
 		/*
 		 * Tell the board that the message is received
 		 */
@@ -152,15 +150,14 @@ int sendmessage(int card,
 	/*
 	 * Disable interrupts and map in shared memory
 	 */
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&adapter[card]->lock, flags);
 	outb((adapter[card]->shmem_magic >> 14) | 0x80,
 		adapter[card]->ioport[adapter[card]->shmem_pgport]); 
 	dpm = (DualPortMemory *) adapter[card]->rambase;	/* Fix me */
 	memcpy_toio(&(dpm->req_queue[dpm->req_head]),&sndmsg,MSG_LEN);
 	dpm->req_head = (dpm->req_head+1) % MAX_MESSAGES;
 	outb(sndmsg.sequence_no, adapter[card]->ioport[FIFO_WRITE]);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&adapter[card]->lock, flags);
 		
 	pr_debug("%s: Sent Message seq:%d pid:%d time:%d "
 			"cnt:%d (type,class,code):(%d,%d,%d) "

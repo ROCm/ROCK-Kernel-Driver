@@ -52,8 +52,10 @@ struct completion;
 #ifdef CONFIG_DEBUG_SPINLOCK_SLEEP
 void __might_sleep(char *file, int line);
 #define might_sleep() __might_sleep(__FILE__, __LINE__)
+#define might_sleep_if(cond) do { if (unlikely(cond)) might_sleep(); } while (0)
 #else
 #define might_sleep() do {} while(0)
+#define might_sleep_if(cond) do {} while (0)
 #endif
 
 extern struct notifier_block *panic_notifier_list;

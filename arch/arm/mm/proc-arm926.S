@@ -31,6 +31,7 @@
 #include <asm/procinfo.h>
 #include <asm/hardware.h>
 #include <asm/page.h>
+#include <asm/ptrace.h>
 #include "proc-macros.S"
 
 /*

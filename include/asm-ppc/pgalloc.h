@@ -20,10 +20,17 @@ extern void pgd_free(pgd_t *pgd);
 #define __pmd_free_tlb(tlb,x)		do { } while (0)
 #define pgd_populate(mm, pmd, pte)      BUG()
 
+#ifndef CONFIG_BOOKE
 #define pmd_populate_kernel(mm, pmd, pte)	\
 		(pmd_val(*(pmd)) = __pa(pte) | _PMD_PRESENT)
 #define pmd_populate(mm, pmd, pte)	\
 		(pmd_val(*(pmd)) = (page_to_pfn(pte) << PAGE_SHIFT) | _PMD_PRESENT)
+#else
+#define pmd_populate_kernel(mm, pmd, pte)	\
+		(pmd_val(*(pmd)) = (unsigned long)pte | _PMD_PRESENT)
+#define pmd_populate(mm, pmd, pte)	\
+		(pmd_val(*(pmd)) = (unsigned long)page_to_virt(pte) | _PMD_PRESENT)
+#endif
 
 extern pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long addr);
 extern struct page *pte_alloc_one(struct mm_struct *mm, unsigned long addr);

@@ -598,6 +598,7 @@ drv_register(struct fsm_inst *fi, int pr, void *arg)
 	iif->statcallb = isdn_status_callback;
 
 	isdn_info_update();
+	return(0);
 }
 
 static int
@@ -609,6 +610,7 @@ drv_stat_run(struct fsm_inst *fi, int pr, void *arg)
 	drv->features = drv->interface->features;
 	isdn_v110_add_features(drv);
 	set_global_features();
+	return(0);
 }
 
 static int
@@ -616,6 +618,7 @@ drv_stat_stop(struct fsm_inst *fi, int pr, void *arg)
 {
 	fsm_change_state(fi, ST_DRV_LOADED);
 	set_global_features();
+	return(0);
 }
 
 static int
@@ -646,6 +649,7 @@ drv_stat_stavail(struct fsm_inst *fi, int pr, void *arg)
 	drv->stavail += c->arg;
 	spin_unlock_irqrestore(&stat_lock, flags);
 	wake_up_interruptible(&drv->st_waitq);
+	return 0;
 }
 
 static int
@@ -1318,20 +1322,18 @@ static ssize_t
 isdn_status_read(struct file *file, char *buf, size_t count, loff_t * off)
 {
 	int retval;
-	int len = 0;
+	size_t len = 0;
 	char *p;
 
 	if (off != &file->f_pos)
 		return -ESPIPE;
 
-	lock_kernel();
 	if (!file->private_data) {
-		if (file->f_flags & O_NONBLOCK) {
-			retval = -EAGAIN;
-			goto out;
-		}
+		if (file->f_flags & O_NONBLOCK)
+			return  -EAGAIN;
 		interruptible_sleep_on(&(dev->info_waitq));
 	}
+	lock_kernel();
 	p = isdn_statstr();
 	file->private_data = 0;
 	if ((len = strlen(p)) <= count) {
@@ -1362,12 +1364,10 @@ isdn_status_poll(struct file *file, poll_table *wait)
 {
 	unsigned int mask = 0;
 
-	lock_kernel();
-
 	poll_wait(file, &(dev->info_waitq), wait);
+	lock_kernel();
 	if (file->private_data)
 		mask |= POLLIN | POLLRDNORM;
-
 	unlock_kernel();
 	return mask;
 }
@@ -1464,7 +1464,7 @@ isdn_ctrl_read(struct file *file, char *buf, size_t count, loff_t * off)
 	struct isdn_slot *slot = file->private_data;
 	DECLARE_WAITQUEUE(wait, current);
 	unsigned long flags;
-	int len = 0;
+	size_t len = 0;
 
 	if (off != &file->f_pos)
 		return -ESPIPE;

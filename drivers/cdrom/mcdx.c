@@ -1970,3 +1970,4 @@ static int mcdx_setattentuator(struct s_drive_stuff *stuffp,
 }
 
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_BLOCKDEV_MAJOR(MITSUMI_X_CDROM_MAJOR);

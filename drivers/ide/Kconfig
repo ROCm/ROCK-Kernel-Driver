@@ -835,6 +835,13 @@ config BLK_DEV_IDEDMA_PMAC
 	  to transfer data to and from memory.  Saying Y is safe and improves
 	  performance.
 
+config BLK_DEV_IDE_PMAC_BLINK
+	bool "Blink laptop LED on drive activity"
+	depends on BLK_DEV_IDE_PMAC && ADB_PMU
+	help
+	  This option enables the use of the sleep LED as a hard drive
+	  activity LED.
+
 config BLK_DEV_IDEDMA_PMAC_AUTO
 	bool "Use DMA by default"
 	depends on BLK_DEV_IDEDMA_PMAC

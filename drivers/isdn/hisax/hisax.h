@@ -265,7 +265,7 @@ struct Layer1 {
 struct Layer2 {
 	int tei;
 	int sap;
-	int maxlen;
+	u_int maxlen;
 	unsigned long flag;
 	unsigned int vs, va, vr;
 	int rc;

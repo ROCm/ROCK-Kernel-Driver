@@ -405,16 +405,20 @@ _GLOBAL(_tlbia)
 	sync			/* Flush to memory before changing mapping */
 	tlbia
 	isync			/* Flush shadow TLB */
-#elif defined(CONFIG_440)
+#elif defined(CONFIG_44x)
 	lis	r3,0
 	sync
 1:
-	tlbwe	r3,r3,PPC440_TLB_PAGEID
+	tlbwe	r3,r3,PPC44x_TLB_PAGEID
 	addi	r3,r3,1
-	cmpwi	0,r3,61
+	/* Load high watermark */
+	lis	r4,tlb_44x_hwater@h
+	ori	r4,r4,tlb_44x_hwater@l
+	lwz	r5,0(r4)
+	cmpw	0,r3,r5
 	ble	1b
 	isync
-#else /* !(CONFIG_40x || CONFIG_440) */
+#else /* !(CONFIG_40x || CONFIG_44x) */
 #if defined(CONFIG_SMP)
 	rlwinm	r8,r1,0,0,18
 	lwz	r8,TI_CPU(r8)
@@ -465,17 +469,17 @@ _GLOBAL(_tlbie)
 	tlbwe	r3, r3, TLB_TAG
 	isync
 10:
-#elif defined(CONFIG_440)
+#elif defined(CONFIG_44x)
 	mfspr	r4,SPRN_MMUCR			/* Get MMUCR */
-	lis	r5,PPC440_MMUCR_STS@h
-	ori	r5,r5,PPC440_MMUCR_TID@l	/* Create mask */
+	lis	r5,PPC44x_MMUCR_STS@h
+	ori	r5,r5,PPC44x_MMUCR_TID@l	/* Create mask */
 	andc	r4,r4,r5			/* Clear out TID/STS bits */
 	mfspr	r5,SPRN_PID			/* Get PID */
 	or	r4,r4,r5			/* Set TID bits */
 	mfmsr	r6				/* Get MSR */
 	andi.	r6,r6,MSR_IS@l			/* TS=1? */
 	beq	11f				/* If not, leave STS=0 */
-	oris	r4,r4,PPC440_MMUCR_STS@h	/* Set STS=1 */
+	oris	r4,r4,PPC44x_MMUCR_STS@h	/* Set STS=1 */
 11:	mtspr	SPRN_MMUCR, r4			/* Put MMUCR */
 
 	tlbsx.	r3, 0, r3
@@ -486,10 +490,10 @@ _GLOBAL(_tlbie)
 	 * the V bit in the TLB_PAGEID, loading this
 	 * value will invalidate the TLB entry.
 	 */
-	tlbwe	r3, r3, PPC440_TLB_PAGEID
+	tlbwe	r3, r3, PPC44x_TLB_PAGEID
 	isync
 10:
-#else /* !(CONFIG_40x || CONFIG_440) */
+#else /* !(CONFIG_40x || CONFIG_44x) */
 #if defined(CONFIG_SMP)
 	rlwinm	r8,r1,0,0,18
 	lwz	r8,TI_CPU(r8)
@@ -658,9 +662,9 @@ _GLOBAL(invalidate_dcache_range)
 #ifdef CONFIG_NOT_COHERENT_CACHE
 /*
  * 40x cores have 8K or 16K dcache and 32 byte line size.
- * 440 has a 32K dcache and 32 byte line size.
+ * 44x has a 32K dcache and 32 byte line size.
  * 8xx has 1, 2, 4, 8K variants.
- * For now, cover the worst case of the 440.
+ * For now, cover the worst case of the 44x.
  * Must be called with external interrupts disabled.
  */
 #define CACHE_NWAYS	64

@@ -372,7 +372,7 @@ static ssize_t disk_stats_read(struct gendisk * disk, char *page)
 		disk_stat_read(disk, write_merges),
 		(unsigned long long)disk_stat_read(disk, write_sectors),
 		jiffies_to_msec(disk_stat_read(disk, write_ticks)),
-		disk_stat_read(disk, in_flight), 
+		disk->in_flight,
 		jiffies_to_msec(disk_stat_read(disk, io_ticks)),
 		jiffies_to_msec(disk_stat_read(disk, time_in_queue)));
 }
@@ -492,7 +492,7 @@ static int diskstats_show(struct seq_file *s, void *v)
 		disk_stat_read(gp, writes), disk_stat_read(gp, write_merges),
 		(unsigned long long)disk_stat_read(gp, write_sectors),
 		jiffies_to_msec(disk_stat_read(gp, write_ticks)),
-		disk_stat_read(gp, in_flight),
+		gp->in_flight,
 		jiffies_to_msec(disk_stat_read(gp, io_ticks)),
 		jiffies_to_msec(disk_stat_read(gp, time_in_queue)));
 

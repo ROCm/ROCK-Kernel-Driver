@@ -265,7 +265,7 @@ isdn_tty_fax_bitorder(modem_info * info, struct sk_buff *skb)
 	__u8 RightMask;
 	__u8 fBit;
 	__u8 Data;
-	int i;
+	u_int i;
 
 	if (!info->fax->bor) {
 		for (i = 0; i < skb->len; i++) {

@@ -398,4 +398,9 @@ extern void firmware_unregister(struct subsystem *);
 #define dev_warn(dev, format, arg...)		\
 	dev_printk(KERN_WARNING , dev , format , ## arg)
 
+/* Create alias, so I can be autoloaded. */
+#define MODULE_ALIAS_CHARDEV(major,minor) \
+	MODULE_ALIAS("char-major-" __stringify(major) "-" __stringify(minor))
+#define MODULE_ALIAS_CHARDEV_MAJOR(major) \
+	MODULE_ALIAS("char-major-" __stringify(major) "-*")
 #endif /* _DEVICE_H_ */

@@ -31,9 +31,9 @@ static void usb_b_out(struct st5481_bcs *bcs,int buf_nr)
 	struct st5481_b_out *b_out = &bcs->b_out;
 	struct st5481_adapter *adapter = bcs->adapter;
 	struct urb *urb;
-	unsigned int packet_size,offset;
-	int len,buf_size,bytes_sent;
-	int i;
+	u_int packet_size, bytes_sent;
+	int len, offset, buf_size;
+	u_int i;
 	struct sk_buff *skb;
 	
 	if (test_and_set_bit(buf_nr, &b_out->busy)) {
