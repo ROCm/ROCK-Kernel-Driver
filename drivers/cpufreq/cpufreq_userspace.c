@@ -174,7 +174,9 @@ cpufreq_procctl(ctl_table *ctl, int write, struct file *filp,
 
 	if (!warning_print) {
 		warning_print++;
-		printk(KERN_INFO "Access to /proc/sys/cpu/ is deprecated and will be removed from (new) 2.6. kernels soon after 2005-01-01");
+		printk(KERN_INFO "Access to /proc/sys/cpu/ is deprecated and "
+			"will be removed from (new) 2.6. kernels soon "
+			"after 2005-01-01\n");
 	}
 
 	if (write) {
@@ -214,7 +216,9 @@ cpufreq_sysctl(ctl_table *table, int __user *name, int nlen,
 
 	if (!warning_print) {
 		warning_print++;
-		printk(KERN_INFO "Access to /proc/sys/cpu/ is deprecated and will be removed from (new) 2.6. kernels soon after 2005-01-01");
+		printk(KERN_INFO "Access to /proc/sys/cpu/ is deprecated and "
+			"will be removed from (new) 2.6. kernels soon "
+			"after 2005-01-01\n");
 	}
 
 	if (oldval && oldlenp) {
