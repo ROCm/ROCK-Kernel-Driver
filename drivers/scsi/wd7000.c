@@ -1605,6 +1605,7 @@ static int wd7000_release(struct Scsi_Host *shost)
 	return 0;
 }
 
+#if 0
 /*
  *  I have absolutely NO idea how to do an abort with the WD7000...
  */
@@ -1619,7 +1620,7 @@ static int wd7000_abort(Scsi_Cmnd * SCpnt)
 	}
 	return FAILED;
 }
-
+#endif
 
 /*
  *  I also have no idea how to do a reset...
