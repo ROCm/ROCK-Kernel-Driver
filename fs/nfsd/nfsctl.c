@@ -203,7 +203,6 @@ asmlinkage handle_sys_nfsservctl(int cmd, void *opaque_argp, void *opaque_resp)
 	int			err;
 	int			argsize, respsize;
 
-	MOD_INC_USE_COUNT;
 	lock_kernel ();
 	if (!initialized)
 		nfsd_init();
@@ -276,7 +275,6 @@ done:
 		kfree(res);
 
 	unlock_kernel ();
-	MOD_DEC_USE_COUNT;
 	return err;
 }
 
@@ -288,6 +286,7 @@ MODULE_LICENSE("GPL");
 
 struct nfsd_linkage nfsd_linkage_s = {
 	do_nfsservctl: handle_sys_nfsservctl,
+	owner: THIS_MODULE,
 };
 
 /*
