@@ -152,8 +152,7 @@ static int calculate_h_scale_registers(struct saa7146_dev *dev,
 	if( 1 == xpsc ) {
 		xacm = 1;
 		dcgx = 0;
-	}
-	else {
+	} else {
 		xacm = 0;
 		/* get best match in the table of attenuations
 		   for horizontal scaling */
@@ -268,8 +267,7 @@ static int calculate_v_scale_registers(struct saa7146_dev *dev, enum v4l2_field 
 		ype = ysci / 16;
 		ypo = ype + (ysci / 64);
 		
-	}
-	else {
+	} else {
 		yacm = 1;	
 
 		/* calculate scaling increment */
@@ -285,8 +283,7 @@ static int calculate_v_scale_registers(struct saa7146_dev *dev, enum v4l2_field 
 						... */
 		if ( ysci < 512) {
 			yacl = 0;
-		}
-		else {
+		} else {
 			yacl = ( ysci / (1024 - ysci) );
 		}
 
@@ -488,33 +485,31 @@ static void saa7146_disable_clipping(struct saa7146_dev *dev)
  	saa7146_write(dev, MC2, (MASK_05 | MASK_21));
  
  	/* disable video dma2 */
-	saa7146_write(dev, MC1, (MASK_21));
+	saa7146_write(dev, MC1, MASK_21);
 }
 
-static void saa7146_set_clipping_rect(struct saa7146_dev *dev, struct saa7146_fh *fh)
+static void saa7146_set_clipping_rect(struct saa7146_fh *fh)
 {
+	struct saa7146_dev *dev = fh->dev;
 	enum v4l2_field field = fh->ov.win.field;
-	int clipcount = fh->ov.nclips;
-	
 	struct	saa7146_video_dma vdma2;
-
-	u32 clip_format	= saa7146_read(dev, CLIP_FORMAT_CTRL);
-	u32 arbtr_ctrl	= saa7146_read(dev, PCI_BT_V1);
-
-	// fixme: is this used at all? SAA7146_CLIPPING_RECT_INVERTED;
-	u32 type = SAA7146_CLIPPING_RECT;
+	u32 clip_format;
+	u32 arbtr_ctrl;
 
 	/* check clipcount, disable clipping if clipcount == 0*/
-	if( clipcount == 0 ) {
+	if( fh->ov.nclips == 0 ) {
 		saa7146_disable_clipping(dev);
 		return;
 	}
+
+	clip_format = saa7146_read(dev, CLIP_FORMAT_CTRL);
+	arbtr_ctrl = saa7146_read(dev, PCI_BT_V1);
 
 	calculate_clipping_registers_rect(dev, fh, &vdma2, &clip_format, &arbtr_ctrl, field);
 
 	/* set clipping format */
 	clip_format &= 0xffff0008;
-	clip_format |= (type << 4);
+	clip_format |= (SAA7146_CLIPPING_RECT << 4);
 
 	/* prepare video dma2 */
 	saa7146_write(dev, BASE_EVEN2,		vdma2.base_even);
@@ -660,25 +655,28 @@ void saa7146_set_hps_source_and_sync(struct saa7146_dev *dev, int source, int sy
 	vv->current_hps_sync = sync;
 } 
 
-/* reprogram hps, enable(1) / disable(0) video */
-void saa7146_set_overlay(struct saa7146_dev *dev, struct saa7146_fh *fh, int v)
+int saa7146_enable_overlay(struct saa7146_fh *fh)
 {
+	struct saa7146_dev *dev = fh->dev;
 	struct saa7146_vv *vv = dev->vv_data;
-
-	/* enable ? */
-	if( 0 == v) {
-		/* disable video dma1 */
-      		saa7146_write(dev, MC1, MASK_22);
-		return;
-	}
 
 	saa7146_set_window(dev, fh->ov.win.w.width, fh->ov.win.w.height, fh->ov.win.field);
 	saa7146_set_position(dev, fh->ov.win.w.left, fh->ov.win.w.top, fh->ov.win.w.height, fh->ov.win.field);
 	saa7146_set_output_format(dev, vv->ov_fmt->trans);
-	saa7146_set_clipping_rect(dev, fh);
+	saa7146_set_clipping_rect(fh);
 
 	/* enable video dma1 */
 	saa7146_write(dev, MC1, (MASK_06 | MASK_22));
+	return 0;
+}
+
+void saa7146_disable_overlay(struct saa7146_fh *fh)
+{
+	struct saa7146_dev *dev = fh->dev;
+
+	/* disable clipping + video dma1 */
+ 	saa7146_disable_clipping(dev);
+	saa7146_write(dev, MC1, MASK_22);
 }		
 
 void saa7146_write_out_dma(struct saa7146_dev* dev, int which, struct saa7146_video_dma* vdma) 
@@ -692,15 +690,8 @@ void saa7146_write_out_dma(struct saa7146_dev* dev, int which, struct saa7146_vi
 	/* calculate starting address */
 	where  = (which-1)*0x18;
 
-/*
-	if( 0 != (dev->ext_vv_data->flags & SAA7146_EXT_SWAP_ODD_EVEN)) {
-		saa7146_write(dev, where, 	vdma->base_even);
-		saa7146_write(dev, where+0x04, 	vdma->base_odd);
-	} else {
-*/
 		saa7146_write(dev, where, 	vdma->base_odd);
 		saa7146_write(dev, where+0x04, 	vdma->base_even);
-//	}
 	saa7146_write(dev, where+0x08, 	vdma->prot_addr);
 	saa7146_write(dev, where+0x0c, 	vdma->pitch);
 	saa7146_write(dev, where+0x10, 	vdma->base_page);
@@ -937,7 +928,7 @@ static int calculate_video_dma_grab_planar(struct saa7146_dev* dev, struct saa71
 	}	
 
 	saa7146_write_out_dma(dev, 1, &vdma1);
-	if( sfmt->swap != 0 ) {
+	if( (sfmt->flags & FORMAT_BYTE_SWAP) != 0 ) {
 		saa7146_write_out_dma(dev, 3, &vdma2);
 		saa7146_write_out_dma(dev, 2, &vdma3);
 	} else {
@@ -955,13 +946,6 @@ static void program_capture_engine(struct saa7146_dev *dev, int planar)
 	unsigned long e_wait = vv->current_hps_sync == SAA7146_HPS_SYNC_PORT_A ? CMD_E_FID_A : CMD_E_FID_B;
 	unsigned long o_wait = vv->current_hps_sync == SAA7146_HPS_SYNC_PORT_A ? CMD_O_FID_A : CMD_O_FID_B;
 
-/*
-	if( 0 != (dev->ext_vv_data->flags & SAA7146_EXT_SWAP_ODD_EVEN)) {
-		unsigned long tmp = e_wait;
-		e_wait = o_wait;
-		o_wait = tmp;
-	}
-*/
 	/* wait for o_fid_a/b / e_fid_a/b toggle only if rps register 0 is not set*/
 	WRITE_RPS0(CMD_PAUSE | CMD_OAN | CMD_SIG0 | o_wait);
 	WRITE_RPS0(CMD_PAUSE | CMD_OAN | CMD_SIG0 | e_wait);
@@ -1038,7 +1022,6 @@ void saa7146_set_capture(struct saa7146_dev *dev, struct saa7146_buf *buf, struc
 
 	saa7146_set_window(dev, buf->fmt->width, buf->fmt->height, buf->fmt->field);
 	saa7146_set_output_format(dev, sfmt->trans);
-	saa7146_disable_clipping(dev);
 
 	if ( vv->last_field == V4L2_FIELD_INTERLACED ) {
 	} else if ( vv->last_field == V4L2_FIELD_TOP ) {
