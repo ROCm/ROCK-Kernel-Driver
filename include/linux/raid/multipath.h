@@ -27,16 +27,7 @@ struct multipath_private_data {
 	struct multipath_info	*spare;
 	spinlock_t		device_lock;
 
-	/* buffer pool */
-	/* buffer_heads that we have pre-allocated have b_pprev -> &freebh
-	 * and are linked into a stack using b_next
-	 * multipath_bh that are pre-allocated have MPBH_PreAlloc set.
-	 * All these variable are protected by device_lock
-	 */
-	struct multipath_bh	*freer1;
-	int			freer1_blocked;
-	int			freer1_cnt;
-	wait_queue_head_t	wait_buffer;
+	mempool_t		*pool;
 };
 
 typedef struct multipath_private_data multipath_conf_t;
