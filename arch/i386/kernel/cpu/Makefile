@@ -1,4 +1,8 @@
-O_TARGET	:= cpu.o
+#
+# Makefile for x86-compatible CPU details and quirks
+#
+
+obj-y	:=	common.o proc.o
 
 obj-y	+=	amd.o
 obj-y	+=	cyrix.o
@@ -8,8 +12,5 @@ obj-y	+=	intel.o
 obj-y	+=	rise.o
 obj-y	+=	nexgen.o
 obj-y	+=	umc.o
-
-obj-y	+=	common.o
-obj-y	+=	proc.o
 
 include $(TOPDIR)/Rules.make
