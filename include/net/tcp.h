@@ -1794,28 +1794,13 @@ static inline int tcp_full_space( struct sock *sk)
 	return tcp_win_from_space(sk->sk_rcvbuf); 
 }
 
-static inline void tcp_acceptq_removed(struct sock *sk)
-{
-	sk->sk_ack_backlog--;
-}
-
-static inline void tcp_acceptq_added(struct sock *sk)
-{
-	sk->sk_ack_backlog++;
-}
-
-static inline int tcp_acceptq_is_full(struct sock *sk)
-{
-	return sk->sk_ack_backlog > sk->sk_max_ack_backlog;
-}
-
 static inline void tcp_acceptq_queue(struct sock *sk, struct open_request *req,
 					 struct sock *child)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
 
 	req->sk = child;
-	tcp_acceptq_added(sk);
+	sk_acceptq_added(sk);
 
 	if (!tp->accept_queue_tail) {
 		tp->accept_queue = req;

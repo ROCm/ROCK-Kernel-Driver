@@ -1182,7 +1182,7 @@ static int tcp_v6_conn_request(struct sock *sk, struct sk_buff *skb)
 		goto drop;		
 	}
 
-	if (tcp_acceptq_is_full(sk) && tcp_synq_young(sk) > 1)
+	if (sk_acceptq_is_full(sk) && tcp_synq_young(sk) > 1)
 		goto drop;
 
 	req = tcp_openreq_alloc();
@@ -1299,7 +1299,7 @@ static struct sock * tcp_v6_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 
 	opt = np->opt;
 
-	if (tcp_acceptq_is_full(sk))
+	if (sk_acceptq_is_full(sk))
 		goto out_overflow;
 
 	if (np->rxopt.bits.srcrt == 2 &&
