@@ -36,6 +36,7 @@
 #include <asm/uaccess.h>
 #include <asm/io.h>
 #include <linux/delay.h>
+#include <linux/proc_fs.h>
 #include <linux/reboot.h>
 #include <linux/module.h>
 #include <linux/list.h>

@@ -25,6 +25,8 @@ struct hpsb_packet *hpsb_make_isopacket(struct hpsb_host *host,
 					int tag, int sync);
 struct hpsb_packet *hpsb_make_writepacket (struct hpsb_host *host, nodeid_t node,
 					   u64 addr, quadlet_t *buffer, size_t length);
+struct hpsb_packet *hpsb_make_streampacket(struct hpsb_host *host, u8 *buffer,
+                                           int length, int channel, int tag, int sync);
 
 /*
  * hpsb_packet_success - Make sense of the ack and reply codes and

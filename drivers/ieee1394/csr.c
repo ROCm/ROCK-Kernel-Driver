@@ -21,6 +21,7 @@
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/param.h>
+#include <linux/spinlock.h>
 
 #include "ieee1394_types.h"
 #include "hosts.h"
