@@ -294,6 +294,11 @@ void svc_export_request(struct cache_detail *cd,
 
 	qword_add(bpp, blen, exp->ex_client->name);
 	pth = d_path(exp->ex_dentry, exp->ex_mnt, *bpp, *blen);
+	if (IS_ERR(pth)) {
+		/* is this correct? */
+		(*bpp)[0] = '\n';
+		return;
+	}
 	qword_add(bpp, blen, pth);
 	(*bpp)[-1] = '\n';
 }

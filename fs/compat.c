@@ -429,6 +429,8 @@ asmlinkage long compat_sys_ioctl(unsigned int fd, unsigned int cmd,
 			       		fn = d_path(filp->f_dentry,
 						filp->f_vfsmnt, path,
 						PAGE_SIZE);
+					if (IS_ERR(fn))
+						fn = "?";
 				}
 
 				sprintf(buf,"'%c'", (cmd>>24) & 0x3f);
