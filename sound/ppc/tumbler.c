@@ -94,6 +94,7 @@ typedef struct pmac_tumbler_t {
 	unsigned int mix_vol[VOL_IDX_LAST_MIX][2]; /* stereo volumes for tas3004 */
 	int drc_range;
 	int drc_enable;
+	int capture_source;
 } pmac_tumbler_t;
 
 
@@ -135,8 +136,8 @@ static int snapper_init_client(pmac_keywest_t *i2c)
 		TAS_REG_MCS, (1<<6)|(2<<4)|0,
 		/* normal operation, all-pass mode */
 		TAS_REG_MCS2, (1<<1),
-		/* normal output, no deemphasis, A input, power-up */
-		TAS_REG_ACS, 2,
+		/* normal output, no deemphasis, A input, power-up, line-in */
+		TAS_REG_ACS, 0,
 		0, /* terminator */
 	};
 	return send_init_client(i2c, regs);
@@ -681,6 +682,52 @@ static int tumbler_put_mute_switch(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_
 	return 0;
 }
 
+static int snapper_set_capture_source(pmac_tumbler_t *mix)
+{
+	return snd_pmac_keywest_write_byte(&mix->i2c, TAS_REG_ACS,
+					   mix->capture_source ? 2 : 0);
+}
+
+static int snapper_info_capture_source(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
+{
+	static char *texts[2] = {
+		"Line", "Mic"
+	};
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
+	uinfo->count = 1;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = 1;
+	if (uinfo->value.enumerated.item > 1)
+		uinfo->value.enumerated.item = 1;
+	strcpy(uinfo->value.enumerated.name, texts[uinfo->value.enumerated.item]);
+	return 0;
+}
+
+static int snapper_get_capture_source(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	pmac_t *chip = snd_kcontrol_chip(kcontrol);
+	pmac_tumbler_t *mix = chip->mixer_data;
+
+	snd_assert(mix, return -ENODEV);
+	ucontrol->value.integer.value[0] = mix->capture_source;
+	return 0;
+}
+
+static int snapper_put_capture_source(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	pmac_t *chip = snd_kcontrol_chip(kcontrol);
+	pmac_tumbler_t *mix = chip->mixer_data;
+	int change;
+
+	snd_assert(mix, return -ENODEV);
+	change = ucontrol->value.integer.value[0] != mix->capture_source;
+	if (change) {
+		mix->capture_source = !!ucontrol->value.integer.value[0];
+		snapper_set_capture_source(mix);
+	}
+	return change;
+}
+
 #define DEFINE_SNAPPER_MIX(xname,idx,ofs) { \
 	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,\
 	.name = xname, \
@@ -753,6 +800,12 @@ static snd_kcontrol_new_t snapper_mixers[] __initdata = {
 	  .info = tumbler_info_drc_value,
 	  .get = tumbler_get_drc_value,
 	  .put = tumbler_put_drc_value
+	},
+	{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	  .name = "Input Source", /* FIXME: "Capture Source" doesn't work properly */
+	  .info = snapper_info_capture_source,
+	  .get = snapper_get_capture_source,
+	  .put = snapper_put_capture_source
 	},
 };
 
@@ -932,6 +985,7 @@ static void tumbler_resume(pmac_t *chip)
 		tumbler_set_mono_volume(mix, &snapper_bass_vol_info);
 		tumbler_set_mono_volume(mix, &snapper_treble_vol_info);
 		snapper_set_drc(mix);
+		snapper_set_capture_source(mix);
 	}
 	tumbler_set_master_volume(mix);
 	if (chip->update_automute)
