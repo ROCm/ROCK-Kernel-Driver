@@ -105,10 +105,9 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 		unsigned int cmd, unsigned long arg);
 
 static int revalidate_allvol(kdev_t dev);
-static int revalidate_logvol(kdev_t dev, int maxusage);
 static int cciss_revalidate(kdev_t dev);
 static int deregister_disk(int ctlr, int logvol);
-static int register_new_disk(kdev_t dev, int cltr);
+static int register_new_disk(int cltr);
 
 static void cciss_getgeometry(int cntl_num);
 
@@ -333,27 +332,6 @@ static void cmd_free(ctlr_info_t *h, CommandList_struct *c, int got_from_pool)
         }
 }
 
-/*  
- * fills in the disk information. 
- */
-static void cciss_geninit( int ctlr)
-{
-	drive_info_struct *drv;
-	int i;
-	
-	/* Loop through each real device */ 
-	hba[ctlr]->gendisk.nr_real = 0; 
-	for(i=0; i< NWD; i++)
-	{
-		drv = &(hba[ctlr]->drv[i]);
-		if( !(drv->nr_blocks))
-			continue;
-		hba[ctlr]->hd[i << NWD_SHIFT].nr_sects = drv->nr_blocks;
-		//hba[ctlr]->gendisk.nr_real++;
-		(BLK_DEFAULT_QUEUE(MAJOR_NR + ctlr))->hardsect_size = drv->block_size;
-	}
-	hba[ctlr]->gendisk.nr_real = hba[ctlr]->highest_lun+1;
-}
 /*
  * Open.  Make sure the device is really there.
  */
@@ -599,7 +577,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 
 	case CCISS_REGNEWD:
 	{
-		return(register_new_disk(inode->i_rdev, ctlr));
+		return(register_new_disk(ctlr));
 	}	
 	case CCISS_PASSTHRU:
 	{
@@ -726,47 +704,9 @@ static int cciss_revalidate(kdev_t dev)
 {
         int ctlr = major(dev) - MAJOR_NR;
 	int target = minor(dev) >> NWD_SHIFT;
-        struct gendisk *gdev = &(hba[ctlr]->gendisk);
-	gdev->part[minor(dev)].nr_sects = hba[ctlr]->drv[target].nr_blocks;
+        struct gendisk *disk = &hba[ctlr]->gendisk[target];
+	disk->part[0].nr_sects = hba[ctlr]->drv[target].nr_blocks;
 	return 0;
-}
-
-/* Borrowed and adapted from sd.c */
-/*
- * FIXME: we are missing the exclusion with ->open() here - it can happen
- * just as we are rereading partition tables.
- */
-static int revalidate_logvol(kdev_t dev, int maxusage)
-{
-        int ctlr, target;
-        struct gendisk *gdev;
-        unsigned long flags;
-        int res;
-
-        target = minor(dev) >> NWD_SHIFT;
-        ctlr = major(dev) - MAJOR_NR;
-        gdev = &(hba[ctlr]->gendisk);
-
-        spin_lock_irqsave(CCISS_LOCK(ctlr), flags);
-        if (hba[ctlr]->drv[target].usage_count > maxusage) {
-                spin_unlock_irqrestore(CCISS_LOCK(ctlr), flags);
-                printk(KERN_WARNING "cciss: Device busy for "
-                        "revalidation (usage=%d)\n",
-                        hba[ctlr]->drv[target].usage_count);
-                return -EBUSY;
-        }
-        hba[ctlr]->drv[target].usage_count++;
-        spin_unlock_irqrestore(CCISS_LOCK(ctlr), flags);
-
-	res = wipe_partitions(dev);
-	if (res)
-		goto leave;
-
-	/* setup partitions per disk */
-	grok_partitions(dev, hba[ctlr]->drv[target].nr_blocks);
-leave:
-        hba[ctlr]->drv[target].usage_count--;
-        return res;
 }
 
 /*
@@ -799,6 +739,15 @@ static int revalidate_allvol(kdev_t dev)
         hba[ctlr]->usage_count++;
 	spin_unlock_irqrestore(CCISS_LOCK(ctlr), flags);
 
+	for(i=0; i< NWD; i++) {
+		struct gendisk *disk = &hba[ctlr]->gendisk[i];
+		if (disk->major_name) {
+			wipe_partitions(mk_kdev(disk->major, disk->first_minor));
+			del_gendisk(disk);
+			disk->major_name = NULL;
+		}
+	}
+
         /*
          * Set the partition and block size structures for all volumes
          * on this controller to zero.  We will reread all of this data
@@ -806,8 +755,6 @@ static int revalidate_allvol(kdev_t dev)
 	memset(hba[ctlr]->hd,         0, sizeof(struct hd_struct) * 256);
         memset(hba[ctlr]->drv,        0, sizeof(drive_info_struct)
 						* CISS_MAX_LUN);
-        hba[ctlr]->gendisk.nr_real = 0;
-
         /*
          * Tell the array controller not to give us any interrupts while
          * we check the new geometry.  Then turn interrupts back on when
@@ -817,13 +764,20 @@ static int revalidate_allvol(kdev_t dev)
         cciss_getgeometry(ctlr);
         hba[ctlr]->access.set_intr_mask(hba[ctlr], CCISS_INTR_ON);
 
-        cciss_geninit(ctlr);
-        for(i=0; i<NWD; i++) {
-		kdev_t kdev = mk_kdev(major(dev), i << NWD_SHIFT);
-                if (hba[ctlr]->gendisk.part[ i<<NWD_SHIFT ].nr_sects)
-                        revalidate_logvol(kdev, 2);
+	/* Loop through each real device */ 
+	for (i = 0; i < NWD; i++) {
+		struct gendisk *disk = &hba[ctlr]->gendisk[i];
+		drive_info_struct *drv = &(hba[ctlr]->drv[i]);
+		if (!drv->nr_blocks)
+			continue;
+		(BLK_DEFAULT_QUEUE(MAJOR_NR + ctlr))->hardsect_size = drv->block_size;
+		disk->major_name = hba[ctlr]->names + 12 * i;
+		add_gendisk(disk);
+		register_disk(disk,
+			      mk_kdev(disk->major, disk->first_minor),
+			      1<<disk->minor_shift, disk->fops,
+			      drv->nr_blocks);
 	}
-
         hba[ctlr]->usage_count--;
         return 0;
 }
@@ -831,18 +785,15 @@ static int revalidate_allvol(kdev_t dev)
 static int deregister_disk(int ctlr, int logvol)
 {
 	unsigned long flags;
-	struct gendisk *gdev = &(hba[ctlr]->gendisk);
+	struct gendisk *disk = &hba[ctlr]->gendisk[logvol];
 	ctlr_info_t  *h = hba[ctlr];
-	int start, max_p;
-
 
 	if (!capable(CAP_SYS_RAWIO))
 		return -EPERM;
 
 	spin_lock_irqsave(CCISS_LOCK(ctlr), flags);
 	/* make sure logical volume is NOT is use */
-	if( h->drv[logvol].usage_count > 1)
-	{
+	if( h->drv[logvol].usage_count > 1) {
 		spin_unlock_irqrestore(CCISS_LOCK(ctlr), flags);
                 return -EBUSY;
 	}
@@ -850,25 +801,24 @@ static int deregister_disk(int ctlr, int logvol)
 	spin_unlock_irqrestore(CCISS_LOCK(ctlr), flags);
 
 	/* invalidate the devices and deregister the disk */ 
-	max_p = 1 << gdev->minor_shift;
-	start = logvol << gdev->minor_shift;
-	wipe_partitions(mk_kdev(MAJOR_NR+ctlr, start));
+	if (disk->major_name) {
+		wipe_partitions(mk_kdev(disk->major, disk->first_minor));
+		del_gendisk(disk);
+		disk->major_name = NULL;
+	}
 	/* check to see if it was the last disk */
-	if (logvol == h->highest_lun)
-	{
+	if (logvol == h->highest_lun) {
 		/* if so, find the new hightest lun */
 		int i, newhighest =-1;
-		for(i=0; i<h->highest_lun; i++)
-		{
+		for(i=0; i<h->highest_lun; i++) {
 			/* if the disk has size > 0, it is available */
-			if (h->gendisk.part[i << gdev->minor_shift].nr_sects)
+			if (h->drv[i].nr_blocks)
 				newhighest = i;
 		}
 		h->highest_lun = newhighest;
 				
 	}
 	--h->num_luns;
-	gdev->nr_real = h->highest_lun+1; 
 	/* zero out the disk size info */ 
 	h->drv[logvol].nr_blocks = 0;
 	h->drv[logvol].block_size = 0;
@@ -1065,11 +1015,11 @@ case CMD_HARDWARE_ERR:
         return(return_status);
 
 }
-static int register_new_disk(kdev_t dev, int ctlr)
+static int register_new_disk(int ctlr)
 {
-        struct gendisk *gdev = &(hba[ctlr]->gendisk);
+        struct gendisk *disk;
         ctlr_info_t  *h = hba[ctlr];
-        int start, max_p, i;
+        int i;
 	int num_luns;
 	int logvol;
 	int new_lun_found = 0;
@@ -1084,7 +1034,6 @@ static int register_new_disk(kdev_t dev, int ctlr)
 	__u32 lunid = 0;
 	unsigned int block_size;
 	unsigned int total_size;
-	kdev_t kdev;
 
         if (!capable(CAP_SYS_RAWIO))
                 return -EPERM;
@@ -1292,15 +1241,16 @@ static int register_new_disk(kdev_t dev, int ctlr)
 			hba[ctlr]->drv[logvol].sectors,
 			hba[ctlr]->drv[logvol].cylinders);
 	hba[ctlr]->drv[logvol].usage_count = 0;
-	max_p = 1 << gdev->minor_shift;
-        start = logvol<< gdev->minor_shift;
-	kdev = mk_kdev(MAJOR_NR + ctlr, logvol<< gdev->minor_shift);
-
-	wipe_partitions(kdev);
 	++hba[ctlr]->num_luns;
-	gdev->nr_real = hba[ctlr]->highest_lun + 1;
 	/* setup partitions per disk */
-	grok_partitions(kdev, hba[ctlr]->drv[logvol].nr_blocks);
+        disk = &hba[ctlr]->gendisk[logvol];
+	disk->major_name = hba[ctlr]->names + 12 * logvol;
+	add_gendisk(disk);
+	register_disk(disk,
+		      mk_kdev(disk->major, disk->first_minor),
+		      1<<disk->minor_shift,
+		      disk->fops,
+		      hba[ctlr]->drv[logvol].nr_blocks);
 	
 	kfree(ld_buff);
 	kfree(size_buff);
@@ -2488,22 +2438,28 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 
 	blk_queue_max_sectors(q, 512);
 
-	/* Fill in the gendisk data */ 	
-	hba[i]->gendisk.major = MAJOR_NR + i;
-	hba[i]->gendisk.major_name = "cciss";
-	hba[i]->gendisk.minor_shift = NWD_SHIFT;
-	hba[i]->gendisk.part = hba[i]->hd;
-	hba[i]->gendisk.nr_real = hba[i]->highest_lun+1;  
 
-	/* Get on the disk list */ 
-	add_gendisk(&(hba[i]->gendisk));
+	for(j=0; j<NWD; j++) {
+		drive_info_struct *drv = &(hba[i]->drv[j]);
+		struct gendisk *disk = hba[i]->gendisk + j;
 
-	cciss_geninit(i);
-	for(j=0; j<NWD; j++)
-		register_disk(&(hba[i]->gendisk),
-			mk_kdev(MAJOR_NR+i, j <<4), 
-			MAX_PART, &cciss_fops, 
-			hba[i]->drv[j].nr_blocks);
+		sprintf(hba[i]->names + 12 * j, "cciss/c%dd%d", i, j);
+		disk->major = MAJOR_NR + i;
+		disk->first_minor = j << NWD_SHIFT;
+		disk->major_name = NULL;
+		disk->minor_shift = NWD_SHIFT;
+		disk->part = hba[i]->hd + (j << NWD_SHIFT);
+		disk->nr_real = 1;
+		if( !(drv->nr_blocks))
+			continue;
+		(BLK_DEFAULT_QUEUE(MAJOR_NR + i))->hardsect_size = drv->block_size;
+		disk->major_name = hba[i]->names + 12 * j;
+		add_gendisk(disk);
+		register_disk(disk,
+			      mk_kdev(disk->major, disk->first_minor),
+			      1<<disk->minor_shift, disk->fops,
+			      drv->nr_blocks);
+	}
 
 	cciss_register_scsi(i, 1);  /* hook ourself into SCSI subsystem */
 
@@ -2513,7 +2469,7 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 static void __devexit cciss_remove_one (struct pci_dev *pdev)
 {
 	ctlr_info_t *tmp_ptr;
-	int i;
+	int i, j;
 	char flush_buf[4];
 	int return_code; 
 
@@ -2548,7 +2504,13 @@ static void __devexit cciss_remove_one (struct pci_dev *pdev)
 	remove_proc_entry(hba[i]->devname, proc_cciss);	
 	
 	/* remove it from the disk list */
-	del_gendisk(&(hba[i]->gendisk));
+	for (j = 0; j < NWD; j++) {
+		struct gendisk *disk = &hba[i]->gendisk[j];
+		if (disk->major_name) {
+			del_gendisk(disk);
+			disk->major_name = NULL;
+		}
+	}
 
 	pci_free_consistent(hba[i]->pdev, NR_CMDS * sizeof(CommandList_struct),
 			    hba[i]->cmd_pool, hba[i]->cmd_pool_dhandle);

@@ -159,7 +159,7 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
 	area->phys_addr = phys_addr;
 	addr = area->addr;
 	if (remap_area_pages(VMALLOC_VMADDR(addr), phys_addr, size, flags)) {
-		vfree(addr);
+		vunmap(addr);
 		return NULL;
 	}
 	return (void *) (offset + (char *)addr);
@@ -215,13 +215,13 @@ void iounmap(void *addr)
 	struct vm_struct *p;
 	if (addr <= high_memory) 
 		return; 
-	p = remove_kernel_area((void *) (PAGE_MASK & (unsigned long) addr));
+	p = remove_vm_area((void *) (PAGE_MASK & (unsigned long) addr));
 	if (!p) { 
 		printk("__iounmap: bad address %p\n", addr);
 		return;
 	} 
 
-	vmfree_area_pages(VMALLOC_VMADDR(p->addr), p->size);	
+	unmap_vm_area(p);
 	if (p->flags && p->phys_addr < virt_to_phys(high_memory)) { 
 		change_page_attr(virt_to_page(__va(p->phys_addr)),
 				 p->size >> PAGE_SHIFT,

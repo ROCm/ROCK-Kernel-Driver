@@ -29,8 +29,8 @@ static void __init init_rise(struct cpuinfo_x86 *c)
 }
 
 static struct cpu_dev rise_cpu_dev __initdata = {
-	c_vendor:	"Rise",
-	c_ident:	{ "RiseRiseRise" },
+	.c_vendor	= "Rise",
+	.c_ident	= { "RiseRiseRise" },
 	c_models: {
 		{ X86_VENDOR_RISE,	5,
 		  { 
@@ -41,7 +41,7 @@ static struct cpu_dev rise_cpu_dev __initdata = {
 		  }
 		},
 	},
-	c_init:		init_rise,
+	.c_init		= init_rise,
 };
 
 int __init rise_init_cpu(void)

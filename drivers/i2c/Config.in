@@ -32,10 +32,10 @@ if [ "$CONFIG_I2C" != "n" ]; then
          dep_tristate '  Embedded Planet RPX Lite/Classic suppoort' CONFIG_I2C_RPXLITE $CONFIG_I2C_ALGO8XX
       fi
    fi
-   if [ "$CONFIG_405" = "y" ]; then
-      dep_tristate 'PPC 405 I2C Algorithm' CONFIG_I2C_PPC405_ALGO $CONFIG_I2C
-      if [ "$CONFIG_I2C_PPC405_ALGO" != "n" ]; then
-         dep_tristate '  PPC 405 I2C Adapter' CONFIG_I2C_PPC405_ADAP $CONFIG_I2C_PPC405_ALGO
+   if [ "$CONFIG_IBM_OCP" = "y" ]; then
+      dep_tristate 'IBM on-chip I2C Algorithm' CONFIG_I2C_IBM_OCP_ALGO $CONFIG_I2C
+      if [ "$CONFIG_I2C_IBM_OCP_ALGO" != "n" ]; then
+         dep_tristate '  IBM on-chip I2C Adapter' CONFIG_I2C_IBM_OCP_ADAP $CONFIG_I2C_IBM_OCP_ALGO
       fi
    fi
 

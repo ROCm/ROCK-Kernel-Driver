@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001 by David Brownell
+ * Copyright (c) 2001-2002 by David Brownell
  * 
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -175,3 +175,215 @@ dbg_qh (char *label, struct ehci_hcd *ehci, struct ehci_qh *qh) {}
 		(status & PORT_CONNECT) ? " CONNECT" : "" \
 	    )
 
+#ifdef DEBUG
+
+#define speed_char(info1) ({ char tmp; \
+		switch (info1 & (3 << 12)) { \
+		case 0 << 12: tmp = 'f'; break; \
+		case 1 << 12: tmp = 'l'; break; \
+		case 2 << 12: tmp = 'h'; break; \
+		default: tmp = '?'; break; \
+		}; tmp; })
+
+static ssize_t
+show_async (struct device *dev, char *buf, size_t count, loff_t off)
+{
+	struct pci_dev		*pdev;
+	struct ehci_hcd		*ehci;
+	unsigned long		flags;
+	unsigned		temp, size;
+	char			*next;
+	struct ehci_qh		*qh;
+
+	if (off != 0)
+		return 0;
+
+	pdev = container_of (dev, struct pci_dev, dev);
+	ehci = container_of (pci_get_drvdata (pdev), struct ehci_hcd, hcd);
+	next = buf;
+	size = count;
+
+	/* dumps a snapshot of the async schedule.
+	 * usually empty except for long-term bulk reads, or head.
+	 * one QH per line, and TDs we know about
+	 */
+	spin_lock_irqsave (&ehci->lock, flags);
+	if (ehci->async) {
+		qh = ehci->async;
+		do {
+			u32			scratch;
+			struct list_head	*entry;
+			struct ehci_qtd		*td;
+
+			scratch = cpu_to_le32p (&qh->hw_info1);
+			temp = snprintf (next, size, "qh %p dev%d %cs ep%d",
+					qh, scratch & 0x007f,
+					speed_char (scratch),
+					(scratch >> 8) & 0x000f);
+			size -= temp;
+			next += temp;
+
+			list_for_each (entry, &qh->qtd_list) {
+				td = list_entry (entry, struct ehci_qtd,
+						qtd_list);
+				scratch = cpu_to_le32p (&td->hw_token);
+				temp = snprintf (next, size,
+						", td %p len=%d %s",
+						td, scratch >> 16,
+						({ char *tmp;
+						 switch ((scratch>>8)&0x03) {
+						 case 0: tmp = "out"; break;
+						 case 1: tmp = "in"; break;
+						 case 2: tmp = "setup"; break;
+						 default: tmp = "?"; break;
+						 } tmp;})
+						);
+				size -= temp;
+				next += temp;
+			}
+
+			temp = snprintf (next, size, "\n");
+			size -= temp;
+			next += temp;
+
+		} while ((qh = qh->qh_next.qh) != ehci->async);
+	}
+	spin_unlock_irqrestore (&ehci->lock, flags);
+
+	return count - size;
+}
+static DEVICE_ATTR (async, "sched-async", S_IRUSR, show_async, NULL);
+
+#define DBG_SCHED_LIMIT 64
+
+static ssize_t
+show_periodic (struct device *dev, char *buf, size_t count, loff_t off)
+{
+	struct pci_dev		*pdev;
+	struct ehci_hcd		*ehci;
+	unsigned long		flags;
+	union ehci_shadow	p, *seen;
+	unsigned		temp, size, seen_count;
+	char			*next;
+	unsigned		i, tag;
+
+	if (off != 0)
+		return 0;
+	if (!(seen = kmalloc (DBG_SCHED_LIMIT * sizeof *seen, SLAB_ATOMIC)))
+		return 0;
+	seen_count = 0;
+
+	pdev = container_of (dev, struct pci_dev, dev);
+	ehci = container_of (pci_get_drvdata (pdev), struct ehci_hcd, hcd);
+	next = buf;
+	size = count;
+
+	temp = snprintf (next, size, "size = %d\n", ehci->periodic_size);
+	size -= temp;
+	next += temp;
+
+	/* dump a snapshot of the periodic schedule.
+	 * iso changes, interrupt usually doesn't.
+	 */
+	spin_lock_irqsave (&ehci->lock, flags);
+	for (i = 0; i < ehci->periodic_size; i++) {
+		p = ehci->pshadow [i];
+		if (!p.ptr)
+			continue;
+		tag = Q_NEXT_TYPE (ehci->periodic [i]);
+
+		temp = snprintf (next, size, "%4d: ", i);
+		size -= temp;
+		next += temp;
+
+		do {
+			switch (tag) {
+			case Q_TYPE_QH:
+				temp = snprintf (next, size, " intr-%d %p",
+						p.qh->period, p.qh);
+				size -= temp;
+				next += temp;
+				for (temp = 0; temp < seen_count; temp++) {
+					if (seen [temp].ptr == p.ptr)
+						break;
+				}
+				/* show more info the first time around */
+				if (temp == seen_count) {
+					u32	scratch = cpu_to_le32p (
+							&p.qh->hw_info1);
+
+					temp = snprintf (next, size,
+						" (%cs dev%d ep%d)",
+						speed_char (scratch),
+						scratch & 0x007f,
+						(scratch >> 8) & 0x000f);
+
+					/* FIXME TDs too */
+
+					if (seen_count < DBG_SCHED_LIMIT)
+						seen [seen_count++].qh = p.qh;
+				} else
+					temp = 0;
+				tag = Q_NEXT_TYPE (p.qh->hw_next);
+				p = p.qh->qh_next;
+				break;
+			case Q_TYPE_FSTN:
+				temp = snprintf (next, size,
+					" fstn-%8x/%p", p.fstn->hw_prev,
+					p.fstn);
+				tag = Q_NEXT_TYPE (p.fstn->hw_next);
+				p = p.fstn->fstn_next;
+				break;
+			case Q_TYPE_ITD:
+				temp = snprintf (next, size,
+					" itd/%p", p.itd);
+				tag = Q_NEXT_TYPE (p.itd->hw_next);
+				p = p.itd->itd_next;
+				break;
+			case Q_TYPE_SITD:
+				temp = snprintf (next, size,
+					" sitd/%p", p.sitd);
+				tag = Q_NEXT_TYPE (p.sitd->hw_next);
+				p = p.sitd->sitd_next;
+				break;
+			}
+			size -= temp;
+			next += temp;
+		} while (p.ptr);
+
+		temp = snprintf (next, size, "\n");
+		size -= temp;
+		next += temp;
+	}
+	spin_unlock_irqrestore (&ehci->lock, flags);
+	kfree (seen);
+
+	return count - size;
+}
+static DEVICE_ATTR (periodic, "sched-periodic", S_IRUSR, show_periodic, NULL);
+
+#undef DBG_SCHED_LIMIT
+
+static inline void create_debug_files (struct ehci_hcd *bus)
+{
+	device_create_file (&bus->hcd.pdev->dev, &dev_attr_async);
+	device_create_file (&bus->hcd.pdev->dev, &dev_attr_periodic);
+}
+
+static inline void remove_debug_files (struct ehci_hcd *bus)
+{
+	device_remove_file (&bus->hcd.pdev->dev, &dev_attr_async);
+	device_remove_file (&bus->hcd.pdev->dev, &dev_attr_periodic);
+}
+
+#else /* DEBUG */
+
+static inline void create_debug_files (struct ehci_hcd *bus)
+{
+}
+
+static inline void remove_debug_files (struct ehci_hcd *bus)
+{
+}
+
+#endif /* DEBUG */
