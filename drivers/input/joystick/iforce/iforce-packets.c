@@ -56,7 +56,7 @@ int iforce_send_packet(struct iforce *iforce, u16 cmd, unsigned char* data)
 	int empty;
 	int head, tail;
 	unsigned long flags;
-			
+
 /*
  * Update head and tail of xmit buffer
  */
@@ -108,7 +108,7 @@ int iforce_send_packet(struct iforce *iforce, u16 cmd, unsigned char* data)
 		break;
 #endif
 #ifdef CONFIG_JOYSTICK_IFORCE_USB
-		case IFORCE_USB: 
+		case IFORCE_USB:
 
 		if (iforce->usbdev && empty &&
 			!test_and_set_bit(IFORCE_XMIT_RUNNING, iforce->xmit_flags)) {

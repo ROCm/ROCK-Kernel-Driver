@@ -26,7 +26,6 @@
 #include <linux/input.h>
 #include <linux/serio.h>
 #include <linux/workqueue.h>
-#include <linux/timer.h>
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
 MODULE_DESCRIPTION("AT and PS/2 keyboard driver");
@@ -173,22 +172,24 @@ struct atkbd {
 	unsigned char keycode[512];
 	struct input_dev dev;
 	struct serio *serio;
-	struct timer_list timer;
+
 	char name[64];
 	char phys[32];
+	unsigned short id;
+	unsigned char set;
+	unsigned int translated:1;
+	unsigned int extra:1;
+	unsigned int write:1;
+
 	unsigned char cmdbuf[4];
 	unsigned char cmdcnt;
-	unsigned char set;
-	unsigned char extra;
-	unsigned char release;
-	int lastkey;
 	volatile signed char ack;
 	unsigned char emul;
-	unsigned short id;
-	unsigned char write;
-	unsigned char translated;
-	unsigned char resend;
-	unsigned char bat_xl;
+	unsigned int resend:1;
+	unsigned int release:1;
+	unsigned int bat_xl:1;
+	unsigned int enabled:1;
+
 	unsigned int last;
 	unsigned long time;
 };
@@ -248,6 +249,9 @@ static irqreturn_t atkbd_interrupt(struct serio *serio, unsigned char data,
 		goto out;
 	}
 
+	if (!atkbd->enabled)
+		goto out;
+
 	if (atkbd->translated) {
 
 		if (atkbd->emul ||
@@ -300,15 +304,20 @@ static irqreturn_t atkbd_interrupt(struct serio *serio, unsigned char data,
 		case ATKBD_KEY_NULL:
 			break;
 		case ATKBD_KEY_UNKNOWN:
-			printk(KERN_WARNING "atkbd.c: Unknown key %s (%s set %d, code %#x on %s).\n",
-				atkbd->release ? "released" : "pressed",
-				atkbd->translated ? "translated" : "raw",
-				atkbd->set, code, serio->phys);
-			if (atkbd->translated && atkbd->set == 2 && code == 0x7a)
-				printk(KERN_WARNING "atkbd.c: This is an XFree86 bug. It shouldn't access"
-					" hardware directly.\n");
-			else
-				printk(KERN_WARNING "atkbd.c: Use 'setkeycodes %s%02x <keycode>' to make it known.\n",						code & 0x80 ? "e0" : "", code & 0x7f);
+			if (data == ATKBD_RET_ACK || data == ATKBD_RET_NAK) {
+				printk(KERN_WARNING "atkbd.c: Spurious %s on %s. Some program, "
+				       "like XFree86, might be trying access hardware directly.\n",
+				       data == ATKBD_RET_ACK ? "ACK" : "NAK", serio->phys);
+			} else {
+				printk(KERN_WARNING "atkbd.c: Unknown key %s "
+				       "(%s set %d, code %#x on %s).\n",
+				       atkbd->release ? "released" : "pressed",
+				       atkbd->translated ? "translated" : "raw",
+				       atkbd->set, code, serio->phys);
+				printk(KERN_WARNING "atkbd.c: Use 'setkeycodes %s%02x <keycode>' "
+				       "to make it known.\n",
+				       code & 0x80 ? "e0" : "", code & 0x7f);
+			}
 			break;
 		case ATKBD_SCR_1:
 			scroll = 1 - atkbd->release * 2;
@@ -745,6 +754,8 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 		atkbd->id = 0xab00;
 	}
 
+	atkbd->enabled = 1;
+
 	if (atkbd->extra) {
 		atkbd->dev.ledbit[0] |= BIT(LED_COMPOSE) | BIT(LED_SUSPEND) | BIT(LED_SLEEP) | BIT(LED_MUTE) | BIT(LED_MISC);
 		sprintf(atkbd->name, "AT Set 2 Extra keyboard");
@@ -809,12 +820,12 @@ static int atkbd_reconnect(struct serio *serio)
 		param[0] = (test_bit(LED_SCROLLL, atkbd->dev.led) ? 1 : 0)
 		         | (test_bit(LED_NUML,    atkbd->dev.led) ? 2 : 0)
  		         | (test_bit(LED_CAPSL,   atkbd->dev.led) ? 4 : 0);
-		
+
 		if (atkbd_probe(atkbd))
 			return -1;
 		if (atkbd->set != atkbd_set_3(atkbd))
 			return -1;
-		
+
 		atkbd_enable(atkbd);
 
 		if (atkbd_command(atkbd, param, ATKBD_CMD_SETLEDS))
