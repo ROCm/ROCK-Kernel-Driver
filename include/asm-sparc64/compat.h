@@ -108,9 +108,9 @@ typedef u32		compat_sigset_word;
  */
 typedef	u32		compat_uptr_t;
 
-static inline void *compat_ptr(compat_ptr_t uptr)
+static inline void *compat_ptr(compat_uptr_t uptr)
 {
-	return (void *)uptr;
+	return (void *)(unsigned long)uptr;
 }
 
 #endif /* _ASM_SPARC64_COMPAT_H */
