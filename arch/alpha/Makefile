@@ -119,15 +119,12 @@ arch/$(ARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \
 				   include/config/MARKER
 
 include/asm-$(ARCH)/asm_offsets.h: arch/$(ARCH)/kernel/asm-offsets.s
-	@echo -n '  Generating $@'
-	@$(generate-asm-offsets.h) < $< > $@.tmp
-	@$(update-if-changed)
+	$(call filechk,gen-asm-offsets)
 
 archclean:
 	$(Q)$(MAKE) -f scripts/Makefile.clean obj=$(boot)
 
-CLEAN_FILES += include/asm-$(ARCH)/asm_offsets.h.tmp \
-	       include/asm-$(ARCH)/asm_offsets.h
+CLEAN_FILES += include/asm-$(ARCH)/asm_offsets.h
 
 define archhelp
   echo '* boot		- Compressed kernel image (arch/alpha/boot/vmlinux.gz)'

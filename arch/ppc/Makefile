@@ -80,12 +80,8 @@ prepare: include/asm-$(ARCH)/offsets.h checkbin
 arch/$(ARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \
 				   include/config/MARKER
 
-include/asm-$(ARCH)/offsets.h.tmp: arch/$(ARCH)/kernel/asm-offsets.s
-	@$(generate-asm-offsets.h) < $< > $@
-
-include/asm-$(ARCH)/offsets.h: include/asm-$(ARCH)/offsets.h.tmp
-	@echo -n '  Generating $@'
-	@$(update-if-changed)
+include/asm-$(ARCH)/offsets.h: arch/$(ARCH)/kernel/asm-offsets.s 
+	$(call filechk,gen-asm-offsets)
 
 ifdef CONFIG_6xx
 # Ensure this is binutils 2.12.1 (or 2.12.90.0.7) or later
@@ -106,6 +102,5 @@ checkbin:
 	@true
 endif
 
-CLEAN_FILES +=	include/asm-$(ARCH)/offsets.h.tmp \
-		include/asm-$(ARCH)/offsets.h \
+CLEAN_FILES +=	include/asm-$(ARCH)/offsets.h \
 		arch/$(ARCH)/kernel/asm-offsets.s
