@@ -1521,6 +1521,12 @@ static int happy_meal_init(struct happy_meal *hp)
 	hme_write32(hp, bregs + BMAC_IGAP1, DEFAULT_IPG1);
 	hme_write32(hp, bregs + BMAC_IGAP2, DEFAULT_IPG2);
 
+	/* Make sure we can handle VLAN frames.  */
+	hme_write32(hp, bregs + BMAC_TXMAX,
+		    ETH_DATA_LEN + ETH_HLEN + 8);
+	hme_write32(hp, bregs + BMAC_RXMAX,
+		    ETH_DATA_LEN + ETH_HLEN + 8);
+
 	/* Load up the MAC address and random seed. */
 	HMD(("rseed/macaddr, "));
 

@@ -506,7 +506,7 @@ void ip6ip6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 		icmpv6_send(skb2, rel_type, rel_code, rel_info, skb2->dev);
 
 		if (rt)
-			dst_free(&rt->u.dst);
+			dst_release(&rt->u.dst);
 
 		kfree_skb(skb2);
 	}
