@@ -1036,8 +1036,8 @@ static int shmem_mknod(struct inode *dir, struct dentry *dentry, int mode, int d
 	struct inode * inode = shmem_get_inode(dir->i_sb, mode, dev);
 	int error = -ENOSPC;
 
-	dir->i_ctime = dir->i_mtime = CURRENT_TIME;
 	if (inode) {
+		dir->i_ctime = dir->i_mtime = CURRENT_TIME;
 		d_instantiate(dentry, inode);
 		dget(dentry); /* Extra count - pin the dentry in core */
 		error = 0;
