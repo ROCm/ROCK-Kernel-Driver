@@ -23,8 +23,6 @@ struct page;
 typedef void ia64_mv_setup_t (char **);
 typedef void ia64_mv_cpu_init_t(void);
 typedef void ia64_mv_irq_init_t (void);
-typedef void ia64_mv_pci_fixup_t (int);
-typedef unsigned long ia64_mv_map_nr_t (unsigned long);
 typedef void ia64_mv_mca_init_t (void);
 typedef void ia64_mv_mca_handler_t (void);
 typedef void ia64_mv_cmci_handler_t (int, void *, struct pt_regs *);
@@ -120,8 +118,6 @@ struct ia64_machine_vector {
 	ia64_mv_setup_t *setup;
 	ia64_mv_cpu_init_t *cpu_init;
 	ia64_mv_irq_init_t *irq_init;
-	ia64_mv_pci_fixup_t *pci_fixup;
-	ia64_mv_map_nr_t *map_nr;
 	ia64_mv_mca_init_t *mca_init;
 	ia64_mv_mca_handler_t *mca_handler;
 	ia64_mv_cmci_handler_t *cmci_handler;
