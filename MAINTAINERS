@@ -1086,6 +1086,14 @@ L:	kbuild-devel@lists.sourceforge.net
 W:	http://kbuild.sourceforge.net
 S:	Maintained 
 
+KERNEL JANITORS
+P:	Several
+L:	kernel-janitor-discuss@lists.sf.net
+W:	http://www.kerneljanitors.org/
+W:	http://sf.net/projects/kernel-janitor/
+W:	http://developer.osdl.org/rddunlap/kj-patches/
+S:	Maintained
+
 KERNEL NFSD
 P:	Neil Brown
 M:	neilb@cse.unsw.edu.au
