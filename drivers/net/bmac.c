@@ -1401,8 +1401,6 @@ static void __init bmac_probe1(struct device_node *bmac, int is_bmac_plus)
 	bp->queue = (struct sk_buff_head *)(bp->rx_cmds + N_RX_RING + 1);
 	skb_queue_head_init(bp->queue);
 
-	memset((char *) bp->tx_cmds, 0,
-	       (N_TX_RING + N_RX_RING + 2) * sizeof(struct dbdma_cmd));
 	init_timer(&bp->tx_timeout);
 	/*     bp->timeout_active = 0; */
 

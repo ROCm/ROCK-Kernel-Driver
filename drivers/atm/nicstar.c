@@ -1538,7 +1538,7 @@ static int ns_open(struct atm_vcc *vcc, short vpi, int vci)
          
 	 fill_tst(card, n, vc);
       }
-      else /* not CBR */
+      else if (vcc->qos.txtp.traffic_class == ATM_UBR)
       {
          vc->cbr_scd = 0x00000000;
 	 vc->scq = card->scq0;

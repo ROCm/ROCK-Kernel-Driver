@@ -397,6 +397,10 @@ static int gem_rxmac_interrupt(struct net_device *dev, struct gem *gp, u32 gem_s
 			gp->dev->name, rxmac_stat);
 
 	if (rxmac_stat & MAC_RXSTAT_OFLW) {
+		u32 smac = readl(gp->regs + MAC_SMACHINE);
+
+		printk(KERN_ERR "%s: RX MAC fifo overflow smac[%08x].\n",
+				dev->name, smac);
 		gp->net_stats.rx_over_errors++;
 		gp->net_stats.rx_fifo_errors++;
 

@@ -1483,7 +1483,9 @@ static void pcnet32_load_multicast (struct net_device *dev)
 	
 	crc = ether_crc_le(6, addrs);
 	crc = crc >> 26;
-	mcast_table [crc >> 4] |= 1 << (crc & 0xf);
+	mcast_table [crc >> 4] = le16_to_cpu(
+		le16_to_cpu(mcast_table [crc >> 4]) | (1 << (crc & 0xf))
+	);
     }
     return;
 }
