@@ -551,7 +551,7 @@ unsigned find_get_pages(struct address_space *mapping, pgoff_t start,
 
 /*
  * Like find_get_pages, except we only return pages which are tagged with
- * `tag'.   We update *start to index the next page for the traversal.
+ * `tag'.   We update *index to index the next page for the traversal.
  */
 unsigned find_get_pages_tag(struct address_space *mapping, pgoff_t *index,
 			int tag, unsigned int nr_pages, struct page **pages)

@@ -365,7 +365,7 @@ struct block_device {
 };
 
 /*
- * Radix-tre tags, for tagging dirty and writeback pages within the pagecache
+ * Radix-tree tags, for tagging dirty and writeback pages within the pagecache
  * radix trees
  */
 #define PAGECACHE_TAG_DIRTY	0
