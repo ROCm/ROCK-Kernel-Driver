@@ -9,6 +9,8 @@
 #include "frame_kern.h"
 #include "sigcontext.h"
 #include "sysdep/ptrace.h"
+#include "choose-mode.h"
+#include "mode.h"
 
 static int copy_restorer(void (*restorer)(void), unsigned long start, 
 			 unsigned long sr_index, int sr_relative)
@@ -23,6 +25,15 @@ static int copy_restorer(void (*restorer)(void), unsigned long start,
 
 	return(copy_to_user((void *) (start + sr_index), &restorer, 
 			    sizeof(restorer)));
+}
+
+static int copy_sc_to_user(void *to, struct pt_regs *from)
+{
+ 	return(CHOOSE_MODE(copy_sc_to_user_tt(to, from->regs.mode.tt, 
+ 					      &signal_frame_sc_sr.arch),
+ 			   copy_sc_to_user_skas(to, &from->regs,
+ 						current->thread.cr2,
+ 						current->thread.err)));
 }
 
 int setup_signal_stack_si(unsigned long stack_top, int sig, 
@@ -43,8 +54,7 @@ int setup_signal_stack_si(unsigned long stack_top, int sig,
 	if(restorer == NULL)
 		panic("setup_signal_stack_si - no restorer");
 
-	if(copy_sc_to_user((void *) sc, regs->regs.mode.tt, 
-			   &signal_frame_sc.arch) ||
+	if(copy_sc_to_user((void *) sc, regs) ||
 	   copy_to_user((void *) start, signal_frame_si.common.data,
 			signal_frame_si.common.len) ||
 	   copy_to_user((void *) (start + signal_frame_si.common.sig_index), 
@@ -86,8 +96,7 @@ int setup_signal_stack_sc(unsigned long stack_top, int sig,
 	if(copy_to_user((void *) start, frame->data, frame->len) ||
 	   copy_to_user((void *) (start + frame->sig_index), &sig, 
 			sizeof(sig)) ||
-	   copy_sc_to_user(user_sc, regs->regs.mode.tt, 
-			   &signal_frame_sc.arch) ||
+	   copy_sc_to_user(user_sc, regs) ||
 	   copy_to_user(sc_sigmask(user_sc), mask, sizeof(mask->sig[0])) ||
 	   copy_to_user((void *) sigs, &mask->sig[1], sig_size) ||
 	   copy_restorer(restorer, start, frame->sr_index, frame->sr_relative))

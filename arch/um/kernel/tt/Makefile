@@ -3,10 +3,13 @@
 # Licensed under the GPL
 #
 
-obj-y = exec_kern.o exec_user.o gdb.o gdb_kern.o mem.o process_kern.o \
-	syscall_user.o tracer.o uaccess_user.o
+subdir-y = sys-$(SUBARCH)/
 
-obj-$(CONFIG_PT_PROXY) += ptproxy/
+subdir-$(CONFIG_PT_PROXY) += ptproxy/
+
+obj-y = exec_kern.o exec_user.o gdb.o gdb_kern.o mem.o process_kern.o \
+	syscall_user.o tracer.o uaccess_user.o $(subdir-y)
+
 
 USER_OBJS := $(filter %_user.o,$(obj-y)) gdb.o tracer.o
 USER_OBJS := $(foreach file,$(USER_OBJS),$(obj)/$(file))
