@@ -19,6 +19,8 @@ obj-$(CONFIG_PCMCIA_SA1111)			+= sa11xx_core.o sa1111_cs.o
 pcmcia_core-y					+= cistpl.o rsrc_mgr.o bulkmem.o cs.o
 pcmcia_core-$(CONFIG_CARDBUS)			+= cardbus.o
 
+sa11xx_core-y					+= soc_common.o sa11xx_base.o
+
 sa1111_cs-y					+= sa1111_generic.o
 sa1111_cs-$(CONFIG_SA1100_ADSBITSY)		+= sa1100_adsbitsy.o
 sa1111_cs-$(CONFIG_ASSABET_NEPONSET)		+= sa1100_neponset.o

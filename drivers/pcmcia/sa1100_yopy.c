@@ -33,19 +33,19 @@ static struct pcmcia_irqs irqs[] = {
 	{ 0, IRQ_CF_BVD1, "CF_BVD1" },
 };
 
-static int yopy_pcmcia_hw_init(struct sa1100_pcmcia_socket *skt)
+static int yopy_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
 {
 	skt->irq = IRQ_CF_IREQ;
 
 	pcmcia_power(0);
 	pcmcia_reset(1);
 
-	return sa11xx_request_irqs(skt, irqs, ARRAY_SIZE(irqs));
+	return soc_pcmcia_request_irqs(skt, irqs, ARRAY_SIZE(irqs));
 }
 
-static void yopy_pcmcia_hw_shutdown(struct sa1100_pcmcia_socket *skt)
+static void yopy_pcmcia_hw_shutdown(struct soc_pcmcia_socket *skt)
 {
-	sa11xx_free_irqs(skt, irqs, ARRAY_SIZE(irqs));
+	soc_pcmcia_free_irqs(skt, irqs, ARRAY_SIZE(irqs));
 
 	/* Disable CF */
 	pcmcia_reset(1);
@@ -53,7 +53,7 @@ static void yopy_pcmcia_hw_shutdown(struct sa1100_pcmcia_socket *skt)
 }
 
 static void
-yopy_pcmcia_socket_state(struct sa1100_pcmcia_socket *skt,
+yopy_pcmcia_socket_state(struct soc_pcmcia_socket *skt,
 			 struct pcmcia_state_array *state)
 {
 	unsigned long levels = GPLR;
@@ -68,7 +68,7 @@ yopy_pcmcia_socket_state(struct sa1100_pcmcia_socket *skt,
 }
 
 static int
-yopy_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt,
+yopy_pcmcia_configure_socket(struct soc_pcmcia_socket *skt,
 			     const socket_state_t *state)
 {
 	switch (state->Vcc) {
@@ -93,14 +93,14 @@ yopy_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt,
 	return 0;
 }
 
-static void yopy_pcmcia_socket_init(struct sa1100_pcmcia_socket *skt)
+static void yopy_pcmcia_socket_init(struct soc_pcmcia_socket *skt)
 {
-	sa11xx_enable_irqs(skt, irqs, ARRAY_SIZE(irqs));
+	soc_pcmcia_enable_irqs(skt, irqs, ARRAY_SIZE(irqs));
 }
 
-static void yopy_pcmcia_socket_suspend(struct sa1100_pcmcia_socket *skt)
+static void yopy_pcmcia_socket_suspend(struct soc_pcmcia_socket *skt)
 {
-	sa11xx_disable_irqs(skt, irqs, ARRAY_SIZE(irqs));
+	soc_pcmcia_disable_irqs(skt, irqs, ARRAY_SIZE(irqs));
 }
 
 static struct pcmcia_low_level yopy_pcmcia_ops = {
