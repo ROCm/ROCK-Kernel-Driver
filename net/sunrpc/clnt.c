@@ -35,7 +35,7 @@
 #include <linux/nfs.h>
 
 
-#define RPC_SLACK_SPACE		512	/* total overkill */
+#define RPC_SLACK_SPACE		(1024)	/* total overkill */
 
 #ifdef RPC_DEBUG
 # define RPCDBG_FACILITY	RPCDBG_CALL

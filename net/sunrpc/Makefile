@@ -2,6 +2,8 @@
 # Makefile for Linux kernel SUN RPC
 #
 
+obj-$(CONFIG_SUNRPC_GSS) += auth_gss/
+
 obj-$(CONFIG_SUNRPC) += sunrpc.o
 
 export-objs := sunrpc_syms.o

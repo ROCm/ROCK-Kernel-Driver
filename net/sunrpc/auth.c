@@ -24,6 +24,13 @@ static struct rpc_authops *	auth_flavors[RPC_AUTH_MAXFLAVOR] = {
 	NULL,			/* others can be loadable modules */
 };
 
+u32
+pseudoflavor_to_flavor(u32 flavor) {
+	if (flavor >= RPC_AUTH_MAXFLAVOR)
+		return RPC_AUTH_GSS;
+	return flavor;
+}
+
 int
 rpcauth_register(struct rpc_authops *ops)
 {
@@ -51,13 +58,14 @@ rpcauth_unregister(struct rpc_authops *ops)
 }
 
 struct rpc_auth *
-rpcauth_create(rpc_authflavor_t flavor, struct rpc_clnt *clnt)
+rpcauth_create(rpc_authflavor_t pseudoflavor, struct rpc_clnt *clnt)
 {
 	struct rpc_authops	*ops;
+	u32			flavor = pseudoflavor_to_flavor(pseudoflavor);
 
 	if (flavor >= RPC_AUTH_MAXFLAVOR || !(ops = auth_flavors[flavor]))
 		return NULL;
-	clnt->cl_auth = ops->create(clnt);
+	clnt->cl_auth = ops->create(clnt, pseudoflavor);
 	return clnt->cl_auth;
 }
 
@@ -218,7 +226,7 @@ retry:
 	rpcauth_destroy_credlist(&free);
 
 	if (!cred) {
-		new = auth->au_ops->crcreate(acred, taskflags);
+		new = auth->au_ops->crcreate(auth, acred, taskflags);
 		if (new) {
 #ifdef RPC_DEBUG
 			new->cr_magic = RPCAUTH_CRED_MAGIC;

@@ -346,6 +346,7 @@ int nfs_fill_super(struct super_block *sb, struct nfs_mount_data *data, int sile
 	struct rpc_clnt		*clnt = NULL;
 	struct rpc_timeout	timeparms;
 	int			tcp, err = -EIO;
+	u32			authflavor;
 
 	server           = NFS_SB(sb);
 	sb->s_blocksize_bits = 0;
@@ -408,8 +409,14 @@ int nfs_fill_super(struct super_block *sb, struct nfs_mount_data *data, int sile
 		printk(KERN_WARNING "NFS: cannot create RPC transport.\n");
 		goto out_fail;
 	}
+
+	if (data->flags & NFS_MOUNT_SECFLAVOUR)
+		authflavor = data->pseudoflavor;
+	else
+		authflavor = RPC_AUTH_UNIX;
+
 	clnt = rpc_create_client(xprt, server->hostname, &nfs_program,
-				 server->rpc_ops->version, RPC_AUTH_UNIX);
+				 server->rpc_ops->version, authflavor);
 	if (clnt == NULL) {
 		printk(KERN_WARNING "NFS: cannot create RPC client.\n");
 		xprt_destroy(xprt);

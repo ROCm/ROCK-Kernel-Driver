@@ -20,7 +20,7 @@
 static struct rpc_credops	null_credops;
 
 static struct rpc_auth *
-nul_create(struct rpc_clnt *clnt)
+nul_create(struct rpc_clnt *clnt, rpc_authflavor_t flavor)
 {
 	struct rpc_auth	*auth;
 
@@ -48,7 +48,7 @@ nul_destroy(struct rpc_auth *auth)
  * Create NULL creds for current process
  */
 static struct rpc_cred *
-nul_create_cred(struct auth_cred *acred, int flags)
+nul_create_cred(struct rpc_auth *auth, struct auth_cred *acred, int flags)
 {
 	struct rpc_cred	*cred;
 

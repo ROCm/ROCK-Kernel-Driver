@@ -1339,6 +1339,17 @@ config SUNRPC
 	default m if NFS_FS!=y && NFSD!=y && (NFS_FS=m || NFSD=m)
 	default y if NFS_FS=y || NFSD=y
 
+config SUNRPC_GSS
+	tristate "Provide RPCSEC_GSS authentication (EXPERIMENTAL)"
+	depends on SUNRPC && EXPERIMENTAL
+	default SUNRPC if NFS_V4=y
+	help
+	  Provides cryptographic authentication for NFS rpc requests.  To
+	  make this useful, you also need support for a gss-api mechanism
+	  (such as Kerberos).
+	  Note: You should always select this option if you wish to use
+	  NFSv4.
+
 config LOCKD
 	tristate
 	default m if NFS_FS!=y && NFSD!=y && (NFS_FS=m || NFSD=m)

@@ -38,7 +38,7 @@ struct unx_cred {
 static struct rpc_credops	unix_credops;
 
 static struct rpc_auth *
-unx_create(struct rpc_clnt *clnt)
+unx_create(struct rpc_clnt *clnt, rpc_authflavor_t flavor)
 {
 	struct rpc_auth	*auth;
 
@@ -64,7 +64,7 @@ unx_destroy(struct rpc_auth *auth)
 }
 
 static struct rpc_cred *
-unx_create_cred(struct auth_cred *acred, int flags)
+unx_create_cred(struct rpc_auth *auth, struct auth_cred *acred, int flags)
 {
 	struct unx_cred	*cred;
 	int		i;
@@ -208,7 +208,7 @@ unx_validate(struct rpc_task *task, u32 *p)
 	}
 
 	size = ntohl(*p++);
-	if (size > 400) {
+	if (size > RPC_MAX_AUTH_SIZE) {
 		printk("RPC: giant verf size: %u\n", size);
 		return NULL;
 	}
