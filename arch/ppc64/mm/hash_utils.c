@@ -353,8 +353,7 @@ void flush_hash_range(unsigned long context, unsigned long number, int local)
 		ppc_md.flush_hash_range(context, number, local);
 	} else {
 		int i;
-		struct ppc64_tlb_batch *batch =
-			&ppc64_tlb_batch[smp_processor_id()];
+		struct ppc64_tlb_batch *batch = &__get_cpu_var(ppc64_tlb_batch);
 
 		for (i = 0; i < number; i++)
 			flush_hash_page(context, batch->addr[i], batch->pte[i],

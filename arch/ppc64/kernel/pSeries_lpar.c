@@ -432,10 +432,8 @@ static long pSeries_lpar_hpte_updatepp(unsigned long slot, unsigned long newpp,
 
 	lpar_rc = plpar_pte_protect(flags, slot, (avpn << 7));
 
-	if (lpar_rc == H_Not_Found) {
-		udbg_printf("updatepp missed\n");
+	if (lpar_rc == H_Not_Found)
 		return -1;
-	}
 
 	if (lpar_rc != H_Success)
 		panic("bad return code from pte protect rc = %lx\n", lpar_rc);
@@ -533,10 +531,8 @@ static void pSeries_lpar_hpte_invalidate(unsigned long slot, unsigned long va,
 	lpar_rc = plpar_pte_remove(H_AVPN, slot, (avpn << 7), &dummy1,
 				   &dummy2);
 
-	if (lpar_rc == H_Not_Found) {
-		udbg_printf("invalidate missed\n");
+	if (lpar_rc == H_Not_Found)
 		return;
-	}
 
 	if (lpar_rc != H_Success)
 		panic("Bad return code from invalidate rc = %lx\n", lpar_rc);
@@ -551,7 +547,7 @@ void pSeries_lpar_flush_hash_range(unsigned long context, unsigned long number,
 {
 	int i;
 	unsigned long flags;
-	struct ppc64_tlb_batch *batch = &ppc64_tlb_batch[smp_processor_id()];
+	struct ppc64_tlb_batch *batch = &__get_cpu_var(ppc64_tlb_batch);
 
 	spin_lock_irqsave(&pSeries_lpar_tlbie_lock, flags);
 
