@@ -189,25 +189,23 @@ __inline static int __count_segments(struct request *req,
 void
 recount_segments(Scsi_Cmnd * SCpnt)
 {
-	struct request *req;
-	struct Scsi_Host *SHpnt;
-	Scsi_Device * SDpnt;
-
-	req   = &SCpnt->request;
-	SHpnt = SCpnt->host;
-	SDpnt = SCpnt->device;
+	struct request *req = &SCpnt->request;
+	struct Scsi_Host *SHpnt = SCpnt->host;
 
 	req->nr_segments = __count_segments(req, SHpnt->unchecked_isa_dma,NULL);
 }
 
-#define MERGEABLE_BUFFERS(X,Y) \
-(((((long)bio_to_phys((X))+(X)->bi_size)|((long)bio_to_phys((Y)))) & \
-  (DMA_CHUNK_SIZE - 1)) == 0)
-
+/*
+ * IOMMU hackery for sparc64
+ */
 #ifdef DMA_CHUNK_SIZE
+
+#define MERGEABLE_BUFFERS(X,Y) \
+	((((bvec_to_phys(__BVEC_END((X))) + __BVEC_END((X))->bv_len) | bio_to_phys((Y))) & (DMA_CHUNK_SIZE - 1)) == 0)
+
 static inline int scsi_new_mergeable(request_queue_t * q,
 				     struct request * req,
-				     struct Scsi_Host *SHpnt)
+				     int nr_segs)
 {
 	/*
 	 * pci_map_sg will be able to merge these two
@@ -216,49 +214,51 @@ static inline int scsi_new_mergeable(request_queue_t * q,
 	 * scsi.c allocates for this purpose
 	 * min(64,sg_tablesize) entries.
 	 */
-	if (req->nr_segments >= q->max_segments)
+	if (req->nr_segments + nr_segs > q->max_segments)
 		return 0;
 
-	req->nr_segments++;
+	req->nr_segments += nr_segs;
 	return 1;
 }
 
 static inline int scsi_new_segment(request_queue_t * q,
 				   struct request * req,
-				   struct bio *bio)
+				   struct bio *bio, int nr_segs)
 {
 	/*
 	 * pci_map_sg won't be able to map these two
 	 * into a single hardware sg entry, so we have to
 	 * check if things fit into sg_tablesize.
 	 */
-	if (req->nr_hw_segments >= q->max_segments)
+	if (req->nr_hw_segments + nr_segs > q->max_segments)
 		return 0;
-	else if (req->nr_segments + bio->bi_vcnt > q->max_segments)
+	else if (req->nr_segments + nr_segs > q->max_segments)
 		return 0;
 
-	req->nr_hw_segments += bio->bi_vcnt;
-	req->nr_segments += bio->bi_vcnt;
+	req->nr_hw_segments += nr_segs;
+	req->nr_segments += nr_segs;
 	return 1;
 }
 
-#else
+#else /* DMA_CHUNK_SIZE */
 
 static inline int scsi_new_segment(request_queue_t * q,
 				   struct request * req,
-				   struct bio *bio)
+				   struct bio *bio, int nr_segs)
 {
-	if (req->nr_segments + bio->bi_vcnt > q->max_segments)
+	if (req->nr_segments + nr_segs > q->max_segments) {
+		req->flags |= REQ_NOMERGE;
 		return 0;
+	}
 
 	/*
 	 * This will form the start of a new segment.  Bump the 
 	 * counter.
 	 */
-	req->nr_segments += bio->bi_vcnt;
+	req->nr_segments += nr_segs;
 	return 1;
 }
-#endif
+#endif /* DMA_CHUNK_SIZE */
 
 /*
  * Function:    __scsi_merge_fn()
@@ -294,36 +294,47 @@ static inline int scsi_new_segment(request_queue_t * q,
  */
 __inline static int __scsi_back_merge_fn(request_queue_t * q,
 					 struct request *req,
-					 struct bio *bio,
-					 int dma_host)
+					 struct bio *bio)
 {
-	if (req->nr_sectors + bio_sectors(bio) > q->max_sectors)
+	int bio_segs;
+
+	if (req->nr_sectors + bio_sectors(bio) > q->max_sectors) {
+		req->flags |= REQ_NOMERGE;
 		return 0;
-	else if (!BIO_SEG_BOUNDARY(q, req->biotail, bio))
-		return 0;
+	}
+
+	bio_segs = bio_hw_segments(q, bio);
+	if (blk_contig_segment(q, req->biotail, bio))
+		bio_segs--;
 
 #ifdef DMA_CHUNK_SIZE
-	if (MERGEABLE_BUFFERS(req->biotail, bio))
-		return scsi_new_mergeable(q, req, q->queuedata);
+	if (MERGEABLE_BUFFERS(bio, req->bio))
+		return scsi_new_mergeable(q, req, bio_segs);
 #endif
-	return scsi_new_segment(q, req, bio);
+
+	return scsi_new_segment(q, req, bio, bio_segs);
 }
 
 __inline static int __scsi_front_merge_fn(request_queue_t * q,
 					  struct request *req,
-					  struct bio *bio,
-					  int dma_host)
+					  struct bio *bio)
 {
-	if (req->nr_sectors + bio_sectors(bio) > q->max_sectors)
+	int bio_segs;
+
+	if (req->nr_sectors + bio_sectors(bio) > q->max_sectors) {
+		req->flags |= REQ_NOMERGE;
 		return 0;
-	else if (!BIO_SEG_BOUNDARY(q, bio, req->bio))
-		return 0;
+	}
+
+	bio_segs = bio_hw_segments(q, bio);
+	if (blk_contig_segment(q, req->biotail, bio))
+		bio_segs--;
 
 #ifdef DMA_CHUNK_SIZE
 	if (MERGEABLE_BUFFERS(bio, req->bio))
-		return scsi_new_mergeable(q, req, q->queuedata);
+		return scsi_new_mergeable(q, req, bio_segs);
 #endif
-	return scsi_new_segment(q, req, bio);
+	return scsi_new_segment(q, req, bio, bio_segs);
 }
 
 /*
@@ -343,7 +354,7 @@ __inline static int __scsi_front_merge_fn(request_queue_t * q,
  * Notes:       Optimized for different cases depending upon whether
  *              ISA DMA is in use and whether clustering should be used.
  */
-#define MERGEFCT(_FUNCTION, _BACK_FRONT, _DMA)				\
+#define MERGEFCT(_FUNCTION, _BACK_FRONT)				\
 static int _FUNCTION(request_queue_t * q,				\
 		     struct request * req,				\
 		     struct bio *bio)					\
@@ -351,16 +362,12 @@ static int _FUNCTION(request_queue_t * q,				\
     int ret;								\
     ret =  __scsi_ ## _BACK_FRONT ## _merge_fn(q,			\
 					       req,			\
-					       bio,			\
-					       _DMA);			\
+					       bio);			\
     return ret;								\
 }
 
-MERGEFCT(scsi_back_merge_fn_, back, 0)
-MERGEFCT(scsi_back_merge_fn_d, back, 1)
-
-MERGEFCT(scsi_front_merge_fn_, front, 0)
-MERGEFCT(scsi_front_merge_fn_d, front, 1)
+MERGEFCT(scsi_back_merge_fn, back)
+MERGEFCT(scsi_front_merge_fn, front)
 
 /*
  * Function:    __scsi_merge_requests_fn()
@@ -390,8 +397,7 @@ __inline static int __scsi_merge_requests_fn(request_queue_t * q,
 					     struct request *next,
 					     int dma_host)
 {
-	Scsi_Device *SDpnt;
-	struct Scsi_Host *SHpnt;
+	int bio_segs;
 
 	/*
 	 * First check if the either of the requests are re-queued
@@ -399,69 +405,44 @@ __inline static int __scsi_merge_requests_fn(request_queue_t * q,
 	 */
 	if (req->special || next->special)
 		return 0;
-	else if (!BIO_SEG_BOUNDARY(q, req->biotail, next->bio))
-		return 0;
 
-	SDpnt = (Scsi_Device *) q->queuedata;
-	SHpnt = SDpnt->host;
-
-#ifdef DMA_CHUNK_SIZE
-	/* If it would not fit into prepared memory space for sg chain,
-	 * then don't allow the merge.
-	 */
-	if (req->nr_segments + next->nr_segments - 1 > q->max_segments)
-		return 0;
-
-	if (req->nr_hw_segments + next->nr_hw_segments - 1 > q->max_segments)
-		return 0;
-#else
 	/*
-	 * If the two requests together are too large (even assuming that we
-	 * can merge the boundary requests into one segment, then don't
-	 * allow the merge.
+	 * will become to large?
 	 */
-	if (req->nr_segments + next->nr_segments - 1 > q->max_segments) {
+	if ((req->nr_sectors + next->nr_sectors) > q->max_sectors)
 		return 0;
-	}
-#endif
 
-	if ((req->nr_sectors + next->nr_sectors) > SHpnt->max_sectors)
+	bio_segs = req->nr_segments + next->nr_segments;
+	if (blk_contig_segment(q, req->biotail, next->bio))
+		bio_segs--;
+
+	/*
+	 * exceeds our max allowed segments?
+	 */
+	if (bio_segs > q->max_segments)
 		return 0;
 
 #ifdef DMA_CHUNK_SIZE
-	if (req->nr_segments + next->nr_segments > q->max_segments)
-		return 0;
+	bio_segs = req->nr_hw_segments + next->nr_hw_segments;
+	if (blk_contig_segment(q, req->biotail, next->bio))
+		bio_segs--;
 
 	/* If dynamic DMA mapping can merge last segment in req with
 	 * first segment in next, then the check for hw segments was
 	 * done above already, so we can always merge.
 	 */
-	if (MERGEABLE_BUFFERS(req->biotail, next->bio)) {
-		req->nr_hw_segments += next->nr_hw_segments - 1;
-	} else if (req->nr_hw_segments + next->nr_hw_segments > q->max_segments)
+	if (bio_segs > q->max_segments)
 		return 0;
-	} else {
-		req->nr_hw_segments += next->nr_hw_segments;
-	}
-	req->nr_segments += next->nr_segments;
-	return 1;
-#else
-	/*
-	 * We know that the two requests at the boundary should not be combined.
-	 * Make sure we can fix something that is the sum of the two.
-	 * A slightly stricter test than we had above.
-	 */
-	if (req->nr_segments + next->nr_segments > q->max_segments) {
-		return 0;
-	} else {
-		/*
-		 * This will form the start of a new segment.  Bump the 
-		 * counter.
-		 */
-		req->nr_segments += next->nr_segments;
-		return 1;
-	}
+
+	req->nr_hw_segments = bio_segs;
 #endif
+
+	/*
+	 * This will form the start of a new segment.  Bump the 
+	 * counter.
+	 */
+	req->nr_segments = bio_segs;
+	return 1;
 }
 
 /*
@@ -530,7 +511,6 @@ __inline static int __init_io(Scsi_Cmnd * SCpnt,
 			      int dma_host)
 {
 	struct bio	   * bio;
-	struct bio	   * bioprev;
 	char		   * buff;
 	int		     count;
 	int		     i;
@@ -603,7 +583,6 @@ __inline static int __init_io(Scsi_Cmnd * SCpnt,
 	SCpnt->request_buffer = (char *) sgpnt;
 	SCpnt->request_bufflen = 0;
 	req->buffer = NULL;
-	bioprev = NULL;
 
 	if (dma_host)
 		bbpnt = (void **) ((char *)sgpnt +
@@ -833,13 +812,13 @@ void initialize_merge_fn(Scsi_Device * SDpnt)
 	 * rather than rely upon the default behavior of ll_rw_blk.
 	 */
 	if (SHpnt->unchecked_isa_dma == 0) {
-		q->back_merge_fn = scsi_back_merge_fn_;
-		q->front_merge_fn = scsi_front_merge_fn_;
+		q->back_merge_fn = scsi_back_merge_fn;
+		q->front_merge_fn = scsi_front_merge_fn;
 		q->merge_requests_fn = scsi_merge_requests_fn_;
 		SDpnt->scsi_init_io_fn = scsi_init_io_v;
 	} else {
-		q->back_merge_fn = scsi_back_merge_fn_d;
-		q->front_merge_fn = scsi_front_merge_fn_d;
+		q->back_merge_fn = scsi_back_merge_fn;
+		q->front_merge_fn = scsi_front_merge_fn;
 		q->merge_requests_fn = scsi_merge_requests_fn_d;
 		SDpnt->scsi_init_io_fn = scsi_init_io_vd;
 	}

@@ -105,6 +105,13 @@ extern void iounmap(void *addr);
 #define page_to_bus page_to_phys
 
 /*
+ * can the hardware map this into one segment or not, given no other
+ * constraints.
+ */
+#define BIOVEC_MERGEABLE(vec1, vec2)	\
+	((bvec_to_phys((vec1)) + (vec1)->bv_len) == bvec_to_phys((vec2)))
+
+/*
  * readX/writeX() are used to access memory mapped devices. On some
  * architectures the memory mapped IO stuff needs to be accessed
  * differently. On the x86 architecture, we just read/write the

@@ -9,6 +9,7 @@
 #include <linux/smp_lock.h>
 #include <linux/blk.h>
 #include <linux/tty.h>
+#include <linux/fd.h>
 
 #include <linux/nfs_fs.h>
 #include <linux/nfs_fs_sb.h>
@@ -29,6 +30,11 @@ static inline _syscall2(int,umount,char *,name,int,flags);
 
 extern void rd_load(void);
 extern void initrd_load(void);
+extern int get_filesystem_list(char * buf);
+extern void wait_for_keypress(void);
+
+asmlinkage long sys_mount(char * dev_name, char * dir_name, char * type,
+	 unsigned long flags, void * data);
 
 #ifdef CONFIG_BLK_DEV_INITRD
 unsigned int real_root_dev;	/* do_proc_dointvec cannot handle kdev_t */
@@ -276,29 +282,25 @@ static void __init mount_root(void)
 	char path[64];
 	char *name = "/dev/root";
 	char *fs_names, *p;
-	int err;
 	int do_devfs = 0;
-#ifdef CONFIG_ROOT_NFS
-	void *data;
-#endif
+
 	root_mountflags |= MS_VERBOSE;
 
 	fs_names = __getname();
 	get_fs_names(fs_names);
 
 #ifdef CONFIG_ROOT_NFS
-	if (MAJOR(ROOT_DEV) != UNNAMED_MAJOR)
-		goto skip_nfs;
-	data = nfs_root_data();
-	if (!data)
-		goto no_nfs;
-	err = mount("/dev/root", "/root", "nfs", root_mountflags, data);
-	if (!err)
-		goto done;
-no_nfs:
-	printk(KERN_ERR "VFS: Unable to mount root fs via NFS, trying floppy.\n");
-	ROOT_DEV = MKDEV(FLOPPY_MAJOR, 0);
-skip_nfs:
+	if (MAJOR(ROOT_DEV) == UNNAMED_MAJOR) {
+		void *data;
+		data = nfs_root_data();
+		if (data) {
+			int err = mount("/dev/root", "/root", "nfs", root_mountflags, data);
+			if (!err)
+				goto done;
+		}
+		printk(KERN_ERR "VFS: Unable to mount root fs via NFS, trying floppy.\n");
+		ROOT_DEV = MKDEV(FLOPPY_MAJOR, 0);
+	}
 #endif
 
 #ifdef CONFIG_BLK_DEV_FD

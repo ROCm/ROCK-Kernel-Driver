@@ -18,7 +18,11 @@ extern unsigned long virt_to_bus_not_defined_use_pci_map(volatile void *addr);
 extern unsigned long bus_to_virt_not_defined_use_pci_map(volatile void *addr);
 #define bus_to_virt bus_to_virt_not_defined_use_pci_map
 
-#define page_to_phys(page)	(((page) - mem_map) << PAGE_SHIFT)
+extern unsigned long phys_base;
+#define page_to_phys(page)	((((page) - mem_map) << PAGE_SHIFT)+phys_base)
+
+#define BIOVEC_MERGEABLE(vec1, vec2)	\
+	((((bvec_to_phys((vec1)) + (vec1)->bv_len) | bvec_to_phys((vec2))) & (DMA_CHUNK_SIZE - 1)) == 0)
 
 /* Different PCI controllers we support have their PCI MEM space
  * mapped to an either 2GB (Psycho) or 4GB (Sabre) aligned area,

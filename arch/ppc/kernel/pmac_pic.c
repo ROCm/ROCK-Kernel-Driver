@@ -36,7 +36,7 @@ static volatile struct pmac_irq_hw *pmac_irq_hw[4] = {
 static int max_irqs;
 static int max_real_irqs;
 
-spinlock_t pmac_pic_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t pmac_pic_lock = SPIN_LOCK_UNLOCKED;
 
 
 #define GATWICK_IRQ_POOL_SIZE        10

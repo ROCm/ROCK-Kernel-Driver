@@ -483,7 +483,8 @@ static void do_ps2esdi_request(request_queue_t * q)
 	}			/* check for above 16Mb dmas */
 	else if ((CURRENT_DEV < ps2esdi_drives) &&
 	    (CURRENT->sector + CURRENT->current_nr_sectors <=
-	     ps2esdi[MINOR(CURRENT->rq_dev)].nr_sects)) {
+	     ps2esdi[MINOR(CURRENT->rq_dev)].nr_sects) &&
+	    	CURRENT->flags & REQ_CMD) {
 #if 0
 		printk("%s:got request. device : %d minor : %d command : %d  sector : %ld count : %ld\n",
 		       DEVICE_NAME,
@@ -495,7 +496,7 @@ static void do_ps2esdi_request(request_queue_t * q)
 		block = CURRENT->sector;
 		count = CURRENT->current_nr_sectors;
 
-		switch (CURRENT->cmd) {
+		switch (rq_data_dir(CURRENT)) {
 		case READ:
 			ps2esdi_readwrite(READ, CURRENT_DEV, block, count);
 			break;

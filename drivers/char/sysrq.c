@@ -336,7 +336,7 @@ static struct sysrq_key_op sysrq_killall_op = {
 
 
 /* Key Operations table and lock */
-spinlock_t sysrq_key_table_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t sysrq_key_table_lock = SPIN_LOCK_UNLOCKED;
 #define SYSRQ_KEY_TABLE_LENGTH 36
 static struct sysrq_key_op *sysrq_key_table[SYSRQ_KEY_TABLE_LENGTH] = {
 /* 0 */	&sysrq_loglevel_op,

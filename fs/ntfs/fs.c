@@ -303,10 +303,8 @@ static int ntfs_readdir(struct file* filp, void *dirent, filldir_t filldir)
 	ntfs_debug(DEBUG_OTHER, __FUNCTION__ "(): After ntfs_getdir_unsorted()"
 			" calls, f_pos 0x%Lx.\n", filp->f_pos);
 	if (!err) {
-#ifdef DEBUG
-		if (cb.ph != 0x7fff || cb.pl)
-			BUG();
 done:
+#ifdef DEBUG
 		if (!cb.ret_code)
 			ntfs_debug(DEBUG_OTHER, __FUNCTION__ "(): EOD, f_pos "
 					"0x%Lx, returning 0.\n", filp->f_pos);
@@ -314,8 +312,6 @@ done:
 			ntfs_debug(DEBUG_OTHER, __FUNCTION__ "(): filldir "
 					"returned %i, returning 0, f_pos "
 					"0x%Lx.\n", cb.ret_code, filp->f_pos);
-#else
-done:
 #endif
 		return 0;
 	}

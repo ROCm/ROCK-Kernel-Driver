@@ -32,8 +32,8 @@
 #define CPQFCTS_DRIVER_VER(maj,min,submin) ((maj<<16)|(min<<8)|(submin))
 // don't forget to also change MODULE_DESCRIPTION in cpqfcTSinit.c
 #define VER_MAJOR 2
-#define VER_MINOR 1
-#define VER_SUBMINOR 1
+#define VER_MINOR 5
+#define VER_SUBMINOR 0
 
 // Macros for kernel (esp. SMP) tracing using a PCI analyzer
 // (e.g. x86).

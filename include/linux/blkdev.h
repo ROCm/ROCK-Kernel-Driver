@@ -256,6 +256,8 @@ extern void blk_attempt_remerge(request_queue_t *, struct request *);
 extern struct request *blk_get_request(request_queue_t *, int, int);
 extern void blk_put_request(struct request *);
 extern void blk_plug_device(request_queue_t *);
+extern void blk_recount_segments(request_queue_t *, struct bio *);
+extern inline int blk_contig_segment(request_queue_t *q, struct bio *, struct bio *);
 
 extern int block_ioctl(kdev_t, unsigned int, unsigned long);
 

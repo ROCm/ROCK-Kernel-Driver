@@ -174,6 +174,7 @@ obj-$(CONFIG_DEPCA) += depca.o
 obj-$(CONFIG_EWRK3) += ewrk3.o
 obj-$(CONFIG_ATP) += atp.o
 obj-$(CONFIG_DE4X5) += de4x5.o
+obj-$(CONFIG_DE2104X) += de2104x.o
 obj-$(CONFIG_NI5010) += ni5010.o
 obj-$(CONFIG_NI52) += ni52.o
 obj-$(CONFIG_NI65) += ni65.o

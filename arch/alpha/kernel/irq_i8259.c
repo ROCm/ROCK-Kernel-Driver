@@ -22,7 +22,7 @@
 
 /* Note mask bit is true for DISABLED irqs.  */
 static unsigned int cached_irq_mask = 0xffff;
-spinlock_t i8259_irq_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t i8259_irq_lock = SPIN_LOCK_UNLOCKED;
 
 static inline void
 i8259_update_irq_hw(unsigned int irq, unsigned long mask)

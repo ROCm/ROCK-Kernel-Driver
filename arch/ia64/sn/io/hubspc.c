@@ -61,7 +61,7 @@ typedef struct cpuprom_info {
 }cpuprom_info_t;
 
 static cpuprom_info_t	*cpuprom_head;
-spinlock_t	cpuprom_spinlock;
+static spinlock_t	cpuprom_spinlock;
 #define	PROM_LOCK()	mutex_spinlock(&cpuprom_spinlock)
 #define	PROM_UNLOCK(s)	mutex_spinunlock(&cpuprom_spinlock, (s))
 

@@ -97,11 +97,11 @@ int CpqTsCreateTachLiteQues( void* pHBA, int opcode)
   fcChip->Exchanges = NULL;
   cpqfcHBAdata->fcLQ = NULL;
   
-  printk("Allocating %u for %u Exchanges ", 
-	  (ULONG)sizeof(FC_EXCHANGES), TACH_MAX_XID);
+  /* printk("Allocating %u for %u Exchanges ", 
+	  (ULONG)sizeof(FC_EXCHANGES), TACH_MAX_XID); */
   fcChip->Exchanges = pci_alloc_consistent(cpqfcHBAdata->PciDev, 
 			sizeof(FC_EXCHANGES), &fcChip->exch_dma_handle);
-  printk("@ %p\n", fcChip->Exchanges);
+  /* printk("@ %p\n", fcChip->Exchanges); */
 
   if( fcChip->Exchanges == NULL ) // fatal error!!
   {
@@ -112,10 +112,10 @@ int CpqTsCreateTachLiteQues( void* pHBA, int opcode)
   memset( fcChip->Exchanges, 0, sizeof( FC_EXCHANGES));  
 
 
-  printk("Allocating %u for LinkQ ", (ULONG)sizeof(FC_LINK_QUE));
+  /* printk("Allocating %u for LinkQ ", (ULONG)sizeof(FC_LINK_QUE)); */
   cpqfcHBAdata->fcLQ = pci_alloc_consistent(cpqfcHBAdata->PciDev,
 				 sizeof( FC_LINK_QUE), &cpqfcHBAdata->fcLQ_dma_handle);
-  printk("@ %p (%u elements)\n", cpqfcHBAdata->fcLQ, FC_LINKQ_DEPTH);
+  /* printk("@ %p (%u elements)\n", cpqfcHBAdata->fcLQ, FC_LINKQ_DEPTH); */
   memset( cpqfcHBAdata->fcLQ, 0, sizeof( FC_LINK_QUE));
 
   if( cpqfcHBAdata->fcLQ == NULL ) // fatal error!!
@@ -222,8 +222,8 @@ int CpqTsCreateTachLiteQues( void* pHBA, int opcode)
   // power-of-2 boundary
   // LIVE DANGEROUSLY!  Assume the boundary for SEST mem will
   // be on physical page (e.g. 4k) boundary.
-  printk("Allocating %u for TachSEST for %u Exchanges\n", 
-		 (ULONG)sizeof(TachSEST), TACH_SEST_LEN);
+  /* printk("Allocating %u for TachSEST for %u Exchanges\n", 
+		 (ULONG)sizeof(TachSEST), TACH_SEST_LEN); */
   fcChip->SEST = fcMemManager( cpqfcHBAdata->PciDev,
 		  &cpqfcHBAdata->dynamic_mem[0],
 		  sizeof(TachSEST),  4, 0L, &SESTdma );
@@ -289,7 +289,7 @@ int CpqTsCreateTachLiteQues( void* pHBA, int opcode)
 
   // set the Host's pointer for Tachyon to access
 
-  printk("  cpqfcTS: writing IMQ BASE %Xh  ", fcChip->IMQ->base );
+  /* printk("  cpqfcTS: writing IMQ BASE %Xh  ", fcChip->IMQ->base ); */
   writel( fcChip->IMQ->base, 
     (fcChip->Registers.ReMapMemBase + IMQ_BASE));
 
@@ -315,9 +315,9 @@ int CpqTsCreateTachLiteQues( void* pHBA, int opcode)
     return -1;  // failed
   }
 #endif
-//#if DBG
+#if DBG
   printk("  PI %Xh\n", (ULONG)ulAddr );
-//#endif
+#endif
   writel( (ULONG)ulAddr, 
     (fcChip->Registers.ReMapMemBase + IMQ_PRODUCER_INDEX));
 
@@ -337,9 +337,9 @@ int CpqTsCreateTachLiteQues( void* pHBA, int opcode)
   writel( fcChip->SEST->base,
     (fcChip->Registers.ReMapMemBase + TL_MEM_SEST_BASE));
 
-  printk("  cpqfcTS: SEST %p(virt): Wrote base %Xh @ %p\n",
+  /* printk("  cpqfcTS: SEST %p(virt): Wrote base %Xh @ %p\n",
     fcChip->SEST, fcChip->SEST->base, 
-    fcChip->Registers.ReMapMemBase + TL_MEM_SEST_BASE);
+    fcChip->Registers.ReMapMemBase + TL_MEM_SEST_BASE); */
 
   writel( fcChip->SEST->length,
     (fcChip->Registers.ReMapMemBase + TL_MEM_SEST_LENGTH));
@@ -1723,7 +1723,7 @@ int CpqTsInitializeTachLite( void *pHBA, int opcode1, int opcode2)
 	UCHAR Minor = (UCHAR)(RevId & 0x3);
 	UCHAR Major = (UCHAR)((RevId & 0x1C) >>2);
   
-        printk("  HBA Tachyon RevId %d.%d\n", Major, Minor);
+	/* printk("  HBA Tachyon RevId %d.%d\n", Major, Minor); */
   	if( (Major == 1) && (Minor == 2) )
         {
 	  sprintf( cpqfcHBAdata->fcChip.Name, STACHLITE66_TS12);

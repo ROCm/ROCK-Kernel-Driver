@@ -1,6 +1,6 @@
 /*
  * Support for VIA 82Cxxx Audio Codecs
- * Copyright 1999,2000 Jeff Garzik <jgarzik@mandrakesoft.com>
+ * Copyright 1999,2000 Jeff Garzik
  *
  * Distributed under the GNU GENERAL PUBLIC LICENSE (GPL) Version 2.
  * See the "COPYING" file distributed with this software for more info.
@@ -8,9 +8,6 @@
  * For a list of known bugs (errata) and documentation,
  * see via-audio.pdf in linux/Documentation/DocBook.
  * If this documentation does not exist, run "make pdfdocs".
- * If "make pdfdocs" fails, obtain the documentation from
- * the driver's Website at
- * http://gtf.org/garzik/drivers/via82cxxx/
  *
  */
 
@@ -3357,7 +3354,7 @@ static void __exit cleanup_via82cxxx_audio(void)
 module_init(init_via82cxxx_audio);
 module_exit(cleanup_via82cxxx_audio);
 
-MODULE_AUTHOR("Jeff Garzik <jgarzik@mandrakesoft.com>");
+MODULE_AUTHOR("Jeff Garzik");
 MODULE_DESCRIPTION("DSP audio and mixer driver for Via 82Cxxx audio devices");
 MODULE_LICENSE("GPL");
 

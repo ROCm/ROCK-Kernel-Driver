@@ -1887,7 +1887,8 @@ static void idetape_end_request (byte uptodate, ide_hwgroup_t *hwgroup)
 						printk("ide-tape: %s: skipping over config parition..\n", tape->name);
 #endif
 					tape->onstream_write_error = OS_PART_ERROR;
-					complete(tape->waiting);
+					if (tape->waiting)
+						complete(tape->waiting);
 				}
 			}
 			remove_stage = 1;
@@ -1903,7 +1904,8 @@ static void idetape_end_request (byte uptodate, ide_hwgroup_t *hwgroup)
 					tape->nr_pending_stages++;
 					tape->next_stage = tape->first_stage;
 					rq->current_nr_sectors = rq->nr_sectors;
-					complete(tape->waiting);
+					if (tape->waiting)
+						complete(tape->waiting);
 				}
 			}
 		} else if (rq->cmd == IDETAPE_READ_RQ) {

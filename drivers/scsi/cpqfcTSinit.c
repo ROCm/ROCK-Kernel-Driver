@@ -188,7 +188,7 @@ static void Cpqfc_initHBAdata( CPQFCHBA *cpqfcHBAdata, struct pci_dev *PciDev )
   DEBUG_PCI(printk("    IOBaseU = %x\n", 
     cpqfcHBAdata->fcChip.Registers.IOBaseU));
   
-  printk(" ioremap'd Membase: %p\n", cpqfcHBAdata->fcChip.Registers.ReMapMemBase);
+  /* printk(" ioremap'd Membase: %p\n", cpqfcHBAdata->fcChip.Registers.ReMapMemBase); */
   
   DEBUG_PCI(printk("    SFQconsumerIndex.address = %p\n", 
     cpqfcHBAdata->fcChip.Registers.SFQconsumerIndex.address));
@@ -242,7 +242,7 @@ static void launch_FCworker_thread(struct Scsi_Host *HostAdapter)
   cpqfcHBAdata->notify_wt = &sem;
 
   /* must unlock before kernel_thread(), for it may cause a reschedule. */
-  spin_unlock_irq(&io_request_lock);
+  spin_unlock_irq(&HostAdapter->host_lock);
   kernel_thread((int (*)(void *))cpqfcTSWorkerThread, 
                           (void *) HostAdapter, 0);
   /*
@@ -250,7 +250,7 @@ static void launch_FCworker_thread(struct Scsi_Host *HostAdapter)
 
    */
   down (&sem);
-  spin_lock_irq(&io_request_lock);
+  spin_lock_irq(&HostAdapter->host_lock);
   cpqfcHBAdata->notify_wt = NULL;
 
   LEAVE("launch_FC_worker_thread");
@@ -312,8 +312,8 @@ int cpqfcTS_detect(Scsi_Host_Template *ScsiHostTemplate)
       }
 
       // NOTE: (kernel 2.2.12-32) limits allocation to 128k bytes...
-      printk(" scsi_register allocating %d bytes for FC HBA\n",
-		      (ULONG)sizeof(CPQFCHBA));
+      /* printk(" scsi_register allocating %d bytes for FC HBA\n",
+		      (ULONG)sizeof(CPQFCHBA)); */
 
       HostAdapter = scsi_register( ScsiHostTemplate, sizeof( CPQFCHBA ) );
       
@@ -403,9 +403,11 @@ int cpqfcTS_detect(Scsi_Host_Template *ScsiHostTemplate)
       DEBUG_PCI(printk("  Requesting 255 I/O addresses @ %x\n",
         cpqfcHBAdata->fcChip.Registers.IOBaseU ));
 
-      
+     
+ 
       // start our kernel worker thread
 
+      spin_lock_irq(&HostAdapter->host_lock);
       launch_FCworker_thread(HostAdapter);
 
 
@@ -445,15 +447,16 @@ int cpqfcTS_detect(Scsi_Host_Template *ScsiHostTemplate)
 	
 	unsigned long stop_time;
 
-        spin_unlock_irq(&io_request_lock);
+	spin_unlock_irq(&HostAdapter->host_lock);
 	stop_time = jiffies + 4*HZ;
         while ( time_before(jiffies, stop_time) ) 
 	  	schedule();  // (our worker task needs to run)
 
-	spin_lock_irq(&io_request_lock);
       }
       
+      spin_lock_irq(&HostAdapter->host_lock);
       NumberOfAdapters++; 
+      spin_unlock_irq(&HostAdapter->host_lock);
     } // end of while()
   }
 
@@ -1593,9 +1596,9 @@ int cpqfcTS_eh_device_reset(Scsi_Cmnd *Cmnd)
   int retval;
   Scsi_Device *SDpnt = Cmnd->device;
   // printk("   ENTERING cpqfcTS_eh_device_reset() \n");
-  spin_unlock_irq(&io_request_lock);
+  spin_unlock_irq(&Cmnd->host->host_lock);
   retval = cpqfcTS_TargetDeviceReset( SDpnt, 0);
-  spin_lock_irq(&io_request_lock);
+  spin_lock_irq(&Cmnd->host->host_lock);
   return retval;
 }
 
@@ -1650,8 +1653,7 @@ void cpqfcTS_intr_handler( int irq,
   UCHAR IntPending;
   
   ENTER("intr_handler");
-
-  spin_lock_irqsave( &io_request_lock, flags);
+  spin_lock_irqsave( &HostAdapter->host_lock, flags);
   // is this our INT?
   IntPending = readb( cpqfcHBA->fcChip.Registers.INTPEND.address);
 
@@ -1700,7 +1702,7 @@ void cpqfcTS_intr_handler( int irq,
       }
     }      
   }
-  spin_unlock_irqrestore( &io_request_lock, flags);
+  spin_unlock_irqrestore( &HostAdapter->host_lock, flags);
   LEAVE("intr_handler");
 }
 

@@ -226,12 +226,13 @@ ide_startstop_t ide_dma_intr (ide_drive_t *drive)
 
 static int ide_build_sglist (ide_hwif_t *hwif, struct request *rq)
 {
+	request_queue_t *q = &hwif->drives[DEVICE_NR(rq->rq_dev) & 1].queue;
 	struct scatterlist *sg = hwif->sg_table;
 	int nents;
 
-	nents = blk_rq_map_sg(rq->q, rq, hwif->sg_table);
+	nents = blk_rq_map_sg(q, rq, hwif->sg_table);
 
-	if (nents > rq->nr_segments)
+	if (rq->q && nents > rq->nr_segments)
 		printk("ide-dma: received %d segments, build %d\n", rq->nr_segments, nents);
 
 	if (rq_data_dir(rq) == READ)

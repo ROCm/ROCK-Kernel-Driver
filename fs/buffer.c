@@ -2005,12 +2005,12 @@ int generic_direct_IO(int rw, struct inode * inode, struct kiobuf * iobuf, unsig
 {
 	int i, nr_blocks, retval;
 	sector_t *blocks = iobuf->blocks;
+	struct buffer_head bh;
 
+	bh.b_dev = inode->i_dev;
 	nr_blocks = iobuf->length / blocksize;
 	/* build the blocklist */
 	for (i = 0; i < nr_blocks; i++, blocknr++) {
-		struct buffer_head bh;
-
 		bh.b_state = 0;
 		bh.b_dev = inode->i_dev;
 		bh.b_size = blocksize;
@@ -2036,7 +2036,8 @@ int generic_direct_IO(int rw, struct inode * inode, struct kiobuf * iobuf, unsig
 		blocks[i] = bh.b_blocknr;
 	}
 
-	retval = brw_kiovec(rw, 1, &iobuf, inode->i_dev, blocks, blocksize);
+	/* This does not understand multi-device filesystems currently */
+	retval = brw_kiovec(rw, 1, &iobuf, bh.b_dev, blocks, blocksize);
 
  out:
 	return retval;

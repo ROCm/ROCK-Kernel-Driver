@@ -1692,10 +1692,8 @@ S:	Maintained
 
 VIA 82Cxxx AUDIO DRIVER
 P:	Jeff Garzik
-M:	jgarzik@mandrakesoft.com
 L:	linux-via@gtf.org
-W:	http://sourceforge.net/projects/gkernel/
-S:	Maintained
+S:	Odd fixes
 
 USB DIAMOND RIO500 DRIVER
 P:	Cesar Miquel

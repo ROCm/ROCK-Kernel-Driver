@@ -408,10 +408,25 @@ static void prune_dqcache(int count)
 	}
 }
 
+/*
+ * This is called from kswapd when we think we need some
+ * more memory, but aren't really sure how much. So we
+ * carefully try to free a _bit_ of our dqcache, but not
+ * too much.
+ *
+ * Priority:
+ *   1 - very urgent: shrink everything
+ *   ...
+ *   6 - base-level: try to shrink a bit.
+ */
+
 int shrink_dqcache_memory(int priority, unsigned int gfp_mask)
 {
+	int count = 0;
+
 	lock_kernel();
-	prune_dqcache(nr_free_dquots / (priority + 1));
+	count = nr_free_dquots / priority;
+	prune_dqcache(count);
 	unlock_kernel();
 	kmem_cache_shrink(dquot_cachep);
 	return 0;

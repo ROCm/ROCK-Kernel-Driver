@@ -7,6 +7,11 @@ Tested in single and dual HBA configuration, 32 and 64bit busses,
 SEST size 512 Exchanges (simultaneous I/Os) limited by module kmalloc() 
 	max of 128k bytes contiguous.
 
+Ver 2.5.0  Nov 29, 2001
+   * eliminated io_request_lock.  This change makes the driver specific
+     to the 2.5.x kernels.
+   * silenced excessively noisy printks.
+
 Ver 2.1.1  Oct 18, 2001
    * reinitialize Cmnd->SCp.sent_command (used to identify commands as
      passthrus) on calling scsi_done, since the scsi mid layer does not

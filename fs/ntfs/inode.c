@@ -159,7 +159,7 @@ static int ntfs_insert_mft_attributes(ntfs_inode* ino, char *mft, int mftno)
  * Return 0 on success or -errno on error.
  */
 static int ntfs_insert_mft_attribute(ntfs_inode* ino, int mftno,
-				     ntfs_u8 *attr)
+		ntfs_u8 *attr)
 {
 	int i, error, present = 0;
 
@@ -207,6 +207,7 @@ static int parse_attributes(ntfs_inode *ino, ntfs_u8 *alist, int *plen)
 	int mftno, l, error;
 	int last_mft = -1;
 	int len = *plen;
+	int tries = 0;
 	
 	if (!ino->attr) {
 		ntfs_error("parse_attributes: called on inode 0x%x without a "
@@ -230,9 +231,13 @@ static int parse_attributes(ntfs_inode *ino, ntfs_u8 *alist, int *plen)
 			*   then occur there or the user notified to run
 			*   ntfsck. (AIA) */
 		if (mftno != ino->i_number && mftno != last_mft) {
+continue_after_loading_mft_data:
 			last_mft = mftno;
 			error = ntfs_read_mft_record(ino->vol, mftno, mft);
 			if (error) {
+				if (error == -EINVAL && !tries)
+					goto force_load_mft_data;
+failed_reading_mft_data:
 				ntfs_debug(DEBUG_FILE3, "parse_attributes: "
 					"ntfs_read_mft_record(mftno = 0x%x) "
 					"failed\n", mftno);
@@ -272,9 +277,106 @@ static int parse_attributes(ntfs_inode *ino, ntfs_u8 *alist, int *plen)
 	ntfs_free(mft);
 	*plen = len;
 	return 0;
+force_load_mft_data:
+{
+	ntfs_u8 *mft2, *attr2;
+	int mftno2;
+	int last_mft2 = last_mft;
+	int len2 = len;
+	int error2;
+	int found2 = 0;
+	ntfs_u8 *alist2 = alist;
+	/*
+	 * We only get here if $DATA wasn't found in $MFT which only happens
+	 * on volume mount when $MFT has an attribute list and there are
+	 * attributes before $DATA which are inside extent mft records. So
+	 * we just skip forward to the $DATA attribute and read that. Then we
+	 * restart which is safe as an attribute will not be inserted twice.
+	 *
+	 * This still will not fix the case where the attribute list is non-
+	 * resident, larger than 1024 bytes, and the $DATA attribute list entry
+	 * is not in the first 1024 bytes. FIXME: This should be implemented
+	 * somehow! Perhaps by passing special error code up to
+	 * ntfs_load_attributes() so it keeps going trying to get to $DATA
+	 * regardless. Then it would have to restart just like we do here.
+	 */
+	mft2 = ntfs_malloc(ino->vol->mft_record_size);
+	if (!mft2) {
+		ntfs_free(mft);
+		return -ENOMEM;
+	}
+	ntfs_memcpy(mft2, mft, ino->vol->mft_record_size);
+	while (len2 > 8) {
+		l = NTFS_GETU16(alist2 + 4);
+		if (l > len2)
+			break;
+		if (NTFS_GETU32(alist2 + 0x0) < ino->vol->at_data) {
+			len2 -= l;
+			alist2 += l;
+			continue;
+		}
+		if (NTFS_GETU32(alist2 + 0x0) > ino->vol->at_data) {
+			if (found2)
+				break;
+			/* Uh-oh! It really isn't there! */
+			ntfs_error("Either the $MFT is corrupt or, equally "
+					"likely, the $MFT is too complex for "
+					"the current driver to handle. Please "
+					"email the ntfs maintainer that you "
+					"saw this message. Thank you.\n");
+			goto failed_reading_mft_data;
+		}
+	        /* Process attribute description. */
+		mftno2 = NTFS_GETU32(alist2 + 0x10); 
+		if (mftno2 != ino->i_number && mftno2 != last_mft2) {
+			last_mft2 = mftno2;
+			error2 = ntfs_read_mft_record(ino->vol, mftno2, mft2);
+			if (error2) {
+				ntfs_debug(DEBUG_FILE3, "parse_attributes: "
+					"ntfs_read_mft_record(mftno2 = 0x%x) "
+					"failed\n", mftno2);
+				ntfs_free(mft2);
+				goto failed_reading_mft_data;
+			}
+		}
+		attr2 = ntfs_find_attr_in_mft_rec(
+				ino->vol,		 /* ntfs volume */
+				mftno2 == ino->i_number ?/* mft record is: */
+					ino->attr:	 /*  base record */
+					mft2,		 /*  extension record */
+				NTFS_GETU32(alist2 + 0),	/* type */
+				(wchar_t*)(alist2 + alist2[7]),	/* name */
+				alist2[6], 		 /* name length */
+				1,			 /* ignore case */
+				NTFS_GETU16(alist2 + 24) /* instance number */
+				);
+		if (!attr2) {
+			ntfs_error("parse_attributes: mft records 0x%x and/or "
+				       "0x%x corrupt!\n", ino->i_number,
+				       mftno2);
+			ntfs_free(mft2);
+			goto failed_reading_mft_data;
+		}
+		error2 = ntfs_insert_mft_attribute(ino, mftno2, attr2);
+		if (error2) {
+			ntfs_debug(DEBUG_FILE3, "parse_attributes: "
+				"ntfs_insert_mft_attribute(mftno2 0x%x, "
+				"attribute2 type 0x%x) failed\n", mftno2,
+				NTFS_GETU32(alist2 + 0));
+			ntfs_free(mft2);
+			goto failed_reading_mft_data;
+		}
+		len2 -= l;
+		alist2 += l;
+		found2 = 1;
+	}
+	ntfs_free(mft2);
+	tries = 1;
+	goto continue_after_loading_mft_data;
+}
 }
 
-static void ntfs_load_attributes(ntfs_inode* ino)
+static void ntfs_load_attributes(ntfs_inode *ino)
 {
 	ntfs_attribute *alist;
 	int datasize;

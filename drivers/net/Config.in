@@ -159,7 +159,8 @@ if [ "$CONFIG_NET_ETHERNET" = "y" ]; then
 
       dep_tristate '    Apricot Xen-II on board Ethernet' CONFIG_APRICOT $CONFIG_ISA
       dep_tristate '    CS89x0 support' CONFIG_CS89x0 $CONFIG_ISA
-      dep_tristate '    DECchip Tulip (dc21x4x) PCI support' CONFIG_TULIP $CONFIG_PCI
+      dep_tristate '    Early DECchip Tulip (dc2104x) PCI support (EXPERIMENTAL)' CONFIG_DE2104X $CONFIG_PCI $CONFIG_EXPERIMENTAL
+      dep_tristate '    DECchip Tulip (dc2114x) PCI support' CONFIG_TULIP $CONFIG_PCI
       if [ "$CONFIG_TULIP" = "y" -o "$CONFIG_TULIP" = "m" ]; then
          dep_bool '      New bus configuration (EXPERIMENTAL)' CONFIG_TULIP_MWI $CONFIG_EXPERIMENTAL
          bool '      Use PCI shared mem for NIC registers' CONFIG_TULIP_MMIO

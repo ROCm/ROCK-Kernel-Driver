@@ -98,6 +98,16 @@ list at sourceforge: linux-ntfs-dev@lists.sourceforge.net
 ChangeLog
 =========
 
+NTFS 1.1.21:
+	- Fixed bug with reading $MFT where we try to read higher mft records
+	  before having read the $DATA attribute of $MFT. (Note this is only a
+	  partial solution which will only work in the case that the attribute
+	  list is resident or non-resident but $DATA is in the first 1024
+	  bytes. But this should be enough in the majority of cases. I am not
+	  going to bother fixing the general case until someone finds this to
+	  be a problem for them, which I doubt very much will ever happen...)
+	- Fixed bogus BUG() call in readdir().
+
 NTFS 1.1.20:
 	- Fixed two bugs in ntfs_readwrite_attr(). Thanks to Jan Kara for
 	  spotting the out of bounds one.

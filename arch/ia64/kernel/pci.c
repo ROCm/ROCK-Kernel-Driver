@@ -46,7 +46,7 @@ extern void ia64_mca_check_errors( void );
  * This interrupt-safe spinlock protects all accesses to PCI
  * configuration space.
  */
-spinlock_t pci_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t pci_lock = SPIN_LOCK_UNLOCKED;
 
 struct pci_fixup pcibios_fixups[] = {
 	{ 0 }

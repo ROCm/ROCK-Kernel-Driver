@@ -707,7 +707,17 @@ void prune_icache(int goal)
 	if (goal)
 		schedule_task(&unused_inodes_flush_task);
 }
-
+/*
+ * This is called from kswapd when we think we need some
+ * more memory, but aren't really sure how much. So we
+ * carefully try to free a _bit_ of our icache, but not
+ * too much.
+ *
+ * Priority:
+ *   1 - very urgent: shrink everything
+ *  ...
+ *   6 - base-level: try to shrink a bit.
+ */
 int shrink_icache_memory(int priority, int gfp_mask)
 {
 	int count = 0;

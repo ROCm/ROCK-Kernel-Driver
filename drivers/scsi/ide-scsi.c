@@ -242,7 +242,7 @@ static inline void idescsi_free_bio (struct bio *bio)
 	while (bio) {
 		bhp = bio;
 		bio = bio->bi_next;
-		kfree (bhp);
+		bio_put(bhp);
 	}
 }
 

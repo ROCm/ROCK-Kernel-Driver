@@ -181,18 +181,23 @@ void scsi_build_commandblocks(Scsi_Device * SDpnt);
 void  scsi_initialize_queue(Scsi_Device * SDpnt, struct Scsi_Host * SHpnt)
 {
 	request_queue_t *q = &SDpnt->request_queue;
+	int max_segments = SHpnt->sg_tablesize;
 
 	blk_init_queue(q, scsi_request_fn);
 	q->queuedata = (void *) SDpnt;
+
 #ifdef DMA_CHUNK_SIZE
-	blk_queue_max_segments(q, 64);
-#else
-	blk_queue_max_segments(q, SHpnt->sg_tablesize);
+	if (max_segments > 64)
+		max_segments = 64;
 #endif
+
+	blk_queue_max_segments(q, max_segments);
 	blk_queue_max_sectors(q, SHpnt->max_sectors);
 
 	if (!SHpnt->use_clustering)
 		clear_bit(QUEUE_FLAG_CLUSTER, &q->queue_flags);
+	if (SHpnt->unchecked_isa_dma)
+		blk_queue_segment_boundary(q, ISA_DMA_THRESHOLD);
 }
 
 #ifdef MODULE

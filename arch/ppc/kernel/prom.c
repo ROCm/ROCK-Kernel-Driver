@@ -1928,7 +1928,7 @@ print_properties(struct device_node *np)
 }
 #endif
 
-spinlock_t rtas_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t rtas_lock = SPIN_LOCK_UNLOCKED;
 
 /* this can be called after setup -- Cort */
 int __openfirmware

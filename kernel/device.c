@@ -899,7 +899,6 @@ static int __init device_init_root(void)
 int __init device_driver_init(void)
 {
 	int error = 0;
-	int pid;
 
 	DBG("DEV: Initialising Device Tree\n");
 

@@ -180,7 +180,7 @@ static int	initializing;     /* set while initializing built-in drivers */
  *
  * anti-deadlock ordering: ide_lock -> DRIVE_LOCK
  */
-spinlock_t ide_lock = SPIN_LOCK_UNLOCKED;
+spinlock_t ide_lock __cacheline_aligned = SPIN_LOCK_UNLOCKED;
 
 #ifdef CONFIG_BLK_DEV_IDEPCI
 static int	ide_scan_direction;	/* THIS was formerly 2.2.x pci=reverse */

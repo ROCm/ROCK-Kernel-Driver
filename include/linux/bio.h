@@ -57,8 +57,9 @@ struct bio {
 						 * top bits priority
 						 */
 
-	unsigned int		bi_vcnt;	/* how many bio_vec's */
-	unsigned int		bi_idx;		/* current index into bvl_vec */
+	unsigned short		bi_vcnt;	/* how many bio_vec's */
+	unsigned short		bi_idx;		/* current index into bvl_vec */
+	unsigned short		bi_hw_seg;	/* actual mapped segments */
 	unsigned int		bi_size;	/* total size in bytes */
 	unsigned int		bi_max;		/* max bvl_vecs we can hold,
 						   used as index into pool */
@@ -79,7 +80,7 @@ struct bio {
 #define BIO_UPTODATE	0	/* ok after I/O completion */
 #define BIO_RW_BLOCK	1	/* RW_AHEAD set, and read/write would block */
 #define BIO_EOF		2	/* out-out-bounds error */
-#define BIO_PREBUILT	3	/* not merged big */
+#define BIO_SEG_VALID	3	/* nr_hw_seg valid */
 #define BIO_CLONED	4	/* doesn't own data */
 
 /*
@@ -108,8 +109,8 @@ struct bio {
 /*
  * will die
  */
-#define bio_to_phys(bio)	(page_to_phys(bio_page((bio))) + bio_offset((bio)))
-#define bvec_to_phys(bv)	(page_to_phys((bv)->bv_page) + (bv)->bv_offset)
+#define bio_to_phys(bio)	(page_to_phys(bio_page((bio))) + (unsigned long) bio_offset((bio)))
+#define bvec_to_phys(bv)	(page_to_phys((bv)->bv_page) + (unsigned long) (bv)->bv_offset)
 
 /*
  * queues that have highmem support enabled may still need to revert to
@@ -125,13 +126,16 @@ struct bio {
 /*
  * merge helpers etc
  */
-#define __BVEC_END(bio) bio_iovec_idx((bio), (bio)->bi_vcnt - 1)
+#define __BVEC_END(bio)		bio_iovec_idx((bio), (bio)->bi_vcnt - 1)
+#define __BVEC_START(bio)	bio_iovec_idx((bio), 0)
 #define BIO_CONTIG(bio, nxt) \
-	(bvec_to_phys(__BVEC_END((bio))) + (bio)->bi_size == bio_to_phys((nxt)))
+	BIOVEC_MERGEABLE(__BVEC_END((bio)), __BVEC_START((nxt)))
 #define __BIO_SEG_BOUNDARY(addr1, addr2, mask) \
 	(((addr1) | (mask)) == (((addr2) - 1) | (mask)))
+#define BIOVEC_SEG_BOUNDARY(q, b1, b2) \
+	__BIO_SEG_BOUNDARY(bvec_to_phys((b1)), bvec_to_phys((b2)) + (b2)->bv_len, (q)->seg_boundary_mask)
 #define BIO_SEG_BOUNDARY(q, b1, b2) \
-	__BIO_SEG_BOUNDARY(bvec_to_phys(__BVEC_END((b1))), bio_to_phys((b2)) + (b2)->bi_size, (q)->seg_boundary_mask)
+	BIOVEC_SEG_BOUNDARY((q), __BVEC_END((b1)), __BVEC_START((b2)))
 
 #define bio_io_error(bio) bio_endio((bio), 0, bio_sectors((bio)))
 
@@ -167,6 +171,8 @@ extern struct bio *bio_alloc(int, int);
 extern void bio_put(struct bio *);
 
 extern int bio_endio(struct bio *, int, int);
+struct request_queue;
+extern inline int bio_hw_segments(struct request_queue *, struct bio *);
 
 extern inline void __bio_clone(struct bio *, struct bio *);
 extern struct bio *bio_clone(struct bio *, int);

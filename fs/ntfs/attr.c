@@ -548,7 +548,7 @@ int ntfs_create_attr(ntfs_inode *ino, int anum, char *aname, void *data,
  * attribute.
  */
 static int ntfs_process_runs(ntfs_inode *ino, ntfs_attribute* attr,
-			     unsigned char *data)
+		unsigned char *data)
 {
 	int startvcn, endvcn;
 	int vcn, cnum;
@@ -622,7 +622,7 @@ static int ntfs_process_runs(ntfs_inode *ino, ntfs_attribute* attr,
 }
   
 /* Insert the attribute starting at attr in the inode ino. */
-int ntfs_insert_attribute(ntfs_inode *ino, unsigned char* attrdata)
+int ntfs_insert_attribute(ntfs_inode *ino, unsigned char *attrdata)
 {
 	int i, found;
 	int type;

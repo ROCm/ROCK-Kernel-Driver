@@ -33,6 +33,7 @@
 #include <linux/compiler.h>
 
 #include <asm/uaccess.h>
+#include <asm/io.h>
 
 kmem_cache_t *bio_cachep;
 static spinlock_t __cacheline_aligned bio_lock = SPIN_LOCK_UNLOCKED;
@@ -53,7 +54,8 @@ static struct biovec_pool bvec_list[BIOVEC_NR_POOLS];
 
 /*
  * if you change this list, also change bvec_alloc or things will
- * break badly!
+ * break badly! cannot be bigger than what you can fit into an
+ * unsigned short
  */
 static const int bvec_pool_sizes[BIOVEC_NR_POOLS] = { 1, 4, 16, 64, 128, 256 };
 
@@ -204,6 +206,7 @@ inline void bio_init(struct bio *bio)
 	bio->bi_rw = 0;
 	bio->bi_vcnt = 0;
 	bio->bi_idx = 0;
+	bio->bi_hw_seg = 0;
 	bio->bi_size = 0;
 	bio->bi_end_io = NULL;
 	atomic_set(&bio->bi_cnt, 1);
@@ -312,6 +315,14 @@ void bio_put(struct bio *bio)
 		bio_free(bio);
 }
 
+inline int bio_hw_segments(request_queue_t *q, struct bio *bio)
+{
+	if (unlikely(!(bio->bi_flags & BIO_SEG_VALID)))
+		blk_recount_segments(q, bio);
+
+	return bio->bi_hw_seg;
+}
+
 /**
  * 	__bio_clone	-	clone a bio
  * 	@bio: destination bio
@@ -331,11 +342,15 @@ inline void __bio_clone(struct bio *bio, struct bio *bio_src)
 	bio->bi_rw = bio_src->bi_rw;
 
 	/*
-	 * notes -- maybe just leave bi_idx alone. bi_max has no used
-	 * on a cloned bio
+	 * notes -- maybe just leave bi_idx alone. bi_max has no use
+	 * on a cloned bio. assume identical mapping for the clone
 	 */
 	bio->bi_vcnt = bio_src->bi_vcnt;
 	bio->bi_idx = bio_src->bi_idx;
+	if (bio_src->bi_flags & (1 << BIO_SEG_VALID)) {
+		bio->bi_hw_seg = bio_src->bi_hw_seg;
+		bio->bi_flags |= (1 << BIO_SEG_VALID);
+	}
 	bio->bi_size = bio_src->bi_size;
 	bio->bi_max = bio_src->bi_max;
 }
@@ -387,8 +402,15 @@ struct bio *bio_copy(struct bio *bio, int gfp_mask, int copy)
 			if (bbv->bv_page == NULL)
 				goto oom;
 
+			bbv->bv_len = bv->bv_len;
+			bbv->bv_offset = bv->bv_offset;
+
+			/*
+			 * if doing a copy for a READ request, no need
+			 * to memcpy page data
+			 */
 			if (!copy)
-				goto fill_in;
+				continue;
 
 			if (gfp_mask & __GFP_WAIT) {
 				vfrom = kmap(bv->bv_page);
@@ -408,10 +430,6 @@ struct bio *bio_copy(struct bio *bio, int gfp_mask, int copy)
 				kunmap_atomic(vfrom, KM_BIO_IRQ);
 				local_irq_restore(flags);
 			}
-
-fill_in:
-			bbv->bv_len = bv->bv_len;
-			bbv->bv_offset = bv->bv_offset;
 		}
 
 		b->bi_sector = bio->bi_sector;
@@ -595,9 +613,6 @@ next_chunk:
 	}
 
 queue_io:
-	if (bio->bi_vcnt > 1)
-		bio->bi_flags |= 1 << BIO_PREBUILT;
-
 	submit_bio(rw, bio);
 
 	if (total_nr_pages)

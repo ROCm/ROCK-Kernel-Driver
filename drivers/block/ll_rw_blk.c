@@ -257,7 +257,8 @@ void blk_queue_segment_boundary(request_queue_t *q, unsigned long mask)
 static char *rq_flags[] = { "REQ_RW", "REQ_RW_AHEAD", "REQ_BARRIER",
 			   "REQ_CMD", "REQ_NOMERGE", "REQ_STARTED",
 			   "REQ_DONTPREP", "REQ_DRIVE_CMD", "REQ_DRIVE_TASK",
-			   "REQ_PC", "REQ_SENSE", "REQ_SPECIAL" };
+			   "REQ_PC", "REQ_BLOCK_PC", "REQ_SENSE",
+			   "REQ_SPECIAL" };
 
 void blk_dump_rq_flags(struct request *rq, char *msg)
 {
@@ -315,15 +316,46 @@ static int ll_10byte_cmd_build(request_queue_t *q, struct request *rq)
 	return 0;
 }
 
-/*
- * can we merge the two segments, or do we need to start a new one?
- */
-inline int blk_same_segment(request_queue_t *q, struct bio *bio,
+void blk_recount_segments(request_queue_t *q, struct bio *bio)
+{
+	struct bio_vec *bv, *bvprv = NULL;
+	int i, nr_segs, seg_size, cluster;
+
+	if (unlikely(!bio->bi_io_vec))
+		return;
+
+	cluster = q->queue_flags & (1 << QUEUE_FLAG_CLUSTER);
+	seg_size = nr_segs = 0;
+	bio_for_each_segment(bv, bio, i) {
+		if (bvprv && cluster) {
+			if (seg_size + bv->bv_len > q->max_segment_size)
+				goto new_segment;
+			if (!BIOVEC_MERGEABLE(bvprv, bv))
+				goto new_segment;
+			if (!BIOVEC_SEG_BOUNDARY(q, bvprv, bv))
+				goto new_segment;
+
+			seg_size += bv->bv_len;
+			bvprv = bv;
+			continue;
+		}
+new_segment:
+		nr_segs++;
+		bvprv = bv;
+		seg_size = 0;
+	}
+
+	bio->bi_hw_seg = nr_segs;
+	bio->bi_flags |= (1 << BIO_SEG_VALID);
+}
+
+
+inline int blk_contig_segment(request_queue_t *q, struct bio *bio,
 			    struct bio *nxt)
 {
-	/*
-	 * not contigous, just forget it
-	 */
+	if (!(q->queue_flags & (1 << QUEUE_FLAG_CLUSTER)))
+		return 0;
+
 	if (!BIO_CONTIG(bio, nxt))
 		return 0;
 
@@ -343,19 +375,17 @@ inline int blk_same_segment(request_queue_t *q, struct bio *bio,
  */
 int blk_rq_map_sg(request_queue_t *q, struct request *rq, struct scatterlist *sg)
 {
-	unsigned long long lastend;
-	struct bio_vec *bvec;
+	struct bio_vec *bvec, *bvprv;
 	struct bio *bio;
 	int nsegs, i, cluster;
 
 	nsegs = 0;
-	bio = rq->bio;
-	lastend = ~0ULL;
 	cluster = q->queue_flags & (1 << QUEUE_FLAG_CLUSTER);
 
 	/*
 	 * for each bio in rq
 	 */
+	bvprv = NULL;
 	rq_for_each_bio(bio, rq) {
 		/*
 		 * for each segment in bio
@@ -363,26 +393,20 @@ int blk_rq_map_sg(request_queue_t *q, struct request *rq, struct scatterlist *sg
 		bio_for_each_segment(bvec, bio, i) {
 			int nbytes = bvec->bv_len;
 
-			BIO_BUG_ON(i > bio->bi_vcnt);
-
-			if (cluster && bvec_to_phys(bvec) == lastend) {
+			if (bvprv && cluster) {
 				if (sg[nsegs - 1].length + nbytes > q->max_segment_size)
 					goto new_segment;
 
-				/*
-				 * make sure to not map a segment across a
-				 * boundary that the queue doesn't want
-				 */
-				if (!__BIO_SEG_BOUNDARY(lastend, lastend + nbytes, q->seg_boundary_mask))
-					lastend = ~0ULL;
-				else
-					lastend += nbytes;
+				if (!BIOVEC_MERGEABLE(bvprv, bvec))
+					goto new_segment;
+				if (!BIOVEC_SEG_BOUNDARY(q, bvprv, bvec))
+					goto new_segment;
 
 				sg[nsegs - 1].length += nbytes;
 			} else {
 new_segment:
-				if (nsegs > q->max_segments) {
-					printk("map: %d >= %d\n", nsegs, q->max_segments);
+				if (nsegs >= q->max_segments) {
+					printk("map: %d >= %d, i %d, segs %d, size %ld\n", nsegs, q->max_segments, i, rq->nr_segments, rq->nr_sectors);
 					BUG();
 				}
 
@@ -391,9 +415,9 @@ new_segment:
 				sg[nsegs].length = nbytes;
 				sg[nsegs].offset = bvec->bv_offset;
 
-				lastend = bvec_to_phys(bvec) + nbytes;
 				nsegs++;
 			}
+			bvprv = bvec;
 		} /* segments in bio */
 	} /* bios in rq */
 
@@ -405,35 +429,55 @@ new_segment:
  * specific ones if so desired
  */
 static inline int ll_new_segment(request_queue_t *q, struct request *req,
-				 struct bio *bio)
+				 struct bio *bio, int nr_segs)
 {
-	if (req->nr_segments + bio->bi_vcnt <= q->max_segments) {
-		req->nr_segments += bio->bi_vcnt;
+	if (req->nr_segments + nr_segs <= q->max_segments) {
+		req->nr_segments += nr_segs;
 		return 1;
 	}
+
+	req->flags |= REQ_NOMERGE;
 	return 0;
 }
 
 static int ll_back_merge_fn(request_queue_t *q, struct request *req, 
 			    struct bio *bio)
 {
-	if (req->nr_sectors + bio_sectors(bio) > q->max_sectors)
+	int bio_segs;
+
+	if (req->nr_sectors + bio_sectors(bio) > q->max_sectors) {
+		req->flags |= REQ_NOMERGE;
 		return 0;
-	if (blk_same_segment(q, req->biotail, bio))
+	}
+
+	bio_segs = bio_hw_segments(q, bio);
+	if (blk_contig_segment(q, req->biotail, bio))
+		bio_segs--;
+
+	if (!bio_segs)
 		return 1;
 
-	return ll_new_segment(q, req, bio);
+	return ll_new_segment(q, req, bio, bio_segs);
 }
 
 static int ll_front_merge_fn(request_queue_t *q, struct request *req, 
 			     struct bio *bio)
 {
-	if (req->nr_sectors + bio_sectors(bio) > q->max_sectors)
+	int bio_segs;
+
+	if (req->nr_sectors + bio_sectors(bio) > q->max_sectors) {
+		req->flags |= REQ_NOMERGE;
 		return 0;
-	if (blk_same_segment(q, bio, req->bio))
+	}
+
+	bio_segs = bio_hw_segments(q, bio);
+	if (blk_contig_segment(q, bio, req->bio))
+		bio_segs--;
+
+	if (!bio_segs)
 		return 1;
 
-	return ll_new_segment(q, req, bio);
+	return ll_new_segment(q, req, bio, bio_segs);
 }
 
 static int ll_merge_requests_fn(request_queue_t *q, struct request *req,
@@ -441,7 +485,7 @@ static int ll_merge_requests_fn(request_queue_t *q, struct request *req,
 {
 	int total_segments = req->nr_segments + next->nr_segments;
 
-	if (blk_same_segment(q, req->biotail, next->bio))
+	if (blk_contig_segment(q, req->biotail, next->bio))
 		total_segments--;
     
 	if (total_segments > q->max_segments)
@@ -643,7 +687,7 @@ int blk_init_queue(request_queue_t *q, request_fn_proc *rfn)
 		return ret;
 	}
 
-	q->request_fn     	= rfn;
+	q->request_fn		= rfn;
 	q->back_merge_fn       	= ll_back_merge_fn;
 	q->front_merge_fn      	= ll_front_merge_fn;
 	q->merge_requests_fn	= ll_merge_requests_fn;
@@ -973,6 +1017,7 @@ again:
 			BUG_ON(req->flags & REQ_NOMERGE);
 			if (!q->back_merge_fn(q, req, bio))
 				break;
+
 			elevator->elevator_merge_cleanup_fn(q, req, nr_sectors);
 
 			req->biotail->bi_next = bio;
@@ -987,6 +1032,7 @@ again:
 			BUG_ON(req->flags & REQ_NOMERGE);
 			if (!q->front_merge_fn(q, req, bio))
 				break;
+
 			elevator->elevator_merge_cleanup_fn(q, req, nr_sectors);
 
 			bio->bi_next = req->bio;
@@ -1070,7 +1116,7 @@ get_rq:
 	req->hard_nr_sectors = req->nr_sectors = nr_sectors;
 	req->current_nr_sectors = req->hard_cur_sectors = cur_nr_sectors;
 	req->nr_segments = bio->bi_vcnt;
-	req->nr_hw_segments = req->nr_segments;
+	req->nr_hw_segments = bio_hw_segments(q, bio);
 	req->buffer = bio_data(bio);	/* see ->buffer comment above */
 	req->waiting = NULL;
 	req->bio = req->biotail = bio;
@@ -1451,7 +1497,6 @@ int end_that_request_first(struct request *req, int uptodate, int nr_sectors)
 	while ((bio = req->bio)) {
 		nsect = bio_iovec(bio)->bv_len >> 9;
 
-		bio->bi_size -= bio_iovec(bio)->bv_len;
 
 		/*
 		 * not a complete bvec done
@@ -1459,11 +1504,17 @@ int end_that_request_first(struct request *req, int uptodate, int nr_sectors)
 		if (unlikely(nsect > nr_sectors)) {
 			int residual = (nsect - nr_sectors) << 9;
 
+			bio->bi_size -= residual;
 			bio_iovec(bio)->bv_offset += residual;
 			bio_iovec(bio)->bv_len -= residual;
 			blk_recalc_request(req, nr_sectors);
 			return 1;
 		}
+
+		/*
+		 * account transfer
+		 */
+		bio->bi_size -= bio_iovec(bio)->bv_len;
 
 		nr_sectors -= nsect;
 		total_nsect += nsect;
