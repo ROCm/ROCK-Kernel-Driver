@@ -1,12 +1,12 @@
 /* 
    3w-xxxx.h -- 3ware Storage Controller device driver for Linux.
    
-   Written By: Adam Radford <linux@3ware.com>
+   Written By: Adam Radford <linuxraid@amcc.com>
    Modifications By: Joel Jacobson <linux@3ware.com>
    		     Arnaldo Carvalho de Melo <acme@conectiva.com.br>
                      Brad Strand <linux@3ware.com>
 
-   Copyright (C) 1999-2003 3ware Inc.
+   Copyright (C) 1999-2004 3ware Inc.
 
    Kernel compatiblity By:	Andre Hedrick <andre@suse.com>
    Non-Copyright (C) 2000	Andre Hedrick <andre@suse.com>
@@ -45,10 +45,10 @@
    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA 
 
    Bugs/Comments/Suggestions should be mailed to:                            
-   linux@3ware.com
+   linuxraid@amcc.com
    
    For more information, goto:
-   http://www.3ware.com
+   http://www.amcc.com
 */
 
 #ifndef _3W_XXXX_H

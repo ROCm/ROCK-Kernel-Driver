@@ -26,9 +26,7 @@
 /************************************
  * Some useful macros...
  */
-#define NUMBER(arr) ((int) (sizeof(arr) / sizeof(arr[0]))) /* from XtNumber() in /usr/X11R6/include/X11/Intrinsic.h */
 #define BIT(x)      (1L << (x))
-#define MIN(a,b)    ((a) > (b) ? (b) : (a))
 
 /* SCSI initiator must be ID 7 */
 #define NSP_INITIATOR_ID  7

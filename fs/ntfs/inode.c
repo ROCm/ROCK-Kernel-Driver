@@ -1310,7 +1310,7 @@ err_out:
  * This should work but there are two possible pit falls (see inline comments
  * below), but only time will tell if they are real pits or just smoke...
  */
-void ntfs_read_inode_mount(struct inode *vi)
+int ntfs_read_inode_mount(struct inode *vi)
 {
 	VCN next_vcn, last_vcn, highest_vcn;
 	s64 block;
@@ -1325,12 +1325,6 @@ void ntfs_read_inode_mount(struct inode *vi)
 	int err;
 
 	ntfs_debug("Entering.");
-
-	if (vi->i_ino != FILE_MFT) {
-		ntfs_error(sb, "Called for inode 0x%lx but only inode %d "
-				"allowed.", vi->i_ino, FILE_MFT);
-		goto err_out;
-	}
 
 	/* Initialize the ntfs specific part of @vi. */
 	ntfs_init_big_inode(vi);
@@ -1616,13 +1610,7 @@ void ntfs_read_inode_mount(struct inode *vi)
 			/*
 			 * We have got the first extent of the run_list for
 			 * $MFT which means it is now relatively safe to call
-			 * the normal ntfs_read_inode() function. Thus, take
-			 * us out of the calling chain. Also we need to do this
-			 * now because we need ntfs_read_inode() in place to
-			 * get at subsequent extents.
-			 */
-			sb->s_op = &ntfs_sops;
-			/*
+			 * the normal ntfs_read_inode() function.
 			 * Complete reading the inode, this will actually
 			 * re-read the mft record for $MFT, this time entering
 			 * it into the page cache with which we complete the
@@ -1649,8 +1637,8 @@ void ntfs_read_inode_mount(struct inode *vi)
 						"sourceforge.net");
 				put_attr_search_ctx(ctx);
 				/* Revert to the safe super operations. */
-				sb->s_op = &ntfs_mount_sops;
-				goto out_now;
+				ntfs_free(m);
+				return -1;
 			}
 			/*
 			 * Re-initialize some specifics about $MFT's inode as
@@ -1699,20 +1687,19 @@ void ntfs_read_inode_mount(struct inode *vi)
 	}
 	put_attr_search_ctx(ctx);
 	ntfs_debug("Done.");
-out_now:
 	ntfs_free(m);
-	return;
+	return 0;
+
 em_put_err_out:
 	ntfs_error(sb, "Couldn't find first extent of $DATA attribute in "
 			"attribute list. $MFT is corrupt. Run chkdsk.");
 put_err_out:
 	put_attr_search_ctx(ctx);
 err_out:
-	/* Make sure we revert to the safe super operations. */
-	sb->s_op = &ntfs_mount_sops;
 	ntfs_error(sb, "Failed. Marking inode as bad.");
 	make_bad_inode(vi);
-	goto out_now;
+	ntfs_free(m);
+	return -1;
 }
 
 /**

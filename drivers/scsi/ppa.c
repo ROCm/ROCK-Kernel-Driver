@@ -15,18 +15,23 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/blkdev.h>
-#include <asm/io.h>
 #include <linux/parport.h>
 #include <linux/workqueue.h>
-#include "scsi.h"
-#include "hosts.h"
+#include <asm/io.h>
+
+#include <scsi/scsi.h>
+#include <scsi/scsi_cmnd.h>
+#include <scsi/scsi_device.h>
+#include <scsi/scsi_host.h>
+
+
 static void ppa_reset_pulse(unsigned int base);
 
 typedef struct {
 	struct pardevice *dev;	/* Parport device entry         */
 	int base;		/* Actual port address          */
 	int mode;		/* Transfer mode                */
-	Scsi_Cmnd *cur_cmd;	/* Current queued command       */
+	struct scsi_cmnd *cur_cmd;	/* Current queued command       */
 	struct work_struct ppa_tq;	/* Polling interrupt stuff       */
 	unsigned long jstart;	/* Jiffies at start             */
 	unsigned long recon_tmo;	/* How many usecs to wait for reconnection (6th bit) */
@@ -501,7 +506,7 @@ static int ppa_init(ppa_struct *dev)
 	return device_check(dev);
 }
 
-static inline int ppa_send_command(Scsi_Cmnd *cmd)
+static inline int ppa_send_command(struct scsi_cmnd *cmd)
 {
 	ppa_struct *dev = ppa_dev(cmd->device->host);
 	int k;
@@ -522,7 +527,7 @@ static inline int ppa_send_command(Scsi_Cmnd *cmd)
  * The driver appears to remain stable if we speed up the parallel port
  * i/o in this function, but not elsewhere.
  */
-static int ppa_completion(Scsi_Cmnd *cmd)
+static int ppa_completion(struct scsi_cmnd *cmd)
 {
 	/* Return codes:
 	 * -1     Error
@@ -626,7 +631,7 @@ static int ppa_completion(Scsi_Cmnd *cmd)
 static void ppa_interrupt(void *data)
 {
 	ppa_struct *dev = (ppa_struct *) data;
-	Scsi_Cmnd *cmd = dev->cur_cmd;
+	struct scsi_cmnd *cmd = dev->cur_cmd;
 
 	if (!cmd) {
 		printk("PPA: bug in ppa_interrupt\n");
@@ -682,7 +687,7 @@ static void ppa_interrupt(void *data)
 	cmd->scsi_done(cmd);
 }
 
-static int ppa_engine(ppa_struct *dev, Scsi_Cmnd *cmd)
+static int ppa_engine(ppa_struct *dev, struct scsi_cmnd *cmd)
 {
 	unsigned short ppb = dev->base;
 	unsigned char l = 0, h = 0;
@@ -802,7 +807,8 @@ static int ppa_engine(ppa_struct *dev, Scsi_Cmnd *cmd)
 	return 0;
 }
 
-static int ppa_queuecommand(Scsi_Cmnd *cmd, void (*done) (Scsi_Cmnd *))
+static int ppa_queuecommand(struct scsi_cmnd *cmd,
+		void (*done) (struct scsi_cmnd *))
 {
 	ppa_struct *dev = ppa_dev(cmd->device->host);
 
@@ -847,7 +853,7 @@ static int ppa_biosparam(struct scsi_device *sdev, struct block_device *dev,
 	return 0;
 }
 
-static int ppa_abort(Scsi_Cmnd *cmd)
+static int ppa_abort(struct scsi_cmnd *cmd)
 {
 	ppa_struct *dev = ppa_dev(cmd->device->host);
 	/*
@@ -875,7 +881,7 @@ static void ppa_reset_pulse(unsigned int base)
 	w_ctr(base, 0xc);
 }
 
-static int ppa_reset(Scsi_Cmnd *cmd)
+static int ppa_reset(struct scsi_cmnd *cmd)
 {
 	ppa_struct *dev = ppa_dev(cmd->device->host);
 
@@ -974,7 +980,7 @@ static int device_check(ppa_struct *dev)
 	return -ENODEV;
 }
 
-static Scsi_Host_Template ppa_template = {
+static struct scsi_host_template ppa_template = {
 	.module			= THIS_MODULE,
 	.proc_name		= "ppa",
 	.proc_info		= ppa_proc_info,

@@ -16,7 +16,7 @@
 # Modified for PA-RISC Linux by Paul Lahaie, Alex deVries, 
 # Mike Shaver, Helge Deller and Martin K. Petersen
 #
-NM		= sh arch/parisc/nm
+NM		= sh $(srctree)/arch/parisc/nm
 ifdef CONFIG_PARISC64
 CROSS_COMPILE	:= hppa64-linux-
 UTS_MACHINE	:= parisc64
@@ -48,6 +48,7 @@ cflags-y	+= -ffunction-sections
 cflags-$(CONFIG_PA7100)		+= -march=1.1 -mschedule=7100
 cflags-$(CONFIG_PA7200)		+= -march=1.1 -mschedule=7200
 cflags-$(CONFIG_PA7100LC)	+= -march=1.1 -mschedule=7100LC
+cflags-$(CONFIG_PA7300LC)	+= -march=1.1 -mschedule=7300
 cflags-$(CONFIG_PA8X00)		+= -march=2.0 -mschedule=8000
 
 head-y			:= arch/parisc/kernel/head.o 

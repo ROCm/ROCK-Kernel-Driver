@@ -116,7 +116,7 @@ static inline int gamma_dma_is_ready(drm_device_t *dev)
 	return (!GAMMA_READ(GAMMA_DMACOUNT));
 }
 
-irqreturn_t gamma_dma_service( DRM_IRQ_ARGS )
+irqreturn_t gamma_irq_handler( DRM_IRQ_ARGS )
 {
 	drm_device_t	 *dev = (drm_device_t *)arg;
 	drm_device_dma_t *dma = dev->dma;
@@ -262,7 +262,7 @@ static void gamma_dma_timer_bh(unsigned long dev)
 	gamma_dma_schedule((drm_device_t *)dev, 0);
 }
 
-void gamma_dma_immediate_bh(void *dev)
+void gamma_irq_immediate_bh(void *dev)
 {
 	gamma_dma_schedule(dev, 0);
 }
@@ -656,12 +656,12 @@ int gamma_do_cleanup_dma( drm_device_t *dev )
 {
 	DRM_DEBUG( "%s\n", __FUNCTION__ );
 
-#if _HAVE_DMA_IRQ
+#if __HAVE_IRQ
 	/* Make sure interrupts are disabled here because the uninstall ioctl
 	 * may not have been called from userspace and after dev_private
 	 * is freed, it's too late.
 	 */
-	if ( dev->irq ) DRM(irq_uninstall)(dev);
+	if ( dev->irq_enabled ) DRM(irq_uninstall)(dev);
 #endif
 
 	if ( dev->dev_private ) {

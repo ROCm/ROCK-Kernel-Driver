@@ -72,6 +72,8 @@ int DRM(open_helper)(struct inode *inode, struct file *filp, drm_device_t *dev)
 	priv->authenticated = capable(CAP_SYS_ADMIN);
 	priv->lock_count    = 0;
 
+	DRIVER_OPEN_HELPER( priv, dev );
+
 	down(&dev->struct_sem);
 	if (!dev->file_last) {
 		priv->next	= NULL;

@@ -77,7 +77,6 @@
 	[DRM_IOCTL_NR(DRM_IOCTL_I810_MC)]      = { i810_dma_mc,     1, 1 }, \
 	[DRM_IOCTL_NR(DRM_IOCTL_I810_RSTATUS)] = { i810_rstatus,    1, 0 }, \
 	[DRM_IOCTL_NR(DRM_IOCTL_I810_FLIP)] =    { i810_flip_bufs,  1, 0 }
- 
 
 #define __HAVE_COUNTERS         4
 #define __HAVE_COUNTER6         _DRM_STAT_IRQ
@@ -112,7 +111,7 @@
  * a noop stub is generated for compatibility.
  */
 /* XXX: Add vblank support? */
-#define __HAVE_DMA_IRQ		0
+#define __HAVE_IRQ		0
 
 /* Buffer customization:
  */

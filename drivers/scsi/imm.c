@@ -12,6 +12,18 @@
  */
 
 #include <linux/config.h>
+#include <linux/init.h>
+#include <linux/kernel.h>
+#include <linux/module.h>
+#include <linux/blkdev.h>
+#include <linux/parport.h>
+#include <linux/workqueue.h>
+#include <asm/io.h>
+
+#include <scsi/scsi.h>
+#include <scsi/scsi_cmnd.h>
+#include <scsi/scsi_device.h>
+#include <scsi/scsi_host.h>
 
 /* The following #define is to avoid a clash with hosts.c */
 #define IMM_PROBE_SPP   0x0001
@@ -20,22 +32,13 @@
 #define IMM_PROBE_EPP17 0x0100
 #define IMM_PROBE_EPP19 0x0200
 
-#include <linux/init.h>
-#include <linux/kernel.h>
-#include <linux/module.h>
-#include <linux/blkdev.h>
-#include <asm/io.h>
-#include <linux/parport.h>
-#include <linux/workqueue.h>
-#include "scsi.h"
-#include "hosts.h"
 
 typedef struct {
 	struct pardevice *dev;	/* Parport device entry         */
 	int base;		/* Actual port address          */
 	int base_hi;		/* Hi Base address for ECP-ISA chipset */
 	int mode;		/* Transfer mode                */
-	Scsi_Cmnd *cur_cmd;	/* Current queued command       */
+	struct scsi_cmnd *cur_cmd;	/* Current queued command       */
 	struct work_struct imm_tq;	/* Polling interrupt stuff       */
 	unsigned long jstart;	/* Jiffies at start             */
 	unsigned failed:1;	/* Failure flag                 */
@@ -613,7 +616,7 @@ static int imm_init(imm_struct *dev)
 	return device_check(dev);
 }
 
-static inline int imm_send_command(Scsi_Cmnd *cmd)
+static inline int imm_send_command(struct scsi_cmnd *cmd)
 {
 	imm_struct *dev = imm_dev(cmd->device->host);
 	int k;
@@ -633,7 +636,7 @@ static inline int imm_send_command(Scsi_Cmnd *cmd)
  * The driver appears to remain stable if we speed up the parallel port
  * i/o in this function, but not elsewhere.
  */
-static int imm_completion(Scsi_Cmnd *cmd)
+static int imm_completion(struct scsi_cmnd *cmd)
 {
 	/* Return codes:
 	 * -1     Error
@@ -736,7 +739,7 @@ static int imm_completion(Scsi_Cmnd *cmd)
 static void imm_interrupt(void *data)
 {
 	imm_struct *dev = (imm_struct *) data;
-	Scsi_Cmnd *cmd = dev->cur_cmd;
+	struct scsi_cmnd *cmd = dev->cur_cmd;
 	struct Scsi_Host *host = cmd->device->host;
 	unsigned long flags;
 
@@ -796,7 +799,7 @@ static void imm_interrupt(void *data)
 	return;
 }
 
-static int imm_engine(imm_struct *dev, Scsi_Cmnd *cmd)
+static int imm_engine(imm_struct *dev, struct scsi_cmnd *cmd)
 {
 	unsigned short ppb = dev->base;
 	unsigned char l = 0, h = 0;
@@ -937,7 +940,8 @@ static int imm_engine(imm_struct *dev, Scsi_Cmnd *cmd)
 	return 0;
 }
 
-static int imm_queuecommand(Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *))
+static int imm_queuecommand(struct scsi_cmnd *cmd,
+		void (*done)(struct scsi_cmnd *))
 {
 	imm_struct *dev = imm_dev(cmd->device->host);
 
@@ -980,7 +984,7 @@ static int imm_biosparam(struct scsi_device *sdev, struct block_device *dev,
 	return 0;
 }
 
-static int imm_abort(Scsi_Cmnd *cmd)
+static int imm_abort(struct scsi_cmnd *cmd)
 {
 	imm_struct *dev = imm_dev(cmd->device->host);
 	/*
@@ -1012,7 +1016,7 @@ static void imm_reset_pulse(unsigned int base)
 	w_ctr(base, 0x04);
 }
 
-static int imm_reset(Scsi_Cmnd *cmd)
+static int imm_reset(struct scsi_cmnd *cmd)
 {
 	imm_struct *dev = imm_dev(cmd->device->host);
 
@@ -1114,7 +1118,7 @@ static int device_check(imm_struct *dev)
 	return -ENODEV;
 }
 
-static Scsi_Host_Template imm_template = {
+static struct scsi_host_template imm_template = {
 	.module			= THIS_MODULE,
 	.proc_name		= "imm",
 	.proc_info		= imm_proc_info,

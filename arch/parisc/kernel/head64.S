@@ -88,26 +88,25 @@ $bss_loop:
 	mtctl		%r4,%cr24	/* Initialize kernel root pointer */
 	mtctl		%r4,%cr25	/* Initialize user root pointer */
 
-#if (__PAGE_OFFSET != 0x10000000UL)
-Error! Code below (the next five std's) needs to be changed
-#endif
-
-	std             %r3,0x00(%r4)   /* Hardwired 0x1... kernel Vaddr start*/
+	stw             %r3,ASM_PGD_ENTRY*ASM_PGD_ENTRY_SIZE(%r4)
 
 	ldo		_PAGE_TABLE(%r1),%r3
-	std             %r3,0x400(%r5)  /* Hardwired 0x1... kernel Vaddr start*/
-	ldo		0x1000(%r3),%r3
-	std             %r3,0x408(%r5)
-	ldo		0x1000(%r3),%r3
-	std             %r3,0x410(%r5)
-	ldo		0x1000(%r3),%r3
-	std             %r3,0x418(%r5)
+	ldo		ASM_PMD_ENTRY*ASM_PMD_ENTRY_SIZE(%r5),%r5
+	ldi		ASM_PT_INITIAL,%r1
+1:
+	stw		%r3,0(%r5)
+	ldo		ASM_PAGE_SIZE(%r3),%r3
+	addib,>		-1,%r1,1b
+	ldo		ASM_PMD_ENTRY_SIZE(%r5),%r5
 
 	ldo		_PAGE_KERNEL(%r0),%r3 /* Hardwired 0 phys addr start */
+	ldil		L%PA(pg0),%r1
+	ldo		R%PA(pg0)(%r1),%r1
+
 $pgt_fill_loop:
-	std,ma		%r3,8(%r1)
-	ldo		0x1000(%r3),%r3
-	bb,>=		%r3,8,$pgt_fill_loop
+	std,ma		%r3,ASM_PTE_ENTRY_SIZE(%r1)
+	ldo		ASM_PAGE_SIZE(%r3),%r3
+	bb,>=		%r3,31-KERNEL_INITIAL_ORDER,$pgt_fill_loop
 	nop
 
 	/* And the RFI Target address too */
@@ -169,7 +168,6 @@ common_stext:
 	tophys_r1	%r10
 	std		%r11,  TASK_PT_GR11(%r10)
 
-#ifndef CONFIG_PDC_NARROW
 	/* Switch to wide mode; Superdome doesn't support narrow PDC
 	** calls.
 	*/
@@ -179,7 +177,6 @@ common_stext:
 	bv		(%rp)
 	ssm		PSW_SM_W,%r0
 2:
-#endif /* CONFIG_PDC_NARROW */
 
 	/* Set Wide mode as the "Default" (eg for traps)
 	** First trap occurs *right* after (or part of) rfi for slave CPUs.

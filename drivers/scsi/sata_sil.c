@@ -1,5 +1,9 @@
 /*
- *  ata_sil.c - Silicon Image SATA
+ *  sata_sil.c - Silicon Image SATA
+ *
+ *  Maintained by:  Jeff Garzik <jgarzik@pobox.com>
+ *  		    Please ALWAYS copy linux-ide@vger.kernel.org
+ *		    on emails.
  *
  *  Copyright 2003 Red Hat, Inc.
  *  Copyright 2003 Benjamin Herrenschmidt <benh@kernel.crashing.org>

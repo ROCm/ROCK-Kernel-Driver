@@ -51,25 +51,34 @@ choice
 config PA7000
 	bool "PA7000/PA7100"
 	---help---
-	  This is the processor type of your CPU. This information is used for
-	  optimizing purposes.  In order to compile a kernel that can run on
-	  all PA CPUs (albeit not optimally fast), you can specify "PA7000"
-	  here.
+	  This is the processor type of your CPU.  This information is
+	  used for optimizing purposes.  In order to compile a kernel
+	  that can run on all 32-bit PA CPUs (albeit not optimally fast),
+	  you can specify "PA7000" here.
 
 	  Specifying "PA8000" here will allow you to select a 64-bit kernel
 	  which is required on some machines.
 
 config PA7100LC
-	bool "PA7100LC/PA7300LC"
+	bool "PA7100LC"
 	help
-	  Select this option for a 7100LC or 7300LC processor, as used
-	  in the 712, 715/Mirage, A180, B132, C160L and some other machines.
+	  Select this option for the PCX-L processor, as used in the
+	  712, 715/64, 715/80, 715/100, 715/100XC, 725/100, 743, 748,
+	  D200, D210, D300, D310 and E-class
 
 config PA7200
 	bool "PA7200"
 	help
-	  Select this option for the PCX-T' processor, as used in C110, D100
-	  and similar machines.
+	  Select this option for the PCX-T' processor, as used in the
+	  C100, C110, J100, J110, J210XC, D250, D260, D350, D360,
+	  K100, K200, K210, K220, K400, K410 and K420
+
+config PA7300LC
+	bool "PA7300LC"
+	help
+	  Select this option for the PCX-L2 processor, as used in the
+	  744, A180, B132L, B160L, B180L, C132L, C160L, C180L,
+	  D220, D230, D320 and D330.
 
 config PA8X00
 	bool "PA8000 and up"
@@ -81,14 +90,16 @@ endchoice
 # Define implied options from the CPU selection here
 
 config PA20
-	bool
+	def_bool y
 	depends on PA8X00
-	default y
 
 config PA11
-	bool
-	depends on PA7000 || PA7100LC || PA7200
-	default y
+	def_bool y
+	depends on PA7000 || PA7100LC || PA7200 || PA7300LC
+
+config PREFETCH
+	def_bool y
+	depends on PA8X00
 
 config PARISC64
 	bool "64-bit kernel"
@@ -105,18 +116,6 @@ config PARISC64
 
 config 64BIT
 	def_bool PARISC64
-
-config PDC_NARROW
-	bool "32-bit firmware"
-	depends on PARISC64
-	help
-	  This option will enable owners of C160, C180, C200, C240, C360, J280,
-	  J282, J2240 and some D/K/R class to run a 64bit kernel with their
-	  32bit PDC firmware.
-	
-	  Nobody should try this option unless they know what they are doing.
-	
-	  If unsure, say N.
 
 config SMP
 	bool "Symmetric multi-processing support"

@@ -3371,6 +3371,7 @@ qla1280_64bit_start_scsi(struct scsi_qla_host *ha, struct srb * sp)
 	sp->flags |= SRB_SENT;
 	ha->actthreads++;
 	WRT_REG_WORD(&reg->mailbox4, ha->req_ring_index);
+	(void) RD_REG_WORD(&reg->mailbox4); /* PCI posted write flush */
 
  out:
 	if (status)
@@ -3639,6 +3640,7 @@ qla1280_32bit_start_scsi(struct scsi_qla_host *ha, struct srb * sp)
 	sp->flags |= SRB_SENT;
 	ha->actthreads++;
 	WRT_REG_WORD(&reg->mailbox4, ha->req_ring_index);
+	(void) RD_REG_WORD(&reg->mailbox4); /* PCI posted write flush */
 
 out:
 	if (status)
@@ -3750,6 +3752,7 @@ qla1280_isp_cmd(struct scsi_qla_host *ha)
 
 	/* Set chip new ring index. */
 	WRT_REG_WORD(&reg->mailbox4, ha->req_ring_index);
+	(void) RD_REG_WORD(&reg->mailbox4); /* PCI posted write flush */
 
 	LEAVE("qla1280_isp_cmd");
 }
@@ -3788,7 +3791,7 @@ qla1280_isr(struct scsi_qla_host *ha, struct list_head *done_q)
 
 	/* Check for mailbox interrupt. */
 
-	mailbox[0] = RD_REG_WORD(&reg->semaphore);
+	mailbox[0] = RD_REG_WORD_dmasync(&reg->semaphore);
 
 	if (mailbox[0] & BIT_0) {
 		/* Get mailbox data. */

@@ -168,10 +168,8 @@ S:	Supported
 
 AACRAID SCSI RAID DRIVER
 P:	Adaptec OEM Raid Solutions
-M:	linux-aacraid-devel@dell.com
-L:	linux-aacraid-devel@dell.com
-L:	linux-aacraid-announce@dell.com
-W:	http://domsch.com/linux
+L:	linux-scsi@vger.kernel.org
+W:	http://linux.dell.com/storage.shtml
 S:	Supported
 
 ACPI
@@ -973,6 +971,11 @@ P:	Michael Lang
 M:	langa2@kph.uni-mainz.de
 W:	http://www.uni-mainz.de/~langm000/linux.html
 S:	Maintained
+
+IBM Power Linux RAID adapter
+P:	Brian King
+M:	brking@us.ibm.com
+S:	Supported
 
 IBM ServeRAID RAID DRIVER
 P:	Jack Hammer
@@ -1799,6 +1802,12 @@ M:	jmorris@redhat.com
 L:	linux-kernel@vger.kernel.org (kernel issues)
 L: 	selinux@tycho.nsa.gov (general discussion)
 W:	http://www.nsa.gov/selinux
+S:	Supported
+
+SERIAL ATA (SATA) SUBSYSTEM:
+P:	Jeff Garzik
+M:	jgarzik@pobox.com
+L:	linux-ide@vger.kernel.org
 S:	Supported
 
 SGI SN-IA64 (Altix) SERIAL CONSOLE DRIVER

@@ -59,11 +59,8 @@
 **	sym53c8xx and ncr53c8xx drivers should share.
 **	The sharing will be achieved in a further version  
 **	of the driver bundle. For now, only the ncr53c8xx 
-**	driver includes	this file.
+**	driver includes this file.
 */
-
-#define MIN(a,b)        (((a) < (b)) ? (a) : (b))
-#define MAX(a,b)        (((a) > (b)) ? (a) : (b))
 
 /*==========================================================
 **

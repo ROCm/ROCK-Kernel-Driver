@@ -26,6 +26,7 @@
 #include <asm-generic/vmlinux.lds.h>
 /* needed for the processor specific cache alignment size */	
 #include <asm/cache.h>
+#include <asm/page.h>
 	
 /* ld script to make hppa Linux kernel */
 #ifndef CONFIG_PARISC64
@@ -45,13 +46,17 @@ jiffies = jiffies_64;
 SECTIONS
 {
 
-  . = 0x10100000;
+  . = KERNEL_BINARY_TEXT_START;
 
   _text = .;			/* Text and read-only data */
   .text ALIGN(16) : {
-	*(.text*)
+	*(.text)
 	SCHED_TEXT
-	*(.PARISC.unwind)
+	*(.text.do_softirq)
+	*(.text.sys_exit)
+	*(.text.do_sigaltstack)
+	*(.text.do_fork)
+	*(.text.*)
 	*(.fixup)
 	*(.lock.text)		/* out-of-line lock text */
 	*(.gnu.warning)
@@ -72,6 +77,10 @@ SECTIONS
   __ex_table : { *(__ex_table) }
   __stop___ex_table = .;
 
+  __start___unwind = .;         /* unwind info */
+  .PARISC.unwind : { *(.PARISC.unwind) }
+  __stop___unwind = .;
+ 
   .data : {			/* Data */
 	*(.data)
 	CONSTRUCTORS
@@ -87,6 +96,10 @@ SECTIONS
 
   . = ALIGN(L1_CACHE_BYTES);
   .data.cacheline_aligned : { *(.data.cacheline_aligned) }
+
+  /* PA-RISC locks requires 16-byte alignment */
+  . = ALIGN(16);
+  .data.lock_aligned : { *(.data.lock_aligned) }
 
   _edata = .;			/* End of data section */
 

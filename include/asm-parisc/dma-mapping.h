@@ -247,4 +247,7 @@ struct parisc_device;
 void * sba_get_iommu(struct parisc_device *dev);
 #endif
 
+/* At the moment, we panic on error for IOMMU resource exaustion */
+#define dma_mapping_error(x)	0
+
 #endif

@@ -52,6 +52,8 @@ extern void disable_sr_hashing(void);   /* turns off space register hashing */
 extern void disable_sr_hashing_asm(int); /* low level support for above */
 extern void free_sid(unsigned long);
 unsigned long alloc_sid(void);
+extern void flush_user_dcache_page(unsigned long);
+extern void flush_user_icache_page(unsigned long);
 
 struct seq_file;
 extern void show_cache_info(struct seq_file *m);

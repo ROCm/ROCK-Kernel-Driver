@@ -155,9 +155,10 @@ linux_gateway_entry:
 	stw     %r21, -56(%r30)                 /* 6th argument */
 #endif
 
+	/* Are we being ptraced? */
 	mfctl	%cr30, %r1
-	LDREG	TI_FLAGS(%r1), %r19
-	bb,<,n	%r19,31-TIF_SYSCALL_TRACE,.Ltracesys
+	LDREG	TASK_PTRACE(%r1), %r1
+	bb,<,n	%r1,31,.Ltracesys
 	
 	/* Note!  We cannot use the syscall table that is mapped
 	nearby since the gateway page is mapped execute-only. */

@@ -230,26 +230,21 @@ void disable_sr_hashing(void)
 void __flush_dcache_page(struct page *page)
 {
 	struct address_space *mapping = page_mapping(page);
-	struct mm_struct *mm = current->active_mm;
 	struct list_head *l;
 
 	flush_kernel_dcache_page(page_address(page));
 
 	if (!mapping)
 		return;
-	/* check shared list first if it's not empty...it's usually
-	 * the shortest */
+
+	/* We have ensured in arch_get_unmapped_area() that all shared
+	 * mappings are mapped at equivalent addresses, so we only need
+	 * to flush one for them all to become coherent */
 	list_for_each(l, &mapping->i_mmap_shared) {
 		struct vm_area_struct *mpnt;
-		unsigned long off;
+		unsigned long off, addr;
 
 		mpnt = list_entry(l, struct vm_area_struct, shared);
-
-		/*
-		 * If this VMA is not in our MM, we can ignore it.
-		 */
-		if (mpnt->vm_mm != mm)
-			continue;
 
 		if (page->index < mpnt->vm_pgoff)
 			continue;
@@ -258,25 +253,34 @@ void __flush_dcache_page(struct page *page)
 		if (off >= (mpnt->vm_end - mpnt->vm_start) >> PAGE_SHIFT)
 			continue;
 
-		flush_cache_page(mpnt, mpnt->vm_start + (off << PAGE_SHIFT));
+		addr = mpnt->vm_start + (off << PAGE_SHIFT);
 
-		/* All user shared mappings should be equivalently mapped,
-		 * so once we've flushed one we should be ok
-		 */
+		/* flush instructions produce non access tlb misses.
+		 * On PA, we nullify these instructions rather than 
+		 * taking a page fault if the pte doesn't exist, so we
+		 * have to find a congruent address with an existing
+		 * translation */
+
+		if (!translation_exists(mpnt, addr))
+			continue;
+
+		__flush_cache_page(mpnt, addr);
+
+		/* If we find an address to flush, that will also
+		 * bring all the private mappings up to date (see
+		 * comment below) */
 		return;
 	}
 
-	/* then check private mapping list for read only shared mappings
-	 * which are flagged by VM_MAYSHARE */
+	/* we have carefully arranged in arch_get_unmapped_area() that
+	 * *any* mappings of a file are always congruently mapped (whether
+	 * declared as MAP_PRIVATE or MAP_SHARED), so we only need
+	 * to flush one address here too */
 	list_for_each(l, &mapping->i_mmap) {
 		struct vm_area_struct *mpnt;
-		unsigned long off;
+		unsigned long off, addr;
 
 		mpnt = list_entry(l, struct vm_area_struct, shared);
-
-
-		if (mpnt->vm_mm != mm || !(mpnt->vm_flags & VM_MAYSHARE))
-			continue;
 
 		if (page->index < mpnt->vm_pgoff)
 			continue;
@@ -285,12 +289,17 @@ void __flush_dcache_page(struct page *page)
 		if (off >= (mpnt->vm_end - mpnt->vm_start) >> PAGE_SHIFT)
 			continue;
 
-		flush_cache_page(mpnt, mpnt->vm_start + (off << PAGE_SHIFT));
+		addr = mpnt->vm_start + (off << PAGE_SHIFT);
 
-		/* All user shared mappings should be equivalently mapped,
-		 * so once we've flushed one we should be ok
-		 */
-		break;
+		/* This is just for speed.  If the page translation isn't
+		 * there there's no point exciting the nadtlb handler into
+		 * a nullification frenzy */
+		if(!translation_exists(mpnt, addr))
+			continue;
+
+		__flush_cache_page(mpnt, addr);
+
+		return;
 	}
 }
 EXPORT_SYMBOL(__flush_dcache_page);

@@ -73,7 +73,7 @@ typedef void *aic7770_dev_t;
 static int aic7770_linux_config(struct aic7770_identity *entry,
 				aic7770_dev_t dev, u_int eisaBase);
 
-void
+int
 ahc_linux_eisa_init(void)
 {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
@@ -82,7 +82,7 @@ ahc_linux_eisa_init(void)
 	int i;
 
 	if (aic7xxx_probe_eisa_vl == 0)
-		return;
+		return -ENODEV;
 
 	/*
 	 * Linux requires the EISA IDs to be specified in
@@ -93,7 +93,7 @@ ahc_linux_eisa_init(void)
 					 (ahc_num_aic7770_devs + 1),
 					 M_DEVBUF, M_NOWAIT);
 	if (aic7770_driver.id_table == NULL)
-		return;
+		return -ENOMEM;
 
 	for (eid = (struct eisa_device_id *)aic7770_driver.id_table,
 	     id = aic7770_ident_table, i = 0;
@@ -109,15 +109,16 @@ ahc_linux_eisa_init(void)
 	}
 	eid->sig[0] = 0;
 
-	eisa_driver_register(&aic7770_driver);
+	return eisa_driver_register(&aic7770_driver);
 #else /* LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0) */
 	struct aic7770_identity *entry;
 	u_int  slot;
 	u_int  eisaBase;
 	u_int  i;
+	int ret = -ENODEV;
 
 	if (aic7xxx_probe_eisa_vl == 0)
-		return;
+		return ret;
 
 	eisaBase = 0x1000 + AHC_EISA_SLOT_OFFSET;
 	for (slot = 1; slot < NUMSLOTS; eisaBase+=0x1000, slot++) {
@@ -146,24 +147,22 @@ ahc_linux_eisa_init(void)
 			continue;  /* no EISA card in slot */
 
 		entry = aic7770_find_device(eisa_id);
-		if (entry != NULL)
+		if (entry != NULL) {
 			aic7770_linux_config(entry, NULL, eisaBase);
+			ret = 0;
+		}
 	}
+	return ret;
 #endif
 }
 
 void
 ahc_linux_eisa_exit(void)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
-	if (aic7xxx_probe_eisa_vl == 0)
-		return;
-
-	if (aic7770_driver.id_table != NULL) {
+	if(aic7xxx_probe_eisa_vl != 0 && aic7770_driver.id_table != NULL) {
 		eisa_driver_unregister(&aic7770_driver);
 		free(aic7770_driver.id_table, M_DEVBUF);
 	}
-#endif
 }
 
 static int

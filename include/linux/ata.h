@@ -104,6 +104,8 @@ enum {
 
 	/* ATA device commands */
 	ATA_CMD_EDD		= 0x90,	/* execute device diagnostic */
+	ATA_CMD_FLUSH		= 0xE7,
+	ATA_CMD_FLUSH_EXT	= 0xEA,
 	ATA_CMD_ID_ATA		= 0xEC,
 	ATA_CMD_ID_ATAPI	= 0xA1,
 	ATA_CMD_READ		= 0xC8,
@@ -196,7 +198,9 @@ struct ata_taskfile {
 };
 
 #define ata_id_is_ata(dev)	(((dev)->id[0] & (1 << 15)) == 0)
+#define ata_id_wcache_enabled(dev) ((dev)->id[85] & (1 << 5))
 #define ata_id_has_lba48(dev)	((dev)->id[83] & (1 << 10))
+#define ata_id_has_wcache(dev)	((dev)->id[82] & (1 << 5))
 #define ata_id_has_lba(dev)	((dev)->id[49] & (1 << 8))
 #define ata_id_has_dma(dev)	((dev)->id[49] & (1 << 9))
 #define ata_id_u32(dev,n)	\

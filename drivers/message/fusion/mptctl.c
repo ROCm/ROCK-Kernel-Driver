@@ -1199,7 +1199,7 @@ static int
 mptctl_getiocinfo (unsigned long arg, unsigned int data_size)
 {
 	struct mpt_ioctl_iocinfo *uarg = (struct mpt_ioctl_iocinfo *) arg;
-	struct mpt_ioctl_iocinfo karg;
+	struct mpt_ioctl_iocinfo *karg;
 	MPT_ADAPTER		*ioc;
 	struct pci_dev		*pdev;
 	struct Scsi_Host	*sh;
@@ -1219,34 +1219,46 @@ mptctl_getiocinfo (unsigned long arg, unsigned int data_size)
 	 */
 	if (data_size == sizeof(struct mpt_ioctl_iocinfo_rev0))
 		cim_rev = 0;
-	else if (data_size == sizeof(struct mpt_ioctl_iocinfo))
+	else if (data_size == sizeof(struct mpt_ioctl_iocinfo_rev1))
 		cim_rev = 1;
+	else if (data_size == sizeof(struct mpt_ioctl_iocinfo))
+		cim_rev = 2;
 	else if (data_size == (sizeof(struct mpt_ioctl_iocinfo_rev0)+12))
 		cim_rev = 0;	/* obsolete */
 	else
 		return -EFAULT;
-
-	if (copy_from_user(&karg, uarg, data_size)) {
+	
+	karg = kmalloc(data_size, GFP_KERNEL);
+	if (karg == NULL) {
+		printk(KERN_ERR "%s::mpt_ioctl_iocinfo() @%d - no memory available!\n",
+				__FILE__, __LINE__);
+		return -ENOMEM;
+	}
+		
+	if (copy_from_user(karg, uarg, data_size)) {
 		printk(KERN_ERR "%s@%d::mptctl_getiocinfo - "
 			"Unable to read in mpt_ioctl_iocinfo struct @ %p\n",
 				__FILE__, __LINE__, (void*)uarg);
+		kfree(karg);
 		return -EFAULT;
 	}
 
-	if (((iocnum = mpt_verify_adapter(karg.hdr.iocnum, &ioc)) < 0) ||
+	if (((iocnum = mpt_verify_adapter(karg->hdr.iocnum, &ioc)) < 0) ||
 	    (ioc == NULL)) {
 		dctlprintk((KERN_ERR "%s::mptctl_getiocinfo() @%d - ioc%d not found!\n",
 				__FILE__, __LINE__, iocnum));
+		kfree(karg);
 		return -ENODEV;
 	}
 
 	/* Verify the data transfer size is correct.
 	 * Ignore the port setting.
 	 */
-	if (karg.hdr.maxDataSize != data_size) {
+	if (karg->hdr.maxDataSize != data_size) {
 		printk(KERN_ERR "%s@%d::mptctl_getiocinfo - "
 			"Structure size mismatch. Command not completed.\n",
 				__FILE__, __LINE__);
+		kfree(karg);
 		return -EFAULT;
 	}
 
@@ -1254,29 +1266,37 @@ mptctl_getiocinfo (unsigned long arg, unsigned int data_size)
 	 * program
 	 */
 	if ((int)ioc->chip_type <= (int) FC929)
-		karg.adapterType = MPT_IOCTL_INTERFACE_FC;
+		karg->adapterType = MPT_IOCTL_INTERFACE_FC;
 	else
-		karg.adapterType = MPT_IOCTL_INTERFACE_SCSI;
+		karg->adapterType = MPT_IOCTL_INTERFACE_SCSI;
 
-	port = karg.hdr.port;
+	port = karg->hdr.port;
 
-	karg.port = port;
+	karg->port = port;
 	pdev = (struct pci_dev *) ioc->pcidev;
 
-	karg.pciId = pdev->device;
+	karg->pciId = pdev->device;
 	pci_read_config_byte(pdev, PCI_CLASS_REVISION, &revision);
-	karg.hwRev = revision;
+	karg->hwRev = revision;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-	karg.subSystemDevice = pdev->subsystem_device;
-	karg.subSystemVendor = pdev->subsystem_vendor;
+	karg->subSystemDevice = pdev->subsystem_device;
+	karg->subSystemVendor = pdev->subsystem_vendor;
 #endif
 
 	if (cim_rev == 1) {
 		/* Get the PCI bus, device, and function numbers for the IOC
 		 */
-		karg.pciInfo.u.bits.busNumber = pdev->bus->number;
-		karg.pciInfo.u.bits.deviceNumber = PCI_SLOT( pdev->devfn );
-		karg.pciInfo.u.bits.functionNumber = PCI_FUNC( pdev->devfn );
+		karg->pciInfo.u.bits.busNumber = pdev->bus->number;
+		karg->pciInfo.u.bits.deviceNumber = PCI_SLOT( pdev->devfn );
+		karg->pciInfo.u.bits.functionNumber = PCI_FUNC( pdev->devfn );
+	} else if (cim_rev == 2) {
+		/* Get the PCI bus, device, function and segment ID numbers 
+		   for the IOC */
+		karg->pciInfo.u.bits.busNumber = pdev->bus->number;
+		karg->pciInfo.u.bits.deviceNumber = PCI_SLOT( pdev->devfn );
+		karg->pciInfo.u.bits.functionNumber = PCI_FUNC( pdev->devfn );
+		karg->pciInfo.u.bits.functionNumber = PCI_FUNC( pdev->devfn );
+		karg->pciInfo.segmentID = pci_domain_nr(pdev->bus);
 	}
 
 	/* Get number of devices
@@ -1297,31 +1317,33 @@ mptctl_getiocinfo (unsigned long arg, unsigned int data_size)
 			}
 		}
 	}
-	karg.numDevices = numDevices;
+	karg->numDevices = numDevices;
 
 	/* Set the BIOS and FW Version
 	 */
-	karg.FWVersion = ioc->facts.FWVersion.Word;
-	karg.BIOSVersion = ioc->biosVersion;
+	karg->FWVersion = ioc->facts.FWVersion.Word;
+	karg->BIOSVersion = ioc->biosVersion;
 
 	/* Set the Version Strings.
 	 */
-	strncpy (karg.driverVersion, MPT_LINUX_PACKAGE_NAME, MPT_IOCTL_VERSION_LENGTH);
-	karg.driverVersion[MPT_IOCTL_VERSION_LENGTH-1]='\0';
+	strncpy (karg->driverVersion, MPT_LINUX_PACKAGE_NAME, MPT_IOCTL_VERSION_LENGTH);
+	karg->driverVersion[MPT_IOCTL_VERSION_LENGTH-1]='\0';
 
-	karg.busChangeEvent = 0;
-	karg.hostId = ioc->pfacts[port].PortSCSIID;
-	karg.rsvd[0] = karg.rsvd[1] = 0;
+	karg->busChangeEvent = 0;
+	karg->hostId = ioc->pfacts[port].PortSCSIID;
+	karg->rsvd[0] = karg->rsvd[1] = 0;
 
 	/* Copy the data from kernel memory to user memory
 	 */
-	if (copy_to_user((char *)arg, &karg, data_size)) {
+	if (copy_to_user((char *)arg, karg, data_size)) {
 		printk(KERN_ERR "%s@%d::mptctl_getiocinfo - "
 			"Unable to write out mpt_ioctl_iocinfo struct @ %p\n",
 				__FILE__, __LINE__, (void*)uarg);
+		kfree(karg);
 		return -EFAULT;
 	}
 
+	kfree(karg);
 	return 0;
 }
 
@@ -2909,6 +2931,8 @@ int __init mptctl_init(void)
 	if (++where && err) goto out_fail;
 	err = register_ioctl32_conversion(MPTIOCINFO1, compat_mptctl_ioctl);
 	if (++where && err) goto out_fail;
+	err = register_ioctl32_conversion(MPTIOCINFO2, compat_mptctl_ioctl);
+	if (++where && err) goto out_fail;
 	err = register_ioctl32_conversion(MPTTARGETINFO, compat_mptctl_ioctl);
 	if (++where && err) goto out_fail;
 	err = register_ioctl32_conversion(MPTTEST, compat_mptctl_ioctl);
@@ -2968,6 +2992,7 @@ out_fail:
 			" (%d:err=%d)\n", where, err);
 	unregister_ioctl32_conversion(MPTIOCINFO);
 	unregister_ioctl32_conversion(MPTIOCINFO1);
+	unregister_ioctl32_conversion(MPTIOCINFO2);
 	unregister_ioctl32_conversion(MPTTARGETINFO);
 	unregister_ioctl32_conversion(MPTTEST);
 	unregister_ioctl32_conversion(MPTEVENTQUERY);
@@ -3018,6 +3043,7 @@ void mptctl_exit(void)
 #ifdef CONFIG_COMPAT
 	unregister_ioctl32_conversion(MPTIOCINFO);
 	unregister_ioctl32_conversion(MPTIOCINFO1);
+	unregister_ioctl32_conversion(MPTIOCINFO2);
 	unregister_ioctl32_conversion(MPTTARGETINFO);
 	unregister_ioctl32_conversion(MPTTEST);
 	unregister_ioctl32_conversion(MPTEVENTQUERY);

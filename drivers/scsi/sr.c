@@ -138,7 +138,15 @@ static inline struct scsi_cd *scsi_cd_get(struct gendisk *disk)
 		goto out;
 	cd = scsi_cd(disk);
 	if (!kref_get(&cd->kref))
-		cd = NULL;
+		goto out_null;
+	if (scsi_device_get(cd->device))
+		goto out_put;
+	goto out;
+
+ out_put:
+	kref_put(&cd->kref);
+ out_null:
+	cd = NULL;
  out:
 	up(&sr_ref_sem);
 	return cd;
@@ -147,6 +155,7 @@ static inline struct scsi_cd *scsi_cd_get(struct gendisk *disk)
 static inline void scsi_cd_put(struct scsi_cd *cd)
 {
 	down(&sr_ref_sem);
+	scsi_device_put(cd->device);
 	kref_put(&cd->kref);
 	up(&sr_ref_sem);
 }
@@ -558,13 +567,10 @@ static int sr_probe(struct device *dev)
 	if (sdev->type != TYPE_ROM && sdev->type != TYPE_WORM)
 		goto fail;
 
-	if ((error = scsi_device_get(sdev)) != 0)
-		goto fail;
-
 	error = -ENOMEM;
 	cd = kmalloc(sizeof(*cd), GFP_KERNEL);
 	if (!cd)
-		goto fail_put_sdev;
+		goto fail;
 	memset(cd, 0, sizeof(*cd));
 
 	kref_init(&cd->kref, sr_kref_release);
@@ -637,8 +643,6 @@ fail_put:
 	put_disk(disk);
 fail_free:
 	kfree(cd);
-fail_put_sdev:
-	scsi_device_put(sdev);
 fail:
 	return error;
 }
@@ -926,7 +930,6 @@ static int sr_packet(struct cdrom_device_info *cdi,
 static void sr_kref_release(struct kref *kref)
 {
 	struct scsi_cd *cd = container_of(kref, struct scsi_cd, kref);
-	struct scsi_device *sdev = cd->device;
 	struct gendisk *disk = cd->disk;
 
 	spin_lock(&sr_index_lock);
@@ -940,8 +943,6 @@ static void sr_kref_release(struct kref *kref)
 	put_disk(disk);
 
 	kfree(cd);
-
-	scsi_device_put(sdev);
 }
 
 static int sr_remove(struct device *dev)
@@ -950,7 +951,9 @@ static int sr_remove(struct device *dev)
 
 	del_gendisk(cd->disk);
 
-	scsi_cd_put(cd);
+	down(&sr_ref_sem);
+	kref_put(&cd->kref);
+	up(&sr_ref_sem);
 
 	return 0;
 }

@@ -1585,19 +1585,6 @@ static int ntfs_statfs(struct super_block *sb, struct kstatfs *sfs)
 }
 
 /**
- * Super operations for mount time when we don't have enough setup to use the
- * proper functions.
- */
-struct super_operations ntfs_mount_sops = {
-	.alloc_inode	= ntfs_alloc_big_inode,	  /* VFS: Allocate new inode. */
-	.destroy_inode	= ntfs_destroy_big_inode, /* VFS: Deallocate inode. */
-	.read_inode	= ntfs_read_inode_mount,  /* VFS: Load inode from disk,
-						     called from iget(). */
-	.clear_inode	= ntfs_clear_big_inode,	  /* VFS: Called when inode is
-						     removed from memory. */
-};
-
-/**
  * The complete super operations.
  */
 struct super_operations ntfs_sops = {
@@ -1814,28 +1801,20 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	 * the inode for $MFT which is sufficient to allow our normal inode
 	 * operations and associated address space operations to function.
 	 */
-	/*
-	 * Poison vol->mft_ino so we know whether iget() called into our
-	 * ntfs_read_inode_mount() method.
-	 */
-#define OGIN	((struct inode*)n2p(le32_to_cpu(0x4e49474f)))	/* OGIN */
-	vol->mft_ino = OGIN;
-	sb->s_op = &ntfs_mount_sops;
-	tmp_ino = iget(vol->sb, FILE_MFT);
-	if (!tmp_ino || tmp_ino != vol->mft_ino || is_bad_inode(tmp_ino)) {
+	sb->s_op = &ntfs_sops;
+	tmp_ino = new_inode(sb);
+	if (!tmp_ino) {
 		if (!silent)
 			ntfs_error(sb, "Failed to load essential metadata.");
-		if (tmp_ino && vol->mft_ino == OGIN)
-			ntfs_error(sb, "BUG: iget() did not call "
-					"ntfs_read_inode_mount() method!\n");
-		if (!tmp_ino)
-			goto cond_iput_mft_ino_err_out_now;
+		goto err_out_now;
+	}
+	tmp_ino->i_ino = FILE_MFT;
+	insert_inode_hash(tmp_ino);
+	if (ntfs_read_inode_mount(tmp_ino) < 0) {
+		if (!silent)
+			ntfs_error(sb, "Failed to load essential metadata.");
 		goto iput_tmp_ino_err_out_now;
 	}
-	/*
-	 * Note: sb->s_op has already been set to &ntfs_sops by our specialized
-	 * ntfs_read_inode_mount() method when it was invoked by iget().
-	 */
 	down(&ntfs_lock);
 	/*
 	 * The current mount is a compression user if the cluster size is
@@ -1931,12 +1910,10 @@ unl_upcase_iput_tmp_ino_err_out_now:
 	up(&ntfs_lock);
 iput_tmp_ino_err_out_now:
 	iput(tmp_ino);
-cond_iput_mft_ino_err_out_now:
-	if (vol->mft_ino && vol->mft_ino != OGIN && vol->mft_ino != tmp_ino) {
+	if (vol->mft_ino && vol->mft_ino != tmp_ino) {
 		iput(vol->mft_ino);
 		vol->mft_ino = NULL;
 	}
-#undef OGIN
 	/*
 	 * This is needed to get ntfs_clear_extent_inode() called for each
 	 * inode we have ever called ntfs_iget()/iput() on, otherwise we A)

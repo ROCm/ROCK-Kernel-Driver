@@ -198,7 +198,7 @@ extern int
 qla2x00_get_port_name(scsi_qla_host_t *, uint16_t, uint8_t *, uint8_t);
 
 extern uint8_t
-qla2x00_get_link_status(scsi_qla_host_t *, uint8_t, link_stat_t *, uint16_t *);
+qla2x00_get_link_status(scsi_qla_host_t *, uint16_t, link_stat_t *, uint16_t *);
 
 extern int
 qla2x00_lip_reset(scsi_qla_host_t *);
@@ -255,14 +255,6 @@ extern void qla2x00_lock_nvram_access(scsi_qla_host_t *);
 extern void qla2x00_unlock_nvram_access(scsi_qla_host_t *);
 extern uint16_t qla2x00_get_nvram_word(scsi_qla_host_t *, uint32_t);
 extern void qla2x00_write_nvram_word(scsi_qla_host_t *, uint32_t, uint16_t);
-extern void qla2x00_flash_enable(scsi_qla_host_t *);
-extern void qla2x00_flash_disable(scsi_qla_host_t *);
-extern uint8_t qla2x00_read_flash_byte(scsi_qla_host_t *, uint32_t);
-extern uint8_t qla2x00_get_flash_manufacturer(scsi_qla_host_t *);
-extern uint16_t qla2x00_get_flash_version(scsi_qla_host_t *);
-extern uint16_t qla2x00_get_flash_image(scsi_qla_host_t *, uint8_t *);
-extern uint16_t qla2x00_set_flash_image(scsi_qla_host_t *, uint8_t *);
-
 /*
  * Global Function Prototypes in qla_dbg.c source file.
  */

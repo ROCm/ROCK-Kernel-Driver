@@ -63,6 +63,7 @@ struct scsi_device {
 	char devfs_name[256];	/* devfs junk */
 	char type;
 	char scsi_level;
+	char inq_periph_qual;	/* PQ from INQUIRY data */	
 	unsigned char inquiry_len;	/* valid bytes in 'inquiry' */
 	unsigned char * inquiry;	/* INQUIRY response data */
 	char * vendor;		/* [back_compat] point into 'inquiry' ... */
@@ -110,6 +111,8 @@ struct scsi_device {
 
 	unsigned int max_device_blocked; /* what device_blocked counts down from  */
 #define SCSI_DEFAULT_DEVICE_BLOCKED	3
+
+	int timeout;
 
 	struct device		sdev_gendev;
 	struct class_device	sdev_classdev;

@@ -4,36 +4,43 @@
 #include <asm/system.h>
 
 /* Note that PA-RISC has to use `1' to mean unlocked and `0' to mean locked
- * since it only has load-and-zero.
+ * since it only has load-and-zero. Moreover, at least on some PA processors,
+ * the semaphore address has to be 16-byte aligned.
  */
 
 #undef SPIN_LOCK_UNLOCKED
-#define SPIN_LOCK_UNLOCKED (spinlock_t) { 1 }
+#define SPIN_LOCK_UNLOCKED (spinlock_t) { { 1, 1, 1, 1 } }
 
-#define spin_lock_init(x)	do { (x)->lock = 1; } while(0)
+#define spin_lock_init(x)	do { *(x) = SPIN_LOCK_UNLOCKED; } while(0)
 
-#define spin_is_locked(x) ((x)->lock == 0)
+static inline int spin_is_locked(spinlock_t *x)
+{
+	volatile unsigned int *a = __ldcw_align(x);
+	return *a == 0;
+}
 
-#define spin_unlock_wait(x)	do { barrier(); } while(((volatile spinlock_t *)(x))->lock == 0)
+#define spin_unlock_wait(x)	do { barrier(); } while(spin_is_locked(x))
 #define _raw_spin_lock_flags(lock, flags) _raw_spin_lock(lock)
 
-#if 1
-#define _raw_spin_lock(x) do { \
-	while (__ldcw (&(x)->lock) == 0) \
-		while (((x)->lock) == 0) ; } while (0)
+static inline void _raw_spin_lock(spinlock_t *x)
+{
+	volatile unsigned int *a = __ldcw_align(x);
+	while (__ldcw(a) == 0)
+		while (*a == 0);
+}
 
-#else
-#define _raw_spin_lock(x) \
-	do { while(__ldcw(&(x)->lock) == 0); } while(0)
-#endif
+static inline void _raw_spin_unlock(spinlock_t *x)
+{
+	volatile unsigned int *a = __ldcw_align(x);
+	*a = 1;
+}
+
+static inline int _raw_spin_trylock(spinlock_t *x)
+{
+	volatile unsigned int *a = __ldcw_align(x);
+	return __ldcw(a) != 0;
+}
 	
-#define _raw_spin_unlock(x) \
-	do { (x)->lock = 1; } while(0)
-
-#define _raw_spin_trylock(x) (__ldcw(&(x)->lock) != 0)
-
-
-
 /*
  * Read-write spinlocks, allowing multiple readers
  * but only one writer.
@@ -43,7 +50,7 @@ typedef struct {
 	volatile int counter;
 } rwlock_t;
 
-#define RW_LOCK_UNLOCKED (rwlock_t) { {1}, 0 }
+#define RW_LOCK_UNLOCKED (rwlock_t) { { { 1, 1, 1, 1 } }, 0 }
 
 #define rwlock_init(lp)	do { *(lp) = RW_LOCK_UNLOCKED; } while (0)
 
