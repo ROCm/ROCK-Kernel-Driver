@@ -256,7 +256,8 @@ static void us2e_set_cpu_divider_index(unsigned int cpu, unsigned int index)
 	freqs.cpu = cpu;
 	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 
-	us2e_transition(estar, new_bits, clock_tick, old_divisor, divisor);
+	if (old_divisor != divisor)
+		us2e_transition(estar, new_bits, clock_tick, old_divisor, divisor);
 
 	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
 
