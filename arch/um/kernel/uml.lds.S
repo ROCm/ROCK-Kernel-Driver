@@ -7,8 +7,12 @@ jiffies = jiffies_64;
 
 SECTIONS
 {
+  /*This must contain the right address - not quite the default ELF one.*/
+  PROVIDE (__executable_start = START);
   . = START + SIZEOF_HEADERS;
 
+  /* Used in arch/um/kernel/mem.c. Any memory between START and __binary_start
+   * is remapped.*/
   __binary_start = .;
 #ifdef MODE_TT
   .thread_private : {
@@ -20,9 +24,13 @@ SECTIONS
   }
   . = ALIGN(4096);
   .remap : { arch/um/kernel/tt/unmap_fin.o (.text) }
-#endif
+
+  /* We want it only if we are in MODE_TT. In both cases, however, when MODE_TT
+   * is off the resulting binary segfaults.*/
 
   . = ALIGN(4096);		/* Init code and data */
+#endif
+
   _stext = .;
   __init_begin = .;
   .init.text : {
