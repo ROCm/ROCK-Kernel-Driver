@@ -37,6 +37,7 @@
 #include <asm/hardirq.h>
 #include <asm/softirq.h>
 #include <asm/mmu_context.h>
+#include <asm/tlbflush.h>
 
 #define __KERNEL_SYSCALLS__
 #include <asm/unistd.h>
@@ -83,9 +84,6 @@ int smp_num_cpus = 1;		/* Number that came online.  */
 int smp_threads_ready;		/* True once the per process idle is forked. */
 cycles_t cacheflush_time;
 unsigned long cache_decay_ticks;
-
-int __cpu_number_map[NR_CPUS];
-int __cpu_logical_map[NR_CPUS];
 
 extern void calibrate_delay(void);
 extern asmlinkage void entInt(void);
@@ -463,9 +461,6 @@ smp_boot_one_cpu(int cpuid, int cpunum)
 	init_idle(idle, cpuid);
 	unhash_process(idle);
 
-	__cpu_logical_map[cpunum] = cpuid;
-	__cpu_number_map[cpuid] = cpunum;
-
 	DBGS(("smp_boot_one_cpu: CPU %d state 0x%lx flags 0x%lx\n",
 	      cpuid, idle->state, idle->flags));
 
@@ -490,9 +485,7 @@ smp_boot_one_cpu(int cpuid, int cpunum)
 		barrier();
 	}
 
-	/* We must invalidate our stuff as we failed to boot the CPU.  */
-	__cpu_logical_map[cpunum] = -1;
-	__cpu_number_map[cpuid] = -1;
+	/* We failed to boot the CPU.  */
 
 	printk(KERN_ERR "SMP: Processor %d is stuck.\n", cpuid);
 	return -1;
@@ -562,12 +555,8 @@ smp_boot_cpus(void)
 	unsigned long bogosum;
 
 	/* Take care of some initial bookkeeping.  */
-	memset(__cpu_number_map, -1, sizeof(__cpu_number_map));
-	memset(__cpu_logical_map, -1, sizeof(__cpu_logical_map));
 	memset(ipi_data, 0, sizeof(ipi_data));
 
-	__cpu_number_map[boot_cpuid] = 0;
-	__cpu_logical_map[0] = boot_cpuid;
 	current_thread_info()->cpu = boot_cpuid;
 
 	smp_store_cpu_info(boot_cpuid);
@@ -942,10 +931,9 @@ flush_tlb_mm(struct mm_struct *mm)
 	if (mm == current->active_mm) {
 		flush_tlb_current(mm);
 		if (atomic_read(&mm->mm_users) <= 1) {
-			int i, cpu, this_cpu = smp_processor_id();
-			for (i = 0; i < smp_num_cpus; i++) {
-				cpu = cpu_logical_map(i);
-				if (cpu == this_cpu)
+			int cpu, this_cpu = smp_processor_id();
+			for (cpu = 0; cpu < NR_CPUS; cpu++) {
+				if (!cpu_online(cpu) || cpu == this_cpu)
 					continue;
 				if (mm->context[cpu])
 					mm->context[cpu] = 0;
@@ -986,10 +974,9 @@ flush_tlb_page(struct vm_area_struct *vma, unsigned long addr)
 	if (mm == current->active_mm) {
 		flush_tlb_current_page(mm, vma, addr);
 		if (atomic_read(&mm->mm_users) <= 1) {
-			int i, cpu, this_cpu = smp_processor_id();
-			for (i = 0; i < smp_num_cpus; i++) {
-				cpu = cpu_logical_map(i);
-				if (cpu == this_cpu)
+			int cpu, this_cpu = smp_processor_id();
+			for (cpu = 0; cpu < NR_CPUS; cpu++) {
+				if (!cpu_online(cpu) || cpu == this_cpu)
 					continue;
 				if (mm->context[cpu])
 					mm->context[cpu] = 0;
@@ -1036,10 +1023,9 @@ flush_icache_user_range(struct vm_area_struct *vma, struct page *page,
 	if (mm == current->active_mm) {
 		__load_new_mm_context(mm);
 		if (atomic_read(&mm->mm_users) <= 1) {
-			int i, cpu, this_cpu = smp_processor_id();
-			for (i = 0; i < smp_num_cpus; i++) {
-				cpu = cpu_logical_map(i);
-				if (cpu == this_cpu)
+			int cpu, this_cpu = smp_processor_id();
+			for (cpu = 0; cpu < NR_CPUS; cpu++) {
+				if (!cpu_online(cpu) || cpu == this_cpu)
 					continue;
 				if (mm->context[cpu])
 					mm->context[cpu] = 0;

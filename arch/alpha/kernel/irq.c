@@ -525,12 +525,9 @@ show_interrupts(struct seq_file *p, void *v)
 
 #ifdef CONFIG_SMP
 	seq_puts(p, "           ");
-	for (i = 0; i < smp_num_cpus; i++)
-		seq_printf(p, "CPU%d       ", i);
-#ifdef DO_BROADCAST_INTS
-	for (i = 0; i < smp_num_cpus; i++)
-		seq_printf(p, "TRY%d       ", i);
-#endif
+	for (i = 0; i < NR_CPUS; i++)
+		if (cpu_online(i))
+			seq_printf(p, "CPU%d       ", i);
 	seq_putc(p, '\n');
 #endif
 
@@ -542,14 +539,9 @@ show_interrupts(struct seq_file *p, void *v)
 #ifndef CONFIG_SMP
 		seq_printf(p, "%10u ", kstat_irqs(i));
 #else
-		for (j = 0; j < smp_num_cpus; j++)
-			seq_printf(p, "%10u ",
-				     kstat.irqs[cpu_logical_map(j)][i]);
-#ifdef DO_BROADCAST_INTS
-		for (j = 0; j < smp_num_cpus; j++)
-			seq_printf(p, "%10lu ",
-				     irq_attempt(cpu_logical_map(j), i));
-#endif
+		for (j = 0; j < NR_CPUS; j++)
+			if (cpu_online(j))
+				seq_printf(p, "%10u ", kstat.irqs[j][i]);
 #endif
 		seq_printf(p, " %14s", irq_desc[i].handler->typename);
 		seq_printf(p, "  %c%s",
@@ -565,9 +557,9 @@ show_interrupts(struct seq_file *p, void *v)
 	}
 #if CONFIG_SMP
 	seq_puts(p, "IPI: ");
-	for (j = 0; j < smp_num_cpus; j++)
-		seq_printf(p, "%10lu ",
-			     cpu_data[cpu_logical_map(j)].ipi_count);
+	for (i = 0; i < NR_CPUS; i++)
+		if (cpu_online(i))
+			seq_printf(p, "%10lu ", cpu_data[i].ipi_count);
 	seq_putc(p, '\n');
 #endif
 	seq_printf(p, "ERR: %10lu\n", irq_err_count);
