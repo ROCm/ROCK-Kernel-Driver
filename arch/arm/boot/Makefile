@@ -5,31 +5,31 @@
 # License.  See the file "COPYING" in the main directory of this archive
 # for more details.
 #
-# Copyright (C) 1995-2000 Russell King
+# Copyright (C) 1995-2002 Russell King
 #
 
 SYSTEM	=$(TOPDIR)/vmlinux
 
 ifeq ($(CONFIG_CPU_26),y)
-ZTEXTADDR	 = 0x02080000
+ZRELADDR	 = 0x02080000
 PARAMS_PHYS	 = 0x0207c000
 INITRD_PHYS	 = 0x02180000
 INITRD_VIRT	 = 0x02180000
 endif
 
 ifeq ($(CONFIG_ARCH_RPC),y)
-ZTEXTADDR	 = 0x10008000
+ZRELADDR	 = 0x10008000
 PARAMS_PHYS	 = 0x10000100
 INITRD_PHYS	 = 0x18000000
 INITRD_VIRT	 = 0xc8000000
 endif
 
 ifeq ($(CONFIG_ARCH_CLPS7500),y)
-ZTEXTADDR	 = 0x10008000
+ZRELADDR	 = 0x10008000
 endif
 
 ifeq ($(CONFIG_ARCH_EBSA110),y)
-ZTEXTADDR	 = 0x00008000
+ZRELADDR	 = 0x00008000
 PARAMS_PHYS	 = 0x00000400
 INITRD_PHYS	 = 0x00800000
 INITRD_VIRT	 = 0xc0800000
@@ -41,41 +41,34 @@ ZRELADDR	 = 0x08008000
 endif
 
 ifeq ($(CONFIG_FOOTBRIDGE),y)
-ZTEXTADDR	 = 0x00008000
+ZRELADDR	 = 0x00008000
 PARAMS_PHYS	 = 0x00000100
 INITRD_PHYS	 = 0x00800000
 INITRD_VIRT	 = 0xc0800000
 endif
 
 ifeq ($(CONFIG_ARCH_INTEGRATOR),y)
-ZTEXTADDR	 = 0x00008000
+ZRELADDR	 = 0x00008000
 PARAMS_PHYS	 = 0x00000100
 INITRD_PHYS	 = 0x00800000
 INITRD_VIRT	 = 0xc0800000
 endif
 
 ifeq ($(CONFIG_ARCH_CAMELOT),y)
-ZTEXTADDR	 = 0x00008000
+ZRELADDR	 = 0x00008000
 endif
 
 ifeq ($(CONFIG_ARCH_NEXUSPCI),y)
-ZTEXTADDR	 = 0x40008000
+ZRELADDR	 = 0x40008000
 endif
 
 ifeq ($(CONFIG_ARCH_L7200),y)
-# RAM based kernel
-#ZTEXTADDR	 = 0xf0400000
-#ZRELADDR	 = 0xf0008000
-
-# FLASH based kernel
-ZTEXTADDR	 = 0x00010000
 ZRELADDR	 = 0xf0008000
-ZBSSADDR	 = 0xf03e0000
 endif
 
 # The standard locations for stuff on CLPS711x type processors
 ifeq ($(CONFIG_ARCH_CLPS711X),y)
-ZTEXTADDR	 = 0xc0028000
+ZRELADDR	 = 0xc0028000
 PARAMS_PHYS	 = 0xc0000100
 endif
 
@@ -90,60 +83,40 @@ INITRD_VIRT	 = 0xc0300000
 endif
 
 ifeq ($(CONFIG_ARCH_SA1100),y)
-ZTEXTADDR	 = 0xc0008000
 ZRELADDR	 = 0xc0008000
-ifeq ($(CONFIG_SA1100_VICTOR),y)
-  ZTEXTADDR	 = 0x00002000
-  ZBSSADDR	 = 0xc0200000
-endif
-ifeq ($(CONFIG_SA1100_SHERMAN),y)
-  ZTEXTADDR      = 0x00050000   
-  ZBSSADDR       = 0xc0200000
-endif
-ifeq ($(CONFIG_SA1100_GRAPHICSCLIENT),y)
-  ZTEXTADDR	 = 0xC0200000
-endif
-ifeq ($(CONFIG_SA1100_GRAPHICSMASTER),y)
-  ZTEXTADDR	 = 0xC0400000
-endif
-ifeq ($(CONFIG_SA1100_ADSBITSY),y)
-  ZTEXTADDR	 = 0xC0400000
-endif
-ifeq ($(CONFIG_SA1100_YOPY),y)
-  ZTEXTADDR      = 0x00080000
-  ZBSSADDR       = 0xc0200000
-endif
+# No defconfig file to move this into...
+#ifeq ($(CONFIG_SA1100_YOPY),y)
+#  ZTEXTADDR      = 0x00080000
+#  ZBSSADDR       = 0xc0200000
+#endif
 ifeq ($(CONFIG_SA1111),y)
   ZRELADDR	 = 0xc0208000
 endif
 endif
 
 ifeq ($(CONFIG_ARCH_ANAKIN),y)
-ZTEXTADDR	 = 0x20008000
+ZRELADDR	 = 0x20008000
 endif
 
 ifeq ($(CONFIG_ARCH_IQ80310),y)
 ZRELADDR	 = 0xa0008000
-
-# for serial upload
-ZTEXTADDR	 = 0xa1008000
-
-# for direct flash execution
-# ZTEXTADDR	 = 0x00060000
-# ZBSSADDR	 = 0xa1008000
 endif
 
 ifeq ($(CONFIG_ARCH_ADIFCC),y)
 ZRELADDR	 = 0xc0008000
-ZTEXTADDR	 = 0xc1000000
 endif
 
 #
-# If you don't define ZRELADDR above,
-# then it defaults to ZTEXTADDR
+# We now have a PIC decompressor implementation.  Decompressors running
+# from RAM should not define ZTEXTADDR.  Decompressors running directly
+# from ROM or Flash must define ZTEXTADDR (preferably via the config)
 #
-ifeq ($(ZRELADDR),)
-ZRELADDR	= $(ZTEXTADDR)
+ifeq ($(CONFIG_ZBOOT_ROM),y)
+ZTEXTADDR	=0x$(CONFIG_ZBOOT_ROM_TEXT)
+ZBSSADDR	=0x$(CONFIG_ZBOOT_ROM_BSS)
+else
+ZTEXTADDR	=0
+ZBSSADDR	=ALIGN(4)
 endif
 
 export	SYSTEM ZTEXTADDR ZBSSADDR ZRELADDR INITRD_PHYS INITRD_VIRT PARAMS_PHYS

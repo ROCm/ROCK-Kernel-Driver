@@ -26,10 +26,9 @@
 #include <asm/hardware.h>
 #include <asm/pgtable.h>
 #include <asm/page.h>
+#include <asm/sizes.h>
  
 #include <asm/mach/map.h>
-
-#define MB1 1048576	/* one megabyte == size of an MMU section */
 
 extern void clps711x_map_io(void);
 
@@ -56,12 +55,12 @@ static struct map_desc edb7211_io_desc[] __initdata = {
  /* virtual, physical, length, domain, r, w, c, b */
 
  /* memory-mapped extra keyboard row and CS8900A Ethernet chip */
- { EP7211_VIRT_EXTKBD, EP7211_PHYS_EXTKBD, MB1, DOMAIN_IO, 0, 1, 0, 0 }, 
- { EP7211_VIRT_CS8900A, EP7211_PHYS_CS8900A, MB1, DOMAIN_IO, 0, 1, 0, 0 },
+ { EP7211_VIRT_EXTKBD,  EP7211_PHYS_EXTKBD,  SZ_1M, DOMAIN_IO, 0, 1, 0, 0 }, 
+ { EP7211_VIRT_CS8900A, EP7211_PHYS_CS8900A, SZ_1M, DOMAIN_IO, 0, 1, 0, 0 },
 
  /* flash banks */
- { EP7211_VIRT_FLASH1, EP7211_PHYS_FLASH1, MB1 * 8, DOMAIN_KERNEL, 0, 1, 0, 0 },
- { EP7211_VIRT_FLASH2, EP7211_PHYS_FLASH2, MB1 * 8, DOMAIN_KERNEL, 0, 1, 0, 0 },
+ { EP7211_VIRT_FLASH1,  EP7211_PHYS_FLASH1,  SZ_8M, DOMAIN_KERNEL, 0, 1, 0, 0 },
+ { EP7211_VIRT_FLASH2,  EP7211_PHYS_FLASH2,  SZ_8M, DOMAIN_KERNEL, 0, 1, 0, 0 },
 
  LAST_DESC
 };
