@@ -42,8 +42,8 @@
 #define BEQUIET
 
 #ifdef LEAK_CHECK
-static int check_malloc = 0;
-static int check_bread = 0;
+static int check_malloc;
+static int check_bread;
 #endif
 
 static int isofs_hashi(struct dentry *parent, struct qstr *qstr);
