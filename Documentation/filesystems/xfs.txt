@@ -29,9 +29,6 @@ When mounting an XFS filesystem, the following options are accepted.
 	The preferred buffered I/O size can also be altered on an
 	individual file basis using the ioctl(2) system call.
 
-  dmapi/xdsm
-	Enable the DMAPI (Data Management API) event callouts.
-
   irixsgid
 	Do not inherit the ISGID bit on subdirectories of ISGID
 	directories, if the process creating the subdirectory
