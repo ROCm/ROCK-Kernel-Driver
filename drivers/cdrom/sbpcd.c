@@ -480,7 +480,6 @@ static void sbp_read_cmd(struct request *req);
 static int sbp_data(struct request *req);
 static int cmd_out(void);
 static int DiskInfo(void);
-static int sbpcd_chk_disk_change(kdev_t);
 
 /*==========================================================================*/
 
@@ -623,8 +622,6 @@ static u_char drv_pattern[NR_SBPCD]={speed_auto,speed_auto,speed_auto,speed_auto
 /*
  * drive space begins here (needed separate for each unit) 
  */
-static int d; /* DriveStruct index: drive number */
-
 static struct sbpcd_drive {
 	char drv_id;           /* "jumpered" drive ID or -1 */
 	char drv_sel;          /* drive select lines bits */
@@ -762,7 +759,7 @@ static void msg(int level, const char *fmt, ...)
 	
 	msgnum++;
 	if (msgnum>99) msgnum=0;
-	sprintf(buf, MSG_LEVEL "%s-%d [%02d]:  ", major_name, d, msgnum);
+	sprintf(buf, MSG_LEVEL "%s-%d [%02d]:  ", major_name, current_drive - D_S, msgnum);
 	va_start(args, fmt);
 	vsprintf(&buf[18], fmt, args);
 	va_end(args);
@@ -1998,16 +1995,15 @@ static int SetSpeed(void)
 	return (i);
 }
 
-static void switch_drive(int i);
+static void switch_drive(struct sbpcd_drive *);
 
 static int sbpcd_select_speed(struct cdrom_device_info *cdi, int speed)
 {
-  int i = minor(cdi->dev);
+	struct sbpcd_drive *p = cdi->handle;
+	if (p != current_drive)
+		switch_drive(p);
 
-  if (i != d)
-    switch_drive(i);
-
-  return cc_SetSpeed(speed == 2 ? speed_300 : speed_150, 0, 0);
+	return cc_SetSpeed(speed == 2 ? speed_300 : speed_150, 0, 0);
 }
 
 /*==========================================================================*/
@@ -2040,12 +2036,10 @@ static int DriveReset(void)
 
 static int sbpcd_reset(struct cdrom_device_info *cdi)
 {
-  int i = minor(cdi->dev);
-
-  if (i != d)
-    switch_drive(i);
-
-  return DriveReset();
+	struct sbpcd_drive *p = cdi->handle;
+	if (p != current_drive)
+		switch_drive(p);
+	return DriveReset();
 }
 
 /*==========================================================================*/
@@ -2156,7 +2150,7 @@ static int cc_LockDoor(char lock)
 	int i;
 	
 	if (fam0_drive) return (0);
-	msg(DBG_LCK,"cc_LockDoor: %d (drive %d)\n", lock, d);
+	msg(DBG_LCK,"cc_LockDoor: %d (drive %d)\n", lock, current_drive - D_S);
 	msg(DBG_LCS,"p_door_locked bit %d before\n", st_door_locked);
 	clr_cmdbuf();
 	response_count=0;
@@ -2250,7 +2244,7 @@ static int cc_CloseTray(void)
 	int i;
 	
 	if (fam0_drive) return (0);
-	msg(DBG_LCK,"cc_CloseTray (drive %d)\n", d);
+	msg(DBG_LCK,"cc_CloseTray (drive %d)\n", current_drive - D_S);
 	msg(DBG_LCS,"p_door_closed bit %d before\n", st_door_closed);
 	
 	clr_cmdbuf();
@@ -2319,10 +2313,8 @@ static int cc_CloseTray(void)
 
 static int sbpcd_tray_move(struct cdrom_device_info *cdi, int position)
 {
-	int i;
 	int retval=0;
-	i = minor(cdi->dev);
-	switch_drive(i);
+	switch_drive(cdi->handle);
 	/* DUH! --AJK */
 	if(current_drive->CD_changed != 0xFF) {
 		current_drive->CD_changed=0xFF;
@@ -3297,7 +3289,7 @@ static int __init check_version(void)
 	int i, j, l;
 	int teac_possible=0;
 	
-	msg(DBG_INI,"check_version: id=%d, d=%d.\n", current_drive->drv_id, d);
+	msg(DBG_INI,"check_version: id=%d, d=%d.\n", current_drive->drv_id, current_drive - D_S);
 	current_drive->drv_type=0;
 
 	/* check for CR-52x, CR-56x, LCS-7260 and ECS-AT */
@@ -3578,12 +3570,12 @@ static int __init check_version(void)
 	return (0);
 }
 /*==========================================================================*/
-static void switch_drive(int i)
+static void switch_drive(struct sbpcd_drive *p)
 {
-	d=i;
-	current_drive = D_S + i;
+	current_drive = p;
 	OUT(CDo_enable,current_drive->drv_sel);
-	msg(DBG_DID,"drive %d (ID=%d) activated.\n", i, current_drive->drv_id);
+	msg(DBG_DID,"drive %d (ID=%d) activated.\n",
+		current_drive - D_S, current_drive->drv_id);
 	return;
 }
 /*==========================================================================*/
@@ -3703,10 +3695,11 @@ static int __init check_drives(void)
 	ndrives=0;
 	for (j=0;j<max_drives;j++)
 	{
-		D_S[ndrives].drv_id=j;
-		if (sbpro_type==1) D_S[ndrives].drv_sel=(j&0x01)<<1|(j&0x02)>>1;
-		else D_S[ndrives].drv_sel=j;
-		switch_drive(ndrives);
+		struct sbpcd_drive *p = D_S + ndrives;
+		p->drv_id=j;
+		if (sbpro_type==1) p->drv_sel=(j&0x01)<<1|(j&0x02)>>1;
+		else p->drv_sel=j;
+		switch_drive(p);
 		msg(DBG_INI,"check_drives: drive %d (ID=%d) activated.\n",ndrives,j);
 		msg(DBG_000,"check_drives: drive %d (ID=%d) activated.\n",ndrives,j);
 		i=check_version();
@@ -3716,7 +3709,7 @@ static int __init check_drives(void)
 			current_drive->drv_options=drv_pattern[j];
 			if (fam0L_drive) current_drive->drv_options&=~(speed_auto|speed_300|speed_150);
 			msg(DBG_INF, "Drive %d (ID=%d): %.9s (%.4s) at 0x%03X (type %d)\n",
-			    d,
+			    current_drive - D_S,
 			    current_drive->drv_id,
 			    current_drive->drive_model,
 			    current_drive->firmware_version,
@@ -3985,6 +3978,7 @@ static int DiskInfo(void)
 
 static int sbpcd_drive_status(struct cdrom_device_info *cdi, int slot_nr)
 {
+	struct sbpcd_drive *p = cdi->handle;
 	int st;
 
 	if (CDSL_CURRENT != slot_nr) {
@@ -4007,13 +4001,13 @@ static int sbpcd_drive_status(struct cdrom_device_info *cdi, int slot_nr)
 	msg(DBG_000,"Drive Status: busy =%d.\n", st_busy);
 
 #if 0
-  if (!(D_S[minor(cdi->dev)].status_bits & p_door_closed)) return CDS_TRAY_OPEN;
-  if (D_S[minor(cdi->dev)].status_bits & p_disk_ok) return CDS_DISC_OK;
-  if (D_S[minor(cdi->dev)].status_bits & p_disk_in) return CDS_DRIVE_NOT_READY;
+  if (!(p->status_bits & p_door_closed)) return CDS_TRAY_OPEN;
+  if (p->status_bits & p_disk_ok) return CDS_DISC_OK;
+  if (p->status_bits & p_disk_in) return CDS_DRIVE_NOT_READY;
 
   return CDS_NO_DISC;
 #else
-  if (D_S[minor(cdi->dev)].status_bits & p_spinning) return CDS_DISC_OK;
+  if (p->status_bits & p_spinning) return CDS_DISC_OK;
 /*  return CDS_TRAY_OPEN; */
   return CDS_NO_DISC;
   
@@ -4148,9 +4142,10 @@ static int sbp_status(void)
 		
 static int sbpcd_get_last_session(struct cdrom_device_info *cdi, struct cdrom_multisession *ms_infp)
 {
+	struct sbpcd_drive *p = cdi->handle;
 	ms_infp->addr_format = CDROM_LBA;
-	ms_infp->addr.lba    = D_S[minor(cdi->dev)].lba_multi;
-	if (D_S[minor(cdi->dev)].f_multisession)
+	ms_infp->addr.lba    = p->lba_multi;
+	if (p->f_multisession)
 		ms_infp->xa_flag=1; /* valid redirection address */
 	else
 		ms_infp->xa_flag=0; /* invalid redirection address */
@@ -4166,20 +4161,19 @@ static int sbpcd_get_last_session(struct cdrom_device_info *cdi, struct cdrom_mu
 static int sbpcd_dev_ioctl(struct cdrom_device_info *cdi, u_int cmd,
 		      u_long arg)
 {
+	struct sbpcd_drive *p = cdi->handle;
 	int i;
 	
-	msg(DBG_IO2,"ioctl(%d, 0x%08lX, 0x%08lX)\n",
-	    minor(cdi->dev), cmd, arg);
-	i=minor(cdi->dev);
-	if ((i<0) || (i>=NR_SBPCD) || (D_S[i].drv_id==-1))
-	{
-		msg(DBG_INF, "ioctl: bad device: %04X\n", cdi->dev);
+	msg(DBG_IO2,"ioctl(%s, 0x%08lX, 0x%08lX)\n", cdi->name, cmd, arg);
+	if (p->drv_id==-1) {
+		msg(DBG_INF, "ioctl: bad device: %s\n", cdi->name);
 		return (-ENXIO);             /* no such drive */
 	}
 	down(&ioctl_read_sem);
-	if (d!=i) switch_drive(i);
+	if (p != current_drive)
+		switch_drive(p);
 	
-	msg(DBG_IO2,"ioctl: device %d, request %04X\n",i,cmd);
+	msg(DBG_IO2,"ioctl: device %s, request %04X\n",cdi->name,cmd);
 	switch (cmd) 		/* Sun-compatible */
 	{
 	case DDIOCSDBG:		/* DDI Debug */
@@ -4487,20 +4481,19 @@ static int sbpcd_dev_ioctl(struct cdrom_device_info *cdi, u_int cmd,
 static int sbpcd_audio_ioctl(struct cdrom_device_info *cdi, u_int cmd,
 		       void * arg)
 {
+	struct sbpcd_drive *p = cdi->handle;
 	int i, st, j;
 	
-	msg(DBG_IO2,"ioctl(%d, 0x%08lX, 0x%08p)\n",
-	    minor(cdi->dev), cmd, arg);
-	i=minor(cdi->dev);
-	if ((i<0) || (i>=NR_SBPCD) || (D_S[i].drv_id==-1))
-	{
-		msg(DBG_INF, "ioctl: bad device: %04X\n", cdi->dev);
+	msg(DBG_IO2,"ioctl(%s, 0x%08lX, 0x%08p)\n", cdi->name, cmd, arg);
+	if (p->drv_id==-1) {
+		msg(DBG_INF, "ioctl: bad device: %s\n", cdi->name);
 		return (-ENXIO);             /* no such drive */
 	}
 	down(&ioctl_read_sem);
-	if (d!=i) switch_drive(i);
+	if (p != current_drive)
+		switch_drive(p);
 	
-	msg(DBG_IO2,"ioctl: device %d, request %04X\n",i,cmd);
+	msg(DBG_IO2,"ioctl: device %s, request %04X\n",cdi->name,cmd);
 	switch (cmd) 		/* Sun-compatible */
 	{
 		
@@ -4836,8 +4829,9 @@ static void do_sbpcd_request(request_queue_t * q)
 {
 	u_int block;
 	u_int nsect;
-	int i, status_tries, data_tries;
+	int status_tries, data_tries;
 	struct request *req;
+	struct sbpcd_drive *p;
 #ifdef DEBUG_GTL
 	static int xx_nr=0;
 	int xnr;
@@ -4876,9 +4870,8 @@ static void do_sbpcd_request(request_queue_t * q)
 		msg(DBG_INF, "bad cmd %d\n", req->cmd);
 		goto err_done;
 	}
-	i = minor(req->rq_dev);
-	if ( (i<0) || (i>=NR_SBPCD) || (D_S[i].drv_id==-1))
-	{
+	p = D_S + minor(req->rq_dev);
+	if (p->drv_id==-1) {
 		msg(DBG_INF, "do_request: bad device: %s\n",
 			kdevname(req->rq_dev));
 		goto err_done;
@@ -4888,9 +4881,10 @@ static void do_sbpcd_request(request_queue_t * q)
 	busy_data=1;
 #endif /* OLD_BUSY */
 	
-	if (D_S[i].audio_state==audio_playing) goto err_done;
-	if (d!=i) switch_drive(i);
-	
+	if (p->audio_state==audio_playing) goto err_done;
+	if (p != current_drive)
+		switch_drive(p);
+
 	block = req->sector; /* always numbered as 512-byte-pieces */
 	nsect = req->nr_sectors; /* always counted as 512-byte-pieces */
 	
@@ -5371,12 +5365,10 @@ static struct block_device_operations sbpcd_bdops =
  */
 static int sbpcd_open(struct cdrom_device_info *cdi, int purpose)
 {
-	int i;
-
-	i = minor(cdi->dev);
+	struct sbpcd_drive *p = cdi->handle;
 
 	down(&ioctl_read_sem);
-	switch_drive(i);
+	switch_drive(p);
 
 	/*
 	 * try to keep an "open" counter here and lock the door if 0->1.
@@ -5385,6 +5377,7 @@ static int sbpcd_open(struct cdrom_device_info *cdi, int purpose)
 	    current_drive->open_count,current_drive->open_count+1);
 	if (++current_drive->open_count<=1)
 	{
+		int i;
 		i=LockDoor();
 		current_drive->open_count=1;
 		if (famT_drive)	msg(DBG_TEA,"sbpcd_open: before i=DiskInfo();.\n");
@@ -5410,32 +5403,30 @@ static int sbpcd_open(struct cdrom_device_info *cdi, int purpose)
  */
 static void sbpcd_release(struct cdrom_device_info * cdi)
 {
-	int i;
+	struct sbpcd_drive *p = cdi->handle;
 
-	i = minor(cdi->dev);
-	if ((i<0) || (i>=NR_SBPCD) || (D_S[i].drv_id==-1))
-	{
-		msg(DBG_INF, "release: bad device: %04X\n", cdi->dev);
-		return ;
+	if (p->drv_id==-1) {
+		msg(DBG_INF, "release: bad device: %s\n", cdi->name);
+		return;
 	}
 	down(&ioctl_read_sem);
-	switch_drive(i);
+	switch_drive(p);
 	/*
 	 * try to keep an "open" counter here and unlock the door if 1->0.
 	 */
 	msg(DBG_LCK,"open_count: %d -> %d\n",
-	    current_drive->open_count,current_drive->open_count-1);
-	if (current_drive->open_count>-2) /* CDROMEJECT may have been done */
+	    p->open_count,p->open_count-1);
+	if (p->open_count>-2) /* CDROMEJECT may have been done */
 	{
-		if (--current_drive->open_count<=0) 
+		if (--p->open_count<=0) 
 		{
-			current_drive->sbp_first_frame=current_drive->sbp_last_frame=-1;
-			if (current_drive->audio_state!=audio_playing)
-				if (current_drive->f_eject) cc_SpinDown();
-			current_drive->diskstate_flags &= ~cd_size_bit;
-			current_drive->open_count=0; 
+			p->sbp_first_frame=p->sbp_last_frame=-1;
+			if (p->audio_state!=audio_playing)
+				if (p->f_eject) cc_SpinDown();
+			p->diskstate_flags &= ~cd_size_bit;
+			p->open_count=0; 
 #if SAFE_MIXED
-			current_drive->has_data=0;
+			p->has_data=0;
 #endif /* SAFE_MIXED */ 
 		}
 	}
@@ -5464,13 +5455,6 @@ static struct cdrom_device_ops sbpcd_dops = {
 				CDC_MULTI_SESSION | CDC_MEDIA_CHANGED |
 				CDC_MCN | CDC_PLAY_AUDIO | CDC_IOCTLS,
 	n_minors:		1,
-};
-
-static struct cdrom_device_info sbpcd_info = {
-	ops:			&sbpcd_dops,
-	speed:			2,
-	capacity:		1,
-	name:			"sbpcd",
 };
 
 /*==========================================================================*/
@@ -5711,21 +5695,23 @@ int __init sbpcd_init(void)
 	
 	for (j=0;j<NR_SBPCD;j++)
 	{
-		if (D_S[j].drv_id==-1) continue;
-		switch_drive(j);
+		struct sbpcd_drive *p = D_S + j;
+		if (p->drv_id==-1)
+			continue;
+		switch_drive(p);
 #if 1
 		if (!famL_drive) cc_DriveReset();
 #endif
 		if (!st_spinning) cc_SpinUp();
-		D_S[j].sbp_first_frame = -1;  /* First frame in buffer */
-		D_S[j].sbp_last_frame = -1;   /* Last frame in buffer  */
-		D_S[j].sbp_read_frames = 0;   /* Number of frames being read to buffer */
-		D_S[j].sbp_current = 0;       /* Frame being currently read */
-		D_S[j].CD_changed=1;
-		D_S[j].frame_size=CD_FRAMESIZE;
-		D_S[j].f_eject=0;
+		p->sbp_first_frame = -1;  /* First frame in buffer */
+		p->sbp_last_frame = -1;   /* Last frame in buffer  */
+		p->sbp_read_frames = 0;   /* Number of frames being read to buffer */
+		p->sbp_current = 0;       /* Frame being currently read */
+		p->CD_changed=1;
+		p->frame_size=CD_FRAMESIZE;
+		p->f_eject=0;
 #if EJECT
-		if (!fam0_drive) D_S[j].f_eject=1;
+		if (!fam0_drive) p->f_eject=1;
 #endif /* EJECT */ 
 		cc_ReadStatus();
 		i=ResponseStatus();  /* returns orig. status or p_busy_new */
@@ -5745,8 +5731,8 @@ int __init sbpcd_init(void)
 		}
 		msg(DBG_INI,"init: first GetStatus: %d\n",i);
 		msg(DBG_LCS,"init: first GetStatus: error_byte=%d\n",
-		    D_S[j].error_byte);
-		if (D_S[j].error_byte==aud_12)
+		    p->error_byte);
+		if (p->error_byte==aud_12)
 		{
 			timeout=jiffies+2*HZ;
 			do
@@ -5755,14 +5741,14 @@ int __init sbpcd_init(void)
 				msg(DBG_INI,"init: second GetStatus: %02X\n",i);
 				msg(DBG_LCS,
 				    "init: second GetStatus: error_byte=%d\n",
-				    D_S[j].error_byte);
+				    p->error_byte);
 				if (i<0) break;
 				if (!st_caddy_in) break;
 				}
 			while ((!st_diskok)||time_after(jiffies, timeout));
 		}
 		i=SetSpeed();
-		if (i>=0) D_S[j].CD_changed=1;
+		if (i>=0) p->CD_changed=1;
 	}
 
 	/*
@@ -5791,24 +5777,26 @@ int __init sbpcd_init(void)
 	for (j=0;j<NR_SBPCD;j++)
 	{
 		struct cdrom_device_info * sbpcd_infop;
+		struct sbpcd_drive *p = D_S + j;
 
-		if (D_S[j].drv_id==-1) continue;
-		switch_drive(j);
+		if (p->drv_id==-1) continue;
+		switch_drive(p);
 #if SAFE_MIXED
-		D_S[j].has_data=0;
+		p->has_data=0;
 #endif /* SAFE_MIXED */ 
 		/*
 		 * allocate memory for the frame buffers
 		 */
-		D_S[j].aud_buf=NULL;
-		D_S[j].sbp_audsiz=0;
-		D_S[j].sbp_bufsiz=buffers;
-		if (D_S[j].drv_type&drv_fam1)
-			if (READ_AUDIO>0) D_S[j].sbp_audsiz=READ_AUDIO;
-		D_S[j].sbp_buf=(u_char *) vmalloc(D_S[j].sbp_bufsiz*CD_FRAMESIZE);
-		if (D_S[j].sbp_buf==NULL)
-		{
-			msg(DBG_INF,"data buffer (%d frames) not available.\n",D_S[j].sbp_bufsiz);
+		p->aud_buf=NULL;
+		p->sbp_audsiz=0;
+		p->sbp_bufsiz=buffers;
+		if (p->drv_type&drv_fam1)
+			if (READ_AUDIO>0)
+				p->sbp_audsiz = READ_AUDIO;
+		p->sbp_buf=(u_char *) vmalloc(buffers*CD_FRAMESIZE);
+		if (!p->sbp_buf) {
+			msg(DBG_INF,"data buffer (%d frames) not available.\n",
+				buffers);
 			if ((unregister_blkdev(MAJOR_NR, major_name) == -EINVAL))
 			{
 				printk("Can't unregister %s\n", major_name);
@@ -5820,11 +5808,11 @@ int __init sbpcd_init(void)
 #ifdef MODULE
 		msg(DBG_INF,"data buffer size: %d frames.\n",buffers);
 #endif /* MODULE */
-		if (D_S[j].sbp_audsiz>0)
+		if (p->sbp_audsiz>0)
 		{
-			D_S[j].aud_buf=(u_char *) vmalloc(D_S[j].sbp_audsiz*CD_FRAMESIZE_RAW);
-			if (D_S[j].aud_buf==NULL) msg(DBG_INF,"audio buffer (%d frames) not available.\n",D_S[j].sbp_audsiz);
-			else msg(DBG_INF,"audio buffer size: %d frames.\n",D_S[j].sbp_audsiz);
+			p->aud_buf=(u_char *) vmalloc(p->sbp_audsiz*CD_FRAMESIZE_RAW);
+			if (p->aud_buf==NULL) msg(DBG_INF,"audio buffer (%d frames) not available.\n",p->sbp_audsiz);
+			else msg(DBG_INF,"audio buffer size: %d frames.\n",p->sbp_audsiz);
 		}
                 sbpcd_infop = vmalloc(sizeof (struct cdrom_device_info));
 		if (sbpcd_infop == NULL)
@@ -5833,12 +5821,15 @@ int __init sbpcd_init(void)
 			blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
                         return -ENOMEM;
 		}
-		D_S[j].sbpcd_infop = sbpcd_infop;
-		memcpy (sbpcd_infop, &sbpcd_info, sizeof(struct cdrom_device_info));
+		memset(sbpcd_infop, 0, sizeof(struct cdrom_device_info));
+		sbpcd_infop->ops = &sbpcd_dops;
+		sbpcd_infop->speed = 2;
+		sbpcd_infop->capacity = 1;
+		sprintf(sbpcd_infop->name, "sbpcd%d", j);
 		sbpcd_infop->dev = mk_kdev(MAJOR_NR, j);
-		strncpy(sbpcd_infop->name,major_name, sizeof(sbpcd_infop->name)); 
-
-		sprintf (nbuff, "c0t%d/cd", D_S[j].drv_id);
+		sbpcd_infop->handle = p;
+		p->sbpcd_infop = sbpcd_infop;
+		sprintf(nbuff, "c0t%d/cd", p->drv_id);
 		sbpcd_infop->de =
 		    devfs_register (devfs_handle, nbuff, DEVFS_FL_DEFAULT,
 				    MAJOR_NR, j, S_IFBLK | S_IRUGO | S_IWUGO,
@@ -5889,22 +5880,15 @@ module_exit(sbpcd_exit);
 
 
 #endif /* MODULE */
-/*==========================================================================*/
-/*
- * Check if the media has changed in the CD-ROM drive.
- * used externally (isofs/inode.c, fs/buffer.c)
- */
-static int sbpcd_chk_disk_change(kdev_t full_dev)
+static int sbpcd_media_changed(struct cdrom_device_info *cdi, int disc_nr)
 {
-	int i;
+	struct sbpcd_drive *p = cdi->handle;
+	msg(DBG_CHK,"media_check (%s) called\n", cdi->name);
 	
-	i=minor(full_dev);
-	msg(DBG_CHK,"media_check (%d) called\n", i);
-	
-	if (D_S[i].CD_changed==0xFF)
+	if (p->CD_changed==0xFF)
         {
-                D_S[i].CD_changed=0;
-                msg(DBG_CHK,"medium changed (drive %d)\n", i);
+                p->CD_changed=0;
+                msg(DBG_CHK,"medium changed (drive %s)\n", cdi->name);
 		/* BUG! Should invalidate buffers! --AJK */
 		/* Why should it do the above at all?! --mdcki */
 		current_drive->diskstate_flags &= ~toc_bit;
@@ -5917,11 +5901,6 @@ static int sbpcd_chk_disk_change(kdev_t full_dev)
         }
         else
                 return (0);
-}
-
-static int sbpcd_media_changed( struct cdrom_device_info *cdi, int disc_nr)
-{
-   return sbpcd_chk_disk_change(cdi->dev);
 }
 
 MODULE_LICENSE("GPL");
