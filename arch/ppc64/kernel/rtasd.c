@@ -50,6 +50,8 @@ extern volatile int no_more_logging;
 
 volatile int error_log_cnt = 0;
 
+int print_rtasmsgs = 1;
+
 /*
  * Since we use 32 bit RTAS, the physical address of this must be below
  * 4G or else bad things happen. Allocate this in the kernel data and
@@ -77,6 +79,9 @@ static void printk_log_rtas(char *buf, int len)
 	int perline = 16;
 	char buffer[64];
 	char * str = "RTAS event";
+
+	if (print_rtasmsgs == 0)
+		return;
 
 	printk(RTAS_DEBUG "%d -------- %s begin --------\n", error_log_cnt, str);
 
@@ -474,5 +479,15 @@ static int __init surveillance_setup(char *str)
 	return 1;
 }
 
+static int __init rtasmsg_setup(char *str)
+{
+	int i;
+	if (get_option(&str, &i)) 
+		print_rtasmsgs = i;
+
+	return 1;
+}
+
 __initcall(rtas_init);
 __setup("surveillance=", surveillance_setup);
+__setup("rtasmsgs=", rtasmsg_setup);

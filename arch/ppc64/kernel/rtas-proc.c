@@ -162,6 +162,10 @@ static ssize_t ppc_rtas_tone_volume_read(struct file * file, char * buf,
 		size_t count, loff_t *ppos);
 static ssize_t ppc_rtas_rmo_buf_read(struct file *file, char *buf,
 				    size_t count, loff_t *ppos);
+static ssize_t ppc_rtas_msg_write(struct file * file, const char * buf,
+		size_t count, loff_t *ppos);
+static ssize_t ppc_rtas_msg_read(struct file * file, char * buf,
+		size_t count, loff_t *ppos);
 
 struct file_operations ppc_rtas_poweron_operations = {
 	.read =		ppc_rtas_poweron_read,
@@ -188,6 +192,10 @@ struct file_operations ppc_rtas_tone_volume_operations = {
 
 static struct file_operations ppc_rtas_rmo_buf_ops = {
 	.read =		ppc_rtas_rmo_buf_read,
+};
+struct file_operations ppc_rtas_msg_operations = {
+	.read =		ppc_rtas_msg_read,
+	.write =	ppc_rtas_msg_write
 };
 
 int ppc_rtas_find_all_sensors (void);
@@ -236,6 +244,10 @@ static int __init proc_rtas_init(void)
 	entry = create_proc_entry("ppc64/rtas/rmo_buffer", S_IRUSR, NULL);
 	if (entry)
 		entry->proc_fops = &ppc_rtas_rmo_buf_ops;
+
+	entry = create_proc_entry("ppc64/rtas/rtasmsgs", S_IRUSR, NULL);
+	if (entry)
+		entry->proc_fops = &ppc_rtas_msg_operations;
 
 	return 0;
 }
@@ -954,3 +966,50 @@ static ssize_t ppc_rtas_rmo_buf_read(struct file *file, char __user *buf,
 	
 	return n;
 }
+
+/* ****************************************************************** */
+
+static ssize_t ppc_rtas_msg_write(struct file * file, const char * buf,
+		size_t count, loff_t *ppos)
+{
+	char stkbuf[40];  /* its small, its on stack */
+	char *dest;
+
+	if (39 < count) count = 39;
+	if (copy_from_user (stkbuf, buf, count)) {
+		return -EFAULT;
+	}
+	stkbuf[count] = 0;
+	print_rtasmsgs = simple_strtoul(stkbuf, &dest, 10);
+	if (*dest != '\0' && *dest != '\n') {
+		printk("ppc_rtas_msg_write: Invalid message setting\n");
+		return count;
+	}
+	
+	printk(KERN_INFO "RTAS: %s rtas messsage output to /var/log/messages\n",
+		(print_rtasmsgs ? "Enabling" : "Disabling"));
+	return count;
+}
+
+static ssize_t ppc_rtas_msg_read(struct file * file, char * buf,
+		size_t count, loff_t *ppos)
+{
+	int n, sn;
+	char stkbuf[40];  /* its small, its on stack */
+
+	n = scnprintf(stkbuf, 40, "%d\n", print_rtasmsgs);
+
+	sn = strlen (stkbuf) +1;
+	if (*ppos >= sn)
+		return 0;
+	if (n > sn - *ppos)
+		n = sn - *ppos;
+	if (n > count)
+		n = count;
+	if (copy_to_user (buf, stkbuf + (*ppos), n)) {
+		return -EFAULT;
+	}
+	*ppos += n;
+	return n;
+}
+
