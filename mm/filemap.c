@@ -70,7 +70,7 @@ void __remove_inode_page(struct page *page)
 {
 	struct address_space *mapping = page->mapping;
 
-	if (unlikely(PageDirty(page)))
+	if (unlikely(PageDirty(page)) && !PageSwapCache(page))
 		BUG();
 
 	radix_tree_delete(&page->mapping->page_tree, page->index);
