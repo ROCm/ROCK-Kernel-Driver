@@ -1817,7 +1817,7 @@ static int idefloppy_ioctl (ide_drive_t *drive, struct inode *inode, struct file
 		return (idefloppy_get_format_progress(drive, inode, file,
 						      (int *)arg));
 	}
- 	return -EIO;
+ 	return -EINVAL;
 }
 
 /*
