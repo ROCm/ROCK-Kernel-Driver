@@ -320,7 +320,7 @@ static void
 clps711xuart_set_termios(struct uart_port *port, struct termios *termios,
 			 struct termios *old)
 {
-	unsigned int ubrlcr, quot;
+	unsigned int ubrlcr, baud, quot;
 	unsigned long flags;
 
 	/*
@@ -331,7 +331,8 @@ clps711xuart_set_termios(struct uart_port *port, struct termios *termios,
 	/*
 	 * Ask the core to calculate the divisor for us.
 	 */
-	quot = uart_get_divisor(port, termios, old);
+	baud = uart_get_baud_rate(port, termios, old, 0, port->uartclk/16); 
+	quot = uart_get_divisor(port, baud);
 
 	switch (termios->c_cflag & CSIZE) {
 	case CS5:
@@ -362,7 +363,7 @@ clps711xuart_set_termios(struct uart_port *port, struct termios *termios,
 	/*
 	 * Update the per-port timeout.
 	 */
-	uart_update_timeout(port, termios->c_cflag, quot);
+	uart_update_timeout(port, termios->c_cflag, baud);
 
 	port->read_status_mask = UARTDR_OVERR;
 	if (termios->c_iflag & INPCK)
