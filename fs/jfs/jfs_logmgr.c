@@ -197,6 +197,8 @@ struct lmStat {
 	uint commit;		/* # of commit */
 	uint pagedone;		/* # of page written */
 	uint submitted;		/* # of pages submitted */
+	uint full_page;		/* # of full pages submitted */
+	uint partial_page;	/* # of partial pages submitted */
 } lmStat;
 #endif
 
@@ -597,21 +599,21 @@ static int lmNextPage(struct jfs_log * log)
 		/* mark tblk for end-of-page */
 		tblk->flag |= tblkGC_EOP;
 
-		/* if page is not already on write queue,
-		 * just enqueue (no lbmWRITE to prevent redrive)
-		 * buffer to wqueue to ensure correct serial order
-		 * of the pages since log pages will be added
-		 * continuously (tblk bound with the page hasn't
-		 * got around to init write of the page, either
-		 * preempted or the page got filled by its COMMIT
-		 * record);
-		 * pages with COMMIT are paged out explicitly by
-		 * tblk in lmGroupCommit();
-		 */
-		if (bp->l_wqnext == NULL) {
-			/* bp->l_ceor = bp->l_eor; */
-			/* lp->h.eor = lp->t.eor = bp->l_ceor; */
-			lbmWrite(log, bp, 0, 0);
+		if (log->cflag & logGC_PAGEOUT) {
+			/* if page is not already on write queue,
+			 * just enqueue (no lbmWRITE to prevent redrive)
+			 * buffer to wqueue to ensure correct serial order
+			 * of the pages since log pages will be added
+			 * continuously
+			 */
+			if (bp->l_wqnext == NULL)
+				lbmWrite(log, bp, 0, 0);
+		} else {
+			/*
+			 * No current GC leader, initiate group commit
+			 */
+			log->cflag |= logGC_PAGEOUT;
+			lmGCwrite(log, 0);
 		}
 	}
 	/* page is not bound with outstanding tblk:
@@ -678,10 +680,17 @@ int lmGroupCommit(struct jfs_log * log, struct tblock * tblk)
 		LOGGC_UNLOCK(log);
 		return rc;
 	}
-	jFYI(1,
-	     ("lmGroup Commit: tblk = 0x%p, gcrtc = %d\n", tblk,
-	      log->gcrtc));
+	jFYI(1, ("lmGroup Commit: tblk = 0x%p, gcrtc = %d\n", tblk,
+		 log->gcrtc));
 
+	if (tblk->xflag & COMMIT_LAZY) {
+		/*
+		 * Lazy transactions can leave now
+		 */
+		tblk->flag |= tblkGC_LAZY;
+		LOGGC_UNLOCK(log);
+		return 0;
+	}
 	/*
 	 * group commit pageout in progress
 	 */
@@ -709,12 +718,6 @@ int lmGroupCommit(struct jfs_log * log, struct tblock * tblk)
 	/* upcount transaction waiting for completion
 	 */
 	log->gcrtc++;
-
-	if (tblk->xflag & COMMIT_LAZY) {
-		tblk->flag |= tblkGC_LAZY;
-		LOGGC_UNLOCK(log);
-		return 0;
-	}
 	tblk->flag |= tblkGC_READY;
 
 	__SLEEP_COND(tblk->gcwait, (tblk->flag & tblkGC_COMMITTED),
@@ -785,6 +788,7 @@ void lmGCwrite(struct jfs_log * log, int cant_write)
 			bp->l_ceor));
 		lbmWrite(log, bp, lbmWRITE | lbmRELEASE | lbmGC,
 			 cant_write);
+		INCREMENT(lmStat.full_page);
 	}
 	/* page is not yet full */
 	else {
@@ -794,6 +798,7 @@ void lmGCwrite(struct jfs_log * log, int cant_write)
 		       ("gc: tclsn:0x%x, bceor:0x%x\n", tblk->clsn,
 			bp->l_ceor));
 		lbmWrite(log, bp, lbmWRITE | lbmGC, cant_write);
+		INCREMENT(lmStat.partial_page);
 	}
 }
 
@@ -881,11 +886,15 @@ void lmPostGC(struct lbuf * bp)
 
 	/* are there any transactions who have entered lnGroupCommit()
 	 * (whose COMMITs are after that of the last log page written.
-	 * They are waiting for new group commit (above at (SLEEP 1)):
+	 * They are waiting for new group commit (above at (SLEEP 1))
+	 * or lazy transactions are on a full (queued) log page,
 	 * select the latest ready transaction as new group leader and
 	 * wake her up to lead her group.
 	 */
-	if ((log->gcrtc > 0) && log->cqueue.head)
+	if ((tblk = log->cqueue.head) &&
+	    ((log->gcrtc > 0) || (tblk->bp->l_wqnext != NULL) ||
+	     test_bit(log_SYNCBARRIER, &log->flag) ||
+	     test_bit(log_QUIESCE, &log->flag)))
 		/*
 		 * Call lmGCwrite with new group leader
 		 */
@@ -1041,6 +1050,16 @@ int lmLogSync(struct jfs_log * log, int nosyncwait)
 		jFYI(1, ("log barrier on: lsn=0x%x syncpt=0x%x\n", lsn,
 			 log->syncpt));
 	}
+
+	/*
+	 * We may have to initiate group commit
+	 */
+	LOGGC_LOCK(log);
+	if (log->cqueue.head && !(log->cflag & logGC_PAGEOUT)) {
+		log->cflag |= logGC_PAGEOUT;
+		lmGCwrite(log, 0);
+	}
+	LOGGC_UNLOCK(log);
 
 	return lsn;
 }
@@ -1407,6 +1426,22 @@ void lmLogWait(struct jfs_log *log)
 
 	jFYI(1, ("lmLogWait: log:0x%p\n", log));
 
+	/*
+	 * This ensures that we will keep writing to the journal as long
+	 * as there are unwritten commit records
+	 */
+	set_bit(log_QUIESCE, &log->flag);
+
+	/*
+	 * Initiate I/O on outstanding transactions
+	 */
+	LOGGC_LOCK(log);
+	if (log->cqueue.head && !(log->cflag & logGC_PAGEOUT)) {
+		log->cflag |= logGC_PAGEOUT;
+		lmGCwrite(log, 0);
+	}
+	LOGGC_UNLOCK(log);
+
 	if (log->cqueue.head || !list_empty(&log->synclist)) {
 		/*
 		 * If there was very recent activity, we may need to wait
@@ -1423,6 +1458,8 @@ void lmLogWait(struct jfs_log *log)
 	}
 	assert(log->cqueue.head == NULL);
 	assert(list_empty(&log->synclist));
+
+	clear_bit(log_QUIESCE, &log->flag);	/* Probably not needed */
 }
 
 /*
@@ -2312,10 +2349,14 @@ int jfs_lmstats_read(char *buffer, char **start, off_t offset, int length,
 		       "================\n"
 		       "commits = %d\n"
 		       "writes submitted = %d\n"
-		       "writes completed = %d\n",
+		       "writes completed = %d\n"
+		       "full pages submitted = %d\n"
+		       "partial pages submitted = %d\n",
 		       lmStat.commit,
 		       lmStat.submitted,
-		       lmStat.pagedone);
+		       lmStat.pagedone,
+		       lmStat.full_page,
+		       lmStat.partial_page);
 
 	begin = offset;
 	*start = buffer + begin;
