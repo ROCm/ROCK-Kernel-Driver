@@ -91,13 +91,6 @@ find_freq_from_fid(u32 fid)
 	return 800 + (fid * 100);
 }
 
-/* Return a fid matching an input frequency in MHz */
-static u32
-find_fid_from_freq(u32 freq)
-{
-	return (freq - 800) / 100;
-}
-
 /* Return the vco fid for an input fid */
 static u32
 convert_fid_to_vco_fid(u32 fid)
@@ -736,112 +729,22 @@ find_psb_table(void)
 	return -ENODEV;
 }
 
-/* Converts a frequency (that might not necessarily be a multiple of 200) */
-/* to a fid.                                                              */
-static u32
-find_closest_fid(u32 freq, int searchup)
-{
-	if (searchup == SEARCH_UP)
-		freq += MIN_FREQ_RESOLUTION - 1;
-
-	freq = (freq / MIN_FREQ_RESOLUTION) * MIN_FREQ_RESOLUTION;
-
-	if (freq < MIN_FREQ)
-		freq = MIN_FREQ;
-	else if (freq > MAX_FREQ)
-		freq = MAX_FREQ;
-
-	return find_fid_from_freq(freq);
-}
-
-static int
-find_match(u32 * ptargfreq, u32 * pmin, u32 * pmax, int searchup, u32 * pfid,
-	   u32 * pvid)
-{
-	u32 availpstates = batps;
-	u32 targfid = find_closest_fid(*ptargfreq, searchup);
-	u32 minfid = find_closest_fid(*pmin, SEARCH_DOWN);
-	u32 maxfid = find_closest_fid(*pmax, SEARCH_UP);
-	u32 minidx = 0;
-	u32 maxidx = availpstates - 1;
-	u32 targidx = 0xffffffff;
-	int i;
-
-	dprintk(KERN_DEBUG PFX "find match: freq %d MHz, min %d, max %d\n",
-		*ptargfreq, *pmin, *pmax);
-
-	/* Restrict values to the frequency choices in the PST */
-	if (minfid < ppst[0].fid)
-		minfid = ppst[0].fid;
-	if (maxfid > ppst[maxidx].fid)
-		maxfid = ppst[maxidx].fid;
-
-	/* Find appropriate PST index for the minimim fid */
-	for (i = 0; i < (int) availpstates; i++) {
-		if (minfid >= ppst[i].fid)
-			minidx = i;
-	}
-
-	/* Find appropriate PST index for the maximum fid */
-	for (i = availpstates - 1; i >= 0; i--) {
-		if (maxfid <= ppst[i].fid)
-			maxidx = i;
-	}
-
-	if (minidx > maxidx)
-		maxidx = minidx;
-
-	/* Frequency ids are now constrained by limits matching PST entries */
-	minfid = ppst[minidx].fid;
-	maxfid = ppst[maxidx].fid;
-
-	/* Limit the target frequency to these limits */
-	if (targfid < minfid)
-		targfid = minfid;
-	else if (targfid > maxfid)
-		targfid = maxfid;
-
-	/* Find the best target index into the PST, contrained by the range */
-	if (searchup == SEARCH_UP) {
-		for (i = maxidx; i >= (int) minidx; i--) {
-			if (targfid <= ppst[i].fid)
-				targidx = i;
-		}
-	} else {
-		for (i = minidx; i <= (int) maxidx; i++) {
-			if (targfid >= ppst[i].fid)
-				targidx = i;
-		}
-	}
-
-	if (targidx == 0xffffffff) {
-		printk(KERN_ERR PFX "could not find target\n");
-		return 1;
-	}
-
-	*pmin = find_freq_from_fid(minfid);
-	*pmax = find_freq_from_fid(maxfid);
-	*ptargfreq = find_freq_from_fid(ppst[targidx].fid);
-
-	if (pfid)
-		*pfid = ppst[targidx].fid;
-	if (pvid)
-		*pvid = ppst[targidx].vid;
-
-	return 0;
-}
-
 /* Take a frequency, and issue the fid/vid transition command */
 static inline int
-transition_frequency(u32 * preq, u32 * pmin, u32 * pmax, u32 searchup)
+transition_frequency(unsigned int index)
 {
 	u32 fid;
 	u32 vid;
 	int res;
 	struct cpufreq_freqs freqs;
 
-	if (find_match(preq, pmin, pmax, searchup, &fid, &vid))
-		return 1;
+	/* fid are the lower 8 bits of the index we stored into
+	 * the cpufreq frequency table in find_psb_table, vid are 
+	 * the upper 8 bits.
+	 */
+
+	fid = powernow_table[index].index & 0xFF;
+	vid = (powernow_table[index].index & 0xFF00) >> 8;
 
 	dprintk(KERN_DEBUG PFX "table matched fid 0x%x, giving vid 0x%x\n",
 		fid, vid);
@@ -885,14 +788,7 @@ powernowk8_target(struct cpufreq_policy *pol, unsigned targfreq, unsigned relati
 {
 	u32 checkfid = currfid;
 	u32 checkvid = currvid;
-	u32 reqfreq = targfreq / 1000;
-	u32 minfreq = pol->min / 1000;
-	u32 maxfreq = pol->max / 1000;
-
-	if (ppst == 0) {
-		printk(KERN_ERR PFX "targ: ppst 0\n");
-		return -ENODEV;
-	}
+	unsigned int newstate;
 
 	if (pending_bit_stuck()) {
 		printk(KERN_ERR PFX "drv targ fail: change pending bit set\n");
@@ -914,9 +810,10 @@ powernowk8_target(struct cpufreq_policy *pol, unsigned targfreq, unsigned relati
 		       checkfid, currfid, checkvid, currvid);
 	}
 
-	if (transition_frequency(&reqfreq, &minfreq, &maxfreq,
-				 relation ==
-				 CPUFREQ_RELATION_H ? SEARCH_UP : SEARCH_DOWN))
+	if (cpufreq_frequency_table_target(pol, powernow_table, targfreq, relation, &newstate))
+		return -EINVAL;
+	
+	if (transition_frequency(newstate))
 	{
 		printk(KERN_ERR PFX "transition frequency failed\n");
 		return 1;
