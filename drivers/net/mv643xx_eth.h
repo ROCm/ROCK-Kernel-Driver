@@ -7,7 +7,7 @@
 #include <linux/spinlock.h>
 #include <linux/workqueue.h>
 
-#include <asm/mv64340.h>
+#include <linux/mv643xx.h>
 
 #define	BIT0	0x00000001
 #define	BIT1	0x00000002

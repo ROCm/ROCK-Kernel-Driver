@@ -2131,32 +2131,32 @@ config TIGON3
 	  To compile this driver as a module, choose M here: the module
 	  will be called tg3.  This is recommended.
 
-config MV64340_ETH
-	tristate "MV-64340 Ethernet support"
+config MV643XX_ETH
+	tristate "MV-643XX Ethernet support"
 	depends on MOMENCO_OCELOT_C || MOMENCO_JAGUAR_ATX
 	help
-	  This driver supports the gigabit Ethernet on the Marvell MV64340
+	  This driver supports the gigabit Ethernet on the Marvell MV643XX
 	  chipset which is used in the Momenco Ocelot C and Jaguar ATX.
 
-config MV64340_ETH_0
-	bool "MV-64340 Port 0"
-	depends on MV64340_ETH
+config MV643XX_ETH_0
+	bool "MV-643XX Port 0"
+	depends on MV643XX_ETH
 	help
-	  This enables support for Port 0 of the Marvell MV64340 Gigabit
+	  This enables support for Port 0 of the Marvell MV643XX Gigabit
 	  Ethernet.
 
-config MV64340_ETH_1
-	bool "MV-64340 Port 1"
-	depends on MV64340_ETH
+config MV643XX_ETH_1
+	bool "MV-643XX Port 1"
+	depends on MV643XX_ETH
 	help
-	  This enables support for Port 1 of the Marvell MV64340 Gigabit
+	  This enables support for Port 1 of the Marvell MV643XX Gigabit
 	  Ethernet.
 
-config MV64340_ETH_2
-	bool "MV-64340 Port 2"
-	depends on MV64340_ETH
+config MV643XX_ETH_2
+	bool "MV-643XX Port 2"
+	depends on MV643XX_ETH
 	help
-	  This enables support for Port 2 of the Marvell MV64340 Gigabit
+	  This enables support for Port 2 of the Marvell MV643XX Gigabit
 	  Ethernet.
 
 endmenu

@@ -54,7 +54,7 @@
 #include <asm/types.h>
 #include <asm/pgtable.h>
 #include <asm/system.h>
-#include "mv64340_eth.h"
+#include "mv643xx_eth.h"
 
 /*
  * The first part is the high level driver of the gigE ethernet ports. 
@@ -1425,23 +1425,23 @@ static struct net_device *mv64340_dev2;
  */
 static int __init mv64340_init_module(void)
 {
-	printk(KERN_NOTICE "MV-64340 10/100/1000 Ethernet Driver\n");
+	printk(KERN_NOTICE "MV-643xx 10/100/1000 Ethernet Driver\n");
 
-#ifdef CONFIG_MV64340_ETH_0
+#ifdef CONFIG_MV643XX_ETH_0
 	mv64340_dev0 = mv64340_eth_init(0);
 	if (!mv64340_dev0) {
 		printk(KERN_ERR
 		       "Error registering MV-64360 ethernet port 0\n");
 	}
 #endif
-#ifdef CONFIG_MV64340_ETH_1
+#ifdef CONFIG_MV643XX_ETH_1
 	mv64340_dev1 = mv64340_eth_init(1);
 	if (!mv64340_dev1) {
 		printk(KERN_ERR
 		       "Error registering MV-64360 ethernet port 1\n");
 	}
 #endif
-#ifdef CONFIG_MV64340_ETH_2
+#ifdef CONFIG_MV643XX_ETH_2
 	mv64340_dev2 = mv64340_eth_init(2);
 	if (!mv64340_dev2) {
 		printk(KERN_ERR
