@@ -40,7 +40,6 @@
 #include <linux/adb.h>
 #include <linux/module.h>
 #include <linux/delay.h>
-
 #include <linux/irq.h>
 #include <linux/seq_file.h>
 #include <linux/root_dev.h>
@@ -59,13 +58,12 @@
 #include <asm/time.h>
 #include <asm/nvram.h>
 #include <asm/plpar_wrappers.h>
-
-#include "i8259.h"
 #include <asm/xics.h>
-#include <asm/ppcdebug.h>
 #include <asm/cputable.h>
 
+#include "i8259.h"
 #include "mpic.h"
+#include "pci.h"
 
 #ifdef DEBUG
 #define DBG(fmt...) udbg_printf(fmt)
@@ -73,7 +71,6 @@
 #define DBG(fmt...)
 #endif
 
-extern void find_and_init_phbs(void);
 extern void pSeries_final_fixup(void);
 
 extern void pSeries_get_boot_time(struct rtc_time *rtc_time);
@@ -86,10 +83,6 @@ extern void generic_find_legacy_serial_ports(u64 *physport,
 		unsigned int *default_speed);
 
 int fwnmi_active;  /* TRUE if an FWNMI handler is present */
-
-unsigned long  virtPython0Facilities = 0;  // python0 facility area (memory mapped io) (64-bit format) VIRTUAL address.
-
-extern unsigned long loops_per_jiffy;
 
 extern unsigned long ppc_proc_freq;
 extern unsigned long ppc_tb_freq;
@@ -230,7 +223,7 @@ static void __init pSeries_setup_arch(void)
 	fwnmi_init();
 
 	/* Find and initialize PCI host bridges */
-	/* iSeries needs to be done much later. */
+	init_pci_config_tokens();
 	eeh_init();
 	find_and_init_phbs();
 
