@@ -353,7 +353,8 @@ static void opl3sa2_mixer_reset(opl3sa2_state_t* devc)
 	}
 }
 
-
+/* Currently only used for power management */
+#ifdef CONFIG_PM
 static void opl3sa2_mixer_restore(opl3sa2_state_t* devc)
 {
 	if (devc) {
@@ -366,7 +367,7 @@ static void opl3sa2_mixer_restore(opl3sa2_state_t* devc)
 		}
 	}
 }
-
+#endif
 
 static inline void arg_to_vol_mono(unsigned int vol, int* value)
 {
@@ -961,7 +962,6 @@ static int opl3sa2_resume(struct pm_dev *pdev)
 	spin_unlock_irqrestore(&opl3sa2_lock,flags);
 	return 0;
 }
-#endif /* CONFIG_PM */
 
 static int opl3sa2_pm_callback(struct pm_dev *pdev, pm_request_t rqst, void *data)
 {
@@ -976,6 +976,7 @@ static int opl3sa2_pm_callback(struct pm_dev *pdev, pm_request_t rqst, void *dat
 	}
 	return 0;
 }
+#endif /* CONFIG_PM */
 
 /*
  * Install OPL3-SA2 based card(s).
@@ -1127,10 +1128,11 @@ static void __exit cleanup_opl3sa2(void)
 	int card;
 
 	for(card = 0; card < opl3sa2_cards_num; card++) {
+#ifdef CONFIG_PM
 		if (opl3sa2_state[card].pmdev)
 			pm_unregister(opl3sa2_state[card].pmdev);
-
-	        if(opl3sa2_state[card].cfg_mpu.slots[1] != -1) {
+#endif
+	        if (opl3sa2_state[card].cfg_mpu.slots[1] != -1) {
 			unload_opl3sa2_mpu(&opl3sa2_state[card].cfg_mpu);
  		}
 		unload_opl3sa2_mss(&opl3sa2_state[card].cfg_mss);
