@@ -237,7 +237,8 @@ xfs_alloc_delrec(
 			 * allocated, the iclog is pushed up to the LSN
 			 * that freed the block.
 			 */
-			xfs_alloc_mark_busy(cur->bc_tp, agf->agf_seqno, bno, 1);
+			xfs_alloc_mark_busy(cur->bc_tp,
+				INT_GET(agf->agf_seqno, ARCH_CONVERT), bno, 1);
 
 			xfs_trans_agbtree_delta(cur->bc_tp, -1);
 			xfs_alloc_log_agf(cur->bc_tp, cur->bc_private.a.agbp,
@@ -556,7 +557,8 @@ xfs_alloc_delrec(
 	 * busy block is allocated, the iclog is pushed up to the
 	 * LSN that freed the block.
 	 */
-	xfs_alloc_mark_busy(cur->bc_tp, agf->agf_seqno, bno, 1);
+	xfs_alloc_mark_busy(cur->bc_tp,
+		INT_GET(agf->agf_seqno, ARCH_CONVERT), bno, 1);
 
 	xfs_trans_agbtree_delta(cur->bc_tp, -1);
 	/*

@@ -1773,9 +1773,9 @@ xfs_free_ag_extent(
 	 * used in xfs_bmap_finish, we can't allow block to be available
 	 * for reallocation and non-transaction writing (user data)
 	 * until we know that the transaction that moved it to the free
-	 * list is permanently on disk.  We track the blocks by declaring 
-	 * these blocks as "busy"; the busy list is maintained on a per-ag 
-	 * basis and each transaction records which entries should be removed 
+	 * list is permanently on disk.	 We track the blocks by declaring
+	 * these blocks as "busy"; the busy list is maintained on a per-ag
+	 * basis and each transaction records which entries should be removed
 	 * when the iclog commits to disk.  If a busy block is allocated,
 	 * the iclog is pushed up to the LSN that freed the block.
 	 */
@@ -2114,8 +2114,9 @@ xfs_alloc_put_freelist(
 
 	agf = XFS_BUF_TO_AGF(agbp);
 	mp = tp->t_mountp;
-	if (!agflbp &&
-	    (error = xfs_alloc_read_agfl(mp, tp, agf->agf_seqno, &agflbp)))
+
+	if (!agflbp && (error = xfs_alloc_read_agfl(mp, tp,
+			INT_GET(agf->agf_seqno, ARCH_CONVERT), &agflbp)))
 		return error;
 	agfl = XFS_BUF_TO_AGFL(agflbp);
 	INT_MOD(agf->agf_fllast, ARCH_CONVERT, 1);
