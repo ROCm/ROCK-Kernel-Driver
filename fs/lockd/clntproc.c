@@ -42,6 +42,79 @@ static inline void nlmclnt_next_cookie(struct nlm_cookie *c)
 	nlm_cookie++;
 }
 
+static struct nlm_lockowner *nlm_get_lockowner(struct nlm_lockowner *lockowner)
+{
+	atomic_inc(&lockowner->count);
+	return lockowner;
+}
+
+static void nlm_put_lockowner(struct nlm_lockowner *lockowner)
+{
+	if (!atomic_dec_and_lock(&lockowner->count, &lockowner->host->h_lock))
+		return;
+	list_del(&lockowner->list);
+	spin_unlock(&lockowner->host->h_lock);
+	nlm_release_host(lockowner->host);
+	kfree(lockowner);
+}
+
+static inline int nlm_pidbusy(struct nlm_host *host, uint32_t pid)
+{
+	struct nlm_lockowner *lockowner;
+	list_for_each_entry(lockowner, &host->h_lockowners, list) {
+		if (lockowner->pid == pid)
+			return -EBUSY;
+	}
+	return 0;
+}
+
+static inline uint32_t __nlm_alloc_pid(struct nlm_host *host)
+{
+	uint32_t res;
+	do {
+		res = host->h_pidcount++;
+	} while (nlm_pidbusy(host, res) < 0);
+	return res;
+}
+
+static struct nlm_lockowner *__nlm_find_lockowner(struct nlm_host *host, fl_owner_t owner)
+{
+	struct nlm_lockowner *lockowner;
+	list_for_each_entry(lockowner, &host->h_lockowners, list) {
+		if (lockowner->owner != owner)
+			continue;
+		return nlm_get_lockowner(lockowner);
+	}
+	return NULL;
+}
+
+static struct nlm_lockowner *nlm_find_lockowner(struct nlm_host *host, fl_owner_t owner)
+{
+	struct nlm_lockowner *res, *new = NULL;
+
+	spin_lock(&host->h_lock);
+	res = __nlm_find_lockowner(host, owner);
+	if (res == NULL) {
+		spin_unlock(&host->h_lock);
+		new = (struct nlm_lockowner *)kmalloc(sizeof(*new), GFP_KERNEL);
+		spin_lock(&host->h_lock);
+		res = __nlm_find_lockowner(host, owner);
+		if (res == NULL && new != NULL) {
+			res = new;
+			atomic_set(&new->count, 1);
+			new->owner = owner;
+			new->pid = __nlm_alloc_pid(host);
+			new->host = nlm_get_host(host);
+			list_add(&new->list, &host->h_lockowners);
+			new = NULL;
+		}
+	}
+	spin_unlock(&host->h_lock);
+	if (new != NULL)
+		kfree(new);
+	return res;
+}
+
 /*
  * Initialize arguments for TEST/LOCK/UNLOCK/CANCEL calls
  */
@@ -418,12 +491,12 @@ nlmclnt_test(struct nlm_rqst *req, struct file_lock *fl)
 static void nlmclnt_locks_copy_lock(struct file_lock *new, struct file_lock *fl)
 {
 	memcpy(&new->fl_u.nfs_fl, &fl->fl_u.nfs_fl, sizeof(new->fl_u.nfs_fl));
-	nlm_get_host(new->fl_u.nfs_fl.host);
+	nlm_get_lockowner(new->fl_u.nfs_fl.owner);
 }
 
 static void nlmclnt_locks_release_private(struct file_lock *fl)
 {
-	nlm_release_host(fl->fl_u.nfs_fl.host);
+	nlm_put_lockowner(fl->fl_u.nfs_fl.owner);
 	fl->fl_ops = NULL;
 }
 
@@ -437,7 +510,7 @@ static void nlmclnt_locks_init_private(struct file_lock *fl, struct nlm_host *ho
 	BUG_ON(fl->fl_ops != NULL);
 	fl->fl_u.nfs_fl.state = 0;
 	fl->fl_u.nfs_fl.flags = 0;
-	fl->fl_u.nfs_fl.host = nlm_get_host(host);
+	fl->fl_u.nfs_fl.owner = nlm_find_lockowner(host, fl->fl_owner);
 	fl->fl_ops = &nlmclnt_lock_ops;
 }
 
