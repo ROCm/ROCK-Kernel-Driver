@@ -63,7 +63,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v0.2"
+#define DRIVER_VERSION "v0.3"
 #define DRIVER_AUTHOR "Ganesh Varadarajan <ganesh@veritas.com>"
 #define DRIVER_DESC "USB Compaq iPAQ, HP Jornada, Casio EM500 driver"
 
@@ -521,6 +521,7 @@ static void ipaq_shutdown(struct usb_serial *serial)
 
 static int __init ipaq_init(void)
 {
+	spin_lock_init(&write_list_lock);
 	usb_serial_register(&ipaq_device);
 	usb_register(&ipaq_driver);
 	info(DRIVER_DESC " " DRIVER_VERSION);
