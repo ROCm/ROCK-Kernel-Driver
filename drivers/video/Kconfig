@@ -715,6 +715,12 @@ config FB_ATY_GX
 	  is at
 	  <http://support.ati.com/products/pc/mach64/graphics_xpression.html>.
 
+config FB_ATY_XL_INIT
+	bool "  Rage XL No-BIOS Init support" if FB_ATY_CT
+	depends on FB_ATY
+	help
+	  Say Y here to support booting a Rage XL without BIOS support.
+
 config FB_SIS
 	tristate "SIS acceleration"
 	depends on FB && PCI

@@ -849,7 +849,19 @@
 #define LI_CHIP_ID	0x4c49	/* RAGE LT PRO */
 #define LP_CHIP_ID	0x4c50	/* RAGE LT PRO */
 #define LT_CHIP_ID	0x4c54	/* RAGE LT */
-#define XL_CHIP_ID	0x4752	/* RAGE (XL) */
+
+/* mach64CT family / (Rage XL) class */
+#define GR_CHIP_ID	0x4752	/* RAGE XL, BGA, PCI33 */
+#define GS_CHIP_ID	0x4753	/* RAGE XL, PQFP, PCI33 */
+#define GM_CHIP_ID	0x474d	/* RAGE XL, BGA, AGP 1x,2x */
+#define GN_CHIP_ID	0x474e	/* RAGE XL, PQFP,AGP 1x,2x */
+#define GO_CHIP_ID	0x474f	/* RAGE XL, BGA, PCI66 */
+#define GL_CHIP_ID	0x474c	/* RAGE XL, PQFP, PCI66 */
+
+#define IS_XL(id) ((id)==GR_CHIP_ID || (id)==GS_CHIP_ID || \
+		   (id)==GM_CHIP_ID || (id)==GN_CHIP_ID || \
+		   (id)==GO_CHIP_ID || (id)==GL_CHIP_ID)	
+
 #define GT_CHIP_ID	0x4754	/* RAGE (GT) */
 #define GU_CHIP_ID	0x4755	/* RAGE II/II+ (GTB) */
 #define GV_CHIP_ID	0x4756	/* RAGE IIC, PCI */

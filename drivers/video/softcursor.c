@@ -17,30 +17,79 @@
 #include <asm/uaccess.h>
 #include <asm/io.h>
 
+static inline void sysmove_buf(u8 *dst, u8 *src, u32 d_pitch, u32 s_pitch, 
+			       u32 height, struct fb_info *info)
+{
+	int i, j;
+	
+	for (i = height; i--; ) {
+		for (j = 0; j < s_pitch; j++) 
+			dst[j] = *src++;
+		dst += d_pitch;
+	}
+}
+
+static inline void iomove_buf(u8 *dst, u8 *src, u32 d_pitch, u32 s_pitch, 
+			      u32 height, struct fb_info *info)
+{
+	int i, j;
+	
+	for (i = height; i--; ) {
+		for (j = 0; j < s_pitch; j++) 
+			info->pixmap.outbuf(*src++, dst+j);
+		dst += d_pitch;
+	}
+}
+
 int soft_cursor(struct fb_info *info, struct fb_cursor *cursor)
 {
-	int i, size = ((cursor->image.width + 7) / 8) * cursor->image.height;
+	static u8 src[64];
 	struct fb_image image;
-	static char data[64];
+	unsigned int i, size, s_pitch, d_pitch;
+	unsigned dsize = ((cursor->image.width + 7)/8) * cursor->image.height;
+	unsigned int scan_align = info->pixmap.scan_align - 1;
+	unsigned int buf_align = info->pixmap.buf_align - 1;
+	void (*move_data)(u8 *dst, u8 *src, u32 s_pitch, 
+			  u32 d_pitch, u32 height,
+			  struct fb_info *info);
+	u8 *dst;
+			  
+	if (info->pixmap.outbuf != NULL)
+		move_data = iomove_buf;
+	else
+		move_data = sysmove_buf;
+
+	s_pitch = (cursor->image.width + 7)/8;
+	d_pitch = (s_pitch + scan_align) & ~scan_align;
+	size = d_pitch * cursor->image.height + buf_align;
+	size &= ~buf_align;
+	dst = info->pixmap.addr + fb_get_buffer_offset(info, size);
+	image.data = dst;
 
 	if (cursor->enable) {
 		switch (cursor->rop) {
 		case ROP_XOR:
-			for (i = 0; i < size; i++)
-				data[i] = (cursor->image.data[i] &
+			for (i = 0; i < dsize; i++) {
+				src[i] =  (cursor->image.data[i] &
 					   cursor->mask[i]) ^
-				    	   cursor->dest[i];
+					   cursor->dest[i];
+			}
 			break;
 		case ROP_COPY:
 		default:
-			for (i = 0; i < size; i++)
-				data[i] =
-				    cursor->image.data[i] & cursor->mask[i];
+			for (i = 0; i < dsize; i++) {
+				src[i] = cursor->image.data[i] &
+					 cursor->mask[i];
+			}
 			break;
 		}
-	} else
-		memcpy(data, cursor->dest, size);
-
+		move_data(dst, src, d_pitch, s_pitch, cursor->image.height, 
+			  info);
+	} else {
+		move_data(dst, cursor->dest, s_pitch, d_pitch, 
+			  cursor->image.height, info);
+	}
+	  
 	image.bg_color = cursor->image.bg_color;
 	image.fg_color = cursor->image.fg_color;
 	image.dx = cursor->image.dx;
@@ -48,7 +97,6 @@ int soft_cursor(struct fb_info *info, struct fb_cursor *cursor)
 	image.width = cursor->image.width;
 	image.height = cursor->image.height;
 	image.depth = cursor->image.depth;
-	image.data = data;
 
 	if (info->fbops->fb_imageblit)
 		info->fbops->fb_imageblit(info, &image);

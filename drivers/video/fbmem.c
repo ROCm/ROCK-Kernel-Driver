@@ -363,6 +363,31 @@ int num_registered_fb;
 static int ofonly __initdata = 0;
 #endif
 
+/*
+ * we need to lock this section since fbcon_cursor
+ * may use fb_imageblit()
+ */
+u32 fb_get_buffer_offset(struct fb_info *info, u32 size)
+{
+	u32 align = info->pixmap.buf_align - 1;
+	u32 offset;
+
+	spin_lock_irqsave(&info->pixmap.lock,
+			  info->pixmap.lock_flags);
+	offset = info->pixmap.offset + align;
+	offset &= ~align;
+	if (offset + size > info->pixmap.size) {
+		if (info->fbops->fb_sync && 
+		    info->pixmap.flags & FB_PIXMAP_SYNC)
+			info->fbops->fb_sync(info);
+		offset = 0;
+	}
+	info->pixmap.offset = offset + size;
+	spin_unlock_irqrestore(&info->pixmap.lock,
+			       info->pixmap.lock_flags);
+	return offset;
+}
+
 #ifdef CONFIG_LOGO
 #include <linux/linux_logo.h>
 
@@ -1240,5 +1265,6 @@ EXPORT_SYMBOL(fb_show_logo);
 EXPORT_SYMBOL(fb_set_var);
 EXPORT_SYMBOL(fb_blank);
 EXPORT_SYMBOL(fb_pan_display);
+EXPORT_SYMBOL(fb_get_buffer_offset);
 
 MODULE_LICENSE("GPL");

@@ -325,6 +325,23 @@ struct fb_cursor {
 	struct fb_image	image;	/* Cursor image */
 };
 
+#define FB_PIXMAP_DEFAULT 1     /* used internally by fbcon */
+#define FB_PIXMAP_SYSTEM  2     /* memory is in system RAM  */
+#define FB_PIXMAP_IO      4     /* memory is iomapped       */
+#define FB_PIXMAP_SYNC    256   /* set if GPU can DMA       */
+
+struct fb_pixmap {
+        __u8  *addr;                      /* pointer to memory             */  
+	__u32 size;                       /* size of buffer in bytes       */
+	__u32 offset;                     /* current offset to buffer      */
+	__u32 buf_align;                  /* byte alignment of each bitmap */
+	__u32 scan_align;                 /* alignment per scanline        */
+	__u32 flags;                      /* see FB_PIXMAP_*               */
+	void (*outbuf)(u8 dst, u8 *addr); /* access methods                */
+	u8   (*inbuf) (u8 *addr);
+	unsigned long lock_flags;         /* flags for locking             */
+	spinlock_t lock;                  /* spinlock                      */
+};
 #ifdef __KERNEL__
 
 #include <linux/fs.h>
@@ -390,6 +407,7 @@ struct fb_info {
    struct fb_monspecs monspecs;         /* Current Monitor specs */
    struct fb_cursor cursor;		/* Current cursor */	
    struct fb_cmap cmap;                 /* Current cmap */
+   struct fb_pixmap pixmap;	        /* Current pixmap */
    struct fb_ops *fbops;
    char *screen_base;                   /* Virtual address */
    struct vc_data *display_fg;		/* Console visible on this display */
@@ -464,6 +482,7 @@ extern int register_framebuffer(struct fb_info *fb_info);
 extern int unregister_framebuffer(struct fb_info *fb_info);
 extern int fb_prepare_logo(struct fb_info *fb_info);
 extern int fb_show_logo(struct fb_info *fb_info);
+extern u32 fb_get_buffer_offset(struct fb_info *info, u32 size);
 extern struct fb_info *registered_fb[FB_MAX];
 extern int num_registered_fb;
 
