@@ -166,7 +166,6 @@ isdn_ether_init(isdn_net_local *lp)
 
 static struct isdn_netif_ops ether_ops = {
 	.hard_start_xmit     = isdn_net_start_xmit,
-	.hard_header         = eth_header,
 	.receive             = isdn_ether_receive,
 	.init                = isdn_ether_init,
 	.open                = isdn_ether_open,
