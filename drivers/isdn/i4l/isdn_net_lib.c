@@ -1202,7 +1202,7 @@ isdn_net_unbind_channel(isdn_net_dev *idev)
 	if (mlp->ops->unbind)
 		mlp->ops->unbind(idev);
 
-	isdn_slot_set_priv(idev->isdn_slot, NULL, NULL, NULL);
+	isdn_slot_set_priv(idev->isdn_slot, 0, NULL, NULL, NULL);
 
 	skb_queue_purge(&idev->super_tx_queue);
 
@@ -1230,8 +1230,8 @@ isdn_net_bind_channel(isdn_net_dev *idev, int slot)
 	int retval = 0;
 
 	idev->isdn_slot = slot;
-	isdn_slot_set_priv(idev->isdn_slot, idev, isdn_net_stat_callback,
-			   isdn_net_rcv_skb);
+	isdn_slot_set_priv(idev->isdn_slot, ISDN_USAGE_NET, idev,
+			   isdn_net_stat_callback, isdn_net_rcv_skb);
 
 	if (mlp->ops->bind)
 		retval = mlp->ops->bind(idev);
@@ -1382,6 +1382,7 @@ accept_icall(struct fsm_inst *fi, int pr, void *arg)
 	isdn_slot_command(idev->isdn_slot, ISDN_CMD_SETL2, &cmd);
 	cmd.arg = mlp->l3_proto << 8;
 	isdn_slot_command(idev->isdn_slot, ISDN_CMD_SETL3, &cmd);
+	isdn_slot_command(idev->isdn_slot, ISDN_CMD_ACCEPTD, &cmd);
 	
 	idev->dial_timer.expires = jiffies + mlp->dialtimeout;
 	idev->dial_event = EV_TIMER_INCOMING;
@@ -1861,7 +1862,9 @@ isdn_net_hangup(isdn_net_dev *idev)
 	del_timer(&idev->dial_timer);
 
 	printk(KERN_INFO "%s: local hangup\n", idev->name);
-	isdn_slot_command(idev->isdn_slot, ISDN_CMD_HANGUP, &cmd);
+	// FIXME via state machine
+	if (idev->isdn_slot >= 0)
+	  isdn_slot_command(idev->isdn_slot, ISDN_CMD_HANGUP, &cmd);
 	return 1;
 }
 

@@ -656,7 +656,7 @@ isdn_tty_dial(char *n, modem_info * info, atemu * m)
 
 		info->isdn_slot = i;
 		isdn_slot_set_m_idx(i, info->line);
-		isdn_slot_set_priv(i, info, isdn_tty_stat_callback, isdn_tty_rcv_skb);
+		isdn_slot_set_priv(i, ISDN_USAGE_MODEM, info, isdn_tty_stat_callback, isdn_tty_rcv_skb);
 		info->last_dir = 1;
 		info->last_l2 = l2;
 		strcpy(info->last_num, n);
@@ -738,7 +738,7 @@ isdn_tty_modem_hup(modem_info * info, int local)
 	isdn_slot_all_eaz(slot);
 	info->emu.mdmreg[REG_RINGCNT] = 0;
 	isdn_slot_free(slot);
-	isdn_slot_set_priv(slot, NULL, NULL, NULL);
+	isdn_slot_set_priv(slot, 0, NULL, NULL, NULL);
 	info->isdn_slot = -1;
 }
 
@@ -832,7 +832,7 @@ isdn_tty_resume(char *id, modem_info * info, atemu * m)
 	} else {
 		info->isdn_slot = i;
 		isdn_slot_set_m_idx(i, info->line);
-		isdn_slot_set_priv(i, info, isdn_tty_stat_callback, isdn_tty_rcv_skb);
+		isdn_slot_set_priv(i, ISDN_USAGE_MODEM, info, isdn_tty_stat_callback, isdn_tty_rcv_skb);
 		isdn_slot_set_usage(i, isdn_slot_usage(i) | ISDN_USAGE_OUTGOING);
 		info->last_dir = 1;
 //		strcpy(info->last_num, n);
@@ -909,7 +909,7 @@ isdn_tty_send_msg(modem_info * info, atemu * m, char *msg)
 	} else {
 		info->isdn_slot = i;
 		isdn_slot_set_m_idx(i, info->line);
-		isdn_slot_set_priv(i, info, isdn_tty_stat_callback, isdn_tty_rcv_skb);
+		isdn_slot_set_priv(i, ISDN_USAGE_MODEM, info, isdn_tty_stat_callback, isdn_tty_rcv_skb);
 		isdn_slot_set_usage(i, isdn_slot_usage(i) | ISDN_USAGE_OUTGOING);
 		info->last_dir = 1;
 		restore_flags(flags);
@@ -2138,7 +2138,7 @@ isdn_tty_match_icall(char *cid, atemu *emu, int di)
  *      CID is longer.
  */
 int
-isdn_tty_find_icall(int di, int ch, setup_parm *setup)
+isdn_tty_find_icall(int di, int ch, int sl, setup_parm *setup)
 {
 	char *eaz;
 	int i;
@@ -2194,7 +2194,7 @@ isdn_tty_find_icall(int di, int ch, setup_parm *setup)
 				if (!matchret) {                  /* EAZ is matching */
 					info->isdn_slot = idx;
 					isdn_slot_set_m_idx(idx, info->line);
-					isdn_slot_set_priv(idx, info, isdn_tty_stat_callback, isdn_tty_rcv_skb);
+					isdn_slot_set_priv(idx, ISDN_USAGE_MODEM, info, isdn_tty_stat_callback, isdn_tty_rcv_skb);
 					strcpy(isdn_slot_num(idx), nr);
 					strcpy(info->emu.cpn, eaz);
 					info->emu.mdmreg[REG_SI1I] = si2bit[si1];

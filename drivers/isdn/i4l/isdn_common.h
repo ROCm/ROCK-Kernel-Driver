@@ -95,7 +95,7 @@ extern void  isdn_slot_set_usage(int slot, int usage);
 extern char *isdn_slot_num(int slot);
 extern int   isdn_slot_m_idx(int slot);
 extern void  isdn_slot_set_m_idx(int slot, int midx);
-extern void  isdn_slot_set_priv(int sl, void *priv, int (*stat_cb)(int sl, isdn_ctrl *ctrl), int (*recv_cb)(int sl, struct sk_buff *skb));
+extern void  isdn_slot_set_priv(int sl, int usage, void *priv, int (*stat_cb)(int sl, isdn_ctrl *ctrl), int (*recv_cb)(int sl, struct sk_buff *skb));
 extern void *isdn_slot_priv(int sl);
 extern int   isdn_hard_header_len(void);
 

@@ -189,7 +189,6 @@ slot_dial(struct fsm_inst *fi, int pr, void *arg)
 	return retval;
 }
 
-/* FIXME join? */
 static int
 slot_acceptd(struct fsm_inst *fi, int pr, void *arg)
 {
@@ -316,11 +315,6 @@ slot_data_ind(struct fsm_inst *fi, int pr, void *arg)
 		if (!skb)
 			return;
 	}
-
-	/* No network-device found, deliver to tty or raw-channel */
-	if (isdn_tty_rcv_skb(i, di, channel, skb))
-		return;
-	dev_kfree_skb(skb);
 #endif
 }
 
@@ -339,8 +333,6 @@ slot_icall(struct fsm_inst *fi, int pr, void *arg)
 {
 	struct isdn_slot *slot = fi->userdata;
 	isdn_ctrl *ctrl = arg;
-	isdn_ctrl cmd;
-	isdn_net_dev *p;
 	int sl = slot - slots;
 	int retval;
 
@@ -349,23 +341,18 @@ slot_icall(struct fsm_inst *fi, int pr, void *arg)
 	if (dev->global_flags & ISDN_GLOBAL_STOPPED)
 		return 0;
 	
+	strcpy(slot->num, ctrl->parm.setup.phone);
 	/* Try to find a network-interface which will accept incoming call */
 	retval = isdn_net_find_icall(ctrl->driver, ctrl->arg, sl, 
 				     &ctrl->parm.setup);
 
-	/* FIXME */
-	if (retval == 1) {
-		list_for_each_entry(p, &isdn_net_devs, global_list) {
-			if (p->isdn_slot == sl) {
-				strcpy(cmd.parm.setup.eazmsn, p->mlp->msn);
-				isdn_slot_set_usage(sl, (isdn_slot_usage(sl) & ISDN_USAGE_EXCLUSIVE) | ISDN_USAGE_NET);
-				strcpy(isdn_slot_num(sl), ctrl->parm.setup.phone);
-				
-				isdn_slot_command(sl, ISDN_CMD_ACCEPTD, &cmd);
-				break;
-			}
-		}
-	}
+	/* already taken by net now? */
+	if (fi->state != ST_SLOT_IN)
+		goto out;
+
+	retval = isdn_tty_find_icall(ctrl->driver, ctrl->arg, sl, 
+				     &ctrl->parm.setup);
+ out:
 	return 0;
 }
 
@@ -1202,13 +1189,6 @@ isdn_status_callback(isdn_ctrl * c)
 			break;
 			switch (r) {
 				case 0:
-					/* No network-device replies.
-					 * Try ttyI's.
-					 * These return 0 on no match, 1 on match and
-					 * 3 on eventually match, if CID is longer.
-					 */
-                                        if (c->command == ISDN_STAT_ICALL)
-						if ((retval = isdn_tty_find_icall(di, c->arg, &c->parm.setup))) return(retval);
                                          if (divert_if)
 						 if ((retval = divert_if->stat_callback(c))) 
 							 return(retval); /* processed */
@@ -1245,65 +1225,16 @@ isdn_status_callback(isdn_ctrl * c)
 			dbg_statcallb("ICALL: ret=%d\n", retval);
 			return retval;
 			break;
-		case ISDN_STAT_CINF:
-			if (i < 0)
-				return -1;
-			dbg_statcallb("CINF: %d %s\n", i, c->parm.num);
-			if (strcmp(c->parm.num, "0"))
-				isdn_net_stat_callback(i, c);
-			isdn_tty_stat_callback(i, c);
-			break;
-		case ISDN_STAT_CAUSE:
-			dbg_statcallb("CAUSE: %d %s\n", i, c->parm.num);
-			printk(KERN_INFO "isdn: %s,ch%ld cause: %s\n",
-			       isdn_drv_drvid(di), c->arg, c->parm.num);
-			isdn_tty_stat_callback(i, c);
-                        if (divert_if)
-				divert_if->stat_callback(c); 
-			break;
-		case ISDN_STAT_DISPLAY:
-			dbg_statcallb("DISPLAY: %d %s\n", i, c->parm.display);
-			isdn_tty_stat_callback(i, c);
-                        if (divert_if)
-				divert_if->stat_callback(c); 
-			break;
 		case ISDN_STAT_DHUP:
-			if (i < 0)
-				return -1;
-			dbg_statcallb("DHUP: %d\n", i);
-			isdn_info_update();
-			/* Signal hangup to network-devices */
-			if (isdn_net_stat_callback(i, c))
-				break;
 			isdn_v110_stat_callback(&slots[i].iv110, c);
-			if (isdn_tty_stat_callback(i, c))
-				break;
                         if (divert_if)
 				divert_if->stat_callback(c); 
 			break;
 		case ISDN_STAT_BCONN:
-			if (i < 0)
-				return -1;
-			dbg_statcallb("BCONN: %ld\n", c->arg);
-			/* Signal B-channel-connect to network-devices */
-			isdn_info_update();
-			if (isdn_net_stat_callback(i, c))
-				break;
 			isdn_v110_stat_callback(&slots[i].iv110, c);
-			if (isdn_tty_stat_callback(i, c))
-				break;
 			break;
 		case ISDN_STAT_BHUP:
-			if (i < 0)
-				return -1;
-			dbg_statcallb("BHUP: %d\n", i);
-			isdn_info_update();
-			/* Signal hangup to network-devices */
-			if (isdn_net_stat_callback(i, c))
-				break;
 			isdn_v110_stat_callback(&slots[i].iv110, c);
-			if (isdn_tty_stat_callback(i, c))
-				break;
 			break;
 #endif
 #if 0 // FIXME
@@ -2435,8 +2366,6 @@ isdn_slot_map_eaz2msn(int sl, char *msn)
 int
 isdn_slot_command(int sl, int cmd, isdn_ctrl *ctrl)
 {
-	printk("%s: sl = %d\n", __FUNCTION__, sl);
-
 	ctrl->command = cmd;
 	ctrl->driver = isdn_slot_driver(sl);
 
@@ -2576,12 +2505,14 @@ isdn_slot_num(int sl)
 }
 
 void
-isdn_slot_set_priv(int sl, void *priv, 
+isdn_slot_set_priv(int sl, int usage, void *priv, 
 		   int (*stat_cb)(int sl, isdn_ctrl *ctrl),
 		   int (*recv_cb)(int sl, struct sk_buff *skb))
 {
 	BUG_ON(sl < 0);
 
+	slots[sl].usage &= ISDN_USAGE_EXCLUSIVE;
+	slots[sl].usage |= usage;
 	slots[sl].priv = priv;
 	slots[sl].stat_cb = stat_cb;
 	slots[sl].recv_cb = recv_cb;
