@@ -947,10 +947,39 @@ asmlinkage long sys_times(struct tms __user * tbuf)
 	 */
 	if (tbuf) {
 		struct tms tmp;
-		tmp.tms_utime = jiffies_to_clock_t(current->utime);
-		tmp.tms_stime = jiffies_to_clock_t(current->stime);
-		tmp.tms_cutime = jiffies_to_clock_t(current->cutime);
-		tmp.tms_cstime = jiffies_to_clock_t(current->cstime);
+		struct task_struct *tsk = current;
+		struct task_struct *t;
+		unsigned long utime, stime, cutime, cstime;
+
+		read_lock(&tasklist_lock);
+		utime = tsk->signal->utime;
+		stime = tsk->signal->stime;
+		t = tsk;
+		do {
+			utime += t->utime;
+			stime += t->stime;
+			t = next_thread(t);
+		} while (t != tsk);
+
+		/*
+		 * While we have tasklist_lock read-locked, no dying thread
+		 * can be updating current->signal->[us]time.  Instead,
+		 * we got their counts included in the live thread loop.
+		 * However, another thread can come in right now and
+		 * do a wait call that updates current->signal->c[us]time.
+		 * To make sure we always see that pair updated atomically,
+		 * we take the siglock around fetching them.
+		 */
+		spin_lock_irq(&tsk->sighand->siglock);
+		cutime = tsk->signal->cutime;
+		cstime = tsk->signal->cstime;
+		spin_unlock_irq(&tsk->sighand->siglock);
+		read_unlock(&tasklist_lock);
+
+		tmp.tms_utime = jiffies_to_clock_t(utime);
+		tmp.tms_stime = jiffies_to_clock_t(stime);
+		tmp.tms_cutime = jiffies_to_clock_t(cutime);
+		tmp.tms_cstime = jiffies_to_clock_t(cstime);
 		if (copy_to_user(tbuf, &tmp, sizeof(struct tms)))
 			return -EFAULT;
 	}
@@ -1533,50 +1562,101 @@ asmlinkage long sys_setrlimit(unsigned int resource, struct rlimit __user *rlim)
  * a lot simpler!  (Which we're not doing right now because we're not
  * measuring them yet).
  *
- * This is SMP safe.  Either we are called from sys_getrusage on ourselves
- * below (we know we aren't going to exit/disappear and only we change our
- * rusage counters), or we are called from wait4() on a process which is
- * either stopped or zombied.  In the zombied case the task won't get
- * reaped till shortly after the call to getrusage(), in both cases the
- * task being examined is in a frozen state so the counters won't change.
+ * This expects to be called with tasklist_lock read-locked or better,
+ * and the siglock not locked.  It may momentarily take the siglock.
+ *
+ * When sampling multiple threads for RUSAGE_GROUP, under SMP we might have
+ * races with threads incrementing their own counters.  But since word
+ * reads are atomic, we either get new values or old values and we don't
+ * care which for the sums.  We always take the siglock to protect reading
+ * the c* fields from p->signal from races with exit.c updating those
+ * fields when reaping, so a sample either gets all the additions of a
+ * given child after it's reaped, or none so this sample is before reaping.
  */
+
+void k_getrusage(struct task_struct *p, int who, struct rusage *r)
+{
+	struct task_struct *t;
+	unsigned long flags;
+	unsigned long utime, stime;
+
+	memset((char *) r, 0, sizeof *r);
+
+	if (unlikely(!p->signal))
+		return;
+
+	switch (who) {
+		case RUSAGE_SELF:
+			jiffies_to_timeval(p->utime, &r->ru_utime);
+			jiffies_to_timeval(p->stime, &r->ru_stime);
+			r->ru_nvcsw = p->nvcsw;
+			r->ru_nivcsw = p->nivcsw;
+			r->ru_minflt = p->min_flt;
+			r->ru_majflt = p->maj_flt;
+			break;
+		case RUSAGE_CHILDREN:
+			spin_lock_irqsave(&p->sighand->siglock, flags);
+			utime = p->signal->cutime;
+			stime = p->signal->cstime;
+			r->ru_nvcsw = p->signal->cnvcsw;
+			r->ru_nivcsw = p->signal->cnivcsw;
+			r->ru_minflt = p->signal->cmin_flt;
+			r->ru_majflt = p->signal->cmaj_flt;
+			spin_unlock_irqrestore(&p->sighand->siglock, flags);
+			jiffies_to_timeval(utime, &r->ru_utime);
+			jiffies_to_timeval(stime, &r->ru_stime);
+			break;
+		case RUSAGE_GROUP:
+			spin_lock_irqsave(&p->sighand->siglock, flags);
+			utime = stime = 0;
+			goto sum_group;
+		case RUSAGE_BOTH:
+			spin_lock_irqsave(&p->sighand->siglock, flags);
+			utime = p->signal->cutime;
+			stime = p->signal->cstime;
+			r->ru_nvcsw = p->signal->cnvcsw;
+			r->ru_nivcsw = p->signal->cnivcsw;
+			r->ru_minflt = p->signal->cmin_flt;
+			r->ru_majflt = p->signal->cmaj_flt;
+		sum_group:
+			utime += p->signal->utime;
+			stime += p->signal->stime;
+			r->ru_nvcsw += p->signal->nvcsw;
+			r->ru_nivcsw += p->signal->nivcsw;
+			r->ru_minflt += p->signal->min_flt;
+			r->ru_majflt += p->signal->maj_flt;
+			t = p;
+			do {
+				utime += t->utime;
+				stime += t->stime;
+				r->ru_nvcsw += t->nvcsw;
+				r->ru_nivcsw += t->nivcsw;
+				r->ru_minflt += t->min_flt;
+				r->ru_majflt += t->maj_flt;
+				t = next_thread(t);
+			} while (t != p);
+			spin_unlock_irqrestore(&p->sighand->siglock, flags);
+			jiffies_to_timeval(utime, &r->ru_utime);
+			jiffies_to_timeval(stime, &r->ru_stime);
+			break;
+		default:
+			BUG();
+	}
+}
+
 int getrusage(struct task_struct *p, int who, struct rusage __user *ru)
 {
 	struct rusage r;
-
-	memset((char *) &r, 0, sizeof(r));
-	switch (who) {
-		case RUSAGE_SELF:
-			jiffies_to_timeval(p->utime, &r.ru_utime);
-			jiffies_to_timeval(p->stime, &r.ru_stime);
-			r.ru_nvcsw = p->nvcsw;
-			r.ru_nivcsw = p->nivcsw;
-			r.ru_minflt = p->min_flt;
-			r.ru_majflt = p->maj_flt;
-			break;
-		case RUSAGE_CHILDREN:
-			jiffies_to_timeval(p->cutime, &r.ru_utime);
-			jiffies_to_timeval(p->cstime, &r.ru_stime);
-			r.ru_nvcsw = p->cnvcsw;
-			r.ru_nivcsw = p->cnivcsw;
-			r.ru_minflt = p->cmin_flt;
-			r.ru_majflt = p->cmaj_flt;
-			break;
-		default:
-			jiffies_to_timeval(p->utime + p->cutime, &r.ru_utime);
-			jiffies_to_timeval(p->stime + p->cstime, &r.ru_stime);
-			r.ru_nvcsw = p->nvcsw + p->cnvcsw;
-			r.ru_nivcsw = p->nivcsw + p->cnivcsw;
-			r.ru_minflt = p->min_flt + p->cmin_flt;
-			r.ru_majflt = p->maj_flt + p->cmaj_flt;
-			break;
-	}
+	read_lock(&tasklist_lock);
+	k_getrusage(p, who, &r);
+	read_unlock(&tasklist_lock);
 	return copy_to_user(ru, &r, sizeof(r)) ? -EFAULT : 0;
 }
 
 asmlinkage long sys_getrusage(int who, struct rusage __user *ru)
 {
-	if (who != RUSAGE_SELF && who != RUSAGE_CHILDREN)
+	if (who != RUSAGE_SELF && who != RUSAGE_CHILDREN
+	    && who != RUSAGE_GROUP)
 		return -EINVAL;
 	return getrusage(current, who, ru);
 }

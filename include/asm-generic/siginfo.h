@@ -3,6 +3,7 @@
 
 #include <linux/compiler.h>
 #include <linux/types.h>
+#include <linux/resource.h>
 
 typedef union sigval {
 	int sival_int;
@@ -74,6 +75,7 @@ typedef struct siginfo {
 			int _status;		/* exit code */
 			clock_t _utime;
 			clock_t _stime;
+			struct rusage _rusage;
 		} _sigchld;
 
 		/* SIGILL, SIGFPE, SIGSEGV, SIGBUS */
@@ -105,6 +107,7 @@ typedef struct siginfo {
 #define si_status	_sifields._sigchld._status
 #define si_utime	_sifields._sigchld._utime
 #define si_stime	_sifields._sigchld._stime
+#define si_rusage	_sifields._sigchld._rusage
 #define si_value	_sifields._rt._sigval
 #define si_int		_sifields._rt._sigval.sival_int
 #define si_ptr		_sifields._rt._sigval.sival_ptr

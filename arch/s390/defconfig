@@ -1,5 +1,7 @@
 #
 # Automatically generated make config: don't edit
+# Linux kernel version: 2.6.9-rc1
+# Mon Aug 30 19:03:48 2004
 #
 CONFIG_MMU=y
 CONFIG_RWSEM_XCHGADD_ALGORITHM=y
@@ -56,13 +58,21 @@ CONFIG_KMOD=y
 # CONFIG_ARCH_S390X is not set
 # CONFIG_64BIT is not set
 CONFIG_ARCH_S390_31=y
-CONFIG_MARCH_G5=y
-# CONFIG_MARCH_Z900 is not set
-# CONFIG_MARCH_Z990 is not set
 CONFIG_SMP=y
 CONFIG_NR_CPUS=32
 # CONFIG_HOTPLUG_CPU is not set
 CONFIG_MATHEMU=y
+
+#
+# Code generation options
+#
+CONFIG_MARCH_G5=y
+# CONFIG_MARCH_Z900 is not set
+# CONFIG_MARCH_Z990 is not set
+CONFIG_PACK_STACK=y
+# CONFIG_SMALL_STACK is not set
+# CONFIG_CHECK_STACK is not set
+# CONFIG_WARN_STACK is not set
 
 #
 # I/O subsystem configuration
@@ -130,9 +140,7 @@ CONFIG_SCSI_FC_ATTRS=y
 #
 # SCSI low-level drivers
 #
-# CONFIG_SCSI_AIC7XXX_OLD is not set
 # CONFIG_SCSI_SATA is not set
-# CONFIG_SCSI_EATA_PIO is not set
 # CONFIG_SCSI_DEBUG is not set
 CONFIG_ZFCP=y
 CONFIG_CCW=y
@@ -168,6 +176,7 @@ CONFIG_BLK_DEV_MD=y
 CONFIG_MD_LINEAR=m
 CONFIG_MD_RAID0=m
 CONFIG_MD_RAID1=m
+# CONFIG_MD_RAID10 is not set
 CONFIG_MD_RAID5=m
 # CONFIG_MD_RAID6 is not set
 CONFIG_MD_MULTIPATH=m
@@ -236,11 +245,13 @@ CONFIG_IP_MULTICAST=y
 # CONFIG_INET_AH is not set
 # CONFIG_INET_ESP is not set
 # CONFIG_INET_IPCOMP is not set
+# CONFIG_INET_TUNNEL is not set
 CONFIG_IPV6=y
 # CONFIG_IPV6_PRIVACY is not set
 # CONFIG_INET6_AH is not set
 # CONFIG_INET6_ESP is not set
 # CONFIG_INET6_IPCOMP is not set
+# CONFIG_INET6_TUNNEL is not set
 # CONFIG_IPV6_TUNNEL is not set
 # CONFIG_NETFILTER is not set
 CONFIG_XFRM=y
@@ -442,6 +453,7 @@ CONFIG_LOCKD_V4=y
 CONFIG_EXPORTFS=y
 CONFIG_SUNRPC=y
 # CONFIG_RPCSEC_GSS_KRB5 is not set
+# CONFIG_RPCSEC_GSS_SPKM3 is not set
 # CONFIG_SMB_FS is not set
 # CONFIG_CIFS is not set
 # CONFIG_NCP_FS is not set
@@ -485,8 +497,8 @@ CONFIG_MSDOS_PARTITION=y
 CONFIG_DEBUG_KERNEL=y
 CONFIG_MAGIC_SYSRQ=y
 # CONFIG_DEBUG_SLAB is not set
-# CONFIG_DEBUG_INFO is not set
 # CONFIG_DEBUG_SPINLOCK_SLEEP is not set
+# CONFIG_DEBUG_INFO is not set
 
 #
 # Security options
@@ -505,6 +517,7 @@ CONFIG_CRYPTO=y
 # CONFIG_CRYPTO_SHA1_Z990 is not set
 # CONFIG_CRYPTO_SHA256 is not set
 # CONFIG_CRYPTO_SHA512 is not set
+# CONFIG_CRYPTO_WHIRLPOOL is not set
 # CONFIG_CRYPTO_DES is not set
 # CONFIG_CRYPTO_DES_Z990 is not set
 # CONFIG_CRYPTO_BLOWFISH is not set

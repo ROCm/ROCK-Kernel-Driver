@@ -58,14 +58,11 @@ asmlinkage void ret_from_fork(void) __asm__("ret_from_fork");
  */
 unsigned long thread_saved_pc(struct task_struct *tsk)
 {
-	unsigned long bc;
+	struct stack_frame *sf;
 
-	bc = *((unsigned long *) tsk->thread.ksp);
-#ifndef CONFIG_ARCH_S390X
-	return *((unsigned long *) (bc+56));
-#else
-	return *((unsigned long *) (bc+112));
-#endif
+	sf = (struct stack_frame *) tsk->thread.ksp;
+	sf = (struct stack_frame *) sf->back_chain;
+	return sf->gprs[8];
 }
 
 /*
@@ -186,41 +183,20 @@ void show_regs(struct pt_regs *regs)
 
 extern void kernel_thread_starter(void);
 
-#ifndef CONFIG_ARCH_S390X
-
 __asm__(".align 4\n"
 	"kernel_thread_starter:\n"
-	"    l     15,0(8)\n"
-	"    sr    15,7\n"
-	"    stosm 24(15),3\n"
-	"    lr    2,10\n"
+	"    la    2,0(10)\n"
 	"    basr  14,9\n"
-	"    sr    2,2\n"
+	"    la    2,0\n"
 	"    br    11\n");
-
-#else /* CONFIG_ARCH_S390X */
-
-__asm__(".align 4\n"
-	"kernel_thread_starter:\n"
-	"    lg    15,0(8)\n"
-	"    sgr   15,7\n"
-	"    stosm 48(15),3\n"
-	"    lgr   2,10\n"
-	"    basr  14,9\n"
-	"    sgr   2,2\n"
-	"    br    11\n");
-
-#endif /* CONFIG_ARCH_S390X */
 
 int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 {
 	struct pt_regs regs;
 
 	memset(&regs, 0, sizeof(regs));
-	regs.psw.mask = PSW_KERNEL_BITS;
+	regs.psw.mask = PSW_KERNEL_BITS | PSW_MASK_IO | PSW_MASK_EXT;
 	regs.psw.addr = (unsigned long) kernel_thread_starter | PSW_ADDR_AMODE;
-	regs.gprs[7] = STACK_FRAME_OVERHEAD + sizeof(struct pt_regs);
-	regs.gprs[8] = __LC_KERNEL_STACK;
 	regs.gprs[9] = (unsigned long) fn;
 	regs.gprs[10] = (unsigned long) arg;
 	regs.gprs[11] = (unsigned long) do_exit;
@@ -253,20 +229,13 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long new_stackp,
 	unsigned long unused,
         struct task_struct * p, struct pt_regs * regs)
 {
-        struct stack_frame
+        struct fake_frame
           {
-            unsigned long back_chain;
-            unsigned long eos;
-            unsigned long glue1;
-            unsigned long glue2;
-            unsigned long scratch[2];
-            unsigned long gprs[10];    /* gprs 6 -15                       */
-            unsigned int  fprs[4];     /* fpr 4 and 6                      */
-            unsigned int  empty[4];
+	    struct stack_frame sf;
             struct pt_regs childregs;
           } *frame;
 
-        frame = ((struct stack_frame *)
+        frame = ((struct fake_frame *)
 		 (THREAD_SIZE + (unsigned long) p->thread_info)) - 1;
         p->thread.ksp = (unsigned long) frame;
 	p->set_child_tid = p->clear_child_tid = NULL;
@@ -274,13 +243,13 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long new_stackp,
         frame->childregs = *regs;
 	frame->childregs.gprs[2] = 0;	/* child returns 0 on fork. */
         frame->childregs.gprs[15] = new_stackp;
-        frame->back_chain = frame->eos = 0;
+        frame->sf.back_chain = 0;
 
         /* new return point is ret_from_fork */
-        frame->gprs[8] = (unsigned long) ret_from_fork;
+        frame->sf.gprs[8] = (unsigned long) ret_from_fork;
 
         /* fake return stack for resume(), don't go back to schedule */
-        frame->gprs[9] = (unsigned long) frame;
+        frame->sf.gprs[9] = (unsigned long) frame;
 
 	/* Save access registers to new thread structure. */
 	save_access_regs(&p->thread.acrs[0]);
@@ -423,30 +392,26 @@ void dump_thread(struct pt_regs * regs, struct user * dump)
 
 unsigned long get_wchan(struct task_struct *p)
 {
-	unsigned long r14, r15, bc;
-	unsigned long stack_page;
-	int count = 0;
-	if (!p || p == current || p->state == TASK_RUNNING)
+	struct stack_frame *sf, *low, *high;
+	unsigned long return_address;
+	int count;
+
+	if (!p || p == current || p->state == TASK_RUNNING || !p->thread_info)
 		return 0;
-	stack_page = (unsigned long) p->thread_info;
-	r15 = p->thread.ksp;
-	if (!stack_page || r15 < stack_page ||
-	    r15 >= THREAD_SIZE - sizeof(unsigned long) + stack_page)
+	low = (struct stack_frame *) p->thread_info;
+	high = (struct stack_frame *)
+		((unsigned long) p->thread_info + THREAD_SIZE) - 1;
+	sf = (struct stack_frame *) (p->thread.ksp & PSW_ADDR_INSN);
+	if (sf <= low || sf > high)
 		return 0;
-	bc = (*(unsigned long *) r15) & PSW_ADDR_INSN;
-	do {
-		if (bc < stack_page ||
-		    bc >= THREAD_SIZE - sizeof(unsigned long) + stack_page)
+	for (count = 0; count < 16; count++) {
+		sf = (struct stack_frame *) (sf->back_chain & PSW_ADDR_INSN);
+		if (sf <= low || sf > high)
 			return 0;
-#ifndef CONFIG_ARCH_S390X
-		r14 = (*(unsigned long *) (bc+56)) & PSW_ADDR_INSN;
-#else
-		r14 = *(unsigned long *) (bc+112);
-#endif
-		if (!in_sched_functions(r14))
-			return r14;
-		bc = (*(unsigned long *) bc) & PSW_ADDR_INSN;
-	} while (count++ < 16);
+		return_address = sf->gprs[8] & PSW_ADDR_INSN;
+		if (!in_sched_functions(return_address))
+			return return_address;
+	}
 	return 0;
 }
 

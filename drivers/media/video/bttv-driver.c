@@ -1861,6 +1861,8 @@ static int setup_window(struct bttv_fh *fh, struct bttv *btv,
 
 	if (NULL == fh->ovfmt)
 		return -EINVAL;
+	if (!(fh->ovfmt->flags & FORMAT_FLAGS_PACKED))
+		return -EINVAL;
 	retval = verify_window(&bttv_tvnorms[btv->tvnorm],win,fixup);
 	if (0 != retval)
 		return retval;

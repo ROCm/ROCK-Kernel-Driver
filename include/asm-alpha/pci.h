@@ -246,6 +246,8 @@ pcibios_add_platform_entries(struct pci_dev *dev)
 {
 }
 
+struct pci_dev *alpha_gendev_to_pci(struct device *dev);
+
 #endif /* __KERNEL__ */
 
 /* Values for the `which' argument to sys_pciconfig_iobase.  */

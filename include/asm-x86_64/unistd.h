@@ -554,8 +554,10 @@ __SYSCALL(__NR_mq_notify, sys_mq_notify)
 __SYSCALL(__NR_mq_getsetattr, sys_mq_getsetattr)
 #define __NR_kexec_load 	246
 __SYSCALL(__NR_kexec_load, sys_ni_syscall)
+#define __NR_waitid		(253)
+__SYSCALL(__NR_waitid, sys_waitid)
 
-#define __NR_syscall_max __NR_kexec_load
+#define __NR_syscall_max __NR_waitid
 #ifndef __NO_STUBS
 
 /* user-visible error numbers are in the range -1 - -4095 */

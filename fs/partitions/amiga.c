@@ -31,6 +31,7 @@ amiga_partition(struct parsed_partitions *state, struct block_device *bdev)
 	struct RigidDiskBlock *rdb;
 	struct PartitionBlock *pb;
 	int start_sect, nr_sects, blk, part, res = 0;
+	int blksize = 1;	/* Multiplier for disk block size */
 	int slot = 1;
 	char b[BDEVNAME_SIZE];
 
@@ -65,10 +66,14 @@ amiga_partition(struct parsed_partitions *state, struct block_device *bdev)
 			       bdevname(bdev, b), blk);
 	}
 
-	printk(" RDSK");
+	/* blksize is blocks per 512 byte standard block */
+	blksize = be32_to_cpu( rdb->rdb_BlockBytes ) / 512;
+
+	printk(" RDSK (%d)", blksize * 512);	/* Be more informative */
 	blk = be32_to_cpu(rdb->rdb_PartitionList);
 	put_dev_sector(sect);
 	for (part = 1; blk>0 && part<=16; part++, put_dev_sector(sect)) {
+		blk *= blksize;	/* Read in terms partition table understands */
 		data = read_dev_sector(bdev, blk, &sect);
 		if (!data) {
 			if (warn_no_part)
@@ -88,13 +93,32 @@ amiga_partition(struct parsed_partitions *state, struct block_device *bdev)
 		nr_sects = (be32_to_cpu(pb->pb_Environment[10]) + 1 -
 			    be32_to_cpu(pb->pb_Environment[9])) *
 			   be32_to_cpu(pb->pb_Environment[3]) *
-			   be32_to_cpu(pb->pb_Environment[5]);
+			   be32_to_cpu(pb->pb_Environment[5]) *
+			   blksize;
 		if (!nr_sects)
 			continue;
 		start_sect = be32_to_cpu(pb->pb_Environment[9]) *
 			     be32_to_cpu(pb->pb_Environment[3]) *
-			     be32_to_cpu(pb->pb_Environment[5]);
+			     be32_to_cpu(pb->pb_Environment[5]) *
+			     blksize;
 		put_partition(state,slot++,start_sect,nr_sects);
+		{
+			/* Be even more informative to aid mounting */
+			char dostype[4];
+			u32 *dt = (u32 *)dostype;
+			*dt = pb->pb_Environment[16];
+			if (dostype[3] < ' ')
+				printk(" (%c%c%c^%c)",
+					dostype[0], dostype[1],
+					dostype[2], dostype[3] + '@' );
+			else
+				printk(" (%c%c%c%c)",
+					dostype[0], dostype[1],
+					dostype[2], dostype[3]);
+			printk("(res %d spb %d)",
+				be32_to_cpu(pb->pb_Environment[6]),
+				be32_to_cpu(pb->pb_Environment[4]));
+		}
 		res = 1;
 	}
 	printk("\n");

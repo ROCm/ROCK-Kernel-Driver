@@ -155,6 +155,100 @@ void __init disable_early_printk(void)
 	early_console_initialized = 0;
 }
 
+#if !defined(CONFIG_PPC_ISERIES) && defined(CONFIG_SMP)
+/**
+ * setup_cpu_maps - initialize the following cpu maps:
+ *                  cpu_possible_map
+ *                  cpu_present_map
+ *                  cpu_sibling_map
+ *
+ * Having the possible map set up early allows us to restrict allocations
+ * of things like irqstacks to num_possible_cpus() rather than NR_CPUS.
+ *
+ * We do not initialize the online map here; cpus set their own bits in
+ * cpu_online_map as they come up.
+ *
+ * This function is valid only for Open Firmware systems.  finish_device_tree
+ * must be called before using this.
+ *
+ * While we're here, we may as well set the "physical" cpu ids in the paca.
+ */
+static void __init setup_cpu_maps(void)
+{
+	struct device_node *dn = NULL;
+	int cpu = 0;
+
+	while ((dn = of_find_node_by_type(dn, "cpu")) && cpu < NR_CPUS) {
+		u32 *intserv;
+		int j, len = sizeof(u32), nthreads;
+
+		intserv = (u32 *)get_property(dn, "ibm,ppc-interrupt-server#s",
+					      &len);
+		if (!intserv)
+			intserv = (u32 *)get_property(dn, "reg", NULL);
+
+		nthreads = len / sizeof(u32);
+
+		for (j = 0; j < nthreads && cpu < NR_CPUS; j++) {
+			cpu_set(cpu, cpu_possible_map);
+			cpu_set(cpu, cpu_present_map);
+			set_hard_smp_processor_id(cpu, intserv[j]);
+			cpu++;
+		}
+	}
+
+	/*
+	 * On pSeries LPAR, we need to know how many cpus
+	 * could possibly be added to this partition.
+	 */
+	if (systemcfg->platform == PLATFORM_PSERIES_LPAR &&
+				(dn = of_find_node_by_path("/rtas"))) {
+		int num_addr_cell, num_size_cell, maxcpus;
+		unsigned int *ireg;
+
+		num_addr_cell = prom_n_addr_cells(dn);
+		num_size_cell = prom_n_size_cells(dn);
+
+		ireg = (unsigned int *)
+			get_property(dn, "ibm,lrdr-capacity", NULL);
+
+		if (!ireg)
+			goto out;
+
+		maxcpus = ireg[num_addr_cell + num_size_cell];
+
+		/* Double maxcpus for processors which have SMT capability */
+		if (cur_cpu_spec->cpu_features & CPU_FTR_SMT)
+			maxcpus *= 2;
+
+		if (maxcpus > NR_CPUS) {
+			printk(KERN_WARNING
+			       "Partition configured for %d cpus, "
+			       "operating system maximum is %d.\n",
+			       maxcpus, NR_CPUS);
+			maxcpus = NR_CPUS;
+		} else
+			printk(KERN_INFO "Partition configured for %d cpus.\n",
+			       maxcpus);
+
+		for (cpu = 0; cpu < maxcpus; cpu++)
+			cpu_set(cpu, cpu_possible_map);
+	out:
+		of_node_put(dn);
+	}
+
+	/*
+	 * Do the sibling map; assume only two threads per processor.
+	 */
+	for_each_cpu(cpu) {
+		cpu_set(cpu, cpu_sibling_map[cpu]);
+		if (cur_cpu_spec->cpu_features & CPU_FTR_SMT)
+			cpu_set(cpu ^ 0x1, cpu_sibling_map[cpu]);
+	}
+
+	systemcfg->processorCount = num_present_cpus();
+}
+#endif /* !defined(CONFIG_PPC_ISERIES) && defined(CONFIG_SMP) */
 /*
  * Do some initial setup of the system.  The parameters are those which 
  * were passed in from the bootloader.
@@ -220,6 +314,13 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 	}
 #endif /* CONFIG_BOOTX_TEXT */
 
+#ifdef CONFIG_PPC_PMAC
+	if (systemcfg->platform == PLATFORM_POWERMAC) {
+		finish_device_tree();
+		pmac_init(r3, r4, r5, r6, r7);
+	}
+#endif /* CONFIG_PPC_PMAC */
+
 #ifdef CONFIG_PPC_PSERIES
 	if (systemcfg->platform & PLATFORM_PSERIES) {
 		early_console_initialized = 1;
@@ -227,31 +328,32 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 		__irq_offset_value = NUM_ISA_INTERRUPTS;
 		finish_device_tree();
 		chrp_init(r3, r4, r5, r6, r7);
-
-#ifdef CONFIG_SMP
-		/* Start secondary threads on SMT systems; primary threads
-		 * are already in the running state.
-		 */
-		for_each_present_cpu(i) {
-			if (query_cpu_stopped
-			    (get_hard_smp_processor_id(i)) == 0) {
-				printk("%16.16x : starting thread\n", i);
-				rtas_call(rtas_token("start-cpu"), 3, 1, &ret,
-					  get_hard_smp_processor_id(i), 
-					  (u32)*((unsigned long *)pseries_secondary_smp_init),
-					  i);
-			}
-		}
-#endif /* CONFIG_SMP */
 	}
 #endif /* CONFIG_PPC_PSERIES */
 
-#ifdef CONFIG_PPC_PMAC
-	if (systemcfg->platform == PLATFORM_POWERMAC) {
-		finish_device_tree();
-		pmac_init(r3, r4, r5, r6, r7);
+#ifdef CONFIG_SMP
+#ifndef CONFIG_PPC_ISERIES
+	/*
+	 * iSeries has already initialized the cpu maps at this point.
+	 */
+	setup_cpu_maps();
+#endif /* CONFIG_PPC_ISERIES */
+
+#ifdef CONFIG_PPC_PSERIES
+	/* Start secondary threads on SMT systems; primary threads
+	 * are already in the running state.
+	 */
+	for_each_present_cpu(i) {
+		if (query_cpu_stopped(get_hard_smp_processor_id(i)) == 0) {
+			printk("%16.16x : starting thread\n", i);
+			rtas_call(rtas_token("start-cpu"), 3, 1, &ret,
+				  get_hard_smp_processor_id(i),
+				  (u32)*((unsigned long *)pseries_secondary_smp_init),
+				  i);
+		}
 	}
-#endif /* CONFIG_PPC_PMAC */
+#endif /* CONFIG_PPC_PSERIES */
+#endif /* CONFIG_SMP */
 
 #if defined(CONFIG_HOTPLUG_CPU) &&  !defined(CONFIG_PPC_PMAC)
 	rtas_stop_self_args.token = rtas_token("stop-self");
@@ -599,7 +701,7 @@ static void __init irqstack_early_init(void)
 	int i;
 
 	/* interrupt stacks must be under 256MB, we cannot afford to take SLB misses on them */
-	for (i = 0; i < NR_CPUS; i++) {
+	for_each_cpu(i) {
 		softirq_ctx[i] = (struct thread_info *)__va(lmb_alloc_base(THREAD_SIZE,
 					THREAD_SIZE, 0x10000000));
 		hardirq_ctx[i] = (struct thread_info *)__va(lmb_alloc_base(THREAD_SIZE,

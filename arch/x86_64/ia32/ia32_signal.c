@@ -74,6 +74,8 @@ int ia32_copy_siginfo_to_user(siginfo_t32 __user *to, siginfo_t *from)
 			err |= __put_user(from->si_utime, &to->si_utime);
 			err |= __put_user(from->si_stime, &to->si_stime);
 			err |= __put_user(from->si_status, &to->si_status);
+			err |= put_compat_rusage(&from->si_rusage,
+						 &to->si_rusage);
 		default:
 		case __SI_KILL >> 16:
 			err |= __put_user(from->si_uid, &to->si_uid);

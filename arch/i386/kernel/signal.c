@@ -345,18 +345,20 @@ static void setup_frame(int sig, struct k_sigaction *ka,
 	void __user *restorer;
 	struct sigframe __user *frame;
 	int err = 0;
+	int usig;
 
 	frame = get_sigframe(ka, regs, sizeof(*frame));
 
 	if (!access_ok(VERIFY_WRITE, frame, sizeof(*frame)))
 		goto give_sigsegv;
 
-	err |= __put_user((current_thread_info()->exec_domain
-		           && current_thread_info()->exec_domain->signal_invmap
-		           && sig < 32
-		           ? current_thread_info()->exec_domain->signal_invmap[sig]
-		           : sig),
-		          &frame->sig);
+	usig = current_thread_info()->exec_domain
+		&& current_thread_info()->exec_domain->signal_invmap
+		&& sig < 32
+		? current_thread_info()->exec_domain->signal_invmap[sig]
+		: sig;
+
+	err |= __put_user(usig, &frame->sig);
 	if (err)
 		goto give_sigsegv;
 
@@ -395,6 +397,9 @@ static void setup_frame(int sig, struct k_sigaction *ka,
 	/* Set up registers for signal handler */
 	regs->esp = (unsigned long) frame;
 	regs->eip = (unsigned long) ka->sa.sa_handler;
+	regs->eax = (unsigned long) sig;
+	regs->edx = (unsigned long) 0;
+	regs->ecx = (unsigned long) 0;
 
 	set_fs(USER_DS);
 	regs->xds = __USER_DS;
@@ -420,18 +425,20 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	void __user *restorer;
 	struct rt_sigframe __user *frame;
 	int err = 0;
+	int usig;
 
 	frame = get_sigframe(ka, regs, sizeof(*frame));
 
 	if (!access_ok(VERIFY_WRITE, frame, sizeof(*frame)))
 		goto give_sigsegv;
 
-	err |= __put_user((current_thread_info()->exec_domain
-		    	   && current_thread_info()->exec_domain->signal_invmap
-		    	   && sig < 32
-		    	   ? current_thread_info()->exec_domain->signal_invmap[sig]
-			   : sig),
-			  &frame->sig);
+	usig = current_thread_info()->exec_domain
+		&& current_thread_info()->exec_domain->signal_invmap
+		&& sig < 32
+		? current_thread_info()->exec_domain->signal_invmap[sig]
+		: sig;
+
+	err |= __put_user(usig, &frame->sig);
 	err |= __put_user(&frame->info, &frame->pinfo);
 	err |= __put_user(&frame->uc, &frame->puc);
 	err |= copy_siginfo_to_user(&frame->info, info);
@@ -474,6 +481,9 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	/* Set up registers for signal handler */
 	regs->esp = (unsigned long) frame;
 	regs->eip = (unsigned long) ka->sa.sa_handler;
+	regs->eax = (unsigned long) usig;
+	regs->edx = (unsigned long) &frame->info;
+	regs->ecx = (unsigned long) &frame->uc;
 
 	set_fs(USER_DS);
 	regs->xds = __USER_DS;

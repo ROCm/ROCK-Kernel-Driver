@@ -31,7 +31,7 @@
 #define ZFCP_LOG_AREA			ZFCP_LOG_AREA_SCSI
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_SCSI_REVISION "$Revision: 1.66 $"
+#define ZFCP_SCSI_REVISION "$Revision: 1.68 $"
 
 #include "zfcp_ext.h"
 
@@ -247,15 +247,16 @@ zfcp_scsi_command_fail(struct scsi_cmnd *scpnt, int result)
 /**
  * zfcp_scsi_command_async - worker for zfcp_scsi_queuecommand and
  *	zfcp_scsi_command_sync
- * @adapter: adapter for where scsi command is issued
+ * @adapter: adapter where scsi command is issued
  * @unit: unit to which scsi command is sent
  * @scpnt: scsi command to be sent
+ * @timer: timer to be started if request is successfully initiated
  *
  * Note: In scsi_done function must be set in scpnt.
  */
 int
 zfcp_scsi_command_async(struct zfcp_adapter *adapter, struct zfcp_unit *unit,
-			struct scsi_cmnd *scpnt)
+			struct scsi_cmnd *scpnt, struct timer_list *timer)
 {
 	int tmp;
 	int retval;
@@ -291,7 +292,7 @@ zfcp_scsi_command_async(struct zfcp_adapter *adapter, struct zfcp_unit *unit,
 		goto out;
 	}
 
-	tmp = zfcp_fsf_send_fcp_command_task(adapter, unit, scpnt,
+	tmp = zfcp_fsf_send_fcp_command_task(adapter, unit, scpnt, timer,
 					     ZFCP_REQ_AUTO_CLEANUP);
 
 	if (unlikely(tmp < 0)) {
@@ -313,17 +314,27 @@ zfcp_scsi_command_sync_handler(struct scsi_cmnd *scpnt)
 
 /**
  * zfcp_scsi_command_sync - send a SCSI command and wait for completion
- * returns 0, errors are indicated by scsi_cmnd->result
+ * @unit: unit where command is sent to
+ * @scpnt: scsi command to be sent
+ * @timer: timer to be started if request is successfully initiated
+ * Return: 0
+ *
+ * Errors are indicated in scpnt->result
  */
 int
-zfcp_scsi_command_sync(struct zfcp_unit *unit, struct scsi_cmnd *scpnt)
+zfcp_scsi_command_sync(struct zfcp_unit *unit, struct scsi_cmnd *scpnt,
+		       struct timer_list *timer)
 {
+	int ret;
 	DECLARE_COMPLETION(wait);
 
 	scpnt->SCp.ptr = (void *) &wait;  /* silent re-use */
-	scpnt->done = zfcp_scsi_command_sync_handler;
-        zfcp_scsi_command_async(unit->port->adapter, unit, scpnt);
+	scpnt->scsi_done = zfcp_scsi_command_sync_handler;
+	ret = zfcp_scsi_command_async(unit->port->adapter, unit, scpnt, timer);
+	if ((ret == 0) && (scpnt->result == 0))
 	wait_for_completion(&wait);
+
+	scpnt->SCp.ptr = NULL;
 
 	return 0;
 }
@@ -355,7 +366,7 @@ zfcp_scsi_queuecommand(struct scsi_cmnd *scpnt,
 	adapter = (struct zfcp_adapter *) scpnt->device->host->hostdata[0];
 	unit = (struct zfcp_unit *) scpnt->device->hostdata;
 
-	return zfcp_scsi_command_async(adapter, unit, scpnt);
+	return zfcp_scsi_command_async(adapter, unit, scpnt, NULL);
 }
 
 /*

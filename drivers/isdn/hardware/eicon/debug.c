@@ -573,7 +573,7 @@ static void DI_format (int do_lock,
                        unsigned short id,
                        int type,
                        char *format,
-                       va_list argument_list) {
+                       va_list ap) {
   diva_os_spin_lock_magic_t old_irql;
   dword sec, usec;
   diva_dbg_entry_head_t* pmsg = NULL;
@@ -582,7 +582,6 @@ static void DI_format (int do_lock,
   static char fmtBuf[MSG_FRAME_MAX_SIZE+sizeof(*pmsg)+1];
   char          *data;
   unsigned short code;
-  va_list ap;
 
   if (diva_os_in_irq()) {
     dbg_sequence++;
@@ -596,8 +595,6 @@ static void DI_format (int do_lock,
 
 
   
-  ap = argument_list;
-
   diva_os_get_time (&sec, &usec);
 
   if (do_lock) {

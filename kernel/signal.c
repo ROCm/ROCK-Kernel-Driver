@@ -26,6 +26,8 @@
 #include <asm/unistd.h>
 #include <asm/siginfo.h>
 
+extern void k_getrusage(struct task_struct *, int, struct rusage *);
+
 /*
  * SLAB caches for signal bits.
  */
@@ -367,6 +369,22 @@ void __exit_signal(struct task_struct *tsk)
 		if (tsk == sig->curr_target)
 			sig->curr_target = next_thread(tsk);
 		tsk->signal = NULL;
+		/*
+		 * Accumulate here the counters for all threads but the
+		 * group leader as they die, so they can be added into
+		 * the process-wide totals when those are taken.
+		 * The group leader stays around as a zombie as long
+		 * as there are other threads.  When it gets reaped,
+		 * the exit.c code will add its counts into these totals.
+		 * We won't ever get here for the group leader, since it
+		 * will have been the last reference on the signal_struct.
+		 */
+		sig->utime += tsk->utime;
+		sig->stime += tsk->stime;
+		sig->min_flt += tsk->min_flt;
+		sig->maj_flt += tsk->maj_flt;
+		sig->nvcsw += tsk->nvcsw;
+		sig->nivcsw += tsk->nivcsw;
 		spin_unlock(&sighand->siglock);
 		sig = NULL;	/* Marker for below.  */
 	}
@@ -660,12 +678,15 @@ static void handle_stop_signal(int sig, struct task_struct *p)
 			 * the SIGCHLD was pending on entry to this kill.
 			 */
 			p->signal->group_stop_count = 0;
+			p->signal->stop_state = 1;
+			spin_unlock(&p->sighand->siglock);
 			if (p->ptrace & PT_PTRACED)
 				do_notify_parent_cldstop(p, p->parent);
 			else
 				do_notify_parent_cldstop(
 					p->group_leader,
 					p->group_leader->real_parent);
+			spin_lock(&p->sighand->siglock);
 		}
 		rm_from_queue(SIG_KERNEL_STOP_MASK, &p->signal->shared_pending);
 		t = p;
@@ -696,6 +717,23 @@ static void handle_stop_signal(int sig, struct task_struct *p)
 
 			t = next_thread(t);
 		} while (t != p);
+
+		if (p->signal->stop_state > 0) {
+			/*
+			 * We were in fact stopped, and are now continued.
+			 * Notify the parent with CLD_CONTINUED.
+			 */
+			p->signal->stop_state = -1;
+			p->signal->group_exit_code = 0;
+			spin_unlock(&p->sighand->siglock);
+			if (p->ptrace & PT_PTRACED)
+				do_notify_parent_cldstop(p, p->parent);
+			else
+				do_notify_parent_cldstop(
+					p->group_leader,
+					p->group_leader->real_parent);
+			spin_lock(&p->sighand->siglock);
+		}
 	}
 }
 
@@ -1455,8 +1493,8 @@ void do_notify_parent(struct task_struct *tsk, int sig)
 	if (sig == -1)
 		BUG();
 
-	BUG_ON(tsk->group_leader != tsk && tsk->group_leader->state != TASK_ZOMBIE && !tsk->ptrace);
-	BUG_ON(tsk->group_leader == tsk && !thread_group_empty(tsk) && !tsk->ptrace);
+	BUG_ON(!tsk->ptrace &&
+	       (tsk->group_leader != tsk || !thread_group_empty(tsk)));
 
 	info.si_signo = sig;
 	info.si_errno = 0;
@@ -1464,8 +1502,9 @@ void do_notify_parent(struct task_struct *tsk, int sig)
 	info.si_uid = tsk->uid;
 
 	/* FIXME: find out whether or not this is supposed to be c*time. */
-	info.si_utime = tsk->utime;
-	info.si_stime = tsk->stime;
+	info.si_utime = tsk->utime + tsk->signal->utime;
+	info.si_stime = tsk->stime + tsk->signal->stime;
+	k_getrusage(tsk, RUSAGE_BOTH, &info.si_rusage);
 
 	status = tsk->exit_code & 0x7f;
 	why = SI_KERNEL;	/* shouldn't happen */
@@ -1555,9 +1594,16 @@ do_notify_parent_cldstop(struct task_struct *tsk, struct task_struct *parent)
 	/* FIXME: find out whether or not this is supposed to be c*time. */
 	info.si_utime = tsk->utime;
 	info.si_stime = tsk->stime;
+	k_getrusage(tsk, RUSAGE_BOTH, &info.si_rusage);
 
-	info.si_status = tsk->exit_code & 0x7f;
-	info.si_code = CLD_STOPPED;
+	info.si_status = (tsk->signal ? tsk->signal->group_exit_code :
+			  tsk->exit_code) & 0x7f;
+	if (info.si_status == 0) {
+		info.si_status = SIGCONT;
+		info.si_code = CLD_CONTINUED;
+	} else {
+		info.si_code = CLD_STOPPED;
+	}
 
 	sighand = parent->sighand;
 	spin_lock_irqsave(&sighand->siglock, flags);
@@ -1623,14 +1669,17 @@ do_signal_stop(int signr)
 		stop_count = --sig->group_stop_count;
 		current->exit_code = signr;
 		set_current_state(TASK_STOPPED);
+		if (stop_count == 0)
+			sig->stop_state = 1;
 		spin_unlock_irq(&sighand->siglock);
 	}
 	else if (thread_group_empty(current)) {
 		/*
 		 * Lock must be held through transition to stopped state.
 		 */
-		current->exit_code = signr;
+		current->exit_code = current->signal->group_exit_code = signr;
 		set_current_state(TASK_STOPPED);
+		sig->stop_state = 1;
 		spin_unlock_irq(&sighand->siglock);
 	}
 	else {
@@ -1696,6 +1745,8 @@ do_signal_stop(int signr)
 
 		current->exit_code = signr;
 		set_current_state(TASK_STOPPED);
+		if (stop_count == 0)
+			sig->stop_state = 1;
 
 		spin_unlock_irq(&sighand->siglock);
 		read_unlock(&tasklist_lock);
@@ -1736,6 +1787,8 @@ static inline int handle_group_stop(void)
 	 * without any associated signal being in our queue.
 	 */
 	stop_count = --current->signal->group_stop_count;
+	if (stop_count == 0)
+		current->signal->stop_state = 1;
 	current->exit_code = current->signal->group_exit_code;
 	set_current_state(TASK_STOPPED);
 	spin_unlock_irq(&current->sighand->siglock);
@@ -2098,6 +2151,8 @@ int copy_siginfo_to_user(siginfo_t __user *to, siginfo_t *from)
 		err |= __put_user(from->si_status, &to->si_status);
 		err |= __put_user(from->si_utime, &to->si_utime);
 		err |= __put_user(from->si_stime, &to->si_stime);
+		err |= __copy_to_user(&to->si_rusage, &from->si_rusage,
+				      sizeof(to->si_rusage));
 		break;
 	case __SI_RT: /* This is not generated by the kernel as of now. */
 	case __SI_MESGQ: /* But this is */

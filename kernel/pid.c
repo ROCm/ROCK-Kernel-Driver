@@ -27,7 +27,7 @@
 #include <linux/hash.h>
 
 #define pid_hashfn(nr) hash_long((unsigned long)nr, pidhash_shift)
-static struct list_head *pid_hash[PIDTYPE_MAX];
+static struct hlist_head *pid_hash[PIDTYPE_MAX];
 static int pidhash_shift;
 
 int pid_max = PID_MAX_DEFAULT;
@@ -148,11 +148,11 @@ failure:
 
 fastcall struct pid *find_pid(enum pid_type type, int nr)
 {
-	struct list_head *elem, *bucket = &pid_hash[type][pid_hashfn(nr)];
+	struct hlist_node *elem;
 	struct pid *pid;
 
-	__list_for_each(elem, bucket) {
-		pid = list_entry(elem, struct pid, hash_chain);
+	hlist_for_each_entry(pid, elem,
+			&pid_hash[type][pid_hashfn(nr)], hash_chain) {
 		if (pid->nr == nr)
 			return pid;
 	}
@@ -179,7 +179,8 @@ int fastcall attach_pid(task_t *task, enum pid_type type, int nr)
 		INIT_LIST_HEAD(&pid->task_list);
 		pid->task = task;
 		get_task_struct(task);
-		list_add(&pid->hash_chain, &pid_hash[type][pid_hashfn(nr)]);
+		hlist_add_head(&pid->hash_chain,
+				&pid_hash[type][pid_hashfn(nr)]);
 	}
 	list_add_tail(&task->pids[type].pid_chain, &pid->task_list);
 	task->pids[type].pidptr = pid;
@@ -198,7 +199,7 @@ static inline int __detach_pid(task_t *task, enum pid_type type)
 		return 0;
 
 	nr = pid->nr;
-	list_del(&pid->hash_chain);
+	hlist_del(&pid->hash_chain);
 	put_task_struct(pid->task);
 
 	return nr;
@@ -271,15 +272,15 @@ void switch_exec_pids(task_t *leader, task_t *thread)
 void __init pidhash_init(void)
 {
 	int i, j, pidhash_size;
-	unsigned long megabytes = max_pfn >> (20 - PAGE_SHIFT);
+	unsigned long megabytes = nr_kernel_pages >> (20 - PAGE_SHIFT);
 
 	pidhash_shift = max(4, fls(megabytes * 4));
 	pidhash_shift = min(12, pidhash_shift);
 	pidhash_size = 1 << pidhash_shift;
 
-	printk("PID hash table entries: %d (order %d: %Zd bytes)\n",
+	printk("PID hash table entries: %d (order: %d, %Zd bytes)\n",
 		pidhash_size, pidhash_shift,
-		pidhash_size * sizeof(struct list_head));
+		PIDTYPE_MAX * pidhash_size * sizeof(struct hlist_head));
 
 	for (i = 0; i < PIDTYPE_MAX; i++) {
 		pid_hash[i] = alloc_bootmem(pidhash_size *
@@ -287,7 +288,7 @@ void __init pidhash_init(void)
 		if (!pid_hash[i])
 			panic("Could not alloc pidhash!\n");
 		for (j = 0; j < pidhash_size; j++)
-			INIT_LIST_HEAD(&pid_hash[i][j]);
+			INIT_HLIST_HEAD(&pid_hash[i][j]);
 	}
 }
 

@@ -3,9 +3,7 @@
  * object prelinked to its virtual address, and with only one read-only
  * segment (that fits in one page).  This script controls its layout.
  */
-#include <asm/fixmap.h>
-
-VSYSCALL_BASE = __FIXADDR_TOP - 0x1000;
+#include <asm/asm_offsets.h>
 
 SECTIONS
 {

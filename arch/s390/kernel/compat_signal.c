@@ -218,14 +218,17 @@ sys32_sigaction(int sig, const struct old_sigaction32 __user *act,
 		 struct old_sigaction32 __user *oact)
 {
         struct k_sigaction new_ka, old_ka;
+	unsigned long sa_handler, sa_restorer;
         int ret;
 
         if (act) {
 		compat_old_sigset_t mask;
 		if (verify_area(VERIFY_READ, act, sizeof(*act)) ||
-		    __get_user((unsigned long)new_ka.sa.sa_handler, &act->sa_handler) ||
-		    __get_user((unsigned long)new_ka.sa.sa_restorer, &act->sa_restorer))
+		    __get_user(sa_handler, &act->sa_handler) ||
+		    __get_user(sa_restorer, &act->sa_restorer))
 			return -EFAULT;
+		new_ka.sa.sa_handler = (__sighandler_t) sa_handler;
+		new_ka.sa.sa_restorer = (void (*)(void)) sa_restorer;
 		__get_user(new_ka.sa.sa_flags, &act->sa_flags);
 		__get_user(mask, &act->sa_mask);
 		siginitset(&new_ka.sa.sa_mask, mask);
@@ -234,9 +237,11 @@ sys32_sigaction(int sig, const struct old_sigaction32 __user *act,
         ret = do_sigaction(sig, act ? &new_ka : NULL, oact ? &old_ka : NULL);
 
 	if (!ret && oact) {
+		sa_handler = (unsigned long) old_ka.sa.sa_handler;
+		sa_restorer = (unsigned long) old_ka.sa.sa_restorer;
 		if (verify_area(VERIFY_WRITE, oact, sizeof(*oact)) ||
-		    __put_user((unsigned long)old_ka.sa.sa_handler, &oact->sa_handler) ||
-		    __put_user((unsigned long)old_ka.sa.sa_restorer, &oact->sa_restorer))
+		    __put_user(sa_handler, &oact->sa_handler) ||
+		    __put_user(sa_restorer, &oact->sa_restorer))
 			return -EFAULT;
 		__put_user(old_ka.sa.sa_flags, &oact->sa_flags);
 		__put_user(old_ka.sa.sa_mask.sig[0], &oact->sa_mask);
@@ -253,6 +258,7 @@ sys32_rt_sigaction(int sig, const struct sigaction32 __user *act,
 	   struct sigaction32 __user *oact,  size_t sigsetsize)
 {
 	struct k_sigaction new_ka, old_ka;
+	unsigned long sa_handler;
 	int ret;
 	compat_sigset_t set32;
 
@@ -261,7 +267,7 @@ sys32_rt_sigaction(int sig, const struct sigaction32 __user *act,
 		return -EINVAL;
 
 	if (act) {
-		ret = get_user((unsigned long)new_ka.sa.sa_handler, &act->sa_handler);
+		ret = get_user(sa_handler, &act->sa_handler);
 		ret |= __copy_from_user(&set32, &act->sa_mask,
 					sizeof(compat_sigset_t));
 		switch (_NSIG_WORDS) {
@@ -278,6 +284,7 @@ sys32_rt_sigaction(int sig, const struct sigaction32 __user *act,
 		
 		if (ret)
 			return -EFAULT;
+		new_ka.sa.sa_handler = (__sighandler_t) sa_handler;
 	}
 
 	ret = do_sigaction(sig, act ? &new_ka : NULL, oact ? &old_ka : NULL);
@@ -311,17 +318,19 @@ sys32_sigaltstack(const stack_t32 __user *uss, stack_t32 __user *uoss,
 							struct pt_regs *regs)
 {
 	stack_t kss, koss;
+	unsigned long ss_sp;
 	int ret, err = 0;
 	mm_segment_t old_fs = get_fs();
 
 	if (uss) {
 		if (!access_ok(VERIFY_READ, uss, sizeof(*uss)))
 			return -EFAULT;
-		err |= __get_user((unsigned long) kss.ss_sp, &uss->ss_sp);
+		err |= __get_user(ss_sp, &uss->ss_sp);
 		err |= __get_user(kss.ss_size, &uss->ss_size);
 		err |= __get_user(kss.ss_flags, &uss->ss_flags);
 		if (err)
 			return -EFAULT;
+		kss.ss_sp = (void *) ss_sp;
 	}
 
 	set_fs (KERNEL_DS);
@@ -333,7 +342,8 @@ sys32_sigaltstack(const stack_t32 __user *uss, stack_t32 __user *uoss,
 	if (!ret && uoss) {
 		if (!access_ok(VERIFY_WRITE, uoss, sizeof(*uoss)))
 			return -EFAULT;
-		err |= __put_user((unsigned long) koss.ss_sp, &uoss->ss_sp);
+		ss_sp = (unsigned long) koss.ss_sp;
+		err |= __put_user(ss_sp, &uoss->ss_sp);
 		err |= __put_user(koss.ss_size, &uoss->ss_size);
 		err |= __put_user(koss.ss_flags, &uoss->ss_flags);
 		if (err)

@@ -21,6 +21,7 @@
 #include <linux/rcupdate.h>
 #include <net/tcp.h>
 #include <net/udp.h>
+#include <asm/unaligned.h>
 
 /*
  * We maintain a small pool of fully-sized skbs, to make sure the
@@ -37,7 +38,11 @@ static struct sk_buff *skbs;
 static spinlock_t rx_list_lock = SPIN_LOCK_UNLOCKED;
 static LIST_HEAD(rx_list);
 
-static int trapped;
+static atomic_t trapped;
+spinlock_t netpoll_poll_lock = SPIN_LOCK_UNLOCKED;
+
+#define NETPOLL_RX_ENABLED  1
+#define NETPOLL_RX_DROP     2
 
 #define MAX_SKB_SIZE \
 		(MAX_UDP_CHUNK + sizeof(struct udphdr) + \
@@ -62,7 +67,14 @@ static int checksum_udp(struct sk_buff *skb, struct udphdr *uh,
 
 void netpoll_poll(struct netpoll *np)
 {
-	int budget = 1;
+	/*
+	 * In cases where there is bi-directional communications, reading
+	 * only one message at a time can lead to packets being dropped by
+	 * the network adapter, forcing superfluous retries and possibly
+	 * timeouts.  Thus, we set our budget to a more reasonable value.
+	 */
+	int budget = 16;
+	unsigned long flags;
 
 	if(!np->dev || !netif_running(np->dev) || !np->dev->poll_controller)
 		return;
@@ -71,9 +83,19 @@ void netpoll_poll(struct netpoll *np)
 	np->dev->poll_controller(np->dev);
 
 	/* If scheduling is stopped, tickle NAPI bits */
-	if(trapped && np->dev->poll &&
-	   test_bit(__LINK_STATE_RX_SCHED, &np->dev->state))
+	spin_lock_irqsave(&netpoll_poll_lock, flags);
+	if (np->dev->poll &&
+	    test_bit(__LINK_STATE_RX_SCHED, &np->dev->state)) {
+		np->dev->netpoll_rx |= NETPOLL_RX_DROP;
+		atomic_inc(&trapped);
+
 		np->dev->poll(np->dev, &budget);
+
+		atomic_dec(&trapped);
+		np->dev->netpoll_rx &= ~NETPOLL_RX_DROP;
+	}
+	spin_unlock_irqrestore(&netpoll_poll_lock, flags);
+
 	zap_completion_queue();
 }
 
@@ -169,6 +191,18 @@ repeat:
 	spin_lock(&np->dev->xmit_lock);
 	np->dev->xmit_lock_owner = smp_processor_id();
 
+	/*
+	 * network drivers do not expect to be called if the queue is
+	 * stopped.
+	 */
+	if (netif_queue_stopped(np->dev)) {
+		np->dev->xmit_lock_owner = -1;
+		spin_unlock(&np->dev->xmit_lock);
+
+		netpoll_poll(np);
+		goto repeat;
+	}
+
 	status = np->dev->hard_start_xmit(skb, np->dev);
 	np->dev->xmit_lock_owner = -1;
 	spin_unlock(&np->dev->xmit_lock);
@@ -207,17 +241,17 @@ void netpoll_send_udp(struct netpoll *np, const char *msg, int len)
 
 	iph = (struct iphdr *)skb_push(skb, sizeof(*iph));
 
-	iph->version  = 4;
-	iph->ihl      = 5;
+	/* iph->version = 4; iph->ihl = 5; */
+	put_unaligned(0x54, (unsigned char *)iph);
 	iph->tos      = 0;
-	iph->tot_len  = htons(ip_len);
+	put_unaligned(htonl(ip_len), &(iph->tot_len));
 	iph->id       = 0;
 	iph->frag_off = 0;
 	iph->ttl      = 64;
 	iph->protocol = IPPROTO_UDP;
 	iph->check    = 0;
-	iph->saddr    = htonl(np->local_ip);
-	iph->daddr    = htonl(np->remote_ip);
+	put_unaligned(htonl(np->local_ip), &(iph->saddr));
+	put_unaligned(htonl(np->remote_ip), &(iph->daddr));
 	iph->check    = ip_fast_csum((unsigned char *)iph, iph->ihl);
 
 	eth = (struct ethhdr *) skb_push(skb, ETH_HLEN);
@@ -338,7 +372,8 @@ int netpoll_rx(struct sk_buff *skb)
 		goto out;
 
 	/* check if netpoll clients need ARP */
-	if (skb->protocol == __constant_htons(ETH_P_ARP) && trapped) {
+	if (skb->protocol == __constant_htons(ETH_P_ARP) &&
+	    atomic_read(&trapped)) {
 		arp_reply(skb);
 		return 1;
 	}
@@ -401,7 +436,7 @@ int netpoll_rx(struct sk_buff *skb)
 	spin_unlock_irqrestore(&rx_list_lock, flags);
 
 out:
-	return trapped;
+	return atomic_read(&trapped);
 }
 
 int netpoll_parse_options(struct netpoll *np, char *opt)
@@ -594,9 +629,7 @@ int netpoll_setup(struct netpoll *np)
 	if(np->rx_hook) {
 		unsigned long flags;
 
-#ifdef CONFIG_NETPOLL_RX
-		np->dev->netpoll_rx = 1;
-#endif
+		np->dev->netpoll_rx = NETPOLL_RX_ENABLED;
 
 		spin_lock_irqsave(&rx_list_lock, flags);
 		list_add(&np->rx_list, &rx_list);
@@ -611,30 +644,31 @@ int netpoll_setup(struct netpoll *np)
 
 void netpoll_cleanup(struct netpoll *np)
 {
-	if(np->rx_hook) {
+	if (np->rx_hook) {
 		unsigned long flags;
 
 		spin_lock_irqsave(&rx_list_lock, flags);
 		list_del(&np->rx_list);
-#ifdef CONFIG_NETPOLL_RX
-		if (np->dev)
-			np->dev->netpoll_rx = 0;
-#endif
 		spin_unlock_irqrestore(&rx_list_lock, flags);
 	}
 
+	if (np->dev)
+		np->dev->netpoll_rx = 0;
 	dev_put(np->dev);
 	np->dev = NULL;
 }
 
 int netpoll_trap(void)
 {
-	return trapped;
+	return atomic_read(&trapped);
 }
 
 void netpoll_set_trap(int trap)
 {
-	trapped = trap;
+	if (trap)
+		atomic_inc(&trapped);
+	else
+		atomic_dec(&trapped);
 }
 
 EXPORT_SYMBOL(netpoll_set_trap);

@@ -22,9 +22,19 @@
 #ifndef _PPC64_HVCONSOLE_H
 #define _PPC64_HVCONSOLE_H
 
-extern int hvc_get_chars(int index, char *buf, int count);
-extern int hvc_put_chars(int index, const char *buf, int count);
-extern int hvc_count(int *start_termno);
+/*
+ * This is the max number of console adapters that can/will be found as
+ * console devices on first stage console init.  Any number beyond this range
+ * can't be used as a console device but is still a valid tty device.
+ */
+#define MAX_NR_HVC_CONSOLES	16
 
+extern int hvc_get_chars(uint32_t vtermno, char *buf, int count);
+extern int hvc_put_chars(uint32_t vtermno, const char *buf, int count);
+
+/* Early discovery of console adapters. */
+extern int hvc_find_vtys(void);
+
+/* Implemented by a console driver */
+extern int hvc_instantiate(uint32_t vtermno, int index);
 #endif /* _PPC64_HVCONSOLE_H */
-
