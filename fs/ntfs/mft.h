@@ -29,6 +29,7 @@
 
 #include "inode.h"
 
+extern MFT_RECORD *try_map_mft_record(ntfs_inode *ni);
 extern MFT_RECORD *map_mft_record(ntfs_inode *ni);
 extern void unmap_mft_record(ntfs_inode *ni);
 

@@ -115,6 +115,57 @@ err_out:
 }
 
 /**
+ * try_map_mft_record - attempt to map, pin and lock an mft record
+ * @ni:		ntfs inode whose MFT record to map
+ *
+ * First, attempt to take the mrec_lock semaphore.  If the semaphore is already
+ * taken by someone else, return the error code -EALREADY.  Otherwise continue
+ * as described below.
+ *
+ * The page of the record is mapped using map_mft_record_page() before being
+ * returned to the caller.
+ *
+ * This in turn uses ntfs_map_page() to get the page containing the wanted mft
+ * record (it in turn calls read_cache_page() which reads it in from disk if
+ * necessary, increments the use count on the page so that it cannot disappear
+ * under us and returns a reference to the page cache page).
+ *
+ * The mft record is now ours and we return a pointer to it.  You need to check
+ * the returned pointer with IS_ERR() and if that is true, PTR_ERR() will return
+ * the error code.
+ *
+ * For further details see the description of map_mft_record() below.
+ */
+MFT_RECORD *try_map_mft_record(ntfs_inode *ni)
+{
+	MFT_RECORD *m;
+
+	ntfs_debug("Entering for mft_no 0x%lx.", ni->mft_no);
+
+	/* Make sure the ntfs inode doesn't go away. */
+	atomic_inc(&ni->count);
+
+	/*
+	 * Serialize access to this mft record.  If someone else is already
+	 * holding the lock, abort instead of waiting for the lock.
+	 */
+	if (unlikely(down_trylock(&ni->mrec_lock))) {
+		ntfs_debug("Mft record is already locked, aborting.");
+		atomic_dec(&ni->count);
+		return ERR_PTR(-EALREADY);
+	}
+
+	m = map_mft_record_page(ni);
+	if (likely(!IS_ERR(m)))
+		return m;
+
+	up(&ni->mrec_lock);
+	atomic_dec(&ni->count);
+	ntfs_error(ni->vol->sb, "Failed with error code %lu.", -PTR_ERR(m));
+	return m;
+}
+
+/**
  * map_mft_record - map, pin and lock an mft record
  * @ni:		ntfs inode whose MFT record to map
  *
