@@ -238,13 +238,13 @@ static unsigned int real_irq_to_virt(unsigned int real_irq)
 #ifdef CONFIG_SMP
 static int get_irq_server(unsigned int irq)
 {
-	cpumask_t cpumask = irq_affinity[irq];
-	cpumask_t tmp = CPU_MASK_NONE;
 	unsigned int server;
 
 #ifdef CONFIG_IRQ_ALL_CPUS
 	/* For the moment only implement delivery to all cpus or one cpu */
 	if (smp_threads_ready) {
+		cpumask_t cpumask = irq_affinity[irq];
+		cpumask_t tmp = CPU_MASK_NONE;
 		if (cpus_equal(cpumask, CPU_MASK_ALL)) {
 			server = default_distrib_server;
 		} else {
