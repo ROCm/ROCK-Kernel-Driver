@@ -254,7 +254,7 @@ static int longhaul_version;
 static struct cpufreq_frequency_table *longhaul_table;
 
 
-static int longhaul_get_cpu_fsb (void)
+static unsigned int longhaul_get_cpu_fsb (void)
 {
 	unsigned long lo, hi;
 	unsigned int eblcr_fsb_table[] = { 66, 133, 100, -1 };
@@ -402,6 +402,8 @@ static int __init longhaul_get_ranges (void)
 		-1,110,120,-1,135,115,125,105,130,150,160,140,-1,155,-1,145 };
 	unsigned int j, k = 0;
 	union msr_longhaul longhaul;
+
+	fsb = longhaul_get_cpu_fsb();
 
 	switch (longhaul_version) {
 	case 1:
