@@ -44,7 +44,7 @@ struct miscdevice
 	const char *name;
 	struct file_operations *fops;
 	struct miscdevice * next, * prev;
-	devfs_handle_t devfs_handle;
+	char devfs_name[64];
 };
 
 extern int misc_register(struct miscdevice * misc);
