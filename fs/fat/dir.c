@@ -737,10 +737,10 @@ int fat_new_dir(struct inode *dir, struct inode *parent, int is_vfat)
 		de[0].adate = de[0].cdate =
 			de[1].adate = de[1].cdate = date;
 	}
-	de[0].start = CT_LE_W(MSDOS_I(dir)->i_logstart);
-	de[0].starthi = CT_LE_W(MSDOS_I(dir)->i_logstart>>16);
-	de[1].start = CT_LE_W(MSDOS_I(parent)->i_logstart);
-	de[1].starthi = CT_LE_W(MSDOS_I(parent)->i_logstart>>16);
+	de[0].start = cpu_to_le16(MSDOS_I(dir)->i_logstart);
+	de[0].starthi = cpu_to_le16(MSDOS_I(dir)->i_logstart>>16);
+	de[1].start = cpu_to_le16(MSDOS_I(parent)->i_logstart);
+	de[1].starthi = cpu_to_le16(MSDOS_I(parent)->i_logstart>>16);
 	mark_buffer_dirty(bh);
 	brelse(bh);
 	dir->i_atime = dir->i_ctime = dir->i_mtime = CURRENT_TIME;

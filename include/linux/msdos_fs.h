@@ -87,8 +87,8 @@
 
 #define FAT_FSINFO_SIG1	0x41615252
 #define FAT_FSINFO_SIG2	0x61417272
-#define IS_FSINFO(x)	(CF_LE_L((x)->signature1) == FAT_FSINFO_SIG1	\
-			 && CF_LE_L((x)->signature2) == FAT_FSINFO_SIG2)
+#define IS_FSINFO(x)	(le32_to_cpu((x)->signature1) == FAT_FSINFO_SIG1 \
+			 && le32_to_cpu((x)->signature2) == FAT_FSINFO_SIG2)
 
 /*
  * ioctl commands

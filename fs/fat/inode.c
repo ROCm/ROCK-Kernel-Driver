@@ -864,7 +864,8 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 		brelse(bh);
 		goto out_invalid;
 	}
-	logical_sector_size = CF_LE_W(get_unaligned((__le16 *)&b->sector_size));
+	logical_sector_size =
+		le16_to_cpu(get_unaligned((__le16 *)&b->sector_size));
 	if (!logical_sector_size
 	    || (logical_sector_size & (logical_sector_size - 1))
 	    || (logical_sector_size < 512)
@@ -913,8 +914,8 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	sbi->cluster_bits = ffs(sbi->cluster_size) - 1;
 	sbi->fats = b->fats;
 	sbi->fat_bits = 0;		/* Don't know yet */
-	sbi->fat_start = CF_LE_W(b->reserved);
-	sbi->fat_length = CF_LE_W(b->fat_length);
+	sbi->fat_start = le16_to_cpu(b->reserved);
+	sbi->fat_length = le16_to_cpu(b->fat_length);
 	sbi->root_cluster = 0;
 	sbi->free_clusters = -1;	/* Don't know yet */
 	sbi->prev_free = -1;
@@ -925,13 +926,13 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 
 		/* Must be FAT32 */
 		sbi->fat_bits = 32;
-		sbi->fat_length = CF_LE_L(b->fat32_length);
-		sbi->root_cluster = CF_LE_L(b->root_cluster);
+		sbi->fat_length = le32_to_cpu(b->fat32_length);
+		sbi->root_cluster = le32_to_cpu(b->root_cluster);
 
 		sb->s_maxbytes = 0xffffffff;
 		
 		/* MC - if info_sector is 0, don't multiply by 0 */
-		sbi->fsinfo_sector = CF_LE_W(b->info_sector);
+		sbi->fsinfo_sector = le16_to_cpu(b->info_sector);
 		if (sbi->fsinfo_sector == 0)
 			sbi->fsinfo_sector = 1;
 
@@ -949,12 +950,12 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 			       "FAT: Did not find valid FSINFO signature.\n"
 			       "     Found signature1 0x%08x signature2 0x%08x"
 			       " (sector = %lu)\n",
-			       CF_LE_L(fsinfo->signature1),
-			       CF_LE_L(fsinfo->signature2),
+			       le32_to_cpu(fsinfo->signature1),
+			       le32_to_cpu(fsinfo->signature2),
 			       sbi->fsinfo_sector);
 		} else {
-			sbi->free_clusters = CF_LE_L(fsinfo->free_clusters);
-			sbi->prev_free = CF_LE_L(fsinfo->next_cluster);
+			sbi->free_clusters = le32_to_cpu(fsinfo->free_clusters);
+			sbi->prev_free = le32_to_cpu(fsinfo->next_cluster);
 		}
 
 		brelse(fsinfo_bh);
@@ -964,7 +965,8 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	sbi->dir_per_block_bits = ffs(sbi->dir_per_block) - 1;
 
 	sbi->dir_start = sbi->fat_start + sbi->fats * sbi->fat_length;
-	sbi->dir_entries = CF_LE_W(get_unaligned((__le16 *)&b->dir_entries));
+	sbi->dir_entries =
+		le16_to_cpu(get_unaligned((__le16 *)&b->dir_entries));
 	if (sbi->dir_entries & (sbi->dir_per_block - 1)) {
 		if (!silent)
 			printk(KERN_ERR "FAT: bogus directroy-entries per block"
@@ -976,9 +978,9 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	rootdir_sectors = sbi->dir_entries
 		* sizeof(struct msdos_dir_entry) / sb->s_blocksize;
 	sbi->data_start = sbi->dir_start + rootdir_sectors;
-	total_sectors = CF_LE_W(get_unaligned((__le16 *)&b->sectors));
+	total_sectors = le16_to_cpu(get_unaligned((__le16 *)&b->sectors));
 	if (total_sectors == 0)
-		total_sectors = CF_LE_L(b->total_sect);
+		total_sectors = le32_to_cpu(b->total_sect);
 
 	total_clusters = (total_sectors - sbi->data_start) / sbi->sec_per_clus;
 
@@ -1186,9 +1188,9 @@ static int fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
 		inode->i_op = sbi->dir_ops;
 		inode->i_fop = &fat_dir_operations;
 
-		MSDOS_I(inode)->i_start = CF_LE_W(de->start);
+		MSDOS_I(inode)->i_start = le16_to_cpu(de->start);
 		if (sbi->fat_bits == 32)
-			MSDOS_I(inode)->i_start |= (CF_LE_W(de->starthi) << 16);
+			MSDOS_I(inode)->i_start |= (le16_to_cpu(de->starthi) << 16);
 
 		MSDOS_I(inode)->i_logstart = MSDOS_I(inode)->i_start;
 		error = fat_calc_dir_size(inode);
@@ -1204,12 +1206,12 @@ static int fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
 		       !is_exec(de->ext))
 		    	? S_IRUGO|S_IWUGO : S_IRWXUGO)
 		    & ~sbi->options.fs_fmask) | S_IFREG;
-		MSDOS_I(inode)->i_start = CF_LE_W(de->start);
+		MSDOS_I(inode)->i_start = le16_to_cpu(de->start);
 		if (sbi->fat_bits == 32)
-			MSDOS_I(inode)->i_start |= (CF_LE_W(de->starthi) << 16);
+			MSDOS_I(inode)->i_start |= (le16_to_cpu(de->starthi) << 16);
 
 		MSDOS_I(inode)->i_logstart = MSDOS_I(inode)->i_start;
-		inode->i_size = CF_LE_L(de->size);
+		inode->i_size = le32_to_cpu(de->size);
 	        inode->i_op = &fat_file_inode_operations;
 	        inode->i_fop = &fat_file_operations;
 		inode->i_mapping->a_ops = &fat_aops;
@@ -1224,11 +1226,11 @@ static int fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
 	inode->i_blocks = ((inode->i_size + (sbi->cluster_size - 1))
 			   & ~((loff_t)sbi->cluster_size - 1)) >> 9;
 	inode->i_mtime.tv_sec = inode->i_atime.tv_sec =
-		date_dos2unix(CF_LE_W(de->time),CF_LE_W(de->date));
+		date_dos2unix(le16_to_cpu(de->time), le16_to_cpu(de->date));
 	inode->i_mtime.tv_nsec = inode->i_atime.tv_nsec = 0;
 	inode->i_ctime.tv_sec =
 		MSDOS_SB(sb)->options.isvfat
-		? date_dos2unix(CF_LE_W(de->ctime),CF_LE_W(de->cdate))
+		? date_dos2unix(le16_to_cpu(de->ctime), le16_to_cpu(de->cdate))
 		: inode->i_mtime.tv_sec;
 	inode->i_ctime.tv_nsec = de->ctime_ms * 1000000;
 	MSDOS_I(inode)->i_ctime_ms = de->ctime_ms;
@@ -1272,12 +1274,12 @@ retry:
 	}
 	else {
 		raw_entry->attr = ATTR_NONE;
-		raw_entry->size = CT_LE_L(inode->i_size);
+		raw_entry->size = cpu_to_le32(inode->i_size);
 	}
 	raw_entry->attr |= MSDOS_MKATTR(inode->i_mode) |
 	    MSDOS_I(inode)->i_attrs;
-	raw_entry->start = CT_LE_W(MSDOS_I(inode)->i_logstart);
-	raw_entry->starthi = CT_LE_W(MSDOS_I(inode)->i_logstart >> 16);
+	raw_entry->start = cpu_to_le16(MSDOS_I(inode)->i_logstart);
+	raw_entry->starthi = cpu_to_le16(MSDOS_I(inode)->i_logstart >> 16);
 	fat_date_unix2dos(inode->i_mtime.tv_sec, &raw_entry->time, &raw_entry->date);
 	if (sbi->options.isvfat) {
 		fat_date_unix2dos(inode->i_ctime.tv_sec,&raw_entry->ctime,&raw_entry->cdate);

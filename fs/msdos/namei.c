@@ -501,8 +501,8 @@ static int do_msdos_rename(struct inode *old_dir, unsigned char *old_name,
 		mark_inode_dirty(new_inode);
 	}
 	if (dotdot_bh) {
-		dotdot_de->start = CT_LE_W(MSDOS_I(new_dir)->i_logstart);
-		dotdot_de->starthi = CT_LE_W((MSDOS_I(new_dir)->i_logstart) >> 16);
+		dotdot_de->start = cpu_to_le16(MSDOS_I(new_dir)->i_logstart);
+		dotdot_de->starthi = cpu_to_le16((MSDOS_I(new_dir)->i_logstart) >> 16);
 		mark_buffer_dirty(dotdot_bh);
 		old_dir->i_nlink--;
 		mark_inode_dirty(old_dir);
