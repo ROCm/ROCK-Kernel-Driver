@@ -16,6 +16,7 @@
 #include <asm/signal.h>
 #include <asm/pgtable.h>
 #include <asm/processor.h>
+#include <asm/thread_info.h>
 
 #include "conv.h"
 
