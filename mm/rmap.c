@@ -233,6 +233,9 @@ static int page_referenced_one(struct page *page,
 	if (mm != current->mm && has_swap_token(mm))
 		referenced++;
 
+	if (mm->rss > mm->rlimit_rss)
+		referenced = 0;
+
 	(*mapcount)--;
 
 out_unmap:

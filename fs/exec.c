@@ -1124,6 +1124,11 @@ int do_execve(char * filename,
 	retval = init_new_context(current, bprm.mm);
 	if (retval < 0)
 		goto out_mm;
+	if (likely(current->mm)) {
+		bprm.mm->rlimit_rss = current->mm->rlimit_rss;
+	} else {
+		bprm.mm->rlimit_rss = init_mm.rlimit_rss;
+	}
 
 	bprm.argc = count(argv, bprm.p / sizeof(void *));
 	if ((retval = bprm.argc) < 0)

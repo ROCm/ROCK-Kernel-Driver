@@ -112,7 +112,8 @@ ENTRY(swsusp_arch_resume)
 	call	swsusp_restore
 	ret
 
-	.section .data.nosave
+	.section .data.nosave, "aw"
+	.align 8
 loop:
 	.quad 0
 loop2:	
