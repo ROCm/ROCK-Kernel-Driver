@@ -36,7 +36,7 @@
  * device of the previous section.
  * Thus there are (near_copies*far_copies) of each chunk, and each is on a different
  * drive.
- * near_copies and far_copies must be at least one, and there product is at most
+ * near_copies and far_copies must be at least one, and their product is at most
  * raid_disks.
  */
 

@@ -1788,7 +1788,7 @@ static void autorun_array(mddev_t *mddev)
 
 	err = do_md_run (mddev);
 	if (err) {
-		printk(KERN_WARNING "md :do_md_run() returned %d\n", err);
+		printk(KERN_WARNING "md: do_md_run() returned %d\n", err);
 		do_md_stop (mddev, 0);
 	}
 }
@@ -2378,7 +2378,7 @@ static int update_array_info(mddev_t *mddev, mdu_array_info_t *info)
 		/* The "size" is the amount of each device that is used.
 		 * This can only make sense for arrays with redundancy.
 		 * linear and raid0 always use whatever space is available
-		 * We can only consider changing the size of no resync
+		 * We can only consider changing the size if no resync
 		 * or reconstruction is happening, and if the new size
 		 * is acceptable. It must fit before the sb_offset or,
 		 * if that is <data_offset, it must fit before the
