@@ -281,7 +281,7 @@ exp_export(struct nfsctl_export *nxp)
 	if ((nxp->ex_flags & NFSEXP_FSID) &&
 	    (fsid_exp = exp_get_fsid(clp, nxp->ex_dev)) &&
 	    fsid_exp != exp)
-		goto out_unlock;
+		goto finish;
 
 	if (exp != NULL) {
 		/* just a flags/id/fsid update */
@@ -293,7 +293,7 @@ exp_export(struct nfsctl_export *nxp)
 		exp->ex_fsid     = nxp->ex_dev;
 		exp_fsid_hash(clp, exp);
 		err = 0;
-		goto out_unlock;
+		goto finish;
 	}
 
 	/* We currently export only dirs and regular files.
@@ -329,8 +329,8 @@ exp_export(struct nfsctl_export *nxp)
 	strcpy(exp->ex_path, nxp->ex_path);
 	exp->ex_client = clp;
 	exp->ex_parent = parent;
-	exp->ex_dentry = nd.dentry;
-	exp->ex_mnt = nd.mnt;
+	exp->ex_mnt = mntget(nd.mnt);
+	exp->ex_dentry = dget(nd.dentry);
 	exp->ex_flags = nxp->ex_flags;
 	exp->ex_dev = dev;
 	exp->ex_ino = ino;
@@ -350,16 +350,12 @@ exp_export(struct nfsctl_export *nxp)
 
 	err = 0;
 
-	/* Unlock hashtable */
+finish:
+	path_release(&nd);
 out_unlock:
 	exp_writeunlock();
 out:
 	return err;
-
-	/* Release the dentry */
-finish:
-	path_release(&nd);
-	goto out_unlock;
 }
 
 /*
@@ -478,8 +474,7 @@ exp_rootfh(struct svc_client *clp, char *path, struct knfsd_fh *f, int maxsize)
 	fh_put(&fh);
 
 out:
-	if (path)
-		path_release(&nd);
+	path_release(&nd);
 	return err;
 }
 
