@@ -306,6 +306,23 @@ acpi_os_get_line (
 
 
 /*
+ * Directory manipulation
+ */
+
+void *
+acpi_os_open_directory (
+	char                            *pathname,
+	char                            *wildcard_spec);
+
+char *
+acpi_os_get_next_filename (
+	void                            *dir_handle);
+
+void
+acpi_os_close_directory (
+	void                            *dir_handle);
+
+/*
  * Debug
  */
 

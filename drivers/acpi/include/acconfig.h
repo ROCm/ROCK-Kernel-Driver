@@ -53,7 +53,7 @@
 
 /* Version string */
 
-#define ACPI_CA_VERSION                 0x20021217
+#define ACPI_CA_VERSION                 0x20030109
 
 /* Version of ACPI supported */
 
