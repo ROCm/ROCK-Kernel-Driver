@@ -725,3 +725,39 @@ pid_t kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 			   "g1", "g2", "g3", "o0", "o1", "memory", "cc");
 	return retval;
 }
+
+extern void scheduling_functions_start_here(void);
+extern void scheduling_functions_end_here(void);
+
+unsigned long get_wchan(struct task_struct *task)
+{
+	unsigned long pc, fp, bias = 0;
+	unsigned long task_base = (unsigned long) task;
+        unsigned long ret = 0;
+	struct reg_window *rw;
+	int count = 0;
+
+	if (!task || task == current ||
+            task->state == TASK_RUNNING)
+		goto out;
+
+	fp = task->thread_info->ksp + bias;
+	do {
+		/* Bogus frame pointer? */
+		if (fp < (task_base + sizeof(struct task_struct)) ||
+		    fp >= (task_base + (2 * PAGE_SIZE)))
+			break;
+		rw = (struct reg_window *) fp;
+		pc = rw->ins[7];
+		if (pc < ((unsigned long) scheduling_functions_start_here) ||
+                    pc >= ((unsigned long) scheduling_functions_end_here)) {
+			ret = pc;
+			goto out;
+		}
+		fp = rw->ins[6] + bias;
+	} while (++count < 16);
+
+out:
+	return ret;
+}
+
