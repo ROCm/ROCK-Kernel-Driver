@@ -17,6 +17,7 @@
    implementation.  */
 
 #include <asm/entry.h>
+#include <asm/cacheflush.h>
 #include <asm/v850e_cache.h>
 
 #define WAIT_UNTIL_CLEAR(value) while (value) {}
