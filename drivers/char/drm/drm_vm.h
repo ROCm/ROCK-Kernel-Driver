@@ -102,7 +102,7 @@ static __inline__ struct page *DRM(do_vm_nopage)(struct vm_area_struct *vma,
 
 		DRM_DEBUG("baddr = 0x%lx page = 0x%p, offset = 0x%lx, count=%d\n",
 			  baddr, __va(agpmem->memory->memory[offset]), offset,
-			  atomic_read(&page->count));
+			  page_count(page));
 
 		return page;
         }

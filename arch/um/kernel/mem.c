@@ -294,7 +294,7 @@ void setup_highmem(unsigned long len)
 			page = &map[i];
 			ClearPageReserved(page);
 			set_bit(PG_highmem, &page->flags);
-			atomic_set(&page->count, 1);
+			set_page_count(page, 1);
 			__free_page(page);
 		}
 		phys += cur;

@@ -238,7 +238,7 @@ void __init mem_init(void)
 		set_page_address(page, lowmem_page_address(page));
 #endif
 		set_bit(PG_highmem, &page->flags);
-		atomic_set(&page->count, 1);
+		set_page_count(page, 1);
 		__free_page(page);
 		totalhigh_pages++;
 	}

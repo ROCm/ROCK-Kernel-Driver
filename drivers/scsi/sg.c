@@ -1099,10 +1099,10 @@ sg_rb_correct4mmap(Sg_scatter_hold * rsv_schp, int startFinish)
 				page_ptr = sg_scatg2virt(sclp) + m;
 				page = virt_to_page(page_ptr);
 				if (startFinish)
-					atomic_inc(&page->count);
+					get_page(page);
 				else {
 					if (page_count(page) > 0)
-						atomic_dec(&page->count);
+						__put_page(page);
 				}
 			}
 		}
@@ -1111,10 +1111,10 @@ sg_rb_correct4mmap(Sg_scatter_hold * rsv_schp, int startFinish)
 			page_ptr = (unsigned char *) rsv_schp->buffer + m;
 			page = virt_to_page(page_ptr);
 			if (startFinish)
-				atomic_inc(&page->count);
+				get_page(page);
 			else {
 				if (page_count(page) > 0)
-					atomic_dec(&page->count);
+					__put_page(page);
 			}
 		}
 	}

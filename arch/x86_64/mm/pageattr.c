@@ -126,20 +126,20 @@ __change_page_attr(unsigned long address, struct page *page, pgprot_t prot)
 
 			set_pte(kpte, mk_pte(page, prot)); 
 			if (pte_same(old,standard))
-				atomic_inc(&kpte_page->count);
+				get_page(kpte_page);
 		} else {
 			struct page *split = split_large_page(address, prot); 
 			if (!split)
 				return -ENOMEM;
-			atomic_inc(&kpte_page->count);
+			get_page(kpte_page);
 			set_pte(kpte,mk_pte(split, PAGE_KERNEL));
 		}	
 	} else if ((kpte_flags & _PAGE_PSE) == 0) { 
 		set_pte(kpte, mk_pte(page, PAGE_KERNEL));
-		atomic_dec(&kpte_page->count); 
+		__put_page(kpte_page);
 	}
 
-	if (atomic_read(&kpte_page->count) == 1) { 
+	if (page_count(kpte_page) == 1) {
 		save_page(address, kpte_page); 		     
 		revert_page(kpte_page, address);
 	} 
