@@ -597,11 +597,13 @@ static struct edd_attribute * edd_attrs[] = {
 	NULL,
 };
 
-static struct subsystem edd_subsys = {
-	.kobj	= { .name = "edd" },
+static struct kobj_type ktype_edd = {
 	.sysfs_ops	= &edd_attr_ops,
 	.default_attrs	= def_attrs,
 };
+
+static decl_subsys(edd,&ktype_edd);
+
 
 
 /**
@@ -793,7 +795,7 @@ edd_device_register(struct edd_device *edev, int i)
 	edd_dev_set_info(edev, &edd[i]);
 	snprintf(edev->kobj.name, EDD_DEVICE_NAME_SIZE, "int13_dev%02x",
 		 edd[i].device);
-	edev->kobj.subsys = &edd_subsys;
+	kobj_set_kset_s(edev,edd_subsys);
 	error = kobject_register(&edev->kobj);
 	if (!error)
 		populate_dir(edev);
