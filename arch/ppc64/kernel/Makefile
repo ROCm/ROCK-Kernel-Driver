@@ -10,11 +10,12 @@ obj-y               :=	setup.o entry.o traps.o irq.o idle.o \
 			align.o semaphore.o bitops.o stab.o pacaData.o \
 			udbg.o binfmt_elf32.o sys_ppc32.o ioctl32.o \
 			ptrace32.o signal32.o pmc.o rtc.o init_task.o \
-			lmb.o cputable.o cpu_setup_power4.o idle_power4.o
+			lmb.o cputable.o cpu_setup_power4.o idle_power4.o \
+			iommu.o
 
 obj-$(CONFIG_PPC_OF) +=	of_device.o
 
-obj-$(CONFIG_PCI)	+= pci.o pci_dn.o pci_dma.o
+obj-$(CONFIG_PCI)	+= pci.o pci_dn.o pci_iommu.o
 
 ifdef CONFIG_PPC_ISERIES
 obj-$(CONFIG_PCI)	+= iSeries_pci.o iSeries_pci_reset.o \
@@ -28,12 +29,12 @@ obj-$(CONFIG_PPC_ISERIES) += iSeries_irq.o \
 			     HvCall.o HvLpConfig.o LparData.o mf_proc.o \
 			     iSeries_setup.o ItLpQueue.o hvCall.o \
 			     mf.o HvLpEvent.o iSeries_proc.o iSeries_htab.o \
-			     proc_pmc.o
+			     proc_pmc.o iSeries_iommu.o
 
 obj-$(CONFIG_PPC_PSERIES) += pSeries_pci.o pSeries_lpar.o pSeries_hvCall.o \
 			     eeh.o nvram.o pSeries_nvram.o rtasd.o ras.o \
 			     open_pic.o xics.o pSeries_htab.o rtas.o \
-			     chrp_setup.o i8259.o prom.o vio.o
+			     chrp_setup.o i8259.o prom.o vio.o pSeries_iommu.o
 
 obj-$(CONFIG_PROC_FS)		+= proc_ppc64.o
 obj-$(CONFIG_RTAS_FLASH)	+= rtas_flash.o

@@ -36,7 +36,7 @@
 #include <asm/pci-bridge.h>
 #include <asm/ppcdebug.h>
 #include <asm/naca.h>
-#include <asm/pci_dma.h>
+#include <asm/iommu.h>
 
 #include <asm/iSeries/HvCallPci.h>
 #include <asm/iSeries/HvCallSm.h>
@@ -53,7 +53,7 @@ extern int panic_timeout;
 
 extern unsigned long iSeries_Base_Io_Memory;    
 
-extern struct TceTable *tceTables[256];
+extern struct iommu_table *tceTables[256];
 
 extern void iSeries_MmIoTest(void);
 
@@ -273,7 +273,7 @@ void __init iSeries_pci_final_fixup(void)
 			iSeries_Device_Information(pdev, Buffer,
 					sizeof(Buffer));
 			printk("%d. %s\n", DeviceCount, Buffer);
-			create_pci_bus_tce_table((unsigned long)node);
+			iommu_devnode_init(node);
 		} else
 			printk("PCI: Device Tree not found for 0x%016lX\n",
 					(unsigned long)pdev);

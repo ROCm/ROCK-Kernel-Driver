@@ -47,7 +47,7 @@
 #include <asm/bitops.h>
 #include <asm/naca.h>
 #include <asm/pci.h>
-#include <asm/pci_dma.h>
+#include <asm/iommu.h>
 #include <asm/bootinfo.h>
 #include <asm/ppcdebug.h>
 #include <asm/btext.h>
@@ -3003,15 +3003,15 @@ static int of_finish_dynamic_node(struct device_node *node)
                node->devfn = (regs[0] >> 8) & 0xff;
        }
 
-	/* fixing up tce_table */
+	/* fixing up iommu_table */
 
 	if(strcmp(node->name, "pci") == 0 &&
                 get_property(node, "ibm,dma-window", NULL)) {
                 node->bussubno = node->busno;
-                create_pci_bus_tce_table((unsigned long)node);
+                iommu_devnode_init(node);
         }
 	else
-		node->tce_table = parent->tce_table;
+		node->iommu_table = parent->iommu_table;
 
 out:
 	of_node_put(parent);

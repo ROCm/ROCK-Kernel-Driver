@@ -33,7 +33,7 @@
 #include <asm/uaccess.h>
 #include <asm/ppcdebug.h>
 #include <asm/naca.h>
-#include <asm/pci_dma.h>
+#include <asm/iommu.h>
 #include <asm/machdep.h>
 
 #include "pci.h"

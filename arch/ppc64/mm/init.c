@@ -60,10 +60,8 @@
 #include <asm/ppcdebug.h>
 #include <asm/sections.h>
 #include <asm/system.h>
+#include <asm/iommu.h>
 
-#ifdef CONFIG_PPC_ISERIES
-#include <asm/iSeries/iSeries_dma.h>
-#endif
 
 struct mmu_context_queue_t mmu_context_queue;
 int mem_init_done;
@@ -885,7 +883,7 @@ void __init mem_init(void)
 	mem_init_done = 1;
 
 #ifdef CONFIG_PPC_ISERIES
-	create_virtual_bus_tce_table();
+	iommu_vio_init();
 #endif
 }
 

@@ -109,6 +109,18 @@ config POWER4_ONLY
 	  binary will not work on POWER3 or RS64 processors when compiled with
 	  binutils 2.15 or later.
 
+config IOMMU_VMERGE
+	bool "Enable IOMMU virtual merging (EXPERIMENTAL)"
+	depends on EXPERIMENTAL
+	default n
+	help
+	  Cause IO segments sent to a device for DMA to be merged virtually
+	  by the IOMMU when they happen to have been allocated contiguously.
+	  This doesn't add pressure to the IOMMU allocator. However, some
+	  drivers don't support getting large merged segments coming back
+	  from *_map_sg(). Say Y if you know the drivers you are using are
+	  properly handling this case.
+
 config SMP
 	bool "Symmetric multi-processing support"
 	---help---
