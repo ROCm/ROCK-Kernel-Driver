@@ -61,7 +61,7 @@
 
 #include <linux/genhd.h>
 
-static char sd_version_str[] = "Version: 2.0.3 (20020417)";
+/* static char sd_version_str[] = "Version: 2.0.3 (20020417)"; */
 
 #define SD_MAJOR(i) (!(i) ? SCSI_DISK0_MAJOR : SCSI_DISK1_MAJOR-1+(i))
 

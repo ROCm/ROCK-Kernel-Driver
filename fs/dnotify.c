@@ -135,7 +135,6 @@ void __inode_dir_notify(struct inode *inode, unsigned long event)
 	}
 	if (changed)
 		redo_inode_mask(inode);
-out:
 	write_unlock(&dn_lock);
 }
 
