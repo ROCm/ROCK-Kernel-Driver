@@ -46,11 +46,15 @@ static int debug;
 
 static void dprintk(const char *fmt, ...)
 {
+	char s[256];
 	va_list args;
+
 	if (debug == 0)
 		return;
+
 	va_start(args, fmt);
-	printk(fmt, args);
+	vsprintf(s, fmt, args);
+	printk(s);
 	va_end(args);
 }
 
