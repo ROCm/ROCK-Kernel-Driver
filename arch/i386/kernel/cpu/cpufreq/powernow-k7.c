@@ -604,7 +604,7 @@ static int __init powernow_cpu_init (struct cpufreq_policy *policy)
 	}
 	dprintk(KERN_INFO PFX "FSB: %3d.%03d MHz\n", fsb/1000, fsb%1000);
 
- 	if (dmi_check_system(powernow_dmi_table) || acpi_force) {
+	if (dmi_check_system(powernow_dmi_table) || acpi_force) {
 		printk (KERN_INFO PFX "PSB/PST known to be broken.  Trying ACPI instead\n");
 		result = powernow_acpi_init();
 	} else {
