@@ -916,7 +916,7 @@ jumpbit_is_set:
 	return ((int)	((id->dma_ultra >> 14) & 3) ? ide_dma_on :
 			((id->dma_ultra >> 11) & 7) ? ide_dma_on :
 			((id->dma_ultra >> 8) & 7) ? ide_dma_on :
-			((id->dma_mword >> 8) & 7) ? ide_dma_on : 
+			((id->dma_mword >> 8) & 7) ? ide_dma_on :
 			((id->dma_1word >> 8) & 7) ? ide_dma_on :
 						     ide_dma_off_quietly);
 }
@@ -929,7 +929,7 @@ static int config_drive_xfer_rate (ide_drive_t *drive)
 
 	if (id && (id->capability & 1) && hwif->autodma) {
 		/* Consult the list of known "bad" drives */
-		if (ide_dmaproc(ide_dma_bad_drive, drive, NULL)) {
+		if (udma_black_list(drive)) {
 			dma_func = ide_dma_off;
 			goto fast_ata_pio;
 		}
@@ -951,7 +951,7 @@ try_dma_modes:
 				if (dma_func != ide_dma_on)
 					goto no_dma_set;
 			}
-		} else if (ide_dmaproc(ide_dma_good_drive, drive, NULL)) {
+		} else if (udma_white_list(drive)) {
 			if (id->eide_dma_time > 150) {
 				goto no_dma_set;
 			}
@@ -977,20 +977,107 @@ int pdc202xx_quirkproc (ide_drive_t *drive)
 	return ((int) check_in_drive_lists(drive, pdc_quirk_drives));
 }
 
+static int pdc202xx_udma_start(struct ata_device *drive, struct request *rq)
+{
+	u8 clock		= 0;
+	u8 hardware48hack	= 0;
+	struct ata_channel *ch = drive->channel;
+	struct pci_dev *dev	= ch->pci_dev;
+	unsigned long high_16	= pci_resource_start(dev, 4);
+	unsigned long atapi_reg	= high_16 + (ch->unit ? 0x24 : 0x00);
+
+
+	switch (dev->device) {
+		case PCI_DEVICE_ID_PROMISE_20275:
+		case PCI_DEVICE_ID_PROMISE_20276:
+		case PCI_DEVICE_ID_PROMISE_20269:
+		case PCI_DEVICE_ID_PROMISE_20268R:
+		case PCI_DEVICE_ID_PROMISE_20268:
+			break;
+		case PCI_DEVICE_ID_PROMISE_20267:
+		case PCI_DEVICE_ID_PROMISE_20265:
+		case PCI_DEVICE_ID_PROMISE_20262:
+			hardware48hack = 1;
+			clock = IN_BYTE(high_16 + 0x11);
+		default:
+			break;
+	}
+
+	if ((drive->addressing) && (hardware48hack)) {
+		unsigned long word_count = 0;
+
+		outb(clock|(ch->unit ? 0x08 : 0x02), high_16 + 0x11);
+		word_count = (rq->nr_sectors << 8);
+		word_count = (rq_data_dir(rq) == READ) ? word_count | 0x05000000 : word_count | 0x06000000;
+		outl(word_count, atapi_reg);
+	}
+
+	/* Note that this is done *after* the cmd has been issued to the drive,
+	 * as per the BM-IDE spec.  The Promise Ultra33 doesn't work correctly
+	 * when we do this part before issuing the drive cmd.
+	 */
+
+	outb(inb(ch->dma_base) | 1, ch->dma_base); /* start DMA */
+
+	return 0;
+}
+
+int pdc202xx_udma_stop(struct ata_device *drive)
+{
+	u8 newchip		= 0;
+	u8 clock		= 0;
+	u8 hardware48hack	= 0;
+	struct ata_channel *ch = drive->channel;
+	struct pci_dev *dev	= ch->pci_dev;
+	unsigned long high_16	= pci_resource_start(dev, 4);
+	unsigned long atapi_reg	= high_16 + (ch->unit ? 0x24 : 0x00);
+	unsigned long dma_base = ch->dma_base;
+	u8 dma_stat;
+
+	switch (dev->device) {
+		case PCI_DEVICE_ID_PROMISE_20275:
+		case PCI_DEVICE_ID_PROMISE_20276:
+		case PCI_DEVICE_ID_PROMISE_20269:
+		case PCI_DEVICE_ID_PROMISE_20268R:
+		case PCI_DEVICE_ID_PROMISE_20268:
+			newchip = 1;
+			break;
+		case PCI_DEVICE_ID_PROMISE_20267:
+		case PCI_DEVICE_ID_PROMISE_20265:
+		case PCI_DEVICE_ID_PROMISE_20262:
+			hardware48hack = 1;
+			clock = IN_BYTE(high_16 + 0x11);
+ 		default:
+			break;
+	}
+	if ((drive->addressing) && (hardware48hack)) {
+		outl(0, atapi_reg);	/* zero out extra */
+		clock = IN_BYTE(high_16 + 0x11);
+		OUT_BYTE(clock & ~(ch->unit ? 0x08:0x02), high_16 + 0x11);
+	}
+
+	drive->waiting_for_dma = 0;
+	outb(inb(dma_base)&~1, dma_base);	/* stop DMA */
+	dma_stat = inb(dma_base+2);		/* get DMA status */
+	outb(dma_stat|6, dma_base+2);		/* clear the INTR & ERROR bits */
+	udma_destroy_table(ch);			/* purge DMA mappings */
+
+	return (dma_stat & 7) != 4 ? (0x10 | dma_stat) : 0;	/* verify good DMA status */
+}
+
 /*
  * pdc202xx_dmaproc() initiates/aborts (U)DMA read/write operations on a drive.
  */
 int pdc202xx_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request *rq)
 {
-	byte dma_stat		= 0;
-	byte sc1d		= 0;
-	byte newchip		= 0;
-	byte clock		= 0;
-	byte hardware48hack	= 0;
+	u8 dma_stat	= 0;
+	u8 sc1d		= 0;
+	u8 newchip	= 0;
+	u8 clock	= 0;
+	u8 hardware48hack = 0;
 	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev	= hwif->pci_dev;
 	unsigned long high_16	= pci_resource_start(dev, 4);
-	unsigned long atapi_reg	= high_16 + (hwif->unit ? 0x24 : 0x00);
 	unsigned long dma_base	= hwif->dma_base;
 
 	switch (dev->device) {
@@ -1013,29 +1100,6 @@ int pdc202xx_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct req
 	switch (func) {
 		case ide_dma_check:
 			return config_drive_xfer_rate(drive);
-		case ide_dma_begin:
-			/* Note that this is done *after* the cmd has
-			 * been issued to the drive, as per the BM-IDE spec.
-			 * The Promise Ultra33 doesn't work correctly when
-			 * we do this part before issuing the drive cmd.
-			 */
-			if ((drive->addressing) && (hardware48hack)) {
-				struct request *rq = HWGROUP(drive)->rq;
-				unsigned long word_count = 0;
-
-				outb(clock|(hwif->unit ? 0x08 : 0x02), high_16 + 0x11);
-				word_count = (rq->nr_sectors << 8);
-				word_count = (rq_data_dir(rq) == READ) ? word_count | 0x05000000 : word_count | 0x06000000;
-				outl(word_count, atapi_reg);
-			}
-			break;
-		case ide_dma_end:
-			if ((drive->addressing) && (hardware48hack)) {
-				outl(0, atapi_reg);	/* zero out extra */
-				clock = IN_BYTE(high_16 + 0x11);
-				OUT_BYTE(clock & ~(hwif->unit ? 0x08:0x02), high_16 + 0x11);
-			}
-			break;
 		case ide_dma_test_irq:	/* returns 1 if dma irq issued, 0 otherwise */
 			dma_stat = IN_BYTE(dma_base+2);
 			if (newchip)
@@ -1268,6 +1332,8 @@ void __init ide_init_pdc202xx(struct ata_channel *hwif)
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (hwif->dma_base) {
+		hwif->udma_start = pdc202xx_udma_start;
+		hwif->udma_stop = pdc202xx_udma_stop;
 		hwif->udma = pdc202xx_dmaproc;
 		hwif->highmem = 1;
 		if (!noautodma)

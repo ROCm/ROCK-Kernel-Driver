@@ -783,7 +783,7 @@ static int cmd64x_config_drive_for_dma(struct ata_device *drive)
 	if ((id != NULL) && ((id->capability & 1) != 0) &&
 	    hwif->autodma && (drive->type == ATA_DISK)) {
 		/* Consult the list of known "bad" drives */
-		if (ide_dmaproc(ide_dma_bad_drive, drive, NULL)) {
+		if (udma_black_list(drive)) {
 			dma_func = ide_dma_off;
 			goto fast_ata_pio;
 		}
@@ -805,7 +805,7 @@ try_dma_modes:
 				if (dma_func != ide_dma_on)
 					goto no_dma_set;
 			}
-		} else if (ide_dmaproc(ide_dma_good_drive, drive, NULL)) {
+		} else if (udma_white_list(drive)) {
 			if (id->eide_dma_time > 150) {
 				goto no_dma_set;
 			}
@@ -837,6 +837,34 @@ static int cmd680_dmaproc(ide_dma_action_t func, struct ata_device *drive, struc
         return ide_dmaproc(func, drive, rq);
 }
 
+static int cmd64x_udma_stop(struct ata_device *drive)
+{
+	struct ata_channel *ch = drive->channel;
+	u8 dma_stat = 0;
+	unsigned long dma_base	= ch->dma_base;
+	struct pci_dev *dev	= ch->pci_dev;
+	u8 jack_slap		= ((dev->device == PCI_DEVICE_ID_CMD_648) || (dev->device == PCI_DEVICE_ID_CMD_649)) ? 1 : 0;
+
+	drive->waiting_for_dma = 0;
+	outb(inb(dma_base)&~1, dma_base);	/* stop DMA */
+	dma_stat = inb(dma_base+2);		/* get DMA status */
+	outb(dma_stat|6, dma_base+2);		/* clear the INTR & ERROR bits */
+	if (jack_slap) {
+		byte dma_intr = 0;
+		byte dma_mask = (ch->unit) ? ARTTIM23_INTR_CH1 : CFR_INTR_CH0;
+		byte dma_reg = (ch->unit) ? ARTTIM2 : CFR;
+		(void) pci_read_config_byte(dev, dma_reg, &dma_intr);
+		/*
+		 * DAMN BMIDE is not connected to PCI space!
+		 * Have to manually jack-slap that bitch!
+		 * To allow the PCI side to read incoming interrupts.
+		 */
+		(void) pci_write_config_byte(dev, dma_reg, dma_intr|dma_mask);	/* clear the INTR bit */
+	}
+	udma_destroy_table(ch);	/* purge DMA mappings */
+	return (dma_stat & 7) != 4;		/* verify good DMA status */
+}
+
 static int cmd64x_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request *rq)
 {
 	struct ata_channel *ch = drive->channel;
@@ -845,30 +873,10 @@ static int cmd64x_dmaproc(ide_dma_action_t func, struct ata_device *drive, struc
 	u8 mask	= (ch->unit) ? MRDMODE_INTR_CH1 : MRDMODE_INTR_CH0;
 	unsigned long dma_base	= ch->dma_base;
 	struct pci_dev *dev	= ch->pci_dev;
-	byte jack_slap		= ((dev->device == PCI_DEVICE_ID_CMD_648) || (dev->device == PCI_DEVICE_ID_CMD_649)) ? 1 : 0;
 
 	switch (func) {
 		case ide_dma_check:
 			return cmd64x_config_drive_for_dma(drive);
-		case ide_dma_end: /* returns 1 on error, 0 otherwise */
-			drive->waiting_for_dma = 0;
-			outb(inb(dma_base)&~1, dma_base);	/* stop DMA */
-			dma_stat = inb(dma_base+2);		/* get DMA status */
-			outb(dma_stat|6, dma_base+2);		/* clear the INTR & ERROR bits */
-			if (jack_slap) {
-				byte dma_intr = 0;
-				byte dma_mask = (ch->unit) ? ARTTIM23_INTR_CH1 : CFR_INTR_CH0;
-				byte dma_reg = (ch->unit) ? ARTTIM2 : CFR;
-				(void) pci_read_config_byte(dev, dma_reg, &dma_intr);
-				/*
-				 * DAMN BMIDE is not connected to PCI space!
-				 * Have to manually jack-slap that bitch!
-				 * To allow the PCI side to read incoming interrupts.
-				 */
-				(void) pci_write_config_byte(dev, dma_reg, dma_intr|dma_mask);	/* clear the INTR bit */
-			}
-			udma_destroy_table(ch);	/* purge DMA mappings */
-			return (dma_stat & 7) != 4;		/* verify good DMA status */
 		case ide_dma_test_irq:	/* returns 1 if dma irq issued, 0 otherwise */
 			dma_stat = inb(dma_base+2);
 			(void) pci_read_config_byte(dev, MRDMODE, &dma_alt_stat);
@@ -886,26 +894,29 @@ static int cmd64x_dmaproc(ide_dma_action_t func, struct ata_device *drive, struc
 	return ide_dmaproc(func, drive, rq);
 }
 
+static int cmd646_1_udma_stop(struct ata_device *drive)
+{
+	struct ata_channel *ch = drive->channel;
+	unsigned long dma_base = ch->dma_base;
+	u8 dma_stat;
+
+	drive->waiting_for_dma = 0;
+	dma_stat = inb(dma_base+2);		/* get DMA status */
+	outb(inb(dma_base)&~1, dma_base);	/* stop DMA */
+	outb(dma_stat|6, dma_base+2);		/* clear the INTR & ERROR bits */
+	udma_destroy_table(ch);			/* and free any DMA resources */
+	return (dma_stat & 7) != 4;		/* verify good DMA status */
+}
+
 /*
  * ASUS P55T2P4D with CMD646 chipset revision 0x01 requires the old
  * event order for DMA transfers.
  */
 static int cmd646_1_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request *rq)
 {
-	struct ata_channel *ch = drive->channel;
-	unsigned long dma_base = ch->dma_base;
-	byte dma_stat;
-
 	switch (func) {
 		case ide_dma_check:
 			return cmd64x_config_drive_for_dma(drive);
-		case ide_dma_end:
-			drive->waiting_for_dma = 0;
-			dma_stat = inb(dma_base+2);		/* get DMA status */
-			outb(inb(dma_base)&~1, dma_base);	/* stop DMA */
-			outb(dma_stat|6, dma_base+2);		/* clear the INTR & ERROR bits */
-			udma_destroy_table(ch);			/* and free any DMA resources */
-			return (dma_stat & 7) != 4;		/* verify good DMA status */
 		default:
 			break;
 	}
@@ -1134,19 +1145,22 @@ void __init ide_init_cmd64x(struct ata_channel *hwif)
 		case PCI_DEVICE_ID_CMD_649:
 		case PCI_DEVICE_ID_CMD_648:
 		case PCI_DEVICE_ID_CMD_643:
-			hwif->udma	= &cmd64x_dmaproc;
-			hwif->tuneproc	= &cmd64x_tuneproc;
-			hwif->speedproc = &cmd64x_tune_chipset;
+			hwif->udma_stop	= cmd64x_udma_stop;
+			hwif->udma	= cmd64x_dmaproc;
+			hwif->tuneproc	= cmd64x_tuneproc;
+			hwif->speedproc = cmd64x_tune_chipset;
 			break;
 		case PCI_DEVICE_ID_CMD_646:
 			hwif->chipset = ide_cmd646;
 			if (class_rev == 0x01) {
+				hwif->udma_stop = &cmd646_1_udma_stop;
 				hwif->udma = &cmd646_1_dmaproc;
 			} else {
-				hwif->udma = &cmd64x_dmaproc;
+				hwif->udma_stop = cmd64x_udma_stop;
+				hwif->udma = cmd64x_dmaproc;
 			}
-			hwif->tuneproc	= &cmd64x_tuneproc;
-			hwif->speedproc	= &cmd64x_tune_chipset;
+			hwif->tuneproc	= cmd64x_tuneproc;
+			hwif->speedproc	= cmd64x_tune_chipset;
 			break;
 		default:
 			break;

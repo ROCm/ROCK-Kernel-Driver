@@ -95,7 +95,7 @@ static void tcq_invalidate_queue(struct ata_device *drive)
 	del_timer(&hwgroup->timer);
 
 	if (test_bit(IDE_DMA, &hwgroup->flags))
-		drive->channel->udma(ide_dma_end, drive, hwgroup->rq);
+		udma_stop(drive);
 
 	blk_queue_invalidate_tags(q);
 
@@ -328,7 +328,7 @@ ide_startstop_t ide_dmaq_complete(struct ata_device *drive, struct request *rq, 
 	/*
 	 * transfer was in progress, stop DMA engine
 	 */
-	dma_stat = drive->channel->udma(ide_dma_end, drive, rq);
+	dma_stat = udma_stop(drive);
 
 	/*
 	 * must be end of I/O, check status and complete as necessary
@@ -531,7 +531,7 @@ static ide_startstop_t udma_tcq_start(struct ata_device *drive, struct request *
 		return ide_stopped;
 
 	set_irq(drive, ide_dmaq_intr);
-	if (!ch->udma(ide_dma_begin, drive, rq))
+	if (!udma_start(drive, rq))
 		return ide_started;
 
 	return ide_stopped;

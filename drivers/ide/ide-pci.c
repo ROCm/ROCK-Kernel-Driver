@@ -709,7 +709,7 @@ check_if_enabled:
 		d->bootable = (pcicmd & PCI_COMMAND_MEMORY) ? OFF_BOARD : NEVER_BOARD;
 	}
 
-	printk("%s: chipset revision %d\n", dev->name, class_rev);
+	printk(KERN_INFO "ATA: chipset rev.: %d\n", class_rev);
 
 	/*
 	 * Can we trust the reported IRQ?
@@ -722,11 +722,11 @@ check_if_enabled:
 		   to act otherwise on those. The Supertrak however we need
 		   to skip */
 		if (d->vendor == PCI_VENDOR_ID_PROMISE && d->device == PCI_DEVICE_ID_PROMISE_20265) {
-			printk(KERN_INFO "ide: Found promise 20265 in RAID mode.\n");
+			printk(KERN_INFO "ATA: Found promise 20265 in RAID mode.\n");
 			if(dev->bus->self && dev->bus->self->vendor == PCI_VENDOR_ID_INTEL &&
 				dev->bus->self->device == PCI_DEVICE_ID_INTEL_I960)
 			{
-				printk(KERN_INFO "ide: Skipping Promise PDC20265 attached to I2O RAID controller.\n");
+				printk(KERN_INFO "ATA: Skipping Promise PDC20265 attached to I2O RAID controller.\n");
 				return;
 			}
 		}
@@ -734,9 +734,10 @@ check_if_enabled:
 		   Suspect a fastrak and fall through */
 	}
 	if ((dev->class & ~(0xfa)) != ((PCI_CLASS_STORAGE_IDE << 8) | 5)) {
-		printk("%s: not 100%% native mode: will probe irqs later\n", dev->name);
+		printk(KERN_INFO "ATA: non-legacy mode: IRQ probe delayed\n");
+
 		/*
-		 * This allows off board ide-pci cards the enable a BIOS,
+		 * This allows off board ide-pci cards to enable a BIOS,
 		 * verify interrupt settings of split-mirror pci-config
 		 * space, place chipset into init-mode, and/or preserve
 		 * an interrupt if the card is not native ide support.
@@ -746,19 +747,18 @@ check_if_enabled:
 		else
 			pciirq = trust_pci_irq(d, dev);
 	} else if (tried_config) {
-		printk("%s: will probe IRQs later\n", dev->name);
+		printk(KERN_INFO "ATA: will probe IRQs later\n");
 		pciirq = 0;
 	} else if (!pciirq) {
-		printk("%s: bad IRQ (%d): will probe later\n", dev->name, pciirq);
+		printk(KERN_INFO "ATA: invalid IRQ (%d): will probe later\n", pciirq);
 		pciirq = 0;
 	} else {
 		if (d->init_chipset)
 			d->init_chipset(dev);
 #ifdef __sparc__
-		printk("%s: 100%% native mode on irq %s\n",
-		       dev->name, __irq_itoa(pciirq));
+		printk(KERN_INFO "ATA: 100%% native mode on irq\n", __irq_itoa(pciirq));
 #else
-		printk("%s: 100%% native mode on irq %d\n", dev->name, pciirq);
+		printk(KERN_INFO "ATA: 100%% native mode on irq %d\n", pciirq);
 #endif
 	}
 
@@ -889,10 +889,10 @@ static void __init scan_pcidev(struct pci_dev *dev)
 		pdc20270_device_order_fixup(dev, d);
 	else if (!(d->vendor == 0 && d->device == 0) || (dev->class >> 8) == PCI_CLASS_STORAGE_IDE) {
 		if (d->vendor == 0 && d->device == 0)
-			printk(KERN_INFO "ATA: unknown ATA interface %s (%04x:%04x) on PCI slot %s\n",
+			printk(KERN_INFO "ATA: unknown interface: %s (%04x:%04x) on PCI slot %s\n",
 			       dev->name, vendor, device, dev->slot_name);
 		else
-			printk(KERN_INFO "ATA: interface %s on PCI slot %s\n", dev->name, dev->slot_name);
+			printk(KERN_INFO "ATA: interface: %s, on PCI slot %s\n", dev->name, dev->slot_name);
 		setup_pci_device(dev, d);
 	}
 }

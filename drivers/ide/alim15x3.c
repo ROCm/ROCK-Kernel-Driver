@@ -441,7 +441,7 @@ static int ali15x3_config_drive_for_dma(ide_drive_t *drive)
 
 	if ((id != NULL) && ((id->capability & 1) != 0) && hwif->autodma) {
 		/* Consult the list of known "bad" drives */
-		if (ide_dmaproc(ide_dma_bad_drive, drive, NULL)) {
+		if (udma_black_list(drive)) {
 			dma_func = ide_dma_off;
 			goto fast_ata_pio;
 		}
@@ -463,7 +463,7 @@ try_dma_modes:
 				if (dma_func != ide_dma_on)
 					goto no_dma_set;
 			}
-		} else if (ide_dmaproc(ide_dma_good_drive, drive, NULL)) {
+		} else if (udma_white_list(drive)) {
 			if (id->eide_dma_time > 150) {
 				goto no_dma_set;
 			}
@@ -483,21 +483,25 @@ no_dma_set:
 	return hwif->udma(dma_func, drive, NULL);
 }
 
+static int ali15x3_udma_write(struct ata_device *drive, struct request *rq)
+{
+	if ((m5229_revision < 0xC2) && (drive->type != ATA_DISK))
+		return 1;	/* try PIO instead of DMA */
+
+	return ata_do_udma(0, drive, rq);
+}
+
 static int ali15x3_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request *rq)
 {
 	switch(func) {
 		case ide_dma_check:
 			return ali15x3_config_drive_for_dma(drive);
-		case ide_dma_write:
-			if ((m5229_revision < 0xC2) && (drive->type != ATA_DISK))
-				return 1;	/* try PIO instead of DMA */
-			break;
 		default:
 			break;
 	}
 	return ide_dmaproc(func, drive, rq);	/* use standard DMA stuff */
 }
-#endif /* CONFIG_BLK_DEV_IDEDMA */
+#endif
 
 unsigned int __init pci_init_ali15x3(struct pci_dev *dev)
 {
@@ -679,6 +683,7 @@ void __init ide_init_ali15x3(struct ata_channel *hwif)
 		/*
 		 * M1543C or newer for DMAing
 		 */
+		hwif->udma_write = ali15x3_udma_write;
 		hwif->udma = ali15x3_dmaproc;
 		hwif->autodma = 1;
 	}

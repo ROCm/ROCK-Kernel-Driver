@@ -737,9 +737,9 @@ static ide_startstop_t cdrom_start_packet_command(struct ata_device *drive,
 
 	if (info->dma) {
 		if (info->cmd == READ)
-			info->dma = !drive->channel->udma(ide_dma_read, drive, rq);
+			info->dma = !udma_read(drive, rq);
 		else if (info->cmd == WRITE)
-			info->dma = !drive->channel->udma(ide_dma_write, drive, rq);
+			info->dma = !udma_write(drive, rq);
 		else
 			printk("ide-cd: DMA set, but not allowed\n");
 	}
@@ -755,7 +755,7 @@ static ide_startstop_t cdrom_start_packet_command(struct ata_device *drive,
 		OUT_BYTE (drive->ctl, IDE_CONTROL_REG);
 
 	if (info->dma)
-		drive->channel->udma(ide_dma_begin, drive, NULL);
+		udma_start(drive, rq);
 
 	if (CDROM_CONFIG_FLAGS (drive)->drq_interrupt) {
 		ide_set_handler(drive, handler, WAIT_CMD, cdrom_timer_expiry);
@@ -905,7 +905,7 @@ static ide_startstop_t cdrom_read_intr(struct ata_device *drive, struct request 
 	/* Check for errors. */
 	if (dma) {
 		info->dma = 0;
-		if ((dma_error = drive->channel->udma(ide_dma_end, drive, NULL)))
+		if ((dma_error = udma_stop(drive)))
 			drive->channel->udma(ide_dma_off, drive, NULL);
 	}
 
@@ -1480,7 +1480,7 @@ static ide_startstop_t cdrom_write_intr(struct ata_device *drive, struct request
 	/* Check for errors. */
 	if (dma) {
 		info->dma = 0;
-		if ((dma_error = drive->channel->udma(ide_dma_end, drive, NULL))) {
+		if ((dma_error = udma_stop(drive))) {
 			printk("ide-cd: write dma error\n");
 			drive->channel->udma(ide_dma_off, drive, NULL);
 		}

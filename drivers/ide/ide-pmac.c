@@ -1449,7 +1449,6 @@ static int pmac_ide_dmaproc(ide_dma_action_t func, struct ata_device *drive, str
 	case ide_dma_bad_drive:
 	case ide_dma_good_drive:
 		return check_drive_lists(drive, (func == ide_dma_good_drive));
-	case ide_dma_retune:
 	case ide_dma_lostirq:
 	case ide_dma_timeout:
 		printk(KERN_WARNING "ide_pmac_dmaproc: chipset supported func only: %d\n", func);

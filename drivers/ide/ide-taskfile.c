@@ -461,7 +461,6 @@ ide_startstop_t ata_taskfile(struct ata_device *drive,
 		 * regular dma proc -- basically split stuff that needs to act
 		 * on a request from things like ide_dma_check etc.
 		 */
-		ide_dma_action_t dma_act;
 
 		if (!drive->using_dma)
 			return ide_started;
@@ -469,10 +468,10 @@ ide_startstop_t ata_taskfile(struct ata_device *drive,
 		/* for dma commands we don't set the handler */
 		if (args->taskfile.command == WIN_WRITEDMA
 		 || args->taskfile.command == WIN_WRITEDMA_EXT)
-			dma_act = ide_dma_write;
+			udma_write(drive, rq);
 		else if (args->taskfile.command == WIN_READDMA
 		      || args->taskfile.command == WIN_READDMA_EXT)
-			dma_act = ide_dma_read;
+			udma_read(drive, rq);
 #ifdef CONFIG_BLK_DEV_IDE_TCQ
 		else if (args->taskfile.command == WIN_WRITEDMA_QUEUED
 		      || args->taskfile.command == WIN_WRITEDMA_QUEUED_EXT
@@ -484,10 +483,6 @@ ide_startstop_t ata_taskfile(struct ata_device *drive,
 			printk("ata_taskfile: unknown command %x\n", args->taskfile.command);
 			return ide_stopped;
 		}
-
-
-		if (drive->channel->udma(dma_act, drive, rq))
-			return ide_stopped;
 	}
 
 	return ide_started;

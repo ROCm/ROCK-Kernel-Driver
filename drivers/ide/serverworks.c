@@ -431,14 +431,14 @@ static int config_chipset_for_dma (ide_drive_t *drive)
 						     ide_dma_off_quietly);
 }
 
-static int config_drive_xfer_rate (ide_drive_t *drive)
+static int config_drive_xfer_rate(struct ata_device *drive)
 {
 	struct hd_driveid *id = drive->id;
 	ide_dma_action_t dma_func = ide_dma_on;
 
 	if (id && (id->capability & 1) && drive->channel->autodma) {
 		/* Consult the list of known "bad" drives */
-		if (ide_dmaproc(ide_dma_bad_drive, drive, NULL)) {
+		if (udma_black_list(drive)) {
 			dma_func = ide_dma_off;
 			goto fast_ata_pio;
 		}
@@ -460,7 +460,7 @@ try_dma_modes:
 				if (dma_func != ide_dma_on)
 					goto no_dma_set;
 			}
-		} else if (ide_dmaproc(ide_dma_good_drive, drive, NULL)) {
+		} else if (udma_white_list(drive)) {
 			if (id->eide_dma_time > 150) {
 				goto no_dma_set;
 			}
@@ -480,45 +480,54 @@ no_dma_set:
 	return drive->channel->udma(dma_func, drive, NULL);
 }
 
+static int svwks_udma_stop(struct ata_device *drive)
+{
+	struct ata_channel *ch = drive->channel;
+	unsigned long dma_base = ch->dma_base;
+	u8 dma_stat;
+
+	if(inb(dma_base+0x02)&1)
+	{
+#if 0
+		int i;
+		printk(KERN_ERR "Curious - OSB4 thinks the DMA is still running.\n");
+		for(i=0;i<10;i++)
+		{
+			if(!(inb(dma_base+0x02)&1))
+			{
+				printk(KERN_ERR "OSB4 now finished.\n");
+				break;
+			}
+			udelay(5);
+		}
+#endif
+		printk(KERN_CRIT "Serverworks OSB4 in impossible state.\n");
+		printk(KERN_CRIT "Disable UDMA or if you are using Seagate then try switching disk types\n");
+		printk(KERN_CRIT "on this controller. Please report this event to osb4-bug@ide.cabal.tm\n");
+#if 0
+		/* Panic might sys_sync -> death by corrupt disk */
+		panic("OSB4: continuing might cause disk corruption.\n");
+#else
+		printk(KERN_CRIT "OSB4: continuing might cause disk corruption.\n");
+		while(1)
+			cpu_relax();
+#endif
+	}
+
+	drive->waiting_for_dma = 0;
+	outb(inb(dma_base)&~1, dma_base);	/* stop DMA */
+	dma_stat = inb(dma_base+2);		/* get DMA status */
+	outb(dma_stat|6, dma_base+2);		/* clear the INTR & ERROR bits */
+	udma_destroy_table(ch);			/* purge DMA mappings */
+
+	return (dma_stat & 7) != 4 ? (0x10 | dma_stat) : 0;	/* verify good DMA status */
+}
+
 static int svwks_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request *rq)
 {
 	switch (func) {
 		case ide_dma_check:
 			return config_drive_xfer_rate(drive);
-		case ide_dma_end:
-		{
-			struct ata_channel *hwif = drive->channel;
-			unsigned long dma_base		= hwif->dma_base;
-
-			if(inb(dma_base+0x02)&1)
-			{
-#if 0
-				int i;
-				printk(KERN_ERR "Curious - OSB4 thinks the DMA is still running.\n");
-				for(i=0;i<10;i++)
-				{
-					if(!(inb(dma_base+0x02)&1))
-					{
-						printk(KERN_ERR "OSB4 now finished.\n");
-						break;
-					}
-					udelay(5);
-				}
-#endif
-				printk(KERN_CRIT "Serverworks OSB4 in impossible state.\n");
-				printk(KERN_CRIT "Disable UDMA or if you are using Seagate then try switching disk types\n");
-				printk(KERN_CRIT "on this controller. Please report this event to osb4-bug@ide.cabal.tm\n");
-#if 0
-				/* Panic might sys_sync -> death by corrupt disk */
-				panic("OSB4: continuing might cause disk corruption.\n");
-#else
-				printk(KERN_CRIT "OSB4: continuing might cause disk corruption.\n");
-				while(1)
-					cpu_relax();
-#endif
-			}
-			/* and drop through */
-		}
 		default:
 			break;
 	}
@@ -645,6 +654,7 @@ void __init ide_init_svwks(struct ata_channel *hwif)
 		if (!noautodma)
 			hwif->autodma = 1;
 #endif
+		hwif->udma_stop = svwks_udma_stop;
 		hwif->udma = svwks_dmaproc;
 		hwif->highmem = 1;
 	} else {

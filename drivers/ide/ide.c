@@ -1407,7 +1407,7 @@ static void dma_timeout_retry(struct ata_device *drive, struct request *rq)
 	/*
 	 * end current dma transaction
 	 */
-	ch->udma(ide_dma_end, drive, rq);
+	ch->udma_stop(drive);
 
 	/*
 	 * complain a little, later we might remove some of this verbosity
@@ -2127,6 +2127,13 @@ void ide_unregister(struct ata_channel *ch)
 	ch->atapi_read = old.atapi_read;
 	ch->atapi_write = old.atapi_write;
 	ch->udma = old.udma;
+	ch->udma_start = old.udma_start;
+	ch->udma_stop = old.udma_stop;
+	ch->udma_read = old.udma_read;
+	ch->udma_write = old.udma_write;
+	ch->udma_irq_status = old.udma_irq_status;
+	ch->udma_timeout = old.udma_timeout;
+	ch->udma_lost_irq = old.udma_lost_irq;
 	ch->busproc = old.busproc;
 	ch->bus_state = old.bus_state;
 	ch->dma_base = old.dma_base;

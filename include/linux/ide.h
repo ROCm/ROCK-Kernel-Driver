@@ -374,15 +374,10 @@ struct ata_device {
 } ide_drive_t;
 
 typedef enum {
-	ide_dma_read,	ide_dma_write,
-	ide_dma_begin,	ide_dma_end,
 	ide_dma_check,
 	ide_dma_on, ide_dma_off,
 	ide_dma_off_quietly,
 	ide_dma_test_irq,
-	ide_dma_bad_drive,
-	ide_dma_good_drive,
-	ide_dma_retune,
 	ide_dma_lostirq,
 	ide_dma_timeout
 } ide_dma_action_t;
@@ -436,7 +431,19 @@ struct ata_channel {
 	void (*atapi_read)(struct ata_device *, void *, unsigned int);
 	void (*atapi_write)(struct ata_device *, void *, unsigned int);
 
-	int (*udma)(ide_dma_action_t, struct ata_device *, struct request *); /* dma read/write/abort routine */
+	int (*udma)(ide_dma_action_t, struct ata_device *, struct request *);
+
+	int (*udma_start) (struct ata_device *, struct request *rq);
+	int (*udma_stop) (struct ata_device *);
+
+	int (*udma_read) (struct ata_device *, struct request *rq);
+	int (*udma_write) (struct ata_device *, struct request *rq);
+
+	int (*udma_irq_status) (struct ata_device *);
+
+	void (*udma_timeout) (struct ata_device *);
+	void (*udma_lost_irq) (struct ata_device *);
+
 	unsigned int	*dmatable_cpu;	/* dma physical region descriptor table (cpu view) */
 	dma_addr_t	dmatable_dma;	/* dma physical region descriptor table (dma view) */
 	struct scatterlist *sg_table;	/* Scatter-gather list used to build the above */
@@ -873,13 +880,25 @@ extern int udma_new_table(struct ata_channel *, struct request *);
 extern void udma_destroy_table(struct ata_channel *);
 extern void udma_print(struct ata_device *);
 
+extern void udma_enable(struct ata_device *, int, int);
+extern int udma_black_list(struct ata_device *);
+extern int udma_white_list(struct ata_device *);
+extern void udma_timeout(struct ata_device *);
+extern void udma_lost_irq(struct ata_device *);
+extern int udma_start(struct ata_device *, struct request *rq);
+extern int udma_stop(struct ata_device *);
+extern int udma_read(struct ata_device *, struct request *rq);
+extern int udma_write(struct ata_device *, struct request *rq);
+extern int udma_irq_status(struct ata_device *);
+
+extern int ata_do_udma(unsigned int reading, struct ata_device *drive, struct request *rq);
+
 extern ide_startstop_t udma_tcq_taskfile(struct ata_device *, struct request *);
 extern int udma_tcq_enable(struct ata_device *, int);
 
 extern ide_startstop_t ide_dma_intr(struct ata_device *, struct request *);
 extern int check_drive_lists(struct ata_device *, int good_bad);
 extern int ide_dmaproc(ide_dma_action_t func, struct ata_device *, struct request *);
-extern ide_startstop_t ide_tcq_dmaproc(ide_dma_action_t, struct ata_device *, struct request *);
 extern void ide_release_dma(struct ata_channel *);
 extern void ide_setup_dma(struct ata_channel *,	unsigned long, unsigned int) __init;
 extern int ata_start_dma(struct ata_device *, struct request *rq);

@@ -901,7 +901,7 @@ static ide_startstop_t idefloppy_pc_intr(struct ata_device *drive, struct reques
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (test_bit (PC_DMA_IN_PROGRESS, &pc->flags)) {
-		if (drive->channel->udma(ide_dma_end, drive, NULL)) {
+		if (udma_stop(drive)) {
 			set_bit (PC_DMA_ERROR, &pc->flags);
 		} else {
 			pc->actually_transferred=pc->request_transfer;
@@ -1122,8 +1122,12 @@ static ide_startstop_t idefloppy_issue_pc(struct ata_device *drive, struct reque
 	if (test_and_clear_bit (PC_DMA_ERROR, &pc->flags)) {
 		(void) drive->channel->udma(ide_dma_off, drive, NULL);
 	}
-	if (test_bit (PC_DMA_RECOMMENDED, &pc->flags) && drive->using_dma)
-		dma_ok=!drive->channel->udma(test_bit (PC_WRITING, &pc->flags) ? ide_dma_write : ide_dma_read, drive, rq);
+	if (test_bit (PC_DMA_RECOMMENDED, &pc->flags) && drive->using_dma) {
+		if (test_bit (PC_WRITING, &pc->flags))
+			dma_ok = !udma_write(drive, rq);
+		else
+			dma_ok = !udma_read(drive, rq);
+	}
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 
 	if (IDE_CONTROL_REG)
@@ -1136,7 +1140,7 @@ static ide_startstop_t idefloppy_issue_pc(struct ata_device *drive, struct reque
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (dma_ok) {							/* Begin DMA, if necessary */
 		set_bit (PC_DMA_IN_PROGRESS, &pc->flags);
-		(void) drive->channel->udma(ide_dma_begin, drive, NULL);
+		udma_start(drive, rq);
 	}
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 

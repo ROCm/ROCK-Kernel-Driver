@@ -748,7 +748,7 @@ static int config_drive_xfer_rate (ide_drive_t *drive)
 
 	if (id && (id->capability & 1) && drive->channel->autodma) {
 		/* Consult the list of known "bad" drives */
-		if (ide_dmaproc(ide_dma_bad_drive, drive, NULL)) {
+		if (udma_black_list(drive)) {
 			dma_func = ide_dma_off;
 			goto fast_ata_pio;
 		}
@@ -769,7 +769,7 @@ try_dma_modes:
 				if (dma_func != ide_dma_on)
 					goto no_dma_set;
 			}
-		} else if (ide_dmaproc(ide_dma_good_drive, drive, NULL)) {
+		} else if (udma_white_list(drive)) {
 			if (id->eide_dma_time > 150) {
 				goto no_dma_set;
 			}
@@ -830,6 +830,86 @@ int hpt366_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct reque
 	return ide_dmaproc(func, drive, rq);	/* use standard DMA stuff */
 }
 
+static void do_udma_start(struct ata_device *drive)
+{
+	struct ata_channel *ch = drive->channel;
+
+	u8 regstate = ch->unit ? 0x54 : 0x50;
+	pci_write_config_byte(ch->pci_dev, regstate, 0x37);
+	udelay(10);
+}
+
+static int hpt370_udma_start(struct ata_device *drive, struct request *__rq)
+{
+	struct ata_channel *ch = drive->channel;
+
+	do_udma_start(drive);
+
+	/* Note that this is done *after* the cmd has been issued to the drive,
+	 * as per the BM-IDE spec.  The Promise Ultra33 doesn't work correctly
+	 * when we do this part before issuing the drive cmd.
+	 */
+
+	outb(inb(ch->dma_base) | 1, ch->dma_base);	/* start DMA */
+
+	return 0;
+}
+
+static void do_timeout_irq(struct ata_device *drive)
+{
+	u8 dma_stat;
+	u8 regstate = drive->channel->unit ? 0x54 : 0x50;
+	u8 reginfo = drive->channel->unit ? 0x56 : 0x52;
+	unsigned long dma_base = drive->channel->dma_base;
+
+	pci_read_config_byte(drive->channel->pci_dev, reginfo, &dma_stat);
+	printk(KERN_INFO "%s: %d bytes in FIFO\n", drive->name, dma_stat);
+	pci_write_config_byte(drive->channel->pci_dev, regstate, 0x37);
+	udelay(10);
+	dma_stat = inb(dma_base);
+	outb(dma_stat & ~0x1, dma_base); /* stop dma */
+	dma_stat = inb(dma_base + 2);
+	outb(dma_stat | 0x6, dma_base+2); /* clear errors */
+
+}
+
+static void hpt370_udma_timeout(struct ata_device *drive)
+{
+	do_timeout_irq(drive);
+	do_udma_start(drive);
+}
+
+static void hpt370_udma_lost_irq(struct ata_device *drive)
+{
+	do_timeout_irq(drive);
+	do_udma_start(drive);
+}
+
+static int hpt370_udma_stop(struct ata_device *drive)
+{
+	struct ata_channel *ch = drive->channel;
+	unsigned long dma_base = ch->dma_base;
+	u8 dma_stat;
+
+	dma_stat = inb(dma_base + 2);
+	if (dma_stat & 0x01) {
+		udelay(20); /* wait a little */
+		dma_stat = inb(dma_base + 2);
+	}
+	if ((dma_stat & 0x01) != 0) {
+		do_timeout_irq(drive);
+		do_udma_start(drive);
+	}
+
+	drive->waiting_for_dma = 0;
+	outb(inb(dma_base)&~1, dma_base);	/* stop DMA */
+	dma_stat = inb(dma_base+2);		/* get DMA status */
+	outb(dma_stat|6, dma_base+2);		/* clear the INTR & ERROR bits */
+	udma_destroy_table(ch);			/* purge DMA mappings */
+
+	return (dma_stat & 7) != 4 ? (0x10 | dma_stat) : 0;	/* verify good DMA status */
+}
+
 int hpt370_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request *rq)
 {
 	struct ata_channel *hwif = drive->channel;
@@ -845,18 +925,6 @@ int hpt370_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct reque
 			dma_stat = inb(dma_base+2);
 			return (dma_stat & 4) == 4;	/* return 1 if INTR asserted */
 
-		case ide_dma_end:
-			dma_stat = inb(dma_base + 2);
-			if (dma_stat & 0x01) {
-				udelay(20); /* wait a little */
-				dma_stat = inb(dma_base + 2);
-			}
-			if ((dma_stat & 0x01) == 0) 
-				break;
-
-			func = ide_dma_timeout;
-			/* fallthrough */
-
 		case ide_dma_timeout:
 		case ide_dma_lostirq:
 			pci_read_config_byte(hwif->pci_dev, reginfo, 
@@ -871,11 +939,7 @@ int hpt370_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct reque
 			outb(dma_stat | 0x6, dma_base+2); /* clear errors */
 			/* fallthrough */
 
-#ifdef HPT_RESET_STATE_ENGINE
-	        case ide_dma_begin:
-#endif
-			pci_write_config_byte(hwif->pci_dev, regstate, 0x37);
-			udelay(10);
+			do_udma_start(drive);
 			break;
 
 		default:
@@ -883,7 +947,7 @@ int hpt370_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct reque
 	}
 	return ide_dmaproc(func, drive, rq);	/* use standard DMA stuff */
 }
-#endif /* CONFIG_BLK_DEV_IDEDMA */
+#endif
 
 /*
  * Since SUN Cobalt is attempting to do this operation, I should disclose
@@ -1183,6 +1247,8 @@ void __init ide_init_hpt366(struct ata_channel *hwif)
 			pci_read_config_byte(hwif->pci_dev, 0x5a, &reg5ah);
 			if (reg5ah & 0x10)	/* interrupt force enable */
 				pci_write_config_byte(hwif->pci_dev, 0x5a, reg5ah & ~0x10);
+			hwif->udma_start = hpt370_udma_start;
+			hwif->udma_stop = hpt370_udma_stop;
 			hwif->udma = hpt370_dmaproc;
 		} else {
 			hwif->udma = hpt366_dmaproc;

@@ -199,7 +199,7 @@ ide_startstop_t ide_dma_intr(struct ata_device *drive, struct request *rq)
 {
 	u8 stat, dma_stat;
 
-	dma_stat = drive->channel->udma(ide_dma_end, drive, rq);
+	dma_stat = udma_stop(drive);
 	if (OK_STAT(stat = GET_STAT(),DRIVE_READY,drive->bad_wstat|DRQ_STAT)) {
 		if (!dma_stat) {
 			__ide_end_request(drive, rq, 1, rq->nr_sectors);
@@ -288,7 +288,7 @@ int check_drive_lists(struct ata_device *drive, int good_bad)
 			printk("%s: Disabling (U)DMA for %s\n", drive->name, id->model);
 		return(blacklist);
 	}
-#else /* !CONFIG_IDEDMA_NEW_DRIVE_LISTINGS */
+#else
 	const char **list;
 
 	if (good_bad) {
@@ -309,7 +309,7 @@ int check_drive_lists(struct ata_device *drive, int good_bad)
 			}
 		}
 	}
-#endif /* CONFIG_IDEDMA_NEW_DRIVE_LISTINGS */
+#endif
 	return 0;
 }
 
@@ -326,7 +326,7 @@ static int config_drive_for_dma(struct ata_device *drive)
 
 	if (id && (id->capability & 1) && ch->autodma && config_allows_dma) {
 		/* Consult the list of known "bad" drives */
-		if (ide_dmaproc(ide_dma_bad_drive, drive, NULL))
+		if (udma_black_list(drive))
 			return ch->udma(ide_dma_off, drive, NULL);
 
 		/* Enable DMA on any drive that has UltraDMA (mode 6/7/?) enabled */
@@ -346,7 +346,7 @@ static int config_drive_for_dma(struct ata_device *drive)
 			if ((id->dma_mword & 0x404) == 0x404 || (id->dma_1word & 0x404) == 0x404)
 				return ch->udma(ide_dma_on, drive, NULL);
 		/* Consult the list of known "good" drives */
-		if (ide_dmaproc(ide_dma_good_drive, drive, NULL))
+		if (udma_white_list(drive))
 			return ch->udma(ide_dma_on, drive, NULL);
 	}
 	return ch->udma(ide_dma_off_quietly, drive, NULL);
@@ -420,7 +420,7 @@ int ata_start_dma(struct ata_device *drive, struct request *rq)
  *
  * For ATAPI devices, we just prepare for DMA and return. The caller should
  * then issue the packet command to the drive and call us again with
- * ide_dma_begin afterwards.
+ * udma_start afterwards.
  *
  * Returns 0 if all went well.
  * Returns 1 if DMA read/write could not be started, in which case
@@ -432,7 +432,7 @@ int ide_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request 
 	struct ata_channel *ch = drive->channel;
 	unsigned long dma_base = ch->dma_base;
 	u8 unit = (drive->select.b.unit & 0x01);
-	unsigned int reading = 0, set_high = 1;
+	unsigned int set_high = 1;
 	u8 dma_stat;
 
 	switch (func) {
@@ -456,41 +456,6 @@ int ide_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request 
 			return 0;
 		case ide_dma_check:
 			return config_drive_for_dma (drive);
-		case ide_dma_read:
-			reading = 1 << 3;
-		case ide_dma_write:
-			if (ata_start_dma(drive, rq))
-				return 1;
-
-			if (drive->type != ATA_DISK)
-				return 0;
-
-			ide_set_handler(drive, ide_dma_intr, WAIT_CMD, dma_timer_expiry);	/* issue cmd to drive */
-			if ((rq->flags & REQ_DRIVE_ACB) && (drive->addressing == 1)) {
-				struct ata_taskfile *args = rq->special;
-
-				OUT_BYTE(args->taskfile.command, IDE_COMMAND_REG);
-			} else if (drive->addressing) {
-				OUT_BYTE(reading ? WIN_READDMA_EXT : WIN_WRITEDMA_EXT, IDE_COMMAND_REG);
-			} else {
-				OUT_BYTE(reading ? WIN_READDMA : WIN_WRITEDMA, IDE_COMMAND_REG);
-			}
-			return drive->channel->udma(ide_dma_begin, drive, NULL);
-		case ide_dma_begin:
-			/* Note that this is done *after* the cmd has
-			 * been issued to the drive, as per the BM-IDE spec.
-			 * The Promise Ultra33 doesn't work correctly when
-			 * we do this part before issuing the drive cmd.
-			 */
-			outb(inb(dma_base)|1, dma_base);		/* start DMA */
-			return 0;
-		case ide_dma_end: /* returns 1 on error, 0 otherwise */
-			drive->waiting_for_dma = 0;
-			outb(inb(dma_base)&~1, dma_base);	/* stop DMA */
-			dma_stat = inb(dma_base+2);		/* get DMA status */
-			outb(dma_stat|6, dma_base+2);	/* clear the INTR & ERROR bits */
-			udma_destroy_table(ch);	/* purge DMA mappings */
-			return (dma_stat & 7) != 4 ? (0x10 | dma_stat) : 0;	/* verify good DMA status */
 		case ide_dma_test_irq: /* returns 1 if dma irq issued, 0 otherwise */
 			dma_stat = inb(dma_base+2);
 #if 0  /* do not set unless you know what you are doing */
@@ -500,13 +465,9 @@ int ide_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request 
 			}
 #endif
 			return (dma_stat & 4) == 4;	/* return 1 if INTR asserted */
-		case ide_dma_bad_drive:
-		case ide_dma_good_drive:
-			return check_drive_lists(drive, (func == ide_dma_good_drive));
 		case ide_dma_timeout:
 			printk(KERN_ERR "%s: DMA timeout occured!\n", __FUNCTION__);
 			return 1;
-		case ide_dma_retune:
 		case ide_dma_lostirq:
 			printk(KERN_ERR "%s: chipset supported func only: %d\n", __FUNCTION__,  func);
 			return 1;
@@ -585,7 +546,64 @@ dma_alloc_failure:
 /****************************************************************************
  * UDMA function which should have architecture specific counterparts where
  * neccessary.
+ *
+ * The intention is that at some point in time we will move this whole to
+ * architecture specific kernel sections. For now I would love the architecture
+ * maintainers to just #ifdef #endif this stuff directly here. I have for now
+ * tryed to update as much as I could in the architecture specific code.  But
+ * of course I may have done mistakes, so please bear with me and update it
+ * here the proper way.
+ *
+ * Thank you a lot in advance!
+ *
+ * Sat May  4 20:29:46 CEST 2002 Marcin Dalecki.
  */
+
+/*
+ * This is the generic part of the DMA setup used by the host chipset drivers
+ * in the corresponding DMA setup method.
+ *
+ * FIXME: there are some places where this gets used driectly for "error
+ * recovery" in the ATAPI drivers. This was just plain wrong before, in esp.
+ * not portable, and just got uncovered now.
+ */
+void udma_enable(struct ata_device *drive, int on, int verbose)
+{
+	struct ata_channel *ch = drive->channel;
+	int set_high = 1;
+	u8 unit = (drive->select.b.unit & 0x01);
+	u64 addr = BLK_BOUNCE_HIGH;
+
+	if (!on) {
+		if (verbose)
+			printk("%s: DMA disabled\n", drive->name);
+		set_high = 0;
+		outb(inb(ch->dma_base + 2) & ~(1 << (5 + unit)), ch->dma_base + 2);
+#ifdef CONFIG_BLK_DEV_IDE_TCQ
+		udma_tcq_enable(drive, 0);
+#endif
+	}
+
+	/* toggle bounce buffers */
+
+	if (on && drive->type == ATA_DISK && drive->channel->highmem) {
+		if (!PCI_DMA_BUS_IS_PHYS)
+			addr = BLK_BOUNCE_ANY;
+		else
+			addr = drive->channel->pci_dev->dma_mask;
+	}
+
+	blk_queue_bounce_limit(&drive->queue, addr);
+
+	drive->using_dma = on;
+
+	if (on) {
+		outb(inb(ch->dma_base + 2) | (1 << (5 + unit)), ch->dma_base + 2);
+#ifdef CONFIG_BLK_DEV_IDE_TCQ_DEFAULT
+		udma_tcq_enable(drive, 1);
+#endif
+	}
+}
 
 /*
  * This prepares a dma request.  Returns 0 if all went okay, returns 1
@@ -718,4 +736,157 @@ void udma_print(struct ata_device *drive)
 #endif
 }
 
+/*
+ * Drive back/white list handling for UDMA capability:
+ */
+
+int udma_black_list(struct ata_device *drive)
+{
+	return check_drive_lists(drive, 0);
+}
+
+int udma_white_list(struct ata_device *drive)
+{
+	return check_drive_lists(drive, 1);
+}
+
+/*
+ * Generic entry points for functions provided possibly by the host chip set
+ * drivers.
+ */
+
+/*
+ * Prepare the channel for a DMA startfer. Please note that only the broken
+ * Pacific Digital host chip needs the reques to be passed there to decide
+ * about addressing modes.
+ */
+
+int udma_start(struct ata_device *drive, struct request *rq)
+{
+	struct ata_channel *ch = drive->channel;
+	unsigned long dma_base = ch->dma_base;
+
+	if (ch->udma_start)
+		return ch->udma_start(drive, rq);
+
+	/* Note that this is done *after* the cmd has
+	 * been issued to the drive, as per the BM-IDE spec.
+	 * The Promise Ultra33 doesn't work correctly when
+	 * we do this part before issuing the drive cmd.
+	 */
+	outb(inb(dma_base)|1, dma_base);		/* start DMA */
+	return 0;
+}
+
+int udma_stop(struct ata_device *drive)
+{
+	struct ata_channel *ch = drive->channel;
+	unsigned long dma_base = ch->dma_base;
+	u8 dma_stat;
+
+	if (ch->udma_stop)
+		return ch->udma_stop(drive);
+
+	drive->waiting_for_dma = 0;
+	outb(inb(dma_base)&~1, dma_base);	/* stop DMA */
+	dma_stat = inb(dma_base+2);		/* get DMA status */
+	outb(dma_stat|6, dma_base+2);		/* clear the INTR & ERROR bits */
+	udma_destroy_table(ch);			/* purge DMA mappings */
+
+	return (dma_stat & 7) != 4 ? (0x10 | dma_stat) : 0;	/* verify good DMA status */
+}
+
+/*
+ * This is the default read write function.
+ *
+ * It's exported only for host chips which use it for fallback or (too) late
+ * capability checking.
+ */
+
+int ata_do_udma(unsigned int reading, struct ata_device *drive, struct request *rq)
+{
+	if (ata_start_dma(drive, rq))
+		return 1;
+
+	if (drive->type != ATA_DISK)
+		return 0;
+
+	reading <<= 3;
+
+	ide_set_handler(drive, ide_dma_intr, WAIT_CMD, dma_timer_expiry);	/* issue cmd to drive */
+	if ((rq->flags & REQ_DRIVE_ACB) && (drive->addressing == 1)) {
+		struct ata_taskfile *args = rq->special;
+
+		OUT_BYTE(args->taskfile.command, IDE_COMMAND_REG);
+	} else if (drive->addressing) {
+		OUT_BYTE(reading ? WIN_READDMA_EXT : WIN_WRITEDMA_EXT, IDE_COMMAND_REG);
+	} else {
+		OUT_BYTE(reading ? WIN_READDMA : WIN_WRITEDMA, IDE_COMMAND_REG);
+	}
+
+	return udma_start(drive, rq);
+}
+
+int udma_read(struct ata_device *drive, struct request *rq)
+{
+	struct ata_channel *ch = drive->channel;
+
+	if (ch->udma_read)
+		return ch->udma_read(drive, rq);
+
+	return ata_do_udma(1, drive, rq);
+}
+
+int udma_write(struct ata_device *drive, struct request *rq)
+{
+	struct ata_channel *ch = drive->channel;
+
+	if (ch->udma_write)
+		return ch->udma_write(drive, rq);
+
+	return ata_do_udma(0, drive, rq);
+}
+
+/*
+ * FIXME: This should be attached to a channel as we can see now!
+ */
+int udma_irq_status(struct ata_device *drive)
+{
+	struct ata_channel *ch = drive->channel;
+	u8 dma_stat;
+
+	if (ch->udma_irq_status)
+		return ch->udma_irq_status(drive);
+
+	/* default action */
+	dma_stat = inb(ch->dma_base + 2);
+
+	return (dma_stat & 4) == 4;	/* return 1 if INTR asserted */
+}
+
+void udma_timeout(struct ata_device *drive)
+{
+	printk(KERN_ERR "ATA: UDMA timeout occured %s!\n", drive->name);
+
+	/* Invoke the chipset specific handler now. */
+	if (drive->channel->udma_timeout)
+		drive->channel->udma_timeout(drive);
+
+}
+
+void udma_lost_irq(struct ata_device *drive)
+{
+	if (drive->channel->udma_lost_irq)
+		drive->channel->udma_lost_irq(drive);
+}
+
+EXPORT_SYMBOL(udma_enable);
+EXPORT_SYMBOL(udma_start);
+EXPORT_SYMBOL(udma_stop);
+EXPORT_SYMBOL(udma_read);
+EXPORT_SYMBOL(udma_write);
+EXPORT_SYMBOL(ata_do_udma);
+EXPORT_SYMBOL(udma_irq_status);
 EXPORT_SYMBOL(udma_print);
+EXPORT_SYMBOL(udma_black_list);
+EXPORT_SYMBOL(udma_white_list);

@@ -114,7 +114,7 @@ static int config_for_dma(ide_drive_t *drive)
  * Check to see if the drive and
  * chipset is capable of DMA mode
  */
-static int sl82c105_check_drive(ide_drive_t *drive)
+static int sl82c105_check_drive(ide_drive_t *drive, struct request *rq)
 {
 	ide_dma_action_t dma_func = ide_dma_off_quietly;
 
@@ -129,7 +129,7 @@ static int sl82c105_check_drive(ide_drive_t *drive)
 			break;
 
 		/* Consult the list of known "bad" drives */
-		if (ide_dmaproc(ide_dma_bad_drive, drive)) {
+		if (udma_black_list(drive)) {
 			dma_func = ide_dma_off;
 			break;
 		}
@@ -140,23 +140,23 @@ static int sl82c105_check_drive(ide_drive_t *drive)
 			break;
 		}
 
-		if (ide_dmaproc(ide_dma_good_drive, drive)) {
+		if (udma_white_list(drive)) {
 			dma_func = ide_dma_on;
 			break;
 		}
 	} while (0);
 
-	return drive->channel->dmaproc(dma_func, drive);
+	return drive->channel->udma(dma_func, drive, rq);
 }
 
 /*
  * Our own dmaproc, only to intercept ide_dma_check
  */
-static int sl82c105_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
+static int sl82c105_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request *rq)
 {
 	switch (func) {
 	case ide_dma_check:
-		return sl82c105_check_drive(drive);
+		return sl82c105_check_drive(drive, rq);
 	case ide_dma_on:
 		if (config_for_dma(drive))
 			func = ide_dma_off;
@@ -168,7 +168,7 @@ static int sl82c105_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 	default:
 		break;
 	}
-	return ide_dmaproc(func, drive);
+	return ide_dmaproc(func, drive, rq);
 }
 
 /*
@@ -183,8 +183,8 @@ static void tune_sl82c105(ide_drive_t *drive, byte pio)
 	 * We support 32-bit I/O on this interface, and it
 	 * doesn't have problems with interrupts.
 	 */
-	drive->io_32bit = 1;
-	drive->unmask = 1;
+	drive->channel->io_32bit = 1;
+	drive->channel->unmask = 1;
 }
 
 /*
@@ -252,10 +252,10 @@ void __init dma_init_sl82c105(struct ata_channel *hwif, unsigned long dma_base)
 	}
 	outb(dma_state, dma_base + 2);
 
-	hwif->dmaproc = NULL;
+	hwif->udma = NULL;
 	ide_setup_dma(hwif, dma_base, 8);
-	if (hwif->dmaproc)
-		hwif->dmaproc = sl82c105_dmaproc;
+	if (hwif->udma)
+		hwif->udma = sl82c105_dmaproc;
 }
 
 /*
