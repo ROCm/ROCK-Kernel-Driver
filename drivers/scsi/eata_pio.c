@@ -58,6 +58,7 @@
 #include <linux/in.h>
 #include <linux/pci.h>
 #include <linux/proc_fs.h>
+#include <linux/interrupt.h>
 #include <asm/io.h>
 #include "eata_pio.h"
 #include "eata_dma_proc.h"
@@ -805,13 +806,13 @@ static void find_pio_PCI(struct get_conf *buf, Scsi_Host_Template * tpnt)
 	u32 base, x;
 
 	while ((dev = pci_find_device(PCI_VENDOR_ID_DPT, PCI_DEVICE_ID_DPT, dev)) != NULL) {
-		DBG(DBG_PROBE && DBG_PCI, printk("eata_pio: find_PCI, HBA at %s\n", dev->name));
+		DBG(DBG_PROBE && DBG_PCI, printk("eata_pio: find_PCI, HBA at %s\n", dev->dev.name));
 		if (pci_enable_device(dev))
 			continue;
 		pci_set_master(dev);
 		base = pci_resource_flags(dev, 0);
 		if (base & IORESOURCE_MEM) {
-			printk("eata_pio: invalid base address of device %s\n", dev->name);
+			printk("eata_pio: invalid base address of device %s\n", dev->dev.name);
 			continue;
 		}
 		base = pci_resource_start(dev, 0);
