@@ -68,9 +68,13 @@ static void current_irqresource(struct pnp_resource_table * res, int irq)
 	int i = 0;
 	while ((res->irq_resource[i].flags & IORESOURCE_IRQ) && i < PNP_MAX_IRQ) i++;
 	if (i < PNP_MAX_IRQ) {
+		res->irq_resource[i].flags = IORESOURCE_IRQ;  // Also clears _UNSET flag
+		if (irq == -1) {
+			res->irq_resource[i].flags |= IORESOURCE_DISABLED;
+			return;
+		}
 		res->irq_resource[i].start =
 		res->irq_resource[i].end = (unsigned long) irq;
-		res->irq_resource[i].flags = IORESOURCE_IRQ;  // Also clears _UNSET flag
 	}
 }
 
@@ -79,9 +83,13 @@ static void current_dmaresource(struct pnp_resource_table * res, int dma)
 	int i = 0;
 	while ((res->dma_resource[i].flags & IORESOURCE_DMA) && i < PNP_MAX_DMA) i++;
 	if (i < PNP_MAX_DMA) {
+		res->dma_resource[i].flags = IORESOURCE_DMA;  // Also clears _UNSET flag
+		if (dma == -1) {
+			res->dma_resource[i].flags |= IORESOURCE_DISABLED;
+			return;
+		}
 		res->dma_resource[i].start =
 		res->dma_resource[i].end = (unsigned long) dma;
-		res->dma_resource[i].flags = IORESOURCE_DMA;  // Also clears _UNSET flag
 	}
 }
 
@@ -90,9 +98,13 @@ static void current_ioresource(struct pnp_resource_table * res, int io, int len)
 	int i = 0;
 	while ((res->port_resource[i].flags & IORESOURCE_IO) && i < PNP_MAX_PORT) i++;
 	if (i < PNP_MAX_PORT) {
+		res->port_resource[i].flags = IORESOURCE_IO;  // Also clears _UNSET flag
+		if (len <= 0 || (io + len -1) >= 0x10003) {
+			res->port_resource[i].flags |= IORESOURCE_DISABLED;
+			return;
+		}
 		res->port_resource[i].start = (unsigned long) io;
 		res->port_resource[i].end = (unsigned long)(io + len - 1);
-		res->port_resource[i].flags = IORESOURCE_IO;  // Also clears _UNSET flag
 	}
 }
 
@@ -101,9 +113,13 @@ static void current_memresource(struct pnp_resource_table * res, int mem, int le
 	int i = 0;
 	while ((res->mem_resource[i].flags & IORESOURCE_MEM) && i < PNP_MAX_MEM) i++;
 	if (i < PNP_MAX_MEM) {
+		res->mem_resource[i].flags = IORESOURCE_MEM;  // Also clears _UNSET flag
+		if (len <= 0) {
+			res->mem_resource[i].flags |= IORESOURCE_DISABLED;
+			return;
+		}
 		res->mem_resource[i].start = (unsigned long) mem;
 		res->mem_resource[i].end = (unsigned long)(mem + len - 1);
-		res->mem_resource[i].flags = IORESOURCE_MEM;  // Also clears _UNSET flag
 	}
 }
 

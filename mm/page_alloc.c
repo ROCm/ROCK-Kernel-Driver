@@ -32,6 +32,8 @@
 #include <linux/sysctl.h>
 #include <linux/cpu.h>
 
+#include <asm/tlbflush.h>
+
 DECLARE_BITMAP(node_online_map, MAX_NUMNODES);
 DECLARE_BITMAP(memblk_online_map, MAX_NR_MEMBLKS);
 struct pglist_data *pgdat_list;
@@ -40,6 +42,9 @@ unsigned long totalhigh_pages;
 int nr_swap_pages;
 int numnodes = 1;
 int sysctl_lower_zone_protection = 0;
+
+EXPORT_SYMBOL(totalram_pages);
+EXPORT_SYMBOL(nr_swap_pages);
 
 /*
  * Used by page_zone() to look up the address of the struct zone whose
@@ -265,6 +270,7 @@ void __free_pages_ok(struct page *page, unsigned int order)
 	mod_page_state(pgfree, 1 << order);
 	free_pages_check(__FUNCTION__, page);
 	list_add(&page->list, &list);
+	kernel_map_pages(page, 1<<order, 0);
 	free_pages_bulk(page_zone(page), 1, &list, order);
 }
 
@@ -440,6 +446,7 @@ static void free_hot_cold_page(struct page *page, int cold)
 	struct per_cpu_pages *pcp;
 	unsigned long flags;
 
+	kernel_map_pages(page, 1, 0);
 	inc_page_state(pgfree);
 	free_pages_check(__FUNCTION__, page);
 	pcp = &zone->pageset[get_cpu()].pcp[cold];
@@ -556,7 +563,7 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 				(!wait && z->free_pages >= z->pages_high)) {
 			page = buffered_rmqueue(z, order, cold);
 			if (page)
-				return page;
+		       		goto got_pg;
 		}
 		min += z->pages_low * sysctl_lower_zone_protection;
 	}
@@ -579,7 +586,7 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 				(!wait && z->free_pages >= z->pages_high)) {
 			page = buffered_rmqueue(z, order, cold);
 			if (page)
-				return page;
+				goto got_pg;
 		}
 		min += local_min * sysctl_lower_zone_protection;
 	}
@@ -594,7 +601,7 @@ rebalance:
 
 			page = buffered_rmqueue(z, order, cold);
 			if (page)
-				return page;
+				goto got_pg;
 		}
 		goto nopage;
 	}
@@ -622,7 +629,7 @@ rebalance:
 				(!wait && z->free_pages >= z->pages_high)) {
 			page = buffered_rmqueue(z, order, cold);
 			if (page)
-				return page;
+				goto got_pg;
 		}
 		min += z->pages_low * sysctl_lower_zone_protection;
 	}
@@ -653,6 +660,9 @@ nopage:
 			current->comm, order, gfp_mask);
 	}
 	return NULL;
+got_pg:
+	kernel_map_pages(page, 1 << order, 1);
+	return page;
 }
 
 /*
@@ -726,6 +736,7 @@ unsigned int nr_free_pages(void)
 
 	return sum;
 }
+EXPORT_SYMBOL(nr_free_pages);
 
 unsigned int nr_used_zone_pages(void)
 {
@@ -818,6 +829,7 @@ DEFINE_PER_CPU(struct page_state, page_states) = {0};
 EXPORT_PER_CPU_SYMBOL(page_states);
 
 atomic_t nr_pagecache = ATOMIC_INIT(0);
+EXPORT_SYMBOL(nr_pagecache);
 #ifdef CONFIG_SMP
 DEFINE_PER_CPU(long, nr_pagecache_local) = 0;
 #endif
@@ -896,7 +908,7 @@ void si_meminfo_node(struct sysinfo *val, int nid)
 {
 	pg_data_t *pgdat = NODE_DATA(nid);
 
-	val->totalram = pgdat->node_size;
+	val->totalram = pgdat->node_present_pages;
 	val->freeram = nr_free_pages_pgdat(pgdat);
 	val->totalhigh = pgdat->node_zones[ZONE_HIGHMEM].present_pages;
 	val->freehigh = pgdat->node_zones[ZONE_HIGHMEM].free_pages;
@@ -1131,12 +1143,13 @@ static void __init calculate_zone_totalpages(struct pglist_data *pgdat,
 
 	for (i = 0; i < MAX_NR_ZONES; i++)
 		totalpages += zones_size[i];
-	pgdat->node_size = totalpages;
+	pgdat->node_spanned_pages = totalpages;
 
 	realtotalpages = totalpages;
 	if (zholes_size)
 		for (i = 0; i < MAX_NR_ZONES; i++)
 			realtotalpages -= zholes_size[i];
+	pgdat->node_present_pages = realtotalpages;
 	printk("On node %d totalpages: %lu\n", pgdat->node_id, realtotalpages);
 }
 
@@ -1342,7 +1355,7 @@ void __init free_area_init_node(int nid, struct pglist_data *pgdat,
 	pgdat->node_start_pfn = node_start_pfn;
 	calculate_zone_totalpages(pgdat, zones_size, zholes_size);
 	if (!node_mem_map) {
-		size = (pgdat->node_size + 1) * sizeof(struct page); 
+		size = (pgdat->node_spanned_pages + 1) * sizeof(struct page);
 		node_mem_map = alloc_bootmem_node(pgdat, size);
 	}
 	pgdat->node_mem_map = node_mem_map;

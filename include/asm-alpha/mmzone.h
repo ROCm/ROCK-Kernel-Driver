@@ -31,7 +31,6 @@ extern pg_data_t node_data[];
 
 #define pa_to_nid(pa)		alpha_pa_to_nid(pa)
 #define NODE_DATA(nid)		(&node_data[(nid)])
-#define node_size(nid)		(NODE_DATA(nid)->node_size)
 
 #define node_localnr(pfn, nid)	((pfn) - NODE_DATA(nid)->node_start_pfn)
 
@@ -124,7 +123,7 @@ PLAT_NODE_DATA_LOCALNR(unsigned long p, int n)
 #define pfn_to_nid(pfn)		pa_to_nid(((u64)pfn << PAGE_SHIFT))
 #define pfn_valid(pfn)							\
 	(((pfn) - node_start_pfn(pfn_to_nid(pfn))) <			\
-	 node_size(pfn_to_nid(pfn)))					\
+	 node_spanned_pages(pfn_to_nid(pfn)))					\
 
 #define virt_addr_valid(kaddr)	pfn_valid((__pa(kaddr) >> PAGE_SHIFT))
 

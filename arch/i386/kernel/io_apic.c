@@ -35,6 +35,7 @@
 #include <asm/io.h>
 #include <asm/smp.h>
 #include <asm/desc.h>
+#include <asm/timer.h>
 
 #include <mach_apic.h>
 
@@ -2052,7 +2053,6 @@ static inline void unlock_ExtINT_logic(void)
  */
 static inline void check_timer(void)
 {
-	extern int timer_ack;
 	int pin1, pin2;
 	int vector;
 

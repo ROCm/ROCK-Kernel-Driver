@@ -1887,7 +1887,7 @@ queue:
                 BUG();
 
 	if (( c = cmd_alloc(h, 1)) == NULL)
-		goto startio;
+		goto full;
 
 	blkdev_dequeue_request(creq);
 
@@ -1960,8 +1960,9 @@ queue:
 		h->maxQsinceinit = h->Qdepth; 
 
 	goto queue;
-startio:
+full:
 	blk_stop_queue(q);
+startio:
 	start_io(h);
 }
 

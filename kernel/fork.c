@@ -286,7 +286,7 @@ static inline int dup_mmap(struct mm_struct * mm, struct mm_struct * oldmm)
 			continue;
 		if (mpnt->vm_flags & VM_ACCOUNT) {
 			unsigned int len = (mpnt->vm_end - mpnt->vm_start) >> PAGE_SHIFT;
-			if (!vm_enough_memory(len))
+			if (security_vm_enough_memory(len))
 				goto fail_nomem;
 			charge += len;
 		}

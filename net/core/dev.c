@@ -1712,7 +1712,7 @@ out:
 
 softnet_break:
 	netdev_rx_stat[this_cpu].time_squeeze++;
-	__cpu_raise_softirq(this_cpu, NET_RX_SOFTIRQ);
+	__raise_softirq_irqoff(NET_RX_SOFTIRQ);
 	goto out;
 }
 

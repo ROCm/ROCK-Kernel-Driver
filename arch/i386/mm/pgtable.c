@@ -34,7 +34,7 @@ void show_mem(void)
 	show_free_areas();
 	printk("Free swap:       %6dkB\n",nr_swap_pages<<(PAGE_SHIFT-10));
 	for_each_pgdat(pgdat) {
-		for (i = 0; i < pgdat->node_size; ++i) {
+		for (i = 0; i < pgdat->node_spanned_pages; ++i) {
 			page = pgdat->node_mem_map + i;
 			total++;
 			if (PageHighMem(page))

@@ -100,7 +100,6 @@ ia64_shmat (int shmid, void *shmaddr, int shmflg)
 asmlinkage unsigned long
 ia64_brk (unsigned long brk)
 {
-	extern int vm_enough_memory (long pages);
 	unsigned long rlim, retval, newbrk, oldbrk;
 	struct mm_struct *mm = current->mm;
 

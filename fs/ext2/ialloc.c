@@ -489,17 +489,18 @@ found:
 	return group;
 }
 
-struct inode * ext2_new_inode(struct inode * dir, int mode)
+struct inode *ext2_new_inode(struct inode *dir, int mode)
 {
 	struct super_block *sb;
 	struct buffer_head *bitmap_bh = NULL;
 	struct buffer_head *bh2;
 	int group, i;
-	ino_t ino;
+	ino_t ino = 0;
 	struct inode * inode;
-	struct ext2_group_desc * desc;
-	struct ext2_super_block * es;
+	struct ext2_group_desc *gdp;
+	struct ext2_super_block *es;
 	struct ext2_inode_info *ei;
+	struct ext2_sb_info *sbi;
 	int err;
 
 	sb = dir->i_sb;
@@ -508,36 +509,62 @@ struct inode * ext2_new_inode(struct inode * dir, int mode)
 		return ERR_PTR(-ENOMEM);
 
 	ei = EXT2_I(inode);
-	es = EXT2_SB(sb)->s_es;
+	sbi = EXT2_SB(sb);
+	es = sbi->s_es;
 repeat:
 	if (S_ISDIR(mode)) {
-		if (test_opt (sb, OLDALLOC))
+		if (test_opt(sb, OLDALLOC))
 			group = find_group_dir(sb, dir);
 		else
 			group = find_group_orlov(sb, dir);
 	} else 
 		group = find_group_other(sb, dir);
 
-	err = -ENOSPC;
-	if (group == -1)
+	if (group == -1) {
+		err = -ENOSPC;
 		goto fail;
-
-	err = -EIO;
-	bitmap_bh = read_inode_bitmap(sb, group);
-	if (!bitmap_bh)
-		goto fail2;
-
-	i = ext2_find_first_zero_bit((unsigned long *)bitmap_bh->b_data,
-				      EXT2_INODES_PER_GROUP(sb));
-	if (i >= EXT2_INODES_PER_GROUP(sb))
-		goto bad_count;
-	if (ext2_set_bit_atomic(sb_bgl_lock(EXT2_SB(sb), group),
-			i, (void *) bitmap_bh->b_data)) {
-		brelse(bitmap_bh);
-		ext2_release_inode(sb, group, S_ISDIR(mode));
-		goto repeat;
 	}
 
+	for (i = 0; i < sbi->s_groups_count; i++) {
+		gdp = ext2_get_group_desc(sb, group, &bh2);
+		brelse(bitmap_bh);
+		bitmap_bh = read_inode_bitmap(sb, group);
+		if (!bitmap_bh) {
+			err = -EIO;
+			goto fail2;
+		}
+
+		i = ext2_find_first_zero_bit((unsigned long *)bitmap_bh->b_data,
+					      EXT2_INODES_PER_GROUP(sb));
+		if (i >= EXT2_INODES_PER_GROUP(sb)) {
+			/*
+			 * Rare race: find_group_xx() decided that there were
+			 * free inodes in this group, but by the time we tried
+			 * to allocate one, they're all gone.  This can also
+			 * occur because the counters which find_group_orlov()
+			 * uses are approximate.  So just go and search the
+			 * next block group.
+			 */
+			if (++group == sbi->s_groups_count)
+				group = 0;
+			continue;
+		}
+		if (ext2_set_bit_atomic(sb_bgl_lock(EXT2_SB(sb), group),
+						i, bitmap_bh->b_data)) {
+			brelse(bitmap_bh);
+			bitmap_bh = NULL;
+			ext2_release_inode(sb, group, S_ISDIR(mode));
+			goto repeat;
+		}
+		goto got;
+	}
+
+	/*
+	 * Scanned all blockgroups.
+	 */
+	err = -ENOSPC;
+	goto fail2;
+got:
 	mark_buffer_dirty(bitmap_bh);
 	if (sb->s_flags & MS_SYNCHRONOUS)
 		sync_dirty_buffer(bitmap_bh);
@@ -605,8 +632,9 @@ repeat:
 	inode->i_generation = EXT2_SB(sb)->s_next_generation++;
 	insert_inode_hash(inode);
 
-	if(DQUOT_ALLOC_INODE(inode)) {
+	if (DQUOT_ALLOC_INODE(inode)) {
 		DQUOT_DROP(inode);
+		err = -ENOSPC;
 		goto fail3;
 	}
 	err = ext2_init_acl(inode, dir);
@@ -631,21 +659,6 @@ fail:
 	make_bad_inode(inode);
 	iput(inode);
 	return ERR_PTR(err);
-
-bad_count:
-	brelse(bitmap_bh);
-	ext2_error (sb, "ext2_new_inode",
-		    "Free inodes count corrupted in group %d",
-		    group);
-	/* Is it really ENOSPC? */
-	err = -ENOSPC;
-	if (sb->s_flags & MS_RDONLY)
-		goto fail;
-
-	desc = ext2_get_group_desc (sb, group, &bh2);
-	desc->bg_free_inodes_count = 0;
-	mark_buffer_dirty(bh2);
-	goto repeat;
 }
 
 unsigned long ext2_count_free_inodes (struct super_block * sb)
