@@ -74,10 +74,13 @@ int kobject_add(struct kobject * kobj)
 {
 	int error = 0;
 	struct subsystem * s = kobj->subsys;
-	struct kobject * parent = kobject_get(kobj->parent);
+	struct kobject * parent;
 
 	if (!(kobj = kobject_get(kobj)))
 		return -ENOENT;
+
+	parent = kobject_get(kobj->parent);
+
 	pr_debug("kobject %s: registering. parent: %s, subsys: %s\n",
 		 kobj->name, parent ? parent->name : "<NULL>", 
 		 kobj->subsys ? kobj->subsys->kobj.name : "<NULL>" );
@@ -93,8 +96,8 @@ int kobject_add(struct kobject * kobj)
 		up_write(&s->rwsem);
 	}
 	error = create_dir(kobj);
-	if (error && kobj->parent)
-		kobject_put(kobj->parent);
+	if (error && parent)
+		kobject_put(parent);
 	return error;
 }
 
@@ -218,7 +221,7 @@ int subsystem_register(struct subsystem * s)
 		s->kobj.parent = &s->parent->kobj;
 	pr_debug("subsystem %s: registering, parent: %s\n",
 		 s->kobj.name,s->parent ? s->parent->kobj.name : "<none>");
-	return kobject_register(&s->kobj);
+	return kobject_add(&s->kobj);
 }
 
 void subsystem_unregister(struct subsystem * s)

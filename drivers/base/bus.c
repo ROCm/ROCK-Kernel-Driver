@@ -19,7 +19,7 @@
 static DECLARE_MUTEX(bus_sem);
 
 #define to_dev(node) container_of(node,struct device,bus_list)
-#define to_drv(node) container_of(node,struct device_driver,bus_list)
+#define to_drv(node) container_of(node,struct device_driver,kobj.entry)
 
 #define to_bus_attr(_attr) container_of(_attr,struct bus_attribute,attr)
 #define to_bus(obj) container_of(obj,struct bus_type,subsys.kobj)
@@ -203,9 +203,9 @@ int bus_for_each_drv(struct bus_type * bus, struct device_driver * start,
 	if(!(bus = get_bus(bus)))
 		return -EINVAL;
 
-	head = start ? &start->bus_list : &bus->drivers;
+	head = start ? &start->kobj.entry : &bus->drvsubsys.list;
 
-	down_read(&bus->subsys.rwsem);
+	down_read(&bus->drvsubsys.rwsem);
 	list_for_each(entry,head) {
 		struct device_driver * drv = get_driver(to_drv(entry));
 		error = fn(drv,data);
@@ -213,7 +213,7 @@ int bus_for_each_drv(struct bus_type * bus, struct device_driver * start,
 		if(error)
 			break;
 	}
-	up_read(&bus->subsys.rwsem);
+	up_read(&bus->drvsubsys.rwsem);
 	return error;
 }
 
@@ -287,9 +287,8 @@ static int device_attach(struct device * dev)
 	if (!bus->match)
 		return 0;
 
-	list_for_each(entry,&bus->drivers) {
-		struct device_driver * drv = 
-			container_of(entry,struct device_driver,bus_list);
+	list_for_each(entry,&bus->drvsubsys.list) {
+		struct device_driver * drv = to_drv(entry);
 		if (!(error = bus_match(dev,drv)))
 			break;
 	}
@@ -437,7 +436,6 @@ int bus_add_driver(struct device_driver * drv)
 		kobject_register(&drv->kobj);
 
 		devclass_add_driver(drv);
-		list_add_tail(&drv->bus_list,&bus->drivers);
 		driver_attach(drv);
 		up_write(&bus->subsys.rwsem);
 	}
@@ -460,7 +458,6 @@ void bus_remove_driver(struct device_driver * drv)
 		down_write(&drv->bus->subsys.rwsem);
 		pr_debug("bus %s: remove driver %s\n",drv->bus->name,drv->name);
 		driver_detach(drv);
-		list_del_init(&drv->bus_list);
 		devclass_remove_driver(drv);
 		kobject_unregister(&drv->kobj);
 		up_write(&drv->bus->subsys.rwsem);
@@ -491,7 +488,6 @@ void put_bus(struct bus_type * bus)
 int bus_register(struct bus_type * bus)
 {
 	INIT_LIST_HEAD(&bus->devices);
-	INIT_LIST_HEAD(&bus->drivers);
 
 	down(&bus_sem);
 	strncpy(bus->subsys.kobj.name,bus->name,KOBJ_NAME_LEN);
