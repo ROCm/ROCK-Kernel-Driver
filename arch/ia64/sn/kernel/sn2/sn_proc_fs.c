@@ -107,6 +107,10 @@ static struct proc_dir_entry *sn_procfs_create_entry(
 	return e;
 }
 
+/* /proc/sgi_sn/sn_topology uses seq_file, see sn_hwperf.c */
+extern int sn_topology_open(struct inode *, struct file *);
+extern int sn_topology_release(struct inode *, struct file *);
+
 void register_sn_procfs(void)
 {
 	static struct proc_dir_entry *sgi_proc_dir = NULL;
@@ -132,6 +136,9 @@ void register_sn_procfs(void)
 
 	sn_procfs_create_entry("coherence_id", sgi_proc_dir, 
 		coherence_id_open, single_release);
+	
+	sn_procfs_create_entry("sn_topology", sgi_proc_dir,
+		sn_topology_open, sn_topology_release);
 }
 
 #endif /* CONFIG_PROC_FS */
