@@ -200,14 +200,6 @@ int sys_execve (char *name, char **argv, char **envp, struct pt_regs *regs)
 	return error;
 }
 
-/* This is the common part of the various fork-like system calls (which
-   are in entry.S).  */
-int fork_common (int flags, unsigned long new_sp, struct pt_regs *regs)
-{
-	struct task_struct *p = do_fork (flags, new_sp, regs, 0, 0, 0);
-	return IS_ERR (p) ? PTR_ERR (p) : p->pid;
-}
-
 
 /*
  * These bracket the sleeping functions..

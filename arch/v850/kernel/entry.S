@@ -554,11 +554,14 @@ END(ret_from_long_syscall)
 
 L_ENTRY(sys_fork_wrapper):
 #ifdef CONFIG_MMU
-	addi	SIGCHLD, r0, r6		// Arg 0: flags
+	addi	SIGCHLD, r0, r6		   // Arg 0: flags
 	ld.w	PTO+PT_GPR(GPR_SP)[sp], r7 // Arg 1: child SP (use parent's)
-	movea	PTO, sp, r8		// Arg 2: parent context
-	mov	hilo(CSYM(fork_common)), r18// Where the real work gets done
-	br	save_extra_state_tramp	// Save state and go there
+	movea	PTO, sp, r8		   // Arg 2: parent context
+	mov	r0, r9			   // Arg 3/4/5: 0
+	st.w	r0, 16[sp]
+	st.w	r0, 20[sp]
+	mov	hilo(CSYM(do_fork)), r18   // Where the real work gets done
+	br	save_extra_state_tramp	   // Save state and go there
 #else
 	// fork almost works, enough to trick you into looking elsewhere :-(
 	addi	-EINVAL, r0, r10
@@ -569,18 +572,24 @@ END(sys_fork_wrapper)
 L_ENTRY(sys_vfork_wrapper):
 	addi	CLONE_VFORK | CLONE_VM | SIGCHLD, r0, r6 // Arg 0: flags
 	ld.w	PTO+PT_GPR(GPR_SP)[sp], r7 // Arg 1: child SP (use parent's)
-	movea	PTO, sp, r8		// Arg 2: parent context
-	mov	hilo(CSYM(fork_common)), r18// Where the real work gets done
-	br	save_extra_state_tramp	// Save state and go there
+	movea	PTO, sp, r8		   // Arg 2: parent context
+	mov	r0, r9			   // Arg 3/4/5: 0
+	st.w	r0, 16[sp]
+	st.w	r0, 20[sp]
+	mov	hilo(CSYM(do_fork)), r18   // Where the real work gets done
+	br	save_extra_state_tramp	   // Save state and go there
 END(sys_vfork_wrapper)
 
 L_ENTRY(sys_clone_wrapper):
-	ld.w	PTO+PT_GPR(GPR_SP)[sp], r19 // parent's stack pointer
-        cmp	r7, r0			// See if child SP arg (arg 1) is 0.
-	cmov	z, r19, r7, r7		// ... and use the parent's if so. 
-	movea	PTO, sp, r8		// Arg 2: parent context
-	mov	hilo(CSYM(fork_common)), r18// Where the real work gets done
-	br	save_extra_state_tramp	// Save state and go there
+	ld.w	PTO+PT_GPR(GPR_SP)[sp], r19// parent's stack pointer
+	cmp	r7, r0			   // See if child SP arg (arg 1) is 0.
+	cmov	z, r19, r7, r7		   // ... and use the parent's if so.
+	movea	PTO, sp, r8		   // Arg 2: parent context
+	mov	r0, r9			   // Arg 3/4/5: 0
+	st.w	r0, 16[sp]
+	st.w	r0, 20[sp]
+	mov	hilo(CSYM(do_fork)), r18   // Where the real work gets done
+	br	save_extra_state_tramp	   // Save state and go there
 END(sys_clone_wrapper)
 
 
