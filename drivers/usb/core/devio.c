@@ -875,7 +875,7 @@ static int proc_submiturb(struct dev_state *ps, void __user *arg)
 			return -EINVAL;
 		if (!(ep_desc = usb_epnum_to_ep_desc(ps->dev, uurb.endpoint)))
 			return -ENOENT;
-		interval = 1 << min ((u8)15, ep_desc->bInterval - 1);
+		interval = 1 << min (15, ep_desc->bInterval - 1);
 		isofrmlen = sizeof(struct usbdevfs_iso_packet_desc) * uurb.number_of_packets;
 		if (!(isopkt = kmalloc(isofrmlen, GFP_KERNEL)))
 			return -ENOMEM;
@@ -902,7 +902,7 @@ static int proc_submiturb(struct dev_state *ps, void __user *arg)
 		if (!(ep_desc = usb_epnum_to_ep_desc(ps->dev, uurb.endpoint)))
 			return -ENOENT;
 		if (ps->dev->speed == USB_SPEED_HIGH)
-			interval = 1 << min ((u8)15, ep_desc->bInterval - 1);
+			interval = 1 << min (15, ep_desc->bInterval - 1);
 		else
 			interval = ep_desc->bInterval;
 		if (uurb.buffer_length > 16384)
