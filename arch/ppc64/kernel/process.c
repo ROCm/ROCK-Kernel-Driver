@@ -385,46 +385,6 @@ out:
 	return error;
 }
 
-void initialize_paca_hardware_interrupt_stack(void)
-{
-	int i;
-	unsigned long stack;
-	unsigned long end_of_stack =0;
-
-	for (i=1; i < NR_CPUS; i++) {
-		if (!cpu_possible(i))
-			continue;
-		/* Carve out storage for the hardware interrupt stack */
-		stack = __get_free_pages(GFP_ATOMIC, get_order(8*PAGE_SIZE));
-
-		if ( !stack ) {     
-			printk("ERROR, cannot find space for hardware stack.\n");
-			panic(" no hardware stack ");
-		}
-
-
-		/* Store the stack value in the PACA for the processor */
-		paca[i].xHrdIntStack = stack + (8*PAGE_SIZE) - STACK_FRAME_OVERHEAD;
-		paca[i].xHrdIntCount = 0;
-
-	}
-
-	/*
-	 * __get_free_pages() might give us a page > KERNBASE+256M which
-	 * is mapped with large ptes so we can't set up the guard page.
-	 */
-	if (cur_cpu_spec->cpu_features & CPU_FTR_16M_PAGE)
-		return;
-
-	for (i=0; i < NR_CPUS; i++) {
-		if (!cpu_possible(i))
-			continue;
-		/* set page at the top of stack to be protected - prevent overflow */
-		end_of_stack = paca[i].xHrdIntStack - (8*PAGE_SIZE - STACK_FRAME_OVERHEAD);
-		ppc_md.hpte_updateboltedpp(PP_RXRX,end_of_stack);
-	}
-}
-
 char *ppc_find_proc_name(unsigned *p, char *buf, unsigned buflen)
 {
 	unsigned long tb_flags;

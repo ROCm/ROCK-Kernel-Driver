@@ -40,6 +40,15 @@
 #define DO_SOFT_DISABLE
 #endif
 
+/* copy saved SOFTE bit or EE bit from saved MSR depending
+ * if we are doing soft-disable or not
+ */
+#ifdef DO_SOFT_DISABLE
+#define DO_COPY_EE()	ld	r20,SOFTE(r1)
+#else
+#define DO_COPY_EE()	rldicl	r20,r23,49,63
+#endif
+
 /*
  * hcall interface to pSeries LPAR
  */
@@ -618,11 +627,7 @@ stab_bolted_user_return:
 	ld      r4,_DAR(r1)
 	ld      r5,_DSISR(r1)
 	addi	r3,r1,STACK_FRAME_OVERHEAD
-#ifdef DO_SOFT_DISABLE
-	ld	r20,SOFTE(r1)		/* Copy saved SOFTE bit */
-#else
-	rldicl	r20,r23,49,63   	/* copy EE bit from saved MSR */
-#endif
+	DO_COPY_EE()
 	li	r6,0x300
 	bl      .save_remaining_regs
 	bl      .do_page_fault
@@ -644,12 +649,9 @@ DataAccessSLB_common:
 	or.	r3,r3,r3		/* Check return code */
 	beq     fast_exception_return   /* Return if we succeeded */
 	addi	r3,r1,STACK_FRAME_OVERHEAD
-#ifdef DO_SOFT_DISABLE
-	ld	r20,SOFTE(r1)
-#else
-	rldicl	r20,r23,49,63   	/* copy EE bit from saved MSR */
-#endif
+	DO_COPY_EE()
 	li	r6,0x380
+	li	r5,0
 	bl      .save_remaining_regs
 	bl      .do_page_fault
 	b       .ret_from_except
@@ -670,13 +672,9 @@ InstructionAccess_common:
 	bl	.do_hash_page_ISI	/* Try to handle as hpte fault */
 1:
 	mr	r4,r22
-	mr	r5,r23
+	rlwinm	r5,r23,0,4,4		/* We only care about PR in error_code */
 	addi	r3,r1,STACK_FRAME_OVERHEAD
-#ifdef DO_SOFT_DISABLE
-	ld	r20,SOFTE(r1)
-#else
-	rldicl	r20,r23,49,63   	/* copy EE bit from saved MSR */
-#endif
+	DO_COPY_EE()
 	li	r6,0x400
 	bl      .save_remaining_regs
 	bl      .do_page_fault
@@ -692,12 +690,9 @@ InstructionAccessSLB_common:
 	beq+	fast_exception_return   /* Return if we succeeded */
 
 	addi	r3,r1,STACK_FRAME_OVERHEAD
-#ifdef DO_SOFT_DISABLE
-	ld	r20,SOFTE(r1)
-#else
-	rldicl	r20,r23,49,63   	/* copy EE bit from saved MSR */
-#endif
+	DO_COPY_EE()
 	li	r6,0x480
+	li	r5,0
 	bl      .save_remaining_regs
 	bl      .do_page_fault
 	b       .ret_from_except
@@ -710,70 +705,14 @@ HardwareInterrupt_entry:
 	li	r20,0
 	li	r6,0x500
 	bl      .save_remaining_regs
-	/* Determine if need to run do_irq on a hardware interrupt stack  */
-	/*   The first invocation of do_irq will occur on the kernel      */
-	/*   stack in the current stack                                   */
-	/*   All other invocations of do_irq will run on the hardware     */
-	/*   interrupt stack associated with the PACA of the current      */
-	/*   processor.                                                   */
-	/*                                                                */
-	/*  The call to do_irq will preserve the value of r14 - r31       */
-	/*                                                                */
-/*
- * XXX turn off interrupt stacks until the thread_info stuff is fixed.
- * Otherwise we end up setting need_resched etc bits in the interrupt
- *  stack and they never get seen when we return to the process stack - Anton
- */
-#if 0
-	lbz     r21,PACAHRDWINTCOUNT(r13)    /* get hardware interrupt cnt */
-	cmpi    0,r21,1                     /*                            */
-	addi    r21,r21,1                   /* incr hardware interrupt cnt*/
-	stb     r21,PACAHRDWINTCOUNT(r13)   /*                            */
-	bne     2f                          /*                            */
-
-	mr      r14,r1                      /* preserve current r1        */
-	ld      r1,PACAHRDWINTSTACK(r13)    /*                            */
-	std     r14,0(r1)                   /* set the back chain         */
 	bl      .do_IRQ
-	lbz     r22,PACAHRDWINTCOUNT(r13)   /* get hardware interrupt cnt */
-	cmp     0,r22,r21                   /* debug test                 */
-	bne     3f
-	subi    r21,r21,1
-	stb     r21,PACAHRDWINTCOUNT(r13)   /*                            */
-	mr      r1,r14                      /*                            */
 	b       .ret_from_except
-#endif
-
-2:
-	bl      .do_IRQ
-
-#if 0
-	lbz     r22,PACAHRDWINTCOUNT(r13)   /* get hardware interrupt cnt */
-	cmp     0,r22,r21                   /* debug test                 */
-	bne     3f                          /*                            */
-	subi    r21,r21,1                   /* decr hardware interrupt cnt*/
-	stb     r21,PACAHRDWINTCOUNT(r13)   /*                            */
-#endif
-
-	b       .ret_from_except
-
-3:
-	/* error - counts out of sync                                      */
-#ifdef CONFIG_XMON
-	bl	.xmon
-#endif
-4:	b	4b
-
 
 	.globl Alignment_common
 Alignment_common:
 	EXCEPTION_PROLOG_COMMON
 	addi	r3,r1,STACK_FRAME_OVERHEAD
-#ifdef DO_SOFT_DISABLE
-	ld	r20,SOFTE(r1)
-#else
-	rldicl	r20,r23,49,63   	/* copy EE bit from saved MSR */
-#endif
+	DO_COPY_EE()
 	li	r6,0x600
 	bl      .save_remaining_regs
 	bl      .AlignmentException
@@ -783,11 +722,7 @@ Alignment_common:
 ProgramCheck_common:
 	EXCEPTION_PROLOG_COMMON
 	addi	r3,r1,STACK_FRAME_OVERHEAD
-#ifdef DO_SOFT_DISABLE
-	ld	r20,SOFTE(r1)
-#else
-	rldicl	r20,r23,49,63   	/* copy EE bit from saved MSR */
-#endif
+	DO_COPY_EE()
 	li	r6,0x700
 	bl      .save_remaining_regs
 	bl      .ProgramCheckException
@@ -798,11 +733,7 @@ FPUnavailable_common:
 	EXCEPTION_PROLOG_COMMON
 	bne	.load_up_fpu		/* if from user, just load it up */
 	addi	r3,r1,STACK_FRAME_OVERHEAD
-#ifdef DO_SOFT_DISABLE
-	ld	r20,SOFTE(r1)
-#else
-	rldicl	r20,r23,49,63   	/* copy EE bit from saved MSR */
-#endif
+	DO_COPY_EE()
 	li	r6,0x800
 	bl      .save_remaining_regs
 	bl      .KernelFPUnavailableException
@@ -818,11 +749,7 @@ SystemCall_common:
 	beq+	HardwareInterrupt_entry
 1:
 #endif
-#ifdef DO_SOFT_DISABLE
-	ld	r20,SOFTE(r1)
-#else
-	rldicl	r20,r23,49,63   	/* copy EE bit from saved MSR */
-#endif
+	DO_COPY_EE()
 	li	r6,0xC00
 	bl      .save_remaining_regs
 	bl      .DoSyscall
@@ -1866,18 +1793,6 @@ _STATIC(start_here_common)
 	li	r5,0
 	std	r0,PACAKSAVE(r13)
 
-	/* ptr to hardware interrupt stack for boot processor */
-	LOADADDR(r3, hardware_int_paca0)
-	li      r5,PAGE_SIZE
-	sldi    r5,r5,3
-	subi    r5,r5,STACK_FRAME_OVERHEAD
-
-	add     r3,r3,r5
-	std     r3,PACAHRDWINTSTACK(r13)
-
-	li      r3,0
-	stb     r3,PACAHRDWINTCOUNT(r13)
-
 	/* Restore the parms passed in from the bootloader. */
 	mr	r3,r31
 	mr	r4,r30
@@ -1998,10 +1913,6 @@ swapper_pg_dir:
 	.globl	ioremap_dir
 ioremap_dir:
 	.space	4096
-
-	.globl  hardware_int_paca0
-hardware_int_paca0:
-	.space	8*PAGE_SIZE
 
 /* 1 page segment table per cpu (max 48, cpu0 allocated at STAB0_PHYS_ADDR) */
 	.globl	stab_array

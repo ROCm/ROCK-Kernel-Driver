@@ -122,5 +122,7 @@ $(obj)/imagesize.c: vmlinux
 	awk '{printf "unsigned long vmlinux_memsize = 0x%s;\n", substr($$1,8)}' \
 		>> $(obj)/imagesize.c
 
+install: $(CONFIGURE) $(obj)/$(BOOTIMAGE)
+	sh -x $(src)/install.sh "$(KERNELRELEASE)" "$(obj)/$(BOOTIMAGE)" "$(TOPDIR)/System.map" "$(INSTALL_PATH)"
 
 clean-files := $(patsubst $(obj)/%,%, $(obj-boot))

@@ -86,7 +86,6 @@ static int nvreadb(unsigned);
 static int ppc_inst_dump(unsigned long, long);
 void print_address(unsigned long);
 static int getsp(void);
-static void dump_hash_table(void);
 static void backtrace(struct pt_regs *);
 static void excprint(struct pt_regs *);
 static void prregs(struct pt_regs *);
@@ -158,7 +157,6 @@ Commands:\n\
   dd	dump double values\n\
   e	print exception information\n\
   f	flush cache\n\
-  h	dump hash table\n\
   m	examine/change memory\n\
   mm	move a block of memory\n\
   ms	set a block of memory\n\
@@ -590,9 +588,6 @@ cmds(struct pt_regs *excp)
 		case 'f':
 			cacheflush();
 			break;
-		case 'h':
-			dump_hash_table();
-			break;
 		case 's':
 		case 'x':
 		case EOF:
@@ -981,7 +976,7 @@ backtrace(struct pt_regs *excp)
 			}
 			printf("\n");
                         if (regs.gpr[1] < sp) {
-                            printf("<Stack drops into 32-bit userspace %.16lx>\n", regs.gpr[1]);
+                            printf("<Stack drops into userspace %.16lx>\n", regs.gpr[1]);
                             break;
 			}
 
@@ -1226,152 +1221,6 @@ super_regs()
 		break;
 	}
 	scannl();
-}
-
-#ifndef CONFIG_PPC64BRIDGE
-static void
-dump_hash_table_seg(unsigned seg, unsigned start, unsigned end)
-{
-	extern void *Hash;
-	extern unsigned long Hash_size;
-	unsigned *htab = Hash;
-	unsigned hsize = Hash_size;
-	unsigned v, hmask, va, last_va;
-	int found, last_found, i;
-	unsigned *hg, w1, last_w2, last_va0;
-
-	last_found = 0;
-	hmask = hsize / 64 - 1;
-	va = start;
-	start = (start >> 12) & 0xffff;
-	end = (end >> 12) & 0xffff;
-	for (v = start; v < end; ++v) {
-		found = 0;
-		hg = htab + (((v ^ seg) & hmask) * 16);
-		w1 = 0x80000000 | (seg << 7) | (v >> 10);
-		for (i = 0; i < 8; ++i, hg += 2) {
-			if (*hg == w1) {
-				found = 1;
-				break;
-			}
-		}
-		if (!found) {
-			w1 ^= 0x40;
-			hg = htab + ((~(v ^ seg) & hmask) * 16);
-			for (i = 0; i < 8; ++i, hg += 2) {
-				if (*hg == w1) {
-					found = 1;
-					break;
-				}
-			}
-		}
-		if (!(last_found && found && (hg[1] & ~0x180) == last_w2 + 4096)) {
-			if (last_found) {
-				if (last_va != last_va0)
-					printf(" ... %x", last_va);
-				printf("\n");
-			}
-			if (found) {
-				printf("%x to %x", va, hg[1]);
-				last_va0 = va;
-			}
-			last_found = found;
-		}
-		if (found) {
-			last_w2 = hg[1] & ~0x180;
-			last_va = va;
-		}
-		va += 4096;
-	}
-	if (last_found)
-		printf(" ... %x\n", last_va);
-}
-
-#else /* CONFIG_PPC64BRIDGE */
-static void
-dump_hash_table_seg(unsigned seg, unsigned start, unsigned end)
-{
-	extern void *Hash;
-	extern unsigned long Hash_size;
-	unsigned *htab = Hash;
-	unsigned hsize = Hash_size;
-	unsigned v, hmask, va, last_va;
-	int found, last_found, i;
-	unsigned *hg, w1, last_w2, last_va0;
-
-	last_found = 0;
-	hmask = hsize / 128 - 1;
-	va = start;
-	start = (start >> 12) & 0xffff;
-	end = (end >> 12) & 0xffff;
-	for (v = start; v < end; ++v) {
-		found = 0;
-		hg = htab + (((v ^ seg) & hmask) * 32);
-		w1 = 1 | (seg << 12) | ((v & 0xf800) >> 4);
-		for (i = 0; i < 8; ++i, hg += 4) {
-			if (hg[1] == w1) {
-				found = 1;
-				break;
-			}
-		}
-		if (!found) {
-			w1 ^= 2;
-			hg = htab + ((~(v ^ seg) & hmask) * 32);
-			for (i = 0; i < 8; ++i, hg += 4) {
-				if (hg[1] == w1) {
-					found = 1;
-					break;
-				}
-			}
-		}
-		if (!(last_found && found && (hg[3] & ~0x180) == last_w2 + 4096)) {
-			if (last_found) {
-				if (last_va != last_va0)
-					printf(" ... %x", last_va);
-				printf("\n");
-			}
-			if (found) {
-				printf("%x to %x", va, hg[3]);
-				last_va0 = va;
-			}
-			last_found = found;
-		}
-		if (found) {
-			last_w2 = hg[3] & ~0x180;
-			last_va = va;
-		}
-		va += 4096;
-	}
-	if (last_found)
-		printf(" ... %x\n", last_va);
-}
-#endif /* CONFIG_PPC64BRIDGE */
-
-static unsigned long hash_ctx;
-static unsigned long hash_start;
-static unsigned long hash_end;
-
-static void
-dump_hash_table()
-{
-	int seg;
-	unsigned seg_start, seg_end;
-
-	hash_ctx = 0;
-	hash_start = 0;
-	hash_end = 0xfffff000;
-	scanhex(&hash_ctx);
-	scanhex(&hash_start);
-	scanhex(&hash_end);
-	printf("Mappings for context %x\n", hash_ctx);
-	seg_start = hash_start;
-	for (seg = hash_start >> 28; seg <= hash_end >> 28; ++seg) {
-		seg_end = (seg << 28) | 0x0ffff000;
-		if (seg_end > hash_end)
-			seg_end = hash_end;
-		dump_hash_table_seg((hash_ctx << 4) + seg, seg_start, seg_end);
-		seg_start = seg_end + 0x1000;
-	}
 }
 
 int
