@@ -27,5 +27,12 @@ config CPU_H7202
 	bool
 	help
 	  Select code specific to h7202 variants
+config H7202_SERIAL23
+	depends on CPU_H7202
+	bool "Use serial ports 2+3"
+	help
+	  Say Y here if you wish to use serial ports 2+3. They share their
+	  pins with the keyboard matrix controller, so you have to decide.
+
 
 endif

@@ -59,7 +59,7 @@ static struct pci_ops via82c505_ops = {
 	.write	= via82c505_write_config,
 };
 
-void __init via82c505_preinit(void *sysdata)
+void __init via82c505_preinit(void)
 {
 	printk(KERN_DEBUG "PCI: VIA 82c505\n");
 	if (!request_region(0xA8,2,"via config")) {
