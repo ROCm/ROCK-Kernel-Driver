@@ -168,7 +168,7 @@ static int  visor_write_room		(struct usb_serial_port *port);
 static int  visor_chars_in_buffer	(struct usb_serial_port *port);
 static void visor_throttle	(struct usb_serial_port *port);
 static void visor_unthrottle	(struct usb_serial_port *port);
-static int  visor_probe		(struct usb_serial *serial);
+static int  visor_probe		(struct usb_serial *serial, const struct usb_device_id *id);
 static int  visor_calc_num_ports(struct usb_serial *serial);
 static void visor_shutdown	(struct usb_serial *serial);
 static int  visor_ioctl		(struct usb_serial_port *port, struct file * file, unsigned int cmd, unsigned long arg);
@@ -600,7 +600,7 @@ static void visor_unthrottle (struct usb_serial_port *port)
 		dev_err(&port->dev, "%s - failed submitting read urb, error %d\n", __FUNCTION__, result);
 }
 
-static int visor_probe (struct usb_serial *serial)
+static int visor_probe (struct usb_serial *serial, const struct usb_device_id *id)
 {
 	struct device *dev = &serial->dev->dev;
 	int response;
