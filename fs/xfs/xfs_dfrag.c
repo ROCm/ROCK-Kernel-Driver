@@ -153,12 +153,12 @@ xfs_swapext(
 	if ((error = _MAC_XFS_IACCESS(tip, MACWRITE, NULL))) {
 		goto error0;
 	}
-	if ((current->fsuid != ip->i_d.di_uid) &&
+	if ((current_fsuid(cred) != ip->i_d.di_uid) &&
 	    (error = xfs_iaccess(ip, S_IWUSR, NULL)) &&
 	    !capable_cred(NULL, CAP_FOWNER)) {
 		goto error0;
 	}
-	if ((current->fsuid != tip->i_d.di_uid) &&
+	if ((current_fsuid(cred) != tip->i_d.di_uid) &&
 	    (error = xfs_iaccess(tip, S_IWUSR, NULL)) &&
 	    !capable_cred(NULL, CAP_FOWNER)) {
 		goto error0;

@@ -69,9 +69,11 @@
 
 #include <pagebuf/page_buf.h>
 
-#ifndef STATIC
-#define STATIC static
-#endif
+/*
+ * Feature macros (disable/enable)
+ */
+#undef  HAVE_REFCACHE	/* reference cache not needed for NFS in 2.6 */
+#define HAVE_SENDFILE	/* sendfile(2) exists in 2.6, but not in 2.4 */
 
 /*
  * State flag for unwritten extent buffers.
@@ -99,6 +101,11 @@ static inline void set_buffer_unwritten_io(struct buffer_head *bh)
 #define xfs_inherit_sync	xfs_params.inherit_sync.val
 #define xfs_inherit_nodump	xfs_params.inherit_nodump.val
 #define xfs_inherit_noatime	xfs_params.inherit_noatim.val
+
+#define current_cpu()		smp_processor_id()
+#define current_pid()		(current->pid)
+#define current_fsuid(cred)	(current->fsuid)
+#define current_fsgid(cred)	(current->fsgid)
 
 #define NBPP		PAGE_SIZE
 #define DPPSHFT		(PAGE_SHIFT - 9)
@@ -199,6 +206,11 @@ static inline void set_buffer_unwritten_io(struct buffer_head *bh)
 #define MAX(a,b)	(max(a,b))
 #define howmany(x, y)	(((x)+((y)-1))/(y))
 #define roundup(x, y)	((((x)+((y)-1))/(y))*(y))
+
+static inline void xfs_stack_trace(void)
+{
+	dump_stack();
+}
 
 /* Move the kernel do_div definition off to one side */
 

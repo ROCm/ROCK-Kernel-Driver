@@ -39,21 +39,59 @@ struct xfs_iocore;
 struct xfs_inode;
 struct xfs_bmbt_irec;
 struct page_buf_s;
-struct page_buf_bmap_s;
+struct xfs_iomap;
 
+#if defined(XFS_RW_TRACE)
+/*
+ * Defines for the trace mechanisms in xfs_lrw.c.
+ */
+#define	XFS_RW_KTRACE_SIZE	64
+#define	XFS_STRAT_KTRACE_SIZE	64
+#define	XFS_STRAT_GTRACE_SIZE	512
+
+#define	XFS_READ_ENTER		1
+#define	XFS_WRITE_ENTER		2
 #define XFS_IOMAP_READ_ENTER	3
+#define	XFS_IOMAP_WRITE_ENTER	4
+#define	XFS_IOMAP_READ_MAP	5
+#define	XFS_IOMAP_WRITE_MAP	6
+#define	XFS_IOMAP_WRITE_NOSPACE	7
+#define	XFS_ITRUNC_START	8
+#define	XFS_ITRUNC_FINISH1	9
+#define	XFS_ITRUNC_FINISH2	10
+#define	XFS_CTRUNC1		11
+#define	XFS_CTRUNC2		12
+#define	XFS_CTRUNC3		13
+#define	XFS_CTRUNC4		14
+#define	XFS_CTRUNC5		15
+#define	XFS_CTRUNC6		16
+#define	XFS_BUNMAPI		17
+#define	XFS_INVAL_CACHED	18
+#define	XFS_DIORD_ENTER		19
+#define	XFS_DIOWR_ENTER		20
+extern void xfs_rw_enter_trace(int, struct xfs_iocore *,
+			const struct iovec *, size_t, loff_t, int);
+extern void xfs_inval_cached_trace(struct xfs_iocore *,
+			xfs_off_t, xfs_off_t, xfs_off_t, xfs_off_t);
+#else
+#define xfs_rw_enter_trace(tag, io, iovec, segs, offset, ioflags)
+#define xfs_inval_cached_trace(io, offset, len, first, last)
+#endif
+
 /*
  * Maximum count of bmaps used by read and write paths.
  */
 #define	XFS_MAX_RW_NBMAPS	4
 
 extern int xfs_bmap(struct bhv_desc *, xfs_off_t, ssize_t, int,
-			struct page_buf_bmap_s *, int *);
+			struct xfs_iomap *, int *);
 extern int xfsbdstrat(struct xfs_mount *, struct page_buf_s *);
 extern int xfs_bdstrat_cb(struct page_buf_s *);
 
 extern int xfs_zero_eof(struct vnode *, struct xfs_iocore *, xfs_off_t,
 				xfs_fsize_t, xfs_fsize_t);
+extern void xfs_inval_cached_pages(struct vnode	*, struct xfs_iocore *,
+				xfs_off_t, int, int);
 extern ssize_t xfs_read(struct bhv_desc *, struct kiocb *,
 				const struct iovec *, unsigned int,
 				loff_t *, int, struct cred *);
@@ -63,16 +101,6 @@ extern ssize_t xfs_write(struct bhv_desc *, struct kiocb *,
 extern ssize_t xfs_sendfile(struct bhv_desc *, struct file *,
 				loff_t *, int, size_t, read_actor_t,
 				void *, struct cred *);
-
-extern int xfs_iomap(struct xfs_iocore *, xfs_off_t, ssize_t, int,
-				struct page_buf_bmap_s *, int *);
-extern int xfs_iomap_write_direct(struct xfs_inode *, loff_t, size_t,
-				int, struct xfs_bmbt_irec *, int *, int);
-extern int xfs_iomap_write_delay(struct xfs_inode *, loff_t, size_t,
-				int, struct xfs_bmbt_irec *, int *);
-extern int xfs_iomap_write_allocate(struct xfs_inode *,
-				struct xfs_bmbt_irec *, int *);
-extern int xfs_iomap_write_unwritten(struct xfs_inode *, loff_t, size_t);
 
 extern int xfs_dev_is_read_only(struct xfs_mount *, char *);
 

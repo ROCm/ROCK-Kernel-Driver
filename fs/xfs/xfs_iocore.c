@@ -61,6 +61,7 @@
 #include "xfs_rw.h"
 #include "xfs_quota.h"
 #include "xfs_trans_space.h"
+#include "xfs_iomap.h"
 
 
 STATIC xfs_fsize_t

@@ -181,7 +181,7 @@ extern inline xfs_caddr_t xfs_buf_offset(page_buf_t *bp, size_t offset)
 #define XFS_BUF_SET_VTYPE(bp, type)
 #define XFS_BUF_SET_REF(bp, ref)
 
-#define XFS_BUF_ISPINNED(bp)   pagebuf_ispin(bp)
+#define XFS_BUF_ISPINNED(bp)	pagebuf_ispin(bp)
 
 #define XFS_BUF_VALUSEMA(bp)	pagebuf_lock_value(bp)
 #define XFS_BUF_CPSEMA(bp)	(pagebuf_cond_lock(bp) == 0)
@@ -191,13 +191,11 @@ extern inline xfs_caddr_t xfs_buf_offset(page_buf_t *bp, size_t offset)
 
 /* setup the buffer target from a buftarg structure */
 #define XFS_BUF_SET_TARGET(bp, target)	\
-	(bp)->pb_target = (target)
-
+		(bp)->pb_target = (target)
 #define XFS_BUF_TARGET(bp)	((bp)->pb_target)
+#define XFS_BUFTARG_NAME(target)	\
+		pagebuf_target_name(target)
 
-#define XFS_BUFTARG_NAME(target) \
-	({ char __b[BDEVNAME_SIZE]; bdevname((target->pbr_bdev), __b); __b; })
-	
 #define XFS_BUF_SET_VTYPE_REF(bp, type, ref)
 #define XFS_BUF_SET_VTYPE(bp, type)
 #define XFS_BUF_SET_REF(bp, ref)
@@ -231,18 +229,11 @@ static inline void	xfs_buf_relse(page_buf_t *bp)
 	pagebuf_rele(bp);
 }
 
-
 #define xfs_bpin(bp)		pagebuf_pin(bp)
 #define xfs_bunpin(bp)		pagebuf_unpin(bp)
 
-#ifdef PAGEBUF_TRACE
-# define PB_DEFINE_TRACES
-# include <pagebuf/page_buf_trace.h>
-# define xfs_buftrace(id, bp)	PB_TRACE(bp, PB_TRACE_REC(external), (void *)id)
-#else
-# define xfs_buftrace(id, bp)	do { } while (0)
-#endif
-
+#define xfs_buftrace(id, bp)	\
+	    pagebuf_trace(bp, id, NULL, (void *)__builtin_return_address(0))
 
 #define xfs_biodone(pb)		    \
 	    pagebuf_iodone(pb, (pb->pb_flags & PBF_FS_DATAIOD), 0)
