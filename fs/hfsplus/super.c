@@ -246,8 +246,7 @@ int hfsplus_remount(struct super_block *sb, int *flags, char *data)
 	if (!(*flags & MS_RDONLY)) {
 		struct hfsplus_vh *vhdr = HFSPLUS_SB(sb).s_vhdr;
 
-		if ((vhdr->attributes & cpu_to_be32(HFSPLUS_VOL_INCNSTNT)) ||
-		    !(vhdr->attributes & cpu_to_be32(HFSPLUS_VOL_UNMNT))) {
+		if (!(vhdr->attributes & cpu_to_be32(HFSPLUS_VOL_UNMNT))) {
 			printk("HFS+-fs warning: Filesystem was not cleanly unmounted, "
 			       "running fsck.hfsplus is recommended.  leaving read-only.\n");
 			sb->s_flags |= MS_RDONLY;
@@ -332,8 +331,7 @@ static int hfsplus_fill_super(struct super_block *sb, void *data, int silent)
 	sb->s_op = &hfsplus_sops;
 	sb->s_maxbytes = MAX_LFS_FILESIZE;
 
-	if ((vhdr->attributes & cpu_to_be32(HFSPLUS_VOL_INCNSTNT)) ||
-	    !(vhdr->attributes & cpu_to_be32(HFSPLUS_VOL_UNMNT))) {
+	if (!(vhdr->attributes & cpu_to_be32(HFSPLUS_VOL_UNMNT))) {
 		if (!silent)
 			printk("HFS+-fs warning: Filesystem was not cleanly unmounted, "
 			       "running fsck.hfsplus is recommended.  mounting read-only.\n");
