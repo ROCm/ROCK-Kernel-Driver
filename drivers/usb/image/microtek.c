@@ -583,13 +583,22 @@ static void mts_command_done( struct urb *transfer )
 		return;
 	}
 
-	if ( context->data ) {
+	if (context->srb->cmnd[0] == REQUEST_SENSE) {
 		mts_int_submit_urb(transfer,
 				   context->data_pipe,
-				   context->data,
+				   context->srb->sense_buffer,
 				   context->data_length,
-				   context->srb->use_sg ? mts_do_sg : mts_data_done);
-	} else mts_get_status(transfer);
+				   mts_data_done);
+	} else { if ( context->data ) {
+			mts_int_submit_urb(transfer,
+					   context->data_pipe,
+					   context->data,
+					   context->data_length,
+					   context->srb->use_sg ? mts_do_sg : mts_data_done);
+		} else {
+			mts_get_status(transfer);
+		}
+	}
 
 	return;
 }
@@ -598,7 +607,7 @@ static void mts_do_sg (struct urb* transfer)
 {
 	struct scatterlist * sg;
 	MTS_INT_INIT();
-	
+
 	MTS_DEBUG("Processing fragment %d of %d\n", context->fragment,context->srb->use_sg);
 
 	if (unlikely(transfer->status)) {
