@@ -13,6 +13,7 @@ CFLAGS_prom_init.o      += -mrelocatable-lib
 CFLAGS_btext.o          += -mrelocatable-lib
 
 obj-$(CONFIG_PPCBUG_NVRAM)	+= prep_nvram.o
+obj-$(CONFIG_PPC_OCP)		+= ocp.o
 obj-$(CONFIG_44x)		+= ibm44x_common.o
 obj-$(CONFIG_440GP)		+= ibm440gp_common.o
 ifeq ($(CONFIG_4xx),y)
