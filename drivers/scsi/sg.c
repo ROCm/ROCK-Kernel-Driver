@@ -1359,10 +1359,6 @@ sg_attach(Scsi_Device * scsidp)
 	if (!disk)
 		return -ENOMEM;
 
-	error = scsi_slave_attach(scsidp);
-	if (error)
-		goto out_put;
-		
 	write_lock_irqsave(&sg_dev_arr_lock, iflags);
 	if (sg_nr_dev >= sg_dev_max) {	/* try to resize */
 		Sg_device **tmp_da;
@@ -1375,7 +1371,7 @@ sg_attach(Scsi_Device * scsidp)
 			printk(KERN_ERR
 			       "sg_attach: device array cannot be resized\n");
 			error = -ENOMEM;
-			goto out_detach;
+			goto out;
 		}
 		write_lock_irqsave(&sg_dev_arr_lock, iflags);
 		memset(tmp_da, 0, tmp_dev_max * sizeof (Sg_device *));
@@ -1400,7 +1396,7 @@ find_empty_slot:
 		if (NULL != sdp)
 			vfree((char *) sdp);
 		error = -ENODEV;
-		goto out_detach;
+		goto out;
 	}
 	if (k < sg_dev_max) {
 		if (NULL == sdp) {
@@ -1416,7 +1412,7 @@ find_empty_slot:
 		write_unlock_irqrestore(&sg_dev_arr_lock, iflags);
 		printk(KERN_ERR "sg_attach: Sg_device cannot be allocated\n");
 		error = -ENOMEM;
-		goto out_detach;
+		goto out;
 	}
 
 	SCSI_LOG_TIMEOUT(3, printk("sg_attach: dev=%d \n", k));
@@ -1473,9 +1469,7 @@ find_empty_slot:
 	}
 	return 0;
 
-out_detach:
-	scsi_slave_detach(scsidp);
-out_put:
+out:
 	put_disk(disk);
 	return error;
 }
@@ -1526,7 +1520,6 @@ sg_detach(Scsi_Device * scsidp)
 			SCSI_LOG_TIMEOUT(3, printk("sg_detach: dev=%d\n", k));
 			sg_dev_arr[k] = NULL;
 		}
-		scsi_slave_detach(scsidp);
 		sg_nr_dev--;
 		break;
 	}

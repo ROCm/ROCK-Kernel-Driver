@@ -1269,9 +1269,6 @@ struct scsi_device *scsi_add_device(struct Scsi_Host *shost,
 int scsi_remove_device(struct scsi_device *sdev)
 {
 	scsi_detach_device(sdev);
-	if (sdev->attached)
-		return -EINVAL;
-
 	scsi_device_unregister(sdev);
 	return 0;
 }

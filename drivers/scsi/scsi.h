@@ -261,8 +261,6 @@ extern struct scsi_cmnd *scsi_get_command(struct scsi_device *dev, int flags);
 extern void scsi_put_command(struct scsi_cmnd *cmd);
 extern void scsi_adjust_queue_depth(Scsi_Device *, int, int);
 extern int scsi_track_queue_full(Scsi_Device *, int);
-extern int scsi_slave_attach(struct scsi_device *);
-extern void scsi_slave_detach(struct scsi_device *);
 extern int scsi_device_get(struct scsi_device *);
 extern void scsi_device_put(struct scsi_device *);
 extern void scsi_set_device_offline(struct scsi_device *);
@@ -344,8 +342,6 @@ struct scsi_device {
 					 * vendor-specific cmd's */
 	unsigned sector_size;	/* size in bytes */
 
-	int attached;		/* # of high level drivers attached to 
-				 * this */
 	int access_count;	/* Count of open channels/mounts */
 
 	void *hostdata;		/* available to low-level driver */

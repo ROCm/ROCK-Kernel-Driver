@@ -187,14 +187,7 @@ struct scsi_request *scsi_allocate_request(struct scsi_device *sdev)
  */
 void scsi_release_request(struct scsi_request *sreq)
 {
-	if (likely(sreq->sr_command != NULL)) {
-    		struct request_queue *q = sreq->sr_device->request_queue;
-
-		scsi_put_command(sreq->sr_command);
-		sreq->sr_command = NULL;
-		scsi_queue_next_request(q, NULL);
-	}
-
+	__scsi_release_request(sreq);
 	kfree(sreq);
 }
 
@@ -1274,39 +1267,6 @@ void scsi_set_device_offline(struct scsi_device *sdev)
 	} else {
 		/* FIXME: Send online state change hotplug event */
 	}
-}
-
-/*
- * Function:	scsi_slave_attach()
- *
- * Purpose:	Called from the upper level driver attach to handle common
- * 		attach code.
- *
- * Arguments:	sdev - scsi_device to attach
- *
- * Returns:	1 on error, 0 on succes
- *
- * Lock Status:	Protected via scsi_devicelist_mutex.
- */
-int scsi_slave_attach(struct scsi_device *sdev)
-{
-	sdev->attached++;
-	return 0;
-}
-
-/*
- * Function:	scsi_slave_detach()
- *
- * Purpose:	Called from the upper level driver attach to handle common
- * 		detach code.
- *
- * Arguments:	sdev - struct scsi_device to detach
- *
- * Lock Status:	Protected via scsi_devicelist_mutex.
- */
-void scsi_slave_detach(struct scsi_device *sdev)
-{
-	sdev->attached--;
 }
 
 /*
