@@ -21,7 +21,6 @@
 #include <sound/driver.h>
 #include <linux/time.h>
 #include <linux/fs.h>
-#include <linux/compat.h>
 #include <sound/core.h>
 #include <sound/timer.h>
 #include <asm/uaccess.h>
@@ -32,7 +31,7 @@ struct sndrv_timer_info32 {
 	s32 card;
 	unsigned char id[64];
 	unsigned char name[80];
-	u32 reserved0;
+	u32 ticks;
 	u32 resolution;
 	unsigned char reserved[64];
 };
@@ -43,11 +42,17 @@ struct sndrv_timer_info32 {
 	COPY(card);\
 	memcpy(dst->id, src->id, sizeof(src->id));\
 	memcpy(dst->name, src->name, sizeof(src->name));\
+	COPY(ticks);\
 	COPY(resolution);\
 }
 
+struct timeval32 {
+	s32 tv_sec;
+	s32 tv_usec;
+};
+
 struct sndrv_timer_status32 {
-	struct compat_timespec tstamp;
+	struct timeval32 tstamp;
 	u32 resolution;
 	u32 lost;
 	u32 overrun;
@@ -58,7 +63,7 @@ struct sndrv_timer_status32 {
 #define CVT_sndrv_timer_status()\
 {\
 	COPY(tstamp.tv_sec);\
-	COPY(tstamp.tv_nsec);\
+	COPY(tstamp.tv_usec);\
 	COPY(resolution);\
 	COPY(lost);\
 	COPY(overrun);\

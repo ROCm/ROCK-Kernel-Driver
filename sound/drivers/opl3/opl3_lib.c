@@ -470,7 +470,7 @@ int snd_opl3_create(snd_card_t * card,
 	case OPL3_HW_OPL4:
 		opl3->max_voices = MAX_OPL3_VOICES;
 		snd_assert(opl3->r_port != 0, snd_opl3_free(opl3); return -ENODEV);
-		opl3->command(opl3, OPL3_RIGHT | OPL3_REG_MODE, 0x00);	/* Enter OPL2 mode */
+		opl3->command(opl3, OPL3_RIGHT | OPL3_REG_MODE, OPL3_OPL3_ENABLE);	/* Enter OPL3 mode */
 	}
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, opl3, &ops)) < 0) {
 		snd_opl3_free(opl3);

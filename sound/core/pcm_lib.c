@@ -1711,7 +1711,7 @@ int snd_pcm_hw_param_near(snd_pcm_t *pcm, snd_pcm_hw_params_t *params,
  * snd_pcm_hw_param_choose
  *
  * Choose one configuration from configuration space defined by PARAMS
- * The configuration choosen is that obtained fixing in this order:
+ * The configuration chosen is that obtained fixing in this order:
  * first access, first format, first subformat, min channels,
  * min rate, min period time, max buffer size, min tick time
  */
@@ -2119,6 +2119,7 @@ static snd_pcm_sframes_t snd_pcm_lib_write1(snd_pcm_substream_t *substream,
 				spin_lock_irq(&runtime->lock);
 				switch (runtime->status->state) {
 				case SNDRV_PCM_STATE_XRUN:
+				case SNDRV_PCM_STATE_DRAINING:
 					state = ERROR;
 					goto _end_loop;
 				case SNDRV_PCM_STATE_SUSPENDED:
@@ -2377,6 +2378,7 @@ static snd_pcm_sframes_t snd_pcm_lib_read1(snd_pcm_substream_t *substream, void 
 		snd_pcm_uframes_t cont;
 		if (runtime->sleep_min == 0 && runtime->status->state == SNDRV_PCM_STATE_RUNNING)
 			snd_pcm_update_hw_ptr(substream);
+	      __draining:
 		avail = snd_pcm_capture_avail(runtime);
 		if (runtime->status->state == SNDRV_PCM_STATE_DRAINING) {
 			if (avail < runtime->xfer_align) {
@@ -2418,6 +2420,8 @@ static snd_pcm_sframes_t snd_pcm_lib_read1(snd_pcm_substream_t *substream, void 
 				case SNDRV_PCM_STATE_SUSPENDED:
 					state = SUSPENDED;
 					goto _end_loop;
+				case SNDRV_PCM_STATE_DRAINING:
+					goto __draining;
 				default:
 					break;
 				}

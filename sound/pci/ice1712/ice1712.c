@@ -1373,25 +1373,25 @@ static int __devinit snd_ice1712_build_pro_mixer(ice1712_t *ice)
 		strcpy(ctl.id.name, "Multi Playback Switch");
 		ctl.id.index = idx;
 		ctl.id.iface = SNDRV_CTL_ELEM_IFACE_MIXER;
+		ctl.count = 1;
 		ctl.info = snd_ice1712_pro_mixer_switch_info;
-		ctl.access = SNDRV_CTL_ELEM_ACCESS_READ|SNDRV_CTL_ELEM_ACCESS_WRITE;
 		ctl.get = snd_ice1712_pro_mixer_switch_get;
 		ctl.put = snd_ice1712_pro_mixer_switch_put;
 		ctl.private_value = idx;
 		ctl.private_data = ice;
-		if ((err = snd_ctl_add(card, snd_ctl_new(&ctl))) < 0)
+		if ((err = snd_ctl_add(card, snd_ctl_new(&ctl, SNDRV_CTL_ELEM_ACCESS_READ|SNDRV_CTL_ELEM_ACCESS_WRITE))) < 0)
 			return err;
 		memset(&ctl, 0, sizeof(ctl));
 		strcpy(ctl.id.name, "Multi Playback Volume");
 		ctl.id.index = idx;
 		ctl.id.iface = SNDRV_CTL_ELEM_IFACE_MIXER;
+		ctl.count = 1;
 		ctl.info = snd_ice1712_pro_mixer_volume_info;
-		ctl.access = SNDRV_CTL_ELEM_ACCESS_READ|SNDRV_CTL_ELEM_ACCESS_WRITE;
 		ctl.get = snd_ice1712_pro_mixer_volume_get;
 		ctl.put = snd_ice1712_pro_mixer_volume_put;
 		ctl.private_value = idx;
 		ctl.private_data = ice;
-		if ((err = snd_ctl_add(card, snd_ctl_new(&ctl))) < 0)
+		if ((err = snd_ctl_add(card, snd_ctl_new(&ctl, SNDRV_CTL_ELEM_ACCESS_READ|SNDRV_CTL_ELEM_ACCESS_WRITE))) < 0)
 			return err;
 	}
 
@@ -1401,25 +1401,25 @@ static int __devinit snd_ice1712_build_pro_mixer(ice1712_t *ice)
 		strcpy(ctl.id.name, "Multi Capture Switch");
 		ctl.id.index = idx;
 		ctl.id.iface = SNDRV_CTL_ELEM_IFACE_MIXER;
+		ctl.count = 1;
 		ctl.info = snd_ice1712_pro_mixer_switch_info;
-		ctl.access = SNDRV_CTL_ELEM_ACCESS_READ|SNDRV_CTL_ELEM_ACCESS_WRITE;
 		ctl.get = snd_ice1712_pro_mixer_switch_get;
 		ctl.put = snd_ice1712_pro_mixer_switch_put;
 		ctl.private_value = idx + 10;
 		ctl.private_data = ice;
-		if ((err = snd_ctl_add(card, snd_ctl_new(&ctl))) < 0)
+		if ((err = snd_ctl_add(card, snd_ctl_new(&ctl, SNDRV_CTL_ELEM_ACCESS_READ|SNDRV_CTL_ELEM_ACCESS_WRITE))) < 0)
 			return err;
 		memset(&ctl, 0, sizeof(ctl));
 		strcpy(ctl.id.name, "Multi Capture Volume");
 		ctl.id.index = idx;
 		ctl.id.iface = SNDRV_CTL_ELEM_IFACE_MIXER;
+		ctl.count = 1;
 		ctl.info = snd_ice1712_pro_mixer_volume_info;
-		ctl.access = SNDRV_CTL_ELEM_ACCESS_READ|SNDRV_CTL_ELEM_ACCESS_WRITE;
 		ctl.get = snd_ice1712_pro_mixer_volume_get;
 		ctl.put = snd_ice1712_pro_mixer_volume_put;
 		ctl.private_value = idx + 10;
 		ctl.private_data = ice;
-		if ((err = snd_ctl_add(card, snd_ctl_new(&ctl))) < 0)
+		if ((err = snd_ctl_add(card, snd_ctl_new(&ctl, SNDRV_CTL_ELEM_ACCESS_READ|SNDRV_CTL_ELEM_ACCESS_WRITE))) < 0)
 			return err;
 	}
 	

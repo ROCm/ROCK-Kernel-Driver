@@ -37,7 +37,9 @@ MODULE_LICENSE("GPL");
 static int index = SNDRV_DEFAULT_IDX1;		/* Index 0-MAX */
 static char *id = SNDRV_DEFAULT_STR1;		/* ID for this card */
 static int enable = 1;
+#ifdef PMAC_SUPPORT_PCM_BEEP
 static int enable_beep = 1;
+#endif
 
 MODULE_PARM(index, "i");
 MODULE_PARM_DESC(index, "Index value for " CHIP_NAME " soundchip.");
@@ -48,9 +50,11 @@ MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 MODULE_PARM(enable, "i");
 MODULE_PARM_DESC(enable, "Enable this soundchip.");
 MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
+#ifdef PMAC_SUPPORT_PCM_BEEP
 MODULE_PARM(enable_beep, "i");
 MODULE_PARM_DESC(enable_beep, "Enable beep using PCM.");
 MODULE_PARM_SYNTAX(enable_beep, SNDRV_ENABLED "," SNDRV_BOOLEAN_TRUE_DESC);
+#endif
 
 
 /*
@@ -129,7 +133,7 @@ static int __init snd_pmac_probe(void)
 		goto __error;
 
 	chip->initialized = 1;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+#ifdef PMAC_SUPPORT_PCM_BEEP
 	if (enable_beep)
 		snd_pmac_attach_beep(chip);
 #endif
@@ -181,8 +185,10 @@ static int __init alsa_card_pmac_setup(char *str)
 {
 	(void)(get_option(&str,&enable) == 2 &&
 	       get_option(&str,&index) == 2 &&
-	       get_id(&str,&id) == 2 &&
-	       get_option(&str,&enable_beep) == 2
+	       get_id(&str,&id) == 2
+#ifdef PMAC_SUPPORT_PCM_BEEP
+	       && get_option(&str,&enable_beep) == 2
+#endif
 	       );
 	return 1;
 }

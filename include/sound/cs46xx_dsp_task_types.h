@@ -27,6 +27,8 @@
 #ifndef __CS46XX_DSP_TASK_TYPES_H__
 #define __CS46XX_DSP_TASK_TYPES_H__
 
+#include "cs46xx_dsp_scb_types.h"
+
 /*********************************************************************************************
 Example hierarchy of stream control blocks in the SP
 
@@ -54,7 +56,7 @@ Ptr____Call (c)
 #define		HFG_CONTEXT_SWITCH_MODE			0x0002
 #define		HFG_CONTEXT_SWITCH_MODE_BIT		1
 
-#define MAX_FG_STACK_SIZE 	32				// THESE NEED TO BE COMPUTED PROPERLY
+#define MAX_FG_STACK_SIZE 	32			/* THESE NEED TO BE COMPUTED PROPERLY */
 #define MAX_MG_STACK_SIZE 	16
 #define MAX_BG_STACK_SIZE 	9
 #define MAX_HFG_STACK_SIZE	4
@@ -74,64 +76,84 @@ typedef struct _hf_save_area_t {
 	u32	r54_save;
 	u32	r98_save;
 
-	u16 status_save;
-	u16 ind_save;
+	___DSP_DUAL_16BIT_ALLOC(
+	    status_save,
+	    ind_save
+	)
 
-	u16 rci1_save;
-	u16 rci0_save;
+	___DSP_DUAL_16BIT_ALLOC(
+	    rci1_save,
+	    rci0_save
+	)
 
 	u32	r32_save;
 	u32	r76_save;
 	u32	rsd2_save;
 
-	u16   rsi2_save;	  /* See TaskTreeParameterBlock for 
+       	___DSP_DUAL_16BIT_ALLOC(
+	      rsi2_save,	  /* See TaskTreeParameterBlock for 
 				     remainder of registers  */
-	u16	rsa2Save;
+	      rsa2Save
+	)
 	/* saved as part of HFG context  */
 } hf_save_area_t;
 
 
 /* Task link data structure */
 typedef struct _tree_link_t {
+	___DSP_DUAL_16BIT_ALLOC(
 	/* Pointer to sibling task control block */
-	u16 next_scb;
+	    next_scb,
 	/* Pointer to child task control block */
-	u16 sub_ptr;
+	    sub_ptr
+	)
   
+	___DSP_DUAL_16BIT_ALLOC(
 	/* Pointer to code entry point */
-	u16 entry_point; 
+	    entry_point, 
 	/* Pointer to local data */
-	u16 this_spb;
+	    this_spb
+	)
 } tree_link_t;
 
 
 typedef struct _task_tree_data_t {
+	___DSP_DUAL_16BIT_ALLOC(
 	/* Initial tock count; controls task tree execution rate */
-	u16 tock_count_limit;
+	    tock_count_limit,
 	/* Tock down counter */
-	u16 tock_count;
-  
+	    tock_count
+	)
+
 	/* Add to ActiveCount when TockCountLimit reached: 
 	   Subtract on task tree termination */
-	u16 active_tncrement;		
+	___DSP_DUAL_16BIT_ALLOC(
+	    active_tncrement,		
 	/* Number of pending activations for task tree */
-	u16 active_count;
+	    active_count
+	)
 
+        ___DSP_DUAL_16BIT_ALLOC(
 	/* BitNumber to enable modification of correct bit in ActiveTaskFlags */
-	u16 active_bit;	    
+	    active_bit,	    
 	/* Pointer to OS location for indicating current activity on task level */
-	u16 active_task_flags_ptr;
+	    active_task_flags_ptr
+	)
 
 	/* Data structure for controlling movement of memory blocks:- 
 	   currently unused */
-	u16 mem_upd_ptr;
+	___DSP_DUAL_16BIT_ALLOC(
+	    mem_upd_ptr,
 	/* Data structure for controlling synchronous link update */
-	u16 link_upd_ptr;
+	    link_upd_ptr
+	)
   
+	___DSP_DUAL_16BIT_ALLOC(
 	/* Save area for remainder of full context. */
-	u16 save_area;  
+	    save_area,
 	/* Address of start of local stack for data storage */
-	u16 data_stack_base_ptr;
+	    data_stack_base_ptr
+	)
 
 } task_tree_data_t;
 
@@ -140,12 +162,16 @@ typedef struct _task_tree_data_t {
 typedef struct _interval_timer_data_t
 {
 	/* These data items have the same relative locations to those */
-	u16  interval_timer_period;
-	u16  itd_unused;
+	___DSP_DUAL_16BIT_ALLOC(
+	     interval_timer_period,
+	     itd_unused
+	)
 
 	/* used for this data in the SPOS control block for SPOS 1.0 */
-	u16  num_FG_ticks_this_interval;        
-	u16  num_intervals;
+	___DSP_DUAL_16BIT_ALLOC(
+	     num_FG_ticks_this_interval,        
+	     num_intervals
+	)
 } interval_timer_data_t;    
 
 
@@ -155,24 +181,36 @@ typedef struct _task_tree_context_block_t {
 	/* Up to 10 values are saved onto the stack.  8 for the task tree, 1 for
 	   The access to the context switch (call or interrupt), and 1 spare that
 	   users should never use.  This last may be required by the system */
-	u16       stack1;		
-	u16		stack0;
-	u16       stack3;		
-	u16		stack2;
-	u16       stack5;		
-	u16		stack4;
-	u16       stack7;
-	u16		stack6;
-	u16       stack9;
-	u16		stack8;
+	___DSP_DUAL_16BIT_ALLOC(
+	     stack1,
+	     stack0
+	)
+	___DSP_DUAL_16BIT_ALLOC(
+	     stack3,
+	     stack2
+	)
+	___DSP_DUAL_16BIT_ALLOC(
+	     stack5,
+	     stack4
+	)
+	___DSP_DUAL_16BIT_ALLOC(
+	     stack7,
+	     stack6
+	)
+	___DSP_DUAL_16BIT_ALLOC(
+	     stack9,
+	     stack8
+	)
 
-	u32		saverfe;					
+	u32	  saverfe;					
 
 	/* Value may be overwriten by stack save algorithm.
 	   Retain the size of the stack data saved here if used */
-	u16       reserved1;	
-	u16		stack_size;
-	u32		saverba;		  /* (HFG) */
+	___DSP_DUAL_16BIT_ALLOC(
+             reserved1,	
+  	     stack_size
+	)
+	u32		saverba;	  /* (HFG) */
 	u32		saverdc;
 	u32		savers_config_23; /* (HFG) */
 	u32		savers_DMA23;	  /* (HFG) */
@@ -205,8 +243,8 @@ typedef struct _task_tree_context_block_t {
 
 typedef struct _task_tree_control_block_t	{
 	hf_save_area_t		 	context;
-	tree_link_t				links;
-	task_tree_data_t			data;
+	tree_link_t			links;
+	task_tree_data_t		data;
 	task_tree_context_block_t	context_blk;
 	interval_timer_data_t		int_timer;
 } task_tree_control_block_t;

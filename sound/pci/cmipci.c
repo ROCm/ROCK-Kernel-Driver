@@ -1443,7 +1443,7 @@ static void save_mixer_state(cmipci_t *cm)
 					ctl->put(ctl, &val); /* toggle */
 					event |= SNDRV_CTL_EVENT_MASK_VALUE;
 				}
-				ctl->access |= SNDRV_CTL_ELEM_ACCESS_INACTIVE;
+				ctl->vd[0].access |= SNDRV_CTL_ELEM_ACCESS_INACTIVE;
 				snd_ctl_notify(cm->card, event, &ctl->id);
 			}
 		}
@@ -1466,7 +1466,7 @@ static void restore_mixer_state(cmipci_t *cm)
 				int event;
 
 				memset(&val, 0, sizeof(val));
-				ctl->access &= ~SNDRV_CTL_ELEM_ACCESS_INACTIVE;
+				ctl->vd[0].access &= ~SNDRV_CTL_ELEM_ACCESS_INACTIVE;
 				ctl->get(ctl, &val);
 				event = SNDRV_CTL_EVENT_MASK_INFO;
 				if (val.value.integer.value[0] != cm->mixer_res_status[i]) {

@@ -681,6 +681,54 @@ cs46xx_dsp_create_src_task_scb(cs46xx_t * chip,char * scb_name,
 	return scb;
 }
 
+dsp_scb_descriptor_t * 
+cs46xx_dsp_create_filter_scb(cs46xx_t * chip,char * scb_name,
+			     u16 buffer_addr,u32 dest,
+			     dsp_scb_descriptor_t * parent_scb,
+			     int scb_child_type) {
+	dsp_scb_descriptor_t * scb;
+	
+	filter_scb_t filter_scb = {
+		.a0_right            = 0x41a9,
+		.a0_left             = 0x41a9,
+		.a1_right            = 0xb8e4,
+		.a1_left             = 0xb8e4,
+		.a2_right            = 0x3e55,
+		.a2_left             = 0x3e55,
+		
+		.filter_unused3      = 0x0000,
+		.filter_unused2      = 0x0000,
+
+		.output_buf_ptr      = buffer_addr,
+		.init                = 0x000,
+
+		.prev_sample_output1 = 0x00000000,
+		.prev_sample_output2 = 0x00000000,
+
+		.prev_sample_input1  = 0x00000000,
+		.prev_sample_input2  = 0x00000000,
+
+		.next_scb_ptr        = 0x0000,
+		.sub_list_ptr        = 0x0000,
+
+		.entry_point         = 0x0000,
+		.spb_ptr             = 0x0000,
+
+		.b0_right            = 0x0e38,
+		.b0_left             = 0x0e38,
+		.b1_right            = 0x1c71,
+		.b1_left             = 0x1c71,
+		.b2_right            = 0x0e38,
+		.b2_left             = 0x0e38,
+	};
+
+
+	scb = cs46xx_dsp_create_generic_scb(chip,scb_name,(u32 *)&filter_scb,
+					    dest,"FILTERTASK",parent_scb,
+					    scb_child_type);
+
+ 	return scb;
+}
 
 dsp_scb_descriptor_t * 
 cs46xx_dsp_create_mix_only_scb(cs46xx_t * chip,char * scb_name,
@@ -705,8 +753,8 @@ cs46xx_dsp_create_mix_only_scb(cs46xx_t * chip,char * scb_name,
 		},
 		/* 9 */ 0,0,
 		/* A */ 0,0,
-		/* B */ RSCONFIG_SAMPLE_16STEREO + RSCONFIG_MODULO_64,
-		/* C */ (mix_buffer_addr  + (32 * 4)) << 0x10, 
+		/* B */ RSCONFIG_SAMPLE_16STEREO + RSCONFIG_MODULO_32,
+		/* C */ (mix_buffer_addr  + (16 * 4)) << 0x10, 
 		/* D */ 0,
 		{
 			/* E */ 0x8000,0x8000,
@@ -768,7 +816,8 @@ cs46xx_dsp_create_mix_to_ostream_scb(cs46xx_t * chip,char * scb_name,
 
 
 	scb = cs46xx_dsp_create_generic_scb(chip,scb_name,(u32 *)&mix2_ostream_scb,
-					    dest,"S16_MIX_TO_OSTREAM",parent_scb,
+				
+	    dest,"S16_MIX_TO_OSTREAM",parent_scb,
 					    scb_child_type);
   
 	return scb;
@@ -1120,23 +1169,38 @@ static u32 pcm_reader_buffer_addr[DSP_MAX_PCM_CHANNELS] = {
 };
 
 static u32 src_output_buffer_addr[DSP_MAX_SRC_NR] = {
-	0x2580,
-	0x2680,
-	0x2780,
-	0x2980,  
-	0x2A80,  
-	0x2B80,  
+	0x2B80,
+	0x2BA0,
+	0x2BC0,
+	0x2BE0,
+	0x2D00,  
+	0x2D20,  
+	0x2D40,  
+	0x2D60,
+	0x2D80,
+	0x2DA0,
+	0x2DC0,
+	0x2DE0,
+	0x2E00,
+	0x2E20
 };
 
 static u32 src_delay_buffer_addr[DSP_MAX_SRC_NR] = {
+	0x2480,
+	0x2500,
+	0x2580,
 	0x2600,
+	0x2680,
 	0x2700,
+	0x2780,
 	0x2800,
+	0x2880,
 	0x2900,
+	0x2980,
 	0x2A00,
-	0x2B00,
+	0x2A80,
+	0x2B00
 };
-
 
 pcm_channel_descriptor_t * cs46xx_dsp_create_pcm_channel (cs46xx_t * chip,
                                                           u32 sample_rate, void * private_data, 
@@ -1159,11 +1223,10 @@ pcm_channel_descriptor_t * cs46xx_dsp_create_pcm_channel (cs46xx_t * chip,
 	case DSP_PCM_REAR_CHANNEL:
 		mixer_scb = ins->rear_mix_scb;
 		break;
-	case DSP_PCM_CENTER_CHANNEL:
-		/* TODO */
-		snd_assert(0);
+	case DSP_PCM_CENTER_LFE_CHANNEL:
+		mixer_scb = ins->center_lfe_mix_scb;
 		break;
-	case DSP_PCM_LFE_CHANNEL:
+	case DSP_PCM_S71_CHANNEL:
 		/* TODO */
 		snd_assert(0);
 		break;

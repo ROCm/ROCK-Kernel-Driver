@@ -20,6 +20,7 @@
  */
 
 #include <sound/driver.h>
+#include <linux/version.h>
 #include <linux/init.h>
 #include <linux/vmalloc.h>
 #include <linux/time.h>
@@ -1032,6 +1033,7 @@ static void snd_info_device_fill_inode(struct inode *inode, int fill)
 static inline void snd_info_device_entry_prepare(struct proc_dir_entry *de, snd_info_entry_t *entry)
 {
 	de->fill_inode = snd_info_device_fill_inode;
+	de->ops = &snd_info_device_inode_operations;
 }
 #else
 static inline void snd_info_device_entry_prepare(struct proc_dir_entry *de, snd_info_entry_t *entry)
@@ -1067,9 +1069,6 @@ snd_info_entry_t *snd_info_create_device(const char *name, unsigned int number, 
 	p = create_proc_entry(entry->name, entry->mode, snd_proc_dev);
 	if (p) {
 		snd_info_device_entry_prepare(p, entry);
-#ifdef LINUX_2_2
-		p->ops = &snd_info_device_inode_operations;
-#endif
 	} else {
 		up(&info_mutex);
 		snd_info_free_entry(entry);
