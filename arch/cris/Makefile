@@ -100,6 +100,3 @@ archclean:
 	rm -rf $(LD_SCRIPT).tmp
 
 archmrproper:
-
-archdep:
-	@$(MAKEBOOT) dep

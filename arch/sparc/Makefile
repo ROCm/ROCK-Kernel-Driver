@@ -58,9 +58,9 @@ archclean:
 archmrproper:
 	rm -f $(TOPDIR)/include/asm-sparc/asm_offsets.h
 
-archdep: check_asm
+prepare: check_asm
 
-check_asm: include/linux/version.h
+check_asm: include/linux/version.h include/linux/asm include/config/MARKER
 	$(MAKE) -C arch/sparc/kernel check_asm
 
 tftpboot.img:

@@ -127,8 +127,11 @@ archmrproper:
 	rm -f arch/$(ARCH)/vmlinux.lds
 	@$(MAKE) -C arch/$(ARCH)/tools mrproper
 
-archdep:
-	@$(MAKEBOOT) dep
-
 bootpfile:
 	@$(MAKEBOOT) bootpfile
+
+prepare: $(TOPDIR)/include/asm-ia64/offsets.h
+
+$(TOPDIR)/include/asm-ia64/offsets.h: include/asm include/linux/version.h \
+				      include/config/MARKER
+	@$(MAKE) -C arch/$(ARCH)/tools $@
