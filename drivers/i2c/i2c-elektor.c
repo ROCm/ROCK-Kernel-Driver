@@ -160,7 +160,7 @@ static int pcf_isa_init(void)
 }
 
 
-static void __exit pcf_isa_exit(void)
+static void pcf_isa_exit(void)
 {
 	if (irq > 0) {
 		disable_irq(irq);
