@@ -1102,6 +1102,8 @@ extern int full_check_disk_change(struct block_device *);
 extern int __check_disk_change(dev_t);
 extern int invalidate_inodes(struct super_block *);
 extern int invalidate_device(kdev_t, int);
+extern void invalidate_mapping_pages(struct address_space *mapping,
+					pgoff_t start, pgoff_t end);
 extern void invalidate_inode_pages(struct address_space *mapping);
 extern void invalidate_inode_pages2(struct address_space *mapping);
 extern void write_inode_now(struct inode *, int);

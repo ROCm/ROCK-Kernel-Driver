@@ -792,8 +792,8 @@ ENTRY(sys_call_table)
 	.long sys_io_getevents
 	.long sys_io_submit
 	.long sys_io_cancel
-	.long sys_ni_syscall 	/* 250 sys_alloc_hugepages - reuse this */
-	.long sys_ni_syscall	/* was sys_free_hugepages - reuse this */
+	.long sys_fadvise64	/* 250 */
+	.long sys_ni_syscall
 	.long sys_exit_group
 	.long sys_lookup_dcookie
 	.long sys_epoll_create

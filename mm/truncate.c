@@ -177,24 +177,28 @@ void truncate_inode_pages(struct address_space *mapping, loff_t lstart)
 }
 
 /**
- * invalidate_inode_pages - Invalidate all the unlocked pages of one inode
- * @inode: the inode which pages we want to invalidate
+ * invalidate_mapping_pages - Invalidate all the unlocked pages of one inode
+ * @inode: the address_space which holds the pages to invalidate
+ * @end: the index of the last page to invalidate (inclusive)
+ * @nr_pages: defines the pagecache span.  Invalidate up to @start + @nr_pages
  *
  * This function only removes the unlocked pages, if you want to
  * remove all the pages of one inode, you must call truncate_inode_pages.
  *
- * invalidate_inode_pages() will not block on IO activity. It will not
+ * invalidate_mapping_pages() will not block on IO activity. It will not
  * invalidate pages which are dirty, locked, under writeback or mapped into
  * pagetables.
  */
-void invalidate_inode_pages(struct address_space *mapping)
+void invalidate_mapping_pages(struct address_space *mapping,
+				pgoff_t start, pgoff_t end)
 {
 	struct pagevec pvec;
-	pgoff_t next = 0;
+	pgoff_t next = start;
 	int i;
 
 	pagevec_init(&pvec, 0);
-	while (pagevec_lookup(&pvec, mapping, next, PAGEVEC_SIZE)) {
+	while (next <= end &&
+			pagevec_lookup(&pvec, mapping, next, PAGEVEC_SIZE)) {
 		for (i = 0; i < pagevec_count(&pvec); i++) {
 			struct page *page = pvec.pages[i];
 
@@ -216,6 +220,11 @@ unlock:
 		pagevec_release(&pvec);
 		cond_resched();
 	}
+}
+
+void invalidate_inode_pages(struct address_space *mapping)
+{
+	invalidate_mapping_pages(mapping, 0, ~0UL);
 }
 
 /**
