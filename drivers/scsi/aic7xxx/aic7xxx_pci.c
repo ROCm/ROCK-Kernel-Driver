@@ -39,7 +39,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic7xxx_pci.c#61 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic7xxx_pci.c#62 $
  *
  * $FreeBSD$
  */
@@ -752,10 +752,7 @@ ahc_find_pci_device(ahc_dev_softc_t pci)
 	device = ahc_pci_read_config(pci, PCIR_DEVICE, /*bytes*/2);
 	subvendor = ahc_pci_read_config(pci, PCIR_SUBVEND_0, /*bytes*/2);
 	subdevice = ahc_pci_read_config(pci, PCIR_SUBDEV_0, /*bytes*/2);
-	full_id = ahc_compose_id(device,
-				 vendor,
-				 subdevice,
-				 subvendor);
+	full_id = ahc_compose_id(device, vendor, subdevice, subvendor);
 
 	/*
 	 * If the second function is not hooked up, ignore it.

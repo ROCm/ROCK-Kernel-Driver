@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.c#123 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.c#124 $
  *
  * $FreeBSD$
  */
@@ -3905,7 +3905,7 @@ ahc_softc_insert(struct ahc_softc *ahc)
 	 */
 	list_ahc = TAILQ_FIRST(&ahc_tailq);
 	while (list_ahc != NULL
-	    && ahc_softc_comp(list_ahc, ahc) <= 0)
+	    && ahc_softc_comp(ahc, list_ahc) <= 0)
 		list_ahc = TAILQ_NEXT(list_ahc, links);
 	if (list_ahc != NULL)
 		TAILQ_INSERT_BEFORE(list_ahc, ahc, links);
