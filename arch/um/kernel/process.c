@@ -40,6 +40,7 @@
 #ifdef UML_CONFIG_MODE_SKAS
 #include "skas.h"
 #include "skas_ptrace.h"
+#include "registers.h"
 #endif
 
 void init_new_thread_stack(void *sig_stack, void (*usr1_handler)(int))

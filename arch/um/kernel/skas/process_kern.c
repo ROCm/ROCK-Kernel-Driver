@@ -22,6 +22,7 @@
 #include "kern.h"
 #include "mode.h"
 #include "proc_mm.h"
+#include "registers.h"
 
 void *switch_to_skas(void *prev, void *next)
 {
@@ -118,12 +119,7 @@ int copy_thread_skas(int nr, unsigned long clone_flags, unsigned long sp,
 		handler = fork_handler;
 	}
 	else {
-	  	memcpy(p->thread.regs.regs.skas.regs, exec_regs, 
-		       sizeof(p->thread.regs.regs.skas.regs));
-		memcpy(p->thread.regs.regs.skas.fp, exec_fp_regs, 
-		       sizeof(p->thread.regs.regs.skas.fp));
-	  	memcpy(p->thread.regs.regs.skas.xfp, exec_fpx_regs, 
-		       sizeof(p->thread.regs.regs.skas.xfp));
+		init_thread_registers(&p->thread.regs.regs);
                 p->thread.request.u.thread = current->thread.request.u.thread;
 		handler = new_thread_handler;
 	}
