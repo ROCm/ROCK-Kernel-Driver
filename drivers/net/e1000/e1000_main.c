@@ -182,13 +182,20 @@ static void e1000_vlan_rx_add_vid(struct net_device *netdev, uint16_t vid);
 static void e1000_vlan_rx_kill_vid(struct net_device *netdev, uint16_t vid);
 
 static int e1000_notify_reboot(struct notifier_block *, unsigned long event, void *ptr);
+static int e1000_notify_netdev(struct notifier_block *, unsigned long event, void *ptr);
 static int e1000_suspend(struct pci_dev *pdev, uint32_t state);
 #ifdef CONFIG_PM
 static int e1000_resume(struct pci_dev *pdev);
 #endif
 
-struct notifier_block e1000_notifier = {
+struct notifier_block e1000_notifier_reboot = {
 	.notifier_call	= e1000_notify_reboot,
+	.next		= NULL,
+	.priority	= 0
+};
+
+struct notifier_block e1000_notifier_netdev = {
+	.notifier_call	= e1000_notify_netdev,
 	.next		= NULL,
 	.priority	= 0
 };
@@ -233,8 +240,10 @@ e1000_init_module(void)
 	printk(KERN_INFO "%s\n", e1000_copyright);
 
 	ret = pci_module_init(&e1000_driver);
-	if(ret >= 0)
-		register_reboot_notifier(&e1000_notifier);
+	if(ret >= 0) {
+		register_reboot_notifier(&e1000_notifier_reboot);
+		register_netdevice_notifier(&e1000_notifier_netdev);
+	}
 	return ret;
 }
 
@@ -250,7 +259,8 @@ module_init(e1000_init_module);
 static void __exit
 e1000_exit_module(void)
 {
-	unregister_reboot_notifier(&e1000_notifier);
+	unregister_reboot_notifier(&e1000_notifier_reboot);
+	unregister_netdevice_notifier(&e1000_notifier_netdev);
 	pci_unregister_driver(&e1000_driver);
 }
 
@@ -478,6 +488,8 @@ e1000_probe(struct pci_dev *pdev,
 		(void (*)(void *))e1000_tx_timeout_task, netdev);
 
 	register_netdev(netdev);
+	memcpy(adapter->ifname, netdev->name, IFNAMSIZ);
+	adapter->ifname[IFNAMSIZ-1] = 0;
 
 	/* we're going to reset, so assume we have no link for now */
 
@@ -2393,6 +2405,29 @@ e1000_notify_reboot(struct notifier_block *nb, unsigned long event, void *p)
 			if(pci_dev_driver(pdev) == &e1000_driver)
 				e1000_suspend(pdev, 3);
 		}
+	}
+	return NOTIFY_DONE;
+}
+
+static int
+e1000_notify_netdev(struct notifier_block *nb, unsigned long event, void *p)
+{
+	struct e1000_adapter *adapter;
+	struct net_device *netdev = p;
+	if(netdev == NULL)
+		return NOTIFY_DONE;
+
+	switch(event) {
+	case NETDEV_CHANGENAME:
+		if(netdev->open == e1000_open) {
+			adapter = netdev->priv;
+			/* rename the proc nodes the easy way */
+			e1000_proc_dev_free(adapter);
+			memcpy(adapter->ifname, netdev->name, IFNAMSIZ);
+			adapter->ifname[IFNAMSIZ-1] = 0;
+			e1000_proc_dev_setup(adapter);
+		}
+		break;
 	}
 	return NOTIFY_DONE;
 }

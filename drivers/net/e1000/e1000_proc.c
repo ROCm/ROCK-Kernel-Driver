@@ -132,7 +132,7 @@ e1000_proc_single_read(char *page, char **start, off_t off,
 	return e1000_proc_read(page, start, off, count, eof);
 }
 
-static void __devexit
+static void
 e1000_proc_dirs_free(char *name, struct list_head *proc_list_head)
 {
 	struct proc_dir_entry *intel_proc_dir, *proc_dir;
@@ -188,7 +188,7 @@ e1000_proc_dirs_free(char *name, struct list_head *proc_list_head)
 }
 
 
-static int __devinit
+static int
 e1000_proc_singles_create(struct proc_dir_entry *parent,
                           struct list_head *proc_list_head)
 {
@@ -215,7 +215,7 @@ e1000_proc_singles_create(struct proc_dir_entry *parent,
 	return 1;
 }
 
-static void __devinit
+static void
 e1000_proc_dirs_create(void *data, char *name, 
                        struct list_head *proc_list_head)
 {
@@ -255,7 +255,7 @@ e1000_proc_dirs_create(void *data, char *name,
 	info_entry->data = proc_list_head;
 }
 
-static void __devinit
+static void
 e1000_proc_list_add(struct list_head *proc_list_head, char *tag,
                     void *data, size_t len, 
 		    char *(*func)(void *, size_t, char *))
@@ -274,7 +274,7 @@ e1000_proc_list_add(struct list_head *proc_list_head, char *tag,
 	list_add_tail(&new->list, proc_list_head);
 }
 
-static void __devexit
+static void
 e1000_proc_list_free(struct list_head *proc_list_head)
 {
 	struct proc_list *elem;
@@ -542,7 +542,7 @@ e1000_proc_rx_status(void *data, size_t len, char *buf)
 #define LIST_ADD_H(T,D) LIST_ADD_F((T), (D), e1000_proc_hex)
 #define LIST_ADD_U(T,D) LIST_ADD_F((T), (D), e1000_proc_unsigned)
 
-static void __devinit
+static void
 e1000_proc_list_setup(struct e1000_adapter *adapter)
 {
 	struct e1000_hw *hw = &adapter->hw;
@@ -572,7 +572,7 @@ e1000_proc_list_setup(struct e1000_adapter *adapter)
 	}
 
 	LIST_ADD_U("IRQ", &adapter->pdev->irq);
-	LIST_ADD_S("System_Device_Name", adapter->netdev->name);
+	LIST_ADD_S("System_Device_Name", adapter->ifname);
 	LIST_ADD_F("Current_HWaddr",
 	            adapter->netdev->dev_addr, e1000_proc_hwaddr);
 	LIST_ADD_F("Permanent_HWaddr",
@@ -670,13 +670,13 @@ e1000_proc_list_setup(struct e1000_adapter *adapter)
  * @adapter: board private structure
  */
 
-void __devinit
+void
 e1000_proc_dev_setup(struct e1000_adapter *adapter)
 {
 	e1000_proc_list_setup(adapter);
 
 	e1000_proc_dirs_create(adapter, 
-	                       adapter->netdev->name,
+	                       adapter->ifname,
 	                       &adapter->proc_list_head);
 }
 
@@ -685,18 +685,18 @@ e1000_proc_dev_setup(struct e1000_adapter *adapter)
  * @adapter: board private structure
  */
 
-void __devexit
+void
 e1000_proc_dev_free(struct e1000_adapter *adapter)
 {
-	e1000_proc_dirs_free(adapter->netdev->name, &adapter->proc_list_head);
+	e1000_proc_dirs_free(adapter->ifname, &adapter->proc_list_head);
 
 	e1000_proc_list_free(&adapter->proc_list_head);
 }
 
 #else /* CONFIG_PROC_FS */
 
-void __devinit e1000_proc_dev_setup(struct e1000_adapter *adapter) {}
-void __devexit e1000_proc_dev_free(struct e1000_adapter *adapter) {}
+void e1000_proc_dev_setup(struct e1000_adapter *adapter) {}
+void e1000_proc_dev_free(struct e1000_adapter *adapter) {}
 
 #endif /* CONFIG_PROC_FS */
 
