@@ -192,53 +192,6 @@ int usb_stor_control_msg(struct us_data *us, unsigned int pipe,
 	return status;
 }
 
-/* This is our function to emulate usb_bulk_msg() with enough control
- * to make aborts/resets/timeouts work
- */
-int usb_stor_bulk_msg(struct us_data *us, void *data, unsigned int pipe,
-		      unsigned int len, unsigned int *act_len)
-{
-	int status;
-
-	/* fill and submit the URB */
-	usb_fill_bulk_urb(us->current_urb, us->pusb_dev, pipe, data, len,
-		      usb_stor_blocking_completion, NULL);
-	status = usb_stor_msg_common(us);
-
-	/* store the actual length of the data transferred */
-	*act_len = us->current_urb->actual_length;
-	return status;
-}
-
-/* This is our function to submit interrupt URBs with enough control
- * to make aborts/resets/timeouts work
- *
- * This routine always uses us->recv_intr_pipe as the pipe and
- * us->ep_bInterval as the interrupt interval.
- */
-int usb_stor_interrupt_msg(struct us_data *us, void *data,
-			unsigned int len, unsigned int *act_len)
-{
-	unsigned int pipe = us->recv_intr_pipe;
-	unsigned int maxp;
-	int status;
-
-	/* calculate the max packet size */
-	maxp = usb_maxpacket(us->pusb_dev, pipe, usb_pipeout(pipe));
-	if (maxp > len)
-		maxp = len;
-
-	/* fill and submit the URB */
-	usb_fill_int_urb(us->current_urb, us->pusb_dev, pipe, data,
-			maxp, usb_stor_blocking_completion, NULL,
-			us->ep_bInterval);
-	status = usb_stor_msg_common(us);
-
-	/* store the actual length of the data transferred */
-	*act_len = us->current_urb->actual_length;
-	return status;
-}
-
 /* This is a version of usb_clear_halt() that doesn't read the status from
  * the device -- this is because some devices crash their internal firmware
  * when the status is requested after a halt.
@@ -282,12 +235,12 @@ int usb_stor_clear_halt(struct us_data *us, unsigned int pipe)
  * Interpret the results of a URB transfer
  *
  * This function prints appropriate debugging messages, clears halts on
- * bulk endpoints, and translates the status to the corresponding
+ * non-control endpoints, and translates the status to the corresponding
  * USB_STOR_XFER_xxx return code.
  */
 static int interpret_urb_result(struct us_data *us, unsigned int pipe,
-		unsigned int length, int result, unsigned int partial) {
-
+		unsigned int length, int result, unsigned int partial)
+{
 	US_DEBUGP("Status code %d; transferred %u/%u\n",
 			result, partial, length);
 	switch (result) {
@@ -340,77 +293,88 @@ static int interpret_urb_result(struct us_data *us, unsigned int pipe,
 }
 
 /*
- * Transfer one control message
- *
- * This function does basically the same thing as usb_stor_control_msg()
- * above, except that return codes are USB_STOR_XFER_xxx rather than the
- * urb status or transfer length.
+ * Transfer one control message, without timeouts, but allowing early
+ * termination.  Return codes are USB_STOR_XFER_xxx.
  */
 int usb_stor_ctrl_transfer(struct us_data *us, unsigned int pipe,
 		u8 request, u8 requesttype, u16 value, u16 index,
-		void *data, u16 size) {
-	int result;
-	unsigned int partial = 0;
-
-	US_DEBUGP("usb_stor_ctrl_transfer(): rq=%02x rqtype=%02x "
-			"value=%04x index=%02x len=%u\n",
-			request, requesttype, value, index, size);
-	result = usb_stor_control_msg(us, pipe, request, requesttype,
-			value, index, data, size);
-
-	if (result > 0) {	/* Separate out the amount transferred */
-		partial = result;
-		result = 0;
-	}
-	return interpret_urb_result(us, pipe, size, result, partial);
-}
-
-/*
- * Receive one buffer via interrupt transfer
- *
- * This function does basically the same thing as usb_stor_interrupt_msg()
- * above, except that return codes are USB_STOR_XFER_xxx rather than the
- * urb status.
- */
-int usb_stor_intr_transfer(struct us_data *us, void *buf,
-		unsigned int length, unsigned int *act_len)
+		void *data, u16 size)
 {
 	int result;
-	unsigned int partial;
 
-	/* transfer the data */
-	US_DEBUGP("usb_stor_intr_transfer(): xfer %u bytes\n", length);
-	result = usb_stor_interrupt_msg(us, buf, length, &partial);
-	if (act_len)
-		*act_len = partial;
+	US_DEBUGP("%s: rq=%02x rqtype=%02x value=%04x index=%02x len=%u\n",
+			__FUNCTION__, request, requesttype,
+			value, index, size);
 
-	return interpret_urb_result(us, us->recv_intr_pipe,
-			length, result, partial);
+	/* fill in the devrequest structure */
+	us->dr->bRequestType = requesttype;
+	us->dr->bRequest = request;
+	us->dr->wValue = cpu_to_le16(value);
+	us->dr->wIndex = cpu_to_le16(index);
+	us->dr->wLength = cpu_to_le16(size);
+
+	/* fill and submit the URB */
+	usb_fill_control_urb(us->current_urb, us->pusb_dev, pipe, 
+			 (unsigned char*) us->dr, data, size, 
+			 usb_stor_blocking_completion, NULL);
+	result = usb_stor_msg_common(us);
+
+	return interpret_urb_result(us, pipe, size, result,
+			us->current_urb->actual_length);
 }
 
 /*
- * Transfer one buffer via bulk transfer
+ * Receive one interrupt buffer, without timeouts, but allowing early
+ * termination.  Return codes are USB_STOR_XFER_xxx.
  *
- * This function does basically the same thing as usb_stor_bulk_msg()
- * above, except that:
- *
- *	1.  If the bulk pipe stalls during the transfer, the halt is
- *	    automatically cleared;
- *	2.  Return codes are USB_STOR_XFER_xxx rather than the
- *	    urb status or transfer length.
+ * This routine always uses us->recv_intr_pipe as the pipe and
+ * us->ep_bInterval as the interrupt interval.
+ */
+int usb_stor_intr_transfer(struct us_data *us, void *buf, unsigned int length)
+{
+	int result;
+	unsigned int pipe = us->recv_intr_pipe;
+	unsigned int maxp;
+
+	US_DEBUGP("%s: xfer %u bytes\n", __FUNCTION__, length);
+
+	/* calculate the max packet size */
+	maxp = usb_maxpacket(us->pusb_dev, pipe, usb_pipeout(pipe));
+	if (maxp > length)
+		maxp = length;
+
+	/* fill and submit the URB */
+	usb_fill_int_urb(us->current_urb, us->pusb_dev, pipe, buf,
+			maxp, usb_stor_blocking_completion, NULL,
+			us->ep_bInterval);
+	result = usb_stor_msg_common(us);
+
+	return interpret_urb_result(us, pipe, length, result,
+			us->current_urb->actual_length);
+}
+
+/*
+ * Transfer one buffer via bulk pipe, without timeouts, but allowing early
+ * termination.  Return codes are USB_STOR_XFER_xxx.  If the bulk pipe
+ * stalls during the transfer, the halt is automatically cleared.
  */
 int usb_stor_bulk_transfer_buf(struct us_data *us, unsigned int pipe,
 	void *buf, unsigned int length, unsigned int *act_len)
 {
 	int result;
-	unsigned int partial;
 
-	/* transfer the data */
-	US_DEBUGP("usb_stor_bulk_transfer_buf(): xfer %u bytes\n", length);
-	result = usb_stor_bulk_msg(us, buf, pipe, length, &partial);
+	US_DEBUGP("%s: xfer %u bytes\n", __FUNCTION__, length);
+
+	/* fill and submit the URB */
+	usb_fill_bulk_urb(us->current_urb, us->pusb_dev, pipe, buf, length,
+		      usb_stor_blocking_completion, NULL);
+	result = usb_stor_msg_common(us);
+
+	/* store the actual length of the data transferred */
 	if (act_len)
-		*act_len = partial;
-	return interpret_urb_result(us, pipe, length, result, partial);
+		*act_len = us->current_urb->actual_length;
+	return interpret_urb_result(us, pipe, length, result, 
+			us->current_urb->actual_length);
 }
 
 /*
@@ -424,15 +388,14 @@ int usb_stor_bulk_transfer_sglist(struct us_data *us, unsigned int pipe,
 		unsigned int *act_len)
 {
 	int result;
-	unsigned int partial;
 
 	/* don't submit s-g requests during abort/disconnect processing */
 	if (us->flags & DONT_SUBMIT)
 		return USB_STOR_XFER_ERROR;
 
 	/* initialize the scatter-gather request block */
-	US_DEBUGP("usb_stor_bulk_transfer_sglist(): xfer %u bytes, "
-			"%d entries\n", length, num_sg);
+	US_DEBUGP("%s: xfer %u bytes, %d entries\n", __FUNCTION__,
+			length, num_sg);
 	result = usb_sg_init(us->current_sg, us->pusb_dev, pipe, 0,
 			sg, num_sg, length, SLAB_NOIO);
 	if (result) {
@@ -459,10 +422,10 @@ int usb_stor_bulk_transfer_sglist(struct us_data *us, unsigned int pipe,
 	clear_bit(US_FLIDX_SG_ACTIVE, &us->flags);
 
 	result = us->current_sg->status;
-	partial = us->current_sg->bytes;
 	if (act_len)
-		*act_len = partial;
-	return interpret_urb_result(us, pipe, length, result, partial);
+		*act_len = us->current_sg->bytes;
+	return interpret_urb_result(us, pipe, length, result,
+			us->current_sg->bytes);
 }
 
 /*
@@ -775,8 +738,7 @@ int usb_stor_CBI_transport(Scsi_Cmnd *srb, struct us_data *us)
 	}
 
 	/* STATUS STAGE */
-	result = usb_stor_intr_transfer(us, us->irqdata,
-					sizeof(us->irqdata), NULL);
+	result = usb_stor_intr_transfer(us, us->irqdata, sizeof(us->irqdata));
 	US_DEBUGP("Got interrupt data (0x%x, 0x%x)\n", 
 			us->irqdata[0], us->irqdata[1]);
 	if (result != USB_STOR_XFER_GOOD)
