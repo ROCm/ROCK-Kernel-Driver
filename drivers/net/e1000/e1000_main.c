@@ -30,7 +30,14 @@
 
 /* Change Log
  *
- * 5.0.43	3/5/03
+ * 5.1.11	5/6/03
+ *   o Feature: Added support for 82546EB (Quad-port) hardware.
+ *   o Feature: Added support for Diagnostics through Ethtool.
+ *   o Cleanup: Removed /proc support.
+ *   o Cleanup: Removed proprietary IDIAG interface.
+ *   o Bug fix: TSO bug fixes.
+ *
+ * 5.0.42	3/5/03
  *   o Feature: Added support for 82541 and 82547 hardware.
  *   o Feature: Added support for Intel Gigabit PHY (IGP) and a variety of
  *   eeproms.
@@ -46,22 +53,11 @@
  *   shared interrupt instances.
  *
  * 4.4.18       11/27/02
- *   o Feature: Added user-settable knob for interrupt throttle rate (ITR).
- *   o Cleanup: removed large static array allocations.
- *   o Cleanup: C99 struct initializer format.
- *   o Bug fix: restore VLAN settings when interface is brought up.
- *   o Bug fix: return cleanly in probe if error in detecting MAC type.
- *   o Bug fix: Wake up on magic packet by default only if enabled in eeprom.
- *   o Bug fix: Validate MAC address in set_mac.
- *   o Bug fix: Throw away zero-length Tx skbs.
- *   o Bug fix: Make ethtool EEPROM acceses work on older versions of ethtool.
- * 
- * 4.4.12       10/15/02
  */
 
 char e1000_driver_name[] = "e1000";
 char e1000_driver_string[] = "Intel(R) PRO/1000 Network Driver";
-char e1000_driver_version[] = "5.0.43-k3";
+char e1000_driver_version[] = "5.1.11-k1";
 char e1000_copyright[] = "Copyright (c) 1999-2003 Intel Corporation.";
 
 /* e1000_pci_tbl - PCI Device ID Table
@@ -107,7 +103,7 @@ int e1000_set_spd_dplx(struct e1000_adapter *adapter, uint16_t spddplx);
 static int e1000_init_module(void);
 static void e1000_exit_module(void);
 static int e1000_probe(struct pci_dev *pdev, const struct pci_device_id *ent);
-static void e1000_remove(struct pci_dev *pdev);
+static void __devexit e1000_remove(struct pci_dev *pdev);
 static int e1000_sw_init(struct e1000_adapter *adapter);
 static int e1000_open(struct net_device *netdev);
 static int e1000_close(struct net_device *netdev);
@@ -1929,6 +1925,7 @@ e1000_update_stats(struct e1000_adapter *adapter)
 		}
 
 		if((hw->mac_type <= e1000_82546) &&
+		   (hw->phy_type == e1000_phy_m88) &&
 		   !e1000_read_phy_reg(hw, M88E1000_RX_ERR_CNTR, &phy_tmp))
 			adapter->phy_stats.receive_errors += phy_tmp;
 	}

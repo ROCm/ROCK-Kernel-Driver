@@ -1406,15 +1406,13 @@ e1000_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
 		void *ptr;
 		int err = 0;
 
+		if(copy_from_user(&eeprom, addr, sizeof(eeprom)))
+			return -EFAULT;
+
 		eeprom_buff = kmalloc(hw->eeprom.word_size * 2, GFP_KERNEL);
 
-		if(eeprom_buff == NULL)
+		if(!eeprom_buff)
 			return -ENOMEM;
-
-		if(copy_from_user(&eeprom, addr, sizeof(eeprom))) {
-			err = -EFAULT;
-			goto err_geeprom_ioctl;
-		}
 
 		if((err = e1000_ethtool_geeprom(adapter, &eeprom,
 						eeprom_buff)))

@@ -1487,7 +1487,6 @@ struct e1000_hw {
 #define E1000_COLLISION_DISTANCE        64
 #define E1000_FDX_COLLISION_DISTANCE    E1000_COLLISION_DISTANCE
 #define E1000_HDX_COLLISION_DISTANCE    E1000_COLLISION_DISTANCE
-#define E1000_GB_HDX_COLLISION_DISTANCE 512
 #define E1000_COLD_SHIFT                12
 
 /* The number of Transmit and Receive Descriptors must be a multiple of 8 */
