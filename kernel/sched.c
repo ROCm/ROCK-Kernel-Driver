@@ -4232,86 +4232,6 @@ static void cpu_attach_domain(struct sched_domain *sd, int cpu)
 	}
 }
 
-/*
- * To enable disjoint top-level NUMA domains, define SD_NODES_PER_DOMAIN
- * in arch code. That defines the number of nearby nodes in a node's top
- * level scheduling domain.
- */
-#ifdef CONFIG_NUMA
-#ifdef SD_NODES_PER_DOMAIN
-/**
- * find_next_best_node - find the next node to include in a sched_domain
- * @node: node whose sched_domain we're building
- * @used_nodes: nodes already in the sched_domain
- *
- * Find the next node to include in a given scheduling domain.  Simply
- * finds the closest node not already in the @used_nodes map.
- *
- * Should use nodemask_t.
- */
-static int __devinit find_next_best_node(int node, unsigned long *used_nodes)
-{
-	int i, n, val, min_val, best_node = 0;
-
-	min_val = INT_MAX;
-
-	for (i = 0; i < numnodes; i++) {
-		/* Start at @node */
-		n = (node + i) % numnodes;
-
-		/* Skip already used nodes */
-		if (test_bit(n, used_nodes))
-			continue;
-
-		/* Simple min distance search */
-		val = node_distance(node, i);
-
-		if (val < min_val) {
-			min_val = val;
-			best_node = n;
-		}
-	}
-
-	set_bit(best_node, used_nodes);
-	return best_node;
-}
-
-/**
- * sched_domain_node_span - get a cpumask for a node's sched_domain
- * @node: node whose cpumask we're constructing
- * @size: number of nodes to include in this span
- *
- * Given a node, construct a good cpumask for its sched_domain to span.  It
- * should be one that prevents unnecessary balancing, but also spreads tasks
- * out optimally.
- */
-static cpumask_t __devinit sched_domain_node_span(int node)
-{
-	int i;
-	cpumask_t span;
-	DECLARE_BITMAP(used_nodes, MAX_NUMNODES);
-
-	cpus_clear(span);
-	bitmap_zero(used_nodes, MAX_NUMNODES);
-
-	for (i = 0; i < SD_NODES_PER_DOMAIN; i++) {
-		int next_node = find_next_best_node(node, used_nodes);
-		cpumask_t  nodemask;
-
-		nodemask = node_to_cpumask(next_node);
-		cpus_or(span, span, nodemask);
-	}
-
-	return span;
-}
-#else /* SD_NODES_PER_DOMAIN */
-static cpumask_t __devinit sched_domain_node_span(int node)
-{
-	return cpu_possible_map;
-}
-#endif /* SD_NODES_PER_DOMAIN */
-#endif /* CONFIG_NUMA */
-
 #ifdef CONFIG_SCHED_SMT
 static DEFINE_PER_CPU(struct sched_domain, cpu_domains);
 static struct sched_group sched_group_cpus[NR_CPUS];
@@ -4434,9 +4354,7 @@ static void __devinit arch_init_sched_domains(void)
 		sd = &per_cpu(node_domains, i);
 		group = cpu_to_node_group(i);
 		*sd = SD_NODE_INIT;
-		/* FIXME: should be multilevel, in arch code */
-		sd->span = sched_domain_node_span(i);
-		cpus_and(sd->span, sd->span, cpu_default_map);
+		sd->span = cpu_default_map;
 		sd->groups = &sched_group_nodes[group];
 #endif
 
