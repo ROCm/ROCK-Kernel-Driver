@@ -961,8 +961,8 @@ static void urb_unlink (struct urb *urb)
 	spin_lock_irqsave (&hcd_data_lock, flags);
 	list_del_init (&urb->urb_list);
 	dev = urb->dev;
-	usb_put_dev (dev);
 	spin_unlock_irqrestore (&hcd_data_lock, flags);
+	usb_put_dev (dev);
 }
 
 
