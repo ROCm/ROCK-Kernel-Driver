@@ -18,6 +18,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/device.h>
 #include <linux/sysdev.h>
@@ -33,7 +34,9 @@
 #include <asm/mach/flash.h>
 #include <asm/mach/irq.h>
 #include <asm/mach/map.h>
+#ifdef CONFIG_MMC
 #include <asm/mach/mmc.h>
+#endif
 
 /*
  * All IO addresses are mapped onto VA 0xFFFx.xxxx, where x.xxxx
@@ -294,6 +297,7 @@ static struct platform_device smc91x_device = {
 
 #define VERSATILE_SYSMCI	(IO_ADDRESS(VERSATILE_SYS_BASE) + VERSATILE_SYS_MCI_OFFSET)
 
+#ifdef CONFIG_MMC
 static unsigned int mmc_status(struct device *dev)
 {
 	struct amba_device *adev = container_of(dev, struct amba_device, dev);
@@ -318,6 +322,7 @@ static struct mmc_platform_data mmc1_plat_data = {
 	.ocr_mask	= MMC_VDD_32_33|MMC_VDD_33_34,
 	.status		= mmc_status,
 };
+#endif
 
 #define AMBA_DEVICE(name,busid,base,plat)			\
 static struct amba_device name##_device = {			\
@@ -332,7 +337,7 @@ static struct amba_device name##_device = {			\
 		.flags	= IORESOURCE_MEM,			\
 	},							\
 	.irq		= base##_IRQ,				\
-	.dma		= base##_DMA,				\
+	/* .dma		= base##_DMA,*/				\
 }
 
 #define AACI_IRQ	{ IRQ_AACI, NO_IRQ }
@@ -396,12 +401,16 @@ static struct amba_device name##_device = {			\
 
 /* FPGA Primecells */
 AMBA_DEVICE(aaci,  "fpga:04", AACI,     NULL);
+#ifdef CONFIG_MMC
 AMBA_DEVICE(mmc0,  "fpga:05", MMCI0,    &mmc0_plat_data);
+#endif
 AMBA_DEVICE(kmi0,  "fpga:06", KMI0,     NULL);
 AMBA_DEVICE(kmi1,  "fpga:07", KMI1,     NULL);
 AMBA_DEVICE(uart3, "fpga:09", UART3,    NULL);
 AMBA_DEVICE(sci1,  "fpga:0a", SCI1,     NULL);
+#ifdef CONFIG_MMC
 AMBA_DEVICE(mmc1,  "fpga:0b", MMCI1,    &mmc1_plat_data);
+#endif
 
 /* DevChip Primecells */
 AMBA_DEVICE(smc,   "dev:00",  SMC,      NULL);
@@ -440,11 +449,15 @@ static struct amba_device *amba_devs[] __initdata = {
 	&sci0_device,
 	&ssp0_device,
 	&aaci_device,
+#ifdef CONFIG_MMC
 	&mmc0_device,
+#endif
 	&kmi0_device,
 	&kmi1_device,
 	&sci1_device,
+#ifdef CONFIG_MMC
 	&mmc1_device,
+#endif
 };
 
 #define VA_LEDS_BASE (IO_ADDRESS(VERSATILE_SYS_BASE) + VERSATILE_SYS_LED_OFFSET)
