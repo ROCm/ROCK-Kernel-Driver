@@ -264,8 +264,9 @@ static irqreturn_t snd_bt87x_interrupt(int irq, void *dev_id, struct pt_regs *re
 			snd_printk(KERN_ERR "Aieee - PCI error! status %#08x, PCI status %#04x\n",
 				   status, pci_status);
 		}
-	}
-	if (status & INT_RISCI) {
+		if (chip->reg_control & CTL_ACAP_EN)
+			snd_pcm_stop(chip->substream, SNDRV_PCM_STATE_XRUN);
+	} else if ((status & INT_RISCI) && (chip->reg_control & CTL_ACAP_EN)) {
 		int current_block, irq_block;
 
 		/* assume that exactly one line has been recorded */
