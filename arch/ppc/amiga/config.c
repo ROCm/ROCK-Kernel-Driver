@@ -952,8 +952,9 @@ static int amiga_get_hardware_list(char *buffer)
     AMIGAHW_ANNOUNCE(MAGIC_REKICK, "Magic Hard Rekick");
     AMIGAHW_ANNOUNCE(PCMCIA, "PCMCIA Slot");
     if (AMIGAHW_PRESENT(ZORRO))
-	len += sprintf(buffer+len, "\tZorro%s AutoConfig: %d Expansion Device%s\n",
-		       AMIGAHW_PRESENT(ZORRO3) ? " III" : "",
+	len += sprintf(buffer+len, "\tZorro II%s AutoConfig: %d Expansion "
+				   "Device%s\n",
+		       AMIGAHW_PRESENT(ZORRO3) ? "I" : "",
 		       zorro_num_autocon, zorro_num_autocon == 1 ? "" : "s");
 
 #undef AMIGAHW_ANNOUNCE
