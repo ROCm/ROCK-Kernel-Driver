@@ -700,12 +700,12 @@ pci_bus_map_create(vertex_hdl_t xtalk, char * io_moduleid)
 		 * Pre assign DMA maps needed for 32 Bits Page Map DMA.
 		 */
 		busnum_to_atedmamaps[num_bridges - 1] = (void *) kmalloc(
-			sizeof(struct sn_dma_maps_s) * MAX_ATE_MAPS, GFP_KERNEL);
+			sizeof(struct pcibr_dmamap_s) * MAX_ATE_MAPS, GFP_KERNEL);
 		if (!busnum_to_atedmamaps[num_bridges - 1])
 			printk("WARNING: pci_bus_map_create: Unable to precreate ATE DMA Maps for busnum %d vertex 0x%p\n", num_bridges - 1, (void *)xwidget);
 
 		memset(busnum_to_atedmamaps[num_bridges - 1], 0x0, 
-			sizeof(struct sn_dma_maps_s) * MAX_ATE_MAPS);
+			sizeof(struct pcibr_dmamap_s) * MAX_ATE_MAPS);
 
 	}
 
@@ -764,12 +764,12 @@ pci_bus_map_create(vertex_hdl_t xtalk, char * io_moduleid)
 			 * Pre assign DMA maps needed for 32 Bits Page Map DMA.
 			 */
 			busnum_to_atedmamaps[bus_number] = (void *) kmalloc(
-				sizeof(struct sn_dma_maps_s) * MAX_ATE_MAPS, GFP_KERNEL);
+				sizeof(struct pcibr_dmamap_s) * MAX_ATE_MAPS, GFP_KERNEL);
 			if (!busnum_to_atedmamaps[bus_number])
 				printk("WARNING: pci_bus_map_create: Unable to precreate ATE DMA Maps for busnum %d vertex 0x%p\n", num_bridges - 1, (void *)xwidget);
 	
 			memset(busnum_to_atedmamaps[bus_number], 0x0, 
-				sizeof(struct sn_dma_maps_s) * MAX_ATE_MAPS);
+				sizeof(struct pcibr_dmamap_s) * MAX_ATE_MAPS);
 		}
 	}
 
