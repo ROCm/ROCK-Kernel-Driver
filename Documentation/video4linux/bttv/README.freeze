@@ -46,10 +46,6 @@ Sometimes problems show up with bttv just because of the high load on
 the PCI bus. The bt848/878 chips have a few workarounds for known
 incompatibilities, see README.quirks.
 
-Some folks report that increasing the pci latency helps too,
-althrought I'm not sure whenever this really fixes the problems or
-only makes it less likely to happen.
-
 Some mainboard have problems to deal correctly with multiple devices
 doing DMA at the same time.  bttv + ide seems to cause this sometimes,
 if this is the case you likely see freezes only with video and hard disk
