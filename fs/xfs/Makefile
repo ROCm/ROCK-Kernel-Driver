@@ -51,23 +51,22 @@ export-objs			:= pagebuf/page_buf.o support/ktrace.o \
 obj-$(CONFIG_XFS_FS)		+= xfs.o
 
 
-xfs-obj-$(CONFIG_XFS_RT)	+= xfs_rtalloc.o
+xfs-$(CONFIG_XFS_RT)		+= xfs_rtalloc.o
 
-xfs-obj-$(CONFIG_XFS_QUOTA)	+= xfs_dquot.o \
+xfs-$(CONFIG_XFS_QUOTA)		+= xfs_dquot.o \
 				   xfs_dquot_item.o \
 				   xfs_trans_dquot.o \
 				   xfs_qm_syscalls.o \
 				   xfs_qm.o
 
-xfs-obj-$(CONFIG_XFS_POSIX_ACL)	+= xfs_acl.o
-xfs-obj-$(CONFIG_FS_POSIX_CAP)	+= xfs_cap.o
-xfs-obj-$(CONFIG_FS_POSIX_MAC)	+= xfs_mac.o
-xfs-obj-$(CONFIG_PROC_FS)	+= linux/xfs_stats.o
-xfs-obj-$(CONFIG_SYSCTL)	+= linux/xfs_sysctl.o
+xfs-$(CONFIG_XFS_POSIX_ACL)	+= xfs_acl.o
+xfs-$(CONFIG_FS_POSIX_CAP)	+= xfs_cap.o
+xfs-$(CONFIG_FS_POSIX_MAC)	+= xfs_mac.o
+xfs-$(CONFIG_PROC_FS)		+= linux/xfs_stats.o
+xfs-$(CONFIG_SYSCTL)		+= linux/xfs_sysctl.o
 
 
-xfs-objs			+= $(xfs-obj-y) \
-				   xfs_alloc.o \
+xfs-y				+= xfs_alloc.o \
 				   xfs_alloc_btree.o \
 				   xfs_attr.o \
 				   xfs_attr_fetch.o \
@@ -115,12 +114,12 @@ xfs-objs			+= $(xfs-obj-y) \
 				   xfs_rw.o
 
 # Objects in pagebuf/
-xfs-objs			+= $(addprefix pagebuf/, \
+xfs-y				+= $(addprefix pagebuf/, \
 				   page_buf.o \
 				   page_buf_locking.o)
 
 # Objects in linux/
-xfs-objs			+= $(addprefix linux/, \
+xfs-y				+= $(addprefix linux/, \
 				   xfs_aops.o \
 				   xfs_behavior.o \
 				   xfs_file.o \
@@ -134,7 +133,7 @@ xfs-objs			+= $(addprefix linux/, \
 				   xfs_vnode.o)
 
 # Objects in support/
-xfs-objs			+= $(addprefix support/, \
+xfs-y				+= $(addprefix support/, \
 				   debug.o \
 				   kmem.o \
 				   ktrace.o \
