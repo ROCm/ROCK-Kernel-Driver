@@ -45,7 +45,7 @@ typedef short xtalk_instate_t[XTINST_SZ];
 typedef short xtalk_coefs_t[5][5];
 typedef short xtalk_state_t[5][4];
 
-extern xtalk_gains_t const asXtalkGainsAllChan;
+extern xtalk_gains_t const vortex_asXtalkGainsAllChan;
 
 static void vortex_XtalkHw_SetGains(vortex_t * vortex,
 				    xtalk_gains_t const gains);

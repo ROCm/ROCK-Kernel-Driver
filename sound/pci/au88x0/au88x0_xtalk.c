@@ -61,7 +61,7 @@ static xtalk_gains_t const asXtalkGains1Chan = {
 };
 
 // Input gain for 4 A3D slices. One possible input pair is left zero.
-static xtalk_gains_t const asXtalkGainsAllChan = {
+xtalk_gains_t const vortex_asXtalkGainsAllChan = {
 	0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF, 0, 0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF,
 	0
 	    //0x7FFF,0x7FFF,0x7FFF,0x7FFF,0x7fff,0x7FFF,0x7FFF,0x7FFF,0x7FFF,0x7fff
