@@ -89,6 +89,8 @@ int sym53c8xx_eh_device_reset_handler(Scsi_Cmnd *);
 int sym53c8xx_eh_bus_reset_handler(Scsi_Cmnd *);
 int sym53c8xx_eh_host_reset_handler(Scsi_Cmnd *);
 
+int sym53c8xx_slave_attach(Scsi_Device *);
+
 #ifdef MODULE
 int sym53c8xx_release(struct Scsi_Host *);
 #else
@@ -109,6 +111,7 @@ int sym53c8xx_release(struct Scsi_Host *);
 	release:		sym53c8xx_release,			\
 	info:			sym53c8xx_info, 			\
 	queuecommand:		sym53c8xx_queue_command,		\
+	slave_attach:		sym53c8xx_slave_attach,			\
 	eh_abort_handler:	sym53c8xx_eh_abort_handler,		\
 	eh_device_reset_handler:sym53c8xx_eh_device_reset_handler,	\
 	eh_bus_reset_handler:	sym53c8xx_eh_bus_reset_handler,		\
