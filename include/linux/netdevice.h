@@ -676,7 +676,7 @@ static inline void dev_kfree_skb_any(struct sk_buff *skb)
 extern int		netif_rx(struct sk_buff *skb);
 #define HAVE_NETIF_RECEIVE_SKB 1
 extern int		netif_receive_skb(struct sk_buff *skb);
-extern int		dev_ioctl(unsigned int cmd, void *);
+extern int		dev_ioctl(unsigned int cmd, void __user *);
 extern int		dev_ethtool(struct ifreq *);
 extern unsigned		dev_get_flags(const struct net_device *);
 extern int		dev_change_flags(struct net_device *, unsigned);

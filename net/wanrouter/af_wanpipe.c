@@ -1832,7 +1832,7 @@ static int wanpipe_ioctl(struct socket *sock, unsigned int cmd, unsigned long ar
 #endif
 
 		default:
-			return dev_ioctl(cmd,(void *) arg);
+			return dev_ioctl(cmd,(void __user *) arg);
 	}
 	/*NOTREACHED*/
 }

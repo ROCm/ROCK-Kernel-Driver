@@ -1829,7 +1829,7 @@ static int atalk_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		case SIOCGIFCOUNT:
 		case SIOCGIFINDEX:
 		case SIOCGIFNAME:
-			rc = dev_ioctl(cmd, (void *)arg);
+			rc = dev_ioctl(cmd, (void __user *)arg);
 			break;
 	}
 

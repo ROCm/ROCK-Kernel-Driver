@@ -872,7 +872,7 @@ int inet_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 			if (!sk->sk_prot->ioctl ||
 			    (err = sk->sk_prot->ioctl(sk, cmd, arg)) ==
 			    					-ENOIOCTLCMD)
-				err = dev_ioctl(cmd, (void *)arg);
+				err = dev_ioctl(cmd, (void __user *)arg);
 			break;
 	}
 	return err;

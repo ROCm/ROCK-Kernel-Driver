@@ -490,7 +490,7 @@ int inet6_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 	default:
 		if (!sk->sk_prot->ioctl ||
 		    (err = sk->sk_prot->ioctl(sk, cmd, arg)) == -ENOIOCTLCMD)
-			return(dev_ioctl(cmd,(void *) arg));		
+			return(dev_ioctl(cmd,(void __user *) arg));		
 		return err;
 	}
 	/*NOTREACHED*/

@@ -1228,7 +1228,7 @@ static int nr_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 
 	default:
 		release_sock(sk);
-		return dev_ioctl(cmd, (void *)arg);
+		return dev_ioctl(cmd, (void __user *)arg);
 	}
 	release_sock(sk);
 

@@ -1486,7 +1486,7 @@ static int packet_ioctl(struct socket *sock, unsigned int cmd,
 #endif
 
 		default:
-			return dev_ioctl(cmd, (void *)arg);
+			return dev_ioctl(cmd, (void __user *)arg);
 	}
 	return 0;
 }

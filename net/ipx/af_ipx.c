@@ -1883,7 +1883,7 @@ static int ipx_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		rc = -EINVAL;
 		break;
 	default:
-		rc = dev_ioctl(cmd,(void *) arg);
+		rc = dev_ioctl(cmd,(void __user *) arg);
 		break;
 	}
 

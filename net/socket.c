@@ -775,11 +775,11 @@ static int sock_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	unlock_kernel();
 	sock = SOCKET_I(inode);
 	if (cmd >= SIOCDEVPRIVATE && cmd <= (SIOCDEVPRIVATE + 15)) {
-		err = dev_ioctl(cmd, (void *)arg);
+		err = dev_ioctl(cmd, (void __user *)arg);
 	} else
 #ifdef WIRELESS_EXT
 	if (cmd >= SIOCIWFIRST && cmd <= SIOCIWLAST) {
-		err = dev_ioctl(cmd, (void *)arg);
+		err = dev_ioctl(cmd, (void __user *)arg);
 	} else
 #endif	/* WIRELESS_EXT */
 	switch (cmd) {
