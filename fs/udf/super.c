@@ -1455,7 +1455,7 @@ static void udf_close_lvid(struct super_block *sb)
 			UDF_SB_LVIDIU(sb)->minUDFReadRev = cpu_to_le16(UDF_SB_UDFREV(sb));
 		if (UDF_SB_UDFREV(sb) > le16_to_cpu(UDF_SB_LVIDIU(sb)->minUDFWriteRev))
 			UDF_SB_LVIDIU(sb)->minUDFWriteRev = cpu_to_le16(UDF_SB_UDFREV(sb));
-		UDF_SB_LVID(sb)->integrityType = LVID_INTEGRITY_TYPE_CLOSE;
+		UDF_SB_LVID(sb)->integrityType = cpu_to_le32(LVID_INTEGRITY_TYPE_CLOSE);
 
 		UDF_SB_LVID(sb)->descTag.descCRC =
 			cpu_to_le16(udf_crc((char *)UDF_SB_LVID(sb) + sizeof(tag),
@@ -1585,7 +1585,8 @@ static int udf_fill_super(struct super_block *sb, void *options, int silent)
 		if (minUDFReadRev > UDF_MAX_READ_VERSION)
 		{
 			printk("UDF-fs: minUDFReadRev=%x (max is %x)\n",
-				UDF_SB_LVIDIU(sb)->minUDFReadRev, UDF_MAX_READ_VERSION);
+				le16_to_cpu(UDF_SB_LVIDIU(sb)->minUDFReadRev),
+				UDF_MAX_READ_VERSION);
 			goto error_out;
 		}
 		else if (minUDFWriteRev > UDF_MAX_WRITE_VERSION)
@@ -1824,7 +1825,7 @@ udf_count_free_bitmap(struct super_block *sb, struct udf_bitmap *bitmap)
 	}
 
 	bm = (struct spaceBitmapDesc *)bh->b_data;
-	bytes = bm->numOfBytes;
+	bytes = le32_to_cpu(bm->numOfBytes);
 	index = sizeof(struct spaceBitmapDesc); /* offset in first block only */
 	ptr = (uint8_t *)bh->b_data;
 
