@@ -30,10 +30,6 @@
  *  add Fn key status
  *  Add mode selection on module loading (parameter) -> still necessary?
  *  Complete display switching -- may require dirty hacks?
- *  Complete support for Centrino laptops
- *  Reading certain fields (e.g. \SG66 in A2500H) consistently fails, while 
- *    reading others (\BAOF, the same machine) succeeds. Why?
- *
  */
 
 #include <linux/config.h>
@@ -49,7 +45,7 @@
 #include <acpi/acpi_drivers.h>
 #include <acpi/acpi_bus.h>
 
-#define ASUS_ACPI_VERSION "0.25"
+#define ASUS_ACPI_VERSION "0.26"
 
 #define PROC_ASUS       "asus"	//the directory
 #define PROC_MLED       "mled"
@@ -122,16 +118,18 @@ struct asus_hotk {
 		A2X,		//A2500H
 		D1X,		//D1
 		L1X,		//L1400B
-		L2X,		//L200D -> TODO check Q11 (Fn+F8)
+		L2X,		//L2000D -> TODO check Q11 (Fn+F8)
 				//	   Calling this method simply hangs the
 				//	   computer, ISMI method hangs the laptop.
 		L3D,		//L3400D
 		L3X,		//L3C
+		L5X,		//L5C TODO this model seems to have one more
+		                //         LED, add support
 		M2X,		//M2400E
 		M3N,		//M3700N, but also S1300N -> TODO WLED
 		S1X,		//S1300A -> TODO special keys do not work ?
 		S2X,		//S200 (J1 reported), Victor MP-XP7210
-				//TODO  A1370D does not seems to have a ATK device 
+				//TODO  A1370D does not seem to have an ATK device 
 				//	L8400 model doesn't have ATK
 		END_MODEL
 	} model;		//Models currently supported
@@ -180,6 +178,9 @@ static struct model_data model_conf[END_MODEL] = {
 	 L3X_PREFIX "_Q0F", L3X_PREFIX "_Q0E", "SPLV", "GPLV", "\\BLVL", "SDSP", 
 	 "\\_SB.PCI0.PCI1.VGAC.NMAP"},
 
+	{"L5X", "MLED", NULL, "WLED", "WRED", "\\Q0D", "\\BAOF", 
+	 "\\Q0C","\\Q0B", "SPLV", "GPLV", NULL, "SDSP", "\\INFB"},
+	 
 	{"M2X", "MLED", NULL, "WLED", NULL, "\\Q10", "\\GP06", 
 	 "\\Q0E","\\Q0F", "SPLV", "GPLV", NULL, "SDSP", "\\INFB"},
 
@@ -267,6 +268,7 @@ proc_read_info(char *page, char **start, off_t off, int count, int *eof,
 		void *data)
 {
 	int len = 0;
+	int sfun;
 	struct asus_hotk *hotk = (struct asus_hotk *) data;
 	char buf[16];		//enough for all info
 	/*
@@ -275,28 +277,27 @@ proc_read_info(char *page, char **start, off_t off, int count, int *eof,
 	 */
 
 	len += sprintf(page, ACPI_HOTK_NAME " " ASUS_ACPI_VERSION "\n");
-	len +=
-	    sprintf(page + len, "Model reference    : %s\n",
-		    hotk->methods->name);
+	len += sprintf(page + len, "Model reference    : %s\n", 
+		       hotk->methods->name);
+	if(read_acpi_int(hotk->handle, "SFUN", &sfun))
+		len += sprintf(page + len, "SFUN value         : 0x%04x\n", sfun);
 	if (asus_info) {
-		snprintf(buf, 5, "%s", asus_info->signature);
-		len += sprintf(page + len, "ACPI signature     : %s\n", buf);
 		snprintf(buf, 16, "%d", asus_info->length);
-		len += sprintf(page + len, "Table length       : %s\n", buf);
-		snprintf(buf, 16, "%d", asus_info->revision);
-		len += sprintf(page + len, "ACPI minor version : %s\n", buf);
+		len += sprintf(page + len, "DSDT length        : %s\n", buf);
 		snprintf(buf, 16, "%d", asus_info->checksum);
-		len += sprintf(page + len, "Checksum           : %s\n", buf);
+		len += sprintf(page + len, "DSDT checksum      : %s\n", buf);
+		snprintf(buf, 16, "%d", asus_info->revision);
+		len += sprintf(page + len, "DSDT revision      : %s\n", buf);
 		snprintf(buf, 7, "%s", asus_info->oem_id);
-		len += sprintf(page + len, "OEM identification : %s\n", buf);
+		len += sprintf(page + len, "OEM id             : %s\n", buf);
 		snprintf(buf, 9, "%s", asus_info->oem_table_id);
 		len += sprintf(page + len, "OEM table id       : %s\n", buf);
 		snprintf(buf, 16, "%x", asus_info->oem_revision);
-		len += sprintf(page + len, "OEM rev number     : 0x%s\n", buf);
+		len += sprintf(page + len, "OEM revision       : 0x%s\n", buf);
 		snprintf(buf, 5, "%s", asus_info->asl_compiler_id);
-		len += sprintf(page + len, "ASL comp vendor ID : %s\n", buf);
+		len += sprintf(page + len, "ASL comp vendor id : %s\n", buf);
 		snprintf(buf, 16, "%x", asus_info->asl_compiler_revision);
-		len += sprintf(page + len, "ASL comp rev number: 0x%s\n", buf);
+		len += sprintf(page + len, "ASL comp revision  : 0x%s\n", buf);
 	}
 
 	return len;
@@ -322,7 +323,7 @@ proc_read_mled(char *page, char **start, off_t off, int count, int *eof,
 				  &led_status))
 			len =  sprintf(page, "%d\n", led_status);
 		else
-			printk(KERN_NOTICE "Asus ACPI: Error reading MLED "
+			printk(KERN_WARNING "Asus ACPI: Error reading MLED "
 			       "status\n");
 	} else {
 		len = sprintf(page, "%d\n", (hotk->status & MLED_ON) ? 1 : 0);
@@ -352,7 +353,7 @@ proc_write_mled(struct file *file, const char *buffer,
 	/* We don't have to check mt_mled exists if we are here :) */
 	if (!write_acpi_int(hotk->handle, hotk->methods->mt_mled, led_out,
 			    NULL))
-		printk(KERN_NOTICE "Asus ACPI: MLED write failed\n");
+		printk(KERN_WARNING "Asus ACPI: MLED write failed\n");
 
 
 
@@ -373,11 +374,11 @@ proc_read_wled(char *page, char **start, off_t off, int count, int *eof,
 	int led_status;
 
 	if (hotk->methods->wled_status) {
-		if (read_acpi_int(NULL, hotk->methods->mled_status, 
+		if (read_acpi_int(NULL, hotk->methods->wled_status, 
 				  &led_status))
 			len = sprintf(page, "%d\n", led_status);
 		else
-			printk(KERN_NOTICE "Asus ACPI: Error reading WLED "
+			printk(KERN_WARNING "Asus ACPI: Error reading WLED "
 			       "status\n");
 	} else {
 		len = sprintf(page, "%d\n", (hotk->status & WLED_ON) ? 1 : 0);
@@ -404,7 +405,7 @@ proc_write_wled(struct file *file, const char *buffer,
 	/* We don't have to check if mt_wled exists if we are here :) */
 	if (!write_acpi_int(hotk->handle, hotk->methods->mt_wled, led_out,
 			    NULL))
-		printk(KERN_NOTICE "Asus ACPI: WLED write failed\n");
+		printk(KERN_WARNING "Asus ACPI: WLED write failed\n");
 
 
 	return count;
@@ -417,7 +418,7 @@ static int get_lcd_state(struct asus_hotk *hotk)
 
 	/* We don't have to check anything, if we are here */
 	if (!read_acpi_int(NULL, hotk->methods->lcd_status, &lcd))
-		printk(KERN_NOTICE "Asus ACPI: Error reading LCD status\n");
+		printk(KERN_WARNING "Asus ACPI: Error reading LCD status\n");
 	
 	if (hotk->model == L2X)
 		lcd = ~lcd;
@@ -456,7 +457,7 @@ proc_write_lcd(struct file *file, const char *buffer,
 		    acpi_evaluate_object(NULL, hotk->methods->mt_lcd_switch,
 					 NULL, NULL);
 		if (ACPI_FAILURE(status))
-			printk(KERN_NOTICE "Asus ACPI: Error switching LCD\n");
+			printk(KERN_WARNING "Asus ACPI: Error switching LCD\n");
 	}
 
 	return count;
@@ -474,7 +475,7 @@ static void set_brightness(int value, struct asus_hotk *hotk)
 	if(hotk->methods->brightness_set) {
 		if (!write_acpi_int(hotk->handle, hotk->methods->brightness_set, 
 				    value, NULL))
-			printk(KERN_NOTICE "Asus ACPI: Error changing brightness\n");
+			printk(KERN_WARNING "Asus ACPI: Error changing brightness\n");
 		return;
 	}
 
@@ -487,7 +488,7 @@ static void set_brightness(int value, struct asus_hotk *hotk)
 					      NULL, NULL);
 		(value > 0) ? value-- : value++;
 		if (ACPI_FAILURE(status))
-			printk(KERN_NOTICE "Asus ACPI: Error changing brightness\n");
+			printk(KERN_WARNING "Asus ACPI: Error changing brightness\n");
 	}
 	return;
 }
@@ -499,11 +500,11 @@ static int read_brightness(struct asus_hotk *hotk)
 	if(hotk->methods->brightness_get) { /* SPLV/GPLV laptop */
 		if (!read_acpi_int(hotk->handle, hotk->methods->brightness_get, 
 				   &value))
-			printk(KERN_NOTICE "Asus ACPI: Error reading brightness\n");
+			printk(KERN_WARNING "Asus ACPI: Error reading brightness\n");
 	} else if (hotk->methods->brightness_status) { /* For D1 for example */
 		if (!read_acpi_int(NULL, hotk->methods->brightness_status, 
 				   &value))
-			printk(KERN_NOTICE "Asus ACPI: Error reading brightness\n");
+			printk(KERN_WARNING "Asus ACPI: Error reading brightness\n");
 	} else /* No GPLV method */
 		value = hotk->brightness;
 	return value;
@@ -530,7 +531,7 @@ proc_write_brn(struct file *file, const char *buffer,
 			/* 0 <= value <= 15 */
 		set_brightness(value, hotk);
 	} else {
-		printk(KERN_NOTICE "Asus ACPI: Error reading user input\n");
+		printk(KERN_WARNING "Asus ACPI: Error reading user input\n");
 	}
 
 	return count;
@@ -541,7 +542,7 @@ static void set_display(int value, struct asus_hotk *hotk)
 	/* no sanity check needed for now */
 	if (!write_acpi_int(hotk->handle, hotk->methods->display_set, 
 			    value, NULL))
-		printk(KERN_NOTICE "Asus ACPI: Error setting display\n");
+		printk(KERN_WARNING "Asus ACPI: Error setting display\n");
 	return;
 }
 
@@ -558,7 +559,7 @@ proc_read_disp(char *page, char **start, off_t off, int count, int *eof,
 	struct asus_hotk *hotk = (struct asus_hotk *) data;
 	
 	if (!read_acpi_int(hotk->handle, hotk->methods->display_get, &value))
-		printk(KERN_NOTICE "Asus ACPI: Error reading display status\n");
+		printk(KERN_WARNING "Asus ACPI: Error reading display status\n");
 	return sprintf(page, "%d\n", value);
 }
 
@@ -580,13 +581,13 @@ proc_write_disp(struct file *file, const char *buffer,
 	if (sscanf(buffer, "%d", &value) == 1)
 		set_display(value, hotk);
 	else {
-		printk(KERN_NOTICE "Asus ACPI: Error reading user input\n");
+		printk(KERN_WARNING "Asus ACPI: Error reading user input\n");
 	}
 
 	return count;
 }
 
-static int asus_hotk_add_fs(struct acpi_device *device)
+static int __init asus_hotk_add_fs(struct acpi_device *device)
 {
 	struct proc_dir_entry *proc;
 	struct asus_hotk *hotk = acpi_driver_data(device);
@@ -600,7 +601,7 @@ static int asus_hotk_add_fs(struct acpi_device *device)
 
 	if ((asus_uid == 0) && (asus_gid == 0)){
 		mode = S_IFREG | S_IRUGO | S_IWUGO;
-	}else{
+	} else {
 		mode = S_IFREG | S_IRUSR | S_IRGRP | S_IWUSR | S_IWGRP;
 	}
 
@@ -616,7 +617,7 @@ static int asus_hotk_add_fs(struct acpi_device *device)
 		proc->uid = asus_uid;
 		proc->gid = asus_gid;;
 	} else {
-		printk(KERN_NOTICE "  Unable to create " PROC_INFOS
+		printk(KERN_WARNING "  Unable to create " PROC_INFOS
 		       " fs entry\n");
 	}
 
@@ -630,7 +631,7 @@ static int asus_hotk_add_fs(struct acpi_device *device)
 			proc->uid = asus_uid;
 			proc->gid = asus_gid;;
 		} else {
-			printk(KERN_NOTICE "  Unable to create " PROC_WLED
+			printk(KERN_WARNING "  Unable to create " PROC_WLED
 			       " fs entry\n");
 		}
 	}
@@ -645,7 +646,7 @@ static int asus_hotk_add_fs(struct acpi_device *device)
 			proc->uid = asus_uid;
 			proc->gid = asus_gid;;
 		} else {
-			printk(KERN_NOTICE "  Unable to create " PROC_MLED
+			printk(KERN_WARNING "  Unable to create " PROC_MLED
 			       " fs entry\n");
 		}
 	}
@@ -664,7 +665,7 @@ static int asus_hotk_add_fs(struct acpi_device *device)
 			proc->uid = asus_uid;
 			proc->gid = asus_gid;;
 		} else {
-			printk(KERN_NOTICE "  Unable to create " PROC_LCD
+			printk(KERN_WARNING "  Unable to create " PROC_LCD
 			       " fs entry\n");
 		}
 	}
@@ -680,7 +681,7 @@ static int asus_hotk_add_fs(struct acpi_device *device)
 			proc->uid = asus_uid;
 			proc->gid = asus_gid;;
 		} else {
-			printk(KERN_NOTICE "  Unable to create " PROC_BRN
+			printk(KERN_WARNING "  Unable to create " PROC_BRN
 			       " fs entry\n");
 		}
 	}
@@ -695,12 +696,12 @@ static int asus_hotk_add_fs(struct acpi_device *device)
 			proc->uid = asus_uid;
 			proc->gid = asus_gid;;
 		} else {
-			printk(KERN_NOTICE "  Unable to create " PROC_DISP
+			printk(KERN_WARNING "  Unable to create " PROC_DISP
 			       " fs entry\n");
 		}
 	}
 
-	return (AE_OK);
+	return 0;
 }
 
 
@@ -730,18 +731,39 @@ static void asus_hotk_notify(acpi_handle handle, u32 event, void *data)
  * This function is used to initialize the hotk with right values. In this
  * method, we can make all the detection we want, and modify the hotk struct
  */
-static int asus_hotk_get_info(struct asus_hotk *hotk)
+static int __init asus_hotk_get_info(struct asus_hotk *hotk)
 {
 	struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
+	struct acpi_buffer dsdt = { ACPI_ALLOCATE_BUFFER, NULL };
 	union acpi_object *model = NULL;
+	int bsts_result;
+	acpi_status status;
 
-	/* 
-	 * We have to write 0 on init this far for all ASUS models
+	/*
+	 * Get DSDT headers early enough to allow for differentiating between 
+	 * models, but late enough to allow acpi_bus_register_driver() to fail 
+	 * before doing anything ACPI-specific. Should we encounter a machine,
+	 * which needs special handling (i.e. its hotkey device has a different
+	 * HID), this bit will be moved. A global variable asus_info contains
+	 * the DSDT header.
 	 */
+	status = acpi_get_table(ACPI_TABLE_DSDT, 1, &dsdt);
+	if (ACPI_FAILURE(status))
+		printk(KERN_WARNING "  Couldn't get the DSDT table header\n");
+	else
+		asus_info = (struct acpi_table_header *) dsdt.pointer;
+
+	/* We have to write 0 on init this far for all ASUS models */
 	if (!write_acpi_int(hotk->handle, "INIT", 0, &buffer)) {
-		printk(KERN_NOTICE "  Hotkey initialization failed\n");
+		printk(KERN_ERR "  Hotkey initialization failed\n");
 		return -ENODEV;
 	}
+
+	/* For testing purposes */
+	if (!read_acpi_int(hotk->handle, "BSTS", &bsts_result))
+		printk(KERN_WARNING "  Error calling BSTS\n");
+	else if (bsts_result)
+		printk(KERN_NOTICE "  BSTS called, 0x%02x returned\n", bsts_result);
 
 	/*
 	 * Here, we also use asus_info to make decision. For example, on INIT
@@ -772,12 +794,14 @@ static int asus_hotk_get_info(struct asus_hotk *hotk)
 		hotk->model = M3N; /* S1300N is similar enough */
 	else if (strncmp(model->string.pointer, "L2", 2) == 0)
 		hotk->model = L2X;
-	else if (strncmp(model->string.pointer, "L8", 2) == 0)
+	else if (strncmp(model->string.pointer, "L8", 2) == 0) {
 		/* S1300A reports L84F, but L1400B too */
-		if (strncmp(asus_info->oem_table_id, "L1", 2) == 0)
-			hotk->model = L1X;
-		else
+		if (asus_info) {
+			if (strncmp(asus_info->oem_table_id, "L1", 2) == 0)
+				hotk->model = L1X;
+		} else
 			hotk->model = S1X;
+	}
 	else if (strncmp(model->string.pointer, "D1", 2) == 0)
 		hotk->model = D1X;
 	else if (strncmp(model->string.pointer, "A1", 2) == 0)
@@ -786,12 +810,13 @@ static int asus_hotk_get_info(struct asus_hotk *hotk)
 		hotk->model = A2X;
 	else if (strncmp(model->string.pointer, "J1", 2) == 0)
 		hotk->model = S2X;
-
+	else if (strncmp(model->string.pointer, "L5", 2) == 0)
+		hotk->model = L5X;
 
 	if (hotk->model == END_MODEL) {
 		/* By default use the same values, as I don't know others */
-		printk("unsupported, trying default values, contact the "
-		       "developers\n");
+		printk("unsupported, trying default values, supply the "
+		       "developers with your DSDT\n");
 		hotk->model = L2X;
 	} else {
 		printk("supported\n");
@@ -806,7 +831,7 @@ static int asus_hotk_get_info(struct asus_hotk *hotk)
 
 
 
-static int asus_hotk_check(struct asus_hotk *hotk)
+static int __init asus_hotk_check(struct asus_hotk *hotk)
 {
 	int result = 0;
 
@@ -820,7 +845,7 @@ static int asus_hotk_check(struct asus_hotk *hotk)
 	if (hotk->device->status.present) {
 		result = asus_hotk_get_info(hotk);
 	} else {
-		printk(KERN_NOTICE "  Hotkey device not present, aborting\n");
+		printk(KERN_ERR "  Hotkey device not present, aborting\n");
 		return(-EINVAL);
 	}
 
@@ -829,7 +854,7 @@ static int asus_hotk_check(struct asus_hotk *hotk)
 
 
 
-static int asus_hotk_add(struct acpi_device *device)
+static int __init asus_hotk_add(struct acpi_device *device)
 {
 	struct asus_hotk *hotk = NULL;
 	acpi_status status = AE_OK;
@@ -837,6 +862,9 @@ static int asus_hotk_add(struct acpi_device *device)
 
 	if (!device)
 		return(-EINVAL);
+
+	printk(KERN_NOTICE "Asus Laptop ACPI Extras version %s\n",
+	       ASUS_ACPI_VERSION);
 
 	hotk =
 	    (struct asus_hotk *) kmalloc(sizeof(struct asus_hotk), GFP_KERNEL);
@@ -865,13 +893,8 @@ static int asus_hotk_add(struct acpi_device *device)
 	 */
 	status = acpi_install_notify_handler(hotk->handle, ACPI_SYSTEM_NOTIFY,
 					     asus_hotk_notify, hotk);
-	if (ACPI_FAILURE(status)) {
-		printk(KERN_NOTICE
-		       "  Error installing notify handler\n");
-	} else {
-		printk(KERN_DEBUG
-		       "  Notify Handler installed successfully\n");
-	}
+	if (ACPI_FAILURE(status))
+		printk(KERN_ERR "  Error installing notify handler\n");
 
 	/* For laptops without GPLV: init the hotk->brightness value */
 	if ((!hotk->methods->brightness_get) && (!hotk->methods->brightness_status) &&
@@ -879,12 +902,12 @@ static int asus_hotk_add(struct acpi_device *device)
 		status = acpi_evaluate_object(NULL, hotk->methods->brightness_down,
 					      NULL, NULL);
 		if (ACPI_FAILURE(status))
-			printk(KERN_NOTICE "  Error changing brightness\n");
+			printk(KERN_WARNING "  Error changing brightness\n");
 		else {
 			status = acpi_evaluate_object(NULL, hotk->methods->brightness_up,
 						      NULL, NULL);
 			if (ACPI_FAILURE(status))
-				printk(KERN_NOTICE "  Strange, error changing" 
+				printk(KERN_WARNING "  Strange, error changing" 
 				       " brightness\n");
 		}
 	}
@@ -900,7 +923,7 @@ static int asus_hotk_add(struct acpi_device *device)
 
 
 
-static int asus_hotk_remove(struct acpi_device *device, int type)
+static int __exit asus_hotk_remove(struct acpi_device *device, int type)
 {
 	acpi_status status = 0;
 	struct asus_hotk *hotk = NULL;
@@ -913,7 +936,7 @@ static int asus_hotk_remove(struct acpi_device *device, int type)
 	status = acpi_remove_notify_handler(hotk->handle, ACPI_SYSTEM_NOTIFY,
 					    asus_hotk_notify);
 	if (ACPI_FAILURE(status))
-		printk(KERN_NOTICE "Error removing notify handler\n");
+		printk(KERN_ERR "Asus ACPI: Error removing notify handler\n");
 
 	kfree(hotk);
 
@@ -925,35 +948,17 @@ static int asus_hotk_remove(struct acpi_device *device, int type)
 
 static int __init asus_acpi_init(void)
 {
-	int result = 0;
-	acpi_status status = 0;
-	struct acpi_buffer dsdt = { ACPI_ALLOCATE_BUFFER, NULL };
-
-	printk(KERN_NOTICE "Asus Laptop ACPI Extras version %s\n",
-	       ASUS_ACPI_VERSION);
-	/*
-	 * Here is the code to know the model we are running on. We need to
-	 * know this before calling the acpi_bus_register_driver function, in
-	 * case the HID for the laptop we are running on is different from
-	 * ACPI_HOTK_HID, which I have never seen yet :)
-	 * 
-	 * This information is then available in the global var asus_info
-	 */
-	status = acpi_get_table(ACPI_TABLE_DSDT, 1, &dsdt);
-	if (ACPI_FAILURE(status)) {
-		printk(KERN_NOTICE "  Couldn't get the DSDT table header\n");
-	} else {
-		asus_info = (struct acpi_table_header *) dsdt.pointer;
-	}
+	int result;
 
 	asus_proc_dir = proc_mkdir(PROC_ASUS, acpi_root_dir);
-	if (!asus_proc_dir)
+	if (!asus_proc_dir) {
+		printk(KERN_ERR "Asus ACPI: Unable to create /proc entry");
 		return(-ENODEV);
+	}
 	asus_proc_dir->owner = THIS_MODULE;
 
 	result = acpi_bus_register_driver(&asus_hotk_driver);
 	if (result < 0) {
-		printk(KERN_NOTICE "  Error registering " ACPI_HOTK_NAME " \n");
 		remove_proc_entry(PROC_ASUS, acpi_root_dir);
 		return(-ENODEV);
 	}
