@@ -2620,27 +2620,6 @@ static void enable_cpucache (kmem_cache_t *cachep)
 					cachep->name, -err);
 }
 
-static void drain_array(kmem_cache_t *cachep, struct array_cache *ac)
-{
-	int tofree;
-
-	check_irq_off();
-	if (ac->touched) {
-		ac->touched = 0;
-	} else if (ac->avail) {
-		tofree = (ac->limit+4)/5;
-		if (tofree > ac->avail) {
-			tofree = (ac->avail+1)/2;
-		}
-		spin_lock(&cachep->spinlock);
-		free_block(cachep, ac_entry(ac), tofree);
-		spin_unlock(&cachep->spinlock);
-		ac->avail -= tofree;
-		memmove(&ac_entry(ac)[0], &ac_entry(ac)[tofree],
-					sizeof(void*)*ac->avail);
-	}
-}
-
 static void drain_array_locked(kmem_cache_t *cachep,
 				struct array_cache *ac, int force)
 {
@@ -2694,16 +2673,14 @@ static void cache_reap(void *unused)
 			goto next;
 
 		check_irq_on();
-		local_irq_disable();
-		drain_array(searchp, ac_data(searchp));
+
+		spin_lock_irq(&searchp->spinlock);
+
+		drain_array_locked(searchp, ac_data(searchp), 0);
 
 		if(time_after(searchp->lists.next_reap, jiffies))
-			goto next_irqon;
-
-		spin_lock(&searchp->spinlock);
-		if(time_after(searchp->lists.next_reap, jiffies)) {
 			goto next_unlock;
-		}
+
 		searchp->lists.next_reap = jiffies + REAPTIMEOUT_LIST3;
 
 		if (searchp->lists.shared)
@@ -2736,9 +2713,7 @@ static void cache_reap(void *unused)
 			spin_lock_irq(&searchp->spinlock);
 		} while(--tofree > 0);
 next_unlock:
-		spin_unlock(&searchp->spinlock);
-next_irqon:
-		local_irq_enable();
+		spin_unlock_irq(&searchp->spinlock);
 next:
 		;
 	}
