@@ -1,5 +1,5 @@
 mainmenu_option next_comment
-comment 'Passive ISDN cards'
+comment 'Passive cards'
 dep_tristate 'HiSax SiemensChipSet driver support' CONFIG_ISDN_DRV_HISAX $CONFIG_ISDN
 if [ "$CONFIG_ISDN_DRV_HISAX" != "n" ]; then
    comment '  D-channel protocol features'
