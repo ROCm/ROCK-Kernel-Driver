@@ -292,7 +292,7 @@ static void change_speed (unsigned int index)
 		change_VID(vid);
 		change_FID(fid);
 	}
-	
+
 
 	if (have_a0 == 1)
 		local_irq_enable();
@@ -630,14 +630,14 @@ static struct freq_attr* powernow_table_attr[] = {
 };
 
 static struct cpufreq_driver powernow_driver = {
-	.verify 	= powernow_verify,
-	.target 	= powernow_target,
-	.get		= powernow_get,	
-	.init		= powernow_cpu_init,
-	.exit		= powernow_cpu_exit,
-	.name		= "powernow-k7",
-	.owner		= THIS_MODULE,
-	.attr		= powernow_table_attr,
+	.verify	= powernow_verify,
+	.target	= powernow_target,
+	.get	= powernow_get,
+	.init	= powernow_cpu_init,
+	.exit	= powernow_cpu_exit,
+	.name	= "powernow-k7",
+	.owner	= THIS_MODULE,
+	.attr	= powernow_table_attr,
 };
 
 static int __init powernow_init (void)
