@@ -1028,6 +1028,9 @@ static int lan_saa9730_init(struct net_device *dev, int ioaddr, int irq)
 	 * Make certain the data structures used by the controller are aligned 
 	 * and DMAble. 
 	 */
+	/*
+	 *  XXX: that is obviously broken - kfree() won't be happy with us.
+	 */
 	lp = (struct lan_saa9730_private *) (((unsigned long)
 					      kmalloc(sizeof(*lp) + 7,
 						      GFP_DMA | GFP_KERNEL)
@@ -1095,7 +1098,6 @@ static int lan_saa9730_init(struct net_device *dev, int ioaddr, int irq)
  out:
 	if (dev->priv)
 		kfree(dev->priv);
-	free_netdev(dev);
 	return ret;
 }
 

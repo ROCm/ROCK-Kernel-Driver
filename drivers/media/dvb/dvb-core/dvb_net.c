@@ -523,7 +523,8 @@ static int dvb_net_add_if(struct dvb_net *dvbnet, u16 pid)
         net->base_addr = pid;
                 
 	if ((result = register_netdev(net)) < 0) {
-		kfree(net);
+		dvbnet->device[if_num] = NULL;
+		free_netdev(net);
 		return result;
 	}
 
@@ -545,6 +546,7 @@ static int dvb_net_remove_if(struct dvb_net *dvbnet, int num)
 	flush_scheduled_work();
         unregister_netdev(net);
 	dvbnet->state[num]=0;
+	dvbnet->device[num] = NULL;
 	free_netdev(net);
 
 	return 0;

@@ -1580,7 +1580,7 @@ static void wl3501_detach(dev_link_t *link)
 	*linkp = link->next;
 
 	if (link->priv)
-		kfree(link->priv);
+		free_netdev(link->priv);
 	kfree(link);
 out:
 	return;

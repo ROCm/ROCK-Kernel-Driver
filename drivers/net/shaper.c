@@ -642,7 +642,6 @@ static void __init shaper_setup(struct net_device *dev)
 
 	dev->open		= shaper_open;
 	dev->stop		= shaper_close;
-	dev->destructor 	= free_netdev;
 	dev->hard_start_xmit 	= shaper_start_xmit;
 	dev->get_stats 		= shaper_get_stats;
 	dev->set_multicast_list = NULL;

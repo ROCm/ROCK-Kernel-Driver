@@ -414,7 +414,7 @@ static int dlci_add(struct dlci_add *dlci)
 
  err2:
 	rtnl_unlock();
-	kfree(master);
+	free_netdev(master);
  err1:
 	dev_put(slave);
 	return(err);
