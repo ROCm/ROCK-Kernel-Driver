@@ -1720,7 +1720,7 @@ L:	linux-usb-devel@lists.sourceforge.net
 W:	http://www.suse.cz/development/input/
 S:	Maintained
 
-USB HUB
+USB HUB DRIVER
 P:	Johannes Erdfelt
 M:	johannes@erdfelt.com
 L:	linux-usb-users@lists.sourceforge.net
@@ -1863,13 +1863,12 @@ W:	http://www.linux-usb.org
 S:	Supported
 
 USB UHCI DRIVER
-P:	Georg Acher
-M:	usb@in.tum.de
+P:	Johannes Erdfelt
+M:	johannes@erdfelt.com
 L:	linux-usb-users@lists.sourceforge.net
 L:	linux-usb-devel@lists.sourceforge.net
-W:	http://usb.in.tum.de
 S:	Maintained
-	
+
 USB "USBNET" DRIVER
 P:	David Brownell
 M:	dbrownell@users.sourceforge.net
