@@ -905,8 +905,8 @@ out:
  * The buffer is placed on the transaction's data list and is marked as
  * belonging to the transaction.
  *
- * If `async' is set then the writebask will be initiated by the caller
- * using submit_bh -> end_buffer_io_async.  We put the buffer onto
+ * If `async' is set then the writebabk will be initiated by the caller
+ * using submit_bh -> end_buffer_async_write.  We put the buffer onto
  * t_async_datalist.
  * 
  * Returns error number or 0 on success.  
@@ -1851,8 +1851,7 @@ static int journal_unmap_buffer(journal_t *journal, struct buffer_head *bh)
 	}
 
 zap_buffer:	
-	if (buffer_dirty(bh))
-		clear_buffer_dirty(bh);
+	clear_buffer_dirty(bh);
 	J_ASSERT_BH(bh, !buffer_jdirty(bh));
 	clear_buffer_mapped(bh);
 	clear_buffer_req(bh);

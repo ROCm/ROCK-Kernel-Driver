@@ -267,7 +267,7 @@ write_out_data_locked:
 sync_datalist_empty:
 	/*
 	 * Wait for all the async writepage data.  As they become unlocked
-	 * in end_buffer_io_async(), the only place where they can be
+	 * in end_buffer_async_write(), the only place where they can be
 	 * reaped is in try_to_free_buffers(), and we're locked against
 	 * that.
 	 */

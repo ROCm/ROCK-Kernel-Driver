@@ -1916,7 +1916,7 @@ static inline void submit_bh_for_writepage(struct buffer_head **bhp, int nr) {
     for(i = 0 ; i < nr ; i++) {
         bh = bhp[i] ;
 	lock_buffer(bh) ;
-	set_buffer_async_io(bh) ;
+	mark_buffer_async_write(bh) ;
 	/* submit_bh doesn't care if the buffer is dirty, but nobody
 	** later on in the call chain will be cleaning it.  So, we
 	** clean the buffer here, it still gets written either way.

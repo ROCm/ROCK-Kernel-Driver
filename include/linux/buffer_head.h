@@ -1,24 +1,24 @@
 /*
  * include/linux/buffer_head.h
  *
- * Everything to do with buffer_head.b_state.
+ * Everything to do with buffer_heads.
  */
 
 #ifndef BUFFER_FLAGS_H
 #define BUFFER_FLAGS_H
 
-/* bh state bits */
 enum bh_state_bits {
-	BH_Uptodate,	/* 1 if the buffer contains valid data */
-	BH_Dirty,	/* 1 if the buffer is dirty */
-	BH_Lock,	/* 1 if the buffer is locked */
-	BH_Req,		/* 0 if the buffer has been invalidated */
+	BH_Uptodate,	/* Contains valid data */
+	BH_Dirty,	/* Is dirty */
+	BH_Lock,	/* Is locked */
+	BH_Req,		/* Has been submitted for I/O */
 
-	BH_Mapped,	/* 1 if the buffer has a disk mapping */
-	BH_New,		/* 1 if the buffer is new and not yet written out */
-	BH_Async,	/* 1 if the buffer is under end_buffer_io_async I/O */
-	BH_JBD,		/* 1 if it has an attached journal_head */
+	BH_Mapped,	/* Has a disk mapping */
+	BH_New,		/* Disk mapping was newly created by get_block */
+	BH_Async_Read,	/* Is under end_buffer_async_read I/O */
+	BH_Async_Write,	/* Is under end_buffer_async_write I/O */
 
+	BH_JBD,		/* Has an attached ext3 journal_head */
 	BH_PrivateStart,/* not a state bit, but the first bit available
 			 * for private allocation by other entities
 			 */
@@ -32,28 +32,22 @@ struct buffer_head;
 typedef void (bh_end_io_t)(struct buffer_head *bh, int uptodate);
 
 /*
- * Try to keep the most commonly used fields in single cache lines (16
- * bytes) to improve performance.  This ordering should be
- * particularly beneficial on 32-bit processors.
- * 
- * We use the first 16 bytes for the data which is used in searches
- * over the block hash lists (ie. getblk() and friends).
- * 
- * The second 16 bytes we use for lru buffer scans, as used by
- * sync_buffers() and refill_freelist().  -- sct
+ * Keep related fields in common cachelines.  The most commonly accessed
+ * field (b_state) goes at the start so the compiler does not generate
+ * indexed addressing for it.
  */
 struct buffer_head {
 	/* First cache line: */
-	sector_t b_blocknr;		/* block number */
-	unsigned short b_size;		/* block size */
-	struct block_device *b_bdev;
-
-	atomic_t b_count;		/* users using this block */
 	unsigned long b_state;		/* buffer state bitmap (see above) */
+	atomic_t b_count;		/* users using this block */
 	struct buffer_head *b_this_page;/* circular list of page's buffers */
 	struct page *b_page;		/* the page this bh is mapped to */
 
-	char * b_data;			/* pointer to data block */
+	sector_t b_blocknr;		/* block number */
+	unsigned short b_size;		/* block size */
+	char *b_data;			/* pointer to data block */
+
+	struct block_device *b_bdev;
 	bh_end_io_t *b_end_io;		/* I/O completion */
  	void *b_private;		/* reserved for b_end_io */
 	struct list_head     b_inode_buffers; /* list of inode dirty buffers */
@@ -91,6 +85,11 @@ static inline int test_clear_buffer_##name(struct buffer_head *bh)	\
 	return test_and_clear_bit(BH_##bit, &(bh)->b_state);		\
 }									\
 
+/*
+ * Emit the buffer bitops functions.   Note that there are also functions
+ * of the form "mark_buffer_foo()".  These are higher-level functions which
+ * do something in addition to setting a b_state bit.
+ */
 BUFFER_FNS(Uptodate, uptodate)
 BUFFER_FNS(Dirty, dirty)
 TAS_BUFFER_FNS(Dirty, dirty)
@@ -99,15 +98,12 @@ TAS_BUFFER_FNS(Lock, locked)
 BUFFER_FNS(Req, req)
 BUFFER_FNS(Mapped, mapped)
 BUFFER_FNS(New, new)
-BUFFER_FNS(Async, async)
-
-/*
- * Utility macros
- */
+BUFFER_FNS(Async_Read, async_read)
+BUFFER_FNS(Async_Write, async_write)
 
 /*
  * FIXME: this is used only by bh_kmap, which is used only by RAID5.
- * Clean this up with blockdev-in-highmem infrastructure.
+ * Move all that stuff into raid5.c
  */
 #define bh_offset(bh)		((unsigned long)(bh)->b_data & ~PAGE_MASK)
 
@@ -152,8 +148,8 @@ void end_buffer_io_sync(struct buffer_head *bh, int uptodate);
 void buffer_insert_list(spinlock_t *lock,
 			struct buffer_head *, struct list_head *);
 
-/* reiserfs_writepage needs this */
-void set_buffer_async_io(struct buffer_head *bh);
+void mark_buffer_async_read(struct buffer_head *bh);
+void mark_buffer_async_write(struct buffer_head *bh);
 void invalidate_inode_buffers(struct inode *);
 void invalidate_bdev(struct block_device *, int);
 void __invalidate_buffers(kdev_t dev, int);

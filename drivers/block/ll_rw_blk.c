@@ -1598,10 +1598,12 @@ int submit_bh(int rw, struct buffer_head * bh)
 	BUG_ON(!bh->b_end_io);
 
 	if ((rw == READ || rw == READA) && buffer_uptodate(bh))
-		printk("%s: read of uptodate buffer\n", __FUNCTION__);
+		buffer_error();
 	if (rw == WRITE && !buffer_uptodate(bh))
-		printk("%s: write of non-uptodate buffer\n", __FUNCTION__);
-		
+		buffer_error();
+	if (rw == READ && buffer_dirty(bh))
+		buffer_error();
+				
 	set_buffer_req(bh);
 
 	/*

@@ -186,6 +186,12 @@ __clear_page_buffers(struct page *page)
 	page_cache_release(page);
 }
 
+static void buffer_io_error(struct buffer_head *bh)
+{
+	printk(KERN_ERR "Buffer I/O error on device %s, logical block %ld\n",
+			bdevname(bh->b_bdev), bh->b_blocknr);
+}
+
 /*
  * Default synchronous end-of-IO handler..  Just mark it up-to-date and
  * unlock the buffer. This is what ll_rw_block uses too.
@@ -193,7 +199,7 @@ __clear_page_buffers(struct page *page)
 void end_buffer_io_sync(struct buffer_head *bh, int uptodate)
 {
 	if (!uptodate)
-		printk("%s: I/O error\n", __FUNCTION__);
+		buffer_io_error(bh);
 	if (uptodate)
 		set_buffer_uptodate(bh);
 	else
@@ -537,7 +543,11 @@ static void free_more_memory(void)
 	yield();
 }
 
-static void end_buffer_io_async(struct buffer_head *bh, int uptodate)
+/*
+ * I/O completion handler for block_read_full_page() and brw_page() - pages
+ * which come unlocked at the end of I/O.
+ */
+static void end_buffer_async_read(struct buffer_head *bh, int uptodate)
 {
 	static spinlock_t page_uptodate_lock = SPIN_LOCK_UNLOCKED;
 	unsigned long flags;
@@ -545,16 +555,18 @@ static void end_buffer_io_async(struct buffer_head *bh, int uptodate)
 	struct page *page;
 	int page_uptodate = 1;
 
-	if (!uptodate)
-		printk("%s: I/O error\n", __FUNCTION__);
+	BUG_ON(!buffer_async_read(bh));
 
-	if (uptodate)
-		set_buffer_uptodate(bh);
-	else
-		clear_buffer_uptodate(bh);
-	page = bh->b_page;
 	if (!uptodate)
+		buffer_io_error(bh);
+
+	page = bh->b_page;
+	if (uptodate) {
+		set_buffer_uptodate(bh);
+	} else {
+		clear_buffer_uptodate(bh);
 		SetPageError(page);
+	}
 
 	/*
 	 * Be _very_ careful from here on. Bad things can happen if
@@ -562,13 +574,13 @@ static void end_buffer_io_async(struct buffer_head *bh, int uptodate)
 	 * decide that the page is now completely done.
 	 */
 	spin_lock_irqsave(&page_uptodate_lock, flags);
-	clear_buffer_async(bh);
+	clear_buffer_async_read(bh);
 	unlock_buffer(bh);
 	tmp = bh;
 	do {
 		if (!buffer_uptodate(tmp))
 			page_uptodate = 0;
-		if (buffer_async(tmp)) {
+		if (buffer_async_read(tmp)) {
 			if (buffer_locked(tmp))
 				goto still_busy;
 			if (!buffer_mapped(bh))
@@ -584,13 +596,7 @@ static void end_buffer_io_async(struct buffer_head *bh, int uptodate)
 	 */
 	if (page_uptodate && !PageError(page))
 		SetPageUptodate(page);
-	if (PageWriteback(page)) {
-		/* It was a write */
-		end_page_writeback(page);
-	} else {
-		/* read */
-		unlock_page(page);
-	}
+	unlock_page(page);
 	return;
 
 still_busy:
@@ -599,26 +605,85 @@ still_busy:
 }
 
 /*
- * If a page's buffers are under async writeout (end_buffer_io_async
+ * Completion handler for block_write_full_page() - pages which are unlocked
+ * during I/O, and which have PageWriteback cleared upon I/O completion.
+ */
+static void end_buffer_async_write(struct buffer_head *bh, int uptodate)
+{
+	static spinlock_t page_uptodate_lock = SPIN_LOCK_UNLOCKED;
+	unsigned long flags;
+	struct buffer_head *tmp;
+	struct page *page;
+
+	BUG_ON(!buffer_async_write(bh));
+
+	if (!uptodate)
+		buffer_io_error(bh);
+
+	page = bh->b_page;
+	if (uptodate) {
+		set_buffer_uptodate(bh);
+	} else {
+		clear_buffer_uptodate(bh);
+		SetPageError(page);
+	}
+
+	spin_lock_irqsave(&page_uptodate_lock, flags);
+	clear_buffer_async_write(bh);
+	unlock_buffer(bh);
+	tmp = bh->b_this_page;
+	while (tmp != bh) {
+		if (buffer_async_write(tmp)) {
+			if (buffer_locked(tmp))
+				goto still_busy;
+			if (!buffer_mapped(bh))
+				BUG();
+		}
+		tmp = tmp->b_this_page;
+	}
+	spin_unlock_irqrestore(&page_uptodate_lock, flags);
+	end_page_writeback(page);
+	return;
+
+still_busy:
+	spin_unlock_irqrestore(&page_uptodate_lock, flags);
+	return;
+}
+
+/*
+ * If a page's buffers are under async readin (end_buffer_async_read
  * completion) then there is a possibility that another thread of
  * control could lock one of the buffers after it has completed
  * but while some of the other buffers have not completed.  This
- * locked buffer would confuse end_buffer_io_async() into not unlocking
- * the page.  So the absence of BH_Async tells end_buffer_io_async()
+ * locked buffer would confuse end_buffer_async_read() into not unlocking
+ * the page.  So the absence of BH_Async_Read tells end_buffer_async_read()
  * that this buffer is not under async I/O.
  *
  * The page comes unlocked when it has no locked buffer_async buffers
  * left.
  *
- * The page lock prevents anyone starting new async I/O against any of
+ * PageLocked prevents anyone starting new async I/O reads any of
  * the buffers.
+ *
+ * PageWriteback is used to prevent simultaneous writeout of the same
+ * page.
+ *
+ * PageLocked prevents anyone from starting writeback of a page which is
+ * under read I/O (PageWriteback is only ever set against a locked page).
  */
-inline void set_buffer_async_io(struct buffer_head *bh)
+inline void mark_buffer_async_read(struct buffer_head *bh)
 {
-	bh->b_end_io = end_buffer_io_async;
-	set_buffer_async(bh);
+	bh->b_end_io = end_buffer_async_read;
+	set_buffer_async_read(bh);
 }
-EXPORT_SYMBOL(set_buffer_async_io);
+EXPORT_SYMBOL(mark_buffer_async_read);
+
+inline void mark_buffer_async_write(struct buffer_head *bh)
+{
+	bh->b_end_io = end_buffer_async_write;
+	set_buffer_async_write(bh);
+}
+EXPORT_SYMBOL(mark_buffer_async_write);
 
 /*
  * osync is designed to support O_SYNC io.  It waits synchronously for
@@ -1207,10 +1272,13 @@ void create_empty_buffers(struct page *page,
 	tail->b_this_page = head;
 
 	spin_lock(&page->mapping->host->i_bufferlist_lock);
-	if (PageDirty(page)) {
+	if (PageUptodate(page) || PageDirty(page)) {
 		bh = head;
 		do {
-			set_buffer_dirty(bh);
+			if (PageDirty(page))
+				set_buffer_dirty(bh);
+			if (PageUptodate(page))
+				set_buffer_uptodate(bh);
 			bh = bh->b_this_page;
 		} while (bh != head);
 	}
@@ -1308,12 +1376,18 @@ static int __block_write_full_page(struct inode *inode,
 	 */
 	do {
 		if (block > last_block) {
-			clear_buffer_dirty(bh);
-			if (buffer_mapped(bh))
-				buffer_error();
+			/*
+			 * mapped buffers outside i_size will occur, because
+			 * this page can be outside i_size when there is a
+			 * truncate in progress.
+			 *
+			 * if (buffer_mapped(bh))
+			 *	buffer_error();
+			 */
 			/*
 			 * The buffer was zeroed by block_write_full_page()
 			 */
+			clear_buffer_dirty(bh);
 			set_buffer_uptodate(bh);
 		} else if (!buffer_mapped(bh) && buffer_dirty(bh)) {
 			if (buffer_new(bh))
@@ -1338,7 +1412,7 @@ static int __block_write_full_page(struct inode *inode,
 			if (test_clear_buffer_dirty(bh)) {
 				if (!buffer_uptodate(bh))
 					buffer_error();
-				set_buffer_async_io(bh);
+				mark_buffer_async_write(bh);
 			} else {
 				unlock_buffer(bh);
 			}
@@ -1356,7 +1430,7 @@ static int __block_write_full_page(struct inode *inode,
 	 */
 	do {
 		struct buffer_head *next = bh->b_this_page;
-		if (buffer_async(bh)) {
+		if (buffer_async_write(bh)) {
 			submit_bh(WRITE, bh);
 			nr_underway++;
 		}
@@ -1398,7 +1472,7 @@ recover:
 	do {
 		if (buffer_mapped(bh)) {
 			lock_buffer(bh);
-			set_buffer_async_io(bh);
+			mark_buffer_async_write(bh);
 		} else {
 			/*
 			 * The buffer may have been set dirty during
@@ -1410,7 +1484,7 @@ recover:
 	} while (bh != head);
 	do {
 		struct buffer_head *next = bh->b_this_page;
-		if (buffer_mapped(bh)) {
+		if (buffer_async_write(bh)) {
 			set_buffer_uptodate(bh);
 			clear_buffer_dirty(bh);
 			submit_bh(WRITE, bh);
@@ -1631,13 +1705,9 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
 
 	/* Stage two: lock the buffers */
 	for (i = 0; i < nr; i++) {
-		struct buffer_head * bh = arr[i];
+		bh = arr[i];
 		lock_buffer(bh);
-		if (buffer_uptodate(bh))
-			buffer_error();
-		if (buffer_dirty(bh))
-			buffer_error();
-		set_buffer_async_io(bh);
+		mark_buffer_async_read(bh);
 	}
 
 	/*
@@ -1646,9 +1716,9 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
 	 * the underlying blockdev brought it uptodate (the sct fix).
 	 */
 	for (i = 0; i < nr; i++) {
-		struct buffer_head * bh = arr[i];
+		bh = arr[i];
 		if (buffer_uptodate(bh))
-			end_buffer_io_async(bh, 1);
+			end_buffer_async_read(bh, 1);
 		else
 			submit_bh(READ, bh);
 	}
@@ -2074,9 +2144,15 @@ int brw_page(int rw, struct page *page,
 		bh->b_blocknr = *(b++);
 		bh->b_bdev = bdev;
 		set_buffer_mapped(bh);
-		if (rw == WRITE)
+		if (rw == WRITE) {
 			set_buffer_uptodate(bh);
-		set_buffer_async_io(bh);
+			clear_buffer_dirty(bh);
+		}
+		/*
+		 * Swap pages are locked during writeout, so use
+		 * buffer_async_read in strange ways.
+		 */
+		mark_buffer_async_read(bh);
 		bh = bh->b_this_page;
 	} while (bh != head);
 
