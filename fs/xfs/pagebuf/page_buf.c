@@ -1453,7 +1453,6 @@ next_chunk:
 	bio = bio_alloc(GFP_NOIO, nr_pages);
 
 	BUG_ON(bio == NULL);
-	bio_init(bio);
 	bio->bi_bdev = pb->pb_target->pbr_bdev;
 	bio->bi_sector = sector;
 	bio->bi_end_io = bio_end_io_pagebuf;
@@ -1467,12 +1466,8 @@ next_chunk:
 		if (nbytes > size)
 			nbytes = size;
 
-		bio->bi_vcnt++;
-		bio->bi_size += nbytes;
-
-		bvec->bv_page = pb->pb_pages[map_i];
-		bvec->bv_len = nbytes;
-		bvec->bv_offset = offset;
+		if (bio_add_page(bio, pb->pb_pages[map_i], nbytes, offset))
+			break;
 
 		offset = 0;
 
