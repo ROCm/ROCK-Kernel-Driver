@@ -860,7 +860,7 @@ static int __devinit via_rhine_init_one (struct pci_dev *pdev,
 		if (option & 0x220)
 			np->mii_if.full_duplex = 1;
 		np->default_port = option & 0x3ff;
-		if (np->default_port & 0x330) {
+		if (option & 0x330) {
 			/* FIXME: shouldn't someone check this variable? */
 			/* np->medialock = 1; */
 			printk(KERN_INFO "  Forcing %dMbs %s-duplex operation.\n",
@@ -1683,8 +1683,9 @@ static void via_rhine_error(struct net_device *dev, int intr_status)
 			printk(KERN_INFO "%s: Tx descriptor write-back race.\n",
 				   dev->name);
 	}
-	if ((intr_status & IntrTxError) && ~( IntrTxAborted | IntrTxUnderrun |
-										   IntrTxDescRace )) {
+	if ((intr_status & IntrTxError) &&
+			(intr_status & ( IntrTxAborted |
+			IntrTxUnderrun | IntrTxDescRace )) == 0) {
 		if (np->tx_thresh < 0xE0) {
 			writeb(np->tx_thresh += 0x20, ioaddr + TxConfig);
 		}
