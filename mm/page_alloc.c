@@ -548,7 +548,7 @@ void __pagevec_free(struct pagevec *pvec)
 	int i = pagevec_count(pvec);
 
 	while (--i >= 0)
-		free_hot_page(pvec->pages[i]);
+		free_hot_cold_page(pvec->pages[i], pvec->cold);
 }
 
 void __free_pages(struct page *page, unsigned int order)

@@ -49,7 +49,7 @@ read_pages(struct address_space *mapping, struct file *filp,
 	unsigned page_idx;
 	struct pagevec lru_pvec;
 
-	pagevec_init(&lru_pvec);
+	pagevec_init(&lru_pvec, 0);
 
 	if (mapping->a_ops->readpages)
 		return mapping->a_ops->readpages(mapping, pages, nr_pages);

@@ -203,7 +203,7 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 	int pgactivate = 0;
 	int ret = 0;
 
-	pagevec_init(&freed_pvec);
+	pagevec_init(&freed_pvec, 1);
 	while (!list_empty(page_list)) {
 		struct page *page;
 		int may_enter_fs;
@@ -433,7 +433,7 @@ shrink_cache(const int nr_pages, struct zone *zone,
 	if (nr_to_process < SWAP_CLUSTER_MAX)
 		nr_to_process = SWAP_CLUSTER_MAX;
 
-	pagevec_init(&pvec);
+	pagevec_init(&pvec, 1);
 
 	lru_add_drain();
 	spin_lock_irq(&zone->lru_lock);
@@ -617,7 +617,7 @@ refill_inactive_zone(struct zone *zone, const int nr_pages_in,
 		pgdeactivate++;
 	}
 
-	pagevec_init(&pvec);
+	pagevec_init(&pvec, 1);
 	spin_lock_irq(&zone->lru_lock);
 	while (!list_empty(&l_inactive)) {
 		page = list_entry(l_inactive.prev, struct page, lru);

@@ -1449,7 +1449,7 @@ generic_file_write_nolock(struct file *file, const struct iovec *iov,
 	/* We can write back this queue in page reclaim */
 	current->backing_dev_info = mapping->backing_dev_info;
 
-	pagevec_init(&lru_pvec);
+	pagevec_init(&lru_pvec, 0);
 
 	if (unlikely(file->f_error)) {
 		err = file->f_error;

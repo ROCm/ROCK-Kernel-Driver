@@ -99,13 +99,13 @@ void __page_cache_release(struct page *page)
  * page count inside the lock to see whether shrink_cache grabbed the page
  * via the LRU.  If it did, give up: shrink_cache will free it.
  */
-void release_pages(struct page **pages, int nr)
+void release_pages(struct page **pages, int nr, int cold)
 {
 	int i;
 	struct pagevec pages_to_free;
 	struct zone *zone = NULL;
 
-	pagevec_init(&pages_to_free);
+	pagevec_init(&pages_to_free, cold);
 	for (i = 0; i < nr; i++) {
 		struct page *page = pages[i];
 		struct zone *pagezone;
@@ -126,7 +126,7 @@ void release_pages(struct page **pages, int nr)
 			if (!pagevec_add(&pages_to_free, page)) {
 				spin_unlock_irq(&zone->lru_lock);
 				__pagevec_free(&pages_to_free);
-				pagevec_init(&pages_to_free);
+				pagevec_reinit(&pages_to_free);
 				zone = NULL;	/* No lock is held */
 			}
 		}
@@ -139,8 +139,8 @@ void release_pages(struct page **pages, int nr)
 
 void __pagevec_release(struct pagevec *pvec)
 {
-	release_pages(pvec->pages, pagevec_count(pvec));
-	pagevec_init(pvec);
+	release_pages(pvec->pages, pagevec_count(pvec), pvec->cold);
+	pagevec_reinit(pvec);
 }
 
 /*
@@ -153,7 +153,8 @@ void __pagevec_release_nonlru(struct pagevec *pvec)
 	int i;
 	struct pagevec pages_to_free;
 
-	pagevec_init(&pages_to_free);
+	pagevec_init(&pages_to_free, pvec->cold);
+	pages_to_free.cold = pvec->cold;
 	for (i = 0; i < pagevec_count(pvec); i++) {
 		struct page *page = pvec->pages[i];
 
@@ -162,7 +163,7 @@ void __pagevec_release_nonlru(struct pagevec *pvec)
 			pagevec_add(&pages_to_free, page);
 	}
 	pagevec_free(&pages_to_free);
-	pagevec_init(pvec);
+	pagevec_reinit(pvec);
 }
 
 /*
