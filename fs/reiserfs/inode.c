@@ -490,7 +490,7 @@ static inline int _allocate_block(struct reiserfs_transaction_handle *th,
 	return reiserfs_new_unf_blocknrs2(th, inode, allocated_block_nr, path, block);
     }
 #endif
-    return reiserfs_new_unf_blocknrs (th, allocated_block_nr, path, block);
+    return reiserfs_new_unf_blocknrs (th, inode, allocated_block_nr, path, block);
 }
 
 int reiserfs_get_block (struct inode * inode, sector_t block,
