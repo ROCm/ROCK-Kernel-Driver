@@ -303,10 +303,10 @@ void irlan_eth_send_gratuitous_arp(struct net_device *dev)
 	 */
 #ifdef CONFIG_INET
 	IRDA_DEBUG(4, "IrLAN: Sending gratuitous ARP\n");
-	in_dev = in_dev_get(dev);
-	if (in_dev == NULL)
-		return;
 	rcu_read_lock();
+	in_dev = __in_dev_get(dev);
+	if (in_dev == NULL)
+		goto out;
 	if (in_dev->ifa_list)
 		
 	arp_send(ARPOP_REQUEST, ETH_P_ARP, 
@@ -314,8 +314,8 @@ void irlan_eth_send_gratuitous_arp(struct net_device *dev)
 		 dev, 
 		 in_dev->ifa_list->ifa_address,
 		 NULL, dev->dev_addr, NULL);
+out:
 	rcu_read_unlock();
-	in_dev_put(in_dev);
 #endif /* CONFIG_INET */
 }
 
