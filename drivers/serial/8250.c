@@ -958,7 +958,7 @@ static _INLINE_ void
 receive_chars(struct uart_8250_port *up, int *status, struct pt_regs *regs)
 {
 	struct tty_struct *tty = up->port.info->tty;
-	unsigned char ch;
+	unsigned char ch, lsr = *status;
 	int max_count = 256;
 
 	do {
@@ -972,13 +972,23 @@ receive_chars(struct uart_8250_port *up, int *status, struct pt_regs *regs)
 		*tty->flip.flag_buf_ptr = TTY_NORMAL;
 		up->port.icount.rx++;
 
-		if (unlikely(*status & (UART_LSR_BI | UART_LSR_PE |
-				       UART_LSR_FE | UART_LSR_OE))) {
+#ifdef CONFIG_SERIAL_8250_CONSOLE
+		/*
+		 * Recover the break flag from console xmit
+		 */
+		if (up->port.line == up->port.cons->index) {
+			lsr |= up->lsr_break_flag;
+			up->lsr_break_flag = 0;
+		}
+#endif
+
+		if (unlikely(lsr & (UART_LSR_BI | UART_LSR_PE |
+				    UART_LSR_FE | UART_LSR_OE))) {
 			/*
 			 * For statistics only
 			 */
-			if (*status & UART_LSR_BI) {
-				*status &= ~(UART_LSR_FE | UART_LSR_PE);
+			if (lsr & UART_LSR_BI) {
+				lsr &= ~(UART_LSR_FE | UART_LSR_PE);
 				up->port.icount.brk++;
 				/*
 				 * We do the SysRQ and SAK checking
@@ -988,41 +998,34 @@ receive_chars(struct uart_8250_port *up, int *status, struct pt_regs *regs)
 				 */
 				if (uart_handle_break(&up->port))
 					goto ignore_char;
-			} else if (*status & UART_LSR_PE)
+			} else if (lsr & UART_LSR_PE)
 				up->port.icount.parity++;
-			else if (*status & UART_LSR_FE)
+			else if (lsr & UART_LSR_FE)
 				up->port.icount.frame++;
-			if (*status & UART_LSR_OE)
+			if (lsr & UART_LSR_OE)
 				up->port.icount.overrun++;
 
 			/*
 			 * Mask off conditions which should be ingored.
 			 */
-			*status &= up->port.read_status_mask;
+			lsr &= up->port.read_status_mask;
 
-#ifdef CONFIG_SERIAL_8250_CONSOLE
-			if (up->port.line == up->port.cons->index) {
-				/* Recover the break flag from console xmit */
-				*status |= up->lsr_break_flag;
-				up->lsr_break_flag = 0;
-			}
-#endif
-			if (*status & UART_LSR_BI) {
+			if (lsr & UART_LSR_BI) {
 				DEBUG_INTR("handling break....");
 				*tty->flip.flag_buf_ptr = TTY_BREAK;
-			} else if (*status & UART_LSR_PE)
+			} else if (lsr & UART_LSR_PE)
 				*tty->flip.flag_buf_ptr = TTY_PARITY;
-			else if (*status & UART_LSR_FE)
+			else if (lsr & UART_LSR_FE)
 				*tty->flip.flag_buf_ptr = TTY_FRAME;
 		}
 		if (uart_handle_sysrq_char(&up->port, ch, regs))
 			goto ignore_char;
-		if ((*status & up->port.ignore_status_mask) == 0) {
+		if ((lsr & up->port.ignore_status_mask) == 0) {
 			tty->flip.flag_buf_ptr++;
 			tty->flip.char_buf_ptr++;
 			tty->flip.count++;
 		}
-		if ((*status & UART_LSR_OE) &&
+		if ((lsr & UART_LSR_OE) &&
 		    tty->flip.count < TTY_FLIPBUF_SIZE) {
 			/*
 			 * Overrun is special, since it's reported
@@ -1035,9 +1038,10 @@ receive_chars(struct uart_8250_port *up, int *status, struct pt_regs *regs)
 			tty->flip.count++;
 		}
 	ignore_char:
-		*status = serial_inp(up, UART_LSR);
-	} while ((*status & UART_LSR_DR) && (max_count-- > 0));
+		lsr = serial_inp(up, UART_LSR);
+	} while ((lsr & UART_LSR_DR) && (max_count-- > 0));
 	tty_flip_buffer_push(tty);
+	*status = lsr;
 }
 
 static _INLINE_ void transmit_chars(struct uart_8250_port *up)
