@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC7xxx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#211 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#212 $
  *
  * Copyright (c) 1994 John Aycock
  *   The University of Calgary Department of Computer Science.
@@ -1156,16 +1156,33 @@ ahc_linux_slave_destroy(Scsi_Device *device)
  * off the input host adapter.
  */
 static void
-ahc_linux_select_queue_depth(struct Scsi_Host * host,
-			     Scsi_Device * scsi_devs)
+ahc_linux_select_queue_depth(struct Scsi_Host *host, Scsi_Device *scsi_devs)
 {
 	Scsi_Device *device;
+	Scsi_Device *ldev;
 	struct	ahc_softc *ahc;
 	u_long	flags;
 
 	ahc = *((struct ahc_softc **)host->hostdata);
 	ahc_lock(ahc, &flags);
 	for (device = scsi_devs; device != NULL; device = device->next) {
+
+		/*
+		 * Watch out for duplicate devices.  This works around
+		 * some quirks in how the SCSI scanning code does its
+		 * device management.
+		 */
+		for (ldev = scsi_devs; ldev != device; ldev = ldev->next) {
+			if (ldev->host == device->host
+			 && ldev->channel == device->channel
+			 && ldev->id == device->id
+			 && ldev->lun == device->lun)
+				break;
+		}
+		/* Skip duplicate. */
+		if (ldev != device)
+			continue;
+
 		if (device->host == host) {
 			struct	 ahc_linux_device *dev;
 

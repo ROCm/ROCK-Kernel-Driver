@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC79xx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#148 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#149 $
  *
  * --------------------------------------------------------------------------
  * Copyright (c) 1994-2000 Justin T. Gibbs.
@@ -1173,14 +1173,29 @@ ahd_linux_select_queue_depth(struct Scsi_Host * host,
 			     Scsi_Device * scsi_devs)
 {
 	Scsi_Device *device;
+	Scsi_Device *ldev;
 	struct	ahd_softc *ahd;
 	u_long	flags;
-	int	scbnum;
 
 	ahd = *((struct ahd_softc **)host->hostdata);
 	ahd_lock(ahd, &flags);
-	scbnum = 0;
 	for (device = scsi_devs; device != NULL; device = device->next) {
+
+		/*
+		 * Watch out for duplicate devices.  This works around
+		 * some quirks in how the SCSI scanning code does its
+		 * device management.
+		 */
+		for (ldev = scsi_devs; ldev != device; ldev = ldev->next) {
+			if (ldev->host == device->host
+			 && ldev->channel == device->channel
+			 && ldev->id == device->id
+			 && ldev->lun == device->lun)
+				break;
+		}
+		/* Skip duplicate. */
+		if (ldev != device)
+			continue;
 
 		if (device->host == host) {
 			struct	 ahd_linux_device *dev;
