@@ -202,13 +202,11 @@ void show_regs(struct pt_regs * regs)
 #endif /* CONFIG_SMP */
 
 	for (i = 0; i < 32; i++) {
-		long r;
 		if ((i % 4) == 0) {
 			printk("\n" KERN_INFO "GPR%02d: ", i);
 		}
-		if (__get_user(r, &(regs->gpr[i])))
-		    return;
-		printk("%016lX ", r);
+
+		printk("%016lX ", regs->gpr[i]);
 	}
 	printk("\n");
 	/*
@@ -473,6 +471,20 @@ out:
 	return error;
 }
 
+static int kstack_depth_to_print = 64;
+
+static inline int validate_sp(unsigned long sp, struct task_struct *p)
+{
+	unsigned long stack_page = (unsigned long)p->thread_info;
+
+	if (sp < stack_page + sizeof(struct thread_struct))
+		return 0;
+	if (sp >= stack_page + THREAD_SIZE)
+		return 0;
+
+	return 1;
+}
+
 /*
  * These bracket the sleeping functions..
  */
@@ -484,24 +496,23 @@ extern void scheduling_functions_end_here(void);
 unsigned long get_wchan(struct task_struct *p)
 {
 	unsigned long ip, sp;
-	unsigned long stack_page = (unsigned long)p->thread_info;
 	int count = 0;
+
 	if (!p || p == current || p->state == TASK_RUNNING)
 		return 0;
+
 	sp = p->thread.ksp;
+	if (!validate_sp(sp, p))
+		return 0;
+
 	do {
 		sp = *(unsigned long *)sp;
-		if (sp < (stack_page + sizeof(struct thread_struct)) ||
-		    sp >= (stack_page + THREAD_SIZE))
+		if (!validate_sp(sp, p))
 			return 0;
 		if (count > 0) {
 			ip = *(unsigned long *)(sp + 16);
-			/*
-			 * XXX we mask the upper 32 bits until procps
-			 * gets fixed.
-			 */
 			if (ip < first_sched || ip >= last_sched)
-				return (ip & 0xFFFFFFFF);
+				return ip;
 		}
 	} while (count++ < 16);
 	return 0;
@@ -510,28 +521,30 @@ unsigned long get_wchan(struct task_struct *p)
 void show_stack(struct task_struct *p, unsigned long *_sp)
 {
 	unsigned long ip;
-	unsigned long stack_page = (unsigned long)p->thread_info;
 	int count = 0;
 	unsigned long sp = (unsigned long)_sp;
 
-	if (!p)
+	if (sp == 0) {
+		if (p) {
+			sp = p->thread.ksp;
+		} else {
+			sp = (unsigned long)_get_SP();
+			p = current;
+		}
+	}
+
+	if (!validate_sp(sp, p))
 		return;
 
-	if (sp == 0)
-		sp = p->thread.ksp;
 	printk("Call Trace:\n");
 	do {
-		if (__get_user(sp, (unsigned long *)sp))
-			break;
-		if (sp < stack_page + sizeof(struct thread_struct))
-			break;
-		if (sp >= stack_page + THREAD_SIZE)
-			break;
-		if (__get_user(ip, (unsigned long *)(sp + 16)))
-			break;
+		sp = *(unsigned long *)sp;
+		if (!validate_sp(sp, p))
+			return;
+		ip = *(unsigned long *)(sp + 16);
 		printk("[%016lx] ", ip);
 		print_symbol("%s\n", ip);
-	} while (count++ < 32);
+	} while (count++ < kstack_depth_to_print);
 }
 
 void dump_stack(void)
