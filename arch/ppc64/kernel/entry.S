@@ -404,9 +404,11 @@ restore:
 4:	stb	r5,PACAPROCENABLED(r4)
 #endif
 
+#ifndef CONFIG_PPC_ISERIES
 	ld	r3,_MSR(r1)
 	andi.	r3,r3,MSR_RI
 	beq-	unrecov_restore
+#endif
 
 	ld	r3,_CTR(r1)
 	ld	r0,_LINK(r1)
@@ -459,10 +461,12 @@ do_work:
 	bl	.do_signal
 	b	.ret_from_except
 
+#ifndef CONFIG_PPC_ISERIES
 unrecov_restore:
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	.unrecoverable_exception
 	b	unrecov_restore
+#endif
 
 #ifdef CONFIG_PPC_PSERIES
 /*

@@ -671,8 +671,10 @@ bad_stack:
  * EXCEPTION_PROLOG_COMMON.
  */
 fast_exception_return:
+#ifndef CONFIG_PPC_ISERIES
 	andi.	r3,r23,MSR_RI		/* check if RI is set */
 	beq-	unrecov_fer
+#endif
 	ld      r3,_CCR(r1)
 	ld      r4,_LINK(r1)
 	ld      r5,_CTR(r1)
@@ -696,6 +698,7 @@ fast_exception_return:
 	ld      r1,GPR1(r1)
 	rfid
 
+#ifndef CONFIG_PPC_ISERIES
 unrecov_fer:
 	li	r6,0x4000
 	li	r20,0
@@ -703,6 +706,7 @@ unrecov_fer:
 1:	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	.unrecoverable_exception
 	b	1b
+#endif
 
 /*
  * Here r20 points to the PACA, r21 to the exception frame,
@@ -1062,9 +1066,11 @@ _GLOBAL(do_stab_bolted)
 	addi    r21,r21,EXC_FRAME_SIZE
 	lwz	r23,EX_CCR(r21)		/* get saved CR */
 
+#ifndef CONFIG_PPC_ISERIES
 	ld	r22,EX_SRR1(r21)
 	andi.	r22,r22,MSR_RI
 	beq-	unrecov_stab
+#endif
 
 	/* note that this is almost identical to maskable_exception_exit */
 	mtcr    r23                     /* restore CR */
@@ -1084,6 +1090,7 @@ _GLOBAL(do_stab_bolted)
 	mfspr	r21,SPRG1
 	rfid
 
+#ifndef CONFIG_PPC_ISERIES
 unrecov_stab:
 	EXCEPTION_PROLOG_COMMON
 	li	r6,0x4100
@@ -1092,6 +1099,7 @@ unrecov_stab:
 1:	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	.unrecoverable_exception
 	b	1b
+#endif
 
 /*
  * r20 points to the PACA, r21 to the exception frame,
@@ -1204,9 +1212,11 @@ END_FTR_SECTION_IFSET(CPU_FTR_16M_PAGE)
 	lwz	r23,EX_CCR(r21)		/* get saved CR */
 	/* note that this is almost identical to maskable_exception_exit */
 
+#ifndef CONFIG_PPC_ISERIES
 	ld	r22,EX_SRR1(r21)
 	andi.	r22,r22,MSR_RI
 	beq-	unrecov_stab
+#endif
 
 	/*
 	 * Until everyone updates binutils hardwire the POWER4 optimised
