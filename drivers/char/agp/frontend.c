@@ -40,14 +40,6 @@
 #include <asm/pgtable.h>
 #include "agp.h"
 
-//#define DEBUG
-
-#ifdef DEBUG
-#define DBG(x,y...) printk (KERN_DEBUG "agpgart: %s: " x "\n", __FUNCTION__ , ## y)
-#else
-#define DBG(x,y...) do { } while (0)
-#endif
-
 static struct agp_front_data agp_fe;
 
 static agp_memory *agp_find_mem_by_key(int key)

@@ -30,9 +30,16 @@
 
 #include <asm/agp.h>	/* for flush_agp_cache() */
 
-extern struct agp_bridge_data *agp_bridge;
-
 #define PFX "agpgart: "
+
+//#define AGP_DEBUG 1
+#ifdef AGP_DEBUG
+#define DBG(x,y...) printk (KERN_DEBUG PFX ": %s: " x "\n", __FUNCTION__ , ## y)
+#else
+#define DBG(x,y...) do { } while (0)
+#endif
+
+extern struct agp_bridge_data *agp_bridge;
 
 enum aper_size_type {
 	U8_APER_SIZE,
