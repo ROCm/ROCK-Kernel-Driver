@@ -1792,7 +1792,8 @@ static inline void flush_unauthorized_files(struct files_struct * files)
 
 	spin_lock(&files->file_lock);
 	for (;;) {
-		unsigned long set, i, fd;
+		unsigned long set, i;
+		int fd;
 
 		j++;
 		i = j * __NFDBITS;

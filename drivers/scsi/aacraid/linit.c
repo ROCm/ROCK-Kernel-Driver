@@ -178,15 +178,14 @@ static struct aac_driver_ident aac_drivers[] = {
 static int aac_get_next_adapter_fib_ioctl(unsigned int fd, unsigned int cmd, 
 		unsigned long arg, struct file *file)
 {
-	struct fib_ioctl *f;
+	struct fib_ioctl __user *f;
 
 	f = compat_alloc_user_space(sizeof(*f));
 	if (!access_ok(VERIFY_WRITE, f, sizeof(*f)))
 		return -EFAULT;
 
 	clear_user(f, sizeof(*f));
-	if (copy_from_user((void *)f, (void *)arg, 
-				sizeof(struct fib_ioctl) - sizeof(u32)))
+	if (copy_in_user(f, (void __user *)arg, sizeof(struct fib_ioctl) - sizeof(u32)))
 		return -EFAULT;
 
 	return sys_ioctl(fd, cmd, (unsigned long)f);

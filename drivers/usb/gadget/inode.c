@@ -737,7 +737,7 @@ static struct file_operations ep_io_operations = {
  * speed descriptor, then optional high speed descriptor.
  */
 static ssize_t
-ep_config (struct file *fd, const char *buf, size_t len, loff_t *ptr)
+ep_config (struct file *fd, const char __user *buf, size_t len, loff_t *ptr)
 {
 	struct ep_data		*data = fd->private_data;
 	struct usb_ep		*ep;
@@ -944,7 +944,7 @@ static int setup_req (struct usb_ep *ep, struct usb_request *req, u16 len)
 }
 
 static ssize_t
-ep0_read (struct file *fd, char *buf, size_t len, loff_t *ptr)
+ep0_read (struct file *fd, char __user *buf, size_t len, loff_t *ptr)
 {
 	struct dev_data			*dev = fd->private_data;
 	ssize_t				retval;
@@ -1125,7 +1125,7 @@ next_event (struct dev_data *dev, enum usb_gadgetfs_event_type type)
 }
 
 static ssize_t
-ep0_write (struct file *fd, const char *buf, size_t len, loff_t *ptr)
+ep0_write (struct file *fd, const char __user *buf, size_t len, loff_t *ptr)
 {
 	struct dev_data		*dev = fd->private_data;
 	ssize_t			retval = -ESRCH;
@@ -1763,7 +1763,7 @@ static int is_valid_config (struct usb_config_descriptor *config)
 }
 
 static ssize_t
-dev_config (struct file *fd, const char *buf, size_t len, loff_t *ptr)
+dev_config (struct file *fd, const char __user *buf, size_t len, loff_t *ptr)
 {
 	struct dev_data		*dev = fd->private_data;
 	ssize_t			value = len, length = len;

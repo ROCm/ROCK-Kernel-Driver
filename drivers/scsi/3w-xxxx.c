@@ -650,6 +650,7 @@ static int tw_chrdev_ioctl(struct inode *inode, struct file *file, unsigned int 
 	TW_Passthru *passthru;
 	TW_Device_Extension *tw_dev = tw_device_extension_list[iminor(inode)];
 	int retval = -EFAULT;
+	void __user *argp = (void __user *)arg;
 
 	dprintk(KERN_WARNING "3w-xxxx: tw_chrdev_ioctl()\n");
 
@@ -658,7 +659,7 @@ static int tw_chrdev_ioctl(struct inode *inode, struct file *file, unsigned int 
 		return -EINTR;
 
 	/* First copy down the buffer length */
-	error = copy_from_user(&data_buffer_length, (void *)arg, sizeof(unsigned int));
+	error = copy_from_user(&data_buffer_length, argp, sizeof(unsigned int));
 	if (error)
 		goto out;
 
@@ -681,7 +682,7 @@ static int tw_chrdev_ioctl(struct inode *inode, struct file *file, unsigned int 
 	tw_ioctl = (TW_New_Ioctl *)cpu_addr;
 
 	/* Now copy down the entire ioctl */
-	error = copy_from_user(tw_ioctl, (void *)arg, data_buffer_length + sizeof(TW_New_Ioctl) - 1);
+	error = copy_from_user(tw_ioctl, argp, data_buffer_length + sizeof(TW_New_Ioctl) - 1);
 	if (error)
 		goto out2;
 
@@ -788,7 +789,7 @@ static int tw_chrdev_ioctl(struct inode *inode, struct file *file, unsigned int 
 	}
 
 	/* Now copy the response to userspace */
-	error = copy_to_user((void *)arg, tw_ioctl, sizeof(TW_New_Ioctl) + data_buffer_length - 1);
+	error = copy_to_user(argp, tw_ioctl, sizeof(TW_New_Ioctl) + data_buffer_length - 1);
 	if (error == 0)
 		retval = 0;
 out2:

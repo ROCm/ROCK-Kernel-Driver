@@ -1055,7 +1055,7 @@ static ssize_t snd_seq_write(struct file *file, const char __user *buf, size_t c
 		} else {
 #if defined(CONFIG_SND_BIT32_EMUL) || defined(CONFIG_SND_BIT32_EMUL_MODULE)
 			if (client->convert32 && snd_seq_ev_is_varusr(&event)) {
-				void *ptr = (void*)A(event.data.raw32.d[1]);
+				void *ptr = compat_ptr(event.data.raw32.d[1]);
 				event.data.ext.ptr = ptr;
 			}
 #endif

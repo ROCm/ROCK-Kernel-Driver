@@ -138,7 +138,7 @@ static inline void save_init_fpu( struct task_struct *tsk )
  */
 static inline int restore_i387(struct _fpstate __user *buf)
 {
-	return restore_fpu_checking((struct i387_fxsave_struct *)buf);
+	return restore_fpu_checking((__force struct i387_fxsave_struct *)buf);
 }
 
 #endif /* __ASM_X86_64_I387_H */

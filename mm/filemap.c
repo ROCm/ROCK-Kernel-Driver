@@ -836,9 +836,9 @@ int file_read_actor(read_descriptor_t *desc, struct page *page,
 	 * Faults on the destination of a read are common, so do it before
 	 * taking the kmap.
 	 */
-	if (!fault_in_pages_writeable(desc->buf, size)) {
+	if (!fault_in_pages_writeable(desc->arg.buf, size)) {
 		kaddr = kmap_atomic(page, KM_USER0);
-		left = __copy_to_user(desc->buf, kaddr + offset, size);
+		left = __copy_to_user(desc->arg.buf, kaddr + offset, size);
 		kunmap_atomic(kaddr, KM_USER0);
 		if (left == 0)
 			goto success;
@@ -846,7 +846,7 @@ int file_read_actor(read_descriptor_t *desc, struct page *page,
 
 	/* Do it the slow way */
 	kaddr = kmap(page);
-	left = __copy_to_user(desc->buf, kaddr + offset, size);
+	left = __copy_to_user(desc->arg.buf, kaddr + offset, size);
 	kunmap(page);
 
 	if (left) {
@@ -856,7 +856,7 @@ int file_read_actor(read_descriptor_t *desc, struct page *page,
 success:
 	desc->count = count - size;
 	desc->written += size;
-	desc->buf += size;
+	desc->arg.buf += size;
 	return size;
 }
 
@@ -923,7 +923,7 @@ __generic_file_aio_read(struct kiocb *iocb, const struct iovec *iov,
 			read_descriptor_t desc;
 
 			desc.written = 0;
-			desc.buf = iov[seg].iov_base;
+			desc.arg.buf = iov[seg].iov_base;
 			desc.count = iov[seg].iov_len;
 			if (desc.count == 0)
 				continue;
@@ -973,7 +973,7 @@ int file_send_actor(read_descriptor_t * desc, struct page *page, unsigned long o
 {
 	ssize_t written;
 	unsigned long count = desc->count;
-	struct file *file = (struct file *) desc->buf;
+	struct file *file = desc->arg.data;
 
 	if (size > count)
 		size = count;
@@ -990,7 +990,7 @@ int file_send_actor(read_descriptor_t * desc, struct page *page, unsigned long o
 }
 
 ssize_t generic_file_sendfile(struct file *in_file, loff_t *ppos,
-			 size_t count, read_actor_t actor, void __user *target)
+			 size_t count, read_actor_t actor, void *target)
 {
 	read_descriptor_t desc;
 
@@ -999,7 +999,7 @@ ssize_t generic_file_sendfile(struct file *in_file, loff_t *ppos,
 
 	desc.written = 0;
 	desc.count = count;
-	desc.buf = target;
+	desc.arg.data = target;
 	desc.error = 0;
 
 	do_generic_file_read(in_file, ppos, &desc, actor);

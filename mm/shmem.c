@@ -1474,7 +1474,7 @@ static ssize_t shmem_file_read(struct file *filp, char __user *buf, size_t count
 
 	desc.written = 0;
 	desc.count = count;
-	desc.buf = buf;
+	desc.arg.buf = buf;
 	desc.error = 0;
 
 	do_shmem_file_read(filp, ppos, &desc, file_read_actor);
@@ -1484,7 +1484,7 @@ static ssize_t shmem_file_read(struct file *filp, char __user *buf, size_t count
 }
 
 static ssize_t shmem_file_sendfile(struct file *in_file, loff_t *ppos,
-			 size_t count, read_actor_t actor, void __user *target)
+			 size_t count, read_actor_t actor, void *target)
 {
 	read_descriptor_t desc;
 
@@ -1493,7 +1493,7 @@ static ssize_t shmem_file_sendfile(struct file *in_file, loff_t *ppos,
 
 	desc.written = 0;
 	desc.count = count;
-	desc.buf = target;
+	desc.arg.data = target;
 	desc.error = 0;
 
 	do_shmem_file_read(in_file, ppos, &desc, actor);

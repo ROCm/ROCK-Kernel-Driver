@@ -198,7 +198,7 @@ static int idt77105_ioctl(struct atm_dev *dev,unsigned int cmd,void __user *arg)
 		case IDT77105_GETSTAT:
 			return fetch_stats(dev, arg, cmd == IDT77105_GETSTATZ);
 		case ATM_SETLOOP:
-			return set_loopback(dev,(int) (long) arg);
+			return set_loopback(dev,(int)(unsigned long) arg);
 		case ATM_GETLOOP:
 			return put_user(PRIV(dev)->loop_mode,(int __user *)arg) ?
 			    -EFAULT : 0;

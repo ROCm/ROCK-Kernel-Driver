@@ -720,6 +720,19 @@ sg_common_write(Sg_fd * sfp, Sg_request * srp,
 	return 0;
 }
 
+static inline unsigned
+sg_jif_to_ms(int jifs)
+{
+	if (jifs <= 0)
+		return 0U;
+	else {
+		unsigned int j = (unsigned int) jifs;
+		return (j <
+			(UINT_MAX / 1000)) ? ((j * 1000) / HZ) : ((j / HZ) *
+								  1000);
+	}
+}
+
 static int
 sg_ioctl(struct inode *inode, struct file *filp,
 	 unsigned int cmd_in, unsigned long arg)
@@ -2584,19 +2597,6 @@ sg_ms_to_jif(unsigned int msecs)
 		return ((int) msecs <
 			(INT_MAX / 1000)) ? (((int) msecs * HZ) / 1000)
 		    : (((int) msecs / 1000) * HZ);
-}
-
-static inline unsigned
-sg_jif_to_ms(int jifs)
-{
-	if (jifs <= 0)
-		return 0U;
-	else {
-		unsigned int j = (unsigned int) jifs;
-		return (j <
-			(UINT_MAX / 1000)) ? ((j * 1000) / HZ) : ((j / HZ) *
-								  1000);
-	}
 }
 
 static unsigned char allow_ops[] = { TEST_UNIT_READY, REQUEST_SENSE,

@@ -568,7 +568,7 @@ static struct vortex_chip_info {
 	{"3c920B-EMB-WNM Tornado",
 	 PCI_USES_IO|PCI_USES_MASTER, IS_TORNADO|HAS_NWAY|HAS_HWCKSM, 128, },
 
-	{0,}, /* 0 terminated list. */
+	{NULL,}, /* NULL terminated list. */
 };
 
 
@@ -1695,7 +1695,7 @@ vortex_up(struct net_device *dev)
 		for (i = 0; i < RX_RING_SIZE; i++)	/* AKPM: this is done in vortex_open, too */
 			vp->rx_ring[i].status = 0;
 		for (i = 0; i < TX_RING_SIZE; i++)
-			vp->tx_skbuff[i] = 0;
+			vp->tx_skbuff[i] = NULL;
 		outl(0, ioaddr + DownListPtr);
 	}
 	/* Set receiver mode: presumably accept b-case and phys addr only. */
@@ -1760,7 +1760,7 @@ vortex_open(struct net_device *dev)
 			for (j = 0; j < i; j++) {
 				if (vp->rx_skbuff[j]) {
 					dev_kfree_skb(vp->rx_skbuff[j]);
-					vp->rx_skbuff[j] = 0;
+					vp->rx_skbuff[j] = NULL;
 				}
 			}
 			retval = -ENOMEM;
@@ -1938,9 +1938,9 @@ static void vortex_tx_timeout(struct net_device *dev)
 			unsigned long flags;
 			local_irq_save(flags);
 			if (vp->full_bus_master_tx)
-				boomerang_interrupt(dev->irq, dev, 0);
+				boomerang_interrupt(dev->irq, dev, NULL);
 			else
-				vortex_interrupt(dev->irq, dev, 0);
+				vortex_interrupt(dev->irq, dev, NULL);
 			local_irq_restore(flags);
 		}
 	}
@@ -2419,7 +2419,7 @@ boomerang_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 						le32_to_cpu(vp->tx_ring[entry].addr), skb->len, PCI_DMA_TODEVICE);
 #endif
 					dev_kfree_skb_irq(skb);
-					vp->tx_skbuff[entry] = 0;
+					vp->tx_skbuff[entry] = NULL;
 				} else {
 					printk(KERN_DEBUG "boomerang_interrupt: no skb!\n");
 				}
@@ -2724,7 +2724,7 @@ vortex_close(struct net_device *dev)
 				pci_unmap_single(	VORTEX_PCI(vp), le32_to_cpu(vp->rx_ring[i].addr),
 									PKT_BUF_SZ, PCI_DMA_FROMDEVICE);
 				dev_kfree_skb(vp->rx_skbuff[i]);
-				vp->rx_skbuff[i] = 0;
+				vp->rx_skbuff[i] = NULL;
 			}
 	}
 	if (vp->full_bus_master_tx) { /* Free Boomerang bus master Tx buffers. */
@@ -2743,7 +2743,7 @@ vortex_close(struct net_device *dev)
 				pci_unmap_single(VORTEX_PCI(vp), le32_to_cpu(vp->tx_ring[i].addr), skb->len, PCI_DMA_TODEVICE);
 #endif
 				dev_kfree_skb(skb);
-				vp->tx_skbuff[i] = 0;
+				vp->tx_skbuff[i] = NULL;
 			}
 		}
 	}

@@ -87,7 +87,7 @@ static char filename[PATH_MAX+1] = ".config";
 static char *args[1024], **argptr = args;
 static int indent;
 static struct termios ios_org;
-static int rows, cols;
+static int rows = 0, cols = 0;
 static struct menu *current_menu;
 static int child_count;
 static int do_resize;
@@ -113,26 +113,24 @@ static void init_wsize(void)
 	struct winsize ws;
 	char *env;
 
-	if (ioctl(1, TIOCGWINSZ, &ws) == -1) {
-		rows = 24;
-		cols = 80;
-	} else {
+	if (!ioctl(STDIN_FILENO, TIOCGWINSZ, &ws)) {
 		rows = ws.ws_row;
 		cols = ws.ws_col;
-		if (!rows) {
-			env = getenv("LINES");
-			if (env)
-				rows = atoi(env);
-			if (!rows)
-				rows = 24;
-		}
-		if (!cols) {
-			env = getenv("COLUMNS");
-			if (env)
-				cols = atoi(env);
-			if (!cols)
-				cols = 80;
-		}
+	}
+
+	if (!rows) {
+		env = getenv("LINES");
+		if (env)
+			rows = atoi(env);
+		if (!rows)
+			rows = 24;
+	}
+	if (!cols) {
+		env = getenv("COLUMNS");
+		if (env)
+			cols = atoi(env);
+		if (!cols)
+			cols = 80;
 	}
 
 	if (rows < 19 || cols < 80) {

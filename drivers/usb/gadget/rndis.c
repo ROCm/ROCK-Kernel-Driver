@@ -1320,7 +1320,7 @@ int rndis_proc_read (char *page, char **start, off_t off, int count, int *eof,
 	return len;
 }
 
-int rndis_proc_write (struct file *file, const char *buffer, 
+int rndis_proc_write (struct file *file, const char __user *buffer, 
 		      unsigned long count, void *data)
 {
 	u32 speed = 0;
