@@ -1757,7 +1757,7 @@ default_chipset:
 
 	ami_init_copper();
 
-	if (request_irq(IRQ_AMIGA_VERTB, amifb_interrupt, 0,
+	if (request_irq(IRQ_AMIGA_COPPER, amifb_interrupt, 0,
 	                "fb vertb handler", &currentpar)) {
 		err = -EBUSY;
 		goto amifb_error;
