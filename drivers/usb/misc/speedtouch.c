@@ -46,6 +46,7 @@
  *
  */
 
+#include <asm/semaphore.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -137,6 +138,8 @@ struct udsl_usb_send_data_context {
  */
 
 struct udsl_instance_data {
+	struct semaphore serialize;
+
 	/* usb device part */
 	struct usb_device *usb_dev;
 	struct udsl_data_ctx rcvbufs [UDSL_NUMBER_RCV_URBS];
@@ -150,6 +153,9 @@ struct udsl_instance_data {
 	struct atmsar_vcc_data *atmsar_vcc_list;
 
 	/* receiving */
+	spinlock_t spare_receivers_lock;
+	struct list_head spare_receivers;
+
 	spinlock_t completed_receivers_lock;
 	struct list_head completed_receivers;
 
@@ -428,6 +434,10 @@ static void udsl_atm_processqueue (unsigned long data)
 			PDEBUG ("udsl_atm_processqueue: submission failed\n");
 			/* fall through */
 		default: /* error or urb unlinked */
+			PDEBUG ("udsl_atm_processqueue: adding to spare_receivers\n");
+			spin_lock_irqsave (&instance->spare_receivers_lock, flags);
+			list_add (&ctx->list, &instance->spare_receivers);
+			spin_unlock_irqrestore (&instance->spare_receivers_lock, flags);
 			break;
 		}
 
@@ -443,6 +453,43 @@ static void udsl_atm_processqueue (unsigned long data)
 * SAR driver entries
 *
 ****************************************************************************/
+
+static void udsl_fire_receivers (struct udsl_instance_data *instance)
+{
+	struct list_head receivers, *pos, *n;
+	unsigned long flags;
+
+	INIT_LIST_HEAD (&receivers);
+
+	down (&instance->serialize);
+
+	spin_lock_irqsave (&instance->spare_receivers_lock, flags);
+	list_splice_init (&instance->spare_receivers, &receivers);
+	spin_unlock_irqrestore (&instance->spare_receivers_lock, flags);
+
+	list_for_each_safe (pos, n, &receivers) {
+		struct udsl_data_ctx *ctx = list_entry (pos, struct udsl_data_ctx, list);
+
+		PDEBUG ("udsl_fire_receivers: firing urb %p\n", ctx->urb);
+
+		usb_fill_bulk_urb (ctx->urb,
+				   instance->usb_dev,
+				   usb_rcvbulkpipe (instance->usb_dev, UDSL_ENDPOINT_DATA_IN),
+				   (unsigned char *) ctx->skb->data,
+				   UDSL_RECEIVE_BUFFER_SIZE,
+				   udsl_usb_data_receive, ctx);
+
+		if (usb_submit_urb (ctx->urb, GFP_KERNEL) < 0) {
+			PDEBUG ("udsl_fire_receivers: submit failed!\n");
+			spin_lock_irqsave (&instance->spare_receivers_lock, flags);
+			list_move (pos, &instance->spare_receivers);
+			spin_unlock_irqrestore (&instance->spare_receivers_lock, flags);
+		}
+	}
+
+	up (&instance->serialize);
+}
+
 static int udsl_atm_open (struct atm_vcc *vcc, short vpi, int vci)
 {
 	struct udsl_atm_dev_data *dev_data;
@@ -481,6 +528,9 @@ static int udsl_atm_open (struct atm_vcc *vcc, short vpi, int vci)
 	vcc->alloc_tx = udsl_atm_alloc_tx;
 
 	dev_data->atmsar_vcc->mtu = UDSL_MAX_AAL5_MRU;
+
+	if (instance->data_started)
+		udsl_fire_receivers (instance);
 
 	PDEBUG ("udsl_atm_open successfull\n");
 	return 0;
@@ -692,24 +742,7 @@ static int udsl_usb_data_init (struct udsl_instance_data *instance)
 
 	skb_queue_head_init (&instance->sndqueue);
 
-	for (i = 0, succes = 0; i < UDSL_NUMBER_RCV_URBS; i++) {
-		struct udsl_data_ctx *ctx = &(instance->rcvbufs[i]);
-
-		usb_fill_bulk_urb (ctx->urb,
-			       instance->usb_dev,
-			       usb_rcvbulkpipe (instance->usb_dev, UDSL_ENDPOINT_DATA_IN),
-			       (unsigned char *) ctx->skb->data,
-			       UDSL_RECEIVE_BUFFER_SIZE,
-			       udsl_usb_data_receive, ctx);
-
-		if (usb_submit_urb (ctx->urb, GFP_KERNEL) < 0)
-			PDEBUG ("udsl_usb_data_init: Submit failed, loosing urb.\n");
-		else
-			succes++;
-	}
-
-	PDEBUG ("udsl_usb_data_init %d urb%s queued for receive\n", succes,
-		(succes != 1) ? "s" : "");
+	udsl_fire_receivers (instance);
 
 	for (i = 0, succes = 0; i < UDSL_NUMBER_SND_URBS; i++) {
 		instance->send_ctx[i].urb = usb_alloc_urb (0, GFP_KERNEL);
@@ -729,33 +762,8 @@ static int udsl_usb_data_init (struct udsl_instance_data *instance)
 
 static int udsl_usb_data_exit (struct udsl_instance_data *instance)
 {
-	int i;
-
 	if (!instance->data_started)
 		return 0;
-
-	tasklet_disable (&instance->recvqueue_tasklet);
-
-	for (i = 0; i < UDSL_NUMBER_RCV_URBS; i++)
-		usb_unlink_urb (instance->rcvbufs[i].urb);
-
-	INIT_LIST_HEAD (&instance->completed_receivers);
-
-	tasklet_enable (&instance->recvqueue_tasklet);
-	tasklet_kill (&instance->recvqueue_tasklet);
-
-	for (i = 0; i < UDSL_NUMBER_SND_URBS; i++) {
-		struct udsl_usb_send_data_context *ctx = &(instance->send_ctx[i]);
-
-		usb_unlink_urb (ctx->urb);
-
-		if (ctx->skb)
-			ctx->vcc->pop (ctx->vcc, ctx->skb);
-		ctx->skb = NULL;
-
-		usb_free_urb (ctx->urb);
-
-	}
 
 	instance->data_started = 0;
 	instance->atm_dev->signal = ATM_PHY_SIG_LOST;
@@ -819,7 +827,12 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 
 	memset (instance, 0, sizeof (struct udsl_instance_data));
 
+	init_MUTEX (&instance->serialize);
+
 	instance->usb_dev = dev;
+
+	spin_lock_init (&instance->spare_receivers_lock);
+	INIT_LIST_HEAD (&instance->spare_receivers);
 
 	spin_lock_init (&instance->completed_receivers_lock);
 	INIT_LIST_HEAD (&instance->completed_receivers);
@@ -843,6 +856,8 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 		}
 
 		ctx->instance = instance;
+
+		list_add (&ctx->list, &instance->spare_receivers);
 
 		PDEBUG ("skb->truesize = %d (asked for %d)\n", ctx->skb->truesize, UDSL_RECEIVE_BUFFER_SIZE);
 	}
@@ -908,15 +923,43 @@ static void udsl_usb_disconnect (struct usb_interface *intf)
 		return;
 	}
 
-	/* unlinking receive buffers */
-	udsl_usb_data_exit (instance);
+	tasklet_disable (&instance->recvqueue_tasklet);
 
+	down (&instance->serialize);
+	/* no need to take the spinlock - recvqueue_tasklet is not running */
+	INIT_LIST_HEAD (&instance->spare_receivers);
+	up (&instance->serialize);
+
+	for (i = 0; i < UDSL_NUMBER_RCV_URBS; i++)
+		usb_unlink_urb (instance->rcvbufs[i].urb);
+
+	/* no need to take the spinlock - no completion handlers running */
+	INIT_LIST_HEAD (&instance->completed_receivers);
+
+	tasklet_enable (&instance->recvqueue_tasklet);
+	tasklet_kill (&instance->recvqueue_tasklet);
+
+	PDEBUG ("udsl_usb_disconnect: freeing receivers\n");
 	for (i = 0; i < UDSL_NUMBER_RCV_URBS; i++) {
 		struct udsl_data_ctx *ctx = &(instance->rcvbufs[i]);
 
 		usb_free_urb (ctx->urb);
 		kfree_skb (ctx->skb);
 	}
+
+	for (i = 0; i < UDSL_NUMBER_SND_URBS; i++) {
+		struct udsl_usb_send_data_context *ctx = &(instance->send_ctx[i]);
+
+		usb_unlink_urb (ctx->urb);
+
+		if (ctx->skb)
+			ctx->vcc->pop (ctx->vcc, ctx->skb);
+		ctx->skb = NULL;
+
+		usb_free_urb (ctx->urb);
+
+	}
+
 
 	/* removing atm device */
 	if (instance->atm_dev)
