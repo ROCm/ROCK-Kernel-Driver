@@ -157,3 +157,11 @@ CONFIG_OLD_BELKIN_DONGLE
   called old_belkin.o.  Some information is contained in the comments
   at the top of <file:drivers/net/irda/old_belkin.c>.
 
+ACTiSYS IR-200L dongle (Experimental)
+CONFIG_ACT200L_DONGLE
+  Say Y here if you want to build support for the ACTiSYS IR-200L
+  dongle. If you want to compile it as a module, say M here and read
+  Documentation/modules.txt. The ACTiSYS IR-200L dongle attaches to
+  the normal 9-pin serial port connector, and can currently only be
+  used by IrTTY. To activate support for ACTiSYS IR-200L dongles
+  you will have to start irattach like this: "irattach -d act200l".

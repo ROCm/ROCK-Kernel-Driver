@@ -18,6 +18,10 @@ if [ "$CONFIG_DONGLE" != "n" ]; then
    if [ "$CONFIG_ARCH_EP7211" = "y" ]; then
       dep_tristate '  EP7211 I/R support' CONFIG_EP7211_IR $CONFIG_IRDA
    fi
+   if [ "$CONFIG_EXPERIMENTAL" != "n" ]; then
+      dep_tristate '  ACTiSYS IR-200L dongle (Experimental)' CONFIG_ACT200L_DONGLE $CONFIG_IRDA
+      dep_tristate '  Mobile Action MA600 dongle (Experimental)' CONFIG_MA600_DONGLE $CONFIG_IRDA
+   fi
 fi
 
 comment 'FIR device drivers'
