@@ -805,19 +805,11 @@ static int agpioc_setup_wrap(agp_file_private * priv, unsigned long arg)
 {
 	agp_setup mode;
 
-	if (copy_from_user(&mode, (void *) arg, sizeof(agp_setup)))
+	if (copy_from_user(&mode, (void *) arg, sizeof(agp_setup))) {
 		return -EFAULT;
-
-	switch (mode.agp_mode) {
-		case 1:
-		case 2:
-		case 4:
-		case 8:
-			agp_enable(mode.agp_mode);
-			return 0;
-		default:;
 	}
-	return -EINVAL;
+	agp_enable(mode.agp_mode);
+	return 0;
 }
 
 static int agpioc_reserve_wrap(agp_file_private * priv, unsigned long arg)
