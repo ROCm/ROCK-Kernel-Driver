@@ -2215,8 +2215,6 @@ static int reiserfs_write_full_page(struct page *page, struct writeback_control 
 	} else {
 	    unlock_buffer(bh);
 	}
-
-        bh = bh->b_this_page;
     } while((bh = bh->b_this_page) != head);
 
     BUG_ON(PageWriteback(page));
