@@ -673,7 +673,7 @@ static int mdc800_device_release (struct inode* inode, struct file *file)
  */
 static ssize_t mdc800_device_read (struct file *file, char *buf, size_t len, loff_t *pos)
 {
-	int   left=len, sts=len; /* single transfer size */
+	size_t left=len, sts=len; /* single transfer size */
 	char* ptr=buf;
 	DECLARE_WAITQUEUE(wait, current);
 
@@ -767,7 +767,7 @@ static ssize_t mdc800_device_read (struct file *file, char *buf, size_t len, lof
  */
 static ssize_t mdc800_device_write (struct file *file, const char *buf, size_t len, loff_t *pos)
 {
-	int i=0;
+	size_t i=0;
 	DECLARE_WAITQUEUE(wait, current);
 
 	down (&mdc800->io_lock);
