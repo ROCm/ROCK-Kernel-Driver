@@ -47,6 +47,7 @@
 #include <linux/smp_lock.h>
 
 static int advwdt_is_open;
+static char adv_expect_close;
 static spinlock_t advwdt_lock;
 
 /*
@@ -157,7 +158,7 @@ advwdt_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 static int
 advwdt_open(struct inode *inode, struct file *file)
 {
-	if (minor(inode->i_rdev) = WATCHDOG_MINOR) {
+	if (minor(inode->i_rdev) == WATCHDOG_MINOR) {
 		spin_lock(&advwdt_lock);
 		if (advwdt_is_open) {
 			spin_unlock(&advwdt_lock);
@@ -231,7 +232,7 @@ static struct miscdevice advwdt_miscdev = {
  */
  
 static struct notifier_block advwdt_notifier = {
-	.self = advwdt_notify_sys,
+	.notifier_call = advwdt_notify_sys,
 	.next = NULL,
 	.priority = 0
 };
