@@ -190,8 +190,7 @@ static inline void purge_partial_datagram(struct list_head *old);
 static int ether1394_tx(struct sk_buff *skb, struct net_device *dev);
 static void ether1394_iso(struct hpsb_iso *iso);
 
-static int ether1394_do_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd);
-static int ether1394_ethtool_ioctl(struct net_device *dev, void __user *useraddr);
+static struct ethtool_ops ethtool_ops;
 
 static int ether1394_write(struct hpsb_host *host, int srcid, int destid,
 			   quadlet_t *data, u64 addr, size_t len, u16 flags);
@@ -547,7 +546,7 @@ static void ether1394_init_dev (struct net_device *dev)
 	dev->header_cache_update= ether1394_header_cache_update;
 	dev->hard_header_parse	= ether1394_header_parse;
 	dev->set_mac_address	= ether1394_mac_addr;
-	dev->do_ioctl		= ether1394_do_ioctl;
+	SET_ETHTOOL_OPS(dev, &ethtool_ops);
 
 	/* Some constants */
 	dev->watchdog_timeo	= ETHER1394_TIMEOUT;
@@ -1768,53 +1767,17 @@ fail:
 	return 0;  /* returning non-zero causes serious problems */
 }
 
-static int ether1394_do_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
+static void ether1394_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
 {
-	switch(cmd) {
-		case SIOCETHTOOL:
-			return ether1394_ethtool_ioctl(dev, ifr->ifr_data);
-
-		case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
-		case SIOCGMIIREG:		/* Read MII PHY register. */
-		case SIOCSMIIREG:		/* Write MII PHY register. */
-		default:
-			return -EOPNOTSUPP;
-	}
-
-	return 0;
+	strcpy (info->driver, driver_name);
+	strcpy (info->version, "$Rev: 1224 $");
+	/* FIXME XXX provide sane businfo */
+	strcpy (info->bus_info, "ieee1394");
 }
 
-static int ether1394_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
-{
-	u32 ethcmd;
-
-	if (get_user(ethcmd, (u32 __user *)useraddr))
-		return -EFAULT;
-
-	switch (ethcmd) {
-		case ETHTOOL_GDRVINFO: {
-			struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
-			strcpy (info.driver, driver_name);
-			strcpy (info.version, "$Rev: 1224 $");
-			/* FIXME XXX provide sane businfo */
-			strcpy (info.bus_info, "ieee1394");
-			if (copy_to_user (useraddr, &info, sizeof (info)))
-				return -EFAULT;
-			break;
-		}
-		case ETHTOOL_GSET:
-		case ETHTOOL_SSET:
-		case ETHTOOL_NWAY_RST:
-		case ETHTOOL_GLINK:
-		case ETHTOOL_GMSGLVL:
-		case ETHTOOL_SMSGLVL:
-		default:
-			return -EOPNOTSUPP;
-	}
-
-	return 0;
-}
-
+static struct ethtool_ops ethtool_ops = {
+	.get_drvinfo = ether1394_get_drvinfo
+};
 
 static int __init ether1394_init_module (void)
 {
