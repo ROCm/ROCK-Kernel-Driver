@@ -88,7 +88,7 @@ static int __init pci_mmcfg_init(void)
 		return 0;
 	}	
 
-	printk(KERN_INFO "PCI: Using MMCONFIG at %lx\n", pci_mmcfg_base_addr);
+	printk(KERN_INFO "PCI: Using MMCONFIG at %x\n", pci_mmcfg_base_addr);
 	raw_pci_ops = &pci_mmcfg;
 	pci_probe = (pci_probe & ~PCI_PROBE_MASK) | PCI_PROBE_MMCONF;
 

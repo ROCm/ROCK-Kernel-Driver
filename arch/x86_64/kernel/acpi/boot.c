@@ -366,6 +366,15 @@ __setup("acpi_pic_sci=", acpi_pic_sci_setup);
 
 #endif /* CONFIG_ACPI_BUS */
 
+int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
+{
+	if (use_pci_vector() && !platform_legacy_irq(gsi))
+ 		*irq = IO_APIC_VECTOR(gsi);
+	else
+		*irq = gsi;
+	return 0;
+}
+
 static unsigned long __init
 acpi_scan_rsdp (
 	unsigned long		start,
