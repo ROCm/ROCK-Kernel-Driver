@@ -164,12 +164,12 @@ static inline u64 async_mask(struct mthca_dev *dev)
 		MTHCA_ASYNC_EVENT_MASK;
 }
 
-static inline void set_eq_ci(struct mthca_dev *dev, int eqn, int ci)
+static inline void set_eq_ci(struct mthca_dev *dev, struct mthca_eq *eq, u32 ci)
 {
 	u32 doorbell[2];
 
-	doorbell[0] = cpu_to_be32(MTHCA_EQ_DB_SET_CI | eqn);
-	doorbell[1] = cpu_to_be32(ci);
+	doorbell[0] = cpu_to_be32(MTHCA_EQ_DB_SET_CI | eq->eqn);
+	doorbell[1] = cpu_to_be32(ci & (eq->nent - 1));
 
 	mthca_write64(doorbell,
 		      dev->kar + MTHCA_EQ_DOORBELL,
@@ -200,21 +200,22 @@ static inline void disarm_cq(struct mthca_dev *dev, int eqn, int cqn)
 		      MTHCA_GET_DOORBELL_LOCK(&dev->doorbell_lock));
 }
 
-static inline struct mthca_eqe *get_eqe(struct mthca_eq *eq, int entry)
+static inline struct mthca_eqe *get_eqe(struct mthca_eq *eq, u32 entry)
 {
-	return eq->page_list[entry * MTHCA_EQ_ENTRY_SIZE / PAGE_SIZE].buf
-		+ (entry * MTHCA_EQ_ENTRY_SIZE) % PAGE_SIZE;
+	unsigned long off = (entry & (eq->nent - 1)) * MTHCA_EQ_ENTRY_SIZE;
+	return eq->page_list[off / PAGE_SIZE].buf + off % PAGE_SIZE;
 }
 
-static inline int next_eqe_sw(struct mthca_eq *eq)
+static inline struct mthca_eqe* next_eqe_sw(struct mthca_eq *eq)
 {
-	return !(MTHCA_EQ_ENTRY_OWNER_HW &
-		 get_eqe(eq, eq->cons_index)->owner);
+	struct mthca_eqe* eqe;
+	eqe = get_eqe(eq, eq->cons_index);
+	return (MTHCA_EQ_ENTRY_OWNER_HW & eqe->owner) ? NULL : eqe;
 }
 
-static inline void set_eqe_hw(struct mthca_eq *eq, int entry)
+static inline void set_eqe_hw(struct mthca_eqe *eqe)
 {
-	get_eqe(eq, entry)->owner =  MTHCA_EQ_ENTRY_OWNER_HW;
+	eqe->owner =  MTHCA_EQ_ENTRY_OWNER_HW;
 }
 
 static void port_change(struct mthca_dev *dev, int port, int active)
@@ -235,10 +236,10 @@ static void mthca_eq_int(struct mthca_dev *dev, struct mthca_eq *eq)
 {
 	struct mthca_eqe *eqe;
 	int disarm_cqn;
+	int  eqes_found = 0;
 
-	while (next_eqe_sw(eq)) {
+	while ((eqe = next_eqe_sw(eq))) {
 		int set_ci = 0;
-		eqe = get_eqe(eq, eq->cons_index);
 
 		/*
 		 * Make sure we read EQ entry contents after we've
@@ -328,12 +329,13 @@ static void mthca_eq_int(struct mthca_dev *dev, struct mthca_eq *eq)
 			break;
 		};
 
-		set_eqe_hw(eq, eq->cons_index);
-		eq->cons_index = (eq->cons_index + 1) & (eq->nent - 1);
+		set_eqe_hw(eqe);
+		++eq->cons_index;
+		eqes_found = 1;
 
 		if (set_ci) {
 			wmb(); /* see comment below */
-			set_eq_ci(dev, eq->eqn, eq->cons_index);
+			set_eq_ci(dev, eq, eq->cons_index);
 			set_ci = 0;
 		}
 	}
@@ -347,8 +349,10 @@ static void mthca_eq_int(struct mthca_dev *dev, struct mthca_eq *eq)
 	 * possibility of the HCA writing an entry and then
 	 * having set_eqe_hw() overwrite the owner field.
 	 */
-	wmb();
-	set_eq_ci(dev, eq->eqn, eq->cons_index);
+	if (likely(eqes_found)) {
+		wmb();
+		set_eq_ci(dev, eq, eq->cons_index);
+	}
 	eq_req_not(dev, eq->eqn);
 }
 
@@ -362,7 +366,7 @@ static irqreturn_t mthca_interrupt(int irq, void *dev_ptr, struct pt_regs *regs)
 	if (dev->eq_table.clr_mask)
 		writel(dev->eq_table.clr_mask, dev->eq_table.clr_int);
 
-	while ((ecr = readl(dev->hcr + MTHCA_ECR_OFFSET + 4)) != 0) {
+	if ((ecr = readl(dev->hcr + MTHCA_ECR_OFFSET + 4)) != 0) {
 		work = 1;
 
 		writel(ecr, dev->hcr + MTHCA_ECR_CLR_OFFSET + 4);
@@ -440,7 +444,7 @@ static int __devinit mthca_create_eq(struct mthca_dev *dev,
 	}
 
 	for (i = 0; i < nent; ++i)
-		set_eqe_hw(eq, i);
+		set_eqe_hw(get_eqe(eq, i));
 
 	eq->eqn = mthca_alloc(&dev->eq_table.alloc);
 	if (eq->eqn == -1)
