@@ -1399,6 +1399,7 @@ W: http://www.holtmann.org
 D: Maintainer of the Linux Bluetooth Subsystem
 D: Author and maintainer of the various Bluetooth HCI drivers
 D: Author and maintainer of the CAPI message transport protocol driver
+D: Author and maintainer of the Bluetooth HID protocol driver
 D: Various other Bluetooth related patches, cleanups and fixes
 S: Germany
 

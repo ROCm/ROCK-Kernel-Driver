@@ -1960,6 +1960,11 @@ static int do_blkgetsize64(unsigned int fd, unsigned int cmd,
 #define CMTPGETCONNLIST	_IOR('C', 210, int)
 #define CMTPGETCONNINFO	_IOR('C', 211, int)
 
+#define HIDPCONNADD	_IOW('H', 200, int)
+#define HIDPCONNDEL	_IOW('H', 201, int)
+#define HIDPGETCONNLIST	_IOR('H', 210, int)
+#define HIDPGETCONNINFO	_IOR('H', 211, int)
+
 struct floppy_struct32 {
 	compat_uint_t	size;
 	compat_uint_t	sect;

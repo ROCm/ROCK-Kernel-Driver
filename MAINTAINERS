@@ -382,6 +382,11 @@ P:	Marcel Holtmann
 M:	marcel@holtmann.org
 S:	Maintained
 
+BLUETOOTH HIDP LAYER
+P:	Marcel Holtmann
+M:	marcel@holtmann.org
+S:	Maintained
+
 BLUETOOTH HCI UART DRIVER
 P:	Marcel Holtmann
 M:	marcel@holtmann.org
