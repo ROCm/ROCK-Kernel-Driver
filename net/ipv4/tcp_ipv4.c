@@ -2452,7 +2452,7 @@ static void get_openreq4(struct sock *sk, struct open_request *req,
 	int ttd = req->expires - jiffies;
 
 	sprintf(tmpbuf, "%4d: %08X:%04X %08X:%04X"
-		" %02X %08X:%08X %02X:%08X %08X %5d %8d %u %d %p",
+		" %02X %08X:%08X %02X:%08lX %08X %5d %8d %u %d %p",
 		i,
 		req->af.v4_req.loc_addr,
 		ntohs(inet_sk(sk)->sport),
@@ -2526,7 +2526,7 @@ static void get_timewait4_sock(struct tcp_tw_bucket *tw, char *tmpbuf, int i)
 	srcp  = ntohs(tw->tw_sport);
 
 	sprintf(tmpbuf, "%4d: %08X:%04X %08X:%04X"
-		" %02X %08X:%08X %02X:%08X %08X %5d %8d %d %d %p",
+		" %02X %08X:%08X %02X:%08lX %08X %5d %8d %d %d %p",
 		i, src, srcp, dest, destp, tw->tw_substate, 0, 0,
 		3, jiffies_to_clock_t(ttd), 0, 0, 0, 0,
 		atomic_read(&tw->tw_refcnt), tw);
