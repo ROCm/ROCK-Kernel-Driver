@@ -349,7 +349,7 @@ restore_sigcontext(struct pt_regs *regs, struct sigcontext *usc, void *fp,
 		/*
 		 * user process trying to return with weird frame format
 		 */
-#if DEBUG
+#ifdef DEBUG
 		printk("user process returning with weird frame format\n");
 #endif
 		goto badframe;
@@ -450,7 +450,7 @@ rt_restore_ucontext(struct pt_regs *regs, struct switch_stack *sw,
 		/*
 		 * user process trying to return with weird frame format
 		 */
-#if DEBUG
+#ifdef DEBUG
 		printk("user process returning with weird frame format\n");
 #endif
 		goto badframe;
@@ -829,7 +829,7 @@ adjust_stack:
 	if (regs->stkadj) {
 		struct pt_regs *tregs =
 			(struct pt_regs *)((ulong)regs + regs->stkadj);
-#if DEBUG
+#ifdef DEBUG
 		printk("Performing stackadjust=%04x\n", regs->stkadj);
 #endif
 		/* This must be copied with decreasing addresses to
@@ -912,7 +912,7 @@ adjust_stack:
 	if (regs->stkadj) {
 		struct pt_regs *tregs =
 			(struct pt_regs *)((ulong)regs + regs->stkadj);
-#if DEBUG
+#ifdef DEBUG
 		printk("Performing stackadjust=%04x\n", regs->stkadj);
 #endif
 		/* This must be copied with decreasing addresses to

@@ -27,12 +27,12 @@ struct semaphore {
 	atomic_t count;
 	atomic_t waking;
 	wait_queue_head_t wait;
-#if WAITQUEUE_DEBUG
+#ifdef WAITQUEUE_DEBUG
 	long __magic;
 #endif
 };
 
-#if WAITQUEUE_DEBUG
+#ifdef WAITQUEUE_DEBUG
 # define __SEM_DEBUG_INIT(name) \
 		, (long)&(name).__magic
 #else
@@ -86,7 +86,7 @@ static inline void down(struct semaphore *sem)
 {
 	register struct semaphore *sem1 __asm__ ("%a1") = sem;
 
-#if WAITQUEUE_DEBUG
+#ifdef WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
 #endif
 	might_sleep();
@@ -109,7 +109,7 @@ static inline int down_interruptible(struct semaphore *sem)
 	register struct semaphore *sem1 __asm__ ("%a1") = sem;
 	register int result __asm__ ("%d0");
 
-#if WAITQUEUE_DEBUG
+#ifdef WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
 #endif
 	might_sleep();
@@ -134,7 +134,7 @@ static inline int down_trylock(struct semaphore *sem)
 	register struct semaphore *sem1 __asm__ ("%a1") = sem;
 	register int result __asm__ ("%d0");
 
-#if WAITQUEUE_DEBUG
+#ifdef WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
 #endif
 
@@ -164,7 +164,7 @@ static inline void up(struct semaphore *sem)
 {
 	register struct semaphore *sem1 __asm__ ("%a1") = sem;
 
-#if WAITQUEUE_DEBUG
+#ifdef WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
 #endif
 

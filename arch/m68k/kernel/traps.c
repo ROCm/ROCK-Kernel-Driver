@@ -541,7 +541,7 @@ static inline void bus_error030 (struct frame *fp)
 	unsigned short ssw = fp->un.fmtb.ssw;
 	extern unsigned long _sun3_map_test_start, _sun3_map_test_end;
 
-#if DEBUG
+#ifdef DEBUG
 	if (ssw & (FC | FB))
 		printk ("Instruction fault at %#010lx\n",
 			ssw & FC ?
@@ -670,7 +670,7 @@ static inline void bus_error030 (struct frame *fp)
 	unsigned short mmusr;
 	unsigned long addr, errorcode;
 	unsigned short ssw = fp->un.fmtb.ssw;
-#if DEBUG
+#ifdef DEBUG
 	unsigned long desc;
 
 	printk ("pid = %x  ", current->pid);
@@ -696,7 +696,7 @@ static inline void bus_error030 (struct frame *fp)
 	if (ssw & DF) {
 		addr = fp->un.fmtb.daddr;
 
-#if DEBUG
+#ifdef DEBUG
 		asm volatile ("ptestr %3,%2@,#7,%0\n\t"
 			      "pmove %%psr,%1@"
 			      : "=a&" (desc)
@@ -708,7 +708,7 @@ static inline void bus_error030 (struct frame *fp)
 #endif
 		mmusr = temp;
 
-#if DEBUG
+#ifdef DEBUG
 		printk("mmusr is %#x for addr %#lx in task %p\n",
 		       mmusr, addr, current);
 		printk("descriptor address is %#lx, contents %#lx\n",
@@ -767,7 +767,7 @@ static inline void bus_error030 (struct frame *fp)
 				      : "a" (&tlong));
 			printk("tt1 is %#lx\n", tlong);
 #endif
-#if DEBUG
+#ifdef DEBUG
 			printk("Unknown SIGSEGV - 1\n");
 #endif
 			die_if_kernel("Oops",&fp->ptregs,mmusr);
@@ -812,7 +812,7 @@ static inline void bus_error030 (struct frame *fp)
 		   should still create the ATC entry.  */
 		goto create_atc_entry;
 
-#if DEBUG
+#ifdef DEBUG
 	asm volatile ("ptestr #1,%2@,#7,%0\n\t"
 		      "pmove %%psr,%1@"
 		      : "=a&" (desc)
@@ -836,7 +836,7 @@ static inline void bus_error030 (struct frame *fp)
 	else if (mmusr & (MMU_B|MMU_L|MMU_S)) {
 		printk ("invalid insn access at %#lx from pc %#lx\n",
 			addr, fp->ptregs.pc);
-#if DEBUG
+#ifdef DEBUG
 		printk("Unknown SIGSEGV - 2\n");
 #endif
 		die_if_kernel("Oops",&fp->ptregs,mmusr);
@@ -858,7 +858,7 @@ asmlinkage void buserr_c(struct frame *fp)
 	if (user_mode(&fp->ptregs))
 		current->thread.esp0 = (unsigned long) fp;
 
-#if DEBUG
+#ifdef DEBUG
 	printk ("*** Bus Error *** Format is %x\n", fp->ptregs.format);
 #endif
 
@@ -881,7 +881,7 @@ asmlinkage void buserr_c(struct frame *fp)
 #endif
 	default:
 	  die_if_kernel("bad frame format",&fp->ptregs,0);
-#if DEBUG
+#ifdef DEBUG
 	  printk("Unknown SIGSEGV - 4\n");
 #endif
 	  force_sig(SIGSEGV, current);
