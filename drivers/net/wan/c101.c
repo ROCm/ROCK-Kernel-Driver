@@ -181,7 +181,7 @@ static int c101_open(struct net_device *dev)
 	port_t *port = hdlc_to_port(hdlc);
 	int result;
 
-	result = hdlc_open(hdlc);
+	result = hdlc_open(dev);
 	if (result)
 		return result;
 

@@ -3157,7 +3157,7 @@ int cpc_open(struct net_device *dev)
 		d->if_ptr = &hdlc->state.ppp.pppdev;
 	}
 
-	result = hdlc_open(hdlc);
+	result = hdlc_open(dev);
 	if (hdlc->proto.id == IF_PROTO_PPP) {
 		dev->priv = d;
 	}

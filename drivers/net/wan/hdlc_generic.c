@@ -108,8 +108,9 @@ void hdlc_set_carrier(int on, hdlc_device *hdlc)
 
 
 /* Must be called by hardware driver when HDLC device is being opened */
-int hdlc_open(hdlc_device *hdlc)
+int hdlc_open(struct net_device *dev)
 {
+	hdlc_device *hdlc = dev_to_hdlc(dev);
 #ifdef DEBUG_LINK
 	printk(KERN_DEBUG "hdlc_open carrier %i open %i\n",
 	       hdlc->carrier, hdlc->open);
@@ -129,11 +130,11 @@ int hdlc_open(hdlc_device *hdlc)
 	if (hdlc->carrier) {
 		if (hdlc->proto.start)
 			hdlc->proto.start(hdlc);
-		else if (!netif_carrier_ok(&hdlc->netdev))
-			netif_carrier_on(&hdlc->netdev);
+		else if (!netif_carrier_ok(dev))
+			netif_carrier_on(dev);
 
-	} else if (netif_carrier_ok(&hdlc->netdev))
-		netif_carrier_off(&hdlc->netdev);
+	} else if (netif_carrier_ok(dev))
+		netif_carrier_off(dev);
 
 	hdlc->open = 1;
 

@@ -221,7 +221,7 @@ static int n2_open(struct net_device *dev)
 	u8 mcr = inb(io + N2_MCR) | (port->phy_node ? TX422_PORT1:TX422_PORT0);
 	int result;
 
-	result = hdlc_open(hdlc);
+	result = hdlc_open(dev);
 	if (result)
 		return result;
 

@@ -1309,7 +1309,7 @@ fst_open ( struct net_device *dev )
 {
         int err;
 
-        err = hdlc_open ( dev_to_hdlc ( dev ));
+        err = hdlc_open (dev);
         if ( err )
                 return err;
 

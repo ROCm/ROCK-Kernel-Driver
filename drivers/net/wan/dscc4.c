@@ -1022,7 +1022,7 @@ static int dscc4_open(struct net_device *dev)
 	if ((dscc4_loopback_check(dpriv) < 0) || !dev->hard_start_xmit)
 		goto err;
 
-	if ((ret = hdlc_open(hdlc)))
+	if ((ret = hdlc_open(dev)))
 		goto err;
 
 	ppriv = dpriv->pci_priv;

@@ -425,7 +425,7 @@ static int wanxl_open(struct net_device *dev)
 		printk(KERN_ERR "%s: port already open\n", port_name(port));
 		return -EIO;
 	}
-	if ((i = hdlc_open(hdlc)) != 0)
+	if ((i = hdlc_open(dev)) != 0)
 		return i;
 
 	port->tx_in = port->tx_out = 0;
