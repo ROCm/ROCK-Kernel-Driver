@@ -3,6 +3,7 @@
 
 #include <asm/io.h>
 #include <linux/mmzone.h>
+#include <linux/nodemask.h>
 
 #define APIC_DFR_VALUE	(APIC_DFR_CLUSTER)
 

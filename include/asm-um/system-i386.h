@@ -3,4 +3,6 @@
 
 #include "asm/system-generic.h"
     
+#define __HAVE_ARCH_CMPXCHG 1
+
 #endif

@@ -30,7 +30,7 @@
 #define KEYRING_NAME_HASH_SIZE	(1 << 5)
 
 static struct list_head	keyring_name_hash[KEYRING_NAME_HASH_SIZE];
-static rwlock_t		keyring_name_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(keyring_name_lock);
 
 static inline unsigned keyring_hash(const char *desc)
 {

@@ -89,7 +89,7 @@ static struct list_head ipr_ioa_head = LIST_HEAD_INIT(ipr_ioa_head);
 static unsigned int ipr_log_level = IPR_DEFAULT_LOG_LEVEL;
 static unsigned int ipr_max_speed = 1;
 static int ipr_testmode = 0;
-static spinlock_t ipr_driver_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(ipr_driver_lock);
 
 /* This table describes the differences between DMA controller chips */
 static const struct ipr_chip_cfg_t ipr_chip_cfg[] = {

@@ -33,7 +33,7 @@
  */
 static struct cpufreq_driver   	*cpufreq_driver;
 static struct cpufreq_policy	*cpufreq_cpu_data[NR_CPUS];
-static spinlock_t		cpufreq_driver_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(cpufreq_driver_lock);
 
 
 /* we keep a copy of all ->add'ed CPU's struct sys_device here;
@@ -130,7 +130,7 @@ static unsigned int debug_ratelimit = 1;
  * is set, and disabled upon cpufreq driver removal
  */
 static unsigned int disable_ratelimit = 1;
-static spinlock_t disable_ratelimit_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(disable_ratelimit_lock);
 
 static inline void cpufreq_debug_enable_ratelimit(void)
 {

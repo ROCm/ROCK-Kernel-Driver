@@ -21,7 +21,7 @@
 
 static struct nls_table default_table;
 static struct nls_table *tables = &default_table;
-static spinlock_t nls_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(nls_lock);
 
 /*
  * Sample implementation from Unicode home page.

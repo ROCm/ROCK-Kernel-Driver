@@ -1822,7 +1822,7 @@ int tcp_disconnect(struct sock *sk, int flags)
 	tp->backoff = 0;
 	tp->snd_cwnd = 2;
 	tp->probes_out = 0;
-	tcp_set_pcount(&tp->packets_out, 0);
+	tp->packets_out = 0;
 	tp->snd_ssthresh = 0x7fffffff;
 	tp->snd_cwnd_cnt = 0;
 	tcp_set_ca_state(tp, TCP_CA_Open);
@@ -2137,11 +2137,11 @@ void tcp_get_info(struct sock *sk, struct tcp_info *info)
 	info->tcpi_snd_mss = tp->mss_cache_std;
 	info->tcpi_rcv_mss = tp->ack.rcv_mss;
 
-	info->tcpi_unacked = tcp_get_pcount(&tp->packets_out);
-	info->tcpi_sacked = tcp_get_pcount(&tp->sacked_out);
-	info->tcpi_lost = tcp_get_pcount(&tp->lost_out);
-	info->tcpi_retrans = tcp_get_pcount(&tp->retrans_out);
-	info->tcpi_fackets = tcp_get_pcount(&tp->fackets_out);
+	info->tcpi_unacked = tp->packets_out;
+	info->tcpi_sacked = tp->sacked_out;
+	info->tcpi_lost = tp->lost_out;
+	info->tcpi_retrans = tp->retrans_out;
+	info->tcpi_fackets = tp->fackets_out;
 
 	info->tcpi_last_data_sent = jiffies_to_msecs(now - tp->lsndtime);
 	info->tcpi_last_data_recv = jiffies_to_msecs(now - tp->ack.lrcvtime);

@@ -45,7 +45,7 @@
 #include "../sound_config.h"
 #endif
 
-static spinlock_t midi_spinlock __attribute((unused)) = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(midi_spinlock __attribute((unused)));
 
 static void init_midi_hdr(struct midi_hdr *midihdr)
 {

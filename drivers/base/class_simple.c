@@ -27,7 +27,7 @@ struct simple_dev {
 #define to_simple_dev(d) container_of(d, struct simple_dev, class_dev)
 
 static LIST_HEAD(simple_dev_list);
-static spinlock_t simple_dev_list_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(simple_dev_list_lock);
 
 static void release_simple_dev(struct class_device *class_dev)
 {

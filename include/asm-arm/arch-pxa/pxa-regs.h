@@ -498,14 +498,18 @@
 
 #define POCR		__REG(0x40500000)  /* PCM Out Control Register */
 #define POCR_FEIE	(1 << 3)	/* FIFO Error Interrupt Enable */
+#define POCR_FSRIE	(1 << 1)	/* FIFO Service Request Interrupt Enable */
 
 #define PICR		__REG(0x40500004)  /* PCM In Control Register */
 #define PICR_FEIE	(1 << 3)	/* FIFO Error Interrupt Enable */
+#define PICR_FSRIE	(1 << 1)	/* FIFO Service Request Interrupt Enable */
 
 #define MCCR		__REG(0x40500008)  /* Mic In Control Register */
 #define MCCR_FEIE	(1 << 3)	/* FIFO Error Interrupt Enable */
+#define MCCR_FSRIE	(1 << 1)	/* FIFO Service Request Interrupt Enable */
 
 #define GCR		__REG(0x4050000C)  /* Global Control Register */
+#define GCR_nDMAEN	(1 << 24)	/* non DMA Enable */
 #define GCR_CDONE_IE	(1 << 19)	/* Command Done Interrupt Enable */
 #define GCR_SDONE_IE	(1 << 18)	/* Status Done Interrupt Enable */
 #define GCR_SECRDY_IEN	(1 << 9)	/* Secondary Ready Interrupt Enable */
@@ -519,12 +523,17 @@
 
 #define POSR		__REG(0x40500010)  /* PCM Out Status Register */
 #define POSR_FIFOE	(1 << 4)	/* FIFO error */
+#define POSR_FSR	(1 << 2)	/* FIFO Service Request */
 
 #define PISR		__REG(0x40500014)  /* PCM In Status Register */
 #define PISR_FIFOE	(1 << 4)	/* FIFO error */
+#define PISR_EOC	(1 << 3)	/* DMA End-of-Chain (exclusive clear) */
+#define PISR_FSR	(1 << 2)	/* FIFO Service Request */
 
 #define MCSR		__REG(0x40500018)  /* Mic In Status Register */
 #define MCSR_FIFOE	(1 << 4)	/* FIFO error */
+#define MCSR_EOC	(1 << 3)	/* DMA End-of-Chain (exclusive clear) */
+#define MCSR_FSR	(1 << 2)	/* FIFO Service Request */
 
 #define GSR		__REG(0x4050001C)  /* Global Status Register */
 #define GSR_CDONE	(1 << 19)	/* Command Done */
@@ -537,9 +546,10 @@
 #define GSR_PRIRES	(1 << 10)	/* Primary Resume Interrupt */
 #define GSR_SCR		(1 << 9)	/* Secondary Codec Ready */
 #define GSR_PCR		(1 << 8)	/*  Primary Codec Ready */
-#define GSR_MINT	(1 << 7)	/* Mic In Interrupt */
+#define GSR_MCINT	(1 << 7)	/* Mic In Interrupt */
 #define GSR_POINT	(1 << 6)	/* PCM Out Interrupt */
 #define GSR_PIINT	(1 << 5)	/* PCM In Interrupt */
+#define GSR_ACOFFD	(1 << 3)	/* AC-link Shut Off Done */
 #define GSR_MOINT	(1 << 2)	/* Modem Out Interrupt */
 #define GSR_MIINT	(1 << 1)	/* Modem In Interrupt */
 #define GSR_GSCI	(1 << 0)	/* Codec GPI Status Change Interrupt */
@@ -552,15 +562,20 @@
 
 #define MOCR		__REG(0x40500100)  /* Modem Out Control Register */
 #define MOCR_FEIE	(1 << 3)	/* FIFO Error */
+#define MOCR_FSRIE	(1 << 1)	/* FIFO Service Request Interrupt Enable */
 
 #define MICR		__REG(0x40500108)  /* Modem In Control Register */
 #define MICR_FEIE	(1 << 3)	/* FIFO Error */
+#define MICR_FSRIE	(1 << 1)	/* FIFO Service Request Interrupt Enable */
 
 #define MOSR		__REG(0x40500110)  /* Modem Out Status Register */
 #define MOSR_FIFOE	(1 << 4)	/* FIFO error */
+#define MOSR_FSR	(1 << 2)	/* FIFO Service Request */
 
 #define MISR		__REG(0x40500118)  /* Modem In Status Register */
 #define MISR_FIFOE	(1 << 4)	/* FIFO error */
+#define MISR_EOC	(1 << 3)	/* DMA End-of-Chain (exclusive clear) */
+#define MISR_FSR	(1 << 2)	/* FIFO Service Request */
 
 #define MODR		__REG(0x40500140)  /* Modem FIFO Data Register */
 
@@ -1210,6 +1225,7 @@
 #define GPIO30_SDATA_OUT	30	/* AC97/I2S Sdata_out */
 #define GPIO31_SYNC		31	/* AC97/I2S sync */
 #define GPIO32_SDATA_IN1	32	/* AC97 Sdata_in1 */
+#define GPIO32_SYSCLK		32	/* I2S System Clock */
 #define GPIO32_MMCCLK		32	/* MMC Clock (PXA270) */
 #define GPIO33_nCS_5		33	/* chip select 5 */
 #define GPIO34_FFRXD		34	/* FFUART receive */
@@ -1327,14 +1343,16 @@
 #define GPIO26_SRXD_MD		(26 | GPIO_ALT_FN_1_IN)
 #define GPIO27_SEXTCLK_MD	(27 | GPIO_ALT_FN_1_IN)
 #define GPIO28_BITCLK_AC97_MD	(28 | GPIO_ALT_FN_1_IN)
-#define GPIO28_BITCLK_I2S_MD	(28 | GPIO_ALT_FN_2_IN)
+#define GPIO28_BITCLK_IN_I2S_MD	(28 | GPIO_ALT_FN_2_IN)
+#define GPIO28_BITCLK_OUT_I2S_MD	(28 | GPIO_ALT_FN_1_OUT)
 #define GPIO29_SDATA_IN_AC97_MD	(29 | GPIO_ALT_FN_1_IN)
 #define GPIO29_SDATA_IN_I2S_MD	(29 | GPIO_ALT_FN_2_IN)
 #define GPIO30_SDATA_OUT_AC97_MD	(30 | GPIO_ALT_FN_2_OUT)
 #define GPIO30_SDATA_OUT_I2S_MD	(30 | GPIO_ALT_FN_1_OUT)
-#define GPIO31_SYNC_AC97_MD	(31 | GPIO_ALT_FN_2_OUT)
 #define GPIO31_SYNC_I2S_MD	(31 | GPIO_ALT_FN_1_OUT)
+#define GPIO31_SYNC_AC97_MD	(31 | GPIO_ALT_FN_2_OUT)
 #define GPIO32_SDATA_IN1_AC97_MD	(32 | GPIO_ALT_FN_1_IN)
+#define GPIO32_SYSCLK_I2S_MD	(32 | GPIO_ALT_FN_1_OUT)
 #define GPIO32_MMCCLK_MD		( 32 | GPIO_ALT_FN_2_OUT)
 #define GPIO33_nCS_5_MD		(33 | GPIO_ALT_FN_2_OUT)
 #define GPIO34_FFRXD_MD		(34 | GPIO_ALT_FN_1_IN)

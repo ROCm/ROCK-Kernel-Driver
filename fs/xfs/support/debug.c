@@ -38,7 +38,7 @@
 
 int			doass = 1;
 static char		message[256];	/* keep it off the stack */
-static spinlock_t	xfs_err_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(xfs_err_lock);
 
 /* Translate from CE_FOO to KERN_FOO, err_level(CE_FOO) == KERN_FOO */
 #define XFS_MAX_ERR_LEVEL	7

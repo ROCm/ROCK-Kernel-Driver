@@ -13,7 +13,7 @@
 #include "dm-io.h"
 
 static LIST_HEAD(_log_types);
-static spinlock_t _lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(_lock);
 
 int dm_register_dirty_log_type(struct dirty_log_type *type)
 {

@@ -74,6 +74,7 @@ extern void read_rtc_time(void);
 extern void pmac_find_display(void);
 extern void giveup_fpu(struct task_struct *);
 extern void enable_kernel_fp(void);
+extern void enable_kernel_altivec(void);
 extern void giveup_altivec(struct task_struct *);
 extern void load_up_altivec(struct task_struct *);
 extern void giveup_spe(struct task_struct *);

@@ -110,8 +110,8 @@ static inline void ubd_set_bit(__u64 bit, unsigned char *data)
 
 #define DRIVER_NAME "uml-blkdev"
 
-static spinlock_t ubd_io_lock = SPIN_LOCK_UNLOCKED;
-static spinlock_t ubd_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(ubd_io_lock);
+static DEFINE_SPINLOCK(ubd_lock);
 
 static void (*do_ubd)(void);
 
@@ -682,6 +682,8 @@ static int ubd_new_disk(int major, u64 size, int unit,
 	return 0;
 }
 
+#define ROUND_BLOCK(n) ((n + ((1 << 9) - 1)) & (-1 << 9))
+
 static int ubd_add(int n)
 {
 	struct ubd *dev = &ubd_dev[n];
@@ -696,6 +698,8 @@ static int ubd_add(int n)
 	err = ubd_file_size(dev, &dev->size);
 	if(err < 0)
 		return(err);
+
+	dev->size = ROUND_BLOCK(dev->size);
 
 	err = ubd_new_disk(MAJOR_NR, dev->size, n, &ubd_gendisk[n]);
 	if(err) 

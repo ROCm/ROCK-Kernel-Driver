@@ -831,7 +831,7 @@ static kmem_cache_t *devfsd_buf_cache;
 #ifdef CONFIG_DEVFS_DEBUG
 static unsigned int devfs_debug_init __initdata = DEBUG_NONE;
 static unsigned int devfs_debug = DEBUG_NONE;
-static spinlock_t stat_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(stat_lock);
 static unsigned int stat_num_entries;
 static unsigned int stat_num_bytes;
 #endif
@@ -966,7 +966,7 @@ static struct devfs_entry *_devfs_alloc_entry(const char *name,
 {
 	struct devfs_entry *new;
 	static unsigned long inode_counter = FIRST_INODE;
-	static spinlock_t counter_lock = SPIN_LOCK_UNLOCKED;
+	static DEFINE_SPINLOCK(counter_lock);
 
 	if (name && (namelen < 1))
 		namelen = strlen(name);
@@ -1063,7 +1063,7 @@ static int _devfs_append_entry(devfs_handle_t dir, devfs_handle_t de,
 static struct devfs_entry *_devfs_get_root_entry(void)
 {
 	struct devfs_entry *new;
-	static spinlock_t root_lock = SPIN_LOCK_UNLOCKED;
+	static DEFINE_SPINLOCK(root_lock);
 
 	if (root_entry)
 		return root_entry;
@@ -2683,7 +2683,7 @@ static int devfsd_ioctl(struct inode *inode, struct file *file,
 		   work even if the global kernel lock were to be removed, because it
 		   doesn't matter who gets in first, as long as only one gets it  */
 		if (fs_info->devfsd_task == NULL) {
-			static spinlock_t lock = SPIN_LOCK_UNLOCKED;
+			static DEFINE_SPINLOCK(lock);
 
 			if (!spin_trylock(&lock))
 				return -EBUSY;

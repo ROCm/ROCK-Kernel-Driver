@@ -48,7 +48,7 @@ asmlinkage int sys_tas(int *addr)
 #else /* CONFIG_SMP */
 #include <linux/spinlock.h>
 
-static spinlock_t tas_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(tas_lock);
 
 asmlinkage int sys_tas(int *addr)
 {

@@ -211,7 +211,7 @@ static mempool_t *_job_pool;
  *
  * All three of these are protected by job_lock.
  */
-static spinlock_t _job_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(_job_lock);
 
 static LIST_HEAD(_complete_jobs);
 static LIST_HEAD(_io_jobs);

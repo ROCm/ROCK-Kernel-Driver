@@ -113,7 +113,7 @@ struct tlock *TxLock;           /* transaction lock table */
 /*
  *      transaction management lock
  */
-static spinlock_t jfsTxnLock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(jfsTxnLock);
 
 #define TXN_LOCK()              spin_lock(&jfsTxnLock)
 #define TXN_UNLOCK()            spin_unlock(&jfsTxnLock)

@@ -28,7 +28,7 @@ static int      pending_timer = -1;	/* For timer change operation */
 extern unsigned long seq_time;
 
 static int      obsolete_api_used;
-static spinlock_t lock=SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(lock);
 
 /*
  * Local counts for number of synth and MIDI devices. These are initialized

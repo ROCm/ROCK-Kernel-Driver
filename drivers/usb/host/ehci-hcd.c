@@ -796,7 +796,7 @@ static void ehci_work (struct ehci_hcd *ehci, struct pt_regs *regs)
 	 * such lossage has been observed on both VT6202 and VT8235. 
 	 */
 	if (HCD_IS_RUNNING (ehci_to_hcd(ehci)->state) &&
-			(ehci->async->qh_next.ptr != 0 ||
+			(ehci->async->qh_next.ptr != NULL ||
 			 ehci->periodic_sched != 0))
 		timer_action (ehci, TIMER_IO_WATCHDOG);
 }

@@ -222,7 +222,7 @@ static unsigned short command_reg;
 static unsigned short read_status_reg;
 static unsigned short data_reg;
 
-static spinlock_t sonycd535_lock = SPIN_LOCK_UNLOCKED; /* queue lock */
+static DEFINE_SPINLOCK(sonycd535_lock); /* queue lock */
 static struct request_queue *sonycd535_queue;
 
 static int initialized;			/* Has the drive been initialized? */

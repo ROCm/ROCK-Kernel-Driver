@@ -53,7 +53,7 @@
 static int      mad16_conf;
 static int      mad16_cdsel;
 static struct gameport gameport;
-static spinlock_t lock=SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(lock);
 
 #define C928	1
 #define MOZART	2

@@ -157,7 +157,7 @@ void pcibios_align_resource(void *data, struct resource *res,
 	res->start = start;
 }
 
-static spinlock_t hose_spinlock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(hose_spinlock);
 
 /*
  * pci_controller(phb) initialized common variables.

@@ -118,7 +118,7 @@ static void myri_enable_irq(void __iomem *lp, void __iomem *cregs)
 
 static inline void bang_the_chip(struct myri_eth *mp)
 {
-	struct myri_shmem *shmem	= mp->shmem;
+	struct myri_shmem __iomem *shmem = mp->shmem;
 	void __iomem *cregs		= mp->cregs;
 
 	sbus_writel(1, &shmem->send);
@@ -127,9 +127,9 @@ static inline void bang_the_chip(struct myri_eth *mp)
 
 static int myri_do_handshake(struct myri_eth *mp)
 {
-	struct myri_shmem *shmem	= mp->shmem;
+	struct myri_shmem __iomem *shmem = mp->shmem;
 	void __iomem *cregs = mp->cregs;
-	struct myri_channel *chan	= &shmem->channel;
+	struct myri_channel __iomem *chan = &shmem->channel;
 	int tick 			= 0;
 
 	DET(("myri_do_handshake: "));
@@ -427,7 +427,7 @@ static void myri_rx(struct myri_eth *mp, struct net_device *dev)
 		u32 csum		= sbus_readl(&rxdack->csum);
 		int len			= sbus_readl(&rxdack->myri_scatters[0].len);
 		int index		= sbus_readl(&rxdack->ctx);
-		struct myri_rxd __iomem *rxd	= &rq->myri_rxd[rq->tail];
+		struct myri_rxd __iomem *rxd = &rq->myri_rxd[sbus_readl(&rq->tail)];
 		struct sk_buff *skb	= mp->rx_skbs[index];
 
 		/* Ack it. */
@@ -546,7 +546,7 @@ static irqreturn_t myri_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	struct net_device *dev		= (struct net_device *) dev_id;
 	struct myri_eth *mp		= (struct myri_eth *) dev->priv;
 	void __iomem *lregs		= mp->lregs;
-	struct myri_channel *chan	= &mp->shmem->channel;
+	struct myri_channel __iomem *chan = &mp->shmem->channel;
 	unsigned long flags;
 	u32 status;
 	int handled = 0;

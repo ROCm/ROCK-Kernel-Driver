@@ -33,7 +33,7 @@ static char led_state;
 static short hw_led_state;
 static short saved_state;
 
-static spinlock_t leds_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(leds_lock);
 
 short sequoia_read(int addr) {
   outw(addr,0x24);

@@ -42,7 +42,7 @@
 extern void selnl_notify_policyload(u32 seqno);
 unsigned int policydb_loaded_version;
 
-static rwlock_t policy_rwlock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(policy_rwlock);
 #define POLICY_RDLOCK read_lock(&policy_rwlock)
 #define POLICY_WRLOCK write_lock_irq(&policy_rwlock)
 #define POLICY_RDUNLOCK read_unlock(&policy_rwlock)

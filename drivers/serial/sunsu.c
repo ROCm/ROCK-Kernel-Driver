@@ -989,7 +989,7 @@ static struct uart_sunsu_port sunsu_ports[UART_NR];
 
 #ifdef CONFIG_SERIO
 
-static spinlock_t sunsu_serio_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(sunsu_serio_lock);
 
 static int sunsu_serio_write(struct serio *serio, unsigned char ch)
 {

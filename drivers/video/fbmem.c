@@ -868,6 +868,23 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	}
 }
 
+#ifdef CONFIG_COMPAT
+static long
+fb_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+{
+	int fbidx = iminor(file->f_dentry->d_inode);
+	struct fb_info *info = registered_fb[fbidx];
+	struct fb_ops *fb = info->fbops;
+	int ret;
+	if (fb->fb_compat_ioctl == NULL)
+		return -ENOIOCTLCMD;
+	lock_kernel();
+	ret = fb->fb_compat_ioctl(file, cmd, arg, info);
+	unlock_kernel();
+	return ret;
+}
+#endif
+
 static int 
 fb_mmap(struct file *file, struct vm_area_struct * vma)
 {
@@ -1009,6 +1026,9 @@ static struct file_operations fb_fops = {
 	.read =		fb_read,
 	.write =	fb_write,
 	.ioctl =	fb_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl = fb_compat_ioctl,
+#endif
 	.mmap =		fb_mmap,
 	.open =		fb_open,
 	.release =	fb_release,

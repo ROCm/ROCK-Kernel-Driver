@@ -30,7 +30,7 @@ struct dma_alloc_record {
 	unsigned long		len;
 };
 
-static spinlock_t dma_alloc_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(dma_alloc_lock);
 static LIST_HEAD(dma_alloc_list);
 
 void *dma_alloc_coherent(struct device *hwdev, size_t size, dma_addr_t *dma_handle, int gfp)

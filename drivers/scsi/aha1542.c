@@ -167,7 +167,7 @@ struct aha1542_hostdata {
 
 static struct Scsi_Host *aha_host[7];	/* One for each IRQ level (9-15) */
 
-static spinlock_t aha1542_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(aha1542_lock);
 
 
 

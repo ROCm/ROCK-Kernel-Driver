@@ -2706,18 +2706,18 @@ static int __devinit hrz_probe(struct pci_dev *pci_dev, const struct pci_device_
 	// adapter slot free, read resources from PCI configuration space
 	u32 iobase = pci_resource_start (pci_dev, 0);
 	u32 * membase = bus_to_virt (pci_resource_start (pci_dev, 1));
-	u8 irq = pci_dev->irq;
+	unsigned int irq;
 	unsigned char lat;
 
 	PRINTD (DBG_FLOW, "hrz_probe");
 
-	/* XXX DEV_LABEL is a guess */
-	if (!request_region(iobase, HRZ_IO_EXTENT, DEV_LABEL))
+	if (pci_enable_device(pci_dev))
 		return -EINVAL;
 
-	if (pci_enable_device(pci_dev)) {
-		err = -EINVAL;
-		goto out_release;
+	/* XXX DEV_LABEL is a guess */
+	if (!request_region(iobase, HRZ_IO_EXTENT, DEV_LABEL)) {
+		return -EINVAL;
+		goto out_disable;
 	}
 
 	dev = kmalloc(sizeof(hrz_dev), GFP_KERNEL);
@@ -2725,7 +2725,7 @@ static int __devinit hrz_probe(struct pci_dev *pci_dev, const struct pci_device_
 		// perhaps we should be nice: deregister all adapters and abort?
 		PRINTD(DBG_ERR, "out of memory");
 		err = -ENOMEM;
-		goto out_disable;
+		goto out_release;
 	}
 
 	memset(dev, 0, sizeof(hrz_dev));
@@ -2733,6 +2733,7 @@ static int __devinit hrz_probe(struct pci_dev *pci_dev, const struct pci_device_
 	pci_set_drvdata(pci_dev, dev);
 
 	// grab IRQ and install handler - move this someplace more sensible
+	irq = pci_dev->irq;
 	if (request_irq(irq,
 			interrupt_handler,
 			SA_SHIRQ, /* irqflags guess */
@@ -2846,10 +2847,10 @@ out_free_irq:
 	free_irq(dev->irq, dev);
 out_free:
 	kfree(dev);
-out_disable:
-	pci_disable_device(pci_dev);
 out_release:
 	release_region(iobase, HRZ_IO_EXTENT);
+out_disable:
+	pci_disable_device(pci_dev);
 	goto out;
 }
 

@@ -281,7 +281,7 @@ EXPORT_SYMBOL(acpi_bus_set_power);
                                 Event Management
    -------------------------------------------------------------------------- */
 
-static spinlock_t		acpi_bus_event_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(acpi_bus_event_lock);
 
 LIST_HEAD(acpi_bus_event_list);
 DECLARE_WAIT_QUEUE_HEAD(acpi_bus_event_queue);

@@ -168,11 +168,16 @@ static inline void flush_pci_write(struct ti_ohci *ohci)
 static void it_tasklet_func(unsigned long data);
 static void ir_tasklet_func(unsigned long data);
 
+#ifdef CONFIG_COMPAT
+static long dv1394_compat_ioctl(struct file *file, unsigned int cmd,
+			       unsigned long arg);
+#endif
+
 /* GLOBAL DATA */
 
 /* list of all video_cards */
 static LIST_HEAD(dv1394_cards);
-static spinlock_t dv1394_cards_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(dv1394_cards_lock);
 
 /* translate from a struct file* to the corresponding struct video_card* */
 
@@ -1540,26 +1545,29 @@ static ssize_t dv1394_read(struct file *file,  char __user *buffer, size_t count
 
 /*** DEVICE IOCTL INTERFACE ************************************************/
 
-/* I *think* the VFS serializes ioctl() for us, so we don't have to worry
-   about situations like having two threads in here at once... */
-
-static int dv1394_ioctl(struct inode *inode, struct file *file,
-			   unsigned int cmd, unsigned long arg)
+static long dv1394_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
-	struct video_card *video = file_to_video_card(file);
+	struct video_card *video;
 	unsigned long flags;
 	int ret = -EINVAL;
 	void __user *argp = (void __user *)arg;
 
 	DECLARE_WAITQUEUE(wait, current);
 
+	lock_kernel();
+	video = file_to_video_card(file);
+
 	/* serialize this to prevent multi-threaded mayhem */
 	if (file->f_flags & O_NONBLOCK) {
-		if (down_trylock(&video->sem))
+		if (down_trylock(&video->sem)) {
+			unlock_kernel();
 			return -EAGAIN;
+		}
 	} else {
-		if (down_interruptible(&video->sem))
+		if (down_interruptible(&video->sem)) {
+			unlock_kernel();
 			return -ERESTARTSYS;
+		}
 	}
 
 	switch(cmd)
@@ -1783,10 +1791,9 @@ static int dv1394_ioctl(struct inode *inode, struct file *file,
 
  out:
 	up(&video->sem);
+	unlock_kernel();
 	return ret;
 }
-
-
 
 /*** DEVICE FILE INTERFACE CONTINUED ***************************************/
 
@@ -2165,7 +2172,10 @@ static struct file_operations dv1394_fops=
 {
 	.owner =	THIS_MODULE,
 	.poll =         dv1394_poll,
-	.ioctl =	dv1394_ioctl,
+	.unlocked_ioctl = dv1394_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl = dv1394_compat_ioctl,
+#endif
 	.mmap =		dv1394_mmap,
 	.open =		dv1394_open,
 	.write =        dv1394_write,
@@ -2507,8 +2517,9 @@ struct dv1394_status32 {
 	u32 dropped_frames;
 };
 
-static int handle_dv1394_init(unsigned int fd, unsigned int cmd, unsigned long arg,
-			      struct file *file)
+/* RED-PEN: this should use compat_alloc_userspace instead */
+
+static int handle_dv1394_init(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	struct dv1394_init32 dv32;
 	struct dv1394_init dv;
@@ -2531,15 +2542,14 @@ static int handle_dv1394_init(unsigned int fd, unsigned int cmd, unsigned long a
 
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
-	ret = dv1394_ioctl(file->f_dentry->d_inode, file,
+	ret = dv1394_ioctl(file,
 			   DV1394_IOC_INIT, (unsigned long)&dv);
 	set_fs(old_fs);
 
 	return ret;
 }
 
-static int handle_dv1394_get_status(unsigned int fd, unsigned int cmd, unsigned long arg,
-				    struct file *file)
+static int handle_dv1394_get_status(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	struct dv1394_status32 dv32;
 	struct dv1394_status dv;
@@ -2551,7 +2561,7 @@ static int handle_dv1394_get_status(unsigned int fd, unsigned int cmd, unsigned 
 
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
-	ret = dv1394_ioctl(file->f_dentry->d_inode, file,
+	ret = dv1394_ioctl(file,
 			   DV1394_IOC_GET_STATUS, (unsigned long)&dv);
 	set_fs(old_fs);
 
@@ -2574,6 +2584,30 @@ static int handle_dv1394_get_status(unsigned int fd, unsigned int cmd, unsigned 
 
 	return ret;
 }
+
+
+
+static long dv1394_compat_ioctl(struct file *file, unsigned int cmd,
+			       unsigned long arg)
+{
+	int err;
+	switch (cmd) {
+	case DV1394_IOC_SHUTDOWN:
+	case DV1394_IOC_SUBMIT_FRAMES:
+	case DV1394_IOC_WAIT_FRAMES:
+	case DV1394_IOC_RECEIVE_FRAMES:
+	case DV1394_IOC_START_RECEIVE:
+		return dv1394_ioctl(file, cmd, arg);
+
+	case DV1394_IOC32_INIT:
+		return handle_dv1394_init(file, cmd, arg);
+	case DV1394_IOC32_GET_STATUS:
+		return handle_dv1394_get_status(file, cmd, arg);
+	default:
+		return -ENOIOCTLCMD;
+	}
+}
+
 #endif /* CONFIG_COMPAT */
 
 
@@ -2586,20 +2620,6 @@ MODULE_LICENSE("GPL");
 
 static void __exit dv1394_exit_module(void)
 {
-#ifdef CONFIG_COMPAT
-	int ret;
-
-	ret = unregister_ioctl32_conversion(DV1394_IOC_SHUTDOWN);
-	ret |= unregister_ioctl32_conversion(DV1394_IOC_SUBMIT_FRAMES);
-	ret |= unregister_ioctl32_conversion(DV1394_IOC_WAIT_FRAMES);
-	ret |= unregister_ioctl32_conversion(DV1394_IOC_RECEIVE_FRAMES);
-	ret |= unregister_ioctl32_conversion(DV1394_IOC_START_RECEIVE);
-	ret |= unregister_ioctl32_conversion(DV1394_IOC32_INIT);
-	ret |= unregister_ioctl32_conversion(DV1394_IOC32_GET_STATUS);
-	if (ret)
-		printk(KERN_ERR "dv1394: Error unregistering ioctl32 translations\n");
-#endif
-
 	hpsb_unregister_protocol(&dv1394_driver);
 
 	hpsb_unregister_highlevel(&dv1394_highlevel);
@@ -2632,23 +2652,6 @@ static int __init dv1394_init_module(void)
 		cdev_del(&dv1394_cdev);
 		return ret;
 	}
-
-#ifdef CONFIG_COMPAT
-	{
-		/* First compatible ones */
-		ret = register_ioctl32_conversion(DV1394_IOC_SHUTDOWN, NULL);
-		ret |= register_ioctl32_conversion(DV1394_IOC_SUBMIT_FRAMES, NULL);
-		ret |= register_ioctl32_conversion(DV1394_IOC_WAIT_FRAMES, NULL);
-		ret |= register_ioctl32_conversion(DV1394_IOC_RECEIVE_FRAMES, NULL);
-		ret |= register_ioctl32_conversion(DV1394_IOC_START_RECEIVE, NULL);
-
-		/* These need to be handled by translation */
-		ret |= register_ioctl32_conversion(DV1394_IOC32_INIT, handle_dv1394_init);
-		ret |= register_ioctl32_conversion(DV1394_IOC32_GET_STATUS, handle_dv1394_get_status);
-		if (ret)
-			printk(KERN_ERR "dv1394: Error registering ioctl32 translations\n");
-	}
-#endif
 
 	return 0;
 }

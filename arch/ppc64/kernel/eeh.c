@@ -76,7 +76,7 @@
 #define BUID_LO(buid) ((buid) & 0xffffffff)
 
 /* EEH event workqueue setup. */
-static spinlock_t eeh_eventlist_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(eeh_eventlist_lock);
 LIST_HEAD(eeh_eventlist);
 static void eeh_event_handler(void *);
 DECLARE_WORK(eeh_event_wq, eeh_event_handler, NULL);
@@ -103,7 +103,7 @@ static int eeh_subsystem_enabled;
 
 /* Buffer for reporting slot-error-detail rtas calls */
 static unsigned char slot_errbuf[RTAS_ERROR_LOG_MAX];
-static spinlock_t slot_errbuf_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(slot_errbuf_lock);
 static int eeh_error_buf_size;
 
 /* System monitoring statistics */

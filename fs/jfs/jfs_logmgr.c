@@ -78,7 +78,7 @@
  * lbuf's ready to be redriven.  Protected by log_redrive_lock (jfsIO thread)
  */
 static struct lbuf *log_redrive_list;
-static spinlock_t log_redrive_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(log_redrive_lock);
 DECLARE_WAIT_QUEUE_HEAD(jfs_IO_thread_wait);
 
 
@@ -113,7 +113,7 @@ DECLARE_WAIT_QUEUE_HEAD(jfs_IO_thread_wait);
 /*
  *	log buffer cache synchronization
  */
-static spinlock_t jfsLCacheLock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(jfsLCacheLock);
 
 #define	LCACHE_LOCK(flags)	spin_lock_irqsave(&jfsLCacheLock, flags)
 #define	LCACHE_UNLOCK(flags)	spin_unlock_irqrestore(&jfsLCacheLock, flags)

@@ -26,7 +26,7 @@
 static ext_int_info_t ext_int_info_hwc;
 
 /* Lock to protect internal data consistency. */
-static spinlock_t sclp_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(sclp_lock);
 
 /* Mask of events that we can receive from the sclp interface. */
 static sccb_mask_t sclp_receive_mask;

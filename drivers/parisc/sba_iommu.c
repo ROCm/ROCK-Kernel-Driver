@@ -1861,7 +1861,7 @@ sba_common_init(struct sba_device *sba_dev)
 			__FUNCTION__, i, res_size, sba_dev->ioc[i].res_map);
 	}
 
-	sba_dev->sba_lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&sba_dev->sba_lock);
 	ioc_needs_fdc = boot_cpu_data.pdc.capabilities & PDC_MODEL_IOPDIR_FDC;
 
 #ifdef DEBUG_SBA_INIT

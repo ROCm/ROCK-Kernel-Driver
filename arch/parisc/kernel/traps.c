@@ -46,7 +46,7 @@
 			  /*  dumped to the console via printk)          */
 
 #if defined(CONFIG_SMP) || defined(CONFIG_DEBUG_SPINLOCK)
-spinlock_t pa_dbit_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(pa_dbit_lock);
 #endif
 
 int printbinary(char *buf, unsigned long x, int nbits)
@@ -385,7 +385,7 @@ void transfer_pim_to_trap_frame(struct pt_regs *regs)
  */
 void parisc_terminate(char *msg, struct pt_regs *regs, int code, unsigned long offset)
 {
-	static spinlock_t terminate_lock = SPIN_LOCK_UNLOCKED;
+	static DEFINE_SPINLOCK(terminate_lock);
 
 	oops_in_progress = 1;
 

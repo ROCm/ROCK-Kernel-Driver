@@ -40,7 +40,7 @@ EXPORT_SYMBOL(dcache_stride);
  * by software.  We put a spinlock around all TLB flushes  to
  * ensure this.
  */
-spinlock_t pa_tlb_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(pa_tlb_lock);
 EXPORT_SYMBOL(pa_tlb_lock);
 #endif
 

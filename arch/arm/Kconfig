@@ -236,7 +236,7 @@ config SHARP_LOCOMO
 
 config SHARP_SCOOP
 	bool
-	depends on PXA_SHARPSL
+	depends on PXA_SHARPSL || SA1100_COLLIE
 	default y
 
 config FORCE_MAX_ZONEORDER

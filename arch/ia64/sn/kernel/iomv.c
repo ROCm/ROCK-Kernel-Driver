@@ -32,7 +32,6 @@ void *sn_io_addr(unsigned long port)
 		return ((void *)(port | __IA64_UNCACHED_OFFSET));
 	} else {
 		/* but the simulator uses them... */
-		unsigned long io_base;
 		unsigned long addr;
 
 		/*
@@ -40,14 +39,9 @@ void *sn_io_addr(unsigned long port)
 		 * for accessing registers in bedrock local block
 		 * (so we don't do port&0xfff)
 		 */
-		if ((port >= 0x1f0 && port <= 0x1f7) ||
-		    port == 0x3f6 || port == 0x3f7) {
-			io_base = (0xc000000fcc000000UL |
-				   ((unsigned long)get_nasid() << 38));
-			addr = io_base | ((port >> 2) << 12) | (port & 0xfff);
-		} else {
-			addr = __ia64_get_io_port_base() | ((port >> 2) << 2);
-		}
+		addr = (is_shub2() ? 0xc00000028c000000UL : 0xc0000087cc000000UL) | ((port >> 2) << 12);
+		if ((port >= 0x1f0 && port <= 0x1f7) || port == 0x3f6 || port == 0x3f7)
+			addr |= port;
 		return (void *)addr;
 	}
 }
@@ -66,9 +60,10 @@ EXPORT_SYMBOL(sn_io_addr);
  */
 void __sn_mmiowb(void)
 {
-	while ((((volatile unsigned long)(*pda->pio_write_status_addr)) &
-		SH_PIO_WRITE_STATUS_0_PENDING_WRITE_COUNT_MASK) !=
-	       SH_PIO_WRITE_STATUS_0_PENDING_WRITE_COUNT_MASK)
+	volatile unsigned long *adr = pda->pio_write_status_addr;
+	unsigned long val = pda->pio_write_status_val;
+
+	while ((*adr & SH_PIO_WRITE_STATUS_PENDING_WRITE_COUNT_MASK) != val)
 		cpu_relax();
 }
 

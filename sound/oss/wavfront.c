@@ -277,7 +277,7 @@ struct wf_config {
 	wait_queue_head_t interrupt_sleeper; 
 } dev;
 
-static spinlock_t lock=SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(lock);
 static int  detect_wffx(void);
 static int  wffx_ioctl (wavefront_fx_info *);
 static int  wffx_init (void);

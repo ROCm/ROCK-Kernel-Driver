@@ -94,6 +94,8 @@
 #define mk_config_type1(bus, dev, offset) \
 	mk_config_addr(bus, dev, offset) | 1;
 
+static spinlock_t pcibios_lock = SPIN_LOCK_UNLOCKED;
+
 int qspan_pcibios_read_config_byte(unsigned char bus, unsigned char dev_fn,
 				  unsigned char offset, unsigned char *val)
 {
@@ -109,8 +111,8 @@ int qspan_pcibios_read_config_byte(unsigned char bus, unsigned char dev_fn,
 	}
 
 #ifdef CONFIG_RPXCLASSIC
-	save_flags(flags);
-	cli();
+	/* disable interrupts */
+	spin_lock_irqsave(&pcibios_lock, flags);
 	*((uint *)RPX_CSR_ADDR) &= ~BCSR2_QSPACESEL;
 	eieio();
 #endif
@@ -124,7 +126,7 @@ int qspan_pcibios_read_config_byte(unsigned char bus, unsigned char dev_fn,
 #ifdef CONFIG_RPXCLASSIC
 	*((uint *)RPX_CSR_ADDR) |= BCSR2_QSPACESEL;
 	eieio();
-	restore_flags(flags);
+	spin_unlock_irqrestore(&pcibios_lock, flags);
 #endif
 
 	offset ^= 0x03;
@@ -148,8 +150,8 @@ int qspan_pcibios_read_config_word(unsigned char bus, unsigned char dev_fn,
 	}
 
 #ifdef CONFIG_RPXCLASSIC
-	save_flags(flags);
-	cli();
+	/* disable interrupts */
+	spin_lock_irqsave(&pcibios_lock, flags);
 	*((uint *)RPX_CSR_ADDR) &= ~BCSR2_QSPACESEL;
 	eieio();
 #endif
@@ -164,7 +166,7 @@ int qspan_pcibios_read_config_word(unsigned char bus, unsigned char dev_fn,
 #ifdef CONFIG_RPXCLASSIC
 	*((uint *)RPX_CSR_ADDR) |= BCSR2_QSPACESEL;
 	eieio();
-	restore_flags(flags);
+	spin_unlock_irqrestore(&pcibios_lock, flags);
 #endif
 
 	sp = ((ushort *)&temp) + ((offset >> 1) & 1);
@@ -185,8 +187,8 @@ int qspan_pcibios_read_config_dword(unsigned char bus, unsigned char dev_fn,
 	}
 
 #ifdef CONFIG_RPXCLASSIC
-	save_flags(flags);
-	cli();
+	/* disable interrupts */
+	spin_lock_irqsave(&pcibios_lock, flags);
 	*((uint *)RPX_CSR_ADDR) &= ~BCSR2_QSPACESEL;
 	eieio();
 #endif
@@ -200,7 +202,7 @@ int qspan_pcibios_read_config_dword(unsigned char bus, unsigned char dev_fn,
 #ifdef CONFIG_RPXCLASSIC
 	*((uint *)RPX_CSR_ADDR) |= BCSR2_QSPACESEL;
 	eieio();
-	restore_flags(flags);
+	spin_unlock_irqrestore(&pcibios_lock, flags);
 #endif
 
 	return PCIBIOS_SUCCESSFUL;
@@ -225,8 +227,8 @@ int qspan_pcibios_write_config_byte(unsigned char bus, unsigned char dev_fn,
 	*cp = val;
 
 #ifdef CONFIG_RPXCLASSIC
-	save_flags(flags);
-	cli();
+	/* disable interrupts */
+	spin_lock_irqsave(&pcibios_lock, flags);
 	*((uint *)RPX_CSR_ADDR) &= ~BCSR2_QSPACESEL;
 	eieio();
 #endif
@@ -240,7 +242,7 @@ int qspan_pcibios_write_config_byte(unsigned char bus, unsigned char dev_fn,
 #ifdef CONFIG_RPXCLASSIC
 	*((uint *)RPX_CSR_ADDR) |= BCSR2_QSPACESEL;
 	eieio();
-	restore_flags(flags);
+	spin_unlock_irqrestore(&pcibios_lock, flags);
 #endif
 
 	return PCIBIOS_SUCCESSFUL;
@@ -265,8 +267,8 @@ int qspan_pcibios_write_config_word(unsigned char bus, unsigned char dev_fn,
 	*sp = val;
 
 #ifdef CONFIG_RPXCLASSIC
-	save_flags(flags);
-	cli();
+	/* disable interrupts */
+	spin_lock_irqsave(&pcibios_lock, flags);
 	*((uint *)RPX_CSR_ADDR) &= ~BCSR2_QSPACESEL;
 	eieio();
 #endif
@@ -280,7 +282,7 @@ int qspan_pcibios_write_config_word(unsigned char bus, unsigned char dev_fn,
 #ifdef CONFIG_RPXCLASSIC
 	*((uint *)RPX_CSR_ADDR) |= BCSR2_QSPACESEL;
 	eieio();
-	restore_flags(flags);
+	spin_unlock_irqrestore(&pcibios_lock, flags);
 #endif
 
 	return PCIBIOS_SUCCESSFUL;
@@ -297,8 +299,8 @@ int qspan_pcibios_write_config_dword(unsigned char bus, unsigned char dev_fn,
 		return PCIBIOS_DEVICE_NOT_FOUND;
 
 #ifdef CONFIG_RPXCLASSIC
-	save_flags(flags);
-	cli();
+	/* disable interrupts */
+	spin_lock_irqsave(&pcibios_lock, flags);
 	*((uint *)RPX_CSR_ADDR) &= ~BCSR2_QSPACESEL;
 	eieio();
 #endif
@@ -312,7 +314,7 @@ int qspan_pcibios_write_config_dword(unsigned char bus, unsigned char dev_fn,
 #ifdef CONFIG_RPXCLASSIC
 	*((uint *)RPX_CSR_ADDR) |= BCSR2_QSPACESEL;
 	eieio();
-	restore_flags(flags);
+	spin_unlock_irqrestore(&pcibios_lock, flags);
 #endif
 
 	return PCIBIOS_SUCCESSFUL;

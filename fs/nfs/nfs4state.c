@@ -51,7 +51,7 @@
 
 #define OPENOWNER_POOL_SIZE	8
 
-static spinlock_t		state_spinlock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(state_spinlock);
 
 nfs4_stateid zero_stateid;
 

@@ -234,7 +234,7 @@ void smp_flush_sig_insns(struct mm_struct *mm, unsigned long insn_addr)
 extern unsigned int lvl14_resolution;
 
 /* /proc/profile writes can call this, don't __init it please. */
-static spinlock_t prof_setup_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(prof_setup_lock);
 
 int setup_profiling_timer(unsigned int multiplier)
 {

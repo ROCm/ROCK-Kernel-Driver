@@ -1190,7 +1190,7 @@ int __skb_linearize(struct sk_buff *skb, int gfp_mask)
 
 #define HARD_TX_LOCK(dev, cpu) {			\
 	if ((dev->features & NETIF_F_LLTX) == 0) {	\
-		spin_lock(&dev->xmit_lock);		\
+		spin_lock_irq(&dev->xmit_lock);		\
 		dev->xmit_lock_owner = cpu;		\
 	}						\
 }
@@ -1198,7 +1198,7 @@ int __skb_linearize(struct sk_buff *skb, int gfp_mask)
 #define HARD_TX_UNLOCK(dev) {				\
 	if ((dev->features & NETIF_F_LLTX) == 0) {	\
 		dev->xmit_lock_owner = -1;		\
-		spin_unlock(&dev->xmit_lock);		\
+		spin_unlock_irq(&dev->xmit_lock);	\
 	}						\
 }
 

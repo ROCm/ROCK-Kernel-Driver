@@ -69,7 +69,7 @@ static void sctp_endpoint_bh_rcv(struct sctp_endpoint *ep);
 static struct sctp_endpoint *sctp_endpoint_init(struct sctp_endpoint *ep,
 						struct sock *sk, int gfp)
 {
-	struct sctp_opt *sp = sctp_sk(sk);
+	struct sctp_sock *sp = sctp_sk(sk);
 	memset(ep, 0, sizeof(struct sctp_endpoint));
 
 	/* Initialize the base structure. */

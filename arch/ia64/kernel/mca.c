@@ -85,11 +85,6 @@
 /* Used by mca_asm.S */
 ia64_mca_sal_to_os_state_t	ia64_sal_to_os_handoff_state;
 ia64_mca_os_to_sal_state_t	ia64_os_to_sal_handoff_state;
-u64				ia64_mca_proc_state_dump[512];
-u64				ia64_mca_stack[1024] __attribute__((aligned(16)));
-u64				ia64_mca_stackframe[32];
-u64				ia64_mca_bspstore[1024];
-u64				ia64_init_stack[KERNEL_STACK_SIZE/8] __attribute__((aligned(16)));
 u64				ia64_mca_serialize;
 
 /* In mca_asm.S */
@@ -97,8 +92,6 @@ extern void			ia64_monarch_init_handler (void);
 extern void			ia64_slave_init_handler (void);
 
 static ia64_mc_info_t		ia64_mc_info;
-
-struct ia64_mca_tlb_info ia64_mca_tlb_list[NR_CPUS];
 
 #define MAX_CPE_POLL_INTERVAL (15*60*HZ) /* 15 minutes */
 #define MIN_CPE_POLL_INTERVAL (2*60*HZ)  /* 2 minutes */
@@ -240,6 +233,7 @@ static void
 ia64_mca_log_sal_error_record(int sal_info_type)
 {
 	u8 *buffer;
+	sal_log_record_header_t *rh;
 	u64 size;
 	int irq_safe = sal_info_type != SAL_INFO_TYPE_MCA && sal_info_type != SAL_INFO_TYPE_INIT;
 #ifdef IA64_MCA_DEBUG_INFO
@@ -258,7 +252,8 @@ ia64_mca_log_sal_error_record(int sal_info_type)
 			sal_info_type < ARRAY_SIZE(rec_name) ? rec_name[sal_info_type] : "UNKNOWN");
 
 	/* Clear logs from corrected errors in case there's no user-level logger */
-	if (sal_info_type == SAL_INFO_TYPE_CPE || sal_info_type == SAL_INFO_TYPE_CMC)
+	rh = (sal_log_record_header_t *)buffer;
+	if (rh->severity == sal_log_severity_corrected)
 		ia64_sal_clear_state_info(sal_info_type);
 }
 
@@ -276,7 +271,7 @@ ia64_mca_cpe_int_handler (int cpe_irq, void *arg, struct pt_regs *ptregs)
 {
 	static unsigned long	cpe_history[CPE_HISTORY_LENGTH];
 	static int		index;
-	static spinlock_t	cpe_history_lock = SPIN_LOCK_UNLOCKED;
+	static DEFINE_SPINLOCK(cpe_history_lock);
 
 	IA64_MCA_DEBUG("%s: received interrupt vector = %#x on CPU %d\n",
 		       __FUNCTION__, cpe_irq, smp_processor_id());
@@ -887,6 +882,13 @@ ia64_mca_ucmc_handler(void)
 			&ia64_sal_to_os_handoff_state,
 			&ia64_os_to_sal_handoff_state)); 
 
+return_to_sal:
+
+	if (recover) {
+		sal_log_record_header_t *rh = IA64_LOG_CURR_BUFFER(SAL_INFO_TYPE_MCA);
+		rh->severity = sal_log_severity_corrected;
+		ia64_sal_clear_state_info(SAL_INFO_TYPE_MCA);
+	}
 	/*
 	 *  Wakeup all the processors which are spinning in the rendezvous
 	 *  loop.
@@ -920,7 +922,7 @@ ia64_mca_cmc_int_handler(int cmc_irq, void *arg, struct pt_regs *ptregs)
 {
 	static unsigned long	cmc_history[CMC_HISTORY_LENGTH];
 	static int		index;
-	static spinlock_t	cmc_history_lock = SPIN_LOCK_UNLOCKED;
+	static DEFINE_SPINLOCK(cmc_history_lock);
 
 	IA64_MCA_DEBUG("%s: received interrupt vector = %#x on CPU %d\n",
 		       __FUNCTION__, cmc_irq, smp_processor_id());

@@ -236,8 +236,8 @@ static int dma;
 /* our stuff */
 #include "ltpc.h"
 
-static spinlock_t txqueue_lock = SPIN_LOCK_UNLOCKED;
-static spinlock_t mbox_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(txqueue_lock);
+static DEFINE_SPINLOCK(mbox_lock);
 
 /* function prototypes */
 static int do_read(struct net_device *dev, void *cbuf, int cbuflen,

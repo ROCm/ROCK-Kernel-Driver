@@ -52,7 +52,7 @@ static struct pci_controller *u3_agp;
 extern u8 pci_cache_line_size;
 extern int pcibios_assign_bus_offset;
 
-struct pci_dev *k2_skiplist[2];
+struct device_node *k2_skiplist[2];
 
 /*
  * Magic constants for enabling cache coherency in the bandit/PSX bridge.
@@ -325,8 +325,7 @@ u3_ht_read_config(struct pci_bus *bus, unsigned int devfn, int offset,
 	 * cycle accesses. Fix that here.
 	 */
 	for (i=0; i<2; i++)
-		if (k2_skiplist[i] && k2_skiplist[i]->bus == bus &&
-		    k2_skiplist[i]->devfn == devfn) {
+		if (k2_skiplist[i] == np) {
 			switch (len) {
 			case 1:
 				*val = 0xff; break;
@@ -375,8 +374,7 @@ u3_ht_write_config(struct pci_bus *bus, unsigned int devfn, int offset,
 	 * cycle accesses. Fix that here.
 	 */
 	for (i=0; i<2; i++)
-		if (k2_skiplist[i] && k2_skiplist[i]->bus == bus &&
-		    k2_skiplist[i]->devfn == devfn)
+		if (k2_skiplist[i] == np)
 			return PCIBIOS_SUCCESSFUL;
 
 	addr = u3_ht_cfg_access(hose, bus->number, devfn, offset);

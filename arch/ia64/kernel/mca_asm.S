@@ -13,6 +13,9 @@
 //		   2. Restore current thread pointer to kr6
 //		   3. Move stack ptr 16 bytes to conform to C calling convention
 //
+// 04/11/12 Russ Anderson <rja@sgi.com>
+//		   Added per cpu MCA/INIT stack save areas.
+//
 #include <linux/config.h>
 #include <linux/threads.h>
 
@@ -102,11 +105,6 @@
 	.global ia64_os_mca_dispatch_end
 	.global ia64_sal_to_os_handoff_state
 	.global	ia64_os_to_sal_handoff_state
-	.global	ia64_mca_proc_state_dump
-	.global	ia64_mca_stack
-	.global	ia64_mca_stackframe
-	.global	ia64_mca_bspstore
-	.global ia64_init_stack
 
 	.text
 	.align 16
@@ -146,23 +144,11 @@ ia64_os_mca_done_dump:
 	// The following code purges TC and TR entries. Then reload all TC entries.
 	// Purge percpu data TC entries.
 begin_tlb_purge_and_reload:
-	mov r16=cr.lid
-	LOAD_PHYSICAL(p0,r17,ia64_mca_tlb_list) // Physical address of ia64_mca_tlb_list
-	mov r19=0
-	mov r20=NR_CPUS
+	GET_PERCPU_PADDR(r2)	// paddr of percpu_paddr in cpuinfo struct
 	;;
-1:	cmp.eq p6,p7=r19,r20
-(p6)	br.spnt.few err
-	ld8 r18=[r17],IA64_MCA_TLB_INFO_SIZE
+	mov	r17=r2
 	;;
-	add r19=1,r19
-	cmp.eq p6,p7=r18,r16
-(p7)	br.sptk.few 1b
-	;;
-	adds r17=-IA64_MCA_TLB_INFO_SIZE,r17
-	;;
-	mov r23=r17		// save current ia64_mca_percpu_info addr pointer.
-	adds r17=16,r17
+	adds r17=8,r17
 	;;
 	ld8 r18=[r17],8		// r18=ptce_base
   	;;
@@ -215,7 +201,7 @@ begin_tlb_purge_and_reload:
 	srlz.d
 	;;
 	// 3. Purge ITR for PAL code.
-	adds r17=48,r23
+	adds r17=40,r23
 	;;
 	ld8 r16=[r17]
 	mov r18=IA64_GRANULE_SHIFT<<2
@@ -260,7 +246,9 @@ begin_tlb_purge_and_reload:
 	srlz.d
 	;;
 	// 2. Reload DTR register for PERCPU data.
-	adds r17=8,r23
+	GET_PERCPU_PADDR(r2)		// paddr of percpu_paddr in cpuinfo struct
+	;;
+	mov r17=r2
 	movl r16=PERCPU_ADDR		// vaddr
 	movl r18=PERCPU_PAGE_SHIFT<<2
 	;;
@@ -275,7 +263,9 @@ begin_tlb_purge_and_reload:
 	srlz.d
 	;;
 	// 3. Reload ITR for PAL code.
-	adds r17=40,r23
+	GET_CPUINFO_PAL_PADDR(r2)	// paddr of pal_paddr in cpuinfo struct
+	;;
+	mov r17=r2
 	;;
 	ld8 r18=[r17],8			// pte
 	;;
@@ -318,17 +308,14 @@ err:
 done_tlb_purge_and_reload:
 
 	// Setup new stack frame for OS_MCA handling
-	movl	r2=ia64_mca_bspstore;;	// local bspstore area location in r2
-	DATA_VA_TO_PA(r2);;
-	movl	r3=ia64_mca_stackframe;; // save stack frame to memory in r3
-	DATA_VA_TO_PA(r3);;
+	GET_MCA_BSPSTORE(r2)		// paddr of bspstore save area
+	GET_MCA_STACKFRAME(r3);;	// paddr of stack frame save area
 	rse_switch_context(r6,r3,r2);;	// RSC management in this new context
-	movl	r12=ia64_mca_stack
-	mov	r2=8*1024;;		// stack size must be same as C array
-	add	r12=r2,r12;;		// stack base @ bottom of array
-	adds	r12=-16,r12;;		// allow 16 bytes of scratch
+	GET_MCA_STACK(r2);;		// paddr of stack save area
+					// stack size must be same as C array
+	addl	r2=8*1024-16,r2;;	// stack base @ bottom of array
+	mov	r12=r2			// allow 16 bytes of scratch
 					// (C calling convention)
-	DATA_VA_TO_PA(r12);;
 
         // Enter virtual mode from physical mode
 	VIRTUAL_MODE_ENTER(r2, r3, ia64_os_mca_virtual_begin, r4)
@@ -344,9 +331,7 @@ ia64_os_mca_virtual_begin:
 ia64_os_mca_virtual_end:
 
 	// restore the original stack frame here
-	movl    r2=ia64_mca_stackframe	// restore stack frame from memory at r2
-	;;
-	DATA_VA_TO_PA(r2)
+	GET_MCA_STACKFRAME(r2);;	// phys addr of MCA save area
 	movl    r4=IA64_PSR_MC
 	;;
 	rse_return_context(r4,r3,r2)	// switch from interrupt context for RSE
@@ -387,7 +372,7 @@ ia64_os_mca_dispatch_end:
 ia64_os_mca_proc_state_dump:
 // Save bank 1 GRs 16-31 which will be used by c-language code when we switch
 //  to virtual addressing mode.
-	LOAD_PHYSICAL(p0,r2,ia64_mca_proc_state_dump)// convert OS state dump area to physical address
+	GET_MCA_DUMP_PADDR(r2);;  // phys addr of MCA save area
 
 // save ar.NaT
 	mov		r5=ar.unat                  // ar.unat
@@ -618,9 +603,7 @@ end_os_mca_dump:
 ia64_os_mca_proc_state_restore:
 
 // Restore bank1 GR16-31
-	movl		r2=ia64_mca_proc_state_dump	// Convert virtual address
-	;;						// of OS state dump area
-	DATA_VA_TO_PA(r2)				// to physical address
+	GET_MCA_DUMP_PADDR(r2);;		// phys addr of proc state dump area
 
 restore_GRs:                                    // restore bank-1 GRs 16-31
 	bsw.1;;

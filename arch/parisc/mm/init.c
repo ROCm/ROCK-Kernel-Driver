@@ -853,7 +853,7 @@ static unsigned long space_id_index;
 static unsigned long free_space_ids = NR_SPACE_IDS - 1;
 static unsigned long dirty_space_ids = 0;
 
-static spinlock_t sid_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(sid_lock);
 
 unsigned long alloc_sid(void)
 {

@@ -216,7 +216,7 @@ static int use_virtual_dma;
  * record each buffers capabilities
  */
 
-static spinlock_t floppy_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(floppy_lock);
 static struct completion device_release;
 
 static unsigned short virtual_dma_port = 0x3f0;
@@ -1072,7 +1072,7 @@ static int fd_wait_for_completion(unsigned long delay, timeout_fn function)
 	return 0;
 }
 
-static spinlock_t floppy_hlt_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(floppy_hlt_lock);
 static int hlt_disabled;
 static void floppy_disable_hlt(void)
 {
@@ -4415,7 +4415,7 @@ out_put_disk:
 	return err;
 }
 
-static spinlock_t floppy_usage_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(floppy_usage_lock);
 
 static int floppy_grab_irq_and_dma(void)
 {

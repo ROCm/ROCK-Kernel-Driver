@@ -584,6 +584,10 @@ struct fb_ops {
 	int (*fb_ioctl)(struct inode *inode, struct file *file, unsigned int cmd,
 			unsigned long arg, struct fb_info *info);
 
+	/* Handle 32bit compat ioctl (optional) */
+	int (*fb_compat_ioctl)(struct file *f, unsigned cmd, unsigned long arg,
+			       struct fb_info *info);
+
 	/* perform fb specific mmap */
 	int (*fb_mmap)(struct fb_info *info, struct file *file, struct vm_area_struct *vma);
 };

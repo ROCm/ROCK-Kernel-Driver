@@ -2301,12 +2301,17 @@ static int handle_bmc_rsp(ipmi_smi_t          intf,
 
 	if (!found) {
 		/* Special handling for NULL users. */
-		if (!recv_msg->user && intf->null_user_handler)
+		if (!recv_msg->user && intf->null_user_handler){
 			intf->null_user_handler(intf, msg);
-		/* The user for the message went away, so give up. */
-		spin_lock_irqsave(&intf->counter_lock, flags);
-		intf->unhandled_local_responses++;
-		spin_unlock_irqrestore(&intf->counter_lock, flags);
+			spin_lock_irqsave(&intf->counter_lock, flags);
+			intf->handled_local_responses++;
+			spin_unlock_irqrestore(&intf->counter_lock, flags);
+		}else{
+			/* The user for the message went away, so give up. */
+			spin_lock_irqsave(&intf->counter_lock, flags);
+			intf->unhandled_local_responses++;
+			spin_unlock_irqrestore(&intf->counter_lock, flags);
+		}
 		ipmi_free_recv_msg(recv_msg);
 	} else {
 		struct ipmi_system_interface_addr *smi_addr;

@@ -221,12 +221,12 @@ static const char *proc_arch[] = {
 #define CACHE_M(y)	((y) & (1 << 2))
 #define CACHE_LINE(y)	((y) & 3)
 
-static inline void dump_cache(const char *prefix, unsigned int cache)
+static inline void dump_cache(const char *prefix, int cpu, unsigned int cache)
 {
 	unsigned int mult = 2 + (CACHE_M(cache) ? 1 : 0);
 
-	printk("%s: %d bytes, associativity %d, %d byte lines, %d sets\n",
-		prefix,
+	printk("CPU%u: %s: %d bytes, associativity %d, %d byte lines, %d sets\n",
+		cpu, prefix,
 		mult << (8 + CACHE_SIZE(cache)),
 		(mult << CACHE_ASSOC(cache)) >> 1,
 		8 << CACHE_LINE(cache),
@@ -234,18 +234,18 @@ static inline void dump_cache(const char *prefix, unsigned int cache)
 			CACHE_LINE(cache)));
 }
 
-static void __init dump_cpu_info(void)
+static void __init dump_cpu_info(int cpu)
 {
 	unsigned int info = read_cpuid(CPUID_CACHETYPE);
 
 	if (info != processor_id) {
-		printk("CPU: D %s %s cache\n", cache_is_vivt() ? "VIVT" : "VIPT",
+		printk("CPU%u: D %s %s cache\n", cpu, cache_is_vivt() ? "VIVT" : "VIPT",
 		       cache_types[CACHE_TYPE(info)]);
 		if (CACHE_S(info)) {
-			dump_cache("CPU: I cache", CACHE_ISIZE(info));
-			dump_cache("CPU: D cache", CACHE_DSIZE(info));
+			dump_cache("I cache", cpu, CACHE_ISIZE(info));
+			dump_cache("D cache", cpu, CACHE_DSIZE(info));
 		} else {
-			dump_cache("CPU: cache", CACHE_ISIZE(info));
+			dump_cache("cache", cpu, CACHE_ISIZE(info));
 		}
 	}
 }
@@ -267,9 +267,15 @@ int cpu_architecture(void)
 	return cpu_arch;
 }
 
+/*
+ * These functions re-use the assembly code in head.S, which
+ * already provide the required functionality.
+ */
+extern struct proc_info_list *lookup_processor_type(void);
+extern struct machine_desc *lookup_machine_type(unsigned int);
+
 static void __init setup_processor(void)
 {
-	extern struct proc_info_list __proc_info_begin, __proc_info_end;
 	struct proc_info_list *list;
 
 	/*
@@ -277,15 +283,8 @@ static void __init setup_processor(void)
 	 * types.  The linker builds this table for us from the
 	 * entries in arch/arm/mm/proc-*.S
 	 */
-	for (list = &__proc_info_begin; list < &__proc_info_end ; list++)
-		if ((processor_id & list->cpu_mask) == list->cpu_val)
-			break;
-
-	/*
-	 * If processor type is unrecognised, then we
-	 * can do nothing...
-	 */
-	if (list >= &__proc_info_end) {
+	list = lookup_processor_type();
+	if (!list) {
 		printk("CPU configuration botched (ID %08x), unable "
 		       "to continue.\n", processor_id);
 		while (1);
@@ -310,7 +309,7 @@ static void __init setup_processor(void)
 	       cpu_name, processor_id, (int)processor_id & 15,
 	       proc_arch[cpu_architecture()]);
 
-	dump_cpu_info();
+	dump_cpu_info(smp_processor_id());
 
 	sprintf(system_utsname.machine, "%s%c", list->arch_name, ENDIANNESS);
 	sprintf(elf_platform, "%s%c", list->elf_name, ENDIANNESS);
@@ -321,22 +320,14 @@ static void __init setup_processor(void)
 
 static struct machine_desc * __init setup_machine(unsigned int nr)
 {
-	extern struct machine_desc __arch_info_begin, __arch_info_end;
 	struct machine_desc *list;
 
 	/*
-	 * locate architecture in the list of supported architectures.
+	 * locate machine in the list of supported machines.
 	 */
-	for (list = &__arch_info_begin; list < &__arch_info_end; list++)
-		if (list->nr == nr)
-			break;
-
-	/*
-	 * If the architecture type is not recognised, then we
-	 * can co nothing...
-	 */
-	if (list >= &__arch_info_end) {
-		printk("Architecture configuration botched (nr %d), unable "
+	list = lookup_machine_type(nr);
+	if (!list) {
+		printk("Machine configuration botched (nr %d), unable "
 		       "to continue.\n", nr);
 		while (1);
 	}

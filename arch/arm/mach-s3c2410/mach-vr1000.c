@@ -1,6 +1,6 @@
 /* linux/arch/arm/mach-s3c2410/mach-vr1000.c
  *
- * Copyright (c) 2003,2004 Simtec Electronics
+ * Copyright (c) 2003-2005 Simtec Electronics
  *   Ben Dooks <ben@simtec.co.uk>
  *
  * Machine support for Thorcom VR1000 board. Designed for Thorcom by
@@ -18,9 +18,12 @@
  *     05-Apr-2004 BJD  Copied to make mach-vr1000.c
  *     18-Oct-2004 BJD  Updated board struct
  *     04-Nov-2004 BJD  Clock and serial configuration update
+ *
  *     04-Jan-2005 BJD  Updated uart init call
  *     10-Jan-2005 BJD  Removed include of s3c2410.h
  *     14-Jan-2005 BJD  Added clock init
+ *     15-Jan-2005 BJD  Add serial port device definition
+ *     20-Jan-2005 BJD  Use UPF_IOREMAP for ports
 */
 
 #include <linux/kernel.h>
@@ -30,12 +33,19 @@
 #include <linux/timer.h>
 #include <linux/init.h>
 
+#include <linux/serial.h>
+#include <linux/tty.h>
+#include <linux/serial_8250.h>
+#include <linux/serial_reg.h>
+
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
 #include <asm/mach/irq.h>
 
 #include <asm/arch/bast-map.h>
 #include <asm/arch/vr1000-map.h>
+#include <asm/arch/vr1000-irq.h>
+#include <asm/arch/vr1000-cpld.h>
 
 #include <asm/hardware.h>
 #include <asm/io.h>
@@ -166,12 +176,82 @@ static struct s3c2410_uartcfg vr1000_uartcfgs[] = {
 	}
 };
 
+/* definitions for the vr1000 extra 16550 serial ports */
+
+#define VR1000_BAUDBASE (3692307)
+
+#define VR1000_SERIAL_MAPBASE(x) (VR1000_PA_SERIAL + 0x80 + ((x) << 5))
+
+static struct plat_serial8250_port serial_platform_data[] = {
+	[0] = {
+		.mapbase	= VR1000_SERIAL_MAPBASE(0),
+		.irq		= IRQ_VR1000_SERIAL + 0,
+		.flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP,
+		.iotype		= UPIO_MEM,
+		.regshift	= 0,
+		.uartclk	= VR1000_BAUDBASE,
+	},
+	[1] = {
+		.mapbase	= VR1000_SERIAL_MAPBASE(1),
+		.irq		= IRQ_VR1000_SERIAL + 1,
+		.flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP,
+		.iotype		= UPIO_MEM,
+		.regshift	= 0,
+		.uartclk	= VR1000_BAUDBASE,
+	},
+	[2] = {
+		.mapbase	= VR1000_SERIAL_MAPBASE(2),
+		.irq		= IRQ_VR1000_SERIAL + 2,
+		.flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP,
+		.iotype		= UPIO_MEM,
+		.regshift	= 0,
+		.uartclk	= VR1000_BAUDBASE,
+	},
+	[3] = {
+		.mapbase	= VR1000_SERIAL_MAPBASE(3),
+		.irq		= IRQ_VR1000_SERIAL + 3,
+		.flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP,
+		.iotype		= UPIO_MEM,
+		.regshift	= 0,
+		.uartclk	= VR1000_BAUDBASE,
+	},
+	{ },
+};
+
+static struct platform_device serial_device = {
+	.name			= "serial8250",
+	.id			= 0,
+	.dev			= {
+		.platform_data	= serial_platform_data,
+	},
+};
+
+/* MTD NOR Flash */
+
+static struct resource vr1000_nor_resource[] = {
+	[0] = {
+		.start	= S3C2410_CS1 + 0x4000000,
+		.end	= S3C2410_CS1 + 0x4000000 + SZ_16M - 1,
+		.flags	= IORESOURCE_MEM,
+	}
+};
+
+static struct platform_device vr1000_nor = {
+	.name		= "bast-nor",
+	.id		= -1,
+	.num_resources	= ARRAY_SIZE(vr1000_nor_resource),
+	.resource	= vr1000_nor_resource,
+};
+
+
 static struct platform_device *vr1000_devices[] __initdata = {
 	&s3c_device_usb,
 	&s3c_device_lcd,
 	&s3c_device_wdt,
 	&s3c_device_i2c,
 	&s3c_device_iis,
+	&serial_device,
+	&vr1000_nor,
 };
 
 static struct clk *vr1000_clocks[] = {

@@ -4,4 +4,4 @@
 
 obj-$(CONFIG_FAT_FS) += fat.o
 
-fat-objs := cache.o dir.o file.o inode.o misc.o fatfs_syms.o
+fat-objs := cache.o dir.o file.o inode.o misc.o

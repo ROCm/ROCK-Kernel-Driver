@@ -2721,7 +2721,7 @@ struct pmu_private {
 };
 
 static LIST_HEAD(all_pmu_pvt);
-static spinlock_t all_pvt_lock __pmacdata = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(all_pvt_lock __pmacdata);
 
 static void __pmac
 pmu_pass_intr(unsigned char *data, int len)

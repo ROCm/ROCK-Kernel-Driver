@@ -59,7 +59,7 @@ struct adb_regs {
 
 static volatile struct adb_regs __iomem *adb;
 static struct adb_request *current_req, *last_req;
-static spinlock_t macio_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(macio_lock);
 
 static int macio_probe(void);
 static int macio_init(void);

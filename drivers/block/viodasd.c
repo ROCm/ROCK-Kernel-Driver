@@ -72,7 +72,7 @@ enum {
 	MAX_DISK_NAME = sizeof(((struct gendisk *)0)->disk_name)
 };
 
-static spinlock_t	viodasd_spinlock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(viodasd_spinlock);
 
 #define VIOMAXREQ		16
 #define VIOMAXBLOCKDMA		12

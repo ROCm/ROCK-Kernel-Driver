@@ -75,7 +75,7 @@ static struct order orders[] = {
 #define TEST_AND_CLEAR_USED(pg,off)	(test_and_clear_bit(off, &USED_MAP(pg)))
 #define SET_USED(pg,off)		(set_bit(off, &USED_MAP(pg)))
 
-static spinlock_t small_page_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(small_page_lock);
 
 static unsigned long __get_small_page(int priority, struct order *order)
 {

@@ -5,6 +5,7 @@
  * Copyright (C) 1999, 2004 Silicon Graphics, Inc.
  * Copyright (C) Vijay Chander (vijay@engr.sgi.com)
  * Copyright (C) Srinivasa Thirumalachar (sprasad@engr.sgi.com)
+ * Copyright (C) Russ Anderson (rja@sgi.com)
  */
 
 #ifndef _ASM_IA64_MCA_H
@@ -47,17 +48,6 @@ enum {
 	IA64_MCA_RENDEZ_CHECKIN_NOTDONE	=	0x0,
 	IA64_MCA_RENDEZ_CHECKIN_DONE	=	0x1
 };
-
-/* the following data structure is used for TLB error recovery purposes */
-extern struct ia64_mca_tlb_info {
-	u64	cr_lid;
-	u64	percpu_paddr;
-	u64	ptce_base;
-	u32	ptce_count[2];
-	u32	ptce_stride[2];
-	u64	pal_paddr;
-	u64	pal_base;
-} ia64_mca_tlb_list[NR_CPUS];
 
 /* Information maintained by the MC infrastructure */
 typedef struct ia64_mc_info_s {
@@ -111,6 +101,20 @@ typedef struct ia64_mca_os_to_sal_state_s {
 						 * back to SAL from OS after MCA handling.
 						 */
 } ia64_mca_os_to_sal_state_t;
+
+#define IA64_MCA_STACK_SIZE 	1024
+#define IA64_MCA_STACK_SIZE_BYTES 	(1024 * 8)
+#define IA64_MCA_BSPSTORE_SIZE 	1024
+
+typedef struct ia64_mca_cpu_s {
+	u64	ia64_mca_stack[IA64_MCA_STACK_SIZE] 		__attribute__((aligned(16)));
+	u64	ia64_mca_proc_state_dump[512]			__attribute__((aligned(16)));
+	u64	ia64_mca_stackframe[32]				__attribute__((aligned(16)));
+	u64	ia64_mca_bspstore[IA64_MCA_BSPSTORE_SIZE]	__attribute__((aligned(16)));
+	u64	ia64_init_stack[KERNEL_STACK_SIZE/8] 		__attribute__((aligned(16)));
+} ia64_mca_cpu_t;
+
+#define PERCPU_MCA_SIZE sizeof(ia64_mca_cpu_t)
 
 extern void ia64_mca_init(void);
 extern void ia64_os_mca_dispatch(void);

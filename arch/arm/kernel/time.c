@@ -48,7 +48,7 @@ struct sys_timer *system_timer;
 extern unsigned long wall_jiffies;
 
 /* this needs a better home */
-spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(rtc_lock);
 
 #ifdef CONFIG_SA1100_RTC_MODULE
 EXPORT_SYMBOL(rtc_lock);

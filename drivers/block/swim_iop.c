@@ -76,7 +76,7 @@ static struct swim_iop_req *current_req;
 static int floppy_count;
 
 static struct floppy_state floppy_states[MAX_FLOPPIES];
-static spinlock_t swim_iop_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(swim_iop_lock);
 
 #define CURRENT elv_next_request(swim_queue)
 

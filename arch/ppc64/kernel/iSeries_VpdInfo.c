@@ -36,7 +36,6 @@
 #include <asm/iSeries/HvTypes.h>
 #include <asm/iSeries/mf.h>
 #include <asm/iSeries/LparData.h>
-//#include <asm/iSeries/iSeries_VpdInfo.h>
 #include <asm/iSeries/iSeries_pci.h>
 #include "pci.h"
 
@@ -85,30 +84,6 @@ typedef struct SlotMapStruct SlotMap;
 #define SLOT_ENTRY_SIZE   16
 
 /*
- * Bus, Card, Board, FrameId, CardLocation.
- */
-LocationData* iSeries_GetLocationData(struct pci_dev *PciDev)
-{
-	struct iSeries_Device_Node *DevNode =
-		(struct iSeries_Device_Node *)PciDev->sysdata;
-	LocationData *LocationPtr =
-		(LocationData *)kmalloc(LOCATION_DATA_SIZE, GFP_KERNEL);
-
-	if (LocationPtr == NULL) {
-		printk("PCI: LocationData area allocation failed!\n");
-		return NULL;
-	}
-	memset(LocationPtr, 0, LOCATION_DATA_SIZE);
-	LocationPtr->Bus = ISERIES_BUS(DevNode);
-	LocationPtr->Board = DevNode->Board;
-	LocationPtr->FrameId = DevNode->FrameId;
-	LocationPtr->Card = PCI_SLOT(DevNode->DevFn);
-	strcpy(&LocationPtr->CardLocation[0], &DevNode->CardLocation[0]);
-	return LocationPtr;
-}
-EXPORT_SYMBOL(iSeries_GetLocationData);
-
-/*
  * Formats the device information.
  * - Pass in pci_dev* pointer to the device.
  * - Pass in buffer to place the data.  Danger here is the buffer must
@@ -146,18 +121,6 @@ int iSeries_Device_Information(struct pci_dev *PciDev, char *buffer,
 				pci_class_name(PciDev->class >> 8));
 #endif
 	return len;
-}
-
-/*
- * Build a character string of the device location, Frame  1, Card  C10
- */
-int device_Location(struct pci_dev *PciDev, char *BufPtr)
-{
-	struct iSeries_Device_Node *DevNode =
-		(struct iSeries_Device_Node *)PciDev->sysdata;
-	return sprintf(BufPtr, "PCI: Bus%3d, AgentId%3d, Vendor %04X, Location %s",
-		       DevNode->DsaAddr.Dsa.busNumber, DevNode->AgentId,
-		       DevNode->Vendor, DevNode->Location);
 }
 
 /*

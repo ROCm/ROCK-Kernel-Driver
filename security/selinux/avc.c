@@ -227,7 +227,7 @@ void __init avc_init(void)
 
 	for (i = 0; i < AVC_CACHE_SLOTS; i++) {
 		INIT_LIST_HEAD(&avc_cache.slots[i]);
-		avc_cache.slots_lock[i] = SPIN_LOCK_UNLOCKED;
+		spin_lock_init(&avc_cache.slots_lock[i]);
 	}
 	atomic_set(&avc_cache.active_nodes, 0);
 	atomic_set(&avc_cache.lru_hint, 0);
@@ -415,7 +415,7 @@ out:
 static int avc_latest_notif_update(int seqno, int is_insert)
 {
 	int ret = 0;
-	static spinlock_t notif_lock = SPIN_LOCK_UNLOCKED;
+	static DEFINE_SPINLOCK(notif_lock);
 	unsigned long flag;
 
 	spin_lock_irqsave(&notif_lock, flag);

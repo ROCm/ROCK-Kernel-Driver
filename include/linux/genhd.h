@@ -128,6 +128,12 @@ struct gendisk {
 #endif
 };
 
+/* Structure for sysfs attributes on block devices */
+struct disk_attribute {
+	struct attribute attr;
+	ssize_t (*show)(struct gendisk *, char *);
+};
+
 /* 
  * Macros to operate on percpu disk statistics:
  *

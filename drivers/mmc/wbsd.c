@@ -1,11 +1,24 @@
 /*
- *  linux/drivers/mmc/wbsd.c
+ *  linux/drivers/mmc/wbsd.c - Winbond W83L51xD SD/MMC driver
  *
- *  Copyright (C) 2004 Pierre Ossman, All Rights Reserved.
+ *  Copyright (C) 2004-2005 Pierre Ossman, All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
+ *
+ *
+ * Warning!
+ *
+ * Changes to the FIFO system should be done with extreme care since
+ * the hardware is full of bugs related to the FIFO. Known issues are:
+ *
+ * - FIFO size field in FSR is always zero.
+ *
+ * - FIFO interrupts tend not to work as they should. Interrupts are
+ *   triggered only for full/empty events, not for threshold values.
+ *
+ * - On APIC systems the FIFO empty interrupt is sometimes lost.
  */
 
 #include <linux/config.h>
@@ -27,7 +40,7 @@
 #include "wbsd.h"
 
 #define DRIVER_NAME "wbsd"
-#define DRIVER_VERSION "1.0"
+#define DRIVER_VERSION "1.1"
 
 #ifdef CONFIG_MMC_DEBUG
 #define DBG(x...) \
@@ -237,13 +250,14 @@ static inline int wbsd_next_sg(struct wbsd_host* host)
 
 static inline char* wbsd_kmap_sg(struct wbsd_host* host)
 {
-	return kmap_atomic(host->cur_sg->page, KM_BIO_SRC_IRQ) +
+	host->mapped_sg = kmap_atomic(host->cur_sg->page, KM_BIO_SRC_IRQ) +
 		host->cur_sg->offset;
+	return host->mapped_sg;
 }
 
 static inline void wbsd_kunmap_sg(struct wbsd_host* host)
 {
-	kunmap_atomic(host->cur_sg->page, KM_BIO_SRC_IRQ);
+	kunmap_atomic(host->mapped_sg, KM_BIO_SRC_IRQ);
 }
 
 static inline void wbsd_sg_to_dma(struct wbsd_host* host, struct mmc_data* data)
@@ -270,7 +284,7 @@ static inline void wbsd_sg_to_dma(struct wbsd_host* host, struct mmc_data* data)
 			memcpy(dmabuf, sgbuf, size);
 		else
 			memcpy(dmabuf, sgbuf, sg[i].length);
-		kunmap_atomic(sg[i].page, KM_BIO_SRC_IRQ);
+		kunmap_atomic(sgbuf, KM_BIO_SRC_IRQ);
 		dmabuf += sg[i].length;
 		
 		if (size < sg[i].length)
@@ -316,7 +330,7 @@ static inline void wbsd_dma_to_sg(struct wbsd_host* host, struct mmc_data* data)
 			memcpy(sgbuf, dmabuf, size);
 		else
 			memcpy(sgbuf, dmabuf, sg[i].length);
-		kunmap_atomic(sg[i].page, KM_BIO_SRC_IRQ);
+		kunmap_atomic(sgbuf, KM_BIO_SRC_IRQ);
 		dmabuf += sg[i].length;
 		
 		if (size < sg[i].length)
@@ -398,16 +412,16 @@ static irqreturn_t wbsd_irq(int irq, void *dev_id, struct pt_regs *regs);
 static void wbsd_send_command(struct wbsd_host* host, struct mmc_command* cmd)
 {
 	int i;
-	u8 status, eir, isr;
+	u8 status, isr;
 	
 	DBGF("Sending cmd (%x)\n", cmd->opcode);
 
 	/*
-	 * Disable interrupts as the interrupt routine
-	 * will destroy the contents of ISR.
+	 * Clear accumulated ISR. The interrupt routine
+	 * will fill this one with events that occur during
+	 * transfer.
 	 */
-	eir = inb(host->base + WBSD_EIR);
-	outb(0, host->base + WBSD_EIR);
+	host->isr = 0;
 	
 	/*
 	 * Send the command (CRC calculated by host).
@@ -433,7 +447,7 @@ static void wbsd_send_command(struct wbsd_host* host, struct mmc_command* cmd)
 		/*
 		 * Read back status.
 		 */
-		isr = inb(host->base + WBSD_ISR);
+		isr = host->isr;
 		
 		/* Card removed? */
 		if (isr & WBSD_INT_CARD)
@@ -454,17 +468,6 @@ static void wbsd_send_command(struct wbsd_host* host, struct mmc_command* cmd)
 		}
 	}
 
-	/*
-	 * Restore interrupt mask to previous value.
-	 */
-	outb(eir, host->base + WBSD_EIR);
-	
-	/*
-	 * Call the interrupt routine to jump start
-	 * interrupts.
-	 */
-	wbsd_irq(0, host, NULL);
-
 	DBGF("Sent cmd (%x), res %d\n", cmd->opcode, cmd->error);
 }
 
@@ -476,6 +479,7 @@ static void wbsd_empty_fifo(struct wbsd_host* host)
 {
 	struct mmc_data* data = host->mrq->cmd->data;
 	char* buffer;
+	int i, fsr, fifo;
 	
 	/*
 	 * Handle excessive data.
@@ -489,60 +493,83 @@ static void wbsd_empty_fifo(struct wbsd_host* host)
 	 * Drain the fifo. This has a tendency to loop longer
 	 * than the FIFO length (usually one block).
 	 */
-	while (!(inb(host->base + WBSD_FSR) & WBSD_FIFO_EMPTY))
+	while (!((fsr = inb(host->base + WBSD_FSR)) & WBSD_FIFO_EMPTY))
 	{
-		*buffer = inb(host->base + WBSD_DFR);
-		buffer++;
-		host->offset++;
-		host->remain--;
+		/*
+		 * The size field in the FSR is broken so we have to
+		 * do some guessing.
+		 */		
+		if (fsr & WBSD_FIFO_FULL)
+			fifo = 16;
+		else if (fsr & WBSD_FIFO_FUTHRE)
+			fifo = 8;
+		else
+			fifo = 1;
+		
+		for (i = 0;i < fifo;i++)
+		{
+			*buffer = inb(host->base + WBSD_DFR);
+			buffer++;
+			host->offset++;
+			host->remain--;
 
-		data->bytes_xfered++;
-		
-		/*
-		 * Transfer done?
-		 */
-		if (data->bytes_xfered == host->size)
-		{
-			wbsd_kunmap_sg(host);				
-			return;
-		}
-		
-		/*
-		 * End of scatter list entry?
-		 */
-		if (host->remain == 0)
-		{
-			wbsd_kunmap_sg(host);
+			data->bytes_xfered++;
 			
 			/*
-			 * Get next entry. Check if last.
+			 * Transfer done?
 			 */
-			if (!wbsd_next_sg(host))
+			if (data->bytes_xfered == host->size)
 			{
-				/*
-				 * We should never reach this point.
-				 * It means that we're trying to
-				 * transfer more blocks than can fit
-				 * into the scatter list.
-				 */
-				BUG_ON(1);
-				
-				host->size = data->bytes_xfered;
-				
+				wbsd_kunmap_sg(host);				
 				return;
 			}
 			
-			buffer = wbsd_kmap_sg(host);
+			/*
+			 * End of scatter list entry?
+			 */
+			if (host->remain == 0)
+			{
+				wbsd_kunmap_sg(host);
+				
+				/*
+				 * Get next entry. Check if last.
+				 */
+				if (!wbsd_next_sg(host))
+				{
+					/*
+					 * We should never reach this point.
+					 * It means that we're trying to
+					 * transfer more blocks than can fit
+					 * into the scatter list.
+					 */
+					BUG_ON(1);
+					
+					host->size = data->bytes_xfered;
+					
+					return;
+				}
+				
+				buffer = wbsd_kmap_sg(host);
+			}
 		}
 	}
 	
 	wbsd_kunmap_sg(host);
+
+	/*
+	 * This is a very dirty hack to solve a
+	 * hardware problem. The chip doesn't trigger
+	 * FIFO threshold interrupts properly.
+	 */
+	if ((host->size - data->bytes_xfered) < 16)
+		tasklet_schedule(&host->fifo_tasklet);
 }
 
 static void wbsd_fill_fifo(struct wbsd_host* host)
 {
 	struct mmc_data* data = host->mrq->cmd->data;
 	char* buffer;
+	int i, fsr, fifo;
 	
 	/*
 	 * Check that we aren't being called after the
@@ -557,50 +584,64 @@ static void wbsd_fill_fifo(struct wbsd_host* host)
 	 * Fill the fifo. This has a tendency to loop longer
 	 * than the FIFO length (usually one block).
 	 */
-	while (!(inb(host->base + WBSD_FSR) & WBSD_FIFO_FULL))
+	while (!((fsr = inb(host->base + WBSD_FSR)) & WBSD_FIFO_FULL))
 	{
-		outb(*buffer, host->base + WBSD_DFR);
-		buffer++;
-		host->offset++;
-		host->remain--;
-		
-		data->bytes_xfered++;
-		
 		/*
-		 * Transfer done?
-		 */
-		if (data->bytes_xfered == host->size)
-		{
-			wbsd_kunmap_sg(host);
-			return;
-		}
+		 * The size field in the FSR is broken so we have to
+		 * do some guessing.
+		 */		
+		if (fsr & WBSD_FIFO_EMPTY)
+			fifo = 0;
+		else if (fsr & WBSD_FIFO_EMTHRE)
+			fifo = 8;
+		else
+			fifo = 15;
 
-		/*
-		 * End of scatter list entry?
-		 */
-		if (host->remain == 0)
+		for (i = 16;i > fifo;i--)
 		{
-			wbsd_kunmap_sg(host);
+			outb(*buffer, host->base + WBSD_DFR);
+			buffer++;
+			host->offset++;
+			host->remain--;
+			
+			data->bytes_xfered++;
 			
 			/*
-			 * Get next entry. Check if last.
+			 * Transfer done?
 			 */
-			if (!wbsd_next_sg(host))
+			if (data->bytes_xfered == host->size)
 			{
-				/*
-				 * We should never reach this point.
-				 * It means that we're trying to
-				 * transfer more blocks than can fit
-				 * into the scatter list.
-				 */
-				BUG_ON(1);
-				
-				host->size = data->bytes_xfered;
-				
+				wbsd_kunmap_sg(host);
 				return;
 			}
-			
-			buffer = wbsd_kmap_sg(host);
+
+			/*
+			 * End of scatter list entry?
+			 */
+			if (host->remain == 0)
+			{
+				wbsd_kunmap_sg(host);
+				
+				/*
+				 * Get next entry. Check if last.
+				 */
+				if (!wbsd_next_sg(host))
+				{
+					/*
+					 * We should never reach this point.
+					 * It means that we're trying to
+					 * transfer more blocks than can fit
+					 * into the scatter list.
+					 */
+					BUG_ON(1);
+					
+					host->size = data->bytes_xfered;
+					
+					return;
+				}
+				
+				buffer = wbsd_kmap_sg(host);
+			}
 		}
 	}
 	
@@ -687,9 +728,9 @@ static void wbsd_prepare_data(struct wbsd_host* host, struct mmc_data* data)
 		disable_dma(host->dma);
 		clear_dma_ff(host->dma);
 		if (data->flags & MMC_DATA_READ)
-			set_dma_mode(host->dma, DMA_MODE_READ);
+			set_dma_mode(host->dma, DMA_MODE_READ & ~0x40);
 		else
-			set_dma_mode(host->dma, DMA_MODE_WRITE);
+			set_dma_mode(host->dma, DMA_MODE_WRITE & ~0x40);
 		set_dma_addr(host->dma, host->dma_addr);
 		set_dma_count(host->dma, host->size);
 
@@ -699,8 +740,7 @@ static void wbsd_prepare_data(struct wbsd_host* host, struct mmc_data* data)
 		/*
 		 * Enable DMA on the host.
 		 */
-		wbsd_write_index(host, WBSD_IDX_DMA,
-			WBSD_DMA_SINGLE | WBSD_DMA_ENABLE);
+		wbsd_write_index(host, WBSD_IDX_DMA, WBSD_DMA_ENABLE);
 	}
 	else
 	{
@@ -744,6 +784,7 @@ static void wbsd_finish_data(struct wbsd_host* host, struct mmc_data* data)
 {
 	unsigned long dmaflags;
 	int count;
+	u8 status;
 	
 	WARN_ON(host->mrq == NULL);
 
@@ -752,6 +793,15 @@ static void wbsd_finish_data(struct wbsd_host* host, struct mmc_data* data)
 	 */
 	if (data->stop)
 		wbsd_send_command(host, data->stop);
+
+	/*
+	 * Wait for the controller to leave data
+	 * transfer state.
+	 */
+	do
+	{
+		status = wbsd_read_index(host, WBSD_IDX_STATUS);
+	} while (status & (WBSD_BLOCK_READ | WBSD_BLOCK_WRITE));
 	
 	/*
 	 * DMA transfer?
@@ -849,7 +899,13 @@ static void wbsd_request(struct mmc_host* mmc, struct mmc_request* mrq)
 	 * transfered.
 	 */	
 	if (cmd->data && (cmd->error == MMC_ERR_NONE))
-	{		
+	{
+		/*
+		 * Dirty fix for hardware bug.
+		 */
+		if (host->dma == -1)
+			tasklet_schedule(&host->fifo_tasklet);
+
 		spin_unlock_bh(&host->lock);
 
 		return;
@@ -1019,7 +1075,6 @@ static void wbsd_tasklet_crc(unsigned long param)
 	
 	spin_lock(&host->lock);
 	
-	WARN_ON(!host->mrq);
 	if (!host->mrq)
 		goto end;
 	
@@ -1044,7 +1099,6 @@ static void wbsd_tasklet_timeout(unsigned long param)
 	
 	spin_lock(&host->lock);
 	
-	WARN_ON(!host->mrq);
 	if (!host->mrq)
 		goto end;
 	
@@ -1124,6 +1178,8 @@ static irqreturn_t wbsd_irq(int irq, void *dev_id, struct pt_regs *regs)
 	 */
 	if (isr == 0xff || isr == 0x00)
 		return IRQ_NONE;
+	
+	host->isr |= isr;
 
 	/*
 	 * Schedule tasklets as needed.
@@ -1131,7 +1187,7 @@ static irqreturn_t wbsd_irq(int irq, void *dev_id, struct pt_regs *regs)
 	if (isr & WBSD_INT_CARD)
 		tasklet_schedule(&host->card_tasklet);
 	if (isr & WBSD_INT_FIFO_THRE)
-		tasklet_hi_schedule(&host->fifo_tasklet);
+		tasklet_schedule(&host->fifo_tasklet);
 	if (isr & WBSD_INT_CRC)
 		tasklet_hi_schedule(&host->crc_tasklet);
 	if (isr & WBSD_INT_TIMEOUT)
@@ -1390,8 +1446,8 @@ static int wbsd_probe(struct device* dev)
 	 * Maximum number of segments. Worst case is one sector per segment
 	 * so this will be 64kB/512.
 	 */
-	mmc->max_hw_segs = NR_SG;
-	mmc->max_phys_segs = NR_SG;
+	mmc->max_hw_segs = 128;
+	mmc->max_phys_segs = 128;
 	
 	/*
 	 * Maximum number of sectors in one transfer. Also limited by 64kB
@@ -1588,6 +1644,7 @@ module_param(dma, int, 0444);
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Winbond W83L51xD SD/MMC card interface driver");
+MODULE_VERSION(DRIVER_VERSION);
 
 MODULE_PARM_DESC(io, "I/O base to allocate. Must be 8 byte aligned. (default 0x248)");
 MODULE_PARM_DESC(irq, "IRQ to allocate. (default 6)");

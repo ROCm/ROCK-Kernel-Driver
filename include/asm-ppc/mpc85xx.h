@@ -103,6 +103,14 @@ extern unsigned char __res[];
 #define MPC85xx_CPM_SIZE	(0x40000)
 #define MPC85xx_DMA_OFFSET	(0x21000)
 #define MPC85xx_DMA_SIZE	(0x01000)
+#define MPC85xx_DMA0_OFFSET	(0x21100)
+#define MPC85xx_DMA0_SIZE	(0x00080)
+#define MPC85xx_DMA1_OFFSET	(0x21180)
+#define MPC85xx_DMA1_SIZE	(0x00080)
+#define MPC85xx_DMA2_OFFSET	(0x21200)
+#define MPC85xx_DMA2_SIZE	(0x00080)
+#define MPC85xx_DMA3_OFFSET	(0x21280)
+#define MPC85xx_DMA3_SIZE	(0x00080)
 #define MPC85xx_ENET1_OFFSET	(0x24000)
 #define MPC85xx_ENET1_SIZE	(0x01000)
 #define MPC85xx_ENET2_OFFSET	(0x25000)
@@ -138,6 +146,34 @@ extern phys_addr_t get_ccsrbar(void);
 #else
 #define CCSRBAR BOARD_CCSRBAR
 #endif
+
+enum ppc_sys_devices {
+	MPC85xx_TSEC1,
+	MPC85xx_TSEC2,
+	MPC85xx_FEC,
+	MPC85xx_IIC1,
+	MPC85xx_DMA0,
+	MPC85xx_DMA1,
+	MPC85xx_DMA2,
+	MPC85xx_DMA3,
+	MPC85xx_DUART,
+	MPC85xx_PERFMON,
+	MPC85xx_SEC2,
+	MPC85xx_CPM_SPI,
+	MPC85xx_CPM_I2C,
+	MPC85xx_CPM_USB,
+	MPC85xx_CPM_SCC1,
+	MPC85xx_CPM_SCC2,
+	MPC85xx_CPM_SCC3,
+	MPC85xx_CPM_SCC4,
+	MPC85xx_CPM_FCC1,
+	MPC85xx_CPM_FCC2,
+	MPC85xx_CPM_FCC3,
+	MPC85xx_CPM_MCC1,
+	MPC85xx_CPM_MCC2,
+	MPC85xx_CPM_SMC1,
+	MPC85xx_CPM_SMC2,
+};
 
 #endif /* CONFIG_85xx */
 #endif /* __ASM_MPC85xx_H__ */

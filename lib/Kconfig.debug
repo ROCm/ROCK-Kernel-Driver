@@ -49,7 +49,7 @@ config DEBUG_SLAB
 
 config DEBUG_PREEMPT
 	bool "Debug preemptible kernel"
-	depends on PREEMPT && (X86 || PPC64)
+	depends on PREEMPT
 	default y
 	help
 	  If you say Y here then the kernel will use a debug variant of the

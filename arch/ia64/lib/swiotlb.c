@@ -87,7 +87,7 @@ static unsigned char **io_tlb_orig_addr;
 /*
  * Protect the above data structures in the map and unmap calls
  */
-static spinlock_t io_tlb_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(io_tlb_lock);
 
 static int __init
 setup_io_tlb_npages(char *str)

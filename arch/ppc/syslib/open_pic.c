@@ -531,7 +531,7 @@ void openpic_reset_processor_phys(u_int mask)
 }
 
 #if defined(CONFIG_SMP) || defined(CONFIG_PM)
-static spinlock_t openpic_setup_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(openpic_setup_lock);
 #endif
 
 #ifdef CONFIG_SMP

@@ -67,12 +67,12 @@ union powernow_acpi_control_t {
 #endif
 
 #ifdef CONFIG_CPU_FREQ_DEBUG
-/* divide by 1000 to get VID. */
+/* divide by 1000 to get VCore voltage in V. */
 static int mobile_vid_table[32] = {
     2000, 1950, 1900, 1850, 1800, 1750, 1700, 1650,
     1600, 1550, 1500, 1450, 1400, 1350, 1300, 0,
     1275, 1250, 1225, 1200, 1175, 1150, 1125, 1100,
-    1075, 1050, 1024, 1000, 975, 950, 925, 0,
+    1075, 1050, 1025, 1000, 975, 950, 925, 0,
 };
 #endif
 

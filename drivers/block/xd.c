@@ -123,7 +123,7 @@ static unsigned int xd_bases[] __initdata =
 	0xE0000
 };
 
-static spinlock_t xd_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(xd_lock);
 
 static struct gendisk *xd_gendisk[2];
 

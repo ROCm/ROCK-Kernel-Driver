@@ -159,7 +159,7 @@ struct irqaction *irq_action[NR_IRQS] = {
 };
 
 /* Used to protect the IRQ action lists */
-spinlock_t irq_action_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(irq_action_lock);
 
 int show_interrupts(struct seq_file *p, void *v)
 {

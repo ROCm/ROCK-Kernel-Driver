@@ -54,7 +54,7 @@ struct timeval			nfssvc_boot;
 static struct svc_serv 		*nfsd_serv;
 static atomic_t			nfsd_busy;
 static unsigned long		nfsd_last_call;
-static spinlock_t		nfsd_call_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(nfsd_call_lock);
 
 struct nfsd_list {
 	struct list_head 	list;

@@ -58,7 +58,7 @@
 #if defined(CONFIG_MIPS_ITE8172) || defined(CONFIG_MIPS_IVR)
 void cstm_mips_ixx_set_vpp(struct map_info *map,int vpp)
 {
-	static spinlock_t vpp_lock = SPIN_LOCK_UNLOCKED;
+	static DEFINE_SPINLOCK(vpp_lock);
 	static int vpp_count = 0;
 	unsigned long flags;
 

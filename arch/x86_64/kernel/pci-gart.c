@@ -65,7 +65,7 @@ int iommu_bio_merge = 0;
 #define MAX_NB 8
 
 /* Allocation bitmap for the remapping area */ 
-static spinlock_t iommu_bitmap_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(iommu_bitmap_lock);
 static unsigned long *iommu_gart_bitmap; /* guarded by iommu_bitmap_lock */
 
 static u32 gart_unmapped_entry; 

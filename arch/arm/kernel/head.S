@@ -406,7 +406,7 @@ err_str:
  * calculate the offset.
  *
  * Returns:
- *	r3, r6 corrupted
+ *	r3, r4, r6 corrupted
  *	r5 = proc_info pointer in physical address space
  *	r9 = cpuid
  */
@@ -418,15 +418,24 @@ __lookup_processor_type:
 	add	r5, r5, r3			@ convert virt addresses to
 	add	r6, r6, r3			@ physical address space
 	mrc	p15, 0, r9, c0, c0		@ get processor id
-1:	ldmia	r5, {r3, r10}			@ value, mask
-	and	r10, r10, r9			@ mask wanted bits
-	teq	r3, r10
+1:	ldmia	r5, {r3, r4}			@ value, mask
+	and	r4, r4, r9			@ mask wanted bits
+	teq	r3, r4
 	beq	2f
 	add	r5, r5, #PROC_INFO_SZ		@ sizeof(proc_info_list)
 	cmp	r5, r6
 	blt	1b
 	mov	r5, #0				@ unknown processor
 2:	mov	pc, lr
+
+/*
+ * This provides a C-API version of the above function.
+ */
+ENTRY(lookup_processor_type)
+	stmfd	sp!, {r4 - r6, r9, lr}
+	bl	__lookup_processor_type
+	mov	r0, r5
+	ldmfd	sp!, {r4 - r6, r9, pc}
 
 /*
  * Look in include/asm-arm/procinfo.h and arch/arm/kernel/arch.[ch] for
@@ -464,3 +473,13 @@ __lookup_machine_type:
 	blt	1b
 	mov	r5, #0				@ unknown machine
 2:	mov	pc, lr
+
+/*
+ * This provides a C-API version of the above function.
+ */
+ENTRY(lookup_machine_type)
+	stmfd	sp!, {r4 - r6, lr}
+	mov	r1, r0
+	bl	__lookup_machine_type
+	mov	r0, r5
+	ldmfd	sp!, {r4 - r6, pc}

@@ -51,7 +51,7 @@ int dib3000_init_pid_list(struct dib3000_state *state, int num)
 			return -ENOMEM;
 
 		deb_info("initializing %d pids for the pid_list.\n",num);
-		state->pid_list_lock = SPIN_LOCK_UNLOCKED;
+		spin_lock_init(&state->pid_list_lock);
 		memset(state->pid_list,0,num*(sizeof(struct dib3000_pid)));
 		for (i=0; i < num; i++) {
 			state->pid_list[i].pid = 0;

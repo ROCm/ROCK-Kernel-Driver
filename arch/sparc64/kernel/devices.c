@@ -24,7 +24,7 @@
 /* Used to synchronize acceses to NatSemi SUPER I/O chip configure
  * operations in asm/ns87303.h
  */
-spinlock_t ns87303_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(ns87303_lock);
 
 extern void cpu_probe(void);
 extern void central_probe(void);

@@ -25,9 +25,9 @@ struct files_stat_struct files_stat = {
 EXPORT_SYMBOL(files_stat); /* Needed by unix.o */
 
 /* public. Not pretty! */
-spinlock_t __cacheline_aligned_in_smp files_lock = SPIN_LOCK_UNLOCKED;
+ __cacheline_aligned_in_smp DEFINE_SPINLOCK(files_lock);
 
-static spinlock_t filp_count_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(filp_count_lock);
 
 /* slab constructors and destructors are called from arbitrary
  * context and must be fully threaded - use a local spinlock

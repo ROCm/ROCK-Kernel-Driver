@@ -25,7 +25,7 @@
 
 #include "w1_family.h"
 
-spinlock_t w1_flock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(w1_flock);
 static LIST_HEAD(w1_families);
 
 static int w1_check_family(struct w1_family *f)

@@ -26,7 +26,7 @@ enum auxio_type {
 };
 
 static enum auxio_type auxio_devtype = AUXIO_TYPE_NODEV;
-static spinlock_t auxio_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(auxio_lock);
 
 static void __auxio_sbus_set(u8 bits_on, u8 bits_off)
 {

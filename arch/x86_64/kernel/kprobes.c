@@ -39,6 +39,8 @@
 #include <asm/pgtable.h>
 #include <asm/kdebug.h>
 
+static DECLARE_MUTEX(kprobe_mutex);
+
 /* kprobe_status settings */
 #define KPROBE_HIT_ACTIVE	0x00000001
 #define KPROBE_HIT_SS		0x00000002
@@ -75,17 +77,25 @@ static inline int is_IF_modifier(kprobe_opcode_t *insn)
 int arch_prepare_kprobe(struct kprobe *p)
 {
 	/* insn: must be on special executable page on x86_64. */
+	up(&kprobe_mutex);
 	p->ainsn.insn = get_insn_slot();
+	down(&kprobe_mutex);
 	if (!p->ainsn.insn) {
 		return -ENOMEM;
 	}
-	memcpy(p->ainsn.insn, p->addr, MAX_INSN_SIZE);
 	return 0;
+}
+
+void arch_copy_kprobe(struct kprobe *p)
+{
+	memcpy(p->ainsn.insn, p->addr, MAX_INSN_SIZE);
 }
 
 void arch_remove_kprobe(struct kprobe *p)
 {
+	up(&kprobe_mutex);
 	free_insn_slot(p->ainsn.insn);
+	down(&kprobe_mutex);
 }
 
 static inline void disarm_kprobe(struct kprobe *p, struct pt_regs *regs)
@@ -425,12 +435,12 @@ static kprobe_opcode_t *get_insn_slot(void)
 	}
 
 	/* All out of space.  Need to allocate a new page. Use slot 0.*/
-	kip = kmalloc(sizeof(struct kprobe_insn_page), GFP_ATOMIC);
+	kip = kmalloc(sizeof(struct kprobe_insn_page), GFP_KERNEL);
 	if (!kip) {
 		return NULL;
 	}
 	kip->insns = (kprobe_opcode_t*) __vmalloc(PAGE_SIZE,
-		GFP_ATOMIC|__GFP_HIGHMEM, __pgprot(__PAGE_KERNEL_EXEC));
+		GFP_KERNEL|__GFP_HIGHMEM, __pgprot(__PAGE_KERNEL_EXEC));
 	if (!kip->insns) {
 		kfree(kip);
 		return NULL;

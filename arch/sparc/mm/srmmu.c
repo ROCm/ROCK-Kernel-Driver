@@ -88,7 +88,7 @@ ctxd_t *srmmu_ctx_table_phys;
 ctxd_t *srmmu_context_table;
 
 int viking_mxcc_present;
-static spinlock_t srmmu_context_spinlock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(srmmu_context_spinlock);
 
 int is_hypersparc;
 

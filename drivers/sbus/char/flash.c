@@ -24,7 +24,7 @@
 #include <asm/ebus.h>
 #include <asm/upa.h>
 
-static spinlock_t flash_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(flash_lock);
 static struct {
 	unsigned long read_base;	/* Physical read address */
 	unsigned long write_base;	/* Physical write address */

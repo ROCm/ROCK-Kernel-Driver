@@ -40,9 +40,13 @@
 
 int arch_prepare_kprobe(struct kprobe *p)
 {
+	return 0;
+}
+
+void arch_copy_kprobe(struct kprobe *p)
+{
 	p->ainsn.insn[0] = *p->addr;
 	p->ainsn.insn[1] = BREAKPOINT_INSTRUCTION_2;
-	return 0;
 }
 
 void arch_remove_kprobe(struct kprobe *p)

@@ -25,6 +25,7 @@
 #include <linux/file.h>
 #include <linux/vfs.h>
 #include <linux/ioctl32.h>
+#include <linux/ioctl.h>
 #include <linux/init.h>
 #include <linux/sockios.h>	/* for SIOCDEVPRIVATE */
 #include <linux/smb.h>
@@ -47,6 +48,7 @@
 
 #include <asm/uaccess.h>
 #include <asm/mmu_context.h>
+#include <asm/ioctls.h>
 
 /*
  * Not all architectures have sys_utime, so implement this in terms
@@ -437,16 +439,41 @@ asmlinkage long compat_sys_ioctl(unsigned int fd, unsigned int cmd,
 	if (!filp)
 		goto out;
 
-	if (filp->f_op && filp->f_op->compat_ioctl) {
-		error = filp->f_op->compat_ioctl(filp, cmd, arg);
-		if (error != -ENOIOCTLCMD)
-			goto out_fput;
+	/*
+	 * To allow the compat_ioctl handlers to be self contained
+	 * we need to check the common ioctls here first.
+	 * Just handle them with the standard handlers below.
+	 */
+	switch (cmd) {
+	case FIOCLEX:
+	case FIONCLEX:
+	case FIONBIO:
+	case FIOASYNC:
+	case FIOQSIZE:
+		break;
+
+	case FIBMAP:
+	case FIGETBSZ:
+	case FIONREAD:
+		if (S_ISREG(filp->f_dentry->d_inode->i_mode))
+			break;
+		/*FALL THROUGH*/
+
+	default:
+		if (filp->f_op && filp->f_op->compat_ioctl) {
+			error = filp->f_op->compat_ioctl(filp, cmd, arg);
+			if (error != -ENOIOCTLCMD)
+				goto out_fput;
+		}
+
+		if (!filp->f_op ||
+		    (!filp->f_op->ioctl && !filp->f_op->unlocked_ioctl))
+			goto do_ioctl;
+		break;
 	}
 
-	if (!filp->f_op ||
-	    (!filp->f_op->ioctl && !filp->f_op->unlocked_ioctl))
-		goto do_ioctl;
-
+	/* When register_ioctl32_conversion is finally gone remove
+	   this lock! -AK */
 	down_read(&ioctl32_sem);
 	for (t = ioctl32_hash_table[ioctl32_hash(cmd)]; t; t = t->next) {
 		if (t->cmd == cmd)
@@ -454,7 +481,8 @@ asmlinkage long compat_sys_ioctl(unsigned int fd, unsigned int cmd,
 	}
 	up_read(&ioctl32_sem);
 
-	if (cmd >= SIOCDEVPRIVATE && cmd <= (SIOCDEVPRIVATE + 15)) {
+	if (S_ISSOCK(filp->f_dentry->d_inode->i_mode) &&
+	    cmd >= SIOCDEVPRIVATE && cmd <= (SIOCDEVPRIVATE + 15)) {
 		error = siocdevprivate_ioctl(fd, cmd, arg);
 	} else {
 		static int count;
@@ -468,6 +496,11 @@ asmlinkage long compat_sys_ioctl(unsigned int fd, unsigned int cmd,
 
  found_handler:
 	if (t->handler) {
+		/* RED-PEN how should LSM module know it's handling 32bit? */
+		error = security_file_ioctl(filp, cmd, arg);
+		if (error)
+			goto out_fput;
+
 		lock_kernel();
 		error = t->handler(fd, cmd, arg, filp);
 		unlock_kernel();

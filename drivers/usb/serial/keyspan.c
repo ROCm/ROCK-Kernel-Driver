@@ -374,7 +374,7 @@ static int keyspan_write(struct usb_serial_port *port,
 		flip = p_priv->out_flip;
 	
 		/* Check we have a valid urb/endpoint before we use it... */
-		if ((this_urb = p_priv->out_urbs[flip]) == 0) {
+		if ((this_urb = p_priv->out_urbs[flip]) == NULL) {
 			/* no bulk out, so return 0 bytes written */
 			dbg("%s - no output urb :(", __FUNCTION__);
 			return count;
@@ -1020,11 +1020,11 @@ static int keyspan_write_room (struct usb_serial_port *port)
 	flip = p_priv->out_flip;
 
 	/* Check both endpoints to see if any are available. */
-	if ((this_urb = p_priv->out_urbs[flip]) != 0) {
+	if ((this_urb = p_priv->out_urbs[flip]) != NULL) {
 		if (this_urb->status != -EINPROGRESS)
 			return (data_len);
 		flip = (flip + 1) & d_details->outdat_endp_flip;        
-		if ((this_urb = p_priv->out_urbs[flip]) != 0) 
+		if ((this_urb = p_priv->out_urbs[flip]) != NULL) 
 			if (this_urb->status != -EINPROGRESS)
 				return (data_len);
 	}

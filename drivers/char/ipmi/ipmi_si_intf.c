@@ -1299,7 +1299,7 @@ static int try_init_mem(int intf_num, struct smi_info **new_info)
 	memset(info, 0, sizeof(*info));
 
 	info->io_setup = mem_setup;
-	info->io.info = (void *) addrs[intf_num];
+	info->io.info = &addrs[intf_num];
 	info->io.addr = NULL;
 	info->io.regspacing = regspacings[intf_num];
 	if (!info->io.regspacing)
@@ -1587,8 +1587,9 @@ static int decode_dmi(dmi_header_t *dm, dmi_ipmi_data_t *ipmi_data)
 	case 0x01: /* 32-bit boundaries */
 		ipmi_data->offset = 4;
 		break;
-	case 0x02: /* 16-bit boundaries */
-		ipmi_data->offset = 2;
+	case 0x02: /* 16-byte boundaries */
+		ipmi_data->offset = 16;
+		break;
 	default:
 		printk("ipmi_si: Unknown SMBIOS IPMI Base Addr"
 		       " Modifier: 0x%x\n", reg_spacing);

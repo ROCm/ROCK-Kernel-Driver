@@ -54,7 +54,7 @@ icmp_unique_tuple(struct ip_conntrack_tuple *tuple,
 static int
 icmp_manip_pkt(struct sk_buff **pskb,
 	       unsigned int iphdroff,
-	       const struct ip_conntrack_manip *manip,
+	       const struct ip_conntrack_tuple *tuple,
 	       enum ip_nat_manip_type maniptype)
 {
 	struct iphdr *iph = (struct iphdr *)((*pskb)->data + iphdroff);
@@ -64,12 +64,12 @@ icmp_manip_pkt(struct sk_buff **pskb,
 	if (!skb_ip_make_writable(pskb, hdroff + sizeof(*hdr)))
 		return 0;
 
-	hdr = (void *)(*pskb)->data + hdroff;
+	hdr = (struct icmphdr *)((*pskb)->data + hdroff);
 
 	hdr->checksum = ip_nat_cheat_check(hdr->un.echo.id ^ 0xFFFF,
-					    manip->u.icmp.id,
+					    tuple->src.u.icmp.id,
 					    hdr->checksum);
-	hdr->un.echo.id = manip->u.icmp.id;
+	hdr->un.echo.id = tuple->src.u.icmp.id;
 	return 1;
 }
 

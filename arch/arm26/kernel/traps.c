@@ -171,7 +171,7 @@ void show_stack(struct task_struct *task, unsigned long *sp) {
 	dump_mem("Stack: ", (unsigned long)sp, 8192+(unsigned long)task->thread_info);
 }
 
-spinlock_t die_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(die_lock);
 
 /*
  * This function is protected against re-entrancy.

@@ -37,7 +37,7 @@
 #endif
 
 #ifdef CONFIG_PREEMPT
-spinlock_t kernel_flag = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(kernel_flag);
 #endif
 
 #if defined(CONFIG_FPE_NWFPE)

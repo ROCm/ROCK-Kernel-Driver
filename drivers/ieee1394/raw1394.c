@@ -71,7 +71,7 @@ printk(KERN_INFO "raw1394:" fmt "\n" , ## args)
 
 static LIST_HEAD(host_info_list);
 static int host_count;
-static spinlock_t host_info_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(host_info_lock);
 static atomic_t internal_generation = ATOMIC_INIT(0);
 
 static atomic_t iso_buffer_size;

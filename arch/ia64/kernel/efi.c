@@ -414,16 +414,15 @@ efi_memmap_walk (efi_freemem_callback_t callback, void *arg)
  * ITR to enable safe PAL calls in virtual mode.  See IA-64 Processor
  * Abstraction Layer chapter 11 in ADAG
  */
-void
-efi_map_pal_code (void)
+
+static efi_memory_desc_t *
+pal_code_memdesc (void)
 {
 	void *efi_map_start, *efi_map_end, *p;
 	efi_memory_desc_t *md;
 	u64 efi_desc_size;
 	int pal_code_count = 0;
-	u64 mask, psr;
-	u64 vaddr;
-	int cpu;
+	u64 vaddr, mask;
 
 	efi_map_start = __va(ia64_boot_param->efi_memmap);
 	efi_map_end   = efi_map_start + ia64_boot_param->efi_memmap_size;
@@ -467,29 +466,58 @@ efi_map_pal_code (void)
 		if (md->num_pages << EFI_PAGE_SHIFT > IA64_GRANULE_SIZE)
 			panic("Woah!  PAL code size bigger than a granule!");
 
-		mask  = ~((1 << IA64_GRANULE_SHIFT) - 1);
 #if EFI_DEBUG
+		mask  = ~((1 << IA64_GRANULE_SHIFT) - 1);
+
 		printk(KERN_INFO "CPU %d: mapping PAL code [0x%lx-0x%lx) into [0x%lx-0x%lx)\n",
-		       smp_processor_id(), md->phys_addr,
-		       md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT),
-		       vaddr & mask, (vaddr & mask) + IA64_GRANULE_SIZE);
+			smp_processor_id(), md->phys_addr,
+			md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT),
+			vaddr & mask, (vaddr & mask) + IA64_GRANULE_SIZE);
 #endif
+		return md;
+	}
+
+	return NULL;
+}
+
+void
+efi_get_pal_addr (void)
+{
+	efi_memory_desc_t *md = pal_code_memdesc();
+	u64 vaddr, mask;
+	struct cpuinfo_ia64 *cpuinfo;
+
+	if (md != NULL) {
+
+		vaddr = PAGE_OFFSET + md->phys_addr;
+		mask  = ~((1 << IA64_GRANULE_SHIFT) - 1);
+
+		cpuinfo = (struct cpuinfo_ia64 *)__va(ia64_get_kr(IA64_KR_PA_CPU_INFO));
+		cpuinfo->pal_base = vaddr & mask;
+		cpuinfo->pal_paddr = pte_val(mk_pte_phys(md->phys_addr, PAGE_KERNEL));
+	}
+}
+
+void
+efi_map_pal_code (void)
+{
+	efi_memory_desc_t *md = pal_code_memdesc();
+	u64 vaddr, mask, psr;
+
+	if (md != NULL) {
+
+		vaddr = PAGE_OFFSET + md->phys_addr;
+		mask  = ~((1 << IA64_GRANULE_SHIFT) - 1);
 
 		/*
 		 * Cannot write to CRx with PSR.ic=1
 		 */
 		psr = ia64_clear_ic();
 		ia64_itr(0x1, IA64_TR_PALCODE, vaddr & mask,
-			 pte_val(pfn_pte(md->phys_addr >> PAGE_SHIFT, PAGE_KERNEL)),
-			 IA64_GRANULE_SHIFT);
+			pte_val(pfn_pte(md->phys_addr >> PAGE_SHIFT, PAGE_KERNEL)),
+			IA64_GRANULE_SHIFT);
 		ia64_set_psr(psr);		/* restore psr */
 		ia64_srlz_i();
-
-		cpu = smp_processor_id();
-
-		/* insert this TR into our list for MCA recovery purposes */
-		ia64_mca_tlb_list[cpu].pal_base = vaddr & mask;
-		ia64_mca_tlb_list[cpu].pal_paddr = pte_val(mk_pte_phys(md->phys_addr, PAGE_KERNEL));
 	}
 }
 

@@ -41,7 +41,7 @@ MODULE_DESCRIPTION ("Linux for S/390 IUCV special message driver");
 
 static iucv_handle_t smsg_handle;
 static unsigned short smsg_pathid;
-static spinlock_t smsg_list_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(smsg_list_lock);
 static struct list_head smsg_list = LIST_HEAD_INIT(smsg_list);
 
 static void

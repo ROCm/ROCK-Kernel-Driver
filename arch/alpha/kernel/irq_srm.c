@@ -15,7 +15,7 @@
  * at the same time in multiple CPUs? To be safe I added a spinlock
  * but it can be removed trivially if the palcode is robust against smp.
  */
-spinlock_t srm_irq_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(srm_irq_lock);
 
 static inline void
 srm_enable_irq(unsigned int irq)

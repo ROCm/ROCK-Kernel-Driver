@@ -59,9 +59,9 @@
 struct bmac_data {
 	/* volatile struct bmac *bmac; */
 	struct sk_buff_head *queue;
-	volatile struct dbdma_regs *tx_dma;
+	volatile struct dbdma_regs __iomem *tx_dma;
 	int tx_dma_intr;
-	volatile struct dbdma_regs *rx_dma;
+	volatile struct dbdma_regs __iomem *rx_dma;
 	int rx_dma_intr;
 	volatile struct dbdma_cmd *tx_cmds;	/* xmit dma command list */
 	volatile struct dbdma_cmd *rx_cmds;	/* recv dma command list */
@@ -165,35 +165,35 @@ static void bmac_start(struct net_device *dev);
 #define	DBDMA_CLEAR(x)	( (x) << 16)
 
 static inline void
-dbdma_st32(volatile unsigned long *a, unsigned long x)
+dbdma_st32(volatile __u32 __iomem *a, unsigned long x)
 {
 	__asm__ volatile( "stwbrx %0,0,%1" : : "r" (x), "r" (a) : "memory");
 	return;
 }
 
 static inline unsigned long
-dbdma_ld32(volatile unsigned long *a)
+dbdma_ld32(volatile __u32 __iomem *a)
 {
-	unsigned long swap;
+	__u32 swap;
 	__asm__ volatile ("lwbrx %0,0,%1" :  "=r" (swap) : "r" (a));
 	return swap;
 }
 
 static void
-dbdma_continue(volatile struct dbdma_regs *dmap)
+dbdma_continue(volatile struct dbdma_regs __iomem *dmap)
 {
-	dbdma_st32((volatile unsigned long *)&dmap->control,
+	dbdma_st32(&dmap->control,
 		   DBDMA_SET(RUN|WAKE) | DBDMA_CLEAR(PAUSE|DEAD));
 	eieio();
 }
 
 static void
-dbdma_reset(volatile struct dbdma_regs *dmap)
+dbdma_reset(volatile struct dbdma_regs __iomem *dmap)
 {
-	dbdma_st32((volatile unsigned long *)&dmap->control,
+	dbdma_st32(&dmap->control,
 		   DBDMA_CLEAR(ACTIVE|DEAD|WAKE|FLUSH|PAUSE|RUN));
 	eieio();
-	while (dbdma_ld32((volatile unsigned long *)&dmap->status) & RUN)
+	while (dbdma_ld32(&dmap->status) & RUN)
 		eieio();
 }
 
@@ -213,22 +213,22 @@ dbdma_setcmd(volatile struct dbdma_cmd *cp,
 static inline
 void bmwrite(struct net_device *dev, unsigned long reg_offset, unsigned data )
 {
-	out_le16((void *)dev->base_addr + reg_offset, data);
+	out_le16((void __iomem *)dev->base_addr + reg_offset, data);
 }
 
 
 static inline
 volatile unsigned short bmread(struct net_device *dev, unsigned long reg_offset )
 {
-	return in_le16((void *)dev->base_addr + reg_offset);
+	return in_le16((void __iomem *)dev->base_addr + reg_offset);
 }
 
 static void
 bmac_enable_and_reset_chip(struct net_device *dev)
 {
 	struct bmac_data *bp = netdev_priv(dev);
-	volatile struct dbdma_regs *rd = bp->rx_dma;
-	volatile struct dbdma_regs *td = bp->tx_dma;
+	volatile struct dbdma_regs __iomem *rd = bp->rx_dma;
+	volatile struct dbdma_regs __iomem *td = bp->tx_dma;
 
 	if (rd)
 		dbdma_reset(rd);
@@ -406,7 +406,7 @@ static void
 bmac_start_chip(struct net_device *dev)
 {
 	struct bmac_data *bp = netdev_priv(dev);
-	volatile struct dbdma_regs *rd = bp->rx_dma;
+	volatile struct dbdma_regs __iomem *rd = bp->rx_dma;
 	unsigned short	oldConfig;
 
 	/* enable rx dma channel */
@@ -476,8 +476,8 @@ static int bmac_suspend(struct macio_dev *mdev, u32 state)
 	bp->sleeping = 1;
 	spin_unlock_irqrestore(&bp->lock, flags);
 	if (bp->opened) {
-		volatile struct dbdma_regs *rd = bp->rx_dma;
-		volatile struct dbdma_regs *td = bp->tx_dma;
+		volatile struct dbdma_regs __iomem *rd = bp->rx_dma;
+		volatile struct dbdma_regs __iomem *td = bp->tx_dma;
 			
 		config = bmread(dev, RXCFG);
 		bmwrite(dev, RXCFG, (config & ~RxMACEnable));
@@ -602,7 +602,7 @@ bitrev(unsigned char b)
 static void
 bmac_init_tx_ring(struct bmac_data *bp)
 {
-	volatile struct dbdma_regs *td = bp->tx_dma;
+	volatile struct dbdma_regs __iomem *td = bp->tx_dma;
 
 	memset((char *)bp->tx_cmds, 0, (N_TX_RING+1) * sizeof(struct dbdma_cmd));
 
@@ -623,7 +623,7 @@ bmac_init_tx_ring(struct bmac_data *bp)
 static int
 bmac_init_rx_ring(struct bmac_data *bp)
 {
-	volatile struct dbdma_regs *rd = bp->rx_dma;
+	volatile struct dbdma_regs __iomem *rd = bp->rx_dma;
 	int i;
 	struct sk_buff *skb;
 
@@ -657,7 +657,7 @@ bmac_init_rx_ring(struct bmac_data *bp)
 static int bmac_transmit_packet(struct sk_buff *skb, struct net_device *dev)
 {
 	struct bmac_data *bp = netdev_priv(dev);
-	volatile struct dbdma_regs *td = bp->tx_dma;
+	volatile struct dbdma_regs __iomem *td = bp->tx_dma;
 	int i;
 
 	/* see if there's a free slot in the tx ring */
@@ -693,7 +693,7 @@ static irqreturn_t bmac_rxdma_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *) dev_id;
 	struct bmac_data *bp = netdev_priv(dev);
-	volatile struct dbdma_regs *rd = bp->rx_dma;
+	volatile struct dbdma_regs __iomem *rd = bp->rx_dma;
 	volatile struct dbdma_cmd *cp;
 	int i, nb, stat;
 	struct sk_buff *skb;
@@ -1331,13 +1331,11 @@ static int __devinit bmac_probe(struct macio_dev *mdev, const struct of_match *m
 		goto err_out_iounmap;
 
 	bp->is_bmac_plus = is_bmac_plus;
-	bp->tx_dma = (volatile struct dbdma_regs *)
-		ioremap(macio_resource_start(mdev, 1), macio_resource_len(mdev, 1));
+	bp->tx_dma = ioremap(macio_resource_start(mdev, 1), macio_resource_len(mdev, 1));
 	if (!bp->tx_dma)
 		goto err_out_iounmap;
 	bp->tx_dma_intr = macio_irq(mdev, 1);
-	bp->rx_dma = (volatile struct dbdma_regs *)
-		ioremap(macio_resource_start(mdev, 2), macio_resource_len(mdev, 2));
+	bp->rx_dma = ioremap(macio_resource_start(mdev, 2), macio_resource_len(mdev, 2));
 	if (!bp->rx_dma)
 		goto err_out_iounmap_tx;
 	bp->rx_dma_intr = macio_irq(mdev, 2);
@@ -1392,11 +1390,11 @@ err_out_irq1:
 err_out_irq0:
 	free_irq(dev->irq, dev);
 err_out_iounmap_rx:
-	iounmap((void *)bp->rx_dma);
+	iounmap(bp->rx_dma);
 err_out_iounmap_tx:
-	iounmap((void *)bp->tx_dma);
+	iounmap(bp->tx_dma);
 err_out_iounmap:
-	iounmap((void *)dev->base_addr);
+	iounmap((void __iomem *)dev->base_addr);
 out_release:
 	macio_release_resources(mdev);
 out_free:
@@ -1421,8 +1419,8 @@ static int bmac_open(struct net_device *dev)
 static int bmac_close(struct net_device *dev)
 {
 	struct bmac_data *bp = netdev_priv(dev);
-	volatile struct dbdma_regs *rd = bp->rx_dma;
-	volatile struct dbdma_regs *td = bp->tx_dma;
+	volatile struct dbdma_regs __iomem *rd = bp->rx_dma;
+	volatile struct dbdma_regs __iomem *td = bp->tx_dma;
 	unsigned short config;
 	int i;
 
@@ -1505,8 +1503,8 @@ static void bmac_tx_timeout(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *) data;
 	struct bmac_data *bp = netdev_priv(dev);
-	volatile struct dbdma_regs *td = bp->tx_dma;
-	volatile struct dbdma_regs *rd = bp->rx_dma;
+	volatile struct dbdma_regs __iomem *td = bp->tx_dma;
+	volatile struct dbdma_regs __iomem *rd = bp->rx_dma;
 	volatile struct dbdma_cmd *cp;
 	unsigned long flags;
 	unsigned short config, oldConfig;
@@ -1638,9 +1636,9 @@ static int __devexit bmac_remove(struct macio_dev *mdev)
 	free_irq(bp->tx_dma_intr, dev);	
 	free_irq(bp->rx_dma_intr, dev);
 
-	iounmap((void *)dev->base_addr);
-	iounmap((void *)bp->tx_dma);
-	iounmap((void *)bp->rx_dma);
+	iounmap((void __iomem *)dev->base_addr);
+	iounmap(bp->tx_dma);
+	iounmap(bp->rx_dma);
 
 	macio_release_resources(mdev);
 

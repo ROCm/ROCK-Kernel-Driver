@@ -79,7 +79,6 @@ typedef struct {
 #define RW_LOCK_BIAS		0x01000000
 #define RW_LOCK_UNLOCKED	(rwlock_t) { { 0 }, { RW_LOCK_BIAS } }
 #define rwlock_init(x)		do { *(x) = RW_LOCK_UNLOCKED; } while (0)
-#define rwlock_is_locked(x)	(atomic_read(&(x)->counter) != RW_LOCK_BIAS)
 
 static inline void _raw_read_lock(rwlock_t *rw)
 {

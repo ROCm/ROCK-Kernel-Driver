@@ -27,10 +27,6 @@
 #include <linux/if_fc.h>
 
 #ifdef __KERNEL__
-extern int		fc_header(struct sk_buff *skb, struct net_device *dev,
-				   unsigned short type, void *daddr,
-				   void *saddr, unsigned len);
-extern int		fc_rebuild_header(struct sk_buff *skb);
 extern unsigned short	fc_type_trans(struct sk_buff *skb, struct net_device *dev); 
 
 extern struct net_device *alloc_fcdev(int sizeof_priv);

@@ -424,7 +424,7 @@ static int			broken_psr;
 static DECLARE_WAIT_QUEUE_HEAD(apm_waitqueue);
 static DECLARE_WAIT_QUEUE_HEAD(apm_suspend_waitqueue);
 static struct apm_user *	user_list;
-static spinlock_t		user_list_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(user_list_lock);
 static struct desc_struct	bad_bios_desc = { 0, 0x00409200 };
 
 static char			driver_version[] = "1.16ac";	/* no spaces */

@@ -40,7 +40,7 @@
 #include <asm/mach/time.h>
 #include <asm/mach/irq.h>
 
-static spinlock_t ixp2000_slowport_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(ixp2000_slowport_lock);
 static unsigned long ixp2000_slowport_irq_flags;
 
 /*************************************************************************
@@ -171,22 +171,9 @@ static unsigned next_jiffy_time;
 
 unsigned long ixp2000_gettimeoffset (void)
 {
- 	unsigned long elapsed1, elapsed2, pending;
  	unsigned long offset;
 
-	elapsed1 = *IXP2000_T1_CSR;
- 	pending = (*IXP2000_IRQ_STATUS & IRQ_MASK_TIMER1);
- 	elapsed2 = *IXP2000_T1_CSR;
-
- 	offset = ticks_per_jiffy - elapsed2;
-
- 	/*
- 	 * We have two cases to cover, one where we were pending
-   	 * already, and another where it overflowed while we were
-   	 * checking the timers.
-   	 */
- 	if ((elapsed2 > elapsed1) || pending)
- 		offset += ticks_per_jiffy;
+	offset = next_jiffy_time - *IXP2000_T4_CSR;
 
 	return offset / ticks_per_usec;
 }

@@ -4,6 +4,7 @@
 
 #include <linux/pci.h>
 #include <linux/init.h>
+#include <linux/nodemask.h>
 #include "pci.h"
 
 #define BUS2QUAD(global) (mp_bus_id_to_node[global])

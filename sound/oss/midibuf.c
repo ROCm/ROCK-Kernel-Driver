@@ -53,7 +53,7 @@ static void midi_poll(unsigned long dummy);
 static struct timer_list poll_timer = TIMER_INITIALIZER(midi_poll, 0, 0);
 
 static volatile int open_devs;
-static spinlock_t lock=SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(lock);
 
 #define DATA_AVAIL(q) (q->len)
 #define SPACE_AVAIL(q) (MAX_QUEUE_SIZE - q->len)

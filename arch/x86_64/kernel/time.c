@@ -49,8 +49,8 @@ static void cpufreq_delayed_get(void);
 
 extern int using_apic_timer;
 
-spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
-spinlock_t i8253_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(rtc_lock);
+DEFINE_SPINLOCK(i8253_lock);
 
 static int nohpet __initdata = 0;
 static int notsc __initdata = 0;

@@ -1176,55 +1176,23 @@ static inline int tcp_skb_mss(const struct sk_buff *skb)
 	return skb_shinfo(skb)->tso_size;
 }
 
-static inline void tcp_inc_pcount(tcp_pcount_t *count,
-				  const struct sk_buff *skb)
-{
-	count->val += tcp_skb_pcount(skb);
-}
-
-static inline void tcp_inc_pcount_explicit(tcp_pcount_t *count, int amt)
-{
-	count->val += amt;
-}
-
-static inline void tcp_dec_pcount_explicit(tcp_pcount_t *count, int amt)
-{
-	count->val -= amt;
-}
-
-static inline void tcp_dec_pcount(tcp_pcount_t *count, 
-				  const struct sk_buff *skb)
-{
-	count->val -= tcp_skb_pcount(skb);
-}
-
-static inline void tcp_dec_pcount_approx(tcp_pcount_t *count,
+static inline void tcp_dec_pcount_approx(__u32 *count,
 					 const struct sk_buff *skb)
 {
-	if (count->val) {
-		count->val -= tcp_skb_pcount(skb);
-		if ((int)count->val < 0)
-			count->val = 0;
+	if (*count) {
+		*count -= tcp_skb_pcount(skb);
+		if ((int)*count < 0)
+			*count = 0;
 	}
-}
-
-static inline __u32 tcp_get_pcount(const tcp_pcount_t *count)
-{
-	return count->val;
-}
-
-static inline void tcp_set_pcount(tcp_pcount_t *count, __u32 val)
-{
-	count->val = val;
 }
 
 static inline void tcp_packets_out_inc(struct sock *sk, 
 				       struct tcp_sock *tp,
 				       const struct sk_buff *skb)
 {
-	int orig = tcp_get_pcount(&tp->packets_out);
+	int orig = tp->packets_out;
 
-	tcp_inc_pcount(&tp->packets_out, skb);
+	tp->packets_out += tcp_skb_pcount(skb);
 	if (!orig)
 		tcp_reset_xmit_timer(sk, TCP_TIME_RETRANS, tp->rto);
 }
@@ -1232,7 +1200,7 @@ static inline void tcp_packets_out_inc(struct sock *sk,
 static inline void tcp_packets_out_dec(struct tcp_sock *tp, 
 				       const struct sk_buff *skb)
 {
-	tcp_dec_pcount(&tp->packets_out, skb);
+	tp->packets_out -= tcp_skb_pcount(skb);
 }
 
 /* This determines how many packets are "in the network" to the best
@@ -1251,9 +1219,7 @@ static inline void tcp_packets_out_dec(struct tcp_sock *tp,
  */
 static __inline__ unsigned int tcp_packets_in_flight(const struct tcp_sock *tp)
 {
-	return (tcp_get_pcount(&tp->packets_out) -
-		tcp_get_pcount(&tp->left_out) +
-		tcp_get_pcount(&tp->retrans_out));
+	return (tp->packets_out - tp->left_out + tp->retrans_out);
 }
 
 /*
@@ -1357,14 +1323,9 @@ static inline __u32 tcp_current_ssthresh(struct tcp_sock *tp)
 static inline void tcp_sync_left_out(struct tcp_sock *tp)
 {
 	if (tp->sack_ok &&
-	    (tcp_get_pcount(&tp->sacked_out) >=
-	     tcp_get_pcount(&tp->packets_out) - tcp_get_pcount(&tp->lost_out)))
-		tcp_set_pcount(&tp->sacked_out,
-			       (tcp_get_pcount(&tp->packets_out) -
-				tcp_get_pcount(&tp->lost_out)));
-	tcp_set_pcount(&tp->left_out,
-		       (tcp_get_pcount(&tp->sacked_out) +
-			tcp_get_pcount(&tp->lost_out)));
+	    (tp->sacked_out >= tp->packets_out - tp->lost_out))
+		tp->sacked_out = tp->packets_out - tp->lost_out;
+	tp->left_out = tp->sacked_out + tp->lost_out;
 }
 
 extern void tcp_cwnd_application_limited(struct sock *sk);
@@ -1373,7 +1334,7 @@ extern void tcp_cwnd_application_limited(struct sock *sk);
 
 static inline void tcp_cwnd_validate(struct sock *sk, struct tcp_sock *tp)
 {
-	__u32 packets_out = tcp_get_pcount(&tp->packets_out);
+	__u32 packets_out = tp->packets_out;
 
 	if (packets_out >= tp->snd_cwnd) {
 		/* Network is feed fully. */
@@ -1381,8 +1342,8 @@ static inline void tcp_cwnd_validate(struct sock *sk, struct tcp_sock *tp)
 		tp->snd_cwnd_stamp = tcp_time_stamp;
 	} else {
 		/* Network starves. */
-		if (tcp_get_pcount(&tp->packets_out) > tp->snd_cwnd_used)
-			tp->snd_cwnd_used = tcp_get_pcount(&tp->packets_out);
+		if (tp->packets_out > tp->snd_cwnd_used)
+			tp->snd_cwnd_used = tp->packets_out;
 
 		if ((s32)(tcp_time_stamp - tp->snd_cwnd_stamp) >= tp->rto)
 			tcp_cwnd_application_limited(sk);
@@ -1450,7 +1411,7 @@ tcp_nagle_check(const struct tcp_sock *tp, const struct sk_buff *skb,
 		!(TCP_SKB_CB(skb)->flags & TCPCB_FLAG_FIN) &&
 		((nonagle&TCP_NAGLE_CORK) ||
 		 (!nonagle &&
-		  tcp_get_pcount(&tp->packets_out) &&
+		  tp->packets_out &&
 		  tcp_minshall_check(tp))));
 }
 
@@ -1503,7 +1464,7 @@ static __inline__ int tcp_snd_test(const struct tcp_sock *tp,
 
 static __inline__ void tcp_check_probe_timer(struct sock *sk, struct tcp_sock *tp)
 {
-	if (!tcp_get_pcount(&tp->packets_out) && !tp->pending)
+	if (!tp->packets_out && !tp->pending)
 		tcp_reset_xmit_timer(sk, TCP_TIME_PROBE0, tp->rto);
 }
 

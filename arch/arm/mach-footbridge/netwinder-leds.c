@@ -32,7 +32,7 @@
 static char led_state;
 static char hw_led_state;
 
-static spinlock_t leds_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(leds_lock);
 extern spinlock_t gpio_lock;
 
 static void netwinder_leds_event(led_event_t evt)

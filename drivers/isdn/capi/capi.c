@@ -143,11 +143,11 @@ struct capidev {
 
 /* -------- global variables ---------------------------------------- */
 
-static rwlock_t capidev_list_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(capidev_list_lock);
 static LIST_HEAD(capidev_list);
 
 #ifdef CONFIG_ISDN_CAPI_MIDDLEWARE
-static rwlock_t capiminor_list_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(capiminor_list_lock);
 static LIST_HEAD(capiminor_list);
 #endif /* CONFIG_ISDN_CAPI_MIDDLEWARE */
 

@@ -45,7 +45,7 @@
 int (*ioapic_renumber_irq)(int ioapic, int irq);
 atomic_t irq_mis_count;
 
-static spinlock_t ioapic_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(ioapic_lock);
 
 /*
  *	Is the SiS APIC rmw bug present ?

@@ -52,7 +52,7 @@ module_param_named(timeout, w1_timeout, int, 0);
 module_param_named(max_slave_count, w1_max_slave_count, int, 0);
 module_param_named(slave_ttl, w1_max_slave_ttl, int, 0);
 
-spinlock_t w1_mlock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(w1_mlock);
 LIST_HEAD(w1_masters);
 
 static pid_t control_thread;
@@ -467,17 +467,75 @@ static void w1_slave_detach(struct w1_slave *sl)
 	w1_netlink_send(sl->master, &msg);
 }
 
-static void w1_search(struct w1_master *dev)
+static struct w1_master *w1_search_master(unsigned long data)
+{
+	struct w1_master *dev;
+	int found = 0;
+	
+	spin_lock_irq(&w1_mlock);
+	list_for_each_entry(dev, &w1_masters, w1_master_entry) {
+		if (dev->bus_master->data == data) {
+			found = 1;
+			atomic_inc(&dev->refcnt);
+			break;
+		}
+	}
+	spin_unlock_irq(&w1_mlock);
+
+	return (found)?dev:NULL;
+}
+
+void w1_slave_found(unsigned long data, u64 rn)
+{
+	int slave_count;
+	struct w1_slave *sl;
+	struct list_head *ent;
+	struct w1_reg_num *tmp;
+	int family_found = 0;
+	struct w1_master *dev;
+
+	dev = w1_search_master(data);
+	if (!dev) {
+		printk(KERN_ERR "Failed to find w1 master device for data %08lx, it is impossible.\n",
+				data);
+		return;
+	}
+	
+	tmp = (struct w1_reg_num *) &rn;
+
+	slave_count = 0;
+	list_for_each(ent, &dev->slist) {
+
+		sl = list_entry(ent, struct w1_slave, w1_slave_entry);
+
+		if (sl->reg_num.family == tmp->family &&
+		    sl->reg_num.id == tmp->id &&
+		    sl->reg_num.crc == tmp->crc) {
+			set_bit(W1_SLAVE_ACTIVE, (long *)&sl->flags);
+			break;
+		}
+		else if (sl->reg_num.family == tmp->family) {
+			family_found = 1;
+			break;
+		}
+
+		slave_count++;
+	}
+
+	if (slave_count == dev->slave_count &&
+		rn && ((rn >> 56) & 0xff) == w1_calc_crc8((u8 *)&rn, 7)) {
+		w1_attach_slave_device(dev, (struct w1_reg_num *) &rn);
+	}
+			
+	atomic_dec(&dev->refcnt);
+}
+
+void w1_search(struct w1_master *dev)
 {
 	u64 last, rn, tmp;
-	int i, count = 0, slave_count;
+	int i, count = 0;
 	int last_family_desc, last_zero, last_device;
 	int search_bit, id_bit, comp_bit, desc_bit;
-	struct list_head *ent;
-	struct w1_slave *sl;
-	int family_found = 0;
-
-	dev->attempts++;
 
 	search_bit = id_bit = comp_bit = 0;
 	rn = tmp = last = 0;
@@ -555,33 +613,8 @@ static void w1_search(struct w1_master *dev)
 			last_device = 1;
 
 		desc_bit = last_zero;
-
-		slave_count = 0;
-		list_for_each(ent, &dev->slist) {
-			struct w1_reg_num *tmp;
-
-			tmp = (struct w1_reg_num *) &rn;
-
-			sl = list_entry(ent, struct w1_slave, w1_slave_entry);
-
-			if (sl->reg_num.family == tmp->family &&
-			    sl->reg_num.id == tmp->id &&
-			    sl->reg_num.crc == tmp->crc) {
-				set_bit(W1_SLAVE_ACTIVE, (long *)&sl->flags);
-				break;
-			}
-			else if (sl->reg_num.family == tmp->family) {
-				family_found = 1;
-				break;
-			}
-
-			slave_count++;
-		}
-
-		if (slave_count == dev->slave_count &&
-			rn && ((rn >> 56) & 0xff) == w1_calc_crc8((u8 *)&rn, 7)) {
-			w1_attach_slave_device(dev, (struct w1_reg_num *) &rn);
-		}
+	
+		w1_slave_found(dev->bus_master->data, rn);
 	}
 }
 
@@ -721,8 +754,8 @@ int w1_process(void *data)
 				clear_bit(W1_SLAVE_ACTIVE, (long *)&sl->flags);
 		}
 		
-      		w1_search(dev);
-		
+		w1_search_devices(dev, w1_slave_found);
+
 		list_for_each_safe(ent, n, &dev->slist) {
 			sl = list_entry(ent, struct w1_slave, w1_slave_entry);
 

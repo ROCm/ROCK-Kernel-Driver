@@ -178,7 +178,7 @@ ppp_print_buffer (const char *name, const __u8 *buf, int count)
  *
  * FIXME: Fixed in tty_io nowdays.
  */
-static rwlock_t disc_data_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(disc_data_lock);
 
 static struct syncppp *sp_get(struct tty_struct *tty)
 {

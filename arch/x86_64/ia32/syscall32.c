@@ -55,7 +55,7 @@ int __map_syscall32(struct mm_struct *mm, unsigned long address)
  			if (pte_none(*pte)) {
  				set_pte(pte,
  					mk_pte(virt_to_page(syscall32_page),
- 					       PAGE_KERNEL_VSYSCALL));
+ 					       PAGE_KERNEL_VSYSCALL32));
  			}
  			/* Flush only the local CPU. Other CPUs taking a fault
  			   will just end up here again

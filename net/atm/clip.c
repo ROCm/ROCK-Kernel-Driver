@@ -97,7 +97,7 @@ static void unlink_clip_vcc(struct clip_vcc *clip_vcc)
 		printk(KERN_CRIT "!clip_vcc->entry (clip_vcc %p)\n",clip_vcc);
 		return;
 	}
-	spin_lock_bh(&entry->neigh->dev->xmit_lock);	/* block clip_start_xmit() */
+	spin_lock_irq(&entry->neigh->dev->xmit_lock);	/* block clip_start_xmit() */
 	entry->neigh->used = jiffies;
 	for (walk = &entry->vccs; *walk; walk = &(*walk)->next)
 		if (*walk == clip_vcc) {
@@ -121,7 +121,7 @@ static void unlink_clip_vcc(struct clip_vcc *clip_vcc)
 	printk(KERN_CRIT "ATMARP: unlink_clip_vcc failed (entry %p, vcc "
 	  "0x%p)\n",entry,clip_vcc);
 out:
-	spin_unlock_bh(&entry->neigh->dev->xmit_lock);
+	spin_unlock_irq(&entry->neigh->dev->xmit_lock);
 }
 
 /* The neighbour entry n->lock is held. */

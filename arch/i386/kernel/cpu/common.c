@@ -504,7 +504,7 @@ void __init print_cpu_info(struct cpuinfo_x86 *c)
 		printk("\n");
 }
 
-unsigned long cpu_initialized __initdata = 0;
+cpumask_t cpu_initialized __initdata = CPU_MASK_NONE;
 
 /* This is hacky. :)
  * We're emulating future behavior.
@@ -558,7 +558,7 @@ void __init cpu_init (void)
 	struct tss_struct * t = &per_cpu(init_tss, cpu);
 	struct thread_struct *thread = &current->thread;
 
-	if (test_and_set_bit(cpu, &cpu_initialized)) {
+	if (cpu_test_and_set(cpu, cpu_initialized)) {
 		printk(KERN_WARNING "CPU#%d already initialized!\n", cpu);
 		for (;;) local_irq_enable();
 	}

@@ -770,6 +770,7 @@ extern int task_nice(const task_t *p);
 extern int task_curr(const task_t *p);
 extern int idle_cpu(int cpu);
 extern int sched_setscheduler(struct task_struct *, int, struct sched_param *);
+extern task_t *idle_task(int cpu);
 
 void yield(void);
 

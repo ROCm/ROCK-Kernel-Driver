@@ -38,10 +38,10 @@
 /* Protect struct usb_device->state and ->children members
  * Note: Both are also protected by ->serialize, except that ->state can
  * change to USB_STATE_NOTATTACHED even when the semaphore isn't held. */
-static spinlock_t device_state_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(device_state_lock);
 
 /* khubd's worklist and its lock */
-static spinlock_t hub_event_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(hub_event_lock);
 static LIST_HEAD(hub_event_list);	/* List of hubs needing servicing */
 
 /* Wakes up khubd */
@@ -404,7 +404,7 @@ void usb_hub_tt_clear_buffer (struct usb_device *udev, int pipe)
 	 * since each TT has "at least two" buffers that can need it (and
 	 * there can be many TTs per hub).  even if they're uncommon.
 	 */
-	if ((clear = kmalloc (sizeof *clear, SLAB_ATOMIC)) == 0) {
+	if ((clear = kmalloc (sizeof *clear, SLAB_ATOMIC)) == NULL) {
 		dev_err (&udev->dev, "can't save CLEAR_TT_BUFFER state\n");
 		/* FIXME recover somehow ... RESET_TT? */
 		return;
@@ -1617,7 +1617,6 @@ int __usb_suspend_device (struct usb_device *udev, int port1, u32 state)
 		udev->dev.power.power_state = state;
 	return status;
 }
-EXPORT_SYMBOL(__usb_suspend_device);
 
 /**
  * usb_suspend_device - suspend a usb device
@@ -2299,7 +2298,7 @@ check_highspeed (struct usb_hub *hub, struct usb_device *udev, int port1)
 	int				status;
 
 	qual = kmalloc (sizeof *qual, SLAB_KERNEL);
-	if (qual == 0)
+	if (qual == NULL)
 		return;
 
 	status = usb_get_descriptor (udev, USB_DT_DEVICE_QUALIFIER, 0,
@@ -2830,7 +2829,7 @@ static int config_descriptors_changed(struct usb_device *udev)
 			len = le16_to_cpu(udev->config[index].desc.wTotalLength);
 	}
 	buf = kmalloc (len, SLAB_KERNEL);
-	if (buf == 0) {
+	if (buf == NULL) {
 		dev_err(&udev->dev, "no mem to re-read configs after reset\n");
 		/* assume the worst */
 		return 1;

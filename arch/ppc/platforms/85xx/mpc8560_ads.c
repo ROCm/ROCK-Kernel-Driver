@@ -32,6 +32,7 @@
 #include <linux/serial_core.h>
 #include <linux/initrd.h>
 #include <linux/module.h>
+#include <linux/fsl_devices.h>
 
 #include <asm/system.h>
 #include <asm/pgtable.h>
@@ -48,7 +49,7 @@
 #include <asm/irq.h>
 #include <asm/immap_85xx.h>
 #include <asm/kgdb.h>
-#include <asm/ocp.h>
+#include <asm/ppc_sys.h>
 #include <asm/cpm2.h>
 #include <mm/mmu_decl.h>
 
@@ -57,34 +58,6 @@
 #include <syslib/ppc85xx_setup.h>
 
 extern void cpm2_reset(void);
-
-struct ocp_gfar_data mpc85xx_tsec1_def = {
-        .interruptTransmit = MPC85xx_IRQ_TSEC1_TX,
-        .interruptError = MPC85xx_IRQ_TSEC1_ERROR,
-        .interruptReceive = MPC85xx_IRQ_TSEC1_RX,
-        .interruptPHY = MPC85xx_IRQ_EXT5,
-        .flags = (GFAR_HAS_GIGABIT | GFAR_HAS_MULTI_INTR
-			| GFAR_HAS_RMON | GFAR_HAS_COALESCE
-                        | GFAR_HAS_PHY_INTR),
-        .phyid = 0,
-        .phyregidx = 0,
-};
-
-struct ocp_gfar_data mpc85xx_tsec2_def = {
-        .interruptTransmit = MPC85xx_IRQ_TSEC2_TX,
-        .interruptError = MPC85xx_IRQ_TSEC2_ERROR,
-        .interruptReceive = MPC85xx_IRQ_TSEC2_RX,
-        .interruptPHY = MPC85xx_IRQ_EXT5,
-        .flags = (GFAR_HAS_GIGABIT | GFAR_HAS_MULTI_INTR
-			| GFAR_HAS_RMON | GFAR_HAS_COALESCE
-                        | GFAR_HAS_PHY_INTR),
-        .phyid = 1,
-        .phyregidx = 0,
-};
-
-struct ocp_fs_i2c_data mpc85xx_i2c1_def = {
-	.flags = FS_I2C_SEPARATE_DFSRR,
-};
 
 /* ************************************************************************
  *
@@ -95,10 +68,9 @@ struct ocp_fs_i2c_data mpc85xx_i2c1_def = {
 static void __init
 mpc8560ads_setup_arch(void)
 {
-	struct ocp_def *def;
-	struct ocp_gfar_data *einfo;
 	bd_t *binfo = (bd_t *) __res;
 	unsigned int freq;
+	struct gianfar_platform_data *pdata;
 
 	cpm2_reset();
 
@@ -117,17 +89,22 @@ mpc8560ads_setup_arch(void)
 	mpc85xx_setup_hose();
 #endif
 
-	def = ocp_get_one_device(OCP_VENDOR_FREESCALE, OCP_FUNC_GFAR, 0);
-	if (def) {
-		einfo = (struct ocp_gfar_data *) def->additions;
-		memcpy(einfo->mac_addr, binfo->bi_enetaddr, 6);
-	}
+	/* setup the board related information for the enet controllers */
+	pdata = (struct gianfar_platform_data *) ppc_sys_get_pdata(MPC85xx_TSEC1);
+	pdata->board_flags = FSL_GIANFAR_BRD_HAS_PHY_INTR;
+	pdata->interruptPHY = MPC85xx_IRQ_EXT5;
+	pdata->phyid = 0;
+	/* fixup phy address */
+	pdata->phy_reg_addr += binfo->bi_immr_base;
+	memcpy(pdata->mac_addr, binfo->bi_enetaddr, 6);
 
-	def = ocp_get_one_device(OCP_VENDOR_FREESCALE, OCP_FUNC_GFAR, 1);
-	if (def) {
-		einfo = (struct ocp_gfar_data *) def->additions;
-		memcpy(einfo->mac_addr, binfo->bi_enet1addr, 6);
-	}
+	pdata = (struct gianfar_platform_data *) ppc_sys_get_pdata(MPC85xx_TSEC2);
+	pdata->board_flags = FSL_GIANFAR_BRD_HAS_PHY_INTR;
+	pdata->interruptPHY = MPC85xx_IRQ_EXT5;
+	pdata->phyid = 1;
+	/* fixup phy address */
+	pdata->phy_reg_addr += binfo->bi_immr_base;
+	memcpy(pdata->mac_addr, binfo->bi_enet1addr, 6);
 
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (initrd_start)
@@ -139,8 +116,6 @@ mpc8560ads_setup_arch(void)
 #else
 		ROOT_DEV = Root_HDA1;
 #endif
-
-	ocp_for_each_device(mpc85xx_update_paddr_ocp, &(binfo->bi_immr_base));
 }
 
 static irqreturn_t cpm2_cascade(int irq, void *dev_id, struct pt_regs *regs)
@@ -221,6 +196,8 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 		*(char *) (r7 + KERNELBASE) = 0;
 		strcpy(cmd_line, (char *) (r6 + KERNELBASE));
 	}
+
+	identify_ppc_sys_by_id(mfspr(SVR));
 
 	/* setup the PowerPC module struct */
 	ppc_md.setup_arch = mpc8560ads_setup_arch;

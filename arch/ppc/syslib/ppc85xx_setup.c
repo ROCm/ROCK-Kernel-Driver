@@ -27,7 +27,6 @@
 #include <asm/mpc85xx.h>
 #include <asm/immap_85xx.h>
 #include <asm/mmu.h>
-#include <asm/ocp.h>
 #include <asm/kgdb.h>
 
 #include <syslib/ppc85xx_setup.h>

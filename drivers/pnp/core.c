@@ -20,7 +20,7 @@
 
 LIST_HEAD(pnp_protocols);
 LIST_HEAD(pnp_global);
-spinlock_t pnp_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(pnp_lock);
 
 void *pnp_alloc(long size)
 {

@@ -31,7 +31,7 @@ void reset_scoop(void)
 	SCOOP_REG(SCOOP_IRM) = 0x0000;
 }
 
-static spinlock_t scoop_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(scoop_lock);
 static u32 scoop_gpwr;
 
 unsigned short set_scoop_gpio(unsigned short bit)

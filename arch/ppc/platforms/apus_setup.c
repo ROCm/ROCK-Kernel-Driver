@@ -480,7 +480,7 @@ void cache_clear(__u32 addr, int length)
 void
 apus_restart(char *cmd)
 {
-	cli();
+	local_irq_disable();
 
 	APUS_WRITE(APUS_REG_LOCK,
 		   REGLOCK_BLACKMAGICK1|REGLOCK_BLACKMAGICK2);
