@@ -46,7 +46,9 @@ CONFIG_SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
 TOPDIR	:= $(CURDIR)
 
 HOSTCC  	= gcc
+HOSTCXX  	= g++
 HOSTCFLAGS	= -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer
+HOSTCXXFLAGS	= -O2
 
 CROSS_COMPILE 	=
 
@@ -171,7 +173,8 @@ AFLAGS		:= -D__ASSEMBLY__ $(CPPFLAGS)
 
 export	VERSION PATCHLEVEL SUBLEVEL EXTRAVERSION KERNELRELEASE ARCH \
 	CONFIG_SHELL TOPDIR HOSTCC HOSTCFLAGS CROSS_COMPILE AS LD CC \
-	CPP AR NM STRIP OBJCOPY OBJDUMP MAKE GENKSYMS PERL UTS_MACHINE
+	CPP AR NM STRIP OBJCOPY OBJDUMP MAKE GENKSYMS PERL UTS_MACHINE \
+	HOSTCXX HOSTCXXFLAGS
 
 export CPPFLAGS NOSTDINC_FLAGS OBJCOPYFLAGS LDFLAGS
 export CFLAGS CFLAGS_KERNEL CFLAGS_MODULE 
@@ -247,21 +250,7 @@ ifdef include-config
 
 #	In this section, we need .config
 
-#	If .config doesn't exist - tough luck
-
-.config: arch/$(ARCH)/config.in # FIXME $(shell find . -name Config.in)
-	@echo '***'
-	@if [ -f $@ ]; then \
-	  echo '*** The tree was updated, so your .config may be'; \
-	  echo '*** out of date!'; \
-	else \
-	  echo '*** You have not yet configured your kernel!'; \
-	fi
-	@echo '***'
-	@echo '*** Please run some configurator (e.g. "make oldconfig" or'
-	@echo '*** "make menuconfig" or "make xconfig").'
-	@echo '***'
-	@exit 1
+-include ..config.cmd
 
 ifdef CONFIG_MODULES
 export EXPORT_FLAGS := -DEXPORT_SYMTAB
@@ -429,11 +418,8 @@ include/config/MARKER: scripts/split-include include/linux/autoconf.h
 # 	with it and forgot to run make oldconfig
 
 include/linux/autoconf.h: .config
-	@echo '***'
-	@echo '*** You changed .config w/o running make *config?'
-	@echo '*** Please run "make oldconfig"'
-	@echo '***'
-	@exit 1
+	+@$(call descend,scripts/kconfig,scripts/kconfig/conf)
+	./scripts/kconfig/conf -s arch/$(ARCH)/Kconfig
 
 # Generate some files
 # ---------------------------------------------------------------------------
@@ -649,34 +635,36 @@ ifeq ($(filter-out $(noconfig_targets),$(MAKECMDGOALS)),)
 .PHONY: oldconfig xconfig menuconfig config \
 	make_with_config
 
-xconfig:
-	$(Q)$(MAKE) -f scripts/Makefile.build obj=scripts scripts/kconfig.tk
-	wish -f scripts/kconfig.tk
+scripts/kconfig/conf scripts/kconfig/mconf scripts/kconfig/qconf: scripts/fixdep FORCE
+	+@$(call descend,scripts/kconfig,$@)
 
-menuconfig:
+xconfig: scripts/kconfig/qconf
+	./scripts/kconfig/qconf arch/$(ARCH)/Kconfig
+
+menuconfig: scripts/kconfig/mconf
 	$(Q)$(MAKE) -f scripts/Makefile.build obj=scripts lxdialog
-	$(CONFIG_SHELL) $(src)/scripts/Menuconfig arch/$(ARCH)/config.in
+	./scripts/kconfig/mconf arch/$(ARCH)/Kconfig
 
-config:
-	$(CONFIG_SHELL) $(src)/scripts/Configure arch/$(ARCH)/config.in
+config: scripts/kconfig/conf
+	./scripts/kconfig/conf arch/$(ARCH)/Kconfig
 
-oldconfig:
-	$(CONFIG_SHELL) $(src)/scripts/Configure -d arch/$(ARCH)/config.in
+oldconfig: scripts/kconfig/conf
+	./scripts/kconfig/conf -o arch/$(ARCH)/Kconfig
 
-randconfig:
-	$(CONFIG_SHELL) $(src)/scripts/Configure -r arch/$(ARCH)/config.in
+randconfig: scripts/kconfig/conf
+	./scripts/kconfig/conf -r arch/$(ARCH)/Kconfig
 
-allyesconfig:
-	$(CONFIG_SHELL) $(src)/scripts/Configure -y arch/$(ARCH)/config.in
+allyesconfig: scripts/kconfig/conf
+	./scripts/kconfig/conf -y arch/$(ARCH)/Kconfig
 
-allnoconfig:
-	$(CONFIG_SHELL) $(src)/scripts/Configure -n arch/$(ARCH)/config.in
+allnoconfig: scripts/kconfig/conf
+	./scripts/kconfig/conf -n arch/$(ARCH)/Kconfig
 
-allmodconfig:
-	$(CONFIG_SHELL) $(src)/scripts/Configure -m arch/$(ARCH)/config.in
+allmodconfig: scripts/kconfig/conf
+	./scripts/kconfig/conf -m arch/$(ARCH)/Kconfig
 
-defconfig:
-	yes '' | $(CONFIG_SHELL) $(src)/scripts/Configure -d arch/$(ARCH)/config.in
+defconfig: scripts/kconfig/conf
+	./scripts/kconfig/conf -d arch/$(ARCH)/Kconfig
 
 ###
 # Cleaning is done on three levels.

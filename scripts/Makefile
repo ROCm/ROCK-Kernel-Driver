@@ -11,7 +11,7 @@
 
 EXTRA_TARGETS := fixdep split-include docproc conmakehash
 
-subdir-	:= lxdialog
+subdir-	:= lxdialog kconfig
 
 # Yikes. We need to build this stuff here even if the user only wants
 # modules.

@@ -57,9 +57,33 @@ real-objs-m := $(foreach m, $(obj-m), $(if $(strip $($(m:.o=-objs)) $($(m:.o=-y)
 # Only build module versions for files which are selected to be built
 export-objs := $(filter $(export-objs),$(real-objs-y) $(real-objs-m))
 
-host-progs-single     := $(foreach m,$(host-progs),$(if $($(m)-objs),,$(m)))
-host-progs-multi      := $(foreach m,$(host-progs),$(if $($(m)-objs),$(m)))
-host-progs-multi-objs := $(foreach m,$(host-progs-multi),$($(m)-objs))
+# C code
+# Executables compiled from a single .c file
+host-csingle	:= $(foreach m,$(host-progs),$(if $($(m)-objs),,$(m)))
+
+# C executables linked based on several .o files
+host-cmulti	:= $(foreach m,$(host-progs),\
+		   $(if $($(m)-cxxobjs),,$(if $($(m)-objs),$(m))))
+
+# Object (.o) files compiled from .c files
+host-cobjs	:= $(sort $(foreach m,$(host-progs),$($(m)-objs)))
+
+# C++ code
+# C++ executables compiled from at least on .cc file
+# and zero or more .c files
+host-cxxmulti	:= $(foreach m,$(host-progs),$(if $($(m)-cxxobjs),$(m)))
+
+# C++ Object (.o) files compiled from .cc files
+host-cxxobjs	:= $(sort $(foreach m,$(host-cxxmulti),$($(m)-cxxobjs)))
+
+# Shared libaries (only .c supported)
+# Shared libraries (.so) - all .so files referenced in "xxx-objs"
+host-cshlib	:= $(sort $(filter %.so, $(host-cobjs)))
+# Remove .so files from "xxx-objs"
+host-cobjs	:= $(filter-out %.so,$(host-cobjs))
+
+#Object (.o) files used by the shared libaries
+host-cshobjs	:= $(sort $(foreach m,$(host-cshlib),$($(m:.so=-objs))))
 
 # Add subdir path
 
@@ -75,10 +99,14 @@ multi-used-m	:= $(addprefix $(obj)/,$(multi-used-m))
 multi-objs-y	:= $(addprefix $(obj)/,$(multi-objs-y))
 multi-objs-m	:= $(addprefix $(obj)/,$(multi-objs-m))
 subdir-ym	:= $(addprefix $(obj)/,$(subdir-ym))
-host-progs	:= $(addprefix $(obj)/,$(host-progs))
-host-progs-single     := $(addprefix $(obj)/,$(host-progs-single))
-host-progs-multi      := $(addprefix $(obj)/,$(host-progs-multi))
-host-progs-multi-objs := $(addprefix $(obj)/,$(host-progs-multi-objs))
+host-progs      := $(addprefix $(obj)/,$(host-progs))
+host-csingle	:= $(addprefix $(obj)/,$(host-csingle))
+host-cmulti	:= $(addprefix $(obj)/,$(host-cmulti))
+host-cobjs	:= $(addprefix $(obj)/,$(host-cobjs))
+host-cxxmulti	:= $(addprefix $(obj)/,$(host-cxxmulti))
+host-cxxobjs	:= $(addprefix $(obj)/,$(host-cxxobjs))
+host-cshlib	:= $(addprefix $(obj)/,$(host-cshlib))
+host-cshobjs	:= $(addprefix $(obj)/,$(host-cshobjs))
 
 # The temporary file to save gcc -MD generated dependencies must not
 # contain a comma
