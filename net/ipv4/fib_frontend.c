@@ -251,7 +251,7 @@ int ip_rt_ioctl(unsigned int cmd, void *arg)
 			return -EPERM;
 		if (copy_from_user(&r, arg, sizeof(struct rtentry)))
 			return -EFAULT;
-		rtnl_lock(NULL);
+		rtnl_lock();
 		err = fib_convert_rtentry(cmd, &req.nlh, &req.rtm, &rta, &r);
 		if (err == 0) {
 			if (cmd == SIOCDELRT) {

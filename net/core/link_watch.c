@@ -91,7 +91,7 @@ static void linkwatch_event(void *dummy)
 	linkwatch_nextevent = jiffies + HZ;
 	clear_bit(LW_RUNNING, &linkwatch_flags);
 
-	rtnl_lock(NULL);
+	rtnl_lock();
 	linkwatch_run_queue();
 	rtnl_unlock();
 }

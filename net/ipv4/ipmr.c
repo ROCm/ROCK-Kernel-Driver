@@ -825,9 +825,7 @@ static void mroute_clean_tables(struct sock *sk)
 
 static void mrtsock_destruct(struct sock *sk)
 {
-	struct net_device *unregister_list;
-
-	rtnl_lock(&unregister_list);
+	rtnl_lock();
 	if (sk == mroute_socket) {
 		ipv4_devconf.mc_forwarding--;
 
@@ -852,7 +850,6 @@ int ip_mroute_setsockopt(struct sock *sk,int optname,char *optval,int optlen)
 	int ret;
 	struct vifctl vif;
 	struct mfcctl mfc;
-	struct net_device *unregister_list;
 	
 	if(optname!=MRT_INIT)
 	{
@@ -868,7 +865,7 @@ int ip_mroute_setsockopt(struct sock *sk,int optname,char *optval,int optlen)
 			if(optlen!=sizeof(int))
 				return -ENOPROTOOPT;
 
-			rtnl_lock(NULL);
+			rtnl_lock();
 			if (mroute_socket) {
 				rtnl_unlock();
 				return -EADDRINUSE;
@@ -896,7 +893,7 @@ int ip_mroute_setsockopt(struct sock *sk,int optname,char *optval,int optlen)
 				return -EFAULT; 
 			if(vif.vifc_vifi >= MAXVIFS)
 				return -ENFILE;
-			rtnl_lock(&unregister_list);
+			rtnl_lock();
 			if (optname==MRT_ADD_VIF) {
 				ret = vif_add(&vif, sk==mroute_socket);
 			} else {
@@ -915,7 +912,7 @@ int ip_mroute_setsockopt(struct sock *sk,int optname,char *optval,int optlen)
 				return -EINVAL;
 			if (copy_from_user(&mfc,optval, sizeof(mfc)))
 				return -EFAULT;
-			rtnl_lock(NULL);
+			rtnl_lock();
 			if (optname==MRT_DEL_MFC)
 				ret = ipmr_mfc_delete(&mfc);
 			else
@@ -940,7 +937,7 @@ int ip_mroute_setsockopt(struct sock *sk,int optname,char *optval,int optlen)
 			if(get_user(v,(int *)optval))
 				return -EFAULT;
 			v = (v)?1:0;
-			rtnl_lock(NULL);
+			rtnl_lock();
 			ret = 0;
 			if (v != mroute_do_pim) {
 				mroute_do_pim = v;

@@ -2162,7 +2162,7 @@ static int de_suspend (struct pci_dev *pdev, u32 state)
 	struct net_device *dev = pci_get_drvdata (pdev);
 	struct de_private *de = dev->priv;
 
-	rtnl_lock(NULL);
+	rtnl_lock();
 	if (netif_running (dev)) {
 		del_timer_sync(&de->media_timer);
 
@@ -2197,7 +2197,7 @@ static int de_resume (struct pci_dev *pdev)
 	struct net_device *dev = pci_get_drvdata (pdev);
 	struct de_private *de = dev->priv;
 
-	rtnl_lock(NULL);
+	rtnl_lock();
 	if (netif_device_present(dev))
 		goto out;
 	if (netif_running(dev)) {

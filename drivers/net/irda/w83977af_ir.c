@@ -247,7 +247,7 @@ int w83977af_open(int i, unsigned int iobase, unsigned int irq,
 	dev->do_ioctl        = w83977af_net_ioctl;
 	dev->get_stats	     = w83977af_net_get_stats;
 
-	rtnl_lock(NULL);
+	rtnl_lock();
 	err = register_netdevice(dev);
 	rtnl_unlock();
 	if (err) {
@@ -300,9 +300,7 @@ static int w83977af_close(struct w83977af_ir *self)
 
 	/* Remove netdevice */
 	if (self->netdev) {
-		struct net_device *unregister_list;
-
-		rtnl_lock(&unregister_list);
+		rtnl_lock();
 		unregister_netdevice(self->netdev);
 		rtnl_unlock();
 	}

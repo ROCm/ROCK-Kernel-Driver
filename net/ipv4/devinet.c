@@ -493,7 +493,7 @@ int devinet_ioctl(unsigned int cmd, void *arg)
 	struct in_device *in_dev;
 	struct in_ifaddr **ifap = NULL;
 	struct in_ifaddr *ifa = NULL;
-	struct net_device *dev, *unregister_list;
+	struct net_device *dev;
 	char *colon;
 	int ret = -EFAULT;
 	int tryaddrmatch = 0;
@@ -552,7 +552,7 @@ int devinet_ioctl(unsigned int cmd, void *arg)
 		goto out;
 	}
 
-	rtnl_lock(&unregister_list);
+	rtnl_lock();
 
 	ret = -ENODEV;
 	if ((dev = __dev_get_by_name(ifr.ifr_name)) == NULL)

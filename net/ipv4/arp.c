@@ -1035,7 +1035,7 @@ int arp_ioctl(unsigned int cmd, void *arg)
 	if (!(r.arp_flags & ATF_NETMASK))
 		((struct sockaddr_in *)&r.arp_netmask)->sin_addr.s_addr =
 							   htonl(0xFFFFFFFFUL);
-	rtnl_lock(NULL);
+	rtnl_lock();
 	if (r.arp_dev[0]) {
 		err = -ENODEV;
 		if ((dev = __dev_get_by_name(r.arp_dev)) == NULL)

@@ -596,13 +596,12 @@ static int sixpack_open(struct tty_struct *tty)
 static void sixpack_close(struct tty_struct *tty)
 {
 	struct sixpack *sp = (struct sixpack *) tty->disc_data;
-	struct net_device *unregister_list;
 
 	/* First make sure we're connected. */
 	if (!sp || sp->magic != SIXPACK_MAGIC)
 		return;
 
-	rtnl_lock(&unregister_list);
+	rtnl_lock();
 	dev_close(sp->dev);
 
 	del_timer(&sp->tx_t);

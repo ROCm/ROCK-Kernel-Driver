@@ -1207,7 +1207,7 @@ static inline int irda_usb_open(struct irda_usb_cb *self)
 	netdev->get_stats	= irda_usb_net_get_stats;
 	netdev->do_ioctl        = irda_usb_net_ioctl;
 
-	rtnl_lock(NULL);
+	rtnl_lock();
 	err = register_netdevice(netdev);
 	rtnl_unlock();
 	if (err) {
@@ -1232,9 +1232,7 @@ static inline int irda_usb_close(struct irda_usb_cb *self)
 
 	/* Remove netdevice */
 	if (self->netdev) {
-		struct net_device *unregister_list;
-
-		rtnl_lock(&unregister_list);
+		rtnl_lock();
 		unregister_netdevice(self->netdev);
 		self->netdev = NULL;
 		rtnl_unlock();

@@ -625,7 +625,7 @@ static inline int netif_rx_ni(struct sk_buff *skb)
 }
 
 /* Called by rtnetlink.c:rtnl_unlock() */
-extern void netdev_wait_and_finish_unregister(struct net_device **list);
+extern void netdev_run_todo(void);
 
 static inline void dev_put(struct net_device *dev)
 {

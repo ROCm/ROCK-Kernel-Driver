@@ -1170,7 +1170,7 @@ static int packet_mc_add(struct sock *sk, struct packet_mreq *mreq)
 	struct net_device *dev;
 	int err;
 
-	rtnl_lock(NULL);
+	rtnl_lock();
 
 	err = -ENODEV;
 	dev = __dev_get_by_index(mreq->mr_ifindex);
@@ -1217,7 +1217,7 @@ static int packet_mc_drop(struct sock *sk, struct packet_mreq *mreq)
 {
 	struct packet_mclist *ml, **mlp;
 
-	rtnl_lock(NULL);
+	rtnl_lock();
 
 	for (mlp = &pkt_sk(sk)->mclist; (ml = *mlp) != NULL; mlp = &ml->next) {
 		if (ml->ifindex == mreq->mr_ifindex &&
@@ -1250,7 +1250,7 @@ static void packet_flush_mclist(struct sock *sk)
 	if (!po->mclist)
 		return;
 
-	rtnl_lock(NULL);
+	rtnl_lock();
 	while ((ml = po->mclist) != NULL) {
 		struct net_device *dev;
 

@@ -1088,7 +1088,7 @@ static int __init sa1100_irda_init(void)
 	driver_register(&sa1100ir_driver);
 	sys_device_register(&sa1100ir_device);
 
-	rtnl_lock(NULL);
+	rtnl_lock();
 	dev = dev_alloc("irda%d", &err);
 	if (dev) {
 		dev->irq    = IRQ_Ser2ICP;
@@ -1123,9 +1123,7 @@ static void __exit sa1100_irda_exit(void)
 	struct net_device *dev = dev_get_drvdata(&sa1100ir_device.dev);
 
 	if (dev) {
-		struct net_device *unregister_list;
-
-		rtnl_lock(&unregister_list);
+		rtnl_lock();
 		unregister_netdevice(dev);
 		rtnl_unlock();
 	}

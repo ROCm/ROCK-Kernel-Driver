@@ -456,10 +456,9 @@ int init_module(void)
 int __init teql_init(void)
 #endif
 {
-	struct net_device *unregister_list;
 	int err;
 
-	rtnl_lock(&unregister_list);
+	rtnl_lock();
 
 	the_master.dev.priv = (void*)&the_master;
 	err = dev_alloc_name(&the_master.dev, "teql%d");
@@ -482,9 +481,7 @@ int __init teql_init(void)
 #ifdef MODULE
 void cleanup_module(void) 
 {
-	struct net_device *unregister_list;
-
-	rtnl_lock(&unregister_list);
+	rtnl_lock();
 	unregister_qdisc(&the_master.qops);
 	unregister_netdevice(&the_master.dev);
 	rtnl_unlock();

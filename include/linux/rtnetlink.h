@@ -607,8 +607,7 @@ extern struct semaphore rtnl_sem;
 				     rtnl->data_ready(rtnl, 0); \
 		        } while(0)
 
-extern struct net_device **rtnl_netdev_unregister_list;
-extern void rtnl_lock(struct net_device **unregister_list);
+extern void rtnl_lock(void);
 extern void rtnl_unlock(void);
 extern void rtnetlink_init(void);
 

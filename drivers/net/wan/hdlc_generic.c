@@ -159,9 +159,7 @@ int register_hdlc_device(hdlc_device *hdlc)
 
 void unregister_hdlc_device(hdlc_device *hdlc)
 {
-	struct net_device *unregister_list;
-
-	rtnl_lock(&unregister_list);
+	rtnl_lock();
 	hdlc_proto_detach(hdlc);
 	unregister_netdevice(hdlc_to_dev(hdlc));
 	rtnl_unlock();

@@ -438,7 +438,7 @@ static int tun_chr_ioctl(struct inode *inode, struct file *file,
 			return -EFAULT;
 		ifr.ifr_name[IFNAMSIZ-1] = '\0';
 
-		rtnl_lock(NULL);
+		rtnl_lock();
 		err = tun_set_iff(file, &ifr);
 		rtnl_unlock();
 
@@ -531,7 +531,6 @@ static int tun_chr_open(struct inode *inode, struct file * file)
 static int tun_chr_close(struct inode *inode, struct file *file)
 {
 	struct tun_struct *tun = (struct tun_struct *)file->private_data;
-	struct net_device *unregister_list;
 
 	if (!tun)
 		return 0;
@@ -540,7 +539,7 @@ static int tun_chr_close(struct inode *inode, struct file *file)
 
 	tun_chr_fasync(-1, file, 0);
 
-	rtnl_lock(&unregister_list);
+	rtnl_lock();
 
 	/* Detach from net device */
 	file->private_data = NULL;

@@ -1578,10 +1578,8 @@ toshoboe_close (struct pci_dev *pci_dev)
 
   if (self->netdev)
     {
-      struct net_device *unregister_list;
-
       /* Remove netdevice */
-      rtnl_lock (&unregister_list);
+      rtnl_lock ();
       unregister_netdevice (self->netdev);
       rtnl_unlock ();
     }
@@ -1741,7 +1739,7 @@ toshoboe_open (struct pci_dev *pci_dev, const struct pci_device_id *pdid)
   dev->stop = toshoboe_net_close;
   dev->do_ioctl = toshoboe_net_ioctl;
 
-  rtnl_lock (NULL);
+  rtnl_lock ();
   err = register_netdevice (dev);
   rtnl_unlock ();
   if (err)

@@ -2291,7 +2291,7 @@ ppp_create_interface(int unit, int *retp)
 	dev->priv = ppp;
 	dev->destructor = ppp_device_destructor;
 
-	rtnl_lock(NULL);
+	rtnl_lock();
 	ret = register_netdevice(dev);
 	rtnl_unlock();
 	if (ret != 0) {
@@ -2344,9 +2344,7 @@ static void ppp_shutdown_interface(struct ppp *ppp)
 	ppp->dev = 0;
 	ppp_unlock(ppp);
 	if (dev) {
-		struct net_device *unregister_list;
-
-		rtnl_lock(&unregister_list);
+		rtnl_lock();
 
 		/* This will call dev_close() for us. */
 		unregister_netdevice(dev);

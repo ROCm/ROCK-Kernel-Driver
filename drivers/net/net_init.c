@@ -166,7 +166,7 @@ static struct net_device *init_netdev(struct net_device *dev, int sizeof_priv,
 	if (new_device) {
 		int err;
 
-		rtnl_lock(NULL);
+		rtnl_lock();
 		err = register_netdevice(dev);
 		rtnl_unlock();
 
@@ -532,7 +532,7 @@ int register_netdev(struct net_device *dev)
 {
 	int err;
 
-	rtnl_lock(NULL);
+	rtnl_lock();
 
 	/*
 	 *	If the name is a format string the caller wants us to
@@ -566,9 +566,7 @@ out:
 
 void unregister_netdev(struct net_device *dev)
 {
-	struct net_device *list;
-
-	rtnl_lock(&list);
+	rtnl_lock();
 	unregister_netdevice(dev);
 	rtnl_unlock();
 }

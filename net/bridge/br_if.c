@@ -272,9 +272,9 @@ void br_get_port_ifindices(struct net_bridge *br, int *ifindices)
 
 void __exit br_cleanup_bridges(void)
 {
-	struct net_device *dev, *nxt, *unregister_list;
+	struct net_device *dev, *nxt;
 
-	rtnl_lock(&unregister_list);
+	rtnl_lock();
 	for (dev = dev_base; dev; dev = nxt) {
 		nxt = dev->next;
 		if (dev->priv_flags & IFF_EBRIDGE) {

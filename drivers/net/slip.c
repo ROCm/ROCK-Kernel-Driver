@@ -834,7 +834,7 @@ slip_open(struct tty_struct *tty)
 	   opens of slip channels. There are better ways, but it is
 	   the simplest one.
 	 */
-	rtnl_lock(NULL);
+	rtnl_lock();
 
 	/* Collect hanged up channels. */
 	sl_sync();

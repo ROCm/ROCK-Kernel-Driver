@@ -461,7 +461,7 @@ isdn_net_addslave(char *parm)
 
 	mlp = idev->mlp;
 
-	rtnl_lock(NULL);
+	rtnl_lock();
 
 	if (netif_running(&mlp->dev)) {
 		retval = -EBUSY;
@@ -482,7 +482,7 @@ isdn_net_dev_delete(isdn_net_dev *idev)
 	isdn_net_local *mlp = idev->mlp;
 	int retval;
 
-	rtnl_lock(NULL);
+	rtnl_lock();
 	
 	if (netif_running(&mlp->dev)) {
 		retval = -EBUSY;
@@ -547,7 +547,7 @@ isdn_net_setcfg(isdn_net_ioctl_cfg *cfg)
 
 	mlp = idev->mlp;
 
-	rtnl_lock(NULL);
+	rtnl_lock();
 
 	if (netif_running(&mlp->dev)) {
 		retval = -EBUSY;
@@ -701,7 +701,7 @@ isdn_net_addphone(isdn_net_ioctl_phone *phone)
 	if (!idev)
 		return -ENODEV;
 
-	rtnl_lock(NULL);
+	rtnl_lock();
 
 	if (netif_running(&idev->mlp->dev)) {
 		retval = -EBUSY;
@@ -733,7 +733,7 @@ isdn_net_delphone(isdn_net_ioctl_phone *phone)
 	if (!idev)
 		return -ENODEV;
 
-	rtnl_lock(NULL);
+	rtnl_lock();
 
 	if (netif_running(&idev->mlp->dev)) {
 		retval = -EBUSY;

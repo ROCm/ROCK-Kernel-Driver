@@ -179,9 +179,11 @@ static struct timer_list samp_timer = TIMER_INITIALIZER(sample_queue, 0, 0);
 #endif
 
 #ifdef CONFIG_HOTPLUG
-static int net_run_sbin_hotplug(struct net_device *dev, char *action);
+static void net_run_sbin_hotplug(struct net_device *dev, int is_register);
+static void net_run_hotplug_todo(void);
 #else
-#define net_run_sbin_hotplug(dev, action) ({ 0; })
+#define net_run_sbin_hotplug(dev, is_register) do { } while (0)
+#define net_run_hotplug_todo() do { } while (0)
 #endif
 
 /*
@@ -2355,7 +2357,6 @@ static int dev_ifsioc(struct ifreq *ifr, unsigned int cmd)
 
 int dev_ioctl(unsigned int cmd, void *arg)
 {
-	struct net_device *rtnl_list;
 	struct ifreq ifr;
 	int ret;
 	char *colon;
@@ -2427,7 +2428,7 @@ int dev_ioctl(unsigned int cmd, void *arg)
 			if (!capable(CAP_NET_ADMIN))
 				return -EPERM;
 			dev_load(ifr.ifr_name);
-			rtnl_lock(&rtnl_list);
+			rtnl_lock();
 			ret = dev_ifsioc(&ifr, cmd);
 			rtnl_unlock();
 			if (!ret) {
@@ -2466,7 +2467,7 @@ int dev_ioctl(unsigned int cmd, void *arg)
 			if (!capable(CAP_NET_ADMIN))
 				return -EPERM;
 			dev_load(ifr.ifr_name);
-			rtnl_lock(&rtnl_list);
+			rtnl_lock();
 			ret = dev_ifsioc(&ifr, cmd);
 			rtnl_unlock();
 			return ret;
@@ -2488,7 +2489,7 @@ int dev_ioctl(unsigned int cmd, void *arg)
 			    (cmd >= SIOCDEVPRIVATE &&
 			     cmd <= SIOCDEVPRIVATE + 15)) {
 				dev_load(ifr.ifr_name);
-				rtnl_lock(&rtnl_list);
+				rtnl_lock();
 				ret = dev_ifsioc(&ifr, cmd);
 				rtnl_unlock();
 				if (!ret && copy_to_user(arg, &ifr,
@@ -2507,7 +2508,7 @@ int dev_ioctl(unsigned int cmd, void *arg)
 						return -EPERM;
 				}
 				dev_load(ifr.ifr_name);
-				rtnl_lock(&rtnl_list);
+				rtnl_lock();
 				/* Follow me in net/core/wireless.c */
 				ret = wireless_process_ioctl(&ifr, cmd);
 				rtnl_unlock();
@@ -2567,6 +2568,7 @@ int register_netdevice(struct net_device *dev)
 	int ret;
 
 	BUG_ON(dev_boot_phase);
+	ASSERT_RTNL();
 
 	spin_lock_init(&dev->queue_lock);
 	spin_lock_init(&dev->xmit_lock);
@@ -2639,7 +2641,7 @@ int register_netdevice(struct net_device *dev)
 	/* Notify protocols, that a new device appeared. */
 	notifier_call_chain(&netdev_chain, NETDEV_REGISTER, dev);
 
-	net_run_sbin_hotplug(dev, "register");
+	net_run_sbin_hotplug(dev, 1);
 	ret = 0;
 
 out:
@@ -2730,11 +2732,13 @@ static void netdev_wait_allrefs(struct net_device *dev)
 
 /* The sequence is:
  *
- *	struct net_device *local_list;
- *
- *	rtnl_lock(&local_list);
- *	unregister_netdevice(x1);
- *	unregister_netdevice(x2);
+ *	rtnl_lock();
+ *	...
+ *	register_netdevyce(x1);
+ *	register_netdevyce(x2);
+ *	...
+ *	unregister_netdevice(y1);
+ *	unregister_netdevice(y2);
  *      ...
  *	rtnl_unlock();
  *
@@ -2745,21 +2749,32 @@ static void netdev_wait_allrefs(struct net_device *dev)
  * 2) Since we run with the RTNL semaphore not held, we can sleep
  *    safely in order to wait for the netdev refcnt to drop to zero.
  */
-void netdev_wait_and_finish_unregister(struct net_device **devp)
+static spinlock_t unregister_todo_lock = SPIN_LOCK_UNLOCKED;
+static struct net_device *unregister_todo;
+
+void netdev_run_todo(void)
 {
 	struct net_device *dev;
 
-	while ((dev = *devp) != NULL) {
-		*devp = dev->next;
-		dev->next = NULL;
+	net_run_hotplug_todo();
 
-		net_run_sbin_hotplug(dev, "unregister");
+	spin_lock(&unregister_todo_lock);
+	dev = unregister_todo;
+	unregister_todo = NULL;
+	spin_unlock(&unregister_todo_lock);
+
+	while (dev) {
+		struct net_device *next = dev->next;
+
+		dev->next = NULL;
 
 		netdev_wait_allrefs(dev);
 
 		BUG_ON(atomic_read(&dev->refcnt));
 
 		netdev_finish_unregister(dev);
+
+		dev = next;
 	}
 }
 
@@ -2789,7 +2804,6 @@ int unregister_netdevice(struct net_device *dev)
 
 	BUG_ON(dev_boot_phase);
 	ASSERT_RTNL();
-	BUG_ON(!rtnl_netdev_unregister_list);
 
 	/* If device is running, close it first. */
 	if (dev->flags & IFF_UP)
@@ -2803,8 +2817,6 @@ int unregister_netdevice(struct net_device *dev)
 		if (d == dev) {
 			write_lock_bh(&dev_base_lock);
 			*dp = d->next;
-			d->next = *rtnl_netdev_unregister_list;
-			*rtnl_netdev_unregister_list = d;
 			write_unlock_bh(&dev_base_lock);
 			break;
 		}
@@ -2824,7 +2836,7 @@ int unregister_netdevice(struct net_device *dev)
 	/* Shutdown queueing discipline. */
 	dev_shutdown(dev);
 
-	net_run_sbin_hotplug(dev, "unregister");
+	net_run_sbin_hotplug(dev, 0);
 	
 	/* Notify protocols, that we are about to destroy
 	   this device. They should clean all the things.
@@ -2847,6 +2859,12 @@ int unregister_netdevice(struct net_device *dev)
 #endif
 
 	kobject_unregister(&dev->kobj);
+
+	spin_lock(&unregister_todo_lock);
+	dev->next = unregister_todo;
+	unregister_todo = dev;
+	spin_unlock(&unregister_todo_lock);
+
 	dev_put(dev);
 	return 0;
 }
@@ -3016,18 +3034,22 @@ subsys_initcall(net_dev_init);
 
 #ifdef CONFIG_HOTPLUG
 
-/* Notify userspace when a netdevice event occurs,
- * by running '/sbin/hotplug net' with certain
- * environment variables set.
- */
+struct net_hotplug_todo {
+	struct net_hotplug_todo	*next;
+	char			ifname[IFNAMSIZ];
+	int			is_register;
+};
+static spinlock_t net_hotplug_list_lock = SPIN_LOCK_UNLOCKED;
+static struct net_hotplug_todo *net_hotplug_list;
 
-static int net_run_sbin_hotplug(struct net_device *dev, char *action)
+static void net_run_hotplug_one(struct net_hotplug_todo *ent)
 {
 	char *argv[3], *envp[5], ifname[12 + IFNAMSIZ], action_str[32];
 	int i;
 
-	sprintf(ifname, "INTERFACE=%s", dev->name);
-	sprintf(action_str, "ACTION=%s", action);
+	sprintf(ifname, "INTERFACE=%s", ent->ifname);
+	sprintf(action_str, "ACTION=%s",
+		(ent->is_register ? "register" : "unregister"));
 
         i = 0;
         argv[i++] = hotplug_path;
@@ -3042,6 +3064,46 @@ static int net_run_sbin_hotplug(struct net_device *dev, char *action)
 	envp [i++] = action_str;
 	envp [i] = 0;
 
-	return call_usermodehelper(argv [0], argv, envp, 0);
+	call_usermodehelper(argv [0], argv, envp, 0);
+}
+
+static void net_run_hotplug_todo(void)
+{
+	struct net_hotplug_todo *list;
+
+	spin_lock(&net_hotplug_list_lock);
+	list = net_hotplug_list;
+	net_hotplug_list = NULL;
+	spin_unlock(&net_hotplug_list_lock);
+
+	while (list != NULL) {
+		struct net_hotplug_todo *next = list->next;
+
+		net_run_hotplug_one(list);
+
+		kfree(list);
+		list = next;
+	}
+}
+
+/* Notify userspace when a netdevice event occurs,
+ * by running '/sbin/hotplug net' with certain
+ * environment variables set.
+ */
+
+static void net_run_sbin_hotplug(struct net_device *dev, int is_register)
+{
+	struct net_hotplug_todo *ent = kmalloc(sizeof(*ent), GFP_KERNEL);
+
+	if (!ent)
+		return;
+
+	memcpy(ent->ifname, dev->name, IFNAMSIZ);
+	ent->is_register = is_register;
+
+	spin_lock(&net_hotplug_list_lock);
+	ent->next = net_hotplug_list;
+	net_hotplug_list = ent;
+	spin_unlock(&net_hotplug_list_lock);
 }
 #endif

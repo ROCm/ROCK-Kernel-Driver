@@ -1176,7 +1176,7 @@ int ipv6_route_ioctl(unsigned int cmd, void *arg)
 		if (err)
 			return -EFAULT;
 			
-		rtnl_lock(NULL);
+		rtnl_lock();
 		switch (cmd) {
 		case SIOCADDRT:
 			err = ip6_route_add(&rtmsg, NULL, NULL);

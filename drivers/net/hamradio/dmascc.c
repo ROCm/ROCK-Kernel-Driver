@@ -325,9 +325,7 @@ void cleanup_module(void) {
     /* Unregister devices */
     for (i = 0; i < 2; i++) {
       if (info->dev[i].name) {
-	struct net_device *unregister_list;
-
-	rtnl_lock(&unregister_list);
+	rtnl_lock();
 	unregister_netdevice(&info->dev[i]);
 	rtnl_unlock();
       }
@@ -602,7 +600,7 @@ int __init setup_adapter(int card_base, int type, int n) {
     dev->tx_queue_len = 64;
     memcpy(dev->broadcast, ax25_broadcast, 7);
     memcpy(dev->dev_addr, ax25_test, 7);
-    rtnl_lock(NULL);
+    rtnl_lock();
     if (register_netdevice(dev)) {
       printk(KERN_ERR "dmascc: could not register %s\n", dev->name);
     }

@@ -1604,7 +1604,7 @@ static int rtl8139_thread (void *data)
 		if (tp->time_to_die)
 			break;
 
-		rtnl_lock (NULL);
+		rtnl_lock ();
 		rtl8139_thread_iter (dev, tp, tp->mmio_addr);
 		rtnl_unlock ();
 	}

@@ -1700,7 +1700,6 @@ static int atalk_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 {
 	int rc = -EINVAL;
 	struct sock *sk = sock->sk;
-	struct net_device *unregister_list;
 
 	switch (cmd) {
 		/* Protocol layer */
@@ -1749,7 +1748,7 @@ static int atalk_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		case SIOCDIFADDR:
 		case SIOCSARP:		/* proxy AARP */
 		case SIOCDARP:		/* proxy AARP */
-			rtnl_lock(&unregister_list);
+			rtnl_lock();
 			rc = atif_ioctl(cmd, (void *)arg);
 			rtnl_unlock();
 			break;

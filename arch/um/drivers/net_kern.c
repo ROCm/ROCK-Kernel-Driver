@@ -354,7 +354,7 @@ static int eth_configure(int n, void *init, char *mac,
 	dev->watchdog_timeo = (HZ >> 1);
 	dev->irq = UM_ETH_IRQ;
 
-	rtnl_lock(NULL);
+	rtnl_lock();
 	err = register_netdevice(dev);
 	rtnl_unlock();
 	if(err)

@@ -584,7 +584,7 @@ int dn_dev_ioctl(unsigned int cmd, void *arg)
 			return -EINVAL;
 	}
 
-	rtnl_lock(NULL);
+	rtnl_lock();
 
 	if ((dev = __dev_get_by_name(ifr->ifr_name)) == NULL) {
 		ret = -ENODEV;
@@ -1258,7 +1258,7 @@ void dn_dev_devices_off(void)
 {
 	struct net_device *dev;
 
-	rtnl_lock(NULL);
+	rtnl_lock();
 	for(dev = dev_base; dev; dev = dev->next)
 		dn_dev_down(dev);
 	rtnl_unlock();
@@ -1269,7 +1269,7 @@ void dn_dev_devices_on(void)
 {
 	struct net_device *dev;
 
-	rtnl_lock(NULL);
+	rtnl_lock();
 	for(dev = dev_base; dev; dev = dev->next) {
 		if (dev->flags & IFF_UP)
 			dn_dev_up(dev);
