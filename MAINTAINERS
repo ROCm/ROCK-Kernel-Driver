@@ -1746,6 +1746,7 @@ PCI SUBSYSTEM
 P:	Greg Kroah-Hartman
 M:	greg@kroah.com
 L:	linux-kernel@vger.kernel.org
+L:	linux-pci@atrey.karlin.mff.cuni.cz
 S:	Supported
 
 PCI HOTPLUG CORE
