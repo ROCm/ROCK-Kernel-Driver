@@ -158,7 +158,7 @@ tcp_snat_handler(struct sk_buff **pskb,
 						(*pskb)->len - tcphoff,
 						cp->protocol,
 						(*pskb)->csum);
-		IP_VS_DBG(11, "O-pkt: %s O-csum=%d (+%d)\n",
+		IP_VS_DBG(11, "O-pkt: %s O-csum=%d (+%zd)\n",
 			  pp->name, tcph->check,
 			  (char*)&(tcph->check) - (char*)tcph);
 	}
