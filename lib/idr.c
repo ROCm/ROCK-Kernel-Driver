@@ -27,15 +27,6 @@
  * so you don't need to be too concerned about locking and conflicts
  * with the slab allocator.
 
- * A word on reuse.  We reuse empty id slots as soon as we can, always
- * using the lowest one available.  But we also merge a counter in the
- * high bits of the id.  The counter is RESERVED_ID_BITS (8 at this time)
- * long.  This means that if you allocate and release the same id in a 
- * loop we will reuse an id after about 256 times around the loop.  The
- * word about is used here as we will NOT return a valid id of -1 so if
- * you loop on the largest possible id (and that is 24 bits, wow!) we
- * will kick the counter to avoid -1.  (Paranoid?  You bet!)
- *
  * What you need to do is, since we don't keep the counter as part of
  * id / ptr pair, to keep a copy of it in the pointed to structure
  * (or else where) so that when you ask for a ptr you can varify that
@@ -78,7 +69,8 @@
  *   If memory is required, it will return -EAGAIN, you should unlock
  *   and go back to the idr_pre_get() call.  If the idr is full, it
  *   will return a -ENOSPC.  ptr is the pointer you want associated
- *   with the id.  The value is returned in the "id" field.
+ *   with the id.  The value is returned in the "id" field.  idr_get_new()
+ *   returns a value in the range 0 ... 0x7fffffff
 
  * void *idr_find(struct idr *idp, int id);
  
@@ -271,12 +263,6 @@ build_up:
 	v = sub_alloc(idp, ptr, &id);
 	if (v == -2)
 		goto build_up;
-	if ( likely(v >= 0 )) {
-		idp->count++;
-		v += (idp->count << MAX_ID_SHIFT);
-		if ( unlikely( v == -1 ))
-		     v += (1L << MAX_ID_SHIFT);
-	}
 	return(v);
 }
 EXPORT_SYMBOL(idr_get_new_above);
@@ -334,6 +320,7 @@ static void sub_remove(struct idr *idp, int shift, int id)
 			idp->layers = 0;
 	}
 }
+
 void idr_remove(struct idr *idp, int id)
 {
 	struct idr_layer *p;
