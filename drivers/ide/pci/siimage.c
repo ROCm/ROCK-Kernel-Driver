@@ -55,6 +55,7 @@ static char * print_siimage_get_info (char *buf, struct pci_dev *dev, int index)
 static int siimage_get_info (char *buffer, char **addr, off_t offset, int count)
 {
 	char *p = buffer;
+	int len;
 	u16 i;
 
 	p += sprintf(p, "\n");
@@ -62,7 +63,11 @@ static int siimage_get_info (char *buffer, char **addr, off_t offset, int count)
 		struct pci_dev *dev	= siimage_devs[i];
 		p = print_siimage_get_info(p, dev, i);
 	}
-	return p-buffer;	/* => must be less than 4k! */
+	/* p - buffer must be less than 4k! */
+	len = (p - buffer) - offset;
+	*addr = buffer + offset;
+	
+	return len > count ? count : len;
 }
 
 #endif	/* defined(DISPLAY_SIIMAGE_TIMINGS) && defined(CONFIG_PROC_FS) */
