@@ -164,7 +164,8 @@ static void print_ident(struct synaptics_data *priv)
 
 	if (SYN_CAP_EXTENDED(priv->capabilities)) {
 		printk(KERN_INFO " Touchpad has extended capability bits\n");
-		if (SYN_CAP_MULTI_BUTTON_NO(priv->ext_cap))
+		if (SYN_CAP_MULTI_BUTTON_NO(priv->ext_cap) &&
+		    SYN_CAP_MULTI_BUTTON_NO(priv->ext_cap) <= 8)
 			printk(KERN_INFO " -> %d multi-buttons, i.e. besides standard buttons\n",
 			       (int)(SYN_CAP_MULTI_BUTTON_NO(priv->ext_cap)));
 		else if (SYN_CAP_FOUR_BUTTON(priv->capabilities))
@@ -352,7 +353,11 @@ int synaptics_init(struct psmouse *psmouse)
 	if (SYN_CAP_MULTI_BUTTON_NO(priv->ext_cap))
 		switch (SYN_CAP_MULTI_BUTTON_NO(priv->ext_cap) & ~0x01) {
 		default:
-			printk(KERN_ERR "This touchpad reports more than 8 multi-buttons, don't know how to handle.\n");
+			/*
+			 * if nExtBtn is greater than 8 it should be considered
+			 * invalid and treated as 0
+			 */
+			break;
 		case 8:
 			set_bit(BTN_7, psmouse->dev.keybit);
 			set_bit(BTN_6, psmouse->dev.keybit);
@@ -437,7 +442,11 @@ static void synaptics_parse_hw_state(unsigned char buf[], struct synaptics_data 
 		    ((buf[3] & 2) ? !hw->right : hw->right)) {
 			switch (SYN_CAP_MULTI_BUTTON_NO(priv->ext_cap) & ~0x01) {
 			default:
-				; /* we did comment while initialising... */
+				/*
+				 * if nExtBtn is greater than 8 it should be
+				 * considered invalid and treated as 0
+				 */
+				break;
 			case 8:
 				hw->b7 = ((buf[5] & 0x08)) ? 1 : 0;
 				hw->b6 = ((buf[4] & 0x08)) ? 1 : 0;
@@ -516,7 +525,11 @@ static void synaptics_process_packet(struct psmouse *psmouse)
 	if (SYN_CAP_MULTI_BUTTON_NO(priv->ext_cap))
 		switch(SYN_CAP_MULTI_BUTTON_NO(priv->ext_cap) & ~0x01) {
 		default:
-			; /* we did comment while initialising... */
+			/*
+			 * if nExtBtn is greater than 8 it should be considered
+			 * invalid and treated as 0
+			 */
+			break;
 		case 8:
 			input_report_key(dev, BTN_7,       hw.b7);
 			input_report_key(dev, BTN_6,       hw.b6);
