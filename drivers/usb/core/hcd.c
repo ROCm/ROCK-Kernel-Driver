@@ -435,8 +435,6 @@ static int rh_call_control (struct usb_hcd *hcd, struct urb *urb)
 		/* non-generic request */
 		if (HCD_IS_SUSPENDED (hcd->state))
 			urb->status = -EAGAIN;
-		else if (!HCD_IS_RUNNING (hcd->state))
-			urb->status = -ENODEV;
 		else
 			urb->status = hcd->driver->hub_control (hcd,
 				typeReq, wValue, wIndex,
@@ -445,8 +443,6 @@ static int rh_call_control (struct usb_hcd *hcd, struct urb *urb)
 error:
 		/* "protocol stall" on error */
 		urb->status = -EPIPE;
-		dev_dbg (hcd->self.controller, "unsupported hub control message (maxchild %d)\n",
-				urb->dev->maxchild);
 	}
 	if (urb->status) {
 		urb->actual_length = 0;
@@ -540,7 +536,7 @@ static void rh_report_status (unsigned long ptr)
 		urb->actual_length = length;
 		urb->status = 0;
 		urb->hcpriv = NULL;
-	} else
+	} else if (!urb->dev->dev.power.power_state)
 		mod_timer (&hcd->rh_timer, jiffies + HZ/4);
 	spin_unlock (&hcd_data_lock);
 	spin_unlock (&urb->lock);
