@@ -246,6 +246,8 @@
    #define IPS_SUBDEVICEID_5I1          0x0258
    #define IPS_SUBDEVICEID_6M           0x0279
    #define IPS_SUBDEVICEID_6I           0x028C
+   #define IPS_SUBDEVICEID_7k           0x028E
+   #define IPS_SUBDEVICEID_7M           0x028F
    #define IPS_IOCTL_SIZE               8192
    #define IPS_STATUS_SIZE              4
    #define IPS_STATUS_Q_SIZE            (IPS_MAX_CMDS+1) * IPS_STATUS_SIZE
@@ -330,6 +332,9 @@
    #define IPS_ADTYPE_SERVERAID5I1      0x0D
    #define IPS_ADTYPE_SERVERAID6M       0x0E
    #define IPS_ADTYPE_SERVERAID6I       0x0F
+   #define IPS_ADTYPE_SERVERAID7t       0x10
+   #define IPS_ADTYPE_SERVERAID7k       0x11
+   #define IPS_ADTYPE_SERVERAID7M       0x12
 
    /*
     * Adapter Command/Status Packet Definitions
@@ -1207,25 +1212,26 @@ typedef struct {
 #define IPS_VER_MAJOR_STRING "7"
 #define IPS_VER_MINOR 00
 #define IPS_VER_MINOR_STRING "00"
-#define IPS_VER_BUILD 00
-#define IPS_VER_BUILD_STRING "00"
-#define IPS_VER_STRING "7.00.00"
-#define IPS_RELEASE_ID 0x00010001
-#define IPS_BUILD_IDENT 475
-#define IPS_LEGALCOPYRIGHT_STRING "(C) Copyright IBM Corp. 1994, 2003. All Rights Reserved."
-#define IPS_ADAPTECCOPYRIGHT_STRING "(c) Copyright Adaptec, Inc. 2002 to present. All Rights Reserved."
-#define IPS_NT_LEGALCOPYRIGHT_STRING "(C) Copyright IBM Corp. 1994, 2003."
+#define IPS_VER_BUILD 15
+#define IPS_VER_BUILD_STRING "15"
+#define IPS_VER_STRING "7.00.15"
+#define IPS_RELEASE_ID 0x00020000
+#define IPS_BUILD_IDENT 625
+#define IPS_LEGALCOPYRIGHT_STRING "(C) Copyright IBM Corp. 1994, 2002. All Rights Reserved."
+#define IPS_ADAPTECCOPYRIGHT_STRING "(c) Copyright Adaptec, Inc. 2002 to 2004. All Rights Reserved."
+#define IPS_DELLCOPYRIGHT_STRING "(c) Copyright Dell 2004. All Rights Reserved."
+#define IPS_NT_LEGALCOPYRIGHT_STRING "(C) Copyright IBM Corp. 1994, 2002."
 
 /* Version numbers for various adapters */
 #define IPS_VER_SERVERAID1 "2.25.01"
 #define IPS_VER_SERVERAID2 "2.88.13"
 #define IPS_VER_NAVAJO "2.88.13"
 #define IPS_VER_SERVERAID3 "6.10.24"
-#define IPS_VER_SERVERAID4H "6.11.07"
-#define IPS_VER_SERVERAID4MLx "6.11.07"
-#define IPS_VER_SARASOTA "6.11.07"
-#define IPS_VER_MARCO "6.11.07"
-#define IPS_VER_SEBRING "6.11.07"
+#define IPS_VER_SERVERAID4H "7.00.15"
+#define IPS_VER_SERVERAID4MLx "7.00.15"
+#define IPS_VER_SARASOTA "7.00.15"
+#define IPS_VER_MARCO "7.00.15"
+#define IPS_VER_SEBRING "7.00.15"
 
 /* Compatability IDs for various adapters */
 #define IPS_COMPAT_UNKNOWN ""
