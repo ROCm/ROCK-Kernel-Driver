@@ -1,8 +1,8 @@
 /*
- * unistr.h - Exports for unicode string handling. Part of the Linux-NTFS
- *	      project.
+ * mft.h - Defines for mft record handling in NTFS Linux kernel driver.
+ *	   Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000,2001 Anton Altaparmakov.
+ * Copyright (c) 2001,2002 Anton Altaparmakov.
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -20,25 +20,28 @@
  * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef _LINUX_NTFS_UNISTR_H
-#define _LINUX_NTFS_UNISTR_H
+#ifndef _LINUX_NTFS_MFT_H
+#define _LINUX_NTFS_MFT_H
 
-#include <linux/types.h>
-#include <linux/nls.h>
+#include <linux/fs.h>
 
-extern const __u8 legal_ansi_char_array[0x40];
+#include "inode.h"
 
-int ntfs_are_names_equal(wchar_t *s1, size_t s1_len,
-			  wchar_t *s2, size_t s2_len, int ic,
-			  wchar_t *upcase, __u32 upcase_size);
+extern int format_mft_record(ntfs_inode *ni, MFT_RECORD *m);
+//extern int format_mft_record2(struct super_block *vfs_sb,
+//		const unsigned long inum, MFT_RECORD *m);
 
-int ntfs_collate_names(wchar_t *upcase, __u32 upcase_len,
-		       wchar_t *name1, __u32 name1_len,
-		       wchar_t *name2, __u32 name2_len,
-		       int ic, int err_val);
+extern MFT_RECORD *map_mft_record(const int rw, ntfs_inode *ni);
+extern void unmap_mft_record(const int rw, ntfs_inode *ni);
 
-int ntfs_wcsncasecmp(wchar_t *s1, wchar_t *s2, size_t n,
-		     wchar_t *upcase, __u32 upcase_size);
+extern MFT_RECORD *map_extent_mft_record(ntfs_inode *base_ni, MFT_REF mref,
+		ntfs_inode **ntfs_ino);
 
-#endif /* defined _LINUX_NTFS_UNISTR_H */
+static inline void unmap_extent_mft_record(ntfs_inode *ni)
+{
+	unmap_mft_record(READ, ni);
+	return;
+}
+
+#endif /* _LINUX_NTFS_MFT_H */
 
