@@ -467,7 +467,7 @@ void devfs_register_partitions (struct gendisk *dev, int minor, int unregister)
 	for (part = 1; part < max_p; part++) {
 		if ( unregister || (p[part].nr_sects < 1) ) {
 			devfs_unregister(p[part].de);
-			dev->part[p].de = NULL;
+			p[part].de = NULL;
 			continue;
 		}
 		devfs_register_partition (dev, minor, part);
