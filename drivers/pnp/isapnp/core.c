@@ -1138,7 +1138,7 @@ int __init isapnp_init(void)
 	return 0;
 }
 
-device_initcall(isapnp_init);
+subsys_initcall(isapnp_init);
 
 /* format is: noisapnp */
 
