@@ -688,7 +688,7 @@ nfs_init_locked(struct inode *inode, void *opaque)
 #define NFS_LIMIT_READDIRPLUS (8*PAGE_SIZE)
 
 #ifdef CONFIG_NFS_ACL
-static struct inode_operations nfs_special_inode_operations[] = {{
+static struct inode_operations nfs_special_inode_operations = {
 	.permission =	nfs_permission,
 	.getattr =	nfs_getattr,
 	.setattr =	nfs_setattr,
@@ -696,9 +696,7 @@ static struct inode_operations nfs_special_inode_operations[] = {{
 	.getxattr =	nfs_getxattr,
 	.setxattr =	nfs_setxattr,
 	.removexattr =	nfs_removexattr,
-}};
-#else
-#define nfs_special_inode_operations NULL
+};
 #endif  /* CONFIG_NFS_ACL */
 
 /*
@@ -755,7 +753,9 @@ nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 		} else if (S_ISLNK(inode->i_mode))
 			inode->i_op = &nfs_symlink_inode_operations;
 		else {
-			inode->i_op = nfs_special_inode_operations;
+#ifdef CONFIG_NFS_ACL
+			inode->i_op = &nfs_special_inode_operations;
+#endif
 			init_special_inode(inode, inode->i_mode, fattr->rdev);
 		}
 
