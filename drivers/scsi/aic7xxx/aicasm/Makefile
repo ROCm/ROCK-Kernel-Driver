@@ -1,15 +1,18 @@
 PROG=	aicasm
 
-.SUFFIXES= .l .y .c
+.SUFFIXES= .l .y .c .h
 
 CSRCS=	aicasm.c aicasm_symbol.c
-GENSRCS= aicasm_gram.c aicasm_scan.c
-GENHDRS= y.tab.h aicdb.h
+YSRCS=	aicasm_gram.y aicasm_macro_gram.y
+LSRCS=	aicasm_scan.l aicasm_macro_scan.l
+GENHDRS=	aicdb.h $(YSRCS:.y=.h)
+GENSRCS=	$(YSRCS:.y=.c) $(LSRCS:.l=.c)
 
-SRCS=	${GENSRCS} ${CSRCS}
+SRCS=	${CSRCS} ${GENSRCS}
 
-# Cleaned up by make clean
-clean-files := $(GENSRCS) $(GENHDRS) y.output $(PROG)
+# Cleaned up by make clean in kernel build
+clean-files := ${GENSRCS} ${GENHDRS} $(YSRCS:.y=.output) $(PROG)
+
 # Override default kernel CFLAGS.  This is a userland app.
 AICASM_CFLAGS:= -I/usr/include -I. -ldb
 YFLAGS= -d
@@ -28,7 +31,7 @@ YFLAGS+= -t -v
 LFLAGS= -d
 endif
 
-$(PROG):  $(SRCS) $(GENHDRS)
+$(PROG):  ${GENHDRS} $(SRCS)
 	$(AICASM_CC) $(AICASM_CFLAGS) $(SRCS) -o $(PROG)
 
 aicdb.h:
@@ -44,8 +47,18 @@ aicdb.h:
 		echo "*** Install db development libraries";	\
 	 fi
 
-y.tab.h aicasm_gram.c: aicasm_gram.y
-	$(YACC) $(YFLAGS) aicasm_gram.y
-	mv y.tab.c aicasm_gram.c
+aicasm_gram.c aicasm_gram.h: aicasm_gram.y
+	$(YACC) $(YFLAGS) -b $(<:.y=) $<
+	mv $(<:.y=).tab.c $(<:.y=.c)
+	mv $(<:.y=).tab.h $(<:.y=.h)
 
-aicasm_scan.c: y.tab.h
+aicasm_macro_gram.c aicasm_macro_gram.h: aicasm_macro_gram.y
+	$(YACC) $(YFLAGS) -b $(<:.y=) -p mm $<
+	mv $(<:.y=).tab.c $(<:.y=.c)
+	mv $(<:.y=).tab.h $(<:.y=.h)
+
+aicasm_scan.c: aicasm_scan.l
+	$(LEX) $(LFLAGS) -o$@ $<
+
+aicasm_macro_scan.c: aicasm_macro_scan.l
+	$(LEX) $(LFLAGS) -Pmm -o$@ $<
