@@ -61,12 +61,9 @@ struct line {
 
 struct lines {
 	int num;
-	int refcount;
 };
 
-#define LINES_INIT(n) \
-	{  num :		n, \
-	   refcount :		0 }
+#define LINES_INIT(n) {  num :		n }
 
 extern void line_interrupt(int irq, void *data, struct pt_regs *unused);
 extern void line_write_interrupt(int irq, void *data, struct pt_regs *unused);

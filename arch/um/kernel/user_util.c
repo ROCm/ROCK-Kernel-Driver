@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 2000, 2001 Jeff Dike (jdike@karaya.com)
+ * Copyright (C) 2000, 2001, 2002 Jeff Dike (jdike@karaya.com)
  * Licensed under the GPL
  */
 
@@ -182,85 +182,6 @@ void setup_hostinfo(void)
 	uname(&host);
 	sprintf(host_info, "%s %s %s %s %s", host.sysname, host.nodename,
 		host.release, host.version, host.machine);
-}
-
-void close_fd(int fd)
-{
-	close(fd);
-}
-
-char *tempdir = NULL;
-
-static void __init find_tempdir(void)
-{
-	char *dirs[] = { "TMP", "TEMP", "TMPDIR", NULL };
-	int i;
-	char *dir = NULL;
-
-	if(tempdir != NULL) return;	/* We've already been called */
-	for(i = 0; dirs[i]; i++){
-		dir = getenv(dirs[i]);
-		if(dir != NULL) break;
-	}
-	if(dir == NULL) dir = "/tmp";
-	else if(*dir == '\0') dir = NULL;
-	if(dir != NULL) {
-		tempdir = malloc(strlen(dir) + 2);
-		if(tempdir == NULL){
-			fprintf(stderr, "Failed to malloc tempdir, "
-				"errno = %d\n", errno);
-			return;
-		}
-		strcpy(tempdir, dir);
-		strcat(tempdir, "/");
-	}
-}
-
-int make_tempfile(const char *template, char **out_tempname, int do_unlink)
-{
-	char tempname[MAXPATHLEN];
-	int fd;
-
-	find_tempdir();
-	if (*template != '/')
-		strcpy(tempname, tempdir);
-	else
-		*tempname = 0;
-	strcat(tempname, template);
-	if((fd = mkstemp(tempname)) < 0){
-		fprintf(stderr, "open - cannot create %s: %s\n", tempname, 
-			strerror(errno));
-		return -1;
-	}
-	if(do_unlink && (unlink(tempname) < 0)){
-		perror("unlink");
-		return -1;
-	}
-	if(out_tempname){
-		if((*out_tempname = strdup(tempname)) == NULL){
-			perror("strdup");
-			return -1;
-		}
-	}
-	return(fd);
-}
-
-int user_read(int fd, char *buf, int len)
-{
-	int err;
-
-	err = read(fd, buf, len);
-	if(err < 0) return(-errno);
-	else return(err);
-}
-
-int user_write(int fd, char *buf, int len)
-{
-	int err;
-
-	err = write(fd, buf, len);
-	if(err < 0) return(-errno);
-	else return(err);
 }
 
 /*

@@ -99,6 +99,7 @@ static int signal_tramp(void *arg)
 
 static void last_ditch_exit(int sig)
 {
+	kmalloc_ok = 0;
 	signal(SIGINT, SIG_DFL);
 	signal(SIGTERM, SIG_DFL);
 	signal(SIGHUP, SIG_DFL);
@@ -188,7 +189,7 @@ int signals(int (*init_proc)(void *), void *sp)
 	signal(SIGPIPE, SIG_IGN);
 	setup_tracer_winch();
 	tracing_pid = os_getpid();
-	printk("tracing thread pid = %d\n", tracing_pid);
+	printf("tracing thread pid = %d\n", tracing_pid);
 
 	pid = clone(signal_tramp, sp, CLONE_FILES | SIGCHLD, init_proc);
 	n = waitpid(pid, &status, WUNTRACED);
@@ -207,7 +208,7 @@ int signals(int (*init_proc)(void *), void *sp)
 	set_handler(SIGTERM, last_ditch_exit, SA_ONESHOT | SA_NODEFER, -1);
 	set_handler(SIGHUP, last_ditch_exit, SA_ONESHOT | SA_NODEFER, -1);
 	if(debug_trace){
-		printk("Tracing thread pausing to be attached\n");
+		printf("Tracing thread pausing to be attached\n");
 		stop();
 	}
 	if(debug){
@@ -219,14 +220,14 @@ int signals(int (*init_proc)(void *), void *sp)
 			init_parent_proxy(debugger_parent);
 			err = attach(debugger_parent);
 			if(err){
-				printk("Failed to attach debugger parent %d, "
+				printf("Failed to attach debugger parent %d, "
 				       "errno = %d\n", debugger_parent, err);
 				debugger_parent = -1;
 			}
 			else {
 				if(ptrace(PTRACE_SYSCALL, debugger_parent, 
 					  0, 0) < 0){
-					printk("Failed to continue debugger "
+					printf("Failed to continue debugger "
 					       "parent, errno = %d\n", errno);
 					debugger_parent = -1;
 				}
@@ -237,7 +238,7 @@ int signals(int (*init_proc)(void *), void *sp)
 	while(1){
 		if((pid = waitpid(-1, &status, WUNTRACED)) <= 0){
 			if(errno != ECHILD){
-				printk("wait failed - errno = %d\n", errno);
+				printf("wait failed - errno = %d\n", errno);
 			}
 			continue;
 		}
@@ -314,7 +315,7 @@ int signals(int (*init_proc)(void *), void *sp)
 					ptrace(PTRACE_KILL, pid, 0, 0);
 					return(op == OP_REBOOT);
 				case OP_NONE:
-					printk("Detaching pid %d\n", pid);
+					printf("Detaching pid %d\n", pid);
 					detach(pid, SIGSTOP);
 					continue;
 				default:

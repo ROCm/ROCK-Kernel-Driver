@@ -316,11 +316,12 @@ int linux_main(int argc, char **argv)
 	end_vm = start_vm + virtmem_size;
 
 	if(virtmem_size < physmem_size)
-		printk(KERN_INFO "Kernel virtual memory size shrunk to %ld "
-		       "bytes\n", virtmem_size);
+		printf("Kernel virtual memory size shrunk to %ld bytes\n",
+		       virtmem_size);
 
 	err = reserve_vm(high_physmem, end_vm, &kernel_vm_reserved);
-	if(err)	panic("Failed to reserve VM area for kernel VM\n");
+	if(err)	
+		tracer_panic("Failed to reserve VM area for kernel VM\n");
 
   	uml_postsetup();
 

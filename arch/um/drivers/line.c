@@ -343,8 +343,6 @@ void line_register_devfs(struct lines *set, struct line_driver *line_driver,
 	driver->write_room = line_write_room;
 	driver->init_termios = tty_std_termios;
 
-	driver->refcount = &set->refcount;
-
 	if (tty_register_driver(driver))
 		panic("line_register_devfs : Couldn't register driver\n");
 
@@ -439,7 +437,6 @@ static void winch_cleanup(void)
 	list_for_each(ele, &winch_handlers){
 		winch = list_entry(ele, struct winch, list);
 		close(winch->fd);
-		free_irq_by_fd(winch->fd);
 		if(winch->pid != -1) os_kill_process(winch->pid);
 	}
 }

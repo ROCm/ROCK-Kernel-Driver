@@ -86,6 +86,7 @@ long um_stime(int * tptr)
 	return 0;
 }
 
+/* XXX Needs to be moved under sys-i386 */
 void __delay(um_udelay_t time)
 {
 	/* Stolen from the i386 __loop_delay */

@@ -104,7 +104,7 @@ static int __init set_tty_log_fd(char *name, int *add)
 
 	tty_log_fd = strtoul(name, &end, 0);
 	if(*end != '\0'){
-		printk("set_tty_log_dir - strtoul failed on '%s'\n", name);
+		printk("set_tty_log_fd - strtoul failed on '%s'\n", name);
 		tty_log_fd = -1;
 	}
 	return 0;

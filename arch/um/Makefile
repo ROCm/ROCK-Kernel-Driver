@@ -43,9 +43,8 @@ ARCH_INCLUDE = $(TOPDIR)/$(ARCH_DIR)/include
 # in CFLAGS.  Otherwise, it would cause ld to complain about the two different
 # errnos.
 
-CFLAGS += $(DEBUG) $(PROFILE) $(ARCH_CFLAGS) -D__arch_um__ \
-	-DSUBARCH=\"$(SUBARCH)\" -D_LARGEFILE64_SOURCE -I$(ARCH_INCLUDE) \
-	-Derrno=kernel_errno
+CFLAGS += $(DEBUG) $(PROFILE) -D__arch_um__ -DSUBARCH=\"$(SUBARCH)\" \
+	-D_LARGEFILE64_SOURCE -I$(ARCH_INCLUDE) -Derrno=kernel_errno
 
 LINK_WRAPS = -Wl,--wrap,malloc -Wl,--wrap,free -Wl,--wrap,calloc
 

@@ -519,8 +519,6 @@ __uml_help(eth_setup,
 "    Configure a network device.\n\n"
 );
 
-int ndev = 0;
-
 static int eth_init(void)
 {
 	struct list_head *ele, *next;
