@@ -55,16 +55,6 @@
 	#include <asm/cpufeature.h>
 #endif
 
-/* A new implementation of the V4L 1 API exists that gives drivers direct
- * access to file_operations. The old API is compatible with all 2.2 and 2.4
- * kernels, and all 2.5 kernels through 2.5.5 (at least).
- *
- * Remove this #define to enable the new API
- *
- * Note: This has nothing to do with the V4L 2 API.
- */
-#define OV511_OLD_V4L
-
 #include "ov511.h"
 
 /*
@@ -4467,16 +4457,10 @@ ov51x_dealloc(struct usb_ov511 *ov, int now)
  *
  ***************************************************************************/
 
-#ifdef OV511_OLD_V4L
-static int 
-ov51x_v4l1_open(struct video_device *vdev, int flags)
-{
-#else
 static int 
 ov51x_v4l1_open(struct inode *inode, struct file *file)
 {
 	struct video_device *vdev = video_devdata(file);
-#endif
 	struct usb_ov511 *ov = vdev->priv;
 	int err, i;
 
@@ -4519,6 +4503,7 @@ ov51x_v4l1_open(struct inode *inode, struct file *file)
 	}
 
 	ov->user++;
+	file->private_data = vdev;
 	
 	if (ov->led_policy == LED_AUTO)
 		ov51x_led_control(ov, 1);
@@ -4528,16 +4513,10 @@ out:
 	return err;
 }
 
-#ifdef OV511_OLD_V4L
-static void 
-ov51x_v4l1_close(struct video_device *vdev)
-{
-#else
 static int 
 ov51x_v4l1_close(struct inode *inode, struct file *file)
 {
-	struct video_device *vdev = video_devdata(file);
-#endif
+	struct video_device *vdev = file->private_data;
 	struct usb_ov511 *ov = vdev->priv;
 
 	PDEBUG(4, "ov511_close");
@@ -4566,16 +4545,12 @@ ov51x_v4l1_close(struct inode *inode, struct file *file)
 		up(&ov->cbuf_lock);
 
 		ov51x_dealloc(ov, 1);
-		video_unregister_device(&ov->vdev);
 		kfree(ov);
 		ov = NULL;
 	}
+	file->private_data = NULL;
 
-#ifdef OV511_OLD_V4L
-	return;
-#else
 	return 0;
-#endif
 }
 
 /* Do not call this function directly! */
@@ -5090,84 +5065,11 @@ redo:
 	return 0;
 }
 
-#ifdef OV511_OLD_V4L
-/* This is implemented as video_generic_ioctl() in the new V4L's videodev.c */
-int
-ov51x_v4l1_generic_ioctl(struct video_device *vdev, unsigned int cmd, void *arg)
-{
-	char	sbuf[128];
-	void    *mbuf = NULL;
-	void	*parg = NULL;
-	int	err  = -EINVAL;
-	
-	/*  Copy arguments into temp kernel buffer  */
-	switch (_IOC_DIR(cmd)) {
-	case _IOC_NONE:
-		parg = arg;
-		break;
-	case _IOC_READ: /* some v4l ioctls are marked wrong ... */
-	case _IOC_WRITE:
-	case (_IOC_WRITE | _IOC_READ):
-		if (_IOC_SIZE(cmd) <= sizeof(sbuf)) {
-			parg = sbuf;
-		} else {
-			/* too big to allocate from stack */
-			mbuf = kmalloc(_IOC_SIZE(cmd), GFP_KERNEL);
-			if (NULL == mbuf)
-				return -ENOMEM;
-			parg = mbuf;
-		}
-		
-		err = -EFAULT;
-		if (copy_from_user(parg, arg, _IOC_SIZE(cmd)))
-			goto out;
-		break;
-	}
-
-	err = ov51x_v4l1_ioctl_internal(vdev->priv, cmd, parg);
-	if (err == -ENOIOCTLCMD)
-		err = -EINVAL;
-	if (err < 0)
-		goto out;
-
-	/*  Copy results into user buffer  */
-	switch (_IOC_DIR(cmd))
-	{
-	case _IOC_READ:
-	case (_IOC_WRITE | _IOC_READ):
-		if (copy_to_user(arg, parg, _IOC_SIZE(cmd)))
-			err = -EFAULT;
-		break;
-	}
-
-out:
-	if (mbuf)
-		kfree(mbuf);
-	return err;
-}
-
-static int 
-ov51x_v4l1_ioctl(struct video_device *vdev, unsigned int cmd, void *arg)
-{
-	struct usb_ov511 *ov = vdev->priv;
-	int rc;
-
-	if (down_interruptible(&ov->lock))
-		return -EINTR;
-
-	rc = ov51x_v4l1_generic_ioctl(vdev, cmd, arg);
-
-	up(&ov->lock);
-	return rc;
-}
-
-#else	/* If new V4L API */
-
 static int 
 ov51x_v4l1_ioctl(struct inode *inode, struct file *file,
 		 unsigned int cmd, void *arg)
 {
-	struct video_device *vdev = video_devdata(file);
+	struct video_device *vdev = file->private_data;
 	struct usb_ov511 *ov = vdev->priv;
 	int rc;
 
@@ -5179,21 +5081,13 @@ ov51x_v4l1_ioctl(struct inode *inode, struct file *file,
 	up(&ov->lock);
 	return rc;
 }
-#endif	/* OV511_OLD_V4L */
 
-#ifdef OV511_OLD_V4L
-static inline long 
-ov51x_v4l1_read(struct video_device *vdev, char *buf, unsigned long count,
-		int noblock)
-{
-#else
 static inline int 
 ov51x_v4l1_read(struct file *file, char *buf, size_t cnt, loff_t *ppos)
 {
-	struct video_device *vdev = video_devdata(file);
+	struct video_device *vdev = file->private_data;
 	int noblock = file->f_flags&O_NONBLOCK;
 	unsigned long count = cnt;
-#endif
 	struct usb_ov511 *ov = vdev->priv;
 	int i, rc = 0, frmx = -1;
 	struct ov511_frame *frame;
@@ -5343,21 +5237,11 @@ error:
 }
 
 static int
-#ifdef OV511_OLD_V4L
-ov51x_v4l1_mmap(struct vm_area_struct *vma, struct video_device *vdev,
-		const char *adr, unsigned long size)
-{
-	unsigned long start = (unsigned long)adr;
-
-#else	/* New V4L API */
-
 ov51x_v4l1_mmap(struct file *file, struct vm_area_struct *vma)
 {
-	struct video_device *vdev = video_devdata(file);
+	struct video_device *vdev = file->private_data;
 	unsigned long start = vma->vm_start;
 	unsigned long size  = vma->vm_end - vma->vm_start;
-#endif	/* OV511_OLD_V4L */
-
 	struct usb_ov511 *ov = vdev->priv;
 	unsigned long page, pos;
 
@@ -5394,21 +5278,6 @@ ov51x_v4l1_mmap(struct file *file, struct vm_area_struct *vma)
 	return 0;
 }
 
-#ifdef OV511_OLD_V4L
-static struct video_device vdev_template = {
-	owner:		THIS_MODULE,
-	name:		"OV511 USB Camera",
-	type:		VID_TYPE_CAPTURE,
-	hardware:	VID_HARDWARE_OV511,
-	open:		ov51x_v4l1_open,
-	close:		ov51x_v4l1_close,
-	read:		ov51x_v4l1_read,
-	ioctl:		ov51x_v4l1_ioctl,
-	mmap:		ov51x_v4l1_mmap,
-};
-
-#else	/* New V4L API */
-
 static struct file_operations ov511_fops = {
 	owner:		THIS_MODULE,
 	open:		ov51x_v4l1_open,
@@ -5427,7 +5296,6 @@ static struct video_device vdev_template = {
 	fops:           &ov511_fops,
 	kernel_ioctl:	ov51x_v4l1_ioctl,
 };
-#endif	/* OV511_OLD_V4L */
 
 #if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
 static int 
@@ -6669,9 +6537,8 @@ ov51x_disconnect(struct usb_device *dev, void *ptr)
 	PDEBUG(3, "");
 
 	/* We don't want people trying to open up the device */
-	if (!ov->user)
-		video_unregister_device(&ov->vdev);
-	else
+	video_unregister_device(&ov->vdev);
+	if (ov->user)
 		PDEBUG(3, "Device open...deferring video_unregister_device");
 
 	for (n = 0; n < OV511_NUMFRAMES; n++)
