@@ -33,6 +33,7 @@
 #include <asm/semaphore.h>
 #include <asm/tlbflush.h>
 #include <asm/cacheflush.h>
+#include <asm/vga.h>
 
 #define __KERNEL_SYSCALLS__
 #include <asm/unistd.h>
@@ -90,6 +91,7 @@ EXPORT_SYMBOL(___raw_writeq);
 EXPORT_SYMBOL(_memcpy_fromio);
 EXPORT_SYMBOL(_memcpy_toio);
 EXPORT_SYMBOL(_memset_c_io);
+EXPORT_SYMBOL(scr_memcpyw);
 EXPORT_SYMBOL(insb);
 EXPORT_SYMBOL(insw);
 EXPORT_SYMBOL(insl);

@@ -12,6 +12,7 @@ obj-$(CONFIG_AGP) += agpgart.o
 
 obj-$(CONFIG_AGP_INTEL)		+= intel-agp.o
 obj-$(CONFIG_AGP_VIA)		+= via-agp.o
+obj-$(CONFIG_AGP_VIA_KT400)	+= via-kt400.o
 obj-$(CONFIG_AGP_AMD)		+= amd-k7-agp.o
 obj-$(CONFIG_AGP_SIS)		+= sis-agp.o
 obj-$(CONFIG_AGP_ALI)		+= ali-agp.o
