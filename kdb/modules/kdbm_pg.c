@@ -273,6 +273,7 @@ do_buffer(unsigned long addr)
 		 map_flags(bh.b_state, bh_state_vals));
 }
 
+#if 0
 static int
 kdbm_inode_pages(int argc, const char **argv, const char **envp,
 	struct pt_regs *regs)
@@ -372,6 +373,7 @@ kdbm_inode_pages(int argc, const char **argv, const char **envp,
 		kfree(ap);
 	return diag;
 }
+#endif
 
 static int
 kdbm_inode(int argc, const char **argv, const char **envp,
@@ -551,7 +553,9 @@ static int __init kdbm_pg_init(void)
 	kdb_register("inode", kdbm_inode, "<vaddr>", "Display inode", 0);
 	kdb_register("sb", kdbm_sb, "<vaddr>", "Display super_block", 0);
 	kdb_register("bh", kdbm_buffers, "<buffer head address>", "Display buffer", 0);
+#if 0
 	kdb_register("inode_pages", kdbm_inode_pages, "<inode *>", "Display pages in an inode", 0);
+#endif
 	kdb_register("req", kdbm_request, "<vaddr>", "dump request struct", 0);
 	kdb_register("rqueue", kdbm_rqueue, "<vaddr>", "dump request queue", 0);
 #ifdef	CONFIG_X86
