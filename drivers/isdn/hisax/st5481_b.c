@@ -119,7 +119,7 @@ static void usb_b_out(struct st5481_bcs *bcs,int buf_nr)
 
 	DBG_ISO_PACKET(0x200,urb);
 
-	SUBMIT_URB(urb, GFP_KERNEL);
+	SUBMIT_URB(urb, GFP_NOIO);
 }
 
 /*
@@ -171,8 +171,8 @@ static void usb_b_out_complete(struct urb *urb, struct pt_regs *regs)
 	buf_nr = get_buf_nr(b_out->urb, urb);
 	test_and_clear_bit(buf_nr, &b_out->busy);
 
-	if (urb->status < 0) {
-		if (urb->status != -ENOENT) {
+	if (unlikely(urb->status < 0)) {
+		if (urb->status != -ENOENT && urb->status != -ESHUTDOWN) {
 			WARN("urb status %d",urb->status);
 			if (b_out->busy == 0) {
 				st5481_usb_pipe_reset(adapter, (bcs->channel+1)*2 | USB_DIR_OUT, NULL, NULL);

@@ -85,6 +85,8 @@ struct ehci_hcd {			/* one per controller */
 	unsigned long		actions;
 	unsigned		stamp;
 
+	unsigned		is_arc_rh_tt:1;	/* ARC roothub with TT */
+
 	/* irq statistics */
 #ifdef EHCI_STATS
 	struct ehci_stats	stats;
@@ -549,6 +551,44 @@ struct ehci_fstn {
 	dma_addr_t		fstn_dma;
 	union ehci_shadow	fstn_next;	/* ptr to periodic q entry */
 } __attribute__ ((aligned (32)));
+
+/*-------------------------------------------------------------------------*/
+
+#ifdef CONFIG_USB_EHCI_ROOT_HUB_TT
+
+/*
+ * Some EHCI controllers have a Transaction Translator built into the
+ * root hub. This is a non-standard feature.  Each controller will need
+ * to add code to the following inline functions, and call them as
+ * needed (mostly in root hub code).
+ */
+
+#define	ehci_is_ARC(e)			((e)->is_arc_rh_tt)
+
+/* Returns the speed of a device attached to a port on the root hub. */
+static inline unsigned int
+ehci_port_speed(struct ehci_hcd *ehci, unsigned int portsc)
+{
+	if (ehci_is_ARC(ehci)) {
+		switch ((portsc>>26)&3) {
+		case 0:
+			return 0;
+		case 1:
+			return (1<<USB_PORT_FEAT_LOWSPEED);
+		case 2:
+		default:
+			return (1<<USB_PORT_FEAT_HIGHSPEED);
+		}
+	}
+	return (1<<USB_PORT_FEAT_HIGHSPEED);
+}
+
+#else
+
+#define	ehci_is_ARC(e)			(0)
+
+#define	ehci_port_speed(ehci, portsc)	(1<<USB_PORT_FEAT_HIGHSPEED)
+#endif
 
 /*-------------------------------------------------------------------------*/
 

@@ -78,14 +78,14 @@ typedef struct {
 #endif
 
 #ifndef CONFIG_SMP
-/*
- * Some compilers get the use of "%?" wrong in the asm below.
- */
+
+extern asmlinkage void __do_softirq(void);
+
 #define irq_exit()							\
 	do {								\
 		preempt_count() -= IRQ_EXIT_OFFSET;			\
-		if (!in_interrupt() && softirq_pending(smp_processor_id())) \
-			__asm__("bl	__do_softirq": : : "lr", "cc");/* out of line */\
+		if (!in_interrupt() && local_softirq_pending())		\
+			__do_softirq();					\
 		preempt_enable_no_resched();				\
 	} while (0)
 

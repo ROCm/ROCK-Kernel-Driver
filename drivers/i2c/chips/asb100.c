@@ -124,7 +124,7 @@ static const u16 asb100_reg_temp_hyst[]	= {0, 0x3a, 0x153, 0x253, 0x19};
 static u8 IN_TO_REG(unsigned val)
 {
 	unsigned nval = SENSORS_LIMIT(val, ASB100_IN_MIN, ASB100_IN_MAX);
-	return nval / 16;
+	return (nval + 8) / 16;
 }
 
 static unsigned IN_FROM_REG(u8 reg)
@@ -193,6 +193,7 @@ static u8 DIV_TO_REG(long val)
    data is pointed to by client->data. The structure itself is
    dynamically allocated, at the same time the client itself is allocated. */
 struct asb100_data {
+	struct i2c_client client;
 	struct semaphore lock;
 	enum chips type;
 
@@ -467,7 +468,7 @@ static ssize_t set_##reg(struct device *dev, const char *buf, \
 		data->reg[nr] = TEMP_TO_REG(val); \
 		break; \
 	} \
-	asb100_write_value(client, ASB100_REG_TEMP_##REG(nr), \
+	asb100_write_value(client, ASB100_REG_TEMP_##REG(nr+1), \
 			data->reg[nr]); \
 	return count; \
 }
@@ -722,17 +723,14 @@ static int asb100_detect(struct i2c_adapter *adapter, int address, int kind)
 	   client structure, even though we cannot fill it completely yet.
 	   But it allows us to access asb100_{read,write}_value. */
 
-	if (!(new_client = kmalloc(sizeof(struct i2c_client) +
-			sizeof(struct asb100_data), GFP_KERNEL))) {
+	if (!(data = kmalloc(sizeof(struct asb100_data), GFP_KERNEL))) {
 		pr_debug("asb100.o: detect failed, kmalloc failed!\n");
 		err = -ENOMEM;
 		goto ERROR0;
 	}
+	memset(data, 0, sizeof(struct asb100_data));
 
-	memset(new_client, 0,
-		sizeof(struct i2c_client) + sizeof(struct asb100_data));
-
-	data = (struct asb100_data *) (new_client + 1);
+	new_client = &data->client;
 	init_MUTEX(&data->lock);
 	i2c_set_clientdata(new_client, data);
 	new_client->addr = address;
@@ -807,6 +805,11 @@ static int asb100_detect(struct i2c_adapter *adapter, int address, int kind)
 	/* Initialize the chip */
 	asb100_init_client(new_client);
 
+	/* A few vars need to be filled upon startup */
+	data->fan_min[0] = asb100_read_value(new_client, ASB100_REG_FAN_MIN(0));
+	data->fan_min[1] = asb100_read_value(new_client, ASB100_REG_FAN_MIN(1));
+	data->fan_min[2] = asb100_read_value(new_client, ASB100_REG_FAN_MIN(2));
+
 	/* Register sysfs hooks */
 	device_create_file_in(new_client, 0);
 	device_create_file_in(new_client, 1);
@@ -837,7 +840,7 @@ static int asb100_detect(struct i2c_adapter *adapter, int address, int kind)
 ERROR2:
 	i2c_detach_client(new_client);
 ERROR1:
-	kfree(new_client);
+	kfree(data);
 ERROR0:
 	return err;
 }
@@ -852,14 +855,9 @@ static int asb100_detach_client(struct i2c_client *client)
 		return err;
 	}
 
-	kfree(client);
+	kfree(i2c_get_clientdata(client));
 
 	return 0;
-}
-
-static u16 swap_bytes(u16 val)
-{
-	return (val >> 8) | (val << 8);
 }
 
 /* The SMBus locks itself, usually, but nothing may access the chip between
@@ -886,17 +884,17 @@ static int asb100_read_value(struct i2c_client *client, u16 reg)
 		/* convert from ISA to LM75 I2C addresses */
 		switch (reg & 0xff) {
 		case 0x50: /* TEMP */
-			res = swap_bytes(i2c_smbus_read_word_data (cl, 0));
+			res = swab16(i2c_smbus_read_word_data (cl, 0));
 			break;
 		case 0x52: /* CONFIG */
 			res = i2c_smbus_read_byte_data(cl, 1);
 			break;
 		case 0x53: /* HYST */
-			res = swap_bytes(i2c_smbus_read_word_data (cl, 2));
+			res = swab16(i2c_smbus_read_word_data (cl, 2));
 			break;
 		case 0x55: /* MAX */
 		default:
-			res = swap_bytes(i2c_smbus_read_word_data (cl, 3));
+			res = swab16(i2c_smbus_read_word_data (cl, 3));
 			break;
 		}
 	}
@@ -934,10 +932,10 @@ static void asb100_write_value(struct i2c_client *client, u16 reg, u16 value)
 			i2c_smbus_write_byte_data(cl, 1, value & 0xff);
 			break;
 		case 0x53: /* HYST */
-			i2c_smbus_write_word_data(cl, 2, swap_bytes(value));
+			i2c_smbus_write_word_data(cl, 2, swab16(value));
 			break;
 		case 0x55: /* MAX */
-			i2c_smbus_write_word_data(cl, 3, swap_bytes(value));
+			i2c_smbus_write_word_data(cl, 3, swab16(value));
 			break;
 		}
 	}

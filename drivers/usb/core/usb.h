@@ -17,3 +17,7 @@ extern void usb_enable_interface (struct usb_device *dev,
 
 extern int usb_get_device_descriptor(struct usb_device *dev,
 		unsigned int size);
+extern int usb_set_configuration(struct usb_device *dev, int configuration);
+
+/* for labeling diagnostics */
+extern const char *usbcore_name;

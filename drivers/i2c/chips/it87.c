@@ -134,6 +134,7 @@ static int DIV_TO_REG(int val)
    dynamically allocated, at the same time when a new it87 client is
    allocated. */
 struct it87_data {
+	struct i2c_client client;
 	struct semaphore lock;
 	enum chips type;
 
@@ -366,7 +367,7 @@ static ssize_t set_sensor(struct device *dev, const char *buf,
 	else if (val == 2)
 	    data->sensor |= 8 << nr;
 	else if (val != 0)
-		return -1;
+		return -EINVAL;
 	it87_write_value(client, IT87_REG_TEMP_ENABLE, data->sensor);
 	return count;
 }
@@ -508,7 +509,7 @@ static int it87_attach_adapter(struct i2c_adapter *adapter)
 int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 {
 	int i;
-	struct i2c_client *new_client = NULL;
+	struct i2c_client *new_client;
 	struct it87_data *data;
 	int err = 0;
 	const char *name = "";
@@ -532,12 +533,12 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 			/* We need the timeouts for at least some IT87-like chips. But only
 			   if we read 'undefined' registers. */
 			i = inb_p(address + 1);
-			if (inb_p(address + 2) != i)
+			if (inb_p(address + 2) != i
+			 || inb_p(address + 3) != i
+			 || inb_p(address + 7) != i) {
+		 		err = -ENODEV;
 				goto ERROR1;
-			if (inb_p(address + 3) != i)
-				goto ERROR1;
-			if (inb_p(address + 7) != i)
-				goto ERROR1;
+			}
 #undef REALLY_SLOW_IO
 
 			/* Let's just hope nothing breaks here */
@@ -545,7 +546,8 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 			outb_p(~i & 0x7f, address + 5);
 			if ((inb_p(address + 5) & 0x7f) != (~i & 0x7f)) {
 				outb_p(i, address + 5);
-				return 0;
+				err = -ENODEV;
+				goto ERROR1;
 			}
 		}
 	}
@@ -554,16 +556,13 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 	   client structure, even though we cannot fill it completely yet.
 	   But it allows us to access it87_{read,write}_value. */
 
-	if (!(new_client = kmalloc((sizeof(struct i2c_client)) +
-					sizeof(struct it87_data),
-					GFP_KERNEL))) {
+	if (!(data = kmalloc(sizeof(struct it87_data), GFP_KERNEL))) {
 		err = -ENOMEM;
 		goto ERROR1;
 	}
-	memset(new_client, 0x00, sizeof(struct i2c_client) +
-				 sizeof(struct it87_data));
+	memset(data, 0, sizeof(struct it87_data));
 
-	data = (struct it87_data *) (new_client + 1);
+	new_client = &data->client;
 	if (is_isa)
 		init_MUTEX(&data->lock);
 	i2c_set_clientdata(new_client, data);
@@ -575,11 +574,12 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 	/* Now, we do the remaining detection. */
 
 	if (kind < 0) {
-		if (it87_read_value(new_client, IT87_REG_CONFIG) & 0x80)
-			goto ERROR1;
-		if (!is_isa
-			&& (it87_read_value(new_client, IT87_REG_I2C_ADDR) !=
-			address)) goto ERROR1;
+		if ((it87_read_value(new_client, IT87_REG_CONFIG) & 0x80)
+		  || (!is_isa
+		   && it87_read_value(new_client, IT87_REG_I2C_ADDR) != address)) {
+		   	err = -ENODEV;
+			goto ERROR2;
+		}
 	}
 
 	/* Determine the chip type. */
@@ -594,7 +594,8 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 					"Ignoring 'force' parameter for unknown chip at "
 					"adapter %d, address 0x%02x\n",
 					i2c_adapter_id(adapter), address);
-			goto ERROR1;
+			err = -ENODEV;
+			goto ERROR2;
 		}
 	}
 
@@ -613,7 +614,7 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 
 	/* Tell the I2C layer a new client has arrived */
 	if ((err = i2c_attach_client(new_client)))
-		goto ERROR1;
+		goto ERROR2;
 
 	/* Initialize the IT87 chip */
 	it87_init_client(new_client, data);
@@ -669,9 +670,9 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 
 	return 0;
 
+ERROR2:
+	kfree(data);
 ERROR1:
-	kfree(new_client);
-
 	if (is_isa)
 		release_region(address, IT87_EXTENT);
 ERROR0:
@@ -690,7 +691,7 @@ static int it87_detach_client(struct i2c_client *client)
 
 	if(i2c_is_isa_client(client))
 		release_region(client->addr, IT87_EXTENT);
-	kfree(client);
+	kfree(i2c_get_clientdata(client));
 
 	return 0;
 }

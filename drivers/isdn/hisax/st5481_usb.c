@@ -48,7 +48,7 @@ static void usb_next_ctrl_msg(struct urb *urb,
 	// Prepare the URB
 	urb->dev = adapter->usb_dev;
 
-	SUBMIT_URB(urb, GFP_KERNEL);
+	SUBMIT_URB(urb, GFP_ATOMIC);
 }
 
 /*
@@ -129,8 +129,8 @@ static void usb_ctrl_complete(struct urb *urb, struct pt_regs *regs)
 	struct st5481_ctrl *ctrl = &adapter->ctrl;
 	struct ctrl_msg *ctrl_msg;
 	
-	if (urb->status < 0) {
-		if (urb->status != -ENOENT) {
+	if (unlikely(urb->status < 0)) {
+		if (urb->status != -ENOENT && urb->status != -ESHUTDOWN) {
 			WARN("urb status %d",urb->status);
 		} else {
 			DBG(1,"urb killed");
@@ -239,7 +239,7 @@ exit:
  * initialization
  */
 
-int __devinit st5481_setup_usb(struct st5481_adapter *adapter)
+int st5481_setup_usb(struct st5481_adapter *adapter)
 {
 	struct usb_device *dev = adapter->usb_dev;
 	struct st5481_ctrl *ctrl = &adapter->ctrl;
@@ -341,7 +341,7 @@ void st5481_release_usb(struct st5481_adapter *adapter)
 /*
  *  Initialize the adapter.
  */
-void __devinit st5481_start(struct st5481_adapter *adapter)
+void st5481_start(struct st5481_adapter *adapter)
 {
 	static const u8 init_cmd_table[]={
 		SET_DEFAULT,0,
@@ -381,7 +381,7 @@ void __devinit st5481_start(struct st5481_adapter *adapter)
 /*
  * Reset the adapter to default values.
  */
-void __devexit st5481_stop(struct st5481_adapter *adapter)
+void st5481_stop(struct st5481_adapter *adapter)
 {
 	DBG(8,"");
 
@@ -392,7 +392,7 @@ void __devexit st5481_stop(struct st5481_adapter *adapter)
  * isochronous USB  helpers
  */
 
-static void __devinit
+static void
 fill_isoc_urb(struct urb *urb, struct usb_device *dev,
 	      unsigned int pipe, void *buf, int num_packets, 
 	      int packet_size, usb_complete_t complete,
@@ -417,7 +417,7 @@ fill_isoc_urb(struct urb *urb, struct usb_device *dev,
 	}
 }
 
-int __devinit
+int
 st5481_setup_isocpipes(struct urb* urb[2], struct usb_device *dev, 
 			   unsigned int pipe, int num_packets,
 			   int packet_size, int buf_size,
@@ -481,8 +481,8 @@ static void usb_in_complete(struct urb *urb, struct pt_regs *regs)
 	struct sk_buff *skb;
 	int len, count, status;
 
-	if (urb->status < 0) {
-		if (urb->status != -ENOENT) {
+	if (unlikely(urb->status < 0)) {
+		if (urb->status != -ENOENT && urb->status != -ESHUTDOWN) {
 			WARN("urb status %d",urb->status);
 		} else {
 			DBG(1,"urb killed");
@@ -529,10 +529,10 @@ static void usb_in_complete(struct urb *urb, struct pt_regs *regs)
 	urb->dev = in->adapter->usb_dev;
 	urb->actual_length = 0;
 
-	SUBMIT_URB(urb, GFP_KERNEL);
+	SUBMIT_URB(urb, GFP_ATOMIC);
 }
 
-int __devinit st5481_setup_in(struct st5481_in *in)
+int st5481_setup_in(struct st5481_in *in)
 {
 	struct usb_device *dev = in->adapter->usb_dev;
 	int retval;

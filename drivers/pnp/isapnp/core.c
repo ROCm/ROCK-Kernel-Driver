@@ -995,7 +995,7 @@ static int isapnp_read_resources(struct pnp_dev *dev, struct pnp_resource_table 
 			res->port_resource[tmp].flags = IORESOURCE_IO;
 		}
 		for (tmp = 0; tmp < PNP_MAX_MEM; tmp++) {
-			ret = isapnp_read_dword(ISAPNP_CFG_MEM + (tmp << 3));
+			ret = isapnp_read_word(ISAPNP_CFG_MEM + (tmp << 3)) << 8;
 			if (!ret)
 				continue;
 			res->mem_resource[tmp].start = ret;

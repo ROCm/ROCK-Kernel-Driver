@@ -31,6 +31,7 @@ static __inline__ void wait_ms(unsigned int ms)
 }
 
 struct usb_device;
+struct usb_driver;
 
 /*-------------------------------------------------------------------------*/
 
@@ -86,8 +87,6 @@ struct usb_host_interface {
  *	number from the USB core by calling usb_register_dev().
  * @dev: driver model's view of this device
  * @class_dev: driver model's class view of this device.
- * @released: wait for the interface to be released when changing
- *	configurations.
  *
  * USB device drivers attach to interfaces on a physical device.  Each
  * interface encapsulates a single high level function, such as feeding
@@ -123,11 +122,9 @@ struct usb_interface {
 					 * active alternate setting */
 	unsigned num_altsetting;	/* number of alternate settings */
 
-	struct usb_driver *driver;	/* driver */
 	int minor;			/* minor number this interface is bound to */
 	struct device dev;		/* interface specific device info */
 	struct class_device *class_dev;
-	struct completion *released;	/* wait for release */
 };
 #define	to_usb_interface(d) container_of(d, struct usb_interface, dev)
 #define	interface_to_usbdev(intf) \
@@ -142,6 +139,9 @@ static inline void usb_set_intfdata (struct usb_interface *intf, void *data)
 {
 	dev_set_drvdata(&intf->dev, data);
 }
+
+struct usb_interface *usb_get_intf(struct usb_interface *intf);
+void usb_put_intf(struct usb_interface *intf);
 
 /* this maximum is arbitrary */
 #define USB_MAXINTERFACES	32
@@ -318,7 +318,21 @@ extern int usb_get_current_frame_number (struct usb_device *usb_dev);
 /* used these for multi-interface device registration */
 extern int usb_driver_claim_interface(struct usb_driver *driver,
 			struct usb_interface *iface, void* priv);
-extern int usb_interface_claimed(struct usb_interface *iface);
+
+/**
+ * usb_interface_claimed - returns true iff an interface is claimed
+ * @iface: the interface being checked
+ *
+ * Returns true (nonzero) iff the interface is claimed, else false (zero).
+ * Callers must own the driver model's usb bus readlock.  So driver
+ * probe() entries don't need extra locking, but other call contexts
+ * may need to explicitly claim that lock.
+ *
+ */
+static int inline usb_interface_claimed(struct usb_interface *iface) {
+	return (iface->dev.driver != NULL);
+}
+
 extern void usb_driver_release_interface(struct usb_driver *driver,
 			struct usb_interface *iface);
 const struct usb_device_id *usb_match_id(struct usb_interface *interface,
@@ -904,7 +918,6 @@ extern int usb_string(struct usb_device *dev, int index,
 /* wrappers that also update important state inside usbcore */
 extern int usb_clear_halt(struct usb_device *dev, int pipe);
 extern int usb_reset_configuration(struct usb_device *dev);
-extern int usb_set_configuration(struct usb_device *dev, int configuration);
 extern int usb_set_interface(struct usb_device *dev, int ifnum, int alternate);
 
 /*

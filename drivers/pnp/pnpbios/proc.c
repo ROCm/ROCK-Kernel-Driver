@@ -139,7 +139,7 @@ static int proc_read_devices(char *buf, char **start, off_t pos,
 		/* 26 = the number of characters per line sprintf'ed */
 		if ((p - buf + 26) > count)
 			break;
-		if (pnp_bios_get_dev_node(&nodenum, PNPMODE_STATIC, node))
+		if (pnp_bios_get_dev_node(&nodenum, PNPMODE_DYNAMIC, node))
 			break;
 		p += sprintf(p, "%02x\t%08x\t%02x:%02x:%02x\t%04x\n",
 			     node->handle, node->eisa_id,

@@ -470,7 +470,7 @@ static dev_link_t *nmclan_attach(void)
     dev = alloc_etherdev(sizeof(mace_private));
     if (!dev)
 	return NULL;
-    lp = dev->priv;
+    lp = netdev_priv(dev);
     link = &lp->link;
     link->priv = dev;
     
@@ -707,7 +707,7 @@ static void nmclan_config(dev_link_t *link)
 {
   client_handle_t handle = link->handle;
   struct net_device *dev = link->priv;
-  mace_private *lp = dev->priv;
+  mace_private *lp = netdev_priv(dev);
   tuple_t tuple;
   cisparse_t parse;
   u_char buf[64];
@@ -875,7 +875,7 @@ nmclan_reset
 ---------------------------------------------------------------------------- */
 static void nmclan_reset(struct net_device *dev)
 {
-  mace_private *lp = dev->priv;
+  mace_private *lp = netdev_priv(dev);
 
 #if RESET_XILINX
   dev_link_t *link = &lp->link;
@@ -944,7 +944,7 @@ mace_open
 static int mace_open(struct net_device *dev)
 {
   ioaddr_t ioaddr = dev->base_addr;
-  mace_private *lp = dev->priv;
+  mace_private *lp = netdev_priv(dev);
   dev_link_t *link = &lp->link;
 
   if (!DEV_OK(link))
@@ -967,7 +967,7 @@ mace_close
 static int mace_close(struct net_device *dev)
 {
   ioaddr_t ioaddr = dev->base_addr;
-  mace_private *lp = dev->priv;
+  mace_private *lp = netdev_priv(dev);
   dev_link_t *link = &lp->link;
 
   DEBUG(2, "%s: shutting down ethercard.\n", dev->name);
@@ -1022,7 +1022,7 @@ mace_start_xmit
 
 static void mace_tx_timeout(struct net_device *dev)
 {
-  mace_private *lp = (mace_private *)dev->priv;
+  mace_private *lp = netdev_priv(dev);
   dev_link_t *link = &lp->link;
 
   printk(KERN_NOTICE "%s: transmit timed out -- ", dev->name);
@@ -1038,7 +1038,7 @@ static void mace_tx_timeout(struct net_device *dev)
 
 static int mace_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-  mace_private *lp = (mace_private *)dev->priv;
+  mace_private *lp = netdev_priv(dev);
   ioaddr_t ioaddr = dev->base_addr;
 
   netif_stop_queue(dev);
@@ -1099,7 +1099,7 @@ mace_interrupt
 static irqreturn_t mace_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
   struct net_device *dev = (struct net_device *) dev_id;
-  mace_private *lp = dev->priv;
+  mace_private *lp = netdev_priv(dev);
   ioaddr_t ioaddr = dev->base_addr;
   int status;
   int IntrCnt = MACE_MAX_IR_ITERATIONS;
@@ -1241,7 +1241,7 @@ mace_rx
 ---------------------------------------------------------------------------- */
 static int mace_rx(struct net_device *dev, unsigned char RxCnt)
 {
-  mace_private *lp = (mace_private *)dev->priv;
+  mace_private *lp = netdev_priv(dev);
   ioaddr_t ioaddr = dev->base_addr;
   unsigned char rx_framecnt;
   unsigned short rx_status;
@@ -1408,7 +1408,7 @@ update_stats
 ---------------------------------------------------------------------------- */
 static void update_stats(ioaddr_t ioaddr, struct net_device *dev)
 {
-  mace_private *lp = (mace_private *)dev->priv;
+  mace_private *lp = netdev_priv(dev);
 
   lp->mace_stats.rcvcc += mace_read(lp, ioaddr, MACE_RCVCC);
   lp->mace_stats.rntpc += mace_read(lp, ioaddr, MACE_RNTPC);
@@ -1454,7 +1454,7 @@ mace_get_stats
 ---------------------------------------------------------------------------- */
 static struct net_device_stats *mace_get_stats(struct net_device *dev)
 {
-  mace_private *lp = (mace_private *)dev->priv;
+  mace_private *lp = netdev_priv(dev);
 
   update_stats(dev->base_addr, dev);
 
@@ -1549,7 +1549,7 @@ Input
 ---------------------------------------------------------------------------- */
 static void restore_multicast_list(struct net_device *dev)
 {
-  mace_private *lp = (mace_private *)dev->priv;
+  mace_private *lp = netdev_priv(dev);
   int num_addrs = lp->multicast_num_addrs;
   int *ladrf = lp->multicast_ladrf;
   ioaddr_t ioaddr = dev->base_addr;
@@ -1606,7 +1606,7 @@ Output
 
 static void set_multicast_list(struct net_device *dev)
 {
-  mace_private *lp = (mace_private *)dev->priv;
+  mace_private *lp = netdev_priv(dev);
   int adr[ETHER_ADDR_LEN] = {0}; /* Ethernet address */
   int i;
   struct dev_mc_list *dmi = dev->mc_list;
@@ -1645,10 +1645,10 @@ static void set_multicast_list(struct net_device *dev)
 static void restore_multicast_list(struct net_device *dev)
 {
   ioaddr_t ioaddr = dev->base_addr;
-  mace_private *lp = (mace_private *)dev->priv;
+  mace_private *lp = netdev_priv(dev);
 
   DEBUG(2, "%s: restoring Rx mode to %d addresses.\n", dev->name,
-	((mace_private *)(dev->priv))->multicast_num_addrs);
+	lp->multicast_num_addrs);
 
   if (dev->flags & IFF_PROMISC) {
     /* Promiscuous mode: receive all packets */
@@ -1665,7 +1665,7 @@ static void restore_multicast_list(struct net_device *dev)
 
 static void set_multicast_list(struct net_device *dev)
 {
-  mace_private *lp = (mace_private *)dev->priv;
+  mace_private *lp = netdev_priv(dev);
 
 #ifdef PCMCIA_DEBUG
   if (pc_debug > 1) {

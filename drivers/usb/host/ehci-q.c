@@ -165,7 +165,10 @@ static void qtd_copy_status (
 		/* if async CSPLIT failed, try cleaning out the TT buffer */
 		} else if (urb->dev->tt && !usb_pipeint (urb->pipe)
 				&& ((token & QTD_STS_MMF) != 0
-					|| QTD_CERR(token) == 0)) {
+					|| QTD_CERR(token) == 0)
+				&& (!ehci_is_ARC(ehci)
+                	                || urb->dev->tt->hub !=
+						ehci->hcd.self.root_hub)) {
 #ifdef DEBUG
 			struct usb_device *tt = urb->dev->tt->hub;
 			dev_dbg (&tt->dev,
@@ -576,7 +579,7 @@ clear_toggle (struct usb_device *udev, int ep, int is_out, struct ehci_qh *qh)
 // when each interface/altsetting is established.  Unlink
 // any previous qh and cancel its urbs first; endpoints are
 // implicitly reset then (data toggle too).
-// That'd mean updating how usbcore talks to HCDs. (2.5?)
+// That'd mean updating how usbcore talks to HCDs. (2.7?)
 
 
 /*
@@ -674,7 +677,13 @@ qh_make (
 
 		info2 |= (EHCI_TUNE_MULT_TT << 30);
 		info2 |= urb->dev->ttport << 23;
-		info2 |= urb->dev->tt->hub->devnum << 16;
+
+		/* set the address of the TT; for ARC's integrated
+		 * root hub tt, leave it zeroed.
+		 */
+		if (!ehci_is_ARC(ehci)
+				|| urb->dev->tt->hub != ehci->hcd.self.root_hub)
+			info2 |= urb->dev->tt->hub->devnum << 16;
 
 		/* NOTE:  if (PIPE_INTERRUPT) { scheduler sets c-mask } */
 

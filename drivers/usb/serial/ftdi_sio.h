@@ -160,7 +160,44 @@
 #define PROTEGO_SPECIAL_1	0xFC70	/* special/unknown device */
 #define PROTEGO_R2X0		0xFC71	/* R200-USB TRNG unit (R210, R220, and R230) */
 #define PROTEGO_SPECIAL_3	0xFC72	/* special/unknown device */
-#define PROTEGO_SPECIAL_4	0xFC73	/* special/unknown device */ 
+#define PROTEGO_SPECIAL_4	0xFC73	/* special/unknown device */
+
+/*
+ * Gude Analog- und Digitalsysteme GmbH
+ */
+#define FTDI_GUDEADS_E808_PID    0xE808
+#define FTDI_GUDEADS_E809_PID    0xE809
+#define FTDI_GUDEADS_E80A_PID    0xE80A
+#define FTDI_GUDEADS_E80B_PID    0xE80B
+#define FTDI_GUDEADS_E80C_PID    0xE80C
+#define FTDI_GUDEADS_E80D_PID    0xE80D
+#define FTDI_GUDEADS_E80E_PID    0xE80E
+#define FTDI_GUDEADS_E80F_PID    0xE80F
+#define FTDI_GUDEADS_E888_PID    0xE888  /* Expert ISDN Control USB */
+#define FTDI_GUDEADS_E889_PID    0xE889  /* USB RS-232 OptoBridge */
+#define FTDI_GUDEADS_E88A_PID    0xE88A
+#define FTDI_GUDEADS_E88B_PID    0xE88B
+#define FTDI_GUDEADS_E88C_PID    0xE88C
+#define FTDI_GUDEADS_E88D_PID    0xE88D
+#define FTDI_GUDEADS_E88E_PID    0xE88E
+#define FTDI_GUDEADS_E88F_PID    0xE88F
+
+/*
+ * Linx Technologies product ids
+ */
+#define LINX_SDMUSBQSS_PID	0xF448	/* Linx SDM-USB-QS-S */
+#define LINX_MASTERDEVEL2_PID   0xF449   /* Linx Master Development 2.0 */
+#define LINX_FUTURE_0_PID   0xF44A   /* Linx future device */
+#define LINX_FUTURE_1_PID   0xF44B   /* Linx future device */
+#define LINX_FUTURE_2_PID   0xF44C   /* Linx future device */
+#define FTDI_GUDEADS_889_PID    0xe889  /* USB RS323 OptoBridge */ 
+/* CCS Inc. ICDU/ICDU40 product ID - the FT232BM is used in an in-circuit-debugger */
+/* unit for PIC16's/PIC18's */
+#define FTDI_CCSICDU20_0_PID    0xF9D0     
+#define FTDI_CCSICDU40_1_PID    0xF9D1     
+
+/* Inside Accesso contactless reader (http://www.insidefr.com) */
+#define INSIDE_ACCESSO		0xFAD0
 
 /* Commands */
 #define FTDI_SIO_RESET 		0 /* Reset the port */

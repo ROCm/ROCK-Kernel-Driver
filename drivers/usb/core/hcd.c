@@ -42,6 +42,8 @@
 #include <asm/byteorder.h>
 
 #include <linux/usb.h>
+
+#include "usb.h"
 #include "hcd.h"
 
 
@@ -416,9 +418,14 @@ static int rh_call_control (struct usb_hcd *hcd, struct urb *urb)
 
 	default:
 		/* non-generic request */
-		urb->status = hcd->driver->hub_control (hcd,
-			typeReq, wValue, wIndex,
-			ubuf, wLength);
+		if (HCD_IS_SUSPENDED (hcd->state))
+			urb->status = -EAGAIN;
+		else if (!HCD_IS_RUNNING (hcd->state))
+			urb->status = -ENODEV;
+		else
+			urb->status = hcd->driver->hub_control (hcd,
+				typeReq, wValue, wIndex,
+				ubuf, wLength);
 		break;
 error:
 		/* "protocol stall" on error */
@@ -678,8 +685,10 @@ int usb_register_bus(struct usb_bus *bus)
 	if (busnum < USB_MAXBUS) {
 		set_bit (busnum, busmap.busmap);
 		bus->busnum = busnum;
-	} else
-		warn ("too many buses");
+	} else {
+		printk (KERN_ERR "%s: too many buses\n", usbcore_name);
+		return -E2BIG;
+	}
 
 	snprintf(bus->class_dev.class_id, BUS_ID_SIZE, "usb%d", busnum);
 	bus->class_dev.class = &usb_host_class;
@@ -804,7 +813,7 @@ long usb_calc_bus_time (int speed, int is_input, int isoc, int bytecount)
 			tmp = HS_USECS_ISO (bytecount);
 		return tmp;
 	default:
-		dbg ("bogus device speed!");
+		pr_debug ("%s: bogus device speed!\n", usbcore_name);
 		return -1;
 	}
 }

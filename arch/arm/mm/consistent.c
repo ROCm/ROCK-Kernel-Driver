@@ -162,6 +162,7 @@ __dma_alloc(struct device *dev, size_t size, dma_addr_t *handle, int gfp,
 	if ((limit && size >= limit) || size >= (CONSISTENT_END - CONSISTENT_BASE)) {
 		printk(KERN_WARNING "coherent allocation too big (requested %#x mask %#Lx)\n",
 		       size, mask);
+		*handle = ~0;
 		return NULL;
 	}
 

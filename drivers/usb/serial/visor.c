@@ -189,6 +189,7 @@ static void visor_read_bulk_callback	(struct urb *urb, struct pt_regs *regs);
 static void visor_read_int_callback	(struct urb *urb, struct pt_regs *regs);
 static int  clie_3_5_startup	(struct usb_serial *serial);
 static int  treo_attach		(struct usb_serial *serial);
+static int clie_5_attach (struct usb_serial *serial);
 static int palm_os_3_probe (struct usb_serial *serial, const struct usb_device_id *id);
 static int palm_os_4_probe (struct usb_serial *serial, const struct usb_device_id *id);
 
@@ -231,8 +232,6 @@ static struct usb_device_id id_table [] = {
 		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_NX60_ID),
 		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
-	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_UX50_ID),
-		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_NZ90V_ID),
 		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_TJ25_ID),
@@ -244,6 +243,13 @@ static struct usb_device_id id_table [] = {
 	{ USB_DEVICE(GARMIN_VENDOR_ID, GARMIN_IQUE_3600_ID), 
 		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
 	{ USB_DEVICE(ACEECA_VENDOR_ID, ACEECA_MEZ1000_ID),
+		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
+	{ },					/* optional parameter entry */
+	{ }					/* Terminating entry */
+};
+
+static struct usb_device_id clie_id_5_table [] = {
+	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_UX50_ID),
 		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
 	{ },					/* optional parameter entry */
 	{ }					/* Terminating entry */
@@ -309,6 +315,34 @@ static struct usb_serial_device_type handspring_device = {
 	.throttle =		visor_throttle,
 	.unthrottle =		visor_unthrottle,
 	.attach =		treo_attach,
+	.probe =		visor_probe,
+	.calc_num_ports =	visor_calc_num_ports,
+	.shutdown =		visor_shutdown,
+	.ioctl =		visor_ioctl,
+	.set_termios =		visor_set_termios,
+	.write =		visor_write,
+	.write_room =		visor_write_room,
+	.chars_in_buffer =	visor_chars_in_buffer,
+	.write_bulk_callback =	visor_write_bulk_callback,
+	.read_bulk_callback =	visor_read_bulk_callback,
+	.read_int_callback =	visor_read_int_callback,
+};
+
+/* All of the device info needed for the Clie UX50, TH55 Palm 5.0 devices */
+static struct usb_serial_device_type clie_5_device = {
+	.owner =		THIS_MODULE,
+	.name =			"Sony Clie 5.0",
+	.short_name =		"clie_5",
+	.id_table =		clie_id_5_table,
+	.num_interrupt_in =	NUM_DONT_CARE,
+	.num_bulk_in =		2,
+	.num_bulk_out =		2,
+	.num_ports =		2,
+	.open =			visor_open,
+	.close =		visor_close,
+	.throttle =		visor_throttle,
+	.unthrottle =		visor_unthrottle,
+	.attach =		clie_5_attach,
 	.probe =		visor_probe,
 	.calc_num_ports =	visor_calc_num_ports,
 	.shutdown =		visor_shutdown,
@@ -893,6 +927,27 @@ static int treo_attach (struct usb_serial *serial)
 	return 0;
 }
 
+static int clie_5_attach (struct usb_serial *serial)
+{
+	dbg("%s", __FUNCTION__);
+
+	/* TH55 registers 2 ports. 
+	   Communication in from the UX50/TH55 uses bulk_in_endpointAddress from port 0 
+	   Communication out to the UX50/TH55 uses bulk_out_endpointAddress from port 1 
+	   
+	   Lets do a quick and dirty mapping
+	 */
+	
+	/* some sanity check */
+	if (serial->num_ports < 2)
+		return -1;
+		
+	/* port 0 now uses the modified endpoint Address */
+	serial->port[0]->bulk_out_endpointAddress = serial->port[1]->bulk_out_endpointAddress;
+
+	return 0;
+}
+
 static void visor_shutdown (struct usb_serial *serial)
 {
 	dbg("%s", __FUNCTION__);
@@ -1008,6 +1063,9 @@ static int __init visor_init (void)
 	retval = usb_serial_register(&clie_3_5_device);
 	if (retval)
 		goto failed_clie_3_5_register;
+	retval = usb_serial_register(&clie_5_device);
+	if (retval)
+		goto failed_clie_5_register;
 	retval = usb_register(&visor_driver);
 	if (retval) 
 		goto failed_usb_register;
@@ -1015,6 +1073,8 @@ static int __init visor_init (void)
 
 	return 0;
 failed_usb_register:
+	usb_serial_deregister(&clie_5_device);
+failed_clie_5_register:
 	usb_serial_deregister(&clie_3_5_device);
 failed_clie_3_5_register:
 	usb_serial_deregister(&handspring_device);
@@ -1028,6 +1088,7 @@ static void __exit visor_exit (void)
 	usb_deregister (&visor_driver);
 	usb_serial_deregister (&handspring_device);
 	usb_serial_deregister (&clie_3_5_device);
+	usb_serial_deregister (&clie_5_device);
 }
 
 

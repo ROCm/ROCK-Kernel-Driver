@@ -305,7 +305,7 @@ static int powermate_probe(struct usb_interface *intf, const struct usb_device_i
 	int pipe, maxp;
 	char path[64];
 
-	interface = intf->altsetting + 0;
+	interface = intf->cur_altsetting;
 	endpoint = &interface->endpoint[0].desc;
 	if (!(endpoint->bEndpointAddress & 0x80))
 		return -EIO;
