@@ -7,7 +7,6 @@
 #include <net/xfrm.h>
 #include <net/ip.h>
 #include <net/icmp.h>
-#include <net/inet_ecn.h>
 
 int xfrm4_tunnel_check_size(struct sk_buff *skb)
 {
