@@ -555,17 +555,20 @@ static void tcp_event_data_recv(struct sock *sk, struct tcp_opt *tp, struct sk_b
 		tcp_grow_window(sk, tp, skb);
 }
 
-/* Set up a new TCP connection, depending on whether it should be
- * using Vegas or not.
- */    
-void tcp_vegas_init(struct tcp_opt *tp)
+/* When starting a new connection, pin down the current choice of 
+ * congestion algorithm.
+ */
+void tcp_ca_init(struct tcp_opt *tp)
 {
-	if (sysctl_tcp_vegas_cong_avoid) {
-		tp->vegas.do_vegas = 1;
+	if (sysctl_tcp_westwood) 
+		tp->adv_cong = TCP_WESTWOOD;
+	else if (sysctl_tcp_bic)
+		tp->adv_cong = TCP_BIC;
+	else if (sysctl_tcp_vegas_cong_avoid) {
+		tp->adv_cong = TCP_VEGAS;
 		tp->vegas.baseRTT = 0x7fffffff;
 		tcp_vegas_enable(tp);
-	} else 
-		tcp_vegas_disable(tp);
+	} 
 }
 
 /* Do RTT sampling needed for Vegas.
@@ -2039,7 +2042,7 @@ tcp_ack_update_rtt(struct tcp_opt *tp, int flag, s32 seq_rtt)
 static inline __u32 bictcp_cwnd(struct tcp_opt *tp)
 {
 	/* orignal Reno behaviour */
-	if (!sysctl_tcp_bic)
+	if (!tcp_is_bic(tp))
 		return tp->snd_cwnd;
 
 	if (tp->bictcp.last_cwnd == tp->snd_cwnd &&
