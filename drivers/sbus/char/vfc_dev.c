@@ -253,7 +253,7 @@ static int vfc_debug(struct vfc_dev *dev, int cmd, unsigned long arg)
 		vfc_lock_device(dev);
 		inout.ret=
 			vfc_i2c_sendbuf(dev,inout.addr & 0xff,
-					inout.buffer,inout.len);
+					buffer,inout.len);
 
 		if (copy_to_user((void *)arg,&inout,sizeof(inout))) {
 			kfree(buffer);
@@ -611,13 +611,12 @@ static int vfc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	return ret;
 }
 
-static int vfc_mmap(struct inode *inode, struct file *file, 
-		    struct vm_area_struct *vma) 
+static int vfc_mmap(struct file *file, struct vm_area_struct *vma) 
 {
 	unsigned int map_size, ret, map_offset;
 	struct vfc_dev *dev;
 	
-	dev = vfc_get_dev_ptr(iminor(inode));
+	dev = vfc_get_dev_ptr(iminor(file->f_dentry->d_inode));
 	if(dev == NULL)
 		return -ENODEV;
 

@@ -40,9 +40,9 @@
  */
 
 # define BPP_PUT_PINS _IOW('B', 1, int)
-# define BPP_GET_PINS _IOR('B', 2, void)
+# define BPP_GET_PINS _IOR('B', 2, char) /* that's bogus - should've been _IO */
 # define BPP_PUT_DATA _IOW('B', 3, int)
-# define BPP_GET_DATA _IOR('B', 4, void)
+# define BPP_GET_DATA _IOR('B', 4, char) /* ditto */
 
 /*
  * Set the data bus to input mode. Disengage the data bin driver and
