@@ -325,9 +325,7 @@ static int ti113x_override(struct yenta_socket *socket)
 static int ti1250_init(struct pcmcia_socket *sock)
 {
 	struct yenta_socket *socket = container_of(sock, struct yenta_socket, socket);
-	yenta_init(sock);
 	ti113x_init(sock);
-	ti_set_zv(sock);
 	ti_irqmux(socket) = config_readl(socket, TI122X_IRQMUX);
 	ti_irqmux(socket) = (ti_irqmux(socket) & ~0x0f) | 0x02; /* route INTA */
 	if (!(ti_sysctl(socket) & TI122X_SCR_INTRTIE))
