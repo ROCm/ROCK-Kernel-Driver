@@ -1881,8 +1881,7 @@ intr_parent(struct device_node *p)
  * Find out the size of each entry of the interrupts property
  * for a node.
  */
-static int __devinit
-prom_n_intr_cells(struct device_node *np)
+int __devinit prom_n_intr_cells(struct device_node *np)
 {
 	struct device_node *p;
 	unsigned int *icp;
@@ -1896,7 +1895,7 @@ prom_n_intr_cells(struct device_node *np)
 		    || get_property(p, "interrupt-map", NULL) != NULL) {
 			printk("oops, node %s doesn't have #interrupt-cells\n",
 			       p->full_name);
-		return 1;
+			return 1;
 		}
 	}
 #ifdef DEBUG_IRQ
