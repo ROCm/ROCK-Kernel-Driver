@@ -212,6 +212,15 @@ menuconfig EMBEDDED
 	  a "non-standard" kernel.  Only use this if you really know what you
 	  are doing.
 
+config DELAY_ACCT
+	bool "Enable delay accounting (EXPERIMENTAL)"
+	help
+	  In addition to counting frequency the total delay in ns is also
+	  recorded. CPU delays are specified as cpu-wait and cpu-run. Memory
+	  delay is recorded for minor and major faults. Information is
+	  accessible through /proc/<pid>/delay.
+
+
 config KALLSYMS
 	 bool "Load all symbols for debugging/kksymoops" if EMBEDDED
 	 default y
@@ -332,4 +341,24 @@ config STOP_MACHINE
 	depends on (SMP && MODULE_UNLOAD) || HOTPLUG_CPU
 	help
 	  Need stop_machine() primitive.
+
+config CKRM
+	bool "Class Based Kernel Resource Management"
+	depends on EXPERIMENTAL
+	help
+	  This option adds CKRM support to the Kernel. Say N if you are unsure.
+
+config CKRM_RES_DUMMY
+	tristate "Dummy Resource Manager for CKRM"
+	depends on CKRM
+	default m
+	help
+	  Provides a Dummy Resource Manager for CKRM
+config CKRM_RES_SOCKETAQ
+	tristate "Multiple Accept Queues Resource Manager for CKRM"
+	depends on CKRM
+	help
+	  Provides a  Resource Manager for CKRM to manage the accept queue 
+	  weights. Say N if you are unsure.
+
 endmenu

@@ -1663,15 +1663,20 @@ int handle_mm_fault(struct mm_struct *mm, struct vm_area_struct * vma,
 	 * We need the page table lock to synchronize with kswapd
 	 * and the SMP-safe atomic PTE updates.
 	 */
+	set_delay_flag(current,PF_MEMIO);
 	spin_lock(&mm->page_table_lock);
 	pmd = pmd_alloc(mm, pgd, address);
 
 	if (pmd) {
 		pte_t * pte = pte_alloc_map(mm, pmd, address);
-		if (pte)
-			return handle_pte_fault(mm, vma, address, write_access, pte, pmd);
+		if (pte) {
+			int rc = handle_pte_fault(mm, vma, address, write_access, pte, pmd);
+			clear_delay_flag(current,PF_MEMIO);
+			return rc;
+		}
 	}
 	spin_unlock(&mm->page_table_lock);
+	clear_delay_flag(current,PF_MEMIO);
 	return VM_FAULT_OOM;
 }
 

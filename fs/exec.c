@@ -47,6 +47,7 @@
 #include <linux/syscalls.h>
 #include <linux/objrmap.h>
 #include <linux/trigevent_hooks.h>
+#include <linux/ckrm.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
@@ -1156,6 +1157,8 @@ int do_execve(char * filename,
 			file->f_dentry->d_name.name, regs);
 
 		free_arg_pages(&bprm);
+
+		ckrm_cb_exec(filename);
 
 		/* execve success */
 		security_bprm_free(&bprm);

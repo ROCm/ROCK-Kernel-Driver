@@ -815,6 +815,12 @@ config NTFS_RW
 
 	  It is perfectly safe to say N here.
 
+config RCFS_FS
+       tristate "Resource Class File System for CKRM"
+       depends on EXPERIMENTAL
+       help
+	 This option adds CKRM support to the Kernel. Say N if you are unsure.
+
 endmenu
 
 menu "Pseudo filesystems"

@@ -1692,9 +1692,12 @@ switch_tasks:
 		if (!(HIGH_CREDIT(prev) || LOW_CREDIT(prev)))
 			prev->interactive_credit--;
 	}
+	add_delay_ts(prev,runcpu_total,prev->timestamp,now);
 	prev->timestamp = now;
 
 	if (likely(prev != next)) {
+		add_delay_ts(next,waitcpu_total,next->timestamp,now);
+		inc_delay(next,runs);
 		next->timestamp = now;
 		rq->nr_switches++;
 		rq->curr = next;
@@ -2463,10 +2466,13 @@ EXPORT_SYMBOL(yield);
 void io_schedule(void)
 {
 	struct runqueue *rq = this_rq();
+	def_delay_var(dstart);
 
+	start_delay_set(dstart,PF_IOWAIT);
 	atomic_inc(&rq->nr_iowait);
 	schedule();
 	atomic_dec(&rq->nr_iowait);
+	add_io_delay(dstart);
 }
 
 EXPORT_SYMBOL(io_schedule);
@@ -2475,10 +2481,13 @@ long io_schedule_timeout(long timeout)
 {
 	struct runqueue *rq = this_rq();
 	long ret;
+	def_delay_var(dstart);
 
+	start_delay_set(dstart,PF_IOWAIT);
 	atomic_inc(&rq->nr_iowait);
 	ret = schedule_timeout(timeout);
 	atomic_dec(&rq->nr_iowait);
+	add_io_delay(dstart);
 	return ret;
 }
 
@@ -3055,6 +3064,14 @@ task_t *kdb_cpu_curr(int cpu)
 {
 	return(cpu_curr(cpu));
 }
+#endif
+
+#ifdef CONFIG_DELAY_ACCT
+int task_running_sys(struct task_struct *p)
+{
+       return task_running(task_rq(p),p);
+}
+EXPORT_SYMBOL(task_running_sys);
 #endif
 
 static int __init init_desktop(char *str)

@@ -46,6 +46,9 @@
 #include <asm/io.h>
 #include <asm/bugs.h>
 
+#include <linux/ckrm.h>
+#include <linux/ckrm_res.h>
+
 /*
  * This is one of the first .c files built. Error out early
  * if we have compiler trouble..
@@ -462,6 +465,7 @@ asmlinkage void __init start_kernel(void)
 	rcu_init();
 	init_IRQ();
 	pidhash_init();
+	ckrm_init();
 	sched_init();
 	softirq_init();
 	time_init();
