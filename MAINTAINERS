@@ -2044,6 +2044,12 @@ M:	thomas@winischhofer.net
 W:	http://www.winischhofer.net/linuxsisvga.shtml
 S:	Maintained	
 
+SIS USB2VGA DRIVER
+P:	Thomas Winischhofer
+M:	thomas@winischhofer.net
+W:	http://www.winischhofer.at/linuxsisusbvga.shtml
+S:	Maintained
+
 SMSC47M1 HARDWARE MONITOR DRIVER
 P:	Jean Delvare
 M:	khali@linux-fr.org
@@ -2491,6 +2497,14 @@ P:	Luca Risolia
 M:	luca.risolia@studio.unibo.it
 L:	linux-usb-devel@lists.sourceforge.net
 W:	http://www.linux-projects.org
+S:	Maintained
+
+USB ZD1201 DRIVER
+P:	Jeroen Vreeken
+M:	pe1rxq@amsat.org
+L:	linux-usb-users@lists.sourceforge.net
+L:	linux-usb-devel@lists.sourceforge.net
+W:	http://linux-lc100020.sourceforge.net
 S:	Maintained
 
 USER-MODE LINUX

@@ -3426,6 +3426,7 @@ N: Jeroen Vreeken
 E: pe1rxq@amsat.org
 W: http://www.chello.nl/~j.vreeken/
 D: SE401 usb webcam driver
+D: ZD1201 usb wireless lan driver
 S: Maastrichterweg 63
 S: 5554 GG Valkenswaard
 S: The Netherlands

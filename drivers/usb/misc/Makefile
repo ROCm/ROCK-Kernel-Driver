@@ -16,3 +16,5 @@ obj-$(CONFIG_USB_PHIDGETSERVO)	+= phidgetservo.o
 obj-$(CONFIG_USB_RIO500)	+= rio500.o
 obj-$(CONFIG_USB_TEST)		+= usbtest.o
 obj-$(CONFIG_USB_USS720)	+= uss720.o
+
+obj-$(CONFIG_USB_SISUSBVGA)	+= sisusbvga/

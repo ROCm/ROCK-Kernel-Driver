@@ -137,6 +137,8 @@ config USB_IDMOUSE
 
 	  See also <http://www.fs.tum.de/~echtler/idmouse/>.
 
+source "drivers/usb/misc/sisusbvga/Kconfig"
+
 config USB_TEST
 	tristate "USB testing driver (DEVELOPMENT)"
 	depends on USB && USB_DEVICEFS && EXPERIMENTAL
