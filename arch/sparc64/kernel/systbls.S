@@ -57,7 +57,7 @@ sys_call_table32:
 	.word sys_setsid, sys_fchdir, sys_fgetxattr, sys_listxattr, sys_llistxattr
 /*180*/	.word sys_flistxattr, sys_removexattr, sys_lremovexattr, sys32_sigpending, sys32_query_module
 	.word sys_setpgid, sys_fremovexattr, sys_tkill, sys_exit_group, sparc64_newuname
-/*190*/	.word sys32_init_module, sparc64_personality, sys_nis_syscall, sys_nis_syscall, sys_nis_syscall
+/*190*/	.word sys32_init_module, sparc64_personality, sys_remap_file_pages, sys_nis_syscall, sys_nis_syscall
 	.word sys_nis_syscall, sys_nis_syscall, sys_getppid, sys32_sigaction, sys_sgetmask
 /*200*/	.word sys_ssetmask, sys_sigsuspend, sys32_newlstat, sys_uselib, old32_readdir
 	.word sys32_readahead, sys32_socketcall, sys_syslog, sys_lookup_dcookie, sys_nis_syscall
@@ -116,7 +116,7 @@ sys_call_table:
 	.word sys_setsid, sys_fchdir, sys_fgetxattr, sys_listxattr, sys_llistxattr
 /*180*/	.word sys_flistxattr, sys_removexattr, sys_lremovexattr, sys_nis_syscall, sys_query_module
 	.word sys_setpgid, sys_fremovexattr, sys_tkill, sys_exit_group, sparc64_newuname
-/*190*/	.word sys_init_module, sparc64_personality, sys_nis_syscall, sys_nis_syscall, sys_nis_syscall
+/*190*/	.word sys_init_module, sparc64_personality, sys_remap_file_pages, sys_nis_syscall, sys_nis_syscall
 	.word sys_nis_syscall, sys_nis_syscall, sys_getppid, sys_nis_syscall, sys_sgetmask
 /*200*/	.word sys_ssetmask, sys_nis_syscall, sys_newlstat, sys_uselib, sys_nis_syscall
 	.word sys_readahead, sys_socketcall, sys_syslog, sys_lookup_dcookie, sys_nis_syscall
