@@ -9,6 +9,7 @@
  * most "normal" filesystems (but you don't /have/ to use this:
  * the NFS filesystem used to do this differently, for example)
  */
+#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/compiler.h>
@@ -245,37 +246,6 @@ int add_to_page_cache_lru(struct page *page,
 	if (ret == 0)
 		lru_cache_add(page);
 	return ret;
-}
-
-/*
- * This adds the requested page to the page cache if it isn't already there,
- * and schedules an I/O to read in its contents from disk.
- */
-static int FASTCALL(page_cache_read(struct file * file, unsigned long offset));
-static int page_cache_read(struct file * file, unsigned long offset)
-{
-	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
-	struct page *page; 
-	int error;
-
-	page = page_cache_alloc_cold(mapping);
-	if (!page)
-		return -ENOMEM;
-
-	error = add_to_page_cache_lru(page, mapping, offset);
-	if (!error) {
-		error = mapping->a_ops->readpage(file, page);
-		page_cache_release(page);
-		return error;
-	}
-
-	/*
-	 * We arrive here in the unlikely event that someone 
-	 * raced with us and added our page to the cache first
-	 * or we are out of memory for radix-tree nodes.
-	 */
-	page_cache_release(page);
-	return error == -EEXIST ? 0 : error;
 }
 
 /*
@@ -978,6 +948,38 @@ asmlinkage ssize_t sys_readahead(int fd, loff_t offset, size_t count)
 	return ret;
 }
 
+#ifdef CONFIG_MMU
+/*
+ * This adds the requested page to the page cache if it isn't already there,
+ * and schedules an I/O to read in its contents from disk.
+ */
+static int FASTCALL(page_cache_read(struct file * file, unsigned long offset));
+static int page_cache_read(struct file * file, unsigned long offset)
+{
+	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
+	struct page *page; 
+	int error;
+
+	page = page_cache_alloc_cold(mapping);
+	if (!page)
+		return -ENOMEM;
+
+	error = add_to_page_cache_lru(page, mapping, offset);
+	if (!error) {
+		error = mapping->a_ops->readpage(file, page);
+		page_cache_release(page);
+		return error;
+	}
+
+	/*
+	 * We arrive here in the unlikely event that someone 
+	 * raced with us and added our page to the cache first
+	 * or we are out of memory for radix-tree nodes.
+	 */
+	page_cache_release(page);
+	return error == -EEXIST ? 0 : error;
+}
+
 /*
  * filemap_nopage() is invoked via the vma operations vector for a
  * mapped memory region to read in file data during a page fault.
@@ -986,7 +988,6 @@ asmlinkage ssize_t sys_readahead(int fd, loff_t offset, size_t count)
  * it in the page cache, and handles the special cases reasonably without
  * having a lot of duplicated code.
  */
-
 struct page * filemap_nopage(struct vm_area_struct * area, unsigned long address, int unused)
 {
 	int error;
@@ -1320,6 +1321,12 @@ int generic_file_mmap(struct file * file, struct vm_area_struct * vma)
 	vma->vm_ops = &generic_file_vm_ops;
 	return 0;
 }
+#else
+int generic_file_mmap(struct file * file, struct vm_area_struct * vma)
+{
+	return -ENOSYS;
+}
+#endif /* CONFIG_MMU */
 
 static inline struct page *__read_cache_page(struct address_space *mapping,
 				unsigned long index,
