@@ -560,13 +560,15 @@ struct obsolete_modparm {
 	char type[64-sizeof(void *)];
 	void *addr;
 };
+
+extern void __deprecated MODULE_PARM_(void);
 #ifdef MODULE
 /* DEPRECATED: Do not use. */
 #define MODULE_PARM(var,type)						    \
 struct obsolete_modparm __parm_##var __attribute__((section("__obsparm"))) = \
-{ __stringify(var), type };
+{ __stringify(var), type, &MODULE_PARM_ };
 #else
-#define MODULE_PARM(var,type)
+#define MODULE_PARM(var,type) static void __attribute_unused__ *__parm_##var = &MODULE_PARM_;
 #endif
 
 #define __MODULE_STRING(x) __stringify(x)
