@@ -10,7 +10,7 @@
 struct mb_cache_entry;
 
 struct mb_cache_op {
-	void (*free)(struct mb_cache_entry *);
+	int (*free)(struct mb_cache_entry *, int);
 };
 
 struct mb_cache {
