@@ -25,13 +25,16 @@
 #define MULTIPATH         7UL
 #define MAX_PERSONALITY   8UL
 
+#define	LEVEL_MULTIPATH		(-4)
+#define	LEVEL_LINEAR		(-1)
+
 static inline int pers_to_level (int pers)
 {
 	switch (pers) {
-		case MULTIPATH:		return -4;
+		case MULTIPATH:		return LEVEL_MULTIPATH;
 		case HSM:		return -3;
 		case TRANSLUCENT:	return -2;
-		case LINEAR:		return -1;
+		case LINEAR:		return LEVEL_LINEAR;
 		case RAID0:		return 0;
 		case RAID1:		return 1;
 		case RAID5:		return 5;
@@ -43,10 +46,10 @@ static inline int pers_to_level (int pers)
 static inline int level_to_pers (int level)
 {
 	switch (level) {
-		case -4: return MULTIPATH;
+		case LEVEL_MULTIPATH: return MULTIPATH;
 		case -3: return HSM;
 		case -2: return TRANSLUCENT;
-		case -1: return LINEAR;
+		case LEVEL_LINEAR: return LINEAR;
 		case 0: return RAID0;
 		case 1: return RAID1;
 		case 4:

@@ -665,7 +665,7 @@ static int multipath_run (mddev_t *mddev)
 
 	MOD_INC_USE_COUNT;
 
-	if (sb->level != -4) {
+	if (sb->level != LEVEL_MULTIPATH) {
 		printk(INVALID_LEVEL, mdidx(mddev), sb->level);
 		goto out;
 	}
