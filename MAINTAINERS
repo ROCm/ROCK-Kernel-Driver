@@ -1559,7 +1559,7 @@ S:	Maintained
 ONSTREAM SCSI TAPE DRIVER
 P:	Willem Riede
 M:	osst@riede.org
-L:	osst@linux1.onstream.nl
+L:	osst-users@lists.sourceforge.net
 L:	linux-scsi@vger.kernel.org
 S:	Maintained
 
