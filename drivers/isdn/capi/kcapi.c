@@ -55,21 +55,6 @@ MODULE_PARM(showcapimsgs, "i");
 
 /* ------------------------------------------------------------- */
 
-struct capi_appl {
-	u16 applid;
-	capi_register_params rparam;
-	void *param;
-	void (*signal) (u16 applid, void *param);
-	struct sk_buff_head recv_queue;
-	int nncci;
-	struct capi_ncci *nccilist;
-
-	unsigned long nrecvctlpkt;
-	unsigned long nrecvdatapkt;
-	unsigned long nsentctlpkt;
-	unsigned long nsentdatapkt;
-};
-
 struct capi_notifier {
 	struct capi_notifier *next;
 	unsigned int cmd;
@@ -86,13 +71,10 @@ static char capi_manufakturer[64] = "AVM Berlin";
 
 #define NCCI2CTRL(ncci)    (((ncci) >> 24) & 0x7f)
 
-static struct capi_appl *applications[CAPI_MAXAPPL];
+static struct capi20_appl *applications[CAPI_MAXAPPL];
 static struct capi_ctr *cards[CAPI_MAXCONTR];
 static int ncards;
 static struct sk_buff_head recv_queue;
-
-static LIST_HEAD(users);
-static spinlock_t users_lock = SPIN_LOCK_UNLOCKED;
 
 static LIST_HEAD(drivers);
 static spinlock_t drivers_lock = SPIN_LOCK_UNLOCKED;
@@ -134,7 +116,7 @@ static inline struct capi_ctr *get_capi_ctr_by_nr(u16 contr)
 	return cards[contr - 1];
 }
 
-static inline struct capi_appl *get_capi_appl_by_nr(u16 applid)
+static inline struct capi20_appl *get_capi_appl_by_nr(u16 applid)
 {
 	if (applid - 1 >= CAPI_MAXAPPL)
 		return NULL;
@@ -197,20 +179,18 @@ static inline int capi_subcmd_valid(u8 subcmd)
 static int proc_applications_read_proc(char *page, char **start, off_t off,
                                        int count, int *eof, void *data)
 {
-	struct capi_appl *ap;
+	struct capi20_appl *ap;
 	int i;
 	int len = 0;
 
 	for (i=1; i <= CAPI_MAXAPPL; i++) {
 		ap = get_capi_appl_by_nr(i);
 		if (!ap) continue;
-		len += sprintf(page+len, "%u %d %d %d %d %d\n",
-			ap->applid,
-			ap->rparam.level3cnt,
-			ap->rparam.datablkcnt,
-			ap->rparam.datablklen,
-			ap->nncci,
-                        skb_queue_len(&ap->recv_queue));
+		len += sprintf(page+len, "%u %d %d %d\n",
+			       ap->applid,
+			       ap->rparam.level3cnt,
+			       ap->rparam.datablkcnt,
+			       ap->rparam.datablklen);
 		if (len <= off) {
 			off -= len;
 			len = 0;
@@ -266,39 +246,6 @@ endloop:
 }
 
 /*
- * /proc/capi/users:
- *	name
- */
-static int proc_users_read_proc(char *page, char **start, off_t off,
-                                       int count, int *eof, void *data)
-{
-	struct list_head *l;
-        struct capi_interface_user *cp;
-	int len = 0;
-
-	spin_lock(&users_lock);
-	list_for_each(l, &users) {
-		cp = list_entry(l, struct capi_interface_user, user_list);
-		len += sprintf(page+len, "%s\n", cp->name);
-		if (len <= off) {
-			off -= len;
-			len = 0;
-		} else {
-			if (len-off > count)
-				goto endloop;
-		}
-	}
-endloop:
-	spin_unlock(&users_lock);
-	*start = page+off;
-	if (len < count)
-		*eof = 1;
-	if (len>count) len = count;
-	if (len<0) len = 0;
-	return len;
-}
-
-/*
  * /proc/capi/controller:
  *	cnr driver cardstate name driverinfo
  */
@@ -344,7 +291,7 @@ endloop:
 static int proc_applstats_read_proc(char *page, char **start, off_t off,
                                        int count, int *eof, void *data)
 {
-	struct capi_appl *ap;
+	struct capi20_appl *ap;
 	int i;
 	int len = 0;
 
@@ -422,7 +369,6 @@ static struct procfsentries {
    { "capi",		  S_IFDIR, 0 },
    { "capi/applications", 0	 , proc_applications_read_proc },
    { "capi/driver",       0	 , proc_driver_read_proc },
-   { "capi/users", 	  0	 , proc_users_read_proc },
    { "capi/controller",   0	 , proc_controller_read_proc },
    { "capi/applstats",    0	 , proc_applstats_read_proc },
    { "capi/contrstats",   0	 , proc_contrstats_read_proc },
@@ -548,35 +494,33 @@ static int notify_push(unsigned int cmd, u32 controller,
 
 static void notify_up(u32 contr)
 {
-	struct list_head *l;
-	struct capi_interface_user *p;
 	struct capi_ctr *card = get_capi_ctr_by_nr(contr);
+	struct capi20_appl *ap;
+	u16 applid;
 
-        printk(KERN_NOTICE "kcapi: notify up contr %d\n", contr);
-	spin_lock(&users_lock);
-	list_for_each(l, &users) {
-		p = list_entry(l, struct capi_interface_user, user_list);
-		if (!p->callback) continue;
-		(*p->callback) (KCI_CONTRUP, contr, &card->profile);
+        printk(KERN_DEBUG "kcapi: notify up contr %d\n", contr);
+
+	for (applid = 1; applid <= CAPI_MAXAPPL; applid++) {
+		ap = get_capi_appl_by_nr(applid);
+		if (ap && ap->callback)
+			ap->callback(KCI_CONTRUP, contr, &card->profile);
 	}
-	spin_unlock(&users_lock);
 }
 
 /* -------- KCI_CONTRDOWN ------------------------------------- */
 
 static void notify_down(u32 contr)
 {
-	struct list_head *l;
-	struct capi_interface_user *p;
+	struct capi20_appl *ap;
+	u16 applid;
 
-        printk(KERN_NOTICE "kcapi: notify down contr %d\n", contr);
-	spin_lock(&users_lock);
-	list_for_each(l, &users) {
-		p = list_entry(l, struct capi_interface_user, user_list);
-		if (!p->callback) continue;
-		(*p->callback) (KCI_CONTRDOWN, contr, 0);
+        printk(KERN_DEBUG "kcapi: notify down contr %d\n", contr);
+
+	for (applid = 1; applid <= CAPI_MAXAPPL; applid++) {
+		ap = get_capi_appl_by_nr(applid);
+		if (ap && ap->callback)
+			ap->callback(KCI_CONTRDOWN, contr, 0);
 	}
-	spin_unlock(&users_lock);
 }
 
 /* ------------------------------------------------------------ */
@@ -610,7 +554,7 @@ static void notify_handler(void *dummy)
 static void recv_handler(void *dummy)
 {
 	struct sk_buff *skb;
-	struct capi_appl *ap;
+	struct capi20_appl *ap;
 
 	while ((skb = skb_dequeue(&recv_queue)) != 0) {
 		ap = get_capi_appl_by_nr(CAPIMSG_APPID(skb->data));
@@ -620,20 +564,14 @@ static void recv_handler(void *dummy)
 			kfree_skb(skb);
 			continue;
 		}
-		if (ap->signal == 0) {
-			printk(KERN_ERR "kcapi: recv_handler: applid %d has no signal function\n",
-			       ap->applid);
-			kfree_skb(skb);
-			continue;
-		}
+
 		if (   CAPIMSG_COMMAND(skb->data) == CAPI_DATA_B3
 		    && CAPIMSG_SUBCOMMAND(skb->data) == CAPI_IND) {
 			ap->nrecvdatapkt++;
 		} else {
 			ap->nrecvctlpkt++;
 		}
-		skb_queue_tail(&ap->recv_queue, skb);
-		(ap->signal) (ap->applid, ap->param);
+		ap->recv_message(ap, skb);
 	}
 }
 
@@ -684,7 +622,7 @@ error:
 static void controllercb_ready(struct capi_ctr * card)
 {
 	u16 appl;
-	struct capi_appl *ap;
+	struct capi20_appl *ap;
 
 	card->cardstate = CARD_RUNNING;
 
@@ -717,7 +655,7 @@ static void controllercb_reseted(struct capi_ctr * card)
 	memset(card->serial, 0, sizeof(card->serial));
 
 	for (appl = 1; appl <= CAPI_MAXAPPL; appl++) {
-		struct capi_appl *ap = get_capi_appl_by_nr(appl);
+		struct capi20_appl *ap = get_capi_appl_by_nr(appl);
 		if (!ap)
 			continue;
 
@@ -892,7 +830,7 @@ EXPORT_SYMBOL(detach_capi_driver);
 /* -------- CAPI2.0 Interface ---------------------------------- */
 /* ------------------------------------------------------------- */
 
-static u16 capi_isinstalled(void)
+u16 capi20_isinstalled(void)
 {
 	int i;
 	for (i = 0; i < CAPI_MAXCONTR; i++) {
@@ -902,84 +840,76 @@ static u16 capi_isinstalled(void)
 	return CAPI_REGNOTINSTALLED;
 }
 
-static u16 capi_register(capi_register_params * rparam, u16 * applidp)
+EXPORT_SYMBOL(capi20_isinstalled);
+
+u16 capi20_register(struct capi20_appl *ap)
 {
-	struct capi_appl *ap;
-	int appl;
 	int i;
+	u16 applid;
 
 	DBG("");
 
-	if (rparam->datablklen < 128)
+	if (ap->rparam.datablklen < 128)
 		return CAPI_LOGBLKSIZETOSMALL;
 
-	for (appl = 1; appl <= CAPI_MAXAPPL; appl++) {
-		if (applications[appl - 1] == NULL)
+	for (applid = 1; applid <= CAPI_MAXAPPL; applid++) {
+		if (applications[applid - 1] == NULL)
 			break;
 	}
-	if (appl > CAPI_MAXAPPL)
+	if (applid > CAPI_MAXAPPL)
 		return CAPI_TOOMANYAPPLS;
 
-	ap = kmalloc(sizeof(*ap), GFP_KERNEL);
-	if (!ap)
-		return CAPI_REGOSRESOURCEERR;
+	ap->applid = applid;
+	applications[applid - 1] = ap;
 
-	memset(ap, 0, sizeof(*ap));
-	ap->applid = appl;
-	applications[appl - 1] = ap;
+	ap->nrecvctlpkt = 0;
+	ap->nrecvdatapkt = 0;
+	ap->nsentctlpkt = 0;
+	ap->nsentdatapkt = 0;
+	ap->callback = 0;
 	
-	skb_queue_head_init(&ap->recv_queue);
-	ap->nncci = 0;
-
-	memcpy(&ap->rparam, rparam, sizeof(capi_register_params));
-
 	for (i = 0; i < CAPI_MAXCONTR; i++) {
 		if (!cards[i] || cards[i]->cardstate != CARD_RUNNING)
 			continue;
-		register_appl(cards[i], appl, &ap->rparam);
+		register_appl(cards[i], applid, &ap->rparam);
 	}
-	*applidp = appl;
-	printk(KERN_INFO "kcapi: appl %d up\n", appl);
+	printk(KERN_DEBUG "kcapi: appl %d up\n", applid);
 
 	return CAPI_NOERROR;
 }
 
-static u16 capi_release(u16 applid)
+EXPORT_SYMBOL(capi20_register);
+
+u16 capi20_release(struct capi20_appl *ap)
 {
-	struct capi_appl *ap = get_capi_appl_by_nr(applid);
 	int i;
 
-	DBG("applid %#x", applid);
+	DBG("applid %#x", ap->applid);
 
-	if (!ap)
-		return CAPI_ILLAPPNR;
-
-	skb_queue_purge(&ap->recv_queue);
 	for (i = 0; i < CAPI_MAXCONTR; i++) {
 		if (!cards[i] || cards[i]->cardstate != CARD_RUNNING)
 			continue;
-		release_appl(cards[i], applid);
+		release_appl(cards[i], ap->applid);
 	}
-	applications[applid - 1] = NULL;
-	kfree(ap);
-	printk(KERN_INFO "kcapi: appl %d down\n", applid);
+	applications[ap->applid - 1] = NULL;
+	printk(KERN_DEBUG "kcapi: appl %d down\n", ap->applid);
 
 	return CAPI_NOERROR;
 }
 
-static u16 capi_put_message(u16 applid, struct sk_buff *skb)
+EXPORT_SYMBOL(capi20_release);
+
+u16 capi20_put_message(struct capi20_appl *ap, struct sk_buff *skb)
 {
 	struct capi_ctr *card;
-	struct capi_appl *ap;
 	int showctl = 0;
 	u8 cmd, subcmd;
 
-	DBG("applid %#x", applid);
+	DBG("applid %#x", ap->applid);
  
 	if (ncards == 0)
 		return CAPI_REGNOTINSTALLED;
-	ap = get_capi_appl_by_nr(applid);
-	if (!ap)
+	if (ap->applid == 0)
 		return CAPI_ILLAPPNR;
 	if (skb->len < 12
 	    || !capi_cmd_valid(CAPIMSG_COMMAND(skb->data))
@@ -1024,33 +954,9 @@ static u16 capi_put_message(u16 applid, struct sk_buff *skb)
 	return card->driver->send_message(card, skb);
 }
 
-static u16 capi_get_message(u16 applid, struct sk_buff **msgp)
-{
-	struct capi_appl *ap = get_capi_appl_by_nr(applid);
-	struct sk_buff *skb;
+EXPORT_SYMBOL(capi20_put_message);
 
-	if (!ap)
-		return CAPI_ILLAPPNR;
-	if ((skb = skb_dequeue(&ap->recv_queue)) == 0)
-		return CAPI_RECEIVEQUEUEEMPTY;
-	*msgp = skb;
-	return CAPI_NOERROR;
-}
-
-static u16 capi_set_signal(u16 applid,
-			     void (*signal) (u16 applid, void *param),
-			     void *param)
-{
-	struct capi_appl *ap = get_capi_appl_by_nr(applid);
-
-	if (!ap)
-		return CAPI_ILLAPPNR;
-	ap->signal = signal;
-	ap->param = param;
-	return CAPI_NOERROR;
-}
-
-static u16 capi_get_manufacturer(u32 contr, u8 buf[CAPI_MANUFACTURER_LEN])
+u16 capi20_get_manufacturer(u32 contr, u8 buf[CAPI_MANUFACTURER_LEN])
 {
 	struct capi_ctr *card;
 
@@ -1066,7 +972,9 @@ static u16 capi_get_manufacturer(u32 contr, u8 buf[CAPI_MANUFACTURER_LEN])
 	return CAPI_NOERROR;
 }
 
-static u16 capi_get_version(u32 contr, struct capi_version *verp)
+EXPORT_SYMBOL(capi20_get_manufacturer);
+
+u16 capi20_get_version(u32 contr, struct capi_version *verp)
 {
 	struct capi_ctr *card;
 
@@ -1082,7 +990,9 @@ static u16 capi_get_version(u32 contr, struct capi_version *verp)
 	return CAPI_NOERROR;
 }
 
-static u16 capi_get_serial(u32 contr, u8 serial[CAPI_SERIAL_LEN])
+EXPORT_SYMBOL(capi20_get_version);
+
+u16 capi20_get_serial(u32 contr, u8 serial[CAPI_SERIAL_LEN])
 {
 	struct capi_ctr *card;
 
@@ -1098,7 +1008,9 @@ static u16 capi_get_serial(u32 contr, u8 serial[CAPI_SERIAL_LEN])
 	return CAPI_NOERROR;
 }
 
-static u16 capi_get_profile(u32 contr, struct capi_profile *profp)
+EXPORT_SYMBOL(capi20_get_serial);
+
+u16 capi20_get_profile(u32 contr, struct capi_profile *profp)
 {
 	struct capi_ctr *card;
 
@@ -1114,6 +1026,8 @@ static u16 capi_get_profile(u32 contr, struct capi_profile *profp)
 			sizeof(struct capi_profile));
 	return CAPI_NOERROR;
 }
+
+EXPORT_SYMBOL(capi20_get_profile);
 
 static struct capi_driver *find_driver(char *name)
 {
@@ -1255,7 +1169,7 @@ static int old_capi_manufacturer(unsigned int cmd, void *data)
 }
 #endif
 
-static int capi_manufacturer(unsigned int cmd, void *data)
+int capi20_manufacturer(unsigned int cmd, void *data)
 {
         struct capi_ctr *card;
 	int retval;
@@ -1296,47 +1210,16 @@ static int capi_manufacturer(unsigned int cmd, void *data)
 	return -EINVAL;
 }
 
-struct capi_interface avmb1_interface =
+EXPORT_SYMBOL(capi20_manufacturer);
+
+/* temporary hack */
+void capi20_set_callback(struct capi20_appl *ap,
+			 void (*callback) (unsigned int cmd, __u32 contr, void *data))
 {
-	capi_isinstalled,
-	capi_register,
-	capi_release,
-	capi_put_message,
-	capi_get_message,
-	capi_set_signal,
-	capi_get_manufacturer,
-	capi_get_version,
-	capi_get_serial,
-	capi_get_profile,
-	capi_manufacturer
-};
-
-/* ------------------------------------------------------------- */
-/* -------- Exported Functions --------------------------------- */
-/* ------------------------------------------------------------- */
-
-struct capi_interface *attach_capi_interface(struct capi_interface_user *userp)
-{
-
-	spin_lock(&users_lock);
-	list_add_tail(&userp->user_list, &users);
-	spin_unlock(&users_lock);
-	printk(KERN_NOTICE "kcapi: %s attached\n", userp->name);
-
-	return &avmb1_interface;
+	ap->callback = callback;
 }
 
-EXPORT_SYMBOL(attach_capi_interface);
-
-int detach_capi_interface(struct capi_interface_user *userp)
-{
-	spin_lock(&users_lock);
-	list_del(&userp->user_list);
-	printk(KERN_NOTICE "kcapi: %s detached\n", userp->name);
-	return 0;
-}
-
-EXPORT_SYMBOL(detach_capi_interface);
+EXPORT_SYMBOL(capi20_set_callback);
 
 /* ------------------------------------------------------------- */
 /* -------- Init & Cleanup ------------------------------------- */

@@ -345,12 +345,11 @@ static void t1isa_remove(struct pci_dev *pdev)
 
 /* ------------------------------------------------------------- */
 
-static int __init t1isa_probe(struct pci_dev *pdev)
+static int __init t1isa_probe(struct pci_dev *pdev, int cardnr)
 {
 	avmctrl_info *cinfo;
 	avmcard *card;
 	int retval;
-	static int cardnr = 1;
 
 	card = b1_alloc_card(1);
 	if (!card) {
@@ -363,7 +362,7 @@ static int __init t1isa_probe(struct pci_dev *pdev)
 	card->port = pci_resource_start(pdev, 0);
 	card->irq = pdev->irq;
 	card->cardtype = avm_t1isa;
-	card->cardnr = cardnr++;
+	card->cardnr = cardnr;
 	sprintf(card->name, "t1isa-%x", card->port);
 
 	if (!(((card->port & 0x7) == 0) && ((card->port & 0x30) != 0x30))) {
@@ -505,18 +504,19 @@ static struct capi_driver t1isa_driver = {
 static struct pci_dev isa_dev[MAX_CARDS];
 static int io[MAX_CARDS];
 static int irq[MAX_CARDS];
+static int cardnr[MAX_CARDS];
 
 MODULE_PARM(io, "1-" __MODULE_STRING(MAX_CARDS) "i");
 MODULE_PARM(irq, "1-" __MODULE_STRING(MAX_CARDS) "i");
+MODULE_PARM(cardnr, "1-" __MODULE_STRING(MAX_CARDS) "i");
 MODULE_PARM_DESC(io, "I/O base address(es)");
 MODULE_PARM_DESC(irq, "IRQ number(s) (assigned)");
+MODULE_PARM_DESC(cardnr, "Card number(s) (as jumpered)");
 
 static int __init t1isa_init(void)
 {
 	int i, retval;
 	int found = 0;
-
-	MOD_INC_USE_COUNT;
 
 	b1_set_revision(&t1isa_driver, revision);
         attach_capi_driver(&t1isa_driver);
@@ -528,7 +528,7 @@ static int __init t1isa_init(void)
 		isa_dev[i].resource[0].start = io[i];
 		isa_dev[i].irq_resource[0].start = irq[i];
 
-		if (t1isa_probe(&isa_dev[i]) == 0)
+		if (t1isa_probe(&isa_dev[i], cardnr[i]) == 0)
 			found++;
 	}
 	if (found == 0) {
@@ -541,7 +541,6 @@ static int __init t1isa_init(void)
  err:
 	detach_capi_driver(&t1isa_driver);
  out:
-	MOD_DEC_USE_COUNT;
 	return retval;
 }
 
