@@ -1,10 +1,16 @@
 /* ld script to make the Linux/CRIS kernel
  * Authors: Bjorn Wesen (bjornw@axis.com)
+ *
+ * It is VERY DANGEROUS to fiddle around with the symbols in this
+ * script. It is for example quite vital that all generated sections
+ * that are used are actually named here, otherwise the linker will
+ * put them at the end, where the init stuff is which is FREED after
+ * the kernel has booted. 
  */	
 
 SECTIONS
 {
-	. = @ETRAX_DRAM_VIRTUAL_BASE@;
+	. = @CONFIG_ETRAX_DRAM_VIRTUAL_BASE@;
 	_dram_start = .;
 	_ibr_start = .;
 	. = . + 0x4000; /* see head.S and pages reserved at the start */
@@ -75,5 +81,5 @@ SECTIONS
 		*(.exitcall.exit)
         }
 
-	_dram_end = _dram_start + @ETRAX_DRAM_SIZE_M@*1024*1024;
+	_dram_end = _dram_start + @CONFIG_ETRAX_DRAM_SIZE_M@*1024*1024;
 }

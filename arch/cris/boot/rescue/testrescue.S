@@ -1,9 +1,10 @@
-	;; $Id: testrescue.S,v 1.1 2001/01/31 15:32:09 johana Exp $
-	;;
-	;; Simple testcode to download by the rescue block.
-	;; Just lits some LEDs to show it was downloaded correctly.
-	;; 
-	;; Copyright (C) 1999 Axis Communications AB
+/* $Id: testrescue.S,v 1.2 2001/04/18 12:05:07 bjornw Exp $
+ *
+ * Simple testcode to download by the rescue block.
+ * Just lits some LEDs to show it was downloaded correctly.
+ * 
+ * Copyright (C) 1999 Axis Communications AB
+ */
 
 #define ASSEMBLER_MACROS_ONLY
 #include <asm/sv_addr_ag.h>

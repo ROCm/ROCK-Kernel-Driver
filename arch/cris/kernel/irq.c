@@ -1,4 +1,4 @@
-/* $Id: irq.c,v 1.11 2001/02/27 13:52:52 bjornw Exp $
+/* $Id: irq.c,v 1.14 2001/04/17 13:58:39 orjanf Exp $
  *
  *	linux/arch/cris/kernel/irq.c
  *
@@ -160,7 +160,7 @@ BUILD_IRQ(22, 0x400000)
 BUILD_IRQ(23, 0x800000)
 BUILD_IRQ(24, 0x1000000)
 BUILD_IRQ(25, 0x2000000)
-/* IRQ 26-30 are resereved */	
+/* IRQ 26-30 are reserved */
 BUILD_IRQ(31, 0x80000000)
  
 /*
@@ -261,11 +261,11 @@ asmlinkage void do_IRQ(int irq, struct pt_regs * regs)
         irq_enter(cpu);
 	kstat.irqs[cpu][irq]++;
 
-	action = *(irq + irq_action);
+	action = irq_action[irq];
         if (action) {
                 if (!(action->flags & SA_INTERRUPT))
                         __sti();
-                action = *(irq + irq_action);
+                action = irq_action[irq];
                 do_random = 0;
                 do {
                         do_random |= action->flags;
@@ -396,7 +396,7 @@ void free_irq(unsigned int irq, void *dev_id)
 		save_flags(flags);
 		cli();
 		*p = action->next;
-		if (!irq[irq_action]) {
+		if (!irq_action[irq]) {
 			mask_irq(irq);
 			set_int_vector(irq, bad_interrupt[irq], 0);
 		}
@@ -419,8 +419,8 @@ void weird_irq(void)
 */
 
 void system_call(void);  /* from entry.S */
-void gdb_handle_breakpoint(void); /* from traps.c */
-void do_sigtrap(void); /* also from traps.c */
+void do_sigtrap(void); /* from entry.S */
+void gdb_handle_breakpoint(void); /* from entry.S */
 
 void init_IRQ(void)
 {
@@ -475,10 +475,10 @@ void init_IRQ(void)
 
         /* setup a breakpoint handler for debugging used for both user and
            kernel mode debugging  (which is why it is not inside an ifdef
-           CONFIG_KGDB) */
+           CONFIG_ETRAX_KGDB) */
         set_break_vector(8, gdb_handle_breakpoint);
 
-#ifdef CONFIG_KGDB
+#ifdef CONFIG_ETRAX_KGDB
 	/* setup kgdb if its enabled, and break into the debugger */
 	kgdb_init();
 	breakpoint();

@@ -1,4 +1,4 @@
-/* $Id: process.c,v 1.12 2001/02/27 13:52:52 bjornw Exp $
+/* $Id: process.c,v 1.13 2001/03/20 19:44:06 bjornw Exp $
  * 
  *  linux/arch/cris/kernel/process.c
  *
@@ -6,6 +6,10 @@
  *  Copyright (C) 2000, 2001  Axis Communications AB
  *
  *  Authors:   Bjorn Wesen (bjornw@axis.com)
+ *
+ *  $Log: process.c,v $
+ *  Revision 1.13  2001/03/20 19:44:06  bjornw
+ *  Use the 7th syscall argument for regs instead of current_regs
  *
  */
 
@@ -33,6 +37,8 @@
 #include <asm/pgtable.h>
 #include <asm/system.h>
 #include <asm/io.h>
+#include <asm/processor.h>
+
 #include <linux/smp.h>
 
 //#define DEBUG
@@ -63,13 +69,6 @@ union task_union init_task_union
              { INIT_TASK(init_task_union.task) };
 
 static int hlt_counter=0;
-
-/* in a system call, set_esp0 is called to remember the stack frame, therefore
-   in the implementation of syscalls we can use that value to access the stack
-   frame and saved registers.
-*/
-
-#define currentregs ((struct pt_regs *)current->thread.esp0)
 
 void disable_hlt(void)
 {
@@ -178,7 +177,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	 * remember that the task_struct doubles as the kernel stack for the task
 	 */
 
-	childregs = ((struct pt_regs *) ((unsigned long)p + THREAD_SIZE)) - 1;
+	childregs = user_regs(p);
 
 	*childregs = *regs;  /* struct copy of pt_regs */
 
@@ -202,14 +201,11 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 
 	p->thread.ksp = (unsigned long) swstack;
 
-	/* esp0 keeps the pt_regs stacked structure pointer */
-
-	p->thread.esp0 = (unsigned long) childregs;
-
 #ifdef DEBUG
-	printk("kern_stack_page 0x%x, used stack %d, thread.usp 0x%x, usp 0x%x\n", 
-	       current->kernel_stack_page, usedstack, p->thread.usp, usp);
+	printk("copy_thread: new regs at 0x%p, as shown below:\n", childregs);
+	show_registers(childregs);
 #endif
+
 	return 0;
 }
 
@@ -240,33 +236,53 @@ void dump_thread(struct pt_regs * regs, struct user * dump)
 #endif 
 }
 
-asmlinkage int sys_fork(void)
+/* 
+ * Be aware of the "magic" 7th argument in the four system-calls below.
+ * They need the latest stackframe, which is put as the 7th argument by
+ * entry.S. The previous arguments are dummies or actually used, but need
+ * to be defined to reach the 7th argument.
+ *
+ * N.B.: Another method to get the stackframe is to use current_regs(). But
+ * it returns the latest stack-frame stacked when going from _user mode_ and
+ * some of these (at least sys_clone) are called from kernel-mode sometimes
+ * (for example during kernel_thread, above) and thus cannot use it. Thus,
+ * to be sure not to get any surprises, we use the method for the other calls
+ * as well.
+ */
+
+asmlinkage int sys_fork(long r10, long r11, long r12, long r13, long mof, long srp,
+			struct pt_regs *regs)
 {
-	return do_fork(SIGCHLD, rdusp(), currentregs, 0);
+	return do_fork(SIGCHLD, rdusp(), regs, 0);
 }
 
 /* if newusp is 0, we just grab the old usp */
 
-asmlinkage int sys_clone(unsigned long newusp, unsigned long flags)
+asmlinkage int sys_clone(unsigned long newusp, unsigned long flags,
+			 long r12, long r13, long mof, long srp,
+			 struct pt_regs *regs)
 {
 	if (!newusp)
 		newusp = rdusp();
-	return do_fork(flags, newusp, currentregs, 0);
+	return do_fork(flags, newusp, regs, 0);
 }
 
 /* vfork is a system call in i386 because of register-pressure - maybe
  * we can remove it and handle it in libc but we put it here until then.
  */
 
-asmlinkage int sys_vfork(void)
+asmlinkage int sys_vfork(long r10, long r11, long r12, long r13, long mof, long srp,
+			 struct pt_regs *regs)
 {
-        return do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, rdusp(), currentregs, 0);
+        return do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, rdusp(), regs, 0);
 }
 
 /*
  * sys_execve() executes a new program.
  */
-asmlinkage int sys_execve(const char *fname, char **argv, char **envp)
+asmlinkage int sys_execve(const char *fname, char **argv, char **envp,
+			  long r13, long mof, long srp, 
+			  struct pt_regs *regs)
 {
 	int error;
 	char *filename;
@@ -276,7 +292,7 @@ asmlinkage int sys_execve(const char *fname, char **argv, char **envp)
 
 	if (IS_ERR(filename))
 	        goto out;
-	error = do_execve(filename, argv, envp, currentregs);
+	error = do_execve(filename, argv, envp, regs);
 	putname(filename);
  out:
 	return error;

@@ -29,21 +29,21 @@ the kernel.
 
 Sound card support should be enabled as a module (chose m).
 Answer 'm' for  these items:
-  Generic OPL2/OPL3 FM synthesizer support			(CONFIG_ADLIB)
-  Microsoft Sound System support				(CONFIG_MSS)
-  Support for OPTi MAD16 and/or Mozart based cards	 	(CONFIG_MAD16)
-  FM synthesizer (YM3812/OPL-3) support				(CONFIG_YM3812)
+  Generic OPL2/OPL3 FM synthesizer support		(CONFIG_SOUND_ADLIB)
+  Microsoft Sound System support			(CONFIG_SOUND_MSS)
+  Support for OPTi MAD16 and/or Mozart based cards	(CONFIG_SOUND_MAD16)
+  FM synthesizer (YM3812/OPL-3) support			(CONFIG_SOUND_YM3812)
 
 The configuration menu may ask for addresses, IRQ lines or DMA
 channels. If the card is used as a module the module loading
 options will override these values.
 
 For the OPTi 931 you can answer 'n' to:
-  Support MIDI in older MAD16 based cards (requires SB)		(CONFIG_MAD16_OLDCARD)
+  Support MIDI in older MAD16 based cards (requires SB)	(CONFIG_SOUND_MAD16_OLDCARD)
 If you do need MIDI support in a Mozart or C928 based card you
 need to answer 'm' to the above question. In that case you will
 also need to answer 'm' to:
-  '100% Sound Blaster compatibles (SB16/32/64, ESS, Jazz16) support' (CONFIG_SB)
+  '100% Sound Blaster compatibles (SB16/32/64, ESS, Jazz16) support' (CONFIG_SOUND_SB)
 
 Go on and compile your kernel and modules. Install the modules. Run depmod -a.
 

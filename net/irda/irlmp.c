@@ -959,6 +959,7 @@ int irlmp_data_request(struct lsap_cb *self, struct sk_buff *skb)
 {
 	ASSERT(self != NULL, return -1;);
 	ASSERT(self->magic == LMP_LSAP_MAGIC, return -1;);
+	ASSERT(skb->sk == NULL, /* Just a warning - NOP */;);
 	
 	/* Make room for MUX header */
 	ASSERT(skb_headroom(skb) >= LMP_HEADER, return -1;);

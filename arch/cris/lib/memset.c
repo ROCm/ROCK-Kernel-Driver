@@ -27,6 +27,8 @@
 /*#                                                                         */
 /*#-------------------------------------------------------------------------*/
 
+#include <linux/types.h>
+
 /* No, there's no macro saying 12*4, since it is "hard" to get it into
    the asm in a good way.  Thus better to expose the problem everywhere.
    */
@@ -39,7 +41,7 @@
 
 void *memset(void *pdst,
              int c,
-             unsigned int plen)
+             size_t plen)
 {
   /* Ok.  Now we want the parameters put in special registers.
      Make sure the compiler is able to make something useful of this. */
@@ -54,7 +56,12 @@ void *memset(void *pdst,
 
   /* Ugh.  This is fragile at best.  Check with newer GCC releases, if
      they compile cascaded "x |= x << 8" sanely! */
-  __asm__("movu.b %0,r13\n\tlslq 8,r13\n\tmove.b %0,r13\n\tmove.d r13,%0\n\tlslq 16,r13\n\tor.d r13,%0"
+  __asm__("movu.b %0,r13\n\t"
+          "lslq 8,r13\n\t"
+	  "move.b %0,r13\n\t"
+	  "move.d r13,%0\n\t"
+	  "lslq 16,r13\n\t"
+	  "or.d r13,%0"
           : "=r" (lc) : "0" (lc) : "r13");
 
   {

@@ -94,4 +94,4 @@ void __init ide_probe_for_rz100x (void)	/* called from ide.c */
 		init_rz1000 (dev, "RZ1001");
 }
 
-#endif CONFIG_BLK_DEV_IDEPCI
+#endif /* CONFIG_BLK_DEV_IDEPCI */

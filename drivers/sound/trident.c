@@ -1967,9 +1967,9 @@ static int trident_ioctl(struct inode *inode, struct file *file, unsigned int cm
 
 	case SNDCTL_DSP_GETTRIGGER:
 		val = 0;
-		if (file->f_mode & FMODE_READ && dmabuf->enable)
+		if ((file->f_mode & FMODE_READ) && dmabuf->enable)
 			val |= PCM_ENABLE_INPUT;
-		if (file->f_mode & FMODE_WRITE && dmabuf->enable)
+		if ((file->f_mode & FMODE_WRITE) && dmabuf->enable)
 			val |= PCM_ENABLE_OUTPUT;
 		return put_user(val, (int *)arg);
 
@@ -3309,6 +3309,9 @@ static int __init trident_probe(struct pci_dev *pci_dev, const struct pci_device
 	struct trident_card *card;
 	u8 revision;
 
+	if (pci_enable_device(pci_dev))
+	    return -ENODEV;
+
 	if (pci_set_dma_mask(pci_dev, TRIDENT_DMA_MASK)) {
 		printk(KERN_ERR "trident: architecture does not support"
 		       " 30bit PCI busmaster DMA\n");
@@ -3322,9 +3325,6 @@ static int __init trident_probe(struct pci_dev *pci_dev, const struct pci_device
 		       iobase);
 		return -ENODEV;
 	}
-
-	if (pci_enable_device(pci_dev))
-	    return -ENODEV;
 
 	if ((card = kmalloc(sizeof(struct trident_card), GFP_KERNEL)) == NULL) {
 		printk(KERN_ERR "trident: out of memory\n");

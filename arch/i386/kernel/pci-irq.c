@@ -105,7 +105,7 @@ static void __init pirq_peer_trick(void)
 		 *  known (ascending bus order) and therefore pci_scan_bus returns immediately.
 		 */
 		if (busmap[i] && pci_scan_bus(i, pci_root_bus->ops, NULL))
-			printk("PCI: Discovered primary peer bus %02x [IRQ]\n", i);
+			printk(KERN_INFO "PCI: Discovered primary peer bus %02x [IRQ]\n", i);
 	pcibios_last_bus = -1;
 }
 
@@ -295,10 +295,10 @@ static int pirq_sis_get(struct pci_dev *router, struct pci_dev *dev, int pirq)
 		case 0x61:
 		case 0x6a:
 		case 0x7e:
-			printk("SiS pirq: advanced IDE/ACPI/DAQ mapping not yet implemented\n");
+			printk(KERN_INFO "SiS pirq: advanced IDE/ACPI/DAQ mapping not yet implemented\n");
 			return 0;
 		default:			
-			printk("SiS router pirq escape (%d)\n", pirq);
+			printk(KERN_INFO "SiS router pirq escape (%d)\n", pirq);
 			return 0;
 	}
 	return (x & 0x80) ? 0 : (x & 0x0f);
@@ -329,10 +329,10 @@ static int pirq_sis_set(struct pci_dev *router, struct pci_dev *dev, int pirq, i
 		case 0x61:
 		case 0x6a:
 		case 0x7e:
-			printk("advanced SiS pirq mapping not yet implemented\n");
+			printk(KERN_INFO "advanced SiS pirq mapping not yet implemented\n");
 			return 0;
 		default:			
-			printk("SiS router pirq escape (%d)\n", pirq);
+			printk(KERN_INFO "SiS router pirq escape (%d)\n", pirq);
 			return 0;
 	}
 	pci_write_config_byte(router, reg, x);
@@ -351,7 +351,7 @@ static int pirq_sis_set(struct pci_dev *router, struct pci_dev *dev, int pirq, i
 static int pirq_vlsi_get(struct pci_dev *router, struct pci_dev *dev, int pirq)
 {
 	if (pirq > 8) {
-		printk("VLSI router pirq escape (%d)\n", pirq);
+		printk(KERN_INFO "VLSI router pirq escape (%d)\n", pirq);
 		return 0;
 	}
 	return read_config_nybble(router, 0x74, pirq-1);
@@ -360,7 +360,7 @@ static int pirq_vlsi_get(struct pci_dev *router, struct pci_dev *dev, int pirq)
 static int pirq_vlsi_set(struct pci_dev *router, struct pci_dev *dev, int pirq, int irq)
 {
 	if (pirq > 8) {
-		printk("VLSI router pirq escape (%d)\n", pirq);
+		printk(KERN_INFO "VLSI router pirq escape (%d)\n", pirq);
 		return 0;
 	}
 	write_config_nybble(router, 0x74, pirq-1, irq);
@@ -439,7 +439,7 @@ static void __init pirq_find_router(void)
 
 #ifdef CONFIG_PCI_BIOS
 	if (!rt->signature) {
-		printk("PCI: Using BIOS for IRQ routing\n");
+		printk(KERN_INFO "PCI: Using BIOS for IRQ routing\n");
 		pirq_router = &pirq_bios_router;
 		return;
 	}
@@ -464,7 +464,7 @@ static void __init pirq_find_router(void)
 			pirq_router = r;
 		}
 	}
-	printk("PCI: Using IRQ router %s [%04x/%04x] at %s\n",
+	printk(KERN_INFO "PCI: Using IRQ router %s [%04x/%04x] at %s\n",
 		pirq_router->name,
 		pirq_router_dev->vendor,
 		pirq_router_dev->device,
@@ -568,7 +568,7 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 		} else
 			return 0;
 	}
-	printk("PCI: %s IRQ %d for device %s\n", msg, irq, dev->slot_name);
+	printk(KERN_INFO "PCI: %s IRQ %d for device %s\n", msg, irq, dev->slot_name);
 
 	/* Update IRQ for all devices with the same pirq value */
 	pci_for_each_dev(dev2) {
@@ -582,13 +582,13 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 		if (info->irq[pin].link == pirq) {
 			/* We refuse to override the dev->irq information. Give a warning! */
 		    	if (dev2->irq && dev2->irq != irq) {
-		    		printk("IRQ routing conflict in pirq table for device %s\n", dev2->slot_name);
+		    		printk(KERN_INFO "IRQ routing conflict in pirq table for device %s\n", dev2->slot_name);
 		    		continue;
 		    	}
 			dev2->irq = irq;
 			pirq_penalty[irq]++;
 			if (dev != dev2)
-				printk("PCI: The same IRQ used for device %s\n", dev2->slot_name);
+				printk(KERN_INFO "PCI: The same IRQ used for device %s\n", dev2->slot_name);
 		}
 	}
 	return 1;
@@ -667,7 +667,7 @@ void __init pcibios_fixup_irqs(void)
 				}
 #endif
 				if (irq >= 0) {
-					printk("PCI->APIC IRQ transform: (B%d,I%d,P%d) -> %d\n",
+					printk(KERN_INFO "PCI->APIC IRQ transform: (B%d,I%d,P%d) -> %d\n",
 						dev->bus->number, PCI_SLOT(dev->devfn), pin, irq);
 					dev->irq = irq;
 				}

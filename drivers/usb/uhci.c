@@ -644,21 +644,23 @@ static struct urb_priv *uhci_alloc_urb_priv(struct uhci *uhci, struct urb *urb)
 
 	urb->hcpriv = urbp;
 
-	if (urb->transfer_buffer_length) {
-		urbp->transfer_buffer_dma_handle = pci_map_single(uhci->dev,
-			urb->transfer_buffer, urb->transfer_buffer_length,
-			usb_pipein(urb->pipe) ? PCI_DMA_FROMDEVICE :
-			PCI_DMA_TODEVICE);
-		if (!urbp->transfer_buffer_dma_handle)
-			return NULL;
-	}
+	if (urb->dev != uhci->rh.dev) {
+		if (urb->transfer_buffer_length) {
+			urbp->transfer_buffer_dma_handle = pci_map_single(uhci->dev,
+				urb->transfer_buffer, urb->transfer_buffer_length,
+				usb_pipein(urb->pipe) ? PCI_DMA_FROMDEVICE :
+				PCI_DMA_TODEVICE);
+			if (!urbp->transfer_buffer_dma_handle)
+				return NULL;
+		}
 
-	if (usb_pipetype(urb->pipe) == PIPE_CONTROL && urb->setup_packet) {
-		urbp->setup_packet_dma_handle = pci_map_single(uhci->dev,
-			urb->setup_packet, sizeof(devrequest),
-			PCI_DMA_TODEVICE);
-		if (!urbp->setup_packet_dma_handle)
-			return NULL;
+		if (usb_pipetype(urb->pipe) == PIPE_CONTROL && urb->setup_packet) {
+			urbp->setup_packet_dma_handle = pci_map_single(uhci->dev,
+				urb->setup_packet, sizeof(devrequest),
+				PCI_DMA_TODEVICE);
+			if (!urbp->setup_packet_dma_handle)
+				return NULL;
+		}
 	}
 
 	return urbp;
@@ -722,11 +724,11 @@ static void uhci_destroy_urb_priv(struct urb *urb)
 		uhci_free_td(uhci, td);
 	}
 
-	if (urb->setup_packet)
+	if (urbp->setup_packet_dma_handle)
 		pci_unmap_single(uhci->dev, urbp->setup_packet_dma_handle,
 			sizeof(devrequest), PCI_DMA_TODEVICE);
 
-	if (urb->transfer_buffer_length)
+	if (urbp->transfer_buffer_dma_handle)
 		pci_unmap_single(uhci->dev, urbp->transfer_buffer_dma_handle,
 			urb->transfer_buffer_length, usb_pipein(urb->pipe) ?
 			PCI_DMA_FROMDEVICE : PCI_DMA_TODEVICE);
@@ -2247,12 +2249,12 @@ static void uhci_call_completion(struct urb *urb)
 	if (!killed)
 		urb->status = status;
 
-	if (urb->transfer_buffer_length)
+	if (urbp->transfer_buffer_dma_handle)
 		pci_dma_sync_single(uhci->dev, urbp->transfer_buffer_dma_handle,
 			urb->transfer_buffer_length, usb_pipein(urb->pipe) ?
 			PCI_DMA_FROMDEVICE : PCI_DMA_TODEVICE);
 
-	if (usb_pipetype(urb->pipe) == PIPE_CONTROL && urb->setup_packet)
+	if (urbp->setup_packet_dma_handle)
 		pci_dma_sync_single(uhci->dev, urbp->setup_packet_dma_handle,
 			sizeof(devrequest), PCI_DMA_TODEVICE);
 

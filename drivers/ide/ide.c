@@ -179,6 +179,8 @@ static int	ide_scan_direction;	/* THIS was formerly 2.2.x pci=reverse */
 static int	ide_lock;
 #endif /* __mc68000__ || CONFIG_APUS */
 
+int noautodma = 0;
+
 /*
  * ide_modules keeps track of the available IDE chipset/probe/driver modules.
  */
@@ -1762,11 +1764,7 @@ int ide_revalidate_disk (kdev_t i_rdev)
 	for (p = 0; p < (1<<PARTN_BITS); ++p) {
 		if (drive->part[p].nr_sects > 0) {
 			kdev_t devp = MKDEV(major, minor+p);
-			struct super_block * sb = get_super(devp);
-			fsync_dev          (devp);
-			if (sb)
-				invalidate_inodes(sb);
-			invalidate_buffers (devp);
+			invalidate_device(devp, 1);
 			set_blocksize(devp, 1024);
 		}
 		drive->part[p].start_sect = 0;
@@ -1983,9 +1981,7 @@ void ide_unregister (unsigned int index)
 		for (p = 0; p < (1<<PARTN_BITS); ++p) {
 			if (drive->part[p].nr_sects > 0) {
 				kdev_t devp = MKDEV(hwif->major, minor+p);
-				struct super_block * sb = get_super(devp);
-				if (sb) invalidate_inodes(sb);
-				invalidate_buffers (devp);
+				invalidate_device(devp, 0);
 			}
 		}
 #ifdef CONFIG_PROC_FS
@@ -2893,6 +2889,12 @@ int __init ide_setup (char *s)
 		return 1;
 	}
 #endif /* CONFIG_BLK_DEV_IDEDOUBLER */
+
+	if (!strcmp(s, "ide=nodma")) {
+		printk("IDE: Prevented DMA\n");
+		noautodma = 1;
+		return 1;
+	}
 
 #ifdef CONFIG_BLK_DEV_IDEPCI
 	if (!strcmp(s, "ide=reverse")) {

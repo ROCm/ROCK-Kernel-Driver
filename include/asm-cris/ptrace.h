@@ -23,14 +23,16 @@
 #define PT_DCCR      17
 #define PT_SRP       18
 #define PT_IRP       19
-#define PT_USP       20    /* special case - USP is not in the pt_regs */
-#define PT_MAX       20
+#define PT_CSRINSTR  20    /* CPU Status record remnants - valid if frametype == busfault */
+#define PT_CSRADDR   21
+#define PT_CSRDATA   22
+#define PT_USP       23    /* special case - USP is not in the pt_regs */
+#define PT_MAX       23
 
 /* Frame types */
 
-#define CRIS_FRAME_NORMAL   0  /* normal frame like pt_regs struct */
-#define CRIS_FRAME_BUSFAULT 1  /* SBFS frame of 4 longwords on top, including irp */
-#define CRIS_FRAME_FIXUP    2  /* SBFS frame which should do a normal return, not RBF */
+#define CRIS_FRAME_NORMAL   0  /* normal frame without SBFS stacking */
+#define CRIS_FRAME_BUSFAULT 1  /* frame stacked using SBFS, need RBF return path */
 
 /* Arbitrarily choose the same ptrace numbers as used by the Sparc code. */
 #define PTRACE_GETREGS            12
@@ -63,6 +65,9 @@ struct pt_regs {
 	unsigned long dccr;
 	unsigned long srp;
 	unsigned long irp;
+	unsigned long csrinstr;
+	unsigned long csraddr;
+	unsigned long csrdata;
 };
 
 /* switch_stack is the extra stuff pushed onto the stack in _resume (entry.S) when

@@ -623,7 +623,7 @@ static int etrax_usb_submit_intr_urb(urb_t *urb)
 
 				traffic_ep->nep = tmp_ep->nep;
 				tmp_ep->nep = virt_to_phys(traffic_ep);
-				dbg_intr("One ep successfully inserted");
+				dbg_intr("One ep sucessfully inserted");
 			}
 			i++;
 		}
@@ -1804,7 +1804,7 @@ static void etrax_usb_hc_intr_bottom_half(void *data)
 						r_usb_ept_data);
 			
 			if (error_code == IO_STATE_VALUE(R_USB_EPT_DATA, error_code, no_error)) {
-				/* no_error means that this urb was successfully sent or that we have
+				/* no_error means that this urb was sucessfully sent or that we have
 				   some undefinde error*/
 				
 				if (IO_EXTRACT(R_USB_EPT_DATA, error_count_out, r_usb_ept_data) == 3 ||
@@ -1888,9 +1888,9 @@ static void etrax_usb_hc_intr_bottom_half(void *data)
 						/*
 						  This means that the endpoint has no error, is disabled
 						  and had inserted traffic,
-						  i.e. transfer successfully completed
+						  i.e. transfer sucessfully completed
 						*/
-						dbg_ctrl("Last SB for CTRL %d sent successfully", epid);
+						dbg_ctrl("Last SB for CTRL %d sent sucessfully", epid);
 						handle_control_transfer_attn(epid, 0);
 					}
 				}
@@ -1905,9 +1905,9 @@ static void etrax_usb_hc_intr_bottom_half(void *data)
 						/*
 						  This means that the endpoint has no error, is disabled
 						  and had inserted traffic,
-						  i.e. transfer successfully completed
+						  i.e. transfer sucessfully completed
 						*/
-						dbg_bulk("Last SB for BULK %d sent successfully", epid);
+						dbg_bulk("Last SB for BULK %d sent sucessfully", epid);
 						handle_bulk_transfer_attn(epid, 0);
 					}
 				}

@@ -1,5 +1,5 @@
 mainmenu_option next_comment
-comment 'Drivers for Etrax built-in interfaces'
+comment 'Drivers for ETRAX 100LX built-in interfaces'
 
 bool 'Ethernet support' CONFIG_ETRAX_ETHERNET
 if [ "$CONFIG_ETRAX_ETHERNET" = "y" ]; then
@@ -46,13 +46,13 @@ if [ "$CONFIG_ETRAX_SERIAL" = "y" ]; then
     fi 
   fi
   bool '  Serial port 3 enabled' CONFIG_ETRAX_SERIAL_PORT3
-  bool '  RS-485 support' CONFIG_RS485
-  if [ "$CONFIG_RS485" = "y" ]; then
-    bool '    RS-485 mode on PA' CONFIG_RS485_ON_PA
-    if [ "$CONFIG_RS485_ON_PA" = "y" ]; then
-      int '      RS-485 mode on PA bit' CONFIG_RS485_ON_PA_BIT 3
+  bool '  RS-485 support' CONFIG_ETRAX_RS485
+  if [ "$CONFIG_ETRAX_RS485" = "y" ]; then
+    bool '    RS-485 mode on PA' CONFIG_ETRAX_RS485_ON_PA
+    if [ "$CONFIG_ETRAX_RS485_ON_PA" = "y" ]; then
+      int '      RS-485 mode on PA bit' CONFIG_ETRAX_RS485_ON_PA_BIT 3
     fi
-    bool '    Disable serial receiver' CONFIG_RS485_DISABLE_RECEIVER
+    bool '    Disable serial receiver' CONFIG_ETRAX_RS485_DISABLE_RECEIVER
   fi
 fi
 
@@ -60,13 +60,28 @@ bool 'Synchronous serial port support' CONFIG_ETRAX_SYNCHRONOUS_SERIAL
 if [ "$CONFIG_ETRAX_SYNCHRONOUS_SERIAL" = "y" ]; then 
   bool '  Synchronous serial port 0 enabled' CONFIG_ETRAX_SYNCHRONOUS_SERIAL_PORT0
   if [ "$CONFIG_ETRAX_SYNCHRONOUS_SERIAL_PORT0" = "y" ]; then
-    bool '    Synchronous serial port 0 uses DMA' CONFIG_ETRAX_SYNCHRONOUS_SERIAL0_DMA y
+    bool '    Synchronous serial port 0 uses DMA' CONFIG_ETRAX_SYNCHRONOUS_SERIAL0_DMA
   fi
   bool '  Synchronous serial port 1 enabled' CONFIG_ETRAX_SYNCHRONOUS_SERIAL_PORT1
   if [ "$CONFIG_ETRAX_SYNCHRONOUS_SERIAL_PORT1" = "y" ]; then
-    bool '    Synchronous serial port 1 uses DMA' CONFIG_ETRAX_SYNCHRONOUS_SERIAL1_DMA y
+    bool '    Synchronous serial port 1 uses DMA' CONFIG_ETRAX_SYNCHRONOUS_SERIAL1_DMA
   fi 
 fi
+
+bool 'Parallel port support' CONFIG_ETRAX_PARPORT
+if [ "$CONFIG_ETRAX_PARPORT" = "y" ]; then
+	bool '  Parallel port 0 enabled' CONFIG_ETRAX_PARALLEL_PORT0
+	bool '  Parallel port 1 enabled' CONFIG_ETRAX_PARALLEL_PORT1
+# here we define the CONFIG_'s necessary to enable parallel port support
+	define_tristate CONFIG_PARPORT y
+        define_bool CONFIG_PARPORT_1284 y
+        define_tristate CONFIG_PRINTER y
+else
+	define_tristate CONFIG_PARPORT n
+        define_bool CONFIG_PARPORT_1284 n
+        define_tristate CONFIG_PRINTER n
+fi
+
 
 bool 'ATA/IDE support' CONFIG_ETRAX_IDE
 
@@ -89,7 +104,8 @@ if [ "$CONFIG_ETRAX_IDE" = "y" ]; then
 	choice 'IDE reset pin' \
   	"Port_PB_Bit_7  CONFIG_ETRAX_IDE_PB7_RESET\
    	 Port_G_Bit_27  CONFIG_ETRAX_IDE_G27_RESET\
-   	 Port_CSE1_Bit_16  CONFIG_ETRAX_IDE_CSE1_16_RESET" Port_PB_Bit_7 
+	 Port_CSE1_Bit_16  CONFIG_ETRAX_IDE_CSE1_16_RESET\
+	 Port_CSP0_Bit_08   CONFIG_ETRAX_IDE_CSP0_8_RESET"  Port_PB_Bit_7
 else
 	define_bool CONFIG_IDE n
 fi
@@ -97,6 +113,7 @@ fi
 bool 'Axis flash-map support' CONFIG_ETRAX_AXISFLASHMAP
 
 if [ "$CONFIG_ETRAX_AXISFLASHMAP" = "y" ]; then
+        int  '  Byte-offset of partition table sector' CONFIG_ETRAX_PTABLE_SECTOR 65536
 # here we define the CONFIG_'s necessary to enable MTD support
 # for the flash
 	define_bool CONFIG_MTD y
@@ -118,16 +135,25 @@ if [ "$CONFIG_ETRAX_I2C" = "y" ]; then
 	bool 'I2C uses PB not PB-I2C' CONFIG_ETRAX_I2C_USES_PB_NOT_PB_I2C
 fi
 
+bool 'I2C EEPROM (non-volatile RAM) support' CONFIG_ETRAX_I2C_EEPROM
+if [ "$CONFIG_ETRAX_I2C_EEPROM" = "y" ]; then
+  choice '  EEPROM size' \
+    "Probed CONFIG_ETRAX_I2C_EEPROM_PROBE \
+     2kB    CONFIG_ETRAX_I2C_EEPROM_2KB   \
+     8kB    CONFIG_ETRAX_I2C_EEPROM_8KB   \
+     16kB   CONFIG_ETRAX_I2C_EEPROM_16KB" Probed
+fi
+
 bool 'GPIO support' CONFIG_ETRAX_GPIO
 if [ "$CONFIG_ETRAX_GPIO" = "y" ]; then
   hex  '  PA-buttons bitmask' CONFIG_ETRAX_PA_BUTTON_BITMASK 02
-  hex  '  PA user changeable dir mask' CONFIG_PA_CHANGEABLE_DIR 00
-  hex  '  PA user changeable bits mask' CONFIG_PA_CHANGEABLE_BITS FF
-  hex  '  PB user changeable dir mask' CONFIG_PB_CHANGEABLE_DIR 00
-  hex  '  PB user changeable bits mask' CONFIG_PB_CHANGEABLE_BITS FF
+  hex  '  PA user changeable dir mask' CONFIG_ETRAX_PA_CHANGEABLE_DIR 00
+  hex  '  PA user changeable bits mask' CONFIG_ETRAX_PA_CHANGEABLE_BITS FF
+  hex  '  PB user changeable dir mask' CONFIG_ETRAX_PB_CHANGEABLE_DIR 00
+  hex  '  PB user changeable bits mask' CONFIG_ETRAX_PB_CHANGEABLE_BITS FF
 fi
 
-bool 'Juliette support' CONFIG_JULIETTE n
+bool 'ARTPEC-1 support' CONFIG_JULIETTE
 
 if [ "$CONFIG_JULIETTE" = "y" ]; then
    source arch/cris/drivers/juliette/Config.in
@@ -136,8 +162,18 @@ fi
 bool 'USB host' CONFIG_ETRAX_USB_HOST
 if [ "$CONFIG_ETRAX_USB_HOST" = "y" ]; then
 	define_bool CONFIG_USB y
-	bool '  USB port 1 enabled' CONFIG_ETRAX_USB_HOST_PORT1 n
-	bool '  USB port 2 enabled' CONFIG_ETRAX_USB_HOST_PORT2 n
+	bool '  USB port 1 enabled' CONFIG_ETRAX_USB_HOST_PORT1
+	bool '  USB port 2 enabled' CONFIG_ETRAX_USB_HOST_PORT2
+else
+	define_bool CONFIG_USB n
+fi
+
+bool 'DS1302 Real Time Clock support' CONFIG_ETRAX_DS1302
+if [ "$CONFIG_ETRAX_DS1302" = "y" ]; then
+  bool '  DS1302 RST on Generic Port' CONFIG_ETRAX_DS1302_RST_ON_GENERIC_PORT
+  int '  DS1302 RST bit number' CONFIG_ETRAX_DS1302_RSTBIT 2
+  int '  DS1302 SCL bit number' CONFIG_ETRAX_DS1302_SCLBIT 1
+  int '  DS1302 SDA bit number' CONFIG_ETRAX_DS1302_SDABIT 0
 fi
 
 endmenu

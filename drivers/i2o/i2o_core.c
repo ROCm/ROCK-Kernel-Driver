@@ -1,5 +1,5 @@
-/* 
- * Core I2O structure managment 
+/*
+ * Core I2O structure management 
  * 
  * (C) Copyright 1999   Red Hat Software 
  *
@@ -49,7 +49,7 @@
 
 #include "i2o_lan.h"
 
-// #define DRIVERDEBUG
+//#define DRIVERDEBUG
 
 #ifdef DRIVERDEBUG
 #define dprintk(s, args...) printk(s, ## args)
@@ -147,10 +147,12 @@ extern void i2o_pci_core_detach(void);
  */ 
 struct i2o_post_wait_data
 {
-	int status;
-	u32 id;
-	wait_queue_head_t *wq;
-	struct i2o_post_wait_data *next;
+	int *status;		/* Pointer to status block on caller stack */
+	int *complete;		/* Pointer to completion flag on caller stack */
+	u32 id;			/* Unique identifier */
+	wait_queue_head_t *wq;	/* Wake up for caller (NULL for dead) */
+	struct i2o_post_wait_data *next;	/* Chain */
+	void *mem[2];		/* Memory blocks to recover on failure path */
 };
 static struct i2o_post_wait_data *post_wait_queue = NULL;
 static u32 post_wait_id = 0;	// Unique ID for each post_wait
@@ -169,10 +171,10 @@ static struct i2o_handler i2o_core_handler =
 	I2O_CLASS_EXECUTIVE
 };
 
-
 /*
- * Used when queing a reply to be handled later
+ * Used when queueing a reply to be handled later
  */
+ 
 struct reply_info
 {
 	struct i2o_controller *iop;
@@ -199,10 +201,12 @@ static DECLARE_MUTEX(i2o_configuration_lock);
 static spinlock_t i2o_evt_lock = SPIN_LOCK_UNLOCKED;
 
 /*
- * Semaphore used to syncrhonize event handling thread with 
+ * Semaphore used to synchronize event handling thread with 
  * interrupt handler.
  */
-DECLARE_MUTEX(evt_sem);
+ 
+static DECLARE_MUTEX(evt_sem);
+static DECLARE_MUTEX_LOCKED(evt_dead);
 DECLARE_WAIT_QUEUE_HEAD(evt_wait);
 
 static struct notifier_block i2o_reboot_notifier =
@@ -212,6 +216,12 @@ static struct notifier_block i2o_reboot_notifier =
         0
 };
 
+/*
+ *	Config options
+ */
+
+static int verbose = 0;
+MODULE_PARM(verbose, "i");
 
 /*
  * I2O Core reply handler
@@ -252,7 +262,7 @@ static void i2o_core_reply(struct i2o_handler *h, struct i2o_controller *c,
 	if(msg[2]&0x80000000)	// Post wait message
 	{
 		if (msg[4] >> 24)
-			status = -(msg[4] & 0xFFFF);
+			status = (msg[4] & 0xFFFF);
 		else
 			status = I2O_POST_WAIT_OK;
 	
@@ -369,6 +379,9 @@ int i2o_install_device(struct i2o_controller *c, struct i2o_device *d)
 	d->controller=c;
 	d->owner=NULL;
 	d->next=c->devices;
+	d->prev=NULL;
+	if (c->devices != NULL)
+		c->devices->prev=d;
 	c->devices=d;
 	*d->dev_name = 0;
 
@@ -696,7 +709,7 @@ int i2o_claim_device(struct i2o_device *d, struct i2o_handler *h)
 {
 	down(&i2o_configuration_lock);
 	if (d->owner) {
-		printk(KERN_INFO "Device claim called, but dev allready owned by %s!",
+		printk(KERN_INFO "Device claim called, but dev already owned by %s!",
 		       h->name);
 		up(&i2o_configuration_lock);
 		return -EBUSY;
@@ -721,37 +734,59 @@ int i2o_claim_device(struct i2o_device *d, struct i2o_handler *h)
  *	Drop a claim by an OSM on a given I2O device. The handler is cleared
  *	and 0 is returned on success.
  *
+ *	AC - some devices seem to want to refuse an unclaim until they have
+ *	finished internal processing. It makes sense since you don't want a
+ *	new device to go reconfiguring the entire system until you are done.
+ *	Thus we are prepared to wait briefly.
  */
 
 int i2o_release_device(struct i2o_device *d, struct i2o_handler *h)
 {
 	int err = 0;
+	int tries;
 
 	down(&i2o_configuration_lock);
 	if (d->owner != h) {
-		printk(KERN_INFO "Claim release called, but not owned by %s!",
+		printk(KERN_INFO "Claim release called, but not owned by %s!\n",
 		       h->name);
 		up(&i2o_configuration_lock);
 		return -ENOENT;
 	}	
 
-	d->owner = NULL;
-
-	if(i2o_issue_claim(I2O_CMD_UTIL_RELEASE, d->controller, d->lct_data.tid, 
-			   I2O_CLAIM_PRIMARY))
+	for(tries=0;tries<10;tries++)
 	{
-		err = -ENXIO;
-		d->owner = h;
-	}
+		d->owner = NULL;
 
+		/*
+		 *	If the controller takes a nonblocking approach to
+		 *	releases we have to sleep/poll for a few times.
+		 */
+		 
+		if((err=i2o_issue_claim(I2O_CMD_UTIL_RELEASE, d->controller, d->lct_data.tid, I2O_CLAIM_PRIMARY)) )
+		{
+			err = -ENXIO;
+			current->state = TASK_UNINTERRUPTIBLE;
+			schedule_timeout(HZ);
+		}
+		else
+		{
+			err=0;
+			break;
+		}
+	}
 	up(&i2o_configuration_lock);
 	return err;
 }
 
-/*
- * Called by OSMs to let the core know that they want to be
- * notified if the given device is deleted from the system.
+/**
+ * 	i2o_device_notify_on	-	Enable deletion notifiers
+ *	@d: device for notification
+ *	@h: handler to install
+ *
+ *	Called by OSMs to let the core know that they want to be
+ *	notified if the given device is deleted from the system.
  */
+
 int i2o_device_notify_on(struct i2o_device *d, struct i2o_handler *h)
 {
 	int i;
@@ -773,7 +808,11 @@ int i2o_device_notify_on(struct i2o_device *d, struct i2o_handler *h)
 	return 0;
 }
 
-/*
+/**
+ * 	i2o_device_notify_off	-	Remove deletion notifiers
+ *	@d: device for notification
+ *	@h: handler to remove
+ *
  * Called by OSMs to let the core know that they no longer
  * are interested in the fate of the given device.
  */
@@ -794,9 +833,18 @@ int i2o_device_notify_off(struct i2o_device *d, struct i2o_handler *h)
 	return -ENOENT;
 }
 
-/*
- * Event registration API
+/**
+ *	i2o_event_register	-	register interest in an event
+ * 	@c: Controller to register interest with
+ *	@tid: I2O task id
+ *	@init_context: initiator context to use with this notifier
+ *	@tr_context: transaction context to use with this notifier
+ *	@evt_mask: mask of events
+ *
+ *	Create and posts an event registration message to the task. No reply
+ *	is waited for, or expected. Errors in posting will be reported.
  */
+ 
 int i2o_event_register(struct i2o_controller *c, u32 tid, 
 		u32 init_context, u32 tr_context, u32 evt_mask)
 {
@@ -814,11 +862,13 @@ int i2o_event_register(struct i2o_controller *c, u32 tid,
 }
 
 /*
- * Event ack API
+ * 	i2o_event_ack	-	acknowledge an event
+ *	@c: controller 
+ *	@msg: pointer to the UTIL_EVENT_REGISTER reply we received
  *
- * We just take a pointer to the original UTIL_EVENT_REGISTER reply
- * message and change the function code since that's what spec
- * describes an EventAck message looking like.
+ *	We just take a pointer to the original UTIL_EVENT_REGISTER reply
+ *	message and change the function code since that's what spec
+ *	describes an EventAck message looking like.
  */
  
 int i2o_event_ack(struct i2o_controller *c, u32 *msg)
@@ -850,12 +900,12 @@ static int i2o_core_evt(void *reply_data)
 
 	while(1)
 	{
-		down_interruptible(&evt_sem);
-		if(signal_pending(current))
+		if(down_interruptible(&evt_sem))
 		{
 			dprintk(KERN_INFO "I2O event thread dead\n");
+			printk("exiting...");
 			evt_running = 0;
-			return 0;	
+			up_and_exit(&evt_dead, 0);
 		}
 
 		/* 
@@ -922,6 +972,10 @@ static int i2o_core_evt(void *reply_data)
 					kmalloc(sizeof(struct i2o_device), GFP_KERNEL);
 				int i;
 
+				if (d == NULL) {
+					printk(KERN_EMERG "i2oevtd: out of memory\n");
+					break;
+				}
 				memcpy(&d->lct_data, &msg[5], sizeof(i2o_lct_entry));
 	
 				d->next = NULL;
@@ -974,7 +1028,11 @@ static int i2o_core_evt(void *reply_data)
 				printk(KERN_WARNING "%s: Warning notification received!"
 					"Check configuration for errors!\n", c->name);
 				break;
-	
+				
+			case I2O_EVT_IND_EVT_MASK_MODIFIED:
+				/* Well I guess that was us hey .. */
+				break;
+					
 			default:
 				printk(KERN_WARNING "%s: No handler for event (0x%08x)\n", c->name, msg[4]);
 				break;
@@ -1124,12 +1182,6 @@ void i2o_run_queue(struct i2o_controller *c)
 		m=(struct i2o_message *)bus_to_virt(mv);
 		msg=(u32*)m;
 
-		/*
-		 *	Temporary Debugging
-		 */
-		if(m->function==0x15)
-			printk(KERN_ERR "%s: UTFR!\n", c->name);
-
 		i=i2o_handlers[m->initiator_context&(MAX_I2O_MODULES-1)];
 		if(i && i->reply)
 			i->reply(i,c,m);
@@ -1219,9 +1271,9 @@ const char *i2o_get_class_name(int class)
 
 
 /**
- *	i2o_wait_message
+ *	i2o_wait_message	-	obtain an i2o message from the IOP
  *	@c: controller
- *	@why: explanation
+ *	@why: explanation 
  *
  *	This function waits up to 5 seconds for a message slot to be
  *	available. If no message is available it prints an error message
@@ -1266,9 +1318,11 @@ void i2o_report_controller_unit(struct i2o_controller *c, struct i2o_device *d)
 	char str[22];
 	int ret;
 	int unit = d->lct_data.tid;
-	
-	printk(KERN_INFO "Target ID %d.\n", unit);
 
+	if(verbose==0)
+		return;
+		
+	printk(KERN_INFO "Target ID %d.\n", unit);
 	if((ret=i2o_query_scalar(c, unit, 0xF100, 3, buf, 16))>=0)
 	{
 		buf[16]=0;
@@ -1279,13 +1333,11 @@ void i2o_report_controller_unit(struct i2o_controller *c, struct i2o_device *d)
 		buf[16]=0;
 		printk(KERN_INFO "     Device: %s\n", buf);
 	}
-#if 0
 	if(i2o_query_scalar(c, unit, 0xF100, 5, buf, 16)>=0)
 	{
 		buf[16]=0;
 		printk(KERN_INFO "     Description: %s\n", buf);
 	}
-#endif	
 	if((ret=i2o_query_scalar(c, unit, 0xF100, 6, buf, 8))>=0)
 	{
 		buf[8]=0;
@@ -1581,7 +1633,7 @@ int i2o_clear_controller(struct i2o_controller *c)
 
 
 /**
- *	i2o_reset_controller
+ *	i2o_reset_controller	-	reset an IOP
  *	@c: controller to reset
  *
  *	Reset the IOP into INIT state and wait until IOP gets into RESET state.
@@ -1601,7 +1653,10 @@ static int i2o_reset_controller(struct i2o_controller *c)
 	/* Quiesce all IOPs first */
 
 	for (iop = i2o_controller_chain; iop; iop = iop->next)
-		i2o_quiesce_controller(iop);
+	{
+		if(iop->type != I2O_TYPE_PCI || !iop->bus.pci.dpt)
+			i2o_quiesce_controller(iop);
+	}
 
 	m=i2o_wait_message(c, "AdapterReset");
 	if(m==0xFFFFFFFF)	
@@ -1628,19 +1683,19 @@ static int i2o_reset_controller(struct i2o_controller *c)
 
 	/* Wait for a reply */
 	time=jiffies;
-	while(status[0]==0)
+	while(*status==0)
 	{
 		if((jiffies-time)>=20*HZ)
 		{
 			printk(KERN_ERR "IOP reset timeout.\n");
-			kfree(status);
+			// Better to leak this for safety: kfree(status);
 			return -ETIMEDOUT;
 		}
 		schedule();
 		barrier();
 	}
 
-	if (status[0]==I2O_CMD_IN_PROGRESS)
+	if (*status==I2O_CMD_IN_PROGRESS)
 	{ 
 		/* 
 		 * Once the reset is sent, the IOP goes into the INIT state 
@@ -1799,7 +1854,7 @@ int i2o_hrt_get(struct i2o_controller *c)
 	u32 msg[6];
 	int ret, size = sizeof(i2o_hrt);
 
-	/* Read first just the header to figure out the real size */
+	/* First read just the header to figure out the real size */
 
 	do  {
 		if (c->hrt == NULL) {
@@ -1816,7 +1871,18 @@ int i2o_hrt_get(struct i2o_controller *c)
 		msg[4]= (0xD0000000 | size);	/* Simple transaction */
 		msg[5]= virt_to_bus(c->hrt);	/* Dump it here */
 
-		if ((ret = i2o_post_wait(c, msg, sizeof(msg), 20))) {
+		ret = i2o_post_wait_mem(c, msg, sizeof(msg), 20, c->hrt, NULL);
+		
+		if(ret == -ETIMEDOUT)
+		{
+			/* The HRT block we used is in limbo somewhere. When the iop wakes up
+			   we will recover it */
+			c->hrt = NULL;
+			return ret;
+		}
+		
+		if(ret<0)
+		{
 			printk(KERN_ERR "%s: Unable to get HRT (status=%#x)\n",
 				c->name, -ret);	
 			return ret;
@@ -1845,14 +1911,15 @@ int i2o_hrt_get(struct i2o_controller *c)
 static int i2o_systab_send(struct i2o_controller *iop)
 {
 	u32 msg[12];
-	u32 privmem[2];
-	u32 privio[2];
 	int ret;
+	u32 *privbuf = kmalloc(16, GFP_KERNEL);
+	if(privbuf == NULL)
+		return -ENOMEM;
 
-	privmem[0] = iop->status_block->current_mem_base;
-	privmem[1] = iop->status_block->current_mem_size;
-	privio[0] = iop->status_block->current_io_base;
-	privio[1] = iop->status_block->current_io_size;
+	privbuf[0] = iop->status_block->current_mem_base;
+	privbuf[1] = iop->status_block->current_mem_size;
+	privbuf[2] = iop->status_block->current_io_base;
+	privbuf[3] = iop->status_block->current_io_size;
 
 	msg[0] = I2O_MESSAGE_SIZE(12) | SGL_OFFSET_6;
 	msg[1] = I2O_CMD_SYS_TAB_SET<<24 | HOST_TID<<12 | ADAPTER_TID;
@@ -1864,20 +1931,33 @@ static int i2o_systab_send(struct i2o_controller *iop)
  	 * Provide three SGL-elements:
  	 * System table (SysTab), Private memory space declaration and 
  	 * Private i/o space declaration  
+ 	 *
+ 	 * FIXME: provide these for controllers needing them
  	 */
 	msg[6] = 0x54000000 | sys_tbl_len;
 	msg[7] = virt_to_bus(sys_tbl);
 	msg[8] = 0x54000000 | 0;
-	msg[9] = virt_to_bus(privmem);
+	msg[9] = virt_to_bus(privbuf);
 	msg[10] = 0xD4000000 | 0;
-	msg[11] = virt_to_bus(privio);
+	msg[11] = virt_to_bus(privbuf+8);
 
-	if ((ret=i2o_post_wait(iop, msg, sizeof(msg), 120)))
-		printk(KERN_INFO "%s: Unable to set SysTab (status=%#x).\n", 
+	ret=i2o_post_wait_mem(iop, msg, sizeof(msg), 120, privbuf, NULL);
+	
+	if(ret==-ETIMEDOUT)
+	{
+		printk(KERN_ERR "%s: SysTab setup timed out.\n", iop->name);
+	}
+	else if(ret<0)
+	{
+		printk(KERN_ERR "%s: Unable to set SysTab (status=%#x).\n", 
 			iop->name, -ret);
+		kfree(privbuf);
+	}
 	else
+	{
 		dprintk(KERN_INFO "%s: SysTab set.\n", iop->name);
-
+		kfree(privbuf);
+	}
 	i2o_status_get(iop); // Entered READY state
 
 	return ret;	
@@ -2162,7 +2242,16 @@ int i2o_lct_get(struct i2o_controller *c)
 		msg[6] = 0xD0000000|size;
 		msg[7] = virt_to_bus(c->lct);
 
-		if ((ret=i2o_post_wait(c, msg, sizeof(msg), 120))) {
+		ret=i2o_post_wait_mem(c, msg, sizeof(msg), 120, c->lct, NULL);
+		
+		if(ret == -ETIMEDOUT)
+		{
+			c->lct = NULL;
+			return ret;
+		}
+		
+		if(ret<0)
+		{
 			printk(KERN_ERR "%s: LCT Get failed (status=%#x.\n", 
 				c->name, -ret);	
 			return ret;
@@ -2206,8 +2295,11 @@ int i2o_lct_notify(struct i2o_controller *c)
 /*
  *	Bring a controller online into OPERATIONAL state. 
  */
+ 
 int i2o_online_controller(struct i2o_controller *iop)
 {
+	u32 v;
+	
 	if (i2o_systab_send(iop) < 0)
 		return -1;
 
@@ -2222,6 +2314,15 @@ int i2o_online_controller(struct i2o_controller *iop)
 	dprintk(KERN_INFO "%s: Attempting to get/parse lct...\n", iop->name);
 	if (i2o_lct_get(iop) < 0)
 		return -1;
+
+	/* Check battery status */
+	 
+	iop->battery = 0;
+	if(i2o_query_scalar(iop, ADAPTER_TID, 0x0000, 4, &v, 4)>=0)
+	{
+		if(v&16)
+			iop->battery = 1;
+	}
 
 	return 0;
 }
@@ -2346,83 +2447,134 @@ int i2o_post_this(struct i2o_controller *c, u32 *data, int len)
 	return 0;
 }
 
-/*
- * This core API allows an OSM to post a message and then be told whether
- * or not the system received a successful reply.  It is useful when
- * the OSM does not want to know the exact 3
+/**
+ * 	i2o_post_wait_mem	-	I2O query/reply with DMA buffers
+ *	@c: controller
+ *	@msg: message to send
+ *	@len: length of message
+ *	@timeout: time in seconds to wait
+ *	@mem1: attached memory buffer 1
+ *	@mem2: attached memory buffer 2
+ *
+ * 	This core API allows an OSM to post a message and then be told whether
+ *	or not the system received a successful reply. 
+ *
+ *	If the message times out then the value '-ETIMEDOUT' is returned. This
+ *	is a special case. In this situation the message may (should) complete
+ *	at an indefinite time in the future. When it completes it will use the
+ *	memory buffers attached to the request. If -ETIMEDOUT is returned then
+ *	the memory buffers must not be freed. Instead the event completion will
+ *	free them for you. In all other cases the buffers are your problem.
+ *
+ *	Pass NULL for unneeded buffers.
  */
-int i2o_post_wait(struct i2o_controller *c, u32 *msg, int len, int timeout)
+ 
+int i2o_post_wait_mem(struct i2o_controller *c, u32 *msg, int len, int timeout, void *mem1, void *mem2)
 {
 	DECLARE_WAIT_QUEUE_HEAD(wq_i2o_post);
-	int status = 0;
+	int complete = 0;
+	int status;
 	int flags = 0;
-	struct i2o_post_wait_data *p1, *p2;
 	struct i2o_post_wait_data *wait_data =
 		kmalloc(sizeof(struct i2o_post_wait_data), GFP_KERNEL);
 
 	if(!wait_data)
 		return -ENOMEM;
 
+	/*
+	 *	Create a new notification object
+	 */
+	wait_data->status = &status;
+	wait_data->complete = &complete;
+	wait_data->mem[0] = mem1;
+	wait_data->mem[1] = mem2;
 	/* 
-	 * The spin locking is needed to keep anyone from playing 
-	 * with the queue pointers and id while we do the same
+	 *	Queue the event with its unique id
 	 */
 	spin_lock_irqsave(&post_wait_lock, flags);
+
 	wait_data->next = post_wait_queue;
 	post_wait_queue = wait_data;
 	wait_data->id = (++post_wait_id) & 0x7fff;
+	wait_data->wq = &wq_i2o_post;
+
 	spin_unlock_irqrestore(&post_wait_lock, flags);
 
-	wait_data->wq = &wq_i2o_post;
-	wait_data->status = -ETIMEDOUT;
-
+	/*
+	 *	Fill in the message id
+	 */
+	 
 	msg[2] = 0x80000000|(u32)core_context|((u32)wait_data->id<<16);
 	
-	if ((status = i2o_post_this(c, msg, len))==0) {
-		interruptible_sleep_on_timeout(&wq_i2o_post, HZ * timeout);
-		status = wait_data->status;
-	}  
-
-#ifdef DRIVERDEBUG
-	if(status == -ETIMEDOUT)
-		printk(KERN_INFO "%s: POST WAIT TIMEOUT\n",c->name);
-#endif
-
-	/* 
-	 * Remove the entry from the queue.
-	 * Since i2o_post_wait() may have been called again by
-	 * a different thread while we were waiting for this 
-	 * instance to complete, we're not guaranteed that 
-	 * this entry is at the head of the queue anymore, so 
-	 * we need to search for it, find it, and delete it.
+	/*
+	 *	Post the message to the controller. At some point later it 
+	 *	will return. If we time out before it returns then
+	 *	complete will be zero.  From the point post_this returns
+	 *	the wait_data may have been deleted.
 	 */
-	p2 = NULL;
+	if ((status = i2o_post_this(c, msg, len))==0) {
+		sleep_on_timeout(&wq_i2o_post, HZ * timeout);
+	}  
+	else
+		return -EIO;
+		
+	if(signal_pending(current))
+		status = -EINTR;
+		
 	spin_lock_irqsave(&post_wait_lock, flags);
-	for(p1 = post_wait_queue; p1; p2 = p1, p1 = p1->next) {
-		if(p1 == wait_data) {
-			if(p2)
-				p2->next = p1->next;
-			else
-				post_wait_queue = p1->next;
-
-			break;
+	barrier();	/* Be sure we see complete as it is locked */
+	if(!complete)
+	{
+		/* 
+		 *	Mark the entry dead. We cannot remove it. This is important.
+		 *	When it does terminate (which it must do if the controller hasnt
+		 *	died..) then it will otherwise scribble on stuff.
+		 *	!complete lets us safely check if the entry is still
+		 *	allocated and thus we can write into it
+		 */
+		wait_data->wq = NULL;
+		status = -ETIMEDOUT;
+	}
+	else
+	{
+		/* Debugging check - remove me soon */
+		if(status == -ETIMEDOUT)
+		{
+			printk("TIMEDOUT BUG!\n");
+			status = -EIO;
 		}
 	}
+	/* And the wait_data is not leaked either! */	 
 	spin_unlock_irqrestore(&post_wait_lock, flags);
-	
-	kfree(wait_data);
-
 	return status;
+}
+
+/**
+ * 	i2o_post_wait		-	I2O query/reply
+ *	@c: controller
+ *	@msg: message to send
+ *	@len: length of message
+ *	@timeout: time in seconds to wait
+ *
+ * 	This core API allows an OSM to post a message and then be told whether
+ *	or not the system received a successful reply. 
+ */
+ 
+int i2o_post_wait(struct i2o_controller *c, u32 *msg, int len, int timeout)
+{
+	return i2o_post_wait_mem(c, msg, len, timeout, NULL, NULL);
 }
 
 /*
  * i2o_post_wait is completed and we want to wake up the 
  * sleeping proccess. Called by core's reply handler.
  */
+
 static void i2o_post_wait_complete(u32 context, int status)
 {
-	struct i2o_post_wait_data *p1 = NULL;
-
+	struct i2o_post_wait_data **p1, *q;
+	unsigned long flags;
+	
 	/* 
 	 * We need to search through the post_wait 
 	 * queue to see if the given message is still
@@ -2435,18 +2587,49 @@ static void i2o_post_wait_complete(u32 context, int status)
 	 * Lock needed to keep anyone from moving queue pointers 
 	 * around while we're looking through them.
 	 */
-	spin_lock(&post_wait_lock);
-	for(p1 = post_wait_queue; p1; p1 = p1->next) {
-		if(p1->id == ((context >> 16) & 0x7fff)) {
-			p1->status = status;
-			wake_up_interruptible(p1->wq);
+
+	spin_lock_irqsave(&post_wait_lock, flags);
+
+	for(p1 = &post_wait_queue; *p1!=NULL; p1 = &((*p1)->next)) 
+	{
+		q = (*p1);
+		if(q->id == ((context >> 16) & 0x7fff)) {
+			/*
+			 *	Delete it 
+			 */
+			 
+			*p1 = q->next;
+			
+			/*
+			 *	Live or dead ?
+			 */
+			 
+			if(q->wq)
+			{
+				/* Live entry - wakeup and set status */
+				*q->status = status;
+				*q->complete = 1;
+				wake_up(q->wq);
+			}
+			else
+			{
+				/*
+				 *	Free resources. Caller is dead
+				 */
+				if(q->mem[0])
+					kfree(q->mem[0]);
+				if(q->mem[1])
+					kfree(q->mem[1]);
+				printk(KERN_WARNING "i2o_post_wait event completed after timeout.\n");
+			}
+			kfree(q);
 			spin_unlock(&post_wait_lock);
 			return;
 		}
 	}
 	spin_unlock(&post_wait_lock);
 
-	printk(KERN_DEBUG "i2o_post_wait reply after timeout!\n");
+	printk(KERN_DEBUG "i2o_post_wait: Bogus reply!\n");
 }
 
 /*	Issue UTIL_PARAMS_GET or UTIL_PARAMS_SET
@@ -2461,25 +2644,52 @@ int i2o_issue_params(int cmd, struct i2o_controller *iop, int tid,
                 void *oplist, int oplen, void *reslist, int reslen)
 {
 	u32 msg[9]; 
-	u8 *res = (u8 *)reslist;
 	u32 *res32 = (u32*)reslist;
 	u32 *restmp = (u32*)reslist;
 	int len = 0;
 	int i = 0;
 	int wait_status;
-
+	u32 *opmem, *resmem;
+	
+	/* Get DMAable memory */
+	opmem = kmalloc(oplen, GFP_KERNEL);
+	if(opmem == NULL)
+		return -ENOMEM;
+	memcpy(opmem, oplist, oplen);
+	
+	resmem = kmalloc(reslen, GFP_KERNEL);
+	if(resmem == NULL)
+	{
+		kfree(opmem);
+		return -ENOMEM;
+	}
+	
 	msg[0] = NINE_WORD_MSG_SIZE | SGL_OFFSET_5;
 	msg[1] = cmd << 24 | HOST_TID << 12 | tid; 
 	msg[3] = 0;
 	msg[4] = 0;
 	msg[5] = 0x54000000 | oplen;	/* OperationList */
-	msg[6] = virt_to_bus(oplist);
+	msg[6] = virt_to_bus(opmem);
 	msg[7] = 0xD0000000 | reslen;	/* ResultList */
-	msg[8] = virt_to_bus(reslist);
+	msg[8] = virt_to_bus(resmem);
 
-	if((wait_status = i2o_post_wait(iop, msg, sizeof(msg), 10)))
-		return wait_status; 	/* -DetailedStatus */
+	wait_status = i2o_post_wait_mem(iop, msg, sizeof(msg), 10, opmem, resmem);
+	
+	/*
+	 *	This only looks like a memory leak - don't "fix" it.	
+	 */
+	if(wait_status == -ETIMEDOUT)
+		return wait_status;
 
+	/* Query failed */
+	if(wait_status != 0)
+	{
+		kfree(resmem);
+		kfree(opmem);
+		return wait_status;
+	}
+	
+	memcpy(reslist, resmem, reslen);
 	/*
 	 * Calculate number of bytes of Result LIST
 	 * We need to loop through each Result BLOCK and grab the length
@@ -2500,13 +2710,13 @@ int i2o_issue_params(int cmd, struct i2o_controller *iop, int tid,
 			 *	If this is the only request,than we return an error
 			 */
 			if((res32[0]&0x0000FFFF) == 1)
-				return -((res[1] >> 16) & 0xFF); /* -BlockStatus */
+			{
+				return -((res32[1] >> 16) & 0xFF); /* -BlockStatus */
+			}
 		}
-
 		len += restmp[0] & 0x0000FFFF;	/* Length of res BLOCK */
 		restmp += restmp[0] & 0x0000FFFF;	/* Skip to next BLOCK */
 	}
-
 	return (len << 2);  /* bytes used by result list */
 }
 
@@ -2526,10 +2736,10 @@ int i2o_query_scalar(struct i2o_controller *iop, int tid,
 	size = i2o_issue_params(I2O_CMD_UTIL_PARAMS_GET, iop, tid, 
 		opblk, sizeof(opblk), resblk, sizeof(resblk));
 		
-	if (size < 0)
-		return size;	
-
 	memcpy(buf, resblk+8, buflen);  /* cut off header */
+	
+	if(size>buflen)
+		return buflen;
 	return size;
 }
 
@@ -2570,6 +2780,8 @@ int i2o_set_scalar(struct i2o_controller *iop, int tid,
 				opblk, 12+buflen, resblk, sizeof(resblk));
 
 	kfree(opblk);
+	if(size>buflen)
+		return buflen;
 	return size;
 }
 
@@ -2614,6 +2826,8 @@ int i2o_query_table(int oper, struct i2o_controller *iop, int tid, int group,
 				opblk, 10+ibuflen, resblk, reslen);
 
 	kfree(opblk);
+	if(size>reslen)
+		return reslen;
 	return size;
 }
 
@@ -2662,6 +2876,8 @@ int i2o_row_add_table(struct i2o_controller *iop, int tid,
 				opblk, 10+buflen, resblk, sizeof(resblk));
 
 	kfree(opblk);
+	if(size>buflen)
+		return buflen;
 	return size;
 }
 
@@ -3113,8 +3329,6 @@ static int i2o_reboot_event(struct notifier_block *n, unsigned long code, void
 }
 
 
-#ifdef MODULE
-
 EXPORT_SYMBOL(i2o_controller_chain);
 EXPORT_SYMBOL(i2o_num_controllers);
 EXPORT_SYMBOL(i2o_find_controller);
@@ -3131,6 +3345,7 @@ EXPORT_SYMBOL(i2o_device_notify_off);
 
 EXPORT_SYMBOL(i2o_post_this);
 EXPORT_SYMBOL(i2o_post_wait);
+EXPORT_SYMBOL(i2o_post_wait_mem);
 
 EXPORT_SYMBOL(i2o_query_scalar);
 EXPORT_SYMBOL(i2o_set_scalar);
@@ -3146,6 +3361,8 @@ EXPORT_SYMBOL(i2o_report_status);
 EXPORT_SYMBOL(i2o_dump_message);
 
 EXPORT_SYMBOL(i2o_get_class_name);
+
+#ifdef MODULE
 
 MODULE_AUTHOR("Red Hat Software");
 MODULE_DESCRIPTION("I2O Core");
@@ -3206,17 +3423,13 @@ void cleanup_module(void)
 	 * If this is shutdown time, the thread has already been killed
 	 */
 	if(evt_running) {
+		printk("Terminating i2o threads...");
 		stat = kill_proc(evt_pid, SIGTERM, 1);
 		if(!stat) {
-			int count = 10 * 100;
-			while(evt_running && count--) {
-				current->state = TASK_INTERRUPTIBLE;
-				schedule_timeout(1);
-			}
-	
-			if(!count)
-				printk(KERN_ERR "i2o: Event thread still running!\n");
+			printk("waiting...");
+			down(&evt_dead);
 		}
+		printk("done.\n");
 	}
 
 #ifdef CONFIG_I2O_PCI_MODULE

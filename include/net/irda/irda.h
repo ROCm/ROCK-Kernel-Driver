@@ -71,7 +71,9 @@ if(!(expr)) { \
         func }
 #else
 #define IRDA_DEBUG(n, args...)
-#define ASSERT(expr, func)
+#define ASSERT(expr, func) \
+if(!(expr)) do { \
+        func } while (0)
 #endif /* CONFIG_IRDA_DEBUG */
 
 #define WARNING(args...) printk(KERN_WARNING args)

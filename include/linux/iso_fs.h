@@ -165,14 +165,46 @@ struct iso_directory_record {
 #define ISOFS_SUPER_MAGIC 0x9660
 
 #ifdef __KERNEL__
-extern int isonum_711(char *);
-extern int isonum_712(char *);
-extern int isonum_721(char *);
-extern int isonum_722(char *);
-extern int isonum_723(char *);
-extern int isonum_731(char *);
-extern int isonum_732(char *);
-extern int isonum_733(char *);
+/* Number conversion inlines, named after the section in ISO 9660
+   they correspond to. */
+
+#include <asm/byteorder.h>
+#include <asm/unaligned.h>
+
+static inline int isonum_711(char *p)
+{
+	return *(u8 *)p;
+}
+static inline int isonum_712(char *p)
+{
+	return *(s8 *)p;
+}
+static inline int isonum_721(char *p)
+{
+	return le16_to_cpu(get_unaligned((u16 *)p));
+}
+static inline int isonum_722(char *p)
+{
+	return be16_to_cpu(get_unaligned((u16 *)p));
+}
+static inline int isonum_723(char *p)
+{
+	/* Ignore bigendian datum due to broken mastering programs */
+	return le16_to_cpu(get_unaligned((u16 *)p));
+}
+static inline int isonum_731(char *p)
+{
+	return le32_to_cpu(get_unaligned((u32 *)p));
+}
+static inline int isonum_732(char *p)
+{
+	return be32_to_cpu(get_unaligned((u32 *)p));
+}
+static inline int isonum_733(char *p)
+{
+	/* Ignore bigendian datum due to broken mastering programs */
+	return le32_to_cpu(get_unaligned((u32 *)p));
+}
 extern int iso_date(char *, int);
 
 extern int parse_rock_ridge_inode(struct iso_directory_record *, struct inode *);

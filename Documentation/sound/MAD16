@@ -1,3 +1,5 @@
+(This recipe has been edited to update the configuration symbols.)
+
 From: Shaw Carruthers <shaw@shawc.demon.co.uk>
 
 I have been using mad16 sound for some time now with no problems, current
@@ -14,9 +16,9 @@ sound                  61928   0  [mad16 sb uart401 ad1848]
 .config has:
 
 CONFIG_SOUND=m
-CONFIG_ADLIB=m
-CONFIG_MAD16=m
-CONFIG_YM3812=m
+CONFIG_SOUND_ADLIB=m
+CONFIG_SOUND_MAD16=m
+CONFIG_SOUND_YM3812=m
 
 modules.conf has:
 

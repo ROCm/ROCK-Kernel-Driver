@@ -80,25 +80,28 @@ typedef __u32 DriverVer_type;
 
 #define CISS_MAX_LUN	16	
 
+#define LEVEL2LUN   1   // index into Target(x) structure, due to byte swapping
+#define LEVEL3LUN   0
+
 #pragma pack(1)
 
 //Command List Structure
 typedef union _SCSI3Addr_struct {
    struct {
+    BYTE Dev;
     BYTE Bus:6;
     BYTE Mode:2;        // b00
-    BYTE Dev;
   } PeripDev;
    struct {
+    BYTE DevLSB;
     BYTE DevMSB:6;
     BYTE Mode:2;        // b01
-    BYTE DevLSB;
   } LogDev;
    struct {
-    BYTE Targ:6;
-    BYTE Mode:2;        // b10
     BYTE Dev:5;
     BYTE Bus:3;
+    BYTE Targ:6;
+    BYTE Mode:2;        // b10
   } LogUnit;
 } SCSI3Addr_struct;
 

@@ -10,7 +10,7 @@
  *   (c) 2000 Brian Webb (webbb@earthlink.net)
  *
  * This device contains both a CompactFlash card reader, which
- * usest the Control/Bulk w/o Interrupt protocol and
+ * uses the Control/Bulk w/o Interrupt protocol and
  * a SmartMedia card reader that uses the same protocol
  * as the SDDR09.
  *

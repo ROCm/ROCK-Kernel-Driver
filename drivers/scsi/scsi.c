@@ -104,7 +104,7 @@ Scsi_Cmnd *last_cmnd;
 const unsigned char scsi_command_size[8] =
 {
 	6, 10, 10, 12,
-	16, 12, 10, 10
+	12, 12, 10, 10
 };
 static unsigned long serial_number;
 static Scsi_Cmnd *scsi_bh_queue_head;

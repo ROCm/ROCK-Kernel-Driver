@@ -238,8 +238,8 @@ using this version of the device driver.
 open(const char * filename, int flags)
 --------------------------------------
 The filename should be an 'sg' device such as
-/dev/sg[a-z]
 /dev/sg[0,1,2,...]
+/dev/sg[a-z]             <<< now deprecated >>>
 or a symbolic link to one of these. [Devfs has its own sub-directory for
 sg devices with entries like: /dev/scsi/host1/bus2/target3/lun4/generic .]
 It seems as though SCSI devices are allocated to sg minor numbers in the

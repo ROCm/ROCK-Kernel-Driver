@@ -765,7 +765,7 @@ Your cooperation is appreciated.
  36 char	Netlink support
 		  0 = /dev/route	Routing, device updates, kernel to user
 		  1 = /dev/skip		enSKIP security cache control
-		  3 = /dec/fwmonitor	Firewall packet copies
+		  3 = /dev/fwmonitor	Firewall packet copies
 		 16 = /dev/tap0		First Ethertap device
 		    ...
 		 31 = /dev/tap15	16th Ethertap device
@@ -2436,7 +2436,7 @@ Your cooperation is appreciated.
 
 224 char	A2232 serial card
 		  0 = /dev/ttyY0		First A2232 port
-		  1 = /dev/cuy0			Second A2232 port
+		  1 = /dev/ttyY1		Second A2232 port
 		    ...
 
 225 char	A2232 serial card (alternate devices)

@@ -42,7 +42,6 @@
 
 static int i2o_cfg_context = -1;
 static void *page_buf;
-static void *i2o_buffer;
 static spinlock_t i2o_config_lock = SPIN_LOCK_UNLOCKED;
 struct wait_queue *i2o_wait_queue;
 
@@ -499,6 +498,7 @@ int ioctl_html(unsigned long arg)
 	if(!res)
 	{
 		i2o_unlock_controller(c);
+		kfree(query);
 		return -ENOMEM;
 	}
 
@@ -517,16 +517,25 @@ int ioctl_html(unsigned long arg)
 		msg[7] = 0xD4000000|(kcmd.qlen);
 		msg[8] = virt_to_bus(query);
 	}
-
-	token = i2o_post_wait(c, msg, 9*4, 10);
-	if(token)
+	/*
+	Wait for a considerable time till the Controller 
+	does its job before timing out. The controller might
+	take more time to process this request if there are
+	many devices connected to it.
+	*/
+	token = i2o_post_wait_mem(c, msg, 9*4, 400, query, res);
+	if(token < 0)
 	{
 		printk(KERN_DEBUG "token = %#10x\n", token);
 		i2o_unlock_controller(c);
-		kfree(res);
-		if(kcmd.qlen) kfree(query);
+		
+		if(token != -ETIMEDOUT)
+		{
+			kfree(res);
+			if(kcmd.qlen) kfree(query);
+		}
 
-		return -ETIMEDOUT;
+		return token;
 	}
 	i2o_unlock_controller(c);
 
@@ -595,17 +604,18 @@ int ioctl_swdl(unsigned long arg)
 	msg[8]= virt_to_bus(buffer);
 
 //	printk("i2o_config: swdl frag %d/%d (size %d)\n", curfrag, maxfrag, fragsize);
-	status = i2o_post_wait(c, msg, sizeof(msg), 60);
+	status = i2o_post_wait_mem(c, msg, sizeof(msg), 60, buffer, NULL);
 
 	i2o_unlock_controller(c);
-	kfree(buffer);
+	if(status != -ETIMEDOUT)
+		kfree(buffer);
 	
 	if (status != I2O_POST_WAIT_OK)
 	{
 		// it fails if you try and send frags out of order
 		// and for some yet unknown reasons too
 		printk(KERN_INFO "i2o_config: swdl failed, DetailedStatus = %d\n", status);
-		return -ETIMEDOUT;
+		return status;
 	}
 
 	return 0;
@@ -660,14 +670,15 @@ int ioctl_swul(unsigned long arg)
 	msg[8]= virt_to_bus(buffer);
 	
 //	printk("i2o_config: swul frag %d/%d (size %d)\n", curfrag, maxfrag, fragsize);
-	status = i2o_post_wait(c, msg, sizeof(msg), 60);
+	status = i2o_post_wait_mem(c, msg, sizeof(msg), 60, buffer, NULL);
 	i2o_unlock_controller(c);
 	
 	if (status != I2O_POST_WAIT_OK)
 	{
-		kfree(buffer);
+		if(status != -ETIMEDOUT)
+			kfree(buffer);
 		printk(KERN_INFO "i2o_config: swul failed, DetailedStatus = %d\n", status);
-		return -ETIMEDOUT;
+		return status;
 	}
 	
 	__copy_to_user(kxfer.buf, buffer, fragsize);
@@ -787,13 +798,6 @@ static int ioctl_evt_get(unsigned long arg, struct file *fp)
 	struct i2o_evt_get kget;
 	unsigned int flags;
 
-	// access_ok doesn't check for NULL?!?!
-	if(!arg)
-		return -EFAULT;
-	
-	if(!access_ok(VERIFY_WRITE, uget,  sizeof(struct i2o_evt_get)))
-		return -EFAULT;
-
 	for(p = open_files; p; p = p->next)
 		if(p->q_id == id)
 			break;
@@ -812,8 +816,8 @@ static int ioctl_evt_get(unsigned long arg, struct file *fp)
 	kget.lost = p->q_lost;
 	spin_unlock_irqrestore(&i2o_config_lock, flags);
 
-	__copy_to_user(uget, &kget, sizeof(struct i2o_evt_get));
-
+	if(copy_to_user(uget, &kget, sizeof(struct i2o_evt_get)))
+		return -EFAULT;
 	return 0;
 }
 
@@ -958,8 +962,6 @@ void cleanup_module(void)
 		kfree(page_buf);
 	if(i2o_cfg_context != -1)
 		i2o_remove_handler(&cfg_handler);
-	if(i2o_buffer)
-		kfree(i2o_buffer);
 }
  
 EXPORT_NO_SYMBOLS;

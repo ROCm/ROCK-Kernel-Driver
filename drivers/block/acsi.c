@@ -1886,13 +1886,7 @@ static int revalidate_acsidisk( int dev, int maxusage )
 
 	for( i = max_p - 1; i >= 0 ; i-- ) {
 		if (gdev->part[start + i].nr_sects != 0) {
-			kdev_t devp = MKDEV(MAJOR_NR, start + i);
-			struct super_block *sb = get_super(devp);
-
-			fsync_dev(devp);
-			if (sb)
-				invalidate_inodes(sb);
-			invalidate_buffers(devp);
+			invalidate_device(MKDEV(MAJOR_NR, start + i), 1);
 			gdev->part[start + i].nr_sects = 0;
 		}
 		gdev->part[start+i].start_sect = 0;

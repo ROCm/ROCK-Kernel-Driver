@@ -843,7 +843,7 @@ void __init pci_read_bridge_bases(struct pci_bus *child)
 		 * Ugh. We don't know enough about this bridge. Just assume
 		 * that it's entirely transparent.
 		 */
-		printk("Unknown bridge resource %d: assuming transparent\n", 0);
+		printk(KERN_ERR "Unknown bridge resource %d: assuming transparent\n", 0);
 		child->resource[0] = child->parent->resource[0];
 	}
 
@@ -859,7 +859,7 @@ void __init pci_read_bridge_bases(struct pci_bus *child)
 		res->name = child->name;
 	} else {
 		/* See comment above. Same thing */
-		printk("Unknown bridge resource %d: assuming transparent\n", 1);
+		printk(KERN_ERR "Unknown bridge resource %d: assuming transparent\n", 1);
 		child->resource[1] = child->parent->resource[1];
 	}
 
@@ -886,7 +886,7 @@ void __init pci_read_bridge_bases(struct pci_bus *child)
 		res->name = child->name;
 	} else {
 		/* See comments above */
-		printk("Unknown bridge resource %d: assuming transparent\n", 2);
+		printk(KERN_ERR "Unknown bridge resource %d: assuming transparent\n", 2);
 		child->resource[2] = child->parent->resource[2];
 	}
 }

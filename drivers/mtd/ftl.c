@@ -915,9 +915,6 @@ static int ftl_open(struct inode *inode, struct file *file)
 
 static release_t ftl_close(struct inode *inode, struct file *file)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,0)
-    struct super_block *sb = get_super(inode->i_rdev);
-#endif
     int minor = MINOR(inode->i_rdev);
     partition_t *part = myparts[minor >> 4];
     int i;
@@ -925,11 +922,7 @@ static release_t ftl_close(struct inode *inode, struct file *file)
     DEBUG(0, "ftl_cs: ftl_close(%d)\n", minor);
 
     /* Flush all writes */
-    fsync_dev(inode->i_rdev);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,0)
-    if (sb) invalidate_inodes(sb);
-#endif
-    invalidate_buffers(inode->i_rdev);
+    invalidate_device(inode->i_rdev, 1);
 
     /* Wait for any pending erase operations to complete */
     if (part->mtd->sync)

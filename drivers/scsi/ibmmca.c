@@ -50,7 +50,7 @@
 
 /* driver debugging - #undef all for normal operation */
 /* if defined: count interrupts and ignore this special one: */
-#undef	IM_DEBUG_TIMEOUT	50            
+#undef	IM_DEBUG_TIMEOUT	//50            
 #define TIMEOUT_PUN	0
 #define TIMEOUT_LUN	0
 /* verbose interrupt: */

@@ -2156,7 +2156,6 @@ static int check_disc_changed (struct devfs_entry *de)
     int tmp;
     kdev_t dev = MKDEV (de->u.fcb.u.device.major, de->u.fcb.u.device.minor);
     struct block_device_operations *bdops = de->u.fcb.ops;
-    struct super_block * sb;
     extern int warn_no_part;
 
     if ( !S_ISBLK (de->mode) ) return 0;
@@ -2165,10 +2164,8 @@ static int check_disc_changed (struct devfs_entry *de)
     if ( !bdops->check_media_change (dev) ) return 0;
     printk ( KERN_DEBUG "VFS: Disk change detected on device %s\n",
 	     kdevname (dev) );
-    sb = get_super (dev);
-    if ( sb && invalidate_inodes (sb) )
+    if (invalidate_device(dev, 0))
 	printk("VFS: busy inodes on changed media..\n");
-    invalidate_buffers (dev);
     /*  Ugly hack to disable messages about unable to read partition table  */
     tmp = warn_no_part;
     warn_no_part = 0;

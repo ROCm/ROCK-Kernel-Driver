@@ -28,14 +28,16 @@
  *    		Support for larger I/Os through merge* functions 
  *       	(taken from DAC960 driver)
  *	Boji T Kannanthanam:
- *		Reduced the timeout during RAID 5 creation. 
- *		This is to prevent race condition when a RAID volume
- *		is created and immediately deleted.
+ *		Set the I2O Block devices to be detected in increasing 
+ *		order of TIDs during boot.
+ *		Search and set the I2O block device that we boot off from  as
+ *		the first device to be claimed (as /dev/i2o/hda)
+ *		Properly attach/detach I2O gendisk structure from the system
+ *		gendisk list. The I2O block devices now appear in 
+ * 		/proc/partitions.
  *
  *	To do:
  *		Serial number scanning to find duplicates for FC multipathing
- *		Remove the random timeout in the code needed for RAID 5
- *			volume creation.
  */
 
 #include <linux/major.h>
@@ -86,7 +88,8 @@
 #define I2OB_EVENT_MASK		(I2O_EVT_IND_BSA_VOLUME_LOAD |	\
 				 I2O_EVT_IND_BSA_VOLUME_UNLOAD | \
 				 I2O_EVT_IND_BSA_VOLUME_UNLOAD_REQ | \
-				 I2O_EVT_IND_BSA_CAPACITY_CHANGE)
+				 I2O_EVT_IND_BSA_CAPACITY_CHANGE | \
+				 I2O_EVT_IND_BSA_SCSI_SMART )
 
 
 /*
@@ -135,6 +138,8 @@ struct i2ob_device
 	request_queue_t *req_queue;
 	int max_segments;
 	int done_flag;
+	int constipated;
+	int depth;
 };
 
 /*
@@ -164,7 +169,9 @@ struct i2ob_iop_queue
 	struct i2ob_request *i2ob_qhead;
 	request_queue_t req_queue;
 };
-static struct i2ob_iop_queue *i2ob_queues[MAX_I2O_CONTROLLERS] = {NULL};
+static struct i2ob_iop_queue *i2ob_queues[MAX_I2O_CONTROLLERS];
+static struct i2ob_request *i2ob_backlog[MAX_I2O_CONTROLLERS];
+static struct i2ob_request *i2ob_backlog_tail[MAX_I2O_CONTROLLERS];
 
 /*
  *	Each I2O disk is one of these.
@@ -179,10 +186,10 @@ static struct gendisk i2ob_gendisk;	/* Declared later */
  * Mutex and spin lock for event handling synchronization
  * evt_msg contains the last event.
  */
-DECLARE_MUTEX(i2ob_evt_sem);
+static DECLARE_MUTEX_LOCKED(i2ob_evt_sem);
+static DECLARE_MUTEX_LOCKED(i2ob_thread_dead);
 static spinlock_t i2ob_evt_lock = SPIN_LOCK_UNLOCKED;
-static unsigned int evt_msg[MSG_FRAME_SIZE>>2];
-DECLARE_WAIT_QUEUE_HEAD(i2ob_evt_wait);
+static u32 evt_msg[MSG_FRAME_SIZE>>2];
 
 static struct timer_list i2ob_timer;
 static int i2ob_timer_started = 0;
@@ -195,6 +202,7 @@ static void i2ob_reboot_event(void);
 static int i2ob_install_device(struct i2o_controller *, struct i2o_device *, int);
 static void i2ob_end_request(struct request *);
 static void i2ob_request(request_queue_t *);
+static int i2ob_backlog_request(struct i2o_controller *, struct i2ob_device *);
 static int i2ob_init_iop(unsigned int);
 static request_queue_t* i2ob_get_queue(kdev_t);
 static int i2ob_query_device(struct i2ob_device *, int, int, void*, int);
@@ -203,6 +211,7 @@ static int i2ob_evt(void *);
 
 static int evt_pid = 0;
 static int evt_running = 0;
+static int scan_unit = 0;
 
 /*
  * I2O OSM registration structure...keeps getting bigger and bigger :)
@@ -255,7 +264,12 @@ static int i2ob_send(u32 m, struct i2ob_device *dev, struct i2ob_request *ireq, 
 	__raw_writel(i2ob_context|(unit<<8), msg+8);
 	__raw_writel(ireq->num, msg+12);
 	__raw_writel(req->nr_sectors << 9, msg+20);
-	
+
+	/* 
+	 * Mask out partitions from now on
+	 */
+	unit &= 0xF0;
+		
 	/* This can be optimised later - just want to be sure its right for
 	   starters */
 	offset = ((u64)(req->sector+base)) << 9;
@@ -266,8 +280,6 @@ static int i2ob_send(u32 m, struct i2ob_device *dev, struct i2ob_request *ireq, 
 	if(req->cmd == READ)
 	{
 		__raw_writel(I2O_CMD_BLOCK_READ<<24|HOST_TID<<12|tid, msg+4);
-		/* We don't yet do cache/readahead and other magic */
-		__raw_writel(1<<16, msg+16);
 		while(bh!=NULL)
 		{
 			if(bh->b_data == last) {
@@ -293,16 +305,20 @@ static int i2ob_send(u32 m, struct i2ob_device *dev, struct i2ob_request *ireq, 
 			count -= bh->b_size;
 			bh = bh->b_reqnext;
 		}
+		/*
+		 *	Heuristic for now since the block layer doesnt give
+		 *	us enough info. If its a big write assume sequential
+		 *	readahead on controller. If its small then don't read
+		 *	ahead but do use the controller cache.
+		 */
+		if(size >= 8192)
+			__raw_writel((8<<24)|(1<<16)|8, msg+16);
+		else
+			__raw_writel((8<<24)|(1<<16)|4, msg+16);
 	}
 	else if(req->cmd == WRITE)
 	{
 		__raw_writel(I2O_CMD_BLOCK_WRITE<<24|HOST_TID<<12|tid, msg+4);
-		/* 
-		 * Allow replies to come back once data is cached in the controller
-		 * This allows us to handle writes quickly thus giving more of the
-		 * queue to reads.
-		 */
-		__raw_writel(0x00000010, msg+16);
 		while(bh!=NULL)
 		{
 			if(bh->b_data == last) {
@@ -328,13 +344,32 @@ static int i2ob_send(u32 m, struct i2ob_device *dev, struct i2ob_request *ireq, 
 			count -= bh->b_size;
 			bh = bh->b_reqnext;
 		}
+
+		if(c->battery)
+		{
+			
+			if(size>16384)
+				__raw_writel(4, msg+16);
+			else
+				/* 
+				 * Allow replies to come back once data is cached in the controller
+				 * This allows us to handle writes quickly thus giving more of the
+				 * queue to reads.
+				 */
+				__raw_writel(16, msg+16);
+		}
+		else
+		{
+			/* Large write, don't cache */
+			if(size>8192)
+				__raw_writel(4, msg+16);
+			else
+			/* write through */
+				__raw_writel(8, msg+16);
+		}
 	}
 	__raw_writel(I2O_MESSAGE_SIZE(mptr-msg)>>2 | SGL_OFFSET_8, msg);
 	
-	if(req->current_nr_sectors > i2ob_max_sectors[unit])
-		printk("Gathered sectors %ld.\n", 
-			req->current_nr_sectors);
-			
 	if(count != 0)
 	{
 		printk(KERN_ERR "Request count botched by %d.\n", count);
@@ -434,7 +469,32 @@ static int i2ob_merge_requests(request_queue_t *q,
 	return 1;
 }
 
+static int i2ob_flush(struct i2o_controller *c, struct i2ob_device *d, int unit)
+{
+	unsigned long msg;
+	u32 m = i2ob_get(d);
+	
+	if(m == 0xFFFFFFFF)
+		return -1;
+		
+	msg = c->mem_offset + m;
 
+	/*
+	 *	Ask the controller to write the cache back. This sorts out
+	 *	the supertrak firmware flaw and also does roughly the right
+	 *	thing for other cases too.
+	 */
+	 	
+	__raw_writel(FIVE_WORD_MSG_SIZE|SGL_OFFSET_0, msg);
+	__raw_writel(I2O_CMD_BLOCK_CFLUSH<<24|HOST_TID<<12|d->tid, msg+4);
+	__raw_writel(i2ob_context|(unit<<8), msg+8);
+	__raw_writel(0, msg+12);
+	__raw_writel(60<<16, msg+16);
+	
+	i2o_post_message(c,m);
+	return 0;
+}
+			
 /*
  *	OSM reply handler. This gets all the message replies
  */
@@ -447,7 +507,7 @@ static void i2o_block_reply(struct i2o_handler *h, struct i2o_controller *c, str
 	u32 *m = (u32 *)msg;
 	u8 unit = (m[2]>>8)&0xF0;	/* low 4 bits are partition */
 	struct i2ob_device *dev = &i2ob_dev[(unit&0xF0)];
-
+	
 	/*
 	 * FAILed message
 	 */
@@ -482,9 +542,20 @@ static void i2o_block_reply(struct i2o_handler *h, struct i2o_controller *c, str
 	if(msg->function == I2O_CMD_UTIL_EVT_REGISTER)
 	{
 		spin_lock(&i2ob_evt_lock);
-		memcpy(&evt_msg, m, msg->size);
+		memcpy(evt_msg, msg, (m[0]>>16)<<2);
 		spin_unlock(&i2ob_evt_lock);
-		wake_up_interruptible(&i2ob_evt_wait);
+		up(&i2ob_evt_sem);
+		return;
+	}
+
+	if(msg->function == I2O_CMD_BLOCK_CFLUSH)
+	{
+		spin_lock_irqsave(&io_request_lock, flags);
+		dev->constipated=0;
+		DEBUG(("unconstipated\n"));
+		if(i2ob_backlog_request(c, dev)==0)
+			i2ob_request(dev->req_queue);
+		spin_unlock_irqrestore(&io_request_lock, flags);
 		return;
 	}
 
@@ -517,6 +588,7 @@ static void i2o_block_reply(struct i2o_handler *h, struct i2o_controller *c, str
 
 	if(st!=0)
 	{
+		int err;
 		char *bsa_errors[] = 
 		{ 
 			"Success", 
@@ -535,12 +607,78 @@ static void i2o_block_reply(struct i2o_handler *h, struct i2o_controller *c, str
 			"Volume has changed, waiting for acknowledgement"
 		};
 				
+		err = m[4]&0xFFFF;
+		
+		/*
+		 *	Device not ready means two things. One is that the
+		 *	the thing went offline (but not a removal media)
+		 *
+		 *	The second is that you have a SuperTrak 100 and the
+		 *	firmware got constipated. Unlike standard i2o card
+		 *	setups the supertrak returns an error rather than
+		 *	blocking for the timeout in these cases.
+		 */
+		 
+		
+		spin_lock_irqsave(&io_request_lock, flags);
+		if(err==4)
+		{
+			/*
+			 *	Time to uncork stuff
+			 */
+			
+			if(!dev->constipated)
+			{
+				dev->constipated = 1;
+				DEBUG(("constipated\n"));
+				/* Now pull the chain */
+				if(i2ob_flush(c, dev, unit)<0)
+				{
+					DEBUG(("i2ob: Unable to queue flush. Retrying I/O immediately.\n"));
+					dev->constipated=0;
+				}
+				DEBUG(("flushing\n"));
+			}
+			
+			/*
+			 *	Recycle the request
+			 */
+			 
+//			i2ob_unhook_request(ireq, c->unit);
+			
+			/*
+			 *	Place it on the recycle queue
+			 */
+			 
+			ireq->next = NULL;
+			if(i2ob_backlog_tail[c->unit]!=NULL)
+				i2ob_backlog_tail[c->unit]->next = ireq;
+			else
+				i2ob_backlog[c->unit] = ireq;			
+			i2ob_backlog_tail[c->unit] = ireq;
+			
+			atomic_dec(&i2ob_queues[c->unit]->queue_depth);
+
+			/*
+			 *	If the constipator flush failed we want to
+			 *	poke the queue again. 
+			 */
+			 
+			i2ob_request(dev->req_queue);
+			spin_unlock_irqrestore(&io_request_lock, flags);
+			
+			/*
+			 *	and out
+			 */
+			 
+			return;	
+		}
+		spin_unlock_irqrestore(&io_request_lock, flags);
 		printk(KERN_ERR "\n/dev/%s error: %s", dev->i2odev->dev_name, 
 			bsa_errors[m[4]&0XFFFF]);
 		if(m[4]&0x00FF0000)
 			printk(" - DDM attempted %d retries", (m[4]>>16)&0x00FF );
-		printk("\n");
-
+		printk(".\n");
 		ireq->req->errors++;	
 	}
 	else
@@ -559,7 +697,9 @@ static void i2o_block_reply(struct i2o_handler *h, struct i2o_controller *c, str
 	/*
 	 *	We may be able to do more I/O
 	 */
-	i2ob_request(dev->req_queue);
+
+	if(i2ob_backlog_request(c, dev)==0)
+		i2ob_request(dev->req_queue);
 
 	spin_unlock_irqrestore(&io_request_lock, flags);
 }
@@ -575,6 +715,14 @@ static int i2ob_evt(void *dummy)
 	unsigned int flags;
 	int unit;
 	int i;
+	//The only event that has data is the SCSI_SMART event.
+	struct i2o_reply {
+		u32 header[4];
+		u32 evt_indicator;
+		u8 ASC;
+		u8 ASCQ;
+		u8 data[16];
+		} *evt_local;
 
 	lock_kernel();
 	daemonize();
@@ -585,15 +733,13 @@ static int i2ob_evt(void *dummy)
 
 	while(1)
 	{
-#warning "RACE"
-		interruptible_sleep_on(&i2ob_evt_wait);
- 		if(signal_pending(current)) {
+		if(down_interruptible(&i2ob_evt_sem))
+		{
 			evt_running = 0;
-			return 0;
+			printk("exiting...");
+			break;
 		}
 
-		printk(KERN_INFO "Doing something in i2o_block event thread\n");
-		
 		/*
 		 * Keep another CPU/interrupt from overwriting the 
 		 * message while we're reading it
@@ -602,9 +748,11 @@ static int i2ob_evt(void *dummy)
 		 * None of the BSA we care about events have EventData
 		 */
 		spin_lock_irqsave(&i2ob_evt_lock, flags);
-		unit = evt_msg[3];
-		evt = evt_msg[4];
+		evt_local = (struct i2o_reply *)evt_msg;
 		spin_unlock_irqrestore(&i2ob_evt_lock, flags);
+
+		unit = evt_local->header[3];
+		evt = evt_local->evt_indicator;
 
 		switch(evt)
 		{
@@ -675,18 +823,43 @@ static int i2ob_evt(void *dummy)
 				break;
 			}
 
+			/* 
+			 * We got a SCSI SMART event, we just log the relevant
+			 * information and let the user decide what they want
+			 * to do with the information.
+			 */
+			case I2O_EVT_IND_BSA_SCSI_SMART:
+			{
+				char buf[16];
+				printk(KERN_INFO "I2O Block: %s received a SCSI SMART Event\n",i2ob_dev[unit].i2odev->dev_name);
+				evt_local->data[16]='\0';
+				sprintf(buf,"%s",&evt_local->data[0]);
+				printk(KERN_INFO "      Disk Serial#:%s\n",buf);
+				printk(KERN_INFO "      ASC 0x%02x \n",evt_local->ASC);
+				printk(KERN_INFO "      ASCQ 0x%02x \n",evt_local->ASCQ);
+				break;
+			}
+		
+			/*
+			 *	Non event
+			 */
+			 
+			case 0:
+				break;
+				
 			/*
 			 * An event we didn't ask for.  Call the card manufacturer
 			 * and tell them to fix their firmware :)
 			 */
 			default:
-				printk(KERN_INFO "%s: Received event we didn't register for\n"
-					KERN_INFO "   Call I2O card manufacturer\n", 
-					i2ob_dev[unit].i2odev->dev_name);
+				printk(KERN_INFO "%s: Received event %d we didn't register for\n"
+					KERN_INFO "   Blame the I2O card manufacturer 8)\n", 
+					i2ob_dev[unit].i2odev->dev_name, evt);
 				break;
 		}
 	};
 
+	up_and_exit(&i2ob_thread_dead,0);
 	return 0;
 }
 
@@ -724,6 +897,34 @@ static void i2ob_timer_handler(unsigned long q)
 	spin_unlock_irqrestore(&io_request_lock,flags);
 }
 
+static int i2ob_backlog_request(struct i2o_controller *c, struct i2ob_device *dev)
+{
+	u32 m;
+	struct i2ob_request *ireq;
+	
+	while((ireq=i2ob_backlog[c->unit])!=NULL)
+	{
+		int unit;
+
+		if(atomic_read(&i2ob_queues[c->unit]->queue_depth) > dev->depth/4)
+			break;
+
+		m = i2ob_get(dev);
+		if(m == 0xFFFFFFFF)
+			break;
+
+		i2ob_backlog[c->unit] = ireq->next;
+		if(i2ob_backlog[c->unit] == NULL)
+			i2ob_backlog_tail[c->unit] = NULL;
+			
+		unit = MINOR(ireq->req->rq_dev);
+		i2ob_send(m, dev, ireq, i2ob[unit].start_sect, unit);
+	}
+	if(i2ob_backlog[c->unit])
+		return 1;
+	return 0;
+}
+
 /*
  *	The I2O block driver is listed as one of those that pulls the
  *	front entry off the queue before processing it. This is important
@@ -731,6 +932,7 @@ static void i2ob_timer_handler(unsigned long q)
  *	on us. We must unlink CURRENT in this routine before we return, if
  *	we use it.
  */
+
 static void i2ob_request(request_queue_t *q)
 {
 	struct request *req;
@@ -738,9 +940,8 @@ static void i2ob_request(request_queue_t *q)
 	int unit;
 	struct i2ob_device *dev;
 	u32 m;
-
-	// printk(KERN_INFO "i2ob_request() called with queue %p\n", q);
-
+	
+	
 	while (!list_empty(&q->queue_head)) {
 		/*
 		 *	On an IRQ completion if there is an inactive
@@ -760,9 +961,16 @@ static void i2ob_request(request_queue_t *q)
 		 *	generic IOP commit control. Certainly its not right 
 		 *	its global!  
 		 */
-		if(atomic_read(&i2ob_queues[dev->unit]->queue_depth)>=MAX_I2OB_DEPTH)
+		if(atomic_read(&i2ob_queues[dev->unit]->queue_depth) >= dev->depth)
 			break;
+		
+		/*
+		 *	Is the channel constipated ?
+		 */
 
+		if(i2ob_backlog[dev->unit]!=NULL)
+			break;
+			
 		/* Get a message */
 		m = i2ob_get(dev);
 
@@ -773,7 +981,7 @@ static void i2ob_request(request_queue_t *q)
 			 */
 			if (!i2ob_timer_started)
 			{
-				printk(KERN_ERR "i2ob: starting timer\n");
+				DEBUG((KERN_ERR "i2ob: starting timer\n"));
 
 				/*
 				 * Set the timer_started flag to insure
@@ -795,6 +1003,7 @@ static void i2ob_request(request_queue_t *q)
 				 */
 				 
 				add_timer(&i2ob_timer);
+				return;
 			}
 		}
 
@@ -804,7 +1013,7 @@ static void i2ob_request(request_queue_t *q)
 		req->errors = 0;
 		blkdev_dequeue_request(req);	
 		req->sem = NULL;
-
+		
 		ireq = i2ob_queues[dev->unit]->i2ob_qhead;
 		i2ob_queues[dev->unit]->i2ob_qhead = ireq->next;
 		ireq->req = req;
@@ -892,13 +1101,7 @@ static int do_i2ob_revalidate(kdev_t dev, int maxu)
 	for( i = 15; i>=0 ; i--)
 	{
 		int m = minor+i;
-		kdev_t d = MKDEV(MAJOR_NR, m);
-		struct super_block *sb = get_super(d);
-		
-		sync_dev(d);
-		if(sb)
-			invalidate_inodes(sb);
-		invalidate_buffers(d);
+		invalidate_device(MKDEV(MAJOR_NR, m), 1);
 		i2ob_gendisk.part[m].start_sect = 0;
 		i2ob_gendisk.part[m].nr_sects = 0;
 	}
@@ -1009,7 +1212,8 @@ static int i2ob_release(struct inode *inode, struct file *file)
 		msg[2] = i2ob_context|0x40000000;
 		msg[3] = (u32)query_done;
 		msg[4] = 60<<16;
-		i2o_post_wait(dev->controller, msg, 20, 2);
+		DEBUG("Flushing...");
+		i2o_post_wait(dev->controller, msg, 20, 60);
 
 		/*
 		 *	Unlock the media
@@ -1019,14 +1223,18 @@ static int i2ob_release(struct inode *inode, struct file *file)
 		msg[2] = i2ob_context|0x40000000;
 		msg[3] = (u32)query_done;
 		msg[4] = -1;
+		DEBUG("Unlocking...");
 		i2o_post_wait(dev->controller, msg, 20, 2);
+		DEBUG("Unlocked.\n");
 	
 		/*
  		 * Now unclaim the device.
 		 */
+
 		if (i2o_release_device(dev->i2odev, &i2o_block_handler))
 			printk(KERN_ERR "i2ob_release: controller rejected unclaim.\n");
-
+		
+		DEBUG("Unclaim\n");
 	}
 	MOD_DEC_USE_COUNT;
 	return 0;
@@ -1055,12 +1263,14 @@ static int i2ob_open(struct inode *inode, struct file *file)
 	{ 
 		u32 msg[6];
 		
+		DEBUG("Claim ");
 		if(i2o_claim_device(dev->i2odev, &i2o_block_handler))
 		{
 			dev->refcnt--;
 			printk(KERN_INFO "I2O Block: Could not open device\n");
 			return -EBUSY;
 		}
+		DEBUG("Claimed ");
 		
 		/*
 		 *	Mount the media if needed. Note that we don't use
@@ -1072,6 +1282,7 @@ static int i2ob_open(struct inode *inode, struct file *file)
 		msg[1] = I2O_CMD_BLOCK_MMOUNT<<24|HOST_TID<<12|dev->tid;
 		msg[4] = -1;
 		msg[5] = 0;
+		DEBUG("Mount ");
 		i2o_post_wait(dev->controller, msg, 24, 2);
 
 		/*
@@ -1080,7 +1291,9 @@ static int i2ob_open(struct inode *inode, struct file *file)
 		msg[0] = FIVE_WORD_MSG_SIZE|SGL_OFFSET_0;
 		msg[1] = I2O_CMD_BLOCK_MLOCK<<24|HOST_TID<<12|dev->tid;
 		msg[4] = -1;
+		DEBUG("Lock ");
 		i2o_post_wait(dev->controller, msg, 20, 2);
+		DEBUG("Ready.\n");
 	}		
 	MOD_INC_USE_COUNT;
 	return 0;
@@ -1132,7 +1345,8 @@ static int i2ob_install_device(struct i2o_controller *c, struct i2o_device *d, i
 	i2ob_query_device(dev, 0x0000, 5, &flags, 4);
 	i2ob_query_device(dev, 0x0000, 6, &status, 4);
 	i2ob_sizes[unit] = (int)(size>>10);
-	i2ob_hardsizes[unit] = blocksize;
+	for(i=unit; i <= unit+15 ; i++)
+		i2ob_hardsizes[i] = blocksize;
 	i2ob_gendisk.part[unit].nr_sects = size>>9;
 	i2ob[unit].nr_sects = (int)(size>>9);
 
@@ -1143,19 +1357,32 @@ static int i2ob_install_device(struct i2o_controller *c, struct i2o_device *d, i
 	/*
 	 * Max number of Scatter-Gather Elements
 	 */	
-	i2ob_dev[unit].max_segments = 
-		(d->controller->status_block->inbound_frame_size - 8)/2;
 
-	printk(KERN_INFO "Max Segments set to %d\n", 
-				i2ob_dev[unit].max_segments);
-	printk(KERN_INFO "Byte limit is %d.\n", limit);
-	
 	for(i=unit;i<=unit+15;i++)
 	{
-		i2ob_max_sectors[i]=MAX_SECTORS;
-		i2ob_dev[i].max_segments = 
-			(d->controller->status_block->inbound_frame_size - 8)/2;
+		if(d->controller->type == I2O_TYPE_PCI && d->controller->bus.pci.queue_buggy)
+		{
+			i2ob_max_sectors[i] = 32;
+			i2ob_dev[i].max_segments = 8;
+			i2ob_dev[i].depth = 4;
+		}
+		else if(d->controller->type == I2O_TYPE_PCI && d->controller->bus.pci.short_req)
+		{
+			i2ob_max_sectors[i] = 8;
+			i2ob_dev[i].max_segments = 8;
+		}
+		else
+		{
+			/* MAX_SECTORS was used but 255 is a dumb number for
+			   striped RAID */
+			i2ob_max_sectors[i]=256;
+			i2ob_dev[i].max_segments = (d->controller->status_block->inbound_frame_size - 8)/2;
+		}
 	}
+
+	printk(KERN_INFO "Max segments set to %d\n", 
+				i2ob_dev[unit].max_segments);
+	printk(KERN_INFO "Byte limit is %d.\n", limit);
 
 	i2ob_query_device(dev, 0x0000, 0, &type, 1);
 	
@@ -1190,6 +1417,7 @@ static int i2ob_install_device(struct i2o_controller *c, struct i2o_device *d, i
 			printk(", %dMb cache", cachesize>>10);
 		else
 			printk(", %dKb cache", cachesize);
+		
 	}
 	printk(".\n");
 	printk(KERN_INFO "%s: Maximum sectors/read set to %d.\n", 
@@ -1277,53 +1505,94 @@ static request_queue_t* i2ob_get_queue(kdev_t dev)
 /*
  * Probe the I2O subsytem for block class devices
  */
-static void i2ob_probe(void)
+static void i2ob_scan(int bios)
 {
 	int i;
-	int unit = 0;
 	int warned = 0;
+
+	struct i2o_device *d, *b=NULL;
+	struct i2o_controller *c;
+	struct i2ob_device *dev;
 		
 	for(i=0; i< MAX_I2O_CONTROLLERS; i++)
 	{
-		struct i2o_controller *c=i2o_find_controller(i);
-		struct i2o_device *d;
+		c=i2o_find_controller(i);
 	
 		if(c==NULL)
 			continue;
 
-		for(d=c->devices;d!=NULL;d=d->next)
-		{
+	/*
+	 *    The device list connected to the I2O Controller is doubly linked
+	 * Here we traverse the end of the list , and start claiming devices
+	 * from that end. This assures that within an I2O controller atleast
+	 * the newly created volumes get claimed after the older ones, thus
+	 * mapping to same major/minor (and hence device file name) after 
+	 * every reboot.
+	 * The exception being: 
+	 * 1. If there was a TID reuse.
+	 * 2. There was more than one I2O controller. 
+	 */
+
+	if(!bios)
+	{
+		for (d=c->devices;d!=NULL;d=d->next)
+		if(d->next == NULL)
+			b = d;
+	}
+	else
+		b = c->devices;
+
+	while(b != NULL)
+	{
+		d=b;
+		if(bios)
+			b = b->next;
+		else
+			b = b->prev;
+
 			if(d->lct_data.class_id!=I2O_CLASS_RANDOM_BLOCK_STORAGE)
 				continue;
 
 			if(d->lct_data.user_tid != 0xFFF)
 				continue;
 
+			if(bios)
+			{
+				if(d->lct_data.bios_info != 0x80)
+					continue;
+				printk(KERN_INFO "Claiming as Boot device: Controller %d, TID %d\n", c->unit, d->lct_data.tid);
+			}
+			else
+			{
+				if(d->lct_data.bios_info == 0x80)
+					continue; /*Already claimed on pass 1 */
+			}
+
 			if(i2o_claim_device(d, &i2o_block_handler))
 			{
 				printk(KERN_WARNING "i2o_block: Controller %d, TID %d\n", c->unit,
 					d->lct_data.tid);
-				printk(KERN_WARNING "\tDevice refused claim! Skipping installation\n");
+				printk(KERN_WARNING "\t%sevice refused claim! Skipping installation\n", bios?"Boot d":"D");
 				continue;
 			}
 
-			if(unit<MAX_I2OB<<4)
+			if(scan_unit<MAX_I2OB<<4)
 			{
  				/*
 				 * Get the device and fill in the
 				 * Tid and controller.
 				 */
-				struct i2ob_device *dev=&i2ob_dev[unit];
+				dev=&i2ob_dev[scan_unit];
 				dev->i2odev = d; 
 				dev->controller = c;
 				dev->unit = c->unit;
 				dev->tid = d->lct_data.tid;
 
-				if(i2ob_install_device(c,d,unit))
+				if(i2ob_install_device(c,d,scan_unit))
 					printk(KERN_WARNING "Could not install I2O block device\n");
 				else
 				{
-					unit+=16;
+					scan_unit+=16;
 					i2ob_dev_count++;
 
 					/* We want to know when device goes away */
@@ -1333,13 +1602,38 @@ static void i2ob_probe(void)
 			else
 			{
 				if(!warned++)
-					printk(KERN_WARNING "i2o_block: too many device, registering only %d.\n", unit>>4);
+					printk(KERN_WARNING "i2o_block: too many device, registering only %d.\n", scan_unit>>4);
 			}
 			i2o_release_device(d, &i2o_block_handler);
 		}
 		i2o_unlock_controller(c);
 	}
 }
+
+static void i2ob_probe(void)
+{
+	/*
+	 *      Some overhead/redundancy involved here, while trying to
+	 *      claim the first boot volume encountered as /dev/i2o/hda
+	 *      everytime. All the i2o_controllers are searched and the
+	 *      first i2o block device marked as bootable is claimed
+	 *      If an I2O block device was booted off , the bios sets
+	 *      its bios_info field to 0x80, this what we search for.
+	 *      Assuming that the bootable volume is /dev/i2o/hda
+	 *      everytime will prevent any kernel panic while mounting
+	 *      root partition
+	 */
+
+	printk(KERN_INFO "i2o_block: Checking for Boot device...\n");
+	i2ob_scan(1);
+
+	/*
+	 *      Now the remainder.
+	 */
+	printk(KERN_INFO "i2o_block: Checking for I2O Block devices...\n");
+	i2ob_scan(0);
+}
+
 
 /*
  * New device notification handler.  Called whenever a new
@@ -1368,14 +1662,6 @@ void i2ob_new_device(struct i2o_controller *c, struct i2o_device *d)
 		if(!i2ob_dev[unit].i2odev)
 			break;
 	}
-
-	/*
-	 * Creating a RAID 5 volume takes a little while and the UTIL_CLAIM
-	 * will fail if we don't give the card enough time to do it's magic, 
-	 * so we just sleep for a little while and let it do it's thing
-	 */
-	current->state = TASK_INTERRUPTIBLE;
-	schedule_timeout(3*HZ);
 
 	if(i2o_claim_device(d, &i2o_block_handler))
 	{
@@ -1435,6 +1721,7 @@ void i2ob_del_device(struct i2o_controller *c, struct i2o_device *d)
 	if(unit >= MAX_I2OB<<4)
 	{
 		printk(KERN_ERR "i2ob_del_device called, but not in dev table!\n");
+		spin_unlock_irqrestore(&io_request_lock, flags);
 		return;
 	}
 
@@ -1492,8 +1779,6 @@ void i2ob_del_device(struct i2o_controller *c, struct i2o_device *d)
 	i2ob_media_change_flag[unit] = 1;
 
 	i2ob_dev_count--;	
-
-	return;
 }
 
 /*
@@ -1540,8 +1825,11 @@ static void i2ob_reboot_event(void)
 			msg[2] = i2ob_context|0x40000000;
 			msg[3] = (u32)query_done;
 			msg[4] = 60<<16;
-			i2o_post_wait(dev->controller, msg, 20, 2);
+			
+			DEBUG("Flushing...");
+			i2o_post_wait(dev->controller, msg, 20, 60);
 
+			DEBUG("Unlocking...");
 			/*
 			 *	Unlock the media
 			 */
@@ -1551,19 +1839,20 @@ static void i2ob_reboot_event(void)
 			msg[3] = (u32)query_done;
 			msg[4] = -1;
 			i2o_post_wait(dev->controller, msg, 20, 2);
+			
+			DEBUG("Unlocked.\n");
 		}
 	}	
 }
 
 static struct block_device_operations i2ob_fops =
 {
-   open:       i2ob_open,
-   release:    i2ob_release,
-   ioctl:         i2ob_ioctl,
-   check_media_change:  i2ob_media_change,
-   revalidate:    i2ob_revalidate,
+	open:			i2ob_open,
+	release:		i2ob_release,
+	ioctl:			i2ob_ioctl,
+	check_media_change:	i2ob_media_change,
+	revalidate:		i2ob_revalidate,
 };
-
 
 static struct gendisk i2ob_gendisk = 
 {
@@ -1573,9 +1862,10 @@ static struct gendisk i2ob_gendisk =
 	1<<4,
 	i2ob,
 	i2ob_sizes,
-	0,
+	MAX_I2OB,
 	NULL,
-	NULL
+	NULL,
+	&i2ob_fops,
 };
 
 
@@ -1593,7 +1883,7 @@ int i2o_block_init(void)
 	int i;
 
 	printk(KERN_INFO "I2O Block Storage OSM v0.9\n");
-	printk(KERN_INFO "   (c) Copyright 1999, 2000 Red Hat Software.\n");
+	printk(KERN_INFO "   (c) Copyright 1999-2001 Red Hat Software.\n");
 	
 	/*
 	 *	Register the block device interfaces
@@ -1629,6 +1919,7 @@ int i2o_block_init(void)
 		i2ob_dev[i].tid = 0;
 		i2ob_dev[i].head = NULL;
 		i2ob_dev[i].tail = NULL;
+		i2ob_dev[i].depth = MAX_I2OB_DEPTH;
 		i2ob_blksizes[i] = 1024;
 		i2ob_max_sectors[i] = 2;
 	}
@@ -1683,7 +1974,13 @@ int i2o_block_init(void)
 		register_disk(&i2ob_gendisk, MKDEV(MAJOR_NR,i<<4), 1<<4,
 			&i2ob_fops, 0);
 	i2ob_probe();
-	
+
+	/*
+	 *	Adding i2ob_gendisk into the gendisk list.
+	 */	
+	i2ob_gendisk.next = gendisk_head;
+	gendisk_head = &i2ob_gendisk;
+
 	return 0;
 }
 
@@ -1695,9 +1992,20 @@ MODULE_DESCRIPTION("I2O Block Device OSM");
 
 void cleanup_module(void)
 {
-	struct gendisk **gdp;
+	struct gendisk *gdp;
 	int i;
 	
+	if(evt_running) {
+		printk(KERN_INFO "Killing I2O block threads...");
+		i = kill_proc(evt_pid, SIGTERM, 1);
+		if(!i) {
+			printk("waiting...");
+		}
+		/* Be sure it died */
+		down(&i2ob_thread_dead);
+		printk("done.\n");
+	}
+
 	/*
 	 * Unregister for updates from any devices..otherwise we still
 	 * get them and the core jumps to random memory :O
@@ -1711,6 +2019,18 @@ void cleanup_module(void)
 				i2ob_context, i<<4, 0);
 		}
 	}
+	
+	/*
+	 *	We may get further callbacks for ourself. The i2o_core
+	 *	code handles this case reasonably sanely. The problem here
+	 *	is we shouldn't get them .. but a couple of cards feel 
+	 *	obliged to tell us stuff we dont care about.
+	 *
+	 *	This isnt ideal at all but will do for now.
+	 */
+	 
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout(HZ);
 	
 	/*
 	 *	Flush the OSM
@@ -1729,28 +2049,20 @@ void cleanup_module(void)
 	 */
 	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 
-	if(evt_running) {
-		i = kill_proc(evt_pid, SIGTERM, 1);
-		if(!i) {
-			int count = 5 * 100;
-			while(evt_running && --count) {
-				current->state = TASK_INTERRUPTIBLE;
-				schedule_timeout(1);
-			}
-	
-			if(!count)
-				printk(KERN_ERR "Giving up on i2oblock thread...\n");	
-		}
-	}
-
-
 	/*
 	 *	Why isnt register/unregister gendisk in the kernel ???
 	 */
 
-	for (gdp = &gendisk_head; *gdp; gdp = &((*gdp)->next))
-		if (*gdp == &i2ob_gendisk)
-			break;
-
+	if (gendisk_head == &i2ob_gendisk) {
+		gendisk_head = i2ob_gendisk.next;
+		}
+	else {
+		for (gdp = gendisk_head; gdp; gdp = gdp->next)
+			if (gdp->next == &i2ob_gendisk)
+			{
+				gdp->next = i2ob_gendisk.next;
+				break;
+			}
+	}
 }
 #endif

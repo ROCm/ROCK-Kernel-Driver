@@ -554,7 +554,6 @@ int check_disk_change(kdev_t dev)
 {
 	int i;
 	const struct block_device_operations * bdops = NULL;
-	struct super_block * sb;
 
 	i = MAJOR(dev);
 	if (i < MAX_BLKDEV)
@@ -576,11 +575,8 @@ int check_disk_change(kdev_t dev)
 	printk(KERN_DEBUG "VFS: Disk change detected on device %s\n",
 		bdevname(dev));
 
-	sb = get_super(dev);
-	if (sb && invalidate_inodes(sb))
+	if (invalidate_device(dev, 0))
 		printk("VFS: busy inodes on changed media.\n");
-
-	destroy_buffers(dev);
 
 	if (bdops->revalidate)
 		bdops->revalidate(dev);

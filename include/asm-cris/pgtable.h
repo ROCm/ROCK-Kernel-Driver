@@ -3,6 +3,12 @@
  * HISTORY:
  *
  * $Log: pgtable.h,v $
+ * Revision 1.11  2001/04/04 14:38:36  bjornw
+ * Removed bad_pagetable handling and the _kernel functions
+ *
+ * Revision 1.10  2001/03/23 07:46:42  starvik
+ * Corrected according to review remarks
+ *
  * Revision 1.9  2000/11/22 14:57:53  bjornw
  * * extern inline -> static inline
  * * include asm-generic/pgtable.h
@@ -97,7 +103,9 @@
  * the CRIS page table tree.
  */
 
-/* The cache doesn't need to be flushed when TLB entries change (I think!) */
+/* The cache doesn't need to be flushed when TLB entries change because 
+ * the cache is mapped to physical memory, not virtual memory
+ */
 #define flush_cache_all()			do { } while (0)
 #define flush_cache_mm(mm)			do { } while (0)
 #define flush_cache_range(mm, start, end)	do { } while (0)
@@ -244,26 +252,7 @@ static inline void flush_tlb(void)
 
 /* zero page used for uninitialized stuff */
 extern unsigned long empty_zero_page;
-
-/*
- * BAD_PAGETABLE is used when we need a bogus page-table, while
- * BAD_PAGE is used for a bogus page.
- *
- * ZERO_PAGE is a global shared page that is always zero: used
- * for zero-mapped memory areas etc..
- */
-extern pte_t __bad_page(void);
-extern pte_t * __bad_pagetable(void);
-
-#define BAD_PAGETABLE    __bad_pagetable()
-#define BAD_PAGE         __bad_page()
 #define ZERO_PAGE(vaddr) (virt_to_page(empty_zero_page))
-
-/*
- * Handling allocation failures during page table setup.
- */
-extern void __handle_bad_pmd(pmd_t * pmd);
-extern void __handle_bad_pmd_kernel(pmd_t * pmd);
 
 /* number of bits that fit into a memory pointer */
 #define BITS_PER_PTR			(8*sizeof(unsigned long))
@@ -452,9 +441,6 @@ static inline unsigned long pmd_page(pmd_t pmd)
 
 static inline void pmd_set(pmd_t * pmdp, pte_t * ptep)
 { pmd_val(*pmdp) = _PAGE_TABLE | (unsigned long) ptep; }
-
-static inline void pmd_set_kernel(pmd_t * pmdp, pte_t * ptep)
-{ pmd_val(*pmdp) = _KERNPG_TABLE | (unsigned long) ptep; }
 
 /* to find an entry in a page-table-directory. */
 #define pgd_index(address) ((address >> PGDIR_SHIFT) & (PTRS_PER_PGD-1))

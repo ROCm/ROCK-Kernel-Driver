@@ -2,6 +2,9 @@
  * 1999 Copyright (C) Pavel Machek, pavel@ucw.cz. This code is GPL.
  * 1999/11/04 Copyright (C) 1999 VMware, Inc. (Regis "HPReg" Duchesne)
  *            Made nbd_end_request() use the io_request_lock
+ * 2001 Copyright (C) Steven Whitehouse
+ *            New nbd_end_request() for compatibility with new linux block
+ *            layer code.
  */
 
 #ifndef LINUX_NBD_H

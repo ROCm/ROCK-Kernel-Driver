@@ -25,26 +25,26 @@
 
 struct e100_serial {
 	int                   baud;
-	volatile unsigned char *	port; /* R_SERIALx_CTRL */
-	unsigned long	        irq;  /* bitnr in R_IRQ_MASK2 for dmaX_descr */
+	volatile u8 *port;             /* R_SERIALx_CTRL */
+	u32 irq;                       /* bitnr in R_IRQ_MASK2 for dmaX_descr */
 
-	volatile char *oclrintradr; /* adr to R_DMA_CHx_CLR_INTR, output */
-	volatile unsigned long *ofirstadr;   /* adr to R_DMA_CHx_FIRST, output */
-	volatile char *ocmdadr;     /* adr to R_DMA_CHx_CMD, output */
-	const volatile unsigned short *ostatusadr;  /* adr to R_DMA_CHx_STATUS, output */
-	volatile unsigned long  *ohwswadr;    /* adr to R_DMA_CHx_HWSW, output */
+	volatile u8 *oclrintradr;      /* adr to R_DMA_CHx_CLR_INTR, output */
+	volatile u32 *ofirstadr;       /* adr to R_DMA_CHx_FIRST, output */
+	volatile u8 *ocmdadr;          /* adr to R_DMA_CHx_CMD, output */
+	const volatile u8 *ostatusadr; /* adr to R_DMA_CHx_STATUS, output */
+	volatile u32 *ohwswadr;        /* adr to R_DMA_CHx_HWSW, output */
 
-	volatile char *iclrintradr; /* adr to R_DMA_CHx_CLR_INTR, input */
-	volatile unsigned long *ifirstadr;   /* adr to R_DMA_CHx_FIRST, input */
-	volatile char *icmdadr;     /* adr to R_DMA_CHx_CMD, input */
-	const volatile unsigned short *istatusadr;  /* adr to R_DMA_CHx_STATUS, input */
-	volatile unsigned long  *ihwswadr;    /* adr to R_DMA_CHx_HWSW, input */
+	volatile u8 *iclrintradr;      /* adr to R_DMA_CHx_CLR_INTR, input */
+	volatile u32 *ifirstadr;       /* adr to R_DMA_CHx_FIRST, input */
+	volatile u8 *icmdadr;          /* adr to R_DMA_CHx_CMD, input */
+	const volatile u8 *istatusadr; /* adr to R_DMA_CHx_STATUS, input */
+	volatile u32 *ihwswadr;        /* adr to R_DMA_CHx_HWSW, input */
 
 	int			flags; 		/* defined in tty.h */
 
-	unsigned char           rx_ctrl; /* shadow for R_SERIALx_REC_CTRL */
-	unsigned char           tx_ctrl; /* shadow for R_SERIALx_TR_CTRL */
-	unsigned char           iseteop; /* bit number for R_SET_EOP for the input dma */
+	u8           rx_ctrl; /* shadow for R_SERIALx_REC_CTRL */
+	u8           tx_ctrl; /* shadow for R_SERIALx_TR_CTRL */
+	u8           iseteop; /* bit number for R_SET_EOP for the input dma */
 /* end of fields defined in rs_table[] in .c-file */
 	unsigned char           fifo_didmagic; /* a fifo eop has been forced */
 

@@ -646,12 +646,32 @@ static struct
     unsigned long low;
 } centaur_mcr[8];
 
+static u8 centaur_mcr_reserved;
+static u8 centaur_mcr_type;		/* 0 for winchip, 1 for winchip2 */
+
+/*
+ *	Report boot time MCR setups 
+ */
+ 
+void mtrr_centaur_report_mcr(int mcr, u32 lo, u32 hi)
+{
+	centaur_mcr[mcr].low = lo;
+	centaur_mcr[mcr].high = hi;
+}
+
 static void centaur_get_mcr (unsigned int reg, unsigned long *base,
 			     unsigned long *size, mtrr_type *type)
 {
     *base = centaur_mcr[reg].high >> PAGE_SHIFT;
     *size = -(centaur_mcr[reg].low & 0xfffff000) >> PAGE_SHIFT;
     *type = MTRR_TYPE_WRCOMB;	/*  If it is there, it is write-combining  */
+    if(centaur_mcr_type==1 && ((centaur_mcr[reg].low&31)&2))
+    	*type = MTRR_TYPE_UNCACHABLE;
+    if(centaur_mcr_type==1 && (centaur_mcr[reg].low&31)==25)
+    	*type = MTRR_TYPE_WRBACK;
+    if(centaur_mcr_type==0 && (centaur_mcr[reg].low&31)==31)
+    	*type = MTRR_TYPE_WRBACK;
+    
 }   /*  End Function centaur_get_mcr  */
 
 static void (*get_mtrr) (unsigned int reg, unsigned long *base,
@@ -794,7 +814,15 @@ static void centaur_set_mcr_up (unsigned int reg, unsigned long base,
     else
     {
 	high = base << PAGE_SHIFT;
-	low = -size << PAGE_SHIFT | 0x1f; /* only support write-combining... */
+	if(centaur_mcr_type == 0)
+		low = -size << PAGE_SHIFT | 0x1f; /* only support write-combining... */
+	else
+	{
+		if(type == MTRR_TYPE_UNCACHABLE)
+			low = -size << PAGE_SHIFT | 0x02;	/* NC */
+		else
+			low = -size << PAGE_SHIFT | 0x09;	/* WWO,WC */
+	}
     }
     centaur_mcr[reg].high = high;
     centaur_mcr[reg].low = low;
@@ -1104,6 +1132,28 @@ static int generic_get_free_region (unsigned long base, unsigned long size)
     return -ENOSPC;
 }   /*  End Function generic_get_free_region  */
 
+static int centaur_get_free_region (unsigned long base, unsigned long size)
+/*  [SUMMARY] Get a free MTRR.
+    <base> The starting (base) address of the region.
+    <size> The size (in bytes) of the region.
+    [RETURNS] The index of the region on success, else -1 on error.
+*/
+{
+    int i, max;
+    mtrr_type ltype;
+    unsigned long lbase, lsize;
+
+    max = get_num_var_ranges ();
+    for (i = 0; i < max; ++i)
+    {
+    	if(centaur_mcr_reserved & (1<<i))
+    		continue;
+	(*get_mtrr) (i, &lbase, &lsize, &ltype);
+	if (lsize == 0) return i;
+    }
+    return -ENOSPC;
+}   /*  End Function generic_get_free_region  */
+
 static int cyrix_get_free_region (unsigned long base, unsigned long size)
 /*  [SUMMARY] Get a free ARR.
     <base> The starting (base) address of the region.
@@ -1164,9 +1214,9 @@ static int (*get_free_region) (unsigned long base,
  *
  *	The available types are
  *
- *	%MTRR_TYPE_UNCACHEABLE	-	No caching
+ *	%MTRR_TYPE_UNCACHABLE	-	No caching
  *
- *	%MTRR_TYPE_WRITEBACK	-	Write data back in bursts whenever
+ *	%MTRR_TYPE_WRBACK	-	Write data back in bursts whenever
  *
  *	%MTRR_TYPE_WRCOMB	-	Write data back soon but allow bursts
  *
@@ -1229,9 +1279,13 @@ int mtrr_add_page(unsigned long base, unsigned long size, unsigned int type, cha
     case MTRR_IF_CENTAUR_MCR:
         if ( mtrr_if == MTRR_IF_CENTAUR_MCR )
 	{
-	    if (type != MTRR_TYPE_WRCOMB)
+	    /*
+	     *	FIXME: Winchip2 supports uncached
+	     */
+	    if (type != MTRR_TYPE_WRCOMB && (centaur_mcr_type == 0 || type != MTRR_TYPE_UNCACHABLE))
 	    {
-		printk (KERN_WARNING "mtrr: only write-combining is supported\n");
+		printk (KERN_WARNING "mtrr: only write-combining%s supported\n",
+			centaur_mcr_type?" and uncacheable are":" is");
 		return -EINVAL;
 	    }
 	}
@@ -1348,9 +1402,9 @@ int mtrr_add_page(unsigned long base, unsigned long size, unsigned int type, cha
  *
  *	The available types are
  *
- *	%MTRR_TYPE_UNCACHEABLE	-	No caching
+ *	%MTRR_TYPE_UNCACHABLE	-	No caching
  *
- *	%MTRR_TYPE_WRITEBACK	-	Write data back in bursts whenever
+ *	%MTRR_TYPE_WRBACK	-	Write data back in bursts whenever
  *
  *	%MTRR_TYPE_WRCOMB	-	Write data back soon but allow bursts
  *
@@ -1947,23 +2001,64 @@ static void __init centaur_mcr_init(void)
 {
     unsigned i;
     struct set_mtrr_context ctxt;
+    u32 lo, hi;
+    int wc2 = -1;
 
     set_mtrr_prepare (&ctxt);
     /* Unfortunately, MCR's are read-only, so there is no way to
      * find out what the bios might have done.
      */
-    /* Clear all MCR's.
+     
+    /*
+     *	Enable MCR key if we are using a winchip2
+     */
+     
+    if(boot_cpu_data.x86_model==4)
+    	wc2 = 0;
+    	
+    if(boot_cpu_data.x86_model==8 || boot_cpu_data.x86_model == 9)
+    {
+	    rdmsr(0x120, lo, hi);
+	    if(((lo>>17)&7)==1)		/* Type 1 Winchip2 MCR */
+	    {
+	    	lo&= ~0x1C0;		/* clear key */
+	    	lo|= 0x040;		/* set key to 1 */
+		wrmsr(0x120, lo, hi);	/* unlock MCR */
+		wc2 = 1;
+		centaur_mcr_type = 1;
+	    }
+    }    
+    /* Clear any unconfigured MCR's.
      * This way we are sure that the centaur_mcr array contains the actual
      * values. The disadvantage is that any BIOS tweaks are thus undone.
+     *
      */
     for (i = 0; i < 8; ++i)
     {
-        centaur_mcr[i].high = 0;
-	centaur_mcr[i].low = 0;
-	wrmsr (0x110 + i , 0, 0);
+    	if(centaur_mcr[i]. high == 0 && centaur_mcr[i].low == 0)
+    	{
+    		if(wc2 == 0 || ( wc2 == 1 && !(lo & (1<<(9+i)))))
+			wrmsr (0x110 + i , 0, 0);
+		else
+			/*
+			 *	If the BIOS set up an MCR we cannot see it
+			 *	but we don't wish to obliterate it
+			 */
+			centaur_mcr_reserved |= (1<<i);
+	}
     }
-    /*  Throw the main write-combining switch...  */
-    wrmsr (0x120, 0x01f0001f, 0);
+    /*  Throw the main write-combining switch... 
+        However if OOSTORE is enabled then people have already done far
+        cleverer things and we should behave. 
+     */
+
+    if(wc2 == 1)
+    {     
+	    lo |= 15;			/* Write combine enables */
+	    wrmsr(0x120, lo, hi);
+    }
+    else if(wc2 == 0)
+    	wrmsr(0x120, 0x01F0001F, 0);	/* Write only */
     set_mtrr_done (&ctxt);
 }   /*  End Function centaur_mcr_init  */
 
@@ -2036,6 +2131,7 @@ static int __init mtrr_setup(void)
 	mtrr_if = MTRR_IF_CENTAUR_MCR;
 	get_mtrr = centaur_get_mcr;
 	set_mtrr_up = centaur_set_mcr_up;
+	get_free_region = centaur_get_free_region;
 	centaur_mcr_init();
 	size_or_mask  = 0xfff00000; /* 32 bits */
 	size_and_mask = 0;

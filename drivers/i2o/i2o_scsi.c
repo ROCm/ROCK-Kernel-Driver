@@ -262,7 +262,7 @@ static void i2o_scsi_reply(struct i2o_handler *h, struct i2o_controller *c, stru
 	
 	if(st)
 	{
-		/* An error has occured */
+		/* An error has occurred */
 
 		dprintk((KERN_DEBUG "SCSI error %08X", m[4]));
 			

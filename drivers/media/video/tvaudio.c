@@ -124,7 +124,7 @@ struct CHIPSTATE {
 
 
 /* ---------------------------------------------------------------------- */
-/* i2c adresses                                                           */
+/* i2c addresses                                                           */
 
 static unsigned short normal_i2c[] = {
 	I2C_TDA8425   >> 1,

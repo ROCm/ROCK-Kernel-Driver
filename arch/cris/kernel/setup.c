@@ -1,4 +1,4 @@
-/* $Id: setup.c,v 1.11 2001/03/02 15:52:03 bjornw Exp $
+/* $Id: setup.c,v 1.14 2001/04/03 12:54:12 starvik Exp $
  *
  *  linux/arch/cris/kernel/setup.c
  *
@@ -60,7 +60,7 @@ extern unsigned long romfs_start, romfs_length, romfs_in_flash; /* from head.S *
  * given by the macro __pa().
  *
  * In this DRAM, the kernel code and data is loaded, in the beginning.
- * It really starts at c00a0000 to make room for some special pages - 
+ * It really starts at c0004000 to make room for some special pages - 
  * the start address is text_start. The kernel data ends at _end. After
  * this the ROM filesystem is appended (if there is any).
  * 
@@ -76,11 +76,6 @@ setup_arch(char **cmdline_p)
 	unsigned long start_pfn, max_pfn;
 	unsigned long memory_start;
 	extern void console_print_etrax(const char *b);
-
-#if (defined(CONFIG_CHR_DEV_FLASH) || defined(CONFIG_BLK_DEV_FLASH))
-	/* TODO: move this into flash_init I think */
-	flash_probe();
-#endif
 
  	/* register an initial console printing routine for printk's */
 
@@ -167,8 +162,9 @@ setup_arch(char **cmdline_p)
 
 	paging_init();
 
-	/* we dont use a command line yet, so just let it be an empty string */
-
+	/* we dont use a command line yet, so just let it be an empty string 
+	   to start with */
+        
 	*cmdline_p = command_line;
 	strcpy(command_line, "root=/dev/rom"); /* use the appended romdisk as root */
 

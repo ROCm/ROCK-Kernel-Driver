@@ -591,6 +591,22 @@ int invalidate_inodes(struct super_block * sb)
 
 	return busy;
 }
+ 
+int invalidate_device(kdev_t dev, int do_sync)
+{
+	struct super_block *sb = get_super(dev);
+	int res;
+
+	if (do_sync)
+		fsync_dev(dev);
+
+	res = 0;
+	if (sb)
+		res = invalidate_inodes(sb);
+	invalidate_buffers(dev);
+	return res;
+}
+
 
 /*
  * This is called with the inode lock held. It searches
@@ -612,12 +628,13 @@ void prune_icache(int goal)
 {
 	LIST_HEAD(list);
 	struct list_head *entry, *freeable = &list;
-	int count = 0, synced = 0;
+	int count, synced = 0;
 	struct inode * inode;
 
 	spin_lock(&inode_lock);
 
 free_unused:
+	count = 0;
 	entry = inode_unused.prev;
 	while (entry != &inode_unused)
 	{

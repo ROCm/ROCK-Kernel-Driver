@@ -69,6 +69,7 @@ struct i2o_device
 
 	struct i2o_controller *controller;	/* Controlling IOP */
 	struct i2o_device *next;	/* Chain */
+	struct i2o_device *prev;
 	char dev_name[8];		/* linux /dev name if available */
 };
 
@@ -78,6 +79,9 @@ struct i2o_device
 struct i2o_pci
 {
 	int irq;
+	int queue_buggy:1;	/* Don't send a lot of messages */
+	int short_req:1;	/* Use small block sizes	*/
+	int dpt:1;		/* Don't quiesce		*/
 #ifdef CONFIG_MTRR
 	int mtrr_reg0;
 	int mtrr_reg1;
@@ -120,6 +124,8 @@ struct i2o_controller
 
 	u32 mem_offset;				/* MFA offset */
 	u32 mem_phys;				/* MFA physical */
+	
+	int battery:1;				/* Has a battery backup */
 
 	struct proc_dir_entry* proc_entry;	/* /proc dir */
 
@@ -295,6 +301,7 @@ extern int i2o_device_notify_off(struct i2o_device *, struct i2o_handler *);
 
 extern int i2o_post_this(struct i2o_controller *, u32 *, int);
 extern int i2o_post_wait(struct i2o_controller *, u32 *, int, int);
+extern int i2o_post_wait_mem(struct i2o_controller *, u32 *, int, int, void *, void *);
 
 extern int i2o_query_scalar(struct i2o_controller *, int, int, int, void *, int);
 extern int i2o_set_scalar(struct i2o_controller *, int, int, int, void *, int);

@@ -892,13 +892,7 @@ static int revalidate_hddisk(kdev_t dev, int maxusage)
 
 	for (i=max_p - 1; i >=0 ; i--) {
 		int minor = start + i;
-		kdev_t devi = MKDEV(MAJOR_NR, minor);
-		struct super_block *sb = get_super(devi); 
-
-		sync_dev(devi);
-		if (sb)
-			invalidate_inodes(sb);
-		invalidate_buffers(devi);
+		invalidate_device(MKDEV(MAJOR_NR, minor), 1);
 		gdev->part[minor].start_sect = 0;
 		gdev->part[minor].nr_sects = 0;
 	}

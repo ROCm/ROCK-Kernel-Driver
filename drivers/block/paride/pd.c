@@ -589,9 +589,6 @@ static int pd_revalidate(kdev_t dev)
 
 {       int p, unit, minor;
         long flags;
-        kdev_t devp;
-
-	struct super_block *sb;
 
         unit = DEVICE_NR(dev);
         if ((unit >= PD_UNITS) || (!PD.present)) return -ENODEV;
@@ -607,13 +604,7 @@ static int pd_revalidate(kdev_t dev)
 
         for (p=(PD_PARTNS-1);p>=0;p--) {
 		minor = p + unit*PD_PARTNS;
-                devp = MKDEV(MAJOR_NR, minor);
-                fsync_dev(devp);
-
-                sb = get_super(devp);
-                if (sb) invalidate_inodes(sb);
-
-                invalidate_buffers(devp);
+                invalidate_device(MKDEV(MAJOR_NR, minor), 1);
                 pd_hd[minor].start_sect = 0;
                 pd_hd[minor].nr_sects = 0;
         }

@@ -170,7 +170,7 @@ find_via_cuda(void)
     }
 
     /* Clear and enable interrupts, but only on PPC. On 68K it's done  */
-    /* for us by the the main VIA driver in arch/m68k/mac/via.c        */
+    /* for us by the main VIA driver in arch/m68k/mac/via.c        */
 
 #ifndef CONFIG_MAC
     via[IFR] = 0x7f; eieio();	/* clear interrupts by writing 1s */

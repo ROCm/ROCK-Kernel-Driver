@@ -56,7 +56,7 @@
 #include <asm/uaccess.h>
 
 #define PS2ESDI_IRQ 14
-#define MAX_HD 1
+#define MAX_HD 2
 #define MAX_RETRIES 5
 #define MAX_16BIT 65536
 #define ESDI_TIMEOUT   0xf000
@@ -105,14 +105,14 @@ static void dump_cmd_complete_status(u_int int_ret_code);
 
 static void ps2esdi_get_device_cfg(void);
 
-void ps2esdi_reset_timer(unsigned long unused);
+static void ps2esdi_reset_timer(unsigned long unused);
 
-u_int dma_arb_level;		/* DMA arbitration level */
+static u_int dma_arb_level;		/* DMA arbitration level */
 
 static DECLARE_WAIT_QUEUE_HEAD(ps2esdi_int);
 static DECLARE_WAIT_QUEUE_HEAD(ps2esdi_wait_open);
 
-int no_int_yet;
+static int no_int_yet;
 static int access_count[MAX_HD];
 static char ps2esdi_valid[MAX_HD];
 static int ps2esdi_sizes[MAX_HD << 6];
@@ -123,26 +123,26 @@ static u_short io_base;
 static struct timer_list esdi_timer = { function: ps2esdi_reset_timer };
 static int reset_status;
 static int ps2esdi_slot = -1;
-int tp720esdi = 0;		/* Is it Integrated ESDI of ThinkPad-720? */
-int intg_esdi = 0;              /* If integrated adapter */
+static int tp720esdi = 0;	/* Is it Integrated ESDI of ThinkPad-720? */
+static int intg_esdi = 0;       /* If integrated adapter */
 struct ps2esdi_i_struct {
 	unsigned int head, sect, cyl, wpcom, lzone, ctl;
 };
 
 #if 0
 #if 0				/* try both - I don't know which one is better... UB */
-struct ps2esdi_i_struct ps2esdi_info[] =
+static struct ps2esdi_i_struct ps2esdi_info[MAX_HD] =
 {
 	{4, 48, 1553, 0, 0, 0},
 	{0, 0, 0, 0, 0, 0}};
 #else
-struct ps2esdi_i_struct ps2esdi_info[] =
+static struct ps2esdi_i_struct ps2esdi_info[MAX_HD] =
 {
 	{64, 32, 161, 0, 0, 0},
 	{0, 0, 0, 0, 0, 0}};
 #endif
 #endif
-struct ps2esdi_i_struct ps2esdi_info[] =
+static struct ps2esdi_i_struct ps2esdi_info[MAX_HD] =
 {
 	{0, 0, 0, 0, 0, 0},
 	{0, 0, 0, 0, 0, 0}};
@@ -191,9 +191,9 @@ int __init ps2esdi_init(void)
 
 #ifdef MODULE
 
-int cyl[2] = {-1,-1};
-int head[2] = {-1, -1};
-int sect[2] = {-1, -1};
+static int cyl[MAX_HD] = {-1,-1};
+static int head[MAX_HD] = {-1, -1};
+static int sect[MAX_HD] = {-1, -1};
 
 MODULE_PARM(tp720esdi, "i");
 MODULE_PARM(cyl, "i");
@@ -203,7 +203,7 @@ MODULE_PARM(track, "i");
 int init_module(void) {
 	int drive;
 
-	for(drive = 0; drive <= 1; drive++) {
+	for(drive = 0; drive < MAX_HD; drive++) {
 	        struct ps2_esdi_i_struct *info = &ps2esdi_info[drive];
 
         	if (cyl[drive] != -1) {
@@ -1145,15 +1145,9 @@ static int ps2esdi_reread_partitions(kdev_t dev)
 	for (partition = ps2esdi_gendisk.max_p - 1;
 	     partition >= 0; partition--) {
 		int minor = (start | partition);
-		kdev_t devp = MKDEV(MAJOR_NR, minor);
-		struct super_block * sb = get_super(devp);
-		
-		sync_dev(devp);
-		if (sb)
-			invalidate_inodes(sb);
-		invalidate_buffers(devp);
-		ps2esdi_gendisk.part[start + partition].start_sect = 0;
-		ps2esdi_gendisk.part[start + partition].nr_sects = 0;
+		invalidate_device(MKDEV(MAJOR_NR, minor), 1);
+		ps2esdi_gendisk.part[minor].start_sect = 0;
+		ps2esdi_gendisk.part[minor].nr_sects = 0;
 	}
 
 	grok_partitions(&ps2esdi_gendisk, target, 1<<6, 
@@ -1165,7 +1159,7 @@ static int ps2esdi_reread_partitions(kdev_t dev)
 	return (0);
 }
 
-void ps2esdi_reset_timer(unsigned long unused)
+static void ps2esdi_reset_timer(unsigned long unused)
 {
 
 	int status;

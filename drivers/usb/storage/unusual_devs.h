@@ -79,6 +79,12 @@ UNUSUAL_DEV(  0x0436, 0x0005, 0x0100, 0x0100,
 		"CameraMate (DPCM_USB)",
  		US_SC_SCSI, US_PR_DPCM_USB, NULL,
 		US_FL_START_STOP ),
+
+UNUSUAL_DEV(  0x04e6, 0x0005, 0x0100, 0x0208,
+		"SCM Microsystems Inc",
+		"eUSB SmartMedia / CompactFlash Adapter",
+		US_SC_SCSI, US_PR_DPCM_USB, NULL,
+		US_FL_START_STOP ),
 #endif
 
 UNUSUAL_DEV(  0x04e6, 0x0006, 0x0100, 0x0200, 

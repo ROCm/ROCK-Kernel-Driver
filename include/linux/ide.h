@@ -648,6 +648,7 @@ extern	ide_hwif_t	ide_hwifs[];		/* master data repository */
 extern	ide_module_t	*ide_modules;
 extern	ide_module_t	*ide_probe;
 #endif
+extern int noautodma;
 
 /*
  * We need blk.h, but we replace its end_request by our own version.

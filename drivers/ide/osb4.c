@@ -402,10 +402,16 @@ unsigned int __init pci_init_osb4 (struct pci_dev *dev, const char *name)
 #ifdef DEBUG
 	printk("%s: reg64 == 0x%08x\n", name, reg64);
 #endif
-	reg64 &= ~0x0000A000;
-#ifdef CONFIG_SMP
-	reg64 |= 0x00008000;
-#endif
+
+//	reg64 &= ~0x0000A000;
+//#ifdef CONFIG_SMP
+//	reg64 |= 0x00008000;
+//#endif
+	/* Assume the APIC was set up properly by the BIOS for now . If it
+	   wasnt we need to do a fix up _way_ earlier. Bits 15,10,3 control
+	   APIC enable, routing and decode */
+	   
+	reg64 &= ~0x00002000;	
 	pci_write_config_dword(isa_dev, 0x64, reg64);
 
 	pci_write_config_byte(dev, PCI_LATENCY_TIMER, 0x40);
@@ -441,7 +447,8 @@ void __init ide_init_osb4 (ide_hwif_t *hwif)
 #else /* CONFIG_BLK_DEV_IDEDMA */
 
 	if (hwif->dma_base) {
-		hwif->autodma = 1;
+		if (!noautodma)
+			hwif->autodma = 1;
 		hwif->dmaproc = &osb4_dmaproc;
 	} else {
 		hwif->autodma = 0;

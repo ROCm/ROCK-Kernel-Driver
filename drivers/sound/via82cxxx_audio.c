@@ -3020,6 +3020,11 @@ static int __init via_init_one (struct pci_dev *pdev, const struct pci_device_id
 	if (printed_version++ == 0)
 		printk (KERN_INFO "Via 686a audio driver " VIA_VERSION "\n");
 
+	if (pci_enable_device (pdev)) {
+		rc = -EIO;
+		goto err_out_none;
+	}
+
 	if (!request_region (pci_resource_start (pdev, 0),
 	    		     pci_resource_len (pdev, 0),
 			     VIA_MODULE_NAME)) {
@@ -3028,10 +3033,6 @@ static int __init via_init_one (struct pci_dev *pdev, const struct pci_device_id
 		goto err_out;
 	}
 
-	if (pci_enable_device (pdev)) {
-		rc = -EIO;
-		goto err_out_none;
-	}
 
 	card = kmalloc (sizeof (*card), GFP_KERNEL);
 	if (!card) {

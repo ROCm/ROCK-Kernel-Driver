@@ -130,7 +130,7 @@ int async_wrap_skb(struct sk_buff *skb, __u8 *tx_buff, int buffsize)
 #ifdef __LITTLE_ENDIAN
 	n += stuff_byte(fcs.bytes[0], tx_buff+n);
 	n += stuff_byte(fcs.bytes[1], tx_buff+n);
-#else ifdef __BIG_ENDIAN
+#else /* ifdef __BIG_ENDIAN */
 	n += stuff_byte(fcs.bytes[1], tx_buff+n);
 	n += stuff_byte(fcs.bytes[0], tx_buff+n);
 #endif

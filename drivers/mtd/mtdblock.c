@@ -355,19 +355,12 @@ static release_t mtdblock_release(struct inode *inode, struct file *file)
 {
 	int dev;
 	struct mtdblk_dev *mtdblk;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,0)
-	struct super_block * sb = get_super(inode->i_rdev);
-#endif
    	DEBUG(MTD_DEBUG_LEVEL1, "mtdblock_release\n");
 
 	if (inode == NULL)
 		release_return(-ENODEV);
    
-	fsync_dev(inode->i_rdev);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,0)
-	if (sb) invalidate_inodes(sb);
-#endif
-	invalidate_buffers(inode->i_rdev);
+	invalidate_device(inode->i_rdev, 1);
 
 	dev = MINOR(inode->i_rdev);
 	mtdblk = mtdblks[dev];

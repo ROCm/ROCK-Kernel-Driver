@@ -101,13 +101,6 @@ char *pdc202xx_ultra_verbose (u32 drive_pci, u16 slow_cable)
 	return(pdc202xx_dma_verbose(drive_pci));
 }
 
-char *pdc202xx_interrupt_verbose (u8 sc1d)
-{
-	char *p = NULL;
-	p += sprintf(p,"0x%02x        ", sc1d);
-	return (char *)p;
-}
-
 static char * pdc202xx_info (char *buf, struct pci_dev *dev)
 {
 	char *p = buf;
@@ -862,7 +855,8 @@ void __init ide_init_pdc202xx (ide_hwif_t *hwif)
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (hwif->dma_base) {
 		hwif->dmaproc = &pdc202xx_dmaproc;
-		hwif->autodma = 1;
+		if (!noautodma)
+			hwif->autodma = 1;
 	} else {
 		hwif->drives[0].autotune = 1;
 		hwif->drives[1].autotune = 1;

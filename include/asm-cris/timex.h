@@ -6,7 +6,7 @@
 #ifndef _ASM_CRIS_TIMEX_H
 #define _ASM_CRIS_TIMEX_H
 
-#define CLOCK_TICK_RATE 9600 /* Underlying frequency of the HZ timer */
+#define CLOCK_TICK_RATE 19200 /* Underlying frequency of the HZ timer */
 
 /*
  * We don't have a cycle-counter.. but we do not support SMP anyway where this is

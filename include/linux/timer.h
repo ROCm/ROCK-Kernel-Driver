@@ -5,17 +5,13 @@
 #include <linux/list.h>
 
 /*
- * This is completely separate from the above, and is the
- * "new and improved" way of handling timers more dynamically.
- * Hopefully efficient and general enough for most things.
+ * In Linux 2.4, static timers have been removed from the kernel.
+ * Timers may be dynamically created and destroyed, and should be initialized
+ * by a call to init_timer() upon creation.
  *
- * The "hardcoded" timers above are still useful for well-
- * defined problems, but the timer-list is probably better
- * when you need multiple outstanding timers or similar.
- *
- * The "data" field is in case you want to use the same
- * timeout function for several timeouts. You can use this
- * to distinguish between the different invocations.
+ * The "data" field enables use of a common timeout function for several
+ * timeouts. You can use this field to distinguish between the different
+ * invocations.
  */
 struct timer_list {
 	struct list_head list;

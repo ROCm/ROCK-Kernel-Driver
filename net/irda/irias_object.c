@@ -34,7 +34,7 @@ hashbin_t *objects = NULL;
 /*
  *  Used when a missing value needs to be returned
  */
-struct ias_value missing = { IAS_MISSING, 0, 0, 0};
+struct ias_value missing = { IAS_MISSING, 0, 0, 0, {0}};
 
 /*
  * Function strdup (str)

@@ -380,9 +380,9 @@ irda_irnet_create(irnet_socket *	self)
   self->ckey = irlmp_register_client(0, NULL, NULL, NULL);
 #ifdef DISCOVERY_NOMASK
   self->mask = 0xffff;		/* For W2k compatibility */
-#else DISCOVERY_NOMASK
+#else /* DISCOVERY_NOMASK */
   self->mask = irlmp_service_to_hint(S_LAN);
-#endif DISCOVERY_NOMASK
+#endif /* DISCOVERY_NOMASK */
   self->tx_flow = FLOW_START;	/* Flow control from IrTTP */
 
   DEXIT(IRDA_SOCK_TRACE, "\n");
@@ -692,7 +692,7 @@ irnet_connect_socket(irnet_socket *	self,
   /* If we want to receive "stream sockets" */
   if(max_sdu_size == 0)
     new->max_data_size = irttp_get_max_seg_size(new->tsap);
-#endif STREAM_COMPAT
+#endif /* STREAM_COMPAT */
 
   /* Clean up the original one to keep it in listen state */
   self->tsap->dtsap_sel = self->tsap->lsap->dlsap_sel = LSAP_ANY;
@@ -708,7 +708,7 @@ irnet_connect_socket(irnet_socket *	self,
    * Also, not doing it give IrDA a chance to finish the setup properly
    * before beeing swamped with packets... */
   ppp_output_wakeup(&new->chan);
-#endif CONNECT_INDIC_KICK
+#endif /* CONNECT_INDIC_KICK */
 
   /* Notify the control channel */
   irnet_post_event(new, IRNET_CONNECT_FROM, new->daddr, self->rname);
@@ -738,7 +738,7 @@ irnet_disconnect_server(irnet_socket *	self,
   /* Hum... Is it the right thing to do ? And do we need to send
    * a connect response before ? It looks ok without this... */
   irttp_disconnect_request(self->tsap, NULL, P_NORMAL);
-#endif FAIL_SEND_DISCONNECT
+#endif /* FAIL_SEND_DISCONNECT */
 
   /* Clean up the server to keep it in listen state */
   self->tsap->dtsap_sel = self->tsap->lsap->dlsap_sel = LSAP_ANY;
@@ -788,7 +788,7 @@ irnet_setup_server(void)
 #ifdef ADVERTISE_HINT
   /* Register with IrLMP as a service (advertise our hint bit) */
   irnet_server.skey = irlmp_register_service(hints);
-#endif ADVERTISE_HINT
+#endif /* ADVERTISE_HINT */
 
   /* Register with LM-IAS (so that people can connect to us) */
   irnet_server.ias_obj = irias_new_object(IRNET_SERVICE_NAME, jiffies);
@@ -823,7 +823,7 @@ irnet_destroy_server(void)
 #ifdef ADVERTISE_HINT
   /* Unregister with IrLMP */
   irlmp_unregister_service(irnet_server.skey);
-#endif ADVERTISE_HINT
+#endif /* ADVERTISE_HINT */
 
   /* Unregister with LM-IAS */
   if(irnet_server.ias_obj)
@@ -995,7 +995,7 @@ irnet_connect_confirm(void *	instance,
 #ifdef STREAM_COMPAT
   if(max_sdu_size == 0)
     self->max_data_size = irttp_get_max_seg_size(self->tsap);
-#endif STREAM_COMPAT
+#endif /* STREAM_COMPAT */
 
   /* At this point, IrLMP has assigned our source address */
   self->saddr = irttp_get_saddr(self->tsap);
@@ -1012,10 +1012,10 @@ irnet_connect_confirm(void *	instance,
       DEBUG(IRDA_CB_INFO, "Passing connect packet to PPP.\n");
       /* Try to pass it to PPP */
       irnet_data_indication(instance, sap, skb);
-#else PASS_CONNECT_PACKETS
+#else /* PASS_CONNECT_PACKETS */
       DERROR(IRDA_CB_ERROR, "Dropping non empty packet.\n");
       kfree_skb(skb);	/* Note : will be optimised with other kfree... */
-#endif PASS_CONNECT_PACKETS
+#endif /* PASS_CONNECT_PACKETS */
     }
   else
     kfree_skb(skb);
@@ -1039,6 +1039,7 @@ irnet_flow_indication(void *	instance,
 		      LOCAL_FLOW flow) 
 {
   irnet_socket *	self = (irnet_socket *) instance;
+  LOCAL_FLOW		oldflow = self->tx_flow;
 
   DENTER(IRDA_TCB_TRACE, "(self=0x%X, flow=%d)\n", (unsigned int) self, flow);
 
@@ -1050,7 +1051,11 @@ irnet_flow_indication(void *	instance,
     {
     case FLOW_START:
       DEBUG(IRDA_CB_INFO, "IrTTP wants us to start again\n");
-      ppp_output_wakeup(&self->chan);
+      /* Check if we really need to wake up PPP */
+      if(oldflow == FLOW_STOP)
+	ppp_output_wakeup(&self->chan);
+      else
+	DEBUG(IRDA_CB_INFO, "But we were already transmitting !!!\n");
       break;
     case FLOW_STOP:
       DEBUG(IRDA_CB_INFO, "IrTTP wants us to slow down\n");
@@ -1157,10 +1162,10 @@ irnet_connect_indication(void *		instance,
        * WARNING : This need more testing ! */
       irttp_close_tsap(new->tsap);
       /* Note : no return, fall through... */
-#else ALLOW_SIMULT_CONNECT
+#else /* ALLOW_SIMULT_CONNECT */
       irnet_disconnect_server(self, skb);
       return;
-#endif ALLOW_SIMULT_CONNECT
+#endif /* ALLOW_SIMULT_CONNECT */
     }
 
   /* So : at this point, we have a socket, and it is idle. Good ! */
@@ -1173,10 +1178,10 @@ irnet_connect_indication(void *		instance,
       DEBUG(IRDA_CB_INFO, "Passing connect packet to PPP.\n");
       /* Try to pass it to PPP */
       irnet_data_indication(new, new->tsap, skb);
-#else PASS_CONNECT_PACKETS
+#else /* PASS_CONNECT_PACKETS */
       DERROR(IRDA_CB_ERROR, "Dropping non empty packet.\n");
       kfree_skb(skb);	/* Note : will be optimised with other kfree... */
-#endif PASS_CONNECT_PACKETS
+#endif /* PASS_CONNECT_PACKETS */
     }
   else
     kfree_skb(skb);
@@ -1312,7 +1317,7 @@ irnet_expiry_indication(discovery_t *	expiry,
 
   DEXIT(IRDA_OCB_TRACE, "\n");
 }
-#endif DISCOVERY_EVENTS
+#endif /* DISCOVERY_EVENTS */
 
 
 /*********************** PROC ENTRY CALLBACKS ***********************/
@@ -1426,7 +1431,7 @@ irda_irnet_init(void)
   memset(&irnet_server, 0, sizeof(struct irnet_root));
 
   /* Setup start of irnet instance list */
-  irnet_server.list = hashbin_new(HB_LOCAL); 
+  irnet_server.list = hashbin_new(HB_NOLOCK); 
   DABORT(irnet_server.list == NULL, -ENOMEM,
 	 MODULE_ERROR, "Can't allocate hashbin!\n");
   /* Init spinlock for instance list */
@@ -1469,7 +1474,7 @@ irda_irnet_cleanup(void)
 #ifdef CONFIG_PROC_FS
   /* Remove our /proc file */
   remove_proc_entry("irnet", proc_irda);
-#endif CONFIG_PROC_FS
+#endif /* CONFIG_PROC_FS */
 
   /* Remove our IrNET server from existence */
   irnet_destroy_server();

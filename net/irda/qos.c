@@ -346,7 +346,7 @@ void irlap_adjust_qos_settings(struct qos_info *qos)
 			WARNING(__FUNCTION__ "(), nothing more we can do!\n");
 		}
 	}
-#endif CONFIG_IRDA_DYNAMIC_WINDOW
+#endif /* CONFIG_IRDA_DYNAMIC_WINDOW */
 }
 
 /*

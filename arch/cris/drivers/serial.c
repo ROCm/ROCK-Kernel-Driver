@@ -1,4 +1,4 @@
-/* $Id: serial.c,v 1.10 2001/03/05 13:14:07 bjornw Exp $
+/* $Id: serial.c,v 1.12 2001/04/19 12:23:07 bjornw Exp $
  *
  * Serial port driver for the ETRAX 100LX chip
  *
@@ -7,6 +7,15 @@
  *      Many, many authors. Based once upon a time on serial.c for 16x50.
  *
  * $Log: serial.c,v $
+ * Revision 1.12  2001/04/19 12:23:07  bjornw
+ * CONFIG_RS485 -> CONFIG_ETRAX_RS485
+ *
+ * Revision 1.11  2001/04/05 14:29:48  markusl
+ * Updated according to review remarks i.e.
+ * -Use correct types in port structure to avoid compiler warnings
+ * -Try to use IO_* macros whenever possible
+ * -Open should never return -EBUSY
+ *
  * Revision 1.10  2001/03/05 13:14:07  bjornw
  * Another spelling fix
  *
@@ -190,7 +199,7 @@
  *
  */
 
-static char *serial_version = "$Revision: 1.10 $";
+static char *serial_version = "$Revision: 1.12 $";
 
 #include <linux/config.h>
 #include <linux/version.h>
@@ -299,6 +308,18 @@ static int rs_write(struct tty_struct * tty, int from_user,
 #define REG_BAUD 3
 #define REG_XOFF 4  /* this is a 32 bit register */
 
+/*
+ * General note regarding the use of IO_* macros in this file: 
+ *
+ * We will use the bits defined for DMA channel 6 when using various
+ * IO_* macros (e.g. IO_STATE, IO_MASK, IO_EXTRACT) and _assume_ they are
+ * the same for all channels (which of course they are).
+ *
+ * We will also use the bits defined for serial port 0 when writing commands
+ * to the different ports, as these bits too are the same for all ports.
+ */
+
+
 /* this is the data for the four serial ports in the etrax100 */
 /*  DMA2(ser2), DMA4(ser3), DMA6(ser0) or DMA8(ser1) */
 /* R_DMA_CHx_CLR_INTR, R_DMA_CHx_FIRST, R_DMA_CHx_CMD */
@@ -343,9 +364,9 @@ static struct termios *serial_termios_locked[NR_PORTS];
 
 
 /* RS-485 */
-#if defined(CONFIG_RS485)
-#if defined(CONFIG_RS485_ON_PA)
-static int rs485_pa_bit = CONFIG_RS485_ON_PA_BIT;
+#if defined(CONFIG_ETRAX_RS485)
+#if defined(CONFIG_ETRAX_RS485_ON_PA)
+static int rs485_pa_bit = CONFIG_ETRAX_RS485_ON_PA_BIT;
 #endif
 #endif
   
@@ -421,8 +442,8 @@ static const struct control_pins e100_modem_pins[NR_PORTS] =
   }
 };
 
-#if defined(CONFIG_RS485) && defined(CONFIG_RS485_ON_PA)
-unsigned char rs485_pa_port = CONFIG_RS485_ON_PA_BIT;
+#if defined(CONFIG_ETRAX_RS485) && defined(CONFIG_ETRAX_RS485_ON_PA)
+unsigned char rs485_pa_port = CONFIG_ETRAX_RS485_ON_PA_BIT;
 #endif
 
 #define E100_RTS_MASK 0x20
@@ -668,7 +689,8 @@ e100_disable_rx(struct e100_serial *info)
 {
 #ifndef CONFIG_SVINTO_SIM
 	/* disable the receiver */
-	info->port[REG_REC_CTRL] = (info->rx_ctrl &= ~0x40);
+	info->port[REG_REC_CTRL] = info->rx_ctrl &=
+		~IO_MASK(R_SERIAL0_REC_CTRL, rec_enable);
 #endif
 }
 
@@ -677,7 +699,8 @@ e100_enable_rx(struct e100_serial *info)
 {
 #ifndef CONFIG_SVINTO_SIM
 	/* enable the receiver */
-	info->port[REG_REC_CTRL] = (info->rx_ctrl |= 0x40);
+	info->port[REG_REC_CTRL] = info->rx_ctrl |=
+		IO_MASK(R_SERIAL0_REC_CTRL, rec_enable);
 #endif
 }
 
@@ -747,14 +770,14 @@ e100_enable_serial_data_irq(struct e100_serial *info)
 }
 #endif
 
-#if defined(CONFIG_RS485)
+#if defined(CONFIG_ETRAX_RS485)
 /* Enable RS-485 mode on selected port. This is UGLY. */
 static int
 e100_enable_rs485(struct tty_struct *tty,struct rs485_control *r)
 {
 	struct e100_serial * info = (struct e100_serial *)tty->driver_data;
 
-#if defined(CONFIG_RS485_ON_PA)	
+#if defined(CONFIG_ETRAX_RS485_ON_PA)	
 	*R_PORT_PA_DATA = port_pa_data_shadow |= (1 << rs485_pa_bit);
 #endif
 
@@ -766,7 +789,6 @@ e100_enable_rs485(struct tty_struct *tty,struct rs485_control *r)
 	return 0;
 }
 
-/* Enable RS-485 mode on selected port. This is UGLY. */
 static int
 e100_write_rs485(struct tty_struct *tty,struct rs485_write *r)
 {
@@ -782,7 +804,7 @@ e100_write_rs485(struct tty_struct *tty,struct rs485_write *r)
 	 * the receiver before initiating a DMA transfer
 	 */
 	e100_rts(info, info->rs485.rts_on_send);
-#if defined(CONFIG_RS485_DISABLE_RECEIVER)
+#if defined(CONFIG_ETRAX_RS485_DISABLE_RECEIVER)
 	e100_disable_rx(info);
 	e100_disable_rxdma_irq(info);
 #endif
@@ -824,14 +846,16 @@ e100_write_rs485(struct tty_struct *tty,struct rs485_write *r)
 	max_j = jiffies + (delay_ms * HZ)/1000 + 10;
 
 	while (jiffies < max_j ) {
-	  if (info->port[REG_STATUS] & 0x20) {
+	  if (info->port[REG_STATUS] &
+	      IO_STATE(R_SERIAL0_STATUS, tr_ready, ready)) {
 	    for( i=0 ; i<100; i++ ) {};
-	    if (info->port[REG_STATUS] & 0x20) {
+	    if (info->port[REG_STATUS] &
+		IO_STATE(R_SERIAL0_STATUS, tr_ready, ready)) {
 	      /* ~25 for loops per usec */
-	      stop_delay = 25 * (1000000 / info->baud);
+	      stop_delay = 1000000 / info->baud;
 	      if(cflags & CSTOPB) 
 		stop_delay *= 2;
-	      for( i=0 ; i<stop_delay; i++ ) {};
+	      udelay(stop_delay);
 	      break;
 	    }
 	  }
@@ -839,7 +863,7 @@ e100_write_rs485(struct tty_struct *tty,struct rs485_write *r)
 
 	e100_rts(info, info->rs485.rts_after_sent);
 	
-#if defined(CONFIG_RS485_DISABLE_RECEIVER)
+#if defined(CONFIG_ETRAX_RS485_DISABLE_RECEIVER)
 	e100_enable_rx(info);
 	e100_enable_rxdma_irq(info);
 #endif
@@ -942,7 +966,9 @@ transmit_chars(struct e100_serial *info)
 	return;
 #endif
 	/* acknowledge both a dma_descr and dma_eop irq in R_DMAx_CLRINTR */
-	*info->oclrintradr = 3;
+	*info->oclrintradr =
+		IO_STATE(R_DMA_CH6_CLR_INTR, clr_descr, do) |
+		IO_STATE(R_DMA_CH6_CLR_INTR, clr_eop, do);
 
 #ifdef SERIAL_DEBUG_INTR
 	if(info->line == SERIAL_DEBUG_LINE)
@@ -987,19 +1013,20 @@ transmit_chars(struct e100_serial *info)
 		/* our job here is done, don't schedule any new DMA transfer */
 		info->tr_running = 0;
 
-#if defined(CONFIG_RS485)
+#if defined(CONFIG_ETRAX_RS485)
 		/* Check if we should toggle RTS now */
 		if (info->rs485.enabled)
 		{
 			/* Make sure fifo is empty */
 			int in_fifo = 0 ;
 			do{
-				in_fifo = (*info->ostatusadr) & 0x007F ;
+				in_fifo = IO_EXTRACT(R_DMA_CH6_STATUS, avail,
+						    *info->ostatusadr);
 			}  while (in_fifo > 0) ;
 			/* Any way to really check transmitter empty? (TEMT) */
 			/* Control RTS to set to RX mode */
 			e100_rts(info, info->rs485.rts_after_sent); 
-#if defined(CONFIG_RS485_DISABLE_RECEIVER)
+#if defined(CONFIG_ETRAX_RS485_DISABLE_RECEIVER)
 			e100_enable_rx(info);
 			e100_enable_rxdma_irq(info);
 #endif
@@ -1060,7 +1087,9 @@ receive_chars(struct e100_serial *info)
 
 	/* acknowledge both a dma_descr and dma_eop irq in R_DMAx_CLRINTR */
 
-	*info->iclrintradr = 3;
+	*info->iclrintradr =
+		IO_STATE(R_DMA_CH6_CLR_INTR, clr_descr, do) |
+		IO_STATE(R_DMA_CH6_CLR_INTR, clr_eop, do);
 
 	if(!tty) /* something wrong... */
 		return;
@@ -1088,7 +1117,9 @@ receive_chars(struct e100_serial *info)
 		/* read the status register so we can detect errors */
 		rstat = info->port[REG_STATUS];
 
-		if(rstat & 0xe) {
+		if(rstat & (IO_MASK(R_SERIAL0_STATUS, overrun) |
+			    IO_MASK(R_SERIAL0_STATUS, par_err) |
+			    IO_MASK(R_SERIAL0_STATUS, framing_err))) {
 			/* if we got an error, we must reset it by reading the
 			 * data_in field
 			 */
@@ -1148,7 +1179,7 @@ receive_chars(struct e100_serial *info)
 	descr->status = 0;
 
 	*info->ifirstadr = virt_to_phys(descr);
-	*info->icmdadr = 1; /* start */
+	*info->icmdadr = IO_STATE(R_DMA_CH6_CMD, cmd, start);
 
 #ifdef SERIAL_HANDLE_EARLY_ERRORS
 	e100_enable_serial_data_irq(info);
@@ -1170,8 +1201,9 @@ start_receive(struct e100_serial *info)
 
 	/* reset the input dma channel to be sure it works */
 	
-	*info->icmdadr = 4;
-	while((*info->icmdadr & 7) == 4);
+	*info->icmdadr = IO_STATE(R_DMA_CH6_CMD, cmd, reset);
+	while(IO_EXTRACT(R_DMA_CH6_CMD, cmd, *info->icmdadr) ==
+	      IO_STATE_VALUE(R_DMA_CH6_CMD, cmd, reset));
 
 	descr = &info->rec_descr;
 	
@@ -1186,7 +1218,8 @@ start_receive(struct e100_serial *info)
 	info->tty->flip.count = 0;
 
 	*info->ifirstadr = virt_to_phys(descr);
-	*info->icmdadr = 1; /* start */
+	*info->icmdadr = IO_STATE(R_DMA_CH6_CMD, cmd, start);
+	
 }
 
 
@@ -1293,7 +1326,7 @@ static int timeout_divider = 0;
 static struct timer_list flush_timer;
 
 static void 
-timed_flush_handler(void)
+timed_flush_handler(unsigned long ptr)
 {
 	struct e100_serial *info;
 	int i;
@@ -1381,7 +1414,7 @@ ser_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 				PROCSTAT(early_errors_cnt[info->line]++);
 
 				/* restart the DMA */
-				*info->icmdadr = 3;
+				*info->icmdadr = IO_STATE(R_DMA_CH6_CMD, cmd, restart);
 			} 
 			else { /* it was a valid byte, now let the dma do the rest */
 #ifdef SERIAL_DEBUG_INTR
@@ -1472,7 +1505,7 @@ startup(struct e100_serial * info)
 	if (info->flags & ASYNC_INITIALIZED) {
 		free_page(page);
 		restore_flags(flags);
-		return -EBUSY;
+		return 0;
 	}
 	
 	if (info->xmit.buf)
@@ -1518,14 +1551,22 @@ startup(struct e100_serial * info)
 	 * Reset the DMA channels and make sure their interrupts are cleared
 	 */
 	
-	*info->icmdadr = 4; /* reset command */
-	*info->ocmdadr = 4; /* reset command */
+	*info->icmdadr = IO_STATE(R_DMA_CH6_CMD, cmd, reset);
+	*info->ocmdadr = IO_STATE(R_DMA_CH6_CMD, cmd, reset);
+
+	/* wait until reset cycle is complete */
+	while(IO_EXTRACT(R_DMA_CH6_CMD, cmd, *info->icmdadr) ==
+	      IO_STATE_VALUE(R_DMA_CH6_CMD, cmd, reset));
+
+	while(IO_EXTRACT(R_DMA_CH6_CMD, cmd, *info->ocmdadr) ==
+	      IO_STATE_VALUE(R_DMA_CH6_CMD, cmd, reset));
 	
-	while((*info->icmdadr & 7) == 4); /* wait until reset cycle is complete */
-	while((*info->ocmdadr & 7) == 4);
-	
-	*info->iclrintradr = 3; /* make sure the irqs are cleared */
-	*info->oclrintradr = 3;
+	*info->iclrintradr =
+		IO_STATE(R_DMA_CH6_CLR_INTR, clr_descr, do) |
+		IO_STATE(R_DMA_CH6_CLR_INTR, clr_eop, do);
+	*info->oclrintradr =
+		IO_STATE(R_DMA_CH6_CLR_INTR, clr_descr, do) |
+		IO_STATE(R_DMA_CH6_CLR_INTR, clr_eop, do);
 	
 	if (info->tty)
 		clear_bit(TTY_IO_ERROR, &info->tty->flags);
@@ -1597,8 +1638,8 @@ shutdown(struct e100_serial * info)
 
 	/* reset both dma channels */
 
-	*info->icmdadr = 4;
-	*info->ocmdadr = 4;
+	*info->icmdadr = IO_STATE(R_DMA_CH6_CMD, cmd, reset);
+	*info->ocmdadr = IO_STATE(R_DMA_CH6_CMD, cmd, reset);
 
 #endif /* CONFIG_SVINTO_SIM */
 
@@ -1658,42 +1699,51 @@ change_speed(struct e100_serial *info)
 #ifndef CONFIG_SVINTO_SIM
 	info->port[REG_BAUD] = cflag_to_etrax_baud(cflag);
 	/* start with default settings and then fill in changes */
-	
-	info->rx_ctrl &= ~(0x07); /* 8 bit, no/even parity */
-	info->tx_ctrl &= ~(0x37); /* 8 bit, no/even parity, 1 stop bit, no cts */
+
+	/* 8 bit, no/even parity */
+	info->rx_ctrl &= ~(IO_MASK(R_SERIAL0_REC_CTRL, rec_bitnr) |
+			   IO_MASK(R_SERIAL0_REC_CTRL, rec_par_en) |
+			   IO_MASK(R_SERIAL0_REC_CTRL, rec_par));
+
+	/* 8 bit, no/even parity, 1 stop bit, no cts */
+	info->tx_ctrl &= ~(IO_MASK(R_SERIAL0_TR_CTRL, tr_bitnr) |
+			   IO_MASK(R_SERIAL0_TR_CTRL, tr_par_en) |
+			   IO_MASK(R_SERIAL0_TR_CTRL, tr_par) |
+			   IO_MASK(R_SERIAL0_TR_CTRL, stop_bits) |
+			   IO_MASK(R_SERIAL0_TR_CTRL, auto_cts));
 	
 	if ((cflag & CSIZE) == CS7) {
 		/* set 7 bit mode */
-		info->tx_ctrl |= 0x01;
-		info->rx_ctrl |= 0x01;
+		info->tx_ctrl |= IO_STATE(R_SERIAL0_TR_CTRL, tr_bitnr, tr_7bit);
+		info->rx_ctrl |= IO_STATE(R_SERIAL0_REC_CTRL, rec_bitnr, rec_7bit);
 	}
 	
 	if (cflag & CSTOPB) {
 		/* set 2 stop bit mode */
-		info->tx_ctrl |= 0x10;
+		info->tx_ctrl |= IO_STATE(R_SERIAL0_TR_CTRL, stop_bits, two_bits);
 	}	  
 	
 	if (cflag & PARENB) {
 		/* enable parity */
-		info->tx_ctrl |= 0x02;
-		info->rx_ctrl |= 0x02;
+		info->tx_ctrl |= IO_STATE(R_SERIAL0_TR_CTRL, tr_par_en, enable);
+		info->rx_ctrl |= IO_STATE(R_SERIAL0_REC_CTRL, rec_par_en, enable);
 	}
 	
 	if (cflag & PARODD) {
 		/* set odd parity */
-		info->tx_ctrl |= 0x04;
-		info->rx_ctrl |= 0x04;
+		info->tx_ctrl |= IO_STATE(R_SERIAL0_TR_CTRL, tr_par, odd);
+		info->rx_ctrl |= IO_STATE(R_SERIAL0_REC_CTRL, rec_par, odd);
 	}
 	
 	if (cflag & CRTSCTS) {
 		/* enable automatic CTS handling */
-		info->tx_ctrl |= 0x20;
+		info->tx_ctrl |= IO_STATE(R_SERIAL0_TR_CTRL, auto_cts, active);
 	}
 	
 	/* make sure the tx and rx are enabled */
 	
-	info->tx_ctrl |= 0x40;
-	info->rx_ctrl |= 0x40;
+	info->tx_ctrl |= IO_STATE(R_SERIAL0_TR_CTRL, tr_enable, enable);
+	info->rx_ctrl |= IO_STATE(R_SERIAL0_REC_CTRL, rec_enable, enable);
 
 	/* actually write the control regs to the hardware */
 	
@@ -2330,7 +2380,7 @@ rs_ioctl(struct tty_struct *tty, struct file * file,
 				return -EFAULT;
 			return 0;
 
-#if defined(CONFIG_RS485)
+#if defined(CONFIG_ETRAX_RS485)
 		case TIOCSERSETRS485:
 			error = verify_area(VERIFY_WRITE, (void *) arg,
 					sizeof(struct rs485_control));
@@ -2488,10 +2538,10 @@ rs_close(struct tty_struct *tty, struct file * filp)
 
 	/* port closed */
 
-#if defined(CONFIG_RS485)
+#if defined(CONFIG_ETRAX_RS485)
 	if (info->rs485.enabled) {
 		info->rs485.enabled = 0;
-#if defined(CONFIG_RS485_ON_PA)
+#if defined(CONFIG_ETRAX_RS485_ON_PA)
 		*R_PORT_PA_DATA = port_pa_data_shadow &= ~(1 << rs485_pa_bit);
 #endif
 	}

@@ -11,6 +11,15 @@
  * partition split defined below.
  *
  * $Log: axisflashmap.c,v $
+ * Revision 1.7  2001/04/05 13:41:46  markusl
+ * Updated according to review remarks
+ *
+ * Revision 1.6  2001/03/07 09:21:21  bjornw
+ * No need to waste .data
+ *
+ * Revision 1.5  2001/03/06 16:27:01  jonashg
+ * Probe the entire flash area for flash devices.
+ *
  * Revision 1.4  2001/02/23 12:47:15  bjornw
  * Uncached flash in LOW_MAP moved from 0xe to 0x8
  *
@@ -50,19 +59,13 @@
 #endif
 
 /*
- * WINDOW_SIZE is the total size where the flash chips are mapped,
- * my guess is that this can be the total memory area even if there
- * are many flash chips inside the area or if they are not all mounted.
- * So possibly we can get rid of the CONFIG_ here and just write something
- * like 32 MB always.
+ * WINDOW_SIZE is the total size where the flash chips may be mapped.
+ * MTD probes should find all devices there and it does not matter
+ * if there are unmapped gaps or aliases (mirrors of flash devices).
+ * The MTD probes will ignore them.
  */
 
-#define WINDOW_SIZE  (CONFIG_ETRAX_FLASH_LENGTH * 1024 * 1024)
-
-/* Byte-offset where the partition-table is placed in the first chip
- */
-
-#define PTABLE_SECTOR 65536
+#define WINDOW_SIZE  (128 * 1024 * 1024)
 
 /* 
  * Map driver
@@ -70,8 +73,6 @@
  * Ok this is the scoop - we need to access the flash both with and without
  * the cache - without when doing all the fancy flash interfacing, and with
  * when we do actual copying because otherwise it will be slow like molasses.
- * I hope this works the way it's intended, so that there won't be any cases
- * of non-synchronicity because of the different access modes below...
  */
 
 static __u8 flash_read8(struct map_info *map, unsigned long ofs)
@@ -110,12 +111,6 @@ static void flash_write32(struct map_info *map, __u32 d, unsigned long adr)
 	*(__u32 *)(FLASH_UNCACHED_ADDR + adr) = d;
 }
 
-static void flash_copy_to(struct map_info *map, unsigned long to,
-			  const void *from, ssize_t len)
-{
-	memcpy((void *)(FLASH_CACHED_ADDR + to), from, len);
-}
-
 static struct map_info axis_map = {
 	name: "Axis flash",
 	size: WINDOW_SIZE,
@@ -127,7 +122,6 @@ static struct map_info axis_map = {
 	write8: flash_write8,
 	write16: flash_write16,
 	write32: flash_write32,
-	copy_to: flash_copy_to
 };
 
 /* If no partition-table was found, we use this default-set.
@@ -139,18 +133,18 @@ static struct map_info axis_map = {
 static struct mtd_partition axis_default_partitions[NUM_DEFAULT_PARTITIONS] = {
 	{
 		name: "boot firmware",
-		size: PTABLE_SECTOR,
+		size: CONFIG_ETRAX_PTABLE_SECTOR,
 		offset: 0
 	},
 	{
 		name: "kernel",
 		size: 0x1a0000,
-		offset: PTABLE_SECTOR
+		offset: CONFIG_ETRAX_PTABLE_SECTOR
 	},
 	{
 		name: "filesystem",
 		size: 0x50000,
-		offset: (0x1a0000 + PTABLE_SECTOR)
+		offset: (0x1a0000 + CONFIG_ETRAX_PTABLE_SECTOR)
 	}
 };
 
@@ -214,11 +208,11 @@ init_axis_flash(void)
 	printk(KERN_NOTICE "Axis flash mapping: %x at %x\n",
 	       WINDOW_SIZE, FLASH_CACHED_ADDR);
 
-	mymtd = do_cfi_probe(&axis_map);
+	mymtd = (struct mtd_info *)do_cfi_probe(&axis_map);
 
 #ifdef CONFIG_MTD_AMDSTD
 	if (!mymtd) {
-		mymtd = do_amd_flash_probe(&axis_map);
+		mymtd = (struct mtd_info *)do_amd_flash_probe(&axis_map);
 	}
 #endif
 
@@ -236,18 +230,15 @@ init_axis_flash(void)
 	 */
 
 	ptable_head = (struct partitiontable_head *)(FLASH_CACHED_ADDR +
-		PTABLE_SECTOR + PARTITION_TABLE_OFFSET);
+		CONFIG_ETRAX_PTABLE_SECTOR + PARTITION_TABLE_OFFSET);
 	pidx++;  /* first partition is always set to the default */
 
 	if ((ptable_head->magic == PARTITION_TABLE_MAGIC)
-	    && (ptable_head->size
-		< (MAX_PARTITIONS
-		   * sizeof(struct partitiontable_entry) + 4))
-	    && (*(unsigned long*)
-		((void*)ptable_head
-		 + sizeof(*ptable_head)
-		 + ptable_head->size - 4)
-		==  PARTITIONTABLE_END_MARKER)) {
+	    && (ptable_head->size <
+		(MAX_PARTITIONS * sizeof(struct partitiontable_entry) + 4))
+	    && (*(unsigned long*)((void*)ptable_head + sizeof(*ptable_head) +
+				  ptable_head->size - 4)
+		== PARTITIONTABLE_END_MARKER)) {
 		/* Looks like a start, sane length and end of a
 		 * partition table, lets check csum etc.
 		 */
@@ -256,7 +247,7 @@ init_axis_flash(void)
 			(struct partitiontable_entry *)
 			((unsigned long)ptable_head + sizeof(*ptable_head) +
 			 ptable_head->size);
-		unsigned long offset = PTABLE_SECTOR;
+		unsigned long offset = CONFIG_ETRAX_PTABLE_SECTOR;
 		unsigned char *p;
 		unsigned long csum = 0;
 		
@@ -293,16 +284,7 @@ init_axis_flash(void)
 		       && ptable->offset != 0xffffffff
 		       && ptable < max_addr
 		       && pidx < MAX_PARTITIONS) {
-#if 0
-			/* wait with multi-chip support until we know
-			 * how mtd detects multiple chips
-			 */
-			if ((offset + ptable->offset) >= chips[0].size) {
-				partitions[pidx].start
-					= offset + chips[1].start
-					+ ptable->offset - chips[0].size;
-			}
-#endif
+
 			axis_partitions[pidx].offset = offset + ptable->offset;
 			axis_partitions[pidx].size = ptable->size;
 

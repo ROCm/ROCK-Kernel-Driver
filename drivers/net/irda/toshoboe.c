@@ -81,10 +81,18 @@ static int toshoboe_pmproc (struct pm_dev *dev, pm_request_t rqst, void *data);
 
 #include <net/irda/toshoboe.h>
 
-static char *driver_name = "toshoboe";
+#define PCI_DEVICE_ID_FIR701b  0x0d01
 
-static struct toshoboe_cb *dev_self[NSELFS + 1] =
-{NULL, NULL, NULL, NULL, NULL};
+static struct pci_device_id toshoboe_pci_tbl[] __initdata = {
+	{ PCI_VENDOR_ID_TOSHIBA, PCI_DEVICE_ID_FIR701, PCI_ANY_ID, PCI_ANY_ID, },
+	{ PCI_VENDOR_ID_TOSHIBA, PCI_DEVICE_ID_FIR701b, PCI_ANY_ID, PCI_ANY_ID, },
+	{ }			/* Terminating entry */
+};
+MODULE_DEVICE_TABLE(pci, toshoboe_pci_tbl);
+
+static const char *driver_name = "toshoboe";
+
+static struct toshoboe_cb *dev_self[NSELFS + 1];
 
 static int max_baud = 4000000;
 
@@ -191,8 +199,8 @@ toshoboe_startchip (struct toshoboe_cb *self)
   outb_p (OBOE_NTR_VAL, OBOE_NTR);
   outb_p (0xf0, OBOE_REG_D);
   outb_p (0xff, OBOE_ISR);
-  outb_p (0x0f, OBOE_REG_1A);
-  outb_p (0xff, OBOE_REG_1B);
+  outb_p (0x0f, OBOE_REG_1B);
+  outb_p (0xff, OBOE_REG_1A);
 
 
   physaddr = virt_to_bus (self->taskfile);
@@ -608,18 +616,21 @@ static int toshoboe_net_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	/* Disable interrupts & save flags */
 	save_flags(flags);
 	cli();
-	
 	switch (cmd) {
 	case SIOCSBANDWIDTH: /* Set bandwidth */
-		if (!capable(CAP_NET_ADMIN))
-			return -EPERM;
+		if (!capable(CAP_NET_ADMIN)) {
+			ret = -EPERM;
+			goto out;
+		}
 		/* toshoboe_setbaud(self, irq->ifr_baudrate); */
                 /* Just change speed once - inserted by Paul Bristow */
 	        self->new_speed = irq->ifr_baudrate;
 		break;
 	case SIOCSMEDIABUSY: /* Set media busy */
-		if (!capable(CAP_NET_ADMIN))
-			return -EPERM;
+		if (!capable(CAP_NET_ADMIN)) {
+			ret = -EPERM;
+			goto out;
+		}
 		irda_device_set_media_busy(self->netdev, TRUE);
 		break;
 	case SIOCGRECEIVING: /* Check if we are receiving right now */
@@ -628,9 +639,8 @@ static int toshoboe_net_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	default:
 		ret = -EOPNOTSUPP;
 	}
-	
+out:
 	restore_flags(flags);
-	
 	return ret;
 }
 
@@ -711,6 +721,9 @@ toshoboe_open (struct pci_dev *pci_dev)
       printk (KERN_ERR "Oboe: No more instances available");
       return -ENOMEM;
     }
+
+  if ((err=pci_enable_device(pci_dev)))
+	  return err;
 
   self = kmalloc (sizeof (struct toshoboe_cb), GFP_KERNEL);
 
@@ -898,7 +911,7 @@ toshoboe_gotosleep (struct toshoboe_cb *self)
 /*FIXME: can't sleep here wait one second */
 
   while ((i--) && (self->txpending))
-    mdelay (100);
+    udelay (100);
 
   toshoboe_stopchip (self);
   toshoboe_disablebm (self);
@@ -978,6 +991,24 @@ int __init toshoboe_init (void)
 
     }
   while (pci_dev);
+
+  if (!found) do
+    {
+      pci_dev = pci_find_device (PCI_VENDOR_ID_TOSHIBA,
+                                 PCI_DEVICE_ID_FIR701b, pci_dev);
+      if (pci_dev)
+        {
+          printk (KERN_WARNING "ToshOboe: Found 701b chip at 0x%0lx irq %d\n",
+		  pci_dev->resource[0].start,
+                  pci_dev->irq);
+
+          if (!toshoboe_open (pci_dev))
+	      found++;
+        }
+
+    }
+  while (pci_dev);
+
 
 
   if (found)

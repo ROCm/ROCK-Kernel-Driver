@@ -496,13 +496,6 @@ static int sr_open(struct cdrom_device_info *cdi, int purpose)
 	return 0;
 }
 
-/*
- * do_sr_request() is the request handler function for the sr driver.
- * Its function in life is to take block device requests, and
- * translate them to SCSI commands.
- */
-
-
 static int sr_detect(Scsi_Device * SDp)
 {
 
@@ -869,16 +862,11 @@ static void sr_detach(Scsi_Device * SDp)
 
 	for (cpnt = scsi_CDs, i = 0; i < sr_template.dev_max; i++, cpnt++)
 		if (cpnt->device == SDp) {
-			kdev_t devi = MKDEV(MAJOR_NR, i);
-			struct super_block *sb = get_super(devi);
-
 			/*
 			 * Since the cdrom is read-only, no need to sync the device.
 			 * We should be kind to our buffer cache, however.
 			 */
-			if (sb)
-				invalidate_inodes(sb);
-			invalidate_buffers(devi);
+			invalidate_device(MKDEV(MAJOR_NR, i), 0);
 
 			/*
 			 * Reset things back to a sane state so that one can re-load a new

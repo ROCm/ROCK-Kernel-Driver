@@ -1288,12 +1288,18 @@ static int copy_mount_options (const void *data, unsigned long *where)
 }
 
 /*
- * Flags is a 32-bit value that allows up to 32 non-fs dependent flags to
+ * Flags is a 32-bit value that allows up to 31 non-fs dependent flags to
  * be given to the mount() call (ie: read-only, no-dev, no-suid etc).
  *
  * data is a (void *) that can point to any structure up to
  * PAGE_SIZE-1 bytes, which can contain arbitrary fs-dependent
  * information (or be NULL).
+ *
+ * Pre-0.97 versions of mount() didn't have a flags word.
+ * When the flags word was introduced its top half was required
+ * to have the magic value 0xC0ED, and this remained so until 2.4.0-test9.
+ * Therefore, if this magic number is present, it carries no information
+ * and must be discarded.
  */
 long do_mount(char * dev_name, char * dir_name, char *type_page,
 		  unsigned long flags, void *data_page)
@@ -1303,6 +1309,10 @@ long do_mount(char * dev_name, char * dir_name, char *type_page,
 	struct vfsmount *mnt = NULL;
 	struct super_block *sb;
 	int retval = 0;
+
+	/* Discard magic */
+	if ((flags & MS_MGC_MSK) == MS_MGC_VAL)
+		flags &= ~MS_MGC_MSK;
 
 	/* Basic sanity checks */
 

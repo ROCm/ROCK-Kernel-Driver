@@ -554,8 +554,8 @@ sys_init_module(const char *name_user, struct module *mod_user)
 	put_mod_name(name);
 
 	/* Initialize the module.  */
-	mod->flags |= MOD_INITIALIZING;
 	atomic_set(&mod->uc.usecount,1);
+	mod->flags |= MOD_INITIALIZING;
 	if (mod->init && (error = mod->init()) != 0) {
 		atomic_set(&mod->uc.usecount,0);
 		mod->flags &= ~MOD_INITIALIZING;
@@ -613,11 +613,6 @@ sys_delete_module(const char *name_user)
 	if (name_user) {
 		if ((error = get_mod_name(name_user, &name)) < 0)
 			goto out;
-		if (error == 0) {
-			error = -EINVAL;
-			put_mod_name(name);
-			goto out;
-		}
 		error = -ENOENT;
 		if ((mod = find_module(name)) == NULL) {
 			put_mod_name(name);
@@ -847,7 +842,6 @@ qm_symbols(struct module *mod, char *buf, size_t bufsize, size_t *ret)
 		bufsize -= len;
 		space += len;
 	}
-
 	if (put_user(i, ret))
 		return -EFAULT;
 	else
@@ -876,8 +870,11 @@ qm_info(struct module *mod, char *buf, size_t bufsize, size_t *ret)
 		info.addr = (unsigned long)mod;
 		info.size = mod->size;
 		info.flags = mod->flags;
+		
+		/* usecount is one too high here - report appropriately to
+		   compensate for locking */
 		info.usecount = (mod_member_present(mod, can_unload)
-				 && mod->can_unload ? -1 : atomic_read(&mod->uc.usecount));
+				 && mod->can_unload ? -1 : atomic_read(&mod->uc.usecount)-1);
 
 		if (copy_to_user(buf, &info, sizeof(struct module_info)))
 			return -EFAULT;
@@ -909,15 +906,17 @@ sys_query_module(const char *name_user, int which, char *buf, size_t bufsize,
 			goto out;
 		}
 		err = -ENOENT;
-		if (namelen == 0)
-			mod = &kernel_module;
-		else if ((mod = find_module(name)) == NULL) {
+		if ((mod = find_module(name)) == NULL) {
 			put_mod_name(name);
 			goto out;
 		}
 		put_mod_name(name);
 	}
 
+	/* __MOD_ touches the flags. We must avoid that */
+	
+	atomic_inc(&mod->uc.usecount);
+		
 	switch (which)
 	{
 	case 0:
@@ -942,6 +941,8 @@ sys_query_module(const char *name_user, int which, char *buf, size_t bufsize,
 		err = -EINVAL;
 		break;
 	}
+	atomic_dec(&mod->uc.usecount);
+	
 out:
 	unlock_kernel();
 	return err;

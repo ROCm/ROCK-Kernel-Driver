@@ -24,13 +24,9 @@ if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
   tristate 'Kernel support for JAVA binaries' CONFIG_BINFMT_JAVA
 fi
 
-bool 'Use kernel gdb debugger' CONFIG_KGDB
+bool 'Use kernel gdb debugger' CONFIG_ETRAX_KGDB
 
 bool 'Enable Etrax100 watchdog' CONFIG_ETRAX_WATCHDOG
-
-bool 'Use serial console (on the debug port)' CONFIG_USE_SERIAL_CONSOLE
-
-bool 'Use in-kernel ifconfig/route setup' CONFIG_KERNEL_IFCONFIG
 
 endmenu
 
@@ -46,20 +42,19 @@ choice 'Processor type' \
 
 if [ "$CONFIG_ETRAX100LX" = "y" -o "$CONFIG_SVINTO_SIM" = "y" ]; then
 	define_bool CONFIG_CRIS_LOW_MAP y
-	define_hex  ETRAX_DRAM_VIRTUAL_BASE 60000000
+	define_hex  CONFIG_ETRAX_DRAM_VIRTUAL_BASE 60000000
 else
-	define_hex  ETRAX_DRAM_VIRTUAL_BASE c0000000
+	define_hex  CONFIG_ETRAX_DRAM_VIRTUAL_BASE c0000000
 fi
 
-int 'DRAM size (dec, in MB)' ETRAX_DRAM_SIZE 8
+int 'DRAM size (dec, in MB)' CONFIG_ETRAX_DRAM_SIZE 8
 
-int 'Max possible flash size (dec, in MB)' CONFIG_ETRAX_FLASH_LENGTH 2
 int 'Buswidth of flash in bytes' CONFIG_ETRAX_FLASH_BUSWIDTH 2
 
 choice 'Product LED port' \
 	"Port-PA-LEDs	CONFIG_ETRAX_PA_LEDS	\
 	 Port-PB-LEDs	CONFIG_ETRAX_PB_LEDS	\
-	 Mem-0x90000000-LEDs	CONFIG_ETRAX_90000000_LEDS  \
+	 Port-CSP0-LEDs	CONFIG_ETRAX_CSP0_LEDS  \
 	 None	CONFIG_ETRAX_NO_LEDS" Port-PA-LEDs
 
 if [ "$CONFIG_ETRAX_NO_LEDS" != "y" ]; then
@@ -71,38 +66,54 @@ if [ "$CONFIG_ETRAX_NO_LEDS" != "y" ]; then
   int '  Third red LED bit' CONFIG_ETRAX_LED3G 2
 fi
 
+if [ "$CONFIG_ETRAX_CSP0_LEDS" = "y" ]; then
+  int '  Fourth red LED bit' CONFIG_ETRAX_LED4R 2
+  int '  Fourth green LED bit' CONFIG_ETRAX_LED4G 2
+  int '  Fifth red LED bit' CONFIG_ETRAX_LED5R 2
+  int '  Fifth green LED bit' CONFIG_ETRAX_LED5G 2
+  int '  Sixth red LED bit' CONFIG_ETRAX_LED6R 2
+  int '  Sixth green LED bit' CONFIG_ETRAX_LED6G 2
+  int '  Seventh red LED bit' CONFIG_ETRAX_LED7R 2
+  int '  Seventh green LED bit' CONFIG_ETRAX_LED7G 2
+  int '  Eigth yellow LED bit' CONFIG_ETRAX_LED8Y 2
+  int '  Ninth yellow LED bit' CONFIG_ETRAX_LED9Y 2
+  int '  Tenth yellow LED bit' CONFIG_ETRAX_LED10Y 2
+  int '  Eleventh yellow LED bit' CONFIG_ETRAX_LED11Y 2
+  int '  Twelfth red LED bit' CONFIG_ETRAX_LED12R 2
+fi  
+
 choice 'Product debug-port' \
-	"Serial-0	CONFIG_DEBUG_PORT0	\
-	 Serial-1	CONFIG_DEBUG_PORT1	\
-	 Serial-2	CONFIG_DEBUG_PORT2	\
-	 Serial-3	CONFIG_DEBUG_PORT3	\
-	 disabled	CONFIG_DEBUG_PORT_NULL" Serial-0 
+	"Serial-0	CONFIG_ETRAX_DEBUG_PORT0	\
+	 Serial-1	CONFIG_ETRAX_DEBUG_PORT1	\
+	 Serial-2	CONFIG_ETRAX_DEBUG_PORT2	\
+	 Serial-3	CONFIG_ETRAX_DEBUG_PORT3	\
+	 disabled	CONFIG_ETRAX_DEBUG_PORT_NULL" Serial-0 
 
 choice 'Product rescue-port' \
-	"Serial-0	CONFIG_RESCUE_SER0	\
-	 Serial-1	CONFIG_RESCUE_SER1	\
-	 Serial-2	CONFIG_RESCUE_SER2	\
-	 Serial-3	CONFIG_RESCUE_SER3" Serial-0
+	"Serial-0	CONFIG_ETRAX_RESCUE_SER0	\
+	 Serial-1	CONFIG_ETRAX_RESCUE_SER1	\
+	 Serial-2	CONFIG_ETRAX_RESCUE_SER2	\
+	 Serial-3	CONFIG_ETRAX_RESCUE_SER3" Serial-0
 
-hex 'R_WAITSTATES' DEF_R_WAITSTATES 95a6
-hex 'R_BUS_CONFIG' DEF_R_BUS_CONFIG 104
+hex 'R_WAITSTATES' CONFIG_ETRAX_DEF_R_WAITSTATES 95a6
+hex 'R_BUS_CONFIG' CONFIG_ETRAX_DEF_R_BUS_CONFIG 104
 
-bool 'SDRAM support' CONFIG_SDRAM n
-if [ "$CONFIG_SDRAM" = "n" ]; then
-	hex 'R_DRAM_CONFIG' DEF_R_DRAM_CONFIG 1a200040
-	hex 'R_DRAM_TIMING' DEF_R_DRAM_TIMING 5611
+bool 'SDRAM support' CONFIG_ETRAX_SDRAM n
+if [ "$CONFIG_ETRAX_SDRAM" = "n" ]; then
+	hex 'R_DRAM_CONFIG' CONFIG_ETRAX_DEF_R_DRAM_CONFIG 1a200040
+	hex 'R_DRAM_TIMING' CONFIG_ETRAX_DEF_R_DRAM_TIMING 5611
 fi
 
-if [ "$CONFIG_SDRAM" = "y" ]; then
-	hex 'R_SDRAM_CONFIG' DEF_R_SDRAM_CONFIG d2fa7878
-	hex 'R_SDRAM_TIMING' DEF_R_SDRAM_TIMING 80004801
+if [ "$CONFIG_ETRAX_SDRAM" = "y" ]; then
+	hex 'R_SDRAM_CONFIG' CONFIG_ETRAX_DEF_R_SDRAM_CONFIG d2fa7878
+	hex 'R_SDRAM_TIMING' CONFIG_ETRAX_DEF_R_SDRAM_TIMING 80004801
 fi
 
-hex 'R_PORT_PA_DIR' DEF_R_PORT_PA_DIR 1c
-hex 'R_PORT_PA_DATA' DEF_R_PORT_PA_DATA 00
-hex 'R_PORT_PB_CONFIG' DEF_R_PORT_PB_CONFIG 00
-hex 'R_PORT_PB_DIR' DEF_R_PORT_PB_DIR 00
-hex 'R_PORT_PB_DATA' DEF_R_PORT_PB_DATA ff
+hex 'R_PORT_PA_DIR' CONFIG_ETRAX_DEF_R_PORT_PA_DIR 1c
+hex 'R_PORT_PA_DATA' CONFIG_ETRAX_DEF_R_PORT_PA_DATA 00
+hex 'R_PORT_PB_CONFIG' CONFIG_ETRAX_DEF_R_PORT_PB_CONFIG 00
+hex 'R_PORT_PB_DIR' CONFIG_ETRAX_DEF_R_PORT_PB_DIR 00
+hex 'R_PORT_PB_DATA' CONFIG_ETRAX_DEF_R_PORT_PB_DATA ff
 
 endmenu
 

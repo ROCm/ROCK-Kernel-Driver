@@ -1520,7 +1520,9 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 			val = 16384;
 		if (val > 65536)
 			val = 65536;
-		dmabuf->ossfragsize = val/dmabuf->ossmaxfrags;
+		dmabuf->ossmaxfrags = val/dmabuf->ossfragsize;
+		if(dmabuf->ossmaxfrags<4)
+			dmabuf->ossfragsize = val/4;
 		dmabuf->ready = 0;
 #ifdef DEBUG
 		printk("SNDCTL_DSP_SETFRAGMENT 0x%x, %d, %d\n", val,

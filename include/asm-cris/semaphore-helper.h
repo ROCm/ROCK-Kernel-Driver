@@ -1,4 +1,4 @@
-/* $Id: semaphore-helper.h,v 1.1 2000/07/13 16:52:42 bjornw Exp $
+/* $Id: semaphore-helper.h,v 1.3 2001/03/26 15:00:33 orjanf Exp $
  *
  * SMP- and interrupt-safe semaphores helper functions. Generic versions, no
  * optimizations whatsoever... 
@@ -10,6 +10,12 @@
 
 #include <asm/atomic.h>
 
+#define read(a) ((a)->counter)
+#define inc(a) (((a)->counter)++)
+#define dec(a) (((a)->counter)--)
+
+#define count_inc(a) ((*(a))++)
+
 /*
  * These two _must_ execute atomically wrt each other.
  */
@@ -17,12 +23,6 @@ static inline void wake_one_more(struct semaphore * sem)
 {
 	atomic_inc(&sem->waking);
 }
-
-#define read(a) ((a)->counter)
-#define inc(a) (((a)->counter)++)
-#define dec(a) (((a)->counter)--)
-
-#define count_inc(a) ((*(a))++)
 
 static inline int waking_non_zero(struct semaphore *sem)
 {

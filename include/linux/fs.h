@@ -121,6 +121,12 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 #define MS_RMT_MASK	(MS_RDONLY|MS_NOSUID|MS_NODEV|MS_NOEXEC|\
 			MS_SYNCHRONOUS|MS_MANDLOCK|MS_NOATIME|MS_NODIRATIME)
 
+/*
+ * Old magic mount flag and mask
+ */
+#define MS_MGC_VAL 0xC0ED0000
+#define MS_MGC_MSK 0xffff0000
+
 /* Inode flags - they have nothing to superblock flags now */
 
 #define S_SYNC		1	/* Writes are synced at once */
@@ -1086,6 +1092,7 @@ static inline void mark_buffer_dirty_inode(struct buffer_head *bh, struct inode 
 extern void balance_dirty(kdev_t);
 extern int check_disk_change(kdev_t);
 extern int invalidate_inodes(struct super_block *);
+extern int invalidate_device(kdev_t, int);
 extern void invalidate_inode_pages(struct inode *);
 extern void invalidate_inode_buffers(struct inode *);
 #define invalidate_buffers(dev)	__invalidate_buffers((dev), 0)

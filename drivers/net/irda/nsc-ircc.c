@@ -251,8 +251,13 @@ static int nsc_ircc_open(int i, chipio_t *info)
 
 	IRDA_DEBUG(2, __FUNCTION__ "()\n");
 
+	MESSAGE("%s, Found chip at base=0x%03x\n", driver_name,
+		info->cfg_base);
+
 	if ((nsc_ircc_setup(info)) == -1)
 		return -1;
+
+	MESSAGE("%s, driver loaded (Dag Brattli)\n", driver_name);
 
 	/* Allocate new instance of the driver */
 	self = kmalloc(sizeof(struct nsc_ircc_cb), GFP_KERNEL);
@@ -315,8 +320,8 @@ static int nsc_ircc_open(int i, chipio_t *info)
 	self->tx_buff.head = (__u8 *) kmalloc(self->tx_buff.truesize, 
 					      GFP_KERNEL|GFP_DMA);
 	if (self->tx_buff.head == NULL) {
-		kfree(self);
 		kfree(self->rx_buff.head);
+		kfree(self);
 		return -ENOMEM;
 	}
 	memset(self->tx_buff.head, 0, self->tx_buff.truesize);
@@ -699,8 +704,6 @@ static int nsc_ircc_setup(chipio_t *info)
 		ERROR("%s, Wrong chip version %02x\n", driver_name, version);
 		return -1;
 	}
-	MESSAGE("%s, Found chip at base=0x%03x\n", driver_name, 
-		info->cfg_base);
 
 	/* Switch to advanced mode */
 	switch_bank(iobase, BANK2);
@@ -728,8 +731,6 @@ static int nsc_ircc_setup(chipio_t *info)
 	outb(0x0a, iobase+1); /* Set MIR pulse width */
 	outb(0x0d, iobase+2); /* Set SIR pulse width to 1.6us */
 	outb(0x2a, iobase+4); /* Set beginning frag, and preamble length */
-
-	MESSAGE("%s, driver loaded (Dag Brattli)\n", driver_name);
 
 	/* Enable receive interrupts */
 	switch_bank(iobase, BANK0);
@@ -1858,7 +1859,7 @@ static int nsc_ircc_net_open(struct net_device *dev)
 	if (request_dma(self->io.dma, dev->name)) {
 		WARNING("%s, unable to allocate dma=%d\n", driver_name, 
 			self->io.dma);
-		free_irq(self->io.irq, self);
+		free_irq(self->io.irq, dev);
 		return -EAGAIN;
 	}
 	
@@ -2008,18 +2009,10 @@ static void nsc_ircc_suspend(struct nsc_ircc_cb *self)
 
 static void nsc_ircc_wakeup(struct nsc_ircc_cb *self)
 {
-	int iobase;
-
 	if (!self->io.suspended)
 		return;
 
-	iobase = self->io.fir_base;
-
-	/* Switch to advanced mode */
-	switch_bank(iobase, BANK2);
-	outb(ECR1_EXT_SL, iobase+ECR1);
-	switch_bank(iobase, BANK0);
-
+	nsc_ircc_setup(&self->io);
 	nsc_ircc_net_open(self->netdev);
 	
 	MESSAGE("%s, Waking up\n", driver_name);

@@ -37,8 +37,7 @@ search_exception_table(unsigned long addr)
 
 #ifndef CONFIG_MODULES
 	/* There is only the kernel to search.  */
-	ret = search_one_table(_start___ex_table, _stop___ex_table-1, addr);
-	if (ret) return ret;
+	return search_one_table(_start___ex_table, _stop___ex_table-1, addr);
 #else
 	/* The kernel is the last "module" -- no need to treat it special.  */
 	struct module *mp;

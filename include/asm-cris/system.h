@@ -1,14 +1,11 @@
-/* $Id: system.h,v 1.3 2000/10/17 14:56:27 bjornw Exp $ */
+/* $Id: system.h,v 1.4 2001/03/20 19:46:00 bjornw Exp $ */
 
 #ifndef __ASM_CRIS_SYSTEM_H
 #define __ASM_CRIS_SYSTEM_H
 
-#include <asm/segment.h>
-
-/* I need a task-specific debug struct (and the define for #ifdef
-   RELOC_DEBUG) to kludge into task_struct. */
 #include <linux/config.h>
-#include <asm/eshlibld.h>
+
+#include <asm/segment.h>
 
 /* the switch_to macro calls resume, an asm function in entry.S which does the actual
  * task switching.

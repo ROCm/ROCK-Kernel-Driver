@@ -1,6 +1,6 @@
-/* $Id: sys_cris.c,v 1.4 2001/01/31 14:55:58 perf Exp $
+/* $Id: sys_cris.c,v 1.7 2001/04/17 11:52:15 orjanf Exp $
  *
- * linux/arch/cris/kernel/sys_etrax.c
+ * linux/arch/cris/kernel/sys_cris.c
  *
  * This file contains various random system calls that
  * have a non-standard calling sequence on some platforms.
@@ -177,20 +177,13 @@ asmlinkage int sys_ipc (uint call, int first, int second,
 	case MSGCTL:
 		return sys_msgctl (first, second, (struct msqid_ds *) ptr);
 
-	case SHMAT:
-		switch (version) {
-		default: {
-			ulong raddr;
-			ret = sys_shmat (first, (char *) ptr, second, &raddr);
-			if (ret)
-				return ret;
-			return put_user (raddr, (ulong *) third);
-		}
-		case 1:	/* iBCS2 emulator entry point */
-			if (!segment_eq(get_fs(), get_ds()))
-				return -EINVAL;
-			return sys_shmat (first, (char *) ptr, second, (ulong *) third);
-		}
+	case SHMAT: {
+                ulong raddr;
+                ret = sys_shmat (first, (char *) ptr, second, &raddr);
+                if (ret)
+                        return ret;
+                return put_user (raddr, (ulong *) third);
+        }
 	case SHMDT: 
 		return sys_shmdt ((char *)ptr);
 	case SHMGET:

@@ -742,12 +742,6 @@ void irlap_send_data_primary(struct irlap_cb *self, struct sk_buff *skb)
 			return;
 		}
 		
-		/*
-		 *  make sure the skb->sk accounting of memory usage is sane
-		 */
-		if (skb->sk != NULL)
-			skb_set_owner_w(tx_skb, skb->sk);
-		
 		/* 
 		 *  Insert frame in store, in case of retransmissions 
 		 */
@@ -787,12 +781,6 @@ void irlap_send_data_primary_poll(struct irlap_cb *self, struct sk_buff *skb)
 		if (tx_skb == NULL) {
 			return;
 		}
-		
-		/*
-		 *  make sure the skb->sk accounting of memory usage is sane
-		 */
-		if (skb->sk != NULL)
-			skb_set_owner_w(tx_skb, skb->sk);
 		
 		/* 
 		 *  Insert frame in store, in case of retransmissions 
@@ -863,9 +851,6 @@ void irlap_send_data_secondary_final(struct irlap_cb *self,
 			return;
 		}		
 
-		if (skb->sk != NULL)
-			skb_set_owner_w(tx_skb, skb->sk);
-		
 		/* Insert frame in store */
 		skb_queue_tail(&self->wx_list, skb_get(skb));
 		
@@ -916,9 +901,6 @@ void irlap_send_data_secondary(struct irlap_cb *self, struct sk_buff *skb)
 		if (tx_skb == NULL) {
 			return;
 		}		
-		
-		if (skb->sk != NULL)
-			skb_set_owner_w(tx_skb, skb->sk);
 		
 		/* Insert frame in store */
 		skb_queue_tail(&self->wx_list, skb_get(skb));
@@ -972,12 +954,6 @@ void irlap_resend_rejected_frames(struct irlap_cb *self, int command)
 		/* Unlink tx_skb from list */
 		tx_skb->next = tx_skb->prev = NULL;
 		tx_skb->list = NULL;
-
-		/*
-		 *  make sure the skb->sk accounting of memory usage is sane
-		 */
-		if (skb->sk != NULL)
-			skb_set_owner_w(tx_skb, skb->sk);
 
 		/* Clear old Nr field + poll bit */
 		tx_skb->data[1] &= 0x0f;
@@ -1058,12 +1034,6 @@ void irlap_resend_rejected_frame(struct irlap_cb *self, int command)
 		/* Unlink tx_skb from list */
 		tx_skb->next = tx_skb->prev = NULL;
 		tx_skb->list = NULL;
-
-		/*
-		 *  make sure the skb->sk accounting of memory usage is sane
-		 */
-		if (skb->sk != NULL)
-			skb_set_owner_w(tx_skb, skb->sk);
 
 		/* Clear old Nr field + poll bit */
 		tx_skb->data[1] &= 0x0f;

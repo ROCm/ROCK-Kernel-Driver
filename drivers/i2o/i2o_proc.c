@@ -2356,7 +2356,7 @@ int i2o_proc_read_lan_operation(char *buf, char **start, off_t offset, int len,
 	len += sprintf(buf+len, "Packet orphan limit           : %d\n", work32[2]);
 
 	len += sprintf(buf+len, "Tx modes : 0x%08x\n", work32[3]);
-	len += sprintf(buf+len, "    [%s] HW CRC supression\n",
+	len += sprintf(buf+len, "    [%s] HW CRC suppression\n",
 			(work32[3]&0x00000004) ? "+" : "-");
 	len += sprintf(buf+len, "    [%s] HW IPv4 checksum\n",
 			(work32[3]&0x00000100) ? "+" : "-");
@@ -2368,7 +2368,7 @@ int i2o_proc_read_lan_operation(char *buf, char **start, off_t offset, int len,
 			(work32[3]&0x00000800) ? "+" : "-");
 	len += sprintf(buf+len, "    [%s] HW ICMP checksum\n",
 			(work32[3]&0x00001000) ? "+" : "-");
-	len += sprintf(buf+len, "    [%s] Loopback supression enable\n",
+	len += sprintf(buf+len, "    [%s] Loopback suppression enable\n",
 			(work32[3]&0x00002000) ? "+" : "-");
 
 	len += sprintf(buf+len, "Rx modes : 0x%08x\n", work32[4]);

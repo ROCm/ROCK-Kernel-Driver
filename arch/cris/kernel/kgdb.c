@@ -18,6 +18,9 @@
 *! Jul 21 1999  Bjorn Wesen     eLinux port
 *!
 *! $Log: kgdb.c,v $
+*! Revision 1.5  2001/04/17 13:58:39  orjanf
+*! * Renamed CONFIG_KGDB to CONFIG_ETRAX_KGDB.
+*!
 *! Revision 1.4  2001/02/23 13:45:19  bjornw
 *! config.h check
 *!
@@ -49,7 +52,7 @@
 *!
 *!---------------------------------------------------------------------------
 *!
-*! $Id: kgdb.c,v 1.4 2001/02/23 13:45:19 bjornw Exp $
+*! $Id: kgdb.c,v 1.5 2001/04/17 13:58:39 orjanf Exp $
 *!
 *! (C) Copyright 1999, Axis Communications AB, LUND, SWEDEN
 *!
@@ -60,8 +63,8 @@
  *  kgdb usage notes:
  *  -----------------
  *
- * If you select CONFIG_KGDB in the configuration, the kernel will be built
- * with different gcc flags: "-g" is added to get debug infos, and
+ * If you select CONFIG_ETRAX_KGDB in the configuration, the kernel will be 
+ * built with different gcc flags: "-g" is added to get debug infos, and
  * "-fomit-frame-pointer" is omitted to make debugging easier. Since the
  * resulting kernel will be quite big (approx. > 7 MB), it will be stripped
  * before compresion. Such a kernel will behave just as usually, except if

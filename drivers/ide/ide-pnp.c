@@ -49,7 +49,7 @@ static int generic_ide_offsets[IDE_NR_PORTS] __initdata = {
 
 /* ISA PnP device table entry */
 struct pnp_dev_t {
-	unsigned int vendor, device;
+	unsigned short card_vendor, card_device, vendor, device;
 	int (*init_fn)(struct pci_dev *dev, int enable);
 };
 
@@ -81,8 +81,9 @@ static int __init pnpide_generic_init(struct pci_dev *dev, int enable)
 
 /* Add your devices here :)) */
 struct pnp_dev_t idepnp_devices[] __initdata = {
-	/* Generic ESDI/IDE/ATA compatible hard disk controller */
-	{	ISAPNP_VENDOR('P', 'N', 'P'), ISAPNP_DEVICE(0x0600),
+  	/* Generic ESDI/IDE/ATA compatible hard disk controller */
+	{	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
+		ISAPNP_VENDOR('P', 'N', 'P'), ISAPNP_DEVICE(0x0600),
 		pnpide_generic_init },
 	{	0 }
 };

@@ -254,7 +254,7 @@ fail:
 /* Only used at boot time, so we do not need to worry about latency as much
    here */
 
-static int aha1542_in(unsigned int base, unchar * cmdp, int len)
+static int __init aha1542_in(unsigned int base, unchar * cmdp, int len)
 {
 	unsigned long flags;
 
@@ -276,7 +276,7 @@ fail:
 /* Similar to aha1542_in, except that we wait a very short period of time.
    We use this if we know the board is alive and awake, but we are not sure
    if the board will respond to the command we are about to send or not */
-static int aha1542_in1(unsigned int base, unchar * cmdp, int len)
+static int __init aha1542_in1(unsigned int base, unchar * cmdp, int len)
 {
 	unsigned long flags;
 
@@ -886,7 +886,7 @@ fail:
 /* This function should only be called for 1542C boards - we can detect
    the special firmware settings and unlock the board */
 
-static int aha1542_mbenable(int base)
+static int __init aha1542_mbenable(int base)
 {
 	static unchar mbenable_cmd[3];
 	static unchar mbenable_result[2];

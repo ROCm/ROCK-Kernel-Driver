@@ -32,6 +32,7 @@ comment 'USB Controllers'
    if [ "$CONFIG_USB_STORAGE" != "n" ]; then
       bool '    USB Mass Storage verbose debug' CONFIG_USB_STORAGE_DEBUG
       bool '    Freecom USB/ATAPI Bridge support' CONFIG_USB_STORAGE_FREECOM
+      bool '    Microtech CompactFlash/SmartMedia reader' CONFIG_USB_STORAGE_DPCM
    fi
    dep_tristate '  USB Modem (CDC ACM) support' CONFIG_USB_ACM $CONFIG_USB
    dep_tristate '  USB Printer support' CONFIG_USB_PRINTER $CONFIG_USB

@@ -118,7 +118,7 @@
 /* Uncommnent for disable read prefetch.
  * There is some readprefetch capatibility in hdparm,
  * but when I type hdparm -P 1 /dev/hda, I got errors
- * and till reset drive is inacessible.
+ * and till reset drive is inaccessible.
  * This (hw) read prefetch is safe on my drive.
  */
 

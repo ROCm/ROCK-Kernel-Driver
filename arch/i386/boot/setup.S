@@ -32,6 +32,16 @@
  *
  * Transcribed from Intel (as86) -> AT&T (gas) by Chris Noe, May 1999.
  * <stiker@northlink.com>
+ *
+ * Fix to work around buggy BIOSes which dont use carry bit correctly
+ * and/or report extended memory in CX/DX for e801h memory size detection 
+ * call.  As a result the kernel got wrong figures.  The int15/e801h docs
+ * from Ralf Brown interrupt list seem to indicate AX/BX should be used
+ * anyway.  So to avoid breaking many machines (presumably there was a reason
+ * to orginally use CX/DX instead of AX/BX), we do a kludge to see
+ * if CX/DX have been changed in the e801 call and if so use AX/BX .
+ * Michael Miller, April 2001 <michaelm@mjmm.org>
+ *
  */
 
 #define __ASSEMBLY__
@@ -336,10 +346,24 @@ bail820:
 # to write everything into the same place.)
 
 meme801:
+	stc					# fix to work around buggy
+	xorw	%cx,%cx				# BIOSes which dont clear/set
+	xorw	%dx,%dx				# carry on pass/error of
+						# e801h memory size call
+						# or merely pass cx,dx though
+						# without changing them.
 	movw	$0xe801, %ax
 	int	$0x15
 	jc	mem88
 
+	cmpw	$0x0, %cx			# Kludge to handle BIOSes
+	jne	e801usecxdx			# which report their extended
+	cmpw	$0x0, %dx			# memory in AX/BX rather than
+	jne	e801usecxdx			# CX/DX.  The spec I have read
+	movw	%ax, %cx			# seems to indicate AX/BX 
+	movw	%bx, %dx			# are more reasonable anyway...
+
+e801usecxdx:
 	andl	$0xffff, %edx			# clear sign extend
 	shll	$6, %edx			# and go from 64k to 1k chunks
 	movl	%edx, (0x1e0)			# store extended memory size

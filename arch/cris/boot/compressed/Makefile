@@ -24,7 +24,7 @@ decompress.bin: $(OBJECTS)
 
 
 vmlinuz: piggy.img decompress.bin
-	cat decompress.bin piggy.img $(TOPDIR)/cramfs.img > vmlinuz
+	cat decompress.bin piggy.img > vmlinuz
 	rm -f piggy.img
 
 head.o: head.S

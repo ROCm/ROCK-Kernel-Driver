@@ -160,6 +160,10 @@ int __init i2o_pci_install(struct pci_dev *dev)
 
 	c->bus.pci.irq = -1;
 
+	c->bus.pci.queue_buggy = 0;
+	c->bus.pci.dpt = 0;
+	c->bus.pci.short_req = 0;
+
 	c->irq_mask = (volatile u32 *)(mem+0x34);
 	c->post_port = (volatile u32 *)(mem+0x40);
 	c->reply_port = (volatile u32 *)(mem+0x44);
@@ -175,6 +179,30 @@ int __init i2o_pci_install(struct pci_dev *dev)
 	
 	c->type = I2O_TYPE_PCI;
 
+	/*
+	 *	Cards that fall apart if you hit them with large I/O
+	 *	loads...
+	 */
+	 
+	if(dev->vendor == PCI_VENDOR_ID_NCR && dev->device == 0x0630)
+	{
+		c->bus.pci.short_req=1;
+		printk(KERN_INFO "I2O: Symbios FC920 workarounds activated.\n");
+	}
+	if(dev->subsystem_vendor == PCI_VENDOR_ID_PROMISE)
+	{
+		c->bus.pci.queue_buggy=1;
+		printk(KERN_INFO "I2O: Promise workarounds activated.\n");
+	}
+
+	/*
+	 *	Cards that go bananas if you quiesce them before you reset
+	 *	them
+	 */
+	 
+	if(dev->vendor == PCI_VENDOR_ID_DPT)
+		c->bus.pci.dpt=1;
+	
 	/* 
 	 * Enable Write Combining MTRR for IOP's memory region
 	 */
@@ -186,13 +214,12 @@ int __init i2o_pci_install(struct pci_dev *dev)
 * since the region contains the Messaging unit which shouldn't be cached.
 */
 	c->bus.pci.mtrr_reg1 = -1;
-	if(dev->vendor == PCI_VENDOR_ID_INTEL)
+	if(dev->vendor == PCI_VENDOR_ID_INTEL || dev->vendor == PCI_VENDOR_ID_DPT)
 	{
-	printk(KERN_INFO "I2O: MTRR workaround for Intel i960 processor\n"); 
-	c->bus.pci.mtrr_reg1 =
-		mtrr_add(c->mem_phys, 65536, MTRR_TYPE_UNCACHABLE, 1);
-	if(c->bus.pci.mtrr_reg1< 0)
-		printk(KERN_INFO "i2o_pci: Error in setting MTRR_TYPE_UNCACHABLE\n");
+		printk(KERN_INFO "I2O: MTRR workaround for Intel i960 processor\n"); 
+		c->bus.pci.mtrr_reg1 =	mtrr_add(c->mem_phys, 65536, MTRR_TYPE_UNCACHABLE, 1);
+		if(c->bus.pci.mtrr_reg1< 0)
+			printk(KERN_INFO "i2o_pci: Error in setting MTRR_TYPE_UNCACHABLE\n");
 	}
 
 #endif

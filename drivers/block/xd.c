@@ -401,13 +401,7 @@ static int xd_reread_partitions(kdev_t dev)
 
 	for (partition = xd_gendisk.max_p - 1; partition >= 0; partition--) {
 		int minor = (start | partition);
-		kdev_t devp = MKDEV(MAJOR_NR, minor);
-		struct super_block * sb = get_super(devp);
-		
-		sync_dev(devp);
-		if (sb)
-			invalidate_inodes(sb);
-		invalidate_buffers(devp);
+		invalidate_device(MKDEV(MAJOR_NR, minor), 1);
 		xd_gendisk.part[minor].start_sect = 0;
 		xd_gendisk.part[minor].nr_sects = 0;
 	};
@@ -1163,16 +1157,6 @@ void cleanup_module(void)
 	int partition,dev,start;
 
 	devfs_unregister_blkdev(MAJOR_NR, "xd");
-	for (dev = 0; dev < xd_drives; dev++) {
-		start = dev << xd_gendisk.minor_shift; 
-		for (partition = xd_gendisk.max_p - 1; partition >= 0; partition--) {
-			int minor = (start | partition);
-			kdev_t devp = MKDEV(MAJOR_NR, minor);
-			start = dev << xd_gendisk.minor_shift; 
-			sync_dev(devp);
-			invalidate_buffers(devp);
-		}
-	}
 	xd_done();
 	devfs_unregister (devfs_handle);
 	if (xd_drives) {

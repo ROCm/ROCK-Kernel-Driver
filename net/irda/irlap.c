@@ -860,13 +860,6 @@ void irlap_flush_all_queues(struct irlap_cb *self)
 	/* Free sliding window buffered packets */
 	while ((skb = skb_dequeue(&self->wx_list)) != NULL)
 		dev_kfree_skb(skb);
-
-#ifdef CONFIG_IRDA_RECYCLE_RR
-	if (self->recycle_rr_skb) { 
- 		dev_kfree_skb(self->recycle_rr_skb);
- 		self->recycle_rr_skb = NULL;
- 	}
-#endif
 }
 
 /*
@@ -1076,7 +1069,7 @@ void irlap_apply_connection_parameters(struct irlap_cb *self, int now)
 
 	/* Set the negociated xbofs value */
 	self->next_bofs   = self->qos_tx.additional_bofs.value;
-	if(now)
+	if (now)
 		self->bofs_count = self->next_bofs;
 
 	/* Set the negociated link speed (may need the new xbofs value) */
@@ -1107,13 +1100,13 @@ void irlap_apply_connection_parameters(struct irlap_cb *self, int now)
 		 */
 		self->N1 = -1; /* Disable */
 	else
-		self->N1 = 3000 / self->qos_tx.max_turn_time.value;
+		self->N1 = 3000 / self->qos_rx.max_turn_time.value;
 	
 	IRDA_DEBUG(4, "Setting N1 = %d\n", self->N1);
 	
 	
 	self->N2 = self->qos_tx.link_disc_time.value * 1000 / 
-		self->qos_tx.max_turn_time.value;
+		self->qos_rx.max_turn_time.value;
 	IRDA_DEBUG(4, "Setting N2 = %d\n", self->N2);
 
 	/* 

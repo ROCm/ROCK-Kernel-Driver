@@ -1,4 +1,4 @@
-/* $Id: head.S,v 1.20 2001/02/23 12:47:56 bjornw Exp $
+/* $Id: head.S,v 1.29 2001/04/18 12:51:59 orjanf Exp $
  * 
  * Head of the kernel - alter with care
  *
@@ -7,6 +7,40 @@
  * Authors:	Bjorn Wesen (bjornw@axis.com)
  * 
  * $Log: head.S,v $
+ * Revision 1.29  2001/04/18 12:51:59  orjanf
+ * * Reverted review change regarding the use of bcs/bcc.
+ * * Removed non-working LED-clearing code.
+ *
+ * Revision 1.28  2001/04/17 13:58:39  orjanf
+ * * Renamed CONFIG_KGDB to CONFIG_ETRAX_KGDB.
+ *
+ * Revision 1.27  2001/04/17 11:42:35  orjanf
+ * Changed according to review:
+ * * Added comment explaining memory map bug.
+ * * Changed bcs and bcc to blo and bhs, respectively.
+ * * Removed mentioning of Stallone and Olga boards.
+ *
+ * Revision 1.26  2001/04/06 12:31:07  jonashg
+ * Check for cramfs in flash before RAM instead of RAM before flash.
+ *
+ * Revision 1.25  2001/04/04 06:23:53  starvik
+ * Initialize DRAM if not already initialized
+ *
+ * Revision 1.24  2001/04/03 11:12:00  starvik
+ * Removed dram init (done by rescue or etrax100boot
+ * Corrected include
+ *
+ * Revision 1.23  2001/04/03 09:53:03  starvik
+ * Include hw_settings.S
+ *
+ * Revision 1.22  2001/03/26 14:23:26  bjornw
+ * Namechange of some config options
+ *
+ * Revision 1.21  2001/03/08 12:14:41  bjornw
+ * * Config name for ETRAX IDE was renamed
+ * * Removed G27 auto-setting when JULIETTE is chosen (need to make this
+ *   a new config option later)
+ *
  * Revision 1.20  2001/02/23 12:47:56  bjornw
  * MMU regs during LOW_MAP updated to reflect a newer reality
  *
@@ -76,7 +110,8 @@
 #include <asm/sv_addr_ag.h>
 
 #define CRAMFS_MAGIC 0x28cd3d45
-	
+#define RAM_INIT_MAGIC 0x56902387
+		
 	;; exported symbols
 		
 	.globl	_etrax_irv
@@ -92,9 +127,9 @@
 	;; since etrax actually starts at address 2 when booting from flash, we
 	;; put a nop (2 bytes) here first so we dont accidentally skip the di
 	;;
-	;; NOTICE! The register r9 is used as a parameter carrying register from
-	;; the decompressor (if the kernel was compressed). It should not be
-	;; used in the code below until it is read.
+	;; NOTICE! The registers r8 and r9 are used as a parameter carrying
+	;; information from the decompressor (if the kernel was compressed). 
+	;; They should not be used in the code below until it is read.
 	
 	nop	
 	di
@@ -109,6 +144,7 @@
 	;;
 	;; Due to a bug in Etrax-100 LX version 1 we need to map the memory
 	;; slightly different. We also let the simulator get this mapping for now.
+	;; (The bug is that you can't remap bit 31.)
 
 #ifdef CONFIG_CRIS_LOW_MAP
 	move.d	0x0004b098, r0	; kseg mappings, temporary map of 0xc0->0x40
@@ -161,8 +197,14 @@
 	
 inflash:
 	;; We need to initialze DRAM registers before we start using the DRAM
-#include "../lib/dram_init.S"	
 
+	cmp.d	RAM_INIT_MAGIC, r8	; Already initialized?
+	beq	dram_init_finished
+	nop
+	
+#include "../lib/dram_init.S"
+
+dram_init_finished:		
 	;; Copy text+data to DRAM
 	;; This is fragile - the calculation of r4 as the image size depends
 	;; on that the labels below actually are the first and last positions
@@ -218,7 +260,39 @@ inram:
 	moveq	0, r0
 	move.d	r0, [_romfs_length] ; default if there is no cramfs
 	
-	;; First check if there is a cramfs (magic value)
+	;; The kernel could have been unpacked to DRAM by the loader, but
+	;; the cramfs image could still be in the Flash directly after the
+	;; compressed kernel image. The loader passes the address of the
+	;; byte succeeding the last compressed byte in the flash in the
+	;; register r9 when starting the kernel. Check if r9 points to a
+	;; decent cramfs image!
+	;; (Notice that if this is not booted from the loader, r9 will be
+	;;  garbage but we do sanity checks on it, the chance that it points
+	;;  to a cramfs magic is small.. )
+	
+	cmp.d	0x0ffffff8, r9
+	bcc	no_romfs_in_flash	; r9 points outside the flash area
+	nop
+	move.d	[r9], r0	; cramfs_super.magic
+	cmp.d	CRAMFS_MAGIC, r0
+	bne	no_romfs_in_flash
+	nop
+	move.d	[r9+4], r0	; cramfs_super.length
+	move.d	r0, [_romfs_length]
+#ifdef CONFIG_CRIS_LOW_MAP
+	add.d   0x50000000, r9	; add flash start in virtual memory (cached)
+#else
+	add.d   0xf0000000, r9	; add flash start in virtual memory (cached)
+#endif
+	move.d	r9, [_romfs_start]
+
+	moveq	1, r0
+	move.d	r0, [_romfs_in_flash]
+	
+	jump	start_it	; enter code, cached this time
+
+no_romfs_in_flash:
+	;; Check if there is a cramfs (magic value).
 	;; Notice that we check for cramfs magic value - which is
 	;; the "rom fs" we'll possibly use in 2.4 if not JFFS (which does
 	;; not need this mechanism anyway)
@@ -226,7 +300,7 @@ inram:
 	move.d	__vmlinux_end, r0 ; the image will be after the vmlinux end address
 	move.d	[r0], r1	; cramfs assumes same endian on host/target
 	cmp.d	CRAMFS_MAGIC, r1; magic value in cramfs superblock
-	bne	no_romfs_in_ram
+	bne	1f
 	nop
 
 	;; Ok. What is its size ? 
@@ -263,40 +337,6 @@ inram:
 	move.d	r0, [_romfs_in_flash]
 
 	jump	start_it	; better skip the additional cramfs check below
-			
-no_romfs_in_ram:
-
-	;; We have still one other possibility at this point - the kernel
-	;; could have been unpacked to DRAM by the loader, but the cramfs
-	;; image was still in the Flash directly after the compressed kernel
-	;; image. The loader passes the address of the byte succeeding the
-	;; last compressed byte in the flash in the register r9 when starting
-	;; the kernel. Check if r9 points to a decent cramfs image!
-	;; (Notice that if this is not booted from the loader, r9 will be
-	;;  garbage but we do sanity checks on it, the chance that it points
-	;;  to a cramfs magic is small.. )
-	
-	cmp.d	0x0ffffff8, r9
-	bcc	1f		; r9 points outside the flash area
-	nop
-	move.d	[r9], r0	; cramfs_super.magic
-	cmp.d	CRAMFS_MAGIC, r0
-	bne	1f
-	nop
-	move.d	[r9+4], r0	; cramfs_super.length
-	move.d	r0, [_romfs_length]
-#ifdef CONFIG_CRIS_LOW_MAP
-	add.d   0x50000000, r9	; add flash start in virtual memory (cached)
-#else
-	add.d   0xf0000000, r9	; add flash start in virtual memory (cached)
-#endif
-	move.d	r9, [_romfs_start]
-
-	moveq	1, r0
-	move.d	r0, [_romfs_in_flash]
-1:	
-	
-	jump	start_it	; enter code, cached this time
 	
 start_it:
 	;; the kernel stack is overlayed with the task structure for each
@@ -368,10 +408,10 @@ w5u:	move.b	[R_DMA_CH5_CMD],r0
 	;; Etrax product HW genconfig setup
 
 	moveq	0,r0
-#if !defined(CONFIG_KGDB) && !defined(CONFIG_DMA_MEMCPY)
+#if !defined(CONFIG_ETRAX_KGDB) && !defined(CONFIG_DMA_MEMCPY)
 	or.d	0x140000,r0	; DMA channels 6 and 7 to ser0, kgdb doesnt want DMA
 #endif
-#if !defined(CONFIG_KGDB) || !defined(CONFIG_DEBUG_PORT1)	
+#if !defined(CONFIG_ETRAX_KGDB) || !defined(CONFIG_ETRAX_DEBUG_PORT1)	
 	or.d	0xc00000,r0	; DMA channels 8 and 9 to ser1, kgdb doesnt want DMA
 #endif	
 #ifdef CONFIG_DMA_MEMCPY
@@ -389,7 +429,7 @@ w5u:	move.b	[R_DMA_CH5_CMD],r0
 #if defined(CONFIG_ETRAX_PARALLEL_PORT1) || defined(CONFIG_ETRAX_ETHERNET_LPSLAVE)
 	or.w	0x80,r0	; parport 1 enabled using DMA 4/5
 #endif
-#ifdef CONFIG_BLK_DEV_ETRAXIDE
+#ifdef CONFIG_ETRAX_IDE
 	or.d	0x3c02,r0	; DMA channels 2 and 3 to ATA, ATA enabled
 #endif
 	
@@ -405,9 +445,6 @@ w5u:	move.b	[R_DMA_CH5_CMD],r0
 	
 #ifdef CONFIG_JULIETTE
 	or.d	0x3c000,r0	; DMA channels 4 and 5 to EXTDMA0, for Juliette
-#ifndef CONFIG_BLK_DEV_ETRAXIDE
-	or.d	0x41,r0		; HACK for now! To make G27 connected for the RTC
-#endif
 #endif
 	move.d	r0,[_genconfig_shadow] ; init a shadow register of R_GEN_CONFIG
 
@@ -447,20 +484,20 @@ w91:	move.b	[R_DMA_CH9_CMD],r0	; wait for reset cycle to finish
 	;; setup port PA and PB default initial directions and data
 	;; including their shadow registers
 		
-	move.b	DEF_R_PORT_PA_DIR,r0
+	move.b	CONFIG_ETRAX_DEF_R_PORT_PA_DIR,r0
 	move.b	r0,[_port_pa_dir_shadow]
 	move.b	r0,[R_PORT_PA_DIR]
-	move.b	DEF_R_PORT_PA_DATA,r0
+	move.b	CONFIG_ETRAX_DEF_R_PORT_PA_DATA,r0
 	move.b	r0,[_port_pa_data_shadow]
 	move.b	r0,[R_PORT_PA_DATA]
 	
-	move.b	DEF_R_PORT_PB_CONFIG,r0
+	move.b	CONFIG_ETRAX_DEF_R_PORT_PB_CONFIG,r0
 	move.b	r0,[_port_pb_config_shadow]
 	move.b	r0,[R_PORT_PB_CONFIG]
-	move.b	DEF_R_PORT_PB_DIR,r0
+	move.b	CONFIG_ETRAX_DEF_R_PORT_PB_DIR,r0
 	move.b	r0,[_port_pb_dir_shadow]
 	move.b	r0,[R_PORT_PB_DIR]
-	move.b	DEF_R_PORT_PB_DATA,r0
+	move.b	CONFIG_ETRAX_DEF_R_PORT_PB_DATA,r0
 	move.b	r0,[_port_pb_data_shadow]
 	move.b	r0,[R_PORT_PB_DATA]
 	move.d  0, r0
@@ -499,12 +536,6 @@ w91:	move.b	[R_DMA_CH9_CMD],r0	; wait for reset cycle to finish
 	move.b	0x40,r0			; tr enable
 	move.b	r0,[R_SERIAL1_TR_CTRL]
 
-#ifdef CONFIG_ETRAX_90000000_LEDS
-	;; clear LED's on Stallone and Olga boards
-	moveq	-1,r0
-	move.d	r0,[_port_90000000_shadow]
-	move.d	r0,[0x90000000]
-#endif
 	
 #ifdef CONFIG_ETRAX_SERIAL_PORT3	
 	;; setup the serial port 3 at 115200 baud for debug purposes
@@ -544,3 +575,5 @@ _swapper_pg_dir = 0x60002000
 #else	
 _swapper_pg_dir = 0xc0002000
 #endif
+	
+#include "../lib/hw_settings.S"

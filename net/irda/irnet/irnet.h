@@ -5,7 +5,7 @@
  *
  * This file contains definitions and declarations global to the IrNET module,
  * all grouped in one place...
- * This file is a private header, so other modules don't want to know
+ * This file is a *private* header, so other modules don't want to know
  * what's in there...
  *
  * Note : as most part of the Linux kernel, this module is available
@@ -52,15 +52,13 @@
  *	o multipoint operation (limited by IrLAP specification)
  *	o information in /proc/net/irda/irnet
  *	o IrNET events on /dev/irnet (for user space daemon)
- *	o IrNET deamon (irnetd) to automatically handle incoming requests
+ *	o IrNET daemon (irnetd) to automatically handle incoming requests
  *	o Windows 2000 compatibility (tested, but need more work)
  * Currently missing :
  *	o Lot's of testing (that's your job)
  *	o Connection retries (may be too hard to do)
  *	o Check pppd persist mode
- *	o User space deamon (to automatically handle incoming requests)
- *	o A registered device number (coming, waiting from an answer) 
- *	o Final integration in Linux-IrDA (up to Dag) 
+ *	o User space daemon (to automatically handle incoming requests)
  *
  * The setup is not currently the most easy, but this should get much
  * better when everything will get integrated...
@@ -159,6 +157,17 @@
  *	o Add IRNET_NOANSWER_FROM event (mostly to help support)
  *	o Release flow control in disconnect_indication
  *	o Block packets while connecting (speed up connections)
+ *
+ * v5 - 11/01/01 - Jean II
+ *	o Init self->max_header_size, just in case...
+ *	o Set up ap->chan.hdrlen, to get zero copy on tx side working.
+ *	o avoid tx->ttp->flow->ppp->tx->... loop, by checking flow state
+ *		Thanks to Christian Gennerat for finding this bug !
+ *	---
+ *	o Declare the proper MTU/MRU that we can support
+ *		(but PPP doesn't read the MTU value :-()
+ *	o Declare hashbin HB_NOLOCK instead of HB_LOCAL to avoid
+ *		disabling and enabling irq twice
  */
 
 /***************************** INCLUDES *****************************/
@@ -375,7 +384,7 @@ typedef struct irnet_socket
   struct irda_device_info *discoveries;	/* Copy of the discovery log */
   int			disco_index;	/* Last read in the discovery log */
   int			disco_number;	/* Size of the discovery log */
-#endif INITIAL_DISCOVERY
+#endif /* INITIAL_DISCOVERY */
 
 } irnet_socket;
 
@@ -450,4 +459,4 @@ extern void
 /* Control channel stuff - allocated in irnet_irda.h */
 extern struct irnet_ctrl_channel	irnet_events;
 
-#endif IRNET_H
+#endif /* IRNET_H */

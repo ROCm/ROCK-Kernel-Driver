@@ -1,41 +1,42 @@
-	;; $Id: kimagerescue.S,v 1.2 2001/02/14 16:57:25 larsv Exp $
-	;; 
-	;; Rescue code to be prepended on a kimage and copied to the
-	;; rescue serial port.
-	;; This is called from the rescue code, it will copy received data to
-	;; 4000500 and after a timeout jump to it.
-	
+/* $Id: kimagerescue.S,v 1.4 2001/04/18 12:04:46 bjornw Exp $
+ * 
+ * Rescue code to be prepended on a kimage and copied to the
+ * rescue serial port.
+ * This is called from the rescue code, it will copy received data to
+ * 4004000 and after a timeout jump to it.
+ */
+
 #include <linux/config.h>
 #define ASSEMBLER_MACROS_ONLY
 #include <asm/sv_addr_ag.h>
 
-#define CODE_START 0x40000500
+#define CODE_START 0x40004000
 #define CODE_LENGTH 784
 #define TIMEOUT_VALUE 1000
 	
 		
-#ifdef CONFIG_RESCUE_SER0
+#ifdef CONFIG_ETRAX_RESCUE_SER0
 #define SERXOFF R_SERIAL0_XOFF
 #define SERBAUD R_SERIAL0_BAUD
 #define SERRECC R_SERIAL0_REC_CTRL
 #define SERRDAT R_SERIAL0_REC_DATA
 #define SERSTAT R_SERIAL0_STATUS
 #endif
-#ifdef CONFIG_RESCUE_SER1
+#ifdef CONFIG_ETRAX_RESCUE_SER1
 #define SERXOFF R_SERIAL1_XOFF
 #define SERBAUD R_SERIAL1_BAUD
 #define SERRECC R_SERIAL1_REC_CTRL
 #define SERRDAT R_SERIAL1_REC_DATA
 #define SERSTAT R_SERIAL1_STATUS
 #endif
-#ifdef CONFIG_RESCUE_SER2
+#ifdef CONFIG_ETRAX_RESCUE_SER2
 #define SERXOFF R_SERIAL2_XOFF
 #define SERBAUD R_SERIAL2_BAUD
 #define SERRECC R_SERIAL2_REC_CTRL
 #define SERRDAT R_SERIAL2_REC_DATA
 #define SERSTAT R_SERIAL2_STATUS
 #endif	
-#ifdef CONFIG_RESCUE_SER3
+#ifdef CONFIG_ETRAX_RESCUE_SER3
 #define SERXOFF R_SERIAL3_XOFF
 #define SERBAUD R_SERIAL3_BAUD
 #define SERRECC R_SERIAL3_REC_CTRL
@@ -55,14 +56,14 @@
 	;; setup port PA and PB default initial directions and data
 	;; (so we can flash LEDs, and so that DTR and others are set)
 	
-	move.b	DEF_R_PORT_PA_DIR, r0
+	move.b	CONFIG_ETRAX_DEF_R_PORT_PA_DIR, r0
 	move.b	r0, [R_PORT_PA_DIR]
-	move.b	DEF_R_PORT_PA_DATA, r0
+	move.b	CONFIG_ETRAX_DEF_R_PORT_PA_DATA, r0
 	move.b	r0, [R_PORT_PA_DATA]
 	
-	move.b	DEF_R_PORT_PB_DIR, r0
+	move.b	CONFIG_ETRAX_DEF_R_PORT_PB_DIR, r0
 	move.b	r0, [R_PORT_PB_DIR]
-	move.b	DEF_R_PORT_PB_DATA, r0
+	move.b	CONFIG_ETRAX_DEF_R_PORT_PB_DATA, r0
 	move.b	r0, [R_PORT_PB_DATA]
 	
 	;; We need to setup the bus registers before we start using the DRAM
@@ -99,10 +100,10 @@ wait_ser:
 	nop
 #ifndef CONFIG_ETRAX_NO_LEDS
 #ifdef CONFIG_ETRAX_PA_LEDS
-	move.b	DEF_R_PORT_PA_DATA, r2
+	move.b	CONFIG_ETRAX_DEF_R_PORT_PA_DATA, r2
 #endif
 #ifdef CONFIG_ETRAX_PB_LEDS
-	move.b	DEF_R_PORT_PB_DATA, r2
+	move.b	CONFIG_ETRAX_DEF_R_PORT_PB_DATA, r2
 #endif
 	move.d	(1 << CONFIG_ETRAX_LED1R) | (1 << CONFIG_ETRAX_LED2R), r0
 	btstq	16, r1

@@ -45,7 +45,7 @@ void set_break_vector(int n, irqvectptr addr);
 /* SAVE_ALL saves registers so they match pt_regs */
 
 #define SAVE_ALL \
-  "push irp\n\t"       /* push instruction pointer */ \
+  "move irp,[sp=sp-16]\n\t" /* push instruction pointer and fake SBFS struct */ \
   "push srp\n\t"       /* push subroutine return pointer */ \
   "push dccr\n\t"      /* push condition codes */ \
   "push mof\n\t"       /* push multiply overflow reg */ \
@@ -94,7 +94,9 @@ __asm__ ( \
           "_bad_IRQ" #nr "_interrupt:\n\t" \
 	  "push r0\n\t" \
 	  BLOCK_IRQ(mask,nr) \
-	  "pop r0\n\t");
+	  "pop r0\n\t" \
+          "reti\n\t" \
+          "nop\n");
 
 
 #endif  /* _ASM_IRQ_H */

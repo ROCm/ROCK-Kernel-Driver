@@ -36,7 +36,14 @@ typedef unsigned long elf_fpregset_t;
 	   that have been loaded before the code runs.
 
 	   A value of 0 tells we have no such handler.  */
-#define ELF_PLAT_INIT(_r)	((_r)->r10 = 0)
+	
+	/* Explicitly set registers to 0 to increase determinism.  */
+#define ELF_PLAT_INIT(_r)	do { \
+	(_r)->r13 = 0; (_r)->r12 = 0; (_r)->r11 = 0; (_r)->r10 = 0; \
+	(_r)->r9 = 0;  (_r)->r8 = 0;  (_r)->r7 = 0;  (_r)->r6 = 0;  \
+	(_r)->r5 = 0;  (_r)->r4 = 0;  (_r)->r3 = 0;  (_r)->r2 = 0;  \
+	(_r)->r1 = 0;  (_r)->r0 = 0;  (_r)->mof = 0; (_r)->srp = 0; \
+} while (0)
 
 #undef USE_ELF_CORE_DUMP
 #define ELF_EXEC_PAGESIZE	8192

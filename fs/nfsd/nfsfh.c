@@ -156,6 +156,7 @@ static struct dentry *nfsd_iget(struct super_block *sb, unsigned long ino, __u32
 		result = list_entry(lp,struct dentry, d_alias);
 		if (! (result->d_flags & DCACHE_NFSD_DISCONNECTED)) {
 			dget_locked(result);
+			result->d_vfs_flags |= DCACHE_REFERENCED;
 			spin_unlock(&dcache_lock);
 			iput(inode);
 			return result;

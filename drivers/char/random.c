@@ -610,7 +610,7 @@ static struct tq_struct	batch_tqueue;
 static void batch_entropy_process(void *private_);
 
 /* note: the size must be a power of 2 */
-static int batch_entropy_init(int size, struct entropy_store *r)
+static int __init batch_entropy_init(int size, struct entropy_store *r)
 {
 	batch_entropy_pool = kmalloc(2*size*sizeof(__u32), GFP_KERNEL);
 	if (!batch_entropy_pool)

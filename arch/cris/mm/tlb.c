@@ -288,7 +288,7 @@ tlb_init(void)
 
 	/* clear the page_id map */
 
-	for(i = 0; i < 64; i++)
+	for(i = 0; i < NUM_PAGEID; i++)
 		page_id_map[i] = NULL;
 	
 	/* invalidate the entire TLB */

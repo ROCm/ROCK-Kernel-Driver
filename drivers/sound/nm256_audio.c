@@ -15,6 +15,8 @@
  * Changes:
  * 11-10-2000	Bartlomiej Zolnierkiewicz <bkz@linux-ide.org>
  *		Added some __init
+ * 19-04-2001	Marcus Meissner <mm@caldera.de>
+ *		Ported to 2.4 PCI API.
  */
 
 #define __NO_VERSION__
@@ -48,8 +50,6 @@ static int handle_pm_event (struct pm_dev *dev, pm_request_t rqst, void *data);
 /* These belong in linux/pci.h. */
 #define PCI_DEVICE_ID_NEOMAGIC_NM256AV_AUDIO 0x8005
 #define PCI_DEVICE_ID_NEOMAGIC_NM256ZX_AUDIO 0x8006
-
-#define RSRCADDRESS(dev,num) ((dev)->resource[(num)].start)
 
 /* List of cards.  */
 static struct nm256_info *nmcard_list;
@@ -1042,6 +1042,9 @@ nm256_install(struct pci_dev *pcidev, enum nm256rev rev, char *verstr)
     struct pm_dev *pmdev;
     int x;
 
+    if (pci_enable_device(pcidev))
+	    return 0;
+
     card = kmalloc (sizeof (struct nm256_info), GFP_KERNEL);
     if (card == NULL) {
 	printk (KERN_ERR "NM256: out of memory!\n");
@@ -1055,7 +1058,7 @@ nm256_install(struct pci_dev *pcidev, enum nm256rev rev, char *verstr)
 
     /* Init the memory port info.  */
     for (x = 0; x < 2; x++) {
-	card->port[x].physaddr = RSRCADDRESS (pcidev, x);
+	card->port[x].physaddr = pci_resource_start (pcidev, x);
 	card->port[x].ptr = NULL;
 	card->port[x].start_offset = 0;
 	card->port[x].end_offset = 0;
@@ -1201,6 +1204,8 @@ nm256_install(struct pci_dev *pcidev, enum nm256rev rev, char *verstr)
 	}
     }
 
+    pci_set_drvdata(pcidev,card);
+
     /* Insert the card in the list.  */
     card->next_card = nmcard_list;
     nmcard_list = card;
@@ -1251,37 +1256,38 @@ handle_pm_event (struct pm_dev *dev, pm_request_t rqst, void *data)
     return 0;
 }
 
-/*
- * 	This loop walks the PCI configuration database and finds where
- *	the sound cards are.
- */
- 
-int __init
-init_nm256(void)
+static int __devinit
+nm256_probe(struct pci_dev *pcidev,const struct pci_device_id *pciid)
 {
-    struct pci_dev *pcidev = NULL;
-    int count = 0;
+    if (pcidev->device == PCI_DEVICE_ID_NEOMAGIC_NM256AV_AUDIO)
+	return nm256_install(pcidev, REV_NM256AV, "256AV");
+    if (pcidev->device == PCI_DEVICE_ID_NEOMAGIC_NM256ZX_AUDIO)
+	return nm256_install(pcidev, REV_NM256ZX, "256ZX");
+    return -1; /* should not come here ... */
+}
 
-    if(! pci_present())
-	return -ENODEV;
+static void __devinit
+nm256_remove(struct pci_dev *pcidev) {
+    struct nm256_info *xcard = pci_get_drvdata(pcidev);
+    struct nm256_info *card,*next_card = NULL;
 
-    while((pcidev = pci_find_device(PCI_VENDOR_ID_NEOMAGIC,
-				    PCI_DEVICE_ID_NEOMAGIC_NM256AV_AUDIO,
-				    pcidev)) != NULL) {
-	count += nm256_install(pcidev, REV_NM256AV, "256AV");
+    for (card = nmcard_list; card != NULL; card = next_card) {
+	next_card = card->next_card;
+	if (card == xcard) {
+	    stopPlay (card);
+	    stopRecord (card);
+	    if (card->has_irq)
+		free_irq (card->irq, card);
+	    nm256_release_ports (card);
+	    sound_unload_mixerdev (card->mixer_oss_dev);
+	    sound_unload_audiodev (card->dev[0]);
+	    sound_unload_audiodev (card->dev[1]);
+	    kfree (card);
+	    break;
+	}
     }
-
-    while((pcidev = pci_find_device(PCI_VENDOR_ID_NEOMAGIC,
-				    PCI_DEVICE_ID_NEOMAGIC_NM256ZX_AUDIO,
-				    pcidev)) != NULL) {
-	count += nm256_install(pcidev, REV_NM256ZX, "256ZX");
-    }
-
-    if (count == 0)
-	return -ENODEV;
-
-    printk (KERN_INFO "Done installing NM256 audio driver.\n");
-    return 0;
+    if (nmcard_list == card)
+    	nmcard_list = next_card;
 }
 
 /*
@@ -1639,9 +1645,21 @@ static struct audio_driver nm256_audio_driver =
     local_qlen:		nm256_audio_local_qlen,
 };
 
-EXPORT_SYMBOL(init_nm256);
+static struct pci_device_id nm256_pci_tbl[] __devinitdata = {
+	{PCI_VENDOR_ID_NEOMAGIC, PCI_DEVICE_ID_NEOMAGIC_NM256AV_AUDIO,
+	PCI_ANY_ID, PCI_ANY_ID, 0, 0},
+	{PCI_VENDOR_ID_NEOMAGIC, PCI_DEVICE_ID_NEOMAGIC_NM256ZX_AUDIO,
+	PCI_ANY_ID, PCI_ANY_ID, 0, 0},
+	{0,}
+};
+MODULE_DEVICE_TABLE(pci, nm256_pci_tbl);
 
-static int loaded = 0;
+struct pci_driver nm256_pci_driver = {
+	name:"nm256_audio",
+	id_table:nm256_pci_tbl,
+	probe:nm256_probe,
+	remove:nm256_remove,
+};
 
 MODULE_PARM (usecache, "i");
 MODULE_PARM (buffertop, "i");
@@ -1650,37 +1668,13 @@ MODULE_PARM (force_load, "i");
 
 static int __init do_init_nm256(void)
 {
-    nmcard_list = NULL;
-    printk (KERN_INFO "NeoMagic 256AV/256ZX audio driver, version 1.1\n");
-
-    if (init_nm256 () == 0) {
-	loaded = 1;
-	return 0;
-    }
-    else
-	return -ENODEV;
+    printk (KERN_INFO "NeoMagic 256AV/256ZX audio driver, version 1.1p\n");
+    return pci_module_init(&nm256_pci_driver);
 }
 
 static void __exit cleanup_nm256 (void)
 {
-    if (loaded) {
-	struct nm256_info *card;
-	struct nm256_info *next_card;
-
-	for (card = nmcard_list; card != NULL; card = next_card) {
-	    stopPlay (card);
-	    stopRecord (card);
-	    if (card->has_irq)
-		free_irq (card->irq, card);
-	    nm256_release_ports (card);
-	    sound_unload_mixerdev (card->mixer_oss_dev);
-	    sound_unload_audiodev (card->dev[0]);
-	    sound_unload_audiodev (card->dev[1]);
-	    next_card = card->next_card;
-	    kfree (card);
-	}
-	nmcard_list = NULL;
-    }
+    pci_unregister_driver(&nm256_pci_driver);
     pm_unregister_all (&handle_pm_event);
 }
 

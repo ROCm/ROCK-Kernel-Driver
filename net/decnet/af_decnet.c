@@ -1431,7 +1431,7 @@ static int __dn_getsockopt(struct socket *sock, int level,int optname, char *opt
 	struct	sock *sk = sock->sk;
 	struct dn_scp *scp = DN_SK(sk);
 	struct linkinfo_dn link;
-	int r_len;
+	unsigned int r_len;
 	void *r_data = NULL;
 	unsigned int val;
 

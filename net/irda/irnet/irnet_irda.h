@@ -13,8 +13,9 @@
 #define IRNET_IRDA_H
 
 /***************************** INCLUDES *****************************/
-
 #include <linux/config.h>
+/* Please add other headers in irnet.h */
+
 #include "irnet.h"		/* Module global include */
 
 /************************ CONSTANTS & MACROS ************************/
@@ -149,7 +150,7 @@ static int
 			char **,
 			off_t,
 			int);
-#endif CONFIG_PROC_FS
+#endif /* CONFIG_PROC_FS */
 
 /**************************** VARIABLES ****************************/
 
@@ -164,6 +165,6 @@ struct irnet_ctrl_channel	irnet_events;
 /* The /proc/net/irda directory, defined elsewhere... */
 #ifdef CONFIG_PROC_FS
 extern struct proc_dir_entry *proc_irda;
-#endif CONFIG_PROC_FS
+#endif /* CONFIG_PROC_FS */
 
-#endif IRNET_IRDA_H
+#endif /* IRNET_IRDA_H */

@@ -28,5 +28,7 @@
 #define IO_SETOUTPUT  0xA  /* Set direction 0=unchanged 1=output,
                               returns current dir */
 
+/* LED ioctl extended */
+#define IO_LED_SETBIT 0xB
+#define IO_LED_CLRBIT 0xC
 #endif
-

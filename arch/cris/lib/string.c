@@ -31,9 +31,11 @@
 /*#                                                                         */
 /*#-------------------------------------------------------------------------*/
 
+#include <linux/types.h>
+
 void *memcpy(void *pdst,
              const void *psrc,
-             unsigned int pn)
+             size_t pn)
 {
   /* Ok.  Now we want the parameters put in special registers.
      Make sure the compiler is able to make something useful of this.

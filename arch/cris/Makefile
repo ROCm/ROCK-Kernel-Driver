@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.15 2001/02/16 17:50:04 larsv Exp $
+# $Id: Makefile,v 1.18 2001/04/17 13:58:38 orjanf Exp $
 # cris/Makefile
 #
 # This file is included by the global makefile so that you can add your own
@@ -25,8 +25,8 @@ LD_SCRIPT=$(TOPDIR)/arch/cris/cris.ld
 # regenerating stuff (even for incremental linking of subsystems!) is
 # even more nauseating.
 LD = if [ ! -e $(LD_SCRIPT).tmp -o $(LD_SCRIPT) -nt $(LD_SCRIPT).tmp ]; then \
-          sed -e s/@ETRAX_DRAM_VIRTUAL_BASE@/0x$(ETRAX_DRAM_VIRTUAL_BASE)/ \
-              -e s/@ETRAX_DRAM_SIZE_M@/$(ETRAX_DRAM_SIZE)/ \
+          sed -e s/@CONFIG_ETRAX_DRAM_VIRTUAL_BASE@/0x$(CONFIG_ETRAX_DRAM_VIRTUAL_BASE)/ \
+              -e s/@CONFIG_ETRAX_DRAM_SIZE_M@/$(CONFIG_ETRAX_DRAM_SIZE)/ \
               < $(LD_SCRIPT) > $(LD_SCRIPT).tmp; \
      else true; \
      fi && $(CROSS_COMPILE)ld -mcriself
@@ -42,7 +42,7 @@ OBJCOPY := $(CROSS_COMPILE)objcopy -O binary -R .note -R .comment -S
 
 CFLAGS := $(CFLAGS) -march=v10 -fno-strict-aliasing -pipe -D__linux__
 
-ifdef CONFIG_KGDB
+ifdef CONFIG_ETRAX_KGDB
 CFLAGS := $(subst -fomit-frame-pointer,,$(CFLAGS)) -g
 CFLAGS += -fno-omit-frame-pointer
 endif
@@ -76,7 +76,7 @@ simimage: timage
 
 cramfs:
 ## cramfs      - Creates a cramfs image
-	mkcramfs -b 8192 root cramfs.img
+	mkcramfs -b 8192 -m romfs_meta.txt root cramfs.img
 	cat vmlinux.bin cramfs.img >timage
 
 clinux: vmlinux.bin decompress.bin rescue.bin

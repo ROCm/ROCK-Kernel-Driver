@@ -125,20 +125,20 @@ typedef struct _ReadCapdata_struct
 //Command List Structure
 typedef union _SCSI3Addr_struct {
    struct {
+    BYTE Dev;
     BYTE Bus:6;
     BYTE Mode:2;        // b00
-    BYTE Dev;
   } PeripDev;
    struct {
+    BYTE DevLSB;
     BYTE DevMSB:6;
     BYTE Mode:2;        // b01
-    BYTE DevLSB;
   } LogDev;
    struct {
-    BYTE Targ:6;
-    BYTE Mode:2;        // b10
     BYTE Dev:5;
     BYTE Bus:3;
+    BYTE Targ:6;
+    BYTE Mode:2;        // b10
   } LogUnit;
 } SCSI3Addr_struct;
 

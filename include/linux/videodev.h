@@ -374,6 +374,7 @@ struct video_code
 #define VID_HARDWARE_OV511	27	
 #define VID_HARDWARE_ZR356700	28	/* Zoran 36700 series */
 #define VID_HARDWARE_W9966	29
+#define VID_HARDWARE_SE401	30	/* SE401 USB webcams */
 
 
 /*

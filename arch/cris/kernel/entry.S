@@ -1,4 +1,4 @@
-/* $Id: entry.S,v 1.15 2001/03/05 13:14:30 bjornw Exp $
+/* $Id: entry.S,v 1.22 2001/04/17 13:58:39 orjanf Exp $
  *
  *  linux/arch/cris/entry.S
  *
@@ -7,6 +7,40 @@
  *  Authors:	Bjorn Wesen (bjornw@axis.com)
  *
  *  $Log: entry.S,v $
+ *  Revision 1.22  2001/04/17 13:58:39  orjanf
+ *  * Renamed CONFIG_KGDB to CONFIG_ETRAX_KGDB.
+ *
+ *  Revision 1.21  2001/04/17 11:33:29  orjanf
+ *  Updated according to review:
+ *  * Included asm/sv_addr_ag.h to get macro for internal register.
+ *  * Corrected comment regarding system call argument passing.
+ *  * Removed comment about instruction being in a delay slot.
+ *  * Added comment about SYMBOL_NAME macro.
+ *
+ *  Revision 1.20  2001/04/12 08:51:07  hp
+ *  - Add entry for sys_fcntl64.  In fact copy last piece from i386 including ...
+ *  - .rept to fill table to safe state with sys_ni_syscall.
+ *
+ *  Revision 1.19  2001/04/04 09:43:32  orjanf
+ *  * Moved do_sigtrap from traps.c to entry.S.
+ *  * LTASK_PID need not be global anymore.
+ *
+ *  Revision 1.18  2001/03/26 09:25:02  markusl
+ *  Updated after review, should now handle USB interrupts correctly.
+ *
+ *  Revision 1.17  2001/03/21 16:12:55  bjornw
+ *  * Always make room for the cpu status record in the frame, in order to
+ *    use the same framelength and layout for both mmu busfaults and normal
+ *    irqs. No need to check for the explicit CRIS_FRAME_FIXUP type anymore.
+ *  * Fixed bug with using addq for popping the stack in the epilogue - it
+ *    destroyed the flag register. Use instructions that don't affect the
+ *    flag register instead.
+ *  * Removed write to R_PORT_PA_DATA during spurious_interrupt
+ *
+ *  Revision 1.16  2001/03/20 19:43:02  bjornw
+ *  * Get rid of esp0 setting
+ *  * Give a 7th argument to a systemcall - the stackframe
+ *
  *  Revision 1.15  2001/03/05 13:14:30  bjornw
  *  Spelling fix
  *
@@ -80,7 +114,8 @@
 
 #include <linux/linkage.h>
 #include <linux/sys.h>
-			
+#include <asm/sv_addr_ag.h>
+	
 	;; functions exported from this file
 	
 	.globl _system_call
@@ -95,10 +130,11 @@
 	.globl _spurious_interrupt
 	.globl _hw_bp_trigs
 	.globl _mmu_bus_fault
-				
+	.globl _do_sigtrap
+	.globl _gdb_handle_breakpoint
+			
 	.globl _sys_call_table
 	
-	.globl LTASK_PID	
 	;; syscall error codes
 	
 LENOSYS = 38
@@ -115,11 +151,6 @@ LTASK_PID         = 105
 
 PT_TRACESYS_BIT	  = 1
 
-	;; Offset for esp0 into task_struct: current->thread.esp0.
-	;; FIXME: In need of padding somewhere, to get dword-alignment.
-
-THREAD_ESP0	  = 597
-	
 	;; some pt_regs offsets (from ptrace.h)
 	
 LORIG_R10	= 4
@@ -182,7 +213,7 @@ signal_return:
 	;; Since we can't have system calls inside interrupts, it should not matter
 	;; that we don't stack IRP.
 	;; 
-	;; In r1 we have the wanted syscall number. Arguments come in r10,r11,r12,r13,r0
+	;; In r9 we have the wanted syscall number. Arguments come in r10,r11,r12,r13,mof,srp
 	;;
 	;; This function looks on the _surface_ like spaghetti programming, but it's
 	;; really designed so that the fast-path does not force cache-loading of non-used
@@ -190,7 +221,7 @@ signal_return:
 
 _system_call:
 	;; stack-frame similar to the irq heads, which is reversed in ret_from_sys_call
-	push	brp		; this is normally push irp
+	move	brp,[sp=sp-16]	; instruction pointer and room for a fake SBFS frame
 	push	srp
 	push	dccr
 	push	mof
@@ -202,15 +233,11 @@ _system_call:
 	movs.w	-LENOSYS,r0
 	move.d	r0,[sp+LR10]	; put the default return value in r10 in the frame
 
-	;; Perform "current->thread.esp0 = sp".
-	;; This used to be a separate function; set_esp0(ssp).
-	movs.w -8192,r0		; THREAD_SIZE == 8192
-	and.d sp,r0
-
-	move.d sp,[r0+THREAD_ESP0]
-
 	;; check if this process is syscall-traced
 
+	movs.w	-8192,r0	; THREAD_SIZE == 8192
+	and.d	sp,r0
+	
 	move.d	[r0+LTASK_PTRACE],r0
 	btstq	PT_TRACESYS_BIT, r0
 	bmi	tracesys
@@ -222,6 +249,11 @@ _system_call:
 	bcc	_ret_from_sys_call
 	lslq	2,r9		;  multiply by 4, in the delay slot
 
+	;; as a bonus 7th parameter, we give the location on the stack
+	;; of the register structure itself. some syscalls need this.
+
+	push	sp
+	
 	;; the parameter carrying registers r10, r11, r12 and 13 are intact.
 	;; the fifth and sixth parameters (if any) was in mof and srp 
 	;; respectively, and we need to put them on the stack.
@@ -230,8 +262,8 @@ _system_call:
 	push	mof
 	
 	jsr	[r9+_sys_call_table]	; actually do the system call
-	addq	2*4,sp		; pop the mof and srp parameters
-	move.d	r10,[sp+LR10]	; save the return value
+	addq	3*4,sp			; pop the mof, srp and regs parameters
+	move.d	r10,[sp+LR10]		; save the return value
 
 	moveq	1,r9		; "parameter" to ret_from_sys_call to show it was a sys call
 	
@@ -274,30 +306,19 @@ Rexit:
 	pop	mof		; multiply overflow register 
 	pop	dccr		; condition codes
 	pop	srp		; subroutine return pointer
-	jmpu	[sp+]		; return by popping irp and jumping there
-	;; jmpu takes the U-flag into account to see if we return to
-	;; user-mode or kernel mode.
+	;; now we have a 4-word SBFS frame which we do not want to restore
+	;; using RBF since it was not stacked with SBFS. instead we would like to
+	;; just get the PC value to restart it with, and skip the rest of
+	;; the frame.
+	move	[sp=sp+16], p8	; pop the SBFS frame from the sp
+	jmpu	[sp-16]		; return through the irp field in the sbfs frame
 
 RBFexit:
-	cmpq	2, r10		; was it CRIS_FRAME_FIXUP ?
-	beq	2f
 	movem	[sp+],r13	; registers r0-r13, in delay slot
 	pop	mof		; multiply overflow register 
 	pop	dccr		; condition codes
 	pop	srp		; subroutine return pointer
 	rbf	[sp+]		; return by popping the CPU status
-
-2:	pop	mof		; multiply overflow register
-	pop	dccr		; condition codes
-	pop	srp		; subroutine return pointer
-	;; now we have a 4-word SBFS frame which we do not want to restore
-	;; using RBF since we have made a fixup. instead we would like to
-	;; just get the PC value to restart it with, and skip the rest of
-	;; the frame.
-	pop	irp		; fixup location will be here
-	reti			; return to IRP, taking U-flag into account
-	addq	12,sp		; Skip rest of SBFS frame.
-
 
 tracesys:
 	;; this first invocation of syscall_trace _requires_ that
@@ -332,13 +353,19 @@ tracesys:
 	move	[sp+LMOF],      mof
 	move	[sp+LSRP],      srp
 
+	;; as a bonus 7th parameter, we give the location on the stack
+	;; of the register structure itself. some syscalls need this.
+
+	push	sp
+	
 	;; the fifth and sixth parameters needs to be put on the stack for
 	;; the system call to find them
 
 	push	srp
 	push	mof
+
 	jsr	r9		; actually call the system-call
-	addq	2*4,sp		; pop the r0 parameter
+	addq	3*4,sp		; pop the srp, mof and regs parameters
 
 1:	move.d	r10,[sp+LR10]	; save the return value
 
@@ -354,8 +381,7 @@ tracesys:
 	
 LTHREAD_KSP	= 0
 LTHREAD_USP	= 4
-LTHREAD_ESP0	= 8
-LTHREAD_DCCR	= 12
+LTHREAD_DCCR	= 8
 	
 	;; _resume performs the actual task-switching, by switching stack pointers
 	;; input arguments: r10 = prev, r11 = next, r12 = thread offset in task struct
@@ -468,8 +494,6 @@ nobp:	pop	r11
 _IRQ1_interrupt:
 _spurious_interrupt:	
 	di
-	move.b	4,r0
-	move.b	r0,[0xb0000030]
 basse2:	ba	basse2
 	nop
 
@@ -479,7 +503,7 @@ basse2:	ba	basse2
 	
 _multiple_interrupt:
 	;; this prologue MUST match the one in irq.h and the struct in ptregs.h!!!
-	push	irp
+	move	irp,[sp=sp-16]	; instruction pointer and room for a fake SBFS frame
 	push	srp
 	push	dccr
 	push	mof
@@ -491,15 +515,15 @@ _multiple_interrupt:
 	
 	move.d	_irq_shortcuts + 8,r1
 	moveq	2,r2		; first bit we care about is the timer0 irq
-	move.d	[0xb00000d8],r0	; read the irq bits that triggered the multiple irq
+	move.d	[R_VECT_MASK_RD],r0	; read the irq bits that triggered the multiple irq
 multloop:	
 	btst	r2,r0		; check for the irq given by bit r2
 	bmi	do_shortcut	; actually do the shortcut
 	nop
-	addq	1,r2		; next vector bit - remember this is in the delay slot!
+	addq	1,r2		; next vector bit
 	addq	4,r1		; next vector
-	cmpq	26,r2
-	bne	multloop	; process all irq's up to and including number 25
+	cmp.b	32,r2
+	bne	multloop	; process all irq's up to and including number 31
 	nop
 	
 	;; strange, we didn't get any set vector bits.. oh well, just return
@@ -513,6 +537,48 @@ do_shortcut:
 	nop
 	jump	[r1]		; jump to the irq handlers shortcut
 
+_do_sigtrap:
+	;; 
+	;; SIGTRAP the process that executed the break instruction.
+	;; Make a frame that Rexit in entry.S expects.
+	;;
+	move	brp,[sp=sp-16]		; Push BRP while faking a cpu status record.
+	push	srp			; Push subroutine return pointer.
+	push	dccr			; Push condition codes.
+	push	mof			; Push multiply overflow reg.
+	di				; Need to disable irq's at this point.
+	subq	14*4,sp			; Make room for r0-r13.
+	movem	r13,[sp]		; Push the r0-r13 registers.
+	push	r10			; Push orig_r10.
+	clear.d	[sp=sp-4]		; Frametype - this is a normal stackframe.
+
+	movs.w	-8192,r9		; THREAD_SIZE == 8192
+	and.d	sp,r9
+	move.d	[r9+LTASK_PID],r10	; current->pid as arg1.
+	moveq	5,r11			; SIGTRAP as arg2.
+	jsr	_sys_kill       
+	jump	_ret_from_intr		; Use the return routine for interrupts.
+
+_gdb_handle_breakpoint:	
+	push	dccr
+	push	r0
+#ifdef CONFIG_ETRAX_KGDB
+	move	dccr,r0			; U-flag not affected by previous insns. 
+	btstq	8,r0			; Test the U-flag.
+	bmi	_ugdb_handle_breakpoint	; Go to user mode debugging. 
+	nop				; Empty delay slot (cannot pop r0 here). 
+	pop	r0			; Restore r0.
+	ba	_kgdb_handle_breakpoint	; Go to kernel debugging. 
+	pop	dccr			; Restore dccr in delay slot.
+#endif
+	
+_ugdb_handle_breakpoint:	
+	move	brp,r0			; Use r0 temporarily for calculation.
+	subq	2,r0			; Set to address of previous instruction.
+	move	r0,brp
+	pop	r0			; Restore r0. 
+	ba	_do_sigtrap		; SIGTRAP the offending process. 
+	pop	dccr			; Restore dccr in delay slot.
 	
 	.data
 
@@ -521,8 +587,11 @@ _hw_bp_trigs:
 _hw_bp_trig_ptr:
 	.dword _hw_bp_trigs
 
-/* linux/linkage.h got it wrong for this compiler currently */
-	
+/* Because we compile this file with -traditional, we need to redefine
+   token-concatenation to the traditional trick, using an empty comment.
+   Normally (in other files, with ISO C as in gcc default) this is done
+   with the ## preprocessor operator.  */
+
 #undef SYMBOL_NAME
 #define SYMBOL_NAME(X) _/**/X
 		
@@ -748,6 +817,8 @@ _sys_call_table:
 	.long SYMBOL_NAME(sys_mincore)
 	.long SYMBOL_NAME(sys_madvise)
 	.long SYMBOL_NAME(sys_getdents64)       /* 220 */
+	.long SYMBOL_NAME(sys_fcntl64)
+	.long SYMBOL_NAME(sys_ni_syscall)	/* reserved for TUX */
 
         /*
          * NOTE!! This doesn't have to be exact - we just have
@@ -756,9 +827,7 @@ _sys_call_table:
          * been shrunk every time we add a new system call.
          */
 
-	;; TODO: this needs to actually generate sys_ni_syscall entires
-	;; since we now have removed the check for NULL entries in this
-	;; table in system_call!
-	
-	.space (NR_syscalls-220)*4
+	.rept NR_syscalls-221
+		.long SYMBOL_NAME(sys_ni_syscall)
+	.endr
 	

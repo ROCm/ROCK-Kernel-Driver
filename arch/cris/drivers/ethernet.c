@@ -1,4 +1,4 @@
-/* $Id: ethernet.c,v 1.8 2001/02/27 13:52:48 bjornw Exp $
+/* $Id: ethernet.c,v 1.12 2001/04/05 11:43:11 tobiasa Exp $
  *
  * e100net.c: A network driver for the ETRAX 100LX network controller.
  *
@@ -7,6 +7,21 @@
  * The outline of this driver comes from skeleton.c.
  *
  * $Log: ethernet.c,v $
+ * Revision 1.12  2001/04/05 11:43:11  tobiasa
+ * Check dev before panic.
+ *
+ * Revision 1.11  2001/04/04 11:21:05  markusl
+ * Updated according to review remarks
+ *
+ * Revision 1.10  2001/03/26 16:03:06  bjornw
+ * Needs linux/config.h
+ *
+ * Revision 1.9  2001/03/19 14:47:48  pkj
+ * * Make sure there is always a pause after the network LEDs are
+ *   changed so they will not look constantly lit during heavy traffic.
+ * * Always use HZ when setting times relative to jiffies.
+ * * Use LED_NETWORK_SET() when setting the network LEDs.
+ *
  * Revision 1.8  2001/02/27 13:52:48  bjornw
  * malloc.h -> slab.h
  *
@@ -40,10 +55,13 @@
  *
  */
 
+#include <linux/config.h>
+
 #include <linux/module.h>
 
 #include <linux/kernel.h>
 #include <linux/sched.h>
+#include <linux/delay.h>
 #include <linux/types.h>
 #include <linux/fcntl.h>
 #include <linux/interrupt.h>
@@ -52,11 +70,7 @@
 #include <linux/in.h>
 #include <linux/slab.h>
 #include <linux/string.h>
-#include <asm/system.h>
-#include <asm/bitops.h>
 #include <linux/spinlock.h>
-#include <asm/io.h>
-#include <asm/dma.h>
 #include <linux/errno.h>
 #include <linux/init.h>
 
@@ -65,10 +79,16 @@
 #include <linux/skbuff.h>
 
 #include <asm/svinto.h>     /* DMA and register descriptions */
+#include <asm/io.h>         /* LED_* I/O functions */
+#include <asm/dma.h>
+#include <asm/system.h>
+#include <asm/bitops.h>
 
 //#define ETHDEBUG
-
 #define D(x)
+
+#define ETH_TX_DMA 0
+#define ETH_RX_DMA 1
 
 /*
  * The name of the card. Is used for messages and in the requests for
@@ -126,12 +146,12 @@ struct net_local {
 #define MDIO_PHYS_ADDR                      0x0
 
 /* Network flash constants */
-#define NET_FLASH_TIME                        2 /* 20 ms */
-#define NET_LINK_UP_CHECK_INTERVAL          200 /* 2 s   */
+#define NET_FLASH_TIME                  (HZ/50) /* 20 ms */
+#define NET_FLASH_PAUSE                (HZ/100) /* 10 ms */
+#define NET_LINK_UP_CHECK_INTERVAL       (2*HZ) /* 2 s   */
 
-/* RX_DESC_BUF_SIZE should be a multiple of four to avoid the buffer
- * alignment bug in Etrax 100 release 1
- */
+#define NO_NETWORK_ACTIVITY 0
+#define NETWORK_ACTIVITY    1
 
 #define RX_DESC_BUF_SIZE   256
 #define NBR_OF_RX_DESC     (RX_BUF_SIZE / \
@@ -146,8 +166,8 @@ static etrax_dma_descr *myPrevRxDesc;  /* The descriptor right before myNextRxDe
 
 static unsigned char RxBuf[RX_BUF_SIZE];
 
-static etrax_dma_descr RxDescList[NBR_OF_RX_DESC];
-static etrax_dma_descr TxDesc;
+static etrax_dma_descr RxDescList[NBR_OF_RX_DESC] __attribute__ ((aligned(4)));
+static etrax_dma_descr TxDesc __attribute__ ((aligned(4)));
 
 static struct sk_buff *tx_skb;
 
@@ -155,8 +175,8 @@ static struct sk_buff *tx_skb;
 static struct timer_list speed_timer;
 static struct timer_list clear_led_timer;
 static int current_speed;
-static int led_clear_time;
-static int nolink;
+static int led_next_time;
+static int led_active;
 
 /* Index to functions, as function prototypes. */
 
@@ -184,6 +204,7 @@ static unsigned char e100_receive_mdio_bit(void);
 static void e100_reset_tranceiver(void);
 
 static void e100_clear_network_leds(unsigned long dummy);
+static void e100_set_network_leds(int active);
 
 #define tx_done(dev) (*R_DMA_CH0_CMD == 0)
 
@@ -201,7 +222,7 @@ etrax_ethernet_init(struct net_device *dev)
 	int i;
 	int anOffset = 0;
 
-	printk("ETRAX 100LX 10/100MBit ethernet v2.0 (c) 2000 Axis Communications AB\n");
+	printk("ETRAX 100LX 10/100MBit ethernet v2.0 (c) 2000-2001 Axis Communications AB\n");
 
 	dev->base_addr = (unsigned int)R_NETWORK_SA_0; /* just to have something to show */
 
@@ -212,6 +233,8 @@ etrax_ethernet_init(struct net_device *dev)
 	if (!dev) {
 		printk("dev == NULL. Should this happen?\n");
 		dev = init_etherdev(dev, sizeof(struct net_local));
+		if (!dev)
+			panic("init_etherdev failed\n");
 	}
 
 	/* setup generic handlers and stuff in the dev struct */
@@ -272,13 +295,12 @@ etrax_ethernet_init(struct net_device *dev)
 
 	/* Initialize speed indicator stuff. */
 
-	nolink = 0;
 	current_speed = 10;
 	speed_timer.expires = jiffies + NET_LINK_UP_CHECK_INTERVAL;
 	speed_timer.function = e100_check_speed;
 	add_timer(&speed_timer);
 	clear_led_timer.function = e100_clear_network_leds;
-	clear_led_timer.expires = jiffies + 10;
+	clear_led_timer.expires = jiffies + HZ/10;
 	add_timer(&clear_led_timer);
 
 	return 0;
@@ -345,8 +367,17 @@ e100_open(struct net_device *dev)
 
 	*R_NETWORK_MGM_CTRL = IO_STATE(R_NETWORK_MGM_CTRL, mdoe, enable);
 
-	*R_IRQ_MASK0_CLR = 0xe0000; /* clear excessive_col, over/underrun irq mask */
-	*R_IRQ_MASK2_CLR = 0xf; /* clear dma0 and 1 eop and descr irq masks */
+	*R_IRQ_MASK0_CLR =
+		IO_STATE(R_IRQ_MASK0_CLR, overrun, clr) |
+		IO_STATE(R_IRQ_MASK0_CLR, underrun, clr) |
+		IO_STATE(R_IRQ_MASK0_CLR, excessive_col, clr);
+	
+	/* clear dma0 and 1 eop and descr irq masks */
+	*R_IRQ_MASK2_CLR =
+		IO_STATE(R_IRQ_MASK2_CLR, dma0_descr, clr) |
+		IO_STATE(R_IRQ_MASK2_CLR, dma0_eop, clr) |
+		IO_STATE(R_IRQ_MASK2_CLR, dma1_descr, clr) |
+		IO_STATE(R_IRQ_MASK2_CLR, dma1_eop, clr);
 
 	/* Reset and wait for the DMA channels */
 
@@ -383,17 +414,17 @@ e100_open(struct net_device *dev)
 	 * and clean up on failure.
 	 */
 
-	if(request_dma(0, cardname)) {
+	if(request_dma(ETH_TX_DMA, cardname)) {
 		goto grace_exit;
 	}
 
-	if(request_dma(1, cardname)) {
+	if(request_dma(ETH_RX_DMA, cardname)) {
 	grace_exit:
 		/* this will cause some 'trying to free free irq' but what the heck... */
-		free_dma(0);
-		free_irq(NETWORK_DMARX_IRQ, NULL);
-		free_irq(NETWORK_DMATX_IRQ, NULL);
-		free_irq(NETWORK_STATUS_IRQ, NULL);
+		free_dma(ETH_TX_DMA);
+		free_irq(NETWORK_DMARX_IRQ, (void *)dev);
+		free_irq(NETWORK_DMATX_IRQ, (void *)dev);
+		free_irq(NETWORK_STATUS_IRQ, (void *)dev);
 		return -EAGAIN;
 	}
 
@@ -466,21 +497,19 @@ static void
 e100_check_speed(unsigned long dummy)
 {
 	unsigned long data;
+	int old_speed = current_speed;
+
 	data = e100_get_mdio_reg(MDIO_BASE_STATUS_REG);
 	if (!(data & MDIO_LINK_UP_MASK)) {
-		nolink = 1;
-		LED_NETWORK_TX_SET(1); /* Make it red, link is down. */
+		current_speed = 0;
 	} else {
-		nolink = 0;
-		LED_NETWORK_TX_SET(0); /* Link is up again, clear red LED. */
 		data = e100_get_mdio_reg(MDIO_AUX_CTRL_STATUS_REG);
-		if (data & MDIO_SPEED) {
-			current_speed = 100;
-		} else {
-			current_speed = 10;
-		}
+		current_speed = (data & MDIO_SPEED ? 100 : 10);
 	}
 	
+	if (old_speed != current_speed)
+		e100_set_network_leds(NO_NETWORK_ACTIVITY);
+
 	/* Reinitialize the timer. */
 	speed_timer.expires = jiffies + NET_LINK_UP_CHECK_INTERVAL;
 	add_timer(&speed_timer);
@@ -534,23 +563,26 @@ e100_send_mdio_cmd(unsigned short cmd, int write_cmd)
 static void
 e100_send_mdio_bit(unsigned char bit)
 {
-	volatile int i;
-	*R_NETWORK_MGM_CTRL = 2 | bit&1;
-	for (i=40; i; i--);
-	*R_NETWORK_MGM_CTRL = 6 | bit&1;
-	for (i=40; i; i--);
+	*R_NETWORK_MGM_CTRL =
+		IO_STATE(R_NETWORK_MGM_CTRL, mdoe, enable) |
+		IO_FIELD(R_NETWORK_MGM_CTRL, mdio, bit);
+	udelay(1);
+	*R_NETWORK_MGM_CTRL =
+		IO_STATE(R_NETWORK_MGM_CTRL, mdoe, enable) |
+		IO_MASK(R_NETWORK_MGM_CTRL, mdck) |
+		IO_FIELD(R_NETWORK_MGM_CTRL, mdio, bit);
+	udelay(1);
 }
 
 static unsigned char
 e100_receive_mdio_bit()
 {
 	unsigned char bit;
-	volatile int i;
 	*R_NETWORK_MGM_CTRL = 0;
-	bit = *R_NETWORK_STAT & 1;
-	for (i=40; i; i--);
-	*R_NETWORK_MGM_CTRL = 4;
-	for (i=40; i; i--);
+	bit = IO_EXTRACT(R_NETWORK_STAT, mdio, *R_NETWORK_STAT);
+	udelay(1);
+	*R_NETWORK_MGM_CTRL = IO_MASK(R_NETWORK_MGM_CTRL, mdck);
+	udelay(1);
 	return bit;
 }
 
@@ -566,7 +598,7 @@ e100_reset_tranceiver(void)
 
 	cmd = (MDIO_START << 14) | (MDIO_WRITE << 12) | (MDIO_PHYS_ADDR << 7) | (MDIO_BASE_CONTROL_REG << 2);
 
-	e100_send_mdio_cmd(cmd, 0);
+	e100_send_mdio_cmd(cmd, 1);
 	
 	data |= 0x8000;
 	
@@ -656,8 +688,8 @@ e100rx_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
 	struct net_device *dev = (struct net_device *)dev_id;
 	unsigned long irqbits = *R_IRQ_MASK2_RD;
-
-	if(irqbits & (1U << 3)) {
+ 
+	if(irqbits & IO_STATE(R_IRQ_MASK2_RD, dma1_eop, active)) {
 
 		/* acknowledge the eop interrupt */
 
@@ -671,10 +703,15 @@ e100rx_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 			 */
 			e100_rx(dev);
 			((struct net_local *)dev->priv)->stats.rx_packets++;
-			*R_DMA_CH1_CMD = 3; /* restart/continue on the channel, for safety */
-			*R_DMA_CH1_CLR_INTR = 3; /* clear dma channel 1 eop/descr irq bits */
-			/* now, we might have gotten another packet so we have to loop back
-			   and check if so */
+			/* restart/continue on the channel, for safety */
+			*R_DMA_CH1_CMD = IO_STATE(R_DMA_CH1_CMD, cmd, restart);
+			/* clear dma channel 1 eop/descr irq bits */
+			*R_DMA_CH1_CLR_INTR =
+				IO_STATE(R_DMA_CH1_CLR_INTR, clr_eop, do) |
+				IO_STATE(R_DMA_CH1_CLR_INTR, clr_descr, do);
+			
+			/* now, we might have gotten another packet
+			   so we have to loop back and check if so */
 		}
 	}
 }
@@ -692,8 +729,9 @@ e100tx_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	unsigned long irqbits = *R_IRQ_MASK2_RD;
 	struct net_local *np = (struct net_local *)dev->priv;
 
-	if(irqbits & 2) { /* check for a dma0_eop interrupt */
-
+	/* check for a dma0_eop interrupt */
+	if(irqbits & IO_STATE(R_IRQ_MASK2_RD, dma0_eop, active)) { 
+		
 		/* This protects us from concurrent execution of
 		 * our dev->hard_start_xmit function above.
 		 */
@@ -727,12 +765,14 @@ e100nw_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	struct net_local *np = (struct net_local *)dev->priv;
 	unsigned long irqbits = *R_IRQ_MASK0_RD;
 
-	if(irqbits & (1 << 19)) { /* check for overrun irq */
+	/* check for overrun irq */
+	if(irqbits & IO_STATE(R_IRQ_MASK0_RD, overrun, active)) { 
 		update_rx_stats(&np->stats); /* this will ack the irq */
 		D(printk("ethernet receiver overrun!\n"));
 	}
-	if(irqbits & (1 << 17)) { /* check for excessive collision irq */
-		*R_NETWORK_TR_CTRL = 1 << 8; /* clear the interrupt */
+	/* check for excessive collision irq */
+	if(irqbits & IO_STATE(R_IRQ_MASK0_RD, excessive_col, active)) { 
+		*R_NETWORK_TR_CTRL = IO_STATE(R_NETWORK_TR_CTRL, clr_error, clr);
 		np->stats.tx_errors++;
 		D(printk("ethernet excessive collisions!\n"));
 	}
@@ -746,23 +786,19 @@ e100_rx(struct net_device *dev)
 	struct sk_buff *skb;
 	int length=0;
 	int i;
+	struct net_local *np = (struct net_local *)dev->priv;
 	struct etrax_dma_descr *mySaveRxDesc = myNextRxDesc;
 	unsigned char *skb_data_ptr;
 
-	/* light the network rx packet depending on the current speed.
-	** But only if link has been detected.
-	*/
-	if (!nolink)
-		if (current_speed == 10) {
-			LED_NETWORK_TX_SET(1);
-			LED_NETWORK_RX_SET(1);
-		} else
-			LED_NETWORK_RX_SET(1);
-  
-	/* Set the earliest time we may clear the LED */
+	if (!led_active && jiffies > led_next_time) {
+		/* light the network leds depending on the current speed. */
+		e100_set_network_leds(NETWORK_ACTIVITY);
 
-	led_clear_time = jiffies + NET_FLASH_TIME;
-  
+		/* Set the earliest time we may clear the LED */
+		led_next_time = jiffies + NET_FLASH_TIME;
+		led_active = 1;
+	}
+
 	/* If the packet is broken down in many small packages then merge
 	 * count how much space we will need to alloc with skb_alloc() for
 	 * it to fit.
@@ -790,6 +826,7 @@ e100_rx(struct net_device *dev)
 
 	skb = dev_alloc_skb(length - ETHER_HEAD_LEN);
 	if (!skb) {
+		np->stats.rx_errors++;
 		printk(KERN_NOTICE "%s: Memory squeeze, dropping packet.\n",
 		       dev->name);
 		return;
@@ -798,7 +835,7 @@ e100_rx(struct net_device *dev)
 	skb_put(skb, length - ETHER_HEAD_LEN);        /* allocate room for the packet body */
 	skb_data_ptr = skb_push(skb, ETHER_HEAD_LEN); /* allocate room for the header */
 
-#if 0
+#ifdef ETHDEBUG
 	printk("head = 0x%x, data = 0x%x, tail = 0x%x, end = 0x%x\n",
 	       skb->head, skb->data, skb->tail, skb->end);
 	printk("copying packet to 0x%x.\n", skb_data_ptr);
@@ -849,9 +886,17 @@ e100_close(struct net_device *dev)
 	*R_NETWORK_GEN_CONFIG =
 		IO_STATE(R_NETWORK_GEN_CONFIG, phy,    mii_clk) |
 		IO_STATE(R_NETWORK_GEN_CONFIG, enable, off);
-
-	*R_IRQ_MASK0_CLR = 0xe0000; /* clear excessive_col, over/underrun irq mask */
-	*R_IRQ_MASK2_CLR = 0xf; /* clear dma0 and 1 eop and descr irq masks */
+	
+	*R_IRQ_MASK0_CLR =
+		IO_STATE(R_IRQ_MASK0_CLR, overrun, clr) |
+		IO_STATE(R_IRQ_MASK0_CLR, underrun, clr) |
+		IO_STATE(R_IRQ_MASK0_CLR, excessive_col, clr);
+	
+	*R_IRQ_MASK2_CLR =
+		IO_STATE(R_IRQ_MASK2_CLR, dma0_descr, clr) |
+		IO_STATE(R_IRQ_MASK2_CLR, dma0_eop, clr) |
+		IO_STATE(R_IRQ_MASK2_CLR, dma1_descr, clr) |
+		IO_STATE(R_IRQ_MASK2_CLR, dma1_eop, clr);
 
 	/* Stop the receiver and the transmitter */
 
@@ -864,8 +909,8 @@ e100_close(struct net_device *dev)
 	free_irq(NETWORK_DMATX_IRQ, (void *)dev);
 	free_irq(NETWORK_STATUS_IRQ, (void *)dev);
 
-	free_dma(0);
-	free_dma(1);
+	free_dma(ETH_TX_DMA);
+	free_dma(ETH_RX_DMA);
 
 	/* Update the statistics here. */
 
@@ -997,22 +1042,16 @@ void
 e100_hardware_send_packet(char *buf, int length)
 {
 	D(printk("e100 send pack, buf 0x%x len %d\n", buf, length));
-	/* light the network leds depending on the current speed.
-	** But only if link has been detected.
-	*/
-	if (!nolink) {
-		if (current_speed == 10) {
-			LED_NETWORK_TX_SET(1);
-			LED_NETWORK_RX_SET(1);
-		} else {
-			LED_NETWORK_RX_SET(1);
-		}
+
+	if (!led_active && jiffies > led_next_time) {
+		/* light the network leds depending on the current speed. */
+		e100_set_network_leds(NETWORK_ACTIVITY);
+
+		/* Set the earliest time we may clear the LED */
+		led_next_time = jiffies + NET_FLASH_TIME;
+		led_active = 1;
 	}
 
-	/* Set the earliest time we may clear the LED */
-
-	led_clear_time = jiffies + NET_FLASH_TIME;
-	
 	/* configure the tx dma descriptor */
 
 	TxDesc.sw_len = length;
@@ -1028,16 +1067,41 @@ e100_hardware_send_packet(char *buf, int length)
 static void
 e100_clear_network_leds(unsigned long dummy)
 {
-	if (jiffies > led_clear_time) {
-		if (nolink)
-			LED_NETWORK_TX_SET(1);
-		else
-			LED_NETWORK_TX_SET(0);
-		LED_NETWORK_RX_SET(0); 
+        if (led_active && jiffies > led_next_time) {
+		e100_set_network_leds(NO_NETWORK_ACTIVITY);
+
+		/* Set the earliest time we may set the LED */
+		led_next_time = jiffies + NET_FLASH_PAUSE;
+		led_active = 0;
 	}
-	
-	clear_led_timer.expires = jiffies + 10;
+
+        clear_led_timer.expires = jiffies + HZ/10;
 	add_timer(&clear_led_timer);
+}
+
+static void
+e100_set_network_leds(int active)
+{
+#ifdef CONFIG_LED_OFF_DURING_ACTIVITY
+	int light_leds = (active == NO_NETWORK_ACTIVITY);
+#else
+	int light_leds = (active == NETWORK_ACTIVITY);
+#endif
+
+	if (!current_speed) {
+		/* Make LED red, link is down */
+		LED_NETWORK_SET(LED_RED);
+	}
+	else if (light_leds) {
+		if (current_speed == 10) {
+			LED_NETWORK_SET(LED_ORANGE);
+		} else {
+			LED_NETWORK_SET(LED_GREEN);
+		}
+	}
+	else {
+		LED_NETWORK_SET(LED_OFF);
+	}
 }
 
 static struct net_device dev_etrax_ethernet;  /* only got one */

@@ -369,7 +369,7 @@ int irttp_data_request(struct tsap_cb *self, struct sk_buff *skb)
 	} else {
 		/*
 		 *  Fragment the frame, this function will also queue the
-		 *  fragments, we don't care about the fact the the transmit
+		 *  fragments, we don't care about the fact the transmit
 		 *  queue may be overfilled by all the segments for a little
 		 *  while
 		 */
@@ -454,6 +454,46 @@ static void irttp_run_tx_queue(struct tsap_cb *self)
 		 */
 		skb->data[0] |= (n & 0x7f);
 		
+		/* Detach from socket.
+		 * The current skb has a reference to the socket that sent
+		 * it (skb->sk). When we pass it to IrLMP, the skb will be
+		 * stored in in IrLAP (self->wx_list). When we are within
+		 * IrLAP, we loose the notion of socket, so we should not
+		 * have a reference to a socket. So, we drop it here.
+		 * 
+		 * Why does it matter ?
+		 * When the skb is freed (kfree_skb), if it is associated
+		 * with a socket, it release buffer space on the socket
+		 * (through sock_wfree() and sock_def_write_space()).
+		 * If the socket no longer exist, we may crash. Hard.
+		 * When we close a socket, we make sure that associated packets
+		 * in IrTTP are freed. However, we have no way to cancel
+		 * the packet that we have passed to IrLAP. So, if a packet
+		 * remains in IrLAP (retry on the link or else) after we
+		 * close the socket, we are dead !
+		 * Jean II */
+		if (skb->sk != NULL) {
+			struct sk_buff *tx_skb;
+
+			/* IrSOCK application, IrOBEX, ... */
+			IRDA_DEBUG(4, __FUNCTION__ "() : Detaching SKB from socket.\n");
+			/* Note : still looking for a more efficient way
+			 * to do that - Jean II */
+
+			/* Get another skb on the same buffer, but without
+			 * a reference to the socket (skb->sk = NULL) */
+			tx_skb = skb_clone(skb, GFP_ATOMIC);
+			if (tx_skb != NULL) {
+				/* Release the skb associated with the
+				 * socket, and use the new skb insted */
+				kfree_skb(skb);
+				skb = tx_skb;
+			}
+		} else {
+			/* IrCOMM over IrTTP, IrLAN, ... */
+			IRDA_DEBUG(4, __FUNCTION__ "() : Got SKB not attached to a socket.\n");
+		}
+
 		irlmp_data_request(self->lsap, skb);
 		self->stats.tx_packets++;
 

@@ -88,6 +88,7 @@ extern int mtrr_add_page (unsigned long base, unsigned long size,
 		     unsigned int type, char increment);
 extern int mtrr_del (int reg, unsigned long base, unsigned long size);
 extern int mtrr_del_page (int reg, unsigned long base, unsigned long size);
+extern void mtrr_centaur_report_mcr(int mcr, u32 lo, u32 hi);
 #  else
 static __inline__ int mtrr_add (unsigned long base, unsigned long size,
 				unsigned int type, char increment)
@@ -109,6 +110,9 @@ static __inline__ int mtrr_del_page (int reg, unsigned long base,
 {
     return -ENODEV;
 }
+
+static __inline__ void mtrr_centaur_report_mcr(int mcr, u32 lo, u32 hi) {;}
+
 #  endif
 
 /*  The following functions are for initialisation: don't use them!  */

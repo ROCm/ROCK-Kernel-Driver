@@ -3,11 +3,18 @@
  *
  * Parts taken from the m68k port.
  * 
- * Copyright (c) 2000 Axis Communications AB
+ * Copyright (c) 2000, 2001 Axis Communications AB
  *
  * Authors:   Bjorn Wesen
  *
  * $Log: ptrace.c,v $
+ * Revision 1.5  2001/03/26 14:24:28  orjanf
+ * * Changed loop condition.
+ * * Added comment documenting non-standard ptrace behaviour.
+ *
+ * Revision 1.4  2001/03/20 19:44:41  bjornw
+ * Use the user_regs macro instead of thread.esp0
+ *
  * Revision 1.3  2000/12/18 23:45:25  bjornw
  * Linux/CRIS first version
  *
@@ -49,8 +56,8 @@ static inline long get_reg(struct task_struct *task, unsigned int regno)
 
 	if (regno == PT_USP)
 		return task->thread.usp;
-	else if (regno <= PT_MAX)
-		return ((unsigned long *)(task->thread.esp0))[regno];
+	else if (regno < PT_MAX)
+		return ((unsigned long *)user_regs(task))[regno];
 	else
 		return 0;
 }
@@ -65,12 +72,20 @@ static inline int put_reg(struct task_struct *task, unsigned int regno,
 
 	if (regno == PT_USP)
 		task->thread.usp = data;
-	else if (regno <= PT_MAX)
-		((unsigned long *)(task->thread.esp0))[regno] = data;
+	else if (regno < PT_MAX)
+		((unsigned long *)user_regs(task))[regno] = data;
 	else
 		return -1;
 	return 0;
 }
+
+/* Note that this implementation of ptrace behaves differently from vanilla
+ * ptrace.  Contrary to what the man page says, in the PTRACE_PEEKTEXT,
+ * PTRACE_PEEKDATA, and PTRACE_PEEKUSER requests the data variable is not
+ * ignored.  Instead, the data variable is expected to point at a location
+ * (in user space) where the result of the ptrace call is written (instead of
+ * being returned).
+ */
 
 asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 {

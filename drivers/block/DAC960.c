@@ -5134,16 +5134,12 @@ static int DAC960_IOCTL(Inode_T *Inode, File_T *File,
 						      PartitionNumber);
 	  int MinorNumber = DAC960_MinorNumber(LogicalDriveNumber,
 					       PartitionNumber);
-	  SuperBlock_T *SuperBlock = get_super(Device);
 	  if (Controller->GenericDiskInfo.part[MinorNumber].nr_sects == 0)
 	    continue;
 	  /*
 	    Flush all changes and invalidate buffered state.
 	  */
-	  sync_dev(Device);
-	  if (SuperBlock != NULL)
-	    invalidate_inodes(SuperBlock);
-	  invalidate_buffers(Device);
+	  invalidate_device(Device, 1);
 	  /*
 	    Clear existing partition sizes.
 	  */

@@ -718,6 +718,7 @@ static void __init do_basic_setup(void)
 	do_initcalls();
 
 #ifdef CONFIG_IRDA
+	irda_proto_init();
 	irda_device_init(); /* Must be done after protocol initialization */
 #endif
 #ifdef CONFIG_PCMCIA

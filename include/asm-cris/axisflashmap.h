@@ -15,7 +15,7 @@
  * tools/mkptable is used to generate the ptable. 
  */
 
-/* The partition table start with kod to "jump over" it: */
+/* The partition table starts with code to "jump over" it: */
 #define PARTITIONTABLE_CODE_START { \
  0x0f, 0x05, /* nop 0 */\
  0x25, 0xf0, /* di  2 */\
@@ -24,7 +24,7 @@
 /* The actual offset depend on the number of entries */
 #define PARTITIONTABLE_CODE_END { \
  0x00, 0x00, /* ba offset 6 */\
- 0x0f, 0x0f  /* nop 8 */}
+ 0x0f, 0x05  /* nop 8 */}
 
 #define PARTITION_TABLE_OFFSET 10
 #define PARTITION_TABLE_MAGIC 0xbeef /* Not a good magic */

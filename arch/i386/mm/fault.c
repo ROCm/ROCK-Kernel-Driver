@@ -322,12 +322,16 @@ vmalloc_fault:
 		/*
 		 * Synchronize this task's top level page-table
 		 * with the 'reference' page table.
+		 *
+		 * Do _not_ use "tsk" here. We might be inside
+		 * an interrupt in the middle of a task switch..
 		 */
 		int offset = __pgd_offset(address);
 		pgd_t *pgd, *pgd_k;
 		pmd_t *pmd, *pmd_k;
 
-		pgd = tsk->active_mm->pgd + offset;
+		asm("movl %%cr3,%0":"=r" (pgd));
+		pgd = offset + (pgd_t *)__va(pgd);
 		pgd_k = init_mm.pgd + offset;
 
 		if (!pgd_present(*pgd)) {

@@ -257,23 +257,31 @@ static pcic_t pcic[] = {
 
 /*====================================================================*/
 
+static spinlock_t bus_lock = SPIN_LOCK_UNLOCKED;
+
 static u_char i365_get(u_short sock, u_short reg)
 {
+    unsigned long flags;
+    spin_lock_irqsave(&bus_lock,flags);
     {
 	ioaddr_t port = socket[sock].ioaddr;
 	u_char val;
 	reg = I365_REG(socket[sock].psock, reg);
 	outb(reg, port); val = inb(port+1);
+	spin_unlock_irqrestore(&bus_lock,flags);
 	return val;
     }
 }
 
 static void i365_set(u_short sock, u_short reg, u_char data)
 {
+    unsigned long flags;
+    spin_lock_irqsave(&bus_lock,flags);
     {
 	ioaddr_t port = socket[sock].ioaddr;
 	u_char val = I365_REG(socket[sock].psock, reg);
 	outb(val, port); outb(data, port+1);
+	spin_unlock_irqrestore(&bus_lock,flags);
     }
 }
 
@@ -872,6 +880,13 @@ static void pcic_bh(void *dummy)
 		events = pending_events[i];
 		pending_events[i] = 0;
 		spin_unlock_irq(&pending_event_lock);
+		/* 
+		SS_DETECT events need a small delay here. The reason for this is that 
+		the "is there a card" electronics need time to see the card after the
+		"we have a card coming in" electronics have seen it. 
+		*/
+		if (events & SS_DETECT) 
+			mdelay(2);
 		if (socket[i].handler)
 			socket[i].handler(socket[i].info, events);
 	}
@@ -880,6 +895,8 @@ static void pcic_bh(void *dummy)
 static struct tq_struct pcic_task = {
 	routine:	pcic_bh
 };
+
+static unsigned long last_detect_jiffies;
 
 static void pcic_interrupt(int irq, void *dev,
 				    struct pt_regs *regs)
@@ -906,6 +923,20 @@ static void pcic_interrupt(int irq, void *dev,
 		continue;
 	    }
 	    events = (csc & I365_CSC_DETECT) ? SS_DETECT : 0;
+	    
+	    
+	    /* Several sockets will send multiple "new card detected"
+	       events in rapid succession. However, the rest of the pcmcia expects 
+	       only one such event. We just ignore these events by having a
+               timeout */
+
+	    if (events) {
+	    	if ((jiffies - last_detect_jiffies)<(HZ/20)) 
+	    		events = 0;
+	    	last_detect_jiffies = jiffies;
+	    	
+	    }
+	
 	    if (i365_get(i, I365_INTCTL) & I365_PC_IOCARD)
 		events |= (csc & I365_CSC_STSCHG) ? SS_STSCHG : 0;
 	    else {
@@ -970,6 +1001,7 @@ static int i365_get_status(u_short sock, u_int *value)
     status = i365_get(sock, I365_STATUS);
     *value = ((status & I365_CS_DETECT) == I365_CS_DETECT)
 	? SS_DETECT : 0;
+	
     if (i365_get(sock, I365_INTCTL) & I365_PC_IOCARD)
 	*value |= (status & I365_CS_STSCHG) ? 0 : SS_STSCHG;
     else {
@@ -1247,7 +1279,7 @@ static int i365_get_mem_map(u_short sock, struct pccard_mem_map *mem)
     i = i365_get_pair(sock, base+I365_W_START);
     mem->flags |= (i & I365_MEM_16BIT) ? MAP_16BIT : 0;
     mem->flags |= (i & I365_MEM_0WS) ? MAP_0WS : 0;
-    mem->sys_start += ((u_long)(i & 0x0fff) << 12);
+    mem->sys_start = ((u_long)(i & 0x0fff) << 12);
     
     i = i365_get_pair(sock, base+I365_W_STOP);
     mem->speed  = (i & I365_MEM_WS0) ? 1 : 0;

@@ -1185,7 +1185,7 @@ do_fault:
 	if (skb->len==0) {
 		if (tp->send_head == skb) {
 			tp->send_head = skb->prev;
-			if (tp->send_head == (struct sk_buff*)&sk->write_queue)
+			if (TCP_SKB_CB(skb)->seq == tp->snd_nxt)
 				tp->send_head = NULL;
 		}
 		__skb_unlink(skb, skb->list);

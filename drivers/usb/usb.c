@@ -569,7 +569,7 @@ void usb_driver_release_interface(struct usb_driver *driver, struct usb_interfac
  * The most specific match specifiers use device descriptor
  * data.  These are commonly used with product-specific matches;
  * the USB_DEVICE macro lets you provide vendor and product IDs,
- * and you can also matche against ranges of product revisions.
+ * and you can also match against ranges of product revisions.
  * These are widely used for devices with application or vendor
  * specific bDeviceClass values.
  *

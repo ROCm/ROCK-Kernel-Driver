@@ -7,6 +7,22 @@
  *  Authors:  Bjorn Wesen (bjornw@axis.com)
  *
  *  $Log: init.c,v $
+ *  Revision 1.23  2001/04/04 14:35:40  bjornw
+ *  * Removed get_pte_slow and friends (2.4.3 change)
+ *  * Removed bad_pmd handling (2.4.3 change)
+ *
+ *  Revision 1.22  2001/04/04 13:38:04  matsfg
+ *  Moved ioremap to a separate function instead
+ *
+ *  Revision 1.21  2001/03/27 09:28:33  bjornw
+ *  ioremap used too early - lets try it in mem_init instead
+ *
+ *  Revision 1.20  2001/03/23 07:39:21  starvik
+ *  Corrected according to review remarks
+ *
+ *  Revision 1.19  2001/03/15 14:25:17  bjornw
+ *  More general shadow registers and ioremaped addresses for external I/O
+ *
  *  Revision 1.18  2001/02/23 12:46:44  bjornw
  *  * 0xc was not CSE1; 0x8 is, same as uncached flash, so we move the uncached
  *    flash during CRIS_LOW_MAP from 0xe to 0x8 so both the flash and the I/O
@@ -68,6 +84,7 @@
 #include <asm/pgtable.h>
 #include <asm/dma.h>
 #include <asm/svinto.h>
+#include <asm/io.h>
 
 static unsigned long totalram_pages;
 
@@ -79,128 +96,13 @@ extern void die_if_kernel(char *,struct pt_regs *,long);
 extern void show_net_buffers(void);
 extern void tlb_init(void);
 
-/*
- * empty_bad_page is the page that is used for page faults when linux
- * is out-of-memory. Older versions of linux just did a
- * do_exit(), but using this instead means there is less risk
- * for a process dying in kernel mode, possibly leaving a inode
- * unused etc..
- *
- * the main point is that when a page table error occurs, we want to get
- * out of the kernel safely before killing the process, so we need something
- * to feed the MMU with when the fault occurs even if we don't have any
- * real PTE's or page tables.
- *
- * empty_bad_page_table is the accompanying page-table: it is initialized
- * to point to empty_bad_page writable-shared entries.
- *
- * empty_zero_page is a special page that is used for zero-initialized
- * data and COW.
- */
 
-unsigned long empty_bad_page_table;
-unsigned long empty_bad_page;
 unsigned long empty_zero_page;
-
-pte_t * __bad_pagetable(void)
-{
-	/* somehow it is enough to just clear it and not fill it with
-	 * bad page PTE's...
-	 */
-	memset((void *)empty_bad_page_table, 0, PAGE_SIZE);
-
-	return (pte_t *) empty_bad_page_table;
-}
-
-pte_t __bad_page(void)
-{
-
-	/* clear the empty_bad_page page. this should perhaps be
-	 * a more simple inlined loop like it is on the other 
-	 * architectures.
-	 */
-
-	memset((void *)empty_bad_page, 0, PAGE_SIZE);
-
-	return pte_mkdirty(__mk_pte((void *)empty_bad_page, PAGE_SHARED));
-}
-
-static pte_t * get_bad_pte_table(void)
-{
-	pte_t *empty_bad_pte_table = (pte_t *)empty_bad_page_table;
-	pte_t v;
-	int i;
-
-	v = __bad_page();
-
-	for (i = 0; i < PAGE_SIZE/sizeof(pte_t); i++)
-		empty_bad_pte_table[i] = v;
-
-	return empty_bad_pte_table;
-}
-
-void __handle_bad_pmd(pmd_t *pmd)
-{
-	pmd_ERROR(*pmd);
-	pmd_set(pmd, get_bad_pte_table());
-}
-
-void __handle_bad_pmd_kernel(pmd_t *pmd)
-{
-	pmd_ERROR(*pmd);
-	pmd_set_kernel(pmd, get_bad_pte_table());
-}
-
-pte_t *get_pte_kernel_slow(pmd_t *pmd, unsigned long offset)
-{
-        pte_t *pte;
-
-        pte = (pte_t *) __get_free_page(GFP_KERNEL);
-        if (pmd_none(*pmd)) {
-                if (pte) {
-                        clear_page(pte);
-			pmd_set_kernel(pmd, pte);
-                        return pte + offset;
-                }
-		pmd_set_kernel(pmd, get_bad_pte_table());
-                return NULL;
-        }
-        free_page((unsigned long)pte);
-        if (pmd_bad(*pmd)) {
-                __handle_bad_pmd_kernel(pmd);
-                return NULL;
-        }
-        return (pte_t *) pmd_page(*pmd) + offset;
-}
-
-pte_t *get_pte_slow(pmd_t *pmd, unsigned long offset)
-{
-	pte_t *pte;
-
-        pte = (pte_t *) __get_free_page(GFP_KERNEL);
-        if (pmd_none(*pmd)) {
-                if (pte) {
-                        clear_page(pte);
-			pmd_set(pmd, pte);
-                        return pte + offset;
-                }
-		pmd_set(pmd, get_bad_pte_table());
-                return NULL;
-        }
-        free_page((unsigned long)pte);
-        if (pmd_bad(*pmd)) {
-                __handle_bad_pmd(pmd);
-                return NULL;
-        }
-        return (pte_t *) pmd_page(*pmd) + offset;
-}
-
-#ifndef CONFIG_NO_PGT_CACHE
-struct pgtable_cache_struct quicklists;
 
 /* trim the page-table cache if necessary */
 
-int do_check_pgt_cache(int low, int high)
+int 
+do_check_pgt_cache(int low, int high)
 {
         int freed = 0;
 
@@ -211,25 +113,20 @@ int do_check_pgt_cache(int low, int high)
                                 freed++;
                         }
                         if(pmd_quicklist) {
-                                free_pmd_slow(get_pmd_fast());
+                                pmd_free_slow(pmd_alloc_one_fast(NULL, 0));
                                 freed++;
                         }
                         if(pte_quicklist) {
-                                free_pte_slow(get_pte_fast());
-                                 freed++;
+                                pte_free_slow(pte_alloc_one_fast(NULL, 0));
+				freed++;
                         }
                 } while(pgtable_cache_size > low);
         }
         return freed;
 }
-#else
-int do_check_pgt_cache(int low, int high)
-{
-        return 0;
-}
-#endif
 
-void show_mem(void)
+void 
+show_mem(void)
 {
 	int i,free = 0,total = 0,cached = 0, reserved = 0, nonshared = 0;
 	int shared = 0;
@@ -287,58 +184,8 @@ paging_init(void)
 
 	/* see README.mm for details on the KSEG setup */
 
-#ifdef CONFIG_CRIS_LOW_MAP
-
-	/* Etrax-100 LX version 1 has a bug so that we cannot map anything
-	 * across the 0x80000000 boundary, so we need to shrink the user-virtual
-	 * area to 0x50000000 instead of 0xb0000000 and map things slightly
-	 * different. The unused areas are marked as paged so that we can catch
-	 * freak kernel accesses there.
-	 *
-	 * The Juliette chip is mapped at 0xa so we pass that segment straight
-	 * through. We cannot vremap it because the vmalloc area is below 0x8
-	 * and Juliette needs an uncached area above 0x8.
-	 *
-	 * Same thing with 0xc and 0x9, which is memory-mapped I/O on some boards.
-	 * We map them straight over in LOW_MAP, but use vremap in LX version 2.
-	 */
-
-	*R_MMU_KSEG = ( IO_STATE(R_MMU_KSEG, seg_f, page ) | 
-			IO_STATE(R_MMU_KSEG, seg_e, page ) |
-			IO_STATE(R_MMU_KSEG, seg_d, page ) | 
-			IO_STATE(R_MMU_KSEG, seg_c, page ) |   
-			IO_STATE(R_MMU_KSEG, seg_b, seg  ) |  /* kernel reg area */
-			IO_STATE(R_MMU_KSEG, seg_a, seg  ) |  /* Juliette etc. */
-			IO_STATE(R_MMU_KSEG, seg_9, seg  ) |  /* LED's on some boards */
-			IO_STATE(R_MMU_KSEG, seg_8, seg  ) |  /* CSE0/1, flash and I/O */
-			IO_STATE(R_MMU_KSEG, seg_7, page ) |  /* kernel vmalloc area */
-			IO_STATE(R_MMU_KSEG, seg_6, seg  ) |  /* kernel DRAM area */
-			IO_STATE(R_MMU_KSEG, seg_5, seg  ) |  /* cached flash */
-			IO_STATE(R_MMU_KSEG, seg_4, page ) |  /* user area */
-			IO_STATE(R_MMU_KSEG, seg_3, page ) |  /* user area */
-			IO_STATE(R_MMU_KSEG, seg_2, page ) |  /* user area */
-			IO_STATE(R_MMU_KSEG, seg_1, page ) |  /* user area */
-			IO_STATE(R_MMU_KSEG, seg_0, page ) ); /* user area */
-
-	*R_MMU_KBASE_HI = ( IO_FIELD(R_MMU_KBASE_HI, base_f, 0x0 ) |
-			    IO_FIELD(R_MMU_KBASE_HI, base_e, 0x0 ) |
-			    IO_FIELD(R_MMU_KBASE_HI, base_d, 0x0 ) |
-			    IO_FIELD(R_MMU_KBASE_HI, base_c, 0x0 ) |
-			    IO_FIELD(R_MMU_KBASE_HI, base_b, 0xb ) |
-			    IO_FIELD(R_MMU_KBASE_HI, base_a, 0xa ) |
-			    IO_FIELD(R_MMU_KBASE_HI, base_9, 0x9 ) |
-			    IO_FIELD(R_MMU_KBASE_HI, base_8, 0x8 ) );
-	
-	*R_MMU_KBASE_LO = ( IO_FIELD(R_MMU_KBASE_LO, base_7, 0x0 ) |
-			    IO_FIELD(R_MMU_KBASE_LO, base_6, 0x4 ) |
-			    IO_FIELD(R_MMU_KBASE_LO, base_5, 0x0 ) |
-			    IO_FIELD(R_MMU_KBASE_LO, base_4, 0x0 ) |
-			    IO_FIELD(R_MMU_KBASE_LO, base_3, 0x0 ) |
-			    IO_FIELD(R_MMU_KBASE_LO, base_2, 0x0 ) |
-			    IO_FIELD(R_MMU_KBASE_LO, base_1, 0x0 ) |
-			    IO_FIELD(R_MMU_KBASE_LO, base_0, 0x0 ) );
-#else
-	/* This code is for the hopefully corrected Etrax-100 LX version 2... */
+#ifndef CONFIG_CRIS_LOW_MAP
+	/* This code is for the corrected Etrax-100 LX version 2... */
 
 	*R_MMU_KSEG = ( IO_STATE(R_MMU_KSEG, seg_f, seg  ) | /* cached flash */
 			IO_STATE(R_MMU_KSEG, seg_e, seg  ) | /* uncached flash */
@@ -374,7 +221,56 @@ paging_init(void)
 			    IO_FIELD(R_MMU_KBASE_LO, base_2, 0x0 ) |
 			    IO_FIELD(R_MMU_KBASE_LO, base_1, 0x0 ) |
 			    IO_FIELD(R_MMU_KBASE_LO, base_0, 0x0 ) );
-#endif	
+#else
+	/* Etrax-100 LX version 1 has a bug so that we cannot map anything
+	 * across the 0x80000000 boundary, so we need to shrink the user-virtual
+	 * area to 0x50000000 instead of 0xb0000000 and map things slightly
+	 * different. The unused areas are marked as paged so that we can catch
+	 * freak kernel accesses there.
+	 *
+	 * The ARTPEC chip is mapped at 0xa so we pass that segment straight
+	 * through. We cannot vremap it because the vmalloc area is below 0x8
+	 * and Juliette needs an uncached area above 0x8.
+	 *
+	 * Same thing with 0xc and 0x9, which is memory-mapped I/O on some boards.
+	 * We map them straight over in LOW_MAP, but use vremap in LX version 2.
+	 */
+
+	*R_MMU_KSEG = ( IO_STATE(R_MMU_KSEG, seg_f, page ) | 
+			IO_STATE(R_MMU_KSEG, seg_e, page ) |
+			IO_STATE(R_MMU_KSEG, seg_d, page ) | 
+			IO_STATE(R_MMU_KSEG, seg_c, page ) |   
+			IO_STATE(R_MMU_KSEG, seg_b, seg  ) |  /* kernel reg area */
+			IO_STATE(R_MMU_KSEG, seg_a, seg  ) |  /* ARTPEC etc. */
+			IO_STATE(R_MMU_KSEG, seg_9, seg  ) |  /* LED's on some boards */
+			IO_STATE(R_MMU_KSEG, seg_8, seg  ) |  /* CSE0/1, flash and I/O */
+			IO_STATE(R_MMU_KSEG, seg_7, page ) |  /* kernel vmalloc area */
+			IO_STATE(R_MMU_KSEG, seg_6, seg  ) |  /* kernel DRAM area */
+			IO_STATE(R_MMU_KSEG, seg_5, seg  ) |  /* cached flash */
+			IO_STATE(R_MMU_KSEG, seg_4, page ) |  /* user area */
+			IO_STATE(R_MMU_KSEG, seg_3, page ) |  /* user area */
+			IO_STATE(R_MMU_KSEG, seg_2, page ) |  /* user area */
+			IO_STATE(R_MMU_KSEG, seg_1, page ) |  /* user area */
+			IO_STATE(R_MMU_KSEG, seg_0, page ) ); /* user area */
+
+	*R_MMU_KBASE_HI = ( IO_FIELD(R_MMU_KBASE_HI, base_f, 0x0 ) |
+			    IO_FIELD(R_MMU_KBASE_HI, base_e, 0x0 ) |
+			    IO_FIELD(R_MMU_KBASE_HI, base_d, 0x0 ) |
+			    IO_FIELD(R_MMU_KBASE_HI, base_c, 0x0 ) |
+			    IO_FIELD(R_MMU_KBASE_HI, base_b, 0xb ) |
+			    IO_FIELD(R_MMU_KBASE_HI, base_a, 0xa ) |
+			    IO_FIELD(R_MMU_KBASE_HI, base_9, 0x9 ) |
+			    IO_FIELD(R_MMU_KBASE_HI, base_8, 0x8 ) );
+	
+	*R_MMU_KBASE_LO = ( IO_FIELD(R_MMU_KBASE_LO, base_7, 0x0 ) |
+			    IO_FIELD(R_MMU_KBASE_LO, base_6, 0x4 ) |
+			    IO_FIELD(R_MMU_KBASE_LO, base_5, 0x0 ) |
+			    IO_FIELD(R_MMU_KBASE_LO, base_4, 0x0 ) |
+			    IO_FIELD(R_MMU_KBASE_LO, base_3, 0x0 ) |
+			    IO_FIELD(R_MMU_KBASE_LO, base_2, 0x0 ) |
+			    IO_FIELD(R_MMU_KBASE_LO, base_1, 0x0 ) |
+			    IO_FIELD(R_MMU_KBASE_LO, base_0, 0x0 ) );
+#endif
 
 	*R_MMU_CONTEXT = ( IO_FIELD(R_MMU_CONTEXT, page_id, 0 ) );
 	
@@ -393,8 +289,6 @@ paging_init(void)
 	 * to a couple of allocated pages
 	 */
 
-	empty_bad_page_table = (unsigned long)alloc_bootmem_pages(PAGE_SIZE);
-	empty_bad_page = (unsigned long)alloc_bootmem_pages(PAGE_SIZE);
 	empty_zero_page = (unsigned long)alloc_bootmem_pages(PAGE_SIZE);
 	memset((void *)empty_zero_page, 0, PAGE_SIZE);
 
@@ -412,6 +306,7 @@ paging_init(void)
 	 */
 
 	free_area_init_node(0, 0, 0, zones_size, PAGE_OFFSET, 0);
+
 }
 
 extern unsigned long loops_per_jiffy; /* init/main.c */
@@ -462,7 +357,7 @@ mem_init(void)
 	       datasize >> 10,
 	       initsize >> 10
                );
-	
+
 	/* HACK alert - calculate a loops_per_usec for asm/delay.h here
 	 * since this is called just after calibrate_delay in init/main.c
 	 * but before places which use udelay. cannot be in time.c since
@@ -474,9 +369,52 @@ mem_init(void)
 	return;
 }
 
+/* Initialize remaps of some I/O-ports. This is designed to be callable
+ * multiple times from the drivers init-sections, because we don't know
+ * beforehand which driver will get initialized first.
+ */
+
+void 
+init_ioremap(void)
+{
+  
+	/* Give the external I/O-port addresses their values */
+
+        static int initialized = 0;
+  
+        if( !initialized ) {
+                initialized++;
+            
+#ifdef CONFIG_CRIS_LOW_MAP
+               /* Simply a linear map (see the KSEG map above in paging_init) */
+               port_cse1_addr = (volatile unsigned long *)(MEM_CSE1_START | 
+                                                           MEM_NON_CACHEABLE);
+               port_csp0_addr = (volatile unsigned long *)(MEM_CSP0_START |
+                                                           MEM_NON_CACHEABLE);
+               port_csp4_addr = (volatile unsigned long *)(MEM_CSP4_START |
+                                                           MEM_NON_CACHEABLE);
+#else
+               /* Note that nothing blows up just because we do this remapping 
+                * it's ok even if the ports are not used or connected 
+                * to anything (or connected to a non-I/O thing) */        
+               port_cse1_addr = (volatile unsigned long *)
+                 ioremap((unsigned long)(MEM_CSE1_START | 
+                                         MEM_NON_CACHEABLE), 16);
+               port_csp0_addr = (volatile unsigned long *)
+                 ioremap((unsigned long)(MEM_CSP0_START |
+                                         MEM_NON_CACHEABLE), 16);
+               port_csp4_addr = (volatile unsigned long *)
+                 ioremap((unsigned long)(MEM_CSP4_START |
+                                         MEM_NON_CACHEABLE), 16);
+#endif	
+        }
+}
+
+
 /* free the pages occupied by initialization code */
 
-void free_initmem(void)
+void 
+free_initmem(void)
 {
 #if 0
 	/* currently this is a bad idea since the cramfs image is catted onto
@@ -497,7 +435,8 @@ void free_initmem(void)
 #endif
 }
 
-void si_meminfo(struct sysinfo *val)
+void 
+si_meminfo(struct sysinfo *val)
 {
 	int i;
 

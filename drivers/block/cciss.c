@@ -44,8 +44,8 @@
 #include <linux/genhd.h>
 
 #define CCISS_DRIVER_VERSION(maj,min,submin) ((maj<<16)|(min<<8)|(submin))
-#define DRIVER_NAME "Compaq CISS Driver (v 2.4.2)"
-#define DRIVER_VERSION CCISS_DRIVER_VERSION(2,4,2)
+#define DRIVER_NAME "Compaq CISS Driver (v 2.4.3)"
+#define DRIVER_VERSION CCISS_DRIVER_VERSION(2,4,3)
 
 /* Embedded module documentation macros - see modules.h */
 MODULE_AUTHOR("Charles M. White III - Compaq Computer Corporation");
@@ -125,10 +125,10 @@ static int cciss_proc_get_info(char *buffer, char **start, off_t offset,
 
         ctlr = h->ctlr;
         size = sprintf(buffer, "%s:  Compaq %s Controller\n"
-                "       Board ID: %08lx\n"
+                "       Board ID: 0x%08lx\n"
 		"       Firmware Version: %c%c%c%c\n"
-                "       Memory Address: %08lx\n"
-                "       IRQ: 0x%x\n"
+                "       Memory Address: 0x%08lx\n"
+                "       IRQ: %d\n"
                 "       Logical drives: %d\n"
                 "       Current Q depth: %d\n"
 		"       Current # commands on controller %d\n"
@@ -172,7 +172,7 @@ static int cciss_proc_get_info(char *buffer, char **start, off_t offset,
 static void __init cciss_procinit(int i)
 {
         if (proc_cciss == NULL) {
-                proc_cciss = proc_mkdir("driver/cciss", NULL);
+                proc_cciss = proc_mkdir("cciss", proc_root_driver);
                 if (!proc_cciss) 
 			return;
         }
@@ -691,13 +691,9 @@ static int revalidate_logvol(kdev_t dev, int maxusage)
         max_p = gdev->max_p;
         start = target << gdev->minor_shift;
 
-        for(i=max_p; i>=0; i--) {
+        for(i=max_p-1; i>=0; i--) {
                 int minor = start+i;
-                kdev_t devi = MKDEV(MAJOR_NR + ctlr, minor);
-                struct super_block *sb = get_super(devi);
-                sync_dev(devi);
-                if (sb) invalidate_inodes(sb);
-                invalidate_buffers(devi);
+                invalidate_device(MKDEV(MAJOR_NR + ctlr, minor), 1);
                 gdev->part[minor].start_sect = 0;
                 gdev->part[minor].nr_sects = 0;
 
@@ -1222,6 +1218,9 @@ static void do_cciss_request(request_queue_t *q)
 	struct request *creq;
 	u64bit temp64;
 
+    // Loop till the queue is empty if or it is plugged
+    while (1)
+    {
 	if (q->plugged || list_empty(queue_head)) {
                 start_io(h);
                 return;
@@ -1329,7 +1328,7 @@ static void do_cciss_request(request_queue_t *q)
 	h->Qdepth++;
 	if(h->Qdepth > h->maxQsinceinit)
 		h->maxQsinceinit = h->Qdepth; 
-	start_io(h);
+   }  // while loop
 }
 
 static void do_cciss_intr(int irq, void *dev_id, struct pt_regs *regs)
@@ -1951,7 +1950,7 @@ static void __exit cleanup_cciss_module(void)
 				}
 			}
 		}
-		remove_proc_entry("driver/cciss", &proc_root);
+		remove_proc_entry("cciss", proc_root_driver);
 		kfree(hba[i]->cmd_pool);
 		kfree(hba[i]->errinfo_pool);
                 kfree(hba[i]->cmd_pool_bits);

@@ -993,8 +993,7 @@ static int sd_init_onedisk(int i)
 		the_result = SRpnt->sr_result;
 
 		if (the_result) {
-			printk("%s: test WP failed, assume Write Protected\n", nbuff);
-			rscsi_disks[i].write_prot = 1;
+			printk("%s: test WP failed, assume Write Enabled\n", nbuff);
 		} else {
 			rscsi_disks[i].write_prot = ((buffer[2] & 0x80) != 0);
 			printk("%s: Write Protect is %s\n", nbuff,
@@ -1261,12 +1260,7 @@ int revalidate_scsidisk(kdev_t dev, int maxusage)
 
 	for (i = max_p - 1; i >= 0; i--) {
 		int index = start + i;
-		kdev_t devi = MKDEV_SD_PARTITION(index);
-		struct super_block *sb = get_super(devi);
-		sync_dev(devi);
-		if (sb)
-			invalidate_inodes(sb);
-		invalidate_buffers(devi);
+		invalidate_device(MKDEV_SD_PARTITION(index), 1);
 		sd_gendisks->part[index].start_sect = 0;
 		sd_gendisks->part[index].nr_sects = 0;
 		/*
@@ -1314,12 +1308,7 @@ static void sd_detach(Scsi_Device * SDp)
 
 			for (j = max_p - 1; j >= 0; j--) {
 				int index = start + j;
-				kdev_t devi = MKDEV_SD_PARTITION(index);
-				struct super_block *sb = get_super(devi);
-				sync_dev(devi);
-				if (sb)
-					invalidate_inodes(sb);
-				invalidate_buffers(devi);
+				invalidate_device(MKDEV_SD_PARTITION(index), 1);
 				sd_gendisks->part[index].start_sect = 0;
 				sd_gendisks->part[index].nr_sects = 0;
 				sd_sizes[index] = 0;

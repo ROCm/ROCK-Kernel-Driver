@@ -997,17 +997,13 @@ static int nftl_open(struct inode *ip, struct file *fp)
 
 static int nftl_release(struct inode *inode, struct file *fp)
 {
-	struct super_block *sb = get_super(inode->i_rdev);
 	struct NFTLrecord *thisNFTL;
 
 	thisNFTL = NFTLs[MINOR(inode->i_rdev) / 16];
 
 	DEBUG(MTD_DEBUG_LEVEL2, "NFTL_release\n");
 
-	fsync_dev(inode->i_rdev);
-	if (sb)
-		invalidate_inodes(sb);
-	invalidate_buffers(inode->i_rdev);
+	invalidate_device(inode->i_rdev, 1);
 
 	if (thisNFTL->mtd->sync)
 		thisNFTL->mtd->sync(thisNFTL->mtd);

@@ -57,7 +57,7 @@
 #define __NR_geteuid		 49
 #define __NR_getegid		 50
 #define __NR_acct		 51
-#define __NR_phys		 52
+#define __NR_umount2		 52
 #define __NR_lock		 53
 #define __NR_ioctl		 54
 #define __NR_fcntl		 55

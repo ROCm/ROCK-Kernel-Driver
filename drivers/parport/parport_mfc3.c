@@ -91,7 +91,7 @@ DPRINTK("write_data %c\n",data);
 
 static unsigned char mfc3_read_data(struct parport *p)
 {
-	/* clears interupt bit. Triggers also /STROBE. */
+	/* clears interrupt bit. Triggers also /STROBE. */
 	return pia(p)->pprb;
 }
 

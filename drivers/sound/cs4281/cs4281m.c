@@ -194,9 +194,6 @@ static const char invalid_magic[] =
         }                                         \
 })
 
-#define list_for_each(pos, head) \
-        for (pos = (head)->next; pos != (head); pos = pos->next)
-
 //LIST_HEAD(cs4281_devs);
 struct list_head cs4281_devs = { &cs4281_devs, &cs4281_devs };
 

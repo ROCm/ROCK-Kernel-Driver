@@ -186,7 +186,7 @@ irnet_read_discovery_log(irnet_socket *	ap,
 
   return done_event;
 }
-#endif INITIAL_DISCOVERY
+#endif /* INITIAL_DISCOVERY */
 
 /*------------------------------------------------------------------*/
 /*
@@ -221,7 +221,7 @@ irnet_ctrl_read(irnet_socket *	ap,
       DEXIT(CTRL_TRACE, "\n");
       return(strlen(event));
     }
-#endif INITIAL_DISCOVERY
+#endif /* INITIAL_DISCOVERY */
 
   /* Put ourselves on the wait queue to be woken up */
   add_wait_queue(&irnet_events.rwait, &wait);
@@ -346,7 +346,7 @@ irnet_ctrl_poll(irnet_socket *	ap,
 #ifdef INITIAL_DISCOVERY
   if(ap->disco_number != -1)
     mask |= POLLIN | POLLRDNORM;
-#endif INITIAL_DISCOVERY
+#endif /* INITIAL_DISCOVERY */
 
   DEXIT(CTRL_TRACE, " - mask=0x%X\n", mask);
   return mask;
@@ -379,7 +379,7 @@ dev_irnet_open(struct inode *	inode,
   /* This could (should?) be enforced by the permissions on /dev/irnet. */
   if(!capable(CAP_NET_ADMIN))
     return -EPERM;
-#endif SECURE_DEVIRNET
+#endif /* SECURE_DEVIRNET */
 
   /* Allocate a private structure for this IrNET instance */
   ap = kmalloc(sizeof(*ap), GFP_KERNEL);
@@ -394,8 +394,11 @@ dev_irnet_open(struct inode *	inode,
   /* PPP channel setup */
   ap->ppp_open = 0;
   ap->chan.private = ap;
+  ap->chan.ops = &irnet_ppp_ops;
+  ap->chan.mtu = (2048 - TTP_MAX_HEADER - 2 - PPP_HDRLEN);
+  ap->chan.hdrlen = 2 + TTP_MAX_HEADER;		/* for A/C + Max IrDA hdr */
   /* PPP parameters */
-  ap->mru = PPP_MRU;
+  ap->mru = (2048 - TTP_MAX_HEADER - 2 - PPP_HDRLEN);
   ap->xaccm[0] = ~0U;
   ap->xaccm[3] = 0x60000000U;
   ap->raccm = ~0U;
@@ -554,7 +557,7 @@ dev_irnet_ioctl(struct inode *	inode,
 #ifdef SECURE_DEVIRNET
   if(!capable(CAP_NET_ADMIN))
     return -EPERM;
-#endif SECURE_DEVIRNET
+#endif /* SECURE_DEVIRNET */
 
   err = -EFAULT;
   switch(cmd)
@@ -566,10 +569,7 @@ dev_irnet_ioctl(struct inode *	inode,
       if((val == N_SYNC_PPP) || (val == N_PPP))
 	{
 	  DEBUG(FS_INFO, "Entering PPP discipline.\n");
-	  /* PPP channel setup */
-	  ap->chan.private = ap;
-	  ap->chan.ops = &irnet_ppp_ops;
-	  ap->chan.mtu = PPP_MRU;
+	  /* PPP channel setup (ap->chan in configued in dev_irnet_open())*/
 	  err = ppp_register_channel(&ap->chan);
 	  if(err == 0)
 	    {
@@ -672,7 +672,7 @@ dev_irnet_ioctl(struct inode *	inode,
        * we get rid of our own buffers */
 #ifdef FLUSH_TO_PPP
       ppp_output_wakeup(&ap->chan);
-#endif FLUSH_TO_PPP
+#endif /* FLUSH_TO_PPP */
       err = 0;
       break;
 
@@ -758,7 +758,7 @@ irnet_prepare_skb(irnet_socket *	ap,
   /* prepend address/control fields if necessary */
   if(needaddr)
     {
-      skb_push(skb,2);
+      skb_push(skb, 2);
       skb->data[0] = PPP_ALLSTATIONS;
       skb->data[1] = PPP_UI;
     }
@@ -800,7 +800,7 @@ ppp_irnet_send(struct ppp_channel *	chan,
        * go through interruptible_sleep_on() in irnet_find_lsap_sel()
        * We need to find another way... */
       irda_irnet_connect(self);
-#endif CONNECT_IN_SEND
+#endif /* CONNECT_IN_SEND */
 
       DEBUG(PPP_INFO, "IrTTP not ready ! (%d-0x%X)\n",
 	    self->ttp_open, (unsigned int) self->tsap);
@@ -831,7 +831,7 @@ ppp_irnet_send(struct ppp_channel *	chan,
 	  /* Blocking packet, ppp_generic will retry later */
 	  return 0;
 	}
-#endif BLOCK_WHEN_CONNECT
+#endif /* BLOCK_WHEN_CONNECT */
 
       /* Dropping packet, pppd will retry later */
       dev_kfree_skb(skb);

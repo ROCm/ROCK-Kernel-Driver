@@ -27,8 +27,8 @@
  * Should be defined in <linux/if_ppp.h> */
 #ifndef PPPIOCSLINKNAME
 #define PPPIOCSLINKNAME	_IOW('t', 74, struct ppp_option_data)
-#endif PPPIOCSLINKNAME
-#endif LINKNAME_IOCTL
+#endif /* PPPIOCSLINKNAME */
+#endif /* LINKNAME_IOCTL */
 
 /* PPP hardcore stuff */
 
@@ -127,4 +127,4 @@ struct ppp_channel_ops irnet_ppp_ops =
   ppp_irnet_ioctl
 };
 
-#endif IRNET_PPP_H
+#endif /* IRNET_PPP_H */

@@ -5,7 +5,8 @@
  * deadlocks sometimes - you can not swap over TCP in general.
  * 
  * Copyright 1997-2000 Pavel Machek <pavel@ucw.cz>
- * 
+ * Parts copyright 2001 Steven Whitehouse <steve@chygwyn.com>
+ *
  * (part of code stolen from loop.c)
  *
  * 97-3-25 compiled 0-th version, not yet tested it 
@@ -20,6 +21,9 @@
  * 99-1-11 Attempt to make 64-bit-clean on 32-bit machines <ankry@mif.pg.gda.pl>
  * 01-2-27 Fix to store proper blockcount for kernel (calculated using
  *   BLOCK_SIZE_BITS, not device blocksize) <aga@permonline.ru>
+ * 01-3-11 Make nbd work with new Linux block layer code. It now supports
+ *   plugging like all the other block devices. Also added in MSG_MORE to
+ *   reduce number of partial TCP segments sent. <steve@chygwyn.com>
  *
  * possible FIXME: make set_sock / set_blksize / set_size / do_it one syscall
  * why not: would need verify_area and friends, would share yet another 

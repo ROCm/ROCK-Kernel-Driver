@@ -161,7 +161,7 @@ S:	Supported
 APPLETALK NETWORK LAYER
 P:	Jay Schulist
 M:	jschlst@turbolinux.com
-L:	linux-atalk@netspace.org
+L:	linux-atalk@lists.netspace.org
 S:	Maintained
 
 ARM MFM AND FLOPPY DRIVERS
@@ -280,13 +280,17 @@ S:	Supported
 CONFIGURE, MENUCONFIG, XCONFIG
 P:	Michael Elizabeth Chastain
 M:	mec@shout.net
-L:	linux-kbuild@torque.net
-W:	http://www.kernel.org/pub/linux/kernel/projects/kbuild/
+L:	kbuild-devel@lists.sourceforge.net
+W:	http://kbuild.sourceforge.net
 S:	Maintained
 
 CONFIGURE.HELP
-P:	Axel Boldt
-M:	axel@uni-paderborn.de
+P:	Steven P. Cole
+M:	Steven P. Cole <elenstev@mesatop.com>
+P:	Eric S. Raymond
+M:	Eric S. Raymond <esr@thyrsus.com>
+L:	kbuild-devel@lists.sourceforge.net
+W:	http://kbuild.sourceforge.net
 S:	Maintained
 
 COSA/SRP SYNC SERIAL DRIVER
@@ -393,7 +397,7 @@ S:	Supported
 
 DISK GEOMETRY AND PARTITION HANDLING
 P:     Andries Brouwer
-M:     aeb@veritas.com
+M:     aeb@cwi.nl
 W:     http://www.win.tue.nl/~aeb/linux/Large-Disk.html
 W:     http://www.win.tue.nl/~aeb/linux/zip/zip-1.html
 W:     http://www.win.tue.nl/~aeb/partitions/partition_types-1.html
@@ -547,22 +551,6 @@ M:	klaus.kudielka@ieee.org
 L:	linux-hams@vger.kernel.org
 W:	http://www.nt.tuwien.ac.at/~kkudielk/Linux/
 S:	Maintained
-
-KERNEL BUILD (Makefile, Rules.make, scripts/*)
-P:	Keith Owens
-M:	kaos@ocs.com.au
-P:	Michael Elizabeth Chastain
-M:	mec@shout.net
-L:	linux-kbuild@torque.net
-W:	http://www.kernel.org/pub/linux/kernel/projects/kbuild/
-S:	Maintained 
-
-LOGICAL VOLUME MANAGER
-P:     Heinz Mauelshagen
-M:     linux-LVM@EZ-Darmstadt.Telekom.de
-L:     linux-LVM@msede.com
-W:     http://linux.msede.com/lvm
-S:     Maintained 
 
 HIPPI
 P:	Jes Sorensen
@@ -759,6 +747,15 @@ M:	jeremy@goop.org
 L:	autofs@linux.kernel.org
 S:	Maintained
 
+KERNEL BUILD (Makefile, Rules.make, scripts/*)
+P:	Keith Owens
+M:	kaos@ocs.com.au
+P:	Michael Elizabeth Chastain
+M:	mec@shout.net
+L:	linux-kbuild@torque.net
+W:	http://www.kernel.org/pub/linux/kernel/projects/kbuild/
+S:	Maintained 
+
 KERNEL NFSD
 P:	Neil Brown
 M:	neilb@cse.unsw.edu.au
@@ -792,6 +789,13 @@ M:	paulus@samba.org
 W:	http://www.linuxppc.org/
 L:	linuxppc-dev@lists.linuxppc.org
 S:	Maintained
+
+LOGICAL VOLUME MANAGER
+P:     Heinz Mauelshagen
+M:     linux-LVM@EZ-Darmstadt.Telekom.de
+L:     linux-LVM@msede.com
+W:     http://linux.msede.com/lvm
+S:     Maintained 
 
 M68K
 P:	Jes Sorensen

@@ -1,7 +1,7 @@
 /*
  * misc.c
  *
- * $Id: misc.c,v 1.3 2001/01/17 15:54:18 jonashg Exp $
+ * $Id: misc.c,v 1.6 2001/04/09 10:00:21 starvik Exp $
  * 
  * This is a collection of several routines from gzip-1.0.3 
  * adapted for Linux.
@@ -21,6 +21,7 @@
 #define KERNEL_LOAD_ADR 0x40004000
 
 #include <linux/config.h>
+
 #include <linux/types.h>
 #include <asm/svinto.h>
 
@@ -143,21 +144,21 @@ static void gzip_release(void **ptr)
 static void
 puts(const char *s)
 {
-#ifndef CONFIG_DEBUG_PORT_NULL
+#ifndef CONFIG_ETRAX_DEBUG_PORT_NULL
 	while(*s) {
-#ifdef CONFIG_DEBUG_PORT0
+#ifdef CONFIG_ETRAX_DEBUG_PORT0
 		while(!(*R_SERIAL0_STATUS & (1 << 5))) ;
 		*R_SERIAL0_TR_DATA = *s++;
 #endif
-#ifdef CONFIG_DEBUG_PORT1
+#ifdef CONFIG_ETRAX_DEBUG_PORT1
 		while(!(*R_SERIAL1_STATUS & (1 << 5))) ;
 		*R_SERIAL1_TR_DATA = *s++;
 #endif
-#ifdef CONFIG_DEBUG_PORT2
+#ifdef CONFIG_ETRAX_DEBUG_PORT2
 		while(!(*R_SERIAL2_STATUS & (1 << 5))) ;
 		*R_SERIAL2_TR_DATA = *s++;
 #endif
-#ifdef CONFIG_DEBUG_PORT3
+#ifdef CONFIG_ETRAX_DEBUG_PORT3
 		while(!(*R_SERIAL3_STATUS & (1 << 5))) ;
 		*R_SERIAL3_TR_DATA = *s++;
 #endif
@@ -227,33 +228,45 @@ setup_normal_output_buffer()
 void
 decompress_kernel()
 {
+	char revision;
+	
 	/* input_data is set in head.S */
 	inbuf = input_data;
 
-#ifdef CONFIG_DEBUG_PORT0
+#ifdef CONFIG_ETRAX_DEBUG_PORT0
 	*R_SERIAL0_XOFF = 0;
 	*R_SERIAL0_BAUD = 0x99;
 	*R_SERIAL0_TR_CTRL = 0x40;
 #endif
-#ifdef CONFIG_DEBUG_PORT1
+#ifdef CONFIG_ETRAX_DEBUG_PORT1
 	*R_SERIAL1_XOFF = 0;
 	*R_SERIAL1_BAUD = 0x99;
 	*R_SERIAL1_TR_CTRL = 0x40;
 #endif
-#ifdef CONFIG_DEBUG_PORT2
+#ifdef CONFIG_ETRAX_DEBUG_PORT2
+	*R_GEN_CONFIG = 0x08;
 	*R_SERIAL2_XOFF = 0;
 	*R_SERIAL2_BAUD = 0x99;
 	*R_SERIAL2_TR_CTRL = 0x40;
 #endif
-#ifdef CONFIG_DEBUG_PORT3
+#ifdef CONFIG_ETRAX_DEBUG_PORT3
+	*R_GEN_CONFIG = 0x100;
 	*R_SERIAL3_XOFF = 0;
 	*R_SERIAL3_BAUD = 0x99;
 	*R_SERIAL3_TR_CTRL = 0x40;
 #endif
-       
+
 	setup_normal_output_buffer();
 
 	makecrc();
+
+	__asm__ volatile ("move vr,%0" : "=rm" (revision));
+	if (revision < 10)
+	{
+		puts("You need an ETRAX 100LX to run linux 2.4\n");
+		while(1);
+	}
+
 	puts("Uncompressing Linux...\n");
 	gunzip();
 	puts("Done. Now booting the kernel.\n");

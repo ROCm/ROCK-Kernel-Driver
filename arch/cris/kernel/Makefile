@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.3 2001/01/10 21:11:07 bjornw Exp $
+# $Id: Makefile,v 1.4 2001/04/17 13:58:39 orjanf Exp $
 #
 # Makefile for the linux kernel.
 #
@@ -18,7 +18,7 @@ obj-y   := process.o signal.o entry.o traps.o irq.o \
            ptrace.o setup.o time.o sys_cris.o shadows.o \
 	   debugport.o semaphore.o
 
-obj-$(CONFIG_KGDB) += kgdb.o
+obj-$(CONFIG_ETRAX_KGDB) += kgdb.o
 
 clean:
 

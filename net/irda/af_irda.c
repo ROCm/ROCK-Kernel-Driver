@@ -218,8 +218,7 @@ static void irda_connect_confirm(void *instance, void *sap,
 		   self->max_data_size);
 
 	memcpy(&self->qos_tx, qos, sizeof(struct qos_info));
-
-	skb_queue_tail(&sk->receive_queue, skb);
+	kfree_skb(skb);
 
 	/* We are now connected! */
 	sk->state = TCP_ESTABLISHED;
@@ -439,7 +438,7 @@ static void irda_selective_discovery_indication(discovery_t *discovery,
  * We were waiting for a node to be discovered, but nothing has come up
  * so far. Wake up the user and tell him that we failed...
  */
-static void irda_discovery_timeout(u_long	priv)
+static void irda_discovery_timeout(u_long priv)
 {
 	struct irda_sock *self;
 	
@@ -776,7 +775,6 @@ static int irda_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 	struct sock *sk = sock->sk;
 	struct sockaddr_irda *addr = (struct sockaddr_irda *) uaddr;
 	struct irda_sock *self;
-	__u16 hints = 0;
 	int err;
 
 	IRDA_DEBUG(2, __FUNCTION__ "()\n");
@@ -821,15 +819,6 @@ static int irda_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 				 self->stsap_sel, IAS_KERNEL_ATTR);
 	irias_insert_object(self->ias_obj);
 	
-#if 1 /* Will be removed in near future */
-
-	/* Fill in some default hint bits values */
-	if (strncmp(addr->sir_name, "OBEX", 4) == 0)
-		hints = irlmp_service_to_hint(S_OBEX);
-	
-	if (hints)
-		self->skey = irlmp_register_service(hints);
-#endif
 	return 0;
 }
 
@@ -1633,34 +1622,54 @@ static unsigned int irda_poll(struct file * file, struct socket *sock,
 {
 	struct sock *sk = sock->sk;
 	unsigned int mask;
+	struct irda_sock *self;
 
 	IRDA_DEBUG(4, __FUNCTION__ "()\n");
 
+	self = sk->protinfo.irda;
 	poll_wait(file, sk->sleep, wait);
 	mask = 0;
 
-	/* exceptional events? */
+	/* Exceptional events? */
 	if (sk->err)
 		mask |= POLLERR;
 	if (sk->shutdown & RCV_SHUTDOWN)
 		mask |= POLLHUP;
 
-	/* readable? */
+	/* Readable? */
 	if (!skb_queue_empty(&sk->receive_queue)) {
 		IRDA_DEBUG(4, "Socket is readable\n");
 		mask |= POLLIN | POLLRDNORM;
 	}
+
 	/* Connection-based need to check for termination and startup */
-	if (sk->type == SOCK_STREAM && sk->state==TCP_CLOSE)
-		mask |= POLLHUP;
+	switch (sk->type) {
+	case SOCK_STREAM:
+		if (sk->state == TCP_CLOSE)
+			mask |= POLLHUP;
 
-	/*
-	 * we set writable also when the other side has shut down the
-	 * connection. This prevents stuck sockets.
-	 */
-	if (sk->sndbuf - (int)atomic_read(&sk->wmem_alloc) >= SOCK_MIN_WRITE_SPACE)
+		if (sk->state == TCP_ESTABLISHED) {
+			if ((self->tx_flow == FLOW_START) && 
+			    (sk->sndbuf - (int)atomic_read(&sk->wmem_alloc) >= SOCK_MIN_WRITE_SPACE))
+			{
+				mask |= POLLOUT | POLLWRNORM | POLLWRBAND;
+			}
+		}
+		break;
+	case SOCK_SEQPACKET:
+		if ((self->tx_flow == FLOW_START) && 
+		    (sk->sndbuf - (int)atomic_read(&sk->wmem_alloc) >= SOCK_MIN_WRITE_SPACE))
+		{	
 			mask |= POLLOUT | POLLWRNORM | POLLWRBAND;
-
+		}
+		break;
+	case SOCK_DGRAM:
+		if (sk->sndbuf - (int)atomic_read(&sk->wmem_alloc) >= SOCK_MIN_WRITE_SPACE)
+			mask |= POLLOUT | POLLWRNORM | POLLWRBAND;
+		break;
+	default:
+		break;
+	}		
 	return mask;
 }
 
@@ -2328,6 +2337,9 @@ static struct proto_ops SOCKOPS_WRAPPED(irda_ultra_ops) = {
 SOCKOPS_WRAP(irda_stream, PF_IRDA);
 SOCKOPS_WRAP(irda_seqpacket, PF_IRDA);
 SOCKOPS_WRAP(irda_dgram, PF_IRDA);
+#ifdef CONFIG_IRDA_ULTRA
+SOCKOPS_WRAP(irda_ultra, PF_IRDA);
+#endif /* CONFIG_IRDA_ULTRA */
 
 /*
  * Function irda_device_event (this, event, ptr)
@@ -2416,7 +2428,9 @@ int __init irda_proto_init(void)
 #endif
 	return 0;
 }
-module_init(irda_proto_init);
+#ifdef MODULE
+module_init(irda_proto_init);	/* If non-module, called from init/main.c */
+#endif
 
 /*
  * Function irda_proto_cleanup (void)

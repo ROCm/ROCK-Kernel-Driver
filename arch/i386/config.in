@@ -27,21 +27,21 @@ endmenu
 mainmenu_option next_comment
 comment 'Processor type and features'
 choice 'Processor family' \
-	"386				CONFIG_M386 \
-	 486				CONFIG_M486 \
-	 586/K5/5x86/6x86/6x86MX	CONFIG_M586 \
-	 Pentium-Classic		CONFIG_M586TSC \
-	 Pentium-MMX			CONFIG_M586MMX \
-	 Pentium-Pro/Celeron/Pentium-II	CONFIG_M686 \
-	 Pentium-III			CONFIG_MPENTIUMIII \
-	 Pentium-4			CONFIG_MPENTIUM4 \
-	 K6/K6-II/K6-III		CONFIG_MK6 \
-	 Athlon/Duron/K7		CONFIG_MK7 \
-	 Crusoe				CONFIG_MCRUSOE \
-	 Winchip-C6			CONFIG_MWINCHIPC6 \
-	 Winchip-2			CONFIG_MWINCHIP2 \
-	 Winchip-2A/Winchip-3		CONFIG_MWINCHIP3D \
-	 CyrixIII/C3			CONFIG_MCYRIXIII" Pentium-Pro
+	"386					CONFIG_M386 \
+	 486					CONFIG_M486 \
+	 586/K5/5x86/6x86/6x86MX		CONFIG_M586 \
+	 Pentium-Classic			CONFIG_M586TSC \
+	 Pentium-MMX				CONFIG_M586MMX \
+	 Pentium-Pro/Celeron/Pentium-II		CONFIG_M686 \
+	 Pentium-III/Celeron(Coppermine)	CONFIG_MPENTIUMIII \
+	 Pentium-4				CONFIG_MPENTIUM4 \
+	 K6/K6-II/K6-III			CONFIG_MK6 \
+	 Athlon/Duron/K7			CONFIG_MK7 \
+	 Crusoe					CONFIG_MCRUSOE \
+	 Winchip-C6				CONFIG_MWINCHIPC6 \
+	 Winchip-2				CONFIG_MWINCHIP2 \
+	 Winchip-2A/Winchip-3			CONFIG_MWINCHIP3D \
+	 CyrixIII/C3				CONFIG_MCYRIXIII" Pentium-Pro
 #
 # Define implied options from the CPU selection here
 #

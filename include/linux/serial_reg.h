@@ -260,8 +260,8 @@
 #define UART_RSA_SRR_Rx_FIFO_NEMP (1 << 3) /* Rx FIFO is not empty (1) */
 #define UART_RSA_SRR_Rx_FIFO_NHFL (1 << 4) /* Rx FIFO is not half full (1) */
 #define UART_RSA_SRR_Rx_FIFO_NFUL (1 << 5) /* Rx FIFO is not full (1) */
-#define UART_RSA_SRR_Rx_TOUT (1 << 6) /* Character reception timeout occured (1) */
-#define UART_RSA_SRR_TIMER (1 << 7) /* Timer interrupt occured */
+#define UART_RSA_SRR_Rx_TOUT (1 << 6) /* Character reception timeout occurred (1) */
+#define UART_RSA_SRR_TIMER (1 << 7) /* Timer interrupt occurred */
 
 #define UART_RSA_FRR ((UART_RSA_BASE) + 2) /* OUT: FIFO Reset Register */
 

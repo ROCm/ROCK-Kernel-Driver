@@ -44,8 +44,8 @@
 
 #define SMART2_DRIVER_VERSION(maj,min,submin) ((maj<<16)|(min<<8)|(submin))
 
-#define DRIVER_NAME "Compaq SMART2 Driver (v 2.4.2)"
-#define DRIVER_VERSION SMART2_DRIVER_VERSION(2,4,2)
+#define DRIVER_NAME "Compaq SMART2 Driver (v 2.4.3)"
+#define DRIVER_VERSION SMART2_DRIVER_VERSION(2,4,3)
 
 /* Embedded module documentation macros - see modules.h */
 /* Original author Chris Frantz - Compaq Computer Corporation */
@@ -204,7 +204,7 @@ static struct block_device_operations ida_fops  = {
 static void __init ida_procinit(int i)
 {
 	if (proc_array == NULL) {
-		proc_array = proc_mkdir("driver/array", NULL);
+		proc_array = proc_mkdir("array", proc_root_driver);
 		if (!proc_array) return;
 	}
 
@@ -228,12 +228,12 @@ static int ida_proc_get_info(char *buffer, char **start, off_t offset, int lengt
 
 	ctlr = h->ctlr;
 	size = sprintf(buffer, "%s:  Compaq %s Controller\n"
-		"       Board ID: %08lx\n"
+		"       Board ID: 0x%08lx\n"
 		"       Firmware Revision: %c%c%c%c\n"
-		"       Controller Sig: %08lx\n"
-		"       Memory Address: %08lx\n"
-		"       I/O Port: %04x\n"
-		"       IRQ: %x\n"
+		"       Controller Sig: 0x%08lx\n"
+		"       Memory Address: 0x%08lx\n"
+		"       I/O Port: 0x%04x\n"
+		"       IRQ: %d\n"
 		"       Logical drives: %d\n"
 		"       Physical drives: %d\n\n"
 		"       Current Q depth: %d\n"
@@ -314,7 +314,7 @@ void cleanup_module(void)
 	int i;
 	struct gendisk *g;
 
-	remove_proc_entry("driver/array", NULL);
+	remove_proc_entry("array", proc_root_driver);
 
 	for(i=0; i<nr_ctlr; i++) {
 		hba[i]->access.set_intr_mask(hba[i], 0);
@@ -580,9 +580,11 @@ static int cpqarray_pci_detect(void)
 		pdev = pci_find_device(ida_vendor_id[brdtype],
 				       ida_device_id[brdtype], NULL);
 		while (pdev) {
-			printk(KERN_DEBUG "cpqarray: Device %x has been found at %x %x\n",
+			printk(KERN_DEBUG "cpqarray: Device 0x%x has"
+				" been found at bus %d dev %d func %d\n",
 				ida_vendor_id[brdtype],
-				pdev->bus->number, pdev->devfn);
+				pdev->bus->number, PCI_SLOT(pdev->devfn),
+				PCI_FUNC(pdev->devfn));
 			if (nr_ctlr == 8) {
 				printk(KERN_WARNING "cpqarray: This driver"
 				" supports a maximum of 8 controllers.\n");
@@ -906,6 +908,9 @@ static void do_ida_request(request_queue_t *q)
 	struct buffer_head *bh;
 	struct request *creq;
 
+// Loop till the queue is empty if or it is plugged 
+   while (1)
+{
 	if (q->plugged || list_empty(queue_head)) {
 		start_io(h);
 		return;
@@ -993,8 +998,7 @@ DBGPX(	printk("Done with %p\n", creq); );
 	h->Qdepth++;
 	if (h->Qdepth > h->maxQsinceinit) 
 		h->maxQsinceinit = h->Qdepth;
-
-	start_io(h);
+   } // while loop
 }
 
 /* 
@@ -1574,13 +1578,9 @@ static int revalidate_logvol(kdev_t dev, int maxusage)
 	max_p = gdev->max_p;
 	start = target << gdev->minor_shift;
 
-	for(i=max_p; i>=0; i--) {
+	for(i=max_p-1; i>=0; i--) {
 		int minor = start+i;
-		kdev_t devi = MKDEV(MAJOR_NR + ctlr, minor);
-		struct super_block *sb = get_super(devi);
-		sync_dev(devi);
-		if (sb) invalidate_inodes(sb);
-		invalidate_buffers(devi);
+		invalidate_device(MKDEV(MAJOR_NR + ctlr, minor), 1);
 		gdev->part[minor].start_sect = 0;	
 		gdev->part[minor].nr_sects = 0;	
 

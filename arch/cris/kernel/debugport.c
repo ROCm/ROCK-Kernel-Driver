@@ -12,6 +12,12 @@
  *    init_etrax_debug()
  *
  * $Log: debugport.c,v $
+ * Revision 1.6  2001/04/17 13:58:39  orjanf
+ * * Renamed CONFIG_KGDB to CONFIG_ETRAX_KGDB.
+ *
+ * Revision 1.5  2001/03/26 14:22:05  bjornw
+ * Namechange of some config options
+ *
  * Revision 1.4  2000/10/06 12:37:26  bjornw
  * Use physical addresses when talking to DMA
  *
@@ -29,7 +35,7 @@
 
 /* Which serial-port is our debug port ? */
 
-#if defined(CONFIG_DEBUG_PORT0) || defined(CONFIG_DEBUG_PORT_NULL)
+#if defined(CONFIG_ETRAX_DEBUG_PORT0) || defined(CONFIG_ETRAX_DEBUG_PORT_NULL)
 #define DEBUG_PORT_IDX 0
 #define DEBUG_OCMD R_DMA_CH6_CMD
 #define DEBUG_FIRST R_DMA_CH6_FIRST
@@ -43,7 +49,7 @@
 #define DEBUG_DMA_IRQ_CLR IO_STATE(R_IRQ_MASK2_CLR, dma6_descr, clr)
 #endif
 
-#ifdef CONFIG_DEBUG_PORT1
+#ifdef CONFIG_ETRAX_DEBUG_PORT1
 #define DEBUG_PORT_IDX 1
 #define DEBUG_OCMD R_DMA_CH8_CMD
 #define DEBUG_FIRST R_DMA_CH8_FIRST
@@ -57,7 +63,7 @@
 #define DEBUG_DMA_IRQ_CLR IO_STATE(R_IRQ_MASK2_CLR, dma8_descr, clr)
 #endif
 
-#ifdef CONFIG_DEBUG_PORT2
+#ifdef CONFIG_ETRAX_DEBUG_PORT2
 #define DEBUG_PORT_IDX 2
 #define DEBUG_OCMD R_DMA_CH2_CMD
 #define DEBUG_FIRST R_DMA_CH2_FIRST
@@ -71,7 +77,7 @@
 #define DEBUG_DMA_IRQ_CLR IO_STATE(R_IRQ_MASK2_CLR, dma2_descr, clr)
 #endif
 
-#ifdef CONFIG_DEBUG_PORT3
+#ifdef CONFIG_ETRAX_DEBUG_PORT3
 #define DEBUG_PORT_IDX 3
 #define DEBUG_OCMD R_DMA_CH4_CMD
 #define DEBUG_FIRST R_DMA_CH4_FIRST
@@ -97,7 +103,7 @@ console_write(struct console *co, const char *buf, unsigned int len)
 	unsigned long flags; 
 	int in_progress;
 	
-#ifdef CONFIG_DEBUG_PORT_NULL
+#ifdef CONFIG_ETRAX_DEBUG_PORT_NULL
         /* no debug printout at all */
         return;
 #endif
@@ -111,7 +117,7 @@ console_write(struct console *co, const char *buf, unsigned int len)
 	save_flags(flags);
 	cli();
 
-#ifdef CONFIG_KGDB
+#ifdef CONFIG_ETRAX_KGDB
 	/* kgdb needs to output debug info using the gdb protocol */
 	putDebugString(buf, len);
 	restore_flags(flags);

@@ -36,6 +36,9 @@
 /* a syscall in Linux/CRIS is a break 13 instruction which is 2 bytes */
 /* manipulate regs so that upon return, it will be re-executed */
 
+/* We rely on that pc points to the instruction after "break 13", so the
+ * library must never do strange things like putting it in a delay slot.
+ */
 #define RESTART_CRIS_SYS(regs) regs->r10 = regs->orig_r10; regs->irp -= 2;
 
 int do_signal(int canrestart, sigset_t *oldset, struct pt_regs *regs);
@@ -76,12 +79,14 @@ int copy_siginfo_to_user(siginfo_t *to, siginfo_t *from)
 }
 
 /*
- * Atomically swap in the new signal mask, and wait for a signal.
+ * Atomically swap in the new signal mask, and wait for a signal.  Define 
+ * dummy arguments to be able to reach the regs argument.  (Note that this
+ * arrangement relies on old_sigset_t occupying one register.)
  */
 int
-sys_sigsuspend(old_sigset_t mask)
+sys_sigsuspend(old_sigset_t mask, long r11, long r12, long r13, long mof, 
+               long srp, struct pt_regs *regs)
 {
-	struct pt_regs * regs = (struct pt_regs *)current_regs();
 	sigset_t saveset;
 
 	mask &= _BLOCKABLE;
@@ -100,10 +105,13 @@ sys_sigsuspend(old_sigset_t mask)
 	}
 }
 
+/* Define dummy arguments to be able to reach the regs argument.  (Note that
+ * this arrangement relies on size_t occupying one register.)
+ */
 int
-sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize)
+sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize, long r12, long r13, 
+                  long mof, long srp, struct pt_regs *regs)
 {
-	struct pt_regs * regs = (struct pt_regs *)current_regs();
 	sigset_t saveset, newset;
 
 	/* XXX: Don't preclude handling different sized sigset_t's.  */
@@ -225,9 +233,11 @@ badframe:
 	return 1;
 }
 
-asmlinkage int sys_sigreturn(void)
+/* Define dummy arguments to be able to reach the regs argument.  */
+
+asmlinkage int sys_sigreturn(long r10, long r11, long r12, long r13, long mof, 
+                             long srp, struct pt_regs *regs)
 {
-	struct pt_regs *regs = (struct pt_regs *)current_regs();
 	struct sigframe *frame = (struct sigframe *)rdusp();
 	sigset_t set;
 
@@ -265,9 +275,11 @@ badframe:
 	return 0;
 }	
 
-asmlinkage int sys_rt_sigreturn(void)
+/* Define dummy arguments to be able to reach the regs argument.  */
+
+asmlinkage int sys_rt_sigreturn(long r10, long r11, long r12, long r13, 
+                                long mof, long srp, struct pt_regs *regs)
 {
-	struct pt_regs *regs = (struct pt_regs *)current_regs();
 	struct rt_sigframe *frame = (struct rt_sigframe *)rdusp();
 	sigset_t set;
 	stack_t st;
@@ -389,7 +401,6 @@ static void setup_frame(int sig, struct k_sigaction *ka,
 		/* trampoline - the desired return ip is the retcode itself */
 		return_ip = (unsigned long)&frame->retcode;
 		/* This is movu.w __NR_sigreturn, r9; break 13; */
-		/* TODO: check byteorder */
 		err |= __put_user(0x9c5f,         (short *)(frame->retcode+0));
 		err |= __put_user(__NR_sigreturn, (short *)(frame->retcode+2));
 		err |= __put_user(0xe93d,         (short *)(frame->retcode+4));
@@ -535,7 +546,14 @@ handle_signal(int canrestart, unsigned long sig, struct k_sigaction *ka,
  * Note that 'init' is a special process: it doesn't get signals it doesn't
  * want to handle. Thus you cannot kill init even with a SIGKILL even by
  * mistake.
+ *
+ * Also note that the regs structure given here as an argument, is the latest
+ * pushed pt_regs. It may or may not be the same as the first pushed registers
+ * when the initial usermode->kernelmode transition took place. Therefore
+ * we can use user_mode(regs) to see if we came directly from kernel or user
+ * mode below.
  */
+
 int do_signal(int canrestart, sigset_t *oldset, struct pt_regs *regs)
 {
 	siginfo_t info;

@@ -472,14 +472,14 @@ static int irlmp_state_disconnected(struct lsap_cb *self, IRLMP_EVENT event,
 		irlmp_start_watchdog_timer(self, 5*HZ);
 		break;
 	case LM_CONNECT_INDICATION:
-		irlmp_next_lsap_state(self, LSAP_CONNECT_PEND);
-
 		if (self->conn_skb) {
 			WARNING(__FUNCTION__ 
 				"(), busy with another request!\n");
 			return -EBUSY;
 		}
 		self->conn_skb = skb;
+
+		irlmp_next_lsap_state(self, LSAP_CONNECT_PEND);
 
 		irlmp_do_lap_event(self->lap, LM_LAP_CONNECT_REQUEST, NULL);
 		break;
@@ -562,6 +562,15 @@ static int irlmp_state_connect_pend(struct lsap_cb *self, IRLMP_EVENT event,
 	switch (event) {
 	case LM_CONNECT_REQUEST:
 		/* Keep state */
+		break;
+	case LM_CONNECT_INDICATION:
+		/* Will happen in some rare cases when the socket get stuck,
+		 * the other side retries the connect request.
+		 * We just unstuck the socket - Jean II */
+		IRDA_DEBUG(0, __FUNCTION__ "(), LM_CONNECT_INDICATION, "
+			   "LSAP stuck in CONNECT_PEND state...\n");
+		/* Keep state */
+		irlmp_do_lap_event(self->lap, LM_LAP_CONNECT_REQUEST, NULL);
 		break;
 	case LM_CONNECT_RESPONSE:
 		IRDA_DEBUG(0, __FUNCTION__ "(), LM_CONNECT_RESPONSE, "

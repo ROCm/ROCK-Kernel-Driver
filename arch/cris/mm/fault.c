@@ -1,11 +1,20 @@
 /*
  *  linux/arch/cris/mm/fault.c
  *
- *  Copyright (C) 2000  Axis Communications AB
+ *  Copyright (C) 2000, 2001  Axis Communications AB
  *
  *  Authors:  Bjorn Wesen 
  * 
  *  $Log: fault.c,v $
+ *  Revision 1.12  2001/04/04 10:51:14  bjornw
+ *  mmap_sem is grabbed for reading
+ *
+ *  Revision 1.11  2001/03/23 07:36:07  starvik
+ *  Corrected according to review remarks
+ *
+ *  Revision 1.10  2001/03/21 16:10:11  bjornw
+ *  CRIS_FRAME_FIXUP not needed anymore, use FRAME_NORMAL
+ *
  *  Revision 1.9  2001/03/05 13:22:20  bjornw
  *  Spell-fix and fix in vmalloc_fault handling
  *
@@ -70,12 +79,12 @@ handle_mmu_bus_fault(struct pt_regs *regs)
 
 	address = cause & PAGE_MASK; /* get faulting address */
 	
-	page_id = IO_EXTRACT(R_MMU_CAUSE,  page_id,   cause);
+	D(page_id = IO_EXTRACT(R_MMU_CAUSE,  page_id,   cause));
+	D(acc     = IO_EXTRACT(R_MMU_CAUSE,  acc_excp,  cause));
+	D(inv     = IO_EXTRACT(R_MMU_CAUSE,  inv_excp,  cause));  
+	D(index  =  IO_EXTRACT(R_TLB_SELECT, index,     select));
 	miss    = IO_EXTRACT(R_MMU_CAUSE,  miss_excp, cause);
 	we      = IO_EXTRACT(R_MMU_CAUSE,  we_excp,   cause);
-	acc     = IO_EXTRACT(R_MMU_CAUSE,  acc_excp,  cause);
-	inv     = IO_EXTRACT(R_MMU_CAUSE,  inv_excp,  cause);  
-	index  =  IO_EXTRACT(R_TLB_SELECT, index,     select);
 	
 	D(printk("bus_fault from IRP 0x%x: addr 0x%x, miss %d, inv %d, we %d, acc %d, "
 		 "idx %d pid %d\n",
@@ -304,23 +313,32 @@ do_page_fault(unsigned long address, struct pt_regs *regs,
 	/* Are we prepared to handle this kernel fault?
 	 *
 	 * (The kernel has valid exception-points in the source 
-	 *  when it accesses user-memory. When it fails in one
+	 *  when it acesses user-memory. When it fails in one
 	 *  of those points, we find it in a table and do a jump
 	 *  to some fixup code that loads an appropriate error
 	 *  code)
 	 */
 
         if ((fixup = search_exception_table(regs->irp)) != 0) {
+		/* Adjust the instruction pointer in the stackframe */
+
                 regs->irp = fixup;
-		regs->frametype = CRIS_FRAME_FIXUP;
+
+		/* We do not want to return by restoring the CPU-state
+		 * anymore, so switch frame-types (see ptrace.h)
+		 */
+
+		regs->frametype = CRIS_FRAME_NORMAL;
+
 		D(printk("doing fixup to 0x%x\n", fixup));
                 return;
         }
 
-/*
- * Oops. The kernel tried to access some bad page. We'll have to
- * terminate things with extreme prejudice.
- */
+	/*
+	 * Oops. The kernel tried to access some bad page. We'll have to
+	 * terminate things with extreme prejudice.
+	 */
+
 	if ((unsigned long) (address) < PAGE_SIZE)
 		printk(KERN_ALERT "Unable to handle kernel NULL pointer dereference");
 	else
