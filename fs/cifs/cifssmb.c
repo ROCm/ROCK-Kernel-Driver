@@ -819,6 +819,7 @@ int CIFSSMBRenameOpenFile(const int xid,struct cifsTconInfo *pTcon,
 	pSMB->DataCount = 12 /* sizeof(struct set_file_rename) */ + (2 * len_of_str) + 2;
         pSMB->ByteCount += pSMB->DataCount;
         pSMB->DataCount = cpu_to_le16(pSMB->DataCount);
+	pSMB->TotalDataCount = pSMB->DataCount;
         pSMB->Fid = netfid;
 	pSMB->InformationLevel =
 		cpu_to_le16(SMB_SET_FILE_RENAME_INFORMATION);
