@@ -208,7 +208,7 @@ typedef struct HYSDN_CARD {
 		char infobuf[128];	/* for function procinfo */
 		
 		struct HYSDN_CARD  *card;
-		struct capi_ctr *capi_ctrl;
+		struct capi_ctr capi_ctrl;
 		struct sk_buff *skbs[HYSDN_MAX_CAPI_SKB];
 		int in_idx, out_idx;	/* indexes to buffer ring */
 		int sk_count;		/* number of buffers currently in ring */
