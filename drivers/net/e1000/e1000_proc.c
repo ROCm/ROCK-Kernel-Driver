@@ -95,7 +95,9 @@
 #include <linux/proc_fs.h>
 
 #define ADAPTERS_PROC_DIR           "PRO_LAN_Adapters"
-#define TAG_MAX_LENGTH              36
+#define TAG_MAX_LENGTH              32
+#define LINE_MAX_LENGTH             80
+#define FIELD_MAX_LENGTH            LINE_MAX_LENGTH - TAG_MAX_LENGTH - 3
 
 extern char e1000_driver_name[];
 extern char e1000_driver_version[];
@@ -109,7 +111,7 @@ extern char e1000_driver_version[];
 
 struct proc_list {
 	struct list_head list;                  /* link list */
-	char tag[TAG_MAX_LENGTH];               /* attribute name */
+	char tag[TAG_MAX_LENGTH + 1];           /* attribute name */
 	void *data;                             /* attribute data */
 	size_t len;				/* sizeof data */
 	char *(*func)(void *, size_t, char *);  /* format data func */
@@ -141,15 +143,20 @@ e1000_proc_info_read(char *page, char **start, off_t off,
 	struct list_head *proc_list_head = data, *curr;
 	struct proc_list *elem;
 	char *p = page;
-	char buf[64];
+	char buf[FIELD_MAX_LENGTH + 1];
 
 	list_for_each(curr, proc_list_head) {
 		elem = list_entry(curr, struct proc_list, list);
 
-		if(strlen(elem->tag) == 0)
+		if (p - page + LINE_MAX_LENGTH >= PAGE_SIZE)
+			break;
+
+		if(!strlen(elem->tag))
 			p += sprintf(p, "\n");
 		else
-			p += sprintf(p, "%-32s %s\n", elem->tag,
+			p += sprintf(p, "%-*.*s %.*s\n", 
+				TAG_MAX_LENGTH, TAG_MAX_LENGTH,
+				elem->tag, FIELD_MAX_LENGTH,
 				elem->func(elem->data, elem->len, buf));
 	}
 
@@ -164,7 +171,8 @@ e1000_proc_single_read(char *page, char **start, off_t off,
 {
 	struct proc_list *elem = data;
 
-	sprintf(page, "%s", elem->func(elem->data, elem->len, page));
+	sprintf(page, "%.*s", FIELD_MAX_LENGTH, elem->func(elem->data, 
+	        elem->len, page));
 
 	return e1000_proc_read(page, start, off, count, eof);
 }
@@ -178,8 +186,7 @@ e1000_proc_dirs_free(char *name, struct list_head *proc_list_head)
 	for(intel_proc_dir = proc_net->subdir; intel_proc_dir;
 		intel_proc_dir = intel_proc_dir->next) {
 		if((intel_proc_dir->namelen == strlen(ADAPTERS_PROC_DIR)) &&
-			(memcmp(intel_proc_dir->name,
-			ADAPTERS_PROC_DIR, strlen(ADAPTERS_PROC_DIR)) == 0))
+		   !memcmp(intel_proc_dir->name, ADAPTERS_PROC_DIR, strlen(ADAPTERS_PROC_DIR)))
 			break;
 	}
 
@@ -223,8 +230,6 @@ e1000_proc_dirs_free(char *name, struct list_head *proc_list_head)
 
 	if(!proc_dir)
 		remove_proc_entry(ADAPTERS_PROC_DIR, proc_net);
-
-	return;
 }
 
 
@@ -240,7 +245,7 @@ e1000_proc_singles_create(struct proc_dir_entry *parent,
 
 		elem = list_entry(curr, struct proc_list, list);
 
-		if(strlen(elem->tag) == 0)
+		if(!strlen(elem->tag))
 			continue;
 
 		if(!(proc_entry =
@@ -255,8 +260,9 @@ e1000_proc_singles_create(struct proc_dir_entry *parent,
 	return 1;
 }
 
-static int __devinit
-e1000_proc_dirs_create(char *name, struct list_head *proc_list_head)
+static void __devinit
+e1000_proc_dirs_create(void *data, char *name, 
+                       struct list_head *proc_list_head)
 {
 	struct proc_dir_entry *intel_proc_dir, *proc_dir, *info_entry;
 	char info_name[strlen(name) + strlen(".info")];
@@ -264,8 +270,7 @@ e1000_proc_dirs_create(char *name, struct list_head *proc_list_head)
 	for(intel_proc_dir = proc_net->subdir; intel_proc_dir;
 		intel_proc_dir = intel_proc_dir->next) {
 		if((intel_proc_dir->namelen == strlen(ADAPTERS_PROC_DIR)) &&
-			(memcmp(intel_proc_dir->name,
-			ADAPTERS_PROC_DIR, strlen(ADAPTERS_PROC_DIR)) == 0))
+		   !memcmp(intel_proc_dir->name, ADAPTERS_PROC_DIR, strlen(ADAPTERS_PROC_DIR)))
 			break;
 	}
 
@@ -273,28 +278,26 @@ e1000_proc_dirs_create(char *name, struct list_head *proc_list_head)
 		if(!(intel_proc_dir =
 			create_proc_entry(ADAPTERS_PROC_DIR,
 				S_IFDIR, proc_net)))
-			return 0;
+			return;
 
 	if(!(proc_dir =
 		create_proc_entry(name, S_IFDIR, intel_proc_dir)))
-		return 0;
+		return;
 	SET_MODULE_OWNER(proc_dir);
 
 	if(!e1000_proc_singles_create(proc_dir, proc_list_head))
-		return 0;
+		return;
 
 	strcpy(info_name, name);
 	strcat(info_name, ".info");
 
 	if(!(info_entry =
 		create_proc_entry(info_name, S_IFREG, intel_proc_dir)))
-		return 0;
+		return;
 	SET_MODULE_OWNER(info_entry);
 
 	info_entry->read_proc = e1000_proc_info_read;
 	info_entry->data = proc_list_head;
-
-	return 1;
 }
 
 static void __devinit
@@ -314,8 +317,6 @@ e1000_proc_list_add(struct list_head *proc_list_head, char *tag,
 	new->func = func;
 
 	list_add_tail(&new->list, proc_list_head);
-
-	return;
 }
 
 static void __devexit
@@ -328,8 +329,6 @@ e1000_proc_list_free(struct list_head *proc_list_head)
 		list_del(&elem->list);
 		kfree(elem);
 	}
-
-	return;
 }
 
 /*
@@ -706,7 +705,6 @@ e1000_proc_list_setup(struct e1000_adapter *adapter)
 			   e1000_proc_rx_status);
 	}
 
-	return;
 }
 
 /*
@@ -719,9 +717,9 @@ e1000_proc_dev_setup(struct e1000_adapter *adapter)
 {
 	e1000_proc_list_setup(adapter);
 
-	e1000_proc_dirs_create(adapter->netdev->name,&adapter->proc_list_head);
-
-	return;
+	e1000_proc_dirs_create(adapter, 
+	                       adapter->netdev->name,
+	                       &adapter->proc_list_head);
 }
 
 /*
@@ -735,8 +733,6 @@ e1000_proc_dev_free(struct e1000_adapter *adapter)
 	e1000_proc_dirs_free(adapter->netdev->name, &adapter->proc_list_head);
 
 	e1000_proc_list_free(&adapter->proc_list_head);
-
-	return;
 }
 
 #else /* CONFIG_PROC_FS */
