@@ -25,6 +25,9 @@
 #ifdef CONFIG_MPC8540_ADS
 #include <platforms/85xx/mpc8540_ads.h>
 #endif
+#ifdef CONFIG_SBC8560
+#include <platforms/85xx/sbc8560.h>
+#endif
 
 #define _IO_BASE        isa_io_base
 #define _ISA_MEM_BASE   isa_mem_base
