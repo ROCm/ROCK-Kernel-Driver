@@ -58,10 +58,6 @@
 #include <pcmcia/cistpl.h>
 #include "cs_internal.h"
 
-#ifdef PCMCIA_DEBUG
-static int pc_debug = PCMCIA_DEBUG;
-#endif
-
 /*====================================================================*/
 
 #define FIND_FIRST_BIT(n)	((n) - ((n) & ((n)-1)))
@@ -119,7 +115,7 @@ static u_int xlate_rom_addr(u_char * b, u_int addr)
 static void cb_release_cis_mem(struct pcmcia_socket * s)
 {
 	if (s->cb_cis_virt) {
-		DEBUG(1, "cs: cb_release_cis_mem()\n");
+		cs_dbg(s, 1, "cb_release_cis_mem()\n");
 		iounmap(s->cb_cis_virt);
 		s->cb_cis_virt = NULL;
 		s->cb_cis_res = 0;
@@ -160,7 +156,7 @@ int read_cb_mem(struct pcmcia_socket * s, int space, u_int addr, u_int len, void
 	struct pci_dev *dev;
 	struct resource *res;
 
-	DEBUG(3, "cs: read_cb_mem(%d, %#x, %u)\n", space, addr, len);
+	cs_dbg(s, 3, "read_cb_mem(%d, %#x, %u)\n", space, addr, len);
 
 	dev = pci_find_slot(s->cb_dev->subordinate->number, 0);
 	if (!dev)

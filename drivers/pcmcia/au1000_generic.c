@@ -26,6 +26,7 @@
  * 
  */
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/config.h>
 #include <linux/delay.h>
@@ -54,8 +55,17 @@
 #include <asm/au1000.h>
 #include <asm/au1000_pcmcia.h>
 
-#ifdef PCMCIA_DEBUG
+#ifdef DEBUG
 static int pc_debug;
+
+module_param(pc_debug, int, 0644);
+
+#define debug(lvl,fmt) do {			\
+	if (pc_debug > (lvl))			\
+		printk(KERN_DEBUG fmt);		\
+} while (0)
+#else
+#define debug(lvl,fmt) do { } while (0)
 #endif
 
 MODULE_LICENSE("GPL");
@@ -209,7 +219,7 @@ static int __init au1000_pcmcia_driver_init(void)
 	 */
 	au1000_pcmcia_poll_event(0);
 
-	DEBUG(1, "au1000: initialization complete\n");
+	debug(1, "au1000: initialization complete\n");
 	return 0;
 
 }  /* au1000_pcmcia_driver_init() */
@@ -228,7 +238,7 @@ static void __exit au1000_pcmcia_driver_shutdown(void)
 		if (pcmcia_socket[i].virt_io) 
 			iounmap((void *)pcmcia_socket[i].virt_io);
 	}
-	DEBUG(1, "au1000: shutdown complete\n");
+	debug(1, "au1000: shutdown complete\n");
 }
 
 module_exit(au1000_pcmcia_driver_shutdown);
@@ -249,14 +259,14 @@ au1000_pcmcia_events(struct pcmcia_state *state,
 	unsigned int events=0;
 
 	if(state->detect!=prev_state->detect){
-		DEBUG(2, "%s(): card detect value %u\n", 
+		debug(2, "%s(): card detect value %u\n", 
 				__FUNCTION__, state->detect);
 		events |= mask&SS_DETECT;
 	}
 
 
 	if(state->ready!=prev_state->ready){
-		DEBUG(2, "%s(): card ready value %u\n", 
+		debug(2, "%s(): card ready value %u\n", 
 				__FUNCTION__, state->ready);
 		events |= mask&((flags&SS_IOCARD)?0:SS_READY);
 	}
@@ -429,7 +439,7 @@ au1000_pcmcia_get_status(unsigned int sock, unsigned int *status)
 
 	*status|=state.vs_Xv?SS_XVCARD:0;
 
-	DEBUG(2, "\tstatus: %s%s%s%s%s%s%s%s\n",
+	debug(2, "\tstatus: %s%s%s%s%s%s%s%s\n",
 	(*status&SS_DETECT)?"DETECT ":"",
 	(*status&SS_READY)?"READY ":"", 
 	(*status&SS_BATDEAD)?"BATDEAD ":"",
@@ -457,7 +467,7 @@ au1000_pcmcia_set_socket(unsigned int sock, socket_state_t *state)
 {
 	struct pcmcia_configure configure;
 
-	DEBUG(2, "\tmask:  %s%s%s%s%s%s\n\tflags: %s%s%s%s%s%s\n"
+	debug(2, "\tmask:  %s%s%s%s%s%s\n\tflags: %s%s%s%s%s%s\n"
 	"\tVcc %d  Vpp %d  irq %d\n",
 	(state->csc_mask==0)?"<NONE>":"",
 	(state->csc_mask&SS_DETECT)?"DETECT ":"",
@@ -494,7 +504,7 @@ au1000_pcmcia_set_socket(unsigned int sock, socket_state_t *state)
 static int 
 au1000_pcmcia_get_io_map(unsigned int sock, struct pccard_io_map *map)
 {
-	DEBUG(1, "au1000_pcmcia_get_io_map: sock %d\n", sock);
+	debug(1, "au1000_pcmcia_get_io_map: sock %d\n", sock);
 	if(map->map>=MAX_IO_WIN){
 		printk(KERN_ERR "%s(): map (%d) out of range\n", 
 				__FUNCTION__, map->map);
@@ -531,7 +541,7 @@ au1000_pcmcia_set_io_map(unsigned int sock, struct pccard_io_map *map)
 	map->start=pcmcia_socket[sock].virt_io;
 	map->stop=map->start+(map->stop-start);
 	pcmcia_socket[sock].io_map[map->map]=*map;
-	DEBUG(3, "set_io_map %d start %x stop %x\n", 
+	debug(3, "set_io_map %d start %x stop %x\n", 
 			map->map, map->start, map->stop);
 	return 0;
 
@@ -595,7 +605,7 @@ au1000_pcmcia_set_mem_map(unsigned int sock, struct pccard_mem_map *map)
 	map->sys_stop=map->sys_start+(map->sys_stop-start);
 	pcmcia_socket[sock].mem_map[map->map]=*map;
 	spin_unlock_irqrestore(&pcmcia_lock, flags);
-	DEBUG(3, "set_mem_map %d start %x stop %x card_start %x\n", 
+	debug(3, "set_mem_map %d start %x stop %x card_start %x\n", 
 			map->map, map->sys_start, map->sys_stop, 
 			map->card_start);
 	return 0;

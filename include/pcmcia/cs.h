@@ -422,8 +422,6 @@ enum service {
 };
 
 int pcmcia_access_configuration_register(client_handle_t handle, conf_reg_t *reg);
-int pcmcia_bind_device(bind_req_t *req);
-int pcmcia_bind_mtd(mtd_bind_t *req);
 int pcmcia_deregister_client(client_handle_t handle);
 int pcmcia_get_configuration_info(client_handle_t handle, config_info_t *config);
 int pcmcia_get_card_services_info(servinfo_t *info);
@@ -447,10 +445,10 @@ int pcmcia_request_io(client_handle_t handle, io_req_t *req);
 int pcmcia_request_irq(client_handle_t handle, irq_req_t *req);
 int pcmcia_request_window(client_handle_t *handle, win_req_t *req, window_handle_t *wh);
 int pcmcia_reset_card(client_handle_t handle, client_req_t *req);
-int pcmcia_suspend_card(client_handle_t handle, client_req_t *req);
-int pcmcia_resume_card(client_handle_t handle, client_req_t *req);
-int pcmcia_eject_card(client_handle_t handle, client_req_t *req);
-int pcmcia_insert_card(client_handle_t handle, client_req_t *req);
+int pcmcia_suspend_card(struct pcmcia_socket *skt);
+int pcmcia_resume_card(struct pcmcia_socket *skt);
+int pcmcia_eject_card(struct pcmcia_socket *skt);
+int pcmcia_insert_card(struct pcmcia_socket *skt);
 int pcmcia_set_event_mask(client_handle_t handle, eventmask_t *mask);
 int pcmcia_report_error(client_handle_t handle, error_info_t *err);
 struct pci_bus *pcmcia_lookup_bus(client_handle_t handle);

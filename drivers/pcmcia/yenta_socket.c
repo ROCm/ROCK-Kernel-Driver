@@ -30,9 +30,9 @@
 
 
 #if 0
-#define DEBUG(x,args...)	printk(KERN_DEBUG "%s: " x, __FUNCTION__, ##args)
+#define debug(x,args...) printk(KERN_DEBUG "%s: " x, __func__ , ##args)
 #else
-#define DEBUG(x,args...)
+#define debug(x,args...)
 #endif
 
 /* Don't ask.. */
@@ -47,13 +47,13 @@
 static inline u32 cb_readl(struct yenta_socket *socket, unsigned reg)
 {
 	u32 val = readl(socket->base + reg);
-	DEBUG("%p %04x %08x\n", socket, reg, val);
+	debug("%p %04x %08x\n", socket, reg, val);
 	return val;
 }
 
 static inline void cb_writel(struct yenta_socket *socket, unsigned reg, u32 val)
 {
-	DEBUG("%p %04x %08x\n", socket, reg, val);
+	debug("%p %04x %08x\n", socket, reg, val);
 	writel(val, socket->base + reg);
 }
 
@@ -61,7 +61,7 @@ static inline u8 config_readb(struct yenta_socket *socket, unsigned offset)
 {
 	u8 val;
 	pci_read_config_byte(socket->dev, offset, &val);
-	DEBUG("%p %04x %02x\n", socket, offset, val);
+	debug("%p %04x %02x\n", socket, offset, val);
 	return val;
 }
 
@@ -69,7 +69,7 @@ static inline u16 config_readw(struct yenta_socket *socket, unsigned offset)
 {
 	u16 val;
 	pci_read_config_word(socket->dev, offset, &val);
-	DEBUG("%p %04x %04x\n", socket, offset, val);
+	debug("%p %04x %04x\n", socket, offset, val);
 	return val;
 }
 
@@ -77,32 +77,32 @@ static inline u32 config_readl(struct yenta_socket *socket, unsigned offset)
 {
 	u32 val;
 	pci_read_config_dword(socket->dev, offset, &val);
-	DEBUG("%p %04x %08x\n", socket, offset, val);
+	debug("%p %04x %08x\n", socket, offset, val);
 	return val;
 }
 
 static inline void config_writeb(struct yenta_socket *socket, unsigned offset, u8 val)
 {
-	DEBUG("%p %04x %02x\n", socket, offset, val);
+	debug("%p %04x %02x\n", socket, offset, val);
 	pci_write_config_byte(socket->dev, offset, val);
 }
 
 static inline void config_writew(struct yenta_socket *socket, unsigned offset, u16 val)
 {
-	DEBUG("%p %04x %04x\n", socket, offset, val);
+	debug("%p %04x %04x\n", socket, offset, val);
 	pci_write_config_word(socket->dev, offset, val);
 }
 
 static inline void config_writel(struct yenta_socket *socket, unsigned offset, u32 val)
 {
-	DEBUG("%p %04x %08x\n", socket, offset, val);
+	debug("%p %04x %08x\n", socket, offset, val);
 	pci_write_config_dword(socket->dev, offset, val);
 }
 
 static inline u8 exca_readb(struct yenta_socket *socket, unsigned reg)
 {
 	u8 val = readb(socket->base + 0x800 + reg);
-	DEBUG("%p %04x %02x\n", socket, reg, val);
+	debug("%p %04x %02x\n", socket, reg, val);
 	return val;
 }
 
@@ -111,19 +111,19 @@ static inline u8 exca_readw(struct yenta_socket *socket, unsigned reg)
 	u16 val;
 	val = readb(socket->base + 0x800 + reg);
 	val |= readb(socket->base + 0x800 + reg + 1) << 8;
-	DEBUG("%p %04x %04x\n", socket, reg, val);
+	debug("%p %04x %04x\n", socket, reg, val);
 	return val;
 }
 
 static inline void exca_writeb(struct yenta_socket *socket, unsigned reg, u8 val)
 {
-	DEBUG("%p %04x %02x\n", socket, reg, val);
+	debug("%p %04x %02x\n", socket, reg, val);
 	writeb(val, socket->base + 0x800 + reg);
 }
 
 static void exca_writew(struct yenta_socket *socket, unsigned reg, u16 val)
 {
-	DEBUG("%p %04x %04x\n", socket, reg, val);
+	debug("%p %04x %04x\n", socket, reg, val);
 	writeb(val, socket->base + 0x800 + reg);
 	writeb(val >> 8, socket->base + 0x800 + reg + 1);
 }

@@ -2,6 +2,10 @@
 # Makefile for the kernel pcmcia subsystem (c/o David Hinds)
 #
 
+ifeq ($(CONFIG_PCMCIA_DEBUG),y)
+EXTRA_CFLAGS += -DDEBUG
+endif
+
 obj-$(CONFIG_PCMCIA)				+= pcmcia_core.o ds.o
 obj-$(CONFIG_YENTA) 				+= yenta_socket.o
 
