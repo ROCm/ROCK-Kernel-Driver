@@ -12,7 +12,7 @@
 
 #include <linux/config.h>
 
-extern unsigned long loops_per_sec;
+extern unsigned long loops_per_jiffy;
 
 extern __inline__ void
 __delay(unsigned long loops)
@@ -36,21 +36,21 @@ __delay(unsigned long loops)
  * first constant multiplications gets optimized away if the delay is
  * a constant)
  */
-extern __inline__ void __udelay(unsigned long usecs, unsigned long lps)
+extern __inline__ void __udelay(unsigned long usecs, unsigned long lpj)
 {
 	unsigned long lo;
 
-	usecs *= 0x000010c6f7a0b5edUL;		/* 2**64 / 1000000 */
+	usecs *= 0x00068db8bac710cbUL;		/* 2**64 / (1000000 / HZ) */
 	__asm__("dmultu\t%2,%3"
 		:"=h" (usecs), "=l" (lo)
-		:"r" (usecs),"r" (lps));
+		:"r" (usecs),"r" (lpj));
 	__delay(usecs);
 }
 
 #ifdef CONFIG_SMP
 #define __udelay_val cpu_data[smp_processor_id()].udelay_val
 #else
-#define __udelay_val loops_per_sec
+#define __udelay_val loops_per_jiffy
 #endif
 
 #define udelay(usecs) __udelay((usecs),__udelay_val)

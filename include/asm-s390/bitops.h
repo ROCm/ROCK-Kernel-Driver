@@ -34,7 +34,14 @@
  * align the address to 4 byte boundary. It seems to work
  * without the alignment. 
  */
+#ifdef __KERNEL__
 #define ALIGN_CS 0
+#else
+#define ALIGN_CS 1
+#ifndef CONFIG_SMP
+#error "bitops won't work without CONFIG_SMP"
+#endif
+#endif
 
 /* bitmap tables from arch/S390/kernel/bitmap.S */
 extern const char _oi_bitmap[];
@@ -487,6 +494,7 @@ static __inline__ int test_and_set_bit_simple(int nr, volatile void * addr)
              : "cc", "memory", "1", "2" );
         return oldbit;
 }
+#define __test_and_set_bit(X,Y)		test_and_set_bit_simple(X,Y)
 
 /*
  * fast, non-SMP test_and_clear_bit routine
@@ -513,6 +521,7 @@ static __inline__ int test_and_clear_bit_simple(int nr, volatile void * addr)
              : "cc", "memory", "1", "2" );
         return oldbit;
 }
+#define __test_and_clear_bit(X,Y)	test_and_clear_bit_simple(X,Y)
 
 /*
  * fast, non-SMP test_and_change_bit routine
@@ -539,6 +548,7 @@ static __inline__ int test_and_change_bit_simple(int nr, volatile void * addr)
              : "cc", "memory", "1", "2" );
         return oldbit;
 }
+#define __test_and_change_bit(X,Y)	test_and_change_bit_simple(X,Y)
 
 #ifdef CONFIG_SMP
 #define set_bit             set_bit_cs

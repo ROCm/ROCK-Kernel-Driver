@@ -209,6 +209,7 @@ struct irlan_cb *irlan_open(__u32 saddr, __u32 daddr)
 	struct irlan_cb *self;
 
 	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	ASSERT(irlan != NULL, return NULL;);
 
 	/* 
 	 *  Initialize the irlan structure. 
@@ -224,8 +225,6 @@ struct irlan_cb *irlan_open(__u32 saddr, __u32 daddr)
 	 */
 	self->magic = IRLAN_MAGIC;
 
-	ASSERT(irlan != NULL, return NULL;);
-	
 	sprintf(self->dev.name, "%s", "unknown");
 
 	self->dev.priv = (void *) self;
@@ -1074,19 +1073,18 @@ static int irlan_proc_read(char *buf, char **start, off_t offset, int len)
 {
  	struct irlan_cb *self;
 	unsigned long flags;
+	ASSERT(irlan != NULL, return 0;);
      
 	save_flags(flags);
 	cli();
 
-	ASSERT(irlan != NULL, return 0;);
-	
 	len = 0;
 	
 	len += sprintf(buf+len, "IrLAN instances:\n");
 	
 	self = (struct irlan_cb *) hashbin_get_first(irlan);
 	while (self != NULL) {
-		ASSERT(self->magic == IRLAN_MAGIC, return len;);
+		ASSERT(self->magic == IRLAN_MAGIC, break;);
 		
 		len += sprintf(buf+len, "ifname: %s,\n",
 			       self->dev.name);

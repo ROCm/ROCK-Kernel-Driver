@@ -7,7 +7,7 @@
  *
  *  Ideas also taken from arch/arm.
  *
- *  Copyright (C) 2000 Axis Communications AB
+ *  Copyright (C) 2000, 2001 Axis Communications AB
  *
  *  Authors:  Bjorn Wesen (bjornw@axis.com)
  *
@@ -101,7 +101,14 @@ sys_sigsuspend(old_sigset_t mask, long r11, long r12, long r13, long mof,
 		current->state = TASK_INTERRUPTIBLE;
 		schedule();
 		if (do_signal(0, &saveset, regs))
-			return -EINTR;
+			/* We will get here twice: once to call the signal
+			   handler, then again to return from the
+			   sigsuspend system call.  When calling the
+			   signal handler, R10 holds the signal number as
+			   set through do_signal.  The sigsuspend call
+			   will return with the restored value set above;
+			   always -EINTR.  */
+			return regs->r10;
 	}
 }
 
@@ -133,7 +140,14 @@ sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize, long r12, long r13,
 		current->state = TASK_INTERRUPTIBLE;
 		schedule();
 		if (do_signal(0, &saveset, regs))
-			return -EINTR;
+			/* We will get here twice: once to call the signal
+			   handler, then again to return from the
+			   sigsuspend system call.  When calling the
+			   signal handler, R10 holds the signal number as
+			   set through do_signal.  The sigsuspend call
+			   will return with the restored value set above;
+			   always -EINTR.  */
+			return regs->r10;
 	}
 }
 
@@ -413,6 +427,7 @@ static void setup_frame(int sig, struct k_sigaction *ka,
 
 	regs->irp = (unsigned long) ka->sa.sa_handler;  /* what we enter NOW   */
 	regs->srp = return_ip;                          /* what we enter LATER */
+	regs->r10 = sig;                                /* first argument is signo */
 
 	/* actually move the usp to reflect the stacked frame */
 
@@ -462,7 +477,6 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 		/* trampoline - the desired return ip is the retcode itself */
 		return_ip = (unsigned long)&frame->retcode;
 		/* This is movu.w __NR_sigreturn, r9; break 13; */
-		/* TODO: check byteorder */
 		err |= __put_user(0x9c5f,         (short *)(frame->retcode+0));
 		err |= __put_user(__NR_sigreturn, (short *)(frame->retcode+2));
 		err |= __put_user(0xe93d,         (short *)(frame->retcode+4));
@@ -477,6 +491,7 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 
 	regs->irp = (unsigned long) ka->sa.sa_handler;  /* what we enter NOW   */
 	regs->srp = return_ip;                          /* what we enter LATER */
+	regs->r10 = sig;                                /* first argument is signo */
 
 	/* actually move the usp to reflect the stacked frame */
 

@@ -43,9 +43,6 @@ static char *rcsid = "$Id: toshoboe.c,v 1.91 1999/06/29 14:21:06 root Exp $";
 /* Define this to enable FIR and MIR support */
 #define ENABLE_FAST
 
-/* Number of ports this driver can support, you also need to edit dev_self below */
-#define NSELFS 4
-
 /* Size of IO window */
 #define CHIP_IO_EXTENT	0x1f
 
@@ -77,7 +74,6 @@ static char *rcsid = "$Id: toshoboe.c,v 1.91 1999/06/29 14:21:06 root Exp $";
 #include <net/irda/irda_device.h>
 
 #include <linux/pm.h>
-static int toshoboe_pmproc (struct pm_dev *dev, pm_request_t rqst, void *data);
 
 #include <net/irda/toshoboe.h>
 
@@ -91,8 +87,6 @@ static struct pci_device_id toshoboe_pci_tbl[] __initdata = {
 MODULE_DEVICE_TABLE(pci, toshoboe_pci_tbl);
 
 static const char *driver_name = "toshoboe";
-
-static struct toshoboe_cb *dev_self[NSELFS + 1];
 
 static int max_baud = 4000000;
 
@@ -644,21 +638,20 @@ out:
 	return ret;
 }
 
-#ifdef MODULE
-
 MODULE_DESCRIPTION("Toshiba OBOE IrDA Device Driver");
 MODULE_AUTHOR("James McKenzie <james@fishsoup.dhs.org>");
 MODULE_PARM (max_baud, "i");
 MODULE_PARM_DESC(max_baus, "Maximum baud rate");
 
-static int
-toshoboe_close (struct toshoboe_cb *self)
+static void
+toshoboe_remove (struct pci_dev *pci_dev)
 {
   int i;
+  struct toshoboe_cb *self = (struct toshoboe_cb*)pci_get_drvdata(pci_dev);
 
   IRDA_DEBUG (4, __FUNCTION__ "()\n");
 
-  ASSERT (self != NULL, return -1;
+  ASSERT (self != NULL, return;
     );
 
   if (!self->stopped)
@@ -693,16 +686,12 @@ toshoboe_close (struct toshoboe_cb *self)
   self->taskfilebuf = NULL;
   self->taskfile = NULL;
 
-  return (0);
+  return;
 
 }
 
-#endif
-
-
-
 static int
-toshoboe_open (struct pci_dev *pci_dev)
+toshoboe_probe (struct pci_dev *pci_dev, const struct pci_device_id *pdid)
 {
   struct toshoboe_cb *self;
   struct net_device *dev;
@@ -712,15 +701,6 @@ toshoboe_open (struct pci_dev *pci_dev)
   int err;
 
   IRDA_DEBUG (4, __FUNCTION__ "()\n");
-
-  while (dev_self[i])
-    i++;
-
-  if (i == NSELFS)
-    {
-      printk (KERN_ERR "Oboe: No more instances available");
-      return -ENOMEM;
-    }
 
   if ((err=pci_enable_device(pci_dev)))
 	  return err;
@@ -736,12 +716,10 @@ toshoboe_open (struct pci_dev *pci_dev)
 
   memset (self, 0, sizeof (struct toshoboe_cb));
 
-  dev_self[i] = self;           /*This needs moving if we ever get more than one chip */
-
   self->open = 0;
   self->stopped = 0;
   self->pdev = pci_dev;
-  self->base = pci_dev->resource[0].start;
+  self->base = pci_resource_start(pci_dev,0);
 
   self->io.sir_base = self->base;
   self->io.irq = pci_dev->irq;
@@ -749,18 +727,14 @@ toshoboe_open (struct pci_dev *pci_dev)
   self->io.speed = 9600;
 
   /* Lock the port that we need */
-  i = check_region (self->io.sir_base, self->io.sir_ext);
-  if (i < 0)
+  if (NULL==request_region (self->io.sir_base, self->io.sir_ext, driver_name))
     {
       IRDA_DEBUG (0, __FUNCTION__ "(), can't get iobase of 0x%03x\n",
              self->io.sir_base);
 
-      dev_self[i] = NULL;
-      kfree (self);
-
-      return -ENODEV;
+      err = -EBUSY;
+      goto freeself;
     }
-
 
   irda_init_max_qos_capabilies (&self->qos);
   self->qos.baud_rate.bits = 0;
@@ -804,8 +778,8 @@ toshoboe_open (struct pci_dev *pci_dev)
   if (!self->taskfilebuf)
     {
       printk (KERN_ERR "toshoboe: kmalloc for DMA failed()\n");
-      kfree (self);
-      return -ENOMEM;
+      err = -ENOMEM;
+      goto freeregion;
     }
 
 
@@ -839,25 +813,16 @@ toshoboe_open (struct pci_dev *pci_dev)
   if (ok != RX_SLOTS + TX_SLOTS)
     {
       printk (KERN_ERR "toshoboe: kmalloc for buffers failed()\n");
+      err = -ENOMEM;
+      goto freebufs;
 
+  }
 
-      for (i = 0; i < TX_SLOTS; ++i)
-        if (self->xmit_bufs[i])
-          kfree (self->xmit_bufs[i]);
-      for (i = 0; i < RX_SLOTS; ++i)
-        if (self->recv_bufs[i])
-          kfree (self->recv_bufs[i]);
-
-      kfree (self);
-      return -ENOMEM;
-
-    }
-
-  request_region (self->io.sir_base, self->io.sir_ext, driver_name);
 
   if (!(dev = dev_alloc("irda%d", &err))) {
-	  ERROR(__FUNCTION__ "(), dev_alloc() failed!\n");
-	  return -ENOMEM;
+      ERROR(__FUNCTION__ "(), dev_alloc() failed!\n");
+      err = -ENOMEM;
+      goto freebufs;
   }
   dev->priv = (void *) self;
   self->netdev = dev;
@@ -875,12 +840,15 @@ toshoboe_open (struct pci_dev *pci_dev)
   rtnl_unlock();
   if (err) {
 	  ERROR(__FUNCTION__ "(), register_netdev() failed!\n");
-	  return -1;
+	  /* XXX there is not freeing for dev? */
+          goto freebufs;
   }
+  pci_set_drvdata(pci_dev,self);
 
-  pmdev = pm_register (PM_PCI_DEV, PM_PCI_ID(pci_dev), toshoboe_pmproc);
+/*  pmdev = pm_register (PM_PCI_DEV, PM_PCI_ID(pci_dev), toshoboe_pmproc);
   if (pmdev)
 	  pmdev->data = self;
+	  */
 
   printk (KERN_WARNING "ToshOboe: Using ");
 #ifdef ONETASK
@@ -891,22 +859,36 @@ toshoboe_open (struct pci_dev *pci_dev)
   printk (" tasks, version %s\n", rcsid);
 
   return (0);
+freebufs:
+      for (i = 0; i < TX_SLOTS; ++i)
+        if (self->xmit_bufs[i])
+          kfree (self->xmit_bufs[i]);
+      for (i = 0; i < RX_SLOTS; ++i)
+        if (self->recv_bufs[i])
+          kfree (self->recv_bufs[i]);
+      kfree(self->taskfilebuf);
+freeregion:
+      release_region (self->io.sir_base, self->io.sir_ext);
+freeself:
+      kfree (self);
+      return err;
 }
 
-static void 
-toshoboe_gotosleep (struct toshoboe_cb *self)
+static int
+toshoboe_suspend (struct pci_dev *pci_dev, u32 crap)
 {
   int i = 10;
+  struct toshoboe_cb *self = (struct toshoboe_cb*)pci_get_drvdata(pci_dev);
 
   printk (KERN_WARNING "ToshOboe: suspending\n");
 
-  if (self->stopped)
-    return;
+  if (!self || self->stopped)
+    return 0;
 
   self->stopped = 1;
 
   if (!self->open)
-    return;
+    return 0;
 
 /*FIXME: can't sleep here wait one second */
 
@@ -917,22 +899,26 @@ toshoboe_gotosleep (struct toshoboe_cb *self)
   toshoboe_disablebm (self);
 
   self->txpending = 0;
-
+  return 0;
 }
 
 
-static void 
-toshoboe_wakeup (struct toshoboe_cb *self)
+static int 
+toshoboe_resume (struct pci_dev *pci_dev)
 {
+  struct toshoboe_cb *self = (struct toshoboe_cb*)pci_get_drvdata(pci_dev);
   unsigned long flags;
 
+  if (!self)
+    return 0;
+
   if (!self->stopped)
-    return;
+    return 0;
 
   if (!self->open)
     {
       self->stopped = 0;
-      return;
+      return 0;
     }
 
   save_flags (flags);
@@ -949,108 +935,29 @@ toshoboe_wakeup (struct toshoboe_cb *self)
   netif_wake_queue(self->netdev);
   restore_flags (flags);
   printk (KERN_WARNING "ToshOboe: waking up\n");
-
-}
-
-static int 
-toshoboe_pmproc (struct pm_dev *dev, pm_request_t rqst, void *data)
-{
-  struct toshoboe_cb *self = (struct toshoboe_cb *) dev->data;
-  if (self) {
-	  switch (rqst) {
-	  case PM_SUSPEND:
-		  toshoboe_gotosleep (self);
-		  break;
-	  case PM_RESUME:
-		  toshoboe_wakeup (self);
-		  break;
-	  }
-  }
   return 0;
 }
 
+static struct pci_driver toshoboe_pci_driver = {
+  name		: "toshoboe",
+  id_table	: toshoboe_pci_tbl,
+  probe		: toshoboe_probe,
+  remove	: toshoboe_remove,
+  suspend	: toshoboe_suspend,
+  resume	: toshoboe_resume 
+};
 
-int __init toshoboe_init (void)
-{
-  struct pci_dev *pci_dev = NULL;
-  int found = 0;
-
-  do
-    {
-      pci_dev = pci_find_device (PCI_VENDOR_ID_TOSHIBA,
-                                 PCI_DEVICE_ID_FIR701, pci_dev);
-      if (pci_dev)
-        {
-          printk (KERN_WARNING "ToshOboe: Found 701 chip at 0x%0lx irq %d\n",
-		  pci_dev->resource[0].start,
-                  pci_dev->irq);
-
-          if (!toshoboe_open (pci_dev))
-	      found++;
-        }
-
-    }
-  while (pci_dev);
-
-  if (!found) do
-    {
-      pci_dev = pci_find_device (PCI_VENDOR_ID_TOSHIBA,
-                                 PCI_DEVICE_ID_FIR701b, pci_dev);
-      if (pci_dev)
-        {
-          printk (KERN_WARNING "ToshOboe: Found 701b chip at 0x%0lx irq %d\n",
-		  pci_dev->resource[0].start,
-                  pci_dev->irq);
-
-          if (!toshoboe_open (pci_dev))
-	      found++;
-        }
-
-    }
-  while (pci_dev);
-
-
-
-  if (found)
-    {
-      return 0;
-    }
-
-  return -ENODEV;
+int __init
+toshoboe_init (void) {
+  pci_module_init(&toshoboe_pci_driver);
+  return 0;
 }
-
-#ifdef MODULE
-
-static void
-toshoboe_cleanup (void)
-{
-  int i;
-
-  IRDA_DEBUG (4, __FUNCTION__ "()\n");
-
-  for (i = 0; i < 4; i++)
-    {
-      if (dev_self[i])
-        toshoboe_close (dev_self[i]);
-    }
-
-  pm_unregister_all (toshoboe_pmproc);
-}
-
-
-
-int
-init_module (void)
-{
-  return toshoboe_init ();
-}
-
 
 void
-cleanup_module (void)
+toshoboe_cleanup (void)
 {
-  toshoboe_cleanup ();
+  pci_unregister_driver(&toshoboe_pci_driver);
 }
 
-
-#endif
+module_init(toshoboe_init);
+module_exit(toshoboe_cleanup);

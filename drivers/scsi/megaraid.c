@@ -9,7 +9,7 @@
  *              as published by the Free Software Foundation; either version
  *              2 of the License, or (at your option) any later version.
  *
- * Version : v1.14g (Feb 5, 2001)
+ * Version : v1.15d(May 30, 2001)
  *
  * Description: Linux device driver for AMI MegaRAID controller
  *
@@ -296,6 +296,63 @@
  *	Version 1.14g-ac2 - 22/03/01
  *	Fixed a non obvious dereference after free in the driver unload path
  *
+ *	Version 1.14i
+ *	changes for making 32bit application run on IA64
+ *
+ *	Version 1.14j
+ *	Tue Mar 13 14:27:54 EST 2001 - AM
+ *	Changes made in the driver to be able to run applications if the
+ *	system has memory >4GB.
+ *
+ *
+ *	Version 1.14k
+ *	Thu Mar 15 18:38:11 EST 2001 - AM
+ *
+ *	Firmware version check removed if subsysid==0x1111 and
+ *	subsysvid==0x1111, since its not yet initialized.
+ *
+ *	changes made to correctly calculate the base in mega_findCard.
+ *
+ *	Driver informational messages now appear on the console as well as
+ *	with dmesg
+ *
+ *	Older ioctl interface is returned failure on newer(2.4.xx) kernels.
+ *
+ *	Inclusion of "modversions.h" is still a debatable question. It is
+ *	included anyway with this release.
+ *
+ *	Version 1.14l
+ *	Mon Mar 19 17:39:46 EST 2001 - AM
+ *
+ *	Assorted changes to remove compilation error in 1.14k when compiled
+ *	with kernel < 2.4.0
+ *
+ *	Version 1.15
+ *	Thu Apr 19 09:38:38 EDT 2001 - AM
+ *
+ *	1.14l rollover to 1.15
+ *
+ *	Version 1.15b
+ *  Wed May 16 20:10:01 EDT 2001 - AM
+ *
+ *	"modeversions.h" is no longer included in the code.
+ *	2.4.xx style mutex initialization used for older kernels also
+ *	Brought in-sync with Alan's changes in 2.4.4
+ *	Note: 1.15a is on OBDR brabch(main trunk), and is not merged with yet.
+ *
+ * Version 1.15c
+ * Mon May 21 23:10:42 EDT 2001 - AM
+ *
+ * ioctl interface uses 2.4.x conforming pci dma calls
+ * similar calls used for older kernels
+ *
+ * Version 1.15d
+ * Wed May 30 17:30:41 EDT 2001 - AM
+ *
+ * NULL is not a valid first argument for pci_alloc_consistent() on
+ * IA64(2.4.3-2.10.1). Code shuffling done in ioctl interface to get
+ * "pci_dev" before making calls to pci interface routines.
+
  * BUGS:
  *     Some older 2.1 kernels (eg. 2.1.90) have a bug in pci.c that
  *     fails to detect the controller as a pci device on the system.
@@ -399,7 +456,11 @@ static void WROUTDOOR (mega_host_config * megaCfg, ulong value)
 #define cpuid smp_processor_id()
 #endif
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)	/* 0x020100 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,4)
+#define scsi_set_pci_device(x,y)
+#endif
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)	/* 0x020400 */
 
 /*
  *	Linux 2.4 and higher
@@ -447,10 +508,12 @@ MODULE_DESCRIPTION ("AMI MegaRAID driver");
 #define IO_UNLOCK spin_unlock_irqrestore(&io_request_lock,io_flags);
 
 #define pci_free_consistent(a,b,c,d)
-#define pci_unmap_single(a,b,c,d,e)
+#define pci_unmap_single(a,b,c,d)
 
-#define init_MUTEX_LOCKED(x)	((x)=MUTEX_LOCKED)
-#define init_MUTEX(x)		((x)=MUTEX)
+#define init_MUTEX_LOCKED(x)    (*(x)=MUTEX_LOCKED)
+#define init_MUTEX(x)           (*(x)=MUTEX)
+
+#define pci_enable_device(x) (0)
 
 #define queue_task_irq(a,b)     queue_task(a,b)
 #define queue_task_irq_off(a,b) queue_task(a,b)
@@ -480,10 +543,12 @@ MODULE_DESCRIPTION ("AMI MegaRAID driver");
 #define cpu_to_le32(x) (x)
 
 #define pci_free_consistent(a,b,c,d)
-#define pci_unmap_single(a,b,c,d,e)
+#define pci_unmap_single(a,b,c,d)
 
-#define init_MUTEX_LOCKED(x)	((x)=MUTEX_LOCKED)
-#define init_MUTEX(x)		((x)=MUTEX)
+#define init_MUTEX_LOCKED(x)    (*(x)=MUTEX_LOCKED)
+#define init_MUTEX(x)           (*(x)=MUTEX)
+
+#define pci_enable_device(x) (0)
 
 /*
  *	2.0 lacks spinlocks, iounmap/ioremap
@@ -508,6 +573,16 @@ typedef struct {
 #endif
 
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)	/* 0x020400 */
+#define dma_alloc_consistent pci_alloc_consistent
+#define dma_free_consistent pci_free_consistent
+#else
+typedef unsigned long dma_addr_t;
+void *dma_alloc_consistent(void *, size_t, dma_addr_t *);
+void dma_free_consistent(void *, size_t, void *, dma_addr_t);
+int mega_get_order(int);
+int pow_2(int);
+#endif
 
 /* set SERDEBUG to 1 to enable serial debugging */
 #define SERDEBUG 0
@@ -973,10 +1048,16 @@ static mega_scb *mega_build_cmd (mega_host_config * megaCfg, Scsi_Cmnd * SCpnt)
 	if ((SCpnt->cmnd[0] == MEGADEVIOC))
 		return megadev_doioctl (megaCfg, SCpnt);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
 	if ((SCpnt->cmnd[0] == M_RD_IOCTL_CMD)
-	    || (SCpnt->cmnd[0] == M_RD_IOCTL_CMD_NEW))
+		    || (SCpnt->cmnd[0] == M_RD_IOCTL_CMD_NEW))
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)  
 		return mega_ioctl (megaCfg, SCpnt);	/* Handle IOCTL command */
+#else
+	{
+		printk(KERN_WARNING "megaraid ioctl: older interface - "
+				"not supported.\n");
+		return NULL;
+	}
 #endif
 
 	islogical = (SCpnt->channel == megaCfg->host->max_channel);
@@ -1407,7 +1488,7 @@ static mega_scb *mega_ioctl (mega_host_config * megaCfg, Scsi_Cmnd * SCpnt)
 		 *   cmnd[4..7] = external user buffer     *
 		 *   cmnd[8..11] = length of buffer        *
 		 *                                         */
-		char *user_area = *((char **) &SCpnt->cmnd[4]);
+      	char *user_area = (char *)*((u32*)&SCpnt->cmnd[4]);
 		u32 xfer_size = *((u32 *) & SCpnt->cmnd[8]);
 		switch (data[0]) {
 		case FW_FIRE_WRITE:
@@ -1598,8 +1679,8 @@ static void mega_build_kernel_sg (char *barea, ulong xfersize, mega_scb * pScb, 
 	mbox->xferaddr = virt_to_bus (pScb->sgList);
 	mbox->numsgelements = idx;
 }
+#endif
 
-#endif				/* KERNEL_VERSION(2,3,0) */
 
 #if DEBUG
 static unsigned int cum_time = 0;
@@ -2348,7 +2429,7 @@ static int mega_i_query_adapter (mega_host_config * megaCfg)
 	megaCfg->biosVer[4] = 0;
 #endif
 
-	printk (KERN_INFO "megaraid: [%s:%s] detected %d logical drives" M_RD_CRLFSTR,
+	printk (KERN_NOTICE "megaraid: [%s:%s] detected %d logical drives" M_RD_CRLFSTR,
 		megaCfg->fwVer, megaCfg->biosVer, megaCfg->numldrv);
 	/*
 	 * I hope that I can unmap here, reason DMA transaction is not required any more
@@ -2368,7 +2449,7 @@ static int mega_i_query_adapter (mega_host_config * megaCfg)
  * Returns data to be displayed in /proc/scsi/megaraid/X
  *----------------------------------------------------------*/
 
-static int megaraid_proc_info (char *buffer, char **start, off_t offset,
+int megaraid_proc_info (char *buffer, char **start, off_t offset,
 		    int length, int host_no, int inout)
 {
 	*start = buffer;
@@ -2411,7 +2492,7 @@ static int mega_findCard (Scsi_Host_Template * pHostTmpl,
 #endif
 
 	while ((pdev = pci_find_device (pciVendor, pciDev, pdev))) {
-		if (pci_enable_device (pdev))
+		if(pci_enable_device (pdev))
 			continue;
 		pciBus = pdev->bus->number;
 		pciDevFun = pdev->devfn;
@@ -2425,11 +2506,16 @@ static int mega_findCard (Scsi_Host_Template * pHostTmpl,
 				continue;	/* not an AMI board */
 			}
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
+#if 0
+/*
+ *	This leads to corruption on some HP boards so disable it
+ */
 			pcibios_read_config_dword (pciBus, pciDevFun,
 						   PCI_CONF_AMISIG64, &magic64);
 
 			if (magic64 == AMI_64BIT_SIGNATURE)
 				flag |= BOARD_64BIT;
+#endif				
 #endif
 		}
 
@@ -2451,9 +2537,7 @@ static int mega_findCard (Scsi_Host_Template * pHostTmpl,
 			pci_read_config_word (pdev,
 					      PCI_SUBSYSTEM_ID, &subsysid);
 #endif
-			if ((subsysid == 0x1111) && (subsysvid == 0x1111) &&
-			    (!strcmp (megaCfg->fwVer, "3.00")
-			     || !strcmp (megaCfg->fwVer, "3.01"))) {
+			if ((subsysid == 0x1111) && (subsysvid == 0x1111)) {
 				printk (KERN_WARNING
 					"megaraid: Your card is a Dell PERC 2/SC RAID controller with firmware\n"
 					"megaraid: 3.00 or 3.01.  This driver is known to have corruption issues\n"
@@ -2476,7 +2560,7 @@ static int mega_findCard (Scsi_Host_Template * pHostTmpl,
 				continue;
 		}
 
-		printk (KERN_INFO
+		printk (KERN_NOTICE
 			"megaraid: found 0x%4.04x:0x%4.04x:idx %d:bus %d:slot %d:func %d\n",
 			pciVendor, pciDev, pciIdx, pciBus, PCI_SLOT (pciDevFun),
 			PCI_FUNC (pciDevFun));
@@ -2499,11 +2583,14 @@ static int mega_findCard (Scsi_Host_Template * pHostTmpl,
 		pciIdx++;
 
 		if (flag & BOARD_QUARTZ) {
+			megaBase &= PCI_BASE_ADDRESS_MEM_MASK;
 			megaBase = (long) ioremap (megaBase, 128);
 			if (!megaBase)
 				continue;
-		} else
+		} else {
+			megaBase &= PCI_BASE_ADDRESS_IO_MASK;
 			megaBase += 0x10;
+		}
 
 		/* Initialize SCSI Host structure */
 		host = scsi_register (pHostTmpl, sizeof (mega_host_config));
@@ -2514,11 +2601,11 @@ static int mega_findCard (Scsi_Host_Template * pHostTmpl,
 		megaCfg = (mega_host_config *) host->hostdata;
 		memset (megaCfg, 0, sizeof (mega_host_config));
 
-		printk (KERN_INFO "scsi%d : Found a MegaRAID controller at 0x%x, IRQ: %d"
+		printk (KERN_NOTICE "scsi%d : Found a MegaRAID controller at 0x%x, IRQ: %d"
 			M_RD_CRLFSTR, host->host_no, (u_int) megaBase, megaIrq);
 
 		if (flag & BOARD_64BIT)
-			printk (KERN_INFO "scsi%d : Enabling 64 bit support\n",
+			printk (KERN_NOTICE "scsi%d : Enabling 64 bit support\n",
 				host->host_no);
 
 		/* Copy resource info into structure */
@@ -2549,10 +2636,11 @@ static int mega_findCard (Scsi_Host_Template * pHostTmpl,
 
 		if (!(flag & BOARD_QUARTZ)) {
 			/* Request our IO Range */
-			if (!request_region(megaBase, 16, "megaraid")) {
-				printk (KERN_WARNING "megaraid: Couldn't register I/O range!" M_RD_CRLFSTR);
+			if (check_region (megaBase, 16)) {
+				printk(KERN_WARNING "megaraid: Couldn't register I/O range!\n");
 				goto err_unregister;
 			}
+			request_region(megaBase, 16, "megaraid");
 		}
 
 		/* Request our IRQ */
@@ -2678,7 +2766,7 @@ int megaraid_detect (Scsi_Host_Template * pHostTmpl)
 		skip_id = (skip_id > 15) ? -1 : skip_id;
 	}
 
-	printk (KERN_INFO "megaraid: " MEGARAID_VERSION M_RD_CRLFSTR);
+	printk (KERN_NOTICE "megaraid: " MEGARAID_VERSION M_RD_CRLFSTR);
 
 	memset (mega_hbas, 0, sizeof (mega_hbas));
 
@@ -2736,7 +2824,7 @@ int megaraid_detect (Scsi_Host_Template * pHostTmpl)
 /*---------------------------------------------------------------------
  * Release the controller's resources
  *---------------------------------------------------------------------*/
-static int megaraid_release (struct Scsi_Host *pSHost)
+int megaraid_release (struct Scsi_Host *pSHost)
 {
 	mega_host_config *megaCfg;
 	mega_mailbox *mbox;
@@ -3022,7 +3110,7 @@ static inline void mega_freeSgList (mega_host_config * megaCfg)
 /*----------------------------------------------
  * Get information about the card/driver
  *----------------------------------------------*/
-static const char *megaraid_info (struct Scsi_Host *pSHost)
+const char *megaraid_info (struct Scsi_Host *pSHost)
 {
 	static char buffer[512];
 	mega_host_config *megaCfg;
@@ -3052,7 +3140,7 @@ static const char *megaraid_info (struct Scsi_Host *pSHost)
  *   10 01 numstatus byte
  *   11 01 status byte
  *-----------------------------------------------------------------*/
-static int megaraid_queue (Scsi_Cmnd * SCpnt, void (*pktComp) (Scsi_Cmnd *))
+int megaraid_queue (Scsi_Cmnd * SCpnt, void (*pktComp) (Scsi_Cmnd *))
 {
 	DRIVER_LOCK_T mega_host_config * megaCfg;
 	mega_scb *pScb;
@@ -3063,11 +3151,11 @@ static int megaraid_queue (Scsi_Cmnd * SCpnt, void (*pktComp) (Scsi_Cmnd *))
 
 	if (!(megaCfg->flag & (1L << SCpnt->channel))) {
 		if (SCpnt->channel < SCpnt->host->max_channel)
-			printk ( /*KERN_INFO */
+			printk ( KERN_NOTICE
 				"scsi%d: scanning channel %c for devices.\n",
 				megaCfg->host->host_no, SCpnt->channel + '1');
 		else
-			printk ( /*KERN_INFO */
+			printk ( KERN_NOTICE
 				"scsi%d: scanning virtual channel for logical drives.\n",
 				megaCfg->host->host_no);
 
@@ -3136,7 +3224,7 @@ static int megaraid_queue (Scsi_Cmnd * SCpnt, void (*pktComp) (Scsi_Cmnd *))
 			init_MUTEX_LOCKED (&pScb->ioctl_sem);
 			spin_unlock_irq (&io_request_lock);
 			down (&pScb->ioctl_sem);
-			user_area = *((char **) &pScb->SCpnt->cmnd[4]);
+    		user_area = (char *)*((u32*)&pScb->SCpnt->cmnd[4]);
 			if (copy_to_user
 			    (user_area, pScb->buff_ptr, pScb->iDataSize)) {
 				printk
@@ -3178,7 +3266,7 @@ static void internal_done (Scsi_Cmnd * SCpnt)
 
 /* shouldn't be used, but included for completeness */
 
-static int megaraid_command (Scsi_Cmnd * SCpnt)
+int megaraid_command (Scsi_Cmnd * SCpnt)
 {
 	internal_done_flag = 0;
 
@@ -3195,7 +3283,7 @@ static int megaraid_command (Scsi_Cmnd * SCpnt)
 /*---------------------------------------------------------------------
  * Abort a previous SCSI request
  *---------------------------------------------------------------------*/
-static int megaraid_abort (Scsi_Cmnd * SCpnt)
+int megaraid_abort (Scsi_Cmnd * SCpnt)
 {
 	mega_host_config *megaCfg;
 	int rc;			/*, idx; */
@@ -3293,7 +3381,7 @@ static int megaraid_abort (Scsi_Cmnd * SCpnt)
  * Reset a previous SCSI request
  *---------------------------------------------------------------------*/
 
-static int megaraid_reset (Scsi_Cmnd * SCpnt, unsigned int rstflags)
+int megaraid_reset (Scsi_Cmnd * SCpnt, unsigned int rstflags)
 {
 	mega_host_config *megaCfg;
 	int idx;
@@ -3404,7 +3492,7 @@ static int proc_read_stat (char *page, char **start, off_t offset,
 	*start = page;
 
 	proc_printf (megaCfg, "Statistical Information for this controller\n");
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)	/* 0x020100 */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)	/* 0x020400 */
 	proc_printf (megaCfg, "Interrupts Collected = %Lu\n",
 		     megaCfg->nInterrupts);
 #else
@@ -3574,7 +3662,7 @@ static void mega_create_proc_entry (int index, struct proc_dir_entry *parent)
  *     geom[1] = sectors
  *     geom[2] = cylinders
  *-------------------------------------------------------------*/
-static int megaraid_biosparam (Disk * disk, kdev_t dev, int *geom)
+int megaraid_biosparam (Disk * disk, kdev_t dev, int *geom)
 {
 	int heads, sectors, cylinders;
 	mega_host_config *megaCfg;
@@ -3788,11 +3876,9 @@ static int megadev_ioctl (struct inode *inode, struct file *filep,
 	kdev_t dev;
 	u32 inlen;
 	struct uioctl_t ioc;
-	char *kphysaddr = NULL;
+	char *kvaddr = NULL;
 	int nadap = numCtlrs;
-	int npages;
 	u8 opcode;
-	int order = 0;
 	u32 outlen;
 	int ret;
 	u8 subopcode;
@@ -3800,6 +3886,15 @@ static int megadev_ioctl (struct inode *inode, struct file *filep,
 	struct Scsi_Host *shpnt;
 	char *uaddr;
 	struct uioctl_t *uioc;
+	dma_addr_t	dma_addr;
+	u32		length;
+	mega_host_config *megacfg;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)	/* 0x020400 */
+	struct pci_dev pdev;
+	struct pci_dev *pdevp = &pdev;
+#else
+	char *pdevp = NULL;
+#endif
 	IO_LOCK_T;
 
 	if (!inode || !(dev = inode->i_rdev))
@@ -3807,12 +3902,6 @@ static int megadev_ioctl (struct inode *inode, struct file *filep,
 
 	if (_IOC_TYPE (cmd) != MEGAIOC_MAGIC)
 		return (-EINVAL);
-
-	/*
-	 * We do not transfer more than IOCTL_MAX_DATALEN (see megaraid.h) with
-	 * this interface.If the user needs to transfer more than this,he should
-	 * use 0x81 command op-code.
-	 */
 
 	/*
 	 * Get the user ioctl structure
@@ -3826,10 +3915,10 @@ static int megadev_ioctl (struct inode *inode, struct file *filep,
 		return -EFAULT;
 
 	/*
-	 * The first call the applications should make is to find out the number
-	 * of controllers in the system. The next logical call should be for
-	 * getting the list of controllers in the system as detected by the
-	 * driver.
+	 * The first call the applications should make is to find out the
+	 * number of controllers in the system. The next logical call should
+	 * be for getting the list of controllers in the system as detected
+	 * by the driver.
 	 */
 
 	/*
@@ -3892,173 +3981,135 @@ static int megadev_ioctl (struct inode *inode, struct file *filep,
 		adapno = ioc.ui.fcs.adapno;
 
 		/* See comment above: MEGAIOC_QADAPINFO */
-		adapno = GETADAP (adapno);
+		adapno = GETADAP(adapno);
 
 		if (adapno >= numCtlrs)
-			return (-ENODEV);
+			return(-ENODEV);
 
-		/* Check for zero length buffer. */
-		if (!ioc.ui.fcs.length)
+		length = ioc.ui.fcs.length;
+
+		/* Check for zero length buffer or very large buffers */
+		if( !length || length > 32*1024 )
 			return -EINVAL;
 
 		/* save the user address */
 		uaddr = ioc.ui.fcs.buffer;
 
-/*
-* For M_RD_IOCTL_CMD_NEW commands, the fields outlen and inlen of uioctl_t
-* structure are treated as flags. If outlen is 1, the data is
-* transferred from the device and if inlen is 1, the data is
-* transferred to the device.
-*/
+		/*
+		 * For M_RD_IOCTL_CMD_NEW commands, the fields outlen and inlen of
+		 * uioctl_t structure are treated as flags. If outlen is 1, the
+		 * data is transferred from the device and if inlen is 1, the data
+		 * is transferred to the device.
+		 */
 		outlen = ioc.outlen;
 		inlen = ioc.inlen;
-#if 0
-		if (inlen && outlen)
-			return -EINVAL;
-#endif
-		if (outlen) {
-			ret = verify_area (VERIFY_WRITE,
-					   (char *) ioc.ui.fcs.buffer,
-					   ioc.ui.fcs.length);
-			if (ret)
-				return ret;
-		} else if (inlen) {
-			ret = verify_area (VERIFY_READ,
-					   (char *) ioc.ui.fcs.buffer,
-					   ioc.ui.fcs.length);
 
-			if (ret)
-				return ret;
+		if(outlen) {
+			ret = verify_area(VERIFY_WRITE, (char *)ioc.ui.fcs.buffer, length);
+			if (ret) return ret;
 		}
-
-		/* How many pages required of size PAGE_SIZE */
-		npages = ioc.ui.fcs.length / PAGE_SIZE;
-		/* Do we need one more? */
-
-		if (ioc.ui.fcs.length % PAGE_SIZE)
-			npages++;
-
-		/* ioctl does not support data xfer > 32KB */
-		if (npages == 1)
-			order = 0;
-		else if (npages == 2)
-			order = 1;
-		else if (npages <= 4)
-			order = 2;
-		else if (npages <= 8)
-			order = 3;
-		else
-			return -EINVAL;
-
-		if (outlen || inlen) {
-			/*
-			 * Allocate kernel space for npages.
-			 *
-			 * Since we need the memory for DMA, it needs to be physically
-			 * contiguous. __get_free_pags() return consecutive free pages
-			 * in kernel space.
-			 * Note: We don't do __get_dma_pages(), since for PCI devices,
-			 * the DMA memory is not restriceted to 16M, which is ensured
-			 * by __get_dma_pages()
-			 */
-
-			if ((kphysaddr = (char *) __get_free_pages (GFP_KERNEL,
-								    order)) ==
-			    0) {
-				printk (KERN_INFO
-					"megaraid:allocation failed\n");
-				return -ENOMEM;
-			}
-
-			memset (kphysaddr, 0, npages * PAGE_SIZE);
-			ioc.ui.fcs.buffer = kphysaddr;
-
-			if (inlen) {
-				/* copyin the user data */
-				copy_from_user (kphysaddr,
-						(char *) uaddr,
-						ioc.ui.fcs.length);
-			}
+		if(inlen) {
+			ret = verify_area(VERIFY_READ, (char *) ioc.ui.fcs.buffer, length);
+			if (ret) return ret;
 		}
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-		scsicmd = (Scsi_Cmnd *) kmalloc (sizeof (Scsi_Cmnd),
-						 GFP_KERNEL | GFP_DMA);
-		memset (scsicmd, 0, sizeof (Scsi_Cmnd));
-#else
-		scsicmd = (Scsi_Cmnd *) scsi_init_malloc (sizeof (Scsi_Cmnd),
-							  GFP_ATOMIC | GFP_DMA);
-#endif
-		if (!scsicmd) {
-			if (kphysaddr)
-				free_pages ((unsigned long) kphysaddr, order);
-			return -ENOMEM;
-		}
-
-		scsicmd->host = NULL;
 
 		/*
 		 * Find this host
 		 */
-		for (shpnt = scsi_hostlist; shpnt; shpnt = shpnt->next) {
-			if (shpnt->hostdata ==
-			    (unsigned long *) megaCtlrs[adapno])
-				scsicmd->host = shpnt;
+		for( shpnt = scsi_hostlist; shpnt; shpnt = shpnt->next ) {
+			if( shpnt->hostdata == (unsigned long *)megaCtlrs[adapno] ) {
+				megacfg = (mega_host_config *)shpnt->hostdata;
+				break;
+			}
 		}
+		if(shpnt == NULL)  return -ENODEV;
 
-		if (scsicmd->host == NULL) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-			kfree (scsicmd);
+		scsicmd = (Scsi_Cmnd *)kmalloc(sizeof(Scsi_Cmnd), GFP_KERNEL|GFP_DMA);
 #else
-			scsi_init_free ((char *) scsicmd, sizeof (Scsi_Cmnd));
+		scsicmd = (Scsi_Cmnd *)scsi_init_malloc(sizeof(Scsi_Cmnd),
+							  GFP_ATOMIC | GFP_DMA);
 #endif
-			if (kphysaddr)
-				free_pages ((unsigned long) kphysaddr, order);
-			return -ENODEV;
+		if(scsicmd == NULL) return -ENOMEM;
+
+		memset(scsicmd, 0, sizeof(Scsi_Cmnd));
+		scsicmd->host = shpnt;
+
+		if( outlen || inlen ) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
+			pdevp = &pdev;
+			memcpy(pdevp, megacfg->dev, sizeof(struct pci_dev));
+			pdevp->dma_mask = 0xffffffff;
+#else
+			pdevp = NULL;
+#endif
+			kvaddr = dma_alloc_consistent(pdevp, length, &dma_addr);
+
+			if( kvaddr == NULL ) {
+				printk(KERN_WARNING "megaraid:allocation failed\n");
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)	/*0x20400 */
+				kfree(scsicmd);
+#else
+				scsi_init_free((char *)scsicmd, sizeof(Scsi_Cmnd));
+#endif
+				return -ENOMEM;
+			}
+
+			ioc.ui.fcs.buffer = kvaddr;
+
+			if (inlen) {
+				/* copyin the user data */
+				copy_from_user(kvaddr, (char *)uaddr, length );
+			}
 		}
 
 		scsicmd->cmnd[0] = MEGADEVIOC;
-		scsicmd->request_buffer = (void *) &ioc;
+		scsicmd->request_buffer = (void *)&ioc;
 
-		init_MUTEX_LOCKED (&mimd_ioctl_sem);
+		init_MUTEX_LOCKED(&mimd_ioctl_sem);
 
 		IO_LOCK;
-		megaraid_queue (scsicmd, megadev_ioctl_done);
+		megaraid_queue(scsicmd, megadev_ioctl_done);
 
 		IO_UNLOCK;
 
-		down (&mimd_ioctl_sem);
+		down(&mimd_ioctl_sem);
 
-		if (!scsicmd->result && outlen) {
-			copy_to_user (uaddr, kphysaddr, ioc.ui.fcs.length);
+		if( !scsicmd->result && outlen ) {
+			copy_to_user(uaddr, kvaddr, length);
 		}
 
 		/*
 		 * copyout the result
 		 */
-		uioc = (struct uioctl_t *) arg;
+		uioc = (struct uioctl_t *)arg;
 
-		if (ioc.mbox[0] == MEGA_MBOXCMD_PASSTHRU) {
-			put_user (scsicmd->result, &uioc->pthru.scsistatus);
+		if( ioc.mbox[0] == MEGA_MBOXCMD_PASSTHRU ) {
+			put_user( scsicmd->result, &uioc->pthru.scsistatus );
 		} else {
-			put_user (1, &uioc->mbox[16]);	/* numstatus */
+			put_user(1, &uioc->mbox[16]);	/* numstatus */
 			/* status */
 			put_user (scsicmd->result, &uioc->mbox[17]);
 		}
 
-		if (kphysaddr) {
-			free_pages ((ulong) kphysaddr, order);
+		if (kvaddr) {
+			dma_free_consistent(pdevp, length, kvaddr, dma_addr);
 		}
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)	/*0x20400 */
 		kfree (scsicmd);
 #else
-		scsi_init_free ((char *) scsicmd, sizeof (Scsi_Cmnd));
+		scsi_init_free((char *)scsicmd, sizeof(Scsi_Cmnd));
 #endif
+
+		/* restore the user address */
+		ioc.ui.fcs.buffer = uaddr;
 
 		return ret;
 
 	case M_RD_IOCTL_CMD:
 		/* which adapter?  */
 		adapno = ioc.ui.fcs.adapno;
+
 		/* See comment above: MEGAIOC_QADAPINFO */
 		adapno = GETADAP (adapno);
 
@@ -4070,84 +4121,73 @@ static int megadev_ioctl (struct inode *inode, struct file *filep,
 		outlen = ioc.outlen;
 		inlen = ioc.inlen;
 
-		if ((outlen >= IOCTL_MAX_DATALEN)
-		    || (inlen >= IOCTL_MAX_DATALEN))
+		if ((outlen >= IOCTL_MAX_DATALEN) || (inlen >= IOCTL_MAX_DATALEN))
 			return (-EINVAL);
 
 		if (outlen) {
 			ret = verify_area (VERIFY_WRITE, ioc.data, outlen);
-			if (ret)
-				return ret;
-		} else if (inlen) {
+			if (ret) return ret;
+		}
+		if (inlen) {
 			ret = verify_area (VERIFY_READ, ioc.data, inlen);
-
-			if (ret)
-				return ret;
+			if (ret) return ret;
 		}
 
+		/*
+		 * Find this host
+		 */
+		for( shpnt = scsi_hostlist; shpnt; shpnt = shpnt->next ) {
+			if( shpnt->hostdata == (unsigned long *)megaCtlrs[adapno] ) {
+				megacfg = (mega_host_config *)shpnt->hostdata;
+				break;
+			}
+		}
+		if(shpnt == NULL)  return -ENODEV;
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
+		scsicmd = (Scsi_Cmnd *)kmalloc(sizeof(Scsi_Cmnd), GFP_KERNEL|GFP_DMA);
+#else
+		scsicmd = (Scsi_Cmnd *)scsi_init_malloc(sizeof(Scsi_Cmnd),
+							  GFP_ATOMIC | GFP_DMA);
+#endif
+		if(scsicmd == NULL) return -ENOMEM;
+
+		memset(scsicmd, 0, sizeof(Scsi_Cmnd));
+		scsicmd->host = shpnt;
+
 		if (outlen || inlen) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
+			pdevp = &pdev;
+			memcpy(pdevp, megacfg->dev, sizeof(struct pci_dev));
+			pdevp->dma_mask = 0xffffffff;
+#else
+			pdevp = NULL;
+#endif
 			/*
 			 * Allocate a page of kernel space.
 			 */
-			if ((kphysaddr =
-			     (char *) __get_free_pages (GFP_KERNEL, 0)) == 0) {
+			kvaddr = dma_alloc_consistent(pdevp, PAGE_SIZE, &dma_addr);
 
-				printk (KERN_INFO
-					"megaraid:allocation failed\n");
+			if( kvaddr == NULL ) {
+				printk (KERN_WARNING "megaraid:allocation failed\n");
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)	/*0x20400 */
+				kfree(scsicmd);
+#else
+				scsi_init_free((char *)scsicmd, sizeof(Scsi_Cmnd));
+#endif
 				return -ENOMEM;
 			}
 
-			memset (kphysaddr, 0, PAGE_SIZE);
-			ioc.data = kphysaddr;
+			ioc.data = kvaddr;
 
 			if (inlen) {
 				if (ioc.mbox[0] == MEGA_MBOXCMD_PASSTHRU) {
 					/* copyin the user data */
-					copy_from_user (kphysaddr,
-							uaddr,
-							ioc.pthru.dataxferlen);
+					copy_from_user (kvaddr, uaddr, ioc.pthru.dataxferlen);
 				} else {
-					copy_from_user (kphysaddr,
-							uaddr, inlen);
+					copy_from_user (kvaddr, uaddr, inlen);
 				}
 			}
-		}
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)	/* 0x020400 */
-		scsicmd = (Scsi_Cmnd *) kmalloc (sizeof (Scsi_Cmnd),
-						 GFP_KERNEL | GFP_DMA);
-		memset (scsicmd, 0, sizeof (Scsi_Cmnd));
-#else
-		scsicmd = (Scsi_Cmnd *) scsi_init_malloc (sizeof (Scsi_Cmnd),
-							  GFP_ATOMIC | GFP_DMA);
-#endif
-
-		if (!scsicmd) {
-			if (kphysaddr)
-				free_pages ((unsigned long) kphysaddr, 0);
-			return -ENOMEM;
-		}
-
-		scsicmd->host = NULL;
-
-		/*
-		 * Find this host in the hostlist
-		 */
-		for (shpnt = scsi_hostlist; shpnt; shpnt = shpnt->next) {
-			if (shpnt->hostdata ==
-			    (unsigned long *) megaCtlrs[adapno])
-				scsicmd->host = shpnt;
-		}
-
-		if (scsicmd->host == NULL) {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-			kfree (scsicmd);
-#else
-			scsi_init_free ((char *) scsicmd, sizeof (Scsi_Cmnd));
-#endif
-			if (kphysaddr)
-				free_pages ((unsigned long) kphysaddr, 0);
-
-			return -ENODEV;
 		}
 
 		scsicmd->cmnd[0] = MEGADEVIOC;
@@ -4163,10 +4203,9 @@ static int megadev_ioctl (struct inode *inode, struct file *filep,
 
 		if (!scsicmd->result && outlen) {
 			if (ioc.mbox[0] == MEGA_MBOXCMD_PASSTHRU) {
-				copy_to_user (uaddr,
-					      kphysaddr, ioc.pthru.dataxferlen);
+				copy_to_user (uaddr, kvaddr, ioc.pthru.dataxferlen);
 			} else {
-				copy_to_user (uaddr, kphysaddr, outlen);
+				copy_to_user (uaddr, kvaddr, outlen);
 			}
 		}
 
@@ -4183,26 +4222,31 @@ static int megadev_ioctl (struct inode *inode, struct file *filep,
 			put_user (scsicmd->result, &uioc->mbox[17]);
 		}
 
-		if (kphysaddr)
-			free_pages ((unsigned long) kphysaddr, 0);
+		if (kvaddr) {
+			dma_free_consistent(pdevp, PAGE_SIZE, kvaddr, dma_addr );
+		}
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 		kfree (scsicmd);
 #else
-		scsi_init_free ((char *) scsicmd, sizeof (Scsi_Cmnd));
+		scsi_init_free((char *)scsicmd, sizeof(Scsi_Cmnd));
 #endif
+
+		/* restore user pointer */
+		ioc.data = uaddr;
+
 		return ret;
 
 	default:
 		return (-EINVAL);
 
-	}			/* Outer switch */
+	}/* Outer switch */
 
 	return 0;
 }
 
 static void
-megadev_ioctl_done (Scsi_Cmnd * sc)
+megadev_ioctl_done(Scsi_Cmnd *sc)
 {
 	up (&mimd_ioctl_sem);
 }
@@ -4309,6 +4353,94 @@ megadev_close (struct inode *inode, struct file *filep)
 #endif
 	return 0;
 }
+
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,0)
+void *
+dma_alloc_consistent(void *dev, size_t size, dma_addr_t *dma_addr)
+{
+	void	*_tv;
+	int		npages;
+	int		order = 0;
+
+	/*
+	 * How many pages application needs
+	 */
+	npages = size / PAGE_SIZE;
+
+	/* Do we need one more page */
+	if(size % PAGE_SIZE)
+		npages++;
+
+	order = mega_get_order(npages);
+
+	_tv = (void *)__get_free_pages(GFP_DMA, order);
+
+	if( _tv != NULL ) {
+		memset(_tv, 0, size);
+		*(dma_addr) = virt_to_bus(_tv);
+	}
+
+	return _tv;
+}
+
+/*
+ * int mega_get_order(int)
+ *
+ * returns the order to be used as 2nd argument to __get_free_pages() - which
+ * return pages equal to pow(2, order) - AM
+ */
+int
+mega_get_order(int n)
+{
+	int		i = 0;
+
+	while( pow_2(i++) < n )
+		; /* null statement */
+
+	return i-1;
+}
+
+/*
+ * int pow_2(int)
+ *
+ * calculates pow(2, i)
+ */
+int
+pow_2(int i)
+{
+	unsigned int	v = 1;
+	
+	while(i--)
+		v <<= 1;
+
+	return v;
+}
+
+void
+dma_free_consistent(void *dev, size_t size, void *vaddr, dma_addr_t dma_addr)
+{
+	int		npages;
+	int		order = 0;
+
+	npages = size / PAGE_SIZE;
+
+	if(size % PAGE_SIZE)
+		npages++;
+
+	if (npages == 1)
+		order = 0;
+	else if (npages == 2)
+		order = 1;
+	else if (npages <= 4)
+		order = 2;
+	else
+		order = 3;
+
+	free_pages((unsigned long)vaddr, order);
+
+}
+#endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 static

@@ -36,9 +36,9 @@ static __inline__ __const__ __u64 ___arch__swab64p(__u64 *x)
 static __inline__ void ___arch__swab64s(__u64 *x)
 {
   __asm__ __volatile__ (
-          "   lrvg %0,%1\n"
-	  "   stg  %0,%1"
-          : : "m" (*x) : "memory");
+          "   lrvg 0,%0\n"
+	  "   stg  0,%0"
+          : "+m" (*x) : : "0");
 }
 
 static __inline__ __const__ __u32 ___arch__swab32(__u32 x)
@@ -64,9 +64,9 @@ static __inline__ __const__ __u32 ___arch__swab32p(__u32 *x)
 static __inline__ void ___arch__swab32s(__u32 *x)
 {
   __asm__ __volatile__ (
-          "   lrv  %0,%1\n"
-	  "   st   %0,%1"
-          : : "m" (*x) : "memory");
+          "   lrv  0,%0\n"
+	  "   st   0,%0"
+          : "+m" (*x) : : "0" );
 }
 
 static __inline__ __const__ __u16 ___arch__swab16(__u16 x)
@@ -92,15 +92,18 @@ static __inline__ __const__ __u16 ___arch__swab16p(__u16 *x)
 static __inline__ void ___arch__swab16s(__u16 *x)
 {
   __asm__ __volatile__ (
-          "   lrvh %0,%1\n"
-	  "   sth  %0,%1"
-          : : "m" (*x) : "memory");
+          "   lrvh 0,%0\n"
+	  "   sth  0,%0"
+          : "+m" (*x) : : "0" );
 }
 
+#define __arch__swab64(x) ___arch__swab64(x)
 #define __arch__swab32(x) ___arch__swab32(x)
 #define __arch__swab16(x) ___arch__swab16(x)
+#define __arch__swab64p(x) ___arch__swab64p(x)
 #define __arch__swab32p(x) ___arch__swab32p(x)
 #define __arch__swab16p(x) ___arch__swab16p(x)
+#define __arch__swab64s(x) ___arch__swab64s(x)
 #define __arch__swab32s(x) ___arch__swab32s(x)
 #define __arch__swab16s(x) ___arch__swab16s(x)
 

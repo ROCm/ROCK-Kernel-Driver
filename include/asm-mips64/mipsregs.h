@@ -246,7 +246,7 @@ __BUILD_SET_CP0(config,CP0_CONFIG)
 #define  CAUSEF_BD		(1   << 31)
 
 /*
- * Bits in the coprozessor 0 config register.
+ * Bits in the coprocessor 0 config register.
  */
 #define CONF_CM_CACHABLE_NO_WA		0
 #define CONF_CM_CACHABLE_WA		1
@@ -265,7 +265,7 @@ __BUILD_SET_CP0(config,CP0_CONFIG)
  * R10000 performance counter definitions.
  *
  * FIXME: The R10000 performance counter opens a nice way to implement CPU
- *        time accounting with a precission of one cycle.  I don't have
+ *        time accounting with a precision of one cycle.  I don't have
  *        R10000 silicon but just a manual, so ...
  */
 

@@ -9,6 +9,12 @@ extern void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 
 #define activate_mm(prev,next) switch_mm((prev),(next),NULL,smp_processor_id())
 
+/* current active pgd - this is similar to other processors pgd 
+ * registers like cr3 on the i386
+ */
+
+extern volatile pgd_t *current_pgd;   /* defined in arch/cris/mm/fault.c */
+
 static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk, unsigned cpu)
 {
 }

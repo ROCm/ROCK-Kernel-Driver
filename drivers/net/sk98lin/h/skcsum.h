@@ -2,16 +2,15 @@
  *
  * Name:	skcsum.h
  * Project:	GEnesis - SysKonnect SK-NET Gigabit Ethernet (SK-98xx)
- * Version:	$Revision: 1.7 $
- * Date:	$Date: 2000/06/29 13:17:05 $
+ * Version:	$Revision: 1.9 $
+ * Date:	$Date: 2001/02/06 11:21:39 $
  * Purpose:	Store/verify Internet checksum in send/receive packets.
  *
  ******************************************************************************/
 
 /******************************************************************************
  *
- *	(C)Copyright 1998,1999 SysKonnect,
- *	a business unit of Schneider & Koch & Co. Datensysteme GmbH.
+ *	(C)Copyright 1998-2001 SysKonnect GmbH.
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
@@ -27,6 +26,12 @@
  * History:
  *
  *	$Log: skcsum.h,v $
+ *	Revision 1.9  2001/02/06 11:21:39  rassmann
+ *	Editorial changes.
+ *	
+ *	Revision 1.8  2001/02/06 11:15:36  rassmann
+ *	Supporting two nets on dual-port adapters.
+ *	
  *	Revision 1.7  2000/06/29 13:17:05  rassmann
  *	Corrected reception of a packet with UDP checksum == 0 (which means there
  *	is no UDP checksum).
@@ -193,13 +198,13 @@ typedef struct s_CsProtocolStatistics {
  */
 typedef struct s_Csum {
 	/* Enabled receive SK_PROTO_XXX bit flags. */
-	unsigned ReceiveFlags;
+	unsigned ReceiveFlags[SK_MAX_NETS];
 #ifdef TX_CSUM
-	unsigned TransmitFlags;
+	unsigned TransmitFlags[SK_MAX_NETS];
 #endif /* TX_CSUM */
 
 	/* The protocol statistics structure; one per supported protocol. */
-	SKCS_PROTO_STATS ProtoStats[SKCS_NUM_PROTOCOLS];
+	SKCS_PROTO_STATS ProtoStats[SK_MAX_NETS][SKCS_NUM_PROTOCOLS];
 } SK_CSUM;
 
 /*
@@ -237,17 +242,20 @@ extern SKCS_STATUS SkCsGetReceiveInfo(
 	SK_AC		*pAc,
 	void		*pIpHeader,
 	unsigned	Checksum1,
-	unsigned	Checksum2);
+	unsigned	Checksum2,
+	int			NetNumber);
 
 extern void SkCsGetSendInfo(
-	SK_AC			*pAc,
-	void			*pIpHeader,
-	SKCS_PACKET_INFO	*pPacketInfo);
+	SK_AC				*pAc,
+	void				*pIpHeader,
+	SKCS_PACKET_INFO	*pPacketInfo,
+	int					NetNumber);
 
 extern void SkCsSetReceiveFlags(
 	SK_AC		*pAc,
 	unsigned	ReceiveFlags,
 	unsigned	*pChecksum1Offset,
-	unsigned	*pChecksum2Offset);
+	unsigned	*pChecksum2Offset,
+	int			NetNumber);
 
 #endif	/* __INC_SKCSUM_H */

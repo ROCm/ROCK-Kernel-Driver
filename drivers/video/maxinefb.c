@@ -272,35 +272,11 @@ static int maxinefb_get_fix(struct fb_fix_screeninfo *fix, int con,
 	return 0;
 }
 
-
-static int maxinefb_ioctl(struct inode *inode, struct file *file,
-			  unsigned int cmd, unsigned long arg, int con,
-			  struct fb_info *info)
-{
-	return -EINVAL;
-}
-
 static int maxinefb_switch(int con, struct fb_info *info)
 {
 	maxinefb_do_fb_set_var(&fb_display[con].var, 1);
 	currcon = con;
 	return 0;
-}
-
-/* 0 unblank, 1 blank, 2 no vsync, 3 no hsync, 4 off */
-
-static void maxinefb_blank(int blank, struct fb_info *info)
-{
-	/* Not supported */
-}
-
-static int maxinefb_open(struct fb_info *info, int user)
-{
-	/*
-	 * Nothing, only a usage count for the moment
-	 */
-	MOD_INC_USE_COUNT;
-	return (0);
 }
 
 static void maxinefb_set_disp(int con)
@@ -329,30 +305,27 @@ static void maxinefb_set_disp(int con)
 	display->dispsw = &fbcon_cfb8;
 }
 
-static int maxinefb_release(struct fb_info *info, int user)
-{
-	MOD_DEC_USE_COUNT;
-	return (0);
-}
-
 static struct fb_ops maxinefb_ops = {
-	owner:THIS_MODULE,
-	fb_open:maxinefb_open,
-	fb_release:maxinefb_release,
-	fb_get_fix:maxinefb_get_fix,
-	fb_get_var:maxinefb_get_var,
-	fb_set_var:maxinefb_set_var,
-	fb_get_cmap:maxinefb_get_cmap,
-	fb_set_cmap:maxinefb_set_cmap,
-	fb_ioctl:maxinefb_ioctl,
-	fb_mmap:0,
-	fb_rasterimg:0
+	owner:		THIS_MODULE,
+	fb_get_fix:	maxinefb_get_fix,
+	fb_get_var:	maxinefb_get_var,
+	fb_set_var:	maxinefb_set_var,
+	fb_get_cmap:	maxinefb_get_cmap,
+	fb_set_cmap:	maxinefb_set_cmap,
 };
 
-int __init maxinefb_init_one()
+int __init maxinefb_init(void)
 {
 	volatile unsigned char *fboff;
 	int i;
+
+	/* Validate we're on the proper machine type */
+	if (mips_machtype != MACH_DS5000_XX) {
+		return -EINVAL;
+	}
+
+	printk(KERN_INFO "Maxinefb: Personal DECstation detected\n");
+	printk(KERN_INFO "Maxinefb: initializing onboard framebuffer\n");
 
 	/* Framebuffer display memory base address */
 	fb_start = DS5000_xx_ONBOARD_FBMEM_START;
@@ -390,7 +363,7 @@ int __init maxinefb_init_one()
 	fb_info.disp = &disp;
 	fb_info.switch_con = &maxinefb_switch;
 	fb_info.updatevar = &maxinefb_fb_update_var;
-	fb_info.blank = &maxinefb_blank;
+	fb_info.blank = NULL;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 	maxinefb_do_fb_set_var(&maxinefb_defined, 1);
 
@@ -403,23 +376,13 @@ int __init maxinefb_init_one()
 	return 0;
 }
 
-
-/* Initialise the framebuffer */
-
-void __init maxinefb_init()
+static void __exit maxinefb_exit(void)
 {
-	unsigned int sid;
-
-	if (mips_machtype == MACH_DS5000_XX) {
-		printk("Maxinefb: Personal DECstation detected\n");
-		printk("Maxinefb: initializing onboard framebuffer\n");
-
-		maxinefb_init_one();
-
-	}
-
+	unregister_framebuffer(&fb_info);
 }
 
-void __init maxinefb_setup(char *options, int *ints)
-{
-}
+#ifdef MODULE
+module_init(maxinefb_init);
+#endif
+module_exit(maxinefb_exit);
+

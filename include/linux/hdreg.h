@@ -98,6 +98,7 @@
 #define SMART_IMMEDIATE_OFFLINE	0xd4
 #define SMART_READ_LOG_SECTOR	0xd5
 #define SMART_WRITE_LOG_SECTOR	0xd6
+#define SMART_WRITE_THRESHOLDS	0xd7
 #define SMART_ENABLE		0xd8
 #define SMART_DISABLE		0xd9
 #define SMART_STATUS		0xda
@@ -159,6 +160,7 @@
 #define ABRT_ERR	0x04	/* Command aborted */
 #define MCR_ERR		0x08	/* media change request */
 #define ID_ERR		0x10	/* ID field not found */
+#define MC_ERR		0x20	/* media changed */
 #define ECC_ERR		0x40	/* Uncorrectable ECC error */
 #define	BBD_ERR		0x80	/* pre-EIDE meaning:  block marked bad */
 #define	ICRC_ERR	0x80	/* new meaning:  CRC error during transfer */
@@ -174,6 +176,7 @@ struct hd_geometry {
 #define HDIO_GETGEO		0x0301	/* get device geometry */
 #define HDIO_GET_UNMASKINTR	0x0302	/* get current unmask setting */
 #define HDIO_GET_MULTCOUNT	0x0304	/* get current IDE blockmode setting */
+#define HDIO_GET_QDMA		0x0305	/* get use-qdma flag */
 #define HDIO_OBSOLETE_IDENTITY	0x0307	/* OBSOLETE, DO NOT USE: returns 142 bytes */
 #define HDIO_GET_KEEPSETTINGS	0x0308	/* get keep-settings-on-reset flag */
 #define HDIO_GET_32BIT		0x0309	/* get current io_32bit setting */
@@ -181,9 +184,13 @@ struct hd_geometry {
 #define HDIO_GET_DMA		0x030b	/* get use-dma flag */
 #define HDIO_GET_NICE		0x030c	/* get nice flags */
 #define HDIO_GET_IDENTITY	0x030d	/* get IDE identification info */
+#define HDIO_GET_WCACHE		0x030e	/* get write cache mode on|off */
+#define HDIO_GET_ACOUSTIC	0x030f	/* get acoustic value */
 
+#define HDIO_GET_BUSSTATE	0x031a	/* get the bus state of the hwif */
+#define HDIO_TRISTATE_HWIF	0x031b	/* OBSOLETE - use SET_BUSSTATE */
 #define HDIO_DRIVE_RESET	0x031c	/* execute a device reset */
-#define HDIO_TRISTATE_HWIF	0x031d	/* execute a channel tristate */
+#define HDIO_DRIVE_TASKFILE	0x031d	/* execute raw taskfile */
 #define HDIO_DRIVE_TASK		0x031e	/* execute task and special drive command */
 #define HDIO_DRIVE_CMD		0x031f	/* execute a special drive command */
 
@@ -200,6 +207,17 @@ struct hd_geometry {
 #define HDIO_SCAN_HWIF		0x0328	/* register and (re)scan interface */
 #define HDIO_SET_NICE		0x0329	/* set nice flags */
 #define HDIO_UNREGISTER_HWIF	0x032a  /* unregister interface */
+#define HDIO_SET_WCACHE		0x032b	/* change write cache enable-disable */
+#define HDIO_SET_ACOUSTIC	0x032c	/* change acoustic behavior */
+#define HDIO_SET_BUSSTATE	0x032d	/* set the bus state of the hwif */
+#define HDIO_SET_QDMA		0x032e	/* change use-qdma flag */
+
+/* bus states */
+enum {
+	BUSSTATE_OFF = 0,
+	BUSSTATE_ON,
+	BUSSTATE_TRISTATE
+};
 
 /* BIG GEOMETRY */
 struct hd_big_geometry {

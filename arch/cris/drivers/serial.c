@@ -1,4 +1,4 @@
-/* $Id: serial.c,v 1.12 2001/04/19 12:23:07 bjornw Exp $
+/* $Id: serial.c,v 1.13 2001/05/09 12:40:31 johana Exp $
  *
  * Serial port driver for the ETRAX 100LX chip
  *
@@ -7,6 +7,9 @@
  *      Many, many authors. Based once upon a time on serial.c for 16x50.
  *
  * $Log: serial.c,v $
+ * Revision 1.13  2001/05/09 12:40:31  johana
+ * Use DMA_NBR and IRQ_NBR defines from dma.h and irq.h
+ *
  * Revision 1.12  2001/04/19 12:23:07  bjornw
  * CONFIG_RS485 -> CONFIG_ETRAX_RS485
  *
@@ -199,7 +202,7 @@
  *
  */
 
-static char *serial_version = "$Revision: 1.12 $";
+static char *serial_version = "$Revision: 1.13 $";
 
 #include <linux/config.h>
 #include <linux/version.h>
@@ -495,7 +498,6 @@ static struct semaphore tmp_buf_sem = MUTEX;
 #endif
 
 #ifdef CONFIG_ETRAX_SERIAL_FLUSH_DMA_FAST
-#define TIMER1_IRQ_NBR 3
 
 /* clock select 10 for timer 1 gives 230400 Hz */
 #define FASTTIMER_SELECT (10)
@@ -3049,32 +3051,32 @@ rs_init(void)
 #ifndef CONFIG_SVINTO_SIM
 	/* Not needed in simulator.  May only complicate stuff. */
 	/* hook the irq's for DMA channel 6 and 7, serial output and input, and some more... */
-	if(request_irq(22, tr_interrupt, SA_INTERRUPT, "serial 0 dma tr", NULL))
+	if(request_irq(SER0_DMA_TX_IRQ_NBR, tr_interrupt, SA_INTERRUPT, "serial 0 dma tr", NULL))
 		panic("irq22");
-	if(request_irq(23, rec_interrupt, SA_INTERRUPT, "serial 0 dma rec", NULL))
+	if(request_irq(SER0_DMA_RX_IRQ_NBR, rec_interrupt, SA_INTERRUPT, "serial 0 dma rec", NULL))
 		panic("irq23");
 #ifdef SERIAL_HANDLE_EARLY_ERRORS
-	if(request_irq(8, ser_interrupt, SA_INTERRUPT, "serial ", NULL))
+	if(request_irq(SERIAL_IRQ_NBR, ser_interrupt, SA_INTERRUPT, "serial ", NULL))
 		panic("irq8");
 #endif
 #ifdef CONFIG_ETRAX_SERIAL_PORT1
-	if(request_irq(24, tr_interrupt, SA_INTERRUPT, "serial 1 dma tr", NULL))
+	if(request_irq(SER1_DMA_TX_IRQ_NBR, tr_interrupt, SA_INTERRUPT, "serial 1 dma tr", NULL))
 		panic("irq24");
-	if(request_irq(25, rec_interrupt, SA_INTERRUPT, "serial 1 dma rec", NULL))
+	if(request_irq(SER1_DMA_RX_IRQ_NBR, rec_interrupt, SA_INTERRUPT, "serial 1 dma rec", NULL))
 		panic("irq25");
 #endif
 #ifdef CONFIG_ETRAX_SERIAL_PORT2
 	/* DMA Shared with par0 (and SCSI0 and ATA) */
-	if(request_irq(18, tr_interrupt, SA_SHIRQ, "serial 2 dma tr", NULL))
+	if(request_irq(SER2_DMA_TX_IRQ_NBR, tr_interrupt, SA_SHIRQ, "serial 2 dma tr", NULL))
 		panic("irq18");
-	if(request_irq(19, rec_interrupt, SA_SHIRQ, "serial 2 dma rec", NULL))
+	if(request_irq(SER2_DMA_RX_IRQ_NBR, rec_interrupt, SA_SHIRQ, "serial 2 dma rec", NULL))
 		panic("irq19");
 #endif
 #ifdef CONFIG_ETRAX_SERIAL_PORT3
 	/* DMA Shared with par1 (and SCSI1 and Extern DMA 0) */
-	if(request_irq(20, tr_interrupt, SA_SHIRQ, "serial 3 dma tr", NULL))
+	if(request_irq(SER3_DMA_TX_IRQ_NBR, tr_interrupt, SA_SHIRQ, "serial 3 dma tr", NULL))
 		panic("irq20");
-	if(request_irq(21, rec_interrupt, SA_SHIRQ, "serial 3 dma rec", NULL))
+	if(request_irq(SER3_DMA_RX_IRQ_NBR, rec_interrupt, SA_SHIRQ, "serial 3 dma rec", NULL))
 		panic("irq21");
 #endif
 #ifdef CONFIG_ETRAX_SERIAL_FLUSH_DMA_FAST

@@ -106,11 +106,11 @@ typedef struct ad1848_port_info
 ad1848_port_info;
 
 static struct address_info cfg;
-static int nr_ad1848_devs = 0;
+static int nr_ad1848_devs;
 
-int deskpro_xl = 0;
-int deskpro_m = 0;
-int soundpro = 0;
+int deskpro_xl;
+int deskpro_m;
+int soundpro;
 
 static volatile signed char irq2dev[17] = {
 	-1, -1, -1, -1, -1, -1, -1, -1,
@@ -121,7 +121,7 @@ static volatile signed char irq2dev[17] = {
 static int timer_installed = -1;
 #endif
 
-static int loaded = 0;
+static int loaded;
 
 static int ad_format_mask[10 /*devc->model */ ] =
 {

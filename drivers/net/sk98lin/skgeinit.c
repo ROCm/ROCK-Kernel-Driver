@@ -2,16 +2,15 @@
  *
  * Name:	skgeinit.c
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.57 $
- * Date:	$Date: 2000/08/03 14:55:28 $
+ * Version:	$Revision: 1.63 $
+ * Date:	$Date: 2001/04/05 11:02:09 $
  * Purpose:	Contains functions to initialize the GE HW
  *
  ******************************************************************************/
 
 /******************************************************************************
  *
- *	(C)Copyright 1998-2000 SysKonnect,
- *	a business unit of Schneider & Koch & Co. Datensysteme GmbH.
+ *	(C)Copyright 1998-2001 SysKonnect GmbH.
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
@@ -27,6 +26,24 @@
  * History:
  *
  *	$Log: skgeinit.c,v $
+ *	Revision 1.63  2001/04/05 11:02:09  rassmann
+ *	Stop Port check of the STOP bit did not take 2/18 sec as wanted.
+ *	
+ *	Revision 1.62  2001/02/07 07:54:21  rassmann
+ *	Corrected copyright.
+ *	
+ *	Revision 1.61  2001/01/31 15:31:40  gklug
+ *	fix: problem with autosensing an SR8800 switch
+ *	
+ *	Revision 1.60  2000/10/18 12:22:21  cgoos
+ *	Added workaround for half duplex hangup.
+ *	
+ *	Revision 1.59  2000/10/10 11:22:06  gklug
+ *	add: in manual half duplex mode ignore carrier extension errors
+ *	
+ *	Revision 1.58  2000/10/02 14:10:27  rassmann
+ *	Reading BCOM PHY after releasing reset until it returns a valid value.
+ *	
  *	Revision 1.57  2000/08/03 14:55:28  rassmann
  *	Waiting for I2C to be ready before de-initializing adapter
  *	(prevents sensors from hanging up).
@@ -122,7 +139,7 @@
  *	chg: Default is autosensing with AUTOFULL mode
  *
  *	Revision 1.31  1998/11/25 15:36:16  gklug
- *	fix: do NOT stop LED Timer when port should be stopped
+ *	fix: do NOT stop LED Timer when port should be stoped
  *
  *	Revision 1.30  1998/11/24 13:15:28  gklug
  *	add: Init PCkeckPar struct member
@@ -283,7 +300,7 @@
 /* local variables ************************************************************/
 
 static const char SysKonnectFileId[] =
-	"@(#)$Id: skgeinit.c,v 1.57 2000/08/03 14:55:28 rassmann Exp $ (C) SK ";
+	"@(#)$Id: skgeinit.c,v 1.63 2001/04/05 11:02:09 rassmann Exp $ (C) SK ";
 
 struct s_QOffTab {
 	int	RxQOff;		/* Receive Queue Address Offset */
@@ -666,7 +683,11 @@ SK_IOC	IoC)		/* IO context */
 	SK_OUT16(IoC, B3_PA_TOINI_TX1, SK_PKT_TO_MAX);
 	SK_OUT16(IoC, B3_PA_TOINI_TX2, SK_PKT_TO_MAX);
 
-	/* enable timeout timers if jumbo frames not used */
+	/*
+	 * enable timeout timers if jumbo frames not used
+	 * NOTE: the packet arbiter timeout interrupt is needed for
+	 * half duplex hangup workaround
+	 */
 	if (pAC->GIni.GIPortUsage != SK_JUMBO_LINK) {
 		if (pAC->GIni.GIMacsFound == 1) {
 			SK_OUT16(IoC, B3_PA_CTRL, PA_ENA_TO_TX1);
@@ -1118,10 +1139,10 @@ int		QuIoOffs)	/* Queue IO Address Offset */
  *
  *	Dir =	SK_STOP_TX 	Stops the transmit path only and resets
  *				the XMAC. The receive queue is still and
- *				the pending rx frames may still transferred
+ *				the pending rx frames may still transfered
  *				into the RxD.
  *		SK_STOP_RX	Stop the receive path. The tansmit path
- *				has to be stopped once before.
+ *				has to be stoped once before.
  *		SK_STOP_ALL	SK_STOP_TX + SK_STOP_RX
  *
  *	RstMode=SK_SOFT_RST	Resets the XMAC. The PHY is still alive.
@@ -1129,7 +1150,7 @@ int		QuIoOffs)	/* Queue IO Address Offset */
  *
  * Example:
  *	1) A Link Down event was signaled for a port. Therefore the activity
- *	of this port should be stopped and a hardware reset should be issued
+ *	of this port should be stoped and a hardware reset should be issued
  *	to enable the workaround of XMAC errata #2. But the received frames
  *	should not be discarded.
  *		...
@@ -1198,10 +1219,10 @@ int		RstMode)/* Reset Mode (SK_SOFT_RST, SK_HARD_RST) */
 	SK_U16	Word;
 	SK_U32	XsCsr;
 	SK_U32	XaCsr;
-	int	i;
+	int		i;
 	SK_BOOL	AllPortsDis;
 	SK_U64	ToutStart;
-	int	ToutCnt;
+	int		ToutCnt;
 
 	pPrt = &pAC->GIni.GP[Port];
 
@@ -1226,7 +1247,7 @@ int		RstMode)/* Reset Mode (SK_SOFT_RST, SK_HARD_RST) */
 		do {
 			/*
 			 * Clear packet arbiter timeout to make sure
-			 * this loop will terminate
+			 * this loop will terminate.
 			 */
 			if (Port == MAC_1) {
 				Word = PA_CLR_TO_TX1;
@@ -1237,9 +1258,8 @@ int		RstMode)/* Reset Mode (SK_SOFT_RST, SK_HARD_RST) */
 			SK_OUT16(IoC, B3_PA_CTRL, Word);
 
 			/*
-			 * If the transfer stucks at the XMAC the STOP command
-			 * will not terminate if we don't flush the XMACs
-			 * transmit FIFO !
+			 * If the transfer stucks at the XMAC the STOP command will not
+			 * terminate if we don't flush the XMAC's transmit FIFO!
 			 */
 			XM_IN32(IoC, Port, XM_MODE, &DWord);
 			DWord |= XM_MD_FTF;
@@ -1248,7 +1268,7 @@ int		RstMode)/* Reset Mode (SK_SOFT_RST, SK_HARD_RST) */
 			XsCsr = TestStopBit(pAC, IoC, pPrt->PXsQOff);
 			XaCsr = TestStopBit(pAC, IoC, pPrt->PXaQOff);
 
-			if (ToutStart + (SK_TICKS_PER_SEC / 18) >= SkOsGetTime(pAC)) {
+			if (SkOsGetTime(pAC) - ToutStart > (SK_TICKS_PER_SEC / 18)) {
 				/*
 				 * Timeout of 1/18 second reached.
 				 * This needs to be checked at 1/18 sec only.
@@ -1257,9 +1277,8 @@ int		RstMode)/* Reset Mode (SK_SOFT_RST, SK_HARD_RST) */
 				switch (ToutCnt) {
 				case 1:
 					/*
-					 * Cache Incoherency workaround:
-					 * Assume a start command has been 
-					 * lost while sending the frame. 
+					 * Cache Incoherency workaround: Assume a start command
+					 * has been lost while sending the frame. 
 					 */
 					ToutStart = SkOsGetTime(pAC);
 					if (XsCsr & CSR_STOP) {
@@ -1275,6 +1294,7 @@ int		RstMode)/* Reset Mode (SK_SOFT_RST, SK_HARD_RST) */
 					 * calls StopPort again.
 					 * XXX.
 					 */
+
 					/* Fatal Error, Loop aborted */
 					/* Create an Error Log Entry */
 					SK_ERR_LOG(
@@ -1290,12 +1310,12 @@ int		RstMode)/* Reset Mode (SK_SOFT_RST, SK_HARD_RST) */
 				}
 			}
 
-		/*
-		 * Because of the ASIC problem report entry from 21.08.1998 it is
-		 * required to wait until CSR_STOP is reset and CSR_SV_IDLE is set.
-		 */
-		} while ((XsCsr & (CSR_STOP|CSR_SV_IDLE)) != CSR_SV_IDLE ||
-			 (XaCsr & (CSR_STOP|CSR_SV_IDLE)) != CSR_SV_IDLE);
+			/*
+			 * Because of the ASIC problem report entry from 21.08.1998 it is
+			 * required to wait until CSR_STOP is reset and CSR_SV_IDLE is set.
+			 */
+		} while ((XsCsr & (CSR_STOP | CSR_SV_IDLE)) != CSR_SV_IDLE ||
+			 (XaCsr & (CSR_STOP | CSR_SV_IDLE)) != CSR_SV_IDLE);
 
 		/* reset the XMAC depending on the RstMode */
 		if (RstMode == SK_SOFT_RST) {
@@ -1362,13 +1382,13 @@ int		RstMode)/* Reset Mode (SK_SOFT_RST, SK_HARD_RST) */
 				i--;
 			}
 
-		/* finish if CSR_STOP is done or CSR_SV_IDLE is true and i==0 */
-		/*
-		 * because of the ASIC problem report entry from 21.08.98
-		 * it is required to wait until CSR_STOP is reset and
-		 * CSR_SV_IDLE is set.
-		 */
-		} while ((DWord & (CSR_STOP|CSR_SV_IDLE)) != CSR_SV_IDLE &&
+			/* finish if CSR_STOP is done or CSR_SV_IDLE is true and i==0 */
+			/*
+			 * because of the ASIC problem report entry from 21.08.98
+			 * it is required to wait until CSR_STOP is reset and
+			 * CSR_SV_IDLE is set.
+			 */
+		} while ((DWord & (CSR_STOP | CSR_SV_IDLE)) != CSR_SV_IDLE &&
 			((DWord & CSR_SV_IDLE) == 0 || i != 0));
 
 		/* The path data transfer activity is fully stopped now. */
@@ -1433,6 +1453,7 @@ SK_IOC	IoC)		/* IO context */
 		pPrt->PIsave = 0;
 		pPrt->PPrevShorts = 0;
 		pPrt->PLinkResCt = 0;
+		pPrt->PAutoNegTOCt = 0;
 		pPrt->PPrevRx = 0;
 		pPrt->PPrevFcs = 0;
 		pPrt->PRxLim = SK_DEF_RX_WA_LIM;
@@ -1717,6 +1738,17 @@ SK_IOC	IoC)		/* IO context */
 		if (pAC->GIni.GIPortUsage == SK_JUMBO_LINK) {
 			pPrt->PRxCmd |= XM_RX_BIG_PK_OK;
 		}
+
+		if (pPrt->PLinkModeConf == SK_LMODE_HALF) {
+			/*
+			 * If in manual half duplex mode
+			 * the other side might be in full duplex mode
+			 * so ignore if a carrier extension is not seen on
+			 * frames received
+			 */
+			pPrt->PRxCmd |= XM_RX_DIS_CEXT;
+		}
+
 	}
 }	/* SkGeInit2 */
 
@@ -1891,7 +1923,7 @@ SK_IOC	IoC)		/* IO context */
  *		for PRxQSize, PXSQSize, or PXAQSize are invalid for one
  *		or more queues. The specified port was NOT initialized.
  *		An error log entry was generated.
- *	2:	The port has to be stopped before it can be initilaized again.
+ *	2:	The port has to be stopped before it can be initialized again.
  */
 int SkGeInitPort(
 SK_AC	*pAC,		/* adapter context */

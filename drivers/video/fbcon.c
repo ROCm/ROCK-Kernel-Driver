@@ -31,6 +31,8 @@
  *
  *  Random hacking by Martin Mares <mj@ucw.cz>
  *
+ *	2001 - Documented with DocBook
+ *	- Brad Douglas <brad@neruo.com>
  *
  *  The low level operations for the various display memory organizations are
  *  now in separate source files.
@@ -239,6 +241,20 @@ static void cursor_timer_handler(unsigned long dev_addr)
       add_timer(&cursor_timer);
 }
 
+
+/**
+ *	PROC_CONSOLE - find the attached tty or visible console
+ *	@info: frame buffer info structure
+ *
+ *	Finds the tty attached to the process or visible console if
+ *	the process is not directly attached to a tty (e.g. remote
+ *	user) for device @info.
+ *
+ *	Returns -1 errno on error, or tty/visible console number
+ *	on success.
+ *
+ */
+
 int PROC_CONSOLE(const struct fb_info *info)
 {
         int fgc;
@@ -261,6 +277,21 @@ int PROC_CONSOLE(const struct fb_info *info)
         return MINOR(current->tty->device) - 1;
 }
 
+
+/**
+ *	set_all_vcs - set all virtual consoles to match
+ *	@fbidx: frame buffer index (e.g. fb0, fb1, ...)
+ *	@fb: frame buffer ops structure
+ *	@var: frame buffer screen structure to set
+ *	@info: frame buffer info structure
+ *
+ *	Set all virtual consoles to match screen info set in @var
+ *	for device @info.
+ *
+ *	Returns negative errno on error, or zero on success.
+ *
+ */
+
 int set_all_vcs(int fbidx, struct fb_ops *fb, struct fb_var_screeninfo *var,
                 struct fb_info *info)
 {
@@ -276,6 +307,17 @@ int set_all_vcs(int fbidx, struct fb_ops *fb, struct fb_var_screeninfo *var,
                     fb->fb_set_var(var, unit, info);
     return 0;
 }
+
+
+/**
+ *	set_con2fb_map - map console to frame buffer device
+ *	@unit: virtual console number to map
+ *	@newidx: frame buffer index to map virtual console to
+ *
+ *	Maps a virtual console @unit to a frame buffer device
+ *	@newidx.
+ *
+ */
 
 void set_con2fb_map(int unit, int newidx)
 {
@@ -1108,11 +1150,13 @@ static void fbcon_redraw(struct vc_data *conp, struct display *p,
 	    	}
 	    }
 	    scr_writew(c, d);
+	    console_conditional_schedule();
 	    s++;
 	    d++;
 	} while (s < le);
 	if (s > start)
 	    p->dispsw->putcs(conp, p, start, s - start, real_y(p, line), x);
+	console_conditional_schedule();
 	if (offset > 0)
 		line++;
 	else {
@@ -1124,6 +1168,20 @@ static void fbcon_redraw(struct vc_data *conp, struct display *p,
     }
 }
 
+/**
+ *	fbcon_redraw_clear - clear area of the screen
+ *	@conp: stucture pointing to current active virtual console
+ *	@p: display structure
+ *	@sy: starting Y coordinate
+ *	@sx: starting X coordinate
+ *	@height: height of area to clear
+ *	@width: width of area to clear
+ *
+ *	Clears a specified area of the screen.  All dimensions are in
+ *	pixels.
+ *
+ */
+
 void fbcon_redraw_clear(struct vc_data *conp, struct display *p, int sy, int sx,
 		     int height, int width)
 {
@@ -1133,7 +1191,25 @@ void fbcon_redraw_clear(struct vc_data *conp, struct display *p, int sy, int sx,
 	    fbcon_putc(conp, ' ', sy+y, sx+x);
 }
 
-/* This cannot be used together with ypan or ywrap */
+
+/**
+ *	fbcon_redraw_bmove - copy area of screen to another area
+ *	@p: display structure
+ *	@sy: origin Y coordinate
+ *	@sx: origin X coordinate
+ *	@dy: destination Y coordinate
+ *	@dx: destination X coordinate
+ *	@h: height of area to copy
+ *	@w: width of area to copy
+ *
+ *	Copies an area of the screen to another area of the same screen.
+ *	All dimensions are in pixels.
+ *
+ *	Note that this function cannot be used together with ypan or
+ *	ywrap.
+ *
+ */
+
 void fbcon_redraw_bmove(struct display *p, int sy, int sx, int dy, int dx, int h, int w)
 {
     if (sy != dy)

@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.4 2001/04/17 13:58:39 orjanf Exp $
+# $Id: Makefile,v 1.5 2001/05/15 05:10:00 hp Exp $
 #
 # Makefile for the linux kernel.
 #
@@ -19,6 +19,11 @@ obj-y   := process.o signal.o entry.o traps.o irq.o \
 	   debugport.o semaphore.o
 
 obj-$(CONFIG_ETRAX_KGDB) += kgdb.o
+
+entry.o: entryoffsets.s
+
+entryoffsets.s: entryoffsets.c
+	$(CC) $(CFLAGS) -S -c $<
 
 clean:
 

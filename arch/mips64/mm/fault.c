@@ -6,6 +6,7 @@
  * Copyright (C) 1995 - 2000 by Ralf Baechle
  * Copyright (C) 1999, 2000 by Silicon Graphics, Inc.
  */
+#include <linux/config.h>
 #include <linux/signal.h>
 #include <linux/sched.h>
 #include <linux/interrupt.h>
@@ -31,6 +32,7 @@
 #define development_version (LINUX_VERSION_CODE & 0x100)
 
 extern void die(char *, struct pt_regs *, unsigned long write);
+extern int console_loglevel;
 
 /*
  * Macro for exception fixup code to access integer registers.
@@ -57,17 +59,34 @@ dodebug2(abi64_no_regargs, struct pt_regs regs)
 	printk("Got exception 0x%lx at 0x%lx\n", retaddr, regs.cp0_epc);
 }
 
-extern spinlock_t console_lock, timerlist_lock;
+extern spinlock_t timerlist_lock;
 
 /*
  * Unlock any spinlocks which will prevent us from getting the
- * message out (timerlist_lock is acquired through the
+ * message out (timerlist_lock is aquired through the
  * console unblank code)
  */
-void bust_spinlocks(void)
+void bust_spinlocks(int yes)
 {
-	spin_lock_init(&console_lock);
 	spin_lock_init(&timerlist_lock);
+	if (yes) {
+		oops_in_progress = 1;
+#ifdef CONFIG_SMP
+		global_irq_lock = 0;	/* Many serial drivers do __global_cli() */
+#endif
+	} else {
+		int loglevel_save = console_loglevel;
+		unblank_screen();
+		oops_in_progress = 0;
+		/*
+		 * OK, the message is on the console.  Now we call printk()
+		 * without oops_in_progress set so that printk will give klogd
+		 * a poke.  Hold onto your hats...
+		 */
+		console_loglevel = 15;		/* NMI oopser may have shut the console up */
+		printk(" ");
+		console_loglevel = loglevel_save;
+	}
 }
 
 /*
@@ -83,6 +102,18 @@ do_page_fault(struct pt_regs *regs, unsigned long write, unsigned long address)
 	struct mm_struct *mm = tsk->mm;
 	unsigned long fixup;
 	siginfo_t info;
+
+	/*
+	 * We fault-in kernel-space virtual memory on-demand. The
+	 * 'reference' page table is init_mm.pgd.
+	 *
+	 * NOTE! We MUST NOT take any locks for this case. We may
+	 * be in an interrupt or a critical region, and should
+	 * only copy the information from the master page table,
+	 * nothing more.
+	 */
+	if (address >= TASK_SIZE)
+		goto vmalloc_fault;
 
 	info.si_code = SEGV_MAPERR;
 	/*
@@ -148,13 +179,7 @@ good_area:
 bad_area:
 	up_read(&mm->mmap_sem);
 
-	/*
-	 * Quickly check for vmalloc range faults.
-	 */
-	if ((!vma) && (address >= VMALLOC_START) && (address < VMALLOC_END)) {
-		printk("Fix vmalloc invalidate fault\n");
-		while(1);
-	}
+bad_area_nosemaphore:
 	if (user_mode(regs)) {
 		tsk->thread.cp0_badvaddr = address;
 		tsk->thread.error_code = write;
@@ -195,7 +220,7 @@ no_context:
 	 * terminate things with extreme prejudice.
 	 */
 
-	bust_spinlocks();
+	bust_spinlocks(1);
 
 	printk(KERN_ALERT "Cpu %d Unable to handle kernel paging request at "
 	       "address %08lx, epc == %08x, ra == %08x\n",
@@ -203,6 +228,7 @@ no_context:
                (unsigned int) regs->regs[31]);
 	die("Oops", regs, write);
 	do_exit(SIGKILL);
+	bust_spinlocks(0);
 
 /*
  * We ran out of memory, or some other thing happened to us that made
@@ -232,4 +258,9 @@ do_sigbus:
 	/* Kernel mode? Handle exceptions or die */
 	if (!user_mode(regs))
 		goto no_context;
+
+	return;
+
+vmalloc_fault:
+	panic("Pagefault for kernel virtual memory");
 }

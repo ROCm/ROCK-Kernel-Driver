@@ -45,8 +45,6 @@ extern void *memmove(void *, const void *, size_t);
 extern char *strncpy(char *, const char *, size_t);
 extern int strcmp(const char *,const char *);
 
-#undef __HAVE_ARCH_MEMCHR
-#if 0
 static inline void * memchr(const void * cs,int c,size_t count)
 {
     void *ptr;
@@ -63,7 +61,6 @@ static inline void * memchr(const void * cs,int c,size_t count)
                           : "cc", "0", "1" );
     return ptr;
 }
-#endif
 
 static __inline__ char *strcpy(char *dest, const char *src)
 {
@@ -77,8 +74,6 @@ static __inline__ char *strcpy(char *dest, const char *src)
     return tmp;
 }
 
-#undef __HAVE_ARCH_STRLEN
-#if 0
 static __inline__ size_t strlen(const char *s)
 {
     size_t len;
@@ -93,10 +88,7 @@ static __inline__ size_t strlen(const char *s)
                           : "cc", "0" );
     return len;
 }
-#endif
 
-#undef __HAVE_ARCH_STRCAT
-#if 0
 static __inline__ char *strcat(char *dest, const char *src)
 {
     char *tmp = dest;
@@ -112,7 +104,6 @@ static __inline__ char *strcat(char *dest, const char *src)
                           : "cc", "memory", "0" );
     return tmp;
 }
-#endif
 
 extern void *alloca(size_t);
 #endif /* __KERNEL__ */

@@ -1,10 +1,10 @@
-/* $Id: siginfo.h,v 1.2 2000/01/27 01:05:37 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1998, 1999 by Ralf Baechle
+ * Copyright (C) 1998, 1999, 2001 Ralf Baechle
+ * Copyright (C) 2000, 2001 Silicon Graphics, Inc.
  */
 #ifndef _ASM_SIGINFO_H
 #define _ASM_SIGINFO_H
@@ -62,7 +62,7 @@ typedef struct siginfo {
 
 		/* SIGPOLL, SIGXFSZ (To do ...)  */
 		struct {
-			int _band;	/* POLL_IN, POLL_OUT, POLL_MSG */
+			long _band;	/* POLL_IN, POLL_OUT, POLL_MSG */
 			int _fd;
 		} _sigpoll;
 

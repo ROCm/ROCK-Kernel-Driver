@@ -49,7 +49,7 @@ if [ "$CONFIG_WAN" = "y" ]; then
 
    dep_tristate '  Sealevel Systems 4021 support' CONFIG_SEALEVEL_4021 m
 
-   dep_tristate '  SyncLink HDLC/SYNCPPP support' CONFIG_SYNCLINK_SYNCPPP m
+   tristate '  SyncLink HDLC/SYNCPPP support' CONFIG_SYNCLINK_SYNCPPP
 
    tristate '  Generic HDLC driver' CONFIG_HDLC
    if [ "$CONFIG_HDLC" != "n" ]; then

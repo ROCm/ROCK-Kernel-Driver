@@ -35,9 +35,6 @@
 #include <net/irda/irda.h>
 #include <net/irda/irmod.h>
 #include <net/irda/irlap.h>
-#ifdef CONFIG_IRDA_COMPRESSION
-#include <net/irda/irlap_comp.h>
-#endif /* CONFIG_IRDA_COMPRESSION */
 #include <net/irda/irlmp.h>
 #include <net/irda/iriap.h>
 #include <net/irda/irias_object.h>
@@ -65,12 +62,6 @@ extern int ircomm_init(void);
 extern int ircomm_tty_init(void);
 extern int irlpt_client_init(void);
 extern int irlpt_server_init(void);
-
-#ifdef CONFIG_IRDA_COMPRESSION
-#ifdef CONFIG_IRDA_DEFLATE
-extern irda_deflate_init();
-#endif /* CONFIG_IRDA_DEFLATE */
-#endif /* CONFIG_IRDA_COMPRESSION */
 
 /* IrTTP */
 EXPORT_SYMBOL(irttp_open_tsap);
@@ -150,10 +141,6 @@ EXPORT_SYMBOL(hashbin_get_first);
 /* IrLAP */
 EXPORT_SYMBOL(irlap_open);
 EXPORT_SYMBOL(irlap_close);
-#ifdef CONFIG_IRDA_COMPRESSION
-EXPORT_SYMBOL(irda_unregister_compressor);
-EXPORT_SYMBOL(irda_register_compressor);
-#endif /* CONFIG_IRDA_COMPRESSION */
 EXPORT_SYMBOL(irda_init_max_qos_capabilies);
 EXPORT_SYMBOL(irda_qos_bits_to_value);
 EXPORT_SYMBOL(irda_device_setup);
@@ -208,13 +195,6 @@ int __init irda_init(void)
 	ircomm_init();
 	ircomm_tty_init();
 #endif
-
-#ifdef CONFIG_IRDA_COMPRESSION
-#ifdef CONFIG_IRDA_DEFLATE
-	irda_deflate_init();
-#endif /* CONFIG_IRDA_DEFLATE */
-#endif /* CONFIG_IRDA_COMPRESSION */
-
 	return 0;
 }
 

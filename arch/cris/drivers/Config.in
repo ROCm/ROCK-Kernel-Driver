@@ -6,9 +6,20 @@ if [ "$CONFIG_ETRAX_ETHERNET" = "y" ]; then
 # this is just so that the user does not have to go into the
 # normal ethernet driver section just to enable ethernetworking
   define_bool CONFIG_NET_ETHERNET y
+  
+  choice 'Network LED behavior' \
+  "LED_on_when_link      CONFIG_ETRAX_NETWORK_LED_ON_WHEN_LINK    \
+   LED_on_when_activity  CONFIG_ETRAX_NETWORK_LED_ON_WHEN_ACTIVITY" \
+     LED_on_when_activity
+
 else
   define_bool CONFIG_NET_ETHERNET n
 fi
+
+bool 'Etrax Ethernet slave support (over lp0/1)' CONFIG_ETRAX_ETHERNET_LPSLAVE
+if [ "$CONFIG_ETRAX_ETHERNET_LPSLAVE" = "y" ]; then
+  bool '  Slave has its own LEDs' CONFIG_ETRAX_ETHERNET_LPSLAVE_HAS_LEDS
+fi 
 
 bool 'Serial-port support' CONFIG_ETRAX_SERIAL
 if [ "$CONFIG_ETRAX_SERIAL" = "y" ]; then
@@ -99,7 +110,7 @@ if [ "$CONFIG_ETRAX_IDE" = "y" ]; then
 	define_bool CONFIG_BLK_DEV_IDEDMA y
 	define_bool CONFIG_DMA_NONPCI y
 	
-	int 'Delay for drives to regain consciousness' CONFIG_IDE_DELAY 15
+	int 'Delay for drives to regain consciousness' CONFIG_ETRAX_IDE_DELAY 15
 	
 	choice 'IDE reset pin' \
   	"Port_PB_Bit_7  CONFIG_ETRAX_IDE_PB7_RESET\

@@ -2,15 +2,15 @@
  *
  * Name:	skdrv2nd.h
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.7 $
- * Date:	$Date: 1999/09/28 12:38:21 $
+ * Version:	$Revision: 1.12.2.1 $
+ * Date:	$Date: 2001/03/12 16:50:59 $
  * Purpose:	Second header file for driver and all other modules
  *
  ******************************************************************************/
 
 /******************************************************************************
  *
- *	(C)Copyright 1998,1999 SysKonnect,
+ *	(C)Copyright 1998-2001 SysKonnect,
  *	a business unit of Schneider & Koch & Co. Datensysteme GmbH.
  *
  *	This program is free software; you can redistribute it and/or modify
@@ -27,6 +27,32 @@
  * History:
  *
  *	$Log: skdrv2nd.h,v $
+ *	Revision 1.12.2.1  2001/03/12 16:50:59  mlindner
+ *	chg: kernel 2.4 adaption
+ *	
+ *	Revision 1.12  2001/03/01 12:52:15  mlindner
+ *	Fixed ring size
+ *
+ *	Revision 1.11  2001/02/19 13:28:02  mlindner
+ *	Changed PNMI parameter values
+ *
+ *	Revision 1.10  2001/01/22 14:16:04  mlindner
+ *	added ProcFs functionality
+ *	Dual Net functionality integrated
+ *	Rlmt networks added
+ *
+ *	Revision 1.1  2000/10/05 19:46:50  phargrov
+ *	Add directory src/vipk_devs_nonlbl/vipk_sk98lin/
+ *	This is the SysKonnect SK-98xx Gigabit Ethernet driver,
+ *	contributed by SysKonnect.
+ *
+ *	Revision 1.9  2000/02/21 10:39:55  cgoos
+ *	Added flag for jumbo support usage.
+ *
+ *	Revision 1.8  1999/11/22 13:50:44  cgoos
+ *	Changed license header to GPL.
+ *	Fixed two comments.
+ *
  *	Revision 1.7  1999/09/28 12:38:21  cgoos
  *	Added CheckQueue to SK_AC.
  *	
@@ -160,6 +186,11 @@ struct s_IOCTL {
 #define SK_DRIVER_RESET(pAC, IoC)	0
 #define SK_DRIVER_SENDEVENT(pAC, IoC)	0
 #define SK_DRIVER_SELFTEST(pAC, IoC)	0
+/* For get mtu you must add an own function */
+#define SK_DRIVER_GET_MTU(pAc,IoC,i)	0
+#define SK_DRIVER_SET_MTU(pAc,IoC,i,v)	0
+#define SK_DRIVER_PRESET_MTU(pAc,IoC,i,v)	0
+
 
 /* TX and RX descriptors *****************************************************/
 
@@ -344,6 +375,16 @@ struct s_TxD {
 
 #define IRQ_HWE_MASK	0x00000FFF /* enable all HW irqs */
 
+typedef struct s_DevNet DEV_NET;
+
+struct s_DevNet {
+	int             PortNr;
+	int             NetNr;
+	int             Mtu;
+	int             Up;
+	SK_AC   *pAC;
+};  
+
 typedef struct s_TxPort		TX_PORT;
 
 struct s_TxPort {
@@ -397,7 +438,8 @@ struct s_AC  {
 	SK_RLMT		Rlmt;		/* for rlmt module */
 	spinlock_t	SlowPathLock;	/* Normal IRQ lock */
 	SK_PNMI_STRUCT_DATA PnmiStruct;	/* structure to get all Pnmi-Data */
-	int		RlmtMode;	/* link check mode to set */
+	int			RlmtMode;	/* link check mode to set */
+	int			RlmtNets;	/* Number of nets */
 	
 	SK_IOC		IoBase;		/* register set of adapter */
 	int		BoardLevel;	/* level of active hw init (0-2) */
@@ -405,7 +447,7 @@ struct s_AC  {
 	SK_U32		AllocFlag;	/* flag allocation of resources */
 	struct pci_dev	PciDev;		/* for access to pci config space */
 	SK_U32		PciDevId;	/* pci device id */
-	struct net_device	*dev;		/* pointer to device struct */
+	struct net_device	*dev[2];		/* pointer to device struct */
 	char		Name[30];	/* driver name */
 	struct net_device	*Next;		/* link all devices (for clearing) */
 	int		RxBufSize;	/* length of receive buffers */
@@ -424,6 +466,7 @@ struct s_AC  {
 					/*  (may be more than HW can)*/
 
 	int		ActivePort;	/* the active XMAC port */
+	int		MaxPorts;		/* number of activated ports */
 	int		TxDescrPerRing;	/* # of descriptors per tx ring */
 	int		RxDescrPerRing;	/* # of descriptors per rx ring */
 

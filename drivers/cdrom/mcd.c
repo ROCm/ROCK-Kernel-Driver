@@ -105,17 +105,17 @@
 #define mcd_port mcd    /* for compatible parameter passing with "insmod" */
 #include "mcd.h"
 
-static int mcd_blocksizes[1] = { 0, };
+static int mcd_blocksizes[1];
 
 
 /* I added A flag to drop to 1x speed if too many errors 0 = 1X ; 1 = 2X */
-static int mcdDouble = 0; 
+static int mcdDouble; 
 
 /* How many sectors to hold at 1x speed counter */
-static int mcd1xhold = 0;
+static int mcd1xhold;
 
 /* Is the drive connected properly and responding?? */
-static int mcdPresent = 0;
+static int mcdPresent;
 
 #if 0
 #define TEST1 /* <int-..> */
@@ -162,7 +162,7 @@ static int MCMD_DATA_READ= MCMD_PLAY_READ;
 #define WORK_AROUND_MITSUMI_BUG_92
 #define WORK_AROUND_MITSUMI_BUG_93
 #ifdef WORK_AROUND_MITSUMI_BUG_93
-int mitsumi_bug_93_wait = 0;
+int mitsumi_bug_93_wait;
 #endif /* WORK_AROUND_MITSUMI_BUG_93 */
 
 static short mcd_port = CONFIG_MCD_BASE; /* used as "mcd" by "insmod" */

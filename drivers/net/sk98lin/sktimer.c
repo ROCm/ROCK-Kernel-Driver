@@ -1,23 +1,32 @@
 /******************************************************************************
  *
  * Name:	sktimer.c
- * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.12 $
- * Date:	$Date: 1999/11/22 13:38:51 $
+ * Project:	PCI Gigabit Ethernet Adapter
+ * Version:	$Revision: 1.11 $
+ * Date:	$Date: 1998/12/17 13:24:13 $
  * Purpose:	High level timer functions.
  *
  ******************************************************************************/
 
 /******************************************************************************
  *
- *	(C)Copyright 1998,1999 SysKonnect,
+ *	(C)Copyright 1989-1998 SysKonnect,
  *	a business unit of Schneider & Koch & Co. Datensysteme GmbH.
+ *	All Rights Reserved
  *
- *	This program is free software; you can redistribute it and/or modify
- *	it under the terms of the GNU General Public License as published by
- *	the Free Software Foundation; either version 2 of the License, or
- *	(at your option) any later version.
+ *	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF SYSKONNECT
+ *	The copyright notice above does not evidence any
+ *	actual or intended publication of such source code.
  *
+ *	This Module contains Proprietary Information of SysKonnect
+ *	and should be treated as Confidential.
+ *
+ *	The information in this file is provided for the exclusive use of
+ *	the licensees of SysKonnect.
+ *	Such users have the right to use, modify, and incorporate this code
+ *	into products for purposes authorized by the license agreement
+ *	provided they include this notice and the associated copyright notice
+ *	with any such product.
  *	The information in this file is provided "AS IS" without warranty.
  *
  ******************************************************************************/
@@ -27,9 +36,6 @@
  * History:
  *
  *	$Log: sktimer.c,v $
- *	Revision 1.12  1999/11/22 13:38:51  cgoos
- *	Changed license header to GPL.
- *	
  *	Revision 1.11  1998/12/17 13:24:13  gklug
  *	fix: restart problem: do NOT destroy timer queue if init 1 is done
  *	
@@ -76,7 +82,7 @@
 	Event queue and dispatcher
 */
 static const char SysKonnectFileId[] =
-	"$Header: /usr56/projects/ge/schedule/sktimer.c,v 1.12 1999/11/22 13:38:51 cgoos Exp $" ;
+	"$Header: /usr56/projects/ge/schedule/sktimer.c,v 1.11 1998/12/17 13:24:13 gklug Exp $" ;
 
 #include "h/skdrv1st.h"		/* Driver Specific Definitions */
 #include "h/skdrv2nd.h"		/* Adapter Control- and Driver specific Def. */

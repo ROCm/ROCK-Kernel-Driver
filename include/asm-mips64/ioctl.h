@@ -1,10 +1,9 @@
-/* $Id$
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1995, 1996, 1999 by Ralf Baechle
+ * Copyright (C) 1995, 1996, 1999, 2001 by Ralf Baechle
  */
 #ifndef _ASM_IOCTL_H
 #define _ASM_IOCTL_H
@@ -39,11 +38,6 @@
 #define _IOC_DIRSHIFT	(_IOC_SIZESHIFT+_IOC_SIZEBITS)
 
 /*
- * We to additionally limit parameters to a maximum 255 bytes.
- */
-#define _IOC_SLMASK	0xff
-
-/*
  * Direction bits _IOC_NONE could be 0, but OSF/1 gives it a bit.
  * And this turns out useful to catch old ioctl numbers in header
  * files for us.
@@ -64,7 +58,7 @@
 	(((dir)  << _IOC_DIRSHIFT) | \
 	 ((type) << _IOC_TYPESHIFT) | \
 	 ((nr)   << _IOC_NRSHIFT) | \
-	 (((size) & _IOC_SLMASK) << _IOC_SIZESHIFT))
+	 ((size) << _IOC_SIZESHIFT))
 
 /* used to create numbers */
 #define _IO(type,nr)		_IOC(_IOC_NONE,(type),(nr),0)

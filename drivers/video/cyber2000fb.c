@@ -367,6 +367,7 @@ struct par_info {
 	 * Other
 	 */
 	u_char	palette_ctrl;
+	u_int	vmode;
 };
 
 static const u_char crtc_idx[] = {
@@ -426,6 +427,16 @@ static void cyber2000fb_set_timing(struct cfb_info *cfb, struct par_info *hw)
 	cyber2000_attrw(0x12, 0x0f);
 	cyber2000_attrw(0x13, 0x00);
 	cyber2000_attrw(0x14, 0x00);
+
+	/* woody: set the interlaced bit... */
+	/* FIXME: what about doublescan? */
+	cyber2000_outb(0x11, 0x3ce);
+	i = cyber2000_inb(0x3cf);
+	if (hw->vmode == FB_VMODE_INTERLACED)
+		i |= 0x20;
+	else
+		i &= ~0x20;
+	cyber2000_outb(i, 0x3cf);
 
 	/* PLL registers */
 	cyber2000_grphw(DCLK_MULT, hw->clock_mult);
@@ -711,6 +722,7 @@ cyber2000fb_decode_var(struct fb_var_screeninfo *var, struct cfb_info *cfb,
 
 	hw->width = var->xres_virtual;
 	hw->palette_ctrl = 0x06;
+	hw->vmode = var->vmode;
 
 	switch (var->bits_per_pixel) {
 #ifdef FBCON_HAS_CFB8
@@ -1570,7 +1582,7 @@ cyberpro_probe(struct pci_dev *dev, const struct pci_device_id *id)
 	/*
 	 * Our driver data
 	 */
-	dev->driver_data = cfb;
+	pci_set_drvdata(dev, cfb);
 	if (int_cfb_info == NULL)
 		int_cfb_info = cfb;
 
@@ -1586,7 +1598,7 @@ failed:
 
 static void __devexit cyberpro_remove(struct pci_dev *dev)
 {
-	struct cfb_info *cfb = (struct cfb_info *)dev->driver_data;
+	struct cfb_info *cfb = pci_get_drvdata(dev);
 
 	if (cfb) {
 		/*
@@ -1606,7 +1618,7 @@ static void __devexit cyberpro_remove(struct pci_dev *dev)
 		 * Ensure that the driver data is no longer
 		 * valid.
 		 */
-		dev->driver_data = NULL;
+		pci_set_drvdata(dev, NULL);
 		if (cfb == int_cfb_info)
 			int_cfb_info = NULL;
 	}
@@ -1622,7 +1634,7 @@ static int cyberpro_suspend(struct pci_dev *dev, u32 state)
  */
 static int cyberpro_resume(struct pci_dev *dev)
 {
-	struct cfb_info *cfb = (struct cfb_info *)dev->driver_data;
+	struct cfb_info *cfb = pci_get_drvdata(dev);
 
 	if (cfb) {
 		cyberpro_init_hw(cfb, 0);

@@ -2,16 +2,15 @@
  *
  * Name:	skgeinit.h
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.46 $
- * Date:	$Date: 2000/08/10 11:28:00 $
+ * Version:	$Revision: 1.51 $
+ * Date:	$Date: 2001/02/09 12:26:38 $
  * Purpose:	Structures and prototypes for the GE Init Module
  *
  ******************************************************************************/
 
 /******************************************************************************
  *
- *	(C)Copyright 1998-2000 SysKonnect,
- *	a business unit of Schneider & Koch & Co. Datensysteme GmbH.
+ *	(C)Copyright 1998-2001 SysKonnect GmbH.
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
@@ -27,6 +26,22 @@
  * History:
  *
  *	$Log: skgeinit.h,v $
+ *	Revision 1.51  2001/02/09 12:26:38  cgoos
+ *	Inserted #ifdef DIAG for half duplex workaround timer.
+ *	
+ *	Revision 1.50  2001/02/07 07:56:40  rassmann
+ *	Corrected copyright.
+ *	
+ *	Revision 1.49  2001/01/31 15:32:18  gklug
+ *	fix: problem with autosensing an SR8800 switch
+ *	add: counter for autoneg timeouts
+ *	
+ *	Revision 1.48  2000/11/09 11:30:10  rassmann
+ *	WA: Waiting after releasing reset until BCom chip is accessible.
+ *	
+ *	Revision 1.47  2000/10/18 12:22:40  cgoos
+ *	Added workaround for half duplex hangup.
+ *	
  *	Revision 1.46  2000/08/10 11:28:00  rassmann
  *	Editorial changes.
  *	Preserving 32-bit alignment in structs for the adapter context.
@@ -440,6 +455,12 @@ extern "C" {
  */
 #define	SK_MAX_LRESTART	3	/* Max. 3 times the link is restarted */
 
+/*
+ * define max. autonegotiation timeouts before link detection in sense mode is
+ * reset.
+ */
+#define	SK_MAX_ANEG_TO	10	/* Max. 10 times the sense mode is reset */
+
 /* structures *****************************************************************/
 
 /*
@@ -453,8 +474,13 @@ typedef	struct s_GePort {
 	SK_U64	PPrevRx;		/* Previous RxOk Counter checking */
 	SK_U64	PPrevFcs;		/* Previous FCS Error Counter checking */
 	SK_U64	PRxLim;			/* Previous RxOk Counter checking */
+	SK_U64	LastOctets;		/* For half duplex hang check */
+#ifndef SK_DIAG
+	SK_TIMER	HalfDupChkTimer;
+#endif
 	int		PLinkResCt;		/* Link Restart Counter */
 	int		PAutoNegTimeOut;/* AutoNegotiation timeout current value */
+	int		PAutoNegTOCt;	/* AutoNeg Timeout Counter */
 	int		PRxQSize;		/* Port Rx Queue Size in kB */
 	int		PXSQSize;		/* Port Synchronous Transmit Queue Size in kB */
 	int		PXAQSize;		/* Port Asynchronous Transmit Queue Size in kB*/
@@ -467,13 +493,17 @@ typedef	struct s_GePort {
 	int		PRxQOff;		/* Rx Queue Address Offset */
 	int		PXsQOff;		/* Synchronous Tx Queue Address Offset */
 	int		PXaQOff;		/* Asynchronous Tx Queue Address Offset */
+	int		PhyType;		/* PHY used on this port */
+	SK_U16	PhyAddr;		/* MDIO/MDC PHY address */
 	SK_U16	PRxCmd;			/* Port Receive Command Configuration Value */
 	SK_U16	PIsave;			/* Saved Interrupt status word */
 	SK_U16	PSsave;			/* Saved PHY status word */
+	SK_U16	Align01;
 	SK_BOOL	PHWLinkUp;		/* The hardware Link is up (wireing) */
 	SK_BOOL	PState;			/* Is port initialized ? */
 	SK_BOOL	PLinkBroken;	/* Is Link broken ? */
 	SK_BOOL	PCheckPar;		/* Do we check for parity errors ? */
+	SK_BOOL	HalfDupTimerActive;
 	SK_U8	PLinkCap;		/* Link Capabilities */
 	SK_U8	PLinkModeConf;	/* Link Mode configured */
 	SK_U8	PLinkMode;		/* Link Mode currently used */
@@ -486,8 +516,7 @@ typedef	struct s_GePort {
 	SK_U8	PMSStatus;		/* Master/Slave Status */
 	SK_U8	PAutoNegFail;	/* Autonegotiation fail flag */
 	SK_U8	PLipaAutoNeg;	/* Autonegotiation possible with Link Partner */
-	SK_U16	PhyAddr;		/* MDIO/MDC PHY address */
-	int	PhyType;	/* PHY used on this port */
+	SK_U8	Align02;
 } SK_GEPORT;
 
 /*

@@ -1,4 +1,4 @@
-/* $Id: checksum.S,v 1.4 2001/02/19 11:11:33 bjornw Exp $
+/* $Id: checksum.S,v 1.5 2001/05/29 11:40:14 markusl Exp $
  * A fast checksum routine using movem
  * Copyright (c) 1998-2001 Axis Communications AB
  *
@@ -13,6 +13,8 @@ _csum_partial:
 	;; r12 - checksum
 
 	;; check for breakeven length between movem and normal word looping versions
+	;; we also do _NOT_ want to compute a checksum over more than the 
+	;; actual length when length < 40
 	
 	cmpu.w	80,r11
 	blo	word_loop
@@ -20,6 +22,8 @@ _csum_partial:
 
 	;; need to save the registers we use below in the movem loop
 	;; this overhead is why we have a check above for breakeven length
+	;; only r0 - r8 have to be saved, the other ones are clobber-able
+	;; according to the ABI
 	
 	subq	9*4,sp
 	movem	r8,[sp]

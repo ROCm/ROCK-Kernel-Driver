@@ -98,6 +98,8 @@ static smc_chip_t chips[] =
 	{ "FDC37N769", 0x55, 0x55, 0x0d, 0x28, ircc_probe_69 },
 	{ "FDC37N869", 0x55, 0x00, 0x0d, 0x29, ircc_probe_69 },
 	{ "FDC37N958", 0x55, 0x55, 0x20, 0x09, ircc_probe_58 },
+	{ "FDC37N971", 0x55, 0x55, 0x20, 0x0a, ircc_probe_58 },
+	{ "FDC37N972", 0x55, 0x55, 0x20, 0x0b, ircc_probe_58 },
 	{ NULL }
 };
 
@@ -127,7 +129,7 @@ int __init ircc_init(void)
 	IRDA_DEBUG(0, __FUNCTION__ "\n");
 
 	/* Probe for all the NSC chipsets we know about */
-	for (chip=chips; chip->name ; chip++,i++) {
+	for (chip=chips; chip->name ; chip++) {
 		for (i=0; i<2; i++) {
 			info.cfg_base = smcreg[i];
 			
@@ -136,7 +138,7 @@ int __init ircc_init(void)
                          * parameters which we should use instead of probed
 			 * values
 			 */
-			if (io[i] < 2000) {
+			if (io[i] < 0x2000) {
 				info.fir_base = io[i];
 				info.sir_base = io2[i];
 			} else if (chip->probe(chip, &info) < 0)

@@ -249,7 +249,7 @@ init_bandit(struct pci_controller *bp)
 	out_le32(bp->cfg_addr, (1UL << BANDIT_DEVNUM) + PCI_VENDOR_ID);
 	udelay(2);
 	vendev = in_le32((volatile unsigned int *)bp->cfg_data);
-	if (vendev == (PCI_VENDOR_ID_APPLE_BANDIT << 16) + 
+	if (vendev == (PCI_DEVICE_ID_APPLE_BANDIT << 16) + 
 			PCI_VENDOR_ID_APPLE) {
 		/* read the revision id */
 		out_le32(bp->cfg_addr,

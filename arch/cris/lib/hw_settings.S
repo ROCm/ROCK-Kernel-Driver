@@ -1,14 +1,15 @@
-	;; $Id: hw_settings.S,v 1.2 2001/04/03 11:11:09 starvik Exp $
-	;; 
-	;; This table is used by some tools to extract hardware parameters.
-	;; The table should be included in the kernel and the decompressor.
-	;; Don't forget to update the tools if you change this table.
-	;;
-	;; Copyright (C) 2001 Axis Communications AB
-	;;
-	;; Authors:  Mikael Starvik (starvik@axis.com)	
+/*
+ * $Id: hw_settings.S,v 1.3 2001/04/21 17:02:46 bjornw Exp $
+ * 
+ * This table is used by some tools to extract hardware parameters.
+ * The table should be included in the kernel and the decompressor.
+ * Don't forget to update the tools if you change this table.
+ *
+ * Copyright (C) 2001 Axis Communications AB
+ *
+ * Authors:  Mikael Starvik (starvik@axis.com)	
+ */
 
-	
 #define PA_SET_VALUE ((CONFIG_ETRAX_DEF_R_PORT_PA_DIR << 8) | \
 		(CONFIG_ETRAX_DEF_R_PORT_PA_DATA))
 #define PB_SET_VALUE ((CONFIG_ETRAX_DEF_R_PORT_PB_CONFIG << 16) | \

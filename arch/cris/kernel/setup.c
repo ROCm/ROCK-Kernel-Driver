@@ -1,4 +1,4 @@
-/* $Id: setup.c,v 1.14 2001/04/03 12:54:12 starvik Exp $
+/* $Id: setup.c,v 1.16 2001/05/15 01:23:13 hp Exp $
  *
  *  linux/arch/cris/kernel/setup.c
  *
@@ -190,14 +190,10 @@ static struct cpu_info {
 	unsigned short cache;
 	unsigned short flags;
 } cpu_info[] = {
+	/* The first four models will never ever run this code and are
+	   only here for display.  */
 	{ "ETRAX 1",   0, 0 },
-	{ "ETRAX 2",   0, 0 },	/* Don't say it HAS_TOKENRING - there are
-				   lethal bugs in that chip that
-				   prevents T-R from ever working.
-				   Never go there, and never lead anyone
-				   into believing it can work.  BTW:
-				   Anyone working on a T-R network
-				   driver? :-) :-) :-) :-/ */
+	{ "ETRAX 2",   0, 0 },
 	{ "ETRAX 3",   0, HAS_TOKENRING },
 	{ "ETRAX 4",   0, HAS_TOKENRING | HAS_SCSI },
 	{ "Unknown",   0, 0 },

@@ -43,8 +43,6 @@
 #define PI_ADD_BOFS      0x85
 #define PI_MIN_TURN_TIME 0x86
 #define PI_LINK_DISC     0x08
-#define PI_COMPRESSION   0x07 /* Just a random pick */
-
 
 #define IR_115200_MAX 0x3f
 
@@ -80,10 +78,6 @@ struct qos_info {
 	qos_value_t link_disc_time;
 	
 	qos_value_t power;
-#ifdef CONFIG_IRDA_COMPRESSION
-	/* An experimental non IrDA field */
-	qos_value_t compression;
-#endif
 };
 
 extern int sysctl_max_baud_rate;

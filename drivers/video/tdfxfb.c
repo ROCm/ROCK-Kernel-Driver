@@ -1207,7 +1207,7 @@ static struct display_switch fbcon_banshee8 = {
    revc:		tdfx_cfbX_revc,   
    cursor:		tdfx_cfbX_cursor, 
    clear_margins:	tdfx_cfbX_clear_margins,
-   fontwidthmask:	FONTWIDTH(8)
+   fontwidthmask:	FONTWIDTHRANGE(8, 12)
 };
 #endif
 #ifdef FBCON_HAS_CFB16
@@ -1220,7 +1220,7 @@ static struct display_switch fbcon_banshee16 = {
    revc:		tdfx_cfbX_revc, 
    cursor:		tdfx_cfbX_cursor, 
    clear_margins:	tdfx_cfbX_clear_margins,
-   fontwidthmask:	FONTWIDTH(8)
+   fontwidthmask:	FONTWIDTHRANGE(8, 12)
 };
 #endif
 #ifdef FBCON_HAS_CFB24
@@ -1233,7 +1233,7 @@ static struct display_switch fbcon_banshee24 = {
    revc:		tdfx_cfbX_revc, 
    cursor:		tdfx_cfbX_cursor, 
    clear_margins:	tdfx_cfbX_clear_margins,
-   fontwidthmask:	FONTWIDTH(8)
+   fontwidthmask:	FONTWIDTHRANGE(8, 12)
 };
 #endif
 #ifdef FBCON_HAS_CFB32
@@ -1246,7 +1246,7 @@ static struct display_switch fbcon_banshee32 = {
    revc:		tdfx_cfbX_revc, 
    cursor:		tdfx_cfbX_cursor, 
    clear_margins:	tdfx_cfbX_clear_margins,
-   fontwidthmask:	FONTWIDTH(8)
+   fontwidthmask:	FONTWIDTHRANGE(8, 12)
 };
 #endif
 
@@ -1892,7 +1892,7 @@ int __init tdfxfb_init(void) {
        ((pdev->device == PCI_DEVICE_ID_3DFX_BANSHEE) ||
 	(pdev->device == PCI_DEVICE_ID_3DFX_VOODOO3) ||
 	(pdev->device == PCI_DEVICE_ID_3DFX_VOODOO5))) {
-      char *name;
+      char *name = NULL;
 
       fb_info.dev   = pdev->device;
       switch (pdev->device) {
@@ -2314,7 +2314,12 @@ static void tdfxfb_createcursor(struct display *p)
    unsigned int h,to;
 
    tdfxfb_createcursorshape(p);
-   xline = (1 << fb_info.cursor.w)-1;
+   xline = ~((1 << (32 - fb_info.cursor.w)) - 1);
+
+#ifdef __LITTLE_ENDIAN
+   xline = swab32(xline);
+#endif
+
    cursorbase=(u8*)fb_info.bufbase_virt;
    h=fb_info.cursor.cursorimage;     
    

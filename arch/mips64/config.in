@@ -11,8 +11,10 @@ endmenu
 
 mainmenu_option next_comment
 comment 'Machine selection'
-bool 'Support for SGI IP22' CONFIG_SGI_IP22
-bool 'Support for SGI IP27' CONFIG_SGI_IP27
+choice 'Machine type'						\
+	"SGI-IP22,Indy/Indigo2 CONFIG_SGI_IP22			\
+	 SGI-IP27,Origin200/2000 CONFIG_SGI_IP27 SGI-IP27,Origin200/2000"
+
 if [ "$CONFIG_SGI_IP27" = "y" ]; then
    bool '  IP27 N-Mode' CONFIG_SGI_SN0_N_MODE
    bool '  Discontiguous Memory Support' CONFIG_DISCONTIGMEM
@@ -47,6 +49,7 @@ if [ "$CONFIG_SGI_IP22" = "y" ]; then
    define_bool CONFIG_BOARD_SCACHE y
    define_bool CONFIG_ARC_MEMORY y
    define_bool CONFIG_SGI y
+   define_int CONFIG_L1_CACHE_SHIFT 5
 fi
 
 if [ "$CONFIG_SGI_IP27" = "y" ]; then
@@ -55,6 +58,7 @@ if [ "$CONFIG_SGI_IP27" = "y" ]; then
    define_bool CONFIG_COHERENT_IO y
    define_bool CONFIG_PCI y
    define_bool CONFIG_QL_ISP_A64 y
+   define_int CONFIG_L1_CACHE_SHIFT 7
 fi
 
 if [ "$CONFIG_ISA" != "y" ]; then
@@ -91,6 +95,10 @@ if [ "$CONFIG_CPU_R10000" = "y" ]; then
 fi
 bool 'Generate little endian code' CONFIG_CPU_LITTLE_ENDIAN
 
+if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
+   bool 'Kernel floating-point emulation' CONFIG_MIPS_FPU_EMULATOR
+fi
+
 bool 'Networking support' CONFIG_NET
 
 source drivers/pci/Config.in
@@ -106,6 +114,11 @@ fi
 bool 'System V IPC' CONFIG_SYSVIPC
 bool 'BSD Process Accounting' CONFIG_BSD_PROCESS_ACCT
 bool 'Sysctl support' CONFIG_SYSCTL
+
+if [ "$CONFIG_ARC32" = "y" ]; then
+   bool 'ARC console support' CONFIG_ARC_CONSOLE
+fi
+
 tristate 'Kernel support for 64-bit ELF binaries' CONFIG_BINFMT_ELF
 bool 'Kernel support for Linux/MIPS 32-bit binary compatibility' CONFIG_MIPS32_COMPAT
 if [ "$CONFIG_MIPS32_COMPAT" = "y" ]; then
@@ -125,13 +138,11 @@ fi
 
 source drivers/pci/Config.in
 
-if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
-   bool 'Support for frame buffer devices (EXPERIMENTAL)' CONFIG_FB
-fi
-
 endmenu
 
 source drivers/mtd/Config.in
+
+source drivers/parport/Config.in
 
 source drivers/block/Config.in
 
@@ -166,7 +177,7 @@ if [ "$CONFIG_SCSI" != "n" ]; then
 fi
 endmenu
 
-source drivers/i2o/Config.in
+source drivers/message/i2o/Config.in
 
 if [ "$CONFIG_NET" = "y" ]; then
    mainmenu_option next_comment
@@ -175,16 +186,6 @@ if [ "$CONFIG_NET" = "y" ]; then
    bool 'Network device support' CONFIG_NETDEVICES
    if [ "$CONFIG_NETDEVICES" = "y" ]; then
       source drivers/net/Config.in
-      if [ "$CONFIG_SGI_IP22" = "y" ]; then
-	 bool 'SGI Seeq ethernet controller support' CONFIG_SGISEEQ
-      fi
-      if [ "$CONFIG_DECSTATION" = "y" ]; then
-	 bool 'DEC LANCE ethernet controller support' CONFIG_DECLANCE
-      fi
-      if [ "$CONFIG_BAGET_MIPS" = "y" ]; then
-	 tristate 'Baget AMD LANCE support' CONFIG_BAGETLANCE
-	 tristate 'Baget Backplane Shared Memory support' CONFIG_BAGETBSM
-      fi
       if [ "$CONFIG_ATM" = "y" ]; then
 	 source drivers/atm/Config.in
       fi
@@ -227,6 +228,7 @@ source fs/Config.in
 if [ "$CONFIG_VT" = "y" ]; then
    mainmenu_option next_comment
    comment 'Console drivers'
+   source drivers/video/Config.in
    if [ "$CONFIG_SGI_IP22" = "y" ]; then
       tristate 'SGI Newport Console support' CONFIG_SGI_NEWPORT_CONSOLE
       if [ "$CONFIG_SGI_NEWPORT_CONSOLE" != "y" ]; then
@@ -268,4 +270,7 @@ if [ "$CONFIG_MODULES" = "y" ]; then
 fi
 bool 'Remote GDB kernel debugging' CONFIG_REMOTE_DEBUG
 bool 'Magic SysRq key' CONFIG_MAGIC_SYSRQ
+if [ "$CONFIG_SMP" != "n" ]; then
+   bool 'Run uncached' CONFIG_MIPS_UNCACHED
+fi
 endmenu

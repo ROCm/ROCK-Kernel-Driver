@@ -258,8 +258,16 @@ int fs ;
 		 * Extract message parameters
 		 */
 		p = (void *) sm_to_para(smc,sm,SMT_P320F) ;
+                if (!p) {
+                        printk(KERN_ERR "ESS: sm_to_para failed");
+                        return fs;
+                }       
 		payload = ((struct smt_p_320f *)p)->mib_payload ;
 		p = (void *) sm_to_para(smc,sm,SMT_P3210) ;
+                if (!p) {
+                        printk(KERN_ERR "ESS: sm_to_para failed");
+                        return fs;
+                }       
 		overhead = ((struct smt_p_3210 *)p)->mib_overhead ;
 
 		DB_ESSN(2,"payload= %lx	overhead= %lx\n",payload,overhead) ;

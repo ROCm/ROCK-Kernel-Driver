@@ -31,7 +31,6 @@
 #include <asm/bootinfo.h>
 #include <asm/cachectl.h>
 #include <asm/cpu.h>
-#include <asm/io.h>
 #include <asm/stackframe.h>
 #include <asm/system.h>
 #include <asm/pgalloc.h>
@@ -55,8 +54,6 @@ char wait_available;
  * Do we have a cyclecounter available?
  */
 char cyclecounter_available;
-
-unsigned long loops_per_sec;
 
 /*
  * Set if box has EISA slots.
@@ -89,23 +86,15 @@ unsigned long mips_cputype = CPU_UNKNOWN;
 unsigned long mips_machtype = MACH_UNKNOWN;
 unsigned long mips_machgroup = MACH_GROUP_UNKNOWN;
 
+struct boot_mem_map boot_mem_map;
+
 unsigned char aux_device_present;
-extern int _end;
 
 extern void load_mmu(void);
 
 static char command_line[CL_SIZE] = { 0, };
        char saved_command_line[CL_SIZE];
 extern char arcs_cmdline[CL_SIZE];
-
-/*
- * mips_io_port_base is the begin of the address space to which x86 style
- * I/O ports are mapped.
- */
-#ifdef CONFIG_SGI_IP27
-/* XXX Origin garbage has no business in this file  */
-unsigned long mips_io_port_base = IO_BASE;
-#endif
 
 extern void ip22_setup(void);
 extern void ip27_setup(void);
@@ -137,6 +126,7 @@ static inline void cpu_probe(void)
 		mips_cputype = CPU_R8000;
 		break;
 	case PRID_IMP_R10000:
+	case PRID_IMP_R12000:
 		mips_cputype = CPU_R10000;
 		break;
 	default:
@@ -146,14 +136,6 @@ static inline void cpu_probe(void)
 
 void __init setup_arch(char **cmdline_p)
 {
-#ifdef CONFIG_BLK_DEV_INITRD
-	unsigned long tmp;
-	unsigned long *initrd_header;
-#endif
-	int i;
-	pmd_t *pmd = kpmdtbl;
-	pte_t *pte = kptbl;
-
 	cpu_probe();
 	load_mmu();
 
@@ -164,37 +146,15 @@ void __init setup_arch(char **cmdline_p)
 	ip27_setup();
 #endif
 
-	strncpy (command_line, arcs_cmdline, CL_SIZE);
+#ifdef CONFIG_ARC_MEMORY
+	bootmem_init ();
+#endif
+
+	strncpy(command_line, arcs_cmdline, CL_SIZE);
 	memcpy(saved_command_line, command_line, CL_SIZE);
 	saved_command_line[CL_SIZE-1] = '\0';
 
 	*cmdline_p = command_line;
 
-#ifdef CONFIG_BLK_DEV_INITRD
-#error "Initrd is broken, please fit it."
-	tmp = (((unsigned long)&_end + PAGE_SIZE-1) & PAGE_MASK) - 8;
-	if (tmp < (unsigned long)&_end)
-		tmp += PAGE_SIZE;
-	initrd_header = (unsigned long *)tmp;
-	if (initrd_header[0] == 0x494E5244) {
-		initrd_start = (unsigned long)&initrd_header[2];
-		initrd_end = initrd_start + initrd_header[1];
-		initrd_below_start_ok = 1;
-		if (initrd_end > memory_end) {
-			printk("initrd extends beyond end of memory "
-			       "(0x%08lx > 0x%08lx)\ndisabling initrd\n",
-			       initrd_end,memory_end);
-			initrd_start = 0;
-		} else
-			*memory_start_p = initrd_end;
-	}
-#endif
-
 	paging_init();
-
-	memset((void *)kptbl, 0, PAGE_SIZE << KPTBL_PAGE_ORDER);
-	memset((void *)kpmdtbl, 0, PAGE_SIZE);
-	pgd_set(swapper_pg_dir, kpmdtbl);
-	for (i = 0; i < (1 << KPTBL_PAGE_ORDER); pmd++,i++,pte+=PTRS_PER_PTE)
-		pmd_val(*pmd) = (unsigned long)pte;
 }

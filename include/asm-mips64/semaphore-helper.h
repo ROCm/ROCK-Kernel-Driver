@@ -3,8 +3,8 @@
  *
  * (C) Copyright 1996 Linus Torvalds
  * (C) Copyright 1999 Andrea Arcangeli
- * (C) Copyright 1999 Ralf Baechle
- * (C) Copyright 1999 Silicon Graphics, Inc.
+ * (C) Copyright 1999, 2001 Ralf Baechle
+ * (C) Copyright 1999, 2001 Silicon Graphics, Inc.
  */
 #ifndef _ASM_SEMAPHORE_HELPER_H
 #define _ASM_SEMAPHORE_HELPER_H
@@ -68,63 +68,56 @@ waking_non_zero_interruptible(struct semaphore *sem, struct task_struct *tsk)
 
 #ifdef __MIPSEB__
 
-        __asm__ __volatile__("
-	.set	push
-	.set	noat
-0:	lld	%1, %2
-	li	%0, 0
-	sll	$1, %1, 0
-	blez	$1, 1f
-	daddiu	%1, %1, -1
-	li	%0, 1
-	b 	2f
-1:
-	beqz	%3, 2f
-	li	%0, %4
-	dli	$1, 0x0000000100000000
-	daddu	%1, %1, $1
-2:
-	scd	%1, %2
-	beqz	%1, 0b
-	.set	pop"
+        __asm__ __volatile__(
+	".set\tpush\t\t\t# waking_non_zero_interruptible\n\t"
+	".set\tnoat\n\t"
+	"0:\tlld\t%1, %2\n\t"
+	"li\t%0, 0\n\t"
+	"sll\t$1, %1, 0\n\t"
+	"blez\t$1, 1f\n\t"
+	"daddiu\t%1, %1, -1\n\t"
+	"li\t%0, 1\n\t"
+	"b\t2f\n\t"
+	"1:\tbeqz\t%3, 2f\n\t"
+	"li\t%0, %4\n\t"
+	"dli\t$1, 0x0000000100000000\n\t"
+	"daddu\t%1, %1, $1\n\t"
+	"2:\tscd\t%1, %2\n\t"
+	"beqz\t%1, 0b\n\t"
+	".set\tpop"
 	: "=&r" (ret), "=&r" (tmp), "=m" (*sem)
 	: "r" (signal_pending(tsk)), "i" (-EINTR));
 
 #elif defined(__MIPSEL__)
 
-	__asm__ __volatile__("
-	.set	push
-	.set	noat
-0:
-	lld	%1, %2
-	li	%0, 0
-	blez	%1, 1f
-	dli	$1, 0x0000000100000000
-	dsubu	%1, %1, $1
-	li	%0, 1
-	b	2f
-1:
-	beqz	%3, 2f
-	li	%0, %4
+	__asm__ __volatile__(
+	".set\tpush\t\t\t# waking_non_zero_interruptible\n\t"
+	".set\t	noat\n"
+	"0:\tlld\t%1, %2\n\t"
+	"li\t%0, 0\n\t"
+	"blez\t%1, 1f\n\t"
+	"dli\t$1, 0x0000000100000000\n\t"
+	"dsubu\t%1, %1, $1\n\t"
+	"li\t%0, 1\n\t"
+	"b\t2f\n"
+	"1:\tbeqz\t%3, 2f\n\t"
+	"li\t%0, %4\n\t"
 	/* 
 	 * It would be nice to assume that sem->count
 	 * is != -1, but we will guard against that case
 	 */
-	daddiu	$1, %1, 1
-	dsll32	$1, $1, 0
-	dsrl32	$1, $1, 0
-	dsrl32	%1, %1, 0
-	dsll32	%1, %1, 0
-	or	%1, %1, $1
-2:
-	scd	%1, %2
-	beqz	%1, 0b
-	.set	pop"
+	"daddiu\t$1, %1, 1\n\t"
+	"dsll32\t$1, $1, 0\n\t"
+	"dsrl32\t$1, $1, 0\n\t"
+	"dsrl32\t%1, %1, 0\n\t"
+	"dsll32\t%1, %1, 0\n\t"
+	"or\t%1, %1, $1\n"
+	"2:\tscd\t%1, %2\n\t"
+	"beqz\t	%1, 0b\n\t"
+	".set\tpop"
 	: "=&r" (ret), "=&r" (tmp), "=m" (*sem)
 	: "r" (signal_pending(tsk)), "i" (-EINTR));
 
-#else
-#error "MIPS but neither __MIPSEL__ nor __MIPSEB__?"
 #endif
 
 	return ret;

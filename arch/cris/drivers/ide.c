@@ -1,4 +1,4 @@
-/* $Id: ide.c,v 1.16 2001/04/05 08:30:07 matsfg Exp $
+/* $Id: ide.c,v 1.19 2001/05/09 12:53:16 johana Exp $
  *
  * Etrax specific IDE functions, like init and PIO-mode setting etc.
  * Almost the entire ide.c is used for the rest of the Etrax ATA driver.
@@ -8,6 +8,15 @@
  *             Mikael Starvik     (pio setup stuff)
  *
  * $Log: ide.c,v $
+ * Revision 1.19  2001/05/09 12:53:16  johana
+ * Added #include <asm/dma.h>
+ *
+ * Revision 1.18  2001/05/09 12:37:00  johana
+ * Use DMA_NBR macros from dma.h.
+ *
+ * Revision 1.17  2001/04/23 13:36:30  matsfg
+ * Changed CONFIG_IDE_DELAY to CONFIG_ETRAX_IDE_DELAY
+ *
  * Revision 1.16  2001/04/05 08:30:07  matsfg
  * Corrected cse1 and csp0 reset.
  *
@@ -98,6 +107,7 @@
 
 #include <asm/io.h>
 #include <asm/svinto.h>
+#include <asm/dma.h>
 
 /* number of Etrax DMA descriptors */
 #define MAX_DMA_DESCRS 64
@@ -341,17 +351,17 @@ init_e100_ide (void)
 			     IO_STATE( R_IRQ_MASK0_SET, ata_irq2, set ) |
 			     IO_STATE( R_IRQ_MASK0_SET, ata_irq3, set ) );
 
-	printk("ide: waiting %d seconds for drives to regain consciousness\n", CONFIG_IDE_DELAY);
+	printk("ide: waiting %d seconds for drives to regain consciousness\n", CONFIG_ETRAX_IDE_DELAY);
 
-	h = jiffies + (CONFIG_IDE_DELAY * HZ);
+	h = jiffies + (CONFIG_ETRAX_IDE_DELAY * HZ);
 	while(jiffies < h) ;
 
   /* reset the dma channels we will use */
 
-	RESET_DMA(2);
-	RESET_DMA(3);
-	WAIT_DMA(2);
-	WAIT_DMA(3);
+	RESET_DMA(ATA_TX_DMA_NBR);
+	RESET_DMA(ATA_RX_DMA_NBR);
+	WAIT_DMA(ATA_TX_DMA_NBR);
+	WAIT_DMA(ATA_RX_DMA_NBR);
 
 }
 
@@ -378,8 +388,8 @@ e100_atapi_input_bytes (ide_drive_t *drive, void *buffer, unsigned int bytecount
 	}
 	
 	/* make sure the DMA channel is available */
-	RESET_DMA(3);
-	WAIT_DMA(3); 
+	RESET_DMA(ATA_RX_DMA_NBR);
+	WAIT_DMA(ATA_RX_DMA_NBR); 
 	
 	/* setup DMA descriptor */
 	
@@ -406,7 +416,7 @@ e100_atapi_input_bytes (ide_drive_t *drive, void *buffer, unsigned int bytecount
 	/* wait for completion */
 	
 	LED_DISK_READ(1);
-	WAIT_DMA(3);
+	WAIT_DMA(ATA_RX_DMA_NBR);
 	LED_DISK_READ(0);
 
 #if 0
@@ -457,8 +467,8 @@ e100_atapi_output_bytes (ide_drive_t *drive, void *buffer, unsigned int bytecoun
 	}
 
 	/* make sure the DMA channel is available */
-	RESET_DMA(2);
-	WAIT_DMA(2); 
+	RESET_DMA(ATA_TX_DMA_NBR);
+	WAIT_DMA(ATA_TX_DMA_NBR); 
 	
 	/* setup DMA descriptor */
 	
@@ -485,7 +495,7 @@ e100_atapi_output_bytes (ide_drive_t *drive, void *buffer, unsigned int bytecoun
 	/* wait for completion */
 	
 	LED_DISK_WRITE(1);
-	WAIT_DMA(2);
+	WAIT_DMA(ATA_TX_DMA_NBR);
 	LED_DISK_WRITE(0);
 
 #if 0
@@ -794,8 +804,8 @@ static int e100_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 
 	if(reading) {
 
-		RESET_DMA(3); /* sometimes the DMA channel get stuck so we need to do this */
-		WAIT_DMA(3);
+		RESET_DMA(ATA_RX_DMA_NBR); /* sometimes the DMA channel get stuck so we need to do this */
+		WAIT_DMA(ATA_RX_DMA_NBR);
 
 		/* set up the Etrax DMA descriptors */
 		
@@ -837,8 +847,8 @@ static int e100_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 	} else {
 		/* writing */
 
-		RESET_DMA(2); /* sometimes the DMA channel get stuck so we need to do this */
-		WAIT_DMA(2);
+		RESET_DMA(ATA_TX_DMA_NBR); /* sometimes the DMA channel get stuck so we need to do this */
+		WAIT_DMA(ATA_TX_DMA_NBR);
 
 		/* set up the Etrax DMA descriptors */
 

@@ -3,8 +3,8 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1997, 1999, 2000 Ralf Baechle
- * Copyright (C) 2000 Silicon Graphics, Inc.
+ * Copyright (C) 1997, 1999, 2000, 2001 Ralf Baechle
+ * Copyright (C) 2000, 2001 Silicon Graphics, Inc.
  */
 #ifndef _ASM_SOCKET_H
 #define _ASM_SOCKET_H
@@ -41,7 +41,7 @@ To add: #define SO_REUSEPORT 0x0200	/* Allow local address and port reuse.  */
 #define SO_RCVLOWAT	0x1004	/* receive low-water mark */
 #define SO_SNDTIMEO	0x1005	/* send timeout */
 #define SO_RCVTIMEO 	0x1006	/* receive timeout */
-#define SO_ACCEPTCONN	0x1007
+#define SO_ACCEPTCONN	0x1009
 
 /* linux-specific, might as well be the same as on i386 */
 #define SO_NO_CHECK	11

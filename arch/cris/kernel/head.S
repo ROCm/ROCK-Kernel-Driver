@@ -1,4 +1,4 @@
-/* $Id: head.S,v 1.29 2001/04/18 12:51:59 orjanf Exp $
+/* $Id: head.S,v 1.34 2001/05/15 07:08:14 hp Exp $
  * 
  * Head of the kernel - alter with care
  *
@@ -7,6 +7,21 @@
  * Authors:	Bjorn Wesen (bjornw@axis.com)
  * 
  * $Log: head.S,v $
+ * Revision 1.34  2001/05/15 07:08:14  hp
+ * Tweak "notice" to reflect that both r8 r9 are used
+ *
+ * Revision 1.33  2001/05/15 06:40:05  hp
+ * Put bulk of code in .text.init, data in .data.init
+ *
+ * Revision 1.32  2001/05/15 06:18:56  hp
+ * Execute review comment: s/bcc/bhs/g; s/bcs/blo/g
+ *
+ * Revision 1.31  2001/05/15 06:08:40  hp
+ * Add sentence about autodetecting the bit31-MMU-bug
+ *
+ * Revision 1.30  2001/05/15 06:00:05  hp
+ * Update comment: LOW_MAP is not forced on xsim anymore.
+ *
  * Revision 1.29  2001/04/18 12:51:59  orjanf
  * * Reverted review change regarding the use of bcs/bcc.
  * * Removed non-working LED-clearing code.
@@ -127,9 +142,9 @@
 	;; since etrax actually starts at address 2 when booting from flash, we
 	;; put a nop (2 bytes) here first so we dont accidentally skip the di
 	;;
-	;; NOTICE! The registers r8 and r9 are used as a parameter carrying
+	;; NOTICE! The registers r8 and r9 are used as parameters carrying
 	;; information from the decompressor (if the kernel was compressed). 
-	;; They should not be used in the code below until it is read.
+	;; They should not be used in the code below until read.
 	
 	nop	
 	di
@@ -143,8 +158,11 @@
 	;; temporarily map those segments linearily.
 	;;
 	;; Due to a bug in Etrax-100 LX version 1 we need to map the memory
-	;; slightly different. We also let the simulator get this mapping for now.
-	;; (The bug is that you can't remap bit 31.)
+	;; slightly different.  The bug is that you can't remap bit 31 of
+	;; an address.  Though we can check the version register for
+	;; whether the bug is present, some constants would then have to
+	;; be variables, so we don't.  The drawback is that you can "only" map
+	;; 1G per process with CONFIG_CRIS_LOW_MAP.
 
 #ifdef CONFIG_CRIS_LOW_MAP
 	move.d	0x0004b098, r0	; kseg mappings, temporary map of 0xc0->0x40
@@ -190,11 +208,18 @@
 	move.d	pc,r0
 	and.d	0x7fffffff,r0	; get rid of the non-cache bit
 	cmp.d	0x10000,r0	; arbitrary... just something above this code
-	bcs	inflash
+	blo	inflash0
 	nop
 
 	jump	inram		; enter cached ram
-	
+
+	;; Jumpgate for branches.
+inflash0:
+	jump	inflash
+
+	;; Put this in a suitable section where we can reclaim storage
+	;; after init.
+	.section ".text.init"
 inflash:
 	;; We need to initialze DRAM registers before we start using the DRAM
 
@@ -225,7 +250,7 @@ dram_init_finished:
 1:	move.w	[r0+], r3
 	move.w	r3, [r1+]
 	cmp.d	r2, r1
-	bcs	1b
+	blo	1b
 	nop
 
 	;; We keep the cramfs in the flash.
@@ -271,7 +296,7 @@ inram:
 	;;  to a cramfs magic is small.. )
 	
 	cmp.d	0x0ffffff8, r9
-	bcc	no_romfs_in_flash	; r9 points outside the flash area
+	bhs	no_romfs_in_flash	; r9 points outside the flash area
 	nop
 	move.d	[r9], r0	; cramfs_super.magic
 	cmp.d	CRAMFS_MAGIC, r0
@@ -353,7 +378,7 @@ start_it:
 	move.d	_end, r1
 1:	clear.d	[r0+]
 	cmp.d	r1, r0
-	bcs	1b
+	blo	1b
 	nop
 	
 #ifdef CONFIG_BLK_DEV_ETRAXIDE
@@ -575,5 +600,6 @@ _swapper_pg_dir = 0x60002000
 #else	
 _swapper_pg_dir = 0xc0002000
 #endif
-	
+
+	.section ".data.init"
 #include "../lib/hw_settings.S"

@@ -1870,11 +1870,24 @@ static int irlap_state_nrm_s(struct irlap_cb *self, IRLAP_EVENT event,
 				/* Update Nr received */
 				irlap_update_nr_received(self, info->nr);
 				irlap_wait_min_turn_around(self, &self->qos_tx);
-				
-				irlap_send_rr_frame(self, RSP_FRAME);
-				
 				irlap_start_wd_timer(self, self->wd_timeout);
-				irlap_next_state(self, LAP_NRM_S);
+				
+				/* Note : if the link is idle (this case),
+				 * we never go in XMIT_S, so we never get a
+				 * chance to process any DISCONNECT_REQUEST.
+				 * Do it now ! - Jean II */
+				if (self->disconnect_pending) {
+					/* Disconnect */
+					irlap_send_rd_frame(self);
+					irlap_flush_all_queues(self);
+
+					irlap_next_state(self, LAP_SCLOSE);
+				} else {
+					/* Just send back pf bit */
+					irlap_send_rr_frame(self, RSP_FRAME);
+				
+					irlap_next_state(self, LAP_NRM_S);
+				}
 			}
 		} else if (nr_status == NR_UNEXPECTED) {
 			self->remote_busy = FALSE;
@@ -1927,24 +1940,23 @@ static int irlap_state_nrm_s(struct irlap_cb *self, IRLAP_EVENT event,
 		 *  Wait until retry_count * n matches negotiated threshold/
 		 *  disconnect time (note 2 in IrLAP p. 82)
 		 *
-		 * Note : self->wd_timeout = (self->poll_timeout * 2),
-		 *   and self->final_timeout == self->poll_timeout,
-		 *   which explain why we use (self->retry_count * 2) here !!!
+		 * Note : self->wd_timeout = (self->final_timeout * 2),
+		 *   which explain why we use (self->N2 / 2) here !!!
 		 * Jean II
 		 */
 		IRDA_DEBUG(1, __FUNCTION__ "(), retry_count = %d\n", 
 			   self->retry_count);
 
-		if (((self->retry_count * 2) < self->N2)  && 
-		    ((self->retry_count * 2) != self->N1)) {
+		if ((self->retry_count <  (self->N2 / 2))  && 
+		    (self->retry_count != (self->N1 / 2))) {
 			
 			irlap_start_wd_timer(self, self->wd_timeout);
 			self->retry_count++;
-		} else if ((self->retry_count * 2) == self->N1) {
+		} else if (self->retry_count == (self->N1 / 2)) {
 			irlap_status_indication(self, STATUS_NO_ACTIVITY);
 			irlap_start_wd_timer(self, self->wd_timeout);
 			self->retry_count++;
-		} else if ((self->retry_count * 2) >= self->N2) {
+		} else if (self->retry_count >= (self->N2 / 2)) {
 			irlap_apply_default_connection_parameters(self);
 			
 			/* Always switch state before calling upper layers */

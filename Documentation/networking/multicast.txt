@@ -39,11 +39,13 @@ hp-plus		YES		YES		YES		Hardware
 hp		YES		YES		YES		Hardware
 hp100		YES		YES		YES		Hardware
 ibmtr		NO		NO		NO		N/A
+ioc3-eth	YES		YES		YES		Hardware
 lance		YES		YES		YES		Software(#)
 ne		YES		YES		YES		Hardware
 ni52		<------------------ Buggy ------------------>
 ni65		YES		YES		YES		Software(#)
 seeq		NO		NO		NO		N/A
+sgiseek		<------------------ Buggy ------------------>
 sk_g16		NO		NO		YES		N/A
 smc-ultra	YES		YES		YES		Hardware
 sunlance	YES		YES		YES		Hardware

@@ -6,12 +6,27 @@
 
 # Prompt user for primary drivers.
 
-dep_tristate '  C-Media PCI (CMI8338/8378)' CONFIG_SOUND_CMPCI $CONFIG_SOUND $CONFIG_PCI
+dep_tristate '  C-Media PCI (CMI8338/8738)' CONFIG_SOUND_CMPCI $CONFIG_SOUND $CONFIG_PCI
 if [ "$CONFIG_SOUND_CMPCI" = "y" -o "$CONFIG_SOUND_CMPCI" = "m" ]; then
-    bool '    Enable S/PDIF loop for CMI8738' CONFIG_SOUND_CMPCI_SPDIFLOOP
-    bool '    Enable 4 channel mode for CMI8738' CONFIG_SOUND_CMPCI_4CH
-    if [ "$CONFIG_SOUND_CMPCI_4CH" = "y" ]; then
-        bool '    Separate rear out jack' CONFIG_SOUND_CMPCI_REAR
+    bool '    Enable legacy FM' CONFIG_SOUND_CMPCI_FM
+    if [ "$CONFIG_SOUND_CMPCI_FM" = "y" ]; then
+	define_hex CONFIG_SOUND_CMPCI_FMIO 388
+        hex '    FM I/O 388, 3C8, 3E0, 3E8' CONFIG_SOUND_CMPCI_FMIO 388
+    fi
+    bool '    Enable legacy MPU-401' CONFIG_SOUND_CMPCI_MIDI
+    if [ "$CONFIG_SOUND_CMPCI_MIDI" = "y" ]; then
+        hex '    MPU-401 I/O 330, 320, 310, 300' CONFIG_SOUND_CMPCI_MPUIO 330
+    fi
+    bool '    Enable joystick' CONFIG_SOUND_CMPCI_JOYSTICK
+    bool '    Support CMI8738 based audio cards' CONFIG_SOUND_CMPCI_CM8738
+    if [ "$CONFIG_SOUND_CMPCI_CM8738" = "y" ]; then
+	bool '      Inverse S/PDIF in for CMI8738' CONFIG_SOUND_CMPCI_SPDIFINVERSE
+	bool '      Enable S/PDIF loop for CMI8738' CONFIG_SOUND_CMPCI_SPDIFLOOP
+	int  '      Number of speakers 2, 4, 5, 6' CONFIG_SOUND_CMPCI_SPEAKERS 2
+	if [ "$CONFIG_SOUND_CMPCI_SPEAKERS" != "2" ]; then
+	    bool '        Use Line-in as Read-out' CONFIG_SOUND_CMPCI_LINE_REAR
+	    bool '        Use Line-in as Bass' CONFIG_SOUND_CMPCI_LINE_BASS
+	fi
     fi
 fi
 dep_tristate '  Creative SBLive! (EMU10K1)' CONFIG_SOUND_EMU10K1 $CONFIG_SOUND $CONFIG_PCI

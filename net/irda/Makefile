@@ -20,7 +20,6 @@ ifeq ($(CONFIG_IRDA),m)
 obj-m   := $(O_TARGET)
 endif
 
-obj-$(CONFIG_IRDA_COMPRESSION) += irlap_comp.o
 obj-$(CONFIG_PROC_FS) += irproc.o
 obj-$(CONFIG_SYSCTL) += irsysctl.o
 obj-$(CONFIG_IRLAN) += irlan/irlan.o
@@ -28,7 +27,6 @@ obj-$(CONFIG_IRLAN) += irlan/irlan.o
 subdir-$(CONFIG_IRLAN) += irlan
 subdir-$(CONFIG_IRNET) += irnet
 subdir-$(CONFIG_IRCOMM) += ircomm
-subdir-$(CONFIG_IRDA_COMPRESSION) += compressors
 
 ifeq ($(CONFIG_IRLAN),y)
 obj-y += irlan/irlan.o
@@ -36,14 +34,6 @@ endif
 
 ifeq ($(CONFIG_IRNET),y)
 obj-y += irnet/irnet.o
-endif
-
-ifeq ($(CONFIG_IRDA_DEFLATE),y)
-obj-y += compressors/irda_deflate.o
-else
-  ifeq ($(CONFIG_IRDA_DEFLATE),m)
-  MOD_TO_LIST += irda_deflate.o
-  endif
 endif
 
 ifeq ($(CONFIG_IRCOMM),y)

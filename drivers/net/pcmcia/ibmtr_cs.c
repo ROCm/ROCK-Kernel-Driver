@@ -25,20 +25,9 @@
     All we do here is set the card up enough so that the real ibmtr.c
     driver can find it and work with it properly.
 
-    i.e. We set up the io port, irq, mmio memory and shared ram memory.
-    This enables ibmtr_probe in ibmtr.c to find the card and configure it
-    as though it was a normal ISA and/or PnP card.
-
-    There is some confusion with the difference between available shared
-    ram and the amount actually reserved from memory.  ibmtr.c sets up
-    several offsets depending upon the actual on-board memory, not the
-    reserved memory.  We need to get around this to allow the cards to 
-    work with other cards in restricted memory space.  Therefore the 
-    pcmcia_reality_check function.
-
-    TODO
-	- Write the suspend / resume functions. 
-	- Fix Kernel Oops when removing card before ifconfig down
+    i.e. We set up the io port, irq, mmio memory and shared ram
+    memory.  This enables ibmtr_probe in ibmtr.c to find the card and
+    configure it as though it was a normal ISA and/or PnP card.
 
     CHANGES
 
@@ -49,16 +38,20 @@
     Updated to version 2.2.7 to match the first version of the kernel
     that the modification to ibmtr.c were incorporated into.
     
+    v2.2.17 July 2000 Burt Silverman (burts@us.ibm.com)
+    Address translation feature of PCMCIA controller is usable so
+    memory windows can be placed in High memory (meaning above
+    0xFFFFF.)
+
 ======================================================================*/
 
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/sched.h>
 #include <linux/ptrace.h>
-#include <linux/slab.h>
+#include <linux/malloc.h>
 #include <linux/string.h>
 #include <linux/timer.h>
-#include <linux/delay.h>
 #include <linux/module.h>
 #include <asm/io.h>
 #include <asm/system.h>
@@ -81,8 +74,9 @@ static int pc_debug = PCMCIA_DEBUG;
 MODULE_PARM(pc_debug, "i");
 #define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args)
 static char *version =
-"ibmtr_cs.c 1.10 1996/01/06 05:19:00 (Steve Kipisz)\n"
-"           2.2.7 1999/05/03 12:00:00 (Mike Phillips)\n" ;
+"ibmtr_cs.c 1.10   1996/01/06 05:19:00 (Steve Kipisz)\n"
+"           2.2.7  1999/05/03 12:00:00 (Mike Phillips)\n"
+"           2.4.2  2001/30/28 Midnight (Burt Silverman)\n";
 #else
 #define DEBUG(n, args...)
 #endif
@@ -96,13 +90,13 @@ static u_int irq_mask = 0xdeb8;
 static int irq_list[4] = { -1 };
 
 /* MMIO base address */
-static u_long mmiobase;
+static u_long mmiobase = 0xce000;
 
 /* SRAM base address */
-static u_long srambase;
+static u_long srambase = 0xd0000;
 
 /* SRAM size 8,16,32,64 */
-static u_long sramsize = 16;
+static u_long sramsize = 64;
 
 /* Ringspeed 4,16 */
 static int ringspeed = 16;
@@ -117,7 +111,7 @@ MODULE_PARM(ringspeed, "i");
 /*====================================================================*/
 
 static void ibmtr_config(dev_link_t *link);
-static void ibmtr_hw_setup(struct net_device *dev);
+static void ibmtr_hw_setup(struct net_device *dev, u_int mmiobase);
 static void ibmtr_release(u_long arg);
 static int ibmtr_event(event_t event, int priority,
                        event_callback_args_t *args);
@@ -130,18 +124,14 @@ static void ibmtr_detach(dev_link_t *);
 static dev_link_t *dev_list;
 
 extern int ibmtr_probe(struct net_device *dev);
-unsigned char pcmcia_reality_check(unsigned char gss);
-
 extern int trdev_init(struct net_device *dev);
 extern void tok_interrupt (int irq, void *dev_id, struct pt_regs *regs);
-extern int tok_init_card(struct net_device *dev);
-extern unsigned char get_sram_size(struct tok_info *ti);
 
 /*====================================================================*/
 
 typedef struct ibmtr_dev_t {
     dev_link_t		link;
-    struct net_device	*dev; /* Changed for 2.2.0 */
+    struct net_device	*dev;
     dev_node_t          node;
     window_handle_t     sram_win_handle;
     struct tok_info	ti;
@@ -217,14 +207,13 @@ static dev_link_t *ibmtr_attach(void)
     link->conf.Present = PRESENT_OPTION;
 
     dev = init_trdev(NULL,0);
-    dev->priv = &info->ti;
-    link->irq.Instance = info->dev = dev;
-    
     if (dev == NULL) {
 	ibmtr_detach(link);
         return NULL;
     }
-
+    dev->priv = &info->ti;
+    link->irq.Instance = info->dev = dev;
+    
     dev->init = &ibmtr_probe;
 
     /* Register with Card Services */
@@ -262,7 +251,7 @@ static void ibmtr_detach(dev_link_t *link)
 {
     struct ibmtr_dev_t *info = link->priv;
     dev_link_t **linkp;
-    struct net_device *dev; 
+    struct net_device *dev;
 
     DEBUG(0, "ibmtr_detach(0x%p)\n", link);
 
@@ -291,8 +280,10 @@ static void ibmtr_detach(dev_link_t *link)
 
     /* Unlink device structure, free bits */
     *linkp = link->next;
-    if (link->dev)
+    if (info->dev) {
 	unregister_trdev(info->dev);
+	kfree(info->dev);
+    }
     kfree(info);
 
 } /* ibmtr_detach */
@@ -320,7 +311,6 @@ static void ibmtr_config(dev_link_t *link)
     memreq_t mem;
     int i, last_ret, last_fn;
     u_char buf[64];
-    unsigned char Shared_Ram_Base;
 
     DEBUG(0, "ibmtr_config(0x%p)\n", link);
 
@@ -361,41 +351,40 @@ static void ibmtr_config(dev_link_t *link)
 
     /* Allocate the MMIO memory window */
     req.Attributes = WIN_DATA_WIDTH_16|WIN_MEMORY_TYPE_CM|WIN_ENABLE;
-    req.Attributes |= WIN_USE_WAIT|WIN_STRICT_ALIGN;
-    req.Base = mmiobase;
+    req.Attributes |= WIN_USE_WAIT;
+    req.Base = 0; 
     req.Size = 0x2000;
     req.AccessSpeed = 250;
     link->win = (window_handle_t)link->handle;
     CS_CHECK(RequestWindow, &link->win, &req);
 
-    mem.CardOffset = req.Base;
+    mem.CardOffset = mmiobase;
     mem.Page = 0;
     CS_CHECK(MapMemPage, link->win, &mem);
     ti->mmio = (u_long)ioremap(req.Base, req.Size);
 
     /* Allocate the SRAM memory window */
     req.Attributes = WIN_DATA_WIDTH_16|WIN_MEMORY_TYPE_CM|WIN_ENABLE;
-    req.Attributes |= WIN_USE_WAIT|WIN_MAP_BELOW_1MB;
-    req.Base = srambase;
+    req.Attributes |= WIN_USE_WAIT;
+    req.Base = 0;
     req.Size = sramsize * 1024;
     req.AccessSpeed = 250;
     info->sram_win_handle = (window_handle_t)link->handle;
     CS_CHECK(RequestWindow, &info->sram_win_handle, &req);
 
-    mem.CardOffset = req.Base;
+    mem.CardOffset = srambase;
     mem.Page = 0;
     CS_CHECK(MapMemPage, info->sram_win_handle, &mem);
-    Shared_Ram_Base = req.Base >> 12;
-   
-    ti->sram = 0;
-    ti->sram_base = Shared_Ram_Base;
-    
+
+    ti->sram_base = mem.CardOffset >> 12;
+    ti->sram_virt = (u_long)ioremap(req.Base, req.Size);
+
     CS_CHECK(RequestConfiguration, link->handle, &link->conf);
 
     /*  Set up the Token-Ring Controller Configuration Register and
         turn on the card.  Check the "Local Area Network Credit Card
         Adapters Technical Reference"  SC30-3585 for this info.  */
-    ibmtr_hw_setup(dev);
+    ibmtr_hw_setup(dev, mmiobase);
 
     i = register_trdev(dev);
     
@@ -477,18 +466,20 @@ static int ibmtr_event(event_t event, int priority,
     struct net_device *dev = info->dev;
 
     DEBUG(1, "ibmtr_event(0x%06x)\n", event);
-    
+
     switch (event) {
     case CS_EVENT_CARD_REMOVAL:
         link->state &= ~DEV_PRESENT;
         if (link->state & DEV_CONFIG) {
+	    /* set flag to bypass normal interrupt code */
+	    ((struct tok_info *)dev->priv)->sram_virt |= 1;
 	    netif_device_detach(dev);
 	    mod_timer(&link->release, jiffies + HZ/20);
         }
         break;
     case CS_EVENT_CARD_INSERTION:
         link->state |= DEV_PRESENT;
-	ibmtr_config(link); 
+	ibmtr_config(link);
 	break;
     case CS_EVENT_PM_SUSPEND:
         link->state |= DEV_SUSPEND;
@@ -518,10 +509,9 @@ static int ibmtr_event(event_t event, int priority,
 
 /*====================================================================*/
 
-static void ibmtr_hw_setup(struct net_device *dev)
+static void ibmtr_hw_setup(struct net_device *dev, u_int mmiobase)
 {
-    struct tok_info *ti = dev->priv;
-    int i; 
+    int i;
 
     /* Bizarre IBM behavior, there are 16 bits of information we
        need to set, but the card only allows us to send 4 bits at a 
@@ -530,11 +520,11 @@ static void ibmtr_hw_setup(struct net_device *dev)
        the actual information */
 
     /* First nibble provides 4 bits of mmio */
-    i = ((int)ti->mmio >> 16) & 0x0F;
+    i = (mmiobase >> 16) & 0x0F;
     outb(i, dev->base_addr);
 
     /* Second nibble provides 3 bits of mmio */
-    i = 0x10 | (((int)ti->mmio >> 12) & 0x0E);
+    i = 0x10 | ((mmiobase >> 12) & 0x0E);
     outb(i, dev->base_addr);
 
     /* Third nibble, hard-coded values */
@@ -544,8 +534,7 @@ static void ibmtr_hw_setup(struct net_device *dev)
     /* Fourth nibble sets shared ram page size */
 
     /* 8 = 00, 16 = 01, 32 = 10, 64 = 11 */          
-        
-    i = (sramsize >> 4) & 0x07; 
+    i = (sramsize >> 4) & 0x07;
     i = ((i == 4) ? 3 : i) << 2;
     i |= 0x30;
 
@@ -555,28 +544,10 @@ static void ibmtr_hw_setup(struct net_device *dev)
 	i |= 1;
     outb(i, dev->base_addr);
 
-    /* X40 will release the card for use */
-
+    /* 0x40 will release the card for use */
     outb(0x40, dev->base_addr);
-    
+
     return;
-}
-
-/*======================================================================
-  
-    A sweet little function that circumvents the problem with
-    ibmtr.c trying to use more memory than we can allocate for
-    the PCMCIA card.  ibmtr.c just assumes that if a card has 
-    64K of shared ram, the entire 64K must be mapped into memory,
-    whereas resources are sometimes a little tight in card services
-    so we fool ibmtr.c into thinking the card has less memory on
-    it than it has.
-    
-======================================================================*/
-
-unsigned char pcmcia_reality_check(unsigned char gss)
-{
-    return (gss < sramsize) ? sramsize : gss;
 }
 
 /*====================================================================*/
@@ -584,7 +555,7 @@ unsigned char pcmcia_reality_check(unsigned char gss)
 static int __init init_ibmtr_cs(void)
 {
     servinfo_t serv;
-    DEBUG(0, "%s\n", version);
+    DEBUG(0, "%s", version);
     CardServices(GetCardServicesInfo, &serv);
     if (serv.Revision != CS_RELEASE_CODE) {
         printk(KERN_NOTICE "ibmtr_cs: Card Services release "

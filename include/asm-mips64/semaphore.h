@@ -3,8 +3,8 @@
  * for more details.
  *
  * Copyright (C) 1996  Linus Torvalds
- * Copyright (C) 1998, 1999, 2000  Ralf Baechle
- * Copyright (C) 1999, 2000  Silicon Graphics, Inc.
+ * Copyright (C) 1998, 1999, 2000, 2001  Ralf Baechle
+ * Copyright (C) 1999, 2000, 2001  Silicon Graphics, Inc.
  */
 #ifndef _ASM_SEMAPHORE_H
 #define _ASM_SEMAPHORE_H
@@ -130,29 +130,25 @@ static inline int down_trylock(struct semaphore * sem)
 	CHECK_MAGIC(sem->__magic);
 #endif
 
-	__asm__ __volatile__("
-			.set	mips3
-
-		0:	lld	%1, %4
-			dli	%3, 0x0000000100000000
-			dsubu	%1, %3
-			li	%0, 0
-			bgez	%1, 2f
-			sll	%2, %1, 0
-			blez	%2, 1f
-			daddiu	%1, %1, -1
-			b	2f
-		1:
-			daddu	%1, %1, %3
-			li	%0, 1
-		2:
-			scd	%1, %4
-			beqz	%1, 0b
-
-			.set	mips0"
-		: "=&r"(ret), "=&r"(tmp), "=&r"(tmp2), "=&r"(sub)
-		: "m"(*sem)
-		: "memory");
+	__asm__ __volatile__(
+	".set\tmips3\t\t\t# down_trylock\n"
+	"0:\tlld\t%1, %4\n\t"
+	"\tdli\t%3, 0x0000000100000000\n\t"
+	"\tdsubu\t%1, %3\n\t"
+	"\tli\t%0, 0\n\t"
+	"\tbgez\t%1, 2f\n\t"
+	"\tsll\t%2, %1, 0\n\t"
+	"\tblez\t%2, 1f\n\t"
+	"\tdaddiu\t%1, %1, -1\n\t"
+	"\tb\t2f\n"
+	"1:\tdaddu\t%1, %1, %3\n\t"
+	"\tli\t%0, 1\n"
+	"2:\tscd\t%1, %4\n\t"
+	"\tbeqz\t%1, 0b\n\t"
+	"\t.set\tmips0"
+	: "=&r"(ret), "=&r"(tmp), "=&r"(tmp2), "=&r"(sub)
+	: "m"(*sem)
+	: "memory");
 
 	return ret;
 }

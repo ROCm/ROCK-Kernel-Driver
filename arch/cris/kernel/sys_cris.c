@@ -1,4 +1,4 @@
-/* $Id: sys_cris.c,v 1.7 2001/04/17 11:52:15 orjanf Exp $
+/* $Id: sys_cris.c,v 1.9 2001/05/30 06:20:26 markusl Exp $
  *
  * linux/arch/cris/kernel/sys_cris.c
  *

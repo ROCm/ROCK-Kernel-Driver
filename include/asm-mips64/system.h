@@ -33,7 +33,7 @@ __sti(void)
 }
 
 /*
- * For cli() we have to insert nops to make shure that the new value
+ * For cli() we have to insert nops to make sure that the new value
  * has actually arrived in the status register before the end of this
  * macro.
  * R4000/R4400 need three nops, the R4600 two nops and the R10000 needs

@@ -1,7 +1,7 @@
 /*
  *  linux/arch/cris/mm/tlb.c
  *
- *  Copyright (C) 2000  Axis Communications AB
+ *  Copyright (C) 2000, 2001  Axis Communications AB
  *  
  *  Authors:   Bjorn Wesen (bjornw@axis.com)
  *
@@ -21,6 +21,7 @@
 #include <asm/segment.h>
 #include <asm/pgtable.h>
 #include <asm/svinto.h>
+#include <asm/mmu_context.h>
 
 #define D(x)
 
@@ -252,6 +253,15 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
 
 	get_mmu_context(next);
 
+	/* remember the pgd for the fault handlers
+	 * this is similar to the pgd register in some other CPU's.
+	 * we need our own copy of it because current and active_mm
+	 * might be invalid at points where we still need to derefer
+	 * the pgd.
+	 */
+
+	current_pgd = next->pgd;
+
 	/* switch context in the MMU */
 	
 	D(printk("switching mmu_context to %d (%p)\n", next->context, next));
@@ -288,7 +298,7 @@ tlb_init(void)
 
 	/* clear the page_id map */
 
-	for(i = 0; i < NUM_PAGEID; i++)
+	for (i = 1; i < sizeof (page_id_map) / sizeof (page_id_map[0]); i++)
 		page_id_map[i] = NULL;
 	
 	/* invalidate the entire TLB */

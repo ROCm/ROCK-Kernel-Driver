@@ -19,6 +19,7 @@ CFLAGS_qlogicfas.o = -DPCMCIA -D__NO_VERSION__
 obj-$(CONFIG_PCMCIA_QLOGIC)	+= qlogic_cs.o
 obj-$(CONFIG_PCMCIA_FDOMAIN)	+= fdomain_cs.o
 obj-$(CONFIG_PCMCIA_AHA152X)	+= aha152x_cs.o
+obj-$(CONFIG_PCMCIA_NINJA_SCSI)	+= nsp_cs.o
 
 list-multi	:= qlogic_cs.o fdomain_cs.o aha152x_cs.o
 aha152x_cs-objs	:= aha152x_stub.o aha152x.o

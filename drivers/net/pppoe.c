@@ -410,23 +410,14 @@ static int pppoe_disc_rcv(struct sk_buff *skb,
 	return 0;
 }
 
-
-
-
 struct packet_type pppoes_ptype = {
-	__constant_htons(ETH_P_PPP_SES),
-	NULL,
-	pppoe_rcv,
-	NULL,
-	NULL
+	type:	__constant_htons(ETH_P_PPP_SES),
+	func:	pppoe_rcv,
 };
 
 struct packet_type pppoed_ptype = {
-	__constant_htons(ETH_P_PPP_DISC),
-	NULL,
-	pppoe_disc_rcv,
-	NULL,
-	NULL
+	type:	__constant_htons(ETH_P_PPP_DISC),
+	func:	pppoe_disc_rcv,
 };
 
 /***********************************************************************

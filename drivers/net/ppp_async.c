@@ -96,7 +96,7 @@ static int ppp_async_ioctl(struct ppp_channel *chan, unsigned int cmd,
 static void async_lcp_peek(struct asyncppp *ap, unsigned char *data,
 			   int len, int inbound);
 
-struct ppp_channel_ops async_ops = {
+static struct ppp_channel_ops async_ops = {
 	ppp_async_send,
 	ppp_async_ioctl
 };
@@ -308,7 +308,7 @@ static struct tty_ldisc ppp_ldisc = {
 	write_wakeup: ppp_asynctty_wakeup,
 };
 
-int
+static int __init
 ppp_async_init(void)
 {
 	int err;

@@ -257,6 +257,7 @@ struct ymf_unit {
 	ymfpci_effect_bank_t *bank_effect[YDSXG_EFFECT_VOICES][2];
 
 	int start_count;
+	int suspended;
 
 	u32 active_bank;
 	struct ymf_voice voices[64];
@@ -282,8 +283,6 @@ struct ymf_unit {
 
 	struct list_head ymf_devs;
 	struct list_head states;	/* List of states for this unit */
-	/* For the moment we do not traverse list of states so it is
-	 * entirely useless. Will be used (PM) or killed. XXX */
 };
 
 struct ymf_dmabuf {
@@ -300,7 +299,6 @@ struct ymf_dmabuf {
 	int count;		/* fill count */
 	unsigned total_bytes;	/* total bytes dmaed by hardware */
 
-	unsigned error;		/* number of over/underruns */
 	wait_queue_head_t wait;	/* put process on wait queue when no more space in buffer */
 
 	/* redundant, but makes calculations easier */

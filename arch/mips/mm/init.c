@@ -1,11 +1,13 @@
-/* $Id: init.c,v 1.26 2000/02/23 00:41:00 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
  * Copyright (C) 1994 - 2000 by Ralf Baechle
  * Copyright (C) 2000 Silicon Graphics, Inc.
+ *
+ * Kevin D. Kissell, kevink@mips.com and Carsten Langgaard, carstenl@mips.com
+ * Copyright (C) 2000 MIPS Technologies, Inc.  All rights reserved.
  */
 #include <linux/config.h>
 #include <linux/init.h>
@@ -29,6 +31,7 @@
 
 #include <asm/bootinfo.h>
 #include <asm/cachectl.h>
+#include <asm/cpu.h>
 #include <asm/dma.h>
 #include <asm/jazzdma.h>
 #include <asm/system.h>
@@ -38,74 +41,20 @@
 #include <asm/sgialib.h>
 #endif
 #include <asm/mmu_context.h>
+#include <asm/tlb.h>
+
+mmu_gather_t mmu_gathers[NR_CPUS];
 
 static unsigned long totalram_pages;
 
-extern void prom_fixup_mem_map(unsigned long start, unsigned long end);
 extern void prom_free_prom_memory(void);
-
-
-void __bad_pte_kernel(pmd_t *pmd)
-{
-	printk("Bad pmd in pte_alloc_kernel: %08lx\n", pmd_val(*pmd));
-	pmd_set(pmd, BAD_PAGETABLE);
-}
-
-void __bad_pte(pmd_t *pmd)
-{
-	printk("Bad pmd in pte_alloc: %08lx\n", pmd_val(*pmd));
-	pmd_set(pmd, BAD_PAGETABLE);
-}
-
-pte_t *get_pte_kernel_slow(pmd_t *pmd, unsigned long offset)
-{
-	pte_t *page;
-
-	page = (pte_t *) __get_free_page(GFP_USER);
-	if (pmd_none(*pmd)) {
-		if (page) {
-			clear_page(page);
-			pmd_val(*pmd) = (unsigned long)page;
-			return page + offset;
-		}
-		pmd_set(pmd, BAD_PAGETABLE);
-		return NULL;
-	}
-	free_page((unsigned long)page);
-	if (pmd_bad(*pmd)) {
-		__bad_pte_kernel(pmd);
-		return NULL;
-	}
-	return (pte_t *) pmd_page(*pmd) + offset;
-}
-
-pte_t *get_pte_slow(pmd_t *pmd, unsigned long offset)
-{
-	pte_t *page;
-
-	page = (pte_t *) __get_free_page(GFP_KERNEL);
-	if (pmd_none(*pmd)) {
-		if (page) {
-			clear_page(page);
-			pmd_val(*pmd) = (unsigned long)page;
-			return page + offset;
-		}
-		pmd_set(pmd, BAD_PAGETABLE);
-		return NULL;
-	}
-	free_page((unsigned long)page);
-	if (pmd_bad(*pmd)) {
-		__bad_pte(pmd);
-		return NULL;
-	}
-	return (pte_t *) pmd_page(*pmd) + offset;
-}
 
 
 asmlinkage int sys_cacheflush(void *addr, int bytes, int cache)
 {
-	/* XXX Just get it working for now... */
-	flush_cache_all();
+	/* This should flush more selectivly ...  */
+	__flush_cache_all();
+
 	return 0;
 }
 
@@ -122,17 +71,10 @@ static inline unsigned long setup_zero_pages(void)
 {
 	unsigned long order, size;
 	struct page *page;
-
-	switch (mips_cputype) {
-	case CPU_R4000SC:
-	case CPU_R4000MC:
-	case CPU_R4400SC:
-	case CPU_R4400MC:
+	if(mips_cpu.options & MIPS_CPU_VCE) 
 		order = 3;
-		break;
-	default:
+	else 
 		order = 0;
-	}
 
 	empty_zero_page = __get_free_pages(GFP_KERNEL, order);
 	if (!empty_zero_page)
@@ -167,48 +109,6 @@ int do_check_pgt_cache(int low, int high)
 		} while(pgtable_cache_size > low);
 	}
 	return freed;
-}
-
-/*
- * BAD_PAGE is the page that is used for page faults when linux
- * is out-of-memory. Older versions of linux just did a
- * do_exit(), but using this instead means there is less risk
- * for a process dying in kernel mode, possibly leaving a inode
- * unused etc..
- *
- * BAD_PAGETABLE is the accompanying page-table: it is initialized
- * to point to BAD_PAGE entries.
- *
- * ZERO_PAGE is a special page that is used for zero-initialized
- * data and COW.
- */
-pte_t * __bad_pagetable(void)
-{
-	extern char empty_bad_page_table[PAGE_SIZE];
-	unsigned long page, dummy1, dummy2;
-
-	page = (unsigned long) empty_bad_page_table;
-	__asm__ __volatile__(
-		".set\tnoreorder\n"
-		"1:\tsw\t%2,(%0)\n\t"
-		"subu\t%1,1\n\t"
-		"bnez\t%1,1b\n\t"
-		"addiu\t%0,4\n\t"
-		".set\treorder"
-		:"=r" (dummy1), "=r" (dummy2)
-		:"r" (pte_val(BAD_PAGE)), "0" (page), "1" (PAGE_SIZE/4)
-		:"$1");
-
-	return (pte_t *)page;
-}
-
-pte_t __bad_page(void)
-{
-	extern char empty_bad_page[PAGE_SIZE];
-	unsigned long page = (unsigned long) empty_bad_page;
-
-	clear_page((void *)page);
-	return pte_mkdirty(mk_pte_phys(__pa(page), PAGE_SHARED));
 }
 
 void show_mem(void)
@@ -271,7 +171,30 @@ void __init paging_init(void)
 	free_area_init(zones_size);
 }
 
-extern int page_is_ram(unsigned long pagenr);
+#define PFN_UP(x)	(((x) + PAGE_SIZE - 1) >> PAGE_SHIFT)
+#define PFN_DOWN(x)	((x) >> PAGE_SHIFT)
+
+static inline int page_is_ram(unsigned long pagenr)
+{
+	int i;
+
+	for (i = 0; i < boot_mem_map.nr_map; i++) {
+		unsigned long addr, end;
+
+		if (boot_mem_map.map[i].type != BOOT_MEM_RAM)
+			/* not usable memory */
+			continue;
+
+		addr = PFN_UP(boot_mem_map.map[i].addr);
+		end = PFN_DOWN(boot_mem_map.map[i].addr
+			       + boot_mem_map.map[i].size);
+
+		if (pagenr >= addr && pagenr < end)
+			return 1;
+	}
+
+	return 0;
+}
 
 void __init mem_init(void)
 {
@@ -309,13 +232,16 @@ void __init mem_init(void)
 #ifdef CONFIG_BLK_DEV_INITRD
 void free_initrd_mem(unsigned long start, unsigned long end)
 {
+	if (start < end)
+		printk("Freeing initrd memory: %ldk freed\n",
+		       (end - start) >> 10);
+
 	for (; start < end; start += PAGE_SIZE) {
 		ClearPageReserved(virt_to_page(start));
 		set_page_count(virt_to_page(start), 1);
 		free_page(start);
 		totalram_pages++;
 	}
-	printk ("Freeing initrd memory: %ldk freed\n", (end - start) >> 10);
 }
 #endif
 
@@ -343,7 +269,7 @@ void free_initmem(void)
 void si_meminfo(struct sysinfo *val)
 {
 	val->totalram = totalram_pages;
-	val->sharedram = 0;
+	val->sharedram = atomic_read(&shmem_nrpages);
 	val->freeram = nr_free_pages();
 	val->bufferram = atomic_read(&buffermem_pages);
 	val->totalhigh = 0;

@@ -542,12 +542,13 @@ int __init SK_init(struct net_device *dev)
 {
 	int ioaddr;			   /* I/O port address used for POS regs */
 	int *port, ports[] = SK_IO_PORTS;  /* SK_G16 supported ports */
+	static unsigned version_printed;
 
 	/* get preconfigured base_addr from dev which is done in Space.c */
 	int base_addr = dev->base_addr; 
 
-        PRINTK(("%s: %s", SK_NAME, rcsid));
-        rcsid = NULL;                 /* We do not want to use this further */
+	if (version_printed++ == 0)
+	        PRINTK(("%s: %s", SK_NAME, rcsid));
 
 	if (base_addr > 0x0ff)        /* Check a single specified address */
 	{
@@ -2078,7 +2079,7 @@ void SK_print_dev(struct net_device *dev, char *text)
  *     YY/MM/DD  uid  Description
 -*/
 
-void SK_print_ram(struct net_device *dev)
+void __init SK_print_ram(struct net_device *dev)
 {
 
     int i;    

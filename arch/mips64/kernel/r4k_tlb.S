@@ -24,7 +24,7 @@
 
 	.macro	LOAD_PTE2, ptr, tmp
 #ifdef CONFIG_SMP
-	mfc0	\tmp, CP0_CONTEXT
+	dmfc0	\tmp, CP0_CONTEXT
 	dla	\ptr, pgd_current
 	dsrl	\tmp, 23
 	daddu	\ptr, \tmp
@@ -96,9 +96,6 @@ FEXPORT(handle_vmalloc_address)
 	 */
 	dmfc0	k0, CP0_BADVADDR
 	dli	k1, VMALLOC_START
-	sltu	k1, k0, k1
-	bne	k1, zero, not_vmalloc
-	 dli	k1, VMALLOC_START
 
 	/*
 	 * Now find offset into kptbl.
@@ -114,20 +111,16 @@ FEXPORT(handle_vmalloc_address)
 	 */
 	dla	k0, ekptbl
 	sltu	k0, k1, k0
-	beq	k0, zero, not_vmalloc
+	beqz	k0, not_vmalloc
 
 	/*
 	 * Load cp0 registers.
 	 */
 	ld	k0, 0(k1)			# get even pte
 	ld	k1, 8(k1)			# get odd pte
-1:
+
+not_vmalloc:
 	PTE_RELOAD k0 k1
 	nop
 	tlbwr
 	eret
-not_vmalloc:
-	daddu	k0, zero, zero
-	daddu	k1, zero, zero
-	j	1b
-	nop

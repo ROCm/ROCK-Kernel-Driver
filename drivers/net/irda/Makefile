@@ -17,6 +17,7 @@ obj-$(CONFIG_NSC_FIR)		+= nsc-ircc.o
 obj-$(CONFIG_WINBOND_FIR)	+= w83977af_ir.o
 obj-$(CONFIG_TOSHIBA_FIR)	+= toshoboe.o
 obj-$(CONFIG_SMC_IRCC_FIR)	+= smc-ircc.o	irport.o
+obj-$(CONFIG_ALI_FIR)		+= ali-ircc.o
 obj-$(CONFIG_ESI_DONGLE)	+= esi.o
 obj-$(CONFIG_TEKRAM_DONGLE)	+= tekram.o
 obj-$(CONFIG_ACTISYS_DONGLE)	+= actisys.o

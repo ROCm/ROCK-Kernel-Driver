@@ -1,4 +1,4 @@
-/* $Id: time.c,v 1.4 2000/10/17 14:44:58 bjornw Exp $
+/* $Id: time.c,v 1.6 2001/05/29 11:29:42 markusl Exp $
  *
  *  linux/arch/cris/kernel/time.c
  *
@@ -83,12 +83,9 @@ static unsigned long do_slow_gettimeoffset(void)
 	 * avoiding timer inconsistencies (they are rare, but they happen)...
 	 * there are three kinds of problems that must be avoided here:
 	 *  1. the timer counter underflows
-	 *  2. hardware problem with the timer, not giving us continuous time,
-	 *     the counter does small "jumps" upwards on some Pentium systems,
-	 *     thus causes time warps
-	 *  3. we are after the timer interrupt, but the bottom half handler
+	 *  2. we are after the timer interrupt, but the bottom half handler
 	 *     hasn't executed yet.
-	 */
+ */
 	if( jiffies_t == jiffies_p ) {
 		if( count > count_p ) {
 		}
@@ -195,7 +192,7 @@ static int set_rtc_mmss(unsigned long nowtime)
 	return retval;
 }
 
-/* Except from the Etrax100 HSDD about the built-in watchdog:
+/* Excerpt from the Etrax100 HSDD about the built-in watchdog:
  *
  * 3.10.4 Watchdog timer
 
@@ -231,14 +228,12 @@ static int watchdog_key = 0;  /* arbitrary number */
 
 #define WATCHDOG_MIN_FREE_PAGES 8
 
-extern int nr_free_pages;
-
 static inline void
 reset_watchdog(void)
 {
 #if defined(CONFIG_ETRAX_WATCHDOG) && !defined(CONFIG_SVINTO_SIM)
 	/* only keep watchdog happy as long as we have memory left! */
-	if(nr_free_pages > WATCHDOG_MIN_FREE_PAGES) {
+	if(nr_free_pages() > WATCHDOG_MIN_FREE_PAGES) {
 		/* reset the watchdog with the inverse of the old key */
 		watchdog_key ^= 0x7; /* invert key, which is 3 bits */
 		*R_WATCHDOG = IO_FIELD(R_WATCHDOG, key, watchdog_key) |

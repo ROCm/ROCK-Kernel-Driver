@@ -1,4 +1,4 @@
-/* $Id: parport.c,v 1.4 2001/04/06 13:04:02 hugo Exp $
+/* $Id: parport.c,v 1.5 2001/05/09 12:38:42 johana Exp $
  * 
  * Elinux parallel port driver
  * NOTE!
@@ -501,8 +501,8 @@ parport_etrax_init_registers(void)
 
 #ifdef CONFIG_ETRAX_PARALLEL_PORT0
 #ifdef CONFIG_ETRAX_PAR0_DMA
-	RESET_DMA(2);
-	WAIT_DMA(2);
+	RESET_DMA(PAR0_TX_DMA_NBR);
+	WAIT_DMA(PAR0_TX_DMA_NBR);
 #ifdef CONFIG_ETRAX_SERIAL_PORT2
 	printk(" Warning - DMA clash with ser2!\n");
 #endif /* SERIAL_PORT2 */
@@ -511,8 +511,8 @@ parport_etrax_init_registers(void)
 
 #ifdef CONFIG_ETRAX_PARALLEL_PORT1
 #ifdef CONFIG_ETRAX_PAR1_DMA
-	RESET_DMA(4);
-	WAIT_DMA(4);
+	RESET_DMA(PAR1_TX_DMA_NBR);
+	WAIT_DMA(PAR1_TX_DMA_NBR);
 #ifdef CONFIG_ETRAX_SERIAL_PORT3
 	printk(" Warning - DMA clash with ser3!\n");
 #endif /* SERIAL_PORT3 */

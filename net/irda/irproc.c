@@ -67,6 +67,8 @@ void irda_proc_register(void)
 	int i;
 
 	proc_irda = proc_mkdir("net/irda", NULL);
+	if (proc_irda == NULL)
+		return;
 	proc_irda->owner = THIS_MODULE;
 
 	for (i=0;i<IRDA_ENTRIES_NUM;i++)
@@ -83,10 +85,13 @@ void irda_proc_unregister(void)
 {
 	int i;
 
-	for (i=0;i<IRDA_ENTRIES_NUM;i++)
-		remove_proc_entry(dir[i].name, proc_irda);
+        if (proc_irda) {
+                for (i=0;i<IRDA_ENTRIES_NUM;i++)
+                        remove_proc_entry(dir[i].name, proc_irda);
 
-	remove_proc_entry("net/irda", NULL);
+                remove_proc_entry("net/irda", NULL);
+                proc_irda = NULL;
+        }
 }
 
 

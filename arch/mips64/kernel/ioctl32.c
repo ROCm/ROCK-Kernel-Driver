@@ -7,6 +7,7 @@
  *
  * Mostly stolen from the sparc64 ioctl32 implementation.
  */
+#include <linux/config.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/fs.h>
@@ -25,6 +26,7 @@
 #include <linux/elevator.h>
 #include <linux/auto_fs.h>
 #include <linux/ext2_fs.h>
+#include <linux/raid/md_u.h>
 #include <asm/types.h>
 #include <asm/uaccess.h>
 
@@ -67,6 +69,24 @@ struct timeval32 {
 	int tv_usec;
 };
 
+static int do_siocgstamp(unsigned int fd, unsigned int cmd, unsigned long arg)
+{
+	struct timeval32 *up = (struct timeval32 *)arg;
+	struct timeval ktv;
+	mm_segment_t old_fs = get_fs();
+	int err;
+
+	set_fs(KERNEL_DS);
+	err = sys_ioctl(fd, cmd, (unsigned long)&ktv);
+	set_fs(old_fs);
+	if (!err) {
+		err = put_user(ktv.tv_sec, &up->tv_sec);
+		err |= __put_user(ktv.tv_usec, &up->tv_usec);
+	}
+
+	return err;
+}
+
 #define EXT2_IOC32_GETFLAGS               _IOR('f', 1, int)
 #define EXT2_IOC32_SETFLAGS               _IOW('f', 2, int)
 #define EXT2_IOC32_GETVERSION             _IOR('v', 1, int)
@@ -107,6 +127,8 @@ struct ifconf32 {
         int     ifc_len;                        /* size of buffer       */
         __kernel_caddr_t32  ifcbuf;
 };
+
+#ifdef CONFIG_NET
 
 static int dev_ifname32(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
@@ -308,6 +330,8 @@ static inline int routing_ioctl(unsigned int fd, unsigned int cmd, unsigned long
 	return ret;
 }
 
+#endif /* CONFIG_NET */
+
 static int do_ext2_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
 	/* These are just misnamed, they actually get/put from/to user an int */
@@ -362,6 +386,11 @@ static int hdio_ioctl_trans(unsigned int fd, unsigned int cmd, unsigned long arg
 	}
 
 	return error;
+}
+
+static int ret_einval(unsigned int fd, unsigned int cmd, unsigned long arg)
+{
+	return -EINVAL;
 }
 
 struct blkpg_ioctl_arg32 {
@@ -634,6 +663,27 @@ static struct ioctl32_list ioctl32_handler_table[] = {
 	IOCTL32_DEFAULT(VT_LOCKSWITCH),
 	IOCTL32_DEFAULT(VT_UNLOCKSWITCH),
 
+#ifdef CONFIG_NET
+	/* Socket level stuff */
+	IOCTL32_DEFAULT(FIOSETOWN),
+	IOCTL32_DEFAULT(SIOCSPGRP),
+	IOCTL32_DEFAULT(FIOGETOWN),
+	IOCTL32_DEFAULT(SIOCGPGRP),
+	IOCTL32_DEFAULT(SIOCATMARK),
+	IOCTL32_DEFAULT(SIOCSIFLINK),
+	IOCTL32_DEFAULT(SIOCSIFENCAP),
+	IOCTL32_DEFAULT(SIOCGIFENCAP),
+	IOCTL32_DEFAULT(SIOCSIFBR),
+	IOCTL32_DEFAULT(SIOCGIFBR),
+	IOCTL32_DEFAULT(SIOCSARP),
+	IOCTL32_DEFAULT(SIOCGARP),
+	IOCTL32_DEFAULT(SIOCDARP),
+	IOCTL32_DEFAULT(SIOCSRARP),
+	IOCTL32_DEFAULT(SIOCGRARP),
+	IOCTL32_DEFAULT(SIOCDRARP),
+	IOCTL32_DEFAULT(SIOCADDDLCI),
+	IOCTL32_DEFAULT(SIOCDELDLCI),
+
 	IOCTL32_HANDLER(SIOCGIFNAME, dev_ifname32),
 	IOCTL32_HANDLER(SIOCGIFCONF, dev_ifconf),
 	IOCTL32_HANDLER(SIOCGIFFLAGS, dev_ifsioc),
@@ -665,6 +715,14 @@ static struct ioctl32_list ioctl32_handler_table[] = {
 	IOCTL32_HANDLER(SIOCSIFTXQLEN, dev_ifsioc),
 	IOCTL32_HANDLER(SIOCADDRT, routing_ioctl),
 	IOCTL32_HANDLER(SIOCDELRT, routing_ioctl),
+	/*
+	 * Note SIOCRTMSG is no longer, so this is safe and * the user would
+	 * have seen just an -EINVAL anyways.
+	 */
+	IOCTL32_HANDLER(SIOCRTMSG, ret_einval),
+	IOCTL32_HANDLER(SIOCGSTAMP, do_siocgstamp),
+
+#endif /* CONFIG_NET */
 
 	IOCTL32_HANDLER(EXT2_IOC32_GETFLAGS, do_ext2_ioctl),
 	IOCTL32_HANDLER(EXT2_IOC32_SETFLAGS, do_ext2_ioctl),
@@ -712,6 +770,34 @@ static struct ioctl32_list ioctl32_handler_table[] = {
 	IOCTL32_HANDLER(BLKPG, blkpg_ioctl_trans),
 	IOCTL32_DEFAULT(BLKELVGET),
 	IOCTL32_DEFAULT(BLKELVSET),
+
+#ifdef CONFIG_MD
+	/* status */
+	IOCTL32_DEFAULT(RAID_VERSION),
+	IOCTL32_DEFAULT(GET_ARRAY_INFO),
+	IOCTL32_DEFAULT(GET_DISK_INFO),
+	IOCTL32_DEFAULT(PRINT_RAID_DEBUG),
+	IOCTL32_DEFAULT(RAID_AUTORUN),
+
+	/* configuration */
+	IOCTL32_DEFAULT(CLEAR_ARRAY),
+	IOCTL32_DEFAULT(ADD_NEW_DISK),
+	IOCTL32_DEFAULT(HOT_REMOVE_DISK),
+	IOCTL32_DEFAULT(SET_ARRAY_INFO),
+	IOCTL32_DEFAULT(SET_DISK_INFO),
+	IOCTL32_DEFAULT(WRITE_RAID_INFO),
+	IOCTL32_DEFAULT(UNPROTECT_ARRAY),
+	IOCTL32_DEFAULT(PROTECT_ARRAY),
+	IOCTL32_DEFAULT(HOT_ADD_DISK),
+	IOCTL32_DEFAULT(SET_DISK_FAULTY),
+
+	/* usage */
+	IOCTL32_DEFAULT(RUN_ARRAY),
+	IOCTL32_DEFAULT(START_ARRAY),
+	IOCTL32_DEFAULT(STOP_ARRAY),
+	IOCTL32_DEFAULT(STOP_ARRAY_RO),
+	IOCTL32_DEFAULT(RESTART_ARRAY_RW),
+#endif /* CONFIG_MD */
 
 	IOCTL32_DEFAULT(MTIOCTOP),			/* mtio.h ioctls  */
 	IOCTL32_HANDLER(MTIOCGET32, mt_ioctl_trans),

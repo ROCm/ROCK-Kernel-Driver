@@ -273,20 +273,27 @@ __copy_user_zeroing (void *pdst, const void *psrc, unsigned long pn)
 	movem	r10,[r13+]
 
 	addq   44,r12  ;; compensate for last loop underflowing n
-
+8:
 	;; Restore registers from stack
 	movem [sp+],r10
 
 	.section .fixup,\"ax\"
 
-; To provide a correct count in r10 of bytes that failed to be copied,
-; we jump back into the loop if the loop-branch was taken.
-;  There is no performance penalty; the program will segfault soon
-; enough.
+;; Do not jump back into the loop if we fail.  For some uses, we get a
+;; page fault but for performance reasons we care to not get further
+;; faults.  For example, fs/super.c at one time did
+;;  i = size - copy_from_user((void *)page, data, size);
+;; which would cause repeated faults while clearing the remainder of
+;; the SIZE bytes at PAGE after the first fault.
 
 3:
 	move.d [sp],r10
+
+;; Number of remaining bytes, cleared but not copied, is r12 + 44.
+
+	add.d r12,r10
 	addq 44,r10
+
 	move.d r10,[sp]
 	clear.d r0
 	clear.d r1
@@ -299,7 +306,40 @@ __copy_user_zeroing (void *pdst, const void *psrc, unsigned long pn)
 	clear.d r8
 	clear.d r9
 	clear.d r10
-	jump 1b
+
+;; Perform clear similar to the copy-loop.
+
+4:
+	subq 44,r12
+	bge 4b
+	movem r10,[r13+]
+
+;; Clear by four for the remaining multiples.
+
+	addq 40,r12
+	bmi 6f
+	nop
+5:
+	subq 4,r12
+	bpl 5b
+	clear.d [r13+]
+6:
+	addq 4,r12
+	beq 7f
+	nop
+
+	subq 1,r12
+	beq 7f
+	clear.b [r13+]
+
+	subq 1,r12
+	beq 7f
+	clear.b [r13+]
+
+	clear.d r12
+	clear.b [r13+]
+7:
+	jump 8b
 
 	.previous
 	.section __ex_table,\"a\"

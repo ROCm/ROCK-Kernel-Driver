@@ -117,6 +117,14 @@ extern __u32 sysctl_rmem_max;
 
 static int probed __initdata = 0;
 
+#if LINUX_VERSION_CODE >= 0x20400
+static struct pci_device_id rrunner_pci_tbl[] __initdata = {
+	{ PCI_VENDOR_ID_ESSENTIAL, PCI_DEVICE_ID_ESSENTIAL_ROADRUNNER, PCI_ANY_ID, PCI_ANY_ID, },
+	{ }			/* Terminating entry */
+};
+MODULE_DEVICE_TABLE(pci, rrunner_pci_tbl);
+#endif /* LINUX_VERSION_CODE >= 0x20400 */
+
 #ifdef NEW_NETINIT
 int __init rr_hippi_probe (void)
 #else
@@ -136,9 +144,6 @@ int __init rr_hippi_probe (struct net_device *dev)
 	if (probed)
 		return -ENODEV;
 	probed++;
-
-	if (!pci_present())		/* is PCI BIOS even present? */
-		return -ENODEV;
 
 	version_disp = 0;
 
@@ -176,6 +181,7 @@ int __init rr_hippi_probe (struct net_device *dev)
 		sprintf(rrpriv->name, "RoadRunner serial HIPPI");
 
 		dev->irq = pdev->irq;
+		SET_MODULE_OWNER(dev);
 		dev->open = &rr_open;
 		dev->hard_start_xmit = &rr_start_xmit;
 		dev->stop = &rr_close;
@@ -1183,7 +1189,6 @@ static int rr_open(struct net_device *dev)
 
 	netif_start_queue(dev);
 
-	MOD_INC_USE_COUNT;
 	return ecode;
 
  error:
@@ -1348,7 +1353,6 @@ static int rr_close(struct net_device *dev)
 	free_irq(dev->irq, dev);
 	spin_unlock(&rrpriv->lock);
 
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 

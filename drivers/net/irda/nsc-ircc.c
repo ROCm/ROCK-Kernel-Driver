@@ -90,7 +90,7 @@ static int nsc_ircc_init_338(nsc_chip_t *chip, chipio_t *info);
 static nsc_chip_t chips[] = {
 	{ "PC87108", { 0x150, 0x398, 0xea }, 0x05, 0x10, 0xf0, 
 	  nsc_ircc_probe_108, nsc_ircc_init_108 },
-	{ "PC87338", { 0x398, 0x15c, 0x2e }, 0x08, 0xb0, 0xf0, 
+	{ "PC87338", { 0x398, 0x15c, 0x2e }, 0x08, 0xb0, 0xf8, 
 	  nsc_ircc_probe_338, nsc_ircc_init_338 },
 	{ NULL }
 };
@@ -160,7 +160,7 @@ int __init nsc_ircc_init(void)
 	int i = 0;
 
 	/* Probe for all the NSC chipsets we know about */
-	for (chip=chips; chip->name ; chip++,i++) {
+	for (chip=chips; chip->name ; chip++) {
 		IRDA_DEBUG(2, __FUNCTION__"(), Probing for %s ...\n", 
 			   chip->name);
 		
@@ -196,7 +196,7 @@ int __init nsc_ircc_init(void)
 				 * we init the chip, if not we probe the values
 				 * set by the BIOS
 				 */				
-				if (io[i] < 2000) {
+				if (io[i] < 0x2000) {
 					chip->init(chip, &info);
 				} else
 					chip->probe(chip, &info);
@@ -602,7 +602,7 @@ static int nsc_ircc_probe_338(nsc_chip_t *chip, chipio_t *info)
 	outb(CFG_PNP0, cfg_base);
 	reg = inb(cfg_base+1);
 	
-	pnp = (reg >> 4) & 0x01;
+	pnp = (reg >> 3) & 0x01;
 	if (pnp) {
 		IRDA_DEBUG(2, "(), Chip is in PnP mode\n");
 		outb(0x46, cfg_base);

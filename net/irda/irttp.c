@@ -1598,7 +1598,7 @@ int irttp_proc_read(char *buf, char **start, off_t offset, int len)
 	self = (struct tsap_cb *) hashbin_get_first(irttp->tsaps);
 	while (self != NULL) {
 		if (!self || self->magic != TTP_TSAP_MAGIC)
-			return len;
+			break;
 
 		len += sprintf(buf+len, "TSAP %d, ", i++);
 		len += sprintf(buf+len, "stsap_sel: %02x, ", 

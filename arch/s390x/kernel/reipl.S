@@ -73,7 +73,7 @@ do_reipl:	basr	%r13,0
 		.quad   0x0000000000000000
 .Liplccws:	.long   0x02000000,0x60000018
 		.long   0x08000008,0x20000001
-.Liplorb:	.long	0x0049504c,0x0000ff80
+.Liplorb:	.long	0x0049504c,0x0040ff80
 		.long	0x00000000+.Liplccws
 .Lschib:        .long   0x00000000,0x00000000
 		.long   0x00000000,0x00000000

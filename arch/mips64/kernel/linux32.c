@@ -742,7 +742,9 @@ sys32_getrusage(int who, struct rusage32 *ru)
 	set_fs (KERNEL_DS);
 	ret = sys_getrusage(who, &r);
 	set_fs (old_fs);
-	if (put_rusage (ru, &r)) return -EFAULT;
+	if (put_rusage (ru, &r))
+		return -EFAULT;
+
 	return ret;
 }
 
@@ -752,7 +754,6 @@ get_tv32(struct timeval *o, struct timeval32 *i)
 	return (!access_ok(VERIFY_READ, i, sizeof(*i)) ||
 		(__get_user(o->tv_sec, &i->tv_sec) |
 		 __get_user(o->tv_usec, &i->tv_usec)));
-	return ENOSYS;
 }
 
 static inline long
@@ -763,7 +764,6 @@ get_it32(struct itimerval *o, struct itimerval32 *i)
 		 __get_user(o->it_interval.tv_usec, &i->it_interval.tv_usec) |
 		 __get_user(o->it_value.tv_sec, &i->it_value.tv_sec) |
 		 __get_user(o->it_value.tv_usec, &i->it_value.tv_usec)));
-	return ENOSYS;
 }
 
 static inline long
@@ -777,12 +777,11 @@ put_tv32(struct timeval32 *o, struct timeval *i)
 static inline long
 put_it32(struct itimerval32 *o, struct itimerval *i)
 {
-	return (!access_ok(VERIFY_WRITE, i, sizeof(*i)) ||
+	return (!access_ok(VERIFY_WRITE, o, sizeof(*o)) ||
 		(__put_user(i->it_interval.tv_sec, &o->it_interval.tv_sec) |
 		 __put_user(i->it_interval.tv_usec, &o->it_interval.tv_usec) |
 		 __put_user(i->it_value.tv_sec, &o->it_value.tv_sec) |
 		 __put_user(i->it_value.tv_usec, &o->it_value.tv_usec)));
-	return ENOSYS;
 }
 
 extern int do_getitimer(int which, struct itimerval *value);
@@ -839,6 +838,7 @@ sys32_alarm(unsigned int seconds)
 	/* And we'd better return too much than too little anyway */
 	if (it_old.it_value.tv_usec)
 		oldalarm++;
+
 	return oldalarm;
 }
 

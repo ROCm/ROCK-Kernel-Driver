@@ -1,4 +1,4 @@
-/* $Id: irq.c,v 1.14 2001/04/17 13:58:39 orjanf Exp $
+/* $Id: irq.c,v 1.15 2001/06/10 11:18:46 bjornw Exp $
  *
  *	linux/arch/cris/kernel/irq.c
  *
@@ -485,3 +485,10 @@ void init_IRQ(void)
 #endif
 
 }
+
+#if defined(CONFIG_PROC_FS) && defined(CONFIG_SYSCTL)
+/* Used by other archs to show/control IRQ steering during SMP */
+void init_irq_proc(void)
+{
+}
+#endif

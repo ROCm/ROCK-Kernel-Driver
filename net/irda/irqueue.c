@@ -739,7 +739,7 @@ static irda_queue_t *dequeue_general(irda_queue_t **queue, irda_queue_t* element
 		/*
 		 * Queue was empty.
 		 */
-	} if ( (*queue)->q_next == *queue ) {
+	} else if ( (*queue)->q_next == *queue ) {
 		/* 
 		 *  Queue only contained a single element. It will now be
 		 *  empty.  

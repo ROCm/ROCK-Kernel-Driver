@@ -96,7 +96,7 @@ static void ppp_sync_flush_output(struct syncppp *ap);
 static void ppp_sync_input(struct syncppp *ap, const unsigned char *buf,
 			   char *flags, int count);
 
-struct ppp_channel_ops sync_ops = {
+static struct ppp_channel_ops sync_ops = {
 	ppp_sync_send,
 	ppp_sync_ioctl
 };
@@ -365,7 +365,7 @@ static struct tty_ldisc ppp_sync_ldisc = {
 	write_wakeup: ppp_sync_wakeup,
 };
 
-int
+static int __init
 ppp_sync_init(void)
 {
 	int err;

@@ -218,8 +218,7 @@ static void irda_connect_confirm(void *instance, void *sap,
 		   self->max_data_size);
 
 	memcpy(&self->qos_tx, qos, sizeof(struct qos_info));
-
-	skb_queue_tail(&sk->receive_queue, skb);
+	kfree_skb(skb);
 
 	/* We are now connected! */
 	sk->state = TCP_ESTABLISHED;
@@ -439,7 +438,7 @@ static void irda_selective_discovery_indication(discovery_t *discovery,
  * We were waiting for a node to be discovered, but nothing has come up
  * so far. Wake up the user and tell him that we failed...
  */
-static void irda_discovery_timeout(u_long	priv)
+static void irda_discovery_timeout(u_long priv)
 {
 	struct irda_sock *self;
 	
@@ -776,7 +775,6 @@ static int irda_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 	struct sock *sk = sock->sk;
 	struct sockaddr_irda *addr = (struct sockaddr_irda *) uaddr;
 	struct irda_sock *self;
-	__u16 hints = 0;
 	int err;
 
 	IRDA_DEBUG(2, __FUNCTION__ "()\n");
@@ -821,15 +819,6 @@ static int irda_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 				 self->stsap_sel, IAS_KERNEL_ATTR);
 	irias_insert_object(self->ias_obj);
 	
-#if 1 /* Will be removed in near future */
-
-	/* Fill in some default hint bits values */
-	if (strncmp(addr->sir_name, "OBEX", 4) == 0)
-		hints = irlmp_service_to_hint(S_OBEX);
-	
-	if (hints)
-		self->skey = irlmp_register_service(hints);
-#endif
 	return 0;
 }
 
@@ -1079,8 +1068,10 @@ static int irda_create(struct socket *sock, int protocol)
 		return -ENOMEM;
 	
 	self = kmalloc(sizeof(struct irda_sock), GFP_ATOMIC);
-	if (self == NULL)
+	if (self == NULL) {
+		kfree (sk);
 		return -ENOMEM;
+	}
 	memset(self, 0, sizeof(struct irda_sock));
 
 	init_waitqueue_head(&self->query_wait);
@@ -1633,34 +1624,58 @@ static unsigned int irda_poll(struct file * file, struct socket *sock,
 {
 	struct sock *sk = sock->sk;
 	unsigned int mask;
+	struct irda_sock *self;
 
 	IRDA_DEBUG(4, __FUNCTION__ "()\n");
 
+	self = sk->protinfo.irda;
 	poll_wait(file, sk->sleep, wait);
 	mask = 0;
 
-	/* exceptional events? */
+	/* Exceptional events? */
 	if (sk->err)
 		mask |= POLLERR;
-	if (sk->shutdown & RCV_SHUTDOWN)
+	if (sk->shutdown & RCV_SHUTDOWN) {
+		IRDA_DEBUG(0, __FUNCTION__ "(), POLLHUP\n");
 		mask |= POLLHUP;
+	}
 
-	/* readable? */
+	/* Readable? */
 	if (!skb_queue_empty(&sk->receive_queue)) {
 		IRDA_DEBUG(4, "Socket is readable\n");
 		mask |= POLLIN | POLLRDNORM;
 	}
+
 	/* Connection-based need to check for termination and startup */
-	if (sk->type == SOCK_STREAM && sk->state==TCP_CLOSE)
-		mask |= POLLHUP;
+	switch (sk->type) {
+	case SOCK_STREAM:
+		if (sk->state == TCP_CLOSE) {
+			IRDA_DEBUG(0, __FUNCTION__ "(), POLLHUP\n");
+			mask |= POLLHUP;
+		}
 
-	/*
-	 * we set writable also when the other side has shut down the
-	 * connection. This prevents stuck sockets.
-	 */
-	if (sk->sndbuf - (int)atomic_read(&sk->wmem_alloc) >= SOCK_MIN_WRITE_SPACE)
+		if (sk->state == TCP_ESTABLISHED) {
+			if ((self->tx_flow == FLOW_START) && 
+			    (sk->sndbuf - (int)atomic_read(&sk->wmem_alloc) >= SOCK_MIN_WRITE_SPACE))
+			{
+				mask |= POLLOUT | POLLWRNORM | POLLWRBAND;
+			}
+		}
+		break;
+	case SOCK_SEQPACKET:
+		if ((self->tx_flow == FLOW_START) && 
+		    (sk->sndbuf - (int)atomic_read(&sk->wmem_alloc) >= SOCK_MIN_WRITE_SPACE))
+		{	
 			mask |= POLLOUT | POLLWRNORM | POLLWRBAND;
-
+		}
+		break;
+	case SOCK_DGRAM:
+		if (sk->sndbuf - (int)atomic_read(&sk->wmem_alloc) >= SOCK_MIN_WRITE_SPACE)
+			mask |= POLLOUT | POLLWRNORM | POLLWRBAND;
+		break;
+	default:
+		break;
+	}		
 	return mask;
 }
 
@@ -1740,7 +1755,7 @@ static int irda_setsockopt(struct socket *sock, int level, int optname,
 {
  	struct sock *sk = sock->sk;
 	struct irda_sock *self;
-	struct irda_ias_set	ias_opt;
+	struct irda_ias_set    *ias_opt;
 	struct ias_object      *ias_obj;
 	struct ias_attrib *	ias_attr;	/* Attribute in IAS object */
 	int opt;
@@ -1763,64 +1778,78 @@ static int irda_setsockopt(struct socket *sock, int level, int optname,
 		if (optlen != sizeof(struct irda_ias_set))
 			return -EINVAL;
 	
+		ias_opt = kmalloc(sizeof(struct irda_ias_set), GFP_ATOMIC);
+		if (ias_opt == NULL)
+			return -ENOMEM;
+
 		/* Copy query to the driver. */
-		if (copy_from_user(&ias_opt, (char *)optval, optlen))
+		if (copy_from_user(ias_opt, (char *)optval, optlen)) {
+			kfree(ias_opt);
 		  	return -EFAULT;
+		}
 
 		/* Find the object we target */
-		ias_obj = irias_find_object(ias_opt.irda_class_name);
+		ias_obj = irias_find_object(ias_opt->irda_class_name);
 		if(ias_obj == (struct ias_object *) NULL) {
 			/* Create a new object */
-			ias_obj = irias_new_object(ias_opt.irda_class_name,
+			ias_obj = irias_new_object(ias_opt->irda_class_name,
 						   jiffies);
 		}
 
 		/* Do we have it already ? */
-		if(irias_find_attrib(ias_obj, ias_opt.irda_attrib_name))
+		if(irias_find_attrib(ias_obj, ias_opt->irda_attrib_name)) {
+			kfree(ias_opt);
 			return -EINVAL;
+		}
 
 		/* Look at the type */
-		switch(ias_opt.irda_attrib_type) {
+		switch(ias_opt->irda_attrib_type) {
 		case IAS_INTEGER:
 			/* Add an integer attribute */
 			irias_add_integer_attrib(
 				ias_obj,
-				ias_opt.irda_attrib_name, 
-				ias_opt.attribute.irda_attrib_int,
+				ias_opt->irda_attrib_name, 
+				ias_opt->attribute.irda_attrib_int,
 				IAS_USER_ATTR);
 			break;
 		case IAS_OCT_SEQ:
 			/* Check length */
-			if(ias_opt.attribute.irda_attrib_octet_seq.len >
-			   IAS_MAX_OCTET_STRING)
+			if(ias_opt->attribute.irda_attrib_octet_seq.len >
+			   IAS_MAX_OCTET_STRING) {
+				kfree(ias_opt);
 				return -EINVAL;
+			}
 			/* Add an octet sequence attribute */
 			irias_add_octseq_attrib(
 			      ias_obj,
-			      ias_opt.irda_attrib_name, 
-			      ias_opt.attribute.irda_attrib_octet_seq.octet_seq,
-			      ias_opt.attribute.irda_attrib_octet_seq.len,
+			      ias_opt->irda_attrib_name, 
+			      ias_opt->attribute.irda_attrib_octet_seq.octet_seq,
+			      ias_opt->attribute.irda_attrib_octet_seq.len,
 			      IAS_USER_ATTR);
 			break;
 		case IAS_STRING:
 			/* Should check charset & co */
 			/* Check length */
-			if(ias_opt.attribute.irda_attrib_string.len >
-			   IAS_MAX_STRING)
+			if(ias_opt->attribute.irda_attrib_string.len >
+			   IAS_MAX_STRING) {
+				kfree(ias_opt);
 				return -EINVAL;
+			}
 			/* NULL terminate the string (avoid troubles) */
-			ias_opt.attribute.irda_attrib_string.string[ias_opt.attribute.irda_attrib_string.len] = '\0';
+			ias_opt->attribute.irda_attrib_string.string[ias_opt->attribute.irda_attrib_string.len] = '\0';
 			/* Add a string attribute */
 			irias_add_string_attrib(
 				ias_obj,
-				ias_opt.irda_attrib_name, 
-				ias_opt.attribute.irda_attrib_string.string,
+				ias_opt->irda_attrib_name, 
+				ias_opt->attribute.irda_attrib_string.string,
 				IAS_USER_ATTR);
 			break;
 		default :
+			kfree(ias_opt);
 			return -EINVAL;
 		}
 		irias_insert_object(ias_obj);
+		kfree(ias_opt);
 		break;
 	case IRLMP_IAS_DEL:
 		/* The user want to delete an object from our local IAS
@@ -1831,31 +1860,42 @@ static int irda_setsockopt(struct socket *sock, int level, int optname,
 		if (optlen != sizeof(struct irda_ias_set))
 			return -EINVAL;
 	
+		ias_opt = kmalloc(sizeof(struct irda_ias_set), GFP_ATOMIC);
+		if (ias_opt == NULL)
+			return -ENOMEM;
+	
 		/* Copy query to the driver. */
-		if (copy_from_user(&ias_opt, (char *)optval, optlen))
+		if (copy_from_user(ias_opt, (char *)optval, optlen)) {
+			kfree(ias_opt);
 		  	return -EFAULT;
+		}
 
 		/* Find the object we target */
-		ias_obj = irias_find_object(ias_opt.irda_class_name);
-		if(ias_obj == (struct ias_object *) NULL)
+		ias_obj = irias_find_object(ias_opt->irda_class_name);
+		if(ias_obj == (struct ias_object *) NULL) {
+			kfree(ias_opt);
 			return -EINVAL;
+		}
 
 		/* Find the attribute (in the object) we target */
 		ias_attr = irias_find_attrib(ias_obj,
-					     ias_opt.irda_attrib_name); 
-		if(ias_attr == (struct ias_attrib *) NULL)
+					     ias_opt->irda_attrib_name); 
+		if(ias_attr == (struct ias_attrib *) NULL) {
+			kfree(ias_opt);
 			return -EINVAL;
+		}
 
 		/* Check is the user space own the object */
 		if(ias_attr->value->owner != IAS_USER_ATTR) {
 			IRDA_DEBUG(1, __FUNCTION__ 
 				   "(), attempting to delete a kernel attribute\n");
+			kfree(ias_opt);
 			return -EPERM;
 		}
 
 		/* Remove the attribute (and maybe the object) */
 		irias_delete_attrib(ias_obj, ias_attr);
-
+		kfree(ias_opt);
 		break;
 	case IRLMP_MAX_SDU_SIZE:
 		if (optlen < sizeof(int))
@@ -1978,7 +2018,7 @@ static int irda_getsockopt(struct socket *sock, int level, int optname,
 	struct irda_sock *self;
 	struct irda_device_list list;
 	struct irda_device_info *discoveries;
-	struct irda_ias_set	ias_opt;	/* IAS get/query params */
+	struct irda_ias_set *	ias_opt;	/* IAS get/query params */
 	struct ias_object *	ias_obj;	/* Object in IAS */
 	struct ias_attrib *	ias_attr;	/* Attribute in IAS object */
 	int daddr = DEV_ADDR_ANY;	/* Dest address for IAS queries */
@@ -2048,34 +2088,49 @@ static int irda_getsockopt(struct socket *sock, int level, int optname,
 		 * that we found */
 
 		/* Check that the user has allocated the right space for us */
-		if (len != sizeof(ias_opt))
+		if (len != sizeof(struct irda_ias_set))
 			return -EINVAL;
+
+		ias_opt = kmalloc(sizeof(struct irda_ias_set), GFP_ATOMIC);
+		if (ias_opt == NULL)
+			return -ENOMEM;
 
 		/* Copy query to the driver. */
-		if (copy_from_user((char *) &ias_opt, (char *)optval, len))
+		if (copy_from_user((char *) ias_opt, (char *)optval, len)) {
+			kfree(ias_opt);
 		  	return -EFAULT;
+		}
 
 		/* Find the object we target */
-		ias_obj = irias_find_object(ias_opt.irda_class_name);
-		if(ias_obj == (struct ias_object *) NULL)
+		ias_obj = irias_find_object(ias_opt->irda_class_name);
+		if(ias_obj == (struct ias_object *) NULL) {
+			kfree(ias_opt);
 			return -EINVAL;
+		}
 
 		/* Find the attribute (in the object) we target */
 		ias_attr = irias_find_attrib(ias_obj,
-					     ias_opt.irda_attrib_name); 
-		if(ias_attr == (struct ias_attrib *) NULL)
+					     ias_opt->irda_attrib_name); 
+		if(ias_attr == (struct ias_attrib *) NULL) {
+			kfree(ias_opt);
 			return -EINVAL;
+		}
 
 		/* Translate from internal to user structure */
-		err = irda_extract_ias_value(&ias_opt, ias_attr->value);
-		if(err)
+		err = irda_extract_ias_value(ias_opt, ias_attr->value);
+		if(err) {
+			kfree(ias_opt);
 			return err;
+		}
 
 		/* Copy reply to the user */
-		if (copy_to_user((char *)optval, (char *) &ias_opt,
-				 sizeof(ias_opt)))
+		if (copy_to_user((char *)optval, (char *) ias_opt,
+				 sizeof(struct irda_ias_set))) {
+			kfree(ias_opt);
 		  	return -EFAULT;
+		}
 		/* Note : don't need to put optlen, we checked it */
+		kfree(ias_opt);
 		break;
 	case IRLMP_IAS_QUERY:
 		/* The user want an object from a remote IAS database.
@@ -2083,12 +2138,18 @@ static int irda_getsockopt(struct socket *sock, int level, int optname,
 		 * then wait for the answer to come back. */
 
 		/* Check that the user has allocated the right space for us */
-		if (len != sizeof(ias_opt))
+		if (len != sizeof(struct irda_ias_set))
 			return -EINVAL;
 
+		ias_opt = kmalloc(sizeof(struct irda_ias_set), GFP_ATOMIC);
+		if (ias_opt == NULL)
+			return -ENOMEM;
+
 		/* Copy query to the driver. */
-		if (copy_from_user((char *) &ias_opt, (char *)optval, len))
+		if (copy_from_user((char *) ias_opt, (char *)optval, len)) {
+			kfree(ias_opt);
 		  	return -EFAULT;
+		}
 
 		/* At this point, there are two cases...
 		 * 1) the socket is connected - that's the easy case, we
@@ -2105,15 +2166,18 @@ static int irda_getsockopt(struct socket *sock, int level, int optname,
 		} else {
 			/* We are not connected, we must specify a valid
 			 * destination address */
-			daddr = ias_opt.daddr;
-			if((!daddr) || (daddr == DEV_ADDR_ANY))
+			daddr = ias_opt->daddr;
+			if((!daddr) || (daddr == DEV_ADDR_ANY)) {
+				kfree(ias_opt);
 				return -EINVAL;
+			}
 		}
 
 		/* Check that we can proceed with IAP */
 		if (self->iriap) {
 			WARNING(__FUNCTION__
 				"(), busy with a previous query\n");
+			kfree(ias_opt);
 			return -EBUSY;
 		}
 
@@ -2126,14 +2190,15 @@ static int irda_getsockopt(struct socket *sock, int level, int optname,
 		/* Query remote LM-IAS */
 		iriap_getvaluebyclass_request(self->iriap,
 					      self->saddr, daddr,
-					      ias_opt.irda_class_name,
-					      ias_opt.irda_attrib_name);
+					      ias_opt->irda_class_name,
+					      ias_opt->irda_attrib_name);
 		/* Wait for answer (if not already failed) */
 		if(self->iriap != NULL)
 			interruptible_sleep_on(&self->query_wait);
 		/* Check what happened */
 		if (self->errno)
 		{
+			kfree(ias_opt);
 			/* Requested object/attribute doesn't exist */
 			if((self->errno == IAS_CLASS_UNKNOWN) ||
 			   (self->errno == IAS_ATTRIB_UNKNOWN))
@@ -2143,17 +2208,22 @@ static int irda_getsockopt(struct socket *sock, int level, int optname,
 		}
 
 		/* Translate from internal to user structure */
-		err = irda_extract_ias_value(&ias_opt, self->ias_result);
+		err = irda_extract_ias_value(ias_opt, self->ias_result);
 		if (self->ias_result)
 			irias_delete_value(self->ias_result);
-		if (err)
+		if (err) {
+			kfree(ias_opt);
 			return err;
+		}
 
 		/* Copy reply to the user */
-		if (copy_to_user((char *)optval, (char *) &ias_opt,
-				 sizeof(ias_opt)))
+		if (copy_to_user((char *)optval, (char *) ias_opt,
+				 sizeof(struct irda_ias_set))) {
+			kfree(ias_opt);
 		  	return -EFAULT;
+		}
 		/* Note : don't need to put optlen, we checked it */
+		kfree(ias_opt);
 		break;
 	case IRLMP_WAITDEVICE:
 		/* This function is just another way of seeing life ;-)
@@ -2328,6 +2398,9 @@ static struct proto_ops SOCKOPS_WRAPPED(irda_ultra_ops) = {
 SOCKOPS_WRAP(irda_stream, PF_IRDA);
 SOCKOPS_WRAP(irda_seqpacket, PF_IRDA);
 SOCKOPS_WRAP(irda_dgram, PF_IRDA);
+#ifdef CONFIG_IRDA_ULTRA
+SOCKOPS_WRAP(irda_ultra, PF_IRDA);
+#endif /* CONFIG_IRDA_ULTRA */
 
 /*
  * Function irda_device_event (this, event, ptr)
@@ -2416,7 +2489,9 @@ int __init irda_proto_init(void)
 #endif
 	return 0;
 }
-module_init(irda_proto_init);
+#ifdef MODULE
+module_init(irda_proto_init);	/* If non-module, called from init/main.c */
+#endif
 
 /*
  * Function irda_proto_cleanup (void)

@@ -61,202 +61,6 @@ static char * ireg_name[] = {"v0", "t0", "t1", "t2", "t3", "t4", "t5", "t6",
 			   "a0", "a1", "a2", "a3", "a4", "a5", "t8", "t9",
 			   "t10", "t11", "ra", "pv", "at", "gp", "sp", "zero"};
 
-static char * inst_name[] = {"call_pal", "", "", "", "", "", "", "",
-	"lda", "ldah", "ldbu", "ldq_u", "ldwu", "stw", "stb", "stq_u",
-	"ALU", "ALU", "ALU", "ALU", "SQRT", "FVAX", "FIEEE", "FLOAT",
-	"MISC", "PAL19", "JMP", "PAL1B", "GRAPH", "PAL1D", "PAL1E", "PAL1F",
-	"ldf", "ldg", "lds", "ldt", "stf", "stg", "sts", "stt",
-	"ldl", "ldq", "ldl_l", "ldq_l", "stl", "stq", "stl_c", "stq_c",
-	"br", "fbeq", "fblt", "fble", "bsr", "fbne", "fbge", "fbgt"
-	"blbc", "beq", "blt", "ble", "blbs", "bne", "bge", "bgt"
-};
-
-static char * jump_name[] = {"jmp", "jsr", "ret", "jsr_coroutine"};
-
-typedef struct {int func; char * text;} alist;
-
-static alist inta_name[] = {{0, "addl"}, {2, "s4addl"}, {9, "subl"},
-	{0xb, "s4subl"}, {0xf, "cmpbge"}, {0x12, "s8addl"}, {0x1b, "s8subl"},
-	{0x1d, "cmpult"}, {0x20, "addq"}, {0x22, "s4addq"}, {0x29, "subq"},
-	{0x2b, "s4subq"}, {0x2d, "cmpeq"}, {0x32, "s8addq"}, {0x3b, "s8subq"},
-	{0x3d, "cmpule"}, {0x40, "addl/v"}, {0x49, "subl/v"}, {0x4d, "cmplt"},
-	{0x60, "addq/v"}, {0x69, "subq/v"}, {0x6d, "cmple"}, {-1, 0}};
-
-static alist intl_name[] = {{0, "and"}, {8, "andnot"}, {0x14, "cmovlbs"},
-	{0x16, "cmovlbc"}, {0x20, "or"}, {0x24, "cmoveq"}, {0x26, "cmovne"},
-	{0x28, "ornot"}, {0x40, "xor"}, {0x44, "cmovlt"}, {0x46, "cmovge"},
-	{0x48, "eqv"}, {0x61, "amask"}, {0x64, "cmovle"}, {0x66, "cmovgt"},
-	{0x6c, "implver"}, {-1, 0}};
-
-static alist ints_name[] = {{2, "mskbl"}, {6, "extbl"}, {0xb, "insbl"},
-	{0x12, "mskwl"}, {0x16, "extwl"}, {0x1b, "inswl"}, {0x22, "mskll"},
-	{0x26, "extll"}, {0x2b, "insll"}, {0x30, "zap"}, {0x31, "zapnot"},
-	{0x32, "mskql"}, {0x34, "srl"}, {0x36, "extql"}, {0x39, "sll"},
-	{0x3b, "insql"}, {0x3c, "sra"}, {0x52, "mskwh"}, {0x57, "inswh"},
-	{0x5a, "extwh"}, {0x62, "msklh"}, {0x67, "inslh"}, {0x6a, "extlh"},
-	{0x72, "mskqh"}, {0x77, "insqh"}, {0x7a, "extqh"}, {-1, 0}};
-
-static alist intm_name[] = {{0, "mull"}, {0x20, "mulq"}, {0x30, "umulh"},
-	{0x40, "mull/v"}, {0x60, "mulq/v"}, {-1, 0}};
-
-static alist * int_name[] = {inta_name, intl_name, ints_name, intm_name};
-
-static char *
-assoc(int fcode, alist * a)
-{
-	while ((fcode != a->func) && (a->func != -1))
-		++a;
-	return a->text;
-}
-
-static char *
-iname(unsigned int instr)
-{
-	int opcode = instr >> 26;
-	char * name = inst_name[opcode];
-
-	switch (opcode) {
-		default:
-			break;
-
-		case 0x10:
-		case 0x11:
-		case 0x12:
-		case 0x13: {
-			char * specific_name
-			  = assoc((instr >> 5) & 0x3f, int_name[opcode - 0x10]);
-			if (specific_name)
-				name = specific_name;
-			break;
-		}
-
-		case 0x1a:
-			name = jump_name[(instr >> 14) & 3];
-			break;
-	}
-	
-	return name;
-}
-
-static enum {NOT_INST, PAL, BRANCH, MEMORY, JUMP, OPERATE, FOPERATE, MISC}
-iformat(int opcode)
-{
-	if (opcode >= 0x30)
-		return BRANCH;
-	if (opcode >= 0x20)
-		return MEMORY;
-	if (opcode == 0)
-		return PAL;
-	if (opcode < 8)
-		return NOT_INST;
-	if (opcode < 0x10)
-		return MEMORY;
-	if (opcode < 0x14)
-		return OPERATE;
-	if (opcode < 0x18)
-		return FOPERATE;
-	switch (opcode) {
-		case 0x18:
-			return MISC;
-		case 0x1A:
-			return JUMP;
-		case 0x1C:
-			return OPERATE;
-		default:
-			return NOT_INST;
-	}
-}
-
-/*
- * The purpose here is to provide useful clues about a kernel crash, so
- * less likely instructions, e.g. floating point, aren't fully decoded.
- */
-static void
-disassemble(unsigned int instr)
-{
-	int optype = instr >> 26;
-	char buf[40], *s = buf;
-
-	s += sprintf(buf, "%08x  %s ", instr, iname(instr));
-	switch (iformat(optype)) {
-		default:
-		case NOT_INST:
-		case MISC:
-			break;
-
-		case PAL:
-			s += sprintf(s, "%d", instr);
-			break;
-
-		case BRANCH: {
-			int reg = (instr >> 21) & 0x1f;
-			int offset = instr & 0x1fffff;
-
-			if (offset >= 0x100000)
-				offset -= 0x200000;
-			if (((optype & 3) == 0) || (optype >= 0x38)) {
-				if ((optype != 0x30) || (reg != 0x1f))
-					s += sprintf(s, "%s,", ireg_name[reg]);
-			} else
-				s += sprintf(s, "f%d,", reg);
-			s += sprintf(s, ".%+d", (offset + 1) << 2);
-			break;
-		}
-
-		case MEMORY: {
-			int addr_reg = (instr >> 16) & 0x1f;
-			int value_reg = (instr >> 21) & 0x1f;
-			int offset = instr & 0xffff;
-
-			if (offset >= 0x8000)
-				offset -= 0x10000;
-			if ((optype >= 0x20) && (optype < 0x28))
-				s += sprintf(s, "f%d", value_reg);
-			else
-				s += sprintf(s, "%s", ireg_name[value_reg]);
-
-			s += sprintf(s, ",%d(%s)", offset, ireg_name[addr_reg]);
-			break;
-		}
-
-		case JUMP: {
-			int target_reg = (instr >> 16) & 0x1f;
-			int return_reg = (instr >> 21) & 0x1f;
-
-			s += sprintf(s, "%s,", ireg_name[return_reg]);
-			s += sprintf(s, "(%s)", ireg_name[target_reg]);
-			break;
-		}
-
-		case OPERATE: {
-			int areg = (instr >> 21) & 0x1f;
-			int breg = (instr >> 16) & 0x1f;
-			int creg = instr & 0x1f;
-			int litflag = instr & (1<<12);
-			int lit = (instr >> 13) & 0xff;
-
-			s += sprintf(s, "%s,", ireg_name[areg]);
-			if (litflag)
-				s += sprintf(s, "%d", lit);
-			else
-				s += sprintf(s, "%s", ireg_name[breg]);
-			s += sprintf(s, ",%s", ireg_name[creg]);
-			break;
-		}
-
-		case FOPERATE: {
-			int areg = (instr >> 21) & 0x1f;
-			int breg = (instr >> 16) & 0x1f;
-			int creg = instr & 0x1f;
-
-			s += sprintf(s, "f%d,f%d,f%d", areg, breg, creg);
-			break;
-		}
-	}
-	buf[s-buf] = 0;
-	printk("%s\n", buf);
-}
-
 static void
 dik_show_code(unsigned int *pc)
 {
@@ -267,8 +71,7 @@ dik_show_code(unsigned int *pc)
 		unsigned int insn;
 		if (__get_user(insn, pc+i))
 			break;
-		printk("%c", i ? ' ' : '*');
-		disassemble(insn);
+		printk("%c%08x%c", i ? ' ' : '<', insn, i ? ' ' : '>');
 	}
 	printk("\n");
 }
@@ -286,17 +89,11 @@ dik_show_trace(unsigned long *sp)
 			continue;
 		if (tmp >= (unsigned long) &_etext)
 			continue;
-		/*
-		 * Assume that only the low 24-bits of a kernel text address
-		 * is interesting.
-		 */
-		printk("%6x%c", (int)tmp & 0xffffff, (++i % 11) ? ' ' : '\n');
-#if 0
+		printk("%lx%c", tmp, ' ');
 		if (i > 40) {
 			printk(" ...");
 			break;
 		}
-#endif
 	}
 	printk("\n");
 }
@@ -337,8 +134,8 @@ die_if_kernel(char * str, struct pt_regs *regs, long err, unsigned long *r9_15)
 #endif
 	printk("%s(%d): %s %ld\n", current->comm, current->pid, str, err);
 	dik_show_regs(regs, r9_15);
-	dik_show_code((unsigned int *)regs->pc);
 	dik_show_trace((unsigned long *)(regs+1));
+	dik_show_code((unsigned int *)regs->pc);
 
 	if (current->thread.flags & (1UL << 63)) {
 		printk("die_if_kernel recursion detected.\n");

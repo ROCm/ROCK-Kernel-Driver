@@ -1,32 +1,12 @@
-/*!**************************************************************************
+/*!*****************************************************************************
 *!
-*!  FILE NAME:      e100eeprom.c
+*!  Implements an interface for i2c compatible eeproms to run under linux.
+*!  Supports 2k, 8k(?) and 16k. Uses adaptive timing adjustents by
+*!  Johan.Adolfsson@axis.com
 *!
-*!  DESCRIPTION:    Implements an interface for i2c compatible eeproms to run
-*!                  under linux.
-*!                  Supports 2k, 8k(?) and 16k
-*!                  Uses adaptive timing adjustents by Johan.Adolfsson@axis.com
-*!                  Probing results:
-*!                    8k or not is detected (the assumes 2k or 16k)
-*!                    2k or 16k detected using test reads and writes.
-*!
-*!  FUNCTIONS:
-*!
-*!  (Exported)
-*!              eeprom_init()
-*!
-*!  (Local)
-*!
-*!              eeprom_open()
-*!              eeprom_lseek()
-*!              eeprom_read()
-*!              eeprom_write()
-*!              eeprom_close()
-*!              eeprom_address()
-*!              eeprom_disable_write_protect()
-*!
-*!
-*!  $Id: eeprom.c,v 1.3 2001/03/19 16:04:46 markusl Exp $
+*!  Probing results:
+*!    8k or not is detected (the assumes 2k or 16k)
+*!    2k or 16k detected using test reads and writes.
 *!
 *!------------------------------------------------------------------------
 *!  HISTORY
@@ -40,6 +20,13 @@
 *!                                  in the spin-lock.
 *!
 *!  $Log: eeprom.c,v $
+*!  Revision 1.5  2001/06/14 14:39:51  jonashg
+*!  Forgot to use name when registering the driver.
+*!
+*!  Revision 1.4  2001/06/14 14:35:47  jonashg
+*!  * Gave driver a name and used it in printk's.
+*!  * Cleanup.
+*!
 *!  Revision 1.3  2001/03/19 16:04:46  markusl
 *!  Fixed init of fops struct
 *!
@@ -64,9 +51,7 @@
 *!
 *!
 *!        (c) 1999 Axis Communications AB, Lund, Sweden
-*!**************************************************************************/
-
-/********************** INCLUDE FILES SECTION ******************************/
+*!*****************************************************************************/
 
 #include <linux/config.h>
 #include <linux/kernel.h>
@@ -76,7 +61,6 @@
 #include <linux/delay.h>
 #include "i2c.h"
 
-/********************** CONSTANT AND MACRO SECTION *************************/
 #define D(x) 
 
 /* If we should use adaptive timing or not: */
@@ -86,9 +70,8 @@
 #define EEPROM_MINOR_NR 0
 
 #define MAX_WRITEDELAY_US 10000 /* 10 ms according to spec for 2KB EEPROM */
-/*
- *  this one defines how many times to try when eeprom fails.
- */
+
+/* This one defines how many times to try when eeprom fails. */
 #define EEPROM_RETRIES 10
 
 #define EEPROM_2KB (2 * 1024)
@@ -97,8 +80,6 @@
 #define EEPROM_16KB (16 * 1024)
 
 #define i2c_delay(x) udelay(x)
-
-/********************** TYPE DEFINITION SECTION ****************************/
 
 /*
  *  This structure describes the attached eeprom chip.
@@ -110,51 +91,42 @@ struct eeprom_type
   unsigned long size;
   unsigned long sequential_write_pagesize;
   unsigned char select_cmd;
-  unsigned long usec_delay_writecycles; /* Min time between write cycles (up to 10ms for some models) */
-  unsigned long int usec_delay_step; /* For adaptive algorithm */
+  unsigned long usec_delay_writecycles; /* Min time between write cycles
+					   (up to 10ms for some models) */
+  unsigned long usec_delay_step; /* For adaptive algorithm */
   int adapt_state; /* 1 = To high , 0 = Even, -1 = To low */
   
   /* this one is to keep the read/write operations atomic */
   wait_queue_head_t wait_q;
   int busy;
   int retry_cnt_addr; /* Used to keep track of number of retries for
-                     adaptive timing adjustments */
+                         adaptive timing adjustments */
   int retry_cnt_read;
-
-  
-  
 };
 
-/********************** LOCAL FUNCTION DECLARATION SECTION *****************/
-
-static int  eeprom_open (struct inode * inode, struct file * file);
+static int  eeprom_open(struct inode * inode, struct file * file);
 static loff_t  eeprom_lseek(struct file * file, loff_t offset, int orig);
-static ssize_t  eeprom_read (struct file * file, char * buf, size_t count, loff_t *off);
-static ssize_t  eeprom_write(struct file * file, const char * buf, size_t count, loff_t *off);
+static ssize_t  eeprom_read(struct file * file, char * buf, size_t count,
+                            loff_t *off);
+static ssize_t  eeprom_write(struct file * file, const char * buf, size_t count,
+                             loff_t *off);
 static int eeprom_close(struct inode * inode, struct file * file);
 
 static int  eeprom_address(unsigned long addr);
 static int  read_from_eeprom(char * buf, int count);
-static int eeprom_write_buf(unsigned long int addr,
-                            const char * buf, int count);
+static int eeprom_write_buf(unsigned long addr, const char * buf, int count);
 static int eeprom_read_buf(unsigned long addr,
                            char * buf, int count);
 
 static void eeprom_disable_write_protect(void);
 
 
-/********************** GLOBAL VARIABLE DECLARATION SECTION ****************/
-
-/********************** LOCAL VARIABLE DECLARATION SECTION *****************/
+static const char eeprom_name[] = "eeprom";
 
 /* chip description */
 static struct eeprom_type eeprom;
 
-/*
- *  This is the exported file-operations structure
- *  for this device.
- */
-
+/* This is the exported file-operations structure for this device. */
 struct file_operations eeprom_fops =
 {
   llseek:  eeprom_lseek,
@@ -164,29 +136,7 @@ struct file_operations eeprom_fops =
   release: eeprom_close
 };
 
-/********************** FUNCTION DEFINITION SECTION ************************/
-
-/*#**************************************************************************
-*#                                                            
-*# FUNCTION NAME: eeprom_init
-*#                                                            
-*# PARAMETERS   : none
-*#                                                            
-*# RETURNS      : 0 if OK
-*#                                                            
-*# SIDE EFFECTS : 
-*#                                                            
-*# DESCRIPTION  : eeprom init call. Probes for different eeprom models.
-*#                                                            
-*#---------------------------------------------------------------------------
-*# HISTORY                                                    
-*#                                                            
-*# DATE         NAME            CHANGES                       
-*# ----         ----            -------                       
-*# Aug 28 1999  Edgar Iglesias  Initial version               
-*# Sep 03 1999  Edgar Iglesias  Updated probing. Added forced values.
-*#
-*#**************************************************************************/
+/* eeprom init call. Probes for different eeprom models. */
 
 int __init eeprom_init(void)
 {
@@ -198,9 +148,10 @@ int __init eeprom_init(void)
 #else
 #define EETEXT "Assuming"
 #endif
-  if (register_chrdev(EEPROM_MAJOR_NR, "mem", &eeprom_fops))
+  if (register_chrdev(EEPROM_MAJOR_NR, eeprom_name, &eeprom_fops))
   {
-    printk("unable to get major %d for eeprom device\n", EEPROM_MAJOR_NR);
+    printk(KERN_INFO "%s: unable to get major %d for eeprom device\n",
+           eeprom_name, EEPROM_MAJOR_NR);
     return -1;
   }
   
@@ -213,7 +164,6 @@ int __init eeprom_init(void)
    *        for all models. If you encounter problems the easiest way
    *        is probably to define your model within #ifdef's, and hard-
    *        code it.
-   *
    */
 
   eeprom.size = 0;
@@ -240,7 +190,6 @@ int __init eeprom_init(void)
      * 2. if it doesn't differ - write diferent value to one of the locations,
      *    check the other - if content still is the same it's a 2k EEPROM,
      *    restore original data.
-     *    
      */
 #define LOC1 8
 #define LOC2 (0x1fb) /*1fb, 3ed, 5df, 7d1 */
@@ -256,7 +205,7 @@ int __init eeprom_init(void)
     }
     else
     {
-      printk("Failed to read in 2k mode!\n");  
+      printk(KERN_INFO "%s: Failed to read in 2k mode!\n", eeprom_name);  
     }
     
     /* 16k settings */
@@ -276,7 +225,7 @@ int __init eeprom_init(void)
           if (memcmp(loc1, loc2, 4) != 0 )
           {
             /* It's 16k */
-            printk("16k detected in step 1\n");
+            printk(KERN_INFO "%s: 16k detected in step 1\n", eeprom_name);
             eeprom.size = EEPROM_16KB;     
             success = 1;
           }
@@ -299,7 +248,8 @@ int __init eeprom_init(void)
                          LOC1, loc1, tmp));
                 if (memcmp(loc1, tmp, 4) != 0 )
                 {
-                  printk("read and write differs! Not 16kB\n");
+                  printk(KERN_INFO "%s: read and write differs! Not 16kB\n",
+                         eeprom_name);
                   loc1[0] = ~loc1[0];
                   
                   if (eeprom_write_buf(LOC1, loc1, 1) == 1)
@@ -308,7 +258,8 @@ int __init eeprom_init(void)
                   }
                   else
                   {
-                    printk("eeprom: Restore 2k failed during probe EEPROM might be corrupt!\n");
+                    printk(KERN_INFO "%s: Restore 2k failed during probe,"
+                           " EEPROM might be corrupt!\n", eeprom_name);
                     
                   }
                   i2c_stop();
@@ -321,7 +272,8 @@ int __init eeprom_init(void)
                   }
                   else
                   {
-                    printk("Failed to write back 2k start!\n");
+                    printk(KERN_INFO "%s: Failed to write back 2k start!\n",
+                           eeprom_name);
                   }
                   
                   eeprom.size = EEPROM_2KB;
@@ -338,7 +290,7 @@ int __init eeprom_init(void)
                   {
                     /* Data the same, must be mirrored -> 2k */
                     /* Restore data */
-                    printk("2k detected in step 2\n");
+                    printk(KERN_INFO "%s: 2k detected in step 2\n", eeprom_name);
                     loc1[0] = ~loc1[0];
                     if (eeprom_write_buf(LOC1, loc1, 1) == 1)
                     {
@@ -346,7 +298,8 @@ int __init eeprom_init(void)
                     }
                     else
                     {
-                      printk("eeprom: Restore 2k failed during probe EEPROM might be corrupt!\n");
+                      printk(KERN_INFO "%s: Restore 2k failed during probe,"
+                             " EEPROM might be corrupt!\n", eeprom_name);
                       
                     }
                     
@@ -354,7 +307,8 @@ int __init eeprom_init(void)
                   }
                   else
                   {
-                    printk("16k detected in step 2\n");
+                    printk(KERN_INFO "%s: 16k detected in step 2\n",
+                           eeprom_name);
                     loc1[0] = ~loc1[0];
                     /* Data differs, assume 16k */
                     /* Restore data */
@@ -364,7 +318,8 @@ int __init eeprom_init(void)
                     }
                     else
                     {
-                      printk("eeprom: Restore 16k failed during probe EEPROM might be corrupt!\n");
+                      printk(KERN_INFO "%s: Restore 16k failed during probe,"
+                             " EEPROM might be corrupt!\n", eeprom_name);
                     }
                     
                     eeprom.size = EEPROM_16KB;
@@ -376,7 +331,7 @@ int __init eeprom_init(void)
         } /* address LOC1 */
         if (!success)
         {
-          printk("eeprom: Probing failed!, using 2KB!\n");
+          printk(KERN_INFO "%s: Probing failed!, using 2KB!\n", eeprom_name);
           eeprom.size = EEPROM_2KB;               
         }
       } /* read */
@@ -418,23 +373,23 @@ int __init eeprom_init(void)
   switch(eeprom.size)
   {
    case (EEPROM_2KB):
-     printk("e100eeprom: " EETEXT " i2c compatible 2Kb eeprom.\n");
+     printk("%s: " EETEXT " i2c compatible 2Kb eeprom.\n", eeprom_name);
      eeprom.sequential_write_pagesize = 16;
      eeprom.select_cmd = 0xA0;
      break;
    case (EEPROM_8KB):
-     printk("e100eeprom: " EETEXT " i2c compatible 8Kb eeprom.\n");
+     printk("%s: " EETEXT " i2c compatible 8Kb eeprom.\n", eeprom_name);
      eeprom.sequential_write_pagesize = 16;
      eeprom.select_cmd = 0x80;
      break;
    case (EEPROM_16KB):
-     printk("e100eeprom: " EETEXT " i2c compatible 16Kb eeprom.\n");
+     printk("%s: " EETEXT " i2c compatible 16Kb eeprom.\n", eeprom_name);
      eeprom.sequential_write_pagesize = 64;
      eeprom.select_cmd = 0xA0;     
      break;
    default:
      eeprom.size = 0;
-     printk("e100eeprom: Did not find a supported eeprom\n");
+     printk("%s: Did not find a supported eeprom\n", eeprom_name);
      break;
   }
 
@@ -445,28 +400,7 @@ int __init eeprom_init(void)
   return 0;
 }
 
-/*#**************************************************************************
-*#                                                            
-*# FUNCTION NAME: eeprom_open
-*#                                                            
-*# PARAMETERS   : inode    : Pointer to the inode
-*#                file     : Pointer to the file
-*#                                                            
-*# RETURNS      : 0 if OK
-*#                                                            
-*# SIDE EFFECTS : 
-*#                                                            
-*# DESCRIPTION  : Opens the device.
-*#                                                            
-*#---------------------------------------------------------------------------
-*# HISTORY                                                    
-*#                                                            
-*# DATE         NAME            CHANGES                       
-*# ----         ----            -------                       
-*# Aug 28 1999  Edgar Iglesias  Initial version               
-*# Sep 03 1999  Edgar Iglesias  Removed users check.
-*#
-*#**************************************************************************/
+/* Opens the device. */
 
 static int eeprom_open(struct inode * inode, struct file * file)
 {
@@ -486,29 +420,7 @@ static int eeprom_open(struct inode * inode, struct file * file)
   return -EFAULT;
 }
 
-/*#**************************************************************************
-*#                                                            
-*# FUNCTION NAME: eeprom_lseek
-*#                                                            
-*# PARAMETERS   : file     : Pointer to the file
-*#                offset   : The offset (in bytes)
-*#                orig     : look at the note
-*#                                                            
-*# RETURNS      : 0 if OK
-*#                                                            
-*# SIDE EFFECTS : 
-*#                                                            
-*# DESCRIPTION  : Changes the current file position.
-*#                                                            
-*#---------------------------------------------------------------------------
-*# HISTORY                                                    
-*#                                                            
-*# DATE         NAME            CHANGES                       
-*# ----         ----            -------                       
-*# Aug 28 1999  Edgar Iglesias  Initial version
-*# Sep 03 1999  Edgar Iglesias  Return -EOVERFLOW when beyond eeprom size.
-*#
-*#**************************************************************************/
+/* Changes the current file position. */
 
 static loff_t eeprom_lseek(struct file * file, loff_t offset, int orig)
 {
@@ -549,29 +461,8 @@ static loff_t eeprom_lseek(struct file * file, loff_t offset, int orig)
   return ( file->f_pos );
 }
 
-/*#**************************************************************************
-*#                                                            
-*# FUNCTION NAME: eeprom_read
-*#                                                            
-*# PARAMETERS   : inode    : Pointer to the inode
-*#                file     : Pointer to the file
-*#                buf      : Destination buffer
-*#                count    : max nr bytes to read
-*#                                                            
-*# RETURNS      : number of read bytes.
-*#                                                            
-*# SIDE EFFECTS : updates file->f_pos
-*#                                                            
-*# DESCRIPTION  : Reads data from eeprom.
-*#                                                            
-*#---------------------------------------------------------------------------
-*# HISTORY                                                    
-*#                                                            
-*# DATE         NAME            CHANGES                       
-*# ----         ----            -------                       
-*# Jan 17 2000  Johan Adolfsson Initial version
-*#
-*#**************************************************************************/
+/* Reads data from eeprom. */
+
 static int eeprom_read_buf(unsigned long addr,
                            char * buf, int count)
 {
@@ -583,31 +474,7 @@ static int eeprom_read_buf(unsigned long addr,
 
 
 
-/*#**************************************************************************
-*#                                                            
-*# FUNCTION NAME: eeprom_read
-*#                                                            
-*# PARAMETERS   : file     : Pointer to the file
-*#                buf      : Destination buffer
-*#                count    : max nr bytes to read
-*#                                                            
-*# RETURNS      : number of read bytes.
-*#                                                            
-*# SIDE EFFECTS : updates file->f_pos
-*#                                                            
-*# DESCRIPTION  : Reads data from eeprom.
-*#                                                            
-*#---------------------------------------------------------------------------
-*# HISTORY                                                    
-*#                                                            
-*# DATE         NAME            CHANGES                       
-*# ----         ----            -------                       
-*# Aug 28 1999  Edgar Iglesias  Initial version               
-*# Aug 31 1999  Edgar Iglesias  Made operation atomic with wait queues
-*# Sep 03 1999  Edgar Iglesias  Added bail-out stuff if we get interrupted
-*#                              in the spin-lock.
-*#
-*#**************************************************************************/
+/* Reads data from eeprom. */
 
 static ssize_t eeprom_read(struct file * file, char * buf, size_t count, loff_t *off)
 {
@@ -636,8 +503,8 @@ static ssize_t eeprom_read(struct file * file, char * buf, size_t count, loff_t 
   
   if(!eeprom_address(p))
   {
-    printk("eeprom: Read failed to address the eeprom: "
-           "0x%08X (%i) page: %i\n", p, p, page);
+    printk(KERN_INFO "%s: Read failed to address the eeprom: "
+           "0x%08X (%i) page: %i\n", eeprom_name, p, p, page);
     i2c_stop();
     
     /* don't forget to wake them up */
@@ -674,30 +541,9 @@ static ssize_t eeprom_read(struct file * file, char * buf, size_t count, loff_t 
   return read;
 }
 
-/*#**************************************************************************
-*#                                                            
-*# FUNCTION NAME: eeprom_write_buf
-*#                                                            
-*# PARAMETERS   : addr     : Address to write to
-*#                buf      : Data buffer to write from
-*#                count    : number bytes to write
-*#                                                            
-*# RETURNS      : number of bytes actualy written.
-*#                                                            
-*# SIDE EFFECTS : None
-*#             
-*# DESCRIPTION  : Writes data to eeprom.
-*#                                                            
-*#---------------------------------------------------------------------------
-*# HISTORY                                                    
-*#                                                            
-*# DATE         NAME            CHANGES                       
-*# ----         ----            -------                       
-*# Jan 17 2000  Johan Adolfsson Initial vesion
-*#
-*#**************************************************************************/
-static int eeprom_write_buf(unsigned long int addr,
-                            const char * buf, int count)
+/* Writes data to eeprom. */
+
+static int eeprom_write_buf(unsigned long addr, const char * buf, int count)
 {
   struct file f;
 
@@ -707,33 +553,7 @@ static int eeprom_write_buf(unsigned long int addr,
 }
 
 
-/*#**************************************************************************
-*#                                                            
-*# FUNCTION NAME: eeprom_write
-*#                                                            
-*# PARAMETERS   : file     : Pointer to the file
-*#                buf      : Data buffer to write from
-*#                count    : number bytes to write
-*#                                                            
-*# RETURNS      : number of bytes actualy written.
-*#                                                            
-*# SIDE EFFECTS : updates file->f_pos
-*#             
-*# DESCRIPTION  : Writes data to eeprom.
-*#                                                            
-*#---------------------------------------------------------------------------
-*# HISTORY                                                    
-*#                                                            
-*# DATE         NAME            CHANGES                       
-*# ----         ----            -------                       
-*# Aug 28 1999  Edgar Iglesias  Initial version               
-*# Aug 31 1999  Edgar Iglesias  Made operation atomic with wait queues
-*# Sep 03 1999  Edgar Iglesias  Moved the actual reading to read_from_eeprom
-*# Sep 03 1999  Edgar Iglesias  Added bail-out stuff if we get interrupted
-*#                              in the spin-lock.
-*# May 18 2000  Edgar Iglesias  Make sure to end write cycle after every write.
-*#
-*#**************************************************************************/
+/* Writes data to eeprom. */
 
 static ssize_t eeprom_write(struct file * file, const char * buf, size_t count,
                             loff_t *off)
@@ -761,8 +581,8 @@ static ssize_t eeprom_write(struct file * file, const char * buf, size_t count,
       /* address the eeprom */
       if(!eeprom_address(p))
       {
-        printk("eeprom: Write failed to address the eeprom: 0x%08X (%i) \n", 
-               p, p);
+        printk(KERN_INFO "%s: Write failed to address the eeprom: "
+               "0x%08X (%i) \n", eeprom_name, p, p);
         i2c_stop();
         
         /* don't forget to wake them up */
@@ -868,7 +688,7 @@ static ssize_t eeprom_write(struct file * file, const char * buf, size_t count,
         if(!i2c_getack())
         {
           restart=1;
-          printk("eeprom: write error, retrying. %d\n", i);
+          printk(KERN_INFO "%s: write error, retrying. %d\n", eeprom_name, i);
           i2c_stop();
           break;
         }
@@ -891,28 +711,7 @@ static ssize_t eeprom_write(struct file * file, const char * buf, size_t count,
   return written;
 }
 
-/*#**************************************************************************
-*#                                                            
-*# FUNCTION NAME: eeprom_close
-*#                                                            
-*# PARAMETERS   : inode    : Pointer to the inode
-*#                file     : Pointer to the file
-*#
-*# RETURNS      : nothing
-*#
-*# SIDE EFFECTS :
-*#
-*# DESCRIPTION  : Closes the device.
-*#
-*#---------------------------------------------------------------------------
-*# HISTORY                                                    
-*#
-*# DATE         NAME            CHANGES                       
-*# ----         ----            -------                       
-*# Aug 28 1999  Edgar Iglesias  Initial version               
-*# Sep 03 1999  Edgar Iglesias  Removed eeprom.users stuff.
-*#
-*#**************************************************************************/
+/* Closes the device. */
 
 static int eeprom_close(struct inode * inode, struct file * file)
 {
@@ -920,27 +719,7 @@ static int eeprom_close(struct inode * inode, struct file * file)
   return 0;
 }
 
-/*#**************************************************************************
-*#                                                            
-*# FUNCTION NAME: eeprom_address
-*#                                                            
-*# PARAMETERS   : addr     : Address to be given to eeprom
-*#
-*# RETURNS      : 1 if OK, 0 if failure.
-*#
-*# SIDE EFFECTS :
-*#
-*# DESCRIPTION  : Sets the current address of the eeprom.
-*#
-*#---------------------------------------------------------------------------
-*# HISTORY                                                    
-*#
-*# DATE         NAME            CHANGES                       
-*# ----         ----            -------                       
-*# Aug 28 1999  Edgar Iglesias  Initial version               
-*# Sep 03 1999  Edgar Iglesias  Corrected typo.
-*#
-*#**************************************************************************/
+/* Sets the current address of the eeprom. */
 
 static int eeprom_address(unsigned long addr)
 {
@@ -999,27 +778,7 @@ static int eeprom_address(unsigned long addr)
   return 1;
 }
 
-/*#**************************************************************************
-*#                                                            
-*# FUNCTION NAME: read_from_eeprom
-*#                                                            
-*# PARAMETERS   : buf      : Destination buffer.
-*#                count    : Number of bytes to read.
-*#
-*# RETURNS      : number of read bytes or -EFAULT.
-*#
-*# SIDE EFFECTS :
-*#
-*# DESCRIPTION  : Reads from current adress.
-*#
-*#---------------------------------------------------------------------------
-*# HISTORY                                                    
-*#
-*# DATE         NAME            CHANGES                       
-*# ----         ----            -------                       
-*# Sep 03 1999  Edgar Iglesias  Initial version               
-*#
-*#**************************************************************************/
+/* Reads from current adress. */
 
 static int read_from_eeprom(char * buf, int count)
 {
@@ -1040,7 +799,7 @@ static int read_from_eeprom(char * buf, int count)
   
   if(i == EEPROM_RETRIES)
   {
-    printk("eeprom: failed to read from eeprom\n");
+    printk(KERN_INFO "%s: failed to read from eeprom\n", eeprom_name);
     i2c_stop();
     
     return -EFAULT;
@@ -1066,26 +825,8 @@ static int read_from_eeprom(char * buf, int count)
   return read;
 }
 
-/*#**************************************************************************
-*#                                                            
-*# FUNCTION NAME: eeprom_disable_write_protect
-*#                                                            
-*# PARAMETERS   : None
-*#
-*# RETURNS      : Nothing
-*#
-*# SIDE EFFECTS :
-*#
-*# DESCRIPTION  : Disables write protection if applicable
-*#
-*#---------------------------------------------------------------------------
-*# HISTORY                                                    
-*#
-*# DATE         NAME            CHANGES                       
-*# ----         ----            -------                       
-*# Jan 14 2000  Johan Adolfsson Initial version (from PS pareerom.c)
-*#
-*#**************************************************************************/
+/* Disables write protection if applicable. */
+
 #define DBP_SAVE(x)
 #define ax_printf printk
 static void eeprom_disable_write_protect(void)
@@ -1133,7 +874,7 @@ static void eeprom_disable_write_protect(void)
     }
     i2c_stop();
     
-    /* Step 3 Set BP1, BP0, and/or WPEN bits (write 00000110 to address 1FFFh*/
+    /* Step 3 Set BP1, BP0, and/or WPEN bits (write 00000110 to address 1FFFh */
     i2c_start();
     i2c_outbyte(0xbe);
     if(!i2c_getack())
@@ -1157,5 +898,3 @@ static void eeprom_disable_write_protect(void)
 }
 
 module_init(eeprom_init);
-
-/********************** END OF FILE e100eeprom.c *****************************/

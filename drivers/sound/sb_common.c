@@ -45,10 +45,10 @@
  * global module flag
  */
 
-int sb_be_quiet = 0;
+int sb_be_quiet;
 
-static sb_devc *detected_devc = NULL;	/* For communication from probe to init */
-static sb_devc *last_devc = NULL;	/* For MPU401 initialization */
+static sb_devc *detected_devc;	/* For communication from probe to init */
+static sb_devc *last_devc;	/* For MPU401 initialization */
 
 static unsigned char jazz_irq_bits[] = {
 	0, 0, 2, 3, 0, 1, 0, 4, 0, 2, 5, 0, 0, 0, 0, 6
@@ -58,14 +58,14 @@ static unsigned char jazz_dma_bits[] = {
 	0, 1, 0, 2, 0, 3, 0, 4
 };
 
-void *smw_free = NULL;
+void *smw_free;
 
 /*
  * Jazz16 chipset specific control variables
  */
 
-static int jazz16_base = 0;		/* Not detected */
-static unsigned char jazz16_bits = 0;	/* I/O relocation bits */
+static int jazz16_base;			/* Not detected */
+static unsigned char jazz16_bits;	/* I/O relocation bits */
 static spinlock_t jazz16_lock = SPIN_LOCK_UNLOCKED;
 
 /*
@@ -75,12 +75,12 @@ static spinlock_t jazz16_lock = SPIN_LOCK_UNLOCKED;
 #ifdef SMW_MIDI0001_INCLUDED
 #include "smw-midi0001.h"
 #else
-static unsigned char *smw_ucode = NULL;
-static int      smw_ucodeLen = 0;
+static unsigned char *smw_ucode;
+static int      smw_ucodeLen;
 
 #endif
 
-sb_devc *last_sb = NULL;		/* Last sb loaded */
+sb_devc *last_sb;		/* Last sb loaded */
 
 int sb_dsp_command(sb_devc * devc, unsigned char val)
 {

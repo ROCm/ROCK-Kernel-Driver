@@ -420,6 +420,7 @@ void smp_ptlb_callback(void *info)
 void smp_ptlb_all(void)
 {
         smp_ext_call_others(smp_ptlb_callback, NULL, 1);
+	local_flush_tlb();
 }
 
 /*
@@ -522,8 +523,7 @@ smp_call_function(void (*func)(void *info), void *info, int retry, int wait)
  */
 {
         if (atomic_read(&smp_commenced) != 0)
-                smp_ext_call_others(func, info, 1);
-        (func)(info);
+                smp_ext_call_others(func, info, wait);
         return 0;
 }
 
@@ -776,3 +776,4 @@ EXPORT_SYMBOL(lowcore_ptr);
 EXPORT_SYMBOL(kernel_flag);
 EXPORT_SYMBOL(smp_ctl_set_bit);
 EXPORT_SYMBOL(smp_ctl_clear_bit);
+EXPORT_SYMBOL(smp_num_cpus);

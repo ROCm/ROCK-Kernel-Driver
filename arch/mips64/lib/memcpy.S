@@ -238,8 +238,10 @@ begin_movement:
 	 andi	ta2, a2, 0x40
 
 move_128bytes:
+#if (_MIPS_ISA == _MIPS_ISA_MIPS4)
 	pref	0, 2*128(a0)
 	pref	1, 2*128(a1)
+#endif
 	MOVE_BIGGERCHUNK(a1, a0, 0x00, ta0, ta1, ta3, t0)
 	MOVE_BIGGERCHUNK(a1, a0, 0x40, ta0, ta1, ta3, t0)
 	dsubu	t8, t8, 0x01

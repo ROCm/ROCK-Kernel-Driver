@@ -115,6 +115,12 @@
  *	themselves, but we'll see.  
  *	
  * History
+ *  v0.15 - May 21 2001 - Marcus Meissner <mm@caldera.de>
+ *      Ported to Linux 2.4 PCI API. Some clean ups, global devs list
+ *      removed (now using pci device driver data).
+ *      PM needs to be polished still. Bumped version.
+ *  (still kind of v0.14) May 13 2001 - Ben Pfaff <pfaffben@msu.edu>
+ *      Add support for 978 docking and basic hardware volume control
  *  (still kind of v0.14) Nov 23 - Alan Cox <alan@redhat.com>
  *	Add clocking= for people with seriously warped hardware
  *  (still v0.14) Nov 10 2000 - Bartlomiej Zolnierkiewicz <bkz@linux-ide.org>
@@ -189,7 +195,7 @@
  *	fix bob frequency
  *	endianness
  *	do smart things with ac97 2.0 bits.
- *	docking and dual codecs and 978?
+ *	dual codecs
  *	leave 54->61 open
  *
  *	it also would be fun to have a mode that would not use pci dma at all
@@ -204,28 +210,6 @@
 #include <linux/sched.h>
 #include <linux/smp_lock.h>
 #include <linux/wrapper.h>
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
-
- #define DECLARE_WAITQUEUE(QUEUE,INIT) struct wait_queue QUEUE = {INIT, NULL}
- #define wait_queue_head_t struct wait_queue *
- #define SILLY_PCI_BASE_ADDRESS(PCIDEV) (PCIDEV->base_address[0] & PCI_BASE_ADDRESS_IO_MASK)
- #define SILLY_INIT_SEM(SEM) SEM=MUTEX;
- #define init_waitqueue_head init_waitqueue
- #define SILLY_MAKE_INIT(FUNC) __initfunc(FUNC)
- #define SILLY_OFFSET(VMA) ((VMA)->vm_offset)
-
-
-#else
-
- #define SILLY_PCI_BASE_ADDRESS(PCIDEV) (PCIDEV->resource[0].start)
- #define SILLY_INIT_SEM(SEM) init_MUTEX(&SEM)
- #define SILLY_MAKE_INIT(FUNC) __init FUNC
- #define SILLY_OFFSET(VMA) ((VMA)->vm_pgoff)
-
-
-#endif
-
 #include <linux/string.h>
 #include <linux/ctype.h>
 #include <linux/ioport.h>
@@ -249,6 +233,8 @@ static int maestro_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *d);
 
 #include "maestro.h"
 
+static struct pci_driver maestro_pci_driver;
+
 /* --------------------------------------------------------------------- */
 
 #define M_DEBUG 1
@@ -269,8 +255,17 @@ static int use_pm=2; /* set to 1 for force */
 	
 static int clocking=48000;
 
+MODULE_AUTHOR("Zach Brown <zab@zabbo.net>, Alan Cox <alan@redhat.com>");
+MODULE_DESCRIPTION("ESS Maestro Driver");
+#ifdef M_DEBUG
+MODULE_PARM(debug,"i");
+#endif
+MODULE_PARM(dsps_order,"i");
+MODULE_PARM(use_pm,"i");
+MODULE_PARM(clocking, "i");
+
 /* --------------------------------------------------------------------- */
-#define DRIVER_VERSION "0.14"
+#define DRIVER_VERSION "0.15"
 
 #ifndef PCI_VENDOR_ESS
 #define PCI_VENDOR_ESS			0x125D
@@ -351,6 +346,11 @@ u16 acpi_state_mask[] = {
 	[ACPI_D2] = ACPI_SLEEP,
 	[ACPI_D3] = ACPI_NONE
 };
+
+static char version[] __devinitdata =
+KERN_INFO "maestro: version " DRIVER_VERSION " time " __TIME__ " " __DATE__ "\n";
+
+
 
 static const unsigned sample_size[] = { 1, 2, 2, 4 };
 static const unsigned sample_shift[] = { 0, 1, 1, 2 };
@@ -483,7 +483,11 @@ struct ess_card {
 
 	int bob_freq;
 	char dsps_open;
+
+	int dock_mute_vol;
 };
+
+static void set_mixer(struct ess_card *card,unsigned int mixer, unsigned int val );
 
 static unsigned 
 ld2(unsigned int x)
@@ -515,8 +519,6 @@ ld2(unsigned int x)
 /* --------------------------------------------------------------------- */
 
 static void check_suspend(struct ess_card *card);
-
-static struct ess_card *devs = NULL;
 
 /* --------------------------------------------------------------------- */
 
@@ -983,6 +985,17 @@ maestro_ac97_reset(int ioaddr, struct pci_dev *pcidev)
 		outw(inw(ioaddr+0x68) | 0x600, ioaddr + 0x68);
 		outw(0x0209, ioaddr + 0x60);
 	}
+
+	/* Turn on the 978 docking chip.
+	   First frob the "master output enable" bit,
+	   then set most of the playback volume control registers to max. */
+	outb(inb(ioaddr+0xc0)|(1<<5), ioaddr+0xc0);
+	outb(0xff, ioaddr+0xc3);
+	outb(0xff, ioaddr+0xc4);
+	outb(0xff, ioaddr+0xc6);
+	outb(0xff, ioaddr+0xc8);
+	outb(0x3f, ioaddr+0xcf);
+	outb(0x3f, ioaddr+0xd0);
 }
 /*
  *	Indirect register access. Not all registers are readable so we
@@ -1895,19 +1908,52 @@ ess_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	outw(inw(c->iobase+4)&1, c->iobase+4);
 
 /*	M_printk("maestro int: %x\n",event);*/
-
 	if(event&(1<<6))
 	{
-		/* XXX if we have a hw volume control int enable
-			all the ints?  doesn't make sense.. */
-		event = inw(c->iobase+0x18);
-		outb(0xFF, c->iobase+0x1A);
+		int x;
+		enum {UP_EVT, DOWN_EVT, MUTE_EVT} vol_evt;
+		int volume;
+
+		/* Figure out which volume control button was pushed,
+		   based on differences from the default register
+		   values. */
+		x = inb(c->iobase+0x1c);
+		if (x&1) vol_evt = MUTE_EVT;
+		else if (((x>>1)&7) > 4) vol_evt = UP_EVT;
+		else vol_evt = DOWN_EVT;
+
+		/* Reset the volume control registers. */
+		outb(0x88, c->iobase+0x1c);
+		outb(0x88, c->iobase+0x1d);
+		outb(0x88, c->iobase+0x1e);
+		outb(0x88, c->iobase+0x1f);
+
+		/* Deal with the button press in a hammer-handed
+		   manner by adjusting the master mixer volume. */
+		volume = c->mix.mixer_state[0] & 0xff;
+		if (vol_evt == UP_EVT) {
+			volume += 10;
+			if (volume > 100)
+				volume = 100;
+		}
+		else if (vol_evt == DOWN_EVT) {
+			volume -= 10;
+			if (volume < 0)
+				volume = 0;
+		} else {
+			/* vol_evt == MUTE_EVT */
+			if (volume == 0)
+				volume = c->dock_mute_vol;
+			else {
+				c->dock_mute_vol = volume;
+				volume = 0;
+			}
+		}
+		set_mixer (c, 0, (volume << 8) | volume);
 	}
-	else
-	{
-		/* else ack 'em all, i imagine */
-		outb(0xFF, c->iobase+0x1A);
-	}
+
+	/* Ack all the interrupts. */
+	outb(0xFF, c->iobase+0x1A);
 		
 	/*
 	 *	Update the pointers for all APU's we are running.
@@ -2083,17 +2129,25 @@ static loff_t ess_llseek(struct file *file, loff_t offset, int origin)
 }
 
 /* --------------------------------------------------------------------- */
-
 static int ess_open_mixdev(struct inode *inode, struct file *file)
 {
 	int minor = MINOR(inode->i_rdev);
-	struct ess_card *card = devs;
+	struct ess_card *card = NULL;
+	struct pci_dev *pdev;
+	struct pci_driver *drvr;
 
-	while (card && card->dev_mixer != minor)
-		card = card->next;
+	pci_for_each_dev(pdev) {
+		drvr = pci_dev_driver (pdev);
+		if (drvr == &maestro_pci_driver) {
+			card = (struct ess_card*)pci_get_drvdata (pdev);
+			if (!card)
+				continue;
+			if (card->dev_mixer == minor)
+				break;
+		}
+	}
 	if (!card)
 		return -ENODEV;
-
 	file->private_data = card;
 	return 0;
 }
@@ -2455,7 +2509,7 @@ static int ess_mmap(struct file *file, struct vm_area_struct *vma)
 #endif
 		goto out;
 	ret = -EINVAL;
-	if (SILLY_OFFSET(vma) != 0)
+	if (vma->vm_pgoff != 0)
 		goto out;
 	size = vma->vm_end - vma->vm_start;
 	if (size > (PAGE_SIZE << db->buforder))
@@ -2919,33 +2973,40 @@ static int
 ess_open(struct inode *inode, struct file *file)
 {
 	int minor = MINOR(inode->i_rdev);
-	struct ess_card *c = devs;
-	struct ess_state *s = NULL, *sp;
-	int i;
+	struct ess_state *s = NULL;
 	unsigned char fmtm = ~0, fmts = 0;
-
+	struct pci_dev *pdev;
 	/*
 	 *	Scan the cards and find the channel. We only
 	 *	do this at open time so it is ok
 	 */
-	 
-	while (c!=NULL)
-	{
-		for(i=0;i<NR_DSPS;i++)
-		{
-			sp=&c->channels[i];
-			if(sp->dev_audio < 0)
+
+	pci_for_each_dev(pdev) {
+		struct ess_card *c;
+		struct pci_driver *drvr;
+
+		drvr = pci_dev_driver (pdev);
+		if (drvr == &maestro_pci_driver) {
+			int i;
+			struct ess_state *sp;
+
+			c = (struct ess_card*)pci_get_drvdata (pdev);
+			if (!c)
 				continue;
-			if((sp->dev_audio ^ minor) & ~0xf)
-				continue;
-			s=sp;
+			for(i=0;i<NR_DSPS;i++)
+			{
+				sp=&c->channels[i];
+				if(sp->dev_audio < 0)
+					continue;
+				if((sp->dev_audio ^ minor) & ~0xf)
+					continue;
+				s=sp;
+			}
 		}
-		c=c->next;
 	}
-		
 	if (!s)
 		return -ENODEV;
-		
+
        	VALIDATE_STATE(s);
 	file->private_data = s;
 	/* wait for device to become free */
@@ -3087,8 +3148,8 @@ maestro_config(struct ess_card *card)
 	/* XXX how do we know which to use? */
 	w&=~(1<<14);		/* External clock */
 	
-	w&=~(1<<7);		/* HWV off */
-	w&=~(1<<6);		/* Debounce off */
+	w|= (1<<7);		/* Hardware volume control on */
+	w|= (1<<6);		/* Debounce off: easier to push the HWV buttons. */
 	w&=~(1<<5);		/* GPIO 4:5 */
 	w|= (1<<4);             /* Disconnect from the CHI.  Enabling this made a dell 7500 work. */
 	w&=~(1<<2);		/* MIDI fix off (undoc) */
@@ -3106,6 +3167,12 @@ maestro_config(struct ess_card *card)
 	 
 	pci_write_config_word(pcidev, 0x40, w);
 
+	/* Set up 978 docking control chip. */
+	pci_read_config_word(pcidev, 0x58, &w);
+	w|=1<<2;	/* Enable 978. */
+	w|=1<<3;	/* Turn on 978 hardware volume control. */
+	w&=~(1<<11);	/* Turn on 978 mixer volume control. */
+	pci_write_config_word(pcidev, 0x58, w);
 	
 	sound_reset(iobase);
 
@@ -3170,7 +3237,7 @@ maestro_config(struct ess_card *card)
 	outw(w, iobase+0x18);
 
 	w=inw(iobase+0x18);
-	w&=~(1<<6);		/* Harpo off */
+	w&=~(1<<6);		/* Hardware volume control interrupt off... for now. */
 	outw(w, iobase+0x18);
 	
 	w=inw(iobase+0x18);
@@ -3192,6 +3259,13 @@ maestro_config(struct ess_card *card)
 	w=inw(iobase+0x18);
 	w|=(1<<0);		/* SB IRQ on */
 	outw(w, iobase+0x18);
+
+	/* Set hardware volume control registers to midpoints.
+	   We can tell which button was pushed based on how they change. */
+	outb(0x88, iobase+0x1c);
+	outb(0x88, iobase+0x1d);
+	outb(0x88, iobase+0x1e);
+	outb(0x88, iobase+0x1f);
 
 	/* it appears some maestros (dell 7500) only work if these are set,
 		regardless of wether we use the assp or not. */
@@ -3308,32 +3382,44 @@ parse_power(struct ess_card *card, struct pci_dev *pcidev)
 }
 
 static int __init
-maestro_install(struct pci_dev *pcidev, int card_type)
+maestro_probe(struct pci_dev *pcidev,const struct pci_device_id *pdid)
 {
+	int card_type = pdid->driver_data;
 	u32 n;
 	int iobase;
-	int i;
+	int i, ret;
 	struct ess_card *card;
 	struct ess_state *ess;
 	struct pm_dev *pmdev;
 	int num = 0;
 
+/* when built into the kernel, we only print version if device is found */
+#ifndef MODULE
+	static int printed_version;
+	if (!printed_version++)
+		printk(version);
+#endif
+
 	/* don't pick up weird modem maestros */
 	if(((pcidev->class >> 8) & 0xffff) != PCI_CLASS_MULTIMEDIA_AUDIO)
-		return 0;
+		return -ENODEV;
+
+
+	if ((ret=pci_enable_device(pcidev)))
+		return ret;
 			
-	iobase = SILLY_PCI_BASE_ADDRESS(pcidev); 
+	iobase = pci_resource_start(pcidev,0);
+	if (!iobase || !(pci_resource_flags(pcidev, 0 ) & IORESOURCE_IO))
+		return -ENODEV;
+
+	if(pcidev->irq == 0)
+		return -ENODEV;
 
 	/* stake our claim on the iospace */
 	if( request_region(iobase, 256, card_names[card_type]) == NULL )
 	{
 		printk(KERN_WARNING "maestro: can't allocate 256 bytes I/O at 0x%4.4x\n", iobase);
-		return 0;
-	}
-
-	/* this was tripping up some machines */
-	if(pcidev->irq == 0) {
-		printk(KERN_WARNING "maestro: pci subsystem reports irq 0, this might not be correct.\n");
+		return -EBUSY;
 	}
 
 	/* just to be sure */
@@ -3343,7 +3429,8 @@ maestro_install(struct pci_dev *pcidev, int card_type)
 	if(card == NULL)
 	{
 		printk(KERN_WARNING "maestro: out of memory\n");
-		return 0;
+		release_region(iobase, 256);
+		return -ENOMEM;
 	}
 	
 	memset(card, 0, sizeof(*card));
@@ -3354,18 +3441,14 @@ maestro_install(struct pci_dev *pcidev, int card_type)
 	if (pmdev)
 		pmdev->data = card;
 
-	if (register_reboot_notifier(&maestro_nb)) {
-		printk(KERN_WARNING "maestro: reboot notifier registration failed; may not reboot properly.\n");
-	}
-
 	card->iobase = iobase;
 	card->card_type = card_type;
 	card->irq = pcidev->irq;
-	card->next = devs;
 	card->magic = ESS_CARD_MAGIC;
 	spin_lock_init(&card->lock);
 	init_waitqueue_head(&card->suspend_queue);
-	devs = card;
+
+	card->dock_mute_vol = 50;
 	
 	/* init our groups of 6 apus */
 	for(i=0;i<NR_DSPS;i++)
@@ -3379,7 +3462,7 @@ maestro_install(struct pci_dev *pcidev, int card_type)
 		init_waitqueue_head(&s->dma_dac.wait);
 		init_waitqueue_head(&s->open_wait);
 		spin_lock_init(&s->lock);
-		SILLY_INIT_SEM(s->open_sem);
+		init_MUTEX(&s->open_sem);
 		s->magic = ESS_STATE_MAGIC;
 		
 		s->apu[0] = 6*i;
@@ -3406,19 +3489,6 @@ maestro_install(struct pci_dev *pcidev, int card_type)
 	}
 	
 	ess = &card->channels[0];
-
-	if (pci_enable_device(pcidev)) {
-		printk (KERN_ERR "maestro: pci_enable_device() failed\n");
-		for (i = 0; i < NR_DSPS; i++) {
-			struct ess_state *s = &card->channels[i];
-			if (s->dev_audio != -1)
-				unregister_sound_dsp(s->dev_audio);
-		}
-		release_region(card->iobase, 256);
-		unregister_reboot_notifier(&maestro_nb);
-		kfree(card);
-		return 0;
-	}
 
 	/*
 	 *	Ok card ready. Begin setup proper
@@ -3469,7 +3539,7 @@ maestro_install(struct pci_dev *pcidev, int card_type)
 		mixer_push_state(card);
 	}
 	
-	if(request_irq(card->irq, ess_interrupt, SA_SHIRQ, card_names[card_type], card))
+	if((ret=request_irq(card->irq, ess_interrupt, SA_SHIRQ, card_names[card_type], card)))
 	{
 		printk(KERN_ERR "maestro: unable to allocate irq %d,\n", card->irq);
 		unregister_sound_mixer(card->dev_mixer);
@@ -3482,26 +3552,69 @@ maestro_install(struct pci_dev *pcidev, int card_type)
 		release_region(card->iobase, 256);		
 		unregister_reboot_notifier(&maestro_nb);
 		kfree(card);
-		return 0;
+		return ret;
 	}
+
+	/* Turn on hardware volume control interrupt.
+	   This has to come after we grab the IRQ above,
+	   or a crash will result on installation if a button has been pressed,
+	   because in that case we'll get an immediate interrupt. */
+	n = inw(iobase+0x18);
+	n|=(1<<6);
+	outw(n, iobase+0x18);
+
+	pci_set_drvdata(pcidev,card);
 	/* now go to sleep 'till something interesting happens */
 	maestro_power(card,ACPI_D2);
 
 	printk(KERN_INFO "maestro: %d channels configured.\n", num);
-	return 1; 
+	return 0;
 }
+
+static void maestro_remove(struct pci_dev *pcidev) {
+	struct ess_card *card = pci_get_drvdata(pcidev);
+	int i;
+	
+	/* XXX maybe should force stop bob, but should be all 
+		stopped by _release by now */
+	free_irq(card->irq, card);
+	unregister_sound_mixer(card->dev_mixer);
+	for(i=0;i<NR_DSPS;i++)
+	{
+		struct ess_state *ess = &card->channels[i];
+		if(ess->dev_audio != -1)
+			unregister_sound_dsp(ess->dev_audio);
+	}
+	/* Goodbye, Mr. Bond. */
+	maestro_power(card,ACPI_D3);
+ 	release_region(card->iobase, 256);
+	kfree(card);
+	pci_set_drvdata(pcidev,NULL);
+}
+
+static struct pci_device_id maestro_pci_tbl[] __devinitdata = {
+	{PCI_VENDOR_ESS, PCI_DEVICE_ID_ESS_ESS1968, PCI_ANY_ID, PCI_ANY_ID, 0, 0, TYPE_MAESTRO2},
+	{PCI_VENDOR_ESS, PCI_DEVICE_ID_ESS_ESS1978, PCI_ANY_ID, PCI_ANY_ID, 0, 0, TYPE_MAESTRO2E},
+	{PCI_VENDOR_ESS_OLD, PCI_DEVICE_ID_ESS_ESS0100, PCI_ANY_ID, PCI_ANY_ID, 0, 0, TYPE_MAESTRO},
+	{0,}
+};
+MODULE_DEVICE_TABLE(pci, maestro_pci_tbl);
+
+static struct pci_driver maestro_pci_driver = {
+	name:"maestro",
+	id_table:maestro_pci_tbl,
+	probe:maestro_probe,
+	remove:maestro_remove,
+};
 
 int __init init_maestro(void)
 {
-	struct pci_dev *pcidev = NULL;
-	int foundone = 0;
-
-	if (!pci_present())   /* No PCI bus in this machine! */
-		return -ENODEV;
-	printk(KERN_INFO "maestro: version " DRIVER_VERSION " time " __TIME__ " " __DATE__ "\n");
-
-	pcidev = NULL;
-
+	pci_module_init(&maestro_pci_driver);
+	if (register_reboot_notifier(&maestro_nb))
+		printk(KERN_WARNING "maestro: reboot notifier registration failed; may not reboot properly.\n");
+#ifdef MODULE
+	printk(version);
+#endif
 	if (dsps_order < 0)   {
 		dsps_order = 1;
 		printk(KERN_WARNING "maestro: clipping dsps_order to %d\n",dsps_order);
@@ -3510,96 +3623,28 @@ int __init init_maestro(void)
 		dsps_order = MAX_DSP_ORDER;
 		printk(KERN_WARNING "maestro: clipping dsps_order to %d\n",dsps_order);
 	}
-
-	/*
-	 *	Find the ESS Maestro 2.
-	 */
-
-	while( (pcidev = pci_find_device(PCI_VENDOR_ESS, PCI_DEVICE_ID_ESS_ESS1968, pcidev))!=NULL ) {
-		if (maestro_install(pcidev, TYPE_MAESTRO2))
-			foundone=1;
-	}
-
-	/*
-	 *	Find the ESS Maestro 2E
-	 */
-
-	while( (pcidev = pci_find_device(PCI_VENDOR_ESS, PCI_DEVICE_ID_ESS_ESS1978, pcidev))!=NULL) {
-		if (maestro_install(pcidev, TYPE_MAESTRO2E))
-			foundone=1;
-	}
-
-	/*
-	 *	ESS Maestro 1
-	 */
-
-	while((pcidev = pci_find_device(PCI_VENDOR_ESS_OLD, PCI_DEVICE_ID_ESS_ESS0100, pcidev))!=NULL) {
-		if (maestro_install(pcidev, TYPE_MAESTRO))
-			foundone=1;
-	}
-	if( ! foundone ) {
-		printk("maestro: no devices found.\n");
-		return -ENODEV;
-	}
 	return 0;
-}
-
-static void nuke_maestros(void)
-{
-	struct ess_card *card;
-
-	/* we do these unconditionally, which is probably wrong */
-	pm_unregister_all(maestro_pm_callback);
-	unregister_reboot_notifier(&maestro_nb);
-
-	while ((card = devs)) {
-		int i;
-		devs = devs->next;
-	
-		/* XXX maybe should force stop bob, but should be all 
-			stopped by _release by now */
-		free_irq(card->irq, card);
-		unregister_sound_mixer(card->dev_mixer);
-		for(i=0;i<NR_DSPS;i++)
-		{
-			struct ess_state *ess = &card->channels[i];
-			if(ess->dev_audio != -1)
-				unregister_sound_dsp(ess->dev_audio);
-		}
-		/* Goodbye, Mr. Bond. */
-		maestro_power(card,ACPI_D3);
-		release_region(card->iobase, 256);
-		kfree(card);
-	}
-	devs = NULL;
 }
 
 static int maestro_notifier(struct notifier_block *nb, unsigned long event, void *buf)
 {
 	/* this notifier is called when the kernel is really shut down. */
 	M_printk("maestro: shutting down\n");
-	nuke_maestros();
+	/* this will remove all card instances too */
+	pci_unregister_driver(&maestro_pci_driver);
+	/* XXX dunno about power management */
 	return NOTIFY_OK;
 }
 
 /* --------------------------------------------------------------------- */
 
-#ifdef MODULE
-MODULE_AUTHOR("Zach Brown <zab@zabbo.net>, Alan Cox <alan@redhat.com>");
-MODULE_DESCRIPTION("ESS Maestro Driver");
-#ifdef M_DEBUG
-MODULE_PARM(debug,"i");
-#endif
-MODULE_PARM(dsps_order,"i");
-MODULE_PARM(use_pm,"i");
-MODULE_PARM(clocking, "i");
 
-void cleanup_module(void) {
+void cleanup_maestro(void) {
 	M_printk("maestro: unloading\n");
-	nuke_maestros();
+	pci_unregister_driver(&maestro_pci_driver);
+	pm_unregister_all(maestro_pm_callback);
+	unregister_reboot_notifier(&maestro_nb);
 }
-
-#endif
 
 /* --------------------------------------------------------------------- */
 
@@ -3759,3 +3804,4 @@ out:
 }
 
 module_init(init_maestro);
+module_exit(cleanup_maestro);

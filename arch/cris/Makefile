@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.18 2001/04/17 13:58:38 orjanf Exp $
+# $Id: Makefile,v 1.19 2001/06/11 12:06:40 bjornw Exp $
 # cris/Makefile
 #
 # This file is included by the global makefile so that you can add your own
@@ -49,7 +49,12 @@ endif
 
 HEAD := arch/cris/kernel/head.o
 
-SUBDIRS += arch/cris/kernel arch/cris/mm arch/cris/lib arch/cris/drivers arch/cris/boot/rescue
+SUBDIRS += arch/cris/kernel arch/cris/mm arch/cris/lib arch/cris/drivers
+ifdef CONFIG_ETRAX_AXISFLASHMAP
+# only build this if axis flash map is used, because they depend on
+# each others config options
+SUBDIRS += arch/cris/boot/rescue
+endif
 CORE_FILES += arch/cris/kernel/kernel.o arch/cris/mm/mm.o arch/cris/drivers/drivers.o
 LIBGCC = $(shell $(CC) $(CFLAGS) -print-file-name=libgcc.a)
 LIBS := $(TOPDIR)/arch/cris/lib/lib.a $(LIBS) $(TOPDIR)/arch/cris/lib/lib.a $(LIBGCC)

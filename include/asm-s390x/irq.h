@@ -889,9 +889,9 @@ static inline void s390_do_profile (unsigned long addr)
         spin_lock_irqsave(&(ioinfo[irq]->irq_lock), flags)
 #define s390irq_spin_unlock_irqrestore(irq,flags) \
         spin_unlock_irqrestore(&(ioinfo[irq]->irq_lock), flags)
-#endif /* __KERNEL__ */
 
 #define touch_nmi_watchdog() do { } while(0)
 
+#endif /* __KERNEL__ */
 #endif
 

@@ -88,7 +88,7 @@
 /*
  * Valid machtype for group SGI
  */
-#define MACH_SGI_INDY		0	/* R4?K and R5K Indy workstaions */
+#define MACH_SGI_INDY		0	/* R4?K and R5K Indy workstations */
 #define MACH_SGI_CHALLENGE_S	1       /* The Challenge S server */
 #define MACH_SGI_INDIGO2	2	/* The Indigo2 system */
 #define MACH_SGI_IP27		3	/* Origin 200, Origin 2000, Onyx 2 */
@@ -144,6 +144,11 @@
 
 #define CL_SIZE      (80)
 
+#define BOOT_MEM_MAP_MAX        32
+#define BOOT_MEM_RAM            1
+#define BOOT_MEM_ROM_DATA       2
+#define BOOT_MEM_RESERVED       3
+
 #ifndef _LANGUAGE_ASSEMBLY
 
 /*
@@ -159,6 +164,24 @@ extern unsigned long mips_cputype;
 extern unsigned long mips_machtype;
 extern unsigned long mips_machgroup;
 extern unsigned long mips_tlb_entries;
+
+/*
+ * A memory map that's built upon what was determined
+ * or specified on the command line.
+ */
+struct boot_mem_map {
+        int nr_map;
+        struct {
+                unsigned long addr;     /* start of memory segment */
+                unsigned long size;     /* size of memory segment */
+                long type;              /* type of memory segment */
+        } map[BOOT_MEM_MAP_MAX];
+};
+
+extern struct boot_mem_map boot_mem_map;
+
+extern void add_memory_region(unsigned long start, unsigned long size,
+                              long type);
 
 #endif /* _LANGUAGE_ASSEMBLY */
 

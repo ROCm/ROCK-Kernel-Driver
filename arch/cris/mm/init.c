@@ -7,6 +7,12 @@
  *  Authors:  Bjorn Wesen (bjornw@axis.com)
  *
  *  $Log: init.c,v $
+ *  Revision 1.25  2001/06/13 00:02:23  bjornw
+ *  Use a separate variable to store the current pgd to avoid races in schedule
+ *
+ *  Revision 1.24  2001/05/15 00:52:20  hp
+ *  Only map segment 0xa as seg if CONFIG_JULIETTE
+ *
  *  Revision 1.23  2001/04/04 14:35:40  bjornw
  *  * Removed get_pte_slow and friends (2.4.3 change)
  *  * Removed bad_pmd handling (2.4.3 change)
@@ -85,6 +91,7 @@
 #include <asm/dma.h>
 #include <asm/svinto.h>
 #include <asm/io.h>
+#include <asm/mmu_context.h>
 
 static unsigned long totalram_pages;
 
@@ -177,6 +184,13 @@ paging_init(void)
 
 	for(i = 0; i < PTRS_PER_PGD; i++)
 		swapper_pg_dir[i] = __pgd(0);
+	
+	/* make sure the current pgd table points to something sane
+	 * (even if it is most probably not used until the next 
+	 *  switch_mm)
+	 */
+
+	current_pgd = init_mm.pgd;
 
 	/* initialise the TLB (tlb.c) */
 
@@ -241,7 +255,11 @@ paging_init(void)
 			IO_STATE(R_MMU_KSEG, seg_d, page ) | 
 			IO_STATE(R_MMU_KSEG, seg_c, page ) |   
 			IO_STATE(R_MMU_KSEG, seg_b, seg  ) |  /* kernel reg area */
+#ifdef CONFIG_JULIETTE
 			IO_STATE(R_MMU_KSEG, seg_a, seg  ) |  /* ARTPEC etc. */
+#else
+			IO_STATE(R_MMU_KSEG, seg_a, page ) |
+#endif
 			IO_STATE(R_MMU_KSEG, seg_9, seg  ) |  /* LED's on some boards */
 			IO_STATE(R_MMU_KSEG, seg_8, seg  ) |  /* CSE0/1, flash and I/O */
 			IO_STATE(R_MMU_KSEG, seg_7, page ) |  /* kernel vmalloc area */
@@ -258,7 +276,11 @@ paging_init(void)
 			    IO_FIELD(R_MMU_KBASE_HI, base_d, 0x0 ) |
 			    IO_FIELD(R_MMU_KBASE_HI, base_c, 0x0 ) |
 			    IO_FIELD(R_MMU_KBASE_HI, base_b, 0xb ) |
+#ifdef CONFIG_JULIETTE
 			    IO_FIELD(R_MMU_KBASE_HI, base_a, 0xa ) |
+#else
+			    IO_FIELD(R_MMU_KBASE_HI, base_a, 0x0 ) |
+#endif
 			    IO_FIELD(R_MMU_KBASE_HI, base_9, 0x9 ) |
 			    IO_FIELD(R_MMU_KBASE_HI, base_8, 0x8 ) );
 	
@@ -442,7 +464,7 @@ si_meminfo(struct sysinfo *val)
 
 	i = max_mapnr;
 	val->totalram = 0;
-	val->sharedram = 0;
+	val->sharedram = atomic_read(&shmem_nrpages);
 	val->freeram = nr_free_pages();
 	val->bufferram = atomic_read(&buffermem_pages);
 	while (i-- > 0)  {

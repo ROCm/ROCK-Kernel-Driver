@@ -38,7 +38,14 @@
  * align the address to 4 byte boundary. It seems to work
  * without the alignment. 
  */
+#ifdef __KERNEL__
 #define ALIGN_CS 0
+#else
+#define ALIGN_CS 1
+#ifndef CONFIG_SMP
+#error "bitops won't work without CONFIG_SMP"
+#endif
+#endif
 
 /* bitmap tables from arch/S390/kernel/bitmap.S */
 extern const char _oi_bitmap[];
@@ -54,7 +61,7 @@ static __inline__ void set_bit_cs(unsigned long nr, volatile void * addr)
         unsigned long bits, mask;
         __asm__ __volatile__(
 #if ALIGN_CS == 1
-             "   lghi  %2,3\n"         /* CS must be aligned on 4 byte b. */
+             "   lghi  %2,7\n"         /* CS must be aligned on 4 byte b. */
              "   ngr   %2,%1\n"        /* isolate last 2 bits of address */
              "   xgr   %1,%2\n"        /* make addr % 4 == 0 */
              "   sllg  %2,%2,3\n"
@@ -84,7 +91,7 @@ static __inline__ void clear_bit_cs(unsigned long nr, volatile void * addr)
         unsigned long bits, mask;
         __asm__ __volatile__(
 #if ALIGN_CS == 1
-             "   lghi  %2,3\n"         /* CS must be aligned on 4 byte b. */
+             "   lghi  %2,7\n"         /* CS must be aligned on 4 byte b. */
              "   ngr   %2,%1\n"        /* isolate last 2 bits of address */
              "   xgr   %1,%2\n"        /* make addr % 4 == 0 */
              "   sllg  %2,%2,3\n"
@@ -115,7 +122,7 @@ static __inline__ void change_bit_cs(unsigned long nr, volatile void * addr)
         unsigned long bits, mask;
         __asm__ __volatile__(
 #if ALIGN_CS == 1
-             "   lghi  %2,3\n"         /* CS must be aligned on 4 byte b. */
+             "   lghi  %2,7\n"         /* CS must be aligned on 4 byte b. */
              "   ngr   %2,%1\n"        /* isolate last 2 bits of address */
              "   xgr   %1,%2\n"        /* make addr % 4 == 0 */
              "   sllg  %2,%2,3\n"
@@ -146,7 +153,7 @@ test_and_set_bit_cs(unsigned long nr, volatile void * addr)
         unsigned long bits, mask;
         __asm__ __volatile__(
 #if ALIGN_CS == 1
-             "   lghi  %2,3\n"         /* CS must be aligned on 4 byte b. */
+             "   lghi  %2,7\n"         /* CS must be aligned on 4 byte b. */
              "   ngr   %2,%1\n"        /* isolate last 2 bits of address */
              "   xgr   %1,%2\n"        /* make addr % 4 == 0 */
              "   sllg  %2,%2,3\n"
@@ -179,7 +186,7 @@ test_and_clear_bit_cs(unsigned long nr, volatile void * addr)
         unsigned long bits, mask;
         __asm__ __volatile__(
 #if ALIGN_CS == 1
-             "   lghi  %2,3\n"         /* CS must be aligned on 4 byte b. */
+             "   lghi  %2,7\n"         /* CS must be aligned on 4 byte b. */
              "   ngr   %2,%1\n"        /* isolate last 2 bits of address */
              "   xgr   %1,%2\n"        /* make addr % 4 == 0 */
              "   sllg  %2,%2,3\n"
@@ -212,7 +219,7 @@ test_and_change_bit_cs(unsigned long nr, volatile void * addr)
         unsigned long bits, mask;
         __asm__ __volatile__(
 #if ALIGN_CS == 1
-             "   lghi  %2,3\n"         /* CS must be aligned on 4 byte b. */
+             "   lghi  %2,7\n"         /* CS must be aligned on 4 byte b. */
              "   ngr   %2,%1\n"        /* isolate last 2 bits of address */
              "   xgr   %1,%2\n"        /* make addr % 4 == 0 */
              "   sllg  %2,%2,3\n"
@@ -494,6 +501,7 @@ test_and_set_bit_simple(unsigned long nr, volatile void * addr)
              : "cc", "memory", "1", "2" );
         return oldbit & 1;
 }
+#define __test_and_set_bit(X,Y)		test_and_set_bit_simple(X,Y)
 
 /*
  * fast, non-SMP test_and_clear_bit routine
@@ -518,6 +526,7 @@ test_and_clear_bit_simple(unsigned long nr, volatile void * addr)
              : "cc", "memory", "1", "2" );
         return oldbit & 1;
 }
+#define __test_and_clear_bit(X,Y)	test_and_clear_bit_simple(X,Y)
 
 /*
  * fast, non-SMP test_and_change_bit routine
@@ -542,6 +551,7 @@ test_and_change_bit_simple(unsigned long nr, volatile void * addr)
              : "cc", "memory", "1", "2" );
         return oldbit & 1;
 }
+#define __test_and_change_bit(X,Y)	test_and_change_bit_simple(X,Y)
 
 #ifdef CONFIG_SMP
 #define set_bit             set_bit_cs

@@ -881,7 +881,7 @@ static void set_multicast_list( struct net_device *dev )
 
 
 #ifdef MODULE
-static char devicename[9] = { 0, };
+static char devicename[9];
 
 static struct net_device sun3lance_dev =
 {

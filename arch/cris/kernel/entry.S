@@ -1,4 +1,4 @@
-/* $Id: entry.S,v 1.22 2001/04/17 13:58:39 orjanf Exp $
+/* $Id: entry.S,v 1.27 2001/05/29 11:25:27 markusl Exp $
  *
  *  linux/arch/cris/entry.S
  *
@@ -7,6 +7,21 @@
  *  Authors:	Bjorn Wesen (bjornw@axis.com)
  *
  *  $Log: entry.S,v $
+ *  Revision 1.27  2001/05/29 11:25:27  markusl
+ *  In case of "spurious_interrupt", do hard_reset instead of hanging system in a loop...
+ *
+ *  Revision 1.26  2001/05/15 15:46:03  bjornw
+ *  Include config.h now that we use some CONFIG_ options
+ *
+ *  Revision 1.25  2001/05/15 05:38:47  hp
+ *  Tweaked code in _ret_from_sys_call
+ *
+ *  Revision 1.24  2001/05/15 05:27:49  hp
+ *  Save r9 in r1 over function call rather than on stack.
+ *
+ *  Revision 1.23  2001/05/15 05:10:00  hp
+ *  Generate entry.S structure offsets from C
+ *
  *  Revision 1.22  2001/04/17 13:58:39  orjanf
  *  * Renamed CONFIG_KGDB to CONFIG_ETRAX_KGDB.
  *
@@ -140,39 +155,21 @@
 	
 LENOSYS = 38
 
-	;; offsets into the task_struct (found at sp aligned to THREAD_SIZE, 8192)
-	;; linux/sched.h
-	
-LTASK_SIGPENDING  =  8
-LTASK_NEEDRESCHED = 20
-LTASK_PTRACE      = 24
-LTASK_PID         = 105
+	;; Get offsets into various structs.
+	.include "entryoffsets.s"
 
-	;; process bits for ptrace
+	;; process bits for ptrace.  FIXME: Should be in a header file.
 
 PT_TRACESYS_BIT	  = 1
-
-	;; some pt_regs offsets (from ptrace.h)
-	
-LORIG_R10	= 4
-LR13		= 8
-LR12		= 12
-LR11		= 16
-LR10		= 20
-LR9		= 24
-LMOF		= 64
-LDCCR		= 68
-LSRP		= 72
-LIRP		= 76
 
 	;; below are various parts of system_call which are not in the fast-path
 	
 	;; handle software irqs
 				
 handle_softirq:
-	push	r9
+	move.d	r9,r1
 	jsr	_do_softirq		; call the C routine for softirq handling
-	pop	r9
+	move.d	r1,r9
 
 	;; fall-through
 	
@@ -188,11 +185,10 @@ _ret_from_intr:
 
 reschedule:
 	;; keep r9 intact
-	push	r9
+	move.d	r9,r1
 	jsr	_schedule
-	pop	r9
 	ba	_ret_from_sys_call
-	nop
+	move.d	r1,r9
 
 	;; return but call do_signal first
 signal_return:
@@ -275,8 +271,9 @@ _ret_from_sys_call:
 		
 	;; check if any bottom halves need service
 	
-	move.d	[_irq_stat],r0	       ; softirq_active
-	and.d	[_irq_stat+4],r0       ; softirq_mask
+	move.d	_irq_stat,r10
+	move.d	[r10+],r0	       ; softirq_active
+	and.d	[r10],r0	       ; softirq_mask
 	bne	handle_softirq
 	nop
 
@@ -378,12 +375,6 @@ tracesys:
 	ba	_ret_from_sys_call
 	nop
 		
-	;; from asm/processor.h, the thread_struct
-	
-LTHREAD_KSP	= 0
-LTHREAD_USP	= 4
-LTHREAD_DCCR	= 8
-	
 	;; _resume performs the actual task-switching, by switching stack pointers
 	;; input arguments: r10 = prev, r11 = next, r12 = thread offset in task struct
 	;; returns old current in r10
@@ -495,7 +486,7 @@ nobp:	pop	r11
 _IRQ1_interrupt:
 _spurious_interrupt:	
 	di
-basse2:	ba	basse2
+	jsr _hard_reset_now
 	nop
 
 	;; this handles the case when multiple interrupts arrive at the same time

@@ -1,4 +1,4 @@
-/* $Id: delay.h,v 1.3 2001/02/23 13:47:33 bjornw Exp $ */
+/* $Id: delay.h,v 1.4 2001/05/31 06:40:53 markusl Exp $ */
 
 #ifndef _CRIS_DELAY_H
 #define _CRIS_DELAY_H
@@ -20,23 +20,17 @@ extern void __do_delay(void);	/* Special register call calling convention */
 
 extern __inline__ void __delay(int loops)
 {
-	/* need to be a great deal of nops, because Etrax shuts off IRQ's during a branch
-	   and we depend on the irq's to measure the time! */
-	
 	__asm__ __volatile__ (
-			      "move.d %0,r0\n"
+			      "move.d %0,r0\n\t"
 			      "1:\n\t"
-			      "nop\n\t"
-			      "nop\n\t"
-			      "nop\n\t"
-			      "nop\n\t"
-			      "nop\n\t"
-			      "nop\n\t"
+			      "cmpq 0,r0\n\t"
+			      "beq 2f\n\t"
 			      "nop\n\t"
 			      "subq 1,r0\n\t"
-			      "bne 1b\n\t"
+			      "ba 1b\n\t"
 			      "nop\n\t"
-			      : : "r" (loops) : "r0", "cc");
+			      "2:\n\t"
+			      : : "r" (loops) : "r0");
 }
 
 
@@ -55,13 +49,7 @@ extern __inline__ void udelay(unsigned long usecs)
 	__delay(usecs * loops_per_usec);
 }
 
-extern __inline__ unsigned long muldiv(unsigned long a, unsigned long b, unsigned long c)
-{
-	printk("muldiv called!\n");
-	return 0;
-}
-
-#endif /* defined(_ETRAX_DELAY_H) */
+#endif /* defined(_CRIS_DELAY_H) */
 
 
 

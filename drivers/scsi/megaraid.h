@@ -27,7 +27,8 @@
 #define M_RD_IOCTL_CMD_NEW		0x81
 #define M_RD_DRIVER_IOCTL_INTERFACE	0x82
 
-#define MEGARAID_VERSION "v1.14g-ac2 (Release Date: Mar 22, 2001; 19:34:02)"
+#define MEGARAID_VERSION "v1.15d (Release Date: Wed May 30 17:30:41 EDT 2001)"
+
 #define MEGARAID_IOCTL_VERSION 	114
 
 /* Methods */
@@ -114,6 +115,23 @@
 #define CLEAR_INTR(base)	WRITE_PORT(base,I_ACK_PORT,ACK_BYTE)
 #define ENABLE_INTR(base)	WRITE_PORT(base,I_TOGGLE_PORT,ENABLE_INTR_BYTE)
 #define DISABLE_INTR(base)	WRITE_PORT(base,I_TOGGLE_PORT,DISABLE_INTR_BYTE)
+
+/* Define AMI's PCI codes */
+#ifndef PCI_VENDOR_ID_AMI
+#define PCI_VENDOR_ID_AMI		0x101E
+#endif
+
+#ifndef PCI_DEVICE_ID_AMI_MEGARAID
+#define PCI_DEVICE_ID_AMI_MEGARAID	0x9010
+#endif
+
+#ifndef PCI_DEVICE_ID_AMI_MEGARAID2
+#define PCI_DEVICE_ID_AMI_MEGARAID2	0x9060
+#endif
+
+#ifndef PCI_DEVICE_ID_AMI_MEGARAID3
+#define PCI_DEVICE_ID_AMI_MEGARAID3	0x1960
+#endif
 
 /* Special Adapter Commands */
 #define FW_FIRE_WRITE   	0x2C
@@ -829,15 +847,15 @@ struct mega_hbas {
  *
  *================================================================
  */
-static const char *megaraid_info (struct Scsi_Host *);
+const char *megaraid_info (struct Scsi_Host *);
 int megaraid_detect (Scsi_Host_Template *);
-static int megaraid_release (struct Scsi_Host *);
-static int megaraid_command (Scsi_Cmnd *);
-static int megaraid_abort (Scsi_Cmnd *);
-static int megaraid_reset (Scsi_Cmnd *, unsigned int);
-static int megaraid_queue (Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
-static int megaraid_biosparam (Disk *, kdev_t, int *);
-static int megaraid_proc_info (char *buffer, char **start, off_t offset,
+int megaraid_release (struct Scsi_Host *);
+int megaraid_command (Scsi_Cmnd *);
+int megaraid_abort (Scsi_Cmnd *);
+int megaraid_reset (Scsi_Cmnd *, unsigned int);
+int megaraid_queue (Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
+int megaraid_biosparam (Disk *, kdev_t, int *);
+int megaraid_proc_info (char *buffer, char **start, off_t offset,
 			int length, int hostno, int inout);
 
 static int megaIssueCmd (mega_host_config * megaCfg, u_char * mboxData,
@@ -855,7 +873,7 @@ static void mega_Convert8ldTo40ld (mega_RAIDINQ * inquiry,
 
 static int megaraid_reboot_notify (struct notifier_block *,
 				   unsigned long, void *);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)  
 static mega_scb *mega_ioctl (mega_host_config * megaCfg, Scsi_Cmnd * SCpnt);
 static void mega_build_kernel_sg (char *barea, ulong xfersize, mega_scb * pScb,
 			   mega_ioctl_mbox * mbox);

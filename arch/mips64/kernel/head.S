@@ -33,6 +33,7 @@
 #endif
 	.endm
 
+#ifdef CONFIG_SGI_IP27
 	/*
 	 * outputs the local nasid into t1.
 	 */
@@ -42,6 +43,7 @@
 	and	t1, NSRI_NODEID_MASK
 	dsrl	t1, NSRI_NODEID_SHFT
 	.endm
+#endif /* CONFIG_SGI_IP27 */
 
 	/*
 	 * inputs are the text nasid in t1, data nasid in t2.
@@ -94,9 +96,11 @@ NESTED(kernel_entry, 16, sp)			# kernel entry point
 	ori	sp, 0xf				# align stack on 16 byte.
 	xori	sp, 0xf
 
+#ifdef CONFIG_SGI_IP27
 	GET_NASID_ASM
 	move	t2, t1				# text and data are here
 	MAPPED_KERNEL_SETUP_TLB
+#endif /* IP27 */
 
 	ARC64_TWIDDLE_PC
 
@@ -131,6 +135,7 @@ NESTED(kernel_entry, 16, sp)			# kernel entry point
 1:	b	1b				# just in case ...
 	END(kernel_entry)
 
+#ifdef CONFIG_SGI_IP27
 NESTED(bootstrap, 16, sp)
 	GET_NASID_ASM
 	li	t0, KLDIR_OFFSET + (KLI_KERN_VARS * KLDIR_ENT_SIZE) + KLDIR_OFF_POINTER + K0BASE
@@ -149,6 +154,7 @@ NESTED(bootstrap, 16, sp)
 	mtc0	t0, CP0_STATUS			   # thread in copy_thread.
 	jal	cboot
 	END(bootstrap)
+#endif /* CONFIG_SGI_IP27 */
 
 	__FINIT
 
@@ -170,8 +176,6 @@ NESTED(bootstrap, 16, sp)
 	page	swapper_pg_dir, 1
 	page	invalid_pte_table, 0
 	page	invalid_pmd_table, 1
-	page	empty_bad_page_table, 0
-	page	empty_bad_pmd_table, 1
 	page	kptbl, KPTBL_PAGE_ORDER
 	.globl	ekptbl
 	page	kpmdtbl, 0

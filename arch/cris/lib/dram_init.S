@@ -1,4 +1,4 @@
-/* $Id: dram_init.S,v 1.7 2001/04/18 12:05:39 bjornw Exp $
+/* $Id: dram_init.S,v 1.8 2001/05/15 07:12:45 hp Exp $
  * 
  * DRAM/SDRAM initialization - alter with care
  * This file is intended to be included from other assembler files
@@ -11,6 +11,9 @@
  * Authors:  Mikael Starvik (starvik@axis.com)	
  * 
  * $Log: dram_init.S,v $
+ * Revision 1.8  2001/05/15 07:12:45  hp
+ * Copy warning from head.S about r8 and r9
+ *
  * Revision 1.7  2001/04/18 12:05:39  bjornw
  * Fixed comments, and explicitely include config.h to be sure its there
  *
@@ -44,6 +47,9 @@
 
 #include <linux/config.h>
 
+	;; WARNING! The registers r8 and r9 are used as parameters carrying
+	;; information from the decompressor (if the kernel was compressed). 
+	;; They should not be used in the code below.
 
 #ifndef CONFIG_SVINTO_SIM	
 	move.d   CONFIG_ETRAX_DEF_R_WAITSTATES, r0

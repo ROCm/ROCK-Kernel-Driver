@@ -264,7 +264,7 @@ static inline int get_insn_opcode(struct pt_regs *regs, unsigned int *opcode)
 
 	epc = (unsigned int *) (unsigned long) regs->cp0_epc;
 	if (regs->cp0_cause & CAUSEF_BD)
-		epc += 4;
+		epc++;
 
 	if (verify_area(VERIFY_READ, epc, 4)) {
 		force_sig(SIGSEGV, current);

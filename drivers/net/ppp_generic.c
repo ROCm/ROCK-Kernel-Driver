@@ -878,7 +878,7 @@ ppp_net_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	return err;
 }
 
-int
+static int
 ppp_net_init(struct net_device *dev)
 {
 	dev->hard_header_len = PPP_HDRLEN;

@@ -383,7 +383,7 @@ svc_udp_recvfrom(struct svc_rqst *rqstp)
 
 	/* Sorry. */
 	if (skb_is_nonlinear(skb)) {
-		if (skb_linearize(skb, GFP_ATOMIC) != 0) {
+		if (skb_linearize(skb, GFP_KERNEL) != 0) {
 			kfree_skb(skb);
 			svc_sock_received(svsk, 0);
 			return 0;

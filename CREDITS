@@ -957,6 +957,12 @@ S: P.O. Box 76, Epping
 S: New South Wales, 2121
 S: Australia
 
+N: Carlos E. Gorges 
+E: carlos@techlinux.com.br
+D: fix smp support on cmpci driver
+P: 2048G/EA3C4B19 FF31 33A6 0362 4915 B7EB  E541 17D0 0379 EA3C 4B19
+S: Brazil
+
 N: Dmitry S. Gorodchanin
 E: pgmdsg@ibi.com
 D: RISCom/8 driver, misc kernel fixes.

@@ -2157,6 +2157,7 @@ asmlinkage void do_IRQ( struct pt_regs regs )
 	 * Get interrupt info from lowcore
 	 */
 	volatile tpi_info_t *tpi_info = (tpi_info_t*)(__LC_SUBCHANNEL_ID);
+	int cpu = smp_processor_id();
 
 	/*
 	 * take fast exit if CPU is in sync. I/O state
@@ -2182,7 +2183,9 @@ asmlinkage void do_IRQ( struct pt_regs regs )
 		if ( tpi_info->adapter_IO == 1 &&
 		     tpi_info->int_type == IO_INTERRUPT_TYPE )
 		{
+			irq_enter(cpu, -1);
 			do_adapter_IO( tpi_info->intparm );
+			irq_exit(cpu, -1);
 		} 
 		else 
 		{
@@ -2200,9 +2203,11 @@ asmlinkage void do_IRQ( struct pt_regs regs )
 				return;	/* this keeps the device boxed ... */
 			}
 	
+			irq_enter(cpu, irq);
 			s390irq_spin_lock( irq );
 			s390_process_IRQ( irq );
 			s390irq_spin_unlock( irq );
+			irq_exit(cpu, irq);
 		}
 
 #ifdef CONFIG_FAST_IRQ
@@ -3166,8 +3171,11 @@ int enable_cpu_sync_isc( int irq )
 
 		} /* endif */
 
-		if ( rc )	// can only happen if stsch/msch fails
+		if ( rc )	/* can only happen if stsch/msch fails */
+		{
 			sync_isc_cnt = 0;
+			atomic_set( &sync_isc, -1);
+		}
 	}
 	else
 	{
@@ -4276,12 +4284,7 @@ void s390_device_recognition_irq( int irq )
 		{
 			ret = enable_cpu_sync_isc( irq );
 
-			if ( ret )
-			{
-				free_irq( irq, &devstat );
-				return; // fixme ! fast exit ... grr
-			}
-			else
+			if ( !ret )
 			{
 				ioinfo[irq]->ui.flags.unknown = 0;
 
@@ -5270,24 +5273,28 @@ int s390_DevicePathVerification( int irq, __u8 usermask )
 
 					} /* endif */
 				}
-				else if ( ret )
+				else if ( ret == -EIO )
 				{
-
 #ifdef CONFIG_DEBUG_IO
-						printk( "PathVerification(%04X) "
-						        "- Device %04X doesn't "
-						        " support path grouping\n",
-						        irq,
-						        ioinfo[irq]->schib.pmcw.dev);
-
+					printk("PathVerification(%04X) - I/O error "
+					       "on device %04X\n", irq,
+					       ioinfo[irq]->schib.pmcw.dev);
 #endif
-
 					ioinfo[irq]->ui.flags.pgid_supp = 0;
-
+		    
+				} else {
+#ifdef CONFIG_DEBUG_IO
+					printk( "PathVerification(%04X) "
+						"- Unexpected error on device %04X\n",
+						irq,
+						ioinfo[irq]->schib.pmcw.dev);
+#endif
+					ioinfo[irq]->ui.flags.pgid_supp = 0;
+					
 				} /* endif */
 
 			} /* endif */
-
+			
 		} /* endfor */
 
 	} /* endif */
@@ -5442,9 +5449,9 @@ int s390_SetPGID( int irq, __u8 lpm, pgid_t *pgid )
 
 						} /* endif */
 					}
-#ifdef CONFIG_DEBUG_IO
 					else
 					{
+#ifdef CONFIG_DEBUG_IO
 						printk( "SPID - device %04X,"
 						        " unit check,"
 						        " retry %d, cnt %02d,"
@@ -5462,8 +5469,10 @@ int s390_SetPGID( int irq, __u8 lpm, pgid_t *pgid )
 						        pdevstat->ii.sense.data[6],
 						        pdevstat->ii.sense.data[7]);
 
-					} /* endif */
 #endif
+						retry--;
+
+					} /* endif */
 				}
 				else if ( pdevstat->flag & DEVSTAT_NOT_OPER )
 				{
@@ -5474,6 +5483,7 @@ int s390_SetPGID( int irq, __u8 lpm, pgid_t *pgid )
 					        irq);
 
 					retry = 0;
+					irq_ret = -EIO;
 
 				} /* endif */
 			}
@@ -5488,6 +5498,12 @@ int s390_SetPGID( int irq, __u8 lpm, pgid_t *pgid )
 			} /* endif */
 
 		} while ( retry > 0 );
+
+		if ( retry == 0 )
+		{
+			irq_ret = -EIO;
+
+		} /* endif */		
 
 		if ( init_IRQ_complete )
 		{
@@ -5692,6 +5708,12 @@ int s390_SensePGID( int irq, __u8 lpm, pgid_t *pgid )
 			} /* endif */
 
 		} while ( retry > 0 );
+
+		if ( retry == 0 )
+		{
+			irq_ret = -EIO;
+
+		} /* endif */
 
 		if ( init_IRQ_complete )
 		{
@@ -5936,7 +5958,10 @@ reipl ( int sch )
 		}
 	}
 
-	do_reipl( 0x10000 | sch );
+	if (MACHINE_IS_VM)
+		cpcmd("IPL", NULL, 0);
+	else
+		do_reipl( 0x10000 | sch );
 }
 
 /* Display info on subchannels in /proc/subchannels. *

@@ -668,7 +668,7 @@ pgm_no_sv:
         la      %r2,SP_PTREGS(%r15) # address of register-save area
         srl     %r3,2
         cl      %r3,BASED(.Lc4)   # protection-exception ?
-        bne     BASED(pgm_go)     # if not,
+        bne     BASED(pgm_per)    # if not,
         l       %r5,SP_PSW+4(15)  # load psw addr
         sr      %r5,%r7           # substract ilc from psw
         st      %r5,SP_PSW+4(15)  # store corrected psw addr

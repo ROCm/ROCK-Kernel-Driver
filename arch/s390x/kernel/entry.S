@@ -632,8 +632,6 @@ pgm_check_handler:
  * we just ignore the PER event (FIXME: is there anything we have to do
  * for LPSW?).
  */
-	stmg    %r14,%r15,__LC_SAVE_AREA
-        stam    %a2,%a4,__LC_SAVE_AREA+16
         tm      __LC_PGM_INT_CODE+1,0x80 # check whether we got a per exception
         jz      pgm_sv                   # skip if not
         tm      __LC_PGM_OLD_PSW,0x40    # test if per event recording is on
@@ -642,29 +640,10 @@ pgm_check_handler:
         clc     __LC_PGM_OLD_PSW(16),__LC_SVC_NEW_PSW
         je      pgm_svcper
 # no interesting special case, ignore PER event
-        lm      %r13,%r15,__LC_SAVE_AREA
 	lpswe   __LC_PGM_OLD_PSW
 # it was a single stepped SVC that is causing all the trouble
 pgm_svcper:
-        tm      __LC_SVC_OLD_PSW+1,0x01  # test problem state bit
-	jz	0f                       # skip stack & access regs setup
-	lg      %r15,__LC_KERNEL_STACK   # problem state -> load ksp
-        slr     %r14,%r14
-        sar     %a2,%r14                 # set ac.reg. 2 to primary space
-        lhi     %r14,1   
-        sar     %a4,%r14                 # and access reg. 4 to home space
-0:	aghi    %r15,-SP_SIZE            # make room for registers & psw
-        nill    %r15,0xfff8              # align stack pointer to 8
-        stmg    %r0,%r14,SP_R0(%r15)     # store gprs 0-14 to kernel stack 
-        stg     %r2,SP_ORIG_R2(%r15)     # store original content of gpr 2
-        mvc     SP_R14(16,%r15),__LC_SAVE_AREA         # move R14-R15 to stack
-        stam    %a0,%a15,SP_AREGS(%r15)  # store access registers to kst.
-        mvc     SP_AREGS+8(12,%r15),__LC_SAVE_AREA+16 # store ac. regs
-        mvc     SP_PSW(16,%r15),__LC_PGM_OLD_PSW      # move user PSW to stack
-        lhi     %r0,__LC_SVC_OLD_PSW     # store trap indication
-        st      %r0,SP_TRAP(%r15)
-        xc      0(8,%r15),0(%r15)        # clear back chain
-
+	SAVE_ALL __LC_SVC_OLD_PSW
         mvc     SP_PGM_OLD_ILC(4,%r15),__LC_PGM_ILC # save program check information
         j       pgm_system_call          # now do the svc
 pgm_svcret:
@@ -674,24 +653,7 @@ pgm_svcret:
         mvi     SP_PGM_OLD_ILC(%r15),1   # mark PGM_OLD_ILC as invalid
 	j       pgm_no_sv
 pgm_sv:
-        tm      __LC_PGM_OLD_PSW+1,0x01  # test problem state bit
-	jz	1f		         # skip stack setup save
-	lg      %r15,__LC_KERNEL_STACK   # problem state -> load ksp
-        slr     %r14,%r14
-        sar     %a2,%r14                 # set ac.reg. 2 to primary space
-        lhi     %r14,1
-        sar     %a4,%r14                 # set access reg. 4 to home space
-1:	aghi    %r15,-SP_SIZE            # make room for registers & psw
-        nill    %r15,0xfff8              # align stack pointer to 8
-        stmg    %r0,%r14,SP_R0(%r15)     # store gprs 0-14 to kernel stack
-        stg     %r2,SP_ORIG_R2(%r15)     # store original content of gpr 2
-        mvc     SP_R14(16,%r15),__LC_SAVE_AREA         # move R14-R15 to stack
-        stam    %a0,%a15,SP_AREGS(%r15)  # store access registers to kst.
-        mvc     SP_AREGS+8(12,%r15),__LC_SAVE_AREA+16 # store ac. regs
-        mvc     SP_PSW(16,%r15),__LC_PGM_OLD_PSW      # move user PSW to stack
-        lhi     %r0,__LC_PGM_OLD_PSW     # store trap indication
-        st      %r0,SP_TRAP(%r15)
-        xc      0(8,%r15),0(%r15)        # clear back chain
+	SAVE_ALL __LC_PGM_OLD_PSW
         mvi     SP_PGM_OLD_ILC(%r15),1   # mark PGM_OLD_ILC as invalid
         llgh    %r7,__LC_PGM_ILC         # load instruction length
 	GET_CURRENT
@@ -823,8 +785,10 @@ mcck_return:
         .globl restart_int_handler
 restart_int_handler:
         lg      %r15,__LC_KERNEL_STACK # load ksp
-        lctlg   %c0,%c15,__LC_CREGS_SAVE_AREA # get new ctl regs
-        lam     %a0,%a15,__LC_AREGS_SAVE_AREA
+        lhi     %r10,__LC_CREGS_SAVE_AREA
+        lctlg   %c0,%c15,0(%r10) # get new ctl regs
+        lhi     %r10,__LC_AREGS_SAVE_AREA
+        lam     %a0,%a15,0(%r10)
         stosm   0(%r15),0x04           # now we can turn dat on
         lmg     %r6,%r15,48(%r15)      # load registers from clone
 	jg      start_secondary

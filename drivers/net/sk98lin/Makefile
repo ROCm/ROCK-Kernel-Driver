@@ -7,7 +7,7 @@ O_TARGET := sk98lin.o
 
 obj-y :=     skge.o skaddr.o skgehwt.o skgeinit.o skgepnmi.o skgesirq.o \
              ski2c.o sklm80.o skqueue.o skrlmt.o sktimer.o skvpd.o \
-             skxmac2.o skcsum.o
+             skxmac2.o skproc.o skcsum.o
 obj-m := $(O_TARGET)
 
 # DBGDEF =  \

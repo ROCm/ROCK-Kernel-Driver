@@ -379,13 +379,23 @@ static void irlmp_state_active(struct lap_cb *self, IRLMP_EVENT event,
 			irlmp_start_idle_timer(self, LM_IDLE_TIMEOUT);
 		else {
 			/* No more connections, so close IrLAP */
-			irlmp_next_lap_state(self, LAP_STANDBY);
+
+			/* We don't want to change state just yet, because
+			 * we want to reflect accurately the real state of
+			 * the LAP, not the the state we whish it was in,
+			 * so that we don't loose LM_LAP_CONNECT_REQUEST.
+			 * In some cases, IrLAP won't close the LAP
+			 * immediately. For example, it might still be
+			 * retrying packets or waiting for the pf bit.
+			 * As the LAP always send a DISCONNECT_INDICATION
+			 * in PCLOSE or SCLOSE, just change state on that.
+			 * Jean II */
 			irlap_disconnect_request(self->irlap);
 		}
 		break;
 	case LM_LAP_IDLE_TIMEOUT:
 		if (HASHBIN_GET_SIZE(self->lsaps) == 0) {
-			irlmp_next_lap_state(self, LAP_STANDBY);
+			/* Same reasoning as above - keep state */
 			irlap_disconnect_request(self->irlap);
 		}
 		break;
@@ -472,8 +482,6 @@ static int irlmp_state_disconnected(struct lsap_cb *self, IRLMP_EVENT event,
 		irlmp_start_watchdog_timer(self, 5*HZ);
 		break;
 	case LM_CONNECT_INDICATION:
-		irlmp_next_lsap_state(self, LSAP_CONNECT_PEND);
-
 		if (self->conn_skb) {
 			WARNING(__FUNCTION__ 
 				"(), busy with another request!\n");
@@ -481,7 +489,20 @@ static int irlmp_state_disconnected(struct lsap_cb *self, IRLMP_EVENT event,
 		}
 		self->conn_skb = skb;
 
+		irlmp_next_lsap_state(self, LSAP_CONNECT_PEND);
+
 		irlmp_do_lap_event(self->lap, LM_LAP_CONNECT_REQUEST, NULL);
+
+		/* Start watchdog timer
+		 * This is not mentionned in the spec, but there is a rare
+		 * race condition that can get the socket stuck.
+		 * If we receive this event while our LAP is closing down,
+		 * the LM_LAP_CONNECT_REQUEST get lost and we get stuck in
+		 * CONNECT_PEND state forever.
+		 * Anyway, it make sense to make sure that we always have
+		 * a backup plan. 1 second is plenty (should be immediate).
+		 * Jean II */
+		irlmp_start_watchdog_timer(self, 1*HZ);
 		break;
 	default:
 		IRDA_DEBUG(2, __FUNCTION__ "(), Unknown event %s\n", 
@@ -533,6 +554,16 @@ static int irlmp_state_connect(struct lsap_cb *self, IRLMP_EVENT event,
 
 		irlmp_next_lsap_state(self, LSAP_DATA_TRANSFER_READY);
 		break;
+	case LM_WATCHDOG_TIMEOUT:
+		/* May happen, who knows...
+		 * Jean II */
+		IRDA_DEBUG(0, __FUNCTION__ "() WATCHDOG_TIMEOUT!\n");
+
+		/* Here, we should probably disconnect proper */
+		self->dlsap_sel = LSAP_ANY;
+		self->conn_skb = NULL;
+		irlmp_next_lsap_state(self, LSAP_DISCONNECTED);
+		break;
 	default:
 		IRDA_DEBUG(0, __FUNCTION__ "(), Unknown event %s\n",
 			   irlmp_event[event]);
@@ -563,6 +594,15 @@ static int irlmp_state_connect_pend(struct lsap_cb *self, IRLMP_EVENT event,
 	case LM_CONNECT_REQUEST:
 		/* Keep state */
 		break;
+	case LM_CONNECT_INDICATION:
+		/* Will happen in some rare cases when the socket get stuck,
+		 * the other side retries the connect request.
+		 * We just unstuck the socket - Jean II */
+		IRDA_DEBUG(0, __FUNCTION__ "(), LM_CONNECT_INDICATION, "
+			   "LSAP stuck in CONNECT_PEND state...\n");
+		/* Keep state */
+		irlmp_do_lap_event(self->lap, LM_LAP_CONNECT_REQUEST, NULL);
+		break;
 	case LM_CONNECT_RESPONSE:
 		IRDA_DEBUG(0, __FUNCTION__ "(), LM_CONNECT_RESPONSE, "
 			   "no indication issued yet\n");
@@ -581,6 +621,17 @@ static int irlmp_state_connect_pend(struct lsap_cb *self, IRLMP_EVENT event,
 		self->conn_skb = NULL;
 
 		irlmp_connect_indication(self, skb);
+		break;
+	case LM_WATCHDOG_TIMEOUT:
+		/* Will happen in some rare cases because of a race condition.
+		 * Just make sure we don't stay there forever...
+		 * Jean II */
+		IRDA_DEBUG(0, __FUNCTION__ "() WATCHDOG_TIMEOUT!\n");
+
+		/* Go back to disconnected mode, keep the socket waiting */
+		self->dlsap_sel = LSAP_ANY;
+		self->conn_skb = NULL;
+		irlmp_next_lsap_state(self, LSAP_DISCONNECTED);
 		break;
 	default:
 		IRDA_DEBUG(0, __FUNCTION__ "Unknown event %s\n", 

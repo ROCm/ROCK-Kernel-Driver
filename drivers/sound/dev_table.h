@@ -350,14 +350,14 @@ struct sound_timer_operations
 };
 
 #ifdef _DEV_TABLE_C_   
-struct audio_operations *audio_devs[MAX_AUDIO_DEV] = {NULL};
-int num_audiodevs = 0;
-struct mixer_operations *mixer_devs[MAX_MIXER_DEV] = {NULL};
-int num_mixers = 0;
-struct synth_operations *synth_devs[MAX_SYNTH_DEV+MAX_MIDI_DEV] = {NULL};
-int num_synths = 0;
-struct midi_operations *midi_devs[MAX_MIDI_DEV] = {NULL};
-int num_midis = 0;
+struct audio_operations *audio_devs[MAX_AUDIO_DEV];
+int num_audiodevs;
+struct mixer_operations *mixer_devs[MAX_MIXER_DEV];
+int num_mixers;
+struct synth_operations *synth_devs[MAX_SYNTH_DEV+MAX_MIDI_DEV];
+int num_synths;
+struct midi_operations *midi_devs[MAX_MIDI_DEV];
+int num_midis;
 
 extern struct sound_timer_operations default_sound_timer;
 struct sound_timer_operations *sound_timer_devs[MAX_TIMER_DEV] = {

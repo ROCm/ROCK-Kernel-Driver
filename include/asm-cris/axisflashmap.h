@@ -50,6 +50,7 @@ struct partitiontable_entry {
 };
 /* ended by an end marker: */
 #define PARTITIONTABLE_END_MARKER 0xFFFFFFFF
+#define PARTITIONTABLE_END_MARKER_SIZE 4
 
 /*#define PARTITION_TYPE_RESCUE 0x0000?*/  /* Not used, maybe it should? */
 #define PARTITION_TYPE_PARAM  0x0001 /* Hmm.. */

@@ -33,14 +33,29 @@ typedef struct etrax_dma_descr {
 	unsigned long  next;                  /* 4-7 */
 	unsigned long  buf;                   /* 8-11 */
 	unsigned short hw_len;                /* 12-13 */
-	unsigned short status;                /* 14-15 */
+	unsigned char  status;                /* 14 */
+	unsigned char  fifo_len;              /* 15 */
 } etrax_dma_descr;
 
-#define RESET_DMA( n ) \
+
+/* Use this for constant numbers only */
+#define RESET_DMA_NUM( n ) \
   *R_DMA_CH##n##_CMD = IO_STATE( R_DMA_CH0_CMD, cmd, reset )
 
-#define WAIT_DMA( n ) \
+/* Use this for constant numbers or symbols, 
+ * having two macros makes it possible to use constant expressions. 
+ */
+#define RESET_DMA( n ) RESET_DMA_NUM( n )
+
+
+/* Use this for constant numbers only */
+#define WAIT_DMA_NUM( n ) \
   while( (*R_DMA_CH##n##_CMD & IO_MASK( R_DMA_CH0_CMD, cmd )) != \
          IO_STATE( R_DMA_CH0_CMD, cmd, hold ) )
+
+/* Use this for constant numbers or symbols 
+ * having two macros makes it possible to use constant expressions. 
+ */
+#define WAIT_DMA( n ) WAIT_DMA_NUM( n )
 
 #endif

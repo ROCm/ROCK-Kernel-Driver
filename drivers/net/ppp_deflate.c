@@ -598,7 +598,7 @@ z_incomp(arg, ibuf, icnt)
  * Module interface table
  *************************************************************/
 
-/* These are in ppp.c */
+/* These are in ppp_generic.c */
 extern int  ppp_register_compressor   (struct compressor *cp);
 extern void ppp_unregister_compressor (struct compressor *cp);
 
@@ -639,7 +639,7 @@ struct compressor ppp_deflate_draft = {
 	z_comp_stats,		/* decomp_stat */
 };
 
-int deflate_init(void)
+int __init deflate_init(void)
 {  
         int answer = ppp_register_compressor(&ppp_deflate);
         if (answer == 0)
@@ -649,7 +649,7 @@ int deflate_init(void)
         return answer;
 }
      
-void deflate_cleanup(void)
+void __exit deflate_cleanup(void)
 {
 	ppp_unregister_compressor(&ppp_deflate);
 	ppp_unregister_compressor(&ppp_deflate_draft);

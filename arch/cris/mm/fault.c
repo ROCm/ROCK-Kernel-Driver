@@ -6,6 +6,19 @@
  *  Authors:  Bjorn Wesen 
  * 
  *  $Log: fault.c,v $
+ *  Revision 1.16  2001/06/13 00:06:08  bjornw
+ *  current_pgd should be volatile
+ *
+ *  Revision 1.15  2001/06/13 00:02:23  bjornw
+ *  Use a separate variable to store the current pgd to avoid races in schedule
+ *
+ *  Revision 1.14  2001/05/16 17:41:07  hp
+ *  Last comment tweak further tweaked.
+ *
+ *  Revision 1.13  2001/05/15 00:58:44  hp
+ *  Expand a bit on the comment why we compare address >= TASK_SIZE rather
+ *  than >= VMALLOC_START.
+ *
  *  Revision 1.12  2001/04/04 10:51:14  bjornw
  *  mmap_sem is grabbed for reading
  *
@@ -59,6 +72,10 @@ asmlinkage void do_page_fault(unsigned long address, struct pt_regs *regs,
 /* debug of higher-level faults */
 #define DPG(x)
 
+/* current active page directory */
+
+volatile pgd_t *current_pgd;
+
 /* fast TLB-fill fault handler */
 
 void
@@ -94,9 +111,11 @@ handle_mmu_bus_fault(struct pt_regs *regs)
 
 	if(miss) {
 
-		/* see if the pte exists at all */
+		/* see if the pte exists at all
+		 * refer through current_pgd, dont use mm->pgd
+		 */
 		
-		pmd = (pmd_t *)pgd_offset(mm, address);
+		pmd = (pmd_t *)(current_pgd + pgd_index(address));
 		if(pmd_none(*pmd))
 			goto dofault;
 		if(pmd_bad(*pmd)) {
@@ -206,7 +225,9 @@ do_page_fault(unsigned long address, struct pt_regs *regs,
 	 * should really be >= VMALLOC_START, however, kernel fixup errors
 	 * will be handled more quickly by going through vmalloc_fault and then
 	 * into bad_area_nosemaphore than falling through the find_vma user-mode
-	 * tests.
+	 * tests.  As an aside can be mentioned that the difference in
+	 * compiled code is neglibible; the instruction is the same, just a
+	 * comparison with a different address of the same size.
          */
 
         if (address >= TASK_SIZE)
@@ -384,12 +405,17 @@ vmalloc_fault:
                 /*
                  * Synchronize this task's top level page-table
                  * with the 'reference' page table.
+		 *
+		 * Use current_pgd instead of tsk->active_mm->pgd
+		 * since the latter might be unavailable if this
+		 * code is executed in a misfortunately run irq
                  */
+
                 int offset = pgd_index(address);
                 pgd_t *pgd, *pgd_k;
                 pmd_t *pmd, *pmd_k;
 
-                pgd = tsk->active_mm->pgd + offset;
+                pgd = current_pgd + offset;
                 pgd_k = init_mm.pgd + offset;
 
                 if (!pgd_present(*pgd)) {

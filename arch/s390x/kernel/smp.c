@@ -510,8 +510,7 @@ smp_call_function(void (*func)(void *info), void *info, int retry, int wait)
  */
 {
         if (atomic_read(&smp_commenced) != 0)
-                smp_ext_call_others(func, info, 1);
-        (func)(info);
+                smp_ext_call_others(func, info, wait);
         return 0;
 }
 

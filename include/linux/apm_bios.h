@@ -52,6 +52,9 @@ struct apm_info {
 	struct apm_bios_info	bios;
 	unsigned short		connection_version;
 	int			get_power_status_broken;
+	int			allow_ints;
+	int			realmode_power_off;
+	int			disabled;
 };
 
 /*

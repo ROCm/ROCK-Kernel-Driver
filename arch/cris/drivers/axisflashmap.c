@@ -11,6 +11,23 @@
  * partition split defined below.
  *
  * $Log: axisflashmap.c,v $
+ * Revision 1.12  2001/06/11 09:50:30  jonashg
+ * Oops, 2MB is 0x200000 bytes.
+ *
+ * Revision 1.11  2001/06/08 11:39:44  jonashg
+ * Changed sizes and offsets in axis_default_partitions to use
+ * CONFIG_ETRAX_PTABLE_SECTOR.
+ *
+ * Revision 1.10  2001/05/29 09:42:03  jonashg
+ * Use macro for end marker length instead of sizeof.
+ *
+ * Revision 1.9  2001/05/29 08:52:52  jonashg
+ * Gave names to the magic fours (size of the ptable end marker).
+ *
+ * Revision 1.8  2001/05/28 15:36:20  jonashg
+ * * Removed old comment about ptable location in flash (it's a CONFIG_ option).
+ * * Variable ptable was initialized twice to the same value.
+ *
  * Revision 1.7  2001/04/05 13:41:46  markusl
  * Updated according to review remarks
  *
@@ -130,6 +147,10 @@ static struct map_info axis_map = {
 #define MAX_PARTITIONS         7  
 #define NUM_DEFAULT_PARTITIONS 3
 
+/* Default flash size is 2MB. CONFIG_ETRAX_PTABLE_SECTOR is most likely the
+ * size of one flash block and "filesystem"-partition needs 5 blocks to be able
+ * to use JFFS.
+ */
 static struct mtd_partition axis_default_partitions[NUM_DEFAULT_PARTITIONS] = {
 	{
 		name: "boot firmware",
@@ -138,13 +159,13 @@ static struct mtd_partition axis_default_partitions[NUM_DEFAULT_PARTITIONS] = {
 	},
 	{
 		name: "kernel",
-		size: 0x1a0000,
+		size: 0x200000 - (6 * CONFIG_ETRAX_PTABLE_SECTOR),
 		offset: CONFIG_ETRAX_PTABLE_SECTOR
 	},
 	{
 		name: "filesystem",
-		size: 0x50000,
-		offset: (0x1a0000 + CONFIG_ETRAX_PTABLE_SECTOR)
+		size: 5 * CONFIG_ETRAX_PTABLE_SECTOR,
+		offset: 0x200000 - (5 * CONFIG_ETRAX_PTABLE_SECTOR)
 	}
 };
 
@@ -223,21 +244,17 @@ init_axis_flash(void)
 
 	mymtd->module = THIS_MODULE;
 
-	/* The partition-table is at an offset within the second 
-	 * sector of the flash. We _define_ this to be at offset 64k
-	 * even if the actual sector-size in the flash changes.. for
-	 * now at least.
-	 */
-
 	ptable_head = (struct partitiontable_head *)(FLASH_CACHED_ADDR +
 		CONFIG_ETRAX_PTABLE_SECTOR + PARTITION_TABLE_OFFSET);
 	pidx++;  /* first partition is always set to the default */
 
 	if ((ptable_head->magic == PARTITION_TABLE_MAGIC)
 	    && (ptable_head->size <
-		(MAX_PARTITIONS * sizeof(struct partitiontable_entry) + 4))
+		(MAX_PARTITIONS * sizeof(struct partitiontable_entry) +
+		PARTITIONTABLE_END_MARKER_SIZE))
 	    && (*(unsigned long*)((void*)ptable_head + sizeof(*ptable_head) +
-				  ptable_head->size - 4)
+				  ptable_head->size -
+				  PARTITIONTABLE_END_MARKER_SIZE)
 		== PARTITIONTABLE_END_MARKER)) {
 		/* Looks like a start, sane length and end of a
 		 * partition table, lets check csum etc.
@@ -268,9 +285,6 @@ init_axis_flash(void)
 		ptable_ok = (csum == ptable_head->checksum);
 
 		/* Read the entries and use/show the info.  */
-		ptable = (struct partitiontable_entry *)
-			((unsigned long)ptable_head + sizeof(*ptable_head));
-		
 		printk(" Found %s partition table at 0x%08lX-0x%08lX.\n",
 		       (ptable_ok ? "valid" : "invalid"),
 		       (unsigned long)ptable_head,

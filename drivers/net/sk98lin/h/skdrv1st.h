@@ -2,15 +2,15 @@
  *
  * Name:	skdrv1st.h
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.8 $
- * Date:	$Date: 2000/02/21 12:19:18 $
+ * Version:	$Revision: 1.9.2.1 $
+ * Date:	$Date: 2001/03/12 16:50:59 $
  * Purpose:	First header file for driver and all other modules
  *
  ******************************************************************************/
 
 /******************************************************************************
  *
- *	(C)Copyright 1998,1999 SysKonnect,
+ *	(C)Copyright 1998-2001 SysKonnect,
  *	a business unit of Schneider & Koch & Co. Datensysteme GmbH.
  *
  *	This program is free software; you can redistribute it and/or modify
@@ -27,6 +27,14 @@
  * History:
  *
  *	$Log: skdrv1st.h,v $
+ *	Revision 1.9.2.1  2001/03/12 16:50:59  mlindner
+ *	chg: kernel 2.4 adaption
+ *	
+ *	Revision 1.9  2001/01/22 14:16:04  mlindner
+ *	added ProcFs functionality
+ *	Dual Net functionality integrated
+ *	Rlmt networks added
+ *	
  *	Revision 1.8  2000/02/21 12:19:18  cgoos
  *	Added default for SK_DEBUG_CHKMOD/_CHKCAT
  *	
@@ -105,7 +113,7 @@ typedef struct s_AC	SK_AC;
 #include <linux/string.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
-#include <linux/slab.h>
+#include <linux/malloc.h>
 #include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <asm/byteorder.h>
@@ -140,6 +148,7 @@ typedef struct s_AC	SK_AC;
 // #define SK_RLMT_SLOW_LOOKAHEAD
 
 #define SK_MAX_MACS		2
+#define SK_MAX_NETS		2
 
 #define SK_IOC			char*
 

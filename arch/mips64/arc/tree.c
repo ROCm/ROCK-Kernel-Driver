@@ -123,8 +123,6 @@ prom_testtree(void)
 		dump_component(p);
 		p = ArcGetPeer(p);
 	}
-	prom_printf("press a key\n");
-	prom_getchar();
 }
 
 #endif /* DEBUG_PROM_TREE  */

@@ -36,12 +36,6 @@
 #include <net/irda/parameters.h>
 #include <net/irda/qos.h>
 #include <net/irda/irlap.h>
-#ifdef CONFIG_IRDA_COMPRESSION
-#include <net/irda/irlap_comp.h>
-#include "../../drivers/net/zlib.h"
-
-#define CI_BZIP2  27 /* Random pick */
-#endif
 
 /*
  * Maximum values of the baud rate we negociate with the other end.
@@ -78,10 +72,6 @@ __u32 data_sizes[]      = { 64, 128, 256, 512, 1024, 2048 };        /* bytes */
 __u32 add_bofs[]        = { 48, 24, 12, 5, 3, 2, 1, 0 };            /* bytes */
 __u32 max_turn_times[]  = { 500, 250, 100, 50 };                    /* ms */
 __u32 link_disc_times[] = { 3, 8, 12, 16, 20, 25, 30, 40 };         /* secs */
-
-#ifdef CONFIG_IRDA_COMPRESSION
-__u32 compressions[] = { CI_BZIP2, CI_DEFLATE, CI_DEFLATE_DRAFT };
-#endif
 
 __u32 max_line_capacities[10][4] = {
        /* 500 ms     250 ms  100 ms  50 ms (max turn time) */
@@ -238,10 +228,6 @@ void irda_qos_compute_intersection(struct qos_info *qos, struct qos_info *new)
 	qos->link_disc_time.bits  &= new->link_disc_time.bits;
 	qos->additional_bofs.bits &= new->additional_bofs.bits;
 
-#ifdef CONFIG_IRDA_COMPRESSION
-	qos->compression.bits     &= new->compression.bits;
-#endif
-
 	irda_qos_bits_to_value(qos);
 }
 
@@ -280,10 +266,6 @@ void irda_init_max_qos_capabilies(struct qos_info *qos)
 	qos->data_size.bits       = 0x3f;
 	qos->link_disc_time.bits &= 0xff;
 	qos->additional_bofs.bits = 0xff;
-
-#ifdef CONFIG_IRDA_COMPRESSION	
-	qos->compression.bits     = 0x03;
-#endif
 }
 
 /*
@@ -359,20 +341,10 @@ void irlap_adjust_qos_settings(struct qos_info *qos)
 int irlap_qos_negotiate(struct irlap_cb *self, struct sk_buff *skb) 
 {
 	int ret;
-#ifdef CONFIG_IRDA_COMPRESSION
-	int comp_seen = FALSE;
-#endif
+	
 	ret = irda_param_extract_all(self, skb->data, skb->len, 
 				     &irlap_param_info);
 	
-#ifdef CONFIG_IRDA_COMPRESSION
-	if (!comp_seen) {
-		IRDA_DEBUG( 4, __FUNCTION__ "(), Compression not seen!\n");
-		self->qos_tx.compression.bits = 0x00;
-		self->qos_rx.compression.bits = 0x00;
-	}
-#endif
-
 	/* Convert the negotiated bits to values */
 	irda_qos_bits_to_value(&self->qos_tx);
 	irda_qos_bits_to_value(&self->qos_rx);
@@ -393,10 +365,6 @@ int irlap_qos_negotiate(struct irlap_cb *self, struct sk_buff *skb)
 		   self->qos_tx.min_turn_time.value);
 	IRDA_DEBUG(2, "Setting LINK_DISC to %d secs.\n", 
 		   self->qos_tx.link_disc_time.value);
-#ifdef CONFIG_IRDA_COMPRESSION
-	IRDA_DEBUG(2, "Setting COMPRESSION to %d\n", 
-		   self->qos_tx.compression.value);
-#endif	
 	return ret;
 }
 
@@ -710,12 +678,4 @@ void irda_qos_bits_to_value(struct qos_info *qos)
 	
 	index = msb_index(qos->additional_bofs.bits);
 	qos->additional_bofs.value = add_bofs[index];
-
-#ifdef CONFIG_IRDA_COMPRESSION
-	index = msb_index(qos->compression.bits);
-	if (index >= 0)
-		qos->compression.value = compressions[index];
-	else 
-		qos->compression.value = 0;
-#endif
 }

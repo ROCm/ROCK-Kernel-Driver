@@ -1,5 +1,4 @@
-/* $Id: branch.c,v 1.1 1999/10/09 20:55:05 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -66,7 +65,7 @@ int __compute_return_epc(struct pt_regs *regs)
 		switch (insn.i_format.rt) {
 	 	case bltz_op:
 		case bltzl_op:
-			if (regs->regs[insn.i_format.rs] < 0)
+			if ((long)regs->regs[insn.i_format.rs] < 0)
 				epc = epc + 4 + (insn.i_format.simmediate << 2);
 			else
 				epc += 8;
@@ -75,7 +74,7 @@ int __compute_return_epc(struct pt_regs *regs)
 
 		case bgez_op:
 		case bgezl_op:
-			if (regs->regs[insn.i_format.rs] >= 0)
+			if ((long)regs->regs[insn.i_format.rs] >= 0)
 				epc = epc + 4 + (insn.i_format.simmediate << 2);
 			else
 				epc += 8;
@@ -85,7 +84,7 @@ int __compute_return_epc(struct pt_regs *regs)
 		case bltzal_op:
 		case bltzall_op:
 			regs->regs[31] = epc + 8;
-			if (regs->regs[insn.i_format.rs] < 0)
+			if ((long)regs->regs[insn.i_format.rs] < 0)
 				epc = epc + 4 + (insn.i_format.simmediate << 2);
 			else
 				epc += 8;
@@ -95,7 +94,7 @@ int __compute_return_epc(struct pt_regs *regs)
 		case bgezal_op:
 		case bgezall_op:
 			regs->regs[31] = epc + 8;
-			if (regs->regs[insn.i_format.rs] >= 0)
+			if ((long)regs->regs[insn.i_format.rs] >= 0)
 				epc = epc + 4 + (insn.i_format.simmediate << 2);
 			else
 				epc += 8;
@@ -143,7 +142,7 @@ int __compute_return_epc(struct pt_regs *regs)
 	case blez_op: /* not really i_format */
 	case blezl_op:
 		/* rt field assumed to be zero */
-		if (regs->regs[insn.i_format.rs] <= 0)
+		if ((long)regs->regs[insn.i_format.rs] <= 0)
 			epc = epc + 4 + (insn.i_format.simmediate << 2);
 		else
 			epc += 8;
@@ -153,7 +152,7 @@ int __compute_return_epc(struct pt_regs *regs)
 	case bgtz_op:
 	case bgtzl_op:
 		/* rt field assumed to be zero */
-		if (regs->regs[insn.i_format.rs] > 0)
+		if ((long)regs->regs[insn.i_format.rs] > 0)
 			epc = epc + 4 + (insn.i_format.simmediate << 2);
 		else
 			epc += 8;

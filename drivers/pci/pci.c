@@ -279,7 +279,7 @@ pci_set_power_state(struct pci_dev *dev, int state)
 	 * This doesn't affect PME_Status, disables PME_En, and
 	 * sets PowerState to 0.
 	 */
-	if (dev->current_state == 3)
+	if (dev->current_state >= 3)
 		pmcsr = 0;
 	else {
 		pci_read_config_word(dev, pm + PCI_PM_CTRL, &pmcsr);
@@ -1175,6 +1175,9 @@ int pci_setup_device(struct pci_dev * dev)
 	class >>= 8;
 
 	DBG("Found %02x:%02x [%04x/%04x] %06x %02x\n", dev->bus->number, dev->devfn, dev->vendor, dev->device, class, dev->hdr_type);
+
+	/* "Unknown power state" */
+	dev->current_state = 4;
 
 	switch (dev->hdr_type) {		    /* header type */
 	case PCI_HEADER_TYPE_NORMAL:		    /* standard header */

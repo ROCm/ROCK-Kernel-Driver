@@ -109,8 +109,6 @@ static ssize_t proc_mpc_read(struct file *file, char *buff,
 	eg_cache_entry *eg_entry;
 	struct timeval now;
 	unsigned char ip_string[16];
-	if(count < 0)
-	        return -EINVAL;
 	if(count == 0)
 	        return 0;
 	page = get_free_page(GFP_KERNEL);
@@ -173,7 +171,6 @@ static ssize_t proc_mpc_write(struct file *file, const char *buff,
         char *page, c;
         const char *tmp;
 
-        if (nbytes < 0) return -EINVAL;
         if (nbytes == 0) return 0;
         if (nbytes >= PAGE_SIZE) nbytes = PAGE_SIZE-1;
 

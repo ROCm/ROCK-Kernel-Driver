@@ -1,5 +1,4 @@
-/* $Id: sgialib.h,v 1.3 1999/12/04 03:59:12 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -7,6 +6,7 @@
  * SGI ARCS firmware interface library for the Linux kernel.
  *
  * Copyright (C) 1996 David S. Miller (dm@engr.sgi.com)
+ * Copyright (C) 2001 Ralf Baechle (ralf@gnu.org)
  */
 #ifndef _ASM_SGIALIB_H
 #define _ASM_SGIALIB_H
@@ -90,9 +90,9 @@ extern pcomponent *prom_componentbypath(char *path);
  */
 extern void prom_identify_arch(void);
 
-/* Environemt variable routines. */
+/* Environment variable routines. */
 extern PCHAR ArcGetEnvironmentVariable(PCHAR name);
-extern LONG SetEnvironmentVariable(PCHAR name, PCHAR value);
+extern LONG ArcSetEnvironmentVariable(PCHAR name, PCHAR value);
 
 /* ARCS command line acquisition and parsing. */
 extern char *prom_getcmdline(void);
@@ -120,11 +120,11 @@ extern long prom_invoke(unsigned long pc, unsigned long sp, long argc, char **ar
 extern long prom_exec(char *name, long argc, char **argv, char **envp);
 
 /* Misc. routines. */
-extern void prom_halt(VOID) __attribute__((noreturn));
-extern void prom_powerdown(VOID) __attribute__((noreturn));
-extern void prom_restart(VOID) __attribute__((noreturn));
+extern VOID prom_halt(VOID) __attribute__((noreturn));
+extern VOID prom_powerdown(VOID) __attribute__((noreturn));
+extern VOID prom_restart(VOID) __attribute__((noreturn));
 extern VOID ArcReboot(VOID) __attribute__((noreturn));
-extern VOID ArcEnterInteractiveMode(void) __attribute__((noreturn));
+extern VOID ArcEnterInteractiveMode(VOID) __attribute__((noreturn));
 extern long prom_cfgsave(VOID);
 extern struct linux_sysid *prom_getsysid(VOID);
 extern VOID ArcFlushAllCaches(VOID);

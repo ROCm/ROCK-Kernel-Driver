@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2001 Axis Communications AB.
  *
- * $Id: usb-host.c,v 1.8 2001/02/27 13:52:48 bjornw Exp $
+ * $Id: usb-host.c,v 1.9 2001/05/09 12:54:12 johana Exp $
  *
  */
 
@@ -23,17 +23,18 @@
 #include <asm/uaccess.h>
 #include <asm/io.h>
 #include <asm/irq.h>
+#include <asm/dma.h>
 #include <asm/system.h>
 #include <asm/svinto.h>
 
 #include <linux/usb.h>
 #include "usb-host.h"
 
-#define ETRAX_USB_HC_IRQ 31
-#define ETRAX_USB_RX_IRQ 25
-#define ETRAX_USB_TX_IRQ 24
+#define ETRAX_USB_HC_IRQ USB_HC_IRQ_NBR
+#define ETRAX_USB_RX_IRQ USB_DMA_RX_IRQ_NBR
+#define ETRAX_USB_TX_IRQ USB_DMA_TX_IRQ_NBR
 
-static const char *usb_hcd_version = "$Revision: 1.8 $";
+static const char *usb_hcd_version = "$Revision: 1.9 $";
 
 #undef KERN_DEBUG
 #define KERN_DEBUG ""
@@ -2034,21 +2035,21 @@ static int etrax_rh_submit_urb(urb_t *urb)
 		OK (4);		/* hub power ** */
 		
 	case RH_GET_STATUS | RH_OTHER | RH_CLASS:
-                if (wIndex == 1) {
+		if (wIndex == 1) {
 			*((__u16*)data) = cpu_to_le16(hc->rh.prev_wPortStatus_1);
 			*((__u16*)data + 1) = cpu_to_le16(hc->rh.wPortChange_1);
-                }
-                else if (wIndex == 2) {
+		}
+		else if (wIndex == 2) {
 			*((__u16*)data) = cpu_to_le16(hc->rh.prev_wPortStatus_2);
 			*((__u16*)data + 1) = cpu_to_le16(hc->rh.wPortChange_2);
-                }
-                else {
+		}
+		else {
 			dbg_rh("RH_GET_STATUS whith invalid wIndex !!");
 			OK(0);
-                }
+		}
 		
-                OK(4);
-                
+		OK(4);
+
 	case RH_CLEAR_FEATURE | RH_ENDPOINT:
 		switch (wValue) {
 		case (RH_ENDPOINT_STALL):
@@ -2114,16 +2115,16 @@ static int etrax_rh_submit_urb(urb_t *urb)
 			OK (0);	/* port power ** */
 		case (RH_C_PORT_CONNECTION):
 			
-                        if (wIndex == 1) {
+			if (wIndex == 1) {
 				hc->rh.wPortChange_1 &= ~(1 << RH_PORT_CONNECTION);
-                        }
-                        else if (wIndex == 2) {
+			}
+			else if (wIndex == 2) {
 				hc->rh.wPortChange_2 &= ~(1 << RH_PORT_CONNECTION);
-                        }
-                        else {
+			}
+			else {
 				dbg_rh("RH_CLEAR_FEATURE->RH_C_PORT_CONNECTION "
 				       "with invalid wIndex == %d!!", wIndex);
-                        }
+			}
 
 			OK (0);
 		case (RH_C_PORT_ENABLE):
@@ -2182,7 +2183,7 @@ static int etrax_rh_submit_urb(urb_t *urb)
 
 			OK (0);
 		case (RH_PORT_RESET):
-                        if (wIndex == 1) {
+			if (wIndex == 1) {
 				int port1_retry;
 				
 			port1_redo:
@@ -2205,8 +2206,8 @@ static int etrax_rh_submit_urb(urb_t *urb)
 				   not even schedule() works !!! WHY ?? */
 
 				udelay(15000);
-                        }
-                        else if (wIndex == 2) {
+			}
+			else if (wIndex == 2) {
 				int port2_retry;
 				
 			port2_redo:
@@ -2229,7 +2230,7 @@ static int etrax_rh_submit_urb(urb_t *urb)
 				   not even schedule() works !!! WHY ?? */
 
 				udelay(15000);
-                        }
+			}
 
 			/* Try to bring the HC into running state */
 			*R_USB_COMMAND =
@@ -2237,21 +2238,21 @@ static int etrax_rh_submit_urb(urb_t *urb)
 			
 			nop(); while (*R_USB_COMMAND & IO_MASK(R_USB_COMMAND, busy));
 			
-                        dbg_rh("...Done");
-                        OK(0);
-                        
+			dbg_rh("...Done");
+			OK(0);
+
 		case (RH_PORT_POWER):
 			OK (0);	/* port power ** */
 		case (RH_PORT_ENABLE):
 			/* There is no rh port enable command in the Etrax USB interface!!!! */
 			OK (0);
-                        
+
 		}
 		break;
 		
 	case RH_SET_ADDRESS:
 		hc->rh.devnum = wValue;
-                dbg_rh("RH address set to: %d", hc->rh.devnum);
+		dbg_rh("RH address set to: %d", hc->rh.devnum);
 		OK (0);
 		
 	case RH_GET_DESCRIPTOR:
@@ -2324,7 +2325,7 @@ static int __init etrax_usb_hc_init(void)
 	etrax_usb_bus = bus = usb_alloc_bus(&etrax_usb_device_operations);
 	hc->bus = bus;
 	bus->hcpriv = hc;
-        
+
 	/* Initalize RH to the default address.
 	   And make sure that we have no status change indication */
 	hc->rh.numports = 2;  /* The RH has two ports */
@@ -2339,7 +2340,7 @@ static int __init etrax_usb_hc_init(void)
 	/* Initialize the intr-traffic flags */
 	hc->intr.sleeping = 0;
 	hc->intr.wq = NULL;
-        
+
 	/* Initially all ep's are free except ep 0 */
 	ep_usage_bitmask = 0;
 	set_bit(0, (void *)&ep_usage_bitmask);
@@ -2349,20 +2350,20 @@ static int __init etrax_usb_hc_init(void)
 
 	/* This code should really be moved */
 
-        if (request_dma(8, "ETRAX 100LX built-in USB (Tx)")) {
+	if (request_dma(USB_TX_DMA_NBR, "ETRAX 100LX built-in USB (Tx)")) {
 		err("Could not allocate DMA ch 8 for USB");
 		etrax_usb_hc_cleanup();
 		DBFEXIT;
 		return -1;
 	}
 	
-	if (request_dma(9, "ETRAX 100LX built-in USB (Rx)")) {
+	if (request_dma(USB_RX_DMA_NBR, "ETRAX 100LX built-in USB (Rx)")) {
 		err("Could not allocate DMA ch 9 for USB");
 		etrax_usb_hc_cleanup();
 		DBFEXIT;
 		return -1;
 	}	
-#if 0  /* Moved to head.S */        
+#if 0  /* Moved to head.S */
 	*R_GEN_CONFIG = genconfig_shadow =
 		(genconfig_shadow & ~(IO_MASK(R_GEN_CONFIG, usb1) |
 				      IO_MASK(R_GEN_CONFIG, usb2) |
@@ -2490,8 +2491,8 @@ static void etrax_usb_hc_cleanup(void)
 	free_irq(ETRAX_USB_RX_IRQ, NULL);
 	free_irq(ETRAX_USB_TX_IRQ, NULL);
 
-	free_dma(8);
-	free_dma(9);
+	free_dma(USB_TX_DMA_NBR);
+	free_dma(USB_RX_DMA_NBR);
 	usb_deregister_bus(etrax_usb_bus);
 
 	DBFEXIT;

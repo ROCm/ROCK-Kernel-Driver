@@ -34,6 +34,10 @@ palette
    specificly, red and blue are swapped), try palette=bgr24 or
    palette=rgb24.
 
+   Only the native yuv420/yuv420p format is supported by the in kernel driver. 
+   If you want to use other formats with in-kernel conversion download the
+   driver from the URL given. [Alan]
+
 fbufs
    This paramter specifies the number of internal buffers to use for storing 
    frames from the cam. This will help if the process that reads images from 

@@ -1,4 +1,4 @@
-/* $Id: gpio.c,v 1.7 2001/04/04 13:30:08 matsfg Exp $
+/* $Id: gpio.c,v 1.9 2001/05/04 14:16:07 matsfg Exp $
  *
  * Etrax general port I/O device
  *
@@ -9,6 +9,14 @@
  *             Johan Adolfsson  (read/set directions)
  *
  * $Log: gpio.c,v $
+ * Revision 1.9  2001/05/04 14:16:07  matsfg
+ * Corrected spelling error
+ *
+ * Revision 1.8  2001/04/27 13:55:26  matsfg
+ * Moved initioremap.
+ * Turns off all LEDS on init.
+ * Added support for shutdown and powerbutton.
+ *
  * Revision 1.7  2001/04/04 13:30:08  matsfg
  * Added bitset and bitclear for leds. Calls init_ioremap to set up memmapping
  *
@@ -247,6 +255,16 @@ gpio_ioctl(struct inode *inode, struct file *file,
 			*priv->dir = *priv->dir_shadow |= 
 			  ((unsigned char)arg & priv->changeable_dir);
 			return *priv->dir_shadow;
+                case IO_SHUTDOWN:
+                       SOFT_SHUTDOWN();
+                       break;
+                case IO_GET_PWR_BT:
+#if defined (CONFIG_ETRAX_SOFT_SHUTDOWN)
+                       return (*R_PORT_G_DATA & 
+                               ( 1 << CONFIG_ETRAX_POWERBUTTON_BIT));
+#else
+                       return 0;
+#endif
 		default:
 			if(priv->minor == LEDS)
 				return gpio_leds_ioctl(cmd, arg);
@@ -262,12 +280,6 @@ gpio_leds_ioctl(unsigned int cmd, unsigned long arg)
 {
 	unsigned char green;
 	unsigned char red;
-        static int initialized = 0;
-        if(!initialized)
-        {
-          initialized = 1;
-          init_ioremap();
-        }
 	switch (_IOC_NR(cmd)) {
 		case IO_LEDACTIVE_SET:
 			green = ((unsigned char) arg) & 1;
@@ -298,7 +310,7 @@ struct file_operations gpio_fops = {
 static __init int
 gpio_init(void)
 {
-	int res;
+	int res,i;
 
 	/* do the formalities */
 
@@ -307,6 +319,24 @@ gpio_init(void)
 		printk(KERN_ERR "gpio: couldn't get a major number.\n");
 		return res;
 	}
+
+        /* Clear all leds */
+#if defined (CONFIG_ETRAX_CSP0_LEDS) ||  defined (CONFIG_ETRAX_PA_LEDS)         || defined (CONFIG_ETRAX_PB_LEDS) 
+
+        init_ioremap();
+        LED_NETWORK_SET(0);
+        LED_ACTIVE_SET(0);
+        LED_DISK_READ(0);
+        LED_DISK_WRITE(0);        
+
+#if defined (CONFIG_ETRAX_CSP0_LEDS)
+        for( i = 0; i < 32; i ++)
+        {
+            LED_BIT_SET(i);
+        }
+#endif
+
+#endif
 	
 	printk("ETRAX 100LX GPIO driver v2.1, (c) 2001 Axis Communications AB\n");
 

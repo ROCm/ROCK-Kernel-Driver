@@ -143,7 +143,7 @@ struct linux_tinfo {
 
 /* ARCS virtual dirents. */
 struct linux_vdirent {
-	unsigned long namelen;
+	ULONG namelen;
 	unsigned char attr;
 	char fname[32]; /* XXX imperical, should be a define */
 };
@@ -177,38 +177,38 @@ struct linux_finfo {
 	struct linux_bigint   begin;
 	struct linux_bigint   end;
 	struct linux_bigint   cur;
-	enum linux_devtypes dtype;
+	enum linux_devtypes   dtype;
 	unsigned long         namelen;
 	unsigned char         attr;
 	char                  name[32]; /* XXX imperical, should be define */
 };
 
-/* This describes the vector containing fuction pointers to the ARC
+/* This describes the vector containing function pointers to the ARC
    firmware functions.  */
 struct linux_romvec {
-	LONG load;			/* Load an executable image. */
-	LONG invoke;			/* Invoke a standalong image. */
-	LONG exec;			/* Load and begin execution of a
+	LONG	load;			/* Load an executable image. */
+	LONG	invoke;			/* Invoke a standalong image. */
+	LONG	exec;			/* Load and begin execution of a
 					   standalone image. */
-	LONG halt;			/* Halt the machine. */
-	LONG pdown;			/* Power down the machine. */
-	LONG restart;			/* XXX soft reset??? */
-	LONG reboot;			/* Reboot the machine. */
-	LONG imode;			/* Enter PROM interactive mode. */
-	LONG _unused1;			/* Was ReturnFromMain(). */
+	LONG	halt;			/* Halt the machine. */
+	LONG	pdown;			/* Power down the machine. */
+	LONG	restart;		/* XXX soft reset??? */
+	LONG	reboot;			/* Reboot the machine. */
+	LONG	imode;			/* Enter PROM interactive mode. */
+	LONG	_unused1;		/* Was ReturnFromMain(). */
 
 	/* PROM device tree interface. */
-	LONG next_component;
-	LONG child_component;
-	LONG parent_component;
-	LONG component_data;
-	LONG child_add;
-	LONG comp_del;
-	LONG component_by_path;
+	LONG	next_component;
+	LONG	child_component;
+	LONG	parent_component;
+	LONG	component_data;
+	LONG	child_add;
+	LONG	comp_del;
+	LONG	component_by_path;
 
 	/* Misc. stuff. */
-	LONG cfg_save;
-	LONG get_sysid;
+	LONG	cfg_save;
+	LONG	get_sysid;
 
 	/* Probing for memory. */
 	LONG	get_mdesc;

@@ -85,6 +85,10 @@ int sr_do_ioctl(int target, unsigned char *sr_cmd, void *buffer, unsigned buflen
 
 	SDev = scsi_CDs[target].device;
 	SRpnt = scsi_allocate_request(scsi_CDs[target].device);
+        if (!SRpnt) {
+                printk("Unable to allocate SCSI request in sr_do_ioctl");
+                return -ENOMEM;
+        }
 	SRpnt->sr_data_direction = readwrite;
 
 	/* use ISA DMA buffer if necessary */

@@ -1,4 +1,4 @@
-/* $Id: process.c,v 1.13 2001/03/20 19:44:06 bjornw Exp $
+/* $Id: process.c,v 1.14 2001/05/29 11:27:59 markusl Exp $
  * 
  *  linux/arch/cris/kernel/process.c
  *
@@ -8,6 +8,9 @@
  *  Authors:   Bjorn Wesen (bjornw@axis.com)
  *
  *  $Log: process.c,v $
+ *  Revision 1.14  2001/05/29 11:27:59  markusl
+ *  Fixed so that hard_reset_now will do reset even if watchdog wasn't enabled
+ *
  *  Revision 1.13  2001/03/20 19:44:06  bjornw
  *  Use the 7th syscall argument for regs instead of current_regs
  *
@@ -90,12 +93,21 @@ int cpu_idle(void *unused)
 
 /* if the watchdog is enabled, we can simply disable interrupts and go
  * into an eternal loop, and the watchdog will reset the CPU after 0.1s
+ * if on the other hand the watchdog wasn't enabled, we just enable it and wait
  */
 
 void hard_reset_now (void)
 {
 	printk("*** HARD RESET ***\n");
 	cli();
+
+#ifndef CONFIG_ETRAX_WATCHDOG
+	/* Since we dont plan to keep on reseting the watchdog,
+	   the key can be arbitrary hence three */
+	*R_WATCHDOG = IO_FIELD(R_WATCHDOG, key, 3) |
+		IO_STATE(R_WATCHDOG, enable, start);
+#endif
+
 	while(1) /* waiting for RETRIBUTION! */ ;
 }
 

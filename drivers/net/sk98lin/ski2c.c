@@ -2,17 +2,16 @@
  *
  * Name:	ski2c.c
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.44 $
- * Date:	$Date: 2000/08/07 15:49:03 $
- * Purpose:	Funktions to access Voltage and Temperature Sensor
- *		(taken from Monalisa (taken from Concentrator))
+ * Version:	$Revision: 1.47 $
+ * Date:	$Date: 2001/04/05 11:38:09 $
+ * Purpose:	Functions to access Voltage and Temperature Sensor
+ *			(taken from Monalisa (taken from Concentrator))
  *
  ******************************************************************************/
 
 /******************************************************************************
  *
- *	(C)Copyright 1998-2000 SysKonnect,
- *	a business unit of Schneider & Koch & Co. Datensysteme GmbH.
+ *	(C)Copyright 1998-2001 SysKonnect GmbH.
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
@@ -28,12 +27,22 @@
  * History:
  *
  *	$Log: ski2c.c,v $
+ *	Revision 1.47  2001/04/05 11:38:09  rassmann
+ *	Set SenState to idle in SkI2cWaitIrq().
+ *	Changed error message in SkI2cWaitIrq().
+ *	
+ *	Revision 1.46  2001/04/02 14:03:35  rassmann
+ *	Changed pAC to IoC in SK_IN32().
+ *	
+ *	Revision 1.45  2001/03/21 12:12:49  rassmann
+ *	Resetting I2C_READY interrupt in SkI2cInit1().
+ *	
  *	Revision 1.44  2000/08/07 15:49:03  gklug
- *	fix: SK_INFAST only in NetWare driver
+ *	Fix: SK_INFAST only in NetWare driver.
  *	
  *	Revision 1.43  2000/08/03 14:28:17  rassmann
- *	- Added function to wait for I2C being ready before resetting the board.
- *	- Replaced one duplicate "out of range" message with correct one.
+ *	Added function to wait for I2C being ready before resetting the board.
+ *	Replaced one duplicate "out of range" message with correct one.
  *	
  *	Revision 1.42  1999/11/22 13:35:12  cgoos
  *	Changed license header to GPL.
@@ -180,10 +189,10 @@
 
 
 /*
-	I2C Protocol
-*/
+ *	I2C Protocol
+ */
 static const char SysKonnectFileId[] =
-	"$Id: ski2c.c,v 1.44 2000/08/07 15:49:03 gklug Exp $";
+	"$Id: ski2c.c,v 1.47 2001/04/05 11:38:09 rassmann Exp $";
 
 #include "h/skdrv1st.h"		/* Driver Specific Definitions */
 #include "h/lm80.h"
@@ -191,7 +200,7 @@ static const char SysKonnectFileId[] =
 
 #ifdef __C2MAN__
 /*
-	I2C protocol implemetation.
+	I2C protocol implementation.
 
 	General Description:
 
@@ -486,7 +495,7 @@ int	Byte)		/* byte to send */
 {
 	int	i;
 
-	for (i=0; i<8; i++) {
+	for (i = 0; i < 8; i++) {
 		if (Byte & (1<<(7-i))) {
 			SkI2cSndBit(IoC, 1);
 		} else {
@@ -510,7 +519,7 @@ int	Last)		/* Last Byte Flag */
 	int	i;
 	int	Byte = 0;
 
-	for (i=0; i<8; i++) {
+	for (i = 0; i < 8; i++) {
 		Byte <<= 1;
 		Byte |= SkI2cRcvBit(IoC);
 	}
@@ -601,13 +610,14 @@ SK_IOC	IoC)	/* I/O Context */
 		if (SkOsGetTime(pAC) - StartTime > SK_TICKS_PER_SEC / 8) {
 			SK_I2C_STOP(IoC);
 #ifndef SK_DIAG
-			SK_ERR_LOG(pAC, SK_ERRCL_SW, SKERR_I2C_E002, SKERR_I2C_E002MSG);
+			SK_ERR_LOG(pAC, SK_ERRCL_SW, SKERR_I2C_E016, SKERR_I2C_E016MSG);
 #endif	/* !SK_DIAG */
 			return;
 		}
-		SK_IN32(pAC, B0_ISRC, &IrqSrc);
+		SK_IN32(IoC, B0_ISRC, &IrqSrc);
 	} while ((IrqSrc & IS_I2C_READY) == 0);
 
+	pSen->SenState = SK_SEN_IDLE;
 	return;
 }	/* SkI2cWaitIrq */
 
@@ -662,10 +672,11 @@ int		I2cBurst)	/* I2C Burst Flag ( 0 || I2C_BURST ) */
 /*
  * read a sensor's value
  *
- * This function read a sensors value from the I2C sensor chip. The sensor
+ * This function reads a sensor's value from the I2C sensor chip. The sensor
  * is defined by its index into the sensors database in the struct pAC points
  * to.
- * Returns	1 if the read is completed
+ * Returns
+ *		1 if the read is completed
  *		0 if the read must be continued (I2C Bus still allocated)
  */
 int	SkI2cReadSensor(
@@ -695,7 +706,7 @@ SK_AC	*pAC)	/* Adapter Context */
 	pAC->I2c.DummyReads = SK_MAX_SENSORS;
 #endif
 
-	for (i=0; i < SK_MAX_SENSORS; i ++) {
+	for (i = 0; i < SK_MAX_SENSORS; i ++) {
 		switch (i) {
 		case 0:
 			pAC->I2c.SenTable[i].SenDesc = "Temperature";
@@ -875,16 +886,19 @@ SK_IOC	IoC)	/* I/O Context */
 	
 #ifndef	SK_DIAG
 	pAC->I2c.DummyReads = pAC->I2c.MaxSens;
+
+	/* Clear the interrupt source */
+	SK_OUT32(IoC, B2_I2C_IRQ, I2C_CLR_IRQ);
 #endif	/* !SK_DIAG */
 	
-	/* Now we are IO initialized */
+	/* Now we are I/O initialized */
 	pAC->I2c.InitLevel = SK_INIT_IO;
 	return(0);
 }	/* SkI2cInit1 */
 
 
 /*
- * Init level 2: Start first sensors read
+ * Init level 2: Start first sensor read.
  */
 static	int	SkI2cInit2(
 SK_AC	*pAC,	/* Adapter Context */
@@ -923,12 +937,13 @@ SK_IOC	IoC)	/* I/O Context */
  * Level 0:
  *	Initialize only the data structures. Do NOT access hardware.
  * Level 1:
- *	Initialize hardware through SK_IN?OUT commands. Do NOT use interrupts.
+ *	Initialize hardware through SK_IN / SK_OUT commands. Do NOT use interrupts.
  * Level 2:
  *	Everything is possible. Interrupts may be used from now on.
  *
- * return:	0 = success
- *		other = error.
+ * return:
+ *	0 = success
+ *	other = error.
  */
 int	SkI2cInit(
 SK_AC	*pAC,	/* Adapter Context */
@@ -986,7 +1001,7 @@ SK_SENSOR	*pSen)
 	SK_EVPARA	ParaLocal;
 	SK_BOOL		TooHigh;	/* Is sensor too high? */
 	SK_BOOL		TooLow;		/* Is sensor too low? */
-	SK_U64		CurrTime;	/* current Time */
+	SK_U64		CurrTime;	/* Current Time */
 	SK_BOOL		DoTrapSend;	/* We need to send a trap */
 	SK_BOOL		DoErrLog;	/* We need to log the error */
 	SK_BOOL		IsError;	/* We need to log the error */
@@ -1000,13 +1015,10 @@ SK_SENSOR	*pSen)
 	/* Get the current time */
 	CurrTime = SkOsGetTime(pAC);
 
-	/* Set para to the most useful setting:
-	 * The current sensor.
-	 */
+	/* Set para to the most useful setting: The current sensor. */
 	ParaLocal.Para64 = (SK_U64) pAC->I2c.CurrSens;
 
-	/* Check the Value against the thresholds */
-	/* First: Error Thresholds */
+	/* Check the Value against the thresholds. First: Error Thresholds */
 	TooHigh = (pSen->SenValue > pSen->SenThreErrHigh);
 	TooLow = (pSen->SenValue < pSen->SenThreErrLow);
 		
@@ -1192,11 +1204,11 @@ SK_IOC		IoC,	/* I/O Context */
 SK_U32		Event,	/* Module specific Event */
 SK_EVPARA	Para)	/* Event specific Parameter */
 {
-	int		ReadComplete;
+	int			ReadComplete;
 	SK_SENSOR	*pSen;
 	SK_U32		Time;
 	SK_EVPARA	ParaLocal;
-	int		i;
+	int			i;
 
 	switch (Event) {
 	case SK_I2CEV_IRQ:
@@ -1224,16 +1236,16 @@ SK_EVPARA	Para)	/* Event specific Parameter */
 		}
 		break;
 	case SK_I2CEV_CLEAR:
-		for (i=0; i < SK_MAX_SENSORS; i ++) {
+		for (i = 0; i < SK_MAX_SENSORS; i ++) {
 			pAC->I2c.SenTable[i].SenErrFlag = SK_SEN_ERR_OK;
 			pAC->I2c.SenTable[i].SenErrCts = 0;
 			pAC->I2c.SenTable[i].SenWarnCts = 0;
 			pAC->I2c.SenTable[i].SenBegErrTS = 0;
 			pAC->I2c.SenTable[i].SenBegWarnTS = 0;
-			pAC->I2c.SenTable[i].SenLastErrTrapTS = (SK_U64) 0;
-			pAC->I2c.SenTable[i].SenLastErrLogTS = (SK_U64) 0;
-			pAC->I2c.SenTable[i].SenLastWarnTrapTS = (SK_U64) 0;
-			pAC->I2c.SenTable[i].SenLastWarnLogTS = (SK_U64) 0;
+			pAC->I2c.SenTable[i].SenLastErrTrapTS = (SK_U64)0;
+			pAC->I2c.SenTable[i].SenLastErrLogTS = (SK_U64)0;
+			pAC->I2c.SenTable[i].SenLastWarnTrapTS = (SK_U64)0;
+			pAC->I2c.SenTable[i].SenLastWarnLogTS = (SK_U64)0;
 		}
 		break;
 	default:

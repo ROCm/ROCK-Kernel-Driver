@@ -284,8 +284,8 @@ static void andes_update_mmu_cache(struct vm_area_struct * vma,
 
 	if((pid != (CPU_CONTEXT(smp_processor_id(), vma->vm_mm) & 0xff)) ||
 	   (CPU_CONTEXT(smp_processor_id(), vma->vm_mm) == 0)) {
-		printk("update_mmu_cache: Wheee, bogus tlbpid mmpid=%d 
-			tlbpid=%d\n", (int) (CPU_CONTEXT(smp_processor_id(), 
+		printk("update_mmu_cache: Wheee, bogus tlbpid mmpid=%d "
+			"tlbpid=%d\n", (int) (CPU_CONTEXT(smp_processor_id(),
 			vma->vm_mm) & 0xff), pid);
 	}
 

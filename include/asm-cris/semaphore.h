@@ -1,4 +1,4 @@
-/* $Id: semaphore.h,v 1.2 2000/07/13 16:52:46 bjornw Exp $ */
+/* $Id: semaphore.h,v 1.3 2001/05/08 13:54:09 bjornw Exp $ */
 
 /* On the i386 these are coded in asm, perhaps we should as well. Later.. */
 

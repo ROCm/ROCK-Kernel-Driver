@@ -971,13 +971,17 @@ static int irtty_net_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	switch (cmd) {
 	case SIOCSBANDWIDTH: /* Set bandwidth */
 		if (!capable(CAP_NET_ADMIN))
-			return -EPERM;
-		irda_task_execute(self, irtty_change_speed, NULL, NULL, 
-				  (void *) irq->ifr_baudrate);
+			ret = -EPERM;
+		else
+			irda_task_execute(self, irtty_change_speed, NULL, NULL, 
+					  (void *) irq->ifr_baudrate);
 		break;
 	case SIOCSDONGLE: /* Set dongle */
-		if (!capable(CAP_NET_ADMIN))
-			return -EPERM;
+		if (!capable(CAP_NET_ADMIN)) {
+			ret = -EPERM;
+			break;
+		}
+
 		/* Initialize dongle */
 		dongle = irda_device_dongle_init(dev, irq->ifr_dongle);
 		if (!dongle)
@@ -999,21 +1003,24 @@ static int irtty_net_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		break;
 	case SIOCSMEDIABUSY: /* Set media busy */
 		if (!capable(CAP_NET_ADMIN))
-			return -EPERM;
-		irda_device_set_media_busy(self->netdev, TRUE);
+			ret = -EPERM;
+		else
+			irda_device_set_media_busy(self->netdev, TRUE);
 		break;
 	case SIOCGRECEIVING: /* Check if we are receiving right now */
 		irq->ifr_receiving = irtty_is_receiving(self);
 		break;
 	case SIOCSDTRRTS:
 		if (!capable(CAP_NET_ADMIN))
-			return -EPERM;
-		irtty_set_dtr_rts(dev, irq->ifr_dtr, irq->ifr_rts);
+			ret = -EPERM;
+		else
+			irtty_set_dtr_rts(dev, irq->ifr_dtr, irq->ifr_rts);
 		break;
 	case SIOCSMODE:
 		if (!capable(CAP_NET_ADMIN))
-			return -EPERM;
-		irtty_set_mode(dev, irq->ifr_mode);
+			ret = -EPERM;
+		else
+			irtty_set_mode(dev, irq->ifr_mode);
 		break;
 	default:
 		ret = -EOPNOTSUPP;

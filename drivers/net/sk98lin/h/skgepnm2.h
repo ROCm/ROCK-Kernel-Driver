@@ -2,16 +2,15 @@
  *
  * Name:	skgepnm2.h
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.28 $
- * Date:	$Date: 2000/08/03 15:12:48 $
+ * Version:	$Revision: 1.30 $
+ * Date:	$Date: 2001/02/06 10:03:41 $
  * Purpose:	Defines for Private Network Management Interface
  *
  ****************************************************************************/
 
 /******************************************************************************
  *
- *	(C)Copyright 1998,1999 SysKonnect,
- *	a business unit of Schneider & Koch & Co. Datensysteme GmbH.
+ *	(C)Copyright 1998-2001 SysKonnect GmbH.
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
@@ -27,6 +26,14 @@
  * History:
  *
  *	$Log: skgepnm2.h,v $
+ *	Revision 1.30  2001/02/06 10:03:41  mkunz
+ *	- Pnmi V4 dual net support added. Interface functions and macros extended
+ *	- Vpd bug fixed
+ *	- OID_SKGE_MTU added
+ *	
+ *	Revision 1.29  2001/01/22 13:41:37  rassmann
+ *	Supporting two nets on dual-port adapters.
+ *	
  *	Revision 1.28  2000/08/03 15:12:48  rwahl
  *	- Additional comment for MAC statistic data structure.
  *	
@@ -159,8 +166,6 @@
 /*
  * VPD releated defines
  */
-#define SK_PNMI_VPD_ARR_SIZE	40
-#define SK_PNMI_VPD_STR_SIZE	5
 
 #define SK_PNMI_VPD_RW		1
 #define SK_PNMI_VPD_RO		2
@@ -201,7 +206,8 @@ typedef struct s_OidTabEntry {
 	int		Access;
 	int		(* Func)(SK_AC *pAc, SK_IOC pIo, int action,
 				SK_U32 Id, char* pBuf, unsigned int* pLen,
-				SK_U32 Instance, unsigned int TableIndex);
+				SK_U32 Instance, unsigned int TableIndex,
+                                SK_U32 NetNumber);
 	SK_U16		Param;
 } SK_PNMI_TAB_ENTRY;
 

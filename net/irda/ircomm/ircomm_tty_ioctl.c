@@ -221,16 +221,14 @@ static int ircomm_tty_set_modem_info(struct ircomm_tty_cb *self,
 { 
 	unsigned int arg;
 	__u8 old_rts, old_dtr;
-	int error;
 
 	IRDA_DEBUG(2, __FUNCTION__ "()\n");
 
 	ASSERT(self != NULL, return -1;);
 	ASSERT(self->magic == IRCOMM_TTY_MAGIC, return -1;);
 
-	error = get_user(arg, value);
-	if (error)
-		return error;
+	if (get_user(arg, value))
+		return -EFAULT;
 
 	old_rts = self->settings.dte & IRCOMM_RTS;
 	old_dtr = self->settings.dte & IRCOMM_DTR;
@@ -431,28 +429,18 @@ int ircomm_tty_ioctl(struct tty_struct *tty, struct file *file,
 		cnow = driver->icount;
 		restore_flags(flags);
 		p_cuser = (struct serial_icounter_struct *) arg;
-		error = put_user(cnow.cts, &p_cuser->cts);
-		if (error) return error;
-		error = put_user(cnow.dsr, &p_cuser->dsr);
-		if (error) return error;
-		error = put_user(cnow.rng, &p_cuser->rng);
-		if (error) return error;
-		error = put_user(cnow.dcd, &p_cuser->dcd);
-		if (error) return error;
-		error = put_user(cnow.rx, &p_cuser->rx);
-		if (error) return error;
-		error = put_user(cnow.tx, &p_cuser->tx);
-		if (error) return error;
-		error = put_user(cnow.frame, &p_cuser->frame);
-		if (error) return error;
-		error = put_user(cnow.overrun, &p_cuser->overrun);
-		if (error) return error;
-		error = put_user(cnow.parity, &p_cuser->parity);
-		if (error) return error;
-		error = put_user(cnow.brk, &p_cuser->brk);
-		if (error) return error;
-		error = put_user(cnow.buf_overrun, &p_cuser->buf_overrun);
-		if (error) return error;			
+		if (put_user(cnow.cts, &p_cuser->cts) ||
+		    put_user(cnow.dsr, &p_cuser->dsr) ||
+		    put_user(cnow.rng, &p_cuser->rng) ||
+		    put_user(cnow.dcd, &p_cuser->dcd) ||
+		    put_user(cnow.rx, &p_cuser->rx) ||
+		    put_user(cnow.tx, &p_cuser->tx) ||
+		    put_user(cnow.frame, &p_cuser->frame) ||
+		    put_user(cnow.overrun, &p_cuser->overrun) ||
+		    put_user(cnow.parity, &p_cuser->parity) ||
+		    put_user(cnow.brk, &p_cuser->brk) ||
+		    put_user(cnow.buf_overrun, &p_cuser->buf_overrun))
+			return -EFAULT;
 #endif		
 		return 0;
 	default:

@@ -1,5 +1,4 @@
-/* $Id: init.c,v 1.13 2000/02/23 00:41:00 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -37,27 +36,11 @@
 #include <asm/sgialib.h>
 #endif
 #include <asm/mmu_context.h>
+#include <asm/tlb.h>
+
+mmu_gather_t mmu_gathers[NR_CPUS];
 
 unsigned long totalram_pages;
-
-void __bad_pte_kernel(pmd_t *pmd)
-{
-	printk("Bad pmd in pte_alloc_kernel: %08lx\n", pmd_val(*pmd));
-	pmd_set(pmd, BAD_PAGETABLE);
-}
-
-void __bad_pte(pmd_t *pmd)
-{
-	printk("Bad pmd in pte_alloc: %08lx\n", pmd_val(*pmd));
-	pmd_set(pmd, BAD_PAGETABLE);
-}
-
-/* Fixme, we need something like BAD_PMDTABLE ...  */
-void __bad_pmd(pgd_t *pgd)
-{
-	printk("Bad pgd in pmd_alloc: %08lx\n", pgd_val(*pgd));
-	pgd_set(pgd, empty_bad_pmd_table);
-}
 
 void pgd_init(unsigned long page)
 {
@@ -113,72 +96,6 @@ void pmd_init(unsigned long addr, unsigned long pagetable)
 	}
 }
 
-pmd_t *get_pmd_slow(pgd_t *pgd, unsigned long offset)
-{
-	pmd_t *pmd;
-
-	pmd = (pmd_t *) __get_free_pages(GFP_KERNEL, 1);
-	if (pgd_none(*pgd)) {
-		if (pmd) {
-			pmd_init((unsigned long)pmd, (unsigned long)invalid_pte_table);
-			pgd_set(pgd, pmd);
-			return pmd + offset;
-		}
-		pgd_set(pgd, BAD_PMDTABLE);
-		return NULL;
-	}
-	free_page((unsigned long)pmd);
-	if (pgd_bad(*pgd)) {
-		__bad_pmd(pgd);
-		return NULL;
-	}
-	return (pmd_t *) pgd_page(*pgd) + offset;
-}
-
-pte_t *get_pte_kernel_slow(pmd_t *pmd, unsigned long offset)
-{
-	pte_t *page;
-
-	page = (pte_t *) __get_free_pages(GFP_USER, 1);
-	if (pmd_none(*pmd)) {
-		if (page) {
-			clear_page(page);
-			pmd_set(pmd, page);
-			return page + offset;
-		}
-		pmd_set(pmd, BAD_PAGETABLE);
-		return NULL;
-	}
-	free_page((unsigned long)page);
-	if (pmd_bad(*pmd)) {
-		__bad_pte_kernel(pmd);
-		return NULL;
-	}
-	return (pte_t *) pmd_page(*pmd) + offset;
-}
-
-pte_t *get_pte_slow(pmd_t *pmd, unsigned long offset)
-{
-	pte_t *page;
-
-	page = (pte_t *) __get_free_pages(GFP_KERNEL, 0);
-	if (pmd_none(*pmd)) {
-		if (page) {
-			clear_page(page);
-			pmd_val(*pmd) = (unsigned long)page;
-			return page + offset;
-		}
-		pmd_set(pmd, BAD_PAGETABLE);
-		return NULL;
-	}
-	free_pages((unsigned long)page, 0);
-	if (pmd_bad(*pmd)) {
-		__bad_pte(pmd);
-		return NULL;
-	}
-	return (pte_t *) pmd_page(*pmd) + offset;
-}
-
 int do_check_pgt_cache(int low, int high)
 {
 	int freed = 0;
@@ -205,7 +122,7 @@ asmlinkage int sys_cacheflush(void *addr, int bytes, int cache)
 }
 
 /*
- * We have upto 8 empty zeroed pages so we can map one of the right colour
+ * We have up to 8 empty zeroed pages so we can map one of the right colour
  * when needed.  This is necessary only on R4000 / R4400 SC and MC versions
  * where we have to avoid VCED / VECI exceptions for good performance at
  * any price.  Since page is never written to after the initialization we
@@ -247,32 +164,155 @@ unsigned long setup_zero_pages(void)
 	return 1UL << order;
 }
 
-/*
- * BAD_PAGE is the page that is used for page faults when linux
- * is out-of-memory. Older versions of linux just did a
- * do_exit(), but using this instead means there is less risk
- * for a process dying in kernel mode, possibly leaving a inode
- * unused etc..
- *
- * BAD_PAGETABLE is the accompanying page-table: it is initialized
- * to point to BAD_PAGE entries.
- *
- * ZERO_PAGE is a special page that is used for zero-initialized
- * data and COW.
- */
-pmd_t * __bad_pmd_table(void)
+void __init add_memory_region(unsigned long start, unsigned long size,
+                              long type)
 {
-	return empty_bad_pmd_table;
+        int x = boot_mem_map.nr_map;
+
+        if (x == BOOT_MEM_MAP_MAX) {
+                printk("Ooops! Too many entries in the memory map!\n");
+                return;
+        }
+
+        boot_mem_map.map[x].addr = start;
+        boot_mem_map.map[x].size = size;
+        boot_mem_map.map[x].type = type;
+        boot_mem_map.nr_map++;
 }
 
-pte_t * __bad_pagetable(void)
+static void __init print_memory_map(void)
 {
-	return empty_bad_page_table;
+        int i;
+
+        for (i = 0; i < boot_mem_map.nr_map; i++) {
+                printk(" memory: %08lx @ %08lx ",
+                        boot_mem_map.map[i].size, boot_mem_map.map[i].addr);
+                switch (boot_mem_map.map[i].type) {
+                case BOOT_MEM_RAM:
+                        printk("(usable)\n");
+                        break;
+                case BOOT_MEM_ROM_DATA:
+                        printk("(ROM data)\n");
+                        break;
+                case BOOT_MEM_RESERVED:
+                        printk("(reserved)\n");
+                        break;
+                default:
+                        printk("type %lu\n", boot_mem_map.map[i].type);
+                        break;
+                }
+        }
 }
 
-pte_t __bad_page(void)
-{
-	return __pte(0);
+void bootmem_init(void) {
+#ifdef CONFIG_BLK_DEV_INITRD
+	unsigned long tmp;
+	unsigned long *initrd_header;
+#endif
+	unsigned long bootmap_size;
+	unsigned long start_pfn, max_pfn;
+	int i;
+	extern int _end;
+
+#define PFN_UP(x)	(((x) + PAGE_SIZE - 1) >> PAGE_SHIFT)
+#define PFN_DOWN(x)	((x) >> PAGE_SHIFT)
+#define PFN_PHYS(x)	((x) << PAGE_SHIFT)
+
+	/*
+	 * Partially used pages are not usable - thus
+	 * we are rounding upwards.
+	 */
+	start_pfn = PFN_UP(__pa(&_end));
+
+	/* Find the highest page frame number we have available.  */
+	max_pfn = 0;
+	for (i = 0; i < boot_mem_map.nr_map; i++) {
+		unsigned long start, end;
+
+		if (boot_mem_map.map[i].type != BOOT_MEM_RAM)
+			continue;
+
+		start = PFN_UP(boot_mem_map.map[i].addr);
+		end = PFN_DOWN(boot_mem_map.map[i].addr
+		      + boot_mem_map.map[i].size);
+
+		if (start >= end)
+			continue;
+		if (end > max_pfn)
+			max_pfn = end;
+	}
+
+	/* Initialize the boot-time allocator.  */
+	bootmap_size = init_bootmem(start_pfn, max_pfn);
+
+	/*
+	 * Register fully available low RAM pages with the bootmem allocator.
+	 */
+	for (i = 0; i < boot_mem_map.nr_map; i++) {
+		unsigned long curr_pfn, last_pfn, size;
+
+		/*
+		 * Reserve usable memory.
+		 */
+		if (boot_mem_map.map[i].type != BOOT_MEM_RAM)
+			continue;
+
+		/*
+		 * We are rounding up the start address of usable memory:
+		 */
+		curr_pfn = PFN_UP(boot_mem_map.map[i].addr);
+		if (curr_pfn >= max_pfn)
+			continue;
+		if (curr_pfn < start_pfn)
+			curr_pfn = start_pfn;
+
+		/*
+		 * ... and at the end of the usable range downwards:
+		 */
+		last_pfn = PFN_DOWN(boot_mem_map.map[i].addr
+				    + boot_mem_map.map[i].size);
+
+		if (last_pfn > max_pfn)
+			last_pfn = max_pfn;
+
+		/*
+		 * ... finally, did all the rounding and playing
+		 * around just make the area go away?
+		 */
+		if (last_pfn <= curr_pfn)
+			continue;
+
+		size = last_pfn - curr_pfn;
+		free_bootmem(PFN_PHYS(curr_pfn), PFN_PHYS(size));
+	}
+
+	/* Reserve the bootmap memory.  */
+	reserve_bootmem(PFN_PHYS(start_pfn), bootmap_size);
+
+#ifdef CONFIG_BLK_DEV_INITRD
+#error "Initrd is broken, please fit it."
+	tmp = (((unsigned long)&_end + PAGE_SIZE-1) & PAGE_MASK) - 8;
+	if (tmp < (unsigned long)&_end)
+		tmp += PAGE_SIZE;
+	initrd_header = (unsigned long *)tmp;
+	if (initrd_header[0] == 0x494E5244) {
+		initrd_start = (unsigned long)&initrd_header[2];
+		initrd_end = initrd_start + initrd_header[1];
+		initrd_below_start_ok = 1;
+		if (initrd_end > memory_end) {
+			printk("initrd extends beyond end of memory "
+			       "(0x%08lx > 0x%08lx)\ndisabling initrd\n",
+			       initrd_end,memory_end);
+			initrd_start = 0;
+		} else
+			*memory_start_p = initrd_end;
+	}
+#endif
+
+#undef PFN_UP
+#undef PFN_DOWN
+#undef PFN_PHYS
+
 }
 
 void show_mem(void)
@@ -312,27 +352,39 @@ extern char __init_begin, __init_end;
 
 void __init paging_init(void)
 {
+	pmd_t *pmd = kpmdtbl;
+	pte_t *pte = kptbl;
+
 	unsigned long zones_size[MAX_NR_ZONES] = {0, 0, 0};
 	unsigned long max_dma, low;
+	int i;
 
 	/* Initialize the entire pgd.  */
 	pgd_init((unsigned long)swapper_pg_dir);
 	pmd_init((unsigned long)invalid_pmd_table, (unsigned long)invalid_pte_table);
 	memset((void *)invalid_pte_table, 0, sizeof(pte_t) * PTRS_PER_PTE);
-	pmd_init((unsigned long)empty_bad_pmd_table, (unsigned long)empty_bad_page_table);
-	memset((void *)empty_bad_page_table, 0, sizeof(pte_t) * PTRS_PER_PTE);
 
 	max_dma =  virt_to_phys((char *)MAX_DMA_ADDRESS) >> PAGE_SHIFT;
 	low = max_low_pfn;
 
+#if defined(CONFIG_PCI) || defined(CONFIG_ISA)
 	if (low < max_dma)
 		zones_size[ZONE_DMA] = low;
 	else {
 		zones_size[ZONE_DMA] = max_dma;
 		zones_size[ZONE_NORMAL] = low - max_dma;
 	}
+#else
+	zones_size[ZONE_DMA] = low;
+#endif
 
 	free_area_init(zones_size);
+	
+	memset((void *)kptbl, 0, PAGE_SIZE << KPTBL_PAGE_ORDER);
+	memset((void *)kpmdtbl, 0, PAGE_SIZE);
+	pgd_set(swapper_pg_dir, kpmdtbl);
+	for (i = 0; i < (1 << KPTBL_PAGE_ORDER); pmd++,i++,pte+=PTRS_PER_PTE)
+		pmd_val(*pmd) = (unsigned long)pte;
 }
 
 extern int page_is_ram(unsigned long pagenr);
@@ -411,7 +463,7 @@ void
 si_meminfo(struct sysinfo *val)
 {
 	val->totalram = totalram_pages;
-	val->sharedram = 0;
+	val->sharedram = atomic_read(&shmem_nrpages);
 	val->freeram = nr_free_pages();
 	val->bufferram = atomic_read(&buffermem_pages);
 	val->totalhigh = 0;

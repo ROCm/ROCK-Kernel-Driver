@@ -1,4 +1,4 @@
-/* $Id: ethernet.c,v 1.12 2001/04/05 11:43:11 tobiasa Exp $
+/* $Id: ethernet.c,v 1.17 2001/06/11 12:43:46 olof Exp $
  *
  * e100net.c: A network driver for the ETRAX 100LX network controller.
  *
@@ -7,6 +7,23 @@
  * The outline of this driver comes from skeleton.c.
  *
  * $Log: ethernet.c,v $
+ * Revision 1.17  2001/06/11 12:43:46  olof
+ * Modified defines for network LED behavior
+ *
+ * Revision 1.16  2001/05/30 06:12:46  markusl
+ * TxDesc.next should not be set to NULL
+ *
+ * Revision 1.15  2001/05/29 10:27:04  markusl
+ * Updated after review remarks:
+ * +Use IO_EXTRACT
+ * +Handle underrun
+ *
+ * Revision 1.14  2001/05/29 09:20:14  jonashg
+ * Use driver name on printk output so one can tell which driver that complains.
+ *
+ * Revision 1.13  2001/05/09 12:35:59  johana
+ * Use DMA_NBR and IRQ_NBR defines from dma.h and irq.h
+ *
  * Revision 1.12  2001/04/05 11:43:11  tobiasa
  * Check dev before panic.
  *
@@ -80,6 +97,7 @@
 
 #include <asm/svinto.h>     /* DMA and register descriptions */
 #include <asm/io.h>         /* LED_* I/O functions */
+#include <asm/irq.h>
 #include <asm/dma.h>
 #include <asm/system.h>
 #include <asm/bitops.h>
@@ -87,8 +105,6 @@
 //#define ETHDEBUG
 #define D(x)
 
-#define ETH_TX_DMA 0
-#define ETH_RX_DMA 1
 
 /*
  * The name of the card. Is used for messages and in the requests for
@@ -116,9 +132,6 @@ struct net_local {
 	spinlock_t lock;
 };
 
-#define NETWORK_DMARX_IRQ 17  /* irq 17 is the DMA1 irq */
-#define NETWORK_DMATX_IRQ 16  /* irq 16 is the DMA0 irq */
-#define NETWORK_STATUS_IRQ 6  /* irq 6 is the network irq */
 
 /* Dma descriptors etc. */
 
@@ -231,7 +244,8 @@ etrax_ethernet_init(struct net_device *dev)
 	/* make Linux aware of the new hardware  */
 
 	if (!dev) {
-		printk("dev == NULL. Should this happen?\n");
+		printk(KERN_WARNING "%s: dev == NULL. Should this happen?\n",
+		       cardname);
 		dev = init_etherdev(dev, sizeof(struct net_local));
 		if (!dev)
 			panic("init_etherdev failed\n");
@@ -250,8 +264,8 @@ etrax_ethernet_init(struct net_device *dev)
 
 	/* now setup our etrax specific stuff */
 
-	dev->irq = NETWORK_DMARX_IRQ; /* we really use DMATX as well... */
-	dev->dma = 1;
+	dev->irq = NETWORK_DMA_RX_IRQ_NBR; /* we really use DMATX as well... */
+	dev->dma = NETWORK_RX_DMA_NBR;
 
 	/* fill in our handlers so the network layer can talk to us in the future */
 
@@ -381,30 +395,30 @@ e100_open(struct net_device *dev)
 
 	/* Reset and wait for the DMA channels */
 
-	RESET_DMA(0);
-	RESET_DMA(1);
-	WAIT_DMA(0);
-	WAIT_DMA(1);
+	RESET_DMA(NETWORK_TX_DMA_NBR);
+	RESET_DMA(NETWORK_RX_DMA_NBR);
+	WAIT_DMA(NETWORK_TX_DMA_NBR);
+	WAIT_DMA(NETWORK_RX_DMA_NBR);
 
 	/* Initialise the etrax network controller */
 
 	/* allocate the irq corresponding to the receiving DMA */
 
-	if (request_irq(NETWORK_DMARX_IRQ, e100rx_interrupt, 0,
+	if (request_irq(NETWORK_DMA_RX_IRQ_NBR, e100rx_interrupt, 0,
 			cardname, (void *)dev)) {
 		goto grace_exit;
 	}
 
 	/* allocate the irq corresponding to the transmitting DMA */
 
-	if (request_irq(NETWORK_DMATX_IRQ, e100tx_interrupt, 0,
+	if (request_irq(NETWORK_DMA_TX_IRQ_NBR, e100tx_interrupt, 0,
 			cardname, (void *)dev)) {
 		goto grace_exit;
 	}
 
 	/* allocate the irq corresponding to the network errors etc */
 
-	if (request_irq(NETWORK_STATUS_IRQ, e100nw_interrupt, 0,
+	if (request_irq(NETWORK_STATUS_IRQ_NBR, e100nw_interrupt, 0,
 			cardname, (void *)dev)) {
 		goto grace_exit;
 	}
@@ -414,17 +428,17 @@ e100_open(struct net_device *dev)
 	 * and clean up on failure.
 	 */
 
-	if(request_dma(ETH_TX_DMA, cardname)) {
+	if(request_dma(NETWORK_TX_DMA_NBR, cardname)) {
 		goto grace_exit;
 	}
 
-	if(request_dma(ETH_RX_DMA, cardname)) {
+	if(request_dma(NETWORK_RX_DMA_NBR, cardname)) {
 	grace_exit:
 		/* this will cause some 'trying to free free irq' but what the heck... */
-		free_dma(ETH_TX_DMA);
-		free_irq(NETWORK_DMARX_IRQ, (void *)dev);
-		free_irq(NETWORK_DMATX_IRQ, (void *)dev);
-		free_irq(NETWORK_STATUS_IRQ, (void *)dev);
+		free_dma(NETWORK_TX_DMA_NBR);
+		free_irq(NETWORK_DMA_RX_IRQ_NBR, (void *)dev);
+		free_irq(NETWORK_DMA_TX_IRQ_NBR, (void *)dev);
+		free_irq(NETWORK_STATUS_IRQ_NBR, (void *)dev);
 		return -EAGAIN;
 	}
 
@@ -625,8 +639,8 @@ e100_tx_timeout(struct net_device *dev)
 	
 	/* reset the TX DMA in case it has hung on something */
 	
-	RESET_DMA(0);
-	WAIT_DMA(0);
+	RESET_DMA(NETWORK_TX_DMA_NBR);
+	WAIT_DMA(NETWORK_TX_DMA_NBR);
 	
 	/* Reset the tranceiver. */
 	
@@ -751,7 +765,8 @@ e100tx_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 			tx_skb = 0;
 			netif_wake_queue(dev);
 		} else {
-			printk("tx weird interrupt\n");
+			printk(KERN_WARNING "%s: tx weird interrupt\n",
+			       cardname);
 		}
 
 		spin_unlock(&np->lock);
@@ -764,6 +779,13 @@ e100nw_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	struct net_device *dev = (struct net_device *)dev_id;
 	struct net_local *np = (struct net_local *)dev->priv;
 	unsigned long irqbits = *R_IRQ_MASK0_RD;
+
+	/* check for underrun irq */
+	if(irqbits & IO_STATE(R_IRQ_MASK0_RD, underrun, active)) { 
+		*R_NETWORK_TR_CTRL = IO_STATE(R_NETWORK_TR_CTRL, clr_error, clr);
+		np->stats.tx_errors++;
+		D(printk("ethernet receiver underrun!\n"));
+	}
 
 	/* check for overrun irq */
 	if(irqbits & IO_STATE(R_IRQ_MASK0_RD, overrun, active)) { 
@@ -900,17 +922,17 @@ e100_close(struct net_device *dev)
 
 	/* Stop the receiver and the transmitter */
 
-	RESET_DMA(0);
-	RESET_DMA(1);
+	RESET_DMA(NETWORK_TX_DMA_NBR);
+	RESET_DMA(NETWORK_RX_DMA_NBR);
 
 	/* Flush the Tx and disable Rx here. */
 
-	free_irq(NETWORK_DMARX_IRQ, (void *)dev);
-	free_irq(NETWORK_DMATX_IRQ, (void *)dev);
-	free_irq(NETWORK_STATUS_IRQ, (void *)dev);
+	free_irq(NETWORK_DMA_RX_IRQ_NBR, (void *)dev);
+	free_irq(NETWORK_DMA_TX_IRQ_NBR, (void *)dev);
+	free_irq(NETWORK_STATUS_IRQ_NBR, (void *)dev);
 
-	free_dma(ETH_TX_DMA);
-	free_dma(ETH_RX_DMA);
+	free_dma(NETWORK_TX_DMA_NBR);
+	free_dma(NETWORK_RX_DMA_NBR);
 
 	/* Update the statistics here. */
 
@@ -925,10 +947,10 @@ update_rx_stats(struct net_device_stats *es)
 {
 	unsigned long r = *R_REC_COUNTERS;
 	/* update stats relevant to reception errors */
-	es->rx_fifo_errors += r >> 24;            /* fifo overrun */
-	es->rx_crc_errors += r & 0xff;            /* crc error */
-	es->rx_frame_errors += (r >> 8) & 0xff;   /* alignment error */
-	es->rx_length_errors += (r >> 16) & 0xff; /* oversized frames */
+	es->rx_fifo_errors += IO_EXTRACT(R_REC_COUNTERS, congestion, r);
+	es->rx_crc_errors += IO_EXTRACT(R_REC_COUNTERS, crc_error, r);
+	es->rx_frame_errors += IO_EXTRACT(R_REC_COUNTERS, alignment_error, r);
+	es->rx_length_errors += IO_EXTRACT(R_REC_COUNTERS, oversize, r);
 }
 
 static void
@@ -936,8 +958,10 @@ update_tx_stats(struct net_device_stats *es)
 {
 	unsigned long r = *R_TR_COUNTERS;
 	/* update stats relevant to transmission errors */
-	es->collisions += (r & 0xff) + ((r >> 8) & 0xff); /* single_col + multiple_col */
-	es->tx_errors += (r >> 24) & 0xff; /* deferred transmit frames */
+	es->collisions +=
+		IO_EXTRACT(R_TR_COUNTERS, single_col, r) +
+		IO_EXTRACT(R_TR_COUNTERS, multiple_col, r);
+	es->tx_errors += IO_EXTRACT(R_TR_COUNTERS, deferred, r);
 }
 
 /*
@@ -1082,10 +1106,12 @@ e100_clear_network_leds(unsigned long dummy)
 static void
 e100_set_network_leds(int active)
 {
-#ifdef CONFIG_LED_OFF_DURING_ACTIVITY
+#if defined(CONFIG_ETRAX_NETWORK_LED_ON_WHEN_LINK)
 	int light_leds = (active == NO_NETWORK_ACTIVITY);
-#else
+#elif defined(CONFIG_ETRAX_NETWORK_LED_ON_WHEN_ACTIVITY)
 	int light_leds = (active == NETWORK_ACTIVITY);
+#else
+#error "Define either CONFIG_ETRAX_NETWORK_LED_ON_WHEN_LINK or CONFIG_ETRAX_NETWORK_LED_ON_WHEN_ACTIVITY"
 #endif
 
 	if (!current_speed) {

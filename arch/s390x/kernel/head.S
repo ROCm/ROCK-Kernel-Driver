@@ -262,8 +262,7 @@ iplstart:
         la    %r2,IPL_BS                       # load start address
         bas   %r14,.Lloader                    # load rest of ipl image
         l     %r12,.Lparm                      # pointer to parameter area
-        st    %r1,__LC_IPLDEV                  # store ipl device number
-        st    %r1,IPL_DEVICE+4-PARMAREA(%r12)
+        st    %r1,IPL_DEVICE+4-PARMAREA(%r12)  # store ipl device number
 
 #
 # load parameter file from ipl device
@@ -467,6 +466,8 @@ startup:basr  %r13,0                     # get base
 	sam64				 # switch to 64 bit mode
 	lctlg %c0,%c15,.Lctl-.LPG1(%r13) # load control registers
 	lg    %r12,.Lparm1-.LPG1(%r13)   # pointer to parameter area
+					 # move IPL device to lowcore
+        mvc   __LC_IPLDEV(4),IPL_DEVICE+4-PARMAREA(%r12)
 
 #
 # find out memory size.

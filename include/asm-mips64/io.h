@@ -185,7 +185,7 @@ __asm__ __volatile__ ( \
 	".set\tnoreorder\n\t" \
 	".set\tnoat\n" \
 	"1:\tl" #m "\t$1, %4(%5)\n\t" \
-	"dsubiu\t%1, 1\n\t" \
+	"dsubu\t%1, 1\n\t" \
 	"s" #m "\t$1,(%0)\n\t" \
 	"bnez\t%1, 1b\n\t" \
 	"daddiu\t%0, %6\n\t" \

@@ -31,4 +31,8 @@
 /* LED ioctl extended */
 #define IO_LED_SETBIT 0xB
 #define IO_LED_CLRBIT 0xC
+
+/* SHUTDOWN ioctl */
+#define IO_SHUTDOWN   0xD
+#define IO_GET_PWR_BT 0xE
 #endif

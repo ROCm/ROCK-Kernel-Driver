@@ -47,7 +47,10 @@ jffs_build_begin(struct jffs_control *c, kdev_t dev)
 	mtd = get_mtd_device(NULL, MINOR(dev));
 
 	if (!mtd)
+	{
+		kfree(fmc);
 		return NULL;
+	}
 	
 	/* Retrieve the size of the flash memory.  */
 	fmc->flash_start = 0;

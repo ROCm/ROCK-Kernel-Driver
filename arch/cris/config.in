@@ -18,11 +18,10 @@ comment 'General setup'
 
 bool 'Networking support' CONFIG_NET
 bool 'System V IPC' CONFIG_SYSVIPC
+bool 'BSD Process Accounting' CONFIG_BSD_PROCESS_ACCT
+bool 'Sysctl support' CONFIG_SYSCTL
 
 tristate 'Kernel support for ELF binaries' CONFIG_BINFMT_ELF
-if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
-  tristate 'Kernel support for JAVA binaries' CONFIG_BINFMT_JAVA
-fi
 
 bool 'Use kernel gdb debugger' CONFIG_ETRAX_KGDB
 
@@ -38,9 +37,9 @@ choice 'Processor type' \
 	 Etrax-100-LX-v2	CONFIG_ETRAX100LX_V2	\
 	 Etrax-100-LX-for-xsim-simulator   CONFIG_SVINTO_SIM" Etrax-100-LX-v1
 
-# For both LX version 1 and the current simulator we enable the low VM mapping
+# Etrax100 LX v1 has a MMU "feature" requiring a low mapping
 
-if [ "$CONFIG_ETRAX100LX" = "y" -o "$CONFIG_SVINTO_SIM" = "y" ]; then
+if [ "$CONFIG_ETRAX100LX" = "y" ]; then
 	define_bool CONFIG_CRIS_LOW_MAP y
 	define_hex  CONFIG_ETRAX_DRAM_VIRTUAL_BASE 60000000
 else
@@ -98,7 +97,7 @@ choice 'Product rescue-port' \
 hex 'R_WAITSTATES' CONFIG_ETRAX_DEF_R_WAITSTATES 95a6
 hex 'R_BUS_CONFIG' CONFIG_ETRAX_DEF_R_BUS_CONFIG 104
 
-bool 'SDRAM support' CONFIG_ETRAX_SDRAM n
+bool 'SDRAM support' CONFIG_ETRAX_SDRAM
 if [ "$CONFIG_ETRAX_SDRAM" = "n" ]; then
 	hex 'R_DRAM_CONFIG' CONFIG_ETRAX_DEF_R_DRAM_CONFIG 1a200040
 	hex 'R_DRAM_TIMING' CONFIG_ETRAX_DEF_R_DRAM_TIMING 5611
@@ -114,6 +113,12 @@ hex 'R_PORT_PA_DATA' CONFIG_ETRAX_DEF_R_PORT_PA_DATA 00
 hex 'R_PORT_PB_CONFIG' CONFIG_ETRAX_DEF_R_PORT_PB_CONFIG 00
 hex 'R_PORT_PB_DIR' CONFIG_ETRAX_DEF_R_PORT_PB_DIR 00
 hex 'R_PORT_PB_DATA' CONFIG_ETRAX_DEF_R_PORT_PB_DATA ff
+
+bool 'Software Shutdown Support' CONFIG_ETRAX_SOFT_SHUTDOWN
+if [ "$CONFIG_ETRAX_SOFT_SHUTDOWN" = "y" ]; then
+   int 'Shutdown bit on port CSP0' CONFIG_ETRAX_SHUTDOWN_BIT 12
+   int 'Power button bit on port G' CONFIG_ETRAX_POWERBUTTON_BIT 25
+fi
 
 endmenu
 
@@ -164,7 +169,7 @@ endmenu
 
 source drivers/ieee1394/Config.in
 
-source drivers/i2o/Config.in
+source drivers/message/i2o/Config.in
 
 if [ "$CONFIG_NET" = "y" ]; then
   mainmenu_option next_comment
@@ -214,8 +219,6 @@ source drivers/char/Config.in
 source drivers/media/Config.in
 
 source fs/Config.in
-
-source drivers/char/Config.in
 
 mainmenu_option next_comment
 comment 'Sound'

@@ -376,7 +376,7 @@ int irlmp_connect_request(struct lsap_cb *self, __u8 dlsap_sel,
 	 * discovery log and check if any of the links has discovered a
 	 * device with the given daddr 
 	 */
-	if (!saddr) {
+	if ((!saddr) || (saddr == DEV_ADDR_ANY)) {
 		if (daddr != DEV_ADDR_ANY)
 			discovery = hashbin_find(irlmp->cachelog, daddr, NULL);
 		else {

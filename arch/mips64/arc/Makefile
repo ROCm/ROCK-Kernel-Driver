@@ -3,13 +3,10 @@
 #
 
 L_TARGET = arclib.a
-obj-y	:= init.o printf.o tree.o env.o cmdline.o misc.o time.o file.o \
-	   identify.o
-
-ifndef CONFIG_SGI_IP27
-  obj-y += console.o
-endif
+obj-y	:= console.o init.o identify.o tree.o env.o cmdline.o misc.o time.o \
+	   file.o
 
 obj-$(CONFIG_ARC_MEMORY) += memory.o
+obj-$(CONFIG_ARC_CONSOLE) += arc_con.o
 
 include $(TOPDIR)/Rules.make

@@ -1,5 +1,4 @@
-/* $Id: pci.h,v 1.4 2000/02/24 00:13:20 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -196,8 +195,21 @@ extern inline void pci_dma_sync_sg(struct pci_dev *hwdev,
 #endif
 }
 
-/* Return the index of the PCI controller for device PDEV. */
-#define pci_controller_num(PDEV)	(0)
+extern inline int pci_dma_supported(struct pci_dev *hwdev, dma_addr_t mask)
+{
+	/*
+	 * we fall back to GFP_DMA when the mask isn't all 1s,
+	 * so we can't guarantee allocations that must be
+	 * within a tighter range than GFP_DMA..
+	 */
+	if (mask < 0x00ffffff)
+		return 0;
+
+	return 1;
+}
+
+/* Return the index of the PCI controller for device. */
+#define pci_controller_num(pdev)	(0)
 
 /*
  * These macros should be used after a pci_map_sg call has been done

@@ -9,7 +9,6 @@
  * Copyright (C) 1998, 2001 by Ralf Baechle
  */
 #include <linux/kernel.h>
-#include <linux/spinlock.h>
 #include <linux/mc146818rtc.h>
 
 static unsigned char no_rtc_read_data(unsigned long addr)
