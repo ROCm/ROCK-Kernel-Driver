@@ -9,204 +9,175 @@
 #ifndef _ASM_IA64_SN_ADDRS_H
 #define _ASM_IA64_SN_ADDRS_H
 
+#include <asm/percpu.h>
+#include <asm/sn/types.h>
+#include <asm/sn/pda.h>
 
-/* McKinley Address Format:
+/*
+ *  Memory/SHUB Address Format:
+ *  +-+---------+--+--------------+
+ *  |0|  NASID  |AS| NodeOffset   |
+ *  +-+---------+--+--------------+
  *
- *   4 4       3 3  3 3
- *   9 8       8 7  6 5             0
- *  +-+---------+----+--------------+
- *  |0| Node ID | AS | Node Offset  |
- *  +-+---------+----+--------------+
- *
- *   Node ID: If bit 38 = 1, is ICE, else is SHUB
- *   AS: Address Space Identifier. Used only if bit 38 = 0.
- *     b'00: Local Resources and MMR space
- *           bit 35
+ *  NASID: (low NASID bit is 0) Memory and SHUB MMRs
+ *   AS: 2-bit Address Space Identifier. Used only if low NASID bit is 0
+ *     00: Local Resources and MMR space
+ *           Top bit of NodeOffset
  *               0: Local resources space
  *                  node id:
  *                        0: IA64/NT compatibility space
  *                        2: Local MMR Space
  *                        4: Local memory, regardless of local node id
  *               1: Global MMR space
- *     b'01: GET space.
- *     b'10: AMO space.
- *     b'11: Cacheable memory space.
+ *     01: GET space.
+ *     10: AMO space.
+ *     11: Cacheable memory space.
  *
  *   NodeOffset: byte offset
+ *
+ *
+ *  TIO address format:
+ *  +-+----------+--+--------------+
+ *  |0|  NASID   |AS| Nodeoffset   |
+ *  +-+----------+--+--------------+
+ *
+ *  NASID: (low NASID bit is 1) TIO
+ *   AS: 2-bit Chiplet Identifier
+ *     00: TIO LB (Indicates TIO MMR access.)
+ *     01: TIO ICE (indicates coretalk space access.)
+ * 
+ *   NodeOffset: top bit must be set.
+ *
+ *
+ * Note that in both of the above address formats, the low
+ * NASID bit indicates if the reference is to the SHUB or TIO MMRs.
  */
 
-/* TIO address format:
- *  4 4        3 3 3 3 3             0
- *  9 8        8 7 6 5 4
- * +-+----------+-+---+--------------+
- * |0| Node ID  |0|CID| Node offset  |
- * +-+----------+-+---+--------------+
- *
- * Node ID: if bit 38 == 1, is ICE.
- * Bit 37: Must be zero.
- * CID: Chiplet ID:
- *     b'01: TIO LB (Indicates TIO MMR access.)
- *     b'11: TIO ICE (indicates coretalk space access.)
- * Node offset: byte offest.
- */
 
 /*
- * Note that in both of the above address formats, bit
- * 35 set indicates that the reference is to the 
- * shub or tio MMRs.
+ * Define basic shift & mask constants for manipulating NASIDs and AS values.
  */
+#define NASID_BITMASK		(pda->nasid_bitmask)
+#define NASID_SHIFT		(pda->nasid_shift)
+#define AS_SHIFT		(pda->as_shift)
+#define AS_BITMASK		0x3UL
 
-#ifndef __ASSEMBLY__
-typedef union ia64_sn2_pa {
-	struct {
-		unsigned long off  : 36;
-		unsigned long as   : 2;
-		unsigned long nasid: 11;
-		unsigned long fill : 15;
-	} f;
-	unsigned long l;
-	void *p;
-} ia64_sn2_pa_t;
-#endif
-
-#define TO_PHYS_MASK		0x0001ffcfffffffffUL	/* Note - clear AS bits */
+#define NASID_MASK              ((u64)NASID_BITMASK << NASID_SHIFT)
+#define AS_MASK			((u64)AS_BITMASK << AS_SHIFT)
+#define REGION_BITS		0xe000000000000000UL
 
 
-/* Regions determined by AS */
-#define LOCAL_MMR_SPACE		0xc000008000000000UL	/* Local MMR space */
-#define LOCAL_PHYS_MMR_SPACE	0x8000008000000000UL	/* Local PhysicalMMR space */
-#define LOCAL_MEM_SPACE		0xc000010000000000UL	/* Local Memory space */
-/* It so happens that setting bit 35 indicates a reference to the SHUB or TIO
- * MMR space.  
+/*
+ * AS values. These are the same on both SHUB1 & SHUB2.
  */
-#define GLOBAL_MMR_SPACE	0xc000000800000000UL	/* Global MMR space */
-#define TIO_MMR_SPACE		0xc000000800000000UL	/* TIO MMR space */
-#define ICE_MMR_SPACE		0xc000000000000000UL	/* ICE MMR space */
-#define GLOBAL_PHYS_MMR_SPACE	0x0000000800000000UL	/* Global Physical MMR space */
-#define GET_SPACE		0xe000001000000000UL	/* GET space */
-#define AMO_SPACE		0xc000002000000000UL	/* AMO space */
-#define CACHEABLE_MEM_SPACE	0xe000003000000000UL	/* Cacheable memory space */
-#define UNCACHED                0xc000000000000000UL	/* UnCacheable memory space */
-#define UNCACHED_PHYS           0x8000000000000000UL	/* UnCacheable physical memory space */
+#define AS_GET_VAL		1UL
+#define AS_AMO_VAL		2UL
+#define AS_CAC_VAL		3UL
+#define AS_GET_SPACE		(AS_GET_VAL << AS_SHIFT)
+#define AS_AMO_SPACE		(AS_AMO_VAL << AS_SHIFT)
+#define AS_CAC_SPACE		(AS_CAC_VAL << AS_SHIFT)
 
-#define PHYS_MEM_SPACE		0x0000003000000000UL	/* physical memory space */
 
-/* SN2 address macros */
-/* NID_SHFT has the right value for both SHUB and TIO addresses.*/
-#define NID_SHFT		38
-#define LOCAL_MMR_ADDR(a)	(UNCACHED | LOCAL_MMR_SPACE | (a))
-#define LOCAL_MMR_PHYS_ADDR(a)	(UNCACHED_PHYS | LOCAL_PHYS_MMR_SPACE | (a))
-#define LOCAL_MEM_ADDR(a)	(LOCAL_MEM_SPACE | (a))
-#define REMOTE_ADDR(n,a)	((((unsigned long)(n))<<NID_SHFT) | (a))
-#define GLOBAL_MMR_ADDR(n,a)	(UNCACHED | GLOBAL_MMR_SPACE | REMOTE_ADDR(n,a))
-#define GLOBAL_MMR_PHYS_ADDR(n,a) (UNCACHED_PHYS | GLOBAL_PHYS_MMR_SPACE | REMOTE_ADDR(n,a))
-#define GET_ADDR(n,a)		(GET_SPACE | REMOTE_ADDR(n,a))
-#define AMO_ADDR(n,a)		(UNCACHED | AMO_SPACE | REMOTE_ADDR(n,a))
-#define GLOBAL_MEM_ADDR(n,a)	(CACHEABLE_MEM_SPACE | REMOTE_ADDR(n,a))
+/*
+ * Base addresses for various address ranges.
+ */
+#define CACHED			0xe000000000000000UL
+#define UNCACHED                0xc000000000000000UL
+#define UNCACHED_PHYS           0x8000000000000000UL
+
+
+/* 
+ * Virtual Mode Local & Global MMR space.  
+ */
+#define SH1_LOCAL_MMR_OFFSET	0x8000000000UL
+#define SH2_LOCAL_MMR_OFFSET	0x0200000000UL
+#define LOCAL_MMR_OFFSET	(is_shub2() ? SH2_LOCAL_MMR_OFFSET : SH1_LOCAL_MMR_OFFSET)
+#define LOCAL_MMR_SPACE		(UNCACHED | LOCAL_MMR_OFFSET)
+#define LOCAL_PHYS_MMR_SPACE	(UNCACHED_PHYS | LOCAL_MMR_OFFSET)
+
+#define SH1_GLOBAL_MMR_OFFSET	0x0800000000UL
+#define SH2_GLOBAL_MMR_OFFSET	0x0300000000UL
+#define GLOBAL_MMR_OFFSET	(is_shub2() ? SH2_GLOBAL_MMR_OFFSET : SH1_GLOBAL_MMR_OFFSET)
+#define GLOBAL_MMR_SPACE	(UNCACHED | GLOBAL_MMR_OFFSET)
+
+/*
+ * Physical mode addresses
+ */
+#define GLOBAL_PHYS_MMR_SPACE	(UNCACHED_PHYS | GLOBAL_MMR_OFFSET)
+
+
+/*
+ * Clear region & AS bits.
+ */
+#define TO_PHYS_MASK		(~(REGION_BITS | AS_MASK))
+
+
+/*
+ * Misc NASID manipulation.
+ */
+#define NASID_SPACE(n)		((u64)(n) << NASID_SHIFT)
+#define REMOTE_ADDR(n,a)	(NASID_SPACE(n) | (a))
+#define NODE_OFFSET(x)		((x) & (NODE_ADDRSPACE_SIZE - 1))
+#define NODE_ADDRSPACE_SIZE     (1UL << AS_SHIFT)
+#define NASID_GET(x)		(int) (((u64) (x) >> NASID_SHIFT) & NASID_BITMASK)
+#define LOCAL_MMR_ADDR(a)	(LOCAL_MMR_SPACE | (a))
+#define GLOBAL_MMR_ADDR(n,a)	(GLOBAL_MMR_SPACE | REMOTE_ADDR(n,a))
+#define GLOBAL_MMR_PHYS_ADDR(n,a) (GLOBAL_PHYS_MMR_SPACE | REMOTE_ADDR(n,a))
+#define GLOBAL_CAC_ADDR(n,a)	(CAC_BASE | REMOTE_ADDR(n,a))
+#define CHANGE_NASID(n,x)	((void *)(((u64)(x) & ~NASID_MASK) | NASID_SPACE(n)))
+
 
 /* non-II mmr's start at top of big window space (4G) */
 #define BWIN_TOP		0x0000000100000000UL
 
 /*
- * general address defines - for code common to SN0/SN1/SN2
+ * general address defines
  */
-#define CAC_BASE		CACHEABLE_MEM_SPACE			/* cacheable memory space */
-#define IO_BASE			(UNCACHED | GLOBAL_MMR_SPACE)		/* lower 4G maps II's XIO space */
-#define TIO_BASE		(UNCACHED | ICE_MMR_SPACE)		/* lower 4G maps TIO space */
-#define AMO_BASE		(UNCACHED | AMO_SPACE)			/* fetch & op space */
-#define MSPEC_BASE		AMO_BASE				/* fetch & op space */
-#define UNCAC_BASE		(UNCACHED | CACHEABLE_MEM_SPACE)	/* uncached global memory */
-#define GET_BASE		GET_SPACE				/* momentarily coherent remote mem. */
-#define CALIAS_BASE             LOCAL_CACHEABLE_BASE			/* cached node-local memory */
-#define UALIAS_BASE             (UNCACHED | LOCAL_CACHEABLE_BASE)	/* uncached node-local memory */
-
-#define TO_PHYS(x)              (              ((x) & TO_PHYS_MASK))
-#define TO_CAC(x)               (CAC_BASE    | ((x) & TO_PHYS_MASK))
-#define TO_UNCAC(x)             (UNCAC_BASE  | ((x) & TO_PHYS_MASK))
-#define TO_MSPEC(x)             (MSPEC_BASE  | ((x) & TO_PHYS_MASK))
-#define TO_GET(x)		(GET_BASE    | ((x) & TO_PHYS_MASK))
-#define TO_CALIAS(x)            (CALIAS_BASE | TO_NODE_ADDRSPACE(x))
-#define TO_UALIAS(x)            (UALIAS_BASE | TO_NODE_ADDRSPACE(x))
-#define NODE_SIZE_BITS		36	/* node offset : bits <35:0> */
-#define BWIN_SIZE_BITS		29	/* big window size: 512M */
-#define TIO_BWIN_SIZE_BITS	30	/* big window size: 1G */
-#define NASID_BITS		11	/* bits <48:38> */
-#define NASID_BITMASK		(0x7ffULL)
-#define NASID_SHFT		NID_SHFT
-#define NASID_META_BITS		0	/* ???? */
-#define NASID_LOCAL_BITS	7	/* same router as SN1 */
-
-#define NODE_ADDRSPACE_SIZE     (1UL << NODE_SIZE_BITS)
-#define NASID_MASK              ((uint64_t) NASID_BITMASK << NASID_SHFT)
-#define NASID_GET(_pa)          (int) (((uint64_t) (_pa) >>            \
-                                        NASID_SHFT) & NASID_BITMASK)
-#define PHYS_TO_DMA(x)          ( ((x & NASID_MASK) >> 2) |             \
-                                  (x & (NODE_ADDRSPACE_SIZE - 1)) )
+#define CAC_BASE		(CACHED   | AS_CAC_SPACE)
+#define AMO_BASE		(UNCACHED | AS_AMO_SPACE)
+#define GET_BASE		(CACHED   | AS_GET_SPACE)
 
 /*
- * This address requires a chiplet id in bits 38-39.  For DMA to memory,
- * the chiplet id is zero.  If we implement TIO-TIO dma, we might need
- * to insert a chiplet id into this macro.  However, it is our belief
- * right now that this chiplet id will be ICE, which is also zero.
+ * Convert Memory addresses between various addressing modes.
  */
-#define PHYS_TO_TIODMA(x)     ( ((x & NASID_MASK) << 2) |             \
-                                 (x & (NODE_ADDRSPACE_SIZE - 1)) )
+#define TO_PHYS(x)		(TO_PHYS_MASK & (x))
+#define TO_CAC(x)		(CAC_BASE     | TO_PHYS(x))
+#define TO_AMO(x)		(AMO_BASE     | TO_PHYS(x))
+#define TO_GET(x)		(GET_BASE     | TO_PHYS(x))
 
-#define CHANGE_NASID(n,x)	({ia64_sn2_pa_t _v; _v.l = (long) (x); _v.f.nasid = n; _v.p;})
 
+/*
+ * Covert from processor physical address to II/TIO physical address:
+ *	II - squeeze out the AS bits
+ *	TIO- requires a chiplet id in bits 38-39.  For DMA to memory,
+ *           the chiplet id is zero.  If we implement TIO-TIO dma, we might need
+ *           to insert a chiplet id into this macro.  However, it is our belief
+ *           right now that this chiplet id will be ICE, which is also zero.
+ */
+#define PHYS_TO_TIODMA(x)	( (((u64)(x) & NASID_MASK) << 2) | NODE_OFFSET(x))
+#define PHYS_TO_DMA(x)          ( (((u64)(x) & NASID_MASK) >> 2) | NODE_OFFSET(x))
 
-#ifndef __ASSEMBLY__
-#define NODE_SWIN_BASE(nasid, widget)                                   \
-        ((widget == 0) ? NODE_BWIN_BASE((nasid), SWIN0_BIGWIN)          \
-        : RAW_NODE_SWIN_BASE(nasid, widget))
-#else
-#define NODE_SWIN_BASE(nasid, widget) \
-     (NODE_IO_BASE(nasid) + ((uint64_t) (widget) << SWIN_SIZE_BITS))
-#define LOCAL_SWIN_BASE(widget) \
-	(UNCACHED | LOCAL_MMR_SPACE | (((uint64_t) (widget) << SWIN_SIZE_BITS)))
-#endif /* __ASSEMBLY__ */
 
 /*
  * The following definitions pertain to the IO special address
  * space.  They define the location of the big and little windows
  * of any given node.
  */
+#define BWIN_SIZE_BITS			29	/* big window size: 512M */
+#define TIO_BWIN_SIZE_BITS		30	/* big window size: 1G */
+#define NODE_SWIN_BASE(n, w)		((w == 0) ? NODE_BWIN_BASE((n), SWIN0_BIGWIN) \
+		: RAW_NODE_SWIN_BASE(n, w))
+#define NODE_IO_BASE(n)			(GLOBAL_MMR_SPACE | NASID_SPACE(n))
+#define BWIN_SIZE			(1UL << BWIN_SIZE_BITS)
+#define NODE_BWIN_BASE0(n)		(NODE_IO_BASE(n) + BWIN_SIZE)
+#define NODE_BWIN_BASE(n, w)		(NODE_BWIN_BASE0(n) + ((u64) (w) << BWIN_SIZE_BITS))
+#define RAW_NODE_SWIN_BASE(n, w)	(NODE_IO_BASE(n) + ((u64) (w) << SWIN_SIZE_BITS))
+#define BWIN_WIDGET_MASK		0x7
+#define BWIN_WINDOWNUM(x)		(((x) >> BWIN_SIZE_BITS) & BWIN_WIDGET_MASK)
 
-#define BWIN_SIZE               (1UL << BWIN_SIZE_BITS)
-#define BWIN_SIZEMASK           (BWIN_SIZE - 1)
-#define BWIN_WIDGET_MASK        0x7
-#define NODE_BWIN_BASE0(nasid)  (NODE_IO_BASE(nasid) + BWIN_SIZE)
-#define NODE_BWIN_BASE(nasid, bigwin)   (NODE_BWIN_BASE0(nasid) +       \
-                        ((uint64_t) (bigwin) << BWIN_SIZE_BITS))
+#define TIO_BWIN_WINDOW_SELECT_MASK	0x7
+#define TIO_BWIN_WINDOWNUM(x)		(((x) >> TIO_BWIN_SIZE_BITS) & TIO_BWIN_WINDOW_SELECT_MASK)
 
-#define BWIN_WIDGETADDR(addr)   ((addr) & BWIN_SIZEMASK)
-#define BWIN_WINDOWNUM(addr)    (((addr) >> BWIN_SIZE_BITS) & BWIN_WIDGET_MASK)
-
-#define TIO_BWIN_WINDOW_SELECT_MASK 0x7
-#define TIO_BWIN_WINDOWNUM(addr)    (((addr) >> TIO_BWIN_SIZE_BITS) & TIO_BWIN_WINDOW_SELECT_MASK)
-
-
-#ifndef __ASSEMBLY__
-#include <asm/sn/types.h>
-#endif 
-
-/*
- * The following macros are used to index to the beginning of a specific
- * node's address space.
- */
-
-#define NODE_OFFSET(_n)		((uint64_t) (_n) << NASID_SHFT)
-
-#define NODE_CAC_BASE(_n)	(CAC_BASE  + NODE_OFFSET(_n))
-#define NODE_HSPEC_BASE(_n)	(HSPEC_BASE + NODE_OFFSET(_n))
-#define NODE_IO_BASE(_n)	(IO_BASE    + NODE_OFFSET(_n))
-#define NODE_MSPEC_BASE(_n)	(MSPEC_BASE + NODE_OFFSET(_n))
-#define NODE_UNCAC_BASE(_n)	(UNCAC_BASE + NODE_OFFSET(_n))
-
-#define TO_NODE_CAC(_n, _x)	(NODE_CAC_BASE(_n) | ((_x) & TO_PHYS_MASK))
-
-#define RAW_NODE_SWIN_BASE(nasid, widget)				\
-	(NODE_IO_BASE(nasid) + ((uint64_t) (widget) << SWIN_SIZE_BITS))
 
 
 /*
@@ -215,15 +186,12 @@ typedef union ia64_sn2_pa {
  * of any given node.
  */
 
-#define SWIN_SIZE_BITS		24
-#define SWIN_SIZE		(1UL << 24)
-#define	SWIN_SIZEMASK		(SWIN_SIZE - 1)
-#define	SWIN_WIDGET_MASK	0xF
+#define SWIN_SIZE_BITS			24
+#define	SWIN_WIDGET_MASK		0xF
 
-#define TIO_SWIN_SIZE_BITS	28
-#define TIO_SWIN_SIZE		(1UL << 28)
-#define TIO_SWIN_SIZEMASK	(SWIN_SIZE - 1)
-#define TIO_SWIN_WIDGET_MASK	0x3
+#define TIO_SWIN_SIZE_BITS		28
+#define TIO_SWIN_SIZE			(1UL << TIO_SWIN_SIZE_BITS)
+#define TIO_SWIN_WIDGET_MASK		0x3
 
 /*
  * Convert smallwindow address to xtalk address.
@@ -231,82 +199,39 @@ typedef union ia64_sn2_pa {
  * 'addr' can be physical or virtual address, but will be converted
  * to Xtalk address in the range 0 -> SWINZ_SIZEMASK
  */
-#define	SWIN_WIDGETNUM(addr)	(((addr)  >> SWIN_SIZE_BITS) & SWIN_WIDGET_MASK)
+#define	SWIN_WIDGETNUM(x)		(((x)  >> SWIN_SIZE_BITS) & SWIN_WIDGET_MASK)
+#define TIO_SWIN_WIDGETNUM(x)		(((x)  >> TIO_SWIN_SIZE_BITS) & TIO_SWIN_WIDGET_MASK)
 
-#define TIO_SWIN_WIDGETNUM(addr)	(((addr)  >> TIO_SWIN_SIZE_BITS) & TIO_SWIN_WIDGET_MASK)
 
 /*
  * The following macros produce the correct base virtual address for
- * the hub registers.  The LOCAL_HUB_* macros produce the appropriate
- * address for the local registers.  The REMOTE_HUB_* macro produce
+ * the hub registers. The REMOTE_HUB_* macro produce
  * the address for the specified hub's registers.  The intent is
  * that the appropriate PI, MD, NI, or II register would be substituted
- * for _x.
- */
-
-
-/*
- * SN2 has II mmr's located inside small window space.
- * As all other non-II mmr's located at the top of big window
- * space.
- */
-#define REMOTE_HUB_BASE(_x)						\
-        (UNCACHED | GLOBAL_MMR_SPACE |                                  \
-        (((~(_x)) & BWIN_TOP)>>8)    |                                       \
-        (((~(_x)) & BWIN_TOP)>>9)    | (_x))
-
-#define REMOTE_HUB(_n, _x)						\
-	((uint64_t *)(REMOTE_HUB_BASE(_x) | ((((long)(_n))<<NASID_SHFT))))
-
-
-/*
- * WARNING:
+ * for x.
+ *
+ *   WARNING:
  *	When certain Hub chip workaround are defined, it's not sufficient
  *	to dereference the *_HUB_ADDR() macros.  You should instead use
  *	HUB_L() and HUB_S() if you must deal with pointers to hub registers.
  *	Otherwise, the recommended approach is to use *_HUB_L() and *_HUB_S().
  *	They're always safe.
  */
-/*
- * LOCAL_HUB_ADDR doesn't need to be changed for TIO, since, by definition,
- * there are no "local" TIOs.
- */
-#define LOCAL_HUB_ADDR(_x)							\
-	(((_x) & BWIN_TOP) ? ((volatile uint64_t *)(LOCAL_MMR_ADDR(_x)))		\
-	: ((volatile uint64_t *)(IALIAS_BASE + (_x))))
-#define REMOTE_HUB_ADDR(_n, _x)						\
-	((_n & 1) ?							\
+#define REMOTE_HUB_ADDR(n,x)						\
+	((n & 1) ?							\
 	/* TIO: */							\
-	((volatile uint64_t *)(GLOBAL_MMR_ADDR(_n, _x)))				\
+	((volatile u64 *)(GLOBAL_MMR_ADDR(n,x)))			\
 	: /* SHUB: */							\
-	(((_x) & BWIN_TOP) ? ((volatile uint64_t *)(GLOBAL_MMR_ADDR(_n, _x)))	\
-	: ((volatile uint64_t *)(NODE_SWIN_BASE(_n, 1) + 0x800000 + (_x)))))
+	(((x) & BWIN_TOP) ? ((volatile u64 *)(GLOBAL_MMR_ADDR(n,x)))\
+	: ((volatile u64 *)(NODE_SWIN_BASE(n,1) + 0x800000 + (x)))))
 
-#ifndef __ASSEMBLY__
 
-#define HUB_L(_a)			(*((volatile typeof(*_a) *)_a))
-#define	HUB_S(_a, _d)			(*((volatile typeof(*_a) *)_a) = (_d))
 
-#define LOCAL_HUB_L(_r)			HUB_L(LOCAL_HUB_ADDR(_r))
-#define LOCAL_HUB_S(_r, _d)		HUB_S(LOCAL_HUB_ADDR(_r), (_d))
-#define REMOTE_HUB_L(_n, _r)		HUB_L(REMOTE_HUB_ADDR((_n), (_r)))
-#define REMOTE_HUB_S(_n, _r, _d)	HUB_S(REMOTE_HUB_ADDR((_n), (_r)), (_d))
-#define REMOTE_HUB_PI_L(_n, _sn, _r)	HUB_L(REMOTE_HUB_PI_ADDR((_n), (_sn), (_r)))
-#define REMOTE_HUB_PI_S(_n, _sn, _r, _d) HUB_S(REMOTE_HUB_PI_ADDR((_n), (_sn), (_r)), (_d))
+#define HUB_L(x)			(*((volatile typeof(*x) *)x))
+#define	HUB_S(x,d)			(*((volatile typeof(*x) *)x) = (d))
 
-#endif /* __ASSEMBLY__ */
+#define REMOTE_HUB_L(n, a)		HUB_L(REMOTE_HUB_ADDR((n), (a)))
+#define REMOTE_HUB_S(n, a, d)		HUB_S(REMOTE_HUB_ADDR((n), (a)), (d))
 
-/*
- * The following macros are used to get to a hub/bridge register, given
- * the base of the register space.
- */
-#define HUB_REG_PTR(_base, _off)	\
-	(volatile uint64_t *)((unsigned long)(_base) + (__psunsigned_t)(_off)))
-
-#define HUB_REG_PTR_L(_base, _off)	\
-	HUB_L(HUB_REG_PTR((_base), (_off)))
-
-#define HUB_REG_PTR_S(_base, _off, _data)	\
-	HUB_S(HUB_REG_PTR((_base), (_off)), (_data))
 
 #endif /* _ASM_IA64_SN_ADDRS_H */

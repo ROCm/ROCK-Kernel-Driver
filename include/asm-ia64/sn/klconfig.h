@@ -29,7 +29,7 @@ typedef struct kl_config_hdr {
 } kl_config_hdr_t;
 
 
-#define NODE_OFFSET_TO_LBOARD(nasid,off)        (lboard_t*)(NODE_CAC_BASE(nasid) + (off))
+#define NODE_OFFSET_TO_LBOARD(nasid,off)        (lboard_t*)(GLOBAL_CAC_ADDR((nasid), (off)))
 
 /*
  * The KLCONFIG area is organized as a LINKED LIST of BOARDs. A BOARD

@@ -340,7 +340,7 @@ void __init sn_setup(char **cmdline_p)
  *
  * One time setup for Node Data Area.  Called by sn_setup().
  */
-void __init sn_init_pdas(char **cmdline_p)
+static void __init sn_init_pdas(char **cmdline_p)
 {
 	cnodeid_t cnode;
 
@@ -416,7 +416,16 @@ void __init sn_cpu_init(void)
 	int slice;
 	int cnode;
 	int i;
+	u64 shubtype, nasid_bitmask, nasid_shift;
 	static int wars_have_been_checked;
+
+	memset(pda, 0, sizeof(pda));
+	if (ia64_sn_get_hub_info(0, &shubtype, &nasid_bitmask, &nasid_shift))
+		BUG();
+	pda->shub2 = (u8)shubtype;
+	pda->nasid_bitmask = (u16)nasid_bitmask;
+	pda->nasid_shift = (u8)nasid_shift;
+	pda->as_shift = pda->nasid_shift - 2;
 
 	/*
 	 * The boot cpu makes this call again after platform initialization is
@@ -441,7 +450,6 @@ void __init sn_cpu_init(void)
 
 	cnode = nasid_to_cnodeid(nasid);
 
-	memset(pda, 0, sizeof(pda));
 	pda->p_nodepda = nodepdaindr[cnode];
 	pda->led_address =
 	    (typeof(pda->led_address)) (LED0 + (slice << LED_CPU_SHIFT));
@@ -475,10 +483,6 @@ void __init sn_cpu_init(void)
 	pda->pio_write_status_addr = (volatile unsigned long *)
 	    LOCAL_MMR_ADDR((slice <
 			    2 ? SH_PIO_WRITE_STATUS_0 : SH_PIO_WRITE_STATUS_1));
-	pda->mem_write_status_addr = (volatile u64 *)
-	    LOCAL_MMR_ADDR((slice <
-			    2 ? SH_MEMORY_WRITE_STATUS_0 :
-			    SH_MEMORY_WRITE_STATUS_1));
 
 	if (local_node_data->active_cpu_count++ == 0) {
 		int buddy_nasid;
