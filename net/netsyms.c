@@ -19,7 +19,6 @@
 #include <linux/ioport.h>
 #include <linux/tty.h>
 #include <linux/ethtool.h>
-#include <net/neighbour.h>
 #include <net/snmp.h>
 #include <net/dst.h>
 #include <net/checksum.h>
@@ -45,7 +44,6 @@
 #include <net/atmclip.h>
 #endif
 #include <net/ip.h>
-#include <net/udp.h>
 #include <net/tcp.h>
 #include <net/icmp.h>
 #include <net/inet_common.h>
@@ -144,7 +142,6 @@ EXPORT_SYMBOL(ip_mc_inc_group);
 EXPORT_SYMBOL(ip_mc_dec_group);
 EXPORT_SYMBOL(ip_mc_join_group);
 EXPORT_SYMBOL(ip_finish_output);
-EXPORT_SYMBOL(ip_cmsg_recv);
 EXPORT_SYMBOL(inet_addr_type); 
 EXPORT_SYMBOL(inet_select_addr);
 EXPORT_SYMBOL(ip_dev_find);
@@ -197,25 +194,13 @@ EXPORT_SYMBOL(sysctl_tcp_reordering);
 EXPORT_SYMBOL(sysctl_tcp_ecn);
 EXPORT_SYMBOL(tcp_cwnd_application_limited);
 
-
-
-extern int sysctl_tcp_tw_recycle;
-
 #ifdef CONFIG_SYSCTL
+extern int sysctl_tcp_tw_recycle;
 EXPORT_SYMBOL(sysctl_tcp_tw_recycle); 
 #endif
 
 EXPORT_SYMBOL(ip_generic_getfrag);
-
 #endif
-
-
-#ifdef CONFIG_IP_SCTP_MODULE
-EXPORT_SYMBOL(ip_setsockopt);
-EXPORT_SYMBOL(ip_getsockopt);
-#endif /* CONFIG_IP_SCTP_MODULE */
-
-
 
 /* Used by at least ipip.c.  */
 EXPORT_SYMBOL(ipv4_config);
