@@ -926,6 +926,12 @@ static int storage_probe(struct usb_interface *intf,
 		goto BadDevice;
 	}
 
+	/* set the hostdata to prepare for scanning */
+	ss->host->hostdata[0] = (unsigned long)ss;
+
+	/* associate this host with our interface */
+	scsi_set_device(ss->host, &intf->dev);
+
 	/* now add the host */
 	result = scsi_add_host(ss->host, NULL);
 	if (result) {
@@ -941,9 +947,6 @@ static int storage_probe(struct usb_interface *intf,
 		down(&ss->dev_semaphore);
 		goto BadDevice;
 	}
-
-	ss->host->hostdata[0] = (unsigned long)ss;
-	scsi_set_device(ss->host, &intf->dev);
 
 	printk(KERN_DEBUG 
 	       "WARNING: USB Mass Storage data integrity not assured\n");
