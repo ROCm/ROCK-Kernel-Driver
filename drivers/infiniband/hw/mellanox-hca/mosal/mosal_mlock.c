@@ -299,7 +299,7 @@ int find_m_lock_unlock_ptrs(sys_lock_ptr_t *lock_p, sys_lock_ptr_t *unlock_p)
 #if 1
   extern void sys_mlock(void), sys_munlock(void);
   *lock_p = sys_mlock; 
-  *lock_p = sys_munlock;  return 0;
+  *unlock_p = sys_munlock;  return 0;
 #else
   char *modname;
   const char *name;
