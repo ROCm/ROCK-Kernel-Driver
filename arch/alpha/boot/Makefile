@@ -8,7 +8,9 @@
 # Copyright (C) 1994 by Linus Torvalds
 #
 
-LINKFLAGS = -static -T bootloader.lds #-N -relax
+LINKFLAGS = -static -T bootloader.lds -uvsprintf #-N -relax
+
+CFLAGS := $(CFLAGS) -I$(TOPDIR)/include
 
 .S.s:
 	$(CPP) $(AFLAGS) -traditional -o $*.o $<
