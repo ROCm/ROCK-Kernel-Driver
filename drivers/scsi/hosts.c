@@ -51,7 +51,6 @@ static spinlock_t scsi_host_list_lock = SPIN_LOCK_UNLOCKED;
 
 static int scsi_host_next_hn;		/* host_no for next new host */
 static int scsi_hosts_registered;	/* cnt of registered scsi hosts */
-static int scsi_ignore_no_error_handling = 0;
 
 /**
  * scsi_tp_for_each_host - call function for each scsi host off a template

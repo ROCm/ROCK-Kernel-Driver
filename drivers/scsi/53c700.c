@@ -896,7 +896,7 @@ process_message(struct Scsi_Host *host,	struct NCR_700_Host_Parameters *hostdata
 			NCR_700_clear_flag(SCp->device, NCR_700_DEV_BEGIN_TAG_QUEUEING);
 			hostdata->tag_negotiated &= ~(1<<SCp->target);
 			SCp->device->tagged_supported = 0;
-			scsi_deactivate_tcq(SCp->device);
+			scsi_deactivate_tcq(SCp->device, host->cmd_per_lun);
 		} else {
 			printk(KERN_WARNING "scsi%d (%d:%d) Unexpected REJECT Message %s\n",
 			       host->host_no, pun, lun,
@@ -1813,8 +1813,6 @@ NCR_700_queuecommand(Scsi_Cmnd *SCp, void (*done)(Scsi_Cmnd *))
 		 * NOTE: There is a danger here: the mid layer supports
 		 * tag queuing per LUN.  We only support it per PUN because
 		 * of potential reselection issues */
-		printk(KERN_NOTICE "scsi%d: (%d:%d) beginning blk layer TCQ\n",
-		       SCp->device->host->host_no, SCp->target, SCp->lun);
 		scsi_activate_tcq(SCp->device, NCR_700_MAX_TAGS);
 	}
 

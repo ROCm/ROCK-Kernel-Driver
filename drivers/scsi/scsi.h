@@ -852,8 +852,9 @@ extern int scsi_reset_provider(Scsi_Device *, int);
 static inline void scsi_activate_tcq(Scsi_Device *SDpnt, int depth) {
         request_queue_t *q = &SDpnt->request_queue;
 
-        if(SDpnt->tagged_supported && !blk_queue_tagged(q)) {
-                blk_queue_init_tags(q, depth);
+        if(SDpnt->tagged_supported) {
+		if(!blk_queue_tagged(q))
+			blk_queue_init_tags(q, depth);
 		scsi_adjust_queue_depth(SDpnt, MSG_ORDERED_TAG, depth);
         }
 }
@@ -862,9 +863,12 @@ static inline void scsi_activate_tcq(Scsi_Device *SDpnt, int depth) {
  * scsi_deactivate_tcq - turn off tag command queueing
  * @SDpnt:	device to turn off TCQ for
  **/
-static inline void scsi_deactivate_tcq(Scsi_Device *SDpnt) {
-        blk_queue_free_tags(&SDpnt->request_queue);
-	scsi_adjust_queue_depth(SDpnt, 0, 2);
+static inline void scsi_deactivate_tcq(Scsi_Device *SDpnt, int depth) {
+	request_queue_t *q = &SDpnt->request_queue;
+
+	if(blk_queue_tagged(q))
+		blk_queue_free_tags(q);
+	scsi_adjust_queue_depth(SDpnt, 0, depth);
 }
 
 /**
