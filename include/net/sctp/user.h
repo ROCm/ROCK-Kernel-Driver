@@ -110,6 +110,10 @@ enum sctp_optname {
 #define SCTP_GET_LOCAL_ADDRS	SCTP_GET_LOCAL_ADDRS
 	SCTP_NODELAY, 	/* Get/set nodelay option. */
 #define SCTP_NODELAY	SCTP_NODELAY
+	SCTP_I_WANT_MAPPED_V4_ADDR,  /* Turn on/off mapped v4 addresses  */
+#define SCTP_I_WANT_MAPPED_V4_ADDR SCTP_I_WANT_MAPPED_V4_ADDR
+	SCTP_MAXSEG, 	/* Get/set maximum fragment. */
+#define SCTP_MAXSEG 	SCTP_MAXSEG
 };
 
 
