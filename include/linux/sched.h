@@ -3,8 +3,6 @@
 
 #include <asm/param.h>	/* for HZ */
 
-extern unsigned long event;
-
 #include <linux/config.h>
 #include <linux/capability.h>
 #include <linux/threads.h>
