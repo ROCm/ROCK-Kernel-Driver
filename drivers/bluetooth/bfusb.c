@@ -661,11 +661,11 @@ static int bfusb_probe(struct usb_interface *intf, const struct usb_device_id *i
 	BT_DBG("intf %p id %p", intf, id);
 
 	/* Check number of endpoints */
-	if (intf->altsetting[0].desc.bNumEndpoints < 2)
+	if (intf->cur_altsetting->desc.bNumEndpoints < 2)
 		return -EIO;
 
-	bulk_out_ep = &intf->altsetting[0].endpoint[0];
-	bulk_in_ep  = &intf->altsetting[0].endpoint[1];
+	bulk_out_ep = &intf->cur_altsetting->endpoint[0];
+	bulk_in_ep  = &intf->cur_altsetting->endpoint[1];
 
 	if (!bulk_out_ep || !bulk_in_ep) {
 		BT_ERR("Bulk endpoints not found");
