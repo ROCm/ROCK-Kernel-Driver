@@ -500,7 +500,7 @@ static void flex_sram_read(struct adapter *adapter, u32 bank, u32 addr, u8 *buf,
 	}
 }
 
-static void sram_writeChunk(struct adapter *adapter, u32 addr, u8 *buf, u16 len)
+static void sram_write_chunk(struct adapter *adapter, u32 addr, u8 *buf, u16 len)
 {
 	u32 bank;
 
@@ -520,7 +520,7 @@ static void sram_writeChunk(struct adapter *adapter, u32 addr, u8 *buf, u16 len)
 	flex_sram_write(adapter, bank, addr & 0x7fff, buf, len);
 }
 
-static void sram_readChunk(struct adapter *adapter, u32 addr, u8 *buf, u16 len)
+static void sram_read_chunk(struct adapter *adapter, u32 addr, u8 *buf, u16 len)
 {
 	u32 bank;
 
@@ -554,7 +554,7 @@ static void sram_read(struct adapter *adapter, u32 addr, u8 *buf, u32 len)
 			length = (((addr >> 0x0f) + 1) << 0x0f) - addr;
 		}
 
-		sram_readChunk(adapter, addr, buf, length);
+		sram_read_chunk(adapter, addr, buf, length);
 
 		addr = addr + length;
 		buf = buf + length;
@@ -576,7 +576,7 @@ static void sram_write(struct adapter *adapter, u32 addr, u8 *buf, u32 len)
 			length = (((addr >> 0x0f) + 1) << 0x0f) - addr;
 		}
 
-		sram_writeChunk(adapter, addr, buf, length);
+		sram_write_chunk(adapter, addr, buf, length);
 
 		addr = addr + length;
 		buf = buf + length;
