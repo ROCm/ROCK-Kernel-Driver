@@ -924,12 +924,6 @@ void dumpPci_Controller(struct pci_controller* phb)
 		udbg_printf("\tpci_mem_offset= 0x%016LX\n", phb->pci_mem_offset);
 		udbg_printf("\tpci_io_offset = 0x%016LX\n", phb->pci_io_offset);
 
-		udbg_printf("\tcfg_addr      = 0x%016LX\n", phb->cfg_addr);
-		udbg_printf("\tcfg_data      = 0x%016LX\n", phb->cfg_data);
-		udbg_printf("\tphb_regs      = 0x%016LX\n", phb->phb_regs);
-		udbg_printf("\tchip_regs     = 0x%016LX\n", phb->chip_regs);
-
-
 		udbg_printf("\tResources\n");
 		dumpResources(&phb->io_resource);
 		if (phb->mem_resource_count >  0) dumpResources(&phb->mem_resources[0]);

@@ -45,15 +45,13 @@
 #include "open_pic.h"
 #include "pci.h"
 
-extern struct device_node *allnodes;
-
 /*******************************************************************
  * Forward declares of prototypes. 
  *******************************************************************/
-unsigned long find_and_init_phbs(void);
-struct pci_controller* alloc_phb(struct device_node *dev, char *model, unsigned int addr_size_words) ;
-void pSeries_pcibios_fixup(void);
-static int rtas_fake_read(struct device_node *dn, int offset, int nbytes, unsigned long *returnval);
+struct pci_controller *alloc_phb(struct device_node *dev, char *model,
+				 unsigned int addr_size_words) ;
+static int rtas_fake_read(struct device_node *dn, int offset, int nbytes,
+			  unsigned long *returnval);
 
 /* RTAS tokens */
 static int read_pci_config;
@@ -467,44 +465,37 @@ alloc_phb(struct device_node *dev, char *model, unsigned int addr_size_words)
 	* Python
 	***************************************************************/
 	if (strstr(model, "Python")) {
+		unsigned long chip_regs;
+		volatile u32 *tmp, i;
+
 		PPCDBG(PPCDBG_PHBINIT, "\tCreate python\n");
-	        phb = pci_alloc_pci_controller("PHB PY",phb_type_python);
-		if (phb == NULL) return NULL;
-	
-       		phb->cfg_addr = (volatile unsigned long *) 
-			ioremap(reg_struct.address + 0xf8000, PAGE_SIZE);
-		PPCDBG(PPCDBG_PHBINIT, "\tcfg_addr_r = 0x%lx\n", 
-		       reg_struct.address + 0xf8000);
-		PPCDBG(PPCDBG_PHBINIT, "\tcfg_addr_v = 0x%lx\n", 
-		       phb->cfg_addr);
-		phb->cfg_data = (char*)(phb->cfg_addr + 0x02);
-       		phb->phb_regs = (volatile unsigned long *) 
-			ioremap(reg_struct.address + 0xf7000, PAGE_SIZE);
+
+		phb = pci_alloc_pci_controller("PHB PY", phb_type_python);
+		if (phb == NULL)
+			return NULL;
+
 		/* Python's register file is 1 MB in size. */
-		phb->chip_regs = ioremap(reg_struct.address & ~(0xfffffUL), 
-					 0x100000); 
+		chip_regs = ioremap(reg_struct.address & ~(0xfffffUL),
+				    0x100000); 
 
 		/* 
 		 * Firmware doesn't always clear this bit which is critical
 		 * for good performance - Anton
 		 */
-		{
-			volatile u32 *tmp, i;
 
 #define PRG_CL_RESET_VALID 0x00010000
 
-			tmp = (u32 *)((unsigned long)phb->chip_regs + 0xf6030);
+		tmp = (u32 *)((unsigned long)chip_regs + 0xf6030);
 
-			if (*tmp & PRG_CL_RESET_VALID) {
-				printk("Python workaround: ");
-				*tmp &= ~PRG_CL_RESET_VALID;
-				/*
-				 * We must read it back for changes to
-				 * take effect
-				 */
-				i = *tmp;
-				printk("reg0: %x\n", i);
-			}
+		if (*tmp & PRG_CL_RESET_VALID) {
+			printk("Python workaround: ");
+			*tmp &= ~PRG_CL_RESET_VALID;
+			/*
+			 * We must read it back for changes to
+			 * take effect
+			 */
+			i = *tmp;
+			printk("reg0: %x\n", i);
 		}
 
 	/***************************************************************
@@ -514,28 +505,12 @@ alloc_phb(struct device_node *dev, char *model, unsigned int addr_size_words)
 	} else if ((strstr(model, "Speedwagon")) || 
 		   (strstr(model, "Winnipeg"))) {
 		PPCDBG(PPCDBG_PHBINIT, "\tCreate speedwagon\n");
-	        phb = pci_alloc_pci_controller("PHB SW",phb_type_speedwagon);
-		if (phb == NULL) return NULL;
-
-		if (naca->platform == PLATFORM_PSERIES) {
-			phb->cfg_addr = (volatile unsigned long *) 
-			  ioremap(reg_struct.address + 0x140, PAGE_SIZE);
-			phb->cfg_data = (char*)(phb->cfg_addr - 0x02); /* minus is correct */
-			phb->phb_regs = (volatile unsigned long *) 
-			  ioremap(reg_struct.address, PAGE_SIZE);
-			/* Speedwagon's register file is 1 MB in size. */
-			phb->chip_regs = ioremap(reg_struct.address & ~(0xfffffUL),
-						 0x100000); 
-			PPCDBG(PPCDBG_PHBINIT, "\tmapping chip_regs from 0x%lx -> 0x%lx\n", 
-			       reg_struct.address & 0xfffff, phb->chip_regs);
-		} else {
-			phb->cfg_addr = NULL;
-			phb->cfg_data = NULL; 
-			phb->phb_regs = NULL;
-			phb->chip_regs = NULL;
-		}
+	        phb = pci_alloc_pci_controller("PHB SW", phb_type_speedwagon);
+		if (phb == NULL)
+			return NULL;
 
 		phb->local_number = ((reg_struct.address >> 12) & 0xf) - 0x8;
+
 	/***************************************************************
 	* Trying to build a known just gets the code in trouble.
 	***************************************************************/
@@ -563,7 +538,7 @@ alloc_phb(struct device_node *dev, char *model, unsigned int addr_size_words)
 
 	buid_vals = (int *) get_property(dev, "ibm,fw-phb-id", &len);
 	
-  if (buid_vals == NULL) {
+	if (buid_vals == NULL) {
 		phb->buid = 0;
 	} else {
 		struct pci_bus check;
