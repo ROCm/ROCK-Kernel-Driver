@@ -409,7 +409,7 @@ static void imsttfb_remove(struct pci_dev *pdev);
 static inline u32 read_reg_le32(volatile u32 *base, int regindex)
 {
 #ifdef __powerpc__
-	in_le32((volatile u32 *) (base + regindex));
+	return in_le32((volatile u32 *) (base + regindex));
 #else
 	return readl(base + regindex);
 #endif

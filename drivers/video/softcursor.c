@@ -58,20 +58,19 @@ int soft_cursor(struct fb_info *info, struct fb_cursor *cursor)
 	if (info->cursor.enable) {
 		switch (info->cursor.rop) {
 		case ROP_XOR:
-			for (i = 0; i < size; i++)
+			for (i = 0; i < dsize; i++)
 				src[i] = cursor->image.data[i] ^ info->cursor.mask[i]; 
 			break;
 		case ROP_COPY:
 		default:
-			for (i = 0; i < size; i++)
+			for (i = 0; i < dsize; i++)
 				src[i] = cursor->image.data[i] & info->cursor.mask[i];
 			break;
 		}
 	} else 
-		memcpy(src, cursor->image.data, size);
+		memcpy(src, cursor->image.data, dsize);
 	
 	move_buf_aligned(info, dst, src, d_pitch, s_pitch, info->cursor.image.height);
-	
 	info->cursor.image.data = dst;
 	
 	info->fbops->fb_imageblit(info, &info->cursor.image);

@@ -403,22 +403,22 @@ u8 sys_inbuf(u8 *src)
 	return *src;
 }
 
-void sys_outbuf(u8 src, u8 *dst)
+void sys_outbuf(u8 *src, u8 *dst, unsigned int size)
 {
-	*dst = src;
+	memcpy(dst, src, size);
 }	
 
 void move_buf_aligned(struct fb_info *info, u8 *dst, u8 *src, u32 d_pitch, 
 			u32 s_pitch, u32 height)
 {
-	int i, j;
-	
+	int i;
+
 	for (i = height; i--; ) {
-		for (j = 0; j < s_pitch; j++)
-			info->pixmap.outbuf(*src++, dst+j);
+		info->pixmap.outbuf(src, dst, s_pitch);
+		src += s_pitch;
 		dst += d_pitch;
-	}	
-}	
+	}
+}
 
 void move_buf_unaligned(struct fb_info *info, u8 *dst, u8 *src, u32 d_pitch, 
 			u32 height, u32 mask, u32 shift_high, u32 shift_low,
@@ -432,20 +432,23 @@ void move_buf_unaligned(struct fb_info *info, u8 *dst, u8 *src, u32 d_pitch,
 			tmp = info->pixmap.inbuf(dst+j);
 			tmp &= mask;
 			tmp |= *src >> shift_low;
-			info->pixmap.outbuf(tmp, dst+j);
-			info->pixmap.outbuf(*src << shift_high, dst+j+1);
+			info->pixmap.outbuf(&tmp, dst+j, 1);
+			tmp = *src << shift_high;
+			info->pixmap.outbuf(&tmp, dst+j+1, 1);
 			src++;
 		}
 		tmp = info->pixmap.inbuf(dst+idx);
 		tmp &= mask;
 		tmp |= *src >> shift_low;
-		info->pixmap.outbuf(tmp, dst+idx);
-		if (shift_high < mod)
-			info->pixmap.outbuf(*src<<shift_high, dst+idx+1);
+		info->pixmap.outbuf(&tmp, dst+idx, 1);
+		if (shift_high < mod) {
+			tmp = *src << shift_high;
+			info->pixmap.outbuf(&tmp, dst+idx+1, 1);
+		}	
 		src++;
 		dst += d_pitch;
-	}	
-}	
+	}
+}
 
 /*
  * we need to lock this section since fb_cursor
@@ -467,10 +470,8 @@ u32 fb_get_buffer_offset(struct fb_info *info, u32 size)
 		offset = 0;
 	}
 	info->pixmap.offset = offset + size;
-
 	atomic_inc(&info->pixmap.count);	
 	smp_mb__after_atomic_inc();
-
 	spin_unlock(&info->pixmap.lock);
 	return offset;
 }
@@ -678,7 +679,7 @@ int fb_show_logo(struct fb_info *info)
 	int x;
 
 	/* Return if the frame buffer is not mapped */
-	if (!info->fbops->fb_imageblit || fb_logo.logo == NULL)
+	if (fb_logo.logo == NULL)
 		return 0;
 
 	image.depth = fb_logo.depth;
@@ -724,8 +725,8 @@ int fb_show_logo(struct fb_info *info)
 	     x <= info->var.xres-fb_logo.logo->width; x += (fb_logo.logo->width + 8)) {
 		image.dx = x;
 		info->fbops->fb_imageblit(info, &image);
-		atomic_dec(&info->pixmap.count);
-		smp_mb__after_atomic_dec();
+		//atomic_dec(&info->pixmap.count);
+		//smp_mb__after_atomic_dec();
 	}
 	
 	if (palette != NULL)

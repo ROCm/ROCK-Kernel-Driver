@@ -338,7 +338,8 @@ struct fb_pixmap {
 	__u32 buf_align;                  /* byte alignment of each bitmap */
 	__u32 scan_align;                 /* alignment per scanline        */
 	__u32 flags;                      /* see FB_PIXMAP_*               */
-	void (*outbuf)(u8 dst, u8 *addr); /* access methods                */
+					  /* access methods                */
+	void (*outbuf)(u8 *dst, u8 *addr, unsigned int size); 
 	u8   (*inbuf) (u8 *addr);
 	spinlock_t lock;                  /* spinlock                      */
 	atomic_t count;
