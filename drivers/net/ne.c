@@ -76,6 +76,9 @@ static unsigned int netcard_portlist[] __initdata = {
 #endif
 
 static struct isapnp_device_id isapnp_clone_list[] __initdata = {
+	{	ISAPNP_CARD_ID('A','X','E',0x2011),
+		ISAPNP_VENDOR('A','X','E'), ISAPNP_FUNCTION(0x2011),
+		(long) "NetGear EA201" },
 	{	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
 		ISAPNP_VENDOR('E','D','I'), ISAPNP_FUNCTION(0x0216),
 		(long) "NN NE2000" },
