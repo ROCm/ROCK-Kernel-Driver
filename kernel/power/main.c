@@ -33,8 +33,6 @@ void pm_set_ops(struct pm_ops * ops)
 {
 	down(&pm_sem);
 	pm_ops = ops;
-	if (ops->pm_disk_mode && ops->pm_disk_mode < PM_DISK_MAX)
-		pm_disk_mode = ops->pm_disk_mode;
 	up(&pm_sem);
 }
 
