@@ -389,7 +389,7 @@ void switch_mm_skas(int mm_fd)
 void kill_off_processes_skas(void)
 {
 #warning need to loop over userspace_pids in kill_off_processes_skas
-	os_kill_process(userspace_pid[0], 1);
+	os_kill_ptraced_process(userspace_pid[0], 1);
 }
 
 void init_registers(int pid)

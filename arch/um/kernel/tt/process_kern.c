@@ -82,7 +82,7 @@ void *switch_to_tt(void *prev, void *next, void *last)
 	prev_sched = current->thread.prev_sched;
 	if((prev_sched->exit_state == EXIT_ZOMBIE) ||
 	   (prev_sched->exit_state == EXIT_DEAD))
-		os_kill_process(prev_sched->thread.mode.tt.extern_pid, 1);
+		os_kill_ptraced_process(prev_sched->thread.mode.tt.extern_pid, 1);
 
 	/* This works around a nasty race with 'jail'.  If we are switching
 	 * between two threads of a threaded app and the incoming process 
