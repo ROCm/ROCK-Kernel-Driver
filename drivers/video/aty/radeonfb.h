@@ -262,14 +262,14 @@ struct radeonfb_info {
 	unsigned long		mmio_base_phys;
 	unsigned long		fb_base_phys;
 
-	unsigned long		mmio_base;
-	unsigned long		fb_base;
+	void __iomem		*mmio_base;
+	void __iomem		*fb_base;
 
-	unsigned long 		fb_local_base;
+	unsigned long		fb_local_base;
 
 	struct pci_dev		*pdev;
 
-	u8			*bios_seg;
+	void __iomem		*bios_seg;
 	int			fp_bios_start;
 
 	u32			pseudo_palette[17];

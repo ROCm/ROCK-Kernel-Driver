@@ -142,17 +142,17 @@ void ata_tf_load_mmio(struct ata_port *ap, struct ata_taskfile *tf)
 	unsigned int is_addr = tf->flags & ATA_TFLAG_ISADDR;
 
 	if (tf->ctl != ap->last_ctl) {
-		writeb(tf->ctl, ap->ioaddr.ctl_addr);
+		writeb(tf->ctl, (void __iomem *) ap->ioaddr.ctl_addr);
 		ap->last_ctl = tf->ctl;
 		ata_wait_idle(ap);
 	}
 
 	if (is_addr && (tf->flags & ATA_TFLAG_LBA48)) {
-		writeb(tf->hob_feature, (void *) ioaddr->feature_addr);
-		writeb(tf->hob_nsect, (void *) ioaddr->nsect_addr);
-		writeb(tf->hob_lbal, (void *) ioaddr->lbal_addr);
-		writeb(tf->hob_lbam, (void *) ioaddr->lbam_addr);
-		writeb(tf->hob_lbah, (void *) ioaddr->lbah_addr);
+		writeb(tf->hob_feature, (void __iomem *) ioaddr->feature_addr);
+		writeb(tf->hob_nsect, (void __iomem *) ioaddr->nsect_addr);
+		writeb(tf->hob_lbal, (void __iomem *) ioaddr->lbal_addr);
+		writeb(tf->hob_lbam, (void __iomem *) ioaddr->lbam_addr);
+		writeb(tf->hob_lbah, (void __iomem *) ioaddr->lbah_addr);
 		VPRINTK("hob: feat 0x%X nsect 0x%X, lba 0x%X 0x%X 0x%X\n",
 			tf->hob_feature,
 			tf->hob_nsect,
@@ -162,11 +162,11 @@ void ata_tf_load_mmio(struct ata_port *ap, struct ata_taskfile *tf)
 	}
 
 	if (is_addr) {
-		writeb(tf->feature, (void *) ioaddr->feature_addr);
-		writeb(tf->nsect, (void *) ioaddr->nsect_addr);
-		writeb(tf->lbal, (void *) ioaddr->lbal_addr);
-		writeb(tf->lbam, (void *) ioaddr->lbam_addr);
-		writeb(tf->lbah, (void *) ioaddr->lbah_addr);
+		writeb(tf->feature, (void __iomem *) ioaddr->feature_addr);
+		writeb(tf->nsect, (void __iomem *) ioaddr->nsect_addr);
+		writeb(tf->lbal, (void __iomem *) ioaddr->lbal_addr);
+		writeb(tf->lbam, (void __iomem *) ioaddr->lbam_addr);
+		writeb(tf->lbah, (void __iomem *) ioaddr->lbah_addr);
 		VPRINTK("feat 0x%X nsect 0x%X lba 0x%X 0x%X 0x%X\n",
 			tf->feature,
 			tf->nsect,
@@ -176,7 +176,7 @@ void ata_tf_load_mmio(struct ata_port *ap, struct ata_taskfile *tf)
 	}
 
 	if (tf->flags & ATA_TFLAG_DEVICE) {
-		writeb(tf->device, (void *) ioaddr->device_addr);
+		writeb(tf->device, (void __iomem *) ioaddr->device_addr);
 		VPRINTK("device 0x%X\n", tf->device);
 	}
 
@@ -220,7 +220,7 @@ void ata_exec_command_mmio(struct ata_port *ap, struct ata_taskfile *tf)
 {
 	DPRINTK("ata%u: cmd 0x%X\n", ap->id, tf->command);
 
-       	writeb(tf->command, (void *) ap->ioaddr.command_addr);
+       	writeb(tf->command, (void __iomem *) ap->ioaddr.command_addr);
 	ata_pause(ap);
 }
 
@@ -333,19 +333,19 @@ void ata_tf_read_mmio(struct ata_port *ap, struct ata_taskfile *tf)
 {
 	struct ata_ioports *ioaddr = &ap->ioaddr;
 
-	tf->nsect = readb((void *)ioaddr->nsect_addr);
-	tf->lbal = readb((void *)ioaddr->lbal_addr);
-	tf->lbam = readb((void *)ioaddr->lbam_addr);
-	tf->lbah = readb((void *)ioaddr->lbah_addr);
-	tf->device = readb((void *)ioaddr->device_addr);
+	tf->nsect = readb((void __iomem *)ioaddr->nsect_addr);
+	tf->lbal = readb((void __iomem *)ioaddr->lbal_addr);
+	tf->lbam = readb((void __iomem *)ioaddr->lbam_addr);
+	tf->lbah = readb((void __iomem *)ioaddr->lbah_addr);
+	tf->device = readb((void __iomem *)ioaddr->device_addr);
 
 	if (tf->flags & ATA_TFLAG_LBA48) {
-		writeb(tf->ctl | ATA_HOB, ap->ioaddr.ctl_addr);
-		tf->hob_feature = readb((void *)ioaddr->error_addr);
-		tf->hob_nsect = readb((void *)ioaddr->nsect_addr);
-		tf->hob_lbal = readb((void *)ioaddr->lbal_addr);
-		tf->hob_lbam = readb((void *)ioaddr->lbam_addr);
-		tf->hob_lbah = readb((void *)ioaddr->lbah_addr);
+		writeb(tf->ctl | ATA_HOB, (void __iomem *) ap->ioaddr.ctl_addr);
+		tf->hob_feature = readb((void __iomem *)ioaddr->error_addr);
+		tf->hob_nsect = readb((void __iomem *)ioaddr->nsect_addr);
+		tf->hob_lbal = readb((void __iomem *)ioaddr->lbal_addr);
+		tf->hob_lbam = readb((void __iomem *)ioaddr->lbam_addr);
+		tf->hob_lbah = readb((void __iomem *)ioaddr->lbah_addr);
 	}
 }
 
@@ -378,7 +378,7 @@ u8 ata_check_status_pio(struct ata_port *ap)
  */
 u8 ata_check_status_mmio(struct ata_port *ap)
 {
-       	return readb((void *) ap->ioaddr.status_addr);
+       	return readb((void __iomem *) ap->ioaddr.status_addr);
 }
 
 /**
@@ -652,17 +652,17 @@ static unsigned int ata_mmio_devchk(struct ata_port *ap,
 
 	__ata_dev_select(ap, device);
 
-	writeb(0x55, (void *) ioaddr->nsect_addr);
-	writeb(0xaa, (void *) ioaddr->lbal_addr);
+	writeb(0x55, (void __iomem *) ioaddr->nsect_addr);
+	writeb(0xaa, (void __iomem *) ioaddr->lbal_addr);
 
-	writeb(0xaa, (void *) ioaddr->nsect_addr);
-	writeb(0x55, (void *) ioaddr->lbal_addr);
+	writeb(0xaa, (void __iomem *) ioaddr->nsect_addr);
+	writeb(0x55, (void __iomem *) ioaddr->lbal_addr);
 
-	writeb(0x55, (void *) ioaddr->nsect_addr);
-	writeb(0xaa, (void *) ioaddr->lbal_addr);
+	writeb(0x55, (void __iomem *) ioaddr->nsect_addr);
+	writeb(0xaa, (void __iomem *) ioaddr->lbal_addr);
 
-	nsect = readb((void *) ioaddr->nsect_addr);
-	lbal = readb((void *) ioaddr->lbal_addr);
+	nsect = readb((void __iomem *) ioaddr->nsect_addr);
+	lbal = readb((void __iomem *) ioaddr->lbal_addr);
 
 	if ((nsect == 0x55) && (lbal == 0xaa))
 		return 1;	/* we found a device */
@@ -841,7 +841,7 @@ static void __ata_dev_select (struct ata_port *ap, unsigned int device)
 		tmp = ATA_DEVICE_OBS | ATA_DEV1;
 
 	if (ap->flags & ATA_FLAG_MMIO) {
-		writeb(tmp, (void *) ap->ioaddr.device_addr);
+		writeb(tmp, (void __iomem *) ap->ioaddr.device_addr);
 	} else {
 		outb(tmp, ap->ioaddr.device_addr);
 	}
@@ -1454,8 +1454,8 @@ static void ata_bus_post_reset(struct ata_port *ap, unsigned int devmask)
 
 		__ata_dev_select(ap, 1);
 		if (ap->flags & ATA_FLAG_MMIO) {
-			nsect = readb((void *) ioaddr->nsect_addr);
-			lbal = readb((void *) ioaddr->lbal_addr);
+			nsect = readb((void __iomem *) ioaddr->nsect_addr);
+			lbal = readb((void __iomem *) ioaddr->lbal_addr);
 		} else {
 			nsect = inb(ioaddr->nsect_addr);
 			lbal = inb(ioaddr->lbal_addr);
@@ -1519,11 +1519,11 @@ static unsigned int ata_bus_softreset(struct ata_port *ap,
 
 	/* software reset.  causes dev0 to be selected */
 	if (ap->flags & ATA_FLAG_MMIO) {
-		writeb(ap->ctl, ioaddr->ctl_addr);
+		writeb(ap->ctl, (void __iomem *) ioaddr->ctl_addr);
 		udelay(20);	/* FIXME: flush */
-		writeb(ap->ctl | ATA_SRST, ioaddr->ctl_addr);
+		writeb(ap->ctl | ATA_SRST, (void __iomem *) ioaddr->ctl_addr);
 		udelay(20);	/* FIXME: flush */
-		writeb(ap->ctl, ioaddr->ctl_addr);
+		writeb(ap->ctl, (void __iomem *) ioaddr->ctl_addr);
 	} else {
 		outb(ap->ctl, ioaddr->ctl_addr);
 		udelay(10);
@@ -1599,7 +1599,7 @@ void ata_bus_reset(struct ata_port *ap)
 	else if ((ap->flags & ATA_FLAG_SATA_RESET) == 0) {
 		/* set up device control */
 		if (ap->flags & ATA_FLAG_MMIO)
-			writeb(ap->ctl, ioaddr->ctl_addr);
+			writeb(ap->ctl, (void __iomem *) ioaddr->ctl_addr);
 		else
 			outb(ap->ctl, ioaddr->ctl_addr);
 		rc = ata_bus_edd(ap);
@@ -1632,7 +1632,7 @@ void ata_bus_reset(struct ata_port *ap)
 	if (ap->flags & (ATA_FLAG_SATA_RESET | ATA_FLAG_SRST)) {
 		/* set up device control for ATA_FLAG_SATA_RESET */
 		if (ap->flags & ATA_FLAG_MMIO)
-			writeb(ap->ctl, ioaddr->ctl_addr);
+			writeb(ap->ctl, (void __iomem *) ioaddr->ctl_addr);
 		else
 			outb(ap->ctl, ioaddr->ctl_addr);
 	}
@@ -2081,7 +2081,7 @@ static void ata_mmio_data_xfer(struct ata_port *ap, unsigned char *buf,
 	unsigned int i;
 	unsigned int words = buflen >> 1;
 	u16 *buf16 = (u16 *) buf;
-	void *mmio = (void *)ap->ioaddr.data_addr;
+	void __iomem *mmio = (void __iomem *)ap->ioaddr.data_addr;
 
 	if (write_data) {
 		for (i = 0; i < words; i++)
@@ -2618,7 +2618,7 @@ void ata_bmdma_setup_mmio (struct ata_queued_cmd *qc)
 	struct ata_port *ap = qc->ap;
 	unsigned int rw = (qc->tf.flags & ATA_TFLAG_WRITE);
 	u8 dmactl;
-	void *mmio = (void *) ap->ioaddr.bmdma_addr;
+	void __iomem *mmio = (void __iomem *) ap->ioaddr.bmdma_addr;
 
 	/* load PRD table addr. */
 	mb();	/* make sure PRD table writes are visible to controller */
@@ -2646,7 +2646,7 @@ void ata_bmdma_setup_mmio (struct ata_queued_cmd *qc)
 void ata_bmdma_start_mmio (struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
-	void *mmio = (void *) ap->ioaddr.bmdma_addr;
+	void __iomem *mmio = (void __iomem *) ap->ioaddr.bmdma_addr;
 	u8 dmactl;
 
 	/* start host DMA transaction */

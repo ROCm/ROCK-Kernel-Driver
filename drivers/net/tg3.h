@@ -1989,7 +1989,7 @@ struct tg3 {
 	spinlock_t			lock;
 	spinlock_t			indirect_lock;
 
-	unsigned long			regs;
+	void __iomem			*regs;
 	struct net_device		*dev;
 	struct pci_dev			*pdev;
 

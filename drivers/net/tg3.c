@@ -331,7 +331,7 @@ static void _tw32_flush(struct tg3 *tp, u32 off, u32 val)
 		pci_write_config_dword(tp->pdev, TG3PCI_REG_DATA, val);
 		spin_unlock_irqrestore(&tp->indirect_lock, flags);
 	} else {
-		unsigned long dest = tp->regs + off;
+		void __iomem *dest = tp->regs + off;
 		writel(val, dest);
 		readl(dest);    /* always flush PCI write */
 	}
@@ -339,7 +339,7 @@ static void _tw32_flush(struct tg3 *tp, u32 off, u32 val)
 
 static inline void _tw32_rx_mbox(struct tg3 *tp, u32 off, u32 val)
 {
-	unsigned long mbox = tp->regs + off;
+	void __iomem *mbox = tp->regs + off;
 	writel(val, mbox);
 	if (tp->tg3_flags & TG3_FLAG_MBOX_WRITE_REORDER)
 		readl(mbox);
@@ -347,7 +347,7 @@ static inline void _tw32_rx_mbox(struct tg3 *tp, u32 off, u32 val)
 
 static inline void _tw32_tx_mbox(struct tg3 *tp, u32 off, u32 val)
 {
-	unsigned long mbox = tp->regs + off;
+	void __iomem *mbox = tp->regs + off;
 	writel(val, mbox);
 	if (tp->tg3_flags & TG3_FLAG_TXD_MBOX_HWBUG)
 		writel(val, mbox);
@@ -2976,7 +2976,7 @@ static void tg3_set_txd(struct tg3 *tp, int entry,
 		txd->vlan_tag = vlan_tag << TXD_VLAN_TAG_SHIFT;
 	} else {
 		struct tx_ring_info *txr = &tp->tx_buffers[entry];
-		unsigned long txd;
+		void __iomem *txd;
 
 		txd = (tp->regs +
 		       NIC_SRAM_WIN_BASE +
@@ -3339,7 +3339,7 @@ static void tg3_free_rings(struct tg3 *tp)
  */
 static void tg3_init_rings(struct tg3 *tp)
 {
-	unsigned long start, end;
+	void __iomem *start, *end;
 	u32 i;
 
 	/* Free up all the SKBs. */
@@ -7614,7 +7614,7 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 		    chiprevid == CHIPREV_ID_5701_B0 ||
 		    chiprevid == CHIPREV_ID_5701_B2 ||
 		    chiprevid == CHIPREV_ID_5701_B5) {
-			unsigned long sram_base;
+			void __iomem *sram_base;
 
 			/* Write some dummy words into the SRAM status block
 			 * area, see if it reads back correctly.  If the return
@@ -8305,7 +8305,7 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 	spin_lock_init(&tp->indirect_lock);
 	INIT_WORK(&tp->reset_task, tg3_reset_task, tp);
 
-	tp->regs = (unsigned long) ioremap(tg3reg_base, tg3reg_len);
+	tp->regs = ioremap(tg3reg_base, tg3reg_len);
 	if (tp->regs == 0UL) {
 		printk(KERN_ERR PFX "Cannot map device registers, "
 		       "aborting.\n");
@@ -8468,7 +8468,7 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 	return 0;
 
 err_out_iounmap:
-	iounmap((void *) tp->regs);
+	iounmap(tp->regs);
 
 err_out_free_dev:
 	free_netdev(dev);
@@ -8490,7 +8490,7 @@ static void __devexit tg3_remove_one(struct pci_dev *pdev)
 		struct tg3 *tp = netdev_priv(dev);
 
 		unregister_netdev(dev);
-		iounmap((void *)tp->regs);
+		iounmap(tp->regs);
 		free_netdev(dev);
 		pci_release_regions(pdev);
 		pci_disable_device(pdev);

@@ -169,11 +169,11 @@ acpi_status
 acpi_os_map_memory (
 	acpi_physical_address           physical_address,
 	acpi_size                       size,
-	void                            **logical_address);
+	void __iomem                  **logical_address);
 
 void
 acpi_os_unmap_memory (
-	void                            *logical_address,
+	void __iomem                  *logical_address,
 	acpi_size                       size);
 
 acpi_status
