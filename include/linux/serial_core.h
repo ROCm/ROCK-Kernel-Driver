@@ -55,6 +55,10 @@
 #define PORT_SUNZILOG	38
 #define PORT_SUNSAB	39
 
+/* NEC v850.  */
+#define PORT_NB85E_UART	40
+
+
 #ifdef __KERNEL__
 
 #include <linux/config.h>
