@@ -295,8 +295,8 @@ card_wait_for_busy_clear(const int ioaddr[], const char* name)
 	timeout = jiffies + TimeOutJiffies;
 	while (a & 0x80 || a & 0x40) {
 		/* a little sleep */
-		current->state = TASK_INTERRUPTIBLE;
-		schedule_timeout(0);
+		yield();
+
 		a = inb(ioaddr[0] + 7);
 		if (jiffies >= timeout) {
 			printk(KERN_WARNING "%s: card_wait_for_busy_clear timeout\n",
@@ -319,8 +319,8 @@ card_wait_for_ready(const int ioaddr[], const char* name, unsigned char in[])
 	timeout = jiffies + TimeOutJiffies;
 	while (a & 0x80 || !(a & 0x40)) {
 		/* a little sleep */
-		current->state = TASK_INTERRUPTIBLE;
-		schedule_timeout(0);
+		yield();
+
 		a = inb(ioaddr[1] + 6);
 		if (jiffies >= timeout) {
 			printk(KERN_WARNING "%s: card_wait_for_ready timeout\n",
