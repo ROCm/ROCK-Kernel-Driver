@@ -126,13 +126,7 @@ int xfs_dir_sf_allfit(int count, int totallen);
 	       ((uint)sizeof(xfs_dir_sf_entry_t)-1)*(count) + (totallen))
 #endif
 
-#ifdef XFS_ALL_TRACE
-#define	XFS_DIR_TRACE
-#endif
-
-#if !defined(DEBUG)
-#undef XFS_DIR_TRACE
-#endif
+#if defined(XFS_DIR_TRACE)
 
 /*
  * Kernel tracing support for directories.
@@ -145,6 +139,7 @@ struct xfs_dir_leafblock;
 struct xfs_dir_leaf_entry;
 
 #define	XFS_DIR_TRACE_SIZE	4096	/* size of global trace buffer */
+extern ktrace_t	*xfs_dir_trace_buf;
 
 /*
  * Trace record types.
@@ -155,8 +150,6 @@ struct xfs_dir_leaf_entry;
 #define	XFS_DIR_KTRACE_G_DUL	4	/* dp, uio, leaf */
 #define	XFS_DIR_KTRACE_G_DUE	5	/* dp, uio, leaf entry */
 #define	XFS_DIR_KTRACE_G_DUC	6	/* dp, uio, cookie */
-
-#if defined(XFS_DIR_TRACE)
 
 void xfs_dir_trace_g_du(char *where, struct xfs_inode *dp, struct uio *uio);
 void xfs_dir_trace_g_dub(char *where, struct xfs_inode *dp, struct uio *uio,
@@ -170,12 +163,9 @@ void xfs_dir_trace_g_due(char *where, struct xfs_inode *dp, struct uio *uio,
 void xfs_dir_trace_g_duc(char *where, struct xfs_inode *dp, struct uio *uio,
 			      xfs_off_t cookie);
 void xfs_dir_trace_enter(int type, char *where,
-			     __psunsigned_t a0, __psunsigned_t a1,
-			     __psunsigned_t a2, __psunsigned_t a3,
-			     __psunsigned_t a4, __psunsigned_t a5,
-			     __psunsigned_t a6, __psunsigned_t a7,
-			     __psunsigned_t a8, __psunsigned_t a9,
-			     __psunsigned_t a10, __psunsigned_t a11);
+			     void *a0, void *a1, void *a2, void *a3,
+			     void *a4, void *a5, void *a6, void *a7,
+			     void *a8, void *a9, void *a10, void *a11);
 #else
 #define	xfs_dir_trace_g_du(w,d,u)
 #define	xfs_dir_trace_g_dub(w,d,u,b)

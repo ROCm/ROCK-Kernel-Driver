@@ -51,10 +51,11 @@
 #include "xfs_inode.h"
 #include "xfs_error.h"
 #include "xfs_rw.h"
+#include "xfs_iomap.h"
 #include <linux/mpage.h>
 
 STATIC void convert_page(struct inode *, struct page *,
-			page_buf_bmap_t *, void *, int, int);
+			xfs_iomap_t *, void *, int, int);
 
 void
 linvfs_unwritten_done(
@@ -85,11 +86,9 @@ linvfs_unwritten_convert(
 	vnode_t		*vp = XFS_BUF_FSPRIVATE(bp, vnode_t *);
 	int		error;
 
-	if (atomic_read(&bp->pb_hold) < 1) 
-		BUG();
-
+	BUG_ON(atomic_read(&bp->pb_hold) < 1);
 	VOP_BMAP(vp, XFS_BUF_OFFSET(bp), XFS_BUF_SIZE(bp),
-			BMAP_UNWRITTEN, NULL, NULL, error);
+			BMAPI_UNWRITTEN, NULL, NULL, error);
 	XFS_BUF_SET_FSPRIVATE(bp, NULL);
 	XFS_BUF_CLR_IODONE_FUNC(bp);
 	XFS_BUF_UNDATAIO(bp);
@@ -117,7 +116,7 @@ linvfs_unwritten_convert_direct(
 		vnode_t	*vp = LINVFS_GET_VP(inode);
 		int	error;
 
-		VOP_BMAP(vp, offset, size, BMAP_UNWRITTEN, NULL, NULL, error);
+		VOP_BMAP(vp, offset, size, BMAPI_UNWRITTEN, NULL, NULL, error);
 	}
 }
 
@@ -126,26 +125,26 @@ map_blocks(
 	struct inode		*inode,
 	loff_t			offset,
 	ssize_t			count,
-	page_buf_bmap_t		*pbmapp,
+	xfs_iomap_t		*iomapp,
 	int			flags)
 {
 	vnode_t			*vp = LINVFS_GET_VP(inode);
-	int			error, nmaps = 1;
+	int			error, niomaps = 1;
 
-	if (((flags & (BMAP_DIRECT|BMAP_SYNC)) == BMAP_DIRECT) &&
+	if (((flags & (BMAPI_DIRECT|BMAPI_SYNC)) == BMAPI_DIRECT) &&
 	    (offset >= i_size_read(inode)))
 		count = max_t(ssize_t, count, XFS_WRITE_IO_LOG);
 retry:
-	VOP_BMAP(vp, offset, count, flags, pbmapp, &nmaps, error);
+	VOP_BMAP(vp, offset, count, flags, iomapp, &niomaps, error);
 	if ((error == EAGAIN) || (error == EIO))
 		return -error;
-	if (unlikely((flags & (BMAP_WRITE|BMAP_DIRECT)) ==
-					(BMAP_WRITE|BMAP_DIRECT) && nmaps &&
-					(pbmapp->pbm_flags & PBMF_DELAY))) {
-		flags = BMAP_ALLOCATE;
+	if (unlikely((flags & (BMAPI_WRITE|BMAPI_DIRECT)) ==
+					(BMAPI_WRITE|BMAPI_DIRECT) && niomaps &&
+					(iomapp->iomap_flags & IOMAP_DELAY))) {
+		flags = BMAPI_ALLOCATE;
 		goto retry;
 	}
-	if (flags & (BMAP_WRITE|BMAP_ALLOCATE)) {
+	if (flags & (BMAPI_WRITE|BMAPI_ALLOCATE)) {
 		VMODIFY(vp);
 	}
 	return -error;
@@ -156,10 +155,10 @@ retry:
  * Finds the corresponding mapping in block @map array of the
  * given @offset within a @page.
  */
-STATIC page_buf_bmap_t *
+STATIC xfs_iomap_t *
 match_offset_to_mapping(
 	struct page		*page,
-	page_buf_bmap_t		*map,
+	xfs_iomap_t		*iomapp,
 	unsigned long		offset)
 {
 	loff_t			full_offset;	/* offset from start of file */
@@ -170,10 +169,10 @@ match_offset_to_mapping(
 	full_offset <<= PAGE_CACHE_SHIFT;	/* offset from file start */
 	full_offset += offset;			/* offset from page start */
 
-	if (full_offset < map->pbm_offset)
+	if (full_offset < iomapp->iomap_offset)
 		return NULL;
-	if (map->pbm_offset + map->pbm_bsize > full_offset)
-		return map;
+	if (iomapp->iomap_offset + iomapp->iomap_bsize > full_offset)
+		return iomapp;
 	return NULL;
 }
 
@@ -183,30 +182,30 @@ map_buffer_at_offset(
 	struct buffer_head	*bh,
 	unsigned long		offset,
 	int			block_bits,
-	page_buf_bmap_t		*mp)
+	xfs_iomap_t		*iomapp)
 {
-	page_buf_daddr_t	bn;
+	xfs_daddr_t		bn;
 	loff_t			delta;
 	int			sector_shift;
 
-	ASSERT(!(mp->pbm_flags & PBMF_HOLE));
-	ASSERT(!(mp->pbm_flags & PBMF_DELAY));
-	ASSERT(mp->pbm_bn != PAGE_BUF_DADDR_NULL);
+	ASSERT(!(iomapp->iomap_flags & IOMAP_HOLE));
+	ASSERT(!(iomapp->iomap_flags & IOMAP_DELAY));
+	ASSERT(iomapp->iomap_bn != IOMAP_DADDR_NULL);
 
 	delta = page->index;
 	delta <<= PAGE_CACHE_SHIFT;
 	delta += offset;
-	delta -= mp->pbm_offset;
+	delta -= iomapp->iomap_offset;
 	delta >>= block_bits;
 
 	sector_shift = block_bits - BBSHIFT;
-	bn = mp->pbm_bn >> sector_shift;
+	bn = iomapp->iomap_bn >> sector_shift;
 	bn += delta;
-	ASSERT((bn << sector_shift) >= mp->pbm_bn);
+	ASSERT((bn << sector_shift) >= iomapp->iomap_bn);
 
 	lock_buffer(bh);
 	bh->b_blocknr = bn;
-	bh->b_bdev = mp->pbm_target->pbr_bdev;
+	bh->b_bdev = iomapp->iomap_target->pbr_bdev;
 	set_buffer_mapped(bh);
 	clear_buffer_delay(bh);
 }
@@ -222,7 +221,7 @@ STATIC struct page *
 probe_unwritten_page(
 	struct address_space	*mapping,
 	unsigned long		index,
-	page_buf_bmap_t		*mp,
+	xfs_iomap_t		*iomapp,
 	page_buf_t		*pb,
 	unsigned long		max_offset,
 	unsigned long		*fsbs,
@@ -245,11 +244,11 @@ probe_unwritten_page(
 		do {
 			if (!buffer_unwritten(bh))
 				break;
-			if (!match_offset_to_mapping(page, mp, p_offset))
+			if (!match_offset_to_mapping(page, iomapp, p_offset))
 				break;
 			if (p_offset >= max_offset)
 				break;
-			map_buffer_at_offset(page, bh, p_offset, bbits, mp);
+			map_buffer_at_offset(page, bh, p_offset, bbits, iomapp);
 			set_buffer_unwritten_io(bh);
 			bh->b_private = pb;
 			p_offset += bh->b_size;
@@ -394,11 +393,12 @@ map_unwritten(
 	struct buffer_head	*curr,
 	unsigned long		p_offset,
 	int			block_bits,
-	page_buf_bmap_t		*mp,
+	xfs_iomap_t		*iomapp,
+	int			startio,
 	int			all_bh)
 {
 	struct buffer_head	*bh = curr;
-	page_buf_bmap_t		*tmp;
+	xfs_iomap_t		*tmp;
 	page_buf_t		*pb;
 	loff_t			offset, size;
 	unsigned long		nblocks = 0;
@@ -407,8 +407,8 @@ map_unwritten(
 	offset <<= PAGE_CACHE_SHIFT;
 	offset += p_offset;
 
-	pb = pagebuf_lookup(mp->pbm_target,
-			    mp->pbm_offset, mp->pbm_bsize, 0);
+	pb = pagebuf_lookup(iomapp->iomap_target,
+			    iomapp->iomap_offset, iomapp->iomap_bsize, 0);
 	if (!pb)
 		return -EAGAIN;
 
@@ -433,10 +433,10 @@ map_unwritten(
 	do {
 		if (!buffer_unwritten(bh))
 			break;
-		tmp = match_offset_to_mapping(start_page, mp, p_offset);
+		tmp = match_offset_to_mapping(start_page, iomapp, p_offset);
 		if (!tmp)
 			break;
-		map_buffer_at_offset(start_page, bh, p_offset, block_bits, mp);
+		map_buffer_at_offset(start_page, bh, p_offset, block_bits, iomapp);
 		set_buffer_unwritten_io(bh);
 		bh->b_private = pb;
 		p_offset += bh->b_size;
@@ -444,8 +444,8 @@ map_unwritten(
 	} while ((bh = bh->b_this_page) != head);
 
 	if (unlikely(nblocks == 0)) {
-		printk("XFS: bad unwritten extent map: bh=0x%p, mp=0x%p\n",
-			curr, mp);
+		printk("XFS: bad unwritten extent map: bh=0x%p, iomapp=0x%p\n",
+		       curr, iomapp);
 		BUG();
 	}
 
@@ -461,26 +461,26 @@ map_unwritten(
 		struct page		*page;
 
 		tlast = i_size_read(inode) >> PAGE_CACHE_SHIFT;
-		tloff = (mp->pbm_offset + mp->pbm_bsize) >> PAGE_CACHE_SHIFT;
+		tloff = (iomapp->iomap_offset + iomapp->iomap_bsize) >> PAGE_CACHE_SHIFT;
 		tloff = min(tlast, tloff);
 		for (tindex = start_page->index + 1; tindex < tloff; tindex++) {
-			page = probe_unwritten_page(mapping, tindex, mp, pb,
+			page = probe_unwritten_page(mapping, tindex, iomapp, pb,
 						PAGE_CACHE_SIZE, &bs, bbits);
 			if (!page)
 				break;
 			nblocks += bs;
 			atomic_add(bs, &pb->pb_io_remaining);
-			convert_page(inode, page, mp, pb, 1, all_bh);
+			convert_page(inode, page, iomapp, pb, startio, all_bh);
 		}
 
 		if (tindex == tlast &&
 		    (tloff = (i_size_read(inode) & (PAGE_CACHE_SIZE - 1)))) {
-			page = probe_unwritten_page(mapping, tindex, mp, pb,
+			page = probe_unwritten_page(mapping, tindex, iomapp, pb,
 							tloff, &bs, bbits);
 			if (page) {
 				nblocks += bs;
 				atomic_add(bs, &pb->pb_io_remaining);
-				convert_page(inode, page, mp, pb, 1, all_bh);
+				convert_page(inode, page, iomapp, pb, startio, all_bh);
 			}
 		}
 	}
@@ -542,13 +542,13 @@ STATIC void
 convert_page(
 	struct inode		*inode,
 	struct page		*page,
-	page_buf_bmap_t		*maps,
+	xfs_iomap_t		*iomapp,
 	void			*private,
 	int			startio,
 	int			all_bh)
 {
 	struct buffer_head	*bh_arr[MAX_BUF_PER_PAGE], *bh, *head;
-	page_buf_bmap_t		*mp = maps, *tmp;
+	xfs_iomap_t		*mp = iomapp, *tmp;
 	unsigned long		end, offset, end_index;
 	int			i = 0, index = 0;
 	int			bbits = inode->i_blkbits;
@@ -575,17 +575,17 @@ convert_page(
 		tmp = match_offset_to_mapping(page, mp, offset);
 		if (!tmp)
 			continue;
-		ASSERT(!(tmp->pbm_flags & PBMF_HOLE));
-		ASSERT(!(tmp->pbm_flags & PBMF_DELAY));
+		ASSERT(!(tmp->iomap_flags & IOMAP_HOLE));
+		ASSERT(!(tmp->iomap_flags & IOMAP_DELAY));
 
 		/* If this is a new unwritten extent buffer (i.e. one
 		 * that we haven't passed in private data for, we must
 		 * now map this buffer too.
 		 */
 		if (buffer_unwritten(bh) && !bh->b_end_io) {
-			ASSERT(tmp->pbm_flags & PBMF_UNWRITTEN);
+			ASSERT(tmp->iomap_flags & IOMAP_UNWRITTEN);
 			map_unwritten(inode, page, head, bh,
-						offset, bbits, tmp, all_bh);
+					offset, bbits, tmp, startio, all_bh);
 		} else if (! (buffer_unwritten(bh) && buffer_locked(bh))) {
 			map_buffer_at_offset(page, bh, offset, bbits, tmp);
 			if (buffer_unwritten(bh)) {
@@ -618,19 +618,19 @@ STATIC void
 cluster_write(
 	struct inode		*inode,
 	unsigned long		tindex,
-	page_buf_bmap_t		*mp,
+	xfs_iomap_t		*iomapp,
 	int			startio,
 	int			all_bh)
 {
 	unsigned long		tlast;
 	struct page		*page;
 
-	tlast = (mp->pbm_offset + mp->pbm_bsize) >> PAGE_CACHE_SHIFT;
+	tlast = (iomapp->iomap_offset + iomapp->iomap_bsize) >> PAGE_CACHE_SHIFT;
 	for (; tindex < tlast; tindex++) {
 		page = probe_delalloc_page(inode, tindex);
 		if (!page)
 			break;
-		convert_page(inode, page, mp, NULL, startio, all_bh);
+		convert_page(inode, page, iomapp, NULL, startio, all_bh);
 	}
 }
 
@@ -661,20 +661,21 @@ page_state_convert(
 	int		unmapped) /* also implies page uptodate */
 {
 	struct buffer_head	*bh_arr[MAX_BUF_PER_PAGE], *bh, *head;
-	page_buf_bmap_t		*mp, map;
+	xfs_iomap_t		*iomp, iomap;
 	unsigned long		p_offset = 0, end_index;
 	loff_t			offset, end_offset;
 	int			len, err, i, cnt = 0, uptodate = 1;
-	int			flags = startio ? 0 : BMAP_TRYLOCK;
+	int			flags = startio ? 0 : BMAPI_TRYLOCK;
 	int			page_dirty = 1;
 
 
 	/* Are we off the end of the file ? */
 	end_index = i_size_read(inode) >> PAGE_CACHE_SHIFT;
 	if (page->index >= end_index) {
-		unsigned remaining = i_size_read(inode) & (PAGE_CACHE_SIZE-1);
-		if ((page->index >= end_index+1) || !remaining) {
-			return -EIO;
+		if ((page->index >= end_index + 1) ||
+		    !(i_size_read(inode) & (PAGE_CACHE_SIZE - 1))) {
+			err = -EIO;
+			goto error;
 		}
 	}
 
@@ -684,16 +685,19 @@ page_state_convert(
 		end_offset = i_size_read(inode);
 
 	bh = head = page_buffers(page);
-	mp = NULL;
+	iomp = NULL;
 
 	len = bh->b_size;
 	do {
-		if (!(PageUptodate(page) || buffer_uptodate(bh)) && !startio) {
-			goto next_bh;
-		}
+		if (offset >= end_offset)
+			break;
+		if (!buffer_uptodate(bh))
+			uptodate = 0;
+		if (!(PageUptodate(page) || buffer_uptodate(bh)) && !startio)
+			continue;
 
-		if (mp) {
-			mp = match_offset_to_mapping(page, &map, p_offset);
+		if (iomp) {
+			iomp = match_offset_to_mapping(page, &iomap, p_offset);
 		}
 
 		/*
@@ -701,21 +705,21 @@ page_state_convert(
 		 * extent state conversion transaction on completion.
 		 */
 		if (buffer_unwritten(bh)) {
-			if (!mp) {
-				err = map_blocks(inode, offset, len, &map,
-						BMAP_READ|BMAP_IGNSTATE);
+			if (!iomp) {
+				err = map_blocks(inode, offset, len, &iomap,
+						BMAPI_READ|BMAPI_IGNSTATE);
 				if (err) {
 					goto error;
 				}
-				mp = match_offset_to_mapping(page, &map,
+				iomp = match_offset_to_mapping(page, &iomap,
 								p_offset);
 			}
-			if (mp) {
+			if (iomp) {
 				if (!bh->b_end_io) {
 					err = map_unwritten(inode, page,
 							head, bh, p_offset,
-							inode->i_blkbits,
-							mp, unmapped);
+							inode->i_blkbits, iomp,
+							startio, unmapped);
 					if (err) {
 						goto error;
 					}
@@ -734,18 +738,18 @@ page_state_convert(
 		 * We can return EAGAIN here in the release page case.
 		 */
 		} else if (buffer_delay(bh)) {
-			if (!mp) {
-				err = map_blocks(inode, offset, len, &map,
-					BMAP_ALLOCATE | flags);
+			if (!iomp) {
+				err = map_blocks(inode, offset, len, &iomap,
+					BMAPI_ALLOCATE | flags);
 				if (err) {
 					goto error;
 				}
-				mp = match_offset_to_mapping(page, &map,
+				iomp = match_offset_to_mapping(page, &iomap,
 								p_offset);
 			}
-			if (mp) {
+			if (iomp) {
 				map_buffer_at_offset(page, bh, p_offset,
-					inode->i_blkbits, mp);
+					inode->i_blkbits, iomp);
 				if (startio) {
 					bh_arr[cnt++] = bh;
 				} else {
@@ -766,22 +770,22 @@ page_state_convert(
 				 * was found, and we are in a path where we
 				 * need to write the whole page out.
 				 */
-				if (!mp) {
+				if (!iomp) {
 					size = probe_unmapped_cluster(
 							inode, page, bh, head);
 					err = map_blocks(inode, offset,
-						size, &map,
-						BMAP_WRITE | BMAP_MMAP);
+						size, &iomap,
+						BMAPI_WRITE | BMAPI_MMAP);
 					if (err) {
 						goto error;
 					}
-					mp = match_offset_to_mapping(page, &map,
+					iomp = match_offset_to_mapping(page, &iomap,
 								     p_offset);
 				}
-				if (mp) {
+				if (iomp) {
 					map_buffer_at_offset(page,
 							bh, p_offset,
-							inode->i_blkbits, mp);
+							inode->i_blkbits, iomp);
 					if (startio) {
 						bh_arr[cnt++] = bh;
 					} else {
@@ -799,14 +803,8 @@ page_state_convert(
 				}
 			}
 		}
-
-next_bh:
-		if (!buffer_uptodate(bh))
-			uptodate = 0;
-		offset += len;
-		p_offset += len;
-		bh = bh->b_this_page;
-	} while (offset < end_offset);
+	} while (offset += len, p_offset += len,
+		((bh = bh->b_this_page) != head));
 
 	if (uptodate && bh == head)
 		SetPageUptodate(page);
@@ -814,8 +812,8 @@ next_bh:
 	if (startio)
 		submit_page(page, bh_arr, cnt);
 
-	if (mp)
-		cluster_write(inode, page->index + 1, mp, startio, unmapped);
+	if (iomp)
+		cluster_write(inode, page->index + 1, iomp, startio, unmapped);
 
 	return page_dirty;
 
@@ -849,7 +847,7 @@ linvfs_get_block_core(
 	bmapi_flags_t		flags)
 {
 	vnode_t			*vp = LINVFS_GET_VP(inode);
-	page_buf_bmap_t		pbmap;
+	xfs_iomap_t		iomap;
 	int			retpbbm = 1;
 	int			error;
 	ssize_t			size;
@@ -866,32 +864,32 @@ linvfs_get_block_core(
 		size = 1 << inode->i_blkbits;
 
 	VOP_BMAP(vp, offset, size,
-		create ? flags : BMAP_READ, &pbmap, &retpbbm, error);
+		create ? flags : BMAPI_READ, &iomap, &retpbbm, error);
 	if (error)
 		return -error;
 
 	if (retpbbm == 0)
 		return 0;
 
-	if (pbmap.pbm_bn != PAGE_BUF_DADDR_NULL) {
-		page_buf_daddr_t	bn;
+	if (iomap.iomap_bn != IOMAP_DADDR_NULL) {
+		xfs_daddr_t		bn;
 		loff_t			delta;
 
 		/* For unwritten extents do not report a disk address on
 		 * the read case.
 		 */
-		if (create || ((pbmap.pbm_flags & PBMF_UNWRITTEN) == 0)) {
-			delta = offset - pbmap.pbm_offset;
+		if (create || ((iomap.iomap_flags & IOMAP_UNWRITTEN) == 0)) {
+			delta = offset - iomap.iomap_offset;
 			delta >>= inode->i_blkbits;
 
-			bn = pbmap.pbm_bn >> (inode->i_blkbits - BBSHIFT);
+			bn = iomap.iomap_bn >> (inode->i_blkbits - BBSHIFT);
 			bn += delta;
 
 			bh_result->b_blocknr = bn;
-			bh_result->b_bdev = pbmap.pbm_target->pbr_bdev;
+			bh_result->b_bdev = iomap.iomap_target->pbr_bdev;
 			set_buffer_mapped(bh_result);
 		}
-		if (pbmap.pbm_flags & PBMF_UNWRITTEN) {
+		if (iomap.iomap_flags & IOMAP_UNWRITTEN) {
 			if (create) {
 				if (direct)
 					bh_result->b_private = inode;
@@ -902,29 +900,32 @@ linvfs_get_block_core(
 		}
 	}
 
+	/* If this is a realtime file, data might be on a new device */
+	bh_result->b_bdev = iomap.iomap_target->pbr_bdev;
+
 	/* If we previously allocated a block out beyond eof and
 	 * we are now coming back to use it then we will need to
 	 * flag it as new even if it has a disk address.
 	 */
 	if (create &&
 	    ((!buffer_mapped(bh_result) && !buffer_uptodate(bh_result)) ||
-	     (offset >= i_size_read(inode)) || (pbmap.pbm_flags & PBMF_NEW))) {
+	     (offset >= i_size_read(inode)) || (iomap.iomap_flags & IOMAP_NEW))) {
 		set_buffer_new(bh_result);
 	}
 
-	if (pbmap.pbm_flags & PBMF_DELAY) {
+	if (iomap.iomap_flags & IOMAP_DELAY) {
 		if (unlikely(direct))
 			BUG();
 		if (create) {
 			set_buffer_mapped(bh_result);
 			set_buffer_uptodate(bh_result);
 		}
-		bh_result->b_bdev = pbmap.pbm_target->pbr_bdev;
+		bh_result->b_bdev = iomap.iomap_target->pbr_bdev;
 		set_buffer_delay(bh_result);
 	}
 
 	if (blocks) {
-		size = (pbmap.pbm_bsize - pbmap.pbm_delta); 
+		size = (iomap.iomap_bsize - iomap.iomap_delta); 
 		bh_result->b_size = min_t(ssize_t, size, blocks << inode->i_blkbits);
 	}
 
@@ -939,7 +940,7 @@ linvfs_get_block(
 	int			create)
 {
 	return linvfs_get_block_core(inode, iblock, 0, bh_result,
-					create, 0, BMAP_WRITE);
+					create, 0, BMAPI_WRITE);
 }
 
 STATIC int
@@ -950,7 +951,7 @@ linvfs_get_block_sync(
 	int			create)
 {
 	return linvfs_get_block_core(inode, iblock, 0, bh_result,
-					create, 0, BMAP_SYNC|BMAP_WRITE);
+					create, 0, BMAPI_SYNC|BMAPI_WRITE);
 }
 
 STATIC int
@@ -962,7 +963,7 @@ linvfs_get_blocks_direct(
 	int			create)
 {
 	return linvfs_get_block_core(inode, iblock, max_blocks, bh_result,
-					create, 1, BMAP_WRITE|BMAP_DIRECT);
+					create, 1, BMAPI_WRITE|BMAPI_DIRECT);
 }
 
 STATIC int
@@ -976,15 +977,15 @@ linvfs_direct_IO(
 	struct file	*file = iocb->ki_filp;
 	struct inode	*inode = file->f_dentry->d_inode->i_mapping->host;
 	vnode_t		*vp = LINVFS_GET_VP(inode);
-	page_buf_bmap_t	pbmap;
+	xfs_iomap_t	iomap;
 	int		maps = 1;
 	int		error;
 
-	VOP_BMAP(vp, offset, 0, BMAP_DEVICE, &pbmap, &maps, error);
+	VOP_BMAP(vp, offset, 0, BMAPI_DEVICE, &iomap, &maps, error);
 	if (error)
 		return -error;
 
-        return blockdev_direct_IO(rw, iocb, inode, pbmap.pbm_target->pbr_bdev,
+	return blockdev_direct_IO(rw, iocb, inode, iomap.iomap_target->pbr_bdev,
 		iov, offset, nr_segs,
 		linvfs_get_blocks_direct,
 		linvfs_unwritten_convert_direct);

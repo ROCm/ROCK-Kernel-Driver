@@ -44,6 +44,10 @@
 extern void icmn_err(int, char *, va_list);
 extern void cmn_err(int, char *, ...);
 
+#ifndef STATIC
+# define STATIC static
+#endif
+
 #ifdef DEBUG
 # ifdef lint
 #  define ASSERT(EX)	((void)0) /* avoid "constant in conditional" babble */
