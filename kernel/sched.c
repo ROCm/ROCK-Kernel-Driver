@@ -856,7 +856,7 @@ static inline void idle_tick(runqueue_t *rq)
 
 #endif
 
-DEFINE_PER_CPU(struct kernel_stat, kstat);
+DEFINE_PER_CPU(struct kernel_stat, kstat) = { { 0 } };
 
 /*
  * We place interactive tasks back into the active array, if possible.
