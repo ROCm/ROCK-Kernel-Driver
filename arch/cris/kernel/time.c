@@ -134,8 +134,11 @@ void do_gettimeofday(struct timeval *tv)
 	restore_flags(flags);
 }
 
-void do_settimeofday(struct timeval *tv)
+int do_settimeofday(struct timespec *tv)
 {
+	if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
+		return -EINVAL;
+
 	cli();
 	/* This is revolting. We need to set the xtime.tv_usec
 	 * correctly. However, the value in this location is
@@ -143,10 +146,10 @@ void do_settimeofday(struct timeval *tv)
 	 * Discover what correction gettimeofday
 	 * would have done, and then undo it!
 	 */
-	tv->tv_usec -= do_gettimeoffset();
+	tv->tv_nsec -= do_gettimeoffset() * 1000;
 
-	if (tv->tv_usec < 0) {
-		tv->tv_usec += 1000000;
+	if (tv->tv_nsec < 0) {
+		tv->tv_nsec += NSEC_PER_SEC;
 		tv->tv_sec--;
 	}
 
@@ -157,6 +160,7 @@ void do_settimeofday(struct timeval *tv)
 	time_maxerror = NTP_PHASE_LIMIT;
 	time_esterror = NTP_PHASE_LIMIT;
 	sti();
+	return 0;
 }
 
 
