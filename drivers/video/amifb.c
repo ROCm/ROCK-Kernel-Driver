@@ -1239,8 +1239,6 @@ int __init amifb_setup(char *options)
 		if (!strcmp(this_opt, "inverse")) {
 			amifb_inverse = 1;
 			fb_invert_cmaps();
-		} else if (!strcmp(this_opt, "off")) {
-			amifb_video_off();
 		} else if (!strcmp(this_opt, "ilbm"))
 			amifb_ilbm = 1;
 		else if (!strncmp(this_opt, "monitorcap:", 11))
@@ -2260,8 +2258,10 @@ int __init amifb_init(void)
 #ifndef MODULE
 	char *option = NULL;
 
-	if (fb_get_options("amifb", &option))
+	if (fb_get_options("amifb", &option)) {
+		amifb_video_off();
 		return -ENODEV;
+	}
 	amifb_setup(option);
 #endif
 	if (!MACH_IS_AMIGA || !AMIGAHW_PRESENT(AMI_VIDEO))
