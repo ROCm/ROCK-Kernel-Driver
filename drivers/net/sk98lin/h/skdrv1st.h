@@ -107,9 +107,6 @@
 #ifndef __INC_SKDRV1ST_H
 #define __INC_SKDRV1ST_H
 
-/* Check kernel version */
-#include <linux/version.h>
-
 typedef struct s_AC	SK_AC;
 
 /* Set card versions */
@@ -135,7 +132,6 @@ typedef struct s_AC	SK_AC;
 #error You must compile this driver with "-O".
 #endif
 
-#include <linux/version.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
