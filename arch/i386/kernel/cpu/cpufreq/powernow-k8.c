@@ -31,7 +31,7 @@
 
 #define PFX "powernow-k8: "
 #define BFX PFX "BIOS error: "
-#define VERSION "version 1.00.08 - September 26, 2003"
+#define VERSION "version 1.00.08a"
 #include "powernow-k8.h"
 
 #ifdef CONFIG_PREEMPT
@@ -44,9 +44,10 @@ static u32 numps;	/* number of p-states, from PSB */
 static u32 rvo;		/* ramp voltage offset, from PSB */
 static u32 irt;		/* isochronous relief time, from PSB */
 static u32 vidmvs;	/* usable value calculated from mvs, from PSB */
-struct pst_s *ppst;	/* array of p states, valid for this part */
 static u32 currvid;	/* keep track of the current fid / vid */
 static u32 currfid;
+
+static struct cpufreq_frequency_table *powernow_table;
 
 /*
 The PSB table supplied by BIOS allows for the definition of the number of
@@ -71,30 +72,12 @@ so this is not actually a restriction.
 static u32 batps;	/* limit on the number of p states when on battery */
 			/* - set by BIOS in the PSB/PST                    */
 
-static struct cpufreq_driver cpufreq_amd64_driver = {
-	.verify = powernowk8_verify,
-	.target = powernowk8_target,
-	.init = powernowk8_cpu_init,
-	.name = "cpufreq-amd64",
-	.owner = THIS_MODULE,
-};
-
-#define SEARCH_UP     1
-#define SEARCH_DOWN   0
-
-/* Return a frequency in MHz, given an input fid */
-u32
-find_freq_from_fid(u32 fid)
+ /* Return a frequency in MHz, given an input fid */
+static u32 find_freq_from_fid(u32 fid)
 {
-	return 800 + (fid * 100);
+ 	return 800 + (fid * 100);
 }
 
-/* Return a fid matching an input frequency in MHz */
-static u32
-find_fid_from_freq(u32 freq)
-{
-	return (freq - 800) / 100;
-}
 
 /* Return the vco fid for an input fid */
 static u32
@@ -107,56 +90,27 @@ convert_fid_to_vco_fid(u32 fid)
 	}
 }
 
-/* Sort the fid/vid frequency table into ascending order by fid. The spec */
-/* implies that it will be sorted by BIOS, but, it only implies it, and I */
-/* prefer not to trust when I can check.                                  */
-/* Yes, it is a simple bubble sort, but the PST is really small, so the   */
-/* choice of algorithm is pretty irrelevant.                              */
-static inline void
-sort_pst(struct pst_s *ppst, u32 numpstates)
-{
-	u32 i;
-	u8 tempfid;
-	u8 tempvid;
-	int swaps = 1;
-
-	while (swaps) {
-		swaps = 0;
-		for (i = 0; i < (numpstates - 1); i++) {
-			if (ppst[i].fid > ppst[i + 1].fid) {
-				swaps = 1;
-				tempfid = ppst[i].fid;
-				tempvid = ppst[i].vid;
-				ppst[i].fid = ppst[i + 1].fid;
-				ppst[i].vid = ppst[i + 1].vid;
-				ppst[i + 1].fid = tempfid;
-				ppst[i + 1].vid = tempvid;
-			}
-		}
-	}
-
-	return;
-}
-
-/* Return 1 if the pending bit is set. Unless we are actually just told the */
-/* processor to transition a state, seeing this bit set is really bad news. */
+/*
+ * Return 1 if the pending bit is set. Unless we are actually just told the
+ * processor to transition a state, seeing this bit set is really bad news.
+ */
 static inline int
 pending_bit_stuck(void)
 {
-	u32 lo;
-	u32 hi;
+	u32 lo, hi;
 
 	rdmsr(MSR_FIDVID_STATUS, lo, hi);
 	return lo & MSR_S_LO_CHANGE_PENDING ? 1 : 0;
 }
 
-/* Update the global current fid / vid values from the status msr. Returns 1 */
-/* on error.                                                                 */
+/*
+ * Update the global current fid / vid values from the status msr. Returns 1
+ * on error.
+ */
 static int
 query_current_values_with_pending_wait(void)
 {
-	u32 lo;
-	u32 hi;
+	u32 lo, hi;
 	u32 i = 0;
 
 	lo = MSR_S_LO_CHANGE_PENDING;
@@ -271,9 +225,11 @@ write_new_vid(u32 vid)
 	return 0;
 }
 
-/* Reduce the vid by the max of step or reqvid.                   */
-/* Decreasing vid codes represent increasing voltages :           */
-/* vid of 0 is 1.550V, vid of 0x1e is 0.800V, vid of 0x1f is off. */
+/*
+ * Reduce the vid by the max of step or reqvid.
+ * Decreasing vid codes represent increasing voltages:
+ * vid of 0 is 1.550V, vid of 0x1e is 0.800V, vid of 0x1f is off.
+ */
 static int
 decrease_vid_code_by_step(u32 reqvid, u32 step)
 {
@@ -316,8 +272,10 @@ transition_fid_vid(u32 reqfid, u32 reqvid)
 	return 0;
 }
 
-/* Phase 1 - core voltage transition ... setup appropriate voltage for the */
-/* fid transition.                                                         */
+/*
+ * Phase 1 - core voltage transition ... setup appropriate voltage for the
+ * fid transition.
+ */
 static inline int
 core_voltage_pre_transition(u32 reqvid)
 {
@@ -500,7 +458,9 @@ check_supported_cpu(void)
 	}
 
 	if (c->x86_vendor != X86_VENDOR_AMD) {
+#ifdef MODULE
 		printk(KERN_INFO PFX "Not an AMD processor\n");
+#endif
 		return 0;
 	}
 
@@ -533,10 +493,50 @@ check_supported_cpu(void)
 		return 0;
 	}
 
-	printk(KERN_INFO PFX "Found AMD Athlon 64 / Opteron processor "
-	       "supporting p-state transitions\n");
-
+	printk(KERN_INFO PFX "Found AMD64 processor supporting PowerNow (" VERSION ")\n");
 	return 1;
+}
+
+static int check_pst_table(struct pst_s *pst, u8 maxvid)
+{
+	unsigned int j;
+	u8 lastfid = 0xFF;
+
+	for (j = 0; j < numps; j++) {
+		if (pst[j].vid > LEAST_VID) {
+			printk(KERN_ERR PFX "vid %d invalid : 0x%x\n", j, pst[j].vid);
+			return -EINVAL;
+		}
+		if (pst[j].vid < rvo) {	/* vid + rvo >= 0 */
+			printk(KERN_ERR PFX
+			       "BIOS error - 0 vid exceeded with pstate %d\n",
+			       j);
+			return -ENODEV;
+		}
+		if (pst[j].vid < maxvid + rvo) {	/* vid + rvo >= maxvid */
+			printk(KERN_ERR PFX
+			       "BIOS error - maxvid exceeded with pstate %d\n",
+			       j);
+			return -ENODEV;
+		}
+		if ((pst[j].fid > MAX_FID)
+		    || (pst[j].fid & 1)
+		    || (pst[j].fid < HI_FID_TABLE_BOTTOM)){
+			printk(KERN_ERR PFX "fid %d invalid : 0x%x\n", j, pst[j].fid);
+			return -EINVAL;
+		}
+		if (pst[j].fid < lastfid)
+			lastfid = pst[j].fid;
+	}
+	if (lastfid & 1) {
+		printk(KERN_ERR PFX "lastfid invalid\n");
+		return -EINVAL;
+	}
+	if (lastfid > LO_FID_TABLE_TOP) {
+		printk(KERN_INFO PFX  "first fid not from lo freq table\n");
+	}
+
+	return 0;
 }
 
 /* Find and validate the PSB/PST table in BIOS. */
@@ -545,8 +545,7 @@ find_psb_table(void)
 {
 	struct psb_s *psb;
 	struct pst_s *pst;
-	unsigned i, j;
-	u32 lastfid;
+	unsigned int i, j;
 	u32 mvs;
 	u8 maxvid;
 
@@ -573,33 +572,19 @@ find_psb_table(void)
 		}
 
 		vstable = psb->voltagestabilizationtime;
-		printk(KERN_INFO PFX "voltage stable time: %d (units 20us)\n",
-		       vstable);
-
 		dprintk(KERN_DEBUG PFX "flags2: 0x%x\n", psb->flags2);
 		rvo = psb->flags2 & 3;
 		irt = ((psb->flags2) >> 2) & 3;
 		mvs = ((psb->flags2) >> 4) & 3;
 		vidmvs = 1 << mvs;
 		batps = ((psb->flags2) >> 6) & 3;
-		printk(KERN_INFO PFX "p states on battery: %d ", batps);
-		switch (batps) {
-		case 0:
-			printk("- all available\n");
-			break;
-		case 1:
-			printk("- only the minimum\n");
-			break;
-		case 2:
-			printk("- only the 2 lowest\n");
-			break;
-		case 3:
-			printk("- only the 3 lowest\n");
-			break;
-		}
-		printk(KERN_INFO PFX "ramp voltage offset: %d\n", rvo);
-		printk(KERN_INFO PFX "isochronous relief time: %d\n", irt);
-		printk(KERN_INFO PFX "maximum voltage step: %d\n", mvs);
+
+		printk(KERN_INFO PFX "voltage stable in %d usec", vstable * 20);
+		if (batps)
+			printk(", only %d lowest states on battery", batps);
+		printk(", ramp voltage offset: %d", rvo);
+		printk(", isochronous relief time: %d", irt);
+		printk(", maximum voltage step: %d\n", mvs);
 
 		dprintk(KERN_DEBUG PFX "numpst: 0x%x\n", psb->numpst);
 		if (psb->numpst != 1) {
@@ -610,14 +595,13 @@ find_psb_table(void)
 		dprintk(KERN_DEBUG PFX "cpuid: 0x%x\n", psb->cpuid);
 
 		plllock = psb->plllocktime;
-		printk(KERN_INFO PFX "pll lock time: 0x%x\n", plllock);
+		printk(KERN_INFO PFX "pll lock time: 0x%x, ", plllock);
 
 		maxvid = psb->maxvid;
-		printk(KERN_INFO PFX "maxfid: 0x%x\n", psb->maxfid);
-		printk(KERN_INFO PFX "maxvid: 0x%x\n", maxvid);
+		printk("maxfid 0x%x (%d MHz), maxvid 0x%x\n", 
+		       psb->maxfid, find_freq_from_fid(psb->maxfid), maxvid);
 
 		numps = psb->numpstates;
-		printk(KERN_INFO PFX "numpstates: 0x%x\n", numps);
 		if (numps < 2) {
 			printk(KERN_ERR BFX "no p states to transition\n");
 			return -ENODEV;
@@ -636,78 +620,41 @@ find_psb_table(void)
 			       "%d p-states\n", numps);
 		}
 
-		if ((numps <= 1) || (batps <= 1)) {
+		if (numps <= 1) {
 			printk(KERN_ERR PFX "only 1 p-state to transition\n");
 			return -ENODEV;
 		}
 
-		ppst = kmalloc(sizeof (struct pst_s) * numps, GFP_KERNEL);
-		if (!ppst) {
-			printk(KERN_ERR PFX "ppst memory alloc failure\n");
+		pst = (struct pst_s *) (psb + 1);
+		if (check_pst_table(pst, maxvid))
+			return -EINVAL;
+
+		powernow_table = kmalloc((sizeof(struct cpufreq_frequency_table) * (numps + 1)), GFP_KERNEL);
+		if (!powernow_table) {
+			printk(KERN_ERR PFX "powernow_table memory alloc failure\n");
 			return -ENOMEM;
 		}
 
-		pst = (struct pst_s *) (psb + 1);
 		for (j = 0; j < numps; j++) {
-			ppst[j].fid = pst[j].fid;
-			ppst[j].vid = pst[j].vid;
-			printk(KERN_INFO PFX
-			       "   %d : fid 0x%x, vid 0x%x\n", j,
-			       ppst[j].fid, ppst[j].vid);
+			printk(KERN_INFO PFX "   %d : fid 0x%x (%d MHz), vid 0x%x\n", j,
+			       pst[j].fid, find_freq_from_fid(pst[j].fid), pst[j].vid);
+			powernow_table[j].index = pst[j].fid; /* lower 8 bits */
+			powernow_table[j].index |= (pst[j].vid << 8); /* upper 8 bits */
+			powernow_table[j].frequency = find_freq_from_fid(pst[j].fid);
 		}
-		sort_pst(ppst, numps);
-
-		lastfid = ppst[0].fid;
-		if (lastfid > LO_FID_TABLE_TOP)
-			printk(KERN_INFO BFX "first fid not in lo freq tbl\n");
-
-		if ((lastfid > MAX_FID) || (lastfid & 1) || (ppst[0].vid > LEAST_VID)) {
-			printk(KERN_ERR BFX "first fid/vid bad (0x%x - 0x%x)\n",
-			       lastfid, ppst[0].vid);
-			kfree(ppst);
-			return -ENODEV;
-		}
-
-		for (j = 1; j < numps; j++) {
-			if ((lastfid >= ppst[j].fid)
-			    || (ppst[j].fid & 1)
-			    || (ppst[j].fid < HI_FID_TABLE_BOTTOM)
-			    || (ppst[j].fid > MAX_FID)
-			    || (ppst[j].vid > LEAST_VID)) {
-				printk(KERN_ERR BFX
-				       "invalid fid/vid in pst(%x %x)\n",
-				       ppst[j].fid, ppst[j].vid);
-				kfree(ppst);
-				return -ENODEV;
-			}
-			lastfid = ppst[j].fid;
-		}
-
-		for (j = 0; j < numps; j++) {
-			if (ppst[j].vid < rvo) {	/* vid+rvo >= 0 */
-				printk(KERN_ERR BFX
-				       "0 vid exceeded with pstate %d\n", j);
-				kfree(ppst);
-				return -ENODEV;
-			}
-			if (ppst[j].vid < maxvid+rvo) { /* vid+rvo >= maxvid */
-				printk(KERN_ERR BFX
-				       "maxvid exceeded with pstate %d\n", j);
-				kfree(ppst);
-				return -ENODEV;
-			}
-		}
+		powernow_table[numps].frequency = CPUFREQ_TABLE_END;
+		powernow_table[numps].index = 0;
 
 		if (query_current_values_with_pending_wait()) {
-			kfree(ppst);
+			kfree(powernow_table);
 			return -EIO;
 		}
 
-		printk(KERN_INFO PFX "currfid 0x%x, currvid 0x%x\n",
-		       currfid, currvid);
+		printk(KERN_INFO PFX "currfid 0x%x (%d MHz), currvid 0x%x\n",
+		       currfid, find_freq_from_fid(currfid), currvid);
 
 		for (j = 0; j < numps; j++)
-			if ((ppst[j].fid==currfid) && (ppst[j].vid==currvid))
+			if ((pst[j].fid==currfid) && (pst[j].vid==currvid))
 				return 0;
 
 		printk(KERN_ERR BFX "currfid/vid do not match PST, ignoring\n");
@@ -718,112 +665,22 @@ find_psb_table(void)
 	return -ENODEV;
 }
 
-/* Converts a frequency (that might not necessarily be a multiple of 200) */
-/* to a fid.                                                              */
-static u32
-find_closest_fid(u32 freq, int searchup)
-{
-	if (searchup == SEARCH_UP)
-		freq += MIN_FREQ_RESOLUTION - 1;
-
-	freq = (freq / MIN_FREQ_RESOLUTION) * MIN_FREQ_RESOLUTION;
-
-	if (freq < MIN_FREQ)
-		freq = MIN_FREQ;
-	else if (freq > MAX_FREQ)
-		freq = MAX_FREQ;
-
-	return find_fid_from_freq(freq);
-}
-
-static int
-find_match(u32 * ptargfreq, u32 * pmin, u32 * pmax, int searchup, u32 * pfid,
-	   u32 * pvid)
-{
-	u32 availpstates = batps;
-	u32 targfid = find_closest_fid(*ptargfreq, searchup);
-	u32 minfid = find_closest_fid(*pmin, SEARCH_DOWN);
-	u32 maxfid = find_closest_fid(*pmax, SEARCH_UP);
-	u32 minidx = 0;
-	u32 maxidx = availpstates - 1;
-	u32 targidx = 0xffffffff;
-	int i;
-
-	dprintk(KERN_DEBUG PFX "find match: freq %d MHz, min %d, max %d\n",
-		*ptargfreq, *pmin, *pmax);
-
-	/* Restrict values to the frequency choices in the PST */
-	if (minfid < ppst[0].fid)
-		minfid = ppst[0].fid;
-	if (maxfid > ppst[maxidx].fid)
-		maxfid = ppst[maxidx].fid;
-
-	/* Find appropriate PST index for the minimim fid */
-	for (i = 0; i < (int) availpstates; i++) {
-		if (minfid >= ppst[i].fid)
-			minidx = i;
-	}
-
-	/* Find appropriate PST index for the maximum fid */
-	for (i = availpstates - 1; i >= 0; i--) {
-		if (maxfid <= ppst[i].fid)
-			maxidx = i;
-	}
-
-	if (minidx > maxidx)
-		maxidx = minidx;
-
-	/* Frequency ids are now constrained by limits matching PST entries */
-	minfid = ppst[minidx].fid;
-	maxfid = ppst[maxidx].fid;
-
-	/* Limit the target frequency to these limits */
-	if (targfid < minfid)
-		targfid = minfid;
-	else if (targfid > maxfid)
-		targfid = maxfid;
-
-	/* Find the best target index into the PST, contrained by the range */
-	if (searchup == SEARCH_UP) {
-		for (i = maxidx; i >= (int) minidx; i--) {
-			if (targfid <= ppst[i].fid)
-				targidx = i;
-		}
-	} else {
-		for (i = minidx; i <= (int) maxidx; i++) {
-			if (targfid >= ppst[i].fid)
-				targidx = i;
-		}
-	}
-
-	if (targidx == 0xffffffff) {
-		printk(KERN_ERR PFX "could not find target\n");
-		return 1;
-	}
-
-	*pmin = find_freq_from_fid(minfid);
-	*pmax = find_freq_from_fid(maxfid);
-	*ptargfreq = find_freq_from_fid(ppst[targidx].fid);
-
-	if (pfid)
-		*pfid = ppst[targidx].fid;
-	if (pvid)
-		*pvid = ppst[targidx].vid;
-
-	return 0;
-}
-
 /* Take a frequency, and issue the fid/vid transition command */
 static inline int
-transition_frequency(u32 * preq, u32 * pmin, u32 * pmax, u32 searchup)
+transition_frequency(unsigned int index)
 {
 	u32 fid;
 	u32 vid;
 	int res;
 	struct cpufreq_freqs freqs;
 
-	if (find_match(preq, pmin, pmax, searchup, &fid, &vid))
-		return 1;
+	/* fid are the lower 8 bits of the index we stored into
+	 * the cpufreq frequency table in find_psb_table, vid are 
+	 * the upper 8 bits.
+	 */
+
+	fid = powernow_table[index].index & 0xFF;
+	vid = (powernow_table[index].index & 0xFF00) >> 8;
 
 	dprintk(KERN_DEBUG PFX "table matched fid 0x%x, giving vid 0x%x\n",
 		fid, vid);
@@ -867,14 +724,7 @@ powernowk8_target(struct cpufreq_policy *pol, unsigned targfreq, unsigned relati
 {
 	u32 checkfid = currfid;
 	u32 checkvid = currvid;
-	u32 reqfreq = targfreq / 1000;
-	u32 minfreq = pol->min / 1000;
-	u32 maxfreq = pol->max / 1000;
-
-	if (ppst == 0) {
-		printk(KERN_ERR PFX "targ: ppst 0\n");
-		return -ENODEV;
-	}
+	unsigned int newstate;
 
 	if (pending_bit_stuck()) {
 		printk(KERN_ERR PFX "drv targ fail: change pending bit set\n");
@@ -896,9 +746,10 @@ powernowk8_target(struct cpufreq_policy *pol, unsigned targfreq, unsigned relati
 		       checkfid, currfid, checkvid, currvid);
 	}
 
-	if (transition_frequency(&reqfreq, &minfreq, &maxfreq,
-				 relation ==
-				 CPUFREQ_RELATION_H ? SEARCH_UP : SEARCH_DOWN))
+	if (cpufreq_frequency_table_target(pol, powernow_table, targfreq, relation, &newstate))
+		return -EINVAL;
+	
+	if (transition_frequency(newstate))
 	{
 		printk(KERN_ERR PFX "transition frequency failed\n");
 		return 1;
@@ -913,36 +764,12 @@ powernowk8_target(struct cpufreq_policy *pol, unsigned targfreq, unsigned relati
 static int
 powernowk8_verify(struct cpufreq_policy *pol)
 {
-	u32 min = pol->min / 1000;
-	u32 max = pol->max / 1000;
-	u32 targ = min;
-	int res;
-
-	if (ppst == 0) {
-		printk(KERN_ERR PFX "verify - ppst 0\n");
-		return -ENODEV;
-	}
-
 	if (pending_bit_stuck()) {
 		printk(KERN_ERR PFX "failing verify, change pending bit set\n");
 		return -EIO;
 	}
 
-	dprintk(KERN_DEBUG PFX
-		"ver: cpu%d, min %d, max %d, cur %d, pol %d\n", pol->cpu,
-		pol->min, pol->max, pol->cur, pol->policy);
-
-	if (pol->cpu != 0) {
-		printk(KERN_ERR PFX "verify - cpu not 0\n");
-		return -ENODEV;
-	}
-
-	res = find_match(&targ, &min, &max, SEARCH_DOWN, 0, 0);
-	if (!res) {
-		pol->min = min * 1000;
-		pol->max = max * 1000;
-	}
-	return res;
+	return cpufreq_frequency_table_verify(pol, powernow_table);
 }
 
 /* per CPU init entry point to the driver */
@@ -968,10 +795,11 @@ powernowk8_cpu_init(struct cpufreq_policy *pol)
 	dprintk(KERN_DEBUG PFX "policy current frequency %d kHz\n", pol->cur);
 
 	/* min/max the cpu is capable of */
-	pol->cpuinfo.min_freq = 1000 * find_freq_from_fid(ppst[0].fid);
-	pol->cpuinfo.max_freq = 1000 * find_freq_from_fid(ppst[numps-1].fid);
-	pol->min = 1000 * find_freq_from_fid(ppst[0].fid);
-	pol->max = 1000 * find_freq_from_fid(ppst[batps - 1].fid);
+	if (cpufreq_frequency_table_cpuinfo(pol, powernow_table)) {
+		printk(KERN_ERR PFX "invalid powernow_table\n");
+		kfree(powernow_table);
+		return -EINVAL;
+	}
 
 	printk(KERN_INFO PFX "cpu_init done, current fid 0x%x, vid 0x%x\n",
 	       currfid, currvid);
@@ -979,13 +807,32 @@ powernowk8_cpu_init(struct cpufreq_policy *pol)
 	return 0;
 }
 
+static int __exit powernowk8_cpu_exit (struct cpufreq_policy *pol)
+{
+	if (pol->cpu != 0)
+		return -EINVAL;
+
+	if (powernow_table)
+		kfree(powernow_table);
+
+	return 0;
+}
+
+static struct cpufreq_driver cpufreq_amd64_driver = {
+	.verify = powernowk8_verify,
+	.target = powernowk8_target,
+	.init = powernowk8_cpu_init,
+	.exit = powernowk8_cpu_exit,
+	.name = "powernow-k8",
+	.owner = THIS_MODULE,
+};
+
+
 /* driver entry point for init */
 static int __init
 powernowk8_init(void)
 {
 	int rc;
-
-	printk(KERN_INFO PFX VERSION "\n");
 
 	if (check_supported_cpu() == 0)
 		return -ENODEV;
@@ -996,7 +843,6 @@ powernowk8_init(void)
 
 	if (pending_bit_stuck()) {
 		printk(KERN_ERR PFX "powernowk8_init fail, change pending bit set\n");
-		kfree(ppst);
 		return -EIO;
 	}
 
@@ -1010,7 +856,6 @@ powernowk8_exit(void)
 	dprintk(KERN_INFO PFX "powernowk8_exit\n");
 
 	cpufreq_unregister_driver(&cpufreq_amd64_driver);
-	kfree(ppst);
 }
 
 MODULE_AUTHOR("Paul Devriendt <paul.devriendt@amd.com>");
