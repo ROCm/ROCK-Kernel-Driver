@@ -39,16 +39,31 @@
 #include <linux/vmalloc.h>
 
 #include "meye.h"
-#include "linux/meye.h"
+#include <linux/meye.h>
+
+MODULE_AUTHOR("Stelian Pop <stelian@popies.net>");
+MODULE_DESCRIPTION("v4l/v4l2 driver for the MotionEye camera");
+MODULE_LICENSE("GPL");
+MODULE_VERSION(MEYE_DRIVER_VERSION);
+
+/* number of grab buffers */
+static unsigned int gbuffers = 2;
+module_param(gbuffers, int, 0444);
+MODULE_PARM_DESC(gbuffers, "number of capture buffers, default is 2 (32 max)");
+
+/* size of a grab buffer */
+static unsigned int gbufsize = MEYE_MAX_BUFSIZE;
+module_param(gbufsize, int, 0444);
+MODULE_PARM_DESC(gbufsize, "size of the capture buffers, default is 614400"
+		 " (will be rounded up to a page multiple)");
+
+/* /dev/videoX registration number */
+static int video_nr = -1;
+module_param(video_nr, int, 0444);
+MODULE_PARM_DESC(video_nr, "video device to register (0=/dev/video0, etc)");
 
 /* driver structure - only one possible */
 static struct meye meye;
-/* number of grab buffers */
-static unsigned int gbuffers = 2;
-/* size of a grab buffer */
-static unsigned int gbufsize = MEYE_MAX_BUFSIZE;
-/* /dev/videoX registration number */
-static int video_nr = -1;
 
 /****************************************************************************/
 /* Queue routines                                                           */
@@ -1438,7 +1453,7 @@ static struct pci_driver meye_driver = {
 #endif
 };
 
-static int __init meye_init_module(void) {
+static int __init meye_init(void) {
 	if (gbuffers < 2)
 		gbuffers = 2;
 	if (gbuffers > MEYE_MAX_BUFNBRS)
@@ -1450,42 +1465,10 @@ static int __init meye_init_module(void) {
 	return pci_module_init(&meye_driver);
 }
 
-static void __exit meye_cleanup_module(void) {
+static void __exit meye_exit(void) {
 	pci_unregister_driver(&meye_driver);
 }
 
-#ifndef MODULE
-static int __init meye_setup(char *str) {
-	int ints[4];
-
-	str = get_options(str, ARRAY_SIZE(ints), ints);
-	if (ints[0] <= 0) 
-		goto out;
-	gbuffers = ints[1];
-	if (ints[0] == 1)
-		goto out;
-	gbufsize = ints[2];
-	if (ints[0] == 2)
-		goto out;
-	video_nr = ints[3];
-out:
-	return 1;
-}
-
-__setup("meye=", meye_setup);
-#endif
-
-MODULE_AUTHOR("Stelian Pop <stelian@popies.net>");
-MODULE_DESCRIPTION("video4linux driver for the MotionEye camera");
-MODULE_LICENSE("GPL");
-
-MODULE_PARM(gbuffers,"i");
-MODULE_PARM_DESC(gbuffers,"number of capture buffers, default is 2 (32 max)");
-MODULE_PARM(gbufsize,"i");
-MODULE_PARM_DESC(gbufsize,"size of the capture buffers, default is 614400");
-MODULE_PARM(video_nr,"i");
-MODULE_PARM_DESC(video_nr,"video device to register (0=/dev/video0, etc)");
-
 /* Module entry points */
-module_init(meye_init_module);
-module_exit(meye_cleanup_module);
+module_init(meye_init);
+module_exit(meye_exit);

@@ -33,6 +33,9 @@
 #define MEYE_DRIVER_MAJORVERSION	1
 #define MEYE_DRIVER_MINORVERSION	10
 
+#define MEYE_DRIVER_VERSION __stringify(MEYE_DRIVER_MAJORVERSION) "." \
+			    __stringify(MEYE_DRIVER_MINORVERSION)
+
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/pci.h>
