@@ -6,7 +6,7 @@
  * Author: Mark A. Greer
  *         mgreer@mvista.com
  *
- * Copyright 2000 MontaVista Software Inc.
+ * Copyright 2000-2002 MontaVista Software Inc.
  *
  * This program is free software; you can redistribute  it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the
@@ -101,7 +101,7 @@
  * UIC Exports...
  */
 extern struct hw_interrupt_type cpc700_pic;
-extern unsigned int cpc700_irq_assigns[27][2];
+extern unsigned int cpc700_irq_assigns[32][2];
  
 extern void __init cpc700_init_IRQ(void);
 extern int cpc700_get_irq(struct pt_regs *);
