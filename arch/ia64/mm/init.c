@@ -10,6 +10,7 @@
 
 #include <linux/bootmem.h>
 #include <linux/mm.h>
+#include <linux/personality.h>
 #include <linux/reboot.h>
 #include <linux/slab.h>
 #include <linux/swap.h>
@@ -68,10 +69,9 @@ ia64_init_addr_space (void)
 	struct vm_area_struct *vma;
 
 	/*
-	 * If we're out of memory and kmem_cache_alloc() returns NULL,
-	 * we simply ignore the problem.  When the process attempts to
-	 * write to the register backing store for the first time, it
-	 * will get a SEGFAULT in this case.
+	 * If we're out of memory and kmem_cache_alloc() returns NULL, we simply ignore
+	 * the problem.  When the process attempts to write to the register backing store
+	 * for the first time, it will get a SEGFAULT in this case.
 	 */
 	vma = kmem_cache_alloc(vm_area_cachep, SLAB_KERNEL);
 	if (vma) {
@@ -85,6 +85,19 @@ ia64_init_addr_space (void)
 		vma->vm_file = NULL;
 		vma->vm_private_data = NULL;
 		insert_vm_struct(current->mm, vma);
+	}
+
+	/* map NaT-page at address zero to speed up speculative dereferencing of NULL: */
+	if (!(current->personality & MMAP_PAGE_ZERO)) {
+		vma = kmem_cache_alloc(vm_area_cachep, SLAB_KERNEL);
+		if (vma) {
+			memset(vma, 0, sizeof(*vma));
+			vma->vm_mm = current->mm;
+			vma->vm_end = PAGE_SIZE;
+			vma->vm_page_prot = __pgprot(pgprot_val(PAGE_READONLY) | _PAGE_MA_NAT);
+			vma->vm_flags = VM_READ | VM_MAYREAD | VM_IO | VM_RESERVED;
+			insert_vm_struct(current->mm, vma);
+		}
 	}
 }
 
