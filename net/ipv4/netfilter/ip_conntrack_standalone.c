@@ -71,7 +71,7 @@ print_expect(char *buffer, const struct ip_conntrack_expect *expect)
 	len += sprintf(buffer + len, "use=%u proto=%u ",
 		      atomic_read(&expect->use), expect->tuple.dst.protonum);
 	len += print_tuple(buffer + len, &expect->tuple,
-			   __find_proto(expect->tuple.dst.protonum));
+			   __ip_ct_find_proto(expect->tuple.dst.protonum));
 	len += sprintf(buffer + len, "\n");
 	return len;
 }
@@ -81,7 +81,7 @@ print_conntrack(char *buffer, const struct ip_conntrack *conntrack)
 {
 	unsigned int len;
 	struct ip_conntrack_protocol *proto
-		= __find_proto(conntrack->tuplehash[IP_CT_DIR_ORIGINAL]
+		= __ip_ct_find_proto(conntrack->tuplehash[IP_CT_DIR_ORIGINAL]
 			       .tuple.dst.protonum);
 
 	len = sprintf(buffer, "%-8s %u %lu ",
@@ -361,6 +361,7 @@ EXPORT_SYMBOL(ip_conntrack_helper_unregister);
 EXPORT_SYMBOL(ip_ct_selective_cleanup);
 EXPORT_SYMBOL(ip_ct_refresh);
 EXPORT_SYMBOL(ip_ct_find_proto);
+EXPORT_SYMBOL(__ip_ct_find_proto);
 EXPORT_SYMBOL(ip_ct_find_helper);
 EXPORT_SYMBOL(ip_conntrack_expect_related);
 EXPORT_SYMBOL(ip_conntrack_change_expect);

@@ -75,7 +75,7 @@ static inline int proto_cmpfn(const struct ip_conntrack_protocol *curr,
 	return protocol == curr->proto;
 }
 
-struct ip_conntrack_protocol *__find_proto(u_int8_t protocol)
+struct ip_conntrack_protocol *__ip_ct_find_proto(u_int8_t protocol)
 {
 	struct ip_conntrack_protocol *p;
 
@@ -93,7 +93,7 @@ struct ip_conntrack_protocol *ip_ct_find_proto(u_int8_t protocol)
 	struct ip_conntrack_protocol *p;
 
 	READ_LOCK(&ip_conntrack_lock);
-	p = __find_proto(protocol);
+	p = __ip_ct_find_proto(protocol);
 	READ_UNLOCK(&ip_conntrack_lock);
 	return p;
 }
