@@ -9,6 +9,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/acpi.h>
 #include <linux/efi.h>
@@ -69,3 +70,5 @@ hp_acpi_csr_space (acpi_handle obj, u64 *csr_base, u64 *csr_length)
 	acpi_dispose_crs(&buf);
 	return AE_OK;
 }
+
+EXPORT_SYMBOL(hp_acpi_csr_space);
