@@ -89,7 +89,7 @@ void __page_cache_release(struct page *page)
 			del_page_from_inactive_list(page);
 		spin_unlock_irqrestore(&_pagemap_lru_lock, flags);
 	}
-	__free_page(page);
+	__free_pages_ok(page, 0);
 }
 
 /*
