@@ -108,14 +108,19 @@ void ext3_journal_abort_handle(const char *caller, const char *err_fn,
 	char nbuf[16];
 	const char *errstr = ext3_decode_error(NULL, err, nbuf);
 
-	printk(KERN_ERR "%s: aborting transaction: %s in %s", 
-	       caller, errstr, err_fn);
-
 	if (bh)
 		BUFFER_TRACE(bh, "abort");
-	journal_abort_handle(handle);
+
 	if (!handle->h_err)
 		handle->h_err = err;
+
+	if (is_handle_aborted(handle))
+		return;
+
+	printk(KERN_ERR "%s: aborting transaction: %s in %s\n",
+	       caller, errstr, err_fn);
+
+	journal_abort_handle(handle);
 }
 
 /* Deal with the reporting of failure conditions on a filesystem such as
