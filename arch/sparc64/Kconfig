@@ -741,44 +741,6 @@ config UNIX98_PTY_COUNT
 endmenu
 
 
-menu "Video For Linux"
-
-config VIDEO_DEV
-	tristate "Video For Linux"
-	---help---
-	  Support for audio/video capture and overlay devices and FM radio
-	  cards. The exact capabilities of each device vary. User tools for
-	  this are available from
-	  <ftp://ftp.uk.linux.org/pub/linux/video4linux/>.
-
-	  If you are interested in writing a driver for such an audio/video
-	  device or user software interacting with such a driver, please read
-	  the file <file:Documentation/video4linux/API.html>.
-
-	  This driver is also available as a module called videodev ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want). If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
-
-config VIDEO_BT848
-	tristate "BT848 Video For Linux"
-	depends on PCI && VIDEO_DEV
-	---help---
-	  Support for BT848 based frame grabber/overlay boards. This includes
-	  the Miro, Hauppauge and STB boards. Please read the material in
-	  <file:Documentation/video4linux/bttv> for more information.
-
-	  If you say Y or M here, you need to say Y or M to "I2C support" and
-	  "I2C bit-banging interfaces" in the character device section.
-
-	  This driver is available as a module called bttv ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want). If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
-
-endmenu
-
-
 menu "XFree86 DRI support"
 
 config DRM
@@ -819,8 +781,11 @@ endmenu
 
 source "drivers/input/Kconfig"
 
+source "drivers/i2c/Kconfig"
+
 source "fs/Kconfig"
 
+source "drivers/media/Kconfig"
 
 menu "Sound"
 
