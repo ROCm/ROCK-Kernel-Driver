@@ -27,7 +27,7 @@ extern unsigned long phys_acsi_buffer;
 
 #define DMA_LONG_WRITE(data,mode)							\
     do {													\
-		*((unsigned long *)&dma_wd.fdc_acces_seccount) = 	\
+		*((unsigned long *)&dma_wd.fdc_acces_seccount) =	\
 			((data)<<16) | (mode);							\
 	} while(0)
 

@@ -25,9 +25,9 @@
 #else
 #define THREAD_SIZE PAGE_SIZE
 #endif
- 
+
 #ifndef __ASSEMBLY__
- 
+
 #define get_user_page(vaddr)		__get_free_page(GFP_KERNEL)
 #define free_user_page(page, addr)	free_page(addr)
 
@@ -80,7 +80,7 @@ static inline void clear_page(void *page)
 #endif
 
 #define clear_user_page(addr, vaddr, page)	\
-	do { 	clear_page(addr);		\
+	do {	clear_page(addr);		\
 		flush_dcache_page(page);	\
 	} while (0)
 #define copy_user_page(to, from, vaddr, page)	\

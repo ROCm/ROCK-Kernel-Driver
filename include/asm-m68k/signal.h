@@ -96,7 +96,7 @@ typedef unsigned long sigset_t;
 #define SA_ONESHOT	SA_RESETHAND
 #define SA_INTERRUPT	0x20000000 /* dummy -- ignored */
 
-/* 
+/*
  * sigaltstack controls
  */
 #define SS_ONSTACK	1

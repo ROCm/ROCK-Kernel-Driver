@@ -97,7 +97,7 @@ void stdma_lock(irqreturn_t (*handler)(int, void *, struct pt_regs *),
 /*
  * Function: void stdma_release( void )
  *
- * Purpose: Releases the lock on the ST-DMA chip. 
+ * Purpose: Releases the lock on the ST-DMA chip.
  *
  * Inputs: none
  *

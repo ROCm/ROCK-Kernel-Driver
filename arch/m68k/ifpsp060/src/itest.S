@@ -5,10 +5,10 @@ M68060 Software Package
 Production Release P1.00 -- October 10, 1994
 
 M68060 Software Package Copyright © 1993, 1994 Motorola Inc.  All rights reserved.
- 
+
 THE SOFTWARE is provided on an "AS IS" basis and without warranty.
 To the maximum extent permitted by applicable law,
-MOTOROLA DISCLAIMS ALL WARRANTIES WHETHER EXPRESS OR IMPLIED, 
+MOTOROLA DISCLAIMS ALL WARRANTIES WHETHER EXPRESS OR IMPLIED,
 INCLUDING IMPLIED WARRANTIES OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE
 and any warranty against infringement with regard to the SOFTWARE
 (INCLUDING ANY MODIFIED VERSIONS THEREOF) and any accompanying written materials.
@@ -453,8 +453,8 @@ movp_1:
 	bne.l	error
 
 #####################################################
-# movep.w	%d0,(0x0,%a0) 			    #
-# 	- this test has %cc initially equal to zero #
+# movep.w	%d0,(0x0,%a0)			    #
+#	- this test has %cc initially equal to zero #
 #####################################################
 movp_2:
 	addq.l	&0x1,TESTCTR(%a6)

@@ -2,9 +2,9 @@
  * linux/arch/m68k/motorola.c
  *
  * Routines specific to the Motorola MMU, originally from:
- * linux/arch/m68k/init.c 
+ * linux/arch/m68k/init.c
  * which are Copyright (C) 1995 Hamish Macdonald
- * 
+ *
  * Moved 8/20/1999 Sam Creasey
  */
 
@@ -99,7 +99,7 @@ static pmd_t * __init kernel_ptr_table(void)
 	return last_pgtable;
 }
 
-static unsigned long __init 
+static unsigned long __init
 map_chunk (unsigned long addr, long size)
 {
 #define PTRTREESIZE (256*1024)

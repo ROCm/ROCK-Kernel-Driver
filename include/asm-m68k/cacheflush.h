@@ -45,7 +45,7 @@ extern void cache_push_v(unsigned long vaddr, int len);
 
 /* cache code */
 #define FLUSH_I_AND_D	(0x00000808)
-#define FLUSH_I 	(0x00000008)
+#define FLUSH_I		(0x00000008)
 
 /* This is needed whenever the virtual mapping of the current
    process changes.  */
@@ -95,14 +95,14 @@ static inline void flush_cache_range(struct vm_area_struct *vma,
 				     unsigned long start,
 				     unsigned long end)
 {
-	if (vma->vm_mm == current->mm) 
+	if (vma->vm_mm == current->mm)
 	        __flush_cache_030();
 }
 
 static inline void flush_cache_page(struct vm_area_struct *vma,
 				    unsigned long vmaddr)
 {
- 	if (vma->vm_mm == current->mm)
+	if (vma->vm_mm == current->mm)
 	        __flush_cache_030();
 }
 

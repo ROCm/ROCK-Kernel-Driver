@@ -2,8 +2,8 @@
  *	Macintosh interrupts
  *
  * General design:
- * In contrary to the Amiga and Atari platforms, the Mac hardware seems to 
- * exclusively use the autovector interrupts (the 'generic level0-level7' 
+ * In contrary to the Amiga and Atari platforms, the Mac hardware seems to
+ * exclusively use the autovector interrupts (the 'generic level0-level7'
  * interrupts with exception vectors 0x19-0x1f). The following interrupt levels
  * are used:
  *	1	- VIA1
@@ -248,7 +248,7 @@ void mac_init_IRQ(void)
 	printk("Done.\n");
 #endif /* SHUTUP_SONIC */
 
-	/* 
+	/*
 	 * Now register the handlers for the master IRQ handlers
 	 * at levels 1-7. Most of the work is done elsewhere.
 	 */
@@ -496,7 +496,7 @@ int mac_irq_pending( unsigned int irq )
  * FIXME: You can register interrupts on nonexistent source (ie PSC4 on a
  *        non-PSC machine). We should return -EINVAL in those cases.
  */
- 
+
 int mac_request_irq(unsigned int irq,
 		    irqreturn_t (*handler)(int, void *, struct pt_regs *),
 		    unsigned long flags, const char *devname, void *dev_id)
@@ -533,7 +533,7 @@ int mac_request_irq(unsigned int irq,
 
 	return 0;
 }
-                            
+
 /*
  * Removes an interrupt service routine from an interrupt source.
  */
@@ -661,7 +661,7 @@ static volatile int nmi_hold;
 irqreturn_t mac_nmi_handler(int irq, void *dev_id, struct pt_regs *fp)
 {
 	int i;
-	/* 
+	/*
 	 * generate debug output on NMI switch if 'debug' kernel option given
 	 * (only works with Penguin!)
 	 */
@@ -691,7 +691,7 @@ irqreturn_t mac_nmi_handler(int irq, void *dev_id, struct pt_regs *fp)
 		       fp->d0, fp->d1, fp->d2, fp->d3);
 		printk("d4: %08lx    d5: %08lx    a0: %08lx    a1: %08lx\n",
 		       fp->d4, fp->d5, fp->a0, fp->a1);
-	
+
 		if (STACK_MAGIC != *(unsigned long *)current->kernel_stack_page)
 			printk("Corrupted stack page\n");
 		printk("Process %s (pid: %d, stackpage=%08lx)\n",

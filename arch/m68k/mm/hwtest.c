@@ -3,9 +3,9 @@
  * that it was also in drivers/nubus/nubus.c and I wanted to
  * use it in hp300/config.c, so it seemed sensible to pull it
  * out into its own file.
- * 
+ *
  * The test is for use when trying to read a hardware register
- * that isn't present would cause a bus error. We set up a 
+ * that isn't present would cause a bus error. We set up a
  * temporary handler so that this doesn't kill the kernel.
  *
  * There is a test-by-reading and a test-by-writing; I present
@@ -37,7 +37,7 @@ int hwreg_present( volatile void *regp )
                 "movec	%4,%/vbr\n\t"
 		"movel	%/sp,%1\n\t"
 		"moveq	#0,%0\n\t"
-		"tstb	%3@\n\t"  
+		"tstb	%3@\n\t"
 		"nop\n\t"
 		"moveq	#1,%0\n"
                 "Lberr1:\n\t"
@@ -50,7 +50,7 @@ int hwreg_present( volatile void *regp )
     return( ret );
 }
 EXPORT_SYMBOL(hwreg_present);
-  
+
 /* Basically the same, but writes a value into a word register, protected
  * by a bus error handler. Returns 1 if successful, 0 otherwise.
  */
@@ -67,7 +67,7 @@ int hwreg_write( volatile void *regp, unsigned short val )
 		"movec	%4,%/vbr\n\t"
 		"movel	%/sp,%1\n\t"
 		"moveq	#0,%0\n\t"
-		"movew	%5,%3@\n\t"  
+		"movew	%5,%3@\n\t"
 		"nop	\n\t"	/* If this nop isn't present, 'ret' may already be
 				 * loaded with 1 at the time the bus error
 				 * happens! */

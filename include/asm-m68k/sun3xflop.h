@@ -89,11 +89,11 @@ static void sun3x_82072_fd_outb(unsigned char value, int port)
 
 		if(value & 0x10) {
 			fcr |= (FCR_DSEL0 | FCR_MTRON);
-		} else 
+		} else
 			fcr &= ~(FCR_DSEL0 | FCR_MTRON);
-		
-		
-		if(fcr != sun3x_fdc.fcr) { 
+
+
+		if(fcr != sun3x_fdc.fcr) {
 			*(sun3x_fdc.fcr_r) = fcr;
 			sun3x_fdc.fcr = fcr;
 		}
@@ -121,7 +121,7 @@ asmlinkage irqreturn_t sun3xflop_hardint(int irq, void *dev_id,
 #undef TRACE_FLPY_INT
 #define NO_FLOPPY_ASSEMBLER
 
-#ifdef TRACE_FLPY_INT 
+#ifdef TRACE_FLPY_INT
 	static int calls=0;
 	static int bytes=0;
 	static int dma_wait=0;
@@ -142,13 +142,13 @@ asmlinkage irqreturn_t sun3xflop_hardint(int irq, void *dev_id,
 		register int lcount;
 		register char *lptr;
 
-		for(lcount=virtual_dma_count, lptr=virtual_dma_addr; 
+		for(lcount=virtual_dma_count, lptr=virtual_dma_addr;
 		    lcount; lcount--, lptr++) {
 /*			st=fd_inb(virtual_dma_port+4) & 0x80 ;  */
 			st = *(sun3x_fdc.status_r);
 /*			if(st != 0xa0)                  */
 /*				break;                  */
-	
+
 			if((st & 0x80) == 0) {
 				virtual_dma_count = lcount;
 				virtual_dma_addr = lptr;
@@ -157,7 +157,7 @@ asmlinkage irqreturn_t sun3xflop_hardint(int irq, void *dev_id,
 
 			if((st & 0x20) == 0)
 				break;
-		
+
 			if(virtual_dma_mode)
 /*				fd_outb(*lptr, virtual_dma_port+5); */
 				*(sun3x_fdc.data_r) = *lptr;
@@ -165,7 +165,7 @@ asmlinkage irqreturn_t sun3xflop_hardint(int irq, void *dev_id,
 /*				*lptr = fd_inb(virtual_dma_port+5); */
 				*lptr = *(sun3x_fdc.data_r);
 		}
-		
+
 		virtual_dma_count = lcount;
 		virtual_dma_addr = lptr;
 /*		st = fd_inb(virtual_dma_port+4);   */
@@ -184,7 +184,7 @@ asmlinkage irqreturn_t sun3xflop_hardint(int irq, void *dev_id,
 		doing_pdma = 0;
 
 #ifdef TRACE_FLPY_INT
-		printk("count=%x, residue=%x calls=%d bytes=%x dma_wait=%d\n", 
+		printk("count=%x, residue=%x calls=%d bytes=%x dma_wait=%d\n",
 		       virtual_dma_count, virtual_dma_residue, calls, bytes,
 		       dma_wait);
 		calls = 0;
@@ -195,7 +195,7 @@ asmlinkage irqreturn_t sun3xflop_hardint(int irq, void *dev_id,
 		return IRQ_HANDLED;
 	}
 
-	
+
 #ifdef TRACE_FLPY_INT
 	if(!virtual_dma_count)
 		dma_wait++;
@@ -232,9 +232,9 @@ static int sun3xflop_init(void)
 	if(*sun3x_fdc.status_r == 0xff) {
 		return -1;
 	}
-	
+
 	*sun3x_fdc.fvr_r = FLOPPY_IRQ;
-	
+
 	*sun3x_fdc.fcr_r = FCR_TC;
 	udelay(10);
 	*sun3x_fdc.fcr_r = 0;
@@ -249,7 +249,7 @@ static int sun3xflop_init(void)
 static int sun3x_eject(void)
 {
 	if(MACH_IS_SUN3X) {
-	
+
 		sun3x_fdc.fcr |= (FCR_DSEL0 | FCR_EJECT);
 		*(sun3x_fdc.fcr_r) = sun3x_fdc.fcr;
 		udelay(10);

@@ -1,7 +1,7 @@
 #ifndef __m68k_IPC_H__
 #define __m68k_IPC_H__
 
-/* 
+/*
  * These are used to wrap system calls on m68k.
  *
  * See arch/m68k/kernel/sys_m68k.c for ugly details..

@@ -331,8 +331,8 @@
 |		Copyright (C) Motorola, Inc. 1990
 |			All Rights Reserved
 |
-|	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF MOTOROLA 
-|	The copyright notice above does not evidence any  
+|	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF MOTOROLA
+|	The copyright notice above does not evidence any
 |	actual or intended publication of such source code.
 
 |setox	idnt	2,1 | Motorola 040 Floating Point Software Package
@@ -505,7 +505,7 @@ EXPCONT1:
 	fmovex		%fp0,%fp2
 	fmuls		#0xBC317218,%fp0	| ...N * L1, L1 = lead(-log2/64)
 	fmulx		L2,%fp2		| ...N * L2, L1+L2 = -log2/64
-	faddx		%fp1,%fp0	 	| ...X + N*L1
+	faddx		%fp1,%fp0		| ...X + N*L1
 	faddx		%fp2,%fp0		| ...fp0 is R, reduced arg.
 |	MOVE.W		#$3FA5,EXPA3	...load EXPA3 in cache
 
@@ -516,46 +516,46 @@ EXPCONT1:
 |--[R+R*S*(A2+S*A4)] + [S*(A1+S*(A3+S*A5))]
 
 	fmovex		%fp0,%fp1
-	fmulx		%fp1,%fp1	 	| ...fp1 IS S = R*R
+	fmulx		%fp1,%fp1		| ...fp1 IS S = R*R
 
 	fmoves		#0x3AB60B70,%fp2	| ...fp2 IS A5
 |	MOVE.W		#0,2(%a1)	...load 2^(J/64) in cache
 
-	fmulx		%fp1,%fp2	 	| ...fp2 IS S*A5
+	fmulx		%fp1,%fp2		| ...fp2 IS S*A5
 	fmovex		%fp1,%fp3
 	fmuls		#0x3C088895,%fp3	| ...fp3 IS S*A4
 
 	faddd		EXPA3,%fp2	| ...fp2 IS A3+S*A5
 	faddd		EXPA2,%fp3	| ...fp3 IS A2+S*A4
 
-	fmulx		%fp1,%fp2	 	| ...fp2 IS S*(A3+S*A5)
+	fmulx		%fp1,%fp2		| ...fp2 IS S*(A3+S*A5)
 	movew		%d0,SCALE(%a6)	| ...SCALE is 2^(M) in extended
 	clrw		SCALE+2(%a6)
 	movel		#0x80000000,SCALE+4(%a6)
 	clrl		SCALE+8(%a6)
 
-	fmulx		%fp1,%fp3	 	| ...fp3 IS S*(A2+S*A4)
+	fmulx		%fp1,%fp3		| ...fp3 IS S*(A2+S*A4)
 
 	fadds		#0x3F000000,%fp2	| ...fp2 IS A1+S*(A3+S*A5)
-	fmulx		%fp0,%fp3	 	| ...fp3 IS R*S*(A2+S*A4)
+	fmulx		%fp0,%fp3		| ...fp3 IS R*S*(A2+S*A4)
 
-	fmulx		%fp1,%fp2	 	| ...fp2 IS S*(A1+S*(A3+S*A5))
-	faddx		%fp3,%fp0	 	| ...fp0 IS R+R*S*(A2+S*A4),
+	fmulx		%fp1,%fp2		| ...fp2 IS S*(A1+S*(A3+S*A5))
+	faddx		%fp3,%fp0		| ...fp0 IS R+R*S*(A2+S*A4),
 |					...fp3 released
 
 	fmovex		(%a1)+,%fp1	| ...fp1 is lead. pt. of 2^(J/64)
-	faddx		%fp2,%fp0	 	| ...fp0 is EXP(R) - 1
+	faddx		%fp2,%fp0		| ...fp0 is EXP(R) - 1
 |					...fp2 released
 
 |--Step 5
 |--final reconstruction process
 |--EXP(X) = 2^M * ( 2^(J/64) + 2^(J/64)*(EXP(R)-1) )
 
-	fmulx		%fp1,%fp0	 	| ...2^(J/64)*(Exp(R)-1)
+	fmulx		%fp1,%fp0		| ...2^(J/64)*(Exp(R)-1)
 	fmovemx	(%a7)+,%fp2-%fp2/%fp3	| ...fp2 restored
 	fadds		(%a1),%fp0	| ...accurate 2^(J/64)
 
-	faddx		%fp1,%fp0	 	| ...2^(J/64) + 2^(J/64)*...
+	faddx		%fp1,%fp0		| ...2^(J/64) + 2^(J/64)*...
 	movel		ADJFLAG(%a6),%d0
 
 |--Step 6
@@ -564,7 +564,7 @@ EXPCONT1:
 ADJUST:
 	fmulx		ADJSCALE(%a6),%fp0
 NORMAL:
-	fmovel		%d1,%FPCR	 	| ...restore user FPCR
+	fmovel		%d1,%FPCR		| ...restore user FPCR
 	fmulx		SCALE(%a6),%fp0	| ...multiply 2^(M)
 	bra		t_frcinx
 

@@ -88,7 +88,7 @@ void amiga_mksound( unsigned int hz, unsigned int ticks )
 		custom.aud[2].audlen = sizeof(sine_data)/2;
 		custom.aud[2].audper = (unsigned short)period;
 		custom.aud[2].audvol = 32; /* 50% of maxvol */
-	
+
 		if (ticks) {
 			sound_timer.expires = jiffies + ticks;
 			add_timer( &sound_timer );

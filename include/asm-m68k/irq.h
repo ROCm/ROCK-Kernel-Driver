@@ -64,7 +64,7 @@ static __inline__ int irq_canonicalize(int irq)
  * All interrupt handling is actually machine specific so it is better
  * to use function pointers, as used by the Sparc port, and select the
  * interrupt handling functions when initializing the kernel. This way
- * we save some unnecessary overhead at run-time. 
+ * we save some unnecessary overhead at run-time.
  *                                                      01/11/97 - Jes
  */
 

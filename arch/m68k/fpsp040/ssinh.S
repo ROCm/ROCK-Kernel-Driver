@@ -5,7 +5,7 @@
 |       an input argument; sSinhd does the same except for denormalized
 |       input.
 |
-|       Input: Double-extended number X in location pointed to 
+|       Input: Double-extended number X in location pointed to
 |		by address register a0.
 |
 |       Output: The value sinh(X) returned in floating-point register Fp0.
@@ -49,8 +49,8 @@
 |		Copyright (C) Motorola, Inc. 1990
 |			All Rights Reserved
 |
-|	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF MOTOROLA 
-|	The copyright notice above does not evidence any  
+|	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF MOTOROLA
+|	The copyright notice above does not evidence any
 |	actual or intended publication of such source code.
 
 |SSINH	idnt	2,1 | Motorola 040 Floating Point Software Package
@@ -91,7 +91,7 @@ ssinh:
 	moveml	%a1/%d1,-(%sp)
 	fmovemx %fp0-%fp0,(%a0)
 	clrl	%d1
-	bsr	setoxm1	 	| ...FP0 IS Z = EXPM1(Y)
+	bsr	setoxm1		| ...FP0 IS Z = EXPM1(Y)
 	fmovel	#0,%fpcr
 	moveml	(%sp)+,%a1/%d1
 
