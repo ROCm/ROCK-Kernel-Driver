@@ -1076,7 +1076,7 @@ _pagebuf_wait_unpin(
  *	done with respect to that I/O.	The pb_iodone routine, if
  *	present, will be called as a side-effect.
  */
-void
+STATIC void
 pagebuf_iodone_work(
 	void			*v)
 {
@@ -1255,7 +1255,7 @@ bio_end_io_pagebuf(
 	return 0;
 }
 
-void
+STATIC void
 _pagebuf_ioapply(
 	xfs_buf_t		*pb)
 {
