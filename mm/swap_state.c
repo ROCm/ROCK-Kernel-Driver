@@ -69,7 +69,7 @@ static int __add_to_swap_cache(struct page *page,
 	error = radix_tree_preload(gfp_mask);
 	if (!error) {
 		page_cache_get(page);
-		spin_lock(&swapper_space.tree_lock);
+		spin_lock_irq(&swapper_space.tree_lock);
 		error = radix_tree_insert(&swapper_space.page_tree,
 						entry.val, page);
 		if (!error) {
@@ -80,7 +80,7 @@ static int __add_to_swap_cache(struct page *page,
 			pagecache_acct(1);
 		} else
 			page_cache_release(page);
-		spin_unlock(&swapper_space.tree_lock);
+		spin_unlock_irq(&swapper_space.tree_lock);
 		radix_tree_preload_end();
 	}
 	return error;
@@ -207,9 +207,9 @@ void delete_from_swap_cache(struct page *page)
   
 	entry.val = page->private;
 
-	spin_lock(&swapper_space.tree_lock);
+	spin_lock_irq(&swapper_space.tree_lock);
 	__delete_from_swap_cache(page);
-	spin_unlock(&swapper_space.tree_lock);
+	spin_unlock_irq(&swapper_space.tree_lock);
 
 	swap_free(entry);
 	page_cache_release(page);
@@ -308,13 +308,13 @@ struct page * lookup_swap_cache(swp_entry_t entry)
 {
 	struct page *page;
 
-	spin_lock(&swapper_space.tree_lock);
+	spin_lock_irq(&swapper_space.tree_lock);
 	page = radix_tree_lookup(&swapper_space.page_tree, entry.val);
 	if (page) {
 		page_cache_get(page);
 		INC_CACHE_INFO(find_success);
 	}
-	spin_unlock(&swapper_space.tree_lock);
+	spin_unlock_irq(&swapper_space.tree_lock);
 	INC_CACHE_INFO(find_total);
 	return page;
 }
@@ -336,12 +336,12 @@ struct page * read_swap_cache_async(swp_entry_t entry)
 		 * called after lookup_swap_cache() failed, re-calling
 		 * that would confuse statistics.
 		 */
-		spin_lock(&swapper_space.tree_lock);
+		spin_lock_irq(&swapper_space.tree_lock);
 		found_page = radix_tree_lookup(&swapper_space.page_tree,
 						entry.val);
 		if (found_page)
 			page_cache_get(found_page);
-		spin_unlock(&swapper_space.tree_lock);
+		spin_unlock_irq(&swapper_space.tree_lock);
 		if (found_page)
 			break;
 
