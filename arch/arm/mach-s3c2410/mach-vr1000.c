@@ -11,6 +11,7 @@
  * published by the Free Software Foundation.
  *
  * Modifications:
+ *     06-Aug-2004 BJD  Fixed call to time initialisation
  *     12-Jul-2004 BJD  Renamed machine
  *     16-May-2003 BJD  Created initial version
  *     16-Aug-2003 BJD  Fixed header files and copyright, added URL
@@ -159,7 +160,7 @@ void __init vr1000_init_irq(void)
 
 void __init vr1000_init_time(void)
 {
-	s3c2401_init_time();
+	s3c2410_init_time();
 }
 
 MACHINE_START(VR1000, "Thorcom-VR1000")

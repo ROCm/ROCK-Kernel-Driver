@@ -1,6 +1,6 @@
 /*
  *
- * linux/drivers/s390/net/ctcdbug.c ($Revision: 1.2 $)
+ * linux/drivers/s390/net/ctcdbug.c ($Revision: 1.4 $)
  *
  * CTC / ESCON network driver - s390 dbf exploit.
  *
@@ -9,7 +9,7 @@
  *    Author(s): Original Code written by
  *			  Peter Tiedemann (ptiedem@de.ibm.com)
  *
- *    $Revision: 1.2 $	 $Date: 2004/07/15 16:03:08 $
+ *    $Revision: 1.4 $	 $Date: 2004/08/04 10:11:59 $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -31,51 +31,51 @@
 /**
  * Debug Facility Stuff
  */
-debug_info_t *dbf_setup = NULL;
-debug_info_t *dbf_data = NULL;
-debug_info_t *dbf_trace = NULL;
+debug_info_t *ctc_dbf_setup = NULL;
+debug_info_t *ctc_dbf_data = NULL;
+debug_info_t *ctc_dbf_trace = NULL;
 
-DEFINE_PER_CPU(char[256], dbf_txt_buf);
+DEFINE_PER_CPU(char[256], ctc_dbf_txt_buf);
 
 void
-unregister_dbf_views(void)
+ctc_unregister_dbf_views(void)
 {
-	if (dbf_setup)
-		debug_unregister(dbf_setup);
-	if (dbf_data)
-		debug_unregister(dbf_data);
-	if (dbf_trace)
-		debug_unregister(dbf_trace);
+	if (ctc_dbf_setup)
+		debug_unregister(ctc_dbf_setup);
+	if (ctc_dbf_data)
+		debug_unregister(ctc_dbf_data);
+	if (ctc_dbf_trace)
+		debug_unregister(ctc_dbf_trace);
 }
 int
-register_dbf_views(void)
+ctc_register_dbf_views(void)
 {
-	dbf_setup = debug_register(CTC_DBF_SETUP_NAME,
+	ctc_dbf_setup = debug_register(CTC_DBF_SETUP_NAME,
 					CTC_DBF_SETUP_INDEX,
 					CTC_DBF_SETUP_NR_AREAS,
 					CTC_DBF_SETUP_LEN);
-	dbf_data = debug_register(CTC_DBF_DATA_NAME,
+	ctc_dbf_data = debug_register(CTC_DBF_DATA_NAME,
 				       CTC_DBF_DATA_INDEX,
 				       CTC_DBF_DATA_NR_AREAS,
 				       CTC_DBF_DATA_LEN);
-	dbf_trace = debug_register(CTC_DBF_TRACE_NAME,
+	ctc_dbf_trace = debug_register(CTC_DBF_TRACE_NAME,
 					CTC_DBF_TRACE_INDEX,
 					CTC_DBF_TRACE_NR_AREAS,
 					CTC_DBF_TRACE_LEN);
 
-	if ((dbf_setup == NULL) || (dbf_data == NULL) ||
-	    (dbf_trace == NULL)) {
-		unregister_dbf_views();
+	if ((ctc_dbf_setup == NULL) || (ctc_dbf_data == NULL) ||
+	    (ctc_dbf_trace == NULL)) {
+		ctc_unregister_dbf_views();
 		return -ENOMEM;
 	}
-	debug_register_view(dbf_setup, &debug_hex_ascii_view);
-	debug_set_level(dbf_setup, CTC_DBF_SETUP_LEVEL);
+	debug_register_view(ctc_dbf_setup, &debug_hex_ascii_view);
+	debug_set_level(ctc_dbf_setup, CTC_DBF_SETUP_LEVEL);
 
-	debug_register_view(dbf_data, &debug_hex_ascii_view);
-	debug_set_level(dbf_data, CTC_DBF_DATA_LEVEL);
+	debug_register_view(ctc_dbf_data, &debug_hex_ascii_view);
+	debug_set_level(ctc_dbf_data, CTC_DBF_DATA_LEVEL);
 
-	debug_register_view(dbf_trace, &debug_hex_ascii_view);
-	debug_set_level(dbf_trace, CTC_DBF_TRACE_LEVEL);
+	debug_register_view(ctc_dbf_trace, &debug_hex_ascii_view);
+	debug_set_level(ctc_dbf_trace, CTC_DBF_TRACE_LEVEL);
 
 	return 0;
 }

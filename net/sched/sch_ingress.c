@@ -40,7 +40,7 @@
 #endif
 
 
-#define PRIV(sch) ((struct ingress_qdisc_data *) (sch)->data)
+#define PRIV(sch) qdisc_priv(sch)
 
 
 /* Thanks to Doron Oz for this hack

@@ -2,13 +2,6 @@
 # Makefile for the linux kernel.
 #
 
-ifdef CONFIG_PPC64BRIDGE
-EXTRA_AFLAGS		:= -Wa,-mppc64bridge
-endif
-ifdef CONFIG_40x
-EXTRA_AFLAGS		:= -Wa,-m405
-endif
-
 # Extra CFLAGS so we don't have to do relative includes
 CFLAGS_pmac_setup.o	+= -Iarch/$(ARCH)/mm
 
@@ -26,7 +19,6 @@ obj-$(CONFIG_NVRAM)		+= pmac_nvram.o
 obj-$(CONFIG_CPU_FREQ_PMAC)	+= pmac_cpufreq.o
 endif
 obj-$(CONFIG_PMAC_BACKLIGHT)	+= pmac_backlight.o
-obj-$(CONFIG_PPC_RTAS)		+= error_log.o proc_rtas.o
 obj-$(CONFIG_PREP_RESIDUAL)	+= residual.o
 obj-$(CONFIG_ADIR)		+= adir_setup.o adir_pic.o adir_pci.o
 obj-$(CONFIG_EST8260)		+= est8260_setup.o

@@ -1016,7 +1016,7 @@ hfsc_hash(u32 h)
 static inline struct hfsc_class *
 hfsc_find_class(u32 classid, struct Qdisc *sch)
 {
-	struct hfsc_sched *q = (struct hfsc_sched *)sch->data;
+	struct hfsc_sched *q = qdisc_priv(sch);
 	struct hfsc_class *cl;
 
 	list_for_each_entry(cl, &q->clhash[hfsc_hash(classid)], hlist) {
@@ -1061,7 +1061,7 @@ static int
 hfsc_change_class(struct Qdisc *sch, u32 classid, u32 parentid,
                   struct rtattr **tca, unsigned long *arg)
 {
-	struct hfsc_sched *q = (struct hfsc_sched *)sch->data;
+	struct hfsc_sched *q = qdisc_priv(sch);
 	struct hfsc_class *cl = (struct hfsc_class *)*arg;
 	struct hfsc_class *parent = NULL;
 	struct rtattr *opt = tca[TCA_OPTIONS-1];
@@ -1204,7 +1204,7 @@ hfsc_destroy_filters(struct tcf_proto **fl)
 static void
 hfsc_destroy_class(struct Qdisc *sch, struct hfsc_class *cl)
 {
-	struct hfsc_sched *q = (struct hfsc_sched *)sch->data;
+	struct hfsc_sched *q = qdisc_priv(sch);
 
 	hfsc_destroy_filters(&cl->filter_list);
 	qdisc_destroy(cl->qdisc);
@@ -1218,7 +1218,7 @@ hfsc_destroy_class(struct Qdisc *sch, struct hfsc_class *cl)
 static int
 hfsc_delete_class(struct Qdisc *sch, unsigned long arg)
 {
-	struct hfsc_sched *q = (struct hfsc_sched *)sch->data;
+	struct hfsc_sched *q = qdisc_priv(sch);
 	struct hfsc_class *cl = (struct hfsc_class *)arg;
 
 	if (cl->level > 0 || cl->filter_cnt > 0 || cl == &q->root)
@@ -1240,7 +1240,7 @@ hfsc_delete_class(struct Qdisc *sch, unsigned long arg)
 static struct hfsc_class *
 hfsc_classify(struct sk_buff *skb, struct Qdisc *sch, int *qres)
 {
-	struct hfsc_sched *q = (struct hfsc_sched *)sch->data;
+	struct hfsc_sched *q = qdisc_priv(sch);
 	struct hfsc_class *cl;
 	struct tcf_result res;
 	struct tcf_proto *tcf;
@@ -1381,7 +1381,7 @@ hfsc_unbind_tcf(struct Qdisc *sch, unsigned long arg)
 static struct tcf_proto **
 hfsc_tcf_chain(struct Qdisc *sch, unsigned long arg)
 {
-	struct hfsc_sched *q = (struct hfsc_sched *)sch->data;
+	struct hfsc_sched *q = qdisc_priv(sch);
 	struct hfsc_class *cl = (struct hfsc_class *)arg;
 
 	if (cl == NULL)
@@ -1489,7 +1489,7 @@ hfsc_dump_class(struct Qdisc *sch, unsigned long arg, struct sk_buff *skb,
 static void
 hfsc_walk(struct Qdisc *sch, struct qdisc_walker *arg)
 {
-	struct hfsc_sched *q = (struct hfsc_sched *)sch->data;
+	struct hfsc_sched *q = qdisc_priv(sch);
 	struct hfsc_class *cl;
 	unsigned int i;
 
@@ -1523,7 +1523,7 @@ hfsc_watchdog(unsigned long arg)
 static void
 hfsc_schedule_watchdog(struct Qdisc *sch, u64 cur_time)
 {
-	struct hfsc_sched *q = (struct hfsc_sched *)sch->data;
+	struct hfsc_sched *q = qdisc_priv(sch);
 	struct hfsc_class *cl;
 	u64 next_time = 0;
 	long delay;
@@ -1545,7 +1545,7 @@ hfsc_schedule_watchdog(struct Qdisc *sch, u64 cur_time)
 static int
 hfsc_init_qdisc(struct Qdisc *sch, struct rtattr *opt)
 {
-	struct hfsc_sched *q = (struct hfsc_sched *)sch->data;
+	struct hfsc_sched *q = qdisc_priv(sch);
 	struct tc_hfsc_qopt *qopt;
 	unsigned int i;
 
@@ -1585,7 +1585,7 @@ hfsc_init_qdisc(struct Qdisc *sch, struct rtattr *opt)
 static int
 hfsc_change_qdisc(struct Qdisc *sch, struct rtattr *opt)
 {
-	struct hfsc_sched *q = (struct hfsc_sched *)sch->data;
+	struct hfsc_sched *q = qdisc_priv(sch);
 	struct tc_hfsc_qopt *qopt;
 
 	if (opt == NULL || RTA_PAYLOAD(opt) < sizeof(*qopt))
@@ -1632,7 +1632,7 @@ hfsc_reset_class(struct hfsc_class *cl)
 static void
 hfsc_reset_qdisc(struct Qdisc *sch)
 {
-	struct hfsc_sched *q = (struct hfsc_sched *)sch->data;
+	struct hfsc_sched *q = qdisc_priv(sch);
 	struct hfsc_class *cl;
 	unsigned int i;
 
@@ -1651,7 +1651,7 @@ hfsc_reset_qdisc(struct Qdisc *sch)
 static void
 hfsc_destroy_qdisc(struct Qdisc *sch)
 {
-	struct hfsc_sched *q = (struct hfsc_sched *)sch->data;
+	struct hfsc_sched *q = qdisc_priv(sch);
 	struct hfsc_class *cl, *next;
 	unsigned int i;
 
@@ -1666,7 +1666,7 @@ hfsc_destroy_qdisc(struct Qdisc *sch)
 static int
 hfsc_dump_qdisc(struct Qdisc *sch, struct sk_buff *skb)
 {
-	struct hfsc_sched *q = (struct hfsc_sched *)sch->data;
+	struct hfsc_sched *q = qdisc_priv(sch);
 	unsigned char *b = skb->tail;
 	struct tc_hfsc_qopt qopt;
 
@@ -1730,7 +1730,7 @@ hfsc_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 static struct sk_buff *
 hfsc_dequeue(struct Qdisc *sch)
 {
-	struct hfsc_sched *q = (struct hfsc_sched *)sch->data;
+	struct hfsc_sched *q = qdisc_priv(sch);
 	struct hfsc_class *cl;
 	struct sk_buff *skb;
 	u64 cur_time;
@@ -1799,7 +1799,7 @@ hfsc_dequeue(struct Qdisc *sch)
 static int
 hfsc_requeue(struct sk_buff *skb, struct Qdisc *sch)
 {
-	struct hfsc_sched *q = (struct hfsc_sched *)sch->data;
+	struct hfsc_sched *q = qdisc_priv(sch);
 
 	__skb_queue_head(&q->requeue, skb);
 	sch->q.qlen++;
@@ -1809,7 +1809,7 @@ hfsc_requeue(struct sk_buff *skb, struct Qdisc *sch)
 static unsigned int
 hfsc_drop(struct Qdisc *sch)
 {
-	struct hfsc_sched *q = (struct hfsc_sched *)sch->data;
+	struct hfsc_sched *q = qdisc_priv(sch);
 	struct hfsc_class *cl;
 	unsigned int len;
 

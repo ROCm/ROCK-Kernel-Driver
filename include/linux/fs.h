@@ -75,6 +75,11 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 #define FMODE_READ 1
 #define FMODE_WRITE 2
 
+/* Internal kernel extensions */
+#define FMODE_LSEEK	4
+#define FMODE_PREAD	8
+#define FMODE_PWRITE	FMODE_PREAD	/* These go hand in hand */
+
 #define RW_MASK		1
 #define RWA_MASK	2
 #define READ 0

@@ -2,10 +2,6 @@
 # Makefile for the linux ppc-specific parts of the memory manager.
 #
 
-ifdef CONFIG_PPC64BRIDGE
-EXTRA_AFLAGS		:= -Wa,-mppc64bridge
-endif
-
 obj-y				:= fault.o init.o mem_pieces.o \
 					mmu_context.o pgtable.o
 

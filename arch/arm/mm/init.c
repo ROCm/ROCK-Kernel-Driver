@@ -24,13 +24,7 @@
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
 
-#ifdef CONFIG_CPU_32
-#define TABLE_OFFSET	(PTRS_PER_PTE)
-#else
-#define TABLE_OFFSET	0
-#endif
-
-#define TABLE_SIZE	((TABLE_OFFSET + PTRS_PER_PTE) * sizeof(pte_t))
+#define TABLE_SIZE	(2 * PTRS_PER_PTE * sizeof(pte_t))
 
 DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
 
@@ -289,14 +283,13 @@ static __init void reserve_node_zero(unsigned int bootmap_pfn, unsigned int boot
 	 */
 	reserve_bootmem_node(pgdat, __pa(&_stext), &_end - &_stext);
 
-#ifdef CONFIG_CPU_32
 	/*
 	 * Reserve the page tables.  These are already in use,
 	 * and can only be in node 0.
 	 */
 	reserve_bootmem_node(pgdat, __pa(swapper_pg_dir),
 			     PTRS_PER_PGD * sizeof(pgd_t));
-#endif
+
 	/*
 	 * And don't forget to reserve the allocator bitmap,
 	 * which will be freed later.

@@ -267,7 +267,7 @@ static __inline__ int htb_hash(u32 h)
 /* find class in global hash table using given handle */
 static __inline__ struct htb_class *htb_find(u32 handle, struct Qdisc *sch)
 {
-	struct htb_sched *q = (struct htb_sched *)sch->data;
+	struct htb_sched *q = qdisc_priv(sch);
 	struct list_head *p;
 	if (TC_H_MAJ(handle) != sch->handle) 
 		return NULL;
@@ -300,7 +300,7 @@ static inline u32 htb_classid(struct htb_class *cl)
 
 static struct htb_class *htb_classify(struct sk_buff *skb, struct Qdisc *sch, int *qres)
 {
-	struct htb_sched *q = (struct htb_sched *)sch->data;
+	struct htb_sched *q = qdisc_priv(sch);
 	struct htb_class *cl;
 	struct tcf_result res;
 	struct tcf_proto *tcf;
@@ -712,7 +712,7 @@ htb_deactivate(struct htb_sched *q,struct htb_class *cl)
 static int htb_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 {
     int ret = NET_XMIT_SUCCESS;
-    struct htb_sched *q = (struct htb_sched *)sch->data;
+    struct htb_sched *q = qdisc_priv(sch);
     struct htb_class *cl = htb_classify(skb,sch,&ret);
 
 
@@ -759,7 +759,7 @@ static int htb_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 /* TODO: requeuing packet charges it to policers again !! */
 static int htb_requeue(struct sk_buff *skb, struct Qdisc *sch)
 {
-    struct htb_sched *q = (struct htb_sched *)sch->data;
+    struct htb_sched *q = qdisc_priv(sch);
     int ret =  NET_XMIT_SUCCESS;
     struct htb_class *cl = htb_classify(skb,sch, &ret);
     struct sk_buff *tskb;
@@ -800,7 +800,7 @@ static void htb_timer(unsigned long arg)
 static void htb_rate_timer(unsigned long arg)
 {
 	struct Qdisc *sch = (struct Qdisc*)arg;
-	struct htb_sched *q = (struct htb_sched *)sch->data;
+	struct htb_sched *q = qdisc_priv(sch);
 	struct list_head *p;
 
 	/* lock queue so that we can muck with it */
@@ -1060,7 +1060,7 @@ next:
 
 static void htb_delay_by(struct Qdisc *sch,long delay)
 {
-	struct htb_sched *q = (struct htb_sched *)sch->data;
+	struct htb_sched *q = qdisc_priv(sch);
 	if (delay <= 0) delay = 1;
 	if (unlikely(delay > 5*HZ)) {
 		if (net_ratelimit())
@@ -1077,7 +1077,7 @@ static void htb_delay_by(struct Qdisc *sch,long delay)
 static struct sk_buff *htb_dequeue(struct Qdisc *sch)
 {
 	struct sk_buff *skb = NULL;
-	struct htb_sched *q = (struct htb_sched *)sch->data;
+	struct htb_sched *q = qdisc_priv(sch);
 	int level;
 	long min_delay;
 #ifdef HTB_DEBUG
@@ -1147,7 +1147,7 @@ fin:
 /* try to drop from each class (by prio) until one succeed */
 static unsigned int htb_drop(struct Qdisc* sch)
 {
-	struct htb_sched *q = (struct htb_sched *)sch->data;
+	struct htb_sched *q = qdisc_priv(sch);
 	int prio;
 
 	for (prio = TC_HTB_NUMPRIO - 1; prio >= 0; prio--) {
@@ -1172,7 +1172,7 @@ static unsigned int htb_drop(struct Qdisc* sch)
 /* always caled under BH & queue lock */
 static void htb_reset(struct Qdisc* sch)
 {
-	struct htb_sched *q = (struct htb_sched *)sch->data;
+	struct htb_sched *q = qdisc_priv(sch);
 	int i;
 	HTB_DBG(0,1,"htb_reset sch=%p, handle=%X\n",sch,sch->handle);
 
@@ -1210,7 +1210,7 @@ static void htb_reset(struct Qdisc* sch)
 
 static int htb_init(struct Qdisc *sch, struct rtattr *opt)
 {
-	struct htb_sched *q = (struct htb_sched*)sch->data;
+	struct htb_sched *q = qdisc_priv(sch);
 	struct rtattr *tb[TCA_HTB_INIT];
 	struct tc_htb_glob *gopt;
 	int i;
@@ -1265,7 +1265,7 @@ static int htb_init(struct Qdisc *sch, struct rtattr *opt)
 
 static int htb_dump(struct Qdisc *sch, struct sk_buff *skb)
 {
-	struct htb_sched *q = (struct htb_sched*)sch->data;
+	struct htb_sched *q = qdisc_priv(sch);
 	unsigned char	 *b = skb->tail;
 	struct rtattr *rta;
 	struct tc_htb_glob gopt;
@@ -1300,7 +1300,7 @@ static int htb_dump_class(struct Qdisc *sch, unsigned long arg,
 	struct sk_buff *skb, struct tcmsg *tcm)
 {
 #ifdef HTB_DEBUG
-	struct htb_sched *q = (struct htb_sched*)sch->data;
+	struct htb_sched *q = qdisc_priv(sch);
 #endif
 	struct htb_class *cl = (struct htb_class*)arg;
 	unsigned char	 *b = skb->tail;
@@ -1358,7 +1358,7 @@ static int htb_graft(struct Qdisc *sch, unsigned long arg, struct Qdisc *new,
 		sch_tree_lock(sch);
 		if ((*old = xchg(&cl->un.leaf.q, new)) != NULL) {
 			if (cl->prio_activity)
-				htb_deactivate ((struct htb_sched*)sch->data,cl);
+				htb_deactivate (qdisc_priv(sch),cl);
 
 			/* TODO: is it correct ? Why CBQ doesn't do it ? */
 			sch->q.qlen -= (*old)->q.qlen;	
@@ -1379,7 +1379,7 @@ static struct Qdisc * htb_leaf(struct Qdisc *sch, unsigned long arg)
 static unsigned long htb_get(struct Qdisc *sch, u32 classid)
 {
 #ifdef HTB_DEBUG
-	struct htb_sched *q = (struct htb_sched *)sch->data;
+	struct htb_sched *q = qdisc_priv(sch);
 #endif
 	struct htb_class *cl = htb_find(classid,sch);
 	HTB_DBG(0,1,"htb_get clid=%X q=%p cl=%p ref=%d\n",classid,q,cl,cl?cl->refcnt:0);
@@ -1400,7 +1400,7 @@ static void htb_destroy_filters(struct tcf_proto **fl)
 
 static void htb_destroy_class(struct Qdisc* sch,struct htb_class *cl)
 {
-	struct htb_sched *q = (struct htb_sched *)sch->data;
+	struct htb_sched *q = qdisc_priv(sch);
 	HTB_DBG(0,1,"htb_destrycls clid=%X ref=%d\n", cl?cl->classid:0,cl?cl->refcnt:0);
 	if (!cl->level) {
 		BUG_TRAP(cl->un.leaf.q);
@@ -1435,7 +1435,7 @@ static void htb_destroy_class(struct Qdisc* sch,struct htb_class *cl)
 /* always caled under BH & queue lock */
 static void htb_destroy(struct Qdisc* sch)
 {
-	struct htb_sched *q = (struct htb_sched *)sch->data;
+	struct htb_sched *q = qdisc_priv(sch);
 	HTB_DBG(0,1,"htb_destroy q=%p\n",q);
 
 	del_timer_sync (&q->timer);
@@ -1457,7 +1457,7 @@ static void htb_destroy(struct Qdisc* sch)
 
 static int htb_delete(struct Qdisc *sch, unsigned long arg)
 {
-	struct htb_sched *q = (struct htb_sched *)sch->data;
+	struct htb_sched *q = qdisc_priv(sch);
 	struct htb_class *cl = (struct htb_class*)arg;
 	HTB_DBG(0,1,"htb_delete q=%p cl=%X ref=%d\n",q,cl?cl->classid:0,cl?cl->refcnt:0);
 
@@ -1484,7 +1484,7 @@ static int htb_delete(struct Qdisc *sch, unsigned long arg)
 static void htb_put(struct Qdisc *sch, unsigned long arg)
 {
 #ifdef HTB_DEBUG
-	struct htb_sched *q = (struct htb_sched *)sch->data;
+	struct htb_sched *q = qdisc_priv(sch);
 #endif
 	struct htb_class *cl = (struct htb_class*)arg;
 	HTB_DBG(0,1,"htb_put q=%p cl=%X ref=%d\n",q,cl?cl->classid:0,cl?cl->refcnt:0);
@@ -1497,7 +1497,7 @@ static int htb_change_class(struct Qdisc *sch, u32 classid,
 		u32 parentid, struct rtattr **tca, unsigned long *arg)
 {
 	int err = -EINVAL;
-	struct htb_sched *q = (struct htb_sched *)sch->data;
+	struct htb_sched *q = qdisc_priv(sch);
 	struct htb_class *cl = (struct htb_class*)*arg,*parent;
 	struct rtattr *opt = tca[TCA_OPTIONS-1];
 	struct qdisc_rate_table *rtab = NULL, *ctab = NULL;
@@ -1623,7 +1623,7 @@ failure:
 
 static struct tcf_proto **htb_find_tcf(struct Qdisc *sch, unsigned long arg)
 {
-	struct htb_sched *q = (struct htb_sched *)sch->data;
+	struct htb_sched *q = qdisc_priv(sch);
 	struct htb_class *cl = (struct htb_class *)arg;
 	struct tcf_proto **fl = cl ? &cl->filter_list : &q->filter_list;
 	HTB_DBG(0,2,"htb_tcf q=%p clid=%X fref=%d fl=%p\n",q,cl?cl->classid:0,cl?cl->filter_cnt:q->filter_cnt,*fl);
@@ -1633,7 +1633,7 @@ static struct tcf_proto **htb_find_tcf(struct Qdisc *sch, unsigned long arg)
 static unsigned long htb_bind_filter(struct Qdisc *sch, unsigned long parent,
 	u32 classid)
 {
-	struct htb_sched *q = (struct htb_sched *)sch->data;
+	struct htb_sched *q = qdisc_priv(sch);
 	struct htb_class *cl = htb_find (classid,sch);
 	HTB_DBG(0,2,"htb_bind q=%p clid=%X cl=%p fref=%d\n",q,classid,cl,cl?cl->filter_cnt:q->filter_cnt);
 	/*if (cl && !cl->level) return 0;
@@ -1654,7 +1654,7 @@ static unsigned long htb_bind_filter(struct Qdisc *sch, unsigned long parent,
 
 static void htb_unbind_filter(struct Qdisc *sch, unsigned long arg)
 {
-	struct htb_sched *q = (struct htb_sched *)sch->data;
+	struct htb_sched *q = qdisc_priv(sch);
 	struct htb_class *cl = (struct htb_class *)arg;
 	HTB_DBG(0,2,"htb_unbind q=%p cl=%p fref=%d\n",q,cl,cl?cl->filter_cnt:q->filter_cnt);
 	if (cl) 
@@ -1665,7 +1665,7 @@ static void htb_unbind_filter(struct Qdisc *sch, unsigned long arg)
 
 static void htb_walk(struct Qdisc *sch, struct qdisc_walker *arg)
 {
-	struct htb_sched *q = (struct htb_sched *)sch->data;
+	struct htb_sched *q = qdisc_priv(sch);
 	int i;
 
 	if (arg->stop)
