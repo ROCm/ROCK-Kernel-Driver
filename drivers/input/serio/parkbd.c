@@ -86,20 +86,9 @@ static int parkbd_write(struct serio *port, unsigned char c)
 	return 0;
 }
 
-static int parkbd_open(struct serio *port)
-{
-	return 0;
-}
-
-static void parkbd_close(struct serio *port)
-{
-}
-
 static struct serio parkbd_port =
 {
 	.write	= parkbd_write,
-	.open	= parkbd_open,
-	.close	= parkbd_close,
 	.name	= parkbd_name,
 	.phys	= parkbd_phys,
 };

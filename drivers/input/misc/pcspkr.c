@@ -40,11 +40,11 @@ static int pcspkr_event(struct input_dev *dev, unsigned int type, unsigned int c
 		case SND_BELL: if (value) value = 1000;
 		case SND_TONE: break;
 		default: return -1;
-	} 
+	}
 
 	if (value > 20 && value < 32767)
 		count = CLOCK_TICK_RATE / value;
-	
+
 	spin_lock_irqsave(&i8253_beep_lock, flags);
 
 	if (count) {
