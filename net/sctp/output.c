@@ -356,6 +356,7 @@ int sctp_packet_transmit(struct sctp_packet *packet)
 		if (sctp_chunk_is_data(chunk)) {
 
 			if (!chunk->has_tsn) {
+				sctp_chunk_assign_ssn(chunk);
 				sctp_chunk_assign_tsn(chunk);
 
 			/* 6.3.1 C4) When data is in flight and when allowed
@@ -627,6 +628,8 @@ static sctp_xmit_t sctp_packet_append_data(struct sctp_packet *packet,
 		rwnd = 0;
 
 	asoc->peer.rwnd = rwnd;
+	/* Has been accepted for transmission. */
+	chunk->msg->can_expire = 0;
 
 finish:
 	return retval;

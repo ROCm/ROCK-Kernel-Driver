@@ -165,7 +165,7 @@ static inline int sctp_cacc_skip_3_1(struct sctp_transport *primary,
  */
 static inline int sctp_cacc_skip_3_2(struct sctp_transport *primary, __u32 tsn)
 {
-	if (primary->cacc.cycling_changeover && 
+	if (primary->cacc.cycling_changeover &&
 	    TSN_lt(tsn, primary->cacc.next_tsn_at_change))
 		return 1;
 	return 0;
@@ -174,7 +174,7 @@ static inline int sctp_cacc_skip_3_2(struct sctp_transport *primary, __u32 tsn)
 /*
  * SFR-CACC algorithm:
  * 3) If the missing report count for TSN t is to be
- * incremented according to [RFC2960] and 
+ * incremented according to [RFC2960] and
  * [SCTP_STEWART-2002], and CHANGEOVER_ACTIVE is set,
  * then the sender MUST futher execute steps 3.1 and
  * 3.2 to determine if the missing report count for
@@ -251,8 +251,7 @@ void sctp_outq_teardown(struct sctp_outq *q)
 			chunk = list_entry(lchunk, struct sctp_chunk,
 					   transmitted_list);
 			/* Mark as part of a failed message. */
-			chunk->msg->send_failed = 1;
-			/* Generate a SEND FAILED event. */
+			sctp_datamsg_fail(chunk, q->error);
 			sctp_chunk_free(chunk);
 		}
 	}
@@ -262,6 +261,7 @@ void sctp_outq_teardown(struct sctp_outq *q)
 		list_del(lchunk);
 		chunk = list_entry(lchunk, struct sctp_chunk,
 				   transmitted_list);
+		sctp_datamsg_fail(chunk, q->error);
 		sctp_chunk_free(chunk);
 	}
 
@@ -270,6 +270,7 @@ void sctp_outq_teardown(struct sctp_outq *q)
 		list_del(lchunk);
 		chunk = list_entry(lchunk, struct sctp_chunk,
 				   transmitted_list);
+		sctp_datamsg_fail(chunk, q->error);
 		sctp_chunk_free(chunk);
 	}
 
@@ -277,7 +278,7 @@ void sctp_outq_teardown(struct sctp_outq *q)
 	while ((chunk = sctp_outq_dequeue_data(q))) {
 
 		/* Mark as send failure. */
-		chunk->msg->send_failed = 1;
+		sctp_datamsg_fail(chunk, q->error);
 		sctp_chunk_free(chunk);
 	}
 
@@ -800,27 +801,25 @@ int sctp_outq_flush(struct sctp_outq *q, int rtx_timeout)
 			 */
 			if (chunk->sinfo.sinfo_stream >=
 			    asoc->c.sinit_num_ostreams) {
-				/* Mark as failed send. */
-				chunk->msg->send_failed = 1;
-				chunk->msg->send_error = SCTP_ERROR_INV_STRM;
 
-				/* Free the chunk. */
+				/* Mark as s failed send. */
+				sctp_datamsg_fail(chunk, SCTP_ERROR_INV_STRM);
 				sctp_chunk_free(chunk);
 				continue;
 			}
 
-			/* Now do delayed assignment of SSN.  This will
-			 * probably change again when we start supporting
-			 * large (> approximately 2^16) size messages.
-			 */
-			sctp_chunk_assign_ssn(chunk);
+			/* Has this chunk expired? */
+			if (sctp_datamsg_expires(chunk)) {
+				sctp_datamsg_fail(chunk, 0);
+				sctp_chunk_free(chunk);
+				continue;
+			}
 
 			/* If there is a specified transport, use it.
 			 * Otherwise, we want to use the active path.
 			 */
 			new_transport = chunk->transport;
-			if (new_transport == NULL ||
-			    !new_transport->active)
+			if (!new_transport || !new_transport->active)
 				new_transport = asoc->peer.active_path;
 
 			/* Change packets if necessary.  */
@@ -1024,10 +1023,10 @@ int sctp_outq_sack(struct sctp_outq *q, struct sctp_sackhdr *sack)
 
 	/*
 	 * SFR-CACC algorithm:
-	 * On receipt of a SACK the sender SHOULD execute the 
+	 * On receipt of a SACK the sender SHOULD execute the
 	 * following statements.
 	 *
-	 * 1) If the cumulative ack in the SACK passes next tsn_at_change 
+	 * 1) If the cumulative ack in the SACK passes next tsn_at_change
 	 * on the current primary, the CHANGEOVER_ACTIVE flag SHOULD be
 	 * cleared. The CYCLING_CHANGEOVER flag SHOULD also be cleared for
 	 * all destinations.
@@ -1041,7 +1040,7 @@ int sctp_outq_sack(struct sctp_outq *q, struct sctp_sackhdr *sack)
 		}
 	}
 
-	/* 
+	/*
 	 * SFR-CACC algorithm:
 	 * 2) If the SACK contains gap acks and the flag CHANGEOVER_ACTIVE
 	 * is set the receiver of the SACK MUST take the following actions:
@@ -1087,7 +1086,7 @@ int sctp_outq_sack(struct sctp_outq *q, struct sctp_sackhdr *sack)
 				       transport, sack, highest_new_tsn);
 		/*
 		 * SFR-CACC algorithm:
-		 * C) Let count_of_newacks be the number of 
+		 * C) Let count_of_newacks be the number of
 		 * destinations for which cacc_saw_newack is set.
 		 */
 		if (transport->cacc.cacc_saw_newack)
@@ -1097,7 +1096,7 @@ int sctp_outq_sack(struct sctp_outq *q, struct sctp_sackhdr *sack)
 	list_for_each(pos, transport_list) {
 		transport  = list_entry(pos, struct sctp_transport,
 					transports);
-		sctp_mark_missing(q, &transport->transmitted, transport, 
+		sctp_mark_missing(q, &transport->transmitted, transport,
 				  highest_new_tsn, count_of_newacks);
 	}
 
@@ -1275,8 +1274,8 @@ static void sctp_check_transmitted(struct sctp_outq *q,
 					 * the destination that the TSN was
 					 * sent to.
 					 */
-					if (transport && 
-					    sack->num_gap_ack_blocks && 
+					if (transport &&
+					    sack->num_gap_ack_blocks &&
 					    q->asoc->peer.primary_path->cacc.
 					    changeover_active)
 						transport->cacc.cacc_saw_newack
@@ -1529,12 +1528,12 @@ static void sctp_mark_missing(struct sctp_outq *q,
 		    TSN_lt(tsn, highest_new_tsn_in_sack)) {
 
 			/* SFR-CACC may require us to skip marking
-			 * this chunk as missing. 
+			 * this chunk as missing.
 			 */
 			if (!transport || !sctp_cacc_skip(primary, transport,
 					    count_of_newacks, tsn)) {
 				chunk->tsn_missing_report++;
-				
+
 				SCTP_DEBUG_PRINTK(
 					"%s: TSN 0x%x missing counter: %d\n",
 					__FUNCTION__, tsn,

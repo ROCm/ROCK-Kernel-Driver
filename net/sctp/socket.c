@@ -826,7 +826,7 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	long timeo;
 	__u16 sinfo_flags = 0;
 	struct sctp_datamsg *datamsg;
-	struct list_head *pos, *temp;
+	struct list_head *pos;
 	int msg_flags = msg->msg_flags;
 
 	SCTP_DEBUG_PRINTK("sctp_sendmsg(sk: %p, msg: %p, msg_len: %d)\n",
@@ -1133,9 +1133,8 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	}
 
 	/* Now send the (possibly) fragmented message. */
-	list_for_each_safe(pos, temp, &datamsg->chunks) {
+	list_for_each(pos, &datamsg->chunks) {
 		chunk = list_entry(pos, struct sctp_chunk, frag_list);
-		list_del_init(pos);
 		sctp_datamsg_track(chunk);
 
 		/* Do accounting for the write space.  */
@@ -1143,7 +1142,11 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 
 		chunk->transport = chunk_tp;
 
-		/* Send it to the lower layers.  */
+		/* Send it to the lower layers.  Note:  all chunks
+		 * must either fail or succeed.   The lower layer
+		 * works that way today.  Keep it that way or this
+		 * breaks.
+		 */
 		err = sctp_primitive_SEND(asoc, chunk);
 		/* Did the lower layer accept the chunk? */
 		if (err)
@@ -1152,7 +1155,7 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	}
 
 	sctp_datamsg_free(datamsg);
-	if (err) 
+	if (err)
 		goto out_free;
 	else
 		err = msg_len;
@@ -3815,7 +3818,7 @@ static void sctp_sock_migrate(struct sock *oldsk, struct sock *newsk,
 
 	/* If the association on the newsk is already closed before accept()
 	 * is called, set RCV_SHUTDOWN flag.
-	 */ 
+	 */
 	if (sctp_state(assoc, CLOSED) && sctp_style(newsk, TCP))
 		newsk->shutdown |= RCV_SHUTDOWN;
 

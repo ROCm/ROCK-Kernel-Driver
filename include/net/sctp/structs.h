@@ -450,7 +450,7 @@ static inline __u16 sctp_ssn_next(struct sctp_stream *stream, __u16 id)
 }
 
 /* Structure to track chunk fragments that have been acked, but peer
- * fragments of the same message have not.  
+ * fragments of the same message have not.
  */
 struct sctp_datamsg {
 	/* Chunks waiting to be submitted to lower layer. */
@@ -459,9 +459,13 @@ struct sctp_datamsg {
 	struct list_head track;
 	/* Reference counting. */
 	atomic_t refcnt;
+	/* When is this message no longer interesting to the peer? */
+	unsigned long expires_at; 
 	/* Did the messenge fail to send? */
 	int send_error;
 	char send_failed;
+	/* Control whether fragments from this message can expire. */
+	char can_expire;
 };
 
 struct sctp_datamsg *sctp_datamsg_from_user(struct sctp_association *,
@@ -473,6 +477,9 @@ void sctp_datamsg_hold(struct sctp_datamsg *);
 void sctp_datamsg_free(struct sctp_datamsg *);
 void sctp_datamsg_track(struct sctp_chunk *);
 void sctp_datamsg_assign(struct sctp_datamsg *, struct sctp_chunk *);
+void sctp_datamsg_fail(struct sctp_chunk *, int error);
+int sctp_datamsg_expires(struct sctp_chunk *);
+
 
 /* RFC2960 1.4 Key Terms
  *
@@ -545,18 +552,6 @@ struct sctp_chunk {
 	/* We fill this in if we are calculating RTT. */
 	unsigned long sent_at;
 
-	__u8 rtt_in_progress;  /* Is this chunk used for RTT calculation? */
-	__u8 resent;           /* Has this chunk ever been retransmitted. */
-	__u8 has_tsn;          /* Does this chunk have a TSN yet? */
-	__u8 has_ssn;          /* Does this chunk have a SSN yet? */
-	__u8 singleton;        /* Was this the only chunk in the packet? */
-	__u8 end_of_packet;    /* Was this the last chunk in the packet? */
-	__u8 ecn_ce_done;      /* Have we processed the ECN CE bit? */
-	__u8 pdiscard;	       /* Discard the whole packet now? */
-	__u8 tsn_gap_acked;	  /* Is this chunk acked by a GAP ACK? */
-	__u8 fast_retransmit;    /* Is this chunk fast retransmitted? */
-	__u8 tsn_missing_report; /* Data chunk missing counter. */
-
 	/* What is the origin IP address for this chunk?  */
 	union sctp_addr source;
 	/* Destination address for this chunk. */
@@ -570,6 +565,18 @@ struct sctp_chunk {
 	 * go.  It is NULL if we have no preference.
 	 */
 	struct sctp_transport *transport;
+
+	__u8 rtt_in_progress;	/* Is this chunk used for RTT calculation? */
+	__u8 resent;		/* Has this chunk ever been retransmitted. */
+	__u8 has_tsn;		/* Does this chunk have a TSN yet? */
+	__u8 has_ssn;		/* Does this chunk have a SSN yet? */
+	__u8 singleton;		/* Was this the only chunk in the packet? */
+	__u8 end_of_packet;	/* Was this the last chunk in the packet? */
+	__u8 ecn_ce_done;	/* Have we processed the ECN CE bit? */
+	__u8 pdiscard;		/* Discard the whole packet now? */
+	__u8 tsn_gap_acked;	/* Is this chunk acked by a GAP ACK? */
+	__u8 fast_retransmit;	 /* Is this chunk fast retransmitted? */
+	__u8 tsn_missing_report; /* Data chunk missing counter. */
 };
 
 void sctp_chunk_hold(struct sctp_chunk *);
@@ -580,10 +587,10 @@ struct sctp_chunk *sctp_make_chunk(const struct sctp_association *, __u8 type,
 				   __u8 flags, int size);
 void sctp_chunk_free(struct sctp_chunk *);
 void  *sctp_addto_chunk(struct sctp_chunk *, int len, const void *data);
-struct sctp_chunk *sctp_chunkify(struct sk_buff *, 
+struct sctp_chunk *sctp_chunkify(struct sk_buff *,
 				 const struct sctp_association *,
 				 struct sock *);
-void sctp_init_addrs(struct sctp_chunk *, union sctp_addr *, 
+void sctp_init_addrs(struct sctp_chunk *, union sctp_addr *,
 		     union sctp_addr *);
 const union sctp_addr *sctp_source(const struct sctp_chunk *chunk);
 
@@ -847,7 +854,7 @@ struct sctp_transport {
 
 		/* A flag which indicates the occurrence of a changeover */
 		char changeover_active;
-	
+
 		/* A glag which indicates whether the change of primary is
 		 * the first switch to this destination address during an
 		 * active switch.
@@ -1024,7 +1031,7 @@ struct sctp_bind_addr {
 struct sctp_bind_addr *sctp_bind_addr_new(int gfp_mask);
 void sctp_bind_addr_init(struct sctp_bind_addr *, __u16 port);
 void sctp_bind_addr_free(struct sctp_bind_addr *);
-int sctp_bind_addr_copy(struct sctp_bind_addr *dest, 
+int sctp_bind_addr_copy(struct sctp_bind_addr *dest,
 			const struct sctp_bind_addr *src,
 			sctp_scope_t scope, int gfp,int flags);
 int sctp_add_bind_addr(struct sctp_bind_addr *, union sctp_addr *,
@@ -1613,7 +1620,7 @@ struct sctp_association {
 	/* Need to send an ECNE Chunk? */
 	char need_ecne;
 
-	/* Is it a temporary association? */ 
+	/* Is it a temporary association? */
 	char temp;
 };
 

@@ -55,8 +55,8 @@ void sctp_datamsg_init(struct sctp_datamsg *msg)
 	atomic_set(&msg->refcnt, 1);
 	msg->send_failed = 0;
 	msg->send_error = 0;
+	msg->can_expire = 0;
 	INIT_LIST_HEAD(&msg->chunks);
-	INIT_LIST_HEAD(&msg->track);
 }
 
 /* Allocate and initialize datamsg. */
@@ -84,7 +84,7 @@ static void sctp_datamsg_destroy(struct sctp_datamsg *msg)
 	notify = msg->send_failed ? -1 : 0;
 
 	/* Release all references. */
-	list_for_each_safe(pos, temp, &msg->track) {
+	list_for_each_safe(pos, temp, &msg->chunks) {
 		list_del(pos);
 		chunk = list_entry(pos, struct sctp_chunk, frag_list);
 		/* Check whether we _really_ need to notify. */
@@ -94,7 +94,7 @@ static void sctp_datamsg_destroy(struct sctp_datamsg *msg)
 				error = msg->send_error;
 			else
 				error = asoc->outqueue.error;
-				
+
 			sp = sctp_sk(asoc->base.sk);
 			notify = sctp_ulpevent_type_enabled(SCTP_SEND_FAILED,
 							    &sp->subscribe);
@@ -107,8 +107,8 @@ static void sctp_datamsg_destroy(struct sctp_datamsg *msg)
 				sent = SCTP_DATA_SENT;
 			else
 				sent = SCTP_DATA_UNSENT;
-		       
-			ev = sctp_ulpevent_make_send_failed(asoc, chunk, sent, 
+
+			ev = sctp_ulpevent_make_send_failed(asoc, chunk, sent,
 							    error, GFP_ATOMIC);
 			if (ev)
 				sctp_ulpq_tail_event(&asoc->ulpq, ev);
@@ -146,7 +146,6 @@ void sctp_datamsg_free(struct sctp_datamsg *msg)
 void sctp_datamsg_track(struct sctp_chunk *chunk)
 {
 	sctp_chunk_hold(chunk);
-	list_add_tail(&chunk->frag_list, &chunk->msg->track);
 }
 
 /* Assign a chunk to this datamsg. */
@@ -179,6 +178,20 @@ struct sctp_datamsg *sctp_datamsg_from_user(struct sctp_association *asoc,
 	if (!msg)
 		return NULL;
 
+	/* Note: Calculate this outside of the loop, so that all fragments
+	 * have the same expiration.
+	 */
+	if (sinfo->sinfo_timetolive) {
+		struct timeval tv;
+		__u32 ttl = sinfo->sinfo_timetolive;
+
+		/* sinfo_timetolive is in milliseconds */
+		tv.tv_sec = ttl / 1000;
+		tv.tv_usec = ttl % 1000 * 1000;
+		msg->expires_at = jiffies + timeval_to_jiffies(&tv);
+		msg->can_expire = 1;
+	}
+
 	/* What is a reasonable fragmentation point right now? */
 	max = asoc->pmtu;
 	if (max < SCTP_MIN_PMTU)
@@ -191,7 +204,6 @@ struct sctp_datamsg *sctp_datamsg_from_user(struct sctp_association *asoc,
 
 	/* Subtract out the overhead of a data chunk header. */
 	max -= sizeof(struct sctp_data_chunk);
-
 	whole = 0;
 
 	/* If user has specified smaller fragmentation, make it so. */
@@ -288,4 +300,28 @@ errout:
 	}
 	sctp_datamsg_free(msg);
 	return NULL;
+}
+
+/* Check whether this message has expired. */
+int sctp_datamsg_expires(struct sctp_chunk *chunk)
+{
+	struct sctp_datamsg *msg = chunk->msg;
+
+	/* FIXME: When PR-SCTP is supported we can make this
+	 * check more lenient.
+	 */
+	if (!msg->can_expire)
+		return 0;
+
+	if (time_after(jiffies, msg->expires_at))
+		return 1;
+
+	return 0;
+}
+
+/* This chunk (and consequently entire message) has failed in its sending. */
+void sctp_datamsg_fail(struct sctp_chunk *chunk, int error)
+{
+	chunk->msg->send_failed = 1;
+	chunk->msg->send_error = error;
 }
