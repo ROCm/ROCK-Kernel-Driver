@@ -267,7 +267,7 @@ nfsd4_putrootfh(struct svc_rqst *rqstp, struct svc_fh *current_fh)
 	status = exp_pseudoroot(rqstp->rq_client, current_fh,
 			      &rqstp->rq_chandle);
 	if (!status)
-		status = nfsd_setuser(rqstp, current_fh->fh_export);
+		status = nfserrno(nfsd_setuser(rqstp, current_fh->fh_export));
 	return status;
 }
 
