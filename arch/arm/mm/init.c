@@ -77,7 +77,7 @@ void show_mem(void)
 			else if (!page_count(page))
 				free++;
 			else
-				shared += atomic_read(&page->count) - 1;
+				shared += page_count(page) - 1;
 			page++;
 		} while (page < end);
 	}

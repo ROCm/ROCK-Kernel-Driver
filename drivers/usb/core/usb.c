@@ -1483,6 +1483,16 @@ static int usb_device_resume(struct device *dev)
 	return 0;
 }
 
+void usb_uninterruptible_sleep_ms(int msecs)
+{
+	long timeout = msecs_to_jiffies(msecs);
+	
+	while(timeout) {
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		timeout = schedule_timeout(timeout);
+	}
+}
+
 struct bus_type usb_bus_type = {
 	.name =		"usb",
 	.match =	usb_device_match,
@@ -1600,6 +1610,7 @@ EXPORT_SYMBOL(usb_reset_device);
 EXPORT_SYMBOL(usb_disconnect);
 
 EXPORT_SYMBOL(__usb_get_extra_descriptor);
+EXPORT_SYMBOL(usb_uninterruptible_sleep_ms);
 
 EXPORT_SYMBOL(usb_find_device);
 EXPORT_SYMBOL(usb_get_current_frame_number);

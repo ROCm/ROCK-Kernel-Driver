@@ -127,8 +127,9 @@ static int ohci_pci_suspend (struct usb_hcd *hcd, u32 state)
 #ifdef	CONFIG_USB_SUSPEND
 	(void) usb_suspend_device (hcd->self.root_hub);
 #else
-	/* FIXME lock root hub */
+	down (&hcd->self.root_hub->serialize);
 	(void) ohci_hub_suspend (hcd);
+	up (&hcd->self.root_hub->serialize);
 #endif
 
 	/* let things settle down a bit */

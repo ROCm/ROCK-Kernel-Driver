@@ -640,7 +640,7 @@ pci_generic_prep_mwi(struct pci_dev *dev)
 	if (cacheline_size == pci_cache_line_size)
 		return 0;
 
-	printk(KERN_WARNING "PCI: cache line size of %d is not supported "
+	printk(KERN_DEBUG "PCI: cache line size of %d is not supported "
 	       "by device %s\n", pci_cache_line_size << 2, pci_name(dev));
 
 	return -EINVAL;

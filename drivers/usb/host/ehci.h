@@ -596,12 +596,10 @@ ehci_port_speed(struct ehci_hcd *ehci, unsigned int portsc)
 
 /*-------------------------------------------------------------------------*/
 
-#define	MSEC_TO_JIFFIES(msec) ((HZ * (msec) + 999) / 1000)
-
-static inline void msec_delay(int msec)
+static inline void msec_delay(unsigned msec)
 {
 	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(MSEC_TO_JIFFIES(msec));
+	schedule_timeout(msecs_to_jiffies(msec));
 }
 
 #ifndef DEBUG

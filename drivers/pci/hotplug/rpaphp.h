@@ -62,8 +62,6 @@ extern int debug;
 #define info(format, arg...) printk(KERN_INFO "%s: " format, MY_NAME , ## arg)
 #define warn(format, arg...) printk(KERN_WARNING "%s: " format, MY_NAME , ## arg)
 
-#define SLOT_MAGIC	0x67267322
-
 /* slot types */
 #define VIO_DEV	1
 #define PCI_DEV	2
@@ -79,7 +77,6 @@ extern int debug;
  * struct slot - slot information for each *physical* slot
  */
 struct slot {
-	u32 magic;
 	int state;
 	u32 index;
 	u32 type;

@@ -22,6 +22,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/version.h>
@@ -51,7 +52,7 @@
 #define DEBUG if (rndis_debug) printk 
 static int rndis_debug = 0;
 
-MODULE_PARM (rndis_debug, "i");
+module_param (rndis_debug, bool, 0);
 MODULE_PARM_DESC (rndis_debug, "enable debugging");
 
 #else
@@ -77,44 +78,6 @@ static int rndis_keepalive_response (int configNr,
 				     rndis_keepalive_msg_type *buf);
 
 static rndis_resp_t *rndis_add_response (int configNr, u32 length);
-
-/* helper functions */
-static u32 devFlags2currentFilter (struct net_device *dev)
-{
-	u32 filter = 0;
-	
-	if (!dev) return 0;
-	
-	if (dev->flags & IFF_MULTICAST) 
-	    filter |= NDIS_PACKET_TYPE_MULTICAST;
-	if (dev->flags & IFF_BROADCAST)
-	    filter |= NDIS_PACKET_TYPE_BROADCAST;
-	if (dev->flags & IFF_ALLMULTI)
-	    filter |= NDIS_PACKET_TYPE_ALL_MULTICAST;
-	if (dev->flags & IFF_PROMISC)
-	    filter |= NDIS_PACKET_TYPE_PROMISCUOUS;
-	
-	return filter;
-}
-
-static void currentFilter2devFlags (u32 currentFilter, struct net_device *dev)
-{
-	/* FIXME the filter is supposed to control what gets
-	 * forwarded from gadget to host; but dev->flags controls
-	 * reporting from host to gadget ...
-	 */
-#if 0
-	if (!dev) return;
-	if (currentFilter & NDIS_PACKET_TYPE_MULTICAST)
-	    dev->flags |= IFF_MULTICAST;
-	if (currentFilter & NDIS_PACKET_TYPE_BROADCAST)
-	    dev->flags |= IFF_BROADCAST;
-	if (currentFilter & NDIS_PACKET_TYPE_ALL_MULTICAST)
-	    dev->flags |= IFF_ALLMULTI;
-	if (currentFilter & NDIS_PACKET_TYPE_PROMISCUOUS)
-	    dev->flags |= IFF_PROMISC;
-#endif
-}
 
 /* FIXME OMITTED OIDs, that RNDIS-on-USB "must" support, include
  *  - power management (OID_PNP_CAPABILITIES, ...)
@@ -252,13 +215,12 @@ static int gen_ndis_query_resp (int configNr, u32 OID, rndis_resp_t *r)
 			rndis_per_dev_params [configNr].vendorDescr, length);
 		retval = 0;
 		break;
-		
+
 	/* mandatory */
 	case OID_GEN_CURRENT_PACKET_FILTER:
 		DEBUG("%s: OID_GEN_CURRENT_PACKET_FILTER\n", __FUNCTION__);
 		length = 4;
-		*((u32 *) resp + 6) = devFlags2currentFilter (
-					rndis_per_dev_params [configNr].dev);
+		*((u32 *) resp + 6) = rndis_per_dev_params[configNr].filter;
 		retval = 0;
 		break;
 		
@@ -767,16 +729,24 @@ static int gen_ndis_set_resp (u8 configNr, u32 OID, u8 *buf, u32 buf_len,
 
 	switch (OID) {
 	case OID_GEN_CURRENT_PACKET_FILTER:
-		DEBUG("%s: OID_GEN_CURRENT_PACKET_FILTER\n", __FUNCTION__);
 		params = &rndis_per_dev_params [configNr];
-		currentFilter2devFlags(cp[28], params->dev);
 		retval = 0;
+
+		/* FIXME use this NDIS_PACKET_TYPE_* bitflags to
+		 * filter packets in hard_start_xmit()
+		 * NDIS_PACKET_TYPE_x == CDC_PACKET_TYPE_x for x in:
+		 *	PROMISCUOUS, DIRECTED,
+		 *	MULTICAST, ALL_MULTICAST, BROADCAST
+		 */
+		params->filter = *(u32 *)buf;
+		DEBUG("%s: OID_GEN_CURRENT_PACKET_FILTER %08x\n",
+			__FUNCTION__, params->filter);
 
 		/* this call has a significant side effect:  it's
 		 * what makes the packet flow start and stop, like
 		 * activating the CDC Ethernet altsetting.
 		 */
-		if (cp[28]) {
+		if (params->filter) {
 			params->state = RNDIS_DATA_INITIALIZED;
 			netif_carrier_on(params->dev);
 			if (netif_running(params->dev))

@@ -2487,16 +2487,6 @@ config IPHASE5526
 	  To compile this driver as a module, choose M here: the module
 	  will be called iph5526.
 
-config RCPCI
-	tristate "Red Creek Hardware VPN (EXPERIMENTAL)"
-	depends on NETDEVICES && EXPERIMENTAL && PCI && !64BIT
-	help
-	  This is a driver for hardware which provides a Virtual Private
-	  Network (VPN). Say Y if you have it.
-
-	  To compile this driver as a module, choose M here: the module
-	  will be called rcpci.
-
 config SHAPER
 	tristate "Traffic Shaper (EXPERIMENTAL)"
 	depends on NETDEVICES && EXPERIMENTAL
