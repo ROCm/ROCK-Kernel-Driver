@@ -37,8 +37,9 @@
 #define BIO_BUG_ON
 #endif
 
-#define BIO_MAX_SECTORS	128
-#define BIO_MAX_SIZE	(BIO_MAX_SECTORS << 9)
+#define BIO_MAX_PAGES		(256)
+#define BIO_MAX_SIZE		(BIO_MAX_PAGES << PAGE_CACHE_SHIFT)
+#define BIO_MAX_SECTORS		(BIO_MAX_SIZE >> 9)
 
 /*
  * was unsigned short, but we might as well be ready for > 64kB I/O pages
@@ -101,6 +102,7 @@ struct bio {
 #define BIO_EOF		2	/* out-out-bounds error */
 #define BIO_SEG_VALID	3	/* nr_hw_seg valid */
 #define BIO_CLONED	4	/* doesn't own data */
+#define bio_flagged(bio, flag)	((bio)->bi_flags & (1 << (flag)))
 
 /*
  * bio bi_rw flags
@@ -123,7 +125,7 @@ struct bio {
 #define bio_offset(bio)		bio_iovec((bio))->bv_offset
 #define bio_sectors(bio)	((bio)->bi_size >> 9)
 #define bio_data(bio)		(page_address(bio_page((bio))) + bio_offset((bio)))
-#define bio_barrier(bio)	((bio)->bi_rw & (1 << BIO_BARRIER))
+#define bio_barrier(bio)	((bio)->bi_rw & (1 << BIO_RW_BARRIER))
 
 /*
  * will die
@@ -202,6 +204,8 @@ extern struct bio *bio_clone(struct bio *, int);
 extern struct bio *bio_copy(struct bio *, int, int);
 
 extern inline void bio_init(struct bio *);
+
+extern int bio_add_page(struct bio *, struct page *, unsigned int,unsigned int);
 
 #ifdef CONFIG_HIGHMEM
 /*

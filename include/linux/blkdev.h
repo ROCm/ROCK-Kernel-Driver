@@ -120,6 +120,9 @@ typedef int (make_request_fn) (request_queue_t *q, struct bio *bio);
 typedef int (prep_rq_fn) (request_queue_t *, struct request *);
 typedef void (unplug_fn) (void *q);
 
+struct bio_vec;
+typedef int (merge_bvec_fn) (request_queue_t *, struct bio *, struct bio_vec *);
+
 enum blk_queue_state {
 	Queue_down,
 	Queue_up,
@@ -163,6 +166,7 @@ struct request_queue
 	make_request_fn		*make_request_fn;
 	prep_rq_fn		*prep_rq_fn;
 	unplug_fn		*unplug_fn;
+	merge_bvec_fn		*merge_bvec_fn;
 
 	struct backing_dev_info	backing_dev_info;
 
