@@ -62,6 +62,7 @@ struct cpuinfo_x86 {
 	int	fdiv_bug;
 	int	f00f_bug;
 	int	coma_bug;
+	int	x86_cache_alignment;
 	unsigned long loops_per_jiffy;
 } __attribute__((__aligned__(SMP_CACHE_BYTES)));
 
