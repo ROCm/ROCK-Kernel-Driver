@@ -633,5 +633,7 @@ EXPORT_SYMBOL(ethtool_op_get_link);
 EXPORT_SYMBOL(ethtool_op_get_tx_csum);
 EXPORT_SYMBOL(ethtool_op_get_sg);
 EXPORT_SYMBOL(ethtool_op_set_sg);
+EXPORT_SYMBOL(ethtool_op_get_tso);
+EXPORT_SYMBOL(ethtool_op_set_tso);
 
 #endif  /* CONFIG_NET */
