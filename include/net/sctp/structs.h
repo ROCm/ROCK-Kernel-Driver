@@ -1360,6 +1360,9 @@ struct SCTP_association {
 	 */
 	__u32 rwnd;
 
+	/* This is the last advertised value of rwnd over a SACK chunk. */
+	__u32 a_rwnd;
+
 	/* Number of bytes by which the rwnd has slopped.  The rwnd is allowed
 	 * to slop over a maximum of the association's frag_point.
 	 */

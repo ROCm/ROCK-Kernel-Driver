@@ -186,6 +186,8 @@ sctp_association_t *sctp_association_init(sctp_association_t *asoc,
 	else
 		asoc->rwnd = sk->rcvbuf;
 
+	asoc->a_rwnd = 0;
+
 	asoc->rwnd_over = 0;
 
 	/* Use my own max window until I learn something better.  */

@@ -737,6 +737,9 @@ int sctp_gen_sack(sctp_association_t *asoc, int force, sctp_cmd_seq_t *commands)
 		if (!sack)
 			goto nomem;
 
+		/* Update the last advertised rwnd value. */
+		asoc->a_rwnd = asoc->rwnd;
+
 		asoc->peer.sack_needed = 0;
 		asoc->peer.next_dup_tsn = 0;
 
