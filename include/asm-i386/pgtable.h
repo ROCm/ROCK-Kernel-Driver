@@ -139,9 +139,6 @@ extern void pgtable_cache_init(void);
 #define __PAGE_KERNEL_RO \
 	(_PAGE_PRESENT | _PAGE_DIRTY | _PAGE_ACCESSED)
 
-#ifdef CONFIG_X86_PGE
-# define MAKE_GLOBAL(x) __pgprot((x) | _PAGE_GLOBAL)
-#else
 # define MAKE_GLOBAL(x)						\
 	({							\
 		pgprot_t __ret;					\
@@ -152,7 +149,6 @@ extern void pgtable_cache_init(void);
 			__ret = __pgprot(x);			\
 		__ret;						\
 	})
-#endif
 
 #define PAGE_KERNEL MAKE_GLOBAL(__PAGE_KERNEL)
 #define PAGE_KERNEL_RO MAKE_GLOBAL(__PAGE_KERNEL_RO)
