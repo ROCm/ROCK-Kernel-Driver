@@ -180,7 +180,6 @@ static int dummy_bprm_alloc_security (struct linux_binprm *bprm)
 
 static void dummy_bprm_free_security (struct linux_binprm *bprm)
 {
-	dummy_capget(current, &current->cap_effective, &current->cap_inheritable, &current->cap_permitted);
 	return;
 }
 
@@ -197,6 +196,8 @@ static void dummy_bprm_apply_creds (struct linux_binprm *bprm, int unsafe)
 
 	current->suid = current->euid = current->fsuid = bprm->e_uid;
 	current->sgid = current->egid = current->fsgid = bprm->e_gid;
+
+	dummy_capget(current, &current->cap_effective, &current->cap_inheritable, &current->cap_permitted);
 }
 
 static int dummy_bprm_set_security (struct linux_binprm *bprm)
