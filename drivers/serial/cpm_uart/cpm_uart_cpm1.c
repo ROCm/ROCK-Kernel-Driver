@@ -82,10 +82,17 @@ void cpm_line_cr_cmd(int line, int cmd)
 void smc1_lineif(struct uart_cpm_port *pinfo)
 {
 	volatile cpm8xx_t *cp = cpmp;
+	unsigned int iobits = 0x000000c0;
 
-	cp->cp_pbpar |= 0x000000c0;
-	cp->cp_pbdir &= ~0x000000c0;
-	cp->cp_pbodr &= ~0x000000c0;
+	if (!pinfo->is_portb) {
+		cp->cp_pbpar |= iobits;
+		cp->cp_pbdir &= ~iobits;
+		cp->cp_pbodr &= ~iobits;
+	} else {
+		((immap_t *)IMAP_ADDR)->im_ioport.iop_papar |= iobits;
+		((immap_t *)IMAP_ADDR)->im_ioport.iop_padir &= ~iobits;
+		((immap_t *)IMAP_ADDR)->im_ioport.iop_paodr &= ~iobits;
+	}
 
 	pinfo->brg = 1;
 }
@@ -194,8 +201,16 @@ int cpm_uart_init_portdesc(void)
 	cpm_uart_nr = 0;
 #ifdef CONFIG_SERIAL_CPM_SMC1
 	cpm_uart_ports[UART_SMC1].smcp = &cpmp->cp_smc[0];
+/*
+ *  Is SMC1 being relocated?
+ */
+# ifdef CONFIG_I2C_SPI_SMC1_UCODE_PATCH
+	cpm_uart_ports[UART_SMC1].smcup =
+	    (smc_uart_t *) & cpmp->cp_dparam[0x3C0];
+# else
 	cpm_uart_ports[UART_SMC1].smcup =
 	    (smc_uart_t *) & cpmp->cp_dparam[PROFF_SMC1];
+# endif
 	cpm_uart_ports[UART_SMC1].port.mapbase =
 	    (unsigned long)&cpmp->cp_smc[0];
 	cpm_uart_ports[UART_SMC1].smcp->smc_smcm |= (SMCM_RX | SMCM_TX);
