@@ -195,16 +195,6 @@ static __init int broken_toshiba_keyboard(struct dmi_blacklist *d)
 	return 0;
 }
 
-/*
- * Toshiba fails to preserve interrupts over S1
- */
-
-static __init int init_ints_after_s1(struct dmi_blacklist *d)
-{
-	printk(KERN_WARNING "Toshiba with broken S1 detected.\n");
-	dmi_broken |= BROKEN_INIT_AFTER_S1;
-	return 0;
-}
 
 #ifdef CONFIG_ACPI_SLEEP
 static __init int reset_videomode_after_s3(struct dmi_blacklist *d)
@@ -323,10 +313,6 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			} },
 
 	{ broken_toshiba_keyboard, "Toshiba Satellite 4030cdt", { /* Keyboard generates spurious repeats */
-			MATCH(DMI_PRODUCT_NAME, "S4030CDT/4.3"),
-			NO_MATCH, NO_MATCH, NO_MATCH
-			} },
-	{ init_ints_after_s1, "Toshiba Satellite 4030cdt", { /* Reinitialization of 8259 is needed after S1 resume */
 			MATCH(DMI_PRODUCT_NAME, "S4030CDT/4.3"),
 			NO_MATCH, NO_MATCH, NO_MATCH
 			} },
