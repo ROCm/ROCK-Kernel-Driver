@@ -445,7 +445,7 @@ static inline void set_recovery_timer (ide_hwif_t *hwif)
 /*
  * Do not even *think* about calling this!
  */
-static void init_hwif_data (unsigned int index)
+static void init_hwif_data(ide_hwif_t *hwif, int index)
 {
 	static const byte ide_major[] = {
 		IDE0_MAJOR, IDE1_MAJOR, IDE2_MAJOR, IDE3_MAJOR, IDE4_MAJOR,
@@ -454,7 +454,6 @@ static void init_hwif_data (unsigned int index)
 
 	unsigned int unit;
 	hw_regs_t hw;
-	ide_hwif_t *hwif = &ide_hwifs[index];
 
 	/* bulk initialize hwif & drive info with zeros */
 	memset(hwif, 0, sizeof(ide_hwif_t));
@@ -507,7 +506,7 @@ static void init_hwif_data (unsigned int index)
 #define MAGIC_COOKIE 0x12345678
 static void __init init_ide_data (void)
 {
-	unsigned int index;
+	unsigned int h;
 	static unsigned long magic_cookie = MAGIC_COOKIE;
 
 	if (magic_cookie != MAGIC_COOKIE)
@@ -515,8 +514,8 @@ static void __init init_ide_data (void)
 	magic_cookie = 0;
 
 	/* Initialize all interface structures */
-	for (index = 0; index < MAX_HWIFS; ++index)
-		init_hwif_data(index);
+	for (h = 0; h < MAX_HWIFS; ++h)
+		init_hwif_data(&ide_hwifs[h], h);
 
 	/* Add default hw interfaces */
 	ide_init_default_hwifs();
@@ -1629,7 +1628,7 @@ void ide_dma_timeout_retry(ide_drive_t *drive)
  * But note that it can also be invoked as a result of a "sleep" operation
  * triggered by the mod_timer() call in ide_do_request.
  */
-void ide_timer_expiry (unsigned long data)
+void ide_timer_expiry(unsigned long data)
 {
 	ide_hwgroup_t	*hwgroup = (ide_hwgroup_t *) data;
 	ide_handler_t	*handler;
@@ -1667,7 +1666,7 @@ void ide_timer_expiry (unsigned long data)
 			if ((expiry = hwgroup->expiry) != NULL) {
 				/* continue */
 				if ((wait = expiry(drive)) != 0) {
-					/* reset timer */
+					/* reengage timer */
 					hwgroup->timer.expires  = jiffies + wait;
 					add_timer(&hwgroup->timer);
 					spin_unlock_irqrestore(&ide_lock, flags);
@@ -1869,13 +1868,13 @@ out_lock:
  */
 ide_drive_t *get_info_ptr (kdev_t i_rdev)
 {
-	int		major = major(i_rdev);
-	unsigned int	h;
+	unsigned int major = major(i_rdev);
+	int h;
 
 	for (h = 0; h < MAX_HWIFS; ++h) {
 		ide_hwif_t  *hwif = &ide_hwifs[h];
 		if (hwif->present && major == hwif->major) {
-			unsigned unit = DEVICE_NR(i_rdev);
+			int unit = DEVICE_NR(i_rdev);
 			if (unit < MAX_DRIVES) {
 				ide_drive_t *drive = &hwif->drives[unit];
 				if (drive->present)
@@ -2012,13 +2011,13 @@ void revalidate_drives(void)
 {
 	ide_hwif_t *hwif;
 	ide_drive_t *drive;
-	int index;
-	int unit;
+	int h;
 
-	for (index = 0; index < MAX_HWIFS; ++index) {
-		hwif = &ide_hwifs[index];
+	for (h = 0; h < MAX_HWIFS; ++h) {
+		int unit;
+		hwif = &ide_hwifs[h];
 		for (unit = 0; unit < MAX_DRIVES; ++unit) {
-			drive = &ide_hwifs[index].drives[unit];
+			drive = &ide_hwifs[h].drives[unit];
 			if (drive->revalidate) {
 				drive->revalidate = 0;
 				if (!initializing)
@@ -2164,22 +2163,19 @@ jump_eight:
 #endif
 }
 
-void ide_unregister (unsigned int index)
+void ide_unregister(ide_hwif_t *hwif)
 {
 	struct gendisk *gd;
 	ide_drive_t *drive, *d;
-	ide_hwif_t *hwif, *g;
+	ide_hwif_t *g;
 	ide_hwgroup_t *hwgroup;
 	int irq_count = 0, unit, i;
 	unsigned long flags;
 	unsigned int p, minor;
 	ide_hwif_t old_hwif;
 
-	if (index >= MAX_HWIFS)
-		return;
 	save_flags(flags);	/* all CPUs */
 	cli();			/* all CPUs */
-	hwif = &ide_hwifs[index];
 	if (!hwif->present)
 		goto abort;
 	put_device(&hwif->device);
@@ -2202,7 +2198,7 @@ void ide_unregister (unsigned int index)
 	/*
 	 * All clear?  Then blow away the buffer cache
 	 */
-	sti();
+	spin_lock_irqsave(&ide_lock, flags);
 	for (unit = 0; unit < MAX_DRIVES; ++unit) {
 		drive = &hwif->drives[unit];
 		if (!drive->present)
@@ -2214,11 +2210,13 @@ void ide_unregister (unsigned int index)
 				invalidate_device(devp, 0);
 			}
 		}
-#ifdef CONFIG_PROC_FS
-		destroy_proc_ide_drives(hwif);
-#endif
+
 	}
-	cli();
+
+#ifdef CONFIG_PROC_FS
+	destroy_proc_ide_drives(hwif);
+#endif
+	spin_unlock_irqrestore(&ide_lock, flags);
 	hwgroup = hwif->hwgroup;
 
 	/*
@@ -2271,11 +2269,8 @@ void ide_unregister (unsigned int index)
 		hwgroup->hwif = HWIF(hwgroup->drive);
 
 #if defined(CONFIG_BLK_DEV_IDEDMA) && !defined(CONFIG_DMA_NONPCI)
-	if (hwif->dma_base) {
-		(void) ide_release_dma(hwif);
-		hwif->dma_base = 0;
-	}
-#endif /* (CONFIG_BLK_DEV_IDEDMA) && !(CONFIG_DMA_NONPCI) */
+	ide_release_dma(hwif);
+#endif
 
 	/*
 	 * Remove us from the kernel's knowledge
@@ -2297,8 +2292,14 @@ void ide_unregister (unsigned int index)
 		kfree(gd);
 		hwif->gd = NULL;
 	}
+
+	/*
+	 * Reinitialize the hwif handler, but preserve any special methods for
+	 * it.
+	 */
+
 	old_hwif		= *hwif;
-	init_hwif_data(index);	/* restore hwif data to pristine status */
+	init_hwif_data(hwif, hwif->index);
 	hwif->hwgroup		= old_hwif.hwgroup;
 	hwif->tuneproc		= old_hwif.tuneproc;
 	hwif->speedproc		= old_hwif.speedproc;
@@ -2390,12 +2391,11 @@ int ide_register_hw(hw_regs_t *hw, ide_hwif_t **hwifp)
 				goto found;
 		}
 		for (index = 0; index < MAX_HWIFS; index++)
-			ide_unregister(index);
+			ide_unregister(&ide_hwifs[index]);
 	} while (retry--);
 	return -1;
 found:
-	if (hwif->present)
-		ide_unregister(index);
+	ide_unregister(hwif);
 	if (hwif->present)
 		return -1;
 	memcpy(&hwif->hw, hw, sizeof(*hw));
@@ -2756,21 +2756,6 @@ static int ide_ioctl (struct inode *inode, struct file *file,
 				return -EACCES;
 			return ide_task_ioctl(drive, inode, file, cmd, arg);
 
-		case HDIO_SCAN_HWIF:
-		{
-			int args[3];
-			if (!capable(CAP_SYS_ADMIN)) return -EACCES;
-			if (copy_from_user(args, (void *)arg, 3 * sizeof(int)))
-				return -EFAULT;
-			if (ide_register(args[0], args[1], args[2]) == -1)
-				return -EIO;
-			return 0;
-		}
-	        case HDIO_UNREGISTER_HWIF:
-			if (!capable(CAP_SYS_ADMIN)) return -EACCES;
-			/* (arg > MAX_HWIFS) checked in function */
-			ide_unregister(arg);
-			return 0;
 		case HDIO_SET_NICE:
 			if (!capable(CAP_SYS_ADMIN)) return -EACCES;
 			if (arg != (arg & ((1 << IDE_NICE_DSC_OVERLAP) | (1 << IDE_NICE_1))))
@@ -3479,6 +3464,7 @@ struct block_device_operations ide_fops[] = {{
 	revalidate:		ide_revalidate_disk
 }};
 
+EXPORT_SYMBOL(ide_fops);
 EXPORT_SYMBOL(ide_hwifs);
 EXPORT_SYMBOL(ide_spin_wait_hwgroup);
 EXPORT_SYMBOL(revalidate_drives);
@@ -3490,7 +3476,6 @@ devfs_handle_t ide_devfs_handle;
 
 EXPORT_SYMBOL(ide_lock);
 EXPORT_SYMBOL(drive_is_flashcard);
-EXPORT_SYMBOL(ide_timer_expiry);
 EXPORT_SYMBOL(ide_intr);
 EXPORT_SYMBOL(ide_get_queue);
 EXPORT_SYMBOL(ide_add_generic_settings);
@@ -3584,7 +3569,7 @@ static struct notifier_block ide_notifier = {
  */
 static int __init ata_module_init(void)
 {
-	int i;
+	int h;
 
 	printk(KERN_INFO "Uniform Multi-Platform E-IDE driver ver.:" VERSION "\n");
 
@@ -3714,8 +3699,8 @@ static int __init ata_module_init(void)
 
 	initializing = 0;
 
-	for (i = 0; i < MAX_HWIFS; ++i) {
-		ide_hwif_t  *hwif = &ide_hwifs[i];
+	for (h = 0; h < MAX_HWIFS; ++h) {
+		ide_hwif_t  *hwif = &ide_hwifs[h];
 		if (hwif->present)
 			ide_geninit(hwif);
 	}
@@ -3750,21 +3735,17 @@ static int __init init_ata (void)
 
 static void __exit cleanup_ata (void)
 {
-	int index;
+	int h;
 
 	unregister_reboot_notifier(&ide_notifier);
-	for (index = 0; index < MAX_HWIFS; ++index) {
-		ide_unregister(index);
-# if defined(CONFIG_BLK_DEV_IDEDMA) && !defined(CONFIG_DMA_NONPCI)
-		if (ide_hwifs[index].dma_base)
-			ide_release_dma(&ide_hwifs[index]);
-# endif /* (CONFIG_BLK_DEV_IDEDMA) && !(CONFIG_DMA_NONPCI) */
+	for (h = 0; h < MAX_HWIFS; ++h) {
+		ide_unregister(&ide_hwifs[h]);
 	}
 
 # ifdef CONFIG_PROC_FS
 	proc_ide_destroy();
 # endif
-	devfs_unregister (ide_devfs_handle);
+	devfs_unregister(ide_devfs_handle);
 }
 
 module_init(init_ata);

@@ -242,8 +242,7 @@ typedef struct hw_regs_s {
 /*
  * Register new hardware with ide
  */
-int ide_register_hw(hw_regs_t *hw, struct hwif_s **hwifp);
-
+extern int ide_register_hw(hw_regs_t *hw, struct hwif_s **hwifp);
 /*
  * Set up hw_regs_t structure before calling ide_register_hw (optional)
  */
@@ -505,6 +504,8 @@ typedef struct hwif_s {
 	byte		bus_state;	/* power state of the IDE bus */
 	struct device	device;		/* global device tree handle */
 } ide_hwif_t;
+
+extern void ide_unregister(ide_hwif_t *hwif);
 
 /*
  * Status returned from various ide_ functions

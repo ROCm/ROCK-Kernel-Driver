@@ -6,15 +6,8 @@
  */
 
 /*
- *  This module provides support for automatic detection and
- *  configuration of all PCI IDE interfaces present in a system.
- */
-
-/*
- * Chipsets that are on the IDE_IGNORE list because of problems of not being
- * set at compile time.
- *
- * CONFIG_BLK_DEV_PDC202XX
+ *  This module provides support for automatic detection and configuration of
+ *  all PCI ATA host chip chanells interfaces present in a system.
  */
 
 #include <linux/config.h>
@@ -34,8 +27,14 @@
 #define PCI_VENDOR_ID_HINT 0x3388
 #define PCI_DEVICE_ID_HINT 0x8013
 
-#define	IDE_IGNORE	((void *)-1)
-#define IDE_NO_DRIVER	((void *)-2)
+/*
+ * Some combi chips, which can be used on the PCI bus or the VL bus can be in
+ * some systems acessed either through the PCI config space or through the
+ * hosts IO bus.  If the corresponding initialization driver is using the host
+ * IO space to deal with them please define the following.
+ */
+
+#define	ATA_PCI_IGNORE	((void *)-1)
 
 #ifdef CONFIG_BLK_DEV_AEC62XX
 extern unsigned int pci_init_aec62xx(struct pci_dev *);
@@ -306,7 +305,7 @@ static ide_pci_device_t pci_chipsets[] __initdata = {
 	 * but which still need some generic quirk handling.
 	 */
 	{PCI_VENDOR_ID_PCTECH, PCI_DEVICE_ID_PCTECH_SAMURAI_IDE, NULL, NULL, NULL, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, 0 },
-	{PCI_VENDOR_ID_CMD, PCI_DEVICE_ID_CMD_640, NULL, NULL, IDE_IGNORE, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, 0 },
+	{PCI_VENDOR_ID_CMD, PCI_DEVICE_ID_CMD_640, NULL, NULL, ATA_PCI_IGNORE, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, 0 },
 	{PCI_VENDOR_ID_NS, PCI_DEVICE_ID_NS_87410, NULL, NULL, NULL, NULL, {{0x43,0x08,0x08}, {0x47,0x08,0x08}}, ON_BOARD, 0, 0 },
 	{PCI_VENDOR_ID_HINT, PCI_DEVICE_ID_HINT, NULL, NULL, NULL, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, 0 },
 	{PCI_VENDOR_ID_HOLTEK, PCI_DEVICE_ID_HOLTEK_6565, NULL, NULL, NULL, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, 0 },
@@ -314,7 +313,7 @@ static ide_pci_device_t pci_chipsets[] __initdata = {
 	{PCI_VENDOR_ID_UMC, PCI_DEVICE_ID_UMC_UM8886A, NULL, NULL, NULL, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, ATA_F_FIXIRQ },
 	{PCI_VENDOR_ID_UMC, PCI_DEVICE_ID_UMC_UM8886BF, NULL, NULL, NULL, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, ATA_F_FIXIRQ },
 	{PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C561, NULL, NULL, NULL, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, ATA_F_NOADMA },
-	{PCI_VENDOR_ID_TTI, PCI_DEVICE_ID_TTI_HPT366, NULL, NULL, IDE_NO_DRIVER, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, OFF_BOARD, 240, ATA_F_IRQ | ATA_F_HPTHACK },
+	{PCI_VENDOR_ID_TTI, PCI_DEVICE_ID_TTI_HPT366, NULL, NULL, NULL, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, OFF_BOARD, 240, ATA_F_IRQ | ATA_F_HPTHACK },
 	{0, 0, NULL, NULL, NULL, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0 }};
 
 /*
@@ -683,11 +682,6 @@ static void __init setup_pci_device(struct pci_dev *dev, ide_pci_device_t *d)
 		autodma = 1;
 #endif
 
-	if (d->init_hwif == IDE_NO_DRIVER) {
-		printk(KERN_WARNING "%s: detected chipset, but driver not compiled in!\n", dev->name);
-		d->init_hwif = NULL;
-	}
-
 	if (pci_enable_device(dev)) {
 		printk(KERN_WARNING "%s: Could not enable PCI device.\n", dev->name);
 		return;
@@ -883,11 +877,11 @@ static void __init hpt366_device_order_fixup (struct pci_dev *dev, ide_pci_devic
  * This finds all PCI IDE controllers and calls appropriate initialization
  * functions for them.
  */
-static void __init ide_scan_pcidev(struct pci_dev *dev)
+static void __init scan_pcidev(struct pci_dev *dev)
 {
 	unsigned short vendor;
 	unsigned short device;
-	ide_pci_device_t	*d;
+	ide_pci_device_t *d;
 
 	vendor = dev->vendor;
 	device = dev->device;
@@ -898,7 +892,7 @@ static void __init ide_scan_pcidev(struct pci_dev *dev)
 	while (d->vendor && !(d->vendor == vendor && d->device == device))
 		++d;
 
-	if (d->init_hwif == IDE_IGNORE)
+	if (d->init_hwif == ATA_PCI_IGNORE)
 		printk("%s: has been ignored by PCI bus scan\n", dev->name);
 	else if ((d->vendor == PCI_VENDOR_ID_OPTI && d->device == PCI_DEVICE_ID_OPTI_82C558) && !(PCI_FUNC(dev->devfn) & 1))
 		return;
@@ -927,12 +921,10 @@ void __init ide_scan_pcibus (int scan_direction)
 	struct pci_dev *dev;
 
 	if (!scan_direction) {
-		pci_for_each_dev(dev) {
-			ide_scan_pcidev(dev);
-		}
+		pci_for_each_dev(dev)
+			scan_pcidev(dev);
 	} else {
-		pci_for_each_dev_reverse(dev) {
-			ide_scan_pcidev(dev);
-		}
+		pci_for_each_dev_reverse(dev)
+			scan_pcidev(dev);
 	}
 }
