@@ -233,6 +233,11 @@ static inline int mddev_lock(mddev_t * mddev)
 	return down_interruptible(&mddev->reconfig_sem);
 }
 
+static inline void mddev_lock_uninterruptible(mddev_t * mddev)
+{
+	down(&mddev->reconfig_sem);
+}
+
 static inline int mddev_trylock(mddev_t * mddev)
 {
 	return down_trylock(&mddev->reconfig_sem);
@@ -1074,8 +1079,8 @@ repeat:
 	if (!mddev->persistent)
 		return;
 
-	printk(KERN_INFO "md: updating md%d RAID superblock on device\n",
-					mdidx(mddev));
+	printk(KERN_INFO "md: updating md%d RAID superblock on device (in sync %d)\n",
+					mdidx(mddev),mddev->in_sync);
 
 	err = 0;
 	ITERATE_RDEV(mddev,rdev,tmp) {
@@ -1514,6 +1519,8 @@ static int do_md_run(mddev_t * mddev)
 		mddev->pers = NULL;
 		return -EINVAL;
 	}
+ 	atomic_set(&mddev->writes_pending,0);
+	mddev->safemode = 0;
 	if (mddev->pers->sync_request)
 		mddev->in_sync = 0;
 	else
@@ -1545,6 +1552,7 @@ static int restart_array(mddev_t *mddev)
 		if (!mddev->ro)
 			goto out;
 
+		mddev->safemode = 0;
 		mddev->in_sync = 0;
 		md_update_sb(mddev);
 		mddev->ro = 0;
@@ -2818,6 +2826,48 @@ void md_done_sync(mddev_t *mddev, int blocks, int ok)
 }
 
 
+void md_write_start(mddev_t *mddev)
+{
+	if (mddev->safemode && !atomic_read(&mddev->writes_pending)) {
+		mddev_lock_uninterruptible(mddev);
+		atomic_inc(&mddev->writes_pending);
+		if (mddev->in_sync) {
+			mddev->in_sync = 0;
+			md_update_sb(mddev);
+		}
+		mddev_unlock(mddev);
+	} else
+		atomic_inc(&mddev->writes_pending);
+}
+
+void md_write_end(mddev_t *mddev, mdk_thread_t *thread)
+{
+	if (atomic_dec_and_test(&mddev->writes_pending) && mddev->safemode)
+		md_wakeup_thread(thread);
+}
+static inline void md_enter_safemode(mddev_t *mddev)
+{
+
+	mddev_lock_uninterruptible(mddev);
+	if (mddev->safemode && !atomic_read(&mddev->writes_pending) && !mddev->in_sync && !mddev->recovery_running) {
+		mddev->in_sync = 1;
+		md_update_sb(mddev);
+	}
+	mddev_unlock(mddev);
+}
+
+void md_handle_safemode(mddev_t *mddev)
+{
+	if (signal_pending(current)) {
+		printk(KERN_INFO "md: md%d in safe mode\n",mdidx(mddev));
+		mddev->safemode= 1;
+		flush_curr_signals();
+	}
+	if (mddev->safemode)
+		md_enter_safemode(mddev);
+}
+
+
 DECLARE_WAIT_QUEUE_HEAD(resync_wait);
 
 #define SYNC_MARKS	10
@@ -2995,6 +3045,8 @@ static void md_do_sync(void *data)
 		mddev->recovery_running = 0;
 	if (mddev->recovery_running == 0)
 		mddev->recovery_cp = MaxSector;
+	if (mddev->safemode)
+		md_enter_safemode(mddev);
 	md_recover_arrays();
 }
 
@@ -3270,6 +3322,9 @@ EXPORT_SYMBOL(unregister_md_personality);
 EXPORT_SYMBOL(md_error);
 EXPORT_SYMBOL(md_sync_acct);
 EXPORT_SYMBOL(md_done_sync);
+EXPORT_SYMBOL(md_write_start);
+EXPORT_SYMBOL(md_write_end);
+EXPORT_SYMBOL(md_handle_safemode);
 EXPORT_SYMBOL(md_register_thread);
 EXPORT_SYMBOL(md_unregister_thread);
 EXPORT_SYMBOL(md_wakeup_thread);
