@@ -680,7 +680,7 @@ static void eepro_recalc (struct net_device *dev)
 }
 
 /* prints boot-time info */
-static void eepro_print_info (struct net_device *dev)
+static void __init eepro_print_info (struct net_device *dev)
 {
 	struct eepro_local *	lp = dev->priv;
 	int			i;
