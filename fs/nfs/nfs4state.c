@@ -207,7 +207,7 @@ nfs4_put_client(struct nfs4_client *clp)
 
 int nfs4_init_client(struct nfs4_client *clp)
 {
-	int status = nfs4_proc_setclientid(clp, 0, 0);
+	int status = nfs4_proc_setclientid(clp, NFS4_CALLBACK, nfs_callback_tcpport);
 	if (status == 0)
 		status = nfs4_proc_setclientid_confirm(clp);
 	if (status == 0)
