@@ -439,7 +439,7 @@ void ia64_elf32_init(struct pt_regs *regs);
 	 | ((((sd) >> IA32_SEG_DB) & 0x1) << SEG_DB)						 \
 	 | ((((sd) >> IA32_SEG_G) & 0x1) << SEG_G))
 
-#define IA32_IOBASE	0x2000000000000000 /* Virtual address for I/O space */
+#define IA32_IOBASE	0x2000000000000000UL /* Virtual address for I/O space */
 
 #define IA32_CR0	0x80000001	/* Enable PG and PE bits */
 #define IA32_CR4	0x600		/* MMXEX and FXSR on */

@@ -344,7 +344,7 @@ restore_ia32_fpstate_live (struct _fpstate_ia32 *save)
 	__get_user(lo, (unsigned int *)&save->cw);
 	num64 = mxcsr & 0xff10;
 	num64 = (num64 << 32) | (lo & 0x1f3f);
-	fcr = (fcr & (~0xff1000001f3f)) | num64;
+	fcr = (fcr & (~0xff1000001f3fUL)) | num64;
 
 	/* setting bits 0..31 with sw and tag and 32..37 from mxcsr */
 	__get_user(lo, (unsigned int *)&save->sw);
@@ -355,21 +355,21 @@ restore_ia32_fpstate_live (struct _fpstate_ia32 *save)
 	num64 = mxcsr & 0x3f;
 	num64 = (num64 << 16) | (hi & 0xffff);
 	num64 = (num64 << 16) | (lo & 0xffff);
-	fsr = (fsr & (~0x3fffffffff)) | num64;
+	fsr = (fsr & (~0x3fffffffffUL)) | num64;
 
 	/* setting bits 0..47 with cssel and ipoff */
 	__get_user(lo, (unsigned int *)&save->ipoff);
 	__get_user(hi, (unsigned int *)&save->cssel);
 	num64 = hi & 0xffff;
 	num64 = (num64 << 32) | lo;
-	fir = (fir & (~0xffffffffffff)) | num64;
+	fir = (fir & (~0xffffffffffffUL)) | num64;
 
 	/* setting bits 0..47 with datasel and dataoff */
 	__get_user(lo, (unsigned int *)&save->dataoff);
 	__get_user(hi, (unsigned int *)&save->datasel);
 	num64 = hi & 0xffff;
 	num64 = (num64 << 32) | lo;
-	fdr = (fdr & (~0xffffffffffff)) | num64;
+	fdr = (fdr & (~0xffffffffffffUL)) | num64;
 
 	ia64_setreg(_IA64_REG_AR_FSR, fsr);
 	ia64_setreg(_IA64_REG_AR_FCR, fcr);

@@ -1763,9 +1763,9 @@ restore_ia32_fpxstate (struct task_struct *tsk, struct ia32_user_fxsr_struct *sa
 
 	__get_user(mxcsr, (unsigned int *)&save->mxcsr);
 	num64 = mxcsr & 0xff10;
-	tsk->thread.fcr = (tsk->thread.fcr & (~0xff1000000000)) | (num64<<32);
+	tsk->thread.fcr = (tsk->thread.fcr & (~0xff1000000000UL)) | (num64<<32);
 	num64 = mxcsr & 0x3f;
-	tsk->thread.fsr = (tsk->thread.fsr & (~0x3f00000000)) | (num64<<32);
+	tsk->thread.fsr = (tsk->thread.fsr & (~0x3f00000000UL)) | (num64<<32);
 
 	for (i = 0; i < 8; i++) {
 		copy_from_user(num128, &save->xmm_space[0] + 4*i, sizeof(struct _xmmreg_ia32));

@@ -833,7 +833,7 @@ access_uarea (struct task_struct *child, unsigned long addr, unsigned long *data
 		      case PT_CFM:
 			urbs_end = ia64_get_user_rbs_end(child, pt, &cfm);
 			if (write_access) {
-				if (((cfm ^ *data) & 0x3fffffffffU) != 0) {
+				if (((cfm ^ *data) & 0x3fffffffffUL) != 0) {
 					if (ia64_sync_user_rbs(child, sw,
 							       pt->ar_bspstore, urbs_end) < 0)
 						return -1;
