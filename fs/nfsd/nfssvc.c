@@ -195,7 +195,7 @@ nfsd(struct svc_rqst *rqstp)
 		 * recvfrom routine.
 		 */
 		while ((err = svc_recv(serv, rqstp,
-				       MAX_SCHEDULE_TIMEOUT)) == -EAGAIN)
+				       5*60*HZ)) == -EAGAIN)
 		    ;
 		if (err < 0)
 			break;

@@ -42,7 +42,8 @@ svc_create(struct svc_program *prog, unsigned int bufsize, unsigned int xdrsize)
 	serv->sv_xdrsize   = xdrsize;
 	INIT_LIST_HEAD(&serv->sv_threads);
 	INIT_LIST_HEAD(&serv->sv_sockets);
-	INIT_LIST_HEAD(&serv->sv_allsocks);
+	INIT_LIST_HEAD(&serv->sv_tempsocks);
+	INIT_LIST_HEAD(&serv->sv_permsocks);
 	spin_lock_init(&serv->sv_lock);
 
 	serv->sv_name      = prog->pg_name;
@@ -71,8 +72,14 @@ svc_destroy(struct svc_serv *serv)
 	} else
 		printk("svc_destroy: no threads for serv=%p!\n", serv);
 
-	while (!list_empty(&serv->sv_allsocks)) {
-		svsk = list_entry(serv->sv_allsocks.next,
+	while (!list_empty(&serv->sv_tempsocks)) {
+		svsk = list_entry(serv->sv_tempsocks.next,
+				  struct svc_sock,
+				  sk_list);
+		svc_delete_socket(svsk);
+	}
+	while (!list_empty(&serv->sv_permsocks)) {
+		svsk = list_entry(serv->sv_permsocks.next,
 				  struct svc_sock,
 				  sk_list);
 		svc_delete_socket(svsk);

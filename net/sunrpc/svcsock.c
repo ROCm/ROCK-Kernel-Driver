@@ -585,7 +585,6 @@ svc_tcp_accept(struct svc_sock *svsk)
 	 * installed the data_ready callback. 
 	 */
 	set_bit(SK_DATA, &newsvsk->sk_flags);
-	set_bit(SK_TEMP, &newsvsk->sk_flags);
 	svc_sock_enqueue(newsvsk);
 
 	if (serv->sv_stats)
@@ -781,7 +780,7 @@ svc_tcp_init(struct svc_sock *svsk)
 int
 svc_recv(struct svc_serv *serv, struct svc_rqst *rqstp, long timeout)
 {
-	struct svc_sock		*svsk;
+	struct svc_sock		*svsk =NULL;
 	int			len;
 	DECLARE_WAITQUEUE(wait, current);
 
@@ -805,7 +804,24 @@ svc_recv(struct svc_serv *serv, struct svc_rqst *rqstp, long timeout)
 		return -EINTR;
 
 	spin_lock_bh(&serv->sv_lock);
-	if ((svsk = svc_sock_dequeue(serv)) != NULL) {
+	if (!list_empty(&serv->sv_tempsocks)) {
+		svsk = list_entry(serv->sv_tempsocks.next,
+				  struct svc_sock, sk_list);
+		/* apparently the "standard" is that clients close
+		 * idle connections after 5 minutes, servers after
+		 * 6 minutes
+		 *   http://www.connectathon.org/talks96/nfstcp.pdf 
+		 */
+		if (CURRENT_TIME - svsk->sk_lastrecv < 6*60
+		    || test_bit(SK_BUSY, &svsk->sk_flags))
+			svsk = NULL;
+	}
+	if (svsk) {
+		set_bit(SK_BUSY, &svsk->sk_flags);
+		set_bit(SK_CLOSE, &svsk->sk_flags);
+		rqstp->rq_sock = svsk;
+		svsk->sk_inuse++;
+	} else if ((svsk = svc_sock_dequeue(serv)) != NULL) {
 		rqstp->rq_sock = svsk;
 		svsk->sk_inuse++;
 	} else {
@@ -843,6 +859,14 @@ svc_recv(struct svc_serv *serv, struct svc_rqst *rqstp, long timeout)
 	if (len == 0 || len == -EAGAIN) {
 		svc_sock_release(rqstp);
 		return -EAGAIN;
+	}
+	svsk->sk_lastrecv = CURRENT_TIME;
+	if (test_bit(SK_TEMP, &svsk->sk_flags)) {
+		/* push active sockets to end of list */
+		spin_lock_bh(&serv->sv_lock);
+		list_del(&svsk->sk_list);
+		list_add_tail(&svsk->sk_list, &serv->sv_tempsocks);
+		spin_unlock_bh(&serv->sv_lock);
 	}
 
 	rqstp->rq_secure  = ntohs(rqstp->rq_addr.sin_port) < 1024;
@@ -921,6 +945,7 @@ svc_setup_socket(struct svc_serv *serv, struct socket *sock,
 	svsk->sk_ostate = inet->state_change;
 	svsk->sk_odata = inet->data_ready;
 	svsk->sk_server = serv;
+	svsk->sk_lastrecv = CURRENT_TIME;
 
 	/* Initialize the socket */
 	if (sock->type == SOCK_DGRAM)
@@ -940,8 +965,15 @@ if (svsk->sk_sk == NULL)
 		return NULL;
 	}
 
+
 	spin_lock_bh(&serv->sv_lock);
-	list_add(&svsk->sk_list, &serv->sv_allsocks);
+	if (!pmap_register) {
+		set_bit(SK_TEMP, &svsk->sk_flags);
+		list_add(&svsk->sk_list, &serv->sv_tempsocks);
+	} else {
+		clear_bit(SK_TEMP, &svsk->sk_flags);
+		list_add(&svsk->sk_list, &serv->sv_permsocks);
+	}
 	spin_unlock_bh(&serv->sv_lock);
 
 	dprintk("svc: svc_setup_socket created %p (inet %p)\n",

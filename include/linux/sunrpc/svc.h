@@ -36,7 +36,8 @@ struct svc_serv {
 	unsigned int		sv_bufsz;	/* datagram buffer size */
 	unsigned int		sv_xdrsize;	/* XDR buffer size */
 
-	struct list_head	sv_allsocks;	/* all sockets */
+	struct list_head	sv_permsocks;	/* all permanent sockets */
+	struct list_head	sv_tempsocks;	/* all temporary sockets */
 
 	char *			sv_name;	/* service name */
 };
