@@ -19,6 +19,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * Alan Cox <alan@redhat.com> - Removed several careless u32/dma_addr_t errors
+ *				that broke 64bit platforms.
  */
 
 #ifndef _IPR_H
@@ -669,7 +671,7 @@ struct ipr_hcam {
 
 struct ipr_hostrcb {
 	struct ipr_hcam hcam;
-	u32 hostrcb_dma;
+	dma_addr_t hostrcb_dma;
 	struct list_head queue;
 };
 
@@ -852,7 +854,7 @@ struct ipr_ioa_cfg {
 	char cfg_table_start[8];
 #define IPR_CFG_TBL_START		"cfg"
 	struct ipr_config_table *cfg_table;
-	u32 cfg_table_dma;
+	dma_addr_t cfg_table_dma;
 
 	char resource_table_label[8];
 #define IPR_RES_TABLE_LABEL		"res_tbl"
@@ -863,12 +865,12 @@ struct ipr_ioa_cfg {
 	char ipr_hcam_label[8];
 #define IPR_HCAM_LABEL			"hcams"
 	struct ipr_hostrcb *hostrcb[IPR_NUM_HCAMS];
-	u32 hostrcb_dma[IPR_NUM_HCAMS];
+	dma_addr_t hostrcb_dma[IPR_NUM_HCAMS];
 	struct list_head hostrcb_free_q;
 	struct list_head hostrcb_pending_q;
 
 	u32 *host_rrq;
-	u32 host_rrq_dma;
+	dma_addr_t host_rrq_dma;
 #define IPR_HRRQ_REQ_RESP_HANDLE_MASK	0xfffffffc
 #define IPR_HRRQ_RESP_BIT_SET			0x00000002
 #define IPR_HRRQ_TOGGLE_BIT				0x00000001
@@ -907,7 +909,7 @@ struct ipr_ioa_cfg {
 	enum ipr_sdt_state sdt_state;
 
 	struct ipr_misc_cbs *vpd_cbs;
-	u32 vpd_cbs_dma;
+	dma_addr_t vpd_cbs_dma;
 
 	struct pci_pool *ipr_cmd_pool;
 
