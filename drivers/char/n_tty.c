@@ -172,6 +172,16 @@ ssize_t n_tty_chars_in_buffer(struct tty_struct *tty)
 	return n;
 }
 
+static inline int is_utf8_continuation(unsigned char c)
+{
+	return (c & 0xc0) == 0x80;
+}
+
+static inline int is_continuation(unsigned char c, struct tty_struct *tty)
+{
+	return I_IUTF8(tty) && is_utf8_continuation(c);
+}
+
 /*
  * Perform OPOST processing.  Returns -1 when the output device is
  * full and the character must be retried.
@@ -226,7 +236,7 @@ static int opost(unsigned char c, struct tty_struct *tty)
 		default:
 			if (O_OLCUC(tty))
 				c = toupper(c);
-			if (!iscntrl(c))
+			if (!iscntrl(c) && !is_continuation(c, tty))
 				tty->column++;
 			break;
 		}
@@ -330,7 +340,7 @@ static inline void finish_erasing(struct tty_struct *tty)
 static void eraser(unsigned char c, struct tty_struct *tty)
 {
 	enum { ERASE, WERASE, KILL } kill_type;
-	int head, seen_alnums;
+	int head, seen_alnums, cnt;
 	unsigned long flags;
 
 	if (tty->read_head == tty->canon_head) {
@@ -368,8 +378,18 @@ static void eraser(unsigned char c, struct tty_struct *tty)
 
 	seen_alnums = 0;
 	while (tty->read_head != tty->canon_head) {
-		head = (tty->read_head - 1) & (N_TTY_BUF_SIZE-1);
-		c = tty->read_buf[head];
+		head = tty->read_head;
+
+		/* erase a single possibly multibyte character */
+		do {
+			head = (head - 1) & (N_TTY_BUF_SIZE-1);
+			c = tty->read_buf[head];
+		} while (is_continuation(c, tty) && head != tty->canon_head);
+
+		/* do not partially erase */
+		if (is_continuation(c, tty))
+			break;
+
 		if (kill_type == WERASE) {
 			/* Equivalent to BSD's ALTWERASE. */
 			if (isalnum(c) || c == '_')
@@ -377,9 +397,10 @@ static void eraser(unsigned char c, struct tty_struct *tty)
 			else if (seen_alnums)
 				break;
 		}
+		cnt = (tty->read_head - head) & (N_TTY_BUF_SIZE-1);
 		spin_lock_irqsave(&tty->read_lock, flags);
 		tty->read_head = head;
-		tty->read_cnt--;
+		tty->read_cnt -= cnt;
 		spin_unlock_irqrestore(&tty->read_lock, flags);
 		if (L_ECHO(tty)) {
 			if (L_ECHOPRT(tty)) {
@@ -388,7 +409,12 @@ static void eraser(unsigned char c, struct tty_struct *tty)
 					tty->column++;
 					tty->erasing = 1;
 				}
+				/* if cnt > 1, output a multi-byte character */
 				echo_char(c, tty);
+				while (--cnt > 0) {
+					head = (head+1) & (N_TTY_BUF_SIZE-1);
+					put_char(tty->read_buf[head], tty);
+				}
 			} else if (kill_type == ERASE && !L_ECHOE(tty)) {
 				echo_char(ERASE_CHAR(tty), tty);
 			} else if (c == '\t') {
@@ -403,7 +429,7 @@ static void eraser(unsigned char c, struct tty_struct *tty)
 					else if (iscntrl(c)) {
 						if (L_ECHOCTL(tty))
 							col += 2;
-					} else
+					} else if (!is_continuation(c, tty))
 						col++;
 					tail = (tail+1) & (N_TTY_BUF_SIZE-1);
 				}
