@@ -673,12 +673,17 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 		       bdp->device->name);
 	}
 
-	/* Disabling all WOLs as initialization */
-	bdp->wolsupported = bdp->wolopts = 0;
-	if (bdp->rev_id >= D101A4_REV_ID) {
-		bdp->wolsupported = WAKE_PHY | WAKE_MAGIC;
+	bdp->wolsupported = 0;
+	bdp->wolopts = 0;
+	
+	/* Check if WoL is enabled on EEPROM */
+	if (e100_eeprom_read(bdp, EEPROM_ID_WORD) & BIT_5) {
+		if (bdp->rev_id >= D101A4_REV_ID)
+			bdp->wolsupported = WAKE_PHY | WAKE_MAGIC;
 		if (bdp->rev_id >= D101MA_REV_ID)
 			bdp->wolsupported |= WAKE_UCAST | WAKE_ARP;
+		/* Magic Packet WoL is enabled on device by default */
+		/* if EEPROM WoL bit is TRUE                        */
 		bdp->wolopts = WAKE_MAGIC;
 	}
 
@@ -4089,9 +4094,11 @@ e100_suspend(struct pci_dev *pcid, u32 state)
 	e100_isolate_driver(bdp);
 	pci_save_state(pcid, bdp->pci_state);
 
+	/* Enable or disable WoL */
+	e100_do_wol(pcid, bdp);
+	
 	/* If wol is enabled */
 	if (bdp->wolopts) {
-		e100_do_wol(pcid, bdp);
 		pci_enable_wake(pcid, 3, 1);	/* Enable PME for power state D3 */
 		pci_set_power_state(pcid, 3);	/* Set power state to D3.        */
 	} else {
