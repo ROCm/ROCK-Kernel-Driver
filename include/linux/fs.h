@@ -1408,5 +1408,8 @@ static inline ino_t parent_ino(struct dentry *dentry)
 	return res;
 }
 
+/* kernel/fork.c */
+extern int unshare_files(void);
+
 #endif /* __KERNEL__ */
 #endif /* _LINUX_FS_H */
