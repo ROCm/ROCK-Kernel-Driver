@@ -263,12 +263,12 @@ void ext3_discard_prealloc (struct inode * inode)
 static int ext3_alloc_block (handle_t *handle,
 			struct inode * inode, unsigned long goal, int *err)
 {
-#ifdef EXT3FS_DEBUG
-	static unsigned long alloc_hits = 0, alloc_attempts = 0;
-#endif
 	unsigned long result;
 
 #ifdef EXT3_PREALLOCATE
+#ifdef EXT3FS_DEBUG
+	static unsigned long alloc_hits = 0, alloc_attempts = 0;
+#endif
 	struct ext3_inode_info *ei = EXT3_I(inode);
 	/* Writer: ->i_prealloc* */
 	if (ei->i_prealloc_count &&
