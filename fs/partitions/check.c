@@ -298,6 +298,8 @@ void delete_partition(struct gendisk *disk, int part)
 	kobject_unregister(&p->kobj);
 }
 
+EXPORT_SYMBOL(delete_partition);
+
 void add_partition(struct gendisk *disk, int part, sector_t start, sector_t len)
 {
 	struct hd_struct *p;
