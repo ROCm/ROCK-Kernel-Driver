@@ -345,7 +345,7 @@ static struct file_operations sysfs_file_operations = {
 };
 
 
-int sysfs_add_file(struct dentry * dir, struct attribute * attr)
+int sysfs_add_file(struct dentry * dir, const struct attribute * attr)
 {
 	struct dentry * dentry;
 	int error;
@@ -373,7 +373,7 @@ int sysfs_add_file(struct dentry * dir, struct attribute * attr)
  *	@attr:	atrribute descriptor.
  */
 
-int sysfs_create_file(struct kobject * kobj, struct attribute * attr)
+int sysfs_create_file(struct kobject * kobj, const struct attribute * attr)
 {
 	if (kobj && attr)
 		return sysfs_add_file(kobj->dentry,attr);
@@ -389,7 +389,7 @@ int sysfs_create_file(struct kobject * kobj, struct attribute * attr)
  * Also call dnotify for the dentry, which lots of userspace programs
  * use.
  */
-int sysfs_update_file(struct kobject * kobj, struct attribute * attr)
+int sysfs_update_file(struct kobject * kobj, const struct attribute * attr)
 {
 	struct dentry * dir = kobj->dentry;
 	struct dentry * victim;
@@ -430,7 +430,7 @@ int sysfs_update_file(struct kobject * kobj, struct attribute * attr)
  *	Hash the attribute name and kill the victim.
  */
 
-void sysfs_remove_file(struct kobject * kobj, struct attribute * attr)
+void sysfs_remove_file(struct kobject * kobj, const struct attribute * attr)
 {
 	sysfs_hash_and_remove(kobj->dentry,attr->name);
 }

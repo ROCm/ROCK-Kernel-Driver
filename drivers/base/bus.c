@@ -287,6 +287,7 @@ static int device_attach(struct device * dev)
 {
  	struct bus_type * bus = dev->bus;
 	struct list_head * entry;
+	int error;
 
 	if (dev->driver) {
 		device_bind_driver(dev);
@@ -296,8 +297,15 @@ static int device_attach(struct device * dev)
 	if (bus->match) {
 		list_for_each(entry,&bus->drivers.list) {
 			struct device_driver * drv = to_drv(entry);
-			if (!bus_match(dev,drv))
-				return 1;
+			error = bus_match(dev,drv);
+			if (!error )  
+				/* success, driver matched */
+				return 1; 
+			if (error != -ENODEV) 
+				/* driver matched but the probe failed */
+				printk(KERN_WARNING 
+				    "%s: probe of %s failed with error %d\n",
+				    drv->name, dev->bus_id, error);
 		}
 	}
 
@@ -314,13 +322,14 @@ static int device_attach(struct device * dev)
  *	If bus_match() returns 0 and the @dev->driver is set, we've found
  *	a compatible pair.
  *
- *	Note that we ignore the error from bus_match(), since it's perfectly
- *	valid for a driver not to bind to any devices.
+ *	Note that we ignore the -ENODEV error from bus_match(), since it's 
+ *	perfectly valid for a driver not to bind to any devices.
  */
 void driver_attach(struct device_driver * drv)
 {
 	struct bus_type * bus = drv->bus;
 	struct list_head * entry;
+	int error;
 
 	if (!bus->match)
 		return;
@@ -328,7 +337,12 @@ void driver_attach(struct device_driver * drv)
 	list_for_each(entry,&bus->devices.list) {
 		struct device * dev = container_of(entry,struct device,bus_list);
 		if (!dev->driver) {
-			bus_match(dev,drv);
+			error = bus_match(dev,drv);
+			if (error && (error != -ENODEV))
+				/* driver matched but the probe failed */
+				printk(KERN_WARNING 
+				    "%s: probe of %s failed with error %d\n",
+				    drv->name, dev->bus_id, error);
 		}
 	}
 }
