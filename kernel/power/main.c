@@ -8,10 +8,13 @@
  *
  */
 
+#define DEBUG
+
 #include <linux/suspend.h>
 #include <linux/kobject.h>
 #include <linux/reboot.h>
 #include <linux/string.h>
+#include <linux/delay.h>
 #include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/pm.h>
@@ -182,11 +185,19 @@ static int pm_suspend_disk(void)
 
 	pr_debug("PM: snapshotting memory.\n");
 	in_suspend = 1;
+	local_irq_disable();
 	if ((error = swsusp_save()))
 		goto Done;
 
 	if (in_suspend) {
 		pr_debug("PM: writing image.\n");
+
+		/* 
+		 * FIXME: Leftover from swsusp. Are they necessary? 
+		 */
+		mb();
+		barrier();
+
 		error = swsusp_write();
 		if (!error)
 			error = power_down(pm_disk_mode);
@@ -195,6 +206,7 @@ static int pm_suspend_disk(void)
 		pr_debug("PM: Image restored successfully.\n");
 	swsusp_free();
  Done:
+	local_irq_enable();
 	return error;
 }
 
@@ -363,9 +375,23 @@ static int pm_resume(void)
 	if ((error = suspend_prepare(PM_SUSPEND_DISK)))
 		goto Free;
 
+	barrier();
+	mb();
+	local_irq_disable();
+
+	/* FIXME: The following (comment and mdelay()) are from swsusp. 
+	 * Are they really necessary? 
+	 *
+	 * We do not want some readahead with DMA to corrupt our memory, right?
+	 * Do it with disabled interrupts for best effect. That way, if some
+	 * driver scheduled DMA, we have good chance for DMA to finish ;-).
+	 */
+	pr_debug("PM: Waiting for DMAs to settle down.\n");
+	mdelay(1000);
+
 	pr_debug("PM: Restoring saved image.\n");
 	swsusp_restore();
-
+	local_irq_enable();
 	pr_debug("PM: Restore failed, recovering.n");
 	suspend_finish(PM_SUSPEND_DISK);
  Free:
