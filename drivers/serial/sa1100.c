@@ -306,7 +306,7 @@ static void sa1100_tx_chars(struct sa1100_port *sport)
 	sa1100_mctrl_check(sport);
 
 	if (uart_circ_empty(xmit) || uart_tx_stopped(&sport->port)) {
-		sa1100_stop_tx(sport);
+		sa1100_stop_tx(&sport->port, 0);
 		return;
 	}
 
@@ -326,7 +326,7 @@ static void sa1100_tx_chars(struct sa1100_port *sport)
 		uart_event(&sport->port, EVT_WRITE_WAKEUP);
 
 	if (uart_circ_empty(xmit))
-		sa1100_stop_tx(sport);
+		sa1100_stop_tx(&sport->port, 0);
 }
 
 static void sa1100_int(int irq, void *dev_id, struct pt_regs *regs)
