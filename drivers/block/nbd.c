@@ -170,7 +170,8 @@ void nbd_send_req(struct nbd_device *lo, struct request *req)
 	down(&lo->tx_lock);
 
 	if (!sock || !lo->sock) {
-		FAIL("Attempted sendmsg to closed socket\n");
+		printk(KERN_ERR "NBD: Attempted sendmsg to closed socket\n");
+		goto error_out;
 	}
 
 	result = nbd_xmit(1, sock, (char *) &request, sizeof(request), nbd_cmd(req) == NBD_CMD_WRITE ? MSG_MORE : 0);
