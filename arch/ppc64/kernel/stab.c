@@ -322,6 +322,7 @@ static void make_slbe(unsigned long esid, unsigned long vsid, int large,
 		unsigned long word0;
 		slb_dword1    data;
 	} vsid_data;
+	struct paca_struct *lpaca = get_paca();
 
 	/*
 	 * We take the next entry, round robin. Previously we tried
@@ -339,7 +340,7 @@ static void make_slbe(unsigned long esid, unsigned long vsid, int large,
 	 * paca Ksave is always valid (even when on the interrupt stack)
 	 * so we use that.
 	 */
-	castout_entry = get_paca()->xStab_data.next_round_robin;
+	castout_entry = lpaca->xStab_data.next_round_robin;
 	do {
 		entry = castout_entry;
 		castout_entry++; 
@@ -347,9 +348,9 @@ static void make_slbe(unsigned long esid, unsigned long vsid, int large,
 			castout_entry = 1; 
 		asm volatile("slbmfee  %0,%1" : "=r" (esid_data) : "r" (entry));
 	} while (esid_data.data.v &&
-		 esid_data.data.esid == GET_ESID(paca->xKsave));
+		 esid_data.data.esid == GET_ESID(lpaca->xKsave));
 
-	get_paca()->xStab_data.next_round_robin = castout_entry;
+	lpaca->xStab_data.next_round_robin = castout_entry;
 
 	/* slbie not needed as the previous mapping is still valid. */
 
