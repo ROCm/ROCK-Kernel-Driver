@@ -57,7 +57,7 @@
 #define VERSTR "$Revision: 1.275 $ time " __TIME__ " " __DATE__
 
 #include <linux/usb.h>
-#include "hcd.h"
+#include "../core/hcd.h"
 #include "usb-uhci.h"
 #include "usb-uhci-debug.h"
 

@@ -1,0 +1,24 @@
+#
+# USB Network devices configuration
+#
+comment 'USB Network adaptors'
+if [ "$CONFIG_NET" = "n" ]; then
+   comment '  Networking support is needed for USB Networking device support'
+else
+   dep_tristate '  USB CATC NetMate-based Ethernet device support (EXPERIMENTAL)' CONFIG_USB_CATC $CONFIG_USB $CONFIG_NET $CONFIG_EXPERIMENTAL
+   dep_tristate '  USB CDC Ethernet support (EXPERIMENTAL)' CONFIG_USB_CDCETHER $CONFIG_USB $CONFIG_NET $CONFIG_EXPERIMENTAL
+   dep_tristate '  USB KLSI KL5USB101-based ethernet device support (EXPERIMENTAL)' CONFIG_USB_KAWETH $CONFIG_USB $CONFIG_NET $CONFIG_EXPERIMENTAL
+   dep_tristate '  USB Pegasus/Pegasus-II based ethernet device support (EXPERIMENTAL)' CONFIG_USB_PEGASUS $CONFIG_USB $CONFIG_NET $CONFIG_EXPERIMENTAL
+   dep_tristate '  USB RTL8150 based ethernet device support (EXPERIMENTAL)' CONFIG_USB_RTL8150 $CONFIG_USB $CONFIG_NET $CONFIG_EXPERIMENTAL
+   dep_tristate '  USB-to-USB Networking cable device support (EXPERIMENTAL)' CONFIG_USB_USBNET $CONFIG_USB $CONFIG_NET $CONFIG_EXPERIMENTAL
+fi
+
+# Turn on CONFIG_USB_NET if any of the drivers are compiled into the kernel to
+# make our Makefile logic a bit simpler
+if [ "$CONFIG_USB_PEGASUS" = "y" -o "$CONFIG_USB_RTL8150" = "y" -o "$CONFIG_USB_KAWETH" = "y" ]; then
+   define_bool CONFIG_USB_NET y
+fi
+if [ "$CONFIG_USB_CATC" = "y" -o "$CONFIG_USB_USBNET" = "y" -o "$CONFIG_USB_CDCETHER" = "y" ]; then
+   define_bool CONFIG_USB_NET y
+fi
+   

@@ -38,7 +38,7 @@
 #endif
 
 #include <linux/usb.h>
-#include "../hcd.h"
+#include "../core/hcd.h"
 
 #include <asm/byteorder.h>
 #include <asm/io.h>
