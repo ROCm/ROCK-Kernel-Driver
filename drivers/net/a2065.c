@@ -190,7 +190,7 @@ static void lance_init_ring (struct net_device *dev)
 	ib->phys_addr [5] = dev->dev_addr [4];
 
 	if (ZERO)
-		printk ("TX rings:\n");
+		printk(KERN_DEBUG "TX rings:\n");
     
 	/* Setup the Tx ring entries */
 	for (i = 0; i <= (1<<lp->lance_log_tx_bufs); i++) {
@@ -200,13 +200,13 @@ static void lance_init_ring (struct net_device *dev)
 		ib->btx_ring [i].tmd1_bits = 0;
 		ib->btx_ring [i].length    = 0xf000; /* The ones required by tmd2 */
 		ib->btx_ring [i].misc      = 0;
-		if (i < 3)
-			if (ZERO) printk ("%d: 0x%8.8x\n", i, leptr);
+		if (i < 3 && ZERO)
+			printk(KERN_DEBUG "%d: 0x%8.8x\n", i, leptr);
 	}
 
 	/* Setup the Rx ring entries */
 	if (ZERO)
-		printk ("RX rings:\n");
+		printk(KERN_DEBUG "RX rings:\n");
 	for (i = 0; i < (1<<lp->lance_log_rx_bufs); i++) {
 		leptr = LANCE_ADDR(&aib->rx_buf[i][0]);
 
@@ -216,7 +216,7 @@ static void lance_init_ring (struct net_device *dev)
 		ib->brx_ring [i].length    = -RX_BUFF_SIZE | 0xf000;
 		ib->brx_ring [i].mblength  = 0;
 		if (i < 3 && ZERO)
-			printk ("%d: 0x%8.8x\n", i, leptr);
+			printk(KERN_DEBUG "%d: 0x%8.8x\n", i, leptr);
 	}
 
 	/* Setup the initialization block */
@@ -226,14 +226,14 @@ static void lance_init_ring (struct net_device *dev)
 	ib->rx_len = (lp->lance_log_rx_bufs << 13) | (leptr >> 16);
 	ib->rx_ptr = leptr;
 	if (ZERO)
-		printk ("RX ptr: %8.8x\n", leptr);
+		printk(KERN_DEBUG "RX ptr: %8.8x\n", leptr);
     
 	/* Setup tx descriptor pointer */
 	leptr = LANCE_ADDR(&aib->btx_ring);
 	ib->tx_len = (lp->lance_log_tx_bufs << 13) | (leptr >> 16);
 	ib->tx_ptr = leptr;
 	if (ZERO)
-		printk ("TX ptr: %8.8x\n", leptr);
+		printk(KERN_DEBUG "TX ptr: %8.8x\n", leptr);
 
 	/* Clear the multicast filter */
 	ib->filter [0] = 0;
@@ -252,7 +252,8 @@ static int init_restart_lance (struct lance_private *lp)
 	for (i = 0; (i < 100) && !(ll->rdp & (LE_C0_ERR | LE_C0_IDON)); i++)
 		barrier();
 	if ((i == 100) || (ll->rdp & LE_C0_ERR)) {
-		printk ("LANCE unopened after %d ticks, csr0=%4.4x.\n", i, ll->rdp);
+		printk(KERN_ERR "LANCE unopened after %d ticks, csr0=%4.4x.\n",
+		       i, ll->rdp);
 		return -EIO;
 	}
 
@@ -275,7 +276,7 @@ static int lance_rx (struct net_device *dev)
 
 #ifdef TEST_HITS
 	int i;
-	printk ("[");
+	printk(KERN_DEBUG "[");
 	for (i = 0; i < RX_RING_SIZE; i++) {
 		if (i == lp->rx_new)
 			printk ("%s",
@@ -284,7 +285,7 @@ static int lance_rx (struct net_device *dev)
 			printk ("%s",
 				ib->brx_ring [i].rmd1_bits & LE_R1_OWN ? "." : "1");
 	}
-	printk ("]");
+	printk ("]\n");
 #endif
     
 	ll->rdp = LE_C0_RINT|LE_C0_INEA;
@@ -311,8 +312,8 @@ static int lance_rx (struct net_device *dev)
 			skb = dev_alloc_skb (len+2);
 
 			if (skb == 0) {
-				printk ("%s: Memory squeeze, deferring packet.\n",
-					dev->name);
+				printk(KERN_WARNING "%s: Memory squeeze, "
+				       "deferring packet.\n", dev->name);
 				lp->stats.rx_dropped++;
 				rd->mblength = 0;
 				rd->rmd1_bits = LE_R1_OWN;
@@ -373,8 +374,9 @@ static int lance_tx (struct net_device *dev)
 				lp->stats.tx_carrier_errors++;
 				if (lp->auto_select) {
 					lp->tpe = 1 - lp->tpe;
-					printk("%s: Carrier Lost, trying %s\n",
-					       dev->name, lp->tpe?"TPE":"AUI");
+					printk(KERN_ERR "%s: Carrier Lost, "
+					       "trying %s\n", dev->name,
+					       lp->tpe?"TPE":"AUI");
 					/* Stop the lance */
 					ll->rap = LE_CSR0;
 					ll->rdp = LE_C0_STOP;
@@ -390,8 +392,8 @@ static int lance_tx (struct net_device *dev)
 			if (status & (LE_T3_BUF|LE_T3_UFL)) {
 				lp->stats.tx_fifo_errors++;
 
-				printk ("%s: Tx: ERR_BUF|ERR_UFL, restarting\n",
-					dev->name);
+				printk(KERN_ERR "%s: Tx: ERR_BUF|ERR_UFL, "
+				       "restarting\n", dev->name);
 				/* Stop the lance */
 				ll->rap = LE_CSR0;
 				ll->rdp = LE_C0_STOP;
@@ -464,7 +466,8 @@ lance_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 	if (csr0 & LE_C0_MISS)
 		lp->stats.rx_errors++;       /* Missed a Rx frame. */
 	if (csr0 & LE_C0_MERR) {
-		printk("%s: Bus master arbitration failure, status %4.4x.\n", dev->name, csr0);
+		printk(KERN_ERR "%s: Bus master arbitration failure, status "
+		       "%4.4x.\n", dev->name, csr0);
 		/* Restart the chip. */
 		ll->rdp = LE_C0_STRT;
 	}
@@ -539,7 +542,7 @@ static inline int lance_reset (struct net_device *dev)
 
 	status = init_restart_lance (lp);
 #ifdef DEBUG_DRIVER
-	printk ("Lance restart=%d\n", status);
+	printk(KERN_DEBUG "Lance restart=%d\n", status);
 #endif
 	return status;
 }
@@ -589,9 +592,10 @@ static int lance_start_xmit (struct sk_buff *skb, struct net_device *dev)
 	
 		for (i = 0; i < 64; i++) {
 			if ((i % 16) == 0)
-				printk ("\n");
+				printk("\n" KERN_DEBUG);
 			printk ("%2.2x ", skb->data [i]);
 		}
+		printk("\n");
 	}
 #endif
 	entry = lp->tx_new & lp->tx_ring_mod_mask;
@@ -803,7 +807,7 @@ static int __devinit a2065_init_one(struct zorro_dev *z,
 	}
 	zorro_set_drvdata(z, dev);
 
-	printk("%s: A2065 at 0x%08lx, Ethernet Address "
+	printk(KERN_INFO "%s: A2065 at 0x%08lx, Ethernet Address "
 	       "%02x:%02x:%02x:%02x:%02x:%02x\n", dev->name, board,
 	       dev->dev_addr[0], dev->dev_addr[1], dev->dev_addr[2],
 	       dev->dev_addr[3], dev->dev_addr[4], dev->dev_addr[5]);
