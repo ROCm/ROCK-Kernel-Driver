@@ -613,9 +613,7 @@ static int rs_ioctl (struct tty_struct * tty, struct file * filp,
 		              (unsigned int *) arg);
 		break;
 	case TIOCSSOFTCAR:
-		if ((rc = verify_area(VERIFY_READ, (void *) arg,
-		                      sizeof(int))) == 0) {
-			get_user(ival, (unsigned int *) arg);
+		if ((rc = get_user(ival, (unsigned int *) arg)) == 0) {
 			tty->termios->c_cflag =
 				(tty->termios->c_cflag & ~CLOCAL) |
 				(ival ? CLOCAL : 0);
