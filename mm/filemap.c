@@ -515,24 +515,32 @@ int filemap_fdatawait(struct address_space * mapping)
 }
 
 /*
- * This adds a page to the page cache, starting out as locked,
- * owned by us, but unreferenced, not uptodate and with no errors.
- * The caller must hold a write_lock on the mapping->page_lock.
+ * This adds a page to the page cache, starting out as locked, unreferenced,
+ * not uptodate and with no errors.
+ *
+ * The caller must hold a write_lock on mapping->page_lock.
+ *
+ * This function is used for two things: adding newly allocated pagecache
+ * pages and for moving existing anon pages into swapcache.
+ *
+ * In the case of pagecache pages, the page is new, so we can just run
+ * SetPageLocked() against it.  The other page state flags were set by
+ * rmqueue()
+ *
+ * In the case of swapcache, try_to_swap_out() has already locked the page, so
+ * SetPageLocked() is ugly-but-OK there too.  The required page state has been
+ * set up by swap_out_add_to_swap_cache().
  */
 static int __add_to_page_cache(struct page *page,
 		struct address_space *mapping, unsigned long offset)
 {
-	page_cache_get(page);
-	if (radix_tree_insert(&mapping->page_tree, offset, page) < 0)
-		goto nomem;
-	page->flags &= ~(1 << PG_uptodate | 1 << PG_error |
-			1 << PG_referenced | 1 << PG_arch_1 | 1 << PG_checked);
-	SetPageLocked(page);
-	ClearPageDirty(page);
-	___add_to_page_cache(page, mapping, offset);
-	return 0;
- nomem:
-	page_cache_release(page);
+	if (radix_tree_insert(&mapping->page_tree, offset, page) == 0) {
+		SetPageLocked(page);
+		ClearPageDirty(page);
+		___add_to_page_cache(page, mapping, offset);
+		page_cache_get(page);
+		return 0;
+	}
 	return -ENOMEM;
 }
 

@@ -153,9 +153,13 @@ int move_to_swap_cache(struct page *page, swp_entry_t entry)
 
 		/* Add it to the swap cache */
 		*pslot = page;
-		page->flags &= ~(1 << PG_uptodate | 1 << PG_error
-				| 1 << PG_referenced | 1 << PG_arch_1
-				| 1 << PG_checked);
+		/*
+		 * This code used to clear PG_uptodate, PG_error, PG_arch1,
+		 * PG_referenced and PG_checked.  What _should_ it clear?
+		 */
+		ClearPageUptodate(page);
+		ClearPageReferenced(page);
+
 		SetPageLocked(page);
 		ClearPageDirty(page);
 		___add_to_page_cache(page, &swapper_space, entry.val);
@@ -198,9 +202,14 @@ int move_from_swap_cache(struct page *page, unsigned long index,
 		__delete_from_swap_cache(page);
 
 		*pslot = page;
-		page->flags &= ~(1 << PG_uptodate | 1 << PG_error |
-				 1 << PG_referenced | 1 << PG_arch_1 |
-				 1 << PG_checked);
+
+		/*
+		 * This code used to clear PG_uptodate, PG_error, PG_referenced,
+		 * PG_arch_1 and PG_checked.  It's not really clear why.
+		 */
+		ClearPageUptodate(page);
+		ClearPageReferenced(page);
+
 		/*
 		 * ___add_to_page_cache puts the page on ->clean_pages,
 		 * but it's dirty.  If it's on ->clean_pages, it will basically

@@ -99,7 +99,6 @@ static void __free_pages_ok (struct page *page, unsigned int order)
 	if (PageWriteback(page))
 		BUG();
 	ClearPageDirty(page);
-	page->flags &= ~(1<<PG_referenced);
 
 	if (current->flags & PF_FREE_PAGES)
 		goto local_freelist;
@@ -188,6 +187,24 @@ static inline struct page * expand (zone_t *zone, struct page *page,
 	return page;
 }
 
+/*
+ * This page is about to be returned from the page allocator
+ */
+static inline void prep_new_page(struct page *page)
+{
+	BUG_ON(page->mapping);
+	BUG_ON(PagePrivate(page));
+	BUG_ON(PageLocked(page));
+	BUG_ON(PageLRU(page));
+	BUG_ON(PageActive(page));
+	BUG_ON(PageDirty(page));
+	BUG_ON(PageWriteback(page));
+	page->flags &= ~(1 << PG_uptodate | 1 << PG_error |
+			1 << PG_referenced | 1 << PG_arch_1 |
+			1 << PG_checked);
+	set_page_count(page, 1);
+}
+
 static FASTCALL(struct page * rmqueue(zone_t *zone, unsigned int order));
 static struct page * rmqueue(zone_t *zone, unsigned int order)
 {
@@ -217,13 +234,9 @@ static struct page * rmqueue(zone_t *zone, unsigned int order)
 			page = expand(zone, page, index, order, curr_order, area);
 			spin_unlock_irqrestore(&zone->lock, flags);
 
-			set_page_count(page, 1);
 			if (bad_range(zone, page))
 				BUG();
-			if (PageLRU(page))
-				BUG();
-			if (PageActive(page))
-				BUG();
+			prep_new_page(page);
 			return page;	
 		}
 		curr_order++;
@@ -296,25 +309,9 @@ static struct page * balance_classzone(zone_t * classzone, unsigned int gfp_mask
 				tmp = list_entry(entry, struct page, list);
 				if (tmp->index == order && memclass(page_zone(tmp), classzone)) {
 					list_del(entry);
-					current->nr_local_pages--;
-					set_page_count(tmp, 1);
 					page = tmp;
-
-					if (PagePrivate(page))
-						BUG();
-					if (page->mapping)
-						BUG();
-					if (PageLocked(page))
-						BUG();
-					if (PageLRU(page))
-						BUG();
-					if (PageActive(page))
-						BUG();
-					if (PageDirty(page))
-						BUG();
-					if (PageWriteback(page))
-						BUG();
-
+					current->nr_local_pages--;
+					prep_new_page(page);
 					break;
 				}
 			} while ((entry = entry->next) != local_pages);
