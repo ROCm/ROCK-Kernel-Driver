@@ -31,8 +31,8 @@
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/interrupt.h>
+#include <linux/suspend.h>
 #include <linux/in.h>
-#include <linux/workqueue.h>
 #include <asm/io.h>
 #include <asm/system.h>
 #include <asm/bitops.h>
@@ -959,8 +959,6 @@ static void disable_MAC(struct airo_info *ai, int lock);
 static void enable_interrupts(struct airo_info*);
 static void disable_interrupts(struct airo_info*);
 static u16 issuecommand(struct airo_info*, Cmd *pCmd, Resp *pRsp);
-static u16 sendcommand(struct airo_info *ai, Cmd *pCmd);
-static void completecommand(struct airo_info *ai, Resp *pRsp);
 static int bap_setup(struct airo_info*, u16 rid, u16 offset, int whichbap);
 static int aux_bap_read(struct airo_info*, u16 *pu16Dst, int bytelen,
 			int whichbap);
@@ -980,6 +978,8 @@ static int transmit_802_11_packet(struct airo_info*, int len, char *pPacket);
 
 static irqreturn_t airo_interrupt( int irq, void* dev_id, struct pt_regs
 			    *regs);
+static int airo_thread(void *data);
+static void timer_func( struct net_device *dev );
 static int airo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
 #ifdef WIRELESS_EXT
 struct iw_statistics *airo_get_wireless_stats (struct net_device *dev);
@@ -990,8 +990,8 @@ static int writerids(struct net_device *dev, aironet_ioctl *comp);
 int flashcard(struct net_device *dev, aironet_ioctl *comp);
 #endif /* CISCO_EXT */
 #ifdef MICSUPPORT
-static void micinit(struct airo_info *ai, MICRid *micr);
-static void micsetup(struct airo_info *ai);
+static void micinit(struct airo_info *ai);
+static int micsetup(struct airo_info *ai);
 static int encapsulate(struct airo_info *ai, etherHead *pPacket, MICBuffer *buffer, int len);
 static int decapsulate(struct airo_info *ai, MICBuffer *mic, etherHead *pPacket, u16 payLen);
 #endif
@@ -1009,41 +1009,50 @@ struct airo_info {
 	int need_commit;	// Need to set config
 	char keyindex; // Used with auto wep
 	char defindex; // Used with auto wep
-	struct timer_list timer;
 	struct proc_dir_entry *proc_entry;
 	struct airo_info *next;
         spinlock_t aux_lock;
         unsigned long flags;
-#define FLAG_PROMISC   IFF_PROMISC	/* 0x100 - include/linux/if.h */
-#define FLAG_RADIO_OFF 0x02		/* User disabling of MAC */
-#define FLAG_RADIO_DOWN 0x08		/* ifup/ifdown disabling of MAC */
-#define FLAG_FLASHING  0x10
-#define FLAG_ADHOC        0x01 /* Needed by MIC */
-#define FLAG_MIC_CAPABLE  0x20
-#define FLAG_UPDATE_MULTI 0x40
-#define FLAG_UPDATE_UNI   0x80
-#define FLAG_802_11    0x200
-#define FLAG_PENDING_XMIT   0x400
-#define FLAG_PENDING_XMIT11 0x800
-#define FLAG_PCI    0x1000
+#define FLAG_PROMISC	8	/* IFF_PROMISC 0x100 - include/linux/if.h */
+#define FLAG_RADIO_OFF	0	/* User disabling of MAC */
+#define FLAG_RADIO_DOWN	1	/* ifup/ifdown disabling of MAC */
+#define FLAG_RADIO_MASK 0x03
+#define FLAG_FLASHING	2
+#define FLAG_ADHOC	3	/* Needed by MIC */
+#define FLAG_MIC_CAPABLE 4
+#define FLAG_UPDATE_MULTI 5
+#define FLAG_UPDATE_UNI 6
+#define FLAG_802_11	7
+#define FLAG_PENDING_XMIT 9
+#define FLAG_PENDING_XMIT11 10
+#define FLAG_PCI	11
+#define JOB_MASK	0xff0000
+#define JOB_DIE		16
+#define JOB_XMIT	17
+#define JOB_XMIT11	18
+#define JOB_STATS	19
+#define JOB_PROMISC	20
+#define JOB_MIC		21
+#define JOB_EVENT	22
+#define JOB_AUTOWEP	23
 	int (*bap_read)(struct airo_info*, u16 *pu16Dst, int bytelen,
 			int whichbap);
 	unsigned short *flash;
 	tdsRssiEntry *rssi;
-	struct semaphore sem;
 	struct task_struct *task;
-	struct work_struct stats_task;
-	struct work_struct promisc_task;
+	struct semaphore sem;
+	pid_t thr_pid;
+	wait_queue_head_t thr_wait;
+	struct completion thr_exited;
+	unsigned long expires;
 	struct {
 		struct sk_buff *skb;
 		int fid;
-		struct work_struct task;
 	} xmit, xmit11;
 	struct net_device *wifidev;
 #ifdef WIRELESS_EXT
 	struct iw_statistics	wstats;		// wireless stats
 	unsigned long		scan_timestamp;	/* Time started to scan */
-	struct work_struct	event_task;
 #if WIRELESS_EXT > 15
 	struct iw_spy_data	spy_data;
 #else /* WIRELESS_EXT > 15 */
@@ -1057,7 +1066,6 @@ struct airo_info {
 	/* MIC stuff */
 	mic_module		mod[2];
 	mic_statistics		micstats;
-	struct work_struct 	mic_task;
 };
 
 static inline int bap_read(struct airo_info *ai, u16 *pu16Dst, int bytelen,
@@ -1207,9 +1215,9 @@ static int writeConfigRid(struct airo_info*ai, int lock) {
 	cfgr = ai->config;
 
 	if ((cfgr.opmode & 0xFF) == MODE_STA_IBSS)
-		ai->flags |= FLAG_ADHOC;
+		set_bit(FLAG_ADHOC, &ai->flags);
 	else
-		ai->flags &= ~FLAG_ADHOC;
+		clear_bit(FLAG_ADHOC, &ai->flags);
 
 	for(s = &cfgr.len; s <= &cfgr.rtsThres; s++) *s = cpu_to_le16(*s);
 
@@ -1273,7 +1281,7 @@ static int airo_open(struct net_device *dev) {
 	struct airo_info *info = dev->priv;
 	Resp rsp;
 
-	if (info->flags & FLAG_FLASHING)
+	if (test_bit(FLAG_FLASHING, &info->flags))
 		return -EIO;
 
 	/* Make sure the card is configured.
@@ -1287,7 +1295,7 @@ static int airo_open(struct net_device *dev) {
 
 	if (info->wifidev != dev) {
 		/* Power on the MAC controller (which may have been disabled) */
-		info->flags &= ~FLAG_RADIO_DOWN;
+		clear_bit(FLAG_RADIO_DOWN, &info->flags);
 		enable_interrupts(info);
 	}
 	enable_MAC(info, &rsp, 1);
@@ -1345,7 +1353,7 @@ static void get_tx_error(struct airo_info *ai, u32 fid)
 	}
 }
 
-static void airo_do_xmit(struct net_device *dev) {
+static void airo_end_xmit(struct net_device *dev) {
 	u16 status;
 	int i;
 	struct airo_info *priv = dev->priv;
@@ -1353,17 +1361,10 @@ static void airo_do_xmit(struct net_device *dev) {
 	int fid = priv->xmit.fid;
 	u32 *fids = priv->fids;
 
-	if (down_trylock(&priv->sem) != 0) {
-		priv->flags |= FLAG_PENDING_XMIT;
-		netif_stop_queue(dev);
-		priv->xmit.task.func = (void (*)(void *))airo_do_xmit;
-		priv->xmit.task.data = (void *)dev;
-		schedule_work(&priv->xmit.task);
-		return;
-	}
+	clear_bit(JOB_XMIT, &priv->flags);
+	clear_bit(FLAG_PENDING_XMIT, &priv->flags);
 	status = transmit_802_3_packet (priv, fids[fid], skb->data);
 	up(&priv->sem);
-	priv->flags &= ~FLAG_PENDING_XMIT;
 
 	i = 0;
 	if ( status == SUCCESS ) {
@@ -1407,11 +1408,17 @@ static int airo_start_xmit(struct sk_buff *skb, struct net_device *dev) {
 	fids[i] |= (len << 16);
 	priv->xmit.skb = skb;
 	priv->xmit.fid = i;
-	airo_do_xmit(dev);
+	if (down_trylock(&priv->sem) != 0) {
+		set_bit(FLAG_PENDING_XMIT, &priv->flags);
+		netif_stop_queue(dev);
+		set_bit(JOB_XMIT, &priv->flags);
+		wake_up_interruptible(&priv->thr_wait);
+	} else
+		airo_end_xmit(dev);
 	return 0;
 }
 
-static void airo_do_xmit11(struct net_device *dev) {
+static void airo_end_xmit11(struct net_device *dev) {
 	u16 status;
 	int i;
 	struct airo_info *priv = dev->priv;
@@ -1419,17 +1426,10 @@ static void airo_do_xmit11(struct net_device *dev) {
 	int fid = priv->xmit11.fid;
 	u32 *fids = priv->fids;
 
-	if (down_trylock(&priv->sem) != 0) {
-		priv->flags |= FLAG_PENDING_XMIT11;
-		netif_stop_queue(dev);
-		priv->xmit11.task.func = (void (*)(void *))airo_do_xmit11;
-		priv->xmit11.task.data = (void *)dev;
-		schedule_work(&priv->xmit11.task);
-		return;
-	}
+	clear_bit(JOB_XMIT11, &priv->flags);
+	clear_bit(FLAG_PENDING_XMIT11, &priv->flags);
 	status = transmit_802_11_packet (priv, fids[fid], skb->data);
 	up(&priv->sem);
-	priv->flags &= ~FLAG_PENDING_XMIT11;
 
 	i = MAX_FIDS / 2;
 	if ( status == SUCCESS ) {
@@ -1473,7 +1473,13 @@ static int airo_start_xmit11(struct sk_buff *skb, struct net_device *dev) {
 	fids[i] |= (len << 16);
 	priv->xmit11.skb = skb;
 	priv->xmit11.fid = i;
-	airo_do_xmit11(dev);
+	if (down_trylock(&priv->sem) != 0) {
+		set_bit(FLAG_PENDING_XMIT11, &priv->flags);
+		netif_stop_queue(dev);
+		set_bit(JOB_XMIT11, &priv->flags);
+		wake_up_interruptible(&priv->thr_wait);
+	} else
+		airo_end_xmit11(dev);
 	return 0;
 }
 
@@ -1481,29 +1487,24 @@ static void airo_read_stats(struct airo_info *ai) {
 	StatsRid stats_rid;
 	u32 *vals = stats_rid.vals;
 
-	if (down_trylock(&ai->sem) == 0) {
-		readStatsRid(ai, &stats_rid, RID_STATS, 0);
-		up(&ai->sem);
+	clear_bit(JOB_STATS, &ai->flags);
+	readStatsRid(ai, &stats_rid, RID_STATS, 0);
+	up(&ai->sem);
 
-		ai->stats.rx_packets = vals[43] + vals[44] + vals[45];
-		ai->stats.tx_packets = vals[39] + vals[40] + vals[41];
-		ai->stats.rx_bytes = vals[92];
-		ai->stats.tx_bytes = vals[91];
-		ai->stats.rx_errors = vals[0] + vals[2] + vals[3] + vals[4];
-		ai->stats.tx_errors = vals[42] + ai->stats.tx_fifo_errors;
-		ai->stats.multicast = vals[43];
-		ai->stats.collisions = vals[89];
+	ai->stats.rx_packets = vals[43] + vals[44] + vals[45];
+	ai->stats.tx_packets = vals[39] + vals[40] + vals[41];
+	ai->stats.rx_bytes = vals[92];
+	ai->stats.tx_bytes = vals[91];
+	ai->stats.rx_errors = vals[0] + vals[2] + vals[3] + vals[4];
+	ai->stats.tx_errors = vals[42] + ai->stats.tx_fifo_errors;
+	ai->stats.multicast = vals[43];
+	ai->stats.collisions = vals[89];
 
-		/* detailed rx_errors: */
-		ai->stats.rx_length_errors = vals[3];
-		ai->stats.rx_crc_errors = vals[4];
-		ai->stats.rx_frame_errors = vals[2];
-		ai->stats.rx_fifo_errors = vals[0];
-	} else {
-		ai->stats_task.func = (void (*)(void *))airo_read_stats;
-		ai->stats_task.data = (void *)ai;
-		schedule_work(&ai->stats_task);
-	}
+	/* detailed rx_errors: */
+	ai->stats.rx_length_errors = vals[3];
+	ai->stats.rx_crc_errors = vals[4];
+	ai->stats.rx_frame_errors = vals[2];
+	ai->stats.rx_fifo_errors = vals[0];
 }
 
 struct net_device_stats *airo_get_stats(struct net_device *dev)
@@ -1511,46 +1512,37 @@ struct net_device_stats *airo_get_stats(struct net_device *dev)
 	struct airo_info *local =  dev->priv;
 
 	/* Get stats out of the card if available */
-	airo_read_stats(local);
+	if (down_trylock(&local->sem) != 0) {
+		set_bit(JOB_STATS, &local->flags);
+		wake_up_interruptible(&local->thr_wait);
+	} else
+		airo_read_stats(local);
 
 	return &local->stats;
 }
 
-static void airo_end_promisc(struct airo_info *ai) {
-	Resp rsp;
-
-	if ((IN4500(ai, EVSTAT) & EV_CMD) != 0) {
-		completecommand(ai, &rsp);
-		up(&ai->sem);
-	} else {
-		ai->promisc_task.func = (void (*)(void *))airo_end_promisc;
-		ai->promisc_task.data = (void *)ai;
-		schedule_work(&ai->promisc_task);
-	}
-}
-
 static void airo_set_promisc(struct airo_info *ai) {
 	Cmd cmd;
+	Resp rsp;
 
-	if (down_trylock(&ai->sem) == 0) {
-		memset(&cmd, 0, sizeof(cmd));
-		cmd.cmd=CMD_SETMODE;
-		cmd.parm0=(ai->flags&IFF_PROMISC) ? PROMISC : NOPROMISC;
-		sendcommand(ai, &cmd);
-		airo_end_promisc(ai);
-	} else {
-		ai->promisc_task.func = (void (*)(void *))airo_set_promisc;
-		ai->promisc_task.data = (void *)ai;
-		schedule_work(&ai->promisc_task);
-	}
+	memset(&cmd, 0, sizeof(cmd));
+	cmd.cmd=CMD_SETMODE;
+	clear_bit(JOB_PROMISC, &ai->flags);
+	cmd.parm0=(ai->flags&IFF_PROMISC) ? PROMISC : NOPROMISC;
+	issuecommand(ai, &cmd, &rsp);
+	up(&ai->sem);
 }
 
 static void airo_set_multicast_list(struct net_device *dev) {
 	struct airo_info *ai = dev->priv;
 
 	if ((dev->flags ^ ai->flags) & IFF_PROMISC) {
-		ai->flags ^= IFF_PROMISC;
-		airo_set_promisc(ai);
+		change_bit(FLAG_PROMISC, &ai->flags);
+		if (down_trylock(&ai->sem) != 0) {
+			set_bit(JOB_PROMISC, &ai->flags);
+			wake_up_interruptible(&ai->thr_wait);
+		} else
+			airo_set_promisc(ai);
 	}
 
 	if ((dev->flags&IFF_ALLMULTI)||dev->mc_count>0) {
@@ -1596,7 +1588,7 @@ static int airo_close(struct net_device *dev) {
 		 * That's the method that is most friendly towards the network
 		 * stack (i.e. the network stack won't try to broadcast
 		 * anything on the interface and routes are gone. Jean II */
-		ai->flags |= FLAG_RADIO_DOWN;
+		set_bit(FLAG_RADIO_DOWN, &ai->flags);
 		disable_MAC(ai, 1);
 #endif
 		disable_interrupts( ai );
@@ -1611,8 +1603,6 @@ void stop_airo_card( struct net_device *dev, int freeres )
 	struct airo_info *ai = dev->priv;
 	disable_interrupts(ai);
 	free_irq( dev->irq, dev );
-	if (auto_wep)
-		del_timer_sync(&ai->timer);
 	takedown_proc_entry( dev, ai );
 	if (ai->registered) {
 		unregister_netdev( dev );
@@ -1623,7 +1613,9 @@ void stop_airo_card( struct net_device *dev, int freeres )
 		}
 		ai->registered = 0;
 	}
-	flush_scheduled_work();
+	set_bit(JOB_DIE, &ai->flags);
+	kill_proc(ai->thr_pid, SIGTERM, 1);
+	wait_for_completion(&ai->thr_exited);
 	if (ai->flash)
 		kfree(ai->flash);
 	if (ai->rssi)
@@ -1728,9 +1720,14 @@ struct net_device *init_airo_card( unsigned short irq, int port, int is_pcmcia )
 	sema_init(&ai->sem, 1);
 	ai->need_commit = 0;
 	ai->config.len = 0;
+	init_waitqueue_head (&ai->thr_wait);
+	init_completion (&ai->thr_exited);
+	ai->thr_pid = kernel_thread(airo_thread, dev, CLONE_FS | CLONE_FILES);
+	if (ai->thr_pid < 0)
+		goto err_out_free;
 	rc = add_airo_dev( dev );
 	if (rc)
-		goto err_out_free;
+		goto err_out_thr;
 
 	/* The Airo-specific entries in the device structure. */
 	dev->hard_start_xmit = &airo_start_xmit;
@@ -1770,7 +1767,7 @@ struct net_device *init_airo_card( unsigned short irq, int port, int is_pcmcia )
 		}
 	} else {
 		ai->bap_read = fast_bap_read;
-		ai->flags |= FLAG_FLASHING;
+		set_bit(FLAG_FLASHING, &ai->flags);
 	}
 
 	rc = register_netdev(dev);
@@ -1801,6 +1798,10 @@ err_out_irq:
 	free_irq(dev->irq, dev);
 err_out_unlink:
 	del_airo_dev(dev);
+err_out_thr:
+	set_bit(JOB_DIE, &ai->flags);
+	kill_proc(ai->thr_pid, SIGTERM, 1);
+	wait_for_completion(&ai->thr_exited);
 err_out_free:
 	kfree(dev);
 	return NULL;
@@ -1864,38 +1865,102 @@ static void airo_send_event(struct net_device *dev) {
 	union iwreq_data wrqu;
 	StatusRid status_rid;
 
-	if (down_trylock(&ai->sem) == 0) {
-		PC4500_readrid(ai, RID_STATUS, &status_rid, sizeof(status_rid), 0);
-		up(&ai->sem);
-		wrqu.data.length = 0;
-		wrqu.data.flags = 0;
-		memcpy(wrqu.ap_addr.sa_data, status_rid.bssid[0], ETH_ALEN);
-		wrqu.ap_addr.sa_family = ARPHRD_ETHER;
+	clear_bit(JOB_EVENT, &ai->flags);
+	PC4500_readrid(ai, RID_STATUS, &status_rid, sizeof(status_rid), 0);
+	up(&ai->sem);
+	wrqu.data.length = 0;
+	wrqu.data.flags = 0;
+	memcpy(wrqu.ap_addr.sa_data, status_rid.bssid[0], ETH_ALEN);
+	wrqu.ap_addr.sa_family = ARPHRD_ETHER;
 
-		/* Send event to user space */
-		wireless_send_event(dev, SIOCGIWAP, &wrqu, NULL);
-	} else {
-		ai->event_task.func = (void (*)(void *))airo_send_event;
-		ai->event_task.data = (void *)dev;
-		schedule_work(&ai->event_task);
-	}
+	/* Send event to user space */
+	wireless_send_event(dev, SIOCGIWAP, &wrqu, NULL);
 }
 #endif
 
-static void airo_read_mic(struct airo_info *ai) {
-	MICRid mic_rid;
+static int airo_thread(void *data) {
+	struct net_device *dev = data;
+	struct airo_info *ai = dev->priv;
+	int locked;
+	
+	daemonize("%s", dev->name);
+	allow_signal(SIGTERM);
 
-	if (down_trylock(&ai->sem) == 0) {
-		PC4500_readrid(ai, RID_MIC, &mic_rid, sizeof(mic_rid), 0);
-		up(&ai->sem);
+	while(1) {
+		if (signal_pending(current))
+			flush_signals(current);
+
+		/* make swsusp happy with our thread */
+		if (current->flags & PF_FREEZE)
+			refrigerator(PF_IOTHREAD);
+
+		if (test_bit(JOB_DIE, &ai->flags))
+			break;
+
+		if (ai->flags & JOB_MASK) {
+			locked = down_interruptible(&ai->sem);
+		} else {
+			wait_queue_t wait;
+
+			init_waitqueue_entry(&wait, current);
+			add_wait_queue(&ai->thr_wait, &wait);
+			for (;;) {
+				set_current_state(TASK_INTERRUPTIBLE);
+				if (ai->flags & JOB_MASK)
+					break;
+				if (ai->expires) {
+					if (time_after_eq(jiffies,ai->expires)){
+						set_bit(JOB_AUTOWEP,&ai->flags);
+						break;
+					}
+					if (!signal_pending(current)) {
+						schedule_timeout(ai->expires - jiffies);
+						continue;
+					}
+				} else if (!signal_pending(current)) {
+					schedule();
+					continue;
+				}
+				break;
+			}
+			current->state = TASK_RUNNING;
+			remove_wait_queue(&ai->thr_wait, &wait);
+			locked = 1;
+		}
+
+		if (locked)
+			continue;
+
+		if (test_bit(JOB_DIE, &ai->flags)) {
+			up(&ai->sem);
+			break;
+		}
+
+		if (test_bit(FLAG_FLASHING, &ai->flags)) {
+			up(&ai->sem);
+			continue;
+		}
+
+		if (test_bit(JOB_XMIT, &ai->flags))
+			airo_end_xmit(dev);
+		else if (test_bit(JOB_XMIT11, &ai->flags))
+			airo_end_xmit11(dev);
+		else if (test_bit(JOB_STATS, &ai->flags))
+			airo_read_stats(ai);
+		else if (test_bit(JOB_PROMISC, &ai->flags))
+			airo_set_promisc(ai);
 #ifdef MICSUPPORT
-		micinit (ai, &mic_rid);
+		else if (test_bit(JOB_MIC, &ai->flags))
+			micinit(ai);
 #endif
-	} else {
-		ai->mic_task.func = (void (*)(void *))airo_read_mic;
-		ai->mic_task.data = (void *)ai;
-		schedule_work(&ai->mic_task);
+#if WIRELESS_EXT > 13
+		else if (test_bit(JOB_EVENT, &ai->flags))
+			airo_send_event(dev);
+#endif
+		else if (test_bit(JOB_AUTOWEP, &ai->flags))
+			timer_func(dev);
 	}
+	complete_and_exit (&ai->thr_exited, 0);
 }
 
 static irqreturn_t airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs) {
@@ -1927,8 +1992,15 @@ static irqreturn_t airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs)
 
 		if ( status & EV_MIC ) {
 			OUT4500( apriv, EVACK, EV_MIC );
-			if (apriv->flags & FLAG_MIC_CAPABLE)
-				airo_read_mic( apriv );
+#ifdef MICSUPPORT
+			if (test_bit(FLAG_MIC_CAPABLE, &apriv->flags)) {
+				if (down_trylock(&apriv->sem) != 0) {
+					set_bit(JOB_MIC, &apriv->flags);
+					wake_up_interruptible(&apriv->thr_wait);
+				} else
+					micinit (apriv);
+			}
+#endif
 		}
 		if ( status & EV_LINK ) {
 #if WIRELESS_EXT > 13
@@ -1970,15 +2042,18 @@ static irqreturn_t airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs)
 #define RC_NOAUTH 9 /* Station requesting (Re)Association is not
 		       Authenticated with the responding station */
 			if (newStatus != ASSOCIATED) {
-				if (auto_wep && !timer_pending(&apriv->timer)) {
-					apriv->timer.expires = RUN_AT(HZ*3);
-		      			add_timer(&apriv->timer);
+				if (auto_wep && !apriv->expires) {
+					apriv->expires = RUN_AT(3*HZ);
+					wake_up_interruptible(&apriv->thr_wait);
 				}
 			} else {
 				struct task_struct *task = apriv->task;
+				if (auto_wep)
+					apriv->expires = 0;
 				if (task)
 					wake_up_process (task);
-				apriv->flags|=FLAG_UPDATE_UNI|FLAG_UPDATE_MULTI;
+				set_bit(FLAG_UPDATE_UNI, &apriv->flags);
+				set_bit(FLAG_UPDATE_MULTI, &apriv->flags);
 			}
 #if WIRELESS_EXT > 13
 			/* Question : is ASSOCIATED the only status
@@ -1999,7 +2074,11 @@ static irqreturn_t airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs)
 					wireless_send_event(dev, SIOCGIWSCAN, &wrqu, NULL);
 					apriv->scan_timestamp = 0;
 				}
-				airo_send_event(dev);
+				if (down_trylock(&apriv->sem) != 0) {
+					set_bit(JOB_EVENT, &apriv->flags);
+					wake_up_interruptible(&apriv->thr_wait);
+				} else
+					airo_send_event(dev);
 			} else {
 				memset(wrqu.ap_addr.sa_data, '\0', ETH_ALEN);
 				wrqu.ap_addr.sa_family = ARPHRD_ETHER;
@@ -2030,7 +2109,7 @@ static irqreturn_t airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs)
 			fid = IN4500( apriv, RXFID );
 
 			/* Get the packet length */
-			if (apriv->flags & FLAG_802_11) {
+			if (test_bit(FLAG_802_11, &apriv->flags)) {
 				bap_setup (apriv, fid, 4, BAP0);
 				bap_read (apriv, (u16*)&hdr, sizeof(hdr), BAP0);
 				/* Bad CRC. Ignore packet */
@@ -2049,7 +2128,7 @@ static irqreturn_t airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs)
 				len = 0;
 			}
 			if (len) {
-				if (apriv->flags & FLAG_802_11) {
+				if (test_bit(FLAG_802_11, &apriv->flags)) {
 					bap_read (apriv, (u16*)&fc, sizeof(fc), BAP0);
 					fc = le16_to_cpu(fc);
 					switch (fc & 0xc) {
@@ -2078,7 +2157,7 @@ static irqreturn_t airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs)
 			}
 			if (len) {
 				buffer = (u16*)skb_put (skb, len + hdrlen);
-				if (apriv->flags & FLAG_802_11) {
+				if (test_bit(FLAG_802_11, &apriv->flags)) {
 					buffer[0] = fc;
 					bap_read (apriv, buffer + 1, hdrlen - 2, BAP0);
 					if (hdrlen == 24)
@@ -2125,11 +2204,12 @@ static irqreturn_t airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs)
 					char *sa;
 					struct iw_quality wstats;
 					/* Prepare spy data : addr + qual */
-					sa = (char*)buffer + ((apriv->flags & FLAG_802_11) ? 10 : 6);
-					if (!(apriv->flags & FLAG_802_11)) {
+					if (!test_bit(FLAG_802_11, &apriv->flags)) {
+						sa = (char*)buffer + 6;
 						bap_setup (apriv, fid, 8, BAP0);
 						bap_read (apriv, (u16*)hdr.rssi, 2, BAP0);
-					}
+					} else
+						sa = (char*)buffer + 10;
 					wstats.qual = hdr.rssi[0];
 					if (apriv->rssi)
 						wstats.level = 0x100 - apriv->rssi[hdr.rssi[1]].rssidBm;
@@ -2146,12 +2226,12 @@ static irqreturn_t airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs)
 					int i;
 					char *sa;
 
-					sa = (char*)buffer + ((apriv->flags & FLAG_802_11) ? 10 : 6);
+					sa = (char*)buffer + (test_bit(FLAG_802_11, &apriv->flags) ? 10 : 6);
 
 					for (i=0; i<apriv->spy_number; i++)
 						if (!memcmp(sa,apriv->spy_address[i],ETH_ALEN))
 						{
-							if (!(apriv->flags & FLAG_802_11)) {
+							if (!test_bit(FLAG_802_11, &apriv->flags)) {
 								bap_setup (apriv, fid, 8, BAP0);
 								bap_read (apriv, (u16*)hdr.rssi, 2, BAP0);
 							}
@@ -2169,7 +2249,7 @@ static irqreturn_t airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs)
 #endif /* WIRELESS_EXT > 15 */
 				OUT4500( apriv, EVACK, EV_RX);
 
-				if (apriv->flags & FLAG_802_11) {
+				if (test_bit(FLAG_802_11, &apriv->flags)) {
 					skb->mac.raw = skb->data;
 					skb->pkt_type = PACKET_OTHERHOST;
 					skb->dev = apriv->wifidev;
@@ -2207,10 +2287,10 @@ static irqreturn_t airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs)
 				/* Set up to be used again */
 				apriv->fids[index] &= 0xffff;
 				if (index < MAX_FIDS / 2) {
-					if (!(apriv->flags & FLAG_PENDING_XMIT))
+					if (!test_bit(FLAG_PENDING_XMIT, &apriv->flags))
 						netif_wake_queue(dev);
 				} else {
-					if (!(apriv->flags & FLAG_PENDING_XMIT11))
+					if (!test_bit(FLAG_PENDING_XMIT11, &apriv->flags))
 						netif_wake_queue(apriv->wifidev);
 				}
 			} else {
@@ -2270,7 +2350,7 @@ static int enable_MAC( struct airo_info *ai, Resp *rsp, int lock ) {
 	 * instead of this flag, but I don't trust it *within* the
 	 * open/close functions, and testing both flags together is
 	 * "cheaper" - Jean II */
-	if (ai->flags & (FLAG_RADIO_OFF|FLAG_RADIO_DOWN)) return SUCCESS;
+	if (ai->flags & FLAG_RADIO_MASK) return SUCCESS;
 	memset(&cmd, 0, sizeof(cmd));
 	cmd.cmd = MAC_ENABLE;
 	if (!lock)
@@ -2391,10 +2471,10 @@ static u16 setup_card(struct airo_info *ai, u8 *mac)
 		ai->config.opmode = adhoc ? MODE_STA_IBSS : MODE_STA_ESS;
 
 #ifdef MICSUPPORT
-		if ((cap_rid.len>=sizeof(cap_rid)) && (cap_rid.extSoftCap&1)) {
+		if ((cap_rid.len>=sizeof(cap_rid)) && (cap_rid.extSoftCap&1) &&
+		    (micsetup(ai) == SUCCESS)) {
 			ai->config.opmode |= MODE_MIC;
-			ai->flags |= FLAG_MIC_CAPABLE;
-			micsetup(ai);
+			set_bit(FLAG_MIC_CAPABLE, &ai->flags);
 		}
 #endif
 
@@ -2460,34 +2540,15 @@ static u16 setup_card(struct airo_info *ai, u8 *mac)
 		rc = readWepKeyRid(ai, &wkr, 0);
 	} while(lastindex != wkr.kindex);
 
-	if (auto_wep && !timer_pending(&ai->timer)) {
-		ai->timer.expires = RUN_AT(HZ*3);
-		add_timer(&ai->timer);
+	if (auto_wep) {
+		ai->expires = RUN_AT(3*HZ);
+		wake_up_interruptible(&ai->thr_wait);
 	}
+
 	return SUCCESS;
 }
 
 static u16 issuecommand(struct airo_info *ai, Cmd *pCmd, Resp *pRsp) {
-        // Im really paranoid about letting it run forever!
-	int max_tries = 600000;
-
-	if (sendcommand(ai, pCmd) == (u16)ERROR)
-		return ERROR;
-
-	while (max_tries-- && (IN4500(ai, EVSTAT) & EV_CMD) == 0) {
-		if (!in_interrupt() && (max_tries & 255) == 0)
-			schedule();
-	}
-	if ( max_tries == -1 ) {
-		printk( KERN_ERR
-			"airo: Max tries exceeded waiting for command\n" );
-                return ERROR;
-	}
-	completecommand(ai, pRsp);
-	return SUCCESS;
-}
-
-static u16 sendcommand(struct airo_info *ai, Cmd *pCmd) {
         // Im really paranoid about letting it run forever!
 	int max_tries = 600000;
 	u16 cmd;
@@ -2506,10 +2567,16 @@ static u16 sendcommand(struct airo_info *ai, Cmd *pCmd) {
 			"airo: Max tries exceeded when issueing command\n" );
                 return ERROR;
 	}
-	return SUCCESS;
-}
 
-static void completecommand(struct airo_info *ai, Resp *pRsp) {
+	while (max_tries-- && (IN4500(ai, EVSTAT) & EV_CMD) == 0) {
+		if (!in_atomic() && (max_tries & 255) == 0)
+			schedule();
+	}
+	if ( max_tries == -1 ) {
+		printk( KERN_ERR
+			"airo: Max tries exceeded waiting for command\n" );
+                return ERROR;
+	}
 	// command completed
 	pRsp->status = IN4500(ai, STATUS);
 	pRsp->rsp0 = IN4500(ai, RESP0);
@@ -2522,6 +2589,8 @@ static void completecommand(struct airo_info *ai, Resp *pRsp) {
 	}
 	// acknowledge processing the status/response
 	OUT4500(ai, EVACK, EV_CMD);
+
+	return SUCCESS;
 }
 
 /* Sets up the bap to start exchange data.  whichbap should
@@ -2808,7 +2877,7 @@ static int transmit_802_3_packet(struct airo_info *ai, int len, char *pPacket)
 	len -= ETH_ALEN * 2;
 
 #ifdef MICSUPPORT
-	if ((ai->flags & FLAG_MIC_CAPABLE) && ai->micstats.enabled && 
+	if (test_bit(FLAG_MIC_CAPABLE, &ai->flags) && ai->micstats.enabled && 
 	    (ntohs(((u16 *)pPacket)[6]) != 0x888E)) {
 		if (encapsulate(ai,(etherHead *)pPacket,&pMic,len) != SUCCESS)
 			return ERROR;
@@ -3316,7 +3385,7 @@ static void proc_config_on_close( struct inode *inode, struct file *file ) {
 			if ((ai->config.rmode & 0xff) >= RXMODE_RFMON)
 					ai->need_commit = 2;
 			ai->config.rmode &= 0xfe00;
-			ai->flags &= ~FLAG_802_11;
+			clear_bit (FLAG_802_11, &ai->flags);
 			ai->config.opmode &= 0xFF00;
 			ai->config.scanMode = SCANMODE_ACTIVE;
 			if ( line[0] == 'a' ) {
@@ -3326,11 +3395,11 @@ static void proc_config_on_close( struct inode *inode, struct file *file ) {
 				if ( line[0] == 'r' ) {
 					ai->config.rmode |= RXMODE_RFMON | RXMODE_DISABLE_802_3_HEADER;
 					ai->config.scanMode = SCANMODE_PASSIVE;
-					ai->flags |= FLAG_802_11;
+					set_bit (FLAG_802_11, &ai->flags);
 				} else if ( line[0] == 'y' ) {
 					ai->config.rmode |= RXMODE_RFMON_ANYBSS | RXMODE_DISABLE_802_3_HEADER;
 					ai->config.scanMode = SCANMODE_PASSIVE;
-					ai->flags |= FLAG_802_11;
+					set_bit (FLAG_802_11, &ai->flags);
 				} else if ( line[0] == 'l' )
 					ai->config.rmode |= RXMODE_LANMON;
 			}
@@ -3341,9 +3410,9 @@ static void proc_config_on_close( struct inode *inode, struct file *file ) {
 		else if (!strncmp(line,"Radio: ", 7)) {
 			line += 7;
 			if (!strncmp(line,"off",3)) {
-				ai->flags |= FLAG_RADIO_OFF;
+				set_bit (FLAG_RADIO_OFF, &ai->flags);
 			} else {
-				ai->flags &= ~FLAG_RADIO_OFF;
+				clear_bit (FLAG_RADIO_OFF, &ai->flags);
 			}
 		}
 /*** NodeName processing */
@@ -3545,7 +3614,7 @@ static int proc_config_open( struct inode *inode, struct file *file ) {
 		     (ai->config.opmode & 0xFF) == 1 ? get_rmode(ai->config.rmode):
 		     (ai->config.opmode & 0xFF) == 2 ? "AP" :
 		     (ai->config.opmode & 0xFF) == 3 ? "AP RPTR" : "Error",
-		     ai->flags&FLAG_RADIO_OFF ? "off" : "on",
+		     test_bit(FLAG_RADIO_OFF, &ai->flags) ? "off" : "on",
 		     ai->config.nodeName,
 		     ai->config.powerSaveMode == 0 ? "CAM" :
 		     ai->config.powerSaveMode == 1 ? "PSP" :
@@ -4003,23 +4072,14 @@ static struct net_device_list {
    will switch WEP modes to see if that will help.  If the card is
    associated we will check every minute to see if anything has
    changed. */
-static void timer_func( u_long data ) {
-	struct net_device *dev = (struct net_device*)data;
+static void timer_func( struct net_device *dev ) {
 	struct airo_info *apriv = dev->priv;
-	u16 linkstat = IN4500(apriv, LINKSTAT);
 	Resp rsp;
 
-	if (!(apriv->flags & FLAG_FLASHING) && (linkstat != 0x400)) {
 /* We don't have a link so try changing the authtype */
-		if (down_trylock(&apriv->sem) != 0) {
-			apriv->timer.expires = RUN_AT(1);
-			add_timer(&apriv->timer);
-			return;
-		}
-
-		readConfigRid(apriv, 0);
-		disable_MAC(apriv, 0);
-		switch(apriv->config.authType) {
+	readConfigRid(apriv, 0);
+	disable_MAC(apriv, 0);
+	switch(apriv->config.authType) {
 		case AUTH_ENCRYPT:
 /* So drop to OPEN */
 			apriv->config.authType = AUTH_OPEN;
@@ -4038,31 +4098,21 @@ static void timer_func( u_long data ) {
 			break;
 		default:  /* We'll escalate to SHAREDKEY */
 			apriv->config.authType = AUTH_SHAREDKEY;
-		}
-		apriv->need_commit = 1;
-		writeConfigRid(apriv, 0);
-		enable_MAC(apriv, &rsp, 0);
-		up(&apriv->sem);
+	}
+	apriv->need_commit = 1;
+	writeConfigRid(apriv, 0);
+	enable_MAC(apriv, &rsp, 0);
+	up(&apriv->sem);
 
 /* Schedule check to see if the change worked */
-		apriv->timer.expires = RUN_AT(HZ*3);
-		add_timer(&apriv->timer);
-	}
+	clear_bit(JOB_AUTOWEP, &apriv->flags);
+	apriv->expires = RUN_AT(HZ*3);
 }
 
 static int add_airo_dev( struct net_device *dev ) {
 	struct net_device_list *node = kmalloc( sizeof( *node ), GFP_KERNEL );
 	if ( !node )
 		return -ENOMEM;
-
-	if ( auto_wep ) {
-		struct airo_info *apriv=dev->priv;
-		struct timer_list *timer = &apriv->timer;
-
-		timer->function = timer_func;
-		timer->data = (u_long)dev;
-		init_timer(timer);
-	}
 
 	node->dev = dev;
 	node->next = airo_devices;
@@ -4094,7 +4144,7 @@ static int __devinit airo_pci_probe(struct pci_dev *pdev,
 		return -ENODEV;
 
 	pci_set_drvdata(pdev, dev);
-	((struct airo_info *)dev->priv)->flags |= FLAG_PCI;
+	clear_bit (FLAG_PCI, &((struct airo_info *)dev->priv)->flags);
 	return 0;
 }
 
@@ -4140,7 +4190,7 @@ static void __exit airo_cleanup_module( void )
 	while( airo_devices ) {
 		printk( KERN_INFO "airo: Unregistering %s\n", airo_devices->dev->name );
 #ifdef CONFIG_PCI
-		if (((struct airo_info *)airo_devices->dev->priv)->flags & FLAG_PCI)
+		if (test_bit(FLAG_PCI, &((struct airo_info *)airo_devices->dev->priv)->flags))
 			is_pci = 1;
 #endif
 		stop_airo_card( airo_devices->dev, 1 );
@@ -4614,28 +4664,28 @@ static int airo_set_mode(struct net_device *dev,
 			local->config.opmode |= MODE_STA_IBSS;
 			local->config.rmode &= 0xfe00;
 			local->config.scanMode = SCANMODE_ACTIVE;
-			local->flags &= ~FLAG_802_11;
+			clear_bit (FLAG_802_11, &local->flags);
 			break;
 		case IW_MODE_INFRA:
 			local->config.opmode &= 0xFF00;
 			local->config.opmode |= MODE_STA_ESS;
 			local->config.rmode &= 0xfe00;
 			local->config.scanMode = SCANMODE_ACTIVE;
-			local->flags &= ~FLAG_802_11;
+			clear_bit (FLAG_802_11, &local->flags);
 			break;
 		case IW_MODE_MASTER:
 			local->config.opmode &= 0xFF00;
 			local->config.opmode |= MODE_AP;
 			local->config.rmode &= 0xfe00;
 			local->config.scanMode = SCANMODE_ACTIVE;
-			local->flags &= ~FLAG_802_11;
+			clear_bit (FLAG_802_11, &local->flags);
 			break;
 		case IW_MODE_REPEAT:
 			local->config.opmode &= 0xFF00;
 			local->config.opmode |= MODE_AP_RPTR;
 			local->config.rmode &= 0xfe00;
 			local->config.scanMode = SCANMODE_ACTIVE;
-			local->flags &= ~FLAG_802_11;
+			clear_bit (FLAG_802_11, &local->flags);
 			break;
 		case IW_MODE_MONITOR:
 			local->config.opmode &= 0xFF00;
@@ -4643,7 +4693,7 @@ static int airo_set_mode(struct net_device *dev,
 			local->config.rmode &= 0xfe00;
 			local->config.rmode |= RXMODE_RFMON | RXMODE_DISABLE_802_3_HEADER;
 			local->config.scanMode = SCANMODE_PASSIVE;
-			local->flags |= FLAG_802_11;
+			set_bit (FLAG_802_11, &local->flags);
 			break;
 		default:
 			return -EINVAL;
@@ -4832,14 +4882,14 @@ static int airo_set_txpow(struct net_device *dev,
 	readCapabilityRid(local, &cap_rid);
 
 	if (vwrq->disabled) {
-		local->flags |= FLAG_RADIO_OFF;
+		set_bit (FLAG_RADIO_OFF, &local->flags);
 		local->need_commit = 1;
 		return -EINPROGRESS;		/* Call commit handler */
 	}
 	if (vwrq->flags != IW_TXPOW_MWATT) {
 		return -EINVAL;
 	}
-	local->flags &= ~FLAG_RADIO_OFF;
+	clear_bit (FLAG_RADIO_OFF, &local->flags);
 	for (i = 0; cap_rid.txPowerLevels[i] && (i < 8); i++)
 		if ((vwrq->value==cap_rid.txPowerLevels[i])) {
 			local->config.txPower = vwrq->value;
@@ -4863,7 +4913,7 @@ static int airo_get_txpow(struct net_device *dev,
 
 	vwrq->value = local->config.txPower;
 	vwrq->fixed = 1;	/* No power control */
-	vwrq->disabled = (local->flags & FLAG_RADIO_OFF);
+	vwrq->disabled = test_bit(FLAG_RADIO_OFF, &local->flags);
 	vwrq->flags = IW_TXPOW_MWATT;
 
 	return 0;
@@ -5513,10 +5563,14 @@ static int airo_config_commit(struct net_device *dev,
 		writeSsidRid(local, &SSID_rid);
 		writeAPListRid(local, &APList_rid);
 	}
-	writeConfigRid(local, 1);
-	enable_MAC(local, &rsp, 1);
+	if (down_interruptible(&local->sem))
+		return -ERESTARTSYS;
+	writeConfigRid(local, 0);
+	enable_MAC(local, &rsp, 0);
 	if (local->need_commit > 1)
 		airo_set_promisc(local);
+	else
+		up(&local->sem);
 
 	return 0;
 }
@@ -6055,7 +6109,7 @@ static int readrids(struct net_device *dev, aironet_ioctl *comp) {
 	unsigned char *iobuf;
 	struct airo_info *ai = dev->priv;
 
-	if (ai->flags & FLAG_FLASHING)
+	if (test_bit(FLAG_FLASHING, &ai->flags))
 		return -EIO;
 
 	switch(comp->command)
@@ -6123,7 +6177,7 @@ static int writerids(struct net_device *dev, aironet_ioctl *comp) {
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
 
-	if (ai->flags & FLAG_FLASHING)
+	if (test_bit(FLAG_FLASHING, &ai->flags))
 		return -EIO;
 
 	ridcode = 0;
@@ -6197,13 +6251,13 @@ static int writerids(struct net_device *dev, aironet_ioctl *comp) {
 	if (comp->command == AIROPCFG) {
 		ConfigRid *cfg = (ConfigRid *)iobuf;
 
-		if (ai->flags & FLAG_MIC_CAPABLE)
+		if (test_bit(FLAG_MIC_CAPABLE, &ai->flags))
 			cfg->opmode |= MODE_MIC;
 
 		if ((cfg->opmode & 0xFF) == MODE_STA_IBSS)
-			ai->flags |= FLAG_ADHOC;
+			set_bit (FLAG_ADHOC, &ai->flags);
 		else
-			ai->flags &= ~FLAG_ADHOC;
+			clear_bit (FLAG_ADHOC, &ai->flags);
 	}
 
 	if((*writer)(ai, ridcode, iobuf,comp->len,1)) {
@@ -6314,7 +6368,7 @@ int cmdreset(struct airo_info *ai) {
  */
 
 int setflashmode (struct airo_info *ai) {
-	ai->flags |= FLAG_FLASHING;
+	set_bit (FLAG_FLASHING, &ai->flags);
 
 	OUT4500(ai, SWS0, FLASH_COMMAND);
 	OUT4500(ai, SWS1, FLASH_COMMAND);
@@ -6330,7 +6384,7 @@ int setflashmode (struct airo_info *ai) {
 	schedule_timeout (HZ/2); /* 500ms delay */
 
 	if(!waitbusy(ai)) {
-		ai->flags &= ~FLAG_FLASHING;
+		clear_bit (FLAG_FLASHING, &ai->flags);
 		printk(KERN_INFO "Waitbusy hang after setflash mode\n");
 		return -EIO;
 	}
@@ -6436,7 +6490,7 @@ int flashrestart(struct airo_info *ai,struct net_device *dev){
 
 	set_current_state (TASK_UNINTERRUPTIBLE);
 	schedule_timeout (HZ);          /* Added 12/7/00 */
-	ai->flags &= ~FLAG_FLASHING;
+	clear_bit (FLAG_FLASHING, &ai->flags);
 	status = setup_card(ai, dev->dev_addr);
 
 	for( i = 0; i < MAX_FIDS; i++ ) {
