@@ -304,6 +304,7 @@ EXPORT_SYMBOL(xfrm_state_register_afinfo);
 EXPORT_SYMBOL(xfrm_state_unregister_afinfo);
 EXPORT_SYMBOL(xfrm_state_get_afinfo);
 EXPORT_SYMBOL(xfrm_state_put_afinfo);
+EXPORT_SYMBOL(xfrm_state_delete_tunnel);
 EXPORT_SYMBOL(xfrm_replay_check);
 EXPORT_SYMBOL(xfrm_replay_advance);
 EXPORT_SYMBOL(xfrm_check_selectors);
