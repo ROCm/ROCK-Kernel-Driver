@@ -1092,13 +1092,7 @@ static inline char *dmastr(void)
 		return "(dma IN)";
 }
 
-/* if we're trying to save space, don't bother with this proc file */
-
-#if defined(CONFIG_PROC_FS) && !defined(CONFIG_EMBEDDED)
-#  define	UDC_PROC_FILE
-#endif
-
-#ifdef UDC_PROC_FILE
+#ifdef CONFIG_USB_GADGET_DEBUG_FILES
 
 static const char proc_node_name [] = "driver/udc";
 
@@ -1312,7 +1306,7 @@ done:
 	return count - size;
 }
 
-#endif	/* UDC_PROC_FILE */
+#endif	/* CONFIG_USB_GADGET_DEBUG_FILES */
 
 /*-------------------------------------------------------------------------*/
 
@@ -1815,7 +1809,7 @@ static void goku_remove(struct pci_dev *pdev)
 		usb_gadget_unregister_driver(dev->driver);
 	}
 
-#ifdef	UDC_PROC_FILE
+#ifdef CONFIG_USB_GADGET_DEBUG_FILES
 	remove_proc_entry(proc_node_name, NULL);
 #endif
 	if (dev->regs)
@@ -1933,7 +1927,7 @@ static int goku_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		pci_set_master(pdev);
 
 
-#ifdef	UDC_PROC_FILE
+#ifdef CONFIG_USB_GADGET_DEBUG_FILES
 	create_proc_read_entry(proc_node_name, 0, NULL, udc_proc_read, dev);
 #endif
 

@@ -76,7 +76,6 @@
 #define	EP_DONTUSE		13	/* nonzero */
 
 #define USE_RDK_LEDS		/* GPIO pins control three LEDs */
-#define USE_SYSFS_DEBUG_FILES
 
 
 static const char driver_name [] = "net2280";
@@ -117,7 +116,7 @@ module_param (fifo_mode, ushort, 0644);
 
 #define	DIR_STRING(bAddress) (((bAddress) & USB_DIR_IN) ? "in" : "out")
 
-#if defined(USE_SYSFS_DEBUG_FILES) || defined (DEBUG)
+#if defined(CONFIG_USB_GADGET_DEBUG_FILES) || defined (DEBUG)
 static char *type_string (u8 bmAttributes)
 {
 	switch ((bmAttributes) & USB_ENDPOINT_XFERTYPE_MASK) {
@@ -1449,7 +1448,12 @@ static const struct usb_gadget_ops net2280_ops = {
 
 /*-------------------------------------------------------------------------*/
 
-#ifdef	USE_SYSFS_DEBUG_FILES
+#ifdef	CONFIG_USB_GADGET_DEBUG_FILES
+
+/* FIXME move these into procfs, and use seq_file.
+ * Sysfs _still_ doesn't behave for arbitrarily sized files,
+ * and also doesn't help products using this with 2.4 kernels.
+ */
 
 /* "function" sysfs attribute */
 static ssize_t

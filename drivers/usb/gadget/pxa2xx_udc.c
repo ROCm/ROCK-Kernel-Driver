@@ -91,10 +91,6 @@ static const char ep0name [] = "ep0";
 // #define	USE_OUT_DMA
 // #define	DISABLE_TEST_MODE
 
-#ifdef CONFIG_PROC_FS
-#define	UDC_PROC_FILE
-#endif
-
 #ifdef CONFIG_ARCH_IXP4XX
 #undef USE_DMA
 
@@ -107,12 +103,6 @@ static const char ep0name [] = "ep0";
 
 #include "pxa2xx_udc.h"
 
-
-#ifdef CONFIG_EMBEDDED
-/* few strings, and little code to use them */
-#undef	DEBUG
-#undef	UDC_PROC_FILE
-#endif
 
 #ifdef	USE_DMA
 static int use_dma = 1;
@@ -1211,7 +1201,7 @@ static const struct usb_gadget_ops pxa2xx_udc_ops = {
 
 /*-------------------------------------------------------------------------*/
 
-#ifdef UDC_PROC_FILE
+#ifdef CONFIG_USB_GADGET_DEBUG_FILES
 
 static const char proc_node_name [] = "driver/udc";
 
@@ -1367,11 +1357,12 @@ done:
 #define remove_proc_files() \
 	remove_proc_entry(proc_node_name, NULL)
 
-#else	/* !UDC_PROC_FILE */
+#else	/* !CONFIG_USB_GADGET_DEBUG_FILES */
+
 #define create_proc_files() do {} while (0)
 #define remove_proc_files() do {} while (0)
 
-#endif	/* UDC_PROC_FILE */
+#endif	/* CONFIG_USB_GADGET_DEBUG_FILES */
 
 /* "function" sysfs attribute */
 static ssize_t

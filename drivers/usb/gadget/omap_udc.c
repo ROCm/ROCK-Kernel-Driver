@@ -1976,7 +1976,7 @@ EXPORT_SYMBOL(usb_gadget_unregister_driver);
 
 /*-------------------------------------------------------------------------*/
 
-#ifdef CONFIG_USB_OMAP_PROC
+#ifdef CONFIG_USB_GADGET_DEBUG_FILES
 
 #include <linux/seq_file.h>
 
