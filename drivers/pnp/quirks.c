@@ -111,28 +111,6 @@ static void quirk_sb16audio_resources(struct pnp_dev *dev)
 	return;
 }
 
-extern int pnp_allow_dma0;
-static void quirk_opl3sax_resources(struct pnp_dev *dev)
-{
-	/* This really isn't a device quirk but isapnp core code
-	 * doesn't allow a DMA channel of 0, afflicted card is an
-	 * OPL3Sax where x=4.
-	 */
-	struct pnp_option *res;
-	int max;
-	res = dev->dependent;
-	max = 0;
-	for (; res; res = res->next) {
-		if (res->dma->map > max)
-			max = res->dma->map;
-	}
-	if (max == 1 && pnp_allow_dma0 == -1) {
-		printk(KERN_INFO "pnp: opl3sa4 quirk: Allowing dma 0.\n");
-		pnp_allow_dma0 = 1;
-	}
-	return;
-}
-
 /*
  *  PnP Quirks
  *  Cards or devices that need some tweaking due to incomplete resource info
@@ -153,7 +131,6 @@ static struct pnp_fixup pnp_fixups[] = {
 	{ "CTL0043", quirk_sb16audio_resources },
 	{ "CTL0044", quirk_sb16audio_resources },
 	{ "CTL0045", quirk_sb16audio_resources },
-	{ "YMH0021", quirk_opl3sax_resources },
 	{ "" }
 };
 
@@ -170,4 +147,3 @@ void pnp_fixup_device(struct pnp_dev *dev)
 		i++;
 	}
 }
-
