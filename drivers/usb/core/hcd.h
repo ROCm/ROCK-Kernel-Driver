@@ -244,16 +244,9 @@ extern struct usb_device *usb_alloc_dev(struct usb_device *parent,
 					struct usb_bus *, unsigned port);
 extern int usb_new_device(struct usb_device *dev);
 extern void usb_disconnect(struct usb_device **);
-extern void usb_choose_address(struct usb_device *dev);
-extern void usb_release_address(struct usb_device *dev);
 
-/* exported to hub driver ONLY to support usb_reset_device () */
 extern int usb_get_configuration(struct usb_device *dev);
 extern void usb_destroy_configuration(struct usb_device *dev);
-
-/* use these only before the device's address has been set */
-#define usb_snddefctrl(dev)		((PIPE_CONTROL << 30))
-#define usb_rcvdefctrl(dev)		((PIPE_CONTROL << 30) | USB_DIR_IN)
 
 /*-------------------------------------------------------------------------*/
 

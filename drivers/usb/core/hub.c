@@ -832,6 +832,234 @@ static void hub_start_disconnect(struct usb_device *hdev)
 	dev_err(&hdev->dev, "cannot disconnect hub!\n");
 }
 
+
+static void choose_address(struct usb_device *udev)
+{
+	int		devnum;
+	struct usb_bus	*bus = udev->bus;
+
+	/* If khubd ever becomes multithreaded, this will need a lock */
+
+	/* Try to allocate the next devnum beginning at bus->devnum_next. */
+	devnum = find_next_zero_bit(bus->devmap.devicemap, 128,
+			bus->devnum_next);
+	if (devnum >= 128)
+		devnum = find_next_zero_bit(bus->devmap.devicemap, 128, 1);
+
+	bus->devnum_next = ( devnum >= 127 ? 1 : devnum + 1);
+
+	if (devnum < 128) {
+		set_bit(devnum, bus->devmap.devicemap);
+		udev->devnum = devnum;
+	}
+}
+
+static void release_address(struct usb_device *udev)
+{
+	if (udev->devnum > 0) {
+		clear_bit(udev->devnum, udev->bus->devmap.devicemap);
+		udev->devnum = -1;
+	}
+}
+
+/**
+ * usb_disconnect - disconnect a device (usbcore-internal)
+ * @pdev: pointer to device being disconnected
+ * Context: !in_interrupt ()
+ *
+ * Something got disconnected. Get rid of it, and all of its children.
+ *
+ * Only hub drivers (including virtual root hub drivers for host
+ * controllers) should ever call this.
+ *
+ * This call is synchronous, and may not be used in an interrupt context.
+ */
+void usb_disconnect(struct usb_device **pdev)
+{
+	struct usb_device	*udev = *pdev;
+	struct usb_bus		*bus;
+	struct usb_operations	*ops;
+	int			i;
+
+	if (!udev) {
+		pr_debug ("%s nodev\n", __FUNCTION__);
+		return;
+	}
+	bus = udev->bus;
+	if (!bus) {
+		pr_debug ("%s nobus\n", __FUNCTION__);
+		return;
+	}
+	ops = bus->op;
+
+	*pdev = NULL;
+
+	/* mark the device as inactive, so any further urb submissions for
+	 * this device will fail.
+	 */
+	udev->state = USB_STATE_NOTATTACHED;
+	down(&udev->serialize);
+
+	dev_info (&udev->dev, "USB disconnect, address %d\n", udev->devnum);
+
+	/* Free up all the children before we remove this device */
+	for (i = 0; i < USB_MAXCHILDREN; i++) {
+		struct usb_device **child = udev->children + i;
+		if (*child)
+			usb_disconnect(child);
+	}
+
+	/* deallocate hcd/hardware state ... nuking all pending urbs and
+	 * cleaning up all state associated with the current configuration
+	 */
+	usb_disable_device(udev, 0);
+
+	/* Free the device number and remove the /proc/bus/usb entry */
+	dev_dbg (&udev->dev, "unregistering device\n");
+	release_address(udev);
+	usbfs_remove_device(udev);
+	up(&udev->serialize);
+	device_unregister(&udev->dev);
+}
+
+static int choose_configuration(struct usb_device *udev)
+{
+	int c, i;
+
+	/* NOTE: this should interact with hub power budgeting */
+
+	c = udev->config[0].desc.bConfigurationValue;
+	if (udev->descriptor.bNumConfigurations != 1) {
+		for (i = 0; i < udev->descriptor.bNumConfigurations; i++) {
+			struct usb_interface_descriptor	*desc;
+
+			/* heuristic:  Linux is more likely to have class
+			 * drivers, so avoid vendor-specific interfaces.
+			 */
+			desc = &udev->config[i].intf_cache[0]
+					->altsetting->desc;
+			if (desc->bInterfaceClass == USB_CLASS_VENDOR_SPEC)
+				continue;
+			/* COMM/2/all is CDC ACM, except 0xff is MSFT RNDIS */
+			if (desc->bInterfaceClass == USB_CLASS_COMM
+					&& desc->bInterfaceSubClass == 2
+					&& desc->bInterfaceProtocol == 0xff)
+				continue;
+			c = udev->config[i].desc.bConfigurationValue;
+			break;
+		}
+		dev_info(&udev->dev,
+			"configuration #%d chosen from %d choices\n",
+			c, udev->descriptor.bNumConfigurations);
+	}
+	return c;
+}
+
+#ifdef DEBUG
+static void show_string(struct usb_device *udev, char *id, int index)
+{
+	char *buf;
+
+	if (!index)
+		return;
+	if (!(buf = kmalloc(256, GFP_KERNEL)))
+		return;
+	if (usb_string(udev, index, buf, 256) > 0)
+		dev_printk(KERN_INFO, &udev->dev, "%s: %s\n", id, buf);
+	kfree(buf);
+}
+
+#else
+static inline void show_string(struct usb_device *udev, char *id, int index)
+{}
+#endif
+
+/*
+ * usb_new_device - perform initial device setup (usbcore-internal)
+ * @dev: newly addressed device (in ADDRESS state)
+ *
+ * This is called with devices which have been enumerated, but not yet
+ * configured.  The device descriptor is available, but not descriptors
+ * for any device configuration.  The caller owns dev->serialize, and
+ * the device is not visible through sysfs or other filesystem code.
+ *
+ * Returns 0 for success (device is configured and listed, with its
+ * interfaces, in sysfs); else a negative errno value.  On error, one
+ * reference count to the device has been dropped.
+ *
+ * This call is synchronous, and may not be used in an interrupt context.
+ *
+ * Only the hub driver should ever call this; root hub registration
+ * uses it only indirectly.
+ */
+int usb_new_device(struct usb_device *udev)
+{
+	int err;
+	int c;
+
+	err = usb_get_configuration(udev);
+	if (err < 0) {
+		dev_err(&udev->dev, "can't read configurations, error %d\n",
+			err);
+		goto fail;
+	}
+
+	/* Tell the world! */
+	dev_dbg(&udev->dev, "new device strings: Mfr=%d, Product=%d, "
+			"SerialNumber=%d\n",
+			udev->descriptor.iManufacturer,
+			udev->descriptor.iProduct,
+			udev->descriptor.iSerialNumber);
+
+	if (udev->descriptor.iProduct)
+		show_string(udev, "Product",
+				udev->descriptor.iProduct);
+	if (udev->descriptor.iManufacturer)
+		show_string(udev, "Manufacturer",
+				udev->descriptor.iManufacturer);
+	if (udev->descriptor.iSerialNumber)
+		show_string(udev, "SerialNumber",
+				udev->descriptor.iSerialNumber);
+
+	/* put device-specific files into sysfs */
+	err = device_add (&udev->dev);
+	if (err) {
+		dev_err(&udev->dev, "can't device_add, error %d\n", err);
+		goto fail;
+	}
+	usb_create_sysfs_dev_files (udev);
+
+	/* choose and set the configuration. that registers the interfaces
+	 * with the driver core, and lets usb device drivers bind to them.
+	 */
+	c = choose_configuration(udev);
+	if (c < 0)
+		dev_warn(&udev->dev,
+				"can't choose an initial configuration\n");
+	else {
+		err = usb_set_configuration(udev, c);
+		if (err) {
+			dev_err(&udev->dev, "can't set config #%d, error %d\n",
+					c, err);
+			device_del(&udev->dev);
+			goto fail;
+		}
+	}
+
+	/* USB device state == configured ... usable */
+
+	/* add a /proc/bus/usb entry */
+	usbfs_add_device(udev);
+	return 0;
+
+fail:
+	udev->state = USB_STATE_NOTATTACHED;
+	release_address(udev);
+	usb_put_dev(udev);
+	return err;
+}
+
+
 static int hub_port_status(struct usb_device *hdev, int port,
 			       u16 *status, u16 *change)
 {
@@ -1024,7 +1252,7 @@ static int hub_set_address(struct usb_device *udev)
 	if (udev->state != USB_STATE_DEFAULT &&
 			udev->state != USB_STATE_ADDRESS)
 		return -EINVAL;
-	retval = usb_control_msg(udev, usb_snddefctrl(udev),
+	retval = usb_control_msg(udev, (PIPE_CONTROL << 30) /* Address 0 */,
 		USB_REQ_SET_ADDRESS, 0, udev->devnum, 0,
 		NULL, 0, HZ * USB_CTRL_SET_TIMEOUT);
 	if (retval == 0)
@@ -1098,7 +1326,7 @@ hub_port_init (struct usb_device *hdev, struct usb_device *udev, int port)
  
 	/* set the address */
 	if (udev->devnum <= 0) {
-		usb_choose_address(udev);
+		choose_address(udev);
 		if (udev->devnum <= 0)
 			goto fail;
 
@@ -1153,7 +1381,7 @@ hub_port_init (struct usb_device *hdev, struct usb_device *udev, int port)
 				udev->devnum, retval);
  fail:
 			hub_port_disable(hdev, port);
-			usb_release_address(udev);
+			release_address(udev);
 			usb_put_dev(udev);
 			up(&usb_address0_sem);
 			return retval;
