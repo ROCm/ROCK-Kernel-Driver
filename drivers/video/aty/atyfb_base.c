@@ -984,7 +984,6 @@ static int atyfb_release(struct fb_info *info, int user)
 						var.yres_virtual =
 						    var.yres;
 				}
-				gen_set_var(&var, -1, info);
 			}
 		}
 	} 
@@ -1249,16 +1248,14 @@ static void atyfb_palette(int enter)
 {
 	struct fb_info *info;
 	struct atyfb_par *par;
-	struct display *d;
 	int i;
 
-	for (i = 0; i < MAX_NR_CONSOLES; i++) {
-		d = &fb_display[i];
-		if (d->fb_info &&
-		    d->fb_info->fbops == &atyfb_ops &&
-		    d->fb_info->display_fg &&
-		    d->fb_info->display_fg->vc_num == i) {
-			info = d->fb_info;
+	for (i = 0; i < FB_MAX; i++) {
+		info = registered_fb[i];
+		if (info &&
+		    info->fbops == &atyfb_ops &&
+		    info->display_fg &&
+		    info->display_fg->vc_num == i) {
 			par = (struct atyfb_par *) info->par;
 			
 			atyfb_save_palette(par, enter);
