@@ -893,8 +893,8 @@ static int meye_release(struct inode *inode, struct file *file) {
 	return 0;
 }
 
-static int meye_ioctl(struct inode *inode, struct file *file,
-		      unsigned int cmd, void *arg) {
+static int meye_do_ioctl(struct inode *inode, struct file *file,
+			 unsigned int cmd, void *arg) {
 
 	switch (cmd) {
 
@@ -1169,6 +1169,12 @@ static int meye_ioctl(struct inode *inode, struct file *file,
 	return 0;
 }
 
+static int meye_ioctl(struct inode *inode, struct file *file,
+		     unsigned int cmd, unsigned long arg)
+{
+	return video_usercopy(inode, file, cmd, arg, meye_do_ioctl);
+}
+
 static int meye_mmap(struct file *file, struct vm_area_struct *vma) {
 	unsigned long start = vma->vm_start;
 	unsigned long size  = vma->vm_end - vma->vm_start;
@@ -1209,7 +1215,7 @@ static struct file_operations meye_fops = {
 	open:		meye_open,
 	release:	meye_release,
 	mmap:		meye_mmap,
-	ioctl:		video_generic_ioctl,
+	ioctl:		meye_ioctl,
 	llseek:		no_llseek,
 };
 
@@ -1219,7 +1225,6 @@ static struct video_device meye_template = {
 	type:		VID_TYPE_CAPTURE,
 	hardware:	VID_HARDWARE_MEYE,
 	fops:		&meye_fops,
-	kernel_ioctl:	meye_ioctl,
 };
 
 static int __devinit meye_probe(struct pci_dev *pcidev, 
