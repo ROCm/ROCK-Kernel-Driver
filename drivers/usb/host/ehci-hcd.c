@@ -65,6 +65,8 @@
  *
  * HISTORY:
  *
+ * 2002-08-06	Handling for bulk and interrupt transfers is mostly shared;
+ *	only scheduling is different, no arbitrary limitations.
  * 2002-07-25	Sanity check PCI reads, mostly for better cardbus support,
  * 	clean up HC run state handshaking.
  * 2002-05-24	Preliminary FS/LS interrupts, using scheduling shortcuts
@@ -85,13 +87,15 @@
  * 2001-June	Works with usb-storage and NEC EHCI on 2.4
  */
 
-#define DRIVER_VERSION "2002-Jul-25"
+#define DRIVER_VERSION "2002-Aug-06"
 #define DRIVER_AUTHOR "David Brownell"
 #define DRIVER_DESC "USB 2.0 'Enhanced' Host Controller (EHCI) Driver"
 
 
 // #define EHCI_VERBOSE_DEBUG
 // #define have_split_iso
+
+#define INTR_AUTOMAGIC		/* to be removed later in 2.5 */
 
 /* magic numbers that can affect system performance */
 #define	EHCI_TUNE_CERR		3	/* 0-3 qtd retries; 0 == don't stop */
@@ -618,7 +622,8 @@ dead:
  *
  * hcd-specific init for hcpriv hasn't been done yet
  *
- * NOTE:  EHCI queues control and bulk requests transparently, like OHCI.
+ * NOTE:  control, bulk, and interrupt share the same code to append TDs
+ * to a (possibly active) QH, and the same QH scanning code.
  */
 static int ehci_urb_enqueue (
 	struct usb_hcd	*hcd,
@@ -694,17 +699,35 @@ static int ehci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 		if (qh->qh_state == QH_STATE_LINKED)
 			start_unlink_async (ehci, qh);
 		spin_unlock_irqrestore (&ehci->lock, flags);
-		return 0;
+		break;
 
 	case PIPE_INTERRUPT:
-		intr_deschedule (ehci, urb->start_frame, qh,
-			(urb->dev->speed == USB_SPEED_HIGH)
-			    ? urb->interval
-			    : (urb->interval << 3));
-		if (ehci->hcd.state == USB_STATE_HALT)
-			urb->status = -ESHUTDOWN;
-		qh_completions (ehci, qh, 1);
-		return 0;
+		if (qh->qh_state == QH_STATE_LINKED) {
+			/* messy, can spin or block a microframe ... */
+			intr_deschedule (ehci, qh, 1);
+			/* qh_state == IDLE */
+		}
+		qh_completions (ehci, qh);
+
+		/* reschedule QH iff another request is queued */
+		if (!list_empty (&qh->qtd_list)
+				&& HCD_IS_RUNNING (ehci->hcd.state)) {
+			int status;
+
+			spin_lock_irqsave (&ehci->lock, flags);
+			status = qh_schedule (ehci, qh);
+			spin_unlock_irqrestore (&ehci->lock, flags);
+
+			if (status != 0) {
+				// shouldn't happen often, but ...
+				// FIXME kill those tds' urbs
+				err ("can't reschedule qh %p, err %d",
+					qh, status);
+			}
+			return status;
+		}
+
+		break;
 
 	case PIPE_ISOCHRONOUS:
 		// itd or sitd ...

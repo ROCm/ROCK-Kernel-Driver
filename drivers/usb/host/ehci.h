@@ -299,6 +299,7 @@ struct ehci_qh {
 	u8			c_usecs;	/* ... split completion bw */
 	unsigned short		period;		/* polling interval */
 	unsigned short		start;		/* where polling starts */
+#define NO_FRAME ((unsigned short)~0)			/* pick new start */
 
 } __attribute__ ((aligned (32)));
 
