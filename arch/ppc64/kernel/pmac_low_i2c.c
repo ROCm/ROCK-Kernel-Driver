@@ -50,7 +50,7 @@ struct low_i2c_host
 	struct device_node	*np;		/* OF device node */
 	struct semaphore	mutex;		/* Access mutex for use by i2c-keywest */
 	low_i2c_func_t		func;		/* Access function */
-	int			is_open : 1;	/* Poor man's access control */
+	unsigned		is_open : 1;	/* Poor man's access control */
 	int			mode;		/* Current mode */
 	int			channel;	/* Current channel */
 	int			num_channels;	/* Number of channels */

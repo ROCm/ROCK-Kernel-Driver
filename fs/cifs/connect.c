@@ -64,11 +64,11 @@ struct smb_vol {
 	gid_t linux_gid;
 	mode_t file_mode;
 	mode_t dir_mode;
-	int rw:1;
-	int retry:1;
-	int intr:1;
-	int setuids:1;
-	int noperm:1;
+	unsigned rw:1;
+	unsigned retry:1;
+	unsigned intr:1;
+	unsigned setuids:1;
+	unsigned noperm:1;
 	unsigned int rsize;
 	unsigned int wsize;
 	unsigned int sockopt;
