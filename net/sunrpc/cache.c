@@ -163,6 +163,7 @@ static int current_index;
 
 static struct file_operations cache_file_operations;
 static struct file_operations content_file_operations;
+static struct file_operations cache_flush_operations;
 
 void cache_register(struct cache_detail *cd)
 {
@@ -171,6 +172,14 @@ void cache_register(struct cache_detail *cd)
 		struct proc_dir_entry *p;
 		cd->proc_ent->owner = THIS_MODULE;
 		
+ 		p = create_proc_entry("flush", S_IFREG|S_IRUSR|S_IWUSR,
+ 				      cd->proc_ent);
+ 		if (p) {
+ 			p->proc_fops = &cache_flush_operations;
+ 			p->owner = THIS_MODULE;
+ 			p->data = cd;
+ 		}
+ 
 		if (cd->cache_request || cd->cache_parse) {
 			p = create_proc_entry("channel", S_IFREG|S_IRUSR|S_IWUSR,
 					      cd->proc_ent);
@@ -1082,4 +1091,54 @@ static struct file_operations content_file_operations = {
 	.read		= seq_read,
 	.llseek		= seq_lseek,
 	.release	= content_release,
+};
+
+static ssize_t read_flush(struct file *file, char *buf,
+			    size_t count, loff_t *ppos)
+{
+	struct cache_detail *cd = PDE(file->f_dentry->d_inode)->data;
+	char tbuf[20];
+	unsigned long p = *ppos;
+	int len;
+
+	sprintf(tbuf, "%lu\n", cd->flush_time);
+	len = strlen(tbuf);
+	if (p >= len)
+		return 0;
+	len -= p;
+	if (len > count) len = count;
+	if (copy_to_user(buf, (void*)(tbuf+p), len))
+		len = -EFAULT;
+	else
+		*ppos += len;
+	return len;
+}
+
+static ssize_t write_flush(struct file * file, const char * buf,
+			     size_t count, loff_t *ppos)
+{
+	struct cache_detail *cd = PDE(file->f_dentry->d_inode)->data;
+	char tbuf[20];
+	char *ep;
+	long flushtime;
+	if (*ppos || count > sizeof(tbuf)-1)
+		return -EINVAL;
+	if (copy_from_user(tbuf, buf, count))
+		return -EFAULT;
+	tbuf[count] = 0;
+	flushtime = simple_strtoul(tbuf, &ep, 0);
+	if (*ep && *ep != '\n')
+		return -EINVAL;
+
+	cd->flush_time = flushtime;
+	cd->nextcheck = get_seconds();
+	cache_flush();
+
+	*ppos += count;
+	return count;
+}
+
+static struct file_operations cache_flush_operations = {
+	.read		= read_flush,
+	.write		= write_flush,
 };
