@@ -11,7 +11,7 @@
 
 #include <linux/config.h>
 #include <linux/kernel.h>
-#include <linux/proc_fs.h>
+#include <linux/debugfs.h>
 #include <linux/smp_lock.h>
 #include <asm/io.h>
 
@@ -496,19 +496,18 @@ static int uhci_sprint_schedule(struct uhci_hcd *uhci, char *buf, int len)
 
 #define MAX_OUTPUT	(64 * 1024)
 
-static struct proc_dir_entry *uhci_proc_root = NULL;
+static struct dentry *uhci_debugfs_root = NULL;
 
-struct uhci_proc {
+struct uhci_debug {
 	int size;
 	char *data;
 	struct uhci_hcd *uhci;
 };
 
-static int uhci_proc_open(struct inode *inode, struct file *file)
+static int uhci_debug_open(struct inode *inode, struct file *file)
 {
-	const struct proc_dir_entry *dp = PDE(inode);
-	struct uhci_hcd *uhci = dp->data;
-	struct uhci_proc *up;
+	struct uhci_hcd *uhci = inode->u.generic_ip;
+	struct uhci_debug *up;
 	int ret = -ENOMEM;
 
 	lock_kernel();
@@ -532,9 +531,9 @@ out:
 	return ret;
 }
 
-static loff_t uhci_proc_lseek(struct file *file, loff_t off, int whence)
+static loff_t uhci_debug_lseek(struct file *file, loff_t off, int whence)
 {
-	struct uhci_proc *up;
+	struct uhci_debug *up;
 	loff_t new = -1;
 
 	lock_kernel();
@@ -556,16 +555,16 @@ static loff_t uhci_proc_lseek(struct file *file, loff_t off, int whence)
 	return (file->f_pos = new);
 }
 
-static ssize_t uhci_proc_read(struct file *file, char __user *buf,
+static ssize_t uhci_debug_read(struct file *file, char __user *buf,
 				size_t nbytes, loff_t *ppos)
 {
-	struct uhci_proc *up = file->private_data;
+	struct uhci_debug *up = file->private_data;
 	return simple_read_from_buffer(buf, nbytes, ppos, up->data, up->size);
 }
 
-static int uhci_proc_release(struct inode *inode, struct file *file)
+static int uhci_debug_release(struct inode *inode, struct file *file)
 {
-	struct uhci_proc *up = file->private_data;
+	struct uhci_debug *up = file->private_data;
 
 	kfree(up->data);
 	kfree(up);
@@ -573,11 +572,10 @@ static int uhci_proc_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static struct file_operations uhci_proc_operations = {
-	.open =		uhci_proc_open,
-	.llseek =	uhci_proc_lseek,
-	.read =		uhci_proc_read,
-//	write:		uhci_proc_write,
-	.release =	uhci_proc_release,
+static struct file_operations uhci_debug_operations = {
+	.open =		uhci_debug_open,
+	.llseek =	uhci_debug_lseek,
+	.read =		uhci_debug_read,
+	.release =	uhci_debug_release,
 };
 #endif

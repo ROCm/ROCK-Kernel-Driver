@@ -326,10 +326,8 @@ enum uhci_state {
 struct uhci_hcd {
 	struct usb_hcd hcd;		/* must come first! */
 
-#ifdef CONFIG_PROC_FS
-	/* procfs */
-	struct proc_dir_entry *proc_entry;
-#endif
+	/* debugfs */
+	struct dentry *dentry;
 
 	/* Grabbed from PCI */
 	unsigned long io_addr;
