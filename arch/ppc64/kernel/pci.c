@@ -815,9 +815,6 @@ EXPORT_SYMBOL(pcibios_fixup_device_resources);
 void __devinit pcibios_fixup_bus(struct pci_bus *bus)
 {
 	struct pci_controller *hose = PCI_GET_PHB_PTR(bus);
-	struct list_head *ln;
-
-	/* XXX or bus->parent? */
 	struct pci_dev *dev = bus->self;
 	struct resource *res;
 	int i;
@@ -827,18 +824,13 @@ void __devinit pcibios_fixup_bus(struct pci_bus *bus)
 
 		hose->bus = bus;
 		bus->resource[0] = res = &hose->io_resource;
-		if (!res->flags)
-			BUG();	/* No I/O resource for this PHB? */
 
-		if (request_resource(&ioport_resource, res))
+		if (res->flags && request_resource(&ioport_resource, res))
 			printk(KERN_ERR "Failed to request IO on "
 					"PCI domain %d\n", pci_domain_nr(bus));
 
-
 		for (i = 0; i < 3; ++i) {
 			res = &hose->mem_resources[i];
-			if (!res->flags && i == 0)
-				BUG();	/* No memory resource for this PHB? */
 			bus->resource[i+1] = res;
 			if (res->flags && request_resource(&iomem_resource, res))
 				printk(KERN_ERR "Failed to request MEM on "
@@ -853,12 +845,10 @@ void __devinit pcibios_fixup_bus(struct pci_bus *bus)
 		pcibios_fixup_device_resources(dev, bus);
 	}
 
-	/* XXX Need to check why Alpha doesnt do this - Anton */
 	if (!pci_probe_only)
 		return;
 
-	for (ln = bus->devices.next; ln != &bus->devices; ln = ln->next) {
-		struct pci_dev *dev = pci_dev_b(ln);
+	list_for_each_entry(dev, &bus->devices, bus_list) {
 		if ((dev->class >> 8) != PCI_CLASS_BRIDGE_PCI)
 			pcibios_fixup_device_resources(dev, bus);
 	}
