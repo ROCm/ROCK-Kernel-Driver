@@ -24,6 +24,7 @@
 
 #define CPUFREQ_NAME_LEN 16
 
+#define CPUFREQ_ALL_CPUS	((NR_CPUS))
 
 /*********************************************************************
  *                     CPUFREQ NOTIFIER INTERFACE                    *

@@ -12,9 +12,6 @@
 #include <linux/proc_fs.h>
 #include <asm/uaccess.h>
 
-
-#define CPUFREQ_ALL_CPUS		((NR_CPUS))
-
 /**
  * cpufreq_parse_policy - parse a policy string
  * @input_string: the string to parse.
@@ -164,7 +161,7 @@ end:
  */
 static int cpufreq_proc_write (
         struct file		*file,
-        const char		*buffer,
+        const char		__user *buffer,
         unsigned long		count,
         void			*data)
 {
