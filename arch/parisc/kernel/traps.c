@@ -123,31 +123,6 @@ void dump_stack(void)
 
 
 static int kstack_depth_to_print = 48;
-extern struct module kernel_module;
-
-static inline int kernel_text_address(unsigned long addr)
-{
-#ifdef CONFIG_MODULES
-	struct module *mod;
-#endif
-	extern char _stext, _etext;
-
-	if (addr >= (unsigned long) &_stext &&
-	    addr <= (unsigned long) &_etext)
-		return 1;
-
-#ifdef CONFIG_MODULES
-	for (mod = module_list; mod != &kernel_module; mod = mod->next) {
-		/* mod_bound tests for addr being inside the vmalloc'ed
-		 * module area. Of course it'd be better to test only
-		 * for the .text subset... */
-		if (mod_bound(addr, 0, mod))
-			return 1;
-	}
-#endif
-
-	return 0;
-}
 
 void show_stack(unsigned long *sp)
 {

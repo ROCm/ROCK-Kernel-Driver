@@ -84,6 +84,7 @@ extern unsigned long long memparse(char *ptr, char **retptr);
 extern void dev_probe_lock(void);
 extern void dev_probe_unlock(void);
 
+extern int kernel_text_address(unsigned long addr);
 extern int session_of_pgrp(int pgrp);
 
 asmlinkage int printk(const char * fmt, ...)

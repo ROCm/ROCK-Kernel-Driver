@@ -234,6 +234,9 @@ static inline int module_is_live(struct module *mod)
 	return mod->state != MODULE_STATE_GOING;
 }
 
+/* Is this address in a module? */
+int module_text_address(unsigned long addr);
+
 #ifdef CONFIG_MODULE_UNLOAD
 
 void __symbol_put(const char *symbol);
@@ -322,6 +325,12 @@ static inline const struct exception_table_entry *
 search_module_extables(unsigned long addr)
 {
 	return NULL;
+}
+
+/* Is this address in a module? */
+static int module_text_address(unsigned long addr)
+{
+	return 0;
 }
 
 /* Get/put a kernel symbol (calls should be symmetric) */
@@ -426,14 +435,6 @@ extern int module_dummy_usage;
 #define GET_USE_COUNT(module) (module_dummy_usage)
 #define MOD_IN_USE 0
 #define __MODULE_STRING(x) __stringify(x)
-#define __mod_between(a_start, a_len, b_start, b_len)		\
-(((a_start) >= (b_start) && (a_start) <= (b_start)+(b_len))	\
- || ((a_start)+(a_len) >= (b_start)				\
-     && (a_start)+(a_len) <= (b_start)+(b_len)))
-#define mod_bound(p, n, m)					\
-(((m)->module_init						\
-  && __mod_between((p),(n),(m)->module_init,(m)->init_size))	\
- || __mod_between((p),(n),(m)->module_core,(m)->core_size))
 
 /*
  * The exception and symbol tables, and the lock
