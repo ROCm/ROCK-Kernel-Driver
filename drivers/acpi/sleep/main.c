@@ -41,7 +41,6 @@ static u32 acpi_suspend_states[] = {
 
 static int acpi_pm_prepare(u32 state)
 {
-	int error = 0;
 	u32 acpi_state = acpi_suspend_states[state];
 
 	if (!sleep_states[acpi_state])
@@ -56,15 +55,9 @@ static int acpi_pm_prepare(u32 state)
 		acpi_set_firmware_waking_vector(
 			(acpi_physical_address) acpi_wakeup_address);
 	}
-
 	ACPI_FLUSH_CPU_CACHE();
-
 	acpi_enter_sleep_state_prep(acpi_state);
-
 	return 0;
- Err:
-	acpi_set_firmware_waking_vector(0);
-	return error;
 }
 
 
@@ -150,6 +143,20 @@ static int acpi_pm_finish(u32 state)
 		init_8259A(0);
 	}
 	return 0;
+}
+
+
+int acpi_suspend(u32 acpi_state)
+{
+	u32 states[] = {
+		[1]	= PM_SUSPEND_STANDBY,
+		[3]	= PM_SUSPEND_MEM,
+		[4]	= PM_SUSPEND_DISK,
+	};
+
+	if (acpi_state <= 4 && states[acpi_state])
+		return pm_suspend(states[acpi_state]);
+	return -EINVAL;
 }
 
 
