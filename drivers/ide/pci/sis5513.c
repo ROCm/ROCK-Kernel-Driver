@@ -954,31 +954,25 @@ static void __init init_hwif_sis5513 (ide_hwif_t *hwif)
 	return;
 }
 
-#define DECLARE_SIS_DEV(name_str)					\
-	{								\
-		.name		= name_str,				\
-		.init_chipset	= init_chipset_sis5513,			\
-		.init_hwif	= init_hwif_sis5513,			\
-		.channels	= 2,					\
-		.autodma	= NOAUTODMA,				\
-		.enablebits	= {{0x4a,0x02,0x02}, {0x4a,0x04,0x04}},	\
-		.bootable	= ON_BOARD,				\
-	}
-
-static ide_pci_device_t sis5513_chipsets[] __devinitdata = {
-	/* 0 */ DECLARE_SIS_DEV("SIS5513"),
-	/* 1 */ DECLARE_SIS_DEV("SIS5518")
+static ide_pci_device_t sis5513_chipset __devinitdata = {
+	.name		= "SIS5513",
+	.init_chipset	= init_chipset_sis5513,
+	.init_hwif	= init_hwif_sis5513,
+	.channels	= 2,
+	.autodma	= NOAUTODMA,
+	.enablebits	= {{0x4a,0x02,0x02}, {0x4a,0x04,0x04}},
+	.bootable	= ON_BOARD,
 };
 
 static int __devinit sis5513_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	ide_setup_pci_device(dev, &sis5513_chipsets[id->driver_data]);
+	ide_setup_pci_device(dev, &sis5513_chipset);
 	return 0;
 }
 
 static struct pci_device_id sis5513_pci_tbl[] = {
 	{ PCI_VENDOR_ID_SI, PCI_DEVICE_ID_SI_5513, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
-	{ PCI_VENDOR_ID_SI, PCI_DEVICE_ID_SI_5518, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1},
+	{ PCI_VENDOR_ID_SI, PCI_DEVICE_ID_SI_5518, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{ 0, },
 };
 MODULE_DEVICE_TABLE(pci, sis5513_pci_tbl);

@@ -45,6 +45,8 @@
 
 #ifdef __KERNEL__
 
+#include <asm-generic/iomap.h>
+
 #include <linux/vmalloc.h>
 
 /**
