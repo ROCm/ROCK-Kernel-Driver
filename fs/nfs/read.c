@@ -390,11 +390,6 @@ nfs_readpages(struct file *filp, struct address_space *mapping,
 			       is_sync ? readpage_sync_filler :
 					 readpage_async_filler,
 			       &desc);
-	while (!list_empty(pages)) {
-		struct page *page = list_entry(pages->prev, struct page, list);
-		list_del(&page->list);
-		page_cache_release(page);
-	}
 	if (!list_empty(&head)) {
 		int err = nfs_pagein_list(&head, server->rpages);
 		if (!ret)

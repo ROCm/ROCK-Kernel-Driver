@@ -554,7 +554,6 @@ extern int usb_disabled(void);
 #define URB_NO_FSBR		0x0020	/* UHCI-specific */
 #define URB_ZERO_PACKET		0x0040	/* Finish bulk OUTs with short packet */
 #define URB_NO_INTERRUPT	0x0080	/* HINT: no non-error interrupt needed */
-#define URB_TIMEOUT_KILLED	0x1000	/* only set by HCD! */
 
 struct usb_iso_packet_descriptor {
 	unsigned int offset;

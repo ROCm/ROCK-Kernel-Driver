@@ -1543,7 +1543,7 @@ static int __init eventpoll_init(void)
 
 	/* Allocates slab cache used to allocate "struct epitem" items */
 	error = -ENOMEM;
-	epi_cache = kmem_cache_create("eventpoll epi",
+	epi_cache = kmem_cache_create("eventpoll_epi",
 				      sizeof(struct epitem),
 				      0,
 				      SLAB_HWCACHE_ALIGN | EPI_SLAB_DEBUG, NULL, NULL);
@@ -1552,7 +1552,7 @@ static int __init eventpoll_init(void)
 
 	/* Allocates slab cache used to allocate "struct eppoll_entry" */
 	error = -ENOMEM;
-	pwq_cache = kmem_cache_create("eventpoll pwq",
+	pwq_cache = kmem_cache_create("eventpoll_pwq",
 				      sizeof(struct eppoll_entry),
 				      0,
 				      EPI_SLAB_DEBUG, NULL, NULL);

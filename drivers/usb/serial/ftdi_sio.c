@@ -135,6 +135,7 @@ static struct usb_device_id id_table_sio [] = {
    
 static struct usb_device_id id_table_8U232AM [] = {
 	{ USB_DEVICE(FTDI_VID, FTDI_8U232AM_PID) },
+	{ USB_DEVICE(FTDI_VID, FTDI_RELAIS_PID) },
 	{ USB_DEVICE(FTDI_NF_RIC_VID, FTDI_NF_RIC_PID) },
 	{ }						/* Terminating entry */
 };
@@ -143,6 +144,7 @@ static struct usb_device_id id_table_8U232AM [] = {
 static struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE(FTDI_VID, FTDI_SIO_PID) },
 	{ USB_DEVICE(FTDI_VID, FTDI_8U232AM_PID) },
+	{ USB_DEVICE(FTDI_VID, FTDI_RELAIS_PID) },
 	{ USB_DEVICE(FTDI_NF_RIC_VID, FTDI_NF_RIC_PID) },
 	{ }						/* Terminating entry */
 };

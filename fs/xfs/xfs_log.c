@@ -45,7 +45,7 @@
 /* Local miscellaneous function prototypes */
 STATIC int	 xlog_bdstrat_cb(struct xfs_buf *);
 STATIC int	 xlog_commit_record(xfs_mount_t *mp, xlog_ticket_t *ticket,
-				    xfs_lsn_t *);
+				    xlog_in_core_t **, xfs_lsn_t *);
 STATIC xlog_t *	 xlog_alloc_log(xfs_mount_t	*mp,
 				dev_t		log_dev,
 				xfs_daddr_t	blk_offset,
@@ -55,7 +55,9 @@ STATIC int	 xlog_sync(xlog_t *log, xlog_in_core_t *iclog);
 STATIC void	 xlog_unalloc_log(xlog_t *log);
 STATIC int	 xlog_write(xfs_mount_t *mp, xfs_log_iovec_t region[],
 			    int nentries, xfs_log_ticket_t tic,
-			    xfs_lsn_t *start_lsn, uint flags);
+			    xfs_lsn_t *start_lsn,
+			    xlog_in_core_t **commit_iclog,
+			    uint flags);
 
 /* local state machine functions */
 STATIC void xlog_state_done_syncing(xlog_in_core_t *iclog, int);
@@ -70,10 +72,6 @@ STATIC int  xlog_state_get_iclog_space(xlog_t		*log,
 				       xlog_ticket_t	*ticket,
 				       int		*continued_write,
 				       int		*logoffsetp);
-STATIC int  xlog_state_lsn_is_synced(xlog_t		*log,
-				     xfs_lsn_t		lsn,
-				     xfs_log_callback_t *cb,
-				     int		*abortflg);
 STATIC void xlog_state_put_ticket(xlog_t	*log,
 				  xlog_ticket_t *tic);
 STATIC int  xlog_state_release_iclog(xlog_t		*log,
@@ -254,6 +252,7 @@ xlog_trace_iclog(xlog_in_core_t *iclog, uint state)
 xfs_lsn_t
 xfs_log_done(xfs_mount_t	*mp,
 	     xfs_log_ticket_t	xtic,
+	     void		**iclog,
 	     uint		flags)
 {
 	xlog_t		*log	= mp->m_log;
@@ -271,7 +270,8 @@ xfs_log_done(xfs_mount_t	*mp,
 	     * If we get an error, just continue and give back the log ticket.
 	     */
 	    (((ticket->t_flags & XLOG_TIC_INITED) == 0) &&
-	     (xlog_commit_record(mp, ticket, &lsn)))) {
+	     (xlog_commit_record(mp, ticket,
+				 (xlog_in_core_t **)iclog, &lsn)))) {
 		lsn = (xfs_lsn_t) -1;
 		if (ticket->t_flags & XLOG_TIC_PERM_RESERV) {
 			flags |= XFS_LOG_REL_PERM_RESERV;
@@ -354,21 +354,39 @@ xfs_log_force(xfs_mount_t *mp,
  * been synced to disk, we add the callback to the callback list of the
  * in-core log.
  */
-void
+int
 xfs_log_notify(xfs_mount_t	  *mp,		/* mount of partition */
-	       xfs_lsn_t	  lsn,		/* lsn looking for */
+	       void		  *iclog_hndl,	/* iclog to hang callback off */
 	       xfs_log_callback_t *cb)
 {
 	xlog_t *log = mp->m_log;
-	int	abortflg;
+	xlog_in_core_t	  *iclog = (xlog_in_core_t *)iclog_hndl;
+	int	abortflg, spl;
 
 #if defined(DEBUG) || defined(XLOG_NOLOG)
 	if (! xlog_debug && xlog_devt == log->l_dev)
-		return;
+		return 0;
 #endif
 	cb->cb_next = 0;
-	if (xlog_state_lsn_is_synced(log, lsn, cb, &abortflg))
+	spl = LOG_LOCK(log);
+	abortflg = (iclog->ic_state & XLOG_STATE_IOERROR);
+	if (!abortflg) {
+		ASSERT_ALWAYS((iclog->ic_state == XLOG_STATE_ACTIVE) ||
+			      (iclog->ic_state == XLOG_STATE_WANT_SYNC));
+		cb->cb_next = 0;
+		*(iclog->ic_callback_tail) = cb;
+		iclog->ic_callback_tail = &(cb->cb_next);
+	}
+	LOG_UNLOCK(log, spl);
+	if (!abortflg) {
+		if (xlog_state_release_iclog(log, iclog)) {
+			xfs_force_shutdown(mp, XFS_LOG_IO_ERROR);
+			return EIO;
+		}
+	} else {
 		cb->cb_func(cb->cb_arg, abortflg);
+	}
+	return 0;
 }	/* xfs_log_notify */
 
 
@@ -611,7 +629,7 @@ xfs_log_unmount_write(xfs_mount_t *mp)
 			/* remove inited flag */
 			((xlog_ticket_t *)tic)->t_flags = 0;
 			error = xlog_write(mp, reg, 1, tic, &lsn,
-					   XLOG_UNMOUNT_TRANS);
+					   NULL, XLOG_UNMOUNT_TRANS);
 			/*
 			 * At this point, we're umounting anyway,
 			 * so there's no point in transitioning log state
@@ -717,7 +735,7 @@ xfs_log_write(xfs_mount_t *	mp,
 	if (XLOG_FORCED_SHUTDOWN(log))
 		return XFS_ERROR(EIO);
 
-	if ((error = xlog_write(mp, reg, nentries, tic, start_lsn, 0))) {
+	if ((error = xlog_write(mp, reg, nentries, tic, start_lsn, NULL, 0))) {
 		xfs_force_shutdown(mp, XFS_LOG_IO_ERROR);
 	}
 	return (error);
@@ -1259,6 +1277,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 STATIC int
 xlog_commit_record(xfs_mount_t	*mp,
 		   xlog_ticket_t *ticket,
+		   xlog_in_core_t **iclog,
 		   xfs_lsn_t	*commitlsnp)
 {
 	int		error;
@@ -1267,8 +1286,9 @@ xlog_commit_record(xfs_mount_t	*mp,
 	reg[0].i_addr = 0;
 	reg[0].i_len = 0;
 
+	ASSERT_ALWAYS(iclog);
 	if ((error = xlog_write(mp, reg, 1, ticket, commitlsnp,
-			       XLOG_COMMIT_TRANS))) {
+			       iclog, XLOG_COMMIT_TRANS))) {
 		xfs_force_shutdown(mp, XFS_LOG_IO_ERROR);
 	}
 	return (error);
@@ -1614,6 +1634,7 @@ xlog_write(xfs_mount_t *	mp,
 	   int			nentries,
 	   xfs_log_ticket_t	tic,
 	   xfs_lsn_t		*start_lsn,
+	   xlog_in_core_t	**commit_iclog,
 	   uint			flags)
 {
     xlog_t	     *log    = mp->m_log;
@@ -1776,7 +1797,10 @@ xlog_write(xfs_mount_t *	mp,
 
 		if (iclog->ic_size - log_offset <= sizeof(xlog_op_header_t)) {
 		    xlog_state_want_sync(log, iclog);
-		    if ((error = xlog_state_release_iclog(log, iclog)))
+		    if (commit_iclog) {
+			ASSERT(flags & XLOG_COMMIT_TRANS);
+			*commit_iclog = iclog;
+		    } else if ((error = xlog_state_release_iclog(log, iclog)))
 			   return (error);
 		    if (index == nentries)
 			    return 0;		/* we are done */
@@ -1788,6 +1812,11 @@ xlog_write(xfs_mount_t *	mp,
     } /* for (index = 0; index < nentries; ) */
     ASSERT(len == 0);
 
+    if (commit_iclog) {
+	ASSERT(flags & XLOG_COMMIT_TRANS);
+	*commit_iclog = iclog;
+	return 0;
+    }
     return (xlog_state_release_iclog(log, iclog));
 }	/* xlog_write */
 
@@ -2060,6 +2089,12 @@ xlog_state_do_callback(
 			if (!(iclog->ic_state & XLOG_STATE_IOERROR))
 				iclog->ic_state = XLOG_STATE_DIRTY;
 
+			/*
+			 * Transition from DIRTY to ACTIVE if applicable.
+			 * NOP if STATE_IOERROR.
+			 */
+			xlog_state_clean_log(log);
+
 			/* wake up threads waiting in xfs_log_force() */
 			sv_broadcast(&iclog->ic_forcesema);
 
@@ -2097,12 +2132,6 @@ xlog_state_do_callback(
 		} while (first_iclog != iclog);
 	}
 #endif
-
-	/*
-	 * Transition from DIRTY to ACTIVE if applicable. NOP if
-	 * STATE_IOERROR.
-	 */
-	xlog_state_clean_log(log);
 
 	if (log->l_iclog->ic_state & (XLOG_STATE_ACTIVE|XLOG_STATE_IOERROR)) {
 		flushcnt = log->l_flushcnt;
@@ -2652,52 +2681,6 @@ xlog_ungrant_log_space(xlog_t	     *log,
 	GRANT_UNLOCK(log, s);
 	xfs_log_move_tail(log->l_mp, 1);
 }	/* xlog_ungrant_log_space */
-
-
-/*
- * If the lsn is not found or the iclog with the lsn is in the callback
- * state, we need to call the function directly.  This is done outside
- * this function's scope.  Otherwise, we insert the callback at the end
- * of the iclog's callback list.
- */
-int
-xlog_state_lsn_is_synced(xlog_t		    *log,
-			 xfs_lsn_t	    lsn,
-			 xfs_log_callback_t *cb,
-			 int		    *abortflg)
-{
-	xlog_in_core_t *iclog;
-	SPLDECL(s);
-	int	      lsn_is_synced = 1;
-
-	*abortflg = 0;
-	s = LOG_LOCK(log);
-
-	iclog = log->l_iclog;
-	do {
-		if (INT_GET(iclog->ic_header.h_lsn, ARCH_CONVERT) != lsn) {
-			iclog = iclog->ic_next;
-			continue;
-		} else {
-			if (iclog->ic_state & XLOG_STATE_DIRTY) /* call it*/
-				break;
-
-			if (iclog->ic_state & XLOG_STATE_IOERROR) {
-				*abortflg = XFS_LI_ABORTED;
-				break;
-			}
-			/* insert callback onto end of list */
-			cb->cb_next = 0;
-			*(iclog->ic_callback_tail) = cb;
-			iclog->ic_callback_tail = &(cb->cb_next);
-			lsn_is_synced = 0;
-			break;
-		}
-	} while (iclog != log->l_iclog);
-
-	LOG_UNLOCK(log, s);
-	return lsn_is_synced;
-}	/* xlog_state_lsn_is_synced */
 
 
 /*

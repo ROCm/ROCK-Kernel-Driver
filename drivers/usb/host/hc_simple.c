@@ -219,7 +219,7 @@ static int hci_unlink_urb (struct urb * urb)
 	if (!list_empty (&urb->urb_list) && urb->status == -EINPROGRESS) {
 		/* URB active? */
 
-		if (urb->transfer_flags & (URB_ASYNC_UNLINK | URB_TIMEOUT_KILLED)) {
+		if (urb->transfer_flags & URB_ASYNC_UNLINK) {
 			/* asynchronous with callback */
 			/* relink the urb to the del list */
 			list_move (&urb->urb_list, &hci->del_list);
@@ -388,7 +388,6 @@ static void qu_urb_timeout (unsigned long lurb)
 	struct urb *urb = (struct urb *) lurb;
 
 	DBGFUNC ("enter qu_urb_timeout\n");
-	urb->transfer_flags |= URB_TIMEOUT_KILLED;
 	hci_unlink_urb (urb);
 }
 #endif

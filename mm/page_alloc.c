@@ -1269,7 +1269,7 @@ void __init free_area_init_node(int nid, struct pglist_data *pgdat,
 	pgdat->node_mem_map = node_mem_map;
 
 	free_area_init_core(pgdat, zones_size, zholes_size);
-	memblk_set_online(__node_to_memblk(nid));
+	memblk_set_online(node_to_memblk(nid));
 
 	calculate_zone_bitmap(pgdat, zones_size);
 }
@@ -1379,15 +1379,20 @@ static char *vmstat_text[] = {
 	"pswpin",
 	"pswpout",
 	"pgalloc",
+
 	"pgfree",
 	"pgactivate",
 	"pgdeactivate",
 	"pgfault",
 	"pgmajfault",
+
 	"pgscan",
 	"pgrefill",
 	"pgsteal",
+	"pginodesteal",
 	"kswapd_steal",
+
+	"kswapd_inodesteal",
 	"pageoutrun",
 	"allocstall",
 	"pgrotated",

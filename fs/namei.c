@@ -1659,12 +1659,19 @@ int vfs_unlink(struct inode *dir, struct dentry *dentry)
 	return error;
 }
 
+/*
+ * Make sure that the actual truncation of the file will occur outside its
+ * directory's i_sem.  Truncate can take a long time if there is a lot of
+ * writeout happening, and we don't want to prevent access to the directory
+ * while waiting on the I/O.
+ */
 asmlinkage long sys_unlink(const char * pathname)
 {
 	int error = 0;
 	char * name;
 	struct dentry *dentry;
 	struct nameidata nd;
+	struct inode *inode = NULL;
 
 	name = getname(pathname);
 	if(IS_ERR(name))
@@ -1683,6 +1690,9 @@ asmlinkage long sys_unlink(const char * pathname)
 		/* Why not before? Because we want correct error value */
 		if (nd.last.name[nd.last.len])
 			goto slashes;
+		inode = dentry->d_inode;
+		if (inode)
+			inode = igrab(inode);
 		error = vfs_unlink(nd.dentry->d_inode, dentry);
 	exit2:
 		dput(dentry);
@@ -1693,6 +1703,8 @@ exit1:
 exit:
 	putname(name);
 
+	if (inode)
+		iput(inode);	/* truncate the inode here */
 	return error;
 
 slashes:

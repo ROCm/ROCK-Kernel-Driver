@@ -1,0 +1,5 @@
+#
+# Makefile for USB Network drivers which require generic MII code.
+#
+
+obj-$(CONFIG_USB_PEGASUS)	+= mii.o

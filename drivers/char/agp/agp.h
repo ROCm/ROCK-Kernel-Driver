@@ -47,7 +47,7 @@ static void __attribute__((unused)) global_cache_flush(void)
 	flush_agp_cache();
 }
 #else
-static void global_cache_flush(void)
+static inline void global_cache_flush(void)
 {
 	flush_agp_cache();
 }

@@ -247,7 +247,7 @@ const struct bttv_tvnorm bttv_tvnorms[] = {
 	},{
 		.v4l2_id        = V4L2_STD_PAL_N,
 		.name           = "PAL-N",
-		.Fsc             35468950,
+		.Fsc            = 35468950,
 		.swidth         = 768,
 		.sheight        = 576,
 		.totalwidth     = 1135,

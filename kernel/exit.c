@@ -156,7 +156,7 @@ out:
  *
  * "I ask you, have you ever known what it is to be an orphan?"
  */
-static int __will_become_orphaned_pgrp(int pgrp, task_t *ignored_task)
+static int will_become_orphaned_pgrp(int pgrp, task_t *ignored_task)
 {
 	struct task_struct *p;
 	struct list_head *l;
@@ -177,20 +177,15 @@ static int __will_become_orphaned_pgrp(int pgrp, task_t *ignored_task)
 	return ret;	/* (sighing) "Often!" */
 }
 
-static int will_become_orphaned_pgrp(int pgrp, struct task_struct * ignored_task)
+int is_orphaned_pgrp(int pgrp)
 {
 	int retval;
 
 	read_lock(&tasklist_lock);
-	retval = __will_become_orphaned_pgrp(pgrp, ignored_task);
+	retval = will_become_orphaned_pgrp(pgrp, NULL);
 	read_unlock(&tasklist_lock);
 
 	return retval;
-}
-
-int is_orphaned_pgrp(int pgrp)
-{
-	return will_become_orphaned_pgrp(pgrp, 0);
 }
 
 static inline int has_stopped_jobs(int pgrp)
@@ -495,7 +490,7 @@ static inline void reparent_thread(task_t *p, task_t *father, int traced)
 	    (p->session == father->session)) {
 		int pgrp = p->pgrp;
 
-		if (__will_become_orphaned_pgrp(pgrp, 0) && has_stopped_jobs(pgrp)) {
+		if (will_become_orphaned_pgrp(pgrp, NULL) && has_stopped_jobs(pgrp)) {
 			__kill_pg_info(SIGHUP, (void *)1, pgrp);
 			__kill_pg_info(SIGCONT, (void *)1, pgrp);
 		}
@@ -579,7 +574,7 @@ static void exit_notify(void)
 	
 	if ((t->pgrp != current->pgrp) &&
 	    (t->session == current->session) &&
-	    __will_become_orphaned_pgrp(current->pgrp, current) &&
+	    will_become_orphaned_pgrp(current->pgrp, current) &&
 	    has_stopped_jobs(current->pgrp)) {
 		__kill_pg_info(SIGHUP, (void *)1, current->pgrp);
 		__kill_pg_info(SIGCONT, (void *)1, current->pgrp);

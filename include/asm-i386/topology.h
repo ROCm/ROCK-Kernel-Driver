@@ -34,32 +34,32 @@ extern volatile unsigned long node_2_cpu_mask[];
 extern volatile int cpu_2_node[];
 
 /* Returns the number of the node containing CPU 'cpu' */
-static inline int __cpu_to_node(int cpu)
+static inline int cpu_to_node(int cpu)
 { 
 	return cpu_2_node[cpu];
 }
 
 /* Returns the number of the node containing MemBlk 'memblk' */
-#define __memblk_to_node(memblk) (memblk)
+#define memblk_to_node(memblk) (memblk)
 
 /* Returns the number of the node containing Node 'node'.  This architecture is flat, 
    so it is a pretty simple function! */
-#define __parent_node(node) (node)
+#define parent_node(node) (node)
 
 /* Returns a bitmask of CPUs on Node 'node'. */
-static inline unsigned long __node_to_cpu_mask(int node)
+static inline unsigned long node_to_cpumask(int node)
 {
 	return node_2_cpu_mask[node];
 }
 
 /* Returns the number of the first CPU on Node 'node'. */
-static inline int __node_to_first_cpu(int node)
+static inline int node_to_first_cpu(int node)
 { 
-	return __ffs(__node_to_cpu_mask(node));
+	return __ffs(node_to_cpumask(node));
 }
 
 /* Returns the number of the first MemBlk on Node 'node' */
-#define __node_to_memblk(node) (node)
+#define node_to_memblk(node) (node)
 
 /* Cross-node load balancing interval. */
 #define NODE_BALANCE_RATE 100

@@ -33,6 +33,7 @@
 #define ATMSAR_USE_53BYTE_CELL  0x1L
 #define ATMSAR_SET_PTI          0x2L
 
+#define ATM_CELL_HEADER		(ATM_CELL_SIZE - ATM_CELL_PAYLOAD)
 
 /* types */
 #define ATMSAR_TYPE_AAL0        ATM_AAL0
@@ -88,5 +89,7 @@ struct sk_buff *atmsar_decode_rawcell (struct atmsar_vcc_data *list, struct sk_b
 struct sk_buff *atmsar_decode_aal5 (struct atmsar_vcc_data *ctx, struct sk_buff *skb);
 
 struct sk_buff *atmsar_alloc_tx (struct atmsar_vcc_data *vcc, unsigned int size);
+
+unsigned int atmsar_encode (struct atmsar_vcc_data *ctx, char *source, char *target, unsigned int pdu_length);
 
 #endif				/* _ATMSAR_H_ */
