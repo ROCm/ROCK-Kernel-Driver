@@ -160,7 +160,6 @@ static void __init smp_store_cpu_info(int id)
 				goto valid_k7;
 
 		/* If we get here, it's not a certified SMP capable AMD system. */
-		printk (KERN_INFO "WARNING: This combination of AMD processors is not suitable for SMP.\n");
 		tainted |= TAINT_UNSAFE_SMP;
 	}
 
@@ -1068,6 +1067,15 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 
 	if (smp_b_stepping)
 		printk(KERN_WARNING "WARNING: SMP operation may be unreliable with B stepping processors.\n");
+
+	/* Don't taint if we are running SMP kernel on a single non-MP approved Athlon  */
+	if (tainted & TAINT_UNSAFE_SMP) {
+		if (cpucount)
+			printk (KERN_INFO "WARNING: This combination of AMD processors is not suitable for SMP.\n");
+		else
+			tainted &= ~TAINT_UNSAFE_SMP;
+	}
+
 	Dprintk("Boot done.\n");
 
 	/*
