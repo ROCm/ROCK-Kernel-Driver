@@ -189,6 +189,9 @@ setup_serial_hcdp(void *tablep)
 		if (gsi)
 			port.flags |= UPF_AUTO_IRQ;
 
+#ifdef CONFIG_SERIAL_8250_SHARE_IRQ
+		port.flags |= UPF_SHARE_IRQ;
+#endif
 		/*
 		 * Note: the above memset() initializes port.line to 0,
 		 * so we register this port as ttyS0.
