@@ -1213,7 +1213,7 @@ config JFFS2_CMODE_SIZE
 endchoice
 
 config CRAMFS
-	tristate "Compressed ROM file system support"
+	tristate "Compressed ROM file system support (cramfs)"
 	select ZLIB_INFLATE
 	help
 	  Saying Y here includes support for CramFs (Compressed ROM File
