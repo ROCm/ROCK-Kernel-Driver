@@ -1863,7 +1863,7 @@ static int sym_setup_bus_dma_mask(hcb_p np)
 #if   SYM_CONF_DMA_ADDRESSING_MODE == 1
 #define	PciDmaMask	0xffffffffff
 #elif SYM_CONF_DMA_ADDRESSING_MODE == 2
-#define	PciDmaMask	0xffffffffffffffff
+#define	PciDmaMask	0xffffffffffffffffULL
 #endif
 	if (np->features & FE_DAC) {
 		if (!pci_set_dma_mask(np->s.device, PciDmaMask)) {
