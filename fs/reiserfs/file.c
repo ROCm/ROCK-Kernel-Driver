@@ -66,9 +66,7 @@ static int reiserfs_file_release (struct inode * inode, struct file * filp)
 }
 
 static void reiserfs_vfs_truncate_file(struct inode *inode) {
-    lock_kernel();
     reiserfs_truncate_file(inode, 1) ;
-    unlock_kernel();
 }
 
 /* Sync a reiserfs file. */

@@ -1738,7 +1738,6 @@ unlock:
 void reiserfs_truncate_file(struct inode *p_s_inode, int update_timestamps) {
     struct reiserfs_transaction_handle th ;
     int windex ;
-
     /* we want the offset for the first byte after the end of the file */
     unsigned long offset = p_s_inode->i_size & (PAGE_CACHE_SIZE - 1) ;
     unsigned blocksize = p_s_inode->i_sb->s_blocksize ;
@@ -1746,6 +1745,8 @@ void reiserfs_truncate_file(struct inode *p_s_inode, int update_timestamps) {
     struct page *page = NULL ;
     int error ;
     struct buffer_head *bh = NULL ;
+
+    lock_kernel ();
 
     if (p_s_inode->i_size > 0) {
         if ((error = grab_tail_page(p_s_inode, &page, &bh))) {
@@ -1800,7 +1801,7 @@ void reiserfs_truncate_file(struct inode *p_s_inode, int update_timestamps) {
 	page_cache_release(page) ;
     }
 
-    return ;
+    unlock_kernel ();
 }
 
 static int map_block_for_writepage(struct inode *inode, 
