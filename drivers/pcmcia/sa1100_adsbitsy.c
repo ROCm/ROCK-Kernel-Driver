@@ -14,6 +14,7 @@
 #include <linux/init.h>
 
 #include <asm/hardware.h>
+#include <asm/mach-types.h>
 
 #include "sa1100_generic.h"
 #include "sa1111_generic.h"

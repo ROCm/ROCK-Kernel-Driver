@@ -209,3 +209,5 @@ EXPORT_SYMBOL(nand_calculate_ecc);
 EXPORT_SYMBOL(nand_correct_data);
 
 MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Steven J. Hill <sjhill@cotw.com>");
+MODULE_DESCRIPTION("Generic NAND ECC support");

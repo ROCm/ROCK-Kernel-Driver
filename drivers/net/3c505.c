@@ -1396,7 +1396,7 @@ static int __init elp_sense(struct net_device *dev)
 	int timeout;
 	int addr = dev->base_addr;
 	const char *name = dev->name;
-       unsigned long flags;
+	unsigned long flags;
 	byte orig_HSR;
 
 	if (!request_region(addr, ELP_IO_EXTENT, "3c505"))

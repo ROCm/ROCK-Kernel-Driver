@@ -19,6 +19,7 @@
 #include <linux/init.h>
 
 #include <asm/hardware.h>
+#include <asm/mach-types.h>
 #include <asm/arch/badge4.h>
 #include <asm/hardware/sa1111.h>
 

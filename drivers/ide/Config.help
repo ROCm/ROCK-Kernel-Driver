@@ -292,7 +292,7 @@ CONFIG_IDEDMA_PCI_AUTO
   motherboard uses a VIA VP2 chipset, in which case you should say N.
 
 CONFIG_IDEDMA_IVB
-  There are unclear terms is ATA-4 and ATA-5 standards how certain
+  There are unclear terms in ATA-4 and ATA-5 standards how certain
   hardware (an 80c ribbon) should be detected. Different interpretations
   of the standards have been released in hardware. This causes problems:
   for example, a host with Ultra Mode 4 (or higher) will not run

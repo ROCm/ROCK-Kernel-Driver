@@ -193,12 +193,6 @@ static int ohci_urb_enqueue (
 			break;
 		case PIPE_ISOCHRONOUS: /* number of packets from URB */
 			size = urb->number_of_packets;
-			if (size <= 0)
-				return -EINVAL;
-			for (i = 0; i < urb->number_of_packets; i++) {
-  				urb->iso_frame_desc [i].actual_length = 0;
-  				urb->iso_frame_desc [i].status = -EXDEV;
-  			}
 			break;
 	}
 

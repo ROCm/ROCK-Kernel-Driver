@@ -484,10 +484,8 @@ static void ftdi_sio_write_bulk_callback (struct urb *urb)
 		dbg("nonzero write bulk status received: %d", urb->status);
 		return;
 	}
-	queue_task(&port->tqueue, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
 
-	return;
+	schedule_task(&port->tqueue);
 } /* ftdi_sio_write_bulk_callback */
 
 

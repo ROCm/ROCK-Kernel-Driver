@@ -48,10 +48,10 @@ dma_to_ed_td (struct hash_list_t * entry, dma_addr_t dma)
 	struct hash_t * scan = entry->head;
 	while (scan && scan->dma != dma)
 		scan = scan->next;
-	return scan->virt;
+	return scan ? scan->virt : 0;
 }
 
-static struct td *
+static inline struct td *
 dma_to_td (struct ohci_hcd *hc, dma_addr_t td_dma)
 {
 	td_dma &= TD_MASK;
@@ -62,7 +62,7 @@ dma_to_td (struct ohci_hcd *hc, dma_addr_t td_dma)
 // FIXME:  when updating the hashtables this way, mem_flags is unusable...
 
 /* Add a hash entry for a TD/ED; return true on success */
-static int
+static inline int
 hash_add_ed_td (
 	struct hash_list_t *entry,
 	void *virt,
@@ -97,7 +97,7 @@ hash_add_td (struct ohci_hcd *hc, struct td *td, int mem_flags)
 }
 
 
-static void
+static inline void
 hash_free_ed_td (struct hash_list_t *entry, void *virt)
 {
 	struct hash_t *scan, *prev;

@@ -20,6 +20,7 @@ if [ "$CONFIG_PCMCIA" != "n" ]; then
    fi
    if [ "$CONFIG_ARM" = "y" ]; then
       dep_tristate '  SA1100 support' CONFIG_PCMCIA_SA1100 $CONFIG_ARCH_SA1100 $CONFIG_PCMCIA
+      dep_tristate '  SA1111 support' CONFIG_PCMCIA_SA1111 $CONFIG_PCMCIA_SA1100 $CONFIG_SA1111 $CONFIG_PCMCIA
    fi
 fi
 

@@ -3,8 +3,8 @@ keymaps 0-2,4-5,8,12
 # Change the above line into
 #	keymaps 0-2,4-6,8,12
 # in case you want the entries
-#	altgr   control keycode  83 = Boot            
-#	altgr   control keycode 111 = Boot            
+#	altgr   control keycode  83 = Boot
+#	altgr   control keycode 111 = Boot
 # below.
 #
 # In fact AltGr is used very little, and one more keymap can

@@ -1058,7 +1058,7 @@ int split_vma(struct mm_struct * mm, struct vm_area_struct * vma,
 	if (new_below) {
 		new->vm_end = addr;
 		vma->vm_start = addr;
-		vma->vm_pgoff += ((addr - vma->vm_start) >> PAGE_SHIFT);
+		vma->vm_pgoff += ((addr - new->vm_start) >> PAGE_SHIFT);
 	} else {
 		vma->vm_end = addr;
 		new->vm_start = addr;

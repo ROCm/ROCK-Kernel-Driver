@@ -347,7 +347,7 @@ static dev_link_t *awc_attach(void)
 static void awc_detach(dev_link_t *link)
 {
 	dev_link_t **linkp;
-       unsigned long flags;
+	unsigned long flags;
 	int i=0;
 
 	DEBUG(0, "awc_detach(0x%p)\n", link);

@@ -359,12 +359,9 @@ static void omninet_write_bulk_callback (struct urb *urb)
 		return;
 	}
 
-	queue_task(&port->tqueue, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	schedule_task(&port->tqueue);
 
 //	dbg("omninet_write_bulk_callback, tty %0x\n", tty);
-
-	return;
 }
 
 

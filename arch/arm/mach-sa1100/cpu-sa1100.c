@@ -90,9 +90,7 @@
 
 #include <asm/hardware.h>
 
-extern unsigned int sa11x0_freq_to_ppcr(unsigned int khz);
-extern unsigned int sa11x0_validatespeed(unsigned int cpu, unsigned int khz);
-extern unsigned int sa11x0_getspeed(void);
+#include "generic.h"
 
 typedef struct {
 	int speed;
@@ -107,7 +105,7 @@ typedef struct {
 
 static sa1100_dram_regs_t sa1100_dram_settings[] =
 {
-	/* { mdcnfg, mdcas0, mdcas1, mdcas2 } */ /* clock frequency */
+	/* speed,     mdcnfg,     mdcas0,     mdcas1,     mdcas2  clock frequency */
 	{  59000, 0x00dc88a3, 0xcccccccf, 0xfffffffc, 0xffffffff }, /*  59.0 MHz */
 	{  73700, 0x011490a3, 0xcccccccf, 0xfffffffc, 0xffffffff }, /*  73.7 MHz */
 	{  88500, 0x014e90a3, 0xcccccccf, 0xfffffffc, 0xffffffff }, /*  88.5 MHz */
@@ -127,28 +125,25 @@ static sa1100_dram_regs_t sa1100_dram_settings[] =
 	{ 0, 0, 0, 0, 0 } /* last entry */
 };
 
-
-
-
 static void sa1100_update_dram_timings(int current_speed, int new_speed)
 {
 	sa1100_dram_regs_t *settings = sa1100_dram_settings;
 
 	/* find speed */
-	while(settings->speed != 0) {
+	while (settings->speed != 0) {
 		if(new_speed == settings->speed)
 			break;
 		
 		settings++;
 	}
 
-	if(settings->speed == 0) {
+	if (settings->speed == 0) {
 		panic("%s: couldn't find dram setting for speed %d\n",
 		      __FUNCTION__, new_speed);
 	}
 
 	/* No risk, no fun: run with interrupts on! */
-	if(new_speed > current_speed) {
+	if (new_speed > current_speed) {
 		/* We're going FASTER, so first relax the memory
 		 * timings before changing the core frequency 
 		 */
@@ -181,60 +176,39 @@ static void sa1100_update_dram_timings(int current_speed, int new_speed)
 	}
 }
 
-
-
-
-static int sa1100_dram_notifier(struct notifier_block *nb, 
-				unsigned long val, void *data)
+static void sa1100_setspeed(struct cpufreq_policy *policy)
 {
-	struct cpufreq_freqs *ci = data;
-	
-	switch(val) {
-	case CPUFREQ_MINMAX:
-		cpufreq_updateminmax(data, sa1100_dram_settings->speed, -1);
-		break;
+	unsigned int cur = sa11x0_getspeed();
+	struct cpufreq_freqs freqs;
 
-	case CPUFREQ_PRECHANGE:
-		if(ci->new > ci->cur)
-			sa1100_update_dram_timings(ci->cur, ci->new);
-		break;
+	freqs.old = cur;
+	freqs.new = policy->max;
+	freqs.cpu = CPUFREQ_ALL_CPUS;
 
-	case CPUFREQ_POSTCHANGE:
-		if(ci->new < ci->cur)
-			sa1100_update_dram_timings(ci->cur, ci->new);
-		break;
-		
-	default:
-		printk(KERN_INFO "%s: ignoring unknown notifier type (%ld)\n",
-		       __FUNCTION__, val);
-	}
+	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 
-	return 0;
+	if (policy->max > cur)
+		sa1100_update_dram_timings(cur, policy->max);
+
+	PPCR = sa11x0_freq_to_ppcr(policy->max);
+
+	if (policy->max < cur)
+		sa1100_update_dram_timings(cur, policy->max);
+
+	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
 }
 
-
-
-
-static struct notifier_block sa1100_dram_block = {
-	.notifier_call	= sa1100_dram_notifier,
-};
-
-
-static void sa1100_setspeed(unsigned int cpu, unsigned int khz)
-{
-	PPCR = sa11x0_freq_to_ppcr(khz);
-}
-
-static struct cpufreq_freqs sa1100_freqs = {
-	.min		= 59000,
-	.max		= 287000,
+static struct cpufreq_policy sa1100_policy = {
+	.cpu		= 0,
+	.policy		= CPUFREQ_POLICY_POWERSAVE,
+	.max_cpu_freq	= 287000,
 };
 
 static struct cpufreq_driver sa1100_driver = {
-	.freq		= &sa1100_freqs,
-	.validate	= sa11x0_validatespeed,
-	.setspeed	= sa1100_setspeed,
-	.sync		= 1,
+	.verify		= sa11x0_verify_speed,
+	.setpolicy	= sa1100_setspeed,
+	.policy		= &sa1100_policy,
+	.cpu_min_freq	= 59000,
 };
 
 static int __init sa1100_dram_init(void)
@@ -242,11 +216,9 @@ static int __init sa1100_dram_init(void)
 	int ret = -ENODEV;
 
 	if ((processor_id & CPU_SA1100_MASK) == CPU_SA1100_ID) {
-		ret = cpufreq_register_notifier(&sa1100_dram_block);
-		if (ret)
-			return ret;
-
-		sa1100_freqs.cur = sa11x0_getspeed();
+		sa1100_driver.cpu_curr_freq[0] =
+		sa1100_policy.min =
+		sa1100_policy.max = sa11x0_getspeed();
 
 		ret = cpufreq_register(&sa1100_driver);
 	}
