@@ -339,11 +339,13 @@ static int dbl_rmdir(struct inode * parent, struct dentry *dentry)
 {
 	int error;
 
+	lock_kernel();
 	error = hfs_rmdir(parent, dentry);
 	if ((error == -ENOENT) && is_hdr(parent, dentry->d_name.name,
 					 dentry->d_name.len)) {
 		error = -ENOTDIR;
 	}
+	unlock_kernel();
 	return error;
 }
 

@@ -370,15 +370,22 @@ static int autofs_root_rmdir(struct inode *dir, struct dentry *dentry)
 	struct autofs_dirhash *dh = &sbi->dirhash;
 	struct autofs_dir_ent *ent;
 
-	if ( !autofs_oz_mode(sbi) )
+	lock_kernel();
+	if ( !autofs_oz_mode(sbi) ) {
+		unlock_kernel();
 		return -EACCES;
+	}
 
 	ent = autofs_hash_lookup(dh, &dentry->d_name);
-	if ( !ent )
+	if ( !ent ) {
+		unlock_kernel();
 		return -ENOENT;
+	}
 
-	if ( (unsigned int)ent->ino < AUTOFS_FIRST_DIR_INO )
+	if ( (unsigned int)ent->ino < AUTOFS_FIRST_DIR_INO ) {
+		unlock_kernel();
 		return -ENOTDIR; /* Not a directory */
+	}
 
 	if ( ent->dentry != dentry ) {
 		printk("autofs_rmdir: odentry != dentry for entry %s\n", dentry->d_name.name);
@@ -388,6 +395,7 @@ static int autofs_root_rmdir(struct inode *dir, struct dentry *dentry)
 	autofs_hash_delete(ent);
 	dir->i_nlink--;
 	d_drop(dentry);
+	unlock_kernel();
 
 	return 0;
 }

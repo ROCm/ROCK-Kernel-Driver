@@ -1409,9 +1409,7 @@ int vfs_rmdir(struct inode *dir, struct dentry *dentry)
 	else if (d_mountpoint(dentry))
 		error = -EBUSY;
 	else {
-		lock_kernel();
 		error = dir->i_op->rmdir(dir, dentry);
-		unlock_kernel();
 		if (!error)
 			dentry->d_inode->i_flags |= S_DEAD;
 	}

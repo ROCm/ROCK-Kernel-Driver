@@ -793,10 +793,14 @@ static int jffs2_rmdir (struct inode *dir_i, struct dentry *dentry)
 	struct jffs2_inode_info *f = JFFS2_INODE_INFO(dentry->d_inode);
 	struct jffs2_full_dirent *fd;
 
+	lock_kernel();
 	for (fd = f->dents ; fd; fd = fd->next) {
-		if (fd->ino)
+		if (fd->ino) {
+			unlock_kernel();
 			return -ENOTEMPTY;
+		}
 	}
+	unlock_kernel();
 	return jffs2_unlink(dir_i, dentry);
 }
 

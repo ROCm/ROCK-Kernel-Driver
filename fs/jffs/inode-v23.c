@@ -900,10 +900,12 @@ jffs_rmdir(struct inode *dir, struct dentry *dentry)
 	int ret;
 	D3(printk("***jffs_rmdir()\n"));
 	D3(printk (KERN_NOTICE "rmdir(): down biglock\n"));
+	lock_kernel();
 	down(&c->fmc->biglock);
 	ret = jffs_remove(dir, dentry, S_IFDIR);
 	D3(printk (KERN_NOTICE "rmdir(): up biglock\n"));
 	up(&c->fmc->biglock);
+	unlock_kernel();
 	return ret;
 }
 

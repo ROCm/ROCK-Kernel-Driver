@@ -323,6 +323,7 @@ int msdos_rmdir(struct inode *dir, struct dentry *dentry)
 	struct msdos_dir_entry *de;
 
 	bh = NULL;
+	lock_kernel();
 	res = msdos_find(dir, dentry->d_name.name, dentry->d_name.len,
 				&bh, &de, &ino);
 	if (res < 0)
@@ -347,6 +348,7 @@ int msdos_rmdir(struct inode *dir, struct dentry *dentry)
 
 rmdir_done:
 	fat_brelse(sb, bh);
+	unlock_kernel();
 	return res;
 }
 

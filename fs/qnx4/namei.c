@@ -159,9 +159,11 @@ int qnx4_rmdir(struct inode *dir, struct dentry *dentry)
 	int ino;
 
 	QNX4DEBUG(("qnx4: qnx4_rmdir [%s]\n", dentry->d_name.name));
+	lock_kernel();
 	bh = qnx4_find_entry(dentry->d_name.len, dir, dentry->d_name.name,
 			     &de, &ino);
 	if (bh == NULL) {
+		unlock_kernel();
 		return -ENOENT;
 	}
 	inode = dentry->d_inode;
@@ -193,6 +195,7 @@ int qnx4_rmdir(struct inode *dir, struct dentry *dentry)
       end_rmdir:
 	brelse(bh);
 
+	unlock_kernel();
 	return retval;
 }
 

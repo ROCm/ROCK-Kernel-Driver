@@ -253,6 +253,7 @@ static int ufs_rmdir (struct inode * dir, struct dentry *dentry)
 	struct inode * inode = dentry->d_inode;
 	int err= -ENOTEMPTY;
 
+	lock_kernel();
 	if (ufs_empty_dir (inode)) {
 		err = ufs_unlink(dir, dentry);
 		if (!err) {
@@ -261,6 +262,7 @@ static int ufs_rmdir (struct inode * dir, struct dentry *dentry)
 			ufs_dec_count(dir);
 		}
 	}
+	unlock_kernel();
 	return err;
 }
 

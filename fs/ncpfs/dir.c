@@ -915,6 +915,7 @@ static int ncp_rmdir(struct inode *dir, struct dentry *dentry)
 		dentry->d_parent->d_name.name, dentry->d_name.name);
 
 	error = -EIO;
+	lock_kernel();
 	if (!ncp_conn_valid(server))
 		goto out;
 
@@ -954,6 +955,7 @@ static int ncp_rmdir(struct inode *dir, struct dentry *dentry)
 			break;
        	}
 out:
+	unlock_kernel();
 	return error;
 }
 

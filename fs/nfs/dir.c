@@ -726,10 +726,12 @@ static int nfs_rmdir(struct inode *dir, struct dentry *dentry)
 	dfprintk(VFS, "NFS: rmdir(%s/%ld, %s\n", dir->i_sb->s_id,
 		dir->i_ino, dentry->d_name.name);
 
+	lock_kernel();
 	nfs_zap_caches(dir);
 	error = NFS_PROTO(dir)->rmdir(dir, &dentry->d_name);
 	if (!error)
 		dentry->d_inode->i_nlink = 0;
+	unlock_kernel();
 
 	return error;
 }

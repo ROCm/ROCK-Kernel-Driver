@@ -386,25 +386,30 @@ int hpfs_rmdir(struct inode *dir, struct dentry *dentry)
 	int n_items = 0;
 	int r;
 	hpfs_adjust_length((char *)name, &len);
+	lock_kernel();
 	hpfs_lock_2inodes(dir, inode);
 	if (!(de = map_dirent(dir, hpfs_i(dir)->i_dno, (char *)name, len, &dno, &qbh))) {
 		hpfs_unlock_2inodes(dir, inode);
+		unlock_kernel();
 		return -ENOENT;
 	}	
 	if (de->first) {
 		hpfs_brelse4(&qbh);
 		hpfs_unlock_2inodes(dir, inode);
+		unlock_kernel();
 		return -EPERM;
 	}
 	if (!de->directory) {
 		hpfs_brelse4(&qbh);
 		hpfs_unlock_2inodes(dir, inode);
+		unlock_kernel();
 		return -ENOTDIR;
 	}
 	hpfs_count_dnodes(dir->i_sb, hpfs_i(inode)->i_dno, NULL, NULL, &n_items);
 	if (n_items) {
 		hpfs_brelse4(&qbh);
 		hpfs_unlock_2inodes(dir, inode);
+		unlock_kernel();
 		return -ENOTEMPTY;
 	}
 	fno = de->fnode;
@@ -415,6 +420,7 @@ int hpfs_rmdir(struct inode *dir, struct dentry *dentry)
 		inode->i_nlink = 0;
 		hpfs_unlock_2inodes(dir, inode);
 	} else hpfs_unlock_2inodes(dir, inode);
+	unlock_kernel();
 	return r == 2 ? -ENOSPC : r == 1 ? -EFSERROR : 0;
 }
 

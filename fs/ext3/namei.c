@@ -809,9 +809,12 @@ static int ext3_rmdir (struct inode * dir, struct dentry *dentry)
 	struct ext3_dir_entry_2 * de;
 	handle_t *handle;
 
+	lock_kernel();
 	handle = ext3_journal_start(dir, EXT3_DELETE_TRANS_BLOCKS);
-	if (IS_ERR(handle))
+	if (IS_ERR(handle)) {
+		unlock_kernel();
 		return PTR_ERR(handle);
+	}
 
 	retval = -ENOENT;
 	bh = ext3_find_entry (dentry, &de);
@@ -855,6 +858,7 @@ static int ext3_rmdir (struct inode * dir, struct dentry *dentry)
 end_rmdir:
 	ext3_journal_stop(handle, dir);
 	brelse (bh);
+	unlock_kernel();
 	return retval;
 }
 

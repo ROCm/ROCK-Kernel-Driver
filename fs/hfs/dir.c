@@ -313,18 +313,24 @@ hfs_unlink_put:
  */
 int hfs_rmdir(struct inode * parent, struct dentry *dentry)
 {
-	struct hfs_cat_entry *entry = HFS_I(parent)->entry;
+	struct hfs_cat_entry *entry;
 	struct hfs_cat_entry *victim = NULL;
 	struct inode *inode = dentry->d_inode;
 	struct hfs_cat_key key;
 	int error;
 
+	lock_kernel();
+	entry = HFS_I(parent)->entry;
 	if (build_key(&key, parent, dentry->d_name.name,
-		      dentry->d_name.len))
+		      dentry->d_name.len)) {
+		unlock_kernel();
 		return -EPERM;
+	}
 
-	if (!(victim = hfs_cat_get(entry->mdb, &key)))
+	if (!(victim = hfs_cat_get(entry->mdb, &key))) {
+		unlock_kernel();
 		return -ENOENT;
+	}
 
 	error = -ENOTDIR;
 	if (victim->type != HFS_CDR_DIR) 
@@ -352,6 +358,7 @@ int hfs_rmdir(struct inode * parent, struct dentry *dentry)
 	 
 hfs_rmdir_put:
 	hfs_cat_put(victim);	/* Note that hfs_cat_put(NULL) is safe. */
+	unlock_kernel();
 	return error;
 }
 

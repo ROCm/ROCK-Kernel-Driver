@@ -732,6 +732,7 @@ static int reiserfs_rmdir (struct inode * dir, struct dentry *dentry)
     /* we will be doing 2 balancings and update 2 stat data */
     jbegin_count = JOURNAL_PER_BALANCE_CNT * 2 + 2;
 
+    lock_kernel();
     journal_begin(&th, dir->i_sb, jbegin_count) ;
     windex = push_journal_writer("reiserfs_rmdir") ;
 
@@ -785,6 +786,7 @@ static int reiserfs_rmdir (struct inode * dir, struct dentry *dentry)
     pop_journal_writer(windex) ;
     journal_end(&th, dir->i_sb, jbegin_count) ;
     reiserfs_check_path(&path) ;
+    unlock_kernel();
     return 0;
 	
  end_rmdir:
@@ -794,6 +796,7 @@ static int reiserfs_rmdir (struct inode * dir, struct dentry *dentry)
     pathrelse (&path);
     pop_journal_writer(windex) ;
     journal_end(&th, dir->i_sb, jbegin_count) ;
+    unlock_kernel();
     return retval;	
 }
 

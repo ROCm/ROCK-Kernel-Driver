@@ -523,6 +523,7 @@ smb_rmdir(struct inode *dir, struct dentry *dentry)
 	/*
 	 * Close the directory if it's open.
 	 */
+	lock_kernel();
 	smb_close(inode);
 
 	/*
@@ -536,6 +537,7 @@ smb_rmdir(struct inode *dir, struct dentry *dentry)
 	error = smb_proc_rmdir(dentry);
 
 out:
+	unlock_kernel();
 	return error;
 }
 

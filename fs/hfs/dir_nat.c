@@ -333,6 +333,7 @@ static int nat_rmdir(struct inode *parent, struct dentry *dentry)
 	struct hfs_name cname;
 	int error;
 
+	lock_kernel();
 	hfs_nameout(parent, &cname, dentry->d_name.name, dentry->d_name.len);
 	if (hfs_streq(cname.Name, cname.Len,
 		      DOT_APPLEDOUBLE->Name, DOT_APPLEDOUBLE_LEN)) {
@@ -349,6 +350,7 @@ static int nat_rmdir(struct inode *parent, struct dentry *dentry)
 	} else {
 		error = hfs_rmdir(parent, dentry);
 	}
+	unlock_kernel();
 	return error;
 }
 

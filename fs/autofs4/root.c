@@ -401,12 +401,16 @@ static int autofs4_dir_rmdir(struct inode *dir, struct dentry *dentry)
 	struct autofs_sb_info *sbi = autofs4_sbi(dir->i_sb);
 	struct autofs_info *ino = autofs4_dentry_ino(dentry);
 	
-	if (!autofs4_oz_mode(sbi))
+	lock_kernel();
+	if (!autofs4_oz_mode(sbi)) {
+		unlock_kernel();
 		return -EACCES;
+	}
 
 	spin_lock(&dcache_lock);
 	if (!list_empty(&dentry->d_subdirs)) {
 		spin_unlock(&dcache_lock);
+		unlock_kernel();
 		return -ENOTEMPTY;
 	}
 	list_del_init(&dentry->d_hash);
@@ -420,6 +424,7 @@ static int autofs4_dir_rmdir(struct inode *dir, struct dentry *dentry)
 	if (dir->i_nlink)
 		dir->i_nlink--;
 
+	unlock_kernel();
 	return 0;
 }
 

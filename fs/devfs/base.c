@@ -3140,27 +3140,45 @@ static int devfs_rmdir (struct inode *dir, struct dentry *dentry)
     struct fs_info *fs_info = dir->i_sb->u.generic_sbp;
     struct inode *inode = dentry->d_inode;
 
+    /* WTF??? */
     if (dir->i_sb->u.generic_sbp != inode->i_sb->u.generic_sbp) return -EINVAL;
+    lock_kernel();
     de = get_devfs_entry_from_vfs_inode (inode);
-    if (de == NULL) return -ENOENT;
-    if ( !S_ISDIR (de->mode) ) return -ENOTDIR;
-    if (!de->vfs_deletable) return -EPERM;
+    if (de == NULL) {
+	unlock_kernel();
+	return -ENOENT;
+    }
+    if ( !S_ISDIR (de->mode) ) {
+	unlock_kernel();
+	return -ENOTDIR;
+    }
+    if (!de->vfs_deletable) {
+	unlock_kernel();
+	return -EPERM;
+    }
     /*  First ensure the directory is empty and will stay thay way  */
     write_lock (&de->u.dir.lock);
     de->u.dir.no_more_additions = TRUE;
     if (de->u.dir.first) err = -ENOTEMPTY;
     write_unlock (&de->u.dir.lock);
-    if (err) return err;
+    if (err) {
+	unlock_kernel();
+	return err;
+    }
     /*  Now unhook the directory from it's parent  */
     write_lock (&de->parent->u.dir.lock);
     if ( !_devfs_unhook (de) ) err = -ENOENT;
     write_unlock (&de->parent->u.dir.lock);
-    if (err) return err;
+    if (err) {
+	unlock_kernel();
+	return err;
+    }
     if ( !is_devfsd_or_child (fs_info) )
 	devfsd_notify_de (de, DEVFSD_NOTIFY_DELETE, inode->i_mode,
 			  inode->i_uid, inode->i_gid, fs_info, 0);
     free_dentry (de);
     devfs_put (de);
+    unlock_kernel();
     return 0;
 }   /*  End Function devfs_rmdir  */
 

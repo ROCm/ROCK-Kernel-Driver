@@ -1086,13 +1086,18 @@ int vfat_rmdir(struct inode *dir,struct dentry* dentry)
 	struct buffer_head *bh = NULL;
 	struct msdos_dir_entry *de;
 
+	lock_kernel();
 	res = fat_dir_empty(dentry->d_inode);
-	if (res)
+	if (res) {
+		unlock_kernel();
 		return res;
+	}
 
 	res = vfat_find(dir,&dentry->d_name,&sinfo, &bh, &de);
-	if (res<0)
+	if (res<0) {
+		unlock_kernel();
 		return res;
+	}
 	dentry->d_inode->i_nlink = 0;
 	dentry->d_inode->i_mtime = CURRENT_TIME;
 	dentry->d_inode->i_atime = CURRENT_TIME;
@@ -1101,6 +1106,7 @@ int vfat_rmdir(struct inode *dir,struct dentry* dentry)
 	/* releases bh */
 	vfat_remove_entry(dir,&sinfo,bh,de);
 	dir->i_nlink--;
+	unlock_kernel();
 	return 0;
 }
 

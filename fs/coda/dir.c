@@ -457,20 +457,25 @@ int coda_rmdir(struct inode *dir, struct dentry *de)
 	int len = de->d_name.len;
         int error;
 
+	lock_kernel();
 	coda_vfs_stat.rmdir++;
 
-	if (!d_unhashed(de))
+	if (!d_unhashed(de)) {
+		unlock_kernel();
 		return -EBUSY;
+	}
 	error = venus_rmdir(dir->i_sb, coda_i2f(dir), name, len);
 
         if ( error ) {
                 CDEBUG(D_INODE, "upc returned error %d\n", error);
+		unlock_kernel();
                 return error;
         }
 
 	coda_dir_changed(dir, -1);
 	de->d_inode->i_nlink--;
 	d_delete(de);
+	unlock_kernel();
 
         return 0;
 }

@@ -59,7 +59,7 @@ link:		yes	yes
 mknod:		no	yes
 mkdir:		no	yes
 unlink:		no	yes (both)
-rmdir:		yes	yes (both)	(see below)
+rmdir:		no	yes (both)	(see below)
 rename:		yes	yes (all)	(see below)
 readlink:	no	no
 follow_link:	no	no
