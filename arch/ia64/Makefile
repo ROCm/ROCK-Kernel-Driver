@@ -128,7 +128,6 @@ archmrproper:
 	@$(MAKE) -C arch/$(ARCH)/tools mrproper
 
 archdep:
-	@$(MAKEBOOT) dep
 
 bootpfile:
 	@$(MAKEBOOT) bootpfile

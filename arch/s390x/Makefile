@@ -58,4 +58,3 @@ archclean:
 archmrproper:
 
 archdep:
-	@$(MAKEBOOT) dep
