@@ -533,8 +533,6 @@ void __init do_init_bootmem(void)
 	unsigned long total_pages = lmb_end_of_DRAM() >> PAGE_SHIFT;
 	int boot_mapsize;
 
-        max_pfn = max_low_pfn;
-
 	/*
 	 * Find an area to use for the bootmem bitmap.  Calculate the size of
 	 * bitmap required as (Total Memory) / PAGE_SIZE / BITS_PER_BYTE.
@@ -546,6 +544,8 @@ void __init do_init_bootmem(void)
 	BUG_ON(!start);
 
 	boot_mapsize = init_bootmem(start >> PAGE_SHIFT, total_pages);
+
+	max_pfn = max_low_pfn;
 
 	/* add all physical memory to the bootmem map. Also find the first */
 	for (i=0; i < lmb.memory.cnt; i++) {
