@@ -54,14 +54,14 @@ static void ack_none(unsigned int irq)
 }
 
 struct hw_interrupt_type no_irq_type = {
-	typename:	"none",
-	startup:	startup_none,
-	shutdown:	shutdown_none,
-	enable:		enable_none,
-	disable:	disable_none,
-	ack:		ack_none,
-	end:		end_none,
-	set_affinity:	NULL
+	.typename = 	"none",
+	.startup = 	startup_none,
+	.shutdown = 	shutdown_none,
+	.enable = 	enable_none,
+	.disable = 	disable_none,
+	.ack = 		ack_none,
+	.end = 		end_none,
+	.set_affinity = NULL
 };
 
 /*
