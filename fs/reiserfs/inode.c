@@ -306,7 +306,7 @@ research:
 	** read old data off disk.  Set the up to date bit on the buffer instead
 	** and jump to the end
 	*/
-	    if (PageUptodate(bh_result->b_page)) {
+	    if (!bh_result->b_page || PageUptodate(bh_result->b_page)) {
 		set_buffer_uptodate(bh_result);
 		goto finished ;
     }
@@ -420,6 +420,45 @@ static int reiserfs_get_block_create_0 (struct inode * inode, sector_t block,
     return reiserfs_get_block(inode, block, bh_result, GET_BLOCK_NO_HOLE) ;
 }
 
+/* This is special helper for reiserfs_get_block in case we are executing
+   direct_IO request. */
+static int reiserfs_get_blocks_direct_io(struct inode *inode,
+					 sector_t iblock,
+					 unsigned long max_blocks,
+					 struct buffer_head *bh_result,
+					 int create)
+{
+    int ret ;
+
+    bh_result->b_page = NULL;
+
+    /* We set the b_size before reiserfs_get_block call since it is
+       referenced in convert_tail_for_hole() that may be called from
+       reiserfs_get_block() */
+    bh_result->b_size = (1 << inode->i_blkbits);
+
+    ret = reiserfs_get_block(inode, iblock, bh_result, create) ;
+
+    /* don't allow direct io onto tail pages */
+    if (ret == 0 && buffer_mapped(bh_result) && bh_result->b_blocknr == 0) {
+        /* make sure future calls to the direct io funcs for this offset
+        ** in the file fail by unmapping the buffer
+        */
+        reiserfs_unmap_buffer(bh_result);
+        ret = -EINVAL ;
+    }
+    /* Possible unpacked tail. Flush the data before pages have
+       disappeared */
+    if (REISERFS_I(inode)->i_flags & i_pack_on_close_mask) {
+        lock_kernel();
+        reiserfs_commit_for_inode(inode);
+        REISERFS_I(inode)->i_flags &= ~i_pack_on_close_mask;
+        unlock_kernel();
+    }
+    return ret ;
+}
+
+
 /*
 ** helper function for when reiserfs_get_block is called for a hole
 ** but the file tail is still in a direct item
@@ -448,7 +487,10 @@ static int convert_tail_for_hole(struct inode *inode,
     tail_end = (tail_start | (bh_result->b_size - 1)) + 1 ;
 
     index = tail_offset >> PAGE_CACHE_SHIFT ;
-    if (index != hole_page->index) {
+    /* hole_page can be zero in case of direct_io, we are sure
+       that we cannot get here if we write with O_DIRECT into
+       tail page */
+    if (!hole_page || index != hole_page->index) {
 	tail_page = grab_cache_page(inode->i_mapping, index) ;
 	retval = -ENOMEM;
 	if (!tail_page) {
@@ -554,7 +596,12 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
 	return ret;
     }
 
-    REISERFS_I(inode)->i_flags |= i_pack_on_close_mask ;
+    /* If file is of such a size, that it might have a tail and tails are enabled
+    ** we should mark it as possibly needing tail packing on close
+    */
+    if ( (have_large_tails (inode->i_sb) && inode->i_size < i_block_size (inode)*4) ||
+	 (have_small_tails (inode->i_sb) && inode->i_size < i_block_size(inode)) )
+	REISERFS_I(inode)->i_flags |= i_pack_on_close_mask ;
 
     windex = push_journal_writer("reiserfs_get_block") ;
   
@@ -745,21 +792,26 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
 	    */
 	    set_buffer_uptodate (unbh);
 
-	    /* we've converted the tail, so we must 
-	    ** flush unbh before the transaction commits
-	    */
-	    add_to_flushlist(inode, unbh) ;
-
-	    /* mark it dirty now to prevent commit_write from adding
-	     ** this buffer to the inode's dirty buffer list
+	    /* unbh->b_page == NULL in case of DIRECT_IO request, this means
+	       buffer will disappear shortly, so it should not be added to
 	     */
+	    if ( unbh->b_page ) {
+		/* we've converted the tail, so we must
+		** flush unbh before the transaction commits
+		*/
+		add_to_flushlist(inode, unbh) ;
+
+		/* mark it dirty now to prevent commit_write from adding
+		** this buffer to the inode's dirty buffer list
+		*/
 		/*
 		 * AKPM: changed __mark_buffer_dirty to mark_buffer_dirty().
 		 * It's still atomic, but it sets the page dirty too,
 		 * which makes it eligible for writeback at any time by the
 		 * VM (which was also the case with __mark_buffer_dirty())
 		 */
-	    mark_buffer_dirty(unbh) ;
+		mark_buffer_dirty(unbh) ;
+	    }
 
 	    //inode->i_blocks += inode->i_sb->s_blocksize / 512;
 	    //mark_tail_converted (inode);
@@ -2204,6 +2256,13 @@ static int reiserfs_commit_write(struct file *f, struct page *page,
     if (pos > inode->i_size) {
 	struct reiserfs_transaction_handle th ;
 	reiserfs_write_lock(inode->i_sb);
+	/* If the file have grown beyond the border where it
+	   can have a tail, unmark it as needing a tail
+	   packing */
+	if ( (have_large_tails (inode->i_sb) && inode->i_size > i_block_size (inode)*4) ||
+	     (have_small_tails (inode->i_sb) && inode->i_size > i_block_size(inode)) )
+	    REISERFS_I(inode)->i_flags &= ~i_pack_on_close_mask ;
+
 	journal_begin(&th, inode->i_sb, 1) ;
 	reiserfs_update_inode_transaction(inode) ;
 	inode->i_size = pos ;
@@ -2310,6 +2369,19 @@ static int reiserfs_releasepage(struct page *page, int unused_gfp_flags)
     return ret ;
 }
 
+/* We thank Mingming Cao for helping us understand in great detail what
+   to do in this section of the code. */
+static int reiserfs_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
+			      loff_t offset, unsigned long nr_segs)
+{
+    struct file *file = iocb->ki_filp;
+    struct inode *inode = file->f_dentry->d_inode->i_mapping->host;
+
+    return blockdev_direct_IO(rw, iocb, inode, inode->i_sb->s_bdev, iov,
+			      offset, nr_segs, reiserfs_get_blocks_direct_io, NULL);
+}
+
+
 struct address_space_operations reiserfs_address_space_operations = {
     .writepage = reiserfs_writepage,
     .readpage = reiserfs_readpage, 
@@ -2318,5 +2390,6 @@ struct address_space_operations reiserfs_address_space_operations = {
     .sync_page = block_sync_page,
     .prepare_write = reiserfs_prepare_write,
     .commit_write = reiserfs_commit_write,
-    .bmap = reiserfs_aop_bmap
+    .bmap = reiserfs_aop_bmap,
+    .direct_IO = reiserfs_direct_IO
 } ;

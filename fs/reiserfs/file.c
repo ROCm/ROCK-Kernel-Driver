@@ -485,6 +485,11 @@ int reiserfs_allocate_blocks_for_region(
     /* Now the final thing, if we have grew the file, we must update it's size*/
     if ( pos + write_bytes > inode->i_size) {
 	inode->i_size = pos + write_bytes; // Set new size
+	/* If the file have grown so much that tail packing is no longer possible, reset
+	   "need to pack" flag */
+	if ( (have_large_tails (inode->i_sb) && inode->i_size > i_block_size (inode)*4) ||
+	     (have_small_tails (inode->i_sb) && inode->i_size > i_block_size(inode)) )
+	    REISERFS_I(inode)->i_flags &= ~i_pack_on_close_mask ;
     }
 
     /* Amount of on-disk blocks used by file have changed, update it */
@@ -999,8 +1004,40 @@ ssize_t reiserfs_file_write( struct file *file, /* the file we are going to writ
     struct page * prepared_pages[REISERFS_WRITE_PAGES_AT_A_TIME];
 				/* To simplify coding at this time, we store
 				   locked pages in array for now */
-    if ( count <= PAGE_CACHE_SIZE || file->f_flags & O_DIRECT)
+    if ( count <= PAGE_CACHE_SIZE )
         return generic_file_write(file, buf, count, ppos);
+
+    if ( file->f_flags & O_DIRECT) { // Direct IO needs some special threating.
+	int result, after_file_end = 0;
+	if ( (*ppos + count >= inode->i_size) || (file->f_flags & O_APPEND) ) {
+	    /* If we are appending a file, we need to put this savelink in here.
+	       If we will crash while doing direct io, finish_unfinished will
+	       cut the garbage from the file end. */
+	    struct reiserfs_transaction_handle th;
+	    reiserfs_write_lock(inode->i_sb);
+	    journal_begin(&th, inode->i_sb,  JOURNAL_PER_BALANCE_CNT );
+	    reiserfs_update_inode_transaction(inode);
+	    add_save_link (&th, inode, 1 /* Truncate */);
+	    journal_end(&th, inode->i_sb, JOURNAL_PER_BALANCE_CNT );
+	    reiserfs_write_unlock(inode->i_sb);
+	    after_file_end = 1;
+	}
+	result = generic_file_write(file, buf, count, ppos);
+
+	if ( after_file_end ) { /* Now update i_size and remove the savelink */
+	    struct reiserfs_transaction_handle th;
+	    reiserfs_write_lock(inode->i_sb);
+	    journal_begin(&th, inode->i_sb, 1);
+	    reiserfs_update_inode_transaction(inode);
+	    reiserfs_update_sd(&th, inode);
+	    journal_end(&th, inode->i_sb, 1);
+	    remove_save_link (inode, 1/* truncate */);
+	    reiserfs_write_unlock(inode->i_sb);
+	}
+
+	return result;
+    }
+
 
     if ( unlikely((ssize_t) count < 0 ))
         return -EINVAL;
