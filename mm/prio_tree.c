@@ -12,7 +12,6 @@
  */
 
 #include <linux/init.h>
-#include <linux/module.h>
 #include <linux/mm.h>
 #include <linux/prio_tree.h>
 
@@ -49,18 +48,23 @@
 /* avoid overflow */
 #define HEAP_INDEX(vma)	  ((vma)->vm_pgoff + (VMA_SIZE(vma) - 1))
 
-#define GET_INDEX_VMA(vma, radix, heap)		\
-do {						\
-	radix = RADIX_INDEX(vma);		\
-	heap = HEAP_INDEX(vma);			\
-} while (0)
 
-#define GET_INDEX(node, radix, heap)		\
-do { 						\
-	struct vm_area_struct *__tmp = 		\
-	  prio_tree_entry(node, struct vm_area_struct, shared.prio_tree_node);\
-	GET_INDEX_VMA(__tmp, radix, heap); 	\
-} while (0)
+static void get_index(const struct prio_tree_root *root,
+    const struct prio_tree_node *node,
+    unsigned long *radix, unsigned long *heap)
+{
+	if (root->raw) {
+		struct vm_area_struct *vma = prio_tree_entry(
+		    node, struct vm_area_struct, shared.prio_tree_node);
+
+		*radix = RADIX_INDEX(vma);
+		*heap = HEAP_INDEX(vma);
+	}
+	else {
+		*radix = node->start;
+		*heap = node->last;
+	}
+}
 
 static unsigned long index_bits_to_maxindex[BITS_PER_LONG];
 
@@ -80,8 +84,6 @@ static inline unsigned long prio_tree_maxindex(unsigned int bits)
 {
 	return index_bits_to_maxindex[bits - 1];
 }
-
-static void prio_tree_remove(struct prio_tree_root *, struct prio_tree_node *);
 
 /*
  * Extend a priority search tree so that it can store a node with heap_index
@@ -138,7 +140,7 @@ static struct prio_tree_node *prio_tree_expand(struct prio_tree_root *root,
 /*
  * Replace a prio_tree_node with a new node and return the old node
  */
-static struct prio_tree_node *prio_tree_replace(struct prio_tree_root *root,
+struct prio_tree_node *prio_tree_replace(struct prio_tree_root *root,
 		struct prio_tree_node *old, struct prio_tree_node *node)
 {
 	INIT_PRIO_TREE_NODE(node);
@@ -182,7 +184,7 @@ static struct prio_tree_node *prio_tree_replace(struct prio_tree_root *root,
  * the tree, then returns the address of the prior node. Otherwise, inserts
  * @node into the tree and returns @node.
  */
-static struct prio_tree_node *prio_tree_insert(struct prio_tree_root *root,
+struct prio_tree_node *prio_tree_insert(struct prio_tree_root *root,
 		struct prio_tree_node *node)
 {
 	struct prio_tree_node *cur, *res = node;
@@ -190,7 +192,7 @@ static struct prio_tree_node *prio_tree_insert(struct prio_tree_root *root,
 	unsigned long r_index, h_index, index, mask;
 	int size_flag = 0;
 
-	GET_INDEX(node, radix_index, heap_index);
+	get_index(root, node, &radix_index, &heap_index);
 
 	if (prio_tree_empty(root) ||
 			heap_index > prio_tree_maxindex(root->index_bits))
@@ -200,7 +202,7 @@ static struct prio_tree_node *prio_tree_insert(struct prio_tree_root *root,
 	mask = 1UL << (root->index_bits - 1);
 
 	while (mask) {
-		GET_INDEX(cur, r_index, h_index);
+		get_index(root, cur, &r_index, &h_index);
 
 		if (r_index == radix_index && h_index == heap_index)
 			return cur;
@@ -259,8 +261,7 @@ static struct prio_tree_node *prio_tree_insert(struct prio_tree_root *root,
  * algorithm takes O(log n) time where 'log n' is the number of bits required
  * to represent the maximum heap_index.
  */
-static void prio_tree_remove(struct prio_tree_root *root,
-		struct prio_tree_node *node)
+void prio_tree_remove(struct prio_tree_root *root, struct prio_tree_node *node)
 {
 	struct prio_tree_node *cur;
 	unsigned long r_index, h_index_right, h_index_left;
@@ -269,14 +270,14 @@ static void prio_tree_remove(struct prio_tree_root *root,
 
 	while (!prio_tree_left_empty(cur) || !prio_tree_right_empty(cur)) {
 		if (!prio_tree_left_empty(cur))
-			GET_INDEX(cur->left, r_index, h_index_left);
+			get_index(root, cur->left, &r_index, &h_index_left);
 		else {
 			cur = cur->right;
 			continue;
 		}
 
 		if (!prio_tree_right_empty(cur))
-			GET_INDEX(cur->right, r_index, h_index_right);
+			get_index(root, cur->right, &r_index, &h_index_right);
 		else {
 			cur = cur->left;
 			continue;
@@ -291,7 +292,7 @@ static void prio_tree_remove(struct prio_tree_root *root,
 
 	if (prio_tree_root(cur)) {
 		BUG_ON(root->prio_tree_node != cur);
-		INIT_PRIO_TREE_ROOT(root);
+		__INIT_PRIO_TREE_ROOT(root, root->raw);
 		return;
 	}
 
@@ -318,7 +319,7 @@ static struct prio_tree_node *prio_tree_left(struct prio_tree_iter *iter,
 	if (prio_tree_left_empty(iter->cur))
 		return NULL;
 
-	GET_INDEX(iter->cur->left, *r_index, *h_index);
+	get_index(iter->root, iter->cur->left, r_index, h_index);
 
 	if (iter->r_index <= *h_index) {
 		iter->cur = iter->cur->left;
@@ -359,7 +360,7 @@ static struct prio_tree_node *prio_tree_right(struct prio_tree_iter *iter,
 	if (iter->h_index < value)
 		return NULL;
 
-	GET_INDEX(iter->cur->right, *r_index, *h_index);
+	get_index(iter->root, iter->cur->right, r_index, h_index);
 
 	if (iter->r_index <= *h_index) {
 		iter->cur = iter->cur->right;
@@ -425,7 +426,7 @@ static struct prio_tree_node *prio_tree_first(struct prio_tree_iter *iter)
 	if (prio_tree_empty(root))
 		return NULL;
 
-	GET_INDEX(root->prio_tree_node, r_index, h_index);
+	get_index(root, root->prio_tree_node, &r_index, &h_index);
 
 	if (iter->r_index > h_index)
 		return NULL;
@@ -453,7 +454,7 @@ static struct prio_tree_node *prio_tree_first(struct prio_tree_iter *iter)
  *
  * Get the next prio_tree_node that overlaps with the input interval in iter
  */
-static struct prio_tree_node *prio_tree_next(struct prio_tree_iter *iter)
+struct prio_tree_node *prio_tree_next(struct prio_tree_iter *iter)
 {
 	unsigned long r_index, h_index;
 
@@ -554,8 +555,8 @@ void vma_prio_tree_insert(struct vm_area_struct *vma,
 
 	vma->shared.vm_set.head = NULL;
 
-	ptr = prio_tree_insert(root, &vma->shared.prio_tree_node);
-	if (ptr != &vma->shared.prio_tree_node) {
+	ptr = raw_prio_tree_insert(root, &vma->shared.prio_tree_node);
+	if (ptr != (struct prio_tree_node *) &vma->shared.prio_tree_node) {
 		old = prio_tree_entry(ptr, struct vm_area_struct,
 					shared.prio_tree_node);
 		vma_prio_tree_add(vma, old);
@@ -571,7 +572,7 @@ void vma_prio_tree_remove(struct vm_area_struct *vma,
 		if (!vma->shared.vm_set.parent)
 			list_del_init(&vma->shared.vm_set.list);
 		else
-			prio_tree_remove(root, &vma->shared.prio_tree_node);
+			raw_prio_tree_remove(root, &vma->shared.prio_tree_node);
 	} else {
 		/* Leave this BUG_ON till prio_tree patch stabilizes */
 		BUG_ON(vma->shared.vm_set.head->shared.vm_set.head != vma);
@@ -586,7 +587,7 @@ void vma_prio_tree_remove(struct vm_area_struct *vma,
 			} else
 				new_head = NULL;
 
-			prio_tree_replace(root, &vma->shared.prio_tree_node,
+			raw_prio_tree_replace(root, &vma->shared.prio_tree_node,
 					&head->shared.prio_tree_node);
 			head->shared.vm_set.head = new_head;
 			if (new_head)
