@@ -182,7 +182,7 @@ not_angel:
 		ldmia	r0, {r1, r2, r3, r4, r5, r6, ip, sp}
 		subs	r0, r0, r1		@ calculate the delta offset
 
-						@ if delta is zero, we're
+						@ if delta is zero, we are
 		beq	not_relocated		@ running at the address we
 						@ were linked at.
 

@@ -588,7 +588,7 @@
 		.endm
 
 #elif defined(CONFIG_ARCH_LH7A40X)
-	@ It isn't known if this will be appropriate for every 40x
+	@ It is not known if this will be appropriate for every 40x
 	@ board.
 
 		.macro  addruart,rx
