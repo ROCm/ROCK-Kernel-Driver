@@ -189,42 +189,29 @@ get_io_range(struct IsdnCardState *cs)
 	}
 	return 0;
 }
-  
-int __init
-setup_sportster(struct IsdnCard *card)
+
+static int __init
+sportster_probe(struct IsdnCardState *cs, struct IsdnCard *card)
 {
-	struct IsdnCardState *cs = card->cs;
-	char tmp[64];
-
-	strcpy(tmp, sportster_revision);
-	printk(KERN_INFO "HiSax: USR Sportster driver Rev. %s\n", HiSax_getrev(tmp));
-
-	cs->hw.spt.cfg_reg = card->para[1];
 	cs->irq = card->para[0];
+	cs->hw.spt.cfg_reg = card->para[1];
 	if (!get_io_range(cs))
-		return (0);
+		return -EBUSY;
 	cs->hw.spt.isac = cs->hw.spt.cfg_reg + SPORTSTER_ISAC;
 	cs->hw.spt.hscx[0] = cs->hw.spt.cfg_reg + SPORTSTER_HSCXA;
 	cs->hw.spt.hscx[1] = cs->hw.spt.cfg_reg + SPORTSTER_HSCXB;
 	
 	switch(cs->irq) {
-		case 5:	cs->hw.spt.res_irq = 1;
-			break;
-		case 7:	cs->hw.spt.res_irq = 2;
-			break;
-		case 10:cs->hw.spt.res_irq = 3;
-			break;
-		case 11:cs->hw.spt.res_irq = 4;
-			break;
-		case 12:cs->hw.spt.res_irq = 5;
-			break;
-		case 14:cs->hw.spt.res_irq = 6;
-			break;
-		case 15:cs->hw.spt.res_irq = 7;
-			break;
-		default:sportster_release(cs);
-			printk(KERN_WARNING "Sportster: wrong IRQ\n");
-			return(0);
+	case 5:	cs->hw.spt.res_irq = 1;	break;
+	case 7:	cs->hw.spt.res_irq = 2;	break;
+	case 10:cs->hw.spt.res_irq = 3;	break;
+	case 11:cs->hw.spt.res_irq = 4;	break;
+	case 12:cs->hw.spt.res_irq = 5;	break;
+	case 14:cs->hw.spt.res_irq = 6;	break;
+	case 15:cs->hw.spt.res_irq = 7;	break;
+	default:
+		printk(KERN_WARNING "Sportster: wrong IRQ\n");
+		goto err;
 	}
 	sportster_reset(cs);
 	printk(KERN_INFO "HiSax: %s config irq:%d cfg:0x%X\n",
@@ -234,8 +221,22 @@ setup_sportster(struct IsdnCard *card)
 	cs->card_ops = &sportster_ops;
 	if (hscxisac_setup(cs, &isac_ops, &hscx_ops))
 		goto err;
-	return 1;
- err:
-	hisax_release_resources(cs);
 	return 0;
+ err:
+	sportster_release(cs);
+	return -EBUSY;
+}
+
+int __init
+setup_sportster(struct IsdnCard *card)
+{
+	char tmp[64];
+
+	strcpy(tmp, sportster_revision);
+	printk(KERN_INFO "HiSax: USR Sportster driver Rev. %s\n",
+	       HiSax_getrev(tmp));
+
+	if (sportster_probe(card->cs, card) < 0)
+		return 0;
+	return 1;
 }

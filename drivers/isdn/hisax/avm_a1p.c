@@ -215,20 +215,13 @@ static struct card_ops avm_a1p_ops = {
 	.irq_func = avm_a1p_interrupt,
 };
 
-int __devinit
-setup_avm_a1_pcmcia(struct IsdnCard *card)
+static int __init
+avm_a1p_probe(struct IsdnCardState *cs, struct IsdnCard *card)
 {
 	u8 model, vers;
-	struct IsdnCardState *cs = card->cs;
-	char tmp[64];
 
-
-	strcpy(tmp, avm_revision);
-	printk(KERN_INFO "HiSax: AVM A1 PCMCIA driver Rev. %s\n",
-	       HiSax_getrev(tmp));
-	cs->hw.avm.cfg_reg = card->para[1];
 	cs->irq = card->para[0];
-
+	cs->hw.avm.cfg_reg = card->para[1];
 
 	outb(cs->hw.avm.cfg_reg+ASL1_OFFSET, ASL1_W_ENABLE_S0);
 
@@ -244,11 +237,26 @@ setup_avm_a1_pcmcia(struct IsdnCard *card)
 	vers = bytein(cs->hw.avm.cfg_reg+VERREG_OFFSET);
 
 	printk(KERN_INFO "AVM A1 PCMCIA: io 0x%x irq %d model %d version %d\n",
-				cs->hw.avm.cfg_reg, cs->irq, model, vers);
+	       cs->hw.avm.cfg_reg, cs->irq, model, vers);
 
 	cs->card_ops = &avm_a1p_ops;
 	if (hscxisac_setup(cs, &isac_ops, &hscx_ops))
-		return 0;
+		goto err;
+	return 0;
+ err:
+	hisax_release_resources(cs);
+	return -EBUSY;
+}
 
+int __devinit
+setup_avm_a1_pcmcia(struct IsdnCard *card)
+{
+	char tmp[64];
+
+	strcpy(tmp, avm_revision);
+	printk(KERN_INFO "HiSax: AVM A1 PCMCIA driver Rev. %s\n",
+	       HiSax_getrev(tmp));
+	if (avm_a1p_probe(card->cs, card))
+		return 0;
 	return 1;
 }

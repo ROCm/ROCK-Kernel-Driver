@@ -231,6 +231,51 @@ static struct card_ops asuscom_ipac_ops = {
 	.irq_func = ipac_irq,
 };
 
+static int __init
+asuscom_probe(struct IsdnCardState *cs, struct IsdnCard *card)
+{
+	int rc;
+	u8 val;
+
+	printk(KERN_INFO "ISDNLink: defined at %#lx IRQ %lu\n",
+	       card->para[1], card->para[0]);
+
+	cs->hw.asus.cfg_reg = card->para[1];
+	cs->irq = card->para[0];
+
+	rc = -EBUSY;
+	if (!request_io(&cs->rs, cs->hw.asus.cfg_reg, 8, "asuscom isdn"))
+		goto err;
+
+	rc = -ENODEV;
+	cs->hw.asus.adr = cs->hw.asus.cfg_reg + ASUS_IPAC_ALE;
+	val = readreg(cs, cs->hw.asus.cfg_reg + ASUS_IPAC_DATA, IPAC_ID);
+	if ((val == 1) || (val == 2)) {
+		cs->subtyp = ASUS_IPAC;
+		cs->card_ops = &asuscom_ipac_ops;
+		cs->hw.asus.isac = cs->hw.asus.cfg_reg + ASUS_IPAC_DATA;
+		if (ipac_setup(cs, &ipac_dc_ops, &ipac_bc_ops))
+			goto err;
+	} else {
+		cs->subtyp = ASUS_ISACHSCX;
+		cs->card_ops = &asuscom_ops;
+		cs->hw.asus.adr = cs->hw.asus.cfg_reg + ASUS_ADR;
+		cs->hw.asus.isac = cs->hw.asus.cfg_reg + ASUS_ISAC;
+		cs->hw.asus.hscx = cs->hw.asus.cfg_reg + ASUS_HSCX;
+		cs->hw.asus.u7 = cs->hw.asus.cfg_reg + ASUS_CTRL_U7;
+		cs->hw.asus.pots = cs->hw.asus.cfg_reg + ASUS_CTRL_POTS;
+		if (hscxisac_setup(cs, &isac_ops, &hscx_ops))
+			goto err;
+	}
+	printk(KERN_INFO "ISDNLink: resetting card\n");
+	cs->card_ops->reset(cs);
+	return 0;
+
+ err:
+	hisax_release_resources(cs);
+	return rc;
+}
+
 #ifdef __ISAPNP__
 static struct isapnp_device_id asus_ids[] __initdata = {
 	{ ISAPNP_VENDOR('A', 'S', 'U'), ISAPNP_FUNCTION(0x1688),
@@ -255,9 +300,6 @@ static struct pnp_card *pnp_c __devinitdata = NULL;
 int __init
 setup_asuscom(struct IsdnCard *card)
 {
-	int bytecnt;
-	struct IsdnCardState *cs = card->cs;
-	u8 val;
 	char tmp[64];
 
 	strcpy(tmp, Asuscom_revision);
@@ -310,36 +352,7 @@ setup_asuscom(struct IsdnCard *card)
 		}
 	}
 #endif
-	bytecnt = 8;
-	cs->hw.asus.cfg_reg = card->para[1];
-	cs->irq = card->para[0];
-	if (!request_io(&cs->rs, cs->hw.asus.cfg_reg, bytecnt, "asuscom isdn"))
-		goto err;
-	printk(KERN_INFO "ISDNLink: defined at 0x%x IRQ %d\n",
-		cs->hw.asus.cfg_reg, cs->irq);
-	cs->hw.asus.adr = cs->hw.asus.cfg_reg + ASUS_IPAC_ALE;
-	val = readreg(cs, cs->hw.asus.cfg_reg + ASUS_IPAC_DATA, IPAC_ID);
-	if ((val == 1) || (val == 2)) {
-		cs->subtyp = ASUS_IPAC;
-		cs->card_ops = &asuscom_ipac_ops;
-		cs->hw.asus.isac = cs->hw.asus.cfg_reg + ASUS_IPAC_DATA;
-		if (ipac_setup(cs, &ipac_dc_ops, &ipac_bc_ops))
-			goto err;
-	} else {
-		cs->subtyp = ASUS_ISACHSCX;
-		cs->card_ops = &asuscom_ops;
-		cs->hw.asus.adr = cs->hw.asus.cfg_reg + ASUS_ADR;
-		cs->hw.asus.isac = cs->hw.asus.cfg_reg + ASUS_ISAC;
-		cs->hw.asus.hscx = cs->hw.asus.cfg_reg + ASUS_HSCX;
-		cs->hw.asus.u7 = cs->hw.asus.cfg_reg + ASUS_CTRL_U7;
-		cs->hw.asus.pots = cs->hw.asus.cfg_reg + ASUS_CTRL_POTS;
-		if (hscxisac_setup(cs, &isac_ops, &hscx_ops))
-			goto err;
-	}
-	printk(KERN_INFO "ISDNLink: resetting card\n");
-	cs->card_ops->reset(cs);
+	if (asuscom_probe(card->cs, card) < 0)
+		return 0;
 	return 1;
- err:
-	hisax_release_resources(cs);
-	return 0;
 }
