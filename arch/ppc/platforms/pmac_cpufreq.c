@@ -176,7 +176,7 @@ do_set_cpu_speed(int speed_mode)
 	
 	freqs.old = cur_freq;
 	freqs.new = (speed_mode == PMAC_CPU_HIGH_SPEED) ? hi_freq : low_freq;
-	freqs.cpu = CPUFREQ_ALL_CPUS;
+	freqs.cpu = smp_processor_id();
 
 	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 	if (cpufreq_uses_pmu)
