@@ -948,7 +948,7 @@ static int alloc_ring(struct net_device* dev)
 	return 0;
 }
 
-void free_ring(struct net_device* dev)
+static void free_ring(struct net_device* dev)
 {
 	struct rhine_private *rp = netdev_priv(dev);
 
