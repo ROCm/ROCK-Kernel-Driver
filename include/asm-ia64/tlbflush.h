@@ -33,12 +33,10 @@ extern void local_flush_tlb_all (void);
 #endif
 
 static inline void
-local_flush_tlb_mm (struct mm_struct *mm)
+local_finish_flush_tlb_mm (struct mm_struct *mm)
 {
-	if (mm == current->active_mm) {
-		get_new_mmu_context(mm);
-		reload_context(mm);
-	}
+	if (mm == current->active_mm)
+		activate_context(mm);
 }
 
 /*
@@ -60,7 +58,7 @@ flush_tlb_mm (struct mm_struct *mm)
 #ifdef CONFIG_SMP
 	smp_flush_tlb_mm(mm);
 #else
-	local_flush_tlb_mm(mm);
+	local_finish_flush_tlb_mm(mm);
 #endif
 }
 

@@ -535,7 +535,6 @@ END(ia64_trace_syscall)
 
 GLOBAL_ENTRY(ia64_ret_from_clone)
 	PT_REGS_UNWIND_INFO(0)
-#if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
 	/*
 	 * We need to call schedule_tail() to complete the scheduling process.
 	 * Called by ia64_switch_to() after do_fork()->copy_thread().  r8 contains the
@@ -543,7 +542,6 @@ GLOBAL_ENTRY(ia64_ret_from_clone)
 	 */
 	br.call.sptk.many rp=ia64_invoke_schedule_tail
 .ret8:
-#endif
 	adds r2=TI_FLAGS+IA64_TASK_SIZE,r13
 	;;
 	ld4 r2=[r2]
@@ -844,7 +842,6 @@ ENTRY(handle_syscall_error)
 	br.cond.sptk ia64_leave_kernel
 END(handle_syscall_error)
 
-#ifdef CONFIG_SMP
 	/*
 	 * Invoke schedule_tail(task) while preserving in0-in7, which may be needed
 	 * in case a system call gets restarted.
@@ -860,8 +857,6 @@ GLOBAL_ENTRY(ia64_invoke_schedule_tail)
 	mov rp=loc0
 	br.ret.sptk.many rp
 END(ia64_invoke_schedule_tail)
-
-#endif /* CONFIG_SMP */
 
 #if __GNUC__ < 3
 
@@ -1129,18 +1124,18 @@ sys_call_table:
 	data8 ia64_ni_syscall					/* was: ia64_oldfstat */
 	data8 sys_vhangup
 	data8 sys_lchown
-	data8 sys_vm86				// 1125
+	data8 sys_remap_file_pages		// 1125
 	data8 sys_wait4
 	data8 sys_sysinfo
 	data8 sys_clone
 	data8 sys_setdomainname
 	data8 sys_newuname			// 1130
 	data8 sys_adjtimex
-	data8 ia64_create_module
+	data8 ia64_ni_syscall					/* was: ia64_create_module */
 	data8 sys_init_module
 	data8 sys_delete_module
-	data8 sys_get_kernel_syms		// 1135
-	data8 sys_query_module
+	data8 ia64_ni_syscall			// 1135		/* was: sys_get_kernel_syms */
+	data8 ia64_ni_syscall					/* was: sys_query_module */
 	data8 sys_quotactl
 	data8 sys_bdflush
 	data8 sys_sysfs
@@ -1173,11 +1168,7 @@ sys_call_table:
 	data8 sys_sched_get_priority_min
 	data8 sys_sched_rr_get_interval
 	data8 sys_nanosleep
-#if defined(CONFIG_NFSD) || defined(CONFIG_NFSD_MODULE)
 	data8 sys_nfsservctl
-#else
-	data8 sys_ni_syscall
-#endif
 	data8 sys_prctl				// 1170
 	data8 sys_getpagesize
 	data8 sys_mmap2
@@ -1241,7 +1232,7 @@ sys_call_table:
 	data8 sys_futex				// 1230
 	data8 sys_sched_setaffinity
 	data8 sys_sched_getaffinity
-	data8 sys_ni_syscall
+	data8 sys_set_tid_address
 	data8 sys_alloc_hugepages
 	data8 sys_free_hugepages		// 1235
 	data8 sys_exit_group
@@ -1254,7 +1245,7 @@ sys_call_table:
 	data8 sys_epoll_create
 	data8 sys_epoll_ctl
 	data8 sys_epoll_wait			// 1245
-	data8 ia64_ni_syscall
+	data8 sys_remap_file_pages
 	data8 ia64_ni_syscall
 	data8 ia64_ni_syscall
 	data8 ia64_ni_syscall

@@ -38,7 +38,6 @@
 #include <linux/smb_mount.h>
 #include <linux/ncp_fs.h>
 #include <linux/quota.h>
-#include <linux/module.h>
 #include <linux/sunrpc/svc.h>
 #include <linux/nfsd/nfsd.h>
 #include <linux/nfsd/cache.h>
@@ -194,9 +193,12 @@ putstat (struct stat32 *ubuf, struct kstat *stat)
 	err |= __put_user(high2lowgid(stat->gid), &ubuf->st_gid);
 	err |= __put_user(stat->rdev, &ubuf->st_rdev);
 	err |= __put_user(stat->size, &ubuf->st_size);
-	err |= __put_user(stat->atime, &ubuf->st_atime);
-	err |= __put_user(stat->mtime, &ubuf->st_mtime);
-	err |= __put_user(stat->ctime, &ubuf->st_ctime);
+	err |= __put_user(stat->atime.tv_sec, &ubuf->st_atime);
+	err |= __put_user(stat->atime.tv_nsec, &ubuf->st_atime_nsec);
+	err |= __put_user(stat->mtime.tv_sec, &ubuf->st_mtime);
+	err |= __put_user(stat->mtime.tv_nsec, &ubuf->st_mtime_nsec);
+	err |= __put_user(stat->ctime.tv_sec, &ubuf->st_ctime);
+	err |= __put_user(stat->ctime.tv_nsec, &ubuf->st_ctime_nsec);
 	err |= __put_user(stat->blksize, &ubuf->st_blksize);
 	err |= __put_user(stat->blocks, &ubuf->st_blocks);
 	return err;
@@ -2986,7 +2988,7 @@ save_ia32_fpxstate (struct task_struct *tsk, struct ia32_user_fxsr_struct *save)
         ptp = ia64_task_regs(tsk);
 	tos = (tsk->thread.fsr >> 11) & 7;
         for (i = 0; i < 8; i++)
-		put_fpreg(i, (struct _fpxreg_ia32 *)&save->st_space[4*i], ptp, swp, tos);
+		put_fpreg(i, (struct _fpreg_ia32 *)&save->st_space[4*i], ptp, swp, tos);
 
 	mxcsr = ((tsk->thread.fcr>>32) & 0xff80) | ((tsk->thread.fsr>>32) & 0x3f);
 	__put_user(mxcsr & 0xffff, &save->mxcsr);
@@ -3030,7 +3032,7 @@ restore_ia32_fpxstate (struct task_struct *tsk, struct ia32_user_fxsr_struct *sa
 	ptp = ia64_task_regs(tsk);
 	tos = (tsk->thread.fsr >> 11) & 7;
 	for (i = 0; i < 8; i++)
-	get_fpreg(i, (struct _fpxreg_ia32 *)&save->st_space[4*i], ptp, swp, tos);
+	get_fpreg(i, (struct _fpreg_ia32 *)&save->st_space[4*i], ptp, swp, tos);
 
 	__get_user(mxcsr, (unsigned int *)&save->mxcsr);
 	num64 = mxcsr & 0xff10;
@@ -3637,9 +3639,12 @@ putstat64 (struct stat64 *ubuf, struct kstat *kbuf)
 	err |= __put_user(kbuf->rdev, &ubuf->st_rdev);
 	err |= __put_user(kbuf->size, &ubuf->st_size_lo);
 	err |= __put_user((kbuf->size >> 32), &ubuf->st_size_hi);
-	err |= __put_user(kbuf->atime, &ubuf->st_atime);
-	err |= __put_user(kbuf->mtime, &ubuf->st_mtime);
-	err |= __put_user(kbuf->ctime, &ubuf->st_ctime);
+	err |= __put_user(kbuf->atime.tv_sec, &ubuf->st_atime);
+	err |= __put_user(kbuf->atime.tv_nsec, &ubuf->st_atime_nsec);
+	err |= __put_user(kbuf->mtime.tv_sec, &ubuf->st_mtime);
+	err |= __put_user(kbuf->mtime.tv_nsec, &ubuf->st_mtime_nsec);
+	err |= __put_user(kbuf->ctime.tv_sec, &ubuf->st_ctime);
+	err |= __put_user(kbuf->ctime.tv_nsec, &ubuf->st_ctime_nsec);
 	err |= __put_user(kbuf->blksize, &ubuf->st_blksize);
 	err |= __put_user(kbuf->blocks, &ubuf->st_blocks);
 	return err;

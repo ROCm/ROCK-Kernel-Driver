@@ -340,25 +340,6 @@ ia64_mremap (unsigned long addr, unsigned long old_len, unsigned long new_len, u
 	return addr;
 }
 
-asmlinkage long
-sys_vm86 (long arg0, long arg1, long arg2, long arg3)
-{
-	printk(KERN_ERR "sys_vm86(%lx, %lx, %lx, %lx)!\n", arg0, arg1, arg2, arg3);
-	return -ENOSYS;
-}
-
-asmlinkage unsigned long
-ia64_create_module (const char *name_user, size_t size)
-{
-	extern unsigned long sys_create_module (const char *, size_t);
-	unsigned long   addr;
-
-	addr = sys_create_module (name_user, size);
-	if (!IS_ERR((void *) addr))
-		force_successful_syscall_return();
-	return addr;
-}
-
 #ifndef CONFIG_PCI
 
 asmlinkage long

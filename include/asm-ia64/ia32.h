@@ -229,11 +229,11 @@ struct stat32 {
        unsigned int  st_blksize;
        unsigned int  st_blocks;
        unsigned int  st_atime;
-       unsigned int  __unused1;
+       unsigned int  st_atime_nsec;
        unsigned int  st_mtime;
-       unsigned int  __unused2;
+       unsigned int  st_mtime_nsec;
        unsigned int  st_ctime;
-       unsigned int  __unused3;
+       unsigned int  st_ctime_nsec;
        unsigned int  __unused4;
        unsigned int  __unused5;
 };
@@ -254,11 +254,11 @@ struct stat64 {
 	unsigned int	st_blocks;	/* Number 512-byte blocks allocated. */
 	unsigned int	__pad4;		/* future possible st_blocks high bits */
 	unsigned int	st_atime;
-	unsigned int	__pad5;
+	unsigned int	st_atime_nsec;
 	unsigned int	st_mtime;
-	unsigned int	__pad6;
+	unsigned int	st_mtime_nsec;
 	unsigned int	st_ctime;
-	unsigned int	__pad7;		/* will be high 32 bits of ctime someday */
+	unsigned int	st_ctime_nsec;
 	unsigned int	st_ino_lo;
 	unsigned int	st_ino_hi;
 };

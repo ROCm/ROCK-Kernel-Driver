@@ -1,3 +1,8 @@
+#
+# For a description of the syntax of this configuration file,
+# see Documentation/kbuild/kconfig-language.txt.
+#
+
 mainmenu "IA-64 Linux Kernel Configuration"
 
 source "init/Kconfig"

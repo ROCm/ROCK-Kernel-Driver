@@ -649,9 +649,8 @@ cpu_init (void)
 	 * "NR_CPUS" pages for all CPUs to avoid that AP calls get_zeroed_page().
 	 */
 	if (smp_processor_id() == 0) {
-		cpu_data = (unsigned long) __alloc_bootmem(PERCPU_PAGE_SIZE * NR_CPUS,
-							   PERCPU_PAGE_SIZE,
-							   __pa(MAX_DMA_ADDRESS));
+		cpu_data = __alloc_bootmem(PERCPU_PAGE_SIZE * NR_CPUS, PERCPU_PAGE_SIZE,
+					   __pa(MAX_DMA_ADDRESS));
 		for (cpu = 0; cpu < NR_CPUS; cpu++) {
 			memcpy(cpu_data, __phys_per_cpu_start, __per_cpu_end - __per_cpu_start);
 			__per_cpu_offset[cpu] = (char *) cpu_data - __per_cpu_start;

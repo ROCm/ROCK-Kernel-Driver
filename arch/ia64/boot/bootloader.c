@@ -3,12 +3,14 @@
  *
  * Loads an ELF kernel.
  *
- * Copyright (C) 1998, 1999, 2001 Hewlett-Packard Co
- * Copyright (C) 1998, 1999, 2001 David Mosberger-Tang <davidm@hpl.hp.com>
- * Copyright (C) 1998, 1999 Stephane Eranian <eranian@hpl.hp.com>
+ * Copyright (C) 1998-2002 Hewlett-Packard Co
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
+ *	Stephane Eranian <eranian@hpl.hp.com>
  *
  * 01/07/99 S.Eranian modified to pass command line arguments to kernel
  */
+struct task_struct;	/* forward declaration for elf.h */
+
 #include <linux/config.h>
 #include <linux/elf.h>
 #include <linux/init.h>

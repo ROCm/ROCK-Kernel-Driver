@@ -10,6 +10,7 @@
 #include <linux/pm.h>
 #include <linux/elf.h>
 #include <linux/errno.h>
+#include <linux/kallsyms.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
 #include <linux/module.h>
@@ -376,7 +377,8 @@ copy_thread (int nr, unsigned long clone_flags,
 	/* clear list of sampling buffer to free for new task */
 	p->thread.pfm_smpl_buf_list = NULL;
 
-	if (current->thread.pfm_context) retval = pfm_inherit(p, child_ptregs);
+	if (current->thread.pfm_context)
+		retval = pfm_inherit(p, child_ptregs);
 #endif
 	return retval;
 }
