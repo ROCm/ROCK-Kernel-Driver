@@ -213,6 +213,7 @@ sdev_rd_attr (device_blocked, "%d\n");
 sdev_rd_attr (current_queue_depth, "%d\n");
 sdev_rd_attr (new_queue_depth, "%d\n");
 sdev_rd_attr (type, "%d\n");
+sdev_rd_attr (scsi_level, "%d\n");
 sdev_rd_attr (access_count, "%d\n");
 sdev_rd_attr (vendor, "%.8s\n");
 sdev_rd_attr (model, "%.16s\n");
@@ -224,6 +225,7 @@ static struct device_attribute * const sdev_attrs[] = {
 	&dev_attr_current_queue_depth,
 	&dev_attr_new_queue_depth,
 	&dev_attr_type,
+	&dev_attr_scsi_level,
 	&dev_attr_access_count,
 	&dev_attr_vendor,
 	&dev_attr_model,

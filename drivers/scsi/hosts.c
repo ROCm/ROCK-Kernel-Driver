@@ -36,6 +36,7 @@
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/list.h>
+#include <linux/completion.h>
 
 #define __KERNEL_SYSCALLS__
 
@@ -314,9 +315,10 @@ int __scsi_add_host(struct Scsi_Host *shost)
  **/
 int scsi_add_host(struct Scsi_Host *shost, struct device *dev)
 {
-	dev->class_data = shost;
-	shost->host_gendev = dev;
-
+	if (dev) {
+		dev->class_data = shost;
+		shost->host_gendev = dev;
+	}
 	return __scsi_add_host(shost);
 }
 
@@ -335,10 +337,11 @@ void scsi_unregister(struct Scsi_Host *shost)
 	 * Next, kill the kernel error recovery thread for this host.
 	 */
 	if (shost->ehandler) {
-		DECLARE_MUTEX_LOCKED(sem);
+		DECLARE_COMPLETION(sem);
 		shost->eh_notify = &sem;
-		send_sig(SIGHUP, shost->ehandler, 1);
-		down(&sem);
+		shost->eh_kill = 1;
+		up(shost->eh_wait);
+		wait_for_completion(&sem);
 		shost->eh_notify = NULL;
 	}
 
@@ -368,7 +371,7 @@ struct Scsi_Host * scsi_register(Scsi_Host_Template *shost_tp, int xtr_bytes)
 {
 	struct Scsi_Host *shost, *shost_scr;
 	int gfp_mask;
-	DECLARE_MUTEX_LOCKED(sem);
+	DECLARE_COMPLETION(sem);
 
         /* Check to see if this host has any error handling facilities */
         if(shost_tp->eh_strategy_handler == NULL &&
@@ -464,7 +467,7 @@ found:
 	 * Now wait for the kernel error thread to initialize itself
 	 * as it might be needed when we scan the bus.
 	 */
-	down(&sem);
+	wait_for_completion(&sem);
 	shost->eh_notify = NULL;
 
 	shost->hostt->present++;
