@@ -94,6 +94,8 @@ extern void machvec_tlb_migrate_finish (struct mm_struct *);
 #  include <asm/machvec_dig.h>
 # elif defined (CONFIG_IA64_HP_ZX1)
 #  include <asm/machvec_hpzx1.h>
+# elif defined (CONFIG_IA64_HP_ZX1_SWIOTLB)
+#  include <asm/machvec_hpzx1_swiotlb.h>
 # elif defined (CONFIG_IA64_SGI_SN2)
 #  include <asm/machvec_sn2.h>
 # elif defined (CONFIG_IA64_GENERIC)

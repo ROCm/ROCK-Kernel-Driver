@@ -673,7 +673,11 @@ running once the system is up.
 
 	mac53c9x=	[HW,SCSI]
 			Format: <num_esps>,<disconnect>,<nosync>,<can_queue>,<cmd_per_lun>,<sg_tablesize>,<hostid>,<use_tags>
-	
+
+	machvec=	[IA64]
+			Force the use of a particular machine-vector (machvec) in a generic
+			kernel.  Example: machvec=hpzx1_swiotlb
+
 	mad16=		[HW,OSS]
 			Format: <io>,<irq>,<dma>,<dma16>,<mpu_io>,<mpu_irq>,<joystick>
 
