@@ -29,13 +29,14 @@
 #include "pci_impl.h"
 #include "machvec_impl.h"
 
+#if NR_IRQS < MARVEL_NR_IRQS
+# error NR_IRQS < MARVEL_NR_IRQS !!!
+#endif
+
 
 /*
  * Interrupt handling.
  */
-#define IRQ_VEC_PE_SHIFT (10)
-#define IRQ_VEC_IRQ_MASK ((1 << IRQ_VEC_PE_SHIFT) - 1)
-
 static void 
 io7_device_interrupt(unsigned long vector, struct pt_regs * regs)
 {
@@ -59,9 +60,9 @@ io7_device_interrupt(unsigned long vector, struct pt_regs * regs)
 	pid = vector >> 16;
 	irq = ((vector & 0xffff) - 0x800) >> 4;
 
-	irq += 16;			/* offset for legacy */
-	irq &= IRQ_VEC_IRQ_MASK;	/* not too many bits */
-	irq |= pid << IRQ_VEC_PE_SHIFT;	/* merge the pid     */
+	irq += 16;				/* offset for legacy */
+	irq &= MARVEL_IRQ_VEC_IRQ_MASK;		/* not too many bits */
+	irq |= pid << MARVEL_IRQ_VEC_PE_SHIFT;	/* merge the pid     */
 
 	handle_irq(irq, regs);
 }
@@ -73,7 +74,7 @@ io7_get_irq_ctl(unsigned int irq, struct io7 **pio7)
 	unsigned int pid;
 	struct io7 *io7;
 
-	pid = irq >> IRQ_VEC_PE_SHIFT;
+	pid = irq >> MARVEL_IRQ_VEC_PE_SHIFT;
 
 	if (!(io7 = marvel_find_io7(pid))) {
 		printk(KERN_ERR 
@@ -82,7 +83,7 @@ io7_get_irq_ctl(unsigned int irq, struct io7 **pio7)
 		return NULL;
 	}
 
-	irq &= IRQ_VEC_IRQ_MASK;	/* isolate the vector    */
+	irq &= MARVEL_IRQ_VEC_IRQ_MASK;	/* isolate the vector    */
 	irq -= 16;			/* subtract legacy bias  */
 
 	if (irq >= 0x180) {
@@ -273,7 +274,7 @@ init_io7_irqs(struct io7 *io7,
 	      struct hw_interrupt_type *lsi_ops,
 	      struct hw_interrupt_type *msi_ops)
 {
-	long base = (io7->pe << IRQ_VEC_PE_SHIFT) + 16;
+	long base = (io7->pe << MARVEL_IRQ_VEC_PE_SHIFT) + 16;
 	long i;
 
 	printk("Initializing interrupts for IO7 at PE %u - base %lx\n",
@@ -383,8 +384,8 @@ marvel_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 		       msg_dat);
 		printk("  reporting on %d IRQ(s) from %d (0x%x)\n", 
 		       1 << ((msg_ctl & PCI_MSI_FLAGS_QSIZE) >> 4),
-		       (irq + 16) | (io7->pe << IRQ_VEC_PE_SHIFT),
-		       (irq + 16) | (io7->pe << IRQ_VEC_PE_SHIFT));
+		       (irq + 16) | (io7->pe << MARVEL_IRQ_VEC_PE_SHIFT),
+		       (irq + 16) | (io7->pe << MARVEL_IRQ_VEC_PE_SHIFT));
 #endif
 
 #if 0
@@ -397,8 +398,8 @@ marvel_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 #endif
 	}
 
-	irq += 16;				/* offset for legacy */
-	irq |= io7->pe << IRQ_VEC_PE_SHIFT;	/* merge the pid     */
+	irq += 16;					/* offset for legacy */
+	irq |= io7->pe << MARVEL_IRQ_VEC_PE_SHIFT;	/* merge the pid     */
 
 	return irq; 
 }

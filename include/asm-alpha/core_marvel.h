@@ -17,9 +17,11 @@
 
 #include <asm/compiler.h>
 
-#define MARVEL_MAX_PIDS		128
-#define MARVEL_MAX_LSIS_PER_PID	256
-#define MARVEL_NR_IRQS (MARVEL_MAX_PIDS * MARVEL_MAX_LSIS_PER_PID)
+#define MARVEL_MAX_PIDS		 32 /* as long as we rely on 43-bit superpage */
+#define MARVEL_IRQ_VEC_PE_SHIFT	(10)
+#define MARVEL_IRQ_VEC_IRQ_MASK	((1 << MARVEL_IRQ_VEC_PE_SHIFT) - 1)
+#define MARVEL_NR_IRQS		\
+	(16 + (MARVEL_MAX_PIDS * (1 << MARVEL_IRQ_VEC_PE_SHIFT)))
 
 /*
  * EV7 RBOX Registers
