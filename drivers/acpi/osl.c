@@ -35,7 +35,6 @@
 #include <linux/interrupt.h>
 #include <linux/kmod.h>
 #include <linux/delay.h>
-#include <linux/initrd.h>
 #include <linux/workqueue.h>
 #include <linux/nmi.h>
 #include <acpi/acpi.h>
@@ -45,7 +44,10 @@
 #include <asm/uaccess.h>
 
 #include <linux/efi.h>
-
+#ifdef CONFIG_ACPI_INITRD
+#include<linux/syscalls.h>
+#include <linux/initrd.h>
+#endif
 
 #define _COMPONENT		ACPI_OS_SERVICES
 ACPI_MODULE_NAME	("osl")
@@ -253,53 +255,99 @@ acpi_find_dsdt_initrd(void)
 {
 	static const char signature[] = "INITRDDSDT123DSDT123";
 	char *dsdt_start = NULL;
+	char *dsdt_buffer = NULL;
+	unsigned long len = 0, len2 = 0;
+	int fd;
+	char ramfs_dsdt_name[10] = "/DSDT.aml";
+	struct kstat stat;
 
-	if (initrd_start) {
-		char *data = (char *)initrd_start;
+	/* try to get dsdt from tail of initrd */
+	if ((fd = sys_open(ramfs_dsdt_name, O_RDONLY, 0)) < 0) {
+		if (initrd_start) {
+			char *data = (char *)initrd_start;
 
-		printk(KERN_INFO PREFIX "Looking for DSDT in initrd...");
+			printk(KERN_INFO PREFIX "Looking for DSDT in initrd...");
 
-		/* Search for the start signature */
-		while (data < (char *)initrd_end - sizeof(signature) - 4) {
-			if (!memcmp(data, signature, sizeof(signature))) {
-				data += sizeof(signature);
-				if (!memcmp(data, "DSDT", 4))
-					dsdt_start = data;
-				break;
+			/* Search for the start signature */
+			while (data < (char *)initrd_end - sizeof(signature) - 4) {
+				if (!memcmp(data, signature, sizeof(signature))) {
+					data += sizeof(signature);
+					if (!memcmp(data, "DSDT", 4))
+						dsdt_start = data;
+					break;
+				}
+				data++;
 			}
-			data++;
+
+			if (dsdt_start){
+				printk(PREFIX " found at offset %zu",
+				       dsdt_start - (char *)initrd_start);
+				len = (char*) initrd_end - dsdt_start;
+				printk(", size: %zu bytes\n", len);
+				dsdt_buffer = ACPI_MEM_ALLOCATE(len + 1);
+				memcpy(dsdt_buffer, dsdt_start, len);
+				*(dsdt_buffer + len + 1)= '\0';
+			}					
+			else
+				printk(" not found!\n");
 		}
-		if (dsdt_start != NULL)
-			printk(" found at offset %zu\n",
-			       dsdt_start - (char *)initrd_start);
-		else
-			printk(" not found!\n");
 	}
-	return dsdt_start;
+	/* get dsdt from initramfs */
+	else{
+		printk(KERN_INFO PREFIX "Looking for DSDT in initramfs...");
+		if (vfs_stat(ramfs_dsdt_name, &stat) < 0){
+			printk ("error getting stats for file %s\n", ramfs_dsdt_name);
+			return NULL;
+		}
+		
+		len = stat.size;
+		dsdt_buffer = ACPI_MEM_ALLOCATE(len + 1);
+		if (!dsdt_buffer) {
+			printk("Could not allocate %lu bytes of memory\n", len);
+			return NULL;
+		}
+		printk (" found %s ...", ramfs_dsdt_name);
+		
+		len2 = sys_read (fd, (char __user *) dsdt_buffer, len);
+		if (len2 < len ){
+			printk(PREFIX "\nError trying to read %lu bytes from %s\n", 
+			       len, ramfs_dsdt_name);
+			ACPI_MEM_FREE (dsdt_buffer);
+			dsdt_buffer = NULL;
+		}
+		else{
+			printk(" successfully read %lu bytes from %s\n", 
+			       len, ramfs_dsdt_name);
+			*(dsdt_buffer + len + 1) = '\0';
+		}
+	}
+	if (!dsdt_buffer)
+	    printk(" not found!\n");
+	return dsdt_buffer;
 }
 #endif
-
+	
 acpi_status
-acpi_os_table_override (struct acpi_table_header *existing_table,
-			struct acpi_table_header **new_table)
-{
-	if (!existing_table || !new_table)
-		return AE_BAD_PARAMETER;
-
-	*new_table = NULL;
-	if (strncmp(existing_table->signature, "DSDT", 4) == 0) {
+	acpi_os_table_override (struct acpi_table_header *existing_table,
+				struct acpi_table_header **new_table)
+	{
+		if (!existing_table || !new_table)
+			return AE_BAD_PARAMETER;
+		
+		*new_table = NULL;
+		if (strncmp(existing_table->signature, "DSDT", 4) == 0) {
 #ifdef CONFIG_ACPI_CUSTOM_DSDT
-		*new_table = (struct acpi_table_header*)AmlCode;
+			*new_table = (struct acpi_table_header*)AmlCode;
 #elif defined(CONFIG_ACPI_INITRD)
-		*new_table = (struct acpi_table_header*)acpi_find_dsdt_initrd();
+			*new_table = (struct acpi_table_header*)acpi_find_dsdt_initrd();
 #endif
-		if (*new_table)
-			printk(KERN_INFO PREFIX "Using customized DSDT\n");
-	}
+			if (*new_table)
+				printk(KERN_INFO PREFIX "Using customized DSDT\n");
+		}
 	return AE_OK;
-}
-
-static irqreturn_t
+	}
+ 
+ static irqreturn_t
 acpi_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
 	return (*acpi_irq_handler)(acpi_irq_context) ? IRQ_HANDLED : IRQ_NONE;

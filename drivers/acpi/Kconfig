@@ -279,6 +279,16 @@ config ACPI_DEBUG
 	  of verbosity. Saying Y enables these statements. This will increase
 	  your kernel size by around 50K.
 
+config ACPI_DEBUG_LITE
+        bool "Print ACPI errors and warnings"
+        depends on ACPI
+        default n
+        help
+          Full ACPI_DEBUG output slows down the system significantly,
+	  even if not enabled during runtime.
+	  This variable takes care that errors and warnings will still be printed,
+	  but higher debug levels can not be enabled any more during runtime.
+
 config ACPI_BUS
 	bool
 	depends on ACPI_INTERPRETER
@@ -344,26 +354,16 @@ config ACPI_CONTAINER
 		ACPI0004, PNP0A05 and PNP0A06 devices
 
 config ACPI_INITRD
-	bool "Read DSDT from initrd"
+	bool "Read DSDT from initrd or initramfs"
 	depends on ACPI && BLK_DEV_INITRD && !ACPI_CUSTOM_DSDT
-	default y
+	default n
 	help
 	  The DSDT (Differentiated System Description Table) often needs to be
 	  overridden because of broken BIOS implementations. If you want to use
 	  a customized DSDT, please use the mkinitrd tool (mkinitrd package) to 
-	  attach the  DSDT to the initrd) or see http://gaugusch.at/kernel.shtml 
-	  for instructions on using an existing initrd with ACPI. If there is no 
-	  one found in the initrd, the DSDT from the BIOS is used. Even you do not 
-	  need a new one at the moment, you may want to use a better implemented 
-	  DSDT later. It is save to say yes here
-config ACPI_DEBUG_LITE
-       bool "Print ACPI errors and warnings"
-       depends on ACPI
-       default n
-       help
-         Full ACPI_DEBUG output slows down the system significantly,
-	 even if not enabled during runtime.
-	 This variable takes care that errors and warnings will still be printed,
-	 but higher debug levels can not be enabled any more during runtime.
+	  attach the DSDT to the initrd or initramfs 
+	  (see http://gaugusch.at/kernel.shtml for details)
+	  If there is no DSDT found in the initrd, the DSDT from the BIOS is
+	  used. It is save to say yes here.
 
 endmenu

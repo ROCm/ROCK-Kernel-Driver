@@ -45,7 +45,6 @@
 #include <acpi/acpi.h>
 #include <acpi/actables.h>
 
-
 #define _COMPONENT          ACPI_TABLES
 	 ACPI_MODULE_NAME    ("tbget")
 
@@ -287,11 +286,16 @@ acpi_tb_table_override (
 			acpi_format_exception (status)));
 		return_ACPI_STATUS (status);
 	}
-
+	
 	/* Copy the table info */
 
 	ACPI_REPORT_INFO (("Table [%4.4s] replaced by host OS\n",
 		table_info->pointer->signature));
+
+#ifdef CONFIG_ACPI_INITRD
+	if (new_table)
+	    ACPI_MEM_FREE(new_table);
+#endif
 
 	return_ACPI_STATUS (AE_OK);
 }
