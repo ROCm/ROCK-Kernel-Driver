@@ -60,6 +60,13 @@ static const struct cpu_id cpu_id_dothan_a1 = {
 	.x86_mask = 1,
 };
 
+static const struct cpu_id cpu_id_dothan_b0 = {
+	.x86_vendor = X86_VENDOR_INTEL,
+	.x86 = 6,
+	.x86_model = 13,
+	.x86_mask = 6,
+};
+
 struct cpu_model
 {
 	const struct cpu_id *cpu_id;
@@ -400,7 +407,8 @@ static int centrino_cpu_init(struct cpufreq_policy *policy)
 		return -ENODEV;
 
 	if ((centrino_verify_cpu_id(cpu, &cpu_id_banias)) &&
-	    (centrino_verify_cpu_id(cpu, &cpu_id_dothan_a1))) {
+	    (centrino_verify_cpu_id(cpu, &cpu_id_dothan_a1)) &&
+		(centrino_verify_cpu_id(cpu, &cpu_id_dothan_b0))) {
 		printk(KERN_INFO PFX "found unsupported CPU with Enhanced SpeedStep: "
 		       "send /proc/cpuinfo to " MAINTAINER "\n");
 		return -ENODEV;
