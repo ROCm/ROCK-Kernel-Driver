@@ -470,7 +470,9 @@ config FB_RIVA_DEBUG
 
 config FB_I810
 	tristate "Intel 810/815 support (EXPERIMENTAL)"
-	depends on FB && AGP && AGP_INTEL && EXPERIMENTAL && PCI	
+	depends on FB && EXPERIMENTAL && PCI && X86 && !X86_64
+	select AGP
+	select AGP_INTEL
 	help
 	  This driver supports the on-board graphics built in to the Intel 810 
           and 815 chipsets.  Say Y if you have and plan to use such a board.
