@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.49 2001/07/27 09:42:22 davem Exp $
+#
 # sparc/Makefile
 #
 # Makefile for the architecture dependent flags and dependencies on the
@@ -47,16 +47,24 @@ image: vmlinux
 	$(MAKE) -C arch/sparc/boot image
 
 archclean:
+	rm -f arch/sparc/kernel/include
 	rm -f $(TOPDIR)/vmlinux.aout
 	-$(MAKE) -C arch/sparc/boot clean
 
 archmrproper:
 	rm -f $(TOPDIR)/include/asm-sparc/asm_offsets.h
 
-prepare: check_asm
+prepare: include/asm-$(ARCH)/asm_offsets.h
 
-check_asm: include/linux/version.h include/asm include/config/MARKER
-	$(MAKE) -C arch/sparc/kernel check_asm
+arch/$(ARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \
+				   include/config/MARKER
+
+include/asm-$(ARCH)/asm_offsets.h.tmp: arch/$(ARCH)/kernel/asm-offsets.s
+	@$(generate-asm-offsets.h) < $< > $@
+
+include/asm-$(ARCH)/asm_offsets.h: include/asm-$(ARCH)/asm_offsets.h.tmp
+	@echo -n '  Generating $@'
+	@$(update-if-changed)
 
 tftpboot.img:
 	$(MAKE) -C arch/sparc/boot tftpboot.img
