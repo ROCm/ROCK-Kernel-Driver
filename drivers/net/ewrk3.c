@@ -262,20 +262,22 @@ static int ewrk3_debug = 1;
 #define EWRK3_PKT_BIN_SZ  128	/* Should be >=100 unless you
 				   increase EWRK3_PKT_STAT_SZ */
 
+struct ewrk3_stats {
+	u32 bins[EWRK3_PKT_STAT_SZ];
+	u32 unicast;
+	u32 multicast;
+	u32 broadcast;
+	u32 excessive_collisions;
+	u32 tx_underruns;
+	u32 excessive_underruns;
+};
+
 struct ewrk3_private {
 	char adapter_name[80];	/* Name exported to /proc/ioports */
 	u_long shmem_base;	/* Shared memory start address */
 	u_long shmem_length;	/* Shared memory window length */
 	struct net_device_stats stats;	/* Public stats */
-	struct {
-		u32 bins[EWRK3_PKT_STAT_SZ];	/* Private stats counters */
-		u32 unicast;
-		u32 multicast;
-		u32 broadcast;
-		u32 excessive_collisions;
-		u32 tx_underruns;
-		u32 excessive_underruns;
-	} pktStats;
+	struct ewrk3_stats pktStats; /* Private stats counters */
 	u_char irq_mask;	/* Adapter IRQ mask bits */
 	u_char mPage;		/* Maximum 2kB Page number */
 	u_char lemac;		/* Chip rev. level */
@@ -940,6 +942,7 @@ static void ewrk3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	spin_unlock(&lp->hw_lock);
 }
 
+/* Called with lp->hw_lock held */
 static int ewrk3_rx(struct net_device *dev)
 {
 	struct ewrk3_private *lp = (struct ewrk3_private *) dev->priv;
@@ -1065,8 +1068,9 @@ static int ewrk3_rx(struct net_device *dev)
 }
 
 /*
-   ** Buffer sent - check for TX buffer errors.
- */
+** Buffer sent - check for TX buffer errors.
+** Called with lp->hw_lock held
+*/
 static int ewrk3_tx(struct net_device *dev)
 {
 	struct ewrk3_private *lp = (struct ewrk3_private *) dev->priv;
@@ -1760,6 +1764,7 @@ static int ewrk3_ethtool_ioctl(struct net_device *dev, void *useraddr)
 		return 0;
 	}
 
+#ifdef BROKEN
 	/* Blink LED for identification */
 	case ETHTOOL_PHYS_ID: {
 		struct ethtool_value edata;
@@ -1813,6 +1818,7 @@ out:
 		spin_unlock_irqrestore(&lp->hw_lock, flags);
 		return ret;
 	}
+#endif /* BROKEN */
 
 	}
 
@@ -1830,6 +1836,7 @@ static int ewrk3_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	u_long iobase = dev->base_addr;
 	int i, j, status = 0;
 	u_char csr;
+	unsigned long flags;
 	union ewrk3_addr {
 		u_char addr[HASH_TABLE_LEN * ETH_ALEN];
 		u_short val[(HASH_TABLE_LEN * ETH_ALEN) >> 1];
@@ -1953,19 +1960,26 @@ static int ewrk3_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		}
 
 		break;
-	case EWRK3_GET_STATS:	/* Get the driver statistics */
-		cli();
-		ioc->len = sizeof(lp->pktStats);
-		if (copy_to_user(ioc->data, &lp->pktStats, ioc->len))
-			status = -EFAULT;
-		sti();
+	case EWRK3_GET_STATS: { /* Get the driver statistics */
+		struct ewrk3_stats *tmp_stats =
+        		kmalloc(sizeof(lp->pktStats), GFP_KERNEL);
+		if (!tmp_stats) return -ENOMEM;
 
+		spin_lock_irqsave(&lp->hw_lock, flags);
+		memcpy(tmp_stats, &lp->pktStats, sizeof(lp->pktStats));
+		spin_unlock_irqrestore(&lp->hw_lock, flags);
+
+		ioc->len = sizeof(lp->pktStats);
+		if (copy_to_user(ioc->data, tmp_stats, sizeof(lp->pktStats)))
+    			status = -EFAULT;
+		kfree(tmp_stats);
 		break;
+	}
 	case EWRK3_CLR_STATS:	/* Zero out the driver statistics */
 		if (capable(CAP_NET_ADMIN)) {
-			cli();
+			spin_lock_irqsave(&lp->hw_lock, flags);
 			memset(&lp->pktStats, 0, sizeof(lp->pktStats));
-			sti();
+			spin_unlock_irqrestore(&lp->hw_lock,flags);
 		} else {
 			status = -EPERM;
 		}
