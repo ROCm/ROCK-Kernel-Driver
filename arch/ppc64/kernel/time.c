@@ -66,6 +66,7 @@
 #include <asm/ppcdebug.h>
 #include <asm/prom.h>
 #include <asm/sections.h>
+#include <asm/systemcfg.h>
 
 u64 jiffies_64 __cacheline_aligned_in_smp = INITIAL_JIFFIES;
 

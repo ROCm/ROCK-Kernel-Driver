@@ -43,6 +43,7 @@
 #include <asm/machdep.h>
 #include <asm/abs_addr.h>
 #include <asm/plpar_wrappers.h>
+#include <asm/systemcfg.h>
 #include "pci.h"
 
 

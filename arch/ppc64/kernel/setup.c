@@ -54,6 +54,7 @@
 #include <asm/rtas.h>
 #include <asm/iommu.h>
 #include <asm/serial.h>
+#include <asm/cache.h>
 
 #ifdef DEBUG
 #define DBG(fmt...) udbg_printf(fmt)
@@ -110,6 +111,8 @@ int have_of = 1;
 int boot_cpuid = 0;
 int boot_cpuid_phys = 0;
 dev_t boot_dev;
+
+struct ppc64_caches ppc64_caches;
 
 /*
  * These are used in binfmt_elf.c to put aux entries on the stack
@@ -489,15 +492,15 @@ static void __init initialize_naca(void)
 			lsizep = (u32 *) get_property(np, dc, NULL);
 			if (lsizep != NULL)
 				lsize = *lsizep;
-
 			if (sizep == 0 || lsizep == 0)
 				DBG("Argh, can't find dcache properties ! "
 				    "sizep: %p, lsizep: %p\n", sizep, lsizep);
 
-			systemcfg->dCacheL1Size = size;
-			systemcfg->dCacheL1LineSize = lsize;
-			naca->dCacheL1LogLineSize = __ilog2(lsize);
-			naca->dCacheL1LinesPerPage = PAGE_SIZE/(lsize);
+			systemcfg->dcache_size = ppc64_caches.dsize = size;
+			systemcfg->dcache_line_size =
+				ppc64_caches.dline_size = lsize;
+			ppc64_caches.log_dline_size = __ilog2(lsize);
+			ppc64_caches.dlines_per_page = PAGE_SIZE / lsize;
 
 			size = 0;
 			lsize = cur_cpu_spec->icache_bsize;
@@ -511,11 +514,11 @@ static void __init initialize_naca(void)
 				DBG("Argh, can't find icache properties ! "
 				    "sizep: %p, lsizep: %p\n", sizep, lsizep);
 
-			systemcfg->iCacheL1Size = size;
-			systemcfg->iCacheL1LineSize = lsize;
-			naca->iCacheL1LogLineSize = __ilog2(lsize);
-			naca->iCacheL1LinesPerPage = PAGE_SIZE/(lsize);
-
+			systemcfg->icache_size = ppc64_caches.isize = size;
+			systemcfg->icache_line_size =
+				ppc64_caches.iline_size = lsize;
+			ppc64_caches.log_iline_size = __ilog2(lsize);
+			ppc64_caches.ilines_per_page = PAGE_SIZE / lsize;
 		}
 	}
 
@@ -664,8 +667,10 @@ void __init setup_system(void)
 	printk("systemcfg->platform           = 0x%x\n", systemcfg->platform);
 	printk("systemcfg->processorCount     = 0x%lx\n", systemcfg->processorCount);
 	printk("systemcfg->physicalMemorySize = 0x%lx\n", systemcfg->physicalMemorySize);
-	printk("systemcfg->dCacheL1LineSize   = 0x%x\n", systemcfg->dCacheL1LineSize);
-	printk("systemcfg->iCacheL1LineSize   = 0x%x\n", systemcfg->iCacheL1LineSize);
+	printk("ppc64_caches.dcache_line_size = 0x%x\n",
+			ppc64_caches.dline_size);
+	printk("ppc64_caches.icache_line_size = 0x%x\n",
+			ppc64_caches.iline_size);
 	printk("htab_data.htab                = 0x%p\n", htab_data.htab);
 	printk("htab_data.num_ptegs           = 0x%lx\n", htab_data.htab_num_ptegs);
 	printk("-----------------------------------------------------\n");
@@ -1000,8 +1005,8 @@ void __init setup_arch(char **cmdline_p)
 	 * Systems with OF can look in the properties on the cpu node(s)
 	 * for a possibly more accurate value.
 	 */
-	dcache_bsize = systemcfg->dCacheL1LineSize; 
-	icache_bsize = systemcfg->iCacheL1LineSize; 
+	dcache_bsize = ppc64_caches.dline_size;
+	icache_bsize = ppc64_caches.iline_size;
 
 	/* reboot on panic */
 	panic_timeout = 180;

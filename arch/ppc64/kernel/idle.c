@@ -32,6 +32,7 @@
 #include <asm/iSeries/HvCall.h>
 #include <asm/iSeries/ItLpQueue.h>
 #include <asm/plpar_wrappers.h>
+#include <asm/systemcfg.h>
 
 extern void power4_idle(void);
 

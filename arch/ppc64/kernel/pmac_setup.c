@@ -70,6 +70,7 @@
 #include <asm/time.h>
 #include <asm/of_device.h>
 #include <asm/lmb.h>
+#include <asm/naca.h>
 
 #include "pmac.h"
 #include "mpic.h"

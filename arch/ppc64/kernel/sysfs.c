@@ -15,6 +15,7 @@
 #include <asm/cputable.h>
 #include <asm/hvcall.h>
 #include <asm/prom.h>
+#include <asm/systemcfg.h>
 
 
 static DEFINE_PER_CPU(struct cpu, cpu_devices);

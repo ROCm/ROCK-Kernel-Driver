@@ -35,6 +35,7 @@
 #include <asm/iSeries/HvLpEvent.h>
 #include <asm/rtas.h>
 #include <asm/cputable.h>
+#include <asm/cache.h>
 
 #define DEFINE(sym, val) \
 	asm volatile("\n->" #sym " %0 " #val : : "i" (val))
@@ -69,12 +70,12 @@ int main(void)
 
 	/* naca */
         DEFINE(PACA, offsetof(struct naca_struct, paca));
-	DEFINE(DCACHEL1LINESIZE, offsetof(struct systemcfg, dCacheL1LineSize));
-        DEFINE(DCACHEL1LOGLINESIZE, offsetof(struct naca_struct, dCacheL1LogLineSize));
-        DEFINE(DCACHEL1LINESPERPAGE, offsetof(struct naca_struct, dCacheL1LinesPerPage));
-        DEFINE(ICACHEL1LINESIZE, offsetof(struct systemcfg, iCacheL1LineSize));
-        DEFINE(ICACHEL1LOGLINESIZE, offsetof(struct naca_struct, iCacheL1LogLineSize));
-        DEFINE(ICACHEL1LINESPERPAGE, offsetof(struct naca_struct, iCacheL1LinesPerPage));
+	DEFINE(DCACHEL1LINESIZE, offsetof(struct ppc64_caches, dline_size));
+	DEFINE(DCACHEL1LOGLINESIZE, offsetof(struct ppc64_caches, log_dline_size));
+	DEFINE(DCACHEL1LINESPERPAGE, offsetof(struct ppc64_caches, dlines_per_page));
+	DEFINE(ICACHEL1LINESIZE, offsetof(struct ppc64_caches, iline_size));
+	DEFINE(ICACHEL1LOGLINESIZE, offsetof(struct ppc64_caches, log_iline_size));
+	DEFINE(ICACHEL1LINESPERPAGE, offsetof(struct ppc64_caches, ilines_per_page));
 	DEFINE(PLATFORM, offsetof(struct systemcfg, platform));
 
 	/* paca */

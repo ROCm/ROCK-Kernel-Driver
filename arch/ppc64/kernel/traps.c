@@ -38,6 +38,7 @@
 #include <asm/processor.h>
 #include <asm/ppcdebug.h>
 #include <asm/rtas.h>
+#include <asm/systemcfg.h>
 
 #ifdef CONFIG_PPC_PSERIES
 /* This is true if we are using the firmware NMI handler (typically LPAR) */

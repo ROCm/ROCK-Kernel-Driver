@@ -73,6 +73,7 @@
 #include <asm/ppcdebug.h>
 #include <asm/time.h>
 #include <asm/mmu_context.h>
+#include <asm/systemcfg.h>
 
 #include "pci.h"
 

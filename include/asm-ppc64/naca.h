@@ -16,11 +16,7 @@
 #ifndef __ASSEMBLY__
 
 struct naca_struct {
-	/*==================================================================
-	 * Cache line 1: 0x0000 - 0x007F
-	 * Kernel only data - undefined for user space
-	 *==================================================================
-	 */
+	/* Kernel only data - undefined for user space */
 	void *xItVpdAreas;              /* VPD Data                  0x00 */
 	void *xRamDisk;                 /* iSeries ramdisk           0x08 */
 	u64   xRamDiskSize;		/* In pages                  0x10 */
@@ -32,12 +28,6 @@ struct naca_struct {
 	u64 interrupt_controller;	/* Type of int controller    0x40 */ 
 	u64 unused1;			/* was SLB size in entries   0x48 */
 	u64 pftSize;			/* Log 2 of page table size  0x50 */
-	void *systemcfg;		/* Pointer to systemcfg data 0x58 */
-	u32 dCacheL1LogLineSize;	/* L1 d-cache line size Log2 0x60 */
-	u32 dCacheL1LinesPerPage;	/* L1 d-cache lines / page   0x64 */
-	u32 iCacheL1LogLineSize;	/* L1 i-cache line size Log2 0x68 */
-	u32 iCacheL1LinesPerPage;	/* L1 i-cache lines / page   0x6c */
-	u8  resv0[15];                  /* Reserved           0x71 - 0x7F */
 };
 
 extern struct naca_struct *naca;

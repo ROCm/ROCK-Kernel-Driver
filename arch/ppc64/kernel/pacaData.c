@@ -10,6 +10,8 @@
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/threads.h>
+#include <linux/module.h>
+
 #include <asm/processor.h>
 #include <asm/ptrace.h>
 #include <asm/page.h>
@@ -20,7 +22,9 @@
 #include <asm/paca.h>
 
 struct naca_struct *naca;
+EXPORT_SYMBOL(naca);
 struct systemcfg *systemcfg;
+EXPORT_SYMBOL(systemcfg);
 
 /* This symbol is provided by the linker - let it fill in the paca
  * field correctly */

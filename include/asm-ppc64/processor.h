@@ -19,6 +19,7 @@
 #endif
 #include <asm/ptrace.h>
 #include <asm/types.h>
+#include <asm/systemcfg.h>
 
 /* Machine State Register (MSR) Fields */
 #define MSR_SF_LG	63              /* Enable 64 bit mode */

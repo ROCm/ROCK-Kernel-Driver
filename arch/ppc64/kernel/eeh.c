@@ -32,6 +32,7 @@
 #include <asm/machdep.h>
 #include <asm/rtas.h>
 #include <asm/atomic.h>
+#include <asm/systemcfg.h>
 #include "pci.h"
 
 #undef DEBUG

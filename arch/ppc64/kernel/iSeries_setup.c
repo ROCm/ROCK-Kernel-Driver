@@ -44,6 +44,7 @@
 #include "iSeries_setup.h"
 #include <asm/naca.h>
 #include <asm/paca.h>
+#include <asm/cache.h>
 #include <asm/sections.h>
 #include <asm/iSeries/LparData.h>
 #include <asm/iSeries/HvCallHpt.h>
@@ -560,33 +561,36 @@ static void __init setup_iSeries_cache_sizes(void)
 	unsigned int i, n;
 	unsigned int procIx = get_paca()->lppaca.xDynHvPhysicalProcIndex;
 
-	systemcfg->iCacheL1Size =
-		xIoHriProcessorVpd[procIx].xInstCacheSize * 1024;
-	systemcfg->iCacheL1LineSize =
+	systemcfg->icache_size =
+	ppc64_caches.isize = xIoHriProcessorVpd[procIx].xInstCacheSize * 1024;
+	systemcfg->icache_line_size =
+	ppc64_caches.iline_size =
 		xIoHriProcessorVpd[procIx].xInstCacheOperandSize;
-	systemcfg->dCacheL1Size =
+	systemcfg->dcache_size =
+	ppc64_caches.dsize =
 		xIoHriProcessorVpd[procIx].xDataL1CacheSizeKB * 1024;
-	systemcfg->dCacheL1LineSize =
+	systemcfg->dcache_line_size =
+	ppc64_caches.dline_size =
 		xIoHriProcessorVpd[procIx].xDataCacheOperandSize;
-	naca->iCacheL1LinesPerPage = PAGE_SIZE / systemcfg->iCacheL1LineSize;
-	naca->dCacheL1LinesPerPage = PAGE_SIZE / systemcfg->dCacheL1LineSize;
+	ppc64_caches.ilines_per_page = PAGE_SIZE / ppc64_caches.iline_size;
+	ppc64_caches.dlines_per_page = PAGE_SIZE / ppc64_caches.dline_size;
 
-	i = systemcfg->iCacheL1LineSize;
+	i = ppc64_caches.iline_size;
 	n = 0;
 	while ((i = (i / 2)))
 		++n;
-	naca->iCacheL1LogLineSize = n;
+	ppc64_caches.log_iline_size = n;
 
-	i = systemcfg->dCacheL1LineSize;
+	i = ppc64_caches.dline_size;
 	n = 0;
 	while ((i = (i / 2)))
 		++n;
-	naca->dCacheL1LogLineSize = n;
+	ppc64_caches.log_dline_size = n;
 
 	printk("D-cache line size = %d\n",
-			(unsigned int)systemcfg->dCacheL1LineSize);
+			(unsigned int)ppc64_caches.dline_size);
 	printk("I-cache line size = %d\n",
-			(unsigned int)systemcfg->iCacheL1LineSize);
+			(unsigned int)ppc64_caches.iline_size);
 }
 
 /*
