@@ -671,12 +671,13 @@ static struct inode * get_new_inode_fast(struct super_block *sb, struct hlist_he
 
 static inline unsigned long hash(struct super_block *sb, unsigned long hashval)
 {
-	unsigned long tmp = hashval + ((unsigned long) sb / L1_CACHE_BYTES);
-	tmp = tmp + (tmp >> I_HASHBITS);
+	unsigned long tmp;
+
+	tmp = (hashval * (unsigned long)sb) ^ (GOLDEN_RATIO_PRIME + hashval) /
+			L1_CACHE_BYTES;
+	tmp = tmp ^ ((tmp ^ GOLDEN_RATIO_PRIME) >> I_HASHBITS);
 	return tmp & I_HASHMASK;
 }
-
-/* Yeah, I know about quadratic hash. Maybe, later. */
 
 /**
  *	iunique - get a unique inode number

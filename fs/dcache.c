@@ -21,6 +21,7 @@
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/smp_lock.h>
+#include <linux/hash.h>
 #include <linux/cache.h>
 #include <linux/module.h>
 #include <linux/mount.h>
@@ -794,10 +795,11 @@ struct dentry * d_alloc_root(struct inode * root_inode)
 	return res;
 }
 
-static inline struct hlist_head * d_hash(struct dentry * parent, unsigned long hash)
+static inline struct hlist_head *d_hash(struct dentry *parent,
+					unsigned long hash)
 {
-	hash += (unsigned long) parent / L1_CACHE_BYTES;
-	hash = hash ^ (hash >> D_HASHBITS);
+	hash += ((unsigned long) parent ^ GOLDEN_RATIO_PRIME) / L1_CACHE_BYTES;
+	hash = hash ^ ((hash ^ GOLDEN_RATIO_PRIME) >> D_HASHBITS);
 	return dentry_hashtable + (hash & D_HASHMASK);
 }
 
