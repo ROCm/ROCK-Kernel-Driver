@@ -64,8 +64,7 @@ static void rpckbd_rx(int irq, void *dev_id, struct pt_regs *regs)
 	kbd_pt_regs = regs;
 
 	while (inb(IOMD_KCTRL) & (1 << 5))
-		if (rpckbd_port.dev)
-               		 rpckbd_port.dev->interrupt(&rpckbd_port, inb(IOMD_KARTRX), 0);
+		serio_interrupt(&rpckbd_port, inb(IOMD_KARTRX), 0);
 
 }
 

@@ -121,14 +121,12 @@ struct atkbd {
 	struct serio *serio;
 	char name[64];
 	char phys[32];
-	struct tq_struct tq;
 	unsigned char cmdbuf[4];
 	unsigned char cmdcnt;
 	unsigned char set;
-	char release;
-	char ack;
-	char emul;
-	char error;
+	unsigned char release;
+	signed char ack;
+	unsigned char emul;
 	unsigned short id;
 };
 
@@ -162,8 +160,7 @@ static void atkbd_interrupt(struct serio *serio, unsigned char data, unsigned in
 
 	switch (atkbd->keycode[code]) {
 		case ATKBD_KEY_BAT:
-			queue_task(&atkbd->tq, &tq_immediate);
-			mark_bh(IMMEDIATE_BH);
+			serio_rescan(atkbd->serio);
 			return;
 		case ATKBD_KEY_EMUL0:
 			atkbd->emul = 1;
@@ -432,21 +429,6 @@ static void atkbd_disconnect(struct serio *serio)
 }
 
 /*
- * atkbd_powerup() is called when the keyboard sends the 0xaa character,
- * meaning that it was disconnected and reconnected. We close the port
- * in that case and let the upper layer find an appropriate driver for
- * the device that was connected. It may be a mouse, or a keyboard, we
- * don't know yet.
- */
-
-static void atkbd_powerup(void *data)
-{
-	struct atkbd *atkbd = data;
-	mdelay(40); /* FIXME!!! Wait some nicer way */
-	serio_rescan(atkbd->serio);
-}
-
-/*
  * atkbd_connect() is called when the serio module finds and interface
  * that isn't handled yet by an appropriate device driver. We check if
  * there is an AT keyboard out there and if yes, we register ourselves
@@ -477,9 +459,6 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 	atkbd->dev.event = atkbd_event;
 	atkbd->dev.private = atkbd;
 
-	atkbd->tq.routine = atkbd_powerup;
-	atkbd->tq.data = atkbd;
-
 	serio->private = atkbd;
 
 	if (serio_open(serio, dev)) {
@@ -504,7 +483,7 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 
 	if (atkbd->set == 4) {
 		atkbd->dev.ledbit[0] |= BIT(LED_COMPOSE) | BIT(LED_SUSPEND) | BIT(LED_SLEEP) | BIT(LED_MUTE);
-		sprintf(atkbd->name, "AT Set 2 Extended keyboard\n");
+		sprintf(atkbd->name, "AT Set 2 Extended keyboard");
 	} else
 		sprintf(atkbd->name, "AT Set %d keyboard", atkbd->set);
 

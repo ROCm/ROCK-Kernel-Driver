@@ -88,26 +88,6 @@ extern void pmac_find_bridges(void);
 extern int pmac_ide_check_base(ide_ioreg_t base);
 extern ide_ioreg_t pmac_ide_get_base(int index);
 
-extern int mackbd_setkeycode(unsigned int scancode, unsigned int keycode);
-extern int mackbd_getkeycode(unsigned int scancode);
-extern int mackbd_translate(unsigned char keycode, unsigned char *keycodep,
-		     char raw_mode);
-extern char mackbd_unexpected_up(unsigned char keycode);
-extern void mackbd_leds(unsigned char leds);
-extern void __init mackbd_init_hw(void);
-extern int mac_hid_kbd_translate(unsigned char scancode, unsigned char *keycode,
-				 char raw_mode);
-extern char mac_hid_kbd_unexpected_up(unsigned char keycode);
-extern void mac_hid_init_hw(void);
-extern unsigned char mac_hid_kbd_sysrq_xlate[];
-extern unsigned char pckbd_sysrq_xlate[];
-extern unsigned char mackbd_sysrq_xlate[];
-extern int pckbd_setkeycode(unsigned int scancode, unsigned int keycode);
-extern int pckbd_getkeycode(unsigned int scancode);
-extern int pckbd_translate(unsigned char scancode, unsigned char *keycode,
-			   char raw_mode);
-extern char pckbd_unexpected_up(unsigned char keycode);
-extern int keyboard_sends_linux_keycodes;
 extern void pmac_nvram_update(void);
 extern unsigned char pmac_nvram_read_byte(int addr);
 extern void pmac_nvram_write_byte(int addr, unsigned char val);
@@ -641,37 +621,8 @@ void __init
 select_adb_keyboard(void)
 {
 #ifdef CONFIG_VT
-#ifdef CONFIG_INPUT
-	ppc_md.kbd_init_hw       = mac_hid_init_hw;
 	ppc_md.kbd_translate     = mac_hid_kbd_translate;
 	ppc_md.kbd_unexpected_up = mac_hid_kbd_unexpected_up;
-	ppc_md.kbd_setkeycode    = 0;
-	ppc_md.kbd_getkeycode    = 0;
-	ppc_md.kbd_leds		 = 0;
-#ifdef CONFIG_MAGIC_SYSRQ
-#ifdef CONFIG_MAC_ADBKEYCODES
-	if (!keyboard_sends_linux_keycodes) {
-		ppc_md.ppc_kbd_sysrq_xlate = mac_hid_kbd_sysrq_xlate;
-		SYSRQ_KEY = 0x69;
-	} else
-#endif /* CONFIG_MAC_ADBKEYCODES */
-	{
-		ppc_md.ppc_kbd_sysrq_xlate = pckbd_sysrq_xlate;
-		SYSRQ_KEY = 0x54;
-	}
-#endif /* CONFIG_MAGIC_SYSRQ */
-#elif defined(CONFIG_ADB_KEYBOARD)
-	ppc_md.kbd_setkeycode       = mackbd_setkeycode;
-	ppc_md.kbd_getkeycode       = mackbd_getkeycode;
-	ppc_md.kbd_translate        = mackbd_translate;
-	ppc_md.kbd_unexpected_up    = mackbd_unexpected_up;
-	ppc_md.kbd_leds             = mackbd_leds;
-	ppc_md.kbd_init_hw          = mackbd_init_hw;
-#ifdef CONFIG_MAGIC_SYSRQ
-	ppc_md.ppc_kbd_sysrq_xlate  = mackbd_sysrq_xlate;
-	SYSRQ_KEY = 0x69;
-#endif /* CONFIG_MAGIC_SYSRQ */
-#endif /* CONFIG_INPUT_ADBHID/CONFIG_ADB_KEYBOARD */
 #endif /* CONFIG_VT */
 }
 
