@@ -135,7 +135,7 @@ static void
 ibwdt_ping(void)
 {
 	/* Write a watchdog value */
-	outb_p(wd_times[wd_margin], WDT_START);
+	outb_p(wd_margin, WDT_START);
 }
 
 static ssize_t
