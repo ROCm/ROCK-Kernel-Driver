@@ -238,22 +238,7 @@ get_attention_status(struct hotplug_slot *hotplug_slot, u8 * value)
 static int
 set_attention_status(struct hotplug_slot *hotplug_slot, u8 status)
 {
-	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
-
-	if(slot == NULL)
-		return -ENODEV;
-	switch (status) {
-	case 0:
-		cpci_set_attention_status(slot, 0);
-		break;
-
-	case 1:
-	default:
-		cpci_set_attention_status(slot, 1);
-		break;
-	}
-
-	return 0;
+	return cpci_set_attention_status(hotplug_slot->private, status);
 }
 
 static int
