@@ -332,10 +332,10 @@ xmon(struct pt_regs *excp)
 	cmd = cmds(excp);
 	if (cmd == 's') {
 		xmon_trace[smp_processor_id()] = SSTEP;
-		excp->msr |= 0x400;
+		excp->msr |= MSR_SE;
 	} else if (at_breakpoint(excp->nip)) {
 		xmon_trace[smp_processor_id()] = BRSTEP;
-		excp->msr |= 0x400;
+		excp->msr |= MSR_SE;
 	} else {
 		xmon_trace[smp_processor_id()] = 0;
 		insert_bpts();
@@ -450,7 +450,7 @@ xmon_bpt(struct pt_regs *regs)
 		remove_bpts();
 		excprint(regs);
 		xmon_trace[smp_processor_id()] = BRSTEP;
-		regs->msr |= 0x400;
+		regs->msr |= MSR_SE;
 	} else {
 		printf("Stopped at breakpoint %x (%lx %s)\n", (bp - bpts)+1, bp->address, bp->funcname);
 		xmon(regs);
@@ -480,7 +480,7 @@ xmon_dabr_match(struct pt_regs *regs)
 		remove_bpts();
 		excprint(regs);
 		xmon_trace[smp_processor_id()] = BRSTEP;
-		regs->msr |= 0x400;
+		regs->msr |= MSR_SE;
 	} else {
 		dabr.instr = regs->nip;
 		xmon(regs);
@@ -496,7 +496,7 @@ xmon_iabr_match(struct pt_regs *regs)
 		remove_bpts();
 		excprint(regs);
 		xmon_trace[smp_processor_id()] = BRSTEP;
-		regs->msr |= 0x400;
+		regs->msr |= MSR_SE;
 	} else {
 		xmon(regs);
 	}
