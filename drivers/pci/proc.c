@@ -18,6 +18,8 @@
 
 #define PCI_CFG_SPACE_SIZE 256
 
+static int proc_initialized;	/* = 0 */
+
 static loff_t
 proc_bus_pci_lseek(struct file *file, loff_t off, int whence)
 {
@@ -410,6 +412,9 @@ int pci_proc_attach_device(struct pci_dev *dev)
 	struct proc_dir_entry *de, *e;
 	char name[16];
 
+	if (!proc_initialized)
+		return -EACCES;
+
 	if (!(de = bus->procdir)) {
 		sprintf(name, "%02x", bus->number);
 		de = bus->procdir = proc_mkdir(name, proc_bus_pci_dir);
@@ -445,6 +450,9 @@ int pci_proc_detach_device(struct pci_dev *dev)
 int pci_proc_attach_bus(struct pci_bus* bus)
 {
 	struct proc_dir_entry *de = bus->procdir;
+
+	if (!proc_initialized)
+		return -EACCES;
 
 	if (!de) {
 		char name[16];
@@ -595,6 +603,7 @@ static int __init pci_proc_init(void)
 		entry = create_proc_entry("devices", 0, proc_bus_pci_dir);
 		if (entry)
 			entry->proc_fops = &proc_bus_pci_dev_operations;
+		proc_initialized = 1;
 		pci_for_each_dev(dev) {
 			pci_proc_attach_device(dev);
 		}

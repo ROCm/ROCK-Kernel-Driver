@@ -314,7 +314,7 @@ static int ctrl_slot_setup (struct controller * ctrl, void *smbios_start, void *
 	void *slot_entry= NULL;
 	int result;
 
-	dbg(__FUNCTION__"\n");
+	dbg("%s\n", __FUNCTION__);
 
 	tempdword = readl(ctrl->hpc_reg + INT_INPUT_CLEAR);
 
@@ -467,7 +467,7 @@ static int ctrl_slot_cleanup (struct controller * ctrl)
 //
 // Output:	SUCCESS or FAILURE
 //=============================================================================
-static int get_slot_mapping (struct pci_ops *ops, u8 bus_num, u8 dev_num, u8 *slot)
+static int get_slot_mapping (struct pci_bus *bus, u8 bus_num, u8 dev_num, u8 *slot)
 {
 	struct irq_routing_table *PCIIRQRoutingInfoLength;
 	u32 work;
@@ -476,7 +476,7 @@ static int get_slot_mapping (struct pci_ops *ops, u8 bus_num, u8 dev_num, u8 *sl
 
 	u8 tbus, tdevice, tslot, bridgeSlot;
 
-	dbg(__FUNCTION__" %p, %d, %d, %p\n", ops, bus_num, dev_num, slot);
+	dbg("%s: %p, %d, %d, %p\n", __FUNCTION__, bus, bus_num, dev_num, slot);
 
 	bridgeSlot = 0xFF;
 
@@ -490,7 +490,6 @@ static int get_slot_mapping (struct pci_ops *ops, u8 bus_num, u8 dev_num, u8 *sl
 		return -1;
 	}
 
-
 	for (loop = 0; loop < len; ++loop) {
 		tbus = PCIIRQRoutingInfoLength->slots[loop].bus;
 		tdevice = PCIIRQRoutingInfoLength->slots[loop].devfn >> 3;
@@ -499,7 +498,8 @@ static int get_slot_mapping (struct pci_ops *ops, u8 bus_num, u8 dev_num, u8 *sl
 		if ((tbus == bus_num) && (tdevice == dev_num)) {
 			*slot = tslot;
 
-			if (PCIIRQRoutingInfoLength != NULL) kfree(PCIIRQRoutingInfoLength );
+			if (PCIIRQRoutingInfoLength != NULL)
+				kfree(PCIIRQRoutingInfoLength);
 			return 0;
 		} else {
 			// Didn't get a match on the target PCI device. Check if the
@@ -508,10 +508,11 @@ static int get_slot_mapping (struct pci_ops *ops, u8 bus_num, u8 dev_num, u8 *sl
 			// device, I need to save the bridge's slot number.  If I can't 
 			// find an entry for the target device, I will have to assume it's 
 			// on the other side of the bridge, and assign it the bridge's slot.
-			pci_read_config_dword_nodev (ops, tbus, tdevice, 0, PCI_REVISION_ID, &work);
+			bus->number = tbus;
+			pci_bus_read_config_dword (bus, PCI_DEVFN(tdevice, 0), PCI_REVISION_ID, &work);
 
 			if ((work >> 8) == PCI_TO_PCI_BRIDGE_CLASS) {
-				pci_read_config_dword_nodev (ops, tbus, tdevice, 0, PCI_PRIMARY_BUS, &work);
+				pci_bus_read_config_dword (bus, PCI_DEVFN(tdevice, 0), PCI_PRIMARY_BUS, &work);
 				// See if bridge's secondary bus matches target bus.
 				if (((work >> 8) & 0x000000FF) == (long) bus_num) {
 					bridgeSlot = tslot;
@@ -520,7 +521,6 @@ static int get_slot_mapping (struct pci_ops *ops, u8 bus_num, u8 dev_num, u8 *sl
 		}
 
 	}
-
 
 	// If we got here, we didn't find an entry in the IRQ mapping table 
 	// for the target PCI device.  If we did determine that the target 
@@ -592,7 +592,7 @@ static int set_attention_status (struct hotplug_slot *hotplug_slot, u8 status)
 	if (slot == NULL)
 		return -ENODEV;
 	
-	dbg(__FUNCTION__" - physical_slot = %s\n", hotplug_slot->name);
+	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	ctrl = slot->ctrl;
 	if (ctrl == NULL)
@@ -627,7 +627,7 @@ static int process_SI (struct hotplug_slot *hotplug_slot)
 	if (slot == NULL)
 		return -ENODEV;
 	
-	dbg(__FUNCTION__" - physical_slot = %s\n", hotplug_slot->name);
+	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	ctrl = slot->ctrl;
 	if (ctrl == NULL)
@@ -667,7 +667,7 @@ static int process_SS (struct hotplug_slot *hotplug_slot)
 	if (slot == NULL)
 		return -ENODEV;
 	
-	dbg(__FUNCTION__" - physical_slot = %s\n", hotplug_slot->name);
+	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	ctrl = slot->ctrl;
 	if (ctrl == NULL)
@@ -695,7 +695,7 @@ static int hardware_test (struct hotplug_slot *hotplug_slot, u32 value)
 	struct slot *slot = get_slot (hotplug_slot, __FUNCTION__);
 	struct controller *ctrl;
 
-	dbg(__FUNCTION__"\n");
+	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	if (slot == NULL)
 		return -ENODEV;
@@ -716,7 +716,7 @@ static int get_power_status (struct hotplug_slot *hotplug_slot, u8 *value)
 	if (slot == NULL)
 		return -ENODEV;
 	
-	dbg(__FUNCTION__" - physical_slot = %s\n", hotplug_slot->name);
+	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	ctrl = slot->ctrl;
 	if (ctrl == NULL)
@@ -734,7 +734,7 @@ static int get_attention_status (struct hotplug_slot *hotplug_slot, u8 *value)
 	if (slot == NULL)
 		return -ENODEV;
 	
-	dbg(__FUNCTION__" - physical_slot = %s\n", hotplug_slot->name);
+	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	ctrl = slot->ctrl;
 	if (ctrl == NULL)
@@ -752,7 +752,7 @@ static int get_latch_status (struct hotplug_slot *hotplug_slot, u8 *value)
 	if (slot == NULL)
 		return -ENODEV;
 	
-	dbg(__FUNCTION__" - physical_slot = %s\n", hotplug_slot->name);
+	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	ctrl = slot->ctrl;
 	if (ctrl == NULL)
@@ -770,8 +770,8 @@ static int get_adapter_status (struct hotplug_slot *hotplug_slot, u8 *value)
 	
 	if (slot == NULL)
 		return -ENODEV;
-	
-	dbg(__FUNCTION__" - physical_slot = %s\n", hotplug_slot->name);
+
+	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	ctrl = slot->ctrl;
 	if (ctrl == NULL)
@@ -820,7 +820,7 @@ static int cpqhpc_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		// TODO: This code can be made to support non-Compaq or Intel subsystem IDs
 		rc = pci_read_config_word(pdev, PCI_SUBSYSTEM_VENDOR_ID, &subsystem_vid);
 		if (rc) {
-			err(__FUNCTION__" : pci_read_config_word failed\n");
+			err("%s : pci_read_config_word failed\n", __FUNCTION__);
 			return rc;
 		}
 		dbg("Subsystem Vendor ID: %x\n", subsystem_vid);
@@ -831,14 +831,14 @@ static int cpqhpc_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 		ctrl = (struct controller *) kmalloc(sizeof(struct controller), GFP_KERNEL);
 		if (!ctrl) {
-			err(__FUNCTION__" : out of memory\n");
+			err("%s : out of memory\n", __FUNCTION__);
 			return -ENOMEM;
 		}
 		memset(ctrl, 0, sizeof(struct controller));
 
 		rc = pci_read_config_word(pdev, PCI_SUBSYSTEM_ID, &subsystem_deviceid);
 		if (rc) {
-			err(__FUNCTION__" : pci_read_config_word failed\n");
+			err("%s : pci_read_config_word failed\n", __FUNCTION__);
 			goto err_free_ctrl;
 		}
 
@@ -991,12 +991,20 @@ static int cpqhpc_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	dbg ("    pcix_support           %s\n", ctrl->pcix_support == 0 ? "not supported" : "supported");
 
 	ctrl->pci_dev = pdev;
-	ctrl->pci_ops = pdev->bus->ops;
+
+	/* make our own copy of the pci bus structure, as we like tweaking it a lot */
+	ctrl->pci_bus = kmalloc (sizeof (*ctrl->pci_bus), GFP_KERNEL);
+	if (!ctrl->pci_bus) {
+		err("out of memory\n");
+		rc = -ENOMEM;
+		goto err_free_ctrl;
+	}
+	memcpy (ctrl->pci_bus, pdev->bus, sizeof (*ctrl->pci_bus));
+
 	ctrl->bus = pdev->bus->number;
-	ctrl->device = PCI_SLOT(pdev->devfn);
-	ctrl->function = PCI_FUNC(pdev->devfn);
 	ctrl->rev = rev;
-	dbg("bus device function rev: %d %d %d %d\n", ctrl->bus, ctrl->device, ctrl->function, ctrl->rev);
+	dbg("bus device function rev: %d %d %d %d\n", ctrl->bus,
+	     PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn), ctrl->rev);
 
 	init_MUTEX(&ctrl->crit_sect);
 	init_waitqueue_head(&ctrl->queue);
@@ -1004,7 +1012,7 @@ static int cpqhpc_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	/* initialize our threads if they haven't already been started up */
 	rc = one_time_init();
 	if (rc) {
-		goto err_free_ctrl;
+		goto err_free_bus;
 	}
 	
 	dbg("pdev = %p\n", pdev);
@@ -1015,7 +1023,7 @@ static int cpqhpc_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 				pci_resource_len(pdev, 0), MY_NAME)) {
 		err("cannot reserve MMIO region\n");
 		rc = -ENOMEM;
-		goto err_free_ctrl;
+		goto err_free_bus;
 	}
 
 	ctrl->hpc_reg = ioremap(pci_resource_start(pdev, 0), pci_resource_len(pdev, 0));
@@ -1043,7 +1051,7 @@ static int cpqhpc_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	// in this case it will always be called for the "base"
 	// bus/dev/func of a slot.
 	// CS: this is leveraging the PCIIRQ routing code from the kernel (pci-pc.c: get_irq_routing_table)
-	rc = get_slot_mapping(ctrl->pci_ops, pdev->bus->number, (readb(ctrl->hpc_reg + SLOT_MASK) >> 4), &(ctrl->first_slot));
+	rc = get_slot_mapping(ctrl->pci_bus, pdev->bus->number, (readb(ctrl->hpc_reg + SLOT_MASK) >> 4), &(ctrl->first_slot));
 	dbg("get_slot_mapping: first_slot = %d, returned = %d\n", ctrl->first_slot, rc);
 	if (rc) {
 		err(msg_initialization_err, rc);
@@ -1053,7 +1061,7 @@ static int cpqhpc_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	// Store PCI Config Space for all devices on this bus
 	rc = cpqhp_save_config(ctrl, ctrl->bus, readb(ctrl->hpc_reg + SLOT_MASK));
 	if (rc) {
-		err(__FUNCTION__": unable to save PCI configuration data, error %d\n", rc);
+		err("%s: unable to save PCI configuration data, error %d\n", __FUNCTION__, rc);
 		goto err_iounmap;
 	}
 
@@ -1080,7 +1088,7 @@ static int cpqhpc_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	rc = ctrl_slot_setup(ctrl, smbios_start, smbios_table);
 	if (rc) {
 		err(msg_initialization_err, 6);
-		err(__FUNCTION__": unable to save PCI configuration data, error %d\n", rc);
+		err("%s: unable to save PCI configuration data, error %d\n", __FUNCTION__, rc);
 		goto err_iounmap;
 	}
 	
@@ -1188,6 +1196,8 @@ err_iounmap:
 	iounmap(ctrl->hpc_reg);
 err_free_mem_region:
 	release_mem_region(pci_resource_start(pdev, 0), pci_resource_len(pdev, 0));
+err_free_bus:
+	kfree(ctrl->pci_bus);
 err_free_ctrl:
 	kfree(ctrl);
 	return rc;
@@ -1327,6 +1337,8 @@ static void unload_cpqphpd(void)
 			res = res->next;
 			kfree(tres);
 		}
+
+		kfree (ctrl->pci_bus);
 
 		tctrl = ctrl;
 		ctrl = ctrl->next;

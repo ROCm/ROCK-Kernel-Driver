@@ -45,10 +45,16 @@ static void fix_resources (struct bus_node *);
 static inline struct bus_node *find_bus_wprev (u8, struct bus_node **, u8);
 
 static LIST_HEAD(gbuses);
+LIST_HEAD(ibmphp_res_head);
 
-static struct bus_node * __init alloc_error_bus (struct ebda_pci_rsrc * curr)
+static struct bus_node * __init alloc_error_bus (struct ebda_pci_rsrc * curr, u8 busno, int flag)
 {
 	struct bus_node * newbus;
+
+	if (!(curr) && !(flag)) {
+		err ("NULL pointer passed \n");
+		return NULL;
+	}
 
 	newbus = kmalloc (sizeof (struct bus_node), GFP_KERNEL);
 	if (!newbus) {
@@ -57,14 +63,24 @@ static struct bus_node * __init alloc_error_bus (struct ebda_pci_rsrc * curr)
 	}
 
 	memset (newbus, 0, sizeof (struct bus_node));
-	newbus->busno = curr->bus_num;
+	if (flag)
+		newbus->busno = busno;
+	else
+		newbus->busno = curr->bus_num;
 	list_add_tail (&newbus->bus_list, &gbuses);
 	return newbus;
 }
 
 static struct resource_node * __init alloc_resources (struct ebda_pci_rsrc * curr)
 {
-	struct resource_node *rs = kmalloc (sizeof (struct resource_node), GFP_KERNEL);
+	struct resource_node *rs;
+	
+	if (!curr) {
+		err ("NULL passed to allocate \n");
+		return NULL;
+	}
+
+	rs = kmalloc (sizeof (struct resource_node), GFP_KERNEL);
 	if (!rs) {
 		err ("out of system memory \n");
 		return NULL;
@@ -299,7 +315,7 @@ int __init ibmphp_rsrc_init (void)
 				 * actually appears...
 				 */
 				if (ibmphp_add_resource (new_mem) < 0) {
-					newbus = alloc_error_bus (curr);
+					newbus = alloc_error_bus (curr, 0, 0);
 					if (!newbus)
 						return -ENOMEM;
 					newbus->firstMem = new_mem;
@@ -316,7 +332,7 @@ int __init ibmphp_rsrc_init (void)
 				new_pfmem->type = PFMEM;
 				new_pfmem->fromMem = FALSE;
 				if (ibmphp_add_resource (new_pfmem) < 0) {
-					newbus = alloc_error_bus (curr);
+					newbus = alloc_error_bus (curr, 0, 0);
 					if (!newbus)
 						return -ENOMEM;
 					newbus->firstPFMem = new_pfmem;
@@ -340,7 +356,7 @@ int __init ibmphp_rsrc_init (void)
 				 * range actually appears...
 				 */
 				if (ibmphp_add_resource (new_io) < 0) {
-					newbus = alloc_error_bus (curr);
+					newbus = alloc_error_bus (curr, 0, 0);
 					if (!newbus)
 						return -ENOMEM;
 					newbus->firstIO = new_io;
@@ -352,8 +368,6 @@ int __init ibmphp_rsrc_init (void)
 		}
 	}
 
-	debug ("after the while loop in rsrc_init \n");
-
 	list_for_each (tmp, &gbuses) {
 		bus_cur = list_entry (tmp, struct bus_node, bus_list);
 		/* This is to get info about PPB resources, since EBDA doesn't put this info into the primary bus info */
@@ -361,11 +375,9 @@ int __init ibmphp_rsrc_init (void)
 		if (rc)
 			return rc;
 	}
-	debug ("b4 once_over in rsrc_init \n");
 	rc = once_over ();  /* This is to align ranges (so no -1) */
 	if (rc)
 		return rc;
-	debug ("after once_over in rsrc_init \n");
 	return 0;
 }
 
@@ -580,7 +592,7 @@ static void fix_resources (struct bus_node *bus_cur)
  * based on their resource type and sorted by their starting addresses.  It assigns
  * the ptrs to next and nextRange if needed.
  *
- * Input: 3 diff. resources (nulled out if not needed)
+ * Input: resource ptr
  * Output: ptrs assigned (to the node)
  * 0 or -1
  *******************************************************************************/
@@ -593,12 +605,17 @@ int ibmphp_add_resource (struct resource_node *res)
 	struct resource_node *res_start = NULL;
 
 	debug ("%s - enter\n", __FUNCTION__);
+
+	if (!res) {
+		err ("NULL passed to add \n");
+		return -ENODEV;
+	}
 	
 	bus_cur = find_bus_wprev (res->busno, NULL, 0);
 	
 	if (!bus_cur) {
 		/* didn't find a bus, smth's wrong!!! */
-		err ("no bus in the system, either pci_dev's wrong or allocation failed\n");
+		debug ("no bus in the system, either pci_dev's wrong or allocation failed\n");
 		return -ENODEV;
 	}
 
@@ -769,6 +786,11 @@ int ibmphp_remove_resource (struct resource_node *res)
 	struct resource_node *mem_cur;
 	char * type = "";
 
+	if (!res)  {
+		err ("resource to remove is NULL \n");
+		return -ENODEV;
+	}
+
 	bus_cur = find_bus_wprev (res->busno, NULL, 0);
 
 	if (!bus_cur) {
@@ -797,7 +819,6 @@ int ibmphp_remove_resource (struct resource_node *res)
 	res_prev = NULL;
 
 	while (res_cur) {
-		/* ???????????DO WE _NEED_ TO BE CHECKING FOR END AS WELL?????????? */
 		if ((res_cur->start == res->start) && (res_cur->end == res->end))
 			break;
 		res_prev = res_cur;
@@ -981,7 +1002,7 @@ int ibmphp_check_resource (struct resource_node *res, u8 bridge)
 
 	if (!bus_cur) {
 		/* didn't find a bus, smth's wrong!!! */
-		err ("no bus in the system, either pci_dev's wrong or allocation failed \n");
+		debug ("no bus in the system, either pci_dev's wrong or allocation failed \n");
 		return -EINVAL;
 	}
 
@@ -1340,7 +1361,7 @@ int ibmphp_remove_bus (struct bus_node *bus, u8 parent_busno)
 	prev_bus = find_bus_wprev (parent_busno, NULL, 0);	
 
 	if (!prev_bus) {
-		err ("something terribly wrong. Cannot find parent bus to the one to remove\n");
+		debug ("something terribly wrong. Cannot find parent bus to the one to remove\n");
 		return -ENODEV;
 	}
 
@@ -1467,12 +1488,17 @@ static int remove_ranges (struct bus_node *bus_cur, struct bus_node *bus_prev)
 
 /*
  * find the resource node in the bus 
- * Input: Resource needed, start address of the resource, type or resource
+ * Input: Resource needed, start address of the resource, type of resource
  */
 int ibmphp_find_resource (struct bus_node *bus, u32 start_address, struct resource_node **res, int flag)
 {
 	struct resource_node *res_cur = NULL;
 	char * type = "";
+
+	if (!bus) {
+		err ("The bus passed in NULL to find resource \n");
+		return -ENODEV;
+	}
 
 	switch (flag) {
 		case IO:
@@ -1514,11 +1540,11 @@ int ibmphp_find_resource (struct bus_node *bus, u32 start_address, struct resour
 				res_cur = res_cur->next;
 			}
 			if (!res_cur) {
-				err ("SOS...cannot find %s resource in the bus. \n", type);
+				debug ("SOS...cannot find %s resource in the bus. \n", type);
 				return -EINVAL;
 			}
 		} else {
-			err ("SOS... cannot find %s resource in the bus. \n", type);
+			debug ("SOS... cannot find %s resource in the bus. \n", type);
 			return -EINVAL;
 		}
 	}
@@ -1756,6 +1782,8 @@ void ibmphp_print_test (void)
 	struct range_node *range;
 	struct resource_node *res;
 	struct list_head *tmp;
+	
+	debug_pci ("*****************START**********************\n");
 
 	if ((!list_empty(&gbuses)) && flags) {
 		err ("The GBUSES is not NULL?!?!?!?!?\n");
@@ -1764,50 +1792,50 @@ void ibmphp_print_test (void)
 
 	list_for_each (tmp, &gbuses) {
 		bus_cur = list_entry (tmp, struct bus_node, bus_list);
-		debug ("This is bus # %d.  There are \n", bus_cur->busno);
-		debug ("IORanges = %d\t", bus_cur->noIORanges);
-		debug ("MemRanges = %d\t", bus_cur->noMemRanges);
-		debug ("PFMemRanges = %d\n", bus_cur->noPFMemRanges);
-		debug ("The IO Ranges are as follows:\n");
+		debug_pci ("This is bus # %d.  There are \n", bus_cur->busno);
+		debug_pci ("IORanges = %d\t", bus_cur->noIORanges);
+		debug_pci ("MemRanges = %d\t", bus_cur->noMemRanges);
+		debug_pci ("PFMemRanges = %d\n", bus_cur->noPFMemRanges);
+		debug_pci ("The IO Ranges are as follows:\n");
 		if (bus_cur->rangeIO) {
 			range = bus_cur->rangeIO;
 			for (i = 0; i < bus_cur->noIORanges; i++) {
-				debug ("rangeno is %d\n", range->rangeno);
-				debug ("[%x - %x]\n", range->start, range->end);
+				debug_pci ("rangeno is %d\n", range->rangeno);
+				debug_pci ("[%x - %x]\n", range->start, range->end);
 				range = range->next;
 			}
 		}
 
-		debug ("The Mem Ranges are as follows:\n");
+		debug_pci ("The Mem Ranges are as follows:\n");
 		if (bus_cur->rangeMem) {
 			range = bus_cur->rangeMem;
 			for (i = 0; i < bus_cur->noMemRanges; i++) {
-				debug ("rangeno is %d\n", range->rangeno);
-				debug ("[%x - %x]\n", range->start, range->end);
+				debug_pci ("rangeno is %d\n", range->rangeno);
+				debug_pci ("[%x - %x]\n", range->start, range->end);
 				range = range->next;
 			}
 		}
 
-		debug ("The PFMem Ranges are as follows:\n");
+		debug_pci ("The PFMem Ranges are as follows:\n");
 
 		if (bus_cur->rangePFMem) {
 			range = bus_cur->rangePFMem;
 			for (i = 0; i < bus_cur->noPFMemRanges; i++) {
-				debug ("rangeno is %d\n", range->rangeno);
-				debug ("[%x - %x]\n", range->start, range->end);
+				debug_pci ("rangeno is %d\n", range->rangeno);
+				debug_pci ("[%x - %x]\n", range->start, range->end);
 				range = range->next;
 			}
 		}
 
-		debug ("The resources on this bus are as follows\n");
+		debug_pci ("The resources on this bus are as follows\n");
 
-		debug ("IO...\n");
+		debug_pci ("IO...\n");
 		if (bus_cur->firstIO) {
 			res = bus_cur->firstIO;
 			while (res) {
-				debug ("The range # is %d\n", res->rangeno);
-				debug ("The bus, devfnc is %d, %x\n", res->busno, res->devfunc);
-				debug ("[%x - %x], len=%x\n", res->start, res->end, res->len);
+				debug_pci ("The range # is %d\n", res->rangeno);
+				debug_pci ("The bus, devfnc is %d, %x\n", res->busno, res->devfunc);
+				debug_pci ("[%x - %x], len=%x\n", res->start, res->end, res->len);
 				if (res->next)
 					res = res->next;
 				else if (res->nextRange)
@@ -1816,13 +1844,13 @@ void ibmphp_print_test (void)
 					break;
 			}
 		}
-		debug ("Mem...\n");
+		debug_pci ("Mem...\n");
 		if (bus_cur->firstMem) {
 			res = bus_cur->firstMem;
 			while (res) {
-				debug ("The range # is %d\n", res->rangeno);
-				debug ("The bus, devfnc is %d, %x\n", res->busno, res->devfunc);
-				debug ("[%x - %x], len=%x\n", res->start, res->end, res->len);
+				debug_pci ("The range # is %d\n", res->rangeno);
+				debug_pci ("The bus, devfnc is %d, %x\n", res->busno, res->devfunc);
+				debug_pci ("[%x - %x], len=%x\n", res->start, res->end, res->len);
 				if (res->next)
 					res = res->next;
 				else if (res->nextRange)
@@ -1831,13 +1859,13 @@ void ibmphp_print_test (void)
 					break;
 			}
 		}
-		debug ("PFMem...\n");
+		debug_pci ("PFMem...\n");
 		if (bus_cur->firstPFMem) {
 			res = bus_cur->firstPFMem;
 			while (res) {
-				debug ("The range # is %d\n", res->rangeno);
-				debug ("The bus, devfnc is %d, %x\n", res->busno, res->devfunc);
-				debug ("[%x - %x], len=%x\n", res->start, res->end, res->len);
+				debug_pci ("The range # is %d\n", res->rangeno);
+				debug_pci ("The bus, devfnc is %d, %x\n", res->busno, res->devfunc);
+				debug_pci ("[%x - %x], len=%x\n", res->start, res->end, res->len);
 				if (res->next)
 					res = res->next;
 				else if (res->nextRange)
@@ -1847,23 +1875,53 @@ void ibmphp_print_test (void)
 			}
 		}
 
-		debug ("PFMemFromMem...\n");
+		debug_pci ("PFMemFromMem...\n");
 		if (bus_cur->firstPFMemFromMem) {
 			res = bus_cur->firstPFMemFromMem;
 			while (res) {
-				debug ("The range # is %d\n", res->rangeno);
-				debug ("The bus, devfnc is %d, %x\n", res->busno, res->devfunc);
-				debug ("[%x - %x], len=%x\n", res->start, res->end, res->len);
+				debug_pci ("The range # is %d\n", res->rangeno);
+				debug_pci ("The bus, devfnc is %d, %x\n", res->busno, res->devfunc);
+				debug_pci ("[%x - %x], len=%x\n", res->start, res->end, res->len);
 				res = res->next;
 			}
 		}
 	}
+	debug_pci ("***********************END***********************\n");
+}
+
+int static range_exists_already (struct range_node * range, struct bus_node * bus_cur, u8 type)
+{
+	struct range_node * range_cur = NULL;
+	switch (type) {
+		case IO:
+			range_cur = bus_cur->rangeIO;
+			break;
+		case MEM:
+			range_cur = bus_cur->rangeMem;
+			break;
+		case PFMEM:
+			range_cur = bus_cur->rangePFMem;
+			break;
+		default:
+			err ("wrong type passed to find out if range already exists \n");
+			return -ENODEV;
+	}
+
+	while (range_cur) {
+		if ((range_cur->start == range->start) && (range_cur->end == range->end))
+			return 1;
+		range_cur = range_cur->next;
+	}
+	
+	return 0;
 }
 
 /* This routine will read the windows for any PPB we have and update the
  * range info for the secondary bus, and will also input this info into
  * primary bus, since BIOS doesn't. This is for PPB that are in the system
- * on bootup
+ * on bootup.  For bridged cards that were added during previous load of the
+ * driver, only the ranges and the bus structure are added, the devices are
+ * added from NVRAM
  * Input: primary busno
  * Returns: none
  * Note: this function doesn't take into account IO restrictions etc,
@@ -1874,7 +1932,7 @@ void ibmphp_print_test (void)
  */
 static int __init update_bridge_ranges (struct bus_node **bus)
 {
-	u8 sec_busno, device, function, busno, hdr_type, start_io_address, end_io_address;
+	u8 sec_busno, device, function, hdr_type, start_io_address, end_io_address;
 	u16 vendor_id, upper_io_start, upper_io_end, start_mem_address, end_mem_address;
 	u32 start_address, end_address, upper_start, upper_end;
 	struct bus_node *bus_sec;
@@ -1883,19 +1941,24 @@ static int __init update_bridge_ranges (struct bus_node **bus)
 	struct resource_node *mem;
 	struct resource_node *pfmem;
 	struct range_node *range;
+	unsigned int devfn;
+
 	bus_cur = *bus;
-	busno = bus_cur->busno;
+	if (!bus_cur)
+		return -ENODEV;
+	ibmphp_pci_bus->number = bus_cur->busno;
 
 	debug ("inside %s \n", __FUNCTION__);
 	debug ("bus_cur->busno = %x\n", bus_cur->busno);
 
 	for (device = 0; device < 32; device++) {
 		for (function = 0x00; function < 0x08; function++) {
-			pci_read_config_word_nodev (ibmphp_pci_root_ops, busno, device, function, PCI_VENDOR_ID, &vendor_id);
+			devfn = PCI_DEVFN(device, function);
+			pci_bus_read_config_word (ibmphp_pci_bus, devfn, PCI_VENDOR_ID, &vendor_id);
 
 			if (vendor_id != PCI_VENDOR_ID_NOTVALID) {
 				/* found correct device!!! */
-				pci_read_config_byte_nodev (ibmphp_pci_root_ops, busno, device, function, PCI_HEADER_TYPE, &hdr_type);
+				pci_bus_read_config_byte (ibmphp_pci_bus, devfn, PCI_HEADER_TYPE, &hdr_type);
 
 				switch (hdr_type) {
 					case PCI_HEADER_TYPE_NORMAL:
@@ -1914,21 +1977,25 @@ static int __init update_bridge_ranges (struct bus_node **bus)
 						   temp++;
 						   }
 						 */
-						pci_read_config_byte_nodev (ibmphp_pci_root_ops, busno, device, function, PCI_SECONDARY_BUS, &sec_busno);
+						pci_bus_read_config_byte (ibmphp_pci_bus, devfn, PCI_SECONDARY_BUS, &sec_busno);
 						bus_sec = find_bus_wprev (sec_busno, NULL, 0); 
-						pci_read_config_byte_nodev (ibmphp_pci_root_ops, busno, device, function, PCI_IO_BASE, &start_io_address);
-						pci_read_config_byte_nodev (ibmphp_pci_root_ops, busno, device, function, PCI_IO_LIMIT, &end_io_address);
-						pci_read_config_word_nodev (ibmphp_pci_root_ops, busno, device, function, PCI_IO_BASE_UPPER16, &upper_io_start);
-						pci_read_config_word_nodev (ibmphp_pci_root_ops, busno, device, function, PCI_IO_LIMIT_UPPER16, &upper_io_end);
+						/* this bus structure doesn't exist yet, PPB was configured during previous loading of ibmphp */
+						if (!bus_sec) {
+							bus_sec = alloc_error_bus (NULL, sec_busno, 1);
+							/* the rest will be populated during NVRAM call */
+							return 0;
+						}
+						pci_bus_read_config_byte (ibmphp_pci_bus, devfn, PCI_IO_BASE, &start_io_address);
+						pci_bus_read_config_byte (ibmphp_pci_bus, devfn, PCI_IO_LIMIT, &end_io_address);
+						pci_bus_read_config_word (ibmphp_pci_bus, devfn, PCI_IO_BASE_UPPER16, &upper_io_start);
+						pci_bus_read_config_word (ibmphp_pci_bus, devfn, PCI_IO_LIMIT_UPPER16, &upper_io_end);
 						start_address = (start_io_address & PCI_IO_RANGE_MASK) << 8;
 						start_address |= (upper_io_start << 16);
 						end_address = (end_io_address & PCI_IO_RANGE_MASK) << 8;
 						end_address |= (upper_io_end << 16);
 
 						if ((start_address) && (start_address <= end_address)) {
-
 							range = kmalloc (sizeof (struct range_node), GFP_KERNEL);
-
 							if (!range) {
 								err ("out of system memory \n");
 								return -ENOMEM;
@@ -1937,36 +2004,42 @@ static int __init update_bridge_ranges (struct bus_node **bus)
 							range->start = start_address;
 							range->end = end_address + 0xfff;
 
-							if (bus_sec->noIORanges > 0) 
-								add_range (IO, range, bus_sec);
-							else {
+							if (bus_sec->noIORanges > 0) {
+								if (!range_exists_already (range, bus_sec, IO)) {
+									add_range (IO, range, bus_sec);
+									++bus_sec->noIORanges;
+								} else {
+									kfree (range);
+									range = NULL;
+								}
+							} else {
 								/* 1st IO Range on the bus */
 								range->rangeno = 1;
 								bus_sec->rangeIO = range;
+								++bus_sec->noIORanges;
 							}
-
-							++bus_sec->noIORanges;
 							fix_resources (bus_sec);
-						
-							io = kmalloc (sizeof (struct resource_node), GFP_KERNEL);							
-							if (!io) {
-								kfree (range);
-								err ("out of system memory \n");
-								return -ENOMEM;
+
+							if (ibmphp_find_resource (bus_cur, start_address, &io, IO)) {
+								io = kmalloc (sizeof (struct resource_node), GFP_KERNEL);							
+								if (!io) {
+									kfree (range);
+									err ("out of system memory \n");
+									return -ENOMEM;
+								}
+								memset (io, 0, sizeof (struct resource_node));
+								io->type = IO;
+								io->busno = bus_cur->busno;
+								io->devfunc = ((device << 3) | (function & 0x7));
+								io->start = start_address;
+								io->end = end_address + 0xfff;
+								io->len = io->end - io->start + 1;
+								ibmphp_add_resource (io);
 							}
-							memset (io, 0, sizeof (struct resource_node));
-							io->type = IO;
-							io->busno = bus_cur->busno;
-							io->devfunc = ((device << 3) | (function & 0x7));
-							io->start = start_address;
-							io->end = end_address + 0xfff;
-							io->len = io->end - io->start + 1;
+						}	
 
-							ibmphp_add_resource (io);
-						}
-
-						pci_read_config_word_nodev (ibmphp_pci_root_ops, busno, device, function, PCI_MEMORY_BASE, &start_mem_address);
-						pci_read_config_word_nodev (ibmphp_pci_root_ops, busno, device, function, PCI_MEMORY_LIMIT, &end_mem_address);
+						pci_bus_read_config_word (ibmphp_pci_bus, devfn, PCI_MEMORY_BASE, &start_mem_address);
+						pci_bus_read_config_word (ibmphp_pci_bus, devfn, PCI_MEMORY_LIMIT, &end_mem_address);
 
 						start_address = 0x00000000 | (start_mem_address & PCI_MEMORY_RANGE_MASK) << 16;
 						end_address = 0x00000000 | (end_mem_address & PCI_MEMORY_RANGE_MASK) << 16;
@@ -1982,36 +2055,44 @@ static int __init update_bridge_ranges (struct bus_node **bus)
 							range->start = start_address;
 							range->end = end_address + 0xfffff;
 
-							if (bus_sec->noMemRanges > 0) 
-								add_range (MEM, range, bus_sec);
-							else {
+							if (bus_sec->noMemRanges > 0) {
+								if (!range_exists_already (range, bus_sec, MEM)) {
+									add_range (MEM, range, bus_sec);
+									++bus_sec->noMemRanges;
+								} else {
+									kfree (range);
+									range = NULL;
+								}
+							} else {
 								/* 1st Mem Range on the bus */
 								range->rangeno = 1;
 								bus_sec->rangeMem = range;
+								++bus_sec->noMemRanges;
 							}
 
-							++bus_sec->noMemRanges;
 							fix_resources (bus_sec);
 
-							mem = kmalloc (sizeof (struct resource_node), GFP_KERNEL);
-							if (!mem) {
-								kfree (range);
-								err ("out of system memory \n");
-								return -ENOMEM;
+							if (ibmphp_find_resource (bus_cur, start_address, &mem, MEM)) {
+								mem = kmalloc (sizeof (struct resource_node), GFP_KERNEL);
+								if (!mem) {
+									kfree (range);
+									err ("out of system memory \n");
+									return -ENOMEM;
+								}
+								memset (mem, 0, sizeof (struct resource_node));
+								mem->type = MEM;
+								mem->busno = bus_cur->busno;
+								mem->devfunc = ((device << 3) | (function & 0x7));
+								mem->start = start_address;
+								mem->end = end_address + 0xfffff;
+								mem->len = mem->end - mem->start + 1;
+								ibmphp_add_resource (mem);
 							}
-							memset (mem, 0, sizeof (struct resource_node));
-							mem->type = MEM;
-							mem->busno = bus_cur->busno;
-							mem->devfunc = ((device << 3) | (function & 0x7));
-							mem->start = start_address;
-							mem->end = end_address + 0xfffff;
-							mem->len = mem->end - mem->start + 1;
-							ibmphp_add_resource (mem);
 						}
-						pci_read_config_word_nodev (ibmphp_pci_root_ops, busno, device, function, PCI_PREF_MEMORY_BASE, &start_mem_address);
-						pci_read_config_word_nodev (ibmphp_pci_root_ops, busno, device, function, PCI_PREF_MEMORY_LIMIT, &end_mem_address);
-						pci_read_config_dword_nodev (ibmphp_pci_root_ops, busno, device, function, PCI_PREF_BASE_UPPER32, &upper_start);
-						pci_read_config_dword_nodev (ibmphp_pci_root_ops, busno, device, function, PCI_PREF_LIMIT_UPPER32, &upper_end);
+						pci_bus_read_config_word (ibmphp_pci_bus, devfn, PCI_PREF_MEMORY_BASE, &start_mem_address);
+						pci_bus_read_config_word (ibmphp_pci_bus, devfn, PCI_PREF_MEMORY_LIMIT, &end_mem_address);
+						pci_bus_read_config_dword (ibmphp_pci_bus, devfn, PCI_PREF_BASE_UPPER32, &upper_start);
+						pci_bus_read_config_dword (ibmphp_pci_bus, devfn, PCI_PREF_LIMIT_UPPER32, &upper_end);
 						start_address = 0x00000000 | (start_mem_address & PCI_MEMORY_RANGE_MASK) << 16;
 						end_address = 0x00000000 | (end_mem_address & PCI_MEMORY_RANGE_MASK) << 16;
 #if BITS_PER_LONG == 64
@@ -2030,32 +2111,40 @@ static int __init update_bridge_ranges (struct bus_node **bus)
 							range->start = start_address;
 							range->end = end_address + 0xfffff;
 
-							if (bus_sec->noPFMemRanges > 0)
-								add_range (PFMEM, range, bus_sec);
-							else {
+							if (bus_sec->noPFMemRanges > 0) {
+								if (!range_exists_already (range, bus_sec, PFMEM)) {
+									add_range (PFMEM, range, bus_sec);
+									++bus_sec->noPFMemRanges;
+								} else {
+									kfree (range);
+									range = NULL;
+								}
+							} else {
 								/* 1st PFMem Range on the bus */
 								range->rangeno = 1;
 								bus_sec->rangePFMem = range;
+								++bus_sec->noPFMemRanges;
 							}
 
-							++bus_sec->noPFMemRanges;
 							fix_resources (bus_sec);
+							if (ibmphp_find_resource (bus_cur, start_address, &pfmem, PFMEM)) {
+								pfmem = kmalloc (sizeof (struct resource_node), GFP_KERNEL);
+								if (!pfmem) {
+									kfree (range);
+									err ("out of system memory \n");
+									return -ENOMEM;
+								}
+								memset (pfmem, 0, sizeof (struct resource_node));
+								pfmem->type = PFMEM;
+								pfmem->busno = bus_cur->busno;
+								pfmem->devfunc = ((device << 3) | (function & 0x7));
+								pfmem->start = start_address;
+								pfmem->end = end_address + 0xfffff;
+								pfmem->len = pfmem->end - pfmem->start + 1;
+								pfmem->fromMem = FALSE;
 
-							pfmem = kmalloc (sizeof (struct resource_node), GFP_KERNEL);
-							if (!pfmem) {
-								kfree (range);
-								err ("out of system memory \n");
-								return -ENOMEM;
+								ibmphp_add_resource (pfmem);
 							}
-							memset (pfmem, 0, sizeof (struct resource_node));
-							pfmem->type = PFMEM;
-							pfmem->busno = bus_cur->busno;
-							pfmem->devfunc = ((device << 3) | (function & 0x7));
-							pfmem->start = start_address;
-							pfmem->end = end_address + 0xfffff;
-							pfmem->len = pfmem->end - pfmem->start + 1;
-							pfmem->fromMem = FALSE;
-							ibmphp_add_resource (pfmem);
 						}
 						break;
 				}	/* end of switch */
