@@ -235,6 +235,11 @@ static int __init smp_openpic_probe(void)
 	return nr_cpus;
 }
 
+static void __devinit smp_openpic_setup_cpu(int cpu)
+{
+	do_openpic_setup_cpu();
+}
+
 static void
 smp_kick_cpu(int nr)
 {
@@ -285,16 +290,6 @@ void vpa_init(int cpu)
 	register_vpa(flags, cpu, __pa((unsigned long)&(paca[cpu].xLpPaca))); 
 }
 
-static void __devinit pSeries_setup_cpu(int cpu)
-{
-	if (OpenPIC_Addr) {
-		do_openpic_setup_cpu();
-	} else {
-		if (cpu != boot_cpuid)
-			xics_setup_cpu();
-	}
-}
-
 static void
 smp_xics_message_pass(int target, int msg, unsigned long data, int wait)
 {
@@ -332,6 +327,12 @@ static int __init smp_xics_probe(void)
 	return nr_cpus;
 }
 
+static void __devinit smp_xics_setup_cpu(int cpu)
+{
+	if (cpu != boot_cpuid)
+		xics_setup_cpu();
+}
+
 static spinlock_t timebase_lock = SPIN_LOCK_UNLOCKED;
 static unsigned long timebase = 0;
 
@@ -365,9 +366,11 @@ void __init smp_init_pSeries(void)
 	if (naca->interrupt_controller == IC_OPEN_PIC) {
 		smp_ops->message_pass	= smp_openpic_message_pass;
 		smp_ops->probe		= smp_openpic_probe;
+		smp_ops->setup_cpu	= smp_openpic_setup_cpu;
 	} else {
 		smp_ops->message_pass	= smp_xics_message_pass;
 		smp_ops->probe		= smp_xics_probe;
+		smp_ops->setup_cpu	= smp_xics_setup_cpu;
 	}
 
 	if (systemcfg->platform == PLATFORM_PSERIES) {
@@ -376,7 +379,6 @@ void __init smp_init_pSeries(void)
 	}
 
 	smp_ops->kick_cpu = smp_kick_cpu;
-	smp_ops->setup_cpu = pSeries_setup_cpu;
 }
 #endif
 
@@ -580,11 +582,17 @@ static void __devinit smp_store_cpu_info(int id)
 
 void __init smp_prepare_cpus(unsigned int max_cpus)
 {
+	/* 
+	 * setup_cpu may need to be called on the boot cpu. We havent
+	 * spun any cpus up but lets be paranoid.
+	 */
+	BUG_ON(boot_cpuid != smp_processor_id());
+
 	/* Fixup boot cpu */
-	smp_store_cpu_info(smp_processor_id());
-	cpu_callin_map[smp_processor_id()] = 1;
-	paca[smp_processor_id()].prof_counter = 1;
-	paca[smp_processor_id()].prof_multiplier = 1;
+	smp_store_cpu_info(boot_cpuid);
+	cpu_callin_map[boot_cpuid] = 1;
+	paca[boot_cpuid].prof_counter = 1;
+	paca[boot_cpuid].prof_multiplier = 1;
 
 	/*
 	 * XXX very rough. 
@@ -709,8 +717,19 @@ int setup_profiling_timer(unsigned int multiplier)
 
 void __init smp_cpus_done(unsigned int max_cpus)
 {
+	cpumask_t old_mask;
+
+	/* We want the setup_cpu() here to be called from CPU 0, but our
+	 * init thread may have been "borrowed" by another CPU in the meantime
+	 * se we pin us down to CPU 0 for a short while
+	 */
+	old_mask = current->cpus_allowed;
+	set_cpus_allowed(current, cpumask_of_cpu(boot_cpuid));
+	
 	smp_ops->setup_cpu(boot_cpuid);
 
 	/* XXX fix this, xics currently relies on it - Anton */
 	smp_threads_ready = 1;
+
+	set_cpus_allowed(current, old_mask);
 }
