@@ -116,8 +116,7 @@ static ssize_t w1_therm_read_bin(struct kobject *kobj, char *buf, loff_t off, si
 	verdict = 0;
 	crc = 0;
 
-	while (max_trying--)	
-	{
+	while (max_trying--) {
 		if (!w1_reset_bus (dev)) {
 			int count = 0;
 			u8 match[9] = {W1_MATCH_ROM, };
@@ -133,8 +132,7 @@ static ssize_t w1_therm_read_bin(struct kobject *kobj, char *buf, loff_t off, si
 					w1_write_block(dev, match, 9);
 
 					w1_write_8(dev, W1_READ_SCRATCHPAD);
-					if ((count = w1_read_block(dev, rom, 9)) != 9)
-					{
+					if ((count = w1_read_block(dev, rom, 9)) != 9) {
 						dev_warn(&dev->dev, "w1_read_block() returned %d instead of 9.\n", count);
 					}
 

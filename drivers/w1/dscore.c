@@ -164,8 +164,7 @@ int ds_recv_status(struct ds_device *dev, struct ds_status *st)
 		printk("%02x ", buf[i]);
 	printk("\n");
 
-	if (count >= 16)
-	{
+	if (count >= 16) {
 		ds_dump_status(buf, "enable flag", 0);
 		ds_dump_status(buf, "1-wire speed", 1);
 		ds_dump_status(buf, "strong pullup duration", 2);
@@ -186,8 +185,7 @@ int ds_recv_status(struct ds_device *dev, struct ds_status *st)
 
 	memcpy(st, buf, sizeof(*st));
 
-	if (st->status & ST_EPOF)
-	{
+	if (st->status & ST_EPOF) {
 		printk(KERN_INFO "Resetting device after ST_EPOF.\n");
 		err = ds_send_control_cmd(dev, CTL_RESET_DEVICE, 0);
 		if (err)
@@ -197,8 +195,7 @@ int ds_recv_status(struct ds_device *dev, struct ds_status *st)
 			return err;
 	}
 #if 0
-	if (st->status & ST_IDLE)
-	{
+	if (st->status & ST_IDLE) {
 		printk(KERN_INFO "Resetting pulse after ST_IDLE.\n");
 		err = ds_start_pulse(dev, PULLUP_PULSE_DURATION);
 		if (err)
@@ -311,8 +308,7 @@ int ds_wait_status(struct ds_device *dev, struct ds_status *st)
 	do {
 		err = ds_recv_status_nodump(dev, st, buf, sizeof(buf));
 #if 0
-		if (err >= 0)
-		{	
+		if (err >= 0) {	
 			int i;
 			printk("0x%x: count=%d, status: ", dev->ep[EP_STATUS], err);
 			for (i=0; i<err; ++i)
@@ -343,8 +339,7 @@ int ds_reset(struct ds_device *dev, struct ds_status *st)
 
 	ds_wait_status(dev, st);
 #if 0
-	if (st->command_buffer_status)
-	{
+	if (st->command_buffer_status) {
 		printk(KERN_INFO "Short circuit.\n");
 		return -EIO;
 	}

@@ -122,15 +122,13 @@ static int __devinit ds_w1_init(void)
 	int err;
 	
 	ds_bus_master = kmalloc(sizeof(*ds_bus_master), GFP_KERNEL);
-	if (!ds_bus_master)
-	{
+	if (!ds_bus_master) {
 		printk(KERN_ERR "Failed to allocate DS9490R USB<->W1 bus_master structure.\n");
 		return -ENOMEM;
 	}
 
 	ds_dev = ds_get_device();
-	if (!ds_dev)
-	{
+	if (!ds_dev) {
 		printk(KERN_ERR "DS9490R is not registered.\n");
 		err =  -ENODEV;
 		goto err_out_free_bus_master;

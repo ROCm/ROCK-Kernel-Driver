@@ -556,8 +556,7 @@ static void w1_search(struct w1_master *dev)
 
 			if (sl->reg_num.family == tmp->family &&
 			    sl->reg_num.id == tmp->id &&
-			    sl->reg_num.crc == tmp->crc)
-			{
+			    sl->reg_num.crc == tmp->crc) {
 				set_bit(W1_SLAVE_ACTIVE, (long *)&sl->flags);
 				break;
 			}
@@ -719,8 +718,7 @@ int w1_process(void *data)
 		list_for_each_safe(ent, n, &dev->slist) {
 			sl = list_entry(ent, struct w1_slave, w1_slave_entry);
 
-			if (sl && !test_bit(W1_SLAVE_ACTIVE, (unsigned long *)&sl->flags))
-			{
+			if (sl && !test_bit(W1_SLAVE_ACTIVE, (unsigned long *)&sl->flags)) {
 				list_del (&sl->w1_slave_entry);
 
 				w1_slave_detach (sl);

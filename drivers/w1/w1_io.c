@@ -136,8 +136,7 @@ u8 w1_read_block(struct w1_master *dev, u8 *buf, int len)
 
 	if (dev->bus_master->read_block)
 		ret = dev->bus_master->read_block(dev->bus_master->data, buf, len);
-	else
-	{
+	else {
 		for (i = 0; i < len; ++i)
 			buf[i] = w1_read_8(dev);
 		ret = len;
@@ -152,8 +151,7 @@ int w1_reset_bus(struct w1_master *dev)
 
 	if (dev->bus_master->reset_bus)
 		result = dev->bus_master->reset_bus(dev->bus_master->data) & 0x1;
-	else
-	{
+	else {
 		dev->bus_master->write_bit(dev->bus_master->data, 0);
 		w1_delay(480);
 		dev->bus_master->write_bit(dev->bus_master->data, 1);
