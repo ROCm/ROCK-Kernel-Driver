@@ -77,10 +77,14 @@ typedef struct resource_map_t {
 } resource_map_t;
 
 /* Memory resource database */
-static resource_map_t mem_db = { 0, 0, &mem_db };
+static resource_map_t mem_db = {
+	.next	= &mem_db,
+};
 
 /* IO port resource database */
-static resource_map_t io_db = { 0, 0, &io_db };
+static resource_map_t io_db = {
+	.next	= &io_db,
+};
 
 static DECLARE_MUTEX(rsrc_sem);
 
@@ -93,7 +97,7 @@ typedef struct irq_info_t {
 } irq_info_t;
 
 /* Table of IRQ assignments */
-static irq_info_t irq_table[NR_IRQS] = { { 0, 0, 0 }, /* etc */ };
+static irq_info_t irq_table[NR_IRQS];
 
 #endif
 
