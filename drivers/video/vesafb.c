@@ -36,6 +36,10 @@ static struct fb_var_screeninfo vesafb_defined = {
 	activate:	FB_ACTIVATE_NOW,
 	height:		-1,
 	width:		-1,
+	right_margin:	32,
+	upper_margin:	16,
+	lower_margin:	4,
+	vsync_len:	4,
 	vmode:		FB_VMODE_NONINTERLACED,
 };
 
@@ -301,11 +305,7 @@ int __init vesafb_init(void)
 	/* some dummy values for timing to make fbset happy */
 	vesafb_defined.pixclock     = 10000000 / vesafb_defined.xres * 1000 / vesafb_defined.yres;
 	vesafb_defined.left_margin  = (vesafb_defined.xres / 8) & 0xf8;
-	vesafb_defined.right_margin = 32;
-	vesafb_defined.upper_margin = 16;
-	vesafb_defined.lower_margin = 4;
 	vesafb_defined.hsync_len    = (vesafb_defined.xres / 8) & 0xf8;
-	vesafb_defined.vsync_len    = 4;
 
 	if (vesafb_defined.bits_per_pixel > 8) {
 		vesafb_defined.red.offset    = screen_info.red_pos;
