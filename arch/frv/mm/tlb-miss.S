@@ -184,8 +184,8 @@ __itlb_k_PTD_mapped:
 	movgs		gr31,tplr			/* set TPLR.CXN */
 	tlbpr		gr31,gr0,#4,#0			/* delete matches from TLB, IAMR1, DAMR1 */
 
-	movsg		iampr1,gr31
-	ori		gr31,#xAMPRx_V|DAMPRx_WP,gr31	/* entry was invalidated by tlbpr #4 */
+	movsg		dampr1,gr31
+	ori		gr31,#xAMPRx_V,gr31		/* entry was invalidated by tlbpr #4 */
 	movgs		gr31,tppr
 	movsg		iamlr1,gr31			/* set TPLR.CXN */
 	movgs		gr31,tplr
