@@ -252,20 +252,20 @@ static int az_ioctl(struct inode *inode, struct file *file,
 static struct az_device aztech_unit;
 
 static struct file_operations aztech_fops = {
-	owner:		THIS_MODULE,
-	open:           video_exclusive_open,
-	release:        video_exclusive_release,
-	ioctl:		az_ioctl,
-	llseek:         no_llseek,
+	.owner		= THIS_MODULE,
+	.open           = video_exclusive_open,
+	.release        = video_exclusive_release,
+	.ioctl		= az_ioctl,
+	.llseek         = no_llseek,
 };
 
 static struct video_device aztech_radio=
 {
-	owner:		THIS_MODULE,
-	name:		"Aztech radio",
-	type:		VID_TYPE_TUNER,
-	hardware:	VID_HARDWARE_AZTECH,
-	fops:           &aztech_fops,
+	.owner		= THIS_MODULE,
+	.name		= "Aztech radio",
+	.type		= VID_TYPE_TUNER,
+	.hardware	= VID_HARDWARE_AZTECH,
+	.fops           = &aztech_fops,
 };
 
 static int __init aztech_init(void)

@@ -217,19 +217,19 @@ static int tvmixer_release(struct inode *inode, struct file *file)
 
 
 static struct i2c_driver driver = {
-	name:            "tv card mixer driver",
-        id:              I2C_DRIVERID_TVMIXER,
-	flags:           I2C_DF_DUMMY,
-        attach_adapter:  tvmixer_adapters,
-        detach_client:   tvmixer_clients,
+	.name		= "tv card mixer driver",
+	.id		= I2C_DRIVERID_TVMIXER,
+	.flags		= I2C_DF_DUMMY,
+	.attach_adapter	= tvmixer_adapters,
+	.detach_client	= tvmixer_clients,
 };
 
 static struct file_operations tvmixer_fops = {
-	owner:		THIS_MODULE,
-	llseek:         no_llseek,
-	ioctl:          tvmixer_ioctl,
-	open:           tvmixer_open,
-	release:        tvmixer_release,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.ioctl		= tvmixer_ioctl,
+	.open		= tvmixer_open,
+	.release	= tvmixer_release,
 };
 
 /* ----------------------------------------------------------------------- */

@@ -905,12 +905,12 @@ static struct pci_device_id saa7146_pci_tbl[] __devinitdata = {
 MODULE_DEVICE_TABLE(pci, saa7146_pci_tbl);
 	
 static struct pci_driver saa7146_driver = {
-	name:		"saa7146",
-	id_table:	saa7146_pci_tbl,
-	probe:		saa7146_init_one,
-	remove:		saa7146_remove_one,
-	suspend:	saa7146_suspend,
-	resume:		saa7146_resume,
+	.name		= "saa7146",
+	.id_table	= saa7146_pci_tbl,
+	.probe		= saa7146_init_one,
+	.remove		= saa7146_remove_one,
+	.suspend	= saa7146_suspend,
+	.resume		= saa7146_resume,
 };
 
 
