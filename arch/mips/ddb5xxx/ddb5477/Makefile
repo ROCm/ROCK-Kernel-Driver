@@ -6,10 +6,9 @@
 # unless it's something special (ie not a .c file).
 #
 
-.S.s:
-	$(CPP) $(CFLAGS) $< -o $*.s
-.S.o:
-	$(CC) $(CFLAGS) -c $< -o $*.o
+USE_STANDARD_AS_RULE := true
+
+EXTRA_AFLAGS := $(CFLAGS)
 
 O_TARGET:= ddb5477.o
 

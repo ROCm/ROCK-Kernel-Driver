@@ -6,11 +6,6 @@
 # Copyright (C) 1995, 1998, 1999 by Ralf Baechle
 #
 
-.S.s:
-	$(CPP) $(CFLAGS) $< -o $*.s
-.S.o:
-	$(CC) $(CFLAGS) -c $< -o $*.o
-
 #
 # Some DECstations need all possible sections of an ECOFF executable
 #
