@@ -17,6 +17,12 @@
 
 #include <linux/types.h>
 
+#define SYSFS_BRIDGE_ATTR	"bridge"
+#define SYSFS_BRIDGE_FDB	"brforward"
+#define SYSFS_BRIDGE_PORT_SUBDIR "brif"
+#define SYSFS_BRIDGE_PORT_ATTR	"brport"
+#define SYSFS_BRIDGE_PORT_LINK	"bridge"
+
 #define BRCTL_VERSION 1
 
 #define BRCTL_GET_VERSION 0

@@ -81,8 +81,11 @@ static void destroy_nbp(void *arg)
 	struct net_device *dev = p->dev;
 
 	dev->br_port = NULL;
+	p->br = NULL;
+	p->dev = NULL;
 	dev_put(dev);
-	kfree(p);
+
+	br_sysfs_freeif(p);
 }
 
 /* called with RTNL */
@@ -111,14 +114,16 @@ static void del_nbp(struct net_bridge_port *p)
 /* called with RTNL */
 static void del_br(struct net_bridge *br)
 {
-	struct list_head *p, *n;
+	struct net_bridge_port *p, *n;
 
-	list_for_each_safe(p, n, &br->port_list) {
-		del_nbp(list_entry(p, struct net_bridge_port, list));
+	list_for_each_entry_safe(p, n, &br->port_list, list) {
+		br_sysfs_removeif(p);
+		del_nbp(p);
 	}
 
 	del_timer_sync(&br->gc_timer);
 
+	br_sysfs_delbr(br->dev);
  	unregister_netdevice(br->dev);
 }
 
@@ -210,6 +215,7 @@ static struct net_bridge_port *new_nbp(struct net_bridge *br,
 	p->port_no = index;
 	br_init_port(p);
 	p->state = BR_STATE_DISABLED;
+	kobject_init(&p->kobj);
 
 	return p;
 }
@@ -223,10 +229,37 @@ int br_add_bridge(const char *name)
 	if (!dev) 
 		return -ENOMEM;
 
-	ret = register_netdev(dev);
+	rtnl_lock();
+	if (strchr(dev->name, '%')) {
+		ret = dev_alloc_name(dev, dev->name);
+		if (ret < 0)
+			goto err1;
+	}
+
+	ret = register_netdevice(dev);
 	if (ret)
-		free_netdev(dev);
+		goto err2;
+
+	/* network device kobject is not setup until
+	 * after rtnl_unlock does it's hotplug magic.
+	 * so hold reference to avoid race.
+	 */
+	dev_hold(dev);
+	rtnl_unlock();
+
+	ret = br_sysfs_addbr(dev);
+	dev_put(dev);
+
+	if (ret) 
+		unregister_netdev(dev);
+ out:
 	return ret;
+
+ err2:
+	free_netdev(dev);
+ err1:
+	rtnl_unlock();
+	goto out;
 }
 
 int br_del_bridge(const char *name)
@@ -277,6 +310,8 @@ int br_add_if(struct net_bridge *br, struct net_device *dev)
  	if ((err = br_fdb_insert(br, p, dev->dev_addr, 1)))
 		destroy_nbp(p);
  
+	else if ((err = br_sysfs_addif(p)))
+		del_nbp(p);
 	else {
 		dev_set_promiscuity(dev, 1);
 
@@ -300,6 +335,7 @@ int br_del_if(struct net_bridge *br, struct net_device *dev)
 	if (!p || p->br != br) 
 		return -EINVAL;
 
+	br_sysfs_removeif(p);
 	del_nbp(p);
 
 	spin_lock_bh(&br->lock);

@@ -76,6 +76,7 @@ struct net_bridge_port
 	struct timer_list		forward_delay_timer;
 	struct timer_list		hold_timer;
 	struct timer_list		message_age_timer;
+	struct kobject			kobj;
 	struct rcu_head			rcu;
 };
 
@@ -110,6 +111,7 @@ struct net_bridge
 	struct timer_list		tcn_timer;
 	struct timer_list		topology_change_timer;
 	struct timer_list		gc_timer;
+	struct kobject			ifobj;
 };
 
 extern struct notifier_block br_device_notifier;
@@ -198,6 +200,7 @@ extern void br_stp_set_port_priority(struct net_bridge_port *p,
 				     u8 newprio);
 extern void br_stp_set_path_cost(struct net_bridge_port *p,
 				 u32 path_cost);
+extern ssize_t br_show_bridge_id(char *buf, const struct bridge_id *id);
 
 /* br_stp_bpdu.c */
 extern int br_stp_handle_bpdu(struct sk_buff *skb);
@@ -206,5 +209,29 @@ extern int br_stp_handle_bpdu(struct sk_buff *skb);
 extern void br_stp_timer_init(struct net_bridge *br);
 extern void br_stp_port_timer_init(struct net_bridge_port *p);
 extern unsigned long br_timer_value(const struct timer_list *timer);
+
+#ifdef CONFIG_SYSFS
+/* br_sysfs_if.c */
+extern int br_sysfs_addif(struct net_bridge_port *p);
+extern void br_sysfs_removeif(struct net_bridge_port *p);
+extern void br_sysfs_freeif(struct net_bridge_port *p);
+
+/* br_sysfs_br.c */
+extern struct subsystem bridge_subsys;
+extern void br_sysfs_init(void);
+extern void br_sysfs_fini(void);
+extern int br_sysfs_addbr(struct net_device *dev);
+extern void br_sysfs_delbr(struct net_device *dev);
+
+#else
+
+#define br_sysfs_addif(p)	(0)
+#define br_sysfs_removeif(p)	do { } while(0)
+#define br_sysfs_freeif(p)	kfree(p)
+#define br_sysfs_init()		do { } while(0)
+#define br_sysfs_fini()		do { } while(0)
+#define br_sysfs_addbr(dev)	(0)
+#define br_sysfs_delbr(dev)	do { } while(0)
+#endif /* CONFIG_SYSFS */
 
 #endif
