@@ -262,7 +262,7 @@ sn_check_intr(int irq, pcibr_intr_t intr) {
 	unsigned long irr_reg;
 
 
-	regval = intr->bi_soft->bs_base->p_int_status_64;
+	regval = pcireg_intr_status_get(intr->bi_soft->bs_base);
 	irr_reg_num = irq_to_vector(irq) / 64;
 	irr_bit = irq_to_vector(irq) % 64;
 	switch (irr_reg_num) {

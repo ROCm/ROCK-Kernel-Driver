@@ -6,7 +6,6 @@
  * Copyright (C) 2003 Silicon Graphics, Inc. All rights reserved.
  */
 
-
 #include <linux/types.h>
 #include <asm/sn/sgi.h>
 #include <asm/sn/iograph.h>
@@ -24,51 +23,70 @@
 uint64_t
 pcireg_control_get(void *ptr)
 {
-	uint64_t    ret = 0;
-	pic_t       *bridge;
+	uint64_t ret = 0;
+	pic_t *bridge;
 
-	if ( IS_IOADDR(ptr) )
-		bridge = (pic_t *)ptr;
+	if (IS_IOADDR(ptr))
+		bridge = (pic_t *) ptr;
 	else
-		bridge = (pic_t *)((pcibr_soft_t)(ptr))->bs_base;
+		bridge = (pic_t *) ((pcibr_soft_t) (ptr))->bs_base;
 
-	ret = ((pic_t *)bridge)->p_wid_control;
+	ret = ((pic_t *) bridge)->p_wid_control;
+	return ret;
+}
+
+/*
+ * Interrupt Status Register Access -- Read Only                    0000_0100
+ */
+uint64_t
+pcireg_intr_status_get(void *ptr)
+{
+	short bridge_type;
+	pic_t *bridge;
+	uint64_t ret = 0;
+
+	if (IS_IOADDR(ptr))
+		bridge = (pic_t *) ptr;
+	else
+		bridge = (pic_t *) ((pcibr_soft_t) (ptr))->bs_base;
+
+	ret = ((pic_t *) bridge)->p_int_status;
 	return ret;
 }
 
 void
 pcireg_intr_enable_bit_clr(void *ptr, uint64_t bits)
 {
-	pic_t       *bridge;
+	pic_t *bridge;
 
-	if ( IS_IOADDR(ptr) )
-		bridge = (pic_t *)ptr;
+	if (IS_IOADDR(ptr))
+		bridge = (pic_t *) ptr;
 	else
-		bridge = (pic_t *)((pcibr_soft_t)(ptr))->bs_base;
+		bridge = (pic_t *) ((pcibr_soft_t) (ptr))->bs_base;
 	bridge->p_int_enable &= ~bits;
 }
 
 void
 pcireg_intr_enable_bit_set(void *ptr, uint64_t bits)
 {
-	pic_t       *bridge;
+	pic_t *bridge;
 
-	if ( IS_IOADDR(ptr) )
-		bridge = (pic_t *)ptr;
+	if (IS_IOADDR(ptr))
+		bridge = (pic_t *) ptr;
 	else
-		bridge = (pic_t *)((pcibr_soft_t)(ptr))->bs_base;
+		bridge = (pic_t *) ((pcibr_soft_t) (ptr))->bs_base;
 	bridge->p_int_enable |= bits;
 }
 
 void
 pcireg_intr_addr_addr_set(void *ptr, int int_n, uint64_t addr)
 {
-	pic_t       *bridge;
+	pic_t *bridge;
 
-	if ( IS_IOADDR(ptr) )
-		bridge = (pic_t *)ptr;
+	if (IS_IOADDR(ptr))
+		bridge = (pic_t *) ptr;
 	else
-		bridge = (pic_t *)((pcibr_soft_t)(ptr))->bs_base;
+		bridge = (pic_t *) ((pcibr_soft_t) (ptr))->bs_base;
 	bridge->p_int_addr[int_n] &= ~(0x0000FFFFFFFFFFFF);
 	bridge->p_int_addr[int_n] |= (addr & 0x0000FFFFFFFFFFFF);
 }
@@ -79,11 +97,11 @@ pcireg_intr_addr_addr_set(void *ptr, int int_n, uint64_t addr)
 void
 pcireg_force_intr_set(void *ptr, int int_n)
 {
-	pic_t       *bridge;
+	pic_t *bridge;
 
-	if ( IS_IOADDR(ptr) )
-		bridge = (pic_t *)ptr;
+	if (IS_IOADDR(ptr))
+		bridge = (pic_t *) ptr;
 	else
-		bridge = (pic_t *)((pcibr_soft_t)(ptr))->bs_base;
-        bridge->p_force_pin[int_n] = 1;
+		bridge = (pic_t *) ((pcibr_soft_t) (ptr))->bs_base;
+	bridge->p_force_pin[int_n] = 1;
 }
