@@ -509,6 +509,7 @@ void __init smp_check_cpus(unsigned int max_cpus)
  *      Activate a secondary processor.
  */
 extern void init_cpu_timer(void);
+extern void init_cpu_vtimer(void);
 extern int pfault_init(void);
 extern int pfault_token(void);
 
@@ -518,6 +519,9 @@ int __devinit start_secondary(void *cpuvoid)
         cpu_init();
         /* init per CPU timer */
         init_cpu_timer();
+#ifdef CONFIG_VIRT_TIMER
+        init_cpu_vtimer();
+#endif
 #ifdef CONFIG_PFAULT
 	/* Enable pfault pseudo page faults on this cpu. */
 	pfault_init();

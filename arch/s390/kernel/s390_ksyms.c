@@ -19,9 +19,6 @@
 #ifdef CONFIG_IP_MULTICAST
 #include <net/arp.h>
 #endif
-#ifdef CONFIG_VIRT_TIMER
-#include <asm/timer.h>
-#endif
 
 /*
  * memory management
