@@ -1,4 +1,4 @@
-/* $Id: su.c,v 1.50 2001/05/16 08:37:03 davem Exp $
+/* $Id: su.c,v 1.52 2001/06/29 21:54:32 davem Exp $
  * su.c: Small serial driver for keyboard/mouse interface on sparc32/PCI
  *
  * Copyright (C) 1997  Eddie C. Dost  (ecd@skynet.be)
@@ -228,9 +228,9 @@ static inline int serial_paranoia_check(struct su_struct *info,
 					kdev_t device, const char *routine)
 {
 #ifdef SERIAL_PARANOIA_CHECK
-	static const char *badmagic =
+	static const char *badmagic = KERN_WARNING
 		"Warning: bad magic number for serial struct (%s) in %s\n";
-	static const char *badinfo =
+	static const char *badinfo = KERN_WARNING
 		"Warning: null su_struct for (%s) in %s\n";
 
 	if (!info) {
@@ -1500,13 +1500,11 @@ get_modem_info(struct su_struct * info, unsigned int *value)
 static int
 set_modem_info(struct su_struct * info, unsigned int cmd, unsigned int *value)
 {
-	int error;
 	unsigned int arg;
 	unsigned long flags;
 
-	error = get_user(arg, value);
-	if (error)
-		return error;
+	if (get_user(arg, value))
+		return -EFAULT;
 	switch (cmd) {
 	case TIOCMBIS: 
 		if (arg & TIOCM_RTS)
@@ -1583,7 +1581,6 @@ static int
 su_ioctl(struct tty_struct *tty, struct file * file,
 		    unsigned int cmd, unsigned long arg)
 {
-	int error;
 	struct su_struct * info = (struct su_struct *)tty->driver_data;
 	struct async_icount cprev, cnow;	/* kernel counter temps */
 	struct serial_icounter_struct *p_cuser;	/* user space */
@@ -1663,14 +1660,11 @@ su_ioctl(struct tty_struct *tty, struct file * file,
 			cnow = info->icount;
 			sti();
 			p_cuser = (struct serial_icounter_struct *) arg;
-			error = put_user(cnow.cts, &p_cuser->cts);
-			if (error) return error;
-			error = put_user(cnow.dsr, &p_cuser->dsr);
-			if (error) return error;
-			error = put_user(cnow.rng, &p_cuser->rng);
-			if (error) return error;
-			error = put_user(cnow.dcd, &p_cuser->dcd);
-			if (error) return error;
+			if (put_user(cnow.cts, &p_cuser->cts) ||
+			    put_user(cnow.dsr, &p_cuser->dsr) ||
+			    put_user(cnow.rng, &p_cuser->rng) ||
+			    put_user(cnow.dcd, &p_cuser->dcd))
+				return -EFAULT;
 			return 0;
 
 		default:
@@ -2261,7 +2255,7 @@ done:
  */
 static __inline__ void __init show_su_version(void)
 {
-	char *revision = "$Revision: 1.50 $";
+	char *revision = "$Revision: 1.52 $";
 	char *version, *p;
 
 	version = strchr(revision, ' ');

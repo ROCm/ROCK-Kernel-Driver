@@ -1,4 +1,4 @@
-/* $Id: zs.c,v 1.65 2001/05/09 07:00:10 davem Exp $
+/* $Id: zs.c,v 1.66 2001/06/29 21:33:22 davem Exp $
  * zs.c: Zilog serial port driver for the Sparc.
  *
  * Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
@@ -177,7 +177,7 @@ struct zs_logent {
 #define REGCTRL	0xfd
 };
 struct zs_logent zslog[32];
-int zs_curlog = 0;
+int zs_curlog;
 #define ZSLOG(__reg, __val, __write) \
 do{	int index = zs_curlog; \
 	zslog[index].reg = (__reg); \
@@ -1945,7 +1945,7 @@ int zs_open(struct tty_struct *tty, struct file * filp)
 
 static void show_serial_version(void)
 {
-	char *revision = "$Revision: 1.65 $";
+	char *revision = "$Revision: 1.66 $";
 	char *version, *p;
 
 	version = strchr(revision, ' ');

@@ -533,18 +533,19 @@ extern struct page *filemap_nopage(struct vm_area_struct *, unsigned long, int);
 #define __GFP_HIGHMEM	0x02
 
 /* Action modifiers - doesn't change the zoning */
-#define __GFP_WAIT	0x10
-#define __GFP_HIGH	0x20
-#define __GFP_IO	0x40
-#define __GFP_BUFFER	0x80
+#define __GFP_WAIT	0x10	/* Can wait and reschedule? */
+#define __GFP_HIGH	0x20	/* Should access emergency pools? */
+#define __GFP_IO	0x40	/* Can start physical IO? */
+#define __GFP_FS	0x80	/* Can call down to low-level FS? */
 
-#define GFP_BUFFER	(__GFP_HIGH | __GFP_WAIT | __GFP_BUFFER)
+#define GFP_NOIO	(__GFP_HIGH | __GFP_WAIT)
+#define GFP_NOFS	(__GFP_HIGH | __GFP_WAIT | __GFP_IO)
 #define GFP_ATOMIC	(__GFP_HIGH)
-#define GFP_USER	(             __GFP_WAIT | __GFP_IO)
-#define GFP_HIGHUSER	(             __GFP_WAIT | __GFP_IO | __GFP_HIGHMEM)
-#define GFP_KERNEL	(__GFP_HIGH | __GFP_WAIT | __GFP_IO)
-#define GFP_NFS		(__GFP_HIGH | __GFP_WAIT | __GFP_IO)
-#define GFP_KSWAPD	(                          __GFP_IO)
+#define GFP_USER	(             __GFP_WAIT | __GFP_IO | __GFP_FS)
+#define GFP_HIGHUSER	(             __GFP_WAIT | __GFP_IO | __GFP_FS | __GFP_HIGHMEM)
+#define GFP_KERNEL	(__GFP_HIGH | __GFP_WAIT | __GFP_IO | __GFP_FS)
+#define GFP_NFS		(__GFP_HIGH | __GFP_WAIT | __GFP_IO | __GFP_FS)
+#define GFP_KSWAPD	(                          __GFP_IO | __GFP_FS)
 
 /* Flag - indicates that the buffer will be suitable for DMA.  Ignored on some
    platforms, used as appropriate on others */

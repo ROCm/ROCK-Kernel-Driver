@@ -97,11 +97,7 @@ static struct timer_list aarp_timer;
  */
 static void __aarp_expire(struct aarp_entry *a)
 {
-	struct sk_buff *skb;
-	
-	while ((skb = skb_dequeue(&a->packet_queue)) != NULL)
-		kfree_skb(skb);
-
+	skb_queue_purge(&a->packet_queue);
 	kfree(a);
 }
 
@@ -844,9 +840,7 @@ out0:	kfree_skb(skb);
 }
 
 static struct notifier_block aarp_notifier = {
-	aarp_device_event,
-	NULL,
-	0
+	notifier_call:	aarp_device_event,
 };
 
 static char aarp_snap_id[] = { 0x00, 0x00, 0x00, 0x80, 0xF3 };
@@ -888,8 +882,8 @@ static int aarp_get_info(char *buffer, char **start, off_t offset, int length)
 	int len, ct;
 
 	len = sprintf(buffer,
-		"%-10.10s  ""%-10.10s""%-18.18s""%12.12s""%12.12s"" xmit_count  status\n",
-		"address","device","hw addr","last_sent", "expires");
+		"%-10.10s  %-10.10s%-18.18s%12.12s%12.12s xmit_count  status\n",
+		"address", "device", "hw addr", "last_sent", "expires");
 
 	spin_lock_bh(&aarp_lock);
 

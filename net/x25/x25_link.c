@@ -309,10 +309,8 @@ static void x25_remove_neigh(struct x25_neigh *x25_neigh)
 {
 	struct x25_neigh *s;
 	unsigned long flags;
-	struct sk_buff *skb;
 
-	while ((skb = skb_dequeue(&x25_neigh->queue)) != NULL)
-		kfree_skb(skb);
+	skb_queue_purge(&x25_neigh->queue);
 
 	x25_stop_t20timer(x25_neigh);
 

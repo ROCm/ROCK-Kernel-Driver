@@ -59,19 +59,10 @@
  */
 void ax25_clear_queues(ax25_cb *ax25)
 {
-	struct sk_buff *skb;
-
-	while ((skb = skb_dequeue(&ax25->write_queue)) != NULL)
-		kfree_skb(skb);
-
-	while ((skb = skb_dequeue(&ax25->ack_queue)) != NULL)
-		kfree_skb(skb);
-
-	while ((skb = skb_dequeue(&ax25->reseq_queue)) != NULL)
-		kfree_skb(skb);
-
-	while ((skb = skb_dequeue(&ax25->frag_queue)) != NULL)
-		kfree_skb(skb);
+	skb_queue_purge(&ax25->write_queue);
+	skb_queue_purge(&ax25->ack_queue);
+	skb_queue_purge(&ax25->reseq_queue);
+	skb_queue_purge(&ax25->frag_queue);
 }
 
 /*

@@ -3,7 +3,7 @@
  *
  *  This source is covered by the GNU GPL, the same as all kernel sources.
  *
- *  Version:	$Id: inetpeer.c,v 1.3 2000/10/03 07:29:00 anton Exp $
+ *  Version:	$Id: inetpeer.c,v 1.6 2001/06/21 20:30:14 davem Exp $
  *
  *  Authors:	Andrey V. Savochkin <saw@msu.ru>
  */
@@ -109,11 +109,11 @@ void __init inet_initpeers(void)
 	 * <kuznet@ms2.inr.ac.ru>.  I don't have any opinion about the values
 	 * myself.  --SAW
 	 */
-	if (si.totalram <= 32768*1024)
+	if (si.totalram <= (32768*1024)/PAGE_SIZE)
 		inet_peer_threshold >>= 1; /* max pool size about 1MB on IA32 */
-	if (si.totalram <= 16384*1024)
+	if (si.totalram <= (16384*1024)/PAGE_SIZE)
 		inet_peer_threshold >>= 1; /* about 512KB */
-	if (si.totalram <= 8192*1024)
+	if (si.totalram <= (8192*1024)/PAGE_SIZE)
 		inet_peer_threshold >>= 2; /* about 128KB */
 
 	peer_cachep = kmem_cache_create("inet_peer_cache",

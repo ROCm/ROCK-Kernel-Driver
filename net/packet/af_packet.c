@@ -5,7 +5,7 @@
  *
  *		PACKET - implements raw packet sockets.
  *
- * Version:	$Id: af_packet.c,v 1.54 2001/03/03 01:20:11 davem Exp $
+ * Version:	$Id: af_packet.c,v 1.55 2001/06/28 01:34:29 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -1407,11 +1407,10 @@ static int packet_notifier(struct notifier_block *this, unsigned long msg, void 
 }
 
 
-static int packet_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
+static int packet_ioctl(struct socket *sock, unsigned int cmd,
+			unsigned long arg)
 {
 	struct sock *sk = sock->sk;
-	int err;
-	int pid;
 
 	switch(cmd) 
 	{
@@ -1433,25 +1432,26 @@ static int packet_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg
 			return put_user(amount, (int *)arg);
 		}
 		case FIOSETOWN:
-		case SIOCSPGRP:
-			err = get_user(pid, (int *) arg);
-			if (err)
-				return err; 
+		case SIOCSPGRP: {
+			int pid;
+			if (get_user(pid, (int *) arg))
+				return -EFAULT; 
 			if (current->pid != pid && current->pgrp != -pid && 
 			    !capable(CAP_NET_ADMIN))
 				return -EPERM;
 			sk->proc = pid;
-			return(0);
+			break;
+		}
 		case FIOGETOWN:
 		case SIOCGPGRP:
 			return put_user(sk->proc, (int *)arg);
 		case SIOCGSTAMP:
 			if(sk->stamp.tv_sec==0)
 				return -ENOENT;
-			err = -EFAULT;
-			if (!copy_to_user((void *)arg, &sk->stamp, sizeof(struct timeval)))
-				err = 0;
-			return err;
+			if (copy_to_user((void *)arg, &sk->stamp,
+					 sizeof(struct timeval)))
+				return -EFAULT;
+			break;
 		case SIOCGIFFLAGS:
 #ifndef CONFIG_INET
 		case SIOCSIFFLAGS:
@@ -1493,8 +1493,6 @@ static int packet_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg
 		case SIOCSIFDIVERT:
 #ifdef CONFIG_NET_DIVERT
 			return(divert_ioctl(cmd, (struct divert_cf *) arg));
-#else
-			return -ENOPKG;
 #endif /* CONFIG_NET_DIVERT */
 
 			return -ENOPKG;
@@ -1530,8 +1528,7 @@ static int packet_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg
 #endif
 			return -EOPNOTSUPP;
 	}
-	/*NOTREACHED*/
-	return(0);
+	return 0;
 }
 
 #ifndef CONFIG_PACKET_MMAP

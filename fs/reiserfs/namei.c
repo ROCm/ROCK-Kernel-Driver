@@ -437,7 +437,7 @@ static int reiserfs_add_entry (struct reiserfs_transaction_handle *th, struct in
     /* get memory for composing the entry */
     buflen = DEH_SIZE + ROUND_UP (namelen);
     if (buflen > sizeof (small_buf)) {
-	buffer = reiserfs_kmalloc (buflen, GFP_BUFFER, dir->i_sb);
+	buffer = reiserfs_kmalloc (buflen, GFP_NOFS, dir->i_sb);
 	if (buffer == 0)
 	    return -ENOMEM;
     } else
@@ -878,7 +878,7 @@ int reiserfs_symlink (struct inode * dir, struct dentry * dentry, const char * s
 	return -ENAMETOOLONG;
     }
   
-    name = kmalloc (item_len, GFP_BUFFER);
+    name = kmalloc (item_len, GFP_NOFS);
     if (!name) {
 	iput(inode) ;
 	return -ENOMEM;

@@ -990,8 +990,8 @@ static int __init netlink_proto_init(void)
 
 static void __exit netlink_proto_exit(void)
 {
-	sock_unregister(PF_NETLINK);
-	remove_proc_entry("net/netlink", NULL);
+       sock_unregister(PF_NETLINK);
+       remove_proc_entry("net/netlink", NULL);
 }
 
 module_init(netlink_proto_init);

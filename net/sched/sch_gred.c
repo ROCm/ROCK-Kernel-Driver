@@ -298,14 +298,11 @@ gred_drop(struct Qdisc* sch)
 
 static void gred_reset(struct Qdisc* sch)
 {
-	struct sk_buff *skb;
 	int i;
-
 	struct gred_sched_data *q;
 	struct gred_sched *t= (struct gred_sched *)sch->data;
 
-	while((skb=__skb_dequeue(&sch->q))!=NULL)
-		kfree_skb(skb);
+	__skb_queue_purge(&sch->q);
 
 	sch->stats.backlog = 0;
 

@@ -2250,7 +2250,7 @@ static int get_mem_for_virtual_node (struct tree_balance * tb)
                dcache shrinking). So, release path and collected
                resourses here */
 	    free_buffers_in_tb (tb);
-	    buf = reiserfs_kmalloc(size, GFP_BUFFER, tb->tb_sb);
+	    buf = reiserfs_kmalloc(size, GFP_NOFS, tb->tb_sb);
 	    if ( !buf ) {
 #ifdef CONFIG_REISERFS_CHECK
 		reiserfs_warning ("vs-8345: get_mem_for_virtual_node: "

@@ -9,7 +9,7 @@
  *	as published by the Free Software Foundation; either version
  *	2 of the License, or (at your option) any later version.
  *
- *	Version: $Id: ipmr.c,v 1.59 2001/02/23 06:32:11 davem Exp $
+ *	Version: $Id: ipmr.c,v 1.60 2001/06/29 21:33:22 davem Exp $
  *
  *	Fixes:
  *	Michael Chastain	:	Incorrect size of copying.
@@ -83,8 +83,8 @@ static int maxvif;
 
 #define VIF_EXISTS(idx) (vif_table[idx].dev != NULL)
 
-int mroute_do_assert = 0;				/* Set in PIM assert	*/
-int mroute_do_pim = 0;
+int mroute_do_assert;					/* Set in PIM assert	*/
+int mroute_do_pim;
 
 static struct mfc_cache *mfc_cache_array[MFC_LINES];	/* Forwarding cache	*/
 

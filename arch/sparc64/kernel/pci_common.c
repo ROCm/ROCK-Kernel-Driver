@@ -1,4 +1,4 @@
-/* $Id: pci_common.c,v 1.25 2001/06/14 16:57:41 davem Exp $
+/* $Id: pci_common.c,v 1.26 2001/06/28 01:32:18 davem Exp $
  * pci_common.c: PCI controller common support.
  *
  * Copyright (C) 1999 David S. Miller (davem@redhat.com)
@@ -713,17 +713,22 @@ static void __init pdev_fixup_irq(struct pci_dev *pdev)
 			line = ((pci_irq_line - 1) & 3);
 		}
 
-		/* Now figure out the slot. */
+		/* Now figure out the slot.
+		 *
+		 * Basically, device number zero on the top-level bus is
+		 * always the PCI host controller.  Slot 0 is then device 1.
+		 * PBM A supports two external slots (0 and 1), and PBM B
+		 * supports 4 external slots (0, 1, 2, and 3).  On-board PCI
+		 * devices are wired to device numbers outside of these
+		 * ranges. -DaveM
+ 		 */
 		if (pdev->bus->number == pbm->pci_first_busno) {
-			if (pbm == &pbm->parent->pbm_A)
-				slot = (pdev->devfn >> 3) - 1;
-			else
-				slot = (pdev->devfn >> 3) - 2;
+			slot = (pdev->devfn >> 3) - 1;
 		} else {
-			if (pbm == &pbm->parent->pbm_A)
-				slot = (pdev->bus->self->devfn >> 3) - 1;
-			else
-				slot = (pdev->bus->self->devfn >> 3) - 2;
+			/* Underneath a bridge, use slot number of parent
+			 * bridge.
+			 */
+			slot = (pdev->bus->self->devfn >> 3) - 1;
 		}
 		slot = slot << 2;
 

@@ -221,13 +221,11 @@ static void rose_remove_neigh(struct rose_neigh *rose_neigh)
 {
 	struct rose_neigh *s;
 	unsigned long flags;
-	struct sk_buff *skb;
 
 	rose_stop_ftimer(rose_neigh);
 	rose_stop_t0timer(rose_neigh);
 
-	while ((skb = skb_dequeue(&rose_neigh->queue)) != NULL)
-		kfree_skb(skb);
+	skb_queue_purge(&rose_neigh->queue);
 
 	save_flags(flags); cli();
 
@@ -684,15 +682,13 @@ int rose_rt_ioctl(unsigned int cmd, void *arg)
 static void rose_del_route_by_neigh(struct rose_neigh *rose_neigh)
 {
 	struct rose_route *rose_route, *s;
-	struct sk_buff    *skb;
 
 	rose_neigh->restarted = 0;
 
 	rose_stop_t0timer(rose_neigh);
 	rose_start_ftimer(rose_neigh);
 
-	while ((skb = skb_dequeue(&rose_neigh->queue)) != NULL)
-		kfree_skb(skb);
+	skb_queue_purge(&rose_neigh->queue);
 
 	rose_route = rose_route_list;
 

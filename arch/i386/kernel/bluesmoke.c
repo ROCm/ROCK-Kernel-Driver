@@ -236,5 +236,6 @@ void __init mcheck_init(struct cpuinfo_x86 *c)
 static void __init mcheck_disable(char *str, int *unused)
 {
 	mce_disabled = 1;
+	return 1;
 }
 __setup("nomce", mcheck_disable);

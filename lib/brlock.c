@@ -48,11 +48,14 @@ void __br_write_lock (enum brlock_indices idx)
 {
 	int i;
 
-	spin_lock(&__br_write_locks[idx].lock);
 again:
+	spin_lock(&__br_write_locks[idx].lock);
 	for (i = 0; i < smp_num_cpus; i++)
-		if (__brlock_array[cpu_logical_map(i)][idx] != 0)
+		if (__brlock_array[cpu_logical_map(i)][idx] != 0) {
+			spin_unlock(&__br_write_locks[idx].lock);
+			barrier();
 			goto again;
+		}
 }
 
 void __br_write_unlock (enum brlock_indices idx)

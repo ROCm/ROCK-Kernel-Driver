@@ -398,7 +398,7 @@ static int spx_route_skb(struct spx_opt *pdata, struct sk_buff *skb, int type)
 			pdata->retransmit.expires = jiffies + spx_calc_rtt(0);
 			add_timer(&pdata->retransmit);
 
-			skb2 = skb_clone(skb, GFP_BUFFER);
+			skb2 = skb_clone(skb, GFP_NOFS);	/* Why? Why not GFP_KERNEL? */
 	                if(skb2 == NULL)
         	                return -ENOBUFS;
         	        skb_queue_tail(&pdata->retransmit_queue, skb2);

@@ -296,9 +296,6 @@ void unix_gc(void)
 	 *	Here we are. Hitlist is filled. Die.
 	 */
 
-	while ((skb=__skb_dequeue(&hitlist))!=NULL) {
-		kfree_skb(skb);
-	}
-
+	__skb_queue_purge(&hitlist);
 	up(&unix_gc_sem);
 }

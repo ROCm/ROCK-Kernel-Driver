@@ -7,7 +7,7 @@
  *		handler for protocols to use and generic option handler.
  *
  *
- * Version:	$Id: sock.c,v 1.110 2001/04/20 20:46:19 davem Exp $
+ * Version:	$Id: sock.c,v 1.111 2001/06/26 23:29:17 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -80,6 +80,7 @@
  *		Andi Kleen	:	Add sock_kmalloc()/sock_kfree_s()
  *		Andi Kleen	:	Fix write_space callback
  *		Chris Evans	:	Security fixes - signedness again
+ *		Arnaldo C. Melo :       cleanups, use skb_queue_purge
  *
  * To Fix:
  *
@@ -172,7 +173,6 @@ int sock_setsockopt(struct socket *sock, int level, int optname,
 #endif
 	int val;
 	int valbool;
-	int err;
 	struct linger ling;
 	int ret = 0;
 	
@@ -192,9 +192,8 @@ int sock_setsockopt(struct socket *sock, int level, int optname,
   	if(optlen<sizeof(int))
   		return(-EINVAL);
   	
-	err = get_user(val, (int *)optval);
-	if (err)
-		return err;
+	if (get_user(val, (int *)optval))
+		return -EFAULT;
 	
   	valbool = val?1:0;
 
@@ -918,14 +917,10 @@ static void sklist_destroy_timer(unsigned long data)
  
 void sklist_destroy_socket(struct sock **list,struct sock *sk)
 {
-	struct sk_buff *skb;
 	if(list)
 		sklist_remove_socket(list, sk);
 
-	while((skb=skb_dequeue(&sk->receive_queue))!=NULL)
-	{
-		kfree_skb(skb);
-	}
+	skb_queue_purge(&sk->receive_queue);
 
 	if(atomic_read(&sk->wmem_alloc) == 0 &&
 	   atomic_read(&sk->rmem_alloc) == 0 &&

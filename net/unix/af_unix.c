@@ -1332,7 +1332,7 @@ static int unix_stream_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 
 		/*
 		 *	If you pass two values to the sock_alloc_send_skb
-		 *	it tries to grab the large buffer with GFP_BUFFER
+		 *	it tries to grab the large buffer with GFP_NOFS
 		 *	(which can fail easily), and if it fails grab the
 		 *	fallback size buffer which is under a page and will
 		 *	succeed. [Alan]

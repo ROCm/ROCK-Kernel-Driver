@@ -315,7 +315,7 @@ static struct file_operations proc_info_file_operations = {
 
 static int mem_open(struct inode* inode, struct file* file)
 {
-	file->private_data = (void*)(current->self_exec_id);
+	file->private_data = (void*)((long)current->self_exec_id);
 	return 0;
 }
 
@@ -342,7 +342,7 @@ static ssize_t mem_read(struct file * file, char * buf,
 		atomic_inc(&mm->mm_users);
 	task_unlock(task);
 
-	if (file->private_data != (void*)(current->self_exec_id) ) {
+	if (file->private_data != (void*)((long)current->self_exec_id) ) {
 		mmput(mm);
 		return -EIO;
 	}

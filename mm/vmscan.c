@@ -424,8 +424,8 @@ out:
  * go out to Matthew Dillon.
  */
 #define MAX_LAUNDER 		(4 * (1 << page_cluster))
+#define CAN_DO_FS		(gfp_mask & __GFP_FS)
 #define CAN_DO_IO		(gfp_mask & __GFP_IO)
-#define CAN_DO_BUFFERS		(gfp_mask & __GFP_BUFFER)
 int page_launder(int gfp_mask, int sync)
 {
 	int launder_loop, maxscan, cleaned_pages, maxlaunder;
@@ -482,7 +482,7 @@ dirty_page_rescan:
 				goto page_active;
 
 			/* First time through? Move it to the back of the list */
-			if (!launder_loop || !CAN_DO_IO) {
+			if (!launder_loop || !CAN_DO_FS) {
 				list_del(page_lru);
 				list_add(page_lru, &inactive_dirty_list);
 				UnlockPage(page);
@@ -512,7 +512,8 @@ dirty_page_rescan:
 		 * buffer pages
 		 */
 		if (page->buffers) {
-			int wait, clearedbuf;
+			unsigned int buffer_mask;
+			int clearedbuf;
 			int freed_page = 0;
 			/*
 			 * Since we might be doing disk IO, we have to
@@ -524,16 +525,15 @@ dirty_page_rescan:
 			spin_unlock(&pagemap_lru_lock);
 
 			/* Will we do (asynchronous) IO? */
-			wait = 0;		/* No IO */
-			if (launder_loop) {
-				if (maxlaunder == 0 && sync)
-					wait = 2;	/* Synchrounous IO */
-				else if (maxlaunder-- > 0)
-					wait = 1;	/* Async IO */
-			}
+			if (launder_loop && maxlaunder == 0 && sync)
+				buffer_mask = gfp_mask;				/* Do as much as we can */
+			else if (launder_loop && maxlaunder-- > 0)
+				buffer_mask = gfp_mask & ~__GFP_WAIT;			/* Don't wait, async write-out */
+			else
+				buffer_mask = gfp_mask & ~(__GFP_WAIT | __GFP_IO);	/* Don't even start IO */
 
 			/* Try to free the page buffers. */
-			clearedbuf = try_to_free_buffers(page, wait);
+			clearedbuf = try_to_free_buffers(page, buffer_mask);
 
 			/*
 			 * Re-take the spinlock. Note that we cannot
@@ -613,7 +613,7 @@ page_active:
 	 * loads, flush out the dirty pages before we have to wait on
 	 * IO.
 	 */
-	if ((CAN_DO_IO || CAN_DO_BUFFERS) && !launder_loop && free_shortage()) {
+	if ((CAN_DO_IO || CAN_DO_FS) && !launder_loop && free_shortage()) {
 		launder_loop = 1;
 		/* If we cleaned pages, never do synchronous IO. */
 		if (cleaned_pages)

@@ -1,4 +1,4 @@
-/* $Id: sab82532.c,v 1.62 2001/06/10 06:48:47 davem Exp $
+/* $Id: sab82532.c,v 1.63 2001/06/29 21:23:44 davem Exp $
  * sab82532.c: ASYNC Driver for the SIEMENS SAB82532 DUSCC.
  *
  * Copyright (C) 1997  Eddie C. Dost  (ecd@skynet.be)
@@ -1368,12 +1368,10 @@ static int get_modem_info(struct sab82532 * info, unsigned int *value)
 static int set_modem_info(struct sab82532 * info, unsigned int cmd,
 			  unsigned int *value)
 {
-	int error;
 	unsigned int arg;
 
-	error = get_user(arg, value);
-	if (error)
-		return error;
+	if (get_user(arg, value))
+		return -EFAULT;
 	switch (cmd) {
 	case TIOCMBIS: 
 		if (arg & TIOCM_RTS) {
@@ -1442,7 +1440,6 @@ static void sab82532_break(struct tty_struct *tty, int break_state)
 static int sab82532_ioctl(struct tty_struct *tty, struct file * file,
 		    unsigned int cmd, unsigned long arg)
 {
-	int error;
 	struct sab82532 * info = (struct sab82532 *)tty->driver_data;
 	struct async_icount cprev, cnow;	/* kernel counter temps */
 	struct serial_icounter_struct *p_cuser;	/* user space */
@@ -1462,9 +1459,8 @@ static int sab82532_ioctl(struct tty_struct *tty, struct file * file,
 		case TIOCGSOFTCAR:
 			return put_user(C_CLOCAL(tty) ? 1 : 0, (int *) arg);
 		case TIOCSSOFTCAR:
-			error = get_user(arg, (unsigned int *) arg);
-			if (error)
-				return error;
+			if (get_user(arg, (unsigned int *) arg))
+				return -EFAULT;
 			tty->termios->c_cflag =
 				((tty->termios->c_cflag & ~CLOCAL) |
 				 (arg ? CLOCAL : 0));
@@ -1534,14 +1530,11 @@ static int sab82532_ioctl(struct tty_struct *tty, struct file * file,
 			cnow = info->icount;
 			sti();
 			p_cuser = (struct serial_icounter_struct *) arg;
-			error = put_user(cnow.cts, &p_cuser->cts);
-			if (error) return error;
-			error = put_user(cnow.dsr, &p_cuser->dsr);
-			if (error) return error;
-			error = put_user(cnow.rng, &p_cuser->rng);
-			if (error) return error;
-			error = put_user(cnow.dcd, &p_cuser->dcd);
-			if (error) return error;
+			if (put_user(cnow.cts, &p_cuser->cts) ||
+			    put_user(cnow.dsr, &p_cuser->dsr) ||
+			    put_user(cnow.rng, &p_cuser->rng) ||
+			    put_user(cnow.dcd, &p_cuser->dcd))
+				return -EFAULT;
 			return 0;
 
 		default:
@@ -2212,7 +2205,7 @@ static void __init sab82532_kgdb_hook(int line)
 
 static inline void __init show_serial_version(void)
 {
-	char *revision = "$Revision: 1.62 $";
+	char *revision = "$Revision: 1.63 $";
 	char *version, *p;
 
 	version = strchr(revision, ' ');

@@ -17,6 +17,7 @@
  *	X.25 002	Jonathan Naylor	  Centralised disconnection processing.
  *	mar/20/00	Daniela Squassoni Disabling/enabling of facilities 
  *					  negotiation.
+ *	jun/24/01	Arnaldo C. Melo	  use skb_queue_purge, cleanups
  */
 
 #include <linux/errno.h>
@@ -45,22 +46,11 @@
  */
 void x25_clear_queues(struct sock *sk)
 {
-	struct sk_buff *skb;
-
-	while ((skb = skb_dequeue(&sk->write_queue)) != NULL)
-		kfree_skb(skb);
-
-	while ((skb = skb_dequeue(&sk->protinfo.x25->ack_queue)) != NULL)
-		kfree_skb(skb);
-
-	while ((skb = skb_dequeue(&sk->protinfo.x25->interrupt_in_queue)) != NULL)
-		kfree_skb(skb);
-
-	while ((skb = skb_dequeue(&sk->protinfo.x25->interrupt_out_queue)) != NULL)
-		kfree_skb(skb);
-
-	while ((skb = skb_dequeue(&sk->protinfo.x25->fragment_queue)) != NULL)
-		kfree_skb(skb);
+	skb_queue_purge(&sk->write_queue);
+	skb_queue_purge(&sk->protinfo.x25->ack_queue);
+	skb_queue_purge(&sk->protinfo.x25->interrupt_in_queue);
+	skb_queue_purge(&sk->protinfo.x25->interrupt_out_queue);
+	skb_queue_purge(&sk->protinfo.x25->fragment_queue);
 }
 
 
@@ -72,20 +62,20 @@ void x25_clear_queues(struct sock *sk)
 void x25_frames_acked(struct sock *sk, unsigned short nr)
 {
 	struct sk_buff *skb;
-	int modulus;
-
-	modulus = (sk->protinfo.x25->neighbour->extended) ? X25_EMODULUS : X25_SMODULUS;
+	int modulus = sk->protinfo.x25->neighbour->extended ? X25_EMODULUS :
+							      X25_SMODULUS;
 
 	/*
 	 * Remove all the ack-ed frames from the ack queue.
 	 */
-	if (sk->protinfo.x25->va != nr) {
-		while (skb_peek(&sk->protinfo.x25->ack_queue) != NULL && sk->protinfo.x25->va != nr) {
+	if (sk->protinfo.x25->va != nr)
+		while (skb_peek(&sk->protinfo.x25->ack_queue) != NULL &&
+		       sk->protinfo.x25->va != nr) {
 			skb = skb_dequeue(&sk->protinfo.x25->ack_queue);
 			kfree_skb(skb);
-			sk->protinfo.x25->va = (sk->protinfo.x25->va + 1) % modulus;
+			sk->protinfo.x25->va = (sk->protinfo.x25->va + 1) %
+						modulus;
 		}
-	}
 }
 
 void x25_requeue_frames(struct sock *sk)
@@ -113,18 +103,15 @@ void x25_requeue_frames(struct sock *sk)
 int x25_validate_nr(struct sock *sk, unsigned short nr)
 {
 	unsigned short vc = sk->protinfo.x25->va;
-	int modulus;
-
-	modulus = (sk->protinfo.x25->neighbour->extended) ? X25_EMODULUS : X25_SMODULUS;
+	int modulus = sk->protinfo.x25->neighbour->extended ? X25_EMODULUS :
+							      X25_SMODULUS;
 
 	while (vc != sk->protinfo.x25->vs) {
 		if (nr == vc) return 1;
 		vc = (vc + 1) % modulus;
 	}
 
-	if (nr == sk->protinfo.x25->vs) return 1;
-
-	return 0;
+	return nr == sk->protinfo.x25->vs ? 1 : 0;
 }
 
 /* 
@@ -150,7 +137,8 @@ void x25_write_internal(struct sock *sk, int frametype)
 	 */
 	switch (frametype) {
 		case X25_CALL_REQUEST:
-			len += 1 + X25_ADDR_LEN + X25_MAX_FAC_LEN + X25_MAX_CUD_LEN;
+			len += 1 + X25_ADDR_LEN + X25_MAX_FAC_LEN +
+			       X25_MAX_CUD_LEN;
 			break;
 		case X25_CALL_ACCEPTED:
 			len += 1 + X25_MAX_FAC_LEN + X25_MAX_CUD_LEN;
@@ -167,7 +155,8 @@ void x25_write_internal(struct sock *sk, int frametype)
 		case X25_RESET_CONFIRMATION:
 			break;
 		default:
-			printk(KERN_ERR "X.25: invalid frame type %02X\n", frametype);
+			printk(KERN_ERR "X.25: invalid frame type %02X\n",
+			       frametype);
 			return;
 	}
 
@@ -262,11 +251,10 @@ void x25_write_internal(struct sock *sk, int frametype)
 /*
  *	Unpick the contents of the passed X.25 Packet Layer frame.
  */
-int x25_decode(struct sock *sk, struct sk_buff *skb, int *ns, int *nr, int *q, int *d, int *m)
+int x25_decode(struct sock *sk, struct sk_buff *skb, int *ns, int *nr, int *q,
+	       int *d, int *m)
 {
-	unsigned char *frame;
-
-	frame = skb->data;
+	unsigned char *frame = skb->data;
 
 	*ns = *nr = *q = *d = *m = 0;
 
@@ -323,12 +311,14 @@ int x25_decode(struct sock *sk, struct sk_buff *skb, int *ns, int *nr, int *q, i
 		}
 	}
 
-	printk(KERN_DEBUG "X.25: invalid PLP frame %02X %02X %02X\n", frame[0], frame[1], frame[2]);
+	printk(KERN_DEBUG "X.25: invalid PLP frame %02X %02X %02X\n",
+	       frame[0], frame[1], frame[2]);
 
 	return X25_ILLEGAL;
 }
 
-void x25_disconnect(struct sock *sk, int reason, unsigned char cause, unsigned char diagnostic)
+void x25_disconnect(struct sock *sk, int reason, unsigned char cause,
+		    unsigned char diagnostic)
 {
 	x25_clear_queues(sk);
 	x25_stop_timer(sk);

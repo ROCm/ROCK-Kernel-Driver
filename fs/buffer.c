@@ -161,6 +161,93 @@ void __wait_on_buffer(struct buffer_head * bh)
 	atomic_dec(&bh->b_count);
 }
 
+/* End-of-write handler.. Just mark it up-to-date and unlock the buffer. */
+static void end_buffer_write(struct buffer_head *bh, int uptodate)
+{
+	mark_buffer_uptodate(bh, uptodate);
+	unlock_buffer(bh);
+}
+
+/* The buffers have been marked clean and locked. Just submit the dang things.. */
+static void write_locked_buffers(struct buffer_head **array, unsigned int count)
+{
+	do {
+		struct buffer_head * bh = *array++;
+		bh->b_end_io = end_buffer_write;
+		submit_bh(WRITE, bh);
+	} while (--count);
+}
+
+#define NRSYNC (32)
+static void write_unlocked_buffers(kdev_t dev)
+{
+	struct buffer_head *next;
+	struct buffer_head *array[NRSYNC];
+	unsigned int count;
+	int nr;
+
+repeat:
+	spin_lock(&lru_list_lock);
+	next = lru_list[BUF_DIRTY];
+	nr = nr_buffers_type[BUF_DIRTY] * 2;
+	count = 0;
+	while (next && --nr >= 0) {
+		struct buffer_head * bh = next;
+		next = bh->b_next_free;
+
+		if (dev && bh->b_dev != dev)
+			continue;
+		if (test_and_set_bit(BH_Lock, &bh->b_state))
+			continue;
+		if (atomic_set_buffer_clean(bh)) {
+			__refile_buffer(bh);
+			array[count++] = bh;
+			if (count < NRSYNC)
+				continue;
+
+			spin_unlock(&lru_list_lock);
+			write_locked_buffers(array, count);
+			goto repeat;
+		}
+		unlock_buffer(bh);
+	}
+	spin_unlock(&lru_list_lock);
+
+	if (count)
+		write_locked_buffers(array, count);
+}
+
+static int wait_for_locked_buffers(kdev_t dev, int index, int refile)
+{
+	struct buffer_head * next;
+	int nr;
+
+repeat:
+	spin_lock(&lru_list_lock);
+	next = lru_list[index];
+	nr = nr_buffers_type[index] * 2;
+	while (next && --nr >= 0) {
+		struct buffer_head *bh = next;
+		next = bh->b_next_free;
+
+		if (!buffer_locked(bh)) {
+			if (refile)
+				__refile_buffer(bh);
+			continue;
+		}
+		if (dev && bh->b_dev != dev)
+			continue;
+
+		atomic_inc(&bh->b_count);
+		spin_unlock(&lru_list_lock);
+		wait_on_buffer (bh);
+		atomic_dec(&bh->b_count);
+		goto repeat;
+	}
+	spin_unlock(&lru_list_lock);
+	return 0;
+}
+
 /* Call sync_buffers with wait!=0 to ensure that the call does not
  * return until all buffer writes have completed.  Sync() may return
  * before the writes have finished; fsync() may not.
@@ -173,132 +260,21 @@ void __wait_on_buffer(struct buffer_head * bh)
  */
 static int sync_buffers(kdev_t dev, int wait)
 {
-	int i, retry, pass = 0, err = 0;
-	struct buffer_head * bh, *next;
+	int err = 0;
 
 	/* One pass for no-wait, three for wait:
 	 * 0) write out all dirty, unlocked buffers;
-	 * 1) write out all dirty buffers, waiting if locked;
+	 * 1) wait for all dirty locked buffers;
+	 * 2) write out all dirty, unlocked buffers;
 	 * 2) wait for completion by waiting for all buffers to unlock.
 	 */
-	do {
-		retry = 0;
-
-		/* We search all lists as a failsafe mechanism, not because we expect
-		 * there to be dirty buffers on any of the other lists.
-		 */
-repeat:
-		spin_lock(&lru_list_lock);
-		bh = lru_list[BUF_DIRTY];
-		if (!bh)
-			goto repeat2;
-
-		for (i = nr_buffers_type[BUF_DIRTY]*2 ; i-- > 0 ; bh = next) {
-			next = bh->b_next_free;
-
-			if (!lru_list[BUF_DIRTY])
-				break;
-			if (dev && bh->b_dev != dev)
-				continue;
-			if (buffer_locked(bh)) {
-				/* Buffer is locked; skip it unless wait is
-				 * requested AND pass > 0.
-				 */
-				if (!wait || !pass) {
-					retry = 1;
-					continue;
-				}
-				atomic_inc(&bh->b_count);
-				spin_unlock(&lru_list_lock);
-				wait_on_buffer (bh);
-				atomic_dec(&bh->b_count);
-				goto repeat;
-			}
-
-			/* If an unlocked buffer is not uptodate, there has
-			 * been an IO error. Skip it.
-			 */
-			if (wait && buffer_req(bh) && !buffer_locked(bh) &&
-			    !buffer_dirty(bh) && !buffer_uptodate(bh)) {
-				err = -EIO;
-				continue;
-			}
-
-			/* Don't write clean buffers.  Don't write ANY buffers
-			 * on the third pass.
-			 */
-			if (!buffer_dirty(bh) || pass >= 2)
-				continue;
-
-			atomic_inc(&bh->b_count);
-			spin_unlock(&lru_list_lock);
-			ll_rw_block(WRITE, 1, &bh);
-			atomic_dec(&bh->b_count);
-			retry = 1;
-			goto repeat;
-		}
-
-    repeat2:
-		bh = lru_list[BUF_LOCKED];
-		if (!bh) {
-			spin_unlock(&lru_list_lock);
-			break;
-		}
-		for (i = nr_buffers_type[BUF_LOCKED]*2 ; i-- > 0 ; bh = next) {
-			next = bh->b_next_free;
-
-			if (!lru_list[BUF_LOCKED])
-				break;
-			if (dev && bh->b_dev != dev)
-				continue;
-			if (buffer_locked(bh)) {
-				/* Buffer is locked; skip it unless wait is
-				 * requested AND pass > 0.
-				 */
-				if (!wait || !pass) {
-					retry = 1;
-					continue;
-				}
-				atomic_inc(&bh->b_count);
-				spin_unlock(&lru_list_lock);
-				wait_on_buffer (bh);
-				spin_lock(&lru_list_lock);
-				atomic_dec(&bh->b_count);
-				goto repeat2;
-			}
-		}
-		spin_unlock(&lru_list_lock);
-
-		/* If we are waiting for the sync to succeed, and if any dirty
-		 * blocks were written, then repeat; on the second pass, only
-		 * wait for buffers being written (do not pass to write any
-		 * more buffers on the second pass).
-		 */
-	} while (wait && retry && ++pass<=2);
+	write_unlocked_buffers(dev);
+	if (wait) {
+		err = wait_for_locked_buffers(dev, BUF_DIRTY, 0);
+		write_unlocked_buffers(dev);
+		err |= wait_for_locked_buffers(dev, BUF_LOCKED, 1);
+	}
 	return err;
-}
-
-void sync_dev(kdev_t dev)
-{
-	sync_supers(dev);
-	sync_inodes(dev);
-	DQUOT_SYNC(dev);
-	/* sync all the dirty buffers out to disk only _after_ all the
-	   high level layers finished generated buffer dirty data
-	   (or we'll return with some buffer still dirty on the blockdevice
-	   so breaking the semantics of this call) */
-	sync_buffers(dev, 0);
-	/*
-	 * FIXME(eric) we need to sync the physical devices here.
-	 * This is because some (scsi) controllers have huge amounts of
-	 * cache onboard (hundreds of Mb), and we need to instruct
-	 * them to commit all of the dirty memory to disk, and we should
-	 * not return until this has happened.
-	 *
-	 * This would need to get implemented by going through the assorted
-	 * layers so that each block major number can be synced, and this
-	 * would call down into the upper and mid-layer scsi.
-	 */
 }
 
 int fsync_super(struct super_block *sb)
@@ -329,6 +305,15 @@ int fsync_dev(kdev_t dev)
 	unlock_kernel();
 
 	return sync_buffers(dev, 1);
+}
+
+/*
+ * There's no real reason to pretend we should
+ * ever do anything differently
+ */
+void sync_dev(kdev_t dev)
+{
+	fsync_dev(dev);
 }
 
 asmlinkage long sys_sync(void)
@@ -762,7 +747,7 @@ static void refill_freelist(int size)
 {
 	balance_dirty(NODEV);
 	if (free_shortage())
-		page_launder(GFP_BUFFER, 0);
+		page_launder(GFP_NOFS, 0);
 	if (!grow_buffers(size)) {
 		wakeup_bdflush(1);
 		current->policy |= SCHED_YIELD;
@@ -1223,11 +1208,11 @@ static struct buffer_head * get_unused_buffer_head(int async)
 	}
 	spin_unlock(&unused_list_lock);
 
-	/* This is critical.  We can't swap out pages to get
-	 * more buffer heads, because the swap-out may need
-	 * more buffer-heads itself.  Thus SLAB_BUFFER.
+	/* This is critical.  We can't call out to the FS
+	 * to get more buffer heads, because the FS may need
+	 * more buffer-heads itself.  Thus SLAB_NOFS.
 	 */
-	if((bh = kmem_cache_alloc(bh_cachep, SLAB_BUFFER)) != NULL) {
+	if((bh = kmem_cache_alloc(bh_cachep, SLAB_NOFS)) != NULL) {
 		bh->b_blocknr = -1;
 		bh->b_this_page = NULL;
 		return bh;
@@ -2243,7 +2228,7 @@ static int grow_buffers(int size)
 		return 0;
 	}
 
-	page = alloc_page(GFP_BUFFER);
+	page = alloc_page(GFP_NOFS);
 	if (!page)
 		goto out;
 	LockPage(page);
@@ -2305,7 +2290,7 @@ out:
  *	1 - start IO for dirty buffers
  *	2 - wait for completion of locked buffers
  */
-static void sync_page_buffers(struct buffer_head *bh, int wait)
+static void sync_page_buffers(struct buffer_head *bh, unsigned int gfp_mask)
 {
 	struct buffer_head * tmp = bh;
 
@@ -2313,7 +2298,7 @@ static void sync_page_buffers(struct buffer_head *bh, int wait)
 		struct buffer_head *p = tmp;
 		tmp = tmp->b_this_page;
 		if (buffer_locked(p)) {
-			if (wait > 1)
+			if (gfp_mask & __GFP_WAIT)
 				__wait_on_buffer(p);
 		} else if (buffer_dirty(p))
 			ll_rw_block(WRITE, 1, &p);
@@ -2337,7 +2322,7 @@ static void sync_page_buffers(struct buffer_head *bh, int wait)
  *       obtain a reference to a buffer head within a page.  So we must
  *	 lock out all of these paths to cleanly toss the page.
  */
-int try_to_free_buffers(struct page * page, int wait)
+int try_to_free_buffers(struct page * page, unsigned int gfp_mask)
 {
 	struct buffer_head * tmp, * bh = page->buffers;
 	int index = BUFSIZE_INDEX(bh->b_size);
@@ -2388,10 +2373,10 @@ busy_buffer_page:
 	spin_unlock(&free_list[index].lock);
 	write_unlock(&hash_table_lock);
 	spin_unlock(&lru_list_lock);
-	if (wait) {
-		sync_page_buffers(bh, wait);
+	if (gfp_mask & __GFP_IO) {
+		sync_page_buffers(bh, gfp_mask);
 		/* We waited synchronously, so we can free the buffers. */
-		if (wait > 1 && !loop) {
+		if ((gfp_mask & __GFP_WAIT) && !loop) {
 			loop = 1;
 			goto cleaned_buffers_try_again;
 		}

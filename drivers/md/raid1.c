@@ -75,7 +75,7 @@ static struct buffer_head *raid1_alloc_bh(raid1_conf_t *conf, int cnt)
 		md_spin_unlock_irq(&conf->device_lock);
 		if (cnt == 0)
 			break;
-		t = (struct buffer_head *)kmalloc(sizeof(struct buffer_head), GFP_BUFFER);
+		t = (struct buffer_head *)kmalloc(sizeof(struct buffer_head), GFP_NOIO);
 		if (t) {
 			memset(t, 0, sizeof(*t));
 			t->b_next = bh;
@@ -165,8 +165,7 @@ static struct raid1_bh *raid1_alloc_r1bh(raid1_conf_t *conf)
 		md_spin_unlock_irq(&conf->device_lock);
 		if (r1_bh)
 			return r1_bh;
-		r1_bh = (struct raid1_bh *) kmalloc(sizeof(struct raid1_bh),
-					GFP_BUFFER);
+		r1_bh = (struct raid1_bh *) kmalloc(sizeof(struct raid1_bh), GFP_NOIO);
 		if (r1_bh) {
 			memset(r1_bh, 0, sizeof(*r1_bh));
 			return r1_bh;

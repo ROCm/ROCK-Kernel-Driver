@@ -68,7 +68,7 @@ struct aunhdr
 	unsigned long handle;
 };
 
-static unsigned long aun_seq = 0;
+static unsigned long aun_seq;
 
 /* Queue of packets waiting to be transmitted. */
 static struct sk_buff_head aun_queue;
@@ -172,9 +172,8 @@ static int econet_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len
 	 *	Check legality
 	 */
 	 
-	if (addr_len < sizeof(struct sockaddr_ec))
-		return -EINVAL;
-	if (sec->sec_family != AF_ECONET)
+	if (addr_len < sizeof(struct sockaddr_ec) ||
+	    sec->sec_family != AF_ECONET)
 		return -EINVAL;
 	
 	sk->protinfo.af_econet->cb = sec->cb;
@@ -485,7 +484,6 @@ static void econet_destroy_timer(unsigned long data)
 
 static int econet_release(struct socket *sock)
 {
-	struct sk_buff	*skb;
 	struct sock *sk = sock->sk;
 
 	if (!sk)
@@ -505,8 +503,7 @@ static int econet_release(struct socket *sock)
 
 	/* Purge queues */
 
-	while ((skb=skb_dequeue(&sk->receive_queue))!=NULL)
-		kfree_skb(skb);
+	skb_queue_purge(&sk->receive_queue);
 
 	if (atomic_read(&sk->rmem_alloc) || atomic_read(&sk->wmem_alloc)) {
 		sk->timer.data=(unsigned long)sk;

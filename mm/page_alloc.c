@@ -442,15 +442,15 @@ try_again:
 		 * in that case we bail out to prevent infinite loops and
 		 * hanging device drivers ...
 		 *
-		 * Another issue are GFP_BUFFER allocations; because they
-		 * do not have __GFP_IO set it's possible we cannot make
+		 * Another issue are GFP_NOFS allocations; because they
+		 * do not have __GFP_FS set it's possible we cannot make
 		 * any progress freeing pages, in that case it's better
 		 * to give up than to deadlock the kernel looping here.
 		 */
 		if (gfp_mask & __GFP_WAIT) {
 			if (!order || free_shortage()) {
 				int progress = try_to_free_pages(gfp_mask);
-				if (progress || (gfp_mask & __GFP_IO))
+				if (progress || (gfp_mask & __GFP_FS))
 					goto try_again;
 				/*
 				 * Fail in case no progress was made and the

@@ -128,11 +128,11 @@ allocate_bitmap_node(struct super_block *p_s_sb) {
   struct reiserfs_bitmap_node *bn ;
   static int id = 0 ;
 
-  bn = kmalloc(sizeof(struct reiserfs_bitmap_node), GFP_BUFFER) ;
+  bn = kmalloc(sizeof(struct reiserfs_bitmap_node), GFP_NOFS) ;
   if (!bn) {
     return NULL ;
   }
-  bn->data = kmalloc(p_s_sb->s_blocksize, GFP_BUFFER) ;
+  bn->data = kmalloc(p_s_sb->s_blocksize, GFP_NOFS) ;
   if (!bn->data) {
     kfree(bn) ;
     return NULL ;
@@ -1492,8 +1492,8 @@ static int journal_read_transaction(struct super_block *p_s_sb, unsigned long cu
   }
   trans_id = le32_to_cpu(desc->j_trans_id) ;
   /* now we know we've got a good transaction, and it was inside the valid time ranges */
-  log_blocks = kmalloc(le32_to_cpu(desc->j_len) * sizeof(struct buffer_head *), GFP_BUFFER) ;
-  real_blocks = kmalloc(le32_to_cpu(desc->j_len) * sizeof(struct buffer_head *), GFP_BUFFER) ;
+  log_blocks = kmalloc(le32_to_cpu(desc->j_len) * sizeof(struct buffer_head *), GFP_NOFS) ;
+  real_blocks = kmalloc(le32_to_cpu(desc->j_len) * sizeof(struct buffer_head *), GFP_NOFS) ;
   if (!log_blocks  || !real_blocks) {
     brelse(c_bh) ;
     brelse(d_bh) ;
@@ -1786,10 +1786,10 @@ static void setup_commit_task_arg(struct reiserfs_journal_commit_task *ct,
 
 static void commit_flush_async(struct super_block *p_s_sb, int jindex) {
   struct reiserfs_journal_commit_task *ct ;
-  /* using GFP_BUFFER, GFP_KERNEL could try to flush inodes, which will try
+  /* using GFP_NOFS, GFP_KERNEL could try to flush inodes, which will try
   ** to start/join a transaction, which will deadlock
   */
-  ct = kmalloc(sizeof(struct reiserfs_journal_commit_task), GFP_BUFFER) ;
+  ct = kmalloc(sizeof(struct reiserfs_journal_commit_task), GFP_NOFS) ;
   if (ct) {
     setup_commit_task_arg(ct, p_s_sb, jindex) ;
     queue_task(&(ct->task), &reiserfs_commit_thread_tq);
@@ -2886,7 +2886,7 @@ int reiserfs_add_page_to_flush_list(struct reiserfs_transaction_handle *th,
 #endif
 
   get_page(bh->b_page) ;
-  new_pl = reiserfs_kmalloc(sizeof(struct reiserfs_page_list), GFP_BUFFER,
+  new_pl = reiserfs_kmalloc(sizeof(struct reiserfs_page_list), GFP_NOFS,
                             inode->i_sb) ;
   if (!new_pl) {
     put_page(bh->b_page) ;

@@ -386,7 +386,7 @@ static struct buffer_head *loop_get_buffer(struct loop_device *lo,
 	struct buffer_head *bh;
 
 	do {
-		bh = kmem_cache_alloc(bh_cachep, SLAB_BUFFER);
+		bh = kmem_cache_alloc(bh_cachep, SLAB_NOIO);
 		if (bh)
 			break;
 
@@ -408,7 +408,7 @@ static struct buffer_head *loop_get_buffer(struct loop_device *lo,
 	 * so can we :-)
 	 */
 	do {
-		bh->b_page = alloc_page(GFP_BUFFER);
+		bh->b_page = alloc_page(GFP_NOIO);
 		if (bh->b_page)
 			break;
 
@@ -648,7 +648,7 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file, kdev_t dev,
 	lo->ioctl = NULL;
 	figure_loop_size(lo);
 	lo->old_gfp_mask = inode->i_mapping->gfp_mask;
-	inode->i_mapping->gfp_mask = GFP_BUFFER;
+	inode->i_mapping->gfp_mask = GFP_NOIO;
 
 	bs = 0;
 	if (blksize_size[MAJOR(lo_device)])

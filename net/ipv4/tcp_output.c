@@ -722,7 +722,7 @@ static void tcp_retrans_try_collapse(struct sock *sk, struct sk_buff *skb, int m
 
 		if (skb->ip_summed != CHECKSUM_HW) {
 			memcpy(skb_put(skb, next_skb_size), next_skb->data, next_skb_size);
-			skb->csum = csum_block_add(skb->csum, next_skb->csum, skb->len);
+			skb->csum = csum_block_add(skb->csum, next_skb->csum, skb_size);
 		}
 
 		/* Update sequence range on original skb. */

@@ -157,7 +157,7 @@ static int reiserfs_readdir (struct file * filp, void * dirent, filldir_t filldi
 		if (d_reclen <= 32) {
 		  local_buf = small_buf ;
 		} else {
-		    local_buf = kmalloc(d_reclen, GFP_BUFFER) ;
+		    local_buf = kmalloc(d_reclen, GFP_NOFS) ;
 		    if (!local_buf) {
 			pathrelse (&path_to_entry);
 			return -ENOMEM ;
