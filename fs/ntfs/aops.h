@@ -24,9 +24,76 @@
 #ifndef _LINUX_NTFS_AOPS_H
 #define _LINUX_NTFS_AOPS_H
 
-#ifdef NTFS_RW
+#include <linux/mm.h>
+#include <linux/highmem.h>
+#include <linux/pagemap.h>
+#include <linux/fs.h>
 
 #include "inode.h"
+
+/**
+ * ntfs_unmap_page - release a page that was mapped using ntfs_map_page()
+ * @page:	the page to release
+ *
+ * Unpin, unmap and release a page that was obtained from ntfs_map_page().
+ */
+static inline void ntfs_unmap_page(struct page *page)
+{
+	kunmap(page);
+	page_cache_release(page);
+}
+
+/**
+ * ntfs_map_page - map a page into accessible memory, reading it if necessary
+ * @mapping:	address space for which to obtain the page
+ * @index:	index into the page cache for @mapping of the page to map
+ *
+ * Read a page from the page cache of the address space @mapping at position
+ * @index, where @index is in units of PAGE_CACHE_SIZE, and not in bytes.
+ *
+ * If the page is not in memory it is loaded from disk first using the readpage
+ * method defined in the address space operations of @mapping and the page is
+ * added to the page cache of @mapping in the process.
+ *
+ * If the page is in high memory it is mapped into memory directly addressible
+ * by the kernel.
+ *
+ * Finally the page count is incremented, thus pinning the page into place.
+ *
+ * The above means that page_address(page) can be used on all pages obtained
+ * with ntfs_map_page() to get the kernel virtual address of the page.
+ *
+ * When finished with the page, the caller has to call ntfs_unmap_page() to
+ * unpin, unmap and release the page.
+ *
+ * Note this does not grant exclusive access. If such is desired, the caller
+ * must provide it independently of the ntfs_{un}map_page() calls by using
+ * a {rw_}semaphore or other means of serialization. A spin lock cannot be
+ * used as ntfs_map_page() can block.
+ *
+ * The unlocked and uptodate page is returned on success or an encoded error
+ * on failure. Caller has to test for error using the IS_ERR() macro on the
+ * return value. If that evaluates to TRUE, the negative error code can be
+ * obtained using PTR_ERR() on the return value of ntfs_map_page().
+ */
+static inline struct page *ntfs_map_page(struct address_space *mapping,
+		unsigned long index)
+{
+	struct page *page = read_cache_page(mapping, index,
+			(filler_t*)mapping->a_ops->readpage, NULL);
+
+	if (!IS_ERR(page)) {
+		wait_on_page_locked(page);
+		kmap(page);
+		if (PageUptodate(page) && !PageError(page))
+			return page;
+		ntfs_unmap_page(page);
+		return ERR_PTR(-EIO);
+	}
+	return page;
+}
+
+#ifdef NTFS_RW
 
 extern void mark_ntfs_record_dirty(ntfs_inode *ni, struct page *page,
 		unsigned int rec_start);

@@ -29,8 +29,10 @@
 
 #include "logfile.h"
 #include "volume.h"
-#include "ntfs.h"
+#include "aops.h"
 #include "debug.h"
+#include "malloc.h"
+#include "ntfs.h"
 
 /**
  * ntfs_check_restart_page_header - check the page header for consistency

@@ -19,6 +19,10 @@
  * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <linux/pagemap.h>
+#include <linux/buffer_head.h>
+
+#include "debug.h"
 #include "ntfs.h"
 
 /**

@@ -19,8 +19,9 @@
  * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include "ntfs.h"
 #include "collate.h"
+#include "debug.h"
+#include "ntfs.h"
 
 static int ntfs_collate_binary(ntfs_volume *vol,
 		const void *data1, const int data1_len,

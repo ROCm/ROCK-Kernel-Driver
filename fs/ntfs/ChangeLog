@@ -54,6 +54,10 @@ ToDo/Notes:
 	- Switch fs/ntfs/index.h::ntfs_index_entry_mark_dirty() to using the
 	  new helper fs/ntfs/aops.c::mark_ntfs_record_dirty() and remove the no
 	  longer needed fs/ntfs/index.[hc]::__ntfs_index_entry_mark_dirty().
+	- Move ntfs_{un,}map_page() from ntfs.h to aops.h and fix resulting
+	  include errors.
+	- Move the typedefs for runlist_element and runlist from types.h to
+	  runlist.h and fix resulting include errors.
 
 2.1.20 - Fix two stupid bugs introduced in 2.1.18 release.
 

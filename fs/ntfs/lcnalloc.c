@@ -30,6 +30,7 @@
 #include "volume.h"
 #include "attrib.h"
 #include "malloc.h"
+#include "aops.h"
 #include "ntfs.h"
 
 /**

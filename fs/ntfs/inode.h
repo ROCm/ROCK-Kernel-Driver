@@ -24,10 +24,17 @@
 #ifndef _LINUX_NTFS_INODE_H
 #define _LINUX_NTFS_INODE_H
 
+#include <linux/mm.h>
+#include <linux/fs.h>
 #include <linux/seq_file.h>
+#include <linux/list.h>
+#include <asm/atomic.h>
+#include <asm/semaphore.h>
 
 #include "layout.h"
 #include "volume.h"
+#include "types.h"
+#include "runlist.h"
 
 typedef struct _ntfs_inode ntfs_inode;
 

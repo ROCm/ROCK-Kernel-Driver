@@ -24,6 +24,8 @@
 #define _LINUX_NTFS_MFT_H
 
 #include <linux/fs.h>
+#include <linux/highmem.h>
+#include <linux/pagemap.h>
 
 #include "inode.h"
 

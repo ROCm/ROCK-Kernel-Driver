@@ -27,8 +27,11 @@
 
 #include "ntfs.h"
 #include "dir.h"
+#include "debug.h"
 #include "inode.h"
 #include "attrib.h"
+#include "malloc.h"
+#include "mft.h"
 #include "time.h"
 
 /**

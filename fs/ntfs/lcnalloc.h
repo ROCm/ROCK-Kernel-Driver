@@ -28,6 +28,7 @@
 #include <linux/fs.h>
 
 #include "types.h"
+#include "runlist.h"
 #include "volume.h"
 
 typedef enum {

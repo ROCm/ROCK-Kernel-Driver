@@ -20,8 +20,10 @@
  * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include "ntfs.h"
 #include "dir.h"
+#include "debug.h"
+#include "malloc.h"
+#include "ntfs.h"
 
 /**
  * ntfs_rl_mm - runlist memmove

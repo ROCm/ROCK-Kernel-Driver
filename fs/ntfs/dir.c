@@ -21,8 +21,14 @@
  */
 
 #include <linux/smp_lock.h>
-#include "ntfs.h"
+#include <linux/buffer_head.h>
+
 #include "dir.h"
+#include "aops.h"
+#include "attrib.h"
+#include "mft.h"
+#include "debug.h"
+#include "ntfs.h"
 
 /**
  * The little endian Unicode string $I30 as a global constant.

@@ -24,6 +24,8 @@
 #ifndef _LINUX_NTFS_VOLUME_H
 #define _LINUX_NTFS_VOLUME_H
 
+#include <linux/rwsem.h>
+
 #include "types.h"
 #include "layout.h"
 

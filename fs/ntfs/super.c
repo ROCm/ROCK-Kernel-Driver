@@ -31,12 +31,15 @@
 #include <linux/moduleparam.h>
 #include <linux/smp_lock.h>
 
-#include "ntfs.h"
 #include "sysctl.h"
 #include "logfile.h"
 #include "quota.h"
 #include "dir.h"
+#include "debug.h"
 #include "index.h"
+#include "aops.h"
+#include "malloc.h"
+#include "ntfs.h"
 
 /* Number of mounted file systems which have compression enabled. */
 static unsigned long ntfs_nr_compression_users;

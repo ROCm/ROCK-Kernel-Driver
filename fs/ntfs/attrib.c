@@ -21,6 +21,10 @@
  */
 
 #include <linux/buffer_head.h>
+
+#include "attrib.h"
+#include "debug.h"
+#include "mft.h"
 #include "ntfs.h"
 
 /**

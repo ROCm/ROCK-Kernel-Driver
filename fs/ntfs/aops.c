@@ -28,6 +28,10 @@
 #include <linux/buffer_head.h>
 
 #include "aops.h"
+#include "debug.h"
+#include "inode.h"
+#include "mft.h"
+#include "types.h"
 #include "ntfs.h"
 
 /**

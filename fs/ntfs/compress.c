@@ -25,6 +25,8 @@
 #include <linux/buffer_head.h>
 #include <linux/blkdev.h>
 
+#include "inode.h"
+#include "debug.h"
 #include "ntfs.h"
 
 /**

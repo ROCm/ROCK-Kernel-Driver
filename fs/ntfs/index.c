@@ -19,9 +19,11 @@
  * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include "ntfs.h"
+#include "aops.h"
 #include "collate.h"
+#include "debug.h"
 #include "index.h"
+#include "ntfs.h"
 
 /**
  * ntfs_index_ctx_get - allocate and initialize a new index context

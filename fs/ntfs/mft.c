@@ -20,10 +20,16 @@
  * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <linux/buffer_head.h>
 #include <linux/swap.h>
 
-#include "ntfs.h"
 #include "bitmap.h"
+#include "lcnalloc.h"
+#include "aops.h"
+#include "debug.h"
+#include "mft.h"
+#include "malloc.h"
+#include "ntfs.h"
 
 /**
  * __format_mft_record - initialize an empty mft record
