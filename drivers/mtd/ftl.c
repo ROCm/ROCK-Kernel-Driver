@@ -1223,18 +1223,17 @@ static void ftl_notify_add(struct mtd_info *mtd)
 	}
 
 	partition = kmalloc(sizeof(partition_t), GFP_KERNEL);
-	disk = kmalloc(sizeof(struct gendisk), GFP_KERNEL);
+	disk = alloc_disk();
 		
 	if (!partition||!disk) {
 		printk(KERN_WARNING "No memory to scan for FTL on %s\n",
 			mtd->name);
 		kfree(partition);
-		kfree(disk);
+		put_disk(disk);
 		return;
 	}    
 
 	memset(partition, 0, sizeof(partition_t));
-	memset(disk, 0, sizeof(struct gendisk));
 	sprintf(disk->disk_name, "ftl%c", 'a' + device);
 	disk->major = FTL_MAJOR;
 	disk->first_minor = device << 4;
@@ -1255,7 +1254,7 @@ static void ftl_notify_add(struct mtd_info *mtd)
 #endif
 	} else {
 		kfree(partition);
-		kfree(disk);
+		put_disk(disk);
 	}
 }
 
@@ -1281,7 +1280,7 @@ static void ftl_notify_remove(struct mtd_info *mtd)
 			
 			myparts[i]->state = 0;
 			del_gendisk(myparts[i]->disk);
-			kfree(myparts[i]->disk);
+			put_disk(myparts[i]->disk);
 			kfree(myparts[i]);
 			myparts[i] = NULL;
 		}
