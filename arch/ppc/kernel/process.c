@@ -445,33 +445,26 @@ int sys_clone(unsigned long clone_flags, unsigned long usp, int *parent_tidp,
 	      void *child_threadptr, int *child_tidp, int p6,
 	      struct pt_regs *regs)
 {
- 	struct task_struct *p;
-
 	CHECK_FULL_REGS(regs);
 	if (usp == 0)
 		usp = regs->gpr[1];	/* stack pointer for child */
- 	p = do_fork(clone_flags & ~CLONE_IDLETASK, usp, regs, 0,
-		    parent_tidp, child_tidp);
- 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
+ 	return do_fork(clone_flags & ~CLONE_IDLETASK, usp, regs, 0,
+			parent_tidp, child_tidp);
 }
 
 int sys_fork(int p1, int p2, int p3, int p4, int p5, int p6,
 	     struct pt_regs *regs)
 {
-	struct task_struct *p;
 	CHECK_FULL_REGS(regs);
-	p = do_fork(SIGCHLD, regs->gpr[1], regs, 0, NULL, NULL);
-	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
+	return do_fork(SIGCHLD, regs->gpr[1], regs, 0, NULL, NULL);
 }
 
 int sys_vfork(int p1, int p2, int p3, int p4, int p5, int p6,
 	      struct pt_regs *regs)
 {
-	struct task_struct *p;
 	CHECK_FULL_REGS(regs);
-	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs->gpr[1], regs,
-		    0, NULL, NULL);
-	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
+	return do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs->gpr[1],
+			regs, 0, NULL, NULL);
 }
 
 int sys_execve(unsigned long a0, unsigned long a1, unsigned long a2,
