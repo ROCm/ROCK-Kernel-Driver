@@ -205,15 +205,12 @@ void handle_scancode(unsigned char scancode, int down)
 	char raw_mode;
 
 	pm_access(pm_kbd);
-
-	do_poke_blanked_console = 1;
-	tasklet_schedule(&console_tasklet);
 	add_keyboard_randomness(scancode | up_flag);
 
 	tty = ttytab? ttytab[fg_console]: NULL;
 	if (tty && (!tty->driver_data)) {
 		/*
-		 * We touch the tty structure via the the ttytab array
+		 * We touch the tty structure via the ttytab array
 		 * without knowing whether or not tty is open, which
 		 * is inherently dangerous.  We currently rely on that
 		 * fact that console_open sets tty->driver_data when
@@ -233,7 +230,7 @@ void handle_scancode(unsigned char scancode, int down)
 	 *  Convert scancode to keycode
 	 */
 	if (!kbd_translate(scancode, &keycode, raw_mode))
-	    return;
+		goto out;
 
 	/*
 	 * At this point the variable `keycode' contains the keycode.
@@ -252,11 +249,11 @@ void handle_scancode(unsigned char scancode, int down)
 #ifdef CONFIG_MAGIC_SYSRQ		/* Handle the SysRq Hack */
 	if (keycode == SYSRQ_KEY) {
 		sysrq_pressed = !up_flag;
-		return;
+		goto out;
 	} else if (sysrq_pressed) {
 		if (!up_flag) {
 			handle_sysrq(kbd_sysrq_xlate[keycode], kbd_pt_regs, kbd, tty);
-			return;
+			goto out;
 		}
 	}
 #endif
@@ -298,7 +295,7 @@ void handle_scancode(unsigned char scancode, int down)
 			if (type >= 0xf0) {
 			    type -= 0xf0;
 			    if (raw_mode && ! (TYPES_ALLOWED_IN_RAW_MODE & (1 << type)))
-				return;
+				goto out;
 			    if (type == KT_LETTER) {
 				type = KT_LATIN;
 				if (vc_kbd_led(kbd, VC_CAPSLOCK)) {
@@ -322,13 +319,16 @@ void handle_scancode(unsigned char scancode, int down)
 			compute_shiftstate();
 			kbd->slockstate = 0; /* play it safe */
 #else
-			keysym = U(plain_map[keycode]);
+			keysym =  U(plain_map[keycode]);
 			type = KTYP(keysym);
 			if (type == KT_SHIFT)
 			  (*key_handler[type])(keysym & 0xff, up_flag);
 #endif
 		}
 	}
+out:
+	do_poke_blanked_console = 1;
+	schedule_console_callback();
 }
 
 

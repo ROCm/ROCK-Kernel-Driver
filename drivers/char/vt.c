@@ -835,9 +835,9 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 				 * make sure we are atomic with respect to
 				 * other console switches..
 				 */
-				spin_lock_irq(&console_lock);
+				acquire_console_sem();
 				complete_change_console(newvt);
-				spin_unlock_irq(&console_lock);
+				release_console_sem();
 			}
 		}
 
@@ -1161,7 +1161,8 @@ void reset_vc(unsigned int new_console)
 	vt_cons[new_console]->vt_mode.frsig = 0;
 	vt_cons[new_console]->vt_pid = -1;
 	vt_cons[new_console]->vt_newvt = -1;
-	reset_palette (new_console) ;
+	if (!in_interrupt())    /* Via keyboard.c:SAK() - akpm */
+		reset_palette(new_console) ;
 }
 
 /*

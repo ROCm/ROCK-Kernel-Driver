@@ -586,13 +586,18 @@ static int ext2_bmap(struct address_space *mapping, long block)
 {
 	return generic_block_bmap(mapping,block,ext2_get_block);
 }
+static int ext2_direct_IO(int rw, struct inode * inode, struct kiobuf * iobuf, unsigned long blocknr, int blocksize)
+{
+	return generic_direct_IO(rw, inode, iobuf, blocknr, blocksize, ext2_get_block);
+}
 struct address_space_operations ext2_aops = {
 	readpage: ext2_readpage,
 	writepage: ext2_writepage,
 	sync_page: block_sync_page,
 	prepare_write: ext2_prepare_write,
 	commit_write: generic_commit_write,
-	bmap: ext2_bmap
+	bmap: ext2_bmap,
+	direct_IO: ext2_direct_IO,
 };
 
 /*

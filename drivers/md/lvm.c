@@ -197,9 +197,13 @@ static char *lvm_short_version = "version 0.9.1_beta2 (18/01/2001)";
 
 #include "lvm-snap.h"
 
-#define	LVM_CORRECT_READ_AHEAD( a) \
-   if      ( a < LVM_MIN_READ_AHEAD || \
-             a > LVM_MAX_READ_AHEAD) a = LVM_MAX_READ_AHEAD;
+#define	LVM_CORRECT_READ_AHEAD(a)		\
+do {						\
+	if ((a) < LVM_MIN_READ_AHEAD ||		\
+	    (a) > LVM_MAX_READ_AHEAD)		\
+		(a) = LVM_DEFAULT_READ_AHEAD;	\
+	read_ahead[MAJOR_NR] = (a);		\
+} while(0)
 
 #ifndef WRITEA
 #  define WRITEA WRITE
@@ -905,6 +909,7 @@ static int lvm_blk_ioctl(struct inode *inode, struct file *file,
 		    (long) arg > LVM_MAX_READ_AHEAD)
 			return -EINVAL;
 		lv_ptr->lv_read_ahead = (long) arg;
+		read_ahead[MAJOR_NR] = lv_ptr->lv_read_ahead;
 		break;
 
 

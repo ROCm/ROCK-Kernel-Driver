@@ -353,7 +353,7 @@ repeat:
 		swap_free(*entry);
 		*entry = (swp_entry_t) {0};
 		delete_from_swap_cache_nolock(page);
-		flags = page->flags & ~((1 << PG_uptodate) | (1 << PG_error) | (1 << PG_referenced) | (1 << PG_arch_1));
+		flags = page->flags & ~(1 << PG_uptodate | 1 << PG_error | 1 << PG_referenced | 1 << PG_arch_1);
 		page->flags = flags | (1 << PG_dirty);
 		add_to_page_cache_locked(page, mapping, idx);
 		info->swapped--;

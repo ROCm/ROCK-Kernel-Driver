@@ -20,8 +20,6 @@
 #define dprintk(x...) 
 
 typedef struct raw_device_data_s {
-	struct kiobuf * iobuf;
-	long iobuf_lock;
 	struct block_device *binding;
 	int inuse, sector_size, sector_bits;
 	struct semaphore mutex;
@@ -87,6 +85,12 @@ int raw_open(struct inode *inode, struct file *filp)
 		return 0;
 	}
 	
+	if (!filp->f_iobuf) {
+		err = alloc_kiovec(1, &filp->f_iobuf);
+		if (err)
+			return err;
+	}
+
 	down(&raw_devices[minor].mutex);
 	/*
 	 * No, it is a normal raw device.  All we need to do on open is
@@ -112,19 +116,6 @@ int raw_open(struct inode *inode, struct file *filp)
 	if (raw_devices[minor].inuse++)
 		goto out;
 
-	/* 
-	 * We'll just use one kiobuf
-	 */
-
-	err = alloc_kiovec(1, &raw_devices[minor].iobuf);
-	if (err) {
-		raw_devices[minor].inuse--;
-		up(&raw_devices[minor].mutex);
-		blkdev_put(bdev, BDEV_RAW);
-		return err;
-	}
-
-	
 	/* 
 	 * Don't interfere with mounted devices: we cannot safely set
 	 * the blocksize on a device which is already mounted.  
@@ -160,8 +151,7 @@ int raw_release(struct inode *inode, struct file *filp)
 	minor = MINOR(inode->i_rdev);
 	down(&raw_devices[minor].mutex);
 	bdev = raw_devices[minor].binding;
-	if (!--raw_devices[minor].inuse)
-		free_kiovec(1, &raw_devices[minor].iobuf);
+	raw_devices[minor].inuse--;
 	up(&raw_devices[minor].mutex);
 	blkdev_put(bdev, BDEV_RAW);
 	return 0;
@@ -300,8 +290,8 @@ ssize_t	rw_raw_dev(int rw, struct file *filp, char *buf,
 	minor = MINOR(filp->f_dentry->d_inode->i_rdev);
 
 	new_iobuf = 0;
-	iobuf = raw_devices[minor].iobuf;
-	if (test_and_set_bit(0, &raw_devices[minor].iobuf_lock)) {
+	iobuf = filp->f_iobuf;
+	if (test_and_set_bit(0, &filp->f_iobuf_lock)) {
 		/*
 		 * A parallel read/write is using the preallocated iobuf
 		 * so just run slow and allocate a new one.
@@ -384,7 +374,7 @@ ssize_t	rw_raw_dev(int rw, struct file *filp, char *buf,
 
  out_free:
 	if (!new_iobuf)
-		clear_bit(0, &raw_devices[minor].iobuf_lock);
+		clear_bit(0, &filp->f_iobuf_lock);
 	else
 		free_kiovec(1, &iobuf);
  out:	

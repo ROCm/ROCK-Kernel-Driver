@@ -14,7 +14,6 @@
 #include <asm/uaccess.h>
 #include <asm/io.h>
 
-extern unsigned long log_size;
 extern wait_queue_head_t log_wait;
 
 extern int do_syslog(int type, char * bug, int count);
@@ -39,7 +38,7 @@ static ssize_t kmsg_read(struct file * file, char * buf,
 static unsigned int kmsg_poll(struct file *file, poll_table * wait)
 {
 	poll_wait(file, &log_wait, wait);
-	if (log_size)
+	if (do_syslog(9, 0, 0))
 		return POLLIN | POLLRDNORM;
 	return 0;
 }

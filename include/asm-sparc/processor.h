@@ -91,9 +91,6 @@ struct thread_struct {
 #define SPARC_FLAG_KTHREAD      0x1    /* task is a kernel thread */
 #define SPARC_FLAG_UNALIGNED    0x2    /* is allowed to do unaligned accesses */
 
-#define INIT_MMAP { &init_mm, (0), (0), \
-		    NULL, __pgprot(0x0) , VM_READ | VM_WRITE | VM_EXEC, 1, NULL, NULL }
-
 #define INIT_THREAD  { \
 /* uwinmask, kregs, ksp, kpc, kpsr, kwim */ \
    0,        0,     0,   0,   0,    0, \

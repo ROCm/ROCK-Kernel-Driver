@@ -565,7 +565,7 @@ int shrink_dcache_memory(int priority, unsigned int gfp_mask)
 	if (!(gfp_mask & __GFP_FS))
 		return 0;
 
-	count = dentry_stat.nr_unused >> priority;
+	count = dentry_stat.nr_unused / priority;
 
 	prune_dcache(count);
 	kmem_cache_shrink(dentry_cache);

@@ -109,7 +109,7 @@ vcs_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 	/* Select the proper current console and verify
 	 * sanity of the situation under the console lock.
 	 */
-	spin_lock_irq(&console_lock);
+	acquire_console_sem();
 
 	attr = (currcons & 128);
 	currcons = (currcons & 127);
@@ -232,13 +232,16 @@ vcs_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 			}
 		}
 
-		/* Finally, temporarily drop the console lock and push
+		/* Finally, release the console semaphore while we push
 		 * all the data to userspace from our temporary buffer.
+		 *
+		 * AKPM: Even though it's a semaphore, we should drop it because
+		 * the pagefault handling code may want to call printk().
 		 */
 
-		spin_unlock_irq(&console_lock);
+		release_console_sem();
 		ret = copy_to_user(buf, con_buf_start, orig_count);
-		spin_lock_irq(&console_lock);
+		acquire_console_sem();
 
 		if (ret) {
 			read += (orig_count - ret);
@@ -254,7 +257,7 @@ vcs_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 	if (read)
 		ret = read;
 unlock_out:
-	spin_unlock_irq(&console_lock);
+	release_console_sem();
 	up(&con_buf_sem);
 	return ret;
 }
@@ -276,7 +279,7 @@ vcs_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 	/* Select the proper current console and verify
 	 * sanity of the situation under the console lock.
 	 */
-	spin_lock_irq(&console_lock);
+	acquire_console_sem();
 
 	attr = (currcons & 128);
 	currcons = (currcons & 127);
@@ -310,9 +313,9 @@ vcs_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 		/* Temporarily drop the console lock so that we can read
 		 * in the write data from userspace safely.
 		 */
-		spin_unlock_irq(&console_lock);
+		release_console_sem();
 		ret = copy_from_user(con_buf, buf, this_round);
-		spin_lock_irq(&console_lock);
+		acquire_console_sem();
 
 		if (ret) {
 			this_round -= ret;
@@ -436,7 +439,7 @@ vcs_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 	ret = written;
 
 unlock_out:
-	spin_unlock_irq(&console_lock);
+	release_console_sem();
 
 	up(&con_buf_sem);
 

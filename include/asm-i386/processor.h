@@ -14,6 +14,7 @@
 #include <asm/types.h>
 #include <asm/sigcontext.h>
 #include <asm/cpufeature.h>
+#include <linux/cache.h>
 #include <linux/config.h>
 #include <linux/threads.h>
 
@@ -52,7 +53,7 @@ struct cpuinfo_x86 {
 	unsigned long *pmd_quick;
 	unsigned long *pte_quick;
 	unsigned long pgtable_cache_sz;
-};
+} __attribute__((__aligned__(SMP_CACHE_BYTES)));
 
 #define X86_VENDOR_INTEL 0
 #define X86_VENDOR_CYRIX 1
@@ -391,9 +392,6 @@ struct thread_struct {
 	0,0,0,0,0,0,						\
 	0,{~0,}			/* io permissions */		\
 }
-
-#define INIT_MMAP \
-{ &init_mm, 0, 0, NULL, PAGE_SHARED, VM_READ | VM_WRITE | VM_EXEC, 1, NULL, NULL }
 
 #define INIT_TSS  {						\
 	0,0, /* back_link, __blh */				\

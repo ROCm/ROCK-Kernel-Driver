@@ -14,6 +14,7 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/tty.h>
+#include <linux/iobuf.h>
 
 #include <asm/uaccess.h>
 
@@ -656,6 +657,16 @@ struct file *dentry_open(struct dentry *dentry, struct vfsmount *mnt, int flags)
 	f->f_reada = 0;
 	f->f_op = fops_get(inode->i_fop);
 	file_move(f, &inode->i_sb->s_files);
+
+	/* preallocate kiobuf for O_DIRECT */
+	f->f_iobuf = NULL;
+	f->f_iobuf_lock = 0;
+	if (f->f_flags & O_DIRECT) {
+		error = alloc_kiovec(1, &f->f_iobuf);
+		if (error)
+			goto cleanup_all;
+	}
+
 	if (f->f_op && f->f_op->open) {
 		error = f->f_op->open(inode,f);
 		if (error)
@@ -666,6 +677,8 @@ struct file *dentry_open(struct dentry *dentry, struct vfsmount *mnt, int flags)
 	return f;
 
 cleanup_all:
+	if (f->f_iobuf)
+		free_kiovec(1, &f->f_iobuf);
 	fops_put(f->f_op);
 	if (f->f_mode & FMODE_WRITE)
 		put_write_access(inode);

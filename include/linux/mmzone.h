@@ -39,14 +39,12 @@ typedef struct zone_struct {
 	 */
 	spinlock_t		lock;
 	unsigned long		free_pages;
-	unsigned long		inactive_clean_pages;
-	unsigned long		inactive_dirty_pages;
 	unsigned long		pages_min, pages_low, pages_high;
+	int			need_balance;
 
 	/*
 	 * free areas of different sizes
 	 */
-	struct list_head	inactive_clean_list;
 	free_area_t		free_area[MAX_ORDER];
 
 	/*
@@ -101,6 +99,7 @@ struct bootmem_data;
 typedef struct pglist_data {
 	zone_t node_zones[MAX_NR_ZONES];
 	zonelist_t node_zonelists[GFP_ZONEMASK+1];
+	int nr_zones;
 	struct page *node_mem_map;
 	unsigned long *valid_addr_bitmap;
 	struct bootmem_data *bdata;
@@ -114,8 +113,8 @@ typedef struct pglist_data {
 extern int numnodes;
 extern pg_data_t *pgdat_list;
 
-#define memclass(pgzone, tzone)	(((pgzone)->zone_pgdat == (tzone)->zone_pgdat) \
-			&& ((pgzone) <= (tzone)))
+#define memclass(pgzone, classzone)	(((pgzone)->zone_pgdat == (classzone)->zone_pgdat) \
+			&& ((pgzone) <= (classzone)))
 
 /*
  * The following two are not meant for general usage. They are here as

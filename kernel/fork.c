@@ -40,8 +40,8 @@ void add_wait_queue(wait_queue_head_t *q, wait_queue_t * wait)
 {
 	unsigned long flags;
 
-	wq_write_lock_irqsave(&q->lock, flags);
 	wait->flags &= ~WQ_FLAG_EXCLUSIVE;
+	wq_write_lock_irqsave(&q->lock, flags);
 	__add_wait_queue(q, wait);
 	wq_write_unlock_irqrestore(&q->lock, flags);
 }
@@ -50,8 +50,8 @@ void add_wait_queue_exclusive(wait_queue_head_t *q, wait_queue_t * wait)
 {
 	unsigned long flags;
 
-	wq_write_lock_irqsave(&q->lock, flags);
 	wait->flags |= WQ_FLAG_EXCLUSIVE;
+	wq_write_lock_irqsave(&q->lock, flags);
 	__add_wait_queue_tail(q, wait);
 	wq_write_unlock_irqrestore(&q->lock, flags);
 }
@@ -72,7 +72,7 @@ void __init fork_init(unsigned long mempages)
 	 * value: the thread structures can take up at most half
 	 * of memory.
 	 */
-	max_threads = mempages / (THREAD_SIZE/PAGE_SIZE) / 2;
+	max_threads = mempages / (THREAD_SIZE/PAGE_SIZE) / 16;
 
 	init_task.rlim[RLIMIT_NPROC].rlim_cur = max_threads/2;
 	init_task.rlim[RLIMIT_NPROC].rlim_max = max_threads/2;
@@ -133,7 +133,6 @@ static inline int dup_mmap(struct mm_struct * mm)
 	flush_cache_mm(current->mm);
 	mm->locked_vm = 0;
 	mm->mmap = NULL;
-	mm->mmap_avl = NULL;
 	mm->mmap_cache = NULL;
 	mm->map_count = 0;
 	mm->rss = 0;
@@ -200,8 +199,7 @@ static inline int dup_mmap(struct mm_struct * mm)
 			goto fail_nomem;
 	}
 	retval = 0;
-	if (mm->map_count >= AVL_MIN_MAP_COUNT)
-		build_mmap_avl(mm);
+	build_mmap_rb(mm);
 
 fail_nomem:
 	flush_tlb_mm(current->mm);
@@ -650,6 +648,8 @@ int do_fork(unsigned long clone_flags, unsigned long stack_start,
 #endif
 	p->lock_depth = -1;		/* -1 = no lock */
 	p->start_time = jiffies;
+
+	INIT_LIST_HEAD(&p->local_pages);
 
 	retval = -ENOMEM;
 	/* copy all the process information */

@@ -34,6 +34,7 @@
 #include <linux/pagemap.h>
 #include <linux/highmem.h>
 #include <linux/spinlock.h>
+#include <linux/personality.h>
 #define __NO_VERSION__
 #include <linux/module.h>
 
@@ -186,7 +187,7 @@ int copy_strings(int argc,char ** argv, struct linux_binprm *bprm)
 		int len;
 		unsigned long pos;
 
-		if (get_user(str, argv+argc) || !str || !(len = strnlen_user(str, bprm->p))) 
+		if (get_user(str, argv+argc) || !(len = strnlen_user(str, bprm->p)))
 			return -EFAULT;
 		if (bprm->p < len) 
 			return -E2BIG; 

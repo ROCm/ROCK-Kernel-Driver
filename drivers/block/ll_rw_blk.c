@@ -974,12 +974,7 @@ void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
 	major = MAJOR(bhs[0]->b_dev);
 
 	/* Determine correct block size for this device. */
-	correct_size = BLOCK_SIZE;
-	if (blksize_size[major]) {
-		i = blksize_size[major][MINOR(bhs[0]->b_dev)];
-		if (i)
-			correct_size = i;
-	}
+	correct_size = get_hardsect_size(bhs[0]->b_dev);
 
 	/* Verify requested block sizes. */
 	for (i = 0; i < nr; i++) {

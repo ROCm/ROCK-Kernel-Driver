@@ -50,7 +50,6 @@
  */
 
 unsigned long init_user_stack[1024] = { STACK_MAGIC, };
-static struct vm_area_struct init_mmap = INIT_MMAP;
 static struct fs_struct init_fs = INIT_FS;
 static struct files_struct init_files = INIT_FILES;
 static struct signal_struct init_signals = INIT_SIGNALS;
@@ -213,7 +212,9 @@ machine_power_off(void)
 void
 show_regs(struct pt_regs * regs)
 {
-	printk("\nps: %04lx pc: [<%016lx>]\n", regs->ps, regs->pc);
+	printk("\n");
+	printk("Pid: %d, comm: %20s\n", current->pid, current->comm);
+	printk("ps: %04lx pc: [<%016lx>] CPU %d\n", regs->ps, regs->pc, smp_processor_id());
 	printk("rp: [<%016lx>] sp: %p\n", regs->r26, regs+1);
 	printk(" r0: %016lx  r1: %016lx  r2: %016lx  r3: %016lx\n",
 	       regs->r0, regs->r1, regs->r2, regs->r3);

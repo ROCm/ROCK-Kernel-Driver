@@ -69,23 +69,12 @@ extern int kbd_init(void);
 extern unsigned char getledstate(void);
 extern void setledstate(struct kbd_struct *kbd, unsigned int led);
 
-extern struct tasklet_struct console_tasklet;
-
 extern int do_poke_blanked_console;
 
 extern void (*kbd_ledfunc)(unsigned int led);
 
-static inline void show_console(void)
-{
-	do_poke_blanked_console = 1;
-	tasklet_schedule(&console_tasklet);
-}
-
-static inline void set_console(int nr)
-{
-	want_console = nr;
-	tasklet_schedule(&console_tasklet);
-}
+extern void set_console(int nr);
+extern void schedule_console_callback(void);
 
 static inline void set_leds(void)
 {
@@ -159,12 +148,9 @@ extern unsigned int keymap_count;
 
 /* console.c */
 
-extern task_queue con_task_queue;
-
 static inline void con_schedule_flip(struct tty_struct *t)
 {
-	queue_task(&t->flip.tqueue, &con_task_queue);
-	tasklet_schedule(&console_tasklet);
+	schedule_task(&t->flip.tqueue);
 }
 
 #endif

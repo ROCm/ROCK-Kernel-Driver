@@ -128,11 +128,13 @@ void clear_page_tables(struct mm_struct *mm, unsigned long first, int nr)
 {
 	pgd_t * page_dir = mm->pgd;
 
+	spin_lock(&mm->page_table_lock);
 	page_dir += first;
 	do {
 		free_one_pgd(page_dir);
 		page_dir++;
 	} while (--nr);
+	spin_unlock(&mm->page_table_lock);
 
 	/* keep the page table cache within bounds */
 	check_pgt_cache();
@@ -272,12 +274,8 @@ static inline int free_pte(pte_t pte)
 		 * free_page() used to be able to clear swap cache
 		 * entries.  We may now have to do it manually.  
 		 */
-		if (page->mapping) {
-			if (pte_dirty(pte))
-				set_page_dirty(page);
-			if (pte_young(pte))
-				mark_page_accessed(page);
-		}
+		if (pte_dirty(pte) && page->mapping)
+			set_page_dirty(page);
 		free_page_and_swap_cache(page);
 		return 1;
 	}
@@ -924,6 +922,10 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 			break;
 		/* Recheck swapcachedness once the page is locked */
 		can_reuse = exclusive_swap_page(old_page);
+#if 1
+		if (can_reuse)
+			delete_from_swap_cache_nolock(old_page);
+#endif
 		UnlockPage(old_page);
 		if (!can_reuse)
 			break;
@@ -1104,6 +1106,7 @@ static int do_swap_page(struct mm_struct * mm,
 	struct page *page;
 	swp_entry_t entry = pte_to_swp_entry(orig_pte);
 	pte_t pte;
+	int ret = 1;
 
 	spin_unlock(&mm->page_table_lock);
 	page = lookup_swap_cache(entry);
@@ -1120,6 +1123,9 @@ static int do_swap_page(struct mm_struct * mm,
 			 */
 			return pte_same(*page_table, orig_pte) ? -1 : 1;
 		}
+
+		/* Had to read the page from swap area: Major fault */
+		ret = 2;
 	}
 
 	/*
@@ -1146,12 +1152,13 @@ static int do_swap_page(struct mm_struct * mm,
 
 	swap_free(entry);
 	if (exclusive_swap_page(page)) {	
+#if 0
 		if (write_access)
 			pte = pte_mkwrite(pte_mkdirty(pte));
-		if (vm_swap_full()) {
-			delete_from_swap_cache_nolock(page);
-			pte = pte_mkdirty(pte);
-		}
+#else
+		delete_from_swap_cache_nolock(page);
+		pte = pte_mkwrite(pte_mkdirty(pte));
+#endif
 	}
 	UnlockPage(page);
 
@@ -1161,7 +1168,7 @@ static int do_swap_page(struct mm_struct * mm,
 
 	/* No need to invalidate - it was non-present before */
 	update_mmu_cache(vma, address, pte);
-	return 1;	/* Minor fault */
+	return ret;
 }
 
 /*
@@ -1378,7 +1385,7 @@ pmd_t *__pmd_alloc(struct mm_struct *mm, pgd_t *pgd, unsigned long address)
 		 * Because we dropped the lock, we should re-check the
 		 * entry, as somebody else could have populated it..
 		 */
-		if (pgd_present(*pgd)) {
+		if (!pgd_none(*pgd)) {
 			pmd_free(new);
 			goto out;
 		}
@@ -1396,7 +1403,7 @@ out:
  */
 pte_t *pte_alloc(struct mm_struct *mm, pmd_t *pmd, unsigned long address)
 {
-	if (!pmd_present(*pmd)) {
+	if (pmd_none(*pmd)) {
 		pte_t *new;
 
 		/* "fast" allocation can happen without dropping the lock.. */
@@ -1412,7 +1419,7 @@ pte_t *pte_alloc(struct mm_struct *mm, pmd_t *pmd, unsigned long address)
 			 * Because we dropped the lock, we should re-check the
 			 * entry, as somebody else could have populated it..
 			 */
-			if (pmd_present(*pmd)) {
+			if (!pmd_none(*pmd)) {
 				pte_free(new);
 				goto out;
 			}

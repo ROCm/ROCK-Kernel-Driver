@@ -145,12 +145,12 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
  * display in kilobytes.
  */
 #define K(x) ((x) << (PAGE_SHIFT - 10))
-#define B(x) ((x) << PAGE_SHIFT)
+#define B(x) ((unsigned long long)(x) << PAGE_SHIFT)
 	si_meminfo(&i);
 	si_swapinfo(&i);
 	len = sprintf(page, "        total:    used:    free:  shared: buffers:  cached:\n"
-		"Mem:  %8lu %8lu %8lu %8lu %8lu %8u\n"
-		"Swap: %8lu %8lu %8lu\n",
+		"Mem:  %8Lu %8Lu %8Lu %8Lu %8Lu %8Lu\n"
+		"Swap: %8Lu %8Lu %8Lu\n",
 		B(i.totalram), B(i.totalram-i.freeram), B(i.freeram),
 		B(i.sharedram), B(i.bufferram),
 		B(atomic_read(&page_cache_size)), B(i.totalswap),
@@ -168,9 +168,7 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		"Cached:       %8lu kB\n"
 		"SwapCached:   %8lu kB\n"
 		"Active:       %8u kB\n"
-		"Inact_dirty:  %8u kB\n"
-		"Inact_clean:  %8u kB\n"
-		"Inact_target: %8lu kB\n"
+		"Inactive:     %8u kB\n"
 		"HighTotal:    %8lu kB\n"
 		"HighFree:     %8lu kB\n"
 		"LowTotal:     %8lu kB\n"
@@ -184,9 +182,7 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		K(atomic_read(&page_cache_size) - swapper_space.nrpages),
 		K(swapper_space.nrpages),
 		K(nr_active_pages),
-		K(nr_inactive_dirty_pages),
-		K(nr_inactive_clean_pages()),
-		K(inactive_target),
+		K(nr_inactive_pages),
 		K(i.totalhigh),
 		K(i.freehigh),
 		K(i.totalram-i.totalhigh),

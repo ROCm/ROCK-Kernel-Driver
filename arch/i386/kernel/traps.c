@@ -64,8 +64,6 @@ struct desc_struct default_ldt[] = { { 0, 0 }, { 0, 0 }, { 0, 0 },
  */
 struct desc_struct idt_table[256] __attribute__((__section__(".data.idt"))) = { {0, 0}, };
 
-extern void bust_spinlocks(void);
-
 asmlinkage void divide_error(void);
 asmlinkage void debug(void);
 asmlinkage void nmi(void);
@@ -245,9 +243,10 @@ void die(const char * str, struct pt_regs * regs, long err)
 {
 	console_verbose();
 	spin_lock_irq(&die_lock);
+	bust_spinlocks(1);
 	printk("%s: %04lx\n", str, err & 0xffff);
 	show_registers(regs);
-
+	bust_spinlocks(0);
 	spin_unlock_irq(&die_lock);
 	do_exit(SIGSEGV);
 }
@@ -433,26 +432,50 @@ __setup("nmi_watchdog=", setup_nmi_watchdog);
 
 static spinlock_t nmi_print_lock = SPIN_LOCK_UNLOCKED;
 
+static unsigned int
+	last_irq_sums [NR_CPUS],
+	alert_counter [NR_CPUS];
+
+/*
+ * Sometimes, we know that we're disabling interrupts for too long.
+ * This happens during long writes to slow console devices, and may
+ * happen in other places.
+ *
+ * To prevent the NMI watchdog from firing when we're doing these things,
+ * touch_nmi_watchdog() may be used to reset the NMI watchdog timer
+ * back to its full interval (five seconds).
+ */
+void touch_nmi_watchdog (void)
+{
+	int i;
+
+	/*
+	 * Just reset the alert counters, (other CPUs might be
+	 * spinning on locks we hold):
+	 */
+	for (i = 0; i < smp_num_cpus; i++)
+		alert_counter[i] = 0;
+}
+
+/*
+ * The best way to detect whether a CPU has a 'hard lockup' problem
+ * is to check it's local APIC timer IRQ counts. If they are not
+ * changing then that CPU has some problem.
+ *
+ * As these watchdog NMI IRQs are generated on every CPU, we only
+ * have to check the current processor.
+ *
+ * Since NMIs don't listen to _any_ locks, we have to be extremely
+ * careful not to rely on unsafe variables. The printk path might lock
+ * up though, so we use bust_spinlocks() to break up any console
+ * locks first.  There may be other tty-related locks which require
+ * breaking as well.  They can be broken in bust_spinlocks(), or the
+ * global variable `oops_in_progress' may be used to bypass the
+ * tty locking.
+ */
+
 inline void nmi_watchdog_tick(struct pt_regs * regs)
 {
-	/*
-	 * the best way to detect wether a CPU has a 'hard lockup' problem
-	 * is to check it's local APIC timer IRQ counts. If they are not
-	 * changing then that CPU has some problem.
-	 *
-	 * as these watchdog NMI IRQs are broadcasted to every CPU, here
-	 * we only have to check the current processor.
-	 *
-	 * since NMIs dont listen to _any_ locks, we have to be extremely
-	 * careful not to rely on unsafe variables. The printk might lock
-	 * up though, so we have to break up console_lock first ...
-	 * [when there will be more tty-related locks, break them up
-	 *  here too!]
-	 */
-
-	static unsigned int last_irq_sums [NR_CPUS],
-				alert_counter [NR_CPUS];
-
 	/*
 	 * Since current-> is always on the stack, and we always switch
 	 * the stack NMI-atomically, it's safe to use smp_processor_id().
@@ -473,12 +496,13 @@ inline void nmi_watchdog_tick(struct pt_regs * regs)
 			 * We are in trouble anyway, lets at least try
 			 * to get a message out.
 			 */
-			bust_spinlocks();
+			bust_spinlocks(1);
 			printk("NMI Watchdog detected LOCKUP on CPU%d, registers:\n", cpu);
 			show_registers(regs);
 			printk("console shuts up ...\n");
 			console_silent();
 			spin_unlock(&nmi_print_lock);
+			bust_spinlocks(0);
 			do_exit(SIGSEGV);
 		}
 	} else {

@@ -371,8 +371,6 @@ typedef long  int32_t;
 #define SG_SEGMENTS     32             /* Cmd entry + 6 continuations */
 
 
-typedef struct timer_list   timer_t;         /* timer */
-
 /*
  * SCSI Request Block structure
  */

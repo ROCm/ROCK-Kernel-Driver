@@ -17,6 +17,7 @@
 #include <linux/smp_lock.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
+#include <linux/vt_kern.h>		/* For unblank_screen() */
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -24,6 +25,8 @@
 #include <asm/hardirq.h>
 
 extern void die(const char *,struct pt_regs *,long);
+
+extern int console_loglevel;
 
 /*
  * Ugly, ugly, but the goto's result in better assembly..
@@ -51,8 +54,14 @@ good_area:
 	start &= PAGE_MASK;
 
 	for (;;) {
-		if (handle_mm_fault(current->mm, vma, start, 1) <= 0)
-			goto bad_area;
+	survive:
+		{
+			int fault = handle_mm_fault(current->mm, vma, start, 1);
+			if (!fault)
+				goto bad_area;
+			if (fault < 0)
+				goto out_of_memory;
+		}
 		if (!size)
 			break;
 		size--;
@@ -75,20 +84,56 @@ check_stack:
 
 bad_area:
 	return 0;
+
+out_of_memory:
+	if (current->pid == 1) {
+		current->policy |= SCHED_YIELD;
+		schedule();
+		goto survive;
+	}
+	goto bad_area;
 }
 
-extern spinlock_t console_lock, timerlist_lock;
+extern spinlock_t timerlist_lock;
 
 /*
  * Unlock any spinlocks which will prevent us from getting the
  * message out (timerlist_lock is acquired through the
  * console unblank code)
  */
-void bust_spinlocks(void)
+void bust_spinlocks(int yes)
 {
-	spin_lock_init(&console_lock);
 	spin_lock_init(&timerlist_lock);
+	if (yes) {
+		oops_in_progress = 1;
+#ifdef CONFIG_SMP
+		global_irq_lock = 0;	/* Many serial drivers do __global_cli() */
+#endif
+	} else {
+		int loglevel_save = console_loglevel;
+		unblank_screen();
+		oops_in_progress = 0;
+		/*
+		 * OK, the message is on the console.  Now we call printk()
+		 * without oops_in_progress set so that printk will give klogd
+		 * a poke.  Hold onto your hats...
+		 */
+		console_loglevel = 15;		/* NMI oopser may have shut the console up */
+		printk(" ");
+		console_loglevel = loglevel_save;
+	}
 }
+
+#if 0
+/*
+ * Verbose bug reporting: call do_BUG(__FILE__, __LINE__) in page.h:BUG() to enable this
+ */
+void do_BUG(const char *file, int line)
+{
+	bust_spinlocks(1);
+	printk("kernel BUG at %s:%d!\n", file, line);
+}
+#endif
 
 asmlinkage void do_invalid_op(struct pt_regs *, unsigned long);
 extern unsigned long idt;
@@ -196,6 +241,7 @@ good_area:
 				goto bad_area;
 	}
 
+ survive:
 	/*
 	 * If for any reason at all we couldn't handle the fault,
 	 * make sure we exit gracefully rather than endlessly redo
@@ -271,7 +317,7 @@ no_context:
  * terminate things with extreme prejudice.
  */
 
-	bust_spinlocks();
+	bust_spinlocks(1);
 
 	if (address < PAGE_SIZE)
 		printk(KERN_ALERT "Unable to handle kernel NULL pointer dereference");
@@ -290,6 +336,7 @@ no_context:
 		printk(KERN_ALERT "*pte = %08lx\n", page);
 	}
 	die("Oops", regs, error_code);
+	bust_spinlocks(0);
 	do_exit(SIGKILL);
 
 /*
@@ -298,6 +345,12 @@ no_context:
  */
 out_of_memory:
 	up_read(&mm->mmap_sem);
+	if (tsk->pid == 1) {
+		tsk->policy |= SCHED_YIELD;
+		schedule();
+		down_read(&mm->mmap_sem);
+		goto survive;
+	}
 	printk("VM: killing process %s\n", tsk->comm);
 	if (error_code & 4)
 		do_exit(SIGKILL);

@@ -212,9 +212,9 @@ static inline void copy_from_high_bh (struct buffer_head *to,
 
 	p_from = from->b_page;
 
-	vfrom = kmap_atomic(p_from, KM_BOUNCE_WRITE);
+	vfrom = kmap_atomic(p_from, KM_USER0);
 	memcpy(to->b_data, vfrom + bh_offset(from), to->b_size);
-	kunmap_atomic(vfrom, KM_BOUNCE_WRITE);
+	kunmap_atomic(vfrom, KM_USER0);
 }
 
 static inline void copy_to_high_bh_irq (struct buffer_head *to,

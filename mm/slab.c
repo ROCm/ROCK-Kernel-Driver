@@ -926,8 +926,10 @@ static int __kmem_cache_shrink(kmem_cache_t *cachep)
 			break;
 
 		slabp = list_entry(cachep->slabs_free.prev, slab_t, list);
+#if DEBUG
 		if (slabp->inuse)
 			BUG();
+#endif
 		list_del(&slabp->list);
 
 		spin_unlock_irq(&cachep->spinlock);
@@ -1205,7 +1207,6 @@ static int kmem_extra_free_checks (kmem_cache_t * cachep,
 
 static inline void kmem_cache_alloc_head(kmem_cache_t *cachep, int flags)
 {
-#if DEBUG
 	if (flags & SLAB_DMA) {
 		if (!(cachep->gfpflags & GFP_DMA))
 			BUG();
@@ -1213,11 +1214,10 @@ static inline void kmem_cache_alloc_head(kmem_cache_t *cachep, int flags)
 		if (cachep->gfpflags & GFP_DMA)
 			BUG();
 	}
-#endif
 }
 
 static inline void * kmem_cache_alloc_one_tail (kmem_cache_t *cachep,
-						slab_t *slabp, int partial)
+						slab_t *slabp)
 {
 	void *objp;
 
@@ -1230,14 +1230,9 @@ static inline void * kmem_cache_alloc_one_tail (kmem_cache_t *cachep,
 	objp = slabp->s_mem + slabp->free*cachep->objsize;
 	slabp->free=slab_bufctl(slabp)[slabp->free];
 
-	if (slabp->free == BUFCTL_END) {
+	if (__builtin_expect(slabp->free == BUFCTL_END, 0)) {
 		list_del(&slabp->list);
 		list_add(&slabp->list, &cachep->slabs_full);
-	} else {
-		if (!partial) {
-			list_del(&slabp->list);
-			list_add(&slabp->list, &cachep->slabs_partial);
-		}
 	}
 #if DEBUG
 	if (cachep->flags & SLAB_POISON)
@@ -1264,20 +1259,23 @@ static inline void * kmem_cache_alloc_one_tail (kmem_cache_t *cachep,
  */
 #define kmem_cache_alloc_one(cachep)				\
 ({								\
-	slab_t	*slabp;						\
-	struct list_head * slab_freelist;			\
-	int partial = 1;					\
+	struct list_head * slabs_partial, * entry;		\
+	slab_t *slabp;						\
 								\
-	slab_freelist = &(cachep)->slabs_partial;		\
-	if (list_empty(slab_freelist)) {			\
-		partial = 0;					\
-		slab_freelist = &(cachep)->slabs_free;		\
-		if (list_empty(slab_freelist))			\
+	slabs_partial = &(cachep)->slabs_partial;		\
+	entry = slabs_partial->next;				\
+	if (__builtin_expect(entry == slabs_partial, 0)) {	\
+		struct list_head * slabs_free;			\
+		slabs_free = &(cachep)->slabs_free;		\
+		entry = slabs_free->next;			\
+		if (__builtin_expect(entry == slabs_free, 0))	\
 			goto alloc_new_slab;			\
+		list_del(entry);				\
+		list_add(entry, slabs_partial);			\
 	}							\
 								\
-	slabp = list_entry(slab_freelist->next, slab_t, list);	\
-	kmem_cache_alloc_one_tail(cachep, slabp, partial);	\
+	slabp = list_entry(entry, slab_t, list);		\
+	kmem_cache_alloc_one_tail(cachep, slabp);		\
 })
 
 #ifdef CONFIG_SMP
@@ -1285,25 +1283,27 @@ void* kmem_cache_alloc_batch(kmem_cache_t* cachep, int flags)
 {
 	int batchcount = cachep->batchcount;
 	cpucache_t* cc = cc_data(cachep);
-	struct list_head * slab_freelist;
-	int partial;
-	slab_t *slabp;
 
 	spin_lock(&cachep->spinlock);
 	while (batchcount--) {
+		struct list_head * slabs_partial, * entry;
+		slab_t *slabp;
 		/* Get slab alloc is to come from. */
-		slab_freelist = &(cachep)->slabs_partial;
-		partial = 1;
-		if (list_empty(slab_freelist)) {
-			partial = 0;
-			slab_freelist = &(cachep)->slabs_free;
-			if (list_empty(slab_freelist))
+		slabs_partial = &(cachep)->slabs_partial;
+		entry = slabs_partial->next;
+		if (__builtin_expect(entry == slabs_partial, 0)) {
+			struct list_head * slabs_free;
+			slabs_free = &(cachep)->slabs_free;
+			entry = slabs_free->next;
+			if (__builtin_expect(entry == slabs_free, 0))
 				break;
+			list_del(entry);
+			list_add(entry, slabs_partial);
 		}
 
-		slabp = list_entry(slab_freelist->next, slab_t, list);
+		slabp = list_entry(entry, slab_t, list);
 		cc_entry(cc)[cc->avail++] =
-				kmem_cache_alloc_one_tail(cachep, slabp, partial);
+				kmem_cache_alloc_one_tail(cachep, slabp);
 	}
 	spin_unlock(&cachep->spinlock);
 
@@ -1434,23 +1434,18 @@ static inline void kmem_cache_free_one(kmem_cache_t *cachep, void *objp)
 	STATS_DEC_ACTIVE(cachep);
 	
 	/* fixup slab chains */
-	if (!--slabp->inuse)
-		goto moveslab_free;
-	if (slabp->inuse + 1 == cachep->num)
-		goto moveslab_partial;
-	return;
-
-moveslab_partial:
-    	/* Was full. */
-	list_del(&slabp->list);
-	list_add(&slabp->list, &cachep->slabs_partial);
-	return;
-
-moveslab_free:
-	/* Was partial, now empty. */
-	list_del(&slabp->list);
-	list_add(&slabp->list, &cachep->slabs_free);
-	return;
+	{
+		int inuse = slabp->inuse;
+		if (__builtin_expect(!--slabp->inuse, 0)) {
+			/* Was partial or full, now empty. */
+			list_del(&slabp->list);
+			list_add(&slabp->list, &cachep->slabs_free);
+		} else if (__builtin_expect(inuse == cachep->num, 0)) {
+			/* Was full. */
+			list_del(&slabp->list);
+			list_add(&slabp->list, &cachep->slabs_partial);
+		}
+	}
 }
 
 #ifdef CONFIG_SMP
@@ -1709,7 +1704,7 @@ static void enable_all_cpucaches (void)
  *
  * Called from do_try_to_free_pages() and __alloc_pages()
  */
-void kmem_cache_reap (int gfp_mask)
+int kmem_cache_reap (int gfp_mask)
 {
 	slab_t *slabp;
 	kmem_cache_t *searchp;
@@ -1717,12 +1712,13 @@ void kmem_cache_reap (int gfp_mask)
 	unsigned int best_pages;
 	unsigned int best_len;
 	unsigned int scan;
+	int ret = 0;
 
 	if (gfp_mask & __GFP_WAIT)
 		down(&cache_chain_sem);
 	else
 		if (down_trylock(&cache_chain_sem))
-			return;
+			return 0;
 
 	scan = REAP_SCANLEN;
 	best_len = 0;
@@ -1758,8 +1754,10 @@ void kmem_cache_reap (int gfp_mask)
 		p = searchp->slabs_free.next;
 		while (p != &searchp->slabs_free) {
 			slabp = list_entry(p, slab_t, list);
+#if DEBUG
 			if (slabp->inuse)
 				BUG();
+#endif
 			full_free++;
 			p = p->next;
 		}
@@ -1809,8 +1807,10 @@ perfect:
 		if (p == &best_cachep->slabs_free)
 			break;
 		slabp = list_entry(p,slab_t,list);
+#if DEBUG
 		if (slabp->inuse)
 			BUG();
+#endif
 		list_del(&slabp->list);
 		STATS_INC_REAPED(best_cachep);
 
@@ -1822,9 +1822,10 @@ perfect:
 		spin_lock_irq(&best_cachep->spinlock);
 	}
 	spin_unlock_irq(&best_cachep->spinlock);
+	ret = scan * (1 << best_cachep->gfporder);
 out:
 	up(&cache_chain_sem);
-	return;
+	return ret;
 }
 
 #ifdef CONFIG_PROC_FS

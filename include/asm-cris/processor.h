@@ -77,16 +77,6 @@ struct thread_struct {
 
 #define current_regs() user_regs(current)
 
-/* INIT_MMAP is the kernels map of memory, between KSEG_C and KSEG_D */
-
-#ifdef CONFIG_CRIS_LOW_MAP
-#define INIT_MMAP { &init_mm, KSEG_6, KSEG_7, NULL, PAGE_SHARED, \
-			     VM_READ | VM_WRITE | VM_EXEC, 1, NULL, NULL }
-#else
-#define INIT_MMAP { &init_mm, KSEG_C, KSEG_D, NULL, PAGE_SHARED, \
-			     VM_READ | VM_WRITE | VM_EXEC, 1, NULL, NULL }
-#endif
-
 #define INIT_THREAD  { \
    0, 0, 0x20 }  /* ccr = int enable, nothing else */
 

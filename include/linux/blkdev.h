@@ -203,4 +203,15 @@ static inline int get_hardsect_size(kdev_t dev)
 #define blk_finished_io(nsects)	do { } while (0)
 #define blk_started_io(nsects)	do { } while (0)
 
+static inline int buffered_blk_size(kdev_t dev)
+{
+	int ret = INT_MAX;
+	int major = MAJOR(dev);
+
+	if (blk_size[major])
+		ret = blk_size[major][MINOR(dev)] + ((BUFFERED_BLOCKSIZE-1) >> BLOCK_SIZE_BITS);
+
+	return ret;
+}
+
 #endif

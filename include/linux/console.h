@@ -91,8 +91,6 @@ extern struct console_cmdline console_list[MAX_CMDLINECONSOLES];
 #define CON_CONSDEV	(2) /* Last on the command line */
 #define CON_ENABLED	(4)
 
-extern spinlock_t console_lock;
-
 struct console
 {
 	char	name[8];
@@ -111,6 +109,9 @@ struct console
 extern void register_console(struct console *);
 extern int unregister_console(struct console *);
 extern struct console *console_drivers;
+extern void acquire_console_sem(void);
+extern void release_console_sem(void);
+extern void console_conditional_schedule(void);
 
 /* VESA Blanking Levels */
 #define VESA_NO_BLANKING        0

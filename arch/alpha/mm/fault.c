@@ -140,6 +140,7 @@ good_area:
 			goto bad_area;
 	}
 
+ survive:
 	/*
 	 * If for any reason at all we couldn't handle the fault,
 	 * make sure we exit gracefully rather than endlessly redo
@@ -194,6 +195,12 @@ no_context:
  * us unable to handle the page fault gracefully.
  */
 out_of_memory:
+	if (current->pid == 1) {
+		current->policy |= SCHED_YIELD;
+		schedule();
+		down_read(&mm->mmap_sem);
+		goto survive;
+	}
 	printk(KERN_ALERT "VM: killing process %s(%d)\n",
 	       current->comm, current->pid);
 	if (!user_mode(regs))

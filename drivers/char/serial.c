@@ -1766,11 +1766,13 @@ static void change_speed(struct async_struct *info,
 		if (I_IGNPAR(info->tty))
 			info->ignore_status_mask |= UART_LSR_OE;
 	}
+#if 0 /* breaks serial console during boot stage */
 	/*
 	 * !!! ignore all characters if CREAD is not set
 	 */
 	if ((cflag & CREAD) == 0)
 		info->ignore_status_mask |= UART_LSR_DR;
+#endif
 	save_flags(flags); cli();
 	if (uart_config[info->state->type].flags & UART_STARTECH) {
 		serial_outp(info, UART_LCR, 0xBF);
@@ -5763,7 +5765,7 @@ static inline void wait_for_xmitr(struct async_struct *info)
  *	Print a string to the serial port trying not to disturb
  *	any possible real use of the port...
  *
- *	The console_lock must be held when we get here.
+ *	The console must be locked when we get here.
  */
 static void serial_console_write(struct console *co, const char *s,
 				unsigned count)

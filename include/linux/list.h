@@ -3,6 +3,8 @@
 
 #if defined(__KERNEL__) || defined(_LVM_H_INCLUDE)
 
+#include <linux/prefetch.h>
+
 /*
  * Simple doubly linked list implementation.
  *
@@ -90,6 +92,7 @@ static __inline__ void __list_del(struct list_head * prev,
 static __inline__ void list_del(struct list_head *entry)
 {
 	__list_del(entry->prev, entry->next);
+	entry->next = entry->prev = 0;
 }
 
 /**
@@ -147,8 +150,9 @@ static __inline__ void list_splice(struct list_head *list, struct list_head *hea
  * @head:	the head for your list.
  */
 #define list_for_each(pos, head) \
-	for (pos = (head)->next; pos != (head); pos = pos->next)
-
+	for (pos = (head)->next, prefetch(pos->next); pos != (head); \
+        	pos = pos->next, prefetch(pos->next))
+        	
 #endif /* __KERNEL__ || _LVM_H_INCLUDE */
 
 #endif

@@ -87,6 +87,9 @@ checks:
 
 BOOT_TARGETS = zImage zImage.initrd znetboot znetboot.initrd
 
+# All the instructions talk about "make bzImage".
+bzImage: zImage
+
 $(BOOT_TARGETS): $(CHECKS) vmlinux
 	@$(MAKEBOOT) $@
 

@@ -85,9 +85,6 @@ struct thread_struct {
 #define FAULT_CODE_ITLB		0x04	/* Miss happened in I-TLB		*/
 #define FAULT_CODE_WINFIXUP	0x08	/* Miss happened during spill/fill	*/
 
-#define INIT_MMAP { &init_mm, 0xfffff80000000000, 0xfffff80001000000, \
-		    NULL, PAGE_SHARED , VM_READ | VM_WRITE | VM_EXEC, 1, NULL, NULL }
-
 #define INIT_THREAD  {					\
 /* ksp, wstate, cwp, flags, current_ds, */ 		\
    0,   0,      0,   0,     KERNEL_DS,			\

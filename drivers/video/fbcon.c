@@ -1150,11 +1150,13 @@ static void fbcon_redraw(struct vc_data *conp, struct display *p,
 	    	}
 	    }
 	    scr_writew(c, d);
+	    console_conditional_schedule();
 	    s++;
 	    d++;
 	} while (s < le);
 	if (s > start)
 	    p->dispsw->putcs(conp, p, start, s - start, real_y(p, line), x);
+	console_conditional_schedule();
 	if (offset > 0)
 		line++;
 	else {

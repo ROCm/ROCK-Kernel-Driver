@@ -78,8 +78,6 @@ struct thread_struct {
 	unsigned char  fpstate[FPSTATESIZE];  /* floating point state */
 };
 
-#define INIT_MMAP { &init_mm, 0, 0x40000000, NULL, __pgprot(_PAGE_PRESENT|_PAGE_ACCESSED), VM_READ | VM_WRITE | VM_EXEC, 1, NULL, NULL }
-
 #define INIT_THREAD  { \
 	sizeof(init_stack) + (unsigned long) init_stack, 0, \
 	PS_S, __KERNEL_DS, \

@@ -128,6 +128,18 @@ dik_show_trace(unsigned long *sp)
 	printk("\n");
 }
 
+void show_trace_task(struct task_struct * tsk)
+{
+	struct thread_struct * thread = &tsk->thread;
+	unsigned long fp, sp = thread->ksp, base = (unsigned long) thread;
+ 
+	if (sp > base && sp+6*8 < base + 16*1024) {
+		fp = ((unsigned long*)sp)[6];
+		if (fp > sp && fp < base + 16*1024)
+			dik_show_trace((unsigned long *)fp);
+	}
+}
+
 int kstack_depth_to_print = 24;
 
 void show_stack(unsigned long *sp)
@@ -299,6 +311,7 @@ do_entIF(unsigned long type, unsigned long a1,
 	      case 3: /* FEN fault */
 	      case 5: /* illoc */
 	      default: /* unexpected instruction-fault type */
+		      ;
 	}
 	send_sig(SIGILL, current, 1);
 }

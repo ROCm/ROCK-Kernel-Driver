@@ -36,9 +36,9 @@ static inline int mlock_fixup_start(struct vm_area_struct * vma,
 		get_file(n->vm_file);
 	if (n->vm_ops && n->vm_ops->open)
 		n->vm_ops->open(n);
+	vma->vm_pgoff += (end - vma->vm_start) >> PAGE_SHIFT;
 	lock_vma_mappings(vma);
 	spin_lock(&vma->vm_mm->page_table_lock);
-	vma->vm_pgoff += (end - vma->vm_start) >> PAGE_SHIFT;
 	vma->vm_start = end;
 	__insert_vm_struct(current->mm, n);
 	spin_unlock(&vma->vm_mm->page_table_lock);
@@ -100,13 +100,13 @@ static inline int mlock_fixup_middle(struct vm_area_struct * vma,
 		vma->vm_ops->open(left);
 		vma->vm_ops->open(right);
 	}
+	vma->vm_raend = 0;
+	vma->vm_pgoff += (start - vma->vm_start) >> PAGE_SHIFT;
 	lock_vma_mappings(vma);
 	spin_lock(&vma->vm_mm->page_table_lock);
-	vma->vm_pgoff += (start - vma->vm_start) >> PAGE_SHIFT;
 	vma->vm_start = start;
 	vma->vm_end = end;
 	vma->vm_flags = newflags;
-	vma->vm_raend = 0;
 	__insert_vm_struct(current->mm, left);
 	__insert_vm_struct(current->mm, right);
 	spin_unlock(&vma->vm_mm->page_table_lock);

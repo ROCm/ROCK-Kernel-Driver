@@ -93,6 +93,9 @@ static inline void console_verbose(void)
 		console_loglevel = 15;
 }
 
+extern void bust_spinlocks(int yes);
+extern int oops_in_progress;		/* If set, an oops, panic(), BUG() or die() is in progress */
+
 #if DEBUG
 #define pr_debug(fmt,arg...) \
 	printk(KERN_DEBUG fmt,##arg)

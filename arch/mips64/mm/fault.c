@@ -58,7 +58,7 @@ dodebug2(abi64_no_regargs, struct pt_regs regs)
 	printk("Got exception 0x%lx at 0x%lx\n", retaddr, regs.cp0_epc);
 }
 
-extern spinlock_t console_lock, timerlist_lock;
+extern spinlock_t timerlist_lock;
 
 /*
  * Unlock any spinlocks which will prevent us from getting the
@@ -226,6 +226,7 @@ no_context:
                (unsigned int) regs->regs[31]);
 	die("Oops", regs, write);
 	do_exit(SIGKILL);
+	bust_spinlocks(0);
 
 /*
  * We ran out of memory, or some other thing happened to us that made

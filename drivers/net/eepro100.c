@@ -349,14 +349,17 @@ enum commands {
 /* Clear CmdSuspend (1<<30) avoiding interference with the card access to the
    status bits.  Previous driver versions used separate 16 bit fields for
    commands and statuses.  --SAW
-   FIXME: it may not work on non-IA32 architectures.
  */
-#if defined(__LITTLE_ENDIAN)
-#define clear_suspend(cmd)  ((__u16 *)&(cmd)->cmd_status)[1] &= ~0x4000
-#elif defined(__BIG_ENDIAN)
-#define clear_suspend(cmd)  ((__u16 *)&(cmd)->cmd_status)[1] &= ~0x0040
+#if defined(__alpha__)
+# define clear_suspend(cmd)  clear_bit(30, &(cmd)->cmd_status);
 #else
-#error Unsupported byteorder
+# if defined(__LITTLE_ENDIAN)
+#  define clear_suspend(cmd)  ((__u16 *)&(cmd)->cmd_status)[1] &= ~0x4000
+# elif defined(__BIG_ENDIAN)
+#  define clear_suspend(cmd)  ((__u16 *)&(cmd)->cmd_status)[1] &= ~0x0040
+# else
+#  error Unsupported byteorder
+# endif
 #endif
 
 enum SCBCmdBits {

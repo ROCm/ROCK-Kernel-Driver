@@ -26,6 +26,7 @@
 #include <linux/interrupt.h>
 #include <linux/kernel_stat.h>
 #include <linux/completion.h>
+#include <linux/prefetch.h>
 
 #include <asm/uaccess.h>
 #include <asm/mmu_context.h>
@@ -246,7 +247,7 @@ send_now_idle:
 	 */
 	oldest_idle = (cycles_t) -1;
 	target_tsk = NULL;
-	max_prio = 1;
+	max_prio = 0;
 
 	for (i = 0; i < smp_num_cpus; i++) {
 		cpu = cpu_logical_map(i);
@@ -292,7 +293,7 @@ send_now_idle:
 	struct task_struct *tsk;
 
 	tsk = cpu_curr(this_cpu);
-	if (preemption_goodness(tsk, p, this_cpu) > 1)
+	if (preemption_goodness(tsk, p, this_cpu) > 0)
 		tsk->need_resched = 1;
 #endif
 }
@@ -534,6 +535,8 @@ asmlinkage void schedule(void)
 	struct task_struct *prev, *next, *p;
 	struct list_head *tmp;
 	int this_cpu, c;
+
+	spin_lock_prefetch(&runqueue_lock);
 
 	if (!current->active_mm) BUG();
 need_resched_back:
@@ -1173,7 +1176,7 @@ static void show_task(struct task_struct * p)
 	else
 		printk(" (NOTLB)\n");
 
-#if defined(CONFIG_X86) || defined(CONFIG_SPARC64) || defined(CONFIG_ARM)
+#if defined(CONFIG_X86) || defined(CONFIG_SPARC64) || defined(CONFIG_ARM) || defined(CONFIG_ALPHA)
 /* This is very useful, but only works on ARM, x86 and sparc64 right now */
 	{
 		extern void show_trace_task(struct task_struct *tsk);
@@ -1211,8 +1214,14 @@ void show_state(void)
 	printk("  task                 PC        stack   pid father child younger older\n");
 #endif
 	read_lock(&tasklist_lock);
-	for_each_task(p)
+	for_each_task(p) {
+		/*
+		 * reset the NMI-timeout, listing all files on a slow
+		 * console might take alot of time:
+		 */
+		touch_nmi_watchdog();
 		show_task(p);
+	}
 	read_unlock(&tasklist_lock);
 }
 

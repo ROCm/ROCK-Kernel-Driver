@@ -158,9 +158,9 @@ __asm__( \
 	"\n" __ALIGN_STR"\n" \
 	"common_interrupt:\n\t" \
 	SAVE_ALL \
-	"pushl $ret_from_intr\n\t" \
 	SYMBOL_NAME_STR(call_do_IRQ)":\n\t" \
-	"jmp "SYMBOL_NAME_STR(do_IRQ));
+	"call " SYMBOL_NAME_STR(do_IRQ) "\n\t" \
+	"jmp ret_from_intr\n");
 
 /* 
  * subtle. orig_eax is used by the signal code to distinct between

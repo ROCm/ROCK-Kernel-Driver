@@ -468,6 +468,7 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 
 	spin_lock_bh(&call_lock);
 	call_data = &data;
+	wmb();
 	/* Send a message to all other CPUs and wait for them to respond */
 	send_IPI_allbutself(CALL_FUNCTION_VECTOR);
 
@@ -531,12 +532,15 @@ asmlinkage void smp_call_function_interrupt(void)
 	 * Notify initiating CPU that I've grabbed the data and am
 	 * about to execute the function
 	 */
+	mb();
 	atomic_inc(&call_data->started);
 	/*
 	 * At this point the info structure may be out of scope unless wait==1
 	 */
 	(*func)(info);
-	if (wait)
+	if (wait) {
+		mb();
 		atomic_inc(&call_data->finished);
+	}
 }
 

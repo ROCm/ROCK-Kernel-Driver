@@ -11,7 +11,7 @@ extern struct page *highmem_start_page;
 #include <asm/highmem.h>
 
 /* declarations for linux/mm/highmem.c */
-FASTCALL(unsigned int nr_free_highpages(void));
+unsigned int nr_free_highpages(void);
 
 extern struct buffer_head * create_bounce(int rw, struct buffer_head * bh_orig);
 

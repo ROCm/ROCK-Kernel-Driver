@@ -283,8 +283,9 @@
 #define	LVM_MAX_STRIPES		128	/* max # of stripes */
 #define	LVM_MAX_SIZE            ( 1024LU * 1024 / SECTOR_SIZE * 1024 * 1024)	/* 1TB[sectors] */
 #define	LVM_MAX_MIRRORS    	2	/* future use */
-#define	LVM_MIN_READ_AHEAD	2	/* minimum read ahead sectors */
-#define	LVM_MAX_READ_AHEAD	120	/* maximum read ahead sectors */
+#define	LVM_MIN_READ_AHEAD	0	/* minimum read ahead sectors */
+#define	LVM_DEFAULT_READ_AHEAD	1024	/* default read ahead sectors for 512k scsi segments */
+#define	LVM_MAX_READ_AHEAD	10000	/* maximum read ahead sectors */
 #define	LVM_MAX_LV_IO_TIMEOUT	60	/* seconds I/O timeout (future use) */
 #define	LVM_PARTITION           0xfe	/* LVM partition id */
 #define	LVM_NEW_PARTITION       0x8e	/* new LVM partition id (10/09/1999) */

@@ -931,7 +931,7 @@ byte ide_dump_status (ide_drive_t *drive, const char *msg, byte stat)
 					  cur & 0xf,
 					  IN_BYTE(IDE_SECTOR_REG));
 				}
-				if (HWGROUP(drive)->rq)
+				if (HWGROUP(drive) && HWGROUP(drive)->rq)
 					printk(", sector=%ld", HWGROUP(drive)->rq->sector);
 			}
 		}

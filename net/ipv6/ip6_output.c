@@ -726,7 +726,7 @@ int ip6_forward(struct sk_buff *skb)
 	struct ipv6hdr *hdr = skb->nh.ipv6h;
 	struct inet6_skb_parm *opt =(struct inet6_skb_parm*)skb->cb;
 	
-	if (ipv6_devconf.forwarding == 0 && opt->srcrt == 0)
+	if (ipv6_devconf.forwarding == 0)
 		goto error;
 
 	skb->ip_summed = CHECKSUM_NONE;

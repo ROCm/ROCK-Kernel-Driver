@@ -144,7 +144,6 @@ inline int vmalloc_area_pages (unsigned long address, unsigned long size,
 	int ret;
 
 	dir = pgd_offset_k(address);
-	flush_cache_all();
 	spin_lock(&init_mm.page_table_lock);
 	do {
 		pmd_t *pmd;
@@ -164,7 +163,6 @@ inline int vmalloc_area_pages (unsigned long address, unsigned long size,
 		ret = 0;
 	} while (address && (address < end));
 	spin_unlock(&init_mm.page_table_lock);
-	flush_tlb_all();
 	return ret;
 }
 

@@ -38,7 +38,7 @@ irq_desc_t irq_desc[NR_IRQS] __cacheline_aligned = {
 
 static void register_irq_proc(unsigned int irq);
 
-unsigned long irq_err_count;
+volatile unsigned long irq_err_count;
 
 /*
  * Special irq handlers.

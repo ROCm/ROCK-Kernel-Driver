@@ -100,7 +100,7 @@ static int rd_hardsec[NUM_RAMDISKS];		/* Size of real blocks in bytes */
 static int rd_blocksizes[NUM_RAMDISKS];		/* Size of 1024 byte blocks :)  */
 static int rd_kbsize[NUM_RAMDISKS];		/* Size in blocks of 1024 bytes */
 static devfs_handle_t devfs_handle;
-static struct block_device *rd_bdev[NUM_RAMDISKS];/* Protected device data */
+static struct inode *rd_inode[NUM_RAMDISKS];	/* Protected device inodes */
 
 /*
  * Parameters for the boot-loading of the RAM disk.  These are set by
@@ -186,6 +186,79 @@ __setup("ramdisk_blocksize=", ramdisk_blocksize);
 
 #endif
 
+static int rd_blkdev_pagecache_IO(int rw, struct buffer_head * sbh, int minor)
+{
+	struct address_space * mapping = rd_inode[minor]->i_mapping;
+	unsigned long index;
+	int offset, size, err = 0;
+
+	if (sbh->b_page->mapping == mapping) {
+		if (rw != READ)
+			SetPageDirty(sbh->b_page);
+		goto out;
+	}
+
+	index = sbh->b_rsector >> (PAGE_CACHE_SHIFT - 9);
+	offset = (sbh->b_rsector << 9) & ~PAGE_CACHE_MASK;
+	size = sbh->b_size;
+
+	do {
+		int count;
+		struct page ** hash;
+		struct page * page;
+		const char * src;
+		char * dst;
+		int unlock = 0;
+
+		count = PAGE_CACHE_SIZE - offset;
+		if (count > size)
+			count = size;
+		size -= count;
+
+		hash = page_hash(mapping, index);
+		page = __find_get_page(mapping, index, hash);
+		if (!page && rw != READ) {
+			page = grab_cache_page(mapping, index);
+			err = -ENOMEM;
+			if (!page)
+				goto out;
+			err = 0;
+			unlock = 1;
+		}
+
+		index++;
+		if (!page) {
+			offset = 0;
+			continue;
+		}
+
+		if (rw == READ) {
+			src = kmap(page);
+			src += offset;
+			dst = bh_kmap(sbh);
+		} else {
+			dst = kmap(page);
+			dst += offset;
+			src = bh_kmap(sbh);
+		}
+		offset = 0;
+
+		memcpy(dst, src, count);
+
+		kunmap(page);
+		bh_kunmap(sbh);
+
+		if (rw != READ)
+			SetPageDirty(page);
+		if (unlock)
+			UnlockPage(page);
+		__free_page(page);
+	} while (size);
+
+ out:
+	return err;
+}
+
 /*
  *  Basically, my strategy here is to set up a buffer-head which can't be
  *  deleted, and make that my Ramdisk.  If the request is outside of the
@@ -198,10 +271,7 @@ static int rd_make_request(request_queue_t * q, int rw, struct buffer_head *sbh)
 {
 	unsigned int minor;
 	unsigned long offset, len;
-	struct buffer_head *rbh;
-	char *bdata;
 
-	
 	minor = MINOR(sbh->b_rdev);
 
 	if (minor >= NUM_RAMDISKS)
@@ -221,20 +291,8 @@ static int rd_make_request(request_queue_t * q, int rw, struct buffer_head *sbh)
 		goto fail;
 	}
 
-	rbh = getblk(sbh->b_rdev, sbh->b_rsector/(sbh->b_size>>9), sbh->b_size);
-	/* I think that it is safe to assume that rbh is not in HighMem, though
-	 * sbh might be - NeilBrown
-	 */
-	bdata = bh_kmap(sbh);
-	if (rw == READ) {
-		if (sbh != rbh)
-			memcpy(bdata, rbh->b_data, rbh->b_size);
-	} else
-		if (sbh != rbh)
-			memcpy(rbh->b_data, bdata, rbh->b_size);
-	bh_kunmap(sbh);
-	mark_buffer_protected(rbh);
-	brelse(rbh);
+	if (rd_blkdev_pagecache_IO(rw, sbh, minor))
+		goto fail;
 
 	sbh->b_end_io(sbh,1);
 	return 0;
@@ -259,10 +317,21 @@ static int rd_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 			/* special: we want to release the ramdisk memory,
 			   it's not like with the other blockdevices where
 			   this ioctl only flushes away the buffer cache. */
-			if ((atomic_read(&rd_bdev[minor]->bd_openers) > 2))
-				return -EBUSY;
-			destroy_buffers(inode->i_rdev);
-			rd_blocksizes[minor] = 0;
+			{
+				struct block_device * bdev = inode->i_bdev;
+
+				down(&bdev->bd_sem);
+				if (bdev->bd_openers > 2) {
+					up(&bdev->bd_sem);
+					return -EBUSY;
+				}
+				bdev->bd_openers--;
+				bdev->bd_cache_openers--;
+				iput(rd_inode[minor]);
+				rd_inode[minor] = NULL;
+				rd_blocksizes[minor] = rd_blocksize;
+				up(&bdev->bd_sem);
+			}
 			break;
 
          	case BLKGETSIZE:   /* Return device size */
@@ -305,20 +374,16 @@ static int initrd_release(struct inode *inode,struct file *file)
 {
 	extern void free_initrd_mem(unsigned long, unsigned long);
 
-	lock_kernel();
 	if (!--initrd_users) {
-		blkdev_put(inode->i_bdev, BDEV_FILE);
 		free_initrd_mem(initrd_start, initrd_end);
 		initrd_start = 0;
 	}
-	unlock_kernel();
 	return 0;
 }
 
 
 static struct file_operations initrd_fops = {
 	read:		initrd_read,
-	release:	initrd_release,
 };
 
 #endif
@@ -326,26 +391,37 @@ static struct file_operations initrd_fops = {
 
 static int rd_open(struct inode * inode, struct file * filp)
 {
-	int unit = DEVICE_NR(inode->i_rdev);
-
 #ifdef CONFIG_BLK_DEV_INITRD
-	if (unit == INITRD_MINOR) {
+	if (DEVICE_NR(inode->i_rdev) == INITRD_MINOR) {
+		static struct block_device_operations initrd_bd_op = {
+			open:		rd_open,
+			release:	initrd_release,
+		};
+
 		if (!initrd_start) return -ENODEV;
 		initrd_users++;
 		filp->f_op = &initrd_fops;
+		inode->i_bdev->bd_op = &initrd_bd_op;
 		return 0;
 	}
 #endif
 
-	if (unit >= NUM_RAMDISKS)
+	if (DEVICE_NR(inode->i_rdev) >= NUM_RAMDISKS)
 		return -ENXIO;
 
 	/*
 	 * Immunize device against invalidate_buffers() and prune_icache().
 	 */
-	if (rd_bdev[unit] == NULL) {
-		rd_bdev[unit] = bdget(kdev_t_to_nr(inode->i_rdev));
-		atomic_inc(&rd_bdev[unit]->bd_openers);
+	if (rd_inode[DEVICE_NR(inode->i_rdev)] == NULL) {
+		if (!inode->i_bdev) return -ENXIO;
+		if ((rd_inode[DEVICE_NR(inode->i_rdev)] = igrab(inode)) != NULL) {
+			struct block_device *bdev = inode->i_bdev;
+
+			/* bdev->bd_sem is held by caller */
+			bdev->bd_openers++;
+			bdev->bd_cache_openers++;
+			bdev->bd_inode = inode;
+		}
 	}
 
 	MOD_INC_USE_COUNT;
@@ -359,7 +435,7 @@ static int rd_release(struct inode * inode, struct file * filp)
 	return 0;
 }
 
-static struct block_device_operations fd_fops = {
+static struct block_device_operations rd_bd_op = {
 	open:		rd_open,
 	release:	rd_release,
 	ioctl:		rd_ioctl,
@@ -372,11 +448,18 @@ static void __exit rd_cleanup (void)
 	int i;
 
 	for (i = 0 ; i < NUM_RAMDISKS; i++) {
-		struct block_device *bdev = rd_bdev[i];
-		rd_bdev[i] = NULL;
-		if (bdev) {
-			blkdev_put(bdev, BDEV_FILE);
-			bdput(bdev);
+		if (rd_inode[i]) {
+			/* withdraw invalidate_buffers() and prune_icache() immunity */
+			struct block_device *bdev = rd_inode[i]->i_bdev;
+
+			down(&bdev->bd_sem);
+			bdev->bd_openers--;
+			bdev->bd_cache_openers--;
+			up(&bdev->bd_sem);
+
+			/* remove stale pointer to module address space */
+			rd_inode[i]->i_bdev->bd_op = NULL;
+			iput(rd_inode[i]);
 		}
 		destroy_buffers(MKDEV(MAJOR_NR, i));
 	}
@@ -402,7 +485,7 @@ int __init rd_init (void)
 		rd_blocksize = BLOCK_SIZE;
 	}
 
-	if (register_blkdev(MAJOR_NR, "ramdisk", &fd_fops)) {
+	if (register_blkdev(MAJOR_NR, "ramdisk", &rd_bd_op)) {
 		printk("RAMDISK: Could not get major %d", MAJOR_NR);
 		return -EIO;
 	}
@@ -420,14 +503,14 @@ int __init rd_init (void)
 	devfs_register_series (devfs_handle, "%u", NUM_RAMDISKS,
 			       DEVFS_FL_DEFAULT, MAJOR_NR, 0,
 			       S_IFBLK | S_IRUSR | S_IWUSR,
-			       &fd_fops, NULL);
+			       &rd_bd_op, NULL);
 
 	for (i = 0; i < NUM_RAMDISKS; i++)
-		register_disk(NULL, MKDEV(MAJOR_NR,i), 1, &fd_fops, rd_size<<1);
+		register_disk(NULL, MKDEV(MAJOR_NR,i), 1, &rd_bd_op, rd_size<<1);
 
 #ifdef CONFIG_BLK_DEV_INITRD
 	/* We ought to separate initrd operations here */
-	register_disk(NULL, MKDEV(MAJOR_NR,INITRD_MINOR), 1, &fd_fops, rd_size<<1);
+	register_disk(NULL, MKDEV(MAJOR_NR,INITRD_MINOR), 1, &rd_bd_op, rd_size<<1);
 #endif
 
 	hardsect_size[MAJOR_NR] = rd_hardsec;		/* Size of the RAM disk blocks */
@@ -597,8 +680,10 @@ static void __init rd_load_image(kdev_t device, int offset, int unit)
 	outfile.f_op = &def_blk_fops;
 	init_special_inode(out_inode, S_IFBLK | S_IRUSR | S_IWUSR, kdev_t_to_nr(ram_device));
 
-	if (blkdev_open(inode, &infile) != 0)
+	if (blkdev_open(inode, &infile) != 0) {
+		iput(out_inode);
 		goto free_inode;
+	}
 	if (blkdev_open(out_inode, &outfile) != 0)
 		goto free_inodes;
 
@@ -661,14 +746,15 @@ static void __init rd_load_image(kdev_t device, int offset, int unit)
 		if (i && (i % devblocks == 0)) {
 			printk("done disk #%d.\n", i/devblocks);
 			rotate = 0;
-			invalidate_buffers(device);
-			if (infile.f_op->release)
-				infile.f_op->release(inode, &infile);
+			if (blkdev_close(inode, &infile) != 0) {
+				printk("Error closing the disk.\n");
+				goto noclose_input;
+			}
 			printk("Please insert disk #%d and press ENTER\n", i/devblocks+1);
 			wait_for_keypress();
 			if (blkdev_open(inode, &infile) != 0)  {
 				printk("Error opening disk.\n");
-				goto done;
+				goto noclose_input;
 			}
 			infile.f_pos = 0;
 			printk("Loading disk #%d... ", i/devblocks+1);
@@ -686,18 +772,20 @@ static void __init rd_load_image(kdev_t device, int offset, int unit)
 	kfree(buf);
 
 successful_load:
-	invalidate_buffers(device);
 	ROOT_DEV = MKDEV(MAJOR_NR, unit);
 	if (ROOT_DEVICE_NAME != NULL) strcpy (ROOT_DEVICE_NAME, "rd/0");
 
 done:
-	if (infile.f_op->release)
-		infile.f_op->release(inode, &infile);
+	blkdev_close(inode, &infile);
+noclose_input:
+	blkdev_close(out_inode, &outfile);
+	iput(inode);
+	iput(out_inode);
 	set_fs(fs);
 	return;
 free_inodes: /* free inodes on error */ 
 	iput(out_inode);
-	blkdev_put(inode->i_bdev, BDEV_FILE);
+	blkdev_close(inode, &infile);
 free_inode:
 	iput(inode);
 }

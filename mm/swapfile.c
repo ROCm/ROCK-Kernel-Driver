@@ -31,25 +31,6 @@ struct swap_list_t swap_list = {-1, -1};
 
 struct swap_info_struct swap_info[MAX_SWAPFILES];
 
-/*
- * When swap space gets filled up, we will set this flag.
- * This will make do_swap_page(), in the page fault path,
- * free swap entries on swapin so we'll reclaim swap space
- * in order to be able to swap something out.
- *
- * At the moment we start reclaiming when swap usage goes
- * over 80% of swap space.
- *
- * XXX: Random numbers, fixme.
- */
-#define SWAP_FULL_PCT 80
-int vm_swap_full (void)
-{
-	int swap_used = total_swap_pages - nr_swap_pages;
-
-	return swap_used * 100 > total_swap_pages * SWAP_FULL_PCT;
-}
-
 #define SWAPFILE_CLUSTER 256
 
 static inline int scan_swap_map(struct swap_info_struct *si, unsigned short count)
@@ -471,7 +452,6 @@ static int try_to_unuse(unsigned int type)
 		lock_page(page);
 		if (PageSwapCache(page))
 			delete_from_swap_cache_nolock(page);
-		SetPageDirty(page);
 		UnlockPage(page);
 		flush_page_to_ram(page);
 
@@ -512,6 +492,7 @@ static int try_to_unuse(unsigned int type)
 			mmput(start_mm);
 			start_mm = new_start_mm;
 		}
+		ClearPageDirty(page);
 		page_cache_release(page);
 
 		/*

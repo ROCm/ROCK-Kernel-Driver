@@ -88,6 +88,7 @@ APISOURCES :=	$(TOPDIR)/drivers/media/video/videodev.c \
 		$(TOPDIR)/arch/i386/kernel/mca.c \
 		$(TOPDIR)/arch/i386/kernel/mtrr.c \
 		$(TOPDIR)/drivers/char/misc.c \
+		$(TOPDIR)/kernel/printk.c \
 		$(TOPDIR)/drivers/net/net_init.c \
 		$(TOPDIR)/drivers/net/8390.c \
 		$(TOPDIR)/drivers/char/serial.c \

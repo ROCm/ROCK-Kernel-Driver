@@ -33,6 +33,7 @@
 #include <linux/kbd_kern.h>
 #include <linux/vt_kern.h>
 #include <linux/smp_lock.h>
+#include <linux/kd.h>
 
 #include <asm/keyboard.h>
 #include <asm/bitops.h>

@@ -68,13 +68,6 @@ struct thread_struct {
 	EXTRA_THREAD_STRUCT
 };
 
-#define INIT_MMAP {					\
-	vm_mm:		&init_mm,			\
-	vm_page_prot:	PAGE_SHARED,			\
-	vm_flags:	VM_READ | VM_WRITE | VM_EXEC,	\
-	vm_avl_height:	1,				\
-}
-
 #define INIT_THREAD  {					\
 	refcount:	ATOMIC_INIT(1),			\
 	EXTRA_THREAD_STRUCT_INIT			\

@@ -128,9 +128,14 @@ static __inline__ void pte_free_slow(pte_t *pte)
 	free_page((unsigned long)pte);
 }
 
-#define pte_free(pte)		pte_free_slow(pte)
+#define pte_free(pte)		pte_free_fast(pte)
+#ifdef CONFIG_X86_PAE
+#define pgd_alloc(mm)		get_pgd_slow()
 #define pgd_free(pgd)		free_pgd_slow(pgd)
+#else
 #define pgd_alloc(mm)		get_pgd_fast()
+#define pgd_free(pgd)		free_pgd_fast(pgd)
+#endif
 
 /*
  * allocating and freeing a pmd is trivial: the 1-entry pmd is

@@ -141,11 +141,7 @@ void pdc_console_die(void)
 	--pdc_console_initialized;
 	
 #ifdef CONFIG_VT_CONSOLE
-	{
-	    /* fixme (needed?): Wait for console-tasklet to finish !*/
-	    extern struct tasklet_struct console_tasklet;
-    	    tasklet_schedule(&console_tasklet);
-	}
+	schedule_console_callback();
 #endif
 
 	unregister_console(&pdc_cons);

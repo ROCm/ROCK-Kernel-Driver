@@ -77,6 +77,7 @@ static inline int lo_do_transfer(struct loop_device *lo, int cmd, char *rbuf,
  */
 #define LO_FLAGS_DO_BMAP	1
 #define LO_FLAGS_READ_ONLY	2
+#define LO_FLAGS_BH_REMAP	4
 
 /* 
  * Note that this structure gets the wrong offsets when directly used

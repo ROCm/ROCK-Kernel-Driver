@@ -391,6 +391,7 @@ void show_regs(struct pt_regs * regs)
 	unsigned long cr0 = 0L, cr2 = 0L, cr3 = 0L, cr4 = 0L;
 
 	printk("\n");
+	printk("Pid: %d, comm: %20s\n", current->pid, current->comm);
 	printk("EIP: %04x:[<%08lx>] CPU: %d",0xffff & regs->xcs,regs->eip, smp_processor_id());
 	if (regs->xcs & 3)
 		printk(" ESP: %04x:%08lx",0xffff & regs->xss,regs->esp);

@@ -60,7 +60,7 @@ extern void kmem_cache_free(kmem_cache_t *, void *);
 extern void *kmalloc(size_t, int);
 extern void kfree(const void *);
 
-extern void kmem_cache_reap(int);
+extern int FASTCALL(kmem_cache_reap(int));
 extern int slabinfo_read_proc(char *page, char **start, off_t off,
 				 int count, int *eof, void *data);
 extern int slabinfo_write_proc(struct file *file, const char *buffer,

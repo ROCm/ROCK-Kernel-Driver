@@ -23,17 +23,6 @@
  */
 static int swap_writepage(struct page *page)
 {
-	/* One for the page cache, one for this user, one for page->buffers */
-	if (page_count(page) > 2 + !!page->buffers)
-		goto in_use;
-	if (swap_count(page) > 1)
-		goto in_use;
-
-	delete_from_swap_cache_nolock(page);
-	UnlockPage(page);
-	return 0;
-
-in_use:
 	rw_swap_page(WRITE, page);
 	return 0;
 }
@@ -81,9 +70,8 @@ void add_to_swap_cache(struct page *page, swp_entry_t entry)
 		BUG();
 
 	/* clear PG_dirty so a subsequent set_page_dirty takes effect */
-	flags = page->flags & ~((1 << PG_error) | (1 << PG_dirty) | (1 << PG_arch_1));
+	flags = page->flags & ~(1 << PG_error | 1 << PG_dirty | 1 << PG_arch_1 | 1 << PG_referenced);
 	page->flags = flags | (1 << PG_uptodate);
-	page->age = PAGE_AGE_START;
 	add_to_page_cache_locked(page, &swapper_space, entry.val);
 }
 

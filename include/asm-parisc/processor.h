@@ -107,9 +107,6 @@ struct thread_struct {
 /* Thread struct flags. */
 #define PARISC_KERNEL_DEATH	(1UL << 31)	/* see die_if_kernel()... */
 
-#define INIT_MMAP { &init_mm, 0, 0, NULL, PAGE_SHARED, \
-		    VM_READ | VM_WRITE | VM_EXEC, 1, NULL, NULL }
-
 #define INIT_THREAD { {			\
 	{ 0, 0, 0, 0, 0, 0, 0, 0,	\
 	  0, 0, 0, 0, 0, 0, 0, 0,	\

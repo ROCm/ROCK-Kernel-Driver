@@ -29,11 +29,9 @@
 static inline void show(char *str, spinlock_t *lock, unsigned long caller)
 {
 	int cpu = smp_processor_id();
-	extern spinlock_t console_lock;
 
-	if (lock != &console_lock)
-		printk("%s(%p) CPU#%d stuck at %08lx, owner PC(%08lx):CPU(%lx)\n",str,
-			lock, cpu, caller, lock->owner_pc & ~3, lock->owner_pc & 3);
+	printk("%s(%p) CPU#%d stuck at %08lx, owner PC(%08lx):CPU(%lx)\n",str,
+		lock, cpu, caller, lock->owner_pc & ~3, lock->owner_pc & 3);
 }
 
 static inline void show_read(char *str, rwlock_t *lock, unsigned long caller)

@@ -20,6 +20,8 @@
 #define O_DIRECTORY	0x10000	/* must be a directory */
 #define O_NOFOLLOW	0x20000	/* don't follow links */
 #define O_LARGEFILE	0x40000
+#define O_DIRECT        0x100000 /* direct disk access hint */
+
 
 #define F_DUPFD		0	/* dup */
 #define F_GETFD		1	/* get close_on_exec */

@@ -87,10 +87,12 @@ static devfs_handle_t devfs_handle;      /*  For the directory */
 static int transfer_none(struct loop_device *lo, int cmd, char *raw_buf,
 			 char *loop_buf, int size, int real_block)
 {
-	if (cmd == READ)
-		memcpy(loop_buf, raw_buf, size);
-	else
-		memcpy(raw_buf, loop_buf, size);
+	if (raw_buf != loop_buf) {
+		if (cmd == READ)
+			memcpy(loop_buf, raw_buf, size);
+		else
+			memcpy(raw_buf, loop_buf, size);
+	}
 
 	return 0;
 }
@@ -118,6 +120,7 @@ static int transfer_xor(struct loop_device *lo, int cmd, char *raw_buf,
 
 static int none_status(struct loop_device *lo, struct loop_info *info)
 {
+	lo->lo_flags |= LO_FLAGS_BH_REMAP;
 	return 0;
 }
 
@@ -314,9 +317,13 @@ static int do_bh_filebacked(struct loop_device *lo, struct buffer_head *bh, int 
 	return ret;
 }
 
+static void loop_end_io_transfer(struct buffer_head *bh, int uptodate);
 static void loop_put_buffer(struct buffer_head *bh)
 {
-	if (bh) {
+	/*
+	 * check b_end_io, may just be a remapped bh and not an allocated one
+	 */
+	if (bh && bh->b_end_io == loop_end_io_transfer) {
 		__free_page(bh->b_page);
 		kmem_cache_free(bh_cachep, bh);
 	}
@@ -386,6 +393,14 @@ static struct buffer_head *loop_get_buffer(struct loop_device *lo,
 {
 	struct buffer_head *bh;
 
+	/*
+	 * for xfer_funcs that can operate on the same bh, do that
+	 */
+	if (lo->lo_flags & LO_FLAGS_BH_REMAP) {
+		bh = rbh;
+		goto out_bh;
+	}
+
 	do {
 		bh = kmem_cache_alloc(bh_cachep, SLAB_NOIO);
 		if (bh)
@@ -398,9 +413,6 @@ static struct buffer_head *loop_get_buffer(struct loop_device *lo,
 
 	bh->b_size = rbh->b_size;
 	bh->b_dev = rbh->b_rdev;
-	spin_lock_irq(&lo->lo_lock);
-	bh->b_rdev = lo->lo_device;
-	spin_unlock_irq(&lo->lo_lock);
 	bh->b_state = (1 << BH_Req) | (1 << BH_Mapped) | (1 << BH_Lock);
 
 	/*
@@ -419,8 +431,14 @@ static struct buffer_head *loop_get_buffer(struct loop_device *lo,
 
 	bh->b_data = page_address(bh->b_page);
 	bh->b_end_io = loop_end_io_transfer;
-	bh->b_rsector = rbh->b_rsector + (lo->lo_offset >> 9);
+	bh->b_private = rbh;
 	init_waitqueue_head(&bh->b_wait);
+
+out_bh:
+	bh->b_rsector = rbh->b_rsector + (lo->lo_offset >> 9);
+	spin_lock_irq(&lo->lo_lock);
+	bh->b_rdev = lo->lo_device;
+	spin_unlock_irq(&lo->lo_lock);
 
 	return bh;
 }
@@ -476,8 +494,7 @@ static int loop_make_request(request_queue_t *q, int rw, struct buffer_head *rbh
 	 * piggy old buffer on original, and submit for I/O
 	 */
 	bh = loop_get_buffer(lo, rbh);
-	bh->b_private = rbh;
-	IV = loop_get_iv(lo, bh->b_rsector);
+	IV = loop_get_iv(lo, rbh->b_rsector);
 	if (rw == WRITE) {
 		set_bit(BH_Dirty, &bh->b_state);
 		if (lo_do_transfer(lo, WRITE, bh->b_data, rbh->b_data,
@@ -601,7 +618,7 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file, kdev_t dev,
 	error = -EBUSY;
 	if (lo->lo_state != Lo_unbound)
 		goto out;
-	 
+
 	error = -EBADF;
 	file = fget(arg);
 	if (!file)
@@ -621,7 +638,6 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file, kdev_t dev,
 		 * If we can't read - sorry. If we only can't write - well,
 		 * it's going to be read-only.
 		 */
-		error = -EINVAL;
 		if (!aops->readpage)
 			goto out_putf;
 

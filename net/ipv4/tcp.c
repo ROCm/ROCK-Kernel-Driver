@@ -1236,7 +1236,7 @@ static int tcp_recv_urg(struct sock * sk, long timeo,
 		msg->msg_flags|=MSG_OOB;
 
 		if(len>0) {
-			if (!(flags & MSG_PEEK) && !(flags & MSG_TRUNC))
+			if (!(flags & MSG_TRUNC))
 				err = memcpy_toiovec(msg->msg_iov, &c, 1);
 			len = 1;
 		} else

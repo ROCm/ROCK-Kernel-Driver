@@ -127,11 +127,58 @@ static inline unsigned long move_vma(struct vm_area_struct * vma,
 	unsigned long addr, unsigned long old_len, unsigned long new_len,
 	unsigned long new_addr)
 {
-	struct vm_area_struct * new_vma;
+	struct mm_struct * mm = vma->vm_mm;
+	struct vm_area_struct * new_vma, * next, * prev;
+	int allocated_vma;
 
-	new_vma = kmem_cache_alloc(vm_area_cachep, SLAB_KERNEL);
-	if (new_vma) {
-		if (!move_page_tables(current->mm, new_addr, addr, old_len)) {
+	new_vma = NULL;
+	next = find_vma_prev(mm, new_addr, &prev);
+	if (next) {
+		if (prev && prev->vm_end == new_addr &&
+		    can_vma_merge(prev, vma->vm_flags) && !vma->vm_file && !(vma->vm_flags & VM_SHARED)) {
+			spin_lock(&mm->page_table_lock);
+			prev->vm_end = new_addr + new_len;
+			spin_unlock(&mm->page_table_lock);
+			new_vma = prev;
+			if (next != prev->vm_next)
+				BUG();
+			if (prev->vm_end == next->vm_start && can_vma_merge(next, prev->vm_flags)) {
+				spin_lock(&mm->page_table_lock);
+				prev->vm_end = next->vm_end;
+				__vma_unlink(mm, next, prev);
+				spin_unlock(&mm->page_table_lock);
+
+				mm->map_count--;
+				kmem_cache_free(vm_area_cachep, next);
+			}
+		} else if (next->vm_start == new_addr + new_len &&
+			   can_vma_merge(next, vma->vm_flags) && !vma->vm_file && !(vma->vm_flags & VM_SHARED)) {
+			spin_lock(&mm->page_table_lock);
+			next->vm_start = new_addr;
+			spin_unlock(&mm->page_table_lock);
+			new_vma = next;
+		}
+	} else {
+		prev = find_vma(mm, new_addr-1);
+		if (prev && prev->vm_end == new_addr &&
+		    can_vma_merge(prev, vma->vm_flags) && !vma->vm_file && !(vma->vm_flags & VM_SHARED)) {
+			spin_lock(&mm->page_table_lock);
+			prev->vm_end = new_addr + new_len;
+			spin_unlock(&mm->page_table_lock);
+			new_vma = prev;
+		}
+	}
+
+	allocated_vma = 0;
+	if (!new_vma) {
+		new_vma = kmem_cache_alloc(vm_area_cachep, SLAB_KERNEL);
+		if (!new_vma)
+			goto out;
+		allocated_vma = 1;
+	}
+
+	if (!move_page_tables(current->mm, new_addr, addr, old_len)) {
+		if (allocated_vma) {
 			*new_vma = *vma;
 			new_vma->vm_start = new_addr;
 			new_vma->vm_end = new_addr+new_len;
@@ -142,17 +189,19 @@ static inline unsigned long move_vma(struct vm_area_struct * vma,
 			if (new_vma->vm_ops && new_vma->vm_ops->open)
 				new_vma->vm_ops->open(new_vma);
 			insert_vm_struct(current->mm, new_vma);
-			do_munmap(current->mm, addr, old_len);
-			current->mm->total_vm += new_len >> PAGE_SHIFT;
-			if (new_vma->vm_flags & VM_LOCKED) {
-				current->mm->locked_vm += new_len >> PAGE_SHIFT;
-				make_pages_present(new_vma->vm_start,
-						   new_vma->vm_end);
-			}
-			return new_addr;
 		}
-		kmem_cache_free(vm_area_cachep, new_vma);
+		do_munmap(current->mm, addr, old_len);
+		current->mm->total_vm += new_len >> PAGE_SHIFT;
+		if (new_vma->vm_flags & VM_LOCKED) {
+			current->mm->locked_vm += new_len >> PAGE_SHIFT;
+			make_pages_present(new_vma->vm_start,
+					   new_vma->vm_end);
+		}
+		return new_addr;
 	}
+	if (allocated_vma)
+		kmem_cache_free(vm_area_cachep, new_vma);
+ out:
 	return -ENOMEM;
 }
 

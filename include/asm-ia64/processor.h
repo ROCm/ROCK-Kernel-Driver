@@ -364,11 +364,6 @@ struct thread_struct {
 	struct ia64_fpreg fph[96];	/* saved/loaded on demand */
 };
 
-#define INIT_MMAP {								\
-	&init_mm, PAGE_OFFSET, PAGE_OFFSET + 0x10000000, NULL, PAGE_SHARED,	\
-        VM_READ | VM_WRITE | VM_EXEC, 1, NULL, NULL				\
-}
-
 #define INIT_THREAD {					\
 	0,				/* ksp */	\
 	0,				/* flags */	\
@@ -974,6 +969,25 @@ ia64_thash (__u64 addr)
 	return result;
 }
 
+
+#define ARCH_HAS_PREFETCH
+#define ARCH_HAS_PREFETCHW
+#define ARCH_HAS_SPINLOCK_PREFETCH
+#define PREFETCH_STRIDE 256
+
+extern inline void prefetch(const void *x)
+{
+         __asm__ __volatile__ ("lfetch [%0]" : : "r"(x));
+}
+         
+extern inline void prefetchw(const void *x)
+{
+	__asm__ __volatile__ ("lfetch.excl [%0]" : : "r"(x));
+}
+
+#define spin_lock_prefetch(x)   prefetchw(x)
+
+                  
 #endif /* !__ASSEMBLY__ */
 
 #endif /* _ASM_IA64_PROCESSOR_H */

@@ -1635,7 +1635,7 @@ static int do_md_run (mddev_t * mddev)
 	mddev->param.chunk_size = chunk_size;
 	mddev->param.personality = pnum;
 
-	if ((pnum != MULTIPATH) && (pnum != RAID1) && (pnum != LINEAR)) {
+	if ((pnum != MULTIPATH) && (pnum != RAID1)) {
 		if (!chunk_size) {
 			/*
 			 * 'default chunksize' in the old md code used to
@@ -1663,7 +1663,7 @@ static int do_md_run (mddev_t * mddev)
 		}
 	} else
 		if (chunk_size)
-			printk(KERN_INFO "RAID level %d does not need chunksize! Continuing anyway.\n", mddev->sb->level);
+			printk(KERN_INFO "md: RAID level %d does not need chunksize! Continuing anyway.\n", mddev->sb->level);
 
 	if (pnum >= MAX_PERSONALITY) {
 		MD_BUG();
@@ -1679,7 +1679,7 @@ static int do_md_run (mddev_t * mddev)
 		if (!pers[pnum])
 #endif
 		{
-			printk(KERN_ERR "md.c: personality %d is not loaded!\n",
+			printk(KERN_ERR "md: personality %d is not loaded!\n",
 				pnum);
 			return -EINVAL;
 		}
@@ -1762,7 +1762,7 @@ static int restart_array (mddev_t *mddev)
 		if (mddev->pers->restart_resync)
 			mddev->pers->restart_resync(mddev);
 	} else {
-		printk (KERN_ERR "md.c: md%d has no personality assigned.\n",
+		printk (KERN_ERR "md: md%d has no personality assigned.\n",
 			mdidx(mddev));
 		err = -EINVAL;
 	}
@@ -2262,7 +2262,7 @@ static int hot_generate_error (mddev_t * mddev, kdev_t dev)
 	if (!mddev->pers)
 		return -ENODEV;
  
-	printk("trying to generate %s error in md%d ... \n",
+	printk("md: trying to generate %s error in md%d ... \n",
 		partition_name(dev), mdidx(mddev));
  
 	rdev = find_rdev(mddev, dev);
@@ -2284,7 +2284,7 @@ static int hot_generate_error (mddev_t * mddev, kdev_t dev)
 		MD_BUG();
 		return -ENODEV;
 	}
-	printk("okay, generating error!\n");
+	printk("md: okay, generating error!\n");
 //	q->oneshot_error = 1; // disabled for now
  
 	return 0;
@@ -3080,7 +3080,7 @@ static int status_resync (char * page, mddev_t * mddev)
 	unsigned long max_blocks, resync, res, dt, db, rt;
 
 	resync = (mddev->curr_resync - atomic_read(&mddev->recovery_active))/2;
-	max_blocks = mddev->sb->size << 1;
+	max_blocks = mddev->sb->size;
 
 	/*
 	 * Should not happen.

@@ -314,7 +314,6 @@ EXPORT_SYMBOL(ppc_irq_dispatch_handler);
 EXPORT_SYMBOL(tb_ticks_per_jiffy);
 EXPORT_SYMBOL(get_wchan);
 EXPORT_SYMBOL(console_drivers);
-EXPORT_SYMBOL(console_lock);
 #ifdef CONFIG_XMON
 EXPORT_SYMBOL(xmon);
 #endif

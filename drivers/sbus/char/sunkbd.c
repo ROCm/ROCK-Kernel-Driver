@@ -514,7 +514,7 @@ static void __sunkbd_inchar(unsigned char ch, struct pt_regs *regs)
 	}
 	
 	do_poke_blanked_console = 1;
-	tasklet_schedule(&console_tasklet);
+	schedule_console_callback();
 	add_keyboard_randomness(keycode);
 
 	tty = ttytab? ttytab[fg_console]: NULL;

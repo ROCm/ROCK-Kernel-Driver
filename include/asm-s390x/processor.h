@@ -99,10 +99,6 @@ struct thread_struct
 
 typedef struct thread_struct thread_struct;
 
-#define INIT_MMAP \
-{ &init_mm, 0, 0, NULL, PAGE_SHARED, \
-VM_READ | VM_WRITE | VM_EXEC, 1, NULL,NULL }
-
 #define INIT_THREAD { (struct pt_regs *) 0,                       \
                     { 0,{{0},{0},{0},{0},{0},{0},{0},{0},{0},{0}, \
 			    {0},{0},{0},{0},{0},{0}}},            \

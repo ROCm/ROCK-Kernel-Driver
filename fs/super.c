@@ -1983,7 +1983,11 @@ int __init change_root(kdev_t new_root_dev,const char *put_old)
 			blivet = do_umount(old_rootmnt, 0);
 			mntput(old_rootmnt);
 			if (!blivet) {
-				ioctl_by_bdev(ramdisk, BLKFLSBUF, 0);
+				int ioctl_err;
+
+				ioctl_err = ioctl_by_bdev(ramdisk, BLKFLSBUF, 0);
+				if (ioctl_err)
+					printk("failed to release ramdisk %d...", ioctl_err);
 				printk("okay\n");
 				error = 0;
 			}

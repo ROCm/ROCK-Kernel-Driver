@@ -210,6 +210,7 @@ EXPORT_SYMBOL(waitfor_one_page);
 EXPORT_SYMBOL(generic_file_read);
 EXPORT_SYMBOL(do_generic_file_read);
 EXPORT_SYMBOL(generic_file_write);
+EXPORT_SYMBOL(generic_direct_IO);
 EXPORT_SYMBOL(generic_file_mmap);
 EXPORT_SYMBOL(generic_ro_fops);
 EXPORT_SYMBOL(generic_buffer_fdatasync);
@@ -284,8 +285,6 @@ EXPORT_SYMBOL(tty_unregister_driver);
 EXPORT_SYMBOL(tty_std_termios);
 
 /* block device driver support */
-EXPORT_SYMBOL(block_read);
-EXPORT_SYMBOL(block_write);
 EXPORT_SYMBOL(blksize_size);
 EXPORT_SYMBOL(hardsect_size);
 EXPORT_SYMBOL(blk_size);
@@ -315,8 +314,6 @@ EXPORT_SYMBOL(tty_hung_up_p);
 EXPORT_SYMBOL(tty_flip_buffer_push);
 EXPORT_SYMBOL(tty_get_baud_rate);
 EXPORT_SYMBOL(do_SAK);
-EXPORT_SYMBOL(console_print);
-EXPORT_SYMBOL(console_loglevel);
 
 /* filesystem registration */
 EXPORT_SYMBOL(register_filesystem);
@@ -449,7 +446,6 @@ EXPORT_SYMBOL(nr_running);
 
 /* misc */
 EXPORT_SYMBOL(panic);
-EXPORT_SYMBOL(printk);
 EXPORT_SYMBOL(sprintf);
 EXPORT_SYMBOL(snprintf);
 EXPORT_SYMBOL(sscanf);
@@ -492,6 +488,7 @@ EXPORT_SYMBOL(si_meminfo);
 EXPORT_SYMBOL(sys_tz);
 EXPORT_SYMBOL(file_fsync);
 EXPORT_SYMBOL(fsync_inode_buffers);
+EXPORT_SYMBOL(fsync_inode_data_buffers);
 EXPORT_SYMBOL(clear_inode);
 EXPORT_SYMBOL(nr_async_pages);
 EXPORT_SYMBOL(___strtok);
@@ -522,10 +519,6 @@ EXPORT_SYMBOL(disk_name);	/* for md.c */
 
 /* binfmt_aout */
 EXPORT_SYMBOL(get_write_access);
-
-/* dynamic registering of consoles */
-EXPORT_SYMBOL(register_console);
-EXPORT_SYMBOL(unregister_console);
 
 /* time */
 EXPORT_SYMBOL(get_fast_time);

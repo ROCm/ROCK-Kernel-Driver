@@ -2857,6 +2857,7 @@ static int mega_findCard (Scsi_Host_Template * pHostTmpl,
 		if (!host)
 			goto err_unmap;
 
+#if 0
 		/*
 		 * Comment the following initialization if you know 'max_sectors' is
 		 * not defined for this kernel.
@@ -2864,6 +2865,7 @@ static int mega_findCard (Scsi_Host_Template * pHostTmpl,
 		 * greatly increases the IO performance - AM
 		 */
 		host->max_sectors = 1024;
+#endif
 
 		scsi_set_pci_device(host, pdev);
 		megaCfg = (mega_host_config *) host->hostdata;

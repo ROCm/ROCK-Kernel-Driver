@@ -1299,14 +1299,9 @@ static int __devinit vortex_probe1(struct pci_dev *pdev,
 	/* The 3c59x-specific entries in the device structure. */
 	dev->open = vortex_open;
 	if (vp->full_bus_master_tx) {
-		struct sysinfo sysinfo;
-
 		dev->hard_start_xmit = boomerang_start_xmit;
-		si_meminfo(&sysinfo);
-		if (sysinfo.totalhigh == 0) {
-			/* Actually, it still should work with iommu. */
-			dev->features |= NETIF_F_SG;
-		}
+		/* Actually, it still should work with iommu. */
+		dev->features |= NETIF_F_SG;
 		if (((hw_checksums[card_idx] == -1) && (vp->drv_flags & HAS_HWCKSM)) ||
 					(hw_checksums[card_idx] == 1)) {
 				dev->features |= NETIF_F_IP_CSUM;
