@@ -3,7 +3,8 @@
 #include <linux/spinlock.h> /* For preempt_disable() */
 #include <asm/percpu.h>
 
-#define get_cpu_var(var) ({ preempt_disable(); __get_cpu_var(var); })
+/* Must be an lvalue. */
+#define get_cpu_var(var) (*({ preempt_disable(); &__get_cpu_var(var); }))
 #define put_cpu_var(var) preempt_enable()
 
 #endif /* __LINUX_PERCPU_H */
