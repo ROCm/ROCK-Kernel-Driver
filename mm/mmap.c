@@ -399,7 +399,7 @@ static int vma_merge(struct mm_struct *mm, struct vm_area_struct *prev,
 		     struct rb_node *rb_parent, unsigned long addr, 
 		     unsigned long end, unsigned long vm_flags,
 		     struct file *file, unsigned long pgoff,
-		     anon_vma_t ** anon_vma_cache)
+		     anon_vma_t ** anon_vma_cache, struct vm_policy *policy)
 {
 	struct inode *inode;
 	struct address_space *mapping;
@@ -443,6 +443,7 @@ static int vma_merge(struct mm_struct *mm, struct vm_area_struct *prev,
 	 * Can it merge with the predecessor?
 	 */
 	if (prev->vm_end == addr &&
+	    mpol_equal(vma_policy(prev), policy) && 
 	    can_vma_merge_after(prev, vm_flags, file, pgoff, anon_vma_cache)) {
 		struct vm_area_struct *next;
 
@@ -452,6 +453,7 @@ static int vma_merge(struct mm_struct *mm, struct vm_area_struct *prev,
 		next = prev->vm_next;
 		/* next cannot change under us, it's serialized by the mmap_sem */
 		if (next && end == next->vm_start &&
+		    vma_mpol_equal(prev, next) &&
 		    can_vma_merge_before(prev, next, vm_flags, file,
 					 pgoff + ((end - addr) >> PAGE_SHIFT),
 					 anon_vma_cache)) {
@@ -479,6 +481,7 @@ static int vma_merge(struct mm_struct *mm, struct vm_area_struct *prev,
 				fput(file);
 
 			mm->map_count--;
+			mpol_free(vma_policy(next));
 			kmem_cache_free(vm_area_cachep, next);
 			return 1;
 		}
@@ -504,6 +507,8 @@ static int vma_merge(struct mm_struct *mm, struct vm_area_struct *prev,
 	prev = prev->vm_next;
 	if (prev) {
  merge_next:
+  		if (!mpol_equal(policy, vma_policy(prev)))
+   			return 0;
 		if (end == prev->vm_start &&
 		    can_vma_merge_before(NULL, prev, vm_flags, file,
 					 pgoff + ((end - addr) >> PAGE_SHIFT),
@@ -683,7 +688,7 @@ munmap_back:
 	anon_vma_cache = NULL;
 	if (!file && !(vm_flags & VM_SHARED) && rb_parent)
 		if (vma_merge(mm, prev, rb_parent, addr, addr + len,
-					vm_flags, NULL, pgoff, &anon_vma_cache))
+					vm_flags, NULL, pgoff, &anon_vma_cache, NULL))
 			goto out;
 
 	/*
@@ -696,6 +701,7 @@ munmap_back:
 	if (!vma)
 		goto unacct_error;
 
+ 	mpol_set_vma_default(vma);
 	vma->vm_mm = mm;
 	vma->vm_start = addr;
 	vma->vm_end = addr + len;
@@ -746,7 +752,7 @@ munmap_back:
 
 	if (!file || !rb_parent || !vma_merge(mm, prev, rb_parent, addr,
 					      addr + len, vma->vm_flags, file, pgoff,
-					      &anon_vma_cache)) {
+					      &anon_vma_cache, vma_policy(vma))) {
 		vma->anon_vma = anon_vma_cache;
 		vma_link(mm, vma, prev, rb_link, rb_parent);
 		if (correct_wcount)
@@ -757,6 +763,7 @@ munmap_back:
 				atomic_inc(&inode->i_writecount);
 			fput(file);
 		}
+		mpol_free(vma_policy(vma));
 		kmem_cache_free(vm_area_cachep, vma);
 	}
 out:	
@@ -1164,6 +1171,7 @@ static void unmap_vma(struct mm_struct *mm, struct vm_area_struct *area)
 
 	remove_shared_vm_struct(area);
 
+	mpol_free(vma_policy(area));
 	if (area->vm_ops && area->vm_ops->close)
 		area->vm_ops->close(area);
 	if (area->vm_file)
@@ -1247,6 +1255,7 @@ detach_vmas_to_be_unmapped(struct mm_struct *mm, struct vm_area_struct *vma,
 int split_vma(struct mm_struct * mm, struct vm_area_struct * vma,
 	      unsigned long addr, int new_below)
 {
+	struct mempolicy *pol;
 	struct vm_area_struct *new;
 	struct address_space *mapping = NULL;
 	struct prio_tree_root *root = NULL;
@@ -1269,6 +1278,13 @@ int split_vma(struct mm_struct * mm, struct vm_area_struct * vma,
 		new->vm_start = addr;
 		new->vm_pgoff += ((addr - vma->vm_start) >> PAGE_SHIFT);
 	}
+
+	pol = mpol_copy(vma_policy(vma)); 
+	if (IS_ERR(pol)) { 
+		kmem_cache_free(vm_area_cachep, new); 
+		return PTR_ERR(pol);
+	} 
+	vma_set_policy(new, pol);
 
 	if (new->vm_file)
 		get_file(new->vm_file);
@@ -1454,7 +1470,7 @@ unsigned long do_brk(unsigned long addr, unsigned long len)
 	/* Can we just expand an old anonymous mapping? */
 	anon_vma_cache = NULL;
 	if (rb_parent && vma_merge(mm, prev, rb_parent, addr, addr + len,
-				   flags, NULL, pgoff, &anon_vma_cache))
+				   flags, NULL, pgoff, &anon_vma_cache, NULL))
 		goto out;
 
 	/*
@@ -1465,7 +1481,7 @@ unsigned long do_brk(unsigned long addr, unsigned long len)
 		vm_unacct_memory(len >> PAGE_SHIFT);
 		return -ENOMEM;
 	}
-
+ 	mpol_set_vma_default(vma);
 	vma->vm_mm = mm;
 	vma->vm_start = addr;
 	vma->vm_end = addr + len;
@@ -1534,6 +1550,7 @@ void exit_mmap(struct mm_struct *mm)
 			if (vma->vm_ops->close)
 				vma->vm_ops->close(vma);
 		}
+ 		mpol_free(vma_policy(vma));
 		if (vma->vm_file)
 			fput(vma->vm_file);
 		anon_vma_unlink(vma);

@@ -351,6 +351,7 @@ int setup_arg_pages(struct linux_binprm *bprm, int executable_stack)
 
 	down_write(&mm->mmap_sem);
 	{
+ 		mpol_set_vma_default(mpnt);
 		mpnt->vm_mm = mm;
 		mpnt->vm_start = PAGE_MASK & (unsigned long) bprm->p;
 		mpnt->vm_end = IA32_STACK_TOP;

@@ -130,6 +130,8 @@ mprotect_attempt_merge(struct vm_area_struct *vma, struct vm_area_struct *prev,
 		return 0;
 	if (prev->vm_end != vma->vm_start)
 		return 0;
+	if (!vma_mpol_equal(vma, prev))
+		return 0;
 
 	prev_pgoff = vma->vm_pgoff - ((prev->vm_end - prev->vm_start) >> PAGE_SHIFT);
 	file = vma->vm_file;
@@ -189,6 +191,7 @@ mprotect_attempt_merge(struct vm_area_struct *vma, struct vm_area_struct *prev,
 		if (file)
 			fput(file);
 
+ 		mpol_free(vma_policy(vma));
 		mm->map_count--;
 		kmem_cache_free(vm_area_cachep, vma);
 		return 1;
@@ -291,6 +294,7 @@ mprotect_attempt_merge_final(struct vm_area_struct *prev,
 	if (file)
 		fput(file);
 
+	mpol_free(vma_policy(next));
 	mm->map_count--;
 	kmem_cache_free(vm_area_cachep, next);
 }

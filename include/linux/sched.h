@@ -29,6 +29,7 @@
 #include <linux/completion.h>
 #include <linux/pid.h>
 #include <linux/percpu.h>
+#include <linux/mempolicy.h>
 
 struct exec_domain;
 
@@ -515,6 +516,9 @@ struct task_struct {
 	struct task_delay_info  delays;
 /* TASK_UNMAPPED_BASE */
 	unsigned long map_base;
+
+	struct mempolicy *mempolicy;
+	short il_next;		/* could be shared with used_math */
 };
 
 static inline pid_t process_group(struct task_struct *tsk)

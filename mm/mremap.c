@@ -190,6 +190,7 @@ static unsigned long move_vma(struct vm_area_struct *vma,
 	next = find_vma_prev(mm, new_addr, &prev);
 	if (next) {
 		if (prev && prev->vm_end == new_addr &&
+		    mpol_equal(vma_policy(prev), vma_policy(next)) &&
 		    can_vma_merge(prev, vma->vm_flags) && !vma->vm_file &&
 					!(vma->vm_flags & VM_SHARED)) {
 			spin_lock(&mm->page_table_lock);
@@ -199,6 +200,7 @@ static unsigned long move_vma(struct vm_area_struct *vma,
 			if (next != prev->vm_next)
 				BUG();
 			if (prev->vm_end == next->vm_start &&
+			                vma_mpol_equal(next, prev) && 
 					can_vma_merge(next, prev->vm_flags)) {
 				spin_lock(&mm->page_table_lock);
 				prev->vm_end = next->vm_end;
@@ -207,10 +209,12 @@ static unsigned long move_vma(struct vm_area_struct *vma,
 				if (vma == next)
 					vma = prev;
 				mm->map_count--;
+				mpol_free(vma_policy(next));
 				kmem_cache_free(vm_area_cachep, next);
 			}
 		} else if (next->vm_start == new_addr + new_len &&
 			  	can_vma_merge(next, vma->vm_flags) &&
+			        vma_mpol_equal(next, vma) &&
 				!vma->vm_file && !(vma->vm_flags & VM_SHARED)) {
 			spin_lock(&mm->page_table_lock);
 			next->vm_start = new_addr;
@@ -220,6 +224,7 @@ static unsigned long move_vma(struct vm_area_struct *vma,
 	} else {
 		prev = find_vma(mm, new_addr-1);
 		if (prev && prev->vm_end == new_addr &&
+		    vma_mpol_equal(prev, vma) &&
 		    can_vma_merge(prev, vma->vm_flags) && !vma->vm_file &&
 				!(vma->vm_flags & VM_SHARED)) {
 			spin_lock(&mm->page_table_lock);
@@ -242,7 +247,12 @@ static unsigned long move_vma(struct vm_area_struct *vma,
 		unsigned long vm_locked = vma->vm_flags & VM_LOCKED;
 
 		if (allocated_vma) {
+			struct mempolicy *pol;
 			*new_vma = *vma;
+ 			pol = mpol_copy(vma_policy(new_vma));
+ 			if (IS_ERR(pol))
+ 				goto out_vma;
+ 			vma_set_policy(new_vma, pol);	
 			INIT_VMA_SHARED(new_vma);
 			new_vma->vm_start = new_addr;
 			new_vma->vm_end = new_addr+new_len;
@@ -283,6 +293,7 @@ static unsigned long move_vma(struct vm_area_struct *vma,
 		}
 		return new_addr;
 	}
+ out_vma:
 	if (allocated_vma)
 		kmem_cache_free(vm_area_cachep, new_vma);
  out:

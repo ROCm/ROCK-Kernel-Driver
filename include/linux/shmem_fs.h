@@ -2,6 +2,7 @@
 #define __SHMEM_FS_H
 
 #include <linux/swap.h>
+#include <linux/mempolicy.h>
 
 /* inode in-kernel data */
 
@@ -15,6 +16,7 @@ struct shmem_inode_info {
 	unsigned long		alloced;    /* data pages allocated to file */
 	unsigned long		swapped;    /* subtotal assigned to swap */
 	unsigned long		flags;
+	struct shared_policy     policy;
 	struct list_head	list;
 	struct inode		vfs_inode;
 };

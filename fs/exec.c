@@ -415,6 +415,7 @@ int setup_arg_pages(struct linux_binprm *bprm, int executable_stack)
 
 	down_write(&mm->mmap_sem);
 	{
+ 		mpol_set_vma_default(mpnt);
 		mpnt->vm_mm = mm;
 #ifdef CONFIG_STACK_GROWSUP
 		mpnt->vm_start = stack_base;

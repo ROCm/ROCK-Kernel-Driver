@@ -261,6 +261,9 @@ cond_syscall(sys_msgctl)
 cond_syscall(sys_shmget)
 cond_syscall(sys_shmdt)
 cond_syscall(sys_shmctl)
+cond_syscall(sys_mbind)
+cond_syscall(sys_get_mempolicy)
+cond_syscall(sys_set_mempolicy)
 
 /* arch-specific weak syscall entries */
 cond_syscall(sys_pciconfig_read)
