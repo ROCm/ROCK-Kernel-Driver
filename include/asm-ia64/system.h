@@ -18,14 +18,6 @@
 
 #define KERNEL_START		(PAGE_OFFSET + 68*1024*1024)
 
-/*
- * The following #defines must match with vmlinux.lds.S:
- */
-#define IVT_ADDR		(KERNEL_START)
-#define IVT_END_ADDR		(KERNEL_START + 0x8000)
-#define ZERO_PAGE_ADDR		PAGE_ALIGN(IVT_END_ADDR)
-#define SWAPPER_PGD_ADDR	(ZERO_PAGE_ADDR + 1*PAGE_SIZE)
-
 #define GATE_ADDR		(0xa000000000000000 + PAGE_SIZE)
 #define PERCPU_ADDR		(0xa000000000000000 + 2*PAGE_SIZE)
 

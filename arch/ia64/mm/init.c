@@ -347,8 +347,6 @@ paging_init (void)
 {
 	unsigned long max_dma, zones_size[MAX_NR_ZONES];
 
-	clear_page((void *) ZERO_PAGE_ADDR);
-
 	/* initialize mem_map[] */
 
 	memset(zones_size, 0, sizeof(zones_size));

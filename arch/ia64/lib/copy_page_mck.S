@@ -123,7 +123,7 @@ GLOBAL_ENTRY(copy_page)
 	add src1 = 3*8, in1			// first t3 src
 	add dst0 = 8, in0			// first t1 dst
 	add dst1 = 3*8, in0			// first t3 dst
-	nop.m 0
+	mov t1 = (PAGE_SIZE/128) - (2*PREFETCH_DIST) - 1
 	nop.m 0
 	nop.i 0
 	;;
@@ -134,7 +134,7 @@ GLOBAL_ENTRY(copy_page)
 	br.ctop.sptk .prefetch_loop
 	;;
 	cmp.eq p16, p0 = r0, r0			// reset p16 to 1 (br.ctop cleared it to zero)
-	mov ar.lc = (PAGE_SIZE/128) - (2*PREFETCH_DIST) - 1
+	mov ar.lc = t1				// with 64KB pages, t1 is too big to fit in 8 bits!
 	mov ar.ec = N				// # of stages in pipeline
 	;;
 .line_copy:
