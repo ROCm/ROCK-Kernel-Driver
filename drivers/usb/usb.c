@@ -868,10 +868,8 @@ struct urb *usb_alloc_urb(int iso_packets, int mem_flags)
 void usb_free_urb(struct urb *urb)
 {
 	if (urb)
-		if (atomic_dec_and_test(&urb->count)) {
-			info ("really freeing urb");
+		if (atomic_dec_and_test(&urb->count))
 			kfree(urb);
-		}
 }
 
 /**
