@@ -212,8 +212,8 @@ zfcp_scsi_slave_destroy(struct scsi_device *sdpnt)
 		unit->device = NULL;
 		zfcp_unit_put(unit);
 	} else {
-		ZFCP_LOG_INFO("no unit associated with SCSI device at "
-			      "address 0x%lx\n", (unsigned long) sdpnt);
+		ZFCP_LOG_NORMAL("bug: no unit associated with SCSI device at "
+				"address %p\n", sdpnt);
 	}
 }
 
@@ -273,11 +273,9 @@ zfcp_scsi_command_async(struct zfcp_adapter *adapter, struct zfcp_unit *unit,
 	if (unlikely(
 	      atomic_test_mask(ZFCP_STATUS_COMMON_ERP_FAILED, &unit->status) ||
 	     !atomic_test_mask(ZFCP_STATUS_COMMON_RUNNING, &unit->status))) {
-		ZFCP_LOG_DEBUG("Stopping SCSI IO on the unit with "
-			       "FCP LUN 0x%Lx connected to the port "
-			       "with WWPN 0x%Lx at the adapter %s.\n",
-			       unit->fcp_lun,
-			       unit->port->wwpn,
+		ZFCP_LOG_DEBUG("stopping SCSI I/O on unit 0x%016Lx on port "
+			       "0x%016Lx on adapter %s\n",
+			       unit->fcp_lun, unit->port->wwpn,
 			       zfcp_get_busid_by_adapter(adapter));
 		zfcp_scsi_command_fail(scpnt, DID_ERROR);
 		goto out;
@@ -285,8 +283,8 @@ zfcp_scsi_command_async(struct zfcp_adapter *adapter, struct zfcp_unit *unit,
 
 	if (unlikely(
 	     !atomic_test_mask(ZFCP_STATUS_COMMON_UNBLOCKED, &unit->status))) {
-		ZFCP_LOG_DEBUG("adapter %s not ready or unit with LUN 0x%Lx "
-			       "on the port with WWPN 0x%Lx in recovery.\n",
+		ZFCP_LOG_DEBUG("adapter %s not ready or unit 0x%016Lx "
+			       "on port 0x%016Lx in recovery\n",
 			       zfcp_get_busid_by_unit(unit),
 			       unit->fcp_lun, unit->port->wwpn);
 		retval = SCSI_MLQUEUE_DEVICE_BUSY;
@@ -297,7 +295,7 @@ zfcp_scsi_command_async(struct zfcp_adapter *adapter, struct zfcp_unit *unit,
 					     ZFCP_REQ_AUTO_CLEANUP);
 
 	if (unlikely(tmp < 0)) {
-		ZFCP_LOG_DEBUG("error: Could not send a Send FCP Command\n");
+		ZFCP_LOG_DEBUG("error: initiation of Send FCP Cmnd failed\n");
 		retval = SCSI_MLQUEUE_HOST_BUSY;
 	} else {
 		debug_text_event(adapter->req_dbf, 3, "q_scpnt");
@@ -443,11 +441,8 @@ zfcp_scsi_eh_abort_handler(struct scsi_cmnd *scpnt)
 	       scpnt->cmnd,
 	       min(scpnt->cmd_len, (unsigned char) ZFCP_ABORT_DBF_LENGTH));
 
-	 /*TRACE*/
-	    ZFCP_LOG_INFO
-	    ("Aborting for adapter=0x%lx, busid=%s, scsi_cmnd=0x%lx\n",
-	     (unsigned long) adapter, zfcp_get_busid_by_adapter(adapter),
-	     (unsigned long) scpnt);
+	ZFCP_LOG_INFO("aborting scsi_cmnd=%p on adapter %s\n",
+		      scpnt, zfcp_get_busid_by_adapter(adapter));
 
 	spin_unlock_irq(scsi_host->host_lock);
 
@@ -469,7 +464,7 @@ zfcp_scsi_eh_abort_handler(struct scsi_cmnd *scpnt)
 	 */
 	req_data = (union zfcp_req_data *) scpnt->host_scribble;
 	/* DEBUG */
-	ZFCP_LOG_DEBUG("req_data=0x%lx\n", (unsigned long) req_data);
+	ZFCP_LOG_DEBUG("req_data=%p\n", req_data);
 	if (!req_data) {
 		ZFCP_LOG_DEBUG("late command completion overtook abort\n");
 		/*
@@ -489,11 +484,10 @@ zfcp_scsi_eh_abort_handler(struct scsi_cmnd *scpnt)
 	dbf_timeout =
 	    (jiffies - req_data->send_fcp_command_task.start_jiffies) / HZ;
 
-	/* DEBUG */
-	ZFCP_LOG_DEBUG("old_fsf_req=0x%lx\n", (unsigned long) old_fsf_req);
+	ZFCP_LOG_DEBUG("old_fsf_req=%p\n", old_fsf_req);
 	if (!old_fsf_req) {
 		write_unlock_irqrestore(&adapter->abort_lock, flags);
-		ZFCP_LOG_NORMAL("bug: No old fsf request found.\n");
+		ZFCP_LOG_NORMAL("bug: no old fsf request found\n");
 		ZFCP_LOG_NORMAL("req_data:\n");
 		ZFCP_HEX_DUMP(ZFCP_LOG_LEVEL_NORMAL,
 			      (char *) req_data, sizeof (union zfcp_req_data));
@@ -517,8 +511,7 @@ zfcp_scsi_eh_abort_handler(struct scsi_cmnd *scpnt)
 	 * Since this lock will not be held, fsf_req may complete
 	 * late and may be released meanwhile.
 	 */
-	ZFCP_LOG_DEBUG("unit=0x%lx, unit_fcp_lun=0x%Lx\n",
-		       (unsigned long) unit, unit->fcp_lun);
+	ZFCP_LOG_DEBUG("unit 0x%016Lx (%p)\n", unit->fcp_lun, unit);
 
 	/*
 	 * The 'Abort FCP Command' routine may block (call schedule)
@@ -533,18 +526,18 @@ zfcp_scsi_eh_abort_handler(struct scsi_cmnd *scpnt)
 	new_fsf_req = zfcp_fsf_abort_fcp_command((unsigned long) old_fsf_req,
 						 adapter,
 						 unit, ZFCP_WAIT_FOR_SBAL);
-	ZFCP_LOG_DEBUG("new_fsf_req=0x%lx\n", (unsigned long) new_fsf_req);
+	ZFCP_LOG_DEBUG("new_fsf_req=%p\n", new_fsf_req);
 	if (!new_fsf_req) {
 		retval = FAILED;
-		ZFCP_LOG_DEBUG("warning: Could not abort SCSI command "
-			       "at 0x%lx\n", (unsigned long) scpnt);
+		ZFCP_LOG_NORMAL("error: initiation of Abort FCP Cmnd "
+				"failed\n");
 		strncpy(dbf_result, "##nores", ZFCP_ABORT_DBF_LENGTH);
 		goto out;
 	}
 
 	/* wait for completion of abort */
-	ZFCP_LOG_DEBUG("Waiting for cleanup....\n");
-#ifdef 1
+	ZFCP_LOG_DEBUG("waiting for cleanup...\n");
+#if 1
 	/*
 	 * FIXME:
 	 * copying zfcp_fsf_req_wait_and_cleanup code is not really nice
@@ -615,11 +608,11 @@ zfcp_scsi_eh_device_reset_handler(struct scsi_cmnd *scpnt)
 	spin_unlock_irq(scsi_host->host_lock);
 
 	if (!unit) {
-		ZFCP_LOG_NORMAL("bug: Tried to reset a non existant unit.\n");
+		ZFCP_LOG_NORMAL("bug: Tried reset for nonexistent unit\n");
 		retval = SUCCESS;
 		goto out;
 	}
-	ZFCP_LOG_NORMAL("Resetting Device fcp_lun=0x%Lx\n", unit->fcp_lun);
+	ZFCP_LOG_NORMAL("resetting unit 0x%016Lx\n", unit->fcp_lun);
 
 	/*
 	 * If we do not know whether the unit supports 'logical unit reset'
@@ -633,18 +626,15 @@ zfcp_scsi_eh_device_reset_handler(struct scsi_cmnd *scpnt)
 		retval =
 		    zfcp_task_management_function(unit, LOGICAL_UNIT_RESET);
 		if (retval) {
-			ZFCP_LOG_DEBUG
-			    ("logical unit reset failed (unit=0x%lx)\n",
-			     (unsigned long) unit);
+			ZFCP_LOG_DEBUG("unit reset failed (unit=%p)\n", unit);
 			if (retval == -ENOTSUPP)
 				atomic_set_mask
 				    (ZFCP_STATUS_UNIT_NOTSUPPUNITRESET,
 				     &unit->status);
 			/* fall through and try 'target reset' next */
 		} else {
-			ZFCP_LOG_DEBUG
-			    ("logical unit reset succeeded (unit=0x%lx)\n",
-			     (unsigned long) unit);
+			ZFCP_LOG_DEBUG("unit reset succeeded (unit=%p)\n",
+				       unit);
 			/* avoid 'target reset' */
 			retval = SUCCESS;
 			goto out;
@@ -652,12 +642,10 @@ zfcp_scsi_eh_device_reset_handler(struct scsi_cmnd *scpnt)
 	}
 	retval = zfcp_task_management_function(unit, TARGET_RESET);
 	if (retval) {
-		ZFCP_LOG_DEBUG("target reset failed (unit=0x%lx)\n",
-			       (unsigned long) unit);
+		ZFCP_LOG_DEBUG("target reset failed (unit=%p)\n", unit);
 		retval = FAILED;
 	} else {
-		ZFCP_LOG_DEBUG("target reset succeeded (unit=0x%lx)\n",
-			       (unsigned long) unit);
+		ZFCP_LOG_DEBUG("target reset succeeded (unit=%p)\n", unit);
 		retval = SUCCESS;
 	}
  out:
@@ -677,13 +665,9 @@ zfcp_task_management_function(struct zfcp_unit *unit, u8 tm_flags)
 	fsf_req = zfcp_fsf_send_fcp_command_task_management
 	    (adapter, unit, tm_flags, ZFCP_WAIT_FOR_SBAL);
 	if (!fsf_req) {
-		ZFCP_LOG_INFO("error: Out of resources. Could not create a "
-			      "task management (abort, reset, etc) request "
-			      "for the unit with FCP-LUN 0x%Lx connected to "
-			      "the port with WWPN 0x%Lx connected to "
-			      "the adapter %s.\n",
-			      unit->fcp_lun,
-			      unit->port->wwpn,
+		ZFCP_LOG_INFO("error: creation of task management request "
+			      "failed for unit 0x%016Lx on port 0x%016Lx on  "
+			      "adapter %s\n", unit->fcp_lun, unit->port->wwpn,
 			      zfcp_get_busid_by_adapter(adapter));
 		retval = -ENOMEM;
 		goto out;
@@ -722,10 +706,8 @@ zfcp_scsi_eh_bus_reset_handler(struct scsi_cmnd *scpnt)
 	spin_unlock_irq(scsi_host->host_lock);
 
 	unit = (struct zfcp_unit *) scpnt->device->hostdata;
-	 /*DEBUG*/
-	    ZFCP_LOG_NORMAL("Resetting because of problems with "
-			    "unit=0x%lx, unit_fcp_lun=0x%Lx\n",
-			    (unsigned long) unit, unit->fcp_lun);
+	ZFCP_LOG_NORMAL("bus reset because of problems with "
+			"unit 0x%016Lx\n", unit->fcp_lun);
 	zfcp_erp_adapter_reopen(unit->port->adapter, 0);
 	zfcp_erp_wait(unit->port->adapter);
 	retval = SUCCESS;
@@ -751,10 +733,8 @@ zfcp_scsi_eh_host_reset_handler(struct scsi_cmnd *scpnt)
 	spin_unlock_irq(scsi_host->host_lock);
 
 	unit = (struct zfcp_unit *) scpnt->device->hostdata;
-	 /*DEBUG*/
-	    ZFCP_LOG_NORMAL("Resetting because of problems with "
-			    "unit=0x%lx, unit_fcp_lun=0x%Lx\n",
-			    (unsigned long) unit, unit->fcp_lun);
+	ZFCP_LOG_NORMAL("host reset because of problems with "
+			"unit 0x%016Lx\n", unit->fcp_lun);
 	zfcp_erp_adapter_reopen(unit->port->adapter, 0);
 	zfcp_erp_wait(unit->port->adapter);
 	retval = SUCCESS;
@@ -780,15 +760,13 @@ zfcp_adapter_scsi_register(struct zfcp_adapter *adapter)
 	adapter->scsi_host = scsi_host_alloc(&zfcp_data.scsi_host_template,
 					     sizeof (struct zfcp_adapter *));
 	if (!adapter->scsi_host) {
-		ZFCP_LOG_NORMAL("error: Not enough free memory. "
-				"Could not register adapter %s "
-				"with the SCSI-stack.\n",
+		ZFCP_LOG_NORMAL("error: registration with SCSI stack failed "
+				"for adapter %s ",
 				zfcp_get_busid_by_adapter(adapter));
 		retval = -EIO;
 		goto out;
 	}
-	ZFCP_LOG_DEBUG("host registered, scsi_host at 0x%lx\n",
-		       (unsigned long) adapter->scsi_host);
+	ZFCP_LOG_DEBUG("host registered, scsi_host=%p\n", adapter->scsi_host);
 
 	/* tell the SCSI stack some characteristics of this adapter */
 	adapter->scsi_host->max_id = 1;
