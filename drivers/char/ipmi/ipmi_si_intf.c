@@ -1331,7 +1331,7 @@ static int try_init_mem(int intf_num, struct smi_info **new_info)
 static int acpi_failure = 0;
 
 /* For GPE-type interrupts. */
-u32 ipmi_acpi_gpe(void *context)
+static u32 ipmi_acpi_gpe(void *context)
 {
 	struct smi_info *smi_info = context;
 	unsigned long   flags;
@@ -2253,7 +2253,7 @@ static __init int init_ipmi_si(void)
 }
 module_init(init_ipmi_si);
 
-void __exit cleanup_one_si(struct smi_info *to_clean)
+static void __exit cleanup_one_si(struct smi_info *to_clean)
 {
 	int           rv;
 	unsigned long flags;

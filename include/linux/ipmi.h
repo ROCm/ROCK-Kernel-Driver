@@ -253,7 +253,6 @@ static inline void ipmi_free_recv_msg(struct ipmi_recv_msg *msg)
 {
 	msg->done(msg);
 }
-struct ipmi_recv_msg *ipmi_alloc_recv_msg(void);
 
 struct ipmi_user_hndl
 {
@@ -303,32 +302,6 @@ void ipmi_set_my_LUN(ipmi_user_t   user,
 unsigned char ipmi_get_my_LUN(ipmi_user_t user);
 
 /*
- * Send a command request from the given user.  The address is the
- * proper address for the channel type.  If this is a command, then
- * the message response comes back, the receive handler for this user
- * will be called with the given msgid value in the recv msg.  If this
- * is a response to a command, then the msgid will be used as the
- * sequence number for the response (truncated if necessary), so when
- * sending a response you should use the sequence number you received
- * in the msgid field of the received command.  If the priority is >
- * 0, the message will go into a high-priority queue and be sent
- * first.  Otherwise, it goes into a normal-priority queue.
- * The user_msg_data field will be returned in any response to this
- * message.
- *
- * Note that if you send a response (with the netfn lower bit set),
- * you *will* get back a SEND_MSG response telling you what happened
- * when the response was sent.  You will not get back a response to
- * the message itself.
- */
-int ipmi_request(ipmi_user_t      user,
-		 struct ipmi_addr *addr,
-		 long             msgid,
-		 struct kernel_ipmi_msg *msg,
-		 void             *user_msg_data,
-		 int              priority);
-
-/*
  * Like ipmi_request, but lets you specify the number of retries and
  * the retry time.  The retries is the number of times the message
  * will be resent if no reply is received.  If set to -1, the default
@@ -351,18 +324,6 @@ int ipmi_request_settime(ipmi_user_t      user,
 			 unsigned int     retry_time_ms);
 
 /*
- * Like ipmi_request, but lets you specify the slave return address.
- */
-int ipmi_request_with_source(ipmi_user_t      user,
-			     struct ipmi_addr *addr,
-			     long             msgid,
-			     struct kernel_ipmi_msg  *msg,
-			     void             *user_msg_data,
-			     int              priority,
-			     unsigned char    source_address,
-			     unsigned char    source_lun);
-
-/*
  * Like ipmi_request, but with messages supplied.  This will not
  * allocate any memory, and the messages may be statically allocated
  * (just make sure to do the "done" handling on them).  Note that this
@@ -379,16 +340,6 @@ int ipmi_request_supply_msgs(ipmi_user_t          user,
 			     void                 *supplied_smi,
 			     struct ipmi_recv_msg *supplied_recv,
 			     int                  priority);
-
-/*
- * Do polling on the IPMI interface the user is attached to.  This
- * causes the IPMI code to do an immediate check for information from
- * the driver and handle anything that is immediately pending.  This
- * will not block in anyway.  This is useful if you need to implement
- * polling from the user like you need to send periodic watchdog pings
- * from a crash dump, or something like that.
- */
-void ipmi_poll_interface(ipmi_user_t user);
 
 /*
  * When commands come in to the SMS, the user can register to receive
@@ -418,17 +369,6 @@ void ipmi_user_set_run_to_completion(ipmi_user_t user, int val);
  * have been queued while no one was waiting for events.
  */
 int ipmi_set_gets_events(ipmi_user_t user, int val);
-
-/*
- * Register the given user to handle all received IPMI commands.  This
- * will fail if anyone is registered as a command receiver or if
- * another is already registered to receive all commands.  NOTE THAT
- * THIS IS FOR EMULATION USERS ONLY, DO NOT USER THIS FOR NORMAL
- * STUFF.
- */
-int ipmi_register_all_cmd_rcvr(ipmi_user_t user);
-int ipmi_unregister_all_cmd_rcvr(ipmi_user_t user);
-
 
 /*
  * Called when a new SMI is registered.  This will also be called on
@@ -462,9 +402,6 @@ unsigned int ipmi_addr_length(int addr_type);
 
 /* Validate that the given IPMI address is valid. */
 int ipmi_validate_addr(struct ipmi_addr *addr, int len);
-
-/* Return 1 if the given addresses are equal, 0 if not. */
-int ipmi_addr_equal(struct ipmi_addr *addr1, struct ipmi_addr *addr2);
 
 #endif /* __KERNEL__ */
 

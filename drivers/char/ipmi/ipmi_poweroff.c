@@ -45,9 +45,9 @@
 extern void (*pm_power_off)(void);
 
 /* Stuff from the get device id command. */
-unsigned int mfg_id;
-unsigned int prod_id;
-unsigned char capabilities;
+static unsigned int mfg_id;
+static unsigned int prod_id;
+static unsigned char capabilities;
 
 /* We use our own messages for this operation, we don't let the system
    allocate them, since we may be in a panic situation.  The whole
