@@ -72,6 +72,5 @@ int ext3_sync_file(struct file * file, struct dentry *dentry, int datasync)
 	 *  (they were dirtied by commit).  But that's OK - the blocks are
 	 *  safe in-journal, which is all fsync() needs to ensure.
 	 */
-	ext3_force_commit(inode->i_sb);
-	return 0;
+	return ext3_force_commit(inode->i_sb);
 }

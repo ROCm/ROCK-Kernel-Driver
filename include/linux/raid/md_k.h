@@ -203,6 +203,7 @@ struct mddev_s
 	int				raid_disks;
 	int				max_disks;
 	sector_t			size; /* used size of component devices */
+	sector_t			array_size; /* exported array size */
 	__u64				events;
 
 	char				uuid[16];

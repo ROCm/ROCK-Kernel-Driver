@@ -988,7 +988,7 @@ static struct proto_ops sco_sock_ops = {
 
 static struct net_proto_family sco_sock_family_ops = {
 	.family =       PF_BLUETOOTH,
-	.create =       sco_sock_create
+	.create =       sco_sock_create,
 };
 
 static struct hci_proto sco_hci_proto = {

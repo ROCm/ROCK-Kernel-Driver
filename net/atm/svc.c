@@ -4,8 +4,7 @@
 
 
 #include <linux/string.h>
-#include <linux/net.h>		/* struct socket, struct net_proto,
-				   struct proto_ops */
+#include <linux/net.h>		/* struct socket, struct proto_ops */
 #include <linux/errno.h>	/* error codes */
 #include <linux/kernel.h>	/* printk */
 #include <linux/skbuff.h>
@@ -430,8 +429,8 @@ static int svc_create(struct socket *sock,int protocol)
 
 
 static struct net_proto_family svc_family_ops = {
-	.family =PF_ATMSVC,
-	.create =svc_create,
+	.family = PF_ATMSVC,
+	.create = svc_create,
 };
 
 

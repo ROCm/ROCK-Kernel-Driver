@@ -52,11 +52,16 @@ static inline int ext2_inode_is_fast_symlink(struct inode *inode)
 }
 
 /*
- * Called at each iput()
+ * Called at each iput().
+ *
+ * The inode may be "bad" if ext2_read_inode() saw an error from
+ * ext2_get_inode(), so we need to check that to avoid freeing random disk
+ * blocks.
  */
-void ext2_put_inode (struct inode * inode)
+void ext2_put_inode(struct inode *inode)
 {
-	ext2_discard_prealloc (inode);
+	if (!is_bad_inode(inode))
+		ext2_discard_prealloc(inode);
 }
 
 /*

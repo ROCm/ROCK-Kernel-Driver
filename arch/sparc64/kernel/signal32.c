@@ -812,7 +812,7 @@ setup_svr4_frame32(struct sigaction *sa, unsigned long pc, unsigned long npc,
 	save_and_clear_fpu();
 	
 	regs->u_regs[UREG_FP] &= 0x00000000ffffffffUL;
-	sfp = (svr4_signal_frame_t *) get_sigframe(sa, regs, REGWIN_SZ + SVR4_SF_ALIGNED);
+	sfp = (svr4_signal_frame_t *) get_sigframe(sa, regs, sizeof(struct reg_window32) + SVR4_SF_ALIGNED);
 
 	if (invalid_frame_pointer (sfp, sizeof (*sfp)))
 		do_exit(SIGILL);

@@ -274,6 +274,10 @@ typedef struct {
 #define R_MIPS_LOVENDOR		100
 #define R_MIPS_HIVENDOR		127
 
+/*
+ * Sparc section types
+ */
+#define STT_REGISTER		13
 
 /*
  * Sparc ELF relocation types
@@ -311,6 +315,7 @@ typedef struct {
 #define R_SPARC_10		30
 #define R_SPARC_11		31
 #define R_SPARC_64		32
+#define R_SPARC_OLO10		33
 #define R_SPARC_WDISP16		40
 #define R_SPARC_WDISP19		41
 #define R_SPARC_7		43

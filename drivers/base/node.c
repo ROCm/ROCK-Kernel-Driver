@@ -92,9 +92,13 @@ int __init register_node(struct node *node, int num, struct node *parent)
 int __init register_node_type(void)
 {
 	int error;
-	if (!(error = devclass_register(&node_devclass)))
-		if (error = driver_register(&node_driver))
+	
+	error = devclass_register(&node_devclass);
+	if (!error) {
+		error = driver_register(&node_driver);
+		if (error)
 			devclass_unregister(&node_devclass);
+	}
 	return error;
 }
 postcore_initcall(register_node_type);

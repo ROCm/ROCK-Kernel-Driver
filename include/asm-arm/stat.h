@@ -18,15 +18,23 @@ struct __old_kernel_stat {
 #define STAT_HAVE_NSEC 
 
 struct stat {
+#if defined(__ARMEB__)
 	unsigned short st_dev;
 	unsigned short __pad1;
-	unsigned long st_ino;
+#else
+	unsigned long  st_dev;
+#endif
+	unsigned long  st_ino;
 	unsigned short st_mode;
 	unsigned short st_nlink;
 	unsigned short st_uid;
 	unsigned short st_gid;
+#if defined(__ARMEB__)
 	unsigned short st_rdev;
 	unsigned short __pad2;
+#else
+	unsigned long  st_rdev;
+#endif
 	unsigned long  st_size;
 	unsigned long  st_blksize;
 	unsigned long  st_blocks;
@@ -46,13 +54,7 @@ struct stat {
  * in the hope that the kernel has stretched to using larger sizes.
  */
 struct stat64 {
-#if defined(__ARMEB__)
-	unsigned char   __pad0b[6];
-	unsigned short  st_dev;
-#else
-	unsigned short  st_dev;
-	unsigned char   __pad0b[6];
-#endif
+	unsigned long long	st_dev;
 	unsigned char   __pad0[4];
 
 #define STAT64_HAS_BROKEN_ST_INO	1
@@ -63,13 +65,7 @@ struct stat64 {
 	unsigned long	st_uid;
 	unsigned long	st_gid;
 
-#if defined(__ARMEB__)
-	unsigned char   __pad3b[6];
-	unsigned short  st_rdev;
-#else /* Must be little */
-	unsigned short  st_rdev;
-	unsigned char   __pad3b[6];
-#endif
+	unsigned long long	st_rdev;
 	unsigned char   __pad3[4];
 
 	long long	st_size;

@@ -273,9 +273,7 @@ __ncp_lookup_validate(struct dentry * dentry, int flags)
 	int res, val = 0, len = dentry->d_name.len + 1;
 	__u8 __name[len];
 
-	read_lock(&dparent_lock);
-	parent = dget(dentry->d_parent);
-	read_unlock(&dparent_lock);
+	parent = dget_parent(dentry);
 	dir = parent->d_inode;
 
 	if (!dentry->d_inode)

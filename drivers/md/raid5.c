@@ -21,6 +21,7 @@
 #include <linux/slab.h>
 #include <linux/raid/raid5.h>
 #include <linux/bio.h>
+#include <linux/highmem.h>
 #include <asm/bitops.h>
 #include <asm/atomic.h>
 
@@ -634,12 +635,12 @@ static void copy_data(int frombio, struct bio *bio,
 			else clen = len;
 			
 			if (clen > 0) {
-				char *ba = __bio_kmap(bio, i);
+				char *ba = __bio_kmap_atomic(bio, i, KM_USER0);
 				if (frombio)
 					memcpy(pa+page_offset, ba+b_offset, clen);
 				else
 					memcpy(ba+b_offset, pa+page_offset, clen);
-				__bio_kunmap(bio, i);
+				__bio_kunmap_atomic(ba, KM_USER0);
 			}	
 			if (clen < len) /* hit end of page */
 				break;
@@ -1549,7 +1550,8 @@ memory = conf->max_nr_stripes * (sizeof(struct stripe_head) +
 	print_raid5_conf(conf);
 
 	/* Ok, everything is just fine now */
-	return (0);
+	mddev->array_size =  mddev->size * (mddev->raid_disks - 1);
+	return 0;
 abort:
 	if (conf) {
 		print_raid5_conf(conf);

@@ -1156,6 +1156,8 @@ static int run(mddev_t *mddev)
 	/*
 	 * Ok, everything is just fine now
 	 */
+	mddev->array_size = mddev->size;
+
 	return 0;
 
 out_free_conf:

@@ -25,8 +25,7 @@ struct stat {
 /* This is sparc32 stat64 structure. */
 
 struct stat64 {
-	unsigned char	__pad0[6];
-	unsigned short	st_dev;
+	unsigned long long	st_dev;
 
 	unsigned long long	st_ino;
 
@@ -36,8 +35,7 @@ struct stat64 {
 	unsigned int	st_uid;
 	unsigned int	st_gid;
 
-	unsigned char	__pad2[6];
-	unsigned short	st_rdev;
+	unsigned long long	st_rdev;
 
 	unsigned char	__pad3[8];
 

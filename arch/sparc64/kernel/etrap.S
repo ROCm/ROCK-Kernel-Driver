@@ -15,7 +15,7 @@
 #include <asm/head.h>
 #include <asm/processor.h>
 
-#define		TASK_REGOFF		(THREAD_SIZE-TRACEREG_SZ-REGWIN_SZ)
+#define		TASK_REGOFF		(THREAD_SIZE-TRACEREG_SZ-STACKFRAME_SZ)
 #define		ETRAP_PSTATE1		(PSTATE_RMO | PSTATE_PRIV)
 #define		ETRAP_PSTATE2		(PSTATE_RMO | PSTATE_PEF | PSTATE_PRIV | PSTATE_IE)
 
@@ -33,8 +33,8 @@ etrap_irq:
 		sllx	%g2, 20, %g3						! IEU0		Group
 		andcc	%g1, TSTATE_PRIV, %g0					! IEU1
 		or	%g1, %g3, %g1						! IEU0		Group
-		bne,pn	%xcc, 1f							! CTI
-		 sub	%sp, REGWIN_SZ+TRACEREG_SZ-STACK_BIAS, %g2		! IEU1
+		bne,pn	%xcc, 1f						! CTI
+		 sub	%sp, STACKFRAME_SZ+TRACEREG_SZ-STACK_BIAS, %g2		! IEU1
 		wrpr	%g0, 7, %cleanwin					! Single	Group+4bubbles
 
 		sethi	%hi(TASK_REGOFF), %g2					! IEU0		Group		
@@ -46,12 +46,12 @@ etrap_irq:
 		wr	%g0, 0, %fprs						! Single	Group+4bubbles
 1:		rdpr	%tpc, %g3						! Single	Group
 
-		stx	%g1, [%g2 + REGWIN_SZ + PT_V9_TSTATE]			! Store		Group
+		stx	%g1, [%g2 + STACKFRAME_SZ + PT_V9_TSTATE]		! Store		Group
 		rdpr	%tnpc, %g1						! Single	Group
-		stx	%g3, [%g2 + REGWIN_SZ + PT_V9_TPC]			! Store		Group
+		stx	%g3, [%g2 + STACKFRAME_SZ + PT_V9_TPC]			! Store		Group
 		rd	%y, %g3							! Single	Group+4bubbles
-		stx	%g1, [%g2 + REGWIN_SZ + PT_V9_TNPC]			! Store		Group
-		st	%g3, [%g2 + REGWIN_SZ + PT_V9_Y]			! Store		Group
+		stx	%g1, [%g2 + STACKFRAME_SZ + PT_V9_TNPC]			! Store		Group
+		st	%g3, [%g2 + STACKFRAME_SZ + PT_V9_Y]			! Store		Group
 		save	%g2, -STACK_BIAS, %sp	! Ordering here is critical	! Single	Group
 		mov	%g6, %l6						! IEU0		Group
 
@@ -75,23 +75,23 @@ etrap_irq:
 
 		mov	%g7, %l2						! IEU1
 		wrpr	%g0, ETRAP_PSTATE1, %pstate				! Single	Group+4bubbles
-		stx	%g1, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_G1]		! Store		Group
-		stx	%g2, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_G2]		! Store		Group
-		stx	%g3, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_G3]		! Store		Group
-		stx	%g4, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_G4]		! Store		Group
-		stx	%g5, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_G5]		! Store		Group
-		stx	%g6, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_G6]		! Store		Group
+		stx	%g1, [%sp + PTREGS_OFF + PT_V9_G1]			! Store		Group
+		stx	%g2, [%sp + PTREGS_OFF + PT_V9_G2]			! Store		Group
+		stx	%g3, [%sp + PTREGS_OFF + PT_V9_G3]			! Store		Group
+		stx	%g4, [%sp + PTREGS_OFF + PT_V9_G4]			! Store		Group
+		stx	%g5, [%sp + PTREGS_OFF + PT_V9_G5]			! Store		Group
+		stx	%g6, [%sp + PTREGS_OFF + PT_V9_G6]			! Store		Group
 
-		stx	%g7, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_G7]		! Store		Group
-		stx	%i0, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_I0]		! Store		Group
-		stx	%i1, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_I1]		! Store		Group
-		stx	%i2, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_I2]		! Store		Group
-		stx	%i3, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_I3]		! Store		Group
-		stx	%i4, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_I4]		! Store		Group
-		stx	%i5, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_I5]		! Store		Group
+		stx	%g7, [%sp + PTREGS_OFF + PT_V9_G7]			! Store		Group
+		stx	%i0, [%sp + PTREGS_OFF + PT_V9_I0]			! Store		Group
+		stx	%i1, [%sp + PTREGS_OFF + PT_V9_I1]			! Store		Group
+		stx	%i2, [%sp + PTREGS_OFF + PT_V9_I2]			! Store		Group
+		stx	%i3, [%sp + PTREGS_OFF + PT_V9_I3]			! Store		Group
+		stx	%i4, [%sp + PTREGS_OFF + PT_V9_I4]			! Store		Group
+		stx	%i5, [%sp + PTREGS_OFF + PT_V9_I5]			! Store		Group
 
-		stx	%i6, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_I6]		! Store		Group
-		stx	%i7, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_I7]		! Store		Group
+		stx	%i6, [%sp + PTREGS_OFF + PT_V9_I6]			! Store		Group
+		stx	%i7, [%sp + PTREGS_OFF + PT_V9_I7]			! Store		Group
 		wrpr	%g0, ETRAP_PSTATE2, %pstate				! Single	Group+4bubbles
 		mov	%l6, %g6						! IEU0
 		jmpl	%l2 + 0x4, %g0						! CTI		Group
@@ -167,7 +167,7 @@ etraptl1:	/* Save tstate/tpc/tnpc of TL 1-->4 and the tl register itself.
 		stx	%g1, [%g2 + STACK_BIAS + 0x80]
 
 		rdpr	%tstate, %g1						! Single	Group+4bubbles
-		sub	%g2, REGWIN_SZ + TRACEREG_SZ - STACK_BIAS, %g2		! IEU1
+		sub	%g2, STACKFRAME_SZ + TRACEREG_SZ - STACK_BIAS, %g2	! IEU1
 		ba,pt	%xcc, 1b						! CTI		Group
 		 andcc	%g1, TSTATE_PRIV, %g0					! IEU0
 
@@ -179,7 +179,7 @@ scetrap:	rdpr	%pil, %g2						! Single 	Group
 		andcc	%g1, TSTATE_PRIV, %g0					! IEU1
 		or	%g1, %g3, %g1						! IEU0		Group
 		bne,pn	%xcc, 1f						! CTI
-		 sub	%sp, (REGWIN_SZ+TRACEREG_SZ-STACK_BIAS), %g2		! IEU1
+		 sub	%sp, (STACKFRAME_SZ+TRACEREG_SZ-STACK_BIAS), %g2	! IEU1
 		wrpr	%g0, 7, %cleanwin					! Single	Group+4bubbles
 
 		sllx	%g1, 51, %g3						! IEU0		Group
@@ -189,11 +189,11 @@ scetrap:	rdpr	%pil, %g2						! Single 	Group
 		 add	%g6, %g2, %g2						! IEU0		Group
 		wr	%g0, 0, %fprs						! Single	Group+4bubbles
 1:		rdpr	%tpc, %g3						! Single	Group
-		stx	%g1, [%g2 + REGWIN_SZ + PT_V9_TSTATE]			! Store		Group
+		stx	%g1, [%g2 + STACKFRAME_SZ + PT_V9_TSTATE]		! Store		Group
 
 		rdpr	%tnpc, %g1						! Single	Group
-		stx	%g3, [%g2 + REGWIN_SZ + PT_V9_TPC]			! Store		Group
-		stx	%g1, [%g2 + REGWIN_SZ + PT_V9_TNPC]			! Store		Group
+		stx	%g3, [%g2 + STACKFRAME_SZ + PT_V9_TPC]			! Store		Group
+		stx	%g1, [%g2 + STACKFRAME_SZ + PT_V9_TNPC]			! Store		Group
 		save	%g2, -STACK_BIAS, %sp	! Ordering here is critical	! Single	Group
 		mov	%g6, %l6						! IEU0		Group
 		bne,pn	%xcc, 2f						! CTI		
@@ -214,32 +214,32 @@ scetrap:	rdpr	%pil, %g2						! Single 	Group
 		mov	%g5, %l5						! IEU0		Group
 		add	%g7, 0x4, %l2						! IEU1
 		wrpr	%g0, ETRAP_PSTATE1, %pstate				! Single	Group+4bubbles
-		stx	%g1, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_G1]		! Store		Group
-		stx	%g2, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_G2]		! Store		Group
+		stx	%g1, [%sp + PTREGS_OFF + PT_V9_G1]			! Store		Group
+		stx	%g2, [%sp + PTREGS_OFF + PT_V9_G2]			! Store		Group
 		sllx	%l7, 24, %l7						! IEU0
 
-		stx	%g3, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_G3]		! Store		Group
+		stx	%g3, [%sp + PTREGS_OFF + PT_V9_G3]			! Store		Group
 		rdpr	%cwp, %l0						! Single	Group
-		stx	%g4, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_G4]		! Store		Group
-		stx	%g5, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_G5]		! Store		Group
-		stx	%g6, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_G6]		! Store		Group
-		stx	%g7, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_G7]		! Store		Group
+		stx	%g4, [%sp + PTREGS_OFF + PT_V9_G4]			! Store		Group
+		stx	%g5, [%sp + PTREGS_OFF + PT_V9_G5]			! Store		Group
+		stx	%g6, [%sp + PTREGS_OFF + PT_V9_G6]			! Store		Group
+		stx	%g7, [%sp + PTREGS_OFF + PT_V9_G7]			! Store		Group
 		or	%l7, %l0, %l7						! IEU0
 		sethi	%hi(TSTATE_RMO | TSTATE_PEF), %l0			! IEU1
 
 		or	%l7, %l0, %l7						! IEU0		Group
 		wrpr	%l2, %tnpc						! Single	Group+4bubbles
 		wrpr	%l7, (TSTATE_PRIV | TSTATE_IE), %tstate			! Single	Group+4bubbles
-		stx	%i0, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_I0]		! Store		Group
-		stx	%i1, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_I1]		! Store		Group
-		stx	%i2, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_I2]		! Store		Group
-		stx	%i3, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_I3]		! Store		Group
-		stx	%i4, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_I4]		! Store		Group
+		stx	%i0, [%sp + PTREGS_OFF + PT_V9_I0]			! Store		Group
+		stx	%i1, [%sp + PTREGS_OFF + PT_V9_I1]			! Store		Group
+		stx	%i2, [%sp + PTREGS_OFF + PT_V9_I2]			! Store		Group
+		stx	%i3, [%sp + PTREGS_OFF + PT_V9_I3]			! Store		Group
+		stx	%i4, [%sp + PTREGS_OFF + PT_V9_I4]			! Store		Group
 
-		stx	%i5, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_I5]		! Store		Group
-		stx	%i6, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_I6]		! Store		Group
+		stx	%i5, [%sp + PTREGS_OFF + PT_V9_I5]			! Store		Group
+		stx	%i6, [%sp + PTREGS_OFF + PT_V9_I6]			! Store		Group
 		mov	%l6, %g6						! IEU1
-		stx	%i7, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_I7]		! Store		Group
+		stx	%i7, [%sp + PTREGS_OFF + PT_V9_I7]			! Store		Group
 		ldx	[%g6 + TI_TASK], %g4					! Load		Group
 		done
 		nop

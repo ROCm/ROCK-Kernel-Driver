@@ -379,3 +379,5 @@ EXPORT_SYMBOL(ns87303_lock);
 
 /* for solaris compat module */
 EXPORT_SYMBOL_GPL(sys_call_table);
+
+EXPORT_SYMBOL(tick_ops);

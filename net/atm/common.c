@@ -6,8 +6,7 @@
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kmod.h>
-#include <linux/net.h>		/* struct socket, struct net_proto, struct
-				   proto_ops */
+#include <linux/net.h>		/* struct socket, struct proto_ops */
 #include <linux/atm.h>		/* ATM stuff */
 #include <linux/atmdev.h>
 #include <linux/atmclip.h>	/* CLIP_*ENCAP */
