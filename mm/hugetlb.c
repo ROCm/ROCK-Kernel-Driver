@@ -134,8 +134,8 @@ static int try_to_free_low(unsigned long count)
 {
 	int i;
 	for (i = 0; i < MAX_NUMNODES; ++i) {
-		struct page *page;
-		list_for_each_entry(page, &hugepage_freelists[i], lru) {
+		struct page *page, *next;
+		list_for_each_entry_safe(page, next, &hugepage_freelists[i], lru) {
 			if (PageHighMem(page))
 				continue;
 			list_del(&page->lru);
