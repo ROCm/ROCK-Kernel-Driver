@@ -279,6 +279,67 @@ int allocate_resource(struct resource *root, struct resource *new,
 
 EXPORT_SYMBOL(allocate_resource);
 
+/**
+ * insert_resource - Inserts a resource in the resource tree
+ * @parent: parent of the new resource
+ * @new: new resource to insert
+ *
+ * Returns 0 on success, -EBUSY if the resource can't be inserted.
+ *
+ * This function is equivalent of request_resource when no
+ * conflict happens. If a conflict happens, and the conflicting
+ * resources entirely fit within the range of the new resource,
+ * then the new resource is inserted and the conflicting resources
+ * become childs of the new resource. 
+ */
+int insert_resource(struct resource *parent, struct resource *new)
+{
+	int result = 0;
+	struct resource *first, *next;
+
+	write_lock(&resource_lock);
+	first = __request_resource(parent, new);
+	if (!first)
+		goto out;
+
+	result = -EBUSY;
+	if (first == parent)
+		goto out;
+
+	for (next = first; next->sibling; next = next->sibling)
+		if (next->sibling->start > new->end)
+			break;
+
+	/* existing resource overlaps end of new resource */
+	if (next->end > new->end)
+		goto out;
+
+	result = 0;
+
+	new->parent = parent;
+	new->sibling = next->sibling;
+	new->child = first;
+
+	next->sibling = NULL;
+	for (next = first; next; next = next->sibling)
+		next->parent = new;
+
+	if (parent->child == first) {
+		parent->child = new;
+	} else {
+		next = parent->child;
+		while (next->sibling != first)
+			next = next->sibling;
+		next->sibling = new;
+	}
+
+ out:
+	write_unlock(&resource_lock);
+	return result;
+}
+
+EXPORT_SYMBOL(insert_resource);
+
 /*
  * This is compatibility stuff for IO resources.
  *
