@@ -80,30 +80,16 @@ int sr_do_ioctl(Scsi_CD *cd, struct cdrom_generic_command *cgc)
 	struct scsi_device *SDev;
         struct request *req;
 	int result, err = 0, retries = 0;
-	char *bounce_buffer;
 
 	SDev = cd->device;
 	SRpnt = scsi_allocate_request(SDev);
         if (!SRpnt) {
-                printk("Unable to allocate SCSI request in sr_do_ioctl");
+                printk(KERN_ERR "Unable to allocate SCSI request in sr_do_ioctl");
 		err = -ENOMEM;
 		goto out;
         }
 	SRpnt->sr_data_direction = cgc->data_direction;
 
-	/* use ISA DMA buffer if necessary */
-	SRpnt->sr_request->buffer = cgc->buffer;
-	if (cgc->buffer && SRpnt->sr_host->unchecked_isa_dma &&
-	    (virt_to_phys(cgc->buffer) + cgc->buflen - 1 > ISA_DMA_THRESHOLD)) {
-		bounce_buffer = (char *) kmalloc(cgc->buflen, GFP_DMA);
-		if (bounce_buffer == NULL) {
-			printk("SCSI DMA pool exhausted.");
-			err = -ENOMEM;
-			goto out_free;
-		}
-		memcpy(bounce_buffer, cgc->buffer, cgc->buflen);
-		cgc->buffer = bounce_buffer;
-	}
       retry:
 	if (!scsi_block_when_processing_errors(SDev)) {
 		err = -ENODEV;
@@ -276,11 +262,15 @@ int sr_get_last_session(struct cdrom_device_info *cdi,
 	return 0;
 }
 
+/* primitive to determine whether we need to have GFP_DMA set based on
+ * the status of the unchecked_isa_dma flag in the host structure */
+#define SR_GFP_DMA(cd) (((cd)->device->host->unchecked_isa_dma) ? GFP_DMA : 0)
+
 int sr_get_mcn(struct cdrom_device_info *cdi, struct cdrom_mcn *mcn)
 {
 	Scsi_CD *cd = cdi->handle;
 	struct cdrom_generic_command cgc;
-	char buffer[32];
+	char *buffer = kmalloc(32, GFP_KERNEL | SR_GFP_DMA(cd));
 	int result;
 
 	memset(&cgc, 0, sizeof(struct cdrom_generic_command));
@@ -297,6 +287,7 @@ int sr_get_mcn(struct cdrom_device_info *cdi, struct cdrom_mcn *mcn)
 	memcpy(mcn->medium_catalog_number, buffer + 9, 13);
 	mcn->medium_catalog_number[13] = 0;
 
+	kfree(buffer);
 	return result;
 }
 
@@ -338,7 +329,7 @@ int sr_audio_ioctl(struct cdrom_device_info *cdi, unsigned int cmd, void *arg)
 	Scsi_CD *cd = cdi->handle;
 	struct cdrom_generic_command cgc;
 	int result;
-	unsigned char buffer[32];
+	unsigned char *buffer = kmalloc(32, GFP_KERNEL | SR_GFP_DMA(cd));
 
 	memset(&cgc, 0, sizeof(struct cdrom_generic_command));
 	cgc.timeout = IOCTL_TIMEOUT;
@@ -409,7 +400,7 @@ int sr_audio_ioctl(struct cdrom_device_info *cdi, unsigned int cmd, void *arg)
 	}
 
 	default:
-		return -EINVAL;
+		result = -EINVAL;
 	}
 
 #if 0
@@ -417,6 +408,7 @@ int sr_audio_ioctl(struct cdrom_device_info *cdi, unsigned int cmd, void *arg)
 		printk("DEBUG: sr_audio: result for ioctl %x: %x\n", cmd, result);
 #endif
 
+	kfree(buffer);
 	return result;
 }
 
@@ -528,7 +520,7 @@ int sr_is_xa(Scsi_CD *cd)
 	if (!xa_test)
 		return 0;
 
-	raw_sector = (unsigned char *) kmalloc(2048, GFP_DMA | GFP_KERNEL);
+	raw_sector = (unsigned char *) kmalloc(2048, GFP_KERNEL | SR_GFP_DMA(cd));
 	if (!raw_sector)
 		return -ENOMEM;
 	if (0 == sr_read_sector(cd, cd->ms_offset + 16,
