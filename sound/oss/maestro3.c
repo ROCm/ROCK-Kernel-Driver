@@ -192,8 +192,8 @@ struct m3_list {
     int max;
 };
 
-int external_amp = 1;
-int gpio_pin = -1;
+static int external_amp = 1;
+static int gpio_pin = -1;
 
 struct m3_state {
     unsigned int magic;

@@ -978,7 +978,7 @@ static int opl3sa2_resume(struct pm_dev *pdev)
 
 static int opl3sa2_pm_callback(struct pm_dev *pdev, pm_request_t rqst, void *data)
 {
-	unsigned char mode = (unsigned  char)data;
+	unsigned long mode = (unsigned  long)data;
 
 	switch (rqst) {
 		case PM_SUSPEND:
