@@ -929,19 +929,25 @@ static int meye_do_ioctl(struct inode *inode, struct file *file,
 		if (*i < 0 || *i >= gbuffers)
 			return -EINVAL;
 
+		down(&meye.lock);
+
 		switch (meye.grab_buffer[*i].state) {
 
 		case MEYE_BUF_UNUSED:
+			up(&meye.lock);
 			return -EINVAL;
 		case MEYE_BUF_USING:
 			if (wait_event_interruptible(meye.proc_list,
-						     (meye.grab_buffer[*i].state != MEYE_BUF_USING)))
+						     (meye.grab_buffer[*i].state != MEYE_BUF_USING))) {
+				up(&meye.lock);
 				return -EINTR;
+			}
 			/* fall through */
 		case MEYE_BUF_DONE:
 			meye.grab_buffer[*i].state = MEYE_BUF_UNUSED;
 			kfifo_get(meye.doneq, (unsigned char *)&unused, sizeof(int));
 		}
+		up(&meye.lock);
 		break;
 	}
 
@@ -1059,20 +1065,25 @@ static int meye_do_ioctl(struct inode *inode, struct file *file,
 		if (*i < 0 || *i >= gbuffers)
 			return -EINVAL;
 
+		down(&meye.lock);
 		switch (meye.grab_buffer[*i].state) {
 
 		case MEYE_BUF_UNUSED:
+			up(&meye.lock);
 			return -EINVAL;
 		case MEYE_BUF_USING:
 			if (wait_event_interruptible(meye.proc_list,
-						     (meye.grab_buffer[*i].state != MEYE_BUF_USING)))
+						     (meye.grab_buffer[*i].state != MEYE_BUF_USING))) {
+				up(&meye.lock);
 				return -EINTR;
+			}
 			/* fall through */
 		case MEYE_BUF_DONE:
 			meye.grab_buffer[*i].state = MEYE_BUF_UNUSED;
 			kfifo_get(meye.doneq, (unsigned char *)&unused, sizeof(int));
 		}
 		*i = meye.grab_buffer[*i].size;
+		up(&meye.lock);
 		break;
 	}
 
