@@ -1732,7 +1732,8 @@ static int hcd_free_dev (struct usb_device *udev)
 		return -EINVAL;
 	}
 
-	hcd->driver->free_config (hcd, udev);
+	if (hcd->driver->free_config)
+		hcd->driver->free_config (hcd, udev);
 
 	spin_lock_irqsave (&hcd_data_lock, flags);
 	list_del (&dev->dev_list);

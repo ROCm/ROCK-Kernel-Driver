@@ -4,7 +4,7 @@
 comment 'USB Host Controller Drivers'
 dep_tristate '  EHCI HCD (USB 2.0) support (EXPERIMENTAL)' CONFIG_USB_EHCI_HCD $CONFIG_USB $CONFIG_EXPERIMENTAL
 dep_tristate '  OHCI HCD support (EXPERIMENTAL)' CONFIG_USB_OHCI_HCD $CONFIG_USB $CONFIG_EXPERIMENTAL
-# dep_tristate '  UHCI HCD (most Intel and VIA) support (EXPERIMENTAL)' CONFIG_USB_UHCI_HCD $CONFIG_USB $CONFIG_EXPERIMENTAL
+ dep_tristate '  UHCI HCD (most Intel and VIA) support (EXPERIMENTAL)' CONFIG_USB_UHCI_HCD $CONFIG_USB $CONFIG_EXPERIMENTAL
 if [ "$CONFIG_USB_UHCI_ALT" != "y" ]; then
    dep_tristate '  UHCI (Intel PIIX4, VIA, ...) support' CONFIG_USB_UHCI $CONFIG_USB
 fi
