@@ -2728,7 +2728,7 @@ static int i810_ac97_probe_and_powerup(struct i810_card *card,struct ac97_codec 
 		      i810_ac97_get(codec, AC97_POWER_CONTROL) & ~0x7f00);
 
 	/* wait for analog ready */
-	for (i=10; i && ((i810_ac97_get(codec, AC97_POWER_CONTROL) & 0xf) != 0xf); i--)
+	for (i=100; i && ((i810_ac97_get(codec, AC97_POWER_CONTROL) & 0xf) != 0xf); i--)
 	{
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout(HZ/20);
@@ -3091,8 +3091,15 @@ static int __init i810_probe(struct pci_dev *pci_dev, const struct pci_device_id
 		return -EIO;
 
 	if (pci_set_dma_mask(pci_dev, I810_DMA_MASK)) {
-		printk(KERN_ERR "intel810: architecture does not support"
+		printk(KERN_ERR "i810_audio: architecture does not support"
 		       " 32bit PCI busmaster DMA\n");
+		return -ENODEV;
+	}
+	
+	if( pci_resource_start(pci_dev, 1) == 0)
+	{
+		/* MMIO only ICH5 .. here be dragons .. */
+		printk(KERN_ERR "i810_audio: Pure MMIO interfaces not yet supported.\n");
 		return -ENODEV;
 	}
 

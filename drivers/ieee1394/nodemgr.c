@@ -1744,8 +1744,7 @@ static void nodemgr_add_host(struct hpsb_host *host)
 
 	sprintf(hi->daemon_name, "knodemgrd_%d", host->id);
 
-	hi->pid = kernel_thread(nodemgr_host_thread, hi,
-				CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
+	hi->pid = kernel_thread(nodemgr_host_thread, hi, CLONE_KERNEL);
 
 	if (hi->pid < 0) {
 		HPSB_ERR ("NodeMgr: failed to start %s thread for %s",

@@ -48,7 +48,6 @@ extern inline void wrusp(unsigned long usp) {
 /*
  * Bus types
  */
-#define EISA_bus 0
 #define MCA_bus 0
 
 struct thread_struct {

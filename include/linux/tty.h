@@ -351,7 +351,6 @@ extern void console_init(void);
 
 extern int lp_init(void);
 extern int pty_init(void);
-extern void tty_init(void);
 extern int mxser_init(void);
 extern int moxa_init(void);
 extern int ip2_init(void);

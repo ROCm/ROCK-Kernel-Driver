@@ -348,8 +348,6 @@ EXPORT_SYMBOL(lock_page);
 EXPORT_SYMBOL(unlock_page);
 
 /* device registration */
-EXPORT_SYMBOL(register_chrdev);
-EXPORT_SYMBOL(unregister_chrdev);
 EXPORT_SYMBOL(register_blkdev);
 EXPORT_SYMBOL(unregister_blkdev);
 EXPORT_SYMBOL(tty_register_driver);

@@ -147,7 +147,8 @@ static struct atmdev_ops idt77252_ops =
 	.phy_put	= idt77252_phy_put,
 	.phy_get	= idt77252_phy_get,
 	.change_qos	= idt77252_change_qos,
-	.proc_read	= idt77252_proc_read
+	.proc_read	= idt77252_proc_read,
+	.owner		= THIS_MODULE
 };
 
 static struct idt77252_dev *idt77252_chain = NULL;
@@ -2544,7 +2545,6 @@ idt77252_open(struct atm_vcc *vcc, short vpi, int vci)
 	}
 
 	set_bit(ATM_VF_READY, &vcc->flags);
-	MOD_INC_USE_COUNT;
 
 	up(&card->mutex);
 	return 0;
@@ -2631,7 +2631,6 @@ done:
 		free_scq(card, vc->scq);
 	}
 
-	MOD_DEC_USE_COUNT;
 	up(&card->mutex);
 }
 

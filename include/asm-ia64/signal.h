@@ -50,7 +50,7 @@
 
 /* These should not be considered constants from userland.  */
 #define SIGRTMIN	32
-#define SIGRTMAX	(_NSIG-1)
+#define SIGRTMAX	_NSIG
 
 /*
  * SA_FLAGS values:

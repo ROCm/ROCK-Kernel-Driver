@@ -13,6 +13,8 @@
 #ifndef _ASM_ARCH_TRIZEPS_H_
 #define _ASM_ARCH_TRIZEPS_H_
 
+#include <linux/config.h>
+
 #ifdef CONFIG_TRIZEPS_MFTB2
 #include "mftb2.h"
 #endif

@@ -25,6 +25,7 @@
 
 #include <linux/miscdevice.h>
 #include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 #include <linux/module.h>
 #include <linux/init.h>
 
@@ -32,25 +33,25 @@
 #include <net/irda/irlap.h>
 #include <net/irda/irlmp.h>
 
-extern int irlap_proc_read(char *buf, char **start, off_t offset, int len);
-extern int irlmp_proc_read(char *buf, char **start, off_t offset, int len);
-extern int irttp_proc_read(char *buf, char **start, off_t offset, int len);
-extern int irias_proc_read(char *buf, char **start, off_t offset, int len);
-extern int discovery_proc_read(char *buf, char **start, off_t offset, int len);
+extern struct file_operations discovery_seq_fops;
+extern struct file_operations irlap_seq_fops;
+extern struct file_operations irlmp_seq_fops;
+extern struct file_operations irttp_seq_fops;
+extern struct file_operations irias_seq_fops;
 
 struct irda_entry {
-	char *name;
-	int (*fn)(char*, char**, off_t, int);
+	const char *name;
+	struct file_operations *fops;
 };
 
 struct proc_dir_entry *proc_irda;
  
-static struct irda_entry dir[] = {
-	{"discovery",	discovery_proc_read},
-	{"irttp",	irttp_proc_read},
-	{"irlmp",	irlmp_proc_read},
-	{"irlap",	irlap_proc_read},
-	{"irias",	irias_proc_read},
+static struct irda_entry irda_dirs[] = {
+	{"discovery",	&discovery_seq_fops},
+	{"irttp",	&irttp_seq_fops},
+	{"irlmp",	&irlmp_seq_fops},
+	{"irlap",	&irlap_seq_fops},
+	{"irias",	&irias_seq_fops},
 };
 
 /*
@@ -64,15 +65,15 @@ void __init irda_proc_register(void)
 	int i;
 	struct proc_dir_entry *d;
 
-	proc_irda = proc_mkdir("net/irda", NULL);
+	proc_irda = proc_mkdir("irda", proc_net);
 	if (proc_irda == NULL)
 		return;
 	proc_irda->owner = THIS_MODULE;
 
-	for (i=0; i<ARRAY_SIZE(dir); i++) {
-		d = create_proc_info_entry(dir[i].name,0,proc_irda,dir[i].fn);
-		if (d)
-			d->owner = THIS_MODULE;
+	for (i=0; i<ARRAY_SIZE(irda_dirs); i++) {
+		d = create_proc_entry(irda_dirs[i].name, 0, proc_irda);
+		if (d) 
+			d->proc_fops = irda_dirs[i].fops;
 	}
 }
 
@@ -87,10 +88,10 @@ void __exit irda_proc_unregister(void)
 	int i;
 
         if (proc_irda) {
-                for (i=0; i<ARRAY_SIZE(dir); i++)
-                        remove_proc_entry(dir[i].name, proc_irda);
+                for (i=0; i<ARRAY_SIZE(irda_dirs); i++)
+                        remove_proc_entry(irda_dirs[i].name, proc_irda);
 
-                remove_proc_entry("net/irda", NULL);
+                remove_proc_entry("irda", proc_net);
                 proc_irda = NULL;
         }
 }

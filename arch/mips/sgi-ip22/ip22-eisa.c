@@ -20,6 +20,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/eisa.h>
 #include <linux/types.h>
 #include <linux/init.h>
 #include <linux/irq.h>

@@ -754,16 +754,24 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 			status = -ENOMEM;
 			goto cleanup1;
 		}
-		if (copy_from_user(ioc, (void *) arg, sizeof(*ioc)))
-			return -EFAULT;
+		if (copy_from_user(ioc, (void *) arg, sizeof(*ioc))) {
+			status = -EFAULT;
+			goto cleanup1;
+		}
 		if ((ioc->buf_size < 1) &&
-			(ioc->Request.Type.Direction != XFER_NONE))
-				return -EINVAL;
+			(ioc->Request.Type.Direction != XFER_NONE)) {
+				status = -EINVAL;
+				goto cleanup1;
+		}
 		/* Check kmalloc limits  using all SGs */
-		if (ioc->malloc_size > MAX_KMALLOC_SIZE)
-			return -EINVAL;
-		if (ioc->buf_size > ioc->malloc_size * MAXSGENTRIES)
-			return -EINVAL;
+		if (ioc->malloc_size > MAX_KMALLOC_SIZE) {
+			status = -EINVAL;
+			goto cleanup1;
+		}
+		if (ioc->buf_size > ioc->malloc_size * MAXSGENTRIES) {
+			status = -EINVAL;
+			goto cleanup1;
+		}
 		buff = (unsigned char **) kmalloc(MAXSGENTRIES * 
 				sizeof(char *), GFP_KERNEL);
 		if (!buff) {

@@ -1,6 +1,19 @@
 #ifndef _LINUX_EISA_H
 #define _LINUX_EISA_H
 
+#include <linux/ioport.h>
+#include <linux/device.h>
+
+#ifdef CONFIG_EISA
+# ifdef CONFIG_EISA_ALWAYS
+#  define EISA_bus 1
+# else
+   extern int EISA_bus;
+# endif
+#else
+# define EISA_bus 0
+#endif
+
 #define EISA_SIG_LEN   8
 #define EISA_MAX_SLOTS 8
 

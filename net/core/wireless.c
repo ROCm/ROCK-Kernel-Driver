@@ -495,15 +495,10 @@ static struct file_operations wireless_seq_fops = {
 
 int __init wireless_proc_init(void)
 {
-	struct proc_dir_entry *p;
-	int rc = 0;
+	if (!proc_net_fops_create("wireless", S_IRUGO, &wireless_seq_fops))
+		return -ENOMEM;
 
-	p = create_proc_entry("wireless", S_IRUGO, proc_net);
-	if (p)
-		p->proc_fops = &wireless_seq_fops;
-	else
-		rc = -ENOMEM;
-	return rc;
+	return 0;
 }
 #endif	/* CONFIG_PROC_FS */
 

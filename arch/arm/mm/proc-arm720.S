@@ -124,13 +124,9 @@ ENTRY(cpu_arm720_reset)
 		mcr	p15, 0, ip, c1, c0, 0		@ ctrl register
 		mov	pc, r0
 
-	
-cpu_arm720_name:
-		.asciz	"ARM720T"
-		.align
-
 		__INIT
 
+		.type	__arm720_setup, #function
 __arm720_setup:	mov	r0, #0
 		mcr	p15, 0, r0, c7, c7, 0		@ invalidate caches
 		mcr	p15, 0, r0, c8, c7, 0		@ flush TLB (v4)
@@ -143,6 +139,9 @@ __arm720_setup:	mov	r0, #0
 		orr	r0, r0, #0x2100			@ .... .... .111 .... (old)
 		orr	r0, r0, #0x003d			@ ..1. ..01 ..11 1101 (new)
 		mov	pc, lr				@ __ret (head-armv.S)
+		.size	__arm720_setup, . - __arm720_setup
+
+		__INITDATA
 
 /*
  * Purpose : Function pointers used to access above functions - all calls
@@ -160,6 +159,8 @@ ENTRY(arm720_processor_functions)
 		.word	cpu_arm720_set_pte
 		.size	arm720_processor_functions, . - arm720_processor_functions
 
+		.section ".rodata"
+
 		.type	cpu_arch_name, #object
 cpu_arch_name:	.asciz	"armv4t"
 		.size	cpu_arch_name, . - cpu_arch_name
@@ -167,6 +168,12 @@ cpu_arch_name:	.asciz	"armv4t"
 		.type	cpu_elf_name, #object
 cpu_elf_name:	.asciz	"v4"
 		.size	cpu_elf_name, . - cpu_elf_name
+
+		.type	cpu_arm720_name, #object
+cpu_arm720_name:
+		.asciz	"ARM720T"
+		.size	cpu_arm720_name, . - cpu_arm720_name
+
 		.align
 
 /*

@@ -33,6 +33,7 @@
 #include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 #include <linux/init.h>
 
 #include <net/irda/irda.h>
@@ -53,9 +54,16 @@ static void ircomm_control_indication(struct ircomm_cb *self,
 				      struct sk_buff *skb, int clen);
 
 #ifdef CONFIG_PROC_FS
-static int ircomm_proc_read(char *buf, char **start, off_t offset, int len);
-
 extern struct proc_dir_entry *proc_irda;
+static int ircomm_seq_open(struct inode *, struct file *);
+
+static struct file_operations ircomm_proc_fops = {
+	.owner		= THIS_MODULE,
+	.open           = ircomm_seq_open,
+	.read           = seq_read,
+	.llseek         = seq_lseek,
+	.release	= seq_release_private,
+};
 #endif /* CONFIG_PROC_FS */
 
 hashbin_t *ircomm = NULL;
@@ -69,7 +77,11 @@ int __init ircomm_init(void)
 	}
 	
 #ifdef CONFIG_PROC_FS
-	create_proc_info_entry("ircomm", 0, proc_irda, ircomm_proc_read);
+	{ struct proc_dir_entry *ent;
+	ent = create_proc_entry("ircomm", 0, proc_irda);
+	if (ent) 
+		ent->proc_fops = &ircomm_proc_fops;
+	}
 #endif /* CONFIG_PROC_FS */
 	
 	MESSAGE("IrCOMM protocol (Dag Brattli)\n");
@@ -496,49 +508,98 @@ void ircomm_flow_request(struct ircomm_cb *self, LOCAL_FLOW flow)
 EXPORT_SYMBOL(ircomm_flow_request);
 
 #ifdef CONFIG_PROC_FS
-/*
- * Function ircomm_proc_read (buf, start, offset, len, unused)
- *
- *    
- *
- */
-int ircomm_proc_read(char *buf, char **start, off_t offset, int len)
-{ 	
-	struct ircomm_cb *self;
+struct ircomm_iter_state {
 	unsigned long flags;
-	
-	len = 0;
+};
 
-	spin_lock_irqsave(&ircomm->hb_spinlock, flags);
+static void *ircomm_seq_start(struct seq_file *seq, loff_t *pos)
+{
+	struct ircomm_iter_state *iter = seq->private;
+	struct ircomm_cb *self;
+	loff_t off = 0;
 
-	self = (struct ircomm_cb *) hashbin_get_first(ircomm);
-	while (self != NULL) {
-		ASSERT(self->magic == IRCOMM_MAGIC, break;);
+	spin_lock_irqsave(&ircomm->hb_spinlock, iter->flags);
 
-		if(self->line < 0x10)
-			len += sprintf(buf+len, "ircomm%d", self->line);
-		else
-			len += sprintf(buf+len, "irlpt%d", self->line - 0x10);
-		len += sprintf(buf+len, " state: %s, ",
-			       ircomm_state[ self->state]);
-		len += sprintf(buf+len, 
-			       "slsap_sel: %#02x, dlsap_sel: %#02x, mode:",
-			       self->slsap_sel, self->dlsap_sel); 
-		if(self->service_type & IRCOMM_3_WIRE_RAW)
-			len += sprintf(buf+len, " 3-wire-raw");
-		if(self->service_type & IRCOMM_3_WIRE)
-			len += sprintf(buf+len, " 3-wire");
-		if(self->service_type & IRCOMM_9_WIRE)
-			len += sprintf(buf+len, " 9-wire");
-		if(self->service_type & IRCOMM_CENTRONICS)
-			len += sprintf(buf+len, " Centronics");
-		len += sprintf(buf+len, "\n");
+	for (self = (struct ircomm_cb *) hashbin_get_first(ircomm);
+	     self != NULL;
+	     self = (struct ircomm_cb *) hashbin_get_next(ircomm)) {
+		if (off++ == *pos)
+			break;
+		
+	}
+	return self;
+}
 
-		self = (struct ircomm_cb *) hashbin_get_next(ircomm);
- 	} 
-	spin_unlock_irqrestore(&ircomm->hb_spinlock, flags);
+static void *ircomm_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	++*pos;
 
-	return len;
+	return (void *) hashbin_get_next(ircomm);
+}
+
+static void ircomm_seq_stop(struct seq_file *seq, void *v)
+{
+	struct ircomm_iter_state *iter = seq->private;
+	spin_unlock_irqrestore(&ircomm->hb_spinlock, iter->flags);
+}
+
+static int ircomm_seq_show(struct seq_file *seq, void *v)
+{ 	
+	const struct ircomm_cb *self = v;
+
+	ASSERT(self->magic == IRCOMM_MAGIC, return -EINVAL; );
+
+	if(self->line < 0x10)
+		seq_printf(seq, "ircomm%d", self->line);
+	else
+		seq_printf(seq, "irlpt%d", self->line - 0x10);
+
+	seq_printf(seq,
+		   " state: %s, slsap_sel: %#02x, dlsap_sel: %#02x, mode:",
+		   ircomm_state[ self->state],
+		   self->slsap_sel, self->dlsap_sel); 
+
+	if(self->service_type & IRCOMM_3_WIRE_RAW)
+		seq_printf(seq, " 3-wire-raw");
+	if(self->service_type & IRCOMM_3_WIRE)
+		seq_printf(seq, " 3-wire");
+	if(self->service_type & IRCOMM_9_WIRE)
+		seq_printf(seq, " 9-wire");
+	if(self->service_type & IRCOMM_CENTRONICS)
+		seq_printf(seq, " Centronics");
+	seq_putc(seq, '\n');
+
+	return 0;
+}
+
+static struct seq_operations ircomm_seq_ops = {
+	.start  = ircomm_seq_start,
+	.next   = ircomm_seq_next,
+	.stop   = ircomm_seq_stop,
+	.show   = ircomm_seq_show,
+};
+
+static int ircomm_seq_open(struct inode *inode, struct file *file)
+{
+	struct seq_file *seq;
+	int rc = -ENOMEM;
+	struct ircomm_iter_state *s = kmalloc(sizeof(*s), GFP_KERNEL);
+       
+	if (!s)
+		goto out;
+
+	rc = seq_open(file, &ircomm_seq_ops);
+	if (rc)
+		goto out_kfree;
+
+	seq	     = file->private_data;
+	seq->private = s;
+	memset(s, 0, sizeof(*s));
+out:
+	return rc;
+out_kfree:
+	kfree(s);
+	goto out;
 }
 #endif /* CONFIG_PROC_FS */
 

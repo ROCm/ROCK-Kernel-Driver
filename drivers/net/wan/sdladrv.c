@@ -91,7 +91,6 @@
 #if	defined(_LINUX_)	/****** Linux *******************************/
 
 #include <linux/config.h>
-#include <linux/version.h>
 #include <linux/kernel.h>	/* printk(), and other useful stuff */
 #include <linux/stddef.h>	/* offsetof(), etc. */
 #include <linux/errno.h>	/* return codes */
@@ -351,7 +350,7 @@ static void sdladrv_cleanup(void)
 }
 
 module_init(sdladrv_init);
-module_cleanup(sdladrv_cleanup);
+module_exit(sdladrv_cleanup);
 #endif
 
 /******* Kernel APIs ********************************************************/

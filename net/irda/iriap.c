@@ -29,6 +29,7 @@
 #include <linux/skbuff.h>
 #include <linux/string.h>
 #include <linux/init.h>
+#include <linux/seq_file.h>
 
 #include <asm/byteorder.h>
 #include <asm/unaligned.h>
@@ -970,35 +971,67 @@ void iriap_watchdog_timer_expired(void *data)
 
 #ifdef CONFIG_PROC_FS
 
-static char *ias_value_types[] = {
+static const char *ias_value_types[] = {
 	"IAS_MISSING",
 	"IAS_INTEGER",
 	"IAS_OCT_SEQ",
 	"IAS_STRING"
 };
 
-int irias_proc_read(char *buf, char **start, off_t offset, int len)
+struct irias_iter_state {
+	unsigned long flags;
+};
+
+static inline struct ias_object *irias_seq_idx(loff_t pos) 
 {
 	struct ias_object *obj;
-	struct ias_attrib *attrib;
-	unsigned long flags;
 
-	ASSERT( irias_objects != NULL, return 0;);
+	for (obj = (struct ias_object *) hashbin_get_first(irias_objects);
+	     obj; obj = (struct ias_object *) hashbin_get_next(irias_objects)) {
+		if (pos-- == 0)
+			break;
+	}
+		
+	return obj;
+}
 
-	len = 0;
+static void *irias_seq_start(struct seq_file *seq, loff_t *pos)
+{
+	struct irias_iter_state *iter = seq->private;
 
-	len += sprintf(buf+len, "LM-IAS Objects:\n");
+	spin_lock_irqsave(&irias_objects->hb_spinlock, iter->flags);
 
-	spin_lock_irqsave(&irias_objects->hb_spinlock, flags);
+	return *pos ? irias_seq_idx(*pos - 1) : SEQ_START_TOKEN;
+}
 
-	/* List all irias_objects */
-	obj = (struct ias_object *) hashbin_get_first(irias_objects);
-	while ( obj != NULL) {
-		ASSERT(obj->magic == IAS_OBJECT_MAGIC, return 0;);
+static void *irias_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	++*pos;
 
-		len += sprintf(buf+len, "name: %s, ", obj->name);
-		len += sprintf(buf+len, "id=%d", obj->id);
-		len += sprintf(buf+len, "\n");
+	return (v == SEQ_START_TOKEN) 
+		? (void *) hashbin_get_first(irias_objects)
+		: (void *) hashbin_get_next(irias_objects);
+}
+
+static void irias_seq_stop(struct seq_file *seq, void *v)
+{
+	struct irias_iter_state *iter = seq->private;
+
+	spin_unlock_irqrestore(&irias_objects->hb_spinlock, iter->flags);
+}
+
+static int irias_seq_show(struct seq_file *seq, void *v)
+{
+	if (v == SEQ_START_TOKEN)
+		seq_puts(seq, "LM-IAS Objects:\n");
+	else {
+		struct ias_object *obj = v;
+		struct ias_attrib *attrib;
+
+		ASSERT(obj->magic == IAS_OBJECT_MAGIC, return -EINVAL;);
+
+		seq_printf(seq, "name: %s, id=%d\n",
+			   obj->name, obj->id);
 
 		/* Careful for priority inversions here !
 		 * All other uses of attrib spinlock are independent of
@@ -1006,48 +1039,83 @@ int irias_proc_read(char *buf, char **start, off_t offset, int len)
 		spin_lock(&obj->attribs->hb_spinlock);
 
 		/* List all attributes for this object */
-		attrib = (struct ias_attrib *)
-			hashbin_get_first(obj->attribs);
-		while (attrib != NULL) {
-			ASSERT(attrib->magic == IAS_ATTRIB_MAGIC, return 0;);
+		for (attrib = (struct ias_attrib *) hashbin_get_first(obj->attribs);
+		     attrib != NULL;
+		     attrib = (struct ias_attrib *) hashbin_get_next(obj->attribs)) {
+		     
+			ASSERT(attrib->magic == IAS_ATTRIB_MAGIC, break; );
 
-			len += sprintf(buf+len, " - Attribute name: \"%s\", ",
-				       attrib->name);
-			len += sprintf(buf+len, "value[%s]: ",
-				       ias_value_types[attrib->value->type]);
+			seq_printf(seq, " - Attribute name: \"%s\", ",
+				   attrib->name);
+			seq_printf(seq, "value[%s]: ",
+				   ias_value_types[attrib->value->type]);
 
 			switch (attrib->value->type) {
 			case IAS_INTEGER:
-				len += sprintf(buf+len, "%d\n",
-					       attrib->value->t.integer);
+				seq_printf(seq, "%d\n",
+					   attrib->value->t.integer);
 				break;
 			case IAS_STRING:
-				len += sprintf(buf+len, "\"%s\"\n",
-					       attrib->value->t.string);
+				seq_printf(seq, "\"%s\"\n",
+					   attrib->value->t.string);
 				break;
 			case IAS_OCT_SEQ:
-				len += sprintf(buf+len, "octet sequence (%d bytes)\n", attrib->value->len);
+				seq_printf(seq, "octet sequence (%d bytes)\n", 
+					   attrib->value->len);
 				break;
 			case IAS_MISSING:
-				len += sprintf(buf+len, "missing\n");
+				seq_puts(seq, "missing\n");
 				break;
 			default:
-				IRDA_DEBUG(0, "%s(), Unknown value type!\n",
-					   __FUNCTION__);
-				return -1;
+				seq_printf(seq, "type %d?\n", 
+					   attrib->value->type);
 			}
-			len += sprintf(buf+len, "\n");
+			seq_putc(seq, '\n');
 
-			attrib = (struct ias_attrib *)
-				hashbin_get_next(obj->attribs);
 		}
 		spin_unlock(&obj->attribs->hb_spinlock);
-
-	        obj = (struct ias_object *) hashbin_get_next(irias_objects);
 	}
-	spin_unlock_irqrestore(&irias_objects->hb_spinlock, flags);
 
-	return len;
+	return 0;
 }
+
+static struct seq_operations irias_seq_ops = {
+	.start  = irias_seq_start,
+	.next   = irias_seq_next,
+	.stop   = irias_seq_stop,
+	.show   = irias_seq_show,
+};
+
+static int irias_seq_open(struct inode *inode, struct file *file)
+{
+	struct seq_file *seq;
+	int rc = -ENOMEM;
+	struct irias_iter_state *s;
+
+	ASSERT( irias_objects != NULL, return -EINVAL;);
+	s = kmalloc(sizeof(*s), GFP_KERNEL);
+	if (!s)
+		goto out;
+
+	rc = seq_open(file, &irias_seq_ops);
+	if (rc)
+		goto out_kfree;
+	seq	     = file->private_data;
+	seq->private = s;
+	memset(s, 0, sizeof(*s));
+out:
+	return rc;
+out_kfree:
+	kfree(s);
+	goto out;
+}
+
+struct file_operations irias_seq_fops = {
+	.owner		= THIS_MODULE,
+	.open           = irias_seq_open,
+	.read           = seq_read,
+	.llseek         = seq_lseek,
+	.release	= seq_release_private,
+};
 
 #endif /* PROC_FS */

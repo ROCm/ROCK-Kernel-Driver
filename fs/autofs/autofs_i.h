@@ -123,7 +123,7 @@ static inline struct autofs_sb_info *autofs_sbi(struct super_block *sb)
    filesystem without "magic".) */
 
 static inline int autofs_oz_mode(struct autofs_sb_info *sbi) {
-	return sbi->catatonic || current->pgrp == sbi->oz_pgrp;
+	return sbi->catatonic || process_group(current) == sbi->oz_pgrp;
 }
 
 /* Hash operations */

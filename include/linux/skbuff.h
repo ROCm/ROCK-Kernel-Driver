@@ -306,7 +306,7 @@ extern void	      skb_under_panic(struct sk_buff *skb, int len,
  *
  *	Returns true if the queue is empty, false otherwise.
  */
-static inline int skb_queue_empty(struct sk_buff_head *list)
+static inline int skb_queue_empty(const struct sk_buff_head *list)
 {
 	return list->next == (struct sk_buff *)list;
 }
@@ -357,7 +357,7 @@ static inline void kfree_skb_fast(struct sk_buff *skb)
  *	one of multiple shared copies of the buffer. Cloned buffers are
  *	shared data so must not be written to under normal circumstances.
  */
-static inline int skb_cloned(struct sk_buff *skb)
+static inline int skb_cloned(const struct sk_buff *skb)
 {
 	return skb->cloned && atomic_read(&skb_shinfo(skb)->dataref) != 1;
 }
@@ -369,7 +369,7 @@ static inline int skb_cloned(struct sk_buff *skb)
  *	Returns true if more than one person has a reference to this
  *	buffer.
  */
-static inline int skb_shared(struct sk_buff *skb)
+static inline int skb_shared(const struct sk_buff *skb)
 {
 	return atomic_read(&skb->users) != 1;
 }
@@ -477,7 +477,7 @@ static inline struct sk_buff *skb_peek_tail(struct sk_buff_head *list_)
  *
  *	Return the length of an &sk_buff queue.
  */
-static inline __u32 skb_queue_len(struct sk_buff_head *list_)
+static inline __u32 skb_queue_len(const struct sk_buff_head *list_)
 {
 	return list_->qlen;
 }

@@ -1038,8 +1038,10 @@ retry_undos:
 	 * allocated an undo structure, it was invalidated by an RMID
 	 * and now a new array with received the same id. Check and retry.
 	 */
-	if (un && un->semid == -1)
+	if (un && un->semid == -1) {
+		sem_unlock(sma);
 		goto retry_undos;
+	}
 	error = -EFBIG;
 	if (max >= sma->sem_nsems)
 		goto out_unlock_free;

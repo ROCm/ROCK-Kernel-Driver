@@ -139,7 +139,7 @@ static int jffs_fill_super(struct super_block *sb, void *data, int silent)
 
 	c->thread_pid = kernel_thread (jffs_garbage_collect_thread, 
 				        (void *) c, 
-				        CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
+				        CLONE_KERNEL);
 	D1(printk(KERN_NOTICE "JFFS: GC thread pid=%d.\n", (int) c->thread_pid));
 
 	D1(printk(KERN_NOTICE "JFFS: Successfully mounted device %s.\n",

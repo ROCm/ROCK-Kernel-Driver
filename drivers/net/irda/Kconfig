@@ -254,18 +254,6 @@ config WINBOND_FIR
 	  <file:Documentation/modules.txt>.  The module will be called
 	  w83977af_ir.
 
-config TOSHIBA_OLD
-	tristate "Toshiba Type-O IR Port (old driver)"
-	depends on IRDA && BROKEN_ON_SMP
-	help
-	  Say Y here if you want to build support for the Toshiba Type-O IR
-	  chipset.  This chipset is used by the Toshiba Libretto 100CT, and
-	  many more laptops. This driver is obsolete, will no more be
-	  maintained and will be removed in favor of the new driver.
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.
-	  The module will be called toshoboe.
-
 config TOSHIBA_FIR
 	tristate "Toshiba Type-O IR Port"
 	depends on IRDA
@@ -280,18 +268,6 @@ config TOSHIBA_FIR
 config AU1000_FIR
 	tristate "Alchemy Au1000 SIR/FIR"
 	depends on MIPS_AU1000 && IRDA
-
-config SMC_IRCC_OLD
-	tristate "SMC IrCC (old driver) (EXPERIMENTAL)"
-	depends on EXPERIMENTAL && IRDA && ISA
-	help
-	  Say Y here if you want to build support for the SMC Infrared
-	  Communications Controller.  It is used in the Fujitsu Lifebook 635t
-	  and Sony PCG-505TX.  This driver is obsolete, will no more be
-	  maintained and will be removed in favor of the new driver.
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  The module will be
-	  called smc-ircc.
 
 config SMC_IRCC_FIR
 	tristate "SMSC IrCC (EXPERIMENTAL)"

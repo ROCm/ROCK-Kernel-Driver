@@ -37,7 +37,6 @@
 #define VERSION "0.73"
 
 #include <linux/module.h>
-#include <linux/version.h>
 #include <linux/types.h>
 #include <linux/jiffies.h>
 #include <linux/netdevice.h>

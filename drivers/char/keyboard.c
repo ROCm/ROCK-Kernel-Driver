@@ -205,7 +205,7 @@ int setkeycode(unsigned int scancode, unsigned int keycode)
 	INPUT_KEYCODE(dev, scancode) = keycode;
 
 	for (i = 0; i < dev->keycodemax; i++)
-		if(INPUT_KEYCODE(dev, scancode) == oldkey)
+		if(keycode == oldkey)
 			break;
 	if (i == dev->keycodemax)
 		clear_bit(oldkey, dev->keybit);
