@@ -129,7 +129,7 @@ static struct {
 
 static char curblink __initdata = 1;
 
-static const struct {
+static struct {
 	char name[16];
 	struct pm2fb_par par;
 } user_mode[] __initdata = {
