@@ -71,12 +71,6 @@ static inline void snd_leave_user(mm_segment_t fs)
 	set_fs(fs);
 }
 
-static inline void dec_mod_count(struct module *module)
-{
-	if (module)
-		__MOD_DEC_USE_COUNT(module);
-}
-
 int snd_pcm_oss_plugin_clear(snd_pcm_substream_t *substream)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
@@ -1617,7 +1611,7 @@ static int snd_pcm_oss_open(struct inode *inode, struct file *file)
 	return err;
 
       __error:
-      	dec_mod_count(pcm->card->module);
+      	module_put(pcm->card->module);
       __error2:
       	snd_card_file_remove(pcm->card, file);
       __error1:
@@ -1644,7 +1638,7 @@ static int snd_pcm_oss_release(struct inode *inode, struct file *file)
 	snd_pcm_oss_release_file(pcm_oss_file);
 	up(&pcm->open_mutex);
 	wake_up(&pcm->open_wait);
-	dec_mod_count(pcm->card->module);
+	module_put(pcm->card->module);
 	snd_card_file_remove(pcm->card, file);
 #ifdef LINUX_2_2
 	MOD_DEC_USE_COUNT;

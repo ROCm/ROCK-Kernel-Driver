@@ -33,13 +33,6 @@
 #define FX_MSB_TRANSFER 0x02    /* transfer after DSP MSB byte written */
 #define FX_AUTO_INCR    0x04    /* auto-increment DSP address after transfer */
 
-static inline void
-dec_mod_count(struct module *module)
-{
-	if (module)
-		__MOD_DEC_USE_COUNT(module);
-}
-
 static int
 wavefront_fx_idle (snd_wavefront_t *dev) 
     
@@ -164,7 +157,7 @@ int
 snd_wavefront_fx_release (snd_hwdep_t *hw, struct file *file)
 
 {
-	dec_mod_count(hw->card->module);
+	module_put(hw->card->module);
 	MOD_DEC_USE_COUNT;
 	return 0;
 }

@@ -730,6 +730,7 @@ EXPORT_SYMBOL(usbvideo_SayAndWait);
 
 /* ******************************************************************** */
 
+/* XXX: this piece of crap really wants some error handling.. */
 static void usbvideo_ClientIncModCount(struct uvd *uvd)
 {
 	if (uvd == NULL) {
@@ -744,7 +745,10 @@ static void usbvideo_ClientIncModCount(struct uvd *uvd)
 		err("%s: uvd->handle->md_module == NULL", __FUNCTION__);
 		return;
 	}
-	__MOD_INC_USE_COUNT(uvd->handle->md_module);
+	if (!try_module_get(uvd->handle->md_module)) {
+		err("%s: try_module_get() == 0", __FUNCTION__);
+		return;
+	}
 }
 
 static void usbvideo_ClientDecModCount(struct uvd *uvd)
@@ -761,7 +765,7 @@ static void usbvideo_ClientDecModCount(struct uvd *uvd)
 		err("%s: uvd->handle->md_module == NULL", __FUNCTION__);
 		return;
 	}
-	__MOD_DEC_USE_COUNT(uvd->handle->md_module);
+	module_put(uvd->handle->md_module);
 }
 
 int usbvideo_register(

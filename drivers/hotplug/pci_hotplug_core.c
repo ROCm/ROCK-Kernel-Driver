@@ -561,19 +561,19 @@ static void fs_remove_file (struct dentry *dentry)
 	up(&parent->d_inode->i_sem);
 }
 
+/* yuck, WFT is this? */
 #define GET_STATUS(name,type)	\
 static int get_##name (struct hotplug_slot *slot, type *value)		\
 {									\
 	struct hotplug_slot_ops *ops = slot->ops;			\
 	int retval = 0;							\
-	if (ops->owner)							\
-		__MOD_INC_USE_COUNT(ops->owner);			\
-	if (ops->get_##name)						\
-		retval = ops->get_##name (slot, value);			\
-	else								\
-		*value = slot->info->name;				\
-	if (ops->owner)							\
-		__MOD_DEC_USE_COUNT(ops->owner);			\
+	if (try_module_get(ops->owner)) {				\
+		if (ops->get_##name)					\
+			retval = ops->get_##name (slot, value);		\
+		else							\
+			*value = slot->info->name;			\
+		module_put(ops->owner);					\
+	}								\
 	return retval;							\
 }
 
@@ -665,21 +665,19 @@ static ssize_t power_write_file (struct file *file, const char *ubuff, size_t co
 		case 0:
 			if (!slot->ops->disable_slot)
 				break;
-			if (slot->ops->owner)
-				__MOD_INC_USE_COUNT(slot->ops->owner);
-			retval = slot->ops->disable_slot(slot);
-			if (slot->ops->owner)
-				__MOD_DEC_USE_COUNT(slot->ops->owner);
+			if (try_module_get(slot->ops->owner)) {
+				retval = slot->ops->disable_slot(slot);
+				module_put(slot->ops->owner);
+			}
 			break;
 
 		case 1:
 			if (!slot->ops->enable_slot)
 				break;
-			if (slot->ops->owner)
-				__MOD_INC_USE_COUNT(slot->ops->owner);
-			retval = slot->ops->enable_slot(slot);
-			if (slot->ops->owner)
-				__MOD_DEC_USE_COUNT(slot->ops->owner);
+			if (try_module_get(slot->ops->owner)) {
+				retval = slot->ops->enable_slot(slot);
+				module_put(slot->ops->owner);
+			}
 			break;
 
 		default:
@@ -773,11 +771,10 @@ static ssize_t attention_write_file (struct file *file, const char *ubuff, size_
 	dbg (" - attention = %d\n", attention);
 
 	if (slot->ops->set_attention_status) {
-		if (slot->ops->owner)
-			__MOD_INC_USE_COUNT(slot->ops->owner);
-		retval = slot->ops->set_attention_status(slot, attention);
-		if (slot->ops->owner)
-			__MOD_DEC_USE_COUNT(slot->ops->owner);
+		if (try_module_get(slot->ops->owner)) {
+			retval = slot->ops->set_attention_status(slot, attention);
+			module_put(slot->ops->owner);
+		}
 	}
 
 exit:	
@@ -1011,11 +1008,10 @@ static ssize_t test_write_file (struct file *file, const char *ubuff, size_t cou
 	dbg ("test = %d\n", test);
 
 	if (slot->ops->hardware_test) {
-		if (slot->ops->owner)
-			__MOD_INC_USE_COUNT(slot->ops->owner);
-		retval = slot->ops->hardware_test(slot, test);
-		if (slot->ops->owner)
-			__MOD_DEC_USE_COUNT(slot->ops->owner);
+		if (try_module_get(slot->ops->owner)) {
+			retval = slot->ops->hardware_test(slot, test);
+			module_put(slot->ops->owner);
+		}
 	}
 
 exit:	

@@ -1294,8 +1294,7 @@ static void uart_close(struct tty_struct *tty, struct file *filp)
 	wake_up_interruptible(&info->open_wait);
 
  done:
-	if (drv->owner)
-		__MOD_DEC_USE_COUNT(drv->owner);
+	module_put(drv->owner);
 }
 
 static void uart_wait_until_sent(struct tty_struct *tty, int timeout)
@@ -1665,8 +1664,7 @@ static int uart_open(struct tty_struct *tty, struct file *filp)
 	return retval;
 
  out:
-	if (drv->owner)
-		__MOD_DEC_USE_COUNT(drv->owner);
+	module_put(drv->owner);
  fail:
 	return retval;
 }

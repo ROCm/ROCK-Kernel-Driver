@@ -170,8 +170,7 @@ int MIDIbuf_open(int dev, struct file *file)
 	 *    Interrupts disabled. Be careful
 	 */
 
-	if (midi_devs[dev]->owner)
-		__MOD_INC_USE_COUNT (midi_devs[dev]->owner);
+	module_put(midi_devs[dev]->owner);
 
 	if ((err = midi_devs[dev]->open(dev, mode,
 				 midi_input_intr, midi_output_intr)) < 0)
@@ -254,8 +253,7 @@ void MIDIbuf_release(int dev, struct file *file)
 	midi_in_buf[dev] = NULL;
 	midi_out_buf[dev] = NULL;
 
-	if (midi_devs[dev]->owner)
-		__MOD_DEC_USE_COUNT (midi_devs[dev]->owner);
+	module_put(midi_devs[dev]->owner);
 }
 
 int MIDIbuf_write(int dev, struct file *file, const char *buf, int count)
