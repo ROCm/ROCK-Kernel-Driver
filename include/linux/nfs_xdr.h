@@ -50,6 +50,7 @@ struct nfs_fattr {
  * Info on the file system
  */
 struct nfs_fsinfo {
+	struct nfs_fattr	*fattr; /* Post-op attributes */
 	__u32			rtmax;	/* max.  read transfer size */
 	__u32			rtpref;	/* pref. read transfer size */
 	__u32			rtmult;	/* reads should be multiple of this */
@@ -58,16 +59,31 @@ struct nfs_fsinfo {
 	__u32			wtmult;	/* writes should be multiple of this */
 	__u32			dtpref;	/* pref. readdir transfer size */
 	__u64			maxfilesize;
-	__u64			bsize;	/* block size */
+	__u32			lease_time; /* in seconds */
+};
+
+struct nfs_fsstat {
+	struct nfs_fattr	*fattr; /* Post-op attributes */
 	__u64			tbytes;	/* total size in bytes */
 	__u64			fbytes;	/* # of free bytes */
 	__u64			abytes;	/* # of bytes available to user */
 	__u64			tfiles;	/* # of files */
 	__u64			ffiles;	/* # of free files */
 	__u64			afiles;	/* # of files available to user */
-	__u32			linkmax;/* max # of hard links */
-	__u32			namelen;/* max name length */
-	__u32			lease_time; /* in seconds */
+};
+
+struct nfs2_fsstat {
+	__u32			tsize;  /* Server transfer size */
+	__u32			bsize;  /* Filesystem block size */
+	__u32			blocks; /* No. of "bsize" blocks on filesystem */
+	__u32			bfree;  /* No. of free "bsize" blocks */
+	__u32			bavail; /* No. of available "bsize" blocks */
+};
+
+struct nfs_pathconf {
+	struct nfs_fattr	*fattr; /* Post-op attributes */
+	__u32			max_link; /* max # of hard links */
+	__u32			max_namelen; /* max name length */
 };
 
 /*
@@ -391,7 +407,11 @@ struct nfs_rpc_ops {
 	int	(*mknod)   (struct inode *, struct qstr *, struct iattr *,
 			    dev_t, struct nfs_fh *, struct nfs_fattr *);
 	int	(*statfs)  (struct nfs_server *, struct nfs_fh *,
+			    struct nfs_fsstat *);
+	int	(*fsinfo)  (struct nfs_server *, struct nfs_fh *,
 			    struct nfs_fsinfo *);
+	int	(*pathconf) (struct nfs_server *, struct nfs_fh *,
+			     struct nfs_pathconf *);
 	u32 *	(*decode_dirent)(u32 *, struct nfs_entry *, int plus);
 	void	(*read_setup)   (struct nfs_read_data *, unsigned int count);
 	void	(*write_setup)  (struct nfs_write_data *, unsigned int count, int how);

@@ -240,7 +240,13 @@ int nfs_sb_init(struct super_block *sb)
 {
 	struct nfs_server	*server;
 	struct inode		*root_inode = NULL;
-	struct nfs_fsinfo	fsinfo;
+	struct nfs_fattr	fattr;
+	struct nfs_fsinfo	fsinfo = {
+					.fattr = &fattr,
+				};
+	struct nfs_pathconf pathinfo = {
+			.fattr = &fattr,
+	};
 
 	/* We probably want something more informative here */
 	snprintf(sb->s_id, sizeof(sb->s_id), "%x:%x", MAJOR(sb->s_dev), MINOR(sb->s_dev));
@@ -265,31 +271,27 @@ int nfs_sb_init(struct super_block *sb)
 	sb->s_root->d_op = &nfs_dentry_operations;
 
 	/* Get some general file system info */
-        if (server->rpc_ops->statfs(server, &server->fh, &fsinfo) >= 0) {
-		if (server->namelen == 0)
-			server->namelen = fsinfo.namelen;
-	} else {
+        if (server->rpc_ops->fsinfo(server, &server->fh, &fsinfo) < 0) {
 		printk(KERN_NOTICE "NFS: cannot retrieve file system info.\n");
 		goto out_no_root;
         }
-
+	if (server->namelen == 0 &&
+	    server->rpc_ops->pathconf(server, &server->fh, &pathinfo) >= 0)
+		server->namelen = pathinfo.max_namelen;
 	/* Work out a lot of parameters */
 	if (server->rsize == 0)
 		server->rsize = nfs_block_size(fsinfo.rtpref, NULL);
 	if (server->wsize == 0)
 		server->wsize = nfs_block_size(fsinfo.wtpref, NULL);
-	/* NFSv3: we don't have bsize, but rather rtmult and wtmult... */
-	if (!fsinfo.bsize)
-		fsinfo.bsize = (fsinfo.rtmult>fsinfo.wtmult) ? fsinfo.rtmult : fsinfo.wtmult;
-	/* Also make sure we don't go below rsize/wsize since
-	 * RPC calls are expensive */
-	if (fsinfo.bsize < server->rsize)
-		fsinfo.bsize = server->rsize;
-	if (fsinfo.bsize < server->wsize)
-		fsinfo.bsize = server->wsize;
+	if (sb->s_blocksize == 0) {
+		if (fsinfo.wtmult == 0) {
+			sb->s_blocksize = 512;
+			sb->s_blocksize_bits = 9;
+		} else
+			sb->s_blocksize = nfs_block_bits(fsinfo.wtmult,
+							 &sb->s_blocksize_bits);
+	}
 
-	if (sb->s_blocksize == 0)
-		sb->s_blocksize = nfs_block_bits(fsinfo.bsize, &sb->s_blocksize_bits);
 	if (fsinfo.rtmax >= 512 && server->rsize > fsinfo.rtmax)
 		server->rsize = nfs_block_size(fsinfo.rtmax, NULL);
 	if (fsinfo.wtmax >= 512 && server->wsize > fsinfo.wtmax)
@@ -472,29 +474,30 @@ nfs_statfs(struct super_block *sb, struct statfs *buf)
 	struct nfs_server *server = NFS_SB(sb);
 	unsigned char blockbits;
 	unsigned long blockres;
-	struct nfs_fsinfo res;
+	struct nfs_fh *rootfh = NFS_FH(sb->s_root->d_inode);
+	struct nfs_fattr fattr;
+	struct nfs_fsstat res = {
+			.fattr = &fattr,
+	};
 	int error;
 
 	lock_kernel();
 
-	error = server->rpc_ops->statfs(server, NFS_FH(sb->s_root->d_inode), &res);
+	error = server->rpc_ops->statfs(server, rootfh, &res);
 	buf->f_type = NFS_SUPER_MAGIC;
 	if (error < 0)
 		goto out_err;
 
-	if (res.bsize == 0)
-		res.bsize = sb->s_blocksize;
-	buf->f_bsize = nfs_block_bits(res.bsize, &blockbits);
+	buf->f_bsize = sb->s_blocksize;
+	blockbits = sb->s_blocksize_bits;
 	blockres = (1 << blockbits) - 1;
 	buf->f_blocks = (res.tbytes + blockres) >> blockbits;
 	buf->f_bfree = (res.fbytes + blockres) >> blockbits;
 	buf->f_bavail = (res.abytes + blockres) >> blockbits;
 	buf->f_files = res.tfiles;
 	buf->f_ffree = res.afiles;
-	if (res.namelen == 0 || res.namelen > server->namelen)
-		res.namelen = server->namelen;
-	buf->f_namelen = res.namelen;
 
+	buf->f_namelen = server->namelen;
  out:
 	unlock_kernel();
 
