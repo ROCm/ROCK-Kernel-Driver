@@ -10,6 +10,7 @@
 #	IA64 port via Andreas Dilger
 #	Arm port by Holger Schurig
 #	Random bits by Matt Mackall <mpm@selenic.com>
+#	M68k port by Geert Uytterhoeven and Andreas Schwab
 #
 #	Usage:
 #	objdump -d vmlinux | stackcheck_ppc.pl [arch]
@@ -41,6 +42,10 @@ my (@stack, $re, $x, $xs);
 	} elsif ($arch eq 'ia64') {
 		#e0000000044011fc:       01 0f fc 8c     adds r12=-384,r12
 		$re = qr/.*adds.*r12=-(([0-9]{2}|[3-9])[0-9]{2}),r12/o;
+	} elsif ($arch eq 'm68k') {
+		#    2b6c:       4e56 fb70       linkw %fp,#-1168
+		#  1df770:       defc ffe4       addaw #-28,%sp
+		$re = qr/.*(?:linkw %fp,|addaw )#-([0-9]{1,4})(?:,%sp)?$/o;
 	} elsif ($arch eq 'mips64') {
 		#8800402c:       67bdfff0        daddiu  sp,sp,-16
 		$re = qr/.*daddiu.*sp,sp,-(([0-9]{2}|[3-9])[0-9]{2})/o;
