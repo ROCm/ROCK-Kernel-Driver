@@ -735,6 +735,6 @@ int nvram_clear_error_log()
 }
 
 
-late_initcall(nvram_init);
+module_init(nvram_init);
 module_exit(nvram_cleanup);
 MODULE_LICENSE("GPL");
