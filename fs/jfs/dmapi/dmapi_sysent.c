@@ -633,7 +633,7 @@ static struct file_operations dmapi_fops = {
 
 static struct miscdevice dmapi_dev = {
 	minor:	MISC_DYNAMIC_MINOR,
-	name:	"dmapi",
+	name:	"jfs_dmapi",
 	fops:	&dmapi_fops
 };
 
