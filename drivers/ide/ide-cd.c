@@ -3369,7 +3369,6 @@ static ide_driver_t ide_cdrom_driver = {
 	.supports_dsc_overlap	= 1,
 	.cleanup		= ide_cdrom_cleanup,
 	.do_request		= ide_do_rw_cdrom,
-	.sense			= ide_dump_atapi_status,
 	.error			= ide_cdrom_error,
 	.abort			= ide_cdrom_abort,
 	.capacity		= ide_cdrom_capacity,

@@ -1358,7 +1358,6 @@ static ide_driver_t idedisk_driver = {
 	.supports_dsc_overlap	= 0,
 	.cleanup		= idedisk_cleanup,
 	.do_request		= ide_do_rw_disk,
-	.sense			= idedisk_dump_status,
 	.error			= idedisk_error,
 	.abort			= idedisk_abort,
 	.pre_reset		= idedisk_pre_reset,

@@ -2180,11 +2180,6 @@ static int default_end_request (ide_drive_t *drive, int uptodate, int nr_sects)
 	return ide_end_request(drive, uptodate, nr_sects);
 }
 
-static u8 default_sense (ide_drive_t *drive, const char *msg, u8 stat)
-{
-	return ide_dump_status(drive, msg, stat);
-}
-
 static ide_startstop_t default_error (ide_drive_t *drive, const char *msg, u8 stat)
 {
 	return ide_error(drive, msg, stat);
@@ -2233,7 +2228,6 @@ static void setup_driver_defaults (ide_driver_t *d)
 	if (d->cleanup == NULL)		d->cleanup = default_cleanup;
 	if (d->do_request == NULL)	d->do_request = default_do_request;
 	if (d->end_request == NULL)	d->end_request = default_end_request;
-	if (d->sense == NULL)		d->sense = default_sense;
 	if (d->error == NULL)		d->error = default_error;
 	if (d->abort == NULL)		d->abort = default_abort;
 	if (d->pre_reset == NULL)	d->pre_reset = default_pre_reset;
