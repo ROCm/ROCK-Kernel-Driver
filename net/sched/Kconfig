@@ -317,7 +317,7 @@ config NET_CLS_U32
 	  module will be called cls_u32.
 
 config CLS_U32_PERF
-	bool "     U32 classifier performance counters"
+	bool "U32 classifier performance counters"
 	depends on NET_CLS_U32
 	help
 	  gathers stats that could be used to tune u32 classifier performance.
@@ -364,7 +364,7 @@ config NET_CLS_RSVP6
 	  module will be called cls_rsvp6.
 
 config NET_CLS_ACT
-	bool '  Packet ACTION ' 
+	bool "Packet ACTION"
 	depends on EXPERIMENTAL && NET_CLS && NET_QOS
 	---help---
 	This option requires you have a new iproute2. It enables
@@ -373,7 +373,7 @@ config NET_CLS_ACT
 	  You MUST NOT turn this on if you dont have an update iproute2.
 
 config NET_ACT_POLICE
-	tristate '      Policing Actions' 
+	tristate "Policing Actions"
         depends on NET_CLS_ACT 
         ---help---
         If you are using a newer iproute2 select this one, otherwise use one
@@ -388,14 +388,14 @@ config NET_CLS_POLICE
 	  ingress and egress rate limiting.
 
 config NET_ACT_GACT
-        tristate '      generic Actions'
+        tristate "generic Actions"
         depends on NET_CLS_ACT
         ---help---
         You must have new iproute2 to use this feature
         This adds simple filtering actions like drop,accepet etc 
                                                                                 
 config GACT_PROB
-        bool '         generic Actions probability'
+        bool "generic Actions probability"
         depends on NET_ACT_GACT
         ---help---
         Allows generic actions to be randomly  or deterministically used
