@@ -1633,18 +1633,20 @@ static int cbq_dump(struct Qdisc *sch, struct sk_buff *skb)
 	if (cbq_dump_attr(skb, &q->link) < 0)
 		goto rtattr_failure;
 	rta->rta_len = skb->tail - b;
-	spin_lock_bh(&sch->dev->queue_lock);
-	q->link.xstats.avgidle = q->link.avgidle;
-	if (cbq_copy_xstats(skb, &q->link.xstats)) {
-		spin_unlock_bh(&sch->dev->queue_lock);
-		goto rtattr_failure;
-	}
-	spin_unlock_bh(&sch->dev->queue_lock);
 	return skb->len;
 
 rtattr_failure:
 	skb_trim(skb, b - skb->data);
 	return -1;
+}
+
+static int
+cbq_dump_stats(struct Qdisc *sch, struct gnet_dump *d)
+{
+	struct cbq_sched_data *q = qdisc_priv(sch);
+
+	q->link.xstats.avgidle = q->link.avgidle;
+	return gnet_stats_copy_app(d, &q->link.xstats, sizeof(q->link.xstats));
 }
 
 static int
@@ -2133,6 +2135,7 @@ static struct Qdisc_ops cbq_qdisc_ops = {
 	.destroy	=	cbq_destroy,
 	.change		=	NULL,
 	.dump		=	cbq_dump,
+	.dump_stats	=	cbq_dump_stats,
 	.owner		=	THIS_MODULE,
 };
 
