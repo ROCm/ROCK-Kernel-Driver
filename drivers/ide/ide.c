@@ -567,7 +567,7 @@ u8 ide_dump_status (ide_drive_t *drive, const char *msg, u8 stat)
 
 					sectors = ((u64)high << 24) | low;
 					printk(", LBAsect=%llu, high=%d, low=%d",
-					       (u64) sectors,
+					       (long long) sectors,
 					       high, low);
 				} else {
 					u8 cur = hwif->INB(IDE_SELECT_REG);

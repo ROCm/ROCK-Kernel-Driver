@@ -1401,7 +1401,7 @@ ppp_receive_frame(struct ppp *ppp, struct sk_buff *skb, struct channel *pch)
 	if (skb->len > 0)
 		/* note: a 0-length skb is used as an error indication */
 		++ppp->stats.rx_length_errors;
-err:
+
 	kfree_skb(skb);
 	ppp_receive_error(ppp);
 }
