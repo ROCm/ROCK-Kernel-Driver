@@ -34,6 +34,8 @@
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 
+#include <net/sock.h>
+
 #include <asm/uaccess.h>
 #ifndef KERNEL_DS
 #include <linux/segment.h>

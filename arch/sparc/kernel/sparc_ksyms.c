@@ -90,11 +90,13 @@ extern void dump_thread(struct pt_regs *, struct user *);
 
 #define EXPORT_SYMBOL_DOT(sym)					\
 extern int __sparc_dot_ ## sym (int) __asm__("." #sym);		\
-__EXPORT_SYMBOL(__sparc_dot_ ## sym, "." #sym)
+const struct kernel_symbol __ksymtab___sparc_dot_##sym		\
+__attribute__((section("__ksymtab")))				\
+= { (unsigned long)&__sparc_dot_##sym , "." #sym }
 
 #define EXPORT_SYMBOL_PRIVATE(sym)				\
 extern int __sparc_priv_ ## sym (int) __asm__("__" #sym);	\
-const struct module_symbol __export_priv_##sym			\
+const struct kernel_symbol __export_priv_##sym			\
 __attribute__((section("__ksymtab"))) =				\
 { (unsigned long) &__sparc_priv_ ## sym, "__" #sym }
 

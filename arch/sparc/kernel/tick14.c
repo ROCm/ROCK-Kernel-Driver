@@ -16,6 +16,7 @@
 #include <linux/string.h>
 #include <linux/mm.h>
 #include <linux/timex.h>
+#include <linux/interrupt.h>
 
 #include <asm/oplib.h>
 #include <asm/segment.h>
