@@ -1,3 +1,8 @@
+2002-05-03  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* tulip_core (tulip_pci_tbl): Add new "comet"
+	pci id.  Contributed by Ohta Kyuma.
+
 2002-03-07  Jeff Garzik  <jgarzik@mandrakesoft.com>
 
 	* tulip_core (tulip_mwi_config): Use new PCI API functions
