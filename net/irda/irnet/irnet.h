@@ -520,8 +520,6 @@ extern void
 /* ---------------------------- MODULE ---------------------------- */
 extern int
 	irnet_init(void);		/* Initialise IrNET module */
-extern void
-	irnet_cleanup(void);		/* Teardown IrNET module */
 
 /**************************** VARIABLES ****************************/
 

@@ -44,6 +44,9 @@
 #include <net/irda/irlmp.h>
 #include <net/irda/irlmp_frame.h>
 
+static __u8 irlmp_find_free_slsap(void);
+static int irlmp_slsap_inuse(__u8 slsap_sel);
+
 /* Master structure */
 struct irlmp_cb *irlmp = NULL;
 
@@ -1278,11 +1281,6 @@ void irlmp_connless_data_indication(struct lsap_cb *self, struct sk_buff *skb)
 }
 #endif /* CONFIG_IRDA_ULTRA */
 
-void irlmp_status_request(void)
-{
-	IRDA_DEBUG(0, "%s(), Not implemented\n", __FUNCTION__);
-}
-
 /*
  * Propagate status indication from LAP to LSAPs (via LMP)
  * This don't trigger any change of state in lap_cb, lmp_cb or lsap_cb,
@@ -1656,7 +1654,7 @@ EXPORT_SYMBOL(irlmp_unregister_client);
  * of the allocated LSAP, but I'm not sure the complexity is worth it.
  * Jean II
  */
-int irlmp_slsap_inuse(__u8 slsap_sel)
+static int irlmp_slsap_inuse(__u8 slsap_sel)
 {
 	struct lsap_cb *self;
 	struct lap_cb *lap;
@@ -1756,7 +1754,7 @@ erruncon:
  *    Find a free source LSAP to use. This function is called if the service
  *    user has requested a source LSAP equal to LM_ANY
  */
-__u8 irlmp_find_free_slsap(void)
+static __u8 irlmp_find_free_slsap(void)
 {
 	__u8 lsap_sel;
 	int wrapped = 0;

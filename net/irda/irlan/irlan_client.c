@@ -66,6 +66,7 @@ static void irlan_client_ctrl_connect_confirm(void *instance, void *sap,
 					      struct sk_buff *);
 static void irlan_check_response_param(struct irlan_cb *self, char *param, 
 				       char *value, int val_len);
+static void irlan_client_open_ctrl_tsap(struct irlan_cb *self);
 
 static void irlan_client_kick_timer_expired(void *data)
 {
@@ -88,7 +89,7 @@ static void irlan_client_kick_timer_expired(void *data)
 	}
 }
 
-void irlan_client_start_kick_timer(struct irlan_cb *self, int timeout)
+static void irlan_client_start_kick_timer(struct irlan_cb *self, int timeout)
 {
 	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
 	
@@ -248,7 +249,7 @@ static void irlan_client_ctrl_disconnect_indication(void *instance, void *sap,
  *    Initialize callbacks and open IrTTP TSAPs
  *
  */
-void irlan_client_open_ctrl_tsap(struct irlan_cb *self)
+static void irlan_client_open_ctrl_tsap(struct irlan_cb *self)
 {
 	struct tsap_cb *tsap;
 	notify_t notify;
@@ -307,42 +308,6 @@ static void irlan_client_ctrl_connect_confirm(void *instance, void *sap,
 
 	irlan_do_client_event(self, IRLAN_CONNECT_COMPLETE, NULL);
 }
-
-/*
- * Function irlan_client_reconnect_data_channel (self)
- *
- *    Try to reconnect data channel (currently not used)
- *
- */
-void irlan_client_reconnect_data_channel(struct irlan_cb *self) 
-{
-	struct sk_buff *skb;
-	__u8 *frame;
-		
-	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
-
-	ASSERT(self != NULL, return;);
-	ASSERT(self->magic == IRLAN_MAGIC, return;);
-	
-	skb = dev_alloc_skb(128);
-	if (!skb)
-		return;
-
-	/* Reserve space for TTP, LMP, and LAP header */
-	skb_reserve(skb, self->max_header_size);
-	skb_put(skb, 2);
-	
-	frame = skb->data;
-	
- 	frame[0] = CMD_RECONNECT_DATA_CHAN;
-	frame[1] = 0x01;
- 	irlan_insert_array_param(skb, "RECONNECT_KEY", 
-				 self->client.reconnect_key,
-				 self->client.key_len);
-	
-	irttp_data_request(self->client.tsap_ctrl, skb);	
-}
-
 
 /*
  * Function print_ret_code (code)

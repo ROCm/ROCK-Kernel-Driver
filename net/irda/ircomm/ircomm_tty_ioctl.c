@@ -53,7 +53,7 @@
  *    Change speed of the driver. If the remote device is a DCE, then this
  *    should make it change the speed of its serial port
  */
-void ircomm_tty_change_speed(struct ircomm_tty_cb *self)
+static void ircomm_tty_change_speed(struct ircomm_tty_cb *self)
 {
 	unsigned cflag, cval;
 	int baud;
