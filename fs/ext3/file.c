@@ -76,18 +76,18 @@ ext3_file_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 }
 
 struct file_operations ext3_file_operations = {
-	llseek:		generic_file_llseek,	/* BKL held */
-	read:		generic_file_read,	/* BKL not held.  Don't need */
-	write:		ext3_file_write,	/* BKL not held.  Don't need */
-	ioctl:		ext3_ioctl,		/* BKL held */
-	mmap:		generic_file_mmap,
-	open:		ext3_open_file,		/* BKL not held.  Don't need */
-	release:	ext3_release_file,	/* BKL not held.  Don't need */
-	fsync:		ext3_sync_file,		/* BKL held */
+	.llseek		= generic_file_llseek,	/* BKL held */
+	.read		= generic_file_read,	/* BKL not held.  Don't need */
+	.write		= ext3_file_write,	/* BKL not held.  Don't need */
+	.ioctl		= ext3_ioctl,		/* BKL held */
+	.mmap		= generic_file_mmap,
+	.open		= ext3_open_file,		/* BKL not held.  Don't need */
+	.release	= ext3_release_file,	/* BKL not held.  Don't need */
+	.fsync		= ext3_sync_file,		/* BKL held */
 };
 
 struct inode_operations ext3_file_inode_operations = {
-	truncate:	ext3_truncate,		/* BKL held */
-	setattr:	ext3_setattr,		/* BKL held */
+	.truncate	= ext3_truncate,		/* BKL held */
+	.setattr	= ext3_setattr,		/* BKL held */
 };
 
