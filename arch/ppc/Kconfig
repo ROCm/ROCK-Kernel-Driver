@@ -1193,14 +1193,7 @@ source "drivers/isdn/Kconfig"
 
 source "drivers/video/Kconfig"
 
-menu "Old CD-ROM drivers (not SCSI, not IDE)"
-
-config CD_NO_IDESCSI
-	bool "Support non-SCSI/IDE/ATAPI CDROM drives"
-
 source "drivers/cdrom/Kconfig"
-
-endmenu
 
 source "drivers/input/Kconfig"
 
