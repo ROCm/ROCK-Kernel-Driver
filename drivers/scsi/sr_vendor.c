@@ -39,7 +39,7 @@
 #include <linux/string.h>
 #include <linux/bcd.h>
 
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include "scsi.h"
 #include "hosts.h"
 #include <scsi/scsi_ioctl.h>

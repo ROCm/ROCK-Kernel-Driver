@@ -15,7 +15,7 @@
 /* The following #define is to avoid a clash with hosts.c */
 #define PPA_CODE 1
 
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <asm/io.h>
 #include <linux/parport.h>
 #include <linux/workqueue.h>

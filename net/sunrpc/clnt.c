@@ -385,7 +385,8 @@ rpc_setbufsize(struct rpc_clnt *clnt, unsigned int sndsize, unsigned int rcvsize
 	xprt->rcvsize = 0;
 	if (rcvsize)
 		xprt->rcvsize = rcvsize + RPC_SLACK_SPACE;
-	xprt_sock_setbufsize(xprt);
+	if (xprt_connected(xprt))
+		xprt_sock_setbufsize(xprt);
 }
 
 /*

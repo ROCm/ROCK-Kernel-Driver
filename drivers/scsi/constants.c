@@ -9,7 +9,7 @@
 #include <linux/module.h>
 
 #include <linux/config.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/kernel.h>
 #include "scsi.h"
 #include "hosts.h"

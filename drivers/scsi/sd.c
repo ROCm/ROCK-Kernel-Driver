@@ -43,7 +43,7 @@
 #include <linux/init.h>
 #include <linux/reboot.h>
 #include <linux/vmalloc.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/blkpg.h>
 #include <asm/uaccess.h>
 

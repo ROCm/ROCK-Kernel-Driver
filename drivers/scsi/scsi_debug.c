@@ -41,7 +41,7 @@
 #include <linux/vmalloc.h>
 #include <linux/moduleparam.h>
 
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include "scsi.h"
 #include "hosts.h"
 #include <scsi/scsicam.h>

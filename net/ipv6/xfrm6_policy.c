@@ -4,7 +4,7 @@
  * Authors:
  *	Mitsuru KANDA @USAGI
  * 	Kazunori MIYAZAWA @USAGI
- * 	Kunihiro Ishiguro
+ * 	Kunihiro Ishiguro <kunihiro@ipinfusion.com>
  * 		IPv6 support
  * 	YOSHIFUJI Hideaki
  * 		Split up af-specific portion

@@ -123,7 +123,7 @@
 #include <linux/timer.h>
 #include <linux/stat.h>
 
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,35)
 #include <linux/init.h>

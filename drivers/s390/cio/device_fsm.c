@@ -188,7 +188,7 @@ ccw_device_done(struct ccw_device *cdev, int state)
 
 	wake_up(&cdev->private->wait_q);
 
-	if (state != DEV_STATE_ONLINE)
+	if (css_init_done && state != DEV_STATE_ONLINE)
 		put_device (&cdev->dev);
 }
 
@@ -293,7 +293,7 @@ ccw_device_online(struct ccw_device *cdev)
 	if (cdev->private->state != DEV_STATE_OFFLINE)
 		return -EINVAL;
 	sch = to_subchannel(cdev->dev.parent);
-	if (!get_device(&cdev->dev))
+	if (css_init_done && !get_device(&cdev->dev))
 		return -ENODEV;
 	if (cio_enable_subchannel(sch, sch->schib.pmcw.isc) != 0) {
 		/* Couldn't enable the subchannel for i/o. Sick device. */
@@ -384,7 +384,9 @@ static void
 ccw_device_offline_notoper(struct ccw_device *cdev, enum dev_event dev_event)
 {
 	cdev->private->state = DEV_STATE_NOT_OPER;
-	device_unregister(&cdev->dev);
+	INIT_WORK(&cdev->private->kick_work,
+		  ccw_device_unregister, (void *) &cdev->dev);
+	queue_work(ccw_device_work, &cdev->private->kick_work);
 	wake_up(&cdev->private->wait_q);
 }
 
@@ -403,8 +405,10 @@ ccw_device_online_notoper(struct ccw_device *cdev, enum dev_event dev_event)
 		// FIXME: not-oper indication to device driver ?
 		ccw_device_call_handler(cdev);
 	}
+	INIT_WORK(&cdev->private->kick_work,
+		  ccw_device_unregister, (void *) &cdev->dev);
+	queue_work(ccw_device_work, &cdev->private->kick_work);
 	wake_up(&cdev->private->wait_q);
-	device_unregister(&cdev->dev);
 }
 
 /*

@@ -25,7 +25,7 @@
 #include <linux/timer.h>
 #include <linux/ioport.h>
 #include <linux/major.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/delay.h>

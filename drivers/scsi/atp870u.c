@@ -26,7 +26,7 @@
 #include <linux/proc_fs.h>
 #include <linux/spinlock.h>
 #include <linux/pci.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/stat.h>
 
 #include <asm/system.h>

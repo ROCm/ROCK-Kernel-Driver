@@ -29,8 +29,6 @@
 #include <linux/sched.h>
 #include <linux/init.h>
 #include <linux/slab.h>
-#include <linux/version.h>
-#include <asm/semaphore.h>
 
 #include "dvbdev.h"
 #include "dvb_functions.h"

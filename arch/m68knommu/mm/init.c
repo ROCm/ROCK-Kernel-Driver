@@ -27,9 +27,6 @@
 #include <linux/mm.h>
 #include <linux/swap.h>
 #include <linux/init.h>
-#ifdef CONFIG_BLK_DEV_RAM
-#include <linux/blk.h>
-#endif
 #include <linux/highmem.h>
 #include <linux/pagemap.h>
 #include <linux/bootmem.h>

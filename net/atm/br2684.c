@@ -16,9 +16,12 @@ Author: Marcell GAL, 2000, XDSL Ltd, Hungary
 #include <linux/ip.h>
 #include <asm/uaccess.h>
 #include <net/arp.h>
+#include <linux/atm.h>
+#include <linux/atmdev.h>
 
 #include <linux/atmbr2684.h>
 
+#include "common.h"
 #include "ipcommon.h"
 
 /*
@@ -768,8 +771,6 @@ static struct file_operations br2684_proc_operations = {
 
 extern struct proc_dir_entry *atm_proc_root;	/* from proc.c */
 
-extern int (*br2684_ioctl_hook)(struct atm_vcc *, unsigned int, unsigned long);
-
 /* the following avoids some spurious warnings from the compiler */
 #define UNUSED __attribute__((unused))
 
@@ -779,14 +780,14 @@ static int __init UNUSED br2684_init(void)
 	if ((p = create_proc_entry("br2684", 0, atm_proc_root)) == NULL)
 		return -ENOMEM;
 	p->proc_fops = &br2684_proc_operations;
-	br2684_ioctl_hook = br2684_ioctl;
+	br2684_ioctl_set(br2684_ioctl);
 	return 0;
 }
 
 static void __exit UNUSED br2684_exit(void)
 {
 	struct br2684_dev *brdev;
-	br2684_ioctl_hook = NULL;
+	br2684_ioctl_set(NULL);
 	remove_proc_entry("br2684", atm_proc_root);
 	while (!list_empty(&br2684_devs)) {
 		brdev = list_entry_brdev(br2684_devs.next);

@@ -233,7 +233,7 @@ pci_pool_destroy (struct pci_pool *pool)
 				struct pci_page, page_list);
 		if (is_page_busy (pool->blocks_per_page, page->bitmap)) {
 			printk (KERN_ERR "pci_pool_destroy %s/%s, %p busy\n",
-				pool->dev ? pool->dev->slot_name : NULL,
+				pool->dev ? pci_name(pool->dev) : NULL,
 				pool->name, page->vaddr);
 			/* leak the still-in-use consistent memory */
 			list_del (&page->page_list);
@@ -359,7 +359,7 @@ pci_pool_free (struct pci_pool *pool, void *vaddr, dma_addr_t dma)
 
 	if ((page = pool_find_page (pool, dma)) == 0) {
 		printk (KERN_ERR "pci_pool_free %s/%s, %p/%lx (bad dma)\n",
-			pool->dev ? pool->dev->slot_name : NULL,
+			pool->dev ? pci_name(pool->dev) : NULL,
 			pool->name, vaddr, (unsigned long) dma);
 		return;
 	}
@@ -372,13 +372,13 @@ pci_pool_free (struct pci_pool *pool, void *vaddr, dma_addr_t dma)
 #ifdef	CONFIG_DEBUG_SLAB
 	if (((dma - page->dma) + (void *)page->vaddr) != vaddr) {
 		printk (KERN_ERR "pci_pool_free %s/%s, %p (bad vaddr)/%Lx\n",
-			pool->dev ? pool->dev->slot_name : NULL,
+			pool->dev ? pci_name(pool->dev) : NULL,
 			pool->name, vaddr, (unsigned long long) dma);
 		return;
 	}
 	if (page->bitmap [map] & (1UL << block)) {
 		printk (KERN_ERR "pci_pool_free %s/%s, dma %Lx already free\n",
-			pool->dev ? pool->dev->slot_name : NULL,
+			pool->dev ? pci_name(pool->dev) : NULL,
 			pool->name, (unsigned long long)dma);
 		return;
 	}

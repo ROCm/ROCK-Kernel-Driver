@@ -387,7 +387,7 @@
 #include "sbpcd.h"
 
 #define MAJOR_NR MATSUSHITA_CDROM_MAJOR
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 
 /*==========================================================================*/
 #if SBPCD_DIS_IRQ

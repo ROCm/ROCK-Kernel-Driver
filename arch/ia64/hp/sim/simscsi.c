@@ -9,7 +9,7 @@
  * 99/12/18 David Mosberger	Added support for READ10/WRITE10 needed by linux v2.3.33
  */
 #include <linux/config.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/kernel.h>

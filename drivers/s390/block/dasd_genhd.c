@@ -9,7 +9,7 @@
  *
  * Dealing with devices registered to multiple major numbers.
  *
- * $Revision: 1.29 $
+ * $Revision: 1.31 $
  */
 
 #include <linux/config.h>
@@ -17,7 +17,6 @@
 #include <linux/interrupt.h>
 #include <linux/fs.h>
 #include <linux/blkpg.h>
-#include <linux/blk.h>
 
 #include <asm/uaccess.h>
 
@@ -200,7 +199,6 @@ void
 dasd_destroy_partitions(struct dasd_device * device)
 {
 	del_gendisk(device->gdp);
-	put_disk(device->gdp);
 }
 
 int

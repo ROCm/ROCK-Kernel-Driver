@@ -349,6 +349,9 @@ static int tdlb7_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 
 		sp5659_set_tv_freq (i2c, p->frequency);
 
+		// read status reg in order to clear pending irqs
+		sp8870_readreg(i2c, 0x200);
+
 		// sample rate correction bit [23..17]
 		sp8870_writereg(i2c,0x0319,0x000A);
 		

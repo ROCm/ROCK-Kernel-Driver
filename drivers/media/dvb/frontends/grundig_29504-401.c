@@ -37,15 +37,15 @@ static int debug = 0;
 
 
 struct dvb_frontend_info grundig_29504_401_info = {
-	.name 			= "Grundig 29504-401",
-	.type 			= FE_OFDM,
-/*	.frequency_min 		= ???,*/
-/*	.frequency_max 		= ???,*/
-	.frequency_stepsize 	= 166666,
-/*      .frequency_tolerance 	= ???,*/
-/*      .symbol_rate_tolerance 	= ???,*/
-	.notifier_delay =  0,
-	.caps = FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 | FE_CAN_FEC_3_4 | 
+	name: "Grundig 29504-401",
+	type: FE_OFDM,
+/*	frequency_min: ???,*/
+/*	frequency_max: ???,*/
+	frequency_stepsize: 166666,
+/*      frequency_tolerance: ???,*/
+/*      symbol_rate_tolerance: ???,*/
+	notifier_delay: 0,
+	caps: FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 | FE_CAN_FEC_3_4 | 
 	      FE_CAN_FEC_5_6 | FE_CAN_FEC_7_8 |
 	      FE_CAN_QPSK | FE_CAN_QAM_16 | FE_CAN_QAM_64 |
 	      FE_CAN_MUTE_TS /*| FE_CAN_CLEAN_SETUP*/
@@ -109,15 +109,15 @@ static int tsa5060_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq)
 	div = (36125000 + freq) / 166666;
 	cfg = 0x88;
 
-	cpump = div < 175000000 ? 2 : div < 390000000 ? 1 :
-		div < 470000000 ? 2 : div < 750000000 ? 1 : 3;
+	cpump = freq < 175000000 ? 2 : freq < 390000000 ? 1 :
+		freq < 470000000 ? 2 : freq < 750000000 ? 1 : 3;
 
-	band_select = div < 175000000 ? 0x0e : div < 470000000 ? 0x05 : 0x03;
+	band_select = freq < 175000000 ? 0x0e : freq < 470000000 ? 0x05 : 0x03;
 
 	buf [0] = (div >> 8) & 0x7f;
 	buf [1] = div & 0xff;
 	buf [2] = ((div >> 10) & 0x60) | cfg;
-	buf [3] = cpump | band_select;
+	buf [3] = (cpump << 6) | band_select;
 
 	return tsa5060_write (i2c, buf);
 }
@@ -267,12 +267,12 @@ static int apply_frontend_param (struct dvb_i2c_bus *i2c,
 }
 
 
-static void reset_and_configure (struct dvb_i2c_bus *i2c)
+static int reset_and_configure (struct dvb_i2c_bus *i2c)
 {
 	u8 buf [] = { 0x06 };
 	struct i2c_msg msg = { .addr = 0x00, .flags = 0, .buf = buf, .len = 1 };
 
-	i2c->xfer (i2c, &msg, 1);
+	return (i2c->xfer (i2c, &msg, 1) == 1) ? 0 : -ENODEV;
 }
 
 
@@ -391,7 +391,7 @@ int grundig_29504_401_ioctl (struct dvb_frontend *fe,
 		struct dvb_frontend_parameters *p = arg;
 
 		tsa5060_set_tv_freq (i2c, p->frequency);
-		apply_frontend_param (i2c, p);
+		return apply_frontend_param (i2c, p);
 	}
         case FE_GET_FRONTEND:
 		/*  we could correct the frequency here, but...
@@ -417,25 +417,61 @@ int grundig_29504_401_ioctl (struct dvb_frontend *fe,
 
 static int l64781_attach (struct dvb_i2c_bus *i2c)
 {
+	u8 reg0x3e;
 	u8 b0 [] = { 0x1a };
 	u8 b1 [] = { 0x00 };
 	struct i2c_msg msg [] = { { .addr = 0x55, .flags = 0, .buf = b0, .len = 1 },
 			   { .addr = 0x55, .flags = I2C_M_RD, .buf = b1, .len = 1 } };
 
-	if (i2c->xfer (i2c, msg, 2) == 2)   /*  probably an EEPROM... */
+	/**
+	 *  the L64781 won't show up before we send the reset_and_configure()
+	 *  broadcast. If nothing responds there is no L64781 on the bus...
+	 */
+	if (reset_and_configure(i2c) < 0) {
+		dprintk("no response on reset_and_configure() broadcast, bailing out...\n");
 		return -ENODEV;
+	}
 
-	reset_and_configure (i2c);
-
-	if (i2c->xfer (i2c, msg, 2) != 2)   /*  nothing... */
+	/* The chip always responds to reads */
+	if (i2c->xfer(i2c, msg, 2) != 2) {  
+	        dprintk("no response to read on I2C bus\n");
 		return -ENODEV;
+	}
 
-	if (b1[0] != 0xa1)
+	/* Save current register contents for bailout */
+	reg0x3e = l64781_readreg(i2c, 0x3e);
+
+	/* Reading the POWER_DOWN register always returns 0 */
+	if (reg0x3e != 0) {
+	        dprintk("Device doesn't look like L64781\n");
 		return -ENODEV;
+	}
+
+	/* Turn the chip off */
+	l64781_writereg (i2c, 0x3e, 0x5a);
+
+	/* Responds to all reads with 0 */
+	if (l64781_readreg(i2c, 0x1a) != 0) {
+ 	        dprintk("Read 1 returned unexpcted value\n");
+	        goto bailout;
+	}	  
+
+	/* Turn the chip on */
+	l64781_writereg (i2c, 0x3e, 0xa5);
+	
+	/* Responds with register default value */
+	if (l64781_readreg(i2c, 0x1a) != 0xa1) { 
+ 	        dprintk("Read 2 returned unexpcted value\n");
+	        goto bailout;
+	}
 
 	dvb_register_frontend (grundig_29504_401_ioctl, i2c, NULL,
 			       &grundig_29504_401_info);
 	return 0;
+
+ bailout:
+	l64781_writereg (i2c, 0x3e, reg0x3e);  /* restore reg 0x3e */
+	return -ENODEV;
 }
 
 

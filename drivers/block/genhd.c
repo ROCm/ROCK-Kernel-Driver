@@ -7,7 +7,7 @@
 #include <linux/fs.h>
 #include <linux/genhd.h>
 #include <linux/kernel.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>
 #include <linux/seq_file.h>

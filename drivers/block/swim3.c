@@ -24,7 +24,6 @@
 #include <linux/delay.h>
 #include <linux/fd.h>
 #include <linux/ioctl.h>
-#include <linux/blk.h>
 #include <linux/devfs_fs_kernel.h>
 #include <asm/io.h>
 #include <asm/dbdma.h>

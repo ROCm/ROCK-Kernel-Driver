@@ -442,9 +442,10 @@ static int config_drive_for_dma (ide_drive_t *drive)
  *	the driver to resolve the problem, if a DMA transfer is still
  *	in progress we continue to wait (arguably we need to add a 
  *	secondary 'I don't care what the drive thinks' timeout here)
- *	Finally if we have an interrupt but for some reason got the
- *	timeout first we complete the I/O. This can occur if an 
- *	interrupt is lost or due to bugs.
+ *	Finally if we have an interrupt we let it complete the I/O.
+ *	But only one time - we clear expiry and if it's still not
+ *	completed after WAIT_CMD, we error and retry in PIO.
+ *	This can occur if an interrupt is lost or due to hang or bugs.
  */
  
 static int dma_timer_expiry (ide_drive_t *drive)
@@ -461,19 +462,16 @@ static int dma_timer_expiry (ide_drive_t *drive)
 	HWGROUP(drive)->expiry = NULL;	/* one free ride for now */
 
 	/* 1 dmaing, 2 error, 4 intr */
-	
-	if (dma_stat & 2) {	/* ERROR */
-		(void) hwif->ide_dma_end(drive);
-		return DRIVER(drive)->error(drive,
-			"dma_timer_expiry", hwif->INB(IDE_STATUS_REG));
-	}
+	if (dma_stat & 2)	/* ERROR */
+		return -1;
+
 	if (dma_stat & 1)	/* DMAing */
 		return WAIT_CMD;
 
 	if (dma_stat & 4)	/* Got an Interrupt */
-		HWGROUP(drive)->handler(drive);
+		return WAIT_CMD;
 
-	return 0;
+	return 0;	/* Status is unknown -- reset the bus */
 }
 
 /**

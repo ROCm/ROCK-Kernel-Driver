@@ -81,7 +81,7 @@ pci_setup_cardbus(struct pci_bus *bus)
 	struct pci_bus_region region;
 
 	printk("PCI: Bus %d, cardbus bridge: %s\n",
-		bus->number, bridge->slot_name);
+		bus->number, pci_name(bridge));
 
 	pcibios_resource_to_bus(bridge, &region, bus->resource[0]);
 	if (bus->resource[0]->flags & IORESOURCE_IO) {
@@ -344,7 +344,7 @@ pbus_size_mem(struct pci_bus *bus, unsigned long mask, unsigned long type)
 			if (order > 11) {
 				printk(KERN_WARNING "PCI: region %s/%d "
 				       "too large: %lx-%lx\n",
-				       dev->slot_name, i, r->start, r->end);
+				       pci_name(dev), i, r->start, r->end);
 				r->flags = 0;
 				continue;
 			}
@@ -513,7 +513,7 @@ pci_bus_assign_resources(struct pci_bus *bus)
 
 		default:
 			printk(KERN_INFO "PCI: not setting up bridge %s "
-			       "for bus %d\n", dev->slot_name, b->number);
+			       "for bus %d\n", pci_name(dev), b->number);
 			break;
 		}
 	}

@@ -252,6 +252,7 @@ enum {
 	ATM_VF_SESSION,		/* VCC is p2mp session control descriptor */
 	ATM_VF_HASSAP,		/* SAP has been set */
 	ATM_VF_CLOSE,		/* asynchronous close - treat like VF_RELEASED*/
+	ATM_VF_WAITING,		/* waiting for reply from sigd */
 };
 
 
@@ -291,14 +292,11 @@ struct atm_vcc {
 	void		*dev_data;	/* per-device data */
 	void		*proto_data;	/* per-protocol data */
 	struct k_atm_aal_stats *stats;	/* pointer to AAL stats group */
-	wait_queue_head_t sleep;	/* if socket is busy */
 	struct sock	*sk;		/* socket backpointer */
 	/* SVC part --- may move later ------------------------------------- */
 	short		itf;		/* interface number */
 	struct sockaddr_atmsvc local;
 	struct sockaddr_atmsvc remote;
-	void (*callback)(struct atm_vcc *vcc);
-	int		reply;		/* also used by ATMTCP */
 	/* Multipoint part ------------------------------------------------- */
 	struct atm_vcc	*session;	/* session VCC descriptor */
 	/* Other stuff ----------------------------------------------------- */

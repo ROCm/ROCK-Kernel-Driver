@@ -35,8 +35,6 @@
 
 struct dvb_net {
 	struct dvb_device *dvbdev;
-	int card_num;
-	int dev_num;
 	struct net_device device[DVB_NET_DEVICES_MAX];
 	int state[DVB_NET_DEVICES_MAX];
 	struct dmx_demux *demux;

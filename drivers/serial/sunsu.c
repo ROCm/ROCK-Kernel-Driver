@@ -102,6 +102,7 @@ struct uart_sunsu_port {
 	int			l1_down;
 #ifdef CONFIG_SERIO
 	struct serio		serio;
+	int			serio_open;
 #endif
 };
 
@@ -1021,12 +1022,13 @@ static int sunsu_serio_write(struct serio *serio, unsigned char ch)
 
 static int sunsu_serio_open(struct serio *serio)
 {
+	struct uart_sunsu_port *up = serio->driver;
 	unsigned long flags;
 	int ret;
 
 	spin_lock_irqsave(&sunsu_serio_lock, flags);
-	if (serio->private == NULL) {
-		serio->private = (void *) -1L;
+	if (!up->serio_open) {
+		up->serio_open = 1;
 		ret = 0;
 	} else
 		ret = -EBUSY;
@@ -1037,10 +1039,11 @@ static int sunsu_serio_open(struct serio *serio)
 
 static void sunsu_serio_close(struct serio *serio)
 {
+	struct uart_sunsu_port *up = serio->driver;
 	unsigned long flags;
 
 	spin_lock_irqsave(&sunsu_serio_lock, flags);
-	serio->private = NULL;
+	up->serio_open = 0;
 	spin_unlock_irqrestore(&sunsu_serio_lock, flags);
 }
 

@@ -32,7 +32,7 @@ static char *verstr = "20030622";
 #include <linux/ioctl.h>
 #include <linux/fcntl.h>
 #include <linux/spinlock.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/moduleparam.h>
 #include <linux/devfs_fs_kernel.h>
 #include <asm/uaccess.h>

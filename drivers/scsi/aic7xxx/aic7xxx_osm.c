@@ -139,7 +139,7 @@
 #endif
 
 #include <linux/mm.h>		/* For fetching system memory size */
-#include <linux/blk.h>		/* For block_size() */
+#include <linux/blkdev.h>		/* For block_size() */
 
 /*
  * Lock protecting manipulation of the ahc softc list.

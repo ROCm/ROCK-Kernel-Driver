@@ -23,7 +23,7 @@
 #include <linux/slab.h>
 #include <linux/proc_fs.h>
 #include <linux/errno.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/seq_file.h>
 #include <asm/uaccess.h>
 

@@ -224,7 +224,7 @@
 #include <linux/mm.h>
 #include <linux/config.h>
 #include <linux/version.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/timer.h>
 
 #include "scsi.h"

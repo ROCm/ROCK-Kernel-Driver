@@ -61,7 +61,7 @@ static int sg_version_num = 30529;	/* 2 digits for each component */
 #include <asm/uaccess.h>
 #include <asm/system.h>
 
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include "scsi.h"
 #include "hosts.h"
 #include <scsi/scsi_driver.h>

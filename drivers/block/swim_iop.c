@@ -30,7 +30,6 @@
 #include <linux/timer.h>
 #include <linux/delay.h>
 #include <linux/fd.h>
-#include <linux/blk.h>
 #include <linux/ioctl.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>

@@ -101,7 +101,7 @@
 #include <asm/io.h>
 #include <asm/current.h>
 #include <asm/uaccess.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 
 #define mcd_port mcd		/* for compatible parameter passing with "insmod" */
 #include "mcd.h"

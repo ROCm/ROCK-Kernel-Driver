@@ -166,7 +166,7 @@
 */
 
 #include <linux/version.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include "aztcd.h"
 
 #include <linux/module.h>

@@ -44,7 +44,6 @@
 
 #include <linux/major.h>
 
-#include <linux/blk.h>
 #include <linux/blkdev.h>
 #include <linux/module.h>
 #include <linux/init.h>
@@ -55,8 +54,6 @@
 #include <linux/errno.h>
 #include <linux/file.h>
 #include <linux/ioctl.h>
-#include <linux/blkdev.h>
-#include <linux/blk.h>
 #include <net/sock.h>
 
 #include <linux/devfs_fs_kernel.h>

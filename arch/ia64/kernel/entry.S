@@ -61,7 +61,17 @@ ENTRY(ia64_execve)
 	mov out2=in2			// envp
 	add out3=16,sp			// regs
 	br.call.sptk.many rp=sys_execve
-.ret0:	cmp4.ge p6,p7=r8,r0
+.ret0:
+#ifdef CONFIG_IA32_SUPPORT
+	/*
+	 * Check if we're returning to ia32 mode. If so, we need to restore ia32 registers
+	 * from pt_regs.
+	 */
+	adds r16=PT(CR_IPSR)+16,sp
+	;;
+	ld8 r16=[r16]
+#endif
+	cmp4.ge p6,p7=r8,r0
 	mov ar.pfs=loc1			// restore ar.pfs
 	sxt4 r8=r8			// return 64-bit result
 	;;
@@ -89,6 +99,12 @@ ENTRY(ia64_execve)
 	ldf.fill f23=[sp];	ldf.fill f24=[sp];	mov f25=f0
 	ldf.fill f26=[sp];	ldf.fill f27=[sp];	mov f28=f0
 	ldf.fill f29=[sp];	ldf.fill f30=[sp];	mov f31=f0
+#ifdef CONFIG_IA32_SUPPORT
+	tbit.nz p6,p0=r16, IA64_PSR_IS_BIT
+	movl loc0=ia64_ret_from_ia32_execve
+	;;
+(p6)	mov rp=loc0
+#endif
 	br.ret.sptk.many rp
 END(ia64_execve)
 
@@ -688,7 +704,7 @@ GLOBAL_ENTRY(ia64_leave_syscall)
 	mov b7=r0		// clear b7
 	;;
 (pUStk) st1 [r14]=r3
-	movl r17=THIS_CPU(ia64_phys_stacked_size_p8)
+	addl r17=THIS_CPU(ia64_phys_stacked_size_p8),r0
 	;;
 	mov r16=ar.bsp		// get existing backing store pointer
 	srlz.i			// ensure interruption collection is off
@@ -701,6 +717,19 @@ GLOBAL_ENTRY(ia64_leave_syscall)
 	br.cond.sptk.many rbs_switch
 END(ia64_leave_syscall)
 
+#ifdef CONFIG_IA32_SUPPORT
+GLOBAL_ENTRY(ia64_ret_from_ia32_execve)
+	PT_REGS_UNWIND_INFO(0)
+	adds r2=PT(R8)+16,sp			// r2 = &pt_regs.r8
+	adds r3=PT(R10)+16,sp			// r3 = &pt_regs.r10
+	;;
+	.mem.offset 0,0
+	st8.spill [r2]=r8	// store return value in slot for r8 and set unat bit
+	.mem.offset 8,0
+	st8.spill [r3]=r0	// clear error indication in slot for r10 and set unat bit
+END(ia64_ret_from_ia32_execve_syscall)
+	// fall through
+#endif /* CONFIG_IA32_SUPPORT */
 GLOBAL_ENTRY(ia64_leave_kernel)
 	PT_REGS_UNWIND_INFO(0)
 	/*
@@ -841,7 +870,7 @@ GLOBAL_ENTRY(ia64_leave_kernel)
 	shr.u r18=r19,16	// get byte size of existing "dirty" partition
 	;;
 	mov r16=ar.bsp		// get existing backing store pointer
-	movl r17=THIS_CPU(ia64_phys_stacked_size_p8)
+	addl r17=THIS_CPU(ia64_phys_stacked_size_p8),r0
 	;;
 	ld4 r17=[r17]		// r17 = cpu_data->phys_stacked_size_p8
 (pKStk)	br.cond.dpnt skip_rbs_switch

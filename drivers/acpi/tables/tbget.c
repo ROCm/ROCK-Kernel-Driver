@@ -145,7 +145,7 @@ acpi_tb_get_table_header (
 		/* Create a logical address for the physical pointer*/
 
 		status = acpi_os_map_memory (address->pointer.physical, sizeof (struct acpi_table_header),
-				  (void **) &header);
+				  (void *) &header);
 		if (ACPI_FAILURE (status)) {
 			ACPI_REPORT_ERROR (("Could not map memory at %8.8X%8.8X for length %X\n",
 				ACPI_HIDWORD (address->pointer.physical),
@@ -361,7 +361,7 @@ acpi_tb_get_this_table (
 		 * into our address space.
 		 */
 		status = acpi_os_map_memory (address->pointer.physical, (acpi_size) header->length,
-				  (void **) &full_table);
+				  (void *) &full_table);
 		if (ACPI_FAILURE (status)) {
 			ACPI_REPORT_ERROR (("Could not map memory for table [%4.4s] at %8.8X%8.8X for length %X\n",
 				header->signature,

@@ -72,7 +72,6 @@
 #include <linux/errno.h>
 #include <linux/kdev_t.h>
 #include <linux/blkdev.h>
-#include <linux/blk.h>		/* for io_request_lock (spinlock) decl */
 #include <linux/delay.h>	/* for mdelay */
 #include <linux/interrupt.h>	/* needed for in_interrupt() proto */
 #include <linux/reboot.h>	/* notifier code */

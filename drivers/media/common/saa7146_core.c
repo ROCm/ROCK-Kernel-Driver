@@ -373,6 +373,9 @@ static int saa7146_init_one(struct pci_dev *pci, const struct pci_device_id *ent
 	dev->module = THIS_MODULE;
 	init_waitqueue_head(&dev->i2c_wq);
 
+	/* set some default values */
+	saa7146_write(dev, BCS_CTRL, 0x80400040);
+
 	if( 0 != ext->probe) {
 		if( 0 != ext->probe(dev) ) {
 			DEB_D(("ext->probe() failed for %p. skipping device.\n",dev));
@@ -390,9 +393,6 @@ static int saa7146_init_one(struct pci_dev *pci, const struct pci_device_id *ent
 	INIT_LIST_HEAD(&dev->item);
 	list_add_tail(&dev->item,&saa7146_devices);
 	saa7146_num++;
-
-	/* set some default values */
-	saa7146_write(dev, BCS_CTRL, 0x80400040);
 
 	err = 0;
 	goto out;

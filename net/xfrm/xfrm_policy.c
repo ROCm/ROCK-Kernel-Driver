@@ -4,7 +4,7 @@
  * Changes:
  *	Mitsuru KANDA @USAGI
  * 	Kazunori MIYAZAWA @USAGI
- * 	Kunihiro Ishiguro
+ * 	Kunihiro Ishiguro <kunihiro@ipinfusion.com>
  * 		IPv6 support
  * 	Kazunori MIYAZAWA @USAGI
  * 	YOSHIFUJI Hideaki

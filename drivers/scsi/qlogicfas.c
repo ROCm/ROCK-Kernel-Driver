@@ -127,7 +127,7 @@
 #endif
 
 #include <linux/module.h>
-#include <linux/blk.h>		/* to get disk capacity */
+#include <linux/blkdev.h>		/* to get disk capacity */
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/init.h>

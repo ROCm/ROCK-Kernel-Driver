@@ -17,7 +17,7 @@
  *   02-04-2000	RMK	0.0.4	Updated for new error handling code.
  */
 #include <linux/module.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/ioport.h>

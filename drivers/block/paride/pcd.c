@@ -137,7 +137,7 @@ enum {D_PRT, D_PRO, D_UNI, D_MOD, D_SLV, D_DLY};
 #include <linux/delay.h>
 #include <linux/cdrom.h>
 #include <linux/spinlock.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <asm/uaccess.h>
 
 static spinlock_t pcd_lock;

@@ -6,8 +6,10 @@
 	
 	Alps TDME7 (Tuner: MITEL SP5659)
 	Alps TDED4 (Tuner: TI ALP510, external Nxt6000)
+	Comtech DVBT-6k07 (PLL IC: SP5730)
 
     Copyright (C) 2002-2003 Florian Schirmer <schirmer@taytron.net>
+    Copyright (C) 2003 Paul Andreassen <paul@andreassen.com.au>
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -78,6 +80,7 @@ struct nxt6000_config {
 
 #define TUNER_TYPE_ALP510	0
 #define TUNER_TYPE_SP5659	1
+#define TUNER_TYPE_SP5730	2
 
 #define FE2NXT(fe) ((struct nxt6000_config *)&(fe->data))
 #define FREQ2DIV(freq) ((freq + 36166667) / 166667)
@@ -207,6 +210,39 @@ static int alp510_set_tv_freq(struct dvb_frontend *fe, u32 freq)
 	else
 		return -EINVAL;
 #endif
+
+	return pll_write(fe->i2c, nxt->demod_addr, nxt->tuner_addr, buf, 4);
+	
+}
+
+static int sp5730_set_tv_freq(struct dvb_frontend *fe, u32 freq)
+{
+
+	u8 buf[4];
+	struct nxt6000_config *nxt = FE2NXT(fe);
+
+	buf[0] = (FREQ2DIV(freq) >> 8) & 0x7F;
+	buf[1] = FREQ2DIV(freq) & 0xFF;
+	buf[2] = 0x93;
+
+	if ((freq >= 51000000) && (freq < 132100000))
+		buf[3] = 0x05;
+	else if ((freq >= 132100000) && (freq < 143000000))
+		buf[3] = 0x45;
+	else if ((freq >= 146000000) && (freq < 349100000))
+		buf[3] = 0x06;
+	else if ((freq >= 349100000) && (freq < 397100000))
+		buf[3] = 0x46;
+	else if ((freq >= 397100000) && (freq < 426000000))
+		buf[3] = 0x86;
+	else if ((freq >= 430000000) && (freq < 659100000))
+		buf[3] = 0x03;
+	else if ((freq >= 659100000) && (freq < 759100000))
+		buf[3] = 0x43;
+	else if ((freq >= 759100000) && (freq < 858000000))
+		buf[3] = 0x83;
+	else
+		return -EINVAL;
 
 	return pll_write(fe->i2c, nxt->demod_addr, nxt->tuner_addr, buf, 4);
 	
@@ -756,6 +792,13 @@ static int nxt6000_ioctl(struct dvb_frontend *fe, unsigned int cmd, void *arg)
 						
 					break;
 					
+				case TUNER_TYPE_SP5730:
+
+					if ((result = sp5730_set_tv_freq(fe, param->frequency)) < 0)
+						return result;
+
+					break;
+
 				default:
 				
 					return -EFAULT;
@@ -815,6 +858,14 @@ static int nxt6000_attach(struct dvb_i2c_bus *i2c)
 			nxt.clock_inversion = 0;
 	
 			dprintk("nxt6000: detected MITEL SP5659 tuner at 0x%02X\n", nxt.tuner_addr);
+		
+		} else if (pll_write(i2c, demod_addr_tbl[addr_nr], 0xC0, NULL, 0) == 0) {
+
+			nxt.tuner_addr = 0xC0;
+			nxt.tuner_type = TUNER_TYPE_SP5730;
+			nxt.clock_inversion = 0;
+	
+			dprintk("nxt6000: detected SP5730 tuner at 0x%02X\n", nxt.tuner_addr);
 		
 		} else {
 

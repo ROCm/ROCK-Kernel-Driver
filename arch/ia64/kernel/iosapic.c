@@ -717,6 +717,7 @@ iosapic_parse_prt (void)
 			register_intr(gsi, vector, IOSAPIC_LOWEST_PRIORITY, IOSAPIC_POL_LOW,
 				      IOSAPIC_LEVEL);
 		}
+		entry->irq = vector;
 		snprintf(pci_id, sizeof(pci_id), "%02x:%02x:%02x[%c]",
 			 entry->id.segment, entry->id.bus, entry->id.device, 'A' + entry->pin);
 

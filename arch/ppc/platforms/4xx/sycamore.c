@@ -17,7 +17,6 @@
 #include <linux/threads.h>
 #include <linux/param.h>
 #include <linux/string.h>
-#include <linux/blk.h>
 #include <linux/pci.h>
 #include <linux/rtc.h>
 

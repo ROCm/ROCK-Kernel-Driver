@@ -33,6 +33,7 @@
 #include <linux/irq.h>
 #include <linux/errno.h>
 #include <linux/acpi.h>
+#include <linux/bootmem.h>
 
 #define PREFIX			"ACPI: "
 
@@ -61,16 +62,14 @@ static char *acpi_table_signatures[ACPI_TABLE_COUNT] = {
 
 /* System Description Table (RSDT/XSDT) */
 struct acpi_table_sdt {
-	unsigned long		pa;		/* Physical Address */
-	unsigned long		count;		/* Table count */
-	struct {
-		unsigned long		pa;
-		enum acpi_table_id	id;
-		unsigned long		size;
-	}			entry[ACPI_MAX_TABLES];
+	unsigned long		pa;
+	enum acpi_table_id	id;
+	unsigned long		size;
 } __attribute__ ((packed));
 
-static struct acpi_table_sdt	sdt;
+static unsigned long		sdt_pa;		/* Physical Address */
+static unsigned long		sdt_count;	/* Table count */
+static struct acpi_table_sdt	*sdt_entry;
 
 void
 acpi_table_print (
@@ -236,11 +235,11 @@ acpi_get_table_header_early (
 
 	/* Locate the table. */
 
-	for (i = 0; i < sdt.count; i++) {
-		if (sdt.entry[i].id != temp_id)
+	for (i = 0; i < sdt_count; i++) {
+		if (sdt_entry[i].id != temp_id)
 			continue;
 		*header = (void *)
-			__acpi_map_table(sdt.entry[i].pa, sdt.entry[i].size);
+			__acpi_map_table(sdt_entry[i].pa, sdt_entry[i].size);
 		if (!*header) {
 			printk(KERN_WARNING PREFIX "Unable to map %s\n",
 			       acpi_table_signatures[temp_id]);
@@ -289,11 +288,11 @@ acpi_table_parse_madt_family (
 
 	/* Locate the MADT (if exists). There should only be one. */
 
-	for (i = 0; i < sdt.count; i++) {
-		if (sdt.entry[i].id != id)
+	for (i = 0; i < sdt_count; i++) {
+		if (sdt_entry[i].id != id)
 			continue;
 		madt = (void *)
-			__acpi_map_table(sdt.entry[i].pa, sdt.entry[i].size);
+			__acpi_map_table(sdt_entry[i].pa, sdt_entry[i].size);
 		if (!madt) {
 			printk(KERN_WARNING PREFIX "Unable to map %s\n",
 			       acpi_table_signatures[id]);
@@ -308,7 +307,7 @@ acpi_table_parse_madt_family (
 		return -ENODEV;
 	}
 
-	madt_end = (unsigned long) madt + sdt.entry[i].size;
+	madt_end = (unsigned long) madt + sdt_entry[i].size;
 
 	/* Parse all entries looking for a match. */
 
@@ -349,10 +348,10 @@ acpi_table_parse (
 	if (!handler)
 		return -EINVAL;
 
-	for (i = 0; i < sdt.count; i++) {
-		if (sdt.entry[i].id != id)
+	for (i = 0; i < sdt_count; i++) {
+		if (sdt_entry[i].id != id)
 			continue;
-		handler(sdt.entry[i].pa, sdt.entry[i].size);
+		handler(sdt_entry[i].pa, sdt_entry[i].size);
 		count++;
 	}
 
@@ -377,11 +376,11 @@ acpi_table_get_sdt (
 			
 		struct acpi_table_xsdt	*mapped_xsdt = NULL;
 
-		sdt.pa = ((struct acpi20_table_rsdp*)rsdp)->xsdt_address;
+		sdt_pa = ((struct acpi20_table_rsdp*)rsdp)->xsdt_address;
 
 		/* map in just the header */
 		header = (struct acpi_table_header *)
-			__acpi_map_table(sdt.pa, sizeof(struct acpi_table_header));
+			__acpi_map_table(sdt_pa, sizeof(struct acpi_table_header));
 
 		if (!header) {
 			printk(KERN_WARNING PREFIX "Unable to map XSDT header\n");
@@ -390,7 +389,7 @@ acpi_table_get_sdt (
 
 		/* remap in the entire table before processing */
 		mapped_xsdt = (struct acpi_table_xsdt *)
-			__acpi_map_table(sdt.pa, header->length);
+			__acpi_map_table(sdt_pa, header->length);
 		if (!mapped_xsdt) {
 			printk(KERN_WARNING PREFIX "Unable to map XSDT\n");
 			return -ENODEV;
@@ -407,15 +406,21 @@ acpi_table_get_sdt (
 			return -ENODEV;
 		}
 
-		sdt.count = (header->length - sizeof(struct acpi_table_header)) >> 3;
-		if (sdt.count > ACPI_MAX_TABLES) {
+		sdt_count = (header->length - sizeof(struct acpi_table_header)) >> 3;
+		if (sdt_count > ACPI_MAX_TABLES) {
 			printk(KERN_WARNING PREFIX "Truncated %lu XSDT entries\n",
-				(sdt.count - ACPI_MAX_TABLES));
-			sdt.count = ACPI_MAX_TABLES;
+				(sdt_count - ACPI_MAX_TABLES));
+			sdt_count = ACPI_MAX_TABLES;
 		}
 
-		for (i = 0; i < sdt.count; i++)
-			sdt.entry[i].pa = (unsigned long) mapped_xsdt->entry[i];
+		sdt_entry = alloc_bootmem(sdt_count * sizeof(struct acpi_table_sdt));
+		if (!sdt_entry) {
+			printk(KERN_ERR "ACPI: Could not allocate mem for SDT entries!\n");
+			return -ENOMEM;
+		}
+
+		for (i = 0; i < sdt_count; i++)
+			sdt_entry[i].pa = (unsigned long) mapped_xsdt->entry[i];
 	}
 
 	/* Then check RSDT */
@@ -424,11 +429,11 @@ acpi_table_get_sdt (
 
 		struct acpi_table_rsdt	*mapped_rsdt = NULL;
 
-		sdt.pa = rsdp->rsdt_address;
+		sdt_pa = rsdp->rsdt_address;
 
 		/* map in just the header */
 		header = (struct acpi_table_header *)
-			__acpi_map_table(sdt.pa, sizeof(struct acpi_table_header));
+			__acpi_map_table(sdt_pa, sizeof(struct acpi_table_header));
 		if (!header) {
 			printk(KERN_WARNING PREFIX "Unable to map RSDT header\n");
 			return -ENODEV;
@@ -436,7 +441,7 @@ acpi_table_get_sdt (
 
 		/* remap in the entire table before processing */
 		mapped_rsdt = (struct acpi_table_rsdt *)
-			__acpi_map_table(sdt.pa, header->length);
+			__acpi_map_table(sdt_pa, header->length);
 		if (!mapped_rsdt) {
 			printk(KERN_WARNING PREFIX "Unable to map RSDT\n");
 			return -ENODEV;
@@ -453,15 +458,21 @@ acpi_table_get_sdt (
 			return -ENODEV;
 		}
 
-		sdt.count = (header->length - sizeof(struct acpi_table_header)) >> 2;
-		if (sdt.count > ACPI_MAX_TABLES) {
+		sdt_count = (header->length - sizeof(struct acpi_table_header)) >> 2;
+		if (sdt_count > ACPI_MAX_TABLES) {
 			printk(KERN_WARNING PREFIX "Truncated %lu RSDT entries\n",
-				(sdt.count - ACPI_TABLE_COUNT));
-			sdt.count = ACPI_MAX_TABLES;
+				(sdt_count - ACPI_MAX_TABLES));
+			sdt_count = ACPI_MAX_TABLES;
 		}
 
-		for (i = 0; i < sdt.count; i++)
-			sdt.entry[i].pa = (unsigned long) mapped_rsdt->entry[i];
+		sdt_entry = alloc_bootmem(sdt_count * sizeof(struct acpi_table_sdt));
+		if (!sdt_entry) {
+			printk(KERN_ERR "ACPI: Could not allocate mem for SDT entries!\n");
+			return -ENOMEM;
+		}
+
+		for (i = 0; i < sdt_count; i++)
+			sdt_entry[i].pa = (unsigned long) mapped_rsdt->entry[i];
 	}
 
 	else {
@@ -469,38 +480,38 @@ acpi_table_get_sdt (
 		return -ENODEV;
 	}
 
-	acpi_table_print(header, sdt.pa);
+	acpi_table_print(header, sdt_pa);
 
-	for (i = 0; i < sdt.count; i++) {
+	for (i = 0; i < sdt_count; i++) {
 
 		/* map in just the header */
 		header = (struct acpi_table_header *)
-			__acpi_map_table(sdt.entry[i].pa,
+			__acpi_map_table(sdt_entry[i].pa,
 				sizeof(struct acpi_table_header));
 		if (!header)
 			continue;
 
 		/* remap in the entire table before processing */
 		header = (struct acpi_table_header *)
-			__acpi_map_table(sdt.entry[i].pa,
+			__acpi_map_table(sdt_entry[i].pa,
 				header->length);
 		if (!header)
 			continue;
 	               
-		acpi_table_print(header, sdt.entry[i].pa);
+		acpi_table_print(header, sdt_entry[i].pa);
 
 		if (acpi_table_compute_checksum(header, header->length)) {
 			printk(KERN_WARNING "  >>> ERROR: Invalid checksum\n");
 			continue;
 		}
 
-		sdt.entry[i].size = header->length;
+		sdt_entry[i].size = header->length;
 
 		for (id = 0; id < ACPI_TABLE_COUNT; id++) {
 			if (!strncmp((char *) &header->signature,
 				acpi_table_signatures[id],
 				sizeof(header->signature))) {
-				sdt.entry[i].id = id;
+				sdt_entry[i].id = id;
 			}
 		}
 	}
@@ -524,8 +535,6 @@ acpi_table_init (void)
 	struct acpi_table_rsdp	*rsdp = NULL;
 	unsigned long		rsdp_phys = 0;
 	int			result = 0;
-
-	memset(&sdt, 0, sizeof(struct acpi_table_sdt));
 
 	/* Locate and map the Root System Description Table (RSDP) */
 

@@ -8,7 +8,6 @@
 
 #include <linux/init.h>
 #include <linux/module.h>
-#include <linux/blk.h>
 #include <linux/blkpg.h>
 #include <linux/bio.h>
 #include <linux/mempool.h>

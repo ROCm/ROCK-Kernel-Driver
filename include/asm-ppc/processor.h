@@ -705,6 +705,7 @@ struct thread_struct {
 	.ksp = INIT_SP, \
 	.fs = KERNEL_DS, \
 	.pgdir = swapper_pg_dir, \
+	.fpexc_mode = MSR_FE0 | MSR_FE1, \
 }
 
 /*

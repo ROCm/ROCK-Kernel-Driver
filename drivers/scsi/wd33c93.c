@@ -79,7 +79,7 @@
 #include <linux/delay.h>
 #include <linux/version.h>
 #include <linux/init.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <asm/irq.h>
 
 #include "scsi.h"

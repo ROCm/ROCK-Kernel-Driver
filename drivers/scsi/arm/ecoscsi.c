@@ -27,7 +27,7 @@
 #include <linux/ioport.h>
 #include <linux/delay.h>
 #include <linux/init.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 
 #include <asm/io.h>
 #include <asm/system.h>

@@ -50,7 +50,7 @@
 #include <linux/moduleparam.h>
 #include <linux/delay.h>
 #include <linux/ctype.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <asm/io.h>
 #include "scsi.h"
 #include "hosts.h"

@@ -270,7 +270,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/spinlock.h>
 #include <linux/errno.h>
 #include <linux/string.h>

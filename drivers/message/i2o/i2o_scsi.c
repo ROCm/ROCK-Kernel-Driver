@@ -54,7 +54,7 @@
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/atomic.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/i2o.h>
 #include "../../scsi/scsi.h"
 #include "../../scsi/hosts.h"

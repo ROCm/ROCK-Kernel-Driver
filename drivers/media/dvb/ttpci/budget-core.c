@@ -1,4 +1,5 @@
 #include "budget.h"
+#include "ttpci-eeprom.h"
 
 int budget_debug = 0;
 
@@ -165,7 +166,6 @@ static int budget_register(struct budget *budget)
         if (ret < 0)
                 return ret;
 
-        budget->dvb_net.card_num = budget->dvb_adapter->num;
         dvb_net_init(budget->dvb_adapter, &budget->dvb_net, &dvbdemux->dmx);
 
 	return 0;
@@ -222,7 +222,7 @@ int ttpci_budget_init (struct budget *budget,
            get recognized before the main driver is loaded */
         saa7146_write(dev, GPIO_CTRL, 0x500000);
 	
-	saa7146_i2c_adapter_prepare(dev, NULL, SAA7146_I2C_BUS_BIT_RATE_3200);
+	saa7146_i2c_adapter_prepare(dev, NULL, SAA7146_I2C_BUS_BIT_RATE_120);
 
 	budget->i2c_bus = dvb_register_i2c_bus (master_xfer, dev,
 						budget->dvb_adapter, 0);
@@ -231,6 +231,8 @@ int ttpci_budget_init (struct budget *budget,
 		dvb_unregister_adapter (budget->dvb_adapter);
 		return -ENOMEM;
 	}
+
+	ttpci_eeprom_parse_mac(budget->i2c_bus);
 
 	if( NULL == (budget->grabbing = saa7146_vmalloc_build_pgtable(dev->pci,length,&budget->pt))) {
 		ret = -ENOMEM;

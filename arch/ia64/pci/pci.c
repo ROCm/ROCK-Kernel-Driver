@@ -124,7 +124,7 @@ subsys_initcall(pci_acpi_init);
 
 /* Called by ACPI when it finds a new root bus.  */
 
-static struct pci_controller *
+static struct pci_controller * __devinit
 alloc_pci_controller (int seg)
 {
 	struct pci_controller *controller;
@@ -138,7 +138,7 @@ alloc_pci_controller (int seg)
 	return controller;
 }
 
-static int
+static int __devinit
 alloc_resource (char *name, struct resource *root, unsigned long start, unsigned long end, unsigned long flags)
 {
 	struct resource *res;
@@ -159,7 +159,7 @@ alloc_resource (char *name, struct resource *root, unsigned long start, unsigned
 	return 0;
 }
 
-static u64
+static u64 __devinit
 add_io_space (struct acpi_resource_address64 *addr)
 {
 	u64 offset;
@@ -190,7 +190,7 @@ add_io_space (struct acpi_resource_address64 *addr)
 	return IO_SPACE_BASE(i);
 }
 
-static acpi_status
+static acpi_status __devinit
 count_window (struct acpi_resource *resource, void *data)
 {
 	unsigned int *windows = (unsigned int *) data;
@@ -211,7 +211,7 @@ struct pci_root_info {
 	char *name;
 };
 
-static acpi_status
+static acpi_status __devinit
 add_window (struct acpi_resource *res, void *data)
 {
 	struct pci_root_info *info = (struct pci_root_info *) data;
@@ -252,7 +252,7 @@ add_window (struct acpi_resource *res, void *data)
 	return AE_OK;
 }
 
-struct pci_bus *
+struct pci_bus * __devinit
 pci_acpi_scan_root (struct acpi_device *device, int domain, int bus)
 {
 	struct pci_root_info info;

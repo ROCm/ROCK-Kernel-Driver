@@ -177,7 +177,7 @@
 #include "cdu31a.h"
 
 #define MAJOR_NR CDU31A_CDROM_MAJOR
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 
 #define CDU31A_READAHEAD 4	/* 128 sector, 64kB, 32 reads read-ahead */
 #define CDU31A_MAX_CONSECUTIVE_ATTENTIONS 10

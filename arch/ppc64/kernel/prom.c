@@ -27,7 +27,6 @@
 #include <linux/version.h>
 #include <linux/threads.h>
 #include <linux/spinlock.h>
-#include <linux/blk.h>
 #include <linux/types.h>
 #include <linux/pci.h>
 #include <asm/prom.h>

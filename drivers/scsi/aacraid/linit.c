@@ -50,7 +50,7 @@
 #include <linux/completion.h>
 #include <linux/interrupt.h>
 #include <asm/semaphore.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include "scsi.h"
 #include "hosts.h"
 #include <scsi/scsicam.h>

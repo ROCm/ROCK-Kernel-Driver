@@ -22,7 +22,7 @@
 #include <linux/init.h>
 #include <linux/initrd.h>
 #include <linux/bootmem.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 
 #include <asm/segment.h>
 #include <asm/mach-types.h>

@@ -9,7 +9,7 @@
 #include <linux/sched.h>
 #include <linux/ioport.h>
 #include <linux/delay.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/init.h>
 
 #include <asm/ecard.h>

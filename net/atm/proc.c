@@ -224,7 +224,7 @@ static void vc_info(struct atm_vcc *vcc,char *buf)
 			here += sprintf(here, "%3d", vcc->sk->sk_family);
 	}
 	here += sprintf(here," %04lx  %5d %7d/%7d %7d/%7d\n",vcc->flags,
-	    vcc->reply,
+	    vcc->sk->sk_err,
 	    atomic_read(&vcc->sk->sk_wmem_alloc), vcc->sk->sk_sndbuf,
 	    atomic_read(&vcc->sk->sk_rmem_alloc), vcc->sk->sk_rcvbuf);
 }

@@ -150,7 +150,7 @@ enum {D_PRT, D_PRO, D_UNI, D_MOD, D_SLV, D_LUN, D_DLY};
 #include <linux/hdreg.h>
 #include <linux/cdrom.h>
 #include <linux/spinlock.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/blkpg.h>
 #include <asm/uaccess.h>
 

@@ -681,7 +681,7 @@ nfs3_proc_fsinfo(struct nfs_server *server, struct nfs_fh *fhandle,
 
 	dprintk("NFS call  fsinfo\n");
 	info->fattr->valid = 0;
-	status = rpc_call(server->client, NFS3PROC_FSINFO, fhandle, info, 0);
+	status = rpc_call(server->client_sys, NFS3PROC_FSINFO, fhandle, info, 0);
 	dprintk("NFS reply fsinfo: %d\n", status);
 	return status;
 }

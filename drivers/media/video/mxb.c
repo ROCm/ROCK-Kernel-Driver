@@ -81,7 +81,7 @@ MODULE_PARM_DESC(debug, "debug verbosity");
 enum { TUNER, AUX1, AUX3, AUX3_YC };
 
 static struct v4l2_input mxb_inputs[MXB_INPUTS] = {
-	{ TUNER,	"Tuner",		V4L2_INPUT_TYPE_TUNER,	1, 1, V4L2_STD_PAL_BG|V4L2_STD_NTSC_M, 0 }, 
+	{ TUNER,	"Tuner",		V4L2_INPUT_TYPE_TUNER,	1, 0, V4L2_STD_PAL_BG|V4L2_STD_NTSC_M, 0 }, 
 	{ AUX1,		"AUX1",			V4L2_INPUT_TYPE_CAMERA,	2, 0, V4L2_STD_PAL_BG|V4L2_STD_NTSC_M, 0 },
 	{ AUX3,		"AUX3 Composite",	V4L2_INPUT_TYPE_CAMERA,	4, 0, V4L2_STD_PAL_BG|V4L2_STD_NTSC_M, 0 },
 	{ AUX3_YC,	"AUX3 S-Video",		V4L2_INPUT_TYPE_CAMERA,	4, 0, V4L2_STD_PAL_BG|V4L2_STD_NTSC_M, 0 },
@@ -101,8 +101,8 @@ static struct {
 
 /* this array holds the information of the audio source (mxb_audios),
    which has to be switched corresponding to the video source (mxb_channels) */
-static int video_audio_connect[MXB_AUDIOS] =
-	{ 0, 1, 2, 3, 3 };
+static int video_audio_connect[MXB_INPUTS] =
+	{ 0, 1, 3, 3 };
 
 /* these are the necessary input-output-pins for bringing one audio source
 (see above) to the CD-output */
@@ -173,8 +173,7 @@ struct mxb
 	int	cur_mute;	/* current mute status */
 };
 
-static
-struct saa7146_extension extension;
+static struct saa7146_extension extension;
 
 static int mxb_vbi_bypass(struct saa7146_dev* dev)
 {
@@ -431,10 +430,11 @@ static int mxb_init_done(struct saa7146_dev* dev)
 		   polling method ... */
 		extension.flags &= ~SAA7146_USE_I2C_IRQ;
 		for(i = 1;;i++) {
-			msg.len = mxb_saa7740_init[i].length;		
-			if (msg.len == -1U) {
+			if( -1 == mxb_saa7740_init[i].length ) {
 				break;
 			}
+
+			msg.len = mxb_saa7740_init[i].length;		
 			msg.buf = &mxb_saa7740_init[i].data[0];
 			if( 1 != (err = i2c_transfer(&mxb->i2c_adapter, &msg, 1))) {
 				DEB_D(("failed to initialize 'sound arena module'.\n"));
@@ -472,6 +472,8 @@ void mxb_irq_bh(struct saa7146_dev* dev, u32* irq_mask)
 }
 */
 
+static struct saa7146_ext_vv vv_data;
+
 /* this function only gets called when the probing was successful */
 static int mxb_attach(struct saa7146_dev* dev, struct saa7146_pci_extension_data *info)
 {
@@ -482,7 +484,7 @@ static int mxb_attach(struct saa7146_dev* dev, struct saa7146_pci_extension_data
 	/* checking for i2c-devices can be omitted here, because we
 	   already did this in "mxb_vl42_probe" */
 
-	saa7146_vv_init(dev);
+	saa7146_vv_init(dev,&vv_data);
 	if( 0 != saa7146_register_device(&mxb->video_dev, dev, "mxb", VFL_TYPE_GRABBER)) {
 		ERR(("cannot register capture v4l2 device. skipping.\n"));
 		return -1;
@@ -566,8 +568,9 @@ static int saa7111_set_gpio(struct saa7146_dev *dev, int bl)
 	return 0;
 }
 
-static int mxb_ioctl(struct saa7146_dev *dev, unsigned int cmd, void *arg) 
+static int mxb_ioctl(struct saa7146_fh *fh, unsigned int cmd, void *arg) 
 {
+	struct saa7146_dev *dev = fh->dev;
 	struct mxb* mxb = (struct mxb*)dev->ext_priv;
 	struct saa7146_vv *vv = dev->vv_data; 
 	
@@ -1002,20 +1005,35 @@ static int std_callback(struct saa7146_dev* dev, struct saa7146_standard *std)
 }
 
 static struct saa7146_standard standard[] = {
-	{ "PAL-BG",	V4L2_STD_PAL_BG,	SAA7146_PAL_VALUES },
-	{ "PAL-I",	V4L2_STD_PAL_I,		SAA7146_PAL_VALUES },
-	{ "NTSC",	V4L2_STD_NTSC,		SAA7146_NTSC_VALUES },
-	{ "SECAM", 	V4L2_STD_SECAM,		SAA7146_SECAM_VALUES },
+	{
+		.name	= "PAL-BG", 	.id	= V4L2_STD_PAL_BG,
+		.v_offset	= 0x17,	.v_field 	= 288,	.v_calc		= 576,
+		.h_offset	= 0x14,	.h_pixels 	= 680,	.h_calc		= 680+1,
+		.v_max_out	= 576,	.h_max_out	= 768,
+	}, {
+		.name	= "PAL-I", 	.id	= V4L2_STD_PAL_I,
+		.v_offset	= 0x17,	.v_field 	= 288,	.v_calc		= 576,
+		.h_offset	= 0x14,	.h_pixels 	= 680,	.h_calc		= 680+1,
+		.v_max_out	= 576,	.h_max_out	= 768,
+	}, {
+		.name	= "NTSC", 	.id	= V4L2_STD_NTSC,
+		.v_offset	= 0x16,	.v_field 	= 240,	.v_calc		= 480,
+		.h_offset	= 0x06,	.h_pixels 	= 708,	.h_calc		= 708+1,
+		.v_max_out	= 480,	.h_max_out	= 640,
+	}, {
+		.name	= "SECAM", 	.id	= V4L2_STD_SECAM,
+		.v_offset	= 0x14,	.v_field 	= 288,	.v_calc		= 576,
+		.h_offset	= 0x14,	.h_pixels 	= 720,	.h_calc		= 720+1,
+		.v_max_out	= 576,	.h_max_out	= 768,
+	}
 };
 
-static
-struct saa7146_pci_extension_data mxb = {
+static struct saa7146_pci_extension_data mxb = {
         .ext_priv = "Multimedia eXtension Board",
         .ext = &extension,
 };
 
-static
-struct pci_device_id pci_tbl[] = {
+static struct pci_device_id pci_tbl[] = {
 	{
 		.vendor    = PCI_VENDOR_ID_PHILIPS,
 		.device	   = PCI_DEVICE_ID_PHILIPS_SAA7146,
@@ -1029,8 +1047,7 @@ struct pci_device_id pci_tbl[] = {
 
 MODULE_DEVICE_TABLE(pci, pci_tbl);
 
-static
-struct saa7146_ext_vv vv_data = {
+static struct saa7146_ext_vv vv_data = {
 	.inputs		= MXB_INPUTS,
 	.capabilities	= V4L2_CAP_TUNER | V4L2_CAP_VBI_CAPTURE,
 	.stds		= &standard[0],
@@ -1040,14 +1057,12 @@ struct saa7146_ext_vv vv_data = {
 	.ioctl		= mxb_ioctl,
 };
 
-static
-struct saa7146_extension extension = {
+static struct saa7146_extension extension = {
 	.name		= MXB_IDENTIFIER,
 	.flags		= SAA7146_USE_I2C_IRQ,
 	
 	.pci_tbl	= &pci_tbl[0],
 	.module		= THIS_MODULE,
-	.ext_vv_data	= &vv_data,
 
 	.probe		= mxb_probe,
 	.attach		= mxb_attach,

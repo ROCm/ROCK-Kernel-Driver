@@ -436,6 +436,7 @@ xprt_connect(struct rpc_task *task)
 		goto out_write;
 	}
 	xprt_bind_socket(xprt, sock);
+	xprt_sock_setbufsize(xprt);
 
 	if (!xprt->stream)
 		goto out_write;

@@ -37,7 +37,7 @@
 #include <linux/pci.h>
 #include <linux/spinlock.h>
 #include <linux/slab.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/completion.h>
 #include <linux/mm.h>
 #include <asm/semaphore.h>

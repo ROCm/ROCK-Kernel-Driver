@@ -290,7 +290,7 @@ acpi_ex_digits_needed (
 	 * acpi_integer is unsigned, so we don't worry about a '-'
 	 */
 	if ((current_value = value) == 0) {
-	    return_VALUE (1);
+		return_VALUE (1);
 	}
 
 	num_digits = 0;

@@ -23,9 +23,6 @@
 #include <linux/errno.h>
 #include <linux/string.h>
 #include <linux/types.h>
-#ifdef CONFIG_BLK_DEV_RAM
-#include <linux/blk.h>
-#endif
 #include <linux/ptrace.h>
 #include <linux/mman.h>
 #include <linux/mm.h>

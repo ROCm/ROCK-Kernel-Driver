@@ -252,7 +252,7 @@
 #include <linux/timer.h>
 #include <linux/pci.h>
 #include <linux/proc_fs.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/workqueue.h>
 #include <linux/stat.h>
 #include <linux/slab.h>

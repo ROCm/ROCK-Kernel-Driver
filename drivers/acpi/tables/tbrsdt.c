@@ -85,7 +85,7 @@ acpi_tb_verify_rsdp (
 		 * Obtain access to the RSDP structure
 		 */
 		status = acpi_os_map_memory (address->pointer.physical, sizeof (struct rsdp_descriptor),
-				  (void **) &rsdp);
+				  (void *) &rsdp);
 		if (ACPI_FAILURE (status)) {
 			return_ACPI_STATUS (status);
 		}

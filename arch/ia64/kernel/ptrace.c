@@ -42,7 +42,7 @@
 	(IA64_PSR_UM | IA64_PSR_DB | IA64_PSR_IS | IA64_PSR_ID | IA64_PSR_DD | IA64_PSR_RI)
 #define IPSR_READ_MASK	IPSR_WRITE_MASK
 
-#define PTRACE_DEBUG	1
+#define PTRACE_DEBUG	0
 
 #if PTRACE_DEBUG
 # define dprintk(format...)	printk(format)

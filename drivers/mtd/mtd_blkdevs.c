@@ -15,7 +15,6 @@
 #include <linux/mtd/blktrans.h>
 #include <linux/mtd/mtd.h>
 #include <linux/blkdev.h>
-#include <linux/blk.h>
 #include <linux/blkpg.h>
 #include <linux/spinlock.h>
 #include <linux/hdreg.h>

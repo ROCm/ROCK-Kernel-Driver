@@ -46,8 +46,6 @@
 #include <asm/io.h>
 #include <asm/uaccess.h>
 
-#include <linux/blk.h>
-
 #include "io_ports.h"
 
 #ifdef __arm__

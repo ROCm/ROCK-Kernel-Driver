@@ -62,7 +62,7 @@
 #include <asm/time.h>
 #include <linux/version.h>
 #include <linux/bootmem.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/console.h>
 #ifdef CONFIG_RTC_DS1742
 #include <asm/rtc_ds1742.h>

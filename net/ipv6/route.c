@@ -567,6 +567,11 @@ struct dst_entry *ndisc_dst_alloc(struct net_device *dev,
 	if (unlikely(rt == NULL))
 		goto out;
 
+	if (dev)
+		dev_hold(dev);
+	if (neigh)
+		neigh_hold(neigh);
+
 	rt->rt6i_dev	  = dev;
 	rt->rt6i_nexthop  = neigh;
 	rt->rt6i_expires  = 0;

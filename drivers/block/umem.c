@@ -99,7 +99,7 @@ static int pci_cmds;
 
 static int major_nr;
 
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/blkpg.h>
 
 struct cardinfo {

@@ -11,7 +11,7 @@
 #include <linux/slab.h>
 #include <linux/ioport.h>
 #include <linux/kernel.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/fs.h>
 
 #include <asm/system.h>
