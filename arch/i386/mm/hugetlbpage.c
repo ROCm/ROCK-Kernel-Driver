@@ -527,7 +527,7 @@ int set_hugetlb_mem_size(int count)
 			map->flags &= ~(1 << PG_locked | 1 << PG_error | 1 << PG_referenced |
 					1 << PG_dirty | 1 << PG_active | 1 << PG_reserved |
 					1 << PG_private | 1<< PG_writeback);
-			set_page_count(page, 0);
+			set_page_count(map, 0);
 			map++;
 		}
 		set_page_count(page, 1);
