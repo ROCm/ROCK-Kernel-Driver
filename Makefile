@@ -1069,8 +1069,8 @@ define filechk
 		echo '  UPD     $@';		\
 		mkdir -p $(dir $@);		\
 		cat $$tmp > $@;			\
-	fi					\
-	rm -f $$tmp;
+	fi;					\
+	rm -f $$tmp
 endef
 
 # Shorthand for $(Q)$(MAKE) -f scripts/Makefile.build obj=dir
