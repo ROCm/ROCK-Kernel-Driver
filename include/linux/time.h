@@ -26,6 +26,16 @@ struct timezone {
 
 #include <linux/spinlock.h>
 #include <linux/seqlock.h>
+#include <linux/timex.h>
+#include <asm/div64.h>
+#ifndef div_long_long_rem
+
+#define div_long_long_rem(dividend,divisor,remainder) ({ \
+		       u64 result = dividend;		\
+		       *remainder = do_div(result,divisor); \
+		       result; })
+
+#endif
 
 /*
  * Have the 32 bit jiffies value wrap 5 minutes after boot
@@ -59,25 +69,52 @@ struct timezone {
 #ifndef NSEC_PER_USEC
 #define NSEC_PER_USEC (1000L)
 #endif
+/*
+ * We want to do realistic conversions of time so we need to use the same
+ * values the update wall clock code uses as the jiffie size.  This value
+ * is: TICK_NSEC(TICK_USEC) (both of which are defined in timex.h).  This 
+ * is a constant and is in nanoseconds.  We will used scaled math and
+ * with a scales defined here as SEC_JIFFIE_SC,  USEC_JIFFIE_SC and 
+ * NSEC_JIFFIE_SC.  Note that these defines contain nothing but
+ * constants and so are computed at compile time.  SHIFT_HZ (computed in
+ * timex.h) adjusts the scaling for different HZ values.
+ */
+#define SEC_JIFFIE_SC (30 - SHIFT_HZ)
+#define NSEC_JIFFIE_SC (SEC_JIFFIE_SC + 30)
+#define USEC_JIFFIE_SC (SEC_JIFFIE_SC + 20)
+#define SEC_CONVERSION ((unsigned long)(((u64)NSEC_PER_SEC << SEC_JIFFIE_SC) /\
+                            (u64)TICK_NSEC(TICK_USEC))) 
+#define NSEC_CONVERSION ((unsigned long)(((u64)1 << NSEC_JIFFIE_SC) / \
+                            (u64)TICK_NSEC(TICK_USEC))) 
+#define USEC_CONVERSION \
+               ((unsigned long)(((u64)NSEC_PER_USEC << USEC_JIFFIE_SC)/ \
+                                 (u64)TICK_NSEC(TICK_USEC))) 
+#define MAX_SEC_IN_JIFFIES \
+    (u32)((u64)((u64)MAX_JIFFY_OFFSET * TICK_NSEC(TICK_USEC)) / NSEC_PER_SEC)
 
 static __inline__ unsigned long
 timespec_to_jiffies(struct timespec *value)
 {
 	unsigned long sec = value->tv_sec;
-	long nsec = value->tv_nsec;
+	long nsec = value->tv_nsec + TICK_NSEC(TICK_USEC) - 1;
 
-	if (sec >= (MAX_JIFFY_OFFSET / HZ))
+	if (sec >=  MAX_SEC_IN_JIFFIES)
 		return MAX_JIFFY_OFFSET;
-	nsec += 1000000000L / HZ - 1;
-	nsec /= 1000000000L / HZ;
-	return HZ * sec + nsec;
+	return (((u64)sec * SEC_CONVERSION) +
+		(((u64)nsec * NSEC_CONVERSION) >>
+		 (NSEC_JIFFIE_SC - SEC_JIFFIE_SC))) >> SEC_JIFFIE_SC;
+
 }
 
 static __inline__ void
 jiffies_to_timespec(unsigned long jiffies, struct timespec *value)
 {
-	value->tv_nsec = (jiffies % HZ) * (1000000000L / HZ);
-	value->tv_sec = jiffies / HZ;
+	/*
+	 * Convert jiffies to nanoseconds and seperate with
+	 * one divide.
+	 */
+	u64 nsec = (u64)jiffies * TICK_NSEC(TICK_USEC); 
+	value->tv_sec = div_long_long_rem(nsec, NSEC_PER_SEC, &value->tv_nsec);
 }
 
 /* Same for "timeval" */
@@ -85,20 +122,25 @@ static __inline__ unsigned long
 timeval_to_jiffies(struct timeval *value)
 {
 	unsigned long sec = value->tv_sec;
-	long usec = value->tv_usec;
+	long usec = value->tv_usec + USEC_PER_SEC / HZ - 1;
 
-	if (sec >= (MAX_JIFFY_OFFSET / HZ))
+	if (sec >= MAX_SEC_IN_JIFFIES)
 		return MAX_JIFFY_OFFSET;
-	usec += 1000000L / HZ - 1;
-	usec /= 1000000L / HZ;
-	return HZ * sec + usec;
+	return (((u64)sec * SEC_CONVERSION) +
+		(((u64)usec * USEC_CONVERSION) >>
+		 (USEC_JIFFIE_SC - SEC_JIFFIE_SC))) >> SEC_JIFFIE_SC;
 }
 
 static __inline__ void
 jiffies_to_timeval(unsigned long jiffies, struct timeval *value)
 {
-	value->tv_usec = (jiffies % HZ) * (1000000L / HZ);
-	value->tv_sec = jiffies / HZ;
+	/*
+	 * Convert jiffies to nanoseconds and seperate with
+	 * one divide.
+	 */
+	u64 nsec = (u64)jiffies * TICK_NSEC(TICK_USEC); 
+	value->tv_sec = div_long_long_rem(nsec, NSEC_PER_SEC, &value->tv_usec);
+	value->tv_usec /= NSEC_PER_USEC;
 }
 
 static __inline__ int timespec_equal(struct timespec *a, struct timespec *b) 

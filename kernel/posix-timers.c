@@ -33,7 +33,12 @@
 		       result; })
 
 #endif
+#define CLOCK_REALTIME_RES TICK_NSEC(TICK_USEC)  // In nano seconds.
 
+static inline u64  mpy_l_X_l_ll(unsigned long mpy1,unsigned long mpy2)
+{
+	return (u64)mpy1 * mpy2;
+}
 /*
  * Management arrays for POSIX timers.	 Timers are kept in slab memory
  * Timer ids are allocated by an external routine that keeps track of the
@@ -175,8 +180,8 @@ static inline void unlock_timer(struct k_itimer *timr, unsigned long flags);
  */
 static __init int init_posix_timers(void)
 {
-	struct k_clock clock_realtime = {.res = NSEC_PER_SEC / HZ };
-	struct k_clock clock_monotonic = {.res = NSEC_PER_SEC / HZ,
+	struct k_clock clock_realtime = {.res = CLOCK_REALTIME_RES };
+	struct k_clock clock_monotonic = {.res = CLOCK_REALTIME_RES,
 		.clock_get = do_posix_clock_monotonic_gettime,
 		.clock_set = do_posix_clock_monotonic_settime
 	};
@@ -204,24 +209,14 @@ static void tstojiffie(struct timespec *tp, int res, u64 *jiff)
 	}
 
 	/*
-	 * A note on jiffy overflow: It is possible for the system to
-	 * have been up long enough for the jiffies quanity to overflow.
-	 * In order for correct timer evaluations we require that the
-	 * specified time be somewhere between now and now + (max
-	 * unsigned int/2).  Times beyond this will be truncated back to
-	 * this value.   This is done in the absolute adjustment code,
-	 * below.  Here it is enough to just discard the high order
-	 * bits.
-	 */
-	*jiff = (s64)sec * HZ;
-	/*
-	 * Do the res thing. (Don't forget the add in the declaration of nsec)
-	 */
-	nsec -= nsec % res;
-	/*
-	 * Split to jiffie and sub jiffie
-	 */
-	*jiff += nsec / (NSEC_PER_SEC / HZ);
+	 * The scaling constants are defined in <linux/time.h>
+	 * The difference between there and here is that we do the
+	 * res rounding and compute a 64-bit result (well so does that
+	 * but it then throws away the high bits).
+  	 */
+	*jiff =  (mpy_l_X_l_ll(sec, SEC_CONVERSION) +
+		  (mpy_l_X_l_ll(nsec, NSEC_CONVERSION) >> 
+		   (NSEC_JIFFIE_SC - SEC_JIFFIE_SC))) >> SEC_JIFFIE_SC;
 }
 
 static void schedule_next_timer(struct k_itimer *timr)
@@ -1232,7 +1227,6 @@ do_clock_nanosleep(clockid_t which_clock, int flags, struct timespec *tsave)
 		finish_wait(&nanosleep_abs_wqueue, &abs_wqueue);
 
 	if (left > (s64)0) {
-		unsigned long rmd;
 
 		/*
 		 * Always restart abs calls from scratch to pick up any
@@ -1241,9 +1235,10 @@ do_clock_nanosleep(clockid_t which_clock, int flags, struct timespec *tsave)
 		if (abs)
 			return -ERESTARTNOHAND;
 
-		tsave->tv_sec = div_long_long_rem(left, HZ, &rmd);
-		tsave->tv_nsec = rmd * (NSEC_PER_SEC / HZ);
-
+		left *= TICK_NSEC(TICK_USEC);
+		tsave->tv_sec = div_long_long_rem(left, 
+						  NSEC_PER_SEC, 
+						  &tsave->tv_nsec);
 		restart_block->fn = clock_nanosleep_restart;
 		restart_block->arg0 = which_clock;
 		restart_block->arg1 = (unsigned long)tsave;
