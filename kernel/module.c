@@ -1171,8 +1171,8 @@ static int simplify_symbols(Elf_Shdr *sechdrs,
 			if (ELF_ST_BIND(sym[i].st_info) == STB_WEAK)
 				break;
 
-			printk(KERN_WARNING "%s: Unknown symbol %s\n",
-			       mod->name, strtab + sym[i].st_name);
+			printk(KERN_WARNING "%s: Unknown symbol %s, st_info == 0x%x\n",
+			       mod->name, strtab + sym[i].st_name,(ELF_ST_BIND(sym[i].st_info)));
 			ret = -ENOENT;
 			break;
 
@@ -1760,6 +1760,8 @@ static struct module *load_module(void __user *umod,
 	kfree(args);
  free_hdr:
 	vfree(hdr);
+	if (err)
+		printk(KERN_DEBUG "%s: err 0x%lx (dont worry)\n",__FUNCTION__, err);
 	if (err < 0) return ERR_PTR(err);
 	else return ptr;
 
