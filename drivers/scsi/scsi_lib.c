@@ -923,6 +923,22 @@ static int scsi_prep_fn(struct request_queue *q, struct request *req)
 {
 	struct scsi_device *sdev = q->queuedata;
 	struct scsi_cmnd *cmd;
+	int specials_only = 0;
+
+	if(unlikely(sdev->sdev_state != SDEV_RUNNING)) {
+		/* OK, we're not in a running state don't prep
+		 * user commands */
+		if(sdev->sdev_state == SDEV_DEL) {
+			/* Device is fully deleted, no commands
+			 * at all allowed down */
+			printk(KERN_ERR "scsi%d (%d:%d): rejecting I/O to dead device\n",
+			       sdev->host->host_no, sdev->id, sdev->lun);
+			return BLKPREP_KILL;
+		}
+		/* OK, we only allow special commands (i.e. not
+		 * user initiated ones */
+		specials_only = 1;
+	}
 
 	/*
 	 * Find the actual device driver associated with this command.
@@ -945,6 +961,14 @@ static int scsi_prep_fn(struct request_queue *q, struct request *req)
 		} else
 			cmd = req->special;
 	} else if (req->flags & (REQ_CMD | REQ_BLOCK_PC)) {
+
+		if(unlikely(specials_only)) {
+			printk(KERN_ERR "scsi%d (%d:%d): rejecting I/O to device being removed\n",
+			       sdev->host->host_no, sdev->id, sdev->lun);
+			return BLKPREP_KILL;
+		}
+			
+			
 		/*
 		 * Just check to see if the device is online.  If
 		 * it isn't, we refuse to process ordinary commands
@@ -1127,6 +1151,10 @@ static void scsi_request_fn(struct request_queue *q)
 	struct scsi_cmnd *cmd;
 	struct request *req;
 
+	if(!get_device(&sdev->sdev_gendev))
+		/* We must be tearing the block queue down already */
+		return;
+
 	/*
 	 * To start with, we keep looping until the queue is empty, or until
 	 * the host is no longer able to accept any more requests.
@@ -1199,7 +1227,7 @@ static void scsi_request_fn(struct request_queue *q)
 		}
 	}
 
-	return;
+	goto out;
 
  not_ready:
 	spin_unlock_irq(shost->host_lock);
@@ -1217,6 +1245,12 @@ static void scsi_request_fn(struct request_queue *q)
 	sdev->device_busy--;
 	if(sdev->device_busy == 0)
 		blk_plug_device(q);
+ out:
+	/* must be careful here...if we trigger the ->remove() function
+	 * we cannot be holding the q lock */
+	spin_unlock_irq(q->queue_lock);
+	put_device(&sdev->sdev_gendev);
+	spin_lock_irq(q->queue_lock);
 }
 
 u64 scsi_calculate_bounce_limit(struct Scsi_Host *shost)

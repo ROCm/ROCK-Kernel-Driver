@@ -14,11 +14,15 @@ struct scsi_mode_data;
 /*
  * sdev state
  */
-enum {
-	SDEV_ADD,
-	SDEV_DEL,
-	SDEV_CANCEL,
-	SDEV_RECOVERY,
+enum scsi_device_state {
+	SDEV_CREATED,		/* device created but not added to sysfs
+				 * Only internal commands allowed (for inq) */
+	SDEV_RUNNING,		/* device properly configured
+				 * All commands allowed */
+	SDEV_CANCEL,		/* beginning to delete device
+				 * Only error handler commands allowed */
+	SDEV_DEL,		/* device deleted 
+				 * no commands allowed */
 };
 
 struct scsi_device {
@@ -99,7 +103,7 @@ struct scsi_device {
 	struct device		sdev_gendev;
 	struct class_device	sdev_classdev;
 
-	unsigned long sdev_state;
+	enum scsi_device_state sdev_state;
 };
 #define	to_scsi_device(d)	\
 	container_of(d, struct scsi_device, sdev_gendev)
