@@ -51,7 +51,7 @@ STATIC xlog_t *	 xlog_alloc_log(xfs_mount_t	*mp,
 				xfs_daddr_t	blk_offset,
 				int		num_bblks);
 STATIC int	 xlog_space_left(xlog_t *log, int cycle, int bytes);
-STATIC int	 xlog_sync(xlog_t *log, xlog_in_core_t *iclog, uint flags);
+STATIC int	 xlog_sync(xlog_t *log, xlog_in_core_t *iclog);
 STATIC void	 xlog_unalloc_log(xlog_t *log);
 STATIC int	 xlog_write(xfs_mount_t *mp, xfs_log_iovec_t region[],
 			    int nentries, xfs_log_ticket_t tic,
@@ -1368,8 +1368,7 @@ xlog_grant_push_ail(xfs_mount_t *mp,
 
 int
 xlog_sync(xlog_t		*log,
-	  xlog_in_core_t	*iclog,
-	  uint			flags)
+	  xlog_in_core_t	*iclog)
 {
 	xfs_caddr_t	dptr;		/* pointer to byte sized element */
 	xfs_buf_t	*bp;
@@ -1381,11 +1380,6 @@ xlog_sync(xlog_t		*log,
 
 	XFS_STATS_INC(xfsstats.xs_log_writes);
 	ASSERT(iclog->ic_refcnt == 0);
-
-#ifdef DEBUG
-	if (flags != 0 && (flags & XFS_LOG_SYNC) )
-		xlog_panic("xlog_sync: illegal flag");
-#endif
 
 	/* Round out the log write size */
 	if (iclog->ic_offset & BBMASK) {
@@ -1440,13 +1434,8 @@ xlog_sync(xlog_t		*log,
 	}
 	XFS_BUF_SET_PTR(bp, (xfs_caddr_t) &(iclog->ic_header), count);
 	XFS_BUF_SET_FSPRIVATE(bp, iclog);	/* save for later */
-	if (flags & XFS_LOG_SYNC){
-		XFS_BUF_BUSY(bp);
-		XFS_BUF_HOLD(bp);
-	} else {
-		XFS_BUF_BUSY(bp);
-		XFS_BUF_ASYNC(bp);
-	}
+	XFS_BUF_BUSY(bp);
+	XFS_BUF_ASYNC(bp);
 	/*
 	 * Do a disk write cache flush for the log block.
 	 * This is a bit of a sledgehammer, it would be better
@@ -1832,15 +1821,19 @@ xlog_state_clean_log(xlog_t *log)
 			 * If the number of ops in this iclog indicate it just
 			 * contains the dummy transaction, we can
 			 * change state into IDLE (the second time around).
-			 * Otherwise we should change the state into NEED a dummy.
+			 * Otherwise we should change the state into
+			 * NEED a dummy.
 			 * We don't need to cover the dummy.
 			 */
 			if (!changed &&
 			   (INT_GET(iclog->ic_header.h_num_logops, ARCH_CONVERT) == XLOG_COVER_OPS)) {
 				changed = 1;
-			} else {	/* we have two dirty iclogs so start over */
-					/* This could also be num of ops indicates
-						this is not the dummy going out. */
+			} else {
+				/*
+				 * We have two dirty iclogs so start over
+				 * This could also be num of ops indicates
+				 * this is not the dummy going out.
+				 */
 				changed = 2;
 			}
 			INT_ZERO(iclog->ic_header.h_num_logops, ARCH_CONVERT);
@@ -2225,8 +2218,6 @@ xlog_state_get_iclog_space(xlog_t	  *log,
 	xlog_rec_header_t *head;
 	xlog_in_core_t	  *iclog;
 	int		  error;
-
-	xlog_state_do_callback(log, 0, NULL);	/* also cleans log */
 
 restart:
 	s = LOG_LOCK(log);
@@ -2721,7 +2712,7 @@ void xlog_sync_work(
 	xlog_in_core_t	*iclog = (xlog_in_core_t *)v;
 	xlog_t		*log  = iclog->ic_log;
 
-	xlog_sync(log, iclog, 0);
+	xlog_sync(log, iclog);
 }
 
 int xlog_mode = 1;
@@ -2777,7 +2768,7 @@ xlog_state_release_iclog(xlog_t		*log,
 		INIT_WORK(&iclog->ic_write_work, xlog_sync_work, iclog);
 		switch (xlog_mode) {
 		case 0:
-			return xlog_sync(log, iclog, 0);
+			return xlog_sync(log, iclog);
 		case 1:
 		        queue_work(pagebuf_workqueue, &iclog->ic_write_work);
 		}
