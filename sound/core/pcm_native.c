@@ -1445,7 +1445,7 @@ static int snd_pcm_drain(snd_pcm_substream_t *substream)
 
  _end:
 	snd_pcm_stream_unlock_irq(substream);
-	if (drec && drec != &drec_tmp)
+	if (drec != &drec_tmp)
 		kfree(drec);
  _unlock:
 	snd_power_unlock(card);

@@ -17,7 +17,7 @@
  * 2002-05-12   Tomas Kasparek  another code cleanup
  */
 
-/* $Id: uda1341.c,v 1.13 2004/07/20 15:54:13 cladisch Exp $ */
+/* $Id: uda1341.c,v 1.14 2004/11/29 14:09:45 tiwai Exp $ */
 
 #include <sound/driver.h>
 #include <linux/module.h>
@@ -730,8 +730,7 @@ static int uda1341_attach(struct l3_client *clnt)
 
 static void uda1341_detach(struct l3_client *clnt)
 {
-	if (clnt->driver_data)
-		kfree(clnt->driver_data);
+	kfree(clnt->driver_data);
 }
 
 static int

@@ -408,8 +408,7 @@ static inline int _snd_ioctl32_ctl_elem_value(unsigned int fd, unsigned int cmd,
 	}
 	err = 0;
       __end:
-	if (data)
-		kfree(data);
+	kfree(data);
 	return err;
 }
 

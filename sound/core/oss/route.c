@@ -407,8 +407,7 @@ static void route_free(snd_pcm_plugin_t *plugin)
 	route_t *data = (route_t *)plugin->extra_data;
 	unsigned int dst_channel;
 	for (dst_channel = 0; dst_channel < plugin->dst_format.channels; ++dst_channel) {
-		if (data->ttable[dst_channel].srcs != NULL)
-			kfree(data->ttable[dst_channel].srcs);
+		kfree(data->ttable[dst_channel].srcs);
 	}
 }
 

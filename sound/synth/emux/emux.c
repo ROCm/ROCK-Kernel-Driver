@@ -137,12 +137,8 @@ int snd_emux_free(snd_emux_t *emu)
 	if (emu->sflist)
 		snd_sf_free(emu->sflist);
 
-	if (emu->voices)
-		kfree(emu->voices);
-
-	if (emu->name)
-		kfree(emu->name);
-
+	kfree(emu->voices);
+	kfree(emu->name);
 	kfree(emu);
 	return 0;
 }

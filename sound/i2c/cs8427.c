@@ -156,8 +156,7 @@ static int snd_cs8427_send_corudata(snd_i2c_device_t *device,
 
 static void snd_cs8427_free(snd_i2c_device_t *device)
 {
-	if (device->private_data)
-		kfree(device->private_data);
+	kfree(device->private_data);
 }
 
 int snd_cs8427_create(snd_i2c_bus_t *bus,

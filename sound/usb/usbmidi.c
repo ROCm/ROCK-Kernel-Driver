@@ -504,8 +504,7 @@ static snd_rawmidi_ops_t snd_usbmidi_input_ops = {
 static void snd_usbmidi_in_endpoint_delete(snd_usb_midi_in_endpoint_t* ep)
 {
 	if (ep->urb) {
-		if (ep->urb->transfer_buffer)
-			kfree(ep->urb->transfer_buffer);
+		kfree(ep->urb->transfer_buffer);
 		usb_free_urb(ep->urb);
 	}
 	kfree(ep);
@@ -632,8 +631,7 @@ static void snd_usbmidi_out_endpoint_delete(snd_usb_midi_out_endpoint_t* ep)
 	if (ep->tasklet.func)
 		tasklet_kill(&ep->tasklet);
 	if (ep->urb) {
-		if (ep->urb->transfer_buffer)
-			kfree(ep->urb->transfer_buffer);
+		kfree(ep->urb->transfer_buffer);
 		usb_free_urb(ep->urb);
 	}
 	kfree(ep);

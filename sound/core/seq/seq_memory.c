@@ -436,8 +436,7 @@ int snd_seq_pool_done(pool_t *pool)
 	pool->total_elements = 0;
 	spin_unlock_irqrestore(&pool->lock, flags);
 
-	if (ptr)
-		vfree(ptr);
+	vfree(ptr);
 
 	spin_lock_irqsave(&pool->lock, flags);
 	pool->closing = 0;

@@ -2063,8 +2063,7 @@ static void free_substream(snd_usb_substream_t *subs)
 		return; /* not initialized */
 	list_for_each_safe(p, n, &subs->fmt_list) {
 		struct audioformat *fp = list_entry(p, struct audioformat, list);
-		if (fp->rate_table)
-			kfree(fp->rate_table);
+		kfree(fp->rate_table);
 		kfree(fp);
 	}
 }
@@ -2550,8 +2549,7 @@ static int parse_audio_endpoints(snd_usb_audio_t *chip, int iface_no)
 
 		/* ok, let's parse further... */
 		if (parse_audio_format(dev, fp, format, fmt, stream) < 0) {
-			if (fp->rate_table)
-				kfree(fp->rate_table);
+			kfree(fp->rate_table);
 			kfree(fp);
 			continue;
 		}
@@ -2559,8 +2557,7 @@ static int parse_audio_endpoints(snd_usb_audio_t *chip, int iface_no)
 		snd_printdd(KERN_INFO "%d:%u:%d: add audio endpoint 0x%x\n", dev->devnum, iface_no, i, fp->endpoint);
 		err = add_audio_endpoint(chip, stream, fp);
 		if (err < 0) {
-			if (fp->rate_table)
-				kfree(fp->rate_table);
+			kfree(fp->rate_table);
 			kfree(fp);
 			return err;
 		}
@@ -2693,15 +2690,13 @@ static int create_fixed_stream_quirk(snd_usb_audio_t *chip,
 	err = add_audio_endpoint(chip, stream, fp);
 	if (err < 0) {
 		kfree(fp);
-		if (rate_table)
-			kfree(rate_table);
+		kfree(rate_table);
 		return err;
 	}
 	if (fp->iface != get_iface_desc(&iface->altsetting[0])->bInterfaceNumber ||
 	    fp->altset_idx >= iface->num_altsetting) {
 		kfree(fp);
-		if (rate_table)
-			kfree(rate_table);
+		kfree(rate_table);
 		return -EINVAL;
 	}
 	alts = &iface->altsetting[fp->altset_idx];

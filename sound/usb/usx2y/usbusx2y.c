@@ -301,8 +301,7 @@ static void usX2Y_unlinkSeq(snd_usX2Y_AsyncSeq_t* S)
 			S->urb[i] = NULL;
 		}
 	}
-	if (S->buffer)
-		kfree(S->buffer);
+	kfree(S->buffer);
 }
 
 
@@ -406,8 +405,7 @@ static struct usb_driver snd_usX2Y_usb_driver = {
 
 static void snd_usX2Y_card_private_free(snd_card_t *card)
 {
-	if (usX2Y(card)->In04Buf)
-		kfree(usX2Y(card)->In04Buf);
+	kfree(usX2Y(card)->In04Buf);
 	usb_free_urb(usX2Y(card)->In04urb);
 	if (usX2Y(card)->us428ctls_sharedmem)
 		snd_free_pages(usX2Y(card)->us428ctls_sharedmem, sizeof(*usX2Y(card)->us428ctls_sharedmem));

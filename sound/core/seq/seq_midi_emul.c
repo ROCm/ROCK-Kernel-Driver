@@ -713,8 +713,7 @@ void snd_midi_channel_free_set(snd_midi_channel_set_t *chset)
 {
 	if (chset == NULL)
 		return;
-	if (chset->channels != NULL)
-		kfree(chset->channels);
+	kfree(chset->channels);
 	kfree(chset);
 }
 

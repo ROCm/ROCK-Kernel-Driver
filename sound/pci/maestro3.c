@@ -2374,8 +2374,7 @@ static int snd_m3_free(m3_t *chip)
 	}
 
 #ifdef CONFIG_PM
-	if (chip->suspend_mem)
-		vfree(chip->suspend_mem);
+	vfree(chip->suspend_mem);
 #endif
 
 	if (chip->irq >= 0) {

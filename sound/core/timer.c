@@ -351,8 +351,7 @@ int snd_timer_close(snd_timer_instance_t * timeri)
 	}
 	if (timeri->private_free)
 		timeri->private_free(timeri);
-	if (timeri->owner)
-		kfree(timeri->owner);
+	kfree(timeri->owner);
 	kfree(timeri);
 	if (timer && timer->card)
 		module_put(timer->card->module);
@@ -1004,8 +1003,7 @@ static struct _snd_timer_hardware snd_timer_system =
 
 static void snd_timer_free_system(snd_timer_t *timer)
 {
-	if (timer->private_data)
-		kfree(timer->private_data);
+	kfree(timer->private_data);
 }
 
 static int snd_timer_register_system(void)
@@ -1226,10 +1224,8 @@ static int snd_timer_user_release(struct inode *inode, struct file *file)
 		fasync_helper(-1, file, 0, &tu->fasync);
 		if (tu->timeri)
 			snd_timer_close(tu->timeri);
-		if (tu->queue)
-			kfree(tu->queue);
-		if (tu->tqueue)
-			kfree(tu->tqueue);
+		kfree(tu->queue);
+		kfree(tu->tqueue);
 		kfree(tu);
 	}
 	return 0;

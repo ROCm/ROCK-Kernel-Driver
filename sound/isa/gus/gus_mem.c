@@ -100,8 +100,7 @@ int snd_gf1_mem_xfree(snd_gf1_mem_t * alloc, snd_gf1_mem_block_t * block)
 		if (block->prev)
 			block->prev->next = block->next;
 	}
-	if (block->name)
-		kfree(block->name);
+	kfree(block->name);
 	kfree(block);
 	return 0;
 }

@@ -1989,8 +1989,7 @@ static int snd_ali_free(ali_t * codec)
 		pci_release_regions(codec->pci);
 	pci_disable_device(codec->pci);
 #ifdef CONFIG_PM
-	if (codec->image)
-		kfree(codec->image);
+	kfree(codec->image);
 #endif
 	kfree(codec);
 	return 0;

@@ -772,8 +772,7 @@ static void snd_emu10k1_pcm_free_substream(snd_pcm_runtime_t *runtime)
 {
 	emu10k1_pcm_t *epcm = runtime->private_data;
 
-	if (epcm)
-		kfree(epcm);
+	kfree(epcm);
 }
 
 static int snd_emu10k1_playback_open(snd_pcm_substream_t * substream)

@@ -891,8 +891,7 @@ void snd_info_free_entry(snd_info_entry_t * entry)
 {
 	if (entry == NULL)
 		return;
-	if (entry->name)
-		kfree((char *)entry->name);
+	kfree(entry->name);
 	if (entry->private_free)
 		entry->private_free(entry);
 	kfree(entry);

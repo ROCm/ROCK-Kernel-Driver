@@ -291,15 +291,9 @@ void  cs46xx_dsp_spos_destroy (cs46xx_t * chip)
 		cs46xx_dsp_proc_free_scb_desc ( (ins->scbs + i) );
 	}
 
-	if (ins->code.data)
-		kfree(ins->code.data);
-
-	if (ins->symbol_table.symbols)
-		vfree(ins->symbol_table.symbols);
-
-	if (ins->modules)
-		kfree(ins->modules);
-	
+	kfree(ins->code.data);
+	vfree(ins->symbol_table.symbols);
+	kfree(ins->modules);
 	kfree(ins);
 	up(&chip->spos_mutex);
 }

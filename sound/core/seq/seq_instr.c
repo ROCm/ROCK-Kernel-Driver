@@ -56,8 +56,6 @@ snd_seq_kcluster_t *snd_seq_cluster_new(int atomic)
 
 void snd_seq_cluster_free(snd_seq_kcluster_t *cluster, int atomic)
 {
-	if (cluster == NULL)
-		return;
 	kfree(cluster);
 }
 

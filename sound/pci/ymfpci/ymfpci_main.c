@@ -831,8 +831,7 @@ static void snd_ymfpci_pcm_free_substream(snd_pcm_runtime_t *runtime)
 {
 	ymfpci_pcm_t *ypcm = runtime->private_data;
 	
-	if (ypcm)
-		kfree(ypcm);
+	kfree(ypcm);
 }
 
 static int snd_ymfpci_playback_open_1(snd_pcm_substream_t * substream)
@@ -2065,8 +2064,7 @@ static int snd_ymfpci_free(ymfpci_t *chip)
 #endif
 
 #ifdef CONFIG_PM
-	if (chip->saved_regs)
-		vfree(chip->saved_regs);
+	vfree(chip->saved_regs);
 #endif
 	if (chip->mpu_res) {
 		release_resource(chip->mpu_res);

@@ -662,12 +662,11 @@ int snd_card_file_remove(snd_card_t *card, struct file *file)
 	spin_unlock(&card->files_lock);
 	if (card->files == NULL)
 		wake_up(&card->shutdown_sleep);
-	if (mfile) {
-		kfree(mfile);
-	} else {
+	if (!mfile) {
 		snd_printk(KERN_ERR "ALSA card file remove problem (%p)\n", file);
 		return -ENOENT;
 	}
+	kfree(mfile);
 	return 0;
 }
 

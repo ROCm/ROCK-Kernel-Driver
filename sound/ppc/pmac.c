@@ -71,7 +71,7 @@ static int snd_pmac_dbdma_alloc(pmac_dbdma_t *rec, int size)
 
 static void snd_pmac_dbdma_free(pmac_dbdma_t *rec)
 {
-	if (rec && rec->space)
+	if (rec)
 		kfree(rec->space);
 }
 

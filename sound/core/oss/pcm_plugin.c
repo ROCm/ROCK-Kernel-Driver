@@ -86,8 +86,7 @@ static int snd_pcm_plugin_alloc(snd_pcm_plugin_t *plugin, snd_pcm_uframes_t fram
 	snd_assert((size % 8) == 0, return -ENXIO);
 	size /= 8;
 	if (plugin->buf_frames < frames) {
-		if (plugin->buf)
-			vfree(plugin->buf);
+		vfree(plugin->buf);
 		plugin->buf = vmalloc(size);
 		plugin->buf_frames = frames;
 	}
@@ -217,14 +216,10 @@ int snd_pcm_plugin_free(snd_pcm_plugin_t *plugin)
 		return 0;
 	if (plugin->private_free)
 		plugin->private_free(plugin);
-	if (plugin->buf_channels)
-		kfree(plugin->buf_channels);
-	if (plugin->buf)
-		vfree(plugin->buf);
-	if (plugin->src_vmask)
-		kfree(plugin->src_vmask);
-	if (plugin->dst_vmask)
-		kfree(plugin->dst_vmask);
+	kfree(plugin->buf_channels);
+	vfree(plugin->buf);
+	kfree(plugin->src_vmask);
+	kfree(plugin->dst_vmask);
 	kfree(plugin);
 	return 0;
 }

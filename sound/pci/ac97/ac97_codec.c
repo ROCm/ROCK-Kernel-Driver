@@ -1055,8 +1055,7 @@ static int snd_ac97_bus_free(ac97_bus_t *bus)
 {
 	if (bus) {
 		snd_ac97_bus_proc_done(bus);
-		if (bus->pcms)
-			kfree(bus->pcms);
+		kfree(bus->pcms);
 		if (bus->private_free)
 			bus->private_free(bus);
 		kfree(bus);
