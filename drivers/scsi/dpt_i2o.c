@@ -1635,14 +1635,14 @@ static int adpt_close(struct inode *inode, struct file *file)
 }
 
 
-static int adpt_i2o_passthru(adpt_hba* pHba, u32* arg)
+static int adpt_i2o_passthru(adpt_hba* pHba, u32 __user *arg)
 {
 	u32 msg[MAX_MESSAGE_SIZE];
 	u32* reply = NULL;
 	u32 size = 0;
 	u32 reply_size = 0;
-	u32* user_msg = (u32*)arg;
-	u32* user_reply = NULL;
+	u32 __user *user_msg = arg;
+	u32 __user * user_reply = NULL;
 	ulong sg_list[pHba->sg_tablesize];
 	u32 sg_offset = 0;
 	u32 sg_count = 0;
@@ -1666,7 +1666,7 @@ static int adpt_i2o_passthru(adpt_hba* pHba, u32* arg)
 	size *= 4; // Convert to bytes
 
 	/* Copy in the user's I2O command */
-	if(copy_from_user((void*)msg, (void*)user_msg, size)) {
+	if(copy_from_user(msg, user_msg, size)) {
 		return -EFAULT;
 	}
 	get_user(reply_size, &user_reply[0]);
@@ -1765,7 +1765,7 @@ static int adpt_i2o_passthru(adpt_hba* pHba, u32* arg)
 		size = size>>16;
 		size *= 4;
 		/* Copy in the user's I2O command */
-		if (copy_from_user ((void*)msg, (void*)user_msg, size)) {
+		if (copy_from_user (msg, user_msg, size)) {
 			rcode = -EFAULT;
 			goto cleanup;
 		}
@@ -1820,7 +1820,7 @@ cleanup:
  */
 
 /* Get all the info we can not get from kernel services */
-static int adpt_system_info(void *buffer)
+static int adpt_system_info(void __user *buffer)
 {
 	sysInfo_S si;
 
@@ -1916,6 +1916,7 @@ static int adpt_ioctl(struct inode *inode, struct file *file, uint cmd,
 	int error = 0;
 	adpt_hba* pHba;
 	ulong flags = 0;
+	void __user *argp = (void __user *)arg;
 
 	minor = iminor(inode);
 	if (minor >= DPTI_MAX_HBA){
@@ -1941,13 +1942,12 @@ static int adpt_ioctl(struct inode *inode, struct file *file, uint cmd,
 	switch (cmd) {
 	// TODO: handle 3 cases
 	case DPT_SIGNATURE:
-		if (copy_to_user((char*)arg, &DPTI_sig, sizeof(DPTI_sig))) {
+		if (copy_to_user(argp, &DPTI_sig, sizeof(DPTI_sig))) {
 			return -EFAULT;
 		}
 		break;
 	case I2OUSRCMD:
-		return	adpt_i2o_passthru(pHba,(u32*)arg);
-		break;
+		return adpt_i2o_passthru(pHba, argp);
 
 	case DPT_CTRLINFO:{
 		drvrHBAinfo_S HbaInfo;
@@ -1963,19 +1963,18 @@ static int adpt_ioctl(struct inode *inode, struct file *file, uint cmd,
 		HbaInfo.pciDeviceNum=PCI_SLOT(pHba->pDev->devfn); 
 		HbaInfo.Interrupt = pHba->pDev->irq; 
 		HbaInfo.hbaFlags = FLG_OSD_PCI_VALID | FLG_OSD_DMA | FLG_OSD_I2O;
-		if(copy_to_user((void *) arg, &HbaInfo, sizeof(HbaInfo))){
+		if(copy_to_user(argp, &HbaInfo, sizeof(HbaInfo))){
 			printk(KERN_WARNING"%s: Could not copy HbaInfo TO user\n",pHba->name);
 			return -EFAULT;
 		}
 		break;
 		}
 	case DPT_SYSINFO:
-		return adpt_system_info((void*)arg);
-		break;
+		return adpt_system_info(argp);
 	case DPT_BLINKLED:{
 		u32 value;
 		value = (u32)adpt_read_blink_led(pHba);
-		if (copy_to_user((char*)arg, &value, sizeof(value))) {
+		if (copy_to_user(argp, &value, sizeof(value))) {
 			return -EFAULT;
 		}
 		break;
