@@ -275,7 +275,7 @@ islpci_monitor_rx(islpci_private *priv, struct sk_buff **skb)
 									 avs_80211_1_header),
 								 0, GFP_ATOMIC);
 			if (newskb) {
-				kfree_skb(*skb);
+				dev_kfree_skb_irq(*skb);
 				*skb = newskb;
 			} else
 				return -1;
@@ -419,7 +419,7 @@ islpci_eth_receive(islpci_private *priv)
 	     skb->data[4], skb->data[5]);
 #endif
 	if (unlikely(discard)) {
-		dev_kfree_skb(skb);
+		dev_kfree_skb_irq(skb);
 		skb = NULL;
 	} else
 		netif_rx(skb);
@@ -462,7 +462,7 @@ islpci_eth_receive(islpci_private *priv)
 			      "Error mapping DMA address\n");
 
 			/* free the skbuf structure before aborting */
-			dev_kfree_skb((struct sk_buff *) skb);
+			dev_kfree_skb_irq((struct sk_buff *) skb);
 			skb = NULL;
 			break;
 		}

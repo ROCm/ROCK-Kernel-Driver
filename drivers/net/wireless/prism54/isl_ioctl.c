@@ -632,8 +632,8 @@ prism54_translate_bss(struct net_device *ndev, char *current_ev,
 	current_ev = iwe_stream_add_point(current_ev, end_buf, &iwe, NULL);
 
 	/* Add frequency. (short) bss->channel is the frequency in MHz */
-	iwe.u.freq.m = bss->channel;
-	iwe.u.freq.e = 6;
+	iwe.u.freq.m = channel_of_freq(bss->channel);
+	iwe.u.freq.e = 0;
 	iwe.cmd = SIOCGIWFREQ;
 	current_ev =
 	    iwe_stream_add_event(current_ev, end_buf, &iwe, IW_EV_FREQ_LEN);
