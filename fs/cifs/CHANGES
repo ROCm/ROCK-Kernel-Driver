@@ -4,7 +4,8 @@ Invalidate local inode cached pages on oplock break and when last file
 instance is closed so that the client does not continue using stale local
 copy rather than later modified server copy of file.  Do not reconnect
 when server drops the tcp session prematurely before negotiate
-protocol response.  Fix oops in roepen_file when dentry freed.
+protocol response.  Fix oops in roepen_file when dentry freed.  Allow
+the support for CIFS Unix Extensions to be disabled via proc interface.
 
 Version 0.98
 ------------

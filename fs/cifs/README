@@ -162,38 +162,48 @@ A partial list of the supported mount options follows:
 Misc /proc/fs/cifs Flags and Debug Info
 =======================================
 Informational pseudo-files:
-  DebugData		Displays information about active CIFS sessions
-  SimultaneousOps       Counter which holds maximum number of
+DebugData		Displays information about active CIFS sessions
+SimultaneousOps		Counter which holds maximum number of
 			simultaneous outstanding SMB/CIFS requests.
-  Stats			Lists summary resource usage information
+Stats			Lists summary resource usage information
 
 Configuration pseudo-files:
-  MultiuserMount	If set to one, more than one CIFS session to 
+MultiuserMount		If set to one, more than one CIFS session to 
 			the same server ip address can be established
 			if more than one uid accesses the same mount
 			point and if the uids user/password mapping
 			information is available. (default is 0)
-  PacketSigningEnabled  If set to one, cifs packet signing is enabled
+PacketSigningEnabled	If set to one, cifs packet signing is enabled
 			and will be used if the server requires 
 			it.  If set to two, cifs packet signing is
 			required even if the server considers packet
 			signing optional. (default 1)
-  cifsFYI		If set to one, additional debug information is
+cifsFYI			If set to one, additional debug information is
 			logged to the system error log. (default 0)
-  ExtendedSecurity	If set to one, SPNEGO session establishment
+ExtendedSecurity	If set to one, SPNEGO session establishment
 			is allowed which enables more advanced 
 			secure CIFS session establishment (default 0)
-  NTLMV2Enabled		If set to one, more secure password hashes
+NTLMV2Enabled		If set to one, more secure password hashes
 			are used when the server supports them and
 			when kerberos is not negotiated (default 0)
-  traceSMB		If set to one, debug information is logged to the
+traceSMB		If set to one, debug information is logged to the
 			system error log with the start of smb requests
 			and responses (default 0)
-  LookupCacheEnable     If set to one, inode information is kept cached
+LookupCacheEnable	If set to one, inode information is kept cached
 			for one second improving performance of lookups
 			(default 1)
-  OplockEnabled		If set to one, safe distributed caching enabled.
+OplockEnabled		If set to one, safe distributed caching enabled.
 			(default 1)
+LinuxExtensionsEnabled	If set to one then the client will attempt to
+			use the CIFS "UNIX" extensions which are optional
+			protocol enhancements that allow CIFS servers
+			to return accurate UID/GID information as well
+			as support symbolic links. If you use servers
+			such as Samba that support the CIFS Unix
+			extensions but do not want to use symbolic link
+			support and want to map the uid and gid fields 
+			to values supplied at mount (rather than the 
+			actual values, then set this to zero. (deafult 1)
 
 These experimental features and tracing can be enabled by changing flags in 
 /proc/fs/cifs (after the cifs module has been installed or built into the 
@@ -207,9 +217,9 @@ and for more extensive tracing including the start of smb requests and responses
 	echo 1 > /proc/fs/cifs/traceSMB
 	
 Also note that "cat /proc/fs/cifs/DebugData" will display some information about 
-the active sessions and the shares that are mounted.  NTLMv2 enablement and 
-packet signing will not work since they the implementation is not quite 
-complete.  Do not enable these flags unless you are doing specific testing.  
+the active sessions and the shares that are mounted.  Note: NTLMv2 enablement 
+will not work since they its implementation is not quite complete yet.
+Do not alter these configuration values unless you are doing specific testing.  
 Enabling extended security works to Windows 2000 Workstations and XP but not to 
 Windows 2000 server or Samba since it does not usually send "raw NTLMSSP" 
 (instead it sends NTLMSSP encapsulated in SPNEGO/GSSAPI, which support is not 

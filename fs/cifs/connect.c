@@ -725,6 +725,8 @@ int setup_session(unsigned int xid, struct cifsSesInfo *pSesInfo, struct nls_tab
 			pSesInfo->server->tcpStatus = CifsGood;
 	}
 	pSesInfo->capabilities = pSesInfo->server->capabilities;
+	if(linuxExtEnabled == 0)
+		pSesInfo->capabilities &= (~CAP_UNIX);
 	pSesInfo->sequence_number = 0;
 	if (!rc) {
 		cFYI(1,("Security Mode: 0x%x Capabilities: 0x%x Time Zone: %d",
