@@ -1125,8 +1125,8 @@ config SUN3_SCSI
 	depends on SUN3 && SCSI
 	help
 	  This option will enable support for the OBIO (onboard io) NCR5380
-	  SCSI controller found in the Sun 3/50 and 3/60.  Note that this
-	  driver does not provide support for VME SCSI boards.
+	  SCSI controller found in the Sun 3/50 and 3/60, as well as for
+	  "Sun3" type VME scsi controllers also based on the NCR5380.
 	  General Linux information on the Sun 3 series (now discontinued)
 	  is at <http://www.angelfire.com/ca2/tech68k/sun3.html>.
 

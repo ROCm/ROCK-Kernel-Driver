@@ -39,5 +39,11 @@ extern int show_sun3_interrupts(struct seq_file *, void *);
 extern void sun3_process_int(int, struct pt_regs *);
 extern volatile unsigned char* sun3_intreg;
 
+/* master list of VME vectors -- don't fuck with this */
+#define SUN3_VEC_FLOPPY 0x40
+#define SUN3_VEC_VMESCSI0 0x40
+#define SUN3_VEC_VMESCSI1 0x41
+#define SUN3_VEC_CG 0xA8
+
 
 #endif /* SUN3INTS_H */

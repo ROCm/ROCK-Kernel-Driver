@@ -240,8 +240,14 @@ inline unsigned long dvma_map_align(unsigned long kaddr, int len, int align)
 
 void dvma_unmap(void *baddr)
 {
-
-	free_baddr((unsigned long)baddr);
+	unsigned long addr;
+	
+	addr = (unsigned long)baddr;
+	/* check if this is a vme mapping */
+	if(!(addr & 0x00f00000))
+		addr |= 0xf00000;
+	
+	free_baddr(addr);
 	
 	return;
 
