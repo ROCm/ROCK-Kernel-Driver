@@ -83,4 +83,7 @@ static __inline__ void flush_tlb_pgtables(struct mm_struct *mm, unsigned long st
 	}
 }
 
+/* XXX For now... */
+#define flush_tlb_kernel_range(start, end)	flush_tlb_all()
+
 #endif /* _SPARC64_TLBFLUSH_H */
