@@ -1,15 +1,6 @@
 ToDo/Notes:
 	- Find and fix bugs.
-	- Either invalidate quotas or update the quota charges on NTFS 3.x
-	  volumes with quota tracking enabled ($Quota).
 	- Checkpoint or disable the user space journal ($UsnJrnl).
-	- Implement aops->set_page_dirty() in order to take control of buffer
-	  dirtying. Not having it means if page_has_buffers(), all buffers
-	  will be dirtied with the page. And if not they won't be. That is
-	  fine for the moment but will break once we enable metadata updates.
-	  For now just always using __set_page_dirty_nobuffers() for metadata
-	  pages as nothing can dirty a page other than ourselves. Should this
-	  change, we will really need to roll our own ->set_page_dirty().
 	- Implement sops->dirty_inode() to implement {a,m,c}time updates and
 	  such things.  This should probably just flag the ntfs inode such that
 	  sops->write_inode(), i.e. ntfs_write_inode(), will copy the times
@@ -35,7 +26,7 @@ ToDo/Notes:
 	- Enable the code for setting the NT4 compatibility flag when we start
 	  making NTFS 1.2 specific modifications.
 
-2.1.15 - .
+2.1.15 - Invalidate quotas when (re)mounting read-write.
 
 	- Add new element itype.index.collation_rule to the ntfs inode
 	  structure and set it appropriately in ntfs_read_locked_inode().
@@ -89,6 +80,12 @@ ToDo/Notes:
 	  dirty index records rather than having to write all the records in
 	  the page.  Modify fs/ntfs/index.h::ntfs_index_entry_mark_dirty() to
 	  use this rather than __set_page_dirty_nobuffers().
+	- Implement fs/ntfs/aops.c::ntfs_write_mst_block() which enables the
+	  writing of page cache pages belonging to mst protected attributes
+	  like the index allocation attribute in directory indices and other
+	  indices like $Quota/$Q, etc.  This means that the quota is now marked
+	  out of date on all volumes rather than only on ones where the quota
+	  defaults entry is in the index root attribute of the $Quota/$Q index.
 
 2.1.14 - Fix an NFSd caused deadlock reported by several users.
 

@@ -773,6 +773,10 @@ lock_retry_remap:
 	return err;
 }
 
+static const char *ntfs_please_email = "Please email "
+		"linux-ntfs-dev@lists.sourceforge.net and say that you saw "
+		"this message.  Thank you.";
+
 /**
  * ntfs_write_mst_block - write a @page to the backing store
  * @wbc:	writeback control structure
@@ -796,13 +800,20 @@ lock_retry_remap:
 static int ntfs_write_mst_block(struct writeback_control *wbc,
 		struct page *page)
 {
-	struct inode *vi;
-	ntfs_inode *ni;
-	ntfs_volume *vol;
+	sector_t block, dblock, rec_block;;
+	struct inode *vi = page->mapping->host;
+	ntfs_inode *ni = NTFS_I(vi);
+	ntfs_volume *vol = ni->vol;
+	u8 *kaddr;
+	unsigned int bh_size = 1 << vi->i_blkbits;
+	unsigned int rec_size;
+	struct buffer_head *bh, *head;
+	int max_bhs = PAGE_CACHE_SIZE / bh_size;
+	struct buffer_head *bhs[max_bhs];
+	int i, nr_recs, nr_bhs, bhs_per_rec, err;
+	unsigned char bh_size_bits;
+	BOOL rec_is_dirty;
 
-	vi = page->mapping->host;
-	ni = NTFS_I(vi);
-	vol = ni->vol;
 	ntfs_debug("Entering for inode 0x%lx, attribute type 0x%x, page index "
 			"0x%lx.", vi->i_ino, ni->type, page->index);
 	BUG_ON(!NInoNonResident(ni));
@@ -810,12 +821,186 @@ static int ntfs_write_mst_block(struct writeback_control *wbc,
 	BUG_ON(!(S_ISDIR(vi->i_mode) ||
 			(NInoAttr(ni) && ni->type == AT_INDEX_ALLOCATION)));
 	BUG_ON(PageWriteback(page));
+	BUG_ON(!PageUptodate(page));
+	BUG_ON(!max_bhs);
+
+	/* Make sure we have mapped buffers. */
+	if (unlikely(!page_has_buffers(page))) {
+no_buffers_err_out:
+		ntfs_error(vol->sb, "Writing ntfs records without existing "
+				"buffers is not implemented yet.  %s",
+				ntfs_please_email);
+		err = -EOPNOTSUPP;
+		goto err_out;
+	}
+	bh = head = page_buffers(page);
+	if (unlikely(!bh))
+		goto no_buffers_err_out;
+
+	bh_size_bits = vi->i_blkbits;
+	rec_size = ni->itype.index.block_size;
+	nr_recs = PAGE_CACHE_SIZE / rec_size;
+	BUG_ON(!nr_recs);
+	bhs_per_rec = rec_size >> bh_size_bits;
+	BUG_ON(!bhs_per_rec);
+
+	/* The first block in the page. */
+	rec_block = block = (s64)page->index <<
+			(PAGE_CACHE_SHIFT - bh_size_bits);
+
+	/* The first out of bounds block for the data size. */
+	dblock = (vi->i_size + bh_size - 1) >> bh_size_bits;
+
+	err = nr_bhs = 0;
+	/* Need this to silence a stupid gcc warning. */
+	rec_is_dirty = FALSE;
+	do {
+		if (unlikely(block >= dblock)) {
+			/*
+			 * Mapped buffers outside i_size will occur, because
+			 * this page can be outside i_size when there is a
+			 * truncate in progress. The contents of such buffers
+			 * were zeroed by ntfs_writepage().
+			 *
+			 * FIXME: What about the small race window where
+			 * ntfs_writepage() has not done any clearing because
+			 * the page was within i_size but before we get here,
+			 * vmtruncate() modifies i_size?
+			 */
+			clear_buffer_dirty(bh);
+			continue;
+		}
+		if (rec_block == block) {
+			/* This block is the first one in the record. */
+			rec_block += rec_size >> bh_size_bits;
+			if (!buffer_dirty(bh)) {
+				/* Clean buffers are not written out. */
+				rec_is_dirty = FALSE;
+				continue;
+			}
+			rec_is_dirty = TRUE;
+		} else {
+			/* This block is not the first one in the record. */
+			if (!buffer_dirty(bh)) {
+				/* Clean buffers are not written out. */
+				BUG_ON(rec_is_dirty);
+				continue;
+			}
+			BUG_ON(!rec_is_dirty);
+		}
+		/* Attempting to write outside the initialized size is a bug. */
+		BUG_ON(((block + 1) << bh_size_bits) > ni->initialized_size);
+		if (!buffer_mapped(bh)) {
+			ntfs_error(vol->sb, "Writing ntfs records without "
+					"existing mapped buffers is not "
+					"implemented yet.  %s",
+					ntfs_please_email);
+			clear_buffer_dirty(bh);
+			err = -EOPNOTSUPP;
+			goto cleanup_out;
+		}
+		if (!buffer_uptodate(bh)) {
+			ntfs_error(vol->sb, "Writing ntfs records without "
+					"existing uptodate buffers is not "
+					"implemented yet.  %s",
+					ntfs_please_email);
+			clear_buffer_dirty(bh);
+			err = -EOPNOTSUPP;
+			goto cleanup_out;
+		}
+		bhs[nr_bhs++] = bh;
+		BUG_ON(nr_bhs > max_bhs);
+	} while (block++, (bh = bh->b_this_page) != head);
+	/* If there were no dirty buffers, we are done. */
+	if (!nr_bhs)
+		goto done;
+	/* Apply the mst protection fixups. */
+	kaddr = page_address(page);
+	for (i = 0; i < nr_bhs; i++) {
+		if (!(i % bhs_per_rec)) {
+			err = pre_write_mst_fixup((NTFS_RECORD*)(kaddr +
+					bh_offset(bhs[i])), rec_size);
+			if (err) {
+				ntfs_error(vol->sb, "Failed to apply mst "
+						"fixups (inode 0x%lx, "
+						"attribute type 0x%x, page "
+						"index 0x%lx)!  Umount and "
+						"run chkdsk.", vi->i_ino,
+						ni->type,
+				page->index);
+				nr_bhs = i;
+				goto mst_cleanup_out;
+			}
+		}
+	}
+	flush_dcache_page(page);
+	/* Lock buffers and start synchronous write i/o on them. */
+	for (i = 0; i < nr_bhs; i++) {
+		struct buffer_head *tbh = bhs[i];
+
+		if (unlikely(test_set_buffer_locked(tbh)))
+			BUG();
+		if (unlikely(!test_clear_buffer_dirty(tbh))) {
+			unlock_buffer(tbh);
+			continue;
+		}
+		BUG_ON(!buffer_uptodate(tbh));
+		BUG_ON(!buffer_mapped(tbh));
+		get_bh(tbh);
+		tbh->b_end_io = end_buffer_write_sync;
+		submit_bh(WRITE, tbh);
+	}
+	/* Wait on i/o completion of buffers. */
+	for (i = 0; i < nr_bhs; i++) {
+		struct buffer_head *tbh = bhs[i];
+
+		wait_on_buffer(tbh);
+		if (unlikely(!buffer_uptodate(tbh))) {
+			err = -EIO;
+			/*
+			 * Set the buffer uptodate so the page & buffer states
+			 * don't become out of sync.
+			 */
+			if (PageUptodate(page))
+				set_buffer_uptodate(tbh);
+		}
+	}
+	/* Remove the mst protection fixups again. */
+	for (i = 0; i < nr_bhs; i++) {
+		if (!(i % bhs_per_rec))
+			post_write_mst_fixup((NTFS_RECORD*)(kaddr +
+					bh_offset(bhs[i])));
+	}
+	flush_dcache_page(page);
+	if (unlikely(err)) {
+		/* I/O error during writing.  This is really bad! */
+		ntfs_error(vol->sb, "I/O error while writing ntfs record "
+				"(inode 0x%lx, attribute type 0x%x, page "
+				"index 0x%lx)!  Umount and run chkdsk.",
+				vi->i_ino, ni->type, page->index);
+		goto err_out;
+	}
+done:
 	set_page_writeback(page);
 	unlock_page(page);
 	end_page_writeback(page);
-	ntfs_warning(vi->i_sb, "Writing to index allocation attribute is not "
-			"supported yet.  Discarding written data.");
-	return 0;
+	if (!err)
+		ntfs_debug("Done.");
+	return err;
+mst_cleanup_out:
+	/* Remove the mst protection fixups again. */
+	for (i = 0; i < nr_bhs; i++) {
+		if (!(i % bhs_per_rec))
+			post_write_mst_fixup((NTFS_RECORD*)(kaddr +
+					bh_offset(bhs[i])));
+	}
+cleanup_out:
+	/* Clean the buffers. */
+	for (i = 0; i < nr_bhs; i++)
+		clear_buffer_dirty(bhs[i]);
+err_out:
+	SetPageError(page);
+	goto done;
 }
 
 /**
