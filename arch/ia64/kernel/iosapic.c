@@ -172,7 +172,7 @@ gsi_to_irq (unsigned int gsi)
 static void
 set_rte (unsigned int vector, unsigned int dest, int mask)
 {
-	unsigned long pol, trigger, dmode;
+	unsigned long pol, trigger, dmode, flags;
 	u32 low32, high32;
 	char *addr;
 	int rte_index;
@@ -211,11 +211,15 @@ set_rte (unsigned int vector, unsigned int dest, int mask)
 	/* dest contains both id and eid */
 	high32 = (dest << IOSAPIC_DEST_SHIFT);
 
-	writel(IOSAPIC_RTE_HIGH(rte_index), addr + IOSAPIC_REG_SELECT);
-	writel(high32, addr + IOSAPIC_WINDOW);
-	writel(IOSAPIC_RTE_LOW(rte_index), addr + IOSAPIC_REG_SELECT);
-	writel(low32, addr + IOSAPIC_WINDOW);
-	iosapic_intr_info[vector].low32 = low32;
+	spin_lock_irqsave(&iosapic_lock, flags);
+	{
+		writel(IOSAPIC_RTE_HIGH(rte_index), addr + IOSAPIC_REG_SELECT);
+		writel(high32, addr + IOSAPIC_WINDOW);
+		writel(IOSAPIC_RTE_LOW(rte_index), addr + IOSAPIC_REG_SELECT);
+		writel(low32, addr + IOSAPIC_WINDOW);
+		iosapic_intr_info[vector].low32 = low32;
+	}
+	spin_unlock_irqrestore(&iosapic_lock, flags);
 }
 
 static void
