@@ -664,6 +664,7 @@ void __init setup_arch(char **cmdline_p)
  	screen_info = SCREEN_INFO;
 #ifdef CONFIG_APM
 	apm_info.bios = APM_BIOS_INFO;
+#endif
 #ifdef CONFIG_ACPI_SLEEP
 	saved_videomode = VIDEO_MODE;
 	printk("Video mode to be used for restore is %lx\n", saved_videomode);
