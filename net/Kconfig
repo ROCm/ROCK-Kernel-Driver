@@ -191,9 +191,11 @@ config BRIDGE
 	  information.
 
 	  If you enable iptables support along with the bridge support then you
-	  turn your bridge into a bridging firewall.
+	  turn your bridge into a bridging IP firewall.
 	  iptables will then see the IP packets being bridged, so you need to
 	  take this into account when setting up your firewall rules.
+	  Enabling arptables support when bridging will let arptables see
+	  bridged ARP traffic in the arptables FORWARD chain.
 
 	  If you want to compile this code as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
@@ -242,6 +244,12 @@ menuconfig NETFILTER
 	  the local network tries to connect to an outside host, your Linux
 	  box can transparently forward the traffic to a local server,
 	  typically a caching proxy server.
+
+	  Yet another use of Netfilter is building a bridging firewall. Using
+	  a bridge with Network packet filtering enabled makes iptables "see"
+	  the bridged traffic. For filtering on the lower network and Ethernet
+	  protocols over the bridge, use ebtables (under bridge netfilter
+	  configuration).
 
 	  Various modules exist for netfilter which replace the previous
 	  masquerading (ipmasqadm), packet filtering (ipchains), transparent

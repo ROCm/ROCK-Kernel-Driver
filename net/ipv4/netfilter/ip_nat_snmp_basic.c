@@ -56,7 +56,9 @@
 #include <asm/uaccess.h>
 #include <asm/checksum.h>
 
-
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("James Morris <jmorris@intercode.com.au>");
+MODULE_DESCRIPTION("Basic SNMP Application Layer Gateway");
 
 #define SNMP_PORT 161
 #define SNMP_TRAP_PORT 162
@@ -1357,5 +1359,3 @@ module_init(init);
 module_exit(fini);
 
 MODULE_PARM(debug, "i");
-MODULE_DESCRIPTION("Basic SNMP Application Layer Gateway");
-MODULE_LICENSE("GPL");

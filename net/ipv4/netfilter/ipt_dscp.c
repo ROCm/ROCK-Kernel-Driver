@@ -13,8 +13,8 @@
 #include <linux/netfilter_ipv4/ipt_dscp.h>
 #include <linux/netfilter_ipv4/ip_tables.h>
 
-MODULE_AUTHOR("Harald Welte <laforge@gnumonks.org>");
-MODULE_DESCRIPTION("IP tables DSCP matching module");
+MODULE_AUTHOR("Harald Welte <laforge@netfilter.org>");
+MODULE_DESCRIPTION("iptables DSCP matching module");
 MODULE_LICENSE("GPL");
 
 static int match(const struct sk_buff *skb, const struct net_device *in,

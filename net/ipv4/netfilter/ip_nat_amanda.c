@@ -35,7 +35,7 @@
 #endif
 
 MODULE_AUTHOR("Brian J. Murrell <netfilter@interlinx.bc.ca>");
-MODULE_DESCRIPTION("Amanda network address translation module");
+MODULE_DESCRIPTION("Amanda NAT helper");
 MODULE_LICENSE("GPL");
 
 /* protects amanda part of conntracks */

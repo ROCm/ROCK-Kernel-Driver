@@ -9,6 +9,10 @@
 #include <linux/netfilter_ipv6/ip6t_multiport.h>
 #include <linux/netfilter_ipv6/ip6_tables.h>
 
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Netfilter Core Team <coreteam@netfilter.org>");
+MODULE_DESCRIPTION("ip6tables match for multiple ports");
+
 #if 0
 #define duprintf(format, args...) printk(format , ## args)
 #else

@@ -17,6 +17,8 @@
 #include <linux/netfilter_ipv4/ipt_helper.h>
 
 MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Martin Josefsson <gandalf@netfilter.org>");
+MODULE_DESCRIPTION("iptables helper match module");
 
 #if 0
 #define DEBUGP printk

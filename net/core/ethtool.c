@@ -13,6 +13,7 @@
 #include <linux/errno.h>
 #include <linux/ethtool.h>
 #include <linux/netdevice.h>
+#include <asm/uaccess.h>
 
 /* 
  * Some useful ethtool_ops methods that're device independent.

@@ -3,6 +3,10 @@
 #include <linux/netfilter_arp/arpt_mangle.h>
 #include <net/sock.h>
 
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("David S. Miller <davem@redhat.com>");
+MODULE_DESCRIPTION("arptables mangle table");
+
 static unsigned int
 target(struct sk_buff **pskb, unsigned int hooknum, const struct net_device *in,
    const struct net_device *out, const void *targinfo, void *userinfo)
@@ -98,4 +102,3 @@ static void __exit fini(void)
 
 module_init(init);
 module_exit(fini);
-MODULE_LICENSE("GPL");
