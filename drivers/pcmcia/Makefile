@@ -15,11 +15,13 @@ obj-$(CONFIG_TCIC)				+= tcic.o
 obj-$(CONFIG_HD64465_PCMCIA)			+= hd64465_ss.o
 obj-$(CONFIG_PCMCIA_SA1100)			+= sa11xx_core.o sa1100_cs.o
 obj-$(CONFIG_PCMCIA_SA1111)			+= sa11xx_core.o sa1111_cs.o
+obj-$(CONFIG_PCMCIA_PXA2XX)                     += pxa2xx_core.o pxa2xx_cs.o
 
 pcmcia_core-y					+= cistpl.o rsrc_mgr.o bulkmem.o cs.o
 pcmcia_core-$(CONFIG_CARDBUS)			+= cardbus.o
 
 sa11xx_core-y					+= soc_common.o sa11xx_base.o
+pxa2xx_core-y					+= soc_common.o pxa2xx_base.o
 
 sa1111_cs-y					+= sa1111_generic.o
 sa1111_cs-$(CONFIG_SA1100_ADSBITSY)		+= sa1100_adsbitsy.o

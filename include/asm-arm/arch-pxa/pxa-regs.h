@@ -1336,6 +1336,19 @@ typedef void            (*ExcpHndlr) (void) ;
 #define MDMRS		__REG(0x48000040)  /* MRS value to be written to SDRAM */
 #define BOOT_DEF	__REG(0x48000044)  /* Read-Only Boot-Time Register. Contains BOOT_SEL and PKG_SEL */
 
+/*
+ * More handy macros for PCMCIA
+ *
+ * Arg is socket number
+ */
+#define MCMEM(s)	__REG2(0x48000028, (s)<<2 )  /* Card interface Common Memory Space Socket s Timing */
+#define MCATT(s)	__REG2(0x48000030, (s)<<2 )  /* Card interface Attribute Space Socket s Timing Configuration */
+#define MCIO(s)		__REG2(0x48000038, (s)<<2 )  /* Card interface I/O Space Socket s Timing Configuration */
+
+/* MECR register defines */
+#define MECR_NOS	(1 << 0)	/* Number Of Sockets: 0 -> 1 sock, 1 -> 2 sock */
+#define MECR_CIT	(1 << 1)	/* Card Is There: 0 -> no card, 1 -> card inserted */
+
 #define MDREFR_K2FREE	(1 << 25)	/* SDRAM Free-Running Control */
 #define MDREFR_K1FREE	(1 << 24)	/* SDRAM Free-Running Control */
 #define MDREFR_K0FREE	(1 << 23)	/* SDRAM Free-Running Control */
