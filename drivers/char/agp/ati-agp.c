@@ -9,9 +9,6 @@
 #include <linux/agp_backend.h>
 #include "agp.h"
 
-static int agp_try_unsupported __initdata = 0;
-
-
 static struct aper_size_info_lvl2 ati_generic_sizes[7] =
 {
 	{2048, 524288, 0x0000000c},
@@ -470,16 +467,9 @@ static int __init agp_ati_probe(struct pci_dev *pdev,
 			goto found;
 	}
 
-	if (!agp_try_unsupported) {
-		printk(KERN_ERR PFX
-		     "Unsupported Ati chipset (device id: %04x),"
-		     " you might want to try agp_try_unsupported=1.\n",
-		     pdev->device);
-		return -ENODEV;
-	}
-
-	printk(KERN_WARNING PFX "Trying generic Ati routines"
-	       " for device id: %04x\n", pdev->device);
+	printk(KERN_ERR PFX
+	     "Unsupported Ati chipset (device id: %04x)\n", pdev->device);
+	return -ENODEV;
 
 found:
 	bridge = agp_alloc_bridge();
@@ -546,7 +536,6 @@ static void __exit agp_ati_cleanup(void)
 module_init(agp_ati_init);
 module_exit(agp_ati_cleanup);
 
-MODULE_PARM(agp_try_unsupported, "1i");
 MODULE_AUTHOR("Dave Jones <davej@codemonkey.org.uk>");
 MODULE_LICENSE("GPL and additional rights");
 
