@@ -894,9 +894,10 @@ extern inline void *ide_map_buffer(struct request *rq, unsigned long *flags)
 	return rq->buffer + task_rq_offset(rq);
 }
 
-extern inline void ide_unmap_buffer(char *buffer, unsigned long *flags)
+extern inline void ide_unmap_buffer(struct request *rq, char *buffer, unsigned long *flags)
 {
-	bio_kunmap_irq(buffer, flags);
+	if (rq->bio)
+		bio_kunmap_irq(buffer, flags);
 }
 
 #define IDE_CHIPSET_PCI_MASK	\
