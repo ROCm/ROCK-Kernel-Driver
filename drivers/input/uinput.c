@@ -357,7 +357,6 @@ struct file_operations uinput_fops = {
 	.read =		uinput_read,
 	.write =	uinput_write,
 	.poll =		uinput_poll,
-//	fasync:		uinput_fasync,
 	.ioctl =	uinput_ioctl,
 };
 
@@ -369,16 +368,7 @@ static struct miscdevice uinput_misc = {
 
 static int __init uinput_init(void)
 {
-	int	retval;
-	
-	retval = misc_register(&uinput_misc);
-
-	if (!retval) {
-		printk(KERN_INFO "%s: User level driver support for input subsystem loaded\n", UINPUT_NAME);
-		printk(KERN_INFO "%s: Aristeu Sergio Rozanski Filho <aris@cathedrallabs.org>\n", UINPUT_NAME);
-	}
-
-	return retval;
+	return misc_register(&uinput_misc);
 }
 
 static void __exit uinput_exit(void)

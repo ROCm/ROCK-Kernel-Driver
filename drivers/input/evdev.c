@@ -233,7 +233,7 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	struct evdev_list *list = file->private_data;
 	struct evdev *evdev = list->evdev;
 	struct input_dev *dev = evdev->handle.dev;
-	int retval, t, u;
+	int t, u;
 
 	if (!evdev->exist) return -ENODEV;
 
@@ -243,20 +243,20 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			return put_user(EV_VERSION, (int *) arg);
 
 		case EVIOCGID:
-			return copy_to_user((void *) arg, &dev->id, sizeof(struct input_devinfo));
+			return copy_to_user((void *) arg, &dev->id, sizeof(struct input_id));
 		
 		case EVIOCGREP:
-			if ((retval = put_user(dev->rep[0], ((int *) arg) + 0))) return retval;
-			if ((retval = put_user(dev->rep[1], ((int *) arg) + 1))) return retval;
+			if (put_user(dev->rep[0], ((int *) arg) + 0)) return -EFAULT;
+			if (put_user(dev->rep[1], ((int *) arg) + 1)) return -EFAULT;
 			return 0;
 
 		case EVIOCSREP:
-			if ((retval = get_user(dev->rep[0], ((int *) arg) + 0))) return retval;
-			if ((retval = get_user(dev->rep[1], ((int *) arg) + 1))) return retval;
+			if (get_user(dev->rep[0], ((int *) arg) + 0)) return -EFAULT;
+			if (get_user(dev->rep[1], ((int *) arg) + 1)) return -EFAULT;
 			return 0;
 
 		case EVIOCGKEYCODE:
-			if ((retval = get_user(t, ((int *) arg) + 0))) return retval;
+			if (get_user(t, ((int *) arg) + 0)) return -EFAULT;
 			if (t < 0 || t > dev->keycodemax) return -EINVAL;
 			switch (dev->keycodesize) {
 				case 1: u = *(u8*)(dev->keycode + t); break;
@@ -264,13 +264,13 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 				case 4: u = *(u32*)(dev->keycode + t * 4); break;
 				default: return -EINVAL;
 			}
-			if ((retval = put_user(u, ((int *) arg) + 1))) return retval;
+			if (put_user(u, ((int *) arg) + 1)) return -EFAULT;
 			return 0;
 
 		case EVIOCSKEYCODE:
-			if ((retval = get_user(t, ((int *) arg) + 0))) return retval;
+			if (get_user(t, ((int *) arg) + 0)) return -EFAULT;
 			if (t < 0 || t > dev->keycodemax) return -EINVAL;
-			if ((retval = get_user(u, ((int *) arg) + 1))) return retval;
+			if (get_user(u, ((int *) arg) + 1)) return -EFAULT;
 			switch (dev->keycodesize) {
 				case 1: *(u8*)(dev->keycode + t) = u; break;
 				case 2: *(u16*)(dev->keycode + t * 2) = u; break;
@@ -284,13 +284,11 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 				struct ff_effect effect;
 				int err;
 
-				if (copy_from_user((void*)(&effect), (void*)arg, sizeof(effect))) {
+				if (copy_from_user((void*)(&effect), (void*)arg, sizeof(effect)))
 					return -EFAULT;
-				}
 				err = dev->upload_effect(dev, &effect);
-				if (put_user(effect.id, &(((struct ff_effect*)arg)->id))) {
+				if (put_user(effect.id, &(((struct ff_effect*)arg)->id)))
 					return -EFAULT;
-				}
 				return err;
 			}
 			else return -ENOSYS;
@@ -302,8 +300,8 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			else return -ENOSYS;
 
 		case EVIOCGEFFECTS:
-			if ((retval = put_user(dev->ff_effects_max, (int*) arg)))
-				return retval;
+			if (put_user(dev->ff_effects_max, (int*) arg))
+				return -EFAULT;
 			return 0;
 
 		default:
@@ -380,11 +378,24 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 				int t = _IOC_NR(cmd) & ABS_MAX;
 
-				if ((retval = put_user(dev->abs[t],     ((int *) arg) + 0))) return retval;
-				if ((retval = put_user(dev->absmin[t],  ((int *) arg) + 1))) return retval;
-				if ((retval = put_user(dev->absmax[t],  ((int *) arg) + 2))) return retval;
-				if ((retval = put_user(dev->absfuzz[t], ((int *) arg) + 3))) return retval;
-				if ((retval = put_user(dev->absflat[t], ((int *) arg) + 4))) return retval;
+				if (put_user(dev->abs[t],     ((int *) arg) + 0)) return -EFAULT;
+				if (put_user(dev->absmin[t],  ((int *) arg) + 1)) return -EFAULT;
+				if (put_user(dev->absmax[t],  ((int *) arg) + 2)) return -EFAULT;
+				if (put_user(dev->absfuzz[t], ((int *) arg) + 3)) return -EFAULT;
+				if (put_user(dev->absflat[t], ((int *) arg) + 4)) return -EFAULT;
+
+				return 0;
+			}
+
+			if ((_IOC_NR(cmd) & ~ABS_MAX) == _IOC_NR(EVIOCSABS(0))) {
+
+				int t = _IOC_NR(cmd) & ABS_MAX;
+
+				if (get_user(dev->abs[t],     ((int *) arg) + 0)) return -EFAULT;
+				if (get_user(dev->absmin[t],  ((int *) arg) + 1)) return -EFAULT;
+				if (get_user(dev->absmax[t],  ((int *) arg) + 2)) return -EFAULT;
+				if (get_user(dev->absfuzz[t], ((int *) arg) + 3)) return -EFAULT;
+				if (get_user(dev->absflat[t], ((int *) arg) + 4)) return -EFAULT;
 
 				return 0;
 			}

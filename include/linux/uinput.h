@@ -64,7 +64,7 @@ struct uinput_device {
 #define UINPUT_MAX_NAME_SIZE	80
 struct uinput_user_dev {
 	char name[UINPUT_MAX_NAME_SIZE];
-	struct input_devinfo id;
+	struct input_id id;
         int ff_effects_max;
         int absmax[ABS_MAX + 1];
         int absmin[ABS_MAX + 1];

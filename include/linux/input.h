@@ -56,7 +56,7 @@ struct input_event {
  * IOCTLs (0x00 - 0x7f)
  */
 
-struct input_devinfo {
+struct input_id {
 	__u16 bustype;
 	__u16 vendor;
 	__u16 product;
@@ -64,7 +64,7 @@ struct input_devinfo {
 };
 
 #define EVIOCGVERSION		_IOR('E', 0x01, int)			/* get driver version */
-#define EVIOCGID		_IOR('E', 0x02, struct input_devinfo)	/* get device ID */
+#define EVIOCGID		_IOR('E', 0x02, struct input_id)	/* get device ID */
 #define EVIOCGREP		_IOR('E', 0x03, int[2])			/* get repeat settings */
 #define EVIOCSREP		_IOW('E', 0x03, int[2])			/* get repeat settings */
 #define EVIOCGKEYCODE		_IOR('E', 0x04, int[2])			/* get keycode */
@@ -80,6 +80,7 @@ struct input_devinfo {
 
 #define EVIOCGBIT(ev,len)	_IOC(_IOC_READ, 'E', 0x20 + ev, len)	/* get event bits */
 #define EVIOCGABS(abs)		_IOR('E', 0x40 + abs, int[5])		/* get abs value/limits */
+#define EVIOCSABS(abs)		_IOW('E', 0xc0 + abs, int[5])		/* set abs value/limits */
 
 #define EVIOCSFF		_IOC(_IOC_WRITE, 'E', 0x80, sizeof(struct ff_effect))	/* send a force effect to a force feedback device */
 #define EVIOCRMFF		_IOW('E', 0x81, int)			/* Erase a force effect */
@@ -754,7 +755,7 @@ struct input_dev {
 	char *name;
 	char *phys;
 	char *uniq;
-	struct input_devinfo id;
+	struct input_id id;
 
 	unsigned long evbit[NBITS(EV_MAX)];
 	unsigned long keybit[NBITS(KEY_MAX)];
@@ -829,7 +830,7 @@ struct input_device_id {
 
 	unsigned long flags;
 
-	struct input_devinfo id;
+	struct input_id id;
 
 	unsigned long evbit[NBITS(EV_MAX)];
 	unsigned long keybit[NBITS(KEY_MAX)];

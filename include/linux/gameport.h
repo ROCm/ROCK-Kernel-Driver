@@ -39,7 +39,7 @@ struct gameport {
 	char *name;
 	char *phys;
 
-	struct input_devinfo id;
+	struct input_id id;
 
 	int io;
 	int speed;
