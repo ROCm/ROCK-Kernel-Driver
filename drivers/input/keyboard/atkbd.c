@@ -234,6 +234,7 @@ static void atkbd_report_key(struct input_dev *dev, struct pt_regs *regs, int co
 	input_regs(dev, regs);
 	if (value == 3) {
 		input_report_key(dev, code, 1);
+		input_sync(dev);
 		input_report_key(dev, code, 0);
 	} else
 		input_event(dev, EV_KEY, code, value);
@@ -352,6 +353,7 @@ static irqreturn_t atkbd_interrupt(struct serio *serio, unsigned char data,
 				       "to make it known.\n",
 				       code & 0x80 ? "e0" : "", code & 0x7f);
 			}
+			input_sync(&atkbd->dev);
 			break;
 		case ATKBD_SCR_1:
 			scroll = 1 - atkbd->release * 2;
