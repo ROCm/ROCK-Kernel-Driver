@@ -71,7 +71,7 @@ int sysfs_create_dir(struct kobject * kobj)
 	else
 		return -EFAULT;
 
-	dentry = create_dir(kobj,parent,kobj->name);
+	dentry = create_dir(kobj,parent,kobject_name(kobj));
 	if (!IS_ERR(dentry))
 		kobj->dentry = dentry;
 	else
@@ -158,7 +158,7 @@ void sysfs_rename_dir(struct kobject * kobj, const char *new_name)
 {
 	struct dentry * new_dentry, * parent;
 
-	if (!strcmp(kobj->name, new_name))
+	if (!strcmp(kobject_name(kobj), new_name))
 		return;
 
 	if (!kobj->parent)
@@ -170,9 +170,7 @@ void sysfs_rename_dir(struct kobject * kobj, const char *new_name)
 
 	new_dentry = sysfs_get_dentry(parent, new_name);
 	d_move(kobj->dentry, new_dentry);
-
-	strlcpy(kobj->name, new_name, KOBJ_NAME_LEN);
-
+	kobject_set_name(kobj,new_name);
 	up(&parent->d_inode->i_sem);	
 }
 
