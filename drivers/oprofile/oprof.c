@@ -13,7 +13,6 @@
 #include <linux/mm.h>
 #include <linux/module.h>
 #include <linux/sched.h>
-#include <linux/dcookies.h>
 #include <linux/notifier.h>
 #include <linux/profile.h>
 #include <linux/oprofile.h>

@@ -118,13 +118,13 @@ void sync_stop(void)
  * because we cannot reach this code without at least one
  * dcookie user still being registered (namely, the reader
  * of the event buffer). */
-static inline unsigned long fast_get_dcookie(struct dentry * dentry,
+static inline u32 fast_get_dcookie(struct dentry * dentry,
 	struct vfsmount * vfsmnt)
 {
-	unsigned long cookie;
+	u32 cookie;
  
 	if (dentry->d_cookie)
-		return (unsigned long)dentry;
+		return (u32)dentry;
 	get_dcookie(dentry, vfsmnt, &cookie);
 	return cookie;
 }
@@ -135,9 +135,9 @@ static inline unsigned long fast_get_dcookie(struct dentry * dentry,
  * not strictly necessary but allows oprofile to associate
  * shared-library samples with particular applications
  */
-static unsigned long get_exec_dcookie(struct mm_struct * mm)
+static u32 get_exec_dcookie(struct mm_struct * mm)
 {
-	unsigned long cookie = 0;
+	u32 cookie = 0;
 	struct vm_area_struct * vma;
  
 	if (!mm)
@@ -163,9 +163,9 @@ out:
  * sure to do this lookup before a mm->mmap modification happens so
  * we don't lose track.
  */
-static unsigned long lookup_dcookie(struct mm_struct * mm, unsigned long addr, off_t * offset)
+static u32 lookup_dcookie(struct mm_struct * mm, unsigned long addr, off_t * offset)
 {
-	unsigned long cookie = 0;
+	u32 cookie = 0;
 	struct vm_area_struct * vma;
 
 	for (vma = find_vma(mm, addr); vma; vma = vma->vm_next) {
@@ -188,7 +188,7 @@ out:
 }
 
 
-static unsigned long last_cookie = ~0UL;
+static u32 last_cookie = ~0UL;
  
 static void add_cpu_switch(int i)
 {
@@ -199,7 +199,7 @@ static void add_cpu_switch(int i)
 }
 
  
-static void add_ctx_switch(pid_t pid, unsigned long cookie)
+static void add_ctx_switch(pid_t pid, u32 cookie)
 {
 	add_event_entry(ESCAPE_CODE);
 	add_event_entry(CTX_SWITCH_CODE); 
@@ -208,7 +208,7 @@ static void add_ctx_switch(pid_t pid, unsigned long cookie)
 }
 
  
-static void add_cookie_switch(unsigned long cookie)
+static void add_cookie_switch(u32 cookie)
 {
 	add_event_entry(ESCAPE_CODE);
 	add_event_entry(COOKIE_SWITCH_CODE);
@@ -225,7 +225,7 @@ static void add_sample_entry(unsigned long offset, unsigned long event)
 
 static void add_us_sample(struct mm_struct * mm, struct op_sample * s)
 {
-	unsigned long cookie;
+	u32 cookie;
 	off_t offset;
  
  	cookie = lookup_dcookie(mm, s->eip, &offset);
@@ -317,7 +317,7 @@ static void sync_buffer(struct oprofile_cpu_buffer * cpu_buf)
 {
 	struct mm_struct * mm = 0;
 	struct task_struct * new;
-	unsigned long cookie;
+	u32 cookie;
 	int i;
  
 	for (i=0; i < cpu_buf->pos; ++i) {

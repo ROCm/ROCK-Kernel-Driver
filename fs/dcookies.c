@@ -8,7 +8,7 @@
  * non-transitory that can be processed at a later date.
  * This is done by locking the dentry/vfsmnt pair in the
  * kernel until released by the tasks needing the persistent
- * objects. The tag is simply an unsigned long that refers
+ * objects. The tag is simply an u32 that refers
  * to the pair and can be looked up from userspace.
  */
 
@@ -46,19 +46,19 @@ static inline int is_live(void)
 
 
 /* The dentry is locked, its address will do for the cookie */
-static inline unsigned long dcookie_value(struct dcookie_struct * dcs)
+static inline u32 dcookie_value(struct dcookie_struct * dcs)
 {
-	return (unsigned long)dcs->dentry;
+	return (u32)dcs->dentry;
 }
 
 
-static size_t dcookie_hash(unsigned long dcookie)
+static size_t dcookie_hash(u32 dcookie)
 {
 	return (dcookie >> 2) & (hash_size - 1);
 }
 
 
-static struct dcookie_struct * find_dcookie(unsigned long dcookie)
+static struct dcookie_struct * find_dcookie(u32 dcookie)
 {
 	struct dcookie_struct * found = 0;
 	struct dcookie_struct * dcs;
@@ -109,7 +109,7 @@ static struct dcookie_struct * alloc_dcookie(struct dentry * dentry,
  * value for a dentry/vfsmnt pair.
  */
 int get_dcookie(struct dentry * dentry, struct vfsmount * vfsmnt,
-	unsigned long * cookie)
+	u32 * cookie)
 {
 	int err = 0;
 	struct dcookie_struct * dcs;
@@ -142,7 +142,7 @@ out:
 /* And here is where the userspace process can look up the cookie value
  * to retrieve the path.
  */
-asmlinkage int sys_lookup_dcookie(unsigned long cookie, char * buf, size_t len)
+asmlinkage int sys_lookup_dcookie(u32 cookie, char * buf, size_t len)
 {
 	char * kbuf;
 	char * path;
