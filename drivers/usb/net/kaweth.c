@@ -55,6 +55,8 @@
 #include <linux/etherdevice.h>
 #include <linux/usb.h>
 #include <linux/types.h>
+#include <linux/ethtool.h>
+#include <asm/uaccess.h>
 #include <asm/semaphore.h>
 #include <asm/byteorder.h>
 
@@ -638,11 +640,35 @@ static int kaweth_close(struct net_device *net)
 	return 0;
 }
 
+static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
+{
+	u32 ethcmd;
+	
+	if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
+		return -EFAULT;
+	
+	switch (ethcmd) {
+	case ETHTOOL_GDRVINFO: {
+		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
+		strncpy(info.driver, "kaweth", sizeof(info.driver)-1);
+		if (copy_to_user(useraddr, &info, sizeof(info)))
+			return -EFAULT;
+		return 0;
+	}
+	}
+	
+	return -EOPNOTSUPP;
+}
+
 /****************************************************************
  *     kaweth_ioctl
  ****************************************************************/
 static int kaweth_ioctl(struct net_device *net, struct ifreq *rq, int cmd)
 {
+	switch (cmd) {
+	case SIOCETHTOOL:
+		return netdev_ethtool_ioctl(net, (void *) rq->ifr_data);
+	}
 	return -EOPNOTSUPP;
 }
 

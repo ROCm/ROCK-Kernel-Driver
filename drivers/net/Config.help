@@ -673,16 +673,25 @@ CONFIG_8139TOO_PIO
   say N.
 
 CONFIG_8139TOO_TUNE_TWISTER
-  This implements a function which might come in handy in case you are
-  using low quality on long cabling. It tries to match the transceiver
-  to the cable characteristics. This is experimental since hardly
-  documented by the manufacturer.  If unsure, say N.
+  This implements a function which might come in handy in case you
+  are using low quality on long cabling. It is required for RealTek
+  RTL-8139 revision K boards, and totally unused otherwise.  It tries
+  to match the transceiver to the cable characteristics. This is
+  experimental since hardly documented by the manufacturer.
+  If unsure, say Y.
 
 CONFIG_8139TOO_8129
   This enables support for the older and uncommon RTL-8129 and
   RTL-8130 chips, which support MII via an external transceiver,
   instead of an internal one.  Disabling this option will save some
   memory by making the code size smaller.  If unsure, say Y.
+
+CONFIG_8139_OLD_RX_RESET
+  The 8139too driver was recently updated to contain a more rapid
+  reset sequence, in the face of severe receive errors.  This "new"
+  RX-reset method should be adequate for all boards.  But if you
+  experience problems, you can enable this option to restore the
+  old RX-reset behavior.  If unsure, say N.
 
 CONFIG_SIS900
   This is a driver for the Fast Ethernet PCI network cards based on

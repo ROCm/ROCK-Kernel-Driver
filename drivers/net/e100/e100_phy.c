@@ -1,73 +1,28 @@
 /*******************************************************************************
 
-This software program is available to you under a choice of one of two 
-licenses. You may choose to be licensed under either the GNU General Public 
-License 2.0, June 1991, available at http://www.fsf.org/copyleft/gpl.html, 
-or the Intel BSD + Patent License, the text of which follows:
-
-Recipient has requested a license and Intel Corporation ("Intel") is willing
-to grant a license for the software entitled Linux Base Driver for the 
-Intel(R) PRO/100 Family of Adapters (e100) (the "Software") being provided 
-by Intel Corporation. The following definitions apply to this license:
-
-"Licensed Patents" means patent claims licensable by Intel Corporation which 
-are necessarily infringed by the use of sale of the Software alone or when 
-combined with the operating system referred to below.
-
-"Recipient" means the party to whom Intel delivers this Software.
-
-"Licensee" means Recipient and those third parties that receive a license to 
-any operating system available under the GNU General Public License 2.0 or 
-later.
-
-Copyright (c) 1999 - 2002 Intel Corporation.
-All rights reserved.
-
-The license is provided to Recipient and Recipient's Licensees under the 
-following terms.
-
-Redistribution and use in source and binary forms of the Software, with or 
-without modification, are permitted provided that the following conditions 
-are met:
-
-Redistributions of source code of the Software may retain the above 
-copyright notice, this list of conditions and the following disclaimer.
-
-Redistributions in binary form of the Software may reproduce the above 
-copyright notice, this list of conditions and the following disclaimer in 
-the documentation and/or materials provided with the distribution.
-
-Neither the name of Intel Corporation nor the names of its contributors 
-shall be used to endorse or promote products derived from this Software 
-without specific prior written permission.
-
-Intel hereby grants Recipient and Licensees a non-exclusive, worldwide, 
-royalty-free patent license under Licensed Patents to make, use, sell, offer 
-to sell, import and otherwise transfer the Software, if any, in source code 
-and object code form. This license shall include changes to the Software 
-that are error corrections or other minor changes to the Software that do 
-not add functionality or features when the Software is incorporated in any 
-version of an operating system that has been distributed under the GNU 
-General Public License 2.0 or later. This patent license shall apply to the 
-combination of the Software and any operating system licensed under the GNU 
-General Public License 2.0 or later if, at the time Intel provides the 
-Software to Recipient, such addition of the Software to the then publicly 
-available versions of such operating systems available under the GNU General 
-Public License 2.0 or later (whether in gold, beta or alpha form) causes 
-such combination to be covered by the Licensed Patents. The patent license 
-shall not apply to any other combinations which include the Software. NO 
-hardware per se is licensed hereunder.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" 
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
-IMPLIED WARRANTIES OF MECHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
-ARE DISCLAIMED. IN NO EVENT SHALL INTEL OR IT CONTRIBUTORS BE LIABLE FOR ANY 
-DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES 
-(INCLUDING, BUT NOT LIMITED, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; 
-ANY LOSS OF USE; DATA, OR PROFITS; OR BUSINESS INTERUPTION) HOWEVER CAUSED 
-AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY OR 
-TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE 
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+  
+  Copyright(c) 1999 - 2002 Intel Corporation. All rights reserved.
+  
+  This program is free software; you can redistribute it and/or modify it 
+  under the terms of the GNU General Public License as published by the Free 
+  Software Foundation; either version 2 of the License, or (at your option) 
+  any later version.
+  
+  This program is distributed in the hope that it will be useful, but WITHOUT 
+  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or 
+  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for 
+  more details.
+  
+  You should have received a copy of the GNU General Public License along with
+  this program; if not, write to the Free Software Foundation, Inc., 59 
+  Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+  
+  The full GNU General Public License is included in this distribution in the
+  file called LICENSE.
+  
+  Contact Information:
+  Linux NICS <linux.nics@intel.com>
+  Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
 *******************************************************************************/
 
 #include "e100_phy.h"
@@ -90,11 +45,12 @@ void e100_handle_zlock(struct e100_private *bdp);
  * Returns:
  *	NOTHING
  */
-void
+int
 e100_mdi_write(struct e100_private *bdp, u32 reg_addr, u32 phy_addr, u16 data)
 {
 	int e100_retry;
 	u32 temp_val;
+	unsigned int mdi_cntrl;
 
 	spin_lock_bh(&bdp->mdi_access_lock);
 	temp_val = (((u32) data) | (reg_addr << 16) |
@@ -107,13 +63,18 @@ e100_mdi_write(struct e100_private *bdp, u32 reg_addr, u32 phy_addr, u16 data)
 
 	/* poll for the mdi write to complete */
 	e100_retry = E100_CMD_WAIT;
-	while ((!(readl(&bdp->scb->scb_mdi_cntrl) & MDI_PHY_READY)) &&
-	       (e100_retry)) {
+	while ((!((mdi_cntrl = readl(&bdp->scb->scb_mdi_cntrl)) & MDI_PHY_READY)) && (e100_retry)) {
 
 		udelay(20);
 		e100_retry--;
 	}
 	spin_unlock_bh(&bdp->mdi_access_lock);
+	if (mdi_cntrl & MDI_PHY_READY) 
+		return 0;
+	else {
+		printk(KERN_ERR "e100: MDI write timeout\n");
+		return 1;
+	}
 }
 
 /* 
@@ -135,11 +96,12 @@ e100_mdi_write(struct e100_private *bdp, u32 reg_addr, u32 phy_addr, u16 data)
  * Returns:
  *	NOTHING
  */
-void
+int
 e100_mdi_read(struct e100_private *bdp, u32 reg_addr, u32 phy_addr, u16 *data)
 {
 	int e100_retry;
 	u32 temp_val;
+	unsigned int mdi_cntrl;
 
 	spin_lock_bh(&bdp->mdi_access_lock);
 	/* Issue the read command to the MDI control register. */
@@ -152,16 +114,22 @@ e100_mdi_read(struct e100_private *bdp, u32 reg_addr, u32 phy_addr, u16 *data)
 
 	/* poll for the mdi read to complete */
 	e100_retry = E100_CMD_WAIT;
-	while ((!(readl(&bdp->scb->scb_mdi_cntrl) & MDI_PHY_READY)) &&
-	       (e100_retry)) {
+	while ((!((mdi_cntrl = readl(&bdp->scb->scb_mdi_cntrl)) & MDI_PHY_READY)) && (e100_retry)) {
 
 		udelay(20);
 		e100_retry--;
 	}
 
-	// return the lower word
-	*data = (u16) readl(&bdp->scb->scb_mdi_cntrl);
 	spin_unlock_bh(&bdp->mdi_access_lock);
+	if (mdi_cntrl & MDI_PHY_READY) {
+		/* return the lower word */
+		*data = (u16) mdi_cntrl;
+		return 0;
+	}
+	else {
+		printk(KERN_ERR "e100: MDI read timeout\n");
+		return 1;
+	}
 }
 
 static unsigned char __devinit
@@ -525,10 +493,8 @@ e100_find_speed_duplex(struct e100_private *bdp)
 	/* First we should check to see if we have link */
 	/* If we don't have a link no reason to print a speed and duplex */
 	if (!e100_update_link_state(bdp)) {
-		return;
-	}
-
-	if (bdp->flags & DF_SPEED_FORCED) {
+		bdp->cur_line_speed = 0;
+		bdp->cur_dplx_mode = 0;
 		return;
 	}
 
@@ -662,10 +628,13 @@ e100_force_speed_duplex(struct e100_private *bdp)
 	u16 control;
 	unsigned long expires;
 
+	e100_phy_reset(bdp);
+
 	bdp->flags |= DF_SPEED_FORCED;
 
 	e100_mdi_read(bdp, MII_BMCR, bdp->phy_addr, &control);
 	control &= ~BMCR_ANENABLE;
+	control &= ~BMCR_LOOPBACK;
 
 	/* Check e100.c values */
 	switch (bdp->params.e100_speed_duplex) {
@@ -883,7 +852,7 @@ e100_phy_set_speed_duplex(struct e100_private *bdp, unsigned char force_restart)
 }
 
 void
-e100_phy_reset(struct e100_private *bdp)
+e100_phy_autoneg(struct e100_private *bdp)
 {
 	u16 ctrl_reg;
 
@@ -892,6 +861,23 @@ e100_phy_reset(struct e100_private *bdp)
 	e100_mdi_write(bdp, MII_BMCR, bdp->phy_addr, ctrl_reg);
 
 	udelay(100);
+}
+
+void
+e100_phy_set_loopback(struct e100_private *bdp)
+{
+	u16 ctrl_reg;
+	ctrl_reg = BMCR_LOOPBACK;
+	e100_mdi_write(bdp, MII_BMCR, bdp->phy_addr, ctrl_reg);
+		udelay(100);
+}
+	
+void
+e100_phy_reset(struct e100_private *bdp)
+{
+	u16 ctrl_reg;
+	ctrl_reg = BMCR_RESET;
+	e100_mdi_write(bdp, MII_BMCR, bdp->phy_addr, ctrl_reg);
 }
 
 unsigned char __devinit
@@ -960,7 +946,8 @@ e100_get_link_state(struct e100_private *bdp)
 /* 
  * Procedure: e100_update_link_state
  * 
- * Description: This routine updates the link status of the adapter
+ * Description: This routine updates the link status of the adapter,
+ * 		also considering netif_running
  *
  * Arguments:  bdp - Pointer to the e100_private structure for the board
  *		    
@@ -974,7 +961,8 @@ e100_update_link_state(struct e100_private *bdp)
 {
 	unsigned char link;
 
-	link = e100_get_link_state(bdp);
+	/* Logical AND PHY link & netif_running */
+	link = e100_get_link_state(bdp) && netif_running(bdp->device);
 
 	if (link) {
 		if (!netif_carrier_ok(bdp->device))
