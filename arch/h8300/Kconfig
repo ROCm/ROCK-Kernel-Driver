@@ -154,29 +154,6 @@ config ROMKERNEL
 
 endchoice
 
-config DEFAULT_CMDLINE
-	bool "Use buildin commandline"
-	default n
-	help
-	  buildin kernel commandline enabled.
-
-config KERNEL_COMMAND
-	string "Buildin commmand string"
-	depends on DEFAULT_CMDLINE
-	help
-	  buildin kernel commandline strings.
-
-config BLKDEV_RESERVE
-	bool "BLKDEV Reserved Memory"
-	default n
-	help
-	  Reserved BLKDEV area.
-
-config CONFIG_BLKDEV_RESERVE_ADDRESS
-	hex 'start address'
-	depends on BLKDEV_RESERVE
-	help
-	  BLKDEV start address.
 endmenu
 
 menu "Executable file formats"
@@ -193,26 +170,19 @@ source "drivers/block/Kconfig"
 
 source "drivers/ide/Kconfig"
 
+source "arch/h8300/Kconfig.ide"
+
 source "net/Kconfig"
 
-source "drivers/isdn/Kconfig"
-
-source "drivers/telephony/Kconfig"
-
 #
-# input before char - char/joystick depends on it. As does USB.
+# input - input/joystick depends on it. As does USB.
 #
 source "drivers/input/Kconfig"
-
-#
-# Character device configuration
-#
 
 menu "Character devices"
 
 config VT
 	bool "Virtual terminal"
-	requires INPUT=y
 	---help---
 	  If you say Y here, you will get support for terminal devices with
 	  display and keyboard devices. These are called "virtual" because you
@@ -266,8 +236,37 @@ config HW_CONSOLE
 	depends on VT && !S390 && !UM
 	default y
 
+config SERIAL
+	tristate "Serial (8250, 16450, 16550 or compatible) support"
+	---help---
+	  This selects whether you want to include the driver for the standard
+	  serial ports.  The standard answer is Y.  People who might say N
+	  here are those that are setting up dedicated Ethernet WWW/FTP
+	  servers, or users that have one of the various bus mice instead of a
+	  serial mouse and don't intend to use their machine's standard serial
+	  port for anything.  (Note that the Cyclades and Stallion multi
+	  serial port drivers do not need this driver built in for them to
+	  work.)
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called serial.
+	  [WARNING: Do not compile this driver as a module if you are using
+	  non-standard serial ports, since the configuration information will
+	  be lost when the driver is unloaded.  This limitation may be lifted
+	  in the future.]
+
+	  BTW1: If you have a mouseman serial mouse which is not recognized by
+	  the X window system, try running gpm first.
+
+	  BTW2: If you intend to use a software modem (also called Winmodem)
+	  under Linux, forget it.  These modems are crippled and require
+	  proprietary drivers which are only available under Windows.
+
+	  Most people will say Y or M here, so that they can use serial mice,
+	  modems and similar devices connecting to the standard serial ports.
+
 config SH_SCI
-	tristate "Serial (SCI) support"
+	tristate "Serial (SCI, SCIF) support"
 	help
 	  Selecting this option will allow the Linux kernel to transfer data
 	  over SCI (Serial Communication Interface) and/or SCIF (Serial
@@ -300,6 +299,8 @@ config SERIAL_CONSOLE
 	  system console.
 
 	  If unsure, say N.
+
+comment "Unix98 PTY support"
 
 config UNIX98_PTYS
 	bool "Unix98 PTY support"
@@ -343,15 +344,17 @@ config UNIX98_PTY_COUNT
 	  When not in use, each additional set of 256 PTYs occupy
 	  approximately 8 KB of kernel memory on 32-bit architectures.
 
-endmenu
+source "drivers/char/pcmcia/Kconfig"
 
-source "drivers/media/Kconfig"
-source "sound/Kconfig"
+source "drivers/serial/Kconfig"
 
-source "fs/Kconfig"
+source "drivers/i2c/Kconfig"
 
 source "drivers/usb/Kconfig"
+ 
+endmenu
 
+source "fs/Kconfig"
 
 menu "Kernel hacking"
 
@@ -400,6 +403,29 @@ config CONFIG_SH_STANDARD_BIOS
 	  serial console output using GDB protocol.
 	  Require eCos/RedBoot
 
+config DEFAULT_CMDLINE
+	bool "Use buildin commandline"
+	default n
+	help
+	  buildin kernel commandline enabled.
+
+config KERNEL_COMMAND
+	string "Buildin commmand string"
+	depends on DEFAULT_CMDLINE
+	help
+	  buildin kernel commandline strings.
+
+config BLKDEV_RESERVE
+	bool "BLKDEV Reserved Memory"
+	default n
+	help
+	  Reserved BLKDEV area.
+
+config CONFIG_BLKDEV_RESERVE_ADDRESS
+	hex 'start address'
+	depends on BLKDEV_RESERVE
+	help
+	  BLKDEV start address.
 endmenu
 
 source "security/Kconfig"

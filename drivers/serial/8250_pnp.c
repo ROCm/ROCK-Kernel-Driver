@@ -21,8 +21,10 @@
 #include <linux/pnp.h>
 #include <linux/string.h>
 #include <linux/kernel.h>
+#include <linux/tty.h>
 #include <linux/serial.h>
 #include <linux/serialP.h>
+#include <linux/serial_core.h>
 
 #include <asm/bitops.h>
 #include <asm/byteorder.h>
@@ -408,7 +410,7 @@ serial_pnp_probe(struct pnp_dev * dev, const struct pnp_device_id *dev_id)
 	       serial_req.port, serial_req.irq, serial_req.io_type);
 #endif
 
-	serial_req.flags = ASYNC_SKIP_TEST | ASYNC_AUTOPROBE;
+	serial_req.flags = UPF_SKIP_TEST | UPF_AUTOPROBE  | UPF_RESOURCES;
 	serial_req.baud_base = 115200;
 	line = register_serial(&serial_req);
 

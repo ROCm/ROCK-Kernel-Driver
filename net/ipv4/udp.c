@@ -911,6 +911,8 @@ csum_copy_err:
 
 	skb_free_datagram(sk, skb);
 
+	if (noblock)
+		return -EAGAIN;	
 	goto try_again;
 }
 

@@ -75,6 +75,7 @@ do {							        \
 	set_fs(USER_DS);           /* reads from user space */  \
   	(_regs)->pc = (_pc);				        \
 	(_regs)->ccr &= 0x00;	   /* clear kernel flag */      \
+	wrusp((unsigned long)(_usp) - sizeof(unsigned long)*3);	\
 } while(0)
 #endif
 #if defined(__H8300S__)

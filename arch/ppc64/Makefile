@@ -29,6 +29,7 @@ CFLAGS		+= -msoft-float -pipe -Wno-uninitialized -mminimal-toc \
 
 ifeq ($(CONFIG_POWER4_ONLY),y)
 	CFLAGS += $(call check_gcc,-mcpu=power4,)
+	CFLAGS += -msoft-float
 else
 	CFLAGS += $(call check_gcc,-mtune=power4,)
 endif

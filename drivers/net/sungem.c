@@ -680,6 +680,7 @@ static __inline__ void gem_post_rxds(struct gem *gp, int limit)
 static void gem_rx(struct gem *gp)
 {
 	int entry, drops;
+	u32 done;
 
 	if (netif_msg_intr(gp))
 		printk(KERN_DEBUG "%s: rx interrupt, done: %d, rx_new: %d\n",
@@ -687,6 +688,7 @@ static void gem_rx(struct gem *gp)
 
 	entry = gp->rx_new;
 	drops = 0;
+	done = readl(gp->regs + RXDMA_DONE);
 	for (;;) {
 		struct gem_rxd *rxd = &gp->init_block->rxd[entry];
 		struct sk_buff *skb;
@@ -696,6 +698,19 @@ static void gem_rx(struct gem *gp)
 
 		if ((status & RXDCTRL_OWN) != 0)
 			break;
+
+		/* When writing back RX descriptor, GEM writes status
+		 * then buffer address, possibly in seperate transactions.
+		 * If we don't wait for the chip to write both, we could
+		 * post a new buffer to this descriptor then have GEM spam
+		 * on the buffer address.  We sync on the RX completion
+		 * register to prevent this from happening.
+		 */
+		if (entry == done) {
+			done = readl(gp->regs + RXDMA_DONE);
+			if (entry == done)
+				break;
+		}
 
 		skb = gp->rx_skbs[entry];
 

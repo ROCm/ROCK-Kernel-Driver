@@ -168,6 +168,7 @@ gpio_table:
 	;; PHDDR
 	.byte	0x00,0x00
 
+	.section .rodata
 __target_name:	
 	.asciz	"EDOSK-2674"
 	

@@ -13,6 +13,7 @@
 
 #define H8300_NE_DEFINE
 #include <asm/machine-depend.h>
+#define NE2000_IRQ_VECTOR	(12 + NE2000_IRQ)
 #undef  H8300_NE_DEFINE
 
 /****************************************************************************/

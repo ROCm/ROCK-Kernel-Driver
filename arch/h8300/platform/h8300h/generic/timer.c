@@ -29,13 +29,14 @@ extern int request_irq_boot(unsigned int,
 
 #if defined(CONFIG_H83007) || defined(CONFIG_H83068)
 #include <asm/regs306x.h>
+#define CMFA 6
 
 int platform_timer_setup(void (*timer_int)(int, void *, struct pt_regs *))
 {
-	outb(H8300_TIMER_COUNT_DATA,TMR8CMA2);
-	outb(0x00,TMR8TCSR2);
-	request_irq_boot(40,timer_int,0,"timer",0);
-	outb(0x40|0x08|0x03,TMR8TCNT2);
+	ctrl_outb(H8300_TIMER_COUNT_DATA,TCORA2);
+	ctrl_outb(0x00,_8TCSR2);
+	request_irq(40,timer_int,0,"timer",0);
+	ctrl_outb(0x40|0x08|0x03,_8TCR2);
 	return 0;
 }
 
@@ -65,19 +66,19 @@ int platform_timer_setup(void (*timer_int)(int, void *, struct pt_regs *))
 {
 	*(unsigned short *)GRA= H8300_TIMER_COUNT_DATA;
 	*(unsigned short *)TCNT=0;
-	outb(0x23,TCR);
-	outb(0x00,TIOR);
+	ctrl_outb(0x23,TCR);
+	ctrl_outb(0x00,TIOR);
 	request_timer_irq(26,timer_int,0,"timer",0);
-	outb(inb(TIER) | 0x01,TIER);
-	outb(inb(TSNC) & ~0x01,TSNC);
-	outb(inb(TMDR) & ~0x01,TMDR);
-	outb(inb(TSTR) | 0x01,TSTR);
+	ctrl_outb(inb(TIER) | 0x01,TIER);
+	ctrl_outb(inb(TSNC) & ~0x01,TSNC);
+	ctrl_outb(inb(TMDR) & ~0x01,TMDR);
+	ctrl_outb(inb(TSTR) | 0x01,TSTR);
 	return 0;
 }
 
 void platform_timer_eoi(void)
 {
-	outb(inb(TSR) & ~0x01,TSR);
+	ctrl_outb(inb(TSR) & ~0x01,TSR);
 }
 #endif
 

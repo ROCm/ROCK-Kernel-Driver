@@ -81,15 +81,15 @@ void die(const char *str, struct pt_regs *regs, long err)
 	nl = 1;
 #endif
 #ifdef CONFIG_SMP
-	printk("SMP NR_CPUS=%d", NR_CPUS);
+	printk("SMP NR_CPUS=%d ", NR_CPUS);
 	nl = 1;
 #endif
 #ifdef CONFIG_DEBUG_PAGEALLOC
-	printk("DEBUG_PAGEALLOC");
+	printk("DEBUG_PAGEALLOC ");
 	nl = 1;
 #endif
 #ifdef CONFIG_NUMA
-	printk("NUMA");
+	printk("NUMA ");
 	nl = 1;
 #endif
 	if (nl)
@@ -116,7 +116,7 @@ _exception(int signr, siginfo_t *info, struct pt_regs *regs)
 	if (!user_mode(regs)) {
 		if (debugger(regs))
 			return;
-		die("Exception in kernel mode\n", regs, signr);
+		die("Exception in kernel mode", regs, signr);
 	}
 
 	force_sig_info(signr, info, current);

@@ -3535,8 +3535,7 @@ void __init addrconf_init(void)
 #endif
 }
 
-#ifdef MODULE
-void addrconf_cleanup(void)
+void __exit addrconf_cleanup(void)
 {
  	struct net_device *dev;
  	struct inet6_dev *idev;
@@ -3602,5 +3601,3 @@ void addrconf_cleanup(void)
 	proc_net_remove("if_inet6");
 #endif
 }
-#endif	/* MODULE */
-

@@ -90,11 +90,6 @@ extern int if6_proc_init(void);
 extern void if6_proc_exit(void);
 #endif
 
-#ifdef CONFIG_SYSCTL
-extern void ipv6_sysctl_register(void);
-extern void ipv6_sysctl_unregister(void);
-#endif
-
 int sysctl_ipv6_bindv6only;
 
 #ifdef INET_REFCNT_DEBUG
@@ -573,7 +568,7 @@ int ipv6_unload(void)
 #endif
 #endif
 
-#if defined(MODULE) && defined(CONFIG_SYSCTL)
+#ifdef CONFIG_SYSCTL
 extern void ipv6_sysctl_register(void);
 extern void ipv6_sysctl_unregister(void);
 #endif
@@ -784,7 +779,7 @@ static int __init inet6_init(void)
 	 *	able to communicate via both network protocols.
 	 */
 
-#if defined(MODULE) && defined(CONFIG_SYSCTL)
+#ifdef CONFIG_SYSCTL
 	ipv6_sysctl_register();
 #endif
 	err = icmpv6_init(&inet6_family_ops);
@@ -859,7 +854,7 @@ ip6_tunnel_fail:
 ndisc_fail:
 	icmpv6_cleanup();
 icmp_fail:
-#if defined(MODULE) && defined(CONFIG_SYSCTL)
+#ifdef CONFIG_SYSCTL
 	ipv6_sysctl_unregister();
 #endif
 	cleanup_ipv6_mibs();
@@ -868,9 +863,7 @@ init_mib_fail:
 }
 module_init(inet6_init);
 
-
-#ifdef MODULE
-static void inet6_exit(void)
+static void __exit inet6_exit(void)
 {
 	/* First of all disallow new sockets creation. */
 	sock_unregister(PF_INET6);
@@ -903,6 +896,5 @@ static void inet6_exit(void)
 	kmem_cache_destroy(raw6_sk_cachep);
 }
 module_exit(inet6_exit);
-#endif /* MODULE */
 
 MODULE_ALIAS_NETPROTO(PF_INET6);

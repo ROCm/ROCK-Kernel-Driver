@@ -25,10 +25,10 @@
 
 int platform_timer_setup(irqreturn_t (*timer_int)(int, void *, struct pt_regs *))
 {
-	outb(H8300_TIMER_COUNT_DATA,_8TCORA1);
-	outb(0x00,_8TCSR1);
+	ctrl_outb(H8300_TIMER_COUNT_DATA,_8TCORA1);
+	ctrl_outb(0x00,_8TCSR1);
 	request_irq(76,timer_int,0,"timer",0);
-	outb(0x40|0x08|0x03,_8TCR1);
+	ctrl_outb(0x40|0x08|0x03,_8TCR1);
 	return 0;
 }
 

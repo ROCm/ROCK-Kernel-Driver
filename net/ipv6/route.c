@@ -2005,8 +2005,7 @@ void __init ip6_route_init(void)
 #endif
 }
 
-#ifdef MODULE
-void ip6_route_cleanup(void)
+void __exit ip6_route_cleanup(void)
 {
 #ifdef CONFIG_PROC_FS
 	proc_net_remove("ipv6_route");
@@ -2019,4 +2018,3 @@ void ip6_route_cleanup(void)
 	fib6_gc_cleanup();
 	kmem_cache_destroy(ip6_dst_ops.kmem_cachep);
 }
-#endif	/* MODULE */
