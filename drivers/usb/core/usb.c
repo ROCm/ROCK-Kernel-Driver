@@ -1300,7 +1300,9 @@ static int __init usb_init(void)
 	retval = bus_register(&usb_bus_type);
 	if (retval) 
 		goto out;
-	usb_host_init();
+	retval = usb_host_init();
+	if (retval)
+		goto host_init_failed;
 	retval = usb_major_init();
 	if (retval)
 		goto major_init_failed;
@@ -1322,6 +1324,7 @@ fs_init_failed:
 	usb_major_cleanup();	
 major_init_failed:
 	usb_host_cleanup();
+host_init_failed:
 	bus_unregister(&usb_bus_type);
 out:
 	return retval;

@@ -626,9 +626,9 @@ static struct class usb_host_class = {
 	.release	= &usb_host_release,
 };
 
-void usb_host_init(void)
+int usb_host_init(void)
 {
-	class_register(&usb_host_class);
+	return class_register(&usb_host_class);
 }
 
 void usb_host_cleanup(void)
