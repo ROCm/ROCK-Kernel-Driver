@@ -473,12 +473,15 @@ static inline __u32 int_ln_12bits(__u32 word)
 #endif
 
 #if 0
-#define DEBUG_ENT(fmt, arg...) printk(KERN_DEBUG "random %04d %04d %04d: " \
+static int debug = 0;
+module_param(debug, bool, 0644);
+#define DEBUG_ENT(fmt, arg...) do { if (debug) \
+	printk(KERN_DEBUG "random %04d %04d %04d: " \
 	fmt,\
 	random_state->entropy_count,\
 	sec_random_state->entropy_count,\
 	urandom_state->entropy_count,\
-	## arg)
+	## arg); } while (0)
 #else
 #define DEBUG_ENT(fmt, arg...) do {} while (0)
 #endif
