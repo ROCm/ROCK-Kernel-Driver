@@ -22,6 +22,8 @@
 #include <linux/un.h>
 #include <net/af_unix.h>
 #include <linux/ip.h>
+#include <linux/ipv6.h>
+#include <net/ipv6.h>
 #include "avc.h"
 #include "avc_ss.h"
 #include "class_to_string.h"
@@ -418,6 +420,16 @@ out:
 	return rc;
 }
 
+static inline void avc_print_ipv6_addr(struct in6_addr *addr, u16 port,
+				       char *name1, char *name2)
+{
+	if (!ipv6_addr_any(addr))
+		printk(" %s=%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x",
+		       name1, NIP6(*addr));
+	if (port)
+		printk(" %s=%d", name2, ntohs(port));
+}
+
 static inline void avc_print_ipv4_addr(u32 addr, u16 port, char *name1, char *name2)
 {
 	if (addr)
@@ -602,11 +614,11 @@ void avc_audit(u32 ssid, u32 tsid,
 			if (a->u.net.sk) {
 				struct sock *sk = a->u.net.sk;
 				struct unix_sock *u;
-				struct inet_opt *inet;
 
 				switch (sk->sk_family) {
-				case AF_INET:
-					inet = inet_sk(sk);
+				case AF_INET: {
+					struct inet_opt *inet = inet_sk(sk);
+
 					avc_print_ipv4_addr(inet->rcv_saddr,
 					                    inet->sport,
 					                    "laddr", "lport");
@@ -614,6 +626,19 @@ void avc_audit(u32 ssid, u32 tsid,
 					                    inet->dport,
 					                    "faddr", "fport");
 					break;
+				}
+				case AF_INET6: {
+					struct inet_opt *inet = inet_sk(sk);
+					struct ipv6_pinfo *inet6 = inet6_sk(sk);
+
+					avc_print_ipv6_addr(&inet6->rcv_saddr,
+							    inet->sport,
+							    "laddr", "lport");
+					avc_print_ipv6_addr(&inet6->daddr,
+							    inet->dport,
+							    "faddr", "fport");
+					break;
+				}
 				case AF_UNIX:
 					u = unix_sk(sk);
 					if (u->dentry) {
@@ -639,11 +664,24 @@ void avc_audit(u32 ssid, u32 tsid,
 				}
 			}
 			
-			avc_print_ipv4_addr(a->u.net.saddr, a->u.net.sport,
-			                    "saddr", "src");
-			avc_print_ipv4_addr(a->u.net.daddr, a->u.net.dport,
-			                    "daddr", "dest");
-
+			switch (a->u.net.family) {
+			case AF_INET:
+				avc_print_ipv4_addr(a->u.net.v4info.saddr,
+						    a->u.net.sport,
+						    "saddr", "src");
+				avc_print_ipv4_addr(a->u.net.v4info.daddr,
+						    a->u.net.dport,
+						    "daddr", "dest");
+				break;
+			case AF_INET6:
+				avc_print_ipv6_addr(&a->u.net.v6info.saddr,
+						    a->u.net.sport,
+						    "saddr", "src");
+				avc_print_ipv6_addr(&a->u.net.v6info.daddr,
+						    a->u.net.dport,
+						    "daddr", "dest");
+				break;
+			}
 			if (a->u.net.netif)
 				printk(" netif=%s", a->u.net.netif);
 			break;

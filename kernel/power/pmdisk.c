@@ -35,7 +35,7 @@
 #include "power.h"
 
 
-extern int pmdisk_arch_suspend(int resume);
+extern asmlinkage int pmdisk_arch_suspend(int resume);
 
 #define __ADDRESS(x)  ((unsigned long) phys_to_virt(x))
 #define ADDRESS(x) __ADDRESS((x) << PAGE_SHIFT)

@@ -164,7 +164,7 @@ static ssize_t sel_read_policyvers(struct file *filp, char *buf,
 		return -ENOMEM;
 	memset(page, 0, PAGE_SIZE);
 
-	length = scnprintf(page, PAGE_SIZE, "%u", POLICYDB_VERSION);
+	length = scnprintf(page, PAGE_SIZE, "%u", POLICYDB_VERSION_MAX);
 	if (length < 0) {
 		free_page((unsigned long)page);
 		return length;

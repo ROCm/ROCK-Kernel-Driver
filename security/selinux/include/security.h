@@ -15,8 +15,15 @@
 #define SECCLASS_NULL			0x0000 /* no class */
 
 #define SELINUX_MAGIC 0xf97cff8c
-#define POLICYDB_VERSION 16
-#define POLICYDB_VERSION_COMPAT 15
+
+/* Identify specific policy version changes */
+#define POLICYDB_VERSION_BASE  15
+#define POLICYDB_VERSION_BOOL  16
+#define POLICYDB_VERSION_IPV6  17
+
+/* Range of policy versions we understand*/
+#define POLICYDB_VERSION_MIN   POLICYDB_VERSION_BASE
+#define POLICYDB_VERSION_MAX   POLICYDB_VERSION_IPV6
 
 #ifdef CONFIG_SECURITY_SELINUX_BOOTPARAM
 extern int selinux_enabled;

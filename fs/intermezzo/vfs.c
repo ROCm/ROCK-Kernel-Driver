@@ -2149,6 +2149,7 @@ again:  /* look the named file or a parent directory so we can get the cache */
         if ( error && error != -ENOENT ) {
                 EXIT;
                 unlock_kernel();
+		putname(tmp);
                 return error;
         } 
         if (error == -ENOENT)
@@ -2195,7 +2196,7 @@ again:  /* look the named file or a parent directory so we can get the cache */
         fd = get_unused_fd();
         if (fd < 0) {
                 EXIT;
-                goto cleanup_dput;
+                goto exit;
         }
 
         {
@@ -2205,10 +2206,9 @@ again:  /* look the named file or a parent directory so we can get the cache */
                 if (IS_ERR(f)) {
                         put_unused_fd(fd);
                         fd = error;
-                        EXIT;
-                        goto cleanup_dput;
-                }
-                fd_install(fd, f);
+                } else {
+	                fd_install(fd, f);
+		}
         }
         /* end of code that might be replaced by open_dentry */
 
@@ -2218,10 +2218,6 @@ exit:
         path_release(&nd);
         putname(tmp);
         return fd;
-
-cleanup_dput:
-        putname(&nd);
-        goto exit;
 }
 
 #ifdef CONFIG_FS_EXT_ATTR
