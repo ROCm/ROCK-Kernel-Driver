@@ -18,7 +18,7 @@ extern void __attach_vcache(vcache_t *vcache,
 		struct mm_struct *mm,
 		void (*callback)(struct vcache_s *data, struct page *new_page));
 
-extern void detach_vcache(vcache_t *vcache);
+extern void __detach_vcache(vcache_t *vcache);
 
 extern void invalidate_vcache(unsigned long address, struct mm_struct *mm,
 				struct page *new_page);

@@ -115,8 +115,9 @@ static struct page *__pin_page(unsigned long addr)
 	 * Do a quick atomic lookup first - this is the fastpath.
 	 */
 	page = follow_page(mm, addr, 0);
-	if (likely(page != NULL)) {
-		get_page(page);
+	if (likely(page != NULL)) {	
+		if (!PageReserved(page))
+			get_page(page);
 		return page;
 	}
 
@@ -140,8 +141,10 @@ repeat_lookup:
 	 * check for races:
 	 */
 	tmp = follow_page(mm, addr, 0);
-	if (tmp != page)
+	if (tmp != page) {
+		put_page(page);
 		goto repeat_lookup;
+	}
 
 	return page;
 }
@@ -176,6 +179,7 @@ static int futex_wake(unsigned long uaddr, int offset, int num)
 
 		if (this->page == page && this->offset == offset) {
 			list_del_init(i);
+			__detach_vcache(&this->vcache);
 			tell_waiter(this);
 			ret++;
 			if (ret >= num)
@@ -235,15 +239,15 @@ static inline int unqueue_me(struct futex_q *q)
 {
 	int ret = 0;
 
-	detach_vcache(&q->vcache);
-
+	spin_lock(&vcache_lock);
 	spin_lock(&futex_lock);
 	if (!list_empty(&q->list)) {
 		list_del(&q->list);
+		__detach_vcache(&q->vcache);
 		ret = 1;
 	}
 	spin_unlock(&futex_lock);
-
+	spin_unlock(&vcache_lock);
 	return ret;
 }
 
@@ -314,13 +318,7 @@ static int futex_close(struct inode *inode, struct file *filp)
 {
 	struct futex_q *q = filp->private_data;
 
-	spin_lock(&futex_lock);
-	if (!list_empty(&q->list)) {
-		list_del(&q->list);
-		/* Noone can be polling on us now. */
-		BUG_ON(waitqueue_active(&q->waiters));
-	}
-	spin_unlock(&futex_lock);
+	unqueue_me(q);
 	unpin_page(q->page);
 	kfree(filp->private_data);
 	return 0;
@@ -436,9 +434,8 @@ asmlinkage int sys_futex(unsigned long uaddr, int op, int val, struct timespec *
 
 	pos_in_page = uaddr % PAGE_SIZE;
 
-	/* Must be "naturally" aligned, and not on page boundary. */
-	if ((pos_in_page % __alignof__(int)) != 0
-	    || pos_in_page + sizeof(int) > PAGE_SIZE)
+	/* Must be "naturally" aligned */
+	if (pos_in_page % sizeof(int))
 		return -EINVAL;
 
 	switch (op) {
