@@ -759,14 +759,12 @@ to "Closing".
 	unsigned int offset;
 	unsigned int length;
 
-   This means that your pci_{map,unmap}_sg() and all other
-   interfaces dealing with scatterlists must be able to cope
-   properly with page being non NULL.
+   The base address is specified by a "page+offset" pair.
 
-   A scatterlist is in one of two states.  The base address is
-   either specified by "address" or by a "page+offset" pair.
-   If "address" is NULL, then "page+offset" is being used.
-   If "page" is NULL, then "address" is being used.
+   Previous versions of struct scatterlist contained a "void *address"
+   field that was sometimes used instead of page+offset.  As of Linux
+   2.5., page+offset is always used, and the "address" field has been
+   deleted.
 
 2) More to come...
 
