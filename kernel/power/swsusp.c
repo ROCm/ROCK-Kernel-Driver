@@ -61,6 +61,7 @@
 #include <linux/bootmem.h>
 #include <linux/syscalls.h>
 #include <linux/console.h>
+#include <linux/highmem.h>
 
 #include <asm/uaccess.h>
 #include <asm/mmu_context.h>
@@ -362,7 +363,73 @@ static int write_suspend_image(void)
 	return 0;
 }
 
+struct highmem_page {
+	char *data;
+	struct page *page;
+	struct highmem_page *next;
+};
+
+struct highmem_page *highmem_copy = NULL;
+
 /* if pagedir_p != NULL it also copies the counted pages */
+static int save_highmem(void)
+{
+	int pfn;
+	struct page *page;
+	int chunk_size;
+
+	for (pfn = 0; pfn < max_pfn; pfn++) {
+		struct highmem_page *save;
+		void *kaddr;
+
+		page = pfn_to_page(pfn);
+
+		if (!PageHighMem(page))
+			continue;
+
+		if (!(pfn%200)) printk(".");
+
+		if (PageReserved(page)) {
+			printk("highmem reserved page?!\n");
+			BUG();
+		}
+		if ((chunk_size=is_head_of_free_region(page))!=0) {
+			pfn += chunk_size - 1;
+			continue;
+		}
+		save = kmalloc(sizeof(struct highmem_page), GFP_ATOMIC);
+		if (!save)
+			panic("Not enough memory");
+		save->next = highmem_copy;
+		save->page = page;
+		save->data = get_zeroed_page(GFP_ATOMIC);
+		if (!save->data)
+			panic("Not enough memory");
+		kaddr = kmap_atomic(page, KM_USER0);
+		memcpy(save->data, kaddr, PAGE_SIZE);
+		kunmap_atomic(kaddr, KM_USER0);
+		highmem_copy = save;
+	}
+	printk("\n");
+	return 0;
+}
+
+static int restore_highmem(void)
+{
+	while (highmem_copy) {
+		struct highmem_page *save = highmem_copy;
+		void *kaddr;
+		highmem_copy = save->next;
+		
+		kaddr = kmap_atomic(save->page, KM_USER0);
+		memcpy(kaddr, save->data, PAGE_SIZE);
+		kunmap_atomic(kaddr, KM_USER0);
+		free_page(save->data);
+		kfree(save);
+	}
+	return 0;
+}
+
 static int count_and_copy_data_pages(struct pbe *pagedir_p)
 {
 	int chunk_size;
@@ -378,7 +445,9 @@ static int count_and_copy_data_pages(struct pbe *pagedir_p)
 	for (pfn = 0; pfn < max_pfn; pfn++) {
 		page = pfn_to_page(pfn);
 		if (PageHighMem(page))
-			panic("Swsusp not supported on highmem boxes. Send 1GB of RAM to <pavel@ucw.cz> and try again ;-).");
+			continue;
+
+		if (!(pfn%200)) printk(".");
 
 		if (!PageReserved(page)) {
 			if (PageNosave(page))
@@ -410,8 +479,10 @@ static int count_and_copy_data_pages(struct pbe *pagedir_p)
 			pagedir_p++;
 		}
 	}
+	printk("\n");
 	return nr_copy_pages;
 }
+
 
 static void free_suspend_pagedir(unsigned long this_pagedir)
 {
@@ -492,14 +563,16 @@ static int suspend_prepare_image(void)
 	struct sysinfo i;
 	unsigned int nr_needed_pages = 0;
 
-	drain_local_pages();
-
 	pagedir_nosave = NULL;
-	printk( "/critical section: Counting pages to copy" );
+	printk( "/critical section: Handling highmem" );
+	save_highmem();
+
+	printk("counting pages to copy" );
+	drain_local_pages();
 	nr_copy_pages = count_and_copy_data_pages(NULL);
 	nr_needed_pages = nr_copy_pages + PAGES_FOR_IO;
 	
-	printk(" (pages needed: %d+%d=%d free: %d)\n",nr_copy_pages,PAGES_FOR_IO,nr_needed_pages,nr_free_pages());
+	printk("(pages needed: %d+%d=%d free: %d)\n",nr_copy_pages,PAGES_FOR_IO,nr_needed_pages,nr_free_pages());
 	if(nr_free_pages() < nr_needed_pages) {
 		printk(KERN_CRIT "%sCouldn't get enough free pages, on %d pages short\n",
 		       name_suspend, nr_needed_pages-nr_free_pages());
@@ -603,6 +676,11 @@ asmlinkage void do_magic_resume_2(void)
 
 	PRINTK( "Freeing prev allocated pagedir\n" );
 	free_suspend_pagedir((unsigned long) pagedir_save);
+
+	printk( "Restoring highmem\n" );
+	restore_highmem();
+	printk("done, devices\n");
+
 	device_power_up();
 	spin_unlock_irq(&suspend_pagedir_lock);
 	device_resume();
@@ -920,10 +998,10 @@ static int __init __read_suspend_image(struct block_device *bdev, union diskpage
 	else if (!memcmp("S2",cur->swh.magic.magic,2))
 		memcpy(cur->swh.magic.magic,"SWAPSPACE2",10);
 	else {
-               if (!noresume)
-                       printk(KERN_ERR "%sUnable to find suspended-data signature (%.10s - misspelled?\nContinuing normal bootup.\n",
-                               name_resume, cur->swh.magic.magic);
-               return -EINVAL;
+		if (!noresume)
+			printk(KERN_ERR "%sUnable to find suspended-data signature (%.10s - misspelled?\nContinuing normal bootup.\n", 
+				name_resume, cur->swh.magic.magic);
+		return -EINVAL;
 	}
 	if (noresume) {
 		/* We don't do a sanity check here: we want to restore the swap
