@@ -47,13 +47,6 @@ extern int page_cluster;
  * per VM-area/task.  A VM area is any part of the process virtual memory
  * space that has a special rule for the page-fault handlers (ie a shared
  * library, the executable area etc).
- *
- * This structure is exactly 64 bytes on ia32.  Please think very, very hard
- * before adding anything to it.
- * [Now 4 bytes more on 32bit NUMA machines. Sorry. -AK.
- * But if you want to recover the 4 bytes justr remove vm_next. It is redundant
- * with vm_rb. Will be a lot of editing work though. vm_rb.color is redundant
- * too.]
  */
 struct vm_area_struct {
 	struct mm_struct * vm_mm;	/* The address space we belong to. */
