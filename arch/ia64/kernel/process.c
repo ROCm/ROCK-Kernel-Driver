@@ -57,7 +57,7 @@ do_show_stack (struct unw_frame_info *info, void *arg)
 
 		unw_get_sp(info, &sp);
 		unw_get_bsp(info, &bsp);
-		snprintf(buf, sizeof(buf), " [<%016lx>] %%s sp=0x%016lx bsp=0x%016lx\n",
+		snprintf(buf, sizeof(buf), " [<%016lx>] %%s\n\t\tsp=%016lx bsp=%016lx\n",
 			 ip, sp, bsp);
 		print_symbol(buf, ip);
 	} while (unw_unwind(info) >= 0);

@@ -239,17 +239,91 @@ show_min_state (pal_min_state_area_t *minstate)
 	       minstate->pmsa_bank1_gr[14], minstate->pmsa_bank1_gr[15]);
 }
 
-/*
- * This routine will be used to deal with platform specific handling
- * of the init, i.e. drop into the kernel debugger on server machine,
- * or if the processor is part of some parallel machine without a
- * console, then we would call the appropriate debug hooks here.
- */
-unsigned long tr_val[32], tr_idx;
+static void
+fetch_min_state (pal_min_state_area_t *ms, struct pt_regs *pt, struct switch_stack *sw)
+{
+	u64 *dst_banked, *src_banked, bit, shift, nat_bits;
+	int i;
+
+	/*
+	 * First, update the pt-regs and switch-stack structures with the contents stored
+	 * in the min-state area:
+	 */
+	if (((struct ia64_psr *) &ms->pmsa_ipsr)->ic == 0) {
+		pt->cr_ipsr = ms->pmsa_xpsr;
+		pt->cr_iip = ms->pmsa_xip;
+		pt->cr_ifs = ms->pmsa_xfs;
+	} else {
+		pt->cr_ipsr = ms->pmsa_ipsr;
+		pt->cr_iip = ms->pmsa_iip;
+		pt->cr_ifs = ms->pmsa_ifs;
+	}
+	pt->ar_rsc = ms->pmsa_rsc;
+	pt->pr = ms->pmsa_pr;
+	pt->r1 = ms->pmsa_gr[0];
+	pt->r2 = ms->pmsa_gr[1];
+	pt->r3 = ms->pmsa_gr[2];
+	sw->r4 = ms->pmsa_gr[3];
+	sw->r5 = ms->pmsa_gr[4];
+	sw->r6 = ms->pmsa_gr[5];
+	sw->r7 = ms->pmsa_gr[6];
+	pt->r8 = ms->pmsa_gr[7];
+	pt->r9 = ms->pmsa_gr[8];
+	pt->r10 = ms->pmsa_gr[9];
+	pt->r11 = ms->pmsa_gr[10];
+	pt->r12 = ms->pmsa_gr[11];
+	pt->r13 = ms->pmsa_gr[12];
+	pt->r14 = ms->pmsa_gr[13];
+	pt->r15 = ms->pmsa_gr[14];
+	dst_banked = &pt->r16;		/* r16-r31 are contiguous in struct pt_regs */
+	src_banked = ms->pmsa_bank1_gr;
+	for (i = 0; i < 16; ++i)
+		*dst_banked = *src_banked;
+	pt->b0 = ms->pmsa_br0;
+	sw->b1 = ms->pmsa_br1;
+
+	/* construct the NaT bits for the pt-regs structure: */
+#	define PUT_NAT_BIT(dst, addr)					\
+	do {								\
+		bit = nat_bits & 1; nat_bits >>= 1;			\
+		shift = ((unsigned long) addr >> 3) & 0x3f;		\
+		dst = ((dst) & ~(1UL << shift)) | (bit << shift);	\
+	} while (0)
+
+	/* Rotate the saved NaT bits such that bit 0 corresponds to pmsa_gr[0]: */
+	shift = ((unsigned long) &ms->pmsa_gr[0] >> 3) & 0x3f;
+	nat_bits = (ms->pmsa_nat_bits >> shift) | (ms->pmsa_nat_bits << (64 - shift));
+
+	PUT_NAT_BIT(sw->caller_unat, &pt->r1);
+	PUT_NAT_BIT(sw->caller_unat, &pt->r2);
+	PUT_NAT_BIT(sw->caller_unat, &pt->r3);
+	PUT_NAT_BIT(sw->ar_unat, &sw->r4);
+	PUT_NAT_BIT(sw->ar_unat, &sw->r5);
+	PUT_NAT_BIT(sw->ar_unat, &sw->r6);
+	PUT_NAT_BIT(sw->ar_unat, &sw->r7);
+	PUT_NAT_BIT(sw->caller_unat, &pt->r8);	PUT_NAT_BIT(sw->caller_unat, &pt->r9);
+	PUT_NAT_BIT(sw->caller_unat, &pt->r10);	PUT_NAT_BIT(sw->caller_unat, &pt->r11);
+	PUT_NAT_BIT(sw->caller_unat, &pt->r12);	PUT_NAT_BIT(sw->caller_unat, &pt->r13);
+	PUT_NAT_BIT(sw->caller_unat, &pt->r14);	PUT_NAT_BIT(sw->caller_unat, &pt->r15);
+	nat_bits >>= 16;	/* skip over bank0 NaT bits */
+	PUT_NAT_BIT(sw->caller_unat, &pt->r16);	PUT_NAT_BIT(sw->caller_unat, &pt->r17);
+	PUT_NAT_BIT(sw->caller_unat, &pt->r18);	PUT_NAT_BIT(sw->caller_unat, &pt->r19);
+	PUT_NAT_BIT(sw->caller_unat, &pt->r20);	PUT_NAT_BIT(sw->caller_unat, &pt->r21);
+	PUT_NAT_BIT(sw->caller_unat, &pt->r22);	PUT_NAT_BIT(sw->caller_unat, &pt->r23);
+	PUT_NAT_BIT(sw->caller_unat, &pt->r24);	PUT_NAT_BIT(sw->caller_unat, &pt->r25);
+	PUT_NAT_BIT(sw->caller_unat, &pt->r26);	PUT_NAT_BIT(sw->caller_unat, &pt->r27);
+	PUT_NAT_BIT(sw->caller_unat, &pt->r28);	PUT_NAT_BIT(sw->caller_unat, &pt->r29);
+	PUT_NAT_BIT(sw->caller_unat, &pt->r30);	PUT_NAT_BIT(sw->caller_unat, &pt->r31);
+}
 
 void
-init_handler_platform (sal_log_processor_info_t *proc_ptr, struct pt_regs *regs)
+init_handler_platform (sal_log_processor_info_t *proc_ptr,
+		       struct pt_regs *pt, struct switch_stack *sw)
 {
+	unsigned long ip, sp, bsp;
+	struct unw_frame_info info;
+	char buf[80];
+
 	/* if a kernel debugger is available call it here else just dump the registers */
 
 	/*
@@ -262,6 +336,23 @@ init_handler_platform (sal_log_processor_info_t *proc_ptr, struct pt_regs *regs)
 	udelay(5*1000000);
 	show_min_state(&SAL_LPI_PSI_INFO(proc_ptr)->min_state_area);
 
+	fetch_min_state(&SAL_LPI_PSI_INFO(proc_ptr)->min_state_area, pt, sw);
+
+	printk("\nCall Trace:\n");
+	unw_init_from_interruption(&info, current, pt, sw);
+	do {
+		unw_get_ip(&info, &ip);
+		if (ip == 0)
+			break;
+
+		unw_get_sp(&info, &sp);
+		unw_get_bsp(&info, &bsp);
+		snprintf(buf, sizeof(buf), " [<%016lx>] %%s\n\t\tsp=%016lx bsp=%016lx\n",
+			 ip, sp, bsp);
+		print_symbol(buf, ip);
+	} while (unw_unwind(&info) >= 0);
+
+	printk("\nINIT dump complete.  Please reboot now.\n");
 	while (1);			/* hang city if no debugger */
 }
 
@@ -1133,7 +1224,7 @@ device_initcall(ia64_mca_late_init);
  *
  */
 void
-ia64_init_handler (struct pt_regs *regs)
+ia64_init_handler (struct pt_regs *pt, struct switch_stack *sw)
 {
 	sal_log_processor_info_t *proc_ptr;
 	ia64_err_rec_t *plog_ptr;
@@ -1160,7 +1251,7 @@ ia64_init_handler (struct pt_regs *regs)
 	/* Clear the INIT SAL logs now that they have been saved in the OS buffer */
 	ia64_sal_clear_state_info(SAL_INFO_TYPE_INIT);
 
-	init_handler_platform(proc_ptr, regs);		/* call platform specific routines */
+	init_handler_platform(proc_ptr, pt, sw);	/* call platform specific routines */
 }
 
 /*
@@ -2210,7 +2301,8 @@ ia64_log_print(int sal_info_type, prfunc_t prfunc)
 	switch(sal_info_type) {
 	      case SAL_INFO_TYPE_MCA:
 		prfunc("+BEGIN HARDWARE ERROR STATE AT MCA\n");
-		platform_err = ia64_log_platform_info_print(IA64_LOG_CURR_BUFFER(sal_info_type), prfunc);
+		platform_err = ia64_log_platform_info_print(IA64_LOG_CURR_BUFFER(sal_info_type),
+							    prfunc);
 		prfunc("+END HARDWARE ERROR STATE AT MCA\n");
 		break;
 	      case SAL_INFO_TYPE_INIT:
