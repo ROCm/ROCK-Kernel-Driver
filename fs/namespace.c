@@ -260,7 +260,15 @@ struct seq_operations mounts_op = {
 	.show	= show_vfsmnt
 };
 
-static int __may_umount_tree(struct vfsmount *mnt, int root_mnt_only)
+/**
+ * may_umount_tree - check if a mount tree is busy
+ * @mnt: root of mount tree
+ *
+ * This is called to check if a tree of mounts has any
+ * open files, pwds, chroots or sub mounts that are
+ * busy.
+ */
+int may_umount_tree(struct vfsmount *mnt)
 {
 	struct list_head *next;
 	struct vfsmount *this_parent = mnt;
@@ -270,14 +278,6 @@ static int __may_umount_tree(struct vfsmount *mnt, int root_mnt_only)
 	spin_lock(&vfsmount_lock);
 	actual_refs = atomic_read(&mnt->mnt_count);
 	minimum_refs = 2;
-
-	if (root_mnt_only) {
- 		spin_unlock(&vfsmount_lock);
-		if (actual_refs > minimum_refs)
-			return -EBUSY;
-		return 0;
-	}
-
 repeat:
 	next = this_parent->mnt_mounts.next;
 resume:
@@ -308,19 +308,6 @@ resume:
 	return 0;
 }
 
-/**
- * may_umount_tree - check if a mount tree is busy
- * @mnt: root of mount tree
- *
- * This is called to check if a tree of mounts has any
- * open files, pwds, chroots or sub mounts that are
- * busy.
- */
-int may_umount_tree(struct vfsmount *mnt)
-{
-	return __may_umount_tree(mnt, 0);
-}
-
 EXPORT_SYMBOL(may_umount_tree);
 
 /**
@@ -338,7 +325,9 @@ EXPORT_SYMBOL(may_umount_tree);
  */
 int may_umount(struct vfsmount *mnt)
 {
-	return __may_umount_tree(mnt, 1);
+	if (atomic_read(&mnt->mnt_count) > 2)
+		return -EBUSY;
+	return 0;
 }
 
 EXPORT_SYMBOL(may_umount);
