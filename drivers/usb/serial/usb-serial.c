@@ -355,25 +355,12 @@
 #define DRIVER_DESC "USB Serial Driver core"
 
 
-#ifdef CONFIG_USB_SERIAL_GENERIC
-/* we want to look at all devices, as the vendor/product id can change
- * depending on the command line argument */
-static struct usb_device_id generic_serial_ids[] = {
-	{.driver_info = 42},
-	{}
-};
-
-#endif /* CONFIG_USB_SERIAL_GENERIC */
-
 /* Driver structure we register with the USB core */
 static struct usb_driver usb_serial_driver = {
 	.owner =	THIS_MODULE,
 	.name =		"usbserial",
 	.probe =	usb_serial_probe,
 	.disconnect =	usb_serial_disconnect,
-#ifdef CONFIG_USB_SERIAL_GENERIC
-	.id_table =	generic_serial_ids,
-#endif
 };
 
 /* There is no MODULE_DEVICE_TABLE for usbserial.c.  Instead
@@ -1383,22 +1370,9 @@ error:
 
 void usb_serial_deregister(struct usb_serial_device_type *device)
 {
-	struct usb_serial *serial;
-	int i;
-
 	info("USB Serial deregistering driver %s", device->name);
-
-	/* clear out the serial_table if the device is attached to a port */
-	for(i = 0; i < SERIAL_TTY_MINORS; ++i) {
-		serial = serial_table[i];
-		if ((serial != NULL) && (serial->type == device)) {
-			usb_driver_release_interface (&usb_serial_driver, serial->interface);
-			usb_serial_disconnect (serial->interface);
-		}
-	}
-
 	list_del(&device->driver_list);
-	usb_serial_bus_deregister (device);
+	usb_serial_bus_deregister(device);
 }
 
 

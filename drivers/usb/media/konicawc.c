@@ -324,7 +324,7 @@ static void resubmit_urb(struct uvd *uvd, struct urb *urb)
         }
         urb->dev = uvd->dev;
         urb->status = 0;
-        ret = usb_submit_urb(urb, GFP_KERNEL);
+	ret = usb_submit_urb(urb, GFP_ATOMIC);
 	DEBUG(3, "submitting urb of length %d", urb->transfer_buffer_length);
         if(ret)
                 err("usb_submit_urb error (%d)", ret);

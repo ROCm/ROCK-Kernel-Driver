@@ -204,6 +204,8 @@ struct usb_hub {
 
 	struct list_head	event_list;	/* hubs w/data or errs ready */
 	unsigned long		event_bits[1];	/* status change bitmask */
+	unsigned long		change_bits[1];	/* ports with logical connect
+							status change */
 #if USB_MAXCHILDREN > 31 /* 8*sizeof(unsigned long) - 1 */
 #error event_bits[] is too short!
 #endif

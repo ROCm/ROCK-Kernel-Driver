@@ -1137,8 +1137,6 @@ static void pegasus_set_multicast(struct net_device *net)
 {
 	pegasus_t *pegasus = net->priv;
 
-	netif_stop_queue(net);
-
 	if (net->flags & IFF_PROMISC) {
 		pegasus->eth_regs[EthCtrl2] |= RX_PROMISCUOUS;
 		info("%s: Promiscuous mode enabled", net->name);
@@ -1154,8 +1152,6 @@ static void pegasus_set_multicast(struct net_device *net)
 
 	pegasus->flags |= ETH_REGS_CHANGE;
 	ctrl_callback(pegasus->ctrl_urb, NULL);
-
-	netif_wake_queue(net);
 }
 
 static __u8 mii_phy_probe(pegasus_t * pegasus)
