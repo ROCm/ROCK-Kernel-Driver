@@ -341,8 +341,6 @@ static __inline__ void __sk_add_node(struct sock *sk, struct hlist_head *list)
 	hlist_add_head(&sk->sk_node, list);
 }
 
-static inline void sock_hold(struct sock *sk);
-
 static __inline__ void sk_add_node(struct sock *sk, struct hlist_head *list)
 {
 	sock_hold(sk);
