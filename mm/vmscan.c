@@ -62,6 +62,9 @@ struct scan_control {
 
 	unsigned long nr_mapped;	/* From page_state */
 
+	/* How many pages shrink_cache() should reclaim */
+	int nr_to_reclaim;
+
 	/* Ask shrink_caches, or shrink_zone to scan at this priority */
 	unsigned int priority;
 
@@ -586,6 +589,7 @@ static void shrink_cache(struct zone *zone, struct scan_control *sc)
 		if (current_is_kswapd())
 			mod_page_state(kswapd_steal, nr_freed);
 		mod_page_state_zone(zone, pgsteal, nr_freed);
+		sc->nr_to_reclaim -= nr_freed;
 
 		spin_lock_irq(&zone->lru_lock);
 		/*
@@ -815,6 +819,8 @@ shrink_zone(struct zone *zone, struct scan_control *sc)
 	else
 		nr_inactive = 0;
 
+	sc->nr_to_reclaim = SWAP_CLUSTER_MAX;
+
 	while (nr_active || nr_inactive) {
 		if (nr_active) {
 			sc->nr_to_scan = min(nr_active,
@@ -828,6 +834,8 @@ shrink_zone(struct zone *zone, struct scan_control *sc)
 					(unsigned long)SWAP_CLUSTER_MAX);
 			nr_inactive -= sc->nr_to_scan;
 			shrink_cache(zone, sc);
+			if (sc->nr_to_reclaim <= 0)
+				break;
 		}
 	}
 }
