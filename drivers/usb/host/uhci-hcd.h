@@ -207,13 +207,13 @@ struct uhci_td {
  *
  * For instance, the queue can look like this:
  *
- * skel int1 QH
+ * skel int128 QH
  * dev 1 interrupt QH
  * dev 5 interrupt QH
- * skel int2 QH
- * skel int4 QH
+ * skel int64 QH
+ * skel int32 QH
  * ...
- * skel int128 QH
+ * skel int1 QH
  * skel low speed control QH
  * dev 5 control QH
  * skel high speed control QH
