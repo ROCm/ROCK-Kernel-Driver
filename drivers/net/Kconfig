@@ -2062,18 +2062,23 @@ config SK98LIN
 	  by this driver:
 	    - 3Com 3C940 Gigabit LOM Ethernet Adapter
 	    - 3Com 3C941 Gigabit LOM Ethernet Adapter
-	    - Allied Telesyn AT-2970SX Gigabit Ethernet Adapter
 	    - Allied Telesyn AT-2970LX Gigabit Ethernet Adapter
+	    - Allied Telesyn AT-2970LX/2SC Gigabit Ethernet Adapter
+	    - Allied Telesyn AT-2970SX Gigabit Ethernet Adapter
+	    - Allied Telesyn AT-2970SX/2SC Gigabit Ethernet Adapter
 	    - Allied Telesyn AT-2970TX Gigabit Ethernet Adapter
+	    - Allied Telesyn AT-2970TX/2TX Gigabit Ethernet Adapter
 	    - Allied Telesyn AT-2971SX Gigabit Ethernet Adapter
 	    - Allied Telesyn AT-2971T Gigabit Ethernet Adapter
-	    - Allied Telesyn AT-2970SX/2SC Gigabit Ethernet Adapter
-	    - Allied Telesyn AT-2970LX/2SC Gigabit Ethernet Adapter
-	    - Allied Telesyn AT-2970TX/2TX Gigabit Ethernet Adapter
-	    - N-Way PCI-Bus Giga-Card 1000/100/10Mbps(L)
 	    - DGE-530T Gigabit Ethernet Adapter
 	    - EG1032 v2 Instant Gigabit Network Adapter
 	    - EG1064 v2 Instant Gigabit Network Adapter
+	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Abit)
+	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Asus)
+	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (ECS)
+	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Epox)
+	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Gigabyte)
+	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Iwill)
 	    - Marvell RDK-8001 Adapter
 	    - Marvell RDK-8002 Adapter
 	    - Marvell RDK-8003 Adapter
@@ -2082,27 +2087,31 @@ config SK98LIN
 	    - Marvell RDK-8007 Adapter
 	    - Marvell RDK-8008 Adapter
 	    - Marvell RDK-8009 Adapter
+	    - Marvell RDK-8010 Adapter
 	    - Marvell RDK-8011 Adapter
 	    - Marvell RDK-8012 Adapter
-	    - Marvell Yukon Gigabit Ethernet 10/100/1000Base-T Adapter
+	    - Marvell Yukon Gigabit Ethernet 10/100/1000Base-T Adapter (32 bit)
+	    - Marvell Yukon Gigabit Ethernet 10/100/1000Base-T Adapter (64 bit)
+	    - N-Way PCI-Bus Giga-Card 1000/100/10Mbps(L)
+	    - SK-9521 10/100/1000Base-T Adapter
+	    - SK-9521 V2.0 10/100/1000Base-T Adapter
 	    - SK-9821 Gigabit Ethernet Server Adapter (SK-NET GE-T)
+	    - SK-9821 V2.0 Gigabit Ethernet 10/100/1000Base-T Adapter
 	    - SK-9822 Gigabit Ethernet Server Adapter (SK-NET GE-T dual link)
 	    - SK-9841 Gigabit Ethernet Server Adapter (SK-NET GE-LX)
+	    - SK-9841 V2.0 Gigabit Ethernet 1000Base-LX Adapter
 	    - SK-9842 Gigabit Ethernet Server Adapter (SK-NET GE-LX dual link)
 	    - SK-9843 Gigabit Ethernet Server Adapter (SK-NET GE-SX)
+	    - SK-9843 V2.0 Gigabit Ethernet 1000Base-SX Adapter
 	    - SK-9844 Gigabit Ethernet Server Adapter (SK-NET GE-SX dual link)
+	    - SK-9851 V2.0 Gigabit Ethernet 1000Base-SX Adapter
 	    - SK-9861 Gigabit Ethernet Server Adapter (SK-NET GE-SX Volition)
+	    - SK-9861 V2.0 Gigabit Ethernet 1000Base-SX Adapter
 	    - SK-9862 Gigabit Ethernet Server Adapter (SK-NET GE-SX Volition dual link)
 	    - SK-9871 Gigabit Ethernet Server Adapter (SK-NET GE-ZX)
-	    - SK-9872 Gigabit Ethernet Server Adapter (SK-NET GE-ZX dual link)
-	    - SK-9521 V2.0 10/100/1000Base-T Adapter
-	    - SK-9821 V2.0 Gigabit Ethernet 10/100/1000Base-T Adapter
-	    - SK-9841 V2.0 Gigabit Ethernet 1000Base-LX Adapter
-	    - SK-9843 V2.0 Gigabit Ethernet 1000Base-SX Adapter
-	    - SK-9851 V2.0 Gigabit Ethernet 1000Base-SX Adapter
-	    - SK-9861 V2.0 Gigabit Ethernet 1000Base-SX Adapter
 	    - SK-9871 V2.0 Gigabit Ethernet 1000Base-ZX Adapter
-	    - SK-9521 10/100/1000Base-T Adapter
+	    - SK-9872 Gigabit Ethernet Server Adapter (SK-NET GE-ZX dual link)
+	    - SMC EZ Card 1000 (SMC9452TXV.2)
 	  
 	  The adapters support Jumbo Frames.
 	  The dual link adapters support link-failover and dual port features.
@@ -2117,139 +2126,6 @@ config SK98LIN
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read Documentation/modules.txt. This is recommended.
 	  The module will be called sk98lin.o.
-	  
-config CONFIG_SK98LIN_T1
-	bool "3Com 3C940/3C941 Gigabit Ethernet Adapter"
-	depends on SK98LIN
-	help
-	  This driver supports:
-	  
-	    - 3Com 3C940 Gigabit LOM Ethernet Adapter
-	    - 3Com 3C941 Gigabit LOM Ethernet Adapter
-	
-	  Questions concerning this driver may be addressed to:
-	      linux@syskonnect.de
-	
-config CONFIG_SK98LIN_T2
-	bool "Allied Telesyn AT-29xx Gigabit Ethernet Adapter"
-	depends on SK98LIN
-	help
-	  This driver supports:
-	  
-	    - Allied Telesyn AT-2970SX Gigabit Ethernet Adapter
-	    - Allied Telesyn AT-2970LX Gigabit Ethernet Adapter
-	    - Allied Telesyn AT-2970TX Gigabit Ethernet Adapter
-	    - Allied Telesyn AT-2971SX Gigabit Ethernet Adapter
-	    - Allied Telesyn AT-2971T Gigabit Ethernet Adapter
-	    - Allied Telesyn AT-2970SX/2SC Gigabit Ethernet Adapter
-	    - Allied Telesyn AT-2970LX/2SC Gigabit Ethernet Adapter
-	    - Allied Telesyn AT-2970TX/2TX Gigabit Ethernet Adapter
-	
-	  Questions concerning this driver may be addressed to:
-	      linux@syskonnect.de
-	
-config CONFIG_SK98LIN_T3
-	bool "CNet N-Way Gigabit Ethernet Adapter"
-	depends on SK98LIN
-	help
-	  This driver supports:
-	  
-	    - N-Way PCI-Bus Giga-Card 1000/100/10Mbps(L)
-	
-	  Questions concerning this driver may be addressed to:
-	      linux@syskonnect.de
-	
-config CONFIG_SK98LIN_T4
-	bool "D-Link DGE-530T Gigabit Ethernet Adapter"
-	depends on SK98LIN
-	help
-	  This driver supports:
-	  
-	    - DGE-530T Gigabit Ethernet Adapter
-	
-	  Questions concerning this driver may be addressed to:
-	      linux@syskonnect.de
-	
-config CONFIG_SK98LIN_T5
-	bool "Linksys EG10xx Ethernet Server Adapter"
-	depends on SK98LIN
-	help
-	  This driver supports:
-	  
-	    - EG1032 v2 Instant Gigabit Network Adapter
-	    - EG1064 v2 Instant Gigabit Network Adapter
-	
-	  Questions concerning this driver may be addressed to:
-	      linux@syskonnect.de
-	
-config CONFIG_SK98LIN_T6
-	bool "Marvell RDK-80xx Adapter"
-	depends on SK98LIN
-	help
-	  This driver supports:
-	  
-	    - Marvell RDK-8001 Adapter
-	    - Marvell RDK-8002 Adapter
-	    - Marvell RDK-8003 Adapter
-	    - Marvell RDK-8004 Adapter
-	    - Marvell RDK-8006 Adapter
-	    - Marvell RDK-8007 Adapter
-	    - Marvell RDK-8008 Adapter
-	    - Marvell RDK-8009 Adapter
-	    - Marvell RDK-8011 Adapter
-	    - Marvell RDK-8012 Adapter
-	
-	  Questions concerning this driver may be addressed to:
-	      linux@syskonnect.de
-	
-config CONFIG_SK98LIN_T7
-	bool "Marvell Yukon Gigabit Ethernet Adapter"
-	depends on SK98LIN
-	help
-	  This driver supports:
-	  
-	    - Marvell Yukon Gigabit Ethernet 10/100/1000Base-T Adapter
-	
-	  Questions concerning this driver may be addressed to:
-	      linux@syskonnect.de
-	
-config CONFIG_SK98LIN_T8
-	bool "SysKonnect SK-98xx Server Gigabit Adapter"
-	depends on SK98LIN
-	help
-	  This driver supports:
-	  
-	    - SK-9821 Gigabit Ethernet Server Adapter (SK-NET GE-T)
-	    - SK-9822 Gigabit Ethernet Server Adapter (SK-NET GE-T dual link)
-	    - SK-9841 Gigabit Ethernet Server Adapter (SK-NET GE-LX)
-	    - SK-9842 Gigabit Ethernet Server Adapter (SK-NET GE-LX dual link)
-	    - SK-9843 Gigabit Ethernet Server Adapter (SK-NET GE-SX)
-	    - SK-9844 Gigabit Ethernet Server Adapter (SK-NET GE-SX dual link)
-	    - SK-9861 Gigabit Ethernet Server Adapter (SK-NET GE-SX Volition)
-	    - SK-9862 Gigabit Ethernet Server Adapter (SK-NET GE-SX Volition dual link)
-	    - SK-9871 Gigabit Ethernet Server Adapter (SK-NET GE-ZX)
-	    - SK-9872 Gigabit Ethernet Server Adapter (SK-NET GE-ZX dual link)
-	
-	  Questions concerning this driver may be addressed to:
-	      linux@syskonnect.de
-	
-config CONFIG_SK98LIN_T9
-	bool "SysKonnect SK-98xx V2.0 Gigabit Ethernet Adapter"
-	depends on SK98LIN
-	help
-	  This driver supports:
-	  
-	    - SK-9521 V2.0 10/100/1000Base-T Adapter
-	    - SK-9821 V2.0 Gigabit Ethernet 10/100/1000Base-T Adapter
-	    - SK-9841 V2.0 Gigabit Ethernet 1000Base-LX Adapter
-	    - SK-9843 V2.0 Gigabit Ethernet 1000Base-SX Adapter
-	    - SK-9851 V2.0 Gigabit Ethernet 1000Base-SX Adapter
-	    - SK-9861 V2.0 Gigabit Ethernet 1000Base-SX Adapter
-	    - SK-9871 V2.0 Gigabit Ethernet 1000Base-ZX Adapter
-	    - SK-9521 10/100/1000Base-T Adapter
-	  
-	  Questions concerning this driver may be addressed to:
-	      linux@syskonnect.de
 	  
 
 
