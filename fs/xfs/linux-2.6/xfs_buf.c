@@ -1531,6 +1531,18 @@ xfs_setsize_buftarg(
 			sectorsize, XFS_BUFTARG_NAME(btp));
 		return EINVAL;
 	}
+
+	/*
+	 * Disallow mounts with 64K pages and 512 byte sectors,
+	 * until the complete fix has been implemented.
+	 */
+	if ((PAGE_CACHE_SIZE == 64 * 1024) && (sectorsize == 512)) {
+		printk(KERN_WARNING
+"XFS: Cannot use a 512-byte-sector filesystem (%s) with 64KB pagesize (yet)\n",
+			XFS_BUFTARG_NAME(btp));
+		return EINVAL;
+	}
+
 	return 0;
 }
 
