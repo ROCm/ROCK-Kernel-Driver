@@ -32,7 +32,6 @@
 #include <linux/slab.h>
 #include <linux/pci.h>
 #include <linux/bootmem.h>
-#include <linux/slab.h>
 #include <linux/irq.h>
 #include <linux/acpi.h>
 #include <asm/mpspec.h>
