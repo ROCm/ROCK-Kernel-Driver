@@ -2,11 +2,6 @@
 # Makefile for most of the non-PCI devices in PA-RISC machines
 #
 
-obj-y :=
-obj-m :=
-obj-n :=
-obj-  :=
-
 # I/O SAPIC is also on IA64 platforms.
 # The two could be merged into a common source some day.
 obj-$(CONFIG_IOSAPIC)		+= iosapic.o
@@ -17,7 +12,7 @@ obj-$(CONFIG_PCI_LBA)		+= lba_pci.o
 # obj-$(CONFIG_IOMMU_CCIO)	+= ccio-rm-dma.o
 obj-$(CONFIG_IOMMU_CCIO)	+= ccio-dma.o
 
-obj-y				+= gsc.o
+obj-$(CONFIG_GSC)		+= gsc.o
 
 obj-$(CONFIG_HPPB)		+= hppb.o
 obj-$(CONFIG_GSC_DINO)		+= dino.o

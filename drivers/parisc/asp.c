@@ -13,7 +13,7 @@
 
 #include <linux/errno.h>
 #include <linux/init.h>
-#include <linux/irq.h>
+#include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/types.h>
@@ -30,25 +30,27 @@
 
 #define VIPER_INT_WORD  0xFFFBF088      /* addr of viper interrupt word */
 
-static int asp_choose_irq(struct parisc_device *dev)
+static void asp_choose_irq(struct parisc_device *dev, void *ctrl)
 {
-	int irq = -1;
+	int irq;
 
 	switch (dev->id.sversion) {
-	case 0x71:	irq = 22; break; /* SCSI */
-	case 0x72:	irq = 23; break; /* LAN */
-	case 0x73:	irq = 30; break; /* HIL */
-	case 0x74:	irq = 24; break; /* Centronics */
-	case 0x75:	irq = (dev->hw_path == 4) ? 26 : 25; break; /* RS232 */
-	case 0x76:	irq = 21; break; /* EISA BA */
-	case 0x77:	irq = 20; break; /* Graphics1 */
-	case 0x7a:	irq = 18; break; /* Audio (Bushmaster) */
-	case 0x7b:	irq = 18; break; /* Audio (Scorpio) */
-	case 0x7c:	irq = 28; break; /* FW SCSI */
-	case 0x7d:	irq = 27; break; /* FDDI */
-	case 0x7f:	irq = 18; break; /* Audio (Outfield) */
+	case 0x71:	irq =  9; break; /* SCSI */
+	case 0x72:	irq =  8; break; /* LAN */
+	case 0x73:	irq =  1; break; /* HIL */
+	case 0x74:	irq =  7; break; /* Centronics */
+	case 0x75:	irq = (dev->hw_path == 4) ? 5 : 6; break; /* RS232 */
+	case 0x76:	irq = 10; break; /* EISA BA */
+	case 0x77:	irq = 11; break; /* Graphics1 */
+	case 0x7a:	irq = 13; break; /* Audio (Bushmaster) */
+	case 0x7b:	irq = 13; break; /* Audio (Scorpio) */
+	case 0x7c:	irq =  3; break; /* FW SCSI */
+	case 0x7d:	irq =  4; break; /* FDDI */
+	case 0x7f:	irq = 13; break; /* Audio (Outfield) */
+	default:	return;		 /* Unknown */
 	}
-	return irq;
+
+	gsc_asic_assign_irq(ctrl, irq, &dev->irq);
 }
 
 /* There are two register ranges we're interested in.  Interrupt /
@@ -62,11 +64,11 @@ static int asp_choose_irq(struct parisc_device *dev)
 int __init
 asp_init_chip(struct parisc_device *dev)
 {
-	struct busdevice *asp;
+	struct gsc_asic *asp;
 	struct gsc_irq gsc_irq;
-	int irq, ret;
+	int ret;
 
-	asp = kmalloc(sizeof(struct busdevice), GFP_KERNEL);
+	asp = kmalloc(sizeof(*asp), GFP_KERNEL);
 	if(!asp)
 		return -ENOMEM;
 
@@ -79,37 +81,34 @@ asp_init_chip(struct parisc_device *dev)
 
 	/* the IRQ ASP should use */
 	ret = -EBUSY;
-	irq = gsc_claim_irq(&gsc_irq, ASP_GSC_IRQ);
-	if (irq < 0) {
+	dev->irq = gsc_claim_irq(&gsc_irq, ASP_GSC_IRQ);
+	if (dev->irq < 0) {
 		printk(KERN_ERR "%s(): cannot get GSC irq\n", __FUNCTION__);
 		goto out;
 	}
 
-	ret = request_irq(gsc_irq.irq, busdev_barked, 0, "asp", asp);
+	asp->eim = ((u32) gsc_irq.txn_addr) | gsc_irq.txn_data;
+
+	ret = request_irq(gsc_irq.irq, gsc_asic_intr, 0, "asp", asp);
 	if (ret < 0)
 		goto out;
-
-	/* Save this for debugging later */
-	asp->parent_irq = gsc_irq.irq;
-	asp->eim = ((u32) gsc_irq.txn_addr) | gsc_irq.txn_data;
 
 	/* Program VIPER to interrupt on the ASP irq */
 	gsc_writel((1 << (31 - ASP_GSC_IRQ)),VIPER_INT_WORD);
 
 	/* Done init'ing, register this driver */
-	ret = gsc_common_irqsetup(dev, asp);
+	ret = gsc_common_setup(dev, asp);
 	if (ret)
 		goto out;
 
-	fixup_child_irqs(dev, asp->busdev_region->data.irqbase, asp_choose_irq);
+	gsc_fixup_irqs(dev, asp, asp_choose_irq);
 	/* Mongoose is a sibling of Asp, not a child... */
-	fixup_child_irqs(dev->parent, asp->busdev_region->data.irqbase,
-			asp_choose_irq);
+	gsc_fixup_irqs(parisc_parent(dev), asp, asp_choose_irq);
 
 	/* initialize the chassis LEDs */ 
 #ifdef CONFIG_CHASSIS_LCD_LED	
 	register_led_driver(DISPLAY_MODEL_OLD_ASP, LED_CMD_REG_NONE, 
-		    (char *)ASP_LED_ADDR);
+		    ASP_LED_ADDR);
 #endif
 
 	return 0;

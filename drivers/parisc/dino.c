@@ -57,7 +57,6 @@
 #include <asm/page.h>
 #include <asm/system.h>
 #include <asm/io.h>
-#include <asm/irq.h>
 #include <asm/hardware.h>
 
 #include "gsc.h"
@@ -146,12 +145,10 @@ struct dino_device
 	spinlock_t		dinosaur_pen;
 	unsigned long		txn_addr; /* EIR addr to generate interrupt */ 
 	u32			txn_data; /* EIR data assign to each dino */ 
-	int			irq;      /* Virtual IRQ dino uses */
-	struct irq_region	*dino_region;  /* region for this Dino */
-
-	u32 			imr; /* IRQ's which are enabled */ 
+	u32 			imr;	  /* IRQ's which are enabled */ 
+	int			global_irq[12]; /* map IMR bit to global irq */
 #ifdef DINO_DEBUG
-	unsigned int		dino_irr0; /* save most recent IRQ line stat */ 
+	unsigned int		dino_irr0; /* save most recent IRQ line stat */
 #endif
 };
 
@@ -298,45 +295,37 @@ struct pci_port_ops dino_port_ops = {
 	.outl	= dino_out32
 };
 
-static void
-dino_mask_irq(void *irq_dev, int irq)
+static void dino_disable_irq(unsigned int irq)
 {
-	struct dino_device *dino_dev = DINO_DEV(irq_dev);
+	struct dino_device *dino_dev = irq_desc[irq].handler_data;
+	int local_irq = gsc_find_local_irq(irq, dino_dev->global_irq, irq);
 
 	DBG(KERN_WARNING "%s(0x%p, %d)\n", __FUNCTION__, irq_dev, irq);
 
-	if (NULL == irq_dev || irq > DINO_IRQS || irq < 0) {
-		printk(KERN_WARNING "%s(0x%lx, %d) - not a dino irq?\n",
-			__FUNCTION__, (long) irq_dev, irq);
-		BUG();
-	} else {
-		/*
-		** Clear the matching bit in the IMR register
-		*/
-		dino_dev->imr &= ~(DINO_MASK_IRQ(irq));
-		gsc_writel(dino_dev->imr, dino_dev->hba.base_addr+DINO_IMR);
-	}
+	/* Clear the matching bit in the IMR register */
+	dino_dev->imr &= ~(DINO_MASK_IRQ(local_irq));
+	__raw_writel(dino_dev->imr, dino_dev->hba.base_addr+DINO_IMR);
 }
 
-
-static void
-dino_unmask_irq(void *irq_dev, int irq)
+static void dino_enable_irq(unsigned int irq)
 {
-	struct dino_device *dino_dev = DINO_DEV(irq_dev);
+	struct dino_device *dino_dev = irq_desc[irq].handler_data;
+	int local_irq = gsc_find_local_irq(irq, dino_dev->global_irq, irq);
 	u32 tmp;
 
 	DBG(KERN_WARNING "%s(0x%p, %d)\n", __FUNCTION__, irq_dev, irq);
 
-	if (NULL == irq_dev || irq > DINO_IRQS) {
-		printk(KERN_WARNING "%s(): %d not a dino irq?\n",
-				__FUNCTION__, irq);
-		BUG();
-		return;
-	}
+	/*
+	** clear pending IRQ bits
+	**
+	** This does NOT change ILR state!
+	** See comment below for ILR usage.
+	*/
+	__raw_readl(dino_dev->hba.base_addr+DINO_IPR);
 
 	/* set the matching bit in the IMR register */
-	dino_dev->imr |= DINO_MASK_IRQ(irq);          /* used in dino_isr() */
-	gsc_writel( dino_dev->imr, dino_dev->hba.base_addr+DINO_IMR);
+	dino_dev->imr |= DINO_MASK_IRQ(local_irq);	/* used in dino_isr() */
+	__raw_writel( dino_dev->imr, dino_dev->hba.base_addr+DINO_IMR);
 
 	/* Emulate "Level Triggered" Interrupt
 	** Basically, a driver is blowing it if the IRQ line is asserted
@@ -347,38 +336,28 @@ dino_unmask_irq(void *irq_dev, int irq)
 	** dino_isr() will read IPR and find nothing. But then catch this
 	** when it also checks ILR.
 	*/
-	tmp = gsc_readl(dino_dev->hba.base_addr+DINO_ILR);
-	if (tmp & DINO_MASK_IRQ(irq)) {
+	tmp = __raw_readl(dino_dev->hba.base_addr+DINO_ILR);
+	if (tmp & DINO_MASK_IRQ(local_irq)) {
 		DBG(KERN_WARNING "%s(): IRQ asserted! (ILR 0x%x)\n",
 				__FUNCTION__, tmp);
 		gsc_writel(dino_dev->txn_data, dino_dev->txn_addr);
 	}
 }
 
-
-
-static void
-dino_enable_irq(void *irq_dev, int irq)
+static unsigned int dino_startup_irq(unsigned int irq)
 {
-	struct dino_device *dino_dev = DINO_DEV(irq_dev);
-
-	/*
-	** clear pending IRQ bits
-	**
-	** This does NOT change ILR state!
-	** See comments in dino_unmask_irq() for ILR usage.
-	*/
-	gsc_readl(dino_dev->hba.base_addr+DINO_IPR);
-
-	dino_unmask_irq(irq_dev, irq);
+	dino_enable_irq(irq);
+	return 0;
 }
 
-
-static struct irq_region_ops dino_irq_ops = {
-	.disable_irq	= dino_mask_irq,	/* ??? */
-	.enable_irq	= dino_enable_irq, 
-	.mask_irq	= dino_mask_irq,
-	.unmask_irq	= dino_unmask_irq
+static struct hw_interrupt_type dino_interrupt_type = {
+	.typename	= "GSC-PCI",
+	.startup	= dino_startup_irq,
+	.shutdown	= dino_disable_irq,
+	.enable		= dino_enable_irq, 
+	.disable	= dino_disable_irq,
+	.ack		= no_ack_irq,
+	.end		= no_end_irq,
 };
 
 
@@ -391,34 +370,28 @@ static struct irq_region_ops dino_irq_ops = {
 static irqreturn_t
 dino_isr(int irq, void *intr_dev, struct pt_regs *regs)
 {
-	struct dino_device *dino_dev = DINO_DEV(intr_dev);
+	struct dino_device *dino_dev = intr_dev;
 	u32 mask;
 	int ilr_loop = 100;
-	extern void do_irq(struct irqaction *a, int i, struct pt_regs *p);
-
 
 	/* read and acknowledge pending interrupts */
 #ifdef DINO_DEBUG
 	dino_dev->dino_irr0 =
 #endif
-	mask = gsc_readl(dino_dev->hba.base_addr+DINO_IRR0) & DINO_IRR_MASK;
+	mask = __raw_readl(dino_dev->hba.base_addr+DINO_IRR0) & DINO_IRR_MASK;
+
+	if (mask == 0)
+		return IRQ_NONE;
 
 ilr_again:
-	while (mask)
-	{
-		int irq;
-
-		irq = __ffs(mask);
-
-		mask &= ~(1<<irq);
-
-		DBG(KERN_WARNING "%s(%x, %p) mask %0x\n",
+	do {
+		int local_irq = __ffs(mask);
+		int irq = dino_dev->global_irq[local_irq];
+		DBG(KERN_DEBUG "%s(%d, %p) mask 0x%x\n",
 			__FUNCTION__, irq, intr_dev, mask);
-		do_irq(&dino_dev->dino_region->action[irq],
-			dino_dev->dino_region->data.irqbase + irq,
-			regs);
-
-	}
+		__do_IRQ(irq, regs);
+		mask &= ~(1 << local_irq);
+	} while (mask);
 
 	/* Support for level triggered IRQ lines.
 	** 
@@ -427,27 +400,40 @@ ilr_again:
 	** device drivers may assume lines are level triggered (and not
 	** edge triggered like EISA/ISA can be).
 	*/
-	mask = gsc_readl(dino_dev->hba.base_addr+DINO_ILR) & dino_dev->imr;
+	mask = __raw_readl(dino_dev->hba.base_addr+DINO_ILR) & dino_dev->imr;
 	if (mask) {
 		if (--ilr_loop > 0)
 			goto ilr_again;
-		printk(KERN_ERR "Dino %lx: stuck interrupt %d\n", dino_dev->hba.base_addr, mask);
+		printk(KERN_ERR "Dino 0x%p: stuck interrupt %d\n", 
+		       dino_dev->hba.base_addr, mask);
 		return IRQ_NONE;
 	}
 	return IRQ_HANDLED;
 }
 
-static int dino_choose_irq(struct parisc_device *dev)
+static void dino_assign_irq(struct dino_device *dino, int local_irq, int *irqp)
 {
-	int irq = -1;
+	int irq = gsc_assign_irq(&dino_interrupt_type, dino);
+	if (irq == NO_IRQ)
+		return;
+
+	*irqp = irq;
+	dino->global_irq[local_irq] = irq;
+}
+
+static void dino_choose_irq(struct parisc_device *dev, void *ctrl)
+{
+	int irq;
+	struct dino_device *dino = ctrl;
 
 	switch (dev->id.sversion) {
 		case 0x00084:	irq =  8; break; /* PS/2 */
 		case 0x0008c:	irq = 10; break; /* RS232 */
 		case 0x00096:	irq =  8; break; /* PS/2 */
+		default:	return;		 /* Unknown */
 	}
 
-	return irq;
+	dino_assign_irq(dino, irq, &dev->irq);
 }
 
 static void __init
@@ -664,11 +650,15 @@ dino_fixup_bus(struct pci_bus *bus)
 
 			u32 irq_pin;
 			
-			dino_cfg_read(dev->bus, dev->devfn, PCI_INTERRUPT_PIN, 1, &irq_pin);
-			dev->irq = (irq_pin + PCI_SLOT(dev->devfn) - 1) % 4 ;
-			dino_cfg_write(dev->bus, dev->devfn, PCI_INTERRUPT_LINE, 1, dev->irq);
-			dev->irq += dino_dev->dino_region->data.irqbase;
-			printk(KERN_WARNING "Device %s has undefined IRQ, setting to %d\n", dev->slot_name, irq_pin);
+			dino_cfg_read(dev->bus, dev->devfn, 
+				      PCI_INTERRUPT_PIN, 1, &irq_pin);
+			irq_pin = (irq_pin + PCI_SLOT(dev->devfn) - 1) % 4 ;
+			printk(KERN_WARNING "Device %s has undefined IRQ, "
+					"setting to %d\n", dev->slot_name,
+					irq_pin);
+			dino_cfg_write(dev->bus, dev->devfn, 
+				       PCI_INTERRUPT_LINE, 1, irq_pin);
+			dino_assign_irq(dino_dev, irq_pin, &dev->irq);
 #else
 			dev->irq = 65535;
 			printk(KERN_WARNING "Device %s has unassigned IRQ\n", dev->slot_name);	
@@ -676,7 +666,7 @@ dino_fixup_bus(struct pci_bus *bus)
 		} else {
 
 			/* Adjust INT_LINE for that busses region */
-			dev->irq += dino_dev->dino_region->data.irqbase;
+			dino_assign_irq(dino_dev, dev->irq, &dev->irq);
 		}
 	}
 }
@@ -830,7 +820,7 @@ static int __init dino_common_init(struct parisc_device *dev,
 	**   still only has 11 IRQ input lines - just map some of them
 	**   to a different processor.
 	*/
-	dino_dev->irq = gsc_alloc_irq(&gsc_irq);
+	dev->irq = gsc_alloc_irq(&gsc_irq);
 	dino_dev->txn_addr = gsc_irq.txn_addr;
 	dino_dev->txn_data = gsc_irq.txn_data;
 	eim = ((u32) gsc_irq.txn_addr) | gsc_irq.txn_data;
@@ -839,27 +829,15 @@ static int __init dino_common_init(struct parisc_device *dev,
 	** Dino needs a PA "IRQ" to get a processor's attention.
 	** arch/parisc/kernel/irq.c returns an EIRR bit.
 	*/
-	if (dino_dev->irq < 0) {
+	if (dev->irq < 0) {
 		printk(KERN_WARNING "%s: gsc_alloc_irq() failed\n", name);
 		return 1;
 	}
 
-	status = request_irq(dino_dev->irq, dino_isr, 0, name, dino_dev);
+	status = request_irq(dev->irq, dino_isr, 0, name, dino_dev);
 	if (status) {
 		printk(KERN_WARNING "%s: request_irq() failed with %d\n", 
 			name, status);
-		return 1;
-	}
-
-	/*
-	** Tell generic interrupt support we have 11 bits which need
-	** be checked in the interrupt handler.
-	*/
-	dino_dev->dino_region = alloc_irq_region(DINO_IRQS, &dino_irq_ops,
-						name, dino_dev);
-
-	if (NULL == dino_dev->dino_region) {
-		printk(KERN_WARNING "%s: alloc_irq_region() failed\n", name);
 		return 1;
 	}
 
@@ -867,21 +845,20 @@ static int __init dino_common_init(struct parisc_device *dev,
 	 * Dino / Cujo chips.
 	 */
 
-	fixup_child_irqs(dev, dino_dev->dino_region->data.irqbase,
-			dino_choose_irq);
+	gsc_fixup_irqs(dev, dino_dev, dino_choose_irq);
 
 	/*
 	** This enables DINO to generate interrupts when it sees
 	** any of its inputs *change*. Just asserting an IRQ
 	** before it's enabled (ie unmasked) isn't good enough.
 	*/
-	gsc_writel(eim, dino_dev->hba.base_addr+DINO_IAR0);
+	__raw_writel(eim, dino_dev->hba.base_addr+DINO_IAR0);
 
 	/*
 	** Some platforms don't clear Dino's IRR0 register at boot time.
 	** Reading will clear it now.
 	*/
-	gsc_readl(dino_dev->hba.base_addr+DINO_IRR0);
+	__raw_readl(dino_dev->hba.base_addr+DINO_IRR0);
 
 	/* allocate I/O Port resource region */
 	res = &dino_dev->hba.io_space;
