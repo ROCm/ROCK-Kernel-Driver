@@ -789,16 +789,6 @@ xfs_mountfs(
 	}
 
 	/*
-	 * Disallow mount attempts with (IRIX) project quota enabled
-	 */
-	if (XFS_SB_VERSION_HASQUOTA(&mp->m_sb) &&
-	    (mp->m_sb.sb_qflags & XFS_PQUOTA_ACCT)) {
-		cmn_err(CE_WARN, "XFS: IRIX project quota are enabled");
-		error = XFS_ERROR(ENOSYS);
-		goto error1;
-	}
-
-	/*
 	 * Initialize realtime fields in the mount structure
 	 */
 	if ((error = xfs_rtmount_init(mp))) {

@@ -198,61 +198,20 @@ xfs_cleanup(void)
 }
 
 /*
- * xfs_cmountfs
- *
- * This function is the common mount file system function for XFS.
+ * xfs_start_flags
+ * 
+ * This function fills in xfs_mount_t fields based on mount args.
+ * Note: the superblock has _not_ yet been read in.
  */
-STATIC int
-xfs_cmountfs(
-	vfs_t		*vfsp,
-	dev_t		ddev,
-	dev_t		logdev,
-	dev_t		rtdev,
-	struct xfs_mount_args *ap,
-	struct cred	*cr)
+int
+xfs_start_flags(
+	vfs_t			*vfsp,
+	dev_t			ddev,
+	dev_t			logdev,
+	dev_t			rtdev,
+	struct xfs_mount_args	*ap,
+	struct xfs_mount	*mp)
 {
-	xfs_mount_t	*mp;
-	int		error = 0;
-
-
-	/*
-	 * Allocate VFS private data (xfs mount structure).
-	 */
-	mp = xfs_mount_init();
-
-	vfs_insertbhv(vfsp, &mp->m_bhv, &xfs_vfsops, mp);
-
-	/*
-	 * Open data, real time, and log devices now - order is important.
-	 */
-	mp->m_ddev_targp = pagebuf_lock_enable(ddev, 0);
-	if (IS_ERR(mp->m_ddev_targp)) {
-		error = PTR_ERR(mp->m_ddev_targp);
-		goto error2;
-	}
-
-	if (rtdev != 0) {
-		mp->m_rtdev_targp = 
-				pagebuf_lock_enable(rtdev, 1);
-		if (IS_ERR(mp->m_rtdev_targp)) {
-			error = PTR_ERR(mp->m_rtdev_targp);
-			pagebuf_lock_disable(mp->m_ddev_targp, 0);
-			goto error2;
-		}
-	}
-
-	if (logdev != ddev) {
-		mp->m_logdev_targp = 
-				pagebuf_lock_enable(logdev, 1);
-		if (IS_ERR(mp->m_logdev_targp)) {
-			error = PTR_ERR(mp->m_logdev_targp);
-			pagebuf_lock_disable(mp->m_ddev_targp, 1);
-			if (mp->m_rtdev_targp)
-				pagebuf_lock_disable(mp->m_rtdev_targp, 1);
-			goto error2;
-		}
-	}
-
 	/* Values are in BBs */
 	if ((ap->flags & XFSMNT_NOALIGN) != XFSMNT_NOALIGN) {
 		/*
@@ -282,8 +241,7 @@ xfs_cmountfs(
 			cmn_err(CE_WARN, 
 				"XFS: invalid logbufs value: %d [not %d-%d]\n",
 				ap->logbufs, XLOG_NUM_ICLOGS, XLOG_MAX_ICLOGS);
-			error = XFS_ERROR(EINVAL);
-			goto error3;
+			return XFS_ERROR(EINVAL);
 		}
 		mp->m_logbufs = ap->logbufs;
 		if (ap->logbufsize != -1 &&
@@ -295,8 +253,7 @@ xfs_cmountfs(
 			cmn_err(CE_WARN,
 		"XFS: invalid logbufsize: %d [not 16k,32k,64k,128k or 256k]\n",
 				ap->logbufsize);
-			error = XFS_ERROR(EINVAL);
-			goto error3;
+			return XFS_ERROR(EINVAL);
 		}
 		mp->m_logbsize = ap->logbufsize;
 		mp->m_fsname_len = strlen(ap->fsname) + 1;
@@ -307,8 +264,7 @@ xfs_cmountfs(
 		if (rtdev == ddev || rtdev == logdev) {
 			cmn_err(CE_WARN,
 	"XFS: Cannot mount filesystem with identical rtdev and logdev.");
-			error = XFS_ERROR(EINVAL);
-			goto error3;
+			return XFS_ERROR(EINVAL);
 		} else {
 			/* Set the realtime device's block size */
 			set_blocksize(mp->m_rtdev_targp->pbr_bdev, 512);
@@ -361,8 +317,7 @@ xfs_cmountfs(
 			"XFS: invalid log iosize: %d [not %d-%d]",
 					ap->iosizelog, XFS_MIN_IO_LOG,
 					XFS_MAX_IO_LOG);
-				error = XFS_ERROR(EINVAL);
-				goto error3;
+				return XFS_ERROR(EINVAL);
 			}
 
 			mp->m_flags |= XFS_MOUNT_DFLT_IOSIZE;
@@ -376,8 +331,7 @@ xfs_cmountfs(
 			if (!(vfsp->vfs_flag & VFS_RDONLY)) {
 				cmn_err(CE_WARN,
 		"XFS: tried to mount a FS read-write without recovery!");
-				error = XFS_ERROR(EINVAL);
-				goto error3;
+				return XFS_ERROR(EINVAL);
 			}
 			mp->m_flags |= XFS_MOUNT_NORECOVERY;
 		}
@@ -388,62 +342,66 @@ xfs_cmountfs(
 			mp->m_flags |= XFS_MOUNT_NOLOGFLUSH;
 	}
 
-	/*
-	 * read in superblock to check read-only flags and shared
-	 * mount status
-	 */
-	if ((error = xfs_readsb(mp)))
-		goto error3;
+	return 0;
+}
 
+/*
+ * This function fills in xfs_mount_t fields based on mount args.
+ * Note: the superblock _has_ now been read in.
+ */
+int
+xfs_finish_flags(
+	vfs_t			*vfsp,
+	dev_t			ddev,
+	dev_t			logdev,
+	dev_t			rtdev,
+	struct xfs_mount_args	*ap,
+	struct xfs_mount	*mp)
+{
 	/* Fail a mount where the logbuf is smaller then the log stripe */
 	if (XFS_SB_VERSION_HASLOGV2(&mp->m_sb)) {
 		if (((ap->logbufsize == -1) &&
 		     (mp->m_sb.sb_logsunit > XLOG_BIG_RECORD_BSIZE)) ||
 		    (ap->logbufsize < mp->m_sb.sb_logsunit)) {
-			cmn_err(CE_WARN, "XFS: "
-				"logbuf size must be greater than or equal to log stripe size");
-			xfs_freesb(mp);
-			error = XFS_ERROR(EINVAL);
-			goto error3;
+			cmn_err(CE_WARN,
+	"XFS: logbuf size must be greater than or equal to log stripe size");
+			return XFS_ERROR(EINVAL);
 		}
 	} else {
 		/* Fail a mount if the logbuf is larger than 32K */
 		if (ap->logbufsize > XLOG_BIG_RECORD_BSIZE) {
-			cmn_err(CE_WARN, "XFS: "
-		"XFS: logbuf size for version 1 logs must be 16K or 32K");
-			xfs_freesb(mp);
-			error = XFS_ERROR(EINVAL);
-			goto error3;
+			cmn_err(CE_WARN,
+	"XFS: logbuf size for version 1 logs must be 16K or 32K");
+			return XFS_ERROR(EINVAL);
 		}
 	}
-
-	pagebuf_target_blocksize(mp->m_ddev_targp, mp->m_sb.sb_blocksize);
-	if (logdev != 0 && logdev != ddev)
-		pagebuf_target_blocksize(mp->m_logdev_targp, mp->m_sb.sb_blocksize);
-	if (rtdev != 0)
-		pagebuf_target_blocksize(mp->m_rtdev_targp, mp->m_sb.sb_blocksize);
 
 	/*
 	 * prohibit r/w mounts of read-only filesystems
 	 */
 	if ((mp->m_sb.sb_flags & XFS_SBF_READONLY) &&
 	    !(vfsp->vfs_flag & VFS_RDONLY)) {
-		cmn_err(CE_WARN, "XFS: "
-			"cannot mount a read-only filesystem as read-write");
-		error = XFS_ERROR(EROFS);
-		xfs_freesb(mp);
-		goto error3;
+		cmn_err(CE_WARN,
+	"XFS: cannot mount a read-only filesystem as read-write");
+		return XFS_ERROR(EROFS);
+	}
+
+	/*
+	 * disallow mount attempts with (IRIX) project quota enabled
+	 */
+	if (XFS_SB_VERSION_HASQUOTA(&mp->m_sb) &&
+	    (mp->m_sb.sb_qflags & XFS_PQUOTA_ACCT)) {
+		cmn_err(CE_WARN,
+	"XFS: cannot mount a filesystem with IRIX project quota enabled");
+		return XFS_ERROR(ENOSYS);
 	}
 
 	/*
 	 * check for shared mount.
 	 */
 	if (ap && ap->flags & XFSMNT_SHARED) {
-		if (!XFS_SB_VERSION_HASSHARED(&mp->m_sb)) {
-			error = XFS_ERROR(EINVAL);
-			xfs_freesb(mp);
-			goto error3;
-		}
+		if (!XFS_SB_VERSION_HASSHARED(&mp->m_sb))
+			return XFS_ERROR(EINVAL);
 
 		/*
 		 * For IRIX 6.5, shared mounts must have the shared
@@ -453,26 +411,98 @@ xfs_cmountfs(
 		 */
 		if (!(vfsp->vfs_flag & VFS_RDONLY) ||
 		    !(mp->m_sb.sb_flags & XFS_SBF_READONLY) ||
-		    mp->m_sb.sb_shared_vn != 0) {
-			error = XFS_ERROR(EINVAL);
-			xfs_freesb(mp);
-			goto error3;
-		}
+		     (mp->m_sb.sb_shared_vn != 0))
+			return XFS_ERROR(EINVAL);
 
 		mp->m_flags |= XFS_MOUNT_SHARED;
 
 		/*
 		 * Shared XFS V0 can't deal with DMI.  Return EINVAL.
 		 */
-		if (mp->m_sb.sb_shared_vn == 0 && (ap->flags & XFSMNT_DMAPI)) {
-			error = XFS_ERROR(EINVAL);
-			xfs_freesb(mp);
-			goto error3;
+		if (mp->m_sb.sb_shared_vn == 0 && (ap->flags & XFSMNT_DMAPI))
+			return XFS_ERROR(EINVAL);
+	}
+
+	return 0;
+}
+
+/*
+ * xfs_cmountfs
+ *
+ * This function is the common mount file system function for XFS.
+ */
+STATIC int
+xfs_cmountfs(
+	vfs_t			*vfsp,
+	dev_t			ddev,
+	dev_t			logdev,
+	dev_t			rtdev,
+	struct xfs_mount_args	*ap,
+	struct cred		*cr)
+{
+	xfs_mount_t		*mp;
+	int			error = 0;
+
+	/*
+	 * Allocate VFS private data (xfs mount structure).
+	 */
+	mp = xfs_mount_init();
+
+	vfs_insertbhv(vfsp, &mp->m_bhv, &xfs_vfsops, mp);
+
+	/*
+	 * Open data, real time, and log devices now - order is important.
+	 */
+	mp->m_ddev_targp = pagebuf_lock_enable(ddev, 0);
+	if (IS_ERR(mp->m_ddev_targp)) {
+		error = PTR_ERR(mp->m_ddev_targp);
+		goto error2;
+	}
+
+	if (rtdev != 0) {
+		mp->m_rtdev_targp = pagebuf_lock_enable(rtdev, 1);
+		if (IS_ERR(mp->m_rtdev_targp)) {
+			error = PTR_ERR(mp->m_rtdev_targp);
+			pagebuf_lock_disable(mp->m_ddev_targp, 0);
+			goto error2;
 		}
 	}
 
-	if ((error = xfs_mountfs(vfsp, mp, ddev, 0)) == 0)
+	if (logdev != ddev) {
+		mp->m_logdev_targp = pagebuf_lock_enable(logdev, 1);
+		if (IS_ERR(mp->m_logdev_targp)) {
+			error = PTR_ERR(mp->m_logdev_targp);
+			pagebuf_lock_disable(mp->m_ddev_targp, 1);
+			if (mp->m_rtdev_targp)
+				pagebuf_lock_disable(mp->m_rtdev_targp, 1);
+			goto error2;
+		}
+	}
+
+	if ((error = xfs_start_flags(vfsp, ddev, logdev, rtdev, ap, mp)))
+		goto error3;
+
+	if ((error = xfs_readsb(mp)))
+		goto error3;
+
+	if ((error = xfs_finish_flags(vfsp, ddev, logdev, rtdev, ap, mp))) {
+		xfs_freesb(mp);
+		goto error3;
+	}
+
+	pagebuf_target_blocksize(mp->m_ddev_targp, mp->m_sb.sb_blocksize);
+	if (logdev != 0 && logdev != ddev)
+		pagebuf_target_blocksize(mp->m_logdev_targp,
+					mp->m_sb.sb_blocksize);
+	if (rtdev != 0)
+		pagebuf_target_blocksize(mp->m_rtdev_targp,
+					mp->m_sb.sb_blocksize);
+
+	mp->m_cxfstype = XFS_CXFS_NOT;
+	if ((error = xfs_mountfs(vfsp, mp, ddev, 0)) == 0) {
+		/* Success! */
 		return 0;
+	}
 
 	/*
 	 * Be careful not to clobber the value of 'error' here.
