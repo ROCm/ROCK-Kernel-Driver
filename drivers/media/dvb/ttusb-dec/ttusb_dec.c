@@ -552,13 +552,14 @@ static void ttusb_dec_process_urb_frame(struct ttusb_dec * dec, u8 * b,
 			break;
 
 		case 3:
-			if (*b++ == 0x00) {
+			if (*b == 0x00) {
 				dec->packet_state++;
 				dec->packet_length = 0;
-			} else {
+			} else if (*b != 0xaa) {
 				dec->packet_state = 0;
 			}
 
+			b++;
 			length--;
 			break;
 
