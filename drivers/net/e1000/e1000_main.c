@@ -1280,41 +1280,6 @@ e1000_set_multi(struct net_device *netdev)
 		e1000_leave_82542_rst(adapter);
 }
 
-static void
-e1000_tx_flush(struct e1000_adapter *adapter)
-{
-	uint32_t ctrl, tctl, txcw, icr;
-
-	e1000_irq_disable(adapter);
-
-	if(adapter->hw.mac_type < e1000_82543) {
-		/* Transmit Unit Reset */
-		tctl = E1000_READ_REG(&adapter->hw, TCTL);
-		E1000_WRITE_REG(&adapter->hw, TCTL, tctl | E1000_TCTL_RST);
-		E1000_WRITE_REG(&adapter->hw, TCTL, tctl);
-		e1000_clean_tx_ring(adapter);
-		e1000_configure_tx(adapter);
-	} else {
-		txcw = E1000_READ_REG(&adapter->hw, TXCW);
-		E1000_WRITE_REG(&adapter->hw, TXCW, txcw & ~E1000_TXCW_ANE);
-
-		ctrl = E1000_READ_REG(&adapter->hw, CTRL);
-		E1000_WRITE_REG(&adapter->hw, CTRL, ctrl | E1000_CTRL_SLU |
-				E1000_CTRL_ILOS);
-
-		mdelay(10);
-
-		e1000_clean_tx_irq(adapter);
-		E1000_WRITE_REG(&adapter->hw, CTRL, ctrl);
-		E1000_WRITE_REG(&adapter->hw, TXCW, txcw);
-
-		/* clear the link status change interrupts this caused */
-		icr = E1000_READ_REG(&adapter->hw, ICR);
-	}
-
-	e1000_irq_enable(adapter);
-}
-
 /* need to wait a few seconds after link up to get diagnostic information from the phy */
 
 static void
@@ -1418,10 +1383,11 @@ e1000_watchdog(unsigned long data)
 
 	if(!netif_carrier_ok(netdev)) {
 		if(E1000_DESC_UNUSED(txdr) + 1 < txdr->count) {
-			unsigned long flags;
-			spin_lock_irqsave(&netdev->xmit_lock, flags);
-			e1000_tx_flush(adapter);
-			spin_unlock_irqrestore(&netdev->xmit_lock, flags);
+			/* We've lost link, so the controller stops DMA,
+			 * but we've got queued Tx work that's never going
+			 * to get done, so reset controller to flush Tx.
+			 * (Do the reset outside of interrupt context). */
+			schedule_work(&adapter->tx_timeout_task);
 		}
 	}
 
