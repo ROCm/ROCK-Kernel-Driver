@@ -335,7 +335,7 @@ static DEVICE_ATTR(beep_mask, S_IWUSR|S_IRUGO,
 
 static int gl518_attach_adapter(struct i2c_adapter *adapter)
 {
-	if (!(adapter->class & I2C_CLASS_SMBUS))
+	if (!(adapter->class & I2C_CLASS_HWMON))
 		return 0;
 	return i2c_detect(adapter, &addr_data, gl518_detect);
 }

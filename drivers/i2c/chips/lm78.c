@@ -488,7 +488,7 @@ static DEVICE_ATTR(alarms, S_IRUGO, show_alarms, NULL);
      * when a new adapter is inserted (and lm78_driver is still present) */
 static int lm78_attach_adapter(struct i2c_adapter *adapter)
 {
-	if (!(adapter->class & I2C_CLASS_SMBUS))
+	if (!(adapter->class & I2C_CLASS_HWMON))
 		return 0;
 	return i2c_detect(adapter, &addr_data, lm78_detect);
 }

@@ -145,7 +145,7 @@ static DEVICE_ATTR(temp1_max, S_IRUGO, show_temp_over, NULL)
 
 static int w83l785ts_attach_adapter(struct i2c_adapter *adapter)
 {
-	if (!(adapter->class & I2C_CLASS_SMBUS))
+	if (!(adapter->class & I2C_CLASS_HWMON))
 		return 0;
 	return i2c_detect(adapter, &addr_data, w83l785ts_detect);
 }

@@ -609,7 +609,7 @@ static DEVICE_ATTR(fan1_pwm_enable, S_IRUGO | S_IWUSR,
  */
 static int asb100_attach_adapter(struct i2c_adapter *adapter)
 {
-	if (!(adapter->class & I2C_CLASS_SMBUS))
+	if (!(adapter->class & I2C_CLASS_HWMON))
 		return 0;
 	return i2c_detect(adapter, &addr_data, asb100_detect);
 }
