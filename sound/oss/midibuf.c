@@ -290,15 +290,15 @@ int MIDIbuf_write(int dev, struct file *file, const char *buf, int count)
 				 */
 
 			if (file->f_flags & O_NONBLOCK) {
-				restore_flags(flags);
-				return -EAGAIN;
+				c = -EAGAIN;
+				goto out;
 			}
 
 			interruptible_sleep_on(&midi_sleeper[dev]);
 			if (signal_pending(current)) 
 			{
-				restore_flags(flags);
-				return -EINTR;
+				c = -EINTR;
+				goto out;
 			}
 			n = SPACE_AVAIL(midi_out_buf[dev]);
 		}
@@ -308,11 +308,15 @@ int MIDIbuf_write(int dev, struct file *file, const char *buf, int count)
 		for (i = 0; i < n; i++)
 		{
 			/* BROKE BROKE BROKE - CANT DO THIS WITH CLI !! */
-			copy_from_user((char *) &tmp_data, &(buf)[c], 1);
+			if (copy_from_user((char *) &tmp_data, &(buf)[c], 1)) {
+				c = -EFAULT;
+				goto out;
+			}
 			QUEUE_BYTE(midi_out_buf[dev], tmp_data);
 			c++;
 		}
 	}
+out:
 	restore_flags(flags);
 	return c;
 }
@@ -333,8 +337,8 @@ int MIDIbuf_read(int dev, struct file *file, char *buf, int count)
 						 * No data yet, wait
 						 */
  		if (file->f_flags & O_NONBLOCK) {
- 			restore_flags(flags);
- 			return -EAGAIN;
+ 			c = -EAGAIN;
+			goto out;
  		}
 		interruptible_sleep_on_timeout(&input_sleeper[dev],
 					       parms[dev].prech_timeout);
@@ -357,10 +361,14 @@ int MIDIbuf_read(int dev, struct file *file, char *buf, int count)
 			REMOVE_BYTE(midi_in_buf[dev], tmp_data);
 			fixit = (char *) &tmp_data;
 			/* BROKE BROKE BROKE */
-			copy_to_user(&(buf)[c], fixit, 1);
+			if (copy_to_user(&(buf)[c], fixit, 1)) {
+				c = -EFAULT;
+				goto out;
+			}
 			c++;
 		}
 	}
+out:
 	restore_flags(flags);
 	return c;
 }

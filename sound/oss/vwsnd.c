@@ -2303,7 +2303,8 @@ static ssize_t vwsnd_audio_do_read(struct file *file,
 		if (nb > count)
 			nb = count;
 		DBGPV("nb = %d\n", nb);
-		copy_to_user(buffer, rport->swbuf + rport->swb_u_idx, nb);
+		if (copy_to_user(buffer, rport->swbuf + rport->swb_u_idx, nb))
+			return -EFAULT;
 		(void) swb_inc_u(rport, nb);
 		buffer += nb;
 		count -= nb;
@@ -2377,7 +2378,8 @@ static ssize_t vwsnd_audio_do_write(struct file *file,
 		if (nb > count)
 			nb = count;
 		DBGPV("nb = %d\n", nb);
-		copy_from_user(wport->swbuf + wport->swb_u_idx, buffer, nb);
+		if (copy_from_user(wport->swbuf + wport->swb_u_idx, buffer, nb))
+			return -EFAULT;
 		pcm_output(devc, 0, nb);
 		buffer += nb;
 		count -= nb;
@@ -2650,7 +2652,9 @@ static int vwsnd_audio_do_ioctl(struct inode *inode,
 		DBGXV("SNDCTL_DSP_GETOSPACE returns { %d %d %d %d }\n",
 		     buf_info.fragments, buf_info.fragstotal,
 		     buf_info.fragsize, buf_info.bytes);
-		return copy_to_user((void *) arg, &buf_info, sizeof buf_info);
+		if (copy_to_user((void *) arg, &buf_info, sizeof buf_info))
+			return -EFAULT;
+		return 0;
 
 	case SNDCTL_DSP_GETISPACE:	/* _SIOR ('P',13, audio_buf_info) */
 		DBGX("SNDCTL_DSP_GETISPACE\n");
@@ -2667,7 +2671,9 @@ static int vwsnd_audio_do_ioctl(struct inode *inode,
 		DBGX("SNDCTL_DSP_GETISPACE returns { %d %d %d %d }\n",
 		     buf_info.fragments, buf_info.fragstotal,
 		     buf_info.fragsize, buf_info.bytes);
-		return copy_to_user((void *) arg, &buf_info, sizeof buf_info);
+		if (copy_to_user((void *) arg, &buf_info, sizeof buf_info))
+			return -EFAULT;
+		return 0;
 
 	case SNDCTL_DSP_NONBLOCK:	/* _SIO  ('P',14) */
 		DBGX("SNDCTL_DSP_NONBLOCK\n");
@@ -2725,7 +2731,9 @@ static int vwsnd_audio_do_ioctl(struct inode *inode,
 			rport->frag_count = 0;
 		}
 		spin_unlock_irqrestore(&rport->lock, flags);
-		return copy_to_user((void *) arg, &info, sizeof info);
+		if (copy_to_user((void *) arg, &info, sizeof info))
+			return -EFAULT;
+		return 0;
 
 	case SNDCTL_DSP_GETOPTR:	/* _SIOR ('P',18, count_info) */
 		DBGX("SNDCTL_DSP_GETOPTR\n");
@@ -2747,7 +2755,9 @@ static int vwsnd_audio_do_ioctl(struct inode *inode,
 			wport->frag_count = 0;
 		}
 		spin_unlock_irqrestore(&wport->lock, flags);
-		return copy_to_user((void *) arg, &info, sizeof info);
+		if (copy_to_user((void *) arg, &info, sizeof info))
+			return -EFAULT;
+		return 0;
 
 	case SNDCTL_DSP_GETODELAY:	/* _SIOR ('P', 23, int) */
 		DBGX("SNDCTL_DSP_GETODELAY\n");
