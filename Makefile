@@ -144,6 +144,13 @@ export CPPFLAGS EXPORT_FLAGS NOSTDINC_FLAGS
 export CFLAGS CFLAGS_KERNEL CFLAGS_MODULE 
 export AFLAGS AFLAGS_KERNEL AFLAGS_MODULE
 
+src	:= .
+obj	:= .
+srctree := $(TOPDIR)
+objtree := $(TOPDIR)
+
+export srctree objtree
+
 SUBDIRS		:= init kernel mm fs ipc lib drivers sound net
 
 noconfig_targets := xconfig menuconfig config oldconfig randconfig \
@@ -255,7 +262,7 @@ define rule_link_vmlinux
 	. scripts/mkversion > .tmpversion
 	mv -f .tmpversion .version
 	+$(MAKE) -C init
-	$(call cmd,cmd_link_vmlinux)
+	$(call cmd,link_vmlinux)
 	$(cmd_link_vmlinux)
 	echo 'cmd_$@ := $(cmd_link_vmlinux)' > $(@D)/.$(@F).cmd
 	$(NM) vmlinux | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
@@ -716,9 +723,9 @@ if_changed_rule = $(if $(strip $? \
 			       $(filter-out $(cmd_$(@F)),$(cmd_$(1)))),\
 	               @$(rule_$(1)))
 
-# If quiet is set, only print short version of rule
+# If quiet is set, only print short version of command
 
-cmd = @$(if $($(quiet)$(1)),echo '  $($(quiet)$(1))' &&) $($(1))
+cmd = @$(if $($(quiet)cmd_$(1)),echo '  $($(quiet)cmd_$(1))' &&) $(cmd_$(1))
 
 define update-if-changed
 	if [ -r $@ ] && cmp -s $@ $@.tmp; then \
