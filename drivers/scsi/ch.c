@@ -732,7 +732,7 @@ ch_is_busy(scsi_changer *ch, int type, int unit)
 		return 0;
 	if (!ch->dt[unit])
 		return 0;
-	return 1;
+	return 0;
 }
 
 static int ch_ioctl(struct inode * inode, struct file * file,

@@ -125,6 +125,7 @@ static int open_proc_mm(struct inode *inode, struct file *file)
 		goto out_mem;
 
 	init_new_empty_context(mm);
+	arch_pick_mmap_layout(mm);
 
 	spin_lock(&mmlist_lock);
 	list_add(&mm->mmlist, &current->mm->mmlist);

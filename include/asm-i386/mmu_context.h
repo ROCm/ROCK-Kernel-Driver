@@ -21,7 +21,6 @@ static inline void init_new_empty_context(struct mm_struct *mm)
 {
 	init_MUTEX(&mm->context.sem);
 	mm->context.size = 0;
-	arch_pick_mmap_layout(mm);
 }
 
 /* LDT copy for SKAS - for the above problem.*/
