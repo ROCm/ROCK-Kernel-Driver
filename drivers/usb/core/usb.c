@@ -137,7 +137,7 @@ void usb_unbind_driver(struct usb_device *device, struct usb_interface *intf)
 	driver = intf->driver;
 	priv = intf->private_data;
 	
-	if (!driver)
+	if (!driver || !driver->disconnect)
 		return;
 
 	/* as soon as we increase the module use count we drop the BKL
