@@ -81,22 +81,23 @@ void sym_init(void)
 	sym_add_default(sym, uts.release);
 }
 
-int sym_get_type(struct symbol *sym)
+enum symbol_type sym_get_type(struct symbol *sym)
 {
-	int type = sym->type;
+	enum symbol_type type = sym->type;
+
 	if (type == S_TRISTATE) {
 		if (sym_is_choice_value(sym) && sym->visible == yes)
 			type = S_BOOLEAN;
 		else {
 			sym_calc_value(modules_sym);
-			if (S_TRI(modules_sym->curr) == no)
+			if (modules_sym->curr.tri == no)
 				type = S_BOOLEAN;
 		}
 	}
 	return type;
 }
 
-const char *sym_type_name(int type)
+const char *sym_type_name(enum symbol_type type)
 {
 	switch (type) {
 	case S_BOOLEAN:
@@ -111,6 +112,8 @@ const char *sym_type_name(int type)
 		return "string";
 	case S_UNKNOWN:
 		return "unknown";
+	case S_OTHER:
+		break;
 	}
 	return "???";
 }
@@ -127,11 +130,10 @@ struct property *sym_get_choice_prop(struct symbol *sym)
 struct property *sym_get_default_prop(struct symbol *sym)
 {
 	struct property *prop;
-	tristate visible;
 
 	for_all_defaults(sym, prop) {
-		visible = E_CALC(prop->visible);
-		if (visible != no)
+		prop->visible.tri = expr_calc_value(prop->visible.expr);
+		if (prop->visible.tri != no)
 			return prop;
 	}
 	return NULL;
@@ -145,8 +147,10 @@ void sym_calc_visibility(struct symbol *sym)
 	/* any prompt visible? */
 	oldvisible = sym->visible;
 	visible = no;
-	for_all_prompts(sym, prop)
-		visible = E_OR(visible, E_CALC(prop->visible));
+	for_all_prompts(sym, prop) {
+		prop->visible.tri = expr_calc_value(prop->visible.expr);
+		visible = E_OR(visible, prop->visible.tri);
+	}
 	if (oldvisible != visible) {
 		sym->visible = visible;
 		sym_set_changed(sym);
@@ -179,14 +183,8 @@ void sym_calc_value(struct symbol *sym)
 		newval = symbol_no.curr;
 		break;
 	default:
-		S_VAL(newval) = sym->name;
-		S_TRI(newval) = no;
-		if (sym->flags & SYMBOL_CONST) {
-			goto out;
-		}
-		//newval = symbol_empty.curr;
-		// generate warning somewhere here later
-		//S_TRI(newval) = yes;
+		newval.val = sym->name;
+		newval.tri = no;
 		goto out;
 	}
 	sym->flags |= SYMBOL_VALID;
@@ -208,18 +206,18 @@ void sym_calc_value(struct symbol *sym)
 					newval = prop->def->curr;
 				}
 			} else
-				S_TRI(newval) = S_TRI(sym->def);
+				newval.tri = sym->user.tri;
 		} else
-			newval = sym->def;
+			newval = sym->user;
 
-		S_TRI(newval) = E_AND(S_TRI(newval), sym->visible);
+		newval.tri = E_AND(newval.tri, sym->visible);
 		/* if the symbol is visible and not optionial,
 		 * possibly ignore old user choice. */
-		if (!sym_is_optional(sym) && S_TRI(newval) == no)
-			S_TRI(newval) = sym->visible;
+		if (!sym_is_optional(sym) && newval.tri == no)
+			newval.tri = sym->visible;
 		if (sym_is_choice_value(sym) && sym->visible == yes) {
 			prop = sym_get_choice_prop(sym);
-			S_TRI(newval) = (S_VAL(prop->def->curr) == sym) ? yes : no;
+			newval.tri = (prop->def->curr.val == sym) ? yes : no;
 		}
 	} else {
 		prop = sym_get_default_prop(sym);
@@ -232,22 +230,25 @@ void sym_calc_value(struct symbol *sym)
 
 	switch (sym_get_type(sym)) {
 	case S_TRISTATE:
-		if (S_TRI(newval) != mod)
+		if (newval.tri != mod)
 			break;
 		sym_calc_value(modules_sym);
-		if (S_TRI(modules_sym->curr) == no)
-			S_TRI(newval) = yes;
+		if (modules_sym->curr.tri == no)
+			newval.tri = yes;
 		break;
 	case S_BOOLEAN:
-		if (S_TRI(newval) == mod)
-			S_TRI(newval) = yes;
+		if (newval.tri == mod)
+			newval.tri = yes;
+		break;
+	default:
+		break;
 	}
 
 out:
 	sym->curr = newval;
 
-	if (sym_is_choice(sym) && S_TRI(newval) == yes) {
-		def_sym = S_VAL(sym->def);
+	if (sym_is_choice(sym) && newval.tri == yes) {
+		def_sym = sym->user.val;
 		if (def_sym) {
 			sym_calc_visibility(def_sym);
 			if (def_sym->visible == no)
@@ -255,7 +256,8 @@ out:
 		}
 		if (!def_sym) {
 			for_all_defaults(sym, def_prop) {
-				if (E_CALC(def_prop->visible) == no)
+				def_prop->visible.tri = expr_calc_value(def_prop->visible.expr);
+				if (def_prop->visible.tri == no)
 					continue;
 				sym_calc_visibility(def_prop->def);
 				if (def_prop->def->visible != no) {
@@ -267,7 +269,7 @@ out:
 
 		if (!def_sym) {
 			prop = sym_get_choice_prop(sym);
-			for (e = prop->dep; e; e = e->left.expr) {
+			for (e = prop->expr; e; e = e->left.expr) {
 				sym_calc_visibility(e->right.sym);
 				if (e->right.sym->visible != no) {
 					def_sym = e->right.sym;
@@ -276,7 +278,7 @@ out:
 			}
 		}
 
-		S_VAL(newval) = def_sym;
+		newval.val = def_sym;
 	}
 
 	if (memcmp(&oldval, &newval, sizeof(newval)))
@@ -286,7 +288,7 @@ out:
 	if (sym_is_choice(sym)) {
 		int flags = sym->flags & (SYMBOL_CHANGED | SYMBOL_WRITE);
 		prop = sym_get_choice_prop(sym);
-		for (e = prop->dep; e; e = e->left.expr) {
+		for (e = prop->expr; e; e = e->left.expr) {
 			e->right.sym->flags |= flags;
 			if (flags & SYMBOL_CHANGED)
 				sym_set_changed(e->right.sym);
@@ -363,11 +365,11 @@ bool sym_set_tristate_value(struct symbol *sym, tristate val)
 	if (sym_is_choice_value(sym) && val == yes) {
 		struct property *prop = sym_get_choice_prop(sym);
 
-		S_VAL(prop->def->def) = sym;
+		prop->def->user.val = sym;
 		prop->def->flags &= ~SYMBOL_NEW;
 	}
 
-	S_TRI(sym->def) = val;
+	sym->user.tri = val;
 	if (oldval != val) {
 		sym_clear_all_valid();
 		if (sym == modules_sym)
@@ -432,14 +434,11 @@ bool sym_string_valid(struct symbol *sym, const char *str)
 	case S_BOOLEAN:
 	case S_TRISTATE:
 		switch (str[0]) {
-		case 'y':
-		case 'Y':
+		case 'y': case 'Y':
 			return sym_tristate_within_range(sym, yes);
-		case 'm':
-		case 'M':
+		case 'm': case 'M':
 			return sym_tristate_within_range(sym, mod);
-		case 'n':
-		case 'N':
+		case 'n': case 'N':
 			return sym_tristate_within_range(sym, no);
 		}
 		return false;
@@ -458,14 +457,11 @@ bool sym_set_string_value(struct symbol *sym, const char *newval)
 	case S_BOOLEAN:
 	case S_TRISTATE:
 		switch (newval[0]) {
-		case 'y':
-		case 'Y':
+		case 'y': case 'Y':
 			return sym_set_tristate_value(sym, yes);
-		case 'm':
-		case 'M':
+		case 'm': case 'M':
 			return sym_set_tristate_value(sym, mod);
-		case 'n':
-		case 'N':
+		case 'n': case 'N':
 			return sym_set_tristate_value(sym, no);
 		}
 		return false;
@@ -481,15 +477,15 @@ bool sym_set_string_value(struct symbol *sym, const char *newval)
 		sym_set_changed(sym);
 	}
 
-	oldval = S_VAL(sym->def);
+	oldval = sym->user.val;
 	size = strlen(newval) + 1;
 	if (sym->type == S_HEX && (newval[0] != '0' || (newval[1] != 'x' && newval[1] != 'X'))) {
 		size += 2;
-		S_VAL(sym->def) = val = malloc(size);
+		sym->user.val = val = malloc(size);
 		*val++ = '0';
 		*val++ = 'x';
 	} else if (!oldval || strcmp(oldval, newval))
-		S_VAL(sym->def) = val = malloc(size);
+		sym->user.val = val = malloc(size);
 	else
 		return true;
 
@@ -520,7 +516,7 @@ const char *sym_get_string_value(struct symbol *sym)
 	default:
 		;
 	}
-	return (const char *)S_VAL(sym->curr);
+	return (const char *)sym->curr.val;
 }
 
 bool sym_is_changable(struct symbol *sym)

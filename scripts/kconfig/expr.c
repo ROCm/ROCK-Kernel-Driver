@@ -914,7 +914,7 @@ tristate expr_calc_value(struct expr *e)
 	switch (e->type) {
 	case E_SYMBOL:
 		sym_calc_value(e->left.sym);
-		return S_TRI(e->left.sym->curr);
+		return e->left.sym->curr.tri;
 	case E_AND:
 		val1 = expr_calc_value(e->left.expr);
 		val2 = expr_calc_value(e->right.expr);

@@ -35,25 +35,6 @@ static struct menu *rootEntry;
 
 static char nohelp_text[] = "Sorry, no help available for this option yet.\n";
 
-#if 0
-static void printc(int ch)
-{
-	static int sep = 0;
-
-	if (!sep) {
-		putchar('[');
-		sep = 1;
-	} else if (ch)
-		putchar('/');
-	if (!ch) {
-		putchar(']');
-		putchar(' ');
-		sep = 0;
-	} else
-		putchar(ch);
-}
-#endif
-
 static void printo(const char *o)
 {
 	static int sep = 0;
@@ -314,8 +295,8 @@ static int conf_choice(struct menu *menu)
 			break;
 		}
 	} else {
-		sym->def = sym->curr;
-		if (S_TRI(sym->curr) == mod) {
+		sym->user = sym->curr;
+		if (sym->curr.tri == mod) {
 			printf("%*s%s\n", indent - 1, "", menu_get_prompt(menu));
 			return 0;
 		}
@@ -422,7 +403,7 @@ static void conf(struct menu *menu)
 
 	if (sym_is_choice(sym)) {
 		conf_choice(menu);
-		if (S_TRI(sym->curr) != mod)
+		if (sym->curr.tri != mod)
 			return;
 		goto conf_childs;
 	}

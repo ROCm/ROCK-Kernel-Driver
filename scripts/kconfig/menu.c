@@ -112,16 +112,16 @@ struct property *create_prop(enum prop_type type)
 	return prop;
 }
 
-struct property *menu_add_prop(int token, char *prompt, struct symbol *def, struct expr *dep)
+struct property *menu_add_prop(enum prop_type type, char *prompt, struct symbol *def, struct expr *dep)
 {
-	struct property *prop = create_prop(token);
+	struct property *prop = create_prop(type);
 	struct property **propp;
 
 	prop->sym = current_entry->sym;
 	prop->menu = current_entry;
 	prop->text = prompt;
 	prop->def = def;
-	E_EXPR(prop->visible) = menu_check_dep(dep);
+	prop->visible.expr = menu_check_dep(dep);
 
 	if (prompt)
 		current_entry->prompt = prop;
@@ -136,14 +136,14 @@ struct property *menu_add_prop(int token, char *prompt, struct symbol *def, stru
 	return prop;
 }
 
-void menu_add_prompt(int token, char *prompt, struct expr *dep)
+void menu_add_prompt(enum prop_type type, char *prompt, struct expr *dep)
 {
-	current_entry->prompt = menu_add_prop(token, prompt, NULL, dep);
+	current_entry->prompt = menu_add_prop(type, prompt, NULL, dep);
 }
 
-void menu_add_default(int token, struct symbol *def, struct expr *dep)
+void menu_add_default(enum prop_type type, struct symbol *def, struct expr *dep)
 {
-	current_entry->prompt = menu_add_prop(token, NULL, def, dep);
+	current_entry->prompt = menu_add_prop(type, NULL, def, dep);
 }
 
 void menu_finalize(struct menu *parent)
@@ -168,7 +168,7 @@ void menu_finalize(struct menu *parent)
 			}
 			parentdep = expr_alloc_symbol(sym);
 		} else if (parent->prompt)
-			parentdep = E_EXPR(parent->prompt->visible);
+			parentdep = parent->prompt->visible.expr;
 		else
 			parentdep = parent->dep;
 
@@ -184,23 +184,23 @@ void menu_finalize(struct menu *parent)
 			for (; prop; prop = prop->next) {
 				if (prop->menu != menu)
 					continue;
-				dep = expr_transform(E_EXPR(prop->visible));
+				dep = expr_transform(prop->visible.expr);
 				dep = expr_alloc_and(expr_copy(basedep), dep);
 				dep = expr_eliminate_dups(dep);
 				if (menu->sym && menu->sym->type != S_TRISTATE)
 					dep = expr_trans_bool(dep);
-				E_EXPR(prop->visible) = dep;
+				prop->visible.expr = dep;
 			}
 		}
 		for (menu = parent->list; menu; menu = menu->next)
 			menu_finalize(menu);
 	} else if (sym) {
-		basedep = parent->prompt ? E_EXPR(parent->prompt->visible) : NULL;
+		basedep = parent->prompt ? parent->prompt->visible.expr : NULL;
 		basedep = expr_trans_compare(basedep, E_UNEQUAL, &symbol_no);
 		basedep = expr_eliminate_dups(expr_transform(basedep));
 		last_menu = NULL;
 		for (menu = parent->next; menu; menu = menu->next) {
-			dep = menu->prompt ? E_EXPR(menu->prompt->visible) : menu->dep;
+			dep = menu->prompt ? menu->prompt->visible.expr : menu->dep;
 			if (!expr_contains_symbol(dep, sym))
 				break;
 			if (expr_depends_symbol(dep, sym))
@@ -233,10 +233,8 @@ void menu_finalize(struct menu *parent)
 			menu_set_type(sym->type);
 			menu_add_prop(P_CHOICE, NULL, parent->sym, NULL);
 			prop = sym_get_choice_prop(parent->sym);
-			//dep = expr_alloc_one(E_CHOICE, dep);
-			//dep->right.sym = menu->sym;
-			prop->dep = expr_alloc_one(E_CHOICE, prop->dep);
-			prop->dep->right.sym = menu->sym;
+			prop->expr = expr_alloc_one(E_CHOICE, prop->expr);
+			prop->expr->right.sym = menu->sym;
 		}
 		if (menu->list && (!menu->prompt || !menu->prompt->text)) {
 			for (last_menu = menu->list; ; last_menu = last_menu->next) {
@@ -259,9 +257,9 @@ bool menu_is_visible(struct menu *menu)
 		return false;
 	if (menu->sym) {
 		sym_calc_value(menu->sym);
-		visible = E_TRI(menu->prompt->visible);
+		visible = menu->prompt->visible.tri;
 	} else
-		visible = E_CALC(menu->prompt->visible);
+		visible = menu->prompt->visible.tri = expr_calc_value(menu->prompt->visible.expr);
 	return visible != no;
 }
 

@@ -18,9 +18,9 @@ P(sym_change_count,int,);
 
 P(sym_lookup,struct symbol *,(const char *name, int isconst));
 P(sym_find,struct symbol *,(const char *name));
-P(sym_type_name,const char *,(int type));
+P(sym_type_name,const char *,(enum symbol_type type));
 P(sym_calc_value,void,(struct symbol *sym));
-P(sym_get_type,int,(struct symbol *sym));
+P(sym_get_type,enum symbol_type,(struct symbol *sym));
 P(sym_tristate_within_range,bool,(struct symbol *sym,tristate tri));
 P(sym_set_tristate_value,bool,(struct symbol *sym,tristate tri));
 P(sym_toggle_tristate_value,tristate,(struct symbol *sym));

@@ -105,11 +105,11 @@ int conf_read(const char *name)
 		case S_INT:
 		case S_HEX:
 		case S_STRING:
-			if (S_VAL(sym->def))
-				free(S_VAL(sym->def));
+			if (sym->user.val)
+				free(sym->user.val);
 		default:
-			S_VAL(sym->def) = NULL;
-			S_TRI(sym->def) = no;
+			sym->user.val = NULL;
+			sym->user.tri = no;
 		}
 	}
 
@@ -129,7 +129,7 @@ int conf_read(const char *name)
 			switch (sym->type) {
 			case S_BOOLEAN:
 			case S_TRISTATE:
-				sym->def = symbol_no.curr;
+				sym->user = symbol_no.curr;
 				sym->flags &= ~SYMBOL_NEW;
 				break;
 			default:
@@ -154,18 +154,18 @@ int conf_read(const char *name)
 			switch (sym->type) {
 			case S_TRISTATE:
 				if (p[0] == 'm') {
-					S_TRI(sym->def) = mod;
+					sym->user.tri = mod;
 					sym->flags &= ~SYMBOL_NEW;
 					break;
 				}
 			case S_BOOLEAN:
 				if (p[0] == 'y') {
-					S_TRI(sym->def) = yes;
+					sym->user.tri = yes;
 					sym->flags &= ~SYMBOL_NEW;
 					break;
 				}
 				if (p[0] == 'n') {
-					S_TRI(sym->def) = no;
+					sym->user.tri = no;
 					sym->flags &= ~SYMBOL_NEW;
 					break;
 				}
@@ -187,7 +187,7 @@ int conf_read(const char *name)
 			case S_INT:
 			case S_HEX:
 				if (sym_string_valid(sym, p)) {
-					S_VAL(sym->def) = strdup(p);
+					sym->user.val = strdup(p);
 					sym->flags &= ~SYMBOL_NEW;
 				} else {
 					fprintf(stderr, "%s:%d: symbol value '%s' invalid for %s\n", name, lineno, p, sym->name);
@@ -199,20 +199,20 @@ int conf_read(const char *name)
 			}
 			if (sym_is_choice_value(sym)) {
 				prop = sym_get_choice_prop(sym);
-				switch (S_TRI(sym->def)) {
+				switch (sym->user.tri) {
 				case mod:
-					if (S_TRI(prop->def->def) == yes)
+					if (prop->def->user.tri == yes)
 						/* warn? */;
 					break;
 				case yes:
-					if (S_TRI(prop->def->def) != no)
+					if (prop->def->user.tri != no)
 						/* warn? */;
-					S_VAL(prop->def->def) = sym;
+					prop->def->user.val = sym;
 					break;
 				case no:
 					break;
 				}
-				S_TRI(prop->def->def) = S_TRI(sym->def);
+				prop->def->user.tri = sym->user.tri;
 			}
 			break;
 		case '\n':
@@ -228,7 +228,7 @@ int conf_read(const char *name)
 			continue;
 		prop = sym_get_choice_prop(sym);
 		sym->flags &= ~SYMBOL_NEW;
-		for (e = prop->dep; e; e = e->left.expr)
+		for (e = prop->expr; e; e = e->left.expr)
 			sym->flags |= e->right.sym->flags & SYMBOL_NEW;
 	}
 
@@ -286,7 +286,7 @@ int conf_write(const char *name)
 			type = sym->type;
 			if (type == S_TRISTATE) {
 				sym_calc_value(modules_sym);
-				if (S_TRI(modules_sym->curr) == no)
+				if (modules_sym->curr.tri == no)
 					type = S_BOOLEAN;
 			}
 			switch (type) {

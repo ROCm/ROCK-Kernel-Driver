@@ -522,8 +522,6 @@ void print_symbol(FILE *out, struct menu *menu)
 	struct symbol *sym = menu->sym;
 	struct property *prop;
 
-	//sym->flags |= SYMBOL_PRINTED;
-
 	if (sym_is_choice(sym))
 		fprintf(out, "choice\n");
 	else
@@ -548,13 +546,6 @@ void print_symbol(FILE *out, struct menu *menu)
 		fputs("  ???\n", out);
 		break;
 	}
-#if 0
-	if (!expr_is_yes(sym->dep)) {
-		fputs("  depends ", out);
-		expr_fprint(sym->dep, out);
-		fputc('\n', out);
-	}
-#endif
 	for (prop = sym->prop; prop; prop = prop->next) {
 		if (prop->menu != menu)
 			continue;
@@ -562,25 +553,18 @@ void print_symbol(FILE *out, struct menu *menu)
 		case P_PROMPT:
 			fputs("  prompt ", out);
 			print_quoted_string(out, prop->text);
-			if (prop->def) {
-				fputc(' ', out);
-				if (prop->def->flags & SYMBOL_CONST)
-					print_quoted_string(out, prop->def->name);
-				else
-					fputs(prop->def->name, out);
-			}
-			if (!expr_is_yes(E_EXPR(prop->visible))) {
+			if (!expr_is_yes(prop->visible.expr)) {
 				fputs(" if ", out);
-				expr_fprint(E_EXPR(prop->visible), out);
+				expr_fprint(prop->visible.expr, out);
 			}
 			fputc('\n', out);
 			break;
 		case P_DEFAULT:
 			fputs( "  default ", out);
 			print_quoted_string(out, prop->def->name);
-			if (!expr_is_yes(E_EXPR(prop->visible))) {
+			if (!expr_is_yes(prop->visible.expr)) {
 				fputs(" if ", out);
-				expr_fprint(E_EXPR(prop->visible), out);
+				expr_fprint(prop->visible.expr, out);
 			}
 			fputc('\n', out);
 			break;
@@ -603,7 +587,6 @@ void print_symbol(FILE *out, struct menu *menu)
 
 void zconfdump(FILE *out)
 {
-	//struct file *file;
 	struct property *prop;
 	struct symbol *sym;
 	struct menu *menu;
@@ -614,11 +597,6 @@ void zconfdump(FILE *out)
 			print_symbol(out, menu);
 		else if ((prop = menu->prompt)) {
 			switch (prop->type) {
-			//case T_MAINMENU:
-			//	fputs("\nmainmenu ", out);
-			//	print_quoted_string(out, prop->text);
-			//	fputs("\n", out);
-			//	break;
 			case P_COMMENT:
 				fputs("\ncomment ", out);
 				print_quoted_string(out, prop->text);
@@ -629,19 +607,12 @@ void zconfdump(FILE *out)
 				print_quoted_string(out, prop->text);
 				fputs("\n", out);
 				break;
-			//case T_SOURCE:
-			//	fputs("\nsource ", out);
-			//	print_quoted_string(out, prop->text);
-			//	fputs("\n", out);
-			//	break;
-			//case T_IF:
-			//	fputs("\nif\n", out);
 			default:
 				;
 			}
-			if (!expr_is_yes(E_EXPR(prop->visible))) {
+			if (!expr_is_yes(prop->visible.expr)) {
 				fputs("  depends ", out);
-				expr_fprint(E_EXPR(prop->visible), out);
+				expr_fprint(prop->visible.expr, out);
 				fputc('\n', out);
 			}
 			fputs("\n", out);
