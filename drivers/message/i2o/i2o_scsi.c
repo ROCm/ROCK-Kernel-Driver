@@ -659,7 +659,7 @@ static int i2o_scsi_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 	if(m==0xFFFFFFFF)
 		return 1;
 
-	msg = (u32 *)(c->mem_offset + m);
+	msg = (u32 *)(c->msg_virt + m);
 	
 	/*
 	 *	Put together a scsi execscb message
@@ -936,7 +936,7 @@ static int i2o_scsi_bus_reset(Scsi_Cmnd * SCpnt)
 	struct Scsi_Host *host;
 	struct i2o_scsi_host *hostdata;
 	u32 m;
-	unsigned long msg;
+	void *msg;
 	unsigned long timeout;
 
 	
@@ -974,7 +974,7 @@ static int i2o_scsi_bus_reset(Scsi_Cmnd * SCpnt)
 	while(time_before(jiffies, timeout));
 	
 	
-	msg = c->mem_offset + m;
+	msg = c->msg_virt + m;
 	i2o_raw_writel(FOUR_WORD_MSG_SIZE|SGL_OFFSET_0, msg);
 	i2o_raw_writel(I2O_CMD_SCSI_BUSRESET<<24|HOST_TID<<12|tid, msg+4);
 	i2o_raw_writel(scsi_context|0x80000000, msg+8);
