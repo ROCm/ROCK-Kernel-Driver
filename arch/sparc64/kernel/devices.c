@@ -25,7 +25,6 @@
 spinlock_t ns87303_lock = SPIN_LOCK_UNLOCKED;
 
 struct prom_cpuinfo linux_cpus[NR_CPUS] __initdata = { { 0 } };
-unsigned prom_cpu_nodes[NR_CPUS];
 int linux_num_cpus = 0;
 
 extern void cpu_probe(void);
@@ -84,8 +83,6 @@ void __init device_scan(void)
 
 	linux_num_cpus = cpu_ctr;
 	
-	prom_cpu_nodes[0] = prom_node_cpu;
-
 #ifndef CONFIG_SMP
 	{
 		up_clock_tick = prom_getintdefault(prom_node_cpu,

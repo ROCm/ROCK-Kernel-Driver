@@ -337,7 +337,6 @@ static int __devinit smp_boot_one_cpu(unsigned int cpu)
 		udelay(100);
 	}
 	if (callin_flag) {
-		prom_cpu_nodes[cpu] = linux_cpus[no].prom_node;
 		ret = 0;
 	} else {
 		printk("Processor %d is stuck.\n", cpu);
@@ -1138,7 +1137,6 @@ void __init smp_tick_init(void)
 	}
 
 	cpu_set(boot_cpu_id, cpu_online_map);
-	prom_cpu_nodes[boot_cpu_id] = linux_cpus[0].prom_node;
 	prof_counter(boot_cpu_id) = prof_multiplier(boot_cpu_id) = 1;
 }
 

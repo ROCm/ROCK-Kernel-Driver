@@ -28,7 +28,6 @@ struct prom_cpuinfo {
 
 extern int linux_num_cpus;	/* number of CPUs probed  */
 extern struct prom_cpuinfo linux_cpus[NR_CPUS];
-extern unsigned int prom_cpu_nodes[NR_CPUS];
 
 #endif /* !(__ASSEMBLY__) */
 
