@@ -90,7 +90,7 @@ static int ISILoad_ioctl(struct inode *inode, struct file *filp, unsigned  int c
 static void isicom_tx(unsigned long _data);
 static void isicom_start(struct tty_struct * tty);
 
-static unsigned char * tmp_buf = 0;
+static unsigned char * tmp_buf;
 static DECLARE_MUTEX(tmp_buf_sem);
 
 /*   baud index mappings from linux defns to isi */
@@ -132,9 +132,10 @@ static int ISILoad_ioctl(struct inode *inode, struct file *filp,
 	unsigned long t;
 	unsigned short word_count, base;
 	bin_frame frame;
+	void __user *argp = (void __user *)arg;
 	/* exec_record exec_rec; */
 	
-	if(get_user(card, (int *)arg))
+	if(get_user(card, (int __user *)argp))
 		return -EFAULT;
 		
 	if(card < 0 || card >= BOARD_COUNT)
@@ -208,13 +209,13 @@ static int ISILoad_ioctl(struct inode *inode, struct file *filp,
 				 return -EIO;
 			}
 			printk("-Done\n");
-			return put_user(signature,(unsigned int*)arg);
+			return put_user(signature,(unsigned __user *)argp);
 						
 	case	MIOCTL_LOAD_FIRMWARE:
 			if (!capable(CAP_SYS_ADMIN))
 				return -EPERM;
 				
-			if(copy_from_user(&frame, (void *) arg, sizeof(bin_frame)))
+			if(copy_from_user(&frame, argp, sizeof(bin_frame)))
 				return -EFAULT;
 			
 			if (WaitTillCardIsFree(base))
@@ -257,7 +258,7 @@ static int ISILoad_ioctl(struct inode *inode, struct file *filp,
 			if (!capable(CAP_SYS_ADMIN))
 				return -EPERM;
 				
-			if(copy_from_user(&frame, (void *) arg, sizeof(bin_header)))
+			if(copy_from_user(&frame, argp, sizeof(bin_header)))
 				return -EFAULT;
 			
 			if (WaitTillCardIsFree(base))
@@ -296,7 +297,7 @@ static int ISILoad_ioctl(struct inode *inode, struct file *filp,
 				return -EIO;
 			}	
 			
-			if(copy_to_user((void *) arg, &frame, sizeof(bin_frame)))
+			if(copy_to_user(argp, &frame, sizeof(bin_frame)))
 				return -EFAULT;
 			return 0;
 	
@@ -1121,7 +1122,7 @@ static void isicom_close(struct tty_struct * tty, struct file * filp)
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer(tty);
 	tty->closing = 0;
-	port->tty = 0;
+	port->tty = NULL;
 	if (port->blocked_open) {
 		if (port->close_delay) {
 			set_current_state(TASK_INTERRUPTIBLE);
@@ -1334,7 +1335,7 @@ static int isicom_tiocmset(struct tty_struct *tty, struct file *file,
 }			
 
 static int isicom_set_serial_info(struct isi_port * port,
-					struct serial_struct * info)
+					struct serial_struct __user *info)
 {
 	struct serial_struct newinfo;
 	unsigned long flags;
@@ -1370,7 +1371,7 @@ static int isicom_set_serial_info(struct isi_port * port,
 }		
 
 static int isicom_get_serial_info(struct isi_port * port, 
-					struct serial_struct * info)
+					struct serial_struct __user *info)
 {
 	struct serial_struct out_info;
 	
@@ -1392,6 +1393,7 @@ static int isicom_ioctl(struct tty_struct * tty, struct file * filp,
 			unsigned int cmd, unsigned long arg) 
 {
 	struct isi_port * port = (struct isi_port *) tty->driver_data;
+	void __user *argp = (void __user *)arg;
 	int retval;
 
 	if (isicom_paranoia_check(port, tty->name, "isicom_ioctl"))
@@ -1416,10 +1418,10 @@ static int isicom_ioctl(struct tty_struct * tty, struct file * filp,
 			return 0;
 			
 		case TIOCGSOFTCAR:
-			return put_user(C_CLOCAL(tty) ? 1 : 0, (unsigned long *) arg);
+			return put_user(C_CLOCAL(tty) ? 1 : 0, (unsigned long __user *)argp);
 			
 		case TIOCSSOFTCAR:
-			if(get_user(arg, (unsigned long *) arg))
+			if(get_user(arg, (unsigned long __user *) argp))
 				return -EFAULT;
 			tty->termios->c_cflag =
 				((tty->termios->c_cflag & ~CLOCAL) |
@@ -1427,12 +1429,10 @@ static int isicom_ioctl(struct tty_struct * tty, struct file * filp,
 			return 0;	
 			
 		case TIOCGSERIAL:
-			return isicom_get_serial_info(port, 
-					(struct serial_struct *) arg);
+			return isicom_get_serial_info(port, argp);
 		
 		case TIOCSSERIAL:
-			return isicom_set_serial_info(port,
-					(struct serial_struct *) arg);
+			return isicom_set_serial_info(port, argp);
 					
 		default:
 			return -ENOIOCTLCMD;						
@@ -1545,7 +1545,7 @@ static void isicom_hangup(struct tty_struct * tty)
 	isicom_shutdown_port(port);
 	port->count = 0;
 	port->flags &= ~ASYNC_NORMAL_ACTIVE;
-	port->tty = 0;
+	port->tty = NULL;
 	wake_up_interruptible(&port->open_wait);
 }
 

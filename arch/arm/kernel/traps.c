@@ -263,7 +263,7 @@ asmlinkage void do_undefinstr(struct pt_regs *regs)
 	unsigned int instr;
 	struct undef_hook *hook;
 	siginfo_t info;
-	void *pc;
+	void __user *pc;
 
 	/*
 	 * According to the ARM ARM, PC is 2 or 4 bytes ahead,
@@ -272,11 +272,11 @@ asmlinkage void do_undefinstr(struct pt_regs *regs)
 	 */
 	regs->ARM_pc -= correction;
 
-	pc = (void *)instruction_pointer(regs);
+	pc = (void __user *)instruction_pointer(regs);
 	if (thumb_mode(regs)) {
-		get_user(instr, (u16 *)pc);
+		get_user(instr, (u16 __user *)pc);
 	} else {
-		get_user(instr, (u32 *)pc);
+		get_user(instr, (u32 __user *)pc);
 	}
 
 	spin_lock_irq(&undef_lock);
@@ -368,7 +368,7 @@ static int bad_syscall(int n, struct pt_regs *regs)
 	info.si_signo = SIGILL;
 	info.si_errno = 0;
 	info.si_code  = ILL_ILLTRP;
-	info.si_addr  = (void *)instruction_pointer(regs) -
+	info.si_addr  = (void __user *)instruction_pointer(regs) -
 			 (thumb_mode(regs) ? 2 : 4);
 
 	force_sig_info(SIGILL, &info, current);
@@ -481,7 +481,7 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
 	info.si_signo = SIGILL;
 	info.si_errno = 0;
 	info.si_code  = ILL_ILLTRP;
-	info.si_addr  = (void *)instruction_pointer(regs) -
+	info.si_addr  = (void __user *)instruction_pointer(regs) -
 			 (thumb_mode(regs) ? 2 : 4);
 
 	force_sig_info(SIGILL, &info, current);
@@ -519,7 +519,7 @@ baddataabort(int code, unsigned long instr, struct pt_regs *regs)
 	info.si_signo = SIGILL;
 	info.si_errno = 0;
 	info.si_code  = ILL_ILLOPC;
-	info.si_addr  = (void *)addr;
+	info.si_addr  = (void __user *)addr;
 
 	force_sig_info(SIGILL, &info, current);
 	die_if_kernel("unknown data abort code", regs, instr);

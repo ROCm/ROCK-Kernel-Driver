@@ -166,7 +166,7 @@ udp_snat_handler(struct sk_buff **pskb,
 						(*pskb)->csum);
 		if (udph->check == 0)
 			udph->check = 0xFFFF;
-		IP_VS_DBG(11, "O-pkt: %s O-csum=%d (+%d)\n",
+		IP_VS_DBG(11, "O-pkt: %s O-csum=%d (+%zd)\n",
 			  pp->name, udph->check,
 			  (char*)&(udph->check) - (char*)udph);
 	}

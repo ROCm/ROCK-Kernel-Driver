@@ -118,7 +118,7 @@ typedef u32		compat_old_sigset_t;	/* at least 32 bits */
 typedef u32               compat_sigset_word;
 
 #define COMPAT_OFF_T_MAX	0x7fffffff
-#define COMPAT_LOFF_T_MAX	0x7fffffffffffffff
+#define COMPAT_LOFF_T_MAX	0x7fffffffffffffffL
 
 struct compat_ipc64_perm {
 	compat_key_t key;

@@ -275,8 +275,8 @@ static void MoxaPortTxDisable(int);
 static void MoxaPortTxEnable(int);
 static int MoxaPortResetBrkCnt(int);
 static void MoxaPortSendBreak(int, int);
-static int moxa_get_serial_info(struct moxa_str *, struct serial_struct *);
-static int moxa_set_serial_info(struct moxa_str *, struct serial_struct *);
+static int moxa_get_serial_info(struct moxa_str *, struct serial_struct __user *);
+static int moxa_set_serial_info(struct moxa_str *, struct serial_struct __user *);
 static void MoxaSetFifo(int port, int enable);
 
 static struct tty_operations moxa_ops = {
@@ -351,13 +351,13 @@ static int __init moxa_init(void)
 	moxaDriver->flags = TTY_DRIVER_REAL_RAW;
 	tty_set_operations(moxaDriver, &moxa_ops);
 
-	moxaXmitBuff = 0;
+	moxaXmitBuff = NULL;
 
 	for (i = 0, ch = moxaChannels; i < MAX_PORTS; i++, ch++) {
 		ch->type = PORT_16550A;
 		ch->port = i;
 		INIT_WORK(&ch->tqueue, do_moxa_softint, ch);
-		ch->tty = 0;
+		ch->tty = NULL;
 		ch->close_delay = 5 * HZ / 10;
 		ch->closing_wait = 30 * HZ;
 		ch->count = 0;
@@ -622,7 +622,7 @@ static void moxa_close(struct tty_struct *tty, struct file *filp)
 		tty->ldisc.flush_buffer(tty);
 	tty->closing = 0;
 	ch->event = 0;
-	ch->tty = 0;
+	ch->tty = NULL;
 	if (ch->blocked_open) {
 		if (ch->close_delay) {
 			set_current_state(TASK_INTERRUPTIBLE);
@@ -807,6 +807,7 @@ static int moxa_ioctl(struct tty_struct *tty, struct file *file,
 {
 	struct moxa_str *ch = (struct moxa_str *) tty->driver_data;
 	register int port;
+	void __user *argp = (void __user *)arg;
 	int retval;
 
 	port = PORTNO(tty);
@@ -832,9 +833,9 @@ static int moxa_ioctl(struct tty_struct *tty, struct file *file,
 		MoxaPortSendBreak(ch->port, arg);
 		return (0);
 	case TIOCGSOFTCAR:
-		return put_user(C_CLOCAL(tty) ? 1 : 0, (unsigned long *) arg);
+		return put_user(C_CLOCAL(tty) ? 1 : 0, (unsigned long __user *) argp);
 	case TIOCSSOFTCAR:
-		if(get_user(retval, (unsigned long *) arg))
+		if(get_user(retval, (unsigned long __user *) argp))
 			return -EFAULT;
 		arg = retval;
 		tty->termios->c_cflag = ((tty->termios->c_cflag & ~CLOCAL) |
@@ -845,10 +846,10 @@ static int moxa_ioctl(struct tty_struct *tty, struct file *file,
 			ch->asyncflags |= ASYNC_CHECK_CD;
 		return (0);
 	case TIOCGSERIAL:
-		return (moxa_get_serial_info(ch, (struct serial_struct *) arg));
+		return moxa_get_serial_info(ch, argp);
 
 	case TIOCSSERIAL:
-		return (moxa_set_serial_info(ch, (struct serial_struct *) arg));
+		return moxa_set_serial_info(ch, argp);
 	default:
 		retval = MoxaDriverIoctl(cmd, arg, port);
 	}
@@ -916,7 +917,7 @@ static void moxa_hangup(struct tty_struct *tty)
 	ch->event = 0;
 	ch->count = 0;
 	ch->asyncflags &= ~ASYNC_NORMAL_ACTIVE;
-	ch->tty = 0;
+	ch->tty = NULL;
 	wake_up_interruptible(&ch->open_wait);
 }
 
@@ -1163,7 +1164,7 @@ static void receive_data(struct moxa_str *ch)
 	unsigned char *charptr, *flagptr;
 	unsigned long flags;
 
-	ts = 0;
+	ts = NULL;
 	tp = ch->tty;
 	if (tp)
 		ts = tp->termios;
@@ -1522,10 +1523,10 @@ static void moxadelay(int);
 static void moxafunc(unsigned long, int, ushort);
 static void wait_finish(unsigned long);
 static void low_water_check(unsigned long);
-static int moxaloadbios(int, unsigned char *, int);
+static int moxaloadbios(int, unsigned char __user *, int);
 static int moxafindcard(int);
-static int moxaload320b(int, unsigned char *, int);
-static int moxaloadcode(int, unsigned char *, int);
+static int moxaload320b(int, unsigned char __user *, int);
+static int moxaloadcode(int, unsigned char __user *, int);
 static int moxaloadc218(int, unsigned long, int);
 static int moxaloadc320(int, unsigned long, int, int *);
 
@@ -1575,7 +1576,7 @@ struct moxaq_str {
 };
 
 struct dl_str {
-	char *buf;
+	char __user *buf;
 	int len;
 	int cardno;
 };
@@ -1601,6 +1602,7 @@ int MoxaDriverIoctl(unsigned int cmd, unsigned long arg, int port)
 	int i;
 	int status;
 	int MoxaPortTxQueue(int), MoxaPortRxQueue(int);
+	void __user *argp = (void __user *)arg;
 
 	if (port == QueryPort) {
 		if ((cmd != MOXA_GET_CONF) && (cmd != MOXA_INIT_DRIVER) &&
@@ -1612,7 +1614,7 @@ int MoxaDriverIoctl(unsigned int cmd, unsigned long arg, int port)
 	}
 	switch (cmd) {
 	case MOXA_GET_CONF:
-		if(copy_to_user((void *)arg, &moxa_boards, MAX_BOARDS * sizeof(moxa_board_conf)))
+		if(copy_to_user(argp, &moxa_boards, MAX_BOARDS * sizeof(moxa_board_conf)))
 			return -EFAULT;
 		return (0);
 	case MOXA_INIT_DRIVER:
@@ -1621,7 +1623,7 @@ int MoxaDriverIoctl(unsigned int cmd, unsigned long arg, int port)
 		return (0);
 	case MOXA_GETDATACOUNT:
 		moxaLog.tick = jiffies;
-		if(copy_to_user((void *)arg, &moxaLog, sizeof(mon_st)))
+		if(copy_to_user(argp, &moxaLog, sizeof(mon_st)))
 			return -EFAULT;
 		return (0);
 	case MOXA_FLUSH_QUEUE:
@@ -1634,22 +1636,22 @@ int MoxaDriverIoctl(unsigned int cmd, unsigned long arg, int port)
 				temp_queue[i].outq = MoxaPortTxQueue(i);
 			}
 		}
-		if(copy_to_user((void *)arg, temp_queue, sizeof(struct moxaq_str) * MAX_PORTS))
+		if(copy_to_user(argp, temp_queue, sizeof(struct moxaq_str) * MAX_PORTS))
 			return -EFAULT;
 		return (0);
 	case MOXA_GET_OQUEUE:
 		i = MoxaPortTxQueue(port);
-		return put_user(i, (unsigned long *) arg);
+		return put_user(i, (unsigned long __user *)argp);
 	case MOXA_GET_IQUEUE:
 		i = MoxaPortRxQueue(port);
-		return put_user(i, (unsigned long *) arg);
+		return put_user(i, (unsigned long __user *)argp);
 	case MOXA_GET_MAJOR:
-		if(copy_to_user((void *)arg, &ttymajor, sizeof(int)))
+		if(copy_to_user(argp, &ttymajor, sizeof(int)))
 			return -EFAULT;
 		return 0;
 	case MOXA_GET_CUMAJOR:
 		i = 0;
-		if(copy_to_user((void *)arg, &i, sizeof(int)))
+		if(copy_to_user(argp, &i, sizeof(int)))
 			return -EFAULT;
 		return 0;
 	case MOXA_GETMSTATUS:
@@ -1675,7 +1677,7 @@ int MoxaDriverIoctl(unsigned int cmd, unsigned long arg, int port)
 			else
 				GMStatus[i].cflag = moxaChannels[i].tty->termios->c_cflag;
 		}
-		if(copy_to_user((void *)arg, GMStatus, sizeof(struct mxser_mstatus) * MAX_PORTS))
+		if(copy_to_user(argp, GMStatus, sizeof(struct mxser_mstatus) * MAX_PORTS))
 			return -EFAULT;
 		return 0;
 	default:
@@ -1687,7 +1689,7 @@ int MoxaDriverIoctl(unsigned int cmd, unsigned long arg, int port)
 		break;
 	}
 
-	if(copy_from_user(&dltmp, (void *)arg, sizeof(struct dl_str)))
+	if(copy_from_user(&dltmp, argp, sizeof(struct dl_str)))
 		return -EFAULT;
 	if(dltmp.cardno < 0 || dltmp.cardno >= MAX_BOARDS)
 		return -EINVAL;
@@ -2682,12 +2684,10 @@ void MoxaPortSendBreak(int port, int ms100)
 }
 
 static int moxa_get_serial_info(struct moxa_str *info,
-				struct serial_struct *retinfo)
+				struct serial_struct __user *retinfo)
 {
 	struct serial_struct tmp;
 
-	if (!retinfo)
-		return (-EFAULT);
 	memset(&tmp, 0, sizeof(tmp));
 	tmp.type = info->type;
 	tmp.line = info->port;
@@ -2706,7 +2706,7 @@ static int moxa_get_serial_info(struct moxa_str *info,
 
 
 static int moxa_set_serial_info(struct moxa_str *info,
-				struct serial_struct *new_info)
+				struct serial_struct __user *new_info)
 {
 	struct serial_struct new_serial;
 
@@ -2795,7 +2795,7 @@ static void low_water_check(unsigned long ofsAddr)
 	}
 }
 
-static int moxaloadbios(int cardno, unsigned char *tmp, int len)
+static int moxaloadbios(int cardno, unsigned char __user *tmp, int len)
 {
 	unsigned long baseAddr;
 	int i;
@@ -2842,7 +2842,7 @@ static int moxafindcard(int cardno)
 	return (0);
 }
 
-static int moxaload320b(int cardno, unsigned char * tmp, int len)
+static int moxaload320b(int cardno, unsigned char __user *tmp, int len)
 {
 	unsigned long baseAddr;
 	int i;
@@ -2862,7 +2862,7 @@ static int moxaload320b(int cardno, unsigned char * tmp, int len)
 	return (0);
 }
 
-static int moxaloadcode(int cardno, unsigned char * tmp, int len)
+static int moxaloadcode(int cardno, unsigned char __user *tmp, int len)
 {
 	unsigned long baseAddr, ofsAddr;
 	int retval, port, i;

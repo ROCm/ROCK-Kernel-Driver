@@ -48,6 +48,6 @@ extern int  zft_fetch_segment_fraction(const unsigned int segment,
 				   0, FT_SEGMENT_SIZE)
 /*   hook for the VFS interface
  */
-extern int  _zft_read(char* buff, int req_len);
+extern int  _zft_read(char __user *buff, int req_len);
 
 #endif /* _ZFTAPE_READ_H */

@@ -93,7 +93,7 @@ int sbusfb_ioctl_helper(unsigned long cmd, unsigned long arg,
 {
 	switch(cmd) {
 	case FBIOGTYPE: {
-		struct fbtype *f = (struct fbtype *) arg;
+		struct fbtype __user *f = (struct fbtype __user *) arg;
 
 		if (put_user(type, &f->fb_type) ||
 		    __put_user(info->var.yres, &f->fb_height) ||
@@ -105,10 +105,12 @@ int sbusfb_ioctl_helper(unsigned long cmd, unsigned long arg,
 		return 0;
 	}
 	case FBIOPUTCMAP_SPARC: {
-		struct fbcmap *c = (struct fbcmap *) arg;
+		struct fbcmap __user *c = (struct fbcmap __user *) arg;
 		struct fb_cmap cmap;
 		u16 red, green, blue;
-		unsigned char *ured, *ugreen, *ublue;
+		unsigned char __user *ured;
+		unsigned char __user *ugreen;
+		unsigned char __user *ublue;
 		int index, count, i;
 
 		if (get_user(index, &c->index) ||
@@ -139,8 +141,10 @@ int sbusfb_ioctl_helper(unsigned long cmd, unsigned long arg,
 		return 0;
 	}
 	case FBIOGETCMAP_SPARC: {
-		struct fbcmap *c = (struct fbcmap *) arg;
-		unsigned char *ured, *ugreen, *ublue;
+		struct fbcmap __user *c = (struct fbcmap __user *) arg;
+		unsigned char __user *ured;
+		unsigned char __user *ugreen;
+		unsigned char __user *ublue;
 		struct fb_cmap *cmap = &info->cmap;
 		int index, count, i;
 

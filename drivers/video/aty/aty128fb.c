@@ -2149,7 +2149,7 @@ static int aty128fb_ioctl(struct inode *inode, struct file *file, u_int cmd,
 	case FBIO_ATY128_SET_MIRROR:
 		if (par->chip_gen != rage_M3)
 			return -EINVAL;
-		rc = get_user(value, (__u32*)arg);
+		rc = get_user(value, (__u32 __user *)arg);
 		if (rc)
 			return rc;
 		par->lcd_on = (value & 0x01) != 0;
@@ -2163,7 +2163,7 @@ static int aty128fb_ioctl(struct inode *inode, struct file *file, u_int cmd,
 		if (par->chip_gen != rage_M3)
 			return -EINVAL;
 		value = (par->crt_on << 1) | par->lcd_on;
-		return put_user(value, (__u32*)arg);
+		return put_user(value, (__u32 __user *)arg);
 	}
 #endif
 	return -EINVAL;

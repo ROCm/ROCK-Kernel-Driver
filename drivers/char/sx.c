@@ -1594,7 +1594,8 @@ static int sx_fw_ioctl (struct inode *inode, struct file *filp,
                         unsigned int cmd, unsigned long arg)
 {
 	int rc = 0;
-	int *descr = (int *)arg, i;
+	int __user *descr = (int __user *)arg;
+	int i;
 	static struct sx_board *board = NULL;
 	int nbytes, offset;
 	unsigned long data;
@@ -1670,7 +1671,7 @@ static int sx_fw_ioctl (struct inode *inode, struct file *filp,
 		get_user (data,	 descr++);
 		while (nbytes && data) {
 			for (i=0;i<nbytes;i += SX_CHUNK_SIZE) {
-				if (copy_from_user(tmp, (char *)data + i, 
+				if (copy_from_user(tmp, (char __user *)data+i, 
 						   (i + SX_CHUNK_SIZE >
 						    nbytes) ? nbytes - i :
 						   	      SX_CHUNK_SIZE)) {
@@ -1776,6 +1777,7 @@ static int sx_ioctl (struct tty_struct * tty, struct file * filp,
 {
 	int rc;
 	struct sx_port *port = tty->driver_data;
+	void __user *argp = (void __user *)arg;
 	int ival;
 
 	/* func_enter2(); */
@@ -1784,24 +1786,20 @@ static int sx_ioctl (struct tty_struct * tty, struct file * filp,
 	switch (cmd) {
 	case TIOCGSOFTCAR:
 		rc = put_user(((tty->termios->c_cflag & CLOCAL) ? 1 : 0),
-		              (unsigned int *) arg);
+		              (unsigned __user *) argp);
 		break;
 	case TIOCSSOFTCAR:
-		if ((rc = get_user(ival, (unsigned int *) arg)) == 0) {
+		if ((rc = get_user(ival, (unsigned __user *) argp)) == 0) {
 			tty->termios->c_cflag =
 				(tty->termios->c_cflag & ~CLOCAL) |
 				(ival ? CLOCAL : 0);
 		}
 		break;
 	case TIOCGSERIAL:
-		if ((rc = verify_area(VERIFY_WRITE, (void *) arg,
-		                      sizeof(struct serial_struct))) == 0)
-			rc = gs_getserial(&port->gs, (struct serial_struct *) arg);
+		rc = gs_getserial(&port->gs, argp);
 		break;
 	case TIOCSSERIAL:
-		if ((rc = verify_area(VERIFY_READ, (void *) arg,
-		                      sizeof(struct serial_struct))) == 0)
-			rc = gs_setserial(&port->gs, (struct serial_struct *) arg);
+		rc = gs_setserial(&port->gs, argp);
 		break;
 	default:
 		rc = -ENOIOCTLCMD;

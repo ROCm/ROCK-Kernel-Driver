@@ -133,7 +133,11 @@ typedef unsigned long sigset_t;
 #define SIG_SETMASK        2	/* for setting the signal mask */
 
 /* Type of a signal handler.  */
-typedef void (*__sighandler_t)(int);
+typedef void __signalfn_t(int);
+typedef __signalfn_t __user *__sighandler_t;
+
+typedef void __restorefn_t(void);
+typedef __restorefn_t __user *__sigrestore_t;
 
 #define SIG_DFL	((__sighandler_t)0)	/* default signal handling */
 #define SIG_IGN	((__sighandler_t)1)	/* ignore signal */
@@ -144,13 +148,13 @@ struct old_sigaction {
 	__sighandler_t sa_handler;
 	old_sigset_t sa_mask;
 	unsigned long sa_flags;
-	void (*sa_restorer)(void);
+	__sigrestore_t sa_restorer;
 };
 
 struct sigaction {
 	__sighandler_t sa_handler;
 	unsigned long sa_flags;
-	void (*sa_restorer)(void);
+	__sigrestore_t sa_restorer;
 	sigset_t sa_mask;		/* mask last for extensibility */
 };
 
@@ -177,7 +181,7 @@ struct sigaction {
 #endif /* __KERNEL__ */
 
 typedef struct sigaltstack {
-	void *ss_sp;
+	void __user *ss_sp;
 	int ss_flags;
 	size_t ss_size;
 } stack_t;
