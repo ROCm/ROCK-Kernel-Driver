@@ -926,7 +926,7 @@ xfs_syncsub(
 		IPOINTER_CLR; \
 	}
 
-#define PREEMPT_MASK	0x7f
+#define XFS_PREEMPT_MASK	0x7f
 
 	if (bypassed)
 		*bypassed = 0;
@@ -1395,7 +1395,7 @@ xfs_syncsub(
 		 * if we have looped many times without dropping the
 		 * lock.
 		 */
-		if ((++preempt & PREEMPT_MASK) == 0) {
+		if ((++preempt & XFS_PREEMPT_MASK) == 0) {
 			if (mount_locked) {
 				IPOINTER_INSERT(ip, mp);
 			}
