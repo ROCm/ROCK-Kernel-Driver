@@ -1924,9 +1924,13 @@ static int addrconf_ifdown(struct net_device *dev, int how)
 		write_unlock_bh(&addrconf_hash_lock);
 	}
 
-	/* Step 3: clear address list */
-
 	write_lock_bh(&idev->lock);
+
+	/* Step 3: clear flags for stateless addrconf */
+	if (how != 1)
+		idev->if_flags &= ~(IF_RS_SENT|IF_RA_RCVD);
+
+	/* Step 4: clear address list */
 #ifdef CONFIG_IPV6_PRIVACY
 	if (how == 1 && del_timer(&idev->regen_timer))
 		in6_dev_put(idev);
@@ -1962,7 +1966,7 @@ static int addrconf_ifdown(struct net_device *dev, int how)
 	}
 	write_unlock_bh(&idev->lock);
 
-	/* Step 4: Discard multicast list */
+	/* Step 5: Discard multicast list */
 
 	if (how == 1)
 		ipv6_mc_destroy_dev(idev);
