@@ -33,6 +33,8 @@ struct unx_cred {
 # define RPCDBG_FACILITY	RPCDBG_AUTH
 #endif
 
+static struct rpc_credops	unix_credops;
+
 static struct rpc_auth *
 unx_create(struct rpc_clnt *clnt)
 {
@@ -71,7 +73,7 @@ unx_create_cred(int flags)
 	if (!(cred = (struct unx_cred *) rpc_allocate(flags, sizeof(*cred))))
 		return NULL;
 
-	cred->uc_count = 0;
+	atomic_set(&cred->uc_count, 0);
 	cred->uc_flags = RPCAUTH_CRED_UPTODATE;
 	if (flags & RPC_TASK_ROOTCREDS) {
 		cred->uc_uid = cred->uc_fsuid = 0;
@@ -91,6 +93,7 @@ unx_create_cred(int flags)
 		if (i < NFS_NGROUPS)
 		  cred->uc_gids[i] = NOGROUP;
 	}
+	cred->uc_base.cr_ops = &unix_credops;
 
 	return (struct rpc_cred *) cred;
 }
@@ -106,7 +109,7 @@ authunix_fake_cred(struct rpc_task *task, uid_t uid, gid_t gid)
 	if (!(cred = (struct unx_cred *) rpc_malloc(task, sizeof(*cred))))
 		return NULL;
 
-	cred->uc_count = 1;
+	atomic_set(&cred->uc_count, 1);
 	cred->uc_flags = RPCAUTH_CRED_DEAD|RPCAUTH_CRED_UPTODATE;
 	cred->uc_uid   = uid;
 	cred->uc_gid   = gid;
@@ -236,7 +239,11 @@ struct rpc_authops	authunix_ops = {
 #endif
 	unx_create,
 	unx_destroy,
-	unx_create_cred,
+	unx_create_cred
+};
+
+static
+struct rpc_credops	unix_credops = {
 	unx_destroy_cred,
 	unx_match,
 	unx_marshal,

@@ -112,6 +112,11 @@ static inline void console_verbose(void)
 	((unsigned char *)&addr)[1], \
 	((unsigned char *)&addr)[0]
 
+#define min(type,x,y) \
+	({ type __x = (x), __y = (y); __x < __y ? __x: __y; })
+#define max(type,x,y) \
+	({ type __x = (x), __y = (y); __x > __y ? __x: __y; })
+
 #endif /* __KERNEL__ */
 
 #define SI_LOAD_SHIFT	16

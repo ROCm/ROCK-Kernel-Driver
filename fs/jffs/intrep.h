@@ -17,8 +17,6 @@
 #ifndef __LINUX_JFFS_INTREP_H__
 #define __LINUX_JFFS_INTREP_H__
 #include "jffs_fm.h"
-inline int jffs_min(int a, int b);
-inline int jffs_max(int a, int b);
 __u32 jffs_checksum(const void *data, int size);
 
 void jffs_cleanup_control(struct jffs_control *c);

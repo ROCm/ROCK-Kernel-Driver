@@ -53,8 +53,6 @@
 #define FLAGS_AVAILABLE     0x0001
 #define FLAGS_READY         0x0002
 
-#define min(x,y) ((x) < (y)) ? (x) : (y)
-
 struct memhandle
 {
 	dma_addr_t dma_handle;

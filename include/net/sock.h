@@ -803,26 +803,6 @@ do {	spin_lock_bh(&((__sk)->lock.slock)); \
 #define bh_lock_sock(__sk)	spin_lock(&((__sk)->lock.slock))
 #define bh_unlock_sock(__sk)	spin_unlock(&((__sk)->lock.slock))
 
-/*
- *	This might not be the most appropriate place for this two	 
- *	but since they are used by a lot of the net related code
- *	at least they get declared on a include that is common to all
- */
-
-static __inline__ int min(unsigned int a, unsigned int b)
-{
-	if (a > b)
-		a = b; 
-	return a;
-}
-
-static __inline__ int max(unsigned int a, unsigned int b)
-{
-	if (a < b)
-		a = b;
-	return a;
-}
-
 extern struct sock *		sk_alloc(int family, int priority, int zero_it);
 extern void			sk_free(struct sock *sk);
 
@@ -1265,7 +1245,7 @@ static inline long sock_sndtimeo(struct sock *sk, int noblock)
 
 static inline int sock_rcvlowat(struct sock *sk, int waitall, int len)
 {
-	return (waitall ? len : min(sk->rcvlowat, len)) ? : 1;
+	return (waitall ? len : min(int, sk->rcvlowat, len)) ? : 1;
 }
 
 /* Alas, with timeout socket operations are not restartable.

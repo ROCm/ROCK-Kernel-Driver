@@ -332,13 +332,6 @@ typedef struct {
 #include <linux/tty_flip.h>
 
 
-#ifndef	min
-#define min(a,b) (((a)<(b))?(a):(b))
-#endif
-#ifndef	max
-#define max(a,b) (((a)>(b))?(a):(b))
-#endif
-
 #define	is_digit(ch) (((ch)>=(unsigned)'0'&&(ch)<=(unsigned)'9')?1:0)
 #define	is_alpha(ch) ((((ch)>=(unsigned)'a'&&(ch)<=(unsigned)'z')||\
 	 	  ((ch)>=(unsigned)'A'&&(ch)<=(unsigned)'Z'))?1:0)

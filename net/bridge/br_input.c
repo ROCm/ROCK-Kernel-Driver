@@ -5,7 +5,7 @@
  *	Authors:
  *	Lennert Buytenhek		<buytenh@gnu.org>
  *
- *	$Id: br_input.c,v 1.8 2001/06/01 09:28:28 davem Exp $
+ *	$Id: br_input.c,v 1.9 2001/08/14 22:05:57 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License
@@ -39,7 +39,7 @@ static void br_pass_frame_up(struct net_bridge *br, struct sk_buff *skb)
 	indev = skb->dev;
 	skb->dev = &br->dev;
 	skb->pkt_type = PACKET_HOST;
-	skb_pull(skb, skb->mac.raw - skb->data);
+	skb_push(skb, ETH_HLEN);
 	skb->protocol = eth_type_trans(skb, &br->dev);
 
 	NF_HOOK(PF_BRIDGE, NF_BR_LOCAL_IN, skb, indev, NULL,
@@ -63,8 +63,6 @@ static void __br_handle_frame(struct sk_buff *skb)
 	if (!(br->dev.flags & IFF_UP) ||
 	    p->state == BR_STATE_DISABLED)
 		goto freeandout;
-
-	skb_push(skb, skb->data - skb->mac.raw);
 
 	if (br->dev.flags & IFF_PROMISC) {
 		struct sk_buff *skb2;

@@ -1805,7 +1805,9 @@ static int rh_send_irq (ohci_t * ohci, void * rh_data, int rh_len)
 	len = i/8 + 1;
   
 	if (ret > 0) { 
-		memcpy (rh_data, data, min (len, min (rh_len, sizeof(data))));
+		memcpy(rh_data, data,
+		       min(unsigned int, len,
+			   min(unsigned int, rh_len, sizeof(data))));
 		return len;
 	}
 	return 0;
@@ -1987,10 +1989,18 @@ static int rh_submit_urb (urb_t * urb)
 		case RH_GET_DESCRIPTOR:
 			switch ((wValue & 0xff00) >> 8) {
 				case (0x01): /* device descriptor */
-					len = min (leni, min (sizeof (root_hub_dev_des), wLength));
+					len = min(unsigned int,
+						  leni,
+						  min(unsigned int,
+						      sizeof (root_hub_dev_des),
+						      wLength));
 					data_buf = root_hub_dev_des; OK(len);
 				case (0x02): /* configuration descriptor */
-					len = min (leni, min (sizeof (root_hub_config_des), wLength));
+					len = min(unsigned int,
+						  leni,
+						  min(unsigned int,
+						      sizeof (root_hub_config_des),
+						      wLength));
 					data_buf = root_hub_config_des; OK(len);
 				case (0x03): /* string descriptors */
 					len = usb_root_hub_string (wValue & 0xff,
@@ -1998,7 +2008,7 @@ static int rh_submit_urb (urb_t * urb)
 						data, wLength);
 					if (len > 0) {
 						data_buf = data;
-						OK (min (leni, len));
+						OK(min(int, leni, len));
 					}
 					// else fallthrough
 				default: 
@@ -2033,7 +2043,8 @@ static int rh_submit_urb (urb_t * urb)
 				data_buf [10] = data_buf [9] = 0xff;
 			    }
 				
-			    len = min (leni, min (data_buf [0], wLength));
+			    len = min(unsigned int, leni,
+				      min(unsigned int, data_buf [0], wLength));
 			    OK (len);
 			}
  
@@ -2050,7 +2061,7 @@ static int rh_submit_urb (urb_t * urb)
 	// ohci_dump_roothub (ohci, 0);
 #endif
 
-	len = min(len, leni);
+	len = min(int, len, leni);
 	if (data != data_buf)
 	    memcpy (data, data_buf, len);
   	urb->actual_length = len;

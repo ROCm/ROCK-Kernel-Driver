@@ -2246,8 +2246,13 @@ int cdrom_get_track_info(kdev_t dev, __u16 track, __u8 type,
 	if ((ret = cdo->generic_packet(cdi, &cgc)))
 		return ret;
 	
-	cgc.cmd[8] = cgc.buflen = be16_to_cpu(ti->track_information_length) +
+	cgc.buflen = be16_to_cpu(ti->track_information_length) +
 		     sizeof(ti->track_information_length);
+
+	if (cgc.buflen > sizeof(track_information))
+		cgc.buflen = sizeof(track_information);
+
+	cgc.cmd[8] = cgc.buflen;
 	return cdo->generic_packet(cdi, &cgc);
 }
 

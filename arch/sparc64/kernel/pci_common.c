@@ -1,4 +1,4 @@
-/* $Id: pci_common.c,v 1.26 2001/06/28 01:32:18 davem Exp $
+/* $Id: pci_common.c,v 1.27 2001/08/12 13:18:22 davem Exp $
  * pci_common.c: PCI controller common support.
  *
  * Copyright (C) 1999 David S. Miller (davem@redhat.com)
@@ -723,12 +723,12 @@ static void __init pdev_fixup_irq(struct pci_dev *pdev)
 		 * ranges. -DaveM
  		 */
 		if (pdev->bus->number == pbm->pci_first_busno) {
-			slot = (pdev->devfn >> 3) - 1;
+			slot = (pdev->devfn >> 3) - pbm->pci_first_slot;
 		} else {
 			/* Underneath a bridge, use slot number of parent
 			 * bridge.
 			 */
-			slot = (pdev->bus->self->devfn >> 3) - 1;
+			slot = (pdev->bus->self->devfn >> 3) - pbm->pci_first_slot;
 		}
 		slot = slot << 2;
 

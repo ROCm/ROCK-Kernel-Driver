@@ -180,6 +180,19 @@ There are two types of DMA mappings:
   to memory is immediately visible to the device, and vice
   versa.  Consistent mappings guarantee this.
 
+  IMPORTANT: Consistent DMA memory does not preclude the usage of
+             proper memory barriers.  The cpu may reorder stores to
+	     consistent memory just as it may normal memory.  Example:
+	     if it is important for the device to see the first word
+	     of a descriptor updated before the second, you must do
+	     something like:
+
+		desc->word0 = address;
+		wmb();
+		desc->word1 = DESC_VALID;
+
+             in order to get correct behavior on all platforms.
+
 - Streaming DMA mappings which are usually mapped for one DMA transfer,
   unmapped right after it (unless you use pci_dma_sync below) and for which
   hardware can optimize for sequential accesses.

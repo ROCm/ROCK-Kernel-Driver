@@ -131,13 +131,6 @@
 
 #define	LVM_DIR_PREFIX	"/dev/"
 
-#ifndef min
-#define min(a,b) (((a)<(b))?(a):(b))
-#endif
-#ifndef max
-#define max(a,b) (((a)>(b))?(a):(b))
-#endif
-
 /* set the default structure version */
 #if ( LVM_STRUCT_VERSION == 1)
 #define pv_t pv_v2_t

@@ -101,7 +101,7 @@
 #define		HERMES_STATUS_CMDCODE		(0x003f)
 
 /*
- * OFFSET refister bitmasks
+ * OFFSET register bitmasks
  */
 #define		HERMES_OFFSET_BUSY		(0x8000)
 #define		HERMES_OFFSET_ERR		(0x4000)

@@ -801,7 +801,6 @@ adapter_init(struct net_device *dev)
  * This differs from the standard function, that can return an
  * arbitrarily small window!
  */
-#define min(a,b)	((a)<(b)?(a):(b))
 static unsigned long
 de600_rspace(struct sock *sk)
 {
@@ -815,7 +814,7 @@ de600_rspace(struct sock *sk)
  */
 
 	if (atomic_read(&sk->rmem_alloc) >= sk->rcvbuf-2*DE600_MIN_WINDOW) return(0);
-	amt = min((sk->rcvbuf-atomic_read(&sk->rmem_alloc))/2/*-DE600_MIN_WINDOW*/, DE600_MAX_WINDOW);
+	amt = min(int, (sk->rcvbuf-atomic_read(&sk->rmem_alloc))/2/*-DE600_MIN_WINDOW*/, DE600_MAX_WINDOW);
 	if (amt < 0) return(0);
 	return(amt);
   }

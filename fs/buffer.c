@@ -794,6 +794,17 @@ void set_blocksize(kdev_t dev, int size)
 		goto retry;
 }
 
+static void free_more_memory(void)
+{
+	balance_dirty(NODEV);
+	page_launder(GFP_NOFS, 0);		
+	wakeup_bdflush();
+	wakeup_kswapd();
+	current->policy |= SCHED_YIELD;
+	__set_current_state(TASK_RUNNING);
+	schedule();
+}
+
 /*
  * We used to try various strange things. Let's not.
  * We'll just try to balance dirty buffers, and possibly
@@ -802,15 +813,8 @@ void set_blocksize(kdev_t dev, int size)
  */
 static void refill_freelist(int size)
 {
-	if (!grow_buffers(size)) {
-		balance_dirty(NODEV);
-		page_launder(GFP_NOFS, 0);		
-		wakeup_bdflush();
-		wakeup_kswapd();
-		current->policy |= SCHED_YIELD;
-		__set_current_state(TASK_RUNNING);
-		schedule();
-	}
+	if (!grow_buffers(size))
+		free_more_memory();
 }
 
 void init_buffer(struct buffer_head *bh, bh_end_io_t *handler, void *private)
@@ -1408,9 +1412,7 @@ no_grow:
 	 */
 	run_task_queue(&tq_disk);
 
-	current->policy |= SCHED_YIELD;
-	__set_current_state(TASK_RUNNING);
-	schedule();
+	free_more_memory();
 	goto try_again;
 }
 

@@ -1,4 +1,4 @@
-/* $Id: entry.S,v 1.128 2001/03/28 10:56:34 davem Exp $
+/* $Id: entry.S,v 1.129 2001/08/13 20:41:54 kanoj Exp $
  * arch/sparc64/kernel/entry.S:  Sparc64 trap low-level entry points.
  *
  * Copyright (C) 1995,1997 David S. Miller (davem@caip.rutgers.edu)
@@ -39,6 +39,11 @@ sparc64_vpte_patchme2:
 	or		%g5, %lo(0), %g5		! This is patched too
 	ba,pt		%xcc, sparc64_kpte_continue	! Part of dtlb_backend
 	 add		%g1, %g1, %g1			! Finish PMD offset adjustment
+
+vpte_noent:
+	mov		TLB_SFSR, %g1			! Restore %g1 value
+	stxa		%g4, [%g1 + %g1] ASI_DMMU	! Restore previous TAG_ACCESS
+	done						! Slick trick
 
 	/* This is trivial with the new code... */
 	.globl		do_fpdis

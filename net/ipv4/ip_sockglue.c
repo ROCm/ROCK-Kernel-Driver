@@ -5,7 +5,7 @@
  *
  *		The IP to API glue.
  *		
- * Version:	$Id: ip_sockglue.c,v 1.56 2001/02/18 09:07:58 davem Exp $
+ * Version:	$Id: ip_sockglue.c,v 1.59 2001/08/13 18:56:12 davem Exp $
  *
  * Authors:	see ip.c
  *
@@ -42,8 +42,6 @@
 
 #include <linux/errqueue.h>
 #include <asm/uaccess.h>
-
-#define MAX(a,b) ((a)>(b)?(a):(b))
 
 #define IP_CMSG_PKTINFO		1
 #define IP_CMSG_TTL		2
@@ -685,7 +683,7 @@ int ip_getsockopt(struct sock *sk, int level, int optname, char *optval, int *op
 
 				ip_options_undo(opt);
 
-				len=min(len, opt->optlen);
+				len = min(unsigned int, len, opt->optlen);
 				if(put_user(len, optlen))
 					return -EFAULT;
 				if(copy_to_user(optval, opt->__data, len))
@@ -746,7 +744,7 @@ int ip_getsockopt(struct sock *sk, int level, int optname, char *optval, int *op
 		case IP_MULTICAST_IF:
 		{
 			struct in_addr addr;
-			len = min(len,sizeof(struct in_addr));
+			len = min(unsigned int, len, sizeof(struct in_addr));
 			addr.s_addr = sk->protinfo.af_inet.mc_addr;
 			release_sock(sk);
 
@@ -810,7 +808,7 @@ int ip_getsockopt(struct sock *sk, int level, int optname, char *optval, int *op
 		if(copy_to_user(optval,&ucval,1))
 			return -EFAULT;
 	} else {
-		len=min(sizeof(int),len);
+		len = min(unsigned int, sizeof(int), len);
 		if(put_user(len, optlen))
 			return -EFAULT;
 		if(copy_to_user(optval,&val,len))

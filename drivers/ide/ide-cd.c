@@ -1885,7 +1885,7 @@ static int cdrom_eject(ide_drive_t *drive, int ejectflag,
 	return cdrom_queue_packet_command (drive, &pc);
 }
 
-static int cdrom_read_capacity(ide_drive_t *drive, unsigned *capacity,
+static int cdrom_read_capacity(ide_drive_t *drive, unsigned long *capacity,
 			       struct request_sense *sense)
 {
 	struct {
@@ -2927,7 +2927,7 @@ void ide_cdrom_revalidate (ide_drive_t *drive)
 static
 unsigned long ide_cdrom_capacity (ide_drive_t *drive)
 {
-	unsigned capacity;
+	unsigned long capacity;
 
 	if (cdrom_read_capacity(drive, &capacity, NULL))
 		return 0;

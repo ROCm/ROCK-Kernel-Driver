@@ -91,7 +91,6 @@ MODULE_PARM_DESC (iucv,
 #include <linux/init.h>		/* __setup()                    */
 #include <asm/string.h>		/* memset, memcpy, etc.         */
 #include "iucv.h"
-#define min(a,b) (a < b) ? a : b
 
 #if defined( DEBUG )
 #undef KERN_INFO
@@ -828,7 +827,8 @@ register_iucv_dev (int devnumber, char *userid)
 	net_device *dev;
 
 	memset (iucv_userid[devnumber], ' ', 8);
-	memcpy (iucv_userid[devnumber], userid, min (strlen (userid), 8));
+	memcpy (iucv_userid[devnumber], userid,
+		min(unsigned int, strlen(userid), 8));
 	dev = &iucv_netdev[devnumber];
 	sprintf (dev->name, "iucv%i", devnumber);
 

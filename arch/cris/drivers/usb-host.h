@@ -146,8 +146,6 @@ struct in_chunk
 #define RH_REQ_ERR                 -1
 #define RH_NACK                    0x00
 
-#define min(a,b) (((a)<(b))?(a):(b))
-
 /* Field definitions for */
 
 #define USB_IN_command__eol__BITNR      0 /* command macros */

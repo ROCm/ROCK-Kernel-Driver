@@ -505,13 +505,13 @@ int wpc_init (sdla_t* card, wandev_conf_t* conf)
 		/* For Primary Port 0 */
 		card->wandev.mtu =
 			(conf->mtu >= MIN_LGTH_CHDLC_DATA_CFG) ?
-			min(conf->mtu, PRI_MAX_NO_DATA_BYTES_IN_FRAME) :
+			min(unsigned int, conf->mtu, PRI_MAX_NO_DATA_BYTES_IN_FRAME) :
 			CHDLC_DFLT_DATA_LEN;
 	} else if(port_num == WANOPT_SEC) { 
 		/* For Secondary Port 1 */
 		card->wandev.mtu =
 			(conf->mtu >= MIN_LGTH_CHDLC_DATA_CFG) ?
-			min(conf->mtu, SEC_MAX_NO_DATA_BYTES_IN_FRAME) :
+			min(unsigned int, conf->mtu, SEC_MAX_NO_DATA_BYTES_IN_FRAME) :
 			CHDLC_DFLT_DATA_LEN;
 	}
 
@@ -827,19 +827,19 @@ static int new_if (wan_device_t* wandev, netdevice_t* dev, wanif_conf_t* conf)
 			card->u.c.kpalv_tx =
 				((conf->keepalive_tx_tmr - MIN_Tx_KPALV_TIMER)
 				>= 0) ?
-	   			min(conf->keepalive_tx_tmr,MAX_Tx_KPALV_TIMER) :
+	   			min(unsigned int, conf->keepalive_tx_tmr,MAX_Tx_KPALV_TIMER) :
 				DEFAULT_Tx_KPALV_TIMER;
 
 			card->u.c.kpalv_rx =
 		   		((conf->keepalive_rx_tmr - MIN_Rx_KPALV_TIMER)
 				>= 0) ?
-	   			min(conf->keepalive_rx_tmr,MAX_Rx_KPALV_TIMER) :
+	   			min(unsigned int, conf->keepalive_rx_tmr,MAX_Rx_KPALV_TIMER) :
 				DEFAULT_Rx_KPALV_TIMER;
 
 			card->u.c.kpalv_err =
 		   		((conf->keepalive_err_margin-MIN_KPALV_ERR_TOL)
 				>= 0) ?
-	   			min(conf->keepalive_err_margin,
+	   			min(unsigned int, conf->keepalive_err_margin,
 				MAX_KPALV_ERR_TOL) : 
 	   			DEFAULT_KPALV_ERR_TOL;
 		}
@@ -847,7 +847,7 @@ static int new_if (wan_device_t* wandev, netdevice_t* dev, wanif_conf_t* conf)
 		/* Setup slarp timer to control delay between slarps */
 		card->u.c.slarp_timer = 
 			((conf->slarp_timer - MIN_SLARP_REQ_TIMER) >= 0) ?
-			min (conf->slarp_timer, MAX_SLARP_REQ_TIMER) :
+			min(unsigned int, conf->slarp_timer, MAX_SLARP_REQ_TIMER) :
 			DEFAULT_SLARP_REQ_TIMER;
 
 #ifdef LINUX_2_0

@@ -1,4 +1,4 @@
-/* orinoco_cs.c 0.06	- (formerly known as dldwd_cs.c)
+/* orinoco_cs.c 0.06f	- (formerly known as dldwd_cs.c)
  *
  * A driver for "Hermes" chipset based PCMCIA wireless adaptors, such
  * as the Lucent WavelanIEEE/Orinoco cards and their OEM (Cabletron/
@@ -40,20 +40,12 @@
 #include "hermes.h"
 #include "orinoco.h"
 
-/* Pcmcia specific structure */
-typedef struct dldwd_card {
-	dev_link_t link;
-	dev_node_t node;
-	int instance;
-
-	/* Common structure (fully included), see orinoco.h */
-	struct dldwd_priv  priv;
-} dldwd_card_t;
-
-static char version[] __initdata =
-"orinoco_cs.c 0.06 (David Gibson <hermes@gibson.dropbear.id.au> and others)";
-
 /*====================================================================*/
+
+static const char version[] __initdata = "orinoco_cs.c 0.06f (David Gibson <hermes@gibson.dropbear.id.au> and others)";
+
+MODULE_AUTHOR("David Gibson <hermes@gibson.dropbear.id.au>");
+MODULE_DESCRIPTION("Driver for PCMCIA Lucent Orinoco, Prism II based and similar wireless cards");
 
 /* Parameters that can be set with 'insmod' */
 
@@ -66,12 +58,23 @@ static int irq_list[4] = { -1 };
 static int reset_cor = 0;
 /* Some D-Link cards have buggy CIS. They do work at 5v properly, but
  * don't have any CIS entry for it. This workaround it... */
-static int ignore_cis_vcc = 0;
+static int ignore_cis_vcc; /* = 0 */
 
 MODULE_PARM(irq_mask, "i");
 MODULE_PARM(irq_list, "1-4i");
 MODULE_PARM(reset_cor, "i");
 MODULE_PARM(ignore_cis_vcc, "i");
+
+
+/* Pcmcia specific structure */
+typedef struct dldwd_card {
+	dev_link_t link;
+	dev_node_t node;
+	int instance;
+
+	/* Common structure (fully included), see orinoco.h */
+	struct dldwd_priv  priv;
+} dldwd_card_t;
 
 /*
  * Function prototypes
@@ -108,8 +111,8 @@ static dev_info_t dev_info = "orinoco_cs";
    device numbers are used to derive the corresponding array index.
 */
 
-static dev_link_t *dev_list;
-static int num_instances;
+static dev_link_t *dev_list; /* = NULL */
+static int num_instances; /* = 0 */
 
 /*====================================================================*/
 
@@ -595,7 +598,7 @@ dldwd_cs_config(dev_link_t * link)
 	strcpy(card->node.dev_name, ndev->name);
 
 	/* Finally, report what we've done */
-	printk(KERN_INFO "%s: index 0x%02x: Vcc %d.%d",
+	printk(KERN_DEBUG "%s: index 0x%02x: Vcc %d.%d",
 	       ndev->name, link->conf.ConfigIndex,
 	       link->conf.Vcc / 10, link->conf.Vcc % 10);
 	if (link->conf.Vpp1)
@@ -777,8 +780,8 @@ init_dldwd_cs(void)
 
 	TRACE_ENTER("dldwd");
 
-	printk(KERN_INFO "dldwd: David's Less Dodgy WaveLAN/IEEE Driver\n"
-	       KERN_INFO "%s\n", version);
+	printk(KERN_DEBUG "dldwd: David's Less Dodgy WaveLAN/IEEE Driver\n"
+	       KERN_DEBUG "%s\n", version);
 
 	CardServices(GetCardServicesInfo, &serv);
 	if (serv.Revision != CS_RELEASE_CODE) {

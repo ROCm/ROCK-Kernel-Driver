@@ -5,7 +5,7 @@
  *	Authors:
  *	Pedro Roque		<roque@di.fc.ul.pt>	
  *
- *	$Id: mcast.c,v 1.37 2001/04/25 20:46:34 davem Exp $
+ *	$Id: mcast.c,v 1.38 2001/08/15 07:36:31 davem Exp $
  *
  *	Based on linux/ipv4/igmp.c and linux/ipv4/ip_sockglue.c 
  *
@@ -90,7 +90,6 @@ int ipv6_sock_mc_join(struct sock *sk, int ifindex, struct in6_addr *addr)
 
 	mc_lst->next = NULL;
 	memcpy(&mc_lst->addr, addr, sizeof(struct in6_addr));
-	mc_lst->ifindex = ifindex;
 
 	if (ifindex == 0) {
 		struct rt6_info *rt;
@@ -107,6 +106,8 @@ int ipv6_sock_mc_join(struct sock *sk, int ifindex, struct in6_addr *addr)
 		sock_kfree_s(sk, mc_lst, sizeof(*mc_lst));
 		return -ENODEV;
 	}
+
+	mc_lst->ifindex = dev->ifindex;
 
 	/*
 	 *	now add/increase the group membership on the device

@@ -137,7 +137,5 @@ struct sbni_flags {
 #define __initdata
 #endif
 
-#define min( x, y )	( (x) < (y)  ?  (x)  :  (y) )
-
 #endif
 

@@ -154,7 +154,7 @@ static ssize_t ata_ct_law(const u_char *userPtr, size_t userCount,
 	ssize_t count, used;
 	u_char *p = &frame[*frameUsed];
 
-	count = min(userCount, frameLeft);
+	count = min(unsigned long, userCount, frameLeft);
 	if (dmasound.soft.stereo)
 		count &= ~1;
 	used = count;
@@ -177,7 +177,7 @@ static ssize_t ata_ct_s8(const u_char *userPtr, size_t userCount,
 	ssize_t count, used;
 	void *p = &frame[*frameUsed];
 
-	count = min(userCount, frameLeft);
+	count = min(unsigned long, userCount, frameLeft);
 	if (dmasound.soft.stereo)
 		count &= ~1;
 	used = count;
@@ -196,7 +196,7 @@ static ssize_t ata_ct_u8(const u_char *userPtr, size_t userCount,
 
 	if (!dmasound.soft.stereo) {
 		u_char *p = &frame[*frameUsed];
-		count = min(userCount, frameLeft);
+		count = min(unsigned long, userCount, frameLeft);
 		used = count;
 		while (count > 0) {
 			u_char data;
@@ -207,7 +207,7 @@ static ssize_t ata_ct_u8(const u_char *userPtr, size_t userCount,
 		}
 	} else {
 		u_short *p = (u_short *)&frame[*frameUsed];
-		count = min(userCount, frameLeft)>>1;
+		count = min(unsigned long, userCount, frameLeft)>>1;
 		used = count*2;
 		while (count > 0) {
 			u_short data;
@@ -230,7 +230,7 @@ static ssize_t ata_ct_s16be(const u_char *userPtr, size_t userCount,
 
 	if (!dmasound.soft.stereo) {
 		u_short *p = (u_short *)&frame[*frameUsed];
-		count = min(userCount, frameLeft)>>1;
+		count = min(unsigned long, userCount, frameLeft)>>1;
 		used = count*2;
 		while (count > 0) {
 			u_short data;
@@ -243,7 +243,7 @@ static ssize_t ata_ct_s16be(const u_char *userPtr, size_t userCount,
 		*frameUsed += used*2;
 	} else {
 		void *p = (u_short *)&frame[*frameUsed];
-		count = min(userCount, frameLeft) & ~3;
+		count = min(unsigned long, userCount, frameLeft) & ~3;
 		used = count;
 		if (copy_from_user(p, userPtr, count))
 			return -EFAULT;
@@ -261,7 +261,7 @@ static ssize_t ata_ct_u16be(const u_char *userPtr, size_t userCount,
 
 	if (!dmasound.soft.stereo) {
 		u_short *p = (u_short *)&frame[*frameUsed];
-		count = min(userCount, frameLeft)>>1;
+		count = min(unsigned long, userCount, frameLeft)>>1;
 		used = count*2;
 		while (count > 0) {
 			u_short data;
@@ -275,7 +275,7 @@ static ssize_t ata_ct_u16be(const u_char *userPtr, size_t userCount,
 		*frameUsed += used*2;
 	} else {
 		u_long *p = (u_long *)&frame[*frameUsed];
-		count = min(userCount, frameLeft)>>2;
+		count = min(unsigned long, userCount, frameLeft)>>2;
 		used = count*4;
 		while (count > 0) {
 			u_long data;
@@ -299,7 +299,7 @@ static ssize_t ata_ct_s16le(const u_char *userPtr, size_t userCount,
 	count = frameLeft;
 	if (!dmasound.soft.stereo) {
 		u_short *p = (u_short *)&frame[*frameUsed];
-		count = min(userCount, frameLeft)>>1;
+		count = min(unsigned long, userCount, frameLeft)>>1;
 		used = count*2;
 		while (count > 0) {
 			u_short data;
@@ -313,7 +313,7 @@ static ssize_t ata_ct_s16le(const u_char *userPtr, size_t userCount,
 		*frameUsed += used*2;
 	} else {
 		u_long *p = (u_long *)&frame[*frameUsed];
-		count = min(userCount, frameLeft)>>2;
+		count = min(unsigned long, userCount, frameLeft)>>2;
 		used = count*4;
 		while (count > 0) {
 			u_long data;
@@ -338,7 +338,7 @@ static ssize_t ata_ct_u16le(const u_char *userPtr, size_t userCount,
 	count = frameLeft;
 	if (!dmasound.soft.stereo) {
 		u_short *p = (u_short *)&frame[*frameUsed];
-		count = min(userCount, frameLeft)>>1;
+		count = min(unsigned long, userCount, frameLeft)>>1;
 		used = count*2;
 		while (count > 0) {
 			u_short data;
@@ -351,7 +351,7 @@ static ssize_t ata_ct_u16le(const u_char *userPtr, size_t userCount,
 		*frameUsed += used*2;
 	} else {
 		u_long *p = (u_long *)&frame[*frameUsed];
-		count = min(userCount, frameLeft)>>2;
+		count = min(unsigned long, userCount, frameLeft)>>2;
 		used = count;
 		while (count > 0) {
 			u_long data;

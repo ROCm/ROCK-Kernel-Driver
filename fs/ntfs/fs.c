@@ -1048,12 +1048,12 @@ struct super_block * ntfs_read_super(struct super_block *sb, void *options,
 	set_blocksize(sb->s_dev, sb->s_blocksize);
 	ntfs_debug(DEBUG_OTHER, "set_blocksize\n");
 	/* Allocate an MFT record (MFT record can be smaller than a cluster). */
-	if (!(vol->mft = ntfs_malloc(max(vol->mft_record_size,
-							 vol->cluster_size))))
+	if (!(vol->mft = ntfs_malloc(max(int, vol->mft_record_size,
+					 vol->cluster_size))))
 		goto ntfs_read_super_unl;
 
 	/* Read at least the MFT record for $Mft. */
-	for (i = 0; i < max(vol->mft_clusters_per_record, 1); i++) {
+	for (i = 0; i < max(int, vol->mft_clusters_per_record, 1); i++) {
 		if (!(bh = bread(sb->s_dev, vol->mft_lcn + i,
 							  vol->cluster_size))) {
 			ntfs_error("Could not read $Mft record 0\n");

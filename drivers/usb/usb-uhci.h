@@ -282,6 +282,4 @@ typedef struct uhci {
 #define RH_REQ_ERR                 -1
 #define RH_NACK                    0x00
 
-#define min(a,b) (((a)<(b))?(a):(b))
-
 #endif

@@ -46,13 +46,6 @@
 
 /****** Defines and Macros **************************************************/
 
-#ifndef	min
-#define min(a,b) (((a)<(b))?(a):(b))
-#endif
-#ifndef	max
-#define max(a,b) (((a)>(b))?(a):(b))
-#endif
-
 #define	PROC_BUFSZ	4000	/* buffer size for printing proc info */
 
 #define PROT_DECODE(prot) ((prot == WANCONFIG_FR) ? " FR" :\
@@ -266,7 +259,7 @@ typedef struct wan_stat_entry
 		pos = dent->get_info(page, dent->data, 0, 0);
 		offs = file->f_pos;
 		if (offs < pos) {
-			len = min(pos - offs, count);
+			len = min(unsigned int, pos - offs, count);
 			if (copy_to_user(buf, (page + offs), len)) {
 				kfree(page);
 				return -EFAULT;
@@ -812,7 +805,7 @@ typedef struct wan_stat_entry
 		pos = dent->get_info(page, dent->data, 0, 0, 0);
 		offs = file->f_pos;
 		if (offs < pos) {
-			len = min(pos - offs, count);
+			len = min(unsigned int, pos - offs, count);
 			if (copy_to_user(buf, (page + offs), len)) {
 				kfree(page);
 				return -EFAULT;
@@ -848,7 +841,7 @@ typedef struct wan_stat_entry
 		pos = dent->get_info(page, dent->data, 0, 0, 0);
 		offs = file->f_pos;
 		if (offs < pos) {
-			len = min(pos - offs, count);
+			len = min(unsigned int, pos - offs, count);
 			memcpy_tofs((void*)buf, (void*)(page + offs), len);
 			file->f_pos += len;
 		}

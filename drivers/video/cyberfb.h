@@ -100,14 +100,6 @@
 
 /**************************************************/
 
-#ifndef min
-#define min(a,b)	((a) < (b) ? (a) : (b))
-#endif /* !min */
-
-#ifndef max
-#define max(a,b)	((a) > (b) ? (a) : (b))
-#endif /* !max */
-
 /* support for a BitBlt operation. The op-codes are identical
    to X11 GCs */
 #define	GRFBBOPclear		0x0	/* 0 */

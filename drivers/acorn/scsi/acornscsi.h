@@ -183,9 +183,6 @@
 #define MASK_ON		(MASKREG_M3|MASKREG_M2|MASKREG_M1|MASKREG_M0)
 #define MASK_OFF	(MASKREG_M3|MASKREG_M2|MASKREG_M1)
 
-#define min(x,y) ((x) < (y) ? (x) : (y))
-#define max(x,y) ((x) < (y) ? (y) : (x))
-
 /*
  * SCSI driver phases
  */

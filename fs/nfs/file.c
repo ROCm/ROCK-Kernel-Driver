@@ -39,7 +39,6 @@ static ssize_t nfs_file_read(struct file *, char *, size_t, loff_t *);
 static ssize_t nfs_file_write(struct file *, const char *, size_t, loff_t *);
 static int  nfs_file_flush(struct file *);
 static int  nfs_fsync(struct file *, struct dentry *dentry, int datasync);
-static int  nfs_file_release(struct inode *, struct file *);
 
 struct file_operations nfs_file_operations = {
 	llseek:		generic_file_llseek,
@@ -48,7 +47,7 @@ struct file_operations nfs_file_operations = {
 	mmap:		nfs_file_mmap,
 	open:		nfs_open,
 	flush:		nfs_file_flush,
-	release:	nfs_file_release,
+	release:	nfs_release,
 	fsync:		nfs_fsync,
 	lock:		nfs_lock,
 };
@@ -87,13 +86,6 @@ nfs_file_flush(struct file *file)
 		file->f_error = 0;
 	}
 	return status;
-}
-
-static int
-nfs_file_release(struct inode *inode, struct file *file)
-{
-	filemap_fdatasync(inode->i_mapping);
-	return nfs_release(inode,file);
 }
 
 static ssize_t

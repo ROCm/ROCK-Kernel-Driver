@@ -180,7 +180,7 @@ int ntfs_getput_clusters(ntfs_volume *vol, int cluster,	ntfs_size_t start_offs,
 			error = -EIO;
 			goto error_ret;
 		}
-		to_copy = min(vol->cluster_size - start_offs, length);
+		to_copy = min(unsigned int, vol->cluster_size - start_offs, length);
 		lock_buffer(bh);
 		if (buf->do_read) {
 			buf->fn_put(buf, bh->b_data + start_offs, to_copy);

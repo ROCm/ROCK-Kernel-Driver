@@ -326,9 +326,9 @@ void ParseHeader(char *Buffer,const int length, struct http_request *Head)
 			
 			strncpy(Head->FileName,sysctl_khttpd_docroot,sizeof(Head->FileName));
 			PrefixLen = strlen(sysctl_khttpd_docroot);
-			Head->FileNameLength = min(255,tmp-Buffer+PrefixLen);		
+			Head->FileNameLength = min(unsigned int, 255, tmp - Buffer + PrefixLen);		
 			
-			strncat(Head->FileName,Buffer,min(255-PrefixLen,tmp-Buffer));
+			strncat(Head->FileName,Buffer,min(unsigned int, 255 - PrefixLen, tmp - Buffer));
 					
 			Buffer=EOL+1;	
 #ifdef BENCHMARK
@@ -341,7 +341,7 @@ void ParseHeader(char *Buffer,const int length, struct http_request *Head)
 		{
 			Buffer+=19;
 			
-			strncpy(Head->IMS,Buffer,min(127,EOL-Buffer-1));
+			strncpy(Head->IMS,Buffer,min(unsigned int, 127,EOL-Buffer-1));
 					
 			Buffer=EOL+1;	
 			continue;
@@ -351,7 +351,7 @@ void ParseHeader(char *Buffer,const int length, struct http_request *Head)
 		{
 			Buffer+=12;
 			
-			strncpy(Head->Agent,Buffer,min(127,EOL-Buffer-1));
+			strncpy(Head->Agent,Buffer,min(unsigned int, 127,EOL-Buffer-1));
 					
 			Buffer=EOL+1;	
 			continue;
@@ -362,7 +362,7 @@ void ParseHeader(char *Buffer,const int length, struct http_request *Head)
 		{
 			Buffer+=6;
 			
-			strncpy(Head->Host,Buffer,min(127,EOL-Buffer-1));
+			strncpy(Head->Host,Buffer,min(unsigned int, 127,EOL-Buffer-1));
 					
 			Buffer=EOL+1;	
 			continue;

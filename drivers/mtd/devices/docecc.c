@@ -80,8 +80,6 @@ modnn(int x)
   return x;
 }
 
-#define	min(a,b)	((a) < (b) ? (a) : (b))
-
 #define	CLEAR(a,n) {\
 int ci;\
 for(ci=(n)-1;ci >=0;ci--)\
@@ -404,7 +402,7 @@ eras_dec_rs(dtype Alpha_to[NN + 1], dtype Index_of[NN + 1],
     den = 0;
     
     /* lambda[i+1] for i even is the formal derivative lambda_pr of lambda[i] */
-    for (i = min(deg_lambda,NN-KK-1) & ~1; i >= 0; i -=2) {
+    for (i = min(int, deg_lambda,NN-KK-1) & ~1; i >= 0; i -=2) {
       if(lambda[i+1] != A0)
 	den ^= Alpha_to[modnn(lambda[i+1] + i * root[j])];
     }

@@ -267,7 +267,7 @@ static ssize_t pmac_ct_law(const u_char *userPtr, size_t userCount,
 	frameLeft >>= 2;
 	if (stereo)
 		userCount >>= 1;
-	used = count = min(userCount, frameLeft);
+	used = count = min(unsigned long, userCount, frameLeft);
 	while (count > 0) {
 		u_char data;
 		if (get_user(data, userPtr++))
@@ -298,7 +298,7 @@ static ssize_t pmac_ct_s8(const u_char *userPtr, size_t userCount,
 	frameLeft >>= 2;
 	if (stereo)
 		userCount >>= 1;
-	used = count = min(userCount, frameLeft);
+	used = count = min(unsigned long, userCount, frameLeft);
 	while (count > 0) {
 		u_char data;
 		if (get_user(data, userPtr++))
@@ -329,7 +329,7 @@ static ssize_t pmac_ct_u8(const u_char *userPtr, size_t userCount,
 	frameLeft >>= 2;
 	if (stereo)
 		userCount >>= 1;
-	used = count = min(userCount, frameLeft);
+	used = count = min(unsigned long, userCount, frameLeft);
 	while (count > 0) {
 		u_char data;
 		if (get_user(data, userPtr++))
@@ -359,7 +359,7 @@ static ssize_t pmac_ct_s16(const u_char *userPtr, size_t userCount,
 
 	frameLeft >>= 2;
 	userCount >>= (stereo? 2: 1);
-	used = count = min(userCount, frameLeft);
+	used = count = min(unsigned long, userCount, frameLeft);
 	if (!stereo) {
 		short *up = (short *) userPtr;
 		while (count > 0) {
@@ -390,7 +390,7 @@ static ssize_t pmac_ct_u16(const u_char *userPtr, size_t userCount,
 
 	frameLeft >>= 2;
 	userCount >>= (stereo? 2: 1);
-	used = count = min(userCount, frameLeft);
+	used = count = min(unsigned long, userCount, frameLeft);
 	while (count > 0) {
 		int data;
 		if (get_user(data, up++))
@@ -648,7 +648,7 @@ static ssize_t pmac_ct_s8_read(const u_char *userPtr, size_t userCount,
 	frameLeft >>= 2;
 	if (stereo)
 		userCount >>= 1;
-	used = count = min(userCount, frameLeft);
+	used = count = min(unsigned long, userCount, frameLeft);
 	while (count > 0) {
 		u_char data;
 
@@ -681,7 +681,7 @@ static ssize_t pmac_ct_u8_read(const u_char *userPtr, size_t userCount,
 	frameLeft >>= 2;
 	if (stereo)
 		userCount >>= 1;
-	used = count = min(userCount, frameLeft);
+	used = count = min(unsigned long, userCount, frameLeft);
 	while (count > 0) {
 		u_char data;
 
@@ -713,7 +713,7 @@ static ssize_t pmac_ct_s16_read(const u_char *userPtr, size_t userCount,
 
 	frameLeft >>= 2;
 	userCount >>= (stereo? 2: 1);
-	used = count = min(userCount, frameLeft);
+	used = count = min(unsigned long, userCount, frameLeft);
 	if (!stereo) {
 		short *up = (short *) userPtr;
 		while (count > 0) {
@@ -744,7 +744,7 @@ static ssize_t pmac_ct_u16_read(const u_char *userPtr, size_t userCount,
 
 	frameLeft >>= 2;
 	userCount >>= (stereo? 2: 1);
-	used = count = min(userCount, frameLeft);
+	used = count = min(unsigned long, userCount, frameLeft);
 	while (count > 0) {
 		int data;
 

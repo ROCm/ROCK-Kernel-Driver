@@ -9,7 +9,7 @@
  *	as published by the Free Software Foundation; either version
  *	2 of the License, or (at your option) any later version.
  *
- *	Version: $Id: ipmr.c,v 1.60 2001/06/29 21:33:22 davem Exp $
+ *	Version: $Id: ipmr.c,v 1.63 2001/08/13 18:56:12 davem Exp $
  *
  *	Fixes:
  *	Michael Chastain	:	Incorrect size of copying.
@@ -976,11 +976,11 @@ int ip_mroute_getsockopt(struct sock *sk,int optname,char *optval,int *optlen)
 	   optname!=MRT_ASSERT)
 		return -ENOPROTOOPT;
 
-	if(get_user(olr, optlen))
+	if (get_user(olr, optlen))
 		return -EFAULT;
 
-	olr=min(olr,sizeof(int));
-	if(olr<0)
+	olr = min(unsigned int, olr, sizeof(int));
+	if (olr < 0)
 		return -EINVAL;
 		
 	if(put_user(olr,optlen))

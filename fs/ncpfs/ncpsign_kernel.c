@@ -52,8 +52,6 @@ DSET_LH(__u8 * buf, int pos, __u32 val)
 #define PUT_LE32(p,v) DSET_LH(p,0,v)
 #endif
 
-#define min(a,b) ((a)<(b)?(a):(b))
-
 static void nwsign(char *r_data1, char *r_data2, char *outdata) {
  int i;
  unsigned int w0,w1,w2,w3;
@@ -102,7 +100,7 @@ void sign_packet(struct ncp_server *server, int *size) {
  memcpy(data,server->sign_root,8);
  PUT_LE32(data+8,(*size));
  memcpy(data+12,server->packet+sizeof(struct ncp_request_header)-1,
-  min((*size)-sizeof(struct ncp_request_header)+1,52));
+  min(unsigned int,(*size)-sizeof(struct ncp_request_header)+1,52));
 
  nwsign(server->sign_last,data,server->sign_last);
 

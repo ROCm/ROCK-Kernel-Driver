@@ -365,10 +365,6 @@ static inline __u8 cfi_read_query(struct map_info *map, __u32 addr)
 	}
 }
 
-#ifndef min
-#define min(x,y) ( (x)<(y)?(x):(y) )
-#endif
-
 static inline void cfi_udelay(int us)
 {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,0)

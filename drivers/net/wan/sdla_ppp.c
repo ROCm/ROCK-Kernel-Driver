@@ -400,7 +400,7 @@ int wpp_init(sdla_t *card, wandev_conf_t *conf)
 	printk(KERN_INFO "%s: running PPP firmware v%s\n",card->devname, u.str); 
 	/* Adjust configuration and set defaults */
 	card->wandev.mtu = (conf->mtu) ?
-		min(conf->mtu, PPP_MAX_MTU) : PPP_DFLT_MTU;
+		min(unsigned int, conf->mtu, PPP_MAX_MTU) : PPP_DFLT_MTU;
 
 	card->wandev.bps	= conf->bps;
 	card->wandev.interface	= conf->interface;
@@ -629,7 +629,7 @@ static int new_if(wan_device_t *wandev, netdevice_t *dev, wanif_conf_t *conf)
 	
 	dev->init = &if_init;
 	dev->priv = ppp_priv_area;
-	dev->mtu = min(dev->mtu, card->wandev.mtu);
+	dev->mtu = min(unsigned int, dev->mtu, card->wandev.mtu);
 
 	/* Initialize the polling task routine */
 #ifndef LINUX_2_4

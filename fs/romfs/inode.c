@@ -76,11 +76,6 @@
 
 #include <asm/uaccess.h>
 
-static int inline min(int a, int b)
-{
-	return a<b ? a : b;
-}
-
 static __s32
 romfs_checksum(void *data, int size)
 {
@@ -129,7 +124,7 @@ romfs_read_super(struct super_block *s, void *data, int silent)
 				"%s.\n", kdevname(dev));
 		goto out;
 	}
-	if (romfs_checksum(rsb, min(sz,512))) {
+	if (romfs_checksum(rsb, min(int, sz, 512))) {
 		printk ("romfs: bad initial checksum on dev "
 			"%s.\n", kdevname(dev));
 		goto out;
@@ -198,7 +193,7 @@ romfs_strnlen(struct inode *i, unsigned long offset, unsigned long count)
 		return -1;		/* error */
 
 	avail = ROMBSIZE - (offset & ROMBMASK);
-	maxsize = min(count, avail);
+	maxsize = min(unsigned long, count, avail);
 	res = strnlen(((char *)bh->b_data)+(offset&ROMBMASK), maxsize);
 	brelse(bh);
 
@@ -211,7 +206,7 @@ romfs_strnlen(struct inode *i, unsigned long offset, unsigned long count)
 		bh = bread(i->i_dev, offset>>ROMBSBITS, ROMBSIZE);
 		if (!bh)
 			return -1;
-		maxsize = min(count-res, ROMBSIZE);
+		maxsize = min(unsigned long, count - res, ROMBSIZE);
 		avail = strnlen(bh->b_data, maxsize);
 		res += avail;
 		brelse(bh);
@@ -236,7 +231,7 @@ romfs_copyfrom(struct inode *i, void *dest, unsigned long offset, unsigned long 
 		return -1;		/* error */
 
 	avail = ROMBSIZE - (offset & ROMBMASK);
-	maxsize = min(count, avail);
+	maxsize = min(unsigned long, count, avail);
 	memcpy(dest, ((char *)bh->b_data) + (offset & ROMBMASK), maxsize);
 	brelse(bh);
 
@@ -249,7 +244,7 @@ romfs_copyfrom(struct inode *i, void *dest, unsigned long offset, unsigned long 
 		bh = bread(i->i_dev, offset>>ROMBSBITS, ROMBSIZE);
 		if (!bh)
 			return -1;
-		maxsize = min(count-res, ROMBSIZE);
+		maxsize = min(unsigned long, count - res, ROMBSIZE);
 		memcpy(dest, bh->b_data, maxsize);
 		brelse(bh);
 		res += maxsize;
@@ -413,7 +408,7 @@ romfs_readpage(struct file *file, struct page * page)
 	offset = page->index << PAGE_CACHE_SHIFT;
 	if (offset < inode->i_size) {
 		avail = inode->i_size-offset;
-		readlen = min(avail, PAGE_SIZE);
+		readlen = min(unsigned long, avail, PAGE_SIZE);
 		if (romfs_copyfrom(inode, buf, inode->u.romfs_i.i_dataoffset+offset, readlen) == readlen) {
 			if (readlen < PAGE_SIZE) {
 				memset(buf + readlen,0,PAGE_SIZE-readlen);

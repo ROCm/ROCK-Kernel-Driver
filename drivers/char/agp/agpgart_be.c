@@ -428,8 +428,8 @@ static void agp_generic_agp_enable(u32 mode)
 			/* adjust RQ depth */
 			command =
 			    ((command & ~0xff000000) |
-			     min((mode & 0xff000000),
-				 min((command & 0xff000000),
+			     min(u32, (mode & 0xff000000),
+				 min(u32, (command & 0xff000000),
 				     (scratch & 0xff000000))));
 
 			/* disable SBA if it's not supported */
@@ -2657,8 +2657,8 @@ static void serverworks_agp_enable(u32 mode)
 			/* adjust RQ depth */
 			command =
 			    ((command & ~0xff000000) |
-			     min((mode & 0xff000000),
-				 min((command & 0xff000000),
+			     min(u32, (mode & 0xff000000),
+				 min(u32, (command & 0xff000000),
 				     (scratch & 0xff000000))));
 
 			/* disable SBA if it's not supported */

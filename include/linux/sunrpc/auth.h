@@ -14,6 +14,8 @@
 #include <linux/config.h>
 #include <linux/sunrpc/sched.h>
 
+#include <asm/atomic.h>
+
 /* size of the nodename buffer */
 #define UNX_MAXNODENAME	32
 
@@ -22,8 +24,10 @@
  */
 struct rpc_cred {
 	struct rpc_cred *	cr_next;	/* linked list */
+	struct rpc_auth *	cr_auth;
+	struct rpc_credops *	cr_ops;
 	unsigned long		cr_expire;	/* when to gc */
-	unsigned short		cr_count;	/* ref count */
+	atomic_t		cr_count;	/* ref count */
 	unsigned short		cr_flags;	/* various flags */
 #ifdef RPC_DEBUG
 	unsigned long		cr_magic;	/* 0x0f4aa4f0 */
@@ -71,6 +75,9 @@ struct rpc_authops {
 	void			(*destroy)(struct rpc_auth *);
 
 	struct rpc_cred *	(*crcreate)(int);
+};
+
+struct rpc_credops {
 	void			(*crdestroy)(struct rpc_cred *);
 
 	int			(*crmatch)(struct rpc_cred *, int);
@@ -92,8 +99,7 @@ void			rpcauth_destroy(struct rpc_auth *);
 struct rpc_cred *	rpcauth_lookupcred(struct rpc_auth *, int);
 struct rpc_cred *	rpcauth_bindcred(struct rpc_task *);
 void			rpcauth_holdcred(struct rpc_task *);
-void			rpcauth_releasecred(struct rpc_auth *,
-					    struct rpc_cred *);
+void			put_rpccred(struct rpc_cred *);
 void			rpcauth_unbindcred(struct rpc_task *);
 int			rpcauth_matchcred(struct rpc_auth *,
 					  struct rpc_cred *, int);
@@ -106,6 +112,13 @@ void			rpcauth_init_credcache(struct rpc_auth *);
 void			rpcauth_free_credcache(struct rpc_auth *);
 void			rpcauth_insert_credcache(struct rpc_auth *,
 						struct rpc_cred *);
+
+static inline
+struct rpc_cred *	get_rpccred(struct rpc_cred *cred)
+{
+	atomic_inc(&cred->cr_count);
+	return cred;
+}
 
 #endif /* __KERNEL__ */
 #endif /* _LINUX_SUNRPC_AUTH_H */

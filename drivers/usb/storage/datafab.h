@@ -24,8 +24,6 @@
 #ifndef _USB_DATAFAB_MDCFE_B_H
 #define _USB_DATAFAB_MDCFE_B_H
 
-#define min(a,b) (((a)<(b))?(a):(b))  // this is defined in tons of header files, i wish it had a standard single definition...
-
 extern int datafab_transport(Scsi_Cmnd *srb, struct us_data *us);
 
 struct datafab_info {

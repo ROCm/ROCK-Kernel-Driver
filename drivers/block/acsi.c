@@ -292,9 +292,6 @@ static char pa_med_rem_cmd[6] = { 0x1e, 0, 0, 0, 0, 0 };
 		cmd[4] = (len);							\
 	} while(0)
 
-#define min(a,b)	(((a)<(b))?(a):(b))
-
-
 /* ACSI errors (from REQUEST SENSE); There are two tables, one for the
  * old Atari disks and one for SCSI on ACSI disks.
  */

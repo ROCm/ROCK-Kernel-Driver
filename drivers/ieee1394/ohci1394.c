@@ -200,7 +200,8 @@ static void dma_trm_reset(struct dma_trm_ctx *d);
 
 static u8 get_phy_reg(struct ti_ohci *ohci, u8 addr) 
 {
-	int i, flags;
+	int i;
+	unsigned long flags;
 	quadlet_t r;
 
 	spin_lock_irqsave (&ohci->phy_reg_lock, flags);
@@ -227,7 +228,8 @@ static u8 get_phy_reg(struct ti_ohci *ohci, u8 addr)
 
 static void set_phy_reg(struct ti_ohci *ohci, u8 addr, u8 data)
 {
-	int i, flags;
+	int i;
+	unsigned long flags;
 	u32 r;
 
 	spin_lock_irqsave (&ohci->phy_reg_lock, flags);
@@ -1078,7 +1080,8 @@ static void ohci_irq_handler(int irq, void *dev_id,
 	quadlet_t event, node_id;
 	struct ti_ohci *ohci = (struct ti_ohci *)dev_id;
 	struct hpsb_host *host = ohci->host;
-	int phyid = -1, isroot = 0, flags;
+	int phyid = -1, isroot = 0;
+	unsigned long flags;
 
 	/* Read the interrupt event register. We don't clear the bus reset
 	 * here. We wait till we get a selfid complete interrupt and clear
@@ -1343,7 +1346,8 @@ static void dma_rcv_tasklet (unsigned long data)
 	struct ti_ohci *ohci = (struct ti_ohci*)(d->ohci);
 	unsigned int split_left, idx, offset, rescount;
 	unsigned char tcode;
-	int length, bytes_left, ack, flags;
+	int length, bytes_left, ack;
+	unsigned long flags;
 	quadlet_t *buf_ptr;
 	char *split_ptr;
 	char msg[256];

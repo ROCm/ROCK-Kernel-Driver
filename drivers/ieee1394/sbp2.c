@@ -965,7 +965,7 @@ void sbp2_cleanup(void)
 static void sbp2_add_host(struct hpsb_host *host)
 {
 	struct sbp2scsi_host_info *hi;
-	unsigned int flags;
+	unsigned long flags;
 
 	SBP2_DEBUG("sbp2: sbp2_add_host");
 
@@ -1048,7 +1048,7 @@ static void sbp2_remove_host(struct hpsb_host *host)
 {
 	struct sbp2scsi_host_info *hi;
 	int i;
-	unsigned int flags;
+	unsigned long flags;
 
 	SBP2_DEBUG("sbp2: sbp2_remove_host");
 

@@ -111,8 +111,8 @@ int __init cyclomx_init (void)
 		fullname, DRV_VERSION, DRV_RELEASE, copyright);
 
 	/* Verify number of cards and allocate adapter data space */
-	ncards = min(ncards, MAX_CARDS);
-	ncards = max(ncards, 1);
+	ncards = min(int, ncards, MAX_CARDS);
+	ncards = max(int, ncards, 1);
 	card_array = kmalloc(sizeof(cycx_t) * ncards, GFP_KERNEL);
 	if (!card_array)
 		goto out;

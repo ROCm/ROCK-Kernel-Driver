@@ -3,21 +3,19 @@
  * Driver core for the "Hermes" wireless MAC controller, as used in
  * the Lucent Orinoco and Cabletron RoamAbout cards. It should also
  * work on the hfa3841 and hfa3842 MAC controller chips used in the
- * Prism I & II chipsets.
+ * Prism II chipsets.
  *
  * This is not a complete driver, just low-level access routines for
  * the MAC controller itself.
  *
  * Based on the prism2 driver from Absolute Value Systems' linux-wlan
  * project, the Linux wvlan_cs driver, Lucent's HCF-Light
- * (wvlan_hcf.c) library, and the NetBSD wireless driver.
+ * (wvlan_hcf.c) library, and the NetBSD wireless driver (in no
+ * particular order).
  *
  * Copyright (C) 2000, David Gibson, Linuxcare Australia <hermes@gibson.dropbear.id.au>
  * 
- * This file distributed under the GPL, version 2.
- */
-
-static const char *version = "hermes.c: 12 Dec 2000 David Gibson <hermes@gibson.dropbear.id.au>";
+ * This file distributed under the GPL, version 2.  */
 
 #include <linux/module.h>
 #include <linux/types.h>
@@ -31,6 +29,10 @@ static const char *version = "hermes.c: 12 Dec 2000 David Gibson <hermes@gibson.
 #include <asm/errno.h>
 
 #include "hermes.h"
+
+static const char version[] __initdata = "hermes.c: 1 Aug 2001 David Gibson <hermes@gibson.dropbear.id.au>";
+MODULE_DESCRIPTION("Low-level driver helper for Lucent Hermes chipset and Prism II HFA384x wireless MAC controller");
+MODULE_AUTHOR("David Gibson <hermes@gibson.dropbear.id.au>");
 
 /* These are maximum timeouts. Most often, card wil react much faster */
 #define CMD_BUSY_TIMEOUT (100) /* In iterations of ~1us */
@@ -70,10 +72,6 @@ static const char *version = "hermes.c: 12 Dec 2000 David Gibson <hermes@gibson.
 static int hermes_issue_cmd(hermes_t *hw, uint16_t cmd, uint16_t param0);
 
 /*
- * Internal inline functions
- */
-
-/*
  * Internal functions
  */
 
@@ -87,7 +85,6 @@ static int hermes_issue_cmd(hermes_t *hw, uint16_t cmd, uint16_t param0);
 static int hermes_issue_cmd(hermes_t *hw, uint16_t cmd, uint16_t param0)
 {
 	uint16_t reg;
-/*  	unsigned long k = CMD_BUSY_TIMEOUT; */
 
 	/* First check that the command register is not busy */
 	reg = hermes_read_regn(hw, CMD);
@@ -124,9 +121,12 @@ int hermes_reset(hermes_t *hw)
 	hermes_write_regn(hw, INTEN, 0);
 	hermes_write_regn(hw, EVACK, 0xffff);
 
-	/* Because we hope we can reset the card even if it gets into
-	   a stupid state, we actually wait to see if the command
-	   register will unbusy itself */
+	/* Normally it's a "can't happen" for the command register to
+           be busy when we go to issue a command because we are
+           serializing all commands.  However we want to have some
+           chance of resetting the card even if it gets into a stupid
+           state, so we actually wait to see if the command register
+           will unbusy itself here. */
 	k = CMD_BUSY_TIMEOUT;
 	reg = hermes_read_regn(hw, CMD);
 	while (k && (reg & HERMES_CMD_BUSY)) {
@@ -139,8 +139,8 @@ int hermes_reset(hermes_t *hw)
 		reg = hermes_read_regn(hw, CMD);
 	}
 	
-	/* No need to explicitly handle the timeout - hermes_issue_cmd() will
-	   probably return -EBUSY */
+	/* No need to explicitly handle the timeout - if we've timed
+	   out hermes_issue_cmd() will probably return -EBUSY below */
 
 	/* According to the documentation, EVSTAT may contain
 	   obsolete event occurrence information.  We have to acknowledge
@@ -503,7 +503,7 @@ EXPORT_SYMBOL(hermes_write_ltv);
 
 static int __init init_hermes(void)
 {
-	printk(KERN_INFO "%s\n", version);
+	printk(KERN_DEBUG "%s\n", version);
 
 	return 0;
 }

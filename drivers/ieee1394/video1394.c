@@ -1313,7 +1313,8 @@ int video1394_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	struct video_card *video = NULL;
 	struct ti_ohci *ohci;
-	int res = -EINVAL, flags;
+	int res = -EINVAL;
+	unsigned long flags;
 	struct list_head *lh;
 
         spin_lock_irqsave(&video1394_cards_lock, flags);
@@ -1350,7 +1351,8 @@ int video1394_mmap(struct file *file, struct vm_area_struct *vma)
 
 static int video1394_open(struct inode *inode, struct file *file)
 {
-	int i = MINOR(inode->i_rdev), flags;
+	int i = MINOR(inode->i_rdev);
+	unsigned long flags;
 	struct video_card *video = NULL;
 	struct list_head *lh;
 
@@ -1380,7 +1382,8 @@ static int video1394_release(struct inode *inode, struct file *file)
 	struct video_card *video = NULL;
 	struct ti_ohci *ohci;
 	u64 mask;
-	int i, flags;
+	int i;
+	unsigned long flags;
 	struct list_head *lh;
 
         spin_lock_irqsave(&video1394_cards_lock, flags);
@@ -1446,7 +1449,8 @@ static int video1394_release(struct inode *inode, struct file *file)
 static void irq_handler(int card, quadlet_t isoRecvIntEvent, 
 		 quadlet_t isoXmitIntEvent)
 {
-	int i, flags;
+	int i;
+	unsigned long flags;
 	struct video_card *video = NULL;
 	struct list_head *lh;
 
@@ -1495,7 +1499,7 @@ static struct file_operations video1394_fops=
 static int video1394_init(struct ti_ohci *ohci)
 {
 	struct video_card *video = kmalloc(sizeof(struct video_card), GFP_KERNEL);
-	int flags;
+	unsigned long flags;
 	char name[16];
 
 	if (video == NULL) {
@@ -1555,7 +1559,8 @@ static int video1394_init(struct ti_ohci *ohci)
 /* Must be called under spinlock */
 static void remove_card(struct video_card *video)
 {
-	int i, flags;
+	int i;
+	unsigned long flags;
 
 	ohci1394_unregister_video(video->ohci, &video_tmpl);
 
@@ -1586,7 +1591,7 @@ static void remove_card(struct video_card *video)
 static void video1394_remove_host (struct hpsb_host *host)
 {
 	struct ti_ohci *ohci;
-	int flags;
+	unsigned long flags;
 	struct list_head *lh;
 
 	/* We only work with the OHCI-1394 driver */

@@ -190,14 +190,6 @@ struct comx_debugflags_struct {
 #endif
 
 
-#ifndef min
-#define min(a,b)		((a) > (b) ? (b) : (a))
-#endif
-#ifndef max
-#define max(a,b)		((a) > (b) ? (a) : (b))
-#endif
-
-
 #define COMX_CHANNEL(dev) ((struct comx_channel*)dev->priv)
 
 #define TWIN(dev) (COMX_CHANNEL(dev)->twin)

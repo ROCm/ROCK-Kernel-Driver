@@ -39,13 +39,6 @@
 #include <asm/s390_ext.h>
 #include <asm/ebcdic.h>
 
-#ifndef min
-#define min(a,b) (((a)<(b))?(a):(b))
-#endif
-#ifndef max
-#define max(a,b) (((a)>(b))?(a):(b))
-#endif
-
 #ifdef DEBUG
 #undef KERN_INFO
 #undef KERN_DEBUG
@@ -1316,7 +1309,7 @@ iucv_receive (u16 pathid, u32 msgid, u32 trgcls,
 			if (residual_buffer)
 				*residual_buffer = parm.ipbfadr1;
 		} else {
-			moved = min (buflen, 8);
+			moved = min(unsigned int, buflen, 8);
 
 			memcpy ((char *) buffer,
 				(char *) &parm.ipbfadr1, moved);
@@ -1409,7 +1402,8 @@ iucv_receive_array (u16 pathid,
 
 			while ((moved < 8) && (moved < buflen)) {
 				dyn_len =
-				    min ((buffer + i)->length, need_to_move);
+				    min(unsigned int,
+					(buffer + i)->length, need_to_move);
 
 				memcpy ((char *)((ulong)((buffer + i)->address)),
 					((char *) &parm.ipbfadr1) + moved,

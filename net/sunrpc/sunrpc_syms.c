@@ -65,7 +65,7 @@ EXPORT_SYMBOL(rpcauth_insert_credcache);
 EXPORT_SYMBOL(rpcauth_lookupcred);
 EXPORT_SYMBOL(rpcauth_bindcred);
 EXPORT_SYMBOL(rpcauth_matchcred);
-EXPORT_SYMBOL(rpcauth_releasecred);
+EXPORT_SYMBOL(put_rpccred);
 
 /* RPC server stuff */
 EXPORT_SYMBOL(svc_create);

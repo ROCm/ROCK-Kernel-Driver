@@ -25,8 +25,6 @@
 #define FALSE 0
 #endif
 
-#define min(a,b) ((a<b)?(a):(b))
-
 #define R_LIMIT 0x20000
 
 #define MAXISA	   4

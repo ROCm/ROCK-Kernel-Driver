@@ -105,8 +105,8 @@ int DataSending(const int CPUNR)
 		
 		Space = sock_wspace(CurrentRequest->sock->sk);
 		
-		ReadSize = min(4*4096,CurrentRequest->FileLength - CurrentRequest->BytesSent);
-		ReadSize = min(ReadSize , Space );
+		ReadSize = min(int, 4 * 4096, CurrentRequest->FileLength - CurrentRequest->BytesSent);
+		ReadSize = min(int, ReadSize, Space);
 
 		if (ReadSize>0)
 		{			

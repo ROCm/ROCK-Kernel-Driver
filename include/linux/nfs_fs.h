@@ -63,6 +63,11 @@
  */
 #define NFS_SUPER_MAGIC			0x6969
 
+static inline struct nfs_inode_info *NFS_I(struct inode *inode)
+{
+	return &inode->u.nfs_i;
+}
+
 #define NFS_FH(inode)			(&(inode)->u.nfs_i.fh)
 #define NFS_SERVER(inode)		(&(inode)->i_sb->u.nfs_sb.s_server)
 #define NFS_CLIENT(inode)		(NFS_SERVER(inode)->client)
@@ -74,7 +79,6 @@
 #define NFS_READTIME(inode)		((inode)->u.nfs_i.read_cache_jiffies)
 #define NFS_CACHE_CTIME(inode)		((inode)->u.nfs_i.read_cache_ctime)
 #define NFS_CACHE_MTIME(inode)		((inode)->u.nfs_i.read_cache_mtime)
-#define NFS_CACHE_ATIME(inode)		((inode)->u.nfs_i.read_cache_atime)
 #define NFS_CACHE_ISIZE(inode)		((inode)->u.nfs_i.read_cache_isize)
 #define NFS_NEXTSCAN(inode)		((inode)->u.nfs_i.nextscan)
 #define NFS_CACHEINV(inode) \

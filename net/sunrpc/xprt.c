@@ -84,11 +84,6 @@ spinlock_t xprt_lock = SPIN_LOCK_UNLOCKED;
 # define RPCDBG_FACILITY	RPCDBG_XPRT
 #endif
 
-#ifndef MAX
-# define MAX(a, b)	((a) > (b)? (a) : (b))
-# define MIN(a, b)	((a) < (b)? (a) : (b))
-#endif
-
 /*
  * Local functions
  */
@@ -749,7 +744,7 @@ tcp_read_xid(struct rpc_xprt *xprt, int avail)
 
 	if (xprt->tcp_copied >= sizeof(xprt->tcp_xid) || !avail)
 		goto done;
-	want = MIN(sizeof(xprt->tcp_xid) - xprt->tcp_copied, avail);
+	want = min(unsigned int, sizeof(xprt->tcp_xid) - xprt->tcp_copied, avail);
 	do {
 		dprintk("RPC:      reading xid (%d bytes)\n", want);
 		riov.iov_base = ((u8*) &xprt->tcp_xid) + xprt->tcp_copied;
@@ -776,7 +771,7 @@ tcp_read_request(struct rpc_xprt *xprt, struct rpc_rqst *req, int avail)
 
 	if (req->rq_rlen <= xprt->tcp_copied || !avail)
 		goto done;
-	want = MIN(req->rq_rlen - xprt->tcp_copied, avail);
+	want = min(unsigned int, req->rq_rlen - xprt->tcp_copied, avail);
 	do {
 		dprintk("RPC: %4d TCP receiving %d bytes\n",
 			req->rq_task->tk_pid, want);
@@ -810,7 +805,7 @@ tcp_read_discard(struct rpc_xprt *xprt, int avail)
 	int		want, result = 0;
 
 	while (avail) {
-		want = MIN(avail, sizeof(dummy));
+		want = min(unsigned int, avail, sizeof(dummy));
 		riov.iov_base = dummy;
 		riov.iov_len  = want;
 		dprintk("RPC:      TCP skipping %d bytes\n", want);
@@ -1072,7 +1067,7 @@ udp_write_space(struct sock *sk)
 
 
 	/* Wait until we have enough socket memory */
-	if (sock_wspace(sk) < min(sk->sndbuf,XPRT_MIN_WRITE_SPACE))
+	if (sock_wspace(sk) < min(int, sk->sndbuf,XPRT_MIN_WRITE_SPACE))
 		return;
 
 	if (!xprt_test_and_set_wspace(xprt)) {

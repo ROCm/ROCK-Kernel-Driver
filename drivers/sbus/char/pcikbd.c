@@ -1,4 +1,4 @@
-/* $Id: pcikbd.c,v 1.58 2001/06/10 06:51:03 davem Exp $
+/* $Id: pcikbd.c,v 1.59 2001/08/13 14:40:08 davem Exp $
  * pcikbd.c: Ultra/AX PC keyboard support.
  *
  * Copyright (C) 1997  Eddie C. Dost  (ecd@skynet.be)
@@ -476,6 +476,11 @@ void pcikbd_leds(unsigned char leds)
 		return;
 	if (!send_data(KBD_CMD_SET_LEDS) || !send_data(leds))
 		send_data(KBD_CMD_ENABLE);
+}
+
+int pcikbd_rate(struct kbd_repeat *rep)
+{
+	return -EIO;
 }
 
 static int pcikbd_wait_for_input(void)

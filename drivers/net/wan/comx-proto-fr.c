@@ -634,7 +634,7 @@ static int fr_read_proc(char *page, char **start, off_t off, int count,
 
 	*start = page + off;
 	if (count >= len - off) *eof = 1;
-	return ( min(count, len - off) );
+	return min(int, count, len - off);
 }
 
 static int fr_write_proc(struct file *file, const char *buffer, 

@@ -718,7 +718,7 @@ jffs_readpage(struct file *file, struct page *page)
 
 	offset = page->index << PAGE_CACHE_SHIFT;
 	if (offset < inode->i_size) {
-		read_len = jffs_min(inode->i_size - offset, PAGE_SIZE);
+		read_len = min(long, inode->i_size - offset, PAGE_SIZE);
 		r = jffs_read_data(f, buf, offset, read_len);
 		if (r == read_len) {
 			if (read_len < PAGE_SIZE) {
@@ -1373,7 +1373,9 @@ jffs_file_write(struct file *filp, const char *buf, size_t count,
 		goto out_isem;
 	}
 	
-	thiscount = jffs_min(c->fmc->max_chunk_size - sizeof(struct jffs_raw_inode), count);
+	thiscount = min(unsigned int,
+			c->fmc->max_chunk_size - sizeof(struct jffs_raw_inode),
+			count);
 
 	if (!(vbuf = kmalloc(thiscount, GFP_KERNEL))) {
 		D(printk("jffs_file_write(): failed to allocate bounce buffer. Fix me to use page cache\n"));
@@ -1437,7 +1439,8 @@ jffs_file_write(struct file *filp, const char *buf, size_t count,
 		raw_inode.deleted = 0;
 		
 		if (pos < f->size) {
-			node->removed_size = raw_inode.rsize = jffs_min(thiscount, f->size - pos);
+			node->removed_size = raw_inode.rsize =
+				min(unsigned int, thiscount, f->size - pos);
 			
 			/* If this node is going entirely over the top of old data, 
 			   we can allow it to go into the reserved space, because 
@@ -1479,7 +1482,9 @@ jffs_file_write(struct file *filp, const char *buf, size_t count,
 
 		D3(printk("jffs_file_write(): new f_pos %ld.\n", (long)pos));
 
-		thiscount = jffs_min(c->fmc->max_chunk_size - sizeof(struct jffs_raw_inode), count);
+		thiscount = min(unsigned int,
+			c->fmc->max_chunk_size - sizeof(struct jffs_raw_inode),
+			count);
 	}
  out:
 	D3(printk (KERN_NOTICE "file_write(): up biglock\n"));

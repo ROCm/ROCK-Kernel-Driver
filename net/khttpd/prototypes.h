@@ -19,17 +19,6 @@
 
 #define CONFIG_KHTTPD_NUMCPU 16    /* Maximum number of threads */
 
-/* the TCP/IP stack defines a __BROKEN__ set of min/max functions !! */
-/* So we better define our own.                                      */
-
-/* Broken means: working on unsigned data only, which is not acceptable
- 		 for kHTTPd and probably a lot of other functions. */
-
-#undef min
-#undef max
-#define min(a,b)  ( (a) < (b) ? (a) : (b) )
-#define max(a,b)  ( (a) > (b) ? (a) : (b) )
-
 #ifdef OOPSTRACE
 #define EnterFunction(x)   printk("Enter: %s, %s line %i\n",x,__FILE__,__LINE__)
 #define LeaveFunction(x)   printk("Leave: %s, %s line %i\n",x,__FILE__,__LINE__)

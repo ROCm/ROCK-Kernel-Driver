@@ -152,11 +152,6 @@ struct baycom_state {
 
 /* --------------------------------------------------------------------- */
 
-#define min(a, b) (((a) < (b)) ? (a) : (b))
-#define max(a, b) (((a) > (b)) ? (a) : (b))
-
-/* --------------------------------------------------------------------- */
-
 static void inline baycom_int_freq(struct baycom_state *bc)
 {
 #ifdef BAYCOM_DEBUG

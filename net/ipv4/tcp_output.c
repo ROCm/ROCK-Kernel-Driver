@@ -5,7 +5,7 @@
  *
  *		Implementation of the Transmission Control Protocol(TCP).
  *
- * Version:	$Id: tcp_output.c,v 1.137 2001/06/29 21:11:28 davem Exp $
+ * Version:	$Id: tcp_output.c,v 1.140 2001/08/13 18:56:12 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -105,11 +105,11 @@ static void tcp_cwnd_restart(struct tcp_opt *tp)
 	u32 cwnd = tp->snd_cwnd;
 
 	tp->snd_ssthresh = tcp_current_ssthresh(tp);
-	restart_cwnd = min(restart_cwnd, cwnd);
+	restart_cwnd = min(u32, restart_cwnd, cwnd);
 
 	while ((delta -= tp->rto) > 0 && cwnd > restart_cwnd)
 		cwnd >>= 1;
-	tp->snd_cwnd = max(cwnd, restart_cwnd);
+	tp->snd_cwnd = max(u32, cwnd, restart_cwnd);
 	tp->snd_cwnd_stamp = tcp_time_stamp;
 	tp->snd_cwnd_used = 0;
 }
@@ -526,7 +526,7 @@ int tcp_sync_mss(struct sock *sk, u32 pmtu)
 
 	/* Bound mss with half of window */
 	if (tp->max_window && mss_now > (tp->max_window>>1))
-		mss_now = max((tp->max_window>>1), 68 - tp->tcp_header_len);
+		mss_now = max(u32, (tp->max_window>>1), 68 - tp->tcp_header_len);
 
 	/* And store cached results */
 	tp->pmtu_cookie = pmtu;
@@ -651,7 +651,7 @@ u32 __tcp_select_window(struct sock *sk)
 	 */
 	int mss = tp->ack.rcv_mss;
 	int free_space = tcp_space(sk);
-	int full_space = min(tp->window_clamp, tcp_full_space(sk));
+	int full_space = min(unsigned int, tp->window_clamp, tcp_full_space(sk));
 	int window;
 
 	if (mss > full_space)
@@ -661,7 +661,7 @@ u32 __tcp_select_window(struct sock *sk)
 		tp->ack.quick = 0;
 
 		if (tcp_memory_pressure)
-			tp->rcv_ssthresh = min(tp->rcv_ssthresh, 4*tp->advmss);
+			tp->rcv_ssthresh = min(u32, tp->rcv_ssthresh, 4*tp->advmss);
 
 		if (free_space < mss)
 			return 0;
@@ -817,7 +817,7 @@ int tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb)
 	/* Do not sent more than we queued. 1/4 is reserved for possible
 	 * copying overhead: frgagmentation, tunneling, mangling etc.
 	 */
-	if (atomic_read(&sk->wmem_alloc) > min(sk->wmem_queued+(sk->wmem_queued>>2),sk->sndbuf))
+	if (atomic_read(&sk->wmem_alloc) > min(int, sk->wmem_queued+(sk->wmem_queued>>2),sk->sndbuf))
 		return -EAGAIN;
 
 	/* If receiver has shrunk his window, and skb is out of
@@ -1264,13 +1264,13 @@ void tcp_send_delayed_ack(struct sock *sk)
 		 * directly.
 		 */
 		if (tp->srtt) {
-			int rtt = max(tp->srtt>>3, TCP_DELACK_MIN);
+			int rtt = max(unsigned int, tp->srtt>>3, TCP_DELACK_MIN);
 
 			if (rtt < max_ato)
 				max_ato = rtt;
 		}
 
-		ato = min(ato, max_ato);
+		ato = min(int, ato, max_ato);
 	}
 
 	/* Stay within the limit we were given */
@@ -1386,7 +1386,7 @@ int tcp_write_wakeup(struct sock *sk)
 			 */
 			if (seg_size < TCP_SKB_CB(skb)->end_seq - TCP_SKB_CB(skb)->seq ||
 			    skb->len > mss) {
-				seg_size = min(seg_size, mss);
+				seg_size = min(int, seg_size, mss);
 				TCP_SKB_CB(skb)->flags |= TCPCB_FLAG_PSH;
 				if (tcp_fragment(sk, skb, seg_size))
 					return -1;
@@ -1429,7 +1429,7 @@ void tcp_send_probe0(struct sock *sk)
 		tp->backoff++;
 		tp->probes_out++;
 		tcp_reset_xmit_timer (sk, TCP_TIME_PROBE0, 
-				      min(tp->rto << tp->backoff, TCP_RTO_MAX));
+				      min(u32, tp->rto << tp->backoff, TCP_RTO_MAX));
 	} else {
 		/* If packet was not sent due to local congestion,
 		 * do not backoff and do not remember probes_out.
@@ -1440,6 +1440,6 @@ void tcp_send_probe0(struct sock *sk)
 		if (!tp->probes_out)
 			tp->probes_out=1;
 		tcp_reset_xmit_timer (sk, TCP_TIME_PROBE0, 
-				      min(tp->rto << tp->backoff, TCP_RESOURCE_PROBE_INTERVAL));
+				      min(unsigned int, tp->rto << tp->backoff, TCP_RESOURCE_PROBE_INTERVAL));
 	}
 }

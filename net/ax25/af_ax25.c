@@ -751,7 +751,7 @@ static int ax25_getsockopt(struct socket *sock, int level, int optname, char *op
 		return -EFAULT;
 
 	valptr = (void *) &val;
-	length = min(maxlen, sizeof(int));
+	length = min(unsigned int, maxlen, sizeof(int));
 
 	switch (optname) {
 		case AX25_WINDOW:
@@ -803,7 +803,7 @@ static int ax25_getsockopt(struct socket *sock, int level, int optname, char *op
 
 			if (ax25_dev != NULL && ax25_dev->dev != NULL) {
 				strncpy(devname, ax25_dev->dev->name, IFNAMSIZ);
-				length = min(strlen(ax25_dev->dev->name)+1, maxlen);
+				length = min(unsigned int, strlen(ax25_dev->dev->name)+1, maxlen);
 				devname[length-1] = '\0';
 			} else {
 				*devname = '\0';

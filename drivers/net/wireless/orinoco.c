@@ -1,4 +1,4 @@
-/* orinoco.c 0.06	- (formerly known as dldwd_cs.c and orinoco_cs.c)
+/* orinoco.c 0.06f	- (formerly known as dldwd_cs.c and orinoco_cs.c)
  *
  * A driver for "Hermes" chipset based PCMCIA wireless adaptors, such
  * as the Lucent WavelanIEEE/Orinoco cards and their OEM (Cabletron/
@@ -33,10 +33,10 @@
  * Reserved.
  *
  * Alternatively, the contents of this file may be used under the
- * terms of the GNU Public License version 2 (the "GPL"), in which
- * case the provisions of the GPL are applicable instead of the above.
- * If you wish to allow the use of your version of this file only
- * under the terms of the GPL and not to allow others to use your
+ * terms of the GNU General Public License version 2 (the "GPL"), in
+ * which case the provisions of the GPL are applicable instead of the
+ * above.  If you wish to allow the use of your version of this file
+ * only under the terms of the GPL and not to allow others to use your
  * version of this file under the MPL, indicate your decision by
  * deleting the provisions above and replace them with the notice and
  * other provisions required by the GPL.  If you do not delete the
@@ -166,6 +166,24 @@
  * v0.06b -> v0.06c - 29/5/2001 - Jean II
  *	o Show first spy address in /proc/net/wireless for IBSS mode as well
  *
+ * v0.06c -> v0.06d - 6/7/2001 - David Gibson
+ *      o Change a bunch of KERN_INFO messages to KERN_DEBUG, as per Linus'
+ *        wishes to reduce the number of unecessary messages.
+ *	o Removed bogus message on CRC error.
+ *	o Merged fixeds for v0.08 Prism 2 firmware from William Waghorn
+ *	  <willwaghorn@yahoo.co.uk>
+ *	o Slight cleanup/re-arrangement of firmware detection code.
+ *
+ * v0.06d -> v0.06e - 1/8/2001 - David Gibson
+ *	o Removed some redundant global initializers (orinoco_cs.c).
+ *	o Added some module metadataa
+ *
+ * v0.06e -> v0.06f - 14/8/2001 - David Gibson
+ *	o Wording fix to license
+ *	o Added a 'use_alternate_encaps' module parameter for APs which need an oui of
+ *	  00:00:00.  We really need a better way of handling this, but the module flag
+ *	  is better than nothing for now.
+ *
  * TODO - Jean II
  *	o inline functions (lot's of candidate, need to reorder code)
  *	o Test PrismII/Symbol cards & firmware versions
@@ -202,13 +220,20 @@
 #include "hermes.h"
 #include "orinoco.h"
 
-static char *version = "orinoco.c 0.06c (David Gibson <hermes@gibson.dropbear.id.au> and others)";
+static const char version[] __initdata = "orinoco.c 0.06f (David Gibson <hermes@gibson.dropbear.id.au> and others)";
+MODULE_AUTHOR("David Gibson <hermes@gibson.dropbear.id.au>");
+MODULE_DESCRIPTION("Driver for Lucent Orinoco, Prism II based and similar wireless cards");
 
 /* Level of debugging. Used in the macros in orinoco.h */
 #ifdef ORINOCO_DEBUG
 int dldwd_debug = ORINOCO_DEBUG;
 MODULE_PARM(dldwd_debug, "i");
 #endif
+
+/* FIXME: We need a better way of handling this */
+/* Set this flag to use 00:00:00 for the encapsulation oui instead of 00:00:F8 */
+static int use_alternate_encaps; /* =0 */
+MODULE_PARM(use_alternate_encaps, "i");
 
 const long channel_frequency[] = {
 	2412, 2417, 2422, 2427, 2432, 2437, 2442,
@@ -273,6 +298,9 @@ struct dldwd_frame_hdr {
 /* 802.2 LLL header SNAP used for SNAP encapsulation over 802.11 */
 struct p8022_hdr encaps_hdr = {
 	0xaa, 0xaa, 0x03, {0x00, 0x00, 0xf8}
+};
+struct p8022_hdr alternate_encaps_hdr = {
+	0xaa, 0xaa, 0x03, {0x00, 0x00, 0x00}
 };
 
 /*
@@ -396,6 +424,7 @@ set_port_type(dldwd_priv_t *priv)
 				priv->port_type = 4;
 			else
 				priv->port_type = 1;
+			priv->port_type = priv->ibss_port;
 			priv->allow_ibss = 1;
 		}
 		break;
@@ -1050,8 +1079,7 @@ static void __dldwd_ev_rx(dldwd_priv_t *priv, hermes_t *hw)
 	if (status & HERMES_RXSTAT_ERR) {
 		if ((status & HERMES_RXSTAT_ERR) == HERMES_RXSTAT_BADCRC) {
 			stats->rx_crc_errors++;
-			printk(KERN_WARNING "%s: Bad CRC on Rx. Frame dropped.\n",
-			       dev->name);
+			DEBUG(1, "%s: Bad CRC on Rx. Frame dropped.\n", dev->name);
 			show_rx_frame(&hdr);
 		} else if ((status & HERMES_RXSTAT_ERR)
 			   == HERMES_RXSTAT_UNDECRYPTABLE) {
@@ -1198,34 +1226,14 @@ static void __dldwd_ev_alloc(dldwd_priv_t *priv, hermes_t *hw)
 /* 	hermes_write_regn(hw, ALLOCFID, 0); */
 }
 
-/*
- * struct net_device methods
- */
-
-int
-dldwd_init(struct net_device *dev)
+static void determine_firmware(struct net_device *dev)
 {
 	dldwd_priv_t *priv = dev->priv;
 	hermes_t *hw = &priv->hw;
-	int err = 0;
-	hermes_id_t nickbuf;
-	uint16_t reclen;
-	int len;
-	char *vendor_str;
+	int err;
 	uint32_t firmver;
+	char *vendor_str;
 
-	TRACE_ENTER("dldwd");
-	
-	dldwd_lock(priv);
-
-	/* Do standard firmware reset */
-	err = hermes_reset(hw);
-	if (err != 0) {
-		printk(KERN_ERR "%s: failed to reset hardware (err = %d)\n",
-		       dev->name, err);
-		goto out;
-	}
-	
 	/* Get the firmware version */
 	err = hermes_read_staidentity(hw, USER_BAP, &priv->firmware_info);
 	if (err) {
@@ -1361,18 +1369,54 @@ dldwd_init(struct net_device *dev)
 		priv->has_pm = 0;
 		priv->has_preamble = 0;
 	}
+	
+	if (priv->firmware_type == FIRMWARE_TYPE_SYMBOL)
+		priv->ibss_port = 4;
+	else if ( (priv->firmware_type == FIRMWARE_TYPE_PRISM2) && (firmver >= 0x00008) )
+		priv->ibss_port = 0;
+	else
+		priv->ibss_port = 1;
 
-	printk(KERN_INFO "%s: Firmware ID %02X vendor 0x%x (%s) version %d.%02d\n",
+	printk(KERN_DEBUG "%s: Firmware ID %02X vendor 0x%x (%s) version %d.%02d\n",
 	       dev->name, priv->firmware_info.id, priv->firmware_info.vendor,
 	       vendor_str, priv->firmware_info.major, priv->firmware_info.minor);
+}
+
+/*
+ * struct net_device methods
+ */
+
+int
+dldwd_init(struct net_device *dev)
+{
+	dldwd_priv_t *priv = dev->priv;
+	hermes_t *hw = &priv->hw;
+	int err = 0;
+	hermes_id_t nickbuf;
+	uint16_t reclen;
+	int len;
+
+	TRACE_ENTER("dldwd");
+	
+	dldwd_lock(priv);
+
+	/* Do standard firmware reset */
+	err = hermes_reset(hw);
+	if (err != 0) {
+		printk(KERN_ERR "%s: failed to reset hardware (err = %d)\n",
+		       dev->name, err);
+		goto out;
+	}
+
+	determine_firmware(dev);
 
 	if (priv->has_port3)
-		printk(KERN_INFO "%s: Ad-hoc demo mode supported.\n", dev->name);
+		printk(KERN_DEBUG "%s: Ad-hoc demo mode supported.\n", dev->name);
 	if (priv->has_ibss)
-		printk(KERN_INFO "%s: IEEE standard IBSS ad-hoc mode supported.\n",
+		printk(KERN_DEBUG "%s: IEEE standard IBSS ad-hoc mode supported.\n",
 		       dev->name);
 	if (priv->has_wep) {
-		printk(KERN_INFO "%s: WEP supported, ", dev->name);
+		printk(KERN_DEBUG "%s: WEP supported, ", dev->name);
 		if (priv->has_big_wep)
 			printk("\"128\"-bit key.\n");
 		else
@@ -1388,7 +1432,7 @@ dldwd_init(struct net_device *dev)
 		goto out;
 	}
 
-	printk(KERN_INFO "%s: MAC address %02X:%02X:%02X:%02X:%02X:%02X\n",
+	printk(KERN_DEBUG "%s: MAC address %02X:%02X:%02X:%02X:%02X:%02X\n",
 	       dev->name, dev->dev_addr[0], dev->dev_addr[1],
 	       dev->dev_addr[2], dev->dev_addr[3], dev->dev_addr[4],
 	       dev->dev_addr[5]);
@@ -1408,7 +1452,7 @@ dldwd_init(struct net_device *dev)
 	memcpy(priv->nick, &nickbuf.val, len);
 	priv->nick[len] = '\0';
 
-	printk(KERN_INFO "%s: Station name \"%s\"\n", dev->name, priv->nick);
+	printk(KERN_DEBUG "%s: Station name \"%s\"\n", dev->name, priv->nick);
 
 	/* Get allowed channels */
 	err = hermes_read_wordrec(hw, USER_BAP, HERMES_RID_CHANNEL_LIST, &priv->channel_mask);
@@ -1482,7 +1526,7 @@ dldwd_init(struct net_device *dev)
 	priv->wep_on = 0;
 	priv->tx_key = 0;
 
-	printk(KERN_INFO "%s: ready\n", dev->name);
+	printk(KERN_DEBUG "%s: ready\n", dev->name);
 
  out:
 	dldwd_unlock(priv);
@@ -1668,7 +1712,11 @@ dldwd_xmit(struct sk_buff *skb, struct net_device *dev)
 		hdr.p8023.h_proto = htons(data_len + ENCAPS_OVERHEAD);
 		
 		/* 802.2 header */
-		memcpy(&hdr.p8022, &encaps_hdr, sizeof(encaps_hdr));
+		/* FIXME: ugh, what a hack for the 00:00:00 APs.  Need to find a better way */
+		if (use_alternate_encaps)
+			memcpy(&hdr.p8022, &alternate_encaps_hdr, sizeof(alternate_encaps_hdr));
+		else
+			memcpy(&hdr.p8022, &encaps_hdr, sizeof(encaps_hdr));
 
 		hdr.ethertype = eh->h_proto;
 		err  = hermes_bap_pwrite(hw, USER_BAP, &hdr, sizeof(hdr),
@@ -2546,6 +2594,33 @@ static int dldwd_ioctl_getretry(struct net_device *dev, struct iw_param *rrq)
 }
 #endif /* WIRELESS_EXT > 10 */
 
+static int dldwd_ioctl_setibssport(struct net_device *dev, struct iwreq *wrq)
+{
+	dldwd_priv_t *priv = dev->priv;
+	int val = *( (int *) wrq->u.name );
+
+	dldwd_lock(priv);
+	priv->ibss_port = val ;
+
+	/* Actually update the mode we are using */
+	set_port_type(priv);
+
+	dldwd_unlock(priv);
+	return 0;
+}
+
+static int dldwd_ioctl_getibssport(struct net_device *dev, struct iwreq *wrq)
+{
+	dldwd_priv_t *priv = dev->priv;
+	int *val = (int *)wrq->u.name;
+
+	dldwd_lock(priv);
+	*val = priv->ibss_port;
+	dldwd_unlock(priv);
+
+	return 0;
+}
+
 static int dldwd_ioctl_setport3(struct net_device *dev, struct iwreq *wrq)
 {
 	dldwd_priv_t *priv = dev->priv;
@@ -2941,7 +3016,13 @@ dldwd_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 				  0, "set_preamble" },
 				{ SIOCDEVPRIVATE + 0x5, 0,
 				  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-				  "get_preamble" }
+				  "get_preamble" },
+				{ SIOCDEVPRIVATE + 0x6,
+				  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+				  0, "set_ibssport" },
+				{ SIOCDEVPRIVATE + 0x7, 0,
+				  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+				  "get_ibssport" }
 			};
 
 			err = verify_area(VERIFY_WRITE, wrq->u.data.pointer, sizeof(privtab));
@@ -3038,6 +3119,25 @@ dldwd_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		} else
 			err = -EOPNOTSUPP;
 		break;
+	case SIOCDEVPRIVATE + 0x6: /* set_ibssport */
+		DEBUG(1, "%s: SIOCDEVPRIVATE + 0x6 (set_ibssport)\n",
+		      dev->name);
+		if (! capable(CAP_NET_ADMIN)) {
+			err = -EPERM;
+			break;
+		}
+
+		err = dldwd_ioctl_setibssport(dev, wrq);
+		if (! err)
+			changed = 1;
+		break;
+
+	case SIOCDEVPRIVATE + 0x7: /* get_ibssport */
+		DEBUG(1, "%s: SIOCDEVPRIVATE + 0x7 (get_ibssport)\n",
+		      dev->name);
+		err = dldwd_ioctl_getibssport(dev, wrq);
+		break;
+
 
 	default:
 		err = -EOPNOTSUPP;
@@ -3601,7 +3701,7 @@ static int __init init_dldwd(void)
 
 	err = dldwd_proc_init();
 
-	printk(KERN_INFO "%s\n", version);
+	printk(KERN_DEBUG "%s\n", version);
 
 	return 0;
 }

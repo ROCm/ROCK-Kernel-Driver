@@ -1,4 +1,4 @@
-/* $Id: sungem.c,v 1.18 2001/08/06 13:34:47 davem Exp $
+/* $Id: sungem.c,v 1.19 2001/08/13 14:40:07 davem Exp $
  * sungem.c: Sun GEM ethernet driver.
  *
  * Copyright (C) 2000, 2001 David S. Miller (davem@redhat.com)
@@ -558,7 +558,7 @@ static void gem_rx(struct gem *gp)
 			skb = copy_skb;
 		}
 
-		skb->csum = ((status & RXDCTRL_TCPCSUM) ^ 0xffff);
+		skb->csum = ntohs((status & RXDCTRL_TCPCSUM) ^ 0xffff);
 		skb->ip_summed = CHECKSUM_HW;
 		skb->protocol = eth_type_trans(skb, gp->dev);
 		netif_rx(skb);

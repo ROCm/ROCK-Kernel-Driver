@@ -148,7 +148,7 @@ int ntfs_new_attr(ntfs_inode *ino, int type, void *name, int namelen,
 					"attribute non-resident. Bug!\n");
 				return -EINVAL;
 			}
-			m = memcmp(value, a->d.data, min(value_len, a->size));
+			m = memcmp(value, a->d.data, min(int, value_len, a->size));
 			if (m > 0)
 				continue;
 			if (m < 0) {
@@ -379,7 +379,7 @@ int ntfs_resize_attr(ntfs_inode *ino, ntfs_attribute *attr, __s64 newsize)
 				ntfs_bzero((char*)attr->d.data + oldsize,
 					   newsize - oldsize);
 			ntfs_memcpy((char*)attr->d.data, v,
-				    min(newsize, oldsize));
+				    min(s64, newsize, oldsize));
 		} else
 			attr->d.data = 0;
 		ntfs_free(v);
@@ -668,7 +668,7 @@ int ntfs_read_zero(ntfs_io *dest, int size)
 	if (!sparse)
 		return -ENOMEM;
 	while (size) {
-		int i = min(size, 512);
+		int i = min(int, size, 512);
 		dest->fn_put(dest, sparse, i);
 		size -= i;
 	}
@@ -723,7 +723,7 @@ int ntfs_read_compressed(ntfs_inode *ino, ntfs_attribute *attr, __s64 offset,
 			__s64 l1;
 			if ((len - (s_vcn - vcn)) & 15)
 				ntfs_error("Unexpected sparse chunk size.");
-			l1 = chunk = min(((__s64)(vcn + len) << clustersizebits)
+			l1 = chunk = min(s64, ((__s64)(vcn + len) << clustersizebits)
 								- offset, l);
 			error = ntfs_read_zero(dest, l1);
 			if (error)
@@ -742,13 +742,13 @@ int ntfs_read_compressed(ntfs_inode *ino, ntfs_attribute *attr, __s64 offset,
 			comp1 = comp;
 			do {
 				io.param = comp1;
-				l1 = min(len - max(s_vcn - vcn, 0), 16 - got);
+				l1 = min(int, len - max(int, s_vcn - vcn, 0), 16 - got);
 				io.size = (__s64)l1 << clustersizebits;
 				error = ntfs_getput_clusters(ino->vol, cl1, 0,
 					       		     &io);
 				if (error)
 					goto out;
-				if (l1 + max(s_vcn - vcn, 0) == len) {
+				if (l1 + max(int, s_vcn - vcn, 0) == len) {
 					rnum++;
 					rl++;
 					vcn += len;
@@ -779,8 +779,8 @@ int ntfs_read_compressed(ntfs_inode *ino, ntfs_attribute *attr, __s64 offset,
 				comp1 = decomp;
 			}
 			offs1 = offset - ((__s64)s_vcn << clustersizebits);
-			chunk = min((16 << clustersizebits) - offs1, chunk);
-			chunk = min(l, chunk);
+			chunk = min(s64, (16 << clustersizebits) - offs1, chunk);
+			chunk = min(s64, l, chunk);
 			dest->fn_put(dest, comp1 + offs1, chunk);
 		}
 		l -= chunk;

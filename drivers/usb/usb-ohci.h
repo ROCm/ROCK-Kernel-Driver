@@ -329,9 +329,6 @@ struct virt_root_hub {
 #define	RH_A_NOCP	(1 << 12)		/* no over current protection */
 #define	RH_A_POTPGT	(0xff << 24)		/* power on to power good time */
 
-#define min(a,b) (((a)<(b))?(a):(b))  
- 
-
 /* urb */
 typedef struct 
 {

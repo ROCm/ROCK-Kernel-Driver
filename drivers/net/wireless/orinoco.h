@@ -69,7 +69,7 @@ typedef struct dldwd_priv {
 #define FIRMWARE_TYPE_LUCENT 1
 #define FIRMWARE_TYPE_PRISM2 2
 #define FIRMWARE_TYPE_SYMBOL 3
-	int has_ibss, has_port3, prefer_port3, has_ibss_any;
+	int has_ibss, has_port3, prefer_port3, has_ibss_any, ibss_port;
 	int has_wep, has_big_wep;
 	int has_mwo;
 	int has_pm;
@@ -107,10 +107,10 @@ typedef struct dldwd_priv {
 
 /*====================================================================*/
 
-extern int dldwd_debug;
 extern struct list_head dldwd_instances;
 
 #ifdef ORINOCO_DEBUG
+extern int dldwd_debug;
 #define DEBUG(n, args...) if (dldwd_debug>(n)) printk(KERN_DEBUG args)
 #define DEBUGMORE(n, args...) do { if (dldwd_debug>(n)) printk(args); } while (0)
 #else

@@ -1,4 +1,4 @@
-/* $Id: timod.c,v 1.11 2001/04/14 21:12:01 davem Exp $
+/* $Id: timod.c,v 1.15 2001/08/13 18:56:10 davem Exp $
  * timod.c: timod emulation.
  *
  * Copyright (C) 1998 Patrik Rak (prak3264@ss1000.ms.mff.cuni.cz)
@@ -699,10 +699,7 @@ int timod_getmsg(unsigned int fd, char *ctl_buf, int ctl_maxlen, s32 *ctl_len,
 	}
 	if (ctl_maxlen >= 0 && sock->pfirst) {
 		struct T_primsg *it = sock->pfirst;
-#ifndef min
-#define min(a,b) ((a)<(b)?(a):(b))
-#endif
-		int l = min(ctl_maxlen, it->length);
+		int l = min(int, ctl_maxlen, it->length);
 		SCHECK_MAGIC((char*)((u64)(((char *)&it->type)+sock->offset+it->length+7)&~7),MKCTL_MAGIC);
 		SOLD("purting ctl data");
 		if(copy_to_user(ctl_buf,
@@ -815,7 +812,7 @@ int timod_getmsg(unsigned int fd, char *ctl_buf, int ctl_maxlen, s32 *ctl_len,
 	filp->f_flags |= O_NONBLOCK;
 	SOLD("calling recvfrom");
 	sys_recvfrom = (int (*)(int, void *, size_t, unsigned, struct sockaddr *, int *))SYS(recvfrom);
-	error = sys_recvfrom(fd, data_buf, min(0,data_maxlen), 0, (struct sockaddr*)tmpbuf, ctl_len);
+	error = sys_recvfrom(fd, data_buf, data_maxlen, 0, (struct sockaddr*)tmpbuf, ctl_len);
 	filp->f_flags = oldflags;
 	if (error < 0)
 		return error;

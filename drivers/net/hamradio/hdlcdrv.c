@@ -95,11 +95,6 @@ static char ax25_nocall[AX25_ADDR_LEN] =
 #define PARAM_RETURN    255
 
 /* --------------------------------------------------------------------- */
-
-#define min(a, b) (((a) < (b)) ? (a) : (b))
-#define max(a, b) (((a) > (b)) ? (a) : (b))
-
-/* --------------------------------------------------------------------- */
 /*
  * the CRC routines are stolen from WAMPES
  * by Dieter Deyke

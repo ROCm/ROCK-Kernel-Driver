@@ -24,8 +24,6 @@
 #ifndef _USB_JUMPSHOT_H
 #define _USB_JUMPSHOT_H
 
-#define min(a,b) (((a)<(b))?(a):(b))  // this is defined in tons of header files, i wish it had a standar single definition...
-
 extern int jumpshot_transport(Scsi_Cmnd *srb, struct us_data *us);
 
 struct jumpshot_info {

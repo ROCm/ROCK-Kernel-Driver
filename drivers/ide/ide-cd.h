@@ -150,7 +150,7 @@ struct atapi_toc_entry {
 struct atapi_toc {
 	int    last_session_lba;
 	int    xa_flag;
-	unsigned capacity;
+	unsigned long capacity;
 	struct atapi_toc_header hdr;
 	struct atapi_toc_entry  ent[MAX_TRACKS+1];
 	  /* One extra for the leadout. */

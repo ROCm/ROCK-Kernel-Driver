@@ -1,4 +1,4 @@
-/* $Id: sunhme.c,v 1.121 2001/07/27 10:22:57 davem Exp $
+/* $Id: sunhme.c,v 1.122 2001/08/13 14:40:07 davem Exp $
  * sunhme.c: Sparc HME/BigMac 10/100baseT half/full duplex auto switching,
  *           auto carrier detecting ethernet driver.  Also known as the
  *           "Happy Meal Ethernet" found on SunSwift SBUS cards.
@@ -2109,7 +2109,7 @@ static void happy_meal_rx(struct happy_meal *hp, struct net_device *dev)
 		}
 
 		/* This card is _fucking_ hot... */
-		skb->csum = (csum ^ 0xffff);
+		skb->csum = ntohs(csum ^ 0xffff);
 		skb->ip_summed = CHECKSUM_HW;
 
 		RXD(("len=%d csum=%4x]", len, csum));

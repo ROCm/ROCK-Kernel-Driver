@@ -1,4 +1,4 @@
-/* $Id: pci_sabre.c,v 1.37 2001/06/13 06:34:30 davem Exp $
+/* $Id: pci_sabre.c,v 1.38 2001/08/12 13:18:23 davem Exp $
  * pci_sabre.c: Sabre specific PCI controller support.
  *
  * Copyright (C) 1997, 1998, 1999 David S. Miller (davem@caipfs.rutgers.edu)
@@ -1395,6 +1395,7 @@ static void __init sabre_pbm_init(struct pci_controller_info *p, int sabre_node,
 			pbm = &p->pbm_A;
 		pbm->parent = p;
 		pbm->prom_node = node;
+		pbm->pci_first_slot = 1;
 		pbm->pci_first_busno = busrange[0];
 		pbm->pci_last_busno = busrange[1];
 		for (err = pbm->pci_first_busno;

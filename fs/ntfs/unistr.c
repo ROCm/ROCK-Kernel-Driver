@@ -96,7 +96,7 @@ int ntfs_collate_names(wchar_t *upcase, __u32 upcase_len,
 	__u32 cnt;
 	wchar_t c1, c2;
 
-	for (cnt = 0; cnt < min(name1_len, name2_len); ++cnt)
+	for (cnt = 0; cnt < min(unsigned int, name1_len, name2_len); ++cnt)
 	{
 		c1 = le16_to_cpu(*name1++);
 		c2 = le16_to_cpu(*name2++);

@@ -5,7 +5,7 @@
  *
  *		ROUTE - implementation of the IP router.
  *
- * Version:	$Id: route.c,v 1.95 2001/07/10 22:32:51 davem Exp $
+ * Version:	$Id: route.c,v 1.98 2001/08/13 18:56:12 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -515,14 +515,14 @@ static int rt_garbage_collect(void)
 			equilibrium = ipv4_dst_ops.gc_thresh;
 		goal = atomic_read(&ipv4_dst_ops.entries) - equilibrium;
 		if (goal > 0) {
-			equilibrium += min(goal / 2, rt_hash_mask + 1);
+			equilibrium += min(unsigned int, goal / 2, rt_hash_mask + 1);
 			goal = atomic_read(&ipv4_dst_ops.entries) - equilibrium;
 		}
 	} else {
 		/* We are in dangerous area. Try to reduce cache really
 		 * aggressively.
 		 */
-		goal = max(goal / 2, rt_hash_mask + 1);
+		goal = max(unsigned int, goal / 2, rt_hash_mask + 1);
 		equilibrium = atomic_read(&ipv4_dst_ops.entries) - goal;
 	}
 
@@ -1207,8 +1207,8 @@ static void rt_set_nexthop(struct rtable *rt, struct fib_result *res, u32 itag)
 	if (rt->u.dst.pmtu > IP_MAX_MTU)
 		rt->u.dst.pmtu = IP_MAX_MTU;
 	if (rt->u.dst.advmss == 0)
-		rt->u.dst.advmss = max(rt->u.dst.dev->mtu - 40,
-					ip_rt_min_advmss);
+		rt->u.dst.advmss = max(unsigned int, rt->u.dst.dev->mtu - 40,
+				       ip_rt_min_advmss);
 	if (rt->u.dst.advmss > 65535 - 40)
 		rt->u.dst.advmss = 65535 - 40;
 

@@ -20,7 +20,7 @@
  *	license in recognition of the original copyright.
  *				-- Alan Cox.
  *
- *	$Id: ipfwadm_core.c,v 1.5 2001/06/01 14:56:53 davem Exp $
+ *	$Id: ipfwadm_core.c,v 1.8 2001/08/13 18:56:12 davem Exp $
  *
  *	Ported from BSD to Linux,
  *		Alan Cox 22/Nov/1994.
@@ -648,7 +648,9 @@ int ip_fw_chk(struct iphdr *ip, struct net_device *rif, __u16 *redirport,
 			struct sk_buff *skb=alloc_skb(128, GFP_ATOMIC);
 			if(skb)
 			{
-				int len=min(128,ntohs(ip->tot_len));
+				int len = min(unsigned int,
+					      128, ntohs(ip->tot_len));
+
 				skb_put(skb,len);
 				memcpy(skb->data,ip,len);
 				if(netlink_post(NETLINK_FIREWALL, skb))

@@ -17,6 +17,8 @@
 # define RPCDBG_FACILITY	RPCDBG_AUTH
 #endif
 
+static struct rpc_credops	null_credops;
+
 static struct rpc_auth *
 nul_create(struct rpc_clnt *clnt)
 {
@@ -52,9 +54,10 @@ nul_create_cred(int flags)
 
 	if (!(cred = (struct rpc_cred *) rpc_allocate(flags, sizeof(*cred))))
 		return NULL;
-	cred->cr_count = 0;
+	atomic_set(&cred->cr_count, 0);
 	cred->cr_flags = RPCAUTH_CRED_UPTODATE;
 	cred->cr_uid = current->uid;
+	cred->cr_ops = &null_credops;
 
 	return cred;
 }
@@ -124,7 +127,11 @@ struct rpc_authops	authnull_ops = {
 #endif
 	nul_create,
 	nul_destroy,
-	nul_create_cred,
+	nul_create_cred
+};
+
+static
+struct rpc_credops	null_credops = {
 	nul_destroy_cred,
 	nul_match,
 	nul_marshal,

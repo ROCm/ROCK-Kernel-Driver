@@ -788,6 +788,9 @@ int inactive_shortage(void)
 			zone_t *zone = pgdat->node_zones + i;
 			unsigned int inactive;
 
+			if (!zone->size)
+				continue;
+
 			inactive  = zone->inactive_dirty_pages;
 			inactive += zone->inactive_clean_pages;
 			inactive += zone->free_pages;

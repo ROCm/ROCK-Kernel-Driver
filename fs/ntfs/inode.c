@@ -105,7 +105,7 @@ static int ntfs_extend_mft(ntfs_volume *vol)
 		 * will fall back to the minimal size allocation below. (AIA) */
 		block = vol->mft_record_size;
 		blockbits = vol->mft_record_size_bits;
-		size = max(size >> 10, mdata->size + vol->mft_record_size);
+		size = max(s64, size >> 10, mdata->size + vol->mft_record_size);
 		size = (__s64)((size + block - 1) >> blockbits) << blockbits;
 		/* Require this to be a single chunk. */
 		error = ntfs_extend_attr(vol->mft_ino, mdata, &size,
@@ -394,7 +394,7 @@ static void ntfs_load_attributes(ntfs_inode* ino)
 		io.fn_put = ntfs_put;
 		io.fn_get = 0;
 		io.param = buf + delta;
-		io.size = len = min(datasize, 1024 - delta);
+		io.size = len = min(int, datasize, 1024 - delta);
 		ntfs_debug(DEBUG_FILE2, "load_attributes %x: len = %i\n",
 						ino->i_number, len);
 		ntfs_debug(DEBUG_FILE2, "load_attributes %x: delta = %i\n",
@@ -729,7 +729,7 @@ int ntfs_readwrite_attr(ntfs_inode *ino, ntfs_attribute *attr, __s64 offset,
 		cluster = attr->d.r.runlist[rnum].cluster;
 		len = attr->d.r.runlist[rnum].len;
 		s_cluster = cluster + s_vcn - vcn;
-		chunk = min(((__s64)(vcn + len) << clustersizebits) - offset,
+		chunk = min(s64, ((__s64)(vcn + len) << clustersizebits) - offset,
 									l);
 		dest->size = chunk;
 		error = ntfs_getput_clusters(ino->vol, s_cluster, offset -

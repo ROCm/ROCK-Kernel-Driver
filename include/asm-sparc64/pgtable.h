@@ -1,4 +1,4 @@
-/* $Id: pgtable.h,v 1.140 2001/04/12 22:41:15 davem Exp $
+/* $Id: pgtable.h,v 1.141 2001/08/13 20:24:34 kanoj Exp $
  * pgtable.h: SpitFire page table operations.
  *
  * Copyright 1996,1997 David S. Miller (davem@caip.rutgers.edu)
@@ -16,6 +16,7 @@
 #include <asm/asi.h>
 #include <asm/mmu_context.h>
 #include <asm/system.h>
+#include <asm/page.h>
 
 #ifndef __ASSEMBLY__
 
@@ -31,14 +32,26 @@
  * XXX cheetah's full 64-bit virtual address space, ie. no more hole
  * XXX in the middle like on spitfire. -DaveM
  */
+/*
+ * Given a virtual address, the lowest PAGE_SHIFT bits determine offset
+ * into the page; the next higher PAGE_SHIFT-3 bits determine the pte#
+ * in the proper pagetable (the -3 is from the 8 byte ptes, and each page
+ * table is a single page long). The next higher PMD_BITS determine pmd# 
+ * in the proper pmdtable (where we must have PMD_BITS <= (PAGE_SHIFT-2) 
+ * since the pmd entries are 4 bytes, and each pmd page is a single page 
+ * long). Finally, the higher few bits determine pgde#.
+ */
+
+#define VA_BITS 	44
 
 /* PMD_SHIFT determines the size of the area a second-level page table can map */
 #define PMD_SHIFT	(PAGE_SHIFT + (PAGE_SHIFT-3))
 #define PMD_SIZE	(1UL << PMD_SHIFT)
 #define PMD_MASK	(~(PMD_SIZE-1))
+#define PMD_BITS	11
 
 /* PGDIR_SHIFT determines what a third-level page table entry can map */
-#define PGDIR_SHIFT	(PAGE_SHIFT + (PAGE_SHIFT-3) + (PAGE_SHIFT-2))
+#define PGDIR_SHIFT	(PAGE_SHIFT + (PAGE_SHIFT-3) + PMD_BITS)
 #define PGDIR_SIZE	(1UL << PGDIR_SHIFT)
 #define PGDIR_MASK	(~(PGDIR_SIZE-1))
 
@@ -48,12 +61,12 @@
 /* We the first one in this file, what we export to the kernel
  * is different so we can optimize correctly for 32-bit tasks.
  */
-#define REAL_PTRS_PER_PMD	(1UL << (PAGE_SHIFT-2))
+#define REAL_PTRS_PER_PMD	(1UL << PMD_BITS)
 #define PTRS_PER_PMD		((const int)((current->thread.flags & SPARC_FLAG_32BIT) ? \
-				 (REAL_PTRS_PER_PMD >> 2) : (REAL_PTRS_PER_PMD)))
+				 (1UL << (32 - (PAGE_SHIFT-3) - PAGE_SHIFT)) : (REAL_PTRS_PER_PMD)))
 
 /* We cannot use the top 16G because VPTE table lives there. */
-#define PTRS_PER_PGD		((1UL << (PAGE_SHIFT-3))-1)
+#define PTRS_PER_PGD		((1UL << (VA_BITS - PAGE_SHIFT - (PAGE_SHIFT-3) - PMD_BITS))-1)
 
 /* Kernel has a separate 44bit address space. */
 #define USER_PTRS_PER_PGD	((const int)((current->thread.flags & SPARC_FLAG_32BIT) ? \
@@ -62,7 +75,6 @@
 
 #define PTE_TABLE_SIZE	0x2000	/* 1024 entries 8 bytes each */
 #define PMD_TABLE_SIZE	0x2000	/* 2048 entries 4 bytes each */
-#define PGD_TABLE_SIZE	0x1000	/* 1024 entries 4 bytes each */
 
 /* NOTE: TLB miss handlers depend heavily upon where this is. */
 #define VMALLOC_START		0x0000000140000000UL

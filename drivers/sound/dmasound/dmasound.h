@@ -47,7 +47,6 @@
 #define MAX_BUFSIZE		128	/* Limit for Amiga in KB */
 
 
-#define min(x, y)	((x) < (y) ? (x) : (y))
 #define le2be16(x)	(((x)<<8 & 0xff00) | ((x)>>8 & 0x00ff))
 #define le2be16dbl(x)	(((x)<<8 & 0xff00ff00) | ((x)>>8 & 0x00ff00ff))
 

@@ -1,4 +1,4 @@
-/* airport.c 0.05
+/* airport.c 0.06f
  *
  * A driver for "Hermes" chipset based Apple Airport wireless
  * card.
@@ -32,6 +32,10 @@
 #include "hermes.h"
 #include "orinoco.h"
 
+static const char version[] __initdata = "airport.c 0.06f (Benjamin Herrenschmidt <benh@kernel.crashing.org>)";
+MODULE_AUTHOR("Benjamin Herrenschmidt <benh@kernel.crashing.org>");
+MODULE_DESCRIPTION("Driver for the Apple Airport wireless card.");
+
 typedef struct dldwd_card {
 	struct device_node* node;
 	int irq_requested;
@@ -39,8 +43,6 @@ typedef struct dldwd_card {
 	/* Common structure (fully included), see orinoco.h */
 	struct dldwd_priv priv;
 } dldwd_card_t;
-
-static char *version = "airport.c 0.05 (Benjamin Herrenschmidt <benh@kernel.crashing.org>)";
 
 /*
  * Function prototypes
@@ -186,7 +188,7 @@ airport_attach(struct device_node* of_node)
 		printk(KERN_ERR "airport: register_netdev() failed\n");
 		goto failed;
 	}
-	printk(KERN_INFO "airport: card registered for interface %s\n", ndev->name);
+	printk(KERN_DEBUG "airport: card registered for interface %s\n", ndev->name);
 	card->ndev_registered = 1;
 
 	SET_MODULE_OWNER(ndev);
@@ -242,7 +244,7 @@ init_airport(void)
 {
 	struct device_node* airport_node;
 
-	printk(KERN_INFO "%s\n", version);
+	printk(KERN_DEBUG "%s\n", version);
 
 	MOD_INC_USE_COUNT;
 

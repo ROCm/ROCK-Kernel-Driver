@@ -46,7 +46,7 @@ static void flush_all_zero_pkmaps(void)
 
 	for (i = 0; i < LAST_PKMAP; i++) {
 		struct page *page;
-		pte_t pte;
+
 		/*
 		 * zero means we don't have anything to do,
 		 * >1 means that it is still in use. Only
@@ -56,10 +56,21 @@ static void flush_all_zero_pkmaps(void)
 		if (pkmap_count[i] != 1)
 			continue;
 		pkmap_count[i] = 0;
-		pte = ptep_get_and_clear(pkmap_page_table+i);
-		if (pte_none(pte))
+
+		/* sanity check */
+		if (pte_none(pkmap_page_table[i]))
 			BUG();
-		page = pte_page(pte);
+
+		/*
+		 * Don't need an atomic fetch-and-clear op here;
+		 * no-one has the page mapped, and cannot get at
+		 * its virtual address (and hence PTE) without first
+		 * getting the kmap_lock (which is held here).
+		 * So no dangers, even with speculative execution.
+		 */
+		page = pte_page(pkmap_page_table[i]);
+		pte_clear(&pkmap_page_table[i]);
+
 		page->virtual = NULL;
 	}
 	flush_tlb_all();
@@ -139,6 +150,7 @@ void kunmap_high(struct page *page)
 {
 	unsigned long vaddr;
 	unsigned long nr;
+	int need_wakeup;
 
 	spin_lock(&kmap_lock);
 	vaddr = (unsigned long) page->virtual;
@@ -150,13 +162,28 @@ void kunmap_high(struct page *page)
 	 * A count must never go down to zero
 	 * without a TLB flush!
 	 */
+	need_wakeup = 0;
 	switch (--pkmap_count[nr]) {
 	case 0:
 		BUG();
 	case 1:
-		wake_up(&pkmap_map_wait);
+		/*
+		 * Avoid an unnecessary wake_up() function call.
+		 * The common case is pkmap_count[] == 1, but
+		 * no waiters.
+		 * The tasks queued in the wait-queue are guarded
+		 * by both the lock in the wait-queue-head and by
+		 * the kmap_lock.  As the kmap_lock is held here,
+		 * no need for the wait-queue-head's lock.  Simply
+		 * test if the queue is empty.
+		 */
+		need_wakeup = waitqueue_active(&pkmap_map_wait);
 	}
 	spin_unlock(&kmap_lock);
+
+	/* do wake-up, if needed, race-free outside of the spin lock */
+	if (need_wakeup)
+		wake_up(&pkmap_map_wait);
 }
 
 #define POOL_SIZE 32
@@ -182,20 +209,12 @@ static inline void copy_from_high_bh (struct buffer_head *to,
 {
 	struct page *p_from;
 	char *vfrom;
-	unsigned long flags;
 
 	p_from = from->b_page;
 
-	/*
-	 * Since this can be executed from IRQ context, reentrance
-	 * on the same CPU must be avoided:
-	 */
-	__save_flags(flags);
-	__cli();
 	vfrom = kmap_atomic(p_from, KM_BOUNCE_WRITE);
 	memcpy(to->b_data, vfrom + bh_offset(from), to->b_size);
 	kunmap_atomic(vfrom, KM_BOUNCE_WRITE);
-	__restore_flags(flags);
 }
 
 static inline void copy_to_high_bh_irq (struct buffer_head *to,

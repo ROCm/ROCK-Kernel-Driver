@@ -693,7 +693,6 @@ static int dgrs_start_xmit(struct sk_buff *skb, struct net_device *devN)
 	I596_RBD	*rbdp;
 	int		count;
 	int		i, len, amt;
-#	define		mymin(A,B)	( (A) < (B) ? (A) : (B) )
 
 	/*
 	 *	Determine 0th priv and dev structure pointers
@@ -734,7 +733,7 @@ static int dgrs_start_xmit(struct sk_buff *skb, struct net_device *devN)
 			goto no_resources;
 		}
 
-		amt = mymin(len, rbdp->size - count);
+		amt = min(unsigned int, len, rbdp->size - count);
 		memcpy( (char *) S2H(rbdp->buf) + count, skb->data + i, amt);
 		i += amt;
 		count += amt;

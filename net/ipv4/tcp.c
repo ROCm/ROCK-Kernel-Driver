@@ -5,7 +5,7 @@
  *
  *		Implementation of the Transmission Control Protocol(TCP).
  *
- * Version:	$Id: tcp.c,v 1.205 2001/05/05 22:25:30 davem Exp $
+ * Version:	$Id: tcp.c,v 1.208 2001/08/13 18:56:12 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -852,7 +852,7 @@ ssize_t do_tcp_sendpages(struct sock *sk, struct page **pages, int poffset, size
 
 		page = pages[poffset/PAGE_SIZE];
 		offset = poffset % PAGE_SIZE;
-		size = min(psize, PAGE_SIZE-offset);
+		size = min(unsigned int, psize, PAGE_SIZE-offset);
 
 		if (tp->send_head==NULL || (copy = mss_now - skb->len) <= 0) {
 new_segment:
@@ -2326,7 +2326,7 @@ int tcp_getsockopt(struct sock *sk, int level, int optname, char *optval,
 	if(get_user(len,optlen))
 		return -EFAULT;
 
-	len = min(len, sizeof(int));
+	len = min(unsigned int, len, sizeof(int));
 	
 	if(len < 0)
 		return -EINVAL;
@@ -2421,7 +2421,7 @@ int tcp_getsockopt(struct sock *sk, int level, int optname, char *optval,
 		info.tcpi_advmss = tp->advmss;
 		info.tcpi_reordering = tp->reordering;
 
-		len = min(len, sizeof(info));
+		len = min(unsigned int, len, sizeof(info));
 		if(put_user(len, optlen))
 			return -EFAULT;
 		if(copy_to_user(optval, &info,len))

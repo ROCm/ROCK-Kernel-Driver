@@ -155,14 +155,14 @@ static ssize_t ami_ct_s8(const u_char *userPtr, size_t userCount,
 
 	if (!dmasound.soft.stereo) {
 		void *p = &frame[*frameUsed];
-		count = min(userCount, frameLeft) & ~1;
+		count = min(unsigned long, userCount, frameLeft) & ~1;
 		used = count;
 		if (copy_from_user(p, userPtr, count))
 			return -EFAULT;
 	} else {
 		u_char *left = &frame[*frameUsed>>1];
 		u_char *right = left+write_sq_block_size_half;
-		count = min(userCount, frameLeft)>>1 & ~1;
+		count = min(unsigned long, userCount, frameLeft)>>1 & ~1;
 		used = count*2;
 		while (count > 0) {
 			if (get_user(*left++, userPtr++)
@@ -189,7 +189,7 @@ static ssize_t funcname(const u_char *userPtr, size_t userCount,	\
 									\
 	if (!dmasound.soft.stereo) {					\
 		u_char *p = &frame[*frameUsed];				\
-		count = min(userCount, frameLeft) & ~1;			\
+		count = min(unsigned long, userCount, frameLeft) & ~1;	\
 		used = count;						\
 		while (count > 0) {					\
 			u_char data;					\
@@ -201,7 +201,7 @@ static ssize_t funcname(const u_char *userPtr, size_t userCount,	\
 	} else {							\
 		u_char *left = &frame[*frameUsed>>1];			\
 		u_char *right = left+write_sq_block_size_half;		\
-		count = min(userCount, frameLeft)>>1 & ~1;		\
+		count = min(unsigned long, userCount, frameLeft)>>1 & ~1;\
 		used = count*2;						\
 		while (count > 0) {					\
 			u_char data;					\
@@ -242,7 +242,7 @@ static ssize_t funcname(const u_char *userPtr, size_t userCount,	\
 	if (!dmasound.soft.stereo) {					\
 		u_char *high = &frame[*frameUsed>>1];			\
 		u_char *low = high+write_sq_block_size_half;		\
-		count = min(userCount, frameLeft)>>1 & ~1;		\
+		count = min(unsigned long, userCount, frameLeft)>>1 & ~1;\
 		used = count*2;						\
 		while (count > 0) {					\
 			if (get_user(data, ((u_short *)userPtr)++))	\
@@ -257,7 +257,7 @@ static ssize_t funcname(const u_char *userPtr, size_t userCount,	\
 		u_char *leftl = lefth+write_sq_block_size_quarter;	\
 		u_char *righth = lefth+write_sq_block_size_half;	\
 		u_char *rightl = righth+write_sq_block_size_quarter;	\
-		count = min(userCount, frameLeft)>>2 & ~1;		\
+		count = min(unsigned long, userCount, frameLeft)>>2 & ~1;\
 		used = count*4;						\
 		while (count > 0) {					\
 			if (get_user(data, ((u_short *)userPtr)++))	\

@@ -1,4 +1,4 @@
-/* $Id: mmu_context.h,v 1.49 2001/08/09 21:10:20 davem Exp $ */
+/* $Id: mmu_context.h,v 1.50 2001/08/13 20:24:34 kanoj Exp $ */
 #ifndef __SPARC64_MMU_CONTEXT_H
 #define __SPARC64_MMU_CONTEXT_H
 
@@ -9,6 +9,7 @@
 #include <linux/spinlock.h>
 #include <asm/system.h>
 #include <asm/spitfire.h>
+#include <asm/page.h>
 
 static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk, unsigned cpu)
 {
@@ -18,7 +19,19 @@ extern spinlock_t ctx_alloc_lock;
 extern unsigned long tlb_context_cache;
 extern unsigned long mmu_context_bmap[];
 
-#define CTX_VERSION_SHIFT	(PAGE_SHIFT - 3)
+/*
+ * For the 8k pagesize kernel, use only 10 hw context bits to optimize some shifts in
+ * the fast tlbmiss handlers, instead of all 13 bits (specifically for vpte offset
+ * calculation). For other pagesizes, this optimization in the tlbhandlers can not be 
+ * done; but still, all 13 bits can not be used because the tlb handlers use "andcc"
+ * instruction which sign extends 13 bit arguments.
+ */
+#if PAGE_SHIFT == 13
+#define CTX_VERSION_SHIFT	10
+#else
+#define CTX_VERSION_SHIFT	12
+#endif
+
 #define CTX_VERSION_MASK	((~0UL) << CTX_VERSION_SHIFT)
 #define CTX_FIRST_VERSION	((1UL << CTX_VERSION_SHIFT) + 1UL)
 #define CTX_VALID(__ctx)	\

@@ -59,9 +59,6 @@
 #define DSP56K_TRANSMIT		(dsp56k_host_interface.isr & DSP56K_ISR_TXDE)
 #define DSP56K_RECEIVE		(dsp56k_host_interface.isr & DSP56K_ISR_RXDF)
 
-#define max(a,b) ((a) > (b) ? (a) : (b))
-#define min(a,b) ((a) < (b) ? (a) : (b))
-
 #define wait_some(n) \
 { \
 	set_current_state(TASK_INTERRUPTIBLE); \
@@ -72,7 +69,7 @@
 { \
 	long i, t, m; \
 	while (count > 0) { \
-		m = min(count, maxio); \
+		m = min(unsigned long, count, maxio); \
 		for (i = 0; i < m; i++) { \
 			for (t = 0; t < timeout && !ENABLE; t++) \
 				wait_some(HZ/50); \

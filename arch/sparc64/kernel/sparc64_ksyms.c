@@ -163,6 +163,7 @@ EXPORT_SYMBOL(__up);
 /* Atomic counter implementation. */
 EXPORT_SYMBOL(__atomic_add);
 EXPORT_SYMBOL(__atomic_sub);
+EXPORT_SYMBOL(atomic_dec_and_lock);
 
 /* Atomic bit operations. */
 EXPORT_SYMBOL(___test_and_set_bit);

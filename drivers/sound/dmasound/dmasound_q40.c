@@ -58,7 +58,7 @@ static ssize_t q40_ct_law(const u_char *userPtr, size_t userCount,
 	ssize_t count, used;
 	u_char *p = (u_char *) &frame[*frameUsed];
 
-	used = count = min(userCount, frameLeft);
+	used = count = min(unsigned long, userCount, frameLeft);
 	if (copy_from_user(p,userPtr,count))
 	  return -EFAULT;
 	while (count > 0) {
@@ -84,7 +84,7 @@ static ssize_t q40_ct_law(const u_char *userPtr, size_t userCount,
 	frameLeft >>= 1;
 	if (stereo)
 		userCount >>= 1;
-	used = count = min(userCount, frameLeft);
+	used = count = min(unsigned long, userCount, frameLeft);
 	while (count > 0) {
 		u_char data;
 		if (get_user(data, userPtr++))
@@ -112,7 +112,7 @@ static ssize_t q40_ct_s8(const u_char *userPtr, size_t userCount,
 	ssize_t count, used;
 	u_char *p = (u_char *) &frame[*frameUsed];
 
-	used = count = min(userCount, frameLeft);
+	used = count = min(unsigned long, userCount, frameLeft);
 	if (copy_from_user(p,userPtr,count))
 	  return -EFAULT;
 	while (count > 0) {
@@ -136,7 +136,7 @@ static ssize_t q40_ct_s8(const u_char *userPtr, size_t userCount,
 	frameLeft >>= 1;
 	if (stereo)
 		userCount >>= 1;
-	used = count = min(userCount, frameLeft);
+	used = count = min(unsigned long, userCount, frameLeft);
 	while (count > 0) {
 		u_char data;
 		if (get_user(data, userPtr++))
@@ -164,7 +164,7 @@ static ssize_t q40_ct_u8(const u_char *userPtr, size_t userCount,
 	ssize_t count, used;
 	u_char *p = (u_char *) &frame[*frameUsed];
 
-	used = count = min(userCount, frameLeft);
+	used = count = min(unsigned long, userCount, frameLeft);
 	if (copy_from_user(p,userPtr,count))
 	  return -EFAULT;
 	*frameUsed += used;
@@ -184,7 +184,7 @@ static ssize_t q40_ct_u8(const u_char *userPtr, size_t userCount,
 	frameLeft >>= 1;
 	if (stereo)
 		userCount >>= 1;
-	used = count = min(userCount, frameLeft);
+	used = count = min(unsigned long, userCount, frameLeft);
 	while (count > 0) {
 		u_char data;
 		if (get_user(data, userPtr++))

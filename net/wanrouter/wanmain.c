@@ -139,17 +139,6 @@ static void dbg_kfree(void * v, int line) {
 
 
 /*
- * 	Defines and Macros 
- */
-
-#ifndef	min
-#define min(a,b) (((a)<(b))?(a):(b))
-#endif
-#ifndef	max
-#define max(a,b) (((a)>(b))?(a):(b))
-#endif
-
-/*
  * 	Function Prototypes 
  */
 

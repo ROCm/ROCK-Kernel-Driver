@@ -819,7 +819,7 @@ struct Port *		PortP;
 	  ** and available space.
 	  */
 			
-	  transCount = min(PacketP->len & PKT_LEN_MASK,
+	  transCount = min(unsigned int, PacketP->len & PKT_LEN_MASK,
 			   TTY_FLIPBUF_SIZE - TtyP->flip.count);
 	  rio_dprintk (RIO_DEBUG_REC,  "port %d: Copy %d bytes\n", 
 				      PortP->PortNum, transCount);

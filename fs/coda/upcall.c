@@ -69,17 +69,9 @@ do {\
         outsize = insize; \
 } while (0)
 
-static inline int max(int a, int b) 
-{
-	if ( a > b )
-		return a; 
-	else
-		return b;
-}
-
 #define INSIZE(tag) sizeof(struct coda_ ## tag ## _in)
 #define OUTSIZE(tag) sizeof(struct coda_ ## tag ## _out)
-#define SIZE(tag)  max(INSIZE(tag), OUTSIZE(tag))
+#define SIZE(tag)  max(unsigned int, INSIZE(tag), OUTSIZE(tag))
 
 
 /* the upcalls */
@@ -159,7 +151,7 @@ int venus_lookup(struct super_block *sb, struct ViceFid *fid,
 	int offset;
 
 	offset = INSIZE(lookup);
-        insize = max(offset + length +1, OUTSIZE(lookup));
+        insize = max(unsigned int, offset + length +1, OUTSIZE(lookup));
 	UPARG(CODA_LOOKUP);
 
         inp->coda_lookup.VFid = *fid;
@@ -275,7 +267,7 @@ int venus_mkdir(struct super_block *sb, struct ViceFid *dirfid,
         int offset;
 
 	offset = INSIZE(mkdir);
-	insize = max(offset + length + 1, OUTSIZE(mkdir));
+	insize = max(unsigned int, offset + length + 1, OUTSIZE(mkdir));
 	UPARG(CODA_MKDIR);
 
         inp->coda_mkdir.VFid = *dirfid;
@@ -306,7 +298,7 @@ int venus_rename(struct super_block *sb, struct ViceFid *old_fid,
 	int offset, s;
 	
 	offset = INSIZE(rename);
-	insize = max(offset + new_length + old_length + 8,
+	insize = max(unsigned int, offset + new_length + old_length + 8,
 		     OUTSIZE(rename)); 
  	UPARG(CODA_RENAME);
 
@@ -344,7 +336,7 @@ int venus_create(struct super_block *sb, struct ViceFid *dirfid,
         int offset;
 
         offset = INSIZE(create);
-	insize = max(offset + length + 1, OUTSIZE(create));
+	insize = max(unsigned int, offset + length + 1, OUTSIZE(create));
 	UPARG(CODA_CREATE);
 
         inp->coda_create.VFid = *dirfid;
@@ -376,7 +368,7 @@ int venus_rmdir(struct super_block *sb, struct ViceFid *dirfid,
         int offset;
 
         offset = INSIZE(rmdir);
-	insize = max(offset + length + 1, OUTSIZE(rmdir));
+	insize = max(unsigned int, offset + length + 1, OUTSIZE(rmdir));
 	UPARG(CODA_RMDIR);
 
         inp->coda_rmdir.VFid = *dirfid;
@@ -398,7 +390,7 @@ int venus_remove(struct super_block *sb, struct ViceFid *dirfid,
         int error=0, insize, outsize, offset;
 
         offset = INSIZE(remove);
-	insize = max(offset + length + 1, OUTSIZE(remove));
+	insize = max(unsigned int, offset + length + 1, OUTSIZE(remove));
 	UPARG(CODA_REMOVE);
 
         inp->coda_remove.VFid = *dirfid;
@@ -421,7 +413,8 @@ int venus_readlink(struct super_block *sb, struct ViceFid *fid,
         int retlen;
         char *result;
         
-	insize = max(INSIZE(readlink), OUTSIZE(readlink)+ *length + 1);
+	insize = max(unsigned int,
+		     INSIZE(readlink), OUTSIZE(readlink)+ *length + 1);
 	UPARG(CODA_READLINK);
 
         inp->coda_readlink.VFid = *fid;
@@ -455,7 +448,7 @@ int venus_link(struct super_block *sb, struct ViceFid *fid,
         int offset;
 
 	offset = INSIZE(link);
-	insize = max(offset  + len + 1, OUTSIZE(link));
+	insize = max(unsigned int, offset  + len + 1, OUTSIZE(link));
         UPARG(CODA_LINK);
 
         inp->coda_link.sourceFid = *fid;
@@ -484,7 +477,7 @@ int venus_symlink(struct super_block *sb, struct ViceFid *fid,
         int offset, s;
 
         offset = INSIZE(symlink);
-	insize = max(offset + len + symlen + 8, OUTSIZE(symlink));
+	insize = max(unsigned int, offset + len + symlen + 8, OUTSIZE(symlink));
 	UPARG(CODA_SYMLINK);
         
         /*        inp->coda_symlink.attr = *tva; XXXXXX */ 
@@ -624,7 +617,7 @@ int venus_statfs(struct super_block *sb, struct statfs *sfs)
         union outputArgs *outp;
         int insize, outsize, error;
         
-	insize = max(INSIZE(statfs), OUTSIZE(statfs));
+	insize = max(unsigned int, INSIZE(statfs), OUTSIZE(statfs));
 	UPARG(CODA_STATFS);
 
         error = coda_upcall(coda_sbp(sb), insize, &outsize, inp);

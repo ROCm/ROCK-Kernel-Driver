@@ -11,12 +11,6 @@
 #define NTFS_INO2VOL(ino)	(&((ino)->i_sb->u.ntfs_sb))
 #define NTFS_LINO2NINO(ino)     (&((ino)->u.ntfs_i))
 
-/* Classical min and max macros still missing in standard headers... */
-#ifndef min
-#define min(a,b)	((a) <= (b) ? (a) : (b))
-#define max(a,b)	((a) >= (b) ? (a) : (b))
-#endif
-
 #define IS_MAGIC(a,b)		(*(int*)(a) == *(int*)(b))
 #define IS_MFT_RECORD(a)	IS_MAGIC((a),"FILE")
 #define IS_INDEX_RECORD(a)	IS_MAGIC((a),"INDX")

@@ -5,7 +5,7 @@
  *	Authors:
  *	Pedro Roque		<roque@di.fc.ul.pt>
  *
- *	$Id: icmp.c,v 1.32 2001/06/10 09:20:07 davem Exp $
+ *	$Id: icmp.c,v 1.35 2001/08/13 18:56:13 davem Exp $
  *
  *	Based on net/ipv4/icmp.c
  *
@@ -365,7 +365,7 @@ void icmpv6_send(struct sk_buff *skb, int type, int code, __u32 info,
 	msg.daddr = &hdr->saddr;
 
 	len = skb->len - msg.offset + sizeof(struct icmp6hdr);
-	len = min(len, IPV6_MIN_MTU - sizeof(struct ipv6hdr));
+	len = min(unsigned int, len, IPV6_MIN_MTU - sizeof(struct ipv6hdr));
 
 	if (len < 0) {
 		printk(KERN_DEBUG "icmp: len problem\n");

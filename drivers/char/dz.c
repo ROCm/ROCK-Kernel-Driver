@@ -1279,7 +1279,8 @@ static void show_serial_version (void)
 
 int __init dz_init(void)
 {
-  int i, flags;
+  int i;
+  unsigned long flags;
   struct dz_serial *info;
 
   /* Setup base handler, and timer table. */

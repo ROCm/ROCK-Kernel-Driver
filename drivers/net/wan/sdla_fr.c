@@ -548,10 +548,10 @@ int wpf_init(sdla_t *card, wandev_conf_t *conf)
 	/* Adjust configuration */
 	conf->mtu += FR_HEADER_LEN;
 	conf->mtu = (conf->mtu >= MIN_LGTH_FR_DATA_CFG) ?
-			min(conf->mtu, FR_MAX_NO_DATA_BYTES_IN_FRAME) :
+			min(unsigned int, conf->mtu, FR_MAX_NO_DATA_BYTES_IN_FRAME) :
                         FR_CHANNEL_MTU + FR_HEADER_LEN;
      
-	conf->bps = min(conf->bps, 2048000);
+	conf->bps = min(unsigned int, conf->bps, 2048000);
 
 	/* Initialze the configuration structure sent to the board to zero */
 	memset(&u.cfg, 0, sizeof(u.cfg));
@@ -618,7 +618,7 @@ int wpf_init(sdla_t *card, wandev_conf_t *conf)
 		 * command in fr_configure() routine. 
 		 */
 
-		card->u.f.dlci_num  = min(max(conf->u.fr.dlci_num, 1), 100);
+		card->u.f.dlci_num  = min(unsigned int, max(unsigned int, conf->u.fr.dlci_num, 1), 100);
 	
 		for ( i = 0; i < card->u.f.dlci_num; i++) {
 
@@ -635,27 +635,27 @@ int wpf_init(sdla_t *card, wandev_conf_t *conf)
 		u.cfg.port |= 0x0002;
 
 	if (conf->u.fr.t391)
-		u.cfg.t391 = min(conf->u.fr.t391, 30);
+		u.cfg.t391 = min(unsigned int, conf->u.fr.t391, 30);
 	else
 		u.cfg.t391 = 5;
 
 	if (conf->u.fr.t392)
-		u.cfg.t392 = min(conf->u.fr.t392, 30);
+		u.cfg.t392 = min(unsigned int, conf->u.fr.t392, 30);
 	else
 		u.cfg.t392 = 15;
 
 	if (conf->u.fr.n391)
-		u.cfg.n391 = min(conf->u.fr.n391, 255);
+		u.cfg.n391 = min(unsigned int, conf->u.fr.n391, 255);
 	else
 		u.cfg.n391 = 2;
 
 	if (conf->u.fr.n392)
-		u.cfg.n392 = min(conf->u.fr.n392, 10);
+		u.cfg.n392 = min(unsigned int, conf->u.fr.n392, 10);
 	else
 		u.cfg.n392 = 3;	
 
 	if (conf->u.fr.n393)
-		u.cfg.n393 = min(conf->u.fr.n393, 10);
+		u.cfg.n393 = min(unsigned int, conf->u.fr.n393, 10);
 	else
 		u.cfg.n393 = 4;
 
@@ -952,7 +952,8 @@ static int new_if (wan_device_t* wandev, netdevice_t* dev, wanif_conf_t* conf)
          */
 	if (conf->cir) {
 
-		chan->cir = max( 1, min( conf->cir, 512 ) );
+		chan->cir = max(unsigned int, 1,
+				min(unsigned int, conf->cir, 512));
 		chan->cir_status = CIR_ENABLED; 
 
 		
@@ -963,7 +964,8 @@ static int new_if (wan_device_t* wandev, netdevice_t* dev, wanif_conf_t* conf)
 		chan->bc = chan->cir;
 
 		if (conf->be){
-			chan->be = max( 0, min( conf->be, 511) ); 
+			chan->be = max(unsigned int,
+				       0, min(unsigned int, conf->be, 511));
 		}else{	
 			conf->be = 0;
 		}

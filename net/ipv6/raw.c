@@ -7,7 +7,7 @@
  *
  *	Adapted from linux/net/ipv4/raw.c
  *
- *	$Id: raw.c,v 1.46 2001/06/05 11:36:55 davem Exp $
+ *	$Id: raw.c,v 1.49 2001/08/13 18:56:13 davem Exp $
  *
  *	Fixes:
  *	Hideaki YOSHIFUJI	:	sin6_scope_id support
@@ -699,7 +699,7 @@ static int rawv6_getsockopt(struct sock *sk, int level, int optname,
 		return -ENOPROTOOPT;
 	}
 
-	len=min(sizeof(int),len);
+	len = min(unsigned int, sizeof(int), len);
 
 	if (put_user(len, optlen))
 		return -EFAULT;

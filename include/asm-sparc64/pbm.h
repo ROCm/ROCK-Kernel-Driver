@@ -1,4 +1,4 @@
-/* $Id: pbm.h,v 1.26 2001/05/15 08:54:30 davem Exp $
+/* $Id: pbm.h,v 1.27 2001/08/12 13:18:23 davem Exp $
  * pbm.h: UltraSparc PCI controller software state.
  *
  * Copyright (C) 1997, 1998, 1999 David S. Miller (davem@redhat.com)
@@ -156,6 +156,9 @@ struct pci_pbm_info {
 
 	/* IOMMU state, potentially shared by both PBM segments. */
 	struct pci_iommu		*iommu;
+
+	/* PCI slot mapping. */
+	unsigned int			pci_first_slot;
 
 	/* Now things for the actual PCI bus probes. */
 	unsigned int			pci_first_busno;

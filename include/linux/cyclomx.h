@@ -37,13 +37,6 @@
 #include <linux/cycx_x25.h>
 #endif
 
-#ifndef	min
-#define min(a,b) (((a)<(b))?(a):(b))
-#endif
-#ifndef	max
-#define max(a,b) (((a)>(b))?(a):(b))
-#endif
-
 #define	is_digit(ch) (((ch)>=(unsigned)'0'&&(ch)<=(unsigned)'9')?1:0)
 
 /* Adapter Data Space.

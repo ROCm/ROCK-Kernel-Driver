@@ -1,4 +1,4 @@
-/* $Id: dtlb_base.S,v 1.9 2001/03/22 00:12:32 davem Exp $
+/* $Id: dtlb_base.S,v 1.10 2001/08/13 20:41:54 kanoj Exp $
  * dtlb_base.S:	Front end to DTLB miss replacement strategy.
  *              This is included directly into the trap table.
  *
@@ -51,6 +51,7 @@
 /* DTLB ** ICACHE line 1: Quick user TLB misses		*/
 	ldxa		[%g1 + %g1] ASI_DMMU, %g4	! Get TAG_ACCESS
 	andcc		%g4, TAG_CONTEXT_BITS, %g0	! From Nucleus?
+from_tl1_trap:
 	be,pn		%xcc, 3f			! Yep, special processing
 	 srax		%g4, VPTE_SHIFT, %g6		! Create VPTE offset
 	ldxa		[%g3 + %g6] ASI_S, %g5		! Load VPTE

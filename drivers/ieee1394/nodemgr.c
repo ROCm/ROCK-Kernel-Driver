@@ -358,7 +358,7 @@ static void nodemgr_node_probe(void *data)
         nodeid_t nodeid = LOCAL_BUS;
 	quadlet_t buffer[5], quad;
 	octlet_t base = CSR_REGISTER_BASE + CSR_CONFIG_ROM;
-	int flags;
+	unsigned long flags;
 
 	/* We need to detect when the ConfigROM's generation has changed,
 	 * so we only update the node's info when it needs to be.  */
@@ -508,7 +508,7 @@ int hpsb_guid_fill_packet(struct node_entry *ne, struct hpsb_packet *pkt)
 static void nodemgr_add_host(struct hpsb_host *host)
 {
 	struct host_info *hi = kmalloc (sizeof (struct host_info), GFP_KERNEL);
-	int flags;
+	unsigned long flags;
 
 	if (!hi) {
 		HPSB_ERR ("Out of memory in Node Manager");
@@ -532,7 +532,7 @@ static void nodemgr_host_reset(struct hpsb_host *host)
 {
 	struct list_head *lh;
 	struct host_info *hi = NULL;
-	int flags;
+	unsigned long flags;
 
 	spin_lock_irqsave (&host_info_lock, flags);
 	list_for_each(lh, &host_info_list) {
@@ -561,7 +561,7 @@ static void nodemgr_remove_host(struct hpsb_host *host)
 	struct list_head *lh;
 	struct host_info *hi = NULL;
 	struct node_entry *ne;
-	int flags;
+	unsigned long flags;
 
 	/* Make sure we have no active scans */
 	flush_scheduled_tasks();

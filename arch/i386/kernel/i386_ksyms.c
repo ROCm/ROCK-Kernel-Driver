@@ -161,3 +161,7 @@ EXPORT_SYMBOL_NOVERS(memset);
 #ifdef CONFIG_X86_PAE
 EXPORT_SYMBOL(empty_zero_page);
 #endif
+
+#ifdef CONFIG_HAVE_DEC_LOCK
+EXPORT_SYMBOL(atomic_dec_and_lock);
+#endif

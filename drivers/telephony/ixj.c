@@ -1844,14 +1844,15 @@ ssize_t ixj_read(struct file * file_p, char *buf, size_t length, loff_t * ppos)
 	remove_wait_queue(&j->read_q, &wait);
 	set_current_state(TASK_RUNNING);
 	/* Don't ever copy more than the user asks */
-	i = copy_to_user(buf, j->read_buffer, min(length, j->read_buffer_size));
+	i = copy_to_user(buf, j->read_buffer,
+			 min(unsigned int, length, j->read_buffer_size));
 	j->read_buffer_ready = 0;
 	if (i) {
 		j->flags.inread = 0;
 		return -EFAULT;
 	} else {
 		j->flags.inread = 0;
-		return min(length, j->read_buffer_size);
+		return min(unsigned int, length, j->read_buffer_size);
 	}
 }
 
@@ -1934,13 +1935,14 @@ ssize_t ixj_write(struct file *file_p, const char *buf, size_t count, loff_t * p
 	remove_wait_queue(&j->write_q, &wait);
 	if (j->write_buffer_wp + count >= j->write_buffer_end)
 		j->write_buffer_wp = j->write_buffer;
-	i = copy_from_user(j->write_buffer_wp, buf, min(count, j->write_buffer_size));
+	i = copy_from_user(j->write_buffer_wp, buf,
+			   min(unsigned int, count, j->write_buffer_size));
 	if (i) {
 		j->flags.inwrite = 0;
 		return -EFAULT;
 	}
 	j->flags.inwrite = 0;
-	return min(count, j->write_buffer_size);
+	return min(unsigned int, count, j->write_buffer_size);
 }
 
 ssize_t ixj_enhanced_write(struct file * file_p, const char *buf, size_t count, loff_t * ppos)

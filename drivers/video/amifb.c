@@ -592,9 +592,6 @@ static u_short maxfmode, chipset;
 	((((long)((unsigned long long)x1 >> 8) % x2) << 8) / x2))
 #endif
 
-#define min(a, b)	((a) < (b) ? (a) : (b))
-#define max(a, b)	((a) > (b) ? (a) : (b))
-
 #define highw(x)	((u_long)(x)>>16 & 0xffff)
 #define loww(x)		((u_long)(x) & 0xffff)
 

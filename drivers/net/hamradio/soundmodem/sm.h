@@ -150,11 +150,6 @@ struct hardware_info {
 
 /* --------------------------------------------------------------------- */
 
-#define min(a, b) (((a) < (b)) ? (a) : (b))
-#define max(a, b) (((a) > (b)) ? (a) : (b))
-
-/* --------------------------------------------------------------------- */
-
 extern const char sm_drvname[];
 extern const char sm_drvinfo[];
 

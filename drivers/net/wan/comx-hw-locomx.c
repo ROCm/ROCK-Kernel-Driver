@@ -324,7 +324,7 @@ static int locomx_read_proc(char *page, char **start, off_t off, int count,
 	if (count >= len - off) {
 		*eof = 1;
 	}
-	return ( min(count, len - off) );
+	return min(int, count, len - off);
 }
 
 static int locomx_write_proc(struct file *file, const char *buffer,
@@ -339,7 +339,7 @@ static int locomx_write_proc(struct file *file, const char *buffer,
 		return -ENOMEM;
 	}
 
-	copy_from_user(page, buffer, count = min(count, PAGE_SIZE));
+	copy_from_user(page, buffer, count = min(unsigned long, count, PAGE_SIZE));
 	if (*(page + count - 1) == '\n') {
 		*(page + count - 1) = 0;
 	}

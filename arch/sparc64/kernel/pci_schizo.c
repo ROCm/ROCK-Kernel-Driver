@@ -1,4 +1,4 @@
-/* $Id: pci_schizo.c,v 1.19 2001/06/20 21:31:00 davem Exp $
+/* $Id: pci_schizo.c,v 1.20 2001/08/12 13:18:23 davem Exp $
  * pci_schizo.c: SCHIZO specific PCI controller support.
  *
  * Copyright (C) 2001 David S. Miller (davem@redhat.com)
@@ -1684,6 +1684,7 @@ static void schizo_pbm_init(struct pci_controller_info *p,
 
 	pbm->parent = p;
 	pbm->prom_node = prom_node;
+	pbm->pci_first_slot = 1;
 	prom_getstring(prom_node, "name",
 		       pbm->prom_name,
 		       sizeof(pbm->prom_name));

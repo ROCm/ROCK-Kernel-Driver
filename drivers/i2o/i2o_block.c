@@ -713,7 +713,7 @@ static void i2o_block_reply(struct i2o_handler *h, struct i2o_controller *c, str
 static int i2ob_evt(void *dummy)
 {
 	unsigned int evt;
-	unsigned int flags;
+	unsigned long flags;
 	int unit;
 	int i;
 	//The only event that has data is the SCSI_SMART event.
@@ -1698,7 +1698,7 @@ void i2ob_del_device(struct i2o_controller *c, struct i2o_device *d)
 {	
 	int unit = 0;
 	int i = 0;
-	int flags;
+	unsigned long flags;
 
 	spin_lock_irqsave(&io_request_lock, flags);
 

@@ -1,4 +1,4 @@
-/* $Id: pci_psycho.c,v 1.26 2001/06/13 06:34:30 davem Exp $
+/* $Id: pci_psycho.c,v 1.27 2001/08/12 13:18:23 davem Exp $
  * pci_psycho.c: PSYCHO/U2P specific PCI controller support.
  *
  * Copyright (C) 1997, 1998, 1999 David S. Miller (davem@caipfs.rutgers.edu)
@@ -1477,14 +1477,23 @@ static void psycho_pbm_init(struct pci_controller_info *p,
 {
 	unsigned int busrange[2];
 	struct pci_pbm_info *pbm;
-	int err;
+	char namebuf[64];
+	int err, len;
 
 	if (is_pbm_a) {
 		pbm = &p->pbm_A;
+		pbm->pci_first_slot = 1;
 		pbm->io_space.start = p->controller_regs + PSYCHO_IOSPACE_A;
 		pbm->mem_space.start = p->controller_regs + PSYCHO_MEMSPACE_A;
 	} else {
 		pbm = &p->pbm_B;
+		pbm->pci_first_slot = 1;
+		len = prom_getproperty(prom_root_node, "name",
+				       namebuf, sizeof(namebuf));
+		if (len > 0) {
+			if (!strcmp(namebuf, "SUNW,Ultra-1-Engine"))
+				pbm->pci_first_slot = 2;
+		}
 		pbm->io_space.start = p->controller_regs + PSYCHO_IOSPACE_B;
 		pbm->mem_space.start = p->controller_regs + PSYCHO_MEMSPACE_B;
 	}

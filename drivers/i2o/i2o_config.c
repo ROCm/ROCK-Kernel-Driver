@@ -790,7 +790,7 @@ static int ioctl_evt_get(unsigned long arg, struct file *fp)
 	struct i2o_cfg_info *p = NULL;
 	struct i2o_evt_get *uget = (struct i2o_evt_get*)arg;
 	struct i2o_evt_get kget;
-	unsigned int flags;
+	unsigned long flags;
 
 	for(p = open_files; p; p = p->next)
 		if(p->q_id == id)
@@ -819,7 +819,7 @@ static int cfg_open(struct inode *inode, struct file *file)
 {
 	struct i2o_cfg_info *tmp = 
 		(struct i2o_cfg_info *)kmalloc(sizeof(struct i2o_cfg_info), GFP_KERNEL);
-	unsigned int flags;
+	unsigned long flags;
 
 	if(!tmp)
 		return -ENOMEM;
@@ -845,7 +845,7 @@ static int cfg_release(struct inode *inode, struct file *file)
 {
 	u32 id = (u32)file->private_data;
 	struct i2o_cfg_info *p1, *p2;
-	unsigned int flags;
+	unsigned long flags;
 
 	lock_kernel();
 	p1 = p2 = NULL;

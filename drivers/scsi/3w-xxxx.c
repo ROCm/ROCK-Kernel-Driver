@@ -1202,15 +1202,14 @@ static void tw_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 	int do_attention_interrupt=0;
 	int do_host_interrupt=0;
 	int do_command_interrupt=0;
-	int flags = 0;
-	int flags2 = 0;
+	unsigned long flags = 0;
 	TW_Command *command_packet;
 	if (test_and_set_bit(TW_IN_INTR, &tw_dev->flags))
 		return;
 	spin_lock_irqsave(&io_request_lock, flags);
 
 	if (tw_dev->tw_pci_dev->irq == irq) {
-		spin_lock_irqsave(&tw_dev->tw_lock, flags2);
+		spin_lock(&tw_dev->tw_lock);
 		dprintk(KERN_NOTICE "3w-xxxx: tw_interrupt()\n");
 
 		/* Read the registers */
@@ -1349,7 +1348,7 @@ static void tw_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 				}
 			}
 		}
-		spin_unlock_irqrestore(&tw_dev->tw_lock, flags2);
+		spin_unlock(&tw_dev->tw_lock);
 	}
 	spin_unlock_irqrestore(&io_request_lock, flags);
 	clear_bit(TW_IN_INTR, &tw_dev->flags);
@@ -1918,7 +1917,7 @@ int tw_scsi_queue(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	unsigned char *command = SCpnt->cmnd;
 	int request_id = 0;
 	int error = 0;
-	int flags = 0;
+	unsigned long flags = 0;
 	TW_Device_Extension *tw_dev = (TW_Device_Extension *)SCpnt->host->hostdata;
 
 	if (tw_dev == NULL) {

@@ -846,7 +846,8 @@ void ndisc_send_redirect(struct sk_buff *skb, struct neighbour *neigh,
 		}
 	}
 
-	rd_len = min(IPV6_MIN_MTU-sizeof(struct ipv6hdr)-len, skb->len + 8);
+	rd_len = min(unsigned int,
+		     IPV6_MIN_MTU-sizeof(struct ipv6hdr)-len, skb->len + 8);
 	rd_len &= ~0x7;
 	len += rd_len;
 

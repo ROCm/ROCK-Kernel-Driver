@@ -5,7 +5,7 @@
  *
  *		Implementation of the Transmission Control Protocol(TCP).
  *
- * Version:	$Id: tcp_minisocks.c,v 1.11 2001/08/03 14:27:25 davem Exp $
+ * Version:	$Id: tcp_minisocks.c,v 1.12 2001/08/13 18:56:13 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -766,7 +766,7 @@ struct sock *tcp_create_openreq_child(struct sock *sk, struct open_request *req,
 			newtp->rcv_wscale = req->rcv_wscale;
 		} else {
 			newtp->snd_wscale = newtp->rcv_wscale = 0;
-			newtp->window_clamp = min(newtp->window_clamp,65535);
+			newtp->window_clamp = min(u32, newtp->window_clamp, 65535);
 		}
 		newtp->snd_wnd = ntohs(skb->h.th->window) << newtp->snd_wscale;
 		newtp->max_window = newtp->snd_wnd;

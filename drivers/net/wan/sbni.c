@@ -659,7 +659,7 @@ download_data( struct net_device  *dev,  u32  *crc_p )
 	struct net_local  *nl    = (struct net_local *) dev->priv;
 	struct sk_buff    *skb	 = nl->tx_buf_p;
 
-	unsigned  len = min( skb->len - nl->outpos, nl->framelen );
+	unsigned  len = min(unsigned int, skb->len - nl->outpos, nl->framelen);
 
 	outsb( dev->base_addr + DAT, skb->data + nl->outpos, len );
 	*crc_p = calc_crc32( *crc_p, skb->data + nl->outpos, len );
@@ -760,8 +760,9 @@ interpret_ack( struct net_device  *dev,  unsigned  ack )
 			nl->outpos += nl->framelen;
 
 			if( --nl->tx_frameno )
-				nl->framelen = min( nl->maxframe,
-					nl->tx_buf_p->len - nl->outpos );
+				nl->framelen = min(unsigned int,
+						   nl->maxframe,
+						   nl->tx_buf_p->len - nl->outpos);
 			else
 				send_complete( nl ),
 #ifdef CONFIG_SBNI_MULTILINE

@@ -890,7 +890,7 @@ static int i2o_core_evt(void *reply_data)
 	struct reply_info *reply = (struct reply_info *) reply_data;
 	u32 *msg = reply->msg;
 	struct i2o_controller *c = NULL;
-	int flags;
+	unsigned long flags;
 
 	lock_kernel();
 	daemonize();
@@ -2535,7 +2535,7 @@ int i2o_post_wait_mem(struct i2o_controller *c, u32 *msg, int len, int timeout, 
 	DECLARE_WAIT_QUEUE_HEAD(wq_i2o_post);
 	int complete = 0;
 	int status;
-	int flags = 0;
+	unsigned long flags = 0;
 	struct i2o_post_wait_data *wait_data =
 		kmalloc(sizeof(struct i2o_post_wait_data), GFP_KERNEL);
 

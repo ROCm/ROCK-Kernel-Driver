@@ -34,8 +34,6 @@
 
 #define MAX_BUF PAGE_SIZE
 
-#define max(a,b) (((a) > (b)) ? (a) : (b))
-
 /*
  * If we are told to probe a host, we will return 0 if  the host is not
  * present, 1 if the host is present, and will return an identifying

@@ -142,10 +142,6 @@ struct agp_bridge_data {
 #define A_IDXFIX()	(A_SIZE_FIX(agp_bridge.aperture_sizes) + i)
 #define MAXKEY		(4096 * 32)
 
-#ifndef min
-#define min(a,b)	(((a)<(b))?(a):(b))
-#endif
-
 #define AGPGART_MODULE_NAME	"agpgart"
 #define PFX			AGPGART_MODULE_NAME ": "
 

@@ -2258,11 +2258,11 @@ static int etrax_rh_submit_urb(urb_t *urb)
 	case RH_GET_DESCRIPTOR:
 		switch ((wValue & 0xff00) >> 8) {
 		case (0x01):	/* device descriptor */
-			len = min (leni, min (sizeof (root_hub_dev_des), wLength));
+			len = min(unsigned int, leni, min(unsigned int, sizeof (root_hub_dev_des), wLength));
 			memcpy (data, root_hub_dev_des, len);
 			OK (len);
 		case (0x02):	/* configuration descriptor */
-			len = min (leni, min (sizeof (root_hub_config_des), wLength));
+			len = min(unsigned int, leni, min(unsigned int, sizeof (root_hub_config_des), wLength));
 			memcpy (data, root_hub_config_des, len);
 			OK (len);
 		case (0x03):	/* string descriptors */
@@ -2270,7 +2270,7 @@ static int etrax_rh_submit_urb(urb_t *urb)
 						   0xff, "ETRAX 100LX",
 						   data, wLength);
 			if (len > 0) {
-				OK (min (leni, len));
+				OK(min(int, leni, len));
 			} else 
 				stat = -EPIPE;
 		}
@@ -2278,7 +2278,7 @@ static int etrax_rh_submit_urb(urb_t *urb)
 		
 	case RH_GET_DESCRIPTOR | RH_CLASS:
 		root_hub_hub_des[2] = hc->rh.numports;
-		len = min (leni, min (sizeof (root_hub_hub_des), wLength));
+		len = min(unsigned int, leni, min(unsigned int, sizeof (root_hub_hub_des), wLength));
 		memcpy (data, root_hub_hub_des, len);
 		OK (len);
 		

@@ -386,8 +386,8 @@ int lvm_snapshot_COW(kdev_t org_phys_dev,
 
 	blksize_org = lvm_get_blksize(org_phys_dev);
 	blksize_snap = lvm_get_blksize(snap_phys_dev);
-	max_blksize = max(blksize_org, blksize_snap);
-	min_blksize = min(blksize_org, blksize_snap);
+	max_blksize = max(int, blksize_org, blksize_snap);
+	min_blksize = min(int, blksize_org, blksize_snap);
 	max_sectors = KIO_MAX_SECTORS * (min_blksize>>9);
 
 	if (chunk_size % (max_blksize>>9))
@@ -395,7 +395,7 @@ int lvm_snapshot_COW(kdev_t org_phys_dev,
 
 	while (chunk_size)
 	{
-		nr_sectors = min(chunk_size, max_sectors);
+		nr_sectors = min(int, chunk_size, max_sectors);
 		chunk_size -= nr_sectors;
 
 		iobuf->length = nr_sectors << 9;
@@ -503,7 +503,7 @@ int lvm_snapshot_alloc_hash_table(lv_t * lv)
 
 	buckets = lv->lv_remap_end;
 	max_buckets = calc_max_buckets();
-	buckets = min(buckets, max_buckets);
+	buckets = min(unsigned long, buckets, max_buckets);
 	while (buckets & (buckets-1))
 		buckets &= (buckets-1);
 

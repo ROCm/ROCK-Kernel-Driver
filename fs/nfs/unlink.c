@@ -128,7 +128,7 @@ nfs_async_unlink_done(struct rpc_task *task)
 	dir_i = dir->d_inode;
 	nfs_zap_caches(dir_i);
 	NFS_PROTO(dir_i)->unlink_done(dir, &task->tk_msg);
-	rpcauth_releasecred(task->tk_auth, data->cred);
+	put_rpccred(data->cred);
 	data->cred = NULL;
 	dput(dir);
 }
