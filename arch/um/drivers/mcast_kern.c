@@ -19,36 +19,33 @@
 #include "net_kern.h"
 #include "net_user.h"
 #include "mcast.h"
-#include "mcast_kern.h"
 
-struct mcast_data mcast_priv[MAX_UML_NETDEV] = {
-	[ 0 ... MAX_UML_NETDEV - 1 ] =
-	{
-		addr:		"239.192.168.1",
-		port:		1102,
-		ttl:		1,
-	}
+struct mcast_init {
+	char *addr;
+	int port;
+	int ttl;
 };
 
-void mcast_init(struct net_device *dev, int index)
+void mcast_init(struct net_device *dev, void *data)
 {
 	struct uml_net_private *pri;
 	struct mcast_data *dpri;
+	struct mcast_init *init = data;
 
 	init_etherdev(dev, 0);
 	pri = dev->priv;
 	dpri = (struct mcast_data *) pri->user;
-	*dpri = mcast_priv[index];
+	*dpri = ((struct mcast_data)
+		{ addr :	init->addr,
+		  port :	init->port,
+		  ttl :		init->ttl,
+		  mcast_addr :	NULL,
+		  dev :		dev });
 	printk("mcast backend ");
 	printk("multicast adddress: %s:%u, TTL:%u ",
 	       dpri->addr, dpri->port, dpri->ttl);
 
 	printk("\n");
-}
-
-static unsigned short mcast_protocol(struct sk_buff *skb)
-{
-	return eth_type_trans(skb, skb->dev);
 }
 
 static int mcast_read(int fd, struct sk_buff **skb, struct uml_net_private *lp)
@@ -68,71 +65,64 @@ static int mcast_write(int fd, struct sk_buff **skb,
 
 static struct net_kern_info mcast_kern_info = {
 	init:			mcast_init,
-	protocol:		mcast_protocol,
+	protocol:		eth_protocol,
 	read:			mcast_read,
 	write:			mcast_write,
 };
 
-static int mcast_count = 0;
-
-int mcast_setup(char *str, struct uml_net *dev)
+int mcast_setup(char *str, char **mac_out, void *data)
 {
-	int err, n = mcast_count;
-	int num = 0;
-	char *p1, *p2;
+	struct mcast_init *init = data;
+	char *port_str = NULL, *ttl_str = NULL, *remain;
+	char *last;
+	int n;
 
-	dev->user = &mcast_user_info;
-	dev->kern = &mcast_kern_info;
-	dev->private_size = sizeof(struct mcast_data);
-	dev->transport_index = mcast_count++;
+	*init = ((struct mcast_init)
+		{ addr :	"239.192.168.1",
+		  port :	1102,
+		  ttl :		1 });
 
-	/* somewhat more sophisticated parser, needed for in_aton */
-
-	p1 = str;
-	if (*str == ',')
-		p1++;
-	while (p1 && *p1) {
-		if ((p2 = strchr(p1, ',')))
-			*p2++ = '\0';
-		if (strlen(p1) > 0) {
-			switch (num) {
-			case 0:
-				/* First argument: Ethernet address */
-				err = setup_etheraddr(p1, dev->mac);
-				if (!err) 
-					dev->have_mac = 1;
-				break;
-			case 1:
-				/* Second argument: Multicast group */
-				mcast_priv[n].addr = p1;
-				break;
-			case 2:
-				/* Third argument: Port number */
-				mcast_priv[n].port = 
-					htons(simple_strtoul(p1, NULL, 10));
-				break;
-			case 3:
-				/* Fourth argument: TTL */
-				mcast_priv[n].ttl = 
-						simple_strtoul(p1, NULL, 10);
-				break;
-			}
+	remain = split_if_spec(str, mac_out, &init->addr, &port_str, &ttl_str,
+			       NULL);
+	if(remain != NULL){
+		printk(KERN_ERR "mcast_setup - Extra garbage on "
+		       "specification : '%s'\n", remain);
+		return(0);
+	}
+	
+	if(port_str != NULL){
+		n = simple_strtoul(port_str, &last, 10);
+		if(*last != '\0'){
+			printk(KERN_ERR "mcast_setup - Bad port : '%s'\n", 
+			       port_str);
+			return(0);
 		}
-		p1 = p2;
-		num++;
+		init->port = htons(n);
 	}
 
-	printk(KERN_INFO "Configured mcast device: %s:%u-%u\n",
-		mcast_priv[n].addr, mcast_priv[n].port,
-		mcast_priv[n].ttl);
+	if(ttl_str != NULL){
+		init->ttl = simple_strtoul(ttl_str, &last, 10);
+		if(*last != '\0'){
+			printk(KERN_ERR "mcast_setup - Bad ttl : '%s'\n", 
+			       ttl_str);
+			return(0);
+		}
+	}
 
-	return(0);
+	printk(KERN_INFO "Configured mcast device: %s:%u-%u\n", init->addr,
+	       init->port, init->ttl);
+
+	return(1);
 }
 
 static struct transport mcast_transport = {
-	list :	LIST_HEAD_INIT(mcast_transport.list),
-	name :	"mcast",
-	setup : mcast_setup
+	list :		LIST_HEAD_INIT(mcast_transport.list),
+	name :		"mcast",
+	setup : 	mcast_setup,
+	user :		&mcast_user_info,
+	kern :		&mcast_kern_info,
+	private_size :	sizeof(struct mcast_data),
+	setup_size :	sizeof(struct mcast_init),
 };
 
 static int register_mcast(void)
@@ -142,6 +132,7 @@ static int register_mcast(void)
 }
 
 __initcall(register_mcast);
+
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.
  * Emacs will notice this stuff at the end of the file and automatically

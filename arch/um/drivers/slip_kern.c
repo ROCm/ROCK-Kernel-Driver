@@ -7,28 +7,29 @@
 #include "net_user.h"
 #include "kern.h"
 #include "slip.h"
-#include "slip_kern.h"
 
-struct slip_data slip_priv[MAX_UML_NETDEV] = {
-	[ 0 ... MAX_UML_NETDEV - 1 ] =
-	{
-		addr:		NULL,
-		gate_addr:	NULL,
-		slave:		-1,
-		buf: 		{ 0 },
-		pos:		0,
-		esc:		0,
-	}
+struct slip_init {
+	char *gate_addr;
 };
 
-void slip_init(struct net_device *dev, int index)
+void slip_init(struct net_device *dev, void *data)
 {
 	struct uml_net_private *private;
 	struct slip_data *spri;
+	struct slip_init *init = data;
 
 	private = dev->priv;
 	spri = (struct slip_data *) private->user;
-	*spri = slip_priv[index];
+	*spri = ((struct slip_data)
+		{ name :	{ '\0' },
+		  addr:		NULL,
+		  gate_addr :	init->gate_addr,
+		  slave : 	0,
+		  buf : 	{ '\0' },
+		  pos :		0,
+		  esc :		0,
+		  dev :		dev });
+
 	strncpy(dev->name, "umn", IFNAMSIZ);
 	dev->init = NULL;
 	dev->hard_header_len = 0;
@@ -67,26 +68,26 @@ struct net_kern_info slip_kern_info = {
 	write:			slip_write,
 };
 
-static int slip_count = 0;
-
-int slip_setup(char *str, struct uml_net *dev)
+static int slip_setup(char *str, char **mac_out, void *data)
 {
-	int n = slip_count;
+	struct slip_init *init = data;
 
-	dev->user = &slip_user_info;
-	dev->kern = &slip_kern_info;
-	dev->private_size = sizeof(struct slip_data);
-	dev->transport_index = slip_count++;
-	if(*str != ',') return(0);
-	str++;
-	if(str[0] != '\0') slip_priv[n].gate_addr = str;
-	return(0);
+	*init = ((struct slip_init)
+		{ gate_addr :		NULL });
+
+	if(str[0] != '\0') 
+		init->gate_addr = str;
+	return(1);
 }
 
 static struct transport slip_transport = {
-	list :	LIST_HEAD_INIT(slip_transport.list),
-	name :	"slip",
-	setup : slip_setup
+	list :		LIST_HEAD_INIT(slip_transport.list),
+	name :		"slip",
+	setup : 	slip_setup,
+	user :		&slip_user_info,
+	kern :		&slip_kern_info,
+	private_size :	sizeof(struct slip_data),
+	setup_size :	sizeof(struct slip_init),
 };
 
 static int register_slip(void)
