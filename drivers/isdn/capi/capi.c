@@ -1,4 +1,4 @@
-/* $Id: capi.c,v 1.1.2.6 2004/04/26 09:33:07 armin Exp $
+/* $Id: capi.c,v 1.1.2.7 2004/04/28 09:48:59 armin Exp $
  *
  * CAPI 2.0 Interface for Linux
  *
@@ -45,7 +45,7 @@
 #include "capifs.h"
 #endif
 
-static char *revision = "$Revision: 1.1.2.6 $";
+static char *revision = "$Revision: 1.1.2.7 $";
 
 MODULE_DESCRIPTION("CAPI4Linux: Userspace /dev/capi20 interface");
 MODULE_AUTHOR("Carsten Paeth");
@@ -927,8 +927,8 @@ capi_ioctl(struct inode *inode, struct file *file,
 			if ((mp = nccip->minorp) != 0) {
 				count += atomic_read(&mp->ttyopencount);
 			}
-			up(&cdev->ncci_list_sem);
 #endif /* CONFIG_ISDN_CAPI_MIDDLEWARE */
+			up(&cdev->ncci_list_sem);
 			return count;
 		}
 		return 0;
