@@ -839,7 +839,7 @@ static int serial_read_proc (char *page, char **start, off_t off, int count, int
 
 		length += sprintf (page+length, "%d:", i);
 		if (serial->type->owner)
-			length += sprintf (page+length, " module:%s", serial->type->owner->name);
+			length += sprintf (page+length, " module:%s", module_name(serial->type->owner));
 		length += sprintf (page+length, " name:\"%s\"", serial->type->name);
 		length += sprintf (page+length, " vendor:%04x product:%04x", serial->vendor, serial->product);
 		length += sprintf (page+length, " num_ports:%d", serial->num_ports);
