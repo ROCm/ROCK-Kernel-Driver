@@ -37,6 +37,13 @@ static void ncp_add_word(struct ncp_server *server, __u16 x)
 	return;
 }
 
+static void ncp_add_be16(struct ncp_server *server, __u16 x)
+{
+	assert_server_locked(server);
+	put_unaligned(cpu_to_be16(x), (__be16 *) (&(server->packet[server->current_size])));
+	server->current_size += 2;
+}
+
 static void ncp_add_dword(struct ncp_server *server, __u32 x)
 {
 	assert_server_locked(server);
@@ -123,6 +130,12 @@ static __u16
 	return get_unaligned((__u16 *) ncp_reply_data(server, offset));
 }
 
+static __u16
+ ncp_reply_be16(struct ncp_server *server, int offset)
+{
+	return be16_to_cpu(get_unaligned((__be16 *) ncp_reply_data(server, offset)));
+}
+
 static inline __u32 DVAL_LH(void* data)
 {
 	return le32_to_cpu(get_unaligned((__u32*)data));
@@ -144,13 +157,13 @@ ncp_negotiate_buffersize(struct ncp_server *server, int size, int *target)
 	int result;
 
 	ncp_init_request(server);
-	ncp_add_word(server, htons(size));
+	ncp_add_be16(server, size);
 
 	if ((result = ncp_request(server, 33)) != 0) {
 		ncp_unlock_server(server);
 		return result;
 	}
-	*target = min_t(unsigned int, ntohs(ncp_reply_word(server, 0)), size);
+	*target = min_t(unsigned int, ncp_reply_be16(server, 0), size);
 
 	ncp_unlock_server(server);
 	return 0;
@@ -170,7 +183,7 @@ ncp_negotiate_size_and_options(struct ncp_server *server,
 	if (size < NCP_BLOCK_SIZE) size = NCP_BLOCK_SIZE;
 
 	ncp_init_request(server);
-	ncp_add_word(server, htons(size));
+	ncp_add_be16(server, size);
 	ncp_add_byte(server, options);
 	
 	if ((result = ncp_request(server, 0x61)) != 0)
@@ -180,7 +193,7 @@ ncp_negotiate_size_and_options(struct ncp_server *server,
 	}
 
 	/* NCP over UDP returns 0 (!!!) */
-	result = ntohs(ncp_reply_word(server, 0));
+	result = ncp_reply_be16(server, 0);
 	if (result >= NCP_BLOCK_SIZE)
 		size = min(result, size);
 	*ret_size = size;
@@ -994,12 +1007,12 @@ ncp_read_kernel(struct ncp_server *server, const char *file_id,
 	ncp_add_byte(server, 0);
 	ncp_add_mem(server, file_id, 6);
 	ncp_add_be32(server, offset);
-	ncp_add_word(server, htons(to_read));
+	ncp_add_be16(server, to_read);
 
 	if ((result = ncp_request(server, 72)) != 0) {
 		goto out;
 	}
-	*bytes_read = ntohs(ncp_reply_word(server, 0));
+	*bytes_read = ncp_reply_be16(server, 0);
 	source = ncp_reply_data(server, 2 + (offset & 1));
 
 	memcpy(target, source, *bytes_read);
@@ -1030,7 +1043,7 @@ ncp_read_bounce(struct ncp_server *server, const char *file_id,
 	ncp_add_byte(server, 0);
 	ncp_add_mem(server, file_id, 6);
 	ncp_add_be32(server, offset);
-	ncp_add_word(server, htons(to_read));
+	ncp_add_be16(server, to_read);
 	result = ncp_request2(server, 72, bounce, bufsize);
 	ncp_unlock_server(server);
 	if (!result) {
@@ -1063,7 +1076,7 @@ ncp_write_kernel(struct ncp_server *server, const char *file_id,
 	ncp_add_byte(server, 0);
 	ncp_add_mem(server, file_id, 6);
 	ncp_add_be32(server, offset);
-	ncp_add_word(server, htons(to_write));
+	ncp_add_be16(server, to_write);
 	ncp_add_mem(server, source, to_write);
 	
 	if ((result = ncp_request(server, 73)) == 0)
@@ -1084,7 +1097,7 @@ ncp_LogPhysicalRecord(struct ncp_server *server, const char *file_id,
 	ncp_add_mem(server, file_id, 6);
 	ncp_add_be32(server, offset);
 	ncp_add_be32(server, length);
-	ncp_add_word(server, htons(timeout));
+	ncp_add_be16(server, timeout);
 
 	if ((result = ncp_request(server, 0x1A)) != 0)
 	{
