@@ -1618,7 +1618,7 @@ static int cp_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	void *regs;
 	long pciaddr;
 	unsigned int addr_len, i, pci_using_dac;
-	u8 pci_rev, cache_size;
+	u8 pci_rev;
 
 #ifndef MODULE
 	static int version_printed;
@@ -1659,9 +1659,13 @@ static int cp_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (rc)
 		goto err_out_free;
 
-	rc = pci_request_regions(pdev, DRV_NAME);
+	rc = pci_set_mwi(pdev);
 	if (rc)
 		goto err_out_disable;
+
+	rc = pci_request_regions(pdev, DRV_NAME);
+	if (rc)
+		goto err_out_mwi;
 
 	if (pdev->irq < 2) {
 		rc = -EIO;
@@ -1759,29 +1763,8 @@ static int cp_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	pci_set_drvdata(pdev, dev);
 
-	/*
-	 * Looks like this is necessary to deal with on all architectures,
-	 * even this %$#%$# N440BX Intel based thing doesn't get it right.
-	 * Ie. having two NICs in the machine, one will have the cache
-	 * line set at boot time, the other will not.
-	 */
-	pci_read_config_byte(pdev, PCI_CACHE_LINE_SIZE, &cache_size);
-	cache_size <<= 2;
-	if (cache_size != SMP_CACHE_BYTES) {
-		printk(KERN_INFO "%s: PCI cache line size set incorrectly "
-		       "(%i bytes) by BIOS/FW, ", dev->name, cache_size);
-		if (cache_size > SMP_CACHE_BYTES)
-			printk("expecting %i\n", SMP_CACHE_BYTES);
-		else {
-			printk("correcting to %i\n", SMP_CACHE_BYTES);
-			pci_write_config_byte(pdev, PCI_CACHE_LINE_SIZE,
-					      SMP_CACHE_BYTES >> 2);
-		}
-	}
-
 	/* enable busmastering and memory-write-invalidate */
 	pci_set_master(pdev);
-	pci_set_mwi(pdev);
 
 	if (cp->wol_enabled) cp_set_d3_state (cp);
 
@@ -1791,6 +1774,8 @@ err_out_iomap:
 	iounmap(regs);
 err_out_res:
 	pci_release_regions(pdev);
+err_out_mwi:
+	pci_clear_mwi(pdev);
 err_out_disable:
 	pci_disable_device(pdev);
 err_out_free:
@@ -1809,6 +1794,7 @@ static void cp_remove_one (struct pci_dev *pdev)
 	iounmap(cp->regs);
 	if (cp->wol_enabled) pci_set_power_state (pdev, 0);
 	pci_release_regions(pdev);
+	pci_clear_mwi(pdev);
 	pci_disable_device(pdev);
 	pci_set_drvdata(pdev, NULL);
 	free_netdev(dev);
