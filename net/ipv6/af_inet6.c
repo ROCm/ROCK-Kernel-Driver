@@ -663,8 +663,8 @@ static int __init inet6_init(void)
 					   sizeof(struct raw6_sock), 0,
                                            SLAB_HWCACHE_ALIGN, 0, 0);
         if (!tcp6_sk_cachep || !udp6_sk_cachep || !raw6_sk_cachep)
-                printk(KERN_CRIT __FUNCTION__
-                        ": Can't create protocol sock SLAB caches!\n");
+                printk(KERN_CRIT "%s: Can't create protocol sock SLAB "
+		       "caches!\n", __FUNCTION__);
 
 	/* Register the socket-side information for inet6_create.  */
 	for(r = &inetsw6[0]; r < &inetsw6[SOCK_MAX]; ++r)

@@ -115,7 +115,7 @@ extern void ip_mc_init_dev(struct in_device *);
 extern void ip_mc_destroy_dev(struct in_device *);
 extern void ip_mc_up(struct in_device *);
 extern void ip_mc_down(struct in_device *);
-extern int ip_mc_dec_group(struct in_device *in_dev, u32 addr);
+extern void ip_mc_dec_group(struct in_device *in_dev, u32 addr);
 extern void ip_mc_inc_group(struct in_device *in_dev, u32 addr);
 #endif
 #endif

@@ -1388,6 +1388,25 @@ static void
 ppp_receive_frame(struct ppp *ppp, struct sk_buff *skb, struct channel *pch)
 {
 	if (skb->len >= 2) {
+		struct sk_buff *new_skb;
+
+		/* If this packet is byte aligned, fix that.  */
+		if ((unsigned long)skb->data & 0x1UL) {
+			int len = skb->len;
+
+			if (skb_tailroom(skb) < 124)
+				len += 128;
+			new_skb = dev_alloc_skb(len);
+			if (!new_skb) {
+				printk(KERN_ERR"PPP: no memory (bad aligned SKB)\n");
+				goto err;
+			}
+			skb_reserve(new_skb, 2);
+			memcpy(skb_put(new_skb, skb->len), skb->data, skb->len);
+			kfree_skb(skb);
+			skb = new_skb;
+		}
+
 #ifdef CONFIG_PPP_MULTILINK
 		/* XXX do channel-level decompression here */
 		if (PPP_PROTO(skb) == PPP_MP)
@@ -1401,7 +1420,7 @@ ppp_receive_frame(struct ppp *ppp, struct sk_buff *skb, struct channel *pch)
 	if (skb->len > 0)
 		/* note: a 0-length skb is used as an error indication */
 		++ppp->stats.rx_length_errors;
-
+err:
 	kfree_skb(skb);
 	ppp_receive_error(ppp);
 }
