@@ -147,6 +147,7 @@ static irqreturn_t psmouse_interrupt(struct serio *serio,
 		psmouse->nak = 1;
 		clear_bit(PSMOUSE_FLAG_ACK, &psmouse->flags);
 		clear_bit(PSMOUSE_FLAG_CMD,  &psmouse->flags);
+		wake_up_interruptible(&psmouse->wait);
 		goto out;
 	}
 
@@ -181,6 +182,7 @@ static irqreturn_t psmouse_interrupt(struct serio *serio,
 			set_bit(PSMOUSE_FLAG_CMD1, &psmouse->flags);
 		}
 		clear_bit(PSMOUSE_FLAG_ACK, &psmouse->flags);
+		wake_up_interruptible(&psmouse->wait);
 
 		if (data == PSMOUSE_RET_ACK || data == PSMOUSE_RET_NAK)
 			goto out;
@@ -190,10 +192,13 @@ static irqreturn_t psmouse_interrupt(struct serio *serio,
 		if (psmouse->cmdcnt)
 			psmouse->cmdbuf[--psmouse->cmdcnt] = data;
 
-		clear_bit(PSMOUSE_FLAG_CMD1, &psmouse->flags);
-		if (!psmouse->cmdcnt)
-			clear_bit(PSMOUSE_FLAG_CMD, &psmouse->flags);
+		if (test_and_clear_bit(PSMOUSE_FLAG_CMD1, &psmouse->flags) && psmouse->cmdcnt)
+			wake_up_interruptible(&psmouse->wait);
 
+		if (!psmouse->cmdcnt) {
+			clear_bit(PSMOUSE_FLAG_CMD, &psmouse->flags);
+			wake_up_interruptible(&psmouse->wait);
+		}
 		goto out;
 	}
 
@@ -265,22 +270,20 @@ out:
  * psmouse_sendbyte() sends a byte to the mouse, and waits for acknowledge.
  * It doesn't handle retransmission, though it could - because when there would
  * be need for retransmissions, the mouse has to be replaced anyway.
+ *
+ * psmouse_sendbyte() can only be called from a process context
  */
 
 static int psmouse_sendbyte(struct psmouse *psmouse, unsigned char byte)
 {
-	int timeout = 200000; /* 200 msec */
-
 	psmouse->nak = 1;
 	set_bit(PSMOUSE_FLAG_ACK, &psmouse->flags);
 
-	if (serio_write(psmouse->serio, byte))
-		goto out;
+	if (serio_write(psmouse->serio, byte) == 0)
+		wait_event_interruptible_timeout(psmouse->wait,
+				!test_bit(PSMOUSE_FLAG_ACK, &psmouse->flags),
+				msecs_to_jiffies(200));
 
-	while (test_bit(PSMOUSE_FLAG_ACK, &psmouse->flags) && timeout--)
-		udelay(1);
-
-out:
 	clear_bit(PSMOUSE_FLAG_ACK, &psmouse->flags);
 	return -psmouse->nak;
 }
@@ -288,27 +291,29 @@ out:
 /*
  * psmouse_command() sends a command and its parameters to the mouse,
  * then waits for the response and puts it in the param array.
+ *
+ * psmouse_command() can only be called from a process context
  */
 
 int psmouse_command(struct psmouse *psmouse, unsigned char *param, int command)
 {
-	int timeout = 500000; /* 500 msec */
+	int timeout;
 	int send = (command >> 12) & 0xf;
 	int receive = (command >> 8) & 0xf;
 	int rc = -1;
 	int i;
 
-	psmouse->cmdcnt = receive;
+	timeout = msecs_to_jiffies(command == PSMOUSE_CMD_RESET_BAT ? 4000 : 500);
 
-	if (command == PSMOUSE_CMD_RESET_BAT)
-		timeout = 4000000; /* 4 sec */
-
+	clear_bit(PSMOUSE_FLAG_CMD, &psmouse->flags);
 	if (command == PSMOUSE_CMD_GETID)
 		set_bit(PSMOUSE_FLAG_WAITID, &psmouse->flags);
 
 	if (receive && param)
 		for (i = 0; i < receive; i++)
 			psmouse->cmdbuf[(receive - 1) - i] = param[i];
+
+	psmouse->cmdcnt = receive;
 
 	if (command & 0xff)
 		if (psmouse_sendbyte(psmouse, command & 0xff))
@@ -318,27 +323,26 @@ int psmouse_command(struct psmouse *psmouse, unsigned char *param, int command)
 		if (psmouse_sendbyte(psmouse, param[i]))
 			goto out;
 
-	while (test_bit(PSMOUSE_FLAG_CMD, &psmouse->flags) && timeout--) {
+	timeout = wait_event_interruptible_timeout(psmouse->wait,
+				!test_bit(PSMOUSE_FLAG_CMD1, &psmouse->flags), timeout);
 
-		if (!test_bit(PSMOUSE_FLAG_CMD1, &psmouse->flags)) {
+	if (psmouse->cmdcnt && timeout > 0) {
+		if (command == PSMOUSE_CMD_RESET_BAT && jiffies_to_msecs(timeout) > 100)
+			timeout = msecs_to_jiffies(100);
 
-			if (command == PSMOUSE_CMD_RESET_BAT && timeout > 100000)
-				timeout = 100000;
-
-			if (command == PSMOUSE_CMD_GETID &&
-			    psmouse->cmdbuf[receive - 1] != 0xab && psmouse->cmdbuf[receive - 1] != 0xac) {
-				/*
-				 * Device behind the port is not a keyboard
-				 * so we don't need to wait for the 2nd byte
-				 * of ID response.
-				 */
-				clear_bit(PSMOUSE_FLAG_CMD, &psmouse->flags);
-				psmouse->cmdcnt = 0;
-				break;
-			}
+		if (command == PSMOUSE_CMD_GETID &&
+		    psmouse->cmdbuf[receive - 1] != 0xab && psmouse->cmdbuf[receive - 1] != 0xac) {
+			/*
+			 * Device behind the port is not a keyboard
+			 * so we don't need to wait for the 2nd byte
+			 * of ID response.
+			 */
+			clear_bit(PSMOUSE_FLAG_CMD, &psmouse->flags);
+			psmouse->cmdcnt = 0;
 		}
 
-		udelay(1);
+		wait_event_interruptible_timeout(psmouse->wait,
+				!test_bit(PSMOUSE_FLAG_CMD, &psmouse->flags), timeout);
 	}
 
 	if (param)
@@ -751,6 +755,7 @@ static void psmouse_connect(struct serio *serio, struct serio_driver *drv)
 
 	memset(psmouse, 0, sizeof(struct psmouse));
 
+	init_waitqueue_head(&psmouse->wait);
 	init_input_dev(&psmouse->dev);
 	psmouse->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_REL);
 	psmouse->dev.keybit[LONG(BTN_MOUSE)] = BIT(BTN_LEFT) | BIT(BTN_MIDDLE) | BIT(BTN_RIGHT);

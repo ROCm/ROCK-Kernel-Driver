@@ -58,6 +58,9 @@ struct psmouse {
 	char phys[32];
 	unsigned long flags;
 
+	/* Used to signal completion from interrupt handler */
+	wait_queue_head_t wait;
+
 	psmouse_ret_t (*protocol_handler)(struct psmouse *psmouse, struct pt_regs *regs);
 	int (*reconnect)(struct psmouse *psmouse);
 	void (*disconnect)(struct psmouse *psmouse);
