@@ -196,6 +196,7 @@ static struct file_system_type bd_type = {
 };
 
 static struct vfsmount *bd_mnt;
+struct super_block *blockdev_superblock;
 
 /*
  * bdev cache handling - shamelessly stolen from inode.c
@@ -251,6 +252,7 @@ void __init bdev_cache_init(void)
 	err = PTR_ERR(bd_mnt);
 	if (IS_ERR(bd_mnt))
 		panic("Cannot create bdev pseudo-fs");
+	blockdev_superblock = bd_mnt->mnt_sb;	/* For writeback */
 }
 
 /*
@@ -567,13 +569,6 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 			}
 		}
 	}
-	if (bdev->bd_inode->i_data.backing_dev_info ==
-				&default_backing_dev_info) {
-		struct backing_dev_info *bdi = blk_get_backing_dev_info(bdev);
-		if (bdi == NULL)
-			bdi = &default_backing_dev_info;
-		inode->i_data.backing_dev_info = bdi;
-	}
 	if (bdev->bd_op->open) {
 		ret = bdev->bd_op->open(inode, file);
 		if (ret)
@@ -594,6 +589,16 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 			bdev->bd_queue =  p->queue(dev);
 		else
 			bdev->bd_queue = &p->request_queue;
+		if (bdev->bd_inode->i_data.backing_dev_info ==
+					&default_backing_dev_info) {
+			struct backing_dev_info *bdi;
+
+			bdi = blk_get_backing_dev_info(bdev);
+			if (bdi == NULL)
+				bdi = &default_backing_dev_info;
+			inode->i_data.backing_dev_info = bdi;
+			bdev->bd_inode->i_data.backing_dev_info = bdi;
+		}
 	}
 	bdev->bd_openers++;
 	unlock_kernel();
