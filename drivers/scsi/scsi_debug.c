@@ -11,7 +11,7 @@
  *  (or disk like devices) sharing a common amount of RAM
  *
  *
- *  For documentation see http://www.torque.net/sg/sdebug25.html
+ *  For documentation see http://www.torque.net/sg/sdebug26.html
  *
  *   D. Gilbert (dpg) work for Magneto-Optical device test [20010421]
  *   dpg: work for devfs large number of disks [20010809]
@@ -56,7 +56,7 @@
 #include "scsi_debug.h"
 
 #define SCSI_DEBUG_VERSION "1.75"
-static const char * scsi_debug_version_date = "20041023";
+static const char * scsi_debug_version_date = "20050113";
 
 /* Additional Sense Code (ASC) used */
 #define NO_ADDED_SENSE 0x0
@@ -1675,6 +1675,7 @@ static void do_create_driverfs_files(void)
 	driver_create_file(&sdebug_driverfs_driver, &driver_attr_add_host);
 	driver_create_file(&sdebug_driverfs_driver, &driver_attr_delay);
 	driver_create_file(&sdebug_driverfs_driver, &driver_attr_dev_size_mb);
+	driver_create_file(&sdebug_driverfs_driver, &driver_attr_dsense);
 	driver_create_file(&sdebug_driverfs_driver, &driver_attr_every_nth);
 	driver_create_file(&sdebug_driverfs_driver, &driver_attr_max_luns);
 	driver_create_file(&sdebug_driverfs_driver, &driver_attr_num_tgts);
@@ -1693,6 +1694,7 @@ static void do_remove_driverfs_files(void)
 	driver_remove_file(&sdebug_driverfs_driver, &driver_attr_num_tgts);
 	driver_remove_file(&sdebug_driverfs_driver, &driver_attr_max_luns);
 	driver_remove_file(&sdebug_driverfs_driver, &driver_attr_every_nth);
+	driver_remove_file(&sdebug_driverfs_driver, &driver_attr_dsense);
 	driver_remove_file(&sdebug_driverfs_driver, &driver_attr_dev_size_mb);
 	driver_remove_file(&sdebug_driverfs_driver, &driver_attr_delay);
 	driver_remove_file(&sdebug_driverfs_driver, &driver_attr_add_host);

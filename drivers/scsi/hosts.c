@@ -28,6 +28,7 @@
 #include <linux/mm.h>
 #include <linux/init.h>
 #include <linux/completion.h>
+#include <linux/transport_class.h>
 
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_host.h>
@@ -79,15 +80,8 @@ void scsi_remove_host(struct Scsi_Host *shost)
 
 	set_bit(SHOST_DEL, &shost->shost_state);
 
-	if (shost->transportt->host_destroy)
-		shost->transportt->host_destroy(shost);
+	transport_unregister_device(&shost->shost_gendev);
 	class_device_unregister(&shost->shost_classdev);
-	if (shost->transport_classdev.class) {
-		if (shost->transportt->host_statistics)
-			sysfs_remove_group(&shost->transport_classdev.kobj,
-				shost->transportt->host_statistics);
- 		class_device_unregister(&shost->transport_classdev);
-	}
 	device_del(&shost->shost_gendev);
 }
 EXPORT_SYMBOL(scsi_remove_host);
@@ -135,9 +129,6 @@ int scsi_add_host(struct Scsi_Host *shost, struct device *dev)
 					 GFP_KERNEL)) == NULL)
 		goto out_del_classdev;
 
-	if (shost->transportt->host_setup)
-		shost->transportt->host_setup(shost);
-
 	error = scsi_sysfs_add_host(shost);
 	if (error)
 		goto out_destroy_host;
@@ -146,8 +137,6 @@ int scsi_add_host(struct Scsi_Host *shost, struct device *dev)
 	return error;
 
  out_destroy_host:
-	if (shost->transportt->host_destroy)
-		shost->transportt->host_destroy(shost);
  out_del_classdev:
 	class_device_del(&shost->shost_classdev);
  out_del_gendev:
@@ -397,3 +386,9 @@ void scsi_exit_hosts(void)
 {
 	class_unregister(&shost_class);
 }
+
+int scsi_is_host_device(const struct device *dev)
+{
+	return dev->release == scsi_host_dev_release;
+}
+EXPORT_SYMBOL(scsi_is_host_device);

@@ -1029,6 +1029,114 @@ static int aac_write(struct scsi_cmnd * scsicmd, int cid)
 	return 0;
 }
 
+static void synchronize_callback(void *context, struct fib *fibptr)
+{
+	struct aac_synchronize_reply *synchronizereply;
+	struct scsi_cmnd *cmd;
+
+	cmd = context;
+
+	dprintk((KERN_DEBUG "synchronize_callback[cpu %d]: t = %ld.\n", 
+				smp_processor_id(), jiffies));
+	BUG_ON(fibptr == NULL);
+
+
+	synchronizereply = fib_data(fibptr);
+	if (le32_to_cpu(synchronizereply->status) == CT_OK)
+		cmd->result = DID_OK << 16 | 
+			COMMAND_COMPLETE << 8 | SAM_STAT_GOOD;
+	else {
+		struct scsi_device *sdev = cmd->device;
+		struct aac_dev *dev = (struct aav_dev *)sdev->host->hostdata;
+		u32 cid = ID_LUN_TO_CONTAINER(sdev->id, sdev->lun);
+		printk(KERN_WARNING 
+		     "synchronize_callback: synchronize failed, status = %d\n",
+		     synchronizereply->status);
+		cmd->result = DID_OK << 16 | 
+			COMMAND_COMPLETE << 8 | SAM_STAT_CHECK_CONDITION;
+		set_sense((u8 *)&dev->fsa_dev[cid].sense_data,
+				    HARDWARE_ERROR,
+				    SENCODE_INTERNAL_TARGET_FAILURE,
+				    ASENCODE_INTERNAL_TARGET_FAILURE, 0, 0,
+				    0, 0);
+		memcpy(cmd->sense_buffer, &dev->fsa_dev[cid].sense_data,
+		  min(sizeof(dev->fsa_dev[cid].sense_data), 
+			  sizeof(cmd->sense_buffer)));
+	}
+
+	fib_complete(fibptr);
+	fib_free(fibptr);
+	aac_io_done(cmd);
+}
+
+static int aac_synchronize(struct scsi_cmnd *scsicmd, int cid)
+{
+	int status;
+	struct fib *cmd_fibcontext;
+	struct aac_synchronize *synchronizecmd;
+	struct scsi_cmnd *cmd;
+	struct scsi_device *sdev = scsicmd->device;
+	int active = 0;
+	unsigned long flags;
+
+	/*
+	 * Wait for all commands to complete to this specific
+	 * target (block).
+	 */
+	spin_lock_irqsave(&sdev->list_lock, flags);
+	list_for_each_entry(cmd, &sdev->cmd_list, list)
+		if (cmd != scsicmd && cmd->serial_number != 0) {
+			++active;
+			break;
+		}
+
+	spin_unlock_irqrestore(&sdev->list_lock, flags);
+
+	/*
+	 *	Yield the processor (requeue for later)
+	 */
+	if (active)
+		return SCSI_MLQUEUE_DEVICE_BUSY;
+
+	/*
+	 *	Alocate and initialize a Fib
+	 */
+	if (!(cmd_fibcontext = 
+	    fib_alloc((struct aac_dev *)scsicmd->device->host->hostdata))) 
+		return SCSI_MLQUEUE_HOST_BUSY;
+
+	fib_init(cmd_fibcontext);
+
+	synchronizecmd = fib_data(cmd_fibcontext);
+	synchronizecmd->command = cpu_to_le32(VM_ContainerConfig);
+	synchronizecmd->type = cpu_to_le32(CT_FLUSH_CACHE);
+	synchronizecmd->cid = cpu_to_le32(cid);
+	synchronizecmd->count = 
+	     cpu_to_le32(sizeof(((struct aac_synchronize_reply *)NULL)->data));
+
+	/*
+	 *	Now send the Fib to the adapter
+	 */
+	status = fib_send(ContainerCommand,
+		  cmd_fibcontext,
+		  sizeof(struct aac_synchronize),
+		  FsaNormal,
+		  0, 1,
+		  (fib_callback)synchronize_callback,
+		  (void *)scsicmd);
+
+	/*
+	 *	Check that the command queued to the controller
+	 */
+	if (status == -EINPROGRESS)
+		return 0;
+
+	printk(KERN_WARNING 
+		"aac_synchronize: fib_send failed with status: %d.\n", status);
+	fib_complete(cmd_fibcontext);
+	fib_free(cmd_fibcontext);
+	return SCSI_MLQUEUE_HOST_BUSY;
+}
 
 /**
  *	aac_scsi_cmd()		-	Process SCSI command
@@ -1274,6 +1382,11 @@ int aac_scsi_cmd(struct scsi_cmnd * scsicmd)
 			ret = aac_write(scsicmd, cid);
 			spin_lock_irq(host->host_lock);
 			return ret;
+
+		case SYNCHRONIZE_CACHE:
+			/* Issue FIB to tell Firmware to flush it's cache */
+			return aac_synchronize(scsicmd, cid);
+			
 		default:
 			/*
 			 *	Unhandled commands

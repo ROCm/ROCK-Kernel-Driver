@@ -170,14 +170,12 @@ void scsi_device_dev_release(struct device *dev)
 
 	if (delete) {
 		struct scsi_target *starget = to_scsi_target(parent);
-		struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);
 		if (!starget->create) {
-			if (shost->transportt->target_destroy)
-				shost->transportt->target_destroy(starget);
+			transport_remove_device(&starget->dev);
 			device_del(parent);
-			if (starget->transport_classdev.class)
-				class_device_unregister(&starget->transport_classdev);
 		}
+		transport_destroy_device(&starget->dev);
+
 		put_device(parent);
 	}
 	if (sdev->request_queue)
@@ -553,7 +551,6 @@ static void scsi_target_dev_release(struct device *dev)
  **/
 int scsi_sysfs_add_sdev(struct scsi_device *sdev)
 {
-	struct class_device_attribute **attrs;
 	struct scsi_target *starget = sdev->sdev_target;
 	struct Scsi_Host *shost = sdev->host;
 	int error, i, create;
@@ -570,31 +567,7 @@ int scsi_sysfs_add_sdev(struct scsi_device *sdev)
 			printk(KERN_ERR "Target device_add failed\n");
 			return error;
 		}
-		if (starget->transport_classdev.class) {
-			int i;
-			struct class_device_attribute **attrs =
-				sdev->host->transportt->target_attrs;
-
-			error = class_device_add(&starget->transport_classdev);
-			if (error) {
-				dev_printk(KERN_ERR, &starget->dev,
-					   "Target transport add failed\n");
-				return error;
-			}
-
-			/* take a reference for the transport_classdev; this
-			 * is released by the transport_class .release */
-			get_device(&starget->dev);
-			for (i = 0; attrs[i]; i++) {
-				error = class_device_create_file(&starget->transport_classdev,
-								 attrs[i]);
-				if (error) {
-					dev_printk(KERN_ERR, &starget->dev,
-						   "Target transport attr add failed\n");
-					return error;
-				}
-			}
-		}
+		transport_add_device(&starget->dev);
 	}
 
 	if ((error = scsi_device_set_state(sdev, SDEV_RUNNING)) != 0)
@@ -606,25 +579,15 @@ int scsi_sysfs_add_sdev(struct scsi_device *sdev)
 		printk(KERN_INFO "error 1\n");
 		return error;
 	}
-
 	error = class_device_add(&sdev->sdev_classdev);
 	if (error) {
 		printk(KERN_INFO "error 2\n");
 		goto clean_device;
 	}
+
 	/* take a reference for the sdev_classdev; this is
 	 * released by the sdev_class .release */
 	get_device(&sdev->sdev_gendev);
-	if (sdev->transport_classdev.class) {
-		error = class_device_add(&sdev->transport_classdev);
-		if (error)
-			goto clean_device2;
-		/* take a reference for the transport_classdev; this
-		 * is released by the transport_class .release */
-		get_device(&sdev->sdev_gendev);
-		
-	}
-
 	if (sdev->host->hostt->sdev_attrs) {
 		for (i = 0; sdev->host->hostt->sdev_attrs[i]; i++) {
 			error = attr_add(&sdev->sdev_gendev,
@@ -650,27 +613,16 @@ int scsi_sysfs_add_sdev(struct scsi_device *sdev)
 		}
 	}
 
- 	if (sdev->transport_classdev.class) {
- 		attrs = sdev->host->transportt->device_attrs;
- 		for (i = 0; attrs[i]; i++) {
- 			error = class_device_create_file(&sdev->transport_classdev,
- 							 attrs[i]);
- 			if (error) {
- 				scsi_remove_device(sdev);
-				goto out;
-			}
- 		}
- 	}
-
+	transport_add_device(&sdev->sdev_gendev);
  out:
 	return error;
 
- clean_device2:
 	class_device_del(&sdev->sdev_classdev);
  clean_device:
 	scsi_device_set_state(sdev, SDEV_CANCEL);
 
 	device_del(&sdev->sdev_gendev);
+	transport_destroy_device(&sdev->sdev_gendev);
 	put_device(&sdev->sdev_gendev);
 
 	return error;
@@ -689,14 +641,11 @@ void scsi_remove_device(struct scsi_device *sdev)
 		goto out;
 
 	class_device_unregister(&sdev->sdev_classdev);
-	if (sdev->transport_classdev.class)
-		class_device_unregister(&sdev->transport_classdev);
 	device_del(&sdev->sdev_gendev);
 	scsi_device_set_state(sdev, SDEV_DEL);
 	if (sdev->host->hostt->slave_destroy)
 		sdev->host->hostt->slave_destroy(sdev);
-	if (sdev->host->transportt->device_destroy)
-		sdev->host->transportt->device_destroy(sdev);
+	transport_unregister_device(&sdev->sdev_gendev);
 	put_device(&sdev->sdev_gendev);
 
 out:
@@ -786,41 +735,11 @@ int scsi_sysfs_add_host(struct Scsi_Host *shost)
 		}
 	}
 
-	class_device_initialize(&shost->transport_classdev);
-	shost->transport_classdev.class = shost->transportt->host_class;
-	shost->transport_classdev.dev = &shost->shost_gendev;
-	snprintf(shost->transport_classdev.class_id, BUS_ID_SIZE,
-		 "host%d", shost->host_no);
-
-	if (shost->transport_classdev.class) {
-		struct class_device_attribute **attrs =
-			shost->transportt->host_attrs;
-		error = class_device_add(&shost->transport_classdev);
-		if (error)
-			return error;
-		/* take a reference for the transport_classdev; this
-		 * is released by the transport_class .release */
-		get_device(&shost->shost_gendev);
-		for (i = 0; attrs[i]; i++) {
- 			error = class_device_create_file(&shost->transport_classdev,
- 							 attrs[i]);
- 			if (error)
-				return error;
- 		}
-
-		if (shost->transportt->host_statistics) {
-			error = sysfs_create_group(
-					&shost->transport_classdev.kobj,
-					shost->transportt->host_statistics);
-			if (error)
-				return error;
-		}
- 	}
-
+	transport_register_device(&shost->shost_gendev);
 	return 0;
 }
 
-int scsi_sysfs_device_initialize(struct scsi_device *sdev)
+void scsi_sysfs_device_initialize(struct scsi_device *sdev)
 {
 	device_initialize(&sdev->sdev_gendev);
 	sdev->sdev_gendev.bus = &scsi_bus_type;
@@ -836,14 +755,14 @@ int scsi_sysfs_device_initialize(struct scsi_device *sdev)
 		 "%d:%d:%d:%d", sdev->host->host_no,
 		 sdev->channel, sdev->id, sdev->lun);
 
-	class_device_initialize(&sdev->transport_classdev);
-	sdev->transport_classdev.dev = &sdev->sdev_gendev;
-	sdev->transport_classdev.class = sdev->host->transportt->device_class;
-	snprintf(sdev->transport_classdev.class_id, BUS_ID_SIZE,
-		 "%d:%d:%d:%d", sdev->host->host_no,
-		 sdev->channel, sdev->id, sdev->lun);
-	return 0;
+	transport_setup_device(&sdev->sdev_gendev);
 }
+
+int scsi_is_sdev_device(const struct device *dev)
+{
+	return dev->release == scsi_device_dev_release;
+}
+EXPORT_SYMBOL(scsi_is_sdev_device);
 
 int scsi_sysfs_target_initialize(struct scsi_device *sdev)
 {
@@ -886,12 +805,6 @@ int scsi_sysfs_target_initialize(struct scsi_device *sdev)
 		dev->release = scsi_target_dev_release;
 		sprintf(dev->bus_id, "target%d:%d:%d",
 			shost->host_no, sdev->channel, sdev->id);
-		class_device_initialize(&starget->transport_classdev);
-		starget->transport_classdev.dev = &starget->dev;
-		starget->transport_classdev.class = shost->transportt->target_class;
-		snprintf(starget->transport_classdev.class_id, BUS_ID_SIZE,
-			 "target%d:%d:%d",
-			 shost->host_no, sdev->channel, sdev->id);
 		starget->id = sdev->id;
 		starget->channel = sdev->channel;
 		create = starget->create = 1;
@@ -907,10 +820,16 @@ int scsi_sysfs_target_initialize(struct scsi_device *sdev)
 	sdev->sdev_target = starget;
 	list_add_tail(&sdev->siblings, &shost->__devices);
 	spin_unlock_irqrestore(shost->host_lock, flags);
-	if (create && shost->transportt->target_setup)
-		shost->transportt->target_setup(starget);
+	if (create)
+		transport_setup_device(&starget->dev);
 	return 0;
 }
+
+int scsi_is_target_device(const struct device *dev)
+{
+	return dev->release == scsi_target_dev_release;
+}
+EXPORT_SYMBOL(scsi_is_target_device);
 
 /* A blank transport template that is used in drivers that don't
  * yet implement Transport Attributes */

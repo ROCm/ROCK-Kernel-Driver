@@ -71,7 +71,18 @@ struct scsi_host_template {
 	 * Status: OPTIONAL
 	 */
 	int (* ioctl)(struct scsi_device *dev, int cmd, void __user *arg);
-	
+
+
+#ifdef CONFIG_COMPAT
+	/* 
+	 * Compat handler. Handle 32bit ABI.
+	 * When unknown ioctl is passed return -ENOIOCTLCMD.
+	 *
+	 * Status: OPTIONAL
+	 */
+	int (* compat_ioctl)(struct scsi_device *dev, int cmd, void __user *arg);
+#endif
+
 	/*
 	 * The queuecommand function is used to queue up a scsi
 	 * command block to the LLDD.  When the driver finished
@@ -528,7 +539,6 @@ struct Scsi_Host {
 	 * separately
 	 */
 	void *shost_data;
-	struct class_device transport_classdev;
 
 	/*
 	 * We should ensure that this is aligned, both for better performance
@@ -542,8 +552,6 @@ struct Scsi_Host {
 	container_of(d, struct Scsi_Host, shost_gendev)
 #define		class_to_shost(d)	\
 	container_of(d, struct Scsi_Host, shost_classdev)
-#define		transport_class_to_shost(class_dev) \
-	container_of(class_dev, struct Scsi_Host, transport_classdev)
 
 
 extern struct Scsi_Host *scsi_host_alloc(struct scsi_host_template *, int);
@@ -578,6 +586,7 @@ static inline struct device *scsi_get_device(struct Scsi_Host *shost)
 extern void scsi_unblock_requests(struct Scsi_Host *);
 extern void scsi_block_requests(struct Scsi_Host *);
 
+struct class_container;
 /*
  * These two functions are used to allocate and free a pseudo device
  * which will connect to the host adapter itself rather than any
@@ -587,6 +596,8 @@ extern void scsi_block_requests(struct Scsi_Host *);
  */
 extern void scsi_free_host_dev(struct scsi_device *);
 extern struct scsi_device *scsi_get_host_dev(struct Scsi_Host *);
+int scsi_is_host_device(const struct device *);
+
 
 /* legacy interfaces */
 extern struct Scsi_Host *scsi_register(struct scsi_host_template *, int);

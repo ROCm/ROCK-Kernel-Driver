@@ -44,6 +44,12 @@ static inline int scsi_sense_is_deferred(struct scsi_sense_hdr *sshdr)
 {
 	return ((sshdr->response_code >= 0x70) && (sshdr->response_code & 1));
 }
+
+extern const u8 * scsi_sense_desc_find(const u8 * sense_buffer, int sb_len,
+				       int desc_type);
+
+extern int scsi_get_sense_info_fld(const u8 * sense_buffer, int sb_len,
+				   u64 * info_out);
  
 /*
  * Reset request from external source
