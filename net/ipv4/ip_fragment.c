@@ -19,6 +19,7 @@
  *		Bill Hawes	:	Frag accounting and evictor fixes.
  *		John McDonald	:	0 length frag bug.
  *		Alexey Kuznetsov:	SMP races, threading, cleanup.
+ *		Patrick McHardy :	LRU queue of frag heads for evictor.
  */
 
 #include <linux/config.h>
@@ -26,6 +27,7 @@
 #include <linux/mm.h>
 #include <linux/jiffies.h>
 #include <linux/skbuff.h>
+#include <linux/list.h>
 #include <linux/ip.h>
 #include <linux/icmp.h>
 #include <linux/netdevice.h>
@@ -67,6 +69,7 @@ struct ipfrag_skb_cb
 /* Describe an entry in the "incomplete datagrams" queue. */
 struct ipq {
 	struct ipq	*next;		/* linked list pointers			*/
+	struct list_head lru_list;	/* lru list member 			*/
 	u32		saddr;
 	u32		daddr;
 	u16		id;
@@ -94,6 +97,7 @@ struct ipq {
 /* Per-bucket lock is easy to add now. */
 static struct ipq *ipq_hash[IPQ_HASHSZ];
 static rwlock_t ipfrag_lock = RW_LOCK_UNLOCKED;
+static LIST_HEAD(ipq_lru_list);
 int ip_frag_nqueues = 0;
 
 static __inline__ void __ipq_unlink(struct ipq *qp)
@@ -101,6 +105,7 @@ static __inline__ void __ipq_unlink(struct ipq *qp)
 	if(qp->next)
 		qp->next->pprev = qp->pprev;
 	*qp->pprev = qp->next;
+	list_del(&qp->lru_list);
 	ip_frag_nqueues--;
 }
 
@@ -202,39 +207,30 @@ static void ipq_kill(struct ipq *ipq)
  */
 static void ip_evictor(void)
 {
-	int i, progress;
+	struct ipq *qp;
+	struct list_head *tmp;
 
-	do {
+	for(;;) {
 		if (atomic_read(&ip_frag_mem) <= sysctl_ipfrag_low_thresh)
 			return;
-		progress = 0;
-		/* FIXME: Make LRU queue of frag heads. -DaveM */
-		for (i = 0; i < IPQ_HASHSZ; i++) {
-			struct ipq *qp;
-			if (ipq_hash[i] == NULL)
-				continue;
-
-			read_lock(&ipfrag_lock);
-			if ((qp = ipq_hash[i]) != NULL) {
-				/* find the oldest queue for this hash bucket */
-				while (qp->next)
-					qp = qp->next;
-				atomic_inc(&qp->refcnt);
-				read_unlock(&ipfrag_lock);
-
-				spin_lock(&qp->lock);
-				if (!(qp->last_in&COMPLETE))
-					ipq_kill(qp);
-				spin_unlock(&qp->lock);
-
-				ipq_put(qp);
-				IP_INC_STATS_BH(IpReasmFails);
-				progress = 1;
-				continue;
-			}
+		read_lock(&ipfrag_lock);
+		if (list_empty(&ipq_lru_list)) {
 			read_unlock(&ipfrag_lock);
+			return;
 		}
-	} while (progress);
+		tmp = ipq_lru_list.next;
+		qp = list_entry(tmp, struct ipq, lru_list);
+		atomic_inc(&qp->refcnt);
+		read_unlock(&ipfrag_lock);
+
+		spin_lock(&qp->lock);
+		if (!(qp->last_in&COMPLETE))
+			ipq_kill(qp);
+		spin_unlock(&qp->lock);
+
+		ipq_put(qp);
+		IP_INC_STATS_BH(IpReasmFails);
+	}
 }
 
 /*
@@ -302,6 +298,8 @@ static struct ipq *ip_frag_intern(unsigned int hash, struct ipq *qp_in)
 		qp->next->pprev = &qp->next;
 	ipq_hash[hash] = qp;
 	qp->pprev = &ipq_hash[hash];
+	INIT_LIST_HEAD(&qp->lru_list);
+	list_add_tail(&qp->lru_list, &ipq_lru_list);
 	ip_frag_nqueues++;
 	write_unlock(&ipfrag_lock);
 	return qp;
@@ -495,6 +493,10 @@ static void ip_frag_queue(struct ipq *qp, struct sk_buff *skb)
 	atomic_add(skb->truesize, &ip_frag_mem);
 	if (offset == 0)
 		qp->last_in |= FIRST_IN;
+
+	write_lock(&ipfrag_lock);
+	list_move_tail(&qp->lru_list, &ipq_lru_list);
+	write_unlock(&ipfrag_lock);
 
 	return;
 
