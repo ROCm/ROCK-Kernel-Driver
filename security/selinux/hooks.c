@@ -4216,4 +4216,57 @@ out:
 
 __initcall(selinux_nf_ip_init);
 
+#ifdef CONFIG_SECURITY_SELINUX_DISABLE
+static void selinux_nf_ip_exit(void)
+{
+	printk(KERN_INFO "SELinux:  Unregistering netfilter hooks\n");
+
+	nf_unregister_hook(&selinux_ipv4_op);
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+	nf_unregister_hook(&selinux_ipv6_op);
+#endif	/* IPV6 */
+}
+#endif
+
+#else /* CONFIG_SECURITY_NETWORK && CONFIG_NETFILTER */
+
+#ifdef CONFIG_SECURITY_SELINUX_DISABLE
+#define selinux_nf_ip_exit()
+#endif
+
 #endif /* CONFIG_SECURITY_NETWORK && CONFIG_NETFILTER */
+
+#ifdef CONFIG_SECURITY_SELINUX_DISABLE
+int selinux_disable(void)
+{
+	extern void exit_sel_fs(void);
+	static int selinux_disabled = 0;
+
+	if (ss_initialized) {
+		/* Not permitted after initial policy load. */
+		return -EINVAL;
+	}
+
+	if (selinux_disabled) {
+		/* Only do this once. */
+		return -EINVAL;
+	}
+
+	printk(KERN_INFO "SELinux:  Disabled at runtime.\n");
+
+	selinux_disabled = 1;
+
+	/* Reset security_ops to the secondary module, dummy or capability. */
+	security_ops = secondary_ops;
+
+	/* Unregister netfilter hooks. */
+	selinux_nf_ip_exit();
+
+	/* Unregister selinuxfs. */
+	exit_sel_fs();
+
+	return 0;
+}
+#endif
+
+
