@@ -240,6 +240,10 @@ static struct rt6_info *rt6_best_dflt(struct rt6_info *rt, int oif)
 		struct neighbour *neigh;
 		int m = 0;
 
+		/* Skip expired routers */
+		if ((sprt->rt6i_flags & RTF_EXPIRES) && time_after(jiffies, sprt->rt6i_expires))
+			continue;
+
 		if (!oif ||
 		    (sprt->rt6i_dev &&
 		     sprt->rt6i_dev->ifindex == oif))

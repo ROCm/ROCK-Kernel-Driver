@@ -945,8 +945,11 @@ static void ndisc_recv_na(struct sk_buff *skb)
 			 */
 			struct rt6_info *rt;
 			rt = rt6_get_dflt_router(saddr, dev);
-			if (rt)
+			if (rt) {
+				/* Mark as expired (may be in use elsewhere) */
+				rt->rt6i_expires = jiffies - 1;
 				ip6_del_rt(rt, NULL, NULL);
+			}
 		}
 
 out:
@@ -1119,7 +1122,7 @@ static void ndisc_router_discovery(struct sk_buff *skb)
 	}
 
 	if (rt)
-		rt->rt6i_expires = jiffies + (HZ * lifetime);
+		fib6_update_expiry(rt, lifetime);
 
 	if (ra_msg->icmph.icmp6_hop_limit)
 		in6_dev->cnf.hop_limit = ra_msg->icmph.icmp6_hop_limit;
