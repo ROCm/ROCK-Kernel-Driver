@@ -566,7 +566,7 @@ static int handle_minor_send(struct capiminor *mp)
 #endif /* CONFIG_ISDN_CAPI_MIDDLEWARE */
 /* -------- function called by lower level -------------------------- */
 
-static void capi_signal(struct capi20_appl *ap)
+static void capi_recv_message(struct capi20_appl *ap, struct sk_buff *skb)
 {
 	struct capidev *cdev = ap->private;
 #ifdef CONFIG_ISDN_CAPI_MIDDLEWARE
@@ -574,14 +574,7 @@ static void capi_signal(struct capi20_appl *ap)
 	u16 datahandle;
 #endif /* CONFIG_ISDN_CAPI_MIDDLEWARE */
 	struct capincci *np;
-	struct sk_buff *skb = 0;
 	u32 ncci;
-
-	capi20_get_message(&cdev->ap, &skb);
-	if (!skb) {
-		printk(KERN_ERR "BUG: capi_signal: no skb\n");
-		return;
-	}
 
 	if (CAPIMSG_COMMAND(skb->data) == CAPI_CONNECT_B3_CONF) {
 		u16 info = CAPIMSG_U16(skb->data, 12); // Info field
@@ -795,12 +788,12 @@ capi_ioctl(struct inode *inode, struct file *file,
 				return -EFAULT;
 			
 			cdev->ap.private = cdev;
+			cdev->ap.recv_message = capi_recv_message;
 			cdev->errcode = capi20_register(ap);
 			if (cdev->errcode) {
 				ap->applid = 0;
 				return -EIO;
 			}
-			capi20_set_signal(ap, capi_signal);
 		}
 		return (int)ap->applid;
 

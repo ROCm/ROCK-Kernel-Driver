@@ -1372,36 +1372,32 @@ static void handle_data(_cmsg * cmsg, struct sk_buff *skb)
 
 static _cmsg s_cmsg;
 
-static void capidrv_signal(struct capi20_appl *ap)
+static void capidrv_recv_message(struct capi20_appl *ap, struct sk_buff *skb)
 {
-	struct sk_buff *skb = 0;
-
-	while (capi20_get_message(ap, &skb) == CAPI_NOERROR) {
-		capi_message2cmsg(&s_cmsg, skb->data);
-		if (debugmode > 2)
-			printk(KERN_DEBUG "capidrv_signal: applid=%d %s\n",
-			       ap->applid, capi_cmsg2str(&s_cmsg));
-
-		if (s_cmsg.Command == CAPI_DATA_B3
-		    && s_cmsg.Subcommand == CAPI_IND) {
-			handle_data(&s_cmsg, skb);
-			global.nrecvdatapkt++;
-			continue;
-		}
-		if ((s_cmsg.adr.adrController & 0xffffff00) == 0)
-			handle_controller(&s_cmsg);
-		else if ((s_cmsg.adr.adrPLCI & 0xffff0000) == 0)
-			handle_plci(&s_cmsg);
-		else
-			handle_ncci(&s_cmsg);
-		/*
-		 * data of skb used in s_cmsg,
-		 * free data when s_cmsg is not used again
-		 * thanks to Lars Heete <hel@admin.de>
-		 */
-		kfree_skb(skb);
-		global.nrecvctlpkt++;
+	capi_message2cmsg(&s_cmsg, skb->data);
+	if (debugmode > 2)
+		printk(KERN_DEBUG "capidrv_signal: applid=%d %s\n",
+		       ap->applid, capi_cmsg2str(&s_cmsg));
+	
+	if (s_cmsg.Command == CAPI_DATA_B3
+	    && s_cmsg.Subcommand == CAPI_IND) {
+		handle_data(&s_cmsg, skb);
+		global.nrecvdatapkt++;
+		return;
 	}
+	if ((s_cmsg.adr.adrController & 0xffffff00) == 0)
+		handle_controller(&s_cmsg);
+	else if ((s_cmsg.adr.adrPLCI & 0xffff0000) == 0)
+		handle_plci(&s_cmsg);
+	else
+		handle_ncci(&s_cmsg);
+	/*
+	 * data of skb used in s_cmsg,
+	 * free data when s_cmsg is not used again
+	 * thanks to Lars Heete <hel@admin.de>
+	 */
+	kfree_skb(skb);
+	global.nrecvctlpkt++;
 }
 
 /* ------------------------------------------------------------------- */
@@ -2313,6 +2309,7 @@ static int __init capidrv_init(void)
 	global.ap.rparam.datablkcnt = 16;
 	global.ap.rparam.datablklen = 2048;
 
+	global.ap.recv_message = capidrv_recv_message;
 	errcode = capi20_register(&global.ap);
 	if (errcode) {
 		MOD_DEC_USE_COUNT;
@@ -2327,8 +2324,6 @@ static int __init capidrv_init(void)
 		MOD_DEC_USE_COUNT;
 		return -EIO;
 	}
-
-	capi20_set_signal(&global.ap, capidrv_signal);
 
 	ncontr = profile.ncontroller;
 	for (contr = 1; contr <= ncontr; contr++) {

@@ -186,13 +186,11 @@ static int proc_applications_read_proc(char *page, char **start, off_t off,
 	for (i=1; i <= CAPI_MAXAPPL; i++) {
 		ap = get_capi_appl_by_nr(i);
 		if (!ap) continue;
-		len += sprintf(page+len, "%u %d %d %d %d %d\n",
-			ap->applid,
-			ap->rparam.level3cnt,
-			ap->rparam.datablkcnt,
-			ap->rparam.datablklen,
-			ap->nncci,
-                        skb_queue_len(&ap->recv_queue));
+		len += sprintf(page+len, "%u %d %d %d\n",
+			       ap->applid,
+			       ap->rparam.level3cnt,
+			       ap->rparam.datablkcnt,
+			       ap->rparam.datablklen);
 		if (len <= off) {
 			off -= len;
 			len = 0;
@@ -566,20 +564,14 @@ static void recv_handler(void *dummy)
 			kfree_skb(skb);
 			continue;
 		}
-		if (ap->signal == 0) {
-			printk(KERN_ERR "kcapi: recv_handler: applid %d has no signal function\n",
-			       ap->applid);
-			kfree_skb(skb);
-			continue;
-		}
+
 		if (   CAPIMSG_COMMAND(skb->data) == CAPI_DATA_B3
 		    && CAPIMSG_SUBCOMMAND(skb->data) == CAPI_IND) {
 			ap->nrecvdatapkt++;
 		} else {
 			ap->nrecvctlpkt++;
 		}
-		skb_queue_tail(&ap->recv_queue, skb);
-		(ap->signal) (ap);
+		ap->recv_message(ap, skb);
 	}
 }
 
@@ -870,9 +862,6 @@ u16 capi20_register(struct capi20_appl *ap)
 	ap->applid = applid;
 	applications[applid - 1] = ap;
 
-	ap->signal = NULL;
-	skb_queue_head_init(&ap->recv_queue);
-	ap->nncci = 0;
 	ap->nrecvctlpkt = 0;
 	ap->nrecvdatapkt = 0;
 	ap->nsentctlpkt = 0;
@@ -897,7 +886,6 @@ u16 capi20_release(struct capi20_appl *ap)
 
 	DBG("applid %#x", ap->applid);
 
-	skb_queue_purge(&ap->recv_queue);
 	for (i = 0; i < CAPI_MAXCONTR; i++) {
 		if (!cards[i] || cards[i]->cardstate != CARD_RUNNING)
 			continue;
@@ -967,31 +955,6 @@ u16 capi20_put_message(struct capi20_appl *ap, struct sk_buff *skb)
 }
 
 EXPORT_SYMBOL(capi20_put_message);
-
-u16 capi20_get_message(struct capi20_appl *ap, struct sk_buff **msgp)
-{
-	struct sk_buff *skb;
-
-	if (ap->applid == 0)
-		return CAPI_ILLAPPNR;
-	if ((skb = skb_dequeue(&ap->recv_queue)) == 0)
-		return CAPI_RECEIVEQUEUEEMPTY;
-	*msgp = skb;
-	return CAPI_NOERROR;
-}
-
-EXPORT_SYMBOL(capi20_get_message);
-
-u16 capi20_set_signal(struct capi20_appl *ap,
-		      void (*signal) (struct capi20_appl *appl))
-{
-	if (ap->applid == 0)
-		return CAPI_ILLAPPNR;
-	ap->signal = signal;
-	return CAPI_NOERROR;
-}
-
-EXPORT_SYMBOL(capi20_set_signal);
 
 u16 capi20_get_manufacturer(u32 contr, u8 buf[CAPI_MANUFACTURER_LEN])
 {

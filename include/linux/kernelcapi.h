@@ -49,20 +49,16 @@ typedef struct kcapi_carddef {
 
 #include <linux/skbuff.h>
 
-#define	KCI_CONTRUP	0	/* struct capi_profile */
-#define	KCI_CONTRDOWN	1	/* NULL */
+#define	KCI_CONTRUP	0	/* arg: struct capi_profile */
+#define	KCI_CONTRDOWN	1	/* arg: NULL */
 
 struct capi20_appl {
 	u16 applid;
 	capi_register_params rparam;
+	void (*recv_message)(struct capi20_appl *ap, struct sk_buff *skb);
 	void *private;
 
 	/* internal to kernelcapi.o */
-	void (*signal) (struct capi20_appl *ap);
-	struct sk_buff_head recv_queue;
-	int nncci;
-	struct capi_ncci *nccilist;
-
 	unsigned long nrecvctlpkt;
 	unsigned long nrecvdatapkt;
 	unsigned long nsentctlpkt;
@@ -78,9 +74,6 @@ u16 capi20_isinstalled(void);
 u16 capi20_register(struct capi20_appl *ap);
 u16 capi20_release(struct capi20_appl *ap);
 u16 capi20_put_message(struct capi20_appl *ap, struct sk_buff *skb);
-u16 capi20_get_message(struct capi20_appl *ap, struct sk_buff **msgp);
-u16 capi20_set_signal(struct capi20_appl *ap,
-		      void (*signal) (struct capi20_appl *ap));
 u16 capi20_get_manufacturer(u32 contr, u8 buf[CAPI_MANUFACTURER_LEN]);
 u16 capi20_get_version(u32 contr, struct capi_version *verp);
 u16 capi20_get_serial(u32 contr, u8 serial[CAPI_SERIAL_LEN]);
