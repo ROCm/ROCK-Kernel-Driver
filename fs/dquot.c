@@ -1372,7 +1372,16 @@ static int vfs_quota_on_file(struct file *f, int type, int format_id)
 	 * into filesystem when allocating page for quota inode */
 	down_write(&dqopt->dqptr_sem);
 	inode->i_flags |= S_NOQUOTA | S_NOATIME;
-	clear_bit(ffs(__GFP_FS), &inode->i_mapping->flags);
+
+	/*
+	 * We write to quota files deep within filesystem code.  We don't want
+	 * the VFS to reenter filesystem code when it tries to allocate a
+	 * pagecache page for the quota file write.  So clear __GFP_FS in
+	 * the quota file's allocation flags.
+	 */
+	mapping_set_gfp_mask(inode->i_mapping,
+		mapping_gfp_mask(inode->i_mapping) & ~__GFP_FS);
+
 	for (cnt = 0; cnt < MAXQUOTAS; cnt++) {
 		to_drop[cnt] = inode->i_dquot[cnt];
 		inode->i_dquot[cnt] = NODQUOT;
