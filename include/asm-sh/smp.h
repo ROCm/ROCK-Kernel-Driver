@@ -24,7 +24,6 @@ extern cpumask_t cpu_online_map;
 extern cpumask_t cpu_possible_map;
 
 #define cpu_online(cpu)		cpu_isset(cpu, cpu_online_map)
-#define cpu_possible(cpu)	cpu_isset(cpu, cpu_possible_map)
 
 #define smp_processor_id()	(current_thread_info()->cpu)
 
