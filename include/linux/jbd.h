@@ -623,7 +623,6 @@ struct transaction_s
  *  a commit?
  * @j_commit_timer:  The timer used to wakeup the commit thread
  * @j_commit_timer_active: Timer flag
- * @j_all_journals:  Link all journals together - system-wide 
  * @j_revoke: The revoke table - maintains the list of revoked blocks in the
  *     current transaction.
  */
@@ -803,9 +802,6 @@ struct journal_s
 	/* The timer used to wakeup the commit thread: */
 	struct timer_list	*j_commit_timer;
 	int			j_commit_timer_active;	/* [j_state_lock] */
-
-	/* Link all journals together - system-wide [lock_kernel] */
-	struct list_head	j_all_journals;
 
 	/*
 	 * The revoke table: maintains the list of revoked blocks in the

@@ -84,11 +84,6 @@ EXPORT_SYMBOL(journal_force_commit);
 static int journal_convert_superblock_v1(journal_t *, journal_superblock_t *);
 
 /*
- * List of all journals in the system.  Protected by the BKL.
- */
-static LIST_HEAD(all_journals);
-
-/*
  * Helper function used to manage commit timeouts
  */
 
@@ -137,8 +132,6 @@ int kjournald(void *arg)
 
 	daemonize("kjournald");
 
-	lock_kernel();
-
 	/* Set up an interval timer which can be used to trigger a
            commit wakeup after the commit interval expires */
 	init_timer(&timer);
@@ -152,10 +145,6 @@ int kjournald(void *arg)
 
 	printk(KERN_INFO "kjournald starting.  Commit interval %ld seconds\n",
 			journal->j_commit_interval / HZ);
-
-	lock_kernel();
-	list_add(&journal->j_all_journals, &all_journals);
-	unlock_kernel();
 
 	/*
 	 * And now, wait forever for commit wakeup events.
@@ -234,14 +223,9 @@ loop:
 	}
 	spin_unlock(&journal->j_state_lock);
 
-	lock_kernel();
-	list_del(&journal->j_all_journals);
-	unlock_kernel();
-
 	journal->j_task = NULL;
 	wake_up(&journal->j_wait_done_commit);
 	jbd_debug(1, "Journal thread exiting.\n");
-	unlock_kernel();
 	return 0;
 }
 
@@ -514,7 +498,6 @@ int log_wait_commit(journal_t *journal, tid_t tid)
 {
 	int err = 0;
 
-	lock_kernel();
 #ifdef CONFIG_JBD_DEBUG
 	lock_journal(journal);
 	spin_lock(&journal->j_state_lock);
@@ -542,8 +525,6 @@ int log_wait_commit(journal_t *journal, tid_t tid)
 		printk(KERN_EMERG "journal commit I/O error\n");
 		err = -EIO;
 	}
-
-	unlock_kernel();
 	return err;
 }
 
@@ -918,14 +899,13 @@ void journal_update_superblock(journal_t *journal, int wait)
 	 * any future commit will have to be careful to update the
 	 * superblock again to re-record the true start of the log. */
 
-	lock_kernel();
+	spin_lock(&journal->j_state_lock);
 	if (sb->s_start)
 		journal->j_flags &= ~JFS_FLUSHED;
 	else
 		journal->j_flags |= JFS_FLUSHED;
-	unlock_kernel();
+	spin_unlock(&journal->j_state_lock);
 }
-
 
 /*
  * Read the superblock for a given journal, performing initial
@@ -1425,7 +1405,6 @@ void __journal_abort_soft (journal_t *journal, int errno)
 	if (journal->j_flags & JFS_ABORT)
 		return;
 
-	lock_kernel();
 	if (!journal->j_errno)
 		journal->j_errno = errno;
 
@@ -1433,7 +1412,6 @@ void __journal_abort_soft (journal_t *journal, int errno)
 
 	if (errno)
 		journal_update_superblock(journal, 1);
-	unlock_kernel();
 }
 
 /**
@@ -1500,17 +1478,17 @@ void journal_abort (journal_t *journal, int errno)
  * If the journal has been aborted on this mount time -EROFS will
  * be returned.
  */
-int journal_errno (journal_t *journal)
+int journal_errno(journal_t *journal)
 {
 	int err;
 
 	lock_journal(journal);
-	lock_kernel();
+	spin_lock(&journal->j_state_lock);
 	if (journal->j_flags & JFS_ABORT)
 		err = -EROFS;
 	else
 		err = journal->j_errno;
-	unlock_kernel();
+	spin_unlock(&journal->j_state_lock);
 	unlock_journal(journal);
 	return err;
 }
@@ -1523,17 +1501,17 @@ int journal_errno (journal_t *journal)
  * An error must be cleared or Acked to take a FS out of readonly
  * mode.
  */
-int journal_clear_err (journal_t *journal)
+int journal_clear_err(journal_t *journal)
 {
 	int err = 0;
 
 	lock_journal(journal);
-	lock_kernel();
+	spin_lock(&journal->j_state_lock);
 	if (journal->j_flags & JFS_ABORT)
 		err = -EROFS;
 	else
 		journal->j_errno = 0;
-	unlock_kernel();
+	spin_unlock(&journal->j_state_lock);
 	unlock_journal(journal);
 	return err;
 }
@@ -1545,13 +1523,13 @@ int journal_clear_err (journal_t *journal)
  * An error must be cleared or Acked to take a FS out of readonly
  * mode.
  */
-void journal_ack_err (journal_t *journal)
+void journal_ack_err(journal_t *journal)
 {
 	lock_journal(journal);
-	lock_kernel();
+	spin_lock(&journal->j_state_lock);
 	if (journal->j_errno)
 		journal->j_flags |= JFS_ACK_ERR;
-	unlock_kernel();
+	spin_unlock(&journal->j_state_lock);
 	unlock_journal(journal);
 }
 

@@ -70,8 +70,6 @@ void journal_commit_transaction(journal_t *journal)
 	spin_unlock(&journal->j_list_lock);
 #endif
 
-	lock_kernel();
-
 	J_ASSERT(journal->j_running_transaction != NULL);
 	J_ASSERT(journal->j_committing_transaction == NULL);
 
@@ -168,8 +166,6 @@ void journal_commit_transaction(journal_t *journal)
 	commit_transaction->t_log_start = journal->j_head;
 	wake_up(&journal->j_wait_transaction_locked);
 	spin_unlock(&journal->j_state_lock);
-
-	unlock_kernel();
 	
 	jbd_debug (3, "JBD: commit phase 2\n");
 

@@ -290,9 +290,7 @@ handle_t *journal_start(journal_t *journal, int nblocks)
 
 	current->journal_info = handle;
 
-	lock_kernel();
 	err = start_this_handle(journal, handle);
-	unlock_kernel();
 	if (err < 0) {
 		jbd_free_handle(handle);
 		current->journal_info = NULL;
@@ -407,7 +405,6 @@ int journal_restart(handle_t *handle, int nblocks)
 	J_ASSERT(transaction->t_updates > 0);
 	J_ASSERT(journal_current_handle() == handle);
 
-	lock_kernel();
 	spin_lock(&transaction->t_handle_lock);
 	transaction->t_outstanding_credits -= handle->h_buffer_credits;
 	transaction->t_updates--;
@@ -421,7 +418,6 @@ int journal_restart(handle_t *handle, int nblocks)
 
 	handle->h_buffer_credits = nblocks;
 	ret = start_this_handle(journal, handle);
-	unlock_kernel();
 	return ret;
 }
 
@@ -845,10 +841,8 @@ int journal_get_create_access(handle_t *handle, struct buffer_head *bh)
 	 * which hits an assertion error.
 	 */
 	JBUFFER_TRACE(jh, "cancelling revoke");
-	lock_kernel();
 	journal_cancel_revoke(handle, jh);
 	journal_put_journal_head(jh);
-	unlock_kernel();
 out:
 	unlock_journal(journal);
 	return err;
@@ -1385,7 +1379,6 @@ int journal_stop(handle_t *handle)
 	}
 
 	current->journal_info = NULL;
-	lock_kernel();
 	spin_lock(&transaction->t_handle_lock);
 	transaction->t_outstanding_credits -= handle->h_buffer_credits;
 	transaction->t_updates--;
@@ -1431,7 +1424,6 @@ int journal_stop(handle_t *handle)
 		spin_unlock(&transaction->t_handle_lock);
 	}
 
-	unlock_kernel();
 	jbd_free_handle(handle);
 	return err;
 }
@@ -1448,16 +1440,13 @@ int journal_force_commit(journal_t *journal)
 	handle_t *handle;
 	int ret;
 
-	lock_kernel();
 	handle = journal_start(journal, 1);
 	if (IS_ERR(handle)) {
 		ret = PTR_ERR(handle);
-		goto out;
+	} else {
+		handle->h_sync = 1;
+		ret = journal_stop(handle);
 	}
-	handle->h_sync = 1;
-	ret = journal_stop(handle);
-out:
-	unlock_kernel();
 	return ret;
 }
 
