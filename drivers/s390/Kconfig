@@ -101,6 +101,19 @@ config SCLP_CONSOLE
 	  Include support for using an IBM HWC line-mode terminal as the Linux
 	  system console.
 
+config SCLP_VT220_TTY
+	bool "Support for SCLP VT220-compatible terminal"
+	depends on SCLP
+	help
+	  Include support for an IBM SCLP VT220-compatible terminal.
+
+config SCLP_VT220_CONSOLE
+	bool "Support for console on SCLP VT220-compatible terminal"
+	depends on SCLP_VT220_TTY
+	help
+	  Include support for using an IBM SCLP VT220-compatible terminal as a
+	  Linux system console.
+
 config SCLP_CPI
 	tristate "Control-Program Identification"
 	depends on SCLP
