@@ -162,6 +162,29 @@ static struct card_ops ix1_ops = {
 	.irq_func = hscxisac_irq,
 };
 
+static int __init
+ix1_probe(struct IsdnCardState *cs, struct IsdnCard *card)
+{
+	cs->irq             = card->para[0];
+	cs->hw.ix1.isac_ale = card->para[1] + ISAC_COMMAND_OFFSET;
+	cs->hw.ix1.isac     = card->para[1] + ISAC_DATA_OFFSET;
+	cs->hw.ix1.hscx     = card->para[1] + HSCX_DATA_OFFSET;
+	cs->hw.ix1.cfg_reg  = card->para[1];
+	if (!request_io(&cs->rs, cs->hw.ix1.cfg_reg, 4, "ix1micro cfg"))
+		goto err;
+	
+	printk(KERN_INFO "HiSax: %s config irq:%d io:0x%X\n",
+	       CardType[cs->typ], cs->irq, cs->hw.ix1.cfg_reg);
+	ix1_reset(cs);
+	cs->card_ops = &ix1_ops;
+	if (hscxisac_setup(cs, &isac_ops, &hscx_ops))
+		goto err;
+	return 0;
+ err:
+	hisax_release_resources(cs);
+	return -EBUSY;
+}
+
 #ifdef __ISAPNP__
 static struct isapnp_device_id itk_ids[] __initdata = {
 	{ ISAPNP_VENDOR('I', 'T', 'K'), ISAPNP_FUNCTION(0x25),
@@ -181,14 +204,18 @@ static struct pnp_card *pnp_c __devinitdata = NULL;
 int __init
 setup_ix1micro(struct IsdnCard *card)
 {
-	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
 
 	strcpy(tmp, ix1_revision);
 	printk(KERN_INFO "HiSax: ITK IX1 driver Rev. %s\n", HiSax_getrev(tmp));
 
+	if (card->para[1]) {
+		if (ix1_probe(card->cs, card))
+			return 0;
+		return 1;
+	}
 #ifdef __ISAPNP__
-	if (!card->para[1] && isapnp_present()) {
+	if (isapnp_present()) {
 		struct pnp_card *pb;
 		struct pnp_dev *pd;
 
@@ -221,7 +248,9 @@ setup_ix1micro(struct IsdnCard *card)
 					}
 					card->para[1] = pnp_port_start(pd, 0);
 					card->para[0] = pnp_irq(pd, 0);
-					break;
+					if (ix1_probe(card->cs, card))
+						return 0;
+					return 1;
 				} else {
 					printk(KERN_ERR "ITK PnP: PnP error card found, no device\n");
 				}
@@ -231,27 +260,8 @@ setup_ix1micro(struct IsdnCard *card)
 		} 
 		if (!idev->card_vendor) {
 			printk(KERN_INFO "ITK PnP: no ISAPnP card found\n");
-			return(0);
 		}
 	}
 #endif
-	/* IO-Ports */
-	cs->hw.ix1.isac_ale = card->para[1] + ISAC_COMMAND_OFFSET;
-	cs->hw.ix1.isac = card->para[1] + ISAC_DATA_OFFSET;
-	cs->hw.ix1.hscx = card->para[1] + HSCX_DATA_OFFSET;
-	cs->hw.ix1.cfg_reg = card->para[1];
-	cs->irq = card->para[0];
-	if (!request_io(&cs->rs, cs->hw.ix1.cfg_reg, 4, "ix1micro cfg"))
-		goto err;
-	
-	printk(KERN_INFO "HiSax: %s config irq:%d io:0x%X\n",
-	       CardType[cs->typ], cs->irq, cs->hw.ix1.cfg_reg);
-	ix1_reset(cs);
-	cs->card_ops = &ix1_ops;
-	if (hscxisac_setup(cs, &isac_ops, &hscx_ops))
-		goto err;
-	return 1;
- err:
-	hisax_release_resources(cs);
 	return 0;
 }

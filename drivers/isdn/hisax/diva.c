@@ -362,7 +362,7 @@ diva_ipacx_pci_irq(int intno, void *dev_id, struct pt_regs *regs)
 static void
 diva_release(struct IsdnCardState *cs)
 {
-	del_timer(&cs->hw.diva.tl);
+	del_timer_sync(&cs->hw.diva.tl);
 	if (cs->hw.diva.cfg_reg)
 		byteout(cs->hw.diva.ctrl, 0); /* LED off, Reset */
 
@@ -515,6 +515,162 @@ static struct card_ops diva_ipacx_pci_ops = {
 	.irq_func    = diva_ipacx_pci_irq,
 };
 
+static int __init
+diva_ipac_probe(struct IsdnCardState *cs)
+{
+	u8 val;
+
+	// request_io
+	val = readreg(cs->hw.diva.cfg_reg + DIVA_IPAC_ADR,
+		      cs->hw.diva.cfg_reg + DIVA_IPAC_DATA, IPAC_ID);
+	printk(KERN_INFO "Diva: IPAC version %x\n", val);
+	return (val == 1 || val == 2);
+}
+
+static int __init
+diva_ipac_isa_probe(struct IsdnCardState *cs, struct IsdnCard *card)
+{
+	cs->subtyp = DIVA_IPAC_ISA;
+	cs->irq = card->para[0];
+	cs->hw.diva.cfg_reg  = card->para[1];
+	cs->hw.diva.isac     = card->para[1] + DIVA_IPAC_DATA;
+	cs->hw.diva.isac_adr = card->para[1] + DIVA_IPAC_ADR;
+	printk(KERN_INFO "Diva: %s card configured at %#lx IRQ %d\n",
+	       "IPAC ISA", cs->hw.diva.cfg_reg, cs->irq);
+	if (!request_io(&cs->rs, cs->hw.diva.cfg_reg, 8, "diva isdn"))
+		goto err;
+	diva_ipac_isa_reset(cs);
+	cs->card_ops = &diva_ipac_isa_ops;
+	if (ipac_setup(cs, &ipac_dc_ops, &ipac_bc_ops))
+		goto err;
+	return 0;
+ err:
+	hisax_release_resources(cs);
+	return -EBUSY;
+}
+
+static int __init
+diva_isac_isa_probe(struct IsdnCardState *cs, struct IsdnCard *card)
+{
+	cs->subtyp = DIVA_ISA;
+	cs->irq = card->para[0];
+	cs->hw.diva.cfg_reg  = card->para[1];
+	cs->hw.diva.ctrl     = card->para[1] + DIVA_ISA_CTRL;
+	cs->hw.diva.isac     = card->para[1] + DIVA_ISA_ISAC_DATA;
+	cs->hw.diva.hscx     = card->para[1] + DIVA_HSCX_DATA;
+	cs->hw.diva.isac_adr = card->para[1] + DIVA_ISA_ISAC_ADR;
+	cs->hw.diva.hscx_adr = card->para[1] + DIVA_HSCX_ADR;
+	printk(KERN_INFO "Diva: %s card configured at %#lx IRQ %d\n",
+	       "ISA", cs->hw.diva.cfg_reg, cs->irq);
+	if (!request_io(&cs->rs, cs->hw.diva.cfg_reg, 8, "diva isdn"))
+		goto err;
+	diva_reset(cs);
+	init_timer(&cs->hw.diva.tl);
+	cs->hw.diva.tl.function = (void *) diva_led_handler;
+	cs->hw.diva.tl.data = (long) cs;
+	cs->card_ops = &diva_ops;
+	if (hscxisac_setup(cs, &isac_ops, &hscx_ops))
+		goto err;
+	return 0;
+ err:
+	hisax_release_resources(cs);
+	return -EBUSY;
+}
+
+static int __init
+diva_isa_probe(struct IsdnCardState *cs, struct IsdnCard *card)
+{
+	int is_ipac;
+	cs->hw.diva.cfg_reg  = card->para[1];
+	if (!request_io(&cs->rs, cs->hw.diva.cfg_reg, 8, "diva isdn"))
+		return -EBUSY;
+
+	is_ipac = diva_ipac_probe(cs);
+	hisax_release_resources(cs);
+
+	if (is_ipac)
+		return diva_ipac_isa_probe(cs, card);
+	else
+		return diva_isac_isa_probe(cs, card);
+}
+
+static int __init
+diva_pci_probe(struct IsdnCardState *cs, struct pci_dev *pdev)
+{
+	if (pci_enable_device(pdev))
+		goto err;
+
+	cs->subtyp = DIVA_PCI;
+	cs->irq = pdev->irq;
+	cs->irq_flags |= SA_SHIRQ;
+	cs->hw.diva.cfg_reg  = pci_resource_start(pdev, 2);
+	cs->hw.diva.ctrl     = cs->hw.diva.cfg_reg + DIVA_PCI_CTRL;
+	cs->hw.diva.isac     = cs->hw.diva.cfg_reg + DIVA_PCI_ISAC_DATA;
+	cs->hw.diva.hscx     = cs->hw.diva.cfg_reg + DIVA_HSCX_DATA;
+	cs->hw.diva.isac_adr = cs->hw.diva.cfg_reg + DIVA_PCI_ISAC_ADR;
+	cs->hw.diva.hscx_adr = cs->hw.diva.cfg_reg + DIVA_HSCX_ADR;
+	printk(KERN_INFO "Diva: %s card configured at %#lx IRQ %d\n",
+	       "PCI", cs->hw.diva.cfg_reg, cs->irq);
+	printk(KERN_INFO "Diva: %s space at %#lx\n",
+	       "PCI", cs->hw.diva.pci_cfg);
+	if (!request_io(&cs->rs, cs->hw.diva.cfg_reg, 32, "diva isdn"))
+		goto err;
+	return 0;
+ err:
+	hisax_release_resources(cs);
+	return -EBUSY;
+}
+
+static int __init
+diva_ipac_pci_probe(struct IsdnCardState *cs, struct pci_dev *pdev)
+{
+	if (pci_enable_device(pdev))
+		goto err;
+
+	cs->subtyp = DIVA_IPAC_PCI;
+	cs->irq = pdev->irq;
+	cs->irq_flags |= SA_SHIRQ;
+	cs->hw.diva.pci_cfg = (unsigned long)request_mmio(
+		&cs->rs, pci_resource_start(pdev, 0), 4096, "diva");
+	cs->hw.diva.cfg_reg = (unsigned long)request_mmio(
+		&cs->rs, pci_resource_start(pdev, 1), 4096, "diva");
+	printk(KERN_INFO "Diva: %s card configured at %#lx IRQ %d\n",
+	       "IPAC PCI", cs->hw.diva.cfg_reg, cs->irq);
+	printk(KERN_INFO "Diva: %s space at %#lx\n",
+	       "IPAC PCI", cs->hw.diva.pci_cfg);
+	diva_ipac_pci_reset(cs);
+	cs->card_ops = &diva_ipac_pci_ops;
+	if (ipac_setup(cs, &mem_ipac_dc_ops, &mem_ipac_bc_ops))
+		goto err;
+	return 0;
+ err:
+	hisax_release_resources(cs);
+	return -EBUSY;
+}
+
+static int __init
+diva_ipacx_pci_probe(struct IsdnCardState *cs, struct pci_dev *pdev)
+{
+	if (pci_enable_device(pdev))
+		goto err;
+
+	cs->subtyp = DIVA_IPACX_PCI;
+	cs->irq = pdev->irq;
+	cs->irq_flags |= SA_SHIRQ;
+	printk(KERN_INFO "Diva: %s card configured at %#lx IRQ %d\n",
+	       "IPACX PCI", cs->hw.diva.cfg_reg, cs->irq);
+	printk(KERN_INFO "Diva: %s space at %#lx\n",
+	       "IPACX PCI", cs->hw.diva.pci_cfg);
+	diva_ipacx_pci_reset(cs);
+	cs->card_ops = &diva_ipacx_pci_ops;
+	if (ipacx_setup(cs, &ipacx_dc_ops, &ipacx_bc_ops))
+		goto err;
+	return 0;
+ err:
+	hisax_release_resources(cs);
+	return -EBUSY;
+}
+
 static struct pci_dev *dev_diva __initdata = NULL;
 static struct pci_dev *dev_diva_u __initdata = NULL;
 static struct pci_dev *dev_diva201 __initdata = NULL;
@@ -545,101 +701,60 @@ static struct isapnp_device_id *pdev = &diva_ids[0];
 static struct pnp_card *pnp_c __devinitdata = NULL;
 #endif
 
-
 int __init
 setup_diva(struct IsdnCard *card)
 {
-	int bytecnt = 8;
-	u8 val;
-	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
 
 	strcpy(tmp, Diva_revision);
 	printk(KERN_INFO "HiSax: Eicon.Diehl Diva driver Rev. %s\n", HiSax_getrev(tmp));
 	if (card->para[1]) {
-		cs->hw.diva.ctrl_reg = 0;
-		cs->hw.diva.cfg_reg = card->para[1];
-		val = readreg(cs->hw.diva.cfg_reg + DIVA_IPAC_ADR,
-			cs->hw.diva.cfg_reg + DIVA_IPAC_DATA, IPAC_ID);
-		printk(KERN_INFO "Diva: IPAC version %x\n", val);
-		if ((val == 1) || (val==2)) {
-			cs->subtyp = DIVA_IPAC_ISA;
-			cs->hw.diva.ctrl = 0;
-			cs->hw.diva.isac = card->para[1] + DIVA_IPAC_DATA;
-			cs->hw.diva.hscx = card->para[1] + DIVA_IPAC_DATA;
-			cs->hw.diva.isac_adr = card->para[1] + DIVA_IPAC_ADR;
-			cs->hw.diva.hscx_adr = card->para[1] + DIVA_IPAC_ADR;
-		} else {
-			cs->subtyp = DIVA_ISA;
-			cs->hw.diva.ctrl = card->para[1] + DIVA_ISA_CTRL;
-			cs->hw.diva.isac = card->para[1] + DIVA_ISA_ISAC_DATA;
-			cs->hw.diva.hscx = card->para[1] + DIVA_HSCX_DATA;
-			cs->hw.diva.isac_adr = card->para[1] + DIVA_ISA_ISAC_ADR;
-			cs->hw.diva.hscx_adr = card->para[1] + DIVA_HSCX_ADR;
-		}
-		cs->irq = card->para[0];
-	} else {
+		if (diva_isa_probe(card->cs, card) < 0)
+			return 0;
+		return 1;
+		
+	}
 #ifdef __ISAPNP__
-		if (isapnp_present()) {
-			struct pnp_card *pb;
-			struct pnp_dev *pd;
-
-			while(pdev->card_vendor) {
-				if ((pb = pnp_find_card(pdev->card_vendor,
-							pdev->card_device,
-							pnp_c))) {
-					pnp_c = pb;
-					pd = NULL;
-					if ((pd = pnp_find_dev(pnp_c,
-							       pdev->vendor,
-							       pdev->function,
-							       pd))) {
-						printk(KERN_INFO "HiSax: %s detected\n",
-							(char *)pdev->driver_data);
-						if (pnp_device_attach(pd) < 0) {
-							printk(KERN_ERR "Diva PnP: attach failed\n");
+	if (isapnp_present()) {
+		struct pnp_card *pb;
+		struct pnp_dev *pd;
+		
+		while(pdev->card_vendor) {
+			if ((pb = pnp_find_card(pdev->card_vendor,
+						pdev->card_device, pnp_c))) {
+				pnp_c = pb;
+				pd = NULL;
+				if ((pd = pnp_find_dev(pnp_c,
+						       pdev->vendor,
+						       pdev->function,
+						       pd))) {
+					printk(KERN_INFO "HiSax: %s detected\n",
+					       (char *)pdev->driver_data);
+					if (pnp_device_attach(pd) < 0) {
+						printk(KERN_ERR "Diva PnP: attach failed\n");
+						return 0;
+					}
+					if (pnp_activate_dev(pd) < 0) {
+						printk(KERN_ERR "Diva PnP: activate failed\n");
+						pnp_device_detach(pd);
+						return 0;
+					}
+					if (!pnp_irq_valid(pd, 0) || !pnp_port_valid(pd, 0)) {
+						printk(KERN_ERR "Diva PnP:some resources are missing %ld/%lx\n",
+						       pnp_irq(pd, 0), pnp_port_start(pd, 0));
+						pnp_device_detach(pd);
+						return(0);
+					}
+					card->para[1] = pnp_port_start(pd, 0);
+					card->para[0] = pnp_irq(pd, 0);
+					if (pdev->function == ISAPNP_FUNCTION(0xA1)) {
+						if (diva_ipac_isa_probe(cs->card, cs))
 							return 0;
-						}
-						if (pnp_activate_dev(pd) < 0) {
-							printk(KERN_ERR "Diva PnP: activate failed\n");
-							pnp_device_detach(pd);
+						return 1;
+					} else {
+						if (diva_isac_isa_probe(cs->card, cs))
 							return 0;
-						}
-						if (!pnp_irq_valid(pd, 0) || !pnp_port_valid(pd, 0)) {
-							printk(KERN_ERR "Diva PnP:some resources are missing %ld/%lx\n",
-								pnp_irq(pd, 0), pnp_port_start(pd, 0));
-							pnp_device_detach(pd);
-							return(0);
-						}
-						card->para[1] = pnp_port_start(pd, 0);
-						card->para[0] = pnp_irq(pd, 0);
-						cs->hw.diva.cfg_reg  = card->para[1];
-						cs->irq = card->para[0];
-						if (pdev->function == ISAPNP_FUNCTION(0xA1)) {
-							cs->subtyp = DIVA_IPAC_ISA;
-							cs->hw.diva.ctrl = 0;
-							cs->hw.diva.isac =
-								card->para[1] + DIVA_IPAC_DATA;
-							cs->hw.diva.hscx =
-								card->para[1] + DIVA_IPAC_DATA;
-							cs->hw.diva.isac_adr =
-								card->para[1] + DIVA_IPAC_ADR;
-							cs->hw.diva.hscx_adr =
-								card->para[1] + DIVA_IPAC_ADR;
-						} else {
-							cs->subtyp = DIVA_ISA;
-							cs->hw.diva.ctrl =
-								card->para[1] + DIVA_ISA_CTRL;
-							cs->hw.diva.isac =
-								card->para[1] + DIVA_ISA_ISAC_DATA;
-							cs->hw.diva.hscx =
-								card->para[1] + DIVA_HSCX_DATA;
-							cs->hw.diva.isac_adr =
-								card->para[1] + DIVA_ISA_ISAC_ADR;
-							cs->hw.diva.hscx_adr =
-								card->para[1] + DIVA_HSCX_ADR;
-						}
-						goto ready;
+						return 1;
 					} else {
 						printk(KERN_ERR "Diva PnP: PnP error card found, no device\n");
 						return(0);
@@ -652,111 +767,29 @@ setup_diva(struct IsdnCard *card)
 				printk(KERN_INFO "Diva PnP: no ISAPnP card found\n");
 			}
 		}
+	}
 #endif
 #if CONFIG_PCI
-		cs->subtyp = 0;
-		if ((dev_diva = pci_find_device(PCI_VENDOR_ID_EICON,
-			PCI_DEVICE_ID_EICON_DIVA20, dev_diva))) {
-			if (pci_enable_device(dev_diva))
-				return(0);
-			cs->subtyp = DIVA_PCI;
-			cs->irq = dev_diva->irq;
-			cs->hw.diva.cfg_reg = pci_resource_start(dev_diva, 2);
-		} else if ((dev_diva_u = pci_find_device(PCI_VENDOR_ID_EICON,
-			PCI_DEVICE_ID_EICON_DIVA20_U, dev_diva_u))) {
-			if (pci_enable_device(dev_diva_u))
-				return(0);
-			cs->subtyp = DIVA_PCI;
-			cs->irq = dev_diva_u->irq;
-			cs->hw.diva.cfg_reg = pci_resource_start(dev_diva_u, 2);
-		} else if ((dev_diva201 = pci_find_device(PCI_VENDOR_ID_EICON,
-			PCI_DEVICE_ID_EICON_DIVA201, dev_diva201))) {
-			if (pci_enable_device(dev_diva201))
-				return(0);
-			cs->subtyp = DIVA_IPAC_PCI;
-			cs->irq = dev_diva201->irq;
-			cs->hw.diva.pci_cfg = (unsigned long)request_mmio(&cs->rs, pci_resource_start(dev_diva201, 0), 4096, "diva");
-			cs->hw.diva.cfg_reg = (unsigned long)request_mmio(&cs->rs, pci_resource_start(dev_diva201, 1), 4096, "diva");
-		} else {
-			printk(KERN_WARNING "Diva: No PCI card found\n");
-			return(0);
-		}
-
-		if (!cs->irq) {
-			printk(KERN_WARNING "Diva: No IRQ for PCI card found\n");
-			goto err;
-		}
-
-		if (!cs->hw.diva.cfg_reg) {
-			printk(KERN_WARNING "Diva: No IO-Adr for PCI card found\n");
-			goto err;
-		}
-		cs->irq_flags |= SA_SHIRQ;
-#endif /* CONFIG_PCI */
-		if ((cs->subtyp == DIVA_IPAC_PCI) ||
-		    (cs->subtyp == DIVA_IPACX_PCI)   ) {
-			cs->hw.diva.ctrl = 0;
-			cs->hw.diva.isac = 0;
-			cs->hw.diva.hscx = 0;
-			cs->hw.diva.isac_adr = 0;
-			cs->hw.diva.hscx_adr = 0;
-			bytecnt = 0;
-		} else {
-			cs->hw.diva.ctrl = cs->hw.diva.cfg_reg + DIVA_PCI_CTRL;
-			cs->hw.diva.isac = cs->hw.diva.cfg_reg + DIVA_PCI_ISAC_DATA;
-			cs->hw.diva.hscx = cs->hw.diva.cfg_reg + DIVA_HSCX_DATA;
-			cs->hw.diva.isac_adr = cs->hw.diva.cfg_reg + DIVA_PCI_ISAC_ADR;
-			cs->hw.diva.hscx_adr = cs->hw.diva.cfg_reg + DIVA_HSCX_ADR;
-			bytecnt = 32;
-		}
-	}
-ready:
-	printk(KERN_INFO
-		"Diva: %s card configured at %#lx IRQ %d\n",
-		(cs->subtyp == DIVA_PCI) ? "PCI" :
-		(cs->subtyp == DIVA_ISA) ? "ISA" : 
-		(cs->subtyp == DIVA_IPAC_ISA) ? "IPAC ISA" :
-		(cs->subtyp == DIVA_IPAC_PCI) ? "IPAC PCI" : "IPACX PCI",
-		cs->hw.diva.cfg_reg, cs->irq);
-	if ((cs->subtyp == DIVA_IPAC_PCI)  || 
-	    (cs->subtyp == DIVA_IPACX_PCI) || 
-	    (cs->subtyp == DIVA_PCI)         )
-		printk(KERN_INFO "Diva: %s space at %#lx\n",
-			(cs->subtyp == DIVA_PCI) ? "PCI" :
-			(cs->subtyp == DIVA_IPAC_PCI) ? "IPAC PCI" : "IPACX PCI",
-			cs->hw.diva.pci_cfg);
-	if ((cs->subtyp != DIVA_IPAC_PCI) &&
-	    (cs->subtyp != DIVA_IPACX_PCI)   ) {
-		if (!request_io(&cs->rs, cs->hw.diva.cfg_reg, bytecnt, "diva isdn"))
+	if ((dev_diva = pci_find_device(PCI_VENDOR_ID_EICON,
+					PCI_DEVICE_ID_EICON_DIVA20,
+					dev_diva))) {
+		if (diva_pci_probe(card->cs, dev_diva))
 			return 0;
+		return 1;
+	} else if ((dev_diva_u = pci_find_device(PCI_VENDOR_ID_EICON,
+						 PCI_DEVICE_ID_EICON_DIVA20_U,
+						 dev_diva_u))) {
+		if (diva_pci_probe(card->cs, dev_diva_u))
+			return 0;
+		return 1;
+	} else if ((dev_diva201 = pci_find_device(PCI_VENDOR_ID_EICON,
+						  PCI_DEVICE_ID_EICON_DIVA201,
+						  dev_diva201))) {
+		if (diva_ipac_pci_probe(card->cs, dev_diva201))
+			return 0;
+		return 1;
 	}
-	if (cs->subtyp == DIVA_IPAC_ISA) {
-		diva_ipac_isa_reset(cs);
-		cs->card_ops = &diva_ipac_isa_ops;
-		if (ipac_setup(cs, &ipac_dc_ops, &ipac_bc_ops))
-			goto err;
-	} else if (cs->subtyp == DIVA_IPAC_PCI) {
-		diva_ipac_pci_reset(cs);
-		cs->card_ops = &diva_ipac_pci_ops;
-		if (ipac_setup(cs, &mem_ipac_dc_ops, &mem_ipac_bc_ops))
-			goto err;
-	} else if (cs->subtyp == DIVA_IPACX_PCI) {
-		diva_ipacx_pci_reset(cs);
-		cs->card_ops = &diva_ipacx_pci_ops;
-		if (ipacx_setup(cs, &ipacx_dc_ops, &ipacx_bc_ops))
-			goto err;
-	} else { /* DIVA 2.0 */
-		diva_reset(cs);
-		cs->hw.diva.tl.function = (void *) diva_led_handler;
-		cs->hw.diva.tl.data = (long) cs;
-		init_timer(&cs->hw.diva.tl);
-		cs->card_ops = &diva_ops;
-		if (hscxisac_setup(cs, &isac_ops, &hscx_ops))
-			goto err;
-	}
-	return 1;
- err:
-	diva_release(cs);
+	printk(KERN_WARNING "Diva: No PCI card found\n");
+#endif /* CONFIG_PCI */
 	return 0;
-
 }
