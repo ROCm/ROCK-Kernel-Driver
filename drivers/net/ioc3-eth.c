@@ -1172,9 +1172,14 @@ static int __devinit ioc3_probe(struct pci_dev *pdev,
 	u32 vendor, model, rev;
 	int err;
 
+	if (pci_enable_device(pdev))
+		return -ENODEV;
+
 	dev = alloc_etherdev(sizeof(struct ioc3_private));
-	if (!dev)
-		return -ENOMEM;
+	if (!dev) {
+		err = -ENOMEM;
+		goto out_disable;
+	}
 
 	err = pci_request_regions(pdev, "ioc3");
 	if (err)
@@ -1269,6 +1274,8 @@ out_res:
 	pci_release_regions(pdev);
 out_free:
 	free_netdev(dev);
+out_disable:
+	pci_disable_device(pdev);
 	return err;
 }
 
@@ -1282,6 +1289,7 @@ static void __devexit ioc3_remove_one (struct pci_dev *pdev)
 	iounmap(ioc3);
 	pci_release_regions(pdev);
 	free_netdev(dev);
+	pci_disable_device(pdev);
 }
 
 static struct pci_device_id ioc3_pci_tbl[] = {
