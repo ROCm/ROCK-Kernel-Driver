@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/video/sgivwfb.h -- SGI DBE frame buffer device header
+ *  linux/drivers/video/sgivw.h -- SGI DBE frame buffer device header
  *
  *      Copyright (C) 1999 Silicon Graphics, Inc.
  *      Jeffrey Newquist, newquist@engr.sgi.som
@@ -12,10 +12,10 @@
 #ifndef __SGIVWFB_H__
 #define __SGIVWFB_H__
 
-#define DBE_GETREG(reg, dest)       ((dest) = DBE_REG_BASE->##reg)
-#define DBE_SETREG(reg, src)        DBE_REG_BASE->##reg = (src)
-#define DBE_IGETREG(reg, idx, dest) ((dest) = DBE_REG_BASE->##reg##[idx])
-#define DBE_ISETREG(reg, idx, src)  (DBE_REG_BASE->##reg##[idx] = (src))
+#define DBE_GETREG(reg, dest)		((dest) = DBE_REG_BASE->reg)
+#define DBE_SETREG(reg, src)		DBE_REG_BASE->reg = (src)
+#define DBE_IGETREG(reg, idx, dest)	((dest) = DBE_REG_BASE->reg[idx])
+#define DBE_ISETREG(reg, idx, src)	(DBE_REG_BASE->reg[idx] = (src))
 
 #define MASK(msb, lsb)          ( (((u32)1<<((msb)-(lsb)+1))-1) << (lsb) )
 #define GET(v, msb, lsb)        ( ((u32)(v) & MASK(msb,lsb)) >> (lsb) )
@@ -29,7 +29,7 @@
 #define DBE_REG_PHYS	0xd0000000
 #define DBE_REG_SIZE        0x01000000
 
-typedef struct {
+struct asregs {
   volatile u32 ctrlstat;     /* 0x000000 general control */
   volatile u32 dotclock;     /* 0x000004 dot clock PLL control */
   volatile u32 i2c;          /* 0x000008 crt I2C control */
@@ -121,7 +121,7 @@ typedef struct {
   volatile u32 vc_6;           /* 0x080018 video capture crtl 3 */
   volatile u32 vc_7;           /* 0x08001c video capture crtl 3 */
   volatile u32 vc_8;           /* 0x08000c video capture crtl 3 */
-} asregs;
+};
 
 /* Bit mask information */
 
@@ -144,6 +144,21 @@ typedef struct {
 #define DBE_VT_XY_VT_FREEZE_MSB     31
 #define DBE_VT_XY_VT_FREEZE_LSB     31
 
+#define DBE_FP_VDRV_FP_VDRV_ON_MSB	23
+#define DBE_FP_VDRV_FP_VDRV_ON_LSB	12
+#define DBE_FP_VDRV_FP_VDRV_OFF_MSB	11
+#define DBE_FP_VDRV_FP_VDRV_OFF_LSB	0
+
+#define DBE_FP_HDRV_FP_HDRV_ON_MSB	23
+#define DBE_FP_HDRV_FP_HDRV_ON_LSB	12
+#define DBE_FP_HDRV_FP_HDRV_OFF_MSB	11
+#define DBE_FP_HDRV_FP_HDRV_OFF_LSB	0
+
+#define DBE_FP_DE_FP_DE_ON_MSB		23
+#define DBE_FP_DE_FP_DE_ON_LSB		12
+#define DBE_FP_DE_FP_DE_OFF_MSB		11
+#define DBE_FP_DE_FP_DE_OFF_LSB		0
+
 #define DBE_VT_VSYNC_VT_VSYNC_ON_MSB        23
 #define DBE_VT_VSYNC_VT_VSYNC_ON_LSB        12
 #define DBE_VT_VSYNC_VT_VSYNC_OFF_MSB       11
@@ -163,6 +178,11 @@ typedef struct {
 #define DBE_VT_HBLANK_VT_HBLANK_ON_LSB        12
 #define DBE_VT_HBLANK_VT_HBLANK_OFF_MSB       11
 #define DBE_VT_HBLANK_VT_HBLANK_OFF_LSB       0
+
+#define DBE_VT_FLAGS_VDRV_INVERT_MSB		0
+#define DBE_VT_FLAGS_VDRV_INVERT_LSB		0
+#define DBE_VT_FLAGS_HDRV_INVERT_MSB		2
+#define DBE_VT_FLAGS_HDRV_INVERT_LSB		2
 
 #define DBE_VT_VCMAP_VT_VCMAP_ON_MSB        23
 #define DBE_VT_VCMAP_VT_VCMAP_ON_LSB        12
@@ -264,6 +284,8 @@ typedef struct {
 
 #define DBE_CRS_MAGIC       54
 
+#define DBE_CLOCK_REF_KHZ	27000
+
 /* Config Register (DBE Only) Definitions */
 
 #define DBE_CONFIG_VDAC_ENABLE       0x00000001
@@ -326,7 +348,7 @@ typedef enum {
  * Crime Video Timing Data Structure
  */
 
-typedef struct dbe_timing_info
+struct dbe_timing_info
 {
   dbe_timing_t type;
   int flags;				
@@ -347,7 +369,7 @@ typedef struct dbe_timing_info
   short pll_m;		    /* PLL M parameter		*/
   short pll_n;		    /* PLL P parameter		*/
   short pll_p;		    /* PLL N parameter		*/
-} dbe_timing_info_t;
+};
 
 /* Defines for dbe_vof_info_t flags */
 

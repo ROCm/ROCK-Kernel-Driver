@@ -363,7 +363,7 @@ config VIDEO_SELECT
 
 config FB_SGIVW
 	tristate "SGI Visual Workstation framebuffer support"
-	depends on FB && VISWS
+	depends on FB && X86_VISWS
 	help
 	  SGI Visual Workstation support for framebuffer graphics.
 
