@@ -1,6 +1,4 @@
 /*
- *  $Id: speedstep.c,v 1.70 2003/02/22 10:23:46 db Exp $
- *
  * (C) 2001  Dave Jones, Arjan van de ven.
  * (C) 2002 - 2003  Dominik Brodowski <linux@brodo.de>
  *
@@ -27,45 +25,31 @@
 #include <linux/pci.h>
 #include <linux/slab.h>
 
-#include <asm/msr.h>
+#include "speedstep-lib.h"
+
 
 /* speedstep_chipset:
  *   It is necessary to know which chipset is used. As accesses to 
  * this device occur at various places in this module, we need a 
  * static struct pci_dev * pointing to that device.
  */
-static unsigned int                     speedstep_chipset;
-static struct pci_dev                   *speedstep_chipset_dev;
+static struct pci_dev			*speedstep_chipset_dev;
 
-#define SPEEDSTEP_CHIPSET_ICH2M         0x00000002
-#define SPEEDSTEP_CHIPSET_ICH3M         0x00000003
-#define SPEEDSTEP_CHIPSET_ICH4M         0x00000004
 
 /* speedstep_processor
  */
-static unsigned int                     speedstep_processor = 0;
-static int                              speedstep_coppermine = 0;
-
-#define SPEEDSTEP_PROCESSOR_PIII_C      0x00000001  /* Coppermine core */
-#define SPEEDSTEP_PROCESSOR_PIII_T      0x00000002  /* Tualatin core */
-#define SPEEDSTEP_PROCESSOR_P4M         0x00000003  /* P4-M with 100 MHz FSB */
+static unsigned int			speedstep_processor = 0;
 
 
-/* speedstep_[low,high]_freq
+/* 
  *   There are only two frequency states for each processor. Values
  * are in kHz for the time being.
  */
-#define SPEEDSTEP_HIGH                  0x00000000
-#define SPEEDSTEP_LOW                   0x00000001
-
 static struct cpufreq_frequency_table speedstep_freqs[] = {
 	{SPEEDSTEP_HIGH, 	0},
 	{SPEEDSTEP_LOW,		0},
 	{0,			CPUFREQ_TABLE_END},
 };
-
-#define speedstep_low_freq	speedstep_freqs[SPEEDSTEP_LOW].frequency
-#define speedstep_high_freq	speedstep_freqs[SPEEDSTEP_HIGH].frequency
 
 
 /* DEBUG
@@ -80,149 +64,82 @@ static struct cpufreq_frequency_table speedstep_freqs[] = {
 #endif
 
 
-
-/*********************************************************************
- *                    LOW LEVEL CHIPSET INTERFACE                    *
- *********************************************************************/
-
-/**
- * speedstep_get_state - read the current SpeedStep state
- * @state: Speedstep state (SPEEDSTEP_LOW or SPEEDSTEP_HIGH)
- *
- *   Tries to read the SpeedStep state. Returns -EIO when there has been
- * trouble to read the status or write to the control register, -EINVAL
- * on an unsupported chipset, and zero on success.
- */
-static int speedstep_get_state (unsigned int *state)
-{
-	unsigned long   flags;
-	u32             pmbase;
-	u8              value;
-
-	if (!speedstep_chipset_dev || !state)
-		return -EINVAL;
-
-	switch (speedstep_chipset) {
-	case SPEEDSTEP_CHIPSET_ICH2M:
-	case SPEEDSTEP_CHIPSET_ICH3M:
-	case SPEEDSTEP_CHIPSET_ICH4M:
-		/* get PMBASE */
-		pci_read_config_dword(speedstep_chipset_dev, 0x40, &pmbase);
-		if (!(pmbase & 0x01))
-			return -EIO;
-
-		pmbase &= 0xFFFFFFFE;
-		if (!pmbase) 
-			return -EIO;
-
-		/* read state */
-		local_irq_save(flags);
-		value = inb(pmbase + 0x50);
-		local_irq_restore(flags);
-
-		dprintk(KERN_DEBUG "cpufreq: read at pmbase 0x%x + 0x50 returned 0x%x\n", pmbase, value);
-
-		*state = value & 0x01;
-		return 0;
-
-	}
-
-	printk (KERN_ERR "cpufreq: setting CPU frequency on this chipset unsupported.\n");
-	return -EINVAL;
-}
-
-
 /**
  * speedstep_set_state - set the SpeedStep state
  * @state: new processor frequency state (SPEEDSTEP_LOW or SPEEDSTEP_HIGH)
  *
  *   Tries to change the SpeedStep state. 
  */
-static void speedstep_set_state (unsigned int state, int notify)
+static void speedstep_set_state (unsigned int state, unsigned int notify)
 {
-	u32                     pmbase;
-	u8	                pm2_blk;
-	u8                      value;
-	unsigned long           flags;
-	unsigned int            oldstate;
-	struct cpufreq_freqs    freqs;
+	u32			pmbase;
+	u8			pm2_blk;
+	u8			value;
+	unsigned long		flags;
+	struct cpufreq_freqs	freqs;
 
 	if (!speedstep_chipset_dev || (state > 0x1))
 		return;
 
-	if (speedstep_get_state(&oldstate))
-		return;
-
-	if (oldstate == state)
-		return;
-
-	freqs.old = (oldstate == SPEEDSTEP_HIGH) ? speedstep_high_freq : speedstep_low_freq;
-	freqs.new = (state == SPEEDSTEP_HIGH) ? speedstep_high_freq : speedstep_low_freq;
+	freqs.old = speedstep_get_processor_frequency(speedstep_processor);
+	freqs.new = speedstep_freqs[SPEEDSTEP_LOW].frequency;
 	freqs.cpu = 0; /* speedstep.c is UP only driver */
 	
 	if (notify)
 		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 
-	switch (speedstep_chipset) {
-	case SPEEDSTEP_CHIPSET_ICH2M:
-	case SPEEDSTEP_CHIPSET_ICH3M:
-	case SPEEDSTEP_CHIPSET_ICH4M:
-		/* get PMBASE */
-		pci_read_config_dword(speedstep_chipset_dev, 0x40, &pmbase);
-		if (!(pmbase & 0x01))
-		{
-			printk(KERN_ERR "cpufreq: could not find speedstep register\n");
-			return;
-		}
+	/* get PMBASE */
+	pci_read_config_dword(speedstep_chipset_dev, 0x40, &pmbase);
+	if (!(pmbase & 0x01))
+	{
+		printk(KERN_ERR "cpufreq: could not find speedstep register\n");
+		return;
+	}
 
-		pmbase &= 0xFFFFFFFE;
-		if (!pmbase) {
-			printk(KERN_ERR "cpufreq: could not find speedstep register\n");
-			return;
-		}
+	pmbase &= 0xFFFFFFFE;
+	if (!pmbase) {
+		printk(KERN_ERR "cpufreq: could not find speedstep register\n");
+		return;
+	}
 
-		/* Disable IRQs */
-		local_irq_save(flags);
+	/* Disable IRQs */
+	local_irq_save(flags);
 
-		/* read state */
-		value = inb(pmbase + 0x50);
+	/* read state */
+	value = inb(pmbase + 0x50);
 
-		dprintk(KERN_DEBUG "cpufreq: read at pmbase 0x%x + 0x50 returned 0x%x\n", pmbase, value);
+	dprintk(KERN_DEBUG "cpufreq: read at pmbase 0x%x + 0x50 returned 0x%x\n", pmbase, value);
 
-		/* write new state */
-		value &= 0xFE;
-		value |= state;
+	/* write new state */
+	value &= 0xFE;
+	value |= state;
 
-		dprintk(KERN_DEBUG "cpufreq: writing 0x%x to pmbase 0x%x + 0x50\n", value, pmbase);
+	dprintk(KERN_DEBUG "cpufreq: writing 0x%x to pmbase 0x%x + 0x50\n", value, pmbase);
 
-		/* Disable bus master arbitration */
-		pm2_blk = inb(pmbase + 0x20);
-		pm2_blk |= 0x01;
-		outb(pm2_blk, (pmbase + 0x20));
+	/* Disable bus master arbitration */
+	pm2_blk = inb(pmbase + 0x20);
+	pm2_blk |= 0x01;
+	outb(pm2_blk, (pmbase + 0x20));
 
-		/* Actual transition */
-		outb(value, (pmbase + 0x50));
+	/* Actual transition */
+	outb(value, (pmbase + 0x50));
 
-		/* Restore bus master arbitration */
-		pm2_blk &= 0xfe;
-		outb(pm2_blk, (pmbase + 0x20));
+	/* Restore bus master arbitration */
+	pm2_blk &= 0xfe;
+	outb(pm2_blk, (pmbase + 0x20));
 
-		/* check if transition was successful */
-		value = inb(pmbase + 0x50);
+	/* check if transition was successful */
+	value = inb(pmbase + 0x50);
 
-		/* Enable IRQs */
-		local_irq_restore(flags);
+	/* Enable IRQs */
+	local_irq_restore(flags);
 
-		dprintk(KERN_DEBUG "cpufreq: read at pmbase 0x%x + 0x50 returned 0x%x\n", pmbase, value);
+	dprintk(KERN_DEBUG "cpufreq: read at pmbase 0x%x + 0x50 returned 0x%x\n", pmbase, value);
 
-		if (state == (value & 0x1)) {
-			dprintk (KERN_INFO "cpufreq: change to %u MHz succeeded\n", (freqs.new / 1000));
-		} else {
-			printk (KERN_ERR "cpufreq: change failed - I/O error\n");
-		}
-		break;
-	default:
-		printk (KERN_ERR "cpufreq: setting CPU frequency on this chipset unsupported.\n");
+	if (state == (value & 0x1)) {
+		dprintk (KERN_INFO "cpufreq: change to %u MHz succeeded\n", (freqs.new / 1000));
+	} else {
+		printk (KERN_ERR "cpufreq: change failed - I/O error\n");
 	}
 
 	if (notify)
@@ -240,31 +157,21 @@ static void speedstep_set_state (unsigned int state, int notify)
  */
 static int speedstep_activate (void)
 {
+	u16		value = 0;
+
 	if (!speedstep_chipset_dev)
 		return -EINVAL;
 
-	switch (speedstep_chipset) {
-	case SPEEDSTEP_CHIPSET_ICH2M:
-	case SPEEDSTEP_CHIPSET_ICH3M:
-	case SPEEDSTEP_CHIPSET_ICH4M:
-	{
-		u16             value = 0;
-
-		pci_read_config_word(speedstep_chipset_dev, 
-				     0x00A0, &value);
-		if (!(value & 0x08)) {
-			value |= 0x08;
-			dprintk(KERN_DEBUG "cpufreq: activating SpeedStep (TM) registers\n");
-			pci_write_config_word(speedstep_chipset_dev, 
-					      0x00A0, value);
-		}
-
-		return 0;
+	pci_read_config_word(speedstep_chipset_dev, 
+			     0x00A0, &value);
+	if (!(value & 0x08)) {
+		value |= 0x08;
+		dprintk(KERN_DEBUG "cpufreq: activating SpeedStep (TM) registers\n");
+		pci_write_config_word(speedstep_chipset_dev, 
+				      0x00A0, value);
 	}
-	}
-	
-	printk (KERN_ERR "cpufreq: SpeedStep (TM) on this chipset unsupported.\n");
-	return -EINVAL;
+
+	return 0;
 }
 
 
@@ -284,7 +191,7 @@ static unsigned int speedstep_detect_chipset (void)
 			      PCI_ANY_ID,
 			      NULL);
 	if (speedstep_chipset_dev)
-		return SPEEDSTEP_CHIPSET_ICH4M;
+		return 4; /* 4-M */
 
 	speedstep_chipset_dev = pci_find_subsys(PCI_VENDOR_ID_INTEL,
 			      PCI_DEVICE_ID_INTEL_82801CA_12, 
@@ -292,7 +199,7 @@ static unsigned int speedstep_detect_chipset (void)
 			      PCI_ANY_ID,
 			      NULL);
 	if (speedstep_chipset_dev)
-		return SPEEDSTEP_CHIPSET_ICH3M;
+		return 3; /* 3-M */
 
 
 	speedstep_chipset_dev = pci_find_subsys(PCI_VENDOR_ID_INTEL,
@@ -305,7 +212,7 @@ static unsigned int speedstep_detect_chipset (void)
 		 * 8100 which use a pretty old revision of the 82815 
 		 * host brige. Abort on these systems.
 		 */
-		static struct pci_dev   *hostbridge;
+		static struct pci_dev	*hostbridge;
 		u8			rev = 0;
 
 		hostbridge  = pci_find_subsys(PCI_VENDOR_ID_INTEL,
@@ -315,7 +222,7 @@ static unsigned int speedstep_detect_chipset (void)
 			      NULL);
 
 		if (!hostbridge)
-			return SPEEDSTEP_CHIPSET_ICH2M;
+			return 2; /* 2-M */
 			
 		pci_read_config_byte(hostbridge, PCI_REVISION_ID, &rev);
 		if (rev < 5) {
@@ -324,265 +231,8 @@ static unsigned int speedstep_detect_chipset (void)
 			return 0;
 		}
 
-		return SPEEDSTEP_CHIPSET_ICH2M;
+		return 2; /* 2-M */
 	}
-
-	return 0;
-}
-
-
-
-/*********************************************************************
- *                   LOW LEVEL PROCESSOR INTERFACE                   *
- *********************************************************************/
-
-
-/**
- * pentium3_get_frequency - get the core frequencies for PIIIs
- *
- *   Returns the core frequency of a Pentium III processor (in kHz)
- */
-static unsigned int pentium3_get_frequency (void)
-{
-        /* See table 14 of p3_ds.pdf and table 22 of 29834003.pdf */
-	struct {
-		unsigned int ratio;	/* Frequency Multiplier (x10) */
-		u8 bitmap;	        /* power on configuration bits
-					   [27, 25:22] (in MSR 0x2a) */
-	} msr_decode_mult [] = {
-		{ 30, 0x01 },
-		{ 35, 0x05 },
-		{ 40, 0x02 },
-		{ 45, 0x06 },
-		{ 50, 0x00 },
-		{ 55, 0x04 },
-		{ 60, 0x0b },
-		{ 65, 0x0f },
-		{ 70, 0x09 },
-		{ 75, 0x0d },
-		{ 80, 0x0a },
-		{ 85, 0x26 },
-		{ 90, 0x20 },
-		{ 100, 0x2b },
-		{ 0, 0xff }     /* error or unknown value */
-	};
-	/* PIII(-M) FSB settings: see table b1-b of 24547206.pdf */
-	struct {
-		unsigned int value;     /* Front Side Bus speed in MHz */
-		u8 bitmap;              /* power on configuration bits [18: 19]
-					   (in MSR 0x2a) */
-	} msr_decode_fsb [] = {
-		{  66, 0x0 },
-		{ 100, 0x2 },
-		{ 133, 0x1 },
-		{   0, 0xff}
-	};
-	u32     msr_lo, msr_tmp;
-	int     i = 0, j = 0;
-	struct  cpuinfo_x86 *c = cpu_data;
-
-	/* read MSR 0x2a - we only need the low 32 bits */
-	rdmsr(MSR_IA32_EBL_CR_POWERON, msr_lo, msr_tmp);
-	dprintk(KERN_DEBUG "cpufreq: P3 - MSR_IA32_EBL_CR_POWERON: 0x%x 0x%x\n", msr_lo, msr_tmp);
-	msr_tmp = msr_lo;
-
-	/* decode the FSB */
-	msr_tmp &= 0x00c0000;
-	msr_tmp >>= 18;
-	while (msr_tmp != msr_decode_fsb[i].bitmap) {
-		if (msr_decode_fsb[i].bitmap == 0xff)
-			return -EINVAL;
-		i++;
-	}
-
-	/* decode the multiplier */
-	if ((c->x86_model == 0x08) && (c->x86_mask == 0x01)) 
-                /* different on early Coppermine PIII */
-		msr_lo &= 0x03c00000;
-	else
-		msr_lo &= 0x0bc00000;
-	msr_lo >>= 22;
-	while (msr_lo != msr_decode_mult[j].bitmap) {
-		if (msr_decode_mult[j].bitmap == 0xff)
-			return -EINVAL;
-		j++;
-	}
-
-	return (msr_decode_mult[j].ratio * msr_decode_fsb[i].value * 100);
-}
-
-
-/**
- * pentium4_get_frequency - get the core frequency for P4-Ms
- *
- *   Should return the core frequency (in kHz) for P4-Ms. 
- */
-static unsigned int pentium4_get_frequency(void)
-{
-	u32 msr_lo, msr_hi;
-
-	rdmsr(0x2c, msr_lo, msr_hi);
-
-	dprintk(KERN_DEBUG "cpufreq: P4 - MSR_EBC_FREQUENCY_ID: 0x%x 0x%x\n", msr_lo, msr_hi);
-
-	/* First 12 bits seem to change a lot (0x511, 0x410 and 0x30f seen 
-	 * yet). Next 12 bits always seem to be 0x300. If this is not true 
-	 * on this CPU, complain. Last 8 bits are frequency (in 100MHz).
-	 */
-	if (msr_hi || ((msr_lo & 0x00FFF000) != 0x300000)) {
-		printk(KERN_DEBUG "cpufreq: P4 - MSR_EBC_FREQUENCY_ID: 0x%x 0x%x\n", msr_lo, msr_hi);
-		printk(KERN_INFO "cpufreq: problem in initialization. Please contact Dominik Brodowski\n");
-		printk(KERN_INFO "cpufreq: <linux@brodo.de> and attach this dmesg. Thanks in advance\n");
-		return 0;
-	}
-
-	msr_lo >>= 24;
-	return (msr_lo * 100000);
-}
-
-
-/** 
- * speedstep_detect_processor - detect Intel SpeedStep-capable processors.
- *
- *   Returns the SPEEDSTEP_PROCESSOR_-number for the detected processor, 
- * or zero on failure.
- */
-static unsigned int speedstep_detect_processor (void)
-{
-	struct cpuinfo_x86 *c = cpu_data;
-	u32                     ebx;
-
-	if ((c->x86_vendor != X86_VENDOR_INTEL) || 
-	    ((c->x86 != 6) && (c->x86 != 0xF)))
-		return 0;
-
-	if (c->x86 == 0xF) {
-		/* Intel Pentium 4 Mobile P4-M */
-		if (c->x86_model != 2)
-			return 0;
-
-		if ((c->x86_mask != 4) && (c->x86_mask != 7))
-			return 0;
-
-		ebx = cpuid_ebx(0x00000001);
-		ebx &= 0x000000FF;
-		if ((ebx != 0x0e) && (ebx != 0x0f))
-			return 0;
-
-		return SPEEDSTEP_PROCESSOR_P4M;
-	}
-
-	switch (c->x86_model) {
-	case 0x0B: /* Intel PIII [Tualatin] */
-		/* cpuid_ebx(1) is 0x04 for desktop PIII, 
-		                   0x06 for mobile PIII-M */
-		ebx = cpuid_ebx(0x00000001);
-
-		ebx &= 0x000000FF;
-		if (ebx != 0x06)
-			return 0;
-
-		/* So far all PIII-M processors support SpeedStep. See
-		 * Intel's 24540633.pdf of August 2002 
-		 */
-
-		return SPEEDSTEP_PROCESSOR_PIII_T;
-
-	case 0x08: /* Intel PIII [Coppermine] */
- 	        {
-			u32     msr_lo, msr_hi;
-
-			/* all mobile PIII Coppermines have FSB 100 MHz
-			 * ==> sort out a few desktop PIIIs. */
-			rdmsr(MSR_IA32_EBL_CR_POWERON, msr_lo, msr_hi);
-			dprintk(KERN_DEBUG "cpufreq: Coppermine: MSR_IA32_EBL_Cr_POWERON is 0x%x, 0x%x\n", msr_lo, msr_hi);
-			msr_lo &= 0x00c0000;
-			if (msr_lo != 0x0080000)
-				return 0;
-
-			if (speedstep_coppermine)
-				return SPEEDSTEP_PROCESSOR_PIII_C;
-
-			/*
-			 * If the processor is a mobile version,
-			 * platform ID has bit 50 set
-			 * it has SpeedStep technology if either
-			 * bit 56 or 57 is set
-			 */
-			rdmsr(MSR_IA32_PLATFORM_ID, msr_lo, msr_hi);
-			dprintk(KERN_DEBUG "cpufreq: Coppermine: MSR_IA32_PLATFORM ID is 0x%x, 0x%x\n", msr_lo, msr_hi);
-			if ((msr_hi & (1<<18)) && (msr_hi & (3<<24)))
-				return SPEEDSTEP_PROCESSOR_PIII_C;
-
-			printk(KERN_INFO "cpufreq: in case this is a SpeedStep-capable Intel Pentium III Coppermine\n");
-			printk(KERN_INFO "cpufreq: processor, please pass the boot option or module parameter\n");
-			printk(KERN_INFO "cpufreq: `speedstep_coppermine=1` to the kernel. Thanks!\n");
-			return 0;
-		}
-
-	default:
-		return 0;
-	}
-}
-
-
-
-/*********************************************************************
- *                        HIGH LEVEL FUNCTIONS                       *
- *********************************************************************/
-
-/**
- * speedstep_detect_speeds - detects low and high CPU frequencies.
- *
- *   Detects the low and high CPU frequencies in kHz. Returns 0 on
- * success or -EINVAL / -EIO on problems. 
- */
-static int speedstep_detect_speeds (void)
-{
-	unsigned long   flags;
-	unsigned int    state;
-	int             i, result;
-
-	/* Disable irqs for entire detection process */
-	local_irq_save(flags);
-
-	for (i=0; i<2; i++) {
-		/* read the current state */
-		result = speedstep_get_state(&state);
-		if (result) {
-			local_irq_restore(flags);
-			return result;
-		}
-
-		/* save the correct value, and switch to other */
-		if (state == SPEEDSTEP_LOW) {
-			switch (speedstep_processor) {
-			case SPEEDSTEP_PROCESSOR_PIII_C:
-			case SPEEDSTEP_PROCESSOR_PIII_T:
-				speedstep_low_freq = pentium3_get_frequency();
-				break;
-			case SPEEDSTEP_PROCESSOR_P4M:
-				speedstep_low_freq = pentium4_get_frequency();
-			}
-			speedstep_set_state(SPEEDSTEP_HIGH, 0);
-		} else {
-			switch (speedstep_processor) {
-			case SPEEDSTEP_PROCESSOR_PIII_C:
-			case SPEEDSTEP_PROCESSOR_PIII_T:
-				speedstep_high_freq = pentium3_get_frequency();
-				break;
-			case SPEEDSTEP_PROCESSOR_P4M:
-				speedstep_high_freq = pentium4_get_frequency();
-			}
-			speedstep_set_state(SPEEDSTEP_LOW, 0);
-		}
-	}
-
-	local_irq_restore(flags);
-
-	if (!speedstep_low_freq || !speedstep_high_freq || 
-	    (speedstep_low_freq == speedstep_high_freq))
-		return -EIO;
 
 	return 0;
 }
@@ -598,7 +248,7 @@ static int speedstep_target (struct cpufreq_policy *policy,
 			     unsigned int target_freq,
 			     unsigned int relation)
 {
-	unsigned int    newstate = 0;
+	unsigned int	newstate = 0;
 
 	if (cpufreq_frequency_table_target(policy, &speedstep_freqs[0], target_freq, relation, &newstate))
 		return -EINVAL;
@@ -632,48 +282,30 @@ static int speedstep_cpu_init(struct cpufreq_policy *policy)
 		return -ENODEV;
 
 	/* detect low and high frequency */
-	result = speedstep_detect_speeds();
+	result = speedstep_get_freqs(speedstep_processor,
+				     &speedstep_freqs[SPEEDSTEP_LOW].frequency,
+				     &speedstep_freqs[SPEEDSTEP_HIGH].frequency,
+				     &speedstep_set_state);
 	if (result)
 		return result;
 
 	/* get current speed setting */
-	result = speedstep_get_state(&speed);
-	if (result)
-		return result;
+	speed = speedstep_get_processor_frequency(speedstep_processor);
+	if (!speed)
+		return -EIO;
 
-	speed = (speed == SPEEDSTEP_LOW) ? speedstep_low_freq : speedstep_high_freq;
 	dprintk(KERN_INFO "cpufreq: currently at %s speed setting - %i MHz\n", 
 		(speed == speedstep_low_freq) ? "low" : "high",
 		(speed / 1000));
 
 	/* cpuinfo and default policy values */
-	policy->policy = (speed == speedstep_low_freq) ? 
+	policy->policy = (speed == speedstep_freqs[SPEEDSTEP_LOW].frequency) ? 
 		CPUFREQ_POLICY_POWERSAVE : CPUFREQ_POLICY_PERFORMANCE;
 	policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
 	policy->cur = speed;
 
 	return cpufreq_frequency_table_cpuinfo(policy, &speedstep_freqs[0]);
 }
-
-
-#ifndef MODULE
-/**
- * speedstep_setup  speedstep command line parameter parsing
- *
- * speedstep command line parameter.  Use:
- *  speedstep_coppermine=1
- * if the CPU in your notebook is a SpeedStep-capable Intel
- * Pentium III Coppermine. These processors cannot be detected
- * automatically, as Intel continues to consider the detection 
- * algorithm as proprietary material.
- */
-static int __init speedstep_setup(char *str)
-{
-	speedstep_coppermine = simple_strtoul(str, &str, 0);
-	return 1;
-}
-__setup("speedstep_coppermine=", speedstep_setup);
-#endif
 
 
 static struct cpufreq_driver speedstep_driver = {
@@ -694,19 +326,16 @@ static struct cpufreq_driver speedstep_driver = {
  */
 static int __init speedstep_init(void)
 {
-	/* detect chipset */
-	speedstep_chipset = speedstep_detect_chipset(); 
+	/* detect processor */
+	speedstep_processor = speedstep_detect_processor();
+	if (!speedstep_processor)
+		return -ENODEV;
 
 	/* detect chipset */
-	if (speedstep_chipset)
-		speedstep_processor = speedstep_detect_processor();
-
-	if ((!speedstep_chipset) || (!speedstep_processor)) {
-		printk(KERN_INFO "cpufreq: Intel(R) SpeedStep(TM) for this %s not (yet) available.\n", speedstep_chipset ? "processor" : "chipset");
+	if (!speedstep_detect_chipset()) {
+		printk(KERN_INFO "cpufreq: Intel(R) SpeedStep(TM) for this chipset not (yet) available.\n");
 		return -ENODEV;
 	}
-
-	dprintk(KERN_INFO "cpufreq: Intel(R) SpeedStep(TM) support $Revision: 1.70 $\n");
 
 	/* activate speedstep support */
 	if (speedstep_activate())
@@ -727,10 +356,8 @@ static void __exit speedstep_exit(void)
 }
 
 
-MODULE_PARM (speedstep_coppermine, "i");
-
 MODULE_AUTHOR ("Dave Jones <davej@suse.de>, Dominik Brodowski <linux@brodo.de>");
-MODULE_DESCRIPTION ("Speedstep driver for Intel mobile processors.");
+MODULE_DESCRIPTION ("Speedstep driver for Intel mobile processors on chipsets with ICH-M southbridges.");
 MODULE_LICENSE ("GPL");
 
 module_init(speedstep_init);

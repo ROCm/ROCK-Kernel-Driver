@@ -123,6 +123,11 @@ config X86_SPEEDSTEP_CENTRINO
 	  
 	  If in doubt, say N.
 
+config X86_SPEEDSTEP_LIB
+       tristate
+       depends on X86_SPEEDSTEP_ICH
+       default X86_SPEEDSTEP_ICH
+
 config X86_P4_CLOCKMOD
 	tristate "Intel Pentium 4 clock modulation"
 	depends on CPU_FREQ_TABLE
