@@ -10,6 +10,8 @@
 #include <linux/binfmts.h>
 #include <linux/compat.h>
 
+#include <asm/processor.h>
+
 /*
  * 32 bit structures for IA32 support.
  */
@@ -327,14 +329,22 @@ void ia64_elf32_init(struct pt_regs *regs);
 #define __USER_CS      0x23
 #define __USER_DS      0x2B
 
-#define FIRST_TSS_ENTRY 6
-#define FIRST_LDT_ENTRY (FIRST_TSS_ENTRY+1)
-#define _TSS(n) ((((unsigned long) n)<<4)+(FIRST_TSS_ENTRY<<3))
-#define _LDT(n) ((((unsigned long) n)<<4)+(FIRST_LDT_ENTRY<<3))
+/*
+ * The per-cpu GDT has 32 entries: see <asm-i386/segment.h>
+ */
+#define GDT_ENTRIES 32
+
+#define GDT_SIZE	(GDT_ENTRIES * 8)
+
+#define TSS_ENTRY 14
+#define LDT_ENTRY	(TSS_ENTRY + 1)
 
 #define IA32_SEGSEL_RPL		(0x3 << 0)
 #define IA32_SEGSEL_TI		(0x1 << 2)
 #define IA32_SEGSEL_INDEX_SHIFT	3
+
+#define _TSS			((unsigned long) TSS_ENTRY << IA32_SEGSEL_INDEX_SHIFT)
+#define _LDT			((unsigned long) LDT_ENTRY << IA32_SEGSEL_INDEX_SHIFT)
 
 #define IA32_SEG_BASE		16
 #define IA32_SEG_TYPE		40
@@ -419,7 +429,42 @@ void ia64_elf32_init(struct pt_regs *regs);
 #define IA32_LDT_ENTRIES	8192		/* Maximum number of LDT entries supported. */
 #define IA32_LDT_ENTRY_SIZE	8		/* The size of each LDT entry. */
 
-struct ia32_modify_ldt_ldt_s {
+#define LDT_entry_a(info) \
+	((((info)->base_addr & 0x0000ffff) << 16) | ((info)->limit & 0x0ffff))
+
+#define LDT_entry_b(info)				\
+	(((info)->base_addr & 0xff000000) |		\
+	(((info)->base_addr & 0x00ff0000) >> 16) |	\
+	((info)->limit & 0xf0000) |			\
+	(((info)->read_exec_only ^ 1) << 9) |		\
+	((info)->contents << 10) |			\
+	(((info)->seg_not_present ^ 1) << 15) |		\
+	((info)->seg_32bit << 22) |			\
+	((info)->limit_in_pages << 23) |		\
+	((info)->useable << 20) |			\
+	0x7100)
+
+#define LDT_empty(info) (			\
+	(info)->base_addr	== 0	&&	\
+	(info)->limit		== 0	&&	\
+	(info)->contents	== 0	&&	\
+	(info)->read_exec_only	== 1	&&	\
+	(info)->seg_32bit	== 0	&&	\
+	(info)->limit_in_pages	== 0	&&	\
+	(info)->seg_not_present	== 1	&&	\
+	(info)->useable		== 0	)
+
+static inline void
+load_TLS (struct thread_struct *t, unsigned int cpu)
+{
+	extern unsigned long *cpu_gdt_table[NR_CPUS];
+
+	memcpy(cpu_gdt_table[cpu] + GDT_ENTRY_TLS_MIN + 0, &t->tls_array[0], sizeof(long));
+	memcpy(cpu_gdt_table[cpu] + GDT_ENTRY_TLS_MIN + 1, &t->tls_array[1], sizeof(long));
+	memcpy(cpu_gdt_table[cpu] + GDT_ENTRY_TLS_MIN + 2, &t->tls_array[2], sizeof(long));
+}
+
+struct ia32_user_desc {
 	unsigned int entry_number;
 	unsigned int base_addr;
 	unsigned int limit;

@@ -2817,6 +2817,114 @@ sys32_epoll_wait(int epfd, struct epoll_event32 *events, int maxevents,
 	return numevents;
 }
 
+/*
+ * Get a yet unused TLS descriptor index.
+ */
+static int
+get_free_idx (void)
+{
+	struct thread_struct *t = &current->thread;
+	int idx;
+
+	for (idx = 0; idx < GDT_ENTRY_TLS_ENTRIES; idx++)
+		if (desc_empty(t->tls_array + idx))
+			return idx + GDT_ENTRY_TLS_MIN;
+	return -ESRCH;
+}
+
+/*
+ * Set a given TLS descriptor:
+ */
+asmlinkage int
+sys32_set_thread_area (struct ia32_user_desc *u_info)
+{
+	struct thread_struct *t = &current->thread;
+	struct ia32_user_desc info;
+	struct desc_struct *desc;
+	int cpu, idx;
+
+	if (copy_from_user(&info, u_info, sizeof(info)))
+		return -EFAULT;
+	idx = info.entry_number;
+
+	/*
+	 * index -1 means the kernel should try to find and allocate an empty descriptor:
+	 */
+	if (idx == -1) {
+		idx = get_free_idx();
+		if (idx < 0)
+			return idx;
+		if (put_user(idx, &u_info->entry_number))
+			return -EFAULT;
+	}
+
+	if (idx < GDT_ENTRY_TLS_MIN || idx > GDT_ENTRY_TLS_MAX)
+		return -EINVAL;
+
+	desc = t->tls_array + idx - GDT_ENTRY_TLS_MIN;
+
+	cpu = smp_processor_id();
+
+	if (LDT_empty(&info)) {
+		desc->a = 0;
+		desc->b = 0;
+	} else {
+		desc->a = LDT_entry_a(&info);
+		desc->b = LDT_entry_b(&info);
+	}
+	load_TLS(t, cpu);
+	return 0;
+}
+
+/*
+ * Get the current Thread-Local Storage area:
+ */
+
+#define GET_BASE(desc) (			\
+	(((desc)->a >> 16) & 0x0000ffff) |	\
+	(((desc)->b << 16) & 0x00ff0000) |	\
+	( (desc)->b        & 0xff000000)   )
+
+#define GET_LIMIT(desc) (			\
+	((desc)->a & 0x0ffff) |			\
+	 ((desc)->b & 0xf0000) )
+
+#define GET_32BIT(desc)		(((desc)->b >> 23) & 1)
+#define GET_CONTENTS(desc)	(((desc)->b >> 10) & 3)
+#define GET_WRITABLE(desc)	(((desc)->b >>  9) & 1)
+#define GET_LIMIT_PAGES(desc)	(((desc)->b >> 23) & 1)
+#define GET_PRESENT(desc)	(((desc)->b >> 15) & 1)
+#define GET_USEABLE(desc)	(((desc)->b >> 20) & 1)
+
+asmlinkage int
+sys32_get_thread_area (struct ia32_user_desc *u_info)
+{
+	struct ia32_user_desc info;
+	struct desc_struct *desc;
+	int idx;
+
+	if (get_user(idx, &u_info->entry_number))
+		return -EFAULT;
+	if (idx < GDT_ENTRY_TLS_MIN || idx > GDT_ENTRY_TLS_MAX)
+		return -EINVAL;
+
+	desc = current->thread.tls_array + idx - GDT_ENTRY_TLS_MIN;
+
+	info.entry_number = idx;
+	info.base_addr = GET_BASE(desc);
+	info.limit = GET_LIMIT(desc);
+	info.seg_32bit = GET_32BIT(desc);
+	info.contents = GET_CONTENTS(desc);
+	info.read_exec_only = !GET_WRITABLE(desc);
+	info.limit_in_pages = GET_LIMIT_PAGES(desc);
+	info.seg_not_present = !GET_PRESENT(desc);
+	info.useable = GET_USEABLE(desc);
+
+	if (copy_to_user(u_info, &info, sizeof(info)))
+		return -EFAULT;
+	return 0;
+}
+
 #ifdef	NOTYET  /* UNTESTED FOR IA64 FROM HERE DOWN */
 
 struct ncp_mount_data32 {
