@@ -21,15 +21,24 @@ int nfsd_setuser(struct svc_rqst *rqstp, struct svc_export *exp)
 	if (exp->ex_flags & NFSEXP_ALLSQUASH) {
 		cred->cr_uid = exp->ex_anon_uid;
 		cred->cr_gid = exp->ex_anon_gid;
-		cred->cr_group_info->ngroups = 0;
+		put_group_info(cred->cr_group_info);
+		cred->cr_group_info = groups_alloc(0);
 	} else if (exp->ex_flags & NFSEXP_ROOTSQUASH) {
+		struct group_info *gi;
 		if (!cred->cr_uid)
 			cred->cr_uid = exp->ex_anon_uid;
 		if (!cred->cr_gid)
 			cred->cr_gid = exp->ex_anon_gid;
-		for (i = 0; i < cred->cr_group_info->ngroups; i++)
-			if (!GROUP_AT(cred->cr_group_info, i))
-				GROUP_AT(cred->cr_group_info, i) = exp->ex_anon_gid;
+		gi = groups_alloc(cred->cr_group_info->ngroups);
+		if (gi)
+			for (i = 0; i < cred->cr_group_info->ngroups; i++) {
+				if (!GROUP_AT(cred->cr_group_info, i))
+					GROUP_AT(gi, i) = exp->ex_anon_gid;
+				else
+					GROUP_AT(gi, i) = GROUP_AT(cred->cr_group_info, i);
+			}
+		put_group_info(cred->cr_group_info);
+		cred->cr_group_info = gi;
 	}
 
 	if (cred->cr_uid != (uid_t) -1)
@@ -41,6 +50,8 @@ int nfsd_setuser(struct svc_rqst *rqstp, struct svc_export *exp)
 	else
 		current->fsgid = exp->ex_anon_gid;
 
+	if (!cred->cr_group_info)
+		return -ENOMEM;
 	ret = set_current_groups(cred->cr_group_info);
 	if ((cred->cr_uid)) {
 		cap_t(current->cap_effective) &= ~CAP_NFSD_MASK;
