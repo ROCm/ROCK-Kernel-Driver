@@ -131,7 +131,6 @@ struct us_data {
 	 */
 	struct semaphore	dev_semaphore;	 /* protect pusb_dev */
 	struct usb_device	*pusb_dev;	 /* this usb_device */
-
 	unsigned long		flags;		 /* from filter initially */
 
 	/* information about the device -- always good */
@@ -164,8 +163,8 @@ struct us_data {
 	Scsi_Cmnd		*srb;		 /* current srb		*/
 
 	/* thread information */
-	int			pid;		 /* control thread	  */
-	atomic_t		sm_state;
+	int			pid;		 /* control thread	 */
+	atomic_t		sm_state;	 /* what we are doing	 */
 
 	/* interrupt info for CBI devices -- only good if attached */
 	struct semaphore	ip_waitq;	 /* for CBI interrupts	 */
@@ -177,7 +176,7 @@ struct us_data {
 	unsigned char		irqdata[2];	 /* data from USB IRQ	 */
 
 	/* control and bulk communications data */
-	struct semaphore	current_urb_sem; /* to protect irq_urb	 */
+	struct semaphore	current_urb_sem; /* protect current_urb  */
 	struct urb		*current_urb;	 /* non-int USB requests */
 	struct usb_ctrlrequest	*dr;		 /* control requests	 */
 

@@ -473,7 +473,7 @@ static int usb_stor_control_thread(void * __us)
 }	
 
 /* Set up the URB, the usb_ctrlrequest, and the IRQ pipe and handler.
- * ss->dev_semaphore should already be locked.
+ * ss->dev_semaphore must already be locked.
  * Note that this function assumes that all the data in the us_data
  * strucuture is current.  This includes the ep_int field, which gives us
  * the endpoint for the interrupt.

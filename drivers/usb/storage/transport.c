@@ -849,6 +849,7 @@ void usb_stor_abort_transport(struct us_data *us)
 	/* Normally the current state is RUNNING.  If the control thread
 	 * hasn't even started processing this command, the state will be
 	 * IDLE.  Anything else is a bug. */
+	BUG_ON((state != US_STATE_RUNNING && state != US_STATE_IDLE));
 
 	/* set state to abort and release the lock */
 	atomic_set(&us->sm_state, US_STATE_ABORTING);

@@ -114,9 +114,10 @@ static int release(struct Scsi_Host *psh)
 	/* Kill the control threads
 	 *
 	 * Enqueue the command, wake up the thread, and wait for 
-	 * notification that it's exited.
+	 * notification that it has exited.
 	 */
 	US_DEBUGP("-- sending exit command to thread\n");
+	BUG_ON(atomic_read(&us->sm_state) != US_STATE_IDLE);
 	us->srb = NULL;
 	up(&(us->sema));
 	wait_for_completion(&(us->notify));
@@ -136,7 +137,7 @@ static int command( Scsi_Cmnd *srb )
 	return DID_BAD_TARGET << 16;
 }
 
-/* run command */
+/* queue a command */
 /* This is always called with scsi_lock(srb->host) held */
 static int queuecommand( Scsi_Cmnd *srb , void (*done)(Scsi_Cmnd *))
 {
@@ -146,6 +147,7 @@ static int queuecommand( Scsi_Cmnd *srb , void (*done)(Scsi_Cmnd *))
 	srb->host_scribble = (unsigned char *)us;
 
 	/* enqueue the command */
+	BUG_ON(atomic_read(&us->sm_state) != US_STATE_IDLE || us->srb != NULL);
 	srb->scsi_done = done;
 	us->srb = srb;
 
@@ -186,6 +188,7 @@ static int device_reset( Scsi_Cmnd *srb )
 	int result;
 
 	US_DEBUGP("device_reset() called\n" );
+	BUG_ON(atomic_read(&us->sm_state) != US_STATE_IDLE);
 
 	/* set the state and release the lock */
 	atomic_set(&us->sm_state, US_STATE_RESETTING);
