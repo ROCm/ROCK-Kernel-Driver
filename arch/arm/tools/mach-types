@@ -6,7 +6,7 @@
 # To add an entry into this database, please see Documentation/arm/README,
 # or contact rmk@arm.linux.org.uk
 #
-# Last update: Sat Nov 16 15:57:50 2002
+# Last update: Mon Dec 23 18:49:04 2002
 #
 # machine_is_xxx	CONFIG_xxxx		MACH_TYPE_xxx		number
 #
@@ -154,7 +154,7 @@ piranha			ARCH_PIRANHA		PIRANHA			142
 sbcamelot		SA1100_SBCAMELOT	SBCAMELOT		143
 kings			SA1100_KINGS		KINGS			144
 smdk2400		ARCH_SMDK2400		SMDK2400		145
-collie			ARCH_COLLIE		COLLIE			146
+collie			SA1100_COLLIE		COLLIE			146
 idr			ARCH_IDR		IDR			147
 badge4			SA1100_BADGE4		BADGE4			148
 webnet			ARCH_WEBNET		WEBNET			149
@@ -258,3 +258,18 @@ chimp			ARCH_CHIMP		CHIMP			246
 stork_nest		ARCH_STORK_NEST		STORK_NEST		247
 stork_egg		ARCH_STORK_EGG		STORK_EGG		248
 wismo			SA1100_WISMO		WISMO			249
+ezlinx			ARCH_EZLINX		EZLINX			250
+at91rm9200		ARCH_AT91		AT91			251
+orion			ARCH_ORION		ORION			252
+neptune			ARCH_NEPTUNE		NEPTUNE			253
+hackkit			SA1100_HACKKIT		HACKKIT			254
+pxa_wins30		ARCH_PXA_WINS30		PXA_WINS30		255
+lavinna			SA1100_LAVINNA		LAVINNA			256
+pxa_uengine		ARCH_PXA_UENGINE	PXA_UENGINE		257
+innokom			ARCH_INNOKOM		INNOKOM			258
+bms			ARCH_BMS		BMS			259
+ixcdp1100		ARCH_IXCDP1100		IXCDP1100		260
+prpmc1100		ARCH_PRPMC1100		PRPMC1100		261
+at91rm9200dk		ARCH_AT91RM9200DK	AT91RM9200DK		262
+armstick		ARCH_ARMSTICK		ARMSTICK		263
+armonie			ARCH_ARMONIE		ARMONIE			264
