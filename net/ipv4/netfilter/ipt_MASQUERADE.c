@@ -116,6 +116,7 @@ masquerade_target(struct sk_buff **pskb,
 			if (net_ratelimit())
 				printk("MASQUERADE:"
 				       " Route sent us somewhere else.\n");
+			ip_rt_put(rt);
 			return NF_DROP;
 		}
 	}
