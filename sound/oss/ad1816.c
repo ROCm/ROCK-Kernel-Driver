@@ -518,20 +518,20 @@ static void ad1816_close (int dev) /* close device */
 
 static struct audio_driver ad1816_audio_driver =
 {
-	owner:		THIS_MODULE,
-	open:		ad1816_open,
-	close:		ad1816_close,
-	output_block:	ad1816_output_block,
-	start_input:	ad1816_start_input,
-	prepare_for_input:	ad1816_prepare_for_input,
-	prepare_for_output:	ad1816_prepare_for_output,
-	halt_io:		ad1816_halt,
-	halt_input:	ad1816_halt_input,
-	halt_output:	ad1816_halt_output,
-	trigger:	ad1816_trigger,
-	set_speed:	ad1816_set_speed,
-	set_bits:	ad1816_set_bits,
-	set_channels:	ad1816_set_channels,
+	.owner			= THIS_MODULE,
+	.open			= ad1816_open,
+	.close			= ad1816_close,
+	.output_block		= ad1816_output_block,
+	.start_input		= ad1816_start_input,
+	.prepare_for_input	= ad1816_prepare_for_input,
+	.prepare_for_output	= ad1816_prepare_for_output,
+	.halt_io		= ad1816_halt,
+	.halt_input		= ad1816_halt_input,
+	.halt_output		= ad1816_halt_output,
+	.trigger		= ad1816_trigger,
+	.set_speed		= ad1816_set_speed,
+	.set_bits		= ad1816_set_bits,
+	.set_channels		= ad1816_set_channels,
 };
 
 
@@ -970,10 +970,10 @@ ad1816_mixer_ioctl (int dev, unsigned int cmd, caddr_t arg)
 /* Mixer structure */
 
 static struct mixer_operations ad1816_mixer_operations = {
-	owner:	THIS_MODULE,
-	id:	"AD1816",
-	name:	"AD1816 Mixer",
-	ioctl:	ad1816_mixer_ioctl
+	.owner	= THIS_MODULE,
+	.id	= "AD1816",
+	.name	= "AD1816 Mixer",
+	.ioctl	= ad1816_mixer_ioctl
 };
 
 
