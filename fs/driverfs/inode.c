@@ -213,21 +213,49 @@ static int driverfs_empty(struct dentry *dentry)
 static int driverfs_unlink(struct inode *dir, struct dentry *dentry)
 {
 	struct inode *inode = dentry->d_inode;
-	inode->i_nlink--;
+	down(&inode->i_sem);
+	dentry->d_inode->i_nlink--;
 	dput(dentry);
+	up(&inode->i_sem);
+	d_delete(dentry);
 	return 0;
+}
+
+static void d_unhash(struct dentry *dentry)
+{
+	dget(dentry);
+	spin_lock(&dcache_lock);
+	switch (atomic_read(&dentry->d_count)) {
+	default:
+		spin_unlock(&dcache_lock);
+		shrink_dcache_parent(dentry);
+		spin_lock(&dcache_lock);
+		if (atomic_read(&dentry->d_count) != 2)
+			break;
+	case 2:
+		list_del_init(&dentry->d_hash);
+	}
+	spin_unlock(&dcache_lock);
 }
 
 static int driverfs_rmdir(struct inode *dir, struct dentry *dentry)
 {
 	int error = -ENOTEMPTY;
+	struct inode * inode = dentry->d_inode;
 
+	down(&inode->i_sem);
+	d_unhash(dentry);
 	if (driverfs_empty(dentry)) {
-		dentry->d_inode->i_nlink--;
-		driverfs_unlink(dir, dentry);
+		dentry->d_inode->i_nlink -= 2;
+		dput(dentry);
+		inode->i_flags |= S_DEAD;
 		dir->i_nlink--;
 		error = 0;
 	}
+	up(&inode->i_sem);
+	if (!error)
+		d_delete(dentry);
+	dput(dentry);
 	return error;
 }
 
@@ -431,8 +459,6 @@ static struct file_operations driverfs_file_operations = {
 
 static struct inode_operations driverfs_dir_inode_operations = {
 	.lookup		= simple_lookup,
-	.unlink		= driverfs_unlink,
-	.rmdir		= driverfs_rmdir,
 };
 
 static struct address_space_operations driverfs_aops = {
@@ -712,7 +738,7 @@ void driverfs_remove_file(struct driver_dir_entry * dir, const char * name)
 		entry = list_entry(node,struct driver_file_entry,node);
 		if (!strcmp(entry->name,name)) {
 			list_del_init(node);
-			vfs_unlink(entry->dentry->d_parent->d_inode,entry->dentry);
+			driverfs_unlink(entry->dentry->d_parent->d_inode,entry->dentry);
 			dput(entry->dentry);
 			put_mount();
 			break;
@@ -747,14 +773,14 @@ void driverfs_remove_dir(struct driver_dir_entry * dir)
 		entry = list_entry(node,struct driver_file_entry,node);
 
 		list_del_init(node);
-		vfs_unlink(dentry->d_inode,entry->dentry);
+		driverfs_unlink(dentry->d_inode,entry->dentry);
 		dput(entry->dentry);
 		put_mount();
 		node = dir->files.next;
 	}
 	up(&dentry->d_inode->i_sem);
 
-	vfs_rmdir(dentry->d_parent->d_inode,dentry);
+	driverfs_rmdir(dentry->d_parent->d_inode,dentry);
 	up(&dentry->d_parent->d_inode->i_sem);
 	dput(dentry);
  done:
