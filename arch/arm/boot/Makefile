@@ -106,13 +106,11 @@ initrd:
 	(echo You must specify INITRD; exit -1)
 
 install: $(obj)/Image
-	$(CONFIG_SHELL) $(obj)/install.sh \
-	$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION) \
+	$(CONFIG_SHELL) $(srctree)/$(src)/install.sh $(KERNELRELEASE) \
 	$(obj)/Image System.map "$(INSTALL_PATH)"
 
 zinstall: $(obj)/zImage
-	$(CONFIG_SHELL) $(obj)/install.sh \
-	$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION) \
+	$(CONFIG_SHELL) $(srctree)/$(src)/install.sh $(KERNELRELEASE) \
 	$(obj)/zImage System.map "$(INSTALL_PATH)"
 
 subdir-	    := bootp compressed
