@@ -571,7 +571,7 @@ extern struct nfs4_state_owner * nfs4_get_state_owner(struct nfs_server *, struc
 extern void nfs4_put_state_owner(struct nfs4_state_owner *);
 extern struct nfs4_state * nfs4_get_open_state(struct inode *, struct nfs4_state_owner *);
 extern void nfs4_put_open_state(struct nfs4_state *);
-extern void nfs4_increment_seqid(u32 status, struct nfs4_state_owner *sp);
+extern void nfs4_increment_seqid(int status, struct nfs4_state_owner *sp);
 
 struct nfs4_mount_data;
 #else

@@ -57,7 +57,7 @@
 /* Mapping from NFS error code to "errno" error code. */
 #define errno_NFSERR_IO		EIO
 
-extern int			nfs_stat_to_errno(int);
+static int nfs_stat_to_errno(int);
 
 /* NFSv4 COMPOUND tags are only wanted for debugging purposes */
 #ifdef DEBUG
@@ -2648,6 +2648,67 @@ nfs4_decode_dirent(uint32_t *p, struct nfs_entry *entry, int plus)
 
 	entry->eof = !p[0] && p[1];
 	return p;
+}
+
+/*
+ * We need to translate between nfs status return values and
+ * the local errno values which may not be the same.
+ */
+static struct {
+	int stat;
+	int errno;
+} nfs_errtbl[] = {
+	{ NFS4_OK,		0		},
+	{ NFS4ERR_PERM,		EPERM		},
+	{ NFS4ERR_NOENT,	ENOENT		},
+	{ NFS4ERR_IO,		errno_NFSERR_IO	},
+	{ NFS4ERR_NXIO,		ENXIO		},
+	{ NFS4ERR_ACCESS,	EACCES		},
+	{ NFS4ERR_EXIST,	EEXIST		},
+	{ NFS4ERR_XDEV,		EXDEV		},
+	{ NFS4ERR_NOTDIR,	ENOTDIR		},
+	{ NFS4ERR_ISDIR,	EISDIR		},
+	{ NFS4ERR_INVAL,	EINVAL		},
+	{ NFS4ERR_FBIG,		EFBIG		},
+	{ NFS4ERR_NOSPC,	ENOSPC		},
+	{ NFS4ERR_ROFS,		EROFS		},
+	{ NFS4ERR_MLINK,	EMLINK		},
+	{ NFS4ERR_NAMETOOLONG,	ENAMETOOLONG	},
+	{ NFS4ERR_NOTEMPTY,	ENOTEMPTY	},
+	{ NFS4ERR_DQUOT,	EDQUOT		},
+	{ NFS4ERR_STALE,	ESTALE		},
+	{ NFS4ERR_BADHANDLE,	EBADHANDLE	},
+	{ NFS4ERR_BAD_COOKIE,	EBADCOOKIE	},
+	{ NFS4ERR_NOTSUPP,	ENOTSUPP	},
+	{ NFS4ERR_TOOSMALL,	ETOOSMALL	},
+	{ NFS4ERR_SERVERFAULT,	ESERVERFAULT	},
+	{ NFS4ERR_BADTYPE,	EBADTYPE	},
+	{ NFS4ERR_LOCKED,	EAGAIN		},
+	{ NFS4ERR_RESOURCE,	EREMOTEIO	},
+	{ NFS4ERR_SYMLINK,	ELOOP		},
+	{ NFS4ERR_OP_ILLEGAL,	EOPNOTSUPP	},
+	{ NFS4ERR_DEADLOCK,	EDEADLK		},
+	{ -1,			EIO		}
+};
+
+/*
+ * Convert an NFS error code to a local one.
+ * This one is used jointly by NFSv2 and NFSv3.
+ */
+static int
+nfs_stat_to_errno(int stat)
+{
+	int i;
+	for (i = 0; nfs_errtbl[i].stat != -1; i++) {
+		if (nfs_errtbl[i].stat == stat)
+			return nfs_errtbl[i].errno;
+	}
+	/* If we cannot translate the error, the recovery routines should
+	 * handle it.
+	 * Note: remaining NFSv4 error codes have values > 10000, so should
+	 * not conflict with native Linux error codes.
+	 */
+	return stat;
 }
 
 #ifndef MAX

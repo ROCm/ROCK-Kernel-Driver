@@ -376,9 +376,9 @@ nfs4_put_open_state(struct nfs4_state *state)
 * see comments nfs_fs.h:seqid_mutating_error()
 */
 void
-nfs4_increment_seqid(u32 status, struct nfs4_state_owner *sp)
+nfs4_increment_seqid(int status, struct nfs4_state_owner *sp)
 {
-	if (status == NFS_OK || seqid_mutating_err(status))
+	if (status == NFS_OK || seqid_mutating_err(-status))
 		sp->so_seqid++;
 }
 
