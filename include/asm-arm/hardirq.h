@@ -69,10 +69,18 @@ typedef struct {
 
 #define irq_enter()		(preempt_count() += HARDIRQ_OFFSET)
 
+#ifdef CONFIG_PREEMPT
+# define in_atomic()	((preempt_count() & ~PREEMPT_ACTIVE) != kernel_locked())
+# define IRQ_EXIT_OFFSET (HARDIRQ_OFFSET-1)
+#else
+# define in_atomic()	(preempt_count() != 0)
+# define IRQ_EXIT_OFFSET HARDIRQ_OFFSET
+#endif
+
 #ifndef CONFIG_SMP
 #define irq_exit()							\
 	do {								\
-		preempt_count() -= HARDIRQ_OFFSET;			\
+		preempt_count() -= IRQ_EXIT_OFFSET;			\
 		if (!in_interrupt() && softirq_pending(smp_processor_id())) \
 			__asm__("bl%? __do_softirq": : : "lr");/* out of line */\
 		preempt_enable_no_resched();				\
@@ -80,7 +88,7 @@ typedef struct {
 
 #define synchronize_irq(irq)	barrier()
 #else
-#error SMP not supported
+extern void synchronize_irq(unsigned int irq);
 #endif
 
 #endif /* __ASM_HARDIRQ_H */
