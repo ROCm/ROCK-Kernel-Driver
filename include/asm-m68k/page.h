@@ -18,9 +18,9 @@
 #include <asm/setup.h>
 
 #if PAGE_SHIFT < 13
-#define KTHREAD_SIZE (8192)
+#define THREAD_SIZE (8192)
 #else
-#define KTHREAD_SIZE PAGE_SIZE
+#define THREAD_SIZE PAGE_SIZE
 #endif
  
 #ifndef __ASSEMBLY__

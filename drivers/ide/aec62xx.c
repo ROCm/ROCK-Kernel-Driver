@@ -26,7 +26,7 @@
 
 #include "ata-timing.h"
 
-#define DISPLAY_AEC62XX_TIMINGS
+#undef DISPLAY_AEC62XX_TIMINGS
 
 #ifndef HIGH_4
 #define HIGH_4(H)		((H)=(H>>4))
@@ -503,7 +503,7 @@ unsigned int __init pci_init_aec62xx (struct pci_dev *dev)
 		bmide_dev = dev;
 		aec62xx_display_info = &aec62xx_get_info;
 	}
-#endif /* DISPLAY_AEC62XX_TIMINGS && CONFIG_PROC_FS */
+#endif
 
 	return dev->irq;
 }

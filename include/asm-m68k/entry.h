@@ -109,7 +109,7 @@ PT_DTRACE_BIT = 2
 
 .macro	get_current reg=%d0
 	movel	%sp,\reg
-	andw	#-KTHREAD_SIZE,\reg
+	andw	#-THREAD_SIZE,\reg
 	movel	\reg,%curptr
 .endm
 
@@ -128,8 +128,9 @@ PT_DTRACE_BIT = 2
 	"moveml	%%d1-%%d5/%%a0-%%a2,%%sp@-"
 #define GET_CURRENT(tmp) \
 	"movel	%%sp,"#tmp"\n\t" \
-	"andw	#-"STR(KTHREAD_SIZE)","#tmp"\n\t" \
-	"movel	"#tmp",%%a2"
+	"andw	#-"STR(THREAD_SIZE)","#tmp"\n\t" \
+	"movel	"#tmp",%%a2\n\t" \
+	"movel	%%a2@,%%a2"
 
 #endif
 

@@ -141,7 +141,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		if (request != PTRACE_KILL)
 			goto out_tsk;
 	}
-	if (child->p_pptr != current)
+	if (child->parent != current)
 		goto out_tsk;
 
 	switch (request) {

@@ -337,13 +337,15 @@ void pcibios_fixup_pbus_ranges(
 ** than res->start.
 */
 void __devinit
-pcibios_align_resource(void *data, struct resource *res, unsigned long size)
+pcibios_align_resource(void *data, struct resource *res,
+		       unsigned long size, unsigned long alignment)
 {
 	unsigned long mask, align;
 
-	DBG_RES("pcibios_align_resource(%s, (%p) [%lx,%lx]/%x, 0x%lx)\n",
+	DBG_RES("pcibios_align_resource(%s, (%p) [%lx,%lx]/%x, 0x%lx, 0x%lx)\n",
 		((struct pci_dev *) data)->slot_name,
-		res->parent, res->start, res->end, (int) res->flags, size);
+		res->parent, res->start, res->end,
+		(int) res->flags, size, alignment);
 
 	/* has resource already been aligned/assigned? */
 	if (res->parent)
@@ -400,11 +402,11 @@ pcibios_size_bridge(struct pci_bus *bus, struct pbus_set_ranges_data *outer)
 
 			if (res.flags & IORESOURCE_IO) {
 				res.start = inner.io_end;
-				pcibios_align_resource(dev, &res, size);
+				pcibios_align_resource(dev, &res, size, 0);
 				inner.io_end += res.start + size;
 			} else if (res.flags & IORESOURCE_MEM) {
 				res.start = inner.mem_end;
-				pcibios_align_resource(dev, &res, size);
+				pcibios_align_resource(dev, &res, size, 0);
 				inner.mem_end = res.start + size;
 			}
 

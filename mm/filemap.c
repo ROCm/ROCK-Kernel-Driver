@@ -600,7 +600,7 @@ static inline wait_queue_head_t *page_waitqueue(struct page *page)
 	return &zone->wait_table[hash_ptr(page, zone->wait_table_bits)];
 }
 
-static void wait_on_page_bit(struct page *page, int bit_nr)
+void wait_on_page_bit(struct page *page, int bit_nr)
 {
 	wait_queue_head_t *waitqueue = page_waitqueue(page);
 	struct task_struct *tsk = current;
@@ -617,28 +617,7 @@ static void wait_on_page_bit(struct page *page, int bit_nr)
 	__set_task_state(tsk, TASK_RUNNING);
 	remove_wait_queue(waitqueue, &wait);
 }
-
-/* 
- * Wait for a page to be unlocked.
- *
- * This must be called with the caller "holding" the page,
- * ie with increased "page->count" so that the page won't
- * go away during the wait..
- */
-void ___wait_on_page_locked(struct page *page)
-{
-	wait_on_page_bit(page, PG_locked);
-}
-EXPORT_SYMBOL(___wait_on_page_locked);
-
-/* 
- * Wait for a page to complete writeback
- */
-void wait_on_page_writeback(struct page *page)
-{
-	wait_on_page_bit(page, PG_writeback);
-}
-EXPORT_SYMBOL(wait_on_page_writeback);
+EXPORT_SYMBOL(wait_on_page_bit);
 
 /**
  * unlock_page() - unlock a locked page
@@ -705,12 +684,6 @@ static void __lock_page(struct page *page)
 	__set_task_state(tsk, TASK_RUNNING);
 	remove_wait_queue(waitqueue, &wait);
 }
-
-void wake_up_page(struct page *page)
-{
-	wake_up(page_waitqueue(page));
-}
-EXPORT_SYMBOL(wake_up_page);
 
 /*
  * Get an exclusive lock on the page, optimistically

@@ -561,7 +561,7 @@ tty3270_write_proc(struct file *file, const char *buffer,
 	/*
 	 * Superuser-mode settings affect the driver overall ---
 	 */
-	if (!suser()) {
+	if (!capable(CAP_SYS_TTY_CONFIG)) {
 		return -EPERM;
 	} else if (strncmp(mybuf, "index=", 6) == 0) {
 		tty3270_proc_index = simple_strtoul(mybuf + 6, 0,0);

@@ -29,7 +29,7 @@
 
 #include "ata-timing.h"
 
-#define DISPLAY_CS5530_TIMINGS
+#undef DISPLAY_CS5530_TIMINGS
 
 #if defined(DISPLAY_CS5530_TIMINGS) && defined(CONFIG_PROC_FS)
 #include <linux/stat.h>

@@ -15,6 +15,7 @@
 #include <linux/devfs_fs_kernel.h>
 #include <linux/interrupt.h>
 #include <linux/bitops.h>
+#include <asm/byteorder.h>
 #include <asm/hdreg.h>
 
 /*
@@ -46,7 +47,7 @@
 # define DISK_RECOVERY_TIME	0	/*  for hardware that needs it */
 #endif
 #ifndef OK_TO_RESET_CONTROLLER		/* 1 needed for good error recovery */
-# define OK_TO_RESET_CONTROLLER	1	/* 0 for use with AH2372A/B interface */
+# define OK_TO_RESET_CONTROLLER	0	/* 0 for use with AH2372A/B interface */
 #endif
 #ifndef FANCY_STATUS_DUMPS		/* 1 for human-readable drive errors */
 # define FANCY_STATUS_DUMPS	1	/* 0 to reduce kernel size */
@@ -265,6 +266,50 @@ void ide_setup_ports(hw_regs_t *hw,
 
 struct ide_settings_s;
 
+typedef union {
+	unsigned all			: 8;	/* all of the bits together */
+	struct {
+#if defined(__LITTLE_ENDIAN_BITFIELD)
+		unsigned head		: 4;	/* always zeros here */
+		unsigned unit		: 1;	/* drive select number: 0/1 */
+		unsigned bit5		: 1;	/* always 1 */
+		unsigned lba		: 1;	/* using LBA instead of CHS */
+		unsigned bit7		: 1;	/* always 1 */
+#elif defined(__BIG_ENDIAN_BITFIELD)
+		unsigned bit7		: 1;
+		unsigned lba		: 1;
+		unsigned bit5		: 1;
+		unsigned unit		: 1;
+		unsigned head		: 4;
+#else
+#error "Please fix <asm/byteorder.h>"
+#endif
+	} b;
+} select_t;
+
+typedef union {
+	unsigned all			: 8;	/* all of the bits together */
+	struct {
+#if defined(__LITTLE_ENDIAN_BITFIELD)
+		unsigned bit0		: 1;
+		unsigned nIEN		: 1;	/* device INTRQ to host */
+		unsigned SRST		: 1;	/* host soft reset bit */
+		unsigned bit3		: 1;	/* ATA-2 thingy */
+		unsigned reserved456	: 3;
+		unsigned HOB		: 1;	/* 48-bit address ordering */
+#elif defined(__BIG_ENDIAN_BITFIELD)
+		unsigned HOB		: 1;
+		unsigned reserved456	: 3;
+		unsigned bit3		: 1;
+		unsigned SRST		: 1;
+		unsigned nIEN		: 1;
+		unsigned bit0		: 1;
+#else
+#error "Please fix <asm/byteorder.h>"
+#endif
+	} b;
+} control_t;
+
 /*
  * ATA/ATAPI device structure :
  */
@@ -282,19 +327,9 @@ struct ata_device {
 	 */
 	request_queue_t	queue;	/* per device request queue */
 
-
 	unsigned long sleep;	/* sleep until this time */
 
-	/* Flags requesting/indicating one of the following special commands
-	 * executed on the request queue.
-	 */
-#define ATA_SPECIAL_GEOMETRY		0x01
-#define ATA_SPECIAL_RECALIBRATE		0x02
-#define ATA_SPECIAL_MMODE		0x04
-#define ATA_SPECIAL_TUNE		0x08
-	unsigned char special_cmd;
-	u8 mult_req;			/* requested multiple sector setting */
-	u8 tune_req;			/* requested drive tuning setting */
+	u8 XXX_tune_req;			/* requested drive tuning setting */
 
 	byte     using_dma;		/* disk is using dma for read/write */
 	byte	 using_tcq;		/* disk is using queueing */
@@ -344,8 +379,7 @@ struct ata_device {
 
 	void		*driver_data;	/* extra driver data */
 	devfs_handle_t	de;		/* directory for device */
-	struct proc_dir_entry *proc;	/* /proc/ide/ directory entry */
-	struct ide_settings_s *settings;    /* /proc/ide/ drive settings */
+	struct ide_settings_s *settings;    /* ioctl entires */
 	char		driver_req[10];	/* requests specific driver */
 
 	int		last_lun;	/* last logical unit */
@@ -364,6 +398,7 @@ struct ata_device {
 	unsigned int	failures;	/* current failure count */
 	unsigned int	max_failures;	/* maximum allowed failure count */
 	struct device	device;		/* global device tree handle */
+
 	/*
 	 * tcq statistics
 	 */
@@ -386,7 +421,7 @@ struct ata_channel {
 
 	ide_ioreg_t	io_ports[IDE_NR_PORTS];	/* task file registers */
 	hw_regs_t	hw;		/* Hardware info */
-#ifdef CONFIG_BLK_DEV_IDEPCI
+#ifdef CONFIG_PCI
 	struct pci_dev	*pci_dev;	/* for pci chipsets */
 #endif
 	struct ata_device drives[MAX_DRIVES];	/* drive info */
@@ -423,6 +458,8 @@ struct ata_channel {
 	void (*atapi_write)(struct ata_device *, void *, unsigned int);
 
 	int (*XXX_udma)(struct ata_device *);
+
+	void (*udma_enable)(struct ata_device *, int, int);
 
 	int (*udma_start) (struct ata_device *, struct request *rq);
 	int (*udma_stop) (struct ata_device *);
@@ -472,6 +509,8 @@ struct ata_channel {
 	/* driver soft-power interface */
 	int (*busproc)(struct ata_device *, int);
 	byte		bus_state;	/* power state of the IDE bus */
+
+	unsigned long poll_timeout; /* timeout value during polled operations */
 };
 
 /*
@@ -520,17 +559,19 @@ static inline int ata_can_queue(struct ata_device *drive)
 	return 1;
 }
 #else
-#define ata_pending_commands(drive)	(0)
-#define ata_can_queue(drive)		(1)
+# define ata_pending_commands(drive)	(0)
+# define ata_can_queue(drive)		(1)
 #endif
 
 typedef struct hwgroup_s {
+	/* FIXME: We should look for busy request queues instead of looking at
+	 * the !NULL state of this field.
+	 */
 	ide_startstop_t (*handler)(struct ata_device *, struct request *);	/* irq handler, if active */
 	unsigned long flags;		/* BUSY, SLEEPING */
 	struct ata_device *XXX_drive;	/* current drive */
 	struct request *rq;		/* current request */
 	struct timer_list timer;	/* failsafe timer */
-	unsigned long poll_timeout;	/* timeout value during long polls */
 	int (*expiry)(struct ata_device *, struct request *);	/* irq handler, if active */
 } ide_hwgroup_t;
 
@@ -572,44 +613,7 @@ extern int ide_read_setting(struct ata_device *, ide_settings_t *);
 extern int ide_write_setting(struct ata_device *, ide_settings_t *, int);
 extern void ide_add_generic_settings(struct ata_device *);
 
-/*
- * /proc/ide interface
- */
-typedef struct {
-	const char	*name;
-	mode_t		mode;
-	read_proc_t	*read_proc;
-	write_proc_t	*write_proc;
-} ide_proc_entry_t;
-
-#ifdef CONFIG_PROC_FS
-void proc_ide_create(void);
-void proc_ide_destroy(void);
-void destroy_proc_ide_drives(struct ata_channel *);
-void create_proc_ide_interfaces(void);
-void ide_add_proc_entries(struct proc_dir_entry *dir, ide_proc_entry_t *p, void *data);
-void ide_remove_proc_entries(struct proc_dir_entry *dir, ide_proc_entry_t *p);
-read_proc_t proc_ide_read_capacity;
-read_proc_t proc_ide_read_geometry;
-
-/*
- * Standard exit stuff:
- */
-#define PROC_IDE_READ_RETURN(page,start,off,count,eof,len) \
-{					\
-	len -= off;			\
-	if (len < count) {		\
-		*eof = 1;		\
-		if (len <= 0)		\
-			return 0;	\
-	} else				\
-		len = count;		\
-	*start = page + off;		\
-	return len;			\
-}
-#else
-# define PROC_IDE_READ_RETURN(page,start,off,count,eof,len) return 0;
-#endif
+#define PROC_IDE_READ_RETURN(page,start,off,count,eof,len) return 0;
 
 /*
  * This structure describes the operations possible on a particular device type
@@ -631,11 +635,7 @@ struct ata_operations {
 	int (*check_media_change)(struct ata_device *);
 	void (*revalidate)(struct ata_device *);
 
-	void (*pre_reset)(struct ata_device *);
 	sector_t (*capacity)(struct ata_device *);
-	ide_startstop_t	(*special)(struct ata_device *);
-
-	ide_proc_entry_t *proc;
 };
 
 /* Alas, no aliases. Too much hassle with bringing module.h everywhere */
@@ -783,20 +783,19 @@ extern ide_startstop_t ata_taskfile(struct ata_device *,
  */
 
 extern ide_startstop_t recal_intr(struct ata_device *, struct request *);
-extern ide_startstop_t set_geometry_intr(struct ata_device *, struct request *);
-extern ide_startstop_t set_multmode_intr(struct ata_device *, struct request *);
 extern ide_startstop_t task_no_data_intr(struct ata_device *, struct request *);
 
 
 /* This is setting up all fields in args, which depend upon the command type.
  */
 extern void ide_cmd_type_parser(struct ata_taskfile *args);
-extern int ide_raw_taskfile(struct ata_device *drive, struct ata_taskfile *cmd, byte *buf);
+extern int ide_raw_taskfile(struct ata_device *, struct ata_taskfile *);
 extern int ide_cmd_ioctl(struct ata_device *drive, unsigned long arg);
 
 void ide_delay_50ms(void);
 
 extern byte ide_auto_reduce_xfer(struct ata_device *);
+extern void ide_fix_driveid(struct hd_driveid *id);
 extern int ide_driveid_update(struct ata_device *);
 extern int ide_ata66_check(struct ata_device *, struct ata_taskfile *);
 extern int ide_config_drive_speed(struct ata_device *, byte);
@@ -827,7 +826,6 @@ void do_ide_request (request_queue_t * q);
 void ide_init_subdrivers (void);
 
 extern struct block_device_operations ide_fops[];
-extern ide_proc_entry_t generic_subdriver_entries[];
 
 #ifdef CONFIG_BLK_DEV_IDE
 /* Probe for devices attached to the systems host controllers.
@@ -854,7 +852,7 @@ extern struct ata_device *ide_scan_devices(byte, const char *, struct ata_operat
 extern int ide_register_subdriver(struct ata_device *, struct ata_operations *);
 extern int ide_unregister_subdriver(struct ata_device *drive);
 
-#ifdef CONFIG_BLK_DEV_IDEPCI
+#ifdef CONFIG_PCI
 # define ON_BOARD		1
 # define NEVER_BOARD		0
 # ifdef CONFIG_BLK_DEV_OFFBOARD

@@ -36,19 +36,29 @@ extern char _text, _end;
 char sun3_reserved_pmeg[SUN3_PMEGS_NUM];
 
 extern unsigned long sun3_gettimeoffset(void);
-extern int show_sun3_interrupts (char *);
+extern int show_sun3_interrupts (struct seq_file *, void *);
 extern void sun3_sched_init(void (*handler)(int, void *, struct pt_regs *));
 extern void sun3_get_model (char* model);
 extern void idprom_init (void);
-extern void sun3_gettod (int *yearp, int *monp, int *dayp,
-                   int *hourp, int *minp, int *secp);
-extern int sun3_hwclk(int set, struct hwclk_time *t);
+extern int sun3_hwclk(int set, struct rtc_time *t);
 
 extern void sun_serial_setup(void);
 volatile char* clock_va; 
 extern volatile unsigned char* sun3_intreg;
 extern unsigned long availmem;
 unsigned long num_pages;
+
+static int sun3_get_hardware_list(char *buffer)
+{
+	
+	int len = 0;
+
+	len += sprintf(buffer + len, "PROM Revision:\t%s\n",
+		       romvec->pv_monid);
+	
+	return len;
+
+}
 
 void __init sun3_init(void)
 {
@@ -146,12 +156,12 @@ void __init config_sun3(void)
         disable_irq  	     =  sun3_disable_irq;
 	mach_process_int     =  sun3_process_int;
         mach_get_irq_list    =  show_sun3_interrupts;
-        mach_gettod          =  sun3_gettod;	
         mach_reset           =  sun3_reboot;
 	mach_gettimeoffset   =  sun3_gettimeoffset;
 	mach_get_model	     =  sun3_get_model;
 	mach_hwclk           =  sun3_hwclk;
 	mach_halt	     =  sun3_halt;
+	mach_get_hardware_list = sun3_get_hardware_list;
 #if !defined(CONFIG_SERIAL_CONSOLE) && defined(CONFIG_FB)
 	conswitchp 	     = &dummy_con;
 #endif
@@ -166,7 +176,6 @@ void __init config_sun3(void)
 	sun3_bootmem_alloc(memory_start, memory_end);
 
 	sun_serial_setup();
-
 
 }
 

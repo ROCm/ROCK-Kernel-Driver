@@ -710,7 +710,7 @@ svc_tcp_accept(struct svc_sock *svsk)
 	 * We randomly choose between newest and oldest (in terms
 	 * of recent activity) and drop it.
 	 */
-	if (serv->sv_tmpcnt > serv->sv_nrthreads*5) {
+	if (serv->sv_tmpcnt > (serv->sv_nrthreads+3)*5) {
 		struct svc_sock *svsk = NULL;
 		spin_lock_bh(&serv->sv_lock);
 		if (!list_empty(&serv->sv_tempsocks)) {
@@ -924,7 +924,7 @@ svc_tcp_init(struct svc_sock *svsk)
 		 * as soon a a complete request arrives.
 		 */
 		svc_sock_setbufsize(svsk->sk_sock,
-				    svsk->sk_server->sv_nrthreads *
+				    (svsk->sk_server->sv_nrthreads+3) *
 				    svsk->sk_server->sv_bufsz,
 				    3 * svsk->sk_server->sv_bufsz);
 	}
@@ -966,7 +966,7 @@ svc_sock_update_bufs(struct svc_serv *serv)
 		if (sock->type == SOCK_STREAM) {
 			/* See svc_tcp_init above for rationale on buffer sizes */
 			svc_sock_setbufsize(sock,
-					    serv->sv_nrthreads *
+					    (serv->sv_nrthreads+3) *
 					    serv->sv_bufsz,
 					    3 * serv->sv_bufsz);
 		} else 

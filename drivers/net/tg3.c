@@ -1,4 +1,4 @@
-/* $Id: tg3.c,v 1.43.2.79 2002/03/12 07:11:17 davem Exp $
+/* $Id: tg3.c,v 1.43.2.80 2002/03/14 00:10:04 davem Exp $
  * tg3.c: Broadcom Tigon3 ethernet driver.
  *
  * Copyright (C) 2001, 2002 David S. Miller (davem@redhat.com)
@@ -956,6 +956,17 @@ static int tg3_setup_copper_phy(struct tg3 *tp)
 		     tp->link_config.active_speed == SPEED_10))
 			tp->mac_mode |= MAC_MODE_LINK_POLARITY;
 	}
+
+	/* ??? Without this setting Netgear GA302T PHY does not
+	 * ??? send/receive packets...
+	 */
+	if ((tp->phy_id & PHY_ID_MASK) == PHY_ID_BCM5411 &&
+	    tp->pci_chip_rev_id == CHIPREV_ID_5700_ALTIMA) {
+		tp->mi_mode |= MAC_MI_MODE_AUTO_POLL;
+		tw32(MAC_MI_MODE, tp->mi_mode);
+		udelay(40);
+	}
+
 	tw32(MAC_MODE, tp->mac_mode);
 
 	if (tp->tg3_flags & TG3_FLAG_USE_LINKCHG_REG) {

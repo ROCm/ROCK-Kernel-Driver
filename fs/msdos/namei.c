@@ -221,13 +221,22 @@ struct dentry *msdos_lookup(struct inode *dir,struct dentry *dentry)
 	if (res)
 		goto out;
 add:
-	d_add(dentry, inode);
+	if (inode) {
+		dentry = d_splice_alias(inode, dentry);
+		dentry->d_op = &msdos_dentry_operations;
+	} else {
+		d_add(dentry, inode);
+		dentry = NULL;
+	}
 	res = 0;
 out:
 	if (bh)
 		fat_brelse(sb, bh);
 	unlock_kernel();
-	return ERR_PTR(res);
+	if (res)
+		return ERR_PTR(res);
+	else
+		return dentry;
 }
 
 /***** Creates a directory entry (name is already formatted). */

@@ -1,10 +1,16 @@
-
 /*
  *  linux/drivers/sound/dmasound/dmasound_atari.c
  *
  *  Atari TT and Falcon DMA Sound Driver
  *
  *  See linux/drivers/sound/dmasound/dmasound_core.c for copyright and credits
+ *  prior to 28/01/2001
+ *
+ *  28/01/2001 [0.1] Iain Sandoe
+ *		     - added versioning
+ *		     - put in and populated the hardware_afmts field.
+ *             [0.2] - put in SNDCTL_DSP_GETCAPS value.
+ *  01/02/2001 [0.3] - put in default hard/soft settings.
  */
 
 
@@ -21,9 +27,10 @@
 
 #include "dmasound.h"
 
+#define DMASOUND_ATARI_REVISION 0
+#define DMASOUND_ATARI_EDITION 3
 
 extern void atari_microwire_cmd(int cmd);
-
 
 static int is_falcon;
 static int write_sq_ignore_int = 0;	/* ++TeSche: used for Falcon */
@@ -136,10 +143,10 @@ static void FalconMixerInit(void);
 static int AtaMixerIoctl(u_int cmd, u_long arg);
 static int TTMixerIoctl(u_int cmd, u_long arg);
 static int FalconMixerIoctl(u_int cmd, u_long arg);
-static void AtaWriteSqSetup(void);
-static void AtaSqOpen(void);
-static int TTStateInfo(char *buffer);
-static int FalconStateInfo(char *buffer);
+static int AtaWriteSqSetup(void);
+static int AtaSqOpen(mode_t mode);
+static int TTStateInfo(char *buffer, size_t space);
+static int FalconStateInfo(char *buffer, size_t space);
 
 
 /*** Translations ************************************************************/
@@ -1438,43 +1445,73 @@ static int FalconMixerIoctl(u_int cmd, u_long arg)
 	return AtaMixerIoctl(cmd, arg);
 }
 
-static void AtaWriteSqSetup(void)
+static int AtaWriteSqSetup(void)
 {
 	write_sq_ignore_int = 0;
+	return 0 ;
 }
 
-static void AtaSqOpen(void)
+static int AtaSqOpen(mode_t mode)
 {
 	write_sq_ignore_int = 1;
+	return 0 ;
 }
 
-static int TTStateInfo(char *buffer)
+static int TTStateInfo(char *buffer, size_t space)
 {
 	int len = 0;
-	len += sprintf(buffer+len, "\tsound.volume_left = %ddB [-40...0]\n",
+	len += sprintf(buffer+len, "\tvol left  %ddB [-40...  0]\n",
 		       dmasound.volume_left);
-	len += sprintf(buffer+len, "\tsound.volume_right = %ddB [-40...0]\n",
+	len += sprintf(buffer+len, "\tvol right %ddB [-40...  0]\n",
 		       dmasound.volume_right);
-	len += sprintf(buffer+len, "\tsound.bass = %ddB [-12...+12]\n",
+	len += sprintf(buffer+len, "\tbass      %ddB [-12...+12]\n",
 		       dmasound.bass);
-	len += sprintf(buffer+len, "\tsound.treble = %ddB [-12...+12]\n",
+	len += sprintf(buffer+len, "\ttreble    %ddB [-12...+12]\n",
 		       dmasound.treble);
+	if (len >= space) {
+		printk(KERN_ERR "dmasound_atari: overflowed state buffer alloc.\n") ;
+		len = space ;
+	}
 	return len;
 }
 
-static int FalconStateInfo(char *buffer)
+static int FalconStateInfo(char *buffer, size_t space)
 {
 	int len = 0;
-	len += sprintf(buffer+len, "\tsound.volume_left = %ddB [-22.5...0]\n",
+	len += sprintf(buffer+len, "\tvol left  %ddB [-22.5 ... 0]\n",
 		       dmasound.volume_left);
-	len += sprintf(buffer+len, "\tsound.volume_right = %ddB [-22.5...0]\n",
+	len += sprintf(buffer+len, "\tvol right %ddB [-22.5 ... 0]\n",
 		       dmasound.volume_right);
+	if (len >= space) {
+		printk(KERN_ERR "dmasound_atari: overflowed state buffer alloc.\n") ;
+		len = space ;
+	}
 	return len;
 }
 
 
 /*** Machine definitions *****************************************************/
 
+static SETTINGS def_hard_falcon = {
+	format: AFMT_S8,
+	stereo: 0,
+	size: 8,
+	speed: 8195
+} ;
+
+static SETTINGS def_hard_tt = {
+	format: AFMT_S8,
+	stereo: 0,
+	size: 8,
+	speed: 12517
+} ;
+
+static SETTINGS def_soft = {
+	format: AFMT_U8,
+	stereo: 0,
+	size: 8,
+	speed: 8000
+} ;
 
 static MACHINE machTT = {
 	name:		"Atari",
@@ -1501,6 +1538,9 @@ static MACHINE machTT = {
 	sq_open:	AtaSqOpen,
 	state_info:	TTStateInfo,
 	min_dsp_speed:	6258,
+	version:	((DMASOUND_ATARI_REVISION<<8) | DMASOUND_ATARI_EDITION),
+	hardware_afmts:	AFMT_S8,  /* h'ware-supported formats *only* here */
+	capabilities:	 DSP_CAP_BATCH	/* As per SNDCTL_DSP_GETCAPS */
 };
 
 static MACHINE machFalcon = {
@@ -1525,6 +1565,9 @@ static MACHINE machFalcon = {
 	sq_open:	AtaSqOpen,
 	state_info:	FalconStateInfo,
 	min_dsp_speed:	8195,
+	version:	((DMASOUND_ATARI_REVISION<<8) | DMASOUND_ATARI_EDITION),
+	hardware_afmts:	(AFMT_S8 | AFMT_S16_BE), /* h'ware-supported formats *only* here */
+	capabilities:	 DSP_CAP_BATCH	/* As per SNDCTL_DSP_GETCAPS */
 };
 
 
@@ -1536,9 +1579,13 @@ static int __init dmasound_atari_init(void)
 	if (MACH_IS_ATARI && ATARIHW_PRESENT(PCM_8BIT)) {
 	    if (ATARIHW_PRESENT(CODEC)) {
 		dmasound.mach = machFalcon;
+		dmasound.mach.default_soft = def_soft ;
+		dmasound.mach.default_hard = def_hard_falcon ;
 		is_falcon = 1;
 	    } else if (ATARIHW_PRESENT(MICROWIRE)) {
 		dmasound.mach = machTT;
+		dmasound.mach.default_soft = def_soft ;
+		dmasound.mach.default_hard = def_hard_tt ;
 		is_falcon = 0;
 	    } else
 		return -ENODEV;

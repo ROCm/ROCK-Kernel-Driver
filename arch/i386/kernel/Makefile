@@ -7,8 +7,8 @@
 #
 # Note 2! The CFLAGS definitions are now in the main makefile...
 
-.S.o:
-	$(CC) $(AFLAGS) -traditional -c $< -o $*.o
+EXTRA_AFLAGS	:= -traditional
+USE_STANDARD_AS_RULE	:= true
 
 all: kernel.o head.o init_task.o
 
@@ -18,18 +18,8 @@ export-objs     := mca.o mtrr.o msr.o cpuid.o microcode.o i386_ksyms.o time.o
 
 obj-y	:= process.o semaphore.o signal.o entry.o traps.o irq.o vm86.o \
 		ptrace.o i8259.o ioport.o ldt.o setup.o time.o sys_i386.o \
-		pci-dma.o i386_ksyms.o i387.o bluesmoke.o dmi_scan.o \
+		i386_ksyms.o i387.o bluesmoke.o dmi_scan.o \
 		bootflag.o
-
-
-ifdef CONFIG_PCI
-obj-y			+= pci-i386.o
-ifdef CONFIG_VISWS
-obj-y			+= pci-visws.o
-else
-obj-y			+= pci-pc.o pci-irq.o
-endif
-endif
 
 obj-$(CONFIG_MCA)		+= mca.o
 obj-$(CONFIG_MTRR)		+= mtrr.o

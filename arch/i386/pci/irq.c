@@ -17,7 +17,7 @@
 #include <asm/smp.h>
 #include <asm/io_apic.h>
 
-#include "pci-i386.h"
+#include "pci.h"
 
 #define PIRQ_SIGNATURE	(('$' << 0) + ('P' << 8) + ('I' << 16) + ('R' << 24))
 #define PIRQ_VERSION 0x0100
@@ -45,6 +45,8 @@ struct irq_router {
 	int (*get)(struct pci_dev *router, struct pci_dev *dev, int pirq);
 	int (*set)(struct pci_dev *router, struct pci_dev *dev, int pirq, int new);
 };
+
+int (*pci_lookup_irq)(struct pci_dev * dev, int assign) = NULL;
 
 /*
  *  Search 0xf0000 -- 0xfffff for the PCI IRQ Routing Table.
@@ -116,7 +118,7 @@ static void __init pirq_peer_trick(void)
  *  Code for querying and setting of IRQ routes on various interrupt routers.
  */
 
-static void eisa_set_level_irq(unsigned int irq)
+void eisa_set_level_irq(unsigned int irq)
 {
 	unsigned char mask = 1 << (irq & 7);
 	unsigned int port = 0x4d0 + (irq >> 3);
@@ -243,6 +245,8 @@ static int pirq_opti_set(struct pci_dev *router, struct pci_dev *dev, int pirq, 
 
 /*
  * Cyrix: nibble offset 0x5C
+ * 0x5C bits 7:4 is INTB bits 3:0 is INTA 
+ * 0x5D bits 7:4 is INTD bits 3:0 is INTC
  */
 static int pirq_cyrix_get(struct pci_dev *router, struct pci_dev *dev, int pirq)
 {
@@ -556,54 +560,6 @@ static void pcibios_test_irq_handler(int irq, void *dev_id, struct pt_regs *regs
 {
 }
 
-#ifdef CONFIG_ACPI_PCI
-
-static int acpi_lookup_irq (
-	struct pci_dev		*dev,
-	u8			pin,
-	int			assign)
-{
-	int			result = 0;
-	int			irq = 0;
-
-	/* TBD: Select IRQ from possible to improve routing performance. */
-
-	result = acpi_prt_get_irq(dev, pin, &irq);
-	if (!irq)
-		result = -ENODEV;
-	if (0 != result) {
-		printk(KERN_WARNING "PCI: No IRQ known for interrupt pin %c of device %s\n",
-		       'A'+pin, dev->slot_name);
-		return result;
-	}
-
-	dev->irq = irq;
-
-	if (!assign) {
-		/* only check for the IRQ */
-		printk(KERN_INFO "PCI: Found IRQ %d for device %s\n", irq, 
-		       dev->slot_name);
-		return 1;
-	}
-
-	/* also assign an IRQ */
-	if (irq && (dev->class >> 8) != PCI_CLASS_DISPLAY_VGA) {
-		result = acpi_prt_set_irq(dev, pin, irq);
-		if (0 != result) {
-			printk(KERN_WARNING "PCI: Could not assign IRQ %d to device %s\n", irq, dev->slot_name);
-			return result;
-		}
-
-		eisa_set_level_irq(irq);
-
-		printk(KERN_INFO "PCI: Assigned IRQ %d for device %s\n", irq, dev->slot_name);
-	}
-
-	return 1;
-}
-
-#endif /* CONFIG_ACPI_PCI */
-
 static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 {
 	u8 pin;
@@ -622,12 +578,6 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 		return 0;
 	}
 	pin = pin - 1;
-
-#ifdef CONFIG_ACPI_PCI
-	/* Use ACPI to lookup IRQ */
-	if (pci_use_acpi_routing)
-		return acpi_lookup_irq(dev, pin, assign);
-#endif
 
 	/* Find IRQ routing entry */
 
@@ -736,21 +686,12 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 	return 1;
 }
 
-void __init pcibios_irq_init(void)
+static int __init pcibios_irq_init(void)
 {
 	DBG("PCI: IRQ init\n");
 
-#ifdef CONFIG_ACPI_PCI
-	if (!(pci_probe & PCI_NO_ACPI_ROUTING)) {
-		if (acpi_prts.count) {
-			printk(KERN_INFO "PCI: Using ACPI for IRQ routing\n");
-			pci_use_acpi_routing = 1;
-			return;
-		}
-		else
-			printk(KERN_WARNING "PCI: Invalid ACPI-PCI IRQ routing table\n");
-	}
-#endif
+	if (pci_lookup_irq)
+		return 0;
 
 	pirq_table = pirq_find_routing_table();
 
@@ -771,7 +712,12 @@ void __init pcibios_irq_init(void)
 		if (io_apic_assign_pci_irqs)
 			pirq_table = NULL;
 	}
+	pci_lookup_irq = pcibios_lookup_irq;
+	pcibios_fixup_irqs();
+	return 0;
 }
+
+subsys_initcall(pcibios_irq_init);
 
 void __init pcibios_fixup_irqs(void)
 {
@@ -835,7 +781,7 @@ void __init pcibios_fixup_irqs(void)
 		 * Still no IRQ? Try to lookup one...
 		 */
 		if (pin && !dev->irq)
-			pcibios_lookup_irq(dev, 0);
+			pci_lookup_irq(dev, 0);
 	}
 }
 
@@ -852,7 +798,7 @@ void pcibios_enable_irq(struct pci_dev *dev)
 {
 	u8 pin;
 	pci_read_config_byte(dev, PCI_INTERRUPT_PIN, &pin);
-	if (pin && !pcibios_lookup_irq(dev, 1) && !dev->irq) {
+	if (pin && !pci_lookup_irq(dev, 1) && !dev->irq) {
 		char *msg;
 		if (io_apic_assign_pci_irqs)
 			msg = " Probably buggy MP table.";

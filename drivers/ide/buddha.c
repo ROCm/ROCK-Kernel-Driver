@@ -1,10 +1,10 @@
 /*
  *  linux/drivers/ide/buddha.c -- Amiga Buddha, Catweasel and X-Surf IDE Driver
  *
- *	Copyright (C) 1997 by Geert Uytterhoeven
+ *	Copyright (C) 1997, 2001 by Geert Uytterhoeven and others
  *
- *  This driver was written by based on the specifications in README.buddha and
- *  the X-Surf info from Inside_XSurf.txt available at 
+ *  This driver was written based on the specifications in README.buddha and
+ *  the X-Surf info from Inside_XSurf.txt available at
  *  http://www.jschoenfeld.com
  *
  *  This file is subject to the terms and conditions of the GNU General Public
@@ -52,7 +52,7 @@ static u_int buddha_bases[CATWEASEL_NUM_HWIFS] __initdata = {
     BUDDHA_BASE1, BUDDHA_BASE2, BUDDHA_BASE3
 };
 
-static const u_int xsurf_bases[XSURF_NUM_HWIFS] __initdata = {
+static u_int xsurf_bases[XSURF_NUM_HWIFS] __initdata = {
      XSURF_BASE1, XSURF_BASE2
 };
 
@@ -97,7 +97,7 @@ static int buddha_irqports[CATWEASEL_NUM_HWIFS] __initdata = {
     BUDDHA_IRQ1, BUDDHA_IRQ2, BUDDHA_IRQ3
 };
 
-static const int xsurf_irqports[XSURF_NUM_HWIFS] __initdata = {
+static int xsurf_irqports[XSURF_NUM_HWIFS] __initdata = {
     XSURF_IRQ1, XSURF_IRQ2
 };
 
@@ -108,8 +108,9 @@ static const int xsurf_irqports[XSURF_NUM_HWIFS] __initdata = {
      *  Board information
      */
 
-enum BuddhaType_Enum {BOARD_BUDDHA, BOARD_CATWEASEL, BOARD_XSURF};
-typedef enum BuddhaType_Enum BuddhaType;
+typedef enum BuddhaType_Enum {
+    BOARD_BUDDHA, BOARD_CATWEASEL, BOARD_XSURF
+} BuddhaType;
 
 
     /*
@@ -175,15 +176,20 @@ void __init buddha_init(void)
 			if (!request_mem_region(board+XSURF_BASE1, 0x1000, "IDE"))
 				continue;
 			if (!request_mem_region(board+XSURF_BASE2, 0x1000, "IDE"))
+				goto fail_base2;
+			if (!request_mem_region(board+XSURF_IRQ1, 0x8, "IDE")) {
+				release_mem_region(board+XSURF_BASE2, 0x1000);
+fail_base2:
+				release_mem_region(board+XSURF_BASE1, 0x1000);
 				continue;
-			if (!request_mem_region(board+XSURF_IRQ1, 0x8, "IDE"))
-				continue;
+			}
 		}	  
 		buddha_board = ZTWO_VADDR(board);
 		
 		/* write to BUDDHA_IRQ_MR to enable the board IRQ */
 		/* X-Surf doesn't have this.  IRQs are always on */
-		if(type != BOARD_XSURF) *(char *)(buddha_board+BUDDHA_IRQ_MR) = 0;
+		if (type != BOARD_XSURF)
+			z_writeb(0, buddha_board+BUDDHA_IRQ_MR);
 		
 		for(i=0;i<buddha_num_hwifs;i++) {
 			if(type != BOARD_XSURF) {

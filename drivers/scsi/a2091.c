@@ -40,9 +40,9 @@ static void a2091_intr (int irq, void *dummy, struct pt_regs *fp)
 		continue;
 
 	if (status & ISTR_INTS) {
-		spin_lock_irqsave(instance->host_lock, flags);
+		spin_lock_irqsave(&instance->host_lock, flags);
 		wd33c93_intr (instance);
-		spin_unlock_irqrestore(instance->host_lock, flags);
+		spin_unlock_irqrestore(&instance->host_lock, flags);
 	}
     }
 }
@@ -60,7 +60,7 @@ static int dma_setup (Scsi_Cmnd *cmd, int dir_in)
 	HDATA(instance)->dma_bounce_len = (cmd->SCp.this_residual + 511)
 	    & ~0x1ff;
 	HDATA(instance)->dma_bounce_buffer =
-	    scsi_malloc (HDATA(instance)->dma_bounce_len);
+	    kmalloc (HDATA(instance)->dma_bounce_len, GFP_KERNEL);
 	
 	/* can't allocate memory; use PIO */
 	if (!HDATA(instance)->dma_bounce_buffer) {
@@ -74,8 +74,7 @@ static int dma_setup (Scsi_Cmnd *cmd, int dir_in)
 	/* the bounce buffer may not be in the first 16M of physmem */
 	if (addr & A2091_XFER_MASK) {
 	    /* we could use chipmem... maybe later */
-	    scsi_free (HDATA(instance)->dma_bounce_buffer,
-		       HDATA(instance)->dma_bounce_len);
+	    kfree (HDATA(instance)->dma_bounce_buffer);
 	    HDATA(instance)->dma_bounce_buffer = NULL;
 	    HDATA(instance)->dma_bounce_len = 0;
 	    return 1;
@@ -162,8 +161,7 @@ static void dma_stop (struct Scsi_Host *instance, Scsi_Cmnd *SCpnt,
 		memcpy (SCpnt->SCp.ptr, 
 			HDATA(instance)->dma_bounce_buffer,
 			SCpnt->SCp.this_residual);
-	    scsi_free (HDATA(instance)->dma_bounce_buffer,
-		       HDATA(instance)->dma_bounce_len);
+	    kfree (HDATA(instance)->dma_bounce_buffer);
 	    HDATA(instance)->dma_bounce_buffer = NULL;
 	    HDATA(instance)->dma_bounce_len = 0;
 	    
@@ -174,8 +172,7 @@ static void dma_stop (struct Scsi_Host *instance, Scsi_Cmnd *SCpnt,
 			HDATA(instance)->dma_bounce_buffer,
 			SCpnt->request_bufflen);
 
-	    scsi_free (HDATA(instance)->dma_bounce_buffer,
-		       HDATA(instance)->dma_bounce_len);
+	    kfree (HDATA(instance)->dma_bounce_buffer);
 	    HDATA(instance)->dma_bounce_buffer = NULL;
 	    HDATA(instance)->dma_bounce_len = 0;
 	}

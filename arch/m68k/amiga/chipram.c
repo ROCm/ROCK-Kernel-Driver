@@ -13,6 +13,7 @@
 #include <linux/init.h>
 #include <linux/ioport.h>
 #include <linux/slab.h>
+#include <asm/page.h>
 #include <asm/amigahw.h>
 
 unsigned long amiga_chip_size;

@@ -1,5 +1,6 @@
 #include <linux/linkage.h>
 
+#include <asm/entry.h>
 #include <asm/page.h>
 #include <asm/contregs.h>
 #include <asm/sun3-head.h>
@@ -69,8 +70,8 @@ ENTRY(_start)
 	jmp	1f:l		
 
 /* Following code executes at high addresses (0xE000xxx). */
-1:	lea	init_task_union,%a2			| get initial thread...
-	lea	%a2@(KTHREAD_SIZE),%sp			| ...and its stack.
+1:	lea	init_task,%curptr			| get initial thread...
+	lea	init_thread_union+THREAD_SIZE,%sp	| ...and its stack.
 
 /* copy bootinfo records from the loader to _end */
 	lea	_end, %a1

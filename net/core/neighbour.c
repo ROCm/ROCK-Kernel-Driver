@@ -54,12 +54,6 @@ static int pneigh_ifdown(struct neigh_table *tbl, struct net_device *dev);
 static int neigh_glbl_allocs;
 static struct neigh_table *neigh_tables;
 
-#if defined(__i386__) && defined(CONFIG_SMP)
-#define ASSERT_WL(n) if ((int)((n)->lock.lock) > 0) { printk("WL assertion failed at " __FILE__ "(%d):" __FUNCTION__ "\n", __LINE__); }
-#else
-#define ASSERT_WL(n) do { } while(0)
-#endif
-
 /*
    Neighbour hash table buckets are protected with rwlock tbl->lock.
 
@@ -484,8 +478,6 @@ static void neigh_suspect(struct neighbour *neigh)
 
 	NEIGH_PRINTK2("neigh %p is suspecteded.\n", neigh);
 
-	ASSERT_WL(neigh);
-
 	neigh->output = neigh->ops->output;
 
 	for (hh = neigh->hh; hh; hh = hh->hh_next)
@@ -502,8 +494,6 @@ static void neigh_connect(struct neighbour *neigh)
 	struct hh_cache *hh;
 
 	NEIGH_PRINTK2("neigh %p is connected.\n", neigh);
-
-	ASSERT_WL(neigh);
 
 	neigh->output = neigh->ops->connected_output;
 
@@ -529,7 +519,6 @@ static void neigh_sync(struct neighbour *n)
 	unsigned long now = jiffies;
 	u8 state = n->nud_state;
 
-	ASSERT_WL(n);
 	if (state&(NUD_NOARP|NUD_PERMANENT))
 		return;
 	if (state&NUD_REACHABLE) {

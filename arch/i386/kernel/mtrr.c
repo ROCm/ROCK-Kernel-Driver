@@ -1659,7 +1659,7 @@ static ssize_t mtrr_write (struct file *file, const char *buf, size_t len,
     char *ptr;
     char line[LINE_SIZE];
 
-    if ( !suser () ) return -EPERM;
+    if ( !capable(CAP_SYS_ADMIN)) return -EPERM;
     /*  Can't seek (pwrite) on this device  */
     if (ppos != &file->f_pos) return -ESPIPE;
     memset (line, 0, LINE_SIZE);
@@ -1727,28 +1727,28 @@ static int mtrr_ioctl (struct inode *inode, struct file *file,
       default:
 	return -ENOIOCTLCMD;
       case MTRRIOC_ADD_ENTRY:
-	if ( !suser () ) return -EPERM;
+	if ( ! capable(CAP_SYS_ADMIN) ) return -EPERM;
 	if ( copy_from_user (&sentry, (void *) arg, sizeof sentry) )
 	    return -EFAULT;
 	err = mtrr_file_add (sentry.base, sentry.size, sentry.type, 1, file, 0);
 	if (err < 0) return err;
 	break;
       case MTRRIOC_SET_ENTRY:
-	if ( !suser () ) return -EPERM;
+	if ( !capable(CAP_SYS_ADMIN) ) return -EPERM;
 	if ( copy_from_user (&sentry, (void *) arg, sizeof sentry) )
 	    return -EFAULT;
 	err = mtrr_add (sentry.base, sentry.size, sentry.type, 0);
 	if (err < 0) return err;
 	break;
       case MTRRIOC_DEL_ENTRY:
-	if ( !suser () ) return -EPERM;
+	if ( !capable(CAP_SYS_ADMIN) ) return -EPERM;
 	if ( copy_from_user (&sentry, (void *) arg, sizeof sentry) )
 	    return -EFAULT;
 	err = mtrr_file_del (sentry.base, sentry.size, file, 0);
 	if (err < 0) return err;
 	break;
       case MTRRIOC_KILL_ENTRY:
-	if ( !suser () ) return -EPERM;
+	if ( !capable(CAP_SYS_ADMIN) ) return -EPERM;
 	if ( copy_from_user (&sentry, (void *) arg, sizeof sentry) )
 	    return -EFAULT;
 	err = mtrr_del (-1, sentry.base, sentry.size);
@@ -1773,28 +1773,28 @@ static int mtrr_ioctl (struct inode *inode, struct file *file,
 	     return -EFAULT;
 	break;
       case MTRRIOC_ADD_PAGE_ENTRY:
-	if ( !suser () ) return -EPERM;
+	if ( !capable(CAP_SYS_ADMIN) ) return -EPERM;
 	if ( copy_from_user (&sentry, (void *) arg, sizeof sentry) )
 	    return -EFAULT;
 	err = mtrr_file_add (sentry.base, sentry.size, sentry.type, 1, file, 1);
 	if (err < 0) return err;
 	break;
       case MTRRIOC_SET_PAGE_ENTRY:
-	if ( !suser () ) return -EPERM;
+	if ( !capable(CAP_SYS_ADMIN) ) return -EPERM;
 	if ( copy_from_user (&sentry, (void *) arg, sizeof sentry) )
 	    return -EFAULT;
 	err = mtrr_add_page (sentry.base, sentry.size, sentry.type, 0);
 	if (err < 0) return err;
 	break;
       case MTRRIOC_DEL_PAGE_ENTRY:
-	if ( !suser () ) return -EPERM;
+	if ( !capable(CAP_SYS_ADMIN) ) return -EPERM;
 	if ( copy_from_user (&sentry, (void *) arg, sizeof sentry) )
 	    return -EFAULT;
 	err = mtrr_file_del (sentry.base, sentry.size, file, 1);
 	if (err < 0) return err;
 	break;
       case MTRRIOC_KILL_PAGE_ENTRY:
-	if ( !suser () ) return -EPERM;
+	if ( !capable(CAP_SYS_ADMIN) ) return -EPERM;
 	if ( copy_from_user (&sentry, (void *) arg, sizeof sentry) )
 	    return -EFAULT;
 	err = mtrr_del_page (-1, sentry.base, sentry.size);

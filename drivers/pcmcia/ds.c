@@ -830,7 +830,7 @@ static int ds_ioctl(struct inode * inode, struct file * file,
 	err = unbind_request(i, &buf.bind_info);
 	break;
     case DS_BIND_MTD:
-	if (!suser()) return -EPERM;
+	if (!capable(CAP_SYS_ADMIN)) return -EPERM;
 	err = bind_mtd(i, &buf.mtd_info);
 	break;
     default:

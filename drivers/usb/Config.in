@@ -15,7 +15,7 @@ if [ "$CONFIG_USB" = "y" -o  "$CONFIG_USB" = "m" ]; then
    source drivers/usb/storage/Config.in
 
    source drivers/usb/input/Config.in
- 
+
    source drivers/usb/image/Config.in
 
    source drivers/usb/media/Config.in

@@ -518,7 +518,7 @@ static void channel_probe(struct ata_channel *ch)
 	sprintf(ch->dev.bus_id, "%04x", ch->io_ports[IDE_DATA_OFFSET]);
 	sprintf(ch->dev.name, "ide");
 	ch->dev.driver_data = ch;
-#ifdef CONFIG_BLK_DEV_IDEPCI
+#ifdef CONFIG_PCI
 	if (ch->pci_dev)
 		ch->dev.parent = &ch->pci_dev->dev;
 	else

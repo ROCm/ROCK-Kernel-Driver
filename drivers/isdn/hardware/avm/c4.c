@@ -52,10 +52,6 @@ MODULE_PARM(suppress_pollack, "0-1i");
 
 /* ------------------------------------------------------------- */
 
-static struct capi_driver_interface *di;
-
-/* ------------------------------------------------------------- */
-
 static void c4_dispatch_tx(avmcard *card);
 
 /* ------------------------------------------------------------- */
@@ -587,12 +583,6 @@ static void c4_handle_rx(avmcard *card)
 			ctrl = card->ctrlinfo[cidx].capi_ctrl;
 			if (ctrl)
 				ctrl->free_ncci(ctrl, ApplId, NCCI);
-		} else {
-			for (cidx=0; cidx < 4; cidx++) {
-				ctrl = card->ctrlinfo[cidx].capi_ctrl;
-				if (ctrl)
-					ctrl->appl_released(ctrl, ApplId);
-			}
 		}
 		break;
 
@@ -918,7 +908,7 @@ static void c4_remove_ctr(struct capi_ctr *ctrl)
         for (i=0; i < 4; i++) {
 		cinfo = &card->ctrlinfo[i];
 		if (cinfo->capi_ctrl) {
-			di->detach_ctr(cinfo->capi_ctrl);
+			detach_capi_ctr(cinfo->capi_ctrl);
 			cinfo->capi_ctrl = NULL;
 		}
 	}
@@ -973,8 +963,6 @@ void c4_register_appl(struct capi_ctr *ctrl,
 		skb_queue_tail(&card->dma->send_queue, skb);
 		c4_dispatch_tx(card);
 	}
-
-	ctrl->appl_registered(ctrl, appl);
 }
 
 /* ------------------------------------------------------------- */
@@ -1170,13 +1158,13 @@ static int c4_add_card(struct capi_driver *driver,
 
 	for (i=0; i < nr_controllers ; i++) {
 		cinfo = &card->ctrlinfo[i];
-		cinfo->capi_ctrl = di->attach_ctr(driver, card->name, cinfo);
+		cinfo->capi_ctrl = attach_capi_ctr(driver, card->name, cinfo);
 		if (!cinfo->capi_ctrl) {
 			printk(KERN_ERR "%s: attach controller failed (%d).\n",
 					driver->name, i);
 			for (i--; i >= 0; i--) {
 				cinfo = &card->ctrlinfo[i];
-				di->detach_ctr(cinfo->capi_ctrl);
+				detach_capi_ctr(cinfo->capi_ctrl);
 			}
 			goto err_free_irq;
 		}
@@ -1208,37 +1196,39 @@ static int c4_add_card(struct capi_driver *driver,
 /* ------------------------------------------------------------- */
 
 static struct capi_driver c2_driver = {
-    name: "c2",
-    revision: "0.0",
-    load_firmware: c4_load_firmware,
-    reset_ctr: c4_reset_ctr,
-    remove_ctr: c4_remove_ctr,
-    register_appl: c4_register_appl,
-    release_appl: c4_release_appl,
-    send_message: c4_send_message,
+	owner: THIS_MODULE,
+	name: "c2",
+	revision: "0.0",
+	load_firmware: c4_load_firmware,
+	reset_ctr: c4_reset_ctr,
+	remove_ctr: c4_remove_ctr,
+	register_appl: c4_register_appl,
+	release_appl: c4_release_appl,
+	send_message: c4_send_message,
 
-    procinfo: c4_procinfo,
-    ctr_read_proc: c4_read_proc,
-    driver_read_proc: 0,	/* use standard driver_read_proc */
-
-    add_card: 0, /* no add_card function */
+	procinfo: c4_procinfo,
+	ctr_read_proc: c4_read_proc,
+	driver_read_proc: 0,	/* use standard driver_read_proc */
+	
+	add_card: 0, /* no add_card function */
 };
 
 static struct capi_driver c4_driver = {
-    name: "c4",
-    revision: "0.0",
-    load_firmware: c4_load_firmware,
-    reset_ctr: c4_reset_ctr,
-    remove_ctr: c4_remove_ctr,
-    register_appl: c4_register_appl,
-    release_appl: c4_release_appl,
-    send_message: c4_send_message,
-
-    procinfo: c4_procinfo,
-    ctr_read_proc: c4_read_proc,
-    driver_read_proc: 0,	/* use standard driver_read_proc */
-
-    add_card: 0, /* no add_card function */
+	owner: THIS_MODULE,
+	name: "c4",
+	revision: "0.0",
+	load_firmware: c4_load_firmware,
+	reset_ctr: c4_reset_ctr,
+	remove_ctr: c4_remove_ctr,
+	register_appl: c4_register_appl,
+	release_appl: c4_release_appl,
+	send_message: c4_send_message,
+	
+	procinfo: c4_procinfo,
+	ctr_read_proc: c4_read_proc,
+	driver_read_proc: 0,	/* use standard driver_read_proc */
+	
+	add_card: 0, /* no add_card function */
 };
 
 static int c4_attach_driver (struct capi_driver * driver)
@@ -1253,13 +1243,7 @@ static int c4_attach_driver (struct capi_driver * driver)
 
 	printk(KERN_INFO "%s: revision %s\n", driver->name, driver->revision);
 
-        di = attach_capi_driver(driver);
-	if (!di) {
-		printk(KERN_ERR "%s: failed to attach capi_driver\n",
-				driver->name);
-		MOD_DEC_USE_COUNT;
-		return -ENODEV;
-	}
+        attach_capi_driver(driver);
 	return 0;
 }
 

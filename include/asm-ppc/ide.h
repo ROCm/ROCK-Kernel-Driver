@@ -30,8 +30,6 @@
 #include <linux/ioport.h>
 #include <asm/io.h>
 
-extern void ppc_generic_ide_fix_driveid(struct hd_driveid *id);
-
 struct ide_machdep_calls {
         int         (*default_irq)(ide_ioreg_t base);
         ide_ioreg_t (*default_io_base)(int index);
@@ -42,9 +40,6 @@ struct ide_machdep_calls {
 };
 
 extern struct ide_machdep_calls ppc_ide_md;
-
-void ppc_generic_ide_fix_driveid(struct hd_driveid *id);
-#define ide_fix_driveid(id)	ppc_generic_ide_fix_driveid((id))
 
 #undef	SUPPORT_SLOW_DATA_PORTS
 #define	SUPPORT_SLOW_DATA_PORTS	0
@@ -96,7 +91,7 @@ static __inline__ void ide_init_hwif_ports(hw_regs_t *hw,
 
 static __inline__ void ide_init_default_hwifs(void)
 {
-#ifndef CONFIG_BLK_DEV_IDEPCI
+#ifndef CONFIG_PCI
 	hw_regs_t hw;
 	int index;
 	ide_ioreg_t base;
@@ -109,36 +104,9 @@ static __inline__ void ide_init_default_hwifs(void)
 		hw.irq = ide_default_irq(base);
 		ide_register_hw(&hw, NULL);
 	}
-#endif /* CONFIG_BLK_DEV_IDEPCI */
+#endif
 }
 
-typedef union {
-	unsigned all			: 8;	/* all of the bits together */
-	struct {
-		unsigned bit7		: 1;	/* always 1 */
-		unsigned lba		: 1;	/* using LBA instead of CHS */
-		unsigned bit5		: 1;	/* always 1 */
-		unsigned unit		: 1;	/* drive select number, 0/1 */
-		unsigned head		: 4;	/* always zeros here */
-	} b;
-} select_t;
-
-typedef union {
-	unsigned all			: 8;	/* all of the bits together */
-	struct {
-		unsigned HOB		: 1;	/* 48-bit address ordering */
-		unsigned reserved456	: 3;
-		unsigned bit3		: 1;	/* ATA-2 thingy */
-		unsigned SRST		: 1;	/* host soft reset bit */
-		unsigned nIEN		: 1;	/* device INTRQ to host */
-		unsigned bit0		: 1;
-	} b;
-} control_t;
-
-/*
- * The following are not needed for the non-m68k ports
- * unless direct IDE on 8xx
- */
 #if (defined CONFIG_APUS || defined CONFIG_BLK_DEV_MPC8xx_IDE )
 #define ide_ack_intr(hwif) (hwif->hw.ack_intr ? hwif->hw.ack_intr(hwif) : 1)
 #else

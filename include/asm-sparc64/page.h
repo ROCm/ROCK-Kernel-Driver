@@ -113,8 +113,19 @@ typedef unsigned long iopgprot_t;
 
 #define __pa(x)			((unsigned long)(x) - PAGE_OFFSET)
 #define __va(x)			((void *)((unsigned long) (x) + PAGE_OFFSET))
-#define virt_to_page(kaddr)	(mem_map + ((__pa(kaddr)-phys_base) >> PAGE_SHIFT))
-#define VALID_PAGE(page)	((page - mem_map) < max_mapnr)
+
+/* PFNs are real physical page numbers.  However, mem_map only begins to record
+ * per-page information starting at pfn_base.  This is to handle systems where
+ * the first physical page in the machine is at some huge physical address, such
+ * as 4GB.   This is common on a partitioned E10000, for example.
+ */
+
+#define pfn_to_page(pfn)	(mem_map + ((pfn)-(pfn_base)))
+#define page_to_pfn(page)	((unsigned long)(((page) - mem_map) + pfn_base))
+#define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr)>>PAGE_SHIFT)
+
+#define pfn_valid(pfn)		(((pfn)-(pfn_base)) < max_mapnr)
+#define virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
 
 #define virt_to_phys __pa
 #define phys_to_virt __va

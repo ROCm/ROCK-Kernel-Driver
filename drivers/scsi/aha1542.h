@@ -137,8 +137,10 @@ static int aha1542_abort(Scsi_Cmnd * SCpnt);
 static int aha1542_bus_reset(Scsi_Cmnd * SCpnt);
 static int aha1542_dev_reset(Scsi_Cmnd * SCpnt);
 static int aha1542_host_reset(Scsi_Cmnd * SCpnt);
+#if 0
 static int aha1542_old_abort(Scsi_Cmnd * SCpnt);
 static int aha1542_old_reset(Scsi_Cmnd *, unsigned int);
+#endif
 static int aha1542_biosparam(Disk *, kdev_t, int*);
 
 #define AHA1542_MAILBOXES 8
@@ -154,8 +156,6 @@ static int aha1542_biosparam(Disk *, kdev_t, int*);
 		     detect:			aha1542_detect,		\
 		     command:			aha1542_command,	\
 		     queuecommand:		aha1542_queuecommand,	\
-                     abort:		        aha1542_old_abort,	\
-                     reset:			aha1542_old_reset,	\
 		     eh_abort_handler:		aha1542_abort,		\
 		     eh_device_reset_handler:	aha1542_dev_reset,	\
 		     eh_bus_reset_handler:	aha1542_bus_reset,	\

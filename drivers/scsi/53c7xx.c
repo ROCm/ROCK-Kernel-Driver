@@ -1119,8 +1119,9 @@ NCR53c7x0_init (struct Scsi_Host *host) {
  */
 
 int 
-ncr53c7xx_init (Scsi_Host_Template *tpnt, int board, int chip, 
-    u32 base, int io_port, int irq, int dma, long long options, int clock)
+ncr53c7xx_init (Scsi_Host_Template *tpnt, int board, int chip,
+    unsigned long base, int io_port, int irq, int dma, 
+    long long options, int clock)
 {
     struct Scsi_Host *instance;
     struct NCR53c7x0_hostdata *hostdata;
@@ -1224,7 +1225,7 @@ ncr53c7xx_init (Scsi_Host_Template *tpnt, int board, int chip,
     memset((void *)instance->hostdata[0], 0, 8192);
     cache_push(virt_to_phys((void *)(instance->hostdata[0])), 8192);
     cache_clear(virt_to_phys((void *)(instance->hostdata[0])), 8192);
-    kernel_set_cachemode(instance->hostdata[0], 8192, IOMAP_NOCACHE_SER);
+    kernel_set_cachemode((void *)instance->hostdata[0], 8192, IOMAP_NOCACHE_SER);
 
     /* FIXME : if we ever support an ISA NCR53c7xx based board, we
        need to check if the chip is running in a 16 bit mode, and if so 
@@ -1251,7 +1252,7 @@ ncr53c7xx_init (Scsi_Host_Template *tpnt, int board, int chip,
      */
 
     if (base) {
-	instance->base = (unsigned char *) (unsigned long) base;
+	instance->base = base;
 	/* Check for forced I/O mapping */
     	if (!(options & OPTION_IO_MAPPED)) {
 	    options |= OPTION_MEMORY_MAPPED;
@@ -1423,7 +1424,7 @@ NCR53c7x0_init_fixup (struct Scsi_Host *host) {
     	memory_to_ncr = tmp|DMODE_800_DIOM;
     	ncr_to_memory = tmp|DMODE_800_SIOM;
     } else {
-    	base = virt_to_bus(host->base);
+    	base = virt_to_bus((void *)host->base);
 	memory_to_ncr = ncr_to_memory = tmp;
     }
 
@@ -3049,7 +3050,7 @@ my_free_page (void *addr, int dummy)
     /* XXX This assumes default cache mode to be IOMAP_FULL_CACHING, which
      * XXX may be invalid (CONFIG_060_WRITETHROUGH)
      */
-    kernel_set_cachemode((u32)addr, 4096, IOMAP_FULL_CACHING);
+    kernel_set_cachemode((void *)addr, 4096, IOMAP_FULL_CACHING);
     free_page ((u32)addr);
 }
 
@@ -3107,7 +3108,7 @@ allocate_cmd (Scsi_Cmnd *cmd) {
         memset((void *)real, 0, 4096);
         cache_push(virt_to_phys((void *)real), 4096);
         cache_clear(virt_to_phys((void *)real), 4096);
-        kernel_set_cachemode(real, 4096, IOMAP_NOCACHE_SER);
+        kernel_set_cachemode((void *)real, 4096, IOMAP_NOCACHE_SER);
 	tmp = ROUNDUP(real, void *);
 #ifdef FORCE_DSA_ALIGNMENT
 	{
@@ -6114,7 +6115,7 @@ NCR53c7x0_release(struct Scsi_Host *host) {
     /* XXX This assumes default cache mode to be IOMAP_FULL_CACHING, which
      * XXX may be invalid (CONFIG_060_WRITETHROUGH)
      */
-    kernel_set_cachemode((u32)hostdata, 8192, IOMAP_FULL_CACHING);
+    kernel_set_cachemode((void *)hostdata, 8192, IOMAP_FULL_CACHING);
     free_pages ((u32)hostdata, 1);
     return 1;
 }

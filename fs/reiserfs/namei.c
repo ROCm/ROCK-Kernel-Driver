@@ -363,9 +363,54 @@ static struct dentry * reiserfs_lookup (struct inode * dir, struct dentry * dent
 	return ERR_PTR(-EIO);
     }
 
+    if (inode)
+	    return d_splice_alias(inode, dentry);
+    
     d_add(dentry, inode);
     return NULL;
 }
+
+
+/* 
+** looks up the dentry of the parent directory for child.
+** taken from ext2_get_parent
+*/
+struct dentry *reiserfs_get_parent(struct dentry *child)
+{
+    int retval;
+    struct inode * inode = NULL;
+    struct reiserfs_dir_entry de;
+    INITIALIZE_PATH (path_to_entry);
+    struct dentry *parent;
+    struct inode *dir = child->d_inode ;
+
+
+    if (dir->i_nlink == 0) {
+	return ERR_PTR(-ENOENT);
+    }
+    de.de_gen_number_bit_string = 0;
+
+    lock_kernel();
+    retval = reiserfs_find_entry (dir, "..", 2, &path_to_entry, &de);
+    pathrelse (&path_to_entry);
+    if (retval != NAME_FOUND) {
+	unlock_kernel();
+	return ERR_PTR(-ENOENT);
+    }
+    inode = reiserfs_iget (dir->i_sb, (struct cpu_key *)&(de.de_dir_id));
+    unlock_kernel();
+
+    if (!inode || IS_ERR(inode)) {
+	return ERR_PTR(-EACCES);
+    }
+    parent = d_alloc_anon(inode);
+    if (!parent) {
+	iput(inode);
+	parent = ERR_PTR(-ENOMEM);
+    }
+    return parent;
+}
+
 
 //
 // a portion of this function, particularly the VFS interface portion,

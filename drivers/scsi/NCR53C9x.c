@@ -927,7 +927,7 @@ static void esp_get_dmabufs(struct NCR_ESP *esp, Scsi_Cmnd *sp)
 			esp->dma_mmu_get_scsi_sgl(esp, sp);
 		else
 			sp->SCp.ptr =
-				(char *) virt_to_phys(sp->SCp.buffer->address);
+				(char *) virt_to_phys((page_address(sp->SCp.buffer->page) + sp->SCp.buffer->offset));
 	}
 }
 
@@ -1748,7 +1748,8 @@ static inline void advance_sg(struct NCR_ESP *esp, Scsi_Cmnd *sp)
 	if (esp->dma_advance_sg)
 		esp->dma_advance_sg (sp);
 	else
-		sp->SCp.ptr = (char *)virt_to_phys(sp->SCp.buffer->address);
+		sp->SCp.ptr = (char *) virt_to_phys((page_address(sp->SCp.buffer->page) + sp->SCp.buffer->offset));
+
 }
 
 /* Please note that the way I've coded these routines is that I _always_

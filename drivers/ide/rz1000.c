@@ -11,7 +11,7 @@
  *  Dunno if this fixes both ports, or only the primary port (?).
  */
 
-#include <linux/config.h> /* for CONFIG_BLK_DEV_IDEPCI */
+#include <linux/config.h> /* for CONFIG_PCI */
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/delay.h>
@@ -26,7 +26,7 @@
 
 #include <asm/io.h>
 
-#ifdef CONFIG_BLK_DEV_IDEPCI
+#ifdef CONFIG_PCI
 
 void __init ide_init_rz1000(struct ata_channel *hwif)	/* called from ide-pci.c */
 {
@@ -87,4 +87,4 @@ void __init ide_probe_for_rz100x (void)	/* called from ide.c */
 		init_rz1000 (dev, "RZ1001");
 }
 
-#endif /* CONFIG_BLK_DEV_IDEPCI */
+#endif

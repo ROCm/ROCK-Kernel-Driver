@@ -13,17 +13,7 @@
 
 #ifdef __KERNEL__
 
-#include <linux/config.h>
-
-struct hwclk_time {
-	unsigned	sec;	/* 0..59 */
-	unsigned	min;	/* 0..59 */
-	unsigned	hour;	/* 0..23 */
-	unsigned	day;	/* 1..31 */
-	unsigned	mon;	/* 0..11 */
-	unsigned	year;	/* 70... */
-	int		wday;	/* 0..6, 0 is Sunday, -1 means unknown/don't set */
-};
+#include <asm/machdep.h>
 
 /* a few implementation details for the emulation : */
 

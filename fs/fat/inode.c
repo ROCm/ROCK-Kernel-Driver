@@ -438,20 +438,26 @@ static int fat_read_root(struct inode *inode)
  *  4/  parent->i_logstart - maybe used to hunt for the file on disc
  *
  */
-struct dentry *fat_fh_to_dentry(struct super_block *sb, __u32 *fh,
-				int len, int fhtype, int parent)
+
+struct dentry *fat_decode_fh(struct super_block *sb, __u32 *fh,
+			     int len, int fhtype, 
+			     int (*acceptable)(void *context, struct dentry *de),
+			     void *context)
 {
-	struct inode *inode = NULL;
-	struct dentry *result;
 
 	if (fhtype != 3)
 		return ERR_PTR(-ESTALE);
 	if (len < 5)
 		return ERR_PTR(-ESTALE);
-	/* We cannot find the parent,
-	   It better just *be* there */
-	if (parent)
-		return ERR_PTR(-ESTALE);
+
+	return sb->s_export_op->find_exported_dentry(sb, fh, NULL, acceptable, context);
+}
+
+struct dentry *fat_get_dentry(struct super_block *sb, void *inump)
+{
+	struct inode *inode = NULL;
+	struct dentry *result;
+	__u32 *fh = inump;
 
 	inode = iget(sb, fh[0]);
 	if (!inode || is_bad_inode(inode) ||
@@ -497,12 +503,13 @@ struct dentry *fat_fh_to_dentry(struct super_block *sb, __u32 *fh,
 		iput(inode);
 		return ERR_PTR(-ENOMEM);
 	}
+	result->d_op = sb->s_root->d_op;
 	result->d_vfs_flags |= DCACHE_REFERENCED;
 	return result;
 		
 }
 
-int fat_dentry_to_fh(struct dentry *de, __u32 *fh, int *lenp, int needparent)
+int fat_encode_fh(struct dentry *de, __u32 *fh, int *lenp, int connectable)
 {
 	int len = *lenp;
 	struct inode *inode =  de->d_inode;
@@ -518,6 +525,43 @@ int fat_dentry_to_fh(struct dentry *de, __u32 *fh, int *lenp, int needparent)
 	fh[4] = MSDOS_I(de->d_parent->d_inode)->i_logstart;
 	read_unlock(&dparent_lock);
 	return 3;
+}
+
+struct dentry *fat_get_parent(struct dentry *child)
+{
+	struct buffer_head *bh=NULL;
+	struct msdos_dir_entry *de = NULL;
+	struct dentry *parent = NULL;
+	int res;
+	int ino = 0;
+	struct inode *inode;
+
+	lock_kernel();
+	res = fat_scan(child->d_inode, MSDOS_DOTDOT, &bh, &de, &ino);
+
+	if (res < 0)
+		goto out;
+	inode = fat_build_inode(child->d_sb, de, ino, &res);
+	if (res)
+		goto out;
+	if (!inode)
+		res = -EACCES;
+	else {
+		parent = d_alloc_anon(inode);
+		if (!parent) {
+			iput(inode);
+			res = -ENOMEM;
+		}
+	}
+
+ out:
+	if(bh)
+		fat_brelse(child->d_sb, bh);
+	unlock_kernel();
+	if (res)
+		return ERR_PTR(res);
+	else
+		return parent;
 }
 
 static kmem_cache_t *fat_inode_cachep;
@@ -574,8 +618,13 @@ static struct super_operations fat_sops = {
 	clear_inode:	fat_clear_inode,
 
 	read_inode:	make_bad_inode,
-	fh_to_dentry:	fat_fh_to_dentry,
-	dentry_to_fh:	fat_dentry_to_fh,
+};
+
+static struct export_operations fat_export_ops = {
+	decode_fh:	fat_decode_fh,
+	encode_fh:	fat_encode_fh,
+	get_dentry:	fat_get_dentry,
+	get_parent:	fat_get_parent,
 };
 
 /*
@@ -609,6 +658,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 
 	sb->s_magic = MSDOS_SUPER_MAGIC;
 	sb->s_op = &fat_sops;
+	sb->s_export_op = &fat_export_ops;
 	sbi->options.isvfat = isvfat;
 	sbi->dir_ops = fs_dir_inode_ops;
 	sbi->cvf_format = &default_cvf;

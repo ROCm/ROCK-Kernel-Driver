@@ -22,13 +22,14 @@ static int uni2char(const wchar_t uni,
 	if ((uni & 0xffaf) == 0x040e || (uni & 0xffce) == 0x254c) {
 		/* koi8-ru and koi8-u differ only on two characters */
 		if (uni == 0x040e)
-			return 0xbe;
+			out[0] = 0xbe;
 		else if (uni == 0x045e)
-			return 0xae;
+			out[0] = 0xae;
 		else if (uni == 0x255d || uni == 0x256c)
 			return 0;
 		else
 			return p_nls->uni2char(uni, out, boundlen);
+		return 1;
 	}
 	else
 		/* fast path */

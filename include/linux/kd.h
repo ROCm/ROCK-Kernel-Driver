@@ -132,19 +132,6 @@ struct kbkeycode {
 
 #define KDSIGACCEPT	0x4B4E	/* accept kbd generated signals */
 
-struct hwclk_time {
-	unsigned	sec;	/* 0..59 */
-	unsigned	min;	/* 0..59 */
-	unsigned	hour;	/* 0..23 */
-	unsigned	day;	/* 1..31 */
-	unsigned	mon;	/* 0..11 */
-	unsigned	year;	/* 70... */
-	int		wday;	/* 0..6, 0 is Sunday, -1 means unknown/don't set */
-};
-
-#define KDGHWCLK        0x4B50	/* get hardware clock */
-#define KDSHWCLK        0x4B51  /* set hardware clock */
-
 struct kbd_repeat {
 	int delay;	/* in msec; <= 0: don't change */
 	int rate;	/* in msec; <= 0: don't change */

@@ -236,8 +236,8 @@ static unsigned long find_free_region( unsigned long n_pages, unsigned long
 static void do_stram_request(request_queue_t *);
 static int stram_open( struct inode *inode, struct file *filp );
 static int stram_release( struct inode *inode, struct file *filp );
-#endif
 static void reserve_region(void *start, void *end);
+#endif
 static BLOCK *add_region( void *addr, unsigned long size );
 static BLOCK *find_region( void *addr );
 static int remove_region( BLOCK *block );
@@ -296,7 +296,7 @@ void __init atari_stram_reserve_pages(void *start_mem)
 		max_swap_size =
 			(!MACH_IS_HADES &&
 			 (N_PAGES(stram_end-stram_start)*MAX_STRAM_FRACTION_DENOM <=
-			  (high_memory>>PAGE_SHIFT)*MAX_STRAM_FRACTION_NOM)) ? 16*1024*1024 : 0;
+			  ((unsigned long)high_memory>>PAGE_SHIFT)*MAX_STRAM_FRACTION_NOM)) ? 16*1024*1024 : 0;
 	DPRINTK( "atari_stram_reserve_pages: max_swap_size = %d\n", max_swap_size );
 #endif
 
@@ -660,7 +660,7 @@ static inline void unswap_pmd(struct vm_area_struct * vma, pmd_t *dir,
 		pmd_clear(dir);
 		return;
 	}
-	pte = pte_offset(dir, address);
+	pte = pte_offset_kernel(dir, address);
 	offset += address & PMD_MASK;
 	address &= ~PMD_MASK;
 	end = address + size;
@@ -759,7 +759,7 @@ static int unswap_by_read(unsigned short *map, unsigned long max,
 			/* Get a page for the entry, using the existing
 			   swap cache page if there is one.  Otherwise,
 			   get a clean page and read the swap into it. */
-			page = read_swap_cache(entry);
+			page = read_swap_cache_async(entry);
 			if (!page) {
 				swap_free(entry);
 				return -ENOMEM;
@@ -768,7 +768,7 @@ static int unswap_by_read(unsigned short *map, unsigned long max,
 			for_each_task(p)
 				unswap_process(p->mm, entry, page);
 			read_unlock(&tasklist_lock);
-			shm_unuse(entry, page);
+			shmem_unuse(entry, page);
 			/* Now get rid of the extra reference to the
 			   temporary page we've been using. */
 			if (PageSwapCache(page))
@@ -1069,7 +1069,6 @@ int __init stram_device_init(void)
 	return( 0 );
 }
 
-#endif /* CONFIG_STRAM_SWAP */
 
 
 /* ------------------------------------------------------------------------ */
@@ -1082,6 +1081,7 @@ static void reserve_region(void *start, void *end)
 	reserve_bootmem (virt_to_phys(start), end - start);
 }
 
+#endif /* CONFIG_STRAM_SWAP */
 
 
 /* ------------------------------------------------------------------------ */

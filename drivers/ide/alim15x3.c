@@ -28,7 +28,7 @@
 
 #include "ata-timing.h"
 
-#define DISPLAY_ALI_TIMINGS
+#undef DISPLAY_ALI_TIMINGS
 
 #if defined(DISPLAY_ALI_TIMINGS) && defined(CONFIG_PROC_FS)
 #include <linux/stat.h>

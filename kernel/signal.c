@@ -1110,7 +1110,8 @@ do_sigaction(int sig, const struct k_sigaction *act, struct k_sigaction *oact)
 		    || (k->sa.sa_handler == SIG_DFL
 			&& (sig == SIGCONT ||
 			    sig == SIGCHLD ||
-			    sig == SIGWINCH))) {
+			    sig == SIGWINCH ||
+			    sig == SIGURG))) {
 			spin_lock_irq(&current->sigmask_lock);
 			if (rm_sig_from_queue(sig, current))
 				recalc_sigpending();

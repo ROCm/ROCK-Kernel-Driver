@@ -180,7 +180,8 @@ pcibios_fixup_resources(struct pci_dev* dev)
  * which might have be mirrored at 0x0100-0x03ff..
  */
 void
-pcibios_align_resource(void *data, struct resource *res, unsigned long size)
+pcibios_align_resource(void *data, struct resource *res,
+		       unsigned long size, unsigned long align)
 {
 	struct pci_dev *dev = data;
 
