@@ -65,7 +65,7 @@ int sctp_bind_addr_copy(sctp_bind_addr_t *dest, const sctp_bind_addr_t *src,
 			sctp_scope_t scope, int priority, int flags)
 {
 	struct sockaddr_storage_list *addr;
-	list_t *pos;
+	struct list_head *pos;
 	int error = 0;
 
 	/* All addresses share the same port.  */
@@ -119,7 +119,7 @@ void sctp_bind_addr_init(sctp_bind_addr_t *bp, __u16 port)
 static void sctp_bind_addr_clean(sctp_bind_addr_t *bp)
 {
 	struct sockaddr_storage_list *addr;
-	list_t *pos, *temp;
+	struct list_head *pos, *temp;
 
 	/* Empty the bind address list. */
 	list_for_each_safe(pos, temp, &bp->address_list) {
@@ -173,7 +173,7 @@ int sctp_add_bind_addr(sctp_bind_addr_t *bp, sockaddr_storage_t *new,
  */
 int sctp_del_bind_addr(sctp_bind_addr_t *bp, sockaddr_storage_t *del_addr)
 {
-	list_t *pos, *temp;
+	struct list_head *pos, *temp;
 	struct sockaddr_storage_list *addr;
 
 	list_for_each_safe(pos, temp, &bp->address_list) {
@@ -206,7 +206,7 @@ sctpParam_t sctp_bind_addrs_to_raw(const sctp_bind_addr_t *bp, int *addrs_len,
 	sctpIpAddress_t rawaddr_space;
 	int len;
 	struct sockaddr_storage_list *addr;
-	list_t *pos;
+	struct list_head *pos;
 
 	retval.v = NULL;
 	addrparms_len = 0;
@@ -284,7 +284,7 @@ int sctp_raw_to_bind_addrs(sctp_bind_addr_t *bp, __u8 *raw_addr_list,
 int sctp_bind_addr_has_addr(sctp_bind_addr_t *bp, const sockaddr_storage_t *addr)
 {
 	struct sockaddr_storage_list *laddr;
-	list_t *pos;
+	struct list_head *pos;
 
 	list_for_each(pos, &bp->address_list) {
 		laddr = list_entry(pos, struct sockaddr_storage_list, list);

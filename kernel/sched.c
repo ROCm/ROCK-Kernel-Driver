@@ -133,7 +133,7 @@ typedef struct runqueue runqueue_t;
 struct prio_array {
 	int nr_active;
 	unsigned long bitmap[BITMAP_SIZE];
-	list_t queue[MAX_PRIO];
+	struct list_head queue[MAX_PRIO];
 };
 
 /*
@@ -152,7 +152,7 @@ struct runqueue {
 	int prev_nr_running[NR_CPUS];
 
 	task_t *migration_thread;
-	list_t migration_queue;
+	struct list_head migration_queue;
 
 } ____cacheline_aligned;
 
@@ -739,7 +739,7 @@ static void load_balance(runqueue_t *this_rq, int idle)
 	int imbalance, idx, this_cpu = smp_processor_id();
 	runqueue_t *busiest;
 	prio_array_t *array;
-	list_t *head, *curr;
+	struct list_head *head, *curr;
 	task_t *tmp;
 
 	busiest = find_busiest_queue(this_rq, this_cpu, idle, &imbalance);
@@ -937,7 +937,7 @@ asmlinkage void schedule(void)
 	task_t *prev, *next;
 	runqueue_t *rq;
 	prio_array_t *array;
-	list_t *queue;
+	struct list_head *queue;
 	int idx;
 
 	if (unlikely(in_interrupt()))
@@ -1896,7 +1896,7 @@ void __init init_idle(task_t *idle, int cpu)
  */
 
 typedef struct {
-	list_t list;
+	struct list_head list;
 	task_t *task;
 	struct completion done;
 } migration_req_t;

@@ -408,7 +408,7 @@ void exit_mm(struct task_struct *tsk)
 static inline void forget_original_parent(struct task_struct * father)
 {
 	struct task_struct *p, *reaper;
-	list_t *_p;
+	struct list_head *_p;
 
 	read_lock(&tasklist_lock);
 
@@ -478,7 +478,7 @@ static inline void zap_thread(task_t *p, task_t *father)
 static void exit_notify(void)
 {
 	struct task_struct *t;
-	list_t *_p, *_n;
+	struct list_head *_p, *_n;
 
 	forget_original_parent(current);
 	/*

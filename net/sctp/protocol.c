@@ -198,7 +198,7 @@ static void sctp_get_local_addr_list(sctp_protocol_t *proto)
 static void __sctp_free_local_addr_list(sctp_protocol_t *proto)
 {
 	struct sockaddr_storage_list *addr;
-	list_t *pos, *temp;
+	struct list_head *pos, *temp;
 
 	list_for_each_safe(pos, temp, &proto->local_addr_list) {
 		addr = list_entry(pos, struct sockaddr_storage_list, list);
@@ -223,7 +223,7 @@ int sctp_copy_local_addr_list(sctp_protocol_t *proto, sctp_bind_addr_t *bp,
 {
 	struct sockaddr_storage_list *addr;
 	int error = 0;
-	list_t *pos;
+	struct list_head *pos;
 	long flags __attribute__ ((unused));
 
 	sctp_spin_lock_irqsave(&proto->local_addr_lock, flags);
@@ -327,7 +327,7 @@ int sctp_ctl_sock_init(void)
  */
 sctp_func_t *sctp_get_af_specific(const sockaddr_storage_t *address)
 {
-	list_t *pos;
+	struct list_head *pos;
 	sctp_protocol_t *proto = sctp_get_protocol();
 	sctp_func_t *retval, *af;
 

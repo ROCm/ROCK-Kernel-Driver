@@ -1053,7 +1053,7 @@ static void sctp_cmd_hb_timers_start(sctp_cmd_seq_t *cmds,
 				     sctp_association_t *asoc)
 {
 	sctp_transport_t *t;
-	list_t *pos;
+	struct list_head *pos;
 
 	/* Start a heartbeat timer for each transport on the association.
 	 * hold a reference on the transport to make sure none of
@@ -1072,7 +1072,7 @@ static void sctp_cmd_hb_timers_start(sctp_cmd_seq_t *cmds,
 void sctp_cmd_set_bind_addrs(sctp_cmd_seq_t *cmds, sctp_association_t *asoc,
 			     sctp_bind_addr_t *bp)
 {
-	list_t *pos, *temp;
+	struct list_head *pos, *temp;
 
 	list_for_each_safe(pos, temp, &bp->address_list) {
 		list_del_init(pos);

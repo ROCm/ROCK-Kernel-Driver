@@ -203,7 +203,7 @@ struct SCTP_protocol {
 	/* This is a list of groups of functions for each address
 	 * family that we support.
 	 */
-	list_t address_families;
+	struct list_head address_families;
 
 	/* This is the hash of all endpoints. */
 	int ep_hashsize;
@@ -225,7 +225,7 @@ struct SCTP_protocol {
 	 *
 	 * It is a list of struct sockaddr_storage_list.
 	 */
-	list_t local_addr_list;
+	struct list_head local_addr_list;
 	spinlock_t local_addr_lock;
 };
 
@@ -250,7 +250,7 @@ typedef struct sctp_func {
 	__u16		net_header_len;	
 	int		sockaddr_len;
 	sa_family_t	sa_family;
-	list_t          list;
+	struct list_head list;
 } sctp_func_t;
 
 sctp_func_t *sctp_get_af_specific(const sockaddr_storage_t *address);
@@ -494,7 +494,7 @@ const sockaddr_storage_t *sctp_source(const sctp_chunk_t *chunk);
  * sin_addr -- cast to either (struct in_addr) or (struct in6_addr)
  */
 struct sockaddr_storage_list {
-	list_t list;
+	struct list_head list;
 	sockaddr_storage_t a;
 };
 
@@ -582,7 +582,7 @@ void sctp_packet_free(sctp_packet_t *);
  */
 struct SCTP_transport {
 	/* A list of transports. */
-	list_t transports;
+	struct list_head transports;
 
 	/* Reference counting. */
 	atomic_t refcnt;
@@ -863,7 +863,7 @@ struct SCTP_bind_addr {
 	 *	has bound.  This information is passed to one's
 	 *	peer(s) in INIT and INIT ACK chunks.
 	 */
-	list_t address_list;
+	struct list_head address_list;
 
 	int malloced;        /* Are we kfree()able?  */
 };
@@ -988,7 +988,7 @@ struct SCTP_endpoint {
 	 *            is implemented.
 	 */
 	/* This is really a list of sctp_association_t entries. */
-	list_t asocs;
+	struct list_head asocs;
 
 	/* Secret Key: A secret key used by this endpoint to compute
 	 *            the MAC.  This SHOULD be a cryptographic quality
@@ -1070,7 +1070,7 @@ struct SCTP_association {
 	sctp_endpoint_common_t base;
 
 	/* Associations on the same socket. */
-	list_t asocs;
+	struct list_head asocs;
 
 	/* This is a signature that lets us know that this is a
 	 * sctp_association_t data structure.  Used for mapping an
@@ -1104,7 +1104,7 @@ struct SCTP_association {
 		 *
 		 * It is a list of SCTP_transport's.
 		 */
-		list_t transport_addr_list;
+		struct list_head transport_addr_list;
 
 		/* port
 		 *   The transport layer port number.
