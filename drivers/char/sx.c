@@ -1743,6 +1743,32 @@ static void sx_break (struct tty_struct * tty, int flag)
 }
 
 
+static int sx_tiocmget(struct tty_struct *tty, struct file *file)
+{
+	struct sx_port *port = tty->driver_data;
+	return sx_getsignals(port);
+}
+
+static int sx_tiocmset(struct tty_struct *tty, struct file *file,
+		       unsigned int set, unsigned int clear)
+{
+	struct sx_port *port = tty->driver_data;
+	int rts = -1, dtr = -1;
+
+	if (set & TIOCM_RTS)
+		rts = 1;
+	if (set & TIOCM_DTR)
+		dtr = 1;
+	if (clear & TIOCM_RTS)
+		rts = 0;
+	if (clear & TIOCM_DTR)
+		dtr = 0;
+
+	sx_setsignals(port, dtr, rts);
+	sx_reconfigure_port(port);
+	return 0;
+}
+
 static int sx_ioctl (struct tty_struct * tty, struct file * filp, 
                      unsigned int cmd, unsigned long arg)
 {
@@ -1774,34 +1800,6 @@ static int sx_ioctl (struct tty_struct * tty, struct file * filp,
 		if ((rc = verify_area(VERIFY_READ, (void *) arg,
 		                      sizeof(struct serial_struct))) == 0)
 			rc = gs_setserial(&port->gs, (struct serial_struct *) arg);
-		break;
-	case TIOCMGET:
-		if ((rc = verify_area(VERIFY_WRITE, (void *) arg,
-		                      sizeof(unsigned int))) == 0) {
-			ival = sx_getsignals(port);
-			put_user(ival, (unsigned int *) arg);
-		}
-		break;
-	case TIOCMBIS:
-		if ((rc = get_user(ival, (unsigned int *) arg)) == 0) {
-			sx_setsignals(port, ((ival & TIOCM_DTR) ? 1 : -1),
-			                     ((ival & TIOCM_RTS) ? 1 : -1));
-			sx_reconfigure_port(port);
-		}
-		break;
-	case TIOCMBIC:
-		if ((rc = get_user(ival, (unsigned int *) arg)) == 0) {
-			sx_setsignals(port, ((ival & TIOCM_DTR) ? 0 : -1),
-			                     ((ival & TIOCM_RTS) ? 0 : -1));
-			sx_reconfigure_port(port);
-		}
-		break;
-	case TIOCMSET:
-		if ((rc = get_user(ival, (unsigned int *) arg)) == 0) {
-			sx_setsignals(port, ((ival & TIOCM_DTR) ? 1 : 0),
-			                     ((ival & TIOCM_RTS) ? 1 : 0));
-			sx_reconfigure_port(port);
-		}
 		break;
 	default:
 		rc = -ENOIOCTLCMD;
@@ -2217,6 +2215,8 @@ static struct tty_operations sx_ops = {
 	.stop = gs_stop,
 	.start = gs_start,
 	.hangup = gs_hangup,
+	.tiocmget = sx_tiocmget,
+	.tiocmset = sx_tiocmset,
 };
 
 static int sx_init_drivers(void)

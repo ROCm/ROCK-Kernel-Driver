@@ -160,7 +160,7 @@ void __init config_sun3(void)
 	mach_hwclk           =  sun3_hwclk;
 	mach_halt	     =  sun3_halt;
 	mach_get_hardware_list = sun3_get_hardware_list;
-#if !defined(CONFIG_SERIAL_CONSOLE) && defined(CONFIG_DUMMY_CONSOLE)
+#if defined(CONFIG_DUMMY_CONSOLE)
 	conswitchp 	     = &dummy_con;
 #endif
 

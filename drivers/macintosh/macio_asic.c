@@ -23,7 +23,7 @@
 #include <asm/prom.h>
 #include <asm/pci-bridge.h>
 
-#define DEBUG
+#undef DEBUG
 
 #define MAX_NODE_NAME_SIZE (BUS_ID_SIZE - 12)
 

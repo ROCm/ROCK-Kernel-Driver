@@ -262,7 +262,7 @@
 #include <asm/entry.h>
 #include <asm/pgtable.h>
 #include <asm/page.h>
-#include "m68k_defs.h"
+#include <asm/offsets.h>
 
 #ifdef CONFIG_MAC
 

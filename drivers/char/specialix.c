@@ -1653,12 +1653,16 @@ static void sx_flush_buffer(struct tty_struct *tty)
 }
 
 
-static int sx_get_modem_info(struct specialix_port * port, unsigned int *value)
+static int sx_tiocmget(struct tty_struct *tty, struct file *file)
 {
+	struct specialix_port *port = (struct specialix_port *)tty->driver_data;
 	struct specialix_board * bp;
 	unsigned char status;
 	unsigned int result;
 	unsigned long flags;
+
+	if (sx_paranoia_check(port, tty->name, __FUNCTION__))
+		return -ENODEV;
 
 	bp = port_Board(port);
 	save_flags(flags); cli();
@@ -1683,71 +1687,51 @@ static int sx_get_modem_info(struct specialix_port * port, unsigned int *value)
 		          |/* ((status & MSVR_DSR) ? */ TIOCM_DSR /* : 0) */
 		          |   ((status & MSVR_CTS) ? TIOCM_CTS : 0);
 	}
-	put_user(result,(unsigned int *) value);
-	return 0;
+
+	return result;
 }
 
 
-static int sx_set_modem_info(struct specialix_port * port, unsigned int cmd,
-                             unsigned int *value)
+static int sx_tiocmset(struct tty_struct *tty, struct file *file,
+		       unsigned int set, unsigned int clear)
 {
+	struct specialix_port *port = (struct specialix_port *)tty->driver_data;
 	int error;
 	unsigned int arg;
 	unsigned long flags;
-	struct specialix_board *bp = port_Board(port);
+	struct specialix_board *bp;
 
-	error = verify_area(VERIFY_READ, value, sizeof(int));
-	if (error) 
-		return error;
+	if (sx_paranoia_check(port, tty->name, __FUNCTION__))
+		return -ENODEV;
 
-	get_user(arg, (unsigned long *) value);
-	switch (cmd) {
-	case TIOCMBIS: 
-	   /*	if (arg & TIOCM_RTS) 
-			port->MSVR |= MSVR_RTS; */
-	   /*   if (arg & TIOCM_DTR)
-			port->MSVR |= MSVR_DTR; */
+	bp = port_Board(port);
 
-		if (SX_CRTSCTS(port->tty)) {
-			if (arg & TIOCM_RTS)
-				port->MSVR |= MSVR_DTR; 
-		} else {
-			if (arg & TIOCM_DTR)
-				port->MSVR |= MSVR_DTR; 
-		}	     
-		break;
-	case TIOCMBIC:
-	  /*	if (arg & TIOCM_RTS)
-			port->MSVR &= ~MSVR_RTS; */
-	  /*    if (arg & TIOCM_DTR)
-			port->MSVR &= ~MSVR_DTR; */
-		if (SX_CRTSCTS(port->tty)) {
-			if (arg & TIOCM_RTS)
-				port->MSVR &= ~MSVR_DTR;
-		} else {
-			if (arg & TIOCM_DTR)
-				port->MSVR &= ~MSVR_DTR;
-		}
-		break;
-	case TIOCMSET:
-	  /* port->MSVR = (arg & TIOCM_RTS) ? (port->MSVR | MSVR_RTS) : 
-						 (port->MSVR & ~MSVR_RTS); */
-	  /* port->MSVR = (arg & TIOCM_DTR) ? (port->MSVR | MSVR_DTR) : 
-						 (port->MSVR & ~MSVR_DTR); */
-		if (SX_CRTSCTS(port->tty)) {
-	  		port->MSVR = (arg & TIOCM_RTS) ? 
-			                         (port->MSVR |  MSVR_DTR) : 
-			                         (port->MSVR & ~MSVR_DTR);
-		} else {
-			port->MSVR = (arg & TIOCM_DTR) ?
-			                         (port->MSVR |  MSVR_DTR):
-			                         (port->MSVR & ~MSVR_DTR);
-		}
-		break;
-	default:
-		return -EINVAL;
-	}
 	save_flags(flags); cli();
+   /*	if (set & TIOCM_RTS)
+		port->MSVR |= MSVR_RTS; */
+   /*   if (set & TIOCM_DTR)
+		port->MSVR |= MSVR_DTR; */
+
+	if (SX_CRTSCTS(port->tty)) {
+		if (set & TIOCM_RTS)
+			port->MSVR |= MSVR_DTR;
+	} else {
+		if (set & TIOCM_DTR)
+			port->MSVR |= MSVR_DTR;
+	}
+
+  /*	if (clear & TIOCM_RTS)
+		port->MSVR &= ~MSVR_RTS; */
+  /*    if (clear & TIOCM_DTR)
+		port->MSVR &= ~MSVR_DTR; */
+	if (SX_CRTSCTS(port->tty)) {
+		if (clear & TIOCM_RTS)
+			port->MSVR &= ~MSVR_DTR;
+	} else {
+		if (clear & TIOCM_DTR)
+			port->MSVR &= ~MSVR_DTR;
+	}
+
 	sx_out(bp, CD186x_CAR, port_No(port));
 	sx_out(bp, CD186x_MSVR, port->MSVR);
 	restore_flags(flags);
@@ -1897,16 +1881,6 @@ static int sx_ioctl(struct tty_struct * tty, struct file * filp,
 			((tty->termios->c_cflag & ~CLOCAL) |
 			(arg ? CLOCAL : 0));
 		return 0;
-	 case TIOCMGET:
-		error = verify_area(VERIFY_WRITE, (void *) arg,
-		                    sizeof(unsigned int));
-		if (error)
-			return error;
-		return sx_get_modem_info(port, (unsigned int *) arg);
-	 case TIOCMBIS:
-	 case TIOCMBIC:
-	 case TIOCMSET:
-		return sx_set_modem_info(port, cmd, (unsigned int *) arg);
 	 case TIOCGSERIAL:	
 		return sx_get_serial_info(port, (struct serial_struct *) arg);
 	 case TIOCSSERIAL:	
@@ -2116,6 +2090,8 @@ static struct tty_operations sx_ops = {
 	.stop = sx_stop,
 	.start = sx_start,
 	.hangup = sx_hangup,
+	.tiocmget = sx_tiocmget,
+	.tiocmset = sx_tiocmset,
 };
 
 static int sx_init_drivers(void)

@@ -521,7 +521,8 @@ static int check_pst_table(struct pst_s *pst, u8 maxvid)
 		}
 		if ((pst[j].fid > MAX_FID)
 		    || (pst[j].fid & 1)
-		    || (pst[j].fid < HI_FID_TABLE_BOTTOM)){
+		    || (j && (pst[j].fid < HI_FID_TABLE_BOTTOM))) {
+			/* Only first fid is allowed to be in "low" range */
 			printk(KERN_ERR PFX "fid %d invalid : 0x%x\n", j, pst[j].fid);
 			return -EINVAL;
 		}

@@ -1248,57 +1248,48 @@ static int get_lsr_info(struct async_struct * info, unsigned int *value)
 }
 
 
-static int get_modem_info(struct async_struct * info, unsigned int *value)
+static int rs_tiocmget(struct tty_struct *tty, struct file *file)
 {
+	struct async_struct * info = (struct async_struct *)tty->driver_data;
 	unsigned char control, status;
-	unsigned int result;
 	unsigned long flags;
+
+	if (serial_paranoia_check(info, tty->name, "rs_ioctl"))
+		return -ENODEV;
+	if (tty->flags & (1 << TTY_IO_ERROR))
+		return -EIO;
 
 	control = info->MCR;
 	local_irq_save(flags);
 	status = ciab.pra;
 	local_irq_restore(flags);
-	result =  ((control & SER_RTS) ? TIOCM_RTS : 0)
+	return    ((control & SER_RTS) ? TIOCM_RTS : 0)
 		| ((control & SER_DTR) ? TIOCM_DTR : 0)
 		| (!(status  & SER_DCD) ? TIOCM_CAR : 0)
 		| (!(status  & SER_DSR) ? TIOCM_DSR : 0)
 		| (!(status  & SER_CTS) ? TIOCM_CTS : 0);
-	if (copy_to_user(value, &result, sizeof(int)))
-		return -EFAULT;
-	return 0;
 }
 
-static int set_modem_info(struct async_struct * info, unsigned int cmd,
-			  unsigned int *value)
+static int rs_tiocmset(struct tty_struct *tty, struct file *file,
+		       unsigned int set, unsigned int clear)
 {
-	unsigned int arg;
+	struct async_struct * info = (struct async_struct *)tty->driver_data;
 	unsigned long flags;
 
-	if (copy_from_user(&arg, value, sizeof(int)))
-		return -EFAULT;
+	if (serial_paranoia_check(info, tty->name, "rs_ioctl"))
+		return -ENODEV;
+	if (tty->flags & (1 << TTY_IO_ERROR))
+		return -EIO;
 
-	switch (cmd) {
-	case TIOCMBIS: 
-	        if (arg & TIOCM_RTS)
-			info->MCR |= SER_RTS;
-		if (arg & TIOCM_DTR)
-			info->MCR |= SER_DTR;
-		break;
-	case TIOCMBIC:
-	        if (arg & TIOCM_RTS)
-			info->MCR &= ~SER_RTS;
-		if (arg & TIOCM_DTR)
-			info->MCR &= ~SER_DTR;
-		break;
-	case TIOCMSET:
-		info->MCR = ((info->MCR & ~(SER_RTS | SER_DTR))
-			     | ((arg & TIOCM_RTS) ? SER_RTS : 0)
-			     | ((arg & TIOCM_DTR) ? SER_DTR : 0));
-		break;
-	default:
-		return -EINVAL;
-	}
 	local_irq_save(flags);
+	if (set & TIOCM_RTS)
+		info->MCR |= SER_RTS;
+	if (set & TIOCM_DTR)
+		info->MCR |= SER_DTR;
+	if (clear & TIOCM_RTS)
+		info->MCR &= ~SER_RTS;
+	if (clear & TIOCM_DTR)
+		info->MCR &= ~SER_DTR;
 	rtsdtr_ctrl(info->MCR);
 	local_irq_restore(flags);
 	return 0;
@@ -1344,12 +1335,6 @@ static int rs_ioctl(struct tty_struct *tty, struct file * file,
 	}
 
 	switch (cmd) {
-		case TIOCMGET:
-			return get_modem_info(info, (unsigned int *) arg);
-		case TIOCMBIS:
-		case TIOCMBIC:
-		case TIOCMSET:
-			return set_modem_info(info, cmd, (unsigned int *) arg);
 		case TIOCGSERIAL:
 			return get_serial_info(info,
 					       (struct serial_struct *) arg);
@@ -2045,6 +2030,8 @@ static struct tty_operations serial_ops = {
 	.send_xchar = rs_send_xchar,
 	.wait_until_sent = rs_wait_until_sent,
 	.read_proc = rs_read_proc,
+	.tiocmget = rs_tiocmget,
+	.tiocmset = rs_tiocmset,
 };
 
 /*

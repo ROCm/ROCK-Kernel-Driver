@@ -3632,8 +3632,9 @@ static int get_lsr_info(struct cyclades_port *info, unsigned int *value)
 }
 
 static int
-get_modem_info(struct cyclades_port * info, unsigned int *value)
+cy_tiocmget(struct tty_struct *tty, struct file *file)
 {
+  struct cyclades_port * info = (struct cyclades_port *)tty->driver_data;
   int card,chip,channel,index;
   unsigned char *base_addr;
   unsigned long flags;
@@ -3644,6 +3645,9 @@ get_modem_info(struct cyclades_port * info, unsigned int *value)
   struct ZFW_CTRL *zfw_ctrl;
   struct BOARD_CTRL *board_ctrl;
   struct CH_CTRL *ch_ctrl;
+
+    if (serial_paranoia_check(info, tty->name, __FUNCTION__))
+	return -ENODEV;
 
     card = info->card;
     channel = (info->line) - (cy_card[card].first_line);
@@ -3700,23 +3704,26 @@ get_modem_info(struct cyclades_port * info, unsigned int *value)
 	}
 
     }
-    return cy_put_user(result, value);
-} /* get_modem_info */
+    return result;
+} /* cy_tiomget */
 
 
 static int
-set_modem_info(struct cyclades_port * info, unsigned int cmd,
-                          unsigned int *value)
+cy_tiocmset(struct tty_struct *tty, struct file *file,
+            unsigned int set, unsigned int clear)
 {
+  struct cyclades_port * info = (struct cyclades_port *)tty->driver_data;
   int card,chip,channel,index;
   unsigned char *base_addr;
   unsigned long flags;
-  unsigned int arg = cy_get_user((unsigned long *) value);
   struct FIRM_ID *firm_id;
   struct ZFW_CTRL *zfw_ctrl;
   struct BOARD_CTRL *board_ctrl;
   struct CH_CTRL *ch_ctrl;
   int retval;
+
+    if (serial_paranoia_check(info, tty->name, __FUNCTION__))
+	return -ENODEV;
 
     card = info->card;
     channel = (info->line) - (cy_card[card].first_line);
@@ -3728,66 +3735,7 @@ set_modem_info(struct cyclades_port * info, unsigned int cmd,
 		       (cy_card[card].base_addr
 		       + (cy_chip_offset[chip]<<index));
 
-	switch (cmd) {
-	case TIOCMBIS:
-	    if (arg & TIOCM_RTS){
-		CY_LOCK(info, flags);
-		cy_writeb((u_long)base_addr+(CyCAR<<index), (u_char)channel);
-                if (info->rtsdtr_inv) {
-		    cy_writeb((u_long)base_addr+(CyMSVR2<<index), CyDTR);
-                } else {
-		    cy_writeb((u_long)base_addr+(CyMSVR1<<index), CyRTS);
-                }
-		CY_UNLOCK(info, flags);
-	    }
-	    if (arg & TIOCM_DTR){
-		CY_LOCK(info, flags);
-		cy_writeb((u_long)base_addr+(CyCAR<<index), (u_char)channel);
-                if (info->rtsdtr_inv) {
-		    cy_writeb((u_long)base_addr+(CyMSVR1<<index), CyRTS);
-                } else {
-		    cy_writeb((u_long)base_addr+(CyMSVR2<<index), CyDTR);
-                }
-#ifdef CY_DEBUG_DTR
-		printk("cyc:set_modem_info raising DTR\n");
-		printk("     status: 0x%x, 0x%x\n",
-		    cy_readb(base_addr+(CyMSVR1<<index)), 
-                    cy_readb(base_addr+(CyMSVR2<<index)));
-#endif
-		CY_UNLOCK(info, flags);
-	    }
-	    break;
-	case TIOCMBIC:
-	    if (arg & TIOCM_RTS){
-		CY_LOCK(info, flags);
-		cy_writeb((u_long)base_addr+(CyCAR<<index), 
-                          (u_char)channel);
-                if (info->rtsdtr_inv) {
-		    	cy_writeb((u_long)base_addr+(CyMSVR2<<index), ~CyDTR);
-                } else {
-		    	cy_writeb((u_long)base_addr+(CyMSVR1<<index), ~CyRTS);
-                }
-		CY_UNLOCK(info, flags);
-	    }
-	    if (arg & TIOCM_DTR){
-		CY_LOCK(info, flags);
-		cy_writeb((u_long)base_addr+(CyCAR<<index), (u_char)channel);
-                if (info->rtsdtr_inv) {
-			cy_writeb((u_long)base_addr+(CyMSVR1<<index), ~CyRTS);
-                } else {
-			cy_writeb((u_long)base_addr+(CyMSVR2<<index), ~CyDTR);
-                }
-#ifdef CY_DEBUG_DTR
-		printk("cyc:set_modem_info dropping DTR\n");
-		printk("     status: 0x%x, 0x%x\n",
-		    cy_readb(base_addr+(CyMSVR1<<index)), 
-                    cy_readb(base_addr+(CyMSVR2<<index)));
-#endif
-		CY_UNLOCK(info, flags);
-	    }
-	    break;
-	case TIOCMSET:
-	    if (arg & TIOCM_RTS){
+	if (set & TIOCM_RTS){
 		CY_LOCK(info, flags);
 	        cy_writeb((u_long)base_addr+(CyCAR<<index), (u_char)channel);
                 if (info->rtsdtr_inv) {
@@ -3796,7 +3744,8 @@ set_modem_info(struct cyclades_port * info, unsigned int cmd,
 			cy_writeb((u_long)base_addr+(CyMSVR1<<index), CyRTS);
                 }
 		CY_UNLOCK(info, flags);
-	    }else{
+	}
+	if (clear & TIOCM_RTS) {
 		CY_LOCK(info, flags);
 		cy_writeb((u_long)base_addr+(CyCAR<<index), (u_char)channel);
                 if (info->rtsdtr_inv) {
@@ -3805,8 +3754,8 @@ set_modem_info(struct cyclades_port * info, unsigned int cmd,
 			cy_writeb((u_long)base_addr+(CyMSVR1<<index), ~CyRTS);
                 }
 		CY_UNLOCK(info, flags);
-	    }
-	    if (arg & TIOCM_DTR){
+	}
+	if (set & TIOCM_DTR){
 		CY_LOCK(info, flags);
 		cy_writeb((u_long)base_addr+(CyCAR<<index), (u_char)channel);
                 if (info->rtsdtr_inv) {
@@ -3821,7 +3770,8 @@ set_modem_info(struct cyclades_port * info, unsigned int cmd,
                     cy_readb(base_addr+(CyMSVR2<<index)));
 #endif
 		CY_UNLOCK(info, flags);
-	    }else{
+	}
+	if (clear & TIOCM_DTR) {
 		CY_LOCK(info, flags);
 		cy_writeb((u_long)base_addr+(CyCAR<<index), (u_char)channel);
                 if (info->rtsdtr_inv) {
@@ -3837,10 +3787,6 @@ set_modem_info(struct cyclades_port * info, unsigned int cmd,
                     cy_readb(base_addr+(CyMSVR2<<index)));
 #endif
 		CY_UNLOCK(info, flags);
-	    }
-	    break;
-	default:
-	    return -EINVAL;
 	}
     } else {
 	base_addr = (unsigned char*) (cy_card[card].base_addr);
@@ -3854,15 +3800,19 @@ set_modem_info(struct cyclades_port * info, unsigned int cmd,
 	    board_ctrl = &zfw_ctrl->board_ctrl;
 	    ch_ctrl = zfw_ctrl->ch_ctrl;
 
-	    switch (cmd) {
-	    case TIOCMBIS:
-		if (arg & TIOCM_RTS){
+	    if (set & TIOCM_RTS){
 		    CY_LOCK(info, flags);
 		    cy_writel(&ch_ctrl[channel].rs_control,
                        cy_readl(&ch_ctrl[channel].rs_control) | C_RS_RTS);
 		    CY_UNLOCK(info, flags);
-		}
-		if (arg & TIOCM_DTR){
+	    }
+	    if (clear & TIOCM_RTS) {
+		    CY_LOCK(info, flags);
+		    cy_writel(&ch_ctrl[channel].rs_control,
+                       cy_readl(&ch_ctrl[channel].rs_control) & ~C_RS_RTS);
+		    CY_UNLOCK(info, flags);
+	    }
+	    if (set & TIOCM_DTR){
 		    CY_LOCK(info, flags);
 		    cy_writel(&ch_ctrl[channel].rs_control,
                        cy_readl(&ch_ctrl[channel].rs_control) | C_RS_DTR);
@@ -3870,16 +3820,8 @@ set_modem_info(struct cyclades_port * info, unsigned int cmd,
 		    printk("cyc:set_modem_info raising Z DTR\n");
 #endif
 		    CY_UNLOCK(info, flags);
-		}
-		break;
-	    case TIOCMBIC:
-		if (arg & TIOCM_RTS){
-		    CY_LOCK(info, flags);
-		    cy_writel(&ch_ctrl[channel].rs_control,
-                       cy_readl(&ch_ctrl[channel].rs_control) & ~C_RS_RTS);
-		    CY_UNLOCK(info, flags);
-		}
-		if (arg & TIOCM_DTR){
+	    }
+	    if (clear & TIOCM_DTR) {
 		    CY_LOCK(info, flags);
 		    cy_writel(&ch_ctrl[channel].rs_control,
                        cy_readl(&ch_ctrl[channel].rs_control) & ~C_RS_DTR);
@@ -3887,40 +3829,6 @@ set_modem_info(struct cyclades_port * info, unsigned int cmd,
 		    printk("cyc:set_modem_info clearing Z DTR\n");
 #endif
 		    CY_UNLOCK(info, flags);
-		}
-		break;
-	    case TIOCMSET:
-		if (arg & TIOCM_RTS){
-		    CY_LOCK(info, flags);
-		    cy_writel(&ch_ctrl[channel].rs_control,
-                       cy_readl(&ch_ctrl[channel].rs_control) | C_RS_RTS);
-		    CY_UNLOCK(info, flags);
-		}else{
-		    CY_LOCK(info, flags);
-		    cy_writel(&ch_ctrl[channel].rs_control,
-                       cy_readl(&ch_ctrl[channel].rs_control) & ~C_RS_RTS);
-		    CY_UNLOCK(info, flags);
-		}
-		if (arg & TIOCM_DTR){
-		    CY_LOCK(info, flags);
-		    cy_writel(&ch_ctrl[channel].rs_control,
-                       cy_readl(&ch_ctrl[channel].rs_control) | C_RS_DTR);
-#ifdef CY_DEBUG_DTR
-		    printk("cyc:set_modem_info raising Z DTR\n");
-#endif
-		    CY_UNLOCK(info, flags);
-		}else{
-		    CY_LOCK(info, flags);
-		    cy_writel(&ch_ctrl[channel].rs_control,
-                       cy_readl(&ch_ctrl[channel].rs_control) & ~C_RS_DTR);
-#ifdef CY_DEBUG_DTR
-		    printk("cyc:set_modem_info clearing Z DTR\n");
-#endif
-		    CY_UNLOCK(info, flags);
-		}
-		break;
-	    default:
-		return -EINVAL;
 	    }
 	}else{
 	    return -ENODEV;
@@ -3935,7 +3843,7 @@ set_modem_info(struct cyclades_port * info, unsigned int cmd,
 	CY_UNLOCK(info, flags);
     }
     return 0;
-} /* set_modem_info */
+} /* cy_tiocmset */
 
 /*
  * cy_break() --- routine which turns the break handling on or off
@@ -4242,14 +4150,6 @@ cy_ioctl(struct tty_struct *tty, struct file * file,
 	case CYGETWAIT:
 	    ret_val = info->closing_wait / (HZ/100);
 	    break;
-        case TIOCMGET:
-            ret_val = get_modem_info(info, (unsigned int *) arg);
-            break;
-        case TIOCMBIS:
-        case TIOCMBIC:
-        case TIOCMSET:
-            ret_val = set_modem_info(info, cmd, (unsigned int *) arg);
-            break;
         case TIOCGSERIAL:
             ret_val = get_serial_info(info, (struct serial_struct *) arg);
             break;
@@ -5429,6 +5329,8 @@ static struct tty_operations cy_ops = {
     .break_ctl = cy_break,
     .wait_until_sent = cy_wait_until_sent,
     .read_proc = cyclades_get_proc_info,
+    .tiocmget = cy_tiocmget,
+    .tiocmset = cy_tiocmset,
 };
 
 static int __init

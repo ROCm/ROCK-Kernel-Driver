@@ -68,12 +68,12 @@
  */
 #define NR_MONTYPES	6
 static struct fb_monspecs monspecs[NR_MONTYPES] __initdata = {
-	{ 15469, 15781, 49, 51, 0 },	/* TV		*/
-	{     0, 99999,  0, 99, 0 },	/* Multi Freq	*/
-	{ 58608, 58608, 64, 64, 0 },	/* Hi-res mono	*/
-	{ 30000, 70000, 60, 60, 0 },	/* VGA		*/
-	{ 30000, 70000, 56, 75, 0 },	/* SVGA		*/
-	{ 30000, 70000, 60, 60, 0 }
+	{ 15469, 15781, 49,  51, 0 },	/* TV		*/
+	{     0, 99999,  0, 199, 0 },	/* Multi Freq	*/
+	{ 58608, 58608, 64,  64, 0 },	/* Hi-res mono	*/
+	{ 30000, 70000, 60,  60, 0 },	/* VGA		*/
+	{ 30000, 70000, 56,  75, 0 },	/* SVGA		*/
+	{ 30000, 70000, 60,  60, 0 }
 };
 
 static struct fb_info fb_info;
@@ -127,9 +127,13 @@ static struct pixclock a5k_clocks[] = {
 #endif
 
 static struct pixclock *
-acornfb_valid_pixrate(u_long pixclock)
+acornfb_valid_pixrate(struct fb_var_screeninfo *var)
 {
+	u_long pixclock = var->pixclock;
 	u_int i;
+
+	if (!var->pixclock)
+		return NULL;
 
 	for (i = 0; i < ARRAY_SIZE(arc_clocks); i++)
 		if (pixclock > arc_clocks[i].min_clock &&
@@ -173,7 +177,7 @@ acornfb_set_timing(struct fb_var_screeninfo *var)
 
 	memset(&vidc, 0, sizeof(vidc));
 
-	pclk = acornfb_valid_pixrate(var->pixclock);
+	pclk = acornfb_valid_pixrate(var);
 	vidc_ctl = pclk->vidc_ctl;
 	vid_ctl  = pclk->vid_ctl;
 
@@ -345,9 +349,9 @@ acornfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
  *  vdsr : >= 1
  *  vder : >= vdsr
  */
-static void
-acornfb_set_timing(struct fb_info *info, struct fb_var_screeninfo *var)
+static void acornfb_set_timing(struct fb_info *info)
 {
+	struct fb_var_screeninfo *var = &info->var;
 	struct vidc_timing vidc;
 	u_int vcr, fsize;
 	u_int ext_ctl, dat_ctl;
@@ -448,9 +452,9 @@ acornfb_set_timing(struct fb_info *info, struct fb_var_screeninfo *var)
 	 * 1MB VRAM	32bit
 	 * 2MB VRAM	64bit
 	 */
-	if (current_par.using_vram && current_par.vram_half_sam == 2048) {
+	if (current_par.using_vram && current_par.vram_half_sam == 2048)
 		dat_ctl |= VIDC20_DCTL_BUS_D63_0;
-	} else 
+	else
 		dat_ctl |= VIDC20_DCTL_BUS_D31_0;
 
 	vidc_writel(VIDC20_DCTL | dat_ctl);
@@ -502,10 +506,19 @@ acornfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 		  u_int trans, struct fb_info *info)
 {
 	union palette pal;
-	int bpp = info->var.bits_per_pixel;
 
 	if (regno >= current_par.palette_size)
 		return 1;
+
+	if (regno < 16 && info->fix.visual == FB_VISUAL_DIRECTCOLOR) {
+		u32 pseudo_val;
+
+		pseudo_val  = regno << info->var.red.offset;
+		pseudo_val |= regno << info->var.green.offset;
+		pseudo_val |= regno << info->var.blue.offset;
+
+		((u32 *)info->pseudo_palette)[regno] = pseudo_val;
+	}
 
 	pal.p = 0;
 	pal.vidc20.red   = red >> 8;
@@ -514,15 +527,8 @@ acornfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 
 	current_par.palette[regno] = pal;
 
-	if (bpp == 32 && regno < 16) {
-		current_par.cmap.cfb32[regno] =
-				regno | regno << 8 | regno << 16;
-	}
-	if (bpp == 16 && regno < 16) {
+	if (info->var.bits_per_pixel == 16) {
 		int i;
-
-		current_par.cmap.cfb16[regno] =
-				regno | regno << 5 | regno << 10;
 
 		pal.p = 0;
 		vidc_writel(0x10000000);
@@ -677,8 +683,7 @@ acornfb_validate_timing(struct fb_var_screeninfo *var,
 static inline void
 acornfb_update_dma(struct fb_info *info, struct fb_var_screeninfo *var)
 {
-	u_int off = (var->yoffset * var->xres_virtual *
-		     var->bits_per_pixel) >> 3;
+	u_int off = var->yoffset * info->fix.line_length;
 
 #if defined(HAS_MEMC)
 	memc_write(VDMA_INIT, off >> 2);
@@ -697,6 +702,11 @@ acornfb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 	 * FIXME: Find the font height
 	 */
 	fontht = 8;
+
+	var->red.msb_right = 0;
+	var->green.msb_right = 0;
+	var->blue.msb_right = 0;
+	var->transp.msb_right = 0;
 
 	switch (var->bits_per_pixel) {
 	case 1:	case 2:	case 4:	case 8:
@@ -738,7 +748,7 @@ acornfb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 	/*
 	 * Check to see if the pixel rate is valid.
 	 */
-	if (!var->pixclock || !acornfb_valid_pixrate(var->pixclock))
+	if (!acornfb_valid_pixrate(var))
 		return -EINVAL;
 
 	/*
@@ -782,13 +792,11 @@ static int acornfb_set_par(struct fb_info *info)
 #ifdef HAS_VIDC20
 	case 16:
 		current_par.palette_size = 32;
-		info->pseudo_palette = current_par.cmap.cfb16;
 		info->fix.visual = FB_VISUAL_DIRECTCOLOR;
 		break;
 	case 32:
 		current_par.palette_size = VIDC_PALETTE_SIZE;
-		info->pseudo_palette = current_par.cmap.cfb32;
-		info->fix.visual = FB_VISUAL_TRUECOLOR;
+		info->fix.visual = FB_VISUAL_DIRECTCOLOR;
 		break;
 #endif
 	default:
@@ -827,7 +835,7 @@ static int acornfb_set_par(struct fb_info *info)
 #endif
 
 	acornfb_update_dma(info, &info->var);
-	acornfb_set_timing(info, &info->var);
+	acornfb_set_timing(info);
 
 	return 0;
 }
@@ -869,9 +877,7 @@ acornfb_mmap(struct fb_info *info, struct file *file, struct vm_area_struct *vma
 	/* This is an IO map - tell maydump to skip this VMA */
 	vma->vm_flags |= VM_IO;
 
-#ifdef CONFIG_CPU_32
-	pgprot_val(vma->vm_page_prot) &= ~L_PTE_CACHEABLE;
-#endif
+	vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
 
 	/*
 	 * Don't alter the page protection flags; we want to keep the area
@@ -981,6 +987,7 @@ static void __init acornfb_init_fbinfo(void)
 
 	fb_info.fbops		= &acornfb_ops;
 	fb_info.flags		= FBINFO_FLAG_DEFAULT;
+	fb_info.pseudo_palette	= current_par.pseudo_palette;
 
 	strcpy(fb_info.fix.id, "Acorn");
 	fb_info.fix.type	= FB_TYPE_PACKED_PIXELS;

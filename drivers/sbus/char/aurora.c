@@ -1752,8 +1752,9 @@ static void aurora_flush_buffer(struct tty_struct *tty)
 #endif
 }
 
-static int aurora_get_modem_info(struct Aurora_port * port, unsigned int *value)
+static int aurora_tiocmget(struct tty_struct *tty, struct file *file)
 {
+	struct Aurora_port *port = (struct Aurora_port *) tty->driver_data;
 	struct Aurora_board * bp;
 	unsigned char status,chip;
 	unsigned int result;
@@ -1762,6 +1763,9 @@ static int aurora_get_modem_info(struct Aurora_port * port, unsigned int *value)
 #ifdef AURORA_DEBUG
 	printk("aurora_get_modem_info: start\n");
 #endif
+	if ((aurora_paranoia_check(port, tty->name, __FUNCTION__))
+		return -ENODEV;
+
 	chip = AURORA_CD180(port_No(port));
 
 	bp = port_Board(port);
@@ -1782,16 +1786,16 @@ static int aurora_get_modem_info(struct Aurora_port * port, unsigned int *value)
 		| ((status & MSVR_DSR) ? TIOCM_DSR : 0)
 		| ((status & MSVR_CTS) ? TIOCM_CTS : 0);
 
-	put_user(result,(unsigned long *) value);
 #ifdef AURORA_DEBUG
 	printk("aurora_get_modem_info: end\n");
 #endif
-	return 0;
+	return result;
 }
 
-static int aurora_set_modem_info(struct Aurora_port * port, unsigned int cmd,
-				 unsigned int *value)
+static int aurora_tiocmset(struct tty_struct *tty, struct file *file,
+			   unsigned int set, unsigned int clear)
 {
+	struct Aurora_port *port = (struct Aurora_port *) tty->driver_data;
 	unsigned int arg;
 	unsigned long flags;
 	struct Aurora_board *bp = port_Board(port);
@@ -1800,33 +1804,20 @@ static int aurora_set_modem_info(struct Aurora_port * port, unsigned int cmd,
 #ifdef AURORA_DEBUG
 	printk("aurora_set_modem_info: start\n");
 #endif
-	if (get_user(arg, value))
-		return -EFAULT;
+	if ((aurora_paranoia_check(port, tty->name, __FUNCTION__))
+		return -ENODEV;
+
 	chip = AURORA_CD180(port_No(port));
-	switch (cmd) {
-	 case TIOCMBIS: 
-		if (arg & TIOCM_RTS) 
-			port->MSVR |= bp->RTS;
-		if (arg & TIOCM_DTR)
-			port->MSVR |= bp->DTR;
-		break;
-	case TIOCMBIC:
-		if (arg & TIOCM_RTS)
-			port->MSVR &= ~bp->RTS;
-		if (arg & TIOCM_DTR)
-			port->MSVR &= ~bp->DTR;
-		break;
-	case TIOCMSET:
-		port->MSVR = (arg & TIOCM_RTS) ? (port->MSVR | bp->RTS) : 
-					         (port->MSVR & ~bp->RTS);
-		port->MSVR = (arg & TIOCM_DTR) ? (port->MSVR | bp->RTS) :
-						 (port->MSVR & ~bp->RTS);
-		break;
-	 default:
-		return -EINVAL;
-	};
 
 	save_flags(flags); cli();
+	if (set & TIOCM_RTS)
+		port->MSVR |= bp->RTS;
+	if (set & TIOCM_DTR)
+		port->MSVR |= bp->DTR;
+	if (clear & TIOCM_RTS)
+		port->MSVR &= ~bp->RTS;
+	if (clear & TIOCM_DTR)
+		port->MSVR &= ~bp->DTR;
 
 	sbus_writeb(port_No(port) & 7, &bp->r[chip]->r[CD180_CAR]);
 	udelay(1);
@@ -1993,16 +1984,6 @@ static int aurora_ioctl(struct tty_struct * tty, struct file * filp,
 			((tty->termios->c_cflag & ~CLOCAL) |
 			 (arg ? CLOCAL : 0));
 		return 0;
-	case TIOCMGET:
-		retval = verify_area(VERIFY_WRITE, (void *) arg,
-				    sizeof(unsigned int));
-		if (retval)
-			return retval;
-		return aurora_get_modem_info(port, (unsigned int *) arg);
-	case TIOCMBIS:
-	case TIOCMBIC:
-	case TIOCMSET:
-		return aurora_set_modem_info(port, cmd, (unsigned int *) arg);
 	case TIOCGSERIAL:	
 		return aurora_get_serial_info(port, (struct serial_struct *) arg);
 	case TIOCSSERIAL:	
@@ -2268,6 +2249,8 @@ static struct tty_operations aurora_ops = {
 	.stop = aurora_stop,
 	.start = aurora_start,
 	.hangup = aurora_hangup,
+	.tiocmget = aurora_tiocmget,
+	.tiocmset = aurora_tiocmset,
 };
 
 static int aurora_init_drivers(void)

@@ -173,6 +173,9 @@ static inline void txwinon(struct channel *ch);
 static inline void memoff(struct channel *ch);
 static inline void assertgwinon(struct channel *ch);
 static inline void assertmemoff(struct channel *ch);
+static int pcxe_tiocmget(struct tty_struct *tty, struct file *file);
+static int pcxe_tiocmset(struct tty_struct *tty, struct file *file,
+			 unsigned int set, unsigned int clear);
 
 #define TZ_BUFSZ 4096
 
@@ -1029,6 +1032,8 @@ static struct tty_operations pcxe_ops = {
 	.stop = pcxe_stop,
 	.start = pcxe_start,
 	.hangup = pcxe_hangup,
+	.tiocmget = pcxe_tiocmget,
+	.tiocmset = pcxe_tiocmset,
 };
 
 /*
@@ -1983,6 +1988,89 @@ static void receive_data(struct channel *ch)
 }
 
 
+static int pcxe_tiocmget(struct tty_struct *tty, struct file *file)
+{
+	struct channel *ch = (struct channel *) tty->driver_data;
+	volatile struct board_chan *bc;
+	unsigned long flags;
+	int mflag = 0;
+
+	if(ch)
+		bc = ch->brdchan;
+	else {
+		printk("ch is NULL in %s!\n", __FUNCTION__);
+		return(-EINVAL);
+	}
+
+	save_flags(flags);
+	cli();
+	globalwinon(ch);
+	mstat = bc->mstat;
+	memoff(ch);
+	restore_flags(flags);
+
+	if(mstat & DTR)
+		mflag |= TIOCM_DTR;
+	if(mstat & RTS)
+		mflag |= TIOCM_RTS;
+	if(mstat & CTS)
+		mflag |= TIOCM_CTS;
+	if(mstat & ch->dsr)
+		mflag |= TIOCM_DSR;
+	if(mstat & RI)
+		mflag |= TIOCM_RI;
+	if(mstat & ch->dcd)
+		mflag |= TIOCM_CD;
+
+	return mflag;
+}
+
+
+static int pcxe_tiocmset(struct tty_struct *tty, struct file *file,
+			 unsigned int set, unsigned int clear)
+{
+	struct channel *ch = (struct channel *) tty->driver_data;
+	volatile struct board_chan *bc;
+	unsigned long flags;
+
+	if(ch)
+		bc = ch->brdchan;
+	else {
+		printk("ch is NULL in %s!\n", __FUNCTION__);
+		return(-EINVAL);
+	}
+
+	save_flags(flags);
+	cli();
+	/*
+	 * I think this modemfake stuff is broken.  It doesn't
+	 * correctly reflect the behaviour desired by the TIOCM*
+	 * ioctls.  Therefore this is probably broken.
+	 */
+	if (set & TIOCM_DTR) {
+		ch->modemfake |= DTR;
+		ch->modem |= DTR;
+	}
+	if (set & TIOCM_RTS) {
+		ch->modemfake |= RTS;
+		ch->modem |= RTS;
+	}
+
+	if (clear & TIOCM_DTR) {
+		ch->modemfake |= DTR;
+		ch->modem &= ~DTR;
+	}
+	if (clear & TIOCM_RTS) {
+		ch->modemfake |= RTS;
+		ch->modem &= ~RTS;
+	}
+	globalwinon(ch);
+	pcxxparam(tty,ch);
+	memoff(ch);
+	restore_flags(flags);
+}
+
+
 static int pcxe_ioctl(struct tty_struct *tty, struct file * file,
 		    unsigned int cmd, unsigned long arg)
 {
@@ -2036,69 +2124,15 @@ static int pcxe_ioctl(struct tty_struct *tty, struct file * file,
 			return 0;
 
 		case TIOCMODG:
-		case TIOCMGET:
-			mflag = 0;
-
-			cli();
-			globalwinon(ch);
-			mstat = bc->mstat;
-			memoff(ch);
-			restore_flags(flags);
-
-			if(mstat & DTR)
-				mflag |= TIOCM_DTR;
-			if(mstat & RTS)
-				mflag |= TIOCM_RTS;
-			if(mstat & CTS)
-				mflag |= TIOCM_CTS;
-			if(mstat & ch->dsr)
-				mflag |= TIOCM_DSR;
-			if(mstat & RI)
-				mflag |= TIOCM_RI;
-			if(mstat & ch->dcd)
-				mflag |= TIOCM_CD;
-
+			mflag = pcxe_tiocmget(tty, file);
 			if (put_user(mflag, (unsigned int *) arg))
 				return -EFAULT;
 			break;
 
-		case TIOCMBIS:
-		case TIOCMBIC:
 		case TIOCMODS:
-		case TIOCMSET:
 			if (get_user(mstat, (unsigned int *) arg))
 				return -EFAULT;
-
-			mflag = 0;
-			if(mstat & TIOCM_DTR)
-				mflag |= DTR;
-			if(mstat & TIOCM_RTS)
-				mflag |= RTS;
-
-			switch(cmd) {
-				case TIOCMODS:
-				case TIOCMSET:
-					ch->modemfake = DTR|RTS;
-					ch->modem = mflag;
-					break;
-
-				case TIOCMBIS:
-					ch->modemfake |= mflag;
-					ch->modem |= mflag;
-					break;
-
-				case TIOCMBIC:
-					ch->modemfake &= ~mflag;
-					ch->modem &= ~mflag;
-					break;
-			}
-
-			cli();
-			globalwinon(ch);
-			pcxxparam(tty,ch);
-			memoff(ch);
-			restore_flags(flags);
-			break;
+			return pcxe_tiocmset(tty, file, mstat, ~mstat);
 
 		case TIOCSDTR:
 			cli();

@@ -42,7 +42,7 @@
 #include <asm/traps.h>
 #include <asm/unistd.h>
 
-#include "m68k_defs.h"
+#include <asm/offsets.h>
 
 .globl system_call, buserr, trap
 .globl resume, ret_from_exception

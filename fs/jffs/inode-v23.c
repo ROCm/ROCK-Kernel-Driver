@@ -1807,13 +1807,25 @@ init_jffs_fs(void)
 	
 #ifdef CONFIG_JFFS_PROC_FS
 	jffs_proc_root = proc_mkdir("jffs", proc_root_fs);
+	if (!jffs_proc_root) {
+		printk(KERN_WARNING "cannot create /proc/jffs entry\n");
+	}
 #endif
 	fm_cache = kmem_cache_create("jffs_fm", sizeof(struct jffs_fm),
 				     0, SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT, 
 				     NULL, NULL);
+	if (!fm_cache) {
+		return -ENOMEM;
+	}
+
 	node_cache = kmem_cache_create("jffs_node",sizeof(struct jffs_node),
 				       0, SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT, 
 				       NULL, NULL);
+	if (!node_cache) {
+		kmem_cache_destroy(fm_cache);
+		return -ENOMEM;
+	}
+
 	return register_filesystem(&jffs_fs_type);
 }
 

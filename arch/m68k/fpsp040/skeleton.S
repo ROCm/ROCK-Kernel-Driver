@@ -40,7 +40,7 @@
 
 #include <linux/linkage.h>
 #include <asm/entry.h>
-#include "../kernel/m68k_defs.h"
+#include <asm/offsets.h>
 
 |SKELETON	idnt    2,1 | Motorola 040 Floating Point Software Package
 

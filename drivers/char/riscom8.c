@@ -1306,12 +1306,16 @@ static void rc_flush_buffer(struct tty_struct *tty)
 		(tty->ldisc.write_wakeup)(tty);
 }
 
-static int rc_get_modem_info(struct riscom_port * port, unsigned int *value)
+static int rc_tiocmget(struct tty_struct *tty, struct file *file)
 {
+	struct riscom_port *port = (struct riscom_port *)tty->driver_data;
 	struct riscom_board * bp;
 	unsigned char status;
 	unsigned int result;
 	unsigned long flags;
+
+	if (rc_paranoia_check(port, tty->name, __FUNCTION__))
+		return -ENODEV;
 
 	bp = port_Board(port);
 	save_flags(flags); cli();
@@ -1324,41 +1328,32 @@ static int rc_get_modem_info(struct riscom_port * port, unsigned int *value)
 		| ((status & MSVR_CD)  ? TIOCM_CAR : 0)
 		| ((status & MSVR_DSR) ? TIOCM_DSR : 0)
 		| ((status & MSVR_CTS) ? TIOCM_CTS : 0);
-	return put_user(result, value);
+	return result;
 }
 
-static int rc_set_modem_info(struct riscom_port * port, unsigned int cmd,
-			     unsigned int *value)
+static int rc_tiocmset(struct tty_struct *tty, struct file *file,
+		       unsigned int set, unsigned int clear)
 {
-	unsigned int arg;
+	struct riscom_port *port = (struct riscom_port *)tty->driver_data;
 	unsigned long flags;
-	struct riscom_board *bp = port_Board(port);
+	struct riscom_board *bp;
 
-	if (get_user(arg, value))
-		return -EFAULT;
-	switch (cmd) {
-	 case TIOCMBIS: 
-		if (arg & TIOCM_RTS) 
-			port->MSVR |= MSVR_RTS;
-		if (arg & TIOCM_DTR)
-			bp->DTR &= ~(1u << port_No(port));
-		break;
-	case TIOCMBIC:
-		if (arg & TIOCM_RTS)
-			port->MSVR &= ~MSVR_RTS;
-		if (arg & TIOCM_DTR)
-			bp->DTR |= (1u << port_No(port));
-		break;
-	case TIOCMSET:
-		port->MSVR = (arg & TIOCM_RTS) ? (port->MSVR | MSVR_RTS) : 
-					         (port->MSVR & ~MSVR_RTS);
-		bp->DTR = arg & TIOCM_DTR ? (bp->DTR &= ~(1u << port_No(port))) :
-					    (bp->DTR |=  (1u << port_No(port)));
-		break;
-	 default:
-		return -EINVAL;
-	}
+	if (rc_paranoia_check(port, tty->name, __FUNCTION__))
+		return -ENODEV;
+
+	bp = port_Board(port);
+
 	save_flags(flags); cli();
+	if (set & TIOCM_RTS)
+		port->MSVR |= MSVR_RTS;
+	if (set & TIOCM_DTR)
+		bp->DTR &= ~(1u << port_No(port));
+
+	if (clear & TIOCM_RTS)
+		port->MSVR &= ~MSVR_RTS;
+	if (clear & TIOCM_DTR)
+		bp->DTR |= (1u << port_No(port));
+
 	rc_out(bp, CD180_CAR, port_No(port));
 	rc_out(bp, CD180_MSVR, port->MSVR);
 	rc_out(bp, RC_DTR, bp->DTR);
@@ -1485,12 +1480,6 @@ static int rc_ioctl(struct tty_struct * tty, struct file * filp,
 			((tty->termios->c_cflag & ~CLOCAL) |
 			(arg ? CLOCAL : 0));
 		break;
-	 case TIOCMGET:
-		return rc_get_modem_info(port, (unsigned int *) arg);
-	 case TIOCMBIS:
-	 case TIOCMBIC:
-	 case TIOCMSET:
-		return rc_set_modem_info(port, cmd, (unsigned int *) arg);
 	 case TIOCGSERIAL:	
 		return rc_get_serial_info(port, (struct serial_struct *) arg);
 	 case TIOCSSERIAL:	
@@ -1677,6 +1666,8 @@ static struct tty_operations riscom_ops = {
 	.stop = rc_stop,
 	.start = rc_start,
 	.hangup = rc_hangup,
+	.tiocmget = rc_tiocmget,
+	.tiocmset = rc_tiocmset,
 };
 
 static inline int rc_init_drivers(void)

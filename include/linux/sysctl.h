@@ -129,6 +129,7 @@ enum
 	KERN_HPPA_UNALIGNED=59,	/* int: hppa unaligned-trap enable */
 	KERN_PRINTK_RATELIMIT=60, /* int: tune printk ratelimiting */
 	KERN_PRINTK_RATELIMIT_BURST=61,	/* int: tune printk ratelimiting */
+	KERN_PTY=62,		/* dir: pty driver */
 };
 
 
@@ -190,6 +191,13 @@ enum
 	RANDOM_WRITE_THRESH=4,
 	RANDOM_BOOT_ID=5,
 	RANDOM_UUID=6
+};
+
+/* /proc/sys/kernel/pty */
+enum
+{
+	PTY_MAX=1,
+	PTY_NR=2
 };
 
 /* /proc/sys/bus/isa */
