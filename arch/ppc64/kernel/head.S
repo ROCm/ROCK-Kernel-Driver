@@ -265,6 +265,9 @@ _GLOBAL(__secondary_hold)
 	mfspr	r23,SPRG2;		/* Save r20 in exc. frame      */ \
 	std	r23,EX_R20(r21);	                                  \
                                                                          \
+	mfmsr	r22;			    /* set MSR.RI		   */ \
+	ori	r22,r22,MSR_RI;						      \
+	mtmsrd	r22,1;							      \
 	mfcr    r23;                        /* save CR in r23              */
 
 /*
