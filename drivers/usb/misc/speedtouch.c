@@ -143,14 +143,12 @@ struct udsl_instance_data {
 	struct usb_device *usb_dev;
 	struct udsl_data_ctx *rcvbufs;
 	struct sk_buff_head sndqueue;
-	spinlock_t sndqlock;
 	struct udsl_usb_send_data_context send_ctx[UDSL_NUMBER_SND_URBS];
 	int data_started;
 
 	/* atm device part */
 	struct atm_dev *atm_dev;
 	struct sk_buff_head recvqueue;
-	spinlock_t recvqlock;
 
 	struct atmsar_vcc_data *atmsar_vcc_list;
 };
@@ -238,19 +236,15 @@ void udsl_atm_stopdevice (struct udsl_instance_data *instance)
 	struct atm_vcc *walk;
 	struct sk_buff *skb;
 	struct atm_dev *atm_dev;
-	unsigned long iflags;
+
 	if (!instance->atm_dev)
 		return;
 
 	atm_dev = instance->atm_dev;
 
 	/* clean queue */
-	spin_lock_irqsave (&instance->recvqlock, iflags);
-	while (!skb_queue_empty (&instance->recvqueue)) {
-		skb = skb_dequeue (&instance->recvqueue);
+	while ((skb = skb_dequeue (&instance->recvqueue)))
 		dev_kfree_skb (skb);
-	};
-	spin_unlock_irqrestore (&instance->recvqlock, iflags);
 
 	atm_dev->signal = ATM_PHY_SIG_LOST;
 	walk = atm_dev->vccs;
@@ -372,21 +366,10 @@ void udsl_atm_processqueue (unsigned long data)
 	struct udsl_instance_data *instance = (struct udsl_instance_data *) data;
 	struct atmsar_vcc_data *atmsar_vcc = NULL;
 	struct sk_buff *new = NULL, *skb = NULL, *tmp = NULL;
-	unsigned long iflags;
 
-	/* quick check */
-	spin_lock_irqsave (&instance->recvqlock, iflags);
-	if (skb_queue_empty (&instance->recvqueue)) {
-		spin_unlock_irqrestore (&instance->recvqlock, iflags);
-		return;
-	}
 	PDEBUG ("udsl_atm_processqueue entered\n");
 
-	while (!skb_queue_empty (&instance->recvqueue)) {
-		skb = skb_dequeue (&instance->recvqueue);
-
-		spin_unlock_irqrestore (&instance->recvqlock, iflags);
-
+	while ((skb = skb_dequeue (&instance->recvqueue))) {
 		PDEBUG ("skb = %p, skb->len = %d\n", skb, skb->len);
 		PACKETDEBUG (skb->data, skb->len);
 
@@ -426,10 +409,8 @@ void udsl_atm_processqueue (unsigned long data)
 			}
 		};
 		dev_kfree_skb (skb);
-		spin_lock_irqsave (&instance->recvqlock, iflags);
 	};
 
-	spin_unlock_irqrestore (&instance->recvqlock, iflags);
 	PDEBUG ("udsl_atm_processqueue successfull\n");
 }
 
@@ -539,17 +520,12 @@ static void udsl_usb_send_data_complete (struct urb *urb, struct pt_regs *regs)
 		ctx->skb, urb->status);
 
 	ctx->vcc->pop (ctx->vcc, ctx->skb);
-	ctx->skb = NULL;
 
-	spin_lock (&instance->sndqlock);
-	if (skb_queue_empty (&instance->sndqueue)) {
-		spin_unlock (&instance->sndqlock);
+	if (!(ctx->skb = skb_dequeue (&(instance->sndqueue))))
 		return;
-	}
+
 	/* submit next skb */
-	ctx->skb = skb_dequeue (&(instance->sndqueue));
 	ctx->vcc = ((struct udsl_cb *) (ctx->skb->cb))->vcc;
-	spin_unlock (&instance->sndqlock);
 	usb_fill_bulk_urb (urb,
 		       instance->usb_dev,
 		       usb_sndbulkpipe (instance->usb_dev, UDSL_ENDPOINT_DATA_OUT),
@@ -596,13 +572,13 @@ int udsl_usb_send_data (struct udsl_instance_data *instance, struct atm_vcc *vcc
 
 	PACKETDEBUG (skb->data, skb->len);
 
-	spin_lock_irqsave (&instance->sndqlock, flags);
+	spin_lock_irqsave (&instance->sndqueue.lock, flags);
 	((struct udsl_cb *) skb->cb)->vcc = vcc;
 
 	/* we are already queueing */
 	if (!skb_queue_empty (&instance->sndqueue)) {
-		skb_queue_tail (&instance->sndqueue, skb);
-		spin_unlock_irqrestore (&instance->sndqlock, flags);
+		__skb_queue_tail (&instance->sndqueue, skb);
+		spin_unlock_irqrestore (&instance->sndqueue.lock, flags);
 		PDEBUG ("udsl_usb_send_data: already queing, skb (0x%p) queued\n", skb);
 		return 0;
 	}
@@ -613,8 +589,8 @@ int udsl_usb_send_data (struct udsl_instance_data *instance, struct atm_vcc *vcc
 
 	/* we must start queueing */
 	if (i == UDSL_NUMBER_SND_URBS) {
-		skb_queue_tail (&instance->sndqueue, skb);
-		spin_unlock_irqrestore (&instance->sndqlock, flags);
+		__skb_queue_tail (&instance->sndqueue, skb);
+		spin_unlock_irqrestore (&instance->sndqueue.lock, flags);
 		PDEBUG ("udsl_usb_send_data: skb (0x%p) queued\n", skb);
 		return 0;
 	};
@@ -625,7 +601,7 @@ int udsl_usb_send_data (struct udsl_instance_data *instance, struct atm_vcc *vcc
 	instance->send_ctx[i].vcc = vcc;
 	instance->send_ctx[i].instance = instance;
 
-	spin_unlock_irqrestore (&instance->sndqlock, flags);
+	spin_unlock_irqrestore (&instance->sndqueue.lock, flags);
 
 	/* submit packet */
 	usb_fill_bulk_urb (urb,
@@ -671,9 +647,7 @@ void udsl_usb_data_receive (struct urb *urb, struct pt_regs *regs)
 		skb_put (ctx->skb, urb->actual_length);
 
 		/* queue the skb for processing and wake the SAR */
-		spin_lock (&instance->recvqlock);
 		skb_queue_tail (&instance->recvqueue, ctx->skb);
-		spin_unlock (&instance->recvqlock);
 		tasklet_schedule (&instance->recvqueue_tasklet);
 		/* get a new skb */
 		ctx->skb = dev_alloc_skb (UDSL_RECEIVE_BUFFER_SIZE);
@@ -886,8 +860,6 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 	memset (instance, 0, sizeof (struct udsl_instance_data));
 	instance->usb_dev = dev;
 	instance->rcvbufs = NULL;
-	spin_lock_init (&instance->sndqlock);
-	spin_lock_init (&instance->recvqlock);
 	tasklet_init (&instance->recvqueue_tasklet, udsl_atm_processqueue, (unsigned long) instance);
 
 	udsl_atm_startdevice (instance, &udsl_atm_devops);
