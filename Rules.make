@@ -12,17 +12,17 @@ space   := $(empty) $(empty)
 # ---------------------------------------------------------------------------
 
 ifdef O_TARGET
-$(warning kbuild: Usage of O_TARGET is obsolete in 2.5. Please fix!
+$(error kbuild: $(obj)/Makefile - Usage of O_TARGET := $(O_TARGET) is obsolete in 2.5. Please fix!
 endif
 
 ifdef L_TARGET
 ifneq ($(L_TARGET),lib.a)
-$(warning kbuild: L_TARGET ($(L_TARGET)) should be renamed to lib.a. Please fix!)
+$(warning kbuild: $(obj)/Makefile - L_TARGET := $(L_TARGET) target shall be renamed to lib.a. Please fix!)
 endif
 endif
 
 ifdef list-multi
-$(warning kbuild: list-multi ($(list-multi)) is obsolete in 2.5. Please fix!)
+$(warning kbuild: $(obj)/Makefile - list-multi := $(list-multi) is obsolete in 2.5. Please fix!)
 endif
 
 # Some paths for the Makefiles to use
