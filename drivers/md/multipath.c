@@ -82,7 +82,7 @@ static int multipath_map (mddev_t *mddev, struct block_device **bdev)
 
 	for (i = 0; i < disks; i++) {
 		if (conf->multipaths[i].operational) {
-			*bdev = conf->multipaths[i].bdev;
+			*bdev = conf->multipaths[i].rdev->bdev;
 			return (0);
 		}
 	}
@@ -136,7 +136,7 @@ void multipath_end_request(struct bio *bio)
 	 * oops, IO error:
 	 */
 	conf = mddev_to_conf(mp_bh->mddev);
-	bdev = conf->multipaths[mp_bh->path].bdev;
+	bdev = conf->multipaths[mp_bh->path].rdev->bdev;
 	md_error (mp_bh->mddev, bdev);
 	printk(KERN_ERR "multipath: %s: rescheduling sector %lu\n", 
 		 bdev_partition_name(bdev), bio->bi_sector);
@@ -179,7 +179,7 @@ static int multipath_make_request (request_queue_t *q, struct bio * bio)
 	multipath = conf->multipaths + mp_bh->path;
 
 	mp_bh->bio = *bio;
-	mp_bh->bio.bi_bdev = multipath->bdev;
+	mp_bh->bio.bi_bdev = multipath->rdev->bdev;
 	mp_bh->bio.bi_end_io = multipath_end_request;
 	mp_bh->bio.bi_private = mp_bh;
 	generic_make_request(&mp_bh->bio);
@@ -218,7 +218,7 @@ static void mark_disk_bad (mddev_t *mddev, int failed)
 	multipath->operational = 0;
 	mddev->sb_dirty = 1;
 	conf->working_disks--;
-	printk (DISK_FAILED, bdev_partition_name (multipath->bdev),
+	printk (DISK_FAILED, bdev_partition_name (multipath->rdev->bdev),
 				 conf->working_disks);
 }
 
@@ -240,7 +240,7 @@ static int multipath_error (mddev_t *mddev, struct block_device *bdev)
 		 * which has just failed.
 		 */
 		for (i = 0; i < disks; i++) {
-			if (multipaths[i].bdev == bdev && !multipaths[i].operational)
+			if (multipaths[i].rdev->bdev == bdev && !multipaths[i].operational)
 				return 0;
 		}
 		printk (LAST_DISK);
@@ -250,7 +250,7 @@ static int multipath_error (mddev_t *mddev, struct block_device *bdev)
 		 * Mark disk as unusable
 		 */
 		for (i = 0; i < disks; i++) {
-			if (multipaths[i].bdev == bdev && multipaths[i].operational) {
+			if (multipaths[i].rdev->bdev == bdev && multipaths[i].operational) {
 				mark_disk_bad(mddev, i);
 				break;
 			}
@@ -283,7 +283,7 @@ static void print_multipath_conf (multipath_conf_t *conf)
 			printk(" disk%d, o:%d, us:%d dev:%s\n",
 				i,tmp->operational,
 				tmp->used_slot,
-				bdev_partition_name(tmp->bdev));
+				bdev_partition_name(tmp->rdev->bdev));
 	}
 }
 
@@ -297,7 +297,7 @@ static int multipath_add_disk(mddev_t *mddev, mdk_rdev_t *rdev)
 	print_multipath_conf(conf);
 	spin_lock_irq(&conf->device_lock);
 	if (!p->used_slot) {
-		p->bdev = rdev->bdev;
+		p->rdev = rdev;
 		p->operational = 1;
 		p->used_slot = 1;
 		conf->working_disks++;
@@ -326,7 +326,7 @@ static int multipath_remove_disk(mddev_t *mddev, int number)
 			err = -EBUSY;
 			goto abort;
 		}
-		p->bdev = NULL;
+		p->rdev = NULL;
 		p->used_slot = 0;
 		err = 0;
 	}
@@ -485,7 +485,7 @@ static int multipath_run (mddev_t *mddev)
 		 * spares.  multipath_read_balance deals with choose
 		 * the "best" operational device.
 		 */
-		disk->bdev = rdev->bdev;
+		disk->rdev = rdev;
 		disk->operational = 1;
 		disk->used_slot = 1;
 		num_rdevs++;

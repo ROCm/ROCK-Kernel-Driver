@@ -371,7 +371,7 @@ static void raid5_end_read_request (struct bio * bi)
 		set_bit(R5_UPTODATE, &sh->dev[i].flags);
 #endif		
 	} else {
-		md_error(conf->mddev, conf->disks[i].bdev);
+		md_error(conf->mddev, conf->disks[i].rdev->bdev);
 		clear_bit(R5_UPTODATE, &sh->dev[i].flags);
 	}
 #if 0
@@ -407,7 +407,7 @@ static void raid5_end_write_request (struct bio *bi)
 
 	spin_lock_irqsave(&conf->device_lock, flags);
 	if (!uptodate)
-		md_error(conf->mddev, conf->disks[i].bdev);
+		md_error(conf->mddev, conf->disks[i].rdev->bdev);
 	
 	clear_bit(R5_LOCKED, &sh->dev[i].flags);
 	set_bit(STRIPE_HANDLE, &sh->state);
@@ -420,7 +420,6 @@ static unsigned long compute_blocknr(struct stripe_head *sh, int i);
 	
 static void raid5_build_block (struct stripe_head *sh, int i)
 {
-	raid5_conf_t *conf = sh->raid_conf;
 	struct r5dev *dev = &sh->dev[i];
 
 	bio_init(&dev->req);
@@ -430,7 +429,6 @@ static void raid5_build_block (struct stripe_head *sh, int i)
 	dev->vec.bv_len = STRIPE_SIZE;
 	dev->vec.bv_offset = 0;
 
-	dev->req.bi_bdev = conf->disks[i].bdev;
 	dev->req.bi_sector = sh->sector;
 	dev->req.bi_private = sh;
 
@@ -448,7 +446,7 @@ static int error(mddev_t *mddev, struct block_device *bdev)
 	PRINTK("raid5: error called\n");
 
 	for (i = 0, disk = conf->disks; i < conf->raid_disks; i++, disk++) {
-		if (disk->bdev != bdev)
+		if (disk->rdev->bdev != bdev)
 			continue;
 		if (disk->operational) {
 			disk->operational = 0;
@@ -468,7 +466,7 @@ static int error(mddev_t *mddev, struct block_device *bdev)
 	 */
 	if (conf->spare) {
 		disk = conf->spare;
-		if (disk->bdev == bdev) {
+		if (disk->rdev->bdev == bdev) {
 			printk (KERN_ALERT
 				"raid5: Disk failure on spare %s\n",
 				bdev_partition_name (bdev));
@@ -1003,7 +1001,7 @@ static void handle_stripe(struct stripe_head *sh)
 					locked++;
 					PRINTK("Reading block %d (sync=%d)\n", i, syncing);
 					if (syncing)
-						md_sync_acct(conf->disks[i].bdev, STRIPE_SECTORS);
+						md_sync_acct(conf->disks[i].rdev->bdev, STRIPE_SECTORS);
 				}
 			}
 		}
@@ -1142,9 +1140,9 @@ static void handle_stripe(struct stripe_head *sh)
 			locked++;
 			set_bit(STRIPE_INSYNC, &sh->state);
 			if (conf->disks[failed_num].operational)
-				md_sync_acct(conf->disks[failed_num].bdev, STRIPE_SECTORS);
+				md_sync_acct(conf->disks[failed_num].rdev->bdev, STRIPE_SECTORS);
 			else if ((spare=conf->spare))
-				md_sync_acct(spare->bdev, STRIPE_SECTORS);
+				md_sync_acct(spare->rdev->bdev, STRIPE_SECTORS);
 
 		}
 	}
@@ -1170,9 +1168,9 @@ static void handle_stripe(struct stripe_head *sh)
 			else
 				bi->bi_end_io = raid5_end_write_request;
 			if (conf->disks[i].operational)
-				bi->bi_bdev = conf->disks[i].bdev;
+				bi->bi_bdev = conf->disks[i].rdev->bdev;
 			else if (spare && action[i] == WRITE+1)
-				bi->bi_bdev = spare->bdev;
+				bi->bi_bdev = spare->rdev->bdev;
 			else skip=1;
 			if (!skip) {
 				PRINTK("for %ld schedule op %d on disc %d\n", sh->sector, action[i]-1, i);
@@ -1409,7 +1407,7 @@ static int run (mddev_t *mddev)
 
 		if (rdev->faulty) {
 			printk(KERN_ERR "raid5: disabled device %s (errors detected)\n", bdev_partition_name(rdev->bdev));
-			disk->bdev = rdev->bdev;
+			disk->rdev = rdev;
 
 			disk->operational = 0;
 			disk->write_only = 0;
@@ -1424,7 +1422,7 @@ static int run (mddev_t *mddev)
 			}
 			printk(KERN_INFO "raid5: device %s operational as raid disk %d\n", bdev_partition_name(rdev->bdev), raid_disk);
 	
-			disk->bdev = rdev->bdev;
+			disk->rdev = rdev;
 			disk->operational = 1;
 			disk->used_slot = 1;
 
@@ -1434,7 +1432,7 @@ static int run (mddev_t *mddev)
 			 * Must be a spare disk ..
 			 */
 			printk(KERN_INFO "raid5: spare disk %s\n", bdev_partition_name(rdev->bdev));
-			disk->bdev = rdev->bdev;
+			disk->rdev = rdev;
 
 			disk->operational = 0;
 			disk->write_only = 0;
@@ -1447,7 +1445,7 @@ static int run (mddev_t *mddev)
 		disk = conf->disks + i;
 
 		if (!disk->used_slot) {
-			disk->bdev = NULL;
+			disk->rdev = NULL;
 
 			disk->operational = 0;
 			disk->write_only = 0;
@@ -1628,7 +1626,7 @@ static void print_raid5_conf (raid5_conf_t *conf)
 		printk(" disk %d, s:%d, o:%d, us:%d dev:%s\n",
 			i, tmp->spare,tmp->operational,
 			tmp->used_slot,
-			bdev_partition_name(tmp->bdev));
+			bdev_partition_name(tmp->rdev->bdev));
 	}
 }
 
@@ -1695,7 +1693,7 @@ static int raid5_spare_active(mddev_t *mddev)
 	 * disk. (this means we switch back these values)
 	 */
 
-	if (!sdisk->bdev)
+	if (!sdisk->rdev)
 		sdisk->used_slot = 0;
 
 	/*
@@ -1778,7 +1776,7 @@ static int raid5_remove_disk(mddev_t *mddev, int number)
 			err = -EBUSY;
 			goto abort;
 		}
-		p->bdev = NULL;
+		p->rdev = NULL;
 		p->used_slot = 0;
 		err = 0;
 	}
@@ -1804,7 +1802,7 @@ static int raid5_add_disk(mddev_t *mddev, mdk_rdev_t *rdev)
 
 	if (!p->used_slot) {
 		/* it will be held open by rdev */
-		p->bdev = rdev->bdev;
+		p->rdev = rdev;
 		p->operational = 0;
 		p->write_only = 0;
 		p->spare = 1;

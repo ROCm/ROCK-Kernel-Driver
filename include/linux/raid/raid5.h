@@ -192,11 +192,11 @@ struct stripe_head {
  
 
 struct disk_info {
-	struct block_device *bdev;
-	int	operational;
-	int	write_only;
-	int	spare;
-	int	used_slot;
+	mdk_rdev_t	*rdev;
+	int		operational;
+	int		write_only;
+	int		spare;
+	int		used_slot;
 };
 
 struct raid5_private_data {

@@ -6,7 +6,7 @@
 typedef struct mirror_info mirror_info_t;
 
 struct mirror_info {
-	struct block_device *bdev;
+	mdk_rdev_t	*rdev;
 	sector_t	head_position;
 	atomic_t	nr_pending;
 

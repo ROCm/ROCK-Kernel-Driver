@@ -200,7 +200,7 @@ static int map(mddev_t *mddev, struct block_device **bdev)
 
 	for (i = 0; i < disks; i++) {
 		if (conf->mirrors[i].operational) {
-			*bdev = conf->mirrors[i].bdev;
+			*bdev = conf->mirrors[i].rdev->bdev;
 			return 0;
 		}
 	}
@@ -265,7 +265,7 @@ static void end_request(struct bio *bio)
 	 * this branch is our 'one mirror IO has finished' event handler:
 	 */
 	if (!uptodate)
-		md_error(r1_bio->mddev, conf->mirrors[mirror].bdev);
+		md_error(r1_bio->mddev, conf->mirrors[mirror].rdev->bdev);
 	else
 		/*
 		 * Set R1BIO_Uptodate in our master bio, so that
@@ -293,7 +293,7 @@ static void end_request(struct bio *bio)
 		 * oops, read error:
 		 */
 		printk(KERN_ERR "raid1: %s: rescheduling sector %lu\n",
-			bdev_partition_name(conf->mirrors[mirror].bdev), r1_bio->sector);
+			bdev_partition_name(conf->mirrors[mirror].rdev->bdev), r1_bio->sector);
 		reschedule_retry(r1_bio);
 		return;
 	}
@@ -478,7 +478,7 @@ static int make_request(request_queue_t *q, struct bio * bio)
 		r1_bio->read_bio = read_bio;
 
 		read_bio->bi_sector = r1_bio->sector;
-		read_bio->bi_bdev = mirror->bdev;
+		read_bio->bi_bdev = mirror->rdev->bdev;
 		read_bio->bi_end_io = end_request;
 		read_bio->bi_rw = r1_bio->cmd;
 		read_bio->bi_private = r1_bio;
@@ -502,7 +502,7 @@ static int make_request(request_queue_t *q, struct bio * bio)
 		r1_bio->write_bios[i] = mbio;
 
 		mbio->bi_sector	= r1_bio->sector;
-		mbio->bi_bdev = conf->mirrors[i].bdev;
+		mbio->bi_bdev = conf->mirrors[i].rdev->bdev;
 		mbio->bi_end_io	= end_request;
 		mbio->bi_rw = r1_bio->cmd;
 		mbio->bi_private = r1_bio;
@@ -582,7 +582,7 @@ static void mark_disk_bad(mddev_t *mddev, int failed)
 		conf->working_disks--;
 	}
 	mddev->sb_dirty = 1;
-	printk(DISK_FAILED, bdev_partition_name(mirror->bdev), conf->working_disks);
+	printk(DISK_FAILED, bdev_partition_name(mirror->rdev->bdev), conf->working_disks);
 }
 
 static int error(mddev_t *mddev, struct block_device *bdev)
@@ -600,7 +600,7 @@ static int error(mddev_t *mddev, struct block_device *bdev)
 	 * else mark the drive as failed
 	 */
 	for (i = 0; i < disks; i++)
-		if (mirrors[i].bdev == bdev && mirrors[i].operational)
+		if (mirrors[i].operational && mirrors[i].rdev->bdev == bdev)
 			break;
 	if (i == disks)
 		return 0;
@@ -633,7 +633,7 @@ static void print_conf(conf_t *conf)
 		printk(" disk %d, s:%d, o:%d, us:%d dev:%s\n",
 			i, tmp->spare, tmp->operational,
 			tmp->used_slot,
-			bdev_partition_name(tmp->bdev));
+			bdev_partition_name(tmp->rdev->bdev));
 	}
 }
 
@@ -718,7 +718,7 @@ static int raid1_spare_active(mddev_t *mddev)
 	 * disk. (this means we switch back these values)
 	 */
 
-	if (!sdisk->bdev)
+	if (!sdisk->rdev)
 		sdisk->used_slot = 0;
 	/*
 	 * this really activates the spare.
@@ -792,8 +792,7 @@ static int raid1_add_disk(mddev_t *mddev, mdk_rdev_t *rdev)
 	print_conf(conf);
 	spin_lock_irq(&conf->device_lock);
 	if (!p->used_slot) {
-		/* it will be held open by rdev */
-		p->bdev = rdev->bdev;
+		p->rdev = rdev;
 		p->operational = 0;
 		p->write_only = 0;
 		p->spare = 1;
@@ -822,7 +821,7 @@ static int raid1_remove_disk(mddev_t *mddev, int number)
 			err = -EBUSY;
 			goto abort;
 		}
-		p->bdev = NULL;
+		p->rdev = NULL;
 		p->used_slot = 0;
 		err = 0;
 	}
@@ -857,7 +856,7 @@ static void end_sync_read(struct bio *bio)
 	 */
 	if (!uptodate)
 		md_error(r1_bio->mddev,
-			 conf->mirrors[r1_bio->read_disk].bdev);
+			 conf->mirrors[r1_bio->read_disk].rdev->bdev);
 	else
 		set_bit(R1BIO_Uptodate, &r1_bio->state);
 	reschedule_retry(r1_bio);
@@ -878,7 +877,7 @@ static void end_sync_write(struct bio *bio)
 			break;
 		}
 	if (!uptodate)
-		md_error(mddev, conf->mirrors[mirror].bdev);
+		md_error(mddev, conf->mirrors[mirror].rdev->bdev);
 	update_head_pos(mirror, r1_bio);
 
 	if (atomic_dec_and_test(&r1_bio->remaining)) {
@@ -931,7 +930,7 @@ static void sync_request_write(mddev_t *mddev, r1bio_t *r1_bio)
 		if (r1_bio->write_bios[i])
 			BUG();
 		r1_bio->write_bios[i] = mbio;
-		mbio->bi_bdev = conf->mirrors[i].bdev;
+		mbio->bi_bdev = conf->mirrors[i].rdev->bdev;
 		mbio->bi_sector = r1_bio->sector;
 		mbio->bi_end_io	= end_sync_write;
 		mbio->bi_rw = WRITE;
@@ -1119,7 +1118,7 @@ static int sync_request(mddev_t *mddev, sector_t sector_nr, int go_faster)
 	read_bio = bio_clone(r1_bio->master_bio, GFP_NOIO);
 
 	read_bio->bi_sector = sector_nr;
-	read_bio->bi_bdev = mirror->bdev;
+	read_bio->bi_bdev = mirror->rdev->bdev;
 	read_bio->bi_end_io = end_sync_read;
 	read_bio->bi_rw = READ;
 	read_bio->bi_private = r1_bio;
@@ -1228,7 +1227,7 @@ static int run(mddev_t *mddev)
 		disk = conf->mirrors + disk_idx;
 
 		if (rdev->faulty) {
-			disk->bdev = rdev->bdev;
+			disk->rdev = rdev;
 			disk->operational = 0;
 			disk->write_only = 0;
 			disk->spare = 0;
@@ -1245,7 +1244,7 @@ static int run(mddev_t *mddev)
 			}
 			printk(OPERATIONAL, bdev_partition_name(rdev->bdev),
 					disk_idx);
-			disk->bdev = rdev->bdev;
+			disk->rdev = rdev;
 			disk->operational = 1;
 			disk->write_only = 0;
 			disk->spare = 0;
@@ -1257,7 +1256,7 @@ static int run(mddev_t *mddev)
 		 * Must be a spare disk ..
 		 */
 			printk(SPARE, bdev_partition_name(rdev->bdev));
-			disk->bdev = rdev->bdev;
+			disk->rdev = rdev;
 			disk->operational = 0;
 			disk->write_only = 0;
 			disk->spare = 1;
@@ -1284,7 +1283,7 @@ static int run(mddev_t *mddev)
 		disk = conf->mirrors + i;
 
 		if (!disk->used_slot) {
-			disk->bdev = NULL;
+			disk->rdev = NULL;
 			disk->operational = 0;
 			disk->write_only = 0;
 			disk->spare = 0;

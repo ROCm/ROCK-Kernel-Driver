@@ -4,7 +4,7 @@
 #include <linux/raid/md.h>
 
 struct dev_info {
-	struct block_device *bdev;
+	mdk_rdev_t	*rdev;
 	unsigned long	size;
 	unsigned long	offset;
 };
