@@ -315,13 +315,13 @@ static void agp_3_0_nonisochronous_node_enable(struct agp_bridge_data *bridge,
  * Fully configure and enable an AGP 3.0 host bridge and all the devices
  * lying behind it.
  */
-int agp_3_0_node_enable(struct agp_bridge_data *bridge, u32 mode, u32 minor)
+int agp_3_0_node_enable(struct agp_bridge_data *bridge, u32 mode)
 {
 	struct pci_dev *td = bridge->dev, *dev;
 	u8 mcapndx;
 	u32 isoch, arqsz, cal_cycle, tmp, rate;
 	u32 tstatus, tcmd, mcmd, mstatus, ncapid;
-	u32 mmajor, mminor;
+	u32 mmajor;
 	u16 mpstat;
 	struct agp_3_0_dev *dev_list, *cur;
 	struct list_head *head, *pos;
@@ -416,8 +416,6 @@ int agp_3_0_node_enable(struct agp_bridge_data *bridge, u32 mode, u32 minor)
 		}
 
 		mmajor = (ncapid >> AGP_MAJOR_VERSION_SHIFT) & 0xf;
-		mminor = (ncapid >> AGP_MINOR_VERSION_SHIFT) & 0xf;
-
 		if(mmajor < 3) {
 			printk(KERN_ERR PFX "woah!  AGP 2.0 device "
 				"found on the secondary bus of an AGP 3.0 "

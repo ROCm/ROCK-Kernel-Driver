@@ -139,6 +139,8 @@ struct agp_bridge_data {
 	int max_memory_agp;	/* in number of pages */
 	int aperture_size_idx;
 	int capndx;
+	char major_version;
+	char minor_version;
 };
 
 #define OUTREG64(mmap, addr, val)	__raw_writeq((val), (mmap)+(addr))
@@ -388,8 +390,9 @@ void agp_free_key(int key);
 int agp_num_entries(void);
 u32 agp_collect_device_status(u32 mode, u32 command);
 void agp_device_command(u32 command, int agp_v3);
-int agp_3_0_node_enable(struct agp_bridge_data *bridge, u32 mode, u32 minor);
+int agp_3_0_node_enable(struct agp_bridge_data *bridge, u32 mode);
 void global_cache_flush(void);
+void get_agp_version(struct agp_bridge_data *bridge);
 
 /* Standard agp registers */
 #define AGPSTAT			0x4

@@ -446,22 +446,37 @@ void agp_device_command(u32 command, int agp_v3)
 EXPORT_SYMBOL(agp_device_command);
 
 
-void agp_generic_enable(u32 mode)
+void get_agp_version(struct agp_bridge_data *bridge)
 {
-	u32 command, ncapid, major, minor;
+	u32 ncapid;
+
+	/* Exit early if already set by errata workarounds. */
+	if (agp_bridge->major_version != 0)
+		return;
 
 	pci_read_config_dword(agp_bridge->dev, agp_bridge->capndx, &ncapid);
-	major = (ncapid >> 20) & 0xf;
-	minor = (ncapid >> 16) & 0xf;
-	printk(KERN_INFO PFX "Found an AGP %d.%d compliant device.\n",major, minor);
+	agp_bridge->major_version = (ncapid >> AGP_MAJOR_VERSION_SHIFT) & 0xf;
+	agp_bridge->minor_version = (ncapid >> AGP_MINOR_VERSION_SHIFT) & 0xf;
+}
+EXPORT_SYMBOL(get_agp_version);
 
-	if(major >= 3) {
+
+void agp_generic_enable(u32 mode)
+{
+	u32 command;
+
+	get_agp_version(agp_bridge);
+
+	printk(KERN_INFO PFX "Found an AGP %d.%d compliant device.\n",
+				agp_bridge->major_version, agp_bridge->minor_version);
+
+	if(agp_bridge->major_version >= 3) {
 		u32 agp_3_0;
 
 		pci_read_config_dword(agp_bridge->dev, agp_bridge->capndx + 0x4, &agp_3_0);
 		/* Check to see if we are operating in 3.0 mode */
 		if((agp_3_0 >> 3) & 0x1) {
-			agp_3_0_node_enable(agp_bridge, mode, minor);
+			agp_3_0_node_enable(agp_bridge, mode);
 			return;
 		} else {
 			printk (KERN_INFO PFX "not in AGP 3.0 mode, falling back to 2.x\n");
