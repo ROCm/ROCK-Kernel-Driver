@@ -32,6 +32,7 @@
 #include <linux/errno.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
+#include <linux/random.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/rtnetlink.h>
@@ -120,7 +121,7 @@ static int __init irlan_init(void)
 	struct irlan_cb *new;
 	__u16 hints;
 
-	IRDA_DEBUG(0, "%s()\n", __FUNCTION__ );
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 
 #ifdef CONFIG_PROC_FS
 	{ struct proc_dir_entry *proc;
@@ -191,9 +192,7 @@ struct irlan_cb *irlan_open(__u32 saddr, __u32 daddr)
 	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 
 	/* Create network device with irlan */
-	dev = alloc_netdev(sizeof(*self), 
-			   eth ? "eth%d" : "irlan%d", 
-			   irlan_eth_setup);
+	dev = alloc_irlandev(eth ? "eth%d" : "irlan%d");
 	if (!dev)
 		return NULL;
 
@@ -209,6 +208,19 @@ struct irlan_cb *irlan_open(__u32 saddr, __u32 daddr)
 
 	/* Provider access can only be PEER, DIRECT, or HOSTED */
 	self->provider.access_type = access;
+	if (access == ACCESS_DIRECT) {
+		/*  
+		 * Since we are emulating an IrLAN sever we will have to
+		 * give ourself an ethernet address!  
+		 */
+		dev->dev_addr[0] = 0x40;
+		dev->dev_addr[1] = 0x00;
+		dev->dev_addr[2] = 0x00;
+		dev->dev_addr[3] = 0x00;
+		get_random_bytes(dev->dev_addr+4, 1);
+		get_random_bytes(dev->dev_addr+5, 1);
+	}
+
 	self->media = MEDIA_802_3;
 	self->disconnect_reason = LM_USER_REQUEST;
 	init_timer(&self->watchdog_timer);
@@ -248,8 +260,8 @@ static void __irlan_close(struct irlan_cb *self)
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == IRLAN_MAGIC, return;);
 
-	del_timer(&self->watchdog_timer);
-	del_timer(&self->client.kick_timer);
+	del_timer_sync(&self->watchdog_timer);
+	del_timer_sync(&self->client.kick_timer);
 
 	/* Close all open connections and remove TSAPs */
 	irlan_close_tsaps(self);
@@ -300,7 +312,7 @@ void irlan_connect_indication(void *instance, void *sap, struct qos_info *qos,
 	self->max_sdu_size = max_sdu_size;
 	self->max_header_size = max_header_size;
 
-	IRDA_DEBUG(0, "IrLAN, We are now connected!\n");
+	IRDA_DEBUG(0, "%s: We are now connected!\n", __FUNCTION__);
 
 	del_timer(&self->watchdog_timer);
 
@@ -342,7 +354,7 @@ void irlan_connect_confirm(void *instance, void *sap, struct qos_info *qos,
 
 	/* TODO: we could set the MTU depending on the max_sdu_size */
 
-	IRDA_DEBUG(2, "IrLAN, We are now connected!\n");
+	IRDA_DEBUG(0, "%s: We are now connected!\n", __FUNCTION__);
 	del_timer(&self->watchdog_timer);
 
 	/* 
@@ -448,7 +460,7 @@ void irlan_open_data_tsap(struct irlan_cb *self)
 	notify.udata_indication      = irlan_eth_receive;
 	notify.connect_indication    = irlan_connect_indication;
 	notify.connect_confirm       = irlan_connect_confirm;
- 	/*notify.flow_indication       = irlan_eth_flow_indication;*/
+ 	notify.flow_indication       = irlan_eth_flow_indication;
 	notify.disconnect_indication = irlan_disconnect_indication;
 	notify.instance              = self;
 	strlcpy(notify.name, "IrLAN data", sizeof(notify.name));
