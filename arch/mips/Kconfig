@@ -258,8 +258,10 @@ config IT8172_REVC
 
 config MIPS_ATLAS
 	bool "Support for MIPS Atlas board"
+	select BOOT_ELF32
 	select DMA_NONCOHERENT
 	select HW_HAS_PCI
+	select MIPS_GT64120
 	select SWAP_IO_SPACE
 	help
 	  This enables support for the QED R5231-based MIPS Atlas evaluation
@@ -267,9 +269,13 @@ config MIPS_ATLAS
 
 config MIPS_MALTA
 	bool "Support for MIPS Malta board"
+	select BOOT_ELF32
 	select HAVE_STD_PC_SERIAL_PORT
 	select DMA_NONCOHERENT
+	select GENERIC_ISA_DMA
 	select HW_HAS_PCI
+	select I8259
+	select MIPS_GT64120
 	select SWAP_IO_SPACE
 	help
 	  This enables support for the VR5000-based MIPS Malta evaluation
