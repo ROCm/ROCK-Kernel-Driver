@@ -262,6 +262,9 @@ err_out:
 
 int agp_unregister_driver(struct agp_driver *drv)
 {
+	if (drv->dev==NULL)
+		return -ENODEV;
+
 	agp_bridge.type = NOT_SUPPORTED;
 	pm_unregister_all(agp_power);
 	agp_frontend_cleanup();
