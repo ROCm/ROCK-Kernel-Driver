@@ -293,7 +293,7 @@ comment "Compiled-in MSND Classic support requires firmware during compilation."
 	depends on SOUND_PRIME && SOUND_MSNDCLAS=y
 
 config MSNDCLAS_HAVE_BOOT
-	bool "Have MSNDINIT.BIN firmware file"
+	bool
 	depends on SOUND_MSNDCLAS=y
 	default y
 
@@ -355,7 +355,7 @@ comment "Compiled-in MSND Pinnacle support requires firmware during compilation.
 	depends on SOUND_PRIME && SOUND_MSNDPIN=y
 
 config MSNDPIN_HAVE_BOOT
-	bool "Have PNDSPINI.BIN firmware file"
+	bool
 	depends on SOUND_MSNDPIN=y
 	default y
 
