@@ -664,4 +664,18 @@ source "net/irda/Kconfig"
 
 source "net/bluetooth/Kconfig"
 
+config NETPOLL
+	bool "Netpoll API"
+
+config NETPOLL_RX
+	bool "Netpoll receive hooks"
+	depends on NETPOLL
+
+config NETPOLL_TRAP
+	bool "Netpoll traffic trapping"
+	depends on NETPOLL
+
+config NET_POLL_CONTROLLER
+	def_bool NETPOLL
+
 endmenu
