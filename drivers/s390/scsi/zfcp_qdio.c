@@ -28,7 +28,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define ZFCP_QDIO_C_REVISION "$Revision: 1.16 $"
+#define ZFCP_QDIO_C_REVISION "$Revision: 1.18 $"
 
 #include "zfcp_ext.h"
 
@@ -485,10 +485,6 @@ zfcp_qdio_reqid_check(struct zfcp_adapter *adapter, void *sbale_addr)
 	struct zfcp_fsf_req *fsf_req;
 	int retval = 0;
 
-	/* Note: seq is entered later */
-	debug_text_event(adapter->req_dbf, 1, "i:a/seq");
-	debug_event(adapter->req_dbf, 1, &sbale_addr, sizeof (unsigned long));
-
 	/* invalid (per convention used in this driver) */
 	if (unlikely(!sbale_addr)) {
 		ZFCP_LOG_NORMAL("bug: invalid reqid\n");
@@ -505,11 +501,6 @@ zfcp_qdio_reqid_check(struct zfcp_adapter *adapter, void *sbale_addr)
 				fsf_req, fsf_req->adapter, adapter);
 		retval = -EINVAL;
 		goto out;
-	}
-	/* debug feature stuff (test for QTCB: remember new unsol. status!) */
-	if (likely(fsf_req->qtcb)) {
-		debug_event(adapter->req_dbf, 1,
-			    &fsf_req->qtcb->prefix.req_seq_no, sizeof (u32));
 	}
 
 	ZFCP_LOG_TRACE("fsf_req at %p, QTCB at %p\n", fsf_req, fsf_req->qtcb);

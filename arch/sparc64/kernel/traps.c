@@ -1760,13 +1760,6 @@ void show_stack(struct task_struct *tsk, unsigned long *_ksp)
 #endif
 }
 
-void show_trace_task(struct task_struct *tsk)
-{
-	if (tsk)
-		show_stack(tsk,
-			   (unsigned long *) tsk->thread_info->ksp);
-}
-
 void dump_stack(void)
 {
 	unsigned long *ksp;

@@ -198,7 +198,8 @@ __switch_to_noper:
  */
 	.global do_call_softirq
 do_call_softirq:
-	stm	%r12,%r15,24(%r15)
+	stnsm	24(%r15),0xfc
+	stm	%r12,%r15,28(%r15)
 	lr	%r12,%r15
         basr    %r13,0
 do_call_base:
@@ -211,7 +212,8 @@ do_call_base:
         st	%r12,0(%r15)	# store backchain
 	l	%r1,.Ldo_softirq-do_call_base(%r13)
 	basr	%r14,%r1
-	lm	%r12,%r15,24(%r12)
+	lm	%r12,%r15,28(%r12)
+	ssm	24(%r15)
 	br	%r14
 	
 __critical_start:

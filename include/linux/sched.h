@@ -151,7 +151,6 @@ extern void init_idle(task_t *idle, int cpu);
 
 extern void show_state(void);
 extern void show_regs(struct pt_regs *);
-extern void show_trace_task(task_t *tsk);
 
 /*
  * TASK is a pointer to the task whose backtrace we want to see (or NULL for current

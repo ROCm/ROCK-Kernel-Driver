@@ -105,17 +105,6 @@ void show_trace(struct task_struct *task, unsigned long * stack)
 	printk("\n");
 }
 
-void show_trace_task(struct task_struct *tsk)
-{
-	/*
-	 * We can't print the backtrace of a running process. It is
-	 * unreliable at best and can cause kernel oopses.
-	 */
-	if (tsk->state == TASK_RUNNING)
-		return;
-	show_trace(tsk, (unsigned long *) tsk->thread.ksp);
-}
-
 void show_stack(struct task_struct *task, unsigned long *sp)
 {
 	unsigned long *stack;

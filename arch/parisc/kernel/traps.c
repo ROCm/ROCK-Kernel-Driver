@@ -202,11 +202,6 @@ void show_trace(struct task_struct *task, unsigned long *stack)
 	printk("\n");
 }
 
-void show_trace_task(struct task_struct *tsk)
-{
-	show_trace(tsk, (unsigned long *)tsk->thread.regs.ksp);
-}
-
 void die_if_kernel(char *str, struct pt_regs *regs, long err)
 {
 	if (user_mode(regs)) {

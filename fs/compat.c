@@ -235,7 +235,7 @@ out:
 	return error;
 }
 
-/* ioctl32 stuff, used by sparc64, parisc, s390x, ppc64, x86_64 */
+/* ioctl32 stuff, used by sparc64, parisc, s390x, ppc64, x86_64, MIPS */
 
 #define IOCTL_HASHSIZE 256
 struct ioctl_trans *ioctl32_hash_table[IOCTL_HASHSIZE];
