@@ -84,7 +84,7 @@ static int hwgfs_mkdir(struct inode * dir, struct dentry * dentry, int mode)
 	return hwgfs_mknod(dir, dentry, mode | S_IFDIR, 0);
 }
 
-static int hwgfs_create(struct inode *dir, struct dentry *dentry, int mode)
+static int hwgfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidata *unused)
 {
 	return hwgfs_mknod(dir, dentry, mode | S_IFREG, 0);
 }
