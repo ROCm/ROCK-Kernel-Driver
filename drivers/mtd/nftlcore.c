@@ -846,11 +846,11 @@ void nftl_request(RQFUNC_ARG)
 		
 		/* We can do this because the generic code knows not to
 		   touch the request at the head of the queue */
-		spin_unlock_irq(&QUEUE->queue_lock);
+		spin_unlock_irq(QUEUE->queue_lock);
 
 		DEBUG(MTD_DEBUG_LEVEL2, "NFTL_request\n");
 		DEBUG(MTD_DEBUG_LEVEL3,
-		      "NFTL %s request, from sector 0x%04lx for 0x%04lx sectors\n",
+		      "NFTL %s request, from sector 0x%04lx for %d sectors\n",
 		      (req->cmd == READ) ? "Read " : "Write",
 		      req->sector, req->current_nr_sectors);
 
@@ -899,7 +899,7 @@ void nftl_request(RQFUNC_ARG)
 			DEBUG(MTD_DEBUG_LEVEL2,"NFTL read request completed OK\n");
 			up(&nftl->mutex);
 			goto repeat;
-		} else if (req->cmd == WRITE) {
+		} else if (rq_data_dir(req) == WRITE) {
 			DEBUG(MTD_DEBUG_LEVEL2, "NFTL write request of 0x%x sectors @ %x "
 			      "(req->nr_sectors == %lx)\n", nsect, block,
 			      req->nr_sectors);
@@ -927,7 +927,7 @@ void nftl_request(RQFUNC_ARG)
 		}
 	repeat: 
 		DEBUG(MTD_DEBUG_LEVEL3, "end_request(%d)\n", res);
-		spin_lock_irq(&QUEUE->queue_lock);
+		spin_lock_irq(QUEUE->queue_lock);
 		end_request(res);
 	}
 }
@@ -1015,10 +1015,10 @@ static struct mtd_notifier nftl_notifier = {
 };
 
 extern char nftlmountrev[];
+static spinlock_t nftl_lock = SPIN_LOCK_UNLOCKED;
 
 int __init init_nftl(void)
 {
-	int i;
 
 #ifdef PRERELEASE 
 	printk(KERN_INFO "NFTL driver: nftlcore.c $Revision: 1.82 $, nftlmount.c %s\n", nftlmountrev);
@@ -1028,7 +1028,7 @@ int __init init_nftl(void)
 		printk("unable to register NFTL block device on major %d\n", MAJOR_NR);
 		return -EBUSY;
 	} else {
-		blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), &nftl_request);
+		blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), &nftl_request, &nftl_lock);
 		add_gendisk(&nftl_gendisk);
 	}
 	
