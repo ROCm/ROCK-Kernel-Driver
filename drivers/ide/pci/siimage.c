@@ -847,19 +847,6 @@ static int __devinit siimage_init_one(struct pci_dev *dev, const struct pci_devi
 	return 0;
 }
 
-/**
- *	siimage_remove_one	-	called when an SI IDE is unplugged
- *	@dev: the device that was removed
- *
- *	Disconnect an IDE device that has been unplugged either by hotplug
- *	or by a more civilized notification scheme. Not yet supported.
- */
- 
-static void siimage_remove_one(struct pci_dev *dev)
-{
-	panic("SiImage IDE removal not yet supported");
-}
-
 static struct pci_device_id siimage_pci_tbl[] __devinitdata = {
 	{ PCI_VENDOR_ID_CMD, PCI_DEVICE_ID_SII_680,  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{ PCI_VENDOR_ID_CMD, PCI_DEVICE_ID_SII_3112, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1},
@@ -870,7 +857,6 @@ static struct pci_driver driver = {
 	name:		"SiI IDE",
 	id_table:	siimage_pci_tbl,
 	probe:		siimage_init_one,
-	remove:		__devexit_p(siimage_remove_one),
 };
 
 static int siimage_ide_init(void)

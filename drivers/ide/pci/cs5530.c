@@ -430,19 +430,6 @@ static int __devinit cs5530_init_one(struct pci_dev *dev, const struct pci_devic
 	return 0;
 }
 
-/**
- *	cs5530_remove_one	-	called when a CS5530 is unplugged
- *	@dev: the device that was removed
- *
- *	Disconnect an Cyrix device that has been unplugged either by hotplug
- *	or by a more civilized notification scheme. Not yet supported.
- */
- 
-static void cs5530_remove_one(struct pci_dev *dev)
-{
-	panic("Cyrix removal not yet supported");
-}
-
 static struct pci_device_id cs5530_pci_tbl[] __devinitdata = {
 	{ PCI_VENDOR_ID_CYRIX, PCI_DEVICE_ID_CYRIX_5530_IDE, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{ 0, },
@@ -452,7 +439,6 @@ static struct pci_driver driver = {
 	name:		"CS5530 IDE",
 	id_table:	cs5530_pci_tbl,
 	probe:		cs5530_init_one,
-	remove:		__devexit_p(cs5530_remove_one),
 };
 
 static int cs5530_ide_init(void)

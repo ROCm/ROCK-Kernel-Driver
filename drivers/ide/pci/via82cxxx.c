@@ -644,19 +644,6 @@ static int __devinit via_init_one(struct pci_dev *dev, const struct pci_device_i
 	return 0;
 }
 
-/**
- *	via_remove_one	-	called with a VIA IDE interface is unplugged
- *	@dev: the device that was removed
- *
- *	Disconnect a VIA IDE device that has been unplugged either by hotplug
- *	or by a more civilized notification scheme. Not yet supported.
- */
- 
-static void via_remove_one(struct pci_dev *dev)
-{
-	panic("VIA IDE removal not yet supported");
-}
-
 static struct pci_device_id via_pci_tbl[] __devinitdata = {
 	{ PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C576_1, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{ PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C586_1, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1},
@@ -667,7 +654,6 @@ static struct pci_driver driver = {
 	name:		"VIA IDE",
 	id_table:	via_pci_tbl,
 	probe:		via_init_one,
-	remove:		__devexit_p(via_remove_one),
 };
 
 static int via_ide_init(void)

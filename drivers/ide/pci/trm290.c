@@ -406,19 +406,6 @@ static int __devinit trm290_init_one(struct pci_dev *dev, const struct pci_devic
 	return 0;
 }
 
-/**
- *	trm290_remove_one	-	called when an trm290 is unplugged
- *	@dev: the device that was removed
- *
- *	Disconnect a trm290 device that has been unplugged either by hotplug
- *	or by a more civilized notification scheme. Not yet supported.
- */
- 
-static void trm290_remove_one(struct pci_dev *dev)
-{
-	panic("trm290 removal not yet supported");
-}
-
 static struct pci_device_id trm290_pci_tbl[] __devinitdata = {
 	{ PCI_VENDOR_ID_TEKRAM, PCI_DEVICE_ID_TEKRAM_DC290, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{ 0, },
@@ -428,7 +415,6 @@ static struct pci_driver driver = {
 	name:		"TRM290 IDE",
 	id_table:	trm290_pci_tbl,
 	probe:		trm290_init_one,
-	remove:		__devexit_p(trm290_remove_one),
 };
 
 static int trm290_ide_init(void)

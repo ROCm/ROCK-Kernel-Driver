@@ -1188,25 +1188,12 @@ static int __devinit hpt366_init_one(struct pci_dev *dev, const struct pci_devic
 	return 0;
 }
 
-/**
- *	hpt366_remove_one	-	called when an HPT366 is unplugged
- *	@dev: the device that was removed
- *
- *	Disconnect a HPT366 device that has been unplugged either by hotplug
- *	or by a more civilized notification scheme. Not yet supported.
- */
- 
-static void hpt366_remove_one(struct pci_dev *dev)
-{
-	panic("HPT366 removal not yet supported");
-}
-
 static struct pci_device_id hpt366_pci_tbl[] __devinitdata = {
 	{ PCI_VENDOR_ID_TTI, PCI_DEVICE_ID_TTI_HPT366, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{ PCI_VENDOR_ID_TTI, PCI_DEVICE_ID_TTI_HPT372, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1},
 	{ PCI_VENDOR_ID_TTI, PCI_DEVICE_ID_TTI_HPT302, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 2},
 	{ PCI_VENDOR_ID_TTI, PCI_DEVICE_ID_TTI_HPT371, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 3},
-	{ PCI_VENDOR_ID_TTI, PCI_DEVICE_ID_TTI_HPT374, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 15},
+	{ PCI_VENDOR_ID_TTI, PCI_DEVICE_ID_TTI_HPT374, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 4},
 	{ 0, },
 };
 
@@ -1214,7 +1201,6 @@ static struct pci_driver driver = {
 	name:		"HPT366 IDE",
 	id_table:	hpt366_pci_tbl,
 	probe:		hpt366_init_one,
-	remove:		__devexit_p(hpt366_remove_one),
 };
 
 static int hpt366_ide_init(void)

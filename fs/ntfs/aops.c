@@ -1018,7 +1018,6 @@ static int ntfs_prepare_nonresident_write(struct page *page,
 	ntfs_volume *vol;
 	run_list_element *rl;
 	struct buffer_head *bh, *head, *wait[2], **wait_bh = wait;
-	char *kaddr = page_address(page);
 	unsigned int vcn_ofs, block_start, block_end, blocksize;
 	int err;
 	BOOL is_retry;
@@ -1267,13 +1266,20 @@ lock_retry_remap:
 				 * region. NOTE: This is how we decide if to
 				 * zero or not!
 				 */
-				if (block_end > to)
-					memset(kaddr + to, 0, block_end - to);
-				if (block_start < from)
-					memset(kaddr + block_start, 0,
-							from - block_start);
-				if (block_end > to || block_start < from)
+				if (block_end > to || block_start < from) {
+					void *kaddr;
+
+					kaddr = kmap_atomic(page, KM_USER0);
+					if (block_end > to)
+						memset(kaddr + to, 0,
+								block_end - to);
+					if (block_start < from)
+						memset(kaddr + block_start, 0,
+								from -
+								block_start);
 					flush_dcache_page(page);
+					kunmap_atomic(kaddr, KM_USER0);
+				}
 				continue;
 			}
 		}
@@ -1330,10 +1336,14 @@ err_out:
 		if (block_start >= to)
 			break;
 		if (buffer_new(bh)) {
+			void *kaddr;
+
 			clear_buffer_new(bh);
 			if (buffer_uptodate(bh))
 				buffer_error();
+			kaddr = kmap_atomic(page, KM_USER0);
 			memset(kaddr + block_start, 0, bh->b_size);
+			kunmap_atomic(kaddr, KM_USER0);
 			set_buffer_uptodate(bh);
 			mark_buffer_dirty(bh);
 			is_retry = TRUE;

@@ -346,19 +346,6 @@ static int __devinit nforce_init_one(struct pci_dev *dev, const struct pci_devic
 	return 0;
 }
 
-/**
- *	nforce_remove_one	-	called with an nForce is unplugged
- *	@dev: the device that was removed
- *
- *	Disconnect an nForce device that has been unplugged either by hotplug
- *	or by a more civilized notification scheme. Not yet supported.
- */
- 
-static void nforce_remove_one(struct pci_dev *dev)
-{
-	panic("nForce removal not yet supported");
-}
-
 static struct pci_device_id nforce_pci_tbl[] __devinitdata = {
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_NFORCE_IDE, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{ 0, },
@@ -368,7 +355,6 @@ static struct pci_driver driver = {
 	name:		"nForce IDE",
 	id_table:	nforce_pci_tbl,
 	probe:		nforce_init_one,
-	remove:		__devexit_p(nforce_remove_one),
 };
 
 static int nforce_ide_init(void)

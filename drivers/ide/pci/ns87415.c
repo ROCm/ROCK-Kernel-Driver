@@ -239,19 +239,6 @@ static int __devinit ns87415_init_one(struct pci_dev *dev, const struct pci_devi
 	return 0;
 }
 
-/**
- *	ns87415_remove_one	-	called with an NS87415 is unplugged
- *	@dev: the device that was removed
- *
- *	Disconnect an NS87415 device that has been unplugged either by hotplug
- *	or by a more civilized notification scheme. Not yet supported.
- */
- 
-static void ns87415_remove_one(struct pci_dev *dev)
-{
-	panic("NS87415 removal not yet supported");
-}
-
 static struct pci_device_id ns87415_pci_tbl[] __devinitdata = {
 	{ PCI_VENDOR_ID_NS, PCI_DEVICE_ID_NS_87415, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{ 0, },
@@ -261,7 +248,6 @@ static struct pci_driver driver = {
 	name:		"NS87415IDE",
 	id_table:	ns87415_pci_tbl,
 	probe:		ns87415_init_one,
-	remove:		__devexit_p(ns87415_remove_one),
 };
 
 static int ns87415_ide_init(void)

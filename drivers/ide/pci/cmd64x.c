@@ -777,19 +777,6 @@ static int __devinit cmd64x_init_one(struct pci_dev *dev, const struct pci_devic
 	return 0;
 }
 
-/**
- *	cmd64x_remove_one	-	called with an CMD64x is unplugged
- *	@dev: the device that was removed
- *
- *	Disconnect a CMD64x device that has been unplugged either by hotplug
- *	or by a more civilized notification scheme. Not yet supported.
- */
- 
-static void cmd64x_remove_one(struct pci_dev *dev)
-{
-	panic("CMD64x removal not yet supported");
-}
-
 static struct pci_device_id cmd64x_pci_tbl[] __devinitdata = {
 	{ PCI_VENDOR_ID_CMD, PCI_DEVICE_ID_CMD_643, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{ PCI_VENDOR_ID_CMD, PCI_DEVICE_ID_CMD_646, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1},
@@ -802,7 +789,6 @@ static struct pci_driver driver = {
 	name:		"CMD64x IDE",
 	id_table:	cmd64x_pci_tbl,
 	probe:		cmd64x_init_one,
-	remove:		__devexit_p(cmd64x_remove_one),
 };
 
 static int cmd64x_ide_init(void)
