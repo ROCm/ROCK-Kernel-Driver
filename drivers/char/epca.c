@@ -2931,6 +2931,96 @@ static int info_ioctl(struct tty_struct *tty, struct file * file,
 }
 /* --------------------- Begin pc_ioctl  ----------------------- */
 
+static int pc_tiocmget(struct tty_struct *tty, struct file *file)
+{
+	struct channel *ch = (struct channel *) tty->driver_data;
+	volatile struct board_chan *bc;
+	unsigned int mstat, mflag = 0;
+	unsigned long flags;
+
+	if (ch)
+		bc = ch->brdchan;
+	else
+	{
+		printk(KERN_ERR "<Error> - ch is NULL in pc_tiocmget!\n");
+		return(-EINVAL);
+	}
+
+	save_flags(flags);
+	cli();
+	globalwinon(ch);
+	mstat = bc->mstat;
+	memoff(ch);
+	restore_flags(flags);
+
+	if (mstat & ch->m_dtr)
+		mflag |= TIOCM_DTR;
+
+	if (mstat & ch->m_rts)
+		mflag |= TIOCM_RTS;
+
+	if (mstat & ch->m_cts)
+		mflag |= TIOCM_CTS;
+
+	if (mstat & ch->dsr)
+		mflag |= TIOCM_DSR;
+
+	if (mstat & ch->m_ri)
+		mflag |= TIOCM_RI;
+
+	if (mstat & ch->dcd)
+		mflag |= TIOCM_CD;
+
+	return mflag;
+}
+
+static int pc_tiocmset(struct tty_struct *tty, struct file *file,
+		       unsigned int set, unsigned int clear)
+{
+	struct channel *ch = (struct channel *) tty->driver_data;
+	unsigned long flags;
+
+	if (!ch) {
+		printk(KERN_ERR "<Error> - ch is NULL in pc_tiocmset!\n");
+		return(-EINVAL);
+	}
+
+	save_flags(flags);
+	cli();
+	/*
+	 * I think this modemfake stuff is broken.  It doesn't
+	 * correctly reflect the behaviour desired by the TIOCM*
+	 * ioctls.  Therefore this is probably broken.
+	 */
+	if (set & TIOCM_RTS) {
+		ch->modemfake |= ch->m_rts;
+		ch->modem |= ch->m_rts;
+	}
+	if (set & TIOCM_DTR) {
+		ch->modemfake |= ch->m_dtr;
+		ch->modem |= ch->m_dtr;
+	}
+	if (clear & TIOCM_RTS) {
+		ch->modemfake |= ch->m_rts;
+		ch->modem &= ~ch->m_rts;
+	}
+	if (clear & TIOCM_DTR) {
+		ch->modemfake |= ch->m_dtr;
+		ch->modem &= ~ch->m_dtr;
+	}
+
+	globalwinon(ch);
+
+	/*  --------------------------------------------------------------
+		The below routine generally sets up parity, baud, flow control
+		issues, etc.... It effect both control flags and input flags.
+	------------------------------------------------------------------ */
+
+	epcaparam(tty,ch);
+	memoff(ch);
+	restore_flags(flags);
+}
+
 static int pc_ioctl(struct tty_struct *tty, struct file * file,
 		    unsigned int cmd, unsigned long arg)
 { /* Begin pc_ioctl */
@@ -3021,90 +3111,15 @@ static int pc_ioctl(struct tty_struct *tty, struct file * file,
 		}
 
 		case TIOCMODG:
-		case TIOCMGET:
-
-			mflag = 0;
-
-			cli();
-			globalwinon(ch);
-			mstat = bc->mstat;
-			memoff(ch);
-			restore_flags(flags);
-
-			if (mstat & ch->m_dtr)
-				mflag |= TIOCM_DTR;
-
-			if (mstat & ch->m_rts)
-				mflag |= TIOCM_RTS;
-
-			if (mstat & ch->m_cts)
-				mflag |= TIOCM_CTS;
-
-			if (mstat & ch->dsr)
-				mflag |= TIOCM_DSR;
-
-			if (mstat & ch->m_ri)
-				mflag |= TIOCM_RI;
-
-			if (mstat & ch->dcd)
-				mflag |= TIOCM_CD;
-
-			error = verify_area(VERIFY_WRITE, (void *) arg,sizeof(long));
-
-			if (error)
-				return error;
-
-			putUser(mflag, (unsigned int *) arg);
-
+			mflag = pc_tiocmget(tty, file);
+			if (putUser(mflag, (unsigned int *) arg))
+				return -EFAULT;
 			break;
 
-		case TIOCMBIS:
-		case TIOCMBIC:
 		case TIOCMODS:
-		case TIOCMSET:
-
-			getUser(mstat, (unsigned int *)arg);
-
-			mflag = 0;
-			if (mstat & TIOCM_DTR)
-				mflag |= ch->m_dtr;
-
-			if (mstat & TIOCM_RTS)
-				mflag |= ch->m_rts;
-
-			switch (cmd) 
-			{ /* Begin switch cmd */
-
-				case TIOCMODS:
-				case TIOCMSET:
-					ch->modemfake = ch->m_dtr|ch->m_rts;
-					ch->modem = mflag;
-					break;
-
-				case TIOCMBIS:
-					ch->modemfake |= mflag;
-					ch->modem |= mflag;
-					break;
-
-				case TIOCMBIC:
-					ch->modemfake |= mflag;
-					ch->modem &= ~mflag;
-					break;
-
-			} /* End switch cmd */
-
-			cli();
-			globalwinon(ch);
-
-			/*  --------------------------------------------------------------
-				The below routine generally sets up parity, baud, flow control 
-				issues, etc.... It effect both control flags and input flags.
-			------------------------------------------------------------------ */
-
-			epcaparam(tty,ch);
-			memoff(ch);
-			restore_flags(flags);
-			break;
+			if (getUser(mstat, (unsigned int *)arg))
+				return -EFAULT;
+			return pc_tiocmset(tty, file, mstat, ~mstat);
 
 		case TIOCSDTR:
 			ch->omodem |= ch->m_dtr;

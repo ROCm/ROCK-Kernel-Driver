@@ -1291,63 +1291,44 @@ static inline void isicom_send_break(struct isi_port * port, unsigned long lengt
 out:	restore_flags(flags);
 }
 
-static int isicom_get_modem_info(struct isi_port * port, unsigned int * value)
+static int isicom_tiocmget(struct tty_struct *tty, struct file *file)
 {
+	struct isi_port * port = (struct isi_port *) tty->driver_data;
 	/* just send the port status */
-	unsigned int info;
 	unsigned short status = port->status;
+
+	if (isicom_paranoia_check(port, tty->name, "isicom_ioctl"))
+		return -ENODEV;
 	
-	info =  ((status & ISI_RTS) ? TIOCM_RTS : 0) |
+	return  ((status & ISI_RTS) ? TIOCM_RTS : 0) |
 		((status & ISI_DTR) ? TIOCM_DTR : 0) |
 		((status & ISI_DCD) ? TIOCM_CAR : 0) |
 		((status & ISI_DSR) ? TIOCM_DSR : 0) |
 		((status & ISI_CTS) ? TIOCM_CTS : 0) |
 		((status & ISI_RI ) ? TIOCM_RI  : 0);
-	return put_user(info, (unsigned int *) value);
 }
 
-static int isicom_set_modem_info(struct isi_port * port, unsigned int cmd,
-					unsigned int * value)
+static int isicom_tiocmset(struct tty_struct *tty, struct file *file,
+			   unsigned int set, unsigned int clear)
 {
+	struct isi_port * port = (struct isi_port *) tty->driver_data;
 	unsigned int arg;
 	unsigned long flags;
 	
-	if(get_user(arg, value))
-		return -EFAULT;
+	if (isicom_paranoia_check(port, tty->name, "isicom_ioctl"))
+		return -ENODEV;
 	
 	save_flags(flags); cli();
-	
-	switch(cmd) {
-		case TIOCMBIS:
-			if (arg & TIOCM_RTS) 
-				raise_rts(port);
-			if (arg & TIOCM_DTR) 
-				raise_dtr(port);
-			break;
-		
-		case TIOCMBIC:
-			if (arg & TIOCM_RTS)
-				drop_rts(port);
-			if (arg & TIOCM_DTR)
-				drop_dtr(port);	
-			break;
-			
-		case TIOCMSET:
-			if (arg & TIOCM_RTS)
-				raise_rts(port);
-			else
-				drop_rts(port);
-			
-			if (arg & TIOCM_DTR)
-				raise_dtr(port);
-			else
-				drop_dtr(port);
-			break;
-		
-		default:
-			restore_flags(flags);
-			return -EINVAL;		 	
-	}
+	if (set & TIOCM_RTS)
+		raise_rts(port);
+	if (set & TIOCM_DTR)
+		raise_dtr(port);
+
+	if (clear & TIOCM_RTS)
+		drop_rts(port);
+	if (clear & TIOCM_DTR)
+		drop_dtr(port);
+
 	restore_flags(flags);
 	return 0;
 }			
@@ -1445,15 +1426,6 @@ static int isicom_ioctl(struct tty_struct * tty, struct file * filp,
 				(arg ? CLOCAL : 0));
 			return 0;	
 			
-		case TIOCMGET:
-			return isicom_get_modem_info(port, (unsigned int*) arg);
-			
-		case TIOCMBIS:
-		case TIOCMBIC:
-		case TIOCMSET: 	
-			return isicom_set_modem_info(port, cmd, 
-					(unsigned int *) arg);
-		
 		case TIOCGSERIAL:
 			return isicom_get_serial_info(port, 
 					(struct serial_struct *) arg);
@@ -1640,6 +1612,8 @@ static struct tty_operations isicom_ops = {
 	.start	= isicom_start,
 	.hangup	= isicom_hangup,
 	.flush_buffer	= isicom_flush_buffer,
+	.tiocmget	= isicom_tiocmget,
+	.tiocmset	= isicom_tiocmset,
 };
 
 static int register_drivers(void)
