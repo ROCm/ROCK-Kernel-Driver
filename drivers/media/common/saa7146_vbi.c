@@ -213,8 +213,9 @@ static int buffer_activate(struct saa7146_dev *dev,
 	return 0;
 }
 
-static int buffer_prepare(struct file *file, struct videobuf_buffer *vb,enum v4l2_field field)
+static int buffer_prepare(void *priv, struct videobuf_buffer *vb,enum v4l2_field field)
 {
+	struct file *file = priv;
 	struct saa7146_fh *fh = file->private_data;
 	struct saa7146_dev *dev = fh->dev;
 	struct saa7146_buf *buf = (struct saa7146_buf *)vb;
@@ -264,7 +265,7 @@ static int buffer_prepare(struct file *file, struct videobuf_buffer *vb,enum v4l
 	return err;
 }
 
-static int buffer_setup(struct file *file, unsigned int *count, unsigned int *size)
+static int buffer_setup(void *priv, unsigned int *count, unsigned int *size)
 {
 	int llength,lines;
 	
@@ -279,8 +280,9 @@ static int buffer_setup(struct file *file, unsigned int *count, unsigned int *si
 	return 0;
 }
 
-static void buffer_queue(struct file *file, struct videobuf_buffer *vb)
+static void buffer_queue(void *priv, struct videobuf_buffer *vb)
 {
+	struct file *file = priv;
 	struct saa7146_fh *fh = file->private_data;
 	struct saa7146_dev *dev = fh->dev;
 	struct saa7146_vv *vv = dev->vv_data;
@@ -290,8 +292,9 @@ static void buffer_queue(struct file *file, struct videobuf_buffer *vb)
 	saa7146_buffer_queue(dev,&vv->vbi_q,buf);
 }
 
-static void buffer_release(struct file *file, struct videobuf_buffer *vb)
+static void buffer_release(void *priv, struct videobuf_buffer *vb)
 {
+	struct file *file = priv;
 	struct saa7146_fh *fh   = file->private_data;
 	struct saa7146_dev *dev = fh->dev;
 	struct saa7146_buf *buf = (struct saa7146_buf *)vb;
@@ -480,7 +483,8 @@ static ssize_t vbi_read(struct file *file, char __user *data, size_t count, loff
 	}
 
 	mod_timer(&fh->vbi_read_timeout, jiffies+BUFFER_TIMEOUT);
-	ret = videobuf_read_stream(file, &fh->vbi_q, data, count, ppos, 1);
+	ret = videobuf_read_stream(file, &fh->vbi_q, data, count, ppos, 1,
+				   file->f_flags & O_NONBLOCK);
 /*
 	printk("BASE_ODD3:      0x%08x\n", saa7146_read(dev, BASE_ODD3));
 	printk("BASE_EVEN3:     0x%08x\n", saa7146_read(dev, BASE_EVEN3));

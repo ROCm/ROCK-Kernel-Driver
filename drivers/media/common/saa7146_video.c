@@ -1147,7 +1147,7 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 	case VIDIOC_DQBUF: {
 		struct v4l2_buffer *buf = arg;
 		int ret = 0;
-		ret = videobuf_dqbuf(file,q,buf);
+		ret = videobuf_dqbuf(file,q,buf,file->f_flags & O_NONBLOCK);
 		DEB_D(("VIDIOC_DQBUF: ret:%d, index:%d\n",ret,buf->index));
 		return ret;
 	}
@@ -1240,8 +1240,9 @@ static int buffer_activate (struct saa7146_dev *dev,
 	return 0;
 }
 
-static int buffer_prepare(struct file *file, struct videobuf_buffer *vb, enum v4l2_field field)
+static int buffer_prepare(void *priv, struct videobuf_buffer *vb, enum v4l2_field field)
 {
+	struct file *file = priv;
 	struct saa7146_fh *fh = file->private_data;
 	struct saa7146_dev *dev = fh->dev;
 	struct saa7146_vv *vv = dev->vv_data;
@@ -1322,8 +1323,9 @@ static int buffer_prepare(struct file *file, struct videobuf_buffer *vb, enum v4
 	return err;
 }
 
-static int buffer_setup(struct file *file, unsigned int *count, unsigned int *size)
+static int buffer_setup(void *priv, unsigned int *count, unsigned int *size)
 {
+	struct file *file = priv;
 	struct saa7146_fh *fh = file->private_data;
 
 	if (0 == *count || *count > MAX_SAA7146_CAPTURE_BUFFERS)
@@ -1341,8 +1343,9 @@ static int buffer_setup(struct file *file, unsigned int *count, unsigned int *si
 	return 0;
 }
 
-static void buffer_queue(struct file *file, struct videobuf_buffer *vb)
+static void buffer_queue(void *priv, struct videobuf_buffer *vb)
 {
+	struct file *file = priv;
 	struct saa7146_fh *fh = file->private_data;
 	struct saa7146_dev *dev = fh->dev;
 	struct saa7146_vv *vv = dev->vv_data;
@@ -1353,8 +1356,9 @@ static void buffer_queue(struct file *file, struct videobuf_buffer *vb)
 }
 
 
-static void buffer_release(struct file *file, struct videobuf_buffer *vb)
+static void buffer_release(void *priv, struct videobuf_buffer *vb)
 {
+	struct file *file = priv;
 	struct saa7146_fh *fh = file->private_data;
 	struct saa7146_dev *dev = fh->dev;
 	struct saa7146_buf *buf = (struct saa7146_buf *)vb;
@@ -1474,7 +1478,8 @@ static ssize_t video_read(struct file *file, char __user *data, size_t count, lo
 		goto out;
 	}
 
-	ret = videobuf_read_one(file,&fh->video_q , data, count, ppos);
+	ret = videobuf_read_one(file,&fh->video_q , data, count, ppos,
+				file->f_flags & O_NONBLOCK);
 	if (ret != 0) {
 	video_end(fh, file);
 	} else {
