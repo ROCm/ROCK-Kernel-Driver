@@ -1915,7 +1915,7 @@ generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 		count -= written;
 	}
 
-	buf = iov->iov_base;
+	buf = iov->iov_base + written;	/* handle partial DIO write */
 	do {
 		unsigned long index;
 		unsigned long offset;

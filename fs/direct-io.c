@@ -990,6 +990,13 @@ direct_io_worker(int rw, struct kiocb *iocb, struct inode *inode,
 		}
 	} /* end iovec loop */
 
+	if (ret == -ENOTBLK && rw == WRITE) {
+		/*
+		 * The remaining part of the request will be
+		 * be handled by buffered I/O when we return
+		 */
+		ret = 0;
+	}
 	/*
 	 * There may be some unwritten disk at the end of a part-written
 	 * fs-block-sized block.  Go zero that now.
@@ -1088,13 +1095,6 @@ direct_io_worker(int rw, struct kiocb *iocb, struct inode *inode,
 			 */
 			aio_complete(iocb, ret, 0);
 		kfree(dio);
-	}
-	if (ret == -ENOTBLK && rw == WRITE) {
-		/*
-		 * The entire request will be be handled by buffered I/O
-		 * when we return
-		 */
-		ret = 0;
 	}
 	return ret;
 }
