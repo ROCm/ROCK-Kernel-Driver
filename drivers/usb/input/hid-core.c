@@ -1398,7 +1398,7 @@ static struct hid_device *usb_hid_configure(struct usb_device *dev, int ifnum)
 		if (usb_string(dev, dev->descriptor.iProduct, buf, 64) > 0)
 			snprintf(hid->name, 64, "%s %s", hid->name, buf);
 	} else
-		snprintf(hid->name, 64, "%04x:%04x", dev->descriptor.idVendor, dev->descriptor.idProduct);
+		snprintf(hid->name, 128, "%04x:%04x", dev->descriptor.idVendor, dev->descriptor.idProduct);
 
 	usb_make_path(dev, buf, 64);
 	snprintf(hid->phys, 64, "%s/input%d", buf, ifnum);
