@@ -280,8 +280,15 @@ int __init agp_init(void)
 	return 0;
 }
 
+void __exit agp_exit(void)
+{
+	if (agp_count!=0)
+		BUG();
+}
+
 #ifndef CONFIG_GART_IOMMU
 module_init(agp_init);
+module_exit(agp_exit);
 #endif
 
 EXPORT_SYMBOL(agp_backend_acquire);
