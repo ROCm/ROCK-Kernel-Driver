@@ -76,6 +76,9 @@ static void nr_loopback_timer(unsigned long param)
 		if (dev == NULL || nr_rx_frame(skb, dev) == 0)
 			kfree_skb(skb);
 
+		if (dev != NULL)
+			dev_put(dev);
+
 		if (!skb_queue_empty(&loopback_queue) && !nr_loopback_running())
 			nr_set_loopback_timer();
 	}
