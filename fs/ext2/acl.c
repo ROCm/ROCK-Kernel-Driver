@@ -124,14 +124,38 @@ fail:
 	return ERR_PTR(-EINVAL);
 }
 
+static inline struct posix_acl *
+ext2_iget_acl(struct inode *inode, struct posix_acl **i_acl)
+{
+	struct posix_acl *acl = EXT2_ACL_NOT_CACHED;
+
+	spin_lock(&inode->i_lock);
+	if (*i_acl != EXT2_ACL_NOT_CACHED)
+		acl = posix_acl_dup(*i_acl);
+	spin_unlock(&inode->i_lock);
+
+	return acl;
+}
+
+static inline void
+ext2_iset_acl(struct inode *inode, struct posix_acl **i_acl,
+		   struct posix_acl *acl)
+{
+	spin_lock(&inode->i_lock);
+	if (*i_acl != EXT2_ACL_NOT_CACHED)
+		posix_acl_release(*i_acl);
+	*i_acl = posix_acl_dup(acl);
+	spin_unlock(&inode->i_lock);
+}
+
 /*
- * inode->i_sem: down
+ * inode->i_sem: don't care
  */
 static struct posix_acl *
 ext2_get_acl(struct inode *inode, int type)
 {
 	const size_t max_size = ext2_acl_size(EXT2_ACL_MAX_ENTRIES);
-	struct ext2_inode_inode *ei = EXT2_I(inode);
+	struct ext2_inode_info *ei = EXT2_I(inode);
 	int name_index;
 	char *value;
 	struct posix_acl *acl;
@@ -142,14 +166,16 @@ ext2_get_acl(struct inode *inode, int type)
 
 	switch(type) {
 		case ACL_TYPE_ACCESS:
-			if (ei->i_acl != EXT2_ACL_NOT_CACHED)
-				return posix_acl_dup(ei->i_acl);
+			acl = ext2_iget_acl(inode, &ei->i_acl);
+			if (acl != EXT2_ACL_NOT_CACHED)
+				return acl;
 			name_index = EXT2_XATTR_INDEX_POSIX_ACL_ACCESS;
 			break;
 
 		case ACL_TYPE_DEFAULT:
-			if (ei->i_default_acl != EXT2_ACL_NOT_CACHED)
-				return posix_acl_dup(ei->i_default_acl);
+			acl = ext2_iget_acl(inode, &ei->i_default_acl);
+			if (acl != EXT2_ACL_NOT_CACHED)
+				return acl;
 			name_index = EXT2_XATTR_INDEX_POSIX_ACL_DEFAULT;
 			break;
 
@@ -171,11 +197,11 @@ ext2_get_acl(struct inode *inode, int type)
 	if (!IS_ERR(acl)) {
 		switch(type) {
 			case ACL_TYPE_ACCESS:
-				ei->i_acl = posix_acl_dup(acl);
+				ext2_iset_acl(inode, &ei->i_acl, acl);
 				break;
 
 			case ACL_TYPE_DEFAULT:
-				ei->i_default_acl = posix_acl_dup(acl);
+				ext2_iset_acl(inode, &ei->i_default_acl, acl);
 				break;
 		}
 	}
@@ -240,23 +266,24 @@ ext2_set_acl(struct inode *inode, int type, struct posix_acl *acl)
 	if (!error) {
 		switch(type) {
 			case ACL_TYPE_ACCESS:
-				if (ei->i_acl != EXT2_ACL_NOT_CACHED)
-					posix_acl_release(ei->i_acl);
-				ei->i_acl = posix_acl_dup(acl);
+				ext2_iset_acl(inode, &ei->i_acl, acl);
 				break;
 
 			case ACL_TYPE_DEFAULT:
-				if (ei->i_default_acl != EXT2_ACL_NOT_CACHED)
-					posix_acl_release(ei->i_default_acl);
-				ei->i_default_acl = posix_acl_dup(acl);
+				ext2_iset_acl(inode, &ei->i_default_acl, acl);
 				break;
 		}
 	}
 	return error;
 }
 
-static int
-__ext2_permission(struct inode *inode, int mask, int lock)
+/*
+ * Inode operation permission().
+ *
+ * inode->i_sem: don't care
+ */
+int
+ext2_permission(struct inode *inode, int mask, struct nameidata *nd)
 {
 	int mode = inode->i_mode;
 
@@ -270,30 +297,16 @@ __ext2_permission(struct inode *inode, int mask, int lock)
 	if (current->fsuid == inode->i_uid) {
 		mode >>= 6;
 	} else if (test_opt(inode->i_sb, POSIX_ACL)) {
-		struct ext2_inode_info *ei = EXT2_I(inode);
+		struct posix_acl *acl;
 
 		/* The access ACL cannot grant access if the group class
 		   permission bits don't contain all requested permissions. */
 		if (((mode >> 3) & mask & S_IRWXO) != mask)
 			goto check_groups;
-		if (ei->i_acl == EXT2_ACL_NOT_CACHED) {
-			struct posix_acl *acl;
-
-			if (lock) {
-				down(&inode->i_sem);
-				acl = ext2_get_acl(inode, ACL_TYPE_ACCESS);
-				up(&inode->i_sem);
-			} else
-				acl = ext2_get_acl(inode, ACL_TYPE_ACCESS);
-
-			if (IS_ERR(acl))
-				return PTR_ERR(acl);
+		acl = ext2_get_acl(inode, ACL_TYPE_ACCESS);
+		if (acl) {
+			int error = posix_acl_permission(inode, acl, mask);
 			posix_acl_release(acl);
-			if (ei->i_acl == EXT2_ACL_NOT_CACHED)
-				return -EIO;
-		}
-		if (ei->i_acl) {
-			int error = posix_acl_permission(inode, ei->i_acl,mask);
 			if (error == -EACCES)
 				goto check_capabilities;
 			return error;
@@ -320,32 +333,10 @@ check_capabilities:
 }
 
 /*
- * Inode operation permission().
- *
- * inode->i_sem: up
- * BKL held [before 2.5.x]
- */
-int
-ext2_permission(struct inode *inode, int mask, struct nameidata *nd)
-{
-	return __ext2_permission(inode, mask, 1);
-}
-
-/*
- * Used internally if i_sem is already down.
- */
-int
-ext2_permission_locked(struct inode *inode, int mask)
-{
-	return __ext2_permission(inode, mask, 0);
-}
-
-/*
  * Initialize the ACLs of a new inode. Called from ext2_new_inode.
  *
  * dir->i_sem: down
  * inode->i_sem: up (access to inode is still exclusive)
- * BKL held [before 2.5.x] 
  */
 int
 ext2_init_acl(struct inode *inode, struct inode *dir)
@@ -405,7 +396,6 @@ cleanup:
  * file mode.
  *
  * inode->i_sem: down
- * BKL held [before 2.5.x]
  */
 int
 ext2_acl_chmod(struct inode *inode)

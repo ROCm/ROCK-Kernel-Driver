@@ -125,10 +125,34 @@ fail:
 	return ERR_PTR(-EINVAL);
 }
 
+static inline struct posix_acl *
+ext3_iget_acl(struct inode *inode, struct posix_acl **i_acl)
+{
+	struct posix_acl *acl = EXT3_ACL_NOT_CACHED;
+
+	spin_lock(&inode->i_lock);
+	if (*i_acl != EXT3_ACL_NOT_CACHED)
+		acl = posix_acl_dup(*i_acl);
+	spin_unlock(&inode->i_lock);
+
+	return acl;
+}
+
+static inline void
+ext3_iset_acl(struct inode *inode, struct posix_acl **i_acl,
+                  struct posix_acl *acl)
+{
+	spin_lock(&inode->i_lock);
+	if (*i_acl != EXT3_ACL_NOT_CACHED)
+		posix_acl_release(*i_acl);
+	*i_acl = posix_acl_dup(acl);
+	spin_unlock(&inode->i_lock);
+}
+
 /*
  * Inode operation get_posix_acl().
  *
- * inode->i_sem: down
+ * inode->i_sem: don't care
  */
 static struct posix_acl *
 ext3_get_acl(struct inode *inode, int type)
@@ -145,14 +169,16 @@ ext3_get_acl(struct inode *inode, int type)
 
 	switch(type) {
 		case ACL_TYPE_ACCESS:
-			if (ei->i_acl != EXT3_ACL_NOT_CACHED)
-				return posix_acl_dup(ei->i_acl);
+			acl = ext3_iget_acl(inode, &ei->i_acl);
+			if (acl != EXT3_ACL_NOT_CACHED)
+				return acl;
 			name_index = EXT3_XATTR_INDEX_POSIX_ACL_ACCESS;
 			break;
 
 		case ACL_TYPE_DEFAULT:
-			if (ei->i_default_acl != EXT3_ACL_NOT_CACHED)
-				return posix_acl_dup(ei->i_default_acl);
+			acl = ext3_iget_acl(inode, &ei->i_default_acl);
+			if (acl != EXT3_ACL_NOT_CACHED)
+				return acl;
 			name_index = EXT3_XATTR_INDEX_POSIX_ACL_DEFAULT;
 			break;
 
@@ -174,11 +200,11 @@ ext3_get_acl(struct inode *inode, int type)
 	if (!IS_ERR(acl)) {
 		switch(type) {
 			case ACL_TYPE_ACCESS:
-				ei->i_acl = posix_acl_dup(acl);
+				ext3_iset_acl(inode, &ei->i_acl, acl);
 				break;
 
 			case ACL_TYPE_DEFAULT:
-				ei->i_default_acl = posix_acl_dup(acl);
+				ext3_iset_acl(inode, &ei->i_default_acl, acl);
 				break;
 		}
 	}
@@ -245,23 +271,24 @@ ext3_set_acl(handle_t *handle, struct inode *inode, int type,
 	if (!error) {
 		switch(type) {
 			case ACL_TYPE_ACCESS:
-				if (ei->i_acl != EXT3_ACL_NOT_CACHED)
-					posix_acl_release(ei->i_acl);
-				ei->i_acl = posix_acl_dup(acl);
+				ext3_iset_acl(inode, &ei->i_acl, acl);
 				break;
 
 			case ACL_TYPE_DEFAULT:
-				if (ei->i_default_acl != EXT3_ACL_NOT_CACHED)
-					posix_acl_release(ei->i_default_acl);
-				ei->i_default_acl = posix_acl_dup(acl);
+				ext3_iset_acl(inode, &ei->i_default_acl, acl);
 				break;
 		}
 	}
 	return error;
 }
 
-static int
-__ext3_permission(struct inode *inode, int mask, int lock)
+/*
+ * Inode operation permission().
+ *
+ * inode->i_sem: don't care
+ */
+int
+ext3_permission(struct inode *inode, int mask, struct nameidata *nd)
 {
 	int mode = inode->i_mode;
 
@@ -275,30 +302,16 @@ __ext3_permission(struct inode *inode, int mask, int lock)
 	if (current->fsuid == inode->i_uid) {
 		mode >>= 6;
 	} else if (test_opt(inode->i_sb, POSIX_ACL)) {
-		struct ext3_inode_info *ei = EXT3_I(inode);
+		struct posix_acl *acl;
 
 		/* The access ACL cannot grant access if the group class
 		   permission bits don't contain all requested permissions. */
 		if (((mode >> 3) & mask & S_IRWXO) != mask)
 			goto check_groups;
-		if (ei->i_acl == EXT3_ACL_NOT_CACHED) {
-			struct posix_acl *acl;
-
-			if (lock) {
-				down(&inode->i_sem);
-				acl = ext3_get_acl(inode, ACL_TYPE_ACCESS);
-				up(&inode->i_sem);
-			} else
-				acl = ext3_get_acl(inode, ACL_TYPE_ACCESS);
-
-			if (IS_ERR(acl))
-				return PTR_ERR(acl);
+		acl = ext3_get_acl(inode, ACL_TYPE_ACCESS);
+		if (acl) {
+			int error = posix_acl_permission(inode, acl, mask);
 			posix_acl_release(acl);
-			if (ei->i_acl == EXT3_ACL_NOT_CACHED)
-				return -EIO;
-		}
-		if (ei->i_acl) {
-			int error = posix_acl_permission(inode, ei->i_acl,mask);
 			if (error == -EACCES)
 				goto check_capabilities;
 			return error;
@@ -322,26 +335,6 @@ check_capabilities:
 	    (S_ISDIR(inode->i_mode) && !(mask & MAY_WRITE))))
 		return 0;
 	return -EACCES;
-}
-
-/*
- * Inode operation permission().
- *
- * inode->i_sem: up
- */
-int
-ext3_permission(struct inode *inode, int mask, struct nameidata *nd)
-{
-	return __ext3_permission(inode, mask, 1);
-}
-
-/*
- * Used internally if i_sem is already down.
- */
-int
-ext3_permission_locked(struct inode *inode, int mask)
-{
-	return __ext3_permission(inode, mask, 0);
 }
 
 /*
