@@ -477,8 +477,8 @@ static void error(mddev_t *mddev, mdk_rdev_t *rdev)
 
 	if (!rdev->faulty) {
 		mddev->sb_dirty = 1;
-		conf->working_disks--;
 		if (rdev->in_sync) {
+			conf->working_disks--;
 			mddev->degraded++;
 			conf->failed_disks++;
 			rdev->in_sync = 0;
