@@ -67,7 +67,6 @@
 #endif
 
 
-
 static int usX2Y_urb_capt_retire(snd_usX2Y_substream_t *subs)
 {
 	struct urb	*urb = subs->completed_urb;
@@ -891,6 +890,9 @@ static int snd_usX2Y_pcm_open(snd_pcm_substream_t *substream)
 	snd_usX2Y_substream_t	*subs = ((snd_usX2Y_substream_t **)
 					 snd_pcm_substream_chip(substream))[substream->stream];
 	snd_pcm_runtime_t	*runtime = substream->runtime;
+
+	if (subs->usX2Y->chip_status & USX2Y_STAT_CHIP_MMAP_PCM_URBS)
+		return -EBUSY;
 
 	runtime->hw = snd_usX2Y_2c;
 	runtime->private_data = subs;
