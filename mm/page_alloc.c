@@ -704,6 +704,7 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 	int classzone_idx;
 	int do_retry;
 	int can_try_harder;
+	int did_some_progress;
 
 	might_sleep_if(wait);
 
@@ -723,6 +724,7 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 
 	classzone_idx = zone_idx(zones[0]);
 
+ restart:
 	/* Go through the zonelist once, looking for a zone with enough free */
 	for (i = 0; (z = zones[i]) != NULL; i++) {
 
@@ -754,7 +756,7 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 	}
 
 	/* This allocation should allow future memory freeing. */
-	if ((p->flags & (PF_MEMALLOC | PF_MEMDIE)) && !in_interrupt()) {
+	if (((p->flags & PF_MEMALLOC) || p->memdie) && !in_interrupt()) {
 		/* go through the zonelist yet again, ignoring mins */
 		for (i = 0; (z = zones[i]) != NULL; i++) {
 			page = buffered_rmqueue(z, order, gfp_mask);
@@ -769,26 +771,56 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 		goto nopage;
 
 rebalance:
+	cond_resched();
+
 	/* We now go into synchronous reclaim */
 	p->flags |= PF_MEMALLOC;
 	reclaim_state.reclaimed_slab = 0;
 	p->reclaim_state = &reclaim_state;
 
-	try_to_free_pages(zones, gfp_mask, order);
+	did_some_progress = try_to_free_pages(zones, gfp_mask, order);
 
 	p->reclaim_state = NULL;
 	p->flags &= ~PF_MEMALLOC;
 
-	/* go through the zonelist yet one more time */
-	for (i = 0; (z = zones[i]) != NULL; i++) {
-		if (!zone_watermark_ok(z, order, z->pages_min,
-				       classzone_idx, can_try_harder,
-				       gfp_mask & __GFP_HIGH))
-			continue;
+	cond_resched();
 
-		page = buffered_rmqueue(z, order, gfp_mask);
-		if (page)
-			goto got_pg;
+	if (likely(did_some_progress)) {
+		/*
+		 * Go through the zonelist yet one more time, keep
+		 * very high watermark here, this is only to catch
+		 * a parallel oom killing, we must fail if we're still
+		 * under heavy pressure.
+		 */
+		for (i = 0; (z = zones[i]) != NULL; i++) {
+			if (!zone_watermark_ok(z, order, z->pages_min,
+					       classzone_idx, can_try_harder,
+					       gfp_mask & __GFP_HIGH))
+				continue;
+
+			page = buffered_rmqueue(z, order, gfp_mask);
+			if (page)
+				goto got_pg;
+		}
+	} else if ((gfp_mask & __GFP_FS) && !(gfp_mask & __GFP_NORETRY)) {
+		/*
+		 * Go through the zonelist yet one more time, keep
+		 * very high watermark here, this is only to catch
+		 * a parallel oom killing, we must fail if we're still
+		 * under heavy pressure.
+		 */
+		for (i = 0; (z = zones[i]) != NULL; i++) {
+			if (!zone_watermark_ok(z, order, z->pages_high,
+					       classzone_idx, 0, 0))
+				continue;
+
+			page = buffered_rmqueue(z, order, gfp_mask);
+			if (page)
+				goto got_pg;
+		}
+
+		out_of_memory(gfp_mask);
+		goto restart;
 	}
 
 	/*

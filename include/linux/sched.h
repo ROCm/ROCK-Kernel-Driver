@@ -615,6 +615,11 @@ struct task_struct {
 	struct key *thread_keyring;	/* keyring private to this thread */
 #endif
 /*
+ * All archs should support atomic ops with
+ * 1 byte granularity.
+ */
+	unsigned char memdie;
+/*
  * Must be changed atomically so it shouldn't be
  * be a shareable bitflag.
  */
@@ -736,8 +741,7 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PF_DUMPCORE	0x00000200	/* dumped core */
 #define PF_SIGNALED	0x00000400	/* killed by a signal */
 #define PF_MEMALLOC	0x00000800	/* Allocating memory */
-#define PF_MEMDIE	0x00001000	/* Killed for out-of-memory */
-#define PF_FLUSHER	0x00002000	/* responsible for disk writeback */
+#define PF_FLUSHER	0x00001000	/* responsible for disk writeback */
 
 #define PF_FREEZE	0x00004000	/* this task is being frozen for suspend now */
 #define PF_NOFREEZE	0x00008000	/* this thread should not be frozen */
