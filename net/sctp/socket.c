@@ -1164,6 +1164,11 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	if (!asoc) {
 		SCTP_DEBUG_PRINTK("There is no association yet.\n");
 
+		if (sinfo_flags & (MSG_EOF | MSG_ABORT)) {
+			err = -EINVAL;
+			goto out_unlock;
+		}
+
 		/* Check for invalid stream against the stream counts,
 		 * either the default or the user specified stream counts.
 		 */
