@@ -209,36 +209,37 @@ nfsd_setattr(struct svc_rqst *rqstp, struct svc_fh *fhp, struct iattr *iap,
 	dentry = fhp->fh_dentry;
 	inode = dentry->d_inode;
 
-	err = inode_change_ok(inode, iap);
-	/* could be a "touch" (utimes) request where the user is not the owner but does
-	 * have write permission. In this case the user should be allowed to set
-	 * both times to the current time.  We could just assume any such SETATTR
-	 * is intended to set the times to "now", but we do a couple of simple tests
-	 * to increase our confidence.
+	/* NFSv2 does not differentiate between "set-[ac]time-to-now"
+	 * which only requires access, and "set-[ac]time-to-X" which
+	 * requires ownership.
+	 * So if it looks like it might be "set both to the same time which
+	 * is close to now", and if inode_change_ok fails, then we
+	 * convert to "set to now" instead of "set to explicit time"
+	 *
+	 * We only call inode_change_ok as the last test as technically
+	 * it is not an interface that we should be using.  It is only
+	 * valid if the filesystem does not define it's own i_op->setattr.
 	 */
 #define BOTH_TIME_SET (ATTR_ATIME_SET | ATTR_MTIME_SET)
 #define	MAX_TOUCH_TIME_ERROR (30*60)
-	if (err
-	    && (iap->ia_valid & BOTH_TIME_SET) == BOTH_TIME_SET
+	if ((iap->ia_valid & BOTH_TIME_SET) == BOTH_TIME_SET
 	    && iap->ia_mtime == iap->ia_atime
 	    ) {
-	    /* looks good.  now just make sure time is in the right ballpark.
-	     * solaris, at least, doesn't seem to care what the time request is
+	    /* Looks probable.  Now just make sure time is in the right ballpark.
+	     * Solaris, at least, doesn't seem to care what the time request is.
+	     * We require it be within 30 minutes of now.
 	     */
 	    time_t delta = iap->ia_atime - CURRENT_TIME;
 	    if (delta<0) delta = -delta;
-	    if (delta < MAX_TOUCH_TIME_ERROR) {
+	    if (delta < MAX_TOUCH_TIME_ERROR &&
+		inode_change_ok(inode, iap) != 0) {
 		/* turn off ATTR_[AM]TIME_SET but leave ATTR_[AM]TIME
 		 * this will cause notify_change to set these times to "now"
 		 */
 		iap->ia_valid &= ~BOTH_TIME_SET;
-		err = inode_change_ok(inode, iap);
 	    }
 	}
 	    
-	if (err)
-		goto out_nfserr;
-
 	/* The size case is special. It changes the file as well as the attributes.  */
 	if (iap->ia_valid & ATTR_SIZE) {
 		if (iap->ia_size < inode->i_size) {
@@ -511,24 +512,33 @@ nfsd_close(struct file *filp)
  * As this calls fsync (not fdatasync) there is no need for a write_inode
  * after it.
  */
+inline void nfsd_dosync(struct file *filp, struct dentry *dp, 
+			struct file_operations *fop)
+{
+	struct inode *inode = dp->d_inode;
+	int (*fsync) (struct file *, struct dentry *, int);
+
+	filemap_fdatasync(inode->i_mapping);
+	if (fop && (fsync = fop->fsync))
+		fsync(filp, dp, 0);
+	filemap_fdatawait(inode->i_mapping);
+}
+	
+
 void
 nfsd_sync(struct file *filp)
 {
+	struct inode *inode = filp->f_dentry->d_inode;
 	dprintk("nfsd: sync file %s\n", filp->f_dentry->d_name.name);
-	down(&filp->f_dentry->d_inode->i_sem);
-	filp->f_op->fsync(filp, filp->f_dentry, 0);
-	up(&filp->f_dentry->d_inode->i_sem);
+	down(&inode->i_sem);
+	nfsd_dosync(filp, filp->f_dentry, filp->f_op);
+	up(&inode->i_sem);
 }
 
 void
 nfsd_sync_dir(struct dentry *dp)
 {
-	struct inode *inode = dp->d_inode;
-	int (*fsync) (struct file *, struct dentry *, int);
-	
-	if (inode->i_fop && (fsync = inode->i_fop->fsync)) {
-		fsync(NULL, dp, 0);
-	}
+	nfsd_dosync(NULL, dp, dp->d_inode->i_fop);
 }
 
 /*
@@ -1382,7 +1392,6 @@ int
 nfsd_readdir(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset, 
              encode_dent_fn func, u32 *buffer, int *countp, u32 *verf)
 {
-	struct inode	*inode;
 	u32		*p;
 	int		oldlen, eof, err;
 	struct file	file;
@@ -1394,9 +1403,6 @@ nfsd_readdir(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 	if (offset > ~(u32) 0)
 		goto out_close;
 
-	err = nfserr_notdir;
-	if (!file.f_op->readdir)
-		goto out_close;
 	file.f_pos = offset;
 
 	/* Set up the readdir context */
@@ -1411,25 +1417,16 @@ nfsd_readdir(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 	 * readdir() is not guaranteed to fill up the entire buffer, but
 	 * may choose to do less.
 	 */
-	inode = file.f_dentry->d_inode;
-	down(&inode->i_sem);
-	while (1) {
+
+	do {
 		oldlen = cd.buflen;
 
-		/*
-		dprintk("nfsd: f_op->readdir(%s/%ld @ %d) buflen = %d (%d)\n",
-			file.f_inode->i_sb->s_id, file.f_inode->i_ino,
-			(int) file.f_pos, (int) oldlen, (int) cd.buflen);
-		 */
-		err = file.f_op->readdir(&file, &cd, (filldir_t) func);
+		err = vfs_readdir(&file, (filldir_t) func, &cd);
+
 		if (err < 0)
 			goto out_nfserr;
-		if (oldlen == cd.buflen)
-			break;
-		if (cd.eob)
-			break;
-	}
-	up(&inode->i_sem);
+
+	} while (oldlen != cd.buflen && !cd.eob);
 
 	/* If we didn't fill the buffer completely, we're at EOF */
 	eof = !cd.eob;
@@ -1456,7 +1453,6 @@ out:
 	return err;
 
 out_nfserr:
-	up(&inode->i_sem);
 	err = nfserrno(err);
 	goto out_close;
 }

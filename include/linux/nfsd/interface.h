@@ -16,6 +16,7 @@
 
 extern struct nfsd_linkage {
 	long (*do_nfsservctl)(int cmd, void *argp, void *resp);
+	struct module *owner;
 } * nfsd_linkage;
 
 #endif
