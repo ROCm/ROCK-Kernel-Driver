@@ -504,16 +504,17 @@ struct fb_info {
 #define FBINFO_STATE_RUNNING	0
 #define FBINFO_STATE_SUSPENDED	1
 	u32 state;			/* Hardware state i.e suspend */
-#ifdef CONFIG_BOOTSPLASH
-   struct splash_data *splash_data;
-   unsigned char *splash_pic;
-   int splash_pic_size;
-   int splash_bytes;
-   char *silent_screen_base;		/* real screen base */
-   char fb_cursordata[64];
-#endif
 	/* From here on everything is device dependent */
 	void *par;	
+#ifdef CONFIG_BOOTSPLASH
+	struct splash_data *splash_data;
+	unsigned char *splash_pic;
+	int splash_pic_size;
+	int splash_bytes;
+	char *silent_screen_base;       /* real screen base */
+	char fb_cursordata[64];
+#endif
+
 };
 
 #ifdef MODULE

@@ -29,7 +29,7 @@
 
 extern struct fb_ops vesafb_ops;
 
-#define SPLASH_VERSION "3.1.3-2003/11/14"
+#define SPLASH_VERSION "3.1.4-2004/02/19"
 
 /* These errors have to match fbcon-jpegdec.h */
 static unsigned char *jpg_errors[] = {
@@ -412,8 +412,11 @@ static int splash_getraw(unsigned char *start, unsigned char *end)
 	unit = splash_getb(ndata, SPLASH_OFF_UNIT);
 	if (unit >= MAX_NR_CONSOLES)
 	    continue;
-	if (unit)
-	    vc_allocate(unit);
+	if (unit) {
+		acquire_console_sem();
+		vc_allocate(unit);
+		release_console_sem();
+	}
 	vc = vc_cons[unit].d;
 	info = registered_fb[(int)con2fb_map[unit]];
 	width = info->var.xres;
@@ -698,6 +701,7 @@ static int splash_status(struct vc_data *vc)
 		splash_prepare(vc, info);
 	if (vc->vc_splash_data && vc->vc_splash_data->splash_state) {
 		con_remap_def_color(vc->vc_num, vc->vc_splash_data->splash_color << 4 | vc->vc_splash_data->splash_fg_color);
+		acquire_console_sem();
 		/* vc_resize also calls con_switch which resets yscroll */
 		vc_resize(vc->vc_num, vc->vc_splash_data->splash_text_wi / vc->vc_font.width, vc->vc_splash_data->splash_text_he / vc->vc_font.height);
 		if (fg_console == vc->vc_num) {
@@ -706,10 +710,13 @@ static int splash_status(struct vc_data *vc)
 				      vc->vc_size_row * (vc->vc_bottom - vc->vc_top) / 2);
 			splash_clear_margins(vc->vc_splash_data, vc, info, 0);
 		}
+		release_console_sem();
 	} else {
 	  	/* Switch bootsplash off */
 		con_remap_def_color(vc->vc_num, 0x07);
+		acquire_console_sem();
 		vc_resize(vc->vc_num, info->var.xres / vc->vc_font.width, info->var.yres / vc->vc_font.height);
+		release_console_sem();
 	}
 	return 0;
 }
@@ -870,6 +877,7 @@ void splash_init(void)
 	int isramfs = 1;
 	int fd;
 	int len;
+	int max_len = 1024*1024*2;
 	char *mem;
 
 	if (splash_registered)
@@ -894,7 +902,16 @@ void splash_init(void)
 		sys_close(fd);
 		return;
 	}
-	sys_lseek(fd, (off_t)0, 0);
+	/* Don't look for more than the last 2MB */
+	if (len > max_len) {
+		printk( KERN_INFO "bootsplash: scanning last %dMB of initrd for signature\n",
+				max_len>>20);
+		sys_lseek(fd, (off_t)(len - max_len), 0);
+		len = max_len;
+	} else {
+		sys_lseek(fd, (off_t)0, 0);
+	}
+
 	mem = vmalloc(len);
 	if (mem) {
 		if ((int)sys_read(fd, mem, len) == len && splash_getraw((unsigned char *)mem, (unsigned char *)mem + len) == 0 && vc->vc_splash_data)

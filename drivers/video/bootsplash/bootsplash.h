@@ -38,4 +38,7 @@ extern void splash_blank(struct splash_data *sd, struct vc_data *vc, struct fb_i
 /* vt.c */
 extern void con_remap_def_color(int currcons, int new_color);
 
+extern void acquire_console_sem(void);
+extern void release_console_sem(void);
+
 #endif

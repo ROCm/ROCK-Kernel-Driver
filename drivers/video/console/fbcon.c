@@ -201,7 +201,6 @@ static void fb_flashcursor(void *private)
 	if (!info || info->state != FBINFO_STATE_RUNNING ||
 	    info->cursor.rop == ROP_COPY)
 		return;
-	acquire_console_sem();
 	info->cursor.enable ^= 1;
 #ifdef CONFIG_BOOTSPLASH
 	if (info->splash_data) {
@@ -209,6 +208,7 @@ static void fb_flashcursor(void *private)
 		return;
 	}
 #endif
+	acquire_console_sem();
 	info->fbops->fb_cursor(info, &info->cursor);
 	release_console_sem();
 }
