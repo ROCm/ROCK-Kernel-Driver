@@ -703,7 +703,7 @@ alloc_init_file(unsigned int hashval, struct inode *ino) {
 		INIT_LIST_HEAD(&fp->fi_hash);
 		INIT_LIST_HEAD(&fp->fi_perfile);
 		list_add(&fp->fi_hash, &file_hashtbl[hashval]);
-		fp->fi_ino = igrab(ino);
+		fp->fi_inode = igrab(ino);
 		fp->fi_id = current_fileid++;
 		alloc_file++;
 		return fp;
@@ -841,7 +841,7 @@ release_file(struct nfs4_file *fp)
 {
 	free_file++;
 	list_del_init(&fp->fi_hash);
-	iput(fp->ino);
+	iput(fp->fi_inode);
 	kfree(fp);
 }	
 
@@ -913,13 +913,13 @@ verify_clientid(struct nfs4_client **client, clientid_t *clid) {
 
 /* search file_hashtbl[] for file */
 static int
-find_file(unsigned int hashval, nfs4_ino_desc_t *ino, struct nfs4_file **fp) {
+find_file(unsigned int hashval, struct inode *ino, struct nfs4_file **fp) {
 	struct list_head *pos, *next;
 	struct nfs4_file *local = NULL;
 
 	list_for_each_safe(pos, next, &file_hashtbl[hashval]) {
 		local = list_entry(pos, struct nfs4_file, fi_hash);
-		if(!memcmp(&local->fi_ino, ino, sizeof(nfs4_ino_desc_t))) {
+		if (local->fi_inode == ino) {
 			*fp = local;
 			return(1);
 		}
