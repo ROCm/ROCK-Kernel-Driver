@@ -90,7 +90,7 @@ static int atmtcp_recv_control(const struct atmtcp_control *msg)
 	vcc->vpi = msg->addr.sap_addr.vpi;
 	vcc->vci = msg->addr.sap_addr.vci;
 	vcc->qos = msg->qos;
-	vcc->reply = msg->result;
+	vcc->sk->sk_err = -msg->result;
 	switch (msg->type) {
 	    case ATMTCP_CTRL_OPEN:
 		change_bit(ATM_VF_READY,&vcc->flags);
@@ -134,7 +134,7 @@ static int atmtcp_v_open(struct atm_vcc *vcc,short vpi,int vci)
 	clear_bit(ATM_VF_READY,&vcc->flags); /* just in case ... */
 	error = atmtcp_send_control(vcc,ATMTCP_CTRL_OPEN,&msg,ATM_VF_READY);
 	if (error) return error;
-	return vcc->reply;
+	return -vcc->sk->sk_err;
 }
 
 

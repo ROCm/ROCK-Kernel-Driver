@@ -243,6 +243,29 @@ static void vcc_def_wakeup(struct sock *sk)
 		wake_up(sk->sk_sleep);
 	read_unlock(&sk->sk_callback_lock);
 }
+
+static inline int vcc_writable(struct sock *sk)
+{
+	struct atm_vcc *vcc = atm_sk(sk);
+
+	return (vcc->qos.txtp.max_sdu +
+	        atomic_read(&sk->sk_wmem_alloc)) <= sk->sk_sndbuf;
+}
+
+static void vcc_write_space(struct sock *sk)
+{       
+	read_lock(&sk->sk_callback_lock);
+
+	if (vcc_writable(sk)) {
+		if (sk->sk_sleep && waitqueue_active(sk->sk_sleep))
+			wake_up_interruptible(sk->sk_sleep);
+
+		sk_wake_async(sk, 2, POLL_OUT);
+	}
+
+	read_unlock(&sk->sk_callback_lock);
+}
+
  
 int vcc_create(struct socket *sock, int protocol, int family)
 {
@@ -257,6 +280,7 @@ int vcc_create(struct socket *sock, int protocol, int family)
 		return -ENOMEM;
 	sock_init_data(sock, sk);
 	sk->sk_state_change = vcc_def_wakeup;
+	sk->sk_write_space = vcc_write_space;
 
 	vcc = atm_sk(sk) = kmalloc(sizeof(*vcc), GFP_KERNEL);
 	if (!vcc) {
@@ -326,8 +350,8 @@ int vcc_release(struct socket *sock)
 void vcc_release_async(struct atm_vcc *vcc, int reply)
 {
 	set_bit(ATM_VF_CLOSE, &vcc->flags);
-	vcc->reply = reply;
 	vcc->sk->sk_err = -reply;
+	clear_bit(ATM_VF_WAITING, &vcc->flags);
 	vcc->sk->sk_state_change(vcc->sk);
 }
 
@@ -501,7 +525,7 @@ int vcc_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg,
 	vcc = ATM_SD(sock);
 	if (test_bit(ATM_VF_RELEASED,&vcc->flags) ||
 	    test_bit(ATM_VF_CLOSE,&vcc->flags))
-		return vcc->reply;
+		return -sk->sk_err;
 	if (!test_bit(ATM_VF_READY, &vcc->flags))
 		return 0;
 
@@ -558,7 +582,7 @@ int vcc_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
 	vcc = ATM_SD(sock);
 	if (test_bit(ATM_VF_RELEASED, &vcc->flags) ||
 	    test_bit(ATM_VF_CLOSE, &vcc->flags)) {
-		error = vcc->reply;
+		error = -sk->sk_err;
 		goto out;
 	}
 	if (!test_bit(ATM_VF_READY, &vcc->flags)) {
@@ -589,7 +613,7 @@ int vcc_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
 		}
 		if (test_bit(ATM_VF_RELEASED,&vcc->flags) ||
 		    test_bit(ATM_VF_CLOSE,&vcc->flags)) {
-			error = vcc->reply;
+			error = -sk->sk_err;
 			break;
 		}
 		if (!test_bit(ATM_VF_READY,&vcc->flags)) {
@@ -617,29 +641,38 @@ out:
 }
 
 
-unsigned int atm_poll(struct file *file,struct socket *sock,poll_table *wait)
+unsigned int vcc_poll(struct file *file, struct socket *sock, poll_table *wait)
 {
+	struct sock *sk = sock->sk;
 	struct atm_vcc *vcc;
 	unsigned int mask;
 
-	vcc = ATM_SD(sock);
-	poll_wait(file, vcc->sk->sk_sleep, wait);
+	poll_wait(file, sk->sk_sleep, wait);
 	mask = 0;
-	if (skb_peek(&vcc->sk->sk_receive_queue))
-		mask |= POLLIN | POLLRDNORM;
-	if (test_bit(ATM_VF_RELEASED,&vcc->flags) ||
-	    test_bit(ATM_VF_CLOSE,&vcc->flags))
+
+	vcc = ATM_SD(sock);
+
+	/* exceptional events */
+	if (sk->sk_err)
+		mask = POLLERR;
+
+	if (test_bit(ATM_VF_RELEASED, &vcc->flags) ||
+	    test_bit(ATM_VF_CLOSE, &vcc->flags))
 		mask |= POLLHUP;
-	if (sock->state != SS_CONNECTING) {
-		if (vcc->qos.txtp.traffic_class != ATM_NONE &&
-		    vcc->qos.txtp.max_sdu +
-		    atomic_read(&vcc->sk->sk_wmem_alloc) <= vcc->sk->sk_sndbuf)
-			mask |= POLLOUT | POLLWRNORM;
-	}
-	else if (vcc->reply != WAITING) {
-			mask |= POLLOUT | POLLWRNORM;
-			if (vcc->reply) mask |= POLLERR;
-		}
+
+	/* readable? */
+	if (!skb_queue_empty(&sk->sk_receive_queue))
+		mask |= POLLIN | POLLRDNORM;
+
+	/* writable? */
+	if (sock->state == SS_CONNECTING &&
+	    test_bit(ATM_VF_WAITING, &vcc->flags))
+		return mask;
+
+	if (vcc->qos.txtp.traffic_class != ATM_NONE &&
+	    vcc_writable(vcc->sk))
+		mask |= POLLOUT | POLLWRNORM | POLLWRBAND;
+
 	return mask;
 }
 

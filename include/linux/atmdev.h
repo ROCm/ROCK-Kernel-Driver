@@ -252,6 +252,7 @@ enum {
 	ATM_VF_SESSION,		/* VCC is p2mp session control descriptor */
 	ATM_VF_HASSAP,		/* SAP has been set */
 	ATM_VF_CLOSE,		/* asynchronous close - treat like VF_RELEASED*/
+	ATM_VF_WAITING,		/* waiting for reply from sigd */
 };
 
 
@@ -296,7 +297,6 @@ struct atm_vcc {
 	short		itf;		/* interface number */
 	struct sockaddr_atmsvc local;
 	struct sockaddr_atmsvc remote;
-	int		reply;		/* also used by ATMTCP */
 	/* Multipoint part ------------------------------------------------- */
 	struct atm_vcc	*session;	/* session VCC descriptor */
 	/* Other stuff ----------------------------------------------------- */

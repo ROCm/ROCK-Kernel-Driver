@@ -11,9 +11,6 @@
 #include <linux/atmsvc.h>
 
 
-#define WAITING 1 /* for reply: 0: no error, < 0: error, ... */
-
-
 extern struct atm_vcc *sigd; /* needed in svc_release */
 
 

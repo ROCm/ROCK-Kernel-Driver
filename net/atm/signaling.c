@@ -103,7 +103,8 @@ static int sigd_send(struct atm_vcc *vcc,struct sk_buff *skb)
 	vcc = *(struct atm_vcc **) &msg->vcc;
 	switch (msg->type) {
 		case as_okay:
-			vcc->reply = msg->reply;
+			vcc->sk->sk_err = -msg->reply;
+			clear_bit(ATM_VF_WAITING, &vcc->flags);
 			if (!*vcc->local.sas_addr.prv &&
 			    !*vcc->local.sas_addr.pub) {
 				vcc->local.sas_family = AF_ATMSVC;
@@ -123,8 +124,8 @@ static int sigd_send(struct atm_vcc *vcc,struct sk_buff *skb)
 		case as_error:
 			clear_bit(ATM_VF_REGIS,&vcc->flags);
 			clear_bit(ATM_VF_READY,&vcc->flags);
-			vcc->reply = msg->reply;
 			vcc->sk->sk_err = -msg->reply;
+			clear_bit(ATM_VF_WAITING, &vcc->flags);
 			break;
 		case as_indicate:
 			vcc = *(struct atm_vcc **) &msg->listen_vcc;
@@ -145,8 +146,8 @@ as_indicate_complete:
 		case as_close:
 			set_bit(ATM_VF_RELEASED,&vcc->flags);
 			clear_bit(ATM_VF_READY,&vcc->flags);
-			vcc->reply = msg->reply;
 			vcc->sk->sk_err = -msg->reply;
+			clear_bit(ATM_VF_WAITING, &vcc->flags);
 			break;
 		case as_modify:
 			modify_qos(vcc,msg);
@@ -202,8 +203,8 @@ static void purge_vcc(struct atm_vcc *vcc)
 	if (vcc->sk->sk_family == PF_ATMSVC &&
 	    !test_bit(ATM_VF_META,&vcc->flags)) {
 		set_bit(ATM_VF_RELEASED,&vcc->flags);
-		vcc->reply = -EUNATCH;
 		vcc->sk->sk_err = EUNATCH;
+		clear_bit(ATM_VF_WAITING, &vcc->flags);
 		vcc->sk->sk_state_change(vcc->sk);
 	}
 }

@@ -40,7 +40,7 @@ static void atm_pop_raw(struct atm_vcc *vcc,struct sk_buff *skb)
 		skb->truesize);
 	atomic_sub(skb->truesize, &vcc->sk->sk_wmem_alloc);
 	dev_kfree_skb_any(skb);
-	wake_up(vcc->sk->sk_sleep);
+	vcc->sk->sk_write_space(vcc->sk);
 }
 
 
