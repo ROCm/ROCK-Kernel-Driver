@@ -28,6 +28,7 @@
 #include <linux/capability.h>
 #include <linux/smp_lock.h>
 #include <linux/init.h>
+#include <linux/kernel.h>
 #include <linux/sysrq.h>
 #include <linux/highuid.h>
 #include <linux/writeback.h>
