@@ -164,7 +164,7 @@ free_initrd_mem (unsigned long start, unsigned long end)
 		page = virt_to_page(start);
 		ClearPageReserved(page);
 		set_page_count(page, 1);
-		free_page(page);
+		free_page(start);
 		++totalram_pages;
 	}
 }
