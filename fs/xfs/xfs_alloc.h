@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -30,7 +30,7 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 #ifndef __XFS_ALLOC_H__
-#define __XFS_ALLOC_H__
+#define	__XFS_ALLOC_H__
 
 struct xfs_buf;
 struct xfs_mount;
@@ -38,7 +38,7 @@ struct xfs_perag;
 struct xfs_trans;
 
 /*
- * Freespace allocation types.	Argument to xfs_alloc_[v]extent.
+ * Freespace allocation types.  Argument to xfs_alloc_[v]extent.
  */
 typedef enum xfs_alloctype
 {
@@ -54,7 +54,7 @@ typedef enum xfs_alloctype
 /*
  * Flags for xfs_alloc_fix_freelist.
  */
-#define XFS_ALLOC_FLAG_TRYLOCK	0x00000001  /* use trylock for buffer locking */
+#define	XFS_ALLOC_FLAG_TRYLOCK	0x00000001  /* use trylock for buffer locking */
 
 /*
  * Argument structure for xfs_alloc routines.
@@ -78,8 +78,8 @@ typedef struct xfs_alloc_arg {
 	xfs_extlen_t	alignment;	/* align answer to multiple of this */
 	xfs_extlen_t	minalignslop;	/* slop for minlen+alignment calcs */
 	xfs_extlen_t	len;		/* output: actual size of extent */
-	xfs_alloctype_t type;		/* allocation type XFS_ALLOCTYPE_... */
-	xfs_alloctype_t otype;		/* original allocation type */
+	xfs_alloctype_t	type;		/* allocation type XFS_ALLOCTYPE_... */
+	xfs_alloctype_t	otype;		/* original allocation type */
 	char		wasdel;		/* set if allocation was prev delayed */
 	char		wasfromfl;	/* set if allocation is from freelist */
 	char		isfl;		/* set if is freelist blocks - !actg */
@@ -98,21 +98,21 @@ typedef struct xfs_alloc_arg {
 /*
  * Types for alloc tracing.
  */
-#define XFS_ALLOC_KTRACE_ALLOC	1
-#define XFS_ALLOC_KTRACE_FREE	2
-#define XFS_ALLOC_KTRACE_MODAGF 3
-#define XFS_ALLOC_KTRACE_BUSY	4
-#define XFS_ALLOC_KTRACE_UNBUSY 5
-#define XFS_ALLOC_KTRACE_BUSYSEARCH	6
+#define	XFS_ALLOC_KTRACE_ALLOC	1
+#define	XFS_ALLOC_KTRACE_FREE	2
+#define	XFS_ALLOC_KTRACE_MODAGF	3
+#define	XFS_ALLOC_KTRACE_BUSY	4
+#define	XFS_ALLOC_KTRACE_UNBUSY	5
+#define	XFS_ALLOC_KTRACE_BUSYSEARCH	6
 
 
 /*
  * Allocation tracing buffer size.
  */
-#define XFS_ALLOC_TRACE_SIZE	4096
+#define	XFS_ALLOC_TRACE_SIZE	4096
 
 #ifdef	XFS_ALL_TRACE
-#define XFS_ALLOC_TRACE
+#define	XFS_ALLOC_TRACE
 #endif
 
 #if !defined(DEBUG)
@@ -138,7 +138,7 @@ int				/* error */
 xfs_alloc_get_freelist(
 	struct xfs_trans *tp,	/* transaction pointer */
 	struct xfs_buf	*agbp,	/* buffer containing the agf structure */
-	xfs_agblock_t	*bnop); /* block address retrieved from freelist */
+	xfs_agblock_t	*bnop);	/* block address retrieved from freelist */
 
 /*
  * Log the given fields from the agf structure.
@@ -157,7 +157,7 @@ xfs_alloc_pagf_init(
 	struct xfs_mount *mp,	/* file system mount structure */
 	struct xfs_trans *tp,	/* transaction pointer */
 	xfs_agnumber_t	agno,	/* allocation group number */
-	int		flags); /* XFS_ALLOC_FLAGS_... */
+	int		flags);	/* XFS_ALLOC_FLAGS_... */
 
 /*
  * Put the block on the freelist for the allocation group.
@@ -185,7 +185,7 @@ xfs_alloc_read_agf(
  */
 int				/* error */
 xfs_alloc_vextent(
-	xfs_alloc_arg_t *args); /* allocation argument structure */
+	xfs_alloc_arg_t	*args);	/* allocation argument structure */
 
 /*
  * Free an extent.

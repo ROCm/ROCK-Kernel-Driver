@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -38,7 +38,7 @@
 
 int			doass = 1;
 static char		message[256];	/* keep it off the stack */
-static spinlock_t 	xfs_err_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t	xfs_err_lock = SPIN_LOCK_UNLOCKED;
 
 /* Translate from CE_FOO to KERN_FOO, err_level(CE_FOO) == KERN_FOO */
 #define XFS_MAX_ERR_LEVEL	7

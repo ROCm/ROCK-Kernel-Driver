@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -51,12 +51,12 @@ typedef struct xfs_acl_entry {
 
 typedef struct xfs_acl {
 	__int32_t	acl_cnt;
-	xfs_acl_entry_t acl_entry[XFS_ACL_MAX_ENTRIES];
+	xfs_acl_entry_t	acl_entry[XFS_ACL_MAX_ENTRIES];
 } xfs_acl_t;
 
 /* On-disk XFS extended attribute names */
 #define SGI_ACL_FILE	"SGI_ACL_FILE"
-#define SGI_ACL_DEFAULT "SGI_ACL_DEFAULT"
+#define SGI_ACL_DEFAULT	"SGI_ACL_DEFAULT"
 #define SGI_ACL_FILE_SIZE	(sizeof(SGI_ACL_FILE)-1)
 #define SGI_ACL_DEFAULT_SIZE	(sizeof(SGI_ACL_DEFAULT)-1)
 
@@ -84,7 +84,7 @@ extern struct kmem_zone *xfs_acl_zone;
 
 #define _ACL_TYPE_ACCESS	1
 #define _ACL_TYPE_DEFAULT	2
-#define _ACL_PERM_INVALID(perm) ((perm) & ~(ACL_READ|ACL_WRITE|ACL_EXECUTE))
+#define _ACL_PERM_INVALID(perm)	((perm) & ~(ACL_READ|ACL_WRITE|ACL_EXECUTE))
 
 #define _ACL_DECL(a)		xfs_acl_t *(a) = NULL
 #define _ACL_ALLOC(a)		((a) = kmem_zone_alloc(xfs_acl_zone, KM_SLEEP))
@@ -93,7 +93,7 @@ extern struct kmem_zone *xfs_acl_zone;
 #define _ACL_ZONE_DESTROY(z)	(kmem_cache_destroy(z))
 #define _ACL_INHERIT(c,v,d)	(xfs_acl_inherit(c,v,d))
 #define _ACL_GET_ACCESS(pv,pa)	(xfs_acl_vtoacl(pv,pa,NULL) == 0)
-#define _ACL_GET_DEFAULT(pv,pd) (xfs_acl_vtoacl(pv,NULL,pd) == 0)
+#define _ACL_GET_DEFAULT(pv,pd)	(xfs_acl_vtoacl(pv,NULL,pd) == 0)
 #define _ACL_ACCESS_EXISTS	xfs_acl_vhasacl_access
 #define _ACL_DEFAULT_EXISTS	xfs_acl_vhasacl_default
 #define _ACL_XFS_IACCESS(i,m,c) (XFS_IFORK_Q(i) ? xfs_acl_iaccess(i,m,c) : -1)
@@ -109,7 +109,7 @@ extern struct kmem_zone *xfs_acl_zone;
 #define _ACL_ZONE_DESTROY(z)	((void)0)
 #define _ACL_INHERIT(c,v,d)	(0)
 #define _ACL_GET_ACCESS(pv,pa)	(0)
-#define _ACL_GET_DEFAULT(pv,pd) (0)
+#define _ACL_GET_DEFAULT(pv,pd)	(0)
 #define _ACL_ACCESS_EXISTS	(NULL)
 #define _ACL_DEFAULT_EXISTS	(NULL)
 #define _ACL_XFS_IACCESS(i,m,c) (-1)

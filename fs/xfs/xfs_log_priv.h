@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -29,11 +29,11 @@
  *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef __XFS_LOG_PRIV_H__
+#ifndef	__XFS_LOG_PRIV_H__
 #define __XFS_LOG_PRIV_H__
 
 #if defined(XFS_ALL_TRACE)
-#define XFS_LOG_TRACE
+#define	XFS_LOG_TRACE
 #endif
 
 #if !defined(DEBUG)
@@ -136,7 +136,7 @@ void xlog_grant_sub_space(struct log *log, int bytes, int type);
 	if (type == 'w') {						\
 		(log)->l_grant_write_bytes -= (bytes);			\
 		if ((log)->l_grant_write_bytes < 0) {			\
-			(log)->l_grant_write_bytes += (log)->l_logsize; \
+			(log)->l_grant_write_bytes += (log)->l_logsize;	\
 			(log)->l_grant_write_cycle--;			\
 		}							\
 	} else {							\
@@ -158,7 +158,7 @@ void xlog_grant_add_space(struct log *log, int bytes, int type);
 	if (type == 'w') {						\
 		(log)->l_grant_write_bytes += (bytes);			\
 		if ((log)->l_grant_write_bytes > (log)->l_logsize) {	\
-			(log)->l_grant_write_bytes -= (log)->l_logsize; \
+			(log)->l_grant_write_bytes -= (log)->l_logsize;	\
 			(log)->l_grant_write_cycle++;			\
 		}							\
 	} else {							\
@@ -259,7 +259,7 @@ void xlog_grant_add_space(struct log *log, int bytes, int type);
  */
 #define XLOG_CHKSUM_MISMATCH	0x1	/* used only during recovery */
 #define XLOG_ACTIVE_RECOVERY	0x2	/* in the middle of recovery */
-#define XLOG_RECOVERY_NEEDED	0x4	/* log was recovered */
+#define	XLOG_RECOVERY_NEEDED	0x4	/* log was recovered */
 #define XLOG_IO_ERROR		0x8	/* log hit an I/O error, and being
 					   shutdown */
 typedef __uint32_t xlog_tid_t;
@@ -343,11 +343,11 @@ typedef __uint32_t xlog_tid_t;
 
 typedef struct xlog_ticket {
 	sv_t		   t_sema;	 /* sleep on this semaphore	 :20 */
-	struct xlog_ticket *t_next;	 /*				 : 4 */
+	struct xlog_ticket *t_next;	 /*			         : 4 */
 	struct xlog_ticket *t_prev;	 /*				 : 4 */
 	xlog_tid_t	   t_tid;	 /* transaction identifier	 : 4 */
 	int		   t_curr_res;	 /* current reservation in bytes : 4 */
-	int		   t_unit_res;	 /* unit reservation in bytes	 : 4 */
+	int		   t_unit_res;	 /* unit reservation in bytes    : 4 */
 	__uint8_t	   t_ocnt;	 /* original count		 : 1 */
 	__uint8_t	   t_cnt;	 /* current count		 : 1 */
 	__uint8_t	   t_clientid;	 /* who does this belong to;	 : 1 */
@@ -359,7 +359,7 @@ typedef struct xlog_ticket {
 typedef struct xlog_op_header {
 	xlog_tid_t oh_tid;	/* transaction id of operation	:  4 b */
 	int	   oh_len;	/* bytes in data region		:  4 b */
-	__uint8_t  oh_clientid; /* who sent me this		:  1 b */
+	__uint8_t  oh_clientid;	/* who sent me this		:  1 b */
 	__uint8_t  oh_flags;	/*				:  1 b */
 	ushort	   oh_res2;	/* 32 bit align			:  2 b */
 } xlog_op_header_t;
@@ -391,12 +391,12 @@ typedef struct xlog_rec_header {
 	xfs_lsn_t h_tail_lsn;	/* lsn of 1st LR w/ buffers not committed: 8 */
 	uint	  h_chksum;	/* may not be used; non-zero if used	:  4 */
 	int	  h_prev_block; /* block number to previous LR		:  4 */
-	int	  h_num_logops; /* number of log operations in this LR	:  4 */
+	int	  h_num_logops;	/* number of log operations in this LR	:  4 */
 	uint	  h_cycle_data[XLOG_HEADER_CYCLE_SIZE / BBSIZE];
 	/* new fields */
-	int	  h_fmt;	/* format of log record			:  4 */
-	uuid_t	  h_fs_uuid;	/* uuid of FS				: 16 */
-	int	  h_size;	/* iclog size				:  4 */
+	int       h_fmt;        /* format of log record                 :  4 */
+	uuid_t    h_fs_uuid;    /* uuid of FS                           : 16 */
+	int       h_size;	/* iclog size				:  4 */
 } xlog_rec_header_t;
 
 typedef struct xlog_rec_ext_header {
@@ -405,7 +405,7 @@ typedef struct xlog_rec_ext_header {
 } xlog_rec_ext_header_t;
 #ifdef __KERNEL__
 /*
- * - A log record header is 512 bytes.	There is plenty of room to grow the
+ * - A log record header is 512 bytes.  There is plenty of room to grow the
  *	xlog_rec_header_t into the reserved space.
  * - ic_data follows, so a write to disk can start at the beginning of
  *	the iclog.
@@ -457,21 +457,21 @@ typedef struct xlog_in_core {
 /*
  * Defines to save our code from this glop.
  */
-#define ic_forcesema	hic_fields.ic_forcesema
+#define	ic_forcesema	hic_fields.ic_forcesema
 #define ic_writesema	hic_fields.ic_writesema
-#define ic_next		hic_fields.ic_next
-#define ic_prev		hic_fields.ic_prev
-#define ic_bp		hic_fields.ic_bp
-#define ic_log		hic_fields.ic_log
-#define ic_callback	hic_fields.ic_callback
-#define ic_callback_tail hic_fields.ic_callback_tail
-#define ic_trace	hic_fields.ic_trace
-#define ic_size		hic_fields.ic_size
-#define ic_offset	hic_fields.ic_offset
-#define ic_refcnt	hic_fields.ic_refcnt
-#define ic_roundoff	hic_fields.ic_roundoff
-#define ic_bwritecnt	hic_fields.ic_bwritecnt
-#define ic_state	hic_fields.ic_state
+#define	ic_next		hic_fields.ic_next
+#define	ic_prev		hic_fields.ic_prev
+#define	ic_bp		hic_fields.ic_bp
+#define	ic_log		hic_fields.ic_log
+#define	ic_callback	hic_fields.ic_callback
+#define	ic_callback_tail hic_fields.ic_callback_tail
+#define	ic_trace	hic_fields.ic_trace
+#define	ic_size		hic_fields.ic_size
+#define	ic_offset	hic_fields.ic_offset
+#define	ic_refcnt	hic_fields.ic_refcnt
+#define	ic_roundoff	hic_fields.ic_roundoff
+#define	ic_bwritecnt	hic_fields.ic_bwritecnt
+#define	ic_state	hic_fields.ic_state
 #define ic_datap	hic_fields.ic_datap
 #define ic_header	hic_data->ic_h.hic_header
 
@@ -483,29 +483,29 @@ typedef struct xlog_in_core {
  */
 typedef struct log {
     /* The following block of fields are changed while holding icloglock */
-    sema_t		l_flushsema;	/* iclog flushing semaphore */
+    sema_t		l_flushsema;    /* iclog flushing semaphore */
     int			l_flushcnt;	/* # of procs waiting on this sema */
     int			l_ticket_cnt;	/* free ticket count */
     int			l_ticket_tcnt;	/* total ticket count */
     int			l_covered_state;/* state of "covering disk log entries" */
-    xlog_ticket_t	*l_freelist;	/* free list of tickets */
+    xlog_ticket_t	*l_freelist;    /* free list of tickets */
     xlog_ticket_t	*l_unmount_free;/* kmem_free these addresses */
-    xlog_ticket_t	*l_tail;	/* free list of tickets */
-    xlog_in_core_t	*l_iclog;	/* head log queue	*/
-    lock_t		l_icloglock;	/* grab to change iclog state */
-    xfs_lsn_t		l_tail_lsn;	/* lsn of 1st LR w/ unflush buffers */
+    xlog_ticket_t	*l_tail;        /* free list of tickets */
+    xlog_in_core_t	*l_iclog;       /* head log queue	*/
+    lock_t		l_icloglock;    /* grab to change iclog state */
+    xfs_lsn_t		l_tail_lsn;     /* lsn of 1st LR w/ unflush buffers */
     xfs_lsn_t		l_last_sync_lsn;/* lsn of last LR on disk */
-    struct xfs_mount	*l_mp;		/* mount point */
-    struct xfs_buf	*l_xbuf;	/* extra buffer for log wrapping */
-    dev_t		l_dev;		/* dev_t of log */
-    xfs_daddr_t		l_logBBstart;	/* start block of log */
-    int			l_logsize;	/* size of log in bytes */
-    int			l_logBBsize;	/* size of log in 512 byte chunks */
+    struct xfs_mount	*l_mp;	        /* mount point */
+    struct xfs_buf	*l_xbuf;        /* extra buffer for log wrapping */
+    dev_t		l_dev;	        /* dev_t of log */
+    xfs_daddr_t		l_logBBstart;   /* start block of log */
+    int			l_logsize;      /* size of log in bytes */
+    int			l_logBBsize;    /* size of log in 512 byte chunks */
     int			l_roundoff;	/* round off error of all iclogs */
-    int			l_curr_cycle;	/* Cycle number of log writes */
-    int			l_prev_cycle;	/* Cycle # b4 last block increment */
-    int			l_curr_block;	/* current logical block of log */
-    int			l_prev_block;	/* previous logical block of log */
+    int			l_curr_cycle;   /* Cycle number of log writes */
+    int			l_prev_cycle;   /* Cycle # b4 last block increment */
+    int			l_curr_block;   /* current logical block of log */
+    int			l_prev_block;   /* previous logical block of log */
     int			l_iclog_size;	 /* size of log in bytes */
     int			l_iclog_size_log;/* log power size of log */
     int			l_iclog_bufs;	 /* number of iclog buffers */
@@ -530,8 +530,8 @@ typedef struct log {
     uint		l_flags;
     uint		l_quotaoffs_flag;/* XFS_DQ_*, if QUOTAOFFs found */
     struct xfs_buf_cancel **l_buf_cancel_table;
-    int			l_iclog_hsize;	/* size of iclog header */
-    int			l_iclog_heads;	/* number of iclog header sectors */
+    int			l_iclog_hsize;  /* size of iclog header */
+    int			l_iclog_heads;  /* number of iclog header sectors */
 } xlog_t;
 
 

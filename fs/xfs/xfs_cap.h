@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -38,9 +38,9 @@
 typedef __uint64_t xfs_cap_value_t;
 
 typedef struct xfs_cap_set {
-	xfs_cap_value_t cap_effective;	/* use in capability checks */
-	xfs_cap_value_t cap_permitted;	/* combined with file attrs */
-	xfs_cap_value_t cap_inheritable;/* pass through exec */
+	xfs_cap_value_t	cap_effective;	/* use in capability checks */
+	xfs_cap_value_t	cap_permitted;	/* combined with file attrs */
+	xfs_cap_value_t	cap_inheritable;/* pass through exec */
 } xfs_cap_set_t;
 
 /* On-disk XFS extended attribute names */
@@ -81,4 +81,4 @@ extern int xfs_cap_vremove(struct vnode *vp);
 
 #endif	/* __KERNEL__ */
 
-#endif	/* __XFS_CAP_H__ */
+#endif  /* __XFS_CAP_H__ */

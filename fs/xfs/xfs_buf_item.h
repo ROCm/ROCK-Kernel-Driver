@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -29,14 +29,14 @@
  *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef __XFS_BUF_ITEM_H__
-#define __XFS_BUF_ITEM_H__
+#ifndef	__XFS_BUF_ITEM_H__
+#define	__XFS_BUF_ITEM_H__
 
 /*
  * This is the structure used to lay out a buf log item in the
- * log.	 The data map describes which 128 byte chunks of the buffer
+ * log.  The data map describes which 128 byte chunks of the buffer
  * have been logged.  This structure works only on buffers that
- * reside up to the first TB in the filesystem.	 These buffers are
+ * reside up to the first TB in the filesystem.  These buffers are
  * generated only by pre-6.2 systems and are known as XFS_LI_6_1_BUF.
  */
 typedef struct xfs_buf_log_format_v1 {
@@ -69,33 +69,33 @@ typedef struct xfs_buf_log_format_t {
  * This flag indicates that the buffer contains on disk inodes
  * and requires special recovery handling.
  */
-#define XFS_BLI_INODE_BUF	0x1
+#define	XFS_BLI_INODE_BUF	0x1
 /*
  * This flag indicates that the buffer should not be replayed
  * during recovery because its blocks are being freed.
  */
-#define XFS_BLI_CANCEL		0x2
+#define	XFS_BLI_CANCEL		0x2
 /*
  * This flag indicates that the buffer contains on disk
  * user or group dquots and may require special recovery handling.
  */
-#define XFS_BLI_UDQUOT_BUF	0x4
+#define	XFS_BLI_UDQUOT_BUF	0x4
 /* #define XFS_BLI_PDQUOT_BUF	0x8 */
-#define XFS_BLI_GDQUOT_BUF	0x10
+#define	XFS_BLI_GDQUOT_BUF	0x10
 
-#define XFS_BLI_CHUNK		128
-#define XFS_BLI_SHIFT		7
-#define BIT_TO_WORD_SHIFT	5
-#define NBWORD			(NBBY * sizeof(unsigned int))
+#define	XFS_BLI_CHUNK		128
+#define	XFS_BLI_SHIFT		7
+#define	BIT_TO_WORD_SHIFT	5
+#define	NBWORD			(NBBY * sizeof(unsigned int))
 
 /*
  * buf log item flags
  */
-#define XFS_BLI_HOLD		0x01
-#define XFS_BLI_DIRTY		0x02
-#define XFS_BLI_STALE		0x04
-#define XFS_BLI_LOGGED		0x08
-#define XFS_BLI_INODE_ALLOC_BUF 0x10
+#define	XFS_BLI_HOLD		0x01
+#define	XFS_BLI_DIRTY		0x02
+#define	XFS_BLI_STALE		0x04
+#define	XFS_BLI_LOGGED		0x08
+#define	XFS_BLI_INODE_ALLOC_BUF	0x10
 
 
 #ifdef __KERNEL__
@@ -136,11 +136,11 @@ typedef struct xfs_buf_cancel {
 	struct xfs_buf_cancel	*bc_next;
 } xfs_buf_cancel_t;
 
-#define XFS_BLI_TRACE_SIZE	32
+#define	XFS_BLI_TRACE_SIZE	32
 
 
 #if defined(XFS_ALL_TRACE)
-#define XFS_BLI_TRACE
+#define	XFS_BLI_TRACE
 #endif
 
 #if !defined(DEBUG)
@@ -150,7 +150,7 @@ typedef struct xfs_buf_cancel {
 #if defined(XFS_BLI_TRACE)
 void	xfs_buf_item_trace(char *, xfs_buf_log_item_t *);
 #else
-#define xfs_buf_item_trace(id, bip)
+#define	xfs_buf_item_trace(id, bip)
 #endif
 
 void	xfs_buf_item_init(struct xfs_buf *, struct xfs_mount *);
@@ -170,7 +170,7 @@ xfs_buf_item_flush_log_debug(
 	uint	first,
 	uint	last);
 #else
-#define xfs_buf_item_flush_log_debug(bp, first, last)
+#define	xfs_buf_item_flush_log_debug(bp, first, last)
 #endif
 
 #endif	/* __KERNEL__ */

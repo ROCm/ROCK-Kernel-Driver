@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -30,7 +30,7 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#include <xfs.h>
+#include "xfs.h"
 
 STATIC int xfs_cap_allow_set(vnode_t *);
 
@@ -96,7 +96,7 @@ posix_cap_xfs_to_xattr(
 	ASSERT(sizeof(xattr_cap->c_effective) == sizeof(src->cap_effective));
 
 	xattr_cap->c_version	= cpu_to_le32(POSIX_CAP_XATTR_VERSION);
-	xattr_cap->c_abiversion = cpu_to_le32(_LINUX_CAPABILITY_VERSION);
+	xattr_cap->c_abiversion	= cpu_to_le32(_LINUX_CAPABILITY_VERSION);
 	xattr_cap->c_effective	= src->cap_effective;
 	xattr_cap->c_permitted	= src->cap_permitted;
 	xattr_cap->c_inheritable= src->cap_inheritable;
@@ -114,7 +114,7 @@ xfs_cap_vget(
 	int		len = sizeof(xfs_cap_set_t);
 	int		flags = ATTR_ROOT;
 	xfs_cap_set_t	xfs_cap = { 0 };
-	posix_cap_xattr *xattr_cap = cap;
+	posix_cap_xattr	*xattr_cap = cap;
 
 	VN_HOLD(vp);
 	if ((error = _MAC_VACCESS(vp, NULL, VREAD)))

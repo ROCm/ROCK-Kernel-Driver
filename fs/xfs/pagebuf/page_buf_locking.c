@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -40,7 +40,7 @@
  *	cached pages for I/O.  The page_buf_locking module adds support for
  *	locking such page buffers.
  *
- *	Written by Steve Lord at SGI
+ *      Written by Steve Lord at SGI
  *
  */
 

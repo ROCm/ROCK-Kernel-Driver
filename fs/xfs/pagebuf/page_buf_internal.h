@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -79,20 +79,20 @@ struct pagebuf_trace_buf {
 };
 
 #define PB_TRACE_BUFSIZE	1024
-#define CIRC_INC(i)	(((i) + 1) & (PB_TRACE_BUFSIZE - 1))
+#define CIRC_INC(i)     (((i) + 1) & (PB_TRACE_BUFSIZE - 1))
 
 /*
  * Tunable pagebuf parameters
  */
 
-#define P_PARAM 4
+#define P_PARAM	4
 
 typedef union pagebuf_param {
 	struct {
-		ulong	flush_interval; /* interval between runs of the
-					 * delwri flush daemon.	 */
+		ulong	flush_interval;	/* interval between runs of the
+					 * delwri flush daemon.  */
 		ulong	age_buffer;	/* time for buffer to age before
-					 * we flush it.	 */
+					 * we flush it.  */
 		ulong	debug;		/* debug tracing on or off */
 		ulong	stats_clear;	/* clear the pagebuf stats */
 	} p_un;
@@ -129,7 +129,7 @@ extern struct pbstats pbstats;
 #define PB_STATS_INC(count)	( count ++ )
 
 #ifndef STATIC
-# define STATIC static
+# define STATIC	static
 #endif
 
 #endif /* __PAGE_BUF_PRIVATE_H__ */

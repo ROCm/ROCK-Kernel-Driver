@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -93,6 +93,8 @@ typedef int	(*vfs_parseargs_t)(bhv_desc_t *, char *,
 				struct xfs_mount_args *, int);
 typedef	int	(*vfs_showargs_t)(bhv_desc_t *, struct seq_file *);
 typedef int	(*vfs_unmount_t)(bhv_desc_t *, int, struct cred *);
+typedef int	(*vfs_mntupdate_t)(bhv_desc_t *, int *,
+				struct xfs_mount_args *);
 typedef int	(*vfs_root_t)(bhv_desc_t *, struct vnode **);
 typedef int	(*vfs_statvfs_t)(bhv_desc_t *, struct statfs *, struct vnode *);
 typedef int	(*vfs_sync_t)(bhv_desc_t *, int, struct cred *);
@@ -109,6 +111,7 @@ typedef struct vfsops {
 	vfs_parseargs_t		vfs_parseargs;	/* parse mount options */
 	vfs_showargs_t		vfs_showargs;	/* unparse mount options */
 	vfs_unmount_t		vfs_unmount;	/* unmount file system */
+	vfs_mntupdate_t		vfs_mntupdate;	/* update file system options */
 	vfs_root_t		vfs_root;	/* get root vnode */
 	vfs_statvfs_t		vfs_statvfs;	/* file system statistics */
 	vfs_sync_t		vfs_sync;	/* flush files */
@@ -126,7 +129,8 @@ typedef struct vfsops {
 #define VFS_MOUNT(v, ma,cr, rv)		((rv) = vfs_mount(VHEAD(v), ma,cr))
 #define VFS_PARSEARGS(v, o,ma,f, rv)	((rv) = vfs_parseargs(VHEAD(v), o,ma,f))
 #define VFS_SHOWARGS(v, m, rv)		((rv) = vfs_showargs(VHEAD(v), m))
-#define VFS_UNMOUNT(v, f,cr, rv)	((rv) = vfs_unmount(VHEAD(v), f,cr))
+#define VFS_UNMOUNT(v, f, cr, rv)	((rv) = vfs_unmount(VHEAD(v), f,cr))
+#define VFS_MNTUPDATE(v, fl, args, rv)	((rv) = vfs_mntupdate(VHEAD(v), fl, args))
 #define VFS_ROOT(v, vpp, rv)		((rv) = vfs_root(VHEAD(v), vpp))
 #define VFS_STATVFS(v, sp,vp, rv)	((rv) = vfs_statvfs(VHEAD(v), sp,vp))
 #define VFS_SYNC(v, flag,cr, rv)	((rv) = vfs_sync(VHEAD(v), flag,cr))
@@ -143,6 +147,7 @@ typedef struct vfsops {
 #define PVFS_PARSEARGS(b, o,ma,f, rv)	((rv) = vfs_parseargs(b, o,ma,f))
 #define PVFS_SHOWARGS(b, m, rv)		((rv) = vfs_showargs(b, m))
 #define PVFS_UNMOUNT(b, f,cr, rv)	((rv) = vfs_unmount(b, f,cr))
+#define PVFS_MNTUPDATE(b, fl, args, rv)	((rv) = vfs_mntupdate(b, fl, args))
 #define PVFS_ROOT(b, vpp, rv)		((rv) = vfs_root(b, vpp))
 #define PVFS_STATVFS(b, sp,vp, rv)	((rv) = vfs_statvfs(b, sp,vp))
 #define PVFS_SYNC(b, flag,cr, rv)	((rv) = vfs_sync(b, flag,cr))
@@ -156,6 +161,7 @@ extern int vfs_mount(bhv_desc_t *, struct xfs_mount_args *, struct cred *);
 extern int vfs_parseargs(bhv_desc_t *, char *, struct xfs_mount_args *, int);
 extern int vfs_showargs(bhv_desc_t *, struct seq_file *);
 extern int vfs_unmount(bhv_desc_t *, int, struct cred *);
+extern int vfs_mntupdate(bhv_desc_t *, int *, struct xfs_mount_args *);
 extern int vfs_root(bhv_desc_t *, struct vnode **);
 extern int vfs_statvfs(bhv_desc_t *, struct statfs *, struct vnode *);
 extern int vfs_sync(bhv_desc_t *, int, struct cred *);

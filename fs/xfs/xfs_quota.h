@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -149,21 +149,21 @@ typedef struct xfs_qoff_logformat {
 /*
  * Disk quotas status in m_qflags, and also sb_qflags. 16 bits.
  */
-#define XFS_UQUOTA_ACCT 0x0001	/* user quota accounting ON */
-#define XFS_UQUOTA_ENFD 0x0002	/* user quota limits enforced */
-#define XFS_UQUOTA_CHKD 0x0004	/* quotacheck run on usr quotas */
-#define XFS_PQUOTA_ACCT 0x0008	/* (IRIX) project quota accounting ON */
-#define XFS_GQUOTA_ENFD 0x0010	/* group quota limits enforced */
-#define XFS_GQUOTA_CHKD 0x0020	/* quotacheck run on grp quotas */
-#define XFS_GQUOTA_ACCT 0x0040	/* group quota accounting ON */
+#define XFS_UQUOTA_ACCT	0x0001  /* user quota accounting ON */
+#define XFS_UQUOTA_ENFD	0x0002  /* user quota limits enforced */
+#define XFS_UQUOTA_CHKD	0x0004  /* quotacheck run on usr quotas */
+#define XFS_PQUOTA_ACCT	0x0008  /* (IRIX) project quota accounting ON */
+#define XFS_GQUOTA_ENFD	0x0010  /* group quota limits enforced */
+#define XFS_GQUOTA_CHKD	0x0020  /* quotacheck run on grp quotas */
+#define XFS_GQUOTA_ACCT	0x0040  /* group quota accounting ON */
 
 /*
  * Incore only flags for quotaoff - these bits get cleared when quota(s)
  * are in the process of getting turned off. These flags are in m_qflags but
  * never in sb_qflags.
  */
-#define XFS_UQUOTA_ACTIVE	0x0080	/* uquotas are being turned off */
-#define XFS_GQUOTA_ACTIVE	0x0100	/* gquotas are being turned off */
+#define XFS_UQUOTA_ACTIVE	0x0080  /* uquotas are being turned off */
+#define XFS_GQUOTA_ACTIVE	0x0100  /* gquotas are being turned off */
 
 /*
  * Checking XFS_IS_*QUOTA_ON() while holding any inode lock guarantees
@@ -189,7 +189,7 @@ typedef struct xfs_qoff_logformat {
 #define XFS_QMOPT_QUOTAOFF	0x0000080 /* quotas are being turned off */
 #define XFS_QMOPT_UMOUNTING	0x0000100 /* filesys is being unmounted */
 #define XFS_QMOPT_DOLOG		0x0000200 /* log buf changes (in quotacheck) */
-#define XFS_QMOPT_DOWARN	0x0000400 /* increase warning cnt if necessary */
+#define XFS_QMOPT_DOWARN        0x0000400 /* increase warning cnt if necessary */
 #define XFS_QMOPT_ILOCKED	0x0000800 /* inode is already locked (excl) */
 #define XFS_QMOPT_DQREPAIR	0x0001000 /* repair dquot, if damaged. */
 
@@ -222,7 +222,7 @@ typedef struct xfs_qoff_logformat {
  * flags to xfs_trans_mod_dquot.
  */
 #define XFS_TRANS_DQ_RES_BLKS	XFS_QMOPT_RES_REGBLKS
-#define XFS_TRANS_DQ_RES_RTBLKS XFS_QMOPT_RES_RTBLKS
+#define XFS_TRANS_DQ_RES_RTBLKS	XFS_QMOPT_RES_RTBLKS
 #define XFS_TRANS_DQ_RES_INOS	XFS_QMOPT_RES_INOS
 #define XFS_TRANS_DQ_BCOUNT	XFS_QMOPT_BCOUNT
 #define XFS_TRANS_DQ_DELBCOUNT	XFS_QMOPT_DELBCOUNT

@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -30,7 +30,22 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#include <xfs.h>
+#include "xfs.h"
+#include "xfs_fs.h"
+#include "xfs_macros.h"
+#include "xfs_inum.h"
+#include "xfs_log.h"
+#include "xfs_clnt.h"
+#include "xfs_trans.h"
+#include "xfs_sb.h"
+#include "xfs_ag.h"
+#include "xfs_dir.h"
+#include "xfs_dir2.h"
+#include "xfs_imap.h"
+#include "xfs_alloc.h"
+#include "xfs_dmapi.h"
+#include "xfs_mount.h"
+#include "xfs_quota.h"
 
 int
 vfs_mount(
@@ -87,6 +102,21 @@ vfs_unmount(
 		next = BHV_NEXT(next);
 	return ((*bhvtovfsops(next)->vfs_unmount)(next, fl, cr));
 }
+
+int
+vfs_mntupdate(
+	struct bhv_desc		*bdp,
+	int			*fl,
+	struct xfs_mount_args	*args)
+{
+	struct bhv_desc		*next = bdp;
+
+	ASSERT(next);
+	while (! (bhvtovfsops(next))->vfs_mntupdate)
+		next = BHV_NEXT(next);
+	return ((*bhvtovfsops(next)->vfs_mntupdate)(next, fl, args));
+}
+
 
 int
 vfs_root(

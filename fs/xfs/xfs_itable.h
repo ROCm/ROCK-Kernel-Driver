@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -30,7 +30,7 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 #ifndef __XFS_ITABLE_H__
-#define __XFS_ITABLE_H__
+#define	__XFS_ITABLE_H__
 
 /*
  * xfs_bulkstat() is used to fill in xfs_bstat structures as well as dm_stat
@@ -38,8 +38,8 @@
  * that will iget the inode and fill in the appropriate structure.
  * see xfs_bulkstat_one() and dm_bulkstat_one() in dmi_xfs.c
  */
-typedef int (*bulkstat_one_pf)(struct xfs_mount *mp,
-			       struct xfs_trans *tp,
+typedef int (*bulkstat_one_pf)(struct xfs_mount	*mp,
+			       struct xfs_trans	*tp,
 			       xfs_ino_t	ino,
 			       void		*buffer,
 			       xfs_daddr_t	bno,
@@ -48,15 +48,15 @@ typedef int (*bulkstat_one_pf)(struct xfs_mount *mp,
 /*
  * Values for stat return value.
  */
-#define BULKSTAT_RV_NOTHING	0
-#define BULKSTAT_RV_DIDONE	1
-#define BULKSTAT_RV_GIVEUP	2
+#define	BULKSTAT_RV_NOTHING	0
+#define	BULKSTAT_RV_DIDONE	1
+#define	BULKSTAT_RV_GIVEUP	2
 
 /*
  * Values for bulkstat flag argument.
  */
-#define BULKSTAT_FG_IGET	0x1	/* Go through the buffer cache */
-#define BULKSTAT_FG_QUICK	0x2	/* No iget, walk the dinode cluster */
+#define	BULKSTAT_FG_IGET	0x1	/* Go through the buffer cache */
+#define	BULKSTAT_FG_QUICK	0x2	/* No iget, walk the dinode cluster */
 #define BULKSTAT_FG_VFSLOCKED	0x4	/* Already have vfs lock */
 
 /*
@@ -96,7 +96,7 @@ xfs_inumbers(
 	xfs_mount_t		*mp,	/* mount point for filesystem */
 	xfs_trans_t		*tp,	/* transaction pointer */
 	xfs_ino_t		*last,	/* last inode returned */
-	int			*count, /* size of buffer/count returned */
+	int			*count,	/* size of buffer/count returned */
 	xfs_caddr_t		buffer);/* buffer with inode descriptions */
 
 #endif	/* __XFS_ITABLE_H__ */
