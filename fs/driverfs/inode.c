@@ -80,7 +80,6 @@ static int driverfs_prepare_write(struct file *file, struct page *page, unsigned
 		flush_dcache_page(page);
 		SetPageUptodate(page);
 	}
-	SetPageDirty(page);
 	return 0;
 }
 
@@ -89,6 +88,7 @@ static int driverfs_commit_write(struct file *file, struct page *page, unsigned 
 	struct inode *inode = page->mapping->host;
 	loff_t pos = ((loff_t)page->index << PAGE_CACHE_SHIFT) + to;
 
+	set_page_dirty(page);
 	kunmap(page);
 	if (pos > inode->i_size)
 		inode->i_size = pos;
@@ -707,6 +707,7 @@ void driverfs_remove_file(struct driver_dir_entry * dir, const char * name)
 		if (!strcmp(entry->name,name)) {
 			list_del_init(node);
 			vfs_unlink(entry->dentry->d_parent->d_inode,entry->dentry);
+			dput(entry->dentry);
 			put_mount();
 			break;
 		}
@@ -731,7 +732,6 @@ void driverfs_remove_dir(struct driver_dir_entry * dir)
 	if (!dentry)
 		goto done;
 
-	dget(dentry);
 	down(&dentry->d_parent->d_inode->i_sem);
 	down(&dentry->d_inode->i_sem);
 
@@ -742,6 +742,7 @@ void driverfs_remove_dir(struct driver_dir_entry * dir)
 
 		list_del_init(node);
 		vfs_unlink(dentry->d_inode,entry->dentry);
+		dput(entry->dentry);
 		put_mount();
 		node = dir->files.next;
 	}
