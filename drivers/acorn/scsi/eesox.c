@@ -499,15 +499,11 @@ int eesoxscsi_proc_info(char *buffer, char **start, off_t offset,
 			    int length, int host_no, int inout)
 {
 	int pos, begin;
-	struct Scsi_Host *host = scsi_hostlist;
+	struct Scsi_Host *host;
 	EESOXScsi_Info *info;
 	Scsi_Device *scd;
 
-	while (host) {
-		if (host->host_no == host_no)
-			break;
-		host = host->next;
-	}
+	host = scsi_host_hn_get(host_no);
 	if (!host)
 		return 0;
 

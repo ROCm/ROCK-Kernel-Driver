@@ -39,7 +39,7 @@ int platform_device_register(struct platform_device * pdev)
 void platform_device_unregister(struct platform_device * pdev)
 {
 	if (pdev)
-		put_device(&pdev->dev);
+		device_unregister(&pdev->dev);
 }
 	
 static int platform_match(struct device * dev, struct device_driver * drv)

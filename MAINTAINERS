@@ -1,3 +1,4 @@
+
 	List of maintainers and how to submit kernel changes
 
 Please try to follow the guidelines below.  This will make things
@@ -261,7 +262,6 @@ BFS FILE SYSTEM
 P:	Tigran A. Aivazian
 M:	tigran@veritas.com
 L:	linux-kernel@vger.kernel.org
-W:	http://www.ocston.org/~tigran/patches/bfs
 S:	Maintained
 
 BLOCK LAYER
@@ -654,8 +654,8 @@ W:	http://www.nyx.net/~arobinso
 S:	Maintained
 
 HFS FILESYSTEM
-P:	Adrian Sun
-M:	asun@cobaltnet.com
+P:	Oliver Neukum
+M:	oliver@neukum.org
 L:	linux-kernel@vger.kernel.org
 S:	Maintained
 

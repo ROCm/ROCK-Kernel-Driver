@@ -1563,12 +1563,15 @@ static void *do_smb_super_data_conv(void *raw_data)
 	struct smb_mount_data *s = (struct smb_mount_data *)raw_data;
 	struct smb_mount_data32 *s32 = (struct smb_mount_data32 *)raw_data;
 
+	if (s32->version != SMB_MOUNT_OLDVERSION)
+		goto out;
 	s->version = s32->version;
 	s->mounted_uid = low2highuid(s32->mounted_uid);
 	s->uid = low2highuid(s32->uid);
 	s->gid = low2highgid(s32->gid);
 	s->file_mode = s32->file_mode;
 	s->dir_mode = s32->dir_mode;
+out:
 	return raw_data;
 }
 

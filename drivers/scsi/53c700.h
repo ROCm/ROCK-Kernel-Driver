@@ -30,6 +30,11 @@
 /* Alter this with care: too many tags won't give the elevator a chance to
  * work; too few will cause the device to operate less efficiently */
 #define NCR_700_MAX_TAGS		16
+/* This is the default number of commands per LUN in the untagged case.
+ * two is a good value because it means we can have one command active and
+ * one command fully prepared and waiting
+ */
+#define NCR_700_CMD_PER_LUN		2
 /* magic byte identifying an internally generated REQUEST_SENSE command */
 #define NCR_700_INTERNAL_SENSE_MAGIC	0x42
 

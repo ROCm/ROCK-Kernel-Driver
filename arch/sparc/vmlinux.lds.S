@@ -38,12 +38,12 @@ SECTIONS
 
   . = ALIGN(4096);
   __init_begin = .;
-  .text.init : { *(.text.init) }
+  .init.text : { *(.init.text) }
   __init_text_end = .;
-  .data.init : { *(.data.init) }
+  .init.data : { *(.init.data) }
   . = ALIGN(16);
   __setup_start = .;
-  .setup_init : { *(.setup.init) }
+  .init.setup : { *(.init.setup) }
   __setup_end = .;
   __initcall_start = .;
   .initcall.init : {

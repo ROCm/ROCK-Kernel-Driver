@@ -17,6 +17,7 @@
 #include <asm/kgdb.h>
 #include <asm/contregs.h>
 #include <asm/ptrace.h>
+#include <asm/asm_offsets.h>
 #include <asm/psr.h>
 #include <asm/cprefix.h>
 #include <asm/vaddrs.h>

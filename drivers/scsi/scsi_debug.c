@@ -108,9 +108,13 @@ static int scsi_debug_dev_size_mb = DEF_DEV_SIZE_MB;
 #define SDEBUG_SENSE_LEN 32
 
 struct sdebug_dev_info {
-	Scsi_Device * sdp;
 	unsigned char sense_buff[SDEBUG_SENSE_LEN];	/* weak nexus */
+	unsigned int channel;
+	unsigned int target;
+	unsigned int lun;
+	struct Scsi_Host *host;
 	char reset;
+	char used;
 };
 static struct sdebug_dev_info * devInfop;
 
@@ -154,7 +158,7 @@ static int resp_write(Scsi_Cmnd * SCpnt, int upper_blk, int block, int num,
 static int resp_report_luns(unsigned char * cmd, unsigned char * buff,
 			    int bufflen, struct sdebug_dev_info * devip);
 static void timer_intr_handler(unsigned long);
-static struct sdebug_dev_info * devInfoReg(Scsi_Device * sdp);
+static struct sdebug_dev_info * devInfoReg(Scsi_Cmnd *scmd);
 static void mk_sense_buffer(struct sdebug_dev_info * devip, int key, 
 			    int asc, int asq, int inbandLen);
 static int check_reset(Scsi_Cmnd * SCpnt, struct sdebug_dev_info * devip);
@@ -222,7 +226,7 @@ int scsi_debug_queuecommand(Scsi_Cmnd * SCpnt, done_funct_t done)
 		return schedule_resp(SCpnt, NULL, done, 0, 0);
         }
 
-	if ((target > driver_template.this_id) || (SCpnt->lun != 0))
+	if (SCpnt->lun != 0)
 		return schedule_resp(SCpnt, NULL, done, 
 				     DID_NO_CONNECT << 16, 0);
 #if 0
@@ -230,14 +234,10 @@ int scsi_debug_queuecommand(Scsi_Cmnd * SCpnt, done_funct_t done)
 	       (int)SCpnt->device->host->host_no, (int)SCpnt->device->id,
 	       SCpnt->device, (int)*cmd);
 #endif
-	if (NULL == SCpnt->device->hostdata) {
-		devip = devInfoReg(SCpnt->device);
-		if (NULL == devip)
-			return schedule_resp(SCpnt, NULL, done, 
-					     DID_NO_CONNECT << 16, 0);
-		SCpnt->device->hostdata = devip;
-	}
-	devip = SCpnt->device->hostdata;
+	devip = devInfoReg(SCpnt);
+	if (NULL == devip)
+		return schedule_resp(SCpnt, NULL, done, 
+				     DID_NO_CONNECT << 16, 0);
 
         if ((SCSI_DEBUG_OPT_EVERY_NTH & scsi_debug_opts) &&
             (scsi_debug_every_nth > 0) &&
@@ -474,8 +474,8 @@ static int resp_inquiry(unsigned char * cmd, int target, unsigned char * buff,
 		int dev_id_num, len;
 		char dev_id_str[6];
 		
-		dev_id_num = ((devip->sdp->host->host_no + 1) * 1000) + 
-			      devip->sdp->id;
+		dev_id_num = ((devip->host->host_no + 1) * 1000) + 
+			      devip->target;
 		len = snprintf(dev_id_str, 6, "%d", dev_id_num);
 		len = (len > 6) ? 6 : len;
 		if (0 == cmd[2]) { /* supported vital product data pages */
@@ -870,21 +870,28 @@ static int scsi_debug_release(struct Scsi_Host * hpnt)
 	return 0;
 }
 
-static struct sdebug_dev_info * devInfoReg(Scsi_Device * sdp)
+static struct sdebug_dev_info * devInfoReg(Scsi_Cmnd *scmd)
 {
 	int k;
 	struct sdebug_dev_info * devip;
 
 	for (k = 0; k < scsi_debug_num_devs; ++k) {
 		devip = &devInfop[k];
-		if (devip->sdp == sdp)
+		if ((devip->channel == scmd->channel) &&
+		    (devip->target == scmd->target) &&
+		    (devip->lun == scmd->lun) &&
+		    (devip->host == scmd->host))
 			return devip;
 	}
 	for (k = 0; k < scsi_debug_num_devs; ++k) {
 		devip = &devInfop[k];
-		if (NULL == devip->sdp) {
-			devip->sdp = sdp;
+		if (!devip->used) {
+			devip->channel = scmd->channel;
+			devip->target = scmd->target;
+			devip->lun = scmd->lun;
+			devip->host = scmd->host;
 			devip->reset = 1;
+			devip->used = 1;
 			memset(devip->sense_buff, 0, SDEBUG_SENSE_LEN);
 			devip->sense_buff[0] = 0x70;
 			return devip;
@@ -934,19 +941,15 @@ static int scsi_debug_biosparam(Disk * disk, struct block_device * bdev,
 
 static int scsi_debug_device_reset(Scsi_Cmnd * SCpnt)
 {
-	Scsi_Device * sdp;
-	int k;
+	struct sdebug_dev_info * devip;
 
 	if (SCSI_DEBUG_OPT_NOISE & scsi_debug_opts)
 		printk(KERN_INFO "scsi_debug: device_reset\n");
 	++num_dev_resets;
-	if (SCpnt && ((sdp = SCpnt->device))) {
-		for (k = 0; k < scsi_debug_num_devs; ++k) {
-			if (sdp->hostdata == (devInfop + k))
-				break;
-		}
-		if (k < scsi_debug_num_devs)
-			devInfop[k].reset = 1;
+	if (SCpnt) {
+		devip = devInfoReg(SCpnt);
+		if (devip)
+			devip->reset = 1;
 	}
 	return SUCCESS;
 }
@@ -960,9 +963,9 @@ static int scsi_debug_bus_reset(Scsi_Cmnd * SCpnt)
 	if (SCSI_DEBUG_OPT_NOISE & scsi_debug_opts)
 		printk(KERN_INFO "scsi_debug: bus_reset\n");
 	++num_bus_resets;
-	if (SCpnt && ((sdp = SCpnt->device)) && ((hp = sdp->host))) {
+	if (SCpnt && ((sdp = SCpnt->device)) && ((hp = SCpnt->host))) {
 		for (k = 0; k < scsi_debug_num_devs; ++k) {
-			if (hp == devInfop[k].sdp->host)
+			if (hp == devInfop[k].host)
 				devInfop[k].reset = 1;
 		}
 	}

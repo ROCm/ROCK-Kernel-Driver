@@ -258,7 +258,8 @@ static void fdomain_config(dev_link_t *link)
 
     tail = &link->dev;
     info->ndev = 0;
-    for (host = scsi_hostlist; host; host = host->next)
+    for (host = scsi_host_get_next(NULL); host;
+	 host = scsi_host_get_next(host))
 	if (host->hostt == &driver_template)
 	    for (dev = host->host_queue; dev; dev = dev->next) {
 	    u_long arg[2], id;

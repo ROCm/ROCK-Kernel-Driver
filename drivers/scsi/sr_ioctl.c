@@ -200,8 +200,6 @@ static int test_unit_ready(Scsi_CD *cd)
 
 	memset(&cgc, 0, sizeof(struct cdrom_generic_command));
 	cgc.cmd[0] = GPCMD_TEST_UNIT_READY;
-	cgc.cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
-		     ((cd->device->lun) << 5) : 0;
 	cgc.quiet = 1;
 	cgc.data_direction = SCSI_DATA_NONE;
 	cgc.timeout = IOCTL_TIMEOUT;
@@ -215,8 +213,6 @@ int sr_tray_move(struct cdrom_device_info *cdi, int pos)
 
 	memset(&cgc, 0, sizeof(struct cdrom_generic_command));
 	cgc.cmd[0] = GPCMD_START_STOP_UNIT;
-	cgc.cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
-		     ((cd->device->lun) << 5) : 0;
 	cgc.cmd[4] = (pos == 0) ? 0x03 /* close */ : 0x02 /* eject */ ;
 	cgc.data_direction = SCSI_DATA_NONE;
 	cgc.timeout = IOCTL_TIMEOUT;
@@ -293,8 +289,6 @@ int sr_get_mcn(struct cdrom_device_info *cdi, struct cdrom_mcn *mcn)
 
 	memset(&cgc, 0, sizeof(struct cdrom_generic_command));
 	cgc.cmd[0] = GPCMD_READ_SUBCHANNEL;
-	cgc.cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
-		     ((cd->device->lun) << 5) : 0;
 	cgc.cmd[2] = 0x40;	/* I do want the subchannel info */
 	cgc.cmd[3] = 0x02;	/* Give me medium catalog number info */
 	cgc.cmd[8] = 24;
@@ -327,8 +321,6 @@ int sr_select_speed(struct cdrom_device_info *cdi, int speed)
 
 	memset(&cgc, 0, sizeof(struct cdrom_generic_command));
 	cgc.cmd[0] = GPCMD_SET_SPEED;	/* SET CD SPEED */
-	cgc.cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
-		     ((cd->device->lun) << 5) : 0;
 	cgc.cmd[2] = (speed >> 8) & 0xff;	/* MSB for speed (in kbytes/sec) */
 	cgc.cmd[3] = speed & 0xff;	/* LSB */
 	cgc.data_direction = SCSI_DATA_NONE;
@@ -361,8 +353,6 @@ int sr_audio_ioctl(struct cdrom_device_info *cdi, unsigned int cmd, void *arg)
 			struct cdrom_tochdr *tochdr = (struct cdrom_tochdr *) arg;
 
 			cgc.cmd[0] = GPCMD_READ_TOC_PMA_ATIP;
-			cgc.cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
-				     ((cd->device->lun) << 5) : 0;
 			cgc.cmd[8] = 12;		/* LSB of length */
 			cgc.buffer = buffer;
 			cgc.buflen = 12;
@@ -382,8 +372,6 @@ int sr_audio_ioctl(struct cdrom_device_info *cdi, unsigned int cmd, void *arg)
 			struct cdrom_tocentry *tocentry = (struct cdrom_tocentry *) arg;
 
 			cgc.cmd[0] = GPCMD_READ_TOC_PMA_ATIP;
-			cgc.cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
-				     ((cd->device->lun) << 5) : 0;
 			cgc.cmd[1] |= (tocentry->cdte_format == CDROM_MSF) ? 0x02 : 0;
 			cgc.cmd[6] = tocentry->cdte_track;
 			cgc.cmd[8] = 12;		/* LSB of length */
@@ -411,8 +399,6 @@ int sr_audio_ioctl(struct cdrom_device_info *cdi, unsigned int cmd, void *arg)
 		struct cdrom_ti* ti = (struct cdrom_ti*)arg;
 
 		cgc.cmd[0] = GPCMD_PLAYAUDIO_TI;
-		cgc.cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
-			     (cd->device->lun << 5) : 0;
 		cgc.cmd[4] = ti->cdti_trk0;
 		cgc.cmd[5] = ti->cdti_ind0;
 		cgc.cmd[7] = ti->cdti_trk1;
@@ -463,9 +449,7 @@ static int sr_read_cd(Scsi_CD *cd, unsigned char *dest, int lba, int format, int
 
 	memset(&cgc, 0, sizeof(struct cdrom_generic_command));
 	cgc.cmd[0] = GPCMD_READ_CD;	/* READ_CD */
-	cgc.cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
-		     (cd->device->lun << 5) : 0;
-	cgc.cmd[1] |= ((format & 7) << 2);
+	cgc.cmd[1] = ((format & 7) << 2);
 	cgc.cmd[2] = (unsigned char) (lba >> 24) & 0xff;
 	cgc.cmd[3] = (unsigned char) (lba >> 16) & 0xff;
 	cgc.cmd[4] = (unsigned char) (lba >> 8) & 0xff;
@@ -521,8 +505,6 @@ static int sr_read_sector(Scsi_CD *cd, int lba, int blksize, unsigned char *dest
 
 	memset(&cgc, 0, sizeof(struct cdrom_generic_command));
 	cgc.cmd[0] = GPCMD_READ_10;
-	cgc.cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
-		     (cd->device->lun << 5) : 0;
 	cgc.cmd[2] = (unsigned char) (lba >> 24) & 0xff;
 	cgc.cmd[3] = (unsigned char) (lba >> 16) & 0xff;
 	cgc.cmd[4] = (unsigned char) (lba >> 8) & 0xff;

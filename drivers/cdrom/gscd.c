@@ -70,7 +70,6 @@
 #include <asm/uaccess.h>
 
 #define MAJOR_NR GOLDSTAR_CDROM_MAJOR
-#define DEVICE_NR(device) (minor(device))
 #include <linux/blk.h>
 #define gscd_port gscd		/* for compatible parameter passing with "insmod" */
 #include "gscd.h"
@@ -86,7 +85,7 @@ MODULE_PARM(gscd, "h");
  *    static DECLARE_WAIT_QUEUE_HEAD(gscd_waitq);
  */
 
-static void gscd_read_cmd(void);
+static void gscd_read_cmd(struct request *req);
 static void gscd_hsg2msf(long hsg, struct msf *msf);
 static void gscd_bin2bcd(unsigned char *p);
 
@@ -97,7 +96,7 @@ static int gscd_ioctl(struct inode *, struct file *, unsigned int,
 		      unsigned long);
 static int gscd_open(struct inode *, struct file *);
 static int gscd_release(struct inode *, struct file *);
-static int check_gscd_med_chg(kdev_t);
+static int check_gscd_med_chg(struct gendisk *disk);
 
 /*      GoldStar Funktionen    */
 
@@ -151,35 +150,25 @@ static int AudioEnd_f;
 
 static struct timer_list gscd_timer;
 static spinlock_t gscd_lock = SPIN_LOCK_UNLOCKED;
+struct request_queue gscd_queue;
 
 static struct block_device_operations gscd_fops = {
-	.owner			= THIS_MODULE,
-	.open			= gscd_open,
-	.release		= gscd_release,
-	.ioctl			= gscd_ioctl,
-	.check_media_change	= check_gscd_med_chg,
+	.owner		= THIS_MODULE,
+	.open		= gscd_open,
+	.release	= gscd_release,
+	.ioctl		= gscd_ioctl,
+	.media_changed	= check_gscd_med_chg,
 };
 
 /* 
  * Checking if the media has been changed
  * (not yet implemented)
  */
-static int check_gscd_med_chg(kdev_t full_dev)
+static int check_gscd_med_chg(struct gendisk *disk)
 {
-	int target;
-
-
-	target = minor(full_dev);
-
-	if (target > 0) {
-		printk
-		    ("GSCD: GoldStar CD-ROM request error: invalid device.\n");
-		return 0;
-	}
 #ifdef GSCD_DEBUG
 	printk("gscd: check_med_change\n");
 #endif
-
 	return 0;
 }
 
@@ -240,16 +229,14 @@ static int gscd_ioctl(struct inode *ip, struct file *fp, unsigned int cmd,
  * When Linux gets variable block sizes this will probably go away.
  */
 
-static void gscd_transfer(void)
+static void gscd_transfer(struct request *req)
 {
-	long offs;
-
-	while (CURRENT->nr_sectors > 0 && gscd_bn == CURRENT->sector / 4) {
-		offs = (CURRENT->sector & 3) * 512;
-		memcpy(CURRENT->buffer, gscd_buf + offs, 512);
-		CURRENT->nr_sectors--;
-		CURRENT->sector++;
-		CURRENT->buffer += 512;
+	while (req->nr_sectors > 0 && gscd_bn == req->sector / 4) {
+		long offs = (req->sector & 3) * 512;
+		memcpy(req->buffer, gscd_buf + offs, 512);
+		req->nr_sectors--;
+		req->sector++;
+		req->buffer += 512;
 	}
 }
 
@@ -265,46 +252,40 @@ static void do_gscd_request(request_queue_t * q)
 
 static void __do_gscd_request(unsigned long dummy)
 {
-	unsigned int block, dev;
+	struct request *req;
+	unsigned int block;
 	unsigned int nsect;
 
-      repeat:
-	if (blk_queue_empty(QUEUE))
+repeat:
+	if (blk_queue_empty(&gscd_queue))
 		return;
 
-	dev = minor(CURRENT->rq_dev);
-	block = CURRENT->sector;
-	nsect = CURRENT->nr_sectors;
+	req = elv_next_request(&gscd_queue);
+	block = req->sector;
+	nsect = req->nr_sectors;
 
-	if (CURRENT->sector == -1)
+	if (req->sector == -1)
 		goto out;
 
-	if (CURRENT->cmd != READ) {
-		printk("GSCD: bad cmd %p\n", CURRENT->cmd);
-		end_request(CURRENT, 0);
+	if (req->cmd != READ) {
+		printk("GSCD: bad cmd %d\n", req->cmd);
+		end_request(req, 0);
 		goto repeat;
 	}
 
-	if (dev != 0) {
-		printk("GSCD: this version supports only one device\n");
-		end_request(CURRENT, 0);
-		goto repeat;
-	}
-
-	gscd_transfer();
+	gscd_transfer(req);
 
 	/* if we satisfied the request from the buffer, we're done. */
 
-	if (CURRENT->nr_sectors == 0) {
-		end_request(CURRENT, 1);
+	if (req->nr_sectors == 0) {
+		end_request(req, 1);
 		goto repeat;
 	}
 #ifdef GSCD_DEBUG
-	printk("GSCD: dev %d, block %d, nsect %d\n", dev, block, nsect);
+	printk("GSCD: block %d, nsect %d\n", block, nsect);
 #endif
-
-	gscd_read_cmd();
-      out:
+	gscd_read_cmd(req);
+out:
 	return;
 }
 
@@ -315,25 +296,23 @@ static void __do_gscd_request(unsigned long dummy)
  * read-data command.
  */
 
-static void gscd_read_cmd(void)
+static void gscd_read_cmd(struct request *req)
 {
 	long block;
 	struct gscd_Play_msf gscdcmd;
 	char cmd[] = { CMD_READ, 0x80, 0, 0, 0, 0, 1 };	/* cmd mode M-S-F secth sectl */
 
-
-
 	cmd_status();
 	if (disk_state & (ST_NO_DISK | ST_DOOR_OPEN)) {
 		printk("GSCD: no disk or door open\n");
-		end_request(CURRENT, 0);
+		end_request(req, 0);
 	} else {
 		if (disk_state & ST_INVALID) {
 			printk("GSCD: disk invalid\n");
-			end_request(CURRENT, 0);
+			end_request(req, 0);
 		} else {
 			gscd_bn = -1;	/* purge our buffer */
-			block = CURRENT->sector / 4;
+			block = req->sector / 4;
 			gscd_hsg2msf(block, &gscdcmd.start);	/* cvt to msf format */
 
 			cmd[2] = gscdcmd.start.min;
@@ -347,9 +326,9 @@ static void gscd_read_cmd(void)
 			cmd_out(TYPE_DATA, (char *) &cmd,
 				(char *) &gscd_buf[0], 1);
 
-			gscd_bn = CURRENT->sector / 4;
-			gscd_transfer();
-			end_request(CURRENT, 1);
+			gscd_bn = req->sector / 4;
+			gscd_transfer(req);
+			end_request(req, 1);
 		}
 	}
 	SET_TIMER(__do_gscd_request, 1);
@@ -911,7 +890,7 @@ static void __exit gscd_exit(void)
 		printk("What's that: can't unregister GoldStar-module\n");
 		return;
 	}
-	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+	blk_cleanup_queue(&gscd_queue);
 	release_region(gscd_port, GSCD_IO_EXTENT);
 	printk(KERN_INFO "GoldStar-module released.\n");
 }
@@ -989,11 +968,12 @@ static int __init gscd_init(void)
 	devfs_register(NULL, "gscd", DEVFS_FL_DEFAULT, MAJOR_NR, 0,
 		       S_IFBLK | S_IRUGO | S_IWUGO, &gscd_fops, NULL);
 
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_gscd_request, &gscd_lock);
+	blk_init_queue(&gscd_queue, do_gscd_request, &gscd_lock);
 
 	disk_state = 0;
 	gscdPresent = 1;
 
+	gscd_disk->queue = &gscd_queue;
 	add_disk(gscd_disk);
 
 	printk(KERN_INFO "GSCD: GoldStar CD-ROM Drive found.\n");

@@ -3010,14 +3010,12 @@ int acornscsi_proc_info(char *buffer, char **start, off_t offset,
 			int length, int host_no, int inout)
 {
     int pos, begin = 0, devidx;
-    struct Scsi_Host *instance = scsi_hostlist;
+    struct Scsi_Host *instance;
     Scsi_Device *scd;
     AS_Host *host;
     char *p = buffer;
 
-    for (instance = scsi_hostlist;
-	    instance && instance->host_no != host_no;
-		instance = instance->next);
+    instance = scsi_host_hn_get(host_no);
 
     if (inout == 1 || !instance)
 	return -EINVAL;
