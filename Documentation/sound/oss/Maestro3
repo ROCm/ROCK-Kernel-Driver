@@ -71,9 +71,17 @@ There are very few options to the driver.  One is 'debug' which will
 tell the driver to print minimal debugging information as it runs.  This
 can be collected with 'dmesg' or through the klogd daemon.
 
-The other is 'external_amp', which tells the driver to attempt to enable
+One is 'external_amp', which tells the driver to attempt to enable
 an external amplifier.  This defaults to '1', you can tell the driver
 not to bother enabling such an amplifier by setting it to '0'.
+
+And the last is 'gpio_pin', which tells the driver which GPIO pin number
+the external amp uses (0-15), The Allegro uses 8 by default, all others 1.
+If everything loads correctly and seems to be working but you get no sound, 
+try tweaking this value. 
+
+Systems known to need a different value
+        Panasonic ToughBook CF-72: gpio_pin=13 
 
 Power Management
 ----------------
