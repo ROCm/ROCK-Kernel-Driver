@@ -142,6 +142,6 @@ static void llc_station_ack_tmr_callback(unsigned long timeout_data)
 
 		ev->type = LLC_STATION_EV_TYPE_ACK_TMR;
 		ev->data.tmr.timer_specific = NULL;
-		llc_station_send_ev(station, skb);
+		llc_station_state_process(station, skb);
 	}
 }

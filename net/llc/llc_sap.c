@@ -63,14 +63,14 @@ void llc_sap_unassign_sock(struct llc_sap *sap, struct sock *sk)
 }
 
 /**
- *	llc_sap_send_ev - sends event to SAP state machine
+ *	llc_sap_state_process - sends event to SAP state machine
  *	@sap: pointer to SAP
  *	@skb: pointer to occurred event
  *
  *	After executing actions of the event, upper layer will be indicated
  *	if needed(on receiving an UI frame).
  */
-void llc_sap_send_ev(struct llc_sap *sap, struct sk_buff *skb)
+void llc_sap_state_process(struct llc_sap *sap, struct sk_buff *skb)
 {
 	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
 

@@ -1589,8 +1589,8 @@ u8 llc_circular_between(u8 a, u8 b, u8 c)
  *	This function is called from timer callback functions. When connection
  *	is busy (during sending a data frame) timer expiration event must be
  *	queued. Otherwise this event can be sent to connection state machine.
- *	Queued events will process by process_rxframes_events function after
- *	sending data frame. Returns 0 for success, 1 otherwise.
+ *	Queued events will process by llc_backlog_rcv function after sending
+ *	data frame.
  */
 static void llc_process_tmr_ev(struct sock *sk, struct sk_buff *skb)
 {
@@ -1602,7 +1602,7 @@ static void llc_process_tmr_ev(struct sock *sk, struct sk_buff *skb)
 		goto out;
 	}
 	if (!sk->lock.users)
-		llc_conn_send_ev(sk, skb);
+		llc_conn_state_process(sk, skb);
 	else {
 		llc_set_backlog_type(skb, LLC_EVENT);
 		sk_add_backlog(sk, skb);

@@ -13,8 +13,8 @@
  */
 /* Defines MAC-layer interface to LLC layer */
 extern int mac_send_pdu(struct sk_buff *skb);
-extern int mac_indicate(struct sk_buff *skb, struct net_device *dev,
-			struct packet_type *pt);
+extern int llc_rcv(struct sk_buff *skb, struct net_device *dev,
+		   struct packet_type *pt);
 extern struct net_device *mac_dev_peer(struct net_device *current_dev,
 				       int type, u8 *mac);
 extern int llc_pdu_router(struct llc_sap *sap, struct sock *sk,

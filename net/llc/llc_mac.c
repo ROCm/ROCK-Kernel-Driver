@@ -67,7 +67,7 @@ out:
 }
 
 /**
- *	mac_indicate - 802.2 entry point from net lower layers
+ *	llc_rcv - 802.2 entry point from net lower layers
  *	@skb: received pdu
  *	@dev: device that receive pdu
  *	@pt: packet type
@@ -78,7 +78,7 @@ out:
  *	related to a busy connection (a connection is sending data now),
  *	function queues this frame in connection's backlog.
  */
-int mac_indicate(struct sk_buff *skb, struct net_device *dev,
+int llc_rcv(struct sk_buff *skb, struct net_device *dev,
 		 struct packet_type *pt)
 {
 	struct llc_sap *sap;
@@ -119,11 +119,14 @@ int mac_indicate(struct sk_buff *skb, struct net_device *dev,
 		llc_pdu_decode_da(skb, daddr.mac);
 		llc_pdu_decode_dsap(skb, &daddr.lsap);
 
-		sk = llc_find_sock(sap, &saddr, &daddr);
-		if (!sk) { /* didn't find an active connection; allocate a
-			    * connection to use; associate it with this SAP
-			    */
-			sk = llc_sock_alloc();
+		sk = llc_lookup_established(sap, &saddr, &daddr);
+		if (!sk) {
+			/*
+			 * FIXME: here we'll pass the sk->family of the
+			 * listening socket, if found, when
+			 * llc_lookup_listener is added in the next patches.
+			 */
+			sk = llc_sock_alloc(PF_LLC);
 			if (!sk)
 				goto drop;
 			memcpy(&llc_sk(sk)->daddr, &saddr, sizeof(saddr));
@@ -131,21 +134,10 @@ int mac_indicate(struct sk_buff *skb, struct net_device *dev,
 			sock_hold(sk);
 		}
 		bh_lock_sock(sk);
-		if (!sk->lock.users) {
-			/* FIXME: Check this on SMP as it is now calling
-			 * llc_pdu_router _with_ the lock held.
-			 * Old comment:
-			 * With the current code one can't call
-			 * llc_pdu_router with the socket lock held, cause
-			 * it'll route the pdu to the upper layers and it can
-			 * reenter llc and in llc_req_prim will try to grab
-			 * the same lock, maybe we should use spin_trylock_bh
-			 * in the llc_req_prim (llc_data_req_handler, etc) and
-			 * add the request to the backlog, well see...
-			 */
+		if (!sk->lock.users)
 			rc = llc_pdu_router(llc_sk(sk)->sap, sk, skb,
 					    LLC_TYPE_2);
-		} else {
+		else {
 			dprintk("%s: add to backlog\n", __FUNCTION__);
 			llc_set_backlog_type(skb, LLC_PACKET);
 			sk_add_backlog(sk, skb);
@@ -203,7 +195,7 @@ static void fix_up_incoming_skb(struct sk_buff *skb)
  *	is NULL then data unit destined for station else frame destined for SAP
  *	or connection; finds a matching open SAP, if one, forwards the packet
  *	to it; if no matching SAP, drops the packet. Returns 0 or the return of
- *	llc_conn_send_ev (that may well result in the connection being
+ *	llc_conn_state_process (that may well result in the connection being
  *	destroyed)
  */
 int llc_pdu_router(struct llc_sap *sap, struct sock* sk,
@@ -218,13 +210,13 @@ int llc_pdu_router(struct llc_sap *sap, struct sock* sk,
 
 		ev->type	    = LLC_STATION_EV_TYPE_PDU;
 		ev->data.pdu.reason = 0;
-		llc_station_send_ev(station, skb);
+		llc_station_state_process(station, skb);
 	} else if (type == LLC_TYPE_1) {
 		struct llc_sap_state_ev *ev = llc_sap_ev(skb);
 
 		ev->type	    = LLC_SAP_EV_TYPE_PDU;
 		ev->data.pdu.reason = 0;
-		llc_sap_send_ev(sap, skb);
+		llc_sap_state_process(sap, skb);
 	} else if (type == LLC_TYPE_2) {
 		struct llc_conn_state_ev *ev = llc_conn_ev(skb);
 		struct llc_opt *llc = llc_sk(sk);
@@ -234,7 +226,7 @@ int llc_pdu_router(struct llc_sap *sap, struct sock* sk,
 
 		ev->type	    = LLC_CONN_EV_TYPE_PDU;
 		ev->data.pdu.reason = 0;
-		rc = llc_conn_send_ev(sk, skb);
+		rc = llc_conn_state_process(sk, skb);
 	} else
 		rc = -EINVAL;
 	return rc;

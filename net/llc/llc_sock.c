@@ -63,7 +63,7 @@ static int llc_ui_wait_for_disc(struct sock *sk, int seconds);
  *
  *	Return the next unused link number for a given sap.
  */
-static inline u16 llc_ui_next_link_no(int sap)
+static __inline__ u16 llc_ui_next_link_no(int sap)
 {
 	return llc_ui_sap_link_no_max[sap]++;
 }
@@ -77,7 +77,7 @@ static inline u16 llc_ui_next_link_no(int sap)
  *	is not a complete match up to len, 1 if a complete match up to len is
  *	found.
  */
-static inline u8 llc_ui_mac_match(u8 *mac1, u8 *mac2)
+static __inline__ u8 llc_ui_mac_match(u8 *mac1, u8 *mac2)
 {
 	return !memcmp(mac1, mac2, IFHWADDRLEN);
 }
@@ -89,7 +89,7 @@ static inline u8 llc_ui_mac_match(u8 *mac1, u8 *mac2)
  *	Determines if a given address is a null mac address.  Returns 0 if the
  *	address is not a null mac, 1 if the address is a null mac.
  */
-static inline u8 llc_ui_mac_null(u8 *mac)
+static __inline__ u8 llc_ui_mac_null(u8 *mac)
 {
 	return !memcmp(mac, llc_ui_addrany, IFHWADDRLEN);
 }
@@ -98,7 +98,7 @@ static inline u8 llc_ui_mac_null(u8 *mac)
  *	llc_ui_addr_null - determines if a address structure is null
  *	@addr: Address to test if null.
  */
-static inline u8 llc_ui_addr_null(struct sockaddr_llc *addr)
+static __inline__ u8 llc_ui_addr_null(struct sockaddr_llc *addr)
 {
 	return !memcmp(addr, &llc_ui_addrnull, sizeof(*addr));
 }
@@ -111,7 +111,7 @@ static inline u8 llc_ui_addr_null(struct sockaddr_llc *addr)
  *	Returns  0 if ARP header type not supported or the corresponding
  *	ethernet protocol type.
  */
-static inline u16 llc_ui_protocol_type(u16 arphrd)
+static __inline__ u16 llc_ui_protocol_type(u16 arphrd)
 {
 	u16 rc = htons(ETH_P_802_2);
 
@@ -129,7 +129,8 @@ static inline u16 llc_ui_protocol_type(u16 arphrd)
  *	operation the user would like to perform and the type of socket.
  *	Returns the correct llc header length.
  */
-static inline u8 llc_ui_header_len(struct sock *sk, struct sockaddr_llc *addr)
+static __inline__ u8 llc_ui_header_len(struct sock *sk,
+				       struct sockaddr_llc *addr)
 {
 	u8 rc = LLC_PDU_LEN_U;
 
@@ -280,7 +281,7 @@ static int llc_ui_send_llc1(struct llc_sap *sap, struct sk_buff *skb,
  *	structure which matches the sap number the user specified.
  *	Returns llc_sap upon match, %NULL otherwise.
  */
-static inline struct llc_sap *llc_ui_find_sap(u8 sap)
+static __inline__ struct llc_sap *llc_ui_find_sap(u8 sap)
 {
 	struct sock *sk;
 	struct llc_sap *s = NULL;
@@ -399,7 +400,7 @@ static struct sock *llc_ui_bh_find_sk_by_addr(struct llc_addr *addr,
  *
  *	Insert a socket into the local llc socket list.
  */
-static inline void llc_ui_insert_socket(struct sock *sk)
+static __inline__ void llc_ui_insert_socket(struct sock *sk)
 {
 	write_lock_bh(&llc_ui_sockets_lock);
 	sk->next = llc_ui_sockets;
@@ -417,7 +418,7 @@ static inline void llc_ui_insert_socket(struct sock *sk)
  *
  *	Remove a socket from the local llc socket list.
  */
-static inline void llc_ui_remove_socket(struct sock *sk)
+static __inline__ void llc_ui_remove_socket(struct sock *sk)
 {
 	write_lock_bh(&llc_ui_sockets_lock);
 	if (sk->pprev) {

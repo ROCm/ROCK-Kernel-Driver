@@ -136,7 +136,7 @@ struct llc_sap *llc_sap_find(u8 sap_value)
  *
  *	This function processes frames that has received and timers that has
  *	expired during sending an I pdu (refer to data_req_handler).  frames
- *	queue by mac_indicate function (llc_mac.c) and timers queue by timer
+ *	queue by llc_rcv function (llc_mac.c) and timers queue by timer
  *	callback functions(llc_c_ac.c).
  */
 static int llc_backlog_rcv(struct sock *sk, struct sk_buff *skb)
@@ -152,7 +152,7 @@ static int llc_backlog_rcv(struct sock *sk, struct sk_buff *skb)
 	} else if (llc_backlog_type(skb) == LLC_EVENT) {
 		/* timer expiration event */
 		if (llc->state > 1)  /* not closed */
-			rc = llc_conn_send_ev(sk, skb);
+			rc = llc_conn_state_process(sk, skb);
 		else
 			llc_conn_free_ev(skb);
 		kfree_skb(skb);
@@ -199,13 +199,14 @@ out:
 
 /**
  *	__llc_sock_alloc - Allocates LLC sock
+ *	@family: upper layer protocol family
  *
  *	Allocates a LLC sock and initializes it. Returns the new LLC sock
  *	or %NULL if there's no memory available for one
  */
-struct sock *__llc_sock_alloc(void)
+struct sock *__llc_sock_alloc(int family)
 {
-	struct sock *sk = sk_alloc(PF_LLC, GFP_ATOMIC, 1, NULL);
+	struct sock *sk = sk_alloc(family, GFP_ATOMIC, 1, NULL);
 
 	if (!sk)
 		goto out;
@@ -319,14 +320,14 @@ struct llc_station *llc_station_get(void)
 }
 
 /**
- *	llc_station_send_ev: queue event and try to process queue.
+ *	llc_station_state_process: queue event and try to process queue.
  *	@station: Address of the station
  *	@skb: Address of the event
  *
  *	Queues an event (on the station event queue) for handling by the
  *	station state machine and attempts to process any queued-up events.
  */
-void llc_station_send_ev(struct llc_station *station, struct sk_buff *skb)
+void llc_station_state_process(struct llc_station *station, struct sk_buff *skb)
 {
 	spin_lock_bh(&station->ev_q.lock);
 	skb_queue_tail(&station->ev_q.list, skb);
@@ -556,13 +557,13 @@ unlock:
 
 static struct packet_type llc_packet_type = {
 	.type = __constant_htons(ETH_P_802_2),
-	.func = mac_indicate,
+	.func = llc_rcv,
 	.data = (void *)1,
 };
 
 static struct packet_type llc_tr_packet_type = {
 	.type = __constant_htons(ETH_P_TR_802_2),
-	.func = mac_indicate,
+	.func = llc_rcv,
 	.data = (void *)1,
 };
 

@@ -70,7 +70,7 @@ static llc_prim_call_t llc_resp_prim[LLC_NBR_PRIMITIVES] = {
  *	@lsap: SAP number.
  *	@sap: pointer to allocated SAP (output argument).
  *
- *	Interface function to upper layer. each one who wants to get a SAP
+ *	Interface function to upper layer. Each one who wants to get a SAP
  *	(for example NetBEUI) should call this function. Returns the opened
  *	SAP for success, NULL for failure.
  */
@@ -110,7 +110,7 @@ err:
  *	llc_sap_close - close interface for upper layers.
  *	@sap: SAP to be closed.
  *
- *	Close interface function to upper layer. each one who wants to
+ *	Close interface function to upper layer. Each one who wants to
  *	close an open SAP (for example NetBEUI) should call this function.
  */
 void llc_sap_close(struct llc_sap *sap)
@@ -123,9 +123,9 @@ void llc_sap_close(struct llc_sap *sap)
  *	llc_sap_req - Request interface for upper layers
  *	@prim: pointer to structure that contains service parameters.
  *
- *	Request interface function to upper layer. each one who wants to
- *	request a service from LLC, must call this function. details of
- *	requested service is defined in input argument(prim).  Returns 0 for
+ *	Request interface function to upper layer. Each one who wants to
+ *	request a service from LLC, must call this function. Details of
+ *	requested service is defined in input argument(prim). Returns 0 for
  *	success, 1 otherwise.
  */
 static int llc_sap_req(struct llc_prim_if_block *prim)
@@ -174,7 +174,7 @@ static int llc_unitdata_req_handler(struct llc_prim_if_block *prim)
 	ev->data.prim.type = LLC_PRIM_TYPE_REQ;
 	ev->data.prim.data = prim;
 	rc = 0;
-	llc_sap_send_ev(sap, prim->data->udata.skb);
+	llc_sap_state_process(sap, prim->data->udata.skb);
 out:
 	return rc;
 }
@@ -200,7 +200,7 @@ static int llc_test_req_handler(struct llc_prim_if_block *prim)
 	ev->data.prim.type = LLC_PRIM_TYPE_REQ;
 	ev->data.prim.data = prim;
 	rc = 0;
-	llc_sap_send_ev(sap, prim->data->udata.skb);
+	llc_sap_state_process(sap, prim->data->udata.skb);
 out:
 	return rc;
 }
@@ -227,7 +227,7 @@ static int llc_xid_req_handler(struct llc_prim_if_block *prim)
 	ev->data.prim.type = LLC_PRIM_TYPE_REQ;
 	ev->data.prim.data = prim;
 	rc = 0;
-	llc_sap_send_ev(sap, prim->data->udata.skb);
+	llc_sap_state_process(sap, prim->data->udata.skb);
 out:
 	return rc;
 }
@@ -237,10 +237,10 @@ out:
  *	@prim: pointer to structure that contains service parameters
  *
  *	This function is called when upper layer wants to send data using
- *	connection oriented communication mode. during sending data, connection
+ *	connection oriented communication mode. During sending data, connection
  *	will be locked and received frames and expired timers will be queued.
  *	Returns 0 for success, -ECONNABORTED when the connection already
- *	closed. and -EBUSY when sending data is not permitted in this state or
+ *	closed and -EBUSY when sending data is not permitted in this state or
  *	LLC has send an I pdu with p bit set to 1 and is waiting for it's
  *	response.
  */
@@ -273,7 +273,7 @@ static int llc_data_req_handler(struct llc_prim_if_block *prim)
 	ev->data.prim.type	  = LLC_PRIM_TYPE_REQ;
 	ev->data.prim.data	  = prim;
 	prim->data->data.skb->dev = llc->dev;
-	rc = llc_conn_send_ev(sk, prim->data->data.skb);
+	rc = llc_conn_state_process(sk, prim->data->data.skb);
 out:
 	release_sock(sk);
 	return rc;
@@ -297,8 +297,8 @@ static void llc_confirm_impossible(struct llc_prim_if_block *prim)
  *	@prim: pointer to structure that contains service parameters.
  *
  *	Upper layer calls this to establish an LLC connection with a remote
- *	machine. this function packages a proper event and sends it connection
- *	component state machine.  Success or failure of connection
+ *	machine. This function packages a proper event and sends it connection
+ *	component state machine. Success or failure of connection
  *	establishment will inform to upper layer via calling it's confirm
  *	function and passing proper information.
  */
@@ -323,18 +323,22 @@ static int llc_conn_req_handler(struct llc_prim_if_block *prim)
 	laddr.lsap = prim->data->conn.saddr.lsap;
 	memcpy(daddr.mac, prim->data->conn.daddr.mac, sizeof(daddr.mac));
 	daddr.lsap = prim->data->conn.daddr.lsap;
-	sk = llc_find_sock(sap, &daddr, &laddr);
+	sk = llc_lookup_established(sap, &daddr, &laddr);
 	if (sk) {
 		llc_confirm_impossible(prim);
 		goto out_put;
 	}
-	rc = -ENOMEM; 
+	rc = -ENOMEM;
 	if (prim->data->conn.sk) {
 		sk = prim->data->conn.sk;
 		if (llc_sock_init(sk))
 			goto out;
 	} else {
-		sk = llc_sock_alloc();
+		/*
+		 * FIXME: this one will die as soon as core and
+		 * llc_sock starts sharing a struct sock.
+		 */
+		sk = llc_sock_alloc(PF_LLC);
 		if (!sk) {
 			llc_confirm_impossible(prim);
 			goto out;
@@ -359,7 +363,7 @@ static int llc_conn_req_handler(struct llc_prim_if_block *prim)
 		ev->data.prim.prim = LLC_CONN_PRIM;
 		ev->data.prim.type = LLC_PRIM_TYPE_REQ;
 		ev->data.prim.data = prim;
-		rc = llc_conn_send_ev(sk, skb);
+		rc = llc_conn_state_process(sk, skb);
 	}
 	if (rc) {
 		llc_sap_unassign_sock(sap, sk);
@@ -378,7 +382,7 @@ out:
  *	@prim: pointer to structure that contains service parameters.
  *
  *	Upper layer calls this when it wants to close an established LLC
- *	connection with a remote machine. this function packages a proper event
+ *	connection with a remote machine. This function packages a proper event
  *	and sends it to connection component state machine. Returns 0 for
  *	success, 1 otherwise.
  */
@@ -406,7 +410,7 @@ static int llc_disc_req_handler(struct llc_prim_if_block *prim)
 	ev->data.prim.prim = LLC_DISC_PRIM;
 	ev->data.prim.type = LLC_PRIM_TYPE_REQ;
 	ev->data.prim.data = prim;
-	rc = llc_conn_send_ev(sk, skb);
+	rc = llc_conn_state_process(sk, skb);
 out:
 	release_sock(sk);
 	sock_put(sk);
@@ -418,7 +422,7 @@ out:
  *	@prim: pointer to structure that contains service parameters.
  *
  *	Called when upper layer wants to reset an established LLC connection
- *	with a remote machine. this function packages a proper event and sends
+ *	with a remote machine. This function packages a proper event and sends
  *	it to connection component state machine. Returns 0 for success, 1
  *	otherwise.
  */
@@ -437,7 +441,7 @@ static int llc_rst_req_handler(struct llc_prim_if_block *prim)
 		ev->data.prim.prim = LLC_RESET_PRIM;
 		ev->data.prim.type = LLC_PRIM_TYPE_REQ;
 		ev->data.prim.data = prim;
-		rc = llc_conn_send_ev(sk, skb);
+		rc = llc_conn_state_process(sk, skb);
 	}
 	release_sock(sk);
 	return rc;
@@ -455,7 +459,7 @@ static int llc_flowcontrol_req_handler(struct llc_prim_if_block *prim)
  *	llc_sap_resp - Sends response to peer
  *	@prim: pointer to structure that contains service parameters
  *
- *	This function is a interface function to upper layer. each one who
+ *	This function is a interface function to upper layer. Each one who
  *	wants to response to an indicate can call this function via calling
  *	sap_resp with proper service parameters. Returns 0 for success, 1
  *	otherwise.
@@ -509,7 +513,7 @@ static int llc_rst_rsp_handler(struct llc_prim_if_block *prim)
 		ev->data.prim.prim = LLC_RESET_PRIM;
 		ev->data.prim.type = LLC_PRIM_TYPE_RESP;
 		ev->data.prim.data = prim;
-		rc = llc_conn_send_ev(sk, skb);
+		rc = llc_conn_state_process(sk, skb);
 	}
 	return rc;
 }

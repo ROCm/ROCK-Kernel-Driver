@@ -80,7 +80,7 @@ struct llc_opt {
 
 struct llc_conn_state_ev;
 
-extern struct sock *__llc_sock_alloc(void);
+extern struct sock *__llc_sock_alloc(int family);
 extern void __llc_sock_free(struct sock *sk, u8 free);
 
 #ifdef DEBUG_LLC_CONN_ALLOC
@@ -88,8 +88,8 @@ extern void __llc_sock_free(struct sock *sk, u8 free);
 				__builtin_return_address(0),		\
 				__builtin_return_address(1),		\
 				__builtin_return_address(2));
-#define llc_sock_alloc()	({					\
-	struct sock *__sk = __llc_sock_alloc();				\
+#define llc_sock_alloc(family)	({					\
+	struct sock *__sk = __llc_sock_alloc(family);			\
 	if (__sk) {							\
 		llc_sk(__sk)->f_alloc = __FUNCTION__;			\
 		llc_sk(__sk)->l_alloc = __LINE__;			\
@@ -126,7 +126,7 @@ extern void __llc_sock_free(struct sock *sk, u8 free);
 	return __ret; }							\
 }
 #else /* DEBUG_LLC_CONN_ALLOC */
-#define llc_sock_alloc() __llc_sock_alloc()
+#define llc_sock_alloc(family) __llc_sock_alloc(family)
 #define llc_sock_free(__sk) __llc_sock_free(__sk, 1)
 #define llc_sock_assert(__sk)
 #define llc_sock_assert_ret(__sk)
@@ -136,7 +136,7 @@ extern void llc_sock_reset(struct sock *sk);
 extern int llc_sock_init(struct sock *sk);
 
 /* Access to a connection */
-extern int llc_conn_send_ev(struct sock *sk, struct sk_buff *skb);
+extern int llc_conn_state_process(struct sock *sk, struct sk_buff *skb);
 extern void llc_conn_send_pdu(struct sock *sk, struct sk_buff *skb);
 extern void llc_conn_rtn_pdu(struct sock *sk, struct sk_buff *skb);
 extern void llc_conn_free_ev(struct sk_buff *skb);
@@ -146,8 +146,9 @@ extern void llc_conn_resend_i_pdu_as_rsp(struct sock *sk, u8 nr,
 					 u8 first_f_bit);
 extern int llc_conn_remove_acked_pdus(struct sock *conn, u8 nr,
 				      u16 *how_many_unacked);
-extern struct sock *llc_find_sock(struct llc_sap *sap, struct llc_addr *daddr,
-				  struct llc_addr *laddr);
+extern struct sock *llc_lookup_established(struct llc_sap *sap,
+					   struct llc_addr *daddr,
+					   struct llc_addr *laddr);
 extern u8 llc_data_accept_state(u8 state);
 extern void llc_build_offset_table(void);
 #endif /* LLC_CONN_H */

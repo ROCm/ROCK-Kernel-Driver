@@ -39,7 +39,7 @@ static struct llc_conn_state_trans *llc_qualify_conn_ev(struct sock *sk,
 static int llc_offset_table[NBR_CONN_STATES][NBR_CONN_EV];
 
 /**
- *	llc_conn_send_event - sends event to connection state machine
+ *	llc_conn_state_process - sends event to connection state machine
  *	@sk: connection
  *	@skb: occurred event
  *
@@ -48,7 +48,7 @@ static int llc_offset_table[NBR_CONN_STATES][NBR_CONN_EV];
  *	indicated or confirmed, if needed. Returns 0 for success, 1 for
  *	failure. The socket lock has to be held before calling this function.
  */
-int llc_conn_send_ev(struct sock *sk, struct sk_buff *skb)
+int llc_conn_state_process(struct sock *sk, struct sk_buff *skb)
 {
 	/* sending event to state machine */
 	int rc = llc_conn_service(sk, skb);
@@ -109,7 +109,7 @@ void llc_conn_send_pdu(struct sock *sk, struct sk_buff *skb)
  *
  *	Sends received data pdu to upper layer (by using indicate function).
  *	Prepares service parameters (prim and prim_data). calling indication
- *	function will be done in llc_conn_send_ev.
+ *	function will be done in llc_conn_state_process.
  */
 void llc_conn_rtn_pdu(struct sock *sk, struct sk_buff *skb)
 {
@@ -127,7 +127,10 @@ void llc_conn_rtn_pdu(struct sock *sk, struct sk_buff *skb)
 	prim->prim	     = LLC_DATA_PRIM;
 	prim->sap	     = sap;
 	ev->flag	     = 1;
-	/* saving prepd prim in event for future use in llc_conn_send_ev */
+	/*
+	 * Saving prepd prim in event for future use in
+	 * llc_conn_state_process
+	 */
 	ev->ind_prim	     = prim;
 }
 
@@ -396,7 +399,7 @@ static int llc_exec_conn_trans_actions(struct sock *sk,
 }
 
 /**
- *	llc_find_sock - Finds connection in sap for the remote/local sap/mac
+ *	llc_lookup_established - Finds connection for the remote/local sap/mac
  *	@sap: SAP
  *	@daddr: address of remote LLC (MAC + SAP)
  *	@laddr: address of local LLC (MAC + SAP)
@@ -405,8 +408,8 @@ static int llc_exec_conn_trans_actions(struct sock *sk,
  *	mac, remote sap, local mac, and local sap. Returns pointer for
  *	connection found, %NULL otherwise.
  */
-struct sock *llc_find_sock(struct llc_sap *sap, struct llc_addr *daddr,
-			   struct llc_addr *laddr)
+struct sock *llc_lookup_established(struct llc_sap *sap, struct llc_addr *daddr,
+				    struct llc_addr *laddr)
 {
 	struct sock *rc = NULL;
 	struct list_head *entry;
