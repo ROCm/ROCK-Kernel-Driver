@@ -1,5 +1,5 @@
 /* 
- * arch/ppc/kernel/xics.h
+ * arch/ppc64/kernel/xics.h
  *
  * Copyright 2000 IBM Corporation.
  *
@@ -9,14 +9,10 @@
  *  2 of the License, or (at your option) any later version.
  */
 
-#ifndef _PPC_KERNEL_XICS_H
-#define _PPC_KERNEL_XICS_H
-
-extern struct hw_interrupt_type xics_pic;
-extern struct hw_interrupt_type xics_8259_pic;
+#ifndef _PPC64_KERNEL_XICS_H
+#define _PPC64_KERNEL_XICS_H
 
 void xics_init_IRQ(void);
 int xics_get_irq(struct pt_regs *);
-void xics_isa_init(void);
 
-#endif /* _PPC_KERNEL_XICS_H */
+#endif /* _PPC64_KERNEL_XICS_H */

@@ -258,6 +258,7 @@ static int rtc_read_proc(char *page, char **start, off_t off,
         return len;
 }
 
+#ifdef CONFIG_PPC_ISERIES
 /*
  * Get the RTC from the virtual service processor
  * This requires flowing LpEvents to the primary partition
@@ -269,60 +270,6 @@ void iSeries_get_rtc_time(struct rtc_time *rtc_tm)
 
 	mf_getRtc(rtc_tm);
 	rtc_tm->tm_mon--;
-}
-
-
-void pSeries_get_rtc_time(struct rtc_time *rtc_tm)
-{
-        unsigned long ret[8];
-        int error;
-	int count;
-
-	/*
-	 * error -2 is clock busy, we keep retrying a few times to see
-	 * if it will come good  -- paulus
-	 */
-	count = 0;
-	do {
-		error = rtas_call(rtas_token("get-time-of-day"), 0, 8, (void *)&ret);
-	} while (error == -2 && ++count < 1000);
-
-        if (error != 0) {
-                printk(KERN_WARNING "error: reading the clock failed (%d)\n",
-		       error);
-		return;
-        }
-
-	rtc_tm->tm_sec = ret[5];
-	rtc_tm->tm_min = ret[4];
-	rtc_tm->tm_hour = ret[3];
-	rtc_tm->tm_mday = ret[2];
-	rtc_tm->tm_mon = ret[1] - 1;
-	rtc_tm->tm_year = ret[0] - 1900;
-}
-
-int pSeries_set_rtc_time(struct rtc_time *tm)
-{
-        int error;
-	int count;
-
-	/*
-	 * error -2 is clock busy, we keep retrying a few times to see
-	 * if it will come good  -- paulus
-	 */
-	count = 0;
-	do {
-	        error = rtas_call(rtas_token("set-time-of-day"), 7, 1, NULL,
-				  tm->tm_year + 1900, tm->tm_mon + 1, 
-				  tm->tm_mday, tm->tm_hour, tm->tm_min, 
-				  tm->tm_sec, 0);
-	} while (error == -2 && ++count < 1000);
-
-        if (error != 0)
-                printk(KERN_WARNING "error: setting the clock failed (%d)\n",
-		       error); 
-
-        return 0;
 }
 
 /*
@@ -380,3 +327,59 @@ void iSeries_get_boot_time(struct rtc_time *tm)
 	tm->tm_year -= 1900;
 	tm->tm_mon  -= 1;
 }
+#endif
+
+#ifdef CONFIG_PPC_PSERIES
+void pSeries_get_rtc_time(struct rtc_time *rtc_tm)
+{
+        unsigned long ret[8];
+        int error;
+	int count;
+
+	/*
+	 * error -2 is clock busy, we keep retrying a few times to see
+	 * if it will come good  -- paulus
+	 */
+	count = 0;
+	do {
+		error = rtas_call(rtas_token("get-time-of-day"), 0, 8, (void *)&ret);
+	} while (error == -2 && ++count < 1000);
+
+        if (error != 0) {
+                printk(KERN_WARNING "error: reading the clock failed (%d)\n",
+		       error);
+		return;
+        }
+
+	rtc_tm->tm_sec = ret[5];
+	rtc_tm->tm_min = ret[4];
+	rtc_tm->tm_hour = ret[3];
+	rtc_tm->tm_mday = ret[2];
+	rtc_tm->tm_mon = ret[1] - 1;
+	rtc_tm->tm_year = ret[0] - 1900;
+}
+
+int pSeries_set_rtc_time(struct rtc_time *tm)
+{
+        int error;
+	int count;
+
+	/*
+	 * error -2 is clock busy, we keep retrying a few times to see
+	 * if it will come good  -- paulus
+	 */
+	count = 0;
+	do {
+	        error = rtas_call(rtas_token("set-time-of-day"), 7, 1, NULL,
+				  tm->tm_year + 1900, tm->tm_mon + 1, 
+				  tm->tm_mday, tm->tm_hour, tm->tm_min, 
+				  tm->tm_sec, 0);
+	} while (error == -2 && ++count < 1000);
+
+        if (error != 0)
+                printk(KERN_WARNING "error: setting the clock failed (%d)\n",
+		       error); 
+
+        return 0;
+}
+#endif

@@ -13,61 +13,47 @@
 # Adjusted for PPC64 by Tom Gall
 #
 
-KERNELLOAD	=0xc000000000000000
+KERNELLOAD	= 0xc000000000000000
 
 LDFLAGS		:= -m elf64ppc
-LDFLAGS_vmlinux	= -Bstatic \
-		-e $(KERNELLOAD) -Ttext $(KERNELLOAD)
+LDFLAGS_vmlinux	= -Bstatic -e $(KERNELLOAD) -Ttext $(KERNELLOAD)
 LDFLAGS_BLOB	:= --format binary --oformat elf64-powerpc
-CFLAGS		:= $(CFLAGS) -msoft-float -pipe \
+CFLAGS		+= -msoft-float -pipe \
 		-Wno-uninitialized -mminimal-toc -mtraceback=full \
 		-finline-limit-2000 -mcpu=power4
-CPP		= $(CC) -E $(CFLAGS)
-
 
 HEAD := arch/ppc64/kernel/head.o
 
-core-y			+= arch/ppc64/kernel/ arch/ppc64/mm/ arch/ppc64/lib/
-core-$(CONFIG_XMON)	+= arch/ppc64/xmon/
+libs-y				+= arch/ppc64/lib/
+core-y				+= arch/ppc64/kernel/
+core-y				+= arch/ppc64/mm/
+core-$(CONFIG_XMON)		+= arch/ppc64/xmon/
+drivers-$(CONFIG_OPROFILE)	+= arch/ppc64/oprofile/
 
-# FIXME: is drivers- right ?
-drivers-$(CONFIG_OPROFILE)		+= arch/ppc64/oprofile/
+makeboot =$(Q)$(MAKE) -f scripts/Makefile.build obj=arch/ppc64/boot $(1)
 
-makeboot = $(call descend,arch/ppc64/boot,$(1))
-
-ifdef CONFIG_PPC_PSERIES
-BOOT_TARGETS = zImage zImage.initrd
-endif
-
-ifdef CONFIG_PPC_ISERIES
-BOOT_TARGETS = vmlinux.sminitrd vmlinux.initrd vmlinux.sm
-endif
-
-$(BOOT_TARGETS): vmlinux
-	@$(call makeboot,arch/ppc64/boot/$@)
+boottarget-$(CONFIG_PPC_PSERIES) := zImage zImage.initrd
+boottarget-$(CONFIG_PPC_ISERIES) := vmlinux.sminitrd vmlinux.initrd vmlinux.sm
+$(boottarget-y): vmlinux
+	$(call makeboot,arch/ppc64/boot/$@)
 
 %_config: arch/ppc64/configs/%_defconfig
 	rm -f .config arch/ppc64/defconfig
 	cp -f arch/ppc64/configs/$(@:config=defconfig) arch/ppc64/defconfig
 
 archclean:
-	@$(call makeboot,clean)
+	$(Q)$(MAKE) -f scripts/Makefile.clean obj=arch/ppc64/boot
 
-archmrproper:
+prepare: include/asm-ppc64/offsets.h
 
-
-prepare: include/asm-$(ARCH)/offsets.h
-
-arch/$(ARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \
+arch/ppc64/kernel/asm-offsets.s: include/asm include/linux/version.h \
 				   include/config/MARKER
 
-include/asm-$(ARCH)/offsets.h.tmp: arch/$(ARCH)/kernel/asm-offsets.s
-	@$(generate-asm-offsets.h) < $< > $@
-
-include/asm-$(ARCH)/offsets.h: include/asm-$(ARCH)/offsets.h.tmp
+include/asm-ppc64/offsets.h: arch/ppc64/kernel/asm-offsets.s
 	@echo -n '  Generating $@'
+	@$(generate-asm-offsets.h) < $< > $@.tmp
 	@$(update-if-changed)
 
-CLEAN_FILES += include/asm-$(ARCH)/offsets.h.tmp \
-	       include/asm-$(ARCH)/offsets.h
+CLEAN_FILES += include/asm-ppc64/offsets.h.tmp \
+	       include/asm-ppc64/offsets.h
 
