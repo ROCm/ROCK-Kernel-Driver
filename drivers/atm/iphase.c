@@ -2001,6 +2001,10 @@ static int tx_init(struct atm_dev *dev)
         }
         iadev->desc_tbl = kmalloc(iadev->num_tx_desc *
                                    sizeof(struct desc_tbl_t), GFP_KERNEL);
+	if (!iadev->desc_tbl) {
+		printk(KERN_ERR DEV_LABEL " couldn't get mem\n");
+		return -EAGAIN;
+	}
   
 	/* Communication Queues base address */  
         i = TX_COMP_Q * iadev->memSize;
