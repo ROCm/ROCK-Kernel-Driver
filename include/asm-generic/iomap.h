@@ -33,7 +33,7 @@ extern void fastcall iowrite16(u16, void __iomem *);
 extern void fastcall iowrite32(u32, void __iomem *);
 
 /* Create a virtual mapping cookie for an IO port range */
-extern void __iomem *ioport_map(unsigned int port, unsigned int nr);
+extern void __iomem *ioport_map(unsigned long port, unsigned int nr);
 extern void ioport_unmap(void __iomem *);
 
 /* Create a virtual mapping cookie for a PCI BAR (memory or IO) */

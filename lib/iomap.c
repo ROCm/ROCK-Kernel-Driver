@@ -24,9 +24,9 @@
  * we can do some sanity checks on the low bits, and don't
  * need to just take things for granted.
  */
-#define PIO_OFFSET	0x10000
-#define PIO_MASK	0x0ffff
-#define PIO_RESERVED	0x40000
+#define PIO_OFFSET	0x10000UL
+#define PIO_MASK	0x0ffffUL
+#define PIO_RESERVED	0x40000UL
 
 /*
  * Ugly macros are a way of life.
@@ -77,7 +77,7 @@ EXPORT_SYMBOL(iowrite16);
 EXPORT_SYMBOL(iowrite32);
 
 /* Create a virtual mapping cookie for an IO port range */
-void __iomem *ioport_map(unsigned int port, unsigned int nr)
+void __iomem *ioport_map(unsigned long port, unsigned int nr)
 {
 	if (port > PIO_MASK)
 		return NULL;
