@@ -431,6 +431,7 @@ static void put_chip(struct map_info *map, struct flchip *chip, unsigned long ad
 		break;
 
 	case FL_READY:
+	case FL_STATUS:
 		/* We should really make set_vpp() count, rather than doing this */
 		DISABLE_VPP(map);
 		break;
