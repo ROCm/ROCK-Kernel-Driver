@@ -253,41 +253,6 @@
       </para>
     </sect1>
 
-
-
-
-    <sect1>
-      <title>Creating a device</title>
-
-      <funcsynopsis>
-	<funcprototype>
-	  <funcdef>struct proc_dir_entry* <function>proc_mknod</function></funcdef>
-	  <paramdef>const char* <parameter>name</parameter></paramdef>
-	  <paramdef>mode_t <parameter>mode</parameter></paramdef>
-	  <paramdef>struct proc_dir_entry* <parameter>parent</parameter></paramdef>
-	  <paramdef>kdev_t <parameter>rdev</parameter></paramdef>
-	</funcprototype>
-      </funcsynopsis>
-      
-      <para>
-        Creates a device file <parameter>name</parameter> with mode
-        <parameter>mode</parameter> in the procfs directory
-        <parameter>parent</parameter>. The device file will work on
-        the device <parameter>rdev</parameter>, which can be generated
-        by using the <literal>MKDEV</literal> macro from
-        <literal>linux/kdev_t.h</literal>. The
-        <parameter>mode</parameter> parameter
-        <emphasis>must</emphasis> contain <constant>S_IFBLK</constant>
-        or <constant>S_IFCHR</constant> to create a device
-        node. Compare with userland <literal>mknod
-        --mode=</literal><parameter>mode</parameter>
-        <parameter>name</parameter> <parameter>rdev</parameter>.
-      </para>
-    </sect1>
-
-
-
-
     <sect1>
       <title>Creating a directory</title>
       

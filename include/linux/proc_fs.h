@@ -71,7 +71,6 @@ struct proc_dir_entry {
 	write_proc_t *write_proc;
 	atomic_t count;		/* use count */
 	int deleted;		/* delete flag */
-	kdev_t	rdev;
 };
 
 struct kcore_list {
@@ -141,8 +140,6 @@ extern void proc_rtas_init(void);
 
 extern struct proc_dir_entry *proc_symlink(const char *,
 		struct proc_dir_entry *, const char *);
-extern struct proc_dir_entry *proc_mknod(const char *,mode_t,
-		struct proc_dir_entry *,kdev_t);
 extern struct proc_dir_entry *proc_mkdir(const char *,struct proc_dir_entry *);
 
 static inline struct proc_dir_entry *create_proc_read_entry(const char *name,
@@ -209,8 +206,6 @@ static inline struct proc_dir_entry *create_proc_entry(const char *name,
 
 static inline struct proc_dir_entry *proc_symlink(const char *name,
 		struct proc_dir_entry *parent,char *dest) {return NULL;}
-static inline struct proc_dir_entry *proc_mknod(const char *name,mode_t mode,
-		struct proc_dir_entry *parent,kdev_t rdev) {return NULL;}
 static inline struct proc_dir_entry *proc_mkdir(const char *name,
 	struct proc_dir_entry *parent) {return NULL;}
 
