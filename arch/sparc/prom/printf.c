@@ -39,7 +39,7 @@ prom_printf(char *fmt, ...)
 	int i;
 
 	va_start(args, fmt);
-	i = vsnprintf(ppbuf, sizeof(ppbuf), fmt, args);
+	i = vscnprintf(ppbuf, sizeof(ppbuf), fmt, args);
 	va_end(args);
 
 	prom_write(ppbuf, i);

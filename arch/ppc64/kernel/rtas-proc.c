@@ -287,9 +287,9 @@ static ssize_t ppc_rtas_poweron_read(struct file * file, char * buf,
 	char stkbuf[40];  /* its small, its on stack */
 	int n, sn;
 	if (power_on_time == 0)
-		n = snprintf(stkbuf, 40, "Power on time not set\n");
+		n = scnprintf(stkbuf,sizeof(stkbuf),"Power on time not set\n");
 	else
-		n = snprintf(stkbuf, 40, "%lu\n", power_on_time);
+		n = scnprintf(stkbuf,sizeof(stkbuf),"%lu\n",power_on_time);
 
 	sn = strlen (stkbuf) +1;
 	if (*ppos >= sn)
@@ -410,9 +410,10 @@ static ssize_t ppc_rtas_clock_read(struct file * file, char * buf,
 	if (error != 0){
 		printk(KERN_WARNING "error: reading the clock returned: %s\n", 
 				ppc_rtas_process_error(error));
-		n = snprintf (stkbuf, 40, "0");
+		n = scnprintf (stkbuf, sizeof(stkbuf), "0");
 	} else { 
-		n = snprintf (stkbuf, 40, "%lu\n", mktime(year, mon, day, hour, min, sec));
+		n = scnprintf (stkbuf, sizeof(stkbuf), "%lu\n",
+				mktime(year, mon, day, hour, min, sec));
 	}
 	kfree(ret);
 
@@ -819,7 +820,7 @@ int get_location_code(struct individual_sensor s, char * buffer)
 		n += check_location_string(ret, buffer + n);
 		n += sprintf ( buffer+n, " ");
 		/* see how many characters we have printed */
-		snprintf ( t, 50, "%s ", ret);
+		scnprintf(t, sizeof(t), "%s ", ret);
 
 		pos += strlen(t);
 		if (pos >= llen) pos=0;
@@ -863,7 +864,7 @@ static ssize_t ppc_rtas_tone_freq_read(struct file * file, char * buf,
 	int n, sn;
 	char stkbuf[40];  /* its small, its on stack */
 
-	n = snprintf(stkbuf, 40, "%lu\n", rtas_tone_frequency);
+	n = scnprintf(stkbuf, 40, "%lu\n", rtas_tone_frequency);
 
 	sn = strlen (stkbuf) +1;
 	if (*ppos >= sn)
@@ -917,7 +918,7 @@ static ssize_t ppc_rtas_tone_volume_read(struct file * file, char * buf,
 	int n, sn;
 	char stkbuf[40];  /* its small, its on stack */
 
-	n = snprintf(stkbuf, 40, "%lu\n", rtas_tone_volume);
+	n = scnprintf(stkbuf, 40, "%lu\n", rtas_tone_volume);
 
 	sn = strlen (stkbuf) +1;
 	if (*ppos >= sn)

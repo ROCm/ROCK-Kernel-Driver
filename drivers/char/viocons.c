@@ -149,7 +149,7 @@ void hvlog(char *fmt, ...)
 
 	spin_lock_irqsave(&consoleloglock, flags);
 	va_start(args, fmt);
-	i = vsnprintf(buf, sizeof(buf) - 1, fmt, args);
+	i = vscnprintf(buf, sizeof(buf) - 1, fmt, args);
 	va_end(args);
 	buf[i++] = '\r';
 	HvCall_writeLogBuffer(buf, i);

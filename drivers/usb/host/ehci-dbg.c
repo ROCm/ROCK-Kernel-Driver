@@ -173,7 +173,7 @@ dbg_itd (const char *label, struct ehci_hcd *ehci, struct ehci_itd *itd)
 static int __attribute__((__unused__))
 dbg_status_buf (char *buf, unsigned len, char *label, u32 status)
 {
-	return snprintf (buf, len,
+	return scnprintf (buf, len,
 		"%s%sstatus %04x%s%s%s%s%s%s%s%s%s%s",
 		label, label [0] ? " " : "", status,
 		(status & STS_ASS) ? " Async" : "",
@@ -192,7 +192,7 @@ dbg_status_buf (char *buf, unsigned len, char *label, u32 status)
 static int __attribute__((__unused__))
 dbg_intr_buf (char *buf, unsigned len, char *label, u32 enable)
 {
-	return snprintf (buf, len,
+	return scnprintf (buf, len,
 		"%s%sintrenable %02x%s%s%s%s%s%s",
 		label, label [0] ? " " : "", enable,
 		(enable & STS_IAA) ? " IAA" : "",
@@ -209,7 +209,7 @@ static const char *const fls_strings [] =
 
 static int dbg_command_buf (char *buf, unsigned len, char *label, u32 command)
 {
-	return snprintf (buf, len,
+	return scnprintf (buf, len,
 		"%s%scommand %06x %s=%d ithresh=%d%s%s%s%s period=%s%s %s",
 		label, label [0] ? " " : "", command,
 		(command & CMD_PARK) ? "park" : "(park)",
@@ -238,7 +238,7 @@ dbg_port_buf (char *buf, unsigned len, char *label, int port, u32 status)
 	default: sig = "?"; break;
 	}
 
-	return snprintf (buf, len,
+	return scnprintf (buf, len,
 		"%s%sport %d status %06x%s%s sig=%s %s%s%s%s%s%s%s%s%s",
 		label, label [0] ? " " : "", port, status,
 		(status & PORT_POWER) ? " POWER" : "",
@@ -359,7 +359,7 @@ static void qh_lines (
 	}
 	scratch = cpu_to_le32p (&qh->hw_info1);
 	hw_curr = (mark == '*') ? cpu_to_le32p (&qh->hw_current) : 0;
-	temp = snprintf (next, size,
+	temp = scnprintf (next, size,
 			"qh/%p dev%d %cs ep%d %08x %08x (%08x%c %s nak%d)",
 			qh, scratch & 0x007f,
 			speed_char (scratch),
@@ -449,7 +449,7 @@ show_async (struct class_device *class_dev, char *buf)
 	for (qh = ehci->async->qh_next.qh; size > 0 && qh; qh = qh->qh_next.qh)
 		qh_lines (ehci, qh, &next, &size);
 	if (ehci->reclaim && size > 0) {
-		temp = snprintf (next, size, "\nreclaim =\n");
+		temp = scnprintf (next, size, "\nreclaim =\n");
 		size -= temp;
 		next += temp;
 
@@ -486,7 +486,7 @@ show_periodic (struct class_device *class_dev, char *buf)
 	next = buf;
 	size = PAGE_SIZE;
 
-	temp = snprintf (next, size, "size = %d\n", ehci->periodic_size);
+	temp = scnprintf (next, size, "size = %d\n", ehci->periodic_size);
 	size -= temp;
 	next += temp;
 
@@ -500,14 +500,14 @@ show_periodic (struct class_device *class_dev, char *buf)
 			continue;
 		tag = Q_NEXT_TYPE (ehci->periodic [i]);
 
-		temp = snprintf (next, size, "%4d: ", i);
+		temp = scnprintf (next, size, "%4d: ", i);
 		size -= temp;
 		next += temp;
 
 		do {
 			switch (tag) {
 			case Q_TYPE_QH:
-				temp = snprintf (next, size, " qh%d-%04x/%p",
+				temp = scnprintf (next, size, " qh%d-%04x/%p",
 						p.qh->period,
 						le32_to_cpup (&p.qh->hw_info2)
 							/* uframe masks */
@@ -520,7 +520,7 @@ show_periodic (struct class_device *class_dev, char *buf)
 					if (seen [temp].ptr != p.ptr)
 						continue;
 					if (p.qh->qh_next.ptr)
-						temp = snprintf (next, size,
+						temp = scnprintf (next, size,
 							" ...");
 					p.ptr = 0;
 					break;
@@ -545,7 +545,7 @@ show_periodic (struct class_device *class_dev, char *buf)
 						}
 					}
 
-					temp = snprintf (next, size,
+					temp = scnprintf (next, size,
 						" (%c%d ep%d%s "
 						"[%d/%d] q%d p%d)",
 						speed_char (scratch),
@@ -565,20 +565,20 @@ show_periodic (struct class_device *class_dev, char *buf)
 				}
 				break;
 			case Q_TYPE_FSTN:
-				temp = snprintf (next, size,
+				temp = scnprintf (next, size,
 					" fstn-%8x/%p", p.fstn->hw_prev,
 					p.fstn);
 				tag = Q_NEXT_TYPE (p.fstn->hw_next);
 				p = p.fstn->fstn_next;
 				break;
 			case Q_TYPE_ITD:
-				temp = snprintf (next, size,
+				temp = scnprintf (next, size,
 					" itd/%p", p.itd);
 				tag = Q_NEXT_TYPE (p.itd->hw_next);
 				p = p.itd->itd_next;
 				break;
 			case Q_TYPE_SITD:
-				temp = snprintf (next, size,
+				temp = scnprintf (next, size,
 					" sitd/%p", p.sitd);
 				tag = Q_NEXT_TYPE (p.sitd->hw_next);
 				p = p.sitd->sitd_next;
@@ -588,7 +588,7 @@ show_periodic (struct class_device *class_dev, char *buf)
 			next += temp;
 		} while (p.ptr);
 
-		temp = snprintf (next, size, "\n");
+		temp = scnprintf (next, size, "\n");
 		size -= temp;
 		next += temp;
 	}
@@ -623,7 +623,7 @@ show_registers (struct class_device *class_dev, char *buf)
 
 	/* Capability Registers */
 	i = HC_VERSION(readl (&ehci->caps->hc_capbase));
-	temp = snprintf (next, size,
+	temp = scnprintf (next, size,
 		"PCI device %s\nEHCI %x.%02x, hcd state %d (driver " DRIVER_VERSION ")\n",
 		pci_name(hcd->pdev),
 		i >> 8, i & 0x0ff, ehci->hcd.state);
@@ -632,35 +632,35 @@ show_registers (struct class_device *class_dev, char *buf)
 
 	// FIXME interpret both types of params
 	i = readl (&ehci->caps->hcs_params);
-	temp = snprintf (next, size, "structural params 0x%08x\n", i);
+	temp = scnprintf (next, size, "structural params 0x%08x\n", i);
 	size -= temp;
 	next += temp;
 
 	i = readl (&ehci->caps->hcc_params);
-	temp = snprintf (next, size, "capability params 0x%08x\n", i);
+	temp = scnprintf (next, size, "capability params 0x%08x\n", i);
 	size -= temp;
 	next += temp;
 
 	/* Operational Registers */
 	temp = dbg_status_buf (scratch, sizeof scratch, label,
 			readl (&ehci->regs->status));
-	temp = snprintf (next, size, fmt, temp, scratch);
+	temp = scnprintf (next, size, fmt, temp, scratch);
 	size -= temp;
 	next += temp;
 
 	temp = dbg_command_buf (scratch, sizeof scratch, label,
 			readl (&ehci->regs->command));
-	temp = snprintf (next, size, fmt, temp, scratch);
+	temp = scnprintf (next, size, fmt, temp, scratch);
 	size -= temp;
 	next += temp;
 
 	temp = dbg_intr_buf (scratch, sizeof scratch, label,
 			readl (&ehci->regs->intr_enable));
-	temp = snprintf (next, size, fmt, temp, scratch);
+	temp = scnprintf (next, size, fmt, temp, scratch);
 	size -= temp;
 	next += temp;
 
-	temp = snprintf (next, size, "uframe %04x\n",
+	temp = scnprintf (next, size, "uframe %04x\n",
 			readl (&ehci->regs->frame_index));
 	size -= temp;
 	next += temp;
@@ -668,13 +668,13 @@ show_registers (struct class_device *class_dev, char *buf)
 	for (i = 0; i < HCS_N_PORTS (ehci->hcs_params); i++) {
 		temp = dbg_port_buf (scratch, sizeof scratch, label, i,
 				readl (&ehci->regs->port_status [i]));
-		temp = snprintf (next, size, fmt, temp, scratch);
+		temp = scnprintf (next, size, fmt, temp, scratch);
 		size -= temp;
 		next += temp;
 	}
 
 	if (ehci->reclaim) {
-		temp = snprintf (next, size, "reclaim qh %p%s\n",
+		temp = scnprintf (next, size, "reclaim qh %p%s\n",
 				ehci->reclaim,
 				ehci->reclaim_ready ? " ready" : "");
 		size -= temp;
@@ -682,14 +682,14 @@ show_registers (struct class_device *class_dev, char *buf)
 	}
 
 #ifdef EHCI_STATS
-	temp = snprintf (next, size,
+	temp = scnprintf (next, size,
 		"irq normal %ld err %ld reclaim %ld (lost %ld)\n",
 		ehci->stats.normal, ehci->stats.error, ehci->stats.reclaim,
 		ehci->stats.lost_iaa);
 	size -= temp;
 	next += temp;
 
-	temp = snprintf (next, size, "complete %ld unlink %ld\n",
+	temp = scnprintf (next, size, "complete %ld unlink %ld\n",
 		ehci->stats.complete, ehci->stats.unlink);
 	size -= temp;
 	next += temp;

@@ -73,7 +73,7 @@ ccw_hotplug (struct device *dev, char **envp, int num_envp,
 	/* what we want to pass to /sbin/hotplug */
 
 	envp[i++] = buffer;
-	length += snprintf(buffer, buffer_size - length, "CU_TYPE=%04X",
+	length += scnprintf(buffer, buffer_size - length, "CU_TYPE=%04X",
 			   cdev->id.cu_type);
 	if ((buffer_size - length <= 0) || (i >= num_envp))
 		return -ENOMEM;
@@ -81,7 +81,7 @@ ccw_hotplug (struct device *dev, char **envp, int num_envp,
 	buffer += length;
 
 	envp[i++] = buffer;
-	length += snprintf(buffer, buffer_size - length, "CU_MODEL=%02X",
+	length += scnprintf(buffer, buffer_size - length, "CU_MODEL=%02X",
 			   cdev->id.cu_model);
 	if ((buffer_size - length <= 0) || (i >= num_envp))
 		return -ENOMEM;
@@ -90,7 +90,7 @@ ccw_hotplug (struct device *dev, char **envp, int num_envp,
 
 	/* The next two can be zero, that's ok for us */
 	envp[i++] = buffer;
-	length += snprintf(buffer, buffer_size - length, "DEV_TYPE=%04X",
+	length += scnprintf(buffer, buffer_size - length, "DEV_TYPE=%04X",
 			   cdev->id.dev_type);
 	if ((buffer_size - length <= 0) || (i >= num_envp))
 		return -ENOMEM;
@@ -98,7 +98,7 @@ ccw_hotplug (struct device *dev, char **envp, int num_envp,
 	buffer += length;
 
 	envp[i++] = buffer;
-	length += snprintf(buffer, buffer_size - length, "DEV_MODEL=%02X",
+	length += scnprintf(buffer, buffer_size - length, "DEV_MODEL=%02X",
 			   cdev->id.dev_model);
 	if ((buffer_size - length <= 0) || (i >= num_envp))
 		return -ENOMEM;

@@ -134,7 +134,7 @@ static int lparcfg_data(unsigned char *buf, unsigned long size)
 	memset(buf, 0, size); 
 
 	shared = (int)(lpaca->xLpPacaPtr->xSharedProc);
-	n += snprintf(buf, LPARCFG_BUFF_SIZE - n,
+	n += scnprintf(buf, LPARCFG_BUFF_SIZE - n,
 		      "serial_number=%c%c%c%c%c%c%c\n", 
 		      e2a(xItExtVpdPanel.mfgID[2]),
 		      e2a(xItExtVpdPanel.mfgID[3]),
@@ -144,7 +144,7 @@ static int lparcfg_data(unsigned char *buf, unsigned long size)
 		      e2a(xItExtVpdPanel.systemSerial[4]),
 		      e2a(xItExtVpdPanel.systemSerial[5])); 
 
-	n += snprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
+	n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
 		      "system_type=%c%c%c%c\n",
 		      e2a(xItExtVpdPanel.machineType[0]),
 		      e2a(xItExtVpdPanel.machineType[1]),
@@ -152,23 +152,23 @@ static int lparcfg_data(unsigned char *buf, unsigned long size)
 		      e2a(xItExtVpdPanel.machineType[3])); 
 
 	lp_index = HvLpConfig_getLpIndex(); 
-	n += snprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
+	n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
 		      "partition_id=%d\n", (int)lp_index); 
 
-	n += snprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
+	n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
 		      "system_active_processors=%d\n", 
 		      (int)HvLpConfig_getSystemPhysicalProcessors()); 
 
-	n += snprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
+	n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
 		      "system_potential_processors=%d\n", 
 		      (int)HvLpConfig_getSystemPhysicalProcessors()); 
 
 	processors = (int)HvLpConfig_getPhysicalProcessors(); 
-	n += snprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
+	n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
 		      "partition_active_processors=%d\n", processors);  
 
 	max_processors = (int)HvLpConfig_getMaxPhysicalProcessors(); 
-	n += snprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
+	n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
 		      "partition_potential_processors=%d\n", max_processors);  
 
 	if(shared) {
@@ -178,22 +178,22 @@ static int lparcfg_data(unsigned char *buf, unsigned long size)
 		entitled_capacity = processors * 100; 
 		max_entitled_capacity = max_processors * 100; 
 	}
-	n += snprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
+	n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
 		      "partition_entitled_capacity=%d\n", entitled_capacity);
 
-	n += snprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
+	n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
 		      "partition_max_entitled_capacity=%d\n", 
 		      max_entitled_capacity);
 
 	if(shared) {
 		pool_id = HvLpConfig_getSharedPoolIndex(); 
-		n += snprintf(buf+n, LPARCFG_BUFF_SIZE - n, "pool=%d\n", 
+		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n, "pool=%d\n",
 			      (int)pool_id); 
-		n += snprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
+		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
 			      "pool_capacity=%d\n", (int)(HvLpConfig_getNumProcsInSharedPool(pool_id)*100)); 
 	}
 
-	n += snprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
+	n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
 		      "shared_processor_mode=%d\n", shared);
 
 	return 0;
@@ -297,13 +297,13 @@ static int lparcfg_data(unsigned char *buf, unsigned long size)
 		if(lp_index_ptr) lp_index = *lp_index_ptr;
 	}
 
-	n  = snprintf(buf, LPARCFG_BUFF_SIZE - n,
+	n  = scnprintf(buf, LPARCFG_BUFF_SIZE - n,
 		      "serial_number=%s\n", system_id); 
 
-	n += snprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
+	n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
 		      "system_type=%s\n", model); 
 
-	n += snprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
+	n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
 		      "partition_id=%d\n", (int)lp_index); 
 
 	rtas_node = find_path_device("/rtas");
@@ -317,74 +317,74 @@ static int lparcfg_data(unsigned char *buf, unsigned long size)
 	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR) {
 		h_get_ppp(&h_entitled,&h_unallocated,&h_aggregation,&h_resource);
 #ifdef DEBUG
-		n += snprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
+		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
 			      "R4=0x%lx\n", h_entitled);
-		n += snprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
+		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
 			      "R5=0x%lx\n", h_unallocated);
-		n += snprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
+		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
 			      "R6=0x%lx\n", h_aggregation);
-		n += snprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
+		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
 			      "R7=0x%lx\n", h_resource);
 #endif /* DEBUG */
 	}
 
 	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR) {
 		system_potential_processors =  get_splpar_potential_characteristics();
-		n += snprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
+		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
 			      "system_active_processors=%ld\n", 
 			      (h_resource >> 2*8) & 0xffff);
-		n += snprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
+		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
 			      "system_potential_processors=%d\n", 
 			      system_potential_processors);
 	} else {
 		system_potential_processors = system_active_processors;
-		n += snprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
+		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
 			      "system_active_processors=%d\n", 
 			      system_active_processors);
-		n += snprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
+		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
 			      "system_potential_processors=%d\n", 
 			      system_potential_processors);
 	}
 
 	processors = systemcfg->processorCount;
-	n += snprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
+	n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
 		      "partition_active_processors=%d\n", processors);  
-	n += snprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
+	n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
 		      "partition_potential_processors=%d\n",
 		      system_active_processors);
 
 	/* max_entitled_capacity will come out of get_splpar_potential_characteristics() when that function is complete */
 	max_entitled_capacity = system_active_processors * 100; 
 	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR) {
-		n += snprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
+		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
 			      "partition_entitled_capacity=%ld\n", h_entitled);
 	} else {
-		n += snprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
+		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
 			      "partition_entitled_capacity=%d\n", system_active_processors*100);
 	}
 
-	n += snprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
+	n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
 		      "partition_max_entitled_capacity=%d\n", 
 		      max_entitled_capacity);
 
 	shared = 0;
-	n += snprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
+	n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
 		      "shared_processor_mode=%d\n", shared);
 
 	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR) {
-		n += snprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
+		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
 			      "pool=%ld\n", (h_aggregation >> 0*8)&0xffff);
 
-		n += snprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
+		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
 			      "pool_capacity=%ld\n", (h_resource >> 3*8) &0xffff);
 
-		n += snprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
+		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
 			      "group=%ld\n", (h_aggregation >> 2*8)&0xffff);
 
-		n += snprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
+		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
 			      "capped=%ld\n", (h_resource >> 6*8)&0x40);
 
-		n += snprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
+		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
 			      "capacity_weight=%d\n", (int)(h_resource>>5*8)&0xFF);
 	}
 	return 0;

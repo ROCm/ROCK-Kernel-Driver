@@ -1439,7 +1439,7 @@ show_function (struct device *_dev, char *buf)
 			|| !dev->driver->function
 			|| strlen (dev->driver->function) > PAGE_SIZE)
 		return 0;
-	return snprintf (buf, PAGE_SIZE, "%s\n", dev->driver->function);
+	return scnprintf (buf, PAGE_SIZE, "%s\n", dev->driver->function);
 }
 static DEVICE_ATTR (function, S_IRUGO, show_function, NULL);
 
@@ -1465,7 +1465,7 @@ show_registers (struct device *_dev, char *buf)
 		s = "(none)";
 
 	/* Main Control Registers */
-	t = snprintf (next, size, "%s version " DRIVER_VERSION
+	t = scnprintf (next, size, "%s version " DRIVER_VERSION
 			", chiprev %04x, dma %s\n\n"
 			"devinit %03x fifoctl %08x gadget '%s'\n"
 			"pci irqenb0 %02x irqenb1 %08x "
@@ -1497,7 +1497,7 @@ show_registers (struct device *_dev, char *buf)
 		/* full speed bit (6) not working?? */
 	} else
 			s = "not attached";
-	t = snprintf (next, size,
+	t = scnprintf (next, size,
 			"stdrsp %08x usbctl %08x usbstat %08x "
 				"addr 0x%02x (%s)\n",
 			readl (&dev->usb->stdrsp), t1, t2,
@@ -1519,7 +1519,7 @@ show_registers (struct device *_dev, char *buf)
 
 		t1 = readl (&ep->regs->ep_cfg);
 		t2 = readl (&ep->regs->ep_rsp) & 0xff;
-		t = snprintf (next, size,
+		t = scnprintf (next, size,
 				"\n%s\tcfg %05x rsp (%02x) %s%s%s%s%s%s%s%s"
 					"irqenb %02x\n",
 				ep->ep.name, t1, t2,
@@ -1543,7 +1543,7 @@ show_registers (struct device *_dev, char *buf)
 		size -= t;
 		next += t;
 
-		t = snprintf (next, size,
+		t = scnprintf (next, size,
 				"\tstat %08x avail %04x "
 				"(ep%d%s-%s)%s\n",
 				readl (&ep->regs->ep_stat),
@@ -1557,7 +1557,7 @@ show_registers (struct device *_dev, char *buf)
 		if (!ep->dma)
 			continue;
 
-		t = snprintf (next, size,
+		t = scnprintf (next, size,
 				"  dma\tctl %08x stat %08x count %08x\n"
 				"\taddr %08x desc %08x\n",
 				readl (&ep->dma->dmactl),
@@ -1574,7 +1574,7 @@ show_registers (struct device *_dev, char *buf)
 		// none yet 
 
 	/* Statistics */
-	t = snprintf (next, size, "\nirqs:  ");
+	t = scnprintf (next, size, "\nirqs:  ");
 	size -= t;
 	next += t;
 	for (i = 0; i < 7; i++) {
@@ -1583,12 +1583,12 @@ show_registers (struct device *_dev, char *buf)
 		ep = &dev->ep [i];
 		if (i && !ep->irqs)
 			continue;
-		t = snprintf (next, size, " %s/%lu", ep->ep.name, ep->irqs);
+		t = scnprintf (next, size, " %s/%lu", ep->ep.name, ep->irqs);
 		size -= t;
 		next += t;
 
 	}
-	t = snprintf (next, size, "\n");
+	t = scnprintf (next, size, "\n");
 	size -= t;
 	next += t;
 
@@ -1624,7 +1624,7 @@ show_queues (struct device *_dev, char *buf)
 			if (!d)
 				continue;
 			t = d->bEndpointAddress;
-			t = snprintf (next, size,
+			t = scnprintf (next, size,
 				"\n%s (ep%d%s-%s) max %04x %s fifo %d\n",
 				ep->ep.name, t & USB_ENDPOINT_NUMBER_MASK,
 				(t & USB_DIR_IN) ? "in" : "out",
@@ -1641,7 +1641,7 @@ show_queues (struct device *_dev, char *buf)
 				ep->dma ? "dma" : "pio", ep->fifo_size
 				);
 		} else /* ep0 should only have one transfer queued */
-			t = snprintf (next, size, "ep0 max 64 pio %s\n",
+			t = scnprintf (next, size, "ep0 max 64 pio %s\n",
 					ep->is_in ? "in" : "out");
 		if (t <= 0 || t > size)
 			goto done;
@@ -1649,7 +1649,7 @@ show_queues (struct device *_dev, char *buf)
 		next += t;
 
 		if (list_empty (&ep->queue)) {
-			t = snprintf (next, size, "\t(nothing queued)\n");
+			t = scnprintf (next, size, "\t(nothing queued)\n");
 			if (t <= 0 || t > size)
 				goto done;
 			size -= t;
@@ -1658,14 +1658,14 @@ show_queues (struct device *_dev, char *buf)
 		}
 		list_for_each_entry (req, &ep->queue, queue) {
 			if (ep->dma && req->td_dma == readl (&ep->dma->dmadesc))
-				t = snprintf (next, size,
+				t = scnprintf (next, size,
 					"\treq %p len %d/%d "
 					"buf %p (dmacount %08x)\n",
 					&req->req, req->req.actual,
 					req->req.length, req->req.buf,
 					readl (&ep->dma->dmacount));
 			else
-				t = snprintf (next, size,
+				t = scnprintf (next, size,
 					"\treq %p len %d/%d buf %p\n",
 					&req->req, req->req.actual,
 					req->req.length, req->req.buf);
@@ -1678,7 +1678,7 @@ show_queues (struct device *_dev, char *buf)
 				struct net2280_dma	*td;
 
 				td = req->td;
-				t = snprintf (next, size, "\t    td %08x "
+				t = scnprintf (next, size, "\t    td %08x "
 					" count %08x buf %08x desc %08x\n",
 					req->td_dma, td->dmacount,
 					td->dmaaddr, td->dmadesc);
@@ -2788,7 +2788,7 @@ static int net2280_probe (struct pci_dev *pdev, const struct pci_device_id *id)
 		goto done;
 	}
 #ifndef __sparc__
-	snprintf (buf, sizeof buf, "%d", pdev->irq);
+	scnprintf (buf, sizeof buf, "%d", pdev->irq);
 	bufp = buf;
 #else
 	bufp = __irq_itoa(pdev->irq);

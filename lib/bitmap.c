@@ -193,7 +193,7 @@ int bitmap_snprintf(char *buf, unsigned int buflen,
 		word = i / BITS_PER_LONG;
 		bit = i % BITS_PER_LONG;
 		val = (maskp[word] >> bit) & chunkmask;
-		len += snprintf(buf+len, buflen-len, "%s%0*lx", sep,
+		len += scnprintf(buf+len, buflen-len, "%s%0*lx", sep,
 			(chunksz+3)/4, val);
 		chunksz = CHUNKSZ;
 		sep = ",";

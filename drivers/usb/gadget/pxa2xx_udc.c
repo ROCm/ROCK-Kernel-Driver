@@ -1232,7 +1232,7 @@ udc_proc_read(char *page, char **start, off_t off, int count,
 	local_irq_save(flags);
 
 	/* basic device status */
-	t = snprintf(next, size, DRIVER_DESC "\n"
+	t = scnprintf(next, size, DRIVER_DESC "\n"
 		"%s version: %s\nGadget driver: %s\nHost %s\n\n",
 		driver_name, DRIVER_VERSION SIZE_STR DMASTR,
 		dev->driver ? dev->driver->driver.name : "(none)",
@@ -1241,14 +1241,14 @@ udc_proc_read(char *page, char **start, off_t off, int count,
 	next += t;
 
 	/* registers for device and ep0 */
-	t = snprintf(next, size,
+	t = scnprintf(next, size,
 		"uicr %02X.%02X, usir %02X.%02x, ufnr %02X.%02X\n",
 		UICR1, UICR0, USIR1, USIR0, UFNRH, UFNRL);
 	size -= t;
 	next += t;
 
 	tmp = UDCCR;
-	t = snprintf(next, size,
+	t = scnprintf(next, size,
 		"udccr %02X =%s%s%s%s%s%s%s%s\n", tmp,
 		(tmp & UDCCR_REM) ? " rem" : "",
 		(tmp & UDCCR_RSTIR) ? " rstir" : "",
@@ -1262,7 +1262,7 @@ udc_proc_read(char *page, char **start, off_t off, int count,
 	next += t;
 
 	tmp = UDCCS0;
-	t = snprintf(next, size,
+	t = scnprintf(next, size,
 		"udccs0 %02X =%s%s%s%s%s%s%s%s\n", tmp,
 		(tmp & UDCCS0_SA) ? " sa" : "",
 		(tmp & UDCCS0_RNE) ? " rne" : "",
@@ -1277,7 +1277,7 @@ udc_proc_read(char *page, char **start, off_t off, int count,
 
 	if (dev->has_cfr) {
 		tmp = UDCCFR;
-		t = snprintf(next, size,
+		t = scnprintf(next, size,
 			"udccfr %02X =%s%s\n", tmp,
 			(tmp & UDCCFR_AREN) ? " aren" : "",
 			(tmp & UDCCFR_ACM) ? " acm" : "");
@@ -1288,7 +1288,7 @@ udc_proc_read(char *page, char **start, off_t off, int count,
 	if (!is_usb_connected() || !dev->driver)
 		goto done;
 
-	t = snprintf(next, size, "ep0 IN %lu/%lu, OUT %lu/%lu\nirqs %lu\n\n",
+	t = scnprintf(next, size, "ep0 IN %lu/%lu, OUT %lu/%lu\nirqs %lu\n\n",
 		dev->stats.write.bytes, dev->stats.write.ops,
 		dev->stats.read.bytes, dev->stats.read.ops,
 		dev->stats.irqs);
@@ -1308,7 +1308,7 @@ udc_proc_read(char *page, char **start, off_t off, int count,
 			if (!d)
 				continue;
 			tmp = *dev->ep [i].reg_udccs;
-			t = snprintf(next, size,
+			t = scnprintf(next, size,
 				"%s max %d %s udccs %02x irqs %lu/%lu\n",
 				ep->ep.name, le16_to_cpu (d->wMaxPacketSize),
 				(ep->dma >= 0) ? "dma" : "pio", tmp,
@@ -1316,7 +1316,7 @@ udc_proc_read(char *page, char **start, off_t off, int count,
 			/* TODO translate all five groups of udccs bits! */
 
 		} else /* ep0 should only have one transfer queued */
-			t = snprintf(next, size, "ep0 max 16 pio irqs %lu\n",
+			t = scnprintf(next, size, "ep0 max 16 pio irqs %lu\n",
 				ep->pio_irqs);
 		if (t <= 0 || t > size)
 			goto done;
@@ -1324,7 +1324,7 @@ udc_proc_read(char *page, char **start, off_t off, int count,
 		next += t;
 
 		if (list_empty(&ep->queue)) {
-			t = snprintf(next, size, "\t(nothing queued)\n");
+			t = scnprintf(next, size, "\t(nothing queued)\n");
 			if (t <= 0 || t > size)
 				goto done;
 			size -= t;
@@ -1334,7 +1334,7 @@ udc_proc_read(char *page, char **start, off_t off, int count,
 		list_for_each_entry(req, &ep->queue, queue) {
 #ifdef	USE_DMA
 			if (ep->dma >= 0 && req->queue.prev == &ep->queue)
-				t = snprintf(next, size,
+				t = scnprintf(next, size,
 					"\treq %p len %d/%d "
 					"buf %p (dma%d dcmd %08x)\n",
 					&req->req, req->req.actual,
@@ -1344,7 +1344,7 @@ udc_proc_read(char *page, char **start, off_t off, int count,
 					);
 			else
 #endif
-				t = snprintf(next, size,
+				t = scnprintf(next, size,
 					"\treq %p len %d/%d buf %p\n",
 					&req->req, req->req.actual,
 					req->req.length, req->req.buf);
@@ -1382,7 +1382,7 @@ show_function (struct device *_dev, char *buf)
 			|| !dev->driver->function
 			|| strlen (dev->driver->function) > PAGE_SIZE)
 		return 0;
-	return snprintf (buf, PAGE_SIZE, "%s\n", dev->driver->function);
+	return scnprintf (buf, PAGE_SIZE, "%s\n", dev->driver->function);
 }
 static DEVICE_ATTR (function, S_IRUGO, show_function, NULL);
 

@@ -29,7 +29,7 @@ int pci_hotplug (struct device *dev, char **envp, int num_envp,
 
 	/* stuff we want to pass to /sbin/hotplug */
 	envp[i++] = scratch;
-	length += snprintf (scratch, buffer_size - length, "PCI_CLASS=%04X",
+	length += scnprintf (scratch, buffer_size - length, "PCI_CLASS=%04X",
 			    pdev->class);
 	if ((buffer_size - length <= 0) || (i >= num_envp))
 		return -ENOMEM;
@@ -37,7 +37,7 @@ int pci_hotplug (struct device *dev, char **envp, int num_envp,
 	scratch += length;
 
 	envp[i++] = scratch;
-	length += snprintf (scratch, buffer_size - length, "PCI_ID=%04X:%04X",
+	length += scnprintf (scratch, buffer_size - length, "PCI_ID=%04X:%04X",
 			    pdev->vendor, pdev->device);
 	if ((buffer_size - length <= 0) || (i >= num_envp))
 		return -ENOMEM;
@@ -45,7 +45,7 @@ int pci_hotplug (struct device *dev, char **envp, int num_envp,
 	scratch += length;
 
 	envp[i++] = scratch;
-	length += snprintf (scratch, buffer_size - length,
+	length += scnprintf (scratch, buffer_size - length,
 			    "PCI_SUBSYS_ID=%04X:%04X", pdev->subsystem_vendor,
 			    pdev->subsystem_device);
 	if ((buffer_size - length <= 0) || (i >= num_envp))
@@ -54,7 +54,7 @@ int pci_hotplug (struct device *dev, char **envp, int num_envp,
 	scratch += length;
 
 	envp[i++] = scratch;
-	length += snprintf (scratch, buffer_size - length, "PCI_SLOT_NAME=%s",
+	length += scnprintf (scratch, buffer_size - length, "PCI_SLOT_NAME=%s",
 			    pci_name(pdev));
 	if ((buffer_size - length <= 0) || (i >= num_envp))
 		return -ENOMEM;
