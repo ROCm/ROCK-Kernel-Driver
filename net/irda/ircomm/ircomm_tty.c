@@ -561,7 +561,7 @@ static void ircomm_tty_close(struct tty_struct *tty, struct file *filp)
 		tty->ldisc.flush_buffer(tty);
 
 	tty->closing = 0;
-	self->tty = 0;
+	self->tty = NULL;
 
 	if (self->blocked_open) {
 		if (self->close_delay) {
@@ -1045,7 +1045,7 @@ static void ircomm_tty_hangup(struct tty_struct *tty)
 	/* I guess we need to lock here - Jean II */
 	spin_lock_irqsave(&self->spinlock, flags);
 	self->flags &= ~ASYNC_NORMAL_ACTIVE;
-	self->tty = 0;
+	self->tty = NULL;
 	self->open_count = 0;
 	spin_unlock_irqrestore(&self->spinlock, flags);
 

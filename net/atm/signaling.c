@@ -135,7 +135,7 @@ static int sigd_send(struct atm_vcc *vcc,struct sk_buff *skb)
 			lock_sock(vcc->sk);
 			if (vcc->sk->sk_ack_backlog ==
 			    vcc->sk->sk_max_ack_backlog) {
-				sigd_enq(0,as_reject,vcc,NULL,NULL);
+				sigd_enq(NULL,as_reject,vcc,NULL,NULL);
 				goto as_indicate_complete;
 			}
 			vcc->sk->sk_ack_backlog++;

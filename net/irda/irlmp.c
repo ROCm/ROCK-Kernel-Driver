@@ -1491,7 +1491,7 @@ void *irlmp_register_service(__u16 hints)
 	service = kmalloc(sizeof(irlmp_service_t), GFP_ATOMIC);
 	if (!service) {
 		IRDA_DEBUG(1, "%s(), Unable to kmalloc!\n", __FUNCTION__);
-		return 0;
+		return NULL;
 	}
 	service->hints.word = hints;
 	hashbin_insert(irlmp->services, (irda_queue_t *) service,
@@ -1561,13 +1561,13 @@ void *irlmp_register_client(__u16 hint_mask, DISCOVERY_CALLBACK1 disco_clb,
 	irlmp_client_t *client;
 
 	IRDA_DEBUG(1, "%s()\n", __FUNCTION__);
-	ASSERT(irlmp != NULL, return 0;);
+	ASSERT(irlmp != NULL, return NULL;);
 
 	/* Make a new registration */
 	client = kmalloc(sizeof(irlmp_client_t), GFP_ATOMIC);
 	if (!client) {
 		IRDA_DEBUG( 1, "%s(), Unable to kmalloc!\n", __FUNCTION__);
-		return 0;
+		return NULL;
 	}
 
 	/* Register the details */

@@ -593,7 +593,7 @@ ip_vs_receive(struct socket *sock, char *buffer, const size_t buflen)
 	/* Receive a packet */
 	iov.iov_base     = buffer;
 	iov.iov_len      = (size_t)buflen;
-	msg.msg_name     = 0;
+	msg.msg_name     = NULL;
 	msg.msg_namelen  = 0;
 	msg.msg_iov	 = &iov;
 	msg.msg_iovlen   = 1;

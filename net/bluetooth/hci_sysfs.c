@@ -91,7 +91,7 @@ static int bt_hotplug(struct class_device *cdev, char **envp, int num_envp, char
 	if ((size <= 0) || (i >= num_envp))
 		return -ENOMEM;
 
-	envp[i] = 0;
+	envp[i] = NULL;
 	return 0;
 }
 #endif

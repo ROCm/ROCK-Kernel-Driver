@@ -252,7 +252,7 @@ static unsigned char asn1_header_decode(struct asn1_ctx *ctx,
 	if (def)
 		*eoc = ctx->pointer + len;
 	else
-		*eoc = 0;
+		*eoc = NULL;
 	return 1;
 }
 
