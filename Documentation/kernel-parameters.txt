@@ -37,7 +37,7 @@ restrictions referred to are that the relevant option is valid if:
 	MCA	MCA bus support is enabled.
 	MDA	MDA console support is enabled.
 	MOUSE	Appropriate mouse support is enabled.
-	MTD	MTD support is nebaled.
+	MTD	MTD support is enabled.
 	NET	Appropriate network support is enabled.
 	NFS	Appropriate NFS support is enabled.
 	OSS	OSS sound support is enabled.
@@ -57,6 +57,7 @@ restrictions referred to are that the relevant option is valid if:
 	SMP	The kernel is an SMP kernel.
 	SPARC	Sparc architecture is enabled.
 	SWSUSP	Software suspension is enabled.
+	TS	Appropriate touchscreen support is enabled.
 	USB	USB support is enabled.
 	V4L	Video For Linux support is enabled.
 	VGA	The VGA console has been enabled.
@@ -1135,6 +1136,9 @@ running once the system is up.
 	trix=		[HW,OSS] MediaTrix AudioTrix Pro
 			Format: <io>,<irq>,<dma>,<dma2>,<sb_io>,<sb_irq>,<sb_dma>,<mpu_io>,<mpu_irq>
  
+	tsdev.xres	[TS] Horizontal screen resolution.
+	tsdev.yres	[TS] Vertical screen resolution.
+
 	u14-34f=	[HW,SCSI] UltraStor 14F/34F SCSI host adapter
 			See header of drivers/scsi/u14-34f.c.
 

@@ -34,6 +34,7 @@
 #include <linux/slab.h>
 #include <linux/poll.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/input.h>
 #include <linux/major.h>
@@ -50,6 +51,18 @@
 #ifndef CONFIG_INPUT_TSDEV_SCREEN_Y
 #define CONFIG_INPUT_TSDEV_SCREEN_Y	320
 #endif
+
+MODULE_AUTHOR("James Simmons <jsimmons@transvirtual.com>");
+MODULE_DESCRIPTION("Input driver to touchscreen converter");
+MODULE_LICENSE("GPL");
+
+static int xres = CONFIG_INPUT_TSDEV_SCREEN_X;
+module_param(xres, uint, 0);
+MODULE_PARM_DESC(xres, "Horizontal screen resolution");
+
+static int yres = CONFIG_INPUT_TSDEV_SCREEN_Y;
+module_param(yres, uint, 0);
+MODULE_PARM_DESC(yres, "Vertical screen resolution");
 
 struct tsdev {
 	int exist;
@@ -81,9 +94,6 @@ struct tsdev_list {
 static struct input_handler tsdev_handler;
 
 static struct tsdev *tsdev_table[TSDEV_MINORS];
-
-static int xres = CONFIG_INPUT_TSDEV_SCREEN_X;
-static int yres = CONFIG_INPUT_TSDEV_SCREEN_Y;
 
 static int tsdev_fasync(int fd, struct file *file, int on)
 {
@@ -394,10 +404,3 @@ static void __exit tsdev_exit(void)
 
 module_init(tsdev_init);
 module_exit(tsdev_exit);
-
-MODULE_AUTHOR("James Simmons <jsimmons@transvirtual.com>");
-MODULE_DESCRIPTION("Input driver to touchscreen converter");
-MODULE_PARM(xres, "i");
-MODULE_PARM_DESC(xres, "Horizontal screen resolution");
-MODULE_PARM(yres, "i");
-MODULE_PARM_DESC(yres, "Vertical screen resolution");
