@@ -86,7 +86,7 @@ extern int ip_route_me_harder(struct sk_buff **pskb);
 extern int skb_ip_make_writable(struct sk_buff **pskb,
 				unsigned int writable_len);
 
-#ifdef CONFIG_XFRM
+#if defined(CONFIG_XFRM) && defined(CONFIG_NETFILTER)
 #include <net/route.h>
 #include <net/xfrm.h>
 
