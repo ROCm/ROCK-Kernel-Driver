@@ -635,6 +635,9 @@ cpu_init (void)
 	ia32_cpu_init();
 #endif
 
+	/* Clear ITC to eliminiate sched_clock() overflows in human time.  */
+	ia64_set_itc(0);
+
 	/* disable all local interrupt sources: */
 	ia64_set_itv(1 << 16);
 	ia64_set_lrr0(1 << 16);
