@@ -19,22 +19,6 @@ pcibios_present(void)
 	return !list_empty(&pci_devices);
 }
 
-int
-pcibios_find_device(unsigned short vendor, unsigned short device, unsigned short index,
-		    unsigned char *bus, unsigned char *devfn)
-{
-	const struct pci_dev *dev = NULL;
-	int cnt = 0;
-
-	while ((dev = pci_find_device(vendor, device, dev)))
-		if (index == cnt++) {
-			*bus = dev->bus->number;
-			*devfn = dev->devfn;
-			return PCIBIOS_SUCCESSFUL;
-		}
-	return PCIBIOS_DEVICE_NOT_FOUND;
-}
-
 #define PCI_OP(rw,size,type)							\
 int pcibios_##rw##_config_##size (unsigned char bus, unsigned char dev_fn,	\
 				  unsigned char where, unsigned type val)	\
@@ -59,4 +43,3 @@ EXPORT_SYMBOL(pcibios_read_config_dword);
 EXPORT_SYMBOL(pcibios_write_config_byte);
 EXPORT_SYMBOL(pcibios_write_config_word);
 EXPORT_SYMBOL(pcibios_write_config_dword);
-EXPORT_SYMBOL(pcibios_find_device);

@@ -533,9 +533,6 @@ int pcibios_write_config_word (unsigned char bus, unsigned char dev_fn,
 			       unsigned char where, unsigned short val);
 int pcibios_write_config_dword (unsigned char bus, unsigned char dev_fn,
 				unsigned char where, unsigned int val);
-int pcibios_find_device (unsigned short vendor, unsigned short dev_id,
-			 unsigned short index, unsigned char *bus,
-			 unsigned char *dev_fn);
 
 /* Generic PCI functions used internally */
 
