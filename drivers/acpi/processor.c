@@ -475,8 +475,9 @@ acpi_processor_idle (void)
 	 * Track the number of longs (time asleep is greater than threshold)
 	 * and promote when the count threshold is reached.  Note that bus
 	 * mastering activity may prevent promotions.
+	 * Do not promote above acpi_cstate_limit.
 	 */
-	if (cx->promotion.state) {
+	if (cx->promotion.state && (cx->promotion.state <= acpi_cstate_limit)) {
 		if (sleep_ticks > cx->promotion.threshold.ticks) {
 			cx->promotion.count++;
  			cx->demotion.count = 0;
@@ -513,6 +514,13 @@ acpi_processor_idle (void)
 	}
 
 end:
+	/*
+	 * Demote if current state exceeds acpi_cstate_limit
+	 */
+	if (pr->power.state > acpi_cstate_limit) {
+		next_state = acpi_cstate_limit;
+	}
+
 	/*
 	 * New Cx State?
 	 * -------------
@@ -2543,5 +2551,6 @@ acpi_processor_exit (void)
 
 module_init(acpi_processor_init);
 module_exit(acpi_processor_exit);
+module_param_named(acpi_cstate_limit, acpi_cstate_limit, uint, 0);
 
 EXPORT_SYMBOL(acpi_processor_set_thermal_limit);
