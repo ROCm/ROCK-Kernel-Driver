@@ -10,8 +10,8 @@ export-objs    	:= fbmem.o fbcmap.o fbcon.o fbmon.o modedb.o \
 		   fbcon-vga.o fbcon-iplan2p2.o fbcon-iplan2p4.o \
 		   fbcon-iplan2p8.o fbcon-vga-planes.o fbcon-cfb16.o \
 		   fbcon-cfb2.o fbcon-cfb24.o fbcon-cfb32.o fbcon-cfb4.o \
-		   fbcon-cfb8.o fbcon-mac.o fbcon-mfb.o \
-		   cyber2000fb.o sa1100fb.o fbcon-hga.o fbgen.o
+		   fbcon-cfb8.o fbcon-mfb.o fbcon-hga.o \
+		   cyber2000fb.o sa1100fb.o fbgen.o
 
 # Each configuration option enables a list of files.
 
@@ -44,7 +44,7 @@ obj-$(CONFIG_FB_PM3)		  += pm3fb.o
 obj-$(CONFIG_FB_APOLLO)           += dnfb.o cfbfillrect.o cfbimgblt.o
 obj-$(CONFIG_FB_Q40)              += q40fb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o
 obj-$(CONFIG_FB_ATARI)            += atafb.o
-obj-$(CONFIG_FB_ATY128)           += aty128fb.o
+obj-$(CONFIG_FB_ATY128)           += aty128fb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o
 obj-$(CONFIG_FB_RADEON)		  += radeonfb.o
 obj-$(CONFIG_FB_NEOMAGIC)         += neofb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o
 obj-$(CONFIG_FB_IGA)              += igafb.o

@@ -285,6 +285,9 @@ struct aty128fb_par {
 	struct aty128_crtc crtc;
 	struct aty128_pll pll;
 	struct aty128_ddafifo fifo_reg;
+	const struct aty128_meminfo *mem;	/* onboard mem info    */
+	struct aty128_constants constants;	/* PLL and others      */
+	void *regbase;				/* remapped mmio       */
 	int blitter_may_be_busy;
 	int fifo_slots;		/* free slots in FIFO (64 max) */
 	int chip_gen;
@@ -292,16 +295,6 @@ struct aty128fb_par {
 	struct { int vram; int vram_valid; } mtrr;
 #endif
 };
-
-struct fb_info_aty128 {
-	struct fb_info fb_info;
-	struct fb_info_aty128 *next;
-	struct aty128_constants constants;	/* PLL and others      */
-	void *regbase;		/* remapped mmio       */
-	const struct aty128_meminfo *mem;	/* onboard mem info    */
-};
-
-static struct fb_info_aty128 *board_list = NULL;
 
 #define round_div(n, d) ((n+(d/2))/d)
 
@@ -311,92 +304,54 @@ static struct fb_info_aty128 *board_list = NULL;
 int aty128fb_init(void);
 int aty128fb_setup(char *options);
 
-static int aty128fb_set_var(struct fb_var_screeninfo *var, int con,
-			    struct fb_info *info);
+static int aty128fb_check_var(struct fb_var_screeninfo *var, struct fb_info *info);
+static int aty128fb_set_par(struct fb_info *info);
 static int aty128fb_setcolreg(u_int regno, u_int red, u_int green,
 			      u_int blue, u_int transp,
 			      struct fb_info *info);
 static int aty128fb_pan_display(struct fb_var_screeninfo *var, int con,
 				struct fb_info *fb);
-static int aty128fb_blank(int blank, struct fb_info *fb);
+static int aty128fb_blank(int blank, struct fb_info *info);
 static int aty128fb_rasterimg(struct fb_info *info, int start);
 
     /*
      *  Internal routines
      */
-
-static void aty128_set_disp(struct display *disp,
-			      struct fb_info *info);
-static int aty128_encode_var(struct fb_var_screeninfo *var,
-			     const struct aty128fb_par *par,
-			     const struct fb_info_aty128 *info);
 static int aty128_decode_var(struct fb_var_screeninfo *var,
 			     struct aty128fb_par *par,
-			     const struct fb_info_aty128 *info);
+			     const struct fb_info *info);
 static int aty128_pci_register(struct pci_dev *pdev,
 			       const struct aty128_chip_info *aci);
-static struct fb_info_aty128 *aty128_board_list_add(struct fb_info_aty128
-						    *board_list,
-						    struct fb_info_aty128
-						    *new_node);
 #if !defined(CONFIG_PPC) && !defined(__sparc__)
-static void __init aty128_get_pllinfo(struct fb_info_aty128 *info,
+static void __init aty128_get_pllinfo(struct aty128fb_par *par,
 				      char *bios_seg);
-static char __init *aty128find_ROM(struct fb_info_aty128 *info);
+static char __init *aty128find_ROM(struct fb_info *info);
 #endif
-static void aty128_timings(struct fb_info_aty128 *info);
-static void aty128_init_engine(const struct aty128fb_par *par,
-			       struct fb_info_aty128 *info);
-static void aty128_reset_engine(const struct fb_info_aty128 *info);
-static void aty128_flush_pixel_cache(const struct fb_info_aty128 *info);
-static void do_wait_for_fifo(u16 entries, struct fb_info_aty128 *info);
-static void wait_for_fifo(u16 entries, struct fb_info_aty128 *info);
-static void wait_for_idle(struct fb_info_aty128 *info);
+static void aty128_timings(struct aty128fb_par *par);
+static void aty128_init_engine(struct aty128fb_par *par,
+			       struct fb_info *info);
+static void aty128_reset_engine(struct aty128fb_par *par);
+static void aty128_flush_pixel_cache(struct aty128fb_par *par);
+static void do_wait_for_fifo(u16 entries, struct aty128fb_par *par);
+static void wait_for_fifo(u16 entries, struct aty128fb_par *par);
+static void wait_for_idle(struct aty128fb_par *par);
 static u32 bpp_to_depth(u32 bpp);
-
-#ifdef FBCON_HAS_CFB8
-static struct display_switch fbcon_aty128_8;
-static void fbcon_aty8_putc(struct vc_data *conp, struct display *p,
-			    int c, int yy, int xx);
-static void fbcon_aty8_putcs(struct vc_data *conp, struct display *p,
-			     const unsigned short *s, int count,
-			     int yy, int xx);
-#endif
-#ifdef FBCON_HAS_CFB16
-static struct display_switch fbcon_aty128_16;
-static void fbcon_aty16_putc(struct vc_data *conp, struct display *p,
-			     int c, int yy, int xx);
-static void fbcon_aty16_putcs(struct vc_data *conp, struct display *p,
-			      const unsigned short *s, int count,
-			      int yy, int xx);
-#endif
-#ifdef FBCON_HAS_CFB24
-static struct display_switch fbcon_aty128_24;
-static void fbcon_aty24_putc(struct vc_data *conp, struct display *p,
-			     int c, int yy, int xx);
-static void fbcon_aty24_putcs(struct vc_data *conp, struct display *p,
-			      const unsigned short *s, int count,
-			      int yy, int xx);
-#endif
-#ifdef FBCON_HAS_CFB32
-static struct display_switch fbcon_aty128_32;
-static void fbcon_aty32_putc(struct vc_data *conp, struct display *p,
-			     int c, int yy, int xx);
-static void fbcon_aty32_putcs(struct vc_data *conp, struct display *p,
-			      const unsigned short *s, int count,
-			      int yy, int xx);
-#endif
 
 static struct fb_ops aty128fb_ops = {
 	owner:		THIS_MODULE,
 	fb_get_fix:	gen_get_fix,
 	fb_get_var:	gen_get_var,
-	fb_set_var:	aty128fb_set_var,
+	fb_set_var:	gen_set_var,
 	fb_get_cmap:	gen_get_cmap,
 	fb_set_cmap:	gen_set_cmap,
+	fb_check_var:	aty128fb_check_var,
+	fb_set_par:	aty128fb_set_par,
 	fb_setcolreg:	aty128fb_setcolreg,
 	fb_pan_display:	aty128fb_pan_display,
 	fb_blank:	aty128fb_blank,
+	fb_fillrect:	cfb_fillrect,
+	fb_copyarea:	cfb_copyarea,
+	fb_imageblit:	cfb_imageblit,
 	fb_rasterimg:	aty128fb_rasterimg,
 };
 
@@ -416,60 +371,55 @@ static struct backlight_controller aty128_backlight_controller = {
      *    using the other register aperture. TODO.
      */
 static inline u32
-_aty_ld_le32(volatile unsigned int regindex,
-	     const struct fb_info_aty128 *info)
+_aty_ld_le32(volatile unsigned int regindex, const struct aty128fb_par *par)
 {
 	u32 val;
 
 #if defined(__powerpc__)
-      asm("lwbrx %0,%1,%2;eieio": "=r"(val):"b"(regindex),
-	    "r"(info->
-		regbase));
+	asm("lwbrx %0,%1,%2;eieio": "=r"(val):"b"(regindex),"r"(par->regbase));
 #else
-	val = readl(info->regbase + regindex);
+	val = readl(par->regbase + regindex);
 #endif
-
 	return val;
 }
 
 static inline void
-_aty_st_le32(volatile unsigned int regindex, u32 val,
-	     const struct fb_info_aty128 *info)
+_aty_st_le32(volatile unsigned int regindex, u32 val, const struct aty128fb_par *par)
 {
 #if defined(__powerpc__)
-      asm("stwbrx %0,%1,%2;eieio": : "r"(val), "b"(regindex), "r"(info->regbase):"memory");
+	asm("stwbrx %0,%1,%2;eieio": : "r"(val), "b"(regindex), "r"(par->regbase):"memory");
 #else
-	writel(val, info->regbase + regindex);
+	writel(val, par->regbase + regindex);
 #endif
 }
 
 static inline u8
-_aty_ld_8(unsigned int regindex, const struct fb_info_aty128 *info)
+_aty_ld_8(unsigned int regindex, const struct aty128fb_par *par)
 {
-	return readb(info->regbase + regindex);
+	return readb(par->regbase + regindex);
 }
 
 static inline void
-_aty_st_8(unsigned int regindex, u8 val, const struct fb_info_aty128 *info)
+_aty_st_8(unsigned int regindex, u8 val, const struct aty128fb_par *par)
 {
-	writeb(val, info->regbase + regindex);
+	writeb(val, par->regbase + regindex);
 }
 
-#define aty_ld_le32(regindex)		_aty_ld_le32(regindex, info)
-#define aty_st_le32(regindex, val)	_aty_st_le32(regindex, val, info)
-#define aty_ld_8(regindex)		_aty_ld_8(regindex, info)
-#define aty_st_8(regindex, val)		_aty_st_8(regindex, val, info)
+#define aty_ld_le32(regindex)		_aty_ld_le32(regindex, par)
+#define aty_st_le32(regindex, val)	_aty_st_le32(regindex, val, par)
+#define aty_ld_8(regindex)		_aty_ld_8(regindex, par)
+#define aty_st_8(regindex, val)		_aty_st_8(regindex, val, par)
 
     /*
      * Functions to read from/write to the pll registers
      */
 
-#define aty_ld_pll(pll_index)		_aty_ld_pll(pll_index, info)
-#define aty_st_pll(pll_index, val)	_aty_st_pll(pll_index, val, info)
+#define aty_ld_pll(pll_index)		_aty_ld_pll(pll_index, par)
+#define aty_st_pll(pll_index, val)	_aty_st_pll(pll_index, val, par)
 
 
 static u32
-_aty_ld_pll(unsigned int pll_index, const struct fb_info_aty128 *info)
+_aty_ld_pll(unsigned int pll_index, const struct aty128fb_par *par)
 {
 	aty_st_8(CLOCK_CNTL_INDEX, pll_index & 0x1F);
 	return aty_ld_le32(CLOCK_CNTL_DATA);
@@ -477,8 +427,7 @@ _aty_ld_pll(unsigned int pll_index, const struct fb_info_aty128 *info)
 
 
 static void
-_aty_st_pll(unsigned int pll_index, u32 val,
-	    const struct fb_info_aty128 *info)
+_aty_st_pll(unsigned int pll_index, u32 val, const struct aty128fb_par *par)
 {
 	aty_st_8(CLOCK_CNTL_INDEX, (pll_index & 0x1F) | PLL_WR_EN);
 	aty_st_le32(CLOCK_CNTL_DATA, val);
@@ -486,19 +435,19 @@ _aty_st_pll(unsigned int pll_index, u32 val,
 
 
 /* return true when the PLL has completed an atomic update */
-static int aty_pll_readupdate(const struct fb_info_aty128 *info)
+static int aty_pll_readupdate(const struct aty128fb_par *par)
 {
 	return !(aty_ld_pll(PPLL_REF_DIV) & PPLL_ATOMIC_UPDATE_R);
 }
 
 
-static void aty_pll_wait_readupdate(const struct fb_info_aty128 *info)
+static void aty_pll_wait_readupdate(const struct aty128fb_par *par)
 {
 	unsigned long timeout = jiffies + HZ / 100;	// should be more than enough
 	int reset = 1;
 
 	while (time_before(jiffies, timeout))
-		if (aty_pll_readupdate(info)) {
+		if (aty_pll_readupdate(par)) {
 			reset = 0;
 			break;
 		}
@@ -509,9 +458,9 @@ static void aty_pll_wait_readupdate(const struct fb_info_aty128 *info)
 
 
 /* tell PLL to update */
-static void aty_pll_writeupdate(const struct fb_info_aty128 *info)
+static void aty_pll_writeupdate(const struct aty128fb_par *par)
 {
-	aty_pll_wait_readupdate(info);
+	aty_pll_wait_readupdate(par);
 
 	aty_st_pll(PPLL_REF_DIV,
 		   aty_ld_pll(PPLL_REF_DIV) | PPLL_ATOMIC_UPDATE_W);
@@ -519,7 +468,7 @@ static void aty_pll_writeupdate(const struct fb_info_aty128 *info)
 
 
 /* write to the scratch register to test r/w functionality */
-static int __init register_test(const struct fb_info_aty128 *info)
+static int __init register_test(const struct aty128fb_par *par)
 {
 	u32 val;
 	int flag = 0;
@@ -542,9 +491,8 @@ static int __init register_test(const struct fb_info_aty128 *info)
     /*
      * Accelerator engine functions
      */
-static void do_wait_for_fifo(u16 entries, struct fb_info_aty128 *info)
+static void do_wait_for_fifo(u16 entries, struct aty128fb_par *par)
 {
-	struct aty128fb_par *par = (struct aty128fb_par *) info->fb_info.par;
 	int i;
 
 	for (;;) {
@@ -553,45 +501,41 @@ static void do_wait_for_fifo(u16 entries, struct fb_info_aty128 *info)
 			if (par->fifo_slots >= entries)
 				return;
 		}
-		aty128_reset_engine(info);
+		aty128_reset_engine(par);
 	}
 }
 
-
-static void wait_for_idle(struct fb_info_aty128 *info)
+static void wait_for_idle(struct aty128fb_par *par)
 {
-	struct aty128fb_par *par = (struct aty128fb_par *) info->fb_info.par;
 	int i;
 
-	do_wait_for_fifo(64, info);
+	do_wait_for_fifo(64, par);
 
 	for (;;) {
 		for (i = 0; i < 2000000; i++) {
 			if (!(aty_ld_le32(GUI_STAT) & (1 << 31))) {
-				aty128_flush_pixel_cache(info);
+				aty128_flush_pixel_cache(par);
 				par->blitter_may_be_busy = 0;
 				return;
 			}
 		}
-		aty128_reset_engine(info);
+		aty128_reset_engine(par);
 	}
 }
 
 
-static void wait_for_fifo(u16 entries, struct fb_info_aty128 *info)
+static void wait_for_fifo(u16 entries, struct aty128fb_par *par)
 {
-	struct aty128fb_par *par = (struct aty128fb_par *) info->fb_info.par;
-
 	if (par->fifo_slots < entries)
-		do_wait_for_fifo(64, info);
+		do_wait_for_fifo(64, par);
 	par->fifo_slots -= entries;
 }
 
 
-static void aty128_flush_pixel_cache(const struct fb_info_aty128 *info)
+static void aty128_flush_pixel_cache(struct aty128fb_par *par)
 {
-	int i;
 	u32 tmp;
+	int i;
 
 	tmp = aty_ld_le32(PC_NGUI_CTLSTAT);
 	tmp &= ~(0x00ff);
@@ -604,11 +548,11 @@ static void aty128_flush_pixel_cache(const struct fb_info_aty128 *info)
 }
 
 
-static void aty128_reset_engine(const struct fb_info_aty128 *info)
+static void aty128_reset_engine(struct aty128fb_par *par)
 {
 	u32 gen_reset_cntl, clock_cntl_index, mclk_cntl;
 
-	aty128_flush_pixel_cache(info);
+	aty128_flush_pixel_cache(par);
 
 	clock_cntl_index = aty_ld_le32(CLOCK_CNTL_INDEX);
 	mclk_cntl = aty_ld_pll(MCLK_CNTL);
@@ -633,25 +577,25 @@ static void aty128_reset_engine(const struct fb_info_aty128 *info)
 
 
 static void
-aty128_init_engine(const struct aty128fb_par *par,
-		   struct fb_info_aty128 *info)
+aty128_init_engine(struct aty128fb_par *par,
+		   struct fb_info *info)
 {
 	u32 pitch_value;
 
-	wait_for_idle(info);
+	wait_for_idle(par);
 
 	/* 3D scaler not spoken here */
-	wait_for_fifo(1, info);
+	wait_for_fifo(1, par);
 	aty_st_le32(SCALE_3D_CNTL, 0x00000000);
 
-	aty128_reset_engine(info);
+	aty128_reset_engine(par);
 
 	pitch_value = par->crtc.pitch;
 	if (par->crtc.bpp == 24) {
 		pitch_value = pitch_value * 3;
 	}
 
-	wait_for_fifo(4, info);
+	wait_for_fifo(4, par);
 	/* setup engine offset registers */
 	aty_st_le32(DEFAULT_OFFSET, 0x00000000);
 
@@ -678,7 +622,7 @@ aty128_init_engine(const struct aty128fb_par *par,
 		    GMC_DST_CLR_CMP_FCN_CLEAR |
 		    GMC_AUX_CLIP_CLEAR | GMC_WRITE_MASK_SET);
 
-	wait_for_fifo(8, info);
+	wait_for_fifo(8, par);
 	/* clear the line drawing registers */
 	aty_st_le32(DST_BRES_ERR, 0);
 	aty_st_le32(DST_BRES_INC, 0);
@@ -696,7 +640,7 @@ aty128_init_engine(const struct aty128fb_par *par,
 	aty_st_le32(DP_WRITE_MASK, 0xFFFFFFFF);
 
 	/* Wait for all the writes to be completed before returning */
-	wait_for_idle(info);
+	wait_for_idle(par);
 }
 
 
@@ -723,7 +667,7 @@ static u32 bpp_to_depth(u32 bpp)
 /* Program the CRTC registers */
 static void
 aty128_set_crtc(const struct aty128_crtc *crtc,
-		const struct fb_info_aty128 *info)
+		const struct aty128fb_par *par)
 {
 	aty_st_le32(CRTC_GEN_CNTL, crtc->gen_cntl);
 	aty_st_le32(CRTC_H_TOTAL_DISP, crtc->h_total);
@@ -745,7 +689,7 @@ aty128_set_crtc(const struct aty128_crtc *crtc,
 static int
 aty128_var_to_crtc(struct fb_var_screeninfo *var,
 		   struct aty128_crtc *crtc,
-		   const struct fb_info_aty128 *info)
+		   const struct fb_info *info)
 {
 	u32 xres, yres, vxres, vyres, xoffset, yoffset, bpp;
 	u32 left, right, upper, lower, hslen, vslen, sync, vmode;
@@ -800,7 +744,7 @@ aty128_var_to_crtc(struct fb_var_screeninfo *var,
 	bytpp = mode_bytpp[depth];
 
 	/* make sure there is enough video ram for the mode */
-	if ((u32) (vxres * vyres * bytpp) > info->fb_info.fix.smem_len) {
+	if ((u32) (vxres * vyres * bytpp) > info->fix.smem_len) {
 		printk(KERN_ERR "aty128fb: Not enough memory for mode\n");
 		return -EINVAL;
 	}
@@ -985,7 +929,7 @@ aty128_crtc_to_var(const struct aty128_crtc *crtc,
 }
 
 static void
-aty128_set_pll(struct aty128_pll *pll, const struct fb_info_aty128 *info)
+aty128_set_pll(struct aty128_pll *pll, const struct aty128fb_par *par)
 {
 	u32 div3;
 
@@ -1002,9 +946,9 @@ aty128_set_pll(struct aty128_pll *pll, const struct fb_info_aty128 *info)
 		   PPLL_ATOMIC_UPDATE_EN);
 
 	/* write the reference divider */
-	aty_pll_wait_readupdate(info);
-	aty_st_pll(PPLL_REF_DIV, info->constants.ref_divider & 0x3ff);
-	aty_pll_writeupdate(info);
+	aty_pll_wait_readupdate(par);
+	aty_st_pll(PPLL_REF_DIV, par->constants.ref_divider & 0x3ff);
+	aty_pll_writeupdate(par);
 
 	div3 = aty_ld_pll(PPLL_DIV_3);
 	div3 &= ~PPLL_FB3_DIV_MASK;
@@ -1013,13 +957,13 @@ aty128_set_pll(struct aty128_pll *pll, const struct fb_info_aty128 *info)
 	div3 |= post_conv[pll->post_divider] << 16;
 
 	/* write feedback and post dividers */
-	aty_pll_wait_readupdate(info);
+	aty_pll_wait_readupdate(par);
 	aty_st_pll(PPLL_DIV_3, div3);
-	aty_pll_writeupdate(info);
+	aty_pll_writeupdate(par);
 
-	aty_pll_wait_readupdate(info);
+	aty_pll_wait_readupdate(par);
 	aty_st_pll(HTOTAL_CNTL, 0);	/* no horiz crtc adjustment */
-	aty_pll_writeupdate(info);
+	aty_pll_writeupdate(par);
 
 	/* clear the reset, just in case */
 	aty_st_pll(PPLL_CNTL, aty_ld_pll(PPLL_CNTL) & ~PPLL_RESET);
@@ -1028,9 +972,9 @@ aty128_set_pll(struct aty128_pll *pll, const struct fb_info_aty128 *info)
 
 static int
 aty128_var_to_pll(u32 period_in_ps, struct aty128_pll *pll,
-		  const struct fb_info_aty128 *info)
+		  const struct aty128fb_par *par)
 {
-	const struct aty128_constants c = info->constants;
+	const struct aty128_constants c = par->constants;
 	unsigned char post_dividers[] = { 1, 2, 4, 8, 3, 6, 12 };
 	u32 output_freq;
 	u32 vclk;		/* in .01 MHz */
@@ -1072,7 +1016,7 @@ aty128_var_to_pll(u32 period_in_ps, struct aty128_pll *pll,
 static int
 aty128_pll_to_var(const struct aty128_pll *pll,
 		  struct fb_var_screeninfo *var,
-		  const struct fb_info_aty128 *info)
+		  const struct fb_info *info)
 {
 	var->pixclock = 100000000 / pll->vclk;
 
@@ -1082,7 +1026,7 @@ aty128_pll_to_var(const struct aty128_pll *pll,
 
 static void
 aty128_set_fifo(const struct aty128_ddafifo *dsp,
-		const struct fb_info_aty128 *info)
+		const struct aty128fb_par *par)
 {
 	aty_st_le32(DDA_CONFIG, dsp->dda_config);
 	aty_st_le32(DDA_ON_OFF, dsp->dda_on_off);
@@ -1092,12 +1036,13 @@ aty128_set_fifo(const struct aty128_ddafifo *dsp,
 static int
 aty128_ddafifo(struct aty128_ddafifo *dsp,
 	       const struct aty128_pll *pll,
-	       u32 bpp, const struct fb_info_aty128 *info)
+	       u32 bpp, const struct fb_info *info)
 {
-	const struct aty128_meminfo *m = info->mem;
-	u32 xclk = info->constants.xclk;
-	u32 fifo_width = info->constants.fifo_width;
-	u32 fifo_depth = info->constants.fifo_depth;
+	struct aty128fb_par *par = (struct aty128fb_par *) info->par;
+	const struct aty128_meminfo *m = par->mem;
+	u32 xclk = par->constants.xclk;
+	u32 fifo_width = par->constants.fifo_width;
+	u32 fifo_depth = par->constants.fifo_depth;
 	s32 x, b, p, ron, roff;
 	u32 n, d;
 
@@ -1147,13 +1092,13 @@ aty128_ddafifo(struct aty128_ddafifo *dsp,
  * This actually sets the video mode.
  */
 static int 
-aty128fb_set_par(struct fb_info_aty128 *info)
+aty128fb_set_par(struct fb_info *info)
 {
-	struct aty128fb_par *par = (struct aty128fb_par *) info->fb_info.par;
+	struct aty128fb_par *par = (struct aty128fb_par *) info->par;
 	u32 config;
 
 	if (par->blitter_may_be_busy)
-		wait_for_idle(info);
+		wait_for_idle(par);
 
 	/* clear all registers that may interfere with mode setting */
 	aty_st_le32(OVR_CLR, 0);
@@ -1171,9 +1116,9 @@ aty128fb_set_par(struct fb_info_aty128 *info)
 
 	aty_st_8(CRTC_EXT_CNTL + 1, 4);	/* turn video off */
 
-	aty128_set_crtc(&par->crtc, info);
-	aty128_set_pll(&par->pll, info);
-	aty128_set_fifo(&par->fifo_reg, info);
+	aty128_set_crtc(&par->crtc, par);
+	aty128_set_pll(&par->pll, par);
+	aty128_set_fifo(&par->fifo_reg, par);
 
 	config = aty_ld_le32(CONFIG_CNTL) & ~3;
 
@@ -1187,18 +1132,18 @@ aty128fb_set_par(struct fb_info_aty128 *info)
 	aty_st_le32(CONFIG_CNTL, config);
 	aty_st_8(CRTC_EXT_CNTL + 1, 0);	/* turn the video back on */
 
-	if (info->fb_info.var.accel_flags & FB_ACCELF_TEXT)
+	if (info->var.accel_flags & FB_ACCELF_TEXT)
 		aty128_init_engine(par, info);
 
 #if defined(CONFIG_BOOTX_TEXT)
-	btext_update_display(info->fb_info.fix.smem_start,
+	btext_update_display(info->fix.smem_start,
 			     (((par->crtc.h_total >> 16) & 0xff) + 1) * 8,
 			     ((par->crtc.v_total >> 16) & 0x7ff) + 1,
 			     par->crtc.bpp,
 			     par->crtc.vxres * par->crtc.bpp / 8);
 #endif				/* CONFIG_BOOTX_TEXT */
-	info->fb_info.fix.line_length = (info->fb_info.var.xres_virtual * info->fb_info.var.bits_per_pixel) >> 3;
-	info->fb_info.fix.visual = info->fb_info.var.bits_per_pixel <= 8 ? FB_VISUAL_PSEUDOCOLOR : FB_VISUAL_DIRECTCOLOR;
+	info->fix.line_length = (info->var.xres_virtual * info->var.bits_per_pixel) >> 3;
+	info->fix.visual = info->var.bits_per_pixel <= 8 ? FB_VISUAL_PSEUDOCOLOR : FB_VISUAL_DIRECTCOLOR;
 	return 0;
 }
 
@@ -1208,14 +1153,14 @@ aty128fb_set_par(struct fb_info_aty128 *info)
 
 static int
 aty128_decode_var(struct fb_var_screeninfo *var, struct aty128fb_par *par,
-		  const struct fb_info_aty128 *info)
+		  const struct fb_info *info)
 {
 	int err;
 
 	if ((err = aty128_var_to_crtc(var, &par->crtc, info)))
 		return err;
 
-	if ((err = aty128_var_to_pll(var->pixclock, &par->pll, info)))
+	if ((err = aty128_var_to_pll(var->pixclock, &par->pll, par)))
 		return err;
 
 	if ((err =
@@ -1225,25 +1170,12 @@ aty128_decode_var(struct fb_var_screeninfo *var, struct aty128fb_par *par,
 	return 0;
 }
 
-
-static int
-aty128_encode_var(struct fb_var_screeninfo *var,
-		  const struct aty128fb_par *par,
-		  const struct fb_info_aty128 *info)
-{
-	int err;
-
-	if ((err = aty128_crtc_to_var(&par->crtc, var)))
-		return err;
-
-	if ((err = aty128_pll_to_var(&par->pll, var, info)))
-		return err;
-	return 0;
-}
-
 static int
 aty128fb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 {
+	struct aty128fb_par *par = (struct aty128fb_par *) info->par;
+	int err;
+
 	/* basic (in)sanity checks */
 	if (!var->xres)
 		var->xres = 1;
@@ -1281,103 +1213,16 @@ aty128fb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 
 	var->height = -1;
 	var->width = -1;
-	return 0;
-}
-
-    /*
-     *  Set the User Defined Part of the Display
-     */
-
-static int
-aty128fb_set_var(struct fb_var_screeninfo *var, int con,
-		 struct fb_info *fb)
-{
-	struct fb_info_aty128 *info = (struct fb_info_aty128 *) fb;
-	struct aty128fb_par *par = (struct aty128fb_par *) fb->par;
-	struct display *display;
-	int oldxres, oldyres, oldvxres, oldvyres, oldbpp, oldaccel;
-	int err;
-
-	display = (con >= 0) ? &fb_display[con] : fb->disp;
-
-	aty128fb_check_var(var, fb);
 
 	if ((err = aty128_decode_var(var, par, info)))
 		return err;
+	
+	if ((err = aty128_crtc_to_var(&par->crtc, var)))
+		return err;
 
-	aty128_encode_var(var, par, info);
-
-	if ((var->activate & FB_ACTIVATE_MASK) != FB_ACTIVATE_TEST) {
-		oldxres = info->fb_info.var.xres;
-		oldyres = info->fb_info.var.yres;
-		oldvxres = info->fb_info.var.xres_virtual;
-		oldvyres = info->fb_info.var.yres_virtual;
-		oldbpp = info->fb_info.var.bits_per_pixel;
-		oldaccel = info->fb_info.var.accel_flags;
-		display->var = info->fb_info.var = *var;
-		if (oldxres != var->xres || oldyres != var->yres ||
-	    	    oldvxres != var->xres_virtual || oldvyres != var->yres_virtual
-	    	    || oldbpp != var->bits_per_pixel
-	    	    || oldaccel != var->accel_flags) {
-			display->visual = info->fb_info.fix.visual;
-			display->type = info->fb_info.fix.type;
-			display->type_aux = info->fb_info.fix.type_aux;
-			display->ypanstep = info->fb_info.fix.ypanstep;
-			display->ywrapstep = info->fb_info.fix.ywrapstep;
-			display->line_length = info->fb_info.fix.line_length;
-			display->can_soft_blank = 1;
-			display->inverse = 0;
-
-			aty128_set_disp(display, &info->fb_info);
-		}
-		if (!info->fb_info.display_fg
-	    		|| info->fb_info.display_fg->vc_num == con)
-			aty128fb_set_par(info);
-
-		if (oldbpp != var->bits_per_pixel) {
-			if ((err = fb_alloc_cmap(&display->cmap, 0, 0)))
-				return err;
-			do_install_cmap(con, &info->fb_info);
-		}
-	}	
+	if ((err = aty128_pll_to_var(&par->pll, var, info)))
+		return err;
 	return 0;
-}
-
-
-static void
-aty128_set_disp(struct display *disp,
-		  struct fb_info *info)
-{
-	disp->scrollmode = SCROLL_YNOMOVE;
-
-	switch (info->var.bits_per_pixel) {
-#ifdef FBCON_HAS_CFB8
-	case 8:
-		disp->dispsw = &fbcon_aty128_8;
-		break;
-#endif
-#ifdef FBCON_HAS_CFB16
-	case 15:
-	case 16:
-		disp->dispsw = &fbcon_aty128_16;
-		disp->dispsw_data = info->pseudo_palette;
-		break;
-#endif
-#ifdef FBCON_HAS_CFB24
-	case 24:
-		disp->dispsw = &fbcon_aty128_24;
-		disp->dispsw_data = info->pseudo_palette;
-		break;
-#endif
-#ifdef FBCON_HAS_CFB32
-	case 32:
-		disp->dispsw = &fbcon_aty128_32;
-		disp->dispsw_data = info->pseudo_palette;
-		break;
-#endif
-	default:
-		disp->dispsw = &fbcon_dummy;
-	}
 }
 
     /*
@@ -1387,10 +1232,9 @@ aty128_set_disp(struct display *disp,
      */
 static int
 aty128fb_pan_display(struct fb_var_screeninfo *var, int con,
-		     struct fb_info *fb)
+		     struct fb_info *info)
 {
-	struct fb_info_aty128 *info = (struct fb_info_aty128 *) fb;
-	struct aty128fb_par *par = (struct aty128fb_par *) fb->par;
+	struct aty128fb_par *par = (struct aty128fb_par *) info->par;
 	u32 xoffset, yoffset;
 	u32 offset;
 	u32 xres, yres;
@@ -1401,7 +1245,7 @@ aty128fb_pan_display(struct fb_var_screeninfo *var, int con,
 	xoffset = (var->xoffset + 7) & ~7;
 	yoffset = var->yoffset;
 
-	if (xoffset + xres > info->fb_info.var.xres_virtual 
+	if (xoffset + xres > info->var.xres_virtual 
 	    || yoffset + yres > par->crtc.vyres)
 		return -EINVAL;
 
@@ -1409,20 +1253,63 @@ aty128fb_pan_display(struct fb_var_screeninfo *var, int con,
 	par->crtc.yoffset = yoffset;
 
 	offset =
-	    ((yoffset * info->fb_info.var.xres_virtual + xoffset) * par->crtc.bpp) >> 6;
+	    ((yoffset * info->var.xres_virtual + xoffset) * par->crtc.bpp) >> 6;
 
 	aty_st_le32(CRTC_OFFSET, offset);
 
 	return 0;
 }
 
+    /*
+     *  Accelerated functions
+     */
+
+static void
+aty128fb_rectcopy(int srcx, int srcy, int dstx, int dsty,
+		  u_int width, u_int height, struct fb_info *info)
+{
+	struct aty128fb_par *par = (struct aty128fb_par *) info->par;
+	u32 save_dp_datatype, save_dp_cntl, bppval;
+
+	if (!width || !height)
+		return;
+
+	bppval = bpp_to_depth(par->crtc.bpp);
+	if (bppval == DST_24BPP) {
+		srcx *= 3;
+		dstx *= 3;
+		width *= 3;
+	} else if (bppval == -EINVAL) {
+		printk("aty128fb: invalid depth\n");
+		return;
+	}
+
+	wait_for_fifo(2, par);
+	save_dp_datatype = aty_ld_le32(DP_DATATYPE);
+	save_dp_cntl = aty_ld_le32(DP_CNTL);
+
+	wait_for_fifo(6, par);
+	aty_st_le32(SRC_Y_X, (srcy << 16) | srcx);
+	aty_st_le32(DP_MIX, ROP3_SRCCOPY | DP_SRC_RECT);
+	aty_st_le32(DP_CNTL, DST_X_LEFT_TO_RIGHT | DST_Y_TOP_TO_BOTTOM);
+	aty_st_le32(DP_DATATYPE, save_dp_datatype | bppval | SRC_DSTCOLOR);
+
+	aty_st_le32(DST_Y_X, (dsty << 16) | dstx);
+	aty_st_le32(DST_HEIGHT_WIDTH, (height << 16) | width);
+
+	par->blitter_may_be_busy = 1;
+
+	wait_for_fifo(2, par);
+	aty_st_le32(DP_DATATYPE, save_dp_datatype);
+	aty_st_le32(DP_CNTL, save_dp_cntl);
+}
+
 static int aty128fb_rasterimg(struct fb_info *info, int start)
 {
-	struct fb_info_aty128 *fb = (struct fb_info_aty128 *) info;
 	struct aty128fb_par *par = (struct aty128fb_par *) info->par;
 
 	if (par->blitter_may_be_busy)
-		wait_for_idle(fb);
+		wait_for_idle(par);
 	return 0;
 }
 
@@ -1489,7 +1376,7 @@ int __init aty128fb_setup(char *options)
      */
 
 static int __init
-aty128_init(struct fb_info_aty128 *info, struct aty128fb_par *par,
+aty128_init(struct fb_info *info, struct aty128fb_par *par,
 	    struct pci_dev *pdev, const char *name)
 {
 	struct fb_var_screeninfo var;
@@ -1499,14 +1386,14 @@ aty128_init(struct fb_info_aty128 *info, struct aty128fb_par *par,
 	const struct aty128_chip_info *aci = &aty128_pci_probe_list[0];
 	char *video_card = "Rage128";
 
-	if (!info->fb_info.fix.smem_len)	/* may have already been probed */
-		info->fb_info.fix.smem_len =
+	if (!info->fix.smem_len)	/* may have already been probed */
+		info->fix.smem_len =
 		    aty_ld_le32(CONFIG_MEMSIZE) & 0x03FFFFFF;
 
 #ifdef CONFIG_MTRR
 	if (mtrr) {
-		par->mtrr.vram = mtrr_add(info->fb_info.fix.smem_start,
-					  info->fb_info.fix.smem_len,
+		par->mtrr.vram = mtrr_add(info->fix.smem_start,
+					  info->fix.smem_len,
 					  MTRR_TYPE_WRCOMB, 1);
 		par->mtrr.vram_valid = 1;
 		/* let there be speed */
@@ -1527,30 +1414,30 @@ aty128_init(struct fb_info_aty128 *info, struct aty128fb_par *par,
 	printk(KERN_INFO "aty128fb: %s [chip rev 0x%x] ", video_card,
 	       chip_rev);
 
-	if (info->fb_info.fix.smem_len % (1024 * 1024) == 0)
+	if (info->fix.smem_len % (1024 * 1024) == 0)
 		printk("%dM %s\n",
-		       info->fb_info.fix.smem_len / (1024 * 1024),
-		       info->mem->name);
+		       info->fix.smem_len / (1024 * 1024),
+		       par->mem->name);
 	else
-		printk("%dk %s\n", info->fb_info.fix.smem_len / 1024,
-		       info->mem->name);
+		printk("%dk %s\n", info->fix.smem_len / 1024,
+		       par->mem->name);
 
 	/* fill in info */
-	strcpy(info->fb_info.modename, info->fb_info.fix.id);
-	info->fb_info.node = NODEV;
-	info->fb_info.fbops = &aty128fb_ops;
-	strcpy(info->fb_info.fontname, fontname);
-	info->fb_info.changevar = NULL;
-	info->fb_info.switch_con = gen_switch;
-	info->fb_info.updatevar = NULL;
-	info->fb_info.flags = FBINFO_FLAG_DEFAULT;
+	strcpy(info->modename, info->fix.id);
+	info->node = NODEV;
+	info->fbops = &aty128fb_ops;
+	strcpy(info->fontname, fontname);
+	info->changevar = NULL;
+	info->switch_con = gen_switch;
+	info->updatevar = NULL;
+	info->flags = FBINFO_FLAG_DEFAULT;
 
 	var = default_var;
 #ifdef CONFIG_PPC
 	if (_machine == _MACH_Pmac) {
 		if (mode_option) {
 			if (!mac_find_mode
-			    (&var, &info->fb_info, mode_option, 8))
+			    (&var, info, mode_option, 8))
 				var = default_var;
 		} else {
 			if (default_vmode <= 0
@@ -1592,14 +1479,14 @@ aty128_init(struct fb_info_aty128 *info, struct aty128fb_par *par,
 #endif				/* CONFIG_PPC */
 	{
 		if (fb_find_mode
-		    (&var, &info->fb_info, mode_option, NULL, 0,
+		    (&var, info, mode_option, NULL, 0,
 		     &defaultmode, 8) == 0)
 			var = default_var;
 	}
 
 	var.accel_flags |= FB_ACCELF_TEXT;
 
-	info->fb_info.var = var;
+	info->var = var;
 
 	if (aty128_decode_var(&var, par, info)) {
 		printk(KERN_ERR "aty128fb: Cannot set default mode.\n");
@@ -1615,48 +1502,27 @@ aty128_init(struct fb_info_aty128 *info, struct aty128fb_par *par,
 	/* turn off bus mastering, just in case */
 	aty_st_le32(BUS_CNTL, aty_ld_le32(BUS_CNTL) | BUS_MASTER_DIS);
 
-	aty128fb_set_var(&var, -1, &info->fb_info);
+	gen_set_var(&var, -1, info);
 	aty128_init_engine(par, info);
 
-	board_list = aty128_board_list_add(board_list, info);
-
 	size = (var.bits_per_pixel <= 8) ? 256 : 32;
-	fb_alloc_cmap(&info->fb_info.cmap, size, 0);
+	fb_alloc_cmap(&info->cmap, size, 0);
 
-	if (register_framebuffer(&info->fb_info) < 0)
+	if (register_framebuffer(info) < 0)
 		return 0;
 
 #ifdef CONFIG_PMAC_BACKLIGHT
 	/* Could be extended to Rage128Pro LVDS output too */
 	if (info->chip_gen == rage_M3)
 		register_backlight_controller(&aty128_backlight_controller,
-					      info, "ati");
+					      par, "ati");
 #endif				/* CONFIG_PMAC_BACKLIGHT */
 
 	printk(KERN_INFO "fb%d: %s frame buffer device on %s\n",
-	       GET_FB_IDX(info->fb_info.node), info->fb_info.fix.id, name);
+	       GET_FB_IDX(info->node), info->fix.id, name);
 
 	return 1;		/* success! */
 }
-
-
-/* add a new card to the list  ++ajoshi */
-static struct
-fb_info_aty128 *aty128_board_list_add(struct fb_info_aty128 *board_list,
-				      struct fb_info_aty128 *new_node)
-{
-	struct fb_info_aty128 *i_p = board_list;
-
-	new_node->next = NULL;
-	if (board_list == NULL)
-		return new_node;
-	while (i_p->next != NULL)
-		i_p = i_p->next;
-	i_p->next = new_node;
-
-	return board_list;
-}
-
 
 int __init aty128fb_init(void)
 {
@@ -1688,12 +1554,12 @@ static int __init
 aty128_pci_register(struct pci_dev *pdev,
 		    const struct aty128_chip_info *aci)
 {
-	struct fb_info_aty128 *info = NULL;
-	struct aty128fb_par *par;
-	int err;
+	struct aty128fb_par *par = NULL;
+	struct fb_info *info = NULL;
 #if !defined(CONFIG_PPC) && !defined(__sparc__)
 	char *bios_seg = NULL;
 #endif
+	int err;
 
 	/* Enable device in PCI config */
 	if ((err = pci_enable_device(pdev))) {
@@ -1722,10 +1588,10 @@ aty128_pci_register(struct pci_dev *pdev,
 	/* We have the resources. Now virtualize them */
 	if (!
 	    (info =
-	     kmalloc(sizeof(struct fb_info_aty128) +
+	     kmalloc(sizeof(struct fb_info) +
 		     sizeof(struct display) + sizeof(u32) * 17,
 		     GFP_ATOMIC))) {
-		printk(KERN_ERR "aty128fb: can't alloc fb_info_aty128\n");
+		printk(KERN_ERR "aty128fb: can't alloc fb_info\n");
 		goto err_unmap_out;
 	}
 
@@ -1734,36 +1600,36 @@ aty128_pci_register(struct pci_dev *pdev,
 		goto err_unmap_out;
 	}
 
-	memset(info, 0, sizeof(struct fb_info_aty128));
+	memset(info, 0, sizeof(struct fb_info));
 	memset(par, 0, sizeof(struct aty128fb_par));
-	info->fb_info.disp = (struct display *) (info + 1);
-	info->fb_info.pseudo_palette = (void *) (info->fb_info.disp + 1);
-	info->fb_info.par = par;
+	info->disp = (struct display *) (info + 1);
+	info->pseudo_palette = (void *) (info->disp + 1);
+	info->par = par;
 
-	info->fb_info.currcon = -1;
-	info->fb_info.fix = aty128fb_fix;
+	info->currcon = -1;
+	info->fix = aty128fb_fix;
 
 	/* Virtualize mmio region */
-	info->regbase = ioremap(aty128fb_fix.mmio_start, 0x1FFF);
+	par->regbase = ioremap(aty128fb_fix.mmio_start, 0x1FFF);
 
-	if (!info->regbase)
+	if (!par->regbase)
 		goto err_free_info;
 
 	/* Grab memory size from the card */
-	info->fb_info.fix.smem_len =
+	info->fix.smem_len =
 	    aty_ld_le32(CONFIG_MEMSIZE) & 0x03FFFFFF;
 
 	/* Virtualize the framebuffer */
-	info->fb_info.screen_base =
-	    ioremap(aty128fb_fix.smem_start, info->fb_info.fix.smem_len);
+	info->screen_base =
+	    ioremap(aty128fb_fix.smem_start, info->fix.smem_len);
 
-	if (!info->fb_info.screen_base) {
-		iounmap((void *) info->regbase);
+	if (!info->screen_base) {
+		iounmap((void *) par->regbase);
 		goto err_free_info;
 	}
 
 	/* If we can't test scratch registers, something is seriously wrong */
-	if (!register_test(info)) {
+	if (!register_test(par)) {
 		printk(KERN_ERR
 		       "aty128fb: Can't write to video register!\n");
 		goto err_out;
@@ -1775,18 +1641,18 @@ aty128_pci_register(struct pci_dev *pdev,
 	else {
 		printk(KERN_INFO "aty128fb: Rage128 BIOS located at "
 		       "segment %4.4X\n", (unsigned int) bios_seg);
-		aty128_get_pllinfo(info, bios_seg);
+		aty128_get_pllinfo(par, bios_seg);
 	}
 #endif
-	aty128_timings(info);
+	aty128_timings(par);
 
 	if (!aty128_init(info, par, pdev, "PCI"))
 		goto err_out;
 	return 0;
 
       err_out:
-	iounmap(info->fb_info.screen_base);
-	iounmap(info->regbase);
+	iounmap(info->screen_base);
+	iounmap(par->regbase);
       err_free_info:
 	kfree(info);
       err_unmap_out:
@@ -1805,7 +1671,7 @@ aty128_pci_register(struct pci_dev *pdev,
 
 /* PPC and Sparc cannot read video ROM */
 #if !defined(CONFIG_PPC) && !defined(__sparc__)
-static char __init * aty128find_ROM(struct fb_info_aty128 *info)
+static char __init * aty128find_ROM(struct fb_info *info)
 {
 	u32 segstart;
 	char *rom_base;
@@ -1867,7 +1733,7 @@ static char __init * aty128find_ROM(struct fb_info_aty128 *info)
 
 
 static void __init
-aty128_get_pllinfo(struct fb_info_aty128 *info, char *bios_seg)
+aty128_get_pllinfo(struct aty128fb_par *par, char *bios_seg)
 {
 	void *bios_header;
 	void *header_ptr;
@@ -1887,23 +1753,23 @@ aty128_get_pllinfo(struct fb_info_aty128 *info, char *bios_seg)
 
 	memcpy_fromio(&pll, header_ptr, 50);
 
-	info->constants.ppll_max = pll.PCLK_max_freq;
-	info->constants.ppll_min = pll.PCLK_min_freq;
-	info->constants.xclk = (u32) pll.XCLK;
-	info->constants.ref_divider = (u32) pll.PCLK_ref_divider;
-	info->constants.dotclock = (u32) pll.PCLK_ref_freq;
+	par->constants.ppll_max = pll.PCLK_max_freq;
+	par->constants.ppll_min = pll.PCLK_min_freq;
+	par->constants.xclk = (u32) pll.XCLK;
+	par->constants.ref_divider = (u32) pll.PCLK_ref_divider;
+	par->constants.dotclock = (u32) pll.PCLK_ref_freq;
 
 	DBG("ppll_max %d ppll_min %d xclk %d ref_divider %d dotclock %d\n",
-	    info->constants.ppll_max, info->constants.ppll_min,
-	    info->constants.xclk, info->constants.ref_divider,
-	    info->constants.dotclock);
+	    par->constants.ppll_max, par->constants.ppll_min,
+	    par->constants.xclk, par->constants.ref_divider,
+	    par->constants.dotclock);
 
 }
 #endif				/* !CONFIG_PPC */
 
 
 /* fill in known card constants if pll_block is not available */
-static void __init aty128_timings(struct fb_info_aty128 *info)
+static void __init aty128_timings(struct aty128fb_par *par)
 {
 #ifdef CONFIG_PPC
 	/* instead of a table lookup, assume OF has properly
@@ -1916,8 +1782,8 @@ static void __init aty128_timings(struct fb_info_aty128 *info)
 	unsigned PostDivSet[] = { 0, 1, 2, 4, 8, 3, 6, 12 };
 #endif
 
-	if (!info->constants.dotclock)
-		info->constants.dotclock = 2950;
+	if (!par->constants.dotclock)
+		par->constants.dotclock = 2950;
 
 #ifdef CONFIG_PPC
 	x_mpll_ref_fb_div = aty_ld_pll(X_MPLL_REF_FB_DIV);
@@ -1925,55 +1791,55 @@ static void __init aty128_timings(struct fb_info_aty128 *info)
 	Nx = (x_mpll_ref_fb_div & 0x00ff00) >> 8;
 	M = x_mpll_ref_fb_div & 0x0000ff;
 
-	info->constants.xclk = round_div((2 * Nx *
-					  info->constants.dotclock),
+	par->constants.xclk = round_div((2 * Nx *
+					  par->constants.dotclock),
 					 (M * PostDivSet[xclk_cntl]));
 
-	info->constants.ref_divider =
+	par->constants.ref_divider =
 	    aty_ld_pll(PPLL_REF_DIV) & PPLL_REF_DIV_MASK;
 #endif
 
-	if (!info->constants.ref_divider) {
-		info->constants.ref_divider = 0x3b;
+	if (!par->constants.ref_divider) {
+		par->constants.ref_divider = 0x3b;
 
 		aty_st_pll(X_MPLL_REF_FB_DIV, 0x004c4c1e);
-		aty_pll_writeupdate(info);
+		aty_pll_writeupdate(par);
 	}
-	aty_st_pll(PPLL_REF_DIV, info->constants.ref_divider);
-	aty_pll_writeupdate(info);
+	aty_st_pll(PPLL_REF_DIV, par->constants.ref_divider);
+	aty_pll_writeupdate(par);
 
 	/* from documentation */
-	if (!info->constants.ppll_min)
-		info->constants.ppll_min = 12500;
-	if (!info->constants.ppll_max)
-		info->constants.ppll_max = 25000;	/* 23000 on some cards? */
-	if (!info->constants.xclk)
-		info->constants.xclk = 0x1d4d;	/* same as mclk */
+	if (!par->constants.ppll_min)
+		par->constants.ppll_min = 12500;
+	if (!par->constants.ppll_max)
+		par->constants.ppll_max = 25000; /* 23000 on some cards? */
+	if (!par->constants.xclk)
+		par->constants.xclk = 0x1d4d;	/* same as mclk */
 
-	info->constants.fifo_width = 128;
-	info->constants.fifo_depth = 32;
+	par->constants.fifo_width = 128;
+	par->constants.fifo_depth = 32;
 
 	switch (aty_ld_le32(MEM_CNTL) & 0x3) {
 	case 0:
-		info->mem = &sdr_128;
+		par->mem = &sdr_128;
 		break;
 	case 1:
-		info->mem = &sdr_sgram;
+		par->mem = &sdr_sgram;
 		break;
 	case 2:
-		info->mem = &ddr_sgram;
+		par->mem = &ddr_sgram;
 		break;
 	default:
-		info->mem = &sdr_sgram;
+		par->mem = &sdr_sgram;
 	}
 }
 
     /*
      *  Blank the display.
      */
-static int aty128fb_blank(int blank, struct fb_info *fb)
+static int aty128fb_blank(int blank, struct fb_info *info)
 {
-	struct fb_info_aty128 *info = (struct fb_info_aty128 *) fb;
+	struct aty128fb_par *par = (struct aty128fb_par *) info->par;
 	u8 state = 0;
 
 #ifdef CONFIG_PMAC_BACKLIGHT
@@ -2004,10 +1870,9 @@ static int aty128fb_blank(int blank, struct fb_info *fb)
      */
 static int
 aty128fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
-		   u_int transp, struct fb_info *fb)
+		   u_int transp, struct fb_info *info)
 {
-	struct fb_info_aty128 *info = (struct fb_info_aty128 *) fb;
-	struct aty128fb_par *par = (struct aty128fb_par *) fb->par;
+	struct aty128fb_par *par = (struct aty128fb_par *) info->par;
 	u32 col;
 
 	if (regno > 255)
@@ -2075,29 +1940,22 @@ aty128fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 
 	if (regno < 16)
 		switch (par->crtc.bpp) {
-#ifdef FBCON_HAS_CFB16
 		case 9 ... 16:
-			((u32 *) (info->fb_info.pseudo_palette))[regno] =
+			((u32 *) (info->pseudo_palette))[regno] =
 			    (regno << 10) | (regno << 5) | regno;
 			break;
-#endif
-#ifdef FBCON_HAS_CFB24
 		case 17 ... 24:
-			((u32 *) (info->fb_info.pseudo_palette))[regno] =
+			((u32 *) (info->pseudo_palette))[regno] =
 			    (regno << 16) | (regno << 8) | regno;
 			break;
-#endif
-#ifdef FBCON_HAS_CFB32
 		case 25 ... 32:{
 				u32 i;
 
 				i = (regno << 8) | regno;
-				((u32 *) (info->fb_info.
-					  pseudo_palette))[regno] =
+				((u32 *) (info->pseudo_palette))[regno] =
 				    (i << 16) | i;
 				break;
 			}
-#endif
 		}
 	return 0;
 }
@@ -2110,7 +1968,7 @@ static int backlight_conv[] = {
 
 static int aty128_set_backlight_enable(int on, int level, void *data)
 {
-	struct fb_info_aty128 *info = (struct fb_info_aty128 *) data;
+	struct aty128fb_par *par = (struct aty128fb_par *) data;
 	unsigned int reg = aty_ld_le32(LVDS_GEN_CNTL);
 
 	reg |= LVDS_BL_MOD_EN | LVDS_BLON;
@@ -2138,10 +1996,10 @@ static int aty128_set_backlight_level(int level, void *data)
 
 static inline void
 aty128_rectcopy(int srcx, int srcy, int dstx, int dsty,
-		u_int width, u_int height, struct fb_info_aty128 *info)
+		u_int width, u_int height, struct fb_info *info)
 {
 	struct aty128fb_par *par =
-	    (struct aty128fb_par *) info->fb_info.par;
+	    (struct aty128fb_par *) info->par;
 	u32 save_dp_datatype, save_dp_cntl, bppval;
 
 	if (!width || !height)
@@ -2157,11 +2015,11 @@ aty128_rectcopy(int srcx, int srcy, int dstx, int dsty,
 		return;
 	}
 
-	wait_for_fifo(2, info);
+	wait_for_fifo(2, par);
 	save_dp_datatype = aty_ld_le32(DP_DATATYPE);
 	save_dp_cntl = aty_ld_le32(DP_CNTL);
 
-	wait_for_fifo(6, info);
+	wait_for_fifo(6, par);
 	aty_st_le32(SRC_Y_X, (srcy << 16) | srcx);
 	aty_st_le32(DP_MIX, ROP3_SRCCOPY | DP_SRC_RECT);
 	aty_st_le32(DP_CNTL, DST_X_LEFT_TO_RIGHT | DST_Y_TOP_TO_BOTTOM);
@@ -2172,240 +2030,10 @@ aty128_rectcopy(int srcx, int srcy, int dstx, int dsty,
 
 	par->blitter_may_be_busy = 1;
 
-	wait_for_fifo(2, info);
+	wait_for_fifo(2, par);
 	aty_st_le32(DP_DATATYPE, save_dp_datatype);
 	aty_st_le32(DP_CNTL, save_dp_cntl);
 }
-
-
-    /*
-     * Text mode accelerated functions
-     */
-
-static void
-fbcon_aty128_bmove(struct display *p, int sy, int sx, int dy, int dx,
-		   int height, int width)
-{
-	sx *= fontwidth(p);
-	sy *= fontheight(p);
-	dx *= fontwidth(p);
-	dy *= fontheight(p);
-	width *= fontwidth(p);
-	height *= fontheight(p);
-
-	aty128_rectcopy(sx, sy, dx, dy, width, height,
-			(struct fb_info_aty128 *) p->fb_info);
-}
-
-
-#ifdef FBCON_HAS_CFB8
-static void fbcon_aty8_putc(struct vc_data *conp, struct display *p,
-			    int c, int yy, int xx)
-{
-	struct fb_info_aty128 *fb = (struct fb_info_aty128 *) (p->fb_info);
-	struct aty128fb_par *par = (struct aty128fb_par *) fb->fb_info.par;
-
-	if (par->blitter_may_be_busy)
-		wait_for_idle(fb);
-
-	fbcon_cfb8_putc(conp, p, c, yy, xx);
-}
-
-
-static void fbcon_aty8_putcs(struct vc_data *conp, struct display *p,
-			     const unsigned short *s, int count,
-			     int yy, int xx)
-{
-	struct fb_info_aty128 *fb = (struct fb_info_aty128 *) (p->fb_info);
-	struct aty128fb_par *par = (struct aty128fb_par *) fb->fb_info.par;
-
-	if (par->blitter_may_be_busy)
-		wait_for_idle(fb);
-
-	fbcon_cfb8_putcs(conp, p, s, count, yy, xx);
-}
-
-
-static void fbcon_aty8_clear_margins(struct vc_data *conp,
-				     struct display *p, int bottom_only)
-{
-	struct fb_info_aty128 *fb = (struct fb_info_aty128 *) (p->fb_info);
-	struct aty128fb_par *par = (struct aty128fb_par *) fb->fb_info.par;
-
-	if (par->blitter_may_be_busy)
-		wait_for_idle(fb);
-
-	fbcon_cfb8_clear_margins(conp, p, bottom_only);
-}
-
-static struct display_switch fbcon_aty128_8 = {
-	setup:fbcon_cfb8_setup,
-	bmove:fbcon_aty128_bmove,
-	clear:fbcon_cfb8_clear,
-	putc:fbcon_aty8_putc,
-	putcs:fbcon_aty8_putcs,
-	revc:fbcon_cfb8_revc,
-	clear_margins:fbcon_aty8_clear_margins,
-	fontwidthmask:FONTWIDTH(4) | FONTWIDTH(8) | FONTWIDTH(12) |
-	    FONTWIDTH(16)
-};
-#endif
-#ifdef FBCON_HAS_CFB16
-static void fbcon_aty16_putc(struct vc_data *conp, struct display *p,
-			     int c, int yy, int xx)
-{
-	struct fb_info_aty128 *fb = (struct fb_info_aty128 *) (p->fb_info);
-	struct aty128fb_par *par = (struct aty128fb_par *) fb->fb_info.par;
-
-	if (par->blitter_may_be_busy)
-		wait_for_idle(fb);
-
-	fbcon_cfb16_putc(conp, p, c, yy, xx);
-}
-
-
-static void fbcon_aty16_putcs(struct vc_data *conp, struct display *p,
-			      const unsigned short *s, int count,
-			      int yy, int xx)
-{
-	struct fb_info_aty128 *fb = (struct fb_info_aty128 *) (p->fb_info);
-	struct aty128fb_par *par = (struct aty128fb_par *) fb->fb_info.par;
-
-	if (par->blitter_may_be_busy)
-		wait_for_idle(fb);
-
-	fbcon_cfb16_putcs(conp, p, s, count, yy, xx);
-}
-
-
-static void fbcon_aty16_clear_margins(struct vc_data *conp,
-				      struct display *p, int bottom_only)
-{
-	struct fb_info_aty128 *fb = (struct fb_info_aty128 *) (p->fb_info);
-	struct aty128fb_par *par = (struct aty128fb_par *) fb->fb_info.par;
-
-	if (par->blitter_may_be_busy)
-		wait_for_idle(fb);
-
-	fbcon_cfb16_clear_margins(conp, p, bottom_only);
-}
-
-static struct display_switch fbcon_aty128_16 = {
-	setup:fbcon_cfb16_setup,
-	bmove:fbcon_aty128_bmove,
-	clear:fbcon_cfb16_clear,
-	putc:fbcon_aty16_putc,
-	putcs:fbcon_aty16_putcs,
-	revc:fbcon_cfb16_revc,
-	clear_margins:fbcon_aty16_clear_margins,
-	fontwidthmask:FONTWIDTH(4) | FONTWIDTH(8) | FONTWIDTH(12) |
-	    FONTWIDTH(16)
-};
-#endif
-#ifdef FBCON_HAS_CFB24
-static void fbcon_aty24_putc(struct vc_data *conp, struct display *p,
-			     int c, int yy, int xx)
-{
-	struct fb_info_aty128 *fb = (struct fb_info_aty128 *) (p->fb_info);
-	struct aty128fb_par *par = (struct aty128fb_par *) fb->fb_info.par;
-
-	if (par->blitter_may_be_busy)
-		wait_for_idle(fb);
-
-	fbcon_cfb24_putc(conp, p, c, yy, xx);
-}
-
-
-static void fbcon_aty24_putcs(struct vc_data *conp, struct display *p,
-			      const unsigned short *s, int count,
-			      int yy, int xx)
-{
-	struct fb_info_aty128 *fb = (struct fb_info_aty128 *) (p->fb_info);
-	struct aty128fb_par *par = (struct aty128fb_par *) fb->fb_info.par;
-
-	if (par->blitter_may_be_busy)
-		wait_for_idle(fb);
-
-	fbcon_cfb24_putcs(conp, p, s, count, yy, xx);
-}
-
-
-static void fbcon_aty24_clear_margins(struct vc_data *conp,
-				      struct display *p, int bottom_only)
-{
-	struct fb_info_aty128 *fb = (struct fb_info_aty128 *) (p->fb_info);
-	struct aty128fb_par *par = (struct aty128fb_par *) fb->fb_info.par;
-
-	if (par->blitter_may_be_busy)
-		wait_for_idle(fb);
-
-	fbcon_cfb24_clear_margins(conp, p, bottom_only);
-}
-
-static struct display_switch fbcon_aty128_24 = {
-	setup:fbcon_cfb24_setup,
-	bmove:fbcon_aty128_bmove,
-	clear:fbcon_cfb24_clear,
-	putc:fbcon_aty24_putc,
-	putcs:fbcon_aty24_putcs,
-	revc:fbcon_cfb24_revc,
-	clear_margins:fbcon_aty24_clear_margins,
-	fontwidthmask:FONTWIDTH(4) | FONTWIDTH(8) | FONTWIDTH(12) |
-	    FONTWIDTH(16)
-};
-#endif
-#ifdef FBCON_HAS_CFB32
-static void fbcon_aty32_putc(struct vc_data *conp, struct display *p,
-			     int c, int yy, int xx)
-{
-	struct fb_info_aty128 *fb = (struct fb_info_aty128 *) (p->fb_info);
-	struct aty128fb_par *par = (struct aty128fb_par *) fb->fb_info.par;
-
-	if (par->blitter_may_be_busy)
-		wait_for_idle(fb);
-
-	fbcon_cfb32_putc(conp, p, c, yy, xx);
-}
-
-
-static void fbcon_aty32_putcs(struct vc_data *conp, struct display *p,
-			      const unsigned short *s, int count,
-			      int yy, int xx)
-{
-	struct fb_info_aty128 *fb = (struct fb_info_aty128 *) (p->fb_info);
-	struct aty128fb_par *par = (struct aty128fb_par *) fb->fb_info.par;
-
-	if (par->blitter_may_be_busy)
-		wait_for_idle(fb);
-
-	fbcon_cfb32_putcs(conp, p, s, count, yy, xx);
-}
-
-
-static void fbcon_aty32_clear_margins(struct vc_data *conp,
-				      struct display *p, int bottom_only)
-{
-	struct fb_info_aty128 *fb = (struct fb_info_aty128 *) (p->fb_info);
-	struct aty128fb_par *par = (struct aty128fb_par *) fb->fb_info.par;
-
-	if (par->blitter_may_be_busy)
-		wait_for_idle(fb);
-
-	fbcon_cfb32_clear_margins(conp, p, bottom_only);
-}
-
-static struct display_switch fbcon_aty128_32 = {
-	setup:fbcon_cfb32_setup,
-	bmove:fbcon_aty128_bmove,
-	clear:fbcon_cfb32_clear,
-	putc:fbcon_aty32_putc,
-	putcs:fbcon_aty32_putcs,
-	revc:fbcon_cfb32_revc,
-	clear_margins:fbcon_aty32_clear_margins,
-	fontwidthmask:FONTWIDTH(4) | FONTWIDTH(8) | FONTWIDTH(12) |
-	    FONTWIDTH(16)
-};
-#endif
 
 #ifdef MODULE
 MODULE_AUTHOR("(c)1999-2000 Brad Douglas <brad@neruo.com>");
@@ -2425,10 +2053,6 @@ MODULE_PARM_DESC(nomtrr,
 
 int __init init_module(void)
 {
-	if (noaccel) {
-		noaccel = 1;
-		printk(KERN_INFO "aty128fb: Parameter NOACCEL set\n");
-	}
 	if (font) {
 		strncpy(fontname, font, sizeof(fontname) - 1);
 		printk(KERN_INFO "aty128fb: Parameter FONT set to %s\n",
@@ -2452,32 +2076,27 @@ int __init init_module(void)
 
 void __exit cleanup_module(void)
 {
-	struct fb_info_aty128 *info = board_list;
+	struct fb_info *info = board_list;
 	struct aty128fb_par *par;
 
-	while (board_list) {
-		info = board_list;
-		board_list = board_list->next;
-		par = info->fb_info.par;
+	par = info->par;
 
-		unregister_framebuffer(&info->fb_info);
+	unregister_framebuffer(info);
 #ifdef CONFIG_MTRR
-		if (par->mtrr.vram_valid)
-			mtrr_del(par->mtrr.vram,
-				 info->fb_info.fix.smem_start,
-				 info->fb_info.fix.smem_len);
-#endif				/* CONFIG_MTRR */
-		iounmap(info->regbase);
-		iounmap(info->fb_info.screen_base);
+	if (par->mtrr.vram_valid)
+		mtrr_del(par->mtrr.vram,
+			 info->fix.smem_start,
+			 info->fix.smem_len);
+#endif			/* CONFIG_MTRR */
+	iounmap(par->regbase);
+	iounmap(info->screen_base);
 
-		release_mem_region(pci_resource_start(info->pdev, 0),
-				   pci_resource_len(info->pdev, 0));
-		release_mem_region(pci_resource_start(info->pdev, 1),
-				   pci_resource_len(info->pdev, 1));
-		release_mem_region(pci_resource_start(info->pdev, 2),
-				   pci_resource_len(info->pdev, 2));
-
-		kfree(info);
-	}
+	release_mem_region(pci_resource_start(info->pdev, 0),
+			   pci_resource_len(info->pdev, 0));
+	release_mem_region(pci_resource_start(info->pdev, 1),
+			   pci_resource_len(info->pdev, 1));
+	release_mem_region(pci_resource_start(info->pdev, 2),
+			   pci_resource_len(info->pdev, 2));
+	kfree(info);
 }
 #endif				/* MODULE */
