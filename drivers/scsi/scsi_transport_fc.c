@@ -728,6 +728,7 @@ static int fc_host_match(struct attribute_container *cont,
 			  struct device *dev)
 {
 	struct Scsi_Host *shost;
+	struct fc_internal *i;
 
 	if (!scsi_is_host_device(dev))
 		return 0;
@@ -736,13 +737,17 @@ static int fc_host_match(struct attribute_container *cont,
 	if (!shost->transportt  || shost->transportt->host_attrs.class
 	    != &fc_host_class.class)
 		return 0;
-	return 1;
+
+	i = to_fc_internal(shost->transportt);
+	
+	return &i->t.host_attrs == cont;
 }
 
 static int fc_target_match(struct attribute_container *cont,
 			    struct device *dev)
 {
 	struct Scsi_Host *shost;
+	struct fc_internal *i;
 
 	if (!scsi_is_target_device(dev))
 		return 0;
@@ -751,7 +756,10 @@ static int fc_target_match(struct attribute_container *cont,
 	if (!shost->transportt  || shost->transportt->host_attrs.class
 	    != &fc_host_class.class)
 		return 0;
-	return 1;
+
+	i = to_fc_internal(shost->transportt);
+	
+	return &i->t.target_attrs == cont;
 }
 
 
