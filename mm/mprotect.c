@@ -10,6 +10,7 @@
 #include <linux/mman.h>
 #include <linux/fs.h>
 #include <linux/highmem.h>
+#include <linux/security.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
@@ -305,6 +306,10 @@ asmlinkage long sys_mprotect(unsigned long start, size_t len, unsigned long prot
 			error = -EACCES;
 			goto out;
 		}
+
+		error = security_ops->file_mprotect(vma, prot);
+		if (error)
+			goto out;
 
 		if (vma->vm_end > end) {
 			error = mprotect_fixup(vma, &prev, nstart, end, newflags);

@@ -547,4 +547,5 @@ fi
 
 endmenu
 
+source security/Config.in
 source lib/Config.in

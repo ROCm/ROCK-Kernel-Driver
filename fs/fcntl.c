@@ -11,6 +11,7 @@
 #include <linux/smp_lock.h>
 #include <linux/slab.h>
 #include <linux/iobuf.h>
+#include <linux/security.h>
 
 #include <asm/poll.h>
 #include <asm/siginfo.h>
@@ -305,6 +306,13 @@ static long do_fcntl(unsigned int fd, unsigned int cmd,
 			break;
 		case F_SETOWN:
 			lock_kernel();
+
+			err = security_ops->file_set_fowner(filp);
+			if (err) {
+				unlock_kernel();
+				break;
+			}
+
 			filp->f_owner.pid = arg;
 			filp->f_owner.uid = current->uid;
 			filp->f_owner.euid = current->euid;
@@ -353,6 +361,12 @@ asmlinkage long sys_fcntl(unsigned int fd, unsigned int cmd, unsigned long arg)
 	if (!filp)
 		goto out;
 
+	err = security_ops->file_fcntl(filp, cmd, arg);
+	if (err) {
+		fput(filp);
+		return err;
+	}
+
 	err = do_fcntl(fd, cmd, arg, filp);
 
  	fput(filp);
@@ -371,6 +385,13 @@ asmlinkage long sys_fcntl64(unsigned int fd, unsigned int cmd, unsigned long arg
 	if (!filp)
 		goto out;
 
+	err = security_ops->file_fcntl(filp, cmd, arg);
+	if (err) {
+		fput(filp);
+		return err;
+	}
+	err = -EBADF;
+	
 	switch (cmd) {
 		case F_GETLK64:
 			err = fcntl_getlk64(filp, (struct flock64 *) arg);
@@ -409,6 +430,10 @@ static void send_sigio_to_task(struct task_struct *p,
 	    (fown->euid ^ p->suid) && (fown->euid ^ p->uid) &&
 	    (fown->uid ^ p->suid) && (fown->uid ^ p->uid))
 		return;
+
+	if (security_ops->file_send_sigiotask(p, fown, fd, reason))
+		return;
+
 	switch (fown->signum) {
 		siginfo_t si;
 		default:

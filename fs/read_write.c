@@ -11,6 +11,7 @@
 #include <linux/uio.h>
 #include <linux/smp_lock.h>
 #include <linux/dnotify.h>
+#include <linux/security.h>
 
 #include <asm/uaccess.h>
 
@@ -117,6 +118,13 @@ asmlinkage off_t sys_lseek(unsigned int fd, off_t offset, unsigned int origin)
 	file = fget(fd);
 	if (!file)
 		goto bad;
+
+	retval = security_ops->file_llseek(file);
+	if (retval) {
+		fput(file);
+		goto bad;
+	}
+
 	retval = -EINVAL;
 	if (origin <= 2) {
 		loff_t res = llseek(file, offset, origin);
@@ -142,6 +150,11 @@ asmlinkage long sys_llseek(unsigned int fd, unsigned long offset_high,
 	file = fget(fd);
 	if (!file)
 		goto bad;
+
+	retval = security_ops->file_llseek(file);
+	if (retval)
+		goto out_putf;
+
 	retval = -EINVAL;
 	if (origin > 2)
 		goto out_putf;
@@ -176,9 +189,12 @@ ssize_t vfs_read(struct file *file, char *buf, size_t count, loff_t *pos)
 
 	ret = locks_verify_area(FLOCK_VERIFY_READ, inode, file, *pos, count);
 	if (!ret) {
-		ret = file->f_op->read(file, buf, count, pos);
-		if (ret > 0)
-			dnotify_parent(file->f_dentry, DN_ACCESS);
+		ret = security_ops->file_permission (file, MAY_READ);
+		if (!ret) {
+			ret = file->f_op->read(file, buf, count, pos);
+			if (ret > 0)
+				dnotify_parent(file->f_dentry, DN_ACCESS);
+		}
 	}
 
 	return ret;
@@ -198,9 +214,12 @@ ssize_t vfs_write(struct file *file, const char *buf, size_t count, loff_t *pos)
 
 	ret = locks_verify_area(FLOCK_VERIFY_WRITE, inode, file, *pos, count);
 	if (!ret) {
-		ret = file->f_op->write(file, buf, count, pos);
-		if (ret > 0)
-			dnotify_parent(file->f_dentry, DN_MODIFY);
+		ret = security_ops->file_permission (file, MAY_WRITE);
+		if (!ret) {
+			ret = file->f_op->write(file, buf, count, pos);
+			if (ret > 0)
+				dnotify_parent(file->f_dentry, DN_MODIFY);
+		}
 	}
 
 	return ret;
@@ -384,8 +403,11 @@ asmlinkage ssize_t sys_readv(unsigned long fd, const struct iovec * vector,
 	if (!file)
 		goto bad_file;
 	if (file->f_op && (file->f_mode & FMODE_READ) &&
-	    (file->f_op->readv || file->f_op->read))
-		ret = do_readv_writev(VERIFY_WRITE, file, vector, count);
+	    (file->f_op->readv || file->f_op->read)) {
+		ret = security_ops->file_permission (file, MAY_READ);
+		if (!ret)
+			ret = do_readv_writev(VERIFY_WRITE, file, vector, count);
+	}
 	fput(file);
 
 bad_file:
@@ -404,8 +426,11 @@ asmlinkage ssize_t sys_writev(unsigned long fd, const struct iovec * vector,
 	if (!file)
 		goto bad_file;
 	if (file->f_op && (file->f_mode & FMODE_WRITE) &&
-	    (file->f_op->writev || file->f_op->write))
-		ret = do_readv_writev(VERIFY_READ, file, vector, count);
+	    (file->f_op->writev || file->f_op->write)) {
+		ret = security_ops->file_permission (file, MAY_WRITE);
+		if (!ret)
+			ret = do_readv_writev(VERIFY_READ, file, vector, count);
+	}
 	fput(file);
 
 bad_file:

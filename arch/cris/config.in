@@ -228,5 +228,7 @@ if [ "$CONFIG_PROFILE" = "y" ]; then
   int ' Profile shift count' CONFIG_PROFILE_SHIFT 2
 fi
 
-source lib/Config.in
 endmenu
+
+source security/Config.in
+source lib/Config.in

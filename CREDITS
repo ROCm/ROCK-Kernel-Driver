@@ -1670,6 +1670,7 @@ D: USB I/O Edgeport driver, USB Serial IrDA driver
 D: USB Bluetooth driver, USB Skeleton driver
 D: bits and pieces of USB core code.
 D: PCI Hotplug core, PCI Hotplug Compaq driver modifications
+D: portions of the Linux Security Module (LSM) framework
 
 N: Russell Kroll
 E: rkroll@exploits.org
@@ -2154,6 +2155,14 @@ S: Germany
 N: Thomas Molina
 E: tmolina@cox.net
 D: bug fixes, documentation, minor hackery
+
+N: James Morris
+E: jmorris@intercode.com.au
+W: http://www.intercode.com.au/jmorris/
+D: Netfilter, Linux Security Modules (LSM).
+S: PO Box 707
+S: Spit Junction NSW 2088
+S: Australia
 
 N: David Mosberger-Tang
 E: davidm@hpl.hp.com if IA-64 related, else David.Mosberger@acm.org
@@ -2649,6 +2658,11 @@ S: Markusstrasse 18
 S: 8006 Zuerich
 S: Switzerland
 
+N: Wayne Salamon
+E: wsalamon@tislabs.com
+E: wsalamon@nai.com
+D: portions of the Linux Security Module (LSM) framework and security modules
+
 N: Robert Sanders
 E: gt8134b@prism.gatech.edu
 D: Dosemu
@@ -2774,6 +2788,11 @@ D: RSPF daemon
 S: 10 Stockalls Place
 S: Minto, NSW, 2566
 S: Australia
+
+N: Stephen Smalley
+E: sds@tislabs.com
+E: ssmalley@nai.com
+D: portions of the Linux Security Module (LSM) framework and security modules
 
 N: Chris Smith
 E: csmith@convex.com
@@ -3041,6 +3060,11 @@ S: C. Huysmansstraat 12
 S: B-3128 Baal
 S: Belgium
 
+N: Chris Vance
+E: cvance@tislabs.com
+E: cvance@nai.com
+D: portions of the Linux Security Module (LSM) framework and security modules
+
 N: Petr Vandrovec
 E: vandrove@vc.cvut.cz
 D: Small contributions to ncpfs
@@ -3272,6 +3296,14 @@ S: Rustat House
 S: 60 Clifton Road
 S: Cambridge. CB1 7EG
 S: England
+
+N: Chris Wright
+E: chris@wirex.com
+D: hacking on LSM framework and security modules.
+S: c/o WireX
+S: 920 SW 3rd, Ste. 100
+S: Portland, OR 97204
+S: USA
 
 N: Frank Xia
 E: qx@math.columbia.edu

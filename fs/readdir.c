@@ -20,6 +20,11 @@ int vfs_readdir(struct file *file, filldir_t filler, void *buf)
 	int res = -ENOTDIR;
 	if (!file->f_op || !file->f_op->readdir)
 		goto out;
+
+	res = security_ops->file_permission(file, MAY_READ);
+	if (res)
+		goto out;
+
 	down(&inode->i_sem);
 	res = -ENOENT;
 	if (!IS_DEADDIR(inode)) {

@@ -12,6 +12,7 @@
 #include <asm/uaccess.h>
 #include <linux/kernel.h>
 #include <linux/smp_lock.h>
+#include <linux/security.h>
 
 /* Check validity of quotactl */
 static int check_quotactl_valid(struct super_block *sb, int type, int cmd, qid_t id)
@@ -96,7 +97,8 @@ static int check_quotactl_valid(struct super_block *sb, int type, int cmd, qid_t
 	else if (cmd != Q_GETFMT && cmd != Q_SYNC && cmd != Q_GETINFO && cmd != Q_XGETQSTAT)
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
-	return 0;
+
+	return security_ops->quotactl (cmd, type, id, sb);
 }
 
 /* Resolve device pathname to superblock */
