@@ -47,6 +47,7 @@
 #include <linux/proc_fs.h>
 #include <linux/pm.h>
 #include <linux/pci.h>
+#include <linux/device.h>
 #include <asm/system.h>
 #include <asm/irq.h>
 
@@ -2415,16 +2416,24 @@ EXPORT_SYMBOL(pcmcia_unregister_socket);
 EXPORT_SYMBOL(pcmcia_suspend_socket);
 EXPORT_SYMBOL(pcmcia_resume_socket);
 
+struct device_class pcmcia_socket_class = {
+	.name = "pcmcia_socket",
+};
+EXPORT_SYMBOL(pcmcia_socket_class);
+
+
 static int __init init_pcmcia_cs(void)
 {
     printk(KERN_INFO "%s\n", release);
     printk(KERN_INFO "  %s\n", options);
     DEBUG(0, "%s\n", version);
+    devclass_register(&pcmcia_socket_class);
     if (do_apm)
 	pm_register(PM_SYS_DEV, PM_SYS_PCMCIA, handle_pm_event);
 #ifdef CONFIG_PROC_FS
     proc_pccard = proc_mkdir("pccard", proc_bus);
 #endif
+
     return 0;
 }
 
@@ -2439,9 +2448,10 @@ static void __exit exit_pcmcia_cs(void)
     if (do_apm)
 	pm_unregister_all(handle_pm_event);
     release_resource_db();
+    devclass_unregister(&pcmcia_socket_class);
 }
 
-module_init(init_pcmcia_cs);
+subsys_initcall(init_pcmcia_cs);
 module_exit(exit_pcmcia_cs);
 
 /*====================================================================*/

@@ -38,6 +38,7 @@
 #include <asm/errno.h>
 #include <linux/irq.h>
 #include <linux/workqueue.h>
+#include <linux/device.h>
 
 #include <asm/io.h>
 #include <asm/hd64465.h>
@@ -991,6 +992,20 @@ static void hs_exit_socket(hs_socket_t *sp)
 }
 
 
+static struct device_driver hd64465_driver = {
+	.name = "hd64465-pcmcia",
+	.bus = &platform_bus_type,
+	.devclass = &pcmcia_socket_class,
+};
+
+static struct platform_device hd64465_device = {
+	.name = "hd64465-pcmcia",
+	.id = 0,
+	.dev = {
+		.name = "hd64465-pcmcia",
+	},
+};
+
 static int __init init_hs(void)
 {
 	servinfo_t serv;
@@ -1007,6 +1022,7 @@ static int __init init_hs(void)
 	}
 
 /*	hd64465_io_debug = 1; */
+	register_driver(&hd64465_driver);
 	
 	/* Wake both sockets out of STANDBY mode */
 	/* TODO: wait 15ms */
@@ -1036,21 +1052,27 @@ static int __init init_hs(void)
 	    HD64465_IRQ_PCMCIA0,
 	    HD64465_PCC0_BASE,
 	    HD64465_REG_PCC0ISR);
-	if (i < 0)
-	    return i;
+	if (i < 0) {
+		unregister_driver(&hd64465_driver);
+		return i;
+	}
 	i = hs_init_socket(&hs_sockets[1],
 	    HD64465_IRQ_PCMCIA1,
 	    HD64465_PCC1_BASE,
 	    HD64465_REG_PCC1ISR);
-	if (i < 0)
-	    return i;
+	if (i < 0) {
+		unregister_driver(&hd64465_driver);
+		return i;
+	}
 
 /*	hd64465_io_debug = 0; */
-	    
+	platform_device_register(&hd64465_device);
 
 	if (register_ss_entry(HS_MAX_SOCKETS, &hs_operations) != 0) {
 	    for (i=0 ; i<HS_MAX_SOCKETS ; i++)
 		hs_exit_socket(&hs_sockets[i]);
+	    platform_device_unregister(&hd64465_device);
+	    unregister_driver(&hd64465_driver);
     	    return -ENODEV;
 	}
 
@@ -1078,9 +1100,11 @@ static void __exit exit_hs(void)
 	 */
 	for (i=0 ; i<HS_MAX_SOCKETS ; i++)
 	    hs_exit_socket(&hs_sockets[i]);
+	platform_device_unregister(&hd64465_device);
 	unregister_ss_entry(&hs_operations);
 	
 	restore_flags(flags);
+	unregister_driver(&hd64465_driver);
 }
 
 module_init(init_hs);

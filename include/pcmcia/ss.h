@@ -145,4 +145,6 @@ struct pccard_operations {
 extern int register_ss_entry(int nsock, struct pccard_operations *ops);
 extern void unregister_ss_entry(struct pccard_operations *ops);
 
+extern struct device_class pcmcia_socket_class;
+
 #endif /* _LINUX_SS_H */

@@ -22,6 +22,7 @@
 #include <linux/sched.h>
 #include <linux/workqueue.h>
 #include <linux/interrupt.h>
+#include <linux/device.h>
 
 #include <pcmcia/ss.h>
 
@@ -253,11 +254,14 @@ static struct pci_driver pci_cardbus_driver = {
 	.remove		= __devexit_p(cardbus_remove),
 	.suspend	= cardbus_suspend,
 	.resume		= cardbus_resume,
+	.driver		= {
+		.devclass = &pcmcia_socket_class,
+	},
 };
 
 static int __init pci_socket_init(void)
 {
-	return pci_module_init (&pci_cardbus_driver);
+	return pci_register_driver (&pci_cardbus_driver);
 }
 
 static void __exit pci_socket_exit (void)

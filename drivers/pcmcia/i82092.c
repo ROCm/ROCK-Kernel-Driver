@@ -16,6 +16,7 @@
 #include <linux/init.h>
 #include <linux/workqueue.h>
 #include <linux/interrupt.h>
+#include <linux/device.h>
 
 #include <pcmcia/cs_types.h>
 #include <pcmcia/ss.h>
@@ -46,6 +47,9 @@ static struct pci_driver i82092aa_pci_drv = {
 	.id_table       = i82092aa_pci_ids,
 	.probe          = i82092aa_pci_probe,
 	.remove         = __devexit_p(i82092aa_pci_remove),
+	.driver		= {
+		.devclass = &pcmcia_socket_class,
+	},
 };
 
 

@@ -44,6 +44,7 @@
 #include <linux/delay.h>
 #include <linux/proc_fs.h>
 #include <linux/workqueue.h>
+#include <linux/device.h>
 
 #include <asm/io.h>
 #include <asm/bitops.h>
@@ -375,6 +376,21 @@ static int __init get_tcic_id(void)
 
 /*====================================================================*/
 
+
+static struct device_driver tcic_driver = {
+	.name = "tcic-pcmcia",
+	.bus = &platform_bus_type,
+	.devclass = &pcmcia_socket_class,
+};
+
+static struct platform_device tcic_device = {
+	.name = "tcic-pcmcia",
+	.id = 0,
+	.dev = {
+		.name = "tcic-pcmcia",
+	},
+};
+
 static int __init init_tcic(void)
 {
     int i, sock;
@@ -388,12 +404,15 @@ static int __init init_tcic(void)
 	       "does not match!\n");
 	return -1;
     }
+
+    driver_register(&tcic_driver);
     
     printk(KERN_INFO "Databook TCIC-2 PCMCIA probe: ");
     sock = 0;
 
     if (!request_region(tcic_base, 16, "tcic-2")) {
 	printk("could not allocate ports,\n ");
+	driver_unregister(&tcic_driver);
 	return -ENODEV;
     }
     else {
@@ -416,6 +435,7 @@ static int __init init_tcic(void)
     if (sock == 0) {
 	printk("not found.\n");
 	release_region(tcic_base, 16);
+	driver_unregister(&tcic_driver);
 	return -ENODEV;
     }
 
@@ -428,6 +448,8 @@ static int __init init_tcic(void)
 	socket_table[sockets].id = get_tcic_id();
 	sockets++;
     }
+
+    platform_device_register(&tcic_device);
 
     switch (socket_table[0].id) {
     case TCIC_ID_DB86082:
@@ -504,6 +526,8 @@ static int __init init_tcic(void)
 	release_region(tcic_base, 16);
 	if (cs_irq != 0)
 	    free_irq(cs_irq, tcic_interrupt);
+	platform_device_unregister(&tcic_device);
+	driver_unregister(&tcic_driver);
 	return -ENODEV;
     }
 
@@ -522,6 +546,8 @@ static void __exit exit_tcic(void)
 	free_irq(cs_irq, tcic_interrupt);
     }
     release_region(tcic_base, 16);
+    platform_device_unregister(&tcic_device);
+    driver_unregister(&tcic_driver);
 } /* exit_tcic */
 
 /*====================================================================*/
