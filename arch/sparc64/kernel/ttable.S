@@ -7,6 +7,8 @@
 #include <linux/config.h>
 
 	.globl	sparc64_ttable_tl0, sparc64_ttable_tl1
+	.globl	tl0_icpe, tl1_icpe
+	.globl	tl0_dcpe, tl1_dcpe
 	.globl	tl0_fecc, tl1_fecc
 	.globl	tl0_cee, tl1_cee
 	.globl	tl0_iae, tl1_iae
@@ -79,7 +81,9 @@ tl0_damiss:
 tl0_daprot:
 #include	"dtlb_prot.S"
 tl0_fecc:	BTRAP(0x70)	/* Fast-ECC on Cheetah */
-tl0_resv071:	BTRAP(0x71) BTRAP(0x72) BTRAP(0x73) BTRAP(0x74) BTRAP(0x75)
+tl0_dcpe:	BTRAP(0x71)	/* D-cache Parity Error on Cheetah+ */
+tl0_icpe:	BTRAP(0x72)	/* I-cache Parity Error on Cheetah+ */
+tl0_resv073:	BTRAP(0x73) BTRAP(0x74) BTRAP(0x75)
 tl0_resv076:	BTRAP(0x76) BTRAP(0x77) BTRAP(0x78) BTRAP(0x79) BTRAP(0x7a) BTRAP(0x7b)
 tl0_resv07c:	BTRAP(0x7c) BTRAP(0x7d) BTRAP(0x7e) BTRAP(0x7f)
 tl0_s0n:	SPILL_0_NORMAL
@@ -235,8 +239,10 @@ tl1_damiss:
 #include	"dtlb_backend.S"
 tl1_daprot:
 #include	"dtlb_prot.S"
-tl1_fecc:	BTRAP(0x70)	/* Fast-ECC on Cheetah */
-tl1_resc071:	BTRAPTL1(0x71) BTRAPTL1(0x72) BTRAPTL1(0x73)
+tl1_fecc:	BTRAPTL1(0x70)	/* Fast-ECC on Cheetah */
+tl1_dcpe:	BTRAPTL1(0x71)	/* D-cache Parity Error on Cheetah+ */
+tl1_icpe:	BTRAPTL1(0x72)	/* I-cache Parity Error on Cheetah+ */
+tl1_resv073:	BTRAPTL1(0x73)
 tl1_resv074:	BTRAPTL1(0x74) BTRAPTL1(0x75) BTRAPTL1(0x76) BTRAPTL1(0x77)
 tl1_resv078:	BTRAPTL1(0x78) BTRAPTL1(0x79) BTRAPTL1(0x7a) BTRAPTL1(0x7b)
 tl1_resv07c:	BTRAPTL1(0x7c) BTRAPTL1(0x7d) BTRAPTL1(0x7e) BTRAPTL1(0x7f)

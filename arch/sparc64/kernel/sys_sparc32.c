@@ -57,6 +57,7 @@
 #include <asm/uaccess.h>
 #include <asm/fpumacro.h>
 #include <asm/semaphore.h>
+#include <asm/mmu_context.h>
 
 #include <net/scm.h>
 
@@ -2873,25 +2874,29 @@ do_execve32(char * filename, u32 * argv, u32 * envp, struct pt_regs * regs)
 	int retval;
 	int i;
 
-	bprm.p = PAGE_SIZE*MAX_ARG_PAGES-sizeof(void *);
-	memset(bprm.page, 0, MAX_ARG_PAGES * sizeof(bprm.page[0]));
-
 	file = open_exec(filename);
 
 	retval = PTR_ERR(file);
 	if (IS_ERR(file))
 		return retval;
 
+	bprm.p = PAGE_SIZE*MAX_ARG_PAGES-sizeof(void *);
+	memset(bprm.page, 0, MAX_ARG_PAGES * sizeof(bprm.page[0]));
+
 	bprm.file = file;
 	bprm.filename = filename;
 	bprm.sh_bang = 0;
 	bprm.loader = 0;
 	bprm.exec = 0;
-
+	bprm.security = NULL;
 	bprm.mm = mm_alloc();
 	retval = -ENOMEM;
 	if (!bprm.mm) 
 		goto out_file;
+
+	retval = init_new_context(current, bprm.mm);
+	if (retval < 0)
+		goto out_mm;
 
 	bprm.argc = count32(argv, bprm.p / sizeof(u32));
 	if ((retval = bprm.argc) < 0)
@@ -2900,6 +2905,10 @@ do_execve32(char * filename, u32 * argv, u32 * envp, struct pt_regs * regs)
 	bprm.envc = count32(envp, bprm.p / sizeof(u32));
 	if ((retval = bprm.envc) < 0)
 		goto out_mm;
+
+	retval = security_ops->bprm_alloc_security(&bprm);
+	if (retval) 
+		goto out;
 
 	retval = prepare_binprm(&bprm);
 	if (retval < 0)
@@ -2919,9 +2928,11 @@ do_execve32(char * filename, u32 * argv, u32 * envp, struct pt_regs * regs)
 		goto out;
 
 	retval = search_binary_handler(&bprm, regs);
-	if (retval >= 0)
+	if (retval >= 0) {
 		/* execve success */
+		security_ops->bprm_free_security(&bprm);
 		return retval;
+	}
 
 out:
 	/* Something went wrong, return the inode and free the argument pages*/
@@ -2930,6 +2941,9 @@ out:
 		if (page)
 			__free_page(page);
 	}
+
+	if (bprm.security)
+		security_ops->bprm_free_security(&bprm);
 
 out_mm:
 	mmdrop(bprm.mm);
@@ -2971,6 +2985,7 @@ asmlinkage int sparc32_execve(struct pt_regs *regs)
 		current_thread_info()->xfsr[0] = 0;
 		current_thread_info()->fpsaved[0] = 0;
 		regs->tstate &= ~TSTATE_PEF;
+		current->ptrace &= ~PT_DTRACE;
 	}
 out:
         return error;

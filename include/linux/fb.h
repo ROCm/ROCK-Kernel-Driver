@@ -409,6 +409,7 @@ extern void cfb_imageblit(struct fb_info *info, struct fb_image *image);
      *  Helper functions
      */
 
+extern void do_install_cmap(int con, struct fb_info *info);
 extern int gen_update_var(int con, struct fb_info *info);
 extern int fb_blank(int blank, struct fb_info *info);
 extern int gen_switch(int con, struct fb_info *info);

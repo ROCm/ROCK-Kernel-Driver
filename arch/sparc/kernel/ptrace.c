@@ -17,6 +17,7 @@
 #include <linux/user.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
+#include <linux/security.h>
 
 #include <asm/pgtable.h>
 #include <asm/system.h>
@@ -283,11 +284,19 @@ asmlinkage void do_ptrace(struct pt_regs *regs)
 	}
 #endif
 	if(request == PTRACE_TRACEME) {
+		int ret;
+
 		/* are we already being traced? */
 		if (current->ptrace & PT_PTRACED) {
 			pt_error_return(regs, EPERM);
 			goto out;
 		}
+		ret = security_ops->ptrace(current->parent, current);
+		if (ret) {
+			pt_error_return(regs, -ret);
+			goto out;
+		}
+
 		/* set the ptrace bit in the process flags. */
 		current->ptrace |= PT_PTRACED;
 		pt_succ_return(regs, 0);

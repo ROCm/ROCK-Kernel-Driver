@@ -171,7 +171,7 @@
 #define __NR_poll               153 /* Common                                      */
 #define __NR_getdents64		154 /* Linux specific				   */
 /* #define __NR_fcntl64         155    Linux sparc32 Specific                      */
-/* #define __NR_getdirentries   156    SunOS Specific                              */
+#define __NR_security           156 /* getdirentries under SunOS                   */
 #define __NR_statfs             157 /* Common                                      */
 #define __NR_fstatfs            158 /* Common                                      */
 #define __NR_umount             159 /* Common                                      */

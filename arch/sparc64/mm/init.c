@@ -345,6 +345,8 @@ void mmu_info(struct seq_file *m)
 {
 	if (tlb_type == cheetah)
 		seq_printf(m, "MMU Type\t: Cheetah\n");
+	else if (tlb_type == cheetah_plus)
+		seq_printf(m, "MMU Type\t: Cheetah+\n");
 	else if (tlb_type == spitfire)
 		seq_printf(m, "MMU Type\t: Spitfire\n");
 	else
@@ -514,6 +516,7 @@ static void inherit_prom_mappings(void)
 		break;
 
 	case cheetah:
+	case cheetah_plus:
 		phys_page = cheetah_get_litlb_data(sparc64_highest_locked_tlbent());
 		break;
 	};
@@ -539,7 +542,7 @@ static void inherit_prom_mappings(void)
 			"i" (ASI_DMMU), "i" (ASI_DTLB_DATA_ACCESS),
 			"i" (ASI_IMMU), "i" (ASI_ITLB_DATA_ACCESS)
 			: "memory");
-	} else if (tlb_type == cheetah) {
+	} else if (tlb_type == cheetah || tlb_type == cheetah_plus) {
 		/* Lock this into i/d tlb-0 entry 11 */
 		__asm__ __volatile__(
 			"stxa	%%g0, [%2] %3\n\t"
@@ -684,9 +687,9 @@ static void __flush_nucleus_vptes(void)
 				spitfire_put_dtlb_data(i, 0x0UL);
 			}
 		}
-	} else if (tlb_type == cheetah) {
+	} else if (tlb_type == cheetah || tlb_type == cheetah_plus) {
 		for (i = 0; i < 512; i++) {
-			unsigned long tag = cheetah_get_dtlb_tag(i);
+			unsigned long tag = cheetah_get_dtlb_tag(i, 2);
 
 			if ((tag & ~PAGE_MASK) == 0 &&
 			    (tag & PAGE_MASK) >= prom_reserved_base) {
@@ -694,7 +697,21 @@ static void __flush_nucleus_vptes(void)
 						     "membar #Sync"
 						     : /* no outputs */
 						     : "r" (TLB_TAG_ACCESS), "i" (ASI_DMMU));
-				cheetah_put_dtlb_data(i, 0x0UL);
+				cheetah_put_dtlb_data(i, 0x0UL, 2);
+			}
+
+			if (tlb_type != cheetah_plus)
+				continue;
+
+			tag = cheetah_get_dtlb_tag(i, 3);
+
+			if ((tag & ~PAGE_MASK) == 0 &&
+			    (tag & PAGE_MASK) >= prom_reserved_base) {
+				__asm__ __volatile__("stxa %%g0, [%0] %1\n\t"
+						     "membar #Sync"
+						     : /* no outputs */
+						     : "r" (TLB_TAG_ACCESS), "i" (ASI_DMMU));
+				cheetah_put_dtlb_data(i, 0x0UL, 3);
 			}
 		}
 	} else {
@@ -743,7 +760,7 @@ void prom_world(int enter)
 				if (tlb_type == spitfire)
 					spitfire_put_dtlb_data(prom_dtlb[i].tlb_ent,
 							       prom_dtlb[i].tlb_data);
-				else if (tlb_type == cheetah)
+				else if (tlb_type == cheetah || tlb_type == cheetah_plus)
 					cheetah_put_ldtlb_data(prom_dtlb[i].tlb_ent,
 							       prom_dtlb[i].tlb_data);
 			}
@@ -756,7 +773,7 @@ void prom_world(int enter)
 				if (tlb_type == spitfire)
 					spitfire_put_itlb_data(prom_itlb[i].tlb_ent,
 							       prom_itlb[i].tlb_data);
-				else if (tlb_type == cheetah)
+				else if (tlb_type == cheetah || tlb_type == cheetah_plus)
 					cheetah_put_litlb_data(prom_itlb[i].tlb_ent,
 							       prom_itlb[i].tlb_data);
 			}
@@ -891,7 +908,7 @@ void inherit_locked_prom_mappings(int save_p)
 					break;
 			}
 		}
-	} else if (tlb_type == cheetah) {
+	} else if (tlb_type == cheetah || tlb_type == cheetah_plus) {
 		int high = CHEETAH_HIGHEST_LOCKED_TLBENT - bigkernel;
 
 		for (i = 0; i < high; i++) {
@@ -963,7 +980,7 @@ void prom_reload_locked(void)
 			if (tlb_type == spitfire)
 				spitfire_put_dtlb_data(prom_dtlb[i].tlb_ent,
 						       prom_dtlb[i].tlb_data);
-			else if (tlb_type == cheetah)
+			else if (tlb_type == cheetah || tlb_type == cheetah_plus)
 				cheetah_put_ldtlb_data(prom_dtlb[i].tlb_ent,
 						      prom_dtlb[i].tlb_data);
 		}
@@ -1064,7 +1081,7 @@ void __flush_tlb_all(void)
 				spitfire_put_itlb_data(i, 0x0UL);
 			}
 		}
-	} else if (tlb_type == cheetah) {
+	} else if (tlb_type == cheetah || tlb_type == cheetah_plus) {
 		cheetah_flush_dtlb_all();
 		cheetah_flush_itlb_all();
 	}
@@ -1208,7 +1225,7 @@ void sparc_ultra_dump_itlb(void)
 				slot+2,
 				spitfire_get_itlb_tag(slot+2), spitfire_get_itlb_data(slot+2));
 		}
-	} else if (tlb_type == cheetah) {
+	} else if (tlb_type == cheetah || tlb_type == cheetah_plus) {
 		printk ("Contents of itlb0:\n");
 		for (slot = 0; slot < 16; slot+=2) {
 			printk ("%2x:%016lx,%016lx %2x:%016lx,%016lx\n",
@@ -1246,7 +1263,7 @@ void sparc_ultra_dump_dtlb(void)
 				slot+2,
 				spitfire_get_dtlb_tag(slot+2), spitfire_get_dtlb_data(slot+2));
 		}
-	} else if (tlb_type == cheetah) {
+	} else if (tlb_type == cheetah || tlb_type == cheetah_plus) {
 		printk ("Contents of dtlb0:\n");
 		for (slot = 0; slot < 16; slot+=2) {
 			printk ("%2x:%016lx,%016lx %2x:%016lx,%016lx\n",
@@ -1259,9 +1276,19 @@ void sparc_ultra_dump_dtlb(void)
 		for (slot = 0; slot < 512; slot+=2) {
 			printk ("%2x:%016lx,%016lx %2x:%016lx,%016lx\n",
 				slot,
-				cheetah_get_dtlb_tag(slot), cheetah_get_dtlb_data(slot),
+				cheetah_get_dtlb_tag(slot, 2), cheetah_get_dtlb_data(slot, 2),
 				slot+1,
-				cheetah_get_dtlb_tag(slot+1), cheetah_get_dtlb_data(slot+1));
+				cheetah_get_dtlb_tag(slot+1, 2), cheetah_get_dtlb_data(slot+1, 2));
+		}
+		if (tlb_type == cheetah_plus) {
+			printk ("Contents of dtlb3:\n");
+			for (slot = 0; slot < 512; slot+=2) {
+				printk ("%2x:%016lx,%016lx %2x:%016lx,%016lx\n",
+					slot,
+					cheetah_get_dtlb_tag(slot, 3), cheetah_get_dtlb_data(slot, 3),
+					slot+1,
+					cheetah_get_dtlb_tag(slot+1, 3), cheetah_get_dtlb_data(slot+1, 3));
+			}
 		}
 	}
 }
@@ -1439,7 +1466,7 @@ void __init paging_init(void)
 			  "i" (ASI_DMMU), "i" (ASI_DTLB_DATA_ACCESS), "r" (60 << 3)
 			: "memory");
 		}
-	} else if (tlb_type == cheetah) {
+	} else if (tlb_type == cheetah || tlb_type == cheetah_plus) {
 		__asm__ __volatile__(
 	"	stxa	%1, [%0] %3\n"
 	"	stxa	%2, [%5] %4\n"
@@ -1745,7 +1772,7 @@ void __init mem_init(void)
 	       initpages << (PAGE_SHIFT-10), 
 	       PAGE_OFFSET, (last_valid_pfn << PAGE_SHIFT));
 
-	if (tlb_type == cheetah)
+	if (tlb_type == cheetah || tlb_type == cheetah_plus)
 		cheetah_ecache_flush_init();
 }
 

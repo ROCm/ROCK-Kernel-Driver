@@ -66,14 +66,14 @@ cheetah_patch_1:
 	ldx		[%g6 + TI_FLAGS], %g3
 
 	/* Spitfire Errata #32 workaround */
-	mov		0x8, %o4
+	mov		PRIMARY_CONTEXT, %o4
 	stxa		%g0, [%o4] ASI_DMMU
 	membar		#Sync
 
 	ldxa		[%o3] ASI_DTLB_TAG_READ, %o4
 
 	/* Spitfire Errata #32 workaround */
-	mov		0x8, %o5
+	mov		PRIMARY_CONTEXT, %o5
 	stxa		%g0, [%o5] ASI_DMMU
 	membar		#Sync
 
@@ -85,14 +85,14 @@ cheetah_patch_1:
 	add		%o3, (TLBTEMP_ENTSZ), %o3
 
 	/* Spitfire Errata #32 workaround */
-	mov		0x8, %g5
+	mov		PRIMARY_CONTEXT, %g5
 	stxa		%g0, [%g5] ASI_DMMU
 	membar		#Sync
 
 	ldxa		[%o3] ASI_DTLB_TAG_READ, %g5
 
 	/* Spitfire Errata #32 workaround */
-	mov		0x8, %g7
+	mov		PRIMARY_CONTEXT, %g7
 	stxa		%g0, [%g7] ASI_DMMU
 	membar		#Sync
 
@@ -109,7 +109,9 @@ cheetah_patch_1:
 	rdpr		%ver, %g3
 	sllx		%g3, 16, %g3
 	srlx		%g3, 32 + 16, %g3
-	cmp		%g3, 0x14
+	cmp		%g3, 0x14			! CHEETAH_ID
+	be,pn		%icc, cheetah_copy_user_page
+	 cmp		%g3, 0x15			! CHEETAH_PLUS_ID
 	bne,pt		%icc, spitfire_copy_user_page
 	 nop
 
@@ -357,14 +359,14 @@ cheetah_patch_2:
 	wrpr		%g3, PSTATE_IE, %pstate
 
 	/* Spitfire Errata #32 workaround */
-	mov		0x8, %g5
+	mov		PRIMARY_CONTEXT, %g5
 	stxa		%g0, [%g5] ASI_DMMU
 	membar		#Sync
 
 	ldxa		[%o3] ASI_DTLB_TAG_READ, %g5
 
 	/* Spitfire Errata #32 workaround */
-	mov		0x8, %g7
+	mov		PRIMARY_CONTEXT, %g7
 	stxa		%g0, [%g7] ASI_DMMU
 	membar		#Sync
 
@@ -409,7 +411,8 @@ clear_page_common:
 	retl
 	 nop
 
-1:	stxa		%g5, [%o2] ASI_DMMU
+1:
+	stxa		%g5, [%o2] ASI_DMMU
 	stxa		%g7, [%o3] ASI_DTLB_DATA_ACCESS
 	membar		#Sync
 	jmpl		%o7 + 0x8, %g0

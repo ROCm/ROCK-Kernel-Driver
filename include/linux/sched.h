@@ -309,7 +309,7 @@ struct task_struct {
 
 	wait_queue_head_t wait_chldexit;	/* for wait4() */
 	struct completion *vfork_done;		/* for vfork() */
-	long *user_tid;				/* for CLONE_CLEARTID */
+	int *user_tid;				/* for CLONE_CLEARTID */
 
 	unsigned long rt_priority;
 	unsigned long it_real_value, it_prof_value, it_virt_value;

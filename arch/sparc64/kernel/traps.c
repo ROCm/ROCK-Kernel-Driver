@@ -37,6 +37,33 @@
 #include <linux/kmod.h>
 #endif
 
+/* When an irrecoverable trap occurs at tl > 0, the trap entry
+ * code logs the trap state registers at every level in the trap
+ * stack.  It is found at (pt_regs + sizeof(pt_regs)) and the layout
+ * is as follows:
+ */
+struct tl1_traplog {
+	struct {
+		unsigned long tstate;
+		unsigned long tpc;
+		unsigned long tnpc;
+	} trapstack[4];
+	unsigned long tl;
+};
+
+static void dump_tl1_traplog(struct tl1_traplog *p)
+{
+	int i;
+
+	printk("TRAPLOG: Error at trap level 0x%lx, dumping track stack.\n",
+	       p->tl);
+	for (i = 0; i < 4; i++) {
+		printk("TRAPLOG: Trap level %d TSTATE[%016lx] TPC[%016lx] TNPC[%016lx]\n",
+		       i + 1,
+		       p->trapstack[i].tstate, p->trapstack[i].tpc, p->trapstack[i].tnpc);
+	}
+}
+
 void bad_trap (struct pt_regs *regs, long lvl)
 {
 	char buffer[32];
@@ -66,8 +93,10 @@ void bad_trap (struct pt_regs *regs, long lvl)
 
 void bad_trap_tl1 (struct pt_regs *regs, long lvl)
 {
-	char buffer[24];
+	char buffer[32];
 	
+	dump_tl1_traplog((struct tl1_traplog *)(regs + 1));
+
 	sprintf (buffer, "Bad trap %lx at tl>0", lvl);
 	die_if_kernel (buffer, regs);
 }
@@ -80,8 +109,8 @@ void do_BUG(const char *file, int line)
 }
 #endif
 
-void instruction_access_exception (struct pt_regs *regs,
-				   unsigned long sfsr, unsigned long sfar)
+void instruction_access_exception(struct pt_regs *regs,
+				  unsigned long sfsr, unsigned long sfar)
 {
 	siginfo_t info;
 
@@ -100,6 +129,13 @@ void instruction_access_exception (struct pt_regs *regs,
 	info.si_addr = (void *)regs->tpc;
 	info.si_trapno = 0;
 	force_sig_info(SIGSEGV, &info, current);
+}
+
+void instruction_access_exception_tl1(struct pt_regs *regs,
+				      unsigned long sfsr, unsigned long sfar)
+{
+	dump_tl1_traplog((struct tl1_traplog *)(regs + 1));
+	instruction_access_exception(regs, sfsr, sfar);
 }
 
 void data_access_exception (struct pt_regs *regs,
@@ -167,7 +203,7 @@ static void clean_and_reenable_l1_caches(void)
 					    LSU_CONTROL_IM | LSU_CONTROL_DM),
 				     "i" (ASI_LSU_CONTROL)
 				     : "memory");
-	} else if (tlb_type == cheetah) {
+	} else if (tlb_type == cheetah || tlb_type == cheetah_plus) {
 		/* Flush D-cache */
 		for (va = 0; va < (1 << 16); va += (1 << 5)) {
 			__asm__ __volatile__("stxa %%g0, [%0] %1\n\t"
@@ -201,7 +237,7 @@ void do_dae(struct pt_regs *regs)
 		pci_poke_faulted = 1;
 
 		/* Why the fuck did they have to change this? */
-		if (tlb_type == cheetah)
+		if (tlb_type == cheetah || tlb_type == cheetah_plus)
 			regs->tpc += 4;
 
 		regs->tnpc = regs->tpc + 4;
@@ -390,10 +426,14 @@ static __inline__ struct cheetah_err_info *cheetah_get_error_log(unsigned long a
 	return p;
 }
 
+extern unsigned int tl0_icpe[], tl1_icpe[];
+extern unsigned int tl0_dcpe[], tl1_dcpe[];
 extern unsigned int tl0_fecc[], tl1_fecc[];
 extern unsigned int tl0_cee[], tl1_cee[];
 extern unsigned int tl0_iae[], tl1_iae[];
 extern unsigned int tl0_dae[], tl1_dae[];
+extern unsigned int cheetah_plus_icpe_trap_vector[], cheetah_plus_icpe_trap_vector_tl1[];
+extern unsigned int cheetah_plus_dcpe_trap_vector[], cheetah_plus_dcpe_trap_vector_tl1[];
 extern unsigned int cheetah_fecc_trap_vector[], cheetah_fecc_trap_vector_tl1[];
 extern unsigned int cheetah_cee_trap_vector[], cheetah_cee_trap_vector_tl1[];
 extern unsigned int cheetah_deferred_trap_vector[], cheetah_deferred_trap_vector_tl1[];
@@ -487,6 +527,12 @@ void __init cheetah_ecache_flush_init(void)
 	memcpy(tl1_iae, cheetah_deferred_trap_vector_tl1, (8 * 4));
 	memcpy(tl0_dae, cheetah_deferred_trap_vector, (8 * 4));
 	memcpy(tl1_dae, cheetah_deferred_trap_vector_tl1, (8 * 4));
+	if (tlb_type == cheetah_plus) {
+		memcpy(tl0_dcpe, cheetah_plus_dcpe_trap_vector, (8 * 4));
+		memcpy(tl1_dcpe, cheetah_plus_dcpe_trap_vector_tl1, (8 * 4));
+		memcpy(tl0_icpe, cheetah_plus_icpe_trap_vector, (8 * 4));
+		memcpy(tl1_icpe, cheetah_plus_icpe_trap_vector_tl1, (8 * 4));
+	}
 	flushi(PAGE_OFFSET);
 }
 
@@ -567,9 +613,22 @@ unsigned long __init cheetah_tune_scheduling(void)
  *
  * So we must only flush the I-cache when it is disabled.
  */
+static void __cheetah_flush_icache(void)
+{
+	unsigned long i;
+
+	/* Clear the valid bits in all the tags. */
+	for (i = 0; i < (1 << 15); i += (1 << 5)) {
+		__asm__ __volatile__("stxa %%g0, [%0] %1\n\t"
+				     "membar #Sync"
+				     : /* no outputs */
+				     : "r" (i | (2 << 3)), "i" (ASI_IC_TAG));
+	}
+}
+
 static void cheetah_flush_icache(void)
 {
-	unsigned long dcu_save, i;
+	unsigned long dcu_save;
 
 	/* Save current DCU, disable I-cache. */
 	__asm__ __volatile__("ldxa [%%g0] %1, %0\n\t"
@@ -580,13 +639,7 @@ static void cheetah_flush_icache(void)
 			     : "i" (ASI_DCU_CONTROL_REG), "i" (DCU_IC)
 			     : "g1");
 
-	/* Clear the valid bits in all the tags. */
-	for (i = 0; i < (1 << 16); i += (1 << 5)) {
-		__asm__ __volatile__("stxa %%g0, [%0] %1\n\t"
-				     "membar #Sync"
-				     : /* no outputs */
-				     : "r" (i | (2 << 3)), "i" (ASI_IC_TAG));
-	}
+	__cheetah_flush_icache();
 
 	/* Restore DCU register */
 	__asm__ __volatile__("stxa %0, [%%g0] %1\n\t"
@@ -604,6 +657,34 @@ static void cheetah_flush_dcache(void)
 				     "membar #Sync"
 				     : /* no outputs */
 				     : "r" (i), "i" (ASI_DCACHE_TAG));
+	}
+}
+
+/* In order to make the even parity correct we must do two things.
+ * First, we clear DC_data_parity and set DC_utag to an appropriate value.
+ * Next, we clear out all 32-bytes of data for that line.  Data of
+ * all-zero + tag parity value of zero == correct parity.
+ */
+static void cheetah_plus_zap_dcache_parity(void)
+{
+	unsigned long i;
+
+	for (i = 0; i < (1 << 16); i += (1 << 5)) {
+		unsigned long tag = (i >> 14);
+		unsigned long j;
+
+		__asm__ __volatile__("membar	#Sync\n\t"
+				     "stxa	%0, [%1] %2\n\t"
+				     "membar	#Sync"
+				     : /* no outputs */
+				     : "r" (tag), "r" (i),
+				       "i" (ASI_DCACHE_UTAG));
+		for (j = i; j < i + (1 << 5); j += (1 << 3))
+			__asm__ __volatile__("membar	#Sync\n\t"
+					     "stxa	%%g0, [%0] %1\n\t"
+					     "membar	#Sync"
+					     : /* no outputs */
+					     : "r" (j), "i" (ASI_DCACHE_DATA));
 	}
 }
 
@@ -1327,6 +1408,46 @@ void cheetah_deferred_handler(struct pt_regs *regs, unsigned long afsr, unsigned
 		panic("Irrecoverable deferred error trap.\n");
 }
 
+/* Handle a D/I cache parity error trap.  TYPE is encoded as:
+ *
+ * Bit0:	0=dcache,1=icache
+ * Bit1:	0=recoverable,1=unrecoverable
+ *
+ * The hardware has disabled both the I-cache and D-cache in
+ * the %dcr register.  
+ */
+void cheetah_plus_parity_error(int type, struct pt_regs *regs)
+{
+	if (type & 0x1)
+		__cheetah_flush_icache();
+	else
+		cheetah_plus_zap_dcache_parity();
+	cheetah_flush_dcache();
+
+	/* Re-enable I-cache/D-cache */
+	__asm__ __volatile__("ldxa [%%g0] %0, %%g1\n\t"
+			     "or %%g1, %1, %%g1\n\t"
+			     "stxa %%g1, [%%g0] %0\n\t"
+			     "membar #Sync"
+			     : /* no outputs */
+			     : "i" (ASI_DCU_CONTROL_REG),
+			       "i" (DCU_DC | DCU_IC)
+			     : "g1");
+
+	if (type & 0x2) {
+		printk(KERN_EMERG "CPU[%d]: Cheetah+ %c-cache parity error at TPC[%016lx]\n",
+		       smp_processor_id(),
+		       (type & 0x1) ? 'I' : 'D',
+		       regs->tpc);
+		panic("Irrecoverable Cheetah+ parity error.");
+	}
+
+	printk(KERN_WARNING "CPU[%d]: Cheetah+ %c-cache parity error at TPC[%016lx]\n",
+	       smp_processor_id(),
+	       (type & 0x1) ? 'I' : 'D',
+	       regs->tpc);
+}
+
 void do_fpe_common(struct pt_regs *regs)
 {
 	if (regs->tstate & TSTATE_PRIV) {
@@ -1604,56 +1725,67 @@ void do_cee(struct pt_regs *regs)
 
 void do_cee_tl1(struct pt_regs *regs)
 {
+	dump_tl1_traplog((struct tl1_traplog *)(regs + 1));
 	die_if_kernel("TL1: Cache Error Exception", regs);
 }
 
 void do_dae_tl1(struct pt_regs *regs)
 {
+	dump_tl1_traplog((struct tl1_traplog *)(regs + 1));
 	die_if_kernel("TL1: Data Access Exception", regs);
 }
 
 void do_iae_tl1(struct pt_regs *regs)
 {
+	dump_tl1_traplog((struct tl1_traplog *)(regs + 1));
 	die_if_kernel("TL1: Instruction Access Exception", regs);
 }
 
 void do_div0_tl1(struct pt_regs *regs)
 {
+	dump_tl1_traplog((struct tl1_traplog *)(regs + 1));
 	die_if_kernel("TL1: DIV0 Exception", regs);
 }
 
 void do_fpdis_tl1(struct pt_regs *regs)
 {
+	dump_tl1_traplog((struct tl1_traplog *)(regs + 1));
 	die_if_kernel("TL1: FPU Disabled", regs);
 }
 
 void do_fpieee_tl1(struct pt_regs *regs)
 {
+	dump_tl1_traplog((struct tl1_traplog *)(regs + 1));
 	die_if_kernel("TL1: FPU IEEE Exception", regs);
 }
 
 void do_fpother_tl1(struct pt_regs *regs)
 {
+	dump_tl1_traplog((struct tl1_traplog *)(regs + 1));
 	die_if_kernel("TL1: FPU Other Exception", regs);
 }
 
 void do_ill_tl1(struct pt_regs *regs)
 {
+	dump_tl1_traplog((struct tl1_traplog *)(regs + 1));
 	die_if_kernel("TL1: Illegal Instruction Exception", regs);
 }
 
 void do_irq_tl1(struct pt_regs *regs)
 {
+	dump_tl1_traplog((struct tl1_traplog *)(regs + 1));
 	die_if_kernel("TL1: IRQ Exception", regs);
 }
 
 void do_lddfmna_tl1(struct pt_regs *regs)
 {
+	dump_tl1_traplog((struct tl1_traplog *)(regs + 1));
 	die_if_kernel("TL1: LDDF Exception", regs);
 }
 
 void do_stdfmna_tl1(struct pt_regs *regs)
 {
+	dump_tl1_traplog((struct tl1_traplog *)(regs + 1));
 	die_if_kernel("TL1: STDF Exception", regs);
 }
 
@@ -1664,6 +1796,7 @@ void do_paw(struct pt_regs *regs)
 
 void do_paw_tl1(struct pt_regs *regs)
 {
+	dump_tl1_traplog((struct tl1_traplog *)(regs + 1));
 	die_if_kernel("TL1: Phys Watchpoint Exception", regs);
 }
 
@@ -1674,11 +1807,13 @@ void do_vaw(struct pt_regs *regs)
 
 void do_vaw_tl1(struct pt_regs *regs)
 {
+	dump_tl1_traplog((struct tl1_traplog *)(regs + 1));
 	die_if_kernel("TL1: Virt Watchpoint Exception", regs);
 }
 
 void do_tof_tl1(struct pt_regs *regs)
 {
+	dump_tl1_traplog((struct tl1_traplog *)(regs + 1));
 	die_if_kernel("TL1: Tag Overflow Exception", regs);
 }
 

@@ -774,7 +774,14 @@ __do_instruction_access_exception_tl1:
 	membar		#Sync
 	sethi		%hi(109f), %g7
 	ba,pt		%xcc, etraptl1
-	 or		%g7, %lo(109f), %g7	! Merge in below
+109:	 or		%g7, %lo(109b), %g7
+	mov		%l4, %o1
+	mov		%l5, %o2
+	call		instruction_access_exception_tl1
+	 add		%sp, STACK_BIAS + REGWIN_SZ, %o0
+	ba,pt		%xcc, rtrap
+	 clr		%l6
+
 __do_instruction_access_exception:
 	rdpr		%pstate, %g4
 	wrpr		%g4, PSTATE_MG|PSTATE_AG, %pstate
@@ -1073,6 +1080,181 @@ cheetah_deferred_trap_vector_tl1:
 	sethi		%hi(cheetah_deferred_trap), %g2
 	jmpl		%g2 + %lo(cheetah_deferred_trap), %g0
 	 mov		1, %g1
+
+	/* Cheetah+ specific traps. These are for the new I/D cache parity
+	 * error traps.  The first argument to cheetah_plus_parity_handler
+	 * is encoded as follows:
+	 *
+	 * Bit0:	0=dcache,1=icache
+	 * Bit1:	0=recoverable,1=unrecoverable
+	 */
+	.globl		cheetah_plus_dcpe_trap_vector, cheetah_plus_dcpe_trap_vector_tl1
+cheetah_plus_dcpe_trap_vector:
+	membar		#Sync
+	sethi		%hi(do_cheetah_plus_data_parity), %g7
+	jmpl		%g7 + %lo(do_cheetah_plus_data_parity), %g0
+	 nop
+	nop
+	nop
+	nop
+	nop
+
+do_cheetah_plus_data_parity:
+	ba,pt		%xcc, etrap
+	 rd		%pc, %g7
+	mov		0x0, %o0
+	call		cheetah_plus_parity_error
+	 add		%sp, STACK_BIAS + REGWIN_SZ, %o1
+	ba,pt		%xcc, rtrap
+	 clr		%l6
+
+cheetah_plus_dcpe_trap_vector_tl1:
+	membar		#Sync
+	wrpr		PSTATE_IG | PSTATE_PEF | PSTATE_PRIV, %pstate
+	sethi		%hi(do_dcpe_tl1), %g3
+	jmpl		%g3 + %lo(do_dcpe_tl1), %g0
+	 nop
+	nop
+	nop
+	nop
+
+	.globl		cheetah_plus_icpe_trap_vector, cheetah_plus_icpe_trap_vector_tl1
+cheetah_plus_icpe_trap_vector:
+	membar		#Sync
+	sethi		%hi(do_cheetah_plus_insn_parity), %g7
+	jmpl		%g7 + %lo(do_cheetah_plus_insn_parity), %g0
+	 nop
+	nop
+	nop
+	nop
+	nop
+
+do_cheetah_plus_insn_parity:
+	ba,pt		%xcc, etrap
+	 rd		%pc, %g7
+	mov		0x1, %o0
+	call		cheetah_plus_parity_error
+	 add		%sp, STACK_BIAS + REGWIN_SZ, %o1
+	ba,pt		%xcc, rtrap
+	 clr		%l6
+
+cheetah_plus_icpe_trap_vector_tl1:
+	membar		#Sync
+	wrpr		PSTATE_IG | PSTATE_PEF | PSTATE_PRIV, %pstate
+	sethi		%hi(do_icpe_tl1), %g3
+	jmpl		%g3 + %lo(do_icpe_tl1), %g0
+	 nop
+	nop
+	nop
+	nop
+
+	/* If we take one of these traps when tl >= 1, then we
+	 * jump to interrupt globals.  If some trap level above us
+	 * was also using interrupt globals, we cannot recover.
+	 * We may use all interrupt global registers except %g6.
+	 */
+	.globl		do_dcpe_tl1, do_icpe_tl1
+do_dcpe_tl1:
+	rdpr		%tl, %g1		! Save original trap level
+	mov		1, %g2			! Setup TSTATE checking loop
+	sethi		%hi(TSTATE_IG), %g3	! TSTATE mask bit
+1:	wrpr		%g2, %tl		! Set trap level to check
+	rdpr		%tstate, %g4		! Read TSTATE for this level
+	andcc		%g4, %g3, %g0		! Interrupt globals in use?
+	bne,a,pn	%xcc, do_dcpe_tl1_fatal	! Yep, irrecoverable
+	 wrpr		%g1, %tl		! Restore original trap level
+	add		%g2, 1, %g2		! Next trap level
+	cmp		%g2, %g1		! Hit them all yet?
+	ble,pt		%icc, 1b		! Not yet
+	 nop
+	wrpr		%g1, %tl		! Restore original trap level
+do_dcpe_tl1_nonfatal:	/* Ok we may use interrupt globals safely. */
+	/* Reset D-cache parity */
+	sethi		%hi(1 << 16), %g1	! D-cache size
+	mov		(1 << 5), %g2		! D-cache line size
+	sub		%g1, %g2, %g1		! Move down 1 cacheline
+1:	srl		%g1, 14, %g3		! Compute UTAG
+	membar		#Sync
+	stxa		%g3, [%g1] ASI_DCACHE_UTAG
+	membar		#Sync
+	sub		%g2, 8, %g3		! 64-bit data word within line
+2:	membar		#Sync
+	stxa		%g0, [%g1 + %g3] ASI_DCACHE_DATA
+	membar		#Sync
+	subcc		%g3, 8, %g3		! Next 64-bit data word
+	bge,pt		%icc, 2b
+	 nop
+	subcc		%g1, %g2, %g1		! Next cacheline
+	bge,pt		%icc, 1b
+	 nop
+	ba,pt		%xcc, dcpe_icpe_tl1_common
+	 nop
+
+do_dcpe_tl1_fatal:
+	sethi		%hi(1f), %g7
+	ba,pt		%xcc, etraptl1
+1:	or		%g7, %lo(1b), %g7
+	mov		0x2, %o0
+	call		cheetah_plus_parity_error
+	 add		%sp, STACK_BIAS + REGWIN_SZ, %o1
+	ba,pt		%xcc, rtrap
+	 clr		%l6
+
+do_icpe_tl1:
+	rdpr		%tl, %g1		! Save original trap level
+	mov		1, %g2			! Setup TSTATE checking loop
+	sethi		%hi(TSTATE_IG), %g3	! TSTATE mask bit
+1:	wrpr		%g2, %tl		! Set trap level to check
+	rdpr		%tstate, %g4		! Read TSTATE for this level
+	andcc		%g4, %g3, %g0		! Interrupt globals in use?
+	bne,a,pn	%xcc, do_icpe_tl1_fatal	! Yep, irrecoverable
+	 wrpr		%g1, %tl		! Restore original trap level
+	add		%g2, 1, %g2		! Next trap level
+	cmp		%g2, %g1		! Hit them all yet?
+	ble,pt		%icc, 1b		! Not yet
+	 nop
+	wrpr		%g1, %tl		! Restore original trap level
+do_icpe_tl1_nonfatal:	/* Ok we may use interrupt globals safely. */
+	/* Flush I-cache */
+	sethi		%hi(1 << 15), %g1	! I-cache size
+	mov		(1 << 5), %g2		! I-cache line size
+	sub		%g1, %g2, %g1
+1:	or		%g1, (2 << 3), %g3
+	stxa		%g0, [%g3] ASI_IC_TAG
+	membar		#Sync
+	subcc		%g1, %g2, %g1
+	bge,pt		%icc, 1b
+	 nop
+	ba,pt		%xcc, dcpe_icpe_tl1_common
+	 nop
+
+do_icpe_tl1_fatal:
+	sethi		%hi(1f), %g7
+	ba,pt		%xcc, etraptl1
+1:	or		%g7, %lo(1b), %g7
+	mov		0x3, %o0
+	call		cheetah_plus_parity_error
+	 add		%sp, STACK_BIAS + REGWIN_SZ, %o1
+	ba,pt		%xcc, rtrap
+	 clr		%l6
+	
+dcpe_icpe_tl1_common:
+	/* Flush D-cache, re-enable D/I caches in DCU and finally
+	 * retry the trapping instruction.
+	 */
+	sethi		%hi(1 << 16), %g1	! D-cache size
+	mov		(1 << 5), %g2		! D-cache line size
+	sub		%g1, %g2, %g1
+1:	stxa		%g0, [%g1] ASI_DCACHE_TAG
+	membar		#Sync
+	subcc		%g1, %g2, %g1
+	bge,pt		%icc, 1b
+	 nop
+	ldxa		[%g0] ASI_DCU_CONTROL_REG, %g1
+	or		%g1, (DCU_DC | DCU_IC), %g1
+	stxa		%g1, [%g0] ASI_DCU_CONTROL_REG
+	membar		#Sync
+	retry
 
 	/* Cheetah FECC trap handling, we get here from tl{0,1}_fecc
 	 * in the trap table.  That code has done a memory barrier
@@ -1639,11 +1821,16 @@ do_gettimeofday:	/* %o0 = timevalp */
 	or	%g2, %lo(xtime), %g2
 	or	%g1, %lo(timer_tick_compare), %g1
 1:	rdpr	%ver, %o2
-	sethi	%hi(0x003e0014), %o1
+	sethi	%hi(CHEETAH_ID), %o1
 	srlx	%o2, 32, %o2
-	or	%o1, %lo(0x003e0014), %o1
+	or	%o1, %lo(CHEETAH_ID), %o1
 	membar	#Sync
 	ldda	[%g2] ASI_NUCLEUS_QUAD_LDD, %o4
+	cmp	%o2, %o1
+	be,a,pn	%xcc, 3f
+	 rd	%asr24, %o1
+	sethi	%hi(CHEETAH_PLUS_ID), %o1
+	or	%o1, %lo(CHEETAH_PLUS_ID), %o1
 	cmp	%o2, %o1
 	bne,pt	%xcc, 2f
 	 nop

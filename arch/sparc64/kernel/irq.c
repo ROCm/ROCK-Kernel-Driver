@@ -7,6 +7,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/sched.h>
 #include <linux/ptrace.h>
 #include <linux/errno.h>
 #include <linux/kernel_stat.h>
@@ -162,7 +163,7 @@ void enable_irq(unsigned int irq)
 	if (imap == 0UL)
 		return;
 
-	if (tlb_type == cheetah) {
+	if (tlb_type == cheetah || tlb_type == cheetah_plus) {
 		/* We set it to our Safari AID. */
 		__asm__ __volatile__("ldxa [%%g0] %1, %0"
 				     : "=r" (tid)
@@ -1068,7 +1069,7 @@ static int retarget_one_irq(struct irqaction *p, int goal_cpu)
 			goal_cpu = 0;
 	}
 
-	if (tlb_type == cheetah) {
+	if (tlb_type == cheetah || tlb_type == cheetah_plus) {
 		tid = goal_cpu << 26;
 		tid &= IMAP_AID_SAFARI;
 	} else if (this_is_starfire == 0) {
