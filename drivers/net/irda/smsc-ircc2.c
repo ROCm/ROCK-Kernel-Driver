@@ -1745,11 +1745,8 @@ static int __exit smsc_ircc_close(struct smsc_ircc_cb *self)
 		pm_unregister(self->pmdev);
 
 	/* Remove netdevice */
-	if (self->netdev) {
-		rtnl_lock();
-		unregister_netdevice(self->netdev);
-		rtnl_unlock();
-	}
+	if (self->netdev) 
+		unregister_netdev(self->netdev);
 
 	/* Make sure the irq handler is not exectuting */
 	spin_lock_irqsave(&self->lock, flags);
