@@ -1,7 +1,7 @@
 #include <linux/linkage.h>
 #include <asm/assembler.h>
 /*
- * Function: armv4t_early_abort
+ * Function: v4t_early_abort
  *
  * Params  : r2 = address of aborted instruction
  *         : r3 = saved SPSR
@@ -18,7 +18,7 @@
  * picture.  Unfortunately, this does happen.  We live with it.
  */
 	.align	5
-ENTRY(armv4t_early_abort)
+ENTRY(v4t_early_abort)
 	mrc	p15, 0, r1, c5, c0, 0		@ get FSR
 	mrc	p15, 0, r0, c6, c0, 0		@ get FAR
 	tst	r3, #PSR_T_BIT

@@ -420,7 +420,9 @@ ENTRY(cpu_arm920_set_pmd)
  */
 	.align	5
 ENTRY(cpu_arm920_set_pte)
-	str	r1, [r0], #-1024		@ linux version
+	tst	r0, #2048
+	streq	r0, [r0, -r0]			@ BUG_ON
+	str	r1, [r0], #-2048		@ linux version
 
 	eor	r1, r1, #LPTE_PRESENT | LPTE_YOUNG | LPTE_WRITE | LPTE_DIRTY
 
@@ -511,7 +513,7 @@ __arm920_setup:
  */
 	.type	arm920_processor_functions, #object
 arm920_processor_functions:
-	.word	armv4t_early_abort
+	.word	v4t_early_abort
 	.word	cpu_arm920_check_bugs
 	.word	cpu_arm920_proc_init
 	.word	cpu_arm920_proc_fin
@@ -537,10 +539,6 @@ arm920_processor_functions:
 	.word	cpu_arm920_set_pgd
 	.word	cpu_arm920_set_pmd
 	.word	cpu_arm920_set_pte
-
-	/* misc */
-	.word	armv4_clear_user_page
-	.word	armv4_copy_user_page
 
 	.size	arm920_processor_functions, . - arm920_processor_functions
 
@@ -575,4 +573,5 @@ __arm920_proc_info:
 	.long	cpu_arm920_info
 	.long	arm920_processor_functions
 	.long	v4wbi_tlb_fns
+	.long	v4_user_fns
 	.size	__arm920_proc_info, . - __arm920_proc_info

@@ -602,7 +602,9 @@ ENTRY(cpu_xscale_set_pmd)
  */
 	.align	5
 ENTRY(cpu_xscale_set_pte)
-	str	r1, [r0], #-1024		@ linux version
+	tst	r0, #2048
+	streq	r0, [r0, -r0]			@ BUG_ON
+	str	r1, [r0], #-2048		@ linux version
 
 	bic	r2, r1, #0xff0
 	orr	r2, r2, #PTE_TYPE_EXT		@ extended page
@@ -695,7 +697,7 @@ __xscale_setup:
 
 	.type	xscale_processor_functions, #object
 ENTRY(xscale_processor_functions)
-	.word	armv4t_early_abort
+	.word	v4t_early_abort
 	.word	cpu_xscale_check_bugs
 	.word	cpu_xscale_proc_init
 	.word	cpu_xscale_proc_fin
@@ -721,10 +723,6 @@ ENTRY(xscale_processor_functions)
 	.word	cpu_xscale_set_pgd
 	.word	cpu_xscale_set_pmd
 	.word	cpu_xscale_set_pte
-
-	/* misc */
-	.word	armv5te_clear_user_page
-	.word	armv5te_copy_user_page
 
 	.size	xscale_processor_functions, . - xscale_processor_functions
 
@@ -765,6 +763,7 @@ __80200_proc_info:
 	.long	cpu_80200_info
 	.long	xscale_processor_functions
 	.long	v4wbi_tlb_fns
+	.long	v5te_mc_user_fns
 	.size	__80200_proc_info, . - __80200_proc_info
 
 	.type	__pxa250_proc_info,#object
@@ -779,6 +778,7 @@ __pxa250_proc_info:
 	.long	cpu_pxa250_info
 	.long	xscale_processor_functions
 	.long	v4wbi_tlb_fns
+	.long	v5te_mc_user_fns
 	.size	__cotulla_proc_info, . - __cotulla_proc_info
 	.size	__pxa250_proc_info, . - __pxa250_proc_info
 

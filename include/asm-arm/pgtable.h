@@ -1,7 +1,7 @@
 /*
  *  linux/include/asm-arm/pgtable.h
  *
- *  Copyright (C) 2000-2001 Russell King
+ *  Copyright (C) 2000-2002 Russell King
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -19,7 +19,11 @@
  * PGDIR_SHIFT determines what a third-level page table entry can map
  */
 #define PMD_SHIFT		20
+#ifdef CONFIG_CPU_32
+#define PGDIR_SHIFT		21
+#else
 #define PGDIR_SHIFT		20
+#endif
 
 #define LIBRARY_TEXT_START	0x0c000000
 
@@ -93,7 +97,6 @@ extern struct page *empty_zero_page;
 
 #define pmd_none(pmd)		(!pmd_val(pmd))
 #define pmd_present(pmd)	(pmd_val(pmd))
-#define pmd_clear(pmdp)		set_pmd(pmdp, __pmd(0))
 
 /*
  * Permanent address of a page. We never have highmem, so this is trivial.
@@ -106,18 +109,10 @@ extern struct page *empty_zero_page;
  */
 static inline pte_t mk_pte_phys(unsigned long physpage, pgprot_t pgprot)
 {
-	pte_t pte;
-	pte_val(pte) = physpage | pgprot_val(pgprot);
-	return pte;
+	return __pte(physpage | pgprot_val(pgprot));
 }
 
-#define mk_pte(page,pgprot)				\
-({							\
-	pte_t __pte;					\
-	pte_val(__pte) = __pa(page_address(page)) +	\
-			   pgprot_val(pgprot);		\
-	__pte;						\
-})
+#define mk_pte(page,pgprot)	mk_pte_phys(__pa(page_address(page)), pgprot)
 
 /*
  * The "pgd_xxx()" functions here are trivial for a folded two-level
@@ -127,7 +122,7 @@ static inline pte_t mk_pte_phys(unsigned long physpage, pgprot_t pgprot)
 #define pgd_none(pgd)		(0)
 #define pgd_bad(pgd)		(0)
 #define pgd_present(pgd)	(1)
-#define pgd_clear(pgdp)
+#define pgd_clear(pgdp)		do { } while (0)
 
 #define page_pte_prot(page,prot)	mk_pte(page, prot)
 #define page_pte(page)		mk_pte(page, __pgprot(0))
@@ -146,15 +141,6 @@ static inline pte_t mk_pte_phys(unsigned long physpage, pgprot_t pgprot)
 
 /* Find an entry in the third-level page table.. */
 #define __pte_index(addr)	(((addr) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
-
-#define pmd_page(dir)		((struct page *)__pmd_page(dir))
-
-#define __pte_offset(dir, addr)	((pte_t *)__pmd_page(*(dir)) + __pte_index(addr))
-#define pte_offset_kernel	__pte_offset
-#define pte_offset_map		__pte_offset
-#define pte_offset_map_nested	__pte_offset
-#define pte_unmap(pte)		do { } while (0)
-#define pte_unmap_nested(pte)	do { } while (0)
 
 #include <asm/proc/pgtable.h>
 
@@ -181,8 +167,6 @@ extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
 #define kern_addr_valid(addr)	(1)
 
 #include <asm-generic/pgtable.h>
-
-extern void pgtable_cache_init(void);
 
 /*
  * remap a physical address `phys' of size `size' with page protection `prot'

@@ -3,7 +3,7 @@
  *
  *  Copyright (C) 2001 Russell King
  *
- *  $Id: cpu-sa1110.c,v 1.6 2001/10/22 11:53:47 rmk Exp $
+ *  $Id: cpu-sa1110.c,v 1.8 2002/01/09 17:13:27 rmk Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -69,13 +69,23 @@ static struct sdram_params tc59sm716_cl3_params __initdata = {
 };
 
 static struct sdram_params samsung_k4s641632d_tc75 __initdata = {
-	rows:		14,
-	tck:		9,
-	trcd:		27,
-	trp:		20,
-	twr:		9,
-	refresh:	64000,
-	cas_latency:	3,
+	rows:		    14,
+	tck:		     9,
+	trcd:		    27,
+	trp:		    20,
+	twr:		     9,
+	refresh:	 64000,
+	cas_latency:	     3,
+};
+
+static struct sdram_params samsung_km416s4030ct __initdata = {
+	rows:		    13,
+	tck:		     8,
+	trcd:		    24,	/* 3 CLKs */
+	trp:		    24,	/* 3 CLKs */
+	twr:		    16,	/* Trdl: 2 CLKs */
+	refresh:	 64000,
+	cas_latency:	     3,
 };
 
 static struct sdram_params sdram_params;
@@ -273,6 +283,8 @@ static int __init sa1110_clk_init(void)
 	if (machine_is_pt_system3())
 		sdram = &samsung_k4s641632d_tc75;
 
+	if (machine_is_h3100())
+		sdram = &samsung_km416s4030ct;
 
 	if (sdram) {
 		printk(KERN_DEBUG "SDRAM: tck: %d trcd: %d trp: %d"

@@ -20,6 +20,7 @@
  * 			in the platform specific files.
  */
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/init.h>
 #include <linux/pm.h>
 #include <linux/slab.h>
@@ -27,6 +28,7 @@
 #include <linux/interrupt.h>
 #include <linux/sysctl.h>
 #include <linux/errno.h>
+#include <linux/cpufreq.h>
 
 #include <asm/hardware.h>
 #include <asm/memory.h>
@@ -210,3 +212,5 @@ static int __init pm_init(void)
 __initcall(pm_init);
 
 #endif
+
+EXPORT_SYMBOL(pm_do_suspend);
