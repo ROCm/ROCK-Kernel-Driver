@@ -149,7 +149,7 @@ static void shm_close (struct vm_area_struct *shmd)
 
 static int shm_mmap(struct file * file, struct vm_area_struct * vma)
 {
-	update_atime(file->f_dentry->d_inode);
+	file_accessed(file);
 	vma->vm_ops = &shm_vm_ops;
 	shm_inc(file->f_dentry->d_inode->i_ino);
 	return 0;

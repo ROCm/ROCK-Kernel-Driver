@@ -300,6 +300,7 @@ static struct pci_device_id it8172_pci_tbl[] = {
 	{ PCI_VENDOR_ID_ITE, PCI_DEVICE_ID_ITE_IT8172G, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{ 0, },
 };
+MODULE_DEVICE_TABLE(pci, it8172_pci_tbl);
 
 static struct pci_driver driver = {
 	.name		= "IT8172IDE",

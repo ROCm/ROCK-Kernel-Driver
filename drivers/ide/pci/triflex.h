@@ -37,5 +37,6 @@ static struct pci_device_id triflex_pci_tbl[] = {
 		PCI_ANY_ID, 0, 0, 0 },
 	{ 0, },
 };
+MODULE_DEVICE_TABLE(pci, triflex_pci_tbl);
 
 #endif /* TRIFLEX_H */

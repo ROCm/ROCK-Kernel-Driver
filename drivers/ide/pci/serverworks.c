@@ -809,6 +809,7 @@ static struct pci_device_id svwks_pci_tbl[] = {
 	{ PCI_VENDOR_ID_SERVERWORKS, PCI_DEVICE_ID_SERVERWORKS_CSB6IDE2, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 3},
 	{ 0, },
 };
+MODULE_DEVICE_TABLE(pci, svwks_pci_tbl);
 
 static struct pci_driver driver = {
 	.name		= "Serverworks IDE",

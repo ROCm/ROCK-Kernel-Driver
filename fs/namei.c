@@ -412,7 +412,7 @@ static inline int do_follow_link(struct dentry *dentry, struct nameidata *nd)
 		goto loop;
 	current->link_count++;
 	current->total_link_count++;
-	update_atime(dentry->d_inode);
+	touch_atime(nd->mnt, dentry);
 	err = dentry->d_inode->i_op->follow_link(dentry, nd);
 	current->link_count--;
 	return err;
@@ -1368,7 +1368,7 @@ do_link:
 	error = security_inode_follow_link(dentry, nd);
 	if (error)
 		goto exit_dput;
-	update_atime(dentry->d_inode);
+	touch_atime(nd->mnt, dentry);
 	error = dentry->d_inode->i_op->follow_link(dentry, nd);
 	dput(dentry);
 	if (error)

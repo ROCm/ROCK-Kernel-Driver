@@ -1061,14 +1061,8 @@ void shmem_lock(struct file *file, int lock)
 
 static int shmem_mmap(struct file *file, struct vm_area_struct *vma)
 {
-	struct vm_operations_struct *ops;
-	struct inode *inode = file->f_dentry->d_inode;
-
-	ops = &shmem_vm_ops;
-	if (!S_ISREG(inode->i_mode))
-		return -EACCES;
-	update_atime(inode);
-	vma->vm_ops = ops;
+	file_accessed(file);
+	vma->vm_ops = &shmem_vm_ops;
 	return 0;
 }
 
@@ -1363,7 +1357,7 @@ static void do_shmem_file_read(struct file *filp, loff_t *ppos, read_descriptor_
 	}
 
 	*ppos = ((loff_t) index << PAGE_CACHE_SHIFT) + offset;
-	update_atime(inode);
+	file_accessed(filp);
 }
 
 static ssize_t shmem_file_read(struct file *filp, char __user *buf, size_t count, loff_t *ppos)
