@@ -1311,12 +1311,12 @@ static int __init snd_es18xx_initialize(es18xx_t *chip)
 	if (chip->caps & ES18XX_CONTROL) {
 		/* Hardware volume IRQ */
 		snd_es18xx_config_write(chip, 0x27, chip->irq);
-		if (chip->fm_port > SNDRV_AUTO_PORT) {
+		if (chip->fm_port > 0 && chip->fm_port != SNDRV_AUTO_PORT) {
 			/* FM I/O */
 			snd_es18xx_config_write(chip, 0x62, chip->fm_port >> 8);
 			snd_es18xx_config_write(chip, 0x63, chip->fm_port & 0xff);
 		}
-		if (chip->mpu_port > SNDRV_AUTO_PORT) {
+		if (chip->mpu_port > 0 && chip->mpu_port != SNDRV_AUTO_PORT) {
 			/* MPU-401 I/O */
 			snd_es18xx_config_write(chip, 0x64, chip->mpu_port >> 8);
 			snd_es18xx_config_write(chip, 0x65, chip->mpu_port & 0xff);
@@ -1404,7 +1404,7 @@ static int __init snd_es18xx_initialize(es18xx_t *chip)
 		snd_es18xx_mixer_write(chip, 0x7A, 0x68);
 		/* Enable and set hardware volume interrupt */
 		snd_es18xx_mixer_write(chip, 0x64, 0x06);
-		if (chip->mpu_port > SNDRV_AUTO_PORT) {
+		if (chip->mpu_port > 0 && chip->mpu_port != SNDRV_AUTO_PORT) {
 			/* MPU401 share irq with audio
 			   Joystick enabled
 			   FM enabled */
@@ -2040,7 +2040,7 @@ static int __init snd_audiodrive_isapnp(int dev, struct snd_audiodrive *acard)
 	/* skip csn and logdev initialization - already done in isapnp_configure */
 	isapnp_cfg_begin(pdev->bus->number, pdev->devfn);
 	isapnp_write_byte(0x27, pdev->irq_resource[0].start);	/* Hardware Volume IRQ Number */
-	if (snd_mpu_port[dev] > SNDRV_AUTO_PORT)
+	if (snd_mpu_port[dev] != SNDRV_AUTO_PORT)
 		isapnp_write_byte(0x28, pdev->irq);		/* MPU-401 IRQ Number */
 	isapnp_write_byte(0x72, pdev->irq_resource[0].start);	/* second IRQ */
 	isapnp_cfg_end();
@@ -2147,16 +2147,18 @@ static int __init snd_audiodrive_probe(int dev)
 		return err;
 	}
 
-	if (snd_opl3_create(card, chip->fm_port, chip->fm_port + 2, OPL3_HW_OPL3, 0, &opl3) < 0) {
-		printk(KERN_ERR PFX "opl3 not detected at 0x%lx\n", chip->port);
-	} else {
-		if ((err = snd_opl3_hwdep_new(opl3, 0, 1, NULL)) < 0) {
-			snd_card_free(card);
-			return err;
+	if (snd_fm_port[dev] > 0 && snd_fm_port[dev] != SNDRV_AUTO_PORT) {
+		if (snd_opl3_create(card, chip->fm_port, chip->fm_port + 2, OPL3_HW_OPL3, 0, &opl3) < 0) {
+			printk(KERN_ERR PFX "opl3 not detected at 0x%lx\n", chip->fm_port);
+		} else {
+			if ((err = snd_opl3_hwdep_new(opl3, 0, 1, NULL)) < 0) {
+				snd_card_free(card);
+				return err;
+			}
 		}
 	}
 
-	if (snd_mpu_port[dev] != SNDRV_AUTO_PORT) {
+	if (snd_mpu_port[dev] > 0 && snd_mpu_port[dev] != SNDRV_AUTO_PORT) {
 		if ((err = snd_mpu401_uart_new(card, 0, MPU401_HW_ES18XX,
 					       chip->mpu_port, 0,
 					       irq, 0,

@@ -50,12 +50,8 @@ extern int pid_to_processor_id(int pid);
 extern void block_signals(void);
 extern void unblock_signals(void);
 extern void deliver_signals(void *t);
-extern void lock_syscall(void);
-extern void unlock_syscall(void);
-extern void lock_trap(void);
-extern void unlock_trap(void);
-extern void lock_pid(void);
-extern void unlock_pid(void);
+extern int next_syscall_index(int max);
+extern int next_trap_index(int max);
 extern void default_idle(void);
 extern void finish_fork(void);
 extern void paging_init(void);
@@ -121,7 +117,7 @@ extern void arch_switch(void);
 extern int is_valid_pid(int pid);
 extern void free_irq(unsigned int, void *);
 extern int um_in_interrupt(void);
-
+extern int cpu(void);
 #endif
 
 /*

@@ -13,6 +13,7 @@
 #include "init.h"
 #include "os.h"
 
+/* Changed by uml_initrd_setup, which is a setup */
 static char *initrd __initdata = NULL;
 
 static int __init read_initrd(void)

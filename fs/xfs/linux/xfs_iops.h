@@ -65,7 +65,6 @@ extern struct file_operations linvfs_dir_operations;
 
 extern struct address_space_operations linvfs_aops;
 
-extern int linvfs_revalidate_core(struct inode *, int);
 extern int linvfs_get_block(struct inode *, sector_t, struct buffer_head *, int);
 
 #endif /* __XFS_IOPS_H__ */

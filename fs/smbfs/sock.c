@@ -58,7 +58,7 @@ _recvfrom(struct socket *socket, unsigned char *ubuf, int size, unsigned flags)
 	iov.iov_len = size;
 
 	init_sync_kiocb(&iocb, NULL);
-	si = kiocb_to_siocb(iocb);
+	si = kiocb_to_siocb(&iocb);
 	si->sock = socket;
 	si->scm = &si->async_scm;
 	si->msg = &msg;
@@ -327,7 +327,7 @@ smb_receive_drop(struct smb_sb_info *server)
 		rlen = PAGE_SIZE;
 
 	init_sync_kiocb(&iocb, NULL);
-	si = kiocb_to_siocb(iocb);
+	si = kiocb_to_siocb(&iocb);
 	si->sock = sock;
 	si->scm = &si->async_scm;
 	si->msg = &msg;
@@ -338,7 +338,7 @@ smb_receive_drop(struct smb_sb_info *server)
 
 	result = sock->ops->recvmsg(&iocb, sock, &msg, rlen, flags, si->scm);
 	if (result >= 0)
-		scm_recv(sock, &msg, &scm, flags);
+		scm_recv(sock, &msg, si->scm, flags);
 	if (-EIOCBQUEUED == result)
 		result = wait_on_sync_kiocb(&iocb);
 
@@ -369,7 +369,8 @@ smb_receive(struct smb_sb_info *server, struct smb_request *req)
 	unsigned int flags;
 	struct iovec iov[4];
 	struct msghdr msg;
-	struct scm_cookie scm;
+	struct kiocb iocb;
+	struct sock_iocb *si;
 	mm_segment_t fs;
 	int rlen;
 	int result = -EIO;
@@ -397,7 +398,7 @@ smb_receive(struct smb_sb_info *server, struct smb_request *req)
 		rlen = req->rq_rlen;
 
 	init_sync_kiocb(&iocb, NULL);
-	si = kiocb_to_siocb(iocb);
+	si = kiocb_to_siocb(&iocb);
 	si->sock = sock;
 	si->scm = &si->async_scm;
 	si->msg = &msg;
@@ -408,7 +409,7 @@ smb_receive(struct smb_sb_info *server, struct smb_request *req)
 
 	result = sock->ops->recvmsg(&iocb, sock, &msg, rlen, flags, si->scm);
 	if (result >= 0)
-		scm_recv(sock, &msg, &scm, flags);
+		scm_recv(sock, &msg, si->scm, flags);
 	if (-EIOCBQUEUED == result)
 		result = wait_on_sync_kiocb(&iocb);
 
@@ -464,7 +465,7 @@ smb_send_request(struct smb_request *req)
 		smb_move_iov(&msg, iov, req->rq_bytes_sent);
 
 	init_sync_kiocb(&iocb, NULL);
-	si = kiocb_to_siocb(iocb);
+	si = kiocb_to_siocb(&iocb);
 	si->scm = &si->async_scm;
 	si->sock = sock;
 	si->msg = &msg;
@@ -476,7 +477,7 @@ smb_send_request(struct smb_request *req)
 	if (result >= 0) {
 		result = sock->ops->sendmsg(&iocb, sock, &msg, slen, si->scm);
 		if (-EIOCBQUEUED != result)
-			scm_destroy(&scm);
+			scm_destroy(si->scm);
 	}
 	if (-EIOCBQUEUED == result)
 		result = wait_on_sync_kiocb(&iocb);

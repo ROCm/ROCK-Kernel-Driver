@@ -28,7 +28,7 @@
 #include <sound/version.h>
 #include <linux/utsname.h>
 
-#ifdef CONFIG_SND_OSSEMUL
+#if defined(CONFIG_SND_OSSEMUL) && defined(CONFIG_PROC_FS)
 
 /*
  *  OSS compatible part

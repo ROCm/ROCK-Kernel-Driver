@@ -788,6 +788,7 @@ shut_us_down:
 	commit_lsn = xfs_log_done(mp, tp->t_ticket, log_flags);
 #endif
 
+	tp->t_commit_lsn = commit_lsn;
 	if (nvec > XFS_TRANS_LOGVEC_COUNT) {
 		kmem_free(log_vector, nvec * sizeof(xfs_log_iovec_t));
 	}

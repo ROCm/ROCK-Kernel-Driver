@@ -122,7 +122,9 @@ snd_seq_oss_writeq_sync(seq_oss_writeq_t *q)
 	}
 		
 	/* wait for echo event */
-	snd_seq_sleep_timeout_in_lock(&q->sync_sleep, &q->sync_lock, HZ);
+	spin_unlock(&q->sync_lock);
+	interruptible_sleep_on_timeout(&q->sync_sleep, HZ);
+	spin_lock(&q->sync_lock);
 	if (signal_pending(current)) {
 		/* interrupted - return 0 to finish sync */
 		q->sync_event_put = 0;

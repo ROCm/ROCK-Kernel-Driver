@@ -1,5 +1,5 @@
 RFCOMM protocol support
-CONFIG_BLUEZ_RFCOMM
+CONFIG_BT_RFCOMM
   RFCOMM provides connection oriented stream transport. RFCOMM
   support is required for Dialup Networking, OBEX and other Bluetooth
   applications.
@@ -8,5 +8,5 @@ CONFIG_BLUEZ_RFCOMM
   compile it as module (rfcomm.o).
 
 RFCOMM TTY emulation support
-CONFIG_BLUEZ_RFCOMM_TTY
+CONFIG_BT_RFCOMM_TTY
   This option enables TTY emulation support for RFCOMM channels.

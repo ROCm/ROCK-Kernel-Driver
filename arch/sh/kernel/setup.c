@@ -171,12 +171,12 @@ static int __init sh_console_setup(struct console *co, char *options)
 }
 
 static struct console sh_console = {
-	name:		"bios",
-	write:		sh_console_write,
-	device:		sh_console_device,
-	setup:		sh_console_setup,
-	flags:		CON_PRINTBUFFER,
-	index:		-1,
+	.name		= "bios",
+	.write		= sh_console_write,
+	.device		= sh_console_device,
+	.setup		= sh_console_setup,
+	.flags		= CON_PRINTBUFFER,
+	.index		= -1,
 };
 
 void sh_console_init(void)
@@ -548,9 +548,9 @@ static void c_stop(struct seq_file *m, void *v)
 {
 }
 struct seq_operations cpuinfo_op = {
-	start:	c_start,
-	next:	c_next,
-	stop:	c_stop,
-	show:	show_cpuinfo,
+	.start	= c_start,
+	.next	= c_next,
+	.stop	= c_stop,
+	.show	= show_cpuinfo,
 };
 #endif

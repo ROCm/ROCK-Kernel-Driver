@@ -56,8 +56,18 @@ if [ "$CONFIG_ARM" = "y" ]; then
    dep_tristate '  CFI Flash device mapped on ARM Integrator/P720T' CONFIG_MTD_ARM_INTEGRATOR $CONFIG_MTD_CFI
    dep_tristate '  Cirrus CDB89712 evaluation board mappings' CONFIG_MTD_CDB89712 $CONFIG_MTD_CFI $CONFIG_ARCH_CDB89712
    dep_tristate '  CFI Flash device mapped on StrongARM SA11x0' CONFIG_MTD_SA1100 $CONFIG_MTD_CFI $CONFIG_ARCH_SA1100 $CONFIG_MTD_PARTITIONS
-   dep_tristate '  CFI Flash device mapped on DC21285 Footbridge' CONFIG_MTD_DC21285 $CONFIG_MTD_CFI $CONFIG_ARCH_FOOTBRIDGE $CONFIG_MTD_PARTITIONS
+   dep_tristate '  CFI Flash device mapped on DC21285 Footbridge' CONFIG_MTD_DC21285 $CONFIG_MTD_CFI $CONFIG_ARCH_FOOTBRIDGE
    dep_tristate '  CFI Flash device mapped on the XScale IQ80310 board' CONFIG_MTD_IQ80310 $CONFIG_MTD_CFI $CONFIG_ARCH_IQ80310
+   dep_tristate '  CFI Flash device mapped on Epxa10db' CONFIG_MTD_EPXA10DB $CONFIG_MTD_CFI  $CONFIG_MTD_PARTITIONS $CONFIG_ARCH_CAMELOT
+   dep_tristate '  CFI Flash device mapped on the FortuNet board' CONFIG_MTD_FORTUNET $CONFIG_MTD_CFI $CONFIG_MTD_PARTITIONS $CONFIG_SA1100_FORTUNET
+   dep_tristate '  NV-RAM mapping AUTCPU12 board' CONFIG_MTD_AUTCPU12 $CONFIG_ARCH_AUTCPU12
+   dep_tristate '  CFI Flash device mapped on EDB7312' CONFIG_MTD_EDB7312 $CONFIG_MTD_CFI
+   dep_tristate '  JEDEC Flash device mapped on impA7' CONFIG_MTD_IMPA7 $CONFIG_MTD_JEDECPROBE
+   dep_tristate '  JEDEC Flash device mapped on Ceiva/Polaroid PhotoMax Digital Picture Frame' CONFIG_MTD_CEIVA $CONFIG_MTD_JEDECPROBE  $CONFIG_ARCH_CEIVA
 fi
+
+# This needs CFI or JEDEC, depending on the cards found.
+dep_tristate '  PCI MTD driver' CONFIG_MTD_PCI $CONFIG_MTD $CONFIG_PCI
+dep_tristate '  PCMCIA MTD driver' CONFIG_MTD_PCMCIA $CONFIG_MTD $CONFIG_PCMCIA
 
 endmenu

@@ -476,7 +476,7 @@ xlog_find_head(xlog_t  *log,
 	     * mkfs etc write a dummy unmount record to a fresh
 	     * log so we can store the uuid in there
 	     */
-	    xlog_warn("XFS: totally zeroed log\n");
+	    xlog_warn("XFS: totally zeroed log");
 	}
 
 	return 0;
@@ -873,9 +873,19 @@ xlog_find_tail(xlog_t  *log,
 	 * overwrite the unmount record after a clean unmount.
 	 *
 	 * Do this only if we are going to recover the filesystem
+	 *
+	 * NOTE: This used to say "if (!readonly)"
+	 * However on Linux, we can & do recover a read-only filesystem.
+	 * We only skip recovery if NORECOVERY is specified on mount,
+	 * in which case we would not be here.
+	 *
+	 * But... if the -device- itself is readonly, just skip this.
+	 * We can't recover this device anyway, so it won't matter.
 	 */
-	if (!readonly)
+
+	if (!bdev_read_only(log->l_mp->m_logdev_targp->pbr_bdev)) {
 		error = xlog_clear_stale_blocks(log, tail_lsn);
+	}
 #endif
 
 bread_err:
@@ -1242,7 +1252,7 @@ xlog_recover_add_to_cont_trans(xlog_recover_t	*trans,
 		/* finish copying rest of trans header */
 		xlog_recover_add_item(&trans->r_itemq);
 		ptr = (xfs_caddr_t)&trans->r_theader+sizeof(xfs_trans_header_t)-len;
-		bcopy(dp, ptr, len); /* s, d, l */
+		memcpy(ptr, dp, len); /* d, s, l */
 		return 0;
 	}
 	item = item->ri_prev;
@@ -1251,7 +1261,7 @@ xlog_recover_add_to_cont_trans(xlog_recover_t	*trans,
 	old_len = item->ri_buf[item->ri_cnt-1].i_len;
 
 	ptr = kmem_realloc(old_ptr, len+old_len, old_len, 0);
-	bcopy(dp , &ptr[old_len], len); /* s, d, l */
+	memcpy(&ptr[old_len], dp, len); /* d, s, l */
 	item->ri_buf[item->ri_cnt-1].i_len += len;
 	item->ri_buf[item->ri_cnt-1].i_addr = ptr;
 	return 0;
@@ -1282,7 +1292,7 @@ xlog_recover_add_to_trans(xlog_recover_t	*trans,
 	if (!len)
 		return 0;
 	ptr = kmem_zalloc(len, 0);
-	bcopy(dp, ptr, len);
+	memcpy(ptr, dp, len);
 
 	in_f = (xfs_inode_log_format_t *)ptr;
 	item = trans->r_itemq;
@@ -1290,7 +1300,7 @@ xlog_recover_add_to_trans(xlog_recover_t	*trans,
 		ASSERT(*(uint *)dp == XFS_TRANS_HEADER_MAGIC);
 		if (len == sizeof(xfs_trans_header_t))
 			xlog_recover_add_item(&trans->r_itemq);
-		bcopy(dp, &trans->r_theader, len); /* s, d, l */
+		memcpy(&trans->r_theader, dp, len); /* d, s, l */
 		return 0;
 	}
 	if (item->ri_prev->ri_total != 0 &&
@@ -1799,9 +1809,10 @@ xlog_recover_do_reg_buffer(xfs_mount_t		*mp,
 					       "dquot_buf_recover");
 		}
 		if (!error)
-		    bcopy(item->ri_buf[i].i_addr,		   /* source */
-		      xfs_buf_offset(bp, (uint)bit << XFS_BLI_SHIFT), /* dest */
-		      nbits<<XFS_BLI_SHIFT);			   /* length */
+			memcpy(xfs_buf_offset(bp,
+					(uint)bit << XFS_BLI_SHIFT),	/* dest */
+				item->ri_buf[i].i_addr,			/* source */
+				nbits<<XFS_BLI_SHIFT);			/* length */
 		i++;
 		bit += nbits;
 	}
@@ -2115,9 +2126,9 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 			      -1, ARCH_CONVERT);
 	/* the rest is in on-disk format */
 	if (item->ri_buf[1].i_len > sizeof(xfs_dinode_core_t)) {
-		bcopy(item->ri_buf[1].i_addr + sizeof(xfs_dinode_core_t),
-		      (xfs_caddr_t) dip		 + sizeof(xfs_dinode_core_t),
-		      item->ri_buf[1].i_len  - sizeof(xfs_dinode_core_t));
+		memcpy((xfs_caddr_t) dip + sizeof(xfs_dinode_core_t),
+			item->ri_buf[1].i_addr + sizeof(xfs_dinode_core_t),
+			item->ri_buf[1].i_len  - sizeof(xfs_dinode_core_t));
 	}
 
 	fields = in_f->ilf_fields;
@@ -2143,7 +2154,7 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 	switch (fields & XFS_ILOG_DFORK) {
 	case XFS_ILOG_DDATA:
 	case XFS_ILOG_DEXT:
-		bcopy(src, &dip->di_u, len);
+		memcpy(&dip->di_u, src, len);
 		break;
 
 	case XFS_ILOG_DBROOT:
@@ -2182,7 +2193,7 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 		case XFS_ILOG_AEXT:
 			dest = XFS_DFORK_APTR(dip);
 			ASSERT(len <= XFS_DFORK_ASIZE(dip, mp));
-			bcopy(src, dest, len);
+			memcpy(dest, src, len);
 			break;
 
 		case XFS_ILOG_ABROOT:
@@ -2341,7 +2352,7 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 		return XFS_ERROR(EIO);
 	}
 
-	bcopy(recddq, ddq, item->ri_buf[1].i_len);
+	memcpy(ddq, recddq, item->ri_buf[1].i_len);
 
 	ASSERT(dq_f->qlf_size == 2);
 	ASSERT(XFS_BUF_FSPRIVATE(bp, void *) == NULL ||
@@ -2382,7 +2393,7 @@ xlog_recover_do_efi_trans(xlog_t		*log,
 
 	mp = log->l_mp;
 	efip = xfs_efi_init(mp, efi_formatp->efi_nextents);
-	bcopy((char *)efi_formatp, (char *)&(efip->efi_format),
+	memcpy((char *)&(efip->efi_format), (char *)efi_formatp,
 	      sizeof(xfs_efi_log_format_t) +
 	      ((efi_formatp->efi_nextents - 1) * sizeof(xfs_extent_t)));
 	efip->efi_next_extent = efi_formatp->efi_nextents;
@@ -3131,7 +3142,7 @@ xlog_unpack_data(xlog_rec_header_t *rhead,
 "XFS: Disregard message if filesystem was created with non-DEBUG kernel");
 		    if (XFS_SB_VERSION_HASLOGV2(&log->l_mp->m_sb)) {
 			    cmn_err(CE_DEBUG,
-				"XFS: LogR this is a LogV2 filesystem\n");
+				"XFS: LogR this is a LogV2 filesystem");
 		    }
 		    log->l_flags |= XLOG_CHKSUM_MISMATCH;
 	    }
@@ -3215,7 +3226,7 @@ xlog_do_recovery_pass(xlog_t	*log,
 	return ENOMEM;
     }
 
-    bzero(rhash, sizeof(rhash));
+    memset(rhash, 0, sizeof(rhash));
     if (tail_blk <= head_blk) {
 	for (blk_no = tail_blk; blk_no < head_blk; ) {
 	    if ((error = xlog_bread(log, blk_no, hblks, hbp)))
@@ -3521,17 +3532,20 @@ xlog_recover(xlog_t *log, int readonly)
 		 * error message.
 		 * ...but this is no longer true.  Now, unless you specify
 		 * NORECOVERY (in which case this function would never be
-		 * called), it enables read-write access long enough to do
-		 * recovery.
+		 * called), we just go ahead and recover.  We do this all
+		 * under the vfs layer, so we can get away with it unless
+		 * the device itself is read-only, in which case we fail.
 		 */
-		if (readonly) {
 #ifdef __KERNEL__
-			if ((error = xfs_recover_read_only(log)))
-				return error;
-#else
-			return ENOSPC;
-#endif
+		if ((error = xfs_dev_is_read_only(log->l_mp,
+						"recovery required"))) {
+			return error;
 		}
+#else
+		if (readonly) {
+			return ENOSPC;
+		}
+#endif
 
 #ifdef __KERNEL__
 #if defined(DEBUG) && defined(XFS_LOUD_RECOVERY)
@@ -3548,8 +3562,6 @@ xlog_recover(xlog_t *log, int readonly)
 #endif
 		error = xlog_do_recover(log, head_blk, tail_blk);
 		log->l_flags |= XLOG_RECOVERY_NEEDED;
-		if (readonly)
-			XFS_MTOVFS(log->l_mp)->vfs_flag |= VFS_RDONLY;
 	}
 	return error;
 }	/* xlog_recover */
@@ -3607,7 +3619,7 @@ xlog_recover_finish(xlog_t *log, int mfsi_flags)
 		log->l_flags &= ~XLOG_RECOVERY_NEEDED;
 	} else {
 		cmn_err(CE_DEBUG,
-			"!Ending clean XFS mount for filesystem: %s\n",
+			"!Ending clean XFS mount for filesystem: %s",
 			log->l_mp->m_fsname);
 	}
 	return 0;

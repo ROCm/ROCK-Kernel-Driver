@@ -1470,9 +1470,6 @@ static int floppy_open(struct inode *inode, struct file *filp)
 	int drive = minor(inode->i_rdev) & 3;
 	int old_dev;
 
-	if ((minor(inode->i_rdev) >> 2) > NUM_DISK_TYPES)
-		return -ENXIO;
-
 	old_dev = fd_device[drive];
 
 	if (fd_ref[drive])
@@ -1547,7 +1544,7 @@ int fd1772_init(void)
 		return 0;
 
 	for (i = 0; i < FD_MAX_UNITS; i++) {
-		disks[i] = alloc_disk();
+		disks[i] = alloc_disk(1);
 		if (!disks[i])
 			goto out;
 	}

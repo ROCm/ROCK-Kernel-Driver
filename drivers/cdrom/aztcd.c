@@ -1908,7 +1908,7 @@ static int __init aztcd_init(void)
 	}
 	devfs_register(NULL, "aztcd", DEVFS_FL_DEFAULT, MAJOR_NR, 0,
 		       S_IFBLK | S_IRUGO | S_IWUGO, &azt_fops, NULL);
-	azt_disk = alloc_disk();
+	azt_disk = alloc_disk(1);
 	if (!azt_disk)
 		goto err_out2;
 	if (register_blkdev(MAJOR_NR, "aztcd", &azt_fops) != 0) {
@@ -1921,7 +1921,6 @@ static int __init aztcd_init(void)
 	blk_queue_hardsect_size(BLK_DEFAULT_QUEUE(MAJOR_NR), 2048);
 	azt_disk->major = MAJOR_NR;
 	azt_disk->first_minor = 0;
-	azt_disk->minor_shift = 0;
 	azt_disk->fops = &azt_fops;
 	sprintf(azt_disk->disk_name, "aztcd");
 	add_disk(azt_disk);

@@ -258,7 +258,7 @@ out_socket:
 	goto out;
 }
 
-void __exit llc_proc_exit(void)
+void llc_proc_exit(void)
 {
 	remove_proc_entry("socket", llc_proc_dir);
 	remove_proc_entry("core", llc_proc_dir);
@@ -270,7 +270,7 @@ int __init llc_proc_init(void)
 	return 0;
 }
 
-void __exit llc_proc_exit(void)
+void llc_proc_exit(void)
 {
 }
 #endif /* CONFIG_PROC_FS */

@@ -60,6 +60,7 @@ extern int BusLogic_ResetCommand(SCSI_Command_T *, unsigned int);
 extern int BusLogic_BIOSDiskParameters(SCSI_Disk_T *, struct block_device *,
 				       int *);
 extern int BusLogic_ProcDirectoryInfo(char *, char **, off_t, int, int, int);
+extern int BusLogic_SlaveAttach(SCSI_Device_T *);
 
 
 /*
@@ -76,6 +77,7 @@ extern int BusLogic_ProcDirectoryInfo(char *, char **, off_t, int, int, int);
     queuecommand:   BusLogic_QueueCommand,	  /* Queue Command Function */ \
     abort:          BusLogic_AbortCommand,	  /* Abort Command Function */ \
     reset:          BusLogic_ResetCommand,	  /* Reset Command Function */ \
+    slave_attach:   BusLogic_SlaveAttach,	  /* Configure a SCSI_Device*/ \
     bios_param:     BusLogic_BIOSDiskParameters,  /* BIOS Disk Parameters   */ \
     unchecked_isa_dma: 1,			  /* Default Initial Value  */ \
     max_sectors:    128,			  /* I/O queue len limit    */ \

@@ -350,9 +350,6 @@ static int pd_open(struct inode *inode, struct file *file)
 	int unit = DEVICE_NR(inode->i_rdev);
 	struct pd_unit *disk = pd + unit;
 
-	if (unit >= PD_UNITS || !disk->present)
-		return -ENODEV;
-
 	disk->access++;
 
 	if (disk->removable) {
@@ -703,14 +700,13 @@ static int pd_detect(void)
 	}
 	for (unit = 0, disk = pd; unit < PD_UNITS; unit++, disk++) {
 		if (disk->present) {
-			struct gendisk *p = alloc_disk();
+			struct gendisk *p = alloc_disk(1 << PD_BITS);
 			if (!p) {
 				disk->present = 0;
 				k--;
 				continue;
 			}
 			strcpy(p->disk_name, disk->name);
-			p->minor_shift = PD_BITS;
 			p->fops = &pd_fops;
 			p->major = major;
 			p->first_minor = unit << PD_BITS;

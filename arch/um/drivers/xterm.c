@@ -44,6 +44,7 @@ void *xterm_init(char *str, int device, struct chan_opts *opts)
 	return(data);
 }
 
+/* Only changed by xterm_setup, which is a setup */
 static char *terminal_emulator = "xterm";
 static char *title_switch = "-T";
 static char *exec_switch = "-e";

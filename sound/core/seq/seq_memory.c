@@ -233,17 +233,21 @@ int snd_seq_cell_alloc(pool_t *pool, snd_seq_event_cell_t **cellp, int nonblock,
 		goto __error;
 	}
 	while (pool->free == NULL && ! nonblock && ! pool->closing) {
+
+		spin_unlock(&pool->lock);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 3, 0)
 		/* change semaphore to allow other clients
 		   to access device file */
 		if (file)
 			up(&semaphore_of(file));
-
-		snd_seq_sleep_in_lock(&pool->output_sleep, &pool->lock);
-
+#endif
+		interruptible_sleep_on(&pool->output_sleep);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 3, 0)
 		/* restore semaphore again */
 		if (file)
 			down(&semaphore_of(file));
-
+#endif
+		spin_lock(&pool->lock);
 		/* interrupted? */
 		if (signal_pending(current)) {
 			err = -ERESTARTSYS;

@@ -14,31 +14,13 @@
 #include "user.h"
 #include "process.h"
 #include "signal_user.h"
+#include "time_user.h"
 
 extern struct timeval xtime;
-
-void timer_handler(int sig, struct uml_pt_regs *regs)
-{
-	timer_irq(regs);
-}
 
 void timer(void)
 {
 	gettimeofday(&xtime, NULL);
-}
-
-static struct itimerval profile_interval;
-
-void get_profile_timer(void)
-{
-	getitimer(ITIMER_PROF, &profile_interval);
-	profile_interval.it_value = profile_interval.it_interval;
-}
-
-void disable_profile_timer(void)
-{
-	struct itimerval interval = ((struct itimerval) { { 0, 0 }, { 0, 0 }});
-	setitimer(ITIMER_PROF, &interval, NULL);
 }
 
 static void set_interval(int timer_type)
@@ -51,6 +33,15 @@ static void set_interval(int timer_type)
 	interval.it_value.tv_usec = 1000000/hz();
 	if(setitimer(timer_type, &interval, NULL) == -1)
 		panic("setitimer failed - errno = %d\n", errno);
+}
+
+void enable_timer(void)
+{
+	struct itimerval enable = ((struct itimerval) { { 0, 1000000/hz() },
+							{ 0, 1000000/hz() }});
+	if(setitimer(ITIMER_VIRTUAL, &enable, NULL))
+		printk("enable_timer - setitimer failed, errno = %d\n",
+		       errno);
 }
 
 void switch_timers(int to_real)
@@ -79,8 +70,9 @@ void idle_timer(void)
 {
 	if(signal(SIGVTALRM, SIG_IGN) == SIG_ERR)
 		panic("Couldn't unset SIGVTALRM handler");
+	
 	set_handler(SIGALRM, (__sighandler_t) alarm_handler, 
-		    SA_NODEFER | SA_RESTART, SIGUSR1, SIGIO, SIGWINCH, -1);
+		    SA_RESTART, SIGUSR1, SIGIO, SIGWINCH, SIGVTALRM, -1);
 	set_interval(ITIMER_REAL);
 }
 
@@ -98,28 +90,24 @@ void time_init(void)
 	set_interval(ITIMER_VIRTUAL);
 }
 
-void set_timers(int set_signal)
-{
-	if(set_signal)
-		set_interval(ITIMER_VIRTUAL);
-	if(setitimer(ITIMER_PROF, &profile_interval, NULL) == -1)
-		panic("setitimer ITIMER_PROF failed - errno = %d\n", errno);
-}
-
 struct timeval local_offset = { 0, 0 };
 
 void do_gettimeofday(struct timeval *tv)
 {
+	time_lock();
 	gettimeofday(tv, NULL);
 	timeradd(tv, &local_offset, tv);
+	time_unlock();
 }
 
 void do_settimeofday(struct timeval *tv)
 {
 	struct timeval now;
 
+	time_lock();
 	gettimeofday(&now, NULL);
 	timersub(tv, &now, &local_offset);
+	time_unlock();
 }
 
 void idle_sleep(int secs)

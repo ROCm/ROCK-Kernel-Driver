@@ -639,24 +639,42 @@ nfs3_proc_mknod(struct inode *dir, struct qstr *name, struct iattr *sattr,
 	return status;
 }
 
-/*
- * This is a combo call of fsstat and fsinfo
- */
 static int
 nfs3_proc_statfs(struct nfs_server *server, struct nfs_fh *fhandle,
-		 struct nfs_fsinfo *info)
+		 struct nfs_fsstat *stat)
 {
 	int	status;
 
 	dprintk("NFS call  fsstat\n");
-	memset((char *)info, 0, sizeof(*info));
-	status = rpc_call(server->client, NFS3PROC_FSSTAT, fhandle, info, 0);
-	if (status < 0)
-		goto error;
-	status = rpc_call(server->client, NFS3PROC_FSINFO, fhandle, info, 0);
-
-error:
+	stat->fattr->valid = 0;
+	status = rpc_call(server->client, NFS3PROC_FSSTAT, fhandle, stat, 0);
 	dprintk("NFS reply statfs: %d\n", status);
+	return status;
+}
+
+static int
+nfs3_proc_fsinfo(struct nfs_server *server, struct nfs_fh *fhandle,
+		 struct nfs_fsinfo *info)
+{
+	int	status;
+
+	dprintk("NFS call  fsinfo\n");
+	info->fattr->valid = 0;
+	status = rpc_call(server->client, NFS3PROC_FSINFO, fhandle, info, 0);
+	dprintk("NFS reply fsinfo: %d\n", status);
+	return status;
+}
+
+static int
+nfs3_proc_pathconf(struct nfs_server *server, struct nfs_fh *fhandle,
+		   struct nfs_pathconf *info)
+{
+	int	status;
+
+	dprintk("NFS call  pathconf\n");
+	info->fattr->valid = 0;
+	status = rpc_call(server->client, NFS3PROC_PATHCONF, fhandle, info, 0);
+	dprintk("NFS reply pathconf: %d\n", status);
 	return status;
 }
 
@@ -824,6 +842,8 @@ struct nfs_rpc_ops	nfs_v3_clientops = {
 	.readdir	= nfs3_proc_readdir,
 	.mknod		= nfs3_proc_mknod,
 	.statfs		= nfs3_proc_statfs,
+	.fsinfo		= nfs3_proc_fsinfo,
+	.pathconf	= nfs3_proc_pathconf,
 	.decode_dirent	= nfs3_decode_dirent,
 	.read_setup	= nfs3_proc_read_setup,
 	.write_setup	= nfs3_proc_write_setup,

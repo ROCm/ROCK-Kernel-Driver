@@ -30,8 +30,11 @@
 #include <sound/control.h>
 #include <sound/pcm.h>
 #include <sound/rawmidi.h>
+#ifdef CHIP1371
 #include <sound/ac97_codec.h>
+#else
 #include <sound/ak4531_codec.h>
+#endif
 #define SNDRV_GET_ID
 #include <sound/initval.h>
 
@@ -352,13 +355,16 @@ struct _snd_ensoniq {
 	unsigned int rev;	/* chip revision */
 
 	union {
+#ifdef CHIP1371
 		struct {
 			ac97_t *ac97;
 		} es1371;
+#else
 		struct {
 			int pclkdiv_lock;
 			ak4531_t *ak4531;
 		} es1370;
+#endif
 	} u;
 
 	struct pci_dev *pci;

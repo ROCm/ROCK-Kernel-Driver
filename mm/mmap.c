@@ -16,6 +16,7 @@
 #include <linux/fs.h>
 #include <linux/personality.h>
 #include <linux/security.h>
+#include <linux/profile.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
@@ -1104,6 +1105,10 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len)
 	if (mpnt->vm_start >= end)
 		return 0;
 
+	/* Something will probably happen, so notify. */
+	if (mpnt->vm_file && (mpnt->vm_flags & VM_EXEC))
+		profile_exec_unmap(mm);
+ 
 	/*
 	 * If we need to split any vma, do it now to save pain later.
 	 */
@@ -1253,7 +1258,10 @@ void exit_mmap(struct mm_struct * mm)
 	mmu_gather_t *tlb;
 	struct vm_area_struct * mpnt;
 
+	profile_exit_mmap(mm);
+ 
 	release_segments(mm);
+ 
 	spin_lock(&mm->page_table_lock);
 
 	tlb = tlb_gather_mmu(mm, 1);

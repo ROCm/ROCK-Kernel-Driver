@@ -190,14 +190,13 @@ dasd_gendisk_alloc(int devindex)
 		}
 	}
 
-	gdp = alloc_disk();
+	gdp = alloc_disk(1 << DASD_PARTN_BITS);
 	if (!gdp)
 		return ERR_PTR(-ENOMEM);
 
 	/* Initialize gendisk structure. */
 	gdp->major = mi->major;
 	gdp->first_minor = index << DASD_PARTN_BITS;
-	gdp->minor_shift = DASD_PARTN_BITS;
 	gdp->fops = &dasd_device_operations;
 
 	/*

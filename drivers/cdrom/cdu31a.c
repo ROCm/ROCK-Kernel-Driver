@@ -3366,12 +3366,11 @@ int __init cdu31a_init(void)
 		goto errout2;
 	}
 
-	disk = alloc_disk();
+	disk = alloc_disk(1);
 	if (!disk)
 		goto errout1;
 	disk->major = MAJOR_NR;
 	disk->first_minor = 0;
-	disk->minor_shift = 0;
 	sprintf(disk->disk_name, "cdu31a");
 	disk->fops = &scd_bdops;
 	disk->flags = GENHD_FL_CD;

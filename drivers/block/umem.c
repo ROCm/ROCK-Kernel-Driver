@@ -864,18 +864,6 @@ static int mm_check_change(kdev_t i_rdev)
 
 	return 0;
 }
-
-/*
------------------------------------------------------------------------------------
---                            mm_open
------------------------------------------------------------------------------------
-*/
-static int mm_open(struct inode *i, struct file *filp)
-{
-	if (DEVICE_NR(i->i_rdev) >= num_cards)
-		return -ENXIO;
-	return 0;
-}
 /*
 -----------------------------------------------------------------------------------
 --                             mm_fops
@@ -883,7 +871,6 @@ static int mm_open(struct inode *i, struct file *filp)
 */
 static struct block_device_operations mm_fops = {
 	owner:		THIS_MODULE,
-	open:		mm_open,
 	ioctl:		mm_ioctl,
 	revalidate:	mm_revalidate,
 	check_media_change: mm_check_change,
@@ -1190,7 +1177,7 @@ int __init mm_init(void)
 	}
 
 	for (i = 0; i < num_cards; i++) {
-		mm_gendisk[i] = alloc_disk();
+		mm_gendisk[i] = alloc_disk(1 << MM_SHIFT);
 		if (!mm_gendisk[i])
 			goto out;
 	}
@@ -1203,7 +1190,6 @@ int __init mm_init(void)
 		spin_lock_init(&cards[i].lock);
 		disk->major = major_nr;
 		disk->first_minor  = i << MM_SHIFT;
-		disk->minor_shift = MM_SHIFT;
 		disk->fops = &mm_fops;
 		set_capacity(disk, cards[i].mm_size << 1);
 		add_disk(disk);

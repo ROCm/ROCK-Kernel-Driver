@@ -1138,11 +1138,13 @@ snd_emu8000_new(snd_card_t *card, int index, long port, int seq_ports, snd_seq_d
 		snd_emu8000_free(hw);
 		return err;
 	}
+#if defined(CONFIG_SND_SEQUENCER) || defined(CONFIG_SND_SEQUENCER_MODULE)
 	if (snd_seq_device_new(card, index, SNDRV_SEQ_DEV_ID_EMU8000,
 			       sizeof(emu8000_t*), &awe) >= 0) {
 		strcpy(awe->name, "EMU-8000");
 		*(emu8000_t**)SNDRV_SEQ_DEVICE_ARGPTR(awe) = hw;
 	}
+#endif
 	if (awe_ret)
 		*awe_ret = awe;
 

@@ -43,7 +43,7 @@ xfs_attr_fetch(xfs_inode_t *ip, char *name, char *value, int valuelen)
 	/*
 	 * Do the argument setup for the xfs_attr routines.
 	 */
-	bzero((char *)&args, sizeof(args));
+	memset((char *)&args, 0, sizeof(args));
 	args.dp = ip;
 	args.flags = ATTR_ROOT;
 	args.whichfork = XFS_ATTR_FORK;

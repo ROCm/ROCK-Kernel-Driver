@@ -213,19 +213,19 @@ static void rtc_enable_disable(unsigned int irq) { }
 static unsigned int rtc_startup(unsigned int irq) { return 0; }
 
 struct irqaction timer_irqaction = {
-	handler:	timer_interrupt,
-	flags:		SA_INTERRUPT,
-	name:		"timer",
+	.handler	= timer_interrupt,
+	.flags		= SA_INTERRUPT,
+	.name		= "timer",
 };
 
 static struct hw_interrupt_type rtc_irq_type = {
-	typename:	"RTC",
-	startup:	rtc_startup,
-	shutdown:	rtc_enable_disable,
-	enable:		rtc_enable_disable,
-	disable:	rtc_enable_disable,
-	ack:		rtc_enable_disable,
-	end:		rtc_enable_disable,
+	.typename	= "RTC",
+	.startup	= rtc_startup,
+	.shutdown	= rtc_enable_disable,
+	.enable		= rtc_enable_disable,
+	.disable	= rtc_enable_disable,
+	.ack		= rtc_enable_disable,
+	.end		= rtc_enable_disable,
 };
 
 void __init
@@ -238,16 +238,16 @@ init_rtc_irq(void)
 
 /* Dummy irqactions.  */
 struct irqaction isa_cascade_irqaction = {
-	handler:	no_action,
-	name:		"isa-cascade"
+	.handler	= no_action,
+	.name		= "isa-cascade"
 };
 
 struct irqaction timer_cascade_irqaction = {
-	handler:	no_action,
-	name:		"timer-cascade"
+	.handler	= no_action,
+	.name		= "timer-cascade"
 };
 
 struct irqaction halt_switch_irqaction = {
-	handler:	no_action,
-	name:		"halt-switch"
+	.handler	= no_action,
+	.name		= "halt-switch"
 };

@@ -175,6 +175,18 @@ static int nmi_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
 	return 0;
 }
 
+struct pm_dev * set_nmi_pm_callback(pm_callback callback)
+{
+	apic_pm_unregister(nmi_pmdev);
+	return apic_pm_register(PM_SYS_DEV, 0, callback);
+}
+
+void unset_nmi_pm_callback(struct pm_dev * dev)
+{
+	apic_pm_unregister(dev);
+	nmi_pmdev = apic_pm_register(PM_SYS_DEV, 0, nmi_pm_callback);
+}
+ 
 static void nmi_pm_init(void)
 {
 	if (!nmi_pmdev)

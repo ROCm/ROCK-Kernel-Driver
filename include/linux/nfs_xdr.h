@@ -50,6 +50,7 @@ struct nfs_fattr {
  * Info on the file system
  */
 struct nfs_fsinfo {
+	struct nfs_fattr	*fattr; /* Post-op attributes */
 	__u32			rtmax;	/* max.  read transfer size */
 	__u32			rtpref;	/* pref. read transfer size */
 	__u32			rtmult;	/* reads should be multiple of this */
@@ -58,16 +59,31 @@ struct nfs_fsinfo {
 	__u32			wtmult;	/* writes should be multiple of this */
 	__u32			dtpref;	/* pref. readdir transfer size */
 	__u64			maxfilesize;
-	__u64			bsize;	/* block size */
+	__u32			lease_time; /* in seconds */
+};
+
+struct nfs_fsstat {
+	struct nfs_fattr	*fattr; /* Post-op attributes */
 	__u64			tbytes;	/* total size in bytes */
 	__u64			fbytes;	/* # of free bytes */
 	__u64			abytes;	/* # of bytes available to user */
 	__u64			tfiles;	/* # of files */
 	__u64			ffiles;	/* # of free files */
 	__u64			afiles;	/* # of files available to user */
-	__u32			linkmax;/* max # of hard links */
-	__u32			namelen;/* max name length */
-	__u32			lease_time; /* in seconds */
+};
+
+struct nfs2_fsstat {
+	__u32			tsize;  /* Server transfer size */
+	__u32			bsize;  /* Filesystem block size */
+	__u32			blocks; /* No. of "bsize" blocks on filesystem */
+	__u32			bfree;  /* No. of free "bsize" blocks */
+	__u32			bavail; /* No. of available "bsize" blocks */
+};
+
+struct nfs_pathconf {
+	struct nfs_fattr	*fattr; /* Post-op attributes */
+	__u32			max_link; /* max # of hard links */
+	__u32			max_namelen; /* max name length */
 };
 
 /*
@@ -309,6 +325,219 @@ struct nfs3_readdirres {
 	int			plus;
 };
 
+#ifdef CONFIG_NFS_V4
+
+typedef u64 clientid4;
+
+struct nfs4_change_info {
+	u32				atomic;
+	u64				before;
+	u64				after;
+};
+
+struct nfs4_access {
+	u32				ac_req_access;     /* request */
+	u32 *				ac_resp_supported; /* response */
+	u32 *				ac_resp_access;    /* response */
+};
+
+struct nfs4_close {
+	char *				cl_stateid;        /* request */
+	u32				cl_seqid;          /* request */
+};
+
+struct nfs4_commit {
+	u64				co_start;          /* request */
+	u32				co_len;            /* request */
+	struct nfs_writeverf *		co_verifier;       /* response */
+};
+
+struct nfs4_create {
+	u32				cr_ftype;          /* request */
+	union {                                            /* request */
+		struct {
+			u32		textlen;
+			const char *	text;
+		} symlink;   /* NF4LNK */
+		struct {
+			u32		specdata1;
+			u32		specdata2;
+		} device;    /* NF4BLK, NF4CHR */
+	} u;
+	u32				cr_namelen;        /* request */
+	const char *			cr_name;           /* request */
+	struct iattr *			cr_attrs;          /* request */
+	struct nfs4_change_info	*	cr_cinfo;          /* response */
+};
+#define cr_textlen			u.symlink.textlen
+#define cr_text				u.symlink.text
+#define cr_specdata1			u.device.specdata1
+#define cr_specdata2			u.device.specdata2
+
+struct nfs4_getattr {
+        u32 *				gt_bmval;          /* request */
+        struct nfs_fattr *		gt_attrs;          /* response */
+	struct nfs_fsstat *		gt_fsstat;         /* response */
+	struct nfs_fsinfo *		gt_fsinfo;         /* response */
+	struct nfs_pathconf *		gt_pathconf;       /* response */
+	u32 *				gt_bmres;	   /* response */
+};
+
+struct nfs4_getfh {
+	struct nfs_fh *			gf_fhandle;       /* response */
+};
+
+struct nfs4_link {
+	u32				ln_namelen;       /* request */
+	const char *			ln_name;          /* request */
+	struct nfs4_change_info *	ln_cinfo;         /* response */
+};
+
+struct nfs4_lookup {
+	struct qstr *			lo_name;          /* request */
+};
+
+struct nfs4_open {
+	u32				op_share_access;  /* request */
+	u32				op_opentype;      /* request */
+	u32				op_createmode;    /* request */
+	union {                                           /* request */
+		struct iattr *		attrs;    /* UNCHECKED, GUARDED */
+		nfs4_verifier		verifier; /* EXCLUSIVE */
+	} u;
+	struct qstr *			op_name;          /* request */
+	char *				op_stateid;       /* response */
+	struct nfs4_change_info	*	op_cinfo;         /* response */
+	u32 *				op_rflags;        /* response */
+};
+#define op_attrs     u.attrs
+#define op_verifier  u.verifier
+
+struct nfs4_open_confirm {
+	char *				oc_stateid;       /* request */
+};
+
+struct nfs4_putfh {
+	struct nfs_fh *			pf_fhandle;       /* request */
+};
+
+struct nfs4_read {
+	u64				rd_offset;        /* request */
+	u32				rd_length;        /* request */
+	u32				*rd_eof;          /* response */
+	u32				*rd_bytes_read;   /* response */
+	struct page **			rd_pages;   /* zero-copy data */
+	unsigned int			rd_pgbase;  /* zero-copy data */
+};
+
+struct nfs4_readdir {
+	u64				rd_cookie;        /* request */
+	nfs4_verifier			rd_req_verifier;  /* request */
+	u32				rd_count;         /* request */
+	u32				rd_bmval[2];      /* request */	
+	nfs4_verifier			rd_resp_verifier; /* response */
+	struct page **			rd_pages;   /* zero-copy data */
+	unsigned int			rd_pgbase;  /* zero-copy data */
+};
+
+struct nfs4_readlink {
+	u32				rl_count;   /* zero-copy data */
+	struct page **			rl_pages;   /* zero-copy data */
+};
+
+struct nfs4_remove {
+	u32				rm_namelen;       /* request */
+	const char *			rm_name;          /* request */
+	struct nfs4_change_info *	rm_cinfo;         /* response */
+};
+
+struct nfs4_rename {
+	u32				rn_oldnamelen;    /* request */
+	const char *			rn_oldname;       /* request */
+	u32				rn_newnamelen;    /* request */
+	const char *			rn_newname;       /* request */
+	struct nfs4_change_info	*	rn_src_cinfo;     /* response */
+	struct nfs4_change_info *	rn_dst_cinfo;     /* response */
+};
+
+struct nfs4_setattr {
+	char *				st_stateid;       /* request */
+	struct iattr *			st_iap;           /* request */
+};
+
+struct nfs4_setclientid {
+	nfs4_verifier			sc_verifier;      /* request */
+	char *				sc_name;	  /* request */
+	u32				sc_prog;          /* request */
+	char				sc_netid[4];	  /* request */
+	char				sc_uaddr[24];     /* request */
+	u32				sc_cb_ident;      /* request */
+};
+
+struct nfs4_write {
+	u64				wr_offset;        /* request */
+	u32				wr_stable_how;    /* request */
+	u32				wr_len;           /* request */
+	u32 *				wr_bytes_written; /* response */
+	struct nfs_writeverf *		wr_verf;          /* response */
+	struct page **			wr_pages;   /* zero-copy data */
+	unsigned int			wr_pgbase;  /* zero-copy data */
+};
+
+struct nfs4_op {
+	u32				opnum;
+	u32				nfserr;
+	union {
+		struct nfs4_access	access;
+		struct nfs4_close	close;
+		struct nfs4_commit	commit;
+		struct nfs4_create	create;
+		struct nfs4_getattr	getattr;
+		struct nfs4_getfh	getfh;
+		struct nfs4_link	link;
+		struct nfs4_lookup	lookup;
+		struct nfs4_open	open;
+		struct nfs4_open_confirm open_confirm;
+		struct nfs4_putfh	putfh;
+		struct nfs4_read	read;
+		struct nfs4_readdir	readdir;
+		struct nfs4_readlink	readlink;
+		struct nfs4_remove	remove;
+		struct nfs4_rename	rename;
+		struct nfs4_setattr	setattr;
+		struct nfs4_setclientid	setclientid;
+		struct nfs4_write	write;
+	} u;
+};
+
+struct nfs4_compound {
+	unsigned int		flags;   /* defined below */
+	struct nfs_server *	server;
+
+	/* RENEW information */
+	int			renew_index;
+	unsigned long		timestamp;
+
+	/* scratch variables for XDR encode/decode */
+	int			nops;
+	u32 *			p;
+	u32 *			end;
+
+	/* the individual COMPOUND operations */
+	struct nfs4_op		*ops;
+
+	/* request */
+	int			req_nops;
+	u32			taglen;
+	char *			tag;
+	
+	/* response */
+	int			resp_nops;
+	int			toplevel_status;
+};
+
+#endif /* CONFIG_NFS_V4 */
+
 struct nfs_read_data {
 	struct rpc_task		task;
 	struct inode		*inode;
@@ -322,7 +551,12 @@ struct nfs_read_data {
 			struct nfs_readres  res;
 		} v3;   /* also v2 */
 #ifdef CONFIG_NFS_V4
-		/* NFSv4 data will come here... */
+		struct {
+			struct nfs4_compound  compound;
+			struct nfs4_op        ops[3];
+			u32                   res_count;
+			u32                   res_eof;
+		} v4;
 #endif
 	} u;
 };
@@ -337,11 +571,17 @@ struct nfs_write_data {
 	struct page		*pagevec[NFS_WRITE_MAXIOV];
 	union {
 		struct {
-			struct nfs_writeargs args;
-			struct nfs_writeres  res;
+			struct nfs_writeargs	args;		/* argument struct */
+			struct nfs_writeres	res;		/* result struct */
 		} v3;
 #ifdef CONFIG_NFS_V4
-		/* NFSv4 data to come here... */
+		struct {
+			struct nfs4_compound  compound;
+			struct nfs4_op        ops[3];
+			u32                   arg_count;
+			u32                   arg_stable;
+			u32                   res_count;
+		} v4;
 #endif
 	} u;
 };
@@ -391,7 +631,11 @@ struct nfs_rpc_ops {
 	int	(*mknod)   (struct inode *, struct qstr *, struct iattr *,
 			    dev_t, struct nfs_fh *, struct nfs_fattr *);
 	int	(*statfs)  (struct nfs_server *, struct nfs_fh *,
+			    struct nfs_fsstat *);
+	int	(*fsinfo)  (struct nfs_server *, struct nfs_fh *,
 			    struct nfs_fsinfo *);
+	int	(*pathconf) (struct nfs_server *, struct nfs_fh *,
+			     struct nfs_pathconf *);
 	u32 *	(*decode_dirent)(u32 *, struct nfs_entry *, int plus);
 	void	(*read_setup)   (struct nfs_read_data *, unsigned int count);
 	void	(*write_setup)  (struct nfs_write_data *, unsigned int count, int how);
@@ -410,8 +654,10 @@ struct nfs_rpc_ops {
  */
 extern struct nfs_rpc_ops	nfs_v2_clientops;
 extern struct nfs_rpc_ops	nfs_v3_clientops;
+extern struct nfs_rpc_ops	nfs_v4_clientops;
 extern struct rpc_version	nfs_version2;
 extern struct rpc_version	nfs_version3;
+extern struct rpc_version	nfs_version4;
 extern struct rpc_program	nfs_program;
 extern struct rpc_stat		nfs_rpcstat;
 

@@ -23,7 +23,7 @@
 */
 
 /*
- * BlueZ HCI UART driver.
+ * Bluetooth HCI UART driver.
  *
  * $Id: hci_ldisc.c,v 1.5 2002/10/02 18:37:20 maxk Exp $    
  */
@@ -55,7 +55,7 @@
 #include <net/bluetooth/hci_core.h>
 #include "hci_uart.h"
 
-#ifndef HCI_UART_DEBUG
+#ifndef CONFIG_BT_HCIUART_DEBUG
 #undef  BT_DBG
 #define BT_DBG( A... )
 #undef  BT_DMP
@@ -507,11 +507,11 @@ static unsigned int hci_uart_tty_poll(struct tty_struct *tty, struct file *filp,
 	return 0;
 }
 
-#ifdef CONFIG_BLUEZ_HCIUART_H4
+#ifdef CONFIG_BT_HCIUART_H4
 int h4_init(void);
 int h4_deinit(void);
 #endif
-#ifdef CONFIG_BLUEZ_HCIUART_BCSP
+#ifdef CONFIG_BT_HCIUART_BCSP
 int bcsp_init(void);
 int bcsp_deinit(void);
 #endif
@@ -521,7 +521,7 @@ int __init hci_uart_init(void)
 	static struct tty_ldisc hci_uart_ldisc;
 	int err;
 
-	BT_INFO("BlueZ HCI UART driver ver %s Copyright (C) 2000,2001 Qualcomm Inc", 
+	BT_INFO("Bluetooth HCI UART driver ver %s Copyright (C) 2000,2001 Qualcomm Inc",
 		VERSION);
 	BT_INFO("Written 2000,2001 by Maxim Krasnyansky <maxk@qualcomm.com>");
 
@@ -545,10 +545,10 @@ int __init hci_uart_init(void)
 		return err;
 	}
 
-#ifdef CONFIG_BLUEZ_HCIUART_H4
+#ifdef CONFIG_BT_HCIUART_H4
 	h4_init();
 #endif
-#ifdef CONFIG_BLUEZ_HCIUART_BCSP
+#ifdef CONFIG_BT_HCIUART_BCSP
 	bcsp_init();
 #endif
 	
@@ -559,10 +559,10 @@ void hci_uart_cleanup(void)
 {
 	int err;
 
-#ifdef CONFIG_BLUEZ_HCIUART_H4
+#ifdef CONFIG_BT_HCIUART_H4
 	h4_deinit();
 #endif
-#ifdef CONFIG_BLUEZ_HCIUART_BCSP
+#ifdef CONFIG_BT_HCIUART_BCSP
 	bcsp_deinit();
 #endif
 
@@ -575,5 +575,5 @@ module_init(hci_uart_init);
 module_exit(hci_uart_cleanup);
 
 MODULE_AUTHOR("Maxim Krasnyansky <maxk@qualcomm.com>");
-MODULE_DESCRIPTION("BlueZ HCI UART driver ver " VERSION);
+MODULE_DESCRIPTION("Bluetooth HCI UART driver ver " VERSION);
 MODULE_LICENSE("GPL");

@@ -92,6 +92,8 @@ typedef struct vfsops {
 					/* send dmapi mount event */
 	int	(*vfs_dmapi_fsys_vector)(bhv_desc_t *,
 					 struct dm_fcntl_vector *);
+	void	(*vfs_init_vnode)(bhv_desc_t *, struct vnode *,
+					bhv_desc_t *, int);
 	void	(*vfs_force_shutdown)(bhv_desc_t *,
 					int, char *, int);
 } vfsops_t;
@@ -132,6 +134,14 @@ typedef struct vfsops {
 	rv = (*(VFS_FOPS(vfsp)->vfs_vget))((vfsp)->vfs_fbhv, vpp, fidp);  \
 	BHV_READ_UNLOCK(&(vfsp)->vfs_bh); \
 }
+
+#define VFS_INIT_VNODE(vfsp, vp, bhv, unlock) \
+{	\
+	BHV_READ_LOCK(&(vfsp)->vfs_bh); \
+	(*(VFS_FOPS(vfsp)->vfs_init_vnode))((vfsp)->vfs_fbhv, vp, bhv, unlock);\
+	BHV_READ_UNLOCK(&(vfsp)->vfs_bh); \
+}
+
 /* No behavior lock here */
 #define VFS_FORCE_SHUTDOWN(vfsp, flags) \
 	(*(VFS_FOPS(vfsp)->vfs_force_shutdown))((vfsp)->vfs_fbhv, flags, __FILE__, __LINE__);

@@ -304,7 +304,7 @@ static void __exit cpqarray_exit(void)
 		kfree(hba[i]->cmd_pool_bits);
 
 		for (j = 0; j < NWD; j++) {
-			if (ida_gendisk[i][j]->part)
+			if (ida_gendisk[i][j]->flags & GENHD_FL_UP)
 				del_gendisk(ida_gendisk[i][j]);
 			put_disk(ida_gendisk[i][j]);
 		}
@@ -358,7 +358,7 @@ static int __init cpqarray_init(void)
 		}
 		num_cntlrs_reg++;
 		for (j=0; j<NWD; j++) {
-			ida_gendisk[i][j] = alloc_disk();
+			ida_gendisk[i][j] = alloc_disk(1 << NWD_SHIFT);
 			if (!ida_gendisk[i][j])
 				goto Enomem2;
 		}
@@ -405,7 +405,6 @@ static int __init cpqarray_init(void)
 			sprintf(disk->disk_name, "ida/c%dd%d", i, j);
 			disk->major = MAJOR_NR + i;
 			disk->first_minor = j<<NWD_SHIFT;
-			disk->minor_shift = NWD_SHIFT;
 			disk->flags = GENHD_FL_DEVFS;
 			disk->fops = &ida_fops; 
 			if (!drv->nr_blks)
@@ -1428,7 +1427,7 @@ static int revalidate_allvol(kdev_t dev)
 	 */
 	for (i = 0; i < NWD; i++) {
 		struct gendisk *disk = ida_gendisk[ctlr][i];
-		if (disk->part)
+		if (disk->flags & GENDH_FL_UP)
 			del_gendisk(disk);
 	}
 	memset(hba[ctlr]->drv,            0, sizeof(drv_info_t)*NWD);

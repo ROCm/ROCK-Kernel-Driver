@@ -1223,7 +1223,7 @@ static void ftl_notify_add(struct mtd_info *mtd)
 	}
 
 	partition = kmalloc(sizeof(partition_t), GFP_KERNEL);
-	disk = alloc_disk();
+	disk = alloc_disk(1 << PART_BITS);
 		
 	if (!partition||!disk) {
 		printk(KERN_WARNING "No memory to scan for FTL on %s\n",
@@ -1237,7 +1237,6 @@ static void ftl_notify_add(struct mtd_info *mtd)
 	sprintf(disk->disk_name, "ftl%c", 'a' + device);
 	disk->major = FTL_MAJOR;
 	disk->first_minor = device << 4;
-	disk->minor_shift = PART_BITS;
 	disk->fops = &ftl_blk_fops;
 	partition->mtd = mtd;
 	partition->disk = disk;

@@ -70,10 +70,10 @@ void kill_child_dead(int pid)
 	while(waitpid(pid, NULL, 0) > 0) kill(pid, SIGCONT);
 }
 
+/* Changed early in boot, and then only read */
 int debug = 0;
 int debug_stop = 1;
 int debug_parent = 0;
-
 int honeypot = 0;
 
 static int signal_tramp(void *arg)
@@ -90,7 +90,6 @@ static int signal_tramp(void *arg)
 	signal(SIGUSR1, SIG_IGN);
 	change_sig(SIGCHLD, 0);
 	signal(SIGSEGV, (__sighandler_t) sig_handler);
-	set_timers(0);
 	set_cmdline("(idle thread)");
 	set_init_pid(os_getpid());
 	proc = arg;
@@ -99,6 +98,7 @@ static int signal_tramp(void *arg)
 
 static void last_ditch_exit(int sig)
 {
+	kmalloc_ok = 0;
 	signal(SIGINT, SIG_DFL);
 	signal(SIGTERM, SIG_DFL);
 	signal(SIGHUP, SIG_DFL);
@@ -142,33 +142,20 @@ static void sleeping_process_signal(int pid, int sig)
 	}
 }
 
-#ifdef CONFIG_SMP
-#error need to make these arrays
-#endif
-
+/* Accessed only by the tracing thread */
 int debugger_pid = -1;
 int debugger_parent = -1;
 int debugger_fd = -1;
 int gdb_pid = -1;
 
 struct {
-	unsigned long address;
-	int is_write;
-	int pid;
-	unsigned long sp;
-	int is_user;
-} segfault_record[1024];
-
-int segfault_index = 0;
-
-struct {
 	int pid;
 	int signal;
 	unsigned long addr;
 	struct timeval time;
-} signal_record[1024];
+} signal_record[1024][32];
 
-int signal_index = 0;
+int signal_index[32];
 int nsignals = 0;
 int debug_trace = 0;
 extern int io_nsignals, io_count, intr_count;
@@ -188,7 +175,7 @@ int signals(int (*init_proc)(void *), void *sp)
 	signal(SIGPIPE, SIG_IGN);
 	setup_tracer_winch();
 	tracing_pid = os_getpid();
-	printk("tracing thread pid = %d\n", tracing_pid);
+	printf("tracing thread pid = %d\n", tracing_pid);
 
 	pid = clone(signal_tramp, sp, CLONE_FILES | SIGCHLD, init_proc);
 	n = waitpid(pid, &status, WUNTRACED);
@@ -207,7 +194,7 @@ int signals(int (*init_proc)(void *), void *sp)
 	set_handler(SIGTERM, last_ditch_exit, SA_ONESHOT | SA_NODEFER, -1);
 	set_handler(SIGHUP, last_ditch_exit, SA_ONESHOT | SA_NODEFER, -1);
 	if(debug_trace){
-		printk("Tracing thread pausing to be attached\n");
+		printf("Tracing thread pausing to be attached\n");
 		stop();
 	}
 	if(debug){
@@ -219,14 +206,14 @@ int signals(int (*init_proc)(void *), void *sp)
 			init_parent_proxy(debugger_parent);
 			err = attach(debugger_parent);
 			if(err){
-				printk("Failed to attach debugger parent %d, "
+				printf("Failed to attach debugger parent %d, "
 				       "errno = %d\n", debugger_parent, err);
 				debugger_parent = -1;
 			}
 			else {
 				if(ptrace(PTRACE_SYSCALL, debugger_parent, 
 					  0, 0) < 0){
-					printk("Failed to continue debugger "
+					printf("Failed to continue debugger "
 					       "parent, errno = %d\n", errno);
 					debugger_parent = -1;
 				}
@@ -237,7 +224,7 @@ int signals(int (*init_proc)(void *), void *sp)
 	while(1){
 		if((pid = waitpid(-1, &status, WUNTRACED)) <= 0){
 			if(errno != ECHILD){
-				printk("wait failed - errno = %d\n", errno);
+				printf("wait failed - errno = %d\n", errno);
 			}
 			continue;
 		}
@@ -259,36 +246,36 @@ int signals(int (*init_proc)(void *), void *sp)
 		if(WIFEXITED(status)) ;
 #ifdef notdef
 		{
-			printk("Child %d exited with status %d\n", pid, 
+			printf("Child %d exited with status %d\n", pid, 
 			       WEXITSTATUS(status));
 		}
 #endif
 		else if(WIFSIGNALED(status)){
 			sig = WTERMSIG(status);
 			if(sig != 9){
-				printk("Child %d exited with signal %d\n", pid,
+				printf("Child %d exited with signal %d\n", pid,
 				       sig);
 			}
 		}
 		else if(WIFSTOPPED(status)){
+			proc_id = pid_to_processor_id(pid);
 			sig = WSTOPSIG(status);
-			if(signal_index == 1024){
-				signal_index = 0;
+			if(signal_index[proc_id] == 1024){
+				signal_index[proc_id] = 0;
 				last_index = 1023;
 			}
-			else last_index = signal_index - 1;
+			else last_index = signal_index[proc_id] - 1;
 			if(((sig == SIGPROF) || (sig == SIGVTALRM) || 
 			    (sig == SIGALRM)) &&
-			   (signal_record[last_index].signal == sig) &&
-			   (signal_record[last_index].pid == pid))
-				signal_index = last_index;
-			signal_record[signal_index].pid = pid;
-			gettimeofday(&signal_record[signal_index].time, NULL);
+			   (signal_record[proc_id][last_index].signal == sig)&&
+			   (signal_record[proc_id][last_index].pid == pid))
+				signal_index[proc_id] = last_index;
+			signal_record[proc_id][signal_index[proc_id]].pid = pid;
+			gettimeofday(&signal_record[proc_id][signal_index[proc_id]].time, NULL);
 			eip = ptrace(PTRACE_PEEKUSER, pid, PT_IP_OFFSET, 0);
-			signal_record[signal_index].addr = eip;
-			signal_record[signal_index++].signal = sig;
+			signal_record[proc_id][signal_index[proc_id]].addr = eip;
+			signal_record[proc_id][signal_index[proc_id]++].signal = sig;
 			
-			proc_id = pid_to_processor_id(pid);
 			if(proc_id == -1){
 				sleeping_process_signal(pid, sig);
 				continue;
@@ -314,7 +301,7 @@ int signals(int (*init_proc)(void *), void *sp)
 					ptrace(PTRACE_KILL, pid, 0, 0);
 					return(op == OP_REBOOT);
 				case OP_NONE:
-					printk("Detaching pid %d\n", pid);
+					printf("Detaching pid %d\n", pid);
 					detach(pid, SIGSTOP);
 					continue;
 				default:
@@ -413,22 +400,30 @@ __uml_setup("honeypot", uml_honeypot_setup,
 "    UML.  This implies 'jail'.\n\n"
 );
 
+/* Unlocked - don't care if this is a bit off */
 int nsegfaults = 0;
+
+struct {
+	unsigned long address;
+	int is_write;
+	int pid;
+	unsigned long sp;
+	int is_user;
+} segfault_record[1024];
 
 void segv_handler(int sig, struct uml_pt_regs *regs)
 {
 	struct sigcontext *context = regs->sc;
-	int index;
+	int index, max;
 
 	if(regs->is_user && !SEGV_IS_FIXABLE(context)){
 		bad_segv(SC_FAULT_ADDR(context), SC_IP(context), 
 			 SC_FAULT_WRITE(context));
 		return;
 	}
-	lock_trap();
-	index = segfault_index++;
-	if(segfault_index == 1024) segfault_index = 0;
-	unlock_trap();
+	max = sizeof(segfault_record)/sizeof(segfault_record[0]);
+	index = next_trap_index(max);
+
 	nsegfaults++;
 	segfault_record[index].address = SC_FAULT_ADDR(context);
 	segfault_record[index].pid = os_getpid();
@@ -438,8 +433,6 @@ void segv_handler(int sig, struct uml_pt_regs *regs)
 	segv(SC_FAULT_ADDR(context), SC_IP(context), SC_FAULT_WRITE(context),
 	     regs->is_user, context);
 }
-
-extern int kern_timer_on;
 
 struct signal_info {
 	void (*handler)(int, struct uml_pt_regs *);
@@ -471,7 +464,7 @@ void sig_handler_common(int sig, struct sigcontext *sc)
 {
 	struct uml_pt_regs save_regs, *r;
 	struct signal_info *info;
-	int save_errno = errno, save_timer = kern_timer_on, is_user;
+	int save_errno = errno, is_user;
 
 	unprotect_kernel_mem();
 
@@ -488,7 +481,6 @@ void sig_handler_common(int sig, struct sigcontext *sc)
 
 	(*info->handler)(sig, r);
 
-	kern_timer_on = save_timer;
 	if(is_user){
 		interrupt_end();
 		block_signals();
@@ -505,19 +497,15 @@ void sig_handler(int sig, struct sigcontext sc)
 	sig_handler_common(sig, &sc);
 }
 
-extern int timer_irq_inited, missed_ticks;
-
-extern int jail_timer_off;
+extern int timer_irq_inited, missed_ticks[];
 
 void alarm_handler(int sig, struct sigcontext sc)
 {
 	int user;
 
 	if(!timer_irq_inited) return;
-	missed_ticks++;
+	missed_ticks[cpu()]++;
 	user = user_context(SC_SP(&sc));
-	if(!user && !kern_timer_on) return;
-	if(!user && jail_timer_off) return;
 
 	if(sig == SIGALRM)
 		switch_timers(0);

@@ -2639,7 +2639,7 @@ static int ide_ioctl (struct inode *inode, struct file *file,
 
 		case CDROMEJECT:
 		case CDROMCLOSETRAY:
-			return block_ioctl(inode->i_bdev, cmd, arg);
+			return scsi_cmd_ioctl(inode->i_bdev, cmd, arg);
 
 		case HDIO_GET_BUSSTATE:
 			if (!capable(CAP_SYS_ADMIN))

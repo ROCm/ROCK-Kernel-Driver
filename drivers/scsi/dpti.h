@@ -43,6 +43,7 @@ static int adpt_queue(Scsi_Cmnd * cmd, void (*cmdcomplete) (Scsi_Cmnd *));
 static int adpt_abort(Scsi_Cmnd * cmd);
 static int adpt_reset(Scsi_Cmnd* cmd);
 static int adpt_release(struct Scsi_Host *host);
+static int adpt_slave_attach(Scsi_Device *);
 
 static const char *adpt_info(struct Scsi_Host *pSHost);
 static int adpt_bios_param(Disk * disk, struct block_device *dev, int geom[]);
@@ -90,10 +91,11 @@ static int adpt_device_reset(Scsi_Cmnd* cmd);
 	eh_bus_reset_handler: adpt_bus_reset,				\
 	eh_host_reset_handler: adpt_reset,				\
 	bios_param: adpt_bios_param,					\
+	slave_attach: adpt_slave_attach,				\
 	can_queue: MAX_TO_IOP_MESSAGES,	/* max simultaneous cmds      */\
 	this_id: 7,			/* scsi id of host adapter    */\
 	sg_tablesize: 0,		/* max scatter-gather cmds    */\
-	cmd_per_lun: 256,		/* cmds per lun (linked cmds) */\
+	cmd_per_lun: 1,			/* cmds per lun (linked cmds) */\
 	use_clustering: ENABLE_CLUSTERING,				\
 	proc_name: "dpt_i2o"	/* this is the name of our proc node*/	\
 }
@@ -346,7 +348,6 @@ static s32 adpt_rescan(adpt_hba* pHba);
 static s32 adpt_i2o_reparse_lct(adpt_hba* pHba);
 static s32 adpt_send_nop(adpt_hba*pHba,u32 m);
 static void adpt_i2o_delete_hba(adpt_hba* pHba);
-static void adpt_select_queue_depths(struct Scsi_Host *host, Scsi_Device * devicelist);
 static void adpt_inquiry(adpt_hba* pHba);
 static void adpt_fail_posted_scbs(adpt_hba* pHba);
 static struct adpt_device* adpt_find_device(adpt_hba* pHba, u32 chan, u32 id, u32 lun);

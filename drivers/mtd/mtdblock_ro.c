@@ -201,8 +201,6 @@ static int mtdblock_ioctl(struct inode * inode, struct file * file,
 	if (!mtd || cmd != BLKFLSBUF)
 		return -EINVAL;
 
-	if(!capable(CAP_SYS_ADMIN))
-		return -EACCES;
 	fsync_bdev(inode->i_bdev);
 	invalidate_bdev(inode->i_bdev, 0);
 	if (mtd->sync)
@@ -224,7 +222,7 @@ int __init init_mtdblock(void)
 	int i;
 
 	for (i = 0; i < MAX_MTD_DEVICES; i++) {
-		struct gendisk *disk = alloc_disk();
+		struct gendisk *disk = alloc_disk(1);
 		if (!disk)
 			goto out;
 		disk->major = MAJOR_NR;

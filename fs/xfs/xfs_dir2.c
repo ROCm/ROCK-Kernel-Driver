@@ -147,7 +147,7 @@ xfs_dir2_init(
 	xfs_da_args_t	args;		/* operation arguments */
 	int		error;		/* error return value */
 
-	bzero((char *)&args, sizeof(args));
+	memset((char *)&args, 0, sizeof(args));
 	args.dp = dp;
 	args.trans = tp;
 	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
@@ -711,7 +711,7 @@ xfs_dir2_put_dirent64_direct(
 	idbp->d_off = pa->cook;
 	idbp->d_name[namelen] = '\0';
 	pa->done = 1;
-	bcopy(pa->name, idbp->d_name, namelen);
+	memcpy(idbp->d_name, pa->name, namelen);
 	return 0;
 }
 
@@ -743,7 +743,7 @@ xfs_dir2_put_dirent64_uio(
 	idbp->d_ino = pa->ino;
 	idbp->d_off = pa->cook;
 	idbp->d_name[namelen] = '\0';
-	bcopy(pa->name, idbp->d_name, namelen);
+	memcpy(idbp->d_name, pa->name, namelen);
 	rval = uiomove((caddr_t)idbp, reclen, UIO_READ, uio);
 	pa->done = (rval == 0);
 	return rval;

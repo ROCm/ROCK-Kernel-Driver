@@ -1,5 +1,5 @@
 /*
- * $Id: iq80310.c,v 1.8 2001/10/02 15:05:14 dwmw2 Exp $
+ * $Id: iq80310.c,v 1.9 2002/01/01 22:45:02 rmk Exp $
  *
  * Mapping for the Intel XScale IQ80310 evaluation board
  *
@@ -116,7 +116,7 @@ static int __init init_iq80310(void)
 	int parsed_nr_parts = 0;
 	char *part_type = "static";
 
-	iq80310_map.map_priv_1 = (unsigned long)__ioremap(WINDOW_ADDR, WINDOW_SIZE, 0);
+	iq80310_map.map_priv_1 = (unsigned long)ioremap(WINDOW_ADDR, WINDOW_SIZE);
 	if (!iq80310_map.map_priv_1) {
 		printk("Failed to ioremap\n");
 		return -EIO;
@@ -161,7 +161,6 @@ static void __exit cleanup_iq80310(void)
 	}
 	if (iq80310_map.map_priv_1)
 		iounmap((void *)iq80310_map.map_priv_1);
-	return 0;
 }
 
 module_init(init_iq80310);

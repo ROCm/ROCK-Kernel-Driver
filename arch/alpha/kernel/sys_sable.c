@@ -185,13 +185,13 @@ sable_mask_and_ack_irq(unsigned int irq)
 }
 
 static struct hw_interrupt_type sable_irq_type = {
-	typename:	"SABLE",
-	startup:	sable_startup_irq,
-	shutdown:	sable_disable_irq,
-	enable:		sable_enable_irq,
-	disable:	sable_disable_irq,
-	ack:		sable_mask_and_ack_irq,
-	end:		sable_end_irq,
+	.typename	= "SABLE",
+	.startup	= sable_startup_irq,
+	.shutdown	= sable_disable_irq,
+	.enable		= sable_enable_irq,
+	.disable	= sable_disable_irq,
+	.ack		= sable_mask_and_ack_irq,
+	.end		= sable_end_irq,
 };
 
 static void 
@@ -284,29 +284,29 @@ sable_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 #undef GAMMA_BIAS
 #define GAMMA_BIAS 0
 struct alpha_machine_vector sable_mv __initmv = {
-	vector_name:		"Sable",
+	.vector_name		= "Sable",
 	DO_EV4_MMU,
 	DO_DEFAULT_RTC,
 	DO_T2_IO,
 	DO_T2_BUS,
-	machine_check:		t2_machine_check,
-	max_dma_address:	ALPHA_SABLE_MAX_DMA_ADDRESS,
-	min_io_address:		EISA_DEFAULT_IO_BASE,
-	min_mem_address:	T2_DEFAULT_MEM_BASE,
+	.machine_check		= t2_machine_check,
+	.max_dma_address	= ALPHA_SABLE_MAX_DMA_ADDRESS,
+	.min_io_address		= EISA_DEFAULT_IO_BASE,
+	.min_mem_address	= T2_DEFAULT_MEM_BASE,
 
-	nr_irqs:		40,
-	device_interrupt:	sable_srm_device_interrupt,
+	.nr_irqs		= 40,
+	.device_interrupt	= sable_srm_device_interrupt,
 
-	init_arch:		t2_init_arch,
-	init_irq:		sable_init_irq,
-	init_rtc:		common_init_rtc,
-	init_pci:		common_init_pci,
-	kill_arch:		NULL,
-	pci_map_irq:		sable_map_irq,
-	pci_swizzle:		common_swizzle,
+	.init_arch		= t2_init_arch,
+	.init_irq		= sable_init_irq,
+	.init_rtc		= common_init_rtc,
+	.init_pci		= common_init_pci,
+	.kill_arch		= NULL,
+	.pci_map_irq		= sable_map_irq,
+	.pci_swizzle		= common_swizzle,
 
-	sys: { t2: {
-	    gamma_bias:		0
+	.sys = { .t2 = {
+	    .gamma_bias		= 0
 	} }
 };
 ALIAS_MV(sable)
@@ -316,28 +316,28 @@ ALIAS_MV(sable)
 #undef GAMMA_BIAS
 #define GAMMA_BIAS _GAMMA_BIAS
 struct alpha_machine_vector sable_gamma_mv __initmv = {
-	vector_name:		"Sable-Gamma",
+	.vector_name		= "Sable-Gamma",
 	DO_EV5_MMU,
 	DO_DEFAULT_RTC,
 	DO_T2_IO,
 	DO_T2_BUS,
-	machine_check:		t2_machine_check,
-	max_dma_address:	ALPHA_SABLE_MAX_DMA_ADDRESS,
-	min_io_address:		EISA_DEFAULT_IO_BASE,
-	min_mem_address:	T2_DEFAULT_MEM_BASE,
+	.machine_check		= t2_machine_check,
+	.max_dma_address	= ALPHA_SABLE_MAX_DMA_ADDRESS,
+	.min_io_address		= EISA_DEFAULT_IO_BASE,
+	.min_mem_address	= T2_DEFAULT_MEM_BASE,
 
-	nr_irqs:		40,
-	device_interrupt:	sable_srm_device_interrupt,
+	.nr_irqs		= 40,
+	.device_interrupt	= sable_srm_device_interrupt,
 
-	init_arch:		t2_init_arch,
-	init_irq:		sable_init_irq,
-	init_rtc:		common_init_rtc,
-	init_pci:		common_init_pci,
-	pci_map_irq:		sable_map_irq,
-	pci_swizzle:		common_swizzle,
+	.init_arch		= t2_init_arch,
+	.init_irq		= sable_init_irq,
+	.init_rtc		= common_init_rtc,
+	.init_pci		= common_init_pci,
+	.pci_map_irq		= sable_map_irq,
+	.pci_swizzle		= common_swizzle,
 
-	sys: { t2: {
-	    gamma_bias:		_GAMMA_BIAS
+	.sys = { .t2 = {
+	    .gamma_bias		= _GAMMA_BIAS
 	} }
 };
 ALIAS_MV(sable_gamma)

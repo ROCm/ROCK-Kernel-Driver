@@ -736,6 +736,7 @@ ENTRY(sys_call_table)
 	.long sys_alloc_hugepages /* 250 */
 	.long sys_free_hugepages
 	.long sys_exit_group
+	.long sys_lookup_dcookie
 
 	.rept NR_syscalls-(.-sys_call_table)/4
 		.long sys_ni_syscall

@@ -1962,7 +1962,6 @@ static boolean DAC960_RegisterBlockDevice(DAC960_Controller_T *Controller)
 	sprintf(disk->disk_name, "rd/c%dd%d", Controller->ControllerNumber, n);
 	disk->major = MajorNumber;
 	disk->first_minor = n << DAC960_MaxPartitionsBits;
-	disk->minor_shift = DAC960_MaxPartitionsBits;
 	disk->fops = &DAC960_BlockDeviceOperations;
    }
   /*
@@ -2200,7 +2199,7 @@ static void DAC960_DetectControllers(DAC960_HardwareType_T HardwareType)
 	}
       memset(Controller, 0, sizeof(DAC960_Controller_T));
       for (i = 0; i < DAC960_MaxLogicalDrives; i++) {
-		Controller->disks[i] = alloc_disk();
+		Controller->disks[i] = alloc_disk(1<<DAC960_MaxPartitionsBits);
 		if (!Controller->disks[i])
 			goto Enomem;
       }

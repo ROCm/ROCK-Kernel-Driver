@@ -1037,7 +1037,7 @@ int swim3_init(void)
 		return -ENODEV;
 
 	for (i = 0; i < floppy_count; i++) {
-		disks[i] = alloc_disk();
+		disks[i] = alloc_disk(1);
 		if (!disks[i])
 			goto out;
 	}

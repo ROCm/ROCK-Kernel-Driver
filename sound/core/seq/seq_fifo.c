@@ -182,7 +182,9 @@ int snd_seq_fifo_cell_out(fifo_t *f, snd_seq_event_cell_t **cellp, int nonblock)
 			spin_unlock_irqrestore(&f->lock, flags);
 			return -EAGAIN;
 		}
-		snd_seq_sleep_in_lock(&f->input_sleep, &f->lock);
+		spin_unlock(&f->lock);
+		interruptible_sleep_on(&f->input_sleep);
+		spin_lock(&f->lock);
 
 		if (signal_pending(current)) {
 			spin_unlock_irqrestore(&f->lock, flags);

@@ -64,11 +64,6 @@ extern spinlock_t i8259A_lock;
 
 #include "do_timer.h"
 
-/*
- * for x86_do_profile()
- */
-#include <linux/irq.h>
-
 u64 jiffies_64;
 
 unsigned long cpu_khz;	/* Detected as we calibrate the TSC */

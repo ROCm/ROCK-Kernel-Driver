@@ -229,7 +229,6 @@ struct Scsi_Host * scsi_register(Scsi_Host_Template * tpnt, int j)
     if (!blk_nohighio)
 	retval->highmem_io = tpnt->highmem_io;
 
-    retval->select_queue_depths = tpnt->select_queue_depths;
     retval->max_sectors = tpnt->max_sectors;
     retval->use_blk_tcq = tpnt->use_blk_tcq;
 

@@ -67,6 +67,10 @@
 #define STATIC static
 #endif
 
+#define restricted_chown	xfs_params.restrict_chown
+#define irix_sgid_inherit	xfs_params.sgid_inherit
+#define irix_symlink_mode	xfs_params.symlink_mode
+
 typedef struct xfs_dirent {		/* data from readdir() */
 	xfs_ino_t	d_ino;		/* inode number of entry */
 	xfs_off_t	d_off;		/* offset of disk directory entry */

@@ -119,13 +119,13 @@ jensen_local_end(unsigned int irq)
 }
 
 static struct hw_interrupt_type jensen_local_irq_type = {
-	typename:	"LOCAL",
-	startup:	jensen_local_startup,
-	shutdown:	jensen_local_shutdown,
-	enable:		jensen_local_enable,
-	disable:	jensen_local_disable,
-	ack:		jensen_local_ack,
-	end:		jensen_local_end,
+	.typename	= "LOCAL",
+	.startup	= jensen_local_startup,
+	.shutdown	= jensen_local_shutdown,
+	.enable		= jensen_local_enable,
+	.disable	= jensen_local_disable,
+	.ack		= jensen_local_ack,
+	.end		= jensen_local_end,
 };
 
 static void 
@@ -252,21 +252,21 @@ jensen_machine_check (u64 vector, u64 la, struct pt_regs *regs)
  */
 
 struct alpha_machine_vector jensen_mv __initmv = {
-	vector_name:		"Jensen",
+	.vector_name		= "Jensen",
 	DO_EV4_MMU,
 	IO_LITE(JENSEN,jensen),
 	BUS(jensen),
-	machine_check:		jensen_machine_check,
-	max_dma_address:	ALPHA_MAX_DMA_ADDRESS,
-	rtc_port:		0x170,
+	.machine_check		= jensen_machine_check,
+	.max_dma_address	= ALPHA_MAX_DMA_ADDRESS,
+	.rtc_port		= 0x170,
 
-	nr_irqs:		16,
-	device_interrupt:	jensen_device_interrupt,
+	.nr_irqs		= 16,
+	.device_interrupt	= jensen_device_interrupt,
 
-	init_arch:		jensen_init_arch,
-	init_irq:		jensen_init_irq,
-	init_rtc:		common_init_rtc,
-	init_pci:		NULL,
-	kill_arch:		NULL,
+	.init_arch		= jensen_init_arch,
+	.init_irq		= jensen_init_irq,
+	.init_rtc		= common_init_rtc,
+	.init_pci		= NULL,
+	.kill_arch		= NULL,
 };
 ALIAS_MV(jensen)

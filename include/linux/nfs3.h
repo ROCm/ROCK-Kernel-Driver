@@ -59,6 +59,11 @@ enum nfs3_ftype {
 	NF3BAD  = 8
 };
 
+struct nfs3_fh {
+	unsigned short size;
+	unsigned char  data[NFS3_FHSIZE];
+};
+
 #define NFS3_VERSION		3
 #define NFS3PROC_NULL		0
 #define NFS3PROC_GETATTR	1

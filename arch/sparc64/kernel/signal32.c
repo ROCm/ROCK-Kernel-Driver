@@ -230,7 +230,7 @@ asmlinkage void do_rt_sigsuspend32(u32 uset, size_t sigsetsize, struct pt_regs *
 	}
 }
 
-static inline int restore_fpu_state32(struct pt_regs *regs, __siginfo_fpu_t *fpu)
+static int restore_fpu_state32(struct pt_regs *regs, __siginfo_fpu_t *fpu)
 {
 	unsigned long *fpregs = current_thread_info()->fpregs;
 	unsigned long fprs;
@@ -477,7 +477,7 @@ static int invalid_frame_pointer(void *fp, int fplen)
 	return 0;
 }
 
-static inline void *get_sigframe(struct sigaction *sa, struct pt_regs *regs, unsigned long framesize)
+static void *get_sigframe(struct sigaction *sa, struct pt_regs *regs, unsigned long framesize)
 {
 	unsigned long sp;
 	
@@ -645,7 +645,7 @@ sigsegv:
 }
 
 
-static inline int save_fpu_state32(struct pt_regs *regs, __siginfo_fpu_t *fpu)
+static int save_fpu_state32(struct pt_regs *regs, __siginfo_fpu_t *fpu)
 {
 	unsigned long *fpregs = current_thread_info()->fpregs;
 	unsigned long fprs;
@@ -665,8 +665,8 @@ static inline int save_fpu_state32(struct pt_regs *regs, __siginfo_fpu_t *fpu)
 	return err;
 }
 
-static inline void new_setup_frame32(struct k_sigaction *ka, struct pt_regs *regs,
-				     int signo, sigset_t *oldset)
+static void new_setup_frame32(struct k_sigaction *ka, struct pt_regs *regs,
+			      int signo, sigset_t *oldset)
 {
 	struct new_signal_frame32 *sf;
 	int sigframe_size;
@@ -790,7 +790,7 @@ sigsegv:
 }
 
 /* Setup a Solaris stack frame */
-static inline void
+static void
 setup_svr4_frame32(struct sigaction *sa, unsigned long pc, unsigned long npc,
 		   struct pt_regs *regs, int signr, sigset_t *oldset)
 {
@@ -1089,9 +1089,9 @@ sigsegv:
 	do_exit(SIGSEGV);
 }
 
-static inline void setup_rt_frame32(struct k_sigaction *ka, struct pt_regs *regs,
-				        unsigned long signr, sigset_t *oldset,
-				        siginfo_t *info)
+static void setup_rt_frame32(struct k_sigaction *ka, struct pt_regs *regs,
+			     unsigned long signr, sigset_t *oldset,
+			     siginfo_t *info)
 {
 	struct rt_signal_frame32 *sf;
 	int sigframe_size;

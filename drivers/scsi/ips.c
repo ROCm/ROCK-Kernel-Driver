@@ -1879,10 +1879,12 @@ ips_slave_attach(Scsi_Device *SDptr)
    int          min;
 
    ha = IPS_HA(SDptr->host);
-   min = ha->max_cmds / 4;
-   if (min < 8)
-      min = ha->max_cmds - 1;
-   scsi_adjust_queue_depth(SDptr, MSG_ORDERED_TAG, min);
+   if (SDptr->tagged_supported) {
+      min = ha->max_cmds / 2;
+      if (min <= 16)
+         min = ha->max_cmds - 1;
+      scsi_adjust_queue_depth(SDptr, MSG_ORDERED_TAG, min);
+   }
    return 0;
 }
 

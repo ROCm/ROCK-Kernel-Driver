@@ -13,6 +13,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/profile.h>
 #include <asm/atomic.h>
 #include <asm/irq.h>
 
@@ -65,20 +66,31 @@ extern char _stext, _etext;
 
 #define IO_APIC_IRQ(x) (((x) >= 16) || ((1<<(x)) & io_apic_irqs))
 
-extern unsigned long prof_cpu_mask;
-extern unsigned int * prof_buffer;
-extern unsigned long prof_len;
-extern unsigned long prof_shift;
-
 /*
- * x86 profiling function, SMP safe. We might want to do this in
- * assembly totally?
+ * The profiling function is SMP safe. (nothing can mess
+ * around with "current", and the profiling counters are
+ * updated with atomic operations). This is especially
+ * useful with a profiling multiplier != 1
  */
-static inline void x86_do_profile (unsigned long eip)
+static inline void x86_do_profile(struct pt_regs * regs)
 {
+	unsigned long eip;
+	extern unsigned long prof_cpu_mask;
+	extern char _stext;
+#ifdef CONFIG_PROFILING
+	extern void x86_profile_hook(struct pt_regs *);
+ 
+	x86_profile_hook(regs);
+#endif
+ 
+	if (user_mode(regs))
+		return;
+ 
 	if (!prof_buffer)
 		return;
 
+	eip = regs->eip;
+ 
 	/*
 	 * Only measure the CPUs specified by /proc/irq/prof_cpu_mask.
 	 * (default is all CPUs.)
@@ -97,7 +109,28 @@ static inline void x86_do_profile (unsigned long eip)
 		eip = prof_len-1;
 	atomic_inc((atomic_t *)&prof_buffer[eip]);
 }
+ 
+struct notifier_block;
+ 
+#ifdef CONFIG_PROFILING
+ 
+int register_profile_notifier(struct notifier_block * nb);
+int unregister_profile_notifier(struct notifier_block * nb);
 
+#else
+
+static inline int register_profile_notifier(struct notifier_block * nb)
+{
+	return -ENOSYS;
+}
+
+static inline int unregister_profile_notifier(struct notifier_block * nb)
+{
+	return -ENOSYS;
+}
+
+#endif /* CONFIG_PROFILING */
+ 
 #ifdef CONFIG_SMP /*more of this file should probably be ifdefed SMP */
 static inline void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i) {
 	if (IO_APIC_IRQ(i))

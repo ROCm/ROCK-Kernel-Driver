@@ -2108,7 +2108,9 @@ static int idefloppy_attach (ide_drive_t *drive)
 	DRIVER(drive)->busy++;
 	idefloppy_setup (drive, floppy);
 	DRIVER(drive)->busy--;
+	g->minors = 1 << PARTN_BITS;
 	g->minor_shift = PARTN_BITS;
+	g->driverfs_dev = &drive->gendev;
 	g->de = drive->de;
 	g->flags = drive->removable ? GENHD_FL_REMOVABLE : 0;
 	g->flags |= GENHD_FL_DEVFS;

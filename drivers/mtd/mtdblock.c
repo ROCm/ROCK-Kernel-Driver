@@ -295,7 +295,7 @@ static int mtdblock_open(struct inode *inode, struct file *file)
 	spin_unlock(&mtdblks_lock);
 
 	mtdblk = kmalloc(sizeof(struct mtdblk_dev), GFP_KERNEL);
-	disk = alloc_disk();
+	disk = alloc_disk(1);
 	if (!mtdblk || !disk)
 		goto Enomem;
 	memset(mtdblk, 0, sizeof(*mtdblk));
@@ -313,7 +313,6 @@ static int mtdblock_open(struct inode *inode, struct file *file)
 	}
 	disk->major = MAJOR_NR;
 	disk->first_minor = dev;
-	disk->minor_shift = 0;
 	disk->fops = &mtd_fops;
 	sprintf(disk->disk_name, "mtd%d", dev);
 	mtdblk->disk = disk;
@@ -518,8 +517,6 @@ static int mtdblock_ioctl(struct inode * inode, struct file * file,
 
 	switch (cmd) {
 	case BLKFLSBUF:
-		if(!capable(CAP_SYS_ADMIN))
-			return -EACCES;
 		fsync_bdev(inode->i_bdev);
 		invalidate_bdev(inode->i_bdev, 0);
 		down(&mtdblk->cache_sem);

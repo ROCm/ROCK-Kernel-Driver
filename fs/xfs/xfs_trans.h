@@ -378,7 +378,10 @@ typedef struct xfs_trans {
 	unsigned int		t_rtx_res_used; /* # of resvd rt extents used */
 	xfs_log_ticket_t	t_ticket;	/* log mgr ticket */
 	sema_t			t_sema;		/* sema for commit completion */
-	xfs_lsn_t		t_lsn;		/* log seq num of trans commit*/
+	xfs_lsn_t		t_lsn;		/* log seq num of start of
+						 * transaction. */
+	xfs_lsn_t		t_commit_lsn;	/* log seq num of end of 
+						 * transaction. */
 	struct xfs_mount	*t_mountp;	/* ptr to fs mount struct */
 	struct xfs_dquot_acct	*t_dqinfo;	/* accting info for dquots */
 	xfs_trans_callback_t	t_callback;	/* transaction callback */
