@@ -712,15 +712,19 @@ repeat:
 				if (retval)
 					goto end_wait4; 
 				retval = p->pid;
-				if (p->real_parent != p->parent || p->ptrace) {
+				if (p->real_parent != p->parent) {
 					write_lock_irq(&tasklist_lock);
-					remove_parent(p);
-					p->parent = p->real_parent;
-					add_parent(p, p->parent);
+					ptrace_unlink(p);
 					do_notify_parent(p, SIGCHLD);
 					write_unlock_irq(&tasklist_lock);
-				} else
+				} else {
+					if (p->ptrace) {
+						write_lock_irq(&tasklist_lock);
+						ptrace_unlink(p);
+						write_unlock_irq(&tasklist_lock);
+					}
 					release_task(p);
+				}
 				goto end_wait4;
 			default:
 				continue;
