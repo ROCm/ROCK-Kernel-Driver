@@ -639,13 +639,13 @@ static void cp_rx (struct cp_private *cp)
 		cp_rx_skb(cp, skb, desc);
 
 rx_next:
+		cp->rx_ring[rx_tail].opts2 = 0;
+		cp->rx_ring[rx_tail].addr = cpu_to_le64(mapping);
 		if (rx_tail == (CP_RX_RING_SIZE - 1))
 			desc->opts1 = cpu_to_le32(DescOwn | RingEnd |
 						  cp->rx_buf_sz);
 		else
 			desc->opts1 = cpu_to_le32(DescOwn | cp->rx_buf_sz);
-		cp->rx_ring[rx_tail].opts2 = 0;
-		cp->rx_ring[rx_tail].addr = cpu_to_le64(mapping);
 		rx_tail = NEXT_RX(rx_tail);
 	}
 
@@ -669,14 +669,14 @@ static void cp_interrupt (int irq, void *dev_instance, struct pt_regs *regs)
 		printk(KERN_DEBUG "%s: intr, status %04x cmd %02x cpcmd %04x\n",
 		        dev->name, status, cpr8(Cmd), cpr16(CpCmd));
 
+	cpw16_f(IntrStatus, status);
+
 	spin_lock(&cp->lock);
 
 	if (status & (RxOK | RxErr | RxEmpty | RxFIFOOvr))
 		cp_rx(cp);
 	if (status & (TxOK | TxErr | TxEmpty | SWInt))
 		cp_tx(cp);
-
-	cpw16_f(IntrStatus, status);
 
 	if (status & PciErr) {
 		u16 pci_status;
@@ -781,7 +781,6 @@ static int cp_start_xmit (struct sk_buff *skb, struct net_device *dev)
 
 		len = skb->len;
 		mapping = pci_map_single(cp->pdev, skb->data, len, PCI_DMA_TODEVICE);
-		eor = (entry == (CP_TX_RING_SIZE - 1)) ? RingEnd : 0;
 		CP_VLAN_TX_TAG(txd, vlan_tag);
 		txd->addr = cpu_to_le64(mapping);
 		wmb();
@@ -811,7 +810,7 @@ static int cp_start_xmit (struct sk_buff *skb, struct net_device *dev)
 		entry = NEXT_TX(entry);
 	} else {
 		struct cp_desc *txd;
-		u32 first_len;
+		u32 first_len, first_eor;
 		dma_addr_t first_mapping;
 		int frag, first_entry = entry;
 #ifdef CP_TX_CHECKSUM
@@ -821,6 +820,7 @@ static int cp_start_xmit (struct sk_buff *skb, struct net_device *dev)
 		/* We must give this initial chunk to the device last.
 		 * Otherwise we could race with the device.
 		 */
+		first_eor = eor;
 		first_len = skb->len - skb->data_len;
 		first_mapping = pci_map_single(cp->pdev, skb->data,
 					       first_len, PCI_DMA_TODEVICE);
@@ -879,17 +879,19 @@ static int cp_start_xmit (struct sk_buff *skb, struct net_device *dev)
 #ifdef CP_TX_CHECKSUM
 		if (skb->ip_summed == CHECKSUM_HW) {
 			if (ip->protocol == IPPROTO_TCP)
-				txd->opts1 = cpu_to_le32(first_len | FirstFrag |
-							DescOwn | IPCS | TCPCS);
+				txd->opts1 = cpu_to_le32(first_eor | first_len |
+							 FirstFrag | DescOwn |
+							 IPCS | TCPCS);
 			else if (ip->protocol == IPPROTO_UDP)
-				txd->opts1 = cpu_to_le32(first_len | FirstFrag |
-							DescOwn | IPCS | UDPCS);
+				txd->opts1 = cpu_to_le32(first_eor | first_len |
+							 FirstFrag | DescOwn |
+							 IPCS | UDPCS);
 			else
 				BUG();
 		} else
 #endif
-			txd->opts1 = cpu_to_le32(first_len | FirstFrag |
-						 DescOwn);
+			txd->opts1 = cpu_to_le32(first_eor | first_len |
+						 FirstFrag | DescOwn);
 		wmb();
 	}
 	cp->tx_head = entry;
@@ -1088,14 +1090,14 @@ static int cp_refill_rx (struct cp_private *cp)
 		cp->rx_skb[i].skb = skb;
 		cp->rx_skb[i].frag = 0;
 
+		cp->rx_ring[i].opts2 = 0;
+		cp->rx_ring[i].addr = cpu_to_le64(cp->rx_skb[i].mapping);
 		if (i == (CP_RX_RING_SIZE - 1))
 			cp->rx_ring[i].opts1 =
 				cpu_to_le32(DescOwn | RingEnd | cp->rx_buf_sz);
 		else
 			cp->rx_ring[i].opts1 =
 				cpu_to_le32(DescOwn | cp->rx_buf_sz);
-		cp->rx_ring[i].opts2 = 0;
-		cp->rx_ring[i].addr = cpu_to_le64(cp->rx_skb[i].mapping);
 	}
 
 	return 0;
@@ -1208,7 +1210,11 @@ static int cp_close (struct net_device *dev)
 		printk(KERN_DEBUG "%s: disabling interface\n", dev->name);
 
 	netif_stop_queue(dev);
+
+	spin_lock_irq(&cp->lock);
 	cp_stop_hw(cp);
+	spin_unlock_irq(&cp->lock);
+
 	free_irq(dev->irq, dev);
 	cp_free_rings(cp);
 	return 0;

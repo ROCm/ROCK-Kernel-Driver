@@ -56,6 +56,8 @@
  *
  */
 
+#include <linux/ethtool.h>
+#include <asm/uaccess.h>
 #include "wavelan_cs.p.h"		/* Private header */
 
 /************************* MISC SUBROUTINES **************************/
@@ -282,9 +284,11 @@ mmc_out(u_long		base,
 	u_short		o,
 	u_char		d)
 {
+  int count = 0;
+
   /* Wait for MMC to go idle */
-  while(inb(HASR(base)) & HASR_MMI_BUSY)
-    ;
+  while((count++ < 100) && (inb(HASR(base)) & HASR_MMI_BUSY))
+    udelay(10);
 
   outb((u_char)((o << 1) | MMR_MMI_WR), MMR(base));
   outb(d, MMD(base));
@@ -317,14 +321,16 @@ static inline u_char
 mmc_in(u_long	base,
        u_short	o)
 {
-  while(inb(HASR(base)) & HASR_MMI_BUSY)
-    ;
+  int count = 0;
+
+  while((count++ < 100) && (inb(HASR(base)) & HASR_MMI_BUSY))
+    udelay(10);
   outb(o << 1, MMR(base));		/* Set the read address */
 
   outb(0, MMD(base));			/* Required dummy write */
 
-  while(inb(HASR(base)) & HASR_MMI_BUSY)
-    ;
+  while((count++ < 100) && (inb(HASR(base)) & HASR_MMI_BUSY))
+    udelay(10);
   return (u_char) (inb(MMD(base)));	/* Now do the actual read */
 }
 
@@ -1854,6 +1860,27 @@ wl_his_gather(device *	dev,
 }
 #endif	/* HISTOGRAM */
 
+static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
+{
+	u32 ethcmd;
+
+	if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
+		return -EFAULT;
+
+	switch (ethcmd) {
+	case ETHTOOL_GDRVINFO: {
+		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
+
+		strncpy(info.driver, "wavelan_cs", sizeof(info.driver)-1);
+		if (copy_to_user(useraddr, &info, sizeof(info)))
+			return -EFAULT;
+		return 0;
+	}
+	}
+
+	return -EOPNOTSUPP;
+}
+
 /*------------------------------------------------------------------*/
 /*
  * Wireless Handler : get protocol name
@@ -2885,6 +2912,10 @@ wavelan_ioctl(struct net_device *	dev,	/* Device on wich the ioctl apply */
   /* Look what is the request */
   switch(cmd)
     {
+    case SIOCETHTOOL:
+      ret = netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
+      break;
+
       /* --------------- WIRELESS EXTENSIONS --------------- */
 
     case SIOCGIWNAME:
@@ -3581,6 +3612,9 @@ wv_packet_write(device *	dev,
   /* Send the transmit command */
   wv_82593_cmd(dev, "wv_packet_write(): transmit",
 	       OP0_TRANSMIT, SR0_NO_RESULT);
+
+  /* Make sure the watchdog will keep quiet for a while */
+  dev->trans_start = jiffies;
 
   /* Keep stats up to date */
   lp->stats.tx_bytes += length;

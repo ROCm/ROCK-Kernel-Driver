@@ -602,13 +602,15 @@ static void fr_rx(struct sk_buff *skb)
 	}
 
 	if (data[3] == FR_PAD && data[4] == NLPID_SNAP && data[5] == FR_PAD) {
-		u16 oui = ntohl(*(u16*)(data + 6));
-		u16 pid = ntohl(*(u16*)(data + 8));
+		u16 oui = ntohs(*(u16*)(data + 6));
+		u16 pid = ntohs(*(u16*)(data + 8));
 		skb_pull(skb, 10);
 
 		switch ((((u32)oui) << 16) | pid) {
 		case ETH_P_ARP: /* routed frame with SNAP */
 		case ETH_P_IPX:
+		case ETH_P_IP:	/* a long variant */
+		case ETH_P_IPV6:
 			skb->protocol = htons(pid);
 			break;
 
@@ -762,7 +764,7 @@ static void fr_destroy(hdlc_device *hdlc)
 	pvc_device *pvc = hdlc->state.fr.first_pvc;
 	while(pvc) {
 		pvc_device *next = pvc->next;
-		unregister_netdevice(&pvc->netdev);
+		unregister_netdev(&pvc->netdev);
 		kfree(pvc);
 		pvc = next;
 	}
@@ -778,6 +780,7 @@ int hdlc_fr_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
 {
 	fr_proto *fr_s = &ifr->ifr_settings->ifs_hdlc.fr;
 	const size_t size = sizeof(fr_proto);
+	fr_proto new_settings;
 	struct net_device *dev = hdlc_to_dev(hdlc);
 	fr_proto_pvc pvc;
 	int result;
@@ -796,26 +799,40 @@ int hdlc_fr_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
 		if(dev->flags & IFF_UP)
 			return -EBUSY;
 
-		if (copy_from_user(&hdlc->state.fr.settings, fr_s, size))
+		if (copy_from_user(&new_settings, fr_s, size))
 			return -EFAULT;
 
-		/* FIXME - put sanity checks here */
+		if (new_settings.lmi == LMI_DEFAULT)
+			new_settings.lmi = LMI_ANSI;
+
+		if ((new_settings.lmi != LMI_NONE &&
+		     new_settings.lmi != LMI_ANSI &&
+		     new_settings.lmi != LMI_CCITT) ||
+		    new_settings.t391 < 1 ||
+		    new_settings.t392 < 2 ||
+		    new_settings.n391 < 1 ||
+		    new_settings.n392 < 1 ||
+		    new_settings.n393 < new_settings.n392 ||
+		    new_settings.n393 > 32 ||
+		    (new_settings.dce != 0 &&
+		     new_settings.dce != 1))
+			return -EINVAL;
+
+		result=hdlc->attach(hdlc, ENCODING_NRZ,PARITY_CRC16_PR1_CCITT);
+		if (result)
+			return result;
+
 		if (hdlc->proto != IF_PROTO_FR) {
-			hdlc_detach(hdlc);
+			hdlc_proto_detach(hdlc);
 			hdlc->state.fr.first_pvc = NULL;
 			hdlc->state.fr.pvc_count = 0;
 		}
-
-		result=hdlc->attach(hdlc, ENCODING_NRZ,PARITY_CRC16_PR1_CCITT);
-		if (result) {
-			hdlc->proto = -1;
-			return result;
-		}
+		memcpy(&hdlc->state.fr.settings, &new_settings, size);
 
 		hdlc->open = fr_open;
 		hdlc->stop = fr_close;
 		hdlc->netif_rx = fr_rx;
-		hdlc->detach = fr_destroy;
+		hdlc->proto_detach = fr_destroy;
 		hdlc->proto = IF_PROTO_FR;
 		dev->hard_start_xmit = hdlc->xmit;
 		dev->hard_header = fr_hard_header;

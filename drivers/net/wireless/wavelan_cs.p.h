@@ -400,6 +400,12 @@
  *		o got rid of wavelan_ioctl()
  *		o use a bunch of iw_handler instead
  *
+ * Changes made for release in 3.2.1 :
+ * ---------------------------------
+ *	- Set dev->trans_start to avoid filling the logs
+ *		(and generating useless abort commands)
+ *	- Avoid deadlocks in mmc_out()/mmc_in()
+ *
  * Wishes & dreams:
  * ----------------
  *	- Cleanup and integrate the roaming code

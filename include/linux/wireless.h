@@ -1,7 +1,7 @@
 /*
  * This file define a set of standard wireless extensions
  *
- * Version :	14	25.1.02
+ * Version :	15	12.7.02
  *
  * Authors :	Jean Tourrilhes - HPL - <jt@hpl.hp.com>
  * Copyright (c) 1997-2002 Jean Tourrilhes, All Rights Reserved.
@@ -80,7 +80,7 @@
  * (there is some stuff that will be added in the future...)
  * I just plan to increment with each new version.
  */
-#define WIRELESS_EXT	14
+#define WIRELESS_EXT	15
 
 /*
  * Changes :
@@ -153,17 +153,32 @@
  *	- Define additional specific event numbers
  *	- Add "addr" and "param" fields in union iwreq_data
  *	- AP scanning stuff (SIOCSIWSCAN and friends)
+ *
+ * V14 to V15
+ * ----------
+ *	- Add IW_PRIV_TYPE_ADDR for struct sockaddr private arg
+ *	- Make struct iw_freq signed (both m & e), add explicit padding
+ *	- Add IWEVCUSTOM for driver specific event/scanning token
+ *	- Add IW_MAX_GET_SPY for driver returning a lot of addresses
+ *	- Add IW_TXPOW_RANGE for range of Tx Powers
+ *	- Add IWEVREGISTERED & IWEVEXPIRED events for Access Points
+ *	- Add IW_MODE_MONITOR for passive monitor
  */
 
 /**************************** CONSTANTS ****************************/
 
 /* -------------------------- IOCTL LIST -------------------------- */
 
-/* Basic operations */
+/* Wireless Identification */
 #define SIOCSIWCOMMIT	0x8B00		/* Commit pending changes to driver */
 #define SIOCGIWNAME	0x8B01		/* get name == wireless protocol */
-#define SIOCSIWNWID	0x8B02		/* set network id (the cell) */
-#define SIOCGIWNWID	0x8B03		/* get network id */
+/* SIOCGIWNAME is used to verify the presence of Wireless Extensions.
+ * Common values : "IEEE 802.11-DS", "IEEE 802.11-FH", "IEEE 802.11b"...
+ * Don't put the name of your driver there, it's useless. */
+
+/* Basic operations */
+#define SIOCSIWNWID	0x8B02		/* set network id (pre-802.11) */
+#define SIOCGIWNWID	0x8B03		/* get network id (the cell) */
 #define SIOCSIWFREQ	0x8B04		/* set channel/frequency (Hz) */
 #define SIOCGIWFREQ	0x8B05		/* get channel/frequency (Hz) */
 #define SIOCSIWMODE	0x8B06		/* set operation mode */
@@ -178,16 +193,18 @@
 #define SIOCGIWPRIV	0x8B0D		/* get private ioctl interface info */
 #define SIOCSIWSTATS	0x8B0E		/* Unused */
 #define SIOCGIWSTATS	0x8B0F		/* Get /proc/net/wireless stats */
+/* SIOCGIWSTATS is strictly used between user space and the kernel, and
+ * is never passed to the driver (i.e. the driver will never see it). */
 
-/* Mobile IP support */
+/* Mobile IP support (statistics per MAC address) */
 #define SIOCSIWSPY	0x8B10		/* set spy addresses */
 #define SIOCGIWSPY	0x8B11		/* get spy info (quality of link) */
 
 /* Access Point manipulation */
 #define SIOCSIWAP	0x8B14		/* set access point MAC addresses */
 #define SIOCGIWAP	0x8B15		/* get access point MAC addresses */
-#define SIOCGIWAPLIST	0x8B17		/* get list of access point in range */
-#define SIOCSIWSCAN	0x8B18		/* trigger scanning */
+#define SIOCGIWAPLIST	0x8B17		/* Deprecated in favor of scanning */
+#define SIOCSIWSCAN	0x8B18		/* trigger scanning (list cells) */
 #define SIOCGIWSCAN	0x8B19		/* get scanning results */
 
 /* 802.11 specific support */
@@ -197,9 +214,7 @@
 #define SIOCGIWNICKN	0x8B1D		/* get node name/nickname */
 /* As the ESSID and NICKN are strings up to 32 bytes long, it doesn't fit
  * within the 'iwreq' structure, so we need to use the 'data' member to
- * point to a string in user space, like it is done for RANGE...
- * The "flags" member indicate if the ESSID is active or not (promiscuous).
- */
+ * point to a string in user space, like it is done for RANGE... */
 
 /* Other parameters useful in 802.11 and some other devices */
 #define SIOCSIWRATE	0x8B20		/* set default bit rate (bps) */
@@ -257,7 +272,10 @@
 /* Most events use the same identifier as ioctl requests */
 
 #define IWEVTXDROP	0x8C00		/* Packet dropped to excessive retry */
-#define IWEVQUAL	0x8C01		/* Quality part of statistics */
+#define IWEVQUAL	0x8C01		/* Quality part of statistics (scan) */
+#define IWEVCUSTOM	0x8C02		/* Driver specific ascii string */
+#define IWEVREGISTERED	0x8C03		/* Discovered a new node (AP mode) */
+#define IWEVEXPIRED	0x8C04		/* Expired a node (AP mode) */
 
 #define IWEVFIRST	0x8C00
 
@@ -273,7 +291,8 @@
 #define IW_PRIV_TYPE_BYTE	0x1000	/* Char as number */
 #define IW_PRIV_TYPE_CHAR	0x2000	/* Char as character */
 #define IW_PRIV_TYPE_INT	0x4000	/* 32 bits int */
-#define IW_PRIV_TYPE_FLOAT	0x5000
+#define IW_PRIV_TYPE_FLOAT	0x5000	/* struct iw_freq */
+#define IW_PRIV_TYPE_ADDR	0x6000	/* struct sockaddr */
 
 #define IW_PRIV_SIZE_FIXED	0x0800	/* Variable or fixed nuber of args */
 
@@ -297,9 +316,12 @@
 
 /* Maximum tx powers in the range struct */
 #define IW_MAX_TXPOWER		8
+/* Note : if you more than 8 TXPowers, just set the max and min or
+ * a few of them in the struct iw_range. */
 
 /* Maximum of address that you may set with SPY */
-#define IW_MAX_SPY		8
+#define IW_MAX_SPY		8	/* set */
+#define IW_MAX_GET_SPY		64	/* get */
 
 /* Maximum of address that you may get in the
    list of access points in range */
@@ -315,6 +337,7 @@
 #define IW_MODE_MASTER	3	/* Synchronisation master or Access Point */
 #define IW_MODE_REPEAT	4	/* Wireless Repeater (forwarder) */
 #define IW_MODE_SECOND	5	/* Secondary master/repeater (backup) */
+#define IW_MODE_MONITOR	6	/* Passive monitor (listen only) */
 
 /* Maximum number of size of encoding token available
  * they are listed in the range structure */
@@ -350,8 +373,10 @@
 #define IW_POWER_RELATIVE	0x0004	/* Value is not in seconds/ms/us */
 
 /* Transmit Power flags available */
+#define IW_TXPOW_TYPE		0x00FF	/* Type of value */
 #define IW_TXPOW_DBM		0x0000	/* Value is in dBm */
 #define IW_TXPOW_MWATT		0x0001	/* Value is in mW */
+#define IW_TXPOW_RANGE		0x1000	/* Range of value between min/max */
 
 /* Retry limits and lifetime flags available */
 #define IW_RETRY_ON		0x0000	/* No details... */
@@ -375,6 +400,9 @@
 #define IW_SCAN_THIS_RATE	0x0080	/* Scan only this Bit-Rate */
 /* Maximum size of returned data */
 #define IW_SCAN_MAX_DATA	4096	/* In bytes */
+
+/* Max number of char in custom event - use multiple of them if needed */
+#define IW_CUSTOM_MAX		256	/* In bytes */
 
 /****************************** TYPES ******************************/
 
@@ -411,9 +439,10 @@ struct	iw_point
  */
 struct	iw_freq
 {
-	__u32		m;		/* Mantissa */
-	__u16		e;		/* Exponent */
+	__s32		m;		/* Mantissa */
+	__s16		e;		/* Exponent */
 	__u8		i;		/* List index (when in range struct) */
+	__u8		pad;		/* Unused - just for alignement */
 };
 
 /*

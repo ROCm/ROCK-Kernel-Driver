@@ -1,7 +1,7 @@
 /*
  * SDL Inc. RISCom/N2 synchronous serial card driver for Linux
  *
- * Copyright (C) 1998-2001 Krzysztof Halasa <khc@pm.waw.pl>
+ * Copyright (C) 1998-2002 Krzysztof Halasa <khc@pm.waw.pl>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -35,7 +35,7 @@
 #include "hd64570.h"
 
 
-static const char* version = "SDL RISCom/N2 driver version: 1.09";
+static const char* version = "SDL RISCom/N2 driver version: 1.10";
 static const char* devname = "RISCom/N2";
 
 #define USE_WINDOWSIZE 16384
@@ -159,7 +159,7 @@ static __inline__ void close_windows(card_t *card)
 
 
 
-static int n2_set_iface(port_t *port)
+static void n2_set_iface(port_t *port)
 {
 	card_t *card = port->card;
 	int io = card->io;
@@ -169,12 +169,6 @@ static int n2_set_iface(port_t *port)
 	u8 txs = port->txs & CLK_BRG_MASK;
 
 	switch(port->settings.clock_type) {
-	case CLOCK_EXT:
-		mcr &= port->phy_node ? ~CLOCK_OUT_PORT1 : ~CLOCK_OUT_PORT0;
-		rxs |= CLK_LINE_RX; /* RXC input */
-		txs |= CLK_LINE_TX; /* TXC input */
-		break;
-
 	case CLOCK_INT:
 		mcr |= port->phy_node ? CLOCK_OUT_PORT1 : CLOCK_OUT_PORT0;
 		rxs |= CLK_BRG_RX; /* BRG output */
@@ -193,8 +187,10 @@ static int n2_set_iface(port_t *port)
 		txs |= CLK_RXCLK_TX; /* RX clock */
 		break;
 
-	default:
-		return -EINVAL;
+	default:		/* Clock EXTernal */
+		mcr &= port->phy_node ? ~CLOCK_OUT_PORT1 : ~CLOCK_OUT_PORT0;
+		rxs |= CLK_LINE_RX; /* RXC input */
+		txs |= CLK_LINE_TX; /* TXC input */
 	}
 
 	outb(mcr, io + N2_MCR);
@@ -203,7 +199,6 @@ static int n2_set_iface(port_t *port)
 	sca_out(rxs, msci + RXS, card);
 	sca_out(txs, msci + TXS, card);
 	sca_set_port(port);
-	return 0;
 }
 
 
@@ -226,7 +221,8 @@ static int n2_open(struct net_device *dev)
 	outb(inb(io + N2_PCR) | PCR_ENWIN, io + N2_PCR); /* open window */
 	outb(inb(io + N2_PSR) | PSR_DMAEN, io + N2_PSR); /* enable dma */
 	sca_open(hdlc);
-	return n2_set_iface(port);
+	n2_set_iface(port);
+	return 0;
 }
 
 
@@ -252,6 +248,7 @@ static int n2_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
 	union line_settings *line = &ifr->ifr_settings->ifs_line;
 	const size_t size = sizeof(sync_serial_settings);
+	sync_serial_settings new_line;
 	hdlc_device *hdlc = dev_to_hdlc(dev);
 	port_t *port = hdlc_to_port(hdlc);
 
@@ -275,10 +272,21 @@ static int n2_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		if(!capable(CAP_NET_ADMIN))
 			return -EPERM;
 
-		if (copy_from_user(&port->settings, &line->sync, size))
+		if (copy_from_user(&new_line, &line->sync, size))
 			return -EFAULT;
-		/* FIXME - put sanity checks here */
-		return n2_set_iface(port);
+
+		if (new_line.clock_type != CLOCK_EXT &&
+		    new_line.clock_type != CLOCK_TXFROMRX &&
+		    new_line.clock_type != CLOCK_INT &&
+		    new_line.clock_type != CLOCK_TXINT)
+		return -EINVAL;	/* No such clock setting */
+
+		if (new_line.loopback != 0 && new_line.loopback != 1)
+			return -EINVAL;
+
+		memcpy(&port->settings, &new_line, size); /* Update settings */
+		n2_set_iface(port);
+		return 0;
 
 	default:
 		return hdlc_ioctl(dev, ifr, cmd);

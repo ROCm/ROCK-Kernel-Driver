@@ -236,6 +236,9 @@ static struct hp100_eisa_id hp100_eisa_ids[] = {
 	/* 10/100 ISA card with Cascade chip */
 	{0x5019F022, "HP J2573", HP100_BUS_ISA},
 
+	/* 10/100 EISA card with AT&T chip */
+	{0x9019f022, "HP J2577", HP100_BUS_EISA },
+
 	/* 10/100 PCI card - old J2585A */
 	{0x1030103c, "HP J2585A", HP100_BUS_PCI},
 
@@ -1879,7 +1882,7 @@ static void hp100_rx(struct net_device *dev)
 #endif
 
 		/* Now we allocate the skb and transfer the data into it. */
-		skb = dev_alloc_skb(pkt_len);
+		skb = dev_alloc_skb(pkt_len+2);
 		if (skb == NULL) {	/* Not enough memory->drop packet */
 #ifdef HP100_DEBUG
 			printk("hp100: %s: rx: couldn't allocate a sk_buff of size %d\n",
@@ -1890,10 +1893,12 @@ static void hp100_rx(struct net_device *dev)
 
 			u_char *ptr;
 
+			skb_reserve(skb,2);
 			skb->dev = dev;
 
 			/* ptr to start of the sk_buff data area */
-			ptr = (u_char *) skb_put(skb, pkt_len);
+			skb_put(skb, pkt_len);
+			ptr = skb->data;
 
 			/* Now transfer the data from the card into that area */
 			if (lp->mode == 2) {

@@ -658,6 +658,8 @@ static int __devinit speedo_found1(struct pci_dev *pdev,
 		return -1;
 	}
 
+	SET_MODULE_OWNER(dev);
+
 	if (dev->mem_start > 0)
 		option = dev->mem_start;
 	else if (card_idx >= 0  &&  options[card_idx] >= 0)
@@ -919,7 +921,6 @@ static int mdio_write(long ioaddr, int phy_id, int location, int value)
 	return val & 0xffff;
 }
 
-
 static int
 speedo_open(struct net_device *dev)
 {
@@ -929,8 +930,6 @@ speedo_open(struct net_device *dev)
 
 	if (speedo_debug > 1)
 		printk(KERN_DEBUG "%s: speedo_open() irq %d.\n", dev->name, dev->irq);
-
-	MOD_INC_USE_COUNT;
 
 	pci_set_power_state(sp->pdev, 0);
 
@@ -945,7 +944,6 @@ speedo_open(struct net_device *dev)
 	/* .. we can safely take handler calls during init. */
 	retval = request_irq(dev->irq, &speedo_interrupt, SA_SHIRQ, dev->name, dev);
 	if (retval) {
-		MOD_DEC_USE_COUNT;
 		return retval;
 	}
 
@@ -1885,8 +1883,6 @@ speedo_close(struct net_device *dev)
 		printk(KERN_DEBUG "%s: %d multicast blocks dropped.\n", dev->name, i);
 
 	pci_set_power_state(sp->pdev, 2);
-
-	MOD_DEC_USE_COUNT;
 
 	return 0;
 }

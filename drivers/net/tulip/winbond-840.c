@@ -1136,13 +1136,7 @@ static void netdev_tx_done(struct net_device *dev)
 			if (tx_status & 0x0002) np->stats.tx_fifo_errors++;
 			if ((tx_status & 0x0080) && np->mii_if.full_duplex == 0)
 				np->stats.tx_heartbeat_errors++;
-#ifdef ETHER_STATS
-			if (tx_status & 0x0100) np->stats.collisions16++;
-#endif
 		} else {
-#ifdef ETHER_STATS
-			if (tx_status & 0x0001) np->stats.tx_deferred++;
-#endif
 #ifndef final_version
 			if (debug > 3)
 				printk(KERN_DEBUG "%s: Transmit slot %d ok, Tx status %8.8x.\n",

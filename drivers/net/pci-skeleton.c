@@ -1411,10 +1411,6 @@ static void netdrv_tx_interrupt (struct net_device *dev,
 				tp->stats.tx_carrier_errors++;
 			if (txstatus & TxOutOfWindow)
 				tp->stats.tx_window_errors++;
-#ifdef ETHER_STATS
-			if ((txstatus & 0x0f000000) == 0x0f000000)
-				tp->stats.collisions16++;
-#endif
 		} else {
 			if (txstatus & TxUnderrun) {
 				/* Add 64 to the Tx FIFO threshold. */

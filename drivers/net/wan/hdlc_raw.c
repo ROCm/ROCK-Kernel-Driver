@@ -39,35 +39,40 @@ int hdlc_raw_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
 {
 	raw_hdlc_proto *raw_s = &ifr->ifr_settings->ifs_hdlc.raw_hdlc;
 	const size_t size = sizeof(raw_hdlc_proto);
+	raw_hdlc_proto new_settings;
 	struct net_device *dev = hdlc_to_dev(hdlc);
 	int result;
 
 	switch (ifr->ifr_settings->type) {
 	case IF_GET_PROTO:
+		ifr->ifr_settings->type = IF_PROTO_HDLC;
 		if (copy_to_user(raw_s, &hdlc->state.raw_hdlc.settings, size))
 			return -EFAULT;
 		return 0;
 
 	case IF_PROTO_HDLC:
-		if(!capable(CAP_NET_ADMIN))
+		if (!capable(CAP_NET_ADMIN))
 			return -EPERM;
 
-		if(dev->flags & IFF_UP)
+		if (dev->flags & IFF_UP)
 			return -EBUSY;
 
-		if (copy_from_user(&hdlc->state.raw_hdlc.settings, raw_s, size))
+		if (copy_from_user(&new_settings, raw_s, size))
 			return -EFAULT;
 
+		if (new_settings.encoding == ENCODING_DEFAULT)
+			new_settings.encoding = ENCODING_NRZ;
 
-		/* FIXME - put sanity checks here */
-		hdlc_detach(hdlc);
+		if (new_settings.parity == PARITY_DEFAULT)
+			new_settings.parity = PARITY_NONE;
 
-		result=hdlc->attach(hdlc, hdlc->state.raw_hdlc.settings.encoding,
-				    hdlc->state.raw_hdlc.settings.parity);
-		if (result) {
-			hdlc->proto = -1;
+		result = hdlc->attach(hdlc, new_settings.encoding,
+				      new_settings.parity);
+		if (result)
 			return result;
-		}
+
+		hdlc_proto_detach(hdlc);
+		memcpy(&hdlc->state.raw_hdlc.settings, &new_settings, size);
 
 		hdlc->open = NULL;
 		hdlc->stop = NULL;

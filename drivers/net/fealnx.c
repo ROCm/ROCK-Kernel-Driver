@@ -1493,16 +1493,7 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 					if ((tx_status & HF) && np->mii.full_duplex == 0)
 						np->stats.tx_heartbeat_errors++;
 
-#ifdef ETHER_STATS
-					if (tx_status & EC)
-						np->stats.collisions16++;
-#endif
 				} else {
-#ifdef ETHER_STATS
-					if (tx_status & DFR)
-						np->stats.tx_deferred++;
-#endif
-
 					np->stats.tx_bytes +=
 					    ((tx_control & PKTSMask) >> PKTSShift);
 
@@ -1544,9 +1535,6 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 			np->stats.tx_errors += (data & 0xff000000) >> 24;
 			np->stats.tx_aborted_errors += (data & 0xff000000) >> 24;
 			np->stats.tx_window_errors += (data & 0x00ff0000) >> 16;
-#ifdef ETHER_STATS
-			np->stats.collisions16 += (data & 0xff000000) >> 24;
-#endif
 			np->stats.collisions += (data & 0x0000ffff);
 		}
 

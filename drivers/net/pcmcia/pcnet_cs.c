@@ -66,7 +66,7 @@
 #define SOCKET_START_PG	0x01
 #define SOCKET_STOP_PG	0xff
 
-#define PCNET_RDC_TIMEOUT 0x02	/* Max wait in jiffies for Tx RDC */
+#define PCNET_RDC_TIMEOUT (2*HZ/100)	/* Max wait in jiffies for Tx RDC */
 
 static char *if_names[] = { "auto", "10baseT", "10base2"};
 
@@ -1188,7 +1188,7 @@ static void ei_watchdog(u_long arg)
 	}
 	info->link_status = link;
     }
-    if (info->pna_phy && (jiffies - info->mii_reset > 6*HZ)) {
+    if (info->pna_phy && time_after(jiffies, info->mii_reset + 6*HZ)) {
 	link = mdio_read(mii_addr, info->eth_phy, 1) & 0x0004;
 	if (((info->phy_id == info->pna_phy) && link) ||
 	    ((info->phy_id != info->pna_phy) && !link)) {
@@ -1426,7 +1426,7 @@ static void dma_block_output(struct net_device *dev, int count,
 #endif
 
     while ((inb_p(nic_base + EN0_ISR) & ENISR_RDC) == 0)
-	if (jiffies - dma_start > PCNET_RDC_TIMEOUT) {
+	if (time_after(jiffies, dma_start + PCNET_RDC_TIMEOUT)) {
 	    printk(KERN_NOTICE "%s: timeout waiting for Tx RDC.\n",
 		   dev->name);
 	    pcnet_reset_8390(dev);

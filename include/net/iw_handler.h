@@ -1,7 +1,7 @@
 /*
  * This file define the new driver API for Wireless Extensions
  *
- * Version :	3	17.1.02
+ * Version :	4	21.6.02
  *
  * Authors :	Jean Tourrilhes - HPL - <jt@hpl.hp.com>
  * Copyright (c) 2001-2002 Jean Tourrilhes, All Rights Reserved.
@@ -206,7 +206,7 @@
  * will be needed...
  * I just plan to increment with each new version.
  */
-#define IW_HANDLER_VERSION	3
+#define IW_HANDLER_VERSION	4
 
 /*
  * Changes :
@@ -217,6 +217,9 @@
  *	- Add Wireless Event support :
  *		o wireless_send_event() prototype
  *		o iwe_stream_add_event/point() inline functions
+ * V3 to V4
+ * --------
+ *	- Reshuffle IW_HEADER_TYPE_XXX to map IW_PRIV_TYPE_XXX changes
  */
 
 /**************************** CONSTANTS ****************************/
@@ -233,10 +236,10 @@
 #define IW_HEADER_TYPE_CHAR	2	/* char [IFNAMSIZ] */
 #define IW_HEADER_TYPE_UINT	4	/* __u32 */
 #define IW_HEADER_TYPE_FREQ	5	/* struct iw_freq */
-#define IW_HEADER_TYPE_POINT	6	/* struct iw_point */
-#define IW_HEADER_TYPE_PARAM	7	/* struct iw_param */
-#define IW_HEADER_TYPE_ADDR	8	/* struct sockaddr */
-#define IW_HEADER_TYPE_QUAL	9	/* struct iw_quality */
+#define IW_HEADER_TYPE_ADDR	6	/* struct sockaddr */
+#define IW_HEADER_TYPE_POINT	8	/* struct iw_point */
+#define IW_HEADER_TYPE_PARAM	9	/* struct iw_param */
+#define IW_HEADER_TYPE_QUAL	10	/* struct iw_quality */
 
 /* Handling flags */
 /* Most are not implemented. I just use them as a reminder of some

@@ -75,6 +75,61 @@ static const char *block_name[] __devinitdata = {
 };
 
 
+/**
+ * tulip_build_fake_mediatable - Build a fake mediatable entry.
+ * @tp: Ptr to the tulip private data.
+ *
+ * Some cards like the 3x5 HSC cards (J3514A) do not have a standard 
+ * srom and can not be handled under the fixup routine.  These cards
+ * still need a valid mediatable entry for correct csr12 setup and 
+ * mii handling.
+ * 
+ * Since this is currently a parisc-linux specific function, the
+ * #ifdef __hppa__ should completely optimize this function away for
+ * non-parisc hardware.
+ */
+static void __devinit tulip_build_fake_mediatable(struct tulip_private *tp)
+{
+#ifdef __hppa__
+	unsigned char *ee_data = tp->eeprom;
+
+	if (ee_data[0] == 0x3c && ee_data[1] == 0x10 && 
+		(ee_data[2] == 0x63 || ee_data[2] == 0x61) && ee_data[3] == 0x10) {
+
+		static unsigned char leafdata[] =
+			{ 0x01,       /* phy number */
+			  0x02,       /* gpr setup sequence length */
+			  0x02, 0x00, /* gpr setup sequence */
+			  0x02,       /* phy reset sequence length */
+			  0x01, 0x00, /* phy reset sequence */
+			  0x00, 0x78, /* media capabilities */
+			  0x00, 0xe0, /* nway advertisment */
+			  0x00, 0x05, /* fdx bit map */
+			  0x00, 0x06  /* ttm bit map */
+			};
+
+		tp->mtable = (struct mediatable *)
+			kmalloc(sizeof(struct mediatable) + sizeof(struct medialeaf), GFP_KERNEL);
+
+		if (tp->mtable == NULL)
+			return; /* Horrible, impossible failure. */
+
+		tp->mtable->defaultmedia = 0x800;
+		tp->mtable->leafcount = 1;
+		tp->mtable->csr12dir = 0x3f; /* inputs on bit7 for hsc-pci, bit6 for pci-fx */
+		tp->mtable->has_nonmii = 0;
+		tp->mtable->has_reset = 0;
+		tp->mtable->has_mii = 1;
+		tp->mtable->csr15dir = tp->mtable->csr15val = 0;
+		tp->mtable->mleaf[0].type = 1;
+		tp->mtable->mleaf[0].media = 11;
+		tp->mtable->mleaf[0].leafdata = &leafdata[0];
+		tp->flags |= HAS_PHY_IRQ;
+		tp->csr12_shadow = -1;
+	}
+#endif 
+}
+
 void __devinit tulip_parse_eeprom(struct net_device *dev)
 {
 	/* The last media info list parsed, for multiport boards.  */
@@ -136,6 +191,7 @@ void __devinit tulip_parse_eeprom(struct net_device *dev)
 subsequent_board:
 
 	if (ee_data[27] == 0) {		/* No valid media table. */
+		tulip_build_fake_mediatable(tp);
 	} else {
 		unsigned char *p = (void *)ee_data + ee_data[27];
 		unsigned char csr12dir = 0;

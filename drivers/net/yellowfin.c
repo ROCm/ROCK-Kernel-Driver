@@ -1025,17 +1025,11 @@ static void yellowfin_interrupt(int irq, void *dev_instance, struct pt_regs *reg
 					if (tx_errs & 0x0800) yp->stats.tx_carrier_errors++;
 					if (tx_errs & 0x2000) yp->stats.tx_window_errors++;
 					if (tx_errs & 0x8000) yp->stats.tx_fifo_errors++;
-#ifdef ETHER_STATS
-					if (tx_errs & 0x1000) yp->stats.collisions16++;
-#endif
 				} else {
 #ifndef final_version
 					if (yellowfin_debug > 4)
 						printk(KERN_DEBUG "%s: Normal transmit, Tx status %4.4x.\n",
 							   dev->name, tx_errs);
-#endif
-#ifdef ETHER_STATS
-					if (tx_errs & 0x0400) yp->stats.tx_deferred++;
 #endif
 					yp->stats.tx_bytes += skb->len;
 					yp->stats.collisions += tx_errs & 15;

@@ -55,11 +55,9 @@
 #include "falc-lh.h"
 #endif
 
-MODULE_AUTHOR
-    ("Bartok Istvan <bartoki@itc.hu>, Gergely Madarasz <gorgo@itc.hu>, Szilard Pasztor <don@itc.hu>");
-MODULE_DESCRIPTION
-    ("Hardware-level driver for the SliceCOM and PciCOM (WelCOM) adapters");
-
+MODULE_AUTHOR("Bartok Istvan <bartoki@itc.hu>, Gergely Madarasz <gorgo@itc.hu>, Szilard Pasztor <don@itc.hu>");
+MODULE_DESCRIPTION("Hardware-level driver for the SliceCOM and PciCOM (WelCOM) adapters");
+MODULE_LICENSE("GPL");
 /*
  *	TODO: az ilyenek a comxhw.h -ban szoktak lenni, idovel menjenek majd oda:
  */
@@ -1253,8 +1251,6 @@ static void MUNICH_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	/* jon interrupt, de nincs mit feldolgozni, akkor torlom a STAT-ot.     */
 	/* 'needs a rewrite', de elso megoldasnak jo lesz                       */
 //              {
-
-udelay(10000);
 	int_info = board->tiq[board->tiq_ptr];
 	if (int_info.all & 0xF0000000)	/* ha ez nem 0, akkor itt interrupt_info van    */
 	{
@@ -2779,8 +2775,6 @@ static int BOARD_init(struct net_device *dev)
 static int BOARD_exit(struct net_device *dev)
 {
     struct comx_channel *ch = (struct comx_channel *)dev->priv;
-    struct slicecom_privdata *hw = ch->HW_privdata;
-//    munich_board_t *board;
 
     /* Free private data area */
 //    board = hw->boardnum + (ch->hardware == &pcicomhw ? pcicom_boards : slicecom_boards);

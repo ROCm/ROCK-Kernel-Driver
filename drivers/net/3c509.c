@@ -692,7 +692,7 @@ el3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	outw(0x00, ioaddr + TX_FIFO);
 	/* ... and the packet rounded to a doubleword. */
 #ifdef  __powerpc__
-	outsl_unswapped(ioaddr + TX_FIFO, skb->data, (skb->len + 3) >> 2);
+	outsl_ns(ioaddr + TX_FIFO, skb->data, (skb->len + 3) >> 2);
 #else
 	outsl(ioaddr + TX_FIFO, skb->data, (skb->len + 3) >> 2);
 #endif
@@ -903,7 +903,7 @@ el3_rx(struct net_device *dev)
 
 				/* 'skb->data' points to the start of sk_buff data area. */
 #ifdef  __powerpc__
-				insl_unswapped(ioaddr+RX_FIFO, skb_put(skb,pkt_len),
+				insl_ns(ioaddr+RX_FIFO, skb_put(skb,pkt_len),
 							   (pkt_len + 3) >> 2);
 #else
 				insl(ioaddr + RX_FIFO, skb_put(skb,pkt_len),

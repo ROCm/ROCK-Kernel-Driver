@@ -324,6 +324,7 @@ struct site_survey {
 typedef struct netwave_private {
     dev_link_t link;
     struct net_device      dev;
+    spinlock_t	spinlock;	/* Serialize access to the hardware (SMP) */
     dev_node_t node;
     u_char     *ramBase;
     int        timeoutCounter;
@@ -415,8 +416,7 @@ static struct iw_statistics *netwave_get_wireless_stats(struct net_device *dev)
 	
     wstats = &priv->iw_stats;
 
-    save_flags(flags);
-    cli();
+    spin_lock_irqsave(&priv->spinlock, flags);
 	
     netwave_snapshot( priv, ramBase, iobase);
 
@@ -428,7 +428,7 @@ static struct iw_statistics *netwave_get_wireless_stats(struct net_device *dev)
     wstats->discard.code = 0L;
     wstats->discard.misc = 0L;
 
-    restore_flags(flags);
+    spin_unlock_irqrestore(&priv->spinlock, flags);
     
     return &priv->iw_stats;
 }
@@ -490,6 +490,10 @@ static dev_link_t *netwave_attach(void)
     link->conf.IntType = INT_MEMORY_AND_IO;
     link->conf.ConfigIndex = 1;
     link->conf.Present = PRESENT_OPTION;
+
+    /* Netwave private struct init. link/dev/node already taken care of,
+     * other stuff zero'd - Jean II */
+    spin_lock_init(&priv->spinlock);
 
     /* Netwave specific entries in the device structure */
     dev->hard_start_xmit = &netwave_start_xmit;
@@ -640,8 +644,7 @@ static int netwave_set_nwid(struct net_device *dev,
 	u_char *ramBase = priv->ramBase;
 
 	/* Disable interrupts & save flags */
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&priv->spinlock, flags);
 
 #if WIRELESS_EXT > 8
 	if(!wrqu->nwid.disabled) {
@@ -660,7 +663,7 @@ static int netwave_set_nwid(struct net_device *dev,
 	}
 
 	/* ReEnable interrupts & restore flags */
-	restore_flags(flags);
+	spin_unlock_irqrestore(&priv->spinlock, flags);
     
 	return 0;
 }
@@ -699,8 +702,7 @@ static int netwave_set_scramble(struct net_device *dev,
 	u_char *ramBase = priv->ramBase;
 
 	/* Disable interrupts & save flags */
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&priv->spinlock, flags);
 
 	scramble_key = (key[0] << 8) | key[1];
 	wait_WOC(iobase);
@@ -710,7 +712,7 @@ static int netwave_set_scramble(struct net_device *dev,
 	writeb(NETWAVE_CMD_EOC, ramBase + NETWAVE_EREG_CB + 3);
 
 	/* ReEnable interrupts & restore flags */
-	restore_flags(flags);
+	spin_unlock_irqrestore(&priv->spinlock, flags);
     
 	return 0;
 }
@@ -816,8 +818,7 @@ static int netwave_get_snap(struct net_device *dev,
 	u_char *ramBase = priv->ramBase;
 
 	/* Disable interrupts & save flags */
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&priv->spinlock, flags);
 
 	/* Take snapshot of environment */
 	netwave_snapshot( priv, ramBase, iobase);
@@ -827,7 +828,7 @@ static int netwave_get_snap(struct net_device *dev,
 	priv->lastExec = jiffies;
 
 	/* ReEnable interrupts & restore flags */
-	restore_flags(flags);
+	spin_unlock_irqrestore(&priv->spinlock, flags);
     
 	return(0);
 }
@@ -1376,8 +1377,7 @@ static int netwave_hw_xmit(unsigned char* data, int len,
     ioaddr_t iobase = dev->base_addr;
 
     /* Disable interrupts & save flags */
-    save_flags(flags);
-    cli();
+    spin_lock_irqsave(&priv->spinlock, flags);
 
     /* Check if there are transmit buffers available */
     wait_WOC(iobase);
@@ -1385,7 +1385,7 @@ static int netwave_hw_xmit(unsigned char* data, int len,
 	/* No buffers available */
 	printk(KERN_DEBUG "netwave_hw_xmit: %s - no xmit buffers available.\n",
 	       dev->name);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&priv->spinlock, flags);
 	return 1;
     }
 
@@ -1426,7 +1426,7 @@ static int netwave_hw_xmit(unsigned char* data, int len,
     writeb((len>>8) & 0xff, ramBase + NETWAVE_EREG_CB + 2);
     writeb(NETWAVE_CMD_EOC, ramBase + NETWAVE_EREG_CB + 3);
 
-    restore_flags( flags);
+    spin_unlock_irqrestore(&priv->spinlock, flags);
     return 0;
 }
 
@@ -1618,16 +1618,15 @@ static struct net_device_stats *netwave_get_stats(struct net_device *dev) {
 }
 
 static void update_stats(struct net_device *dev) {
-    unsigned long flags;
+    //unsigned long flags;
+/*     netwave_private *priv = (netwave_private*) dev->priv; */
 
-    save_flags(flags);
-    cli();
+    //spin_lock_irqsave(&priv->spinlock, flags);
 
-/*     netwave_private *priv = (netwave_private*) dev->priv;
-    priv->stats.rx_packets = readb(priv->ramBase + 0x18e); 
+/*    priv->stats.rx_packets = readb(priv->ramBase + 0x18e); 
     priv->stats.tx_packets = readb(priv->ramBase + 0x18f); */
 
-    restore_flags(flags);
+    //spin_unlock_irqrestore(&priv->spinlock, flags);
 }
 
 static int netwave_rx(struct net_device *dev) {

@@ -38,7 +38,7 @@
 #include <linux/hdlc.h>
 
 
-static const char* version = "HDLC support module revision 1.08";
+static const char* version = "HDLC support module revision 1.10";
 
 
 static int hdlc_change_mtu(struct net_device *dev, int new_mtu)
@@ -66,6 +66,26 @@ static int hdlc_rcv(struct sk_buff *skb, struct net_device *dev,
 }
 
 
+#ifndef CONFIG_HDLC_RAW
+#define hdlc_raw_ioctl(hdlc, ifr)	-ENOSYS
+#endif
+
+#ifndef CONFIG_HDLC_PPP
+#define hdlc_ppp_ioctl(hdlc, ifr)	-ENOSYS
+#endif
+
+#ifndef CONFIG_HDLC_CISCO
+#define hdlc_cisco_ioctl(hdlc, ifr)	-ENOSYS
+#endif
+
+#ifndef CONFIG_HDLC_FR
+#define hdlc_fr_ioctl(hdlc, ifr)	-ENOSYS
+#endif
+
+#ifndef CONFIG_HDLC_X25
+#define hdlc_x25_ioctl(hdlc, ifr)	-ENOSYS
+#endif
+
 
 int hdlc_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
@@ -89,22 +109,12 @@ int hdlc_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	}
 
 	switch(proto) {
-#ifdef CONFIG_HDLC_RAW
 	case IF_PROTO_HDLC:	return hdlc_raw_ioctl(hdlc, ifr);
-#endif
-#ifdef CONFIG_HDLC_PPP
 	case IF_PROTO_PPP:	return hdlc_ppp_ioctl(hdlc, ifr);
-#endif
-#ifdef CONFIG_HDLC_CISCO
 	case IF_PROTO_CISCO:	return hdlc_cisco_ioctl(hdlc, ifr);
-#endif
-#ifdef CONFIG_HDLC_FR
 	case IF_PROTO_FR:	return hdlc_fr_ioctl(hdlc, ifr);
-#endif
-#ifdef CONFIG_HDLC_X25
 	case IF_PROTO_X25:	return hdlc_x25_ioctl(hdlc, ifr);
-#endif
-	default:		return -ENOSYS;
+	default:		return -EINVAL;
 	}
 }
 
@@ -125,7 +135,7 @@ int register_hdlc_device(hdlc_device *hdlc)
 	dev->flags = IFF_POINTOPOINT | IFF_NOARP;
 
 	hdlc->proto = -1;
-	hdlc->detach = NULL;
+	hdlc->proto_detach = NULL;
 
 	result = dev_alloc_name(dev, "hdlc%d");
 	if (result<0)
@@ -143,7 +153,7 @@ int register_hdlc_device(hdlc_device *hdlc)
 
 void unregister_hdlc_device(hdlc_device *hdlc)
 {
-	hdlc_detach(hdlc);
+	hdlc_proto_detach(hdlc);
 
 	unregister_netdev(hdlc_to_dev(hdlc));
 	MOD_DEC_USE_COUNT;

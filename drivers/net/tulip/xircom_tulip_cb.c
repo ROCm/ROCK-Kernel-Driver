@@ -1105,9 +1105,6 @@ static void xircom_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 					tp->stats.tx_errors++;
 					if (status & Tx0ManyColl) {
 						tp->stats.tx_aborted_errors++;
-#ifdef ETHER_STATS
-						tp->stats.collisions16++;
-#endif
 					}
 					if (status & Tx0NoCarrier) tp->stats.tx_carrier_errors++;
 					if (status & Tx0LateColl) tp->stats.tx_window_errors++;

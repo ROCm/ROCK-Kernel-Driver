@@ -312,8 +312,11 @@ static void update_psa_checksum(device * dev, unsigned long ioaddr, u16 hacr)
  */
 static inline void mmc_out(unsigned long ioaddr, u16 o, u8 d)
 {
+	int count = 0;
+
 	/* Wait for MMC to go idle */
-	while (inw(HASR(ioaddr)) & HASR_MMC_BUSY);
+	while ((count++ < 100) && (inw(HASR(ioaddr)) & HASR_MMC_BUSY))
+		udelay(10);
 
 	outw((u16) (((u16) d << 8) | (o << 1) | 1), MMCR(ioaddr));
 }
@@ -339,10 +342,14 @@ static inline void mmc_write(unsigned long ioaddr, u8 o, u8 * b, int n)
  */
 static inline u8 mmc_in(unsigned long ioaddr, u16 o)
 {
-	while (inw(HASR(ioaddr)) & HASR_MMC_BUSY);
+	int count = 0;
+
+	while ((count++ < 100) && (inw(HASR(ioaddr)) & HASR_MMC_BUSY))
+		udelay(10);
 	outw(o << 1, MMCR(ioaddr));
 
-	while (inw(HASR(ioaddr)) & HASR_MMC_BUSY);
+	while ((count++ < 100) && (inw(HASR(ioaddr)) & HASR_MMC_BUSY))
+		udelay(10);
 	return (u8) (inw(MMCR(ioaddr)) >> 8);
 }
 
@@ -2958,6 +2965,9 @@ static inline int wv_packet_write(device * dev, void *buf, short length)
 		    (unsigned char *) &nop.nop_h.ac_link,
 		    sizeof(nop.nop_h.ac_link));
 
+	/* Make sure the watchdog will keep quiet for a while */
+	dev->trans_start = jiffies;
+
 	/* Keep stats up to date. */
 	lp->stats.tx_bytes += length;
 
@@ -3874,29 +3884,48 @@ static void wavelan_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	 * the spinlock. */
 	spin_lock(&lp->spinlock);
 
+	/* We always had spurious interrupts at startup, but lately I
+	 * saw them comming *between* the request_irq() and the
+	 * spin_lock_irqsave() in wavelan_open(), so the spinlock
+	 * protection is no enough.
+	 * So, we also check lp->hacr that will tell us is we enabled
+	 * irqs or not (see wv_ints_on()).
+	 * We can't use netif_running(dev) because we depend on the
+	 * proper processing of the irq generated during the config. */
+
+	/* Which interrupt it is ? */
+	hasr = hasr_read(ioaddr);
+
+#ifdef DEBUG_INTERRUPT_INFO
+	printk(KERN_INFO
+	       "%s: wavelan_interrupt(): hasr 0x%04x; hacr 0x%04x.\n",
+	       dev->name, hasr, lp->hacr);
+#endif
+
 	/* Check modem interrupt */
-	if ((hasr = hasr_read(ioaddr)) & HASR_MMC_INTR) {
+	if ((hasr & HASR_MMC_INTR) && (lp->hacr & HACR_MMC_INT_ENABLE)) {
 		u8 dce_status;
 
+#ifdef DEBUG_INTERRUPT_ERROR
+		printk(KERN_INFO
+		       "%s: wavelan_interrupt(): unexpected mmc interrupt: status 0x%04x.\n",
+		       dev->name, dce_status);
+#endif
 		/*
 		 * Interrupt from the modem management controller.
 		 * This will clear it -- ignored for now.
 		 */
 		mmc_read(ioaddr, mmroff(0, mmr_dce_status), &dce_status,
 			 sizeof(dce_status));
-#ifdef DEBUG_INTERRUPT_ERROR
-		printk(KERN_INFO
-		       "%s: wavelan_interrupt(): unexpected mmc interrupt: status 0x%04x.\n",
-		       dev->name, dce_status);
-#endif
 	}
 
 	/* Check if not controller interrupt */
-	if ((hasr & HASR_82586_INTR) == 0) {
+	if (((hasr & HASR_82586_INTR) == 0) ||
+	    ((lp->hacr & HACR_82586_INT_ENABLE) == 0)) {
 #ifdef DEBUG_INTERRUPT_ERROR
 		printk(KERN_INFO
-		       "%s: wavelan_interrupt(): interrupt not coming from i82586\n",
-		       dev->name);
+		       "%s: wavelan_interrupt(): interrupt not coming from i82586 - hasr 0x%04x.\n",
+		       dev->name, hasr);
 #endif
 		spin_unlock (&lp->spinlock);
 		return;
