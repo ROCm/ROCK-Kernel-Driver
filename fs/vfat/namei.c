@@ -714,7 +714,7 @@ shortname:
 	PRINTK3(("vfat_fill_slots 9\n"));
 	/* build the entry of 8.3 alias name */
 	(*slots)++;
-	strncpy(de->name, msdos_name, MSDOS_NAME);
+	memcpy(de->name, msdos_name, MSDOS_NAME);
 	de->attr = is_dir ? ATTR_DIR : ATTR_ARCH;
 	de->lcase = lcase;
 	de->adate = de->cdate = de->date = 0;
@@ -901,8 +901,7 @@ static void vfat_remove_entry(struct inode *dir,struct vfat_slot_info *sinfo,
 	int i;
 
 	/* remove the shortname */
-	dir->i_mtime = CURRENT_TIME;
-	dir->i_atime = CURRENT_TIME;
+	dir->i_mtime = dir->i_atime = CURRENT_TIME;
 	dir->i_version++;
 	mark_inode_dirty(dir);
 	de->name[0] = DELETED_FLAG;
@@ -939,8 +938,7 @@ int vfat_rmdir(struct inode *dir,struct dentry* dentry)
 		return res;
 	}
 	dentry->d_inode->i_nlink = 0;
-	dentry->d_inode->i_mtime = CURRENT_TIME;
-	dentry->d_inode->i_atime = CURRENT_TIME;
+	dentry->d_inode->i_mtime = dentry->d_inode->i_atime = CURRENT_TIME;
 	fat_detach(dentry->d_inode);
 	mark_inode_dirty(dentry->d_inode);
 	/* releases bh */
@@ -965,8 +963,7 @@ int vfat_unlink(struct inode *dir, struct dentry* dentry)
 		return res;
 	}
 	dentry->d_inode->i_nlink = 0;
-	dentry->d_inode->i_mtime = CURRENT_TIME;
-	dentry->d_inode->i_atime = CURRENT_TIME;
+	dentry->d_inode->i_mtime = dentry->d_inode->i_atime = CURRENT_TIME;
 	fat_detach(dentry->d_inode);
 	mark_inode_dirty(dentry->d_inode);
 	/* releases bh */
@@ -1013,8 +1010,7 @@ out:
 
 mkdir_failed:
 	inode->i_nlink = 0;
-	inode->i_mtime = CURRENT_TIME;
-	inode->i_atime = CURRENT_TIME;
+	inode->i_mtime = inode->i_atime = CURRENT_TIME;
 	fat_detach(inode);
 	mark_inode_dirty(inode);
 	/* releases bh */
