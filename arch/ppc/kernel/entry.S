@@ -277,7 +277,9 @@ END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
 
 	.globl	ret_from_fork
 ret_from_fork:
+#ifdef CONFIG_SMP
 	bl	schedule_tail
+#endif
 	rlwinm	r3,r1,0,0,18
 	lwz	r3,TI_FLAGS(r3)
 	andi.	r0,r3,_TIF_SYSCALL_TRACE
