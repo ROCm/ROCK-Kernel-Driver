@@ -19,6 +19,7 @@ struct file_operations generic_ro_fops = {
 	llseek:		generic_file_llseek,
 	read:		generic_file_read,
 	mmap:		generic_file_mmap,
+	sendfile:	generic_file_sendfile,
 };
 
 loff_t generic_file_llseek(struct file *file, loff_t offset, int origin)
@@ -184,8 +185,6 @@ ssize_t vfs_read(struct file *file, char *buf, size_t count, loff_t *pos)
 		return -EBADF;
 	if (!file->f_op || !file->f_op->read)
 		return -EINVAL;
-	if (pos < 0)
-		return -EINVAL;
 
 	ret = locks_verify_area(FLOCK_VERIFY_READ, inode, file, *pos, count);
 	if (!ret) {
@@ -208,8 +207,6 @@ ssize_t vfs_write(struct file *file, const char *buf, size_t count, loff_t *pos)
 	if (!(file->f_mode & FMODE_WRITE))
 		return -EBADF;
 	if (!file->f_op || !file->f_op->write)
-		return -EINVAL;
-	if (pos < 0)
 		return -EINVAL;
 
 	ret = locks_verify_area(FLOCK_VERIFY_WRITE, inode, file, *pos, count);
@@ -253,11 +250,14 @@ asmlinkage ssize_t sys_write(unsigned int fd, const char * buf, size_t count)
 	return ret;
 }
 
-asmlinkage ssize_t sys_pread(unsigned int fd, char *buf,
+asmlinkage ssize_t sys_pread64(unsigned int fd, char *buf,
 			     size_t count, loff_t pos)
 {
 	struct file *file;
 	ssize_t ret = -EBADF;
+
+	if (pos < 0)
+		return -EINVAL;
 
 	file = fget(fd);
 	if (file) {
@@ -268,11 +268,14 @@ asmlinkage ssize_t sys_pread(unsigned int fd, char *buf,
 	return ret;
 }
 
-asmlinkage ssize_t sys_pwrite(unsigned int fd, const char *buf,
+asmlinkage ssize_t sys_pwrite64(unsigned int fd, const char *buf,
 			      size_t count, loff_t pos)
 {
 	struct file *file;
 	ssize_t ret = -EBADF;
+
+	if (pos < 0)
+		return -EINVAL;
 
 	file = fget(fd);
 	if (file) {
@@ -435,4 +438,114 @@ asmlinkage ssize_t sys_writev(unsigned long fd, const struct iovec * vector,
 
 bad_file:
 	return ret;
+}
+
+static ssize_t do_sendfile(int out_fd, int in_fd, loff_t *ppos,
+			   size_t count, loff_t max)
+{
+	struct file * in_file, * out_file;
+	struct inode * in_inode, * out_inode;
+	loff_t pos;
+	ssize_t retval;
+
+	/*
+	 * Get input file, and verify that it is ok..
+	 */
+	retval = -EBADF;
+	in_file = fget(in_fd);
+	if (!in_file)
+		goto out;
+	if (!(in_file->f_mode & FMODE_READ))
+		goto fput_in;
+	retval = -EINVAL;
+	in_inode = in_file->f_dentry->d_inode;
+	if (!in_inode)
+		goto fput_in;
+	if (!in_file->f_op || !in_file->f_op->sendfile)
+		goto fput_in;
+	retval = locks_verify_area(FLOCK_VERIFY_READ, in_inode, in_file, in_file->f_pos, count);
+	if (retval)
+		goto fput_in;
+
+	/*
+	 * Get output file, and verify that it is ok..
+	 */
+	retval = -EBADF;
+	out_file = fget(out_fd);
+	if (!out_file)
+		goto fput_in;
+	if (!(out_file->f_mode & FMODE_WRITE))
+		goto fput_out;
+	retval = -EINVAL;
+	if (!out_file->f_op || !out_file->f_op->sendpage)
+		goto fput_out;
+	out_inode = out_file->f_dentry->d_inode;
+	retval = locks_verify_area(FLOCK_VERIFY_WRITE, out_inode, out_file, out_file->f_pos, count);
+	if (retval)
+		goto fput_out;
+
+	if (!ppos)
+		ppos = &in_file->f_pos;
+
+	if (!max)
+		max = min(in_inode->i_sb->s_maxbytes, out_inode->i_sb->s_maxbytes);
+
+	pos = *ppos;
+	retval = -EINVAL;
+	if (unlikely(pos < 0))
+		goto fput_out;
+	if (unlikely(pos + count > max)) {
+		retval = -EOVERFLOW;
+		if (pos >= max)
+			goto fput_out;
+		count = max - pos;
+	}
+
+	retval = in_file->f_op->sendfile(out_file, in_file, ppos, count);
+
+	if (*ppos > max)
+		retval = -EOVERFLOW;
+
+fput_out:
+	fput(out_file);
+fput_in:
+	fput(in_file);
+out:
+	return retval;
+}
+
+asmlinkage ssize_t sys_sendfile(int out_fd, int in_fd, off_t *offset, size_t count)
+{
+	loff_t pos;
+	off_t off;
+	ssize_t ret;
+
+	if (offset) {
+		if (unlikely(get_user(off, offset)))
+			return -EFAULT;
+		pos = off;
+		ret = do_sendfile(out_fd, in_fd, &pos, count, MAX_NON_LFS);
+		if (unlikely(put_user(pos, offset)))
+			return -EFAULT;
+		return ret;
+	}
+
+	return do_sendfile(out_fd, in_fd, NULL, count, MAX_NON_LFS);
+}
+
+asmlinkage ssize_t sys_sendfile64(int out_fd, int in_fd, loff_t *offset, size_t count)
+{
+	loff_t pos;
+	ssize_t ret;
+
+	if (offset) {
+		if (unlikely(copy_from_user(&pos, offset, sizeof(loff_t))))
+			return -EFAULT;
+		ret = do_sendfile(out_fd, in_fd, &pos, count, 0);
+		if (unlikely(put_user(pos, offset)))
+			return -EFAULT;
+		return ret;
+	}
+
+	return do_sendfile(out_fd, in_fd, NULL, count, 0);
 }

@@ -315,10 +315,8 @@ static int __init alsa_sound_init(void)
 #else
 	devfs_handle = devfs_mk_dir(NULL, "snd", NULL);
 #endif
-	if (devfs_register_chrdev(snd_major, "alsa", &snd_fops)) {
-#else
-	if (register_chrdev(snd_major, "alsa", &snd_fops)) {
 #endif
+	if (register_chrdev(snd_major, "alsa", &snd_fops)) {
 		snd_printk(KERN_ERR "unable to register native major device number %d\n", snd_major);
 #ifdef CONFIG_SND_OSSEMUL
 		snd_oss_cleanup_module();
@@ -368,10 +366,10 @@ static void __exit alsa_sound_exit(void)
 		sprintf(controlname, "snd/controlC%d", controlnum);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
 		master = devfs_find_handle(NULL, controlname, strlen(controlname), 0, 0, DEVFS_SPECIAL_CHR, 0);
-#else
-		master = devfs_find_handle(NULL, controlname, 0, 0, DEVFS_SPECIAL_CHR, 0);
-#endif
 		devfs_unregister(master);
+#else
+		devfs_find_and_unregister(NULL, controlname, 0, 0, DEVFS_SPECIAL_CHR, 0);
+#endif
 	}
 #endif
 	
@@ -386,11 +384,7 @@ static void __exit alsa_sound_exit(void)
 #ifdef CONFIG_SND_DEBUG_MEMORY
 	snd_memory_done();
 #endif
-#ifdef CONFIG_DEVFS_FS
-	if (devfs_unregister_chrdev(snd_major, "alsa") != 0)
-#else
 	if (unregister_chrdev(snd_major, "alsa") != 0)
-#endif
 		snd_printk(KERN_ERR "unable to unregister major device number %d\n", snd_major);
 #ifdef CONFIG_DEVFS_FS
 	devfs_unregister(devfs_handle);

@@ -90,9 +90,6 @@ struct hd_struct *sd;
 static Scsi_Disk ** sd_dsk_arr;
 static rwlock_t sd_dsk_arr_lock = RW_LOCK_UNLOCKED;
 
-static int *sd_sizes;
-static int *sd_max_sectors;
-
 static int check_scsidisk_media_change(kdev_t);
 static int fop_revalidate_scsidisk(kdev_t);
 
@@ -536,7 +533,7 @@ static int sd_open(struct inode *inode, struct file *filp)
 	 * See if we are requesting a non-existent partition.  Do this
 	 * after checking for disk change.
 	 */
-	if (sd_sizes[SD_PARTITION(inode->i_rdev)] == 0) {
+	if (sd[SD_PARTITION(inode->i_rdev)].nr_sects == 0) {
 		goto error_out;
 	}
 
@@ -606,22 +603,7 @@ static struct block_device_operations sd_fops =
 	revalidate:		fop_revalidate_scsidisk
 };
 
-/*
- *    If we need more than one SCSI disk major (i.e. more than
- *      16 SCSI disks), we'll have to vmalloc() more gendisks later.
- */
-
-static struct gendisk sd_gendisk =
-{
-	major:		SCSI_DISK0_MAJOR,
-	major_name:	"sd",
-	minor_shift:	4,
-	fops:		&sd_fops,
-};
-
-static struct gendisk *sd_gendisks = &sd_gendisk;
-
-#define SD_GENDISK(i)    sd_gendisks[(i) / SCSI_DISKS_PER_MAJOR]
+static struct gendisk **sd_disks;
 
 /**
  *	sd_rw_intr - bottom half handler: called when the lower level
@@ -1077,7 +1059,7 @@ sd_read_write_protect_flag(Scsi_Disk *sdkp, char *diskname,
 	SRpnt->sr_data_direction = SCSI_DATA_READ;
 
 	scsi_wait_req(SRpnt, (void *) cmd, (void *) buffer,
-		      512, SD_TIMEOUT, MAX_RETRIES);
+		      255, SD_TIMEOUT, MAX_RETRIES);
 
 	the_result = SRpnt->sr_result;
 
@@ -1198,8 +1180,7 @@ static int sd_init()
 
 	if (!sd_registered) {
 		for (k = 0; k < N_USED_SD_MAJORS; k++) {
-			if (devfs_register_blkdev(SD_MAJOR(k), "sd",
-						  &sd_fops)) {
+			if (register_blkdev(SD_MAJOR(k), "sd", &sd_fops)) {
 				printk(KERN_NOTICE "Unable to get major %d "
 				       "for SCSI disk\n", SD_MAJOR(k));
 				return 1;
@@ -1226,69 +1207,25 @@ static int sd_init()
 			sd_dsk_arr[k] = sdkp;
 		}
 	}
-	init_mem_lth(sd_sizes, maxparts);
+	init_mem_lth(sd_disks, sd_template.dev_max);
+	if (sd_disks)
+		zero_mem_lth(sd_disks, sd_template.dev_max);
 	init_mem_lth(sd, maxparts);
-	init_mem_lth(sd_gendisks, N_USED_SD_MAJORS);
-	init_mem_lth(sd_max_sectors, sd_template.dev_max << 4);
 
-	if (!sd_dsk_arr || !sd_sizes || !sd || !sd_gendisks)
+	if (!sd_dsk_arr || !sd || !sd_disks)
 		goto cleanup_mem;
 
-	zero_mem_lth(sd_sizes, maxparts);
 	zero_mem_lth(sd, maxparts);
-
-	for (k = 0; k < maxparts; k++) {
-		/*
-		 * Allow lowlevel device drivers to generate 512k large scsi
-		 * commands if they know what they're doing and they ask for it
-		 * explicitly via the SHpnt->max_sectors API.
-		 */
-		sd_max_sectors[k] = MAX_PHYS_SEGMENTS*8;
-	}
-
-	for (k = 0; k < N_USED_SD_MAJORS; k++) {
-		int N = SCSI_DISKS_PER_MAJOR;
-
-		sd_gendisks[k] = sd_gendisk;
-
-		init_mem_lth(sd_gendisks[k].de_arr, N);
-		init_mem_lth(sd_gendisks[k].flags, N);
-		init_mem_lth(sd_gendisks[k].driverfs_dev_arr, N);
-
-		if (!sd_gendisks[k].de_arr || !sd_gendisks[k].flags ||
-				!sd_gendisks[k].driverfs_dev_arr)
-			goto cleanup_gendisks;
-
-		zero_mem_lth(sd_gendisks[k].de_arr, N);
-		zero_mem_lth(sd_gendisks[k].flags, N);
-		zero_mem_lth(sd_gendisks[k].driverfs_dev_arr, N);
-
-		sd_gendisks[k].major = SD_MAJOR(k);
-		sd_gendisks[k].major_name = "sd";
-		sd_gendisks[k].minor_shift = 4;
-		sd_gendisks[k].part = sd + k * (N << 4);
-		sd_gendisks[k].sizes = sd_sizes + k * (N << 4);
-		sd_gendisks[k].nr_real = 0;
-	}
 	return 0;
 
 #undef init_mem_lth
 #undef zero_mem_lth
 
-cleanup_gendisks:
-	/* vfree can handle NULL, so no test is required here */
-	for (k = 0; k < N_USED_SD_MAJORS; k++) {
-		vfree(sd_gendisks[k].de_arr);
-		vfree(sd_gendisks[k].flags);
-		vfree(sd_gendisks[k].driverfs_dev_arr);
-	}
 cleanup_mem:
-	vfree(sd_gendisks);
-	sd_gendisks = NULL;
+	vfree(sd_disks);
+	sd_disks = NULL;
 	vfree(sd);
 	sd = NULL;
-	vfree(sd_sizes);
-	sd_sizes = NULL;
 	if (sd_dsk_arr) {
                 for (k = 0; k < sd_template.dev_max; ++k)
 			vfree(sd_dsk_arr[k]);
@@ -1296,7 +1233,7 @@ cleanup_mem:
 		sd_dsk_arr = NULL;
 	}
 	for (k = 0; k < N_USED_SD_MAJORS; k++) {
-		devfs_unregister_blkdev(SD_MAJOR(k), "sd");
+		unregister_blkdev(SD_MAJOR(k), "sd");
 	}
 	sd_registered--;
 	return 1;
@@ -1317,18 +1254,16 @@ static void sd_finish()
 	Scsi_Disk * sdkp;
 
 	SCSI_LOG_HLQUEUE(3, printk("sd_finish: \n"));
-	for (k = 0; k < N_USED_SD_MAJORS; k++) {
+	for (k = 0; k < N_USED_SD_MAJORS; k++)
 		blk_dev[SD_MAJOR(k)].queue = sd_find_queue;
-		add_gendisk(&(sd_gendisks[k]));
-	}
 
 	for (k = 0; k < sd_template.dev_max; ++k) {
 		sdkp = sd_get_sdisk(k);
 		if (sdkp && (0 == sdkp->capacity) && sdkp->device) {
 			sd_init_onedisk(sdkp, k);
 			if (!sdkp->has_been_registered) {
-				sd_sizes[k << 4] = sdkp->capacity;
-				register_disk(&SD_GENDISK(k), MKDEV_SD(k),
+				add_gendisk(sd_disks[k]);
+				register_disk(sd_disks[k], MKDEV_SD(k),
 						1<<4, &sd_fops,
 						sdkp->capacity);
 				sdkp->has_been_registered = 1;
@@ -1374,21 +1309,36 @@ static int sd_detect(Scsi_Device * sdp)
  **/
 static int sd_attach(Scsi_Device * sdp)
 {
-        unsigned int devnum;
 	Scsi_Disk *sdkp;
 	int dsk_nr;
 	char diskname[6];
 	unsigned long iflags;
+	struct {
+		struct gendisk disk;
+		devfs_handle_t de;
+		struct device *dev;
+		char flags;
+	} *p;
+	struct gendisk *gd;
 
 	if ((NULL == sdp) ||
 	    ((sdp->type != TYPE_DISK) && (sdp->type != TYPE_MOD)))
 		return 0;
+
+	p = kmalloc(sizeof(*p), GFP_KERNEL);
+	if (!p)
+		return 1;
+	gd = &p->disk;
+	gd->de_arr = &p->de;
+	gd->flags = &p->flags;
+	gd->driverfs_dev_arr = &p->dev;
 
 	SCSI_LOG_HLQUEUE(3, printk("sd_attach: scsi device: <%d,%d,%d,%d>\n", 
 			 sdp->host->host_no, sdp->channel, sdp->id, sdp->lun));
 	if (sd_template.nr_dev >= sd_template.dev_max) {
 		sdp->attached--;
 		printk(KERN_ERR "sd_init: no more room for device\n");
+		kfree(p);
 		return 1;
 	}
 
@@ -1408,17 +1358,23 @@ static int sd_attach(Scsi_Device * sdp)
 	if (dsk_nr >= sd_template.dev_max) {
 		/* panic("scsi_devices corrupt (sd)");  overkill */
 		printk(KERN_ERR "sd_init: sd_dsk_arr corrupted\n");
+		kfree(p);
 		return 1;
 	}
 
 	sd_template.nr_dev++;
-	SD_GENDISK(dsk_nr).nr_real++;
-        devnum = dsk_nr % SCSI_DISKS_PER_MAJOR;
-        SD_GENDISK(dsk_nr).de_arr[devnum] = sdp->de;
-        SD_GENDISK(dsk_nr).driverfs_dev_arr[devnum] = 
-		&sdp->sdev_driverfs_dev;
+	gd->nr_real = 1;
+        gd->de_arr[0] = sdp->de;
+        gd->driverfs_dev_arr[0] = &sdp->sdev_driverfs_dev;
+	gd->major = SD_MAJOR(dsk_nr>>4);
+	gd->first_minor = (dsk_nr & 15)<<4;
+	gd->major_name = "sd";
+	gd->minor_shift = 4;
+	gd->part = sd + (dsk_nr << 4);
+	gd->fops = &sd_fops;
         if (sdp->removable)
-		SD_GENDISK(dsk_nr).flags[devnum] |= GENHD_FL_REMOVABLE;
+		gd->flags[0] |= GENHD_FL_REMOVABLE;
+	sd_disks[dsk_nr] = gd;
 	sd_dskname(dsk_nr, diskname);
 	printk(KERN_NOTICE "Attached scsi %sdisk %s at scsi%d, channel %d, "
 	       "id %d, lun %d\n", sdp->removable ? "removable " : "",
@@ -1487,9 +1443,7 @@ static void sd_detach(Scsi_Device * sdp)
 {
 	Scsi_Disk *sdkp = NULL;
 	kdev_t dev;
-	int dsk_nr, j;
-	int max_p;
-	int start;
+	int dsk_nr;
 	unsigned long iflags;
 
 	SCSI_LOG_HLQUEUE(3, printk("sd_detach: <%d,%d,%d,%d>\n", 
@@ -1499,7 +1453,6 @@ static void sd_detach(Scsi_Device * sdp)
 	for (dsk_nr = 0; dsk_nr < sd_template.dev_max; dsk_nr++) {
 		sdkp = sd_dsk_arr[dsk_nr];
 		if (sdkp->device == sdp) {
-			sdkp->has_been_registered = 0;
 			sdkp->device = NULL;
 			sdkp->capacity = 0;
 			/* sdkp->detaching = 1; */
@@ -1510,22 +1463,20 @@ static void sd_detach(Scsi_Device * sdp)
 	if (dsk_nr >= sd_template.dev_max)
 		return;
 
-	max_p = 1 << sd_gendisk.minor_shift;
-	start = dsk_nr << sd_gendisk.minor_shift;
-	dev = MKDEV_SD_PARTITION(start);
-	driverfs_remove_partitions(&SD_GENDISK (dsk_nr), 
-					SD_MINOR_NUMBER (start));
-	wipe_partitions(dev);
-	for (j = max_p - 1; j >= 0; j--)
-		sd_sizes[start + j] = 0;
-
-	devfs_register_partitions (&SD_GENDISK (dsk_nr),
-				   SD_MINOR_NUMBER (start), 1);
-	/* unregister_disk() */
+	if (sdkp->has_been_registered) {
+		sdkp->has_been_registered = 0;
+		dev = MKDEV_SD(dsk_nr);
+		driverfs_remove_partitions(sd_disks[dsk_nr], minor(dev));
+		wipe_partitions(dev);
+		devfs_register_partitions (sd_disks[dsk_nr], minor(dev), 1);
+		/* unregister_disk() */
+		del_gendisk(sd_disks[dsk_nr]);
+	}
 	sdp->attached--;
 	sd_template.dev_noticed--;
 	sd_template.nr_dev--;
-	SD_GENDISK(dsk_nr).nr_real--;
+	kfree(sd_disks[dsk_nr]);
+	sd_disks[dsk_nr] = NULL;
 }
 
 /**
@@ -1560,7 +1511,7 @@ static void __exit exit_sd(void)
 	SCSI_LOG_HLQUEUE(3, printk("exit_sd: exiting sd driver\n"));
 	scsi_unregister_device(&sd_template);
 	for (k = 0; k < N_USED_SD_MAJORS; k++)
-		devfs_unregister_blkdev(SD_MAJOR(k), "sd");
+		unregister_blkdev(SD_MAJOR(k), "sd");
 
 	sd_registered--;
 	if (sd_dsk_arr != NULL) {
@@ -1568,16 +1519,12 @@ static void __exit exit_sd(void)
 			vfree(sd_dsk_arr[k]);
 		vfree(sd_dsk_arr);
 	}
-	vfree(sd_sizes);
 	vfree((char *) sd);
 	for (k = 0; k < N_USED_SD_MAJORS; k++) {
 		blk_dev[SD_MAJOR(k)].queue = NULL;
-		del_gendisk(&(sd_gendisks[k]));
 		blk_clear(SD_MAJOR(k));
 	}
 	sd_template.dev_max = 0;
-	if (sd_gendisks != &sd_gendisk)
-		vfree(sd_gendisks);
 	remove_driver(&sd_template.scsi_driverfs_driver);
 }
 

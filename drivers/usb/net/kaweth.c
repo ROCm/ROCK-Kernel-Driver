@@ -152,6 +152,7 @@ static struct usb_device_id usb_klsi_table[] = {
 	{ USB_DEVICE(0x10bd, 0x1427) }, /* ASANTE USB To Ethernet Adapter */
 	{ USB_DEVICE(0x1342, 0x0204) }, /* Mobility USB-Ethernet Adapter */
 	{ USB_DEVICE(0x13d2, 0x0400) }, /* Shark Pocket Adapter */
+	{ USB_DEVICE(0x1485, 0x0001) },	/* Silicom U2E */
 	{ USB_DEVICE(0x1645, 0x0005) }, /* Entrega E45 */
 	{ USB_DEVICE(0x1645, 0x0008) }, /* Entrega USB Ethernet Adapter */
 	{ USB_DEVICE(0x1645, 0x8005) }, /* PortGear Ethernet Adapter */

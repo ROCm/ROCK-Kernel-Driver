@@ -16,7 +16,7 @@ struct shmem_inode_info {
 	swp_entry_t		i_direct[SHMEM_NR_DIRECT]; /* for the first blocks */
 	void		      **i_indirect; /* indirect blocks */
 	unsigned long		swapped;
-	int			locked;     /* into memory */
+	unsigned long		flags;
 	struct list_head	list;
 	struct inode		vfs_inode;
 };

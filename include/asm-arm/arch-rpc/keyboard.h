@@ -8,13 +8,6 @@
  * published by the Free Software Foundation.
  *
  *  Keyboard driver definitions for RiscPC architecture
+ *  Now using the input subsystem...
  */
-#include <asm/irq.h>
-
-#define NR_SCANCODES 128
-
-extern int ps2kbd_init_hw(void);
-
-#define kbd_disable_irq()	disable_irq(IRQ_KEYBOARDRX)
-#define kbd_enable_irq()	enable_irq(IRQ_KEYBOARDRX)
-#define kbd_init_hw()		ps2kbd_init_hw()
+#define kbd_init_hw()		do { } while (0)

@@ -71,7 +71,7 @@ unsigned int sa11x0_freq_to_ppcr(unsigned int khz)
  * Validate the speed in khz.  If we can't generate the precise
  * frequency requested, round it down (to be on the safe side).
  */
-unsigned int sa11x0_validatespeed(unsigned int khz)
+unsigned int sa11x0_validatespeed(unsigned int cpu, unsigned int khz)
 {
 	return cclk_frequency_100khz[sa11x0_freq_to_ppcr(khz)] * 100;
 }

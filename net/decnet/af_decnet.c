@@ -2098,16 +2098,16 @@ static int dn_device_event(struct notifier_block *this, unsigned long event,
 }
 
 static struct notifier_block dn_dev_notifier = {
-	notifier_call:	dn_device_event,
+	.notifier_call =dn_device_event,
 };
 
 extern int dn_route_rcv(struct sk_buff *, struct net_device *, struct packet_type *);
 
 static struct packet_type dn_dix_packet_type = {
-	type:		__constant_htons(ETH_P_DNA_RT),
-	dev:		NULL,		/* All devices */
-	func:		dn_route_rcv,
-	data:		(void*)1,
+	.type =		__constant_htons(ETH_P_DNA_RT),
+	.dev =		NULL,		/* All devices */
+	.func =		dn_route_rcv,
+	.data =		(void*)1,
 };
 
 #define IS_NOT_PRINTABLE(x) ((x) < 32 || (x) > 126)
@@ -2196,29 +2196,29 @@ static int dn_get_info(char *buffer, char **start, off_t offset, int length)
 
 
 static struct net_proto_family	dn_family_ops = {
-	family:		AF_DECnet,
-	create:		dn_create,
+	.family =	AF_DECnet,
+	.create =	dn_create,
 };
 
 static struct proto_ops dn_proto_ops = {
-	family:		AF_DECnet,
+	.family =	AF_DECnet,
 
-	release:	dn_release,
-	bind:		dn_bind,
-	connect:	dn_connect,
-	socketpair:	sock_no_socketpair,
-	accept:		dn_accept,
-	getname:	dn_getname,
-	poll:		dn_poll,
-	ioctl:		dn_ioctl,
-	listen:		dn_listen,
-	shutdown:	dn_shutdown,
-	setsockopt:	dn_setsockopt,
-	getsockopt:	dn_getsockopt,
-	sendmsg:	dn_sendmsg,
-	recvmsg:	dn_recvmsg,
-	mmap:		sock_no_mmap,
-	sendpage:	sock_no_sendpage,
+	.release =	dn_release,
+	.bind =		dn_bind,
+	.connect =	dn_connect,
+	.socketpair =	sock_no_socketpair,
+	.accept =	dn_accept,
+	.getname =	dn_getname,
+	.poll =		dn_poll,
+	.ioctl =	dn_ioctl,
+	.listen =	dn_listen,
+	.shutdown =	dn_shutdown,
+	.setsockopt =	dn_setsockopt,
+	.getsockopt =	dn_getsockopt,
+	.sendmsg =	dn_sendmsg,
+	.recvmsg =	dn_recvmsg,
+	.mmap =		sock_no_mmap,
+	.sendpage =	sock_no_sendpage,
 };
 
 #ifdef CONFIG_SYSCTL

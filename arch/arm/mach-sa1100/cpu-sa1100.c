@@ -91,7 +91,7 @@
 #include <asm/hardware.h>
 
 extern unsigned int sa11x0_freq_to_ppcr(unsigned int khz);
-extern unsigned int sa11x0_validatespeed(unsigned int khz);
+extern unsigned int sa11x0_validatespeed(unsigned int cpu, unsigned int khz);
 extern unsigned int sa11x0_getspeed(void);
 
 typedef struct {
@@ -220,29 +220,35 @@ static struct notifier_block sa1100_dram_block = {
 };
 
 
-static void sa1100_setspeed(unsigned int khz)
+static void sa1100_setspeed(unsigned int cpu, unsigned int khz)
 {
 	PPCR = sa11x0_freq_to_ppcr(khz);
 }
+
+static struct cpufreq_freqs sa1100_freqs = {
+	.min		= 59000,
+	.max		= 287000,
+};
+
+static struct cpufreq_driver sa1100_driver = {
+	.freq		= &sa1100_freqs,
+	.validate	= sa11x0_validatespeed,
+	.setspeed	= sa1100_setspeed,
+	.sync		= 1,
+};
 
 static int __init sa1100_dram_init(void)
 {
 	int ret = -ENODEV;
 
 	if ((processor_id & CPU_SA1100_MASK) == CPU_SA1100_ID) {
-		cpufreq_driver_t cpufreq_driver;
-
 		ret = cpufreq_register_notifier(&sa1100_dram_block);
 		if (ret)
 			return ret;
 
-		cpufreq_driver.freq.min = 59000;
-		cpufreq_driver.freq.max = 287000;
-		cpufreq_driver.freq.cur = sa11x0_getspeed();
-		cpufreq_driver.validate = &sa11x0_validatespeed;
-		cpufreq_driver.setspeed = &sa1100_setspeed;
+		sa1100_freqs.cur = sa11x0_getspeed();
 
-		ret = cpufreq_register(cpufreq_driver);<
+		ret = cpufreq_register(&sa1100_driver);
 	}
 
 	return ret;

@@ -118,6 +118,7 @@ xdr_decode_fattr(u32 *p, struct nfs_fattr *fattr)
 		fattr->mode = (fattr->mode & ~S_IFMT) | S_IFIFO;
 		fattr->rdev = 0;
 	}
+	fattr->timestamp = jiffies;
 	return p;
 }
 
@@ -419,9 +420,9 @@ nfs_xdr_readdirres(struct rpc_rqst *req, u32 *p, void *dummy)
 	kunmap(*page);
 	return nr;
  short_pkt:
-	kunmap(*page);
 	printk(KERN_NOTICE "NFS: short packet in readdir reply!\n");
 	entry[0] = entry[1] = 0;
+	kunmap(*page);
 	return nr;
 err_unmap:
 	kunmap(*page);

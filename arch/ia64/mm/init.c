@@ -167,10 +167,10 @@ show_mem(void)
 
 #ifdef CONFIG_DISCONTIGMEM
 	{
-		pg_data_t *pgdat = pgdat_list;
+		pg_data_t *pgdat;
 
 		printk("Free swap:       %6dkB\n", nr_swap_pages<<(PAGE_SHIFT-10));
-		do {
+		for_each_pgdat(pgdat) {
 			printk("Node ID: %d\n", pgdat->node_id);
 			for(i = 0; i < pgdat->node_size; i++) {
 				if (PageReserved(pgdat->node_mem_map+i))
@@ -184,8 +184,7 @@ show_mem(void)
 			printk("\t%d reserved pages\n", reserved);
 			printk("\t%d pages shared\n", shared);
 			printk("\t%d pages swap cached\n", cached);
-			pgdat = pgdat->node_next;
-		} while (pgdat);
+		}
 		printk("Total of %ld pages in page table cache\n", pgtable_cache_size);
 		printk("%d free buffer pages\n", nr_free_buffer_pages());
 	}

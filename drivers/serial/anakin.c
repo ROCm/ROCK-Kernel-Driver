@@ -19,35 +19,20 @@
  *   			SA_INTERRUPT. Works reliably now. No longer requires
  *   			changes to the serial_core API.
  *
- *  $Id: anakin.c,v 1.29 2002/07/22 15:27:32 rmk Exp $
+ *  $Id: anakin.c,v 1.32 2002/07/28 10:03:27 rmk Exp $
  */
 
 #include <linux/config.h>
 #include <linux/module.h>
-#include <linux/errno.h>
-#include <linux/signal.h>
-#include <linux/sched.h>
-#include <linux/interrupt.h>
 #include <linux/tty.h>
-#include <linux/tty_flip.h>
-#include <linux/major.h>
-#include <linux/string.h>
-#include <linux/fcntl.h>
-#include <linux/ptrace.h>
 #include <linux/ioport.h>
-#include <linux/mm.h>
-#include <linux/slab.h>
 #include <linux/init.h>
-#include <linux/circ_buf.h>
 #include <linux/serial.h>
 #include <linux/console.h>
 #include <linux/sysrq.h>
 
-#include <asm/system.h>
 #include <asm/io.h>
 #include <asm/irq.h>
-#include <asm/uaccess.h>
-#include <asm/bitops.h>
 
 #include <linux/serial_core.h>
 
@@ -119,13 +104,9 @@ anakin_start_tx(struct uart_port *port, unsigned int tty_start)
 static void
 anakin_stop_rx(struct uart_port *port)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&port->lock, flags);
 	while (anakin_in(port, 0x10) & RXRELEASE) 
 	    anakin_in(port, 0x14);
 	anakin_out(port, 0x18, anakin_in(port, 0x18) | BLOCKRX);
-	spin_unlock_irqrestore(&port->lock, flags);
 }
 
 static void
@@ -518,7 +499,7 @@ anakin_init(void)
 {
 	int ret;
 
-	printk(KERN_INFO "Serial: Anakin driver $Revision: 1.29 $\n");
+	printk(KERN_INFO "Serial: Anakin driver $Revision: 1.32 $\n");
 
 	ret = uart_register_driver(&anakin_reg);
 	if (ret == 0) {

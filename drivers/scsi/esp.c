@@ -491,8 +491,6 @@ static void esp_reset_dma(struct esp *esp)
 	case dvmahme:
 		/* This is the HME DVMA gate array. */
 
-		save_flags(flags); cli(); /* I really hate this chip. */
-
 		sbus_writel(DMA_RESET_FAS366, esp->dregs + DMA_CSR);
 		sbus_writel(DMA_RST_SCSI, esp->dregs + DMA_CSR);
 
@@ -521,7 +519,6 @@ static void esp_reset_dma(struct esp *esp)
 		 */
 		sbus_writel(0, esp->dregs + DMA_ADDR);
 
-		restore_flags(flags);
 		break;
 	case dvmarev2:
 		/* This is the gate array found in the sun4m

@@ -46,10 +46,8 @@ prom_feval(char *fstring)
 }
 
 /* We want to do this more nicely some day. */
-#ifdef CONFIG_SUN_CONSOLE
 extern void (*prom_palette)(int);
 extern int serial_console;
-#endif
 
 /* Drop into the prom, with the chance to continue with the 'go'
  * prom command.
@@ -63,10 +61,8 @@ prom_cmdline(void)
 	unsigned long flags;
     
 	kernel_enter_debugger();
-#ifdef CONFIG_SUN_CONSOLE
 	if(!serial_console && prom_palette)
 		prom_palette (1);
-#endif
 	install_obp_ticker();
 	spin_lock_irqsave(&prom_lock, flags);
 	(*(romvec->pv_abort))();
@@ -76,10 +72,8 @@ prom_cmdline(void)
 #ifdef CONFIG_SUN_AUXIO
 	TURN_ON_LED;
 #endif
-#ifdef CONFIG_SUN_CONSOLE
 	if(!serial_console && prom_palette)
 		prom_palette (0);
-#endif
 }
 
 /* Drop into the prom, but completely terminate the program.

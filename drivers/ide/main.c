@@ -176,22 +176,34 @@ static void init_hwif_data(struct ata_channel *ch, unsigned int index)
 	};
 
 	unsigned int unit;
-	hw_regs_t hw;
 
 	/* bulk initialize channel & drive info with zeros */
 	memset(ch, 0, sizeof(struct ata_channel));
-	memset(&hw, 0, sizeof(hw_regs_t));
 
 	/* fill in any non-zero initial values */
 	ch->index = index;
-	ide_init_hwif_ports(&hw, ide_default_io_base(index), 0, &ch->irq);
+	ide_init_hwif_ports(&ch->hw, ide_default_io_base(index), 0, &ch->irq);
 
-	memcpy(&ch->hw, &hw, sizeof(hw));
-	memcpy(ch->io_ports, hw.io_ports, sizeof(hw.io_ports));
+	memcpy(ch->io_ports, ch->hw.io_ports, sizeof(ch->hw.io_ports));
+
+	/* Most controllers cannot do transfers across 64kB boundaries.
+	   trm290 can do transfers within a 4GB boundary, so it changes
+	   this mask accordingly. */
+	ch->seg_boundary_mask = 0xffff;
+
+	/* Some chipsets (cs5530, any others?) think a 64kB transfer
+	   is 0 byte transfer, so set the limit one sector smaller.
+	   In the future, we may default to 64kB transfers and let
+	   invidual chipsets with this problem change ch->max_segment_size. */
+	ch->max_segment_size = (1<<16) - 512;
 
 	ch->noprobe	= !ch->io_ports[IDE_DATA_OFFSET];
 #ifdef CONFIG_BLK_DEV_HD
-	if (ch->io_ports[IDE_DATA_OFFSET] == HD_DATA)
+
+	/* Ignore disks for which handling by the legacy driver was requested
+	 * by the used.
+	 */
+	if (ch->io_ports[IDE_DATA_OFFSET] == 0x1f0)
 		ch->noprobe = 1; /* may be overridden by ide_setup() */
 #endif
 
@@ -361,7 +373,7 @@ void ide_unregister(struct ata_channel *ch)
 				if (ata_ops(drive)->cleanup(drive))
 					goto abort;
 			} else
-				ide_unregister_subdriver(drive);
+				ata_unregister_device(drive);
 		}
 	}
 	ch->present = 0;
@@ -476,17 +488,19 @@ void ide_unregister(struct ata_channel *ch)
 	blk_dev[ch->major].data = NULL;
 	blk_dev[ch->major].queue = NULL;
 	blk_clear(ch->major);
-	gd = ch->gd;
+	gd = ch->gd[0];
 	if (gd) {
-		del_gendisk(gd);
-		kfree(gd->sizes);
+		int i;
+		for (i = 0; i < MAX_DRIVES; i++)
+			del_gendisk(gd + i);
 		kfree(gd->part);
 		if (gd->de_arr)
 			kfree (gd->de_arr);
 		if (gd->flags)
 			kfree (gd->flags);
 		kfree(gd);
-		ch->gd = NULL;
+		for (i = 0; i < MAX_DRIVES; i++)
+			ch->gd[i] = NULL;
 	}
 
 	/*
@@ -701,79 +715,46 @@ static void __init init_global_data(void)
 
 /*
  * This gets called VERY EARLY during initialization, to handle kernel "command
- * line" strings beginning with "hdx=" or "ide".It gets called even before the
- * actual module gets initialized.
+ * line" strings beginning with "hdx=".  It gets called even before the actual
+ * module gets initialized.
  *
  * Please look at Documentation/ide.txt to see the complete list of supported
  * options.
  */
-int __init ide_setup(char *s)
+static int __init ata_hd_setup(char *s)
 {
-	int i, vals[4];
-	struct ata_channel *ch;
+	int vals[4];
+	struct ata_channel *ch;	/* FIXME:  Channel parms should not be accessed in ata_hd_setup */
 	struct ata_device *drive;
 	unsigned int hw, unit;
 	const char max_drive = 'a' + ((MAX_HWIFS * MAX_DRIVES) - 1);
-	const char max_ch  = '0' + (MAX_HWIFS - 1);
 
-	if (!strncmp(s, "hd=", 3))	/* hd= is for hd.c driver and not us */
+	if (s[0] == '=')	/* hd= is for hd.c driver and not us */
 		return 0;
 
-	if (strncmp(s,"ide",3) &&
-	    strncmp(s,"hd",2))		/* hdx= & hdxlun= */
-		return 0;
-
-	printk(KERN_INFO  "ide_setup: %s", s);
+	printk(KERN_INFO  "hd%s", s);
 	init_global_data();
 
-#ifdef CONFIG_BLK_DEV_IDEDOUBLER
-	if (!strcmp(s, "ide=doubler")) {
-		extern int ide_doubler;
-
-		printk(KERN_INFO" : Enabled support for IDE doublers\n");
-		ide_doubler = 1;
-
-		return 1;
-	}
-#endif
-
-	if (!strcmp(s, "ide=nodma")) {
-		printk(KERN_INFO "ATA: Prevented DMA\n");
-		noautodma = 1;
-
-		return 1;
-	}
-
-#ifdef CONFIG_PCI
-	if (!strcmp(s, "ide=reverse")) {
-		ide_scan_direction = 1;
-		printk(" : Enabled support for IDE inverse scan order.\n");
-
-		return 1;
-	}
-#endif
-
-	/*
-	 * Look for drive options:  "hdx="
-	 */
-	if (!strncmp(s, "hd", 2) && s[2] >= 'a' && s[2] <= max_drive) {
-		const char *hd_words[] = {"none", "noprobe", "nowerr", "cdrom",
+	if (s[0] >= 'a' && s[0] <= max_drive) {
+		static const char *hd_words[] = {"none", "noprobe", "nowerr", "cdrom",
 				"serialize", "autotune", "noautotune",
-				"slow", "flash", "remap", "noremap", "scsi", NULL};
-		unit = s[2] - 'a';
+				"slow", "flash", "scsi", NULL};
+		unit = s[0] - 'a';
 		hw   = unit / MAX_DRIVES;
 		unit = unit % MAX_DRIVES;
 		ch = &ide_hwifs[hw];
 		drive = &ch->drives[unit];
-		if (!strncmp(s+3, "=ide-", 5)) {
-			strncpy(drive->driver_req, s + 4, 9);
+
+		/* Look for hdx=ide-* */
+		if (!strncmp(s+1, "=ide-", 5)) {
+			strncpy(drive->driver_req, s+2, 9);
 			goto done;
 		}
 		/*
 		 * Look for last lun option:  "hdxlun="
 		 */
-		if (!strncmp(s+3, "lun=", 4)) {
-	                if (*get_options(s+7, 2, vals) || vals[0]!=1)
+		if (!strncmp(s+1, "lun=", 4)) {
+	                if (*get_options(s+5, 2, vals) || vals[0]!=1)
 				goto bad_option;
 			if (vals[1] >= 0 && vals[1] <= 7) {
 				drive->last_lun = vals[1];
@@ -782,7 +763,7 @@ int __init ide_setup(char *s)
 				printk(" -- BAD LAST LUN! Expected value from 0 to 7");
 			goto done;
 		}
-		switch (match_parm(s+3, hd_words, vals, 3)) {
+		switch (match_parm(s+1, hd_words, vals, 3)) {
 			case -1: /* "none" */
 				drive->nobios = 1;  /* drop into "noprobe" */
 			case -2: /* "noprobe" */
@@ -790,16 +771,16 @@ int __init ide_setup(char *s)
 				goto done;
 			case -3: /* "nowerr" */
 				drive->bad_wstat = BAD_R_STAT;
-				ch->noprobe = 0;
+				ch->noprobe = 0;	/* FIXME:  Channel parm */
 				goto done;
 			case -4: /* "cdrom" */
 				drive->present = 1;
 				drive->type = ATA_ROM;
-				ch->noprobe = 0;
+				ch->noprobe = 0;	/* FIXME:  Channel parm */
 				goto done;
 			case -5: /* "serialize" */
 				printk(" -- USE \"ide%d=serialize\" INSTEAD", hw);
-				goto do_serialize;
+				goto bad_option;
 			case -6: /* "autotune" */
 				drive->autotune = 1;
 				goto done;
@@ -807,18 +788,12 @@ int __init ide_setup(char *s)
 				drive->autotune = 2;
 				goto done;
 			case -8: /* "slow" */
-				ch->slow = 1;
+				ch->slow = 1;		/* FIXME:  Channel parm */
 				goto done;
 			case -9: /* "flash" */
 				drive->ata_flash = 1;
 				goto done;
-			case -10: /* "remap" */
-				drive->remap_0_to_1 = 1;
-				goto done;
-			case -11: /* "noremap" */
-				drive->remap_0_to_1 = 2;
-				goto done;
-			case -12: /* "scsi" */
+			case -10: /* "scsi" */
 #if defined(CONFIG_BLK_DEV_IDESCSI) && defined(CONFIG_SCSI)
 				drive->scsi = 1;
 				goto done;
@@ -840,11 +815,63 @@ int __init ide_setup(char *s)
 		}
 	}
 
+bad_option:
+	printk(" -- BAD OPTION\n");
+	return 1;
+
+done:
+	printk("\n");
+
+	return 1;
+}
+
+/*
+ * This gets called VERY EARLY during initialization, to handle kernel "command
+ * line" strings beginning with "ide".  It gets called even before the actual
+ * module gets initialized.
+ *
+ * Please look at Documentation/ide.txt to see the complete list of supported
+ * options.
+ */
+int __init ide_setup(char *s)
+{
+	int i, vals[4];
+	struct ata_channel *ch;
+	unsigned int hw;
+	const char max_ch  = '0' + (MAX_HWIFS - 1);
+
+	printk(KERN_INFO  "ide%s", s);
+	init_global_data();
+
+#ifdef CONFIG_BLK_DEV_IDEDOUBLER
+	if (!strcmp(s, "=doubler")) {
+		extern int ide_doubler;
+
+		printk(KERN_INFO" : Enabled support for ATA doublers\n");
+		ide_doubler = 1;
+		return 1;
+	}
+#endif
+
+	if (!strcmp(s, "=nodma")) {
+		printk(KERN_INFO "ATA: Prevented DMA\n");
+		noautodma = 1;
+		return 1;
+	}
+
+#ifdef CONFIG_PCI
+	if (!strcmp(s, "=reverse")) {
+		ide_scan_direction = 1;
+		printk(" : Enabled support for IDE inverse scan order.\n");
+		return 1;
+	}
+#endif
+
 	/*
 	 * Look for bus speed option:  "idebus="
 	 */
-	if (!strncmp(s, "idebus=", 7)) {
-		if (*get_options(s+7, 2, vals) || vals[0] != 1)
+	if (!strncmp(s, "bus=", 4)) {
+		if (*get_options(s+4, 2, vals) || vals[0] != 1)
 			goto bad_option;
 		idebus_parameter = vals[1];
 		goto done;
@@ -853,7 +880,7 @@ int __init ide_setup(char *s)
 	/*
 	 * Look for interface options:  "idex="
 	 */
-	if (!strncmp(s, "ide", 3) && s[3] >= '0' && s[3] <= max_ch) {
+	if (s[0] >= '0' && s[0] <= max_ch) {
 		/*
 		 * Be VERY CAREFUL changing this: note hardcoded indexes below
 		 */
@@ -861,11 +888,11 @@ int __init ide_setup(char *s)
 			"noprobe", "serialize", "autotune", "noautotune", "reset", "dma", "ata66", NULL };
 		const char *ide_words[] = {
 			"qd65xx", "ht6560b", "cmd640_vlb", "dtc2278", "umc8672", "ali14xx", "dc4030", NULL };
-		hw = s[3] - '0';
+		hw = s[0] - '0';
 		ch = &ide_hwifs[hw];
 
 
-		switch (match_parm(s+4, ide_options, vals, 1)) {
+		switch (match_parm(s + 1, ide_options, vals, 1)) {
 			case -7: /* ata66 */
 #ifdef CONFIG_PCI
 				ch->udma_four = 1;
@@ -889,7 +916,6 @@ int __init ide_setup(char *s)
 				ch->drives[1].autotune = 1;
 				goto done;
 			case -2: /* "serialize" */
-			do_serialize:
 				{
 					struct ata_channel *mate;
 
@@ -904,7 +930,10 @@ int __init ide_setup(char *s)
 				goto done;
 		}
 
-		i = match_parm(&s[4], ide_words, vals, 3);
+		/*
+		 * Check for specific chipset name
+		 */
+		i = match_parm(s + 1, ide_words, vals, 3);
 
 		/*
 		 * Cryptic check to ensure chipset not already set for a channel:
@@ -913,7 +942,7 @@ int __init ide_setup(char *s)
 			if (ide_hwifs[hw].chipset != ide_unknown)
 				goto bad_option;	/* chipset already specified */
 			if (i != -7 && hw != 0)
-				goto bad_channel;		/* chipset drivers are for "ide0=" only */
+				goto bad_channel;	/* chipset drivers are for "ide0=" only */
 			if (i != -7 && ide_hwifs[1].chipset != ide_unknown)
 				goto bad_option;	/* chipset for 2nd port already specified */
 			printk("\n");
@@ -931,7 +960,7 @@ int __init ide_setup(char *s)
 #ifdef CONFIG_BLK_DEV_ALI14XX
 			case -6:  /* "ali14xx" */
 			{
-				extern void init_ali14xx (void);
+				extern void init_ali14xx(void);
 				init_ali14xx();
 				goto done;
 			}
@@ -939,7 +968,7 @@ int __init ide_setup(char *s)
 #ifdef CONFIG_BLK_DEV_UMC8672
 			case -5:  /* "umc8672" */
 			{
-				extern void init_umc8672 (void);
+				extern void init_umc8672(void);
 				init_umc8672();
 				goto done;
 			}
@@ -947,7 +976,7 @@ int __init ide_setup(char *s)
 #ifdef CONFIG_BLK_DEV_DTC2278
 			case -4:  /* "dtc2278" */
 			{
-				extern void init_dtc2278 (void);
+				extern void init_dtc2278(void);
 				init_dtc2278();
 				goto done;
 			}
@@ -963,7 +992,7 @@ int __init ide_setup(char *s)
 #ifdef CONFIG_BLK_DEV_HT6560B
 			case -2:  /* "ht6560b" */
 			{
-				extern void init_ht6560b (void);
+				extern void init_ht6560b(void);
 				init_ht6560b();
 				goto done;
 			}
@@ -971,7 +1000,7 @@ int __init ide_setup(char *s)
 #if CONFIG_BLK_DEV_QD65XX
 			case -1:  /* "qd65xx" */
 			{
-				extern void init_qd65xx (void);
+				extern void init_qd65xx(void);
 				init_qd65xx();
 				goto done;
 			}
@@ -1012,10 +1041,7 @@ done:
 
 /****************************************************************************/
 
-/*
- * This is in fact registering a device not a driver.
- */
-int ide_register_subdriver(struct ata_device *drive, struct ata_operations *driver)
+int ata_register_device(struct ata_device *drive, struct ata_operations *driver)
 {
 	unsigned long flags;
 
@@ -1027,12 +1053,9 @@ int ide_register_subdriver(struct ata_device *drive, struct ata_operations *driv
 		return 1;
 	}
 
-	/* FIXME: This will be pushed to the drivers! Thus allowing us to
-	 * save one parameter here and to separate this out.
-	 */
 	drive->driver = driver;
-
 	spin_unlock_irqrestore(&ide_lock, flags);
+
 	/* Default autotune or requested autotune */
 	if (drive->autotune != 2) {
 		struct ata_channel *ch = drive->channel;
@@ -1046,11 +1069,13 @@ int ide_register_subdriver(struct ata_device *drive, struct ata_operations *driv
 			 *   PARANOIA!!!
 			 */
 
+			spin_lock_irqsave(ch->lock, flags);
 			udma_enable(drive, 0, 0);
 			ch->udma_setup(drive, ch->modes_map);
 #ifdef CONFIG_BLK_DEV_IDE_TCQ_DEFAULT
 			udma_tcq_enable(drive, 1);
 #endif
+			spin_unlock_irqrestore(ch->lock, flags);
 		}
 
 		/* Only CD-ROMs and tape drives support DSC overlap.  But only
@@ -1078,13 +1103,8 @@ int ide_register_subdriver(struct ata_device *drive, struct ata_operations *driv
  *
  * FIXME: Check whatever we maybe don't call it twice!.
  */
-int ide_unregister_subdriver(struct ata_device *drive)
+int ata_unregister_device(struct ata_device *drive)
 {
-#if 0
-	if (__MOD_IN_USE(ata_ops(drive)->owner))
-		return 1;
-#endif
-
 	if (drive->usage || drive->busy || !ata_ops(drive))
 		return 1;
 
@@ -1120,7 +1140,7 @@ int register_ata_driver(struct ata_operations *driver)
 EXPORT_SYMBOL(register_ata_driver);
 
 /*
- * Unregister an ATA subdriver for a particular device type.
+ * Unregister an ATA sub-driver for a particular device type.
  */
 void unregister_ata_driver(struct ata_operations *driver)
 {
@@ -1156,8 +1176,8 @@ EXPORT_SYMBOL(ide_lock);
 
 devfs_handle_t ide_devfs_handle;
 
-EXPORT_SYMBOL(ide_register_subdriver);
-EXPORT_SYMBOL(ide_unregister_subdriver);
+EXPORT_SYMBOL(ata_register_device);
+EXPORT_SYMBOL(ata_unregister_device);
 EXPORT_SYMBOL(ata_revalidate);
 EXPORT_SYMBOL(ide_register_hw);
 EXPORT_SYMBOL(ide_unregister);
@@ -1432,8 +1452,14 @@ static int __init init_ata(void)
 		while ((options = next) != NULL) {
 			if ((next = strchr(options,' ')) != NULL)
 				*next++ = 0;
-			if (!ide_setup(options))
-				printk(KERN_ERR "Unknown option '%s'\n", options);
+			if (!strncmp(options,"hd",2)) {
+				if (!ata_hd_setup(options+2))
+					printk(KERN_ERR "Unknown option '%s'\n", options);
+			}
+			else if (!strncmp(options,"ide",3)) {
+				if (!ide_setup(options+3))
+					printk(KERN_ERR "Unknown option '%s'\n", options);
+			}
 		}
 	}
 	return ata_module_init();
@@ -1457,6 +1483,7 @@ module_exit(cleanup_ata);
 #ifndef MODULE
 
 /* command line option parser */
-__setup("", ide_setup);
+__setup("ide", ide_setup);
+__setup("hd", ata_hd_setup);
 
 #endif

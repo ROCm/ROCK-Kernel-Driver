@@ -48,10 +48,10 @@ __SYSCALL(__NR_rt_sigreturn, stub_rt_sigreturn)
 
 #define __NR_ioctl                              16
 __SYSCALL(__NR_ioctl, sys_ioctl)
-#define __NR_pread                              17
-__SYSCALL(__NR_pread, sys_pread)
-#define __NR_pwrite                             18
-__SYSCALL(__NR_pwrite, sys_pwrite)
+#define __NR_pread64                            17
+__SYSCALL(__NR_pread64, sys_pread64)
+#define __NR_pwrite64                           18
+__SYSCALL(__NR_pwrite64, sys_pwrite64)
 #define __NR_readv                              19
 __SYSCALL(__NR_readv, sys_readv)
 #define __NR_writev                             20

@@ -11,6 +11,8 @@
 
 O_TARGET 		:= 8xx_io.o
 
+export-objs		:= fec.o
+
 obj-y			:= commproc.o uart.o
 
 obj-$(CONFIG_FEC_ENET)	+= fec.o

@@ -249,11 +249,7 @@ static u8 ht_pio2timings(struct ata_device *drive, u8 pio)
  */
 static void ht_set_prefetch(struct ata_device *drive, u8 state)
 {
-	unsigned long flags;
 	int t = HT_PREFETCH_MODE << 8;
-
-	save_flags (flags);	/* all CPUs */
-	cli();		        /* all CPUs */
 
 	/*
 	 *  Prefetch mode and unmask irq seems to conflict
@@ -267,16 +263,16 @@ static void ht_set_prefetch(struct ata_device *drive, u8 state)
 		drive->channel->no_unmask = 0;
 	}
 
-	restore_flags (flags);	/* all CPUs */
-
 #ifdef DEBUG
 	printk("ht6560b: drive %s prefetch mode %sabled\n", drive->name, (state ? "en" : "dis"));
 #endif
 }
 
+/* Assumes IRQ's are disabled or at least that no other process will attempt to
+ * access the IDE registers concurrently.
+ */
 static void tune_ht6560b(struct ata_device *drive, u8 pio)
 {
-	unsigned long flags;
 	u8 timing;
 
 	switch (pio) {
@@ -288,13 +284,8 @@ static void tune_ht6560b(struct ata_device *drive, u8 pio)
 
 	timing = ht_pio2timings(drive, pio);
 
-	save_flags (flags);	/* all CPUs */
-	cli();		        /* all CPUs */
-
 	drive->drive_data &= 0xff00;
 	drive->drive_data |= timing;
-
-	restore_flags (flags);	/* all CPUs */
 
 #ifdef DEBUG
 	printk("ht6560b: drive %s tuned to pio mode %#x timing=%#x\n", drive->name, pio, timing);

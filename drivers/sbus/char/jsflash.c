@@ -533,23 +533,23 @@ static int jsfd_release(struct inode *inode, struct file *file)
 }
 
 static struct file_operations jsf_fops = {
-	owner:		THIS_MODULE,
-	llseek:		jsf_lseek,
-	read:		jsf_read,
-	write:		jsf_write,
-	ioctl:		jsf_ioctl,
-	mmap:		jsf_mmap,
-	open:		jsf_open,
-	release:	jsf_release,
+	.owner =	THIS_MODULE,
+	.llseek =	jsf_lseek,
+	.read =		jsf_read,
+	.write =	jsf_write,
+	.ioctl =	jsf_ioctl,
+	.mmap =		jsf_mmap,
+	.open =		jsf_open,
+	.release =	jsf_release,
 };
 
 static struct miscdevice jsf_dev = { JSF_MINOR, "jsflash", &jsf_fops };
 
 static struct block_device_operations jsfd_fops = {
-	owner:		THIS_MODULE,
-	open:		jsfd_open,
-	release:	jsfd_release,
-	ioctl:		jsfd_ioctl,
+	.owner =	THIS_MODULE,
+	.open =		jsfd_open,
+	.release =	jsfd_release,
+	.ioctl =	jsfd_ioctl,
 };
 
 int jsflash_init(void)

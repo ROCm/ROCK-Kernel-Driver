@@ -82,8 +82,8 @@
 #define __NR_getpagesize         64 /* Common                                      */
 #define __NR_msync               65 /* Common in newer 1.3.x revs...               */
 #define __NR_vfork               66 /* Common                                      */
-#define __NR_pread               67 /* Linux Specific                              */
-#define __NR_pwrite              68 /* Linux Specific                              */
+#define __NR_pread64             67 /* Linux Specific                              */
+#define __NR_pwrite64            68 /* Linux Specific                              */
 #define __NR_geteuid32           69 /* Linux sparc32, sbrk under SunOS             */
 #define __NR_getegid32           70 /* Linux sparc32, sstk under SunOS             */
 #define __NR_mmap                71 /* Common                                      */

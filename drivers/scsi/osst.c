@@ -5585,11 +5585,7 @@ static int osst_init()
   if (osst_template.dev_noticed == 0) return 0;
 
   if(!osst_registered) {
-#ifdef CONFIG_DEVFS_FS
-	if (devfs_register_chrdev(MAJOR_NR,"osst",&osst_fops)) {
-#else
 	if (register_chrdev(MAJOR_NR,"osst",&osst_fops)) {
-#endif
 		printk(KERN_ERR "osst :W: Unable to get major %d for OnStream tapes\n",MAJOR_NR);
 		return 1;
 	}
@@ -5605,11 +5601,7 @@ static int osst_init()
 				   GFP_ATOMIC);
   if (os_scsi_tapes == NULL) {
 	printk(KERN_ERR "osst :W: Unable to allocate array for OnStream SCSI tapes.\n");
-#ifdef CONFIG_DEVFS_FS
-	devfs_unregister_chrdev(MAJOR_NR, "osst");
-#else
 	unregister_chrdev(MAJOR_NR, "osst");
-#endif
 	return 1;
   }
 
@@ -5621,11 +5613,7 @@ static int osst_init()
 				    GFP_ATOMIC);
   if (osst_buffers == NULL) {
 	printk(KERN_ERR "osst :W: Unable to allocate tape buffer pointers.\n");
-#ifdef CONFIG_DEVFS_FS
-	devfs_unregister_chrdev(MAJOR_NR, "osst");
-#else
 	unregister_chrdev(MAJOR_NR, "osst");
-#endif
 	kfree(os_scsi_tapes);
 	return 1;
   }
@@ -5684,11 +5672,7 @@ static void __exit exit_osst (void)
   OS_Scsi_Tape * STp;
 
   scsi_unregister_device(&osst_template);
-#ifdef CONFIG_DEVFS_FS
-  devfs_unregister_chrdev(MAJOR_NR, "osst");
-#else
   unregister_chrdev(MAJOR_NR, "osst");
-#endif
   osst_registered--;
   if(os_scsi_tapes != NULL) {
 	for (i=0; i < osst_template.dev_max; ++i) {

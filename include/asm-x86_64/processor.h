@@ -367,7 +367,7 @@ extern unsigned long get_wchan(struct task_struct *p);
 /* REP NOP (PAUSE) is a good thing to insert into busy-wait loops. */
 extern inline void rep_nop(void)
 {
-	__asm__ __volatile__("rep;nop");
+	__asm__ __volatile__("rep;nop": : :"memory");
 }
 
 #define cpu_has_fpu 1

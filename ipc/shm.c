@@ -186,7 +186,7 @@ static int newseg (key_t key, int shmflg, size_t size)
 	shp->shm_flags = (shmflg & S_IRWXUGO);
 
 	sprintf (name, "SYSV%08x", key);
-	file = shmem_file_setup(name, size);
+	file = shmem_file_setup(name, size, VM_ACCOUNT);
 	error = PTR_ERR(file);
 	if (IS_ERR(file))
 		goto no_file;

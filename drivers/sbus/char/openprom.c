@@ -334,6 +334,9 @@ static int copyin_string(char *user, size_t len, char **ptr)
 {
 	char *tmp;
 
+	if ((ssize_t)len < 0 || (ssize_t)(len + 1) < 0)
+		return -EINVAL;
+
 	tmp = kmalloc(len + 1, GFP_KERNEL);
 	if (!tmp)
 		return -ENOMEM;
@@ -608,11 +611,11 @@ static int openprom_release(struct inode * inode, struct file * file)
 }
 
 static struct file_operations openprom_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	ioctl:		openprom_ioctl,
-	open:		openprom_open,
-	release:	openprom_release,
+	.owner =	THIS_MODULE,
+	.llseek =	no_llseek,
+	.ioctl =	openprom_ioctl,
+	.open =		openprom_open,
+	.release =	openprom_release,
 };
 
 static struct miscdevice openprom_dev = {

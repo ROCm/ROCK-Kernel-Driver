@@ -173,11 +173,11 @@ static struct llc_sap_state_trans *llc_sap_active_state_transitions[] = {
 /* SAP state transition table */
 struct llc_sap_state llc_sap_state_table[] = {
 	{
-		curr_state:	LLC_SAP_STATE_INACTIVE,
-		transitions:	llc_sap_inactive_state_transitions,
+		.curr_state =	LLC_SAP_STATE_INACTIVE,
+		.transitions =	llc_sap_inactive_state_transitions,
        	},
 	{
-		curr_state:	LLC_SAP_STATE_ACTIVE,
-		transitions:	llc_sap_active_state_transitions,
+		.curr_state =	LLC_SAP_STATE_ACTIVE,
+		.transitions =	llc_sap_active_state_transitions,
 	},
 };

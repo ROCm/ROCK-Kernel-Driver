@@ -2496,48 +2496,48 @@ int ipx_unregister_spx(void)
  */
 
 static struct net_proto_family ipx_family_ops = {
-	family:		PF_IPX,
-	create:		ipx_create,
+	.family =	PF_IPX,
+	.create =	ipx_create,
 };
 
 static struct proto_ops SOCKOPS_WRAPPED(ipx_dgram_ops) = {
-	family:		PF_IPX,
+	.family =	PF_IPX,
 
-	release:	ipx_release,
-	bind:		ipx_bind,
-	connect:	ipx_connect,
-	socketpair:	sock_no_socketpair,
-	accept:		sock_no_accept,
-	getname:	ipx_getname,
-	poll:		datagram_poll,
-	ioctl:		ipx_ioctl,
-	listen:		sock_no_listen,
-	shutdown:	sock_no_shutdown, /* FIXME: have to support shutdown */
-	setsockopt:	ipx_setsockopt,
-	getsockopt:	ipx_getsockopt,
-	sendmsg:	ipx_sendmsg,
-	recvmsg:	ipx_recvmsg,
-	mmap:		sock_no_mmap,
-	sendpage:	sock_no_sendpage,
+	.release =	ipx_release,
+	.bind =		ipx_bind,
+	.connect =	ipx_connect,
+	.socketpair =	sock_no_socketpair,
+	.accept =	sock_no_accept,
+	.getname =	ipx_getname,
+	.poll =		datagram_poll,
+	.ioctl =	ipx_ioctl,
+	.listen =	sock_no_listen,
+	.shutdown =	sock_no_shutdown, /* FIXME: have to support shutdown */
+	.setsockopt =	ipx_setsockopt,
+	.getsockopt =	ipx_getsockopt,
+	.sendmsg =	ipx_sendmsg,
+	.recvmsg =	ipx_recvmsg,
+	.mmap =		sock_no_mmap,
+	.sendpage =	sock_no_sendpage,
 };
 
 #include <linux/smp_lock.h>
 SOCKOPS_WRAP(ipx_dgram, PF_IPX);
 
 static struct packet_type ipx_8023_packet_type = {
-	type:		__constant_htons(ETH_P_802_3),
-	func:		ipx_rcv,
-	data:		(void *) 1,	/* yap, I understand shared skbs :-) */
+	.type =		__constant_htons(ETH_P_802_3),
+	.func =		ipx_rcv,
+	.data =		(void *) 1,	/* yap, I understand shared skbs :-) */
 };
 
 static struct packet_type ipx_dix_packet_type = {
-	type:		__constant_htons(ETH_P_IPX),
-	func:		ipx_rcv,
-	data:		(void *) 1,	/* yap, I understand shared skbs :-) */
+	.type =		__constant_htons(ETH_P_IPX),
+	.func =		ipx_rcv,
+	.data =		(void *) 1,	/* yap, I understand shared skbs :-) */
 };
 
 static struct notifier_block ipx_dev_notifier = {
-	notifier_call:	ipxitf_device_event,
+	.notifier_call =ipxitf_device_event,
 };
 
 

@@ -283,12 +283,14 @@ int nfs_fill_super(struct super_block *sb, struct nfs_mount_data *data, int sile
 	INIT_LIST_HEAD(&server->lru_busy);
 
  nfsv3_try_again:
+	server->caps = 0;
 	/* Check NFS protocol revision and initialize RPC op vector
 	 * and file handle pool. */
 	if (data->flags & NFS_MOUNT_VER3) {
 #ifdef CONFIG_NFS_V3
 		server->rpc_ops = &nfs_v3_clientops;
 		version = 3;
+		server->caps |= NFS_CAP_READDIRPLUS;
 		if (data->version < 4) {
 			printk(KERN_NOTICE "NFS: NFSv3 not supported by mount program.\n");
 			goto out_unlock;
@@ -642,6 +644,9 @@ nfs_fhget(struct dentry *dentry, struct nfs_fh *fhandle,
 	return __nfs_fhget(sb, fhandle, fattr);
 }
 
+/* Don't use READDIRPLUS on directories that we believe are too large */
+#define NFS_LIMIT_READDIRPLUS (8*PAGE_SIZE)
+
 /*
  * Look up the inode by super block and fattr->fileid.
  */
@@ -690,6 +695,9 @@ __nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 		} else if (S_ISDIR(inode->i_mode)) {
 			inode->i_op = &nfs_dir_inode_operations;
 			inode->i_fop = &nfs_dir_operations;
+			if (nfs_server_capable(inode, NFS_CAP_READDIRPLUS)
+			    && fattr->size <= NFS_LIMIT_READDIRPLUS)
+				NFS_FLAGS(inode) |= NFS_INO_ADVISE_RDPLUS;
 		} else if (S_ISLNK(inode->i_mode))
 			inode->i_op = &nfs_symlink_inode_operations;
 		else
@@ -700,13 +708,13 @@ __nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 		new_isize = nfs_size_to_loff_t(fattr->size);
 		new_atime = nfs_time_to_secs(fattr->atime);
 
-		NFS_READTIME(inode) = jiffies;
+		NFS_READTIME(inode) = fattr->timestamp;
 		NFS_CACHE_CTIME(inode) = fattr->ctime;
 		inode->i_ctime = nfs_time_to_secs(fattr->ctime);
 		inode->i_atime = new_atime;
 		NFS_CACHE_MTIME(inode) = new_mtime;
 		inode->i_mtime = nfs_time_to_secs(new_mtime);
-		NFS_MTIME_UPDATE(inode) = jiffies;
+		NFS_MTIME_UPDATE(inode) = fattr->timestamp;
 		NFS_CACHE_ISIZE(inode) = new_size;
 		inode->i_size = new_isize;
 		inode->i_mode = fattr->mode;
@@ -1014,6 +1022,9 @@ __nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
 		goto out_err;
 	}
 
+	/* Throw out obsolete READDIRPLUS attributes */
+	if (time_before(fattr->timestamp, NFS_READTIME(inode)))
+		return 0;
 	/*
 	 * Make sure the inode's type hasn't changed.
 	 */
@@ -1032,7 +1043,7 @@ __nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
 	/*
 	 * Update the read time so we don't revalidate too often.
 	 */
-	NFS_READTIME(inode) = jiffies;
+	NFS_READTIME(inode) = fattr->timestamp;
 
 	/*
 	 * Note: NFS_CACHE_ISIZE(inode) reflects the state of the cache.
@@ -1082,7 +1093,7 @@ __nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
 
 	if (NFS_CACHE_MTIME(inode) != new_mtime) {
 		if (invalid)
-			NFS_MTIME_UPDATE(inode) = jiffies;
+			NFS_MTIME_UPDATE(inode) = fattr->timestamp;
 		NFS_CACHE_MTIME(inode) = new_mtime;
 		inode->i_mtime = nfs_time_to_secs(new_mtime);
 	}

@@ -70,7 +70,7 @@ extern void sbus_init(void);
 extern void sysctl_init(void);
 extern void signals_init(void);
 extern void buffer_init(void);
-
+extern void pte_chain_init(void);
 extern void radix_tree_init(void);
 extern void free_initmem(void);
 
@@ -432,7 +432,7 @@ asmlinkage void __init start_kernel(void)
 	mem_init();
 	kmem_cache_sizes_init();
 	pgtable_cache_init();
-
+	pte_chain_init();
 	mempages = num_physpages;
 
 	fork_init(mempages);
@@ -524,6 +524,17 @@ static void __init do_basic_setup(void)
 	do_initcalls();
 }
 
+static void do_pre_smp_initcalls(void)
+{
+	extern int spawn_ksoftirqd(void);
+#ifdef CONFIG_SMP
+	extern int migration_init(void);
+
+	migration_init();
+#endif
+	spawn_ksoftirqd();
+}
+
 extern void prepare_namespace(void);
 
 static int init(void * unused)
@@ -533,6 +544,9 @@ static int init(void * unused)
 	lock_kernel();
 	/* Sets up cpus_possible() */
 	smp_prepare_cpus(max_cpus);
+
+	do_pre_smp_initcalls();
+
 	smp_init();
 	do_basic_setup();
 

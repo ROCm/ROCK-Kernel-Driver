@@ -1,8 +1,8 @@
-/* $Id: iommu.c,v 1.22 2001/12/17 07:05:09 davem Exp $
+/*
  * iommu.c:  IOMMU specific routines for memory management.
  *
  * Copyright (C) 1995 David S. Miller  (davem@caip.rutgers.edu)
- * Copyright (C) 1995 Pete Zaitcev
+ * Copyright (C) 1995,2002 Pete Zaitcev     (zaitcev@yahoo.com)
  * Copyright (C) 1996 Eddie C. Dost    (ecd@skynet.be)
  * Copyright (C) 1997,1998 Jakub Jelinek    (jj@sunsite.mff.cuni.cz)
  */
@@ -12,6 +12,8 @@
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <linux/slab.h>
+#include <linux/highmem.h>	/* pte_offset_map => kmap_atomic */
+
 #include <asm/scatterlist.h>
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>
@@ -19,6 +21,8 @@
 #include <asm/io.h>
 #include <asm/mxcc.h>
 #include <asm/mbus.h>
+#include <asm/cacheflush.h>
+#include <asm/tlbflush.h>
 
 /* srmmu.c */
 extern int viking_mxcc_present;
@@ -245,7 +249,8 @@ static void iommu_map_dma_area(unsigned long va, __u32 addr, int len)
 
 			pgdp = pgd_offset(&init_mm, addr);
 			pmdp = pmd_offset(pgdp, addr);
-			ptep = pte_offset(pmdp, addr);
+			ptep = pte_offset_map(pmdp, addr);
+			/* XXX What if we run out of atomic maps above */
 
 			set_pte(ptep, mk_pte(virt_to_page(page), dvma_prot));
 			if (ipte_cache != 0) {

@@ -12,7 +12,7 @@
 #include <asm/sockios.h>
 
 /*
- * For setsockoptions(2)
+ * For setsockopt(2)
  *
  * This defines are ABI conformant as far as Linux supports these ...
  */

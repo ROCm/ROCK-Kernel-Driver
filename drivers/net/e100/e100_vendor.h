@@ -125,6 +125,7 @@ enum e100_device_type {
 	E100_82559_LOM,
 	E100_82559_LOM_AOL,
 	E100_82559_LOM_AOL2,
+	E100_82559_LOM_DELL,
 	E100_IBM_MDS,
 	E100_CMPQ_S,
 	E100_PROVE_DA,
@@ -132,7 +133,8 @@ enum e100_device_type {
 	E100_PROVE_LOM,
 	E100_PROVE_NET,
 	E100_82562,
-	E100_ALL_BOARDS,
+	E100_82551QM,
+	E100_ALL_BOARDS
 };
 
 struct e100_vendor_info e100_vendor_info_array[] = {
@@ -147,6 +149,7 @@ struct e100_vendor_info e100_vendor_info_array[] = {
 	{ E100_BRD_100, "Intel(R) PRO/100+ PCI Adapter"},
 	{ E100_BRD_100M, "Intel(R) PRO/100+ Management Adapter"},
 	{ E100_BRD_AOL2, "Intel(R) PRO/100+ Alert on LAN* 2 Management Adapter"},
+	{ E100_82559_LOM_DELL, "Intel(R) 8255x Based Network Connection"},
 	{ E100_BRD_AOL, "Intel(R) PRO/100+ Alert on LAN* Management Adapter"},
 	{ E100_PROS_M, "Intel(R) PRO/100 S Management Adapter"},
 	{ E100_PROS_AM, "Intel(R) PRO/100 S Advanced Management Adapter"},
@@ -186,6 +189,7 @@ struct e100_vendor_info e100_vendor_info_array[] = {
 	{ E100_PROVE_LOM, "Intel(R) PRO/100 VE Network ConnectionPLC LOM" },
 	{ E100_PROVE_NET, "Intel(R) PRO/100 VE Network Connection"},
 	{ E100_82562, "Intel(R)82562 based Fast Ethernet Connection"},
+	{ E100_82551QM, "Intel(R) PRO/100 M Mobile Connection"},
 	{ E100_ALL_BOARDS, "Intel(R) 8255x-based Ethernet Adapter"},
 	{0,NULL}
 };
@@ -309,6 +313,7 @@ static struct pci_device_id e100_id_table[] __devinitdata = {
 	{0x8086, 0x1229, 0x0E11, 0xB144, 0, 0, E100_CMPQ_S},     
 	{0x8086, 0x1229, 0x0E11, 0xB163, 0, 0, E100_CMPQ_S},     
 	{0x8086, 0x1229, 0x0E11, 0xB164, 0, 0, E100_CMPQ_S},
+	{0x8086, 0x1229, 0x1028, PCI_ANY_ID, 0, 0, E100_82559_LOM_DELL},
 	{0x8086, 0x1229, PCI_ANY_ID, PCI_ANY_ID, 0, 0, E100_ALL_BOARDS},
 
 	{0x8086, 0x2449, 0x1014, 0x0265, 0, 0, E100_PROVE_D},
@@ -324,7 +329,11 @@ static struct pci_device_id e100_id_table[] __devinitdata = {
 	{0x8086, 0x2449, 0x0E11, PCI_ANY_ID, 0, 0, E100_PROVM_NET},
 	{0x8086, 0x2449, 0x1014, PCI_ANY_ID, 0, 0, E100_PROVE_D},	
 	{0x8086, 0x2449, PCI_ANY_ID, PCI_ANY_ID, 0, 0, E100_ALL_BOARDS},
-
+	
+	{0x8086, 0x1059, 0x1179, 0x0005, 0, 0, E100_82551QM},
+	{0x8086, 0x1059, 0x1033, 0x8191, 0, 0, E100_82551QM},
+	{0x8086, 0x1059, PCI_ANY_ID, PCI_ANY_ID, 0, 0, E100_82551QM},
+	
 	{0x8086, 0x1209, PCI_ANY_ID, PCI_ANY_ID, 0, 0, E100_ALL_BOARDS},
   	{0x8086, 0x1029, PCI_ANY_ID, PCI_ANY_ID, 0, 0, E100_ALL_BOARDS},
 	{0x8086, 0x1030, PCI_ANY_ID, PCI_ANY_ID, 0, 0, E100_ALL_BOARDS},	

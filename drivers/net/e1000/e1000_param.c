@@ -196,37 +196,10 @@ E1000_PARAM(XsumRX, "Disable or enable Receive Checksum offload");
  *
  * Valid Range: 0-65535
  *
- * Default Value: 64/128
+ * Default Value: 0/128
  */
 
 E1000_PARAM(RxIntDelay, "Receive Interrupt Delay");
-
-/* MDI-X Support Enable/Disable - Applies only to Copper PHY
- *
- * Valid Range: 0, 3
- *  - 0 - Auto in all modes
- *  - 1 - MDI
- *  - 2 - MDI-X
- *  - 3 - Auto in 1000 Base-T mode (MDI in 10 Base-T and 100 Base-T)
- *
- * Default Value: 0 (Auto)
- */
-
-E1000_PARAM(MdiX, "Set MDI/MDI-X Mode");
-
-/* Automatic Correction of Reversed Cable Polarity Enable/Disable
- * This setting applies only to Copper PHY
- *
- * Valid Range: 0, 1
- *  - 0 - Disabled
- *  - 1 - Enabled
- *
- * Default Value: 1 (Enabled)
- */
-
-E1000_PARAM(DisablePolarityCorrection,
-	"Disable or enable Automatic Correction for Reversed Cable Polarity");
-
 
 #define AUTONEG_ADV_DEFAULT  0x2F
 #define AUTONEG_ADV_MASK     0x2F
@@ -242,15 +215,10 @@ E1000_PARAM(DisablePolarityCorrection,
 #define MIN_RXD                       80
 #define MAX_82544_RXD               4096
 
-#define DEFAULT_RDTR                  64
+#define DEFAULT_RDTR                   0
 #define DEFAULT_RADV                 128
 #define MAX_RXDELAY               0xFFFF
 #define MIN_RXDELAY                    0
-
-#define DEFAULT_MDIX                   0
-#define MAX_MDIX                       3
-#define MIN_MDIX                       0
-
 
 struct e1000_option {
 	enum { enable_option, range_option, list_option } type;
@@ -646,36 +614,6 @@ e1000_check_copper_options(struct e1000_adapter *adapter)
 		BUG();
 	}
 
-	/* a few other copper only options */
-
-	{ /* MDI/MDI-X */
-		struct e1000_option opt = {
-			type: range_option,
-			name: "MDI/MDI-X",
-			err:  "using default of " __MODULE_STRING(DEFAULT_MDIX),
-			def:  DEFAULT_MDIX,
-			arg: { r: { min: MIN_MDIX, max: MAX_MDIX }}
-		};
-
-		int mdix = MdiX[bd];
-		e1000_validate_option(&mdix, &opt);
-		adapter->hw.mdix = mdix;
-	}
-	{ /* Automatic Correction for Reverse Cable Polarity */
-	  /* option is actually to disable polarity correction,
-	   * so setting to OPTION_ENABLED turns the hardware feature off */
-		struct e1000_option opt = {
-			type: enable_option,
-			name: "Disable Polarity Correction",
-			err:  "defaulting to Disabled",
-			def:  OPTION_DISABLED,
-		};
-
-		int dpc = DisablePolarityCorrection[bd];
-		e1000_validate_option(&dpc, &opt);
-		adapter->hw.disable_polarity_correction = dpc;
-	}
-	
 	/* Speed, AutoNeg and MDI/MDI-X must all play nice */
 	if (e1000_validate_mdi_setting(&(adapter->hw)) < 0) {
 		printk(KERN_INFO "Speed, AutoNeg and MDI-X specifications are "

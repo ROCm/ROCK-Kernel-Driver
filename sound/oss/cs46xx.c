@@ -2521,7 +2521,7 @@ static int cs_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 			{
 				dmabuf = &state->dmabuf;
 				stop_dac(state);
-				synchronize_irq();
+				synchronize_irq(card->irq);
 				dmabuf->ready = 0;
 				resync_dma_ptrs(state);
 				dmabuf->swptr = dmabuf->hwptr = 0;
@@ -2536,7 +2536,7 @@ static int cs_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 			{
 				dmabuf = &state->dmabuf;
 				stop_adc(state);
-				synchronize_irq();
+				synchronize_irq(card->irq);
 				resync_dma_ptrs(state);
 				dmabuf->ready = 0;
 				dmabuf->swptr = dmabuf->hwptr = 0;

@@ -933,9 +933,8 @@ void __exit exit_gscd(void)
 {
 	CLEAR_TIMER;
 
-	devfs_unregister(devfs_find_handle
-			 (NULL, "gscd", 0, 0, DEVFS_SPECIAL_BLK, 0));
-	if ((devfs_unregister_blkdev(MAJOR_NR, "gscd") == -EINVAL)) {
+	devfs_find_and_unregister(NULL, "gscd", 0, 0, DEVFS_SPECIAL_BLK, 0);
+	if ((unregister_blkdev(MAJOR_NR, "gscd") == -EINVAL)) {
 		printk("What's that: can't unregister GoldStar-module\n");
 		return;
 	}
@@ -1013,7 +1012,7 @@ int __init my_gscd_init(void)
 		i++;
 	}
 
-	if (devfs_register_blkdev(MAJOR_NR, "gscd", &gscd_fops) != 0) {
+	if (register_blkdev(MAJOR_NR, "gscd", &gscd_fops) != 0) {
 		printk(KERN_WARNING "GSCD: Unable to get major %d for GoldStar "
 		       "CD-ROM\n", MAJOR_NR);
 		ret = -EIO;

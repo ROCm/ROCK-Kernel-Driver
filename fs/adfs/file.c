@@ -36,6 +36,7 @@ struct file_operations adfs_file_operations = {
 	mmap:		generic_file_mmap,
 	fsync:		file_fsync,
 	write:		generic_file_write,
+	sendfile:	generic_file_sendfile,
 };
 
 struct inode_operations adfs_file_inode_operations = {

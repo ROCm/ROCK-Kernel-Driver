@@ -77,25 +77,25 @@ struct fib_rule
 };
 
 static struct fib_rule default_rule = {
-	r_clntref:	ATOMIC_INIT(2),
-	r_preference:	0x7FFF,
-	r_table:	RT_TABLE_DEFAULT,
-	r_action:	RTN_UNICAST,
+	.r_clntref =	ATOMIC_INIT(2),
+	.r_preference =	0x7FFF,
+	.r_table =	RT_TABLE_DEFAULT,
+	.r_action =	RTN_UNICAST,
 };
 
 static struct fib_rule main_rule = {
-	r_next:		&default_rule,
-	r_clntref:	ATOMIC_INIT(2),
-	r_preference:	0x7FFE,
-	r_table:	RT_TABLE_MAIN,
-	r_action:	RTN_UNICAST,
+	.r_next =	&default_rule,
+	.r_clntref =	ATOMIC_INIT(2),
+	.r_preference =	0x7FFE,
+	.r_table =	RT_TABLE_MAIN,
+	.r_action =	RTN_UNICAST,
 };
 
 static struct fib_rule local_rule = {
-	r_next:		&main_rule,
-	r_clntref:	ATOMIC_INIT(2),
-	r_table:	RT_TABLE_LOCAL,
-	r_action:	RTN_UNICAST,
+	.r_next =	&main_rule,
+	.r_clntref =	ATOMIC_INIT(2),
+	.r_table =	RT_TABLE_LOCAL,
+	.r_action =	RTN_UNICAST,
 };
 
 static struct fib_rule *fib_rules = &local_rule;
@@ -392,7 +392,7 @@ static int fib_rules_event(struct notifier_block *this, unsigned long event, voi
 
 
 struct notifier_block fib_rules_notifier = {
-	notifier_call:	fib_rules_event,
+	.notifier_call =fib_rules_event,
 };
 
 static __inline__ int inet_fill_rule(struct sk_buff *skb,

@@ -5,29 +5,19 @@
  *
  * Based on drivers/char/serial.c
  *
- *  $Id: 21285.c,v 1.34 2002/07/22 15:27:32 rmk Exp $
+ *  $Id: 21285.c,v 1.37 2002/07/28 10:03:27 rmk Exp $
  */
 #include <linux/config.h>
 #include <linux/module.h>
-#include <linux/errno.h>
-#include <linux/signal.h>
-#include <linux/sched.h>
-#include <linux/interrupt.h>
 #include <linux/tty.h>
-#include <linux/tty_flip.h>
-#include <linux/serial.h>
-#include <linux/major.h>
-#include <linux/ptrace.h>
 #include <linux/ioport.h>
-#include <linux/mm.h>
-#include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/console.h>
 #include <linux/serial_core.h>
+#include <linux/serial.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
-#include <asm/uaccess.h>
 #include <asm/hardware/dec21285.h>
 #include <asm/hardware.h>
 
@@ -85,14 +75,10 @@ serial21285_start_tx(struct uart_port *port, unsigned int tty_start)
 
 static void serial21285_stop_rx(struct uart_port *port)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&port->lock, flags);
 	if (rx_enabled(port)) {
 		disable_irq(IRQ_CONRX);
 		rx_enabled(port) = 0;
 	}
-	spin_unlock_irqrestore(&port->lock, flags);
 }
 
 static void serial21285_enable_ms(struct uart_port *port)
@@ -514,7 +500,7 @@ static int __init serial21285_init(void)
 {
 	int ret;
 
-	printk(KERN_INFO "Serial: 21285 driver $Revision: 1.34 $\n");
+	printk(KERN_INFO "Serial: 21285 driver $Revision: 1.37 $\n");
 
 	serial21285_setup_ports();
 
@@ -537,4 +523,4 @@ module_exit(serial21285_exit);
 EXPORT_NO_SYMBOLS;
 
 MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("Intel Footbridge (21285) serial driver $Revision: 1.34 $");
+MODULE_DESCRIPTION("Intel Footbridge (21285) serial driver $Revision: 1.37 $");

@@ -673,7 +673,7 @@ magic_found:
 	}
 	if (uspi->s_bsize < 4096) {
 		printk("ufs_read_super: block size %u is too small\n",
-			uspi->s_fsize);
+			uspi->s_bsize);
 		goto failed;
 	}
 	if (uspi->s_bsize / uspi->s_fsize > 8) {

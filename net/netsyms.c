@@ -56,7 +56,7 @@ extern __u32 sysctl_rmem_max;
 
 extern struct net_proto_family inet_family_ops;
 
-#if defined(CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE) || defined (CONFIG_KHTTPD) || defined (CONFIG_KHTTPD_MODULE)
+#if defined(CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
 #include <linux/in6.h>
 #include <linux/icmpv6.h>
 #include <net/ipv6.h>
@@ -286,7 +286,7 @@ EXPORT_SYMBOL(dlci_ioctl_hook);
 #endif
 
 
-#if defined (CONFIG_IPV6_MODULE) || defined (CONFIG_KHTTPD) || defined (CONFIG_KHTTPD_MODULE)
+#if defined (CONFIG_IPV6_MODULE)
 /* inet functions common to v4 and v6 */
 EXPORT_SYMBOL(inet_release);
 EXPORT_SYMBOL(inet_stream_connect);
@@ -320,6 +320,7 @@ EXPORT_SYMBOL(udp_ioctl);
 EXPORT_SYMBOL(udp_connect);
 EXPORT_SYMBOL(udp_disconnect);
 EXPORT_SYMBOL(udp_sendmsg);
+EXPORT_SYMBOL(tcp_bind_hash);
 EXPORT_SYMBOL(tcp_close);
 EXPORT_SYMBOL(tcp_disconnect);
 EXPORT_SYMBOL(tcp_accept);

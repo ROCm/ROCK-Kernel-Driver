@@ -376,8 +376,7 @@ struct thread_struct {
 	unsigned long		v86flags, v86mask, v86mode, saved_esp0;
 /* IO permissions */
 	unsigned long	*ts_io_bitmap;
-/* TLS info and cached descriptor */
-	unsigned int tls_base, tls_limit, tls_flags;
+/* TLS cached descriptor */
 	struct desc_struct tls_desc;
 };
 
@@ -456,7 +455,7 @@ struct microcode {
 /* REP NOP (PAUSE) is a good thing to insert into busy-wait loops. */
 static inline void rep_nop(void)
 {
-	__asm__ __volatile__("rep;nop");
+	__asm__ __volatile__("rep;nop": : :"memory");
 }
 
 #define cpu_relax()	rep_nop()

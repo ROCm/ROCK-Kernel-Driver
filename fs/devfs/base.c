@@ -639,6 +639,12 @@
     20020722   Richard Gooch <rgooch@atnf.csiro.au>
 	       Fixed devfs entry leak in <devfs_readdir> when *readdir fails.
   v1.18
+    20020725   Richard Gooch <rgooch@atnf.csiro.au>
+	       Created <devfs_find_and_unregister>.
+  v1.19
+    20020728   Richard Gooch <rgooch@atnf.csiro.au>
+	       Removed deprecated <devfs_find_handle>.
+  v1.20
 */
 #include <linux/types.h>
 #include <linux/errno.h>
@@ -671,7 +677,7 @@
 #include <asm/bitops.h>
 #include <asm/atomic.h>
 
-#define DEVFS_VERSION            "1.18 (20020722)"
+#define DEVFS_VERSION            "1.20 (20020728)"
 
 #define DEVFS_NAME "devfs"
 
@@ -1881,19 +1887,15 @@ devfs_handle_t devfs_get_handle (devfs_handle_t dir, const char *name,
     return _devfs_find_entry (dir, name, major, minor, type,traverse_symlinks);
 }   /*  End Function devfs_get_handle  */
 
-
-/*  Compatibility function. Will be removed in sometime in 2.5  */
-
-devfs_handle_t devfs_find_handle (devfs_handle_t dir, const char *name,
-				  unsigned int major, unsigned int minor,
-				  char type, int traverse_symlinks)
+void devfs_find_and_unregister (devfs_handle_t dir, const char *name,
+				unsigned int major, unsigned int minor,
+				char type, int traverse_symlinks)
 {
-    devfs_handle_t de;
-
-    de = devfs_get_handle (dir, name, major, minor, type, traverse_symlinks);
+    devfs_handle_t de = devfs_get_handle (dir, name, major, minor,
+					  type, traverse_symlinks);
+    devfs_unregister (de);
     devfs_put (de);
-    return de;
-}   /*  End Function devfs_find_handle  */
+}
 
 
 /**
@@ -2226,75 +2228,17 @@ const char *devfs_get_name (devfs_handle_t de, unsigned int *namelen)
 
 
 /**
- *	devfs_register_chrdev - Optionally register a conventional character driver.
- *	@major: The major number for the driver.
- *	@name: The name of the driver (as seen in /proc/devices).
- *	@fops: The &file_operations structure pointer.
+ *	devfs_only - returns if "devfs=only" is a boot option
  *
- *	This function will register a character driver provided the "devfs=only"
- *	option was not provided at boot time.
- *	Returns 0 on success, else a negative error code on failure.
+ *	If "devfs=only" this function will return 1, otherwise 0 is returned.
  */
-
-int devfs_register_chrdev (unsigned int major, const char *name,
-			   struct file_operations *fops)
+int devfs_only (void)
 {
-    if (boot_options & OPTION_ONLY) return 0;
-    return register_chrdev (major, name, fops);
-}   /*  End Function devfs_register_chrdev  */
+    if (boot_options & OPTION_ONLY)
+	    return 1;
+    return 0;
+}
 
-
-/**
- *	devfs_register_blkdev - Optionally register a conventional block driver.
- *	@major: The major number for the driver.
- *	@name: The name of the driver (as seen in /proc/devices).
- *	@bdops: The &block_device_operations structure pointer.
- *
- *	This function will register a block driver provided the "devfs=only"
- *	option was not provided at boot time.
- *	Returns 0 on success, else a negative error code on failure.
- */
-
-int devfs_register_blkdev (unsigned int major, const char *name,
-			   struct block_device_operations *bdops)
-{
-    if (boot_options & OPTION_ONLY) return 0;
-    return register_blkdev (major, name, bdops);
-}   /*  End Function devfs_register_blkdev  */
-
-
-/**
- *	devfs_unregister_chrdev - Optionally unregister a conventional character driver.
- *	@major: The major number for the driver.
- *	@name: The name of the driver (as seen in /proc/devices).
- *
- *	This function will unregister a character driver provided the "devfs=only"
- *	option was not provided at boot time.
- *	Returns 0 on success, else a negative error code on failure.
- */
-
-int devfs_unregister_chrdev (unsigned int major, const char *name)
-{
-    if (boot_options & OPTION_ONLY) return 0;
-    return unregister_chrdev (major, name);
-}   /*  End Function devfs_unregister_chrdev  */
-
-
-/**
- *	devfs_unregister_blkdev - Optionally unregister a conventional block driver.
- *	@major: The major number for the driver.
- *	@name: The name of the driver (as seen in /proc/devices).
- *
- *	This function will unregister a block driver provided the "devfs=only"
- *	option was not provided at boot time.
- *	Returns 0 on success, else a negative error code on failure.
- */
-
-int devfs_unregister_blkdev (unsigned int major, const char *name)
-{
-    if (boot_options & OPTION_ONLY) return 0;
-    return unregister_blkdev (major, name);
-}   /*  End Function devfs_unregister_blkdev  */
 
 /**
  *	devfs_setup - Process kernel boot options.
@@ -2368,7 +2312,6 @@ EXPORT_SYMBOL(devfs_unregister);
 EXPORT_SYMBOL(devfs_mk_symlink);
 EXPORT_SYMBOL(devfs_mk_dir);
 EXPORT_SYMBOL(devfs_get_handle);
-EXPORT_SYMBOL(devfs_find_handle);
 EXPORT_SYMBOL(devfs_get_flags);
 EXPORT_SYMBOL(devfs_set_flags);
 EXPORT_SYMBOL(devfs_get_maj_min);
@@ -2384,10 +2327,6 @@ EXPORT_SYMBOL(devfs_get_next_sibling);
 EXPORT_SYMBOL(devfs_auto_unregister);
 EXPORT_SYMBOL(devfs_get_unregister_slave);
 EXPORT_SYMBOL(devfs_get_name);
-EXPORT_SYMBOL(devfs_register_chrdev);
-EXPORT_SYMBOL(devfs_register_blkdev);
-EXPORT_SYMBOL(devfs_unregister_chrdev);
-EXPORT_SYMBOL(devfs_unregister_blkdev);
 
 
 /**

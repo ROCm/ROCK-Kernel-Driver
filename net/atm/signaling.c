@@ -227,8 +227,8 @@ static void sigd_close(struct atm_vcc *vcc)
 
 
 static struct atmdev_ops sigd_dev_ops = {
-	close:	sigd_close,
-	send:	sigd_send
+	.close =sigd_close,
+	.send =	sigd_send
 };
 
 

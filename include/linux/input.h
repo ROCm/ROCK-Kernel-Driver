@@ -41,9 +41,9 @@
 
 struct input_event {
 	struct timeval time;
-	unsigned short type;
-	unsigned short code;
-	unsigned int value;
+	__u16 type;
+	__u16 code;
+	__s32 value;
 };
 
 /*
@@ -63,6 +63,14 @@ struct input_id {
 	__u16 version;
 };
 
+struct input_absinfo {
+	__s32 value;
+	__s32 minimum;
+	__s32 maximum;
+	__s32 fuzz;
+	__s32 flat;
+};
+
 #define EVIOCGVERSION		_IOR('E', 0x01, int)			/* get driver version */
 #define EVIOCGID		_IOR('E', 0x02, struct input_id)	/* get device ID */
 #define EVIOCGREP		_IOR('E', 0x03, int[2])			/* get repeat settings */
@@ -79,8 +87,8 @@ struct input_id {
 #define EVIOCGSND(len)		_IOC(_IOC_READ, 'E', 0x1a, len)		/* get all sounds status */
 
 #define EVIOCGBIT(ev,len)	_IOC(_IOC_READ, 'E', 0x20 + ev, len)	/* get event bits */
-#define EVIOCGABS(abs)		_IOR('E', 0x40 + abs, int[5])		/* get abs value/limits */
-#define EVIOCSABS(abs)		_IOW('E', 0xc0 + abs, int[5])		/* set abs value/limits */
+#define EVIOCGABS(abs)		_IOR('E', 0x40 + abs, struct input_absinfo)		/* get abs value/limits */
+#define EVIOCSABS(abs)		_IOW('E', 0xc0 + abs, struct input_absinfo)		/* set abs value/limits */
 
 #define EVIOCSFF		_IOC(_IOC_WRITE, 'E', 0x80, sizeof(struct ff_effect))	/* send a force effect to a force feedback device */
 #define EVIOCRMFF		_IOW('E', 0x81, int)			/* Erase a force effect */
@@ -473,11 +481,11 @@ struct input_id {
 #define KEY_RESTART		0x198
 #define KEY_SLOW		0x199
 #define KEY_SHUFFLE		0x19a
-#define KEY_BREAK		0x1ab
+#define KEY_BREAK		0x19b
 #define KEY_PREVIOUS		0x19c
 #define KEY_DIGITS		0x19d
 #define KEY_TEEN		0x19e
-#define KEY_TWEN		0x1af
+#define KEY_TWEN		0x19f
 
 #define KEY_MAX			0x1ff
 

@@ -466,7 +466,7 @@ void
 shmiq_init (void)
 {
 	printk ("SHMIQ setup\n");
-	devfs_register_chrdev(SHMIQ_MAJOR, "shmiq", &shmiq_fops);
+	register_chrdev(SHMIQ_MAJOR, "shmiq", &shmiq_fops);
 	devfs_register (NULL, "shmiq", DEVFS_FL_DEFAULT,
 			SHMIQ_MAJOR, 0, S_IFCHR | S_IRUSR | S_IWUSR,
 			&shmiq_fops, NULL);

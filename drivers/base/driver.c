@@ -44,16 +44,6 @@ int driver_for_each_dev(struct device_driver * drv, void * data, int (*callback)
 }
 
 /**
- * driver_make_dir - create a driverfs directory for a driver
- * @drv:	driver in question
- */
-static int driver_make_dir(struct device_driver * drv)
-{
-	drv->dir.name = drv->name;
-	return device_create_dir(&drv->dir,&drv->bus->driver_dir);
-}
-
-/**
  * driver_register - register driver with bus
  * @drv:	driver to register
  * 
@@ -83,7 +73,7 @@ static void __remove_driver(struct device_driver * drv)
 {
 	pr_debug("Unregistering driver '%s' from bus '%s'\n",drv->name,drv->bus->name);
 	driver_detach(drv);
-	driverfs_remove_dir(&drv->dir);
+	driver_remove_dir(drv);
 	if (drv->release)
 		drv->release(drv);
 	put_bus(drv->bus);

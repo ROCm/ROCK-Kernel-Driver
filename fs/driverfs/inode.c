@@ -32,7 +32,7 @@
 #include <linux/namei.h>
 #include <linux/module.h>
 #include <linux/slab.h>
-#include <linux/device.h>
+#include <linux/driverfs_fs.h>
 
 #include <asm/uaccess.h>
 
@@ -50,7 +50,6 @@
 static struct super_operations driverfs_ops;
 static struct file_operations driverfs_file_operations;
 static struct inode_operations driverfs_dir_inode_operations;
-static struct dentry_operations driverfs_dentry_file_ops;
 static struct address_space_operations driverfs_aops;
 
 static struct vfsmount *driverfs_mount;
@@ -131,15 +130,16 @@ struct inode *driverfs_get_inode(struct super_block *sb, int mode, int dev)
 
 static int driverfs_mknod(struct inode *dir, struct dentry *dentry, int mode, int dev)
 {
-	struct inode *inode = driverfs_get_inode(dir->i_sb, mode, dev);
-	int error = -EPERM;
+	struct inode *inode;
+	int error = -ENOSPC;
 
 	if (dentry->d_inode)
 		return -EEXIST;
 
 	/* only allow create if ->d_fsdata is not NULL (so we can assume it 
 	 * comes from the driverfs API below. */
-	if (dentry->d_fsdata && inode) {
+	inode = driverfs_get_inode(dir->i_sb, mode, dev);
+	if (inode) {
 		d_instantiate(dentry, inode);
 		dget(dentry);
 		error = 0;
@@ -161,7 +161,6 @@ static int driverfs_create(struct inode *dir, struct dentry *dentry, int mode)
 {
 	int res;
 	mode = (mode & S_IALLUGO) | S_IFREG;
-	dentry->d_op = &driverfs_dentry_file_ops;
  	res = driverfs_mknod(dir, dentry, mode, 0);
 	return res;
 }
@@ -268,7 +267,7 @@ static int driverfs_rmdir(struct inode *dir, struct dentry *dentry)
  *
  * Userspace wants data from a file. It is up to the creator of the file to
  * provide that data.
- * There is a struct driver_file_entry embedded in file->private_data. We
+ * There is a struct device_attribute embedded in file->private_data. We
  * obtain that and check if the read callback is implemented. If so, we call
  * it, passing the data field of the file entry.
  * Said callback is responsible for filling the buffer and returning the number
@@ -277,23 +276,17 @@ static int driverfs_rmdir(struct inode *dir, struct dentry *dentry)
 static ssize_t
 driverfs_read_file(struct file *file, char *buf, size_t count, loff_t *ppos)
 {
-	struct driver_file_entry * entry;
+	struct attribute * attr = file->f_dentry->d_fsdata;
+	struct driver_dir_entry * dir;
 	unsigned char *page;
 	ssize_t retval = 0;
-	struct device * dev;
 
-	entry = (struct driver_file_entry *)file->private_data;
-	if (!entry) {
-		DBG("%s: file entry is NULL\n",__FUNCTION__);
-		return -ENOENT;
-	}
-	if (!entry->show)
+	dir = file->f_dentry->d_parent->d_fsdata;
+	if (!dir->ops->show)
 		return 0;
 
 	if (count > PAGE_SIZE)
 		count = PAGE_SIZE;
-
-	dev = to_device(entry->parent);
 
 	page = (unsigned char*)__get_free_page(GFP_KERNEL);
 	if (!page)
@@ -302,7 +295,7 @@ driverfs_read_file(struct file *file, char *buf, size_t count, loff_t *ppos)
 	while (count > 0) {
 		ssize_t len;
 
-		len = entry->show(dev,page,count,*ppos);
+		len = dir->ops->show(dir,attr,page,count,*ppos);
 
 		if (len <= 0) {
 			if (len < 0)
@@ -341,20 +334,12 @@ driverfs_read_file(struct file *file, char *buf, size_t count, loff_t *ppos)
 static ssize_t
 driverfs_write_file(struct file *file, const char *buf, size_t count, loff_t *ppos)
 {
-	struct driver_file_entry * entry;
-	struct device * dev;
+	struct attribute * attr = file->f_dentry->d_fsdata;
+	struct driver_dir_entry * dir;
 	ssize_t retval = 0;
 	char * page;
 
-	entry = (struct driver_file_entry *)file->private_data;
-	if (!entry) {
-		DBG("%s: file entry is NULL\n",__FUNCTION__);
-		return -ENOENT;
-	}
-	if (!entry->store)
-		return 0;
-
-	dev = to_device(entry->parent);
+	dir = file->f_dentry->d_parent->d_fsdata;
 
 	page = (char *)__get_free_page(GFP_KERNEL);
 	if (!page)
@@ -369,7 +354,7 @@ driverfs_write_file(struct file *file, const char *buf, size_t count, loff_t *pp
 	while (count > 0) {
 		ssize_t len;
 
-		len = entry->store(dev,page + retval,count,*ppos);
+		len = dir->ops->store(dir,attr,page + retval,count,*ppos);
 
 		if (len <= 0) {
 			if (len < 0)
@@ -414,38 +399,29 @@ driverfs_file_lseek(struct file *file, loff_t offset, int orig)
 
 static int driverfs_open_file(struct inode * inode, struct file * filp)
 {
-	struct driver_file_entry * entry;
-	struct device * dev;
+	struct driver_dir_entry * dir;
+	int error = 0;
 
-	entry = (struct driver_file_entry *)inode->u.generic_ip;
-	if (!entry)
-		return -EFAULT;
-	dev = to_device(entry->parent);
-	get_device(dev);
-	filp->private_data = entry;
-	return 0;
+	dir = (struct driver_dir_entry *)filp->f_dentry->d_parent->d_fsdata;
+	if (dir) {
+		struct attribute * attr = filp->f_dentry->d_fsdata;
+		if (attr && dir->ops) {
+			if (dir->ops->open)
+				error = dir->ops->open(dir);
+			goto Done;
+		}
+	}
+	error = -EINVAL;
+ Done:
+	return error;
 }
 
 static int driverfs_release(struct inode * inode, struct file * filp)
 {
-	struct driver_file_entry * entry;
-	struct device * dev;
-
-	entry = (struct driver_file_entry *)filp->private_data;
-	if (!entry)
-		return -EFAULT;
-	dev = to_device(entry->parent);
-	put_device(dev);
-	return 0;
-}
-
-static int driverfs_d_delete_file (struct dentry * dentry)
-{
-	struct driver_file_entry * entry;
-
-	entry = (struct driver_file_entry *)dentry->d_fsdata;
-	if (entry)
-		kfree(entry);
+	struct driver_dir_entry * dir;
+	dir = (struct driver_dir_entry *)filp->f_dentry->d_parent->d_fsdata;
+	if (dir->ops->close)
+		dir->ops->close(dir);
 	return 0;
 }
 
@@ -466,10 +442,6 @@ static struct address_space_operations driverfs_aops = {
 	.writepage	= fail_writepage,
 	.prepare_write	= driverfs_prepare_write,
 	.commit_write	= driverfs_commit_write
-};
-
-static struct dentry_operations driverfs_dentry_file_ops = {
-	.d_delete	= driverfs_d_delete_file,
 };
 
 static struct super_operations driverfs_ops = {
@@ -572,6 +544,16 @@ int __init init_driverfs_fs(void)
 	return register_filesystem(&driverfs_fs_type);
 }
 
+static struct dentry * get_dentry(struct dentry * parent, const char * name)
+{
+	struct qstr qstr;
+
+	qstr.name = name;
+	qstr.len = strlen(name);
+	qstr.hash = full_name_hash(name,qstr.len);
+	return lookup_hash(&qstr,parent);
+}
+
 /**
  * driverfs_create_dir - create a directory in the filesystem
  * @entry:	directory entry
@@ -583,7 +565,6 @@ driverfs_create_dir(struct driver_dir_entry * entry,
 {
 	struct dentry * dentry = NULL;
 	struct dentry * parent_dentry;
-	struct qstr qstr;
 	int error = 0;
 
 	if (!entry)
@@ -603,10 +584,7 @@ driverfs_create_dir(struct driver_dir_entry * entry,
 	}
 
 	down(&parent_dentry->d_inode->i_sem);
-	qstr.name = entry->name;
-	qstr.len = strlen(entry->name);
-	qstr.hash = full_name_hash(entry->name,qstr.len);
-	dentry = lookup_hash(&qstr,parent_dentry);
+	dentry = get_dentry(parent_dentry,entry->name);
 	if (!IS_ERR(dentry)) {
 		dentry->d_fsdata = (void *) entry;
 		entry->dentry = dentry;
@@ -626,11 +604,10 @@ driverfs_create_dir(struct driver_dir_entry * entry,
  * @parent:	directory to create it in
  */
 int
-driverfs_create_file(struct driver_file_entry * entry,
+driverfs_create_file(struct attribute * entry,
 		     struct driver_dir_entry * parent)
 {
 	struct dentry * dentry;
-	struct qstr qstr;
 	int error = 0;
 
 	if (!entry || !parent)
@@ -645,21 +622,10 @@ driverfs_create_file(struct driver_file_entry * entry,
 	}
 
 	down(&parent->dentry->d_inode->i_sem);
-	qstr.name = entry->name;
-	qstr.len = strlen(entry->name);
-	qstr.hash = full_name_hash(entry->name,qstr.len);
-	dentry = lookup_hash(&qstr,parent->dentry);
+	dentry = get_dentry(parent->dentry,entry->name);
 	if (!IS_ERR(dentry)) {
 		dentry->d_fsdata = (void *)entry;
 		error = driverfs_create(parent->dentry->d_inode,dentry,entry->mode);
-
-		/* Still good? Ok, then fill in the blanks: */
-		if (!error) {
-			dentry->d_inode->u.generic_ip = (void *)entry;
-			entry->dentry = dentry;
-			entry->parent = parent;
-			list_add_tail(&entry->node,&parent->files);
-		}
 	} else
 		error = PTR_ERR(dentry);
 	up(&parent->dentry->d_inode->i_sem);
@@ -676,14 +642,12 @@ driverfs_create_file(struct driver_file_entry * entry,
  * 
  */
 int driverfs_create_symlink(struct driver_dir_entry * parent, 
-			    struct driver_file_entry * entry,
-			    char * target)
+			    char * name, char * target)
 {
 	struct dentry * dentry;
-	struct qstr qstr;
 	int error = 0;
 
-	if (!entry || !parent)
+	if (!parent)
 		return -EINVAL;
 
 	get_mount();
@@ -693,20 +657,10 @@ int driverfs_create_symlink(struct driver_dir_entry * parent,
 		return -EINVAL;
 	}
 	down(&parent->dentry->d_inode->i_sem);
-	qstr.name = entry->name;
-	qstr.len = strlen(entry->name);
-	qstr.hash = full_name_hash(entry->name,qstr.len);
-	dentry = lookup_hash(&qstr,parent->dentry);
-	if (!IS_ERR(dentry)) {
-		dentry->d_fsdata = (void *)entry;
+	dentry = get_dentry(parent->dentry,name);
+	if (!IS_ERR(dentry))
 		error = driverfs_symlink(parent->dentry->d_inode,dentry,target);
-		if (!error) {
-			dentry->d_inode->u.generic_ip = (void *)entry;
-			entry->dentry = dentry;
-			entry->parent = parent;
-			list_add_tail(&entry->node,&parent->files);
-		}
-	} else
+	else
 		error = PTR_ERR(dentry);
 	up(&parent->dentry->d_inode->i_sem);
 	if (error)
@@ -724,26 +678,21 @@ int driverfs_create_symlink(struct driver_dir_entry * parent,
  */
 void driverfs_remove_file(struct driver_dir_entry * dir, const char * name)
 {
-	struct list_head * node;
+	struct dentry * dentry;
 
 	if (!dir->dentry)
 		return;
 
 	down(&dir->dentry->d_inode->i_sem);
-
-	node = dir->files.next;
-	while (node != &dir->files) {
-		struct driver_file_entry * entry = NULL;
-
-		entry = list_entry(node,struct driver_file_entry,node);
-		if (!strcmp(entry->name,name)) {
-			list_del_init(node);
-			driverfs_unlink(entry->dentry->d_parent->d_inode,entry->dentry);
-			dput(entry->dentry);
+	dentry = get_dentry(dir->dentry,name);
+	if (!IS_ERR(dentry)) {
+		/* make sure dentry is really there */
+		if (dentry->d_inode && 
+		    (dentry->d_parent->d_inode == dir->dentry->d_inode)) {
+			driverfs_unlink(dir->dentry->d_inode,dentry);
+			dput(dir->dentry);
 			put_mount();
-			break;
 		}
-		node = node->next;
 	}
 	up(&dir->dentry->d_inode->i_sem);
 }
@@ -767,19 +716,16 @@ void driverfs_remove_dir(struct driver_dir_entry * dir)
 	down(&dentry->d_parent->d_inode->i_sem);
 	down(&dentry->d_inode->i_sem);
 
-	node = dir->files.next;
-	while (node != &dir->files) {
-		struct driver_file_entry * entry;
-		entry = list_entry(node,struct driver_file_entry,node);
+	node = dentry->d_subdirs.next;
+	while (node != &dentry->d_subdirs) {
+		struct dentry * d = list_entry(node,struct dentry,d_child);
 
-		list_del_init(node);
-		driverfs_unlink(dentry->d_inode,entry->dentry);
-		dput(entry->dentry);
+		node = node->next;
+		driverfs_unlink(dentry->d_inode,d);
+		dput(dentry);
 		put_mount();
-		node = dir->files.next;
 	}
 	up(&dentry->d_inode->i_sem);
-
 	driverfs_rmdir(dentry->d_parent->d_inode,dentry);
 	up(&dentry->d_parent->d_inode->i_sem);
 	dput(dentry);

@@ -42,8 +42,8 @@ static int parse_qos(const char *buff, int len);
  *   Define allowed FILE OPERATIONS
  */
 static struct file_operations mpc_file_operations = {
-	read:		proc_mpc_read,
-	write:		proc_mpc_write,
+	.read =		proc_mpc_read,
+	.write =	proc_mpc_write,
 };
 
 static int print_header(char *buff,struct mpoa_client *mpc){

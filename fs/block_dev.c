@@ -24,14 +24,14 @@
 
 #include <asm/uaccess.h>
 
-static unsigned long max_block(struct block_device *bdev)
+static sector_t max_block(struct block_device *bdev)
 {
-	unsigned int retval = ~0U;
+	sector_t retval = ~0U;
 	loff_t sz = bdev->bd_inode->i_size;
 
 	if (sz) {
-		unsigned int size = block_size(bdev);
-		unsigned int sizebits = blksize_bits(size);
+		sector_t size = block_size(bdev);
+		unsigned sizebits = blksize_bits(size);
 		retval = (sz >> sizebits);
 	}
 	return retval;
@@ -88,7 +88,9 @@ int sb_min_blocksize(struct super_block *sb, int size)
 	return sb_set_blocksize(sb, size);
 }
 
-static int blkdev_get_block(struct inode * inode, sector_t iblock, struct buffer_head * bh, int create)
+static int
+blkdev_get_block(struct inode *inode, sector_t iblock,
+		struct buffer_head *bh, int create)
 {
 	if (iblock >= max_block(inode->i_bdev))
 		return -EIO;
@@ -100,11 +102,25 @@ static int blkdev_get_block(struct inode * inode, sector_t iblock, struct buffer
 }
 
 static int
+blkdev_get_blocks(struct inode *inode, sector_t iblock,
+		unsigned long max_blocks, struct buffer_head *bh, int create)
+{
+	if ((iblock + max_blocks) >= max_block(inode->i_bdev))
+		return -EIO;
+
+	bh->b_bdev = inode->i_bdev;
+	bh->b_blocknr = iblock;
+	bh->b_size = max_blocks << inode->i_blkbits;
+	set_buffer_mapped(bh);
+	return 0;
+}
+
+static int
 blkdev_direct_IO(int rw, struct inode *inode, char *buf,
 			loff_t offset, size_t count)
 {
 	return generic_direct_IO(rw, inode, buf, offset,
-				count, blkdev_get_block);
+				count, blkdev_get_blocks);
 }
 
 static int blkdev_writepage(struct page * page)
@@ -437,6 +453,8 @@ struct block_device_operations * get_blkfops(unsigned int major)
 
 int register_blkdev(unsigned int major, const char * name, struct block_device_operations *bdops)
 {
+	if (devfs_only())
+		return 0;
 	if (major == 0) {
 		for (major = MAX_BLKDEV-1; major > 0; major--) {
 			if (blkdevs[major].bdops == NULL) {
@@ -458,6 +476,8 @@ int register_blkdev(unsigned int major, const char * name, struct block_device_o
 
 int unregister_blkdev(unsigned int major, const char * name)
 {
+	if (devfs_only())
+		return 0;
 	if (major >= MAX_BLKDEV)
 		return -EINVAL;
 	if (!blkdevs[major].bdops)
@@ -489,11 +509,12 @@ int check_disk_change(kdev_t dev)
 	if (bdops == NULL) {
 		devfs_handle_t de;
 
-		de = devfs_find_handle (NULL, NULL, i, minor(dev),
-					DEVFS_SPECIAL_BLK, 0);
+		de = devfs_get_handle(NULL, NULL, i, minor(dev),
+				      DEVFS_SPECIAL_BLK, 0);
 		if (de) {
-			bdops = devfs_get_ops (de);
-			devfs_put_ops (de); /* We're running in owner module */
+			bdops = devfs_get_ops(de);
+			devfs_put_ops(de); /* We're running in owner module */
+			devfs_put(de);
 		}
 	}
 	if (bdops == NULL)
@@ -578,9 +599,10 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 
 		bdev->bd_offset = 0;
 		if (g) {
-			bdev->bd_inode->i_size =
-				(loff_t) g->part[minor(dev)].nr_sects << 9;
-			bdev->bd_offset = g->part[minor(dev)].start_sect;
+			struct hd_struct *p;
+			p = g->part + minor(dev) - g->first_minor;
+			bdev->bd_inode->i_size = (loff_t) p->nr_sects << 9;
+			bdev->bd_offset = p->start_sect;
 		} else if (blk_size[major(dev)])
 			bdev->bd_inode->i_size =
 				(loff_t) blk_size[major(dev)][minor(dev)] << 10;
@@ -774,6 +796,7 @@ struct file_operations def_blk_fops = {
 	mmap:		generic_file_mmap,
 	fsync:		block_fsync,
 	ioctl:		blkdev_ioctl,
+	sendfile:	generic_file_sendfile,
 };
 
 int ioctl_by_bdev(struct block_device *bdev, unsigned cmd, unsigned long arg)

@@ -112,16 +112,16 @@ static struct timer_list dn_rt_flush_timer = { function: dn_run_flush };
 int decnet_dst_gc_interval = 2;
 
 static struct dst_ops dn_dst_ops = {
-	family:			PF_DECnet,
-	protocol:		__constant_htons(ETH_P_DNA_RT),
-	gc_thresh:		128,
-	gc:			dn_dst_gc,
-	check:			dn_dst_check,
-	reroute:		dn_dst_reroute,
-	negative_advice:	dn_dst_negative_advice,
-	link_failure:		dn_dst_link_failure,
-	entry_size:		sizeof(struct dn_route),
-	entries:		ATOMIC_INIT(0),
+	.family =		PF_DECnet,
+	.protocol =		__constant_htons(ETH_P_DNA_RT),
+	.gc_thresh =		128,
+	.gc =			dn_dst_gc,
+	.check =		dn_dst_check,
+	.reroute =		dn_dst_reroute,
+	.negative_advice =	dn_dst_negative_advice,
+	.link_failure =		dn_dst_link_failure,
+	.entry_size =		sizeof(struct dn_route),
+	.entries =		ATOMIC_INIT(0),
 };
 
 static __inline__ unsigned dn_hash(unsigned short src, unsigned short dst)

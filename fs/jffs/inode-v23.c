@@ -1631,13 +1631,14 @@ extern loff_t generic_file_llseek(struct file *, loff_t, int) __attribute__((wea
 
 static struct file_operations jffs_file_operations =
 {
-	open:	generic_file_open,
-	llseek:	generic_file_llseek,
-	read:	generic_file_read,
-	write:	generic_file_write,
-	ioctl:	jffs_ioctl,
-	mmap:	generic_file_mmap,
-	fsync:	jffs_fsync,
+	open:		generic_file_open,
+	llseek:		generic_file_llseek,
+	read:		generic_file_read,
+	write:		generic_file_write,
+	ioctl:		jffs_ioctl,
+	mmap:		generic_file_mmap,
+	fsync:		jffs_fsync,
+	sendfile:	generic_file_sendfile,
 };
 
 

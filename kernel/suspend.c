@@ -36,7 +36,6 @@
 
 #include <linux/module.h>
 #include <linux/mm.h>
-#include <linux/swapctl.h>
 #include <linux/suspend.h>
 #include <linux/smp_lock.h>
 #include <linux/file.h>
@@ -66,6 +65,7 @@
 #include <linux/swapops.h>
 
 extern void signal_wake_up(struct task_struct *t);
+extern int sys_sync(void);
 
 unsigned char software_suspend_enabled = 0;
 
@@ -815,17 +815,17 @@ void do_magic_suspend_2(void)
 	PRINTK(KERN_WARNING "%sLeaving do_magic_suspend_2...\n", name_suspend);	
 }
 
-/*
- * We try to swap out as much as we can then make a copy of the
- * occupied pages in memory so we can make a copy of kernel state
- * atomically, the I/O needed by saving won't bother us anymore. 
- */
 void do_software_suspend(void)
 {
 	arch_prepare_suspend();
 	if (prepare_suspend_console())
 		printk( "%sCan't allocate a console... proceeding\n", name_suspend);
 	if (!prepare_suspend_processes()) {
+
+		/* At this point, all user processes and "dangerous"
+                   kernel threads are stopped. Free some memory, as we
+                   need half of memory free. */
+
 		free_some_memory();
 		
 		/* No need to invalidate any vfsmnt list -- they will be valid after resume, anyway.
@@ -835,8 +835,19 @@ void do_software_suspend(void)
 		 */
 		PRINTK("Syncing disks before copy\n");
 		do_suspend_sync();
+
+		/* Save state of all device drivers, and stop them. */		   
 		if(drivers_suspend()==0)
-			do_magic(0);			/* This function returns after machine woken up from resume */
+			/* If stopping device drivers worked, we proceed basically into
+			 * suspend_save_image.
+			 *
+			 * do_magic(0) returns after system is resumed.
+			 *
+			 * do_magic() copies all "used" memory to "free" memory, then
+			 * unsuspends all device drivers, and writes memory to disk
+			 * using normal kernel mechanism.
+			 */
+			do_magic(0);
 		PRINTK("Restarting processes...\n");
 		thaw_processes();
 	}
@@ -1004,8 +1015,8 @@ static int bdev_read_page(struct block_device *bdev, long pos, void *buf)
 
 static int bdev_write_page(struct block_device *bdev, long pos, void *buf)
 {
-	struct buffer_head *bh;
 #if 0
+	struct buffer_head *bh;
 	BUG_ON (pos%PAGE_SIZE);
 	bh = __bread(bdev, pos/PAGE_SIZE, PAGE_SIZE);
 	if (!bh || (!bh->b_data)) {

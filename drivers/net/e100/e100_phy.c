@@ -96,9 +96,11 @@ e100_mdi_write(struct e100_private *bdp, u32 reg_addr, u32 phy_addr, u16 data)
 	int e100_retry;
 	u32 temp_val;
 
+	spin_lock_bh(&bdp->mdi_access_lock);
 	temp_val = (((u32) data) | (reg_addr << 16) |
 		    (phy_addr << 21) | (MDI_WRITE << 26));
 	writel(temp_val, &bdp->scb->scb_mdi_cntrl);
+	readw(&bdp->scb->scb_status);
 
 	/* wait 20usec before checking status */
 	udelay(20);
@@ -111,6 +113,7 @@ e100_mdi_write(struct e100_private *bdp, u32 reg_addr, u32 phy_addr, u16 data)
 		udelay(20);
 		e100_retry--;
 	}
+	spin_unlock_bh(&bdp->mdi_access_lock);
 }
 
 /* 
@@ -138,9 +141,11 @@ e100_mdi_read(struct e100_private *bdp, u32 reg_addr, u32 phy_addr, u16 *data)
 	int e100_retry;
 	u32 temp_val;
 
+	spin_lock_bh(&bdp->mdi_access_lock);
 	/* Issue the read command to the MDI control register. */
 	temp_val = ((reg_addr << 16) | (phy_addr << 21) | (MDI_READ << 26));
 	writel(temp_val, &bdp->scb->scb_mdi_cntrl);
+	readw(&bdp->scb->scb_status);
 
 	/* wait 20usec before checking status */
 	udelay(20);
@@ -156,6 +161,7 @@ e100_mdi_read(struct e100_private *bdp, u32 reg_addr, u32 phy_addr, u16 *data)
 
 	// return the lower word
 	*data = (u16) readl(&bdp->scb->scb_mdi_cntrl);
+	spin_unlock_bh(&bdp->mdi_access_lock);
 }
 
 static unsigned char __devinit
@@ -263,21 +269,22 @@ e100_phy_specific_setup(struct e100_private *bdp)
 		case E100_AUTONEG:
 			/* The adapter can't autoneg. so set to 10/HALF */
 			printk(KERN_INFO
-			       "503 serial component detected which "
+			       "e100: 503 serial component detected which "
 			       "cannot autonegotiate\n");
 			printk(KERN_INFO
-			       "speed/duplex forced to 10Mbps / Half duplex\n");
+			       "e100: speed/duplex forced to "
+			       "10Mbps / Half duplex\n");
 			bdp->params.e100_speed_duplex = E100_SPEED_10_HALF;
 			break;
 
 		case E100_SPEED_100_HALF:
 		case E100_SPEED_100_FULL:
 			printk(KERN_ERR
-			       "503 serial component detected which does not "
-			       "support 100Mbps\n");
+			       "e100: 503 serial component detected "
+			       "which does not support 100Mbps\n");
 			printk(KERN_ERR
-			       "Change the forced speed/duplex to a supported "
-			       "setting\n");
+			       "e100: Change the forced speed/duplex "
+			       "to a supported setting\n");
 			return false;
 		}
 
@@ -294,7 +301,7 @@ e100_phy_specific_setup(struct e100_private *bdp)
 		if ((bdp->params.e100_speed_duplex != E100_AUTONEG) &&
 		    (bdp->params.e100_speed_duplex != E100_SPEED_100_FULL)) {
 			/* just inform user about 100 full */
-			printk(KERN_ERR "NC3133 NIC can only run "
+			printk(KERN_ERR "e100: NC3133 NIC can only run "
 			       "at 100Mbps full duplex\n");
 		}
 
@@ -657,8 +664,6 @@ e100_force_speed_duplex(struct e100_private *bdp)
 
 	bdp->flags |= DF_SPEED_FORCED;
 
-	spin_lock_bh(&(bdp->mdi_access_lock));
-
 	e100_mdi_read(bdp, MII_BMCR, bdp->phy_addr, &control);
 	control &= ~BMCR_ANENABLE;
 
@@ -702,14 +707,10 @@ e100_force_speed_duplex(struct e100_private *bdp)
 		    time_after(jiffies, expires)) {
 			break;
 		} else {
-			spin_unlock_bh(&(bdp->mdi_access_lock));
 			yield();
-			spin_lock_bh(&(bdp->mdi_access_lock));
 		}
 
 	} while (true);
-
-	spin_unlock_bh(&(bdp->mdi_access_lock));
 }
 
 /* 
@@ -753,7 +754,12 @@ e100_set_fc(struct e100_private *bdp)
 		if (ad_reg & NWAY_AD_FC_SUPPORTED)
 			bdp->flags |= DF_LINK_FC_CAP;
 		else
-			bdp->flags &= ~DF_LINK_FC_CAP;
+			/* If link partner is capable of autoneg, but  */
+			/* not capable of flow control, Received PAUSE */
+			/* frames are still honored, i.e.,             */
+		        /* transmitted frames would be paused */
+			/* by incoming PAUSE frames           */
+			bdp->flags |= DF_LINK_FC_TX_ONLY;
 
 	} else {
 		bdp->flags &= ~DF_LINK_FC_CAP;
@@ -821,8 +827,6 @@ e100_auto_neg(struct e100_private *bdp, unsigned char force_restart)
 
 	bdp->flags &= ~DF_SPEED_FORCED;
 
-	spin_lock_bh(&(bdp->mdi_access_lock));
-
 	e100_mdi_read(bdp, MII_BMSR, bdp->phy_addr, &stat_reg);
 	e100_mdi_read(bdp, MII_BMSR, bdp->phy_addr, &stat_reg);
 
@@ -848,25 +852,30 @@ e100_auto_neg(struct e100_private *bdp, unsigned char force_restart)
 			    time_after(jiffies, expires) ) {
 				goto exit;
 			} else {
-				spin_unlock_bh(&(bdp->mdi_access_lock));
 				yield();
-				spin_lock_bh(&(bdp->mdi_access_lock));
 			}
 		} while (true);
 	}
 
 exit:
 	e100_find_speed_duplex(bdp);
-	spin_unlock_bh(&(bdp->mdi_access_lock));
 }
 
 void
 e100_phy_set_speed_duplex(struct e100_private *bdp, unsigned char force_restart)
 {
 	if (bdp->params.e100_speed_duplex == E100_AUTONEG) {
+        	if (bdp->rev_id >= D102_REV_ID) 
+			/* Enable MDI/MDI-X auto switching */
+                	e100_mdi_write(bdp, MII_NCONFIG, bdp->phy_addr,
+		                       MDI_MDIX_AUTO_SWITCH_ENABLE);
 		e100_auto_neg(bdp, force_restart);
 
 	} else {
+        	if (bdp->rev_id >= D102_REV_ID) 
+			/* Disable MDI/MDI-X auto switching */
+                	e100_mdi_write(bdp, MII_NCONFIG, bdp->phy_addr,
+		                       MDI_MDIX_RESET_ALL_MASK);
 		e100_force_speed_duplex(bdp);
 	}
 

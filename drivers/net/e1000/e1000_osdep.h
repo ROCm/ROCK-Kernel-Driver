@@ -88,7 +88,8 @@
 #define usec_delay(x) udelay(x)
 #ifndef msec_delay
 #define msec_delay(x)	do { if(in_interrupt()) { \
-	                	mdelay(x); \
+				/* Don't mdelay in interrupt context! */ \
+	                	BUG(); \
 			} else { \
 				set_current_state(TASK_UNINTERRUPTIBLE); \
 				schedule_timeout((x * HZ)/1000); \
@@ -139,5 +140,7 @@ typedef enum {
     ((a)->mac_type >= e1000_82543) ? \
         readl((a)->hw_addr + E1000_##reg + ((offset) << 2)) : \
         readl((a)->hw_addr + E1000_82542_##reg + ((offset) << 2)))
+
+#define E1000_WRITE_FLUSH(a) E1000_READ_REG(a, STATUS);
 
 #endif /* _E1000_OSDEP_H_ */

@@ -269,6 +269,7 @@ static void smbiod_doio(struct smb_sb_info *server)
 		set_bit(SMBIOD_DATA_READY, &smbiod_flags);
 
 out:
+	return;
 }
 
 /*

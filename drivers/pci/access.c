@@ -7,7 +7,7 @@
  * configuration space.
  */
 
-static spinlock_t pci_lock = SPIN_LOCK_UNLOCKED;
+spinlock_t pci_lock = SPIN_LOCK_UNLOCKED;
 
 /*
  *  Wrappers for all PCI configuration access functions.  They just check
@@ -44,3 +44,4 @@ EXPORT_SYMBOL(pci_read_config_dword);
 EXPORT_SYMBOL(pci_write_config_byte);
 EXPORT_SYMBOL(pci_write_config_word);
 EXPORT_SYMBOL(pci_write_config_dword);
+EXPORT_SYMBOL(pci_lock);

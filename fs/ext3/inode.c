@@ -1378,15 +1378,15 @@ static int ext3_releasepage(struct page *page, int wait)
 
 
 struct address_space_operations ext3_aops = {
-	readpage:	ext3_readpage,		/* BKL not held.  Don't need */
-	readpages:	ext3_readpages,		/* BKL not held.  Don't need */
-	writepage:	ext3_writepage,		/* BKL not held.  We take it */
-	sync_page:	block_sync_page,
-	prepare_write:	ext3_prepare_write,	/* BKL not held.  We take it */
-	commit_write:	ext3_commit_write,	/* BKL not held.  We take it */
-	bmap:		ext3_bmap,		/* BKL held */
-	invalidatepage:	ext3_invalidatepage,	/* BKL not held.  Don't need */
-	releasepage:	ext3_releasepage,	/* BKL not held.  Don't need */
+	.readpage	= ext3_readpage,		/* BKL not held.  Don't need */
+	.readpages	= ext3_readpages,		/* BKL not held.  Don't need */
+	.writepage	= ext3_writepage,		/* BKL not held.  We take it */
+	.sync_page	= block_sync_page,
+	.prepare_write	= ext3_prepare_write,	/* BKL not held.  We take it */
+	.commit_write	= ext3_commit_write,	/* BKL not held.  We take it */
+	.bmap		= ext3_bmap,		/* BKL held */
+	.invalidatepage	= ext3_invalidatepage,	/* BKL not held.  Don't need */
+	.releasepage	= ext3_releasepage,	/* BKL not held.  Don't need */
 };
 
 /* For writeback mode, we can use mpage_writepages() */
@@ -1405,16 +1405,16 @@ ext3_writepages(struct address_space *mapping, int *nr_to_write)
 }
 
 struct address_space_operations ext3_writeback_aops = {
-	readpage:	ext3_readpage,		/* BKL not held.  Don't need */
-	readpages:	ext3_readpages,		/* BKL not held.  Don't need */
-	writepage:	ext3_writepage,		/* BKL not held.  We take it */
-	writepages:	ext3_writepages,	/* BKL not held.  Don't need */
-	sync_page:	block_sync_page,
-	prepare_write:	ext3_prepare_write,	/* BKL not held.  We take it */
-	commit_write:	ext3_commit_write,	/* BKL not held.  We take it */
-	bmap:		ext3_bmap,		/* BKL held */
-	invalidatepage:	ext3_invalidatepage,	/* BKL not held.  Don't need */
-	releasepage:	ext3_releasepage,	/* BKL not held.  Don't need */
+	.readpage	= ext3_readpage,		/* BKL not held.  Don't need */
+	.readpages	= ext3_readpages,		/* BKL not held.  Don't need */
+	.writepage	= ext3_writepage,		/* BKL not held.  We take it */
+	.writepages	= ext3_writepages,	/* BKL not held.  Don't need */
+	.sync_page	= block_sync_page,
+	.prepare_write	= ext3_prepare_write,	/* BKL not held.  We take it */
+	.commit_write	= ext3_commit_write,	/* BKL not held.  We take it */
+	.bmap		= ext3_bmap,		/* BKL held */
+	.invalidatepage	= ext3_invalidatepage,	/* BKL not held.  Don't need */
+	.releasepage	= ext3_releasepage,	/* BKL not held.  Don't need */
 };
 
 /*

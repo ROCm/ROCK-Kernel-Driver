@@ -85,6 +85,24 @@ extern int bus_for_each_drv(struct bus_type * bus, void * data,
 			    int (*callback)(struct device_driver * drv, void * data));
 
 
+/* driverfs interface for exporting bus attributes */
+
+struct bus_attribute {
+	struct attribute	attr;
+	ssize_t (*show)(struct bus_type *, char * buf, size_t count, loff_t off);
+	ssize_t (*store)(struct bus_type *, const char * buf, size_t count, loff_t off);
+};
+
+#define BUS_ATTR(_name,_str,_mode,_show,_store)	\
+struct bus_attribute bus_attr_##_name = { 		\
+	.attr = {.name	= _str,	.mode	= _mode },	\
+	.show	= _show,				\
+	.store	= _store,				\
+};
+
+extern int bus_create_file(struct bus_type *, struct bus_attribute *);
+extern void bus_remove_file(struct bus_type *, struct bus_attribute *);
+
 struct device_driver {
 	char			* name;
 	struct bus_type		* bus;
@@ -124,6 +142,24 @@ extern int driver_for_each_dev(struct device_driver * drv, void * data,
 			       int (*callback)(struct device * dev, void * data));
 
 
+/* driverfs interface for exporting driver attributes */
+
+struct driver_attribute {
+	struct attribute	attr;
+	ssize_t (*show)(struct device_driver *, char * buf, size_t count, loff_t off);
+	ssize_t (*store)(struct device_driver *, const char * buf, size_t count, loff_t off);
+};
+
+#define DRIVER_ATTR(_name,_str,_mode,_show,_store)	\
+struct driver_attribute driver_attr_##_name = { 		\
+	.attr = {.name	= _str,	.mode	= _mode },	\
+	.show	= _show,				\
+	.store	= _store,				\
+};
+
+extern int driver_create_file(struct device_driver *, struct driver_attribute *);
+extern void driver_remove_file(struct device_driver *, struct driver_attribute *);
+
 struct device {
 	struct list_head g_list;        /* node in depth-first order list */
 	struct list_head node;		/* node in sibling list */
@@ -160,8 +196,6 @@ struct device {
 	void	(*release)(struct device * dev);
 };
 
-#define to_device(d) container_of(d, struct device, dir)
-
 static inline struct device *
 list_to_dev(struct list_head *node)
 {
@@ -179,8 +213,24 @@ g_list_to_dev(struct list_head *g_list)
  */
 extern int device_register(struct device * dev);
 
-extern int device_create_file(struct device *device, struct driver_file_entry * entry);
-extern void device_remove_file(struct device * dev, const char * name);
+
+/* driverfs interface for exporting device attributes */
+
+struct device_attribute {
+	struct attribute	attr;
+	ssize_t (*show)(struct device * dev, char * buf, size_t count, loff_t off);
+	ssize_t (*store)(struct device * dev, const char * buf, size_t count, loff_t off);
+};
+
+#define DEVICE_ATTR(_name,_str,_mode,_show,_store)	\
+struct device_attribute dev_attr_##_name = { 		\
+	.attr = {.name	= _str,	.mode	= _mode },	\
+	.show	= _show,				\
+	.store	= _store,				\
+};
+
+extern int device_create_file(struct device *device, struct device_attribute * entry);
+extern void device_remove_file(struct device * dev, struct device_attribute * attr);
 
 /*
  * Platform "fixup" functions - allow the platform to have their say

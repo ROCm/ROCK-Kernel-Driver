@@ -13,6 +13,12 @@
  * L. Haag
  *
  * $Log: r3964.h,v $
+ * Revision 1.3  2001/03/18 13:02:24  dwmw2
+ * Fix timer usage, use spinlocks properly.
+ *
+ * Revision 1.2  2001/03/18 12:53:15  dwmw2
+ * Merge changes in 2.4.2
+ *
  * Revision 1.1.1.1  1998/10/13 16:43:14  dwmw2
  * This'll screw the version control
  *
@@ -103,8 +109,9 @@ enum { R3964_IDLE,
 struct r3964_message;
 
 struct r3964_client_info {
+	spinlock_t     lock;
 	pid_t          pid;
-    unsigned int   sig_flags;
+	unsigned int   sig_flags;
 
 	struct r3964_client_info *next;
 
@@ -186,6 +193,7 @@ struct r3964_block_header
 
 
 struct r3964_info {
+	spinlock_t     lock;
 	struct tty_struct *tty;
 	unsigned char priority;
 	unsigned char *rx_buf;            /* ring buffer */
@@ -209,11 +217,8 @@ struct r3964_info {
 	unsigned int state;
 	unsigned int flags;
 
-	int count_down;
-    int nRetry;
-
-    struct tq_struct bh_1;
-    struct tq_struct bh_2;
+	struct timer_list tmr;
+	int nRetry;
 };
 
 #endif	

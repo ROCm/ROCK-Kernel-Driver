@@ -1251,8 +1251,8 @@ _GLOBAL(sys_call_table)
 	.long sys_rt_sigtimedwait
 	.long sys_rt_sigqueueinfo
 	.long ppc_rt_sigsuspend
-	.long sys_pread
-	.long sys_pwrite	/* 180 */
+	.long sys_pread64
+	.long sys_pwrite64	/* 180 */
 	.long sys_chown
 	.long sys_getcwd
 	.long sys_capget

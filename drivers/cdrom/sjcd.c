@@ -1680,7 +1680,7 @@ int __init sjcd_init(void)
 	printk("SJCD: sjcd=0x%x: ", sjcd_base);
 #endif
 
-	if (devfs_register_blkdev(MAJOR_NR, "sjcd", &sjcd_fops) != 0) {
+	if (register_blkdev(MAJOR_NR, "sjcd", &sjcd_fops) != 0) {
 		printk("SJCD: Unable to get major %d for Sanyo CD-ROM\n",
 		       MAJOR_NR);
 		return (-EIO);
@@ -1789,7 +1789,7 @@ int __init sjcd_init(void)
 
 static int sjcd_cleanup(void)
 {
-	if ((devfs_unregister_blkdev(MAJOR_NR, "sjcd") == -EINVAL))
+	if ((unregister_blkdev(MAJOR_NR, "sjcd") == -EINVAL))
 		printk("SJCD: cannot unregister device.\n");
 	else {
 		release_region(sjcd_base, 4);
@@ -1802,8 +1802,7 @@ static int sjcd_cleanup(void)
 
 void __exit sjcd_exit(void)
 {
-	devfs_unregister(devfs_find_handle
-			 (NULL, "sjcd", 0, 0, DEVFS_SPECIAL_BLK, 0));
+	devfs_find_and_unregister(NULL, "sjcd", 0, 0, DEVFS_SPECIAL_BLK, 0);
 	if (sjcd_cleanup())
 		printk("SJCD: module: cannot be removed.\n");
 	else

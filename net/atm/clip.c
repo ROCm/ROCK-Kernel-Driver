@@ -274,14 +274,14 @@ static void clip_neigh_error(struct neighbour *neigh,struct sk_buff *skb)
 
 
 static struct neigh_ops clip_neigh_ops = {
-	family:			AF_INET,
-	destructor:		clip_neigh_destroy,
-	solicit:		clip_neigh_solicit,
-	error_report:		clip_neigh_error,
-	output:			dev_queue_xmit,
-	connected_output:	dev_queue_xmit,
-	hh_output:		dev_queue_xmit,
-	queue_xmit:		dev_queue_xmit,
+	.family =		AF_INET,
+	.destructor =		clip_neigh_destroy,
+	.solicit =		clip_neigh_solicit,
+	.error_report =		clip_neigh_error,
+	.output =		dev_queue_xmit,
+	.connected_output =	dev_queue_xmit,
+	.hh_output =		dev_queue_xmit,
+	.queue_xmit =		dev_queue_xmit,
 };
 
 
@@ -699,7 +699,7 @@ static void atmarpd_close(struct atm_vcc *vcc)
 
 
 static struct atmdev_ops atmarpd_dev_ops = {
-	close:	atmarpd_close,
+	.close =atmarpd_close,
 };
 
 

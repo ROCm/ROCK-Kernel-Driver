@@ -404,6 +404,7 @@ void proc_fill_inode(struct inode *inode, int fill)
  */
 static int __init skge_probe (void)
 {
+	int			proc_root_initialized = 0;
 	int 		boards_found = 0;
 	int			version_disp = 0;
 	SK_AC		*pAC;
@@ -428,11 +429,6 @@ static int __init skge_probe (void)
 
 	if (!pci_present())		/* is PCI support present? */
 		return -ENODEV;
-
-        pSkRootDir = create_proc_entry("sk98lin",
-                S_IFDIR | S_IWUSR | S_IRUGO | S_IXUGO, proc_net); 
-
-	pSkRootDir->owner = THIS_MODULE;
 
 	while((pdev = pci_find_device(PCI_VENDOR_ID_SYSKONNECT,
 				      PCI_DEVICE_ID_SYSKONNECT_GE, pdev)) != NULL) {
@@ -484,6 +480,14 @@ static int __init skge_probe (void)
 		dev->set_mac_address =	&SkGeSetMacAddr;
 		dev->do_ioctl =		&SkGeIoctl;
 		dev->change_mtu =	&SkGeChangeMtu;
+
+		if(!proc_root_initialized) {
+			pSkRootDir = create_proc_entry("sk98lin",
+				S_IFDIR | S_IWUSR | S_IRUGO | S_IXUGO, proc_net);
+			pSkRootDir->owner = THIS_MODULE;
+
+			proc_root_initialized = 1;
+		}
 
 		pProcFile = create_proc_entry(dev->name, 
 			S_IFREG | 0444, pSkRootDir);

@@ -160,14 +160,14 @@ static int netlink_ioctl(struct inode *inode, struct file *file,
 
 
 static struct file_operations netlink_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	read:		netlink_read,
-	write:		netlink_write,
-	poll:		netlink_poll,
-	ioctl:		netlink_ioctl,
-	open:		netlink_open,
-	release:	netlink_release,
+	.owner =	THIS_MODULE,
+	.llseek =	no_llseek,
+	.read =		netlink_read,
+	.write =	netlink_write,
+	.poll =		netlink_poll,
+	.ioctl =	netlink_ioctl,
+	.open =		netlink_open,
+	.release =	netlink_release,
 };
 
 static devfs_handle_t devfs_handle;
@@ -182,7 +182,7 @@ static void __init make_devfs_entries (const char *name, int minor)
 
 int __init init_netlink(void)
 {
-	if (devfs_register_chrdev(NETLINK_MAJOR,"netlink", &netlink_fops)) {
+	if (register_chrdev(NETLINK_MAJOR,"netlink", &netlink_fops)) {
 		printk(KERN_ERR "netlink: unable to get major %d\n", NETLINK_MAJOR);
 		return -EIO;
 	}
@@ -217,7 +217,7 @@ int init_module(void)
 void cleanup_module(void)
 {
 	devfs_unregister (devfs_handle);
-	devfs_unregister_chrdev(NETLINK_MAJOR, "netlink");
+	unregister_chrdev(NETLINK_MAJOR, "netlink");
 }
 
 #endif

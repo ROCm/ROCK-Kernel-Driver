@@ -89,10 +89,7 @@ static void it8172_tune_drive (struct ata_device *drive, u8 pio)
 	    drive_enables |= 0x0006;
     }
 
-    save_flags(flags);
-    cli();
 	pci_write_config_word(dev, master_port, master_data);
-    restore_flags(flags);
 }
 
 #if defined(CONFIG_BLK_DEV_IDEDMA) && defined(CONFIG_IT8172_TUNING)

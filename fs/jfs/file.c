@@ -98,5 +98,6 @@ struct file_operations jfs_file_operations = {
 	.write		= generic_file_write,
 	.read		= generic_file_read,
 	.mmap		= generic_file_mmap,
+ 	.sendfile	= generic_file_sendfile,
 	.fsync		= jfs_fsync,
 };

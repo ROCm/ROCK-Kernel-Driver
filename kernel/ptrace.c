@@ -11,6 +11,7 @@
 #include <linux/errno.h>
 #include <linux/mm.h>
 #include <linux/highmem.h>
+#include <linux/pagemap.h>
 #include <linux/smp_lock.h>
 
 #include <asm/pgtable.h>
@@ -156,7 +157,7 @@ int access_process_vm(struct task_struct *tsk, unsigned long addr, void *buf, in
 			flush_page_to_ram(page);
 		}
 		kunmap(page);
-		put_page(page);
+		page_cache_release(page);
 		len -= bytes;
 		buf += bytes;
 		addr += bytes;

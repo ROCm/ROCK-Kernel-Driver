@@ -859,12 +859,12 @@ static int bpp_ioctl(struct inode *inode, struct file *f, unsigned int cmd,
 }
 
 static struct file_operations bpp_fops = {
-	owner:		THIS_MODULE,
-	read:		bpp_read,
-	write:		bpp_write,
-	ioctl:		bpp_ioctl,
-	open:		bpp_open,
-	release:	bpp_release,
+	.owner =	THIS_MODULE,
+	.read =		bpp_read,
+	.write =	bpp_write,
+	.ioctl =	bpp_ioctl,
+	.open =		bpp_open,
+	.release =	bpp_release,
 };
 
 #if defined(__i386__)
@@ -1041,7 +1041,7 @@ static int __init bpp_init(void)
 	if (rc == 0)
 		return -ENODEV;
 
-	rc = devfs_register_chrdev(BPP_MAJOR, dev_name, &bpp_fops);
+	rc = register_chrdev(BPP_MAJOR, dev_name, &bpp_fops);
 	if (rc < 0)
 		return rc;
 
@@ -1062,7 +1062,7 @@ static void __exit bpp_cleanup(void)
 	unsigned idx;
 
 	devfs_unregister (devfs_handle);
-	devfs_unregister_chrdev(BPP_MAJOR, dev_name);
+	unregister_chrdev(BPP_MAJOR, dev_name);
 
 	for (idx = 0 ;  idx < BPP_NO ;  idx += 1) {
 		if (instances[idx].present)

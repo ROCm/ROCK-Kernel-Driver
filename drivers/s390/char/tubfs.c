@@ -54,18 +54,15 @@ void fs3270_devfs_register(tub_t *tubp)
 void fs3270_devfs_unregister(tub_t *tubp)
 {
 	char name[16];
-	devfs_handle_t handle;
 
 	sprintf(name, "tub%.4x", tubp->devno);
-	handle = devfs_find_handle (fs3270_devfs_dir, name,
-				    IBM_FS3270_MAJOR, tubp->minor,
-				    DEVFS_SPECIAL_CHR, 0);
-	devfs_unregister (handle);
+	devfs_find_and_unregister(fs3270_devfs_dir, name,
+				  IBM_FS3270_MAJOR, tubp->minor,
+				  DEVFS_SPECIAL_CHR, 0);
 	sprintf(name, "tty%.4x", tubp->devno);
-	handle = devfs_find_handle (fs3270_devfs_dir, name,
-				    IBM_TTY3270_MAJOR, tubp->minor,
-				    DEVFS_SPECIAL_CHR, 0);
-	devfs_unregister(handle);
+	devfs_find_and_unregister(fs3270_devfs_dir, name,
+				  IBM_TTY3270_MAJOR, tubp->minor,
+				  DEVFS_SPECIAL_CHR, 0);
 }
 #endif
 
@@ -77,26 +74,19 @@ fs3270_init(void)
 {
 	int rc;
 
-#ifdef CONFIG_DEVFS_FS
-	rc = devfs_register_chrdev (IBM_FS3270_MAJOR, "fs3270", &fs3270_fops);
-	if (rc) {
-		printk(KERN_ERR "tubmod can't get major nbr %d: error %d\n",
-			IBM_FS3270_MAJOR, rc);
-		return -1;
-	}
-	fs3270_devfs_dir = devfs_mk_dir(NULL, "3270", NULL);
-	fs3270_devfs_tub = 
-		devfs_register(fs3270_devfs_dir, "tub", DEVFS_FL_DEFAULT,
-			       IBM_FS3270_MAJOR, 0,
-			       S_IFCHR | S_IRUGO | S_IWUGO, 
-			       &fs3270_fops, NULL);
-#else
 	rc = register_chrdev(IBM_FS3270_MAJOR, "fs3270", &fs3270_fops);
 	if (rc) {
 		printk(KERN_ERR "tubmod can't get major nbr %d: error %d\n",
 			IBM_FS3270_MAJOR, rc);
 		return -1;
 	}
+#ifdef CONFIG_DEVFS_FS
+	fs3270_devfs_dir = devfs_mk_dir(NULL, "3270", NULL);
+	fs3270_devfs_tub = 
+		devfs_register(fs3270_devfs_dir, "tub", DEVFS_FL_DEFAULT,
+			       IBM_FS3270_MAJOR, 0,
+			       S_IFCHR | S_IRUGO | S_IWUGO, 
+			       &fs3270_fops, NULL);
 #endif
 	fs3270_major = IBM_FS3270_MAJOR;
 	return 0;

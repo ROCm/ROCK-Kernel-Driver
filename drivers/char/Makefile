@@ -7,7 +7,7 @@
 #
 FONTMAPFILE = cp437.uni
 
-obj-y	 += mem.o tty_io.o n_tty.o tty_ioctl.o raw.o pty.o misc.o random.o
+obj-y	 += mem.o tty_io.o n_tty.o tty_ioctl.o pty.o misc.o random.o
 
 # All of the (potential) objects that export symbols.
 # This list comes from 'grep -l EXPORT_SYMBOL *.[hc]'.
@@ -108,14 +108,18 @@ ifeq ($(CONFIG_QTRONIX_KEYBOARD),y)
   KEYMAP   = qtronixmap.o
 endif
 
+ifeq ($(CONFIG_SPARC32),y)
+  KEYBD    =
+endif
+
+ifeq ($(CONFIG_SPARC64),y)
+  KEYBD    =
+endif
+
 obj-$(CONFIG_VT) += vt.o vc_screen.o consolemap.o consolemap_deftbl.o $(CONSOLE) selection.o
 #obj-$(CONFIG_SERIAL) += $(SERIAL) # Fix for decserial.o
 
-ifndef CONFIG_SUN_KEYBOARD
-  obj-$(CONFIG_VT) += keyboard.o $(KEYMAP) $(KEYBD)
-else
-  obj-$(CONFIG_PCI) += keyboard.o $(KEYMAP)
-endif
+obj-$(CONFIG_VT) += keyboard.o $(KEYMAP) $(KEYBD)
 
 obj-$(CONFIG_MAGIC_SYSRQ) += sysrq.o
 obj-$(CONFIG_ATARI_DSP56K) += dsp56k.o
@@ -146,6 +150,7 @@ obj-$(CONFIG_MVME162_SCC) += generic_serial.o vme_scc.o
 obj-$(CONFIG_BVME6000_SCC) += generic_serial.o vme_scc.o
 obj-$(CONFIG_SERIAL_TX3912) += generic_serial.o serial_tx3912.o
 obj-$(CONFIG_HVC_CONSOLE) += hvc_console.o
+obj-$(CONFIG_RAW_DRIVER) += raw.o
 
 obj-$(CONFIG_PRINTER) += lp.o
 

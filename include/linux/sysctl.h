@@ -136,12 +136,12 @@ enum
 	VM_UNUSED1=1,		/* was: struct: Set vm swapping control */
 	VM_UNUSED2=2,		/* was; int: Linear or sqrt() swapout for hogs */
 	VM_UNUSED3=3,		/* was: struct: Set free page thresholds */
-	VM_BDFLUSH_UNUSED=4,	/* Spare */
+	VM_UNUSED4=4,		/* Spare */
 	VM_OVERCOMMIT_MEMORY=5,	/* Turn off the virtual memory safety limit */
-	VM_UNUSED4=6,		/* was: struct: Set buffer memory thresholds */
-	VM_UNUSED5=7,		/* was: struct: Set cache memory thresholds */
-	VM_PAGERDAEMON=8,	/* struct: Control kswapd behaviour */
-	VM_UNUSED6=9,		/* was: struct: Set page table cache parameters */
+	VM_UNUSED5=6,		/* was: struct: Set buffer memory thresholds */
+	VM_UNUSED7=7,		/* was: struct: Set cache memory thresholds */
+	VM_UNUSED8=8,		/* was: struct: Control kswapd behaviour */
+	VM_UNUSED9=9,		/* was: struct: Set page table cache parameters */
 	VM_PAGE_CLUSTER=10,	/* int: set number of pages to swap together */
 	VM_DIRTY_BACKGROUND=11,	/* dirty_background_ratio */
 	VM_DIRTY_ASYNC=12,	/* dirty_async_ratio */
@@ -149,6 +149,7 @@ enum
 	VM_DIRTY_WB_CS=14,	/* dirty_writeback_centisecs */
 	VM_DIRTY_EXPIRE_CS=15,	/* dirty_expire_centisecs */
 	VM_NR_PDFLUSH_THREADS=16, /* nr_pdflush_threads */
+	VM_OVERCOMMIT_RATIO=17, /* percent of RAM to allow overcommit in */
 };
 
 
@@ -171,7 +172,6 @@ enum
 	NET_TR=14,
 	NET_DECNET=15,
 	NET_ECONET=16,
-	NET_KHTTPD=17
 };
 
 /* /proc/sys/kernel/random */
@@ -491,23 +491,6 @@ enum {
 	NET_DECNET_CONF = 10,
 	NET_DECNET_NO_FC_MAX_CWND = 11,
 	NET_DECNET_DEBUG_LEVEL = 255
-};
-
-/* /proc/sys/net/khttpd/ */
-enum {
-	NET_KHTTPD_DOCROOT	= 1,
-	NET_KHTTPD_START	= 2,
-	NET_KHTTPD_STOP		= 3,
-	NET_KHTTPD_UNLOAD	= 4,
-	NET_KHTTPD_CLIENTPORT	= 5,
-	NET_KHTTPD_PERMREQ	= 6,
-	NET_KHTTPD_PERMFORBID	= 7,
-	NET_KHTTPD_LOGGING	= 8,
-	NET_KHTTPD_SERVERPORT	= 9,
-	NET_KHTTPD_DYNAMICSTRING= 10,
-	NET_KHTTPD_SLOPPYMIME   = 11,
-	NET_KHTTPD_THREADS	= 12,
-	NET_KHTTPD_MAXCONNECT	= 13
 };
 
 /* /proc/sys/net/decnet/conf/<dev> */

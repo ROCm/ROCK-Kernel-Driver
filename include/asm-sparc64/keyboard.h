@@ -13,38 +13,21 @@
 
 #ifdef __KERNEL__
 
-#include <linux/kernel.h>
-#include <linux/kd.h>
+/* We use the generic input layer for keyboard handling, thus
+ * some of this stuff should never be invoked.
+ */
+#define kbd_setkeycode(scancode, keycode)	(BUG(), 0)
+#define kbd_getkeycode(scancode)		(BUG(), 0)
 
-#define KEYBOARD_IRQ			1
-#define DISABLE_KBD_DURING_INTERRUPTS	0
+#define kbd_translate(keycode, keycodep, raw_mode) \
+	({ *(keycodep) = scancode; 1; })
+#define kbd_unexpected_up(keycode)		(0200)
 
-extern int pcikbd_setkeycode(unsigned int scancode, unsigned int keycode);
-extern int pcikbd_getkeycode(unsigned int scancode);
-extern int pcikbd_translate(unsigned char scancode, unsigned char *keycode,
-			    char raw_mode);
-extern char pcikbd_unexpected_up(unsigned char keycode);
-extern void pcikbd_leds(unsigned char leds);
-extern void pcikbd_init_hw(void);
-extern unsigned char pcikbd_sysrq_xlate[128];
-
-#define kbd_setkeycode			pcikbd_setkeycode
-#define kbd_getkeycode			pcikbd_getkeycode
-#define kbd_translate			pcikbd_translate
-#define kbd_unexpected_up		pcikbd_unexpected_up
-#define kbd_leds			pcikbd_leds
-#define kbd_init_hw			pcikbd_init_hw
-#define kbd_sysrq_xlate			pcikbd_sysrq_xlate
-#define kbd_init			pcikbd_init
-
-#define compute_shiftstate		pci_compute_shiftstate
-#define getkeycode			pci_getkeycode
-#define setkeycode			pci_setkeycode
-#define getledstate			pci_getledstate
-#define setledstate			pci_setledstate
-#define register_leds			pci_register_leds
+#define kbd_leds(leds)				do { } while (0)
+#define kbd_init_hw()				do { } while (0)
 
 #define SYSRQ_KEY 0x54
+extern unsigned char kbd_sysrq_xlate[128];
 
 #endif /* __KERNEL__ */
 

@@ -53,6 +53,7 @@ static struct file_operations vxfs_file_operations = {
 	.llseek =		generic_file_llseek,
 	.read =			generic_file_read,
 	.mmap =			generic_file_mmap,
+	.sendfile =		generic_file_sendfile,
 };
 
 

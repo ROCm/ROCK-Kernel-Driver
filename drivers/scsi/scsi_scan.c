@@ -305,12 +305,8 @@ static ssize_t scsi_device_type_read(struct device *driverfs_dev, char *page,
 
 	return 0;
 }
+static DEVICE_ATTR(type,"type",S_IRUGO,scsi_device_type_read,NULL);
 
-static struct driver_file_entry scsi_device_type_file = {
-	name: "type",
-	mode: S_IRUGO,
-	show: scsi_device_type_read,
-};
 /* end content handlers */
 
 static void print_inquiry(unsigned char *data)
@@ -715,7 +711,7 @@ static int scan_scsis_single(unsigned int channel, unsigned int dev,
 
 		scsi_wait_req (SRpnt, (void *) scsi_cmd,
 			  (void *) scsi_result,
-			  256, SCSI_TIMEOUT+4*HZ, 3);
+			  scsi_cmd[4], SCSI_TIMEOUT+4*HZ, 3);
 		/* assume successful */
 	}
 	SDpnt->inquiry_len = possible_inq_resp_len;
@@ -825,7 +821,7 @@ static int scan_scsis_single(unsigned int channel, unsigned int dev,
 
 	/* Create driverfs file entries */
 	device_create_file(&SDpnt->sdev_driverfs_dev, 
-			&scsi_device_type_file);
+			   &dev_attr_type);
 
         sprintf (devname, "host%d/bus%d/target%d/lun%d",
                  SDpnt->host->host_no, SDpnt->channel, SDpnt->id, SDpnt->lun);

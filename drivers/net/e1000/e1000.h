@@ -109,11 +109,11 @@
 #include <linux/list.h>
 #include <linux/reboot.h>
 #include <linux/ethtool.h>
-#ifdef NETIF_F_HW_VLAN_TX
 #include <linux/if_vlan.h>
-#endif
 
 #define BAR_0		0
+#define BAR_1		1
+#define BAR_5		5
 #define PCI_DMA_64BIT	0xffffffffffffffffULL
 #define PCI_DMA_32BIT	0x00000000ffffffffULL
 
@@ -149,6 +149,8 @@ struct e1000_adapter;
 
 #define E1000_JUMBO_PBA      0x00000028
 #define E1000_DEFAULT_PBA    0x00000030
+
+#define AUTO_ALL_MODES       0
 
 /* only works for sizes that are powers of 2 */
 #define E1000_ROUNDUP(i, size) ((i) = (((i) + (size) - 1) & ~((size) - 1)))
@@ -195,9 +197,7 @@ struct e1000_adapter {
 #ifdef CONFIG_PROC_FS
 	struct list_head proc_list_head;
 #endif
-#ifdef NETIF_F_HW_VLAN_TX
 	struct vlan_group *vlgrp;
-#endif
 	char *id_string;
 	uint32_t bd_number;
 	uint32_t rx_buffer_len;
@@ -208,10 +208,8 @@ struct e1000_adapter {
 	spinlock_t stats_lock;
 	atomic_t irq_sem;
 
-#ifdef ETHTOOL_PHYS_ID
 	struct timer_list blink_timer;
 	unsigned long led_status;
-#endif
 
 	/* TX */
 	struct e1000_desc_ring tx_ring;

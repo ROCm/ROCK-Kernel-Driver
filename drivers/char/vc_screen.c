@@ -480,10 +480,10 @@ void vcs_make_devfs (unsigned int index, int unregister)
     sprintf (name, "a%u", index + 1);
     if (unregister)
     {
-	devfs_unregister ( devfs_find_handle (devfs_handle, name + 1, 0, 0,
-					      DEVFS_SPECIAL_CHR, 0) );
-	devfs_unregister ( devfs_find_handle (devfs_handle, name, 0, 0,
-					      DEVFS_SPECIAL_CHR, 0) );
+	devfs_find_and_unregister(devfs_handle, name + 1, 0, 0,
+				  DEVFS_SPECIAL_CHR, 0);
+	devfs_find_and_unregister(devfs_handle, name, 0, 0,
+				  DEVFS_SPECIAL_CHR, 0);
     }
     else
     {
@@ -501,7 +501,7 @@ int __init vcs_init(void)
 {
 	int error;
 
-	error = devfs_register_chrdev(VCS_MAJOR, "vcs", &vcs_fops);
+	error = register_chrdev(VCS_MAJOR, "vcs", &vcs_fops);
 
 	if (error)
 		printk("unable to get major %d for vcs device", VCS_MAJOR);

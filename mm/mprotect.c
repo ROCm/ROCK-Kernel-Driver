@@ -1,7 +1,10 @@
 /*
- *	linux/mm/mprotect.c
+ *  mm/mprotect.c
  *
  *  (C) Copyright 1994 Linus Torvalds
+ *
+ *  Address space accounting code	<alan@redhat.com>
+ *  (C) Copyright 2002 Red Hat Inc, All Rights Reserved
  */
 #include <linux/mm.h>
 #include <linux/slab.h>
@@ -248,10 +251,27 @@ static int mprotect_fixup(struct vm_area_struct * vma, struct vm_area_struct ** 
 {
 	pgprot_t newprot;
 	int error;
+	unsigned long charged = 0;
 
 	if (newflags == vma->vm_flags) {
 		*pprev = vma;
 		return 0;
+	}
+
+	/*
+	 * If we make a private mapping writable we increase our commit;
+	 * but (without finer accounting) cannot reduce our commit if we
+	 * make it unwritable again.
+	 *
+	 * FIXME? We haven't defined a VM_NORESERVE flag, so mprotecting
+	 * a MAP_NORESERVE private mapping to writable will now reserve.
+	 */
+	if ((newflags & VM_WRITE) &&
+	    !(vma->vm_flags & (VM_ACCOUNT|VM_WRITE|VM_SHARED))) {
+		charged = (end - start) >> PAGE_SHIFT;
+		if (!vm_enough_memory(charged))
+			return -ENOMEM;
+		newflags |= VM_ACCOUNT;
 	}
 	newprot = protection_map[newflags & 0xf];
 	if (start == vma->vm_start) {
@@ -263,10 +283,10 @@ static int mprotect_fixup(struct vm_area_struct * vma, struct vm_area_struct ** 
 		error = mprotect_fixup_end(vma, pprev, start, newflags, newprot);
 	else
 		error = mprotect_fixup_middle(vma, pprev, start, end, newflags, newprot);
-
-	if (error)
+	if (error) {
+		vm_unacct_memory(charged);
 		return error;
-
+	}
 	change_protection(vma, start, end, newprot);
 	return 0;
 }

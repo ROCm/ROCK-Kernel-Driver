@@ -37,6 +37,8 @@
 
 static int nfs_readdir(struct file *, void *, filldir_t);
 static struct dentry *nfs_lookup(struct inode *, struct dentry *);
+static int nfs_cached_lookup(struct inode *, struct dentry *,
+				struct nfs_fh *, struct nfs_fattr *);
 static int nfs_create(struct inode *, struct dentry *, int);
 static int nfs_mkdir(struct inode *, struct dentry *, int);
 static int nfs_rmdir(struct inode *, struct dentry *);
@@ -107,14 +109,16 @@ int nfs_readdir_filler(nfs_readdir_descriptor_t *desc, struct page *page)
  again:
 	error = NFS_PROTO(inode)->readdir(inode, cred, desc->entry->cookie, page,
 					  NFS_SERVER(inode)->dtsize, desc->plus);
-	/* We requested READDIRPLUS, but the server doesn't grok it */
-	if (desc->plus && error == -ENOTSUPP) {
-		NFS_FLAGS(inode) &= ~NFS_INO_ADVISE_RDPLUS;
-		desc->plus = 0;
-		goto again;
-	}
-	if (error < 0)
+	if (error < 0) {
+		/* We requested READDIRPLUS, but the server doesn't grok it */
+		if (error == -ENOTSUPP && desc->plus) {
+			NFS_SERVER(inode)->caps &= ~NFS_CAP_READDIRPLUS;
+			NFS_FLAGS(inode) &= ~NFS_INO_ADVISE_RDPLUS;
+			desc->plus = 0;
+			goto again;
+		}
 		goto error;
+	}
 	SetPageUptodate(page);
 	/* Ensure consistent page alignment of the data.
 	 * Note: assumes we have exclusive access to this mapping either
@@ -194,8 +198,7 @@ int find_dirent_page(nfs_readdir_descriptor_t *desc)
 
 	dfprintk(VFS, "NFS: find_dirent_page() searching directory page %ld\n", desc->page_index);
 
-	desc->plus = NFS_USE_READDIRPLUS(inode);
-	page = read_cache_page(&inode->i_data, desc->page_index,
+	page = read_cache_page(inode->i_mapping, desc->page_index,
 			       (filler_t *)nfs_readdir_filler, desc);
 	if (IS_ERR(page)) {
 		status = PTR_ERR(page);
@@ -246,6 +249,24 @@ int readdir_search_pagecache(nfs_readdir_descriptor_t *desc)
 	return res;
 }
 
+static unsigned int nfs_type2dtype[] = {
+	DT_UNKNOWN,
+	DT_REG,
+	DT_DIR,
+	DT_BLK,
+	DT_CHR,
+	DT_LNK,
+	DT_SOCK,
+	DT_UNKNOWN,
+	DT_FIFO
+};
+
+static inline
+unsigned int nfs_type_to_d_type(enum nfs_ftype type)
+{
+	return nfs_type2dtype[type];
+}
+
 /*
  * Once we've found the start of the dirent within a page: fill 'er up...
  */
@@ -262,11 +283,17 @@ int nfs_do_filldir(nfs_readdir_descriptor_t *desc, void *dirent,
 	dfprintk(VFS, "NFS: nfs_do_filldir() filling starting @ cookie %Lu\n", (long long)desc->target);
 
 	for(;;) {
+		unsigned d_type = DT_UNKNOWN;
 		/* Note: entry->prev_cookie contains the cookie for
 		 *	 retrieving the current dirent on the server */
 		fileid = nfs_fileid_to_ino_t(entry->ino);
+
+		/* Use readdirplus info */
+		if (desc->plus && (entry->fattr->valid & NFS_ATTR_FATTR))
+			d_type = nfs_type_to_d_type(entry->fattr->type);
+
 		res = filldir(dirent, entry->name, entry->len, 
-			      entry->prev_cookie, fileid, DT_UNKNOWN);
+			      entry->prev_cookie, fileid, d_type);
 		if (res < 0)
 			break;
 		file->f_pos = desc->target = entry->cookie;
@@ -333,7 +360,8 @@ int uncached_readdir(nfs_readdir_descriptor_t *desc, void *dirent,
 	/* Reset read descriptor so it searches the page cache from
 	 * the start upon the next call to readdir_search_pagecache() */
 	desc->page_index = 0;
-	memset(desc->entry, 0, sizeof(*desc->entry));
+	desc->entry->cookie = desc->entry->prev_cookie = 0;
+	desc->entry->eof = 0;
  out:
 	dfprintk(VFS, "NFS: uncached_readdir() returns %d\n", status);
 	return status;
@@ -352,6 +380,8 @@ static int nfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	nfs_readdir_descriptor_t my_desc,
 			*desc = &my_desc;
 	struct nfs_entry my_entry;
+	struct nfs_fh	 fh;
+	struct nfs_fattr fattr;
 	long		res;
 
 	lock_kernel();
@@ -369,12 +399,17 @@ static int nfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	 * itself.
 	 */
 	memset(desc, 0, sizeof(*desc));
-	memset(&my_entry, 0, sizeof(my_entry));
 
 	desc->file = filp;
 	desc->target = filp->f_pos;
-	desc->entry = &my_entry;
 	desc->decode = NFS_PROTO(inode)->decode_dirent;
+	desc->plus = NFS_USE_READDIRPLUS(inode);
+
+	my_entry.cookie = my_entry.prev_cookie = 0;
+	my_entry.eof = 0;
+	my_entry.fh = &fh;
+	my_entry.fattr = &fattr;
+	desc->entry = &my_entry;
 
 	while(!desc->entry->eof) {
 		res = readdir_search_pagecache(desc);
@@ -495,6 +530,15 @@ static int nfs_lookup_revalidate(struct dentry * dentry, int flags)
 		goto out_valid;
 	}
 
+	error = nfs_cached_lookup(dir, dentry, &fhandle, &fattr);
+	if (!error) {
+		if (memcmp(NFS_FH(inode), &fhandle, sizeof(struct nfs_fh))!= 0)
+			goto out_bad;
+		if (nfs_lookup_verify_inode(inode))
+			goto out_bad;
+		goto out_valid_renew;
+	}
+
 	if (NFS_STALE(inode))
 		goto out_bad;
 
@@ -506,6 +550,7 @@ static int nfs_lookup_revalidate(struct dentry * dentry, int flags)
 	if ((error = nfs_refresh_inode(inode, &fattr)) != 0)
 		goto out_bad;
 
+ out_valid_renew:
 	nfs_renew_times(dentry);
  out_valid:
 	unlock_kernel();
@@ -569,7 +614,7 @@ struct dentry_operations nfs_dentry_operations = {
 
 static struct dentry *nfs_lookup(struct inode *dir, struct dentry * dentry)
 {
-	struct inode *inode;
+	struct inode *inode = NULL;
 	int error;
 	struct nfs_fh fhandle;
 	struct nfs_fattr fattr;
@@ -585,8 +630,19 @@ static struct dentry *nfs_lookup(struct inode *dir, struct dentry * dentry)
 	dentry->d_op = &nfs_dentry_operations;
 
 	lock_kernel();
+	error = nfs_cached_lookup(dir, dentry, &fhandle, &fattr);
+	if (!error) {
+		error = -EACCES;
+		inode = nfs_fhget(dentry, &fhandle, &fattr);
+		if (inode) {
+			d_add(dentry, inode);
+			nfs_renew_times(dentry);
+			error = 0;
+		}
+		goto out_unlock;
+	}
+
 	error = NFS_PROTO(dir)->lookup(dir, &dentry->d_name, &fhandle, &fattr);
-	inode = NULL;
 	if (error == -ENOENT)
 		goto no_entry;
 	if (!error) {
@@ -599,9 +655,84 @@ static struct dentry *nfs_lookup(struct inode *dir, struct dentry * dentry)
 		}
 		nfs_renew_times(dentry);
 	}
+out_unlock:
 	unlock_kernel();
 out:
+	BUG_ON(error > 0);
 	return ERR_PTR(error);
+}
+
+static inline
+int find_dirent_name(nfs_readdir_descriptor_t *desc, struct page *page, struct dentry *dentry)
+{
+	struct nfs_entry *entry = desc->entry;
+	int		 status;
+
+	while((status = dir_decode(desc)) == 0) {
+		if (entry->len != dentry->d_name.len)
+			continue;
+		if (memcmp(entry->name, dentry->d_name.name, entry->len))
+			continue;
+		if (!(entry->fattr->valid & NFS_ATTR_FATTR))
+			continue;
+		break;
+	}
+	return status;
+}
+
+/*
+ * Use the cached Readdirplus results in order to avoid a LOOKUP call
+ * whenever we believe that the parent directory has not changed.
+ *
+ * We assume that any file creation/rename changes the directory mtime.
+ * As this results in a page cache invalidation whenever it occurs,
+ * we don't require any other tests for cache coherency.
+ */
+static
+int nfs_cached_lookup(struct inode *dir, struct dentry *dentry,
+			struct nfs_fh *fh, struct nfs_fattr *fattr)
+{
+	nfs_readdir_descriptor_t desc;
+	struct nfs_server *server;
+	struct nfs_entry entry;
+	struct page *page;
+	unsigned long timestamp = NFS_MTIME_UPDATE(dir);
+	int res;
+
+	if (!NFS_USE_READDIRPLUS(dir))
+		return -ENOENT;
+	server = NFS_SERVER(dir);
+	if (server->flags & NFS_MOUNT_NOAC)
+		return -ENOENT;
+	nfs_revalidate_inode(server, dir);
+
+	entry.fh = fh;
+	entry.fattr = fattr;
+
+	desc.decode = NFS_PROTO(dir)->decode_dirent;
+	desc.entry = &entry;
+	desc.page_index = 0;
+	desc.plus = 1;
+
+	for(;(page = find_get_page(dir->i_mapping, desc.page_index)); desc.page_index++) {
+
+		res = -EIO;
+		if (PageUptodate(page)) {
+			desc.ptr = kmap(page);
+			res = find_dirent_name(&desc, page, dentry);
+			kunmap(page);
+		}
+		page_cache_release(page);
+
+		if (res == 0)
+			goto out_found;
+		if (res != -EAGAIN)
+			break;
+	}
+	return -ENOENT;
+ out_found:
+	fattr->timestamp = timestamp;
+	return 0;
 }
 
 /*

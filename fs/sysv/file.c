@@ -25,6 +25,7 @@ struct file_operations sysv_file_operations = {
 	write:		generic_file_write,
 	mmap:		generic_file_mmap,
 	fsync:		sysv_sync_file,
+	sendfile:	generic_file_sendfile,
 };
 
 struct inode_operations sysv_file_inode_operations = {

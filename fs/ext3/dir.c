@@ -31,10 +31,10 @@ static unsigned char ext3_filetype_table[] = {
 static int ext3_readdir(struct file *, void *, filldir_t);
 
 struct file_operations ext3_dir_operations = {
-	read:		generic_read_dir,
-	readdir:	ext3_readdir,		/* we take BKL. needed?*/
-	ioctl:		ext3_ioctl,		/* BKL held */
-	fsync:		ext3_sync_file,		/* BKL held */
+	.read		= generic_read_dir,
+	.readdir	= ext3_readdir,		/* we take BKL. needed?*/
+	.ioctl		= ext3_ioctl,		/* BKL held */
+	.fsync		= ext3_sync_file,		/* BKL held */
 };
 
 int ext3_check_dir_entry (const char * function, struct inode * dir,

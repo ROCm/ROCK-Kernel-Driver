@@ -475,6 +475,23 @@ int thiscpus_mid;
 
 void trap_init(void)
 {
+	extern void thread_info_offsets_are_bolixed_pete(void);
+
+	/* Force linker to barf if mismatched */
+	if (TI_UWINMASK    != offsetof(struct thread_info, uwinmask) ||
+	    TI_TASK        != offsetof(struct thread_info, task) ||
+	    TI_EXECDOMAIN  != offsetof(struct thread_info, exec_domain) ||
+	    TI_FLAGS       != offsetof(struct thread_info, flags) ||
+	    TI_CPU         != offsetof(struct thread_info, cpu) ||
+	    TI_PREEMPT     != offsetof(struct thread_info, preempt_count) ||
+	    TI_SOFTIRQ     != offsetof(struct thread_info, softirq_count) ||
+	    TI_HARDIRQ     != offsetof(struct thread_info, hardirq_count) ||
+	    TI_KSP         != offsetof(struct thread_info, ksp) ||
+	    TI_KPC         != offsetof(struct thread_info, kpc) ||
+	    TI_KPSR        != offsetof(struct thread_info, kpsr) ||
+	    TI_KWIM        != offsetof(struct thread_info, kwim))
+		thread_info_offsets_are_bolixed_pete();
+
 	/* Attach to the address space of init_task. */
 	atomic_inc(&init_mm.mm_count);
 	current->active_mm = &init_mm;

@@ -697,29 +697,29 @@ static int econet_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg
 }
 
 static struct net_proto_family econet_family_ops = {
-	family:		PF_ECONET,
-	create:		econet_create,
+	.family =	PF_ECONET,
+	.create =	econet_create,
 };
 
 static struct proto_ops SOCKOPS_WRAPPED(econet_ops) = {
-	family:		PF_ECONET,
+	.family =	PF_ECONET,
 
-	release:	econet_release,
-	bind:		econet_bind,
-	connect:	sock_no_connect,
-	socketpair:	sock_no_socketpair,
-	accept:		sock_no_accept,
-	getname:	econet_getname, 
-	poll:		datagram_poll,
-	ioctl:		econet_ioctl,
-	listen:		sock_no_listen,
-	shutdown:	sock_no_shutdown,
-	setsockopt:	sock_no_setsockopt,
-	getsockopt:	sock_no_getsockopt,
-	sendmsg:	econet_sendmsg,
-	recvmsg:	econet_recvmsg,
-	mmap:		sock_no_mmap,
-	sendpage:	sock_no_sendpage,
+	.release =	econet_release,
+	.bind =		econet_bind,
+	.connect =	sock_no_connect,
+	.socketpair =	sock_no_socketpair,
+	.accept =	sock_no_accept,
+	.getname =	econet_getname, 
+	.poll =		datagram_poll,
+	.ioctl =	econet_ioctl,
+	.listen =	sock_no_listen,
+	.shutdown =	sock_no_shutdown,
+	.setsockopt =	sock_no_setsockopt,
+	.getsockopt =	sock_no_getsockopt,
+	.sendmsg =	econet_sendmsg,
+	.recvmsg =	econet_recvmsg,
+	.mmap =		sock_no_mmap,
+	.sendpage =	sock_no_sendpage,
 };
 
 #include <linux/smp_lock.h>
@@ -1068,8 +1068,8 @@ static int econet_rcv(struct sk_buff *skb, struct net_device *dev, struct packet
 }
 
 static struct packet_type econet_packet_type = {
-	type:		__constant_htons(ETH_P_ECONET),
-	func:		econet_rcv,
+	.type =		__constant_htons(ETH_P_ECONET),
+	.func =		econet_rcv,
 };
 
 static void econet_hw_initialise(void)
@@ -1103,7 +1103,7 @@ static int econet_notifier(struct notifier_block *this, unsigned long msg, void 
 }
 
 static struct notifier_block econet_netdev_notifier = {
-	notifier_call:	econet_notifier,
+	.notifier_call =econet_notifier,
 };
 
 static void __exit econet_proto_exit(void)

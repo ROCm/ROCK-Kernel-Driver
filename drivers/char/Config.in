@@ -198,4 +198,6 @@ if [ "$CONFIG_X86" = "y" ]; then
    tristate 'ACP Modem (Mwave) support' CONFIG_MWAVE
 fi
 
+tristate '  RAW driver (/dev/raw/rawN)' CONFIG_RAW_DRIVER
+
 endmenu

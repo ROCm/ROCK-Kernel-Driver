@@ -13,6 +13,7 @@
 #include <asm/asi.h>
 #include <asm/winmacro.h>
 #include <asm/asmmacro.h>
+#include <asm/thread_info.h>
 
 /* Just like the overflow handler we define macros for registers
  * with fixed meanings in this routine.
@@ -40,7 +41,7 @@
 	 * andcc %l0, PSR_PS, %g0
 	 */
 
-	/* Datum current->thread.uwinmask contains at all times a bitmask
+	/* Datum current_thread_info->uwinmask contains at all times a bitmask
 	 * where if any user windows are active, at least one bit will
 	 * be set in to mask.  If no user windows are active, the bitmask
 	 * will be all zeroes.
@@ -138,7 +139,7 @@ fwin_from_user:
 C_LABEL(fwin_mmu_patchme):	b	C_LABEL(sun4c_fwin_stackchk)
 				 andcc	%sp, 0x7, %g0
 
-#define STACK_OFFSET (TASK_UNION_SIZE - TRACEREG_SZ - REGWIN_SZ)
+#define STACK_OFFSET (THREAD_SIZE - TRACEREG_SZ - REGWIN_SZ)
 
 fwin_user_stack_is_bolixed:
 	/* LOCATION: Window 'W' */
@@ -184,8 +185,9 @@ fwin_user_stack_is_bolixed:
 	/* Fix users window mask and buffer save count. */
 	mov	0x1, %g5
 	sll	%g5, %g3, %g5
-	st	%g5, [%curptr + AOFF_task_thread + AOFF_thread_uwinmask]		! one live user window still
-	st	%g0, [%curptr + AOFF_task_thread + AOFF_thread_w_saved]		! no windows in the buffer
+	st	%g5, [%curptr + TI_UWINMASK]		! one live user window still
+	ld	[%curptr + TI_TASK], %g5
+	st	%g0, [%g5 + AOFF_task_thread + AOFF_thread_w_saved]		! no windows in the buffer
 
 	wr	%t_psr, PSR_ET, %psr			! enable traps
 	nop

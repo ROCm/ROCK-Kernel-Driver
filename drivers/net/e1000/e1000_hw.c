@@ -107,17 +107,13 @@ e1000_reset_hw(struct e1000_hw *hw)
     uint32_t ctrl_ext;
     uint32_t icr;
     uint32_t manc;
-    uint16_t pci_cmd_word;
 
     DEBUGFUNC("e1000_reset_hw");
     
     /* For 82542 (rev 2.0), disable MWI before issuing a device reset */
     if(hw->mac_type == e1000_82542_rev2_0) {
-        if(hw->pci_cmd_word & CMD_MEM_WRT_INVALIDATE) {
-            DEBUGOUT("Disabling MWI on 82542 rev 2.0\n");
-            pci_cmd_word = hw->pci_cmd_word & ~CMD_MEM_WRT_INVALIDATE;
-            e1000_write_pci_cfg(hw, PCI_COMMAND_REGISTER, &pci_cmd_word);
-        }
+        DEBUGOUT("Disabling MWI on 82542 rev 2.0\n");
+        e1000_pci_clear_mwi(hw);
     }
 
     /* Clear interrupt mask to stop board from generating interrupts */
@@ -130,6 +126,7 @@ e1000_reset_hw(struct e1000_hw *hw)
      */
     E1000_WRITE_REG(hw, RCTL, 0);
     E1000_WRITE_REG(hw, TCTL, E1000_TCTL_PSP);
+    E1000_WRITE_FLUSH(hw);
 
     /* The tbi_compatibility_on Flag must be cleared when Rctl is cleared. */
     hw->tbi_compatibility_on = FALSE;
@@ -146,7 +143,11 @@ e1000_reset_hw(struct e1000_hw *hw)
      */
     DEBUGOUT("Issuing a global reset to MAC\n");
     ctrl = E1000_READ_REG(hw, CTRL);
-    E1000_WRITE_REG(hw, CTRL, (ctrl | E1000_CTRL_RST));
+
+    if(hw->mac_type > e1000_82543)
+        E1000_WRITE_REG_IO(hw, CTRL, (ctrl | E1000_CTRL_RST));
+    else
+        E1000_WRITE_REG(hw, CTRL, (ctrl | E1000_CTRL_RST));
 
     /* Force a reload from the EEPROM if necessary */
     if(hw->mac_type < e1000_82540) {
@@ -155,6 +156,7 @@ e1000_reset_hw(struct e1000_hw *hw)
         ctrl_ext = E1000_READ_REG(hw, CTRL_EXT);
         ctrl_ext |= E1000_CTRL_EXT_EE_RST;
         E1000_WRITE_REG(hw, CTRL_EXT, ctrl_ext);
+        E1000_WRITE_FLUSH(hw);
         /* Wait for EEPROM reload */
         msec_delay(2);
     } else {
@@ -176,7 +178,7 @@ e1000_reset_hw(struct e1000_hw *hw)
     /* If MWI was previously enabled, reenable it. */
     if(hw->mac_type == e1000_82542_rev2_0) {
         if(hw->pci_cmd_word & CMD_MEM_WRT_INVALIDATE)
-            e1000_write_pci_cfg(hw, PCI_COMMAND_REGISTER, &hw->pci_cmd_word);
+            e1000_pci_set_mwi(hw);
     }
 }
 
@@ -197,7 +199,6 @@ e1000_init_hw(struct e1000_hw *hw)
     uint32_t ctrl, status;
     uint32_t i;
     int32_t ret_val;
-    uint16_t pci_cmd_word;
     uint16_t pcix_cmd_word;
     uint16_t pcix_stat_hi_word;
     uint16_t cmd_mmrbc;
@@ -240,12 +241,10 @@ e1000_init_hw(struct e1000_hw *hw)
 
     /* For 82542 (rev 2.0), disable MWI and put the receiver into reset */
     if(hw->mac_type == e1000_82542_rev2_0) {
-        if(hw->pci_cmd_word & CMD_MEM_WRT_INVALIDATE) {
-            DEBUGOUT("Disabling MWI on 82542 rev 2.0\n");
-            pci_cmd_word = hw->pci_cmd_word & ~CMD_MEM_WRT_INVALIDATE;
-            e1000_write_pci_cfg(hw, PCI_COMMAND_REGISTER, &pci_cmd_word);
-        }
+        DEBUGOUT("Disabling MWI on 82542 rev 2.0\n");
+        e1000_pci_clear_mwi(hw);
         E1000_WRITE_REG(hw, RCTL, E1000_RCTL_RST);
+        E1000_WRITE_FLUSH(hw);
         msec_delay(5);
     }
 
@@ -257,9 +256,10 @@ e1000_init_hw(struct e1000_hw *hw)
     /* For 82542 (rev 2.0), take the receiver out of reset and enable MWI */
     if(hw->mac_type == e1000_82542_rev2_0) {
         E1000_WRITE_REG(hw, RCTL, 0);
+        E1000_WRITE_FLUSH(hw);
         msec_delay(1);
         if(hw->pci_cmd_word & CMD_MEM_WRT_INVALIDATE)
-            e1000_write_pci_cfg(hw, PCI_COMMAND_REGISTER, &hw->pci_cmd_word);
+            e1000_pci_set_mwi(hw);
     }
 
     /* Zero out the Multicast HASH table */
@@ -505,6 +505,7 @@ e1000_setup_fiber_link(struct e1000_hw *hw)
 
     E1000_WRITE_REG(hw, TXCW, txcw);
     E1000_WRITE_REG(hw, CTRL, ctrl);
+    E1000_WRITE_FLUSH(hw);
 
     hw->txcw = txcw;
     msec_delay(1);
@@ -1118,6 +1119,7 @@ e1000_config_collision_dist(struct e1000_hw *hw)
     tctl |= E1000_COLLISION_DISTANCE << E1000_COLD_SHIFT;
 
     E1000_WRITE_REG(hw, TCTL, tctl);
+    E1000_WRITE_FLUSH(hw);
 }
 
 /******************************************************************************
@@ -1715,6 +1717,7 @@ e1000_raise_mdi_clk(struct e1000_hw *hw,
      * bit), and then delay 2 microseconds.
      */
     E1000_WRITE_REG(hw, CTRL, (*ctrl | E1000_CTRL_MDC));
+    E1000_WRITE_FLUSH(hw);
     usec_delay(2);
 }
 
@@ -1732,6 +1735,7 @@ e1000_lower_mdi_clk(struct e1000_hw *hw,
      * bit), and then delay 2 microseconds.
      */
     E1000_WRITE_REG(hw, CTRL, (*ctrl & ~E1000_CTRL_MDC));
+    E1000_WRITE_FLUSH(hw);
     usec_delay(2);
 }
 
@@ -1774,6 +1778,7 @@ e1000_shift_out_mdi_bits(struct e1000_hw *hw,
         else ctrl &= ~E1000_CTRL_MDIO;
 
         E1000_WRITE_REG(hw, CTRL, ctrl);
+        E1000_WRITE_FLUSH(hw);
 
         usec_delay(2);
 
@@ -1782,9 +1787,6 @@ e1000_shift_out_mdi_bits(struct e1000_hw *hw,
 
         mask = mask >> 1;
     }
-
-    /* Clear the data bit just before leaving this routine. */
-    ctrl &= ~E1000_CTRL_MDIO;
 }
 
 /******************************************************************************
@@ -1815,6 +1817,7 @@ e1000_shift_in_mdi_bits(struct e1000_hw *hw)
     ctrl &= ~E1000_CTRL_MDIO;
 
     E1000_WRITE_REG(hw, CTRL, ctrl);
+    E1000_WRITE_FLUSH(hw);
 
     /* Raise and Lower the clock before reading in the data. This accounts for
      * the turnaround bits. The first clock occurred when we clocked out the
@@ -1834,9 +1837,6 @@ e1000_shift_in_mdi_bits(struct e1000_hw *hw)
 
     e1000_raise_mdi_clk(hw, &ctrl);
     e1000_lower_mdi_clk(hw, &ctrl);
-
-    /* Clear the MDIO bit just before leaving this routine. */
-    ctrl &= ~E1000_CTRL_MDIO;
 
     return data;
 }
@@ -2011,8 +2011,10 @@ e1000_phy_hw_reset(struct e1000_hw *hw)
          */
         ctrl = E1000_READ_REG(hw, CTRL);
         E1000_WRITE_REG(hw, CTRL, ctrl | E1000_CTRL_PHY_RST);
+        E1000_WRITE_FLUSH(hw);
         msec_delay(10);
         E1000_WRITE_REG(hw, CTRL, ctrl);
+        E1000_WRITE_FLUSH(hw);
     } else {
         /* Read the Extended Device Control Register, assert the PHY_RESET_DIR
          * bit to put the PHY into reset. Then, take it out of reset.
@@ -2021,9 +2023,11 @@ e1000_phy_hw_reset(struct e1000_hw *hw)
         ctrl_ext |= E1000_CTRL_EXT_SDP4_DIR;
         ctrl_ext &= ~E1000_CTRL_EXT_SDP4_DATA;
         E1000_WRITE_REG(hw, CTRL_EXT, ctrl_ext);
+        E1000_WRITE_FLUSH(hw);
         msec_delay(10);
         ctrl_ext |= E1000_CTRL_EXT_SDP4_DATA;
         E1000_WRITE_REG(hw, CTRL_EXT, ctrl_ext);
+        E1000_WRITE_FLUSH(hw);
     }
     usec_delay(150);
 }
@@ -2226,6 +2230,7 @@ e1000_raise_ee_clk(struct e1000_hw *hw,
      */
     *eecd = *eecd | E1000_EECD_SK;
     E1000_WRITE_REG(hw, EECD, *eecd);
+    E1000_WRITE_FLUSH(hw);
     usec_delay(50);
 }
 
@@ -2244,6 +2249,7 @@ e1000_lower_ee_clk(struct e1000_hw *hw,
      */
     *eecd = *eecd & ~E1000_EECD_SK;
     E1000_WRITE_REG(hw, EECD, *eecd);
+    E1000_WRITE_FLUSH(hw);
     usec_delay(50);
 }
 
@@ -2281,6 +2287,7 @@ e1000_shift_out_ee_bits(struct e1000_hw *hw,
             eecd |= E1000_EECD_DI;
 
         E1000_WRITE_REG(hw, EECD, eecd);
+        E1000_WRITE_FLUSH(hw);
 
         usec_delay(50);
 
@@ -2375,24 +2382,71 @@ e1000_standby_eeprom(struct e1000_hw *hw)
     /* Deselct EEPROM */
     eecd &= ~(E1000_EECD_CS | E1000_EECD_SK);
     E1000_WRITE_REG(hw, EECD, eecd);
+    E1000_WRITE_FLUSH(hw);
     usec_delay(50);
 
     /* Clock high */
     eecd |= E1000_EECD_SK;
     E1000_WRITE_REG(hw, EECD, eecd);
+    E1000_WRITE_FLUSH(hw);
     usec_delay(50);
 
     /* Select EEPROM */
     eecd |= E1000_EECD_CS;
     E1000_WRITE_REG(hw, EECD, eecd);
+    E1000_WRITE_FLUSH(hw);
     usec_delay(50);
 
     /* Clock low */
     eecd &= ~E1000_EECD_SK;
     E1000_WRITE_REG(hw, EECD, eecd);
+    E1000_WRITE_FLUSH(hw);
     usec_delay(50);
 }
 
+/******************************************************************************
+ * Raises then lowers the EEPROM's clock pin
+ *
+ * hw - Struct containing variables accessed by shared code
+ *****************************************************************************/
+static void
+e1000_clock_eeprom(struct e1000_hw *hw)
+{
+    uint32_t eecd;
+
+    eecd = E1000_READ_REG(hw, EECD);
+
+    /* Rising edge of clock */
+    eecd |= E1000_EECD_SK;
+    E1000_WRITE_REG(hw, EECD, eecd);
+    E1000_WRITE_FLUSH(hw);
+    usec_delay(50);
+
+    /* Falling edge of clock */
+    eecd &= ~E1000_EECD_SK;
+    E1000_WRITE_REG(hw, EECD, eecd);
+    E1000_WRITE_FLUSH(hw);
+    usec_delay(50);
+}
+
+/******************************************************************************
+ * Terminates a command by lowering the EEPROM's chip select pin
+ *
+ * hw - Struct containing variables accessed by shared code
+ *****************************************************************************/
+static void
+e1000_cleanup_eeprom(struct e1000_hw *hw)
+{
+    uint32_t eecd;
+
+    eecd = E1000_READ_REG(hw, EECD);
+
+    eecd &= ~(E1000_EECD_CS | E1000_EECD_DI);
+
+    E1000_WRITE_REG(hw, EECD, eecd);
+
+    e1000_clock_eeprom(hw);
+}
 
 /******************************************************************************
  * Reads a 16 bit word from the EEPROM.
@@ -2492,6 +2546,152 @@ e1000_validate_eeprom_checksum(struct e1000_hw *hw)
         DEBUGOUT("EEPROM Checksum Invalid\n");    
         return -E1000_ERR_EEPROM;
     }
+}
+
+/******************************************************************************
+ * Calculates the EEPROM checksum and writes it to the EEPROM
+ *
+ * hw - Struct containing variables accessed by shared code
+ *
+ * Sums the first 63 16 bit words of the EEPROM. Subtracts the sum from 0xBABA.
+ * Writes the difference to word offset 63 of the EEPROM.
+ *****************************************************************************/
+int32_t
+e1000_update_eeprom_checksum(struct e1000_hw *hw)
+{
+    uint16_t checksum = 0;
+    uint16_t i, eeprom_data;
+
+    DEBUGFUNC("e1000_update_eeprom_checksum");
+
+    for(i = 0; i < EEPROM_CHECKSUM_REG; i++) {
+        if(e1000_read_eeprom(hw, i, &eeprom_data) < 0) {
+            DEBUGOUT("EEPROM Read Error\n");
+            return -E1000_ERR_EEPROM;
+        }
+        checksum += eeprom_data;
+    }
+    checksum = (uint16_t) EEPROM_SUM - checksum;
+    if(e1000_write_eeprom(hw, EEPROM_CHECKSUM_REG, checksum) < 0) {
+        DEBUGOUT("EEPROM Write Error\n");
+        return -E1000_ERR_EEPROM;
+    }
+    return 0;
+}
+
+/******************************************************************************
+ * Writes a 16 bit word to a given offset in the EEPROM.
+ *
+ * hw - Struct containing variables accessed by shared code
+ * offset - offset within the EEPROM to be written to
+ * data - 16 bit word to be writen to the EEPROM
+ *
+ * If e1000_update_eeprom_checksum is not called after this function, the 
+ * EEPROM will most likely contain an invalid checksum.
+ *****************************************************************************/
+int32_t
+e1000_write_eeprom(struct e1000_hw *hw,
+                   uint16_t offset,
+                   uint16_t data)
+{
+    uint32_t eecd;
+    uint32_t i = 0;
+    int32_t status = 0;
+    boolean_t large_eeprom = FALSE;
+
+    DEBUGFUNC("e1000_write_eeprom");
+
+    /* Request EEPROM Access */
+    if(hw->mac_type > e1000_82544) {
+        eecd = E1000_READ_REG(hw, EECD);
+        if(eecd & E1000_EECD_SIZE) large_eeprom = TRUE;
+        eecd |= E1000_EECD_REQ;
+        E1000_WRITE_REG(hw, EECD, eecd);
+        eecd = E1000_READ_REG(hw, EECD);
+        while((!(eecd & E1000_EECD_GNT)) && (i < 100)) {
+            i++;
+            usec_delay(5);
+            eecd = E1000_READ_REG(hw, EECD);
+        }
+        if(!(eecd & E1000_EECD_GNT)) {
+            eecd &= ~E1000_EECD_REQ;
+            E1000_WRITE_REG(hw, EECD, eecd);
+            DEBUGOUT("Could not acquire EEPROM grant\n");
+            return -E1000_ERR_EEPROM;
+        }
+    }
+
+    /* Prepare the EEPROM for writing  */
+    e1000_setup_eeprom(hw);
+
+    /* Send the 9-bit (or 11-bit on large EEPROM) EWEN (write enable) command
+     * to the EEPROM (5-bit opcode plus 4/6-bit dummy). This puts the EEPROM
+     * into write/erase mode. 
+     */
+    e1000_shift_out_ee_bits(hw, EEPROM_EWEN_OPCODE, 5);
+    if(large_eeprom) 
+        e1000_shift_out_ee_bits(hw, 0, 6);
+    else
+        e1000_shift_out_ee_bits(hw, 0, 4);
+
+    /* Prepare the EEPROM */
+    e1000_standby_eeprom(hw);
+
+    /* Send the Write command (3-bit opcode + addr) */
+    e1000_shift_out_ee_bits(hw, EEPROM_WRITE_OPCODE, 3);
+    if(large_eeprom) 
+        /* If we have a 256 word EEPROM, there are 8 address bits */
+        e1000_shift_out_ee_bits(hw, offset, 8);
+    else
+        /* If we have a 64 word EEPROM, there are 6 address bits */
+        e1000_shift_out_ee_bits(hw, offset, 6);
+
+    /* Send the data */
+    e1000_shift_out_ee_bits(hw, data, 16);
+
+    /* Toggle the CS line.  This in effect tells to EEPROM to actually execute 
+     * the command in question.
+     */
+    e1000_standby_eeprom(hw);
+
+    /* Now read DO repeatedly until is high (equal to '1').  The EEEPROM will
+     * signal that the command has been completed by raising the DO signal.
+     * If DO does not go high in 10 milliseconds, then error out.
+     */
+    for(i = 0; i < 200; i++) {
+        eecd = E1000_READ_REG(hw, EECD);
+        if(eecd & E1000_EECD_DO) break;
+        usec_delay(50);
+    }
+    if(i == 200) {
+        DEBUGOUT("EEPROM Write did not complete\n");
+        status = -E1000_ERR_EEPROM;
+    }
+
+    /* Recover from write */
+    e1000_standby_eeprom(hw);
+
+    /* Send the 9-bit (or 11-bit on large EEPROM) EWDS (write disable) command
+     * to the EEPROM (5-bit opcode plus 4/6-bit dummy). This takes the EEPROM
+     * out of write/erase mode.
+     */
+    e1000_shift_out_ee_bits(hw, EEPROM_EWDS_OPCODE, 5);
+    if(large_eeprom) 
+        e1000_shift_out_ee_bits(hw, 0, 6);
+    else
+        e1000_shift_out_ee_bits(hw, 0, 4);
+
+    /* Done with writing */
+    e1000_cleanup_eeprom(hw);
+
+    /* Stop requesting EEPROM access */
+    if(hw->mac_type > e1000_82544) {
+        eecd = E1000_READ_REG(hw, EECD);
+        eecd &= ~E1000_EECD_REQ;
+        E1000_WRITE_REG(hw, EECD, eecd);
+    }
+
+    return status;
 }
 
 /******************************************************************************
@@ -3333,5 +3533,42 @@ e1000_get_bus_info(struct e1000_hw *hw)
     }
     hw->bus_width = (status & E1000_STATUS_BUS64) ?
                     e1000_bus_width_64 : e1000_bus_width_32;
+}
+/******************************************************************************
+ * Reads a value from one of the devices registers using port I/O (as opposed
+ * memory mapped I/O). Only 82544 and newer devices support port I/O.
+ *
+ * hw - Struct containing variables accessed by shared code
+ * offset - offset to read from
+ *****************************************************************************/
+uint32_t
+e1000_read_reg_io(struct e1000_hw *hw,
+                  uint32_t offset)
+{
+    uint32_t io_addr = hw->io_base;
+    uint32_t io_data = hw->io_base + 4;
+
+    e1000_io_write(hw, io_addr, offset);
+    return e1000_io_read(hw, io_data);
+}
+
+/******************************************************************************
+ * Writes a value to one of the devices registers using port I/O (as opposed to
+ * memory mapped I/O). Only 82544 and newer devices support port I/O.
+ *
+ * hw - Struct containing variables accessed by shared code
+ * offset - offset to write to
+ * value - value to write
+ *****************************************************************************/
+void
+e1000_write_reg_io(struct e1000_hw *hw,
+                   uint32_t offset,
+                   uint32_t value)
+{
+    uint32_t io_addr = hw->io_base;
+    uint32_t io_data = hw->io_base + 4;
+
+    e1000_io_write(hw, io_addr, offset);
+    e1000_io_write(hw, io_data, value);
 }
 

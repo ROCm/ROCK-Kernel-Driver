@@ -1694,9 +1694,9 @@ static int sparcaudio_ioctl(struct inode * inode, struct file * file,
 }
 
 static struct file_operations sparcaudioctl_fops = {
-	owner:		THIS_MODULE,
-	poll:		sparcaudio_poll,
-	ioctl:		sparcaudio_ioctl,
+	.owner =	THIS_MODULE,
+	.poll =		sparcaudio_poll,
+	.ioctl =	sparcaudio_ioctl,
 };
 
 static int sparcaudio_open(struct inode * inode, struct file * file)
@@ -1886,14 +1886,14 @@ static int sparcaudio_release(struct inode * inode, struct file * file)
 }
 
 static struct file_operations sparcaudio_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	read:		sparcaudio_read,
-	write:		sparcaudio_write,
-	poll:		sparcaudio_poll,
-	ioctl:		sparcaudio_ioctl,
-	open:		sparcaudio_open,
-	release:	sparcaudio_release,
+	.owner =	THIS_MODULE,
+	.llseek =	no_llseek,
+	.read =		sparcaudio_read,
+	.write =	sparcaudio_write,
+	.poll =		sparcaudio_poll,
+	.ioctl =	sparcaudio_ioctl,
+	.open =		sparcaudio_open,
+	.release =	sparcaudio_release,
 };
 
 static struct {
@@ -2077,7 +2077,6 @@ kmalloc_failed1:
 
 int unregister_sparcaudio_driver(struct sparcaudio_driver *drv, int duplex)
 {
-	devfs_handle_t de;
 	int i;
 	char name_buf[32];
 
@@ -2104,9 +2103,8 @@ int unregister_sparcaudio_driver(struct sparcaudio_driver *drv, int duplex)
 	/* Unregister ourselves with devfs */
 	for (i=0; i < sizeof (dev_list) / sizeof (*dev_list); i++) {
 		sparcaudio_mkname (name_buf, dev_list[i].name, drv->index);
-		de = devfs_find_handle (devfs_handle, name_buf, 0, 0,
-					DEVFS_SPECIAL_CHR, 0);
-		devfs_unregister (de);
+		devfs_find_and_unregister(devfs_handle, name_buf, 0, 0,
+                                          DEVFS_SPECIAL_CHR, 0);
 	}
 
 	MOD_DEC_USE_COUNT;
@@ -2125,7 +2123,7 @@ EXPORT_SYMBOL(sparcaudio_input_done);
 static int __init sparcaudio_init(void)
 {
 	/* Register our character device driver with the VFS. */
-	if (devfs_register_chrdev(SOUND_MAJOR, "sparcaudio", &sparcaudio_fops))
+	if (register_chrdev(SOUND_MAJOR, "sparcaudio", &sparcaudio_fops))
 		return -EIO;
 
 	devfs_handle = devfs_mk_dir (NULL, "sound", NULL);
@@ -2134,7 +2132,7 @@ static int __init sparcaudio_init(void)
 
 static void __exit sparcaudio_exit(void)
 {
-	devfs_unregister_chrdev(SOUND_MAJOR, "sparcaudio");
+	unregister_chrdev(SOUND_MAJOR, "sparcaudio");
 	devfs_unregister (devfs_handle);
 }
 

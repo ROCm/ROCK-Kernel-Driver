@@ -266,8 +266,8 @@ static int pppoatm_devppp_ioctl(struct ppp_channel *chan, unsigned int cmd,
 }
 
 static /*const*/ struct ppp_channel_ops pppoatm_ops = {
-	start_xmit: pppoatm_send,
-	ioctl: pppoatm_devppp_ioctl,
+	.start_xmit = pppoatm_send,
+	.ioctl = pppoatm_devppp_ioctl,
 };
 
 static int pppoatm_assign_vcc(struct atm_vcc *atmvcc, unsigned long arg)

@@ -23,6 +23,8 @@
 #include <linux/mm.h>
 #include <linux/pagemap.h>
 #include <linux/swapops.h>
+#include <linux/slab.h>
+#include <linux/init.h>
 
 #include <asm/pgalloc.h>
 #include <asm/rmap.h>
@@ -50,10 +52,10 @@ struct pte_chain {
 	pte_t * ptep;
 };
 
+static kmem_cache_t	*pte_chain_cache;
 static inline struct pte_chain * pte_chain_alloc(void);
 static inline void pte_chain_free(struct pte_chain *, struct pte_chain *,
 		struct page *);
-static void alloc_new_pte_chains(void);
 
 /**
  * page_referenced - test if the page was referenced
@@ -148,6 +150,7 @@ void page_add_rmap(struct page * page, pte_t * ptep)
 	}
 
 	pte_chain_unlock(page);
+	inc_page_state(nr_reverse_maps);
 }
 
 /**
@@ -208,9 +211,9 @@ void page_remove_rmap(struct page * page, pte_t * ptep)
 #endif
 
 out:
+	dec_page_state(nr_reverse_maps);
 	pte_chain_unlock(page);
 	return;
-			
 }
 
 /**
@@ -355,27 +358,6 @@ int try_to_unmap(struct page * page)
  ** functions.
  **/
 
-struct pte_chain * pte_chain_freelist;
-spinlock_t pte_chain_freelist_lock = SPIN_LOCK_UNLOCKED;
-
-/* Maybe we should have standard ops for singly linked lists ... - Rik */
-static inline void pte_chain_push(struct pte_chain * pte_chain)
-{
-	pte_chain->ptep = NULL;
-	pte_chain->next = pte_chain_freelist;
-	pte_chain_freelist = pte_chain;
-}
-
-static inline struct pte_chain * pte_chain_pop(void)
-{
-	struct pte_chain *pte_chain;
-
-	pte_chain = pte_chain_freelist;
-	pte_chain_freelist = pte_chain->next;
-	pte_chain->next = NULL;
-
-	return pte_chain;
-}
 
 /**
  * pte_chain_free - free pte_chain structure
@@ -391,15 +373,12 @@ static inline struct pte_chain * pte_chain_pop(void)
 static inline void pte_chain_free(struct pte_chain * pte_chain,
 		struct pte_chain * prev_pte_chain, struct page * page)
 {
-	mod_page_state(used_pte_chains_bytes, -sizeof(struct pte_chain));
 	if (prev_pte_chain)
 		prev_pte_chain->next = pte_chain->next;
 	else if (page)
 		page->pte.chain = pte_chain->next;
 
-	spin_lock(&pte_chain_freelist_lock);
-	pte_chain_push(pte_chain);
-	spin_unlock(&pte_chain_freelist_lock);
+	kmem_cache_free(pte_chain_cache, pte_chain);
 }
 
 /**
@@ -409,47 +388,20 @@ static inline void pte_chain_free(struct pte_chain * pte_chain,
  * pte_chain structures as required.
  * Caller needs to hold the page's pte_chain_lock.
  */
-static inline struct pte_chain * pte_chain_alloc()
+static inline struct pte_chain *pte_chain_alloc(void)
 {
-	struct pte_chain * pte_chain;
-
-	spin_lock(&pte_chain_freelist_lock);
-
-	/* Allocate new pte_chain structs as needed. */
-	if (!pte_chain_freelist)
-		alloc_new_pte_chains();
-
-	/* Grab the first pte_chain from the freelist. */
-	pte_chain = pte_chain_pop();
-
-	spin_unlock(&pte_chain_freelist_lock);
-
-	mod_page_state(used_pte_chains_bytes, sizeof(struct pte_chain));
-	return pte_chain;
+	return kmem_cache_alloc(pte_chain_cache, GFP_ATOMIC);
 }
 
-/**
- * alloc_new_pte_chains - convert a free page to pte_chain structures
- *
- * Grabs a free page and converts it to pte_chain structures. We really
- * should pre-allocate these earlier in the pagefault path or come up
- * with some other trick.
- *
- * Note that we cannot use the slab cache because the pte_chain structure
- * is way smaller than the minimum size of a slab cache allocation.
- * Caller needs to hold the pte_chain_freelist_lock
- */
-static void alloc_new_pte_chains()
+void __init pte_chain_init(void)
 {
-	struct pte_chain * pte_chain = (void *) get_zeroed_page(GFP_ATOMIC);
-	int i = PAGE_SIZE / sizeof(struct pte_chain);
+	pte_chain_cache = kmem_cache_create(	"pte_chain",
+						sizeof(struct pte_chain),
+						0,
+						0,
+						NULL,
+						NULL);
 
-	if (pte_chain) {
-		inc_page_state(nr_pte_chain_pages);
-		for (; i-- > 0; pte_chain++)
-			pte_chain_push(pte_chain);
-	} else {
-		/* Yeah yeah, I'll fix the pte_chain allocation ... */
-		panic("Fix pte_chain allocation, you lazy bastard!\n");
-	}
+	if (!pte_chain_cache)
+		panic("failed to create pte_chain cache!\n");
 }

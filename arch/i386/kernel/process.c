@@ -476,32 +476,42 @@ void show_regs(struct pt_regs * regs)
 }
 
 /*
+ * This gets run with %ebx containing the
+ * function to call, and %edx containing
+ * the "args".
+ */
+extern void kernel_thread_helper(void);
+__asm__(".align 4\n"
+	"kernel_thread_helper:\n\t"
+	"movl %edx,%eax\n\t"
+	"pushl %edx\n\t"
+	"call *%ebx\n\t"
+	"pushl %eax\n\t"
+	"call do_exit");
+
+/*
  * Create a kernel thread
  */
 int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 {
-	long retval, d0;
+	struct task_struct *p;
+	struct pt_regs regs;
 
-	__asm__ __volatile__(
-		"movl %%esp,%%esi\n\t"
-		"int $0x80\n\t"		/* Linux/i386 system call */
-		"cmpl %%esp,%%esi\n\t"	/* child or parent? */
-		"je 1f\n\t"		/* parent - jump */
-		/* Load the argument into eax, and push it.  That way, it does
-		 * not matter whether the called function is compiled with
-		 * -mregparm or not.  */
-		"movl %4,%%eax\n\t"
-		"pushl %%eax\n\t"		
-		"call *%5\n\t"		/* call fn */
-		"movl %3,%0\n\t"	/* exit */
-		"int $0x80\n"
-		"1:\t"
-		:"=&a" (retval), "=&S" (d0)
-		:"0" (__NR_clone), "i" (__NR_exit),
-		 "r" (arg), "r" (fn),
-		 "b" (flags | CLONE_VM)
-		: "memory");
-	return retval;
+	memset(&regs, 0, sizeof(regs));
+
+	regs.ebx = (unsigned long) fn;
+	regs.edx = (unsigned long) arg;
+
+	regs.xds = __KERNEL_DS;
+	regs.xes = __KERNEL_DS;
+	regs.orig_eax = -1;
+	regs.eip = (unsigned long) kernel_thread_helper;
+	regs.xcs = __KERNEL_CS;
+	regs.eflags = 0x286;
+
+	/* Ok, create the new process.. */
+	p = do_fork(flags | CLONE_VM, 0, &regs, 0);
+	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
 /*
@@ -675,6 +685,14 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	tss->esp0 = next->esp0;
 
 	/*
+	 * Load the per-thread Thread-Local Storage descriptor.
+	 *
+	 * NOTE: it's faster to do the two stores unconditionally
+	 * than to branch away.
+	 */
+	load_TLS_desc(next, cpu);
+
+	/*
 	 * Save away %fs and %gs. No need to save %es and %ds, as
 	 * those are always kernel segments while inside the kernel.
 	 */
@@ -688,14 +706,6 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 		loadsegment(fs, next->fs);
 		loadsegment(gs, next->gs);
 	}
-
-	/*
-	 * Load the per-thread Thread-Local Storage descriptor.
-	 *
-	 * NOTE: it's faster to do the two stores unconditionally
-	 * than to branch away.
-	 */
-	load_TLS_desc(next, cpu);
 
 	/*
 	 * Now maybe reload the debug registers
@@ -831,34 +841,16 @@ unsigned long get_wchan(struct task_struct *p)
 /*
  * Set the Thread-Local Storage area:
  */
-asmlinkage int sys_set_thread_area(unsigned int base, unsigned int limit, unsigned int flags)
+asmlinkage int sys_set_thread_area(unsigned long base, unsigned long flags)
 {
 	struct thread_struct *t = &current->thread;
-	int limit_in_pages = 0, writable = 0;
+	int writable = 0;
 	int cpu;
 
 	/* do not allow unused flags */
 	if (flags & ~TLS_FLAGS_MASK)
 		return -EINVAL;
 
-	/* check limit */
-	if (limit & 0xfff00000)
-		return -EINVAL;
-
-	/*
-	 * Clear the TLS?
-	 */
-	if (flags & TLS_FLAG_CLEAR) {
-		cpu = get_cpu();
-		t->tls_base = t->tls_limit = t->tls_flags = 0;
-        	t->tls_desc.a = t->tls_desc.b = 0;
-		load_TLS_desc(t, cpu);
-		put_cpu();
-		return 0;
-	}
-
-	if (flags & TLS_FLAG_LIMIT_IN_PAGES)
-		limit_in_pages = 1;
 	if (flags & TLS_FLAG_WRITABLE)
 		writable = 1;
 
@@ -866,15 +858,12 @@ asmlinkage int sys_set_thread_area(unsigned int base, unsigned int limit, unsign
 	 * We must not get preempted while modifying the TLS.
 	 */
 	cpu = get_cpu();
-	t->tls_base = base;
-	t->tls_limit = limit;
-	t->tls_flags = flags;
 
-        t->tls_desc.a = ((base & 0x0000ffff) << 16) | (limit & 0x0ffff);
+        t->tls_desc.a = ((base & 0x0000ffff) << 16) | 0xffff;
 
         t->tls_desc.b = (base & 0xff000000) | ((base & 0x00ff0000) >> 16) |
-                  (limit & 0xf0000) | (writable << 9) | (1 << 15) |
-		  (1 << 22) | (limit_in_pages << 23) | 0x7000;
+				0xf0000 | (writable << 9) | (1 << 15) |
+					(1 << 22) | (1 << 23) | 0x7000;
 
 	load_TLS_desc(t, cpu);
 	put_cpu();

@@ -494,26 +494,17 @@ static void mtd_notify_remove(struct mtd_info* mtd)
 
 static int __init init_mtdchar(void)
 {
-#ifdef CONFIG_DEVFS_FS
-	if (devfs_register_chrdev(MTD_CHAR_MAJOR, "mtd", &mtd_fops))
-	{
+	if (register_chrdev(MTD_CHAR_MAJOR, "mtd", &mtd_fops)) {
 		printk(KERN_NOTICE "Can't allocate major number %d for Memory Technology Devices.\n",
 		       MTD_CHAR_MAJOR);
 		return -EAGAIN;
 	}
 
+#ifdef CONFIG_DEVFS_FS
 	devfs_dir_handle = devfs_mk_dir(NULL, "mtd", NULL);
 
 	register_mtd_user(&notifier);
-#else
-	if (register_chrdev(MTD_CHAR_MAJOR, "mtd", &mtd_fops))
-	{
-		printk(KERN_NOTICE "Can't allocate major number %d for Memory Technology Devices.\n",
-		       MTD_CHAR_MAJOR);
-		return -EAGAIN;
-	}
 #endif
-
 	return 0;
 }
 
@@ -522,10 +513,8 @@ static void __exit cleanup_mtdchar(void)
 #ifdef CONFIG_DEVFS_FS
 	unregister_mtd_user(&notifier);
 	devfs_unregister(devfs_dir_handle);
-	devfs_unregister_chrdev(MTD_CHAR_MAJOR, "mtd");
-#else
-	unregister_chrdev(MTD_CHAR_MAJOR, "mtd");
 #endif
+	unregister_chrdev(MTD_CHAR_MAJOR, "mtd");
 }
 
 module_init(init_mtdchar);

@@ -973,10 +973,10 @@ void snd_info_free_device(snd_info_entry_t * entry)
 		sprintf(dname, "snd/%s", entry->name);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
 		master = devfs_find_handle(NULL, dname, strlen(dname), 0, 0, DEVFS_SPECIAL_CHR, 0);
-#else
-		master = devfs_find_handle(NULL, dname, 0, 0, DEVFS_SPECIAL_CHR, 0);
-#endif
 		devfs_unregister(master);
+#else
+		devfs_find_and_unregister(NULL, dname, 0, 0, DEVFS_SPECIAL_CHR, 0);
+#endif
 	}
 #endif
 	snd_info_free_entry(entry);

@@ -27,17 +27,9 @@
 		.text		
 		.align	64
 		.globl	etrap, etrap_irq, etraptl1
-#ifdef CONFIG_PREEMPT
-etrap_irq:	ldsw	[%g6 + TI_PRE_COUNT], %g1
-		add	%g1, 1, %g1
-		ba,pt	%xcc, etrap_irq2
-		 stw	%g1, [%g6 + TI_PRE_COUNT]
-#endif
 etrap:		rdpr	%pil, %g2						! Single 	Group
-#ifndef CONFIG_PREEMPT
 etrap_irq:
-#endif
-etrap_irq2:	rdpr	%tstate, %g1						! Single 	Group
+		rdpr	%tstate, %g1						! Single 	Group
 		sllx	%g2, 20, %g3						! IEU0		Group
 		andcc	%g1, TSTATE_PRIV, %g0					! IEU1
 		or	%g1, %g3, %g1						! IEU0		Group

@@ -1194,13 +1194,13 @@ end_rename:
  * directories can handle most operations...
  */
 struct inode_operations ext3_dir_inode_operations = {
-	create:		ext3_create,
-	lookup:		ext3_lookup,
-	link:		ext3_link,
-	unlink:		ext3_unlink,
-	symlink:	ext3_symlink,
-	mkdir:		ext3_mkdir,
-	rmdir:		ext3_rmdir,
-	mknod:		ext3_mknod,
-	rename:		ext3_rename,
+	.create		= ext3_create,
+	.lookup		= ext3_lookup,
+	.link		= ext3_link,
+	.unlink		= ext3_unlink,
+	.symlink	= ext3_symlink,
+	.mkdir		= ext3_mkdir,
+	.rmdir		= ext3_rmdir,
+	.mknod		= ext3_mknod,
+	.rename		= ext3_rename,
 };

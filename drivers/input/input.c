@@ -100,18 +100,14 @@ void input_event(struct input_dev *dev, unsigned int type, unsigned int code, in
 			if (code > KEY_MAX || !test_bit(code, dev->keybit) || !!test_bit(code, dev->key) == value)
 				return;
 
-			if (value == 2) break;
+			if (value == 2)
+				break;
 
 			change_bit(code, dev->key);
 
-			if (test_bit(EV_REP, dev->evbit) && dev->timer.function) {
-				if (value) {
-					mod_timer(&dev->timer, jiffies + dev->rep[REP_DELAY]);
-					dev->repeat_key = code;
-					break;
-				}
-				if (dev->repeat_key == code)
-					del_timer(&dev->timer);
+			if (test_bit(EV_REP, dev->evbit) && value) {
+				dev->repeat_key = code;
+				mod_timer(&dev->timer, jiffies + dev->rep[REP_DELAY]);
 			}
 
 			break;
@@ -204,8 +200,13 @@ void input_event(struct input_dev *dev, unsigned int type, unsigned int code, in
 static void input_repeat_key(unsigned long data)
 {
 	struct input_dev *dev = (void *) data;
+
+	if (!test_bit(dev->repeat_key, dev->key))
+		return;
+
 	input_event(dev, EV_KEY, dev->repeat_key, 2);
 	input_sync(dev);
+
 	mod_timer(&dev->timer, jiffies + dev->rep[REP_PERIOD]);
 }
 
@@ -268,6 +269,7 @@ static void input_link_handle(struct input_handle *handle)
  *
  *     Returns nothing.
  */
+
 #define input_find_and_remove(type, initval, targ, next)		\
 	do {								\
 		type **ptr;						\
@@ -513,7 +515,7 @@ void input_unregister_device(struct input_dev *dev)
  * Kill any pending repeat timers.
  */
 
-	del_timer(&dev->timer);
+	del_timer_sync(&dev->timer);
 
 /*
  * Notify handlers.
@@ -820,7 +822,7 @@ static int __init input_init(void)
 	entry = create_proc_read_entry("handlers", 0, proc_bus_input_dir, input_handlers_read, NULL);
 	entry->owner = THIS_MODULE;
 #endif
-	if (devfs_register_chrdev(INPUT_MAJOR, "input", &input_fops)) {
+	if (register_chrdev(INPUT_MAJOR, "input", &input_fops)) {
 		printk(KERN_ERR "input: unable to register char major %d", INPUT_MAJOR);
 		return -EBUSY;
 	}
@@ -838,7 +840,7 @@ static void __exit input_exit(void)
 	remove_proc_entry("input", proc_bus);
 #endif
 	devfs_unregister(input_devfs_handle);
-        if (devfs_unregister_chrdev(INPUT_MAJOR, "input"))
+        if (unregister_chrdev(INPUT_MAJOR, "input"))
                 printk(KERN_ERR "input: can't unregister char major %d", INPUT_MAJOR);
 }
 

@@ -54,7 +54,7 @@ static pmd_t * __init one_md_table_init(pgd_t *pgd)
 		
 #if CONFIG_X86_PAE
 	pmd_table = (pmd_t *) alloc_bootmem_low_pages(PAGE_SIZE);
-	set_pgd(pgd, __pgd(__pa(md_table) | _PAGE_PRESENT));
+	set_pgd(pgd, __pgd(__pa(pmd_table) | _PAGE_PRESENT));
 	if (pmd_table != pmd_offset(pgd, 0)) 
 		BUG();
 #else

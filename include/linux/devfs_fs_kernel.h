@@ -74,9 +74,9 @@ extern devfs_handle_t devfs_mk_dir (devfs_handle_t dir, const char *name,
 extern devfs_handle_t devfs_get_handle (devfs_handle_t dir, const char *name,
 					unsigned int major,unsigned int minor,
 					char type, int traverse_symlinks);
-extern devfs_handle_t devfs_find_handle (devfs_handle_t dir, const char *name,
-					 unsigned int major,unsigned int minor,
-					 char type, int traverse_symlinks);
+extern void devfs_find_and_unregister (devfs_handle_t dir, const char *name,
+				       unsigned int major, unsigned int minor,
+				       char type, int traverse_symlinks);
 extern int devfs_get_flags (devfs_handle_t de, unsigned int *flags);
 extern int devfs_set_flags (devfs_handle_t de, unsigned int flags);
 extern int devfs_get_maj_min (devfs_handle_t de, 
@@ -94,12 +94,7 @@ extern devfs_handle_t devfs_get_next_sibling (devfs_handle_t de);
 extern void devfs_auto_unregister (devfs_handle_t master,devfs_handle_t slave);
 extern devfs_handle_t devfs_get_unregister_slave (devfs_handle_t master);
 extern const char *devfs_get_name (devfs_handle_t de, unsigned int *namelen);
-extern int devfs_register_chrdev (unsigned int major, const char *name,
-				  struct file_operations *fops);
-extern int devfs_register_blkdev (unsigned int major, const char *name,
-				  struct block_device_operations *bdops);
-extern int devfs_unregister_chrdev (unsigned int major, const char *name);
-extern int devfs_unregister_blkdev (unsigned int major, const char *name);
+extern int devfs_only (void);
 
 extern void devfs_register_tape (devfs_handle_t de);
 extern void devfs_register_series (devfs_handle_t dir, const char *format,
@@ -164,14 +159,12 @@ static inline devfs_handle_t devfs_get_handle (devfs_handle_t dir,
 {
     return NULL;
 }
-static inline devfs_handle_t devfs_find_handle (devfs_handle_t dir,
-						const char *name,
-						unsigned int major,
-						unsigned int minor,
-						char type,
-						int traverse_symlinks)
+static inline void devfs_find_and_unregister (devfs_handle_t dir,
+					      const char *name,
+					      unsigned int major,
+					      unsigned int minor,
+					      char type, int traverse_symlinks)
 {
-    return NULL;
 }
 static inline int devfs_get_flags (devfs_handle_t de, unsigned int *flags)
 {
@@ -241,23 +234,9 @@ static inline const char *devfs_get_name (devfs_handle_t de,
 {
     return NULL;
 }
-static inline int devfs_register_chrdev (unsigned int major, const char *name,
-					 struct file_operations *fops)
+static inline int devfs_only (void)
 {
-    return register_chrdev (major, name, fops);
-}
-static inline int devfs_register_blkdev (unsigned int major, const char *name,
-					 struct block_device_operations *bdops)
-{
-    return register_blkdev (major, name, bdops);
-}
-static inline int devfs_unregister_chrdev (unsigned int major,const char *name)
-{
-    return unregister_chrdev (major, name);
-}
-static inline int devfs_unregister_blkdev (unsigned int major,const char *name)
-{
-    return unregister_blkdev (major, name);
+    return 0;
 }
 
 static inline void devfs_register_tape (devfs_handle_t de)

@@ -27,4 +27,4 @@ Future plans
 ============
 - Connection to ISDN4LINUX (the hisax interface)
 
-The maintainer of this driver is wmues@nexgo.de
+The maintainer of this driver is wolfgang@iksw-muees.de

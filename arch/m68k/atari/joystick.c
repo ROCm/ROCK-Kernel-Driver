@@ -134,7 +134,7 @@ int __init atari_joystick_init(void)
     init_waitqueue_head(&joystick[0].wait);
     init_waitqueue_head(&joystick[1].wait);
 
-    if (devfs_register_chrdev(MAJOR_NR, "Joystick", &atari_joystick_fops))
+    if (register_chrdev(MAJOR_NR, "Joystick", &atari_joystick_fops))
 	printk("unable to get major %d for joystick devices\n", MAJOR_NR);
     devfs_register_series (NULL, "joysticks/digital%u", 2, DEVFS_FL_DEFAULT,
 			   MAJOR_NR, 128, S_IFCHR | S_IRUSR | S_IWUSR,

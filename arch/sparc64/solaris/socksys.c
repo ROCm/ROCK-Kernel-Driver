@@ -165,8 +165,8 @@ static unsigned int socksys_poll(struct file * filp, poll_table * wait)
 }
 	
 static struct file_operations socksys_fops = {
-	open:		socksys_open,
-	release:	socksys_release,
+	.open =		socksys_open,
+	.release =	socksys_release,
 };
 
 static devfs_handle_t devfs_handle;
@@ -181,7 +181,7 @@ init_socksys(void)
 	int (*sys_close)(unsigned int) = 
 		(int (*)(unsigned int))SYS(close);
 	
-	ret = devfs_register_chrdev (30, "socksys", &socksys_fops);
+	ret = register_chrdev (30, "socksys", &socksys_fops);
 	if (ret < 0) {
 		printk ("Couldn't register socksys character device\n");
 		return ret;
@@ -208,7 +208,7 @@ init_socksys(void)
 void
 cleanup_socksys(void)
 {
-	if (devfs_unregister_chrdev(30, "socksys"))
+	if (unregister_chrdev(30, "socksys"))
 		printk ("Couldn't unregister socksys character device\n");
 	devfs_unregister (devfs_handle);
 }

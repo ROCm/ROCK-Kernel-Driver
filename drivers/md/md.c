@@ -122,7 +122,6 @@ static struct gendisk md_gendisk=
 	.major_name	= "md",
 	.minor_shift	= 0,
 	.part		= md_hd_struct,
-	.sizes		= md_size,
 	.nr_real	= MAX_MD_DEVS,
 	.next		= NULL,
 	.fops		= &md_fops,
@@ -3177,7 +3176,6 @@ static void md_geninit(void)
 	for(i = 0; i < MAX_MD_DEVS; i++) {
 		md_size[i] = 0;
 	}
-	blk_size[MAJOR_NR] = md_size;
 
 	dprintk("md: sizeof(mdp_super_t) = %d\n", (int)sizeof(mdp_super_t));
 
@@ -3207,8 +3205,7 @@ int __init md_init(void)
 			MD_MAJOR_VERSION, MD_MINOR_VERSION,
 			MD_PATCHLEVEL_VERSION, MAX_MD_DEVS, MD_SB_DISKS);
 
-	if (devfs_register_blkdev (MAJOR_NR, "md", &md_fops))
-	{
+	if (register_blkdev (MAJOR_NR, "md", &md_fops)) {
 		printk(KERN_ALERT "md: Unable to get major %d for md\n", MAJOR_NR);
 		return (-1);
 	}
@@ -3412,12 +3409,13 @@ void __init md_setup_drive(void)
 				*p++ = 0;
 
 			dev = name_to_kdev_t(devname);
-			handle = devfs_find_handle(NULL, devname, major(dev), minor(dev),
-							DEVFS_SPECIAL_BLK, 1);
+			handle = devfs_get_handle(NULL, devname, major(dev), minor(dev),
+						  DEVFS_SPECIAL_BLK, 1);
 			if (handle != 0) {
 				unsigned major, minor;
 				devfs_get_maj_min(handle, &major, &minor);
 				dev = mk_kdev(major, minor);
+				devfs_put(handle);
 			}
 			if (kdev_none(dev)) {
 				printk(KERN_WARNING "md: Unknown device name: %s\n", devname);
@@ -3567,7 +3565,7 @@ void cleanup_module(void)
 	md_unregister_thread(md_recovery_thread);
 	devfs_unregister(devfs_handle);
 
-	devfs_unregister_blkdev(MAJOR_NR,"md");
+	unregister_blkdev(MAJOR_NR,"md");
 	unregister_reboot_notifier(&md_notifier);
 	unregister_sysctl_table(raid_table_header);
 #ifdef CONFIG_PROC_FS

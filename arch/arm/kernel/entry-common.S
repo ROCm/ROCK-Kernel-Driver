@@ -35,18 +35,27 @@ ENTRY(__do_softirq)
  * stack.
  */
 ret_fast_syscall:
-	set_cpsr_c r1, #PSR_I_BIT | MODE_SVC	@ disable interrupts
+	disable_irq r1				@ disable interrupts
 	ldr	r1, [tsk, #TI_FLAGS]
 	tst	r1, #_TIF_WORK_MASK
-	bne	ret_fast_work
+	bne	fast_work_pending
 	fast_restore_user_regs
 
 /*
  * Ok, we need to do extra processing, enter the slow path.
  */
-ret_fast_work:
-	str	r0, [sp, #S_R0+S_OFF]!	@ returned r0
-	b	work_pending
+fast_work_pending:
+	str	r0, [sp, #S_R0+S_OFF]!		@ returned r0
+work_pending:
+	tst	r1, #_TIF_NEED_RESCHED
+	bne	work_resched
+	tst	r1, #_TIF_NOTIFY_RESUME | _TIF_SIGPENDING
+	beq	no_work_pending
+	mov	r0, sp				@ 'regs'
+	mov	r2, why				@ 'syscall'
+	bl	do_notify_resume
+	disable_irq r1				@ disable interrupts
+	b	no_work_pending
 
 work_resched:
 	bl	schedule
@@ -55,22 +64,12 @@ work_resched:
  */
 ENTRY(ret_to_user)
 ret_slow_syscall:
-	set_cpsr_c r1, #PSR_I_BIT | MODE_SVC	@ disable interrupts
+	disable_irq r1				@ disable interrupts
 	ldr	r1, [tsk, #TI_FLAGS]
 	tst	r1, #_TIF_WORK_MASK
-	beq	no_work_pending
-work_pending:
-	tst	r1, #_TIF_NEED_RESCHED
-	bne	work_resched
-	tst	r1, #_TIF_NOTIFY_RESUME | _TIF_SIGPENDING
-	blne	__do_notify_resume
+	bne	work_pending
 no_work_pending:
-	restore_user_regs
-
-__do_notify_resume:
-	mov	r0, sp				@ 'regs'
-	mov	r2, why				@ 'syscall'
-	b	do_notify_resume		@ note the bl above sets lr
+	slow_restore_user_regs
 
 /*
  * This is how we return from a fork.
@@ -80,9 +79,9 @@ ENTRY(ret_from_fork)
 	bl	schedule_tail
 #endif
 	get_thread_info tsk
-	ldr	ip, [tsk, #TI_FLAGS]		@ check for syscall tracing
+	ldr	r1, [tsk, #TI_FLAGS]		@ check for syscall tracing
 	mov	why, #1
-	tst	ip, #_TIF_SYSCALL_TRACE		@ are we tracing syscalls?
+	tst	r1, #_TIF_SYSCALL_TRACE		@ are we tracing syscalls?
 	beq	ret_slow_syscall
 	mov	r1, sp
 	mov	r0, #1				@ trace exit [IP = 1]
@@ -134,7 +133,7 @@ ENTRY(vector_swi)
 	ldr	ip, [ip]
 	mcr	p15, 0, ip, c1, c0		@ update control register
 #endif
-	enable_irqs ip
+	enable_irq ip
 
 	str	r4, [sp, #-S_OFF]!		@ push fifth arg
 

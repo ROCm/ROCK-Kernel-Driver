@@ -2047,14 +2047,12 @@ void tty_register_devfs (struct tty_driver *driver, unsigned int flags, unsigned
 void tty_unregister_devfs (struct tty_driver *driver, unsigned minor)
 {
 #ifdef CONFIG_DEVFS_FS
-	void * handle;
 	int idx = minor - driver->minor_start;
 	char buf[32];
 
 	sprintf(buf, driver->name, idx + driver->name_base);
-	handle = devfs_find_handle (NULL, buf, driver->major, minor,
-				    DEVFS_SPECIAL_CHR, 0);
-	devfs_unregister (handle);
+	devfs_find_and_unregister(NULL, buf, driver->major, minor,
+				  DEVFS_SPECIAL_CHR, 0);
 #endif /* CONFIG_DEVFS_FS */
 }
 
@@ -2072,7 +2070,7 @@ int tty_register_driver(struct tty_driver *driver)
 	if (driver->flags & TTY_DRIVER_INSTALLED)
 		return 0;
 
-	error = devfs_register_chrdev(driver->major, driver->name, &tty_fops);
+	error = register_chrdev(driver->major, driver->name, &tty_fops);
 	if (error < 0)
 		return error;
 	else if(driver->major == 0)
@@ -2119,11 +2117,11 @@ int tty_unregister_driver(struct tty_driver *driver)
 		return -ENOENT;
 
 	if (othername == NULL) {
-		retval = devfs_unregister_chrdev(driver->major, driver->name);
+		retval = unregister_chrdev(driver->major, driver->name);
 		if (retval)
 			return retval;
 	} else
-		devfs_register_chrdev(driver->major, othername, &tty_fops);
+		register_chrdev(driver->major, othername, &tty_fops);
 
 	if (driver->prev)
 		driver->prev->next = driver->next;

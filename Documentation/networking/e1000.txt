@@ -1,7 +1,7 @@
 Linux* Base Driver for the Intel(R) PRO/1000 Family of Adapters
 ===============================================================
 
-April 23, 2002
+June 11, 2002
 
 
 Contents
@@ -95,8 +95,8 @@ For the latest Intel network drivers for Linux, go to:
 Command Line Parameters
 =======================
 
-If the driver is built as a module, the following parameters are used by 
-entering them on the command line with the modprobe or insmod command. 
+If the driver is built as a module, the following optional parameters are 
+used by entering them on the command line with the modprobe or insmod command. 
 For example, with two PRO/1000 PCI adapters, entering:
 
     insmod e1000 TxDescriptors=80,128
@@ -141,7 +141,7 @@ Default Value: 80
 
 RxIntDelay
 Valid Range: 0-65535 (0=off)
-Default Value: 64 (82542, 82543, and 82544-based adapters)
+Default Value: 0 (82542, 82543, and 82544-based adapters)
                128 (82540, 82545, and 82546-based adapters)
     This value delays the generation of receive interrupts in units of 1.024
     microseconds.  Receive interrupt reduction can improve CPU efficiency if
@@ -150,6 +150,14 @@ Default Value: 64 (82542, 82543, and 82544-based adapters)
     of TCP traffic. If the system is reporting dropped receives, this value
     may be set too high, causing the driver to run out of available receive
     descriptors.
+
+    CAUTION: When setting RxIntDelay to a value other than 0, adapters based
+             on the Intel 82543 and 82544 LAN controllers may hang (stop
+             transmitting) under certain network conditions. If this occurs a
+             message is logged in the system event log. In addition, the
+             controller is automatically reset, restoring the network
+             connection. To eliminate the potential for the hang ensure that
+             RxIntDelay is set to 0.
 
 Speed (adapters using copper connections only)
 Valid Settings: 0, 10, 100, 1000
@@ -228,16 +236,6 @@ Additional Configurations
 
 Known Issues
 ============
-
-  Inconsistent Driver Behavior Under Heavy Traffic Loads
-  ------------------------------------------------------
-
-  Adapters based on the Intel 82543 and 82544 LAN controllers may hang (stop
-  transmitting) under certain network conditions. If this occurs a message
-  is logged in the system event log. In addition, the controller is
-  automatically reset, restoring the network connection. To eliminate the
-  potential for the hang change the RxIntDelay parameter to zero. For details
-  on the RxIntDelay parameter see the Command Line Parameters section.
 
   Jumbo Frames System Requirement
   -------------------------------

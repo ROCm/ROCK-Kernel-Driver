@@ -138,8 +138,8 @@ static void unhandled_fault(unsigned long address, struct task_struct *tsk,
                      struct pt_regs *regs)
 {
 	if((unsigned long) address < PAGE_SIZE) {
-		printk(KERN_ALERT "Unable to handle kernel NULL "
-		       "pointer dereference");
+		printk(KERN_ALERT
+		    "Unable to handle kernel NULL pointer dereference\n");
 	} else {
 		printk(KERN_ALERT "Unable to handle kernel paging request "
 		       "at virtual address %08lx\n", address);
@@ -401,7 +401,7 @@ asmlinkage void do_sun4c_fault(struct pt_regs *regs, int text_fault, int write,
 {
 	extern void sun4c_update_mmu_cache(struct vm_area_struct *,
 					   unsigned long,pte_t);
-	extern pte_t *sun4c_pte_offset(pmd_t *,unsigned long);
+	extern pte_t *sun4c_pte_offset_kernel(pmd_t *,unsigned long);
 	struct task_struct *tsk = current;
 	struct mm_struct *mm = tsk->mm;
 	pgd_t *pgdp;
@@ -421,7 +421,7 @@ asmlinkage void do_sun4c_fault(struct pt_regs *regs, int text_fault, int write,
 	}
 
 	pgdp = pgd_offset(mm, address);
-	ptep = sun4c_pte_offset((pmd_t *) pgdp, address);
+	ptep = sun4c_pte_offset_kernel((pmd_t *) pgdp, address);
 
 	if (pgd_val(*pgdp)) {
 	    if (write) {

@@ -57,10 +57,6 @@ CONFIG_SUN_JSFLASH
   If you say Y here, you will be able to boot from your JavaStation's
   Flash memory.
 
-CONFIG_SAB82532
-  This driver supports the serial ports on newer (PCI) Ultra systems.
-  Say Y if you want to be able to use your serial ports.
-
 CONFIG_SUN_VIDEOPIX
   Say Y here to support the Videopix Frame Grabber from Sun
   Microsystems, commonly found on SPARCstations.  This card, which is

@@ -712,18 +712,6 @@ static struct file_operations dabusb_fops =
 	.release =	dabusb_release,
 };
 
-static int dabusb_find_struct (void)
-{
-	int u;
-
-	for (u = 0; u < NRDABUSB; u++) {
-		pdabusb_t s = &dabusb[u];
-		if (!s->usbdev)
-			return u;
-	}
-	return -1;
-}
-
 /* --------------------------------------------------------------------- */
 static void *dabusb_probe (struct usb_device *usbdev, unsigned int ifnum,
 			   const struct usb_device_id *id)

@@ -351,7 +351,8 @@ struct usb_bus {
 	int bandwidth_int_reqs;		/* number of Interrupt requests */
 	int bandwidth_isoc_reqs;	/* number of Isoc. requests */
 
-	struct dentry *dentry;		/* usbfs dentry entry for the bus */
+	struct dentry *usbfs_dentry;	/* usbfs dentry entry for the bus */
+	struct dentry *usbdevfs_dentry;	/* usbdevfs dentry entry for the bus */
 
 	atomic_t refcnt;
 };
@@ -410,7 +411,8 @@ struct usb_device {
 	void *hcpriv;			/* Host Controller private data */
 	
 	struct list_head filelist;
-	struct dentry *dentry;		/* usbfs dentry entry for the device */
+	struct dentry *usbfs_dentry;	/* usbfs dentry entry for the device */
+	struct dentry *usbdevfs_dentry;	/* usbdevfs dentry entry for the device */
 
 	/*
 	 * Child devices - these can be either new devices

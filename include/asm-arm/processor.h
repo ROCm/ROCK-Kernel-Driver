@@ -59,7 +59,7 @@ extern void release_thread(struct task_struct *);
 
 unsigned long get_wchan(struct task_struct *p);
 
-#define cpu_relax()			do { } while (0)
+#define cpu_relax()			barrier()
 
 /*
  * Create a new kernel thread

@@ -66,77 +66,77 @@ static void dn_send_ptp_hello(struct net_device *dev);
 
 static struct dn_dev_parms dn_dev_list[] =  {
 {
-	type:		ARPHRD_ETHER, /* Ethernet */
-	mode:		DN_DEV_BCAST,
-	state:		DN_DEV_S_RU,
-	blksize:	1498,
-	t2:		1,
-	t3:		10,
-	name:		"ethernet",
-	ctl_name:	NET_DECNET_CONF_ETHER,
-	up:		dn_eth_up,
-	timer3:		dn_send_brd_hello,
+	.type =		ARPHRD_ETHER, /* Ethernet */
+	.mode =		DN_DEV_BCAST,
+	.state =	DN_DEV_S_RU,
+	.blksize =	1498,
+	.t2 =		1,
+	.t3 =		10,
+	.name =		"ethernet",
+	.ctl_name =	NET_DECNET_CONF_ETHER,
+	.up =		dn_eth_up,
+	.timer3 =	dn_send_brd_hello,
 },
 {
-	type:		ARPHRD_IPGRE, /* DECnet tunneled over GRE in IP */
-	mode:		DN_DEV_BCAST,
-	state:		DN_DEV_S_RU,
-	blksize:	1400,
-	t2:		1,
-	t3:		10,
-	name:		"ipgre",
-	ctl_name:	NET_DECNET_CONF_GRE,
-	timer3:		dn_send_brd_hello,
+	.type =		ARPHRD_IPGRE, /* DECnet tunneled over GRE in IP */
+	.mode =		DN_DEV_BCAST,
+	.state =	DN_DEV_S_RU,
+	.blksize =	1400,
+	.t2 =		1,
+	.t3 =		10,
+	.name =		"ipgre",
+	.ctl_name =	NET_DECNET_CONF_GRE,
+	.timer3 =	dn_send_brd_hello,
 },
 #if 0
 {
-	type:		ARPHRD_X25, /* Bog standard X.25 */
-	mode:		DN_DEV_UCAST,
-	state:		DN_DEV_S_DS,
-	blksize:	230,
-	t2:		1,
-	t3:		120,
-	name:		"x25",
-	ctl_name:	NET_DECNET_CONF_X25,
-	timer3:		dn_send_ptp_hello,
+	.type =		ARPHRD_X25, /* Bog standard X.25 */
+	.mode =		DN_DEV_UCAST,
+	.state =	DN_DEV_S_DS,
+	.blksize =	230,
+	.t2 =		1,
+	.t3 =		120,
+	.name =		"x25",
+	.ctl_name =	NET_DECNET_CONF_X25,
+	.timer3 =	dn_send_ptp_hello,
 },
 #endif
 #if 0
 {
-	type:		ARPHRD_PPP, /* DECnet over PPP */
-	mode:		DN_DEV_BCAST,
-	state:		DN_DEV_S_RU,
-	blksize:	230,
-	t2:		1,
-	t3:		10,
-	name:		"ppp",
-	ctl_name:	NET_DECNET_CONF_PPP,
-	timer3:		dn_send_brd_hello,
+	.type =		ARPHRD_PPP, /* DECnet over PPP */
+	.mode =		DN_DEV_BCAST,
+	.state =	DN_DEV_S_RU,
+	.blksize =	230,
+	.t2 =		1,
+	.t3 =		10,
+	.name =		"ppp",
+	.ctl_name =	NET_DECNET_CONF_PPP,
+	.timer3 =	dn_send_brd_hello,
 },
 #endif
 #if 0
 {
-	type:		ARPHRD_DDCMP, /* DECnet over DDCMP */
-	mode:		DN_DEV_UCAST,
-	state:		DN_DEV_S_DS,
-	blksize:	230,
-	t2:		1,
-	t3:		120,
-	name:		"ddcmp",
-	ctl_name:	NET_DECNET_CONF_DDCMP,
-	timer3:		dn_send_ptp_hello,
+	.type =		ARPHRD_DDCMP, /* DECnet over DDCMP */
+	.mode =		DN_DEV_UCAST,
+	.state =	DN_DEV_S_DS,
+	.blksize =	230,
+	.t2 =		1,
+	.t3 =		120,
+	.name =		"ddcmp",
+	.ctl_name =	NET_DECNET_CONF_DDCMP,
+	.timer3 =	dn_send_ptp_hello,
 },
 #endif
 {
-	type:		ARPHRD_LOOPBACK, /* Loopback interface - always last */
-	mode:		DN_DEV_BCAST,
-	state:		DN_DEV_S_RU,
-	blksize:	1498,
-	t2:		1,
-	t3:		10,
-	name:		"loopback",
-	ctl_name:	NET_DECNET_CONF_LOOPBACK,
-	timer3:		dn_send_brd_hello,
+	.type =		ARPHRD_LOOPBACK, /* Loopback interface - always last */
+	.mode =		DN_DEV_BCAST,
+	.state =	DN_DEV_S_RU,
+	.blksize =	1498,
+	.t2 =		1,
+	.t3 =		10,
+	.name =		"loopback",
+	.ctl_name =	NET_DECNET_CONF_LOOPBACK,
+	.timer3 =	dn_send_brd_hello,
 }
 };
 

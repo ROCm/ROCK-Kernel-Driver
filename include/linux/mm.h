@@ -103,8 +103,9 @@ struct vm_area_struct {
 #define VM_DONTCOPY	0x00020000      /* Do not copy this vma on fork */
 #define VM_DONTEXPAND	0x00040000	/* Cannot expand with mremap() */
 #define VM_RESERVED	0x00080000	/* Don't unmap it from swap_out */
+#define VM_ACCOUNT	0x00100000	/* Is a VM accounted object */
 
-#define VM_STACK_FLAGS	(0x00000100 | VM_DATA_DEFAULT_FLAGS)
+#define VM_STACK_FLAGS	(0x00000100 | VM_DATA_DEFAULT_FLAGS | VM_ACCOUNT)
 
 #define VM_READHINTMASK			(VM_SEQ_READ | VM_RAND_READ)
 #define VM_ClearReadHint(v)		(v)->vm_flags &= ~VM_READHINTMASK
@@ -149,12 +150,12 @@ struct pte_chain;
  * TODO: make this structure smaller, it could be as small as 32 bytes.
  */
 struct page {
+	unsigned long flags;		/* atomic flags, some possibly
+					   updated asynchronously */
+	atomic_t count;			/* Usage count, see below. */
 	struct list_head list;		/* ->mapping has some page lists. */
 	struct address_space *mapping;	/* The inode (or ...) we belong to. */
 	unsigned long index;		/* Our offset within mapping. */
-	atomic_t count;			/* Usage count, see below. */
-	unsigned long flags;		/* atomic flags, some possibly
-					   updated asynchronously */
 	struct list_head lru;		/* Pageout list, eg. active_list;
 					   protected by pagemap_lru_lock !! */
 	union {
@@ -327,11 +328,10 @@ static inline void set_page_zone(struct page *page, unsigned long zone_num)
 extern struct page *mem_map;
 
 extern void show_free_areas(void);
-extern void show_free_areas_node(pg_data_t *pgdat);
 
 extern int fail_writepage(struct page *);
 struct page * shmem_nopage(struct vm_area_struct * vma, unsigned long address, int unused);
-struct file *shmem_file_setup(char * name, loff_t size);
+struct file *shmem_file_setup(char * name, loff_t size, unsigned long flags);
 extern void shmem_lock(struct file * file, int lock);
 extern int shmem_zero_setup(struct vm_area_struct *);
 
@@ -400,8 +400,6 @@ extern void swapin_readahead(swp_entry_t);
 
 extern int can_share_swap_page(struct page *);
 extern int remove_exclusive_swap_page(struct page *);
-
-extern void __free_pte(pte_t);
 
 /* mmap.c */
 extern void lock_vma_mappings(struct vm_area_struct *);
@@ -472,31 +470,8 @@ void page_cache_readahead(struct file *file, unsigned long offset);
 void page_cache_readaround(struct file *file, unsigned long offset);
 void handle_ra_miss(struct file *file);
 
-/* vma is the first one with  address < vma->vm_end,
- * and even  address < vma->vm_start. Have to extend vma. */
-static inline int expand_stack(struct vm_area_struct * vma, unsigned long address)
-{
-	unsigned long grow;
-
-	/*
-	 * vma->vm_start/vm_end cannot change under us because the caller is required
-	 * to hold the mmap_sem in write mode. We need to get the spinlock only
-	 * before relocating the vma range ourself.
-	 */
-	address &= PAGE_MASK;
-	grow = (vma->vm_start - address) >> PAGE_SHIFT;
-	if (vma->vm_end - address > current->rlim[RLIMIT_STACK].rlim_cur ||
-	    ((vma->vm_mm->total_vm + grow) << PAGE_SHIFT) > current->rlim[RLIMIT_AS].rlim_cur)
-		return -ENOMEM;
-	spin_lock(&vma->vm_mm->page_table_lock);
-	vma->vm_start = address;
-	vma->vm_pgoff -= grow;
-	vma->vm_mm->total_vm += grow;
-	if (vma->vm_flags & VM_LOCKED)
-		vma->vm_mm->locked_vm += grow;
-	spin_unlock(&vma->vm_mm->page_table_lock);
-	return 0;
-}
+/* Do stack extension */
+extern int expand_stack(struct vm_area_struct * vma, unsigned long address);
 
 /* Look up the first VMA which satisfies  addr < vm_end,  NULL if none. */
 extern struct vm_area_struct * find_vma(struct mm_struct * mm, unsigned long addr);
