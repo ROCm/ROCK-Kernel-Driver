@@ -471,6 +471,28 @@ static const lookup_t error_table[] = {
 };
 #define ERROR_COUNT	(sizeof(error_table)/sizeof(lookup_t))
 
+/**
+ *	apm_error	-	display an APM error
+ *	@str: information string
+ *	@err: APM BIOS return code
+ *
+ *	Write a meaningful log entry to the kernel log in the event of
+ *	an APM error.
+ */
+ 
+static void apm_error(char *str, int err)
+{
+	int	i;
+
+	for (i = 0; i < ERROR_COUNT; i++)
+		if (error_table[i].key == err) break;
+	if (i < ERROR_COUNT)
+		printk(KERN_NOTICE "apm: %s: %s\n", str, error_table[i].msg);
+	else
+		printk(KERN_NOTICE "apm: %s: unknown error code %#2.2x\n",
+			str, err);
+}
+
 /*
  * These are the actual BIOS calls.  Depending on APM_ZERO_SEGS and
  * apm_info.allow_ints, we are being really paranoid here!  Not only
@@ -1033,28 +1055,6 @@ static int apm_engage_power_management(u_short device, int enable)
 			apm_info.bios.flags |= APM_BIOS_DISENGAGED;
 	}
 	return APM_SUCCESS;
-}
-
-/**
- *	apm_error	-	display an APM error
- *	@str: information string
- *	@err: APM BIOS return code
- *
- *	Write a meaningful log entry to the kernel log in the event of
- *	an APM error.
- */
- 
-static void apm_error(char *str, int err)
-{
-	int	i;
-
-	for (i = 0; i < ERROR_COUNT; i++)
-		if (error_table[i].key == err) break;
-	if (i < ERROR_COUNT)
-		printk(KERN_NOTICE "apm: %s: %s\n", str, error_table[i].msg);
-	else
-		printk(KERN_NOTICE "apm: %s: unknown error code %#2.2x\n",
-			str, err);
 }
 
 #if defined(CONFIG_APM_DISPLAY_BLANK) && defined(CONFIG_VT)
