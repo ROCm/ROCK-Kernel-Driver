@@ -1155,89 +1155,54 @@ typhoon_ethtool_sset(struct typhoon *tp, struct ethtool_cmd *cmd)
 	return 0;
 }
 
-static inline int
-typhoon_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
+static void typhoon_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
 {
 	struct typhoon *tp = netdev_priv(dev);
-	u32 ethcmd;
-
-	if(copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
-		return -EFAULT;
-
-	switch (ethcmd) {
-	case ETHTOOL_GDRVINFO: {
-			struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
-
-			typhoon_ethtool_gdrvinfo(tp, &info);
-			if(copy_to_user(useraddr, &info, sizeof(info)))
-				return -EFAULT;
-			return 0;
-		}
-	case ETHTOOL_GSET: {
-			struct ethtool_cmd cmd = { ETHTOOL_GSET };
-
-			typhoon_ethtool_gset(tp, &cmd);
-			if(copy_to_user(useraddr, &cmd, sizeof(cmd)))
-				return -EFAULT;
-			return 0;
-		}
-	case ETHTOOL_SSET: {
-			struct ethtool_cmd cmd;
-			if(copy_from_user(&cmd, useraddr, sizeof(cmd)))
-				return -EFAULT;
-
-			return typhoon_ethtool_sset(tp, &cmd);
-		}
-	case ETHTOOL_GLINK:{
-			struct ethtool_value edata = { ETHTOOL_GLINK };
-
-			edata.data = netif_carrier_ok(dev) ? 1 : 0;
-			if(copy_to_user(useraddr, &edata, sizeof(edata)))
-				return -EFAULT;
-			return 0;
-		}
-	case ETHTOOL_GWOL: {
-			struct ethtool_wolinfo wol = { ETHTOOL_GWOL };
-
-			if(tp->wol_events & TYPHOON_WAKE_LINK_EVENT)
-				wol.wolopts |= WAKE_PHY;
-			if(tp->wol_events & TYPHOON_WAKE_MAGIC_PKT)
-				wol.wolopts |= WAKE_MAGIC;
-			if(copy_to_user(useraddr, &wol, sizeof(wol)))
-				return -EFAULT;
-			return 0;
-	}
-	case ETHTOOL_SWOL: {
-			struct ethtool_wolinfo wol;
-
-			if(copy_from_user(&wol, useraddr, sizeof(wol)))
-				return -EFAULT;
-			tp->wol_events = 0;
-			if(wol.wolopts & WAKE_PHY)
-				tp->wol_events |= TYPHOON_WAKE_LINK_EVENT;
-			if(wol.wolopts & WAKE_MAGIC)
-				tp->wol_events |= TYPHOON_WAKE_MAGIC_PKT;
-			return 0;
-	}
-	default:
-		break;
-	}
-
-	return -EOPNOTSUPP;
+	typhoon_ethtool_gdrvinfo(tp, info);
 }
 
-static int
-typhoon_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
+static int typhoon_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 {
-	switch (cmd) {
-	case SIOCETHTOOL:
-		return typhoon_ethtool_ioctl(dev, ifr->ifr_data);
-	default:
-		break;
-	}
-
-	return -EOPNOTSUPP;
+	struct typhoon *tp = netdev_priv(dev);
+	typhoon_ethtool_gset(tp, cmd);
+	return 0;
 }
+
+static int typhoon_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+{
+	struct typhoon *tp = netdev_priv(dev);
+	typhoon_ethtool_sset(tp, cmd);
+	return 0;
+}
+
+static void typhoon_get_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
+{
+	struct typhoon *tp = netdev_priv(dev);
+	if (tp->wol_events & TYPHOON_WAKE_LINK_EVENT)
+		wol->wolopts |= WAKE_PHY;
+	if (tp->wol_events & TYPHOON_WAKE_MAGIC_PKT)
+		wol->wolopts |= WAKE_MAGIC;
+}
+
+static int typhoon_set_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
+{
+	struct typhoon *tp = netdev_priv(dev);
+	tp->wol_events = 0;
+	if (wol->wolopts & WAKE_PHY)
+		tp->wol_events |= TYPHOON_WAKE_LINK_EVENT;
+	if (wol->wolopts & WAKE_MAGIC)
+		tp->wol_events |= TYPHOON_WAKE_MAGIC_PKT;
+	return 0;
+}
+
+static struct ethtool_ops ops = {
+	.get_drvinfo = typhoon_get_drvinfo,
+	.get_settings = typhoon_get_settings,
+	.set_settings = typhoon_set_settings,
+	.get_link = ethtool_op_get_link,
+	.get_wol = typhoon_get_wol,
+	.set_wol = typhoon_set_wol,
+};
 
 static int
 typhoon_wait_interrupt(unsigned long ioaddr)
@@ -2464,9 +2429,9 @@ typhoon_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	dev->watchdog_timeo	= TX_TIMEOUT;
 	dev->get_stats		= typhoon_get_stats;
 	dev->set_mac_address	= typhoon_set_mac_address;
-	dev->do_ioctl		= typhoon_ioctl;
 	dev->vlan_rx_register	= typhoon_vlan_rx_register;
 	dev->vlan_rx_kill_vid	= typhoon_vlan_rx_kill_vid;
+	SET_ETHTOOL_OPS(dev, &ops);
 
 	/* We can handle scatter gather, up to 16 entries, and
 	 * we can do IP checksumming (only version 4, doh...)
