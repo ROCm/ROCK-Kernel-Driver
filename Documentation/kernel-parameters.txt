@@ -713,7 +713,6 @@ running once the system is up.
 					numbers ourselves, overriding
 					whatever the firmware may have
 					done.
-
 		usepirqmask		[IA-32] Honor the possible IRQ mask
 					stored in the BIOS $PIR table. This is
 					needed on some systems with broken
@@ -721,6 +720,7 @@ running once the system is up.
 					and Omnibook XE3 notebooks. This will
 					have no effect if ACPI IRQ routing is
 					enabled.
+		noacpi			[IA-32] Do not use ACPI for IRQ routing.
 
 	pcmv=		[HW,PCMCIA] BadgePAD 4
 
