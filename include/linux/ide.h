@@ -886,6 +886,8 @@ typedef struct hwif_s {
 	
 	struct pnp_dev  *pnp_dev;	/* for PnP devices */
 
+	ide_startstop_t (*rw_disk)(ide_drive_t *, struct request *, sector_t);
+
 #if 0
 	ide_hwif_ops_t	*hwifops;
 #else
@@ -1534,6 +1536,8 @@ extern int ide_config_drive_speed(ide_drive_t *, u8);
 extern u8 eighty_ninty_three (ide_drive_t *);
 extern int set_transfer(ide_drive_t *, ide_task_t *);
 extern int taskfile_lib_get_identify(ide_drive_t *drive, u8 *);
+
+ide_startstop_t __ide_do_rw_disk(ide_drive_t *drive, struct request *rq, sector_t block);
 
 /*
  * ide_system_bus_speed() returns what we think is the system VESA/PCI

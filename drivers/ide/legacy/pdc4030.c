@@ -94,6 +94,8 @@
 
 #include "pdc4030.h"
 
+static ide_startstop_t promise_rw_disk (ide_drive_t *drive, struct request *rq, unsigned long block);
+
 /*
  * promise_selectproc() is invoked by ide.c
  * in preparation for access to the specified drive.
@@ -230,6 +232,10 @@ int __init setup_pdc4030(ide_hwif_t *hwif)
 	hwif->serialized = hwif2->serialized = 1;
 	/* DC4030 hosted drives need their own identify... */
 	hwif->identify = hwif2->identify = &pdc4030_identify;
+
+	/* Override the normal ide disk read/write. */
+	hwif->rw_disk = promise_rw_disk;
+	hwif2->rw_disk = promise_rw_disk;
 
 	/* Shift the remaining interfaces up by one */
 	for (i=MAX_HWIFS-1 ; i > hwif->index+1 ; i--) {
@@ -803,7 +809,7 @@ ide_startstop_t do_pdc4030_io (ide_drive_t *drive, ide_task_t *task)
 	}
 }
 
-ide_startstop_t promise_rw_disk (ide_drive_t *drive, struct request *rq, unsigned long block)
+static ide_startstop_t promise_rw_disk (ide_drive_t *drive, struct request *rq, unsigned long block)
 {
 	/* The four drives on the two logical (one physical) interfaces
 	   are distinguished by writing the drive number (0-3) to the
