@@ -248,7 +248,7 @@ static struct kioctx *ioctx_alloc(unsigned nr_events)
 	write_unlock(&mm->ioctx_list_lock);
 
 	dprintk("aio: allocated ioctx %p[%ld]: mm=%p mask=0x%x\n",
-		ctx, ctx->user_id, current->mm, ctx->ring_info.ring->nr);
+		ctx, ctx->user_id, current->mm, ctx->ring_info.nr);
 	return ctx;
 
 out_cleanup:
@@ -376,7 +376,7 @@ void __put_ioctx(struct kioctx *ctx)
 /* aio_get_req
  *	Allocate a slot for an aio request.  Increments the users count
  * of the kioctx so that the kioctx stays around until all requests are
- * complete.  Returns -EAGAIN if no requests are free.
+ * complete.  Returns NULL if no requests are free.
  */
 static struct kiocb *FASTCALL(__aio_get_req(struct kioctx *ctx));
 static struct kiocb *__aio_get_req(struct kioctx *ctx)
@@ -409,9 +409,9 @@ static struct kiocb *__aio_get_req(struct kioctx *ctx)
 		req->ki_user_obj = NULL;
 		req->ki_ctx = ctx;
 		req->ki_users = 1;
+		okay = 1;
 	} else {
 		kmem_cache_free(kiocb_cachep, req);
-		okay = 1;
 	}
 	kunmap_atomic(ring, KM_USER0);
 	spin_unlock_irq(&ctx->ctx_lock);
