@@ -1,52 +1,68 @@
 #include <linux/pci.h>
 #include <linux/module.h>
-#include <linux/kmod.h>		/* for hotplug_path */
+#include "pci.h"
 
-#ifndef FALSE
-#define FALSE	(0)
-#define TRUE	(!FALSE)
-#endif
 
 #ifdef CONFIG_HOTPLUG
-static void run_sbin_hotplug(struct pci_dev *pdev, int insert)
+int pci_hotplug (struct device *dev, char **envp, int num_envp,
+		 char *buffer, int buffer_size)
 {
-	int i;
-	char *argv[3], *envp[8];
-	char id[20], sub_id[24], bus_id[24], class_id[20];
+	struct pci_dev *pdev;
+	char *scratch;
+	int i = 0;
+	int length = 0;
 
-	if (!hotplug_path[0])
-		return;
+	if (!dev)
+		return -ENODEV;
 
-	sprintf(class_id, "PCI_CLASS=%04X", pdev->class);
-	sprintf(id, "PCI_ID=%04X:%04X", pdev->vendor, pdev->device);
-	sprintf(sub_id, "PCI_SUBSYS_ID=%04X:%04X", pdev->subsystem_vendor, pdev->subsystem_device);
-	sprintf(bus_id, "PCI_SLOT_NAME=%s", pdev->slot_name);
+	pdev = to_pci_dev(dev);
+	if (!pdev)
+		return -ENODEV;
 
-	i = 0;
-	argv[i++] = hotplug_path;
-	argv[i++] = "pci";
-	argv[i] = 0;
+	scratch = buffer;
 
-	i = 0;
-	/* minimal command environment */
-	envp[i++] = "HOME=/";
-	envp[i++] = "PATH=/sbin:/bin:/usr/sbin:/usr/bin";
-	
-	/* other stuff we want to pass to /sbin/hotplug */
-	envp[i++] = class_id;
-	envp[i++] = id;
-	envp[i++] = sub_id;
-	envp[i++] = bus_id;
-	if (insert)
-		envp[i++] = "ACTION=add";
-	else
-		envp[i++] = "ACTION=remove";
+	/* stuff we want to pass to /sbin/hotplug */
+	envp[i++] = scratch;
+	length += snprintf (scratch, buffer_size - length, "PCI_CLASS=%04X",
+			    pdev->class);
+	if ((buffer_size - length <= 0) || (i >= num_envp))
+		return -ENOMEM;
+	++length;
+	scratch += length;
+
+	envp[i++] = scratch;
+	length += snprintf (scratch, buffer_size - length, "PCI_ID=%04X:%04X",
+			    pdev->vendor, pdev->device);
+	if ((buffer_size - length <= 0) || (i >= num_envp))
+		return -ENOMEM;
+	++length;
+	scratch += length;
+
+	envp[i++] = scratch;
+	length += snprintf (scratch, buffer_size - length,
+			    "PCI_SUBSYS_ID=%04X:%04X", pdev->subsystem_vendor,
+			    pdev->subsystem_device);
+	if ((buffer_size - length <= 0) || (i >= num_envp))
+		return -ENOMEM;
+	++length;
+	scratch += length;
+
+	envp[i++] = scratch;
+	length += snprintf (scratch, buffer_size - length, "PCI_SLOT_NAME=%s",
+			    pdev->slot_name);
+	if ((buffer_size - length <= 0) || (i >= num_envp))
+		return -ENOMEM;
+
 	envp[i] = 0;
 
-	call_usermodehelper (argv [0], argv, envp);
+	return 0;
 }
 #else
-static void run_sbin_hotplug(struct pci_dev *pdev, int insert) { }
+int pci_hotplug (struct device *dev, char **envp, int num_envp,
+		 char *buffer, int buffer_size)
+{
+	return -ENODEV;
+}
 #endif
 
 /**
@@ -66,8 +82,6 @@ pci_insert_device(struct pci_dev *dev, struct pci_bus *bus)
 #ifdef CONFIG_PROC_FS
 	pci_proc_attach_device(dev);
 #endif
-	/* notify userspace of new hotplug device */
-	run_sbin_hotplug(dev, TRUE);
 }
 
 static void
@@ -99,8 +113,6 @@ pci_remove_device(struct pci_dev *dev)
 #ifdef CONFIG_PROC_FS
 	pci_proc_detach_device(dev);
 #endif
-	/* notify userspace of hotplug device removal */
-	run_sbin_hotplug(dev, FALSE);
 }
 
 #ifdef CONFIG_HOTPLUG
