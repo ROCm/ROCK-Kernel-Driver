@@ -1022,28 +1022,26 @@ static int irda_connect(struct socket *sock, struct sockaddr *uaddr,
 	/* Now the loop */
 	if (sk->state != TCP_ESTABLISHED && (flags & O_NONBLOCK))
 		return -EINPROGRESS;
-		
-	cli();	/* To avoid races on the sleep */
-	
-	/* A Connect Ack with Choke or timeout or failed routing will go to
-	 * closed.  */
+
+	/* Here, there is a race condition : the state may change between
+	 * our test and the sleep, via irda_connect_confirm().
+	 * The way to workaround that is to sleep with a timeout, so that
+	 * we don't sleep forever and check the state when waking up.
+	 * 50ms is plenty good enough, because the LAP is already connected.
+	 * Jean II */
 	while (sk->state == TCP_SYN_SENT) {
-		interruptible_sleep_on(sk->sleep);
+		interruptible_sleep_on_timeout(sk->sleep, HZ/20);
 		if (signal_pending(current)) {
-			sti();
 			return -ERESTARTSYS;
 		}
 	}
 	
 	if (sk->state != TCP_ESTABLISHED) {
-		sti();
 		sock->state = SS_UNCONNECTED;
 		return sock_error(sk);	/* Always set at this point */
 	}
 	
 	sock->state = SS_CONNECTED;
-	
-	sti();
 	
 	/* At this point, IrLMP has assigned our source address */
 	self->saddr = irttp_get_saddr(self->tsap);
