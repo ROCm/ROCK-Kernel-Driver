@@ -21,11 +21,9 @@ config ARCNET
 	  from <http://www.tldp.org/docs.html#howto>(even though ARCnet
 	  is not really Ethernet).
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called arcnet.  If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt> as well
-	  as <file:Documentation/networking/net-modules.txt>.
+	  To compile this driver as a module, choose M here and read
+	  <file:Documentation/networking/net-modules.txt>.  The module will
+	  be called arcnet.
 
 config ARCNET_1201
 	tristate "Enable standard ARCNet packet format (RFC 1201)"
@@ -69,11 +67,9 @@ config ARCNET_COM90xx
 	  have always used the old ARCnet driver without knowing what type of
 	  card you had, this is probably the one for you.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called com90xx.  If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt> as well
-	  as <file:Documentation/networking/net-modules.txt>.
+	  To compile this driver as a module, choose M here and read
+	  <file:Documentation/networking/net-modules.txt>.  The module will
+	  be called com90xx.
 
 config ARCNET_COM90xxIO
 	tristate "ARCnet COM90xx (IO mapped) chipset driver"
@@ -84,11 +80,9 @@ config ARCNET_COM90xxIO
 	  the normal driver. Only use it if your card doesn't support shared
 	  memory.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called com90io.  If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt> as well
-	  as <file:Documentation/networking/net-modules.txt>.
+	  To compile this driver as a module, choose M here and read
+	  <file:Documentation/networking/net-modules.txt>.  The module will
+	  be called com90io.
 
 config ARCNET_RIM_I
 	tristate "ARCnet COM90xx (RIM I) chipset driver"
@@ -99,11 +93,9 @@ config ARCNET_RIM_I
 	  driver is completely untested, so if you have one of these cards,
 	  please mail dwmw2@infradead.org, especially if it works!
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you
-	  want). The module will be called arc-rimi.  If you want to compile
-	  it as a module, say M here and read <file:Documentation/modules.txt>
-	  as  well as <file:Documentation/networking/net-modules.txt>.
+	  To compile this driver as a module, choose M here and read
+	  <file:Documentation/networking/net-modules.txt>.  The module will
+	  be called arc-rimi.
 
 config ARCNET_COM20020
 	tristate "ARCnet COM20020 chipset driver"
@@ -113,11 +105,9 @@ config ARCNET_COM20020
 	  things as promiscuous mode, so packet sniffing is possible, and
 	  extra diagnostic information.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called com20020.  If you want to compile it as
-	  a module, say M here and read <file:Documentation/modules.txt> as
-	  well as <file:Documentation/networking/net-modules.txt>.
+	  To compile this driver as a module, choose M here and read
+	  <file:Documentation/networking/net-modules.txt>.  The module will
+	  be called com20020.
 
 config ARCNET_COM20020_ISA
 	tristate "Support for COM20020 on ISA"
