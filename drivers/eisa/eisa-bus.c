@@ -83,8 +83,10 @@ static int eisa_bus_match (struct device *dev, struct device_driver *drv)
 		return 0;
 
 	while (strlen (eids->sig)) {
-		if (!strcmp (eids->sig, edev->id.sig))
+		if (!strcmp (eids->sig, edev->id.sig)) {
+			edev->id.driver_data = eids->driver_data;
 			return 1;
+		}
 
 		eids++;
 	}
